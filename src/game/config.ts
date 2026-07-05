@@ -1,0 +1,226 @@
+// 시뮬레이션 밸런스 값 모음 — 숫자 튜닝은 전부 여기서 한다.
+
+export const CONFIG = {
+  map: {
+    width: 44,
+    height: 44,
+  },
+
+  time: {
+    seasonDays: 12,           // 한 계절 길이(일)
+    yearDays: 48,             // 1년 = 4계절
+    // 하루당 실시간(ms). 밤낮 사이클을 느긋하게 볼 수 있도록 1배속을 8초/일로 늦췄다.
+    // (3배 ≈ 2.7초/일, 10배 ≈ 0.8초/일로 빨리감기)
+    msPerDay: { 1: 8000, 3: 2700, 10: 800 } as Record<number, number>,
+  },
+
+  start: {
+    residents: 12,
+    resources: {
+      food: 100, firewood: 45, wood: 30, stone: 12, iron: 4, tools: 10,
+      hide: 6, clothes: 12, herbs: 5, grain: 0, game: 0,
+      reputation: 50, defense: 0,
+    },
+    // 시작 직업 구성
+    jobs: {
+      woodcutter: 2, hunter: 2, farmer: 2, builder: 2,
+      hauler: 1, herbalist: 1, watchman: 1, idle: 1,
+    } as Record<string, number>,
+  },
+
+  needs: {
+    foodPerDay: 0.5,          // 1인당 하루 식량 소비
+    hungerGainFed: 40,        // 식사 시 포만도 회복
+    hungerLossUnfed: 30,      // 굶을 때 포만도 감소
+    firewoodPerPerson: 0.12,  // 1인당 기본 장작 소비 (계절/날씨 배율 적용)
+    clothesWearWinter: 0.02,  // 겨울철 1인당 옷 마모
+    warmthLossWinterBase: 13, // 겨울 기본 체온 손실
+    warmthRegenWarmSeason: 20,
+    heatOndol: 12,            // 장작이 충분할 때 온돌집 난방량
+    heatHut: 8,               // 초가집 난방량
+    heatHomeless: 3,          // 노숙 난방량
+    homelessLossMult: 1.7,
+    noClothesLossMult: 0.9,   // 옷 없는 비율만큼 추가 손실 (×이 값)
+  },
+
+  health: {
+    coldDamage: 5,        // 체온 25 미만
+    freezeDamage: 10,     // 체온 10 미만
+    hungryDamage: 4,      // 포만 25 미만
+    starveDamage: 8,      // 포만 0
+    sickDamage: 3,
+    sickDamageWithHerbs: 1,
+    naturalHeal: 2,
+    sickBaseChance: 0.002,
+    sickColdChance: 0.015,    // 체온 30 미만 추가
+    sickSummerChance: 0.006,  // 여름 질병 위험 소폭 증가
+    sickHungryChance: 0.01,
+    recoverChance: 0.10,
+    recoverChanceHerbs: 0.28,
+    herbsPerSickPerDay: 0.5,
+  },
+
+  production: {
+    woodPerDay: 1.3,
+    gamePerDay: 0.9,
+    herbsPerDay: 0.5,
+    toolsPerDay: 1.0,
+    ironMinePerDay: 0.8,
+    haulerWoodToFirewood: 2.5, // 운반꾼 1인 하루 목재 가공량
+    firewoodPerWood: 1.4,
+    haulerGamePerDay: 2,       // 사냥감 손질량
+    foodPerGame: 4,
+    hidePerGame: 1,
+    haulerGrainPerDay: 4,      // 곡물 도정량 (곡물 1 → 식량 1)
+    haulerStonePerDay: 0.4,    // 돌이 부족할 때 채석
+    stoneReserveTarget: 40,
+    stoneUrgentBelow: 15,      // 돌이 이보다 적으면 운반꾼이 채석을 우선한다
+    woodReserve: 25,           // 건축용으로 남겨둘 목재 (이 이상만 장작으로 팬다)
+    tanneryHidePerDay: 2,      // 가죽공방 하루 가죽 소비 (가죽 2 → 옷 1)
+    fieldGrainYield: 20,       // 밭 1개가 만작일 때 곡물 수확량
+    fertileBonus: 1.3,
+    lumberCampBonus: 1.4,
+    huntLodgeBonus: 1.5,
+    herbHutBonus: 1.6,
+    toolWearPerWorker: 0.015,  // 생산직 1인당 하루 도구 마모
+    skillGainPerDay: 0.012,
+    skillEffect: 0.5,          // 숙련 1.0일 때 생산 +50%
+  },
+
+  // 주민 에이전트 (이동/작업/운반)
+  agents: {
+    subticksPerDay: 8,        // 하루를 나누는 서브틱 수
+    moveSpeed: 2,             // 서브틱당 이동 타일 수
+    moveSpeedWinter: 1.5,     // 겨울 눈길
+    moveSpeedSnow: 1,         // 폭설/눈보라
+    shelterThreshold: 0.3,    // 실외작업 중단 기준 (날씨 효율이 이 밑이면 대피)
+    carryCap: { wood: 4, game: 2, herbs: 1.5, iron: 3, stone: 3, grain: 6 },
+    work: {                   // 작업지에서 1회 채집에 드는 서브틱
+      chop: 3, hunt: 5, herb: 3, mine: 4, quarry: 3,
+      harvestPerSubtick: 8,   // 가을 수확: 서브틱당 깎는 성장도
+      growPerSubtick: 1.4,    // 봄여름 농사: 서브틱당 올리는 성장도
+      buildPerSubtick: 0.2,   // 건축가 서브틱당 공정 (건축가-일 환산)
+    },
+    yields: {                 // 1회 채집으로 지는 짐
+      wood: 1.1, game: 0.75, herbs: 0.55, iron: 1.2, mineStone: 0.4, stone: 1.1,
+    },
+    forestDepleteChance: 0.12, // 벌목 1회당 숲이 평지가 될 확률
+    forestRegrowChance: 0.0015, // 봄여름, 숲 인접 평지가 숲이 될 하루 확률
+  },
+
+  seasons: {
+    firewoodMult: { spring: 1, summer: 0.6, autumn: 1.5, winter: 3 },
+    woodMult:     { spring: 1, summer: 1.3, autumn: 1.1, winter: 0.7 },
+    gameMult:     { spring: 1.25, summer: 1, autumn: 1.1, winter: 0.5 },
+  },
+
+  weather: {
+    // 계절별 날씨 확률 (합 1)
+    table: {
+      spring: { clear: 0.5, rain: 0.25, frost: 0.1, thawFlood: 0.1, heavySnow: 0.05, blizzard: 0, coldSnap: 0 },
+      summer: { clear: 0.65, rain: 0.3, frost: 0.05, thawFlood: 0, heavySnow: 0, blizzard: 0, coldSnap: 0 },
+      autumn: { clear: 0.5, rain: 0.2, frost: 0.2, heavySnow: 0.1, blizzard: 0, coldSnap: 0, thawFlood: 0 },
+      winter: { clear: 0.35, frost: 0.15, heavySnow: 0.2, blizzard: 0.15, coldSnap: 0.15, rain: 0, thawFlood: 0 },
+    } as Record<string, Record<string, number>>,
+    outdoorMult: { clear: 1, rain: 0.8, frost: 0.9, heavySnow: 0.5, blizzard: 0.15, coldSnap: 0.6, thawFlood: 0.5 },
+    firewoodMult: { clear: 1, rain: 1.1, frost: 1.2, heavySnow: 1.4, blizzard: 1.8, coldSnap: 1.7, thawFlood: 1 },
+    warmthLossMult: { clear: 1, rain: 1.05, frost: 1.2, heavySnow: 1.3, blizzard: 1.8, coldSnap: 1.7, thawFlood: 1 },
+  },
+
+  threat: {
+    basePerDay: 0.5,
+    coldSeasonExtra: 0.7,      // 가을/겨울 추가 증가
+    wealthExtra: 0.25,         // 식량+가죽 비축이 많을 때
+    wealthThreshold: 160,
+    perWatchman: 0.08,         // 파수꾼 1인당 감소
+    defenseFactor: 500,        // 방어도/이 값 만큼 매일 감소
+    lowRepExtra: 0.2,          // 명성 35 미만
+    tradeRefusedExtra: 0.6,    // 교역 거절 여파 기간 동안
+    raidThreshold: 60,
+    raidChanceDiv: 180,        // (위협-60)/이 값 = 일일 습격 확률
+    afterRaidThreat: 20,
+    raidCooldownDays: 10,
+    earlyWarnChance: 0.65,     // 봉수대/망루 보유 시 조기 경보 확률
+    earlyWarnLeadDays: 2,
+  },
+
+  raid: {
+    basePower: 22,
+    powerPerYear: 8,
+    powerRandom: 15,
+    wealthPowerDiv: 60,
+    watchmanDefense: 6,
+    militiaDefense: 12,
+    warnedDefenseMult: 1.25,
+    // 지도 위 습격 무리 이동
+    raiderSpeedWarned: 1.2,   // 경보된 습격: 천천히 접근 (대비 시간)
+    raiderSpeedSurprise: 2.0, // 기습: 빠르게 들이닥침
+    spotDistance: 12,         // 이 거리 안이면 경계병이 발견 로그를 띄움
+    arriveDistance: 2,        // 중심지에서 이 거리면 위기 이벤트 발생
+    siegeDefenseMult: 1.15,   // 목책이 무리를 막아섰을 때 방어 보정
+  },
+
+  trade: {
+    minIntervalDays: 14,
+    dailyChance: 0.07,
+  },
+
+  // 세력별 우호도 증감
+  relations: {
+    driftFactor: 0.01,     // 하루에 기본 성향 쪽으로 1%씩 수렴
+    tradeAccept: 4,
+    tradeDecline: -3,
+    tribute: 6,            // 공물을 바치면 그 세력과의 관계 개선
+    negotiateSuccess: 8,
+    negotiateFail: -5,
+    militiaWin: -6,        // 물리치면 원한이 남는다
+    militiaLoss: -2,
+    shelter: -1,
+    beacon: -2,
+    lowRelThreatBelow: 45, // 적대 세력 평균 관계가 이보다 낮으면 위협도 가산
+    lowRelThreatScale: 0.02,
+  },
+
+  immigration: {
+    dailyChance: 0.12,
+    minFoodPerPerson: 8,
+    minMorale: 45,
+    groupMin: 2,
+    groupMax: 5,
+  },
+
+  // 난이도별 보정 (메인 메뉴에서 선택)
+  difficulty: {
+    easy: {
+      name: '이주민', tag: '수월',
+      desc: '물자가 넉넉하고 국경이 비교적 조용합니다. 처음 오는 이에게.',
+      startRes: 1.5, threatGain: 0.7, raidPower: 0.8,
+    },
+    normal: {
+      name: '개척민', tag: '표준',
+      desc: '설계된 기본 난이도. 첫 겨울과 첫 습격이 당신을 시험합니다.',
+      startRes: 1, threatGain: 1, raidPower: 1,
+    },
+    hard: {
+      name: '변방 첨사', tag: '혹한',
+      desc: '물자가 빠듯하고 습격이 사납습니다. 국경의 겨울은 자비가 없습니다.',
+      startRes: 0.7, threatGain: 1.35, raidPower: 1.25,
+    },
+  },
+
+  victory: {
+    years: 5,
+    population: 40,
+    maxWinterDeathRate: 0.10,
+    defense: 100,
+    food: 100,
+    firewood: 100,
+  },
+
+  ui: {
+    logLimit: 120,
+    tileSize: 28, // 지도 칸 픽셀 크기 (렌더/히트판정 전부 이 값을 따른다). 지도는 드래그로 이동.
+  },
+} as const;
+
+export type Config = typeof CONFIG;
