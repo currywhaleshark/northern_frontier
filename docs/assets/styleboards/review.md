@@ -33,6 +33,24 @@ Best if the project should emphasize harsh northern climate, defense, and winter
 - Characters read as roles at small scale.
 - The direction can work with the existing square-tile camera and `SpriteAPI` renderer.
 
-## Review Checkpoint
+## Review Result
 
-After the boards are generated, choose A, B, C, or a hybrid direction such as "A palette with C silhouettes." The selected direction will become a separate style-guide task after review.
+Selected direction: **B. Folk Warm**.
+
+Carry forward:
+
+- Warmer Korean folk-painting influenced color mood.
+- Hand-crafted late-Joseon frontier feeling.
+- Practical settlement materials: timber, earth, straw thatch, dark roof accents, palisade wood, and beacon structures.
+- Four-season terrain treatment with distinct spring, summer, autumn, and winter palettes.
+
+Borrow selectively from C:
+
+- Stronger silhouette separation where B becomes too decorative or soft.
+- Winter readability for snowfield, frozen river, and snow-loaded forest.
+
+Avoid:
+
+- Decorative clutter that makes 28px tiles unreadable.
+- Generic fantasy buildings, European castle forms, or heroic RPG character proportions.
+- Large concept-art compositions that cannot be decomposed into tiles and sprites.
