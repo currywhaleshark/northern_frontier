@@ -53,6 +53,7 @@ export interface BuildingDrawParams {
   built: boolean;
   progress01: number; // 0~1 공정률
   ghost: boolean;     // 배치 미리보기
+  season: Season;
   growth01?: number;  // 밭 전용: 작물 성장 0~1
   x: number;
   y: number;

@@ -8,6 +8,7 @@
 import { CONFIG } from '../game/config';
 import { BUILDING_DEFS, canAfford, canPlaceOn } from '../game/buildings';
 import { getSeason } from '../game/seasons';
+import { findForestHabitatIconAtTile, findForestHabitats, type ForestHabitat } from '../game/habitats';
 import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
 import type { BuildingTypeId, GameState, Resident, Terrain } from '../game/types';
 
@@ -122,6 +123,46 @@ function drawFootprints(ctx: CanvasRenderingContext2D, trail: { x: number; y: nu
   }
 }
 
+function drawHabitatRange(ctx: CanvasRenderingContext2D, habitat: ForestHabitat): void {
+  const cx = (habitat.x + 0.5) * TILE;
+  const cy = (habitat.y + 0.5) * TILE;
+  ctx.save();
+  ctx.fillStyle = 'rgba(217,164,65,0.13)';
+  ctx.strokeStyle = 'rgba(217,164,65,0.8)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([7, 5]);
+  ctx.beginPath();
+  ctx.arc(cx, cy, habitat.radius * TILE, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawHabitatIcon(ctx: CanvasRenderingContext2D, habitat: ForestHabitat): void {
+  const cx = (habitat.x + 0.5) * TILE;
+  const cy = (habitat.y + 0.5) * TILE;
+  const r = TILE * 0.36;
+  ctx.save();
+  ctx.fillStyle = 'rgba(32,24,14,0.58)';
+  ctx.strokeStyle = 'rgba(245,214,146,0.88)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#f3d79c';
+  const s = TILE / 28;
+  for (const [ox, oy, rr] of [[-5, -4, 2.6], [0, -6, 2.8], [5, -4, 2.6], [-3, 1, 3.2], [3, 1, 3.2]] as const) {
+    ctx.beginPath();
+    ctx.arc(cx + ox * s, cy + oy * s, rr * s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 5 * s, 5.2 * s, 3.7 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: SceneOptions): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -131,8 +172,12 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
 
   // 1) 지형
   const layer = drawTerrainLayer(state, canvas.width, canvas.height, sprites);
+  const habitats = findForestHabitats(state.map);
+  const hoveredHabitat = o.hover ? findForestHabitatIconAtTile(habitats, o.hover.x, o.hover.y) : null;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(layer, 0, 0);
+  if (hoveredHabitat) drawHabitatRange(ctx, hoveredHabitat);
+  for (const habitat of habitats) drawHabitatIcon(ctx, habitat);
 
   // 2) 건물 — 지붕이 위 타일에 겹치므로 y 순서로 그린다
   const season = getSeason(state.day);
@@ -142,6 +187,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     const def = BUILDING_DEFS[b.type];
     sprites.drawBuilding(ctx, {
       type: b.type, built: b.built, ghost: false,
+      season,
       progress01: def.buildDays > 0 ? b.progress / def.buildDays : 1,
       growth01: b.type === 'field' ? b.fieldGrowth / 100 : undefined,
       x: b.x * TILE, y: b.y * TILE, size: TILE,
@@ -244,6 +290,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     ctx.fillRect(o.hover.x * TILE, o.hover.y * TILE, TILE, TILE);
     sprites.drawBuilding(ctx, {
       type: o.placingType, built: true, ghost: true, progress01: 1,
+      season,
       x: o.hover.x * TILE, y: o.hover.y * TILE, size: TILE,
     });
   }

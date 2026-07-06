@@ -8,6 +8,24 @@ import { placeholderSprites, type BuildingDrawParams, type SpriteAPI } from './s
 import { CONFIG } from '../game/config';
 import { JOB_COLORS } from '../game/constants';
 import type { BuildingTypeId, JobId, Season } from '../game/types';
+import {
+  historicalTerrainSampleOffsetFromHash,
+  historicalTerrainSourceRect,
+  historicalTerrainVariantFromHash,
+} from './historicalTerrain';
+import { riverSourceRect } from './riverAutotile';
+import {
+  GENERATED_TERRAIN_OBJECT_SHEET,
+  fertileGroundWash,
+  generatedTerrainObjectSourceRect,
+  terrainObjectFor,
+  type GeneratedTerrainObject,
+} from './generatedTerrainObjects';
+import { terrainShowsStandaloneGameTrail } from './terrainVisuals';
+import {
+  GENERATED_BUILDING_SHEET,
+  generatedBuildingSourceRect,
+} from './generatedBuildingAssets';
 
 const PITCH = 17;
 const T = 16;
@@ -19,6 +37,10 @@ const CF = CHAR / 16; // 소품 스케일 계수
 // ── 이미지 로딩 ──
 let sheet: HTMLImageElement | null = null;
 let chars: HTMLImageElement | null = null;
+let riverSheet: HTMLImageElement | null = null;
+let historicalTerrainSheet: HTMLImageElement | null = null;
+let terrainObjectSheet: HTMLImageElement | null = null;
+let buildingSheet: HTMLImageElement | null = null;
 let loaded = 0;
 let started = false;
 
@@ -31,11 +53,23 @@ function ensureLoaded(): void {
   chars = new Image();
   chars.onload = () => { loaded++; };
   chars.src = '/assets/roguelikeChar_transparent.png';
+  riverSheet = new Image();
+  riverSheet.onload = () => { loaded++; };
+  riverSheet.src = '/assets/river-mask-autotile-28px-sheet.png';
+  historicalTerrainSheet = new Image();
+  historicalTerrainSheet.onload = () => { loaded++; };
+  historicalTerrainSheet.src = '/assets/folk-warm-terrain-v3-28px-sheet.png';
+  terrainObjectSheet = new Image();
+  terrainObjectSheet.onload = () => { loaded++; };
+  terrainObjectSheet.src = GENERATED_TERRAIN_OBJECT_SHEET.src;
+  buildingSheet = new Image();
+  buildingSheet.onload = () => { loaded++; };
+  buildingSheet.src = GENERATED_BUILDING_SHEET.src;
 }
 
 export function atlasReady(): boolean {
   ensureLoaded();
-  return loaded >= 2;
+  return loaded >= 6;
 }
 
 // 아틀라스가 준비되면 아틀라스, 아니면 임시 그래픽
@@ -49,6 +83,29 @@ type CR = [number, number]; // [col, row]
 function blit(ctx: CanvasRenderingContext2D, img: HTMLImageElement, [c, r]: CR,
   x: number, y: number, size: number): void {
   ctx.drawImage(img, c * PITCH, r * PITCH, T, T, x, y, size, size);
+}
+
+function blitTerrainObject(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  kind: GeneratedTerrainObject,
+  x: number,
+  y: number,
+  size: number,
+): void {
+  const rect = generatedTerrainObjectSourceRect(kind);
+  ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, x, y, size, size);
+}
+
+function blitGeneratedBuilding(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  p: BuildingDrawParams,
+): void {
+  const rect = generatedBuildingSourceRect(p.type, p.season);
+  const scale = p.size / GENERATED_BUILDING_SHEET.tileSize;
+  const destHeight = GENERATED_BUILDING_SHEET.spriteHeight * scale;
+  ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
 }
 
 // 결정적 의사난수 (타일 좌표 → 변형 선택)
@@ -202,7 +259,7 @@ function seasonWash(ctx: CanvasRenderingContext2D, season: Season, x: number, y:
 }
 
 export const atlasSprites: SpriteAPI = {
-  id: 'kenney-atlas',
+  id: 'kenney-atlas-river-mask-historical-ground-generated-objects-buildings-v1',
 
   drawTerrain(ctx, p) {
     if (!sheet) return;
@@ -211,6 +268,11 @@ export const atlasSprites: SpriteAPI = {
 
     // 강: 겨울엔 물 위에 얼음 워시 + 균열을 얹는다 (팩에 전용 얼음 타일이 없음)
     if (p.terrain === 'river') {
+      if (riverSheet) {
+        const rect = riverSourceRect(p.season, p.frozenRiver, p.banks);
+        ctx.drawImage(riverSheet, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y, p.size, p.size);
+        return;
+      }
       blit(ctx, sheet, h % 7 === 0 ? WATER_SPARKLE : WATER, p.x, p.y, p.size);
       // 뭍과 닿는 방향에 못(pond) 가장자리 타일의 띠를 잘라 붙여 물가를 만든다
       if (p.banks && !p.winter) {
@@ -229,37 +291,61 @@ export const atlasSprites: SpriteAPI = {
     }
 
     // 바닥 (겨울엔 크림색 지면으로 갈아 눈밭 느낌을 낸다)
-    let base: CR = GRASS;
-    if (p.winter) base = GROUND_PALE;
-    else if (p.terrain === 'fertile') base = GRASS_FERTILE;
-    else if (p.terrain === 'plain' || p.terrain === 'center' || p.terrain === 'hunting') {
-      if (p.season === 'spring' && h % 9 === 0) base = GRASS_FLOWER_WHITE;
-      else if (p.season === 'summer' && h % 11 === 0) base = GRASS_FLOWER_RED;
-    }
-    blit(ctx, sheet, base, p.x, p.y, p.size);
-
-    // 지형 오브젝트
-    if (p.terrain === 'forest') {
-      const pool = p.winter ? TREES_WINTER : p.season === 'autumn' ? TREES_AUTUMN : TREES_GREEN;
-      blit(ctx, sheet, pool[h % pool.length], p.x, p.y, p.size);
-    } else if (p.terrain === 'hunting') {
-      const pool = p.season === 'autumn' ? BUSHES_AUTUMN : BUSHES;
-      blit(ctx, sheet, pool[h % pool.length], p.x, p.y, p.size);
-    } else if (p.terrain === 'mountain') {
-      blit(ctx, sheet, h % 2 === 0 ? ROCK_GRAY : ROCK_GRAY2, p.x, p.y, p.size);
-    } else if (p.terrain === 'rock') {
-      blit(ctx, sheet, ROCK_BROWN, p.x, p.y, p.size);
-      if (p.hasIron) {
-        const s = Math.floor(p.size * 0.6);
-        blit(ctx, sheet, ORE_GOLD, p.x + p.size - s, p.y + p.size - s, s);
+    let drewHistoricalGround = false;
+    if (historicalTerrainSheet) {
+      const rect = historicalTerrainSourceRect(p.terrain, p.season);
+      if (rect) {
+        const variant = historicalTerrainVariantFromHash(h);
+        const sampleOffset = historicalTerrainSampleOffsetFromHash(h);
+        ctx.save();
+        ctx.translate(p.x + (variant.flipX ? p.size : 0), p.y + (variant.flipY ? p.size : 0));
+        ctx.scale(variant.flipX ? -1 : 1, variant.flipY ? -1 : 1);
+        ctx.drawImage(
+          historicalTerrainSheet,
+          rect.sx + sampleOffset.dx,
+          rect.sy + sampleOffset.dy,
+          rect.sw,
+          rect.sh,
+          0,
+          0,
+          p.size,
+          p.size,
+        );
+        ctx.restore();
+        drewHistoricalGround = true;
       }
     }
 
+    if (!drewHistoricalGround) {
+      let base: CR = GRASS;
+      if (p.winter) base = GROUND_PALE;
+      else if (p.terrain === 'fertile') base = GRASS_FERTILE;
+      else if (p.terrain === 'plain' || p.terrain === 'center' || p.terrain === 'hunting') {
+        if (p.season === 'spring' && h % 9 === 0) base = GRASS_FLOWER_WHITE;
+        else if (p.season === 'summer' && h % 11 === 0) base = GRASS_FLOWER_RED;
+      }
+      blit(ctx, sheet, base, p.x, p.y, p.size);
+    }
+
+    if (p.terrain === 'fertile') {
+      ctx.fillStyle = fertileGroundWash(p.season);
+      ctx.fillRect(p.x, p.y, p.size, p.size);
+    }
+
+    // 지형 오브젝트
+    let terrainObject = terrainObjectFor(p.terrain, p.season, p.hasIron ?? false);
+    if (terrainObject === 'lowRock' && h % 2 === 1) terrainObject = 'fieldstone';
+    if (terrainObject && terrainObjectSheet) {
+      blitTerrainObject(ctx, terrainObjectSheet, terrainObject, p.x, p.y, p.size);
+    }
+
     // 계절 색조 (겨울 눈덮임 / 가을 마름)
-    seasonWash(ctx, p.season, p.x, p.y, p.size);
+    if (!drewHistoricalGround) {
+      seasonWash(ctx, p.season, p.x, p.y, p.size);
+    }
 
     // 사냥터: 짐승 발자국을 워시 위에 그려 눈밭에서도 또렷하게 — 사냥터 식별 표식
-    if (p.terrain === 'hunting') {
+    if (terrainShowsStandaloneGameTrail(p.terrain)) {
       drawGameTrail(ctx, p.x, p.y, p.size, h);
     }
   },
@@ -270,6 +356,18 @@ export const atlasSprites: SpriteAPI = {
     const spr = BUILDING_SPRITES[p.type];
     const alpha = p.ghost ? 0.75 : p.built ? 1 : 0.55;
     ctx.globalAlpha = alpha;
+
+    if (buildingSheet) {
+      blitGeneratedBuilding(ctx, buildingSheet, p);
+      ctx.globalAlpha = 1;
+      if (!p.built && !p.ghost) {
+        ctx.fillStyle = '#10141a';
+        ctx.fillRect(p.x + 2, p.y + p.size - 4, p.size - 4, 3);
+        ctx.fillStyle = '#d9a441';
+        ctx.fillRect(p.x + 2, p.y + p.size - 4, (p.size - 4) * p.progress01, 3);
+      }
+      return;
+    }
 
     // 몸체
     blit(ctx, sheet, spr.base, p.x, p.y, p.size);

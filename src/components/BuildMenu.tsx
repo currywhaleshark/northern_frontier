@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { BUILDING_DEFS, canAfford } from '../game/buildings';
 import { RESOURCE_NAMES } from '../game/constants';
+import { getSeason } from '../game/seasons';
 import { getActiveSprites } from '../render/atlas';
 import type { BuildingTypeId, GameState, ResourceId } from '../game/types';
 
@@ -37,7 +38,7 @@ function costText(type: BuildingTypeId): string {
 }
 
 // 스프라이트 썸네일 (아틀라스 로드 전엔 임시 그래픽이 대신 그려진다)
-function BuildingThumb({ type }: { type: BuildingTypeId }) {
+function BuildingThumb({ type, state }: { type: BuildingTypeId; state: GameState }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current;
@@ -47,6 +48,7 @@ function BuildingThumb({ type }: { type: BuildingTypeId }) {
     ctx.clearRect(0, 0, cv.width, cv.height);
     getActiveSprites().drawBuilding(ctx, {
       type, built: true, ghost: false, progress01: 1,
+      season: getSeason(state.day),
       growth01: type === 'field' ? 0.8 : undefined,
       x: 3, y: 17, size: 22,
     });
@@ -93,7 +95,7 @@ export function BuildMenu({ state, placingType, setPlacingType }: Props) {
                   onClick={() => setPlacingType(placingType === type ? null : type)}
                   style={{ display: 'flex', alignItems: 'center', gap: 6 }}
                 >
-                  <BuildingThumb type={type} />
+                  <BuildingThumb type={type} state={state} />
                   <span>
                     <div>{def.name}{uniqueBuilt ? ' (완료)' : ''}</div>
                     <div className="cost">{costText(type)} · 공기 {def.buildDays}일</div>
