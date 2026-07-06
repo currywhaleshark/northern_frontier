@@ -21,17 +21,19 @@ def is_key_pixel(r: int, g: int, b: int) -> bool:
     return r > 190 and g < 100 and b > 170
 
 
-def remove_key(image: Image.Image) -> Image.Image:
+def clear_key_pixels(image: Image.Image) -> Image.Image:
     rgba = image.convert("RGBA")
     pixels = rgba.load()
     for y in range(rgba.height):
         for x in range(rgba.width):
             r, g, b, a = pixels[x, y]
-            if is_key_pixel(r, g, b):
+            if a > 0 and is_key_pixel(r, g, b):
                 pixels[x, y] = (0, 0, 0, 0)
-            elif a > 0:
-                pixels[x, y] = (r, g, b, a)
     return rgba
+
+
+def remove_key(image: Image.Image) -> Image.Image:
+    return clear_key_pixels(image)
 
 
 def contiguous_runs(values: list[int], gap: int = 2) -> list[tuple[int, int]]:
@@ -116,9 +118,9 @@ def fit_to_cell(sprite: Image.Image, cell_width: int, cell_height: int, max_widt
     )
     cell = Image.new("RGBA", (cell_width, cell_height), (0, 0, 0, 0))
     x = (cell_width - resized.width) // 2
-    y = cell_height - resized.height - 1
-    cell.alpha_composite(resized, (x, y))
-    return cell
+    y = cell_height - resized.height
+    cell.alpha_composite(clear_key_pixels(resized), (x, y))
+    return clear_key_pixels(cell)
 
 
 def paste_cell(output: Image.Image, source: Image.Image, box: tuple[int, int, int, int], row: int, col: int) -> None:
@@ -143,6 +145,7 @@ def main() -> None:
     for row_index, boxes in enumerate(rows):
         for col_index, box in enumerate(boxes):
             paste_cell(output, source, box, row_index, col_index)
+    output = clear_key_pixels(output)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     output.save(OUTPUT)
     print(f"wrote {OUTPUT}")
