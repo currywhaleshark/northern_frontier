@@ -17,7 +17,41 @@ import { InspectorPanel, type InspectorTab } from './components/InspectorPanel';
 import { JobPanel } from './components/JobPanel';
 import { MainMenu } from './components/MainMenu';
 import { TopBar } from './components/TopBar';
-import type { BuildingTypeId, Difficulty, JobId } from './game/types';
+import { RESOURCE_NAMES } from './game/constants';
+import type { BuildingTypeId, Difficulty, GameState, JobId, ResourceId } from './game/types';
+
+// 조정 세공 준비 현황 — 품목별 보유/요구와 남은 기한
+function TributePanel({ state }: { state: GameState }) {
+  const tribute = state.courtTribute;
+  if (!tribute) return null;
+  const daysLeft = tribute.dueDay - state.day;
+  return (
+    <div className="section">
+      <div className="panel-title">조정 세공 ({tribute.year}년차)</div>
+      {tribute.resolved ? (
+        <div className="small" style={{ color: tribute.paid ? '#6fbf73' : '#e06c5c' }}>
+          {tribute.paid ? '올해 세공 납부 완료 ✓' : '올해 세공을 바치지 못했습니다'}
+        </div>
+      ) : (
+        <>
+          {Object.entries(tribute.items).map(([res, amt]) => {
+            const have = Math.floor(state.resources[res as ResourceId]);
+            const ok = have >= (amt ?? 0);
+            return (
+              <div key={res} className="small" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>{RESOURCE_NAMES[res as ResourceId]}</span>
+                <span style={{ color: ok ? '#6fbf73' : '#e06c5c' }}>{have} / {amt}</span>
+              </div>
+            );
+          })}
+          <div className="muted small" style={{ marginTop: 4 }}>
+            {daysLeft > 0 ? `겨울까지 ${daysLeft}일` : '조정의 사자가 기다리고 있습니다'}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   // 게임 상태는 ref에 두고, version 증가로 리렌더를 트리거한다
@@ -286,6 +320,8 @@ export default function App() {
               <div className="victory-note">{state.victoryProgressNote}</div>
             </div>
           )}
+          <TributePanel state={state} />
+
           <InspectorPanel
             state={state}
             selected={selected}

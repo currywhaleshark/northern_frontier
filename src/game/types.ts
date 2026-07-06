@@ -162,12 +162,21 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'trade';
+  kind: 'raid' | 'trade' | 'tribute';
   title: string;
   body: string;
   options: ChoiceOption[];
-  // raid: { power, faction, warned } / trade: { give, giveAmt, get, getAmt, faction }
+  // raid: { power, faction, warned } / trade: { give, giveAmt, get, getAmt, faction } / tribute: { year }
   data: Record<string, unknown>;
+}
+
+// 조정 세공(歲貢) — 봄 첫날 그해 요구량이 공지되고, 겨울 첫날 사자가 거둬 간다
+export interface CourtTribute {
+  year: number;                               // 몇 년차 공물인지
+  items: Partial<Record<ResourceId, number>>; // 요구 품목 (1~2종)
+  dueDay: number;                             // 겨울 첫날 (수거일)
+  resolved: boolean;                          // 올해분 처리 여부 (납부 또는 거절)
+  paid: boolean;                              // 실제로 바쳤는지
 }
 
 // 지도 위를 이동하는 습격 무리
@@ -246,6 +255,8 @@ export interface GameState {
   lastTradeDay: number;     // 마지막 교역 제안이 온 날
   lastTradeByFaction: Record<string, number>; // 세력별 마지막 플레이어 주도 교역일 (쿨다운용)
   pendingChoice: PendingChoice | null;
+  courtTribute: CourtTribute | null;  // 올해 세공 (봄 공지 때 설정)
+  tributeFailStreak: number;          // 연속 미납 횟수 (2년 연속이면 명성 하락 가중)
   log: LogEntry[];
   totalDeaths: number;
   starvationDeathsThisYear: number;

@@ -173,6 +173,21 @@ export const CONFIG = {
     playerCooldownDays: 6,  // 플레이어 주도 교역의 세력별 간격 (교환비 고정이라 반복 차익 방지)
   },
 
+  // 조정 세공(歲貢) — 봄 첫날 공지, 겨울 첫날 수거.
+  // 겨울 생존 필수품(식량·장작)은 걷지 않는다. 곡물만 식량 경로와 겹치는 의도된 압박(밭 확장 동기).
+  tribute: {
+    baseAmounts: { hide: 8, grain: 25, iron: 3, clothes: 6, herbs: 6 }, // 품목별 기준량
+    yearScale: 0.3,        // 연차당 요구량 증가 (1 + 0.3×(연차-1))
+    popScaleBase: 0.7,     // 인구 배율 = 0.7 + 인구/40
+    popScaleDiv: 40,
+    repPaid: 6,            // 납부 시 명성
+    repFail: 12,           // 미납 시 명성 하락
+    repFailStreakExtra: 8, // 2년 연속 미납 시 추가 하락 (합계 -20)
+    threatFail: 8,         // 미납 시 위협도 상승
+    rewardTools: 2,        // 격년 하사품 (도구 또는 옷, 결정적 롤)
+    rewardClothes: 3,
+  },
+
   // 세력별 우호도 증감
   relations: {
     driftFactor: 0.01,     // 하루에 기본 성향 쪽으로 1%씩 수렴

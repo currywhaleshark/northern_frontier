@@ -5,6 +5,7 @@ import { CONFIG } from './config';
 import { SEASON_NAMES } from './constants';
 import { BUILDING_DEFS, canAfford, canPlaceOn, computeDefense, countBuilt, housingCapacity } from './buildings';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
+import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
 import { generateMap, makeRng } from './map';
 import { isHabitatActive, spawnAnimalHabitats } from './habitats';
 import { agentsTick, resetAgent, SUBTICKS } from './agents';
@@ -54,6 +55,8 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     lastTradeDay: 0,
     lastTradeByFaction: {},
     pendingChoice: null,
+    courtTribute: null,
+    tributeFailStreak: 0,
     log: [],
     totalDeaths: 0,
     starvationDeathsThisYear: 0,
@@ -82,6 +85,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
 
   addLog(state, '조정의 명을 받아 두만강 이북 개척지에 도착했습니다. 짧은 봄 동안 겨울을 준비해야 합니다.', 'info');
   addLog(state, '나무를 베고, 집을 짓고, 식량과 장작을 모으십시오. 첫 겨울이 모든 것을 시험할 것입니다.', 'info');
+  announceCourtTribute(state); // 1년차 봄이 day 1이므로 첫해 세공도 여기서 공지
   return state;
 }
 
@@ -158,6 +162,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   if (!state.pendingChoice) return;
   const rng = makeRng(state.seed + state.day * 7919 + 31);
   if (state.pendingChoice.kind === 'raid') resolveRaid(state, optionId, rng);
+  else if (state.pendingChoice.kind === 'tribute') resolveCourtTribute(state, optionId);
   else resolveTrade(state, optionId);
   state.resources.defense = computeDefense(state);
 }
@@ -220,6 +225,7 @@ function endOfDay(state: GameState): void {
   }
   runImmigration(state, rng);
   maybeFlavorLog(state, rng);
+  maybeCollectTribute(state); // 겨울: 조정의 사자가 세공을 거둔다 (모달 충돌 시 다음 날로)
 
   state.resources.defense = computeDefense(state);
   checkEndConditions(state);
@@ -251,6 +257,7 @@ function onSeasonChange(state: GameState, prev: string, next: string): void {
   if (next === 'spring') {
     state.starvationDeathsThisYear = 0;
     addLog(state, '파종철입니다. 밭에 농부를 배정하면 가을에 곡물을 거둘 수 있습니다.', 'info');
+    announceCourtTribute(state); // 새해 세공 공지
   }
   if (next === 'autumn') {
     addLog(state, '수확철입니다. 곡식을 거두고 장작을 쌓아 두십시오. 국경 너머의 움직임도 잦아지는 때입니다.', 'info');

@@ -1,8 +1,10 @@
 // localStorage 저장/불러오기
 import { CONFIG } from './config';
+import { rollCourtTribute } from './courtTribute';
 import { spawnAnimalHabitats } from './habitats';
 import { makeRng } from './map';
 import { initRelations } from './relations';
+import { getSeason, getYear } from './seasons';
 import type { GameState, Gender, Resident } from './types';
 
 const SAVE_KEY = 'buksae-save-v3'; // v3: 이동 보간(px/py)과 지도 위 습격 무리 추가
@@ -67,6 +69,17 @@ export function loadGame(): GameState | null {
         CONFIG.difficulty[parsed.difficulty].habitatChance,
       );
     }
+    // 세공 없는 구버전: 시드로 올해분을 재생성. 이미 겨울이면 올해분은 면제 (다음 봄부터 정상 진행)
+    if (!Object.prototype.hasOwnProperty.call(parsed, 'courtTribute')) {
+      const pop = parsed.residents.filter(r => r.alive).length;
+      const tribute = rollCourtTribute(parsed.seed ?? 1, getYear(parsed.day), pop);
+      if (getSeason(parsed.day) === 'winter') {
+        tribute.resolved = true;
+        tribute.paid = true;
+      }
+      parsed.courtTribute = tribute;
+    }
+    if (parsed.tributeFailStreak == null) parsed.tributeFailStreak = 0;
     migrateResidentGender(parsed);
     return parsed;
   } catch {
