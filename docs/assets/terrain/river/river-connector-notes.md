@@ -66,3 +66,17 @@ A river source sheet that does not clearly include these six shapes is not suffi
 ## Current Preference
 
 Prefer v2 over v1 for future river work because the six mandatory core shapes are visually explicit. Further cleanup should focus on normalizing water width and exact edge contact points before renderer integration.
+
+## Mask-First Builder
+
+The next production pass uses a deterministic mask-first builder rather than asking image generation to produce final connector sheets directly.
+
+- Script: `tools/terrain/build_river_mask_tiles.py`
+- Output folder: `docs/assets/terrain/river/generated/`
+- Main outputs:
+  - `river-mask-autotile-28px-sheet.png`
+  - `river-mask-autotile-28px-preview-4x.png`
+  - `river-mask-autotile-seam-preview.png`
+  - `river-mask-autotile-report.txt`
+
+The builder owns connector geometry, water width, and edge contact pixels. Generated river candidates remain useful as texture and palette sources, but they no longer define final tile shape.
