@@ -40,6 +40,10 @@ class RiverMaskTilesTest(unittest.TestCase):
         preview = river.build_seam_preview(sheet)
         self.assertEqual((504, 2070), preview.size)
 
+    def test_built_sheet_edges_match_for_compatible_openings(self) -> None:
+        sheet = river.build_sheet()
+        self.assertEqual([], river.validate_sheet_edges(sheet))
+
 
 if __name__ == "__main__":
     unittest.main()

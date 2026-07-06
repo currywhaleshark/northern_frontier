@@ -126,6 +126,45 @@ def validate_masks() -> list[str]:
     return errors
 
 
+def edge_signature(tile: Image.Image, side: str) -> list[tuple[int, int, int]]:
+    px = tile.load()
+    if side == "n":
+        return [px[x, 0] for x in EDGE_CORRIDOR]
+    if side == "e":
+        return [px[TILE_SIZE - 1, y] for y in EDGE_CORRIDOR]
+    if side == "s":
+        return [px[x, TILE_SIZE - 1] for x in EDGE_CORRIDOR]
+    if side == "w":
+        return [px[0, y] for y in EDGE_CORRIDOR]
+    raise ValueError(f"unknown side: {side}")
+
+
+def validate_sheet_edges(sheet: Image.Image) -> list[str]:
+    errors: list[str] = []
+    opposite = {"n": "s", "s": "n", "e": "w", "w": "e"}
+    for season_index, season in enumerate(SEASONS):
+        tiles = {}
+        for col, connector in enumerate(CONNECTORS):
+            tiles[connector.key] = sheet.crop((
+                col * TILE_SIZE,
+                season_index * TILE_SIZE,
+                (col + 1) * TILE_SIZE,
+                (season_index + 1) * TILE_SIZE,
+            ))
+        for a in CONNECTORS:
+            for side in ("n", "e", "s", "w"):
+                if not getattr(a, side):
+                    continue
+                for b in CONNECTORS:
+                    opposite_side = opposite[side]
+                    if not getattr(b, opposite_side):
+                        continue
+                    if edge_signature(tiles[a.key], side) != edge_signature(tiles[b.key], opposite_side):
+                        errors.append(f"{season}: {a.key}.{side} does not match {b.key}.{opposite_side}")
+                        break
+    return errors
+
+
 def load_source_sheet() -> Image.Image:
     if not SOURCE_SHEET.exists():
         raise FileNotFoundError(f"missing source sheet: {SOURCE_SHEET}")
@@ -265,6 +304,11 @@ def main() -> None:
         return
 
     sheet = build_sheet()
+    sheet_errors = validate_sheet_edges(sheet)
+    if sheet_errors:
+        for error in sheet_errors:
+            print(f"ERROR: {error}")
+        raise SystemExit(1)
     sheet.save(SHEET_OUT)
     save_preview(sheet)
     seam_preview = build_seam_preview(sheet)
