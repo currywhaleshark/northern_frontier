@@ -6,7 +6,7 @@
 // 현재 구현(placeholderSprites)은 단색 사각형 + 이모지 임시 그래픽이다.
 import { BUILDING_DEFS } from '../game/buildings';
 import { JOB_COLORS } from '../game/constants';
-import type { BuildingTypeId, JobId, Season, Terrain } from '../game/types';
+import type { BuildingTypeId, Gender, JobId, Season, Terrain } from '../game/types';
 
 // 계절별 지형 팔레트 (임시 그래픽용)
 const TERRAIN_PALETTES: Record<Season, Record<Terrain, string>> = {
@@ -65,6 +65,7 @@ export interface BuildingDrawParams {
 
 export interface ResidentDrawParams {
   job: JobId;
+  gender: Gender;
   x: number; // 보간·지터가 적용된 픽셀 중심
   y: number;
   sick: boolean;

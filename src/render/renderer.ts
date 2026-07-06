@@ -255,7 +255,10 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     if (!r.alive) continue;
     const p = residentPixelPos(r, o.alpha);
     sprites.drawResident(ctx, {
-      job: r.job, x: p.x, y: p.y,
+      job: r.job,
+      gender: r.gender,
+      x: p.x,
+      y: p.y,
       sick: r.sick,
       carrying: Object.keys(r.carrying).length > 0,
       selected: r.id === o.selectedResidentId,

@@ -4,7 +4,19 @@
 //
 // 시트 규격: 16x16 타일, 1px 간격 (pitch 17)
 // 이미지가 로드되기 전에는 placeholderSprites가 대신 쓰인다 (getActiveSprites 참고).
-import { placeholderSprites, type BuildingDrawParams, type SpriteAPI, type TerrainDrawParams } from './sprites';
+import {
+  placeholderSprites,
+  type BuildingDrawParams,
+  type RaiderDrawParams,
+  type ResidentDrawParams,
+  type SpriteAPI,
+  type TerrainDrawParams,
+} from './sprites';
+import {
+  GENERATED_CHARACTER_SHEET,
+  generatedMountedRaiderSourceRect,
+  generatedResidentSourceRect,
+} from './generatedCharacterAssets';
 import { CONFIG } from '../game/config';
 import { JOB_COLORS } from '../game/constants';
 import type { BuildingTypeId, JobId, Season, Terrain } from '../game/types';
@@ -50,6 +62,7 @@ let riverSheet: HTMLImageElement | null = null;
 let historicalTerrainSheet: HTMLImageElement | null = null;
 let terrainObjectSheet: HTMLImageElement | null = null;
 let buildingSheet: HTMLImageElement | null = null;
+let generatedCharacterSheet: HTMLImageElement | null = null;
 let loaded = 0;
 let started = false;
 
@@ -74,6 +87,12 @@ function ensureLoaded(): void {
   buildingSheet = new Image();
   buildingSheet.onload = () => { loaded++; };
   buildingSheet.src = GENERATED_BUILDING_SHEET.src;
+  const characterSheet = new Image();
+  characterSheet.onload = () => {
+    generatedCharacterSheet = characterSheet;
+    loaded++;
+  };
+  characterSheet.src = GENERATED_CHARACTER_SHEET.src;
 }
 
 export function atlasReady(): boolean {
@@ -115,6 +134,61 @@ function blitGeneratedBuilding(
   const scale = p.size / GENERATED_BUILDING_SHEET.tileSize;
   const destHeight = GENERATED_BUILDING_SHEET.spriteHeight * scale;
   ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
+}
+
+interface SourceRect {
+  sx: number;
+  sy: number;
+  sw: number;
+  sh: number;
+}
+
+function drawGeneratedCharacterRect(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  rect: SourceRect,
+  x: number,
+  y: number,
+  facing: 1 | -1 | undefined,
+  bob: number,
+): void {
+  const scale = CHAR / GENERATED_CHARACTER_SHEET.residentWidth;
+  const dw = rect.sw * scale;
+  const dh = rect.sh * scale;
+  ctx.save();
+  ctx.translate(x, y - bob);
+  if (facing === -1) ctx.scale(-1, 1);
+  ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, -dw / 2, CHALF - dh, dw, dh);
+  ctx.restore();
+}
+
+function drawGeneratedResident(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  p: ResidentDrawParams,
+  bob: number,
+): void {
+  drawGeneratedCharacterRect(ctx, img, generatedResidentSourceRect(p.job, p.gender), p.x, p.y, p.facing, bob);
+}
+
+function drawGeneratedMountedRaider(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  p: RaiderDrawParams,
+  index: number,
+  bob: number,
+  ox: number,
+  oy: number,
+): void {
+  drawGeneratedCharacterRect(
+    ctx,
+    img,
+    generatedMountedRaiderSourceRect(index),
+    p.x + ox,
+    p.y + oy,
+    p.facing,
+    bob,
+  );
 }
 
 // 결정적 의사난수 (타일 좌표 → 변형 선택)
@@ -471,13 +545,18 @@ export const atlasSprites: SpriteAPI = {
     if (!chars) return;
     ctx.imageSmoothingEnabled = false;
     const half = CHALF;
-    // 걷기 연출: 보브(상하 흔들림) + 이동 방향으로 좌우 반전
     const bob = (p.moving ? Math.floor(performance.now() / 130) % 2 : 0) * CF;
-    ctx.save();
-    ctx.translate(p.x, p.y - bob);
-    if (p.facing === -1) ctx.scale(-1, 1);
-    blit(ctx, chars, CHAR_BY_JOB[p.job], -half, -half, CHAR);
-    ctx.restore();
+
+    if (generatedCharacterSheet) {
+      drawGeneratedResident(ctx, generatedCharacterSheet, p, bob);
+    } else {
+      ctx.save();
+      ctx.translate(p.x, p.y - bob);
+      if (p.facing === -1) ctx.scale(-1, 1);
+      blit(ctx, chars, CHAR_BY_JOB[p.job], -half, -half, CHAR);
+      ctx.restore();
+    }
+
     // 직업 식별 점 (머리 위)
     ctx.fillStyle = JOB_COLORS[p.job];
     const dot = Math.max(3, Math.round(3 * CF));
@@ -509,16 +588,20 @@ export const atlasSprites: SpriteAPI = {
   drawRaiders(ctx, p) {
     if (!chars) return;
     ctx.imageSmoothingEnabled = false;
-    for (let i = 0; i < p.count; i++) {
+    const visible = generatedCharacterSheet ? Math.min(p.count, 4) : p.count;
+    for (let i = 0; i < visible; i++) {
       const ox = ((i * 17) % 15 - 7) * 1.1 * CF;
       const oy = ((i * 29) % 11 - 5) * 1.1 * CF;
-      // 개별로 어긋난 보브 — 무리가 꿈틀대며 이동하는 느낌
       const bob = (p.moving ? Math.floor(performance.now() / 130 + i) % 2 : 0) * CF;
-      ctx.save();
-      ctx.translate(p.x + ox, p.y + oy - bob);
-      if (p.facing === -1) ctx.scale(-1, 1);
-      blit(ctx, chars, CHAR_RAIDER, -CHALF, -CHALF, CHAR);
-      ctx.restore();
+      if (generatedCharacterSheet) {
+        drawGeneratedMountedRaider(ctx, generatedCharacterSheet, p, i, bob, ox, oy);
+      } else {
+        ctx.save();
+        ctx.translate(p.x + ox, p.y + oy - bob);
+        if (p.facing === -1) ctx.scale(-1, 1);
+        blit(ctx, chars, CHAR_RAIDER, -CHALF, -CHALF, CHAR);
+        ctx.restore();
+      }
     }
     if (p.spotted) {
       ctx.fillStyle = '#e05f5f';
