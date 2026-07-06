@@ -74,7 +74,6 @@ export const CONFIG = {
     haulerGrainPerDay: 4,      // 곡물 도정량 (곡물 1 → 식량 1)
     haulerStonePerDay: 0.4,    // 돌이 부족할 때 채석
     stoneReserveTarget: 40,
-    stoneUrgentBelow: 15,      // 돌이 이보다 적으면 운반꾼이 채석을 우선한다
     woodReserve: 25,           // 건축용으로 남겨둘 목재 (이 이상만 장작으로 팬다)
     tanneryHidePerDay: 2,      // 가죽공방 하루 가죽 소비 (가죽 2 → 옷 1)
     fieldGrainYield: 20,       // 밭 1개가 만작일 때 곡물 수확량

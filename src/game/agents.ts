@@ -385,12 +385,19 @@ function haulerTick(state: GameState, r: Resident, ctx: Ctx): void {
 
   const spareWood = state.resources.wood - p.woodReserve;
   const hasProcessing = state.resources.game > 0.2 || state.resources.grain > 0.2 || spareWood > 0.5;
-  const stoneUrgent = state.resources.stone < p.stoneUrgentBelow;
-
-  if (hasProcessing && !stoneUrgent) {
-    // 창고/중심지에서 가공 작업
+  if (hasProcessing) {
+    // 창고/중심지에서 가공 작업. 채석 이동/작업 중 새 가공물이 생기면 생존 자원 처리를 우선한다.
+    if (r.phase === 'toWork' || r.phase === 'working' || r.phase === 'toDeposit') {
+      r.path = [];
+      r.workTimer = 0;
+    }
     const st = goTo(state, r, ctx, depositGoal(state, []));
-    if (st !== 'arrived') { r.task = st === 'stuck' ? '길이 막힘' : '창고로 이동'; return; }
+    if (st !== 'arrived') {
+      r.phase = st === 'stuck' ? 'rest' : 'toWork';
+      r.task = st === 'stuck' ? '길이 막힘' : '창고로 이동';
+      return;
+    }
+    r.phase = 'rest';
     const eff = effOf(r) * ctx.mMod;
     let label = '창고 정리';
     const g = Math.min(state.resources.game, (p.haulerGamePerDay / 5) * eff);
