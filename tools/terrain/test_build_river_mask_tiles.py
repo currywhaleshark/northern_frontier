@@ -1,5 +1,7 @@
 import unittest
 
+from PIL import Image
+
 from . import build_river_mask_tiles as river
 
 
@@ -21,6 +23,13 @@ class RiverMaskTilesTest(unittest.TestCase):
 
     def test_all_connector_masks_validate(self) -> None:
         self.assertEqual([], river.validate_masks())
+
+    def test_composed_vertical_tile_normalizes_open_edge_pixels(self) -> None:
+        source = Image.new("RGB", (28, 28), (40, 110, 180))
+        tile = river.compose_tile(source, "spring", river.CONNECTORS[0])
+        water = river.SEASON_TINTS["spring"]["water"]
+        self.assertTrue(all(tile.getpixel((x, 0)) == water for x in river.EDGE_CORRIDOR))
+        self.assertTrue(all(tile.getpixel((x, 27)) == water for x in river.EDGE_CORRIDOR))
 
 
 if __name__ == "__main__":
