@@ -83,7 +83,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   garrison: {
     id: 'garrison', name: '군영', emoji: '⛺',
-    desc: '방어도 +25. 민병의 방어 기여가 커진다. 승리 조건에 필요하다.',
+    desc: '방어도 +25. 수비병의 방어 기여가 커진다. 승리 조건에 필요하다.',
     cost: { wood: 20, stone: 10, iron: 4 }, buildDays: 14, slots: 6, capacity: 0, defense: 25,
     winterBonus: false, placement: 'land', unique: true,
   },
@@ -138,7 +138,7 @@ export function housingCapacity(state: GameState): { total: number; ondol: numbe
   return { total, ondol };
 }
 
-// 방어도 = 건물 + 파수꾼 + 민병
+// 방어도 = 건물 + 파수꾼 + 수비병
 export function computeDefense(state: GameState): number {
   let d = 0;
   for (const b of state.buildings) {

@@ -25,7 +25,7 @@ export const TERRAIN_NAMES: Record<Terrain, string> = {
 export const JOB_NAMES: Record<JobId, string> = {
   idle: '무직', woodcutter: '벌목꾼', hunter: '사냥꾼', farmer: '농부',
   builder: '건축가', hauler: '운반꾼', herbalist: '약초꾼', smith: '대장장이',
-  watchman: '파수꾼', militia: '민병',
+  watchman: '파수꾼', militia: '수비병',
 };
 
 export const JOB_ORDER: JobId[] = [
@@ -43,7 +43,7 @@ export const JOB_DESC: Record<JobId, string> = {
   herbalist: '산기슭을 다니며 약초를 캐 약초막이나 창고로 나릅니다.',
   smith: '대장간에서 도구를 만들고, 철이 떨어지면 철광까지 채굴을 다녀옵니다.',
   watchman: '방어 시설 사이를 순찰합니다. 방어도가 오르고 위협도 증가가 줄어듭니다.',
-  militia: '군영(없으면 마을 중심)에서 조련하는 상비 민병입니다. 방어도가 크게 오릅니다.',
+  militia: '군영(없으면 마을 중심)에서 조련하는 상비 수비병입니다. 방어도가 크게 오릅니다.',
 };
 
 // 지도 위 주민 점 색상

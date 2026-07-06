@@ -1,4 +1,4 @@
-// 지도 위 습격 전투: 민병/파수꾼 집결, 교전, 전투 종료 처리
+// 지도 위 습격 전투: 수비병/파수꾼(요격) 또는 주민 전체(징집) 집결, 교전, 전투 종료 처리
 //
 // 승패는 교전이 시작되는 순간 기존 즉시 판정과 똑같은 확률
 // defense/(defense+power)로 한 번 굴려 정한다. 이후의 소모전(전력 감소·부상)은
@@ -10,7 +10,7 @@ import { changeRelation } from './relations';
 import { resetAgent } from './agents';
 import { livingResidents } from './residents';
 import { damageBuildings, injure, loot, moraleShock } from './raidDamage';
-import type { Battle, BattleOutcome, GameState, Resident, WeatherId } from './types';
+import type { Battle, BattleMode, BattleOutcome, GameState, Resident, WeatherId } from './types';
 
 export const BATTLE_MUSTER_DEADLINE = 5;
 export const BATTLE_CLASH_TICK_LIMIT = 8;
@@ -46,41 +46,55 @@ export function raidBandSize(power: number): number {
   return Math.max(1, Math.min(6, 3 + Math.floor(power / 25)));
 }
 
+// 징집(levy) 시 일반 주민(수비병/파수꾼 제외)이 보태는 방어도.
+// 직업을 바꾸는 방식은 금지 — computeDefense가 주민 전원을 수비병(12)으로 세어 폭증한다.
+export function levyDefenseBonus(state: GameState): number {
+  const civilians = livingResidents(state)
+    .filter(r => !r.sick && r.health >= 20 && r.job !== 'militia' && r.job !== 'watchman')
+    .length;
+  return civilians * CONFIG.raid.levyDefensePerResident;
+}
+
+function battleSideName(mode: BattleMode): string {
+  return mode === 'levy' ? '징집된 주민들' : '수비병';
+}
+
 // 지도에 무리가 있을 때만 전투를 연다. 무리 없이 열린 폴백 습격(접근 경로 없음)은
 // false를 반환해 resolveRaid의 즉시 판정으로 처리하게 한다.
-export function startBattle(state: GameState): boolean {
+export function startBattle(state: GameState, mode: BattleMode): boolean {
   const choice = state.pendingChoice;
   if (!choice || choice.kind !== 'raid') return false;
   const band = state.raiders;
   if (!band) return false;
 
-  const defenders = livingResidents(state)
-    .filter(r => !r.sick && r.health >= 20 && (r.job === 'militia' || r.job === 'watchman'));
-  const defenderIds = defenders.map(r => r.id);
-  const draftedJobs = defenders.map(r => ({ id: r.id, job: r.job }));
-
+  // 요격: 훈련된 수비병+파수꾼만 / 징집: 앓지 않는 성한 주민 전체
+  const defenders = livingResidents(state).filter(r =>
+    !r.sick && r.health >= 20 &&
+    (mode === 'levy' || r.job === 'militia' || r.job === 'watchman'));
   for (const defender of defenders) {
     resetAgent(state, defender);
-    defender.job = 'militia';
     defender.task = '출전 준비';
   }
 
   state.battle = {
     phase: 'muster',
+    mode,
     frontX: band.x,
     frontY: band.y,
     initialPower: band.power,
-    defenderIds,
+    defenderIds: defenders.map(r => r.id),
+    levyBonus: mode === 'levy' ? levyDefenseBonus(state) : 0,
     ticks: 0,
     musterDeadline: BATTLE_MUSTER_DEADLINE,
     faction: String(choice.data.faction ?? band.faction),
     warned: Boolean(choice.data.warned ?? band.warned),
     siege: Boolean(choice.data.siege ?? band.siege),
     outcome: null,
-    draftedJobs,
   };
   state.pendingChoice = null;
-  addLog(state, `민병대가 소집되었습니다. ${state.battle.faction}이(가) 마을 어귀에서 진을 칩니다.`, 'raid');
+  addLog(state, mode === 'levy'
+    ? `온 마을이 낫과 도끼를 들었습니다. ${state.battle.faction}에 맞서 주민들이 나섭니다.`
+    : `수비병이 요격에 나섭니다. ${state.battle.faction}이(가) 마을 어귀에서 진을 칩니다.`, 'raid');
   return true;
 }
 
@@ -90,7 +104,8 @@ export function battleTick(state: GameState, rng: () => number): void {
   if (!battle || !band || state.gameOver) return;
 
   pruneBattleDefenders(state, battle);
-  const defense = applyBattleDefenseMultipliers(computeDefense(state), battle, state.weather);
+  const defense = applyBattleDefenseMultipliers(
+    computeDefense(state) + (battle.levyBonus ?? 0), battle, state.weather);
 
   if (battle.phase === 'muster') {
     battle.ticks += 1;
@@ -151,21 +166,28 @@ function maybeInjureDefender(
   rng: () => number,
 ): void {
   const chance = defense <= 0 ? 1 : power / (power + defense);
-  if (rng() >= chance) return;
+  // 징집전은 훈련 안 된 주민이 앞줄에 서므로 부상이 더 넓게 퍼진다 (틱당 최대 2명)
+  const attempts = (battle.mode ?? 'garrison') === 'levy' ? 2 : 1;
   const candidates = battleDefenders(state, battle)
     .sort((a, b) => distanceToFront(a, battle) - distanceToFront(b, battle));
-  const target = candidates[0];
-  if (!target) return;
-  target.health = Math.max(5, target.health - (12 + rng() * 12));
-  target.task = '전투 부상';
-  if (target.health < 20) {
-    battle.defenderIds = battle.defenderIds.filter(id => id !== target.id);
+  let next = 0;
+  for (let i = 0; i < attempts; i++) {
+    if (rng() >= chance) continue;
+    const target = candidates[next++];
+    if (!target) return;
+    target.health = Math.max(5, target.health - (12 + rng() * 12));
+    target.task = '전투 부상';
+    if (target.health < 20) {
+      battle.defenderIds = battle.defenderIds.filter(id => id !== target.id);
+    }
   }
 }
 
 function finishBattle(state: GameState, outcome: BattleOutcome, rng: () => number): void {
   const battle = state.battle;
   if (!battle) return;
+  const mode = battle.mode ?? 'garrison';
+  const side = battleSideName(mode);
   const activeDefenderIds = [...battle.defenderIds];
   const draftedJobs = battle.draftedJobs ?? [];
   const resetIds = new Set([...activeDefenderIds, ...draftedJobs.map(d => d.id)]);
@@ -174,14 +196,16 @@ function finishBattle(state: GameState, outcome: BattleOutcome, rng: () => numbe
     state.resources.reputation = Math.min(100, state.resources.reputation + 5);
     moraleShock(state, -8);
     changeRelation(state, battle.faction, CONFIG.relations.militiaWin);
-    addLog(state, `민병대가 ${battle.faction}을(를) 전선에서 몰아냈습니다! 마을의 사기와 명성이 올랐습니다.`, 'good');
+    addLog(state, `${side}이(가) ${battle.faction}을(를) 전선에서 몰아냈습니다! 마을의 사기와 명성이 올랐습니다.`, 'good');
   } else {
-    const injured = injure(state, rng, 1 + Math.floor(rng() * 2), 30, activeDefenderIds);
+    // 징집전 패배는 훈련 안 된 주민이 흩어지며 부상이 더 넓게 퍼진다
+    const injuredCount = mode === 'levy' ? 2 + Math.floor(rng() * 3) : 1 + Math.floor(rng() * 2);
+    const injured = injure(state, rng, injuredCount, 30, activeDefenderIds);
     const lootMsg = loot(state, 0.2 + rng() * 0.1);
     const destroyed = damageBuildings(state, rng, rng() < 0.5 ? 1 : 0);
     moraleShock(state, 15);
     changeRelation(state, battle.faction, CONFIG.relations.militiaLoss);
-    addLog(state, `민병대가 밀려났습니다. 부상자 ${injured}명, ${lootMsg}.${destroyed.length > 0 ? ' 건물이 파손되었습니다.' : ''}`, 'raid');
+    addLog(state, `${side}이(가) 밀려났습니다. 부상자 ${injured}명, ${lootMsg}.${destroyed.length > 0 ? ' 건물이 파손되었습니다.' : ''}`, 'raid');
   }
 
   state.threat = CONFIG.threat.afterRaidThreat;

@@ -156,6 +156,7 @@ export const CONFIG = {
     wealthPowerDiv: 60,
     watchmanDefense: 6,
     militiaDefense: 12,
+    levyDefensePerResident: 4, // 징집된 일반 주민 1인당 방어 기여 (수비병 12, 파수꾼 6과 비교)
     warnedDefenseMult: 1.25,
     // 지도 위 습격 무리 이동
     raiderSpeedWarned: 1.2,   // 경보된 습격: 천천히 접근 (대비 시간)

@@ -3,7 +3,7 @@ import { CONFIG } from './config';
 import { FACTIONS, type Faction } from './constants';
 import { countBuilt } from './buildings';
 import { addLog } from './events';
-import { startBattle } from './battles';
+import { applyBattleDefenseMultipliers, levyDefenseBonus, startBattle } from './battles';
 import { findPath } from './agents';
 import { damageBuildings, injure, loot, moraleShock } from './raidDamage';
 import { changeRelation, getRelation, hostileRelationsAvg } from './relations';
@@ -175,6 +175,26 @@ export function raidersTick(state: GameState, rng: () => number): void {
   }
 }
 
+// 무리 없는 폴백 습격의 즉시 전투 판정 (요격/징집 공용) — 승패 확률만 다르고 결과 처리는 같다
+function resolveFightFallback(
+  state: GameState, rng: () => number, faction: string, successP: number, side: string,
+): void {
+  if (rng() < successP) {
+    const injured = injure(state, rng, 1 + Math.floor(rng() * 2), 20);
+    state.resources.reputation = Math.min(100, state.resources.reputation + 5);
+    moraleShock(state, -8); // 사기 상승
+    changeRelation(state, faction, CONFIG.relations.militiaWin); // 물리치면 원한이 남는다
+    addLog(state, `${side}이(가) ${faction}을(를) 물리쳤습니다! 부상자 ${injured}명. 마을의 사기와 명성이 올랐습니다.`, 'good');
+  } else {
+    const injured = injure(state, rng, 2 + Math.floor(rng() * 3), 30);
+    const lootMsg = loot(state, 0.2 + rng() * 0.1);
+    const destroyed = damageBuildings(state, rng, rng() < 0.5 ? 1 : 0);
+    moraleShock(state, 15);
+    changeRelation(state, faction, CONFIG.relations.militiaLoss);
+    addLog(state, `${side}이(가) 밀려났습니다. 부상자 ${injured}명, ${lootMsg}.${destroyed.length > 0 ? ' 건물이 파손되었습니다.' : ''}`, 'raid');
+  }
+}
+
 // 습격 선택지 모달 생성
 export function openRaidChoice(
   state: GameState, rng: () => number, warned: boolean,
@@ -203,8 +223,12 @@ export function openRaidChoice(
         desc: '인명 피해는 거의 없지만 창고 자원의 일부를 약탈당합니다.',
       },
       {
-        id: 'militia', label: '민병대를 소집해 맞선다',
-        desc: '지도 위에서 실제 전투가 벌어집니다. 민병과 파수꾼이 전선으로 출전합니다.',
+        id: 'militia', label: '수비병으로 요격한다',
+        desc: '수비병과 파수꾼이 전선으로 출전합니다. 훈련된 소수의 싸움입니다.',
+      },
+      {
+        id: 'levy', label: '민병을 징집한다',
+        desc: '성한 주민 모두가 무기를 듭니다. 방어도가 오르지만 부상이 널리 퍼지고, 며칠간 일손이 흔들립니다.',
       },
       {
         id: 'tribute', label: '공물을 내어보낸다',
@@ -239,13 +263,9 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
   const faction = c.data.faction as string;
   const warned = c.data.warned as boolean;
 
-  let defense = state.resources.defense;
-  if (warned) defense *= CONFIG.raid.warnedDefenseMult;
-  // 목책이 무리를 막아섰다면 방책 뒤에서 싸운다
-  if (c.data.siege) defense *= CONFIG.raid.siegeDefenseMult;
-  // 눈보라/혹한은 침입자에게 더 가혹하다
-  if (state.weather === 'blizzard' || state.weather === 'coldSnap') defense *= 1.2;
-
+  // 경보/공성/궂은 날씨 보정 — 지도 전투와 같은 배율 (눈보라·혹한은 침입자에게 더 가혹하다)
+  const battleMods = { warned, siege: Boolean(c.data.siege) };
+  const defense = applyBattleDefenseMultipliers(state.resources.defense, battleMods, state.weather);
   const successP = defense / (defense + power);
 
   switch (optionId) {
@@ -257,24 +277,18 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
       addLog(state, `주민들이 목책 안으로 피했습니다. ${lootMsg}.${injured > 0 ? ` 미처 피하지 못한 ${injured}명이 다쳤습니다.` : ''}`, 'raid');
       break;
     }
+    // 요격/징집: 지도에 무리가 있으면 실제 전투를 연다 (승패·후처리는 battleTick이 맡는다).
+    // 무리 없이 열린 폴백 습격(접근 경로 없음)만 즉시 판정으로 처리한다.
     case 'militia': {
-      // 지도에 무리가 있으면 실제 전투를 연다 (승패·후처리는 battleTick이 맡는다).
-      // 무리 없이 열린 폴백 습격(접근 경로 없음)만 아래의 즉시 판정으로 처리한다.
-      if (startBattle(state)) return;
-      if (rng() < successP) {
-        const injured = injure(state, rng, 1 + Math.floor(rng() * 2), 20);
-        state.resources.reputation = Math.min(100, state.resources.reputation + 5);
-        moraleShock(state, -8); // 사기 상승
-        changeRelation(state, faction, CONFIG.relations.militiaWin); // 물리치면 원한이 남는다
-        addLog(state, `민병대가 ${faction}을(를) 물리쳤습니다! 부상자 ${injured}명. 마을의 사기와 명성이 올랐습니다.`, 'good');
-      } else {
-        const injured = injure(state, rng, 2 + Math.floor(rng() * 3), 30);
-        const lootMsg = loot(state, 0.2 + rng() * 0.1);
-        const destroyed = damageBuildings(state, rng, rng() < 0.5 ? 1 : 0);
-        moraleShock(state, 15);
-        changeRelation(state, faction, CONFIG.relations.militiaLoss);
-        addLog(state, `민병대가 밀려났습니다. 부상자 ${injured}명, ${lootMsg}.${destroyed.length > 0 ? ' 건물이 파손되었습니다.' : ''}`, 'raid');
-      }
+      if (startBattle(state, 'garrison')) return;
+      resolveFightFallback(state, rng, faction, successP, '수비병');
+      break;
+    }
+    case 'levy': {
+      if (startBattle(state, 'levy')) return;
+      const levyDefense = applyBattleDefenseMultipliers(
+        state.resources.defense + levyDefenseBonus(state), battleMods, state.weather);
+      resolveFightFallback(state, rng, faction, levyDefense / (levyDefense + power), '징집된 주민들');
       break;
     }
     case 'tribute': {

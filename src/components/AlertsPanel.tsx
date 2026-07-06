@@ -35,7 +35,7 @@ export function computeAlerts(state: GameState): AlertItem[] {
     alerts.push({
       id: 'raidIncoming',
       text: state.raiders.spotted
-        ? `습격 임박! ${state.raiders.faction}이(가) 마을로 접근 중입니다. 민병을 준비하십시오.`
+        ? `습격 임박! ${state.raiders.faction}이(가) 마을로 접근 중입니다. 방비를 갖추십시오.`
         : '불길한 기척이 감돕니다. 국경 쪽 개들이 짖어댑니다.',
       level: 'danger',
     });

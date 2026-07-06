@@ -44,7 +44,7 @@ export type JobId =
   | 'herbalist'  // 약초꾼
   | 'smith'      // 대장장이
   | 'watchman'   // 파수꾼
-  | 'militia';   // 민병
+  | 'militia';   // 수비병 (내부 id는 저장 호환을 위해 유지)
 
 export type ResourceId =
   | 'food'       // 식량
@@ -189,9 +189,12 @@ export interface RaiderBand {
 
 export type BattlePhase = 'muster' | 'clash';
 export type BattleOutcome = 'victory' | 'defeat';
+// garrison: 수비병+파수꾼 요격 / levy: 성한 주민 전체 징집
+export type BattleMode = 'garrison' | 'levy';
 
 export interface Battle {
   phase: BattlePhase;
+  mode: BattleMode;
   frontX: number;
   frontY: number;
   initialPower: number;
@@ -203,7 +206,10 @@ export interface Battle {
   siege: boolean;
   // 교전 시작 때 기존 즉시 판정과 같은 확률로 굴려 둔 승패 — 소모전은 이 결과를 향해 연출된다
   outcome: BattleOutcome | null;
-  // 전투 동안 임시 민병으로 바뀐 주민들의 원래 직업
+  // 징집(levy)된 일반 주민의 방어 기여 — 개전 시점 스냅샷.
+  // 직업을 바꾸지 않고 명시 수치로 더한다 (computeDefense가 부풀지 않게).
+  levyBonus?: number;
+  // 구버전 저장 호환: 예전 코드가 전투 동안 직업을 바꿔 둔 주민들의 원래 직업
   draftedJobs?: { id: number; job: JobId }[];
 }
 
