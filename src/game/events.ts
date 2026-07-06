@@ -57,9 +57,75 @@ export function maybeOfferTrade(state: GameState, rng: () => number, daysSinceTr
   return true;
 }
 
+// 플레이어가 먼저 교역을 청할 수 있는지 — 불가하면 사유 문자열 (UI 버튼 비활성 사유와 공유)
+export function canRequestTrade(state: GameState, factionName: string): string | null {
+  const faction = FACTIONS.find(f => f.name === factionName);
+  if (!faction || faction.trades.length === 0) return '교역 품목이 없는 세력입니다';
+  if (countBuilt(state, 'market') === 0) return '장터가 필요합니다';
+  if (state.pendingChoice || state.battle) return '지금은 거래할 수 없습니다';
+  if (getRelation(state, factionName) < CONFIG.trade.minRelationToTrade) {
+    return '관계가 나빠 상대해 주지 않습니다';
+  }
+  const last = state.lastTradeByFaction[factionName];
+  if (last != null && state.day - last < CONFIG.trade.playerCooldownDays) {
+    return `상단이 아직 돌아오지 않았습니다 (${CONFIG.trade.playerCooldownDays - (state.day - last)}일 뒤)`;
+  }
+  return null;
+}
+
+// 플레이어 주도 교역: 그 세력의 교환 목록 전체를 선택지 모달로 연다
+export function requestTrade(state: GameState, factionName: string): string | null {
+  const reason = canRequestTrade(state, factionName);
+  if (reason) return reason;
+  const faction = FACTIONS.find(f => f.name === factionName)!;
+
+  const choice: PendingChoice = {
+    kind: 'trade',
+    title: `장터 교역 — ${faction.name}`,
+    body: `${faction.name}(${faction.desc})에 먼저 사람을 보냈습니다.\n무엇을 바꾸시겠습니까?`,
+    options: [
+      ...faction.trades.map((t, i) => ({
+        id: `offer-${i}`,
+        label: `${RESOURCE_NAMES[t.give]} ${t.giveAmt} ↔ ${RESOURCE_NAMES[t.get]} ${t.getAmt}`,
+        desc: `${RESOURCE_NAMES[t.give]} -${t.giveAmt}, ${RESOURCE_NAMES[t.get]} +${t.getAmt}, 명성 +1`,
+        disabled: state.resources[t.give] < t.giveAmt,
+        disabledReason: `${RESOURCE_NAMES[t.give]}이(가) 부족합니다`,
+      })),
+      { id: 'cancel', label: '돌려보낸다', desc: '거래 없이 상단을 돌려보냅니다. 불이익은 없습니다.' },
+    ],
+    data: { faction: faction.name, initiated: true, offers: faction.trades },
+  };
+  state.pendingChoice = choice;
+  return null;
+}
+
+// 플레이어가 먼저 청한 교역 처리 — 돌려보내기는 무벌칙.
+// (명성 -1/위협 상승의 거절 벌칙은 상대가 찾아온 제안 전용이므로 절대 섞지 않는다)
+function resolveInitiatedTrade(state: GameState, optionId: string): void {
+  const c = state.pendingChoice!;
+  const faction = c.data.faction as string;
+  const offers = c.data.offers as TradeOffer[];
+  const picked = /^offer-(\d+)$/.exec(optionId);
+  const offer = picked ? offers[Number(picked[1])] : undefined;
+  if (offer && state.resources[offer.give] >= offer.giveAmt) {
+    state.resources[offer.give] -= offer.giveAmt;
+    state.resources[offer.get] += offer.getAmt;
+    // 먼저 아쉬운 소리를 한 쪽이므로 명성 보상은 제안 수락(+2)보다 작다
+    state.resources.reputation = Math.min(100, state.resources.reputation + 1);
+    state.lastTradeByFaction[faction] = state.day;
+    changeRelation(state, faction, CONFIG.relations.tradeAccept);
+    addLog(state, `장터에서 ${faction}과(와) ${RESOURCE_NAMES[offer.give]}을(를) ${RESOURCE_NAMES[offer.get]}(으)로 교환했습니다.`, 'trade');
+  }
+  state.pendingChoice = null;
+}
+
 export function resolveTrade(state: GameState, optionId: string): void {
   const c = state.pendingChoice;
   if (!c || c.kind !== 'trade') return;
+  if (c.data.initiated) {
+    resolveInitiatedTrade(state, optionId);
+    return;
+  }
   const d = c.data as unknown as TradeOffer & { faction: string };
   if (optionId === 'accept') {
     state.resources[d.give] = Math.max(0, state.resources[d.give] - d.giveAmt);

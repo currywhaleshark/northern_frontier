@@ -244,6 +244,7 @@ export interface GameState {
   raidCooldown: number;     // 습격 후 유예 기간
   tradeRefusedDays: number; // 최근 교역 거절 여파 남은 일수
   lastTradeDay: number;     // 마지막 교역 제안이 온 날
+  lastTradeByFaction: Record<string, number>; // 세력별 마지막 플레이어 주도 교역일 (쿨다운용)
   pendingChoice: PendingChoice | null;
   log: LogEntry[];
   totalDeaths: number;

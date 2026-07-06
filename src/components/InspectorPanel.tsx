@@ -1,6 +1,7 @@
 // 선택한 타일/건물/주민 정보 패널
 import { BUILDING_DEFS, getBuilding } from '../game/buildings';
 import { FACTIONS, JOB_NAMES, JOB_ORDER, RESOURCE_NAMES, TERRAIN_NAMES } from '../game/constants';
+import { canRequestTrade } from '../game/events';
 import { getRelation } from '../game/relations';
 import type { GameState, JobId, Resident, ResourceId } from '../game/types';
 
@@ -10,10 +11,28 @@ interface Props {
   state: GameState;
   selected: { x: number; y: number } | null;
   onSetResidentJob: (id: number, job: JobId) => void;
+  onRequestTrade: (factionName: string) => void;
   tab: InspectorTab;
   setTab: (t: InspectorTab) => void;
   residentId: number | null;
   setResidentId: (id: number | null) => void;
+}
+
+// "거래하기" 버튼 — 불가 사유는 게임 로직(canRequestTrade)과 같은 함수를 쓴다
+function TradeButton({ state, factionName, onRequestTrade }: {
+  state: GameState; factionName: string; onRequestTrade: (name: string) => void;
+}) {
+  const reason = canRequestTrade(state, factionName);
+  return (
+    <button
+      className="btn small"
+      disabled={!!reason}
+      title={reason ?? '장터에서 먼저 거래를 청합니다'}
+      onClick={() => onRequestTrade(factionName)}
+    >
+      거래하기{reason ? ` — ${reason}` : ''}
+    </button>
+  );
 }
 
 function Bar({ value, color }: { value: number; color: string }) {
@@ -65,7 +84,7 @@ function ResidentDetail({ r, onSetJob }: { r: Resident; onSetJob: (job: JobId) =
 }
 
 export function InspectorPanel({
-  state, selected, onSetResidentJob, tab, setTab, residentId, setResidentId,
+  state, selected, onSetResidentJob, onRequestTrade, tab, setTab, residentId, setResidentId,
 }: Props) {
   const tile = selected ? state.map[selected.y]?.[selected.x] : null;
   const building = tile ? getBuilding(state, tile.buildingId) : undefined;
@@ -98,6 +117,28 @@ export function InspectorPanel({
                     {building.type === 'field' && building.built && (
                       <tr><td>작물</td><td><Bar value={building.fieldGrowth} color="#6fbf73" /></td></tr>
                     )}
+                    {building.type === 'market' && building.built && (
+                      <tr>
+                        <td>교역</td>
+                        <td>
+                          {FACTIONS.filter(f => f.trades.length > 0).map(f => {
+                            const reason = canRequestTrade(state, f.name);
+                            return (
+                              <button
+                                key={f.name}
+                                className="btn small"
+                                disabled={!!reason}
+                                title={reason ?? `${f.name}에 먼저 거래를 청합니다`}
+                                style={{ margin: '2px 4px 2px 0' }}
+                                onClick={() => onRequestTrade(f.name)}
+                              >
+                                {f.name}
+                              </button>
+                            );
+                          })}
+                        </td>
+                      </tr>
+                    )}
                     <tr><td colSpan={2} className="muted small">{def.desc}</td></tr>
                   </>
                 );
@@ -127,6 +168,11 @@ export function InspectorPanel({
                     ? '교역품: ' + f.trades.map(t => RESOURCE_NAMES[t.get]).join(', ')
                     : '교역하지 않음'}
                 </div>
+                {f.trades.length > 0 && (
+                  <div style={{ marginTop: 3 }}>
+                    <TradeButton state={state} factionName={f.name} onRequestTrade={onRequestTrade} />
+                  </div>
+                )}
               </div>
             );
           })}

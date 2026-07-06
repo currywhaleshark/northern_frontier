@@ -169,6 +169,8 @@ export const CONFIG = {
   trade: {
     minIntervalDays: 14,
     dailyChance: 0.07,
+    minRelationToTrade: 35, // 이보다 관계가 나쁘면 먼저 청해도 상대해 주지 않는다
+    playerCooldownDays: 6,  // 플레이어 주도 교역의 세력별 간격 (교환비 고정이라 반복 차익 방지)
   },
 
   // 세력별 우호도 증감

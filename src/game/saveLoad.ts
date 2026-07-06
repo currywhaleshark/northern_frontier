@@ -48,6 +48,7 @@ export function loadGame(): GameState | null {
     if (!('raiders' in parsed)) return null;
     if (!Object.prototype.hasOwnProperty.call(parsed, 'battle')) parsed.battle = null;
     if (parsed.battle && !parsed.battle.mode) parsed.battle.mode = 'garrison';
+    if (!parsed.lastTradeByFaction) parsed.lastTradeByFaction = {};
     // 구버전 저장 마이그레이션: 없는 필드는 기본값으로 채운다
     if (!parsed.relations) parsed.relations = initRelations();
     if (!parsed.difficulty) parsed.difficulty = 'normal';

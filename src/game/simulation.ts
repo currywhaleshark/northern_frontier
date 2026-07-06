@@ -52,6 +52,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     raidCooldown: 0,
     tradeRefusedDays: 0,
     lastTradeDay: 0,
+    lastTradeByFaction: {},
     pendingChoice: null,
     log: [],
     totalDeaths: 0,

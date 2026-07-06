@@ -6,7 +6,7 @@ import {
   SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
 import { clearSave, hasSave, loadGame, saveGame } from './game/saveLoad';
-import { addLog } from './game/events';
+import { addLog, requestTrade } from './game/events';
 import { initAudio, isMuted, playSfx, setMuted, setWeatherAmbient } from './sound/sfx';
 import { AlertsPanel } from './components/AlertsPanel';
 import { BuildMenu } from './components/BuildMenu';
@@ -177,6 +177,13 @@ export default function App() {
     bump();
   };
 
+  // 세력 탭/장터 타일에서 먼저 거래를 청한다 (버튼이 미리 비활성화되지만 안전망으로 사유를 로그에)
+  const handleRequestTrade = (factionName: string) => {
+    const err = requestTrade(stateRef.current, factionName);
+    if (err) addLog(stateRef.current, err, 'info');
+    bump();
+  };
+
   const handleSave = () => {
     if (saveGame(stateRef.current)) {
       addLog(stateRef.current, '진행 상황을 저장했습니다.', 'info');
@@ -283,6 +290,7 @@ export default function App() {
             state={state}
             selected={selected}
             onSetResidentJob={handleSetResidentJob}
+            onRequestTrade={handleRequestTrade}
             tab={inspTab}
             setTab={setInspTab}
             residentId={inspResidentId}
