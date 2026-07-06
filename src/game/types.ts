@@ -184,6 +184,26 @@ export interface RaiderBand {
   trail: { x: number; y: number }[]; // 지나온 자취 (눈밭 발자국 렌더링용)
 }
 
+export type BattlePhase = 'muster' | 'clash';
+export type BattleOutcome = 'victory' | 'defeat';
+
+export interface Battle {
+  phase: BattlePhase;
+  frontX: number;
+  frontY: number;
+  initialPower: number;
+  defenderIds: number[];
+  ticks: number;
+  musterDeadline: number;
+  faction: string;
+  warned: boolean;
+  siege: boolean;
+  // 교전 시작 때 기존 즉시 판정과 같은 확률로 굴려 둔 승패 — 소모전은 이 결과를 향해 연출된다
+  outcome: BattleOutcome | null;
+  // 전투 동안 임시 민병으로 바뀐 주민들의 원래 직업
+  draftedJobs?: { id: number; job: JobId }[];
+}
+
 export interface AlertItem {
   id: string;
   text: string;
@@ -211,6 +231,7 @@ export interface GameState {
   threat: number;         // 습격 위협도 0~100
   relations: Record<string, number>; // 세력별 우호도 0~100 (키: 세력 이름)
   raiders: RaiderBand | null; // 접근 중인 습격 무리
+  battle: Battle | null;      // 지도 위에서 진행 중인 습격 전투
   raidCooldown: number;     // 습격 후 유예 기간
   tradeRefusedDays: number; // 최근 교역 거절 여파 남은 일수
   lastTradeDay: number;     // 마지막 교역 제안이 온 날

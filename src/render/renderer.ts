@@ -126,6 +126,34 @@ function drawFootprints(ctx: CanvasRenderingContext2D, trail: { x: number; y: nu
   }
 }
 
+
+function drawBattleClash(ctx: CanvasRenderingContext2D, frontX: number, frontY: number): void {
+  const t = performance.now() / 140;
+  const cx = frontX * TILE + TILE / 2;
+  const cy = frontY * TILE + TILE / 2;
+  ctx.save();
+  for (let i = 0; i < 18; i++) {
+    const phase = fract(t + i * 0.173);
+    const angle = i * 2.399 + t * 0.08;
+    const radius = (0.35 + phase * 1.2) * TILE;
+    const x = cx + Math.cos(angle) * radius;
+    const y = cy + Math.sin(angle) * radius * 0.62;
+    const alpha = 0.6 * (1 - phase);
+    ctx.fillStyle = i % 3 === 0
+      ? `rgba(230,130,64,${alpha.toFixed(2)})`
+      : `rgba(238,222,184,${(alpha * 0.75).toFixed(2)})`;
+    ctx.beginPath();
+    ctx.arc(x, y, 1.2 + phase * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(120,60,36,0.35)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, TILE * 1.45, TILE * 0.9, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawHabitatRange(ctx: CanvasRenderingContext2D, habitat: AnimalHabitat): void {
   const cx = (habitat.x + 0.5) * TILE;
   const cy = (habitat.y + 0.5) * TILE;
@@ -250,6 +278,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       moving: b.px !== b.x || b.py !== b.y,
       facing: b.x < b.px ? -1 : 1,
     });
+    if (state.battle?.phase === 'clash') drawBattleClash(ctx, state.battle.frontX, state.battle.frontY);
   }
 
   // 6) 밤낮 색조 — 하루 진행도(subTick+보간)로 계산. 세계를 물들이고 창에는 불이 켜진다.

@@ -3,11 +3,13 @@ import { CONFIG } from './config';
 import { FACTIONS, type Faction } from './constants';
 import { countBuilt } from './buildings';
 import { addLog } from './events';
+import { startBattle } from './battles';
 import { findPath } from './agents';
+import { damageBuildings, injure, loot, moraleShock } from './raidDamage';
 import { changeRelation, getRelation, hostileRelationsAvg } from './relations';
-import { countJob, livingResidents } from './residents';
+import { countJob } from './residents';
 import { getSeason, getYear } from './seasons';
-import type { GameState, PendingChoice, ResourceId } from './types';
+import type { GameState, PendingChoice } from './types';
 
 // 위협도 일일 갱신
 export function updateThreat(state: GameState): void {
@@ -72,7 +74,7 @@ function raiderPassable(state: GameState, x: number, y: number): boolean {
 // 습격 발생 판정: 성사되면 지도 가장자리에 습격 무리가 나타나 마을로 접근한다
 export function checkRaidTrigger(state: GameState, rng: () => number): void {
   const t = CONFIG.threat;
-  if (state.pendingChoice || state.raidCooldown > 0 || state.raiders) return;
+  if (state.pendingChoice || state.raidCooldown > 0 || state.raiders || state.battle) return;
   if (state.threat < t.raidThreshold) return;
   let chance = (state.threat - t.raidThreshold) / t.raidChanceDiv;
   const season = getSeason(state.day);
@@ -144,8 +146,11 @@ export function spawnRaiders(state: GameState, rng: () => number, warned: boolea
 export function raidersTick(state: GameState, rng: () => number): void {
   const band = state.raiders;
   if (!band || state.pendingChoice || state.gameOver) return;
+  // 보간 기준점을 매 틱 현재 위치로 맞춘다 — 전투로 묶여 있어도 갱신해야
+  // 렌더러가 직전 타일에서 미끄러져 들어오는 이동을 반복 재생하지 않는다
   band.px = band.x;
   band.py = band.y;
+  if (state.battle) return; // 전투 중엔 무리가 전선에 묶인다
   let steps = Math.floor(band.speed) + (rng() < band.speed % 1 ? 1 : 0);
   while (steps-- > 0 && band.path.length > 0) {
     const next = band.path.shift()!;
@@ -199,7 +204,7 @@ export function openRaidChoice(
       },
       {
         id: 'militia', label: '민병대를 소집해 맞선다',
-        desc: '방어도가 높으면 물리칠 수 있습니다. 부상자가 나올 수 있고, 며칠간 일손이 줄어듭니다.',
+        desc: '지도 위에서 실제 전투가 벌어집니다. 민병과 파수꾼이 전선으로 출전합니다.',
       },
       {
         id: 'tribute', label: '공물을 내어보낸다',
@@ -224,63 +229,6 @@ export function openRaidChoice(
   };
   state.pendingChoice = choice;
   addLog(state, `${faction.name}의 습격이 시작되었습니다!`, 'raid');
-}
-
-// 창고 자원 약탈 처리
-function loot(state: GameState, ratio: number): string {
-  const storeBonus = Math.min(0.3, countBuilt(state, 'storehouse') * 0.1);
-  const r = Math.max(0.05, ratio - storeBonus);
-  const targets: ResourceId[] = ['food', 'grain', 'hide', 'tools', 'clothes', 'firewood'];
-  const parts: string[] = [];
-  for (const res of targets) {
-    const taken = Math.floor(state.resources[res] * r);
-    if (taken > 0) {
-      state.resources[res] -= taken;
-      parts.push(`${res === 'food' ? '식량' : res === 'grain' ? '곡물' : res === 'hide' ? '가죽' : res === 'tools' ? '도구' : res === 'clothes' ? '옷' : '장작'} ${taken}`);
-    }
-  }
-  return parts.length > 0 ? parts.join(', ') + ' 약탈당함' : '약탈 피해 없음';
-}
-
-// 부상자 발생: 무작위 주민의 건강을 깎는다 (학살이 아니라 부상 중심)
-function injure(state: GameState, rng: () => number, count: number, severity: number): number {
-  const living = livingResidents(state);
-  let injured = 0;
-  for (let i = 0; i < count && living.length > 0; i++) {
-    const r = living[Math.floor(rng() * living.length)];
-    r.health = Math.max(5, r.health - (severity + rng() * severity));
-    r.task = '부상 회복 중';
-    injured++;
-  }
-  return injured;
-}
-
-function damageBuildings(state: GameState, rng: () => number, count: number): string[] {
-  // 중심지는 파괴 대상에서 제외 (중심지 파괴 패배는 연속 실패 시에만)
-  const candidates = state.buildings.filter(b => b.type !== 'center' && b.built);
-  const destroyed: string[] = [];
-  for (let i = 0; i < count && candidates.length > 0; i++) {
-    const idx = Math.floor(rng() * candidates.length);
-    const b = candidates.splice(idx, 1)[0];
-    // 절반 확률로 완파, 아니면 반파(재건 필요)
-    if (rng() < 0.5) {
-      state.buildings = state.buildings.filter(x => x.id !== b.id);
-      const tile = state.map[b.y]?.[b.x];
-      if (tile) tile.buildingId = null;
-      destroyed.push(b.type);
-    } else {
-      b.built = false;
-      b.progress = Math.floor(b.progress / 2);
-      destroyed.push(b.type);
-    }
-  }
-  return destroyed;
-}
-
-function moraleShock(state: GameState, amount: number): void {
-  for (const r of livingResidents(state)) {
-    r.morale = Math.max(0, Math.min(100, r.morale - amount));
-  }
 }
 
 // 선택지 결과 판정
@@ -310,6 +258,9 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
       break;
     }
     case 'militia': {
+      // 지도에 무리가 있으면 실제 전투를 연다 (승패·후처리는 battleTick이 맡는다).
+      // 무리 없이 열린 폴백 습격(접근 경로 없음)만 아래의 즉시 판정으로 처리한다.
+      if (startBattle(state)) return;
       if (rng() < successP) {
         const injured = injure(state, rng, 1 + Math.floor(rng() * 2), 20);
         state.resources.reputation = Math.min(100, state.resources.reputation + 5);

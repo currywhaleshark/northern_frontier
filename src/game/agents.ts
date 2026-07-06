@@ -509,6 +509,25 @@ function militiaTick(state: GameState, r: Resident, ctx: Ctx): void {
   else goToCenter(state, r, ctx);
 }
 
+
+function battleAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const battle = state.battle;
+  if (!battle) return;
+  if (battle.phase === 'muster') {
+    r.task = '출전 중';
+    const st = goTo(state, r, ctx, tile =>
+      Math.abs(tile.x - battle.frontX) + Math.abs(tile.y - battle.frontY) <= 2);
+    if (st === 'stuck') {
+      r.path = [];
+      r.task = '전선 대기';
+    }
+    return;
+  }
+  r.path = [];
+  r.phase = 'working';
+  r.task = '전투 중';
+}
+
 function idleTick(state: GameState, r: Resident, ctx: Ctx): void {
   r.task = '대기';
   const center = state.buildings.find(b => b.id === ctx.centerId);
@@ -566,6 +585,11 @@ export function agentsTick(state: GameState): void {
       r.task = '앓아누움';
       if (carryTotal(r) > 0) depositAll(state, r); // 짐은 이웃이 거둬 간다
       goToCenter(state, r, ctx);
+      continue;
+    }
+    // 전투에 징집된 주민은 직업 행동보다 전선 행동을 우선한다.
+    if (state.battle?.defenderIds.includes(r.id)) {
+      battleAgentTick(state, r, ctx);
       continue;
     }
     // 심한 악천후엔 실외 작업자는 대피한다

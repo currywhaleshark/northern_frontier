@@ -8,6 +8,7 @@ import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events'
 import { generateMap, makeRng } from './map';
 import { isHabitatActive, spawnAnimalHabitats } from './habitats';
 import { agentsTick, resetAgent, SUBTICKS } from './agents';
+import { battleTick } from './battles';
 import { checkRaidTrigger, raidersTick, resolveRaid, updateThreat } from './raids';
 import { driftRelations, initRelations } from './relations';
 import { avg, createResident, livingResidents, updateMorale, updateResidentNeeds } from './residents';
@@ -47,6 +48,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     threat: 25,
     relations: initRelations(),
     raiders: null,
+    battle: null,
     raidCooldown: 0,
     tradeRefusedDays: 0,
     lastTradeDay: 0,
@@ -165,7 +167,9 @@ export function resolveChoice(state: GameState, optionId: string): void {
 export function advanceTick(state: GameState): void {
   if (state.gameOver || state.pendingChoice) return;
   agentsTick(state);
-  raidersTick(state, makeRng(state.seed + state.day * 7919 + state.subTick * 131 + 3));
+  const tickRng = makeRng(state.seed + state.day * 7919 + state.subTick * 131 + 3);
+  battleTick(state, tickRng);
+  raidersTick(state, tickRng);
   state.subTick++;
   if (state.subTick >= SUBTICKS) {
     state.subTick = 0;

@@ -17,7 +17,7 @@ export function addLog(state: GameState, text: string, kind: LogEntry['kind'] = 
 // 교역품이 있는 세력(니마차 등)은 평시엔 장사꾼으로 온다.
 export function maybeOfferTrade(state: GameState, rng: () => number, daysSinceTrade: number): boolean {
   if (countBuilt(state, 'market') === 0) return false;
-  if (state.pendingChoice) return false;
+  if (state.pendingChoice || state.battle) return false;
   if (daysSinceTrade < CONFIG.trade.minIntervalDays) return false;
   if (rng() >= CONFIG.trade.dailyChance) return false;
 
