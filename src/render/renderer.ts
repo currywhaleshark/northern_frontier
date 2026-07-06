@@ -8,15 +8,14 @@
 import { CONFIG } from '../game/config';
 import { BUILDING_DEFS, canAfford, canPlaceOn } from '../game/buildings';
 import { getSeason } from '../game/seasons';
-import { findForestHabitatIconAtTile, findForestHabitats, type ForestHabitat } from '../game/habitats';
+import { findHabitatIconAtTile } from '../game/habitats';
 import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
-import type { BuildingTypeId, GameState, Resident, Terrain } from '../game/types';
+import type { AnimalHabitat, BuildingTypeId, GameState, Resident, Terrain } from '../game/types';
 
 const TILE = CONFIG.ui.tileSize;
 
 // 배치 모드에서 금색으로 짚어 주는 자원 지형 (건물 → 찾아야 할 지형)
 const PLACEMENT_HINT: Partial<Record<BuildingTypeId, Terrain>> = {
-  huntLodge: 'hunting',
   field: 'fertile',
 };
 
@@ -84,7 +83,11 @@ function drawTerrainLayer(state: GameState, width: number, height: number, sprit
         hasIron: tile.hasIron, tileX: x, tileY: y,
         x: x * TILE, y: y * TILE, size: TILE,
         banks: tile.terrain === 'river'
-          ? { n: isLand(x, y - 1), e: isLand(x + 1, y), s: isLand(x, y + 1), w: isLand(x - 1, y) }
+          ? {
+              n: isLand(x, y - 1), e: isLand(x + 1, y), s: isLand(x, y + 1), w: isLand(x - 1, y),
+              ne: isLand(x + 1, y - 1), se: isLand(x + 1, y + 1),
+              sw: isLand(x - 1, y + 1), nw: isLand(x - 1, y - 1),
+            }
           : undefined,
       });
     }
@@ -123,7 +126,7 @@ function drawFootprints(ctx: CanvasRenderingContext2D, trail: { x: number; y: nu
   }
 }
 
-function drawHabitatRange(ctx: CanvasRenderingContext2D, habitat: ForestHabitat): void {
+function drawHabitatRange(ctx: CanvasRenderingContext2D, habitat: AnimalHabitat): void {
   const cx = (habitat.x + 0.5) * TILE;
   const cy = (habitat.y + 0.5) * TILE;
   ctx.save();
@@ -138,7 +141,7 @@ function drawHabitatRange(ctx: CanvasRenderingContext2D, habitat: ForestHabitat)
   ctx.restore();
 }
 
-function drawHabitatIcon(ctx: CanvasRenderingContext2D, habitat: ForestHabitat): void {
+function drawHabitatIcon(ctx: CanvasRenderingContext2D, habitat: AnimalHabitat): void {
   const cx = (habitat.x + 0.5) * TILE;
   const cy = (habitat.y + 0.5) * TILE;
   const r = TILE * 0.36;
@@ -172,8 +175,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
 
   // 1) 지형
   const layer = drawTerrainLayer(state, canvas.width, canvas.height, sprites);
-  const habitats = findForestHabitats(state.map);
-  const hoveredHabitat = o.hover ? findForestHabitatIconAtTile(habitats, o.hover.x, o.hover.y) : null;
+  // 짐승이 떠난(비활성) 서식지는 지도에서도 숨긴다
+  const habitats = state.habitats.filter(h => h.active);
+  const hoveredHabitat = o.hover ? findHabitatIconAtTile(habitats, o.hover.x, o.hover.y) : null;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(layer, 0, 0);
   if (hoveredHabitat) drawHabitatRange(ctx, hoveredHabitat);
@@ -264,7 +268,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   // 8) 날씨 오버레이 (비/눈/눈보라/서리/혹한/해빙 홍수)
   drawWeather(ctx, state.weather, canvas.width, canvas.height);
 
-  // 9) 배치 모드: 관련 자원 타일 하이라이트 (사냥막→사냥터, 밭→비옥한 땅)
+  // 9) 배치 모드: 관련 자원 하이라이트 (사냥막→서식지 범위, 밭→비옥한 땅)
   if (o.placingType) {
     // 사냥막 배치 중엔 모든 서식지 범위를 보여줘 자리를 잡기 쉽게 한다
     if (o.placingType === 'huntLodge') {

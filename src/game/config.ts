@@ -108,7 +108,6 @@ export const CONFIG = {
     forestRegrowChance: 0.0015, // 봄여름, 숲 인접 평지가 숲이 될 하루 확률
     // 사냥 수확 배율 — 짐승 서식지(숲 덩어리)가 클수록 사냥감이 풍부하다
     hunting: {
-      strayYield: 0.75,          // 서식지 밖 명시적 사냥터 지형
       habitatYieldBase: 0.8,     // 서식지 기본
       habitatYieldPerTile: 0.012, // 서식지 숲 1타일당 가산 (숲 50타일에서 최대치)
       habitatYieldMax: 1.4,
@@ -197,21 +196,22 @@ export const CONFIG = {
   },
 
   // 난이도별 보정 (메인 메뉴에서 선택)
+  // habitatChance: 숲 덩어리마다 짐승 서식지가 자리 잡을 확률 — 어려울수록 사냥감이 귀하다
   difficulty: {
     easy: {
       name: '이주민', tag: '수월',
       desc: '물자가 넉넉하고 국경이 비교적 조용합니다. 처음 오는 이에게.',
-      startRes: 1.5, threatGain: 0.7, raidPower: 0.8,
+      startRes: 1.5, threatGain: 0.7, raidPower: 0.8, habitatChance: 0.85,
     },
     normal: {
       name: '개척민', tag: '표준',
       desc: '설계된 기본 난이도. 첫 겨울과 첫 습격이 당신을 시험합니다.',
-      startRes: 1, threatGain: 1, raidPower: 1,
+      startRes: 1, threatGain: 1, raidPower: 1, habitatChance: 0.65,
     },
     hard: {
       name: '변방 첨사', tag: '혹한',
       desc: '물자가 빠듯하고 습격이 사납습니다. 국경의 겨울은 자비가 없습니다.',
-      startRes: 0.7, threatGain: 1.35, raidPower: 1.25,
+      startRes: 0.7, threatGain: 1.35, raidPower: 1.25, habitatChance: 0.45,
     },
   },
 

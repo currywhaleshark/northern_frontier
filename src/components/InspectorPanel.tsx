@@ -85,6 +85,10 @@ export function InspectorPanel({
             <tbody>
               <tr><td>위치</td><td>({tile.x}, {tile.y})</td></tr>
               <tr><td>지형</td><td>{TERRAIN_NAMES[tile.terrain]}{tile.terrain === 'rock' && tile.hasIron ? ' (철맥)' : ''}</td></tr>
+              {tile.terrain === 'forest' && state.habitats.some(h =>
+                h.active && (h.x - tile.x) ** 2 + (h.y - tile.y) ** 2 <= h.radius ** 2) && (
+                <tr><td>서식지</td><td>🐾 짐승 서식지 범위 (사냥 가능)</td></tr>
+              )}
               {building && (() => {
                 const def = BUILDING_DEFS[building.type];
                 return (

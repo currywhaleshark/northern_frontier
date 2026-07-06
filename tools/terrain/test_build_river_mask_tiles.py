@@ -6,12 +6,13 @@ from . import build_river_mask_tiles as river
 
 
 class RiverMaskTilesTest(unittest.TestCase):
-    def test_defines_sixteen_connectors_and_four_seasons(self) -> None:
-        self.assertEqual(16, len(river.CONNECTORS))
+    def test_defines_seventeen_connectors_and_four_seasons(self) -> None:
+        self.assertEqual(17, len(river.CONNECTORS))
         self.assertEqual(("spring", "summer", "autumn", "winter"), river.SEASONS)
         self.assertEqual("vertical", river.CONNECTORS[0].key)
         self.assertEqual("horizontal", river.CONNECTORS[1].key)
-        self.assertEqual("source", river.CONNECTORS[-1].key)
+        self.assertEqual("source", river.CONNECTORS[-2].key)
+        self.assertEqual("fill", river.CONNECTORS[-1].key)
 
     def test_vertical_mask_opens_only_north_and_south(self) -> None:
         vertical = river.CONNECTORS[0]
@@ -33,7 +34,17 @@ class RiverMaskTilesTest(unittest.TestCase):
 
     def test_build_sheet_dimensions_match_connectors_and_seasons(self) -> None:
         sheet = river.build_sheet()
-        self.assertEqual((28 * 16, 28 * 4), sheet.size)
+        self.assertEqual((28 * 17, 28 * 4), sheet.size)
+
+    def test_water_fill_tile_stays_near_water_palette(self) -> None:
+        for season in river.SEASONS:
+            tile = river.make_water_fill_tile(season)
+            base = river.SEASON_TINTS[season]["water"]
+            for x in (0, 13, 27):
+                for y in (0, 13, 27):
+                    pixel = tile.getpixel((x, y))
+                    for channel, ref in zip(pixel, base):
+                        self.assertLessEqual(abs(channel - ref), 24, f"{season} ({x},{y})")
 
     def test_seam_preview_dimensions_match_preview_grid(self) -> None:
         sheet = river.build_sheet()

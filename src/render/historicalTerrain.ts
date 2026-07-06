@@ -23,7 +23,6 @@ export function historicalTerrainColumn(terrain: Terrain): number | null {
     case 'mountain':
     case 'rock':
     case 'fertile':
-    case 'hunting':
       return 0;
     case 'river':
       return null;

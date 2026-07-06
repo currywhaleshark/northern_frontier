@@ -19,7 +19,7 @@ export const WEATHER_ICONS: Record<WeatherId, string> = {
 
 export const TERRAIN_NAMES: Record<Terrain, string> = {
   forest: '숲', plain: '평지', river: '강', mountain: '산지',
-  hunting: '사냥터', fertile: '비옥한 땅', rock: '바위/철광', center: '마을 터',
+  fertile: '비옥한 땅', rock: '바위/철광', center: '마을 터',
 };
 
 export const JOB_NAMES: Record<JobId, string> = {
@@ -36,7 +36,7 @@ export const JOB_ORDER: JobId[] = [
 export const JOB_DESC: Record<JobId, string> = {
   idle: '배정된 일이 없습니다.',
   woodcutter: '숲까지 걸어가 나무를 베고, 벌목장이나 창고로 목재를 나릅니다.',
-  hunter: '사냥터를 오가며 사냥감을 잡아 사냥막이나 창고로 나릅니다.',
+  hunter: '짐승 서식지를 오가며 사냥감을 잡아 사냥막이나 창고로 나릅니다.',
   farmer: '밭을 오가며 봄여름에 작물을 돌보고 가을에 곡물을 거둬 나릅니다.',
   builder: '공사장까지 가서 건물을 짓습니다.',
   hauler: '창고에서 장작을 패고 사냥감을 손질하고 곡물을 도정하며, 일이 없으면 채석을 다녀옵니다.',

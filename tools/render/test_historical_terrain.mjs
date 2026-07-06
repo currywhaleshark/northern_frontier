@@ -27,7 +27,6 @@ const columnCases = [
   ['mountain', 0],
   ['rock', 0],
   ['fertile', 0],
-  ['hunting', 0],
 ];
 
 for (const [terrain, expectedColumn] of columnCases) {

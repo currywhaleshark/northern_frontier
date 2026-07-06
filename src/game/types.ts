@@ -18,10 +18,19 @@ export type Terrain =
   | 'plain'    // 평지
   | 'river'    // 강 (겨울에는 얼어붙은 강으로 표시)
   | 'mountain' // 산지
-  | 'hunting'  // 사냥터
   | 'fertile'  // 비옥한 땅
   | 'rock'     // 바위/철광
   | 'center';  // 마을 중심지 예정지
+
+// 짐승 서식지 — 지도 생성 때 숲 덩어리마다 난이도별 확률로 자리 잡는다.
+// 반경 안 숲이 벌목으로 줄면 짐승이 떠나고(active=false), 숲이 되살아나면 돌아온다.
+export interface AnimalHabitat {
+  id: number;
+  x: number;
+  y: number;
+  radius: number;
+  active: boolean;
+}
 
 export type JobId =
   | 'idle'       // 무직
@@ -193,6 +202,7 @@ export interface GameState {
   seed: number;
   weather: WeatherId;
   map: Tile[][];
+  habitats: AnimalHabitat[];
   residents: Resident[];
   buildings: Building[];
   nextBuildingId: number;

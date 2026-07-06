@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,6 +37,7 @@ class Connector:
     s: bool = False
     w: bool = False
     source_pool: bool = False
+    fill: bool = False  # 타일 전체가 물 — 렌더러가 물 영역을 직접 잘라 쓰는 텍스처
 
 
 CONNECTORS: tuple[Connector, ...] = (
@@ -55,6 +57,7 @@ CONNECTORS: tuple[Connector, ...] = (
     Connector("tee_wne", "T west/north/east", w=True, n=True, e=True),
     Connector("cross", "cross", n=True, e=True, s=True, w=True),
     Connector("source", "source pool", source_pool=True),
+    Connector("fill", "water fill", fill=True),
 )
 
 CONNECTOR_BY_KEY = {connector.key: connector for connector in CONNECTORS}
@@ -82,6 +85,10 @@ def blank_mask() -> Image.Image:
 def draw_connector_mask(connector: Connector) -> Image.Image:
     mask = blank_mask()
     draw = ImageDraw.Draw(mask)
+
+    if connector.fill:
+        draw.rectangle((0, 0, TILE_SIZE - 1, TILE_SIZE - 1), fill=255)
+        return mask
 
     if connector.source_pool:
         draw.ellipse((7, 7, 21, 21), fill=255)
@@ -115,6 +122,8 @@ def edge_pixels(mask: Image.Image, side: str) -> list[int]:
 def validate_masks() -> list[str]:
     errors: list[str] = []
     for connector in CONNECTORS:
+        if connector.fill:
+            continue  # 전면 물 타일은 통행로 규칙 대상이 아니다
         mask = draw_connector_mask(connector)
         openings = {"n": connector.n, "e": connector.e, "s": connector.s, "w": connector.w}
         for side, is_open in openings.items():
@@ -231,14 +240,44 @@ def normalize_open_edges(tile: Image.Image, connector: Connector, season: str) -
             px[0, y] = color
 
 
+def _grain(x: int, y: int, seed: int) -> float:
+    n = (x * 374761393 + y * 668265263 + seed * 2246822519) & 0xFFFFFFFF
+    n = ((n ^ (n >> 13)) * 1274126177) & 0xFFFFFFFF
+    return ((n ^ (n >> 16)) & 0xFF) / 255.0
+
+
+def make_water_fill_tile(season: str) -> Image.Image:
+    """타일 전체 물 텍스처 — 렌더러가 물 폭에 맞춰 임의로 잘라 쓴다.
+
+    어느 위치에서 잘라도 이웃 타일과 이어져 보여야 하므로, 잔물결은 타일
+    크기로 나눠떨어지는 주기의 사인파만 쓰고 알갱이는 좌표 해시로 만든다.
+    """
+    base = SEASON_TINTS[season]["water"]
+    out = Image.new("RGB", (TILE_SIZE, TILE_SIZE), base)
+    px = out.load()
+    seed = SEASONS.index(season)
+    step = 2 * math.pi / TILE_SIZE
+    for y in range(TILE_SIZE):
+        for x in range(TILE_SIZE):
+            ripple = math.sin((x * 2 + y * 5) * step) + 0.5 * math.sin((x * 7 - y * 3) * step)
+            grain = _grain(x, y, seed) - 0.5
+            # 겨울 얼음은 매끈하고 밝은 결, 나머지 계절은 잔물결이 조금 더 살아 있게
+            lift = ripple * 5 + grain * 6 if season == "winter" else ripple * 7 + grain * 10
+            px[x, y] = tuple(max(0, min(255, round(c + lift))) for c in base)
+    return out
+
+
 def build_sheet() -> Image.Image:
     source = load_source_sheet()
     sheet = Image.new("RGB", (TILE_SIZE * len(CONNECTORS), TILE_SIZE * len(SEASONS)))
     for row, season in enumerate(SEASONS):
         for col, connector in enumerate(CONNECTORS):
-            sample_col = 15 if connector.source_pool else col
-            source_tile = crop_source_tile(source, row, sample_col)
-            tile = compose_tile(source_tile, season, connector)
+            if connector.fill:
+                tile = make_water_fill_tile(season)
+            else:
+                sample_col = 15 if connector.source_pool else col
+                source_tile = crop_source_tile(source, row, sample_col)
+                tile = compose_tile(source_tile, season, connector)
             sheet.paste(tile, (col * TILE_SIZE, row * TILE_SIZE))
     return sheet
 

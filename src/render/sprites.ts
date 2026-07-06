@@ -12,19 +12,19 @@ import type { BuildingTypeId, JobId, Season, Terrain } from '../game/types';
 const TERRAIN_PALETTES: Record<Season, Record<Terrain, string>> = {
   spring: {
     forest: '#2f5d3a', plain: '#7c8b58', river: '#3e6f9e', mountain: '#6d6a63',
-    hunting: '#5c7247', fertile: '#8a7a45', rock: '#7d7468', center: '#a08858',
+    fertile: '#8a7a45', rock: '#7d7468', center: '#a08858',
   },
   summer: {
     forest: '#2a6b3a', plain: '#84955c', river: '#3a6fa8', mountain: '#6d6a63',
-    hunting: '#628a4a', fertile: '#96833f', rock: '#7d7468', center: '#a08858',
+    fertile: '#96833f', rock: '#7d7468', center: '#a08858',
   },
   autumn: {
     forest: '#6b5a2e', plain: '#8f7f4e', river: '#3e6a92', mountain: '#69655e',
-    hunting: '#7a6a3c', fertile: '#7d6a3a', rock: '#78706a', center: '#a08858',
+    fertile: '#7d6a3a', rock: '#78706a', center: '#a08858',
   },
   winter: {
     forest: '#46564e', plain: '#c3ccd3', river: '#a8cbdd', mountain: '#8d949c',
-    hunting: '#b2bfc4', fertile: '#bcc6cd', rock: '#828a92', center: '#b0a890',
+    fertile: '#bcc6cd', rock: '#828a92', center: '#b0a890',
   },
 };
 
@@ -44,8 +44,11 @@ export interface TerrainDrawParams {
   x: number;     // 픽셀 좌표
   y: number;
   size: number;
-  // 강 타일 전용: 각 방향이 뭍인지 (물가 경계 표현용)
-  banks?: { n: boolean; e: boolean; s: boolean; w: boolean };
+  // 강 타일 전용: 각 방향(대각선 포함)이 뭍인지 (물가 경계 표현용)
+  banks?: {
+    n: boolean; e: boolean; s: boolean; w: boolean;
+    ne: boolean; se: boolean; sw: boolean; nw: boolean;
+  };
 }
 
 export interface BuildingDrawParams {

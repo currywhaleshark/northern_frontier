@@ -53,20 +53,33 @@ export function generateMap(seed: number): { tiles: Tile[][]; centerX: number; c
   }
 
   // 강: 북쪽에서 남쪽으로 굽이치며 흐른다.
-  // 이전 행의 물줄기와 좌우로 겹치게 이어 붙여, 대각선으로만 닿아 끊겨 보이는 일을 막는다.
-  let rx = Math.floor(w * (0.3 + rng() * 0.4));
-  let prevRx = rx;
+  // 중심선을 기준으로 좌우 대칭으로 파내고, 폭은 사인 곡선을 따라 1~3타일로
+  // 완만하게 넓어졌다 좁아진다 — 여울(좁은 목)과 소(넓은 물)가 드러난다.
+  let riverX = w * (0.3 + rng() * 0.4);
+  let drift = 0; // 굽이 관성 — 급하게 꺾이지 않게
+  const widthPhase = rng() * Math.PI * 2;
+  const widthFreq = 0.10 + rng() * 0.08; // 몇 굽이마다 폭이 바뀌는지
+  let prevLo = -1, prevHi = -1;
   for (let y = 0; y < h; y++) {
-    const width = 1 + (rng() < 0.4 ? 1 : 0);
-    const lo = Math.min(rx, prevRx);
-    const hi = Math.max(rx + width - 1, prevRx);
+    const breadth = 2 + Math.sin(y * widthFreq + widthPhase) * 1.25 + (rng() - 0.5) * 0.6;
+    const width = Math.max(1, Math.min(3, Math.round(breadth)));
+    let lo = Math.round(riverX - (width - 1) / 2);
+    let hi = lo + width - 1;
+    // 이전 행의 물줄기와 좌우로 겹치게 이어 붙여, 대각선으로만 닿아 끊겨 보이는 일을 막는다
+    if (prevLo >= 0) {
+      if (lo > prevHi) lo = prevHi;
+      if (hi < prevLo) hi = prevLo;
+    }
     for (let x = lo; x <= hi; x++) {
       const xx = Math.max(0, Math.min(w - 1, x));
       tiles[y][xx].terrain = 'river';
     }
-    prevRx = rx;
-    rx += Math.round((rng() - 0.5) * 2.4);
-    rx = Math.max(3, Math.min(w - 4, rx));
+    prevLo = Math.max(0, Math.min(w - 1, lo));
+    prevHi = Math.max(0, Math.min(w - 1, hi));
+    drift += (rng() - 0.5) * 0.7;
+    drift = Math.max(-1, Math.min(1, drift));
+    riverX += drift;
+    riverX = Math.max(3, Math.min(w - 4, riverX));
   }
 
   // 산지: 동쪽/북쪽 가장자리에 능선
@@ -80,11 +93,6 @@ export function generateMap(seed: number): { tiles: Tile[][]; centerX: number; c
   // 숲: 넓게 분포
   for (let i = 0; i < 26; i++) {
     blob(tiles, rng, rng() * w, rng() * h, 30, 'forest', ['plain']);
-  }
-
-  // 사냥터: 숲 근처 개활지
-  for (let i = 0; i < 7; i++) {
-    blob(tiles, rng, rng() * w, rng() * h, 8, 'hunting', ['forest', 'plain']);
   }
 
   // 바위/철광: 산지 가장자리(평지와 맞닿은 곳)에만 생성해 주민이 걸어서 닿을 수 있게 한다
@@ -139,28 +147,6 @@ export function generateMap(seed: number): { tiles: Tile[][]; centerX: number; c
     }
   }
   tiles[centerY][centerX].terrain = 'center';
-
-  // 마을 근처에 사냥터를 최소 몇 타일 보장해 초반 식량 운을 줄인다
-  let nearbyHunting = 0;
-  for (let dy = -8; dy <= 8; dy++) {
-    for (let dx = -8; dx <= 8; dx++) {
-      const t = tiles[centerY + dy]?.[centerX + dx];
-      if (t && t.terrain === 'hunting') nearbyHunting++;
-    }
-  }
-  if (nearbyHunting < 4) {
-    let added = 0;
-    for (let tryI = 0; tryI < 200 && added < 5; tryI++) {
-      const dx = Math.round((rng() - 0.5) * 12);
-      const dy = Math.round((rng() - 0.5) * 12);
-      if (Math.abs(dx) < 3 && Math.abs(dy) < 3) continue; // 마을 바로 옆은 비워둔다
-      const t = tiles[centerY + dy]?.[centerX + dx];
-      if (t && (t.terrain === 'forest' || t.terrain === 'plain')) {
-        t.terrain = 'hunting';
-        added++;
-      }
-    }
-  }
 
   return { tiles, centerX, centerY };
 }

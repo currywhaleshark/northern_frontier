@@ -13,15 +13,11 @@ const output = ts.transpileModule(source, {
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(output).toString('base64')}`;
 const {
   terrainCanopyLayer,
-  terrainShowsStandaloneGameTrail,
 } = await import(moduleUrl);
 
 assert.equal(terrainCanopyLayer('forest'), 'forest');
-assert.equal(terrainCanopyLayer('hunting'), 'forest');
 assert.equal(terrainCanopyLayer('plain'), null);
 assert.equal(terrainCanopyLayer('fertile'), null);
 assert.equal(terrainCanopyLayer('mountain'), null);
-assert.equal(terrainShowsStandaloneGameTrail('hunting'), false);
-assert.equal(terrainShowsStandaloneGameTrail('forest'), false);
 
 console.log('terrain visuals tests passed');

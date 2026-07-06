@@ -3,7 +3,7 @@
 import { CONFIG } from './config';
 import { BUILDING_DEFS } from './buildings';
 import { addLog } from './events';
-import { collectHuntableTiles, findForestHabitats } from './habitats';
+import { collectHuntableTiles } from './habitats';
 import { makeRng } from './map';
 import { getSeason } from './seasons';
 import { outdoorMult } from './weather';
@@ -256,7 +256,7 @@ function hunterTick(state: GameState, r: Resident, ctx: Ctx): void {
     yieldAmt: t => a.yields.game * CONFIG.seasons.gameMult[ctx.season] * (ctx.huntable.get(`${t.x},${t.y}`) ?? 0),
     cap: a.carryCap.game,
     depositExtra: ['huntLodge'],
-    taskWork: '사냥 중', taskMove: '사냥터로 이동', taskHaul: '사냥감 운반',
+    taskWork: '사냥 중', taskMove: '서식지로 이동', taskHaul: '사냥감 운반',
     onHarvest: (_tile, res) => {
       if (ctx.rng() < 0.06) {
         addLog(state, `사냥꾼 ${res.name}이(가) 노루를 잡아 식량과 가죽을 가져옵니다.`, 'good');
@@ -275,7 +275,7 @@ function herbalistTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
   gatherJob(state, r, ctx, {
-    goal: t => t.terrain === 'forest' || t.terrain === 'hunting',
+    goal: t => t.terrain === 'forest',
     workTicks: a.work.herb,
     yieldRes: 'herbs',
     yieldAmt: a.yields.herbs,
@@ -554,7 +554,7 @@ export function agentsTick(state: GameState): void {
     mMod: 0.8 + (mAvg / 100) * 0.4,
     rng,
     centerId: center ? center.id : -1,
-    huntable: collectHuntableTiles(state.map, findForestHabitats(state.map), CONFIG.agents.hunting),
+    huntable: collectHuntableTiles(state.map, state.habitats, CONFIG.agents.hunting),
   };
 
   for (const r of living) {

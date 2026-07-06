@@ -35,7 +35,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   huntLodge: {
     id: 'huntLodge', name: '사냥막', emoji: '🏹',
-    desc: '사냥꾼이 사냥감을 부리는 거점. 사냥터 가까이 지으면 왕복이 줄어든다.',
+    desc: '사냥꾼이 사냥감을 부리는 거점. 짐승 서식지 가까이 지으면 왕복이 줄어든다.',
     cost: { wood: 8, hide: 2 }, buildDays: 4, slots: 4, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
@@ -117,7 +117,7 @@ export function canPlaceOn(def: BuildingDef, tile: Tile): boolean {
   if (def.placement === 'field') {
     return tile.terrain === 'fertile' || tile.terrain === 'plain';
   }
-  // land: 평지/숲/사냥터/비옥지 (숲에 지으면 개간)
+  // land: 평지/숲/비옥지 (숲에 지으면 개간)
   return true;
 }
 

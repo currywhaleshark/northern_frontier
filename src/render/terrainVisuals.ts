@@ -5,7 +5,6 @@ export type TerrainCanopyLayer = 'forest' | null;
 export function terrainCanopyLayer(terrain: Terrain): TerrainCanopyLayer {
   switch (terrain) {
     case 'forest':
-    case 'hunting':
       return 'forest';
     case 'plain':
     case 'river':
@@ -15,8 +14,4 @@ export function terrainCanopyLayer(terrain: Terrain): TerrainCanopyLayer {
     case 'center':
       return null;
   }
-}
-
-export function terrainShowsStandaloneGameTrail(_terrain: Terrain): boolean {
-  return false;
 }

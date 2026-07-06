@@ -51,10 +51,6 @@ export function terrainObjectFor(
     if (season === 'autumn') return 'autumnTree';
     return 'broadleaf';
   }
-  if (terrain === 'hunting') {
-    if (season === 'winter') return 'snowPine';
-    return 'pine';
-  }
   if (terrain === 'mountain') return 'mountainCrag';
   if (terrain === 'rock') return hasIron ? 'ironOre' : 'lowRock';
   return null;

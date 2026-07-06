@@ -1,4 +1,7 @@
 // localStorage 저장/불러오기
+import { CONFIG } from './config';
+import { spawnAnimalHabitats } from './habitats';
+import { makeRng } from './map';
 import { initRelations } from './relations';
 import type { GameState } from './types';
 
@@ -25,6 +28,21 @@ export function loadGame(): GameState | null {
     // 구버전 저장 마이그레이션: 없는 필드는 기본값으로 채운다
     if (!parsed.relations) parsed.relations = initRelations();
     if (!parsed.difficulty) parsed.difficulty = 'normal';
+    if (!parsed.habitats) {
+      // 사냥터 지형이 있던 구버전: 사냥터를 숲으로 바꾸고 시드로 서식지를 새로 뽑는다
+      let cx = Math.floor(parsed.map[0].length / 2);
+      let cy = Math.floor(parsed.map.length / 2);
+      for (const row of parsed.map) {
+        for (const tile of row) {
+          if ((tile.terrain as string) === 'hunting') tile.terrain = 'forest';
+          if (tile.terrain === 'center') { cx = tile.x; cy = tile.y; }
+        }
+      }
+      parsed.habitats = spawnAnimalHabitats(
+        parsed.map, cx, cy, makeRng(parsed.seed ?? 1),
+        CONFIG.difficulty[parsed.difficulty].habitatChance,
+      );
+    }
     return parsed;
   } catch {
     return null;

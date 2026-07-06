@@ -4,16 +4,26 @@
 //
 // 시트 규격: 16x16 타일, 1px 간격 (pitch 17)
 // 이미지가 로드되기 전에는 placeholderSprites가 대신 쓰인다 (getActiveSprites 참고).
-import { placeholderSprites, type BuildingDrawParams, type SpriteAPI } from './sprites';
+import { placeholderSprites, type BuildingDrawParams, type SpriteAPI, type TerrainDrawParams } from './sprites';
 import { CONFIG } from '../game/config';
 import { JOB_COLORS } from '../game/constants';
-import type { BuildingTypeId, JobId, Season } from '../game/types';
+import type { BuildingTypeId, JobId, Season, Terrain } from '../game/types';
 import {
+  HISTORICAL_TERRAIN_SAMPLE_SIZE,
   historicalTerrainSampleOffsetFromHash,
   historicalTerrainSourceRect,
   historicalTerrainVariantFromHash,
 } from './historicalTerrain';
-import { riverSourceRect } from './riverAutotile';
+import {
+  RIVER_AUTOTILE_SIZE,
+  RIVER_BANK_COLORS,
+  RIVER_BANK_INSET,
+  RIVER_BANK_STRIP,
+  riverFillSourceRect,
+  riverLandCorners,
+  riverRoundedCorners,
+  riverWaterBox,
+} from './riverAutotile';
 import {
   GENERATED_TERRAIN_OBJECT_SHEET,
   fertileGroundWash,
@@ -21,7 +31,6 @@ import {
   terrainObjectFor,
   type GeneratedTerrainObject,
 } from './generatedTerrainObjects';
-import { terrainShowsStandaloneGameTrail } from './terrainVisuals';
 import {
   GENERATED_BUILDING_SHEET,
   generatedBuildingSourceRect,
@@ -232,18 +241,107 @@ function drawBanks(
   }
 }
 
-// 사냥터 표식: 타일을 가로지르는 짐승 발자국 두 줄 (좌우 번갈아 찍힌 발굽)
-function drawGameTrail(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, h: number): void {
-  const f = size / 16;
-  const flip = h % 2 === 0; // 타일마다 발자국 방향을 엇갈리게
-  ctx.fillStyle = 'rgba(88,58,30,0.75)';
-  for (let i = 0; i < 3; i++) {
-    const t = (i + 0.5) / 3;
-    const bx = x + (flip ? t : 1 - t) * (size - 6 * f) + 2 * f;
-    const by = y + t * (size - 7 * f) + 2 * f;
-    const side = i % 2 === 0 ? -1 : 1;
-    ctx.fillRect(bx + side * 1.6 * f, by, 2 * f, 2.6 * f);
-    ctx.fillRect(bx - side * 1.6 * f, by + 3 * f, 2 * f, 2.6 * f);
+// 역사 지형 시트에서 땅 텍스처를 그린다 (타일 좌표 해시로 뒤집기/표본 위치 변형)
+function drawHistoricalGround(
+  ctx: CanvasRenderingContext2D, terrain: Terrain, p: TerrainDrawParams, h: number,
+): boolean {
+  if (!historicalTerrainSheet) return false;
+  const rect = historicalTerrainSourceRect(terrain, p.season);
+  if (!rect) return false;
+  const variant = historicalTerrainVariantFromHash(h);
+  const sampleOffset = historicalTerrainSampleOffsetFromHash(h);
+  ctx.save();
+  ctx.translate(p.x + (variant.flipX ? p.size : 0), p.y + (variant.flipY ? p.size : 0));
+  ctx.scale(variant.flipX ? -1 : 1, variant.flipY ? -1 : 1);
+  ctx.drawImage(
+    historicalTerrainSheet,
+    rect.sx + sampleOffset.dx,
+    rect.sy + sampleOffset.dy,
+    rect.sw,
+    rect.sh,
+    0,
+    0,
+    p.size,
+    p.size,
+  );
+  ctx.restore();
+  return true;
+}
+
+// 강 타일: 밑에 이웃 평지와 같은 땅 텍스처를 깔고, 이웃 정보로 물 영역을 계산해 채운다.
+// 물은 뭍 방향으로만 둑 여백을 두므로 지도상의 강 폭(1~3타일)이 화면에 그대로 드러난다.
+function drawRiverTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParams, h: number): void {
+  const nb = p.banks!;
+  const f = p.size / RIVER_AUTOTILE_SIZE;
+  const inset = RIVER_BANK_INSET * f;
+  const strip = RIVER_BANK_STRIP * f;
+  const bankColor = RIVER_BANK_COLORS[p.season];
+
+  // 1) 땅 밑바탕 — 주변 지형과 같은 시트라 물가 바깥이 이웃 타일과 이어진다
+  drawHistoricalGround(ctx, 'plain', p, h);
+
+  const box = riverWaterBox(nb);
+  const bx = p.x + box.x0 * f;
+  const by = p.y + box.y0 * f;
+  const bw = (box.x1 - box.x0) * f;
+  const bh = (box.y1 - box.y0) * f;
+
+  // 2) 둑 띠 — 물 상자를 뭍 방향으로만 띠 두께만큼 키워 테두리로 남긴다
+  ctx.fillStyle = bankColor;
+  ctx.fillRect(
+    bx - (nb.w ? strip : 0),
+    by - (nb.n ? strip : 0),
+    bw + (nb.w ? strip : 0) + (nb.e ? strip : 0),
+    bh + (nb.n ? strip : 0) + (nb.s ? strip : 0),
+  );
+
+  // 3) 물 — 전면 물 텍스처에서 물 상자와 같은 위치를 잘라와 이웃 타일과 무늬가 이어진다
+  const fill = riverFillSourceRect(p.season, p.frozenRiver);
+  ctx.drawImage(
+    riverSheet!,
+    fill.sx + box.x0, fill.sy + box.y0, box.x1 - box.x0, box.y1 - box.y0,
+    bx, by, bw, bh,
+  );
+
+  // 4) 양옆이 뭍인 바깥 굽이 모서리는 계단식으로 둥글려 손그림 느낌을 살린다
+  ctx.fillStyle = bankColor;
+  const step = 3 * f;
+  for (const corner of riverRoundedCorners(nb)) {
+    const cx = corner === 'ne' || corner === 'se' ? bx + bw - step : bx;
+    const cy = corner === 'se' || corner === 'sw' ? by + bh - step : by;
+    ctx.fillRect(cx, cy, step, step);
+  }
+
+  // 5) 대각선만 뭍인 모서리는 뭍+둑으로 되메워 이웃 강 타일의 물가와 맞물린다
+  const groundRect = historicalTerrainSourceRect('plain', p.season);
+  const srcScale = HISTORICAL_TERRAIN_SAMPLE_SIZE / RIVER_AUTOTILE_SIZE;
+  for (const corner of riverLandCorners(nb)) {
+    const right = corner === 'ne' || corner === 'se';
+    const bottom = corner === 'se' || corner === 'sw';
+    const cx = p.x + (right ? p.size - inset : 0);
+    const cy = p.y + (bottom ? p.size - inset : 0);
+    if (groundRect && historicalTerrainSheet) {
+      ctx.drawImage(
+        historicalTerrainSheet,
+        groundRect.sx + (right ? HISTORICAL_TERRAIN_SAMPLE_SIZE - RIVER_BANK_INSET * srcScale : 0),
+        groundRect.sy + (bottom ? HISTORICAL_TERRAIN_SAMPLE_SIZE - RIVER_BANK_INSET * srcScale : 0),
+        RIVER_BANK_INSET * srcScale, RIVER_BANK_INSET * srcScale,
+        cx, cy, inset, inset,
+      );
+    }
+    // 물을 향한 두 면의 둑 띠 (L자)
+    ctx.fillStyle = bankColor;
+    ctx.fillRect(right ? cx : cx + inset - strip, cy, strip, inset);
+    ctx.fillRect(cx, bottom ? cy : cy + inset - strip, inset, strip);
+  }
+
+  // 6) 언 강 표시 — 얼음 텍스처 위에 옅은 균열 한 줄 (겨울에 건널 수 있다는 표식)
+  if (p.frozenRiver) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.beginPath();
+    ctx.moveTo(bx + 2 * f, by + bh - 3 * f);
+    ctx.lineTo(bx + bw - 3 * f, by + 2 * f);
+    ctx.stroke();
   }
 }
 
@@ -266,11 +364,10 @@ export const atlasSprites: SpriteAPI = {
     ctx.imageSmoothingEnabled = false;
     const h = hash(p.tileX, p.tileY);
 
-    // 강: 겨울엔 물 위에 얼음 워시 + 균열을 얹는다 (팩에 전용 얼음 타일이 없음)
+    // 강: 이웃 정보 기반 면적 렌더링 — 땅 밑바탕 + 물 영역 + 둑 (겨울엔 얼음 텍스처)
     if (p.terrain === 'river') {
-      if (riverSheet) {
-        const rect = riverSourceRect(p.season, p.frozenRiver, p.banks);
-        ctx.drawImage(riverSheet, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y, p.size, p.size);
+      if (riverSheet && historicalTerrainSheet && p.banks) {
+        drawRiverTile(ctx, p, h);
         return;
       }
       blit(ctx, sheet, h % 7 === 0 ? WATER_SPARKLE : WATER, p.x, p.y, p.size);
@@ -291,36 +388,13 @@ export const atlasSprites: SpriteAPI = {
     }
 
     // 바닥 (겨울엔 크림색 지면으로 갈아 눈밭 느낌을 낸다)
-    let drewHistoricalGround = false;
-    if (historicalTerrainSheet) {
-      const rect = historicalTerrainSourceRect(p.terrain, p.season);
-      if (rect) {
-        const variant = historicalTerrainVariantFromHash(h);
-        const sampleOffset = historicalTerrainSampleOffsetFromHash(h);
-        ctx.save();
-        ctx.translate(p.x + (variant.flipX ? p.size : 0), p.y + (variant.flipY ? p.size : 0));
-        ctx.scale(variant.flipX ? -1 : 1, variant.flipY ? -1 : 1);
-        ctx.drawImage(
-          historicalTerrainSheet,
-          rect.sx + sampleOffset.dx,
-          rect.sy + sampleOffset.dy,
-          rect.sw,
-          rect.sh,
-          0,
-          0,
-          p.size,
-          p.size,
-        );
-        ctx.restore();
-        drewHistoricalGround = true;
-      }
-    }
+    const drewHistoricalGround = drawHistoricalGround(ctx, p.terrain, p, h);
 
     if (!drewHistoricalGround) {
       let base: CR = GRASS;
       if (p.winter) base = GROUND_PALE;
       else if (p.terrain === 'fertile') base = GRASS_FERTILE;
-      else if (p.terrain === 'plain' || p.terrain === 'center' || p.terrain === 'hunting') {
+      else if (p.terrain === 'plain' || p.terrain === 'center') {
         if (p.season === 'spring' && h % 9 === 0) base = GRASS_FLOWER_WHITE;
         else if (p.season === 'summer' && h % 11 === 0) base = GRASS_FLOWER_RED;
       }
@@ -332,9 +406,11 @@ export const atlasSprites: SpriteAPI = {
       ctx.fillRect(p.x, p.y, p.size, p.size);
     }
 
-    // 지형 오브젝트
+    // 지형 오브젝트 (숲은 활엽수/소나무를 타일 해시로 섞어 단조로움을 줄인다)
     let terrainObject = terrainObjectFor(p.terrain, p.season, p.hasIron ?? false);
     if (terrainObject === 'lowRock' && h % 2 === 1) terrainObject = 'fieldstone';
+    if (terrainObject === 'broadleaf' && h % 3 === 0) terrainObject = 'pine';
+    if (terrainObject === 'winterTree' && h % 3 === 0) terrainObject = 'snowPine';
     if (terrainObject && terrainObjectSheet) {
       blitTerrainObject(ctx, terrainObjectSheet, terrainObject, p.x, p.y, p.size);
     }
@@ -342,11 +418,6 @@ export const atlasSprites: SpriteAPI = {
     // 계절 색조 (겨울 눈덮임 / 가을 마름)
     if (!drewHistoricalGround) {
       seasonWash(ctx, p.season, p.x, p.y, p.size);
-    }
-
-    // 사냥터: 짐승 발자국을 워시 위에 그려 눈밭에서도 또렷하게 — 사냥터 식별 표식
-    if (terrainShowsStandaloneGameTrail(p.terrain)) {
-      drawGameTrail(ctx, p.x, p.y, p.size, h);
     }
   },
 

@@ -6,6 +6,7 @@ import { SEASON_NAMES } from './constants';
 import { BUILDING_DEFS, canAfford, canPlaceOn, computeDefense, countBuilt, housingCapacity } from './buildings';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
 import { generateMap, makeRng } from './map';
+import { isHabitatActive, spawnAnimalHabitats } from './habitats';
 import { agentsTick, resetAgent, SUBTICKS } from './agents';
 import { checkRaidTrigger, raidersTick, resolveRaid, updateThreat } from './raids';
 import { driftRelations, initRelations } from './relations';
@@ -36,6 +37,8 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     seed: s,
     weather: 'clear',
     map: tiles,
+    // 짐승 서식지: 숲 덩어리마다 난이도별 확률로 자리 잡는다 (마을 근처 하나는 보장)
+    habitats: spawnAnimalHabitats(tiles, centerX, centerY, rng, diff.habitatChance),
     residents: [],
     buildings: [],
     nextBuildingId: 1,
@@ -199,6 +202,7 @@ function endOfDay(state: GameState): void {
   }
 
   regrowForest(state, rng, season);
+  updateHabitats(state);
   runTannery(state);
   runToolWear(state);
   runConsumptionAndNeeds(state, rng);
@@ -261,6 +265,20 @@ function regrowForest(state: GameState, rng: () => number, season: string): void
         state.map[y - 1]?.[x]?.terrain === 'forest' || state.map[y + 1]?.[x]?.terrain === 'forest' ||
         state.map[y]?.[x - 1]?.terrain === 'forest' || state.map[y]?.[x + 1]?.terrain === 'forest';
       if (nearForest) t.terrain = 'forest';
+    }
+  }
+}
+
+// 서식지 점검: 반경 안 숲이 줄면 짐승이 떠나고, 숲이 되살아나면 돌아온다
+function updateHabitats(state: GameState): void {
+  for (const habitat of state.habitats) {
+    const active = isHabitatActive(state.map, habitat);
+    if (active === habitat.active) continue;
+    habitat.active = active;
+    if (active) {
+      addLog(state, '숲이 되살아나 짐승들이 서식지로 돌아왔습니다.', 'good');
+    } else {
+      addLog(state, '벌목으로 숲이 줄어 짐승들이 서식지를 떠났습니다.', 'bad');
     }
   }
 }
