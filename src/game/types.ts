@@ -4,6 +4,8 @@ export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
+export type Gender = 'male' | 'female';
+
 export type WeatherId =
   | 'clear'      // 맑음
   | 'rain'       // 비
@@ -90,6 +92,7 @@ export interface Resident {
   id: number;
   name: string;
   age: number;
+  gender: Gender;
   job: JobId;
   hunger: number;   // 0(굶주림) ~ 100(포만)
   warmth: number;   // 0(동사 직전) ~ 100

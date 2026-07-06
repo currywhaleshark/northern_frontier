@@ -3,9 +3,30 @@ import { CONFIG } from './config';
 import { spawnAnimalHabitats } from './habitats';
 import { makeRng } from './map';
 import { initRelations } from './relations';
-import type { GameState } from './types';
+import type { GameState, Gender, Resident } from './types';
 
 const SAVE_KEY = 'buksae-save-v3'; // v3: 이동 보간(px/py)과 지도 위 습격 무리 추가
+
+function isGender(value: unknown): value is Gender {
+  return value === 'male' || value === 'female';
+}
+
+function stableGenderForResident(resident: Pick<Resident, 'id' | 'name'>): Gender {
+  let hash = (resident.id * 2166136261) >>> 0;
+  for (let i = 0; i < resident.name.length; i++) {
+    hash ^= resident.name.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return (hash & 1) === 0 ? 'female' : 'male';
+}
+
+function migrateResidentGender(state: GameState): void {
+  for (const resident of state.residents as Array<Resident & { gender?: unknown }>) {
+    if (!isGender(resident.gender)) {
+      resident.gender = stableGenderForResident(resident);
+    }
+  }
+}
 
 export function saveGame(state: GameState): boolean {
   try {
@@ -44,6 +65,7 @@ export function loadGame(): GameState | null {
         CONFIG.difficulty[parsed.difficulty].habitatChance,
       );
     }
+    migrateResidentGender(parsed);
     return parsed;
   } catch {
     return null;

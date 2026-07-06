@@ -5,7 +5,11 @@ import { housingCapacity } from './buildings';
 import { addLog } from './events';
 import { getSeason } from './seasons';
 import { warmthLossWeatherMult } from './weather';
-import type { GameState, JobId, Resident } from './types';
+import type { GameState, Gender, JobId, Resident } from './types';
+
+export function rollResidentGender(rng: () => number): Gender {
+  return rng() < 0.5 ? 'female' : 'male';
+}
 
 export function createResident(state: GameState, rng: () => number, job: JobId = 'idle'): Resident {
   const name = SURNAMES[Math.floor(rng() * SURNAMES.length)] + GIVEN_NAMES[Math.floor(rng() * GIVEN_NAMES.length)];
@@ -17,6 +21,7 @@ export function createResident(state: GameState, rng: () => number, job: JobId =
     id: state.nextResidentId++,
     name,
     age: 16 + Math.floor(rng() * 34),
+    gender: rollResidentGender(rng),
     job,
     hunger: 80,
     warmth: 80,
