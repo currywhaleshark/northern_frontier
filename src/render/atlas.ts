@@ -90,7 +90,6 @@ function ensureLoaded(): void {
   const characterSheet = new Image();
   characterSheet.onload = () => {
     generatedCharacterSheet = characterSheet;
-    loaded++;
   };
   characterSheet.src = GENERATED_CHARACTER_SHEET.src;
 }
@@ -542,18 +541,20 @@ export const atlasSprites: SpriteAPI = {
   },
 
   drawResident(ctx, p) {
-    if (!chars) return;
+    const characterSheet = generatedCharacterSheet;
+    const kenneyChars = chars;
+    if (!characterSheet && !kenneyChars) return;
     ctx.imageSmoothingEnabled = false;
     const half = CHALF;
     const bob = (p.moving ? Math.floor(performance.now() / 130) % 2 : 0) * CF;
 
-    if (generatedCharacterSheet) {
-      drawGeneratedResident(ctx, generatedCharacterSheet, p, bob);
-    } else {
+    if (characterSheet) {
+      drawGeneratedResident(ctx, characterSheet, p, bob);
+    } else if (kenneyChars) {
       ctx.save();
       ctx.translate(p.x, p.y - bob);
       if (p.facing === -1) ctx.scale(-1, 1);
-      blit(ctx, chars, CHAR_BY_JOB[p.job], -half, -half, CHAR);
+      blit(ctx, kenneyChars, CHAR_BY_JOB[p.job], -half, -half, CHAR);
       ctx.restore();
     }
 
@@ -586,20 +587,22 @@ export const atlasSprites: SpriteAPI = {
   },
 
   drawRaiders(ctx, p) {
-    if (!chars) return;
+    const characterSheet = generatedCharacterSheet;
+    const kenneyChars = chars;
+    if (!characterSheet && !kenneyChars) return;
     ctx.imageSmoothingEnabled = false;
-    const visible = generatedCharacterSheet ? Math.min(p.count, 4) : p.count;
+    const visible = characterSheet ? Math.min(p.count, 4) : p.count;
     for (let i = 0; i < visible; i++) {
       const ox = ((i * 17) % 15 - 7) * 1.1 * CF;
       const oy = ((i * 29) % 11 - 5) * 1.1 * CF;
       const bob = (p.moving ? Math.floor(performance.now() / 130 + i) % 2 : 0) * CF;
-      if (generatedCharacterSheet) {
-        drawGeneratedMountedRaider(ctx, generatedCharacterSheet, p, i, bob, ox, oy);
-      } else {
+      if (characterSheet) {
+        drawGeneratedMountedRaider(ctx, characterSheet, p, i, bob, ox, oy);
+      } else if (kenneyChars) {
         ctx.save();
         ctx.translate(p.x + ox, p.y + oy - bob);
         if (p.facing === -1) ctx.scale(-1, 1);
-        blit(ctx, chars, CHAR_RAIDER, -CHALF, -CHALF, CHAR);
+        blit(ctx, kenneyChars, CHAR_RAIDER, -CHALF, -CHALF, CHAR);
         ctx.restore();
       }
     }
