@@ -13,6 +13,7 @@ const output = ts.transpileModule(source, {
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(output).toString('base64')}`;
 const {
   GENERATED_CHARACTER_SHEET,
+  generatedCharacterFacingScale,
   generatedMountedRaiderSourceRect,
   generatedResidentSourceRect,
 } = await import(moduleUrl);
@@ -31,5 +32,10 @@ assert.deepEqual(generatedResidentSourceRect('militia', 'female'), { sx: 252, sy
 assert.deepEqual(generatedMountedRaiderSourceRect(0), { sx: 280, sy: 0, sw: 56, sh: 40 });
 assert.deepEqual(generatedMountedRaiderSourceRect(1), { sx: 280, sy: 40, sw: 56, sh: 40 });
 assert.deepEqual(generatedMountedRaiderSourceRect(2), { sx: 280, sy: 0, sw: 56, sh: 40 });
+
+assert.equal(typeof generatedCharacterFacingScale, 'function');
+assert.equal(generatedCharacterFacingScale(1), -1);
+assert.equal(generatedCharacterFacingScale(-1), 1);
+assert.equal(generatedCharacterFacingScale(undefined), 1);
 
 console.log('generated character asset tests passed');

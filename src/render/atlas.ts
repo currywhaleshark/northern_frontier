@@ -14,6 +14,7 @@ import {
 } from './sprites';
 import {
   GENERATED_CHARACTER_SHEET,
+  generatedCharacterFacingScale,
   generatedMountedRaiderSourceRect,
   generatedResidentSourceRect,
 } from './generatedCharacterAssets';
@@ -156,7 +157,7 @@ function drawGeneratedCharacterRect(
   const dh = rect.sh * scale;
   ctx.save();
   ctx.translate(x, y - bob);
-  if (facing === -1) ctx.scale(-1, 1);
+  ctx.scale(generatedCharacterFacingScale(facing), 1);
   ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, -dw / 2, CHALF - dh, dw, dh);
   ctx.restore();
 }

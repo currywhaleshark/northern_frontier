@@ -27,6 +27,9 @@ const GENDER_ROWS: Record<Gender, number> = {
   female: 1,
 };
 
+export function generatedCharacterFacingScale(facing: 1 | -1 | undefined): 1 | -1 {
+  return facing === 1 ? -1 : 1;
+}
 export function generatedResidentSourceRect(job: JobId, gender: Gender) {
   const col = RESIDENT_COLUMNS[job];
   const row = GENDER_ROWS[gender];
