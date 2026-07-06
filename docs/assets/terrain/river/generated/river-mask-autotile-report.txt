@@ -1,0 +1,8 @@
+River mask autotile build report
+tile_size=28
+water_width=8
+connectors=16
+seasons=4
+source=C:/Users/USER/Documents/Projects/northern frontier/docs/assets/terrain/river/folk-warm-river-connectors-v2-core6-28px-sheet.png
+sheet=C:/Users/USER/Documents/Projects/northern frontier/docs/assets/terrain/river/generated/river-mask-autotile-28px-sheet.png
+preview=C:/Users/USER/Documents/Projects/northern frontier/docs/assets/terrain/river/generated/river-mask-autotile-28px-preview-4x.png

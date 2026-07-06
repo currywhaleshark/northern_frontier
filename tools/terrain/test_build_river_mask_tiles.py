@@ -31,6 +31,10 @@ class RiverMaskTilesTest(unittest.TestCase):
         self.assertTrue(all(tile.getpixel((x, 0)) == water for x in river.EDGE_CORRIDOR))
         self.assertTrue(all(tile.getpixel((x, 27)) == water for x in river.EDGE_CORRIDOR))
 
+    def test_build_sheet_dimensions_match_connectors_and_seasons(self) -> None:
+        sheet = river.build_sheet()
+        self.assertEqual((28 * 16, 28 * 4), sheet.size)
+
 
 if __name__ == "__main__":
     unittest.main()

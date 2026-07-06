@@ -12,6 +12,9 @@ ROOT = Path(__file__).resolve().parents[2]
 RIVER_DIR = ROOT / "docs" / "assets" / "terrain" / "river"
 SOURCE_SHEET = RIVER_DIR / "folk-warm-river-connectors-v2-core6-28px-sheet.png"
 OUTPUT_DIR = RIVER_DIR / "generated"
+SHEET_OUT = OUTPUT_DIR / "river-mask-autotile-28px-sheet.png"
+PREVIEW_OUT = OUTPUT_DIR / "river-mask-autotile-28px-preview-4x.png"
+REPORT_OUT = OUTPUT_DIR / "river-mask-autotile-report.txt"
 
 SEASONS = ("spring", "summer", "autumn", "winter")
 
@@ -176,6 +179,37 @@ def normalize_open_edges(tile: Image.Image, connector: Connector, season: str) -
             px[0, y] = color
 
 
+def build_sheet() -> Image.Image:
+    source = load_source_sheet()
+    sheet = Image.new("RGB", (TILE_SIZE * len(CONNECTORS), TILE_SIZE * len(SEASONS)))
+    for row, season in enumerate(SEASONS):
+        for col, connector in enumerate(CONNECTORS):
+            sample_col = 15 if connector.source_pool else col
+            source_tile = crop_source_tile(source, row, sample_col)
+            tile = compose_tile(source_tile, season, connector)
+            sheet.paste(tile, (col * TILE_SIZE, row * TILE_SIZE))
+    return sheet
+
+
+def save_preview(sheet: Image.Image) -> None:
+    preview = sheet.resize((sheet.width * 4, sheet.height * 4), Image.Resampling.NEAREST)
+    preview.save(PREVIEW_OUT)
+
+
+def write_report() -> None:
+    lines = [
+        "River mask autotile build report",
+        f"tile_size={TILE_SIZE}",
+        f"water_width={WATER_WIDTH}",
+        f"connectors={len(CONNECTORS)}",
+        f"seasons={len(SEASONS)}",
+        f"source={SOURCE_SHEET.as_posix()}",
+        f"sheet={SHEET_OUT.as_posix()}",
+        f"preview={PREVIEW_OUT.as_posix()}",
+    ]
+    REPORT_OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build deterministic 28px river autotiles.")
     parser.add_argument("--validate-only", action="store_true", help="Run geometry validation without writing PNG outputs.")
@@ -195,6 +229,14 @@ def main() -> None:
     print(f"validated masks: {len(CONNECTORS)} connectors")
     if args.validate_only:
         return
+
+    sheet = build_sheet()
+    sheet.save(SHEET_OUT)
+    save_preview(sheet)
+    write_report()
+    print(f"wrote {SHEET_OUT}")
+    print(f"wrote {PREVIEW_OUT}")
+    print(f"wrote {REPORT_OUT}")
 
 
 if __name__ == "__main__":
