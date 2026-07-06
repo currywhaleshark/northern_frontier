@@ -14,6 +14,7 @@ SOURCE_SHEET = RIVER_DIR / "folk-warm-river-connectors-v2-core6-28px-sheet.png"
 OUTPUT_DIR = RIVER_DIR / "generated"
 SHEET_OUT = OUTPUT_DIR / "river-mask-autotile-28px-sheet.png"
 PREVIEW_OUT = OUTPUT_DIR / "river-mask-autotile-28px-preview-4x.png"
+SEAM_PREVIEW_OUT = OUTPUT_DIR / "river-mask-autotile-seam-preview.png"
 REPORT_OUT = OUTPUT_DIR / "river-mask-autotile-report.txt"
 
 SEASONS = ("spring", "summer", "autumn", "winter")
@@ -54,6 +55,18 @@ CONNECTORS: tuple[Connector, ...] = (
     Connector("tee_wne", "T west/north/east", w=True, n=True, e=True),
     Connector("cross", "cross", n=True, e=True, s=True, w=True),
     Connector("source", "source pool", source_pool=True),
+)
+
+CONNECTOR_BY_KEY = {connector.key: connector for connector in CONNECTORS}
+CONNECTOR_INDEX_BY_KEY = {connector.key: index for index, connector in enumerate(CONNECTORS)}
+
+SEAM_ROWS = (
+    ("source", "end_e", "horizontal", "right_down", "end_s", "source"),
+    ("end_e", "horizontal", "horizontal", "tee_esw", "left_down", "end_s"),
+    ("source", "right_down", "end_s", "vertical", "vertical", "vertical"),
+    ("end_e", "tee_wne", "horizontal", "cross", "tee_esw", "left_down"),
+    ("source", "vertical", "source", "vertical", "source", "vertical"),
+    ("end_e", "left_up", "end_e", "left_up", "end_e", "left_up"),
 )
 
 CENTER = TILE_SIZE // 2
@@ -196,6 +209,26 @@ def save_preview(sheet: Image.Image) -> None:
     preview.save(PREVIEW_OUT)
 
 
+def build_seam_preview(sheet: Image.Image) -> Image.Image:
+    season_gap = 6
+    grid_w = len(SEAM_ROWS[0]) * TILE_SIZE
+    grid_h = len(SEAM_ROWS) * TILE_SIZE
+    out = Image.new("RGB", (grid_w, len(SEASONS) * grid_h + (len(SEASONS) - 1) * season_gap), (34, 34, 30))
+    for season_index, _season in enumerate(SEASONS):
+        y_offset = season_index * (grid_h + season_gap)
+        for y, row in enumerate(SEAM_ROWS):
+            for x, key in enumerate(row):
+                col = CONNECTOR_INDEX_BY_KEY[key]
+                tile = sheet.crop((
+                    col * TILE_SIZE,
+                    season_index * TILE_SIZE,
+                    (col + 1) * TILE_SIZE,
+                    (season_index + 1) * TILE_SIZE,
+                ))
+                out.paste(tile, (x * TILE_SIZE, y_offset + y * TILE_SIZE))
+    return out.resize((out.width * 3, out.height * 3), Image.Resampling.NEAREST)
+
+
 def write_report() -> None:
     lines = [
         "River mask autotile build report",
@@ -206,6 +239,7 @@ def write_report() -> None:
         f"source={SOURCE_SHEET.as_posix()}",
         f"sheet={SHEET_OUT.as_posix()}",
         f"preview={PREVIEW_OUT.as_posix()}",
+        f"seam_preview={SEAM_PREVIEW_OUT.as_posix()}",
     ]
     REPORT_OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -233,9 +267,12 @@ def main() -> None:
     sheet = build_sheet()
     sheet.save(SHEET_OUT)
     save_preview(sheet)
+    seam_preview = build_seam_preview(sheet)
+    seam_preview.save(SEAM_PREVIEW_OUT)
     write_report()
     print(f"wrote {SHEET_OUT}")
     print(f"wrote {PREVIEW_OUT}")
+    print(f"wrote {SEAM_PREVIEW_OUT}")
     print(f"wrote {REPORT_OUT}")
 
 

@@ -35,6 +35,11 @@ class RiverMaskTilesTest(unittest.TestCase):
         sheet = river.build_sheet()
         self.assertEqual((28 * 16, 28 * 4), sheet.size)
 
+    def test_seam_preview_dimensions_match_preview_grid(self) -> None:
+        sheet = river.build_sheet()
+        preview = river.build_seam_preview(sheet)
+        self.assertEqual((504, 2070), preview.size)
+
 
 if __name__ == "__main__":
     unittest.main()
