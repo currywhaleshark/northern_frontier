@@ -106,6 +106,13 @@ export const CONFIG = {
     },
     forestDepleteChance: 0.12, // 벌목 1회당 숲이 평지가 될 확률
     forestRegrowChance: 0.0015, // 봄여름, 숲 인접 평지가 숲이 될 하루 확률
+    // 사냥 수확 배율 — 짐승 서식지(숲 덩어리)가 클수록 사냥감이 풍부하다
+    hunting: {
+      strayYield: 0.75,          // 서식지 밖 명시적 사냥터 지형
+      habitatYieldBase: 0.8,     // 서식지 기본
+      habitatYieldPerTile: 0.012, // 서식지 숲 1타일당 가산 (숲 50타일에서 최대치)
+      habitatYieldMax: 1.4,
+    },
   },
 
   seasons: {

@@ -76,6 +76,49 @@ export function findForestHabitats(
   return habitats;
 }
 
+// 사냥 수확 배율 규칙 — config 값을 호출자가 넘긴다 (이 모듈은 의존성 없이 단독 테스트된다)
+export interface HuntableYieldOptions {
+  strayYield: number;        // 서식지 밖 명시적 사냥터 지형의 배율
+  habitatYieldBase: number;  // 서식지 기본 배율
+  habitatYieldPerTile: number; // 서식지 숲 1타일당 가산
+  habitatYieldMax: number;
+}
+
+export function habitatYieldMult(habitat: ForestHabitat, opts: HuntableYieldOptions): number {
+  return Math.min(opts.habitatYieldMax, opts.habitatYieldBase + opts.habitatYieldPerTile * habitat.forestTiles);
+}
+
+// 사냥꾼이 일할 수 있는 타일 → 수확 배율 ("x,y" 키).
+// 서식지 반경 안의 숲/사냥터 덮개는 서식지 크기에 비례한 배율,
+// 명시적 사냥터 지형은 서식지가 없어도 최소 배율을 보장한다(고립 조각 보호).
+// 여러 서식지가 겹치면 높은 배율을 따른다.
+export function collectHuntableTiles(
+  map: Tile[][],
+  habitats: ForestHabitat[],
+  opts: HuntableYieldOptions,
+): Map<string, number> {
+  const tiles = new Map<string, number>();
+  for (const row of map) {
+    for (const tile of row) {
+      if (tile.terrain === 'hunting') tiles.set(`${tile.x},${tile.y}`, opts.strayYield);
+    }
+  }
+  for (const habitat of habitats) {
+    const mult = habitatYieldMult(habitat, opts);
+    const r = habitat.radius;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy > r * r) continue; // 렌더러의 범위 원과 같은 원형 판정
+        const tile = map[habitat.y + dy]?.[habitat.x + dx];
+        if (!tile || !isForestHabitatCover(tile.terrain)) continue;
+        const key = `${tile.x},${tile.y}`;
+        tiles.set(key, Math.max(tiles.get(key) ?? 0, mult));
+      }
+    }
+  }
+  return tiles;
+}
+
 export function findForestHabitatIconAtTile(
   habitats: ForestHabitat[],
   x: number,

@@ -266,6 +266,10 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
 
   // 9) 배치 모드: 관련 자원 타일 하이라이트 (사냥막→사냥터, 밭→비옥한 땅)
   if (o.placingType) {
+    // 사냥막 배치 중엔 모든 서식지 범위를 보여줘 자리를 잡기 쉽게 한다
+    if (o.placingType === 'huntLodge') {
+      for (const habitat of habitats) drawHabitatRange(ctx, habitat);
+    }
     const want = PLACEMENT_HINT[o.placingType];
     if (want) {
       const pulse = 0.22 + 0.14 * Math.sin(performance.now() / 280);

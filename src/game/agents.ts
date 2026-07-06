@@ -3,6 +3,7 @@
 import { CONFIG } from './config';
 import { BUILDING_DEFS } from './buildings';
 import { addLog } from './events';
+import { collectHuntableTiles, findForestHabitats } from './habitats';
 import { makeRng } from './map';
 import { getSeason } from './seasons';
 import { outdoorMult } from './weather';
@@ -19,6 +20,7 @@ interface Ctx {
   mMod: number;   // 사기 보정
   rng: () => number;
   centerId: number;
+  huntable: Map<string, number>; // 사냥 가능 타일 ("x,y") → 수확 배율 — 서식지 범위/크기와 연동
 }
 
 const PRODUCING_JOBS = ['woodcutter', 'hunter', 'farmer', 'builder', 'smith', 'herbalist', 'hauler'];
@@ -172,7 +174,7 @@ interface GatherOpts {
   goal: (t: Tile) => boolean;
   workTicks: number;
   yieldRes: ResourceId;
-  yieldAmt: number;       // 보정 전 1회 채집량
+  yieldAmt: number | ((tile: Tile) => number); // 보정 전 1회 채집량 (타일에 따라 달라질 수 있다)
   cap: number;            // 이만큼 지면 하역하러 간다
   depositExtra: BuildingTypeId[];
   taskWork: string;
@@ -200,7 +202,8 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
     r.workTimer -= ctx.outdoor; // 궂은 날씨엔 일이 더디다
     gainSkillTick(r);
     if (r.workTimer <= 0) {
-      const amt = o.yieldAmt * ctx.tMod * ctx.mMod * effOf(r);
+      const base = typeof o.yieldAmt === 'function' ? o.yieldAmt(state.map[r.y][r.x]) : o.yieldAmt;
+      const amt = base * ctx.tMod * ctx.mMod * effOf(r);
       addCarry(r, o.yieldRes, amt);
       o.onHarvest?.(state.map[r.y][r.x], r);
       r.phase = 'rest';
@@ -245,10 +248,12 @@ function woodcutterTick(state: GameState, r: Resident, ctx: Ctx): void {
 function hunterTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
   gatherJob(state, r, ctx, {
-    goal: t => t.terrain === 'hunting' || t.terrain === 'forest',
+    // 짐승이 사는 서식지 범위 안에서만 사냥이 된다 (렌더러의 서식지 원과 동일 판정)
+    goal: t => ctx.huntable.has(`${t.x},${t.y}`),
     workTicks: a.work.hunt,
     yieldRes: 'game',
-    yieldAmt: a.yields.game * CONFIG.seasons.gameMult[ctx.season],
+    // 서식지가 클수록 사냥감이 풍부하다
+    yieldAmt: t => a.yields.game * CONFIG.seasons.gameMult[ctx.season] * (ctx.huntable.get(`${t.x},${t.y}`) ?? 0),
     cap: a.carryCap.game,
     depositExtra: ['huntLodge'],
     taskWork: '사냥 중', taskMove: '사냥터로 이동', taskHaul: '사냥감 운반',
@@ -549,6 +554,7 @@ export function agentsTick(state: GameState): void {
     mMod: 0.8 + (mAvg / 100) * 0.4,
     rng,
     centerId: center ? center.id : -1,
+    huntable: collectHuntableTiles(state.map, findForestHabitats(state.map), CONFIG.agents.hunting),
   };
 
   for (const r of living) {
