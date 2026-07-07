@@ -9,6 +9,15 @@ export const RANK_NAMES: Record<Rank, string> = {
   settlement: '개척지', bo: '보(堡)', jin: '진(鎭)', bu: '부(府)',
 };
 
+export const RANK_ORDER: Rank[] = ['settlement', 'bo', 'jin', 'bu'];
+
+export function rankAtLeast(rank: Rank | undefined, minRank?: Rank): boolean {
+  if (!minRank) return true;
+  const current = RANK_ORDER.indexOf(rank ?? 'settlement');
+  const required = RANK_ORDER.indexOf(minRank);
+  return current >= required;
+}
+
 export const SEASON_ORDER: Season[] = ['spring', 'summer', 'autumn', 'winter'];
 
 export const WEATHER_NAMES: Record<WeatherId, string> = {
@@ -29,13 +38,23 @@ export const TERRAIN_NAMES: Record<Terrain, string> = {
 export const JOB_NAMES: Record<JobId, string> = {
   idle: '무직', woodcutter: '벌목꾼', hunter: '사냥꾼', farmer: '농부',
   builder: '건축가', hauler: '운반꾼', herbalist: '약초꾼', smith: '대장장이',
+  miner: '채광꾼', fisher: '어부',
   watchman: '파수꾼', militia: '수비병',
 };
 
 export const JOB_ORDER: JobId[] = [
   'idle', 'woodcutter', 'hunter', 'farmer', 'builder',
-  'hauler', 'herbalist', 'smith', 'watchman', 'militia',
+  'hauler', 'herbalist', 'smith', 'miner', 'fisher', 'watchman', 'militia',
 ];
+
+export const JOB_MIN_RANK: Partial<Record<JobId, Rank>> = {
+  miner: 'bo',
+  fisher: 'bo',
+};
+
+export function isJobUnlocked(rank: Rank | undefined, job: JobId): boolean {
+  return rankAtLeast(rank, JOB_MIN_RANK[job]);
+}
 
 export const JOB_DESC: Record<JobId, string> = {
   idle: '배정된 일이 없습니다.',
@@ -46,6 +65,8 @@ export const JOB_DESC: Record<JobId, string> = {
   hauler: '창고에서 장작을 패고 사냥감을 손질하고 곡물을 도정하며, 일이 없으면 채석을 다녀옵니다.',
   herbalist: '산기슭을 다니며 약초를 캐 약초막이나 창고로 나릅니다.',
   smith: '대장간에서 도구를 만들고, 철이 떨어지면 철광까지 채굴을 다녀옵니다.',
+  miner: '보(堡) 승격 후 배치할 수 있습니다. 채광장에서 돌과 철을 안정적으로 캡니다.',
+  fisher: '보(堡) 승격 후 배치할 수 있습니다. 나루터에서 강고기를 잡아 식량을 보탭니다.',
   watchman: '방어 시설 사이를 순찰합니다. 방어도가 오르고 위협도 증가가 줄어듭니다.',
   militia: '군영(없으면 마을 중심)에서 조련하는 상비 수비병입니다. 방어도가 크게 오릅니다.',
 };
@@ -54,6 +75,7 @@ export const JOB_DESC: Record<JobId, string> = {
 export const JOB_COLORS: Record<JobId, string> = {
   idle: '#9aa5ad', woodcutter: '#b0793a', hunter: '#7fa653', farmer: '#d9c26b',
   builder: '#d98d5f', hauler: '#8fb7c9', herbalist: '#6fce9e', smith: '#c96f6f',
+  miner: '#9a8f7a', fisher: '#5ba7d8',
   watchman: '#7f8fd9', militia: '#e05f5f',
 };
 

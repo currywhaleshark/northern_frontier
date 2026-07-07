@@ -23,8 +23,8 @@ interface Ctx {
   huntable: Map<string, number>; // 사냥 가능 타일 ("x,y") → 수확 배율 — 서식지 범위/크기와 연동
 }
 
-const PRODUCING_JOBS = ['woodcutter', 'hunter', 'farmer', 'builder', 'smith', 'herbalist', 'hauler'];
-const OUTDOOR_JOBS = ['woodcutter', 'hunter', 'herbalist', 'farmer', 'builder'];
+const PRODUCING_JOBS = ['woodcutter', 'hunter', 'farmer', 'builder', 'smith', 'miner', 'fisher', 'herbalist', 'hauler'];
+const OUTDOOR_JOBS = ['woodcutter', 'hunter', 'herbalist', 'farmer', 'builder', 'miner', 'fisher'];
 
 // ─────────────────────────── 공통 헬퍼 ───────────────────────────
 
@@ -68,6 +68,9 @@ export function isPassable(state: GameState, x: number, y: number): boolean {
   if (!t) return false;
   if (t.terrain === 'mountain') return false;
   if (t.terrain === 'river') {
+    const hasBridge = t.buildingId != null && state.buildings.some(b =>
+      b.id === t.buildingId && b.built && b.type === 'bridge');
+    if (hasBridge) return true;
     // 겨울 언 강 위는 걸어서 건널 수 있다 (해빙기 홍수 제외)
     return getSeason(state.day) === 'winter' && state.weather !== 'thawFlood';
   }
@@ -491,6 +494,42 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
   goToCenter(state, r, ctx);
 }
 
+function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const a = CONFIG.agents;
+  gatherJob(state, r, ctx, {
+    goal: t => t.buildingId != null && state.buildings.some(b =>
+      b.id === t.buildingId && b.built && b.type === 'mine'),
+    workTicks: a.work.mine,
+    yieldRes: state.map[r.y]?.[r.x]?.hasIron ? 'iron' : 'stone',
+    yieldAmt: tile => tile.hasIron ? a.yields.iron : a.yields.stone,
+    cap: state.map[r.y]?.[r.x]?.hasIron ? a.carryCap.iron : a.carryCap.stone,
+    depositExtra: ['mine'],
+    taskWork: '채광 중',
+    taskMove: '채광장으로 이동',
+    taskHaul: '광물 운반',
+    onHarvest: (tile, worker) => {
+      if (tile.hasIron) addCarry(worker, 'stone', a.yields.mineStone);
+    },
+  });
+}
+
+function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const a = CONFIG.agents;
+  const floodMult = state.weather === 'thawFlood' ? 0.25 : 1;
+  gatherJob(state, r, ctx, {
+    goal: t => t.buildingId != null && state.buildings.some(b =>
+      b.id === t.buildingId && b.built && b.type === 'ferry'),
+    workTicks: a.work.fish,
+    yieldRes: 'food',
+    yieldAmt: a.yields.fish * CONFIG.seasons.fishMult[ctx.season] * floodMult,
+    cap: a.carryCap.food,
+    depositExtra: ['ferry'],
+    taskWork: '고기잡이 중',
+    taskMove: '나루터로 이동',
+    taskHaul: '물고기 운반',
+  });
+}
+
 function watchmanTick(state: GameState, r: Resident, ctx: Ctx): void {
   r.task = '경계 근무';
   // 방어 시설 사이를 순찰한다
@@ -613,6 +652,8 @@ export function agentsTick(state: GameState): void {
       case 'builder': builderTick(state, r, ctx); break;
       case 'hauler': haulerTick(state, r, ctx); break;
       case 'smith': smithTick(state, r, ctx); break;
+      case 'miner': minerTick(state, r, ctx); break;
+      case 'fisher': fisherTick(state, r, ctx); break;
       case 'watchman': watchmanTick(state, r, ctx); break;
       case 'militia': militiaTick(state, r, ctx); break;
       default: idleTick(state, r, ctx); break;

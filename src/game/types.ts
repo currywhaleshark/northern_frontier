@@ -46,6 +46,8 @@ export type JobId =
   | 'hauler'     // 운반꾼
   | 'herbalist'  // 약초꾼
   | 'smith'      // 대장장이
+  | 'miner'      // 채광꾼
+  | 'fisher'     // 어부
   | 'watchman'   // 파수꾼
   | 'militia';   // 수비병 (내부 id는 저장 호환을 위해 유지)
 
@@ -70,10 +72,14 @@ export type BuildingTypeId =
   | 'center'     // 마을 중심지
   | 'hut'        // 초가집
   | 'ondol'      // 온돌집
+  | 'tileHouse'  // 기와집
   | 'storehouse' // 창고
+  | 'bridge'     // 다리
   | 'lumberCamp' // 벌목장
   | 'huntLodge'  // 사냥막
   | 'herbHut'    // 약초막
+  | 'mine'       // 채광장
+  | 'ferry'      // 나루터
   | 'field'      // 밭
   | 'smithy'     // 대장간
   | 'tannery'    // 가죽공방
@@ -141,8 +147,9 @@ export interface BuildingDef {
   capacity: number;         // 주거 수용 인원
   defense: number;          // 제공 방어도
   winterBonus: boolean;     // 겨울 보너스 여부
-  placement: 'land' | 'field' | 'any';
+  placement: 'land' | 'field' | 'river' | 'rock' | 'riverbank' | 'any';
   unique: boolean;          // 하나만 건설 가능 여부
+  minRank?: Rank;
 }
 
 // 교역 제안: 마을이 give를 내주고 get을 받는다

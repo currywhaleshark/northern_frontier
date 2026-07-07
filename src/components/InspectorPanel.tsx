@@ -1,6 +1,6 @@
 // 선택한 타일/건물/주민 정보 패널 + 조정(승격·세공·청원) 창구
 import { BUILDING_DEFS, getBuilding } from '../game/buildings';
-import { FACTIONS, JOB_NAMES, JOB_ORDER, RANK_NAMES, RESOURCE_NAMES, TERRAIN_NAMES } from '../game/constants';
+import { FACTIONS, isJobUnlocked, JOB_NAMES, JOB_ORDER, RANK_NAMES, RESOURCE_NAMES, TERRAIN_NAMES } from '../game/constants';
 import { canRequestTrade } from '../game/events';
 import { canPetition } from '../game/petition';
 import { nextRank, promotionConditions } from '../game/promotion';
@@ -116,7 +116,11 @@ function CourtTab({ state, onPetition }: { state: GameState; onPetition: () => v
   );
 }
 
-function ResidentDetail({ r, onSetJob }: { r: Resident; onSetJob: (job: JobId) => void }) {
+function ResidentDetail({ r, rank, onSetJob }: {
+  r: Resident;
+  rank: GameState['rank'];
+  onSetJob: (job: JobId) => void;
+}) {
   return (
     <table className="insp-table">
       <tbody>
@@ -130,7 +134,9 @@ function ResidentDetail({ r, onSetJob }: { r: Resident; onSetJob: (job: JobId) =
               onChange={e => onSetJob(e.target.value as JobId)}
               style={{ background: '#1e242b', color: '#d8dee5', border: '1px solid #39434e', borderRadius: 4 }}
             >
-              {JOB_ORDER.map(j => <option key={j} value={j}>{JOB_NAMES[j]}</option>)}
+              {JOB_ORDER.filter(j => j === r.job || isJobUnlocked(rank, j)).map(j => (
+                <option key={j} value={j}>{JOB_NAMES[j]}</option>
+              ))}
             </select>
           </td>
         </tr>
@@ -260,7 +266,7 @@ export function InspectorPanel({
           {resident ? (
             <>
               <button className="btn small" style={{ marginBottom: 6 }} onClick={() => setResidentId(null)}>← 목록으로</button>
-              <ResidentDetail r={resident} onSetJob={job => onSetResidentJob(resident.id, job)} />
+              <ResidentDetail r={resident} rank={state.rank} onSetJob={job => onSetResidentJob(resident.id, job)} />
             </>
           ) : (
             <div style={{ maxHeight: 260, overflowY: 'auto' }}>

@@ -1,5 +1,5 @@
 // 직업 배정 패널: 무직 풀에서 직업으로 +/-
-import { JOB_DESC, JOB_NAMES, JOB_ORDER } from '../game/constants';
+import { isJobUnlocked, JOB_DESC, JOB_NAMES, JOB_ORDER } from '../game/constants';
 import { countJob } from '../game/residents';
 import type { GameState, JobId } from '../game/types';
 
@@ -13,7 +13,7 @@ export function JobPanel({ state, onReassign }: Props) {
   return (
     <div className="section">
       <div className="panel-title">직업 배정 <span className="muted small">(무직 {idle}명)</span></div>
-      {JOB_ORDER.filter(j => j !== 'idle').map(job => {
+      {JOB_ORDER.filter(j => j !== 'idle' && isJobUnlocked(state.rank, j)).map(job => {
         const count = countJob(state, job);
         return (
           <div className="job-row" key={job} title={JOB_DESC[job]}>

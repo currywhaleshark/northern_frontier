@@ -2,9 +2,10 @@
 // 하루는 SUBTICKS개의 서브틱으로 나뉜다. 서브틱마다 주민 에이전트가 이동/작업/운반하고,
 // 하루가 넘어갈 때 소비/생존/위협/이벤트 등 일일 처리를 한다.
 import { CONFIG } from './config';
-import { SEASON_NAMES } from './constants';
+import { isJobUnlocked, SEASON_NAMES } from './constants';
 import {
   BUILDING_DEFS, canAfford, cannonPlacementsUsed, canPlaceOn, computeDefense, countBuilt, housingCapacity,
+  isBuildingUnlocked,
 } from './buildings';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
 import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
@@ -129,7 +130,8 @@ export function tryPlaceBuilding(state: GameState, type: BuildingTypeId, x: numb
   const def = BUILDING_DEFS[type];
   const tile = state.map[y]?.[x];
   if (!tile) return '지도 밖입니다.';
-  if (!canPlaceOn(def, tile)) return '이곳에는 지을 수 없습니다.';
+  if (!isBuildingUnlocked(state.rank, type)) return '보(堡) 승격 후 지을 수 있습니다.';
+  if (!canPlaceOn(def, tile, state)) return '이곳에는 지을 수 없습니다.';
   if (def.unique && state.buildings.some(b => b.type === type)) return '이미 건설 중이거나 완공되었습니다.';
   if (type === 'cannonEmplacement' && cannonPlacementsUsed(state) >= state.cannonsGranted) {
     return '불랑기포는 조정의 하사가 있어야 합니다. (조정 탭에서 청원)';
@@ -154,6 +156,7 @@ export function tryPlaceBuilding(state: GameState, type: BuildingTypeId, x: numb
 
 // 직업 재배정: from 직업의 산 주민 1명을 to 직업으로
 export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
+  if (!isJobUnlocked(state.rank, to)) return false;
   const r = state.residents.find(res => res.alive && res.job === from);
   if (!r) return false;
   r.job = to;
@@ -162,6 +165,7 @@ export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
 }
 
 export function setResidentJob(state: GameState, id: number, job: JobId): void {
+  if (!isJobUnlocked(state.rank, job)) return;
   const r = state.residents.find(res => res.id === id);
   if (r && r.alive) {
     r.job = job;

@@ -325,7 +325,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   if (o.placingType && o.hover) {
     const def = BUILDING_DEFS[o.placingType];
     const tile = state.map[o.hover.y]?.[o.hover.x];
-    const ok = tile && canPlaceOn(def, tile) && canAfford(state, def);
+    const ok = tile && canPlaceOn(def, tile, state) && canAfford(state, def);
     ctx.fillStyle = ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
     ctx.fillRect(o.hover.x * TILE, o.hover.y * TILE, TILE, TILE);
     sprites.drawBuilding(ctx, {

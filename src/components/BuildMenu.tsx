@@ -1,6 +1,6 @@
 // 건설 메뉴: 카테고리별 접이식. 건물을 고르고 지도를 클릭해 배치한다.
 import { useEffect, useRef, useState } from 'react';
-import { BUILDING_DEFS, canAfford, cannonPlacementsUsed } from '../game/buildings';
+import { BUILDING_DEFS, canAfford, cannonPlacementsUsed, isBuildingUnlocked } from '../game/buildings';
 import { RESOURCE_NAMES } from '../game/constants';
 import { getSeason } from '../game/seasons';
 import { getActiveSprites } from '../render/atlas';
@@ -8,8 +8,8 @@ import type { BuildingTypeId, GameState, ResourceId } from '../game/types';
 
 // 접이식 카테고리 구성
 const CATEGORIES: { name: string; types: BuildingTypeId[] }[] = [
-  { name: '주거·기반', types: ['hut', 'ondol', 'storehouse'] },
-  { name: '생산', types: ['field', 'lumberCamp', 'huntLodge', 'herbHut', 'smithy', 'tannery', 'market'] },
+  { name: '주거·기반', types: ['hut', 'ondol', 'tileHouse', 'storehouse', 'bridge'] },
+  { name: '생산', types: ['field', 'lumberCamp', 'huntLodge', 'herbHut', 'smithy', 'mine', 'ferry', 'tannery', 'market'] },
   { name: '방어·군사', types: ['palisade', 'watchtower', 'beacon', 'garrison', 'cannonEmplacement'] },
 ];
 
@@ -78,7 +78,8 @@ export function BuildMenu({ state, placingType, setPlacingType }: Props) {
         const hasPlacing = placingType != null && cat.types.includes(placingType);
         // 불랑기포대는 조정 하사(청원) 전엔 목록에 보이지 않는다
         const visibleTypes = cat.types.filter(
-          type => type !== 'cannonEmplacement' || state.cannonsGranted > 0,
+          type => isBuildingUnlocked(state.rank, type) &&
+            (type !== 'cannonEmplacement' || state.cannonsGranted > 0),
         );
         return (
           <div key={cat.name}>
