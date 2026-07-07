@@ -48,6 +48,16 @@ import {
   GENERATED_BUILDING_SHEET,
   generatedBuildingSourceRect,
 } from './generatedBuildingAssets';
+import {
+  isPromotionBuildingType,
+  PROMOTION_BUILDING_SHEET,
+  promotionBuildingSourceRect,
+} from './promotionBuildingAssets';
+import {
+  isPromotionCharacterJob,
+  PROMOTION_CHARACTER_SHEET,
+  promotionResidentSourceRect,
+} from './promotionCharacterAssets';
 
 const PITCH = 17;
 const T = 16;
@@ -64,6 +74,8 @@ let historicalTerrainSheet: HTMLImageElement | null = null;
 let terrainObjectSheet: HTMLImageElement | null = null;
 let buildingSheet: HTMLImageElement | null = null;
 let generatedCharacterSheet: HTMLImageElement | null = null;
+let promotionBuildingSheet: HTMLImageElement | null = null;
+let promotionCharacterSheet: HTMLImageElement | null = null;
 let loaded = 0;
 let started = false;
 
@@ -88,6 +100,15 @@ function ensureLoaded(): void {
   buildingSheet = new Image();
   buildingSheet.onload = () => { loaded++; };
   buildingSheet.src = GENERATED_BUILDING_SHEET.src;
+  promotionBuildingSheet = new Image();
+  promotionBuildingSheet.onload = () => { loaded++; };
+  promotionBuildingSheet.src = PROMOTION_BUILDING_SHEET.src;
+  const promotionChars = new Image();
+  promotionChars.onload = () => {
+    promotionCharacterSheet = promotionChars;
+    loaded++;
+  };
+  promotionChars.src = PROMOTION_CHARACTER_SHEET.src;
   const characterSheet = new Image();
   characterSheet.onload = () => {
     generatedCharacterSheet = characterSheet;
@@ -97,7 +118,7 @@ function ensureLoaded(): void {
 
 export function atlasReady(): boolean {
   ensureLoaded();
-  return loaded >= 6;
+  return loaded >= 8;
 }
 
 // 아틀라스가 준비되면 아틀라스, 아니면 임시 그래픽
@@ -133,6 +154,18 @@ function blitGeneratedBuilding(
   const rect = generatedBuildingSourceRect(p.type, p.season);
   const scale = p.size / GENERATED_BUILDING_SHEET.tileSize;
   const destHeight = GENERATED_BUILDING_SHEET.spriteHeight * scale;
+  ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
+}
+
+function blitPromotionBuilding(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  p: BuildingDrawParams,
+): void {
+  const rect = promotionBuildingSourceRect(p.type, p.season);
+  if (!rect) return;
+  const scale = p.size / PROMOTION_BUILDING_SHEET.tileSize;
+  const destHeight = PROMOTION_BUILDING_SHEET.spriteHeight * scale;
   ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
 }
 
@@ -449,7 +482,7 @@ function seasonWash(ctx: CanvasRenderingContext2D, season: Season, x: number, y:
 }
 
 export const atlasSprites: SpriteAPI = {
-  id: 'kenney-atlas-river-mask-historical-ground-generated-objects-buildings-v1',
+  id: 'kenney-atlas-river-mask-historical-ground-generated-objects-buildings-promotion-v1',
 
   drawTerrain(ctx, p) {
     if (!sheet) return;
@@ -520,6 +553,18 @@ export const atlasSprites: SpriteAPI = {
     const alpha = p.ghost ? 0.75 : p.built ? 1 : 0.55;
     ctx.globalAlpha = alpha;
 
+    if (promotionBuildingSheet && isPromotionBuildingType(p.type)) {
+      blitPromotionBuilding(ctx, promotionBuildingSheet, p);
+      ctx.globalAlpha = 1;
+      if (!p.built && !p.ghost) {
+        ctx.fillStyle = '#10141a';
+        ctx.fillRect(p.x + 2, p.y + p.size - 4, p.size - 4, 3);
+        ctx.fillStyle = '#d9a441';
+        ctx.fillRect(p.x + 2, p.y + p.size - 4, (p.size - 4) * p.progress01, 3);
+      }
+      return;
+    }
+
     if (buildingSheet) {
       blitGeneratedBuilding(ctx, buildingSheet, p);
       ctx.globalAlpha = 1;
@@ -567,7 +612,10 @@ export const atlasSprites: SpriteAPI = {
     const half = CHALF;
     const bob = (p.moving ? Math.floor(performance.now() / 130) % 2 : 0) * CF;
 
-    if (characterSheet) {
+    if (promotionCharacterSheet && isPromotionCharacterJob(p.job)) {
+      const rect = promotionResidentSourceRect(p.job, p.gender);
+      if (rect) drawGeneratedCharacterRect(ctx, promotionCharacterSheet, rect, p.x, p.y, p.facing, bob);
+    } else if (characterSheet) {
       drawGeneratedResident(ctx, characterSheet, p, bob);
     } else if (kenneyChars) {
       ctx.save();
