@@ -53,6 +53,22 @@ function addBuilt(state, type, n = 1) {
   }
 }
 
+function prepareBuildableLandTile(state, type) {
+  for (let y = 2; y < CONFIG.map.height - 2; y++) {
+    for (let x = 2; x < CONFIG.map.width - 2; x++) {
+      const tiles = buildings.buildingFootprintTiles(state, type, x, y);
+      if (!tiles || tiles.some(tile => tile.buildingId != null)) continue;
+      for (const tile of tiles) {
+        tile.terrain = 'plain';
+        tile.hasIron = false;
+        tile.buildingId = null;
+      }
+      if (buildings.canPlaceBuildingAt(state, type, x, y)) return state.map[y][x];
+    }
+  }
+  throw new Error(`no buildable land tile for ${type}`);
+}
+
 // ── 청원 자격: 승격 단계·쿨다운 ──
 {
   const state = simulation.newGame(11);
@@ -134,7 +150,8 @@ function addBuilt(state, type, n = 1) {
   const state = simulation.newGame(11);
   state.rank = 'bu';
   state.resources.reputation = 90;
-  const err = simulation.tryPlaceBuilding(state, 'cannonEmplacement', 3, 3);
+  const tile = prepareBuildableLandTile(state, 'cannonEmplacement');
+  const err = simulation.tryPlaceBuilding(state, 'cannonEmplacement', tile.x, tile.y);
   assert.ok(err.includes('하사'), '하사 전엔 배치 불가');
 
   requestPetition(state);
@@ -142,9 +159,10 @@ function addBuilt(state, type, n = 1) {
   assert.equal(state.cannonsGranted, 1);
   state.resources.wood = 50;
   state.resources.stone = 50;
-  const err2 = simulation.tryPlaceBuilding(state, 'cannonEmplacement', 3, 3);
+  const err2 = simulation.tryPlaceBuilding(state, 'cannonEmplacement', tile.x, tile.y);
   assert.equal(err2, null, '하사 후엔 배치 가능');
-  const err3 = simulation.tryPlaceBuilding(state, 'cannonEmplacement', 5, 5);
+  const nextTile = prepareBuildableLandTile(state, 'cannonEmplacement');
+  const err3 = simulation.tryPlaceBuilding(state, 'cannonEmplacement', nextTile.x, nextTile.y);
   assert.ok(err3?.includes('하사'), '배치권 소진 후엔 다시 불가');
 }
 

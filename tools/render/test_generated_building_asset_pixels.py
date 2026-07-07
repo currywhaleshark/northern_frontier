@@ -8,12 +8,21 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "src" / "render" / "generatedBuildingAssets.ts"
 TILE_SIZE = 28
 SPRITE_HEIGHT = 40
+LARGE_TILE_SIZE = 56
+LARGE_SPRITE_HEIGHT = 80
 
 
 def sheet_path() -> Path:
     source = SOURCE.read_text(encoding="utf-8")
     match = re.search(r"src:\s*'(/assets/[^']+)'", source)
     assert match, "generated building sheet src was not found"
+    return ROOT / "public" / match.group(1).lstrip("/")
+
+
+def large_sheet_path() -> Path:
+    source = SOURCE.read_text(encoding="utf-8")
+    match = re.search(r"GENERATED_LARGE_BUILDING_SHEET\s*=\s*\{[^}]*src:\s*'(/assets/[^']+)'", source, re.S)
+    assert match, "large generated building sheet src was not found"
     return ROOT / "public" / match.group(1).lstrip("/")
 
 
@@ -60,8 +69,38 @@ def test_building_cells_are_not_empty_and_bottom_aligned() -> None:
             assert bottom >= SPRITE_HEIGHT - 2, f"cell {col},{row} is not bottom aligned"
 
 
+def test_large_sheet_dimensions() -> None:
+    image = Image.open(large_sheet_path()).convert("RGBA")
+    assert image.size == (15 * LARGE_TILE_SIZE, 2 * LARGE_SPRITE_HEIGHT)
+
+
+def test_large_building_cells_are_not_empty_and_bottom_aligned() -> None:
+    image = Image.open(large_sheet_path()).convert("RGBA")
+    for row in range(2):
+        for col in range(15):
+            crop = image.crop(
+                (
+                    col * LARGE_TILE_SIZE,
+                    row * LARGE_SPRITE_HEIGHT,
+                    (col + 1) * LARGE_TILE_SIZE,
+                    (row + 1) * LARGE_SPRITE_HEIGHT,
+                ),
+            )
+            bbox = crop.getchannel("A").getbbox()
+            assert bbox is not None, f"large cell {col},{row} is empty"
+            left, top, right, bottom = bbox
+            width = right - left
+            height = bottom - top
+            assert width >= 24, f"large cell {col},{row} is too narrow"
+            assert height >= 28, f"large cell {col},{row} is too short"
+            assert right <= LARGE_TILE_SIZE, f"large cell {col},{row} exceeds cell width"
+            assert bottom >= LARGE_SPRITE_HEIGHT - 2, f"large cell {col},{row} is not bottom aligned"
+
+
 if __name__ == "__main__":
     test_sheet_dimensions()
     test_fields_are_top_down_square_tiles()
     test_building_cells_are_not_empty_and_bottom_aligned()
+    test_large_sheet_dimensions()
+    test_large_building_cells_are_not_empty_and_bottom_aligned()
     print("generated building asset pixel tests passed")

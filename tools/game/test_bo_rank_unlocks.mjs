@@ -33,7 +33,7 @@ const constants = await import(pathToFileURL(join(compiledDir, 'constants.mjs'))
 const agents = await import(pathToFileURL(join(compiledDir, 'agents.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-const BO_BUILDINGS = ['bridge', 'mine', 'tileHouse', 'ferry'];
+const BO_BUILDINGS = ['mine', 'tileHouse', 'ferry'];
 const BO_JOBS = ['miner', 'fisher'];
 
 function boostResources(state) {
@@ -121,6 +121,14 @@ function runTicks(state, ticks) {
   const state = simulation.newGame(20260707);
   boostResources(state);
 
+  assert.equal(buildings.isBuildingUnlocked(state.rank, 'bridge'), true, 'bridge is unlocked before bo');
+  const bridgeRiver = prepareTile(state, 'river');
+  assert.equal(
+    simulation.tryPlaceBuilding(state, 'bridge', bridgeRiver.x, bridgeRiver.y),
+    null,
+    'bridge can be placed before bo',
+  );
+
   for (const building of BO_BUILDINGS) {
     assert.equal(buildings.isBuildingUnlocked(state.rank, building), false, `${building} is locked before bo`);
   }
@@ -134,11 +142,6 @@ function runTicks(state, ticks) {
   assert.equal(resident.job, oldJob);
   simulation.setResidentJob(state, resident.id, 'fisher');
   assert.equal(resident.job, oldJob);
-
-  const river = prepareTile(state, 'river');
-  const lockMessage = simulation.tryPlaceBuilding(state, 'bridge', river.x, river.y);
-  assert.ok(lockMessage, 'bridge placement is rejected before bo');
-  assert.match(lockMessage, /보/);
 }
 
 {

@@ -1,0 +1,175 @@
+import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import ts from 'typescript';
+
+function compileGameModules() {
+  const srcDir = new URL('../../src/game/', import.meta.url);
+  const outDir = mkdtempSync(join(tmpdir(), 'northern-game-tests-'));
+  const files = readdirSync(srcDir).filter(file => file.endsWith('.ts'));
+  for (const file of files) {
+    const source = readFileSync(new URL(file, srcDir), 'utf8');
+    let output = ts.transpileModule(source, {
+      compilerOptions: {
+        module: ts.ModuleKind.ES2022,
+        target: ts.ScriptTarget.ES2022,
+      },
+    }).outputText;
+    output = output.replace(/(from\s+['"])(\.{1,2}\/[^'"]+)(['"])/g, (_match, start, spec, end) => {
+      if (/\.[cm]?js$/.test(spec)) return `${start}${spec}${end}`;
+      return `${start}${spec}.mjs${end}`;
+    });
+    writeFileSync(join(outDir, file.replace(/\.ts$/, '.mjs')), output, 'utf8');
+  }
+  return outDir;
+}
+
+const compiledDir = compileGameModules();
+const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
+const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
+const agents = await import(pathToFileURL(join(compiledDir, 'agents.mjs')).href);
+const raidDamage = await import(pathToFileURL(join(compiledDir, 'raidDamage.mjs')).href);
+
+const SINGLE_TILE = [
+  'bridge',
+  'lumberCamp',
+  'huntLodge',
+  'herbHut',
+  'mine',
+  'field',
+  'ferry',
+  'dock',
+  'palisade',
+  'earthFort',
+  'stoneWall',
+  'watchtower',
+];
+
+const TWO_TILE = Object.keys(buildings.BUILDING_DEFS).filter(type => !SINGLE_TILE.includes(type));
+
+function boostResources(state) {
+  for (const key of Object.keys(state.resources)) state.resources[key] = 1000;
+  state.rank = 'bu';
+  state.cannonsGranted = 10;
+}
+
+function clearMapToPlain(state) {
+  for (const row of state.map) {
+    for (const tile of row) {
+      tile.terrain = 'plain';
+      tile.hasIron = false;
+      tile.buildingId = null;
+    }
+  }
+  state.buildings = [];
+}
+
+function footprintIds(state, type, x, y) {
+  const tiles = buildings.buildingFootprintTiles(state, type, x, y);
+  assert.ok(tiles, `footprint exists for ${type}`);
+  return tiles.map(tile => tile.buildingId);
+}
+
+{
+  for (const type of SINGLE_TILE) {
+    assert.equal(buildings.buildingFootprintSize(type), 1, `${type} stays 1x1`);
+  }
+  for (const type of TWO_TILE) {
+    assert.equal(buildings.buildingFootprintSize(type), 2, `${type} becomes 2x2`);
+  }
+}
+
+{
+  const state = simulation.newGame(2026070701);
+  for (const building of state.buildings) {
+    const size = buildings.buildingFootprintSize(building.type);
+    const ids = footprintIds(state, building.type, building.x, building.y);
+    assert.equal(ids.length, size * size, `${building.type} footprint has ${size * size} tiles`);
+    assert.ok(ids.every(id => id === building.id), `${building.type} prebuilt footprint is occupied by its id`);
+  }
+}
+
+{
+  const state = simulation.newGame(2026070708);
+  for (const resident of state.residents) {
+    assert.equal(
+      agents.isPassable(state, resident.x, resident.y),
+      true,
+      `${resident.name} starts on a passable tile`,
+    );
+  }
+}
+
+{
+  const state = simulation.newGame(2026070702);
+  boostResources(state);
+  clearMapToPlain(state);
+
+  assert.equal(simulation.tryPlaceBuilding(state, 'smithy', 5, 5), null, '2x2 smithy can be placed on open land');
+  const smithy = state.buildings.find(building => building.type === 'smithy');
+  assert.ok(smithy, 'smithy was created');
+  assert.deepEqual(footprintIds(state, 'smithy', 5, 5), [smithy.id, smithy.id, smithy.id, smithy.id]);
+
+  assert.ok(
+    simulation.tryPlaceBuilding(state, 'market', 6, 6),
+    '2x2 market rejects placement when any footprint tile is occupied',
+  );
+
+  assert.ok(
+    simulation.tryPlaceBuilding(state, 'market', state.map[0].length - 1, state.map.length - 1),
+    '2x2 market rejects placement outside the map',
+  );
+}
+
+{
+  const state = simulation.newGame(2026070703);
+  boostResources(state);
+  clearMapToPlain(state);
+
+  assert.equal(simulation.tryPlaceBuilding(state, 'watchtower', 8, 8), null, 'excluded watchtower can be placed');
+  const tower = state.buildings.find(building => building.type === 'watchtower');
+  assert.ok(tower, 'watchtower was created');
+  assert.deepEqual(footprintIds(state, 'watchtower', 8, 8), [tower.id]);
+  assert.equal(state.map[8][9].buildingId, null, 'watchtower does not occupy east neighbor');
+  assert.equal(state.map[9][8].buildingId, null, 'watchtower does not occupy south neighbor');
+}
+
+{
+  const state = simulation.newGame(2026070704);
+  clearMapToPlain(state);
+  state.buildings.push({
+    id: 501,
+    type: 'garrison',
+    x: 3,
+    y: 4,
+    progress: 99,
+    built: true,
+    fieldGrowth: 0,
+  });
+
+  buildings.rebuildBuildingFootprints(state);
+  assert.deepEqual(footprintIds(state, 'garrison', 3, 4), [501, 501, 501, 501]);
+}
+
+{
+  const state = simulation.newGame(2026070705);
+  clearMapToPlain(state);
+  state.buildings.push({
+    id: 601,
+    type: 'storehouse',
+    x: 2,
+    y: 2,
+    progress: 99,
+    built: true,
+    fieldGrowth: 0,
+  });
+  buildings.rebuildBuildingFootprints(state);
+
+  raidDamage.damageBuildings(state, () => 0, 1);
+  assert.equal(state.buildings.length, 0, 'destroyed storehouse is removed');
+  assert.deepEqual(footprintIds(state, 'storehouse', 2, 2), [null, null, null, null]);
+}
+
+console.log('building footprint tests passed');

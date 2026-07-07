@@ -33,6 +33,12 @@ assert.equal(buildingAssets.PROMOTION_BUILDING_SHEET.rows, 2);
 assert.equal(buildingAssets.PROMOTION_BUILDING_SHEET.src, '/assets/promotion-buildings-generated-v1.png');
 assert.deepEqual(buildingAssets.PROMOTION_BUILDING_TYPES, PROMOTION_BUILDINGS);
 
+assert.equal(buildingAssets.PROMOTION_LARGE_BUILDING_SHEET.tileSize, 56);
+assert.equal(buildingAssets.PROMOTION_LARGE_BUILDING_SHEET.spriteHeight, 80);
+assert.equal(buildingAssets.PROMOTION_LARGE_BUILDING_SHEET.columns, PROMOTION_BUILDINGS.length);
+assert.equal(buildingAssets.PROMOTION_LARGE_BUILDING_SHEET.rows, 2);
+assert.equal(buildingAssets.PROMOTION_LARGE_BUILDING_SHEET.src, '/assets/promotion-buildings-generated-large-v1.png');
+
 for (const [col, type] of PROMOTION_BUILDINGS.entries()) {
   assert.equal(buildingAssets.isPromotionBuildingType(type), true, `${type} uses the promotion building sheet`);
   assert.deepEqual(
@@ -44,6 +50,16 @@ for (const [col, type] of PROMOTION_BUILDINGS.entries()) {
     buildingAssets.promotionBuildingSourceRect(type, 'winter'),
     { sx: col * 28, sy: 40, sw: 28, sh: 40 },
     `${type} winter source rect`,
+  );
+  assert.deepEqual(
+    buildingAssets.promotionLargeBuildingSourceRect(type, 'summer'),
+    { sx: col * 56, sy: 0, sw: 56, sh: 80 },
+    `${type} large summer source rect`,
+  );
+  assert.deepEqual(
+    buildingAssets.promotionLargeBuildingSourceRect(type, 'winter'),
+    { sx: col * 56, sy: 80, sw: 56, sh: 80 },
+    `${type} large winter source rect`,
   );
 }
 assert.equal(buildingAssets.isPromotionBuildingType('hut'), false);

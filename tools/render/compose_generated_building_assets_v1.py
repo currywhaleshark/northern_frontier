@@ -12,11 +12,15 @@ SNOW_SOURCE = SOURCE_DIR / "generated-buildings-snow-v1.png"
 FIELD_SOURCE = SOURCE_DIR / "generated-fields-seasons-v1.png"
 TOPDOWN_FIELD_SOURCE = SOURCE_DIR / "generated-fields-topdown-v1.png"
 OUTPUT = ROOT / "public" / "assets" / "folk-buildings-generated-v1.png"
+LARGE_OUTPUT = ROOT / "public" / "assets" / "folk-buildings-generated-large-v1.png"
 
 TILE_SIZE = 28
 SPRITE_HEIGHT = 40
+LARGE_TILE_SIZE = 56
+LARGE_SPRITE_HEIGHT = 80
 OUTPUT_COLUMNS = 15
 OUTPUT_ROWS = 3
+LARGE_OUTPUT_ROWS = 2
 SOURCE_COLUMNS = 5
 SOURCE_ROWS = 3
 
@@ -115,7 +119,13 @@ def alpha_bbox(image: Image.Image) -> tuple[int, int, int, int]:
     return bbox
 
 
-def fit_to_cell(sprite: Image.Image, max_width: int, max_height: int) -> Image.Image:
+def fit_to_cell(
+    sprite: Image.Image,
+    max_width: int,
+    max_height: int,
+    tile_size: int = TILE_SIZE,
+    sprite_height: int = SPRITE_HEIGHT,
+) -> Image.Image:
     bbox = alpha_bbox(sprite)
     cropped = sprite.crop(bbox)
     scale = min(max_width / cropped.width, max_height / cropped.height)
@@ -126,9 +136,9 @@ def fit_to_cell(sprite: Image.Image, max_width: int, max_height: int) -> Image.I
         ),
         Image.Resampling.LANCZOS,
     )
-    cell = Image.new("RGBA", (TILE_SIZE, SPRITE_HEIGHT), (0, 0, 0, 0))
-    x = (TILE_SIZE - resized.width) // 2
-    y = SPRITE_HEIGHT - resized.height - 1
+    cell = Image.new("RGBA", (tile_size, sprite_height), (0, 0, 0, 0))
+    x = (tile_size - resized.width) // 2
+    y = sprite_height - resized.height - 1
     cell.alpha_composite(resized, (x, y))
     return cell
 
@@ -137,7 +147,17 @@ def source_cell(image: Image.Image, boxes: list[tuple[int, int, int, int]], inde
     return image.crop(boxes[index])
 
 
-def compose_building_row(output: Image.Image, source: Path, row: int, fallback_field_index: int) -> None:
+def compose_building_row(
+    output: Image.Image,
+    source: Path,
+    row: int,
+    fallback_field_index: int,
+    tile_size: int = TILE_SIZE,
+    sprite_height: int = SPRITE_HEIGHT,
+    building_max_width: int = 26,
+    building_max_height: int = 38,
+    field_max_size: int = 26,
+) -> None:
     image = Image.open(source).convert("RGB")
     field_image = Image.open(TOPDOWN_FIELD_SOURCE).convert("RGB")
     building_boxes = detect_contact_sheet_boxes(image, SOURCE_COLUMNS, SOURCE_ROWS)
@@ -145,11 +165,17 @@ def compose_building_row(output: Image.Image, source: Path, row: int, fallback_f
     for final_col, source_index in enumerate(BUILDING_SOURCE_INDEX_BY_FINAL_COLUMN):
         if source_index is None:
             crop = source_cell(field_image, field_boxes, fallback_field_index)
-            sprite = fit_to_cell(remove_key(crop), 26, 26)
+            sprite = fit_to_cell(remove_key(crop), field_max_size, field_max_size, tile_size, sprite_height)
         else:
             crop = source_cell(image, building_boxes, source_index)
-            sprite = fit_to_cell(remove_key(crop), 26, 38)
-        output.alpha_composite(sprite, (final_col * TILE_SIZE, row * SPRITE_HEIGHT))
+            sprite = fit_to_cell(
+                remove_key(crop),
+                building_max_width,
+                building_max_height,
+                tile_size,
+                sprite_height,
+            )
+        output.alpha_composite(sprite, (final_col * tile_size, row * sprite_height))
 
 
 def compose_field_row(output: Image.Image) -> None:
@@ -173,6 +199,36 @@ def main() -> None:
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     output.save(OUTPUT)
     print(f"wrote {OUTPUT}")
+
+    large_output = Image.new(
+        "RGBA",
+        (OUTPUT_COLUMNS * LARGE_TILE_SIZE, LARGE_OUTPUT_ROWS * LARGE_SPRITE_HEIGHT),
+        (0, 0, 0, 0),
+    )
+    compose_building_row(
+        large_output,
+        NORMAL_SOURCE,
+        0,
+        fallback_field_index=0,
+        tile_size=LARGE_TILE_SIZE,
+        sprite_height=LARGE_SPRITE_HEIGHT,
+        building_max_width=52,
+        building_max_height=76,
+        field_max_size=52,
+    )
+    compose_building_row(
+        large_output,
+        SNOW_SOURCE,
+        1,
+        fallback_field_index=3,
+        tile_size=LARGE_TILE_SIZE,
+        sprite_height=LARGE_SPRITE_HEIGHT,
+        building_max_width=52,
+        building_max_height=76,
+        field_max_size=52,
+    )
+    large_output.save(LARGE_OUTPUT)
+    print(f"wrote {LARGE_OUTPUT}")
 
 
 if __name__ == "__main__":

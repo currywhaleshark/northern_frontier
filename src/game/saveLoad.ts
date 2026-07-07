@@ -1,5 +1,6 @@
 // localStorage 저장/불러오기
 import { CONFIG } from './config';
+import { rebuildBuildingFootprints } from './buildings';
 import { rollCourtTribute } from './courtTribute';
 import { spawnAnimalHabitats } from './habitats';
 import { makeRng } from './map';
@@ -106,6 +107,7 @@ export function loadGame(): GameState | null {
     }
     if (parsed.tributeFailStreak == null) parsed.tributeFailStreak = 0;
     migrateResidentGender(parsed);
+    rebuildBuildingFootprints(parsed);
     return parsed;
   } catch {
     return null;

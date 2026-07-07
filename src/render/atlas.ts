@@ -46,11 +46,15 @@ import {
 } from './generatedTerrainObjects';
 import {
   GENERATED_BUILDING_SHEET,
+  GENERATED_LARGE_BUILDING_SHEET,
+  generatedLargeBuildingSourceRect,
   generatedBuildingSourceRect,
 } from './generatedBuildingAssets';
 import {
   isPromotionBuildingType,
+  PROMOTION_LARGE_BUILDING_SHEET,
   PROMOTION_BUILDING_SHEET,
+  promotionLargeBuildingSourceRect,
   promotionBuildingSourceRect,
 } from './promotionBuildingAssets';
 import {
@@ -77,8 +81,10 @@ let riverSheet: HTMLImageElement | null = null;
 let historicalTerrainSheet: HTMLImageElement | null = null;
 let terrainObjectSheet: HTMLImageElement | null = null;
 let buildingSheet: HTMLImageElement | null = null;
+let largeBuildingSheet: HTMLImageElement | null = null;
 let generatedCharacterSheet: HTMLImageElement | null = null;
 let promotionBuildingSheet: HTMLImageElement | null = null;
+let promotionLargeBuildingSheet: HTMLImageElement | null = null;
 let promotionCharacterSheet: HTMLImageElement | null = null;
 let militiaWeaponSheet: HTMLImageElement | null = null;
 let loaded = 0;
@@ -105,9 +111,15 @@ function ensureLoaded(): void {
   buildingSheet = new Image();
   buildingSheet.onload = () => { loaded++; };
   buildingSheet.src = GENERATED_BUILDING_SHEET.src;
+  largeBuildingSheet = new Image();
+  largeBuildingSheet.onload = () => { loaded++; };
+  largeBuildingSheet.src = GENERATED_LARGE_BUILDING_SHEET.src;
   promotionBuildingSheet = new Image();
   promotionBuildingSheet.onload = () => { loaded++; };
   promotionBuildingSheet.src = PROMOTION_BUILDING_SHEET.src;
+  promotionLargeBuildingSheet = new Image();
+  promotionLargeBuildingSheet.onload = () => { loaded++; };
+  promotionLargeBuildingSheet.src = PROMOTION_LARGE_BUILDING_SHEET.src;
   const promotionChars = new Image();
   promotionChars.onload = () => {
     promotionCharacterSheet = promotionChars;
@@ -130,7 +142,7 @@ function ensureLoaded(): void {
 
 export function atlasReady(): boolean {
   ensureLoaded();
-  return loaded >= 10;
+  return loaded >= 12;
 }
 
 // 아틀라스가 준비되면 아틀라스, 아니면 임시 그래픽
@@ -169,6 +181,17 @@ function blitGeneratedBuilding(
   ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
 }
 
+function blitLargeGeneratedBuilding(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  p: BuildingDrawParams,
+): void {
+  const rect = generatedLargeBuildingSourceRect(p.type, p.season);
+  const scale = p.size / GENERATED_LARGE_BUILDING_SHEET.tileSize;
+  const destHeight = GENERATED_LARGE_BUILDING_SHEET.spriteHeight * scale;
+  ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
+}
+
 function blitPromotionBuilding(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
@@ -178,6 +201,18 @@ function blitPromotionBuilding(
   if (!rect) return;
   const scale = p.size / PROMOTION_BUILDING_SHEET.tileSize;
   const destHeight = PROMOTION_BUILDING_SHEET.spriteHeight * scale;
+  ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
+}
+
+function blitLargePromotionBuilding(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  p: BuildingDrawParams,
+): void {
+  const rect = promotionLargeBuildingSourceRect(p.type, p.season);
+  if (!rect) return;
+  const scale = p.size / PROMOTION_LARGE_BUILDING_SHEET.tileSize;
+  const destHeight = PROMOTION_LARGE_BUILDING_SHEET.spriteHeight * scale;
   ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
 }
 
@@ -565,8 +600,32 @@ export const atlasSprites: SpriteAPI = {
     const alpha = p.ghost ? 0.75 : p.built ? 1 : 0.55;
     ctx.globalAlpha = alpha;
 
+    if (isPromotionBuildingType(p.type) && p.size > PROMOTION_BUILDING_SHEET.tileSize && promotionLargeBuildingSheet) {
+      blitLargePromotionBuilding(ctx, promotionLargeBuildingSheet, p);
+      ctx.globalAlpha = 1;
+      if (!p.built && !p.ghost) {
+        ctx.fillStyle = '#10141a';
+        ctx.fillRect(p.x + 2, p.y + p.size - 4, p.size - 4, 3);
+        ctx.fillStyle = '#d9a441';
+        ctx.fillRect(p.x + 2, p.y + p.size - 4, (p.size - 4) * p.progress01, 3);
+      }
+      return;
+    }
+
     if (promotionBuildingSheet && isPromotionBuildingType(p.type)) {
       blitPromotionBuilding(ctx, promotionBuildingSheet, p);
+      ctx.globalAlpha = 1;
+      if (!p.built && !p.ghost) {
+        ctx.fillStyle = '#10141a';
+        ctx.fillRect(p.x + 2, p.y + p.size - 4, p.size - 4, 3);
+        ctx.fillStyle = '#d9a441';
+        ctx.fillRect(p.x + 2, p.y + p.size - 4, (p.size - 4) * p.progress01, 3);
+      }
+      return;
+    }
+
+    if (largeBuildingSheet && p.size > GENERATED_BUILDING_SHEET.tileSize) {
+      blitLargeGeneratedBuilding(ctx, largeBuildingSheet, p);
       ctx.globalAlpha = 1;
       if (!p.built && !p.ghost) {
         ctx.fillStyle = '#10141a';

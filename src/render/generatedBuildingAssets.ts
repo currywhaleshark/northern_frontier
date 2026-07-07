@@ -8,6 +8,14 @@ export const GENERATED_BUILDING_SHEET = {
   src: '/assets/folk-buildings-generated-v1.png',
 } as const;
 
+export const GENERATED_LARGE_BUILDING_SHEET = {
+  tileSize: 56,
+  spriteHeight: 80,
+  columns: 15,
+  rows: 2,
+  src: '/assets/folk-buildings-generated-large-v1.png',
+} as const;
+
 const BUILDING_COLUMNS: Record<BuildingTypeId, number> = {
   center: 0,
   hut: 1,
@@ -50,6 +58,19 @@ export function generatedBuildingSourceRect(type: BuildingTypeId, season: Season
   const height = GENERATED_BUILDING_SHEET.spriteHeight;
   const col = type === 'field' ? FIELD_SEASON_COLUMNS[season] : BUILDING_COLUMNS[type];
   const row = type === 'field' ? 2 : season === 'winter' ? 1 : 0;
+  return {
+    sx: col * tile,
+    sy: row * height,
+    sw: tile,
+    sh: height,
+  };
+}
+
+export function generatedLargeBuildingSourceRect(type: BuildingTypeId, season: Season) {
+  const tile = GENERATED_LARGE_BUILDING_SHEET.tileSize;
+  const height = GENERATED_LARGE_BUILDING_SHEET.spriteHeight;
+  const col = type === 'field' ? FIELD_SEASON_COLUMNS[season] : BUILDING_COLUMNS[type];
+  const row = season === 'winter' ? 1 : 0;
   return {
     sx: col * tile,
     sy: row * height,

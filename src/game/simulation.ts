@@ -4,8 +4,9 @@
 import { CONFIG } from './config';
 import { isJobUnlocked, RANK_NAMES, SEASON_NAMES } from './constants';
 import {
-  BUILDING_DEFS, canAfford, cannonPlacementsUsed, canPlaceOn, computeDefense, countBuilt, housingCapacity,
-  isBuildingUnlocked, isSmithyProductUnlocked, SMITHY_PRODUCT_DEFS,
+  BUILDING_DEFS, buildingFootprintTiles, canAfford, cannonPlacementsUsed, canPlaceBuildingAt, canPlaceOn,
+  computeDefense, countBuilt, housingCapacity, isBuildingUnlocked, isSmithyProductUnlocked, occupyBuildingTiles,
+  SMITHY_PRODUCT_DEFS,
 } from './buildings';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
 import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
@@ -89,7 +90,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
 
   // 마을 중심지 + 초가집 2채는 지어진 상태로 시작
   placePrebuilt(state, 'center', centerX, centerY);
-  const hutSpots = findNearbySpots(state, centerX, centerY, 2);
+  const hutSpots = findNearbySpots(state, centerX, centerY, 'hut', 2);
   for (const spot of hutSpots) placePrebuilt(state, 'hut', spot.x, spot.y);
 
   // 시작 주민 (마을 중심에서 출발)
@@ -114,19 +115,40 @@ function placePrebuilt(state: GameState, type: BuildingTypeId, x: number, y: num
     progress: BUILDING_DEFS[type].buildDays, built: true, fieldGrowth: 0,
   };
   state.buildings.push(b);
-  state.map[y][x].buildingId = b.id;
-  if (state.map[y][x].terrain === 'forest') state.map[y][x].terrain = 'plain';
+  const tiles = buildingFootprintTiles(state, type, x, y) ?? [];
+  occupyBuildingTiles(state, b);
+  for (const tile of tiles) {
+    if (tile.terrain === 'forest') tile.terrain = 'plain';
+  }
 }
 
-function findNearbySpots(state: GameState, cx: number, cy: number, count: number): { x: number; y: number }[] {
+function findNearbySpots(
+  state: GameState,
+  cx: number,
+  cy: number,
+  type: BuildingTypeId,
+  count: number,
+): { x: number; y: number }[] {
   const spots: { x: number; y: number }[] = [];
+  const reserved = new Set<string>();
+  const canReserve = (x: number, y: number): boolean => {
+    const tiles = buildingFootprintTiles(state, type, x, y);
+    if (!tiles) return false;
+    const def = BUILDING_DEFS[type];
+    return tiles.every(tile => !reserved.has(`${tile.x},${tile.y}`) && canPlaceOn(def, tile, state));
+  };
+  const reserve = (x: number, y: number): void => {
+    const tiles = buildingFootprintTiles(state, type, x, y) ?? [];
+    for (const tile of tiles) reserved.add(`${tile.x},${tile.y}`);
+  };
   for (let r = 1; r <= 4 && spots.length < count; r++) {
     for (let dy = -r; dy <= r && spots.length < count; dy++) {
       for (let dx = -r; dx <= r && spots.length < count; dx++) {
-        const t = state.map[cy + dy]?.[cx + dx];
-        if (t && t.buildingId == null &&
-            (t.terrain === 'plain' || t.terrain === 'fertile' || t.terrain === 'forest')) {
-          spots.push({ x: t.x, y: t.y });
+        const x = cx + dx;
+        const y = cy + dy;
+        if (canReserve(x, y)) {
+          spots.push({ x, y });
+          reserve(x, y);
         }
       }
     }
@@ -144,7 +166,7 @@ export function tryPlaceBuilding(state: GameState, type: BuildingTypeId, x: numb
     const rankName = def.minRank ? RANK_NAMES[def.minRank] : RANK_NAMES.bo;
     return `${rankName} 승격 후 지을 수 있습니다.`;
   }
-  if (!canPlaceOn(def, tile, state)) return '이곳에는 지을 수 없습니다.';
+  if (!canPlaceBuildingAt(state, type, x, y)) return '이곳에는 지을 수 없습니다.';
   if (def.unique && state.buildings.some(b => b.type === type)) return '이미 건설 중이거나 완공되었습니다.';
   if (type === 'cannonEmplacement' && cannonPlacementsUsed(state) >= state.cannonsGranted) {
     return '불랑기포는 조정의 하사가 있어야 합니다. (조정 탭에서 청원)';
@@ -159,10 +181,13 @@ export function tryPlaceBuilding(state: GameState, type: BuildingTypeId, x: numb
   };
   if (type === 'smithy') b.smithyProduct = 'tools';
   state.buildings.push(b);
-  tile.buildingId = b.id;
-  if (tile.terrain === 'forest') {
-    tile.terrain = 'plain';
-    state.resources.wood += 3; // 개간하며 얻는 목재
+  const tiles = buildingFootprintTiles(state, type, x, y) ?? [];
+  occupyBuildingTiles(state, b);
+  for (const footprintTile of tiles) {
+    if (footprintTile.terrain === 'forest') {
+      footprintTile.terrain = 'plain';
+      state.resources.wood += 3; // 개간하며 얻는 목재
+    }
   }
   addLog(state, `${def.name} 건설을 시작했습니다.`, 'info');
   return null;

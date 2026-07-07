@@ -6,7 +6,7 @@
 // 그리기 자체는 SpriteAPI(sprites.ts)에 위임하므로, 진짜 그래픽을 붙일 때는
 // SpriteAPI 구현체만 교체하면 된다.
 import { CONFIG } from '../game/config';
-import { BUILDING_DEFS, canAfford, canPlaceOn } from '../game/buildings';
+import { BUILDING_DEFS, buildingFootprintSize, canAfford, canPlaceBuildingAt } from '../game/buildings';
 import { getSeason } from '../game/seasons';
 import { findHabitatIconAtTile } from '../game/habitats';
 import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
@@ -103,12 +103,12 @@ function drawTerrainLayer(state: GameState, width: number, height: number, sprit
 }
 
 // 굴뚝 연기: 위로 오르며 흩어지는 회백색 입자 (건물 id로 위상을 어긋나게)
-function drawSmoke(ctx: CanvasRenderingContext2D, bx: number, by: number, id: number): void {
+function drawSmoke(ctx: CanvasRenderingContext2D, bx: number, by: number, id: number, footprint: number): void {
   const t = performance.now() / 1000;
   for (let k = 0; k < 4; k++) {
     const ph = ((t / 2.6) + k / 4 + (id % 7) / 7) % 1; // 0(굴뚝)→1(소멸)
     const sy = by - 13 - ph * 13;
-    const sx = bx + TILE - 4 + Math.sin((ph * 5 + id) * 2) * 1.8;
+    const sx = bx + TILE * footprint - 4 + Math.sin((ph * 5 + id) * 2) * 1.8;
     ctx.fillStyle = `rgba(206,211,218,${(0.65 * (1 - ph)).toFixed(2)})`;
     ctx.beginPath();
     ctx.arc(sx, sy, 1.6 + ph * 2.4, 0, Math.PI * 2);
@@ -220,19 +220,22 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   // 2) 건물 — 지붕이 위 타일에 겹치므로 y 순서로 그린다
   const season = getSeason(state.day);
   const heating = (season === 'autumn' || season === 'winter') && state.resources.firewood > 0;
-  const sorted = [...state.buildings].sort((a, b) => a.y - b.y);
+  const sorted = [...state.buildings].sort((a, b) =>
+    (a.y + buildingFootprintSize(a.type)) - (b.y + buildingFootprintSize(b.type)) || a.x - b.x);
   for (const b of sorted) {
     const def = BUILDING_DEFS[b.type];
+    const footprint = buildingFootprintSize(b.type);
+    const size = TILE * footprint;
     sprites.drawBuilding(ctx, {
       type: b.type, built: b.built, ghost: false,
       season,
       progress01: def.buildDays > 0 ? b.progress / def.buildDays : 1,
       growth01: b.type === 'field' ? b.fieldGrowth / 100 : undefined,
-      x: b.x * TILE, y: b.y * TILE, size: TILE,
+      x: b.x * TILE, y: b.y * TILE, size,
     });
     // 아궁이에 불을 땔 때 온돌집/중심지 굴뚝에서 연기가 오른다
     if (b.built && heating && (b.type === 'ondol' || b.type === 'center')) {
-      drawSmoke(ctx, b.x * TILE, b.y * TILE, b.id);
+      drawSmoke(ctx, b.x * TILE, b.y * TILE, b.id, footprint);
     }
   }
 
@@ -332,14 +335,15 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   // 10) 건설 배치 미리보기 — 날씨 위에 얹어 잘 보이게
   if (o.placingType && o.hover) {
     const def = BUILDING_DEFS[o.placingType];
-    const tile = state.map[o.hover.y]?.[o.hover.x];
-    const ok = tile && canPlaceOn(def, tile, state) && canAfford(state, def);
+    const footprint = buildingFootprintSize(o.placingType);
+    const size = TILE * footprint;
+    const ok = canPlaceBuildingAt(state, o.placingType, o.hover.x, o.hover.y) && canAfford(state, def);
     ctx.fillStyle = ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
-    ctx.fillRect(o.hover.x * TILE, o.hover.y * TILE, TILE, TILE);
+    ctx.fillRect(o.hover.x * TILE, o.hover.y * TILE, size, size);
     sprites.drawBuilding(ctx, {
       type: o.placingType, built: true, ghost: true, progress01: 1,
       season,
-      x: o.hover.x * TILE, y: o.hover.y * TILE, size: TILE,
+      x: o.hover.x * TILE, y: o.hover.y * TILE, size,
     });
   }
 }
@@ -369,8 +373,9 @@ function drawDayNight(ctx: CanvasRenderingContext2D, state: GameState, dayFrac: 
     for (const b of state.buildings) {
       if (!b.built) continue;
       if (b.type === 'hut' || b.type === 'ondol' || b.type === 'center' || b.type === 'garrison') {
+        const size = TILE * buildingFootprintSize(b.type);
         ctx.fillStyle = `rgba(255,205,95,${(0.85 * a).toFixed(2)})`;
-        ctx.fillRect(b.x * TILE + TILE * 0.5 - 1.5, b.y * TILE + TILE * 0.42, 3, 3);
+        ctx.fillRect(b.x * TILE + size * 0.5 - 1.5, b.y * TILE + size * 0.42, 3, 3);
       }
     }
   }

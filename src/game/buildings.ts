@@ -36,9 +36,9 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   bridge: {
     id: 'bridge', name: '다리', emoji: '🌉',
-    desc: '보(堡) 승격 후 건설. 강 위에 놓아 사계절 주민 통행을 가능하게 한다.',
+    desc: '강 위에 놓아 사계절 주민 통행을 가능하게 한다.',
     cost: { wood: 16, stone: 10 }, buildDays: 8, slots: 0, capacity: 0, defense: 0,
-    winterBonus: false, placement: 'river', unique: false, minRank: 'bo',
+    winterBonus: false, placement: 'river', unique: false,
   },
   lumberCamp: {
     id: 'lumberCamp', name: '벌목장', emoji: '🪓',
@@ -174,6 +174,82 @@ export const BUILD_MENU_ORDER: BuildingTypeId[] = [
   'palisade', 'earthFort', 'stoneWall', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement',
 ];
+
+export const SINGLE_TILE_BUILDINGS = [
+  'bridge',
+  'lumberCamp',
+  'huntLodge',
+  'herbHut',
+  'mine',
+  'field',
+  'ferry',
+  'dock',
+  'palisade',
+  'earthFort',
+  'stoneWall',
+  'watchtower',
+] as const satisfies readonly BuildingTypeId[];
+
+const SINGLE_TILE_BUILDING_SET: ReadonlySet<BuildingTypeId> = new Set<BuildingTypeId>(SINGLE_TILE_BUILDINGS);
+
+export function buildingFootprintSize(type: BuildingTypeId): 1 | 2 {
+  return SINGLE_TILE_BUILDING_SET.has(type) ? 1 : 2;
+}
+
+export function buildingFootprintTiles(
+  state: Pick<GameState, 'map'>,
+  type: BuildingTypeId,
+  x: number,
+  y: number,
+): Tile[] | null {
+  const size = buildingFootprintSize(type);
+  const tiles: Tile[] = [];
+  for (let dy = 0; dy < size; dy++) {
+    for (let dx = 0; dx < size; dx++) {
+      const tile = state.map[y + dy]?.[x + dx];
+      if (!tile) return null;
+      tiles.push(tile);
+    }
+  }
+  return tiles;
+}
+
+export function canPlaceBuildingAt(state: GameState, type: BuildingTypeId, x: number, y: number): boolean {
+  const tiles = buildingFootprintTiles(state, type, x, y);
+  if (!tiles) return false;
+  const def = BUILDING_DEFS[type];
+  return tiles.every(tile => canPlaceOn(def, tile, state));
+}
+
+export function occupyBuildingTiles(
+  state: GameState,
+  building: Pick<Building, 'id' | 'type' | 'x' | 'y'>,
+): void {
+  const tiles = buildingFootprintTiles(state, building.type, building.x, building.y);
+  if (!tiles) return;
+  for (const tile of tiles) tile.buildingId = building.id;
+}
+
+export function clearBuildingTiles(state: GameState, buildingId: number): void {
+  for (const row of state.map) {
+    for (const tile of row) {
+      if (tile.buildingId === buildingId) tile.buildingId = null;
+    }
+  }
+}
+
+export function rebuildBuildingFootprints(state: GameState): void {
+  for (const row of state.map) {
+    for (const tile of row) tile.buildingId = null;
+  }
+  for (const building of state.buildings) {
+    const tiles = buildingFootprintTiles(state, building.type, building.x, building.y);
+    if (!tiles) continue;
+    for (const tile of tiles) {
+      if (tile.buildingId == null) tile.buildingId = building.id;
+    }
+  }
+}
 
 // 불랑기포대는 조정 하사 수(cannonsGranted)만큼만 놓을 수 있다 (건설 중 포함)
 export function cannonPlacementsUsed(state: GameState): number {

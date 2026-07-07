@@ -5,18 +5,48 @@ import { housingCapacity } from './buildings';
 import { addLog } from './events';
 import { getSeason } from './seasons';
 import { warmthLossWeatherMult } from './weather';
-import type { GameState, Gender, JobId, Resident } from './types';
+import type { GameState, Gender, JobId, Resident, Tile } from './types';
 
 export function rollResidentGender(rng: () => number): Gender {
   return rng() < 0.5 ? 'female' : 'male';
 }
 
+function isResidentSpawnTile(tile: Tile): boolean {
+  return tile.buildingId == null && tile.terrain !== 'mountain' && tile.terrain !== 'river';
+}
+
+function residentSpawnPoint(
+  state: GameState,
+  rng: () => number,
+  cx: number,
+  cy: number,
+): { x: number; y: number } {
+  for (let radius = 1; radius <= 6; radius++) {
+    const candidates: Tile[] = [];
+    for (let y = cy - radius; y <= cy + radius; y++) {
+      for (let x = cx - radius; x <= cx + radius; x++) {
+        if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) !== radius) continue;
+        const tile = state.map[y]?.[x];
+        if (tile && isResidentSpawnTile(tile)) candidates.push(tile);
+      }
+    }
+    if (candidates.length > 0) {
+      const tile = candidates[Math.floor(rng() * candidates.length)];
+      return { x: tile.x, y: tile.y };
+    }
+  }
+  const fallback = state.map[cy]?.[cx];
+  if (fallback && isResidentSpawnTile(fallback)) return { x: cx, y: cy };
+  return { x: Math.floor(state.map[0].length / 2), y: Math.floor(state.map.length / 2) };
+}
+
 export function createResident(state: GameState, rng: () => number, job: JobId = 'idle'): Resident {
   const name = SURNAMES[Math.floor(rng() * SURNAMES.length)] + GIVEN_NAMES[Math.floor(rng() * GIVEN_NAMES.length)];
-  // 마을 중심지에서 출발한다
+  // 마을 중심지 주변에서 출발한다. 중심지 자체는 solid footprint라 주민을 올려두지 않는다.
   const center = state.buildings.find(b => b.type === 'center');
   const cx = center ? center.x : Math.floor(state.map[0].length / 2);
   const cy = center ? center.y : Math.floor(state.map.length / 2);
+  const spawn = residentSpawnPoint(state, rng, cx, cy);
   return {
     id: state.nextResidentId++,
     name,
@@ -31,10 +61,10 @@ export function createResident(state: GameState, rng: () => number, job: JobId =
     task: JOB_NAMES[job],
     alive: true,
     sick: false,
-    x: cx,
-    y: cy,
-    px: cx,
-    py: cy,
+    x: spawn.x,
+    y: spawn.y,
+    px: spawn.x,
+    py: spawn.y,
     phase: 'rest',
     path: [],
     workTimer: 0,

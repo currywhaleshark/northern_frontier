@@ -1,5 +1,5 @@
 // 습격 피해 처리 공용 헬퍼 — 즉시 판정(raids.ts)과 지도 전투(battles.ts)가 함께 쓴다
-import { countBuilt } from './buildings';
+import { clearBuildingTiles, countBuilt } from './buildings';
 import { livingResidents } from './residents';
 import type { GameState, ResourceId } from './types';
 
@@ -55,8 +55,7 @@ export function damageBuildings(state: GameState, rng: () => number, count: numb
     // 절반 확률로 완파, 아니면 반파(재건 필요)
     if (rng() < 0.5) {
       state.buildings = state.buildings.filter(x => x.id !== b.id);
-      const tile = state.map[b.y]?.[b.x];
-      if (tile) tile.buildingId = null;
+      clearBuildingTiles(state, b.id);
       destroyed.push(b.type);
     } else {
       b.built = false;

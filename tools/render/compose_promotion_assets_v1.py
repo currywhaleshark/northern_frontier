@@ -11,10 +11,13 @@ BUILDING_NORMAL_SOURCE = SOURCE_DIR / "promotion-buildings-topdown-normal-v1.png
 BUILDING_WINTER_SOURCE = SOURCE_DIR / "promotion-buildings-topdown-winter-v1.png"
 CHARACTER_SOURCE = SOURCE_DIR / "promotion-characters-draft-v1.png"
 BUILDING_OUTPUT = ROOT / "public" / "assets" / "promotion-buildings-generated-v1.png"
+LARGE_BUILDING_OUTPUT = ROOT / "public" / "assets" / "promotion-buildings-generated-large-v1.png"
 CHARACTER_OUTPUT = ROOT / "public" / "assets" / "promotion-characters-generated-v1.png"
 
 TILE_SIZE = 28
 SPRITE_HEIGHT = 40
+LARGE_TILE_SIZE = 56
+LARGE_SPRITE_HEIGHT = 80
 BUILDING_COLUMNS = 12
 BUILDING_ROWS = 2
 SOURCE_BUILDING_COLUMNS = 4
@@ -55,7 +58,14 @@ def grid_crop(image: Image.Image, columns: int, rows: int, index: int) -> Image.
     return image.crop((left, top, right, bottom))
 
 
-def fit_to_cell(sprite: Image.Image, max_width: int, max_height: int, bottom_aligned: bool = True) -> Image.Image:
+def fit_to_cell(
+    sprite: Image.Image,
+    max_width: int,
+    max_height: int,
+    bottom_aligned: bool = True,
+    tile_size: int = TILE_SIZE,
+    sprite_height: int = SPRITE_HEIGHT,
+) -> Image.Image:
     cropped = sprite.crop(alpha_bbox(sprite))
     scale = min(max_width / cropped.width, max_height / cropped.height)
     resized = cropped.resize(
@@ -65,20 +75,28 @@ def fit_to_cell(sprite: Image.Image, max_width: int, max_height: int, bottom_ali
         ),
         Image.Resampling.LANCZOS,
     )
-    cell = Image.new("RGBA", (TILE_SIZE, SPRITE_HEIGHT), (0, 0, 0, 0))
-    x = (TILE_SIZE - resized.width) // 2
-    y = SPRITE_HEIGHT - resized.height if bottom_aligned else (SPRITE_HEIGHT - resized.height) // 2
+    cell = Image.new("RGBA", (tile_size, sprite_height), (0, 0, 0, 0))
+    x = (tile_size - resized.width) // 2
+    y = sprite_height - resized.height if bottom_aligned else (sprite_height - resized.height) // 2
     cell.alpha_composite(remove_key(resized), (x, y))
     return remove_key(cell)
 
 
-def compose_building_row(output: Image.Image, source: Path, output_row: int) -> None:
+def compose_building_row(
+    output: Image.Image,
+    source: Path,
+    output_row: int,
+    tile_size: int = TILE_SIZE,
+    sprite_height: int = SPRITE_HEIGHT,
+    max_width: int = 26,
+    default_max_height: int = 36,
+) -> None:
     image = Image.open(source).convert("RGB")
     for index in range(BUILDING_COLUMNS):
         crop = remove_key(grid_crop(image, SOURCE_BUILDING_COLUMNS, SOURCE_BUILDING_ROWS, index))
-        max_height = 30 if index in (1, 9) else 36
-        sprite = fit_to_cell(crop, 26, max_height)
-        output.alpha_composite(sprite, (index * TILE_SIZE, output_row * SPRITE_HEIGHT))
+        max_height = round(default_max_height * (30 / 36)) if index in (1, 9) else default_max_height
+        sprite = fit_to_cell(crop, max_width, max_height, tile_size=tile_size, sprite_height=sprite_height)
+        output.alpha_composite(sprite, (index * tile_size, output_row * sprite_height))
 
 
 def compose_buildings() -> None:
@@ -92,6 +110,32 @@ def compose_buildings() -> None:
     BUILDING_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     output.save(BUILDING_OUTPUT)
     print(f"wrote {BUILDING_OUTPUT}")
+
+    large_output = Image.new(
+        "RGBA",
+        (BUILDING_COLUMNS * LARGE_TILE_SIZE, BUILDING_ROWS * LARGE_SPRITE_HEIGHT),
+        (0, 0, 0, 0),
+    )
+    compose_building_row(
+        large_output,
+        BUILDING_NORMAL_SOURCE,
+        0,
+        tile_size=LARGE_TILE_SIZE,
+        sprite_height=LARGE_SPRITE_HEIGHT,
+        max_width=52,
+        default_max_height=72,
+    )
+    compose_building_row(
+        large_output,
+        BUILDING_WINTER_SOURCE,
+        1,
+        tile_size=LARGE_TILE_SIZE,
+        sprite_height=LARGE_SPRITE_HEIGHT,
+        max_width=52,
+        default_max_height=72,
+    )
+    large_output.save(LARGE_BUILDING_OUTPUT)
+    print(f"wrote {LARGE_BUILDING_OUTPUT}")
 
 
 def compose_characters() -> None:

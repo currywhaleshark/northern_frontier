@@ -42,26 +42,28 @@ function boostResources(state) {
   for (const key of Object.keys(state.resources)) state.resources[key] = 1000;
 }
 
-function openInteriorTile(state) {
+function openInteriorTile(state, type = 'hut') {
   for (let y = 2; y < CONFIG.map.height - 2; y++) {
     for (let x = 2; x < CONFIG.map.width - 2; x++) {
-      const tile = state.map[y][x];
-      if (tile.buildingId == null) return tile;
+      const tiles = buildings.buildingFootprintTiles(state, type, x, y);
+      if (tiles && tiles.every(tile => tile.buildingId == null)) return state.map[y][x];
     }
   }
   throw new Error('no open tile found');
 }
 
-function prepareLandTile(state) {
-  const tile = openInteriorTile(state);
-  tile.terrain = 'plain';
-  tile.hasIron = false;
-  tile.buildingId = null;
+function prepareLandTile(state, type = 'hut') {
+  const tile = openInteriorTile(state, type);
+  for (const footprintTile of buildings.buildingFootprintTiles(state, type, tile.x, tile.y)) {
+    footprintTile.terrain = 'plain';
+    footprintTile.hasIron = false;
+    footprintTile.buildingId = null;
+  }
   return tile;
 }
 
 function prepareRiverEdge(state) {
-  const bank = openInteriorTile(state);
+  const bank = openInteriorTile(state, 'dock');
   const river = state.map[bank.y][bank.x + 1];
   assert.ok(river, 'river neighbor exists');
   bank.terrain = 'plain';
@@ -84,12 +86,12 @@ function placeBuilt(state, type, tile) {
     fieldGrowth: 0,
   };
   state.buildings.push(building);
-  tile.buildingId = building.id;
+  buildings.occupyBuildingTiles(state, building);
   return building;
 }
 
 function withMarket(state) {
-  const tile = prepareLandTile(state);
+  const tile = prepareLandTile(state, 'market');
   placeBuilt(state, 'market', tile);
   return state;
 }
@@ -165,7 +167,7 @@ function runTicks(state, ticks) {
   for (const building of BU_BUILDINGS) {
     assert.ok(buildings.BUILDING_DEFS[building], `${building} has a building definition`);
     assert.equal(buildings.isBuildingUnlocked(state.rank, building), false, `${building} is locked before bu`);
-    const tile = building === 'dock' ? prepareRiverEdge(state).river : prepareLandTile(state);
+    const tile = building === 'dock' ? prepareRiverEdge(state).river : prepareLandTile(state, building);
     const lockMessage = simulation.tryPlaceBuilding(state, building, tile.x, tile.y);
     assert.ok(lockMessage, `${building} placement is rejected before bu`);
     assert.match(lockMessage, /府|遺/);
@@ -189,7 +191,7 @@ function runTicks(state, ticks) {
     boostResources(state);
     state.rank = 'bu';
     assert.equal(buildings.isBuildingUnlocked(state.rank, building), true, `${building} is unlocked at bu`);
-    const tile = building === 'dock' ? prepareRiverEdge(state).river : prepareLandTile(state);
+    const tile = building === 'dock' ? prepareRiverEdge(state).river : prepareLandTile(state, building);
     assert.equal(simulation.tryPlaceBuilding(state, building, tile.x, tile.y), null, `${building} can be placed at bu`);
   }
 
@@ -216,7 +218,7 @@ function runTicks(state, ticks) {
 
 {
   const state = simulation.newGame(202607084);
-  const yardTile = prepareLandTile(state);
+  const yardTile = prepareLandTile(state, 'nitreYard');
   placeBuilt(state, 'nitreYard', yardTile);
   onlyWorkerAt(state, 'powderMaker', yardTile);
   state.resources.firewood = 10;
@@ -232,7 +234,7 @@ function runTicks(state, ticks) {
 {
   const state = simulation.newGame(202607085);
   assert.equal(buildings.officeEfficiencyMultiplier(state), 1);
-  const officeTile = prepareLandTile(state);
+  const officeTile = prepareLandTile(state, 'office');
   placeBuilt(state, 'office', officeTile);
   assert.equal(buildings.officeEfficiencyMultiplier(state), 1, 'office needs assigned clerks to boost work');
 

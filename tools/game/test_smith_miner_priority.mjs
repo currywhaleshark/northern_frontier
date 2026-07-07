@@ -28,6 +28,8 @@ function compileGameModules() {
 
 const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
+const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
+const agents = await import(pathToFileURL(join(compiledDir, 'agents.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 function centerBuilding(state) {
@@ -57,15 +59,25 @@ function placeBuilt(state, type, tile) {
     fieldGrowth: 0,
   };
   state.buildings.push(building);
-  tile.buildingId = building.id;
+  buildings.occupyBuildingTiles(state, building);
   return building;
+}
+
+function isBuildingInteractionTile(state, building, x, y) {
+  const tile = state.map[y]?.[x];
+  if (!tile || !agents.isPassable(state, x, y)) return false;
+  const footprint = buildings.buildingFootprintTiles(state, building.type, building.x, building.y);
+  assert.ok(footprint, `${building.type} footprint exists`);
+  return footprint.some(part =>
+    Math.max(Math.abs(part.x - x), Math.abs(part.y - y)) === 1);
 }
 
 function setupSmithScenario(seed, withMiner) {
   const state = simulation.newGame(seed);
-  const center = centerBuilding(state);
-  const smithyTile = state.map[center.y][center.x];
-  placeBuilt(state, 'smithy', smithyTile);
+  centerBuilding(state);
+  const smithyTile = openInteriorTile(state);
+  smithyTile.terrain = 'plain';
+  const smithy = placeBuilt(state, 'smithy', smithyTile);
 
   const mineTile = openInteriorTile(state);
   mineTile.terrain = 'rock';
@@ -124,17 +136,19 @@ function setupSmithScenario(seed, withMiner) {
   state.processingReserves.iron = 0;
   state.processingReserves.wood = 0;
 
-  return { state, smith, smithyTile };
+  return { state, smith, smithy };
 }
 
 {
-  const { state, smith, smithyTile } = setupSmithScenario(8101, true);
+  const { state, smith, smithy } = setupSmithScenario(8101, true);
 
   simulation.advanceTick(state);
 
   assert.equal(smith.task, '철 대기');
-  assert.equal(smith.x, smithyTile.x, 'smith stays at the smithy when miners can supply iron');
-  assert.equal(smith.y, smithyTile.y, 'smith stays at the smithy when miners can supply iron');
+  assert.ok(
+    isBuildingInteractionTile(state, smithy, smith.x, smith.y),
+    'smith stays at the smithy interaction edge when miners can supply iron',
+  );
   assert.deepEqual(smith.path, []);
 }
 

@@ -2,7 +2,8 @@
 // 자원은 창고/거점에 짐을 부려야 마을 비축량에 더해진다.
 import { CONFIG } from './config';
 import {
-  BUILDING_DEFS, isSmithyProductUnlocked, officeEfficiencyMultiplier, SMITHY_PRODUCT_DEFS, smithyProductOf,
+  BUILDING_DEFS, buildingFootprintTiles, isSmithyProductUnlocked, officeEfficiencyMultiplier,
+  SMITHY_PRODUCT_DEFS, smithyProductOf,
 } from './buildings';
 import { addLog } from './events';
 import { collectHuntableTiles } from './habitats';
@@ -72,14 +73,34 @@ export function resetAgent(state: GameState, r: Resident): void {
 
 // ─────────────────────────── 이동/경로 ───────────────────────────
 
+const PASSABLE_BUILDING_TYPES: ReadonlySet<BuildingTypeId> = new Set<BuildingTypeId>([
+  'field',
+  'bridge',
+  'ferry',
+  'dock',
+  'lumberCamp',
+  'huntLodge',
+  'herbHut',
+  'mine',
+]);
+
+function buildingAtTile(state: GameState, t: Tile): Building | undefined {
+  if (t.buildingId == null) return undefined;
+  return state.buildings.find(b => b.id === t.buildingId);
+}
+
+function isPassableBuilding(type: BuildingTypeId): boolean {
+  return PASSABLE_BUILDING_TYPES.has(type);
+}
+
 export function isPassable(state: GameState, x: number, y: number): boolean {
   const t = state.map[y]?.[x];
   if (!t) return false;
+  const building = buildingAtTile(state, t);
+  if (building && !isPassableBuilding(building.type)) return false;
   if (t.terrain === 'mountain') return false;
   if (t.terrain === 'river') {
-    const hasRiverWorksite = t.buildingId != null && state.buildings.some(b =>
-      b.id === t.buildingId && (b.type === 'bridge' || b.type === 'ferry' || b.type === 'dock'));
-    if (hasRiverWorksite) return true;
+    if (building && (building.type === 'bridge' || building.type === 'ferry' || building.type === 'dock')) return true;
     // 겨울 언 강 위는 걸어서 건널 수 있다 (해빙기 홍수 제외)
     return getSeason(state.day) === 'winter' && state.weather !== 'thawFlood';
   }
@@ -88,7 +109,42 @@ export function isPassable(state: GameState, x: number, y: number): boolean {
 
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
-// BFS: 조건을 만족하는 가장 가까운 타일까지의 경로 (시작 타일 제외)
+function goalTiles(state: GameState, isGoal: (t: Tile) => boolean): { x: number; y: number }[] {
+  const goals: { x: number; y: number }[] = [];
+  for (const row of state.map) {
+    for (const tile of row) {
+      if (isGoal(tile)) goals.push({ x: tile.x, y: tile.y });
+    }
+  }
+  return goals;
+}
+
+function octileDistance(x: number, y: number, goals: { x: number; y: number }[]): number {
+  let best = Infinity;
+  for (const goal of goals) {
+    const dx = Math.abs(goal.x - x);
+    const dy = Math.abs(goal.y - y);
+    const diag = Math.min(dx, dy);
+    const straight = Math.max(dx, dy) - diag;
+    best = Math.min(best, diag * 14 + straight * 10);
+  }
+  return best === Infinity ? 0 : best;
+}
+
+function reconstructPath(prev: Int32Array, width: number, start: number, end: number): { x: number; y: number }[] {
+  const path: { x: number; y: number }[] = [];
+  let node = end;
+  while (node !== start) {
+    if (node < 0) return [];
+    const x = node % width;
+    path.push({ x, y: (node - x) / width });
+    node = prev[node];
+  }
+  path.reverse();
+  return path;
+}
+
+// A*: 조건을 만족하는 가장 가까운 타일까지의 경로 (시작 타일 제외)
 // passable을 넘기면 통행 규칙을 바꿀 수 있다 (습격자는 강을 건넌다)
 export function findPath(
   state: GameState,
@@ -100,34 +156,54 @@ export function findPath(
   const canPass = passable ?? ((x: number, y: number) => isPassable(state, x, y));
   const h = state.map.length, w = state.map[0]?.length ?? 0;
   if (sx < 0 || sy < 0 || sx >= w || sy >= h || !state.map[sy]?.[sx]) return null;
+  const goals = goalTiles(state, isGoal);
+  if (goals.length === 0) return null;
+  const estimate = goals.length <= 128
+    ? (x: number, y: number) => octileDistance(x, y, goals)
+    : () => 0;
   const start = sy * w + sx;
   const prev = new Int32Array(w * h).fill(-2);
+  const cost = new Int32Array(w * h).fill(0x3fffffff);
+  const score = new Int32Array(w * h).fill(0x3fffffff);
+  const inOpen = new Uint8Array(w * h);
   prev[start] = -1;
-  const queue: number[] = [start];
-  let head = 0;
-  while (head < queue.length) {
-    const cur = queue[head++];
+  cost[start] = 0;
+  score[start] = estimate(sx, sy);
+  const open: number[] = [start];
+  inOpen[start] = 1;
+  while (open.length > 0) {
+    let bestIndex = 0;
+    let bestScore = score[open[0]];
+    for (let i = 1; i < open.length; i++) {
+      const curScore = score[open[i]];
+      if (curScore < bestScore) {
+        bestIndex = i;
+        bestScore = curScore;
+      }
+    }
+    const cur = open.splice(bestIndex, 1)[0];
+    inOpen[cur] = 0;
     const cx = cur % w, cy = (cur - cx) / w;
     const tile = state.map[cy]?.[cx];
     if (!tile) continue;
     if (cur !== start && isGoal(tile)) {
-      const path: { x: number; y: number }[] = [];
-      let node = cur;
-      while (node !== start) {
-        path.push({ x: node % w, y: (node - (node % w)) / w });
-        node = prev[node];
-      }
-      path.reverse();
-      return path;
+      return reconstructPath(prev, w, start, cur);
     }
     for (const [dx, dy] of DIRS) {
       const nx = cx + dx, ny = cy + dy;
       if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-      const ni = ny * w + nx;
-      if (prev[ni] !== -2) continue;
       if (!canPass(nx, ny)) continue;
+      if (dx !== 0 && dy !== 0 && (!canPass(cx + dx, cy) || !canPass(cx, cy + dy))) continue;
+      const ni = ny * w + nx;
+      const nextCost = cost[cur] + (dx !== 0 && dy !== 0 ? 14 : 10);
+      if (nextCost >= cost[ni]) continue;
       prev[ni] = cur;
-      queue.push(ni);
+      cost[ni] = nextCost;
+      score[ni] = nextCost + estimate(nx, ny);
+      if (!inOpen[ni]) {
+        open.push(ni);
+        inOpen[ni] = 1;
+      }
     }
   }
   return null;
@@ -165,6 +241,23 @@ function goTo(state: GameState, r: Resident, ctx: Ctx, isGoal: (t: Tile) => bool
   return isGoal(state.map[r.y][r.x]) ? 'arrived' : 'moving';
 }
 
+function isBuildingInteractionTile(state: GameState, t: Tile, buildingId: number): boolean {
+  const building = state.buildings.find(b => b.id === buildingId);
+  if (!building) return false;
+  if (!isPassable(state, t.x, t.y)) return false;
+  if (isPassableBuilding(building.type)) return t.buildingId === building.id;
+
+  const footprint = buildingFootprintTiles(state, building.type, building.x, building.y);
+  if (!footprint) return false;
+  return footprint.some(tile =>
+    Math.max(Math.abs(tile.x - t.x), Math.abs(tile.y - t.y)) === 1);
+}
+
+function isResidentAtBuildingInteraction(state: GameState, r: Resident, buildingId: number): boolean {
+  const tile = state.map[r.y]?.[r.x];
+  return tile ? isBuildingInteractionTile(state, tile, buildingId) : false;
+}
+
 // 하역 거점: 중심지 + 창고 (+직업별 거점 건물)
 function depositGoal(state: GameState, extra: BuildingTypeId[]): (t: Tile) => boolean {
   const ids = new Set<number>();
@@ -172,15 +265,120 @@ function depositGoal(state: GameState, extra: BuildingTypeId[]): (t: Tile) => bo
     if (!b.built) continue;
     if (b.type === 'center' || b.type === 'storehouse' || extra.includes(b.type)) ids.add(b.id);
   }
-  return t => t.buildingId != null && ids.has(t.buildingId);
+  const goalIds = Array.from(ids);
+  return t => goalIds.some(id => isBuildingInteractionTile(state, t, id));
 }
 
-function buildingGoal(id: number): (t: Tile) => boolean {
-  return t => t.buildingId === id;
+function buildingGoal(state: GameState, id: number): (t: Tile) => boolean {
+  return t => isBuildingInteractionTile(state, t, id);
 }
 
 function goToCenter(state: GameState, r: Resident, ctx: Ctx): GoResult {
-  return goTo(state, r, ctx, buildingGoal(ctx.centerId));
+  return goTo(state, r, ctx, buildingGoal(state, ctx.centerId));
+}
+
+function manhattanXY(ax: number, ay: number, bx: number, by: number): number {
+  return Math.abs(ax - bx) + Math.abs(ay - by);
+}
+
+function canStepTo(state: GameState, x: number, y: number, dx: number, dy: number): boolean {
+  const nx = x + dx, ny = y + dy;
+  if (!isPassable(state, nx, ny)) return false;
+  if (dx !== 0 && dy !== 0 && (!isPassable(state, x + dx, y) || !isPassable(state, x, y + dy))) return false;
+  return true;
+}
+
+function tryLoiterStep(
+  state: GameState,
+  r: Resident,
+  ctx: Ctx,
+  anchorX: number,
+  anchorY: number,
+  radius: number,
+): boolean {
+  const start = Math.floor(ctx.rng() * DIRS.length);
+  for (let i = 0; i < DIRS.length; i++) {
+    const [dx, dy] = DIRS[(start + i) % DIRS.length];
+    const nx = r.x + dx, ny = r.y + dy;
+    if (manhattanXY(nx, ny, anchorX, anchorY) > radius) continue;
+    if (!canStepTo(state, r.x, r.y, dx, dy)) continue;
+    r.x = nx;
+    r.y = ny;
+    return true;
+  }
+  return false;
+}
+
+function loiterNearPoint(
+  state: GameState,
+  r: Resident,
+  ctx: Ctx,
+  anchorX: number,
+  anchorY: number,
+  radius: number,
+  task: string,
+): GoResult {
+  r.task = task;
+  if (manhattanXY(r.x, r.y, anchorX, anchorY) > radius) {
+    const returnRadius = Math.max(1, Math.min(2, radius));
+    return goTo(state, r, ctx, tile =>
+      isPassable(state, tile.x, tile.y) && manhattanXY(tile.x, tile.y, anchorX, anchorY) <= returnRadius);
+  }
+  r.path = [];
+  if (ctx.rng() < 0.65 && tryLoiterStep(state, r, ctx, anchorX, anchorY, radius)) return 'moving';
+  return 'arrived';
+}
+
+function loiterNearCenter(state: GameState, r: Resident, ctx: Ctx, task: string): GoResult {
+  const center = state.buildings.find(b => b.id === ctx.centerId);
+  if (!center) {
+    r.task = task;
+    r.path = [];
+    tryLoiterStep(state, r, ctx, r.x, r.y, 2);
+    return 'arrived';
+  }
+  return loiterNearPoint(state, r, ctx, center.x, center.y, 8, task);
+}
+
+function loiterNearBuilding(
+  state: GameState,
+  r: Resident,
+  ctx: Ctx,
+  building: Building,
+  radius: number,
+  task: string,
+): GoResult {
+  r.task = task;
+  if (manhattanXY(r.x, r.y, building.x, building.y) > radius) {
+    return goTo(state, r, ctx, buildingGoal(state, building.id));
+  }
+  r.path = [];
+  if (ctx.rng() < 0.55 && tryLoiterStep(state, r, ctx, building.x, building.y, radius)) return 'moving';
+  return 'arrived';
+}
+
+function nearestPassableTile(state: GameState, x: number, y: number, maxRadius = 8): Tile | null {
+  for (let radius = 1; radius <= maxRadius; radius++) {
+    for (let ty = y - radius; ty <= y + radius; ty++) {
+      for (let tx = x - radius; tx <= x + radius; tx++) {
+        if (Math.max(Math.abs(tx - x), Math.abs(ty - y)) !== radius) continue;
+        const tile = state.map[ty]?.[tx];
+        if (tile && isPassable(state, tx, ty)) return tile;
+      }
+    }
+  }
+  return null;
+}
+
+function ensureResidentOnPassableTile(state: GameState, r: Resident): void {
+  if (isPassable(state, r.x, r.y)) return;
+  const tile = nearestPassableTile(state, r.x, r.y);
+  if (!tile) return;
+  r.x = tile.x;
+  r.y = tile.y;
+  r.px = tile.x;
+  r.py = tile.y;
+  r.path = [];
 }
 
 // ─────────────────────────── 채집형 작업 공통 루틴 ───────────────────────────
@@ -233,8 +431,8 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
     r.task = o.taskWork;
   } else if (st === 'stuck') {
     r.phase = 'rest';
-    r.task = '갈 곳 없음';
     if (carryTotal(r) > 0) r.phase = 'toDeposit';
+    else loiterNearCenter(state, r, ctx, '갈 곳 없음');
   } else {
     r.phase = 'toWork';
     r.task = o.taskMove;
@@ -283,10 +481,13 @@ function hunterTick(state: GameState, r: Resident, ctx: Ctx): void {
 function herbalistTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
   if (ctx.season === 'winter') {
-    r.task = '마른 약초 손질';
     if (carryTotal(r) > 0) { r.phase = 'toDeposit'; }
-    goToCenter(state, r, ctx);
-    if (carryTotal(r) > 0 && state.map[r.y][r.x].buildingId === ctx.centerId) depositAll(state, r);
+    if (carryTotal(r) > 0) {
+      goToCenter(state, r, ctx);
+      if (isResidentAtBuildingInteraction(state, r, ctx.centerId)) depositAll(state, r);
+    } else {
+      loiterNearCenter(state, r, ctx, '마른 약초 손질');
+    }
     return;
   }
   gatherJob(state, r, ctx, {
@@ -306,13 +507,12 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const fields = state.buildings.filter(b => b.type === 'field' && b.built);
 
   if (ctx.season === 'winter' || fields.length === 0) {
-    r.task = ctx.season === 'winter' ? '겨울 채비' : '밭 없음';
     if (carryTotal(r) > 0) {
       const st = goTo(state, r, ctx, depositGoal(state, []));
       if (st === 'arrived' || st === 'stuck') depositAll(state, r);
       return;
     }
-    goToCenter(state, r, ctx);
+    loiterNearCenter(state, r, ctx, ctx.season === 'winter' ? '겨울 채비' : '밭 없음');
     return;
   }
 
@@ -330,11 +530,12 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
     const target = nearestBuilding(r, fields.filter(f => f.fieldGrowth > 0.5));
     if (!target) {
       if (carryTotal(r) > 0) { r.phase = 'toDeposit'; return; }
-      r.task = '수확 마무리';
-      goToCenter(state, r, ctx);
+      const cleanupField = nearestBuilding(r, fields);
+      if (cleanupField) loiterNearBuilding(state, r, ctx, cleanupField, 3, '수확 마무리');
+      else loiterNearCenter(state, r, ctx, '수확 마무리');
       return;
     }
-    const st = goTo(state, r, ctx, buildingGoal(target.id));
+    const st = goTo(state, r, ctx, buildingGoal(state, target.id));
     if (st === 'arrived') {
       r.task = '수확 중';
       const take = Math.min(target.fieldGrowth, a.work.harvestPerSubtick * ctx.outdoor * effOf(r));
@@ -351,8 +552,13 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
 
   // 봄/여름: 아직 안 자란 밭을 돌본다
   const target = nearestBuilding(r, fields.filter(f => f.fieldGrowth < 100));
-  if (!target) { r.task = '김매기'; goToCenter(state, r, ctx); return; }
-  const st = goTo(state, r, ctx, buildingGoal(target.id));
+  if (!target) {
+    const careField = nearestBuilding(r, fields);
+    if (careField) loiterNearBuilding(state, r, ctx, careField, 3, '밭 관리');
+    else loiterNearCenter(state, r, ctx, '김매기');
+    return;
+  }
+  const st = goTo(state, r, ctx, buildingGoal(state, target.id));
   if (st === 'arrived') {
     r.task = '농사 중';
     const weatherGrow = state.weather === 'rain' ? 1.2 : state.weather === 'frost' ? 0.7 : 1;
@@ -366,8 +572,8 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
 function builderTick(state: GameState, r: Resident, ctx: Ctx): void {
   const sites = state.buildings.filter(b => !b.built);
   const target = nearestBuilding(r, sites);
-  if (!target) { r.task = '지을 것 없음'; goToCenter(state, r, ctx); return; }
-  const st = goTo(state, r, ctx, buildingGoal(target.id));
+  if (!target) { loiterNearCenter(state, r, ctx, '지을 것 없음'); return; }
+  const st = goTo(state, r, ctx, buildingGoal(state, target.id));
   if (st === 'arrived') {
     r.task = '건설 중';
     const def = BUILDING_DEFS[target.type];
@@ -454,8 +660,7 @@ function haulerTick(state: GameState, r: Resident, ctx: Ctx): void {
     });
     return;
   }
-  r.task = '대기';
-  goToCenter(state, r, ctx);
+  loiterNearCenter(state, r, ctx, '대기');
 }
 
 function isSmithProcessableResource(resource: ResourceId): resource is ProcessingInputId {
@@ -557,7 +762,7 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
 
   const work = findSmithWork(state, r, ctx, pop);
   if (work) {
-    const st = goTo(state, r, ctx, buildingGoal(work.smithy.id));
+    const st = goTo(state, r, ctx, buildingGoal(state, work.smithy.id));
     if (st === 'arrived') {
       const def = SMITHY_PRODUCT_DEFS[work.product];
       r.task = def.task;
@@ -573,7 +778,7 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
   if (waitSmithy && hasMinerSupply) {
     r.path = [];
     r.workTimer = 0;
-    const st = goTo(state, r, ctx, buildingGoal(waitSmithy.id));
+    const st = goTo(state, r, ctx, buildingGoal(state, waitSmithy.id));
     if (st === 'arrived') {
       r.phase = 'rest';
       r.task = smithWaitTask(state, pop, r, ctx);
@@ -599,8 +804,7 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
     });
     return;
   }
-  r.task = '재료 없음';
-  goToCenter(state, r, ctx);
+  loiterNearCenter(state, r, ctx, '재료 없음');
 }
 
 function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
@@ -643,12 +847,11 @@ function charcoalBurnerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const p = CONFIG.production;
   const kiln = nearestBuilding(r, state.buildings.filter(b => b.type === 'charcoalKiln' && b.built));
   if (!kiln) {
-    r.task = '숯가마 없음';
-    goToCenter(state, r, ctx);
+    loiterNearCenter(state, r, ctx, '숯가마 없음');
     return;
   }
 
-  const st = goTo(state, r, ctx, buildingGoal(kiln.id));
+  const st = goTo(state, r, ctx, buildingGoal(state, kiln.id));
   if (st !== 'arrived') {
     r.phase = st === 'stuck' ? 'rest' : 'toWork';
     r.task = st === 'stuck' ? '길이 막힘' : '숯가마로 이동';
@@ -661,7 +864,7 @@ function charcoalBurnerTick(state: GameState, r: Resident, ctx: Ctx): void {
   );
   if (wood <= 0.05) {
     r.phase = 'rest';
-    r.task = '목재 대기';
+    loiterNearBuilding(state, r, ctx, kiln, 3, '목재 대기');
     return;
   }
 
@@ -674,9 +877,9 @@ function charcoalBurnerTick(state: GameState, r: Resident, ctx: Ctx): void {
 
 function herderTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
+  const stables = state.buildings.filter(b => b.type === 'stable' && b.built);
   gatherJob(state, r, ctx, {
-    goal: t => t.buildingId != null && state.buildings.some(b =>
-      b.id === t.buildingId && b.built && b.type === 'stable'),
+    goal: t => stables.some(stable => isBuildingInteractionTile(state, t, stable.id)),
     workTicks: a.work.herd,
     yieldRes: 'food',
     yieldAmt: a.yields.herdFood,
@@ -693,18 +896,16 @@ function powderMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const p = CONFIG.production;
   // 가동 중지(토글) 또는 감찰 은닉 중이면 화약을 만들지 않는다
   if (state.nitrePaused || state.day < state.nitreHiddenUntil) {
-    r.task = '염초장 가동 중지';
-    goToCenter(state, r, ctx);
+    loiterNearCenter(state, r, ctx, '염초장 가동 중지');
     return;
   }
   const yard = nearestBuilding(r, state.buildings.filter(b => b.type === 'nitreYard' && b.built));
   if (!yard) {
-    r.task = '염초장 없음';
-    goToCenter(state, r, ctx);
+    loiterNearCenter(state, r, ctx, '염초장 없음');
     return;
   }
 
-  const st = goTo(state, r, ctx, buildingGoal(yard.id));
+  const st = goTo(state, r, ctx, buildingGoal(state, yard.id));
   if (st !== 'arrived') {
     r.phase = st === 'stuck' ? 'rest' : 'toWork';
     r.task = st === 'stuck' ? '길이 막힘' : '염초장으로 이동';
@@ -717,7 +918,7 @@ function powderMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const made = Math.min(target, firewoodLimit, stoneLimit);
   if (made <= 0.02) {
     r.phase = 'rest';
-    r.task = '화약 재료 대기';
+    loiterNearBuilding(state, r, ctx, yard, 3, '화약 재료 대기');
     return;
   }
 
@@ -732,12 +933,11 @@ function powderMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
 function clerkTick(state: GameState, r: Resident, ctx: Ctx): void {
   const office = nearestBuilding(r, state.buildings.filter(b => b.type === 'office' && b.built));
   if (!office) {
-    r.task = '관청 없음';
-    goToCenter(state, r, ctx);
+    loiterNearCenter(state, r, ctx, '관청 없음');
     return;
   }
 
-  const st = goTo(state, r, ctx, buildingGoal(office.id));
+  const st = goTo(state, r, ctx, buildingGoal(state, office.id));
   if (st === 'arrived') {
     r.phase = 'working';
     r.task = '관청 업무';
@@ -753,15 +953,15 @@ function watchmanTick(state: GameState, r: Resident, ctx: Ctx): void {
   // 방어 시설 사이를 순찰한다
   const posts = state.buildings.filter(b =>
     b.built && (BUILDING_DEFS[b.type].defense > 0 || b.type === 'center'));
-  if (posts.length === 0) { goToCenter(state, r, ctx); return; }
+  if (posts.length === 0) { loiterNearCenter(state, r, ctx, '경계 근무'); return; }
   let target = posts.find(b => b.id === r.targetId);
-  if (!target || (r.workTimer <= 0 && state.map[r.y][r.x].buildingId === target.id)) {
+  if (!target || (r.workTimer <= 0 && isResidentAtBuildingInteraction(state, r, target.id))) {
     target = posts[Math.floor(ctx.rng() * posts.length)];
     r.targetId = target.id;
     r.path = [];
     r.workTimer = 3; // 도착 후 머무는 시간
   }
-  const st = goTo(state, r, ctx, buildingGoal(target.id));
+  const st = goTo(state, r, ctx, buildingGoal(state, target.id));
   if (st === 'arrived') r.workTimer -= 1;
   else if (st === 'stuck') r.targetId = null;
 }
@@ -769,8 +969,8 @@ function watchmanTick(state: GameState, r: Resident, ctx: Ctx): void {
 function militiaTick(state: GameState, r: Resident, ctx: Ctx): void {
   r.task = '조련 중';
   const garrison = state.buildings.find(b => b.type === 'garrison' && b.built);
-  if (garrison) goTo(state, r, ctx, buildingGoal(garrison.id));
-  else goToCenter(state, r, ctx);
+  if (garrison) goTo(state, r, ctx, buildingGoal(state, garrison.id));
+  else loiterNearCenter(state, r, ctx, '조련 중');
 }
 
 
@@ -793,17 +993,7 @@ function battleAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
 }
 
 function idleTick(state: GameState, r: Resident, ctx: Ctx): void {
-  r.task = '대기';
-  const center = state.buildings.find(b => b.id === ctx.centerId);
-  if (center && Math.abs(r.x - center.x) + Math.abs(r.y - center.y) > 6) {
-    goToCenter(state, r, ctx);
-    return;
-  }
-  // 마을 언저리를 어슬렁거린다
-  if (ctx.rng() < 0.35) {
-    const [dx, dy] = DIRS[Math.floor(ctx.rng() * DIRS.length)];
-    if (isPassable(state, r.x + dx, r.y + dy)) { r.x += dx; r.y += dy; }
-  }
+  loiterNearCenter(state, r, ctx, '대기');
 }
 
 function nearestBuilding<T extends { x: number; y: number }>(r: Resident, list: T[]): T | null {
@@ -841,6 +1031,7 @@ export function agentsTick(state: GameState): void {
   };
 
   for (const r of living) {
+    ensureResidentOnPassableTile(state, r);
     // 보간용 직전 위치 기록
     r.px = r.x;
     r.py = r.y;
