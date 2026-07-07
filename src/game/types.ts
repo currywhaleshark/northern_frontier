@@ -4,6 +4,9 @@ export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
+// 승격 사다리: 개척지 → 보(堡) → 진(鎭) → 부(府). 부 승격이 최종 승리.
+export type Rank = 'settlement' | 'bo' | 'jin' | 'bu';
+
 export type Gender = 'male' | 'female';
 
 export type WeatherId =
@@ -257,6 +260,8 @@ export interface GameState {
   pendingChoice: PendingChoice | null;
   courtTribute: CourtTribute | null;  // 올해 세공 (봄 공지 때 설정)
   tributeFailStreak: number;          // 연속 미납 횟수 (2년 연속이면 명성 하락 가중)
+  tributePaidStreak: number;          // 연속 납부 년수 (승격 조건의 "공물 성실도")
+  rank: Rank;                         // 현재 승격 단계
   log: LogEntry[];
   totalDeaths: number;
   starvationDeathsThisYear: number;

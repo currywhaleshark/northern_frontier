@@ -152,6 +152,7 @@ export const CONFIG = {
   raid: {
     basePower: 22,
     powerPerYear: 8,
+    powerYearCap: 8,   // 연차 스케일 상한 — 승격 후 장기전에서 습격이 무한정 세지지 않게
     powerRandom: 15,
     wealthPowerDiv: 60,
     watchmanDefense: 6,
@@ -232,6 +233,7 @@ export const CONFIG = {
     },
   },
 
+  // 보(堡) 승격 조건 — 첫 승격. (예전의 "승리 조건" — 이제 끝이 아니라 첫 계단이다)
   victory: {
     years: 5,
     population: 40,
@@ -239,6 +241,27 @@ export const CONFIG = {
     defense: 100,
     food: 100,
     firewood: 100,
+  },
+
+  // 승격 사다리 — 개척지 → 보(堡) → 진(鎭) → 부(府). 부 승격이 최종 승리.
+  ranks: {
+    promotionReputation: 10, // 승격 시 명성 보너스
+    // 보 승격 조건은 victory 섹션을 그대로 쓴다. 이후 단계는 아래 조건.
+    jin: {
+      population: 60, defense: 160, tributeYears: 3,
+      buildings: { garrison: 1, watchtower: 2 },
+    },
+    bu: {
+      population: 100, defense: 250, tributeYears: 5,
+      buildings: { garrison: 1, watchtower: 3, market: 1 },
+    },
+    // 승격 효과 배율 — 이주민 유입 / 위협 증가(부유해질수록 노려진다) / 세공 요구량
+    effects: {
+      settlement: { immigration: 1,    threatGain: 1,    tribute: 1 },
+      bo:         { immigration: 1.25, threatGain: 1.15, tribute: 1.3 },
+      jin:        { immigration: 1.5,  threatGain: 1.3,  tribute: 1.7 },
+      bu:         { immigration: 1.75, threatGain: 1.45, tribute: 2.2 },
+    },
   },
 
   ui: {

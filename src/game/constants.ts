@@ -1,8 +1,12 @@
 // 명칭, 텍스트, 정적 정의 모음
-import type { JobId, ResourceId, Season, Terrain, TradeOffer, WeatherId } from './types';
+import type { JobId, Rank, ResourceId, Season, Terrain, TradeOffer, WeatherId } from './types';
 
 export const SEASON_NAMES: Record<Season, string> = {
   spring: '봄', summer: '여름', autumn: '가을', winter: '겨울',
+};
+
+export const RANK_NAMES: Record<Rank, string> = {
+  settlement: '개척지', bo: '보(堡)', jin: '진(鎭)', bu: '부(府)',
 };
 
 export const SEASON_ORDER: Season[] = ['spring', 'summer', 'autumn', 'winter'];

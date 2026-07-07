@@ -17,7 +17,8 @@ import { InspectorPanel, type InspectorTab } from './components/InspectorPanel';
 import { JobPanel } from './components/JobPanel';
 import { MainMenu } from './components/MainMenu';
 import { TopBar } from './components/TopBar';
-import { RESOURCE_NAMES } from './game/constants';
+import { RANK_NAMES, RESOURCE_NAMES } from './game/constants';
+import { nextRank } from './game/promotion';
 import type { BuildingTypeId, Difficulty, GameState, JobId, ResourceId } from './game/types';
 
 // 조정 세공 준비 현황 — 품목별 보유/요구와 남은 기한
@@ -314,9 +315,10 @@ export default function App() {
         </div>
         <div className="side right">
           <AlertsPanel state={state} />
-          {state.victoryProgressNote && (
+          {state.victoryProgressNote && nextRank(state.rank) && (
             <div className="section">
-              <div className="panel-title">승격까지 남은 조건</div>
+              <div className="panel-title">다음 승격 — {RANK_NAMES[nextRank(state.rank)!]}</div>
+              <div className="muted small" style={{ marginBottom: 4 }}>현재: {RANK_NAMES[state.rank]}</div>
               <div className="victory-note">{state.victoryProgressNote}</div>
             </div>
           )}

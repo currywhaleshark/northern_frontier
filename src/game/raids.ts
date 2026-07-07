@@ -6,6 +6,7 @@ import { addLog } from './events';
 import { applyBattleDefenseMultipliers, levyDefenseBonus, startBattle } from './battles';
 import { findPath } from './agents';
 import { damageBuildings, injure, loot, moraleShock } from './raidDamage';
+import { rankEffects } from './promotion';
 import { changeRelation, getRelation, hostileRelationsAvg } from './relations';
 import { countJob } from './residents';
 import { getSeason, getYear } from './seasons';
@@ -27,8 +28,10 @@ export function updateThreat(state: GameState): void {
   if (avgRel < CONFIG.relations.lowRelThreatBelow) {
     delta += (CONFIG.relations.lowRelThreatBelow - avgRel) * CONFIG.relations.lowRelThreatScale;
   }
-  // 난이도: 위협이 오를 때만 배율 적용 (내릴 때는 그대로)
-  if (delta > 0) delta *= CONFIG.difficulty[state.difficulty ?? 'normal'].threatGain;
+  // 난이도·승격 단계: 위협이 오를 때만 배율 적용 (내릴 때는 그대로) — 부유해질수록 노려진다
+  if (delta > 0) {
+    delta *= CONFIG.difficulty[state.difficulty ?? 'normal'].threatGain * rankEffects(state.rank).threatGain;
+  }
   state.threat = Math.max(0, Math.min(100, state.threat + delta));
   if (state.tradeRefusedDays > 0) state.tradeRefusedDays--;
   if (state.raidCooldown > 0) state.raidCooldown--;
@@ -37,8 +40,10 @@ export function updateThreat(state: GameState): void {
 function raidPower(state: GameState, rng: () => number): number {
   const r = CONFIG.raid;
   const wealth = state.resources.food + state.resources.hide + state.resources.tools * 2;
+  // 연차 스케일은 상한을 둔다 — 승격 후 장기전에서 습격이 무한정 세지지 않게
+  const scaledYears = Math.min(getYear(state.day), r.powerYearCap) - 1;
   const base =
-    r.basePower + (getYear(state.day) - 1) * r.powerPerYear +
+    r.basePower + scaledYears * r.powerPerYear +
     rng() * r.powerRandom + wealth / r.wealthPowerDiv;
   return Math.round(base * CONFIG.difficulty[state.difficulty ?? 'normal'].raidPower);
 }

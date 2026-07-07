@@ -5,24 +5,25 @@ import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
 import { makeRng } from './map';
+import { rankEffects } from './promotion';
 import { getSeason, getYear } from './seasons';
-import type { CourtTribute, GameState, ResourceId } from './types';
+import type { CourtTribute, GameState, Rank, ResourceId } from './types';
 
 const TRIBUTE_POOL = Object.keys(CONFIG.tribute.baseAmounts) as ResourceId[];
 
-// 연차·인구에 따른 요구량 배율
-export function tributeScale(year: number, population: number): number {
+// 연차·인구·승격 단계에 따른 요구량 배율 (승격할수록 조정의 요구가 무거워진다)
+export function tributeScale(year: number, population: number, rank: Rank = 'settlement'): number {
   const t = CONFIG.tribute;
-  return (1 + t.yearScale * (year - 1)) * (t.popScaleBase + population / t.popScaleDiv);
+  return (1 + t.yearScale * (year - 1)) * (t.popScaleBase + population / t.popScaleDiv) * rankEffects(rank).tribute;
 }
 
 // 그해 세공 요구 — 시드+연차만으로 결정적 (불러오기 시 재생성 가능)
-export function rollCourtTribute(seed: number, year: number, population: number): CourtTribute {
+export function rollCourtTribute(seed: number, year: number, population: number, rank: Rank = 'settlement'): CourtTribute {
   const t = CONFIG.tribute;
   const rng = makeRng(seed + year * 6007 + 11);
   const itemCount = year <= 1 ? 1 : rng() < 0.5 ? 1 : 2; // 1년차는 가볍게 한 품목
   const pool = [...TRIBUTE_POOL];
-  const scale = tributeScale(year, population);
+  const scale = tributeScale(year, population, rank);
   const items: Partial<Record<ResourceId, number>> = {};
   for (let i = 0; i < itemCount; i++) {
     const res = pool.splice(Math.floor(rng() * pool.length), 1)[0];
@@ -48,7 +49,7 @@ export function canPayTribute(state: GameState, tribute: CourtTribute): boolean 
 export function announceCourtTribute(state: GameState): void {
   const year = getYear(state.day);
   const pop = state.residents.filter(r => r.alive).length;
-  state.courtTribute = rollCourtTribute(state.seed, year, pop);
+  state.courtTribute = rollCourtTribute(state.seed, year, pop, state.rank);
   addLog(
     state,
     `조정에서 파발이 왔습니다. 올해 세공: ${tributeItemsLabel(state.courtTribute.items)} — 겨울이 오기 전까지 준비하십시오.`,
@@ -108,6 +109,7 @@ export function resolveCourtTribute(state: GameState, optionId: string): void {
     }
     tribute.paid = true;
     state.tributeFailStreak = 0;
+    state.tributePaidStreak += 1; // 승격 조건의 "공물 성실도"
     state.resources.reputation = Math.min(100, state.resources.reputation + t.repPaid);
     addLog(state, '세공을 온전히 바쳤습니다. 조정이 개척지의 공을 기억할 것입니다.', 'good');
     // 격년 하사품: 성실 납부에 대한 답례 (결정적 롤)
@@ -124,8 +126,9 @@ export function resolveCourtTribute(state: GameState, optionId: string): void {
     return;
   }
 
-  // 미납 — 명성 하락(연속이면 가중), 위협 상승
+  // 미납 — 명성 하락(연속이면 가중), 위협 상승, 성실도 초기화
   state.tributeFailStreak += 1;
+  state.tributePaidStreak = 0;
   const repLoss = t.repFail + (state.tributeFailStreak >= 2 ? t.repFailStreakExtra : 0);
   state.resources.reputation = Math.max(0, state.resources.reputation - repLoss);
   state.threat = Math.min(100, state.threat + t.threatFail);

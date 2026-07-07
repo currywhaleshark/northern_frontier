@@ -6,6 +6,7 @@ import { SEASON_NAMES } from './constants';
 import { BUILDING_DEFS, canAfford, canPlaceOn, computeDefense, countBuilt, housingCapacity } from './buildings';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
 import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
+import { checkPromotion, rankEffects } from './promotion';
 import { generateMap, makeRng } from './map';
 import { isHabitatActive, spawnAnimalHabitats } from './habitats';
 import { agentsTick, resetAgent, SUBTICKS } from './agents';
@@ -57,6 +58,8 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     pendingChoice: null,
     courtTribute: null,
     tributeFailStreak: 0,
+    tributePaidStreak: 0,
+    rank: 'settlement',
     log: [],
     totalDeaths: 0,
     starvationDeathsThisYear: 0,
@@ -363,7 +366,7 @@ function runImmigration(state: GameState, rng: () => number): void {
   if (housing.total - pop <= 0) return;
   if (state.resources.food < pop * im.minFoodPerPerson) return;
   if (avg(state, 'morale') < im.minMorale) return;
-  if (rng() >= im.dailyChance) return;
+  if (rng() >= im.dailyChance * rankEffects(state.rank).immigration) return; // 승격할수록 사람이 모인다
 
   const rngN = makeRng(state.seed + state.day * 15485863);
   const count = Math.min(
@@ -381,7 +384,6 @@ function runImmigration(state: GameState, rng: () => number): void {
 function checkEndConditions(state: GameState): void {
   if (state.gameOver) return;
   const living = livingResidents(state);
-  const v = CONFIG.victory;
 
   if (living.length === 0) {
     state.gameOver = { won: false, reason: '모든 주민이 죽었습니다. 개척지는 눈 속에 묻혔습니다.' };
@@ -401,26 +403,8 @@ function checkEndConditions(state: GameState): void {
     return;
   }
 
-  const yearsSurvived = (state.day - 1) / CONFIG.time.yearDays;
-  const conditions: [boolean, string][] = [
-    [yearsSurvived >= v.years, `${v.years}년 생존 (${yearsSurvived.toFixed(1)}년)`],
-    [living.length >= v.population, `인구 ${v.population}명 (현재 ${living.length}명)`],
-    [state.lastWinterDeathRate <= v.maxWinterDeathRate, `겨울 사망률 10% 이하 (직전 ${(state.lastWinterDeathRate * 100).toFixed(0)}%)`],
-    [state.resources.defense >= v.defense, `방어도 ${v.defense} (현재 ${state.resources.defense})`],
-    [state.resources.food >= v.food, `식량 ${v.food} 비축 (현재 ${Math.floor(state.resources.food)})`],
-    [state.resources.firewood >= v.firewood, `장작 ${v.firewood} 비축 (현재 ${Math.floor(state.resources.firewood)})`],
-    [countBuilt(state, 'beacon') > 0, '봉수대 건설'],
-    [countBuilt(state, 'garrison') > 0, '군영 건설'],
-  ];
-  const unmet = conditions.filter(([ok]) => !ok);
-  state.victoryProgressNote = unmet.length === 0 ? '' : unmet.map(([, txt]) => txt).join(' · ');
-  if (unmet.length === 0) {
-    state.gameOver = {
-      won: true,
-      reason: '개척지는 다섯 해의 겨울을 이겨냈습니다. 조정은 이곳을 정식 진보로 승격하고, 당신의 공을 치하했습니다.',
-    };
-    addLog(state, '개척지가 정식 진보로 승격되었습니다!', 'good');
-  }
+  // 승격 사다리: 다음 단계 조건 점검 (충족 시 승격, 부 승격이 최종 승리)
+  checkPromotion(state);
 }
 
 export { getSeason, getYear, getDayOfSeason, SUBTICKS };

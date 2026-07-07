@@ -69,10 +69,15 @@ export function loadGame(): GameState | null {
         CONFIG.difficulty[parsed.difficulty].habitatChance,
       );
     }
+    // 승격 없는 구버전: 옛 승리(진보 승격)를 이뤘다면 보에서 이어간다
+    if (!Object.prototype.hasOwnProperty.call(parsed, 'rank')) {
+      parsed.rank = parsed.gameOver?.won ? 'bo' : 'settlement';
+    }
+    if (parsed.tributePaidStreak == null) parsed.tributePaidStreak = 0;
     // 세공 없는 구버전: 시드로 올해분을 재생성. 이미 겨울이면 올해분은 면제 (다음 봄부터 정상 진행)
     if (!Object.prototype.hasOwnProperty.call(parsed, 'courtTribute')) {
       const pop = parsed.residents.filter(r => r.alive).length;
-      const tribute = rollCourtTribute(parsed.seed ?? 1, getYear(parsed.day), pop);
+      const tribute = rollCourtTribute(parsed.seed ?? 1, getYear(parsed.day), pop, parsed.rank);
       if (getSeason(parsed.day) === 'winter') {
         tribute.resolved = true;
         tribute.paid = true;
