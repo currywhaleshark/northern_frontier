@@ -20,7 +20,7 @@ export const CONFIG = {
     resources: {
       food: 100, firewood: 45, wood: 30, stone: 12, iron: 4, tools: 10,
       hide: 6, clothes: 12, herbs: 5, grain: 0, game: 0,
-      gunpowder: 0, muskets: 0,
+      gunpowder: 0, spears: 0, hornBows: 0, muskets: 0,
       reputation: 50, defense: 0,
     },
     // 시작 직업 구성
@@ -67,6 +67,16 @@ export const CONFIG = {
     gamePerDay: 0.9,
     herbsPerDay: 0.5,
     toolsPerDay: 1.0,
+    spearsPerDay: 0.8,
+    spearIronPerUnit: 1.0,
+    spearWoodPerUnit: 0.6,
+    hornBowsPerDay: 0.55,
+    hornBowWoodPerUnit: 1.0,
+    hornBowHidePerUnit: 0.5,
+    musketsPerDay: 0.35,
+    musketIronPerUnit: 1.4,
+    musketWoodPerUnit: 0.8,
+    musketToolsPerUnit: 0.45,
     ironMinePerDay: 0.8,
     fishPerDay: 1.4,
     haulerWoodToFirewood: 2.5, // 운반꾼 1인 하루 목재 가공량
@@ -179,6 +189,8 @@ export const CONFIG = {
     wealthPowerDiv: 60,
     watchmanDefense: 6,
     militiaDefense: 12,
+    spearDefense: 14,          // 창으로 무장한 수비병 1인당 방어 기여
+    hornBowDefense: 16,        // 각궁으로 무장한 수비병 1인당 방어 기여
     musketDefense: 18,         // 조총으로 무장한 수비병 1인당 방어 기여 (화약이 있을 때만)
     powderPerMusket: 0.4,      // 교전당 조총 1정 화약 소모
     powderPerCannon: 2,        // 교전당 불랑기포 1문 화약 소모

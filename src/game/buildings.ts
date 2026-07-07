@@ -1,7 +1,7 @@
 // 건물 정의와 배치/방어 관련 헬퍼
 import { CONFIG } from './config';
 import { rankAtLeast } from './constants';
-import type { Building, BuildingDef, BuildingTypeId, GameState, Tile } from './types';
+import type { Building, BuildingDef, BuildingTypeId, GameState, Rank, ResourceId, SmithyProductId, Tile } from './types';
 
 export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   center: {
@@ -239,6 +239,73 @@ export function canAfford(state: GameState, def: BuildingDef): boolean {
     state.resources[res as keyof typeof state.resources] >= (amt ?? 0));
 }
 
+export interface SmithyProductDef {
+  id: SmithyProductId;
+  name: string;
+  minRank?: Rank;
+  output: ResourceId;
+  inputPerUnit: Partial<Record<ResourceId, number>>;
+  ratePerDay: number;
+  task: string;
+}
+
+export const SMITHY_PRODUCT_ORDER: SmithyProductId[] = ['tools', 'spears', 'hornBows', 'muskets'];
+
+export const SMITHY_PRODUCT_DEFS: Record<SmithyProductId, SmithyProductDef> = {
+  tools: {
+    id: 'tools',
+    name: '도구',
+    output: 'tools',
+    inputPerUnit: { iron: 1, wood: 1 },
+    ratePerDay: CONFIG.production.toolsPerDay,
+    task: '도구 제작 중',
+  },
+  spears: {
+    id: 'spears',
+    name: '창',
+    minRank: 'bo',
+    output: 'spears',
+    inputPerUnit: { iron: CONFIG.production.spearIronPerUnit, wood: CONFIG.production.spearWoodPerUnit },
+    ratePerDay: CONFIG.production.spearsPerDay,
+    task: '창 제작 중',
+  },
+  hornBows: {
+    id: 'hornBows',
+    name: '각궁',
+    minRank: 'jin',
+    output: 'hornBows',
+    inputPerUnit: { wood: CONFIG.production.hornBowWoodPerUnit, hide: CONFIG.production.hornBowHidePerUnit },
+    ratePerDay: CONFIG.production.hornBowsPerDay,
+    task: '각궁 제작 중',
+  },
+  muskets: {
+    id: 'muskets',
+    name: '조총',
+    minRank: 'bu',
+    output: 'muskets',
+    inputPerUnit: {
+      iron: CONFIG.production.musketIronPerUnit,
+      wood: CONFIG.production.musketWoodPerUnit,
+      tools: CONFIG.production.musketToolsPerUnit,
+    },
+    ratePerDay: CONFIG.production.musketsPerDay,
+    task: '조총 제작 중',
+  },
+};
+
+export function smithyProductOf(building: Pick<Building, 'smithyProduct'> | undefined): SmithyProductId {
+  const product = building?.smithyProduct;
+  return product && Object.prototype.hasOwnProperty.call(SMITHY_PRODUCT_DEFS, product) ? product : 'tools';
+}
+
+export function isSmithyProductUnlocked(rank: GameState['rank'] | undefined, product: SmithyProductId): boolean {
+  return rankAtLeast(rank, SMITHY_PRODUCT_DEFS[product].minRank);
+}
+
+export function availableSmithyProducts(rank: GameState['rank'] | undefined): SmithyProductId[] {
+  return SMITHY_PRODUCT_ORDER.filter(product => isSmithyProductUnlocked(rank, product));
+}
+
 // 주거 수용량 (완공 건물만)
 export function housingCapacity(state: GameState): { total: number; ondol: number } {
   let total = 0, ondol = 0;
@@ -253,9 +320,27 @@ export function housingCapacity(state: GameState): { total: number; ondol: numbe
 
 // 조총으로 무장 가능한 수비병 수 — 화약이 없으면 냉병기로 환원된다
 export function armedMusketeers(state: GameState): number {
-  if (state.resources.gunpowder <= 0) return 0;
+  return militiaWeaponAllocation(state).muskets;
+}
+
+export interface MilitiaWeaponAllocation {
+  muskets: number;
+  hornBows: number;
+  spears: number;
+  unarmed: number;
+}
+
+export function militiaWeaponAllocation(state: GameState): MilitiaWeaponAllocation {
   const militia = state.residents.filter(r => r.alive && r.job === 'militia').length;
-  return Math.min(militia, Math.floor(state.resources.muskets));
+  const muskets = state.resources.gunpowder > 0
+    ? Math.min(militia, Math.floor(state.resources.muskets))
+    : 0;
+  let remaining = militia - muskets;
+  const hornBows = Math.min(remaining, Math.floor(state.resources.hornBows));
+  remaining -= hornBows;
+  const spears = Math.min(remaining, Math.floor(state.resources.spears));
+  remaining -= spears;
+  return { muskets, hornBows, spears, unarmed: remaining };
 }
 
 // 방어도 = 건물 + 파수꾼 + 수비병 (조총 무장 수비병은 기여가 크다)
@@ -265,13 +350,14 @@ export function computeDefense(state: GameState): number {
     if (b.built) d += BUILDING_DEFS[b.type].defense;
   }
   const watchmen = state.residents.filter(r => r.alive && r.job === 'watchman').length;
-  const militia = state.residents.filter(r => r.alive && r.job === 'militia').length;
   d += watchmen * CONFIG.raid.watchmanDefense;
   const garrisonMult = countBuilt(state, 'garrison') > 0 ? 1.3 : 1;
-  const musketeers = armedMusketeers(state);
+  const armed = militiaWeaponAllocation(state);
   d += Math.round(
-    (musketeers * CONFIG.raid.musketDefense +
-      (militia - musketeers) * CONFIG.raid.militiaDefense) * garrisonMult,
+    (armed.muskets * CONFIG.raid.musketDefense +
+      armed.hornBows * CONFIG.raid.hornBowDefense +
+      armed.spears * CONFIG.raid.spearDefense +
+      armed.unarmed * CONFIG.raid.militiaDefense) * garrisonMult,
   );
   return Math.round(d);
 }

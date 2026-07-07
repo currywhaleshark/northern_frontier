@@ -77,7 +77,12 @@ export function loadGame(): GameState | null {
     if (parsed.tributePaidStreak == null) parsed.tributePaidStreak = 0;
     // 화기 없는 구버전: 새 자원·청원 필드를 0으로 채운다
     if (parsed.resources.gunpowder == null) parsed.resources.gunpowder = 0;
+    if (parsed.resources.spears == null) parsed.resources.spears = 0;
+    if (parsed.resources.hornBows == null) parsed.resources.hornBows = 0;
     if (parsed.resources.muskets == null) parsed.resources.muskets = 0;
+    for (const building of parsed.buildings) {
+      if (building.type === 'smithy' && !building.smithyProduct) building.smithyProduct = 'tools';
+    }
     ensureProcessingReserves(parsed);
     if (parsed.lastPetitionDay == null) parsed.lastPetitionDay = 0;
     if (parsed.cannonsGranted == null) parsed.cannonsGranted = 0;

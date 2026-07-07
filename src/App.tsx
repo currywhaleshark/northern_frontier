@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CONFIG } from './game/config';
 import {
   advanceDay, advanceTick, continueAfterVictory, newGame, reassignJob, resolveChoice, setResidentJob,
+  setSmithyProduct,
   SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
 import { clearSave, hasSave, loadGame, saveGame } from './game/saveLoad';
@@ -23,7 +24,7 @@ import { requestPetition } from './game/petition';
 import { toggleNitreYards } from './game/suspicion';
 import { setProcessingReserve } from './game/processing';
 import { nextRank } from './game/promotion';
-import type { BuildingTypeId, Difficulty, JobId, ProcessingInputId } from './game/types';
+import type { BuildingTypeId, Difficulty, JobId, ProcessingInputId, SmithyProductId } from './game/types';
 
 export default function App() {
   // 게임 상태는 ref에 두고, version 증가로 리렌더를 트리거한다
@@ -108,6 +109,7 @@ export default function App() {
       },
       build: (type: BuildingTypeId, x: number, y: number) => tryPlaceBuilding(stateRef.current, type, x, y),
       job: (from: JobId, to: JobId) => reassignJob(stateRef.current, from, to),
+      smithy: (id: number, product: SmithyProductId) => setSmithyProduct(stateRef.current, id, product),
       reset: () => { stateRef.current = newGame(); bump(); },
     };
   }, [bump]);
@@ -180,6 +182,12 @@ export default function App() {
 
   const handleSetProcessingReserve = (resource: ProcessingInputId, amount: number) => {
     setProcessingReserve(stateRef.current, resource, amount);
+    bump();
+  };
+
+  const handleSetSmithyProduct = (buildingId: number, product: SmithyProductId) => {
+    const err = setSmithyProduct(stateRef.current, buildingId, product);
+    if (err) addLog(stateRef.current, err, 'info');
     bump();
   };
 
@@ -325,6 +333,7 @@ export default function App() {
             onRequestTrade={handleRequestTrade}
             onPetition={handlePetition}
             onToggleNitre={handleToggleNitre}
+            onSetSmithyProduct={handleSetSmithyProduct}
             tab={inspTab}
             setTab={setInspTab}
             residentId={inspResidentId}

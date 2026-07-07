@@ -5,7 +5,7 @@ import { CONFIG } from './config';
 import { isJobUnlocked, RANK_NAMES, SEASON_NAMES } from './constants';
 import {
   BUILDING_DEFS, canAfford, cannonPlacementsUsed, canPlaceOn, computeDefense, countBuilt, housingCapacity,
-  isBuildingUnlocked,
+  isBuildingUnlocked, isSmithyProductUnlocked, SMITHY_PRODUCT_DEFS,
 } from './buildings';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
 import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
@@ -22,7 +22,7 @@ import { avg, createResident, livingResidents, updateMorale, updateResidentNeeds
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { firewoodWeatherMult, rollWeather } from './weather';
 import { defaultProcessingReserves, processableAmount } from './processing';
-import type { Building, BuildingTypeId, Difficulty, GameState, JobId, ResourceId } from './types';
+import type { Building, BuildingTypeId, Difficulty, GameState, JobId, ResourceId, SmithyProductId } from './types';
 
 // ─────────────────────────── 새 게임 ───────────────────────────
 
@@ -157,6 +157,7 @@ export function tryPlaceBuilding(state: GameState, type: BuildingTypeId, x: numb
   const b: Building = {
     id: state.nextBuildingId++, type, x, y, progress: 0, built: false, fieldGrowth: 0,
   };
+  if (type === 'smithy') b.smithyProduct = 'tools';
   state.buildings.push(b);
   tile.buildingId = b.id;
   if (tile.terrain === 'forest') {
@@ -184,6 +185,19 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
     r.job = job;
     resetAgent(state, r);
   }
+}
+
+export function setSmithyProduct(state: GameState, buildingId: number, product: SmithyProductId): string | null {
+  const building = state.buildings.find(b => b.id === buildingId);
+  if (!building || building.type !== 'smithy') return '대장간을 찾을 수 없습니다.';
+  if (!isSmithyProductUnlocked(state.rank, product)) {
+    const minRank = SMITHY_PRODUCT_DEFS[product].minRank;
+    const rankName = minRank ? RANK_NAMES[minRank] : RANK_NAMES.bo;
+    return `${rankName} 승격 후 생산할 수 있습니다.`;
+  }
+  building.smithyProduct = product;
+  addLog(state, `대장간 생산품을 ${SMITHY_PRODUCT_DEFS[product].name}(으)로 바꿨습니다.`, 'info');
+  return null;
 }
 
 export function resolveChoice(state: GameState, optionId: string): void {

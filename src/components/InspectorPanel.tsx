@@ -1,12 +1,14 @@
 // 선택한 타일/건물/주민 정보 패널 + 조정(승격·세공·청원) 창구
-import { BUILDING_DEFS, getBuilding } from '../game/buildings';
+import {
+  BUILDING_DEFS, getBuilding, isSmithyProductUnlocked, SMITHY_PRODUCT_DEFS, SMITHY_PRODUCT_ORDER, smithyProductOf,
+} from '../game/buildings';
 import { FACTIONS, isJobUnlocked, JOB_NAMES, JOB_ORDER, RANK_NAMES, RESOURCE_NAMES, TERRAIN_NAMES } from '../game/constants';
 import { canRequestTrade } from '../game/events';
 import { canPetition } from '../game/petition';
 import { nextRank, promotionConditions } from '../game/promotion';
 import { suspicionBreakdown } from '../game/suspicion';
 import { getRelation } from '../game/relations';
-import type { GameState, JobId, Resident, ResourceId } from '../game/types';
+import type { GameState, JobId, Resident, ResourceId, SmithyProductId } from '../game/types';
 import { FactionName } from './FactionName';
 
 export type InspectorTab = 'tile' | 'people' | 'factions' | 'court';
@@ -18,6 +20,7 @@ interface Props {
   onRequestTrade: (factionName: string) => void;
   onPetition: () => void;
   onToggleNitre: () => void;
+  onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
   tab: InspectorTab;
   setTab: (t: InspectorTab) => void;
   residentId: number | null;
@@ -208,7 +211,8 @@ function ResidentDetail({ r, rank, onSetJob }: {
 }
 
 export function InspectorPanel({
-  state, selected, onSetResidentJob, onRequestTrade, onPetition, onToggleNitre, tab, setTab, residentId, setResidentId,
+  state, selected, onSetResidentJob, onRequestTrade, onPetition, onToggleNitre, onSetSmithyProduct,
+  tab, setTab, residentId, setResidentId,
 }: Props) {
   const tile = selected ? state.map[selected.y]?.[selected.x] : null;
   const building = tile ? getBuilding(state, tile.buildingId) : undefined;
@@ -243,6 +247,35 @@ export function InspectorPanel({
                     <tr><td>상태</td><td>{building.built ? '완공' : `건설 중 ${Math.floor((building.progress / Math.max(1, def.buildDays)) * 100)}%`}</td></tr>
                     {building.type === 'field' && building.built && (
                       <tr><td>작물</td><td><Bar value={building.fieldGrowth} color="#6fbf73" /></td></tr>
+                    )}
+                    {building.type === 'smithy' && building.built && (
+                      <tr>
+                        <td>생산</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            {SMITHY_PRODUCT_ORDER.map(product => {
+                              const def = SMITHY_PRODUCT_DEFS[product];
+                              const active = smithyProductOf(building) === product;
+                              const unlocked = isSmithyProductUnlocked(state.rank, product);
+                              const recipe = Object.entries(def.inputPerUnit)
+                                .map(([res, amt]) => `${RESOURCE_NAMES[res as ResourceId]} ${amt}`)
+                                .join(' + ');
+                              return (
+                                <button
+                                  key={product}
+                                  className="btn small"
+                                  disabled={!unlocked}
+                                  title={unlocked ? recipe : `${RANK_NAMES[def.minRank ?? 'bo']} 승격 후 생산`}
+                                  style={active ? { borderColor: '#d9a441', color: '#d9a441', fontWeight: 700 } : undefined}
+                                  onClick={() => onSetSmithyProduct(building.id, product)}
+                                >
+                                  {def.name}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </td>
+                      </tr>
                     )}
                     {(building.type === 'market' || building.type === 'dock') && building.built && (
                       <tr>

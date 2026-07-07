@@ -1,7 +1,9 @@
 // 주민 에이전트 시뮬레이션 — 서브틱 단위의 이동, 작업, 운반
 // 자원은 창고/거점에 짐을 부려야 마을 비축량에 더해진다.
 import { CONFIG } from './config';
-import { BUILDING_DEFS, officeEfficiencyMultiplier } from './buildings';
+import {
+  BUILDING_DEFS, isSmithyProductUnlocked, officeEfficiencyMultiplier, SMITHY_PRODUCT_DEFS, smithyProductOf,
+} from './buildings';
 import { addLog } from './events';
 import { collectHuntableTiles } from './habitats';
 import { makeRng } from './map';
@@ -9,7 +11,7 @@ import { getSeason } from './seasons';
 import { outdoorMult } from './weather';
 import { processableAmount } from './processing';
 import type {
-  BuildingTypeId, GameState, Resident, ResourceId, Season, Tile,
+  Building, BuildingTypeId, GameState, ProcessingInputId, Resident, ResourceId, Season, SmithyProductId, Tile,
 } from './types';
 
 export const SUBTICKS = CONFIG.agents.subticksPerDay;
@@ -456,15 +458,94 @@ function haulerTick(state: GameState, r: Resident, ctx: Ctx): void {
   goToCenter(state, r, ctx);
 }
 
+function isSmithProcessableResource(resource: ResourceId): resource is ProcessingInputId {
+  return resource === 'wood' || resource === 'iron' || resource === 'hide';
+}
+
+function smithAvailableResource(state: GameState, resource: ResourceId): number {
+  return isSmithProcessableResource(resource) ? processableAmount(state, resource) : state.resources[resource];
+}
+
+function smithMaxCraftable(state: GameState, product: SmithyProductId): number {
+  const inputs = SMITHY_PRODUCT_DEFS[product].inputPerUnit;
+  let max = Infinity;
+  for (const [resource, perUnit] of Object.entries(inputs) as [ResourceId, number][]) {
+    if (perUnit <= 0) continue;
+    max = Math.min(max, smithAvailableResource(state, resource) / perUnit);
+  }
+  return max === Infinity ? 0 : max;
+}
+
+function consumeSmithInputs(state: GameState, product: SmithyProductId, made: number): void {
+  const inputs = SMITHY_PRODUCT_DEFS[product].inputPerUnit;
+  for (const [resource, perUnit] of Object.entries(inputs) as [ResourceId, number][]) {
+    state.resources[resource] = Math.max(0, state.resources[resource] - perUnit * made);
+  }
+}
+
+function smithNeedsOutput(state: GameState, product: SmithyProductId, pop: number): boolean {
+  if (product === 'tools') return state.resources.tools < pop * 0.7;
+  return true;
+}
+
+interface SmithWork {
+  smithy: Building;
+  product: SmithyProductId;
+  made: number;
+}
+
+function findSmithWork(state: GameState, r: Resident, ctx: Ctx, pop: number): SmithWork | null {
+  const smithies = state.buildings.filter(b => b.type === 'smithy' && b.built);
+  let best: SmithWork | null = null;
+  let bestDistance = Infinity;
+  for (const smithy of smithies) {
+    const product = smithyProductOf(smithy);
+    if (!isSmithyProductUnlocked(state.rank, product)) continue;
+    if (!smithNeedsOutput(state, product, pop)) continue;
+    const def = SMITHY_PRODUCT_DEFS[product];
+    const target = (def.ratePerDay / 5) * effOf(r) * ctx.mMod;
+    const made = Math.min(target, smithMaxCraftable(state, product));
+    if (made <= 0.02) continue;
+    const distance = Math.abs(r.x - smithy.x) + Math.abs(r.y - smithy.y);
+    if (distance < bestDistance) {
+      best = { smithy, product, made };
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+function smithWantsIron(state: GameState, pop: number): boolean {
+  const smithies = state.buildings.filter(b => b.type === 'smithy' && b.built);
+  if (smithies.length === 0) return true;
+  return smithies.some(smithy => {
+    const product = smithyProductOf(smithy);
+    if (!isSmithyProductUnlocked(state.rank, product)) return false;
+    if (!smithNeedsOutput(state, product, pop)) return false;
+    return (SMITHY_PRODUCT_DEFS[product].inputPerUnit.iron ?? 0) > 0 &&
+      processableAmount(state, 'iron') <= 0.02;
+  });
+}
+
+function smithWaitTask(state: GameState, pop: number, r: Resident, ctx: Ctx): string {
+  const toolsRate = (CONFIG.production.toolsPerDay / 5) * effOf(r) * ctx.mMod;
+  const needTools = state.resources.tools < pop * 0.7;
+  if (needTools) return processableAmount(state, 'iron') < toolsRate ? '철 대기' : '재료 대기';
+  const hasWeaponSmithy = state.buildings.some(b => {
+    if (b.type !== 'smithy' || !b.built) return false;
+    const product = smithyProductOf(b);
+    return product !== 'tools' && isSmithyProductUnlocked(state.rank, product);
+  });
+  return hasWeaponSmithy ? '재료 대기' : '도구 충분';
+}
+
 function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
-  const p = CONFIG.production;
   const a = CONFIG.agents;
-  const smithy = state.buildings.find(b => b.type === 'smithy' && b.built);
+  const smithies = state.buildings.filter(b => b.type === 'smithy' && b.built);
+  const waitSmithy = nearestBuilding(r, smithies);
   const pop = state.residents.filter(x => x.alive).length;
   const hasMinerSupply = state.buildings.some(b => b.type === 'mine' && b.built) &&
     state.residents.some(x => x.alive && !x.sick && x.health >= 20 && x.job === 'miner');
-  // 도구는 생산직 수(대략 인구의 70%)만큼 있으면 충분 — 그 이상이면 철을 비축한다
-  const needTools = state.resources.tools < pop * 0.7;
 
   // 캐 온 철 하역 (대장간도 하역 거점). 채광꾼이 있으면 들고 있던 철은 바로 내려놓고 대장간으로 복귀한다.
   if (carryTotal(r) > 0 && (r.phase === 'toDeposit' || hasMinerSupply)) {
@@ -474,14 +555,14 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
 
-  const rate = (p.toolsPerDay / 5) * effOf(r) * ctx.mMod;
-  if (smithy && needTools && processableAmount(state, 'iron') >= rate && processableAmount(state, 'wood') >= rate) {
-    const st = goTo(state, r, ctx, buildingGoal(smithy.id));
+  const work = findSmithWork(state, r, ctx, pop);
+  if (work) {
+    const st = goTo(state, r, ctx, buildingGoal(work.smithy.id));
     if (st === 'arrived') {
-      r.task = '도구 제작 중';
-      state.resources.iron -= rate;
-      state.resources.wood -= rate;
-      state.resources.tools += rate;
+      const def = SMITHY_PRODUCT_DEFS[work.product];
+      r.task = def.task;
+      consumeSmithInputs(state, work.product, work.made);
+      state.resources[def.output] += work.made;
       gainSkillTick(r);
     } else {
       r.task = st === 'stuck' ? '길이 막힘' : '대장간으로 이동';
@@ -489,15 +570,13 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
 
-  if (smithy && hasMinerSupply) {
+  if (waitSmithy && hasMinerSupply) {
     r.path = [];
     r.workTimer = 0;
-    const st = goTo(state, r, ctx, buildingGoal(smithy.id));
+    const st = goTo(state, r, ctx, buildingGoal(waitSmithy.id));
     if (st === 'arrived') {
       r.phase = 'rest';
-      r.task = needTools
-        ? (processableAmount(state, 'iron') < rate ? '철 대기' : '재료 대기')
-        : '도구 충분';
+      r.task = smithWaitTask(state, pop, r, ctx);
     } else {
       r.phase = st === 'stuck' ? 'rest' : 'toWork';
       r.task = st === 'stuck' ? '길이 막힘' : '대장간으로 이동';
@@ -505,9 +584,9 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
 
-  // 재료가 없거나 도구가 충분하면 철광 채굴
+  // 재료가 없거나 도구가 충분하면 필요한 경우에만 철광 채굴
   const hasIron = state.map.some(row => row.some(t => t.terrain === 'rock' && t.hasIron));
-  if (hasIron) {
+  if (hasIron && smithWantsIron(state, pop)) {
     gatherJob(state, r, ctx, {
       goal: t => t.terrain === 'rock' && t.hasIron,
       workTicks: a.work.mine,

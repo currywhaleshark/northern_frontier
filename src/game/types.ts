@@ -68,9 +68,13 @@ export type ResourceId =
   | 'grain'      // 곡물
   | 'game'       // 사냥감
   | 'gunpowder'  // 화약 (조정 지급 — 조총·포대가 전투마다 소모)
+  | 'spears'     // 창
+  | 'hornBows'   // 각궁
   | 'muskets'    // 조총 (조정 하사 — 수비병을 무장시킨다)
   | 'reputation' // 명성
   | 'defense';   // 방어도
+
+export type SmithyProductId = 'tools' | 'spears' | 'hornBows' | 'muskets';
 
 export type ProcessingInputId = 'wood' | 'grain' | 'game' | 'hide' | 'iron';
 
@@ -147,6 +151,7 @@ export interface Building {
   progress: number;   // 투입된 건축가-일수
   built: boolean;
   fieldGrowth: number; // 밭 전용: 작물 성장도 0~100
+  smithyProduct?: SmithyProductId; // 대장간 전용: 현재 생산품
 }
 
 export interface BuildingDef {
