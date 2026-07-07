@@ -6,6 +6,7 @@ import { RANK_NAMES, RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
 import { RANK_ORDER } from './promotion';
 import { livingResidents } from './residents';
+import { lowerSuspicion } from './suspicion';
 import type { GameState, Rank, ResourceId } from './types';
 
 export interface PetitionOffer {
@@ -129,6 +130,7 @@ export function resolvePetition(state: GameState, optionId: string): void {
 
   state.resources.reputation = Math.max(0, state.resources.reputation - offer.repCost);
   state.lastPetitionDay = state.day;
+  lowerSuspicion(state, CONFIG.suspicion.petitionDecay); // 조정과의 접촉은 의심을 누그러뜨린다
 
   const grantedParts: string[] = [];
   if (offer.gives) {

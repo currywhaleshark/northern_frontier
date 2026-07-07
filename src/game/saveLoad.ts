@@ -81,6 +81,14 @@ export function loadGame(): GameState | null {
     ensureProcessingReserves(parsed);
     if (parsed.lastPetitionDay == null) parsed.lastPetitionDay = 0;
     if (parsed.cannonsGranted == null) parsed.cannonsGranted = 0;
+    // 모반 의심 없는 구버전
+    if (parsed.suspicion == null) parsed.suspicion = 0;
+    if (parsed.nitrePaused == null) parsed.nitrePaused = false;
+    if (parsed.nitreHiddenUntil == null) parsed.nitreHiddenUntil = 0;
+    if (!parsed.initiatedTradeDays) parsed.initiatedTradeDays = [];
+    if (parsed.inspectionCooldownUntil == null) parsed.inspectionCooldownUntil = 0;
+    if (parsed.censured == null) parsed.censured = false;
+    if (parsed.crackdownDeadline == null) parsed.crackdownDeadline = 0;
     // 세공 없는 구버전: 시드로 올해분을 재생성. 이미 겨울이면 올해분은 면제 (다음 봄부터 정상 진행)
     if (!Object.prototype.hasOwnProperty.call(parsed, 'courtTribute')) {
       const pop = parsed.residents.filter(r => r.alive).length;

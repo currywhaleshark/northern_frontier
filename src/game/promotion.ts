@@ -60,6 +60,11 @@ export function checkPromotion(state: GameState): void {
     state.victoryProgressNote = '';
     return;
   }
+  // 모반 의심이 짙은 동안(강등 직후 포함) 조정은 승격을 논하지 않는다
+  if (state.suspicion >= CONFIG.suspicion.crackdownClearBelow) {
+    state.victoryProgressNote = '조정의 의심(모반 혐의)이 걷히기 전에는 승격을 논할 수 없습니다';
+    return;
+  }
   const conditions = promotionConditions(state, target);
   const unmet = conditions.filter(([ok]) => !ok);
   state.victoryProgressNote = unmet.map(([, txt]) => txt).join(' · ');

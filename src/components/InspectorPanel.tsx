@@ -4,6 +4,7 @@ import { FACTIONS, isJobUnlocked, JOB_NAMES, JOB_ORDER, RANK_NAMES, RESOURCE_NAM
 import { canRequestTrade } from '../game/events';
 import { canPetition } from '../game/petition';
 import { nextRank, promotionConditions } from '../game/promotion';
+import { suspicionBreakdown } from '../game/suspicion';
 import { getRelation } from '../game/relations';
 import type { GameState, JobId, Resident, ResourceId } from '../game/types';
 import { FactionName } from './FactionName';
@@ -16,6 +17,7 @@ interface Props {
   onSetResidentJob: (id: number, job: JobId) => void;
   onRequestTrade: (factionName: string) => void;
   onPetition: () => void;
+  onToggleNitre: () => void;
   tab: InspectorTab;
   setTab: (t: InspectorTab) => void;
   residentId: number | null;
@@ -47,11 +49,17 @@ function Bar({ value, color }: { value: number; color: string }) {
   );
 }
 
-// 조정 탭 — 승격 단계·명성·다음 승격 조건·올해 세공·청원 (조정 관련 정보의 단일 창구)
-function CourtTab({ state, onPetition }: { state: GameState; onPetition: () => void }) {
+// 조정 탭 — 승격·명성·세공·청원·모반 의심 (조정 관련 정보의 단일 창구)
+function CourtTab({ state, onPetition, onToggleNitre }: {
+  state: GameState; onPetition: () => void; onToggleNitre: () => void;
+}) {
   const target = nextRank(state.rank);
   const petitionReason = canPetition(state);
   const tribute = state.courtTribute;
+  const factors = suspicionBreakdown(state);
+  const suspicionColor = state.suspicion >= 70 ? '#e06c5c' : state.suspicion >= 40 ? '#d9a441' : '#6fbf73';
+  const hasNitre = state.buildings.some(b => b.type === 'nitreYard');
+  const hidden = state.day < state.nitreHiddenUntil;
   return (
     <div>
       <table className="insp-table">
@@ -99,6 +107,43 @@ function CourtTab({ state, onPetition }: { state: GameState; onPetition: () => v
             </>
           )}
         </>
+      )}
+
+      <div className="panel-title" style={{ marginTop: 8 }}>모반 의심</div>
+      <div className="small" style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <span style={{ color: suspicionColor }}>{Math.round(state.suspicion)} / 100</span>
+        {state.crackdownDeadline > 0 && (
+          <span style={{ color: '#e06c5c' }}>토벌 유예 {Math.max(0, state.crackdownDeadline - state.day)}일</span>
+        )}
+      </div>
+      <Bar value={state.suspicion} color={suspicionColor} />
+      {state.crackdownDeadline > 0 && (
+        <div className="small" style={{ color: '#e06c5c', marginTop: 2 }}>
+          기한 안에 의심을 60 아래로 내리지 못하면 토벌군이 내려옵니다.
+        </div>
+      )}
+      {/* 원인 내역 — 무엇이 의심을 올리는지 보여준다 (원인 불명의 게이지는 답답함만 만든다) */}
+      {factors.map(f => (
+        <div key={f.id} className="muted small" style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>{f.label}</span>
+          <span style={{ color: f.delta > 0 ? '#e06c5c' : '#6fbf73' }}>
+            {f.delta > 0 ? '+' : ''}{f.delta.toFixed(2)}/일
+          </span>
+        </div>
+      ))}
+      {hasNitre && (
+        <div style={{ marginTop: 4 }}>
+          <button
+            className="btn small"
+            disabled={hidden}
+            title={hidden
+              ? `감찰을 피해 은닉 중입니다 (${state.nitreHiddenUntil - state.day}일 뒤 재가동)`
+              : '염초장을 세우면 화약 생산이 멈추는 대신 의심이 오르지 않습니다'}
+            onClick={onToggleNitre}
+          >
+            {hidden ? '⚗️ 염초장 은닉 중' : state.nitrePaused ? '⚗️ 염초장 가동 재개' : '⚗️ 염초장 가동 중지'}
+          </button>
+        </div>
       )}
 
       <div style={{ marginTop: 10 }}>
@@ -163,7 +208,7 @@ function ResidentDetail({ r, rank, onSetJob }: {
 }
 
 export function InspectorPanel({
-  state, selected, onSetResidentJob, onRequestTrade, onPetition, tab, setTab, residentId, setResidentId,
+  state, selected, onSetResidentJob, onRequestTrade, onPetition, onToggleNitre, tab, setTab, residentId, setResidentId,
 }: Props) {
   const tile = selected ? state.map[selected.y]?.[selected.x] : null;
   const building = tile ? getBuilding(state, tile.buildingId) : undefined;
@@ -178,7 +223,7 @@ export function InspectorPanel({
         <span style={{ cursor: 'pointer', opacity: tab === 'court' ? 1 : 0.5 }} onClick={() => setTab('court')}>조정</span>
       </div>
 
-      {tab === 'court' && <CourtTab state={state} onPetition={onPetition} />}
+      {tab === 'court' && <CourtTab state={state} onPetition={onPetition} onToggleNitre={onToggleNitre} />}
 
       {tab === 'tile' && (
         !tile ? <div className="muted small">지도를 클릭해 타일을 선택하세요.</div> : (

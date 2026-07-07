@@ -279,6 +279,42 @@ export const CONFIG = {
     luxuryMorale: 15,  // 사치품(비단·소금) 하사 시 전 주민 사기 상승
   },
 
+  // 모반 의심 — "변방 수령이 딴마음을 품었는가". 화약 자급은 강하지만 몰래 해야 하는 것.
+  suspicion: {
+    // ── 일일 상승 요인 ──
+    perNitreYard: 0.5,        // 가동 중인 염초장 1곳당
+    stockThreshold: 15,       // 화약+조총 비축이 이보다 많으면 (조정 하사량을 크게 넘는 수준)
+    stockExtra: 0.15,
+    perInitiatedTrade: 0.08,  // 최근 한 계절 안에 먼저 청한 교역 1건당 (상대가 온 제안은 무혐의)
+    tradeWindowDays: 12,
+    cozyRelationAbove: 75,    // 이 관계 이상인 북방 세력마다 (적대 성향은 2배)
+    perCozyFaction: 0.06,
+    // ── 감소 ──
+    baseDecay: 0.25,          // 하루 자연 감소
+    tributeDecay: 6,          // 세공 납부 시 즉시
+    petitionDecay: 3,         // 청원 수령 시 즉시 (조정과의 접촉)
+    // ── 감찰 어사 (40+) ──
+    inspectionAt: 40,
+    inspectionChance: 0.15,   // 구간 내 일일 확률
+    inspectionCooldownDays: 24,
+    bribeCost: { food: 25, hide: 8 },
+    bribeDecay: 15,
+    hideDays: 6,              // 은닉: 염초장 가동 중지 일수
+    hideDecay: 8,
+    honestBase: 0.35,         // 정직: 성공 기본 확률 (+ 명성/200, 비축 초과 시 -0.2)
+    honestSuccessDecay: 25,
+    honestFailRise: 10,
+    // ── 조정 견책 (70+) ──
+    censureAt: 70,
+    censureRep: 20,
+    censureSeizeRatio: 0.5,   // 화약·조총 몰수 비율
+    // ── 강등·토벌 (100) ──
+    crackdownGraceDays: 24,   // 유예 두 계절
+    crackdownClearBelow: 60,  // 유예 중 이 밑으로 내리면 토벌 취소 (이 값 이상이면 승격도 없음)
+    crackdownStartSuspicion: 80, // 강등 직후 의심 값 (유예 중 내릴 수 있게)
+    crackdownPower: 160,      // 토벌군 규모 — 어떤 습격보다 크다
+  },
+
   // 승격 사다리 — 개척지 → 보(堡) → 진(鎭) → 부(府). 부 승격이 최종 승리.
   ranks: {
     promotionReputation: 10, // 승격 시 명성 보너스

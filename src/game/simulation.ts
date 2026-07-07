@@ -11,6 +11,7 @@ import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events'
 import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
 import { grantYearlyPowder, resolvePetition } from './petition';
 import { checkPromotion, rankEffects } from './promotion';
+import { resolveCrackdown, resolveInspection, updateSuspicion } from './suspicion';
 import { generateMap, makeRng } from './map';
 import { isHabitatActive, spawnAnimalHabitats } from './habitats';
 import { agentsTick, resetAgent, SUBTICKS } from './agents';
@@ -68,6 +69,13 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     rank: 'settlement',
     lastPetitionDay: 0,
     cannonsGranted: 0,
+    suspicion: 0,
+    nitrePaused: false,
+    nitreHiddenUntil: 0,
+    initiatedTradeDays: [],
+    inspectionCooldownUntil: 0,
+    censured: false,
+    crackdownDeadline: 0,
     log: [],
     totalDeaths: 0,
     starvationDeathsThisYear: 0,
@@ -184,6 +192,8 @@ export function resolveChoice(state: GameState, optionId: string): void {
   if (state.pendingChoice.kind === 'raid') resolveRaid(state, optionId, rng);
   else if (state.pendingChoice.kind === 'tribute') resolveCourtTribute(state, optionId);
   else if (state.pendingChoice.kind === 'petition') resolvePetition(state, optionId);
+  else if (state.pendingChoice.kind === 'inspection') resolveInspection(state, optionId, rng);
+  else if (state.pendingChoice.kind === 'crackdown') resolveCrackdown(state, optionId, rng);
   else resolveTrade(state, optionId);
   state.resources.defense = computeDefense(state);
 }
@@ -254,6 +264,7 @@ function endOfDay(state: GameState): void {
   runImmigration(state, rng);
   maybeFlavorLog(state, rng);
   maybeCollectTribute(state); // 겨울: 조정의 사자가 세공을 거둔다 (모달 충돌 시 다음 날로)
+  updateSuspicion(state, rng); // 모반 의심 누적과 감찰/견책/토벌 사건
 
   state.resources.defense = computeDefense(state);
   checkEndConditions(state);

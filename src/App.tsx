@@ -20,6 +20,7 @@ import { ProcessingPanel } from './components/ProcessingPanel';
 import { TopBar } from './components/TopBar';
 import { RANK_NAMES } from './game/constants';
 import { requestPetition } from './game/petition';
+import { toggleNitreYards } from './game/suspicion';
 import { setProcessingReserve } from './game/processing';
 import { nextRank } from './game/promotion';
 import type { BuildingTypeId, Difficulty, JobId, ProcessingInputId } from './game/types';
@@ -78,7 +79,7 @@ export default function App() {
       m.logLen = s.log.length;
     }
     const pk = s.pendingChoice?.kind ?? null;
-    if (pk && pk !== m.pending) playSfx(pk === 'raid' ? 'raidHorn' : 'tradeBell');
+    if (pk && pk !== m.pending) playSfx(pk === 'raid' || pk === 'crackdown' ? 'raidHorn' : 'tradeBell');
     m.pending = pk;
     if (s.gameOver && !m.over) playSfx(s.gameOver.won ? 'win' : 'lose');
     m.over = !!s.gameOver;
@@ -206,6 +207,12 @@ export default function App() {
     bump();
   };
 
+  // 염초장 가동 토글 (모반 의심 관리)
+  const handleToggleNitre = () => {
+    toggleNitreYards(stateRef.current);
+    bump();
+  };
+
   const handleSave = () => {
     if (saveGame(stateRef.current)) {
       addLog(stateRef.current, '진행 상황을 저장했습니다.', 'info');
@@ -317,6 +324,7 @@ export default function App() {
             onSetResidentJob={handleSetResidentJob}
             onRequestTrade={handleRequestTrade}
             onPetition={handlePetition}
+            onToggleNitre={handleToggleNitre}
             tab={inspTab}
             setTab={setInspTab}
             residentId={inspResidentId}

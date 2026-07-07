@@ -612,6 +612,12 @@ function herderTick(state: GameState, r: Resident, ctx: Ctx): void {
 
 function powderMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const p = CONFIG.production;
+  // 가동 중지(토글) 또는 감찰 은닉 중이면 화약을 만들지 않는다
+  if (state.nitrePaused || state.day < state.nitreHiddenUntil) {
+    r.task = '염초장 가동 중지';
+    goToCenter(state, r, ctx);
+    return;
+  }
   const yard = nearestBuilding(r, state.buildings.filter(b => b.type === 'nitreYard' && b.built));
   if (!yard) {
     r.task = '염초장 없음';

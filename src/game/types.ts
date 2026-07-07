@@ -188,7 +188,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'trade' | 'tribute' | 'petition';
+  kind: 'raid' | 'trade' | 'tribute' | 'petition' | 'inspection' | 'crackdown';
   title: string;
   body: string;
   options: ChoiceOption[];
@@ -288,6 +288,14 @@ export interface GameState {
   rank: Rank;                         // 현재 승격 단계
   lastPetitionDay: number;            // 마지막 청원 승인일 (계절당 1회 쿨다운)
   cannonsGranted: number;             // 조정이 하사한 불랑기포 수 (배치 가능 상한)
+  // ── 모반 의심 (화약 자급/월경 교역/북방 유착이 조정의 눈총을 산다) ──
+  suspicion: number;                  // 0~100
+  nitrePaused: boolean;               // 염초장 가동 중지 토글 (플레이어)
+  nitreHiddenUntil: number;           // 감찰 은닉: 이 날까지 염초장이 멈춘다
+  initiatedTradeDays: number[];       // 최근 플레이어 주도 교역 성사일 (월경 교역 혐의)
+  inspectionCooldownUntil: number;    // 다음 감찰 어사가 올 수 있는 날
+  censured: boolean;                  // 현 의심 고조 구간에서 견책을 이미 받았는지
+  crackdownDeadline: number;          // 토벌 유예 마감일 (0이면 없음)
   log: LogEntry[];
   totalDeaths: number;
   starvationDeathsThisYear: number;

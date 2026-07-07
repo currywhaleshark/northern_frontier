@@ -45,6 +45,18 @@ export function computeAlerts(state: GameState): AlertItem[] {
     alerts.push({ id: 'threat1', text: '습격 위협이 커지고 있습니다. 방어를 점검하십시오.', level: 'warn' });
   }
 
+  if (state.crackdownDeadline > 0) {
+    alerts.push({
+      id: 'crackdown',
+      text: `토벌 유예 ${Math.max(0, state.crackdownDeadline - state.day)}일 — 모반 의심을 60 아래로 내려 결백을 증명하십시오!`,
+      level: 'danger',
+    });
+  } else if (state.suspicion >= CONFIG.suspicion.censureAt) {
+    alerts.push({ id: 'susp2', text: '조정의 의심이 위험 수위입니다. 견책과 강등이 눈앞입니다.', level: 'danger' });
+  } else if (state.suspicion >= CONFIG.suspicion.inspectionAt) {
+    alerts.push({ id: 'susp1', text: '조정이 마을을 의심하기 시작했습니다. 감찰 어사가 올 수 있습니다.', level: 'warn' });
+  }
+
   return alerts;
 }
 

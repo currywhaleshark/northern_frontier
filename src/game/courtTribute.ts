@@ -6,6 +6,7 @@ import { RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
 import { makeRng } from './map';
 import { rankEffects } from './promotion';
+import { lowerSuspicion } from './suspicion';
 import { getSeason, getYear } from './seasons';
 import type { CourtTribute, GameState, Rank, ResourceId } from './types';
 
@@ -111,6 +112,7 @@ export function resolveCourtTribute(state: GameState, optionId: string): void {
     state.tributeFailStreak = 0;
     state.tributePaidStreak += 1; // 승격 조건의 "공물 성실도"
     state.resources.reputation = Math.min(100, state.resources.reputation + t.repPaid);
+    lowerSuspicion(state, CONFIG.suspicion.tributeDecay); // 성실한 납부는 모반 의심을 씻는다
     addLog(state, '세공을 온전히 바쳤습니다. 조정이 개척지의 공을 기억할 것입니다.', 'good');
     // 격년 하사품: 성실 납부에 대한 답례 (결정적 롤)
     if (tribute.year % 2 === 0) {

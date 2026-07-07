@@ -131,6 +131,8 @@ function resolveInitiatedTrade(state: GameState, optionId: string): void {
     // 먼저 아쉬운 소리를 한 쪽이므로 명성 보상은 제안 수락(+2)보다 작다
     state.resources.reputation = Math.min(100, state.resources.reputation + 1);
     state.lastTradeByFaction[faction] = state.day;
+    // 먼저 사람을 보낸 거래는 조정의 눈에 밀무역으로 비친다 (모반 의심 계산용)
+    state.initiatedTradeDays = [...(state.initiatedTradeDays ?? []), state.day].slice(-20);
     changeRelation(state, faction, CONFIG.relations.tradeAccept);
     addLog(state, `장터에서 ${faction}과(와) ${RESOURCE_NAMES[offer.give]}을(를) ${RESOURCE_NAMES[offer.get]}(으)로 교환했습니다.`, 'trade');
   }
