@@ -76,6 +76,7 @@ function promote(state: GameState, target: Rank): void {
     addLog(state, '보가 되니 남쪽에서 사람이 모여들지만, 부유해진 만큼 국경 너머의 눈길도 잦아집니다. 조정의 세공도 무거워질 것입니다.', 'info');
   } else if (target === 'jin') {
     addLog(state, '조정이 보를 진(鎭)으로 승격하였습니다! 첨사는 이제 첨절제사라 불립니다.', 'good');
+    addLog(state, '진 승격으로 토성·숯가마·축사와 숯쟁이·목동이 열렸습니다.', 'good');
     addLog(state, '진이 된 마을은 변경 방어의 요충이 되었습니다. 조정의 기대와 세공 요구가 한층 무거워집니다.', 'info');
   } else if (target === 'bu') {
     state.gameOver = {

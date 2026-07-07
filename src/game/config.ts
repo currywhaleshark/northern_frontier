@@ -71,6 +71,8 @@ export const CONFIG = {
     fishPerDay: 1.4,
     haulerWoodToFirewood: 2.5, // 운반꾼 1인 하루 목재 가공량
     firewoodPerWood: 1.4,
+    charcoalWoodPerDay: 2.2,    // 숯쟁이 1인 하루 목재 처리량
+    charcoalFirewoodPerWood: 2.0,
     haulerGamePerDay: 2,       // 사냥감 손질량
     foodPerGame: 4,
     hidePerGame: 1,
@@ -103,15 +105,17 @@ export const CONFIG = {
     moveSpeedWinter: 1.5,     // 겨울 눈길
     moveSpeedSnow: 1,         // 폭설/눈보라
     shelterThreshold: 0.3,    // 실외작업 중단 기준 (날씨 효율이 이 밑이면 대피)
-    carryCap: { wood: 4, game: 2, herbs: 1.5, iron: 3, stone: 3, grain: 6, food: 5 },
+    carryCap: { wood: 4, game: 2, herbs: 1.5, iron: 3, stone: 3, grain: 6, food: 5, hide: 2 },
     work: {                   // 작업지에서 1회 채집에 드는 서브틱
       chop: 3, hunt: 5, herb: 3, mine: 4, quarry: 3, fish: 4,
+      herd: 5,
       harvestPerSubtick: 8,   // 가을 수확: 서브틱당 깎는 성장도
       growPerSubtick: 1.4,    // 봄여름 농사: 서브틱당 올리는 성장도
       buildPerSubtick: 0.2,   // 건축가 서브틱당 공정 (건축가-일 환산)
     },
     yields: {                 // 1회 채집으로 지는 짐
       wood: 1.1, game: 0.75, herbs: 0.55, iron: 1.2, mineStone: 0.4, stone: 1.1, fish: 1.2,
+      herdFood: 1, herdHide: 0.25,
     },
     forestDepleteChance: 0.12, // 벌목 1회당 숲이 평지가 될 확률
     forestRegrowChance: 0.0015, // 봄여름, 숲 인접 평지가 숲이 될 하루 확률

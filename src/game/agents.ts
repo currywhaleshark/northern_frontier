@@ -24,8 +24,14 @@ interface Ctx {
   huntable: Map<string, number>; // 사냥 가능 타일 ("x,y") → 수확 배율 — 서식지 범위/크기와 연동
 }
 
-const PRODUCING_JOBS = ['woodcutter', 'hunter', 'farmer', 'builder', 'smith', 'miner', 'fisher', 'herbalist', 'hauler'];
-const OUTDOOR_JOBS = ['woodcutter', 'hunter', 'herbalist', 'farmer', 'builder', 'miner', 'fisher'];
+const PRODUCING_JOBS = [
+  'woodcutter', 'hunter', 'farmer', 'builder', 'smith', 'miner', 'fisher',
+  'charcoalBurner', 'herder', 'herbalist', 'hauler',
+];
+const OUTDOOR_JOBS = [
+  'woodcutter', 'hunter', 'herbalist', 'farmer', 'builder', 'miner', 'fisher',
+  'charcoalBurner', 'herder',
+];
 
 // ─────────────────────────── 공통 헬퍼 ───────────────────────────
 
@@ -69,9 +75,9 @@ export function isPassable(state: GameState, x: number, y: number): boolean {
   if (!t) return false;
   if (t.terrain === 'mountain') return false;
   if (t.terrain === 'river') {
-    const hasBridge = t.buildingId != null && state.buildings.some(b =>
-      b.id === t.buildingId && b.built && b.type === 'bridge');
-    if (hasBridge) return true;
+    const hasRiverWorksite = t.buildingId != null && state.buildings.some(b =>
+      b.id === t.buildingId && b.built && (b.type === 'bridge' || b.type === 'ferry'));
+    if (hasRiverWorksite) return true;
     // 겨울 언 강 위는 걸어서 건널 수 있다 (해빙기 홍수 제외)
     return getSeason(state.day) === 'winter' && state.weather !== 'thawFlood';
   }
@@ -533,6 +539,56 @@ function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
   });
 }
 
+function charcoalBurnerTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const p = CONFIG.production;
+  const kiln = nearestBuilding(r, state.buildings.filter(b => b.type === 'charcoalKiln' && b.built));
+  if (!kiln) {
+    r.task = '숯가마 없음';
+    goToCenter(state, r, ctx);
+    return;
+  }
+
+  const st = goTo(state, r, ctx, buildingGoal(kiln.id));
+  if (st !== 'arrived') {
+    r.phase = st === 'stuck' ? 'rest' : 'toWork';
+    r.task = st === 'stuck' ? '길이 막힘' : '숯가마로 이동';
+    return;
+  }
+
+  const wood = Math.min(
+    processableAmount(state, 'wood'),
+    (p.charcoalWoodPerDay / 5) * effOf(r) * ctx.mMod,
+  );
+  if (wood <= 0.05) {
+    r.phase = 'rest';
+    r.task = '목재 대기';
+    return;
+  }
+
+  state.resources.wood -= wood;
+  state.resources.firewood += wood * p.charcoalFirewoodPerWood;
+  r.phase = 'working';
+  r.task = '숯 굽기';
+  gainSkillTick(r);
+}
+
+function herderTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const a = CONFIG.agents;
+  gatherJob(state, r, ctx, {
+    goal: t => t.buildingId != null && state.buildings.some(b =>
+      b.id === t.buildingId && b.built && b.type === 'stable'),
+    workTicks: a.work.herd,
+    yieldRes: 'food',
+    yieldAmt: a.yields.herdFood,
+    cap: a.carryCap.food,
+    depositExtra: ['stable'],
+    taskWork: '가축 돌보기',
+    taskMove: '축사로 이동',
+    taskHaul: '축산물 운반',
+    onHarvest: (_tile, worker) => addCarry(worker, 'hide', a.yields.herdHide),
+  });
+}
+
 function watchmanTick(state: GameState, r: Resident, ctx: Ctx): void {
   r.task = '경계 근무';
   // 방어 시설 사이를 순찰한다
@@ -657,6 +713,8 @@ export function agentsTick(state: GameState): void {
       case 'smith': smithTick(state, r, ctx); break;
       case 'miner': minerTick(state, r, ctx); break;
       case 'fisher': fisherTick(state, r, ctx); break;
+      case 'charcoalBurner': charcoalBurnerTick(state, r, ctx); break;
+      case 'herder': herderTick(state, r, ctx); break;
       case 'watchman': watchmanTick(state, r, ctx); break;
       case 'militia': militiaTick(state, r, ctx); break;
       default: idleTick(state, r, ctx); break;

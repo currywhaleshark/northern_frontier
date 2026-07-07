@@ -2,7 +2,7 @@
 // 하루는 SUBTICKS개의 서브틱으로 나뉜다. 서브틱마다 주민 에이전트가 이동/작업/운반하고,
 // 하루가 넘어갈 때 소비/생존/위협/이벤트 등 일일 처리를 한다.
 import { CONFIG } from './config';
-import { isJobUnlocked, SEASON_NAMES } from './constants';
+import { isJobUnlocked, RANK_NAMES, SEASON_NAMES } from './constants';
 import {
   BUILDING_DEFS, canAfford, cannonPlacementsUsed, canPlaceOn, computeDefense, countBuilt, housingCapacity,
   isBuildingUnlocked,
@@ -132,7 +132,10 @@ export function tryPlaceBuilding(state: GameState, type: BuildingTypeId, x: numb
   const def = BUILDING_DEFS[type];
   const tile = state.map[y]?.[x];
   if (!tile) return '지도 밖입니다.';
-  if (!isBuildingUnlocked(state.rank, type)) return '보(堡) 승격 후 지을 수 있습니다.';
+  if (!isBuildingUnlocked(state.rank, type)) {
+    const rankName = def.minRank ? RANK_NAMES[def.minRank] : RANK_NAMES.bo;
+    return `${rankName} 승격 후 지을 수 있습니다.`;
+  }
   if (!canPlaceOn(def, tile, state)) return '이곳에는 지을 수 없습니다.';
   if (def.unique && state.buildings.some(b => b.type === type)) return '이미 건설 중이거나 완공되었습니다.';
   if (type === 'cannonEmplacement' && cannonPlacementsUsed(state) >= state.cannonsGranted) {
@@ -328,7 +331,10 @@ function runTannery(state: GameState): void {
 
 // 도구 마모: 생산직 인원 수에 비례
 function runToolWear(state: GameState): void {
-  const producing = ['woodcutter', 'hunter', 'farmer', 'builder', 'smith', 'herbalist', 'hauler'];
+  const producing = [
+    'woodcutter', 'hunter', 'farmer', 'builder', 'smith', 'miner', 'fisher',
+    'charcoalBurner', 'herder', 'herbalist', 'hauler',
+  ];
   const n = state.residents.filter(r => r.alive && !r.sick && producing.includes(r.job)).length;
   state.resources.tools = Math.max(0, state.resources.tools - n * CONFIG.production.toolWearPerWorker);
 }

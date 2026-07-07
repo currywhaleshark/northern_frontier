@@ -17,6 +17,9 @@ const TILE = CONFIG.ui.tileSize;
 // 배치 모드에서 금색으로 짚어 주는 자원 지형 (건물 → 찾아야 할 지형)
 const PLACEMENT_HINT: Partial<Record<BuildingTypeId, Terrain>> = {
   field: 'fertile',
+  mine: 'rock',
+  bridge: 'river',
+  ferry: 'river',
 };
 
 export interface SceneOptions {

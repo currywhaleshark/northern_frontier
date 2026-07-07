@@ -78,9 +78,21 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   ferry: {
     id: 'ferry', name: '나루터', emoji: '⛵',
-    desc: '보(堡) 승격 후 건설. 강가에 두어 어부가 식량을 얻는 거점.',
+    desc: '보(堡) 승격 후 건설. 육지와 맞닿은 강 타일에 두어 어부가 식량을 얻는 거점.',
     cost: { wood: 14, stone: 4, tools: 1 }, buildDays: 7, slots: 4, capacity: 0, defense: 0,
     winterBonus: false, placement: 'riverbank', unique: false, minRank: 'bo',
+  },
+  charcoalKiln: {
+    id: 'charcoalKiln', name: '숯가마', emoji: '🔥',
+    desc: '진(鎭) 승격 후 건설. 숯쟁이가 목재를 장작으로 더 효율적으로 굽는 생산 거점.',
+    cost: { wood: 12, stone: 12, tools: 1 }, buildDays: 8, slots: 3, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
+  },
+  stable: {
+    id: 'stable', name: '축사', emoji: '🐂',
+    desc: '진(鎭) 승격 후 건설. 목동이 가축을 돌보며 식량과 가죽을 꾸준히 보탠다.',
+    cost: { wood: 16, stone: 6, grain: 8, tools: 1 }, buildDays: 9, slots: 3, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
   },
   tannery: {
     id: 'tannery', name: '가죽공방', emoji: '🧵',
@@ -99,6 +111,12 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     desc: '통나무 방책 한 구간. 방어도 +3. 여러 개 지을 수 있다.',
     cost: { wood: 4 }, buildDays: 2, slots: 0, capacity: 0, defense: 3,
     winterBonus: false, placement: 'land', unique: false,
+  },
+  earthFort: {
+    id: 'earthFort', name: '토성', emoji: '🧱',
+    desc: '진(鎭) 승격 후 건설. 목책보다 튼튼한 흙 성벽 구간. 방어도 +9.',
+    cost: { wood: 8, stone: 8 }, buildDays: 5, slots: 0, capacity: 0, defense: 9,
+    winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
   },
   watchtower: {
     id: 'watchtower', name: '망루', emoji: '🗼',
@@ -128,7 +146,8 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
   'hut', 'ondol', 'tileHouse', 'storehouse', 'bridge', 'field', 'lumberCamp', 'huntLodge', 'herbHut',
-  'smithy', 'mine', 'ferry', 'tannery', 'market', 'palisade', 'watchtower', 'beacon', 'garrison',
+  'smithy', 'mine', 'ferry', 'charcoalKiln', 'stable', 'tannery', 'market',
+  'palisade', 'earthFort', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement',
 ];
 
@@ -152,14 +171,18 @@ export function isBuildingUnlocked(rank: GameState['rank'] | undefined, type: Bu
 
 function isRiverbank(state: GameState | undefined, tile: Tile): boolean {
   if (!state) return false;
-  if (tile.terrain === 'river' || tile.terrain === 'mountain' || tile.terrain === 'rock' || tile.terrain === 'center') {
-    return false;
-  }
+  if (tile.terrain !== 'river') return false;
+  const isLand = (neighbor: Tile | undefined): boolean =>
+    neighbor != null &&
+    neighbor.terrain !== 'river' &&
+    neighbor.terrain !== 'mountain' &&
+    neighbor.terrain !== 'rock' &&
+    neighbor.terrain !== 'center';
   return (
-    state.map[tile.y - 1]?.[tile.x]?.terrain === 'river' ||
-    state.map[tile.y + 1]?.[tile.x]?.terrain === 'river' ||
-    state.map[tile.y]?.[tile.x - 1]?.terrain === 'river' ||
-    state.map[tile.y]?.[tile.x + 1]?.terrain === 'river'
+    isLand(state.map[tile.y - 1]?.[tile.x]) ||
+    isLand(state.map[tile.y + 1]?.[tile.x]) ||
+    isLand(state.map[tile.y]?.[tile.x - 1]) ||
+    isLand(state.map[tile.y]?.[tile.x + 1])
   );
 }
 

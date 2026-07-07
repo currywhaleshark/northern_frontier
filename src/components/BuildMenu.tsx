@@ -9,8 +9,11 @@ import type { BuildingTypeId, GameState, ResourceId } from '../game/types';
 // 접이식 카테고리 구성
 const CATEGORIES: { name: string; types: BuildingTypeId[] }[] = [
   { name: '주거·기반', types: ['hut', 'ondol', 'tileHouse', 'storehouse', 'bridge'] },
-  { name: '생산', types: ['field', 'lumberCamp', 'huntLodge', 'herbHut', 'smithy', 'mine', 'ferry', 'tannery', 'market'] },
-  { name: '방어·군사', types: ['palisade', 'watchtower', 'beacon', 'garrison', 'cannonEmplacement'] },
+  {
+    name: '생산',
+    types: ['field', 'lumberCamp', 'huntLodge', 'herbHut', 'smithy', 'mine', 'ferry', 'charcoalKiln', 'stable', 'tannery', 'market'],
+  },
+  { name: '방어·군사', types: ['palisade', 'earthFort', 'watchtower', 'beacon', 'garrison', 'cannonEmplacement'] },
 ];
 
 const OPEN_KEY = 'buksae-buildmenu-open';

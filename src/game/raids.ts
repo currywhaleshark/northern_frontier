@@ -67,13 +67,17 @@ function pickFaction(state: GameState, rng: () => number): Faction {
   return cands[cands.length - 1].f;
 }
 
-// 습격자 통행 규칙: 산과 완공된 목책은 못 지난다 (강은 여울과 뗏목으로 건넌다)
+function isRaidBarrier(type: string): boolean {
+  return type === 'palisade' || type === 'earthFort';
+}
+
+// 습격자 통행 규칙: 산과 완공된 방책은 못 지난다 (강은 여울과 뗏목으로 건넌다)
 function raiderPassable(state: GameState, x: number, y: number): boolean {
   const t = state.map[y]?.[x];
   if (!t || t.terrain === 'mountain') return false;
   if (t.buildingId != null) {
     const b = state.buildings.find(bb => bb.id === t.buildingId);
-    if (b && b.built && b.type === 'palisade') return false;
+    if (b && b.built && isRaidBarrier(b.type)) return false;
   }
   return true;
 }
@@ -101,12 +105,12 @@ export function spawnRaiders(state: GameState, rng: () => number, warned: boolea
   const faction = pickFaction(state, rng);
   const w = CONFIG.map.width, h = CONFIG.map.height;
 
-  // 목책이 마을을 완전히 두르고 있으면 중심지까지의 길이 없다 → 목책 앞 공성
-  const palisadeTiles = new Set(
-    state.buildings.filter(b => b.built && b.type === 'palisade').map(b => b.y * w + b.x));
-  const nearPalisade = (tx: number, ty: number) =>
+  // 방책이 마을을 완전히 두르고 있으면 중심지까지의 길이 없다 → 방책 앞 공성
+  const barrierTiles = new Set(
+    state.buildings.filter(b => b.built && isRaidBarrier(b.type)).map(b => b.y * w + b.x));
+  const nearBarrier = (tx: number, ty: number) =>
     [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]
-      .some(([dx, dy]) => palisadeTiles.has((ty + dy) * w + (tx + dx)));
+      .some(([dx, dy]) => barrierTiles.has((ty + dy) * w + (tx + dx)));
 
   let spawn: { x: number; y: number } | null = null;
   let path: { x: number; y: number }[] | null = null;
@@ -118,11 +122,11 @@ export function spawnRaiders(state: GameState, rng: () => number, warned: boolea
     else { sx = w - 1; sy = Math.floor(rng() * h * 0.5); }                   // 동쪽 상단
     if (!raiderPassable(state, sx, sy)) continue;
     const pass = (x: number, y: number) => raiderPassable(state, x, y);
-    // 1순위: 중심지까지 직접 (목책에 틈이 있으면 돌아 들어온다)
+    // 1순위: 중심지까지 직접 (방책에 틈이 있으면 돌아 들어온다)
     path = findPath(state, sx, sy, tile => tile.buildingId === center.id, pass);
-    // 2순위: 길이 막혔으면 목책에 붙은 타일까지 가서 공성
-    if (!path && palisadeTiles.size > 0) {
-      path = findPath(state, sx, sy, tile => nearPalisade(tile.x, tile.y), pass);
+    // 2순위: 길이 막혔으면 방책에 붙은 타일까지 가서 공성
+    if (!path && barrierTiles.size > 0) {
+      path = findPath(state, sx, sy, tile => nearBarrier(tile.x, tile.y), pass);
       siege = !!path;
     }
     if (path) spawn = { x: sx, y: sy };
@@ -176,7 +180,7 @@ export function raidersTick(state: GameState, rng: () => number): void {
   }
   if (band.path.length === 0 || dist <= CONFIG.raid.arriveDistance) {
     if (band.siege) {
-      addLog(state, `${band.faction}이(가) 목책 앞에서 멈춰 섰습니다. 방책이 그들을 가로막고 있습니다.`, 'raid');
+      addLog(state, `${band.faction}이(가) 방책 앞에서 멈춰 섰습니다. 목책과 토성이 그들을 가로막고 있습니다.`, 'raid');
     }
     openRaidChoice(state, rng, band.warned, band.power, band.faction, band.siege);
   }
@@ -220,7 +224,7 @@ export function openRaidChoice(
     body:
       `${faction.name}이 마을로 몰려오고 있습니다.` +
       (warned ? ' 경보 덕분에 미리 대비할 시간이 있었습니다.' : ' 아무런 경보도 없이 들이닥쳤습니다!') +
-      (siege ? '\n목책이 무리를 가로막고 있어 방어에 유리합니다.' : '') +
+      (siege ? '\n방책이 무리를 가로막고 있어 방어에 유리합니다.' : '') +
       (getRelation(state, faction.name) >= 60 ? '\n낯익은 얼굴들입니다. 말이 통할지도 모릅니다.'
         : getRelation(state, faction.name) <= 35 ? '\n그들의 눈빛에 해묵은 원한이 서려 있습니다.' : '') +
       `\n추정 규모: ${power < 30 ? '소규모' : power < 50 ? '중간 규모' : '대규모'} / 현재 방어도: ${state.resources.defense}`,

@@ -48,6 +48,8 @@ export type JobId =
   | 'smith'      // 대장장이
   | 'miner'      // 채광꾼
   | 'fisher'     // 어부
+  | 'charcoalBurner' // 숯쟁이
+  | 'herder'     // 목동
   | 'watchman'   // 파수꾼
   | 'militia';   // 수비병 (내부 id는 저장 호환을 위해 유지)
 
@@ -82,11 +84,14 @@ export type BuildingTypeId =
   | 'herbHut'    // 약초막
   | 'mine'       // 채광장
   | 'ferry'      // 나루터
+  | 'charcoalKiln' // 숯가마
+  | 'stable'     // 축사
   | 'field'      // 밭
   | 'smithy'     // 대장간
   | 'tannery'    // 가죽공방
   | 'beacon'     // 봉수대
   | 'palisade'   // 목책
+  | 'earthFort'  // 토성
   | 'watchtower' // 망루
   | 'garrison'   // 군영
   | 'market'     // 장터

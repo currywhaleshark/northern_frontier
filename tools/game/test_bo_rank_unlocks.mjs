@@ -58,7 +58,7 @@ function prepareTile(state, terrain) {
   return tile;
 }
 
-function prepareRiverbank(state) {
+function prepareRiverEdge(state) {
   const bank = openInteriorTile(state);
   const river = state.map[bank.y][bank.x + 1];
   assert.ok(river, 'river neighbor exists');
@@ -68,7 +68,7 @@ function prepareRiverbank(state) {
   river.terrain = 'river';
   river.hasIron = false;
   river.buildingId = null;
-  return bank;
+  return { bank, river };
 }
 
 function placeBuilt(state, type, tile) {
@@ -153,7 +153,7 @@ function runTicks(state, ticks) {
       : building === 'mine'
         ? prepareTile(state, 'rock')
         : building === 'ferry'
-          ? prepareRiverbank(state)
+          ? prepareRiverEdge(state).river
           : prepareTile(state, 'plain');
     if (building === 'mine') tile.hasIron = true;
 
@@ -171,11 +171,20 @@ function runTicks(state, ticks) {
   const ferryState = simulation.newGame(44);
   boostResources(ferryState);
   ferryState.rank = 'bo';
-  const dry = prepareTile(ferryState, 'plain');
+  const { bank } = prepareRiverEdge(ferryState);
+  assert.ok(simulation.tryPlaceBuilding(ferryState, 'ferry', bank.x, bank.y), 'ferry rejects land riverbank tiles');
+
+  const inlandRiverState = simulation.newGame(440);
+  boostResources(inlandRiverState);
+  inlandRiverState.rank = 'bo';
+  const river = prepareTile(inlandRiverState, 'river');
   for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-    ferryState.map[dry.y + dy][dry.x + dx].terrain = 'plain';
+    inlandRiverState.map[river.y + dy][river.x + dx].terrain = 'river';
   }
-  assert.ok(simulation.tryPlaceBuilding(ferryState, 'ferry', dry.x, dry.y), 'ferry requires a riverbank');
+  assert.ok(
+    simulation.tryPlaceBuilding(inlandRiverState, 'ferry', river.x, river.y),
+    'ferry requires a river tile adjacent to land',
+  );
 }
 
 {
@@ -187,6 +196,14 @@ function runTicks(state, ticks) {
 
   placeBuilt(state, 'bridge', river);
   assert.equal(agents.isPassable(state, river.x, river.y), true, 'built bridge opens river movement');
+
+  const ferryState = simulation.newGame(450);
+  ferryState.day = 1;
+  ferryState.weather = 'clear';
+  const ferryRiver = prepareRiverEdge(ferryState).river;
+  assert.equal(agents.isPassable(ferryState, ferryRiver.x, ferryRiver.y), false, 'spring river blocks movement before ferry');
+  placeBuilt(ferryState, 'ferry', ferryRiver);
+  assert.equal(agents.isPassable(ferryState, ferryRiver.x, ferryRiver.y), true, 'built ferry opens its river tile');
 }
 
 {
@@ -203,7 +220,7 @@ function runTicks(state, ticks) {
 
 {
   const state = simulation.newGame(47);
-  const ferryTile = prepareRiverbank(state);
+  const ferryTile = prepareRiverEdge(state).river;
   placeBuilt(state, 'ferry', ferryTile);
   const fisher = onlyWorkerAt(state, 'fisher', ferryTile);
   runTicks(state, 6);

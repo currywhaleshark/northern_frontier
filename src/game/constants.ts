@@ -39,17 +39,21 @@ export const JOB_NAMES: Record<JobId, string> = {
   idle: '무직', woodcutter: '벌목꾼', hunter: '사냥꾼', farmer: '농부',
   builder: '건축가', hauler: '운반꾼', herbalist: '약초꾼', smith: '대장장이',
   miner: '채광꾼', fisher: '어부',
+  charcoalBurner: '숯쟁이', herder: '목동',
   watchman: '파수꾼', militia: '수비병',
 };
 
 export const JOB_ORDER: JobId[] = [
   'idle', 'woodcutter', 'hunter', 'farmer', 'builder',
-  'hauler', 'herbalist', 'smith', 'miner', 'fisher', 'watchman', 'militia',
+  'hauler', 'herbalist', 'smith', 'miner', 'fisher', 'charcoalBurner', 'herder',
+  'watchman', 'militia',
 ];
 
 export const JOB_MIN_RANK: Partial<Record<JobId, Rank>> = {
   miner: 'bo',
   fisher: 'bo',
+  charcoalBurner: 'jin',
+  herder: 'jin',
 };
 
 export function isJobUnlocked(rank: Rank | undefined, job: JobId): boolean {
@@ -67,6 +71,8 @@ export const JOB_DESC: Record<JobId, string> = {
   smith: '대장간에서 도구를 만들고, 철이 떨어지면 철광까지 채굴을 다녀옵니다.',
   miner: '보(堡) 승격 후 배치할 수 있습니다. 채광장에서 돌과 철을 안정적으로 캡니다.',
   fisher: '보(堡) 승격 후 배치할 수 있습니다. 나루터에서 강고기를 잡아 식량을 보탭니다.',
+  charcoalBurner: '진(鎭) 승격 후 배치할 수 있습니다. 숯가마에서 목재를 장작으로 효율적으로 굽습니다.',
+  herder: '진(鎭) 승격 후 배치할 수 있습니다. 축사에서 가축을 돌보며 식량과 가죽을 보탭니다.',
   watchman: '방어 시설 사이를 순찰합니다. 방어도가 오르고 위협도 증가가 줄어듭니다.',
   militia: '군영(없으면 마을 중심)에서 조련하는 상비 수비병입니다. 방어도가 크게 오릅니다.',
 };
@@ -76,6 +82,7 @@ export const JOB_COLORS: Record<JobId, string> = {
   idle: '#9aa5ad', woodcutter: '#b0793a', hunter: '#7fa653', farmer: '#d9c26b',
   builder: '#d98d5f', hauler: '#8fb7c9', herbalist: '#6fce9e', smith: '#c96f6f',
   miner: '#9a8f7a', fisher: '#5ba7d8',
+  charcoalBurner: '#d66f3f', herder: '#c7a85b',
   watchman: '#7f8fd9', militia: '#e05f5f',
 };
 
