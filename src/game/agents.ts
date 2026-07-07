@@ -425,7 +425,7 @@ function haulerTick(state: GameState, r: Resident, ctx: Ctx): void {
     const q = Math.min(processableAmount(state, 'grain'), (p.haulerGrainPerDay / 5) * eff);
     if (q > 0) {
       state.resources.grain -= q;
-      state.resources.food += q;
+      state.resources.food += q * p.foodPerGrain;
       label = '곡물 도정';
     }
     const w = Math.min(processableAmount(state, 'wood'), (p.haulerWoodToFirewood / 5) * eff);

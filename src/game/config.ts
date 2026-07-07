@@ -76,7 +76,8 @@ export const CONFIG = {
     haulerGamePerDay: 2,       // 사냥감 손질량
     foodPerGame: 4,
     hidePerGame: 1,
-    haulerGrainPerDay: 4,      // 곡물 도정량 (곡물 1 → 식량 1)
+    haulerGrainPerDay: 4,      // 운반꾼 1인 하루 곡물 도정량
+    foodPerGrain: 1.5,         // 곡물 1 → 식량 1.5
     haulerStonePerDay: 0.4,    // 돌이 부족할 때 채석
     stoneReserveTarget: 40,
     woodReserve: 25,           // 건축용으로 남겨둘 목재 (이 이상만 장작으로 팬다)
@@ -88,7 +89,7 @@ export const CONFIG = {
       iron: 0,
     } as Record<ProcessingInputId, number>,
     tanneryHidePerDay: 2,      // 가죽공방 하루 가죽 소비 (가죽 2 → 옷 1)
-    fieldGrainYield: 20,       // 밭 1개가 만작일 때 곡물 수확량
+    fieldGrainYield: 36,       // 밭 1개가 만작일 때 곡물 수확량
     fertileBonus: 1.3,
     lumberCampBonus: 1.4,
     huntLodgeBonus: 1.5,
