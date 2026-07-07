@@ -8,6 +8,7 @@ import { canPetition } from '../game/petition';
 import { nextRank, promotionConditions } from '../game/promotion';
 import { suspicionBreakdown } from '../game/suspicion';
 import { getRelation } from '../game/relations';
+import { isExplored } from '../game/exploration';
 import type { GameState, JobId, Resident, ResourceId, SmithyProductId } from '../game/types';
 import { FactionName } from './FactionName';
 
@@ -215,7 +216,8 @@ export function InspectorPanel({
   tab, setTab, residentId, setResidentId,
 }: Props) {
   const tile = selected ? state.map[selected.y]?.[selected.x] : null;
-  const building = tile ? getBuilding(state, tile.buildingId) : undefined;
+  const explored = tile ? isExplored(state, tile.x, tile.y) : false;
+  const building = tile && explored ? getBuilding(state, tile.buildingId) : undefined;
   const resident = state.residents.find(r => r.id === residentId) ?? null;
 
   return (
@@ -234,6 +236,13 @@ export function InspectorPanel({
           <table className="insp-table">
             <tbody>
               <tr><td>위치</td><td>({tile.x}, {tile.y})</td></tr>
+              {!explored ? (
+                <>
+                  <tr><td>상태</td><td>미답사</td></tr>
+                  <tr><td colSpan={2} className="muted small">주민이 가까이 가면 지형과 자원을 확인할 수 있습니다.</td></tr>
+                </>
+              ) : (
+                <>
               <tr><td>지형</td><td>{TERRAIN_NAMES[tile.terrain]}{tile.terrain === 'rock' && tile.hasIron ? ' (철맥)' : ''}</td></tr>
               {tile.terrain === 'forest' && state.habitats.some(h =>
                 h.active && (h.x - tile.x) ** 2 + (h.y - tile.y) ** 2 <= h.radius ** 2) && (
@@ -303,6 +312,8 @@ export function InspectorPanel({
                   </>
                 );
               })()}
+                </>
+              )}
             </tbody>
           </table>
         )

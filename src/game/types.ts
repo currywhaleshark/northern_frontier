@@ -115,6 +115,28 @@ export interface Tile {
   buildingId: number | null;
 }
 
+export interface ExplorationState {
+  explored: boolean[][];  // 한 번이라도 답사한 타일. 미답사는 지형/자원/건물을 알 수 없다.
+}
+
+export type PointerCursor = 'default' | 'move' | 'copy' | 'pointer' | 'not-allowed';
+
+export type SelectedEntity =
+  | { kind: 'tile'; x: number; y: number }
+  | { kind: 'resident'; id: number }
+  | { kind: 'building'; id: number };
+
+export type PointerAction =
+  | { kind: 'none'; cursor: PointerCursor; label: string }
+  | { kind: 'move'; cursor: PointerCursor; label: string; x: number; y: number }
+  | { kind: 'work'; cursor: PointerCursor; label: string; x: number; y: number; buildingId?: number }
+  | { kind: 'building'; cursor: PointerCursor; label: string; buildingId: number }
+  | { kind: 'invalid'; cursor: PointerCursor; label: string };
+
+export type ManualOrder =
+  | { kind: 'move'; x: number; y: number }
+  | { kind: 'work'; x: number; y: number; buildingId?: number; repeat?: boolean };
+
 export type AgentPhase = 'rest' | 'toWork' | 'working' | 'toDeposit';
 
 export interface Resident {
@@ -141,6 +163,7 @@ export interface Resident {
   workTimer: number;                // 현재 작업지에서 남은 작업량(서브틱)
   targetId: number | null;          // 목표 건물 id (밭/건설현장/순찰지 등)
   carrying: Partial<Record<ResourceId, number>>; // 지고 있는 짐
+  manualOrder: ManualOrder | null;  // 플레이어가 우클릭으로 지정한 이동/작업 명령
 }
 
 export interface Building {
@@ -271,6 +294,7 @@ export interface GameState {
   seed: number;
   weather: WeatherId;
   map: Tile[][];
+  exploration: ExplorationState;
   habitats: AnimalHabitat[];
   residents: Resident[];
   buildings: Building[];

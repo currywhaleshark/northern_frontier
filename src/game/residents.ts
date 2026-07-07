@@ -70,6 +70,7 @@ export function createResident(state: GameState, rng: () => number, job: JobId =
     workTimer: 0,
     targetId: null,
     carrying: {},
+    manualOrder: null,
   };
 }
 

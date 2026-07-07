@@ -23,7 +23,11 @@ import { avg, createResident, livingResidents, updateMorale, updateResidentNeeds
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { firewoodWeatherMult, rollWeather } from './weather';
 import { defaultProcessingReserves, processableAmount } from './processing';
-import type { Building, BuildingTypeId, Difficulty, GameState, JobId, ResourceId, SmithyProductId } from './types';
+import { getPointerAction } from './selectionActions';
+import { createExploration, isBuildingFootprintExplored, refreshExploration } from './exploration';
+import type {
+  Building, BuildingTypeId, Difficulty, GameState, JobId, PointerAction, Resident, ResourceId, SmithyProductId,
+} from './types';
 
 // ─────────────────────────── 새 게임 ───────────────────────────
 
@@ -47,6 +51,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     seed: s,
     weather: 'clear',
     map: tiles,
+    exploration: createExploration({ map: tiles }),
     // 짐승 서식지: 숲 덩어리마다 난이도별 확률로 자리 잡는다 (마을 근처 하나는 보장)
     habitats: spawnAnimalHabitats(tiles, centerX, centerY, rng, diff.habitatChance),
     residents: [],
@@ -102,6 +107,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
 
   state.weather = rollWeather(1, rng);
   state.resources.defense = computeDefense(state);
+  refreshExploration(state);
 
   addLog(state, '조정의 명을 받아 두만강 이북 개척지에 도착했습니다. 짧은 봄 동안 겨울을 준비해야 합니다.', 'info');
   addLog(state, '나무를 베고, 집을 짓고, 식량과 장작을 모으십시오. 첫 겨울이 모든 것을 시험할 것입니다.', 'info');
@@ -166,6 +172,7 @@ export function tryPlaceBuilding(state: GameState, type: BuildingTypeId, x: numb
     const rankName = def.minRank ? RANK_NAMES[def.minRank] : RANK_NAMES.bo;
     return `${rankName} 승격 후 지을 수 있습니다.`;
   }
+  if (!isBuildingFootprintExplored(state, type, x, y)) return '아직 답사하지 않은 곳입니다.';
   if (!canPlaceBuildingAt(state, type, x, y)) return '이곳에는 지을 수 없습니다.';
   if (def.unique && state.buildings.some(b => b.type === type)) return '이미 건설 중이거나 완공되었습니다.';
   if (type === 'cannonEmplacement' && cannonPlacementsUsed(state) >= state.cannonsGranted) {
@@ -212,6 +219,90 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
   }
 }
 
+function interruptResidentForManualOrder(resident: Resident): void {
+  resident.path = [];
+  resident.phase = 'rest';
+  resident.workTimer = 0;
+  resident.targetId = null;
+}
+
+export function issueResidentMoveOrder(state: GameState, residentId: number, x: number, y: number): string | null {
+  const resident = state.residents.find(res => res.id === residentId && res.alive);
+  if (!resident) return '선택한 주민이 없습니다.';
+  const tile = state.map[y]?.[x];
+  if (!tile) return '지도 밖입니다.';
+
+  const action = getPointerAction(state, { kind: 'resident', id: residentId }, tile);
+  if (action.kind !== 'move') return action.label || '이동할 수 없습니다.';
+
+  resident.manualOrder = { kind: 'move', x, y };
+  interruptResidentForManualOrder(resident);
+  resident.task = '이동 명령';
+  return null;
+}
+
+export function issueResidentWorkOrder(
+  state: GameState,
+  residentId: number,
+  requestedAction: PointerAction,
+): string | null {
+  if (requestedAction.kind !== 'work') return '작업 명령이 아닙니다.';
+  const resident = state.residents.find(res => res.id === residentId && res.alive);
+  if (!resident) return '선택한 주민이 없습니다.';
+  const tile = state.map[requestedAction.y]?.[requestedAction.x];
+  if (!tile) return '지도 밖입니다.';
+
+  const action = getPointerAction(state, { kind: 'resident', id: residentId }, tile);
+  if (action.kind !== 'work') return action.label || '작업할 수 없습니다.';
+
+  resident.manualOrder = {
+    kind: 'work',
+    x: action.x,
+    y: action.y,
+    buildingId: action.buildingId,
+    repeat: resident.job === 'hauler' && tile.terrain === 'rock',
+  };
+  interruptResidentForManualOrder(resident);
+  resident.task = action.label;
+  return null;
+}
+
+export function clearResidentManualOrder(state: GameState, residentId: number): void {
+  const resident = state.residents.find(res => res.id === residentId);
+  if (!resident) return;
+  resident.manualOrder = null;
+  interruptResidentForManualOrder(resident);
+}
+
+export function upgradeHousingBuilding(
+  state: GameState,
+  buildingId: number,
+  targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>,
+): string | null {
+  const building = state.buildings.find(b => b.id === buildingId);
+  if (!building) return '집을 찾을 수 없습니다.';
+  if ((building.type !== 'hut' || targetType !== 'ondol') && (building.type !== 'ondol' || targetType !== 'tileHouse')) {
+    return '개량할 수 없는 집입니다.';
+  }
+  if (!building.built) return '완공된 집만 개량할 수 있습니다.';
+  const def = BUILDING_DEFS[targetType];
+  if (!isBuildingUnlocked(state.rank, targetType)) {
+    const rankName = def.minRank ? RANK_NAMES[def.minRank] : RANK_NAMES.bo;
+    return `${rankName} 승격 후 개량할 수 있습니다.`;
+  }
+  if (!canAfford(state, def)) return '자원이 부족합니다.';
+
+  for (const [res, amt] of Object.entries(def.cost)) {
+    state.resources[res as keyof typeof state.resources] -= amt ?? 0;
+  }
+  building.type = targetType;
+  building.progress = 0;
+  building.built = false;
+  occupyBuildingTiles(state, building);
+  addLog(state, `${def.name} 개량 공사를 시작했습니다.`, 'info');
+  return null;
+}
+
 export function setSmithyProduct(state: GameState, buildingId: number, product: SmithyProductId): string | null {
   const building = state.buildings.find(b => b.id === buildingId);
   if (!building || building.type !== 'smithy') return '대장간을 찾을 수 없습니다.';
@@ -250,6 +341,7 @@ export function continueAfterVictory(state: GameState): boolean {
 export function advanceTick(state: GameState): void {
   if (state.gameOver || state.pendingChoice) return;
   agentsTick(state);
+  refreshExploration(state);
   const tickRng = makeRng(state.seed + state.day * 7919 + state.subTick * 131 + 3);
   battleTick(state, tickRng);
   raidersTick(state, tickRng);

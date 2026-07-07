@@ -5,7 +5,9 @@ import { CONFIG } from '../game/config';
 import { JOB_NAMES } from '../game/constants';
 import { getActiveSprites } from '../render/atlas';
 import { findResidentAt, renderScene } from '../render/renderer';
-import type { BuildingTypeId, GameState } from '../game/types';
+import { getPointerAction } from '../game/selectionActions';
+import type { BuildingTypeId, GameState, SelectedEntity, SmithyProductId } from '../game/types';
+import { ActionPopup } from './ActionPopup';
 import { FactionName } from './FactionName';
 
 const TILE = CONFIG.ui.tileSize;
@@ -17,16 +19,24 @@ interface Props {
   version: number;
   placingType: BuildingTypeId | null;
   selected: { x: number; y: number } | null;
+  selectedEntity: SelectedEntity | null;
   selectedResidentId: number | null;
   anim: { at: number; ms: number }; // 마지막 서브틱 시각/간격 (이동 보간용)
   onTileClick: (x: number, y: number) => void;
   onResidentClick: (id: number) => void;
+  onContextAction: (x: number, y: number) => void;
+  onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
+  onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
+  onRequestTrade: (factionName: string) => void;
+  onToggleNitre: () => void;
+  onCloseBuildingActions: () => void;
   onCancelPlace: () => void;
 }
 
 export function GameCanvas({
-  state, version, placingType, selected, selectedResidentId, anim,
-  onTileClick, onResidentClick, onCancelPlace,
+  state, version, placingType, selected, selectedEntity, selectedResidentId, anim,
+  onTileClick, onResidentClick, onContextAction, onUpgradeHousing, onSetSmithyProduct, onRequestTrade,
+  onToggleNitre, onCloseBuildingActions, onCancelPlace,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mouse, setMouse] = useState<{ mx: number; my: number } | null>(null);
@@ -41,6 +51,8 @@ export function GameCanvas({
   const hoverTile = mouse
     ? { x: Math.floor(mouse.mx / TILE), y: Math.floor(mouse.my / TILE) }
     : null;
+  const hoveredTile = hoverTile ? state.map[hoverTile.y]?.[hoverTile.x] : null;
+  const pointerAction = placingType ? null : getPointerAction(state, selectedEntity, hoveredTile);
 
   // 매 렌더(≈30fps)마다 장면을 다시 그린다 — 보간 이동 표현
   useEffect(() => {
@@ -68,6 +80,18 @@ export function GameCanvas({
     const by = (b.py + (b.y - b.py) * alpha) * TILE + TILE / 2;
     raiderHovered = Math.hypot(bx - mouse.mx, by - mouse.my) <= 14;
   }
+  const actionTooltip = mouse && !hoveredResident && !raiderHovered && pointerAction && pointerAction.kind !== 'none'
+    ? pointerAction
+    : null;
+  const canvasCursor = placingType
+    ? 'crosshair'
+    : panning
+      ? 'grabbing'
+      : hoveredResident
+        ? 'pointer'
+        : pointerAction && pointerAction.kind !== 'none'
+          ? pointerAction.cursor
+          : 'grab';
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -76,7 +100,7 @@ export function GameCanvas({
         width={w * TILE}
         height={h * TILE}
         data-version={version}
-        style={{ cursor: placingType ? 'crosshair' : panning ? 'grabbing' : 'grab' }}
+        style={{ cursor: canvasCursor }}
         onPointerDown={e => {
           if (e.button !== 0) return; // 좌클릭만 패닝 시작
           const box = scrollBox();
@@ -129,23 +153,46 @@ export function GameCanvas({
         }}
         onContextMenu={e => {
           e.preventDefault();
-          onCancelPlace();
+          if (placingType) {
+            onCancelPlace();
+            return;
+          }
+          const m = toMouse(e);
+          const tx = Math.floor(m.mx / TILE), ty = Math.floor(m.my / TILE);
+          if (tx < 0 || ty < 0 || tx >= w || ty >= h) return;
+          onContextAction(tx, ty);
         }}
       />
-      {mouse && (hoveredResident || raiderHovered) && (
+      {mouse && (hoveredResident || raiderHovered || actionTooltip) && (
         <div className="map-tooltip" style={{ left: mouse.mx + 14, top: mouse.my + 8 }}>
           {hoveredResident ? (
             <>
               <b>{hoveredResident.name}</b> · {JOB_NAMES[hoveredResident.job]}
               <div className="muted">{hoveredResident.task}{hoveredResident.sick ? ' · 앓는 중' : ''}</div>
             </>
-          ) : (
+          ) : raiderHovered ? (
             <>
               <b><FactionName name={state.raiders!.faction} /></b>
               <div className="muted">{state.raiders!.siege ? '목책 앞 공성 중' : '무장 무리 접근 중'}</div>
             </>
-          )}
+          ) : actionTooltip ? (
+            <>
+              <b>{actionTooltip.label}</b>
+              {actionTooltip.kind === 'invalid' && <div className="muted">명령할 수 없음</div>}
+            </>
+          ) : null}
         </div>
+      )}
+      {selectedEntity?.kind === 'building' && (
+        <ActionPopup
+          state={state}
+          buildingId={selectedEntity.id}
+          onUpgradeHousing={onUpgradeHousing}
+          onSetSmithyProduct={onSetSmithyProduct}
+          onRequestTrade={onRequestTrade}
+          onToggleNitre={onToggleNitre}
+          onClose={onCloseBuildingActions}
+        />
       )}
     </div>
   );

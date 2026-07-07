@@ -9,6 +9,7 @@ import { CONFIG } from '../game/config';
 import { BUILDING_DEFS, buildingFootprintSize, canAfford, canPlaceBuildingAt } from '../game/buildings';
 import { getSeason } from '../game/seasons';
 import { findHabitatIconAtTile } from '../game/habitats';
+import { isBuildingFootprintExplored, isExplored } from '../game/exploration';
 import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
 import { militiaWeaponForResident } from './militiaWeaponAssignment';
 import type { AnimalHabitat, BuildingTypeId, GameState, Resident, Terrain } from '../game/types';
@@ -200,6 +201,23 @@ function drawHabitatIcon(ctx: CanvasRenderingContext2D, habitat: AnimalHabitat):
   ctx.restore();
 }
 
+function drawFogOverlay(ctx: CanvasRenderingContext2D, state: GameState): void {
+  ctx.save();
+  for (let y = 0; y < state.map.length; y++) {
+    const row = state.map[y];
+    for (let x = 0; x < row.length; x++) {
+      if (isExplored(state, x, y)) continue;
+      ctx.fillStyle = 'rgba(2,5,8,0.94)';
+      ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+      if ((x * 17 + y * 31) % 7 === 0) {
+        ctx.fillStyle = 'rgba(65,78,90,0.14)';
+        ctx.fillRect(x * TILE + 9, y * TILE + 10, 3, 2);
+      }
+    }
+  }
+  ctx.restore();
+}
+
 export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: SceneOptions): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -210,7 +228,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   // 1) 지형
   const layer = drawTerrainLayer(state, canvas.width, canvas.height, sprites);
   // 짐승이 떠난(비활성) 서식지는 지도에서도 숨긴다
-  const habitats = state.habitats.filter(h => h.active);
+  const habitats = state.habitats.filter(h => h.active && isExplored(state, h.x, h.y));
   const hoveredHabitat = o.hover ? findHabitatIconAtTile(habitats, o.hover.x, o.hover.y) : null;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(layer, 0, 0);
@@ -223,6 +241,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   const sorted = [...state.buildings].sort((a, b) =>
     (a.y + buildingFootprintSize(a.type)) - (b.y + buildingFootprintSize(b.type)) || a.x - b.x);
   for (const b of sorted) {
+    if (!isBuildingFootprintExplored(state, b.type, b.x, b.y)) continue;
     const def = BUILDING_DEFS[b.type];
     const footprint = buildingFootprintSize(b.type);
     const size = TILE * footprint;
@@ -310,7 +329,10 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   // 8) 날씨 오버레이 (비/눈/눈보라/서리/혹한/해빙 홍수)
   drawWeather(ctx, state.weather, canvas.width, canvas.height);
 
-  // 9) 배치 모드: 관련 자원 하이라이트 (사냥막→서식지 범위, 밭→비옥한 땅)
+  // 9) 미답사 안개 — 지형/자원/건물/서식지를 탐색 전까지 가린다
+  drawFogOverlay(ctx, state);
+
+  // 10) 배치 모드: 관련 자원 하이라이트 (사냥막→서식지 범위, 밭→비옥한 땅)
   if (o.placingType) {
     // 사냥막 배치 중엔 모든 서식지 범위를 보여줘 자리를 잡기 쉽게 한다
     if (o.placingType === 'huntLodge') {
@@ -324,7 +346,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       for (let y = 0; y < state.map.length; y++) {
         const row = state.map[y];
         for (let x = 0; x < row.length; x++) {
-          if (row[x].terrain !== want) continue;
+          if (row[x].terrain !== want || !isExplored(state, x, y)) continue;
           ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
           ctx.strokeRect(x * TILE + 0.5, y * TILE + 0.5, TILE - 1, TILE - 1);
         }
@@ -332,12 +354,14 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     }
   }
 
-  // 10) 건설 배치 미리보기 — 날씨 위에 얹어 잘 보이게
+  // 11) 건설 배치 미리보기 — 날씨 위에 얹어 잘 보이게
   if (o.placingType && o.hover) {
     const def = BUILDING_DEFS[o.placingType];
     const footprint = buildingFootprintSize(o.placingType);
     const size = TILE * footprint;
-    const ok = canPlaceBuildingAt(state, o.placingType, o.hover.x, o.hover.y) && canAfford(state, def);
+    const ok = isBuildingFootprintExplored(state, o.placingType, o.hover.x, o.hover.y) &&
+      canPlaceBuildingAt(state, o.placingType, o.hover.x, o.hover.y) &&
+      canAfford(state, def);
     ctx.fillStyle = ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
     ctx.fillRect(o.hover.x * TILE, o.hover.y * TILE, size, size);
     sprites.drawBuilding(ctx, {

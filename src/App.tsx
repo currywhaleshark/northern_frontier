@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CONFIG } from './game/config';
 import {
   advanceDay, advanceTick, continueAfterVictory, newGame, reassignJob, resolveChoice, setResidentJob,
-  setSmithyProduct,
+  setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
   SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
 import { clearSave, hasSave, loadGame, saveGame } from './game/saveLoad';
@@ -24,7 +24,11 @@ import { requestPetition } from './game/petition';
 import { toggleNitreYards } from './game/suspicion';
 import { setProcessingReserve } from './game/processing';
 import { nextRank } from './game/promotion';
-import type { BuildingTypeId, Difficulty, JobId, ProcessingInputId, SmithyProductId } from './game/types';
+import { getPointerAction, selectedEntityFromTile } from './game/selectionActions';
+import { isExplored } from './game/exploration';
+import type {
+  BuildingTypeId, Difficulty, JobId, ProcessingInputId, SelectedEntity, SmithyProductId,
+} from './game/types';
 
 export default function App() {
   // 게임 상태는 ref에 두고, version 증가로 리렌더를 트리거한다
@@ -36,6 +40,7 @@ export default function App() {
   const [speed, setSpeed] = useState(1);
   const [placingType, setPlacingType] = useState<BuildingTypeId | null>(null);
   const [selected, setSelected] = useState<{ x: number; y: number } | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
   const [canLoad, setCanLoad] = useState(hasSave());
   const [inspTab, setInspTab] = useState<InspectorTab>('tile');
   const [inspResidentId, setInspResidentId] = useState<number | null>(null);
@@ -160,7 +165,13 @@ export default function App() {
       bump();
       return;
     }
+    const tile = stateRef.current.map[y]?.[x];
     setSelected({ x, y });
+    setSelectedEntity(tile && isExplored(stateRef.current, x, y)
+      ? selectedEntityFromTile(stateRef.current, tile)
+      : tile ? { kind: 'tile', x, y } : null);
+    setInspResidentId(null);
+    setInspTab('tile');
   };
 
   const handleToggleSound = () => {
@@ -187,6 +198,12 @@ export default function App() {
 
   const handleSetSmithyProduct = (buildingId: number, product: SmithyProductId) => {
     const err = setSmithyProduct(stateRef.current, buildingId, product);
+    if (err) addLog(stateRef.current, err, 'info');
+    bump();
+  };
+
+  const handleUpgradeHousing = (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => {
+    const err = upgradeHousingBuilding(stateRef.current, buildingId, targetType);
     if (err) addLog(stateRef.current, err, 'info');
     bump();
   };
@@ -237,6 +254,7 @@ export default function App() {
       stateRef.current = loaded;
       addLog(stateRef.current, '저장된 진행 상황을 불러왔습니다.', 'info');
       setSelected(null);
+      setSelectedEntity(null);
       setPlacingType(null);
       setInspResidentId(null);
       setScreen('game');
@@ -245,14 +263,55 @@ export default function App() {
   };
 
   const handleResidentClick = (id: number) => {
+    setSelected(null);
+    setSelectedEntity({ kind: 'resident', id });
     setInspTab('people');
     setInspResidentId(id);
+  };
+
+  const handleSetInspectorResidentId = (id: number | null) => {
+    setInspResidentId(id);
+    if (id != null) {
+      setSelected(null);
+      setSelectedEntity({ kind: 'resident', id });
+    } else {
+      setSelectedEntity(prev => prev?.kind === 'resident' ? null : prev);
+    }
+  };
+
+  const handleContextAction = (x: number, y: number) => {
+    const tile = stateRef.current.map[y]?.[x];
+    if (!tile) return;
+    const action = getPointerAction(stateRef.current, selectedEntity, tile);
+    if (selectedEntity?.kind !== 'resident') return;
+
+    let err: string | null = null;
+    if (action.kind === 'move') {
+      err = issueResidentMoveOrder(stateRef.current, selectedEntity.id, action.x, action.y);
+    } else if (action.kind === 'work') {
+      err = issueResidentWorkOrder(stateRef.current, selectedEntity.id, action);
+    } else if (action.kind === 'invalid') {
+      err = action.label;
+    }
+
+    if (err) addLog(stateRef.current, err, action.kind === 'invalid' ? 'info' : 'bad');
+    bump();
+  };
+
+  const handleCloseBuildingActions = () => {
+    setSelectedEntity(prev => prev?.kind === 'building' ? null : prev);
+    setSelected(prev => {
+      if (!prev) return prev;
+      const tile = stateRef.current.map[prev.y]?.[prev.x];
+      return tile?.buildingId != null ? null : prev;
+    });
   };
 
   // 선택 상태를 비우고 새 판을 시작
   const startNewGame = (difficulty: Difficulty) => {
     stateRef.current = newGame(undefined, difficulty);
     setSelected(null);
+    setSelectedEntity(null);
     setPlacingType(null);
     setInspResidentId(null);
     setInspTab('tile');
@@ -309,10 +368,17 @@ export default function App() {
             version={version}
             placingType={placingType}
             selected={selected}
+            selectedEntity={selectedEntity}
             selectedResidentId={inspResidentId}
             anim={animRef.current}
             onTileClick={handleTileClick}
             onResidentClick={handleResidentClick}
+            onContextAction={handleContextAction}
+            onUpgradeHousing={handleUpgradeHousing}
+            onSetSmithyProduct={handleSetSmithyProduct}
+            onRequestTrade={handleRequestTrade}
+            onToggleNitre={handleToggleNitre}
+            onCloseBuildingActions={handleCloseBuildingActions}
             onCancelPlace={() => setPlacingType(null)}
           />
         </div>
@@ -337,7 +403,7 @@ export default function App() {
             tab={inspTab}
             setTab={setInspTab}
             residentId={inspResidentId}
-            setResidentId={setInspResidentId}
+            setResidentId={handleSetInspectorResidentId}
           />
           <EventLog state={state} />
         </div>

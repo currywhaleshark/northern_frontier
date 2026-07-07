@@ -7,6 +7,7 @@ import { makeRng } from './map';
 import { ensureProcessingReserves } from './processing';
 import { initRelations } from './relations';
 import { getSeason, getYear } from './seasons';
+import { ensureExploration, refreshExploration } from './exploration';
 import type { GameState, Gender, Resident } from './types';
 
 const SAVE_KEY = 'buksae-save-v3'; // v3: 이동 보간(px/py)과 지도 위 습격 무리 추가
@@ -29,6 +30,21 @@ function migrateResidentGender(state: GameState): void {
     if (!isGender(resident.gender)) {
       resident.gender = stableGenderForResident(resident);
     }
+  }
+}
+
+function migrateResidentManualOrders(state: GameState): void {
+  for (const resident of state.residents) {
+    const mutable = resident as Resident & { manualOrder?: Resident['manualOrder'] };
+    const order = mutable.manualOrder as unknown;
+    const valid =
+      order == null ||
+      (typeof order === 'object' &&
+        ('kind' in order) &&
+        ((order as { kind?: unknown }).kind === 'move' || (order as { kind?: unknown }).kind === 'work') &&
+        Number.isInteger((order as { x?: unknown }).x) &&
+        Number.isInteger((order as { y?: unknown }).y));
+    if (!valid || mutable.manualOrder === undefined) resident.manualOrder = null;
   }
 }
 
@@ -107,7 +123,10 @@ export function loadGame(): GameState | null {
     }
     if (parsed.tributeFailStreak == null) parsed.tributeFailStreak = 0;
     migrateResidentGender(parsed);
+    migrateResidentManualOrders(parsed);
     rebuildBuildingFootprints(parsed);
+    ensureExploration(parsed);
+    refreshExploration(parsed);
     return parsed;
   } catch {
     return null;

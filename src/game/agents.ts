@@ -11,8 +11,10 @@ import { makeRng } from './map';
 import { getSeason } from './seasons';
 import { outdoorMult } from './weather';
 import { processableAmount } from './processing';
+import { isExplored, refreshExploration } from './exploration';
 import type {
-  Building, BuildingTypeId, GameState, ProcessingInputId, Resident, ResourceId, Season, SmithyProductId, Tile,
+  Building, BuildingTypeId, GameState, ManualOrder, ProcessingInputId, Resident, ResourceId, Season,
+  SmithyProductId, Tile,
 } from './types';
 
 export const SUBTICKS = CONFIG.agents.subticksPerDay;
@@ -69,6 +71,7 @@ export function resetAgent(state: GameState, r: Resident): void {
   r.phase = 'rest';
   r.workTimer = 0;
   r.targetId = null;
+  r.manualOrder = null;
 }
 
 // ─────────────────────────── 이동/경로 ───────────────────────────
@@ -397,6 +400,7 @@ interface GatherOpts {
 }
 
 function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void {
+  const knownGoal = (tile: Tile): boolean => isExplored(state, tile.x, tile.y) && o.goal(tile);
   // 짐이 찼거나 하역 중이면 거점으로
   if (carryTotal(r) >= o.cap || (r.phase === 'toDeposit' && carryTotal(r) > 0)) {
     r.phase = 'toDeposit';
@@ -410,7 +414,7 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
   }
   // 작업 중
   if (r.phase === 'working') {
-    if (!o.goal(state.map[r.y][r.x])) { r.phase = 'rest'; return; } // 서 있던 타일이 변함(벌목 소진 등)
+    if (!knownGoal(state.map[r.y][r.x])) { r.phase = 'rest'; return; } // 서 있던 타일이 변함(벌목 소진 등)
     r.task = o.taskWork;
     r.workTimer -= ctx.outdoor; // 궂은 날씨엔 일이 더디다
     gainSkillTick(r);
@@ -424,7 +428,7 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
     return;
   }
   // 작업지 탐색/이동
-  const st = goTo(state, r, ctx, o.goal);
+  const st = goTo(state, r, ctx, knownGoal);
   if (st === 'arrived') {
     r.phase = 'working';
     r.workTimer = o.workTicks;
@@ -437,6 +441,130 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
     r.phase = 'toWork';
     r.task = o.taskMove;
   }
+}
+
+// ─────────────────────────── 플레이어 수동 명령 ───────────────────────────
+
+function clearManualOrder(r: Resident): void {
+  r.manualOrder = null;
+  r.path = [];
+  r.phase = 'rest';
+  r.workTimer = 0;
+  r.targetId = null;
+}
+
+function exactTileGoal(x: number, y: number): (t: Tile) => boolean {
+  return t => t.x === x && t.y === y;
+}
+
+function handleManualMoveOrder(state: GameState, r: Resident, ctx: Ctx, order: ManualOrder & { kind: 'move' }): boolean {
+  if (!isPassable(state, order.x, order.y)) {
+    r.task = '명령 지점 막힘';
+    clearManualOrder(r);
+    return true;
+  }
+
+  const st = goTo(state, r, ctx, exactTileGoal(order.x, order.y));
+  if (st === 'arrived') {
+    r.task = '이동 완료';
+    clearManualOrder(r);
+  } else if (st === 'stuck') {
+    r.task = '명령 지점 막힘';
+    clearManualOrder(r);
+  } else {
+    r.phase = 'toWork';
+    r.task = '이동 명령';
+  }
+  return true;
+}
+
+function handleManualHaulerQuarry(
+  state: GameState,
+  r: Resident,
+  ctx: Ctx,
+  order: ManualOrder & { kind: 'work' },
+): boolean {
+  const tile = state.map[order.y]?.[order.x];
+  if (!tile || tile.terrain !== 'rock') {
+    r.task = '명령 대상 없음';
+    clearManualOrder(r);
+    return true;
+  }
+
+  const a = CONFIG.agents;
+  if (carryTotal(r) >= a.carryCap.stone || (r.phase === 'toDeposit' && carryTotal(r) > 0)) {
+    r.phase = 'toDeposit';
+    r.task = '돌 운반';
+    const st = goTo(state, r, ctx, depositGoal(state, []));
+    if (st === 'arrived' || st === 'stuck') {
+      depositAll(state, r);
+      r.phase = 'rest';
+    }
+    return true;
+  }
+
+  if (r.phase === 'working') {
+    if (r.x !== order.x || r.y !== order.y) {
+      r.phase = 'rest';
+      r.workTimer = 0;
+      return true;
+    }
+    r.task = '채석 중';
+    r.workTimer -= ctx.outdoor;
+    gainSkillTick(r);
+    if (r.workTimer <= 0) {
+      addCarry(r, 'stone', a.yields.stone * ctx.tMod * ctx.mMod * effOf(r));
+      r.phase = 'rest';
+    }
+    return true;
+  }
+
+  const st = goTo(state, r, ctx, exactTileGoal(order.x, order.y));
+  if (st === 'arrived') {
+    r.phase = 'working';
+    r.workTimer = a.work.quarry;
+    r.task = '채석 중';
+  } else if (st === 'stuck') {
+    r.task = '명령 지점 막힘';
+    clearManualOrder(r);
+  } else {
+    r.phase = 'toWork';
+    r.task = '지정 채석지로 이동';
+  }
+  return true;
+}
+
+function handleManualWorkOrder(state: GameState, r: Resident, ctx: Ctx, order: ManualOrder & { kind: 'work' }): boolean {
+  if (order.repeat && r.job === 'hauler') return handleManualHaulerQuarry(state, r, ctx, order);
+
+  const tile = state.map[order.y]?.[order.x];
+  if (!tile) {
+    r.task = '명령 대상 없음';
+    clearManualOrder(r);
+    return true;
+  }
+
+  const goal = order.buildingId != null ? buildingGoal(state, order.buildingId) : exactTileGoal(order.x, order.y);
+  const st = goTo(state, r, ctx, goal);
+  if (st === 'arrived') {
+    clearManualOrder(r);
+    return false;
+  }
+  if (st === 'stuck') {
+    r.task = '명령 지점 막힘';
+    clearManualOrder(r);
+    return true;
+  }
+  r.phase = 'toWork';
+  r.task = '명령 작업지로 이동';
+  return true;
+}
+
+function handleManualOrder(state: GameState, r: Resident, ctx: Ctx): boolean {
+  const order = r.manualOrder;
+  if (!order) return false;
+  if (order.kind === 'move') return handleManualMoveOrder(state, r, ctx, order);
+  return handleManualWorkOrder(state, r, ctx, order);
 }
 
 // ─────────────────────────── 직업별 행동 ───────────────────────────
@@ -790,7 +918,7 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   // 재료가 없거나 도구가 충분하면 필요한 경우에만 철광 채굴
-  const hasIron = state.map.some(row => row.some(t => t.terrain === 'rock' && t.hasIron));
+  const hasIron = state.map.some(row => row.some(t => isExplored(state, t.x, t.y) && t.terrain === 'rock' && t.hasIron));
   if (hasIron && smithWantsIron(state, pop)) {
     gatherJob(state, r, ctx, {
       goal: t => t.terrain === 'rock' && t.hasIron,
@@ -1053,6 +1181,7 @@ export function agentsTick(state: GameState): void {
       goToCenter(state, r, ctx);
       continue;
     }
+    if (handleManualOrder(state, r, ctx)) continue;
     switch (r.job) {
       case 'woodcutter': woodcutterTick(state, r, ctx); break;
       case 'hunter': hunterTick(state, r, ctx); break;
@@ -1072,4 +1201,5 @@ export function agentsTick(state: GameState): void {
       default: idleTick(state, r, ctx); break;
     }
   }
+  refreshExploration(state);
 }
