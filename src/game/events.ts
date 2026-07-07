@@ -12,6 +12,22 @@ export function addLog(state: GameState, text: string, kind: LogEntry['kind'] = 
   }
 }
 
+export function playerTradeCooldownDays(state: GameState): number {
+  return countBuilt(state, 'dock') > 0
+    ? CONFIG.trade.dockPlayerCooldownDays
+    : CONFIG.trade.playerCooldownDays;
+}
+
+export function scaledTradeOffer(state: GameState, offer: TradeOffer): TradeOffer {
+  if (countBuilt(state, 'dock') === 0) return offer;
+  const scale = CONFIG.trade.dockOfferScale;
+  return {
+    ...offer,
+    giveAmt: Math.ceil(offer.giveAmt * scale),
+    getAmt: Math.ceil(offer.getAmt * scale),
+  };
+}
+
 // 장터가 있으면 주기적으로 교역 제안이 온다.
 // 교역 상대와 품목은 세력 정의(FACTIONS.trades)를 따른다 — 습격 성향이 있어도
 // 교역품이 있는 세력(니마차 등)은 평시엔 장사꾼으로 온다.
@@ -31,7 +47,7 @@ export function maybeOfferTrade(state: GameState, rng: () => number, daysSinceTr
     pick -= weights[i];
     if (pick <= 0) { faction = traders[i]; break; }
   }
-  const tpl = faction.trades[Math.floor(rng() * faction.trades.length)];
+  const tpl = scaledTradeOffer(state, faction.trades[Math.floor(rng() * faction.trades.length)]);
   const canGive = state.resources[tpl.give] >= tpl.giveAmt;
 
   const choice: PendingChoice = {
@@ -67,8 +83,9 @@ export function canRequestTrade(state: GameState, factionName: string): string |
     return '관계가 나빠 상대해 주지 않습니다';
   }
   const last = state.lastTradeByFaction[factionName];
-  if (last != null && state.day - last < CONFIG.trade.playerCooldownDays) {
-    return `상단이 아직 돌아오지 않았습니다 (${CONFIG.trade.playerCooldownDays - (state.day - last)}일 뒤)`;
+  const cooldown = playerTradeCooldownDays(state);
+  if (last != null && state.day - last < cooldown) {
+    return `상단이 아직 돌아오지 않았습니다 (${cooldown - (state.day - last)}일 뒤)`;
   }
   return null;
 }
@@ -78,13 +95,14 @@ export function requestTrade(state: GameState, factionName: string): string | nu
   const reason = canRequestTrade(state, factionName);
   if (reason) return reason;
   const faction = FACTIONS.find(f => f.name === factionName)!;
+  const offers = faction.trades.map(t => scaledTradeOffer(state, t));
 
   const choice: PendingChoice = {
     kind: 'trade',
     title: `장터 교역 — ${faction.name}`,
     body: `${faction.name}에 먼저 사람을 보냈습니다.\n무엇을 바꾸시겠습니까?`,
     options: [
-      ...faction.trades.map((t, i) => ({
+      ...offers.map((t, i) => ({
         id: `offer-${i}`,
         label: `${RESOURCE_NAMES[t.give]} ${t.giveAmt} ↔ ${RESOURCE_NAMES[t.get]} ${t.getAmt}`,
         desc: `${RESOURCE_NAMES[t.give]} -${t.giveAmt}, ${RESOURCE_NAMES[t.get]} +${t.getAmt}, 명성 +1`,
@@ -93,7 +111,7 @@ export function requestTrade(state: GameState, factionName: string): string | nu
       })),
       { id: 'cancel', label: '돌려보낸다', desc: '거래 없이 상단을 돌려보냅니다. 불이익은 없습니다.' },
     ],
-    data: { faction: faction.name, initiated: true, offers: faction.trades },
+    data: { faction: faction.name, initiated: true, offers },
   };
   state.pendingChoice = choice;
   return null;

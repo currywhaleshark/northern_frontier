@@ -199,7 +199,7 @@ export function InspectorPanel({
                     {building.type === 'field' && building.built && (
                       <tr><td>작물</td><td><Bar value={building.fieldGrowth} color="#6fbf73" /></td></tr>
                     )}
-                    {building.type === 'market' && building.built && (
+                    {(building.type === 'market' || building.type === 'dock') && building.built && (
                       <tr>
                         <td>교역</td>
                         <td>

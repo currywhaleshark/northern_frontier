@@ -50,6 +50,8 @@ export type JobId =
   | 'fisher'     // 어부
   | 'charcoalBurner' // 숯쟁이
   | 'herder'     // 목동
+  | 'powderMaker' // 염초장이
+  | 'clerk'      // 아전
   | 'watchman'   // 파수꾼
   | 'militia';   // 수비병 (내부 id는 저장 호환을 위해 유지)
 
@@ -86,14 +88,18 @@ export type BuildingTypeId =
   | 'ferry'      // 나루터
   | 'charcoalKiln' // 숯가마
   | 'stable'     // 축사
+  | 'nitreYard'  // 염초장
+  | 'dock'       // 부두
   | 'field'      // 밭
   | 'smithy'     // 대장간
   | 'tannery'    // 가죽공방
   | 'beacon'     // 봉수대
   | 'palisade'   // 목책
   | 'earthFort'  // 토성
+  | 'stoneWall'  // 석벽
   | 'watchtower' // 망루
   | 'garrison'   // 군영
+  | 'office'     // 관청
   | 'market'     // 장터
   | 'cannonEmplacement'; // 불랑기포대 (부 승격 후 조정 청원으로만 배치)
 

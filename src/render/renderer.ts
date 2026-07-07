@@ -20,6 +20,7 @@ const PLACEMENT_HINT: Partial<Record<BuildingTypeId, Terrain>> = {
   mine: 'rock',
   bridge: 'river',
   ferry: 'river',
+  dock: 'river',
 };
 
 export interface SceneOptions {

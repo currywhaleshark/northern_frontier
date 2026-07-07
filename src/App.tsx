@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CONFIG } from './game/config';
 import {
-  advanceDay, advanceTick, newGame, reassignJob, resolveChoice, setResidentJob,
+  advanceDay, advanceTick, continueAfterVictory, newGame, reassignJob, resolveChoice, setResidentJob,
   SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
 import { clearSave, hasSave, loadGame, saveGame } from './game/saveLoad';
@@ -187,6 +187,11 @@ export default function App() {
     bump();
   };
 
+  const handleContinueAfterVictory = () => {
+    continueAfterVictory(stateRef.current);
+    bump();
+  };
+
   // 세력 탭/장터 타일에서 먼저 거래를 청한다 (버튼이 미리 비활성화되지만 안전망으로 사유를 로그에)
   const handleRequestTrade = (factionName: string) => {
     const err = requestTrade(stateRef.current, factionName);
@@ -332,7 +337,12 @@ export default function App() {
               생존 {Math.floor((state.day - 1) / CONFIG.time.yearDays)}년 {(state.day - 1) % CONFIG.time.yearDays}일 ·
               누적 사망 {state.totalDeaths}명
             </div>
-            <button className="btn primary" onClick={() => setScreen('menu')}>메인 메뉴로</button>
+            {state.gameOver.won && (
+              <button className="btn primary" onClick={handleContinueAfterVictory}>계속 플레이</button>
+            )}
+            <button className="btn" onClick={() => setScreen('menu')}>
+              {state.gameOver.won ? '개척 종료' : '메인 메뉴로'}
+            </button>
           </div>
         </div>
       )}

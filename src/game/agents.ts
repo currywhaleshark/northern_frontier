@@ -1,7 +1,7 @@
 // 주민 에이전트 시뮬레이션 — 서브틱 단위의 이동, 작업, 운반
 // 자원은 창고/거점에 짐을 부려야 마을 비축량에 더해진다.
 import { CONFIG } from './config';
-import { BUILDING_DEFS } from './buildings';
+import { BUILDING_DEFS, officeEfficiencyMultiplier } from './buildings';
 import { addLog } from './events';
 import { collectHuntableTiles } from './habitats';
 import { makeRng } from './map';
@@ -26,7 +26,7 @@ interface Ctx {
 
 const PRODUCING_JOBS = [
   'woodcutter', 'hunter', 'farmer', 'builder', 'smith', 'miner', 'fisher',
-  'charcoalBurner', 'herder', 'herbalist', 'hauler',
+  'charcoalBurner', 'herder', 'powderMaker', 'herbalist', 'hauler',
 ];
 const OUTDOOR_JOBS = [
   'woodcutter', 'hunter', 'herbalist', 'farmer', 'builder', 'miner', 'fisher',
@@ -76,7 +76,7 @@ export function isPassable(state: GameState, x: number, y: number): boolean {
   if (t.terrain === 'mountain') return false;
   if (t.terrain === 'river') {
     const hasRiverWorksite = t.buildingId != null && state.buildings.some(b =>
-      b.id === t.buildingId && b.built && (b.type === 'bridge' || b.type === 'ferry'));
+      b.id === t.buildingId && (b.type === 'bridge' || b.type === 'ferry' || b.type === 'dock'));
     if (hasRiverWorksite) return true;
     // 겨울 언 강 위는 걸어서 건널 수 있다 (해빙기 홍수 제외)
     return getSeason(state.day) === 'winter' && state.weather !== 'thawFlood';
@@ -610,6 +610,59 @@ function herderTick(state: GameState, r: Resident, ctx: Ctx): void {
   });
 }
 
+function powderMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const p = CONFIG.production;
+  const yard = nearestBuilding(r, state.buildings.filter(b => b.type === 'nitreYard' && b.built));
+  if (!yard) {
+    r.task = '염초장 없음';
+    goToCenter(state, r, ctx);
+    return;
+  }
+
+  const st = goTo(state, r, ctx, buildingGoal(yard.id));
+  if (st !== 'arrived') {
+    r.phase = st === 'stuck' ? 'rest' : 'toWork';
+    r.task = st === 'stuck' ? '길이 막힘' : '염초장으로 이동';
+    return;
+  }
+
+  const target = (p.gunpowderPerDay / 5) * effOf(r) * ctx.mMod;
+  const firewoodLimit = state.resources.firewood / p.gunpowderFirewoodPerPowder;
+  const stoneLimit = state.resources.stone / p.gunpowderStonePerPowder;
+  const made = Math.min(target, firewoodLimit, stoneLimit);
+  if (made <= 0.02) {
+    r.phase = 'rest';
+    r.task = '화약 재료 대기';
+    return;
+  }
+
+  state.resources.firewood -= made * p.gunpowderFirewoodPerPowder;
+  state.resources.stone -= made * p.gunpowderStonePerPowder;
+  state.resources.gunpowder += made;
+  r.phase = 'working';
+  r.task = '화약 제조';
+  gainSkillTick(r);
+}
+
+function clerkTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const office = nearestBuilding(r, state.buildings.filter(b => b.type === 'office' && b.built));
+  if (!office) {
+    r.task = '관청 없음';
+    goToCenter(state, r, ctx);
+    return;
+  }
+
+  const st = goTo(state, r, ctx, buildingGoal(office.id));
+  if (st === 'arrived') {
+    r.phase = 'working';
+    r.task = '관청 업무';
+    gainSkillTick(r);
+  } else {
+    r.phase = st === 'stuck' ? 'rest' : 'toWork';
+    r.task = st === 'stuck' ? '길이 막힘' : '관청으로 이동';
+  }
+}
+
 function watchmanTick(state: GameState, r: Resident, ctx: Ctx): void {
   r.task = '경계 근무';
   // 방어 시설 사이를 순찰한다
@@ -696,7 +749,7 @@ export function agentsTick(state: GameState): void {
     season,
     outdoor: outdoorMult(state.weather),
     tMod,
-    mMod: 0.8 + (mAvg / 100) * 0.4,
+    mMod: (0.8 + (mAvg / 100) * 0.4) * officeEfficiencyMultiplier(state),
     rng,
     centerId: center ? center.id : -1,
     huntable: collectHuntableTiles(state.map, state.habitats, CONFIG.agents.hunting),
@@ -736,6 +789,8 @@ export function agentsTick(state: GameState): void {
       case 'fisher': fisherTick(state, r, ctx); break;
       case 'charcoalBurner': charcoalBurnerTick(state, r, ctx); break;
       case 'herder': herderTick(state, r, ctx); break;
+      case 'powderMaker': powderMakerTick(state, r, ctx); break;
+      case 'clerk': clerkTick(state, r, ctx); break;
       case 'watchman': watchmanTick(state, r, ctx); break;
       case 'militia': militiaTick(state, r, ctx); break;
       default: idleTick(state, r, ctx); break;

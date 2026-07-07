@@ -11,9 +11,12 @@ const CATEGORIES: { name: string; types: BuildingTypeId[] }[] = [
   { name: '주거·기반', types: ['hut', 'ondol', 'tileHouse', 'storehouse', 'bridge'] },
   {
     name: '생산',
-    types: ['field', 'lumberCamp', 'huntLodge', 'herbHut', 'smithy', 'mine', 'ferry', 'charcoalKiln', 'stable', 'tannery', 'market'],
+    types: [
+      'field', 'lumberCamp', 'huntLodge', 'herbHut', 'smithy', 'mine', 'ferry',
+      'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'market', 'office',
+    ],
   },
-  { name: '방어·군사', types: ['palisade', 'earthFort', 'watchtower', 'beacon', 'garrison', 'cannonEmplacement'] },
+  { name: '방어·군사', types: ['palisade', 'earthFort', 'stoneWall', 'watchtower', 'beacon', 'garrison', 'cannonEmplacement'] },
 ];
 
 const OPEN_KEY = 'buksae-buildmenu-open';

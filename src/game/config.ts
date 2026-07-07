@@ -73,6 +73,11 @@ export const CONFIG = {
     firewoodPerWood: 1.4,
     charcoalWoodPerDay: 2.2,    // 숯쟁이 1인 하루 목재 처리량
     charcoalFirewoodPerWood: 2.0,
+    gunpowderPerDay: 0.9,
+    gunpowderFirewoodPerPowder: 1.0,
+    gunpowderStonePerPowder: 0.6,
+    officeBonusPerClerk: 0.05,
+    officeMaxBonus: 0.2,
     haulerGamePerDay: 2,       // 사냥감 손질량
     foodPerGame: 4,
     hidePerGame: 1,
@@ -193,6 +198,8 @@ export const CONFIG = {
     dailyChance: 0.07,
     minRelationToTrade: 35, // 이보다 관계가 나쁘면 먼저 청해도 상대해 주지 않는다
     playerCooldownDays: 6,  // 플레이어 주도 교역의 세력별 간격 (교환비 고정이라 반복 차익 방지)
+    dockOfferScale: 1.5,
+    dockPlayerCooldownDays: 4,
   },
 
   // 조정 세공(歲貢) — 봄 첫날 공지, 겨울 첫날 수거.

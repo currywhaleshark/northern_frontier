@@ -263,12 +263,16 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   ferry:      { base: TENT_TAN, glyph: WATER },
   charcoalKiln: { base: CAMPFIRE, glyph: LOGS },
   stable:     { base: TENT_TAN, glyph: HIDE },
+  nitreYard:  { roof: ROOF_DARK, base: FACE_STONE, glyph: CAMPFIRE },
+  dock:       { base: TENT_TAN, glyph: WATER },
   tannery:    { roof: ROOF_BROWN, base: FACE_DOOR, glyph: HIDE },
   beacon:     { base: ROCK_GRAY2, glyph: CAMPFIRE },
   palisade:   { base: FENCE },
   earthFort:  { base: FACE_STONE, glyph: FENCE },
+  stoneWall:  { base: FACE_STONE, glyph: FENCE },
   watchtower: { roof: ROOF_WHITE, base: FACE_STONE, roofLift: 12 },
   garrison:   { base: TENT_GREEN, glyph: BANNER_RED },
+  office:     { roof: ROOF_DARK, base: FACE_SHOP, glyph: BANNER_RED },
   market:     { roof: AWNING, base: COUNTER, roofLift: 12 },
   cannonEmplacement: { base: FACE_STONE, glyph: BANNER_RED }, // 돌 포대 (전용 그림 나오기 전 임시)
 };
@@ -287,6 +291,8 @@ const CHAR_BY_JOB: Record<JobId, CR> = {
   fisher:     [1, 10],
   charcoalBurner: [1, 9],
   herder:     [1, 7],
+  powderMaker: [1, 9],
+  clerk:      [1, 7],
   watchman:   [0, 11],
   militia:    [0, 9],
 };

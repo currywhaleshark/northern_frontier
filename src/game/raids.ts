@@ -68,7 +68,7 @@ function pickFaction(state: GameState, rng: () => number): Faction {
 }
 
 function isRaidBarrier(type: string): boolean {
-  return type === 'palisade' || type === 'earthFort';
+  return type === 'palisade' || type === 'earthFort' || type === 'stoneWall';
 }
 
 // 습격자 통행 규칙: 산과 완공된 방책은 못 지난다 (강은 여울과 뗏목으로 건넌다)

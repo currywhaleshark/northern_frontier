@@ -94,6 +94,18 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     cost: { wood: 16, stone: 6, grain: 8, tools: 1 }, buildDays: 9, slots: 3, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
   },
+  nitreYard: {
+    id: 'nitreYard', name: '염초장', emoji: '⚗️',
+    desc: '부(府) 승격 후 건설. 염초장이 장작과 돌에서 염초를 걸러 화약을 만든다.',
+    cost: { wood: 18, stone: 18, iron: 2, tools: 3 }, buildDays: 12, slots: 3, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false, minRank: 'bu',
+  },
+  dock: {
+    id: 'dock', name: '부두', emoji: '⚓',
+    desc: '부(府) 승격 후 강가에 짓는 대형 교역 거점. 장터 교역 규모가 커지고 상단 회전이 빨라진다.',
+    cost: { wood: 24, stone: 12, iron: 2, tools: 3 }, buildDays: 12, slots: 4, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'riverbank', unique: true, minRank: 'bu',
+  },
   tannery: {
     id: 'tannery', name: '가죽공방', emoji: '🧵',
     desc: '가죽 2를 옷 1로 만든다. (자동, 하루 2가죽 처리)',
@@ -118,6 +130,12 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     cost: { wood: 8, stone: 8 }, buildDays: 5, slots: 0, capacity: 0, defense: 9,
     winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
   },
+  stoneWall: {
+    id: 'stoneWall', name: '석벽', emoji: '🧱',
+    desc: '부(府) 승격 후 건설. 토성보다 더 단단한 석조 방어 구간. 방어도 +16.',
+    cost: { stone: 10, iron: 1, tools: 1 }, buildDays: 6, slots: 0, capacity: 0, defense: 16,
+    winterBonus: false, placement: 'land', unique: false, minRank: 'bu',
+  },
   watchtower: {
     id: 'watchtower', name: '망루', emoji: '🗼',
     desc: '방어도 +8, 조기 경보 확률 증가.',
@@ -129,6 +147,12 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     desc: '방어도 +25. 수비병의 방어 기여가 커진다. 승리 조건에 필요하다.',
     cost: { wood: 20, stone: 10, iron: 4 }, buildDays: 14, slots: 6, capacity: 0, defense: 25,
     winterBonus: false, placement: 'land', unique: true,
+  },
+  office: {
+    id: 'office', name: '관청', emoji: '📜',
+    desc: '부(府) 승격 후 건설. 아전이 행정을 맡으면 자원 수집과 생산 효율이 높아진다.',
+    cost: { wood: 24, stone: 24, iron: 2, tools: 4 }, buildDays: 14, slots: 4, capacity: 0, defense: 6,
+    winterBonus: false, placement: 'land', unique: true, minRank: 'bu',
   },
   market: {
     id: 'market', name: '장터', emoji: '🏮',
@@ -146,8 +170,8 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
   'hut', 'ondol', 'tileHouse', 'storehouse', 'bridge', 'field', 'lumberCamp', 'huntLodge', 'herbHut',
-  'smithy', 'mine', 'ferry', 'charcoalKiln', 'stable', 'tannery', 'market',
-  'palisade', 'earthFort', 'watchtower', 'beacon', 'garrison',
+  'smithy', 'mine', 'ferry', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'market', 'office',
+  'palisade', 'earthFort', 'stoneWall', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement',
 ];
 
@@ -163,6 +187,14 @@ export function getBuilding(state: GameState, id: number | null): Building | und
 
 export function countBuilt(state: GameState, type: BuildingTypeId): number {
   return state.buildings.filter(b => b.type === type && b.built).length;
+}
+
+export function officeEfficiencyMultiplier(state: GameState): number {
+  if (countBuilt(state, 'office') === 0) return 1;
+  const clerks = state.residents.filter(r =>
+    r.alive && !r.sick && r.health >= 20 && r.job === 'clerk').length;
+  const bonus = Math.min(CONFIG.production.officeMaxBonus, clerks * CONFIG.production.officeBonusPerClerk);
+  return 1 + bonus;
 }
 
 export function isBuildingUnlocked(rank: GameState['rank'] | undefined, type: BuildingTypeId): boolean {

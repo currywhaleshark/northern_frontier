@@ -188,6 +188,13 @@ export function resolveChoice(state: GameState, optionId: string): void {
   state.resources.defense = computeDefense(state);
 }
 
+export function continueAfterVictory(state: GameState): boolean {
+  if (!state.gameOver?.won) return false;
+  state.gameOver = null;
+  addLog(state, '부(府) 승격 이후에도 개척을 계속 이어갑니다. 새 관청 체계와 부두 교역을 활용할 수 있습니다.', 'good');
+  return true;
+}
+
 // ─────────────────────────── 틱 진행 ───────────────────────────
 
 // 서브틱 1회: 에이전트 갱신, 하루가 차면 일일 처리
@@ -351,7 +358,7 @@ function runTannery(state: GameState): void {
 function runToolWear(state: GameState): void {
   const producing = [
     'woodcutter', 'hunter', 'farmer', 'builder', 'smith', 'miner', 'fisher',
-    'charcoalBurner', 'herder', 'herbalist', 'hauler',
+    'charcoalBurner', 'herder', 'powderMaker', 'herbalist', 'hauler',
   ];
   const n = state.residents.filter(r => r.alive && !r.sick && producing.includes(r.job)).length;
   state.resources.tools = Math.max(0, state.resources.tools - n * CONFIG.production.toolWearPerWorker);

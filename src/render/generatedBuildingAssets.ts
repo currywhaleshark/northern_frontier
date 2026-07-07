@@ -22,14 +22,18 @@ const BUILDING_COLUMNS: Record<BuildingTypeId, number> = {
   ferry: 5,
   charcoalKiln: 10,
   stable: 5,
+  nitreYard: 9,
+  dock: 5,
   field: 7,
   smithy: 8,
   tannery: 9,
   beacon: 10,
   palisade: 11,
   earthFort: 11,
+  stoneWall: 11,
   watchtower: 12,
   garrison: 13,
+  office: 14,
   market: 14,
   cannonEmplacement: 12, // 전용 그림이 나오기 전까지 망루 그림을 빌려 쓴다
 };
