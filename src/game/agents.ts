@@ -7,6 +7,7 @@ import { collectHuntableTiles } from './habitats';
 import { makeRng } from './map';
 import { getSeason } from './seasons';
 import { outdoorMult } from './weather';
+import { processableAmount } from './processing';
 import type {
   BuildingTypeId, GameState, Resident, ResourceId, Season, Tile,
 } from './types';
@@ -386,8 +387,10 @@ function haulerTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
 
-  const spareWood = state.resources.wood - p.woodReserve;
-  const hasProcessing = state.resources.game > 0.2 || state.resources.grain > 0.2 || spareWood > 0.5;
+  const processableGame = processableAmount(state, 'game');
+  const processableGrain = processableAmount(state, 'grain');
+  const processableWood = processableAmount(state, 'wood');
+  const hasProcessing = processableGame > 0.2 || processableGrain > 0.2 || processableWood > 0.5;
   if (hasProcessing) {
     // 창고/중심지에서 가공 작업. 채석 이동/작업 중 새 가공물이 생기면 생존 자원 처리를 우선한다.
     if (r.phase === 'toWork' || r.phase === 'working' || r.phase === 'toDeposit') {
@@ -403,20 +406,20 @@ function haulerTick(state: GameState, r: Resident, ctx: Ctx): void {
     r.phase = 'rest';
     const eff = effOf(r) * ctx.mMod;
     let label = '창고 정리';
-    const g = Math.min(state.resources.game, (p.haulerGamePerDay / 5) * eff);
+    const g = Math.min(processableAmount(state, 'game'), (p.haulerGamePerDay / 5) * eff);
     if (g > 0) {
       state.resources.game -= g;
       state.resources.food += g * p.foodPerGame;
       state.resources.hide += g * p.hidePerGame;
       label = '사냥감 손질';
     }
-    const q = Math.min(state.resources.grain, (p.haulerGrainPerDay / 5) * eff);
+    const q = Math.min(processableAmount(state, 'grain'), (p.haulerGrainPerDay / 5) * eff);
     if (q > 0) {
       state.resources.grain -= q;
       state.resources.food += q;
       label = '곡물 도정';
     }
-    const w = Math.min(Math.max(0, state.resources.wood - p.woodReserve), (p.haulerWoodToFirewood / 5) * eff);
+    const w = Math.min(processableAmount(state, 'wood'), (p.haulerWoodToFirewood / 5) * eff);
     if (w > 0) {
       state.resources.wood -= w;
       state.resources.firewood += w * p.firewoodPerWood;
@@ -461,7 +464,7 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   const rate = (p.toolsPerDay / 5) * effOf(r) * ctx.mMod;
-  if (smithy && needTools && state.resources.iron >= rate && state.resources.wood >= rate) {
+  if (smithy && needTools && processableAmount(state, 'iron') >= rate && processableAmount(state, 'wood') >= rate) {
     const st = goTo(state, r, ctx, buildingGoal(smithy.id));
     if (st === 'arrived') {
       r.task = '도구 제작 중';

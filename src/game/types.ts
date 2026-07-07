@@ -68,6 +68,8 @@ export type ResourceId =
   | 'reputation' // 명성
   | 'defense';   // 방어도
 
+export type ProcessingInputId = 'wood' | 'grain' | 'game' | 'hide' | 'iron';
+
 export type BuildingTypeId =
   | 'center'     // 마을 중심지
   | 'hut'        // 초가집
@@ -259,6 +261,7 @@ export interface GameState {
   nextBuildingId: number;
   nextResidentId: number;
   resources: Record<ResourceId, number>;
+  processingReserves: Record<ProcessingInputId, number>; // 자동 가공 전에 남길 원자재 수량
   threat: number;         // 습격 위협도 0~100
   relations: Record<string, number>; // 세력별 우호도 0~100 (키: 세력 이름)
   raiders: RaiderBand | null; // 접근 중인 습격 무리

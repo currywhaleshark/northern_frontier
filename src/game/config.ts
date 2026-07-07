@@ -1,4 +1,5 @@
 // 시뮬레이션 밸런스 값 모음 — 숫자 튜닝은 전부 여기서 한다.
+import type { ProcessingInputId } from './types';
 
 export const CONFIG = {
   map: {
@@ -77,6 +78,13 @@ export const CONFIG = {
     haulerStonePerDay: 0.4,    // 돌이 부족할 때 채석
     stoneReserveTarget: 40,
     woodReserve: 25,           // 건축용으로 남겨둘 목재 (이 이상만 장작으로 팬다)
+    processingReserves: {
+      wood: 25,
+      grain: 0,
+      game: 0,
+      hide: 0,
+      iron: 0,
+    } as Record<ProcessingInputId, number>,
     tanneryHidePerDay: 2,      // 가죽공방 하루 가죽 소비 (가죽 2 → 옷 1)
     fieldGrainYield: 20,       // 밭 1개가 만작일 때 곡물 수확량
     fertileBonus: 1.3,

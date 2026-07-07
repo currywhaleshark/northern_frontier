@@ -20,6 +20,7 @@ import { driftRelations, initRelations } from './relations';
 import { avg, createResident, livingResidents, updateMorale, updateResidentNeeds } from './residents';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { firewoodWeatherMult, rollWeather } from './weather';
+import { defaultProcessingReserves, processableAmount } from './processing';
 import type { Building, BuildingTypeId, Difficulty, GameState, JobId, ResourceId } from './types';
 
 // ─────────────────────────── 새 게임 ───────────────────────────
@@ -51,6 +52,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     nextBuildingId: 1,
     nextResidentId: 1,
     resources: startRes,
+    processingReserves: defaultProcessingReserves(),
     threat: 25,
     relations: initRelations(),
     raiders: null,
@@ -316,7 +318,7 @@ function updateHabitats(state: GameState): void {
 function runTannery(state: GameState): void {
   const tanneries = countBuilt(state, 'tannery');
   if (tanneries === 0) return;
-  const hideUsed = Math.min(state.resources.hide, tanneries * CONFIG.production.tanneryHidePerDay);
+  const hideUsed = Math.min(processableAmount(state, 'hide'), tanneries * CONFIG.production.tanneryHidePerDay);
   if (hideUsed >= 2) {
     const made = Math.floor(hideUsed / 2);
     state.resources.hide -= made * 2;

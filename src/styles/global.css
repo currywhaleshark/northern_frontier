@@ -160,6 +160,53 @@ html, body, #root {
 .job-btn:hover:not(:disabled) { border-color: var(--accent); }
 .job-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
+/* ── 자동 가공 조절 ── */
+.processing-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  padding: 5px 0;
+  border-bottom: 1px dotted var(--border);
+}
+.processing-row:last-child { border-bottom: none; }
+.processing-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: bold;
+}
+.processing-controls {
+  display: grid;
+  grid-template-columns: 30px 24px minmax(44px, 1fr) 24px 30px;
+  gap: 3px;
+  align-items: center;
+}
+.processing-controls .job-btn {
+  width: 100%;
+  height: 22px;
+  font-size: 10.5px;
+  padding: 0;
+}
+.processing-input {
+  width: 100%;
+  min-width: 0;
+  height: 22px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  text-align: center;
+  font-size: 12px;
+}
+.processing-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.processing-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 /* ── 시간 컨트롤 ── */
 .time-controls { display: flex; gap: 4px; }
 .time-btn {

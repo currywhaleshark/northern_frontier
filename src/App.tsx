@@ -16,11 +16,13 @@ import { GameCanvas } from './components/GameCanvas';
 import { InspectorPanel, type InspectorTab } from './components/InspectorPanel';
 import { JobPanel } from './components/JobPanel';
 import { MainMenu } from './components/MainMenu';
+import { ProcessingPanel } from './components/ProcessingPanel';
 import { TopBar } from './components/TopBar';
 import { RANK_NAMES } from './game/constants';
 import { requestPetition } from './game/petition';
+import { setProcessingReserve } from './game/processing';
 import { nextRank } from './game/promotion';
-import type { BuildingTypeId, Difficulty, JobId } from './game/types';
+import type { BuildingTypeId, Difficulty, JobId, ProcessingInputId } from './game/types';
 
 export default function App() {
   // 게임 상태는 ref에 두고, version 증가로 리렌더를 트리거한다
@@ -175,6 +177,11 @@ export default function App() {
     bump();
   };
 
+  const handleSetProcessingReserve = (resource: ProcessingInputId, amount: number) => {
+    setProcessingReserve(stateRef.current, resource, amount);
+    bump();
+  };
+
   const handleChoose = (optionId: string) => {
     resolveChoice(stateRef.current, optionId);
     bump();
@@ -274,6 +281,7 @@ export default function App() {
         <div className="side left">
           <BuildMenu state={state} placingType={placingType} setPlacingType={setPlacingType} />
           <JobPanel state={state} onReassign={handleReassign} />
+          <ProcessingPanel state={state} onSetReserve={handleSetProcessingReserve} />
         </div>
         <div className="canvas-wrap">
           <GameCanvas
