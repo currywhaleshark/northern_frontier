@@ -214,6 +214,11 @@ html, body, #root {
 .resident-row.selected { background: #33301f; }
 .bar-outer { background: #10141a; border-radius: 3px; height: 8px; width: 100%; overflow: hidden; }
 .bar-inner { height: 100%; border-radius: 3px; }
+.faction-name {
+  font-weight: 700;
+  text-decoration: underline dotted currentColor 1px;
+  text-underline-offset: 2px;
+}
 
 /* ── 메인 메뉴 ── */
 .main-menu {

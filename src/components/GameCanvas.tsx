@@ -6,6 +6,7 @@ import { JOB_NAMES } from '../game/constants';
 import { getActiveSprites } from '../render/atlas';
 import { findResidentAt, renderScene } from '../render/renderer';
 import type { BuildingTypeId, GameState } from '../game/types';
+import { FactionName } from './FactionName';
 
 const TILE = CONFIG.ui.tileSize;
 const CLICK_RADIUS = Math.round(TILE * 0.65); // 주민 클릭 판정 반경(픽셀)
@@ -140,7 +141,7 @@ export function GameCanvas({
             </>
           ) : (
             <>
-              <b>{state.raiders!.faction}</b>
+              <b><FactionName name={state.raiders!.faction} /></b>
               <div className="muted">{state.raiders!.siege ? '목책 앞 공성 중' : '무장 무리 접근 중'}</div>
             </>
           )}

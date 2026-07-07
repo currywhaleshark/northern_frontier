@@ -6,6 +6,7 @@ import { canPetition } from '../game/petition';
 import { nextRank, promotionConditions } from '../game/promotion';
 import { getRelation } from '../game/relations';
 import type { GameState, JobId, Resident, ResourceId } from '../game/types';
+import { FactionName } from './FactionName';
 
 export type InspectorTab = 'tile' | 'people' | 'factions' | 'court';
 
@@ -207,7 +208,7 @@ export function InspectorPanel({
                                 style={{ margin: '2px 4px 2px 0' }}
                                 onClick={() => onRequestTrade(f.name)}
                               >
-                                {f.name}
+                                <FactionName name={f.name} />
                               </button>
                             );
                           })}
@@ -234,7 +235,7 @@ export function InspectorPanel({
             return (
               <div key={f.name} style={{ marginBottom: 9 }} title={f.desc}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{f.hostile ? '⚔️' : '🤝'} {f.name}</span>
+                  <span>{f.hostile ? '⚔️' : '🤝'} <FactionName name={f.name} /></span>
                   <span className="muted small">{Math.round(rel)}</span>
                 </div>
                 <Bar value={rel} color={color} />

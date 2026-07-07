@@ -218,7 +218,7 @@ export function openRaidChoice(
     kind: 'raid',
     title: `습격! — ${faction.name}`,
     body:
-      `${faction.name}(${faction.desc})이 마을로 몰려오고 있습니다.` +
+      `${faction.name}이 마을로 몰려오고 있습니다.` +
       (warned ? ' 경보 덕분에 미리 대비할 시간이 있었습니다.' : ' 아무런 경보도 없이 들이닥쳤습니다!') +
       (siege ? '\n목책이 무리를 가로막고 있어 방어에 유리합니다.' : '') +
       (getRelation(state, faction.name) >= 60 ? '\n낯익은 얼굴들입니다. 말이 통할지도 모릅니다.'

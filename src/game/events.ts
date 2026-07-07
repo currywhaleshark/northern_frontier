@@ -37,7 +37,7 @@ export function maybeOfferTrade(state: GameState, rng: () => number, daysSinceTr
   const choice: PendingChoice = {
     kind: 'trade',
     title: `교역 제안 — ${faction.name}`,
-    body: `${faction.name}(${faction.desc})이 장터에 찾아왔습니다.\n` +
+    body: `${faction.name}이 장터에 찾아왔습니다.\n` +
       `${RESOURCE_NAMES[tpl.give]} ${tpl.giveAmt}을(를) ${RESOURCE_NAMES[tpl.get]} ${tpl.getAmt}과(와) 바꾸자고 제안합니다.`,
     options: [
       {
@@ -82,7 +82,7 @@ export function requestTrade(state: GameState, factionName: string): string | nu
   const choice: PendingChoice = {
     kind: 'trade',
     title: `장터 교역 — ${faction.name}`,
-    body: `${faction.name}(${faction.desc})에 먼저 사람을 보냈습니다.\n무엇을 바꾸시겠습니까?`,
+    body: `${faction.name}에 먼저 사람을 보냈습니다.\n무엇을 바꾸시겠습니까?`,
     options: [
       ...faction.trades.map((t, i) => ({
         id: `offer-${i}`,

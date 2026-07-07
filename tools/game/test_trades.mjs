@@ -77,8 +77,11 @@ function withMarket(state) {
 
   const c = state.pendingChoice;
   const trades = FACTIONS.find(f => f.name === TRADER).trades;
+  const faction = FACTIONS.find(f => f.name === TRADER);
   assert.equal(c.kind, 'trade');
   assert.equal(c.data.initiated, true);
+  assert.ok(c.body.includes(TRADER));
+  assert.equal(c.body.includes(`(${faction.desc})`), false);
   assert.equal(c.options.length, trades.length + 1);
   assert.equal(c.options.at(-1).id, 'cancel');
 
@@ -134,6 +137,17 @@ function withMarket(state) {
   simulation.resolveChoice(state, 'offer-0');
   assert.equal(state.resources[offer.get], before); // 교환 미적용
   assert.equal(state.pendingChoice, null);
+}
+
+// ── 상대가 찾아온 제안도 세력 설명을 괄호로 붙이지 않는다 ──
+{
+  const state = withMarket(simulation.newGame(66));
+  const faction = FACTIONS.find(f => f.name === TRADER);
+  state.lastTradeDay = -999;
+  state.resources[faction.trades[0].give] = faction.trades[0].giveAmt + 5;
+  assert.equal(events.maybeOfferTrade(state, () => 0, 999), true);
+  assert.ok(state.pendingChoice.body.includes(TRADER));
+  assert.equal(state.pendingChoice.body.includes(`(${faction.desc})`), false);
 }
 
 // ── 상대가 찾아온 제안 경로는 기존 동작 그대로 (거절 벌칙 유지) ──

@@ -81,6 +81,7 @@ export interface Faction {
   name: string;
   hostile: boolean;      // 위협도가 높을 때 습격 무리로 나설 성향
   desc: string;
+  color: string;
   trades: TradeOffer[];  // 비어 있으면 교역하지 않는 세력
   initialRelation: number; // 시작 우호도 (0~100)
 }
@@ -89,6 +90,7 @@ export const FACTIONS: Faction[] = [
   {
     name: '오도리 씨족', hostile: false,
     desc: '회령 방면 강가에 정착해 밭을 갈고 조선과 오래 교역해 온 씨족',
+    color: '#58b6a4',
     trades: [
       { give: 'tools', giveAmt: 3, get: 'grain', getAmt: 16 },
       { give: 'clothes', giveAmt: 4, get: 'hide', getAmt: 9 },
@@ -98,6 +100,7 @@ export const FACTIONS: Faction[] = [
   {
     name: '올량합 부락', hostile: false,
     desc: '두만강 가에서 반농반렵으로 살아가는 부락, 국경 무역에 밝다',
+    color: '#d6a84f',
     trades: [
       { give: 'grain', giveAmt: 12, get: 'hide', getAmt: 8 },
       { give: 'clothes', giveAmt: 3, get: 'game', getAmt: 10 },
@@ -107,6 +110,7 @@ export const FACTIONS: Faction[] = [
   {
     name: '골간 우디캐', hostile: false,
     desc: '두만강 하구 바닷가에서 고기잡이하는 올적합 갈래, 마른 생선과 소금을 가져온다',
+    color: '#5ba7d8',
     trades: [
       { give: 'iron', giveAmt: 4, get: 'food', getAmt: 22 },
       { give: 'tools', giveAmt: 2, get: 'food', getAmt: 15 },
@@ -116,6 +120,7 @@ export const FACTIONS: Faction[] = [
   {
     name: '니마차 우디캐', hostile: true,
     desc: '깊은 숲의 사냥 부족, 평시엔 담비 가죽을 팔러 오지만 굶주린 해에는 창을 든다',
+    color: '#78b95e',
     trades: [
       { give: 'grain', giveAmt: 14, get: 'hide', getAmt: 12 },
       { give: 'food', giveAmt: 16, get: 'herbs', getAmt: 7 },
@@ -125,12 +130,14 @@ export const FACTIONS: Faction[] = [
   {
     name: '홀라온 야인', hostile: true,
     desc: '송화강 쪽에서 말을 몰고 내려오는 무리, 먼 길을 온 만큼 빈손으로 돌아가지 않는다',
+    color: '#d96f5f',
     trades: [],
     initialRelation: 35,
   },
   {
     name: '변경 마적', hostile: true,
     desc: '국경을 떠도는 혼성 무장 무리, 조선 유민도 여진 낙오자도 섞여 있다',
+    color: '#b56f7a',
     trades: [],
     initialRelation: 25,
   },
