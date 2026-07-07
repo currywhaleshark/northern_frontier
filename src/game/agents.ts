@@ -458,11 +458,13 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
   const smithy = state.buildings.find(b => b.type === 'smithy' && b.built);
   const pop = state.residents.filter(x => x.alive).length;
+  const hasMinerSupply = state.buildings.some(b => b.type === 'mine' && b.built) &&
+    state.residents.some(x => x.alive && !x.sick && x.health >= 20 && x.job === 'miner');
   // 도구는 생산직 수(대략 인구의 70%)만큼 있으면 충분 — 그 이상이면 철을 비축한다
   const needTools = state.resources.tools < pop * 0.7;
 
-  // 캐 온 철 하역 (대장간도 하역 거점)
-  if (carryTotal(r) > 0 && r.phase === 'toDeposit') {
+  // 캐 온 철 하역 (대장간도 하역 거점). 채광꾼이 있으면 들고 있던 철은 바로 내려놓고 대장간으로 복귀한다.
+  if (carryTotal(r) > 0 && (r.phase === 'toDeposit' || hasMinerSupply)) {
     r.task = '철 운반';
     const st = goTo(state, r, ctx, depositGoal(state, ['smithy']));
     if (st === 'arrived' || st === 'stuck') { depositAll(state, r); r.phase = 'rest'; }
@@ -479,6 +481,22 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
       state.resources.tools += rate;
       gainSkillTick(r);
     } else {
+      r.task = st === 'stuck' ? '길이 막힘' : '대장간으로 이동';
+    }
+    return;
+  }
+
+  if (smithy && hasMinerSupply) {
+    r.path = [];
+    r.workTimer = 0;
+    const st = goTo(state, r, ctx, buildingGoal(smithy.id));
+    if (st === 'arrived') {
+      r.phase = 'rest';
+      r.task = needTools
+        ? (processableAmount(state, 'iron') < rate ? '철 대기' : '재료 대기')
+        : '도구 충분';
+    } else {
+      r.phase = st === 'stuck' ? 'rest' : 'toWork';
       r.task = st === 'stuck' ? '길이 막힘' : '대장간으로 이동';
     }
     return;

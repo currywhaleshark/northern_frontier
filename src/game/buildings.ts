@@ -66,7 +66,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   smithy: {
     id: 'smithy', name: '대장간', emoji: '⚒️',
-    desc: '철과 목재로 도구를 만든다. 철이 없으면 대장장이가 철광에서 캔다.',
+    desc: '철과 목재로 도구를 만든다. 채광꾼이 없을 때만 대장장이가 철광을 보조 채굴한다.',
     cost: { wood: 10, stone: 6 }, buildDays: 8, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
