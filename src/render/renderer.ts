@@ -10,6 +10,7 @@ import { BUILDING_DEFS, canAfford, canPlaceOn } from '../game/buildings';
 import { getSeason } from '../game/seasons';
 import { findHabitatIconAtTile } from '../game/habitats';
 import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
+import { militiaWeaponForResident } from './militiaWeaponAssignment';
 import type { AnimalHabitat, BuildingTypeId, GameState, Resident, Terrain } from '../game/types';
 
 const TILE = CONFIG.ui.tileSize;
@@ -269,6 +270,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       selected: r.id === o.selectedResidentId,
       moving: r.px !== r.x || r.py !== r.y,
       facing: r.x < r.px ? -1 : 1,
+      militiaWeapon: militiaWeaponForResident(state, r),
     });
   }
 

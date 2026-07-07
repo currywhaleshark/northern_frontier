@@ -47,7 +47,21 @@ def test_fields_are_top_down_square_tiles() -> None:
         assert abs(width - height) <= 4
 
 
+def test_building_cells_are_not_empty_and_bottom_aligned() -> None:
+    image = Image.open(sheet_path()).convert("RGBA")
+    for row in range(2):
+        for col in range(15):
+            left, top, right, bottom = alpha_bbox(image, col, row)
+            width = right - left
+            height = bottom - top
+            assert width >= 12, f"cell {col},{row} is too narrow"
+            assert height >= 14, f"cell {col},{row} is too short"
+            assert right <= TILE_SIZE, f"cell {col},{row} exceeds cell width"
+            assert bottom >= SPRITE_HEIGHT - 2, f"cell {col},{row} is not bottom aligned"
+
+
 if __name__ == "__main__":
     test_sheet_dimensions()
     test_fields_are_top_down_square_tiles()
+    test_building_cells_are_not_empty_and_bottom_aligned()
     print("generated building asset pixel tests passed")

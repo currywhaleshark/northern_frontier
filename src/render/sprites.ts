@@ -7,6 +7,7 @@
 import { BUILDING_DEFS } from '../game/buildings';
 import { JOB_COLORS } from '../game/constants';
 import type { BuildingTypeId, Gender, JobId, Season, Terrain } from '../game/types';
+import type { MilitiaWeaponSpriteId } from './militiaWeaponAssets';
 
 // 계절별 지형 팔레트 (임시 그래픽용)
 const TERRAIN_PALETTES: Record<Season, Record<Terrain, string>> = {
@@ -73,6 +74,7 @@ export interface ResidentDrawParams {
   selected: boolean;
   moving?: boolean;   // 이번 서브틱에 이동 중 (걷기 연출)
   facing?: 1 | -1;    // 1 오른쪽, -1 왼쪽
+  militiaWeapon?: MilitiaWeaponSpriteId;
 }
 
 export interface RaiderDrawParams {

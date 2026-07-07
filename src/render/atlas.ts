@@ -58,6 +58,10 @@ import {
   PROMOTION_CHARACTER_SHEET,
   promotionResidentSourceRect,
 } from './promotionCharacterAssets';
+import {
+  MILITIA_WEAPON_SHEET,
+  militiaWeaponSourceRect,
+} from './militiaWeaponAssets';
 
 const PITCH = 17;
 const T = 16;
@@ -76,6 +80,7 @@ let buildingSheet: HTMLImageElement | null = null;
 let generatedCharacterSheet: HTMLImageElement | null = null;
 let promotionBuildingSheet: HTMLImageElement | null = null;
 let promotionCharacterSheet: HTMLImageElement | null = null;
+let militiaWeaponSheet: HTMLImageElement | null = null;
 let loaded = 0;
 let started = false;
 
@@ -109,16 +114,23 @@ function ensureLoaded(): void {
     loaded++;
   };
   promotionChars.src = PROMOTION_CHARACTER_SHEET.src;
+  const militiaWeapons = new Image();
+  militiaWeapons.onload = () => {
+    militiaWeaponSheet = militiaWeapons;
+    loaded++;
+  };
+  militiaWeapons.src = MILITIA_WEAPON_SHEET.src;
   const characterSheet = new Image();
   characterSheet.onload = () => {
     generatedCharacterSheet = characterSheet;
+    loaded++;
   };
   characterSheet.src = GENERATED_CHARACTER_SHEET.src;
 }
 
 export function atlasReady(): boolean {
   ensureLoaded();
-  return loaded >= 8;
+  return loaded >= 10;
 }
 
 // 아틀라스가 준비되면 아틀라스, 아니면 임시 그래픽
@@ -606,13 +618,24 @@ export const atlasSprites: SpriteAPI = {
 
   drawResident(ctx, p) {
     const characterSheet = generatedCharacterSheet;
+    const militiaSheet = militiaWeaponSheet;
     const kenneyChars = chars;
-    if (!characterSheet && !kenneyChars) return;
+    if (!characterSheet && !militiaSheet && !kenneyChars) return;
     ctx.imageSmoothingEnabled = false;
     const half = CHALF;
     const bob = (p.moving ? Math.floor(performance.now() / 130) % 2 : 0) * CF;
 
-    if (promotionCharacterSheet && isPromotionCharacterJob(p.job)) {
+    if (militiaSheet && p.job === 'militia' && p.militiaWeapon) {
+      drawGeneratedCharacterRect(
+        ctx,
+        militiaSheet,
+        militiaWeaponSourceRect(p.militiaWeapon, p.gender),
+        p.x,
+        p.y,
+        p.facing,
+        bob,
+      );
+    } else if (promotionCharacterSheet && isPromotionCharacterJob(p.job)) {
       const rect = promotionResidentSourceRect(p.job, p.gender);
       if (rect) drawGeneratedCharacterRect(ctx, promotionCharacterSheet, rect, p.x, p.y, p.facing, bob);
     } else if (characterSheet) {

@@ -17,6 +17,7 @@ async function importTsModule(relativePath) {
 
 const buildingAssets = await importTsModule('../../src/render/promotionBuildingAssets.ts');
 const characterAssets = await importTsModule('../../src/render/promotionCharacterAssets.ts');
+const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
 
 const PROMOTION_BUILDINGS = [
   'tileHouse', 'bridge', 'mine', 'ferry',
@@ -68,5 +69,16 @@ for (const [col, job] of PROMOTION_JOBS.entries()) {
   );
 }
 assert.equal(characterAssets.isPromotionCharacterJob('smith'), false);
+
+assert.equal(
+  atlasSource.includes('promotionCharacter'),
+  true,
+  'atlas should route promoted jobs through the regenerated promotion character art',
+);
+assert.equal(
+  atlasSource.includes('isPromotionCharacterJob'),
+  true,
+  'atlas should check whether a job has regenerated promotion character art',
+);
 
 console.log('promotion asset routing tests passed');
