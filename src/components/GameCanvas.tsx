@@ -36,7 +36,7 @@ export function GameCanvas({
 
   const scrollBox = () => canvasRef.current?.closest('.canvas-wrap') as HTMLElement | null;
 
-  const w = CONFIG.map.width, h = CONFIG.map.height;
+  const h = state.map.length, w = state.map[0]?.length ?? 0;
   const alpha = Math.max(0, Math.min(1, (performance.now() - anim.at) / anim.ms));
   const hoverTile = mouse
     ? { x: Math.floor(mouse.mx / TILE), y: Math.floor(mouse.my / TILE) }

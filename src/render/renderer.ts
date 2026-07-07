@@ -78,9 +78,10 @@ function drawTerrainLayer(state: GameState, width: number, height: number, sprit
     const t = state.map[y]?.[x];
     return t ? t.terrain !== 'river' : false;
   };
-  for (let y = 0; y < CONFIG.map.height; y++) {
-    for (let x = 0; x < CONFIG.map.width; x++) {
-      const tile = state.map[y][x];
+  for (let y = 0; y < state.map.length; y++) {
+    const row = state.map[y];
+    for (let x = 0; x < row.length; x++) {
+      const tile = row[x];
       sprites.drawTerrain(ctx, {
         terrain: tile.terrain, season, winter, frozenRiver,
         hasIron: tile.hasIron, tileX: x, tileY: y,
@@ -314,9 +315,10 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       const pulse = 0.22 + 0.14 * Math.sin(performance.now() / 280);
       ctx.fillStyle = `rgba(255,214,90,${pulse.toFixed(3)})`;
       ctx.strokeStyle = 'rgba(255,214,90,0.8)';
-      for (let y = 0; y < CONFIG.map.height; y++) {
-        for (let x = 0; x < CONFIG.map.width; x++) {
-          if (state.map[y][x].terrain !== want) continue;
+      for (let y = 0; y < state.map.length; y++) {
+        const row = state.map[y];
+        for (let x = 0; x < row.length; x++) {
+          if (row[x].terrain !== want) continue;
           ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
           ctx.strokeRect(x * TILE + 0.5, y * TILE + 0.5, TILE - 1, TILE - 1);
         }

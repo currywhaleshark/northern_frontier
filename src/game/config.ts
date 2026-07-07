@@ -3,8 +3,8 @@ import type { ProcessingInputId } from './types';
 
 export const CONFIG = {
   map: {
-    width: 44,
-    height: 44,
+    width: 56,
+    height: 56,
   },
 
   time: {
@@ -118,7 +118,8 @@ export const CONFIG = {
       herdFood: 1, herdHide: 0.25,
     },
     forestDepleteChance: 0.12, // 벌목 1회당 숲이 평지가 될 확률
-    forestRegrowChance: 0.0015, // 봄여름, 숲 인접 평지가 숲이 될 하루 확률
+    forestRegrowChance: 0.003,  // 봄여름, 숲 인접 평지가 숲이 될 하루 확률
+    forestPioneerChance: 0.00018, // 봄여름, 고립된 평지에 새 숲 씨앗이 들 확률
     // 사냥 수확 배율 — 짐승 서식지(숲 덩어리)가 클수록 사냥감이 풍부하다
     hunting: {
       habitatYieldBase: 0.8,     // 서식지 기본

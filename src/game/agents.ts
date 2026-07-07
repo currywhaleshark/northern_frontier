@@ -96,7 +96,8 @@ export function findPath(
   passable?: (x: number, y: number) => boolean,
 ): { x: number; y: number }[] | null {
   const canPass = passable ?? ((x: number, y: number) => isPassable(state, x, y));
-  const w = CONFIG.map.width, h = CONFIG.map.height;
+  const h = state.map.length, w = state.map[0]?.length ?? 0;
+  if (sx < 0 || sy < 0 || sx >= w || sy >= h || !state.map[sy]?.[sx]) return null;
   const start = sy * w + sx;
   const prev = new Int32Array(w * h).fill(-2);
   prev[start] = -1;
@@ -105,7 +106,9 @@ export function findPath(
   while (head < queue.length) {
     const cur = queue[head++];
     const cx = cur % w, cy = (cur - cx) / w;
-    if (cur !== start && isGoal(state.map[cy][cx])) {
+    const tile = state.map[cy]?.[cx];
+    if (!tile) continue;
+    if (cur !== start && isGoal(tile)) {
       const path: { x: number; y: number }[] = [];
       let node = cur;
       while (node !== start) {

@@ -42,6 +42,8 @@ function blob(tiles: Tile[][], rng: () => number, cx: number, cy: number, size: 
 export function generateMap(seed: number): { tiles: Tile[][]; centerX: number; centerY: number } {
   const rng = makeRng(seed);
   const w = CONFIG.map.width, h = CONFIG.map.height;
+  const areaScale = (w * h) / (44 * 44);
+  const scaledCount = (base: number): number => Math.max(1, Math.round(base * areaScale));
 
   const tiles: Tile[][] = [];
   for (let y = 0; y < h; y++) {
@@ -83,15 +85,15 @@ export function generateMap(seed: number): { tiles: Tile[][]; centerX: number; c
   }
 
   // 산지: 동쪽/북쪽 가장자리에 능선
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < scaledCount(10); i++) {
     blob(tiles, rng, w - 2 - rng() * 5, rng() * h, 26, 'mountain', ['plain']);
   }
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < scaledCount(6); i++) {
     blob(tiles, rng, rng() * w, rng() * 4, 20, 'mountain', ['plain']);
   }
 
   // 숲: 넓게 분포
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < scaledCount(26); i++) {
     blob(tiles, rng, rng() * w, rng() * h, 30, 'forest', ['plain']);
   }
 

@@ -289,16 +289,34 @@ function onSeasonChange(state: GameState, prev: string, next: string): void {
 // 봄/여름, 숲 인접 평지가 천천히 다시 숲이 된다
 function regrowForest(state: GameState, rng: () => number, season: string): void {
   if (season !== 'spring' && season !== 'summer') return;
-  const w = CONFIG.map.width, h = CONFIG.map.height;
+  const h = state.map.length;
+  const forestBefore = new Set<string>();
   for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const t = state.map[y][x];
+    const row = state.map[y];
+    for (let x = 0; x < row.length; x++) {
+      if (row[x].terrain === 'forest') forestBefore.add(`${x},${y}`);
+    }
+  }
+
+  const hasForestNearby = (x: number, y: number): boolean => {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        if (forestBefore.has(`${x + dx},${y + dy}`)) return true;
+      }
+    }
+    return false;
+  };
+
+  for (let y = 0; y < h; y++) {
+    const row = state.map[y];
+    for (let x = 0; x < row.length; x++) {
+      const t = row[x];
       if (t.terrain !== 'plain' || t.buildingId != null) continue;
-      if (rng() >= CONFIG.agents.forestRegrowChance) continue;
-      const nearForest =
-        state.map[y - 1]?.[x]?.terrain === 'forest' || state.map[y + 1]?.[x]?.terrain === 'forest' ||
-        state.map[y]?.[x - 1]?.terrain === 'forest' || state.map[y]?.[x + 1]?.terrain === 'forest';
-      if (nearForest) t.terrain = 'forest';
+      const chance = hasForestNearby(x, y)
+        ? CONFIG.agents.forestRegrowChance
+        : CONFIG.agents.forestPioneerChance;
+      if (chance > 0 && rng() < chance) t.terrain = 'forest';
     }
   }
 }

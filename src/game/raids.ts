@@ -103,7 +103,8 @@ export function spawnRaiders(state: GameState, rng: () => number, warned: boolea
   if (!center) return;
   const power = raidPower(state, rng);
   const faction = pickFaction(state, rng);
-  const w = CONFIG.map.width, h = CONFIG.map.height;
+  const h = state.map.length, w = state.map[0]?.length ?? 0;
+  if (w <= 0 || h <= 0) return;
 
   // 방책이 마을을 완전히 두르고 있으면 중심지까지의 길이 없다 → 방책 앞 공성
   const barrierTiles = new Set(
