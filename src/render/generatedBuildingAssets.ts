@@ -24,6 +24,7 @@ const BUILDING_COLUMNS: Record<BuildingTypeId, number> = {
   watchtower: 12,
   garrison: 13,
   market: 14,
+  cannonEmplacement: 12, // 전용 그림이 나오기 전까지 망루 그림을 빌려 쓴다
 };
 
 const FIELD_SEASON_COLUMNS: Record<Season, number> = {

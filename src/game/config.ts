@@ -19,6 +19,7 @@ export const CONFIG = {
     resources: {
       food: 100, firewood: 45, wood: 30, stone: 12, iron: 4, tools: 10,
       hide: 6, clothes: 12, herbs: 5, grain: 0, game: 0,
+      gunpowder: 0, muskets: 0,
       reputation: 50, defense: 0,
     },
     // 시작 직업 구성
@@ -157,6 +158,10 @@ export const CONFIG = {
     wealthPowerDiv: 60,
     watchmanDefense: 6,
     militiaDefense: 12,
+    musketDefense: 18,         // 조총으로 무장한 수비병 1인당 방어 기여 (화약이 있을 때만)
+    powderPerMusket: 0.4,      // 교전당 조총 1정 화약 소모
+    powderPerCannon: 2,        // 교전당 불랑기포 1문 화약 소모
+    cannonBattleMult: 1.2,     // 포대 가동 시(화약 보유) 전투 방어 배율
     levyDefensePerResident: 4, // 징집된 일반 주민 1인당 방어 기여 (수비병 12, 파수꾼 6과 비교)
     warnedDefenseMult: 1.25,
     // 지도 위 습격 무리 이동
@@ -241,6 +246,14 @@ export const CONFIG = {
     defense: 100,
     food: 100,
     firewood: 100,
+  },
+
+  // 조정 청원 — 명성을 소모해 조정 지원 물자를 받는다 (승격 단계 ≥ 보, 계절당 1회)
+  petition: {
+    cooldownDays: 12,  // 분기(계절)당 1회
+    // 진(鎭) 이상은 봄마다 화약이 소량 정기 지급된다 (의도적으로 부족하게 — 단계 3의 긴장 기반)
+    yearlyPowder: { settlement: 0, bo: 0, jin: 2, bu: 4 },
+    luxuryMorale: 15,  // 사치품(비단·소금) 하사 시 전 주민 사기 상승
   },
 
   // 승격 사다리 — 개척지 → 보(堡) → 진(鎭) → 부(府). 부 승격이 최종 승리.

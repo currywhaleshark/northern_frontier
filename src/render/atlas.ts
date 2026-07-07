@@ -263,6 +263,7 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   watchtower: { roof: ROOF_WHITE, base: FACE_STONE, roofLift: 12 },
   garrison:   { base: TENT_GREEN, glyph: BANNER_RED },
   market:     { roof: AWNING, base: COUNTER, roofLift: 12 },
+  cannonEmplacement: { base: FACE_STONE, glyph: BANNER_RED }, // 돌 포대 (전용 그림 나오기 전 임시)
 };
 
 // ── 주민 캐릭터 매핑 (완성형 캐릭터 열) ──

@@ -4,7 +4,7 @@
 // defense/(defense+power)로 한 번 굴려 정한다. 이후의 소모전(전력 감소·부상)은
 // 그 결과를 향해 수렴하는 연출이다 — 밸런스가 기존 공식과 정확히 일치한다.
 import { CONFIG } from './config';
-import { computeDefense } from './buildings';
+import { armedMusketeers, computeDefense, countBuilt } from './buildings';
 import { addLog } from './events';
 import { changeRelation } from './relations';
 import { resetAgent } from './agents';
@@ -44,6 +44,25 @@ export function applyBattleDefenseMultipliers(
 
 export function raidBandSize(power: number): number {
   return Math.max(1, Math.min(6, 3 + Math.floor(power / 25)));
+}
+
+// 포대 가동 여부 — 완공 포대가 있고 화약이 있으면 전투 방어 배율이 붙는다
+export function cannonBattleMult(state: GameState): number {
+  return countBuilt(state, 'cannonEmplacement') > 0 && state.resources.gunpowder > 0
+    ? CONFIG.raid.cannonBattleMult
+    : 1;
+}
+
+// 교전 개시 시 화약 소모: 조총 무장 수비병 + 가동 포대. 비축분이 모자라면 있는 만큼만 쓴다.
+export function consumeBattlePowder(state: GameState): void {
+  const need =
+    armedMusketeers(state) * CONFIG.raid.powderPerMusket +
+    (state.resources.gunpowder > 0 ? countBuilt(state, 'cannonEmplacement') * CONFIG.raid.powderPerCannon : 0);
+  if (need <= 0) return;
+  const used = Math.min(state.resources.gunpowder, need);
+  if (used <= 0) return;
+  state.resources.gunpowder = Math.max(0, state.resources.gunpowder - used);
+  addLog(state, `전선에 총성과 포성이 울립니다! (화약 -${used.toFixed(1)})`, 'raid');
 }
 
 // 징집(levy) 시 일반 주민(수비병/파수꾼 제외)이 보태는 방어도.
@@ -105,15 +124,18 @@ export function battleTick(state: GameState, rng: () => number): void {
 
   pruneBattleDefenders(state, battle);
   const defense = applyBattleDefenseMultipliers(
-    computeDefense(state) + (battle.levyBonus ?? 0), battle, state.weather);
+    (computeDefense(state) + (battle.levyBonus ?? 0)) * cannonBattleMult(state),
+    battle, state.weather);
 
   if (battle.phase === 'muster') {
     battle.ticks += 1;
     if (isMusterReady(state, battle)) {
       battle.phase = 'clash';
       battle.ticks = 0;
+      // 승패는 화약이 마르기 전(조총·포대 보정 포함) 방어도로 굴리고, 그 교전에서 화약을 태운다
       battle.outcome = rollBattleOutcome(defense, band.power, rng);
       addLog(state, '전선에서 함성이 터집니다. 전투가 벌어졌습니다!', 'raid');
+      consumeBattlePowder(state);
     }
     return;
   }

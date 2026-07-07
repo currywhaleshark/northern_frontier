@@ -3,9 +3,12 @@
 // 하루가 넘어갈 때 소비/생존/위협/이벤트 등 일일 처리를 한다.
 import { CONFIG } from './config';
 import { SEASON_NAMES } from './constants';
-import { BUILDING_DEFS, canAfford, canPlaceOn, computeDefense, countBuilt, housingCapacity } from './buildings';
+import {
+  BUILDING_DEFS, canAfford, cannonPlacementsUsed, canPlaceOn, computeDefense, countBuilt, housingCapacity,
+} from './buildings';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
 import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
+import { grantYearlyPowder, resolvePetition } from './petition';
 import { checkPromotion, rankEffects } from './promotion';
 import { generateMap, makeRng } from './map';
 import { isHabitatActive, spawnAnimalHabitats } from './habitats';
@@ -60,6 +63,8 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     tributeFailStreak: 0,
     tributePaidStreak: 0,
     rank: 'settlement',
+    lastPetitionDay: 0,
+    cannonsGranted: 0,
     log: [],
     totalDeaths: 0,
     starvationDeathsThisYear: 0,
@@ -126,6 +131,9 @@ export function tryPlaceBuilding(state: GameState, type: BuildingTypeId, x: numb
   if (!tile) return '지도 밖입니다.';
   if (!canPlaceOn(def, tile)) return '이곳에는 지을 수 없습니다.';
   if (def.unique && state.buildings.some(b => b.type === type)) return '이미 건설 중이거나 완공되었습니다.';
+  if (type === 'cannonEmplacement' && cannonPlacementsUsed(state) >= state.cannonsGranted) {
+    return '불랑기포는 조정의 하사가 있어야 합니다. (조정 탭에서 청원)';
+  }
   if (!canAfford(state, def)) return '자원이 부족합니다.';
 
   for (const [res, amt] of Object.entries(def.cost)) {
@@ -166,6 +174,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   const rng = makeRng(state.seed + state.day * 7919 + 31);
   if (state.pendingChoice.kind === 'raid') resolveRaid(state, optionId, rng);
   else if (state.pendingChoice.kind === 'tribute') resolveCourtTribute(state, optionId);
+  else if (state.pendingChoice.kind === 'petition') resolvePetition(state, optionId);
   else resolveTrade(state, optionId);
   state.resources.defense = computeDefense(state);
 }
@@ -261,6 +270,7 @@ function onSeasonChange(state: GameState, prev: string, next: string): void {
     state.starvationDeathsThisYear = 0;
     addLog(state, '파종철입니다. 밭에 농부를 배정하면 가을에 곡물을 거둘 수 있습니다.', 'info');
     announceCourtTribute(state); // 새해 세공 공지
+    grantYearlyPowder(state);    // 진(鎭) 이상: 연례 화약 배급
   }
   if (next === 'autumn') {
     addLog(state, '수확철입니다. 곡식을 거두고 장작을 쌓아 두십시오. 국경 너머의 움직임도 잦아지는 때입니다.', 'info');

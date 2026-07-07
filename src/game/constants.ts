@@ -60,18 +60,18 @@ export const JOB_COLORS: Record<JobId, string> = {
 export const RESOURCE_NAMES: Record<ResourceId, string> = {
   food: '식량', firewood: '장작', wood: '목재', stone: '돌', iron: '철',
   tools: '도구', hide: '가죽', clothes: '옷', herbs: '약초', grain: '곡물',
-  game: '사냥감', reputation: '명성', defense: '방어도',
+  game: '사냥감', gunpowder: '화약', muskets: '조총', reputation: '명성', defense: '방어도',
 };
 
 export const RESOURCE_ICONS: Record<ResourceId, string> = {
   food: '🍚', firewood: '🔥', wood: '🪵', stone: '🪨', iron: '⛏️',
   tools: '🔨', hide: '🦌', clothes: '🧥', herbs: '🌿', grain: '🌾',
-  game: '🐗', reputation: '📜', defense: '🛡️',
+  game: '🐗', gunpowder: '🧨', muskets: '🔫', reputation: '📜', defense: '🛡️',
 };
 
 export const RESOURCE_ORDER: ResourceId[] = [
   'food', 'firewood', 'wood', 'stone', 'iron', 'tools', 'hide',
-  'clothes', 'herbs', 'grain', 'game', 'reputation', 'defense',
+  'clothes', 'herbs', 'grain', 'game', 'gunpowder', 'muskets', 'reputation', 'defense',
 ];
 
 // 북방 세력 — 조선 기록의 두만강 방면 여진 집단들에서 딴 세력 구성.

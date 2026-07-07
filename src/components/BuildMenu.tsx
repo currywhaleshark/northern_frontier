@@ -1,6 +1,6 @@
 // 건설 메뉴: 카테고리별 접이식. 건물을 고르고 지도를 클릭해 배치한다.
 import { useEffect, useRef, useState } from 'react';
-import { BUILDING_DEFS, canAfford } from '../game/buildings';
+import { BUILDING_DEFS, canAfford, cannonPlacementsUsed } from '../game/buildings';
 import { RESOURCE_NAMES } from '../game/constants';
 import { getSeason } from '../game/seasons';
 import { getActiveSprites } from '../render/atlas';
@@ -10,7 +10,7 @@ import type { BuildingTypeId, GameState, ResourceId } from '../game/types';
 const CATEGORIES: { name: string; types: BuildingTypeId[] }[] = [
   { name: '주거·기반', types: ['hut', 'ondol', 'storehouse'] },
   { name: '생산', types: ['field', 'lumberCamp', 'huntLodge', 'herbHut', 'smithy', 'tannery', 'market'] },
-  { name: '방어·군사', types: ['palisade', 'watchtower', 'beacon', 'garrison'] },
+  { name: '방어·군사', types: ['palisade', 'watchtower', 'beacon', 'garrison', 'cannonEmplacement'] },
 ];
 
 const OPEN_KEY = 'buksae-buildmenu-open';
@@ -76,28 +76,33 @@ export function BuildMenu({ state, placingType, setPlacingType }: Props) {
       {CATEGORIES.map(cat => {
         const isOpen = !!open[cat.name];
         const hasPlacing = placingType != null && cat.types.includes(placingType);
+        // 불랑기포대는 조정 하사(청원) 전엔 목록에 보이지 않는다
+        const visibleTypes = cat.types.filter(
+          type => type !== 'cannonEmplacement' || state.cannonsGranted > 0,
+        );
         return (
           <div key={cat.name}>
             <button className="cat-header" onClick={() => toggle(cat.name)}>
               <span>{isOpen ? '▾' : '▸'} {cat.name}{hasPlacing && !isOpen ? ' ●' : ''}</span>
-              <span className="muted small">{cat.types.length}</span>
+              <span className="muted small">{visibleTypes.length}</span>
             </button>
-            {isOpen && cat.types.map(type => {
+            {isOpen && visibleTypes.map(type => {
               const def = BUILDING_DEFS[type];
               const uniqueBuilt = def.unique && state.buildings.some(b => b.type === type);
+              const grantSpent = type === 'cannonEmplacement' && cannonPlacementsUsed(state) >= state.cannonsGranted;
               const affordable = canAfford(state, def);
               return (
                 <button
                   key={type}
                   className={`build-item${placingType === type ? ' selected' : ''}`}
-                  disabled={uniqueBuilt || !affordable}
-                  title={def.desc}
+                  disabled={uniqueBuilt || grantSpent || !affordable}
+                  title={grantSpent ? '조정의 하사가 있어야 더 놓을 수 있습니다 (조정 탭에서 청원)' : def.desc}
                   onClick={() => setPlacingType(placingType === type ? null : type)}
                   style={{ display: 'flex', alignItems: 'center', gap: 6 }}
                 >
                   <BuildingThumb type={type} state={state} />
                   <span>
-                    <div>{def.name}{uniqueBuilt ? ' (완료)' : ''}</div>
+                    <div>{def.name}{uniqueBuilt ? ' (완료)' : ''}{grantSpent ? ' (하사 대기)' : ''}</div>
                     <div className="cost">{costText(type)} · 공기 {def.buildDays}일</div>
                   </span>
                 </button>

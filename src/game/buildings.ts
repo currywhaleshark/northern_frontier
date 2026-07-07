@@ -93,12 +93,24 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     cost: { wood: 12, stone: 4 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: true,
   },
+  cannonEmplacement: {
+    id: 'cannonEmplacement', name: '불랑기포대', emoji: '💥',
+    desc: '조정이 하사한 불랑기포를 얹은 포대. 방어도 +40, 화약이 있으면 전투 방어가 크게 오른다 (교전마다 화약 소모). 부(府) 승격 후 조정 청원으로만 받을 수 있다.',
+    cost: { wood: 6, stone: 10 }, buildDays: 6, slots: 1, capacity: 0, defense: 40,
+    winterBonus: false, placement: 'land', unique: false,
+  },
 };
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
   'hut', 'ondol', 'storehouse', 'field', 'lumberCamp', 'huntLodge', 'herbHut',
   'smithy', 'tannery', 'market', 'palisade', 'watchtower', 'beacon', 'garrison',
+  'cannonEmplacement',
 ];
+
+// 불랑기포대는 조정 하사 수(cannonsGranted)만큼만 놓을 수 있다 (건설 중 포함)
+export function cannonPlacementsUsed(state: GameState): number {
+  return state.buildings.filter(b => b.type === 'cannonEmplacement').length;
+}
 
 export function getBuilding(state: GameState, id: number | null): Building | undefined {
   if (id == null) return undefined;
@@ -138,7 +150,14 @@ export function housingCapacity(state: GameState): { total: number; ondol: numbe
   return { total, ondol };
 }
 
-// 방어도 = 건물 + 파수꾼 + 수비병
+// 조총으로 무장 가능한 수비병 수 — 화약이 없으면 냉병기로 환원된다
+export function armedMusketeers(state: GameState): number {
+  if (state.resources.gunpowder <= 0) return 0;
+  const militia = state.residents.filter(r => r.alive && r.job === 'militia').length;
+  return Math.min(militia, Math.floor(state.resources.muskets));
+}
+
+// 방어도 = 건물 + 파수꾼 + 수비병 (조총 무장 수비병은 기여가 크다)
 export function computeDefense(state: GameState): number {
   let d = 0;
   for (const b of state.buildings) {
@@ -148,6 +167,10 @@ export function computeDefense(state: GameState): number {
   const militia = state.residents.filter(r => r.alive && r.job === 'militia').length;
   d += watchmen * CONFIG.raid.watchmanDefense;
   const garrisonMult = countBuilt(state, 'garrison') > 0 ? 1.3 : 1;
-  d += Math.round(militia * CONFIG.raid.militiaDefense * garrisonMult);
+  const musketeers = armedMusketeers(state);
+  d += Math.round(
+    (musketeers * CONFIG.raid.musketDefense +
+      (militia - musketeers) * CONFIG.raid.militiaDefense) * garrisonMult,
+  );
   return Math.round(d);
 }

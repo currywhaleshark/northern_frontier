@@ -74,6 +74,11 @@ export function loadGame(): GameState | null {
       parsed.rank = parsed.gameOver?.won ? 'bo' : 'settlement';
     }
     if (parsed.tributePaidStreak == null) parsed.tributePaidStreak = 0;
+    // 화기 없는 구버전: 새 자원·청원 필드를 0으로 채운다
+    if (parsed.resources.gunpowder == null) parsed.resources.gunpowder = 0;
+    if (parsed.resources.muskets == null) parsed.resources.muskets = 0;
+    if (parsed.lastPetitionDay == null) parsed.lastPetitionDay = 0;
+    if (parsed.cannonsGranted == null) parsed.cannonsGranted = 0;
     // 세공 없는 구버전: 시드로 올해분을 재생성. 이미 겨울이면 올해분은 면제 (다음 봄부터 정상 진행)
     if (!Object.prototype.hasOwnProperty.call(parsed, 'courtTribute')) {
       const pop = parsed.residents.filter(r => r.alive).length;

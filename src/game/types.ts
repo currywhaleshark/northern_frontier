@@ -61,6 +61,8 @@ export type ResourceId =
   | 'herbs'      // 약초
   | 'grain'      // 곡물
   | 'game'       // 사냥감
+  | 'gunpowder'  // 화약 (조정 지급 — 조총·포대가 전투마다 소모)
+  | 'muskets'    // 조총 (조정 하사 — 수비병을 무장시킨다)
   | 'reputation' // 명성
   | 'defense';   // 방어도
 
@@ -79,7 +81,8 @@ export type BuildingTypeId =
   | 'palisade'   // 목책
   | 'watchtower' // 망루
   | 'garrison'   // 군영
-  | 'market';    // 장터
+  | 'market'     // 장터
+  | 'cannonEmplacement'; // 불랑기포대 (부 승격 후 조정 청원으로만 배치)
 
 export interface Tile {
   x: number;
@@ -165,7 +168,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'trade' | 'tribute';
+  kind: 'raid' | 'trade' | 'tribute' | 'petition';
   title: string;
   body: string;
   options: ChoiceOption[];
@@ -262,6 +265,8 @@ export interface GameState {
   tributeFailStreak: number;          // 연속 미납 횟수 (2년 연속이면 명성 하락 가중)
   tributePaidStreak: number;          // 연속 납부 년수 (승격 조건의 "공물 성실도")
   rank: Rank;                         // 현재 승격 단계
+  lastPetitionDay: number;            // 마지막 청원 승인일 (계절당 1회 쿨다운)
+  cannonsGranted: number;             // 조정이 하사한 불랑기포 수 (배치 가능 상한)
   log: LogEntry[];
   totalDeaths: number;
   starvationDeathsThisYear: number;

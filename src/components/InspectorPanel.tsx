@@ -1,17 +1,20 @@
-// 선택한 타일/건물/주민 정보 패널
+// 선택한 타일/건물/주민 정보 패널 + 조정(승격·세공·청원) 창구
 import { BUILDING_DEFS, getBuilding } from '../game/buildings';
-import { FACTIONS, JOB_NAMES, JOB_ORDER, RESOURCE_NAMES, TERRAIN_NAMES } from '../game/constants';
+import { FACTIONS, JOB_NAMES, JOB_ORDER, RANK_NAMES, RESOURCE_NAMES, TERRAIN_NAMES } from '../game/constants';
 import { canRequestTrade } from '../game/events';
+import { canPetition } from '../game/petition';
+import { nextRank, promotionConditions } from '../game/promotion';
 import { getRelation } from '../game/relations';
 import type { GameState, JobId, Resident, ResourceId } from '../game/types';
 
-export type InspectorTab = 'tile' | 'people' | 'factions';
+export type InspectorTab = 'tile' | 'people' | 'factions' | 'court';
 
 interface Props {
   state: GameState;
   selected: { x: number; y: number } | null;
   onSetResidentJob: (id: number, job: JobId) => void;
   onRequestTrade: (factionName: string) => void;
+  onPetition: () => void;
   tab: InspectorTab;
   setTab: (t: InspectorTab) => void;
   residentId: number | null;
@@ -39,6 +42,75 @@ function Bar({ value, color }: { value: number; color: string }) {
   return (
     <div className="bar-outer">
       <div className="bar-inner" style={{ width: `${Math.max(0, Math.min(100, value))}%`, background: color }} />
+    </div>
+  );
+}
+
+// 조정 탭 — 승격 단계·명성·다음 승격 조건·올해 세공·청원 (조정 관련 정보의 단일 창구)
+function CourtTab({ state, onPetition }: { state: GameState; onPetition: () => void }) {
+  const target = nextRank(state.rank);
+  const petitionReason = canPetition(state);
+  const tribute = state.courtTribute;
+  return (
+    <div>
+      <table className="insp-table">
+        <tbody>
+          <tr><td>승격 단계</td><td>{RANK_NAMES[state.rank]}</td></tr>
+          <tr><td>명성</td><td>{Math.floor(state.resources.reputation)} <Bar value={state.resources.reputation} color="#d9a441" /></td></tr>
+        </tbody>
+      </table>
+
+      {target && (
+        <>
+          <div className="panel-title" style={{ marginTop: 8 }}>다음 승격 — {RANK_NAMES[target]}</div>
+          {promotionConditions(state, target).map(([ok, txt], i) => (
+            <div key={i} className="small" style={{ color: ok ? '#6fbf73' : '#e06c5c' }}>
+              {ok ? '✓' : '·'} {txt}
+            </div>
+          ))}
+        </>
+      )}
+
+      {tribute && (
+        <>
+          <div className="panel-title" style={{ marginTop: 8 }}>올해 세공 ({tribute.year}년차)</div>
+          {tribute.resolved ? (
+            <div className="small" style={{ color: tribute.paid ? '#6fbf73' : '#e06c5c' }}>
+              {tribute.paid ? '올해 세공 납부 완료 ✓' : '올해 세공을 바치지 못했습니다'}
+            </div>
+          ) : (
+            <>
+              {Object.entries(tribute.items).map(([res, amt]) => {
+                const have = Math.floor(state.resources[res as ResourceId]);
+                const ok = have >= (amt ?? 0);
+                return (
+                  <div key={res} className="small" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{RESOURCE_NAMES[res as ResourceId]}</span>
+                    <span style={{ color: ok ? '#6fbf73' : '#e06c5c' }}>{have} / {amt}</span>
+                  </div>
+                );
+              })}
+              <div className="muted small" style={{ marginTop: 4 }}>
+                {tribute.dueDay - state.day > 0
+                  ? `겨울까지 ${tribute.dueDay - state.day}일`
+                  : '조정의 사자가 기다리고 있습니다'}
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      <div style={{ marginTop: 10 }}>
+        <button
+          className="btn small"
+          disabled={!!petitionReason}
+          title={petitionReason ?? '명성을 들여 조정의 지원 물자를 청합니다 (계절당 1회)'}
+          onClick={onPetition}
+        >
+          📜 조정에 청원
+        </button>
+        {petitionReason && <div className="muted small" style={{ marginTop: 3 }}>{petitionReason}</div>}
+      </div>
     </div>
   );
 }
@@ -84,7 +156,7 @@ function ResidentDetail({ r, onSetJob }: { r: Resident; onSetJob: (job: JobId) =
 }
 
 export function InspectorPanel({
-  state, selected, onSetResidentJob, onRequestTrade, tab, setTab, residentId, setResidentId,
+  state, selected, onSetResidentJob, onRequestTrade, onPetition, tab, setTab, residentId, setResidentId,
 }: Props) {
   const tile = selected ? state.map[selected.y]?.[selected.x] : null;
   const building = tile ? getBuilding(state, tile.buildingId) : undefined;
@@ -96,7 +168,10 @@ export function InspectorPanel({
         <span style={{ cursor: 'pointer', opacity: tab === 'tile' ? 1 : 0.5 }} onClick={() => setTab('tile')}>정보</span>
         <span style={{ cursor: 'pointer', opacity: tab === 'people' ? 1 : 0.5 }} onClick={() => setTab('people')}>주민</span>
         <span style={{ cursor: 'pointer', opacity: tab === 'factions' ? 1 : 0.5 }} onClick={() => setTab('factions')}>세력</span>
+        <span style={{ cursor: 'pointer', opacity: tab === 'court' ? 1 : 0.5 }} onClick={() => setTab('court')}>조정</span>
       </div>
+
+      {tab === 'court' && <CourtTab state={state} onPetition={onPetition} />}
 
       {tab === 'tile' && (
         !tile ? <div className="muted small">지도를 클릭해 타일을 선택하세요.</div> : (

@@ -3,7 +3,9 @@ import { CONFIG } from './config';
 import { FACTIONS, type Faction } from './constants';
 import { countBuilt } from './buildings';
 import { addLog } from './events';
-import { applyBattleDefenseMultipliers, levyDefenseBonus, startBattle } from './battles';
+import {
+  applyBattleDefenseMultipliers, cannonBattleMult, consumeBattlePowder, levyDefenseBonus, startBattle,
+} from './battles';
 import { findPath } from './agents';
 import { damageBuildings, injure, loot, moraleShock } from './raidDamage';
 import { rankEffects } from './promotion';
@@ -270,8 +272,6 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
 
   // 경보/공성/궂은 날씨 보정 — 지도 전투와 같은 배율 (눈보라·혹한은 침입자에게 더 가혹하다)
   const battleMods = { warned, siege: Boolean(c.data.siege) };
-  const defense = applyBattleDefenseMultipliers(state.resources.defense, battleMods, state.weather);
-  const successP = defense / (defense + power);
 
   switch (optionId) {
     case 'shelter': {
@@ -286,13 +286,18 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
     // 무리 없이 열린 폴백 습격(접근 경로 없음)만 즉시 판정으로 처리한다.
     case 'militia': {
       if (startBattle(state, 'garrison')) return;
-      resolveFightFallback(state, rng, faction, successP, '수비병');
+      const fightDefense = applyBattleDefenseMultipliers(
+        state.resources.defense * cannonBattleMult(state), battleMods, state.weather);
+      consumeBattlePowder(state);
+      resolveFightFallback(state, rng, faction, fightDefense / (fightDefense + power), '수비병');
       break;
     }
     case 'levy': {
       if (startBattle(state, 'levy')) return;
       const levyDefense = applyBattleDefenseMultipliers(
-        state.resources.defense + levyDefenseBonus(state), battleMods, state.weather);
+        (state.resources.defense + levyDefenseBonus(state)) * cannonBattleMult(state),
+        battleMods, state.weather);
+      consumeBattlePowder(state);
       resolveFightFallback(state, rng, faction, levyDefense / (levyDefense + power), '징집된 주민들');
       break;
     }
