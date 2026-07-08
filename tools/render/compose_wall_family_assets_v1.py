@@ -18,7 +18,6 @@ SOURCE_ROWS = 4
 OUTPUT_COLUMNS = 16
 OUTPUT_ROWS = 12
 SUSPICIOUS_EDGE_MARGIN = 8
-SUSPICIOUS_COMPONENT_MAX_AREA = 8
 MIN_EXPECTED_SHEET_SCALE = 0.18
 MAX_EXPECTED_SHEET_SCALE = 1.0
 
@@ -143,11 +142,8 @@ def validate_source_cell(image: Image.Image, source_name: str, mask_index: int) 
     if not components:
         raise ValueError(f"{source_cell_label(source_name, mask_index)} contains no non-key pixels")
 
-    for area, bbox in components:
-        if (
-            area <= SUSPICIOUS_COMPONENT_MAX_AREA
-            and component_near_edge(bbox, image.width, image.height)
-        ):
+    for _, bbox in components:
+        if component_near_edge(bbox, image.width, image.height):
             raise ValueError(
                 f"{source_cell_label(source_name, mask_index)} has suspicious off-key artifact "
                 f"near cell edge at {bbox}",

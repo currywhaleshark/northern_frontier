@@ -103,6 +103,17 @@ def inject_off_key_speck(path: Path, index: int) -> None:
     image.save(path)
 
 
+def inject_off_key_edge_strip(path: Path, index: int) -> None:
+    image = Image.open(path).convert("RGBA")
+    draw = ImageDraw.Draw(image)
+    left, top = cell_origin(index)
+    draw.rectangle(
+        (left + 3, top, left + 3, top + SOURCE_CELL - 1),
+        fill=(84, 82, 80, 255),
+    )
+    image.save(path)
+
+
 def clear_source_cell(path: Path, index: int) -> None:
     image = Image.open(path).convert("RGBA")
     draw = ImageDraw.Draw(image)
@@ -241,6 +252,29 @@ def test_compose_rejects_off_key_source_specks() -> None:
             raise AssertionError("expected off-key source speck to raise ValueError")
 
 
+def test_compose_rejects_off_key_source_gutter_strips() -> None:
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        make_all_sources(root)
+        filename = EXPECTED_SOURCE_FILENAMES[3]
+        mask_index = 10
+        inject_off_key_edge_strip(root / filename, mask_index)
+
+        try:
+            compose_wall_family_assets(
+                root,
+                root / "wall-family-generated-v1.png",
+                root / "wall-family-generated-v1-preview-4x.png",
+            )
+        except ValueError as error:
+            message = str(error)
+            assert filename in message
+            assert f"mask index {mask_index}" in message
+            assert "suspicious off-key artifact" in message
+        else:
+            raise AssertionError("expected off-key source gutter strip to raise ValueError")
+
+
 def test_compose_reports_empty_cells_with_source_context() -> None:
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -268,5 +302,6 @@ if __name__ == "__main__":
     test_remove_key_handles_near_keys_and_preserves_wall_purple()
     test_compose_wall_family_assets()
     test_compose_rejects_off_key_source_specks()
+    test_compose_rejects_off_key_source_gutter_strips()
     test_compose_reports_empty_cells_with_source_context()
     print("wall family asset pixel tests passed")
