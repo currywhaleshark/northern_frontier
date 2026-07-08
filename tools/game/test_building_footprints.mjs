@@ -65,6 +65,7 @@ function clearMapToPlain(state) {
     }
   }
   state.buildings = [];
+  state.exploration = { explored: state.map.map(row => row.map(() => true)) };
 }
 
 function footprintIds(state, type, x, y) {
