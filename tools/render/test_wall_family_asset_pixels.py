@@ -17,8 +17,20 @@ SOURCE_SIZE = 512
 SOURCE_COLUMNS = 4
 SOURCE_ROWS = 4
 SOURCE_CELL = SOURCE_SIZE // SOURCE_COLUMNS
-TARGET_INDICES = (0, 1, 2, 4, 8, 15)
-TARGET_ROWS = (0, 5, 11)
+EXPECTED_SOURCE_FILENAMES = [
+    "wall-family-palisade-normal-source-v1.png",
+    "wall-family-earthfort-normal-source-v1.png",
+    "wall-family-stonewall-normal-source-v1.png",
+    "wall-family-gate-wood-normal-source-v1.png",
+    "wall-family-gate-earth-normal-source-v1.png",
+    "wall-family-gate-stone-normal-source-v1.png",
+    "wall-family-palisade-winter-source-v1.png",
+    "wall-family-earthfort-winter-source-v1.png",
+    "wall-family-stonewall-winter-source-v1.png",
+    "wall-family-gate-wood-winter-source-v1.png",
+    "wall-family-gate-earth-winter-source-v1.png",
+    "wall-family-gate-stone-winter-source-v1.png",
+]
 EXACT_MAGENTA = (255, 0, 255, 255)
 NEAR_MAGENTA = (198, 16, 197, 255)
 EXACT_GREEN = (0, 255, 0, 255)
@@ -146,9 +158,11 @@ def test_remove_key_handles_near_keys_and_preserves_wall_purple() -> None:
 
 
 def test_compose_wall_family_assets() -> None:
+    assert SOURCE_FILENAMES == EXPECTED_SOURCE_FILENAMES
+
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
-        for row_index, name in enumerate(SOURCE_FILENAMES):
+        for row_index, name in enumerate(EXPECTED_SOURCE_FILENAMES):
             make_source(root / name, row_index)
 
         output = root / "wall-family-generated-v1.png"
@@ -165,8 +179,8 @@ def test_compose_wall_family_assets() -> None:
                 assert bottom >= SPRITE_HEIGHT - 2
                 assert image.getpixel((col * TILE_SIZE, row * SPRITE_HEIGHT))[3] == 0
 
-        for row in TARGET_ROWS:
-            for col in TARGET_INDICES:
+        for row in range(len(EXPECTED_SOURCE_FILENAMES)):
+            for col in range(SOURCE_COLUMNS * SOURCE_ROWS):
                 assert_cell_contains_color(image, row, col, source_color(row, col))
 
         assert_cell_contains_color(image, 2, 15, PURPLE_WALL)
