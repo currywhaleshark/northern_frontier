@@ -44,6 +44,7 @@ const SINGLE_TILE = [
   'palisade',
   'earthFort',
   'stoneWall',
+  'gate',
   'watchtower',
 ];
 
