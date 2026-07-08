@@ -131,4 +131,41 @@ function addWallRing(state, left, top, right, bottom, gateAt = null) {
   assert.equal(agents.isPassable(state, 8, 5), true, 'gate lets residents pass');
 }
 
+{
+  const state = simulation.newGame(2026070803);
+  clearMapToPlain(state);
+  addWallRing(state, 8, 8, 12, 12, { x: 10, y: 8 });
+
+  const path = agents.findPath(state, 10, 6, tile => tile.x === 10 && tile.y === 10);
+  assert.ok(path, 'resident path exists through the gate');
+  assert.ok(
+    path.some(step => step.x === 10 && step.y === 8),
+    'resident path uses the gate tile',
+  );
+}
+
+{
+  const state = simulation.newGame(2026070804);
+  clearMapToPlain(state);
+  addWallRing(state, 8, 8, 12, 12);
+
+  const path = agents.findPath(state, 10, 6, tile => tile.x === 10 && tile.y === 10);
+  assert.equal(path, null, 'resident path is blocked by a ring with no gate');
+}
+
+{
+  const state = simulation.newGame(2026070805);
+  clearMapToPlain(state);
+  addBuilt(state, 'center', 10, 10);
+  addWallRing(state, 8, 8, 13, 13, { x: 10, y: 8 });
+
+  raids.spawnRaiders(state, () => 0.4, false);
+  assert.ok(state.raiders, 'raiders spawn near enclosed center');
+  assert.equal(state.raiders.siege, true, 'raiders siege instead of passing through the gate');
+  assert.ok(
+    state.raiders.path.length > 0,
+    'raiders still get a path to a siege position',
+  );
+}
+
 console.log('wall and gate tests passed');

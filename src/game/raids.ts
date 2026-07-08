@@ -13,6 +13,7 @@ import { changeRelation, getRelation, hostileRelationsAvg } from './relations';
 import { countJob } from './residents';
 import { getSeason, getYear } from './seasons';
 import type { GameState, PendingChoice } from './types';
+import { isWallBuilding } from './walls';
 
 // 위협도 일일 갱신
 export function updateThreat(state: GameState): void {
@@ -67,17 +68,13 @@ function pickFaction(state: GameState, rng: () => number): Faction {
   return cands[cands.length - 1].f;
 }
 
-function isRaidBarrier(type: string): boolean {
-  return type === 'palisade' || type === 'earthFort' || type === 'stoneWall';
-}
-
 // 습격자 통행 규칙: 산과 완공된 방책은 못 지난다 (강은 여울과 뗏목으로 건넌다)
 function raiderPassable(state: GameState, x: number, y: number): boolean {
   const t = state.map[y]?.[x];
   if (!t || t.terrain === 'mountain') return false;
   if (t.buildingId != null) {
     const b = state.buildings.find(bb => bb.id === t.buildingId);
-    if (b && b.built && isRaidBarrier(b.type)) return false;
+    if (b && b.built && isWallBuilding(b.type)) return false;
   }
   return true;
 }
@@ -108,7 +105,7 @@ export function spawnRaiders(state: GameState, rng: () => number, warned: boolea
 
   // 방책이 마을을 완전히 두르고 있으면 중심지까지의 길이 없다 → 방책 앞 공성
   const barrierTiles = new Set(
-    state.buildings.filter(b => b.built && isRaidBarrier(b.type)).map(b => b.y * w + b.x));
+    state.buildings.filter(b => b.built && isWallBuilding(b.type)).map(b => b.y * w + b.x));
   const nearBarrier = (tx: number, ty: number) =>
     [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]
       .some(([dx, dy]) => barrierTiles.has((ty + dy) * w + (tx + dx)));
