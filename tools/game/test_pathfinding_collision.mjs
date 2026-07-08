@@ -40,6 +40,7 @@ function clearMapToPlain(state) {
     }
   }
   state.buildings = [];
+  state.exploration = { explored: state.map.map(row => row.map(() => true)) };
 }
 
 function boostResources(state) {

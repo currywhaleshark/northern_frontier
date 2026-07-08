@@ -37,6 +37,7 @@ const JIN_JOBS = ['charcoalBurner', 'herder'];
 
 function boostResources(state) {
   for (const key of Object.keys(state.resources)) state.resources[key] = 1000;
+  state.exploration = { explored: state.map.map(row => row.map(() => true)) };
 }
 
 function openInteriorTile(state) {

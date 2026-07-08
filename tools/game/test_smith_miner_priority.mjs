@@ -77,11 +77,13 @@ function setupSmithScenario(seed, withMiner) {
   centerBuilding(state);
   const smithyTile = openInteriorTile(state);
   smithyTile.terrain = 'plain';
+  state.exploration.explored[smithyTile.y][smithyTile.x] = true;
   const smithy = placeBuilt(state, 'smithy', smithyTile);
 
   const mineTile = openInteriorTile(state);
   mineTile.terrain = 'rock';
   mineTile.hasIron = true;
+  state.exploration.explored[mineTile.y][mineTile.x] = true;
   placeBuilt(state, 'mine', mineTile);
 
   const smith = state.residents[0];

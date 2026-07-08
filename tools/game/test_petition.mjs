@@ -62,6 +62,7 @@ function prepareBuildableLandTile(state, type) {
         tile.terrain = 'plain';
         tile.hasIron = false;
         tile.buildingId = null;
+        state.exploration.explored[tile.y][tile.x] = true;
       }
       if (buildings.canPlaceBuildingAt(state, type, x, y)) return state.map[y][x];
     }
