@@ -12,6 +12,7 @@ PREVIEW = ROOT / "docs" / "assets" / "walls" / "wall-family-generated-v1-preview
 
 TILE_SIZE = 28
 SPRITE_HEIGHT = 40
+CONTENT_SIZE = TILE_SIZE
 SOURCE_COLUMNS = 4
 SOURCE_ROWS = 4
 OUTPUT_COLUMNS = 16
@@ -34,8 +35,8 @@ SOURCE_FILENAMES = [
 
 
 def is_key_pixel(r: int, g: int, b: int) -> bool:
-    magenta = r > 200 and g < 80 and b > 200
-    green = r < 80 and g > 200 and b < 80
+    magenta = r >= 190 and b >= 190 and g <= 120 and min(r, b) - g >= 90
+    green = g >= 190 and r <= 120 and b <= 120 and g - max(r, b) >= 90
     return magenta or green
 
 
@@ -57,6 +58,16 @@ def alpha_bbox(image: Image.Image) -> tuple[int, int, int, int]:
     return bbox
 
 
+def union_alpha_bbox(images: list[Image.Image]) -> tuple[int, int, int, int]:
+    boxes = [alpha_bbox(image) for image in images]
+    return (
+        min(box[0] for box in boxes),
+        min(box[1] for box in boxes),
+        max(box[2] for box in boxes),
+        max(box[3] for box in boxes),
+    )
+
+
 def grid_crop(image: Image.Image, index: int) -> Image.Image:
     col = index % SOURCE_COLUMNS
     row = index // SOURCE_COLUMNS
@@ -67,9 +78,12 @@ def grid_crop(image: Image.Image, index: int) -> Image.Image:
     return image.crop((left, top, right, bottom))
 
 
-def fit_to_cell(sprite: Image.Image) -> Image.Image:
-    cropped = sprite.crop(alpha_bbox(sprite))
-    scale = min(TILE_SIZE / cropped.width, 28 / cropped.height)
+def fit_to_cell(
+    sprite: Image.Image,
+    crop_box: tuple[int, int, int, int],
+    scale: float,
+) -> Image.Image:
+    cropped = sprite.crop(crop_box)
     resized = cropped.resize(
         (
             max(1, round(cropped.width * scale)),
@@ -81,7 +95,15 @@ def fit_to_cell(sprite: Image.Image) -> Image.Image:
     x = (TILE_SIZE - resized.width) // 2
     y = SPRITE_HEIGHT - resized.height
     cell.alpha_composite(resized, (x, y))
-    return cell
+    return remove_key(cell)
+
+
+def fit_sheet_cells(cells: list[Image.Image]) -> list[Image.Image]:
+    crop_box = union_alpha_bbox(cells)
+    crop_width = crop_box[2] - crop_box[0]
+    crop_height = crop_box[3] - crop_box[1]
+    scale = min(TILE_SIZE / crop_width, CONTENT_SIZE / crop_height)
+    return [fit_to_cell(cell, crop_box, scale) for cell in cells]
 
 
 def compose_wall_family_assets(
@@ -99,10 +121,12 @@ def compose_wall_family_assets(
         source_path = source_dir / filename
         if not source_path.exists():
             raise FileNotFoundError(source_path)
-        image = Image.open(source_path).convert("RGB")
-        for index in range(16):
-            crop = remove_key(grid_crop(image, index))
-            cell = fit_to_cell(crop)
+        image = Image.open(source_path).convert("RGBA")
+        cells = [
+            remove_key(grid_crop(image, index))
+            for index in range(SOURCE_COLUMNS * SOURCE_ROWS)
+        ]
+        for index, cell in enumerate(fit_sheet_cells(cells)):
             output.alpha_composite(cell, (index * TILE_SIZE, row * SPRITE_HEIGHT))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
