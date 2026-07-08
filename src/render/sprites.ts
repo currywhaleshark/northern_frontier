@@ -59,6 +59,7 @@ export interface BuildingDrawParams {
   ghost: boolean;     // 배치 미리보기
   season: Season;
   growth01?: number;  // 밭 전용: 작물 성장 0~1
+  connections?: { n: boolean; e: boolean; s: boolean; w: boolean }; // 성벽 계열 연결 렌더링
   x: number;
   y: number;
   size: number;

@@ -20,6 +20,7 @@ import {
 } from './generatedCharacterAssets';
 import { CONFIG } from '../game/config';
 import { JOB_COLORS } from '../game/constants';
+import { isGateBuilding, isWallBuilding } from '../game/walls';
 import type { BuildingTypeId, JobId, Season, Terrain } from '../game/types';
 import {
   HISTORICAL_TERRAIN_SAMPLE_SIZE,
@@ -529,6 +530,121 @@ function seasonWash(ctx: CanvasRenderingContext2D, season: Season, x: number, y:
   }
 }
 
+function drawProgressBar(ctx: CanvasRenderingContext2D, p: BuildingDrawParams): void {
+  if (p.built || p.ghost) return;
+  ctx.fillStyle = '#10141a';
+  ctx.fillRect(p.x + 2, p.y + p.size - 4, p.size - 4, 3);
+  ctx.fillStyle = '#d9a441';
+  ctx.fillRect(p.x + 2, p.y + p.size - 4, (p.size - 4) * p.progress01, 3);
+}
+
+function drawWallFamilyBuilding(ctx: CanvasRenderingContext2D, p: BuildingDrawParams): boolean {
+  if (!isWallBuilding(p.type)) return false;
+
+  const c = p.connections ?? { n: false, e: false, s: false, w: false };
+  const x = p.x;
+  const y = p.y;
+  const s = p.size;
+  const midX = x + s / 2;
+  const midY = y + s / 2;
+  const unit = Math.max(1, Math.round(s / 14));
+  const post = Math.max(4, Math.round(s * 0.26));
+  const rail = Math.max(3, Math.round(s * 0.15));
+
+  const palette = p.type === 'stoneWall'
+    ? { body: '#8b8d86', dark: '#5f625d', light: '#c7c2ae' }
+    : p.type === 'earthFort'
+      ? { body: '#9b744d', dark: '#66442e', light: '#c89a62' }
+      : { body: '#7b4e2f', dark: '#4a2f1f', light: '#b87943' };
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  if (isGateBuilding(p.type)) {
+    ctx.strokeStyle = palette.dark;
+    ctx.lineWidth = rail;
+    if (c.w) {
+      ctx.beginPath();
+      ctx.moveTo(x + 2, midY - rail);
+      ctx.lineTo(midX - post * 0.45, midY - rail);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x + 2, midY + rail);
+      ctx.lineTo(midX - post * 0.45, midY + rail);
+      ctx.stroke();
+    }
+    if (c.e) {
+      ctx.beginPath();
+      ctx.moveTo(midX + post * 0.45, midY - rail);
+      ctx.lineTo(x + s - 2, midY - rail);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(midX + post * 0.45, midY + rail);
+      ctx.lineTo(x + s - 2, midY + rail);
+      ctx.stroke();
+    }
+    if (c.n || c.s) {
+      ctx.strokeStyle = palette.dark;
+      ctx.lineWidth = rail;
+      ctx.beginPath();
+      ctx.moveTo(midX - rail, c.n ? y + 2 : midY - post * 0.5);
+      ctx.lineTo(midX - rail, c.s ? y + s - 2 : midY + post * 0.5);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(midX + rail, c.n ? y + 2 : midY - post * 0.5);
+      ctx.lineTo(midX + rail, c.s ? y + s - 2 : midY + post * 0.5);
+      ctx.stroke();
+    }
+    ctx.fillStyle = palette.dark;
+    ctx.fillRect(midX - post * 0.55, y + s * 0.2, unit * 3, s * 0.6);
+    ctx.fillRect(midX + post * 0.35, y + s * 0.2, unit * 3, s * 0.6);
+    ctx.fillStyle = '#c99552';
+    ctx.fillRect(midX - post * 0.28, y + s * 0.28, post * 0.56, s * 0.44);
+    ctx.strokeStyle = '#3d291c';
+    ctx.lineWidth = unit;
+    ctx.strokeRect(midX - post * 0.28, y + s * 0.28, post * 0.56, s * 0.44);
+  } else {
+    ctx.strokeStyle = palette.dark;
+    ctx.lineWidth = rail;
+    if (c.w || c.e) {
+      ctx.beginPath();
+      ctx.moveTo(c.w ? x + 1 : midX, midY - rail);
+      ctx.lineTo(c.e ? x + s - 1 : midX, midY - rail);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(c.w ? x + 1 : midX, midY + rail);
+      ctx.lineTo(c.e ? x + s - 1 : midX, midY + rail);
+      ctx.stroke();
+    }
+    if (c.n || c.s) {
+      ctx.beginPath();
+      ctx.moveTo(midX - rail, c.n ? y + 1 : midY);
+      ctx.lineTo(midX - rail, c.s ? y + s - 1 : midY);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(midX + rail, c.n ? y + 1 : midY);
+      ctx.lineTo(midX + rail, c.s ? y + s - 1 : midY);
+      ctx.stroke();
+    }
+    ctx.fillStyle = palette.body;
+    ctx.fillRect(midX - post / 2, midY - post / 2, post, post);
+    ctx.strokeStyle = palette.dark;
+    ctx.lineWidth = unit;
+    ctx.strokeRect(midX - post / 2, midY - post / 2, post, post);
+    ctx.fillStyle = palette.light;
+    ctx.fillRect(midX - post / 2 + unit, midY - post / 2 + unit, post - unit * 2, unit * 2);
+  }
+
+  if (p.season === 'winter') {
+    ctx.fillStyle = 'rgba(245, 240, 220, 0.72)';
+    ctx.fillRect(x + s * 0.2, y + s * 0.18, s * 0.6, unit * 2);
+  }
+
+  ctx.restore();
+  return true;
+}
+
 export const atlasSprites: SpriteAPI = {
   id: 'kenney-atlas-river-mask-historical-ground-generated-objects-buildings-promotion-v1',
 
@@ -600,6 +716,12 @@ export const atlasSprites: SpriteAPI = {
     const spr = BUILDING_SPRITES[p.type];
     const alpha = p.ghost ? 0.75 : p.built ? 1 : 0.55;
     ctx.globalAlpha = alpha;
+
+    if (drawWallFamilyBuilding(ctx, p)) {
+      ctx.globalAlpha = 1;
+      drawProgressBar(ctx, p);
+      return;
+    }
 
     if (isPromotionBuildingType(p.type) && p.size > PROMOTION_BUILDING_SHEET.tileSize && promotionLargeBuildingSheet) {
       blitLargePromotionBuilding(ctx, promotionLargeBuildingSheet, p);

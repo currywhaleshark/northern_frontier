@@ -10,6 +10,7 @@ import { BUILDING_DEFS, buildingFootprintSize, canAfford, canPlaceBuildingAt } f
 import { getSeason } from '../game/seasons';
 import { findHabitatIconAtTile } from '../game/habitats';
 import { isBuildingFootprintExplored, isExplored } from '../game/exploration';
+import { builtWallTileSet, isWallBuilding, wallConnectionsFromSet } from '../game/walls';
 import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
 import { militiaWeaponForResident } from './militiaWeaponAssignment';
 import type { AnimalHabitat, BuildingTypeId, GameState, Resident, Terrain } from '../game/types';
@@ -238,6 +239,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   // 2) 건물 — 지붕이 위 타일에 겹치므로 y 순서로 그린다
   const season = getSeason(state.day);
   const heating = (season === 'autumn' || season === 'winter') && state.resources.firewood > 0;
+  const wallTiles = builtWallTileSet(state);
   const sorted = [...state.buildings].sort((a, b) =>
     (a.y + buildingFootprintSize(a.type)) - (b.y + buildingFootprintSize(b.type)) || a.x - b.x);
   for (const b of sorted) {
@@ -250,6 +252,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       season,
       progress01: def.buildDays > 0 ? b.progress / def.buildDays : 1,
       growth01: b.type === 'field' ? b.fieldGrowth / 100 : undefined,
+      connections: b.built && isWallBuilding(b.type)
+        ? wallConnectionsFromSet(wallTiles, b.x, b.y)
+        : undefined,
       x: b.x * TILE, y: b.y * TILE, size,
     });
     // 아궁이에 불을 땔 때 온돌집/중심지 굴뚝에서 연기가 오른다
