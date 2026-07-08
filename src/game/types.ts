@@ -101,6 +101,7 @@ export type BuildingTypeId =
   | 'palisade'   // 목책
   | 'earthFort'  // 토성
   | 'stoneWall'  // 석벽
+  | 'gate'       // 성문
   | 'watchtower' // 망루
   | 'garrison'   // 군영
   | 'office'     // 관청

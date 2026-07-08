@@ -136,6 +136,12 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     cost: { stone: 10, iron: 1, tools: 1 }, buildDays: 6, slots: 0, capacity: 0, defense: 16,
     winterBonus: false, placement: 'land', unique: false, minRank: 'bu',
   },
+  gate: {
+    id: 'gate', name: '성문', emoji: '🚪',
+    desc: '성벽 사이의 출입구. 주민은 드나들 수 있지만 습격자는 막힌다.',
+    cost: { wood: 6 }, buildDays: 2, slots: 0, capacity: 0, defense: 2,
+    winterBonus: false, placement: 'land', unique: false,
+  },
   watchtower: {
     id: 'watchtower', name: '망루', emoji: '🗼',
     desc: '방어도 +8, 조기 경보 확률 증가.',
@@ -171,7 +177,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
   'hut', 'ondol', 'tileHouse', 'storehouse', 'bridge', 'field', 'lumberCamp', 'huntLodge', 'herbHut',
   'smithy', 'mine', 'ferry', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'market', 'office',
-  'palisade', 'earthFort', 'stoneWall', 'watchtower', 'beacon', 'garrison',
+  'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement',
 ];
 
@@ -187,6 +193,7 @@ export const SINGLE_TILE_BUILDINGS = [
   'palisade',
   'earthFort',
   'stoneWall',
+  'gate',
   'watchtower',
 ] as const satisfies readonly BuildingTypeId[];
 

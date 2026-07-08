@@ -39,6 +39,7 @@ const BUILDING_COLUMNS: Record<BuildingTypeId, number> = {
   palisade: 11,
   earthFort: 11,
   stoneWall: 11,
+  gate: 11,
   watchtower: 12,
   garrison: 13,
   office: 14,

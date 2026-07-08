@@ -350,6 +350,7 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   palisade:   { base: FENCE },
   earthFort:  { base: FACE_STONE, glyph: FENCE },
   stoneWall:  { base: FACE_STONE, glyph: FENCE },
+  gate:       { base: FENCE },
   watchtower: { roof: ROOF_WHITE, base: FACE_STONE, roofLift: 12 },
   garrison:   { base: TENT_GREEN, glyph: BANNER_RED },
   office:     { roof: ROOF_DARK, base: FACE_SHOP, glyph: BANNER_RED },
