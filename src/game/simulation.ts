@@ -5,9 +5,10 @@ import { CONFIG } from './config';
 import { isJobUnlocked, RANK_NAMES, SEASON_NAMES } from './constants';
 import {
   BUILDING_DEFS, buildingFootprintTiles, canAfford, cannonPlacementsUsed, canPlaceBuildingAt, canPlaceOn,
-  computeDefense, countBuilt, housingCapacity, isBuildingUnlocked, isSmithyProductUnlocked, occupyBuildingTiles,
-  SMITHY_PRODUCT_DEFS,
+  clearBuildingTiles, computeDefense, countBuilt, getBuilding, housingCapacity, isBuildingUnlocked,
+  isSmithyProductUnlocked, occupyBuildingTiles, SMITHY_PRODUCT_DEFS,
 } from './buildings';
+import { isWallBuilding } from './walls';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
 import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
 import { grantYearlyPowder, resolvePetition } from './petition';
@@ -197,6 +198,26 @@ export function tryPlaceBuilding(state: GameState, type: BuildingTypeId, x: numb
     }
   }
   addLog(state, `${def.name} 건설을 시작했습니다.`, 'info');
+  return null;
+}
+
+export function demolishBuilding(state: GameState, x: number, y: number): string | null {
+  const tile = state.map[y]?.[x];
+  if (!tile) return '지도 밖입니다.';
+  const building = getBuilding(state, tile.buildingId);
+  if (!building) return '철거할 건물이 없습니다.';
+  if (!isWallBuilding(building.type)) return '성벽 계열만 철거할 수 있습니다.';
+
+  const def = BUILDING_DEFS[building.type];
+  for (const [res, amount] of Object.entries(def.cost)) {
+    const refund = Math.max(1, Math.floor((amount ?? 0) / 2));
+    state.resources[res as ResourceId] += refund;
+  }
+
+  clearBuildingTiles(state, building.id);
+  state.buildings = state.buildings.filter(b => b.id !== building.id);
+  state.resources.defense = computeDefense(state);
+  addLog(state, `${def.name}을(를) 철거했습니다.`, 'info');
   return null;
 }
 

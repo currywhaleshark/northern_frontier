@@ -168,4 +168,40 @@ function addWallRing(state, left, top, right, bottom, gateAt = null) {
   );
 }
 
+{
+  const state = simulation.newGame(2026070806);
+  clearMapToPlain(state);
+  boostResources(state);
+  state.resources.wood = 0;
+  const gate = addBuilt(state, 'gate', 5, 5);
+  state.resources.defense = buildings.computeDefense(state);
+
+  assert.equal(simulation.demolishBuilding(state, 5, 5), null, 'demolishing gate succeeds');
+  assert.equal(state.resources.wood, 3, 'demolishing gate refunds half wood cost');
+  assert.equal(state.map[5][5].buildingId, null, 'demolishing gate clears tile occupancy');
+  assert.equal(state.buildings.some(building => building.id === gate.id), false, 'demolished gate is removed');
+  assert.equal(state.resources.defense, buildings.computeDefense(state), 'defense is recalculated');
+}
+
+{
+  const state = simulation.newGame(2026070807);
+  clearMapToPlain(state);
+  boostResources(state);
+  state.resources.wood = 0;
+  addBuilt(state, 'storehouse', 5, 5);
+
+  const err = simulation.demolishBuilding(state, 5, 5);
+  assert.equal(err, '성벽 계열만 철거할 수 있습니다.', 'non-wall demolition is rejected');
+  assert.notEqual(state.map[5][5].buildingId, null, 'rejected demolition keeps building occupancy');
+  assert.equal(state.resources.wood, 0, 'rejected demolition does not refund resources');
+}
+
+{
+  const state = simulation.newGame(2026070808);
+  clearMapToPlain(state);
+
+  assert.equal(simulation.demolishBuilding(state, 2, 2), '철거할 건물이 없습니다.');
+  assert.equal(simulation.demolishBuilding(state, -1, 2), '지도 밖입니다.');
+}
+
 console.log('wall and gate tests passed');
