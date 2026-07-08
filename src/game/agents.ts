@@ -12,6 +12,7 @@ import { getSeason } from './seasons';
 import { outdoorMult } from './weather';
 import { processableAmount } from './processing';
 import { isExplored, refreshExploration } from './exploration';
+import { isGateBuilding } from './walls';
 import type {
   Building, BuildingTypeId, GameState, ManualOrder, ProcessingInputId, Resident, ResourceId, Season,
   SmithyProductId, Tile,
@@ -93,7 +94,7 @@ function buildingAtTile(state: GameState, t: Tile): Building | undefined {
 }
 
 function isPassableBuilding(type: BuildingTypeId): boolean {
-  return PASSABLE_BUILDING_TYPES.has(type);
+  return PASSABLE_BUILDING_TYPES.has(type) || isGateBuilding(type);
 }
 
 export function isPassable(state: GameState, x: number, y: number): boolean {

@@ -116,4 +116,19 @@ function addWallRing(state, left, top, right, bottom, gateAt = null) {
   );
 }
 
+{
+  const state = simulation.newGame(2026070802);
+  clearMapToPlain(state);
+
+  addBuilt(state, 'palisade', 5, 5);
+  addBuilt(state, 'earthFort', 6, 5);
+  addBuilt(state, 'stoneWall', 7, 5);
+  addBuilt(state, 'gate', 8, 5);
+
+  assert.equal(agents.isPassable(state, 5, 5), false, 'palisade blocks residents');
+  assert.equal(agents.isPassable(state, 6, 5), false, 'earthFort blocks residents');
+  assert.equal(agents.isPassable(state, 7, 5), false, 'stoneWall blocks residents');
+  assert.equal(agents.isPassable(state, 8, 5), true, 'gate lets residents pass');
+}
+
 console.log('wall and gate tests passed');
