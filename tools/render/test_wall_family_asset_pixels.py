@@ -17,6 +17,7 @@ SOURCE_SIZE = 512
 SOURCE_COLUMNS = 4
 SOURCE_ROWS = 4
 SOURCE_CELL = SOURCE_SIZE // SOURCE_COLUMNS
+LARGE_SOURCE_SIZE = 1024
 EXPECTED_SOURCE_FILENAMES = [
     "wall-family-palisade-normal-source-v1.png",
     "wall-family-earthfort-normal-source-v1.png",
@@ -49,50 +50,84 @@ def source_color(row_index: int, cell_index: int) -> tuple[int, int, int, int]:
     )
 
 
-def cell_origin(index: int) -> tuple[int, int]:
-    return (index % SOURCE_COLUMNS) * SOURCE_CELL, (index // SOURCE_COLUMNS) * SOURCE_CELL
+def cell_origin(index: int, source_cell: int = SOURCE_CELL) -> tuple[int, int]:
+    return (index % SOURCE_COLUMNS) * source_cell, (index // SOURCE_COLUMNS) * source_cell
 
 
-def source_rect(index: int) -> tuple[int, int, int, int]:
-    left, top = cell_origin(index)
+def scale_offset(value: int, source_cell: int) -> int:
+    return round(value * source_cell / SOURCE_CELL)
+
+
+def source_rect(index: int, source_cell: int = SOURCE_CELL) -> tuple[int, int, int, int]:
+    left, top = cell_origin(index, source_cell)
     if index == 0:
-        return left + 18, top + 44, left + 110, top + 110
-    if index == 15:
-        return left + 55, top + 92, left + 73, top + 110
-    if index % 5 == 0:
-        return left + 30, top + 66, left + 96, top + 110
-    if index % 3 == 0:
-        return left + 24, top + 58, left + 90, top + 108
-    return left + 34, top + 62, left + 94, top + 110
+        offsets = (18, 44, 110, 110)
+    elif index == 15:
+        offsets = (55, 92, 73, 110)
+    elif index % 5 == 0:
+        offsets = (30, 66, 96, 110)
+    elif index % 3 == 0:
+        offsets = (24, 58, 90, 108)
+    else:
+        offsets = (34, 62, 94, 110)
+    return tuple(
+        origin + scale_offset(offset, source_cell)
+        for origin, offset in zip((left, top, left, top), offsets)
+    )
 
 
-def make_source(path: Path, row_index: int) -> None:
-    image = Image.new("RGBA", (SOURCE_SIZE, SOURCE_SIZE), EXACT_MAGENTA)
+def make_source(path: Path, row_index: int, source_size: int = SOURCE_SIZE) -> None:
+    image = Image.new("RGBA", (source_size, source_size), EXACT_MAGENTA)
     draw = ImageDraw.Draw(image)
+    source_cell = source_size // SOURCE_COLUMNS
 
     for index in range(SOURCE_COLUMNS * SOURCE_ROWS):
-        left, top = cell_origin(index)
-        draw.rectangle((left, top, left + 42, top + 34), fill=NEAR_MAGENTA)
-        draw.rectangle((left + 82, top, left + 127, top + 36), fill=NEAR_GREEN)
-        draw.rectangle((left, top + 104, left + 22, top + 127), fill=EXACT_GREEN)
-        draw.rectangle(source_rect(index), fill=source_color(row_index, index))
+        left, top = cell_origin(index, source_cell)
+        draw.rectangle(
+            (
+                left,
+                top,
+                left + scale_offset(42, source_cell),
+                top + scale_offset(34, source_cell),
+            ),
+            fill=NEAR_MAGENTA,
+        )
+        draw.rectangle(
+            (
+                left + scale_offset(82, source_cell),
+                top,
+                left + scale_offset(127, source_cell),
+                top + scale_offset(36, source_cell),
+            ),
+            fill=NEAR_GREEN,
+        )
+        draw.rectangle(
+            (
+                left,
+                top + scale_offset(104, source_cell),
+                left + scale_offset(22, source_cell),
+                top + source_cell - 1,
+            ),
+            fill=EXACT_GREEN,
+        )
+        draw.rectangle(source_rect(index, source_cell), fill=source_color(row_index, index))
 
-    transparent_left, transparent_top, transparent_right, transparent_bottom = source_rect(0)
+    transparent_left, transparent_top, transparent_right, transparent_bottom = source_rect(0, source_cell)
     draw.rectangle(
         (
-            transparent_left + 38,
-            transparent_top + 14,
-            transparent_left + 58,
-            transparent_bottom - 10,
+            transparent_left + scale_offset(38, source_cell),
+            transparent_top + scale_offset(14, source_cell),
+            transparent_left + scale_offset(58, source_cell),
+            transparent_bottom - scale_offset(10, source_cell),
         ),
         fill=(0, 0, 0, 0),
     )
     image.save(path)
 
 
-def make_all_sources(root: Path) -> None:
+def make_all_sources(root: Path, source_size: int = SOURCE_SIZE) -> None:
     for row_index, name in enumerate(EXPECTED_SOURCE_FILENAMES):
-        make_source(root / name, row_index)
+        make_source(root / name, row_index, source_size)
 
 
 def inject_off_key_speck(path: Path, index: int) -> None:
@@ -111,6 +146,14 @@ def inject_off_key_edge_strip(path: Path, index: int) -> None:
         (left + 3, top, left + 3, top + SOURCE_CELL - 1),
         fill=(84, 82, 80, 255),
     )
+    image.save(path)
+
+
+def inject_interior_off_key_speck(path: Path, index: int) -> None:
+    image = Image.open(path).convert("RGBA")
+    pixels = image.load()
+    left, top = cell_origin(index)
+    pixels[left + 12, top + 50] = (84, 82, 80, 255)
     image.save(path)
 
 
@@ -229,6 +272,22 @@ def test_compose_wall_family_assets() -> None:
         assert cell_crop(image, 0, 0).getpixel((14, 31))[3] == 0
 
 
+def test_compose_accepts_1024_source_sheets() -> None:
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        make_all_sources(root, LARGE_SOURCE_SIZE)
+
+        output = root / "wall-family-generated-v1.png"
+        preview = root / "wall-family-generated-v1-preview-4x.png"
+        compose_wall_family_assets(root, output, preview)
+
+        image = Image.open(output).convert("RGBA")
+        assert image.size == (16 * TILE_SIZE, 12 * SPRITE_HEIGHT)
+        assert Image.open(preview).size == (16 * TILE_SIZE * 4, 12 * SPRITE_HEIGHT * 4)
+        assert_cell_contains_color(image, 0, 0, source_color(0, 0))
+        assert_cell_contains_color(image, 11, 15, source_color(11, 15))
+
+
 def test_compose_rejects_off_key_source_specks() -> None:
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -250,6 +309,31 @@ def test_compose_rejects_off_key_source_specks() -> None:
             assert "suspicious off-key artifact" in message
         else:
             raise AssertionError("expected off-key source speck to raise ValueError")
+
+
+def test_compose_rejects_interior_detached_source_specks() -> None:
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        make_all_sources(root)
+        filename = EXPECTED_SOURCE_FILENAMES[8]
+        mask_index = 7
+        inject_interior_off_key_speck(root / filename, mask_index)
+
+        try:
+            compose_wall_family_assets(
+                root,
+                root / "wall-family-generated-v1.png",
+                root / "wall-family-generated-v1-preview-4x.png",
+            )
+        except ValueError as error:
+            message = str(error)
+            assert filename in message
+            assert f"mask index {mask_index}" in message
+            assert "tiny detached off-key artifact" in message
+            assert "area 1" in message
+            assert "bbox" in message
+        else:
+            raise AssertionError("expected interior off-key source speck to raise ValueError")
 
 
 def test_compose_rejects_off_key_source_gutter_strips() -> None:
@@ -301,7 +385,9 @@ def test_compose_reports_empty_cells_with_source_context() -> None:
 if __name__ == "__main__":
     test_remove_key_handles_near_keys_and_preserves_wall_purple()
     test_compose_wall_family_assets()
+    test_compose_accepts_1024_source_sheets()
     test_compose_rejects_off_key_source_specks()
+    test_compose_rejects_interior_detached_source_specks()
     test_compose_rejects_off_key_source_gutter_strips()
     test_compose_reports_empty_cells_with_source_context()
     print("wall family asset pixel tests passed")

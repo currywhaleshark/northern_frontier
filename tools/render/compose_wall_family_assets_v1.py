@@ -18,8 +18,9 @@ SOURCE_ROWS = 4
 OUTPUT_COLUMNS = 16
 OUTPUT_ROWS = 12
 SUSPICIOUS_EDGE_MARGIN = 8
-MIN_EXPECTED_SHEET_SCALE = 0.18
-MAX_EXPECTED_SHEET_SCALE = 1.0
+SUSPICIOUS_COMPONENT_MAX_AREA = 8
+MIN_NORMALIZED_FOOTPRINT = 0.05
+MAX_NORMALIZED_FOOTPRINT = 0.95
 
 SOURCE_FILENAMES = [
     "wall-family-palisade-normal-source-v1.png",
@@ -142,23 +143,47 @@ def validate_source_cell(image: Image.Image, source_name: str, mask_index: int) 
     if not components:
         raise ValueError(f"{source_cell_label(source_name, mask_index)} contains no non-key pixels")
 
-    for _, bbox in components:
+    has_substantial_component = False
+    for area, bbox in components:
         if component_near_edge(bbox, image.width, image.height):
             raise ValueError(
                 f"{source_cell_label(source_name, mask_index)} has suspicious off-key artifact "
-                f"near cell edge at {bbox}",
+                f"near cell edge with area {area} and bbox {bbox}",
             )
+        if area <= SUSPICIOUS_COMPONENT_MAX_AREA:
+            raise ValueError(
+                f"{source_cell_label(source_name, mask_index)} has tiny detached off-key artifact "
+                f"with area {area} and bbox {bbox}",
+            )
+        has_substantial_component = True
+
+    if not has_substantial_component:
+        raise ValueError(f"{source_cell_label(source_name, mask_index)} contains no substantial non-key pixels")
 
 
 def validate_sheet_transform(
     crop_box: tuple[int, int, int, int],
-    scale: float,
+    source_size: tuple[int, int],
+    cell_size: tuple[float, float],
     source_name: str,
 ) -> None:
-    if MIN_EXPECTED_SHEET_SCALE <= scale <= MAX_EXPECTED_SHEET_SCALE:
+    crop_width = crop_box[2] - crop_box[0]
+    crop_height = crop_box[3] - crop_box[1]
+    cell_width, cell_height = cell_size
+    width_ratio = crop_width / cell_width
+    height_ratio = crop_height / cell_height
+    if (
+        MIN_NORMALIZED_FOOTPRINT <= width_ratio <= MAX_NORMALIZED_FOOTPRINT
+        and MIN_NORMALIZED_FOOTPRINT <= height_ratio <= MAX_NORMALIZED_FOOTPRINT
+    ):
         return
     raise ValueError(
-        f"{source_name} sheet union bbox {crop_box} creates unexpected scale {scale:.3f}",
+        f"{source_name} sheet union bbox {crop_box} has normalized footprint "
+        f"{width_ratio:.3f}x{height_ratio:.3f}, outside bounds "
+        f"{MIN_NORMALIZED_FOOTPRINT:.2f}-{MAX_NORMALIZED_FOOTPRINT:.2f}; "
+        f"source sheet size {source_size[0]}x{source_size[1]}, "
+        f"source cell size {cell_width:.1f}x{cell_height:.1f}. "
+        "Check non-key artifacts, oversized footprint, or insufficient padding.",
     )
 
 
@@ -192,12 +217,17 @@ def fit_to_cell(
     return remove_key(cell)
 
 
-def fit_sheet_cells(cells: list[Image.Image], source_name: str) -> list[Image.Image]:
+def fit_sheet_cells(
+    cells: list[Image.Image],
+    source_name: str,
+    source_size: tuple[int, int],
+) -> list[Image.Image]:
     crop_box = union_alpha_bbox(cells, source_name)
     crop_width = crop_box[2] - crop_box[0]
     crop_height = crop_box[3] - crop_box[1]
     scale = min(TILE_SIZE / crop_width, CONTENT_SIZE / crop_height)
-    validate_sheet_transform(crop_box, scale, source_name)
+    cell_size = (source_size[0] / SOURCE_COLUMNS, source_size[1] / SOURCE_ROWS)
+    validate_sheet_transform(crop_box, source_size, cell_size, source_name)
     return [fit_to_cell(cell, crop_box, scale) for cell in cells]
 
 
@@ -222,7 +252,7 @@ def compose_wall_family_assets(
             cell = remove_key(grid_crop(image, index))
             validate_source_cell(cell, filename, index)
             cells.append(cell)
-        for index, cell in enumerate(fit_sheet_cells(cells, filename)):
+        for index, cell in enumerate(fit_sheet_cells(cells, filename, image.size)):
             output.alpha_composite(cell, (index * TILE_SIZE, row * SPRITE_HEIGHT))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
