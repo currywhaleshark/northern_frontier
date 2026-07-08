@@ -50,6 +50,12 @@ function boostResources(state) {
   state.cannonsGranted = 10;
 }
 
+function makeState() {
+  const state = simulation.newGame(2026070809);
+  clearMapToPlain(state);
+  return state;
+}
+
 function addBuilt(state, type, x, y, built = true) {
   const building = {
     id: 9000 + state.buildings.length,
@@ -214,6 +220,39 @@ function addWallRing(state, left, top, right, bottom, gateAt = null) {
 
   assert.equal(simulation.demolishBuilding(state, 2, 2), '철거할 건물이 없습니다.');
   assert.equal(simulation.demolishBuilding(state, -1, 2), '지도 밖입니다.');
+}
+
+{
+  const state = makeState();
+  addBuilt(state, 'gate', 10, 10);
+  addBuilt(state, 'earthFort', 10, 9);
+  addBuilt(state, 'gate', 11, 10);
+  addBuilt(state, 'stoneWall', 10, 11);
+  addBuilt(state, 'palisade', 9, 10);
+  addBuilt(state, 'watchtower', 10, 8);
+
+  const map = walls.builtWallTileMap(state);
+  assert.deepEqual(
+    [...map.entries()].sort(),
+    [
+      ['10,10', 'gate'],
+      ['10,11', 'stoneWall'],
+      ['10,9', 'earthFort'],
+      ['11,10', 'gate'],
+      ['9,10', 'palisade'],
+    ],
+    'builtWallTileMap includes built wall-family tiles only',
+  );
+  assert.deepEqual(
+    walls.wallConnectionsFromMap(map, 10, 10),
+    { n: true, e: true, s: true, w: true },
+    'wallConnectionsFromMap detects every adjacent wall-family tile',
+  );
+  assert.deepEqual(
+    walls.wallAdjacentTypesFromMap(map, 10, 10),
+    { n: 'earthFort', e: 'gate', s: 'stoneWall', w: 'palisade' },
+    'wallAdjacentTypesFromMap returns adjacent wall-family building types',
+  );
 }
 
 console.log('wall and gate tests passed');

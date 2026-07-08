@@ -7,6 +7,13 @@ export interface WallConnections {
   w: boolean;
 }
 
+export interface WallAdjacentTypes {
+  n?: BuildingTypeId;
+  e?: BuildingTypeId;
+  s?: BuildingTypeId;
+  w?: BuildingTypeId;
+}
+
 export const WALL_BUILDING_TYPES = [
   'palisade',
   'earthFort',
@@ -37,14 +44,31 @@ export function wallTileKey(x: number, y: number): string {
   return `${x},${y}`;
 }
 
-export function builtWallTileSet(state: Pick<GameState, 'buildings'>): Set<string> {
-  const tiles = new Set<string>();
+export function builtWallTileMap(state: Pick<GameState, 'buildings'>): Map<string, BuildingTypeId> {
+  const tiles = new Map<string, BuildingTypeId>();
   for (const building of state.buildings) {
     if (building.built && isWallBuilding(building.type)) {
-      tiles.add(wallTileKey(building.x, building.y));
+      tiles.set(wallTileKey(building.x, building.y), building.type);
     }
   }
   return tiles;
+}
+
+export function builtWallTileSet(state: Pick<GameState, 'buildings'>): Set<string> {
+  return new Set(builtWallTileMap(state).keys());
+}
+
+export function wallConnectionsFromMap(
+  wallTiles: ReadonlyMap<string, BuildingTypeId>,
+  x: number,
+  y: number,
+): WallConnections {
+  return {
+    n: wallTiles.has(wallTileKey(x, y - 1)),
+    e: wallTiles.has(wallTileKey(x + 1, y)),
+    s: wallTiles.has(wallTileKey(x, y + 1)),
+    w: wallTiles.has(wallTileKey(x - 1, y)),
+  };
 }
 
 export function wallConnectionsFromSet(wallTiles: ReadonlySet<string>, x: number, y: number): WallConnections {
@@ -56,6 +80,23 @@ export function wallConnectionsFromSet(wallTiles: ReadonlySet<string>, x: number
   };
 }
 
+export function wallAdjacentTypesFromMap(
+  wallTiles: ReadonlyMap<string, BuildingTypeId>,
+  x: number,
+  y: number,
+): WallAdjacentTypes {
+  return {
+    n: wallTiles.get(wallTileKey(x, y - 1)),
+    e: wallTiles.get(wallTileKey(x + 1, y)),
+    s: wallTiles.get(wallTileKey(x, y + 1)),
+    w: wallTiles.get(wallTileKey(x - 1, y)),
+  };
+}
+
 export function wallConnectionsAt(state: Pick<GameState, 'buildings'>, x: number, y: number): WallConnections {
-  return wallConnectionsFromSet(builtWallTileSet(state), x, y);
+  return wallConnectionsFromMap(builtWallTileMap(state), x, y);
+}
+
+export function wallAdjacentTypesAt(state: Pick<GameState, 'buildings'>, x: number, y: number): WallAdjacentTypes {
+  return wallAdjacentTypesFromMap(builtWallTileMap(state), x, y);
 }
