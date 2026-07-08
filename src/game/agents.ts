@@ -149,7 +149,7 @@ function reconstructPath(prev: Int32Array, width: number, start: number, end: nu
 }
 
 // A*: 조건을 만족하는 가장 가까운 타일까지의 경로 (시작 타일 제외)
-// passable을 넘기면 통행 규칙을 바꿀 수 있다 (습격자는 강을 건넌다)
+// passable을 넘기면 주민과 다른 통행 규칙을 적용할 수 있다.
 export function findPath(
   state: GameState,
   sx: number,

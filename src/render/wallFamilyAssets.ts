@@ -1,97 +1,92 @@
 import type { BuildingTypeId, Season } from '../game/types';
-import type { WallAdjacentTypes, WallConnections } from '../game/walls';
+import type { WallConnections } from '../game/walls';
 
-export const WALL_FAMILY_BUILDING_TYPES = [
+export const WALL_FAMILY_WALL_TYPES = [
   'palisade',
   'earthFort',
   'stoneWall',
-  'gate',
 ] as const satisfies readonly BuildingTypeId[];
 
-export type WallFamilyBuildingType = typeof WALL_FAMILY_BUILDING_TYPES[number];
-export type WallFamilyAdjacentTypes = Partial<Record<'n' | 'e' | 's' | 'w', WallFamilyBuildingType>>;
+export const WALL_MODULAR_PIECES = [
+  'pillar',
+  'horizontal',
+  'vertical',
+] as const;
+
+export type WallFamilyWallType = typeof WALL_FAMILY_WALL_TYPES[number];
+export type WallModularPiece = typeof WALL_MODULAR_PIECES[number];
 export type WallVisualMaterial = 'wood' | 'earth' | 'stone';
 
 export const WALL_FAMILY_SHEET = {
   tileSize: 28,
   spriteHeight: 40,
-  columns: 16,
-  rows: 12,
-  src: '/assets/wall-family-generated-v1.png',
+  columns: 3,
+  rows: 6,
+  src: '/assets/wall-family-modular-v1.png',
 } as const;
 
-const NORMAL_WALL_ROWS: Record<Exclude<WallFamilyBuildingType, 'gate'>, number> = {
+const WALL_FAMILY_WALL_TYPE_SET: ReadonlySet<BuildingTypeId> = new Set(WALL_FAMILY_WALL_TYPES);
+
+const MATERIAL_BY_TYPE: Record<WallFamilyWallType, WallVisualMaterial> = {
+  palisade: 'wood',
+  earthFort: 'earth',
+  stoneWall: 'stone',
+};
+
+const NORMAL_ROWS: Record<WallFamilyWallType, number> = {
   palisade: 0,
   earthFort: 1,
   stoneWall: 2,
 };
 
-const NORMAL_GATE_ROWS: Record<WallVisualMaterial, number> = {
-  wood: 3,
-  earth: 4,
-  stone: 5,
+const PIECE_COLUMNS: Record<WallModularPiece, number> = {
+  pillar: 0,
+  horizontal: 1,
+  vertical: 2,
 };
 
-const WINTER_ROW_OFFSET = 6;
-const WALL_FAMILY_BUILDING_TYPE_SET: ReadonlySet<BuildingTypeId> = new Set(WALL_FAMILY_BUILDING_TYPES);
+const WINTER_ROW_OFFSET = 3;
 
-export function isWallFamilyBuildingType(type: BuildingTypeId): type is WallFamilyBuildingType {
-  return WALL_FAMILY_BUILDING_TYPE_SET.has(type);
+export function isWallFamilyWallType(type: BuildingTypeId): type is WallFamilyWallType {
+  return WALL_FAMILY_WALL_TYPE_SET.has(type);
 }
 
-export function toWallFamilyAdjacentTypes(adjacentTypes?: WallAdjacentTypes): WallFamilyAdjacentTypes | undefined {
-  if (!adjacentTypes) return undefined;
-
-  const narrowed: WallFamilyAdjacentTypes = {};
-  if (adjacentTypes.n && isWallFamilyBuildingType(adjacentTypes.n)) narrowed.n = adjacentTypes.n;
-  if (adjacentTypes.e && isWallFamilyBuildingType(adjacentTypes.e)) narrowed.e = adjacentTypes.e;
-  if (adjacentTypes.s && isWallFamilyBuildingType(adjacentTypes.s)) narrowed.s = adjacentTypes.s;
-  if (adjacentTypes.w && isWallFamilyBuildingType(adjacentTypes.w)) narrowed.w = adjacentTypes.w;
-  return narrowed;
+export function wallVisualMaterial(type: WallFamilyWallType): WallVisualMaterial {
+  return MATERIAL_BY_TYPE[type];
 }
 
-export function wallConnectionMask(connections?: WallConnections): number {
-  if (!connections) return 0;
-  return (
-    (connections.n ? 1 : 0) +
-    (connections.e ? 2 : 0) +
-    (connections.s ? 4 : 0) +
-    (connections.w ? 8 : 0)
-  );
+export function modularWallPiece(connections?: WallConnections): WallModularPiece {
+  if (!connections) return 'pillar';
+
+  const horizontal = connections.e && connections.w;
+  const vertical = connections.n && connections.s;
+  const horizontalOnly = horizontal && !connections.n && !connections.s;
+  const verticalOnly = vertical && !connections.e && !connections.w;
+
+  if (horizontalOnly) return 'horizontal';
+  if (verticalOnly) return 'vertical';
+  return 'pillar';
 }
 
-export function gateVisualMaterial(adjacentTypes?: WallFamilyAdjacentTypes): WallVisualMaterial {
-  const adjacent = [
-    adjacentTypes?.n,
-    adjacentTypes?.e,
-    adjacentTypes?.s,
-    adjacentTypes?.w,
-  ];
-  if (adjacent.includes('stoneWall')) return 'stone';
-  if (adjacent.includes('earthFort')) return 'earth';
-  return 'wood';
-}
-
-function rowFor(type: WallFamilyBuildingType, season: Season, adjacentTypes?: WallFamilyAdjacentTypes): number {
-  const seasonOffset = season === 'winter' ? WINTER_ROW_OFFSET : 0;
-  if (type === 'gate') {
-    return NORMAL_GATE_ROWS[gateVisualMaterial(adjacentTypes)] + seasonOffset;
-  }
-  return NORMAL_WALL_ROWS[type] + seasonOffset;
-}
-
-export function wallFamilySourceRect(
-  type: WallFamilyBuildingType,
-  connections: WallConnections | undefined,
+export function wallFamilyPieceSourceRect(
+  type: WallFamilyWallType,
+  piece: WallModularPiece,
   season: Season,
-  adjacentTypes?: WallFamilyAdjacentTypes,
 ) {
-  const col = wallConnectionMask(connections);
-  const row = rowFor(type, season, adjacentTypes);
+  const row = NORMAL_ROWS[type] + (season === 'winter' ? WINTER_ROW_OFFSET : 0);
+  const col = PIECE_COLUMNS[piece];
   return {
     sx: col * WALL_FAMILY_SHEET.tileSize,
     sy: row * WALL_FAMILY_SHEET.spriteHeight,
     sw: WALL_FAMILY_SHEET.tileSize,
     sh: WALL_FAMILY_SHEET.spriteHeight,
   };
+}
+
+export function wallFamilySourceRect(
+  type: WallFamilyWallType,
+  connections: WallConnections | undefined,
+  season: Season,
+) {
+  return wallFamilyPieceSourceRect(type, modularWallPiece(connections), season);
 }

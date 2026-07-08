@@ -1,7 +1,7 @@
 // 습격 시스템 — 위협도 누적, 지도 위 습격 무리 접근, 위기 선택지와 결과 판정
 import { CONFIG } from './config';
 import { FACTIONS, type Faction } from './constants';
-import { countBuilt } from './buildings';
+import { buildingFootprintTiles, countBuilt } from './buildings';
 import { addLog } from './events';
 import {
   applyBattleDefenseMultipliers, cannonBattleMult, consumeBattlePowder, levyDefenseBonus, startBattle,
@@ -12,7 +12,7 @@ import { rankEffects } from './promotion';
 import { changeRelation, getRelation, hostileRelationsAvg } from './relations';
 import { countJob } from './residents';
 import { getSeason, getYear } from './seasons';
-import type { GameState, PendingChoice } from './types';
+import type { Building, GameState, PendingChoice } from './types';
 import { isWallBuilding } from './walls';
 
 // 위협도 일일 갱신
@@ -68,15 +68,39 @@ function pickFaction(state: GameState, rng: () => number): Faction {
   return cands[cands.length - 1].f;
 }
 
-// 습격자 통행 규칙: 산과 완공된 방책은 못 지난다 (강은 여울과 뗏목으로 건넌다)
+function buildingAt(state: GameState, buildingId: number): Building | undefined {
+  return state.buildings.find(building => building.id === buildingId);
+}
+
+function raiderCanUseBuilding(building: Building): boolean {
+  return building.built && (
+    building.type === 'bridge' ||
+    building.type === 'ferry' ||
+    building.type === 'dock'
+  );
+}
+
+// 습격자 통행 규칙: 산, 강물, 건물 발자국은 막는다. 겨울 얼음강과 완공된 교통 건물만 예외다.
 function raiderPassable(state: GameState, x: number, y: number): boolean {
   const t = state.map[y]?.[x];
   if (!t || t.terrain === 'mountain') return false;
   if (t.buildingId != null) {
-    const b = state.buildings.find(bb => bb.id === t.buildingId);
-    if (b && b.built && isWallBuilding(b.type)) return false;
+    const building = buildingAt(state, t.buildingId);
+    if (building && raiderCanUseBuilding(building)) return true;
+    return false;
+  }
+  if (t.terrain === 'river') {
+    return getSeason(state.day) === 'winter' && state.weather !== 'thawFlood';
   }
   return true;
+}
+
+function raiderBuildingApproachGoal(state: GameState, building: Building): (tile: { x: number; y: number }) => boolean {
+  const footprint = buildingFootprintTiles(state, building.type, building.x, building.y) ?? [];
+  return tile =>
+    raiderPassable(state, tile.x, tile.y) &&
+    footprint.some(footprintTile =>
+      Math.max(Math.abs(footprintTile.x - tile.x), Math.abs(footprintTile.y - tile.y)) === 1);
 }
 
 // 습격 발생 판정: 성사되면 지도 가장자리에 습격 무리가 나타나 마을로 접근한다
@@ -121,7 +145,7 @@ export function spawnRaiders(state: GameState, rng: () => number, warned: boolea
     if (!raiderPassable(state, sx, sy)) continue;
     const pass = (x: number, y: number) => raiderPassable(state, x, y);
     // 1순위: 중심지까지 직접 (방책에 틈이 있으면 돌아 들어온다)
-    path = findPath(state, sx, sy, tile => tile.buildingId === center.id, pass);
+    path = findPath(state, sx, sy, raiderBuildingApproachGoal(state, center), pass);
     // 2순위: 길이 막혔으면 방책에 붙은 타일까지 가서 공성
     if (!path && barrierTiles.size > 0) {
       path = findPath(state, sx, sy, tile => nearBarrier(tile.x, tile.y), pass);

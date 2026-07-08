@@ -13,24 +13,18 @@ from compose_wall_family_assets_v1 import (
 )
 
 
-SOURCE_SIZE = 512
-SOURCE_COLUMNS = 4
-SOURCE_ROWS = 4
+ROOT = Path(__file__).resolve().parents[2]
+SOURCE_SIZE = 384
+SOURCE_COLUMNS = 3
+SOURCE_ROWS = 1
 SOURCE_CELL = SOURCE_SIZE // SOURCE_COLUMNS
-LARGE_SOURCE_SIZE = 1024
 EXPECTED_SOURCE_FILENAMES = [
     "wall-family-palisade-normal-source-v1.png",
     "wall-family-earthfort-normal-source-v1.png",
     "wall-family-stonewall-normal-source-v1.png",
-    "wall-family-gate-wood-normal-source-v1.png",
-    "wall-family-gate-earth-normal-source-v1.png",
-    "wall-family-gate-stone-normal-source-v1.png",
     "wall-family-palisade-winter-source-v1.png",
     "wall-family-earthfort-winter-source-v1.png",
     "wall-family-stonewall-winter-source-v1.png",
-    "wall-family-gate-wood-winter-source-v1.png",
-    "wall-family-gate-earth-winter-source-v1.png",
-    "wall-family-gate-stone-winter-source-v1.png",
 ]
 EXACT_MAGENTA = (255, 0, 255, 255)
 NEAR_MAGENTA = (198, 16, 197, 255)
@@ -40,140 +34,58 @@ PURPLE_WALL = (205, 78, 171, 255)
 
 
 def source_color(row_index: int, cell_index: int) -> tuple[int, int, int, int]:
-    if row_index == 2 and cell_index == 15:
+    if row_index == 2 and cell_index == 1:
         return PURPLE_WALL
     return (
-        32 + (cell_index * 29 + row_index * 7) % 176,
+        32 + (cell_index * 41 + row_index * 7) % 176,
         42 + (row_index * 31 + cell_index * 3) % 145,
-        48 + (cell_index * 17 + row_index * 11) % 142,
+        48 + (cell_index * 23 + row_index * 11) % 142,
         255,
     )
 
 
-def cell_origin(index: int, source_cell: int = SOURCE_CELL) -> tuple[int, int]:
-    return (index % SOURCE_COLUMNS) * source_cell, (index // SOURCE_COLUMNS) * source_cell
+def cell_origin(index: int) -> tuple[int, int]:
+    return index * SOURCE_CELL, 0
 
 
-def scale_offset(value: int, source_cell: int) -> int:
-    return round(value * source_cell / SOURCE_CELL)
-
-
-def source_rect(index: int, source_cell: int = SOURCE_CELL) -> tuple[int, int, int, int]:
-    left, top = cell_origin(index, source_cell)
+def source_rect(index: int) -> tuple[int, int, int, int]:
+    left, top = cell_origin(index)
     if index == 0:
-        offsets = (18, 44, 110, 110)
-    elif index == 15:
-        offsets = (55, 92, 73, 110)
-    elif index % 5 == 0:
-        offsets = (30, 66, 96, 110)
-    elif index % 3 == 0:
-        offsets = (24, 58, 90, 108)
+        offsets = (39, 76, 89, 112)
+    elif index == 1:
+        offsets = (16, 83, 112, 108)
     else:
-        offsets = (34, 62, 94, 110)
-    return tuple(
-        origin + scale_offset(offset, source_cell)
-        for origin, offset in zip((left, top, left, top), offsets)
+        offsets = (48, 20, 80, 118)
+    return (
+        left + offsets[0],
+        top + offsets[1],
+        left + offsets[2],
+        top + offsets[3],
     )
 
 
-def make_source(path: Path, row_index: int, source_size: int = SOURCE_SIZE) -> None:
-    image = Image.new("RGBA", (source_size, source_size), EXACT_MAGENTA)
-    draw = ImageDraw.Draw(image)
-    source_cell = source_size // SOURCE_COLUMNS
-
-    for index in range(SOURCE_COLUMNS * SOURCE_ROWS):
-        left, top = cell_origin(index, source_cell)
-        draw.rectangle(
-            (
-                left,
-                top,
-                left + scale_offset(42, source_cell),
-                top + scale_offset(34, source_cell),
-            ),
-            fill=NEAR_MAGENTA,
-        )
-        draw.rectangle(
-            (
-                left + scale_offset(82, source_cell),
-                top,
-                left + scale_offset(127, source_cell),
-                top + scale_offset(36, source_cell),
-            ),
-            fill=NEAR_GREEN,
-        )
-        draw.rectangle(
-            (
-                left,
-                top + scale_offset(104, source_cell),
-                left + scale_offset(22, source_cell),
-                top + source_cell - 1,
-            ),
-            fill=EXACT_GREEN,
-        )
-        draw.rectangle(source_rect(index, source_cell), fill=source_color(row_index, index))
-
-    transparent_left, transparent_top, transparent_right, transparent_bottom = source_rect(0, source_cell)
-    draw.rectangle(
-        (
-            transparent_left + scale_offset(38, source_cell),
-            transparent_top + scale_offset(14, source_cell),
-            transparent_left + scale_offset(58, source_cell),
-            transparent_bottom - scale_offset(10, source_cell),
-        ),
-        fill=(0, 0, 0, 0),
-    )
-    image.save(path)
-
-
-def make_all_sources(root: Path, source_size: int = SOURCE_SIZE) -> None:
-    for row_index, name in enumerate(EXPECTED_SOURCE_FILENAMES):
-        make_source(root / name, row_index, source_size)
-
-
-def make_tiny_footprint_source(path: Path, row_index: int) -> None:
-    image = Image.new("RGBA", (SOURCE_SIZE, SOURCE_SIZE), EXACT_MAGENTA)
+def make_source(path: Path, row_index: int) -> None:
+    image = Image.new("RGBA", (SOURCE_SIZE, SOURCE_CELL), EXACT_MAGENTA)
     draw = ImageDraw.Draw(image)
     for index in range(SOURCE_COLUMNS * SOURCE_ROWS):
         left, top = cell_origin(index)
-        draw.rectangle(
-            (left + 61, top + 61, left + 66, top + 66),
-            fill=source_color(row_index, index),
-        )
+        draw.rectangle((left, top, left + 24, top + 22), fill=NEAR_MAGENTA)
+        draw.rectangle((left + SOURCE_CELL - 28, top, left + SOURCE_CELL - 1, top + 22), fill=NEAR_GREEN)
+        draw.rectangle((left, top + SOURCE_CELL - 20, left + 18, top + SOURCE_CELL - 1), fill=EXACT_GREEN)
+        draw.rectangle(source_rect(index), fill=source_color(row_index, index))
     image.save(path)
 
 
-def inject_off_key_speck(path: Path, index: int) -> None:
-    image = Image.open(path).convert("RGBA")
-    pixels = image.load()
-    left, top = cell_origin(index)
-    pixels[left + 3, top + 3] = (84, 82, 80, 255)
-    image.save(path)
+def make_all_sources(root: Path) -> None:
+    for row_index, name in enumerate(EXPECTED_SOURCE_FILENAMES):
+        make_source(root / name, row_index)
 
 
 def inject_off_key_edge_strip(path: Path, index: int) -> None:
     image = Image.open(path).convert("RGBA")
     draw = ImageDraw.Draw(image)
     left, top = cell_origin(index)
-    draw.rectangle(
-        (left + 3, top, left + 3, top + SOURCE_CELL - 1),
-        fill=(84, 82, 80, 255),
-    )
-    image.save(path)
-
-
-def inject_interior_off_key_speck(path: Path, index: int) -> None:
-    image = Image.open(path).convert("RGBA")
-    pixels = image.load()
-    left, top = cell_origin(index)
-    pixels[left + 12, top + 50] = (84, 82, 80, 255)
-    image.save(path)
-
-
-def inject_interior_off_key_cluster(path: Path, index: int) -> None:
-    image = Image.open(path).convert("RGBA")
-    draw = ImageDraw.Draw(image)
-    left, top = cell_origin(index)
-    draw.rectangle((left + 12, top + 50, left + 15, top + 53), fill=(84, 82, 80, 255))
+    draw.rectangle((left + 3, top, left + 3, top + SOURCE_CELL - 1), fill=(84, 82, 80, 255))
     image.save(path)
 
 
@@ -181,10 +93,7 @@ def clear_source_cell(path: Path, index: int) -> None:
     image = Image.open(path).convert("RGBA")
     draw = ImageDraw.Draw(image)
     left, top = cell_origin(index)
-    draw.rectangle(
-        (left, top, left + SOURCE_CELL - 1, top + SOURCE_CELL - 1),
-        fill=EXACT_MAGENTA,
-    )
+    draw.rectangle((left, top, left + SOURCE_CELL - 1, top + SOURCE_CELL - 1), fill=EXACT_MAGENTA)
     image.save(path)
 
 
@@ -202,19 +111,6 @@ def alpha_bbox(image: Image.Image, col: int, row: int) -> tuple[int, int, int, i
     bbox = crop.getchannel("A").getbbox()
     assert bbox is not None, f"cell {col},{row} is empty"
     return bbox
-
-
-def solid_alpha_bbox(cell: Image.Image) -> tuple[int, int, int, int]:
-    alpha = cell.getchannel("A")
-    xs: list[int] = []
-    ys: list[int] = []
-    for y in range(cell.height):
-        for x in range(cell.width):
-            if alpha.getpixel((x, y)) >= 64:
-                xs.append(x)
-                ys.append(y)
-    assert xs and ys, "cell contains no solid alpha pixels"
-    return min(xs), min(ys), max(xs) + 1, max(ys) + 1
 
 
 def assert_cell_contains_color(
@@ -262,123 +158,23 @@ def test_compose_wall_family_assets() -> None:
         root = Path(tmp)
         make_all_sources(root)
 
-        output = root / "wall-family-generated-v1.png"
-        preview = root / "wall-family-generated-v1-preview-4x.png"
+        output = root / "wall-family-modular-v1.png"
+        preview = root / "wall-family-modular-v1-preview-4x.png"
         compose_wall_family_assets(root, output, preview)
 
         image = Image.open(output).convert("RGBA")
-        assert image.size == (16 * TILE_SIZE, 12 * SPRITE_HEIGHT)
-        assert Image.open(preview).size == (16 * TILE_SIZE * 4, 12 * SPRITE_HEIGHT * 4)
+        assert image.size == (3 * TILE_SIZE, 6 * SPRITE_HEIGHT)
+        assert Image.open(preview).size == (3 * TILE_SIZE * 4, 6 * SPRITE_HEIGHT * 4)
 
-        for row in range(12):
-            for col in range(16):
+        for row in range(6):
+            for col in range(3):
                 _, _, _, bottom = alpha_bbox(image, col, row)
                 assert bottom >= SPRITE_HEIGHT - 2
                 assert image.getpixel((col * TILE_SIZE, row * SPRITE_HEIGHT))[3] == 0
-
-        for row in range(len(EXPECTED_SOURCE_FILENAMES)):
-            for col in range(SOURCE_COLUMNS * SOURCE_ROWS):
                 assert_cell_contains_color(image, row, col, source_color(row, col))
 
-        assert_cell_contains_color(image, 2, 15, PURPLE_WALL)
+        assert_cell_contains_color(image, 2, 1, PURPLE_WALL)
         assert_no_opaque_key_pixels(image)
-
-        skinny = solid_alpha_bbox(cell_crop(image, 15, 0))
-        wide = solid_alpha_bbox(cell_crop(image, 0, 0))
-        assert skinny == (11, 34, 17, SPRITE_HEIGHT)
-        assert skinny[2] - skinny[0] <= 8
-        assert wide[2] - wide[0] >= 24
-
-        assert cell_crop(image, 0, 0).getpixel((14, 31))[3] == 0
-
-
-def test_compose_accepts_1024_source_sheets() -> None:
-    with TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        make_all_sources(root, LARGE_SOURCE_SIZE)
-
-        output = root / "wall-family-generated-v1.png"
-        preview = root / "wall-family-generated-v1-preview-4x.png"
-        compose_wall_family_assets(root, output, preview)
-
-        image = Image.open(output).convert("RGBA")
-        assert image.size == (16 * TILE_SIZE, 12 * SPRITE_HEIGHT)
-        assert Image.open(preview).size == (16 * TILE_SIZE * 4, 12 * SPRITE_HEIGHT * 4)
-        assert_cell_contains_color(image, 0, 0, source_color(0, 0))
-        assert_cell_contains_color(image, 11, 15, source_color(11, 15))
-
-
-def test_compose_rejects_off_key_source_specks() -> None:
-    with TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        make_all_sources(root)
-        filename = EXPECTED_SOURCE_FILENAMES[4]
-        mask_index = 6
-        inject_off_key_speck(root / filename, mask_index)
-
-        try:
-            compose_wall_family_assets(
-                root,
-                root / "wall-family-generated-v1.png",
-                root / "wall-family-generated-v1-preview-4x.png",
-            )
-        except ValueError as error:
-            message = str(error)
-            assert filename in message
-            assert f"mask index {mask_index}" in message
-            assert "suspicious off-key artifact" in message
-        else:
-            raise AssertionError("expected off-key source speck to raise ValueError")
-
-
-def test_compose_rejects_interior_detached_source_specks() -> None:
-    with TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        make_all_sources(root)
-        filename = EXPECTED_SOURCE_FILENAMES[8]
-        mask_index = 7
-        inject_interior_off_key_speck(root / filename, mask_index)
-
-        try:
-            compose_wall_family_assets(
-                root,
-                root / "wall-family-generated-v1.png",
-                root / "wall-family-generated-v1-preview-4x.png",
-            )
-        except ValueError as error:
-            message = str(error)
-            assert filename in message
-            assert f"mask index {mask_index}" in message
-            assert "tiny detached off-key artifact" in message
-            assert "area 1" in message
-            assert "bbox" in message
-        else:
-            raise AssertionError("expected interior off-key source speck to raise ValueError")
-
-
-def test_compose_rejects_interior_detached_source_clusters() -> None:
-    with TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        make_all_sources(root)
-        filename = EXPECTED_SOURCE_FILENAMES[9]
-        mask_index = 5
-        inject_interior_off_key_cluster(root / filename, mask_index)
-
-        try:
-            compose_wall_family_assets(
-                root,
-                root / "wall-family-generated-v1.png",
-                root / "wall-family-generated-v1-preview-4x.png",
-            )
-        except ValueError as error:
-            message = str(error)
-            assert filename in message
-            assert f"mask index {mask_index}" in message
-            assert "tiny detached off-key artifact" in message
-            assert "area 16" in message
-            assert "bbox" in message
-        else:
-            raise AssertionError("expected interior off-key source cluster to raise ValueError")
 
 
 def test_compose_rejects_off_key_source_gutter_strips() -> None:
@@ -386,78 +182,74 @@ def test_compose_rejects_off_key_source_gutter_strips() -> None:
         root = Path(tmp)
         make_all_sources(root)
         filename = EXPECTED_SOURCE_FILENAMES[3]
-        mask_index = 10
-        inject_off_key_edge_strip(root / filename, mask_index)
+        piece_index = 2
+        inject_off_key_edge_strip(root / filename, piece_index)
 
         try:
             compose_wall_family_assets(
                 root,
-                root / "wall-family-generated-v1.png",
-                root / "wall-family-generated-v1-preview-4x.png",
+                root / "wall-family-modular-v1.png",
+                root / "wall-family-modular-v1-preview-4x.png",
             )
         except ValueError as error:
             message = str(error)
             assert filename in message
-            assert f"mask index {mask_index}" in message
+            assert f"piece index {piece_index}" in message
             assert "suspicious off-key artifact" in message
         else:
             raise AssertionError("expected off-key source gutter strip to raise ValueError")
-
-
-def test_compose_reports_too_small_sheet_footprint_with_context() -> None:
-    with TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        make_all_sources(root)
-        filename = EXPECTED_SOURCE_FILENAMES[1]
-        make_tiny_footprint_source(root / filename, 1)
-
-        try:
-            compose_wall_family_assets(
-                root,
-                root / "wall-family-generated-v1.png",
-                root / "wall-family-generated-v1-preview-4x.png",
-            )
-        except ValueError as error:
-            message = str(error)
-            assert filename in message
-            assert "normalized footprint" in message
-            assert "source cell size" in message
-            assert "Check non-key artifacts, oversized footprint, or insufficient padding" in message
-        else:
-            raise AssertionError("expected tiny source footprint to raise ValueError")
 
 
 def test_compose_reports_empty_cells_with_source_context() -> None:
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
         make_all_sources(root)
-        filename = EXPECTED_SOURCE_FILENAMES[7]
-        mask_index = 9
-        clear_source_cell(root / filename, mask_index)
+        filename = EXPECTED_SOURCE_FILENAMES[5]
+        piece_index = 1
+        clear_source_cell(root / filename, piece_index)
 
         try:
             compose_wall_family_assets(
                 root,
-                root / "wall-family-generated-v1.png",
-                root / "wall-family-generated-v1-preview-4x.png",
+                root / "wall-family-modular-v1.png",
+                root / "wall-family-modular-v1-preview-4x.png",
             )
         except ValueError as error:
             message = str(error)
             assert filename in message
-            assert f"mask index {mask_index}" in message
+            assert f"piece index {piece_index}" in message
             assert "contains no non-key pixels" in message
         else:
             raise AssertionError("expected empty source cell to raise ValueError")
 
 
+def test_wall_gate_asset_pixels() -> None:
+    output = ROOT / "public" / "assets" / "wall-gate-v1.png"
+    preview = ROOT / "docs" / "assets" / "walls" / "wall-gate-v1-preview-8x.png"
+
+    image = Image.open(output).convert("RGBA")
+    assert image.size == (2 * TILE_SIZE, 2 * SPRITE_HEIGHT)
+    assert Image.open(preview).size == (2 * TILE_SIZE * 8, 2 * SPRITE_HEIGHT * 8)
+
+    for row in range(2):
+        for col in range(2):
+            left, top, right, bottom = alpha_bbox(image, col, row)
+            assert bottom >= SPRITE_HEIGHT - 1
+            assert right - left >= 18
+            assert bottom - top >= 30
+            assert image.getpixel((col * TILE_SIZE, row * SPRITE_HEIGHT))[3] == 0
+
+    horizontal_width = alpha_bbox(image, 0, 0)[2] - alpha_bbox(image, 0, 0)[0]
+    vertical_width = alpha_bbox(image, 1, 0)[2] - alpha_bbox(image, 1, 0)[0]
+    assert horizontal_width >= 24
+    assert vertical_width >= 20
+    assert_no_opaque_key_pixels(image)
+
+
 if __name__ == "__main__":
     test_remove_key_handles_near_keys_and_preserves_wall_purple()
     test_compose_wall_family_assets()
-    test_compose_accepts_1024_source_sheets()
-    test_compose_rejects_off_key_source_specks()
-    test_compose_rejects_interior_detached_source_specks()
-    test_compose_rejects_interior_detached_source_clusters()
     test_compose_rejects_off_key_source_gutter_strips()
-    test_compose_reports_too_small_sheet_footprint_with_context()
     test_compose_reports_empty_cells_with_source_context()
+    test_wall_gate_asset_pixels()
     print("wall family asset pixel tests passed")

@@ -67,6 +67,15 @@ import {
   MILITIA_WEAPON_SHEET,
   militiaWeaponSourceRect,
 } from './militiaWeaponAssets';
+import {
+  WALL_FAMILY_SHEET,
+  isWallFamilyWallType,
+  wallFamilySourceRect,
+} from './wallFamilyAssets';
+import {
+  WALL_GATE_SHEET,
+  wallGateSourceRect,
+} from './wallGateAssets';
 
 const PITCH = 17;
 const T = 16;
@@ -88,6 +97,8 @@ let promotionBuildingSheet: HTMLImageElement | null = null;
 let promotionLargeBuildingSheet: HTMLImageElement | null = null;
 let promotionCharacterSheet: HTMLImageElement | null = null;
 let militiaWeaponSheet: HTMLImageElement | null = null;
+let wallFamilySheet: HTMLImageElement | null = null;
+let wallGateSheet: HTMLImageElement | null = null;
 let loaded = 0;
 let started = false;
 
@@ -133,6 +144,12 @@ function ensureLoaded(): void {
     loaded++;
   };
   militiaWeapons.src = MILITIA_WEAPON_SHEET.src;
+  wallFamilySheet = new Image();
+  wallFamilySheet.onload = () => { loaded++; };
+  wallFamilySheet.src = WALL_FAMILY_SHEET.src;
+  wallGateSheet = new Image();
+  wallGateSheet.onload = () => { loaded++; };
+  wallGateSheet.src = WALL_GATE_SHEET.src;
   const characterSheet = new Image();
   characterSheet.onload = () => {
     generatedCharacterSheet = characterSheet;
@@ -143,7 +160,7 @@ function ensureLoaded(): void {
 
 export function atlasReady(): boolean {
   ensureLoaded();
-  return loaded >= 12;
+  return loaded >= 14;
 }
 
 // 아틀라스가 준비되면 아틀라스, 아니면 임시 그래픽
@@ -214,6 +231,29 @@ function blitLargePromotionBuilding(
   if (!rect) return;
   const scale = p.size / PROMOTION_LARGE_BUILDING_SHEET.tileSize;
   const destHeight = PROMOTION_LARGE_BUILDING_SHEET.spriteHeight * scale;
+  ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
+}
+
+function blitWallFamilyBuilding(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  p: BuildingDrawParams,
+): void {
+  if (!isWallFamilyWallType(p.type)) return;
+  const rect = wallFamilySourceRect(p.type, p.connections, p.season);
+  const scale = p.size / WALL_FAMILY_SHEET.tileSize;
+  const destHeight = WALL_FAMILY_SHEET.spriteHeight * scale;
+  ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
+}
+
+function blitWallGateBuilding(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  p: BuildingDrawParams,
+): void {
+  const rect = wallGateSourceRect(p.connections, p.season);
+  const scale = p.size / WALL_GATE_SHEET.tileSize;
+  const destHeight = WALL_GATE_SHEET.spriteHeight * scale;
   ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
 }
 
@@ -540,6 +580,14 @@ function drawProgressBar(ctx: CanvasRenderingContext2D, p: BuildingDrawParams): 
 
 function drawWallFamilyBuilding(ctx: CanvasRenderingContext2D, p: BuildingDrawParams): boolean {
   if (!isWallBuilding(p.type)) return false;
+  if (isWallFamilyWallType(p.type) && wallFamilySheet) {
+    blitWallFamilyBuilding(ctx, wallFamilySheet, p);
+    return true;
+  }
+  if (isGateBuilding(p.type) && wallGateSheet) {
+    blitWallGateBuilding(ctx, wallGateSheet, p);
+    return true;
+  }
 
   const c = p.connections ?? { n: false, e: false, s: false, w: false };
   const x = p.x;

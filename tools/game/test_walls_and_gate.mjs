@@ -86,6 +86,16 @@ function addWallRing(state, left, top, right, bottom, gateAt = null) {
   }
 }
 
+function sequenceRng(values) {
+  let index = 0;
+  return () => values[Math.min(index++, values.length - 1)];
+}
+
+function spawnXRoll(state, x) {
+  const w = state.map[0]?.length ?? 0;
+  return (x - 2 + 0.1) / (w - 4);
+}
+
 {
   assert.equal(buildings.BUILDING_DEFS.gate.name, '성문', 'gate definition exists');
   assert.equal(buildings.BUILDING_DEFS.gate.defense, 2, 'gate is weaker than palisade');
@@ -184,6 +194,40 @@ function addWallRing(state, left, top, right, bottom, gateAt = null) {
     state.raiders.path.length > 0,
     'raiders still get a path to a siege position',
   );
+}
+
+{
+  const state = makeState();
+  const centerX = Math.floor((state.map[0]?.length ?? 30) / 2);
+  const centerY = 12;
+  addBuilt(state, 'center', centerX, centerY);
+  const obstacle = addBuilt(state, 'storehouse', centerX, 5);
+
+  raids.spawnRaiders(state, sequenceRng([0.4, 0.4, spawnXRoll(state, centerX)]), false);
+
+  assert.ok(state.raiders, 'raiders spawn on a map with an open route around buildings');
+  assert.equal(
+    state.raiders.path.some(step => state.map[step.y][step.x].buildingId === obstacle.id),
+    false,
+    'raiders route around built building footprints instead of walking over them',
+  );
+}
+
+{
+  const state = makeState();
+  const centerX = Math.floor((state.map[0]?.length ?? 30) / 2);
+  const riverY = Math.floor(state.map.length * 0.5) + 1;
+  addBuilt(state, 'center', centerX, riverY + 4);
+  state.day = 1; // spring
+  state.weather = 'clear';
+  for (let x = 0; x < state.map[0].length; x++) {
+    state.map[riverY][x].terrain = 'river';
+  }
+
+  raids.spawnRaiders(state, sequenceRng([0.4, 0.4, spawnXRoll(state, centerX)]), false);
+
+  assert.equal(state.raiders, null, 'raiders do not spawn a map path across a thawed river barrier');
+  assert.equal(state.pendingChoice?.kind, 'raid', 'blocked river approach falls back to an immediate raid choice');
 }
 
 {

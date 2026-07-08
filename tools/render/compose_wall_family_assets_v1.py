@@ -7,35 +7,30 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_DIR = ROOT / "tools" / "render" / "source_images"
-OUTPUT = ROOT / "public" / "assets" / "wall-family-generated-v1.png"
-PREVIEW = ROOT / "docs" / "assets" / "walls" / "wall-family-generated-v1-preview-4x.png"
+OUTPUT = ROOT / "public" / "assets" / "wall-family-modular-v1.png"
+PREVIEW = ROOT / "docs" / "assets" / "walls" / "wall-family-modular-v1-preview-4x.png"
 
 TILE_SIZE = 28
 SPRITE_HEIGHT = 40
 CONTENT_SIZE = TILE_SIZE
-SOURCE_COLUMNS = 4
-SOURCE_ROWS = 4
-OUTPUT_COLUMNS = 16
-OUTPUT_ROWS = 12
+SOURCE_COLUMNS = 3
+SOURCE_ROWS = 1
+OUTPUT_COLUMNS = 3
+OUTPUT_ROWS = 6
 SUSPICIOUS_EDGE_MARGIN = 8
 MIN_TINY_COMPONENT_AREA = 16
 TINY_COMPONENT_AREA_RATIO = 0.001
 MIN_NORMALIZED_FOOTPRINT = 0.05
 MAX_NORMALIZED_FOOTPRINT = 0.95
+OUTPUT_ALPHA_THRESHOLD = 48
 
 SOURCE_FILENAMES = [
     "wall-family-palisade-normal-source-v1.png",
     "wall-family-earthfort-normal-source-v1.png",
     "wall-family-stonewall-normal-source-v1.png",
-    "wall-family-gate-wood-normal-source-v1.png",
-    "wall-family-gate-earth-normal-source-v1.png",
-    "wall-family-gate-stone-normal-source-v1.png",
     "wall-family-palisade-winter-source-v1.png",
     "wall-family-earthfort-winter-source-v1.png",
     "wall-family-stonewall-winter-source-v1.png",
-    "wall-family-gate-wood-winter-source-v1.png",
-    "wall-family-gate-earth-winter-source-v1.png",
-    "wall-family-gate-stone-winter-source-v1.png",
 ]
 
 
@@ -56,22 +51,22 @@ def remove_key(image: Image.Image) -> Image.Image:
     return rgba
 
 
-def source_cell_label(source_name: str | None, mask_index: int | None) -> str:
+def source_cell_label(source_name: str | None, piece_index: int | None) -> str:
     if source_name is None:
         return "source cell"
-    if mask_index is None:
+    if piece_index is None:
         return source_name
-    return f"{source_name} mask index {mask_index}"
+    return f"{source_name} piece index {piece_index}"
 
 
 def alpha_bbox(
     image: Image.Image,
     source_name: str | None = None,
-    mask_index: int | None = None,
+    piece_index: int | None = None,
 ) -> tuple[int, int, int, int]:
     bbox = image.getchannel("A").getbbox()
     if bbox is None:
-        raise ValueError(f"{source_cell_label(source_name, mask_index)} contains no non-key pixels")
+        raise ValueError(f"{source_cell_label(source_name, piece_index)} contains no non-key pixels")
     return bbox
 
 
@@ -143,28 +138,23 @@ def tiny_component_area_threshold(width: int, height: int) -> int:
     return max(MIN_TINY_COMPONENT_AREA, round(width * height * TINY_COMPONENT_AREA_RATIO))
 
 
-def validate_source_cell(image: Image.Image, source_name: str, mask_index: int) -> None:
+def validate_source_cell(image: Image.Image, source_name: str, piece_index: int) -> None:
     components = alpha_components(image)
     if not components:
-        raise ValueError(f"{source_cell_label(source_name, mask_index)} contains no non-key pixels")
+        raise ValueError(f"{source_cell_label(source_name, piece_index)} contains no non-key pixels")
 
-    has_substantial_component = False
     tiny_threshold = tiny_component_area_threshold(image.width, image.height)
     for area, bbox in components:
         if component_near_edge(bbox, image.width, image.height):
             raise ValueError(
-                f"{source_cell_label(source_name, mask_index)} has suspicious off-key artifact "
+                f"{source_cell_label(source_name, piece_index)} has suspicious off-key artifact "
                 f"near cell edge with area {area} and bbox {bbox}",
             )
         if area <= tiny_threshold:
             raise ValueError(
-                f"{source_cell_label(source_name, mask_index)} has tiny detached off-key artifact "
+                f"{source_cell_label(source_name, piece_index)} has tiny detached off-key artifact "
                 f"with area {area}, threshold {tiny_threshold}, and bbox {bbox}",
             )
-        has_substantial_component = True
-
-    if not has_substantial_component:
-        raise ValueError(f"{source_cell_label(source_name, mask_index)} contains no substantial non-key pixels")
 
 
 def validate_sheet_transform(
@@ -220,7 +210,63 @@ def fit_to_cell(
     x = (TILE_SIZE - resized.width) // 2
     y = SPRITE_HEIGHT - resized.height
     cell.alpha_composite(resized, (x, y))
-    return remove_key(cell)
+    return keep_largest_component(harden_output_alpha(remove_key(cell)))
+
+
+def harden_output_alpha(image: Image.Image) -> Image.Image:
+    rgba = image.convert("RGBA")
+    pixels = rgba.load()
+    for y in range(rgba.height):
+        for x in range(rgba.width):
+            r, g, b, a = pixels[x, y]
+            if a < OUTPUT_ALPHA_THRESHOLD:
+                pixels[x, y] = (0, 0, 0, 0)
+            else:
+                pixels[x, y] = (r, g, b, 255)
+    return rgba
+
+
+def keep_largest_component(image: Image.Image) -> Image.Image:
+    components = alpha_components(image)
+    if len(components) <= 1:
+        return image
+
+    _, largest_bbox = max(components, key=lambda component: component[0])
+    source_pixels = image.load()
+    alpha_pixels = image.getchannel("A").load()
+    output = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    output_pixels = output.load()
+
+    seed_x = seed_y = 0
+    found_seed = False
+    for y in range(largest_bbox[1], largest_bbox[3]):
+        for x in range(largest_bbox[0], largest_bbox[2]):
+            if alpha_pixels[x, y] > 0:
+                seed_x = x
+                seed_y = y
+                found_seed = True
+                break
+        if found_seed:
+            break
+
+    if not found_seed:
+        return output
+
+    visited = bytearray(image.width * image.height)
+    stack = [(seed_x, seed_y)]
+    visited[seed_y * image.width + seed_x] = 1
+    while stack:
+        x, y = stack.pop()
+        output_pixels[x, y] = source_pixels[x, y]
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if nx < 0 or ny < 0 or nx >= image.width or ny >= image.height:
+                continue
+            offset = ny * image.width + nx
+            if visited[offset] or alpha_pixels[nx, ny] == 0:
+                continue
+            visited[offset] = 1
+            stack.append((nx, ny))
+    return output
 
 
 def fit_sheet_cells(

@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 const source = readFileSync(new URL('../../src/render/wallFamilyAssets.ts', import.meta.url), 'utf8');
+const gateSource = readFileSync(new URL('../../src/render/wallGateAssets.ts', import.meta.url), 'utf8');
+const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
 const output = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.ES2022,
@@ -13,116 +15,167 @@ const output = ts.transpileModule(source, {
 }).outputText;
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(output).toString('base64')}`;
 const assets = await import(moduleUrl);
+const gateOutput = ts.transpileModule(gateSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ES2022,
+    target: ts.ScriptTarget.ES2022,
+  },
+}).outputText;
+const gateModuleUrl = `data:text/javascript;base64,${Buffer.from(gateOutput).toString('base64')}`;
+const gateAssets = await import(gateModuleUrl);
 
 assert.deepEqual(assets.WALL_FAMILY_SHEET, {
   tileSize: 28,
   spriteHeight: 40,
-  columns: 16,
-  rows: 12,
-  src: '/assets/wall-family-generated-v1.png',
+  columns: 3,
+  rows: 6,
+  src: '/assets/wall-family-modular-v1.png',
 });
 
-assert.equal(assets.isWallFamilyBuildingType('palisade'), true);
-assert.equal(assets.isWallFamilyBuildingType('gate'), true);
-assert.equal(assets.isWallFamilyBuildingType('hut'), false);
-assert.deepEqual(
-  assets.toWallFamilyAdjacentTypes({ n: 'palisade', e: 'hut', s: 'stoneWall' }),
-  { n: 'palisade', s: 'stoneWall' },
+assert.deepEqual(assets.WALL_FAMILY_WALL_TYPES, ['palisade', 'earthFort', 'stoneWall']);
+assert.deepEqual(assets.WALL_MODULAR_PIECES, ['pillar', 'horizontal', 'vertical']);
+
+assert.equal(assets.isWallFamilyWallType('palisade'), true);
+assert.equal(assets.isWallFamilyWallType('earthFort'), true);
+assert.equal(assets.isWallFamilyWallType('stoneWall'), true);
+assert.equal(assets.isWallFamilyWallType('gate'), false);
+assert.equal(assets.isWallFamilyWallType('hut'), false);
+
+assert.equal(assets.wallVisualMaterial('palisade'), 'wood');
+assert.equal(assets.wallVisualMaterial('earthFort'), 'earth');
+assert.equal(assets.wallVisualMaterial('stoneWall'), 'stone');
+
+const none = { n: false, e: false, s: false, w: false };
+assert.equal(assets.modularWallPiece(none), 'pillar', 'isolated wall renders as pillar');
+assert.equal(
+  assets.modularWallPiece({ n: false, e: true, s: false, w: false }),
+  'pillar',
+  'run endpoint renders as pillar',
+);
+assert.equal(
+  assets.modularWallPiece({ n: false, e: true, s: false, w: true }),
+  'horizontal',
+  'horizontal straight-run interior renders as horizontal segment',
+);
+assert.equal(
+  assets.modularWallPiece({ n: true, e: false, s: true, w: false }),
+  'vertical',
+  'vertical straight-run interior renders as vertical segment',
+);
+assert.equal(
+  assets.modularWallPiece({ n: true, e: true, s: false, w: false }),
+  'pillar',
+  'corner renders as pillar',
+);
+assert.equal(
+  assets.modularWallPiece({ n: true, e: true, s: true, w: false }),
+  'pillar',
+  'T-junction renders as pillar',
+);
+assert.equal(
+  assets.modularWallPiece({ n: true, e: true, s: true, w: true }),
+  'pillar',
+  'cross junction renders as pillar',
 );
 
-assert.equal(assets.wallConnectionMask({ n: false, e: false, s: false, w: false }), 0);
-assert.equal(assets.wallConnectionMask({ n: true, e: false, s: false, w: false }), 1);
-assert.equal(assets.wallConnectionMask({ n: false, e: true, s: false, w: false }), 2);
-assert.equal(assets.wallConnectionMask({ n: false, e: false, s: true, w: false }), 4);
-assert.equal(assets.wallConnectionMask({ n: false, e: false, s: false, w: true }), 8);
-assert.equal(assets.wallConnectionMask({ n: true, e: true, s: true, w: true }), 15);
-
 assert.deepEqual(
-  assets.wallFamilySourceRect('palisade', { n: true, e: false, s: true, w: false }, 'summer'),
-  { sx: 5 * 28, sy: 0, sw: 28, sh: 40 },
+  assets.wallFamilySourceRect('palisade', none, 'summer'),
+  { sx: 0, sy: 0, sw: 28, sh: 40 },
+  'palisade pillar summer',
 );
 assert.deepEqual(
   assets.wallFamilySourceRect('earthFort', { n: false, e: true, s: false, w: true }, 'summer'),
-  { sx: 10 * 28, sy: 40, sw: 28, sh: 40 },
+  { sx: 28, sy: 40, sw: 28, sh: 40 },
+  'earth fort horizontal summer',
 );
 assert.deepEqual(
-  assets.wallFamilySourceRect('stoneWall', { n: true, e: true, s: true, w: true }, 'winter'),
-  { sx: 15 * 28, sy: 8 * 40, sw: 28, sh: 40 },
-);
-
-const originConnections = { n: false, e: false, s: false, w: false };
-const sourceRectCases = [
-  ['palisade summer', 'palisade', 'summer', undefined, 0],
-  ['earth fort summer', 'earthFort', 'summer', undefined, 1],
-  ['stone wall summer', 'stoneWall', 'summer', undefined, 2],
-  ['wood gate summer', 'gate', 'summer', { n: 'palisade' }, 3],
-  ['earth gate summer', 'gate', 'summer', { n: 'earthFort' }, 4],
-  ['stone gate summer', 'gate', 'summer', { n: 'stoneWall' }, 5],
-  ['palisade winter', 'palisade', 'winter', undefined, 6],
-  ['earth fort winter', 'earthFort', 'winter', undefined, 7],
-  ['stone wall winter', 'stoneWall', 'winter', undefined, 8],
-  ['wood gate winter', 'gate', 'winter', { n: 'gate' }, 9],
-  ['earth gate winter', 'gate', 'winter', { n: 'earthFort' }, 10],
-  ['stone gate winter', 'gate', 'winter', { n: 'stoneWall' }, 11],
-];
-for (const [label, type, season, adjacentTypes, row] of sourceRectCases) {
-  assert.deepEqual(
-    assets.wallFamilySourceRect(type, originConnections, season, adjacentTypes),
-    { sx: 0, sy: row * 40, sw: 28, sh: 40 },
-    label,
-  );
-}
-
-assert.equal(assets.gateVisualMaterial({ n: 'palisade' }), 'wood');
-assert.equal(assets.gateVisualMaterial({ n: 'earthFort', s: 'palisade' }), 'earth');
-assert.equal(assets.gateVisualMaterial({ e: 'stoneWall', w: 'earthFort' }), 'stone');
-assert.equal(assets.gateVisualMaterial({ n: 'gate', s: 'gate' }), 'wood');
-
-assert.deepEqual(
-  assets.wallFamilySourceRect('gate', { n: false, e: true, s: false, w: true }, 'summer', { e: 'earthFort' }),
-  { sx: 10 * 28, sy: 4 * 40, sw: 28, sh: 40 },
+  assets.wallFamilySourceRect('stoneWall', { n: true, e: false, s: true, w: false }, 'winter'),
+  { sx: 2 * 28, sy: 5 * 40, sw: 28, sh: 40 },
+  'stone wall vertical winter',
 );
 assert.deepEqual(
-  assets.wallFamilySourceRect('gate', { n: false, e: true, s: false, w: true }, 'winter', { w: 'stoneWall' }),
-  { sx: 10 * 28, sy: 11 * 40, sw: 28, sh: 40 },
+  assets.wallFamilyPieceSourceRect('palisade', 'horizontal', 'winter'),
+  { sx: 28, sy: 3 * 40, sw: 28, sh: 40 },
+  'direct piece source rect works',
+);
+
+assert.deepEqual(gateAssets.WALL_GATE_SHEET, {
+  tileSize: 28,
+  spriteHeight: 40,
+  columns: 2,
+  rows: 2,
+  src: '/assets/wall-gate-v1.png',
+});
+
+assert.deepEqual(gateAssets.WALL_GATE_ORIENTATIONS, ['horizontal', 'vertical']);
+assert.equal(gateAssets.wallGateOrientation(undefined), 'horizontal');
+assert.equal(
+  gateAssets.wallGateOrientation({ n: false, e: true, s: false, w: true }),
+  'horizontal',
+  'east-west gate renders as horizontal',
+);
+assert.equal(
+  gateAssets.wallGateOrientation({ n: true, e: false, s: true, w: false }),
+  'vertical',
+  'north-south gate renders as vertical',
+);
+assert.equal(
+  gateAssets.wallGateOrientation({ n: true, e: true, s: true, w: true }),
+  'horizontal',
+  'ambiguous gate junction keeps a stable horizontal fallback',
+);
+assert.deepEqual(
+  gateAssets.wallGateSourceRect({ n: false, e: true, s: false, w: true }, 'summer'),
+  { sx: 0, sy: 0, sw: 28, sh: 40 },
+  'horizontal gate summer',
+);
+assert.deepEqual(
+  gateAssets.wallGateSourceRect({ n: true, e: false, s: true, w: false }, 'winter'),
+  { sx: 28, sy: 40, sw: 28, sh: 40 },
+  'vertical gate winter',
 );
 
 const typecheckSource = `
 import type { BuildingTypeId } from '../../src/game/types';
-import type { WallAdjacentTypes } from '../../src/game/walls';
 import {
-  gateVisualMaterial,
-  isWallFamilyBuildingType,
-  toWallFamilyAdjacentTypes,
+  isWallFamilyWallType,
+  modularWallPiece,
+  wallFamilyPieceSourceRect,
   wallFamilySourceRect,
+  wallVisualMaterial,
 } from '../../src/render/wallFamilyAssets';
+import {
+  wallGateOrientation,
+  wallGateSourceRect,
+} from '../../src/render/wallGateAssets';
 
 wallFamilySourceRect('palisade', undefined, 'summer');
 wallFamilySourceRect('earthFort', undefined, 'winter');
 wallFamilySourceRect('stoneWall', undefined, 'summer');
-wallFamilySourceRect('gate', undefined, 'winter', { n: 'stoneWall' });
-gateVisualMaterial({ n: 'palisade', s: 'gate' });
+wallFamilyPieceSourceRect('stoneWall', 'vertical', 'winter');
+wallVisualMaterial('palisade');
+modularWallPiece({ n: true, e: false, s: true, w: false });
+wallGateOrientation({ n: false, e: true, s: false, w: true });
+wallGateSourceRect(undefined, 'summer');
+wallGateSourceRect({ n: true, e: false, s: true, w: false }, 'winter');
 
 function guardedSourceRect(type: BuildingTypeId) {
-  if (!isWallFamilyBuildingType(type)) return undefined;
+  if (!isWallFamilyWallType(type)) return undefined;
   return wallFamilySourceRect(type, undefined, 'summer');
 }
 
-// @ts-expect-error non-wall buildings are not valid wall-family source rect types
+// @ts-expect-error gates use a separate render path, not the base three-piece wall sheet
+wallFamilySourceRect('gate', undefined, 'summer');
+
+// @ts-expect-error non-wall buildings are not valid modular wall source rect types
 wallFamilySourceRect('hut', undefined, 'summer');
 
+// @ts-expect-error direct source rect only accepts known modular pieces
+wallFamilyPieceSourceRect('palisade', 'corner', 'summer');
+
 const broadType: BuildingTypeId = 'hut';
-// @ts-expect-error broad building IDs must be narrowed before rendering wall-family assets
+// @ts-expect-error broad building IDs must be narrowed before rendering modular wall assets
 wallFamilySourceRect(broadType, undefined, 'summer');
-
-// @ts-expect-error gate visual material only accepts wall-family adjacent values
-gateVisualMaterial({ n: 'hut' });
-
-const broadAdjacent: WallAdjacentTypes = { n: 'hut' };
-// @ts-expect-error broad adjacent building types must be narrowed before choosing gate material
-gateVisualMaterial(broadAdjacent);
-
-gateVisualMaterial(toWallFamilyAdjacentTypes(broadAdjacent));
 `;
 
 const typecheckFileName = fileURLToPath(new URL('./wall_family_assets_typecheck.ts', import.meta.url));
@@ -152,6 +205,62 @@ host.readFile = (fileName) => (normalizeFileName(fileName) === typecheckFileKey 
 const typecheckProgram = ts.createProgram([typecheckFileName], typecheckOptions, host);
 const typecheckDiagnostics = ts.getPreEmitDiagnostics(typecheckProgram);
 assert.deepEqual(typecheckDiagnostics.map(formatDiagnostic), []);
+
+assert.match(
+  atlasSource,
+  /WALL_FAMILY_SHEET[\s\S]*isWallFamilyWallType[\s\S]*wallFamilySourceRect/,
+  'atlas imports modular wall-family sheet metadata and source rect helpers',
+);
+assert.match(
+  atlasSource,
+  /wallFamilySheet\s*=\s*new Image\(\)[\s\S]*wallFamilySheet\.src\s*=\s*WALL_FAMILY_SHEET\.src/,
+  'atlas loads the modular wall-family image sheet',
+);
+assert.match(
+  atlasSource,
+  /loaded >= 14/,
+  'atlas readiness includes the modular wall-family image sheet',
+);
+assert.match(
+  atlasSource,
+  /WALL_GATE_SHEET[\s\S]*wallGateSourceRect/,
+  'atlas imports generated gate sheet metadata and source rect helper',
+);
+assert.match(
+  atlasSource,
+  /wallGateSheet\s*=\s*new Image\(\)[\s\S]*wallGateSheet\.src\s*=\s*WALL_GATE_SHEET\.src/,
+  'atlas loads the generated wall-gate image sheet',
+);
+assert.match(
+  atlasSource,
+  /loaded >= 14/,
+  'atlas readiness includes the generated wall-gate image sheet',
+);
+assert.match(
+  atlasSource,
+  /function blitWallFamilyBuilding[\s\S]*wallFamilySourceRect/,
+  'atlas can blit modular wall-family pieces from the generated sheet',
+);
+assert.match(
+  atlasSource,
+  /function blitWallGateBuilding[\s\S]*wallGateSourceRect/,
+  'atlas can blit generated wall-gate sprites from the generated sheet',
+);
+assert.match(
+  atlasSource,
+  /if \(isWallFamilyWallType\(p\.type\) && wallFamilySheet\)[\s\S]*blitWallFamilyBuilding\(ctx, wallFamilySheet, p\)/,
+  'solid wall-family buildings use the modular sprite sheet before procedural fallback',
+);
+assert.match(
+  atlasSource,
+  /if \(isGateBuilding\(p\.type\) && wallGateSheet\)[\s\S]*blitWallGateBuilding\(ctx, wallGateSheet, p\)/,
+  'gate buildings use the generated gate sprite sheet before procedural fallback',
+);
+assert.match(
+  atlasSource,
+  /if \(isGateBuilding\(p\.type\)\)/,
+  'gate keeps the procedural wall-family render path as a fallback',
+);
 
 console.log('wall family asset tests passed');
 
