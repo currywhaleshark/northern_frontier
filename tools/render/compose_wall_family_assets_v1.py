@@ -17,6 +17,10 @@ SOURCE_COLUMNS = 4
 SOURCE_ROWS = 4
 OUTPUT_COLUMNS = 16
 OUTPUT_ROWS = 12
+SUSPICIOUS_EDGE_MARGIN = 8
+SUSPICIOUS_COMPONENT_MAX_AREA = 8
+MIN_EXPECTED_SHEET_SCALE = 0.18
+MAX_EXPECTED_SHEET_SCALE = 1.0
 
 SOURCE_FILENAMES = [
     "wall-family-palisade-normal-source-v1.png",
@@ -51,20 +55,114 @@ def remove_key(image: Image.Image) -> Image.Image:
     return rgba
 
 
-def alpha_bbox(image: Image.Image) -> tuple[int, int, int, int]:
+def source_cell_label(source_name: str | None, mask_index: int | None) -> str:
+    if source_name is None:
+        return "source cell"
+    if mask_index is None:
+        return source_name
+    return f"{source_name} mask index {mask_index}"
+
+
+def alpha_bbox(
+    image: Image.Image,
+    source_name: str | None = None,
+    mask_index: int | None = None,
+) -> tuple[int, int, int, int]:
     bbox = image.getchannel("A").getbbox()
     if bbox is None:
-        raise ValueError("source cell contains no non-key pixels")
+        raise ValueError(f"{source_cell_label(source_name, mask_index)} contains no non-key pixels")
     return bbox
 
 
-def union_alpha_bbox(images: list[Image.Image]) -> tuple[int, int, int, int]:
-    boxes = [alpha_bbox(image) for image in images]
+def union_alpha_bbox(
+    images: list[Image.Image],
+    source_name: str | None = None,
+) -> tuple[int, int, int, int]:
+    boxes = [alpha_bbox(image, source_name, index) for index, image in enumerate(images)]
     return (
         min(box[0] for box in boxes),
         min(box[1] for box in boxes),
         max(box[2] for box in boxes),
         max(box[3] for box in boxes),
+    )
+
+
+def alpha_components(image: Image.Image) -> list[tuple[int, tuple[int, int, int, int]]]:
+    alpha = image.getchannel("A")
+    width, height = alpha.size
+    pixels = alpha.load()
+    visited = bytearray(width * height)
+    components: list[tuple[int, tuple[int, int, int, int]]] = []
+
+    for start_y in range(height):
+        for start_x in range(width):
+            start_offset = start_y * width + start_x
+            if visited[start_offset] or pixels[start_x, start_y] == 0:
+                continue
+
+            visited[start_offset] = 1
+            stack = [(start_x, start_y)]
+            area = 0
+            left = right = start_x
+            top = bottom = start_y
+
+            while stack:
+                x, y = stack.pop()
+                area += 1
+                left = min(left, x)
+                top = min(top, y)
+                right = max(right, x)
+                bottom = max(bottom, y)
+
+                for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                    if nx < 0 or ny < 0 or nx >= width or ny >= height:
+                        continue
+                    offset = ny * width + nx
+                    if visited[offset] or pixels[nx, ny] == 0:
+                        continue
+                    visited[offset] = 1
+                    stack.append((nx, ny))
+
+            components.append((area, (left, top, right + 1, bottom + 1)))
+
+    return components
+
+
+def component_near_edge(bbox: tuple[int, int, int, int], width: int, height: int) -> bool:
+    left, top, right, bottom = bbox
+    return (
+        left < SUSPICIOUS_EDGE_MARGIN
+        or top < SUSPICIOUS_EDGE_MARGIN
+        or right > width - SUSPICIOUS_EDGE_MARGIN
+        or bottom > height - SUSPICIOUS_EDGE_MARGIN
+    )
+
+
+def validate_source_cell(image: Image.Image, source_name: str, mask_index: int) -> None:
+    components = alpha_components(image)
+    if not components:
+        raise ValueError(f"{source_cell_label(source_name, mask_index)} contains no non-key pixels")
+
+    for area, bbox in components:
+        if (
+            area <= SUSPICIOUS_COMPONENT_MAX_AREA
+            and component_near_edge(bbox, image.width, image.height)
+        ):
+            raise ValueError(
+                f"{source_cell_label(source_name, mask_index)} has suspicious off-key artifact "
+                f"near cell edge at {bbox}",
+            )
+
+
+def validate_sheet_transform(
+    crop_box: tuple[int, int, int, int],
+    scale: float,
+    source_name: str,
+) -> None:
+    if MIN_EXPECTED_SHEET_SCALE <= scale <= MAX_EXPECTED_SHEET_SCALE:
+        return
+    raise ValueError(
+        f"{source_name} sheet union bbox {crop_box} creates unexpected scale {scale:.3f}",
     )
 
 
@@ -98,11 +196,12 @@ def fit_to_cell(
     return remove_key(cell)
 
 
-def fit_sheet_cells(cells: list[Image.Image]) -> list[Image.Image]:
-    crop_box = union_alpha_bbox(cells)
+def fit_sheet_cells(cells: list[Image.Image], source_name: str) -> list[Image.Image]:
+    crop_box = union_alpha_bbox(cells, source_name)
     crop_width = crop_box[2] - crop_box[0]
     crop_height = crop_box[3] - crop_box[1]
     scale = min(TILE_SIZE / crop_width, CONTENT_SIZE / crop_height)
+    validate_sheet_transform(crop_box, scale, source_name)
     return [fit_to_cell(cell, crop_box, scale) for cell in cells]
 
 
@@ -122,11 +221,12 @@ def compose_wall_family_assets(
         if not source_path.exists():
             raise FileNotFoundError(source_path)
         image = Image.open(source_path).convert("RGBA")
-        cells = [
-            remove_key(grid_crop(image, index))
-            for index in range(SOURCE_COLUMNS * SOURCE_ROWS)
-        ]
-        for index, cell in enumerate(fit_sheet_cells(cells)):
+        cells = []
+        for index in range(SOURCE_COLUMNS * SOURCE_ROWS):
+            cell = remove_key(grid_crop(image, index))
+            validate_source_cell(cell, filename, index)
+            cells.append(cell)
+        for index, cell in enumerate(fit_sheet_cells(cells, filename)):
             output.alpha_composite(cell, (index * TILE_SIZE, row * SPRITE_HEIGHT))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

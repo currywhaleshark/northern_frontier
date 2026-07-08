@@ -90,6 +90,30 @@ def make_source(path: Path, row_index: int) -> None:
     image.save(path)
 
 
+def make_all_sources(root: Path) -> None:
+    for row_index, name in enumerate(EXPECTED_SOURCE_FILENAMES):
+        make_source(root / name, row_index)
+
+
+def inject_off_key_speck(path: Path, index: int) -> None:
+    image = Image.open(path).convert("RGBA")
+    pixels = image.load()
+    left, top = cell_origin(index)
+    pixels[left + 3, top + 3] = (84, 82, 80, 255)
+    image.save(path)
+
+
+def clear_source_cell(path: Path, index: int) -> None:
+    image = Image.open(path).convert("RGBA")
+    draw = ImageDraw.Draw(image)
+    left, top = cell_origin(index)
+    draw.rectangle(
+        (left, top, left + SOURCE_CELL - 1, top + SOURCE_CELL - 1),
+        fill=EXACT_MAGENTA,
+    )
+    image.save(path)
+
+
 def cell_crop(image: Image.Image, col: int, row: int) -> Image.Image:
     return image.crop((
         col * TILE_SIZE,
@@ -162,8 +186,7 @@ def test_compose_wall_family_assets() -> None:
 
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
-        for row_index, name in enumerate(EXPECTED_SOURCE_FILENAMES):
-            make_source(root / name, row_index)
+        make_all_sources(root)
 
         output = root / "wall-family-generated-v1.png"
         preview = root / "wall-family-generated-v1-preview-4x.png"
@@ -188,13 +211,62 @@ def test_compose_wall_family_assets() -> None:
 
         skinny = solid_alpha_bbox(cell_crop(image, 15, 0))
         wide = solid_alpha_bbox(cell_crop(image, 0, 0))
+        assert skinny == (11, 34, 17, SPRITE_HEIGHT)
         assert skinny[2] - skinny[0] <= 8
         assert wide[2] - wide[0] >= 24
 
         assert cell_crop(image, 0, 0).getpixel((14, 31))[3] == 0
 
 
+def test_compose_rejects_off_key_source_specks() -> None:
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        make_all_sources(root)
+        filename = EXPECTED_SOURCE_FILENAMES[4]
+        mask_index = 6
+        inject_off_key_speck(root / filename, mask_index)
+
+        try:
+            compose_wall_family_assets(
+                root,
+                root / "wall-family-generated-v1.png",
+                root / "wall-family-generated-v1-preview-4x.png",
+            )
+        except ValueError as error:
+            message = str(error)
+            assert filename in message
+            assert f"mask index {mask_index}" in message
+            assert "suspicious off-key artifact" in message
+        else:
+            raise AssertionError("expected off-key source speck to raise ValueError")
+
+
+def test_compose_reports_empty_cells_with_source_context() -> None:
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        make_all_sources(root)
+        filename = EXPECTED_SOURCE_FILENAMES[7]
+        mask_index = 9
+        clear_source_cell(root / filename, mask_index)
+
+        try:
+            compose_wall_family_assets(
+                root,
+                root / "wall-family-generated-v1.png",
+                root / "wall-family-generated-v1-preview-4x.png",
+            )
+        except ValueError as error:
+            message = str(error)
+            assert filename in message
+            assert f"mask index {mask_index}" in message
+            assert "contains no non-key pixels" in message
+        else:
+            raise AssertionError("expected empty source cell to raise ValueError")
+
+
 if __name__ == "__main__":
     test_remove_key_handles_near_keys_and_preserves_wall_purple()
     test_compose_wall_family_assets()
+    test_compose_rejects_off_key_source_specks()
+    test_compose_reports_empty_cells_with_source_context()
     print("wall family asset pixel tests passed")
