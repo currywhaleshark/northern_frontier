@@ -16,7 +16,7 @@ const CATEGORIES: { name: string; types: BuildingTypeId[] }[] = [
       'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'market', 'office',
     ],
   },
-  { name: '방어·군사', types: ['palisade', 'earthFort', 'stoneWall', 'watchtower', 'beacon', 'garrison', 'cannonEmplacement'] },
+  { name: '방어·군사', types: ['palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison', 'cannonEmplacement'] },
 ];
 
 const OPEN_KEY = 'buksae-buildmenu-open';

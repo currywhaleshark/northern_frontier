@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CONFIG } from './game/config';
 import {
-  advanceDay, advanceTick, continueAfterVictory, newGame, reassignJob, resolveChoice, setResidentJob,
+  advanceDay, advanceTick, continueAfterVictory, demolishBuilding, newGame, reassignJob, resolveChoice, setResidentJob,
   setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
   SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
@@ -208,6 +208,18 @@ export default function App() {
     bump();
   };
 
+  const handleDemolishBuilding = (x: number, y: number) => {
+    const err = demolishBuilding(stateRef.current, x, y);
+    if (err) {
+      addLog(stateRef.current, err, 'info');
+    } else {
+      playSfx('hammer');
+      setSelected(null);
+      setSelectedEntity(null);
+    }
+    bump();
+  };
+
   const handleChoose = (optionId: string) => {
     resolveChoice(stateRef.current, optionId);
     bump();
@@ -400,6 +412,7 @@ export default function App() {
             onPetition={handlePetition}
             onToggleNitre={handleToggleNitre}
             onSetSmithyProduct={handleSetSmithyProduct}
+            onDemolishBuilding={handleDemolishBuilding}
             tab={inspTab}
             setTab={setInspTab}
             residentId={inspResidentId}

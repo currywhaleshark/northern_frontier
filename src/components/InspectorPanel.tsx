@@ -9,6 +9,7 @@ import { nextRank, promotionConditions } from '../game/promotion';
 import { suspicionBreakdown } from '../game/suspicion';
 import { getRelation } from '../game/relations';
 import { isExplored } from '../game/exploration';
+import { isWallBuilding } from '../game/walls';
 import type { GameState, JobId, Resident, ResourceId, SmithyProductId } from '../game/types';
 import { FactionName } from './FactionName';
 
@@ -22,6 +23,7 @@ interface Props {
   onPetition: () => void;
   onToggleNitre: () => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
+  onDemolishBuilding: (x: number, y: number) => void;
   tab: InspectorTab;
   setTab: (t: InspectorTab) => void;
   residentId: number | null;
@@ -213,7 +215,7 @@ function ResidentDetail({ r, rank, onSetJob }: {
 
 export function InspectorPanel({
   state, selected, onSetResidentJob, onRequestTrade, onPetition, onToggleNitre, onSetSmithyProduct,
-  tab, setTab, residentId, setResidentId,
+  onDemolishBuilding, tab, setTab, residentId, setResidentId,
 }: Props) {
   const tile = selected ? state.map[selected.y]?.[selected.x] : null;
   const explored = tile ? isExplored(state, tile.x, tile.y) : false;
@@ -305,6 +307,20 @@ export function InspectorPanel({
                               </button>
                             );
                           })}
+                        </td>
+                      </tr>
+                    )}
+                    {isWallBuilding(building.type) && (
+                      <tr>
+                        <td>정비</td>
+                        <td>
+                          <button
+                            className="btn small"
+                            type="button"
+                            onClick={() => onDemolishBuilding(tile.x, tile.y)}
+                          >
+                            철거
+                          </button>
                         </td>
                       </tr>
                     )}
