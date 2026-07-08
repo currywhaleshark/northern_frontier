@@ -130,6 +130,18 @@ def make_all_sources(root: Path, source_size: int = SOURCE_SIZE) -> None:
         make_source(root / name, row_index, source_size)
 
 
+def make_tiny_footprint_source(path: Path, row_index: int) -> None:
+    image = Image.new("RGBA", (SOURCE_SIZE, SOURCE_SIZE), EXACT_MAGENTA)
+    draw = ImageDraw.Draw(image)
+    for index in range(SOURCE_COLUMNS * SOURCE_ROWS):
+        left, top = cell_origin(index)
+        draw.rectangle(
+            (left + 61, top + 61, left + 66, top + 66),
+            fill=source_color(row_index, index),
+        )
+    image.save(path)
+
+
 def inject_off_key_speck(path: Path, index: int) -> None:
     image = Image.open(path).convert("RGBA")
     pixels = image.load()
@@ -154,6 +166,14 @@ def inject_interior_off_key_speck(path: Path, index: int) -> None:
     pixels = image.load()
     left, top = cell_origin(index)
     pixels[left + 12, top + 50] = (84, 82, 80, 255)
+    image.save(path)
+
+
+def inject_interior_off_key_cluster(path: Path, index: int) -> None:
+    image = Image.open(path).convert("RGBA")
+    draw = ImageDraw.Draw(image)
+    left, top = cell_origin(index)
+    draw.rectangle((left + 12, top + 50, left + 15, top + 53), fill=(84, 82, 80, 255))
     image.save(path)
 
 
@@ -336,6 +356,31 @@ def test_compose_rejects_interior_detached_source_specks() -> None:
             raise AssertionError("expected interior off-key source speck to raise ValueError")
 
 
+def test_compose_rejects_interior_detached_source_clusters() -> None:
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        make_all_sources(root)
+        filename = EXPECTED_SOURCE_FILENAMES[9]
+        mask_index = 5
+        inject_interior_off_key_cluster(root / filename, mask_index)
+
+        try:
+            compose_wall_family_assets(
+                root,
+                root / "wall-family-generated-v1.png",
+                root / "wall-family-generated-v1-preview-4x.png",
+            )
+        except ValueError as error:
+            message = str(error)
+            assert filename in message
+            assert f"mask index {mask_index}" in message
+            assert "tiny detached off-key artifact" in message
+            assert "area 16" in message
+            assert "bbox" in message
+        else:
+            raise AssertionError("expected interior off-key source cluster to raise ValueError")
+
+
 def test_compose_rejects_off_key_source_gutter_strips() -> None:
     with TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -357,6 +402,29 @@ def test_compose_rejects_off_key_source_gutter_strips() -> None:
             assert "suspicious off-key artifact" in message
         else:
             raise AssertionError("expected off-key source gutter strip to raise ValueError")
+
+
+def test_compose_reports_too_small_sheet_footprint_with_context() -> None:
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        make_all_sources(root)
+        filename = EXPECTED_SOURCE_FILENAMES[1]
+        make_tiny_footprint_source(root / filename, 1)
+
+        try:
+            compose_wall_family_assets(
+                root,
+                root / "wall-family-generated-v1.png",
+                root / "wall-family-generated-v1-preview-4x.png",
+            )
+        except ValueError as error:
+            message = str(error)
+            assert filename in message
+            assert "normalized footprint" in message
+            assert "source cell size" in message
+            assert "Check non-key artifacts, oversized footprint, or insufficient padding" in message
+        else:
+            raise AssertionError("expected tiny source footprint to raise ValueError")
 
 
 def test_compose_reports_empty_cells_with_source_context() -> None:
@@ -388,6 +456,8 @@ if __name__ == "__main__":
     test_compose_accepts_1024_source_sheets()
     test_compose_rejects_off_key_source_specks()
     test_compose_rejects_interior_detached_source_specks()
+    test_compose_rejects_interior_detached_source_clusters()
     test_compose_rejects_off_key_source_gutter_strips()
+    test_compose_reports_too_small_sheet_footprint_with_context()
     test_compose_reports_empty_cells_with_source_context()
     print("wall family asset pixel tests passed")

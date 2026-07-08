@@ -18,7 +18,8 @@ SOURCE_ROWS = 4
 OUTPUT_COLUMNS = 16
 OUTPUT_ROWS = 12
 SUSPICIOUS_EDGE_MARGIN = 8
-SUSPICIOUS_COMPONENT_MAX_AREA = 8
+MIN_TINY_COMPONENT_AREA = 16
+TINY_COMPONENT_AREA_RATIO = 0.001
 MIN_NORMALIZED_FOOTPRINT = 0.05
 MAX_NORMALIZED_FOOTPRINT = 0.95
 
@@ -138,22 +139,27 @@ def component_near_edge(bbox: tuple[int, int, int, int], width: int, height: int
     )
 
 
+def tiny_component_area_threshold(width: int, height: int) -> int:
+    return max(MIN_TINY_COMPONENT_AREA, round(width * height * TINY_COMPONENT_AREA_RATIO))
+
+
 def validate_source_cell(image: Image.Image, source_name: str, mask_index: int) -> None:
     components = alpha_components(image)
     if not components:
         raise ValueError(f"{source_cell_label(source_name, mask_index)} contains no non-key pixels")
 
     has_substantial_component = False
+    tiny_threshold = tiny_component_area_threshold(image.width, image.height)
     for area, bbox in components:
         if component_near_edge(bbox, image.width, image.height):
             raise ValueError(
                 f"{source_cell_label(source_name, mask_index)} has suspicious off-key artifact "
                 f"near cell edge with area {area} and bbox {bbox}",
             )
-        if area <= SUSPICIOUS_COMPONENT_MAX_AREA:
+        if area <= tiny_threshold:
             raise ValueError(
                 f"{source_cell_label(source_name, mask_index)} has tiny detached off-key artifact "
-                f"with area {area} and bbox {bbox}",
+                f"with area {area}, threshold {tiny_threshold}, and bbox {bbox}",
             )
         has_substantial_component = True
 
