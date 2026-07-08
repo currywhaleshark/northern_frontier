@@ -1,6 +1,8 @@
-import type { BuildingTypeId, Season } from '../game/types';
-import type { WallAdjacentTypes, WallConnections } from '../game/walls';
+import type { Season } from '../game/types';
+import type { WallConnections } from '../game/walls';
 
+export type WallFamilyBuildingType = 'palisade' | 'earthFort' | 'stoneWall' | 'gate';
+export type WallFamilyAdjacentTypes = Partial<Record<'n' | 'e' | 's' | 'w', WallFamilyBuildingType>>;
 export type WallVisualMaterial = 'wood' | 'earth' | 'stone';
 
 export const WALL_FAMILY_SHEET = {
@@ -11,7 +13,7 @@ export const WALL_FAMILY_SHEET = {
   src: '/assets/wall-family-generated-v1.png',
 } as const;
 
-const NORMAL_WALL_ROWS: Record<'palisade' | 'earthFort' | 'stoneWall', number> = {
+const NORMAL_WALL_ROWS: Record<Exclude<WallFamilyBuildingType, 'gate'>, number> = {
   palisade: 0,
   earthFort: 1,
   stoneWall: 2,
@@ -35,7 +37,7 @@ export function wallConnectionMask(connections?: WallConnections): number {
   );
 }
 
-export function gateVisualMaterial(adjacentTypes?: WallAdjacentTypes): WallVisualMaterial {
+export function gateVisualMaterial(adjacentTypes?: WallFamilyAdjacentTypes): WallVisualMaterial {
   const adjacent = [
     adjacentTypes?.n,
     adjacentTypes?.e,
@@ -47,22 +49,19 @@ export function gateVisualMaterial(adjacentTypes?: WallAdjacentTypes): WallVisua
   return 'wood';
 }
 
-function rowFor(type: BuildingTypeId, season: Season, adjacentTypes?: WallAdjacentTypes): number {
+function rowFor(type: WallFamilyBuildingType, season: Season, adjacentTypes?: WallFamilyAdjacentTypes): number {
   const seasonOffset = season === 'winter' ? WINTER_ROW_OFFSET : 0;
   if (type === 'gate') {
     return NORMAL_GATE_ROWS[gateVisualMaterial(adjacentTypes)] + seasonOffset;
   }
-  if (type === 'palisade' || type === 'earthFort' || type === 'stoneWall') {
-    return NORMAL_WALL_ROWS[type] + seasonOffset;
-  }
-  return NORMAL_WALL_ROWS.palisade + seasonOffset;
+  return NORMAL_WALL_ROWS[type] + seasonOffset;
 }
 
 export function wallFamilySourceRect(
-  type: BuildingTypeId,
+  type: WallFamilyBuildingType,
   connections: WallConnections | undefined,
   season: Season,
-  adjacentTypes?: WallAdjacentTypes,
+  adjacentTypes?: WallFamilyAdjacentTypes,
 ) {
   const col = wallConnectionMask(connections);
   const row = rowFor(type, season, adjacentTypes);
