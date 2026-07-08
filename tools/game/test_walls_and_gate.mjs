@@ -105,9 +105,21 @@ function addWallRing(state, left, top, right, bottom, gateAt = null) {
     'isolated wall has no connections',
   );
 
-  addBuilt(state, 'earthFort', 10, 9);
   addBuilt(state, 'gate', 11, 10);
+  assert.deepEqual(
+    walls.wallConnectionsAt(state, 10, 10),
+    { n: false, e: true, s: false, w: false },
+    'wall line connects to adjacent wall-family segment',
+  );
+
   addBuilt(state, 'stoneWall', 10, 11);
+  assert.deepEqual(
+    walls.wallConnectionsAt(state, 10, 10),
+    { n: false, e: true, s: true, w: false },
+    'wall corner connects to adjacent wall-family segments',
+  );
+
+  addBuilt(state, 'earthFort', 10, 9);
   addBuilt(state, 'palisade', 9, 10);
   assert.deepEqual(
     walls.wallConnectionsAt(state, 10, 10),

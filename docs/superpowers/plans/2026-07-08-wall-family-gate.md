@@ -1035,4 +1035,3 @@ git log --oneline -8
 ```
 
 Expected: clean working tree after Task 7 commit, with the task commits visible on the current branch.
-
