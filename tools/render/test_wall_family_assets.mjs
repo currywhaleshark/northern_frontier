@@ -22,6 +22,14 @@ assert.deepEqual(assets.WALL_FAMILY_SHEET, {
   src: '/assets/wall-family-generated-v1.png',
 });
 
+assert.equal(assets.isWallFamilyBuildingType('palisade'), true);
+assert.equal(assets.isWallFamilyBuildingType('gate'), true);
+assert.equal(assets.isWallFamilyBuildingType('hut'), false);
+assert.deepEqual(
+  assets.toWallFamilyAdjacentTypes({ n: 'palisade', e: 'hut', s: 'stoneWall' }),
+  { n: 'palisade', s: 'stoneWall' },
+);
+
 assert.equal(assets.wallConnectionMask({ n: false, e: false, s: false, w: false }), 0);
 assert.equal(assets.wallConnectionMask({ n: true, e: false, s: false, w: false }), 1);
 assert.equal(assets.wallConnectionMask({ n: false, e: true, s: false, w: false }), 2);
@@ -82,13 +90,23 @@ assert.deepEqual(
 const typecheckSource = `
 import type { BuildingTypeId } from '../../src/game/types';
 import type { WallAdjacentTypes } from '../../src/game/walls';
-import { gateVisualMaterial, wallFamilySourceRect } from '../../src/render/wallFamilyAssets';
+import {
+  gateVisualMaterial,
+  isWallFamilyBuildingType,
+  toWallFamilyAdjacentTypes,
+  wallFamilySourceRect,
+} from '../../src/render/wallFamilyAssets';
 
 wallFamilySourceRect('palisade', undefined, 'summer');
 wallFamilySourceRect('earthFort', undefined, 'winter');
 wallFamilySourceRect('stoneWall', undefined, 'summer');
 wallFamilySourceRect('gate', undefined, 'winter', { n: 'stoneWall' });
 gateVisualMaterial({ n: 'palisade', s: 'gate' });
+
+function guardedSourceRect(type: BuildingTypeId) {
+  if (!isWallFamilyBuildingType(type)) return undefined;
+  return wallFamilySourceRect(type, undefined, 'summer');
+}
 
 // @ts-expect-error non-wall buildings are not valid wall-family source rect types
 wallFamilySourceRect('hut', undefined, 'summer');
@@ -103,6 +121,8 @@ gateVisualMaterial({ n: 'hut' });
 const broadAdjacent: WallAdjacentTypes = { n: 'hut' };
 // @ts-expect-error broad adjacent building types must be narrowed before choosing gate material
 gateVisualMaterial(broadAdjacent);
+
+gateVisualMaterial(toWallFamilyAdjacentTypes(broadAdjacent));
 `;
 
 const typecheckFileName = fileURLToPath(new URL('./wall_family_assets_typecheck.ts', import.meta.url));

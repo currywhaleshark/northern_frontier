@@ -1,7 +1,14 @@
-import type { Season } from '../game/types';
-import type { WallConnections } from '../game/walls';
+import type { BuildingTypeId, Season } from '../game/types';
+import type { WallAdjacentTypes, WallConnections } from '../game/walls';
 
-export type WallFamilyBuildingType = 'palisade' | 'earthFort' | 'stoneWall' | 'gate';
+export const WALL_FAMILY_BUILDING_TYPES = [
+  'palisade',
+  'earthFort',
+  'stoneWall',
+  'gate',
+] as const satisfies readonly BuildingTypeId[];
+
+export type WallFamilyBuildingType = typeof WALL_FAMILY_BUILDING_TYPES[number];
 export type WallFamilyAdjacentTypes = Partial<Record<'n' | 'e' | 's' | 'w', WallFamilyBuildingType>>;
 export type WallVisualMaterial = 'wood' | 'earth' | 'stone';
 
@@ -26,6 +33,22 @@ const NORMAL_GATE_ROWS: Record<WallVisualMaterial, number> = {
 };
 
 const WINTER_ROW_OFFSET = 6;
+const WALL_FAMILY_BUILDING_TYPE_SET: ReadonlySet<BuildingTypeId> = new Set(WALL_FAMILY_BUILDING_TYPES);
+
+export function isWallFamilyBuildingType(type: BuildingTypeId): type is WallFamilyBuildingType {
+  return WALL_FAMILY_BUILDING_TYPE_SET.has(type);
+}
+
+export function toWallFamilyAdjacentTypes(adjacentTypes?: WallAdjacentTypes): WallFamilyAdjacentTypes | undefined {
+  if (!adjacentTypes) return undefined;
+
+  const narrowed: WallFamilyAdjacentTypes = {};
+  if (adjacentTypes.n && isWallFamilyBuildingType(adjacentTypes.n)) narrowed.n = adjacentTypes.n;
+  if (adjacentTypes.e && isWallFamilyBuildingType(adjacentTypes.e)) narrowed.e = adjacentTypes.e;
+  if (adjacentTypes.s && isWallFamilyBuildingType(adjacentTypes.s)) narrowed.s = adjacentTypes.s;
+  if (adjacentTypes.w && isWallFamilyBuildingType(adjacentTypes.w)) narrowed.w = adjacentTypes.w;
+  return narrowed;
+}
 
 export function wallConnectionMask(connections?: WallConnections): number {
   if (!connections) return 0;
