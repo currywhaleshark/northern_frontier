@@ -29,6 +29,8 @@ interface Props {
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
   onRequestTrade: (factionName: string) => void;
   onToggleNitre: () => void;
+  onAssignNearestWorker: (buildingId: number) => void;
+  onUnassignWorker: (residentId: number) => void;
   onCloseBuildingActions: () => void;
   onCancelPlace: () => void;
 }
@@ -36,7 +38,7 @@ interface Props {
 export function GameCanvas({
   state, version, placingType, selected, selectedEntity, selectedResidentId, anim,
   onTileClick, onResidentClick, onContextAction, onUpgradeHousing, onSetSmithyProduct, onRequestTrade,
-  onToggleNitre, onCloseBuildingActions, onCancelPlace,
+  onToggleNitre, onAssignNearestWorker, onUnassignWorker, onCloseBuildingActions, onCancelPlace,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mouse, setMouse] = useState<{ mx: number; my: number } | null>(null);
@@ -53,6 +55,7 @@ export function GameCanvas({
     : null;
   const hoveredTile = hoverTile ? state.map[hoverTile.y]?.[hoverTile.x] : null;
   const pointerAction = placingType ? null : getPointerAction(state, selectedEntity, hoveredTile);
+  const selectedBuildingId = selectedEntity?.kind === 'building' ? selectedEntity.id : null;
 
   // 매 렌더(≈30fps)마다 장면을 다시 그린다 — 보간 이동 표현
   useEffect(() => {
@@ -60,6 +63,7 @@ export function GameCanvas({
     if (!canvas) return;
     renderScene(canvas, state, {
       alpha, hover: hoverTile, placingType, selected, selectedResidentId,
+      selectedBuildingId,
       sprites: getActiveSprites(),
     });
   });
@@ -191,6 +195,9 @@ export function GameCanvas({
           onSetSmithyProduct={onSetSmithyProduct}
           onRequestTrade={onRequestTrade}
           onToggleNitre={onToggleNitre}
+          onAssignNearestWorker={onAssignNearestWorker}
+          onUnassignWorker={onUnassignWorker}
+          onSelectResident={onResidentClick}
           onClose={onCloseBuildingActions}
         />
       )}

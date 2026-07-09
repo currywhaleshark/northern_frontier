@@ -2,9 +2,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CONFIG } from './game/config';
 import {
+  assignNearestWorkerToBuilding, assignResidentToBuilding,
   advanceDay, advanceTick, continueAfterVictory, demolishBuilding, newGame, reassignJob, resolveChoice, setResidentJob,
   setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
-  SUBTICKS, tryPlaceBuilding,
+  unassignResidentFromBuilding, SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
 import { clearSave, hasSave, loadGame, saveGame } from './game/saveLoad';
 import { addLog, requestTrade } from './game/events';
@@ -115,6 +116,7 @@ export default function App() {
       build: (type: BuildingTypeId, x: number, y: number) => tryPlaceBuilding(stateRef.current, type, x, y),
       job: (from: JobId, to: JobId) => reassignJob(stateRef.current, from, to),
       smithy: (id: number, product: SmithyProductId) => setSmithyProduct(stateRef.current, id, product),
+      assign: (residentId: number, buildingId: number) => assignResidentToBuilding(stateRef.current, residentId, buildingId),
       reset: () => { stateRef.current = newGame(); bump(); },
     };
   }, [bump]);
@@ -205,6 +207,17 @@ export default function App() {
   const handleUpgradeHousing = (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => {
     const err = upgradeHousingBuilding(stateRef.current, buildingId, targetType);
     if (err) addLog(stateRef.current, err, 'info');
+    bump();
+  };
+
+  const handleAssignNearestWorker = (buildingId: number) => {
+    const err = assignNearestWorkerToBuilding(stateRef.current, buildingId);
+    if (err) addLog(stateRef.current, err, 'info');
+    bump();
+  };
+
+  const handleUnassignWorker = (residentId: number) => {
+    unassignResidentFromBuilding(stateRef.current, residentId);
     bump();
   };
 
@@ -390,6 +403,8 @@ export default function App() {
             onSetSmithyProduct={handleSetSmithyProduct}
             onRequestTrade={handleRequestTrade}
             onToggleNitre={handleToggleNitre}
+            onAssignNearestWorker={handleAssignNearestWorker}
+            onUnassignWorker={handleUnassignWorker}
             onCloseBuildingActions={handleCloseBuildingActions}
             onCancelPlace={() => setPlacingType(null)}
           />

@@ -7,13 +7,15 @@
 // SpriteAPI 구현체만 교체하면 된다.
 import { CONFIG } from '../game/config';
 import { BUILDING_DEFS, buildingFootprintSize, canAfford, canPlaceBuildingAt } from '../game/buildings';
+import { JOB_COLORS } from '../game/constants';
 import { getSeason } from '../game/seasons';
 import { findHabitatIconAtTile } from '../game/habitats';
 import { isBuildingFootprintExplored, isExplored } from '../game/exploration';
 import { builtWallTileSet, isWallBuilding, wallConnectionsFromSet } from '../game/walls';
+import { assignedWorkers, workerSlotConfig } from '../game/workerSlots';
 import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
 import { militiaWeaponForResident } from './militiaWeaponAssignment';
-import type { AnimalHabitat, BuildingTypeId, GameState, Resident, Terrain } from '../game/types';
+import type { AnimalHabitat, Building, BuildingTypeId, GameState, Resident, Terrain } from '../game/types';
 
 const TILE = CONFIG.ui.tileSize;
 
@@ -32,6 +34,7 @@ export interface SceneOptions {
   placingType: BuildingTypeId | null;
   selected: { x: number; y: number } | null;
   selectedResidentId: number | null;
+  selectedBuildingId?: number | null;
   sprites?: SpriteAPI;
 }
 
@@ -202,6 +205,104 @@ function drawHabitatIcon(ctx: CanvasRenderingContext2D, habitat: AnimalHabitat):
   ctx.restore();
 }
 
+function drawSlotDot(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  fill: string,
+  stroke: string,
+  lineWidth = 1,
+): void {
+  ctx.fillStyle = fill;
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = lineWidth;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.lineWidth = 1;
+}
+
+function drawWorkerSlotOverlay(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  building: Building,
+  expanded: boolean,
+): void {
+  if (!building.built) return;
+  const config = workerSlotConfig(building.type);
+  if (!config) return;
+  if (!isBuildingFootprintExplored(state, building.type, building.x, building.y)) return;
+
+  const workers = assignedWorkers(state, building);
+  const footprint = buildingFootprintSize(building.type);
+  const cx = (building.x + footprint / 2) * TILE;
+  const top = building.y * TILE;
+  const emptyFill = 'rgba(30,36,43,0.78)';
+  const emptyStroke = 'rgba(216,222,229,0.48)';
+
+  ctx.save();
+  if (expanded) {
+    const radius = 4.4;
+    const gap = 3;
+    const pad = 4;
+    const width = config.slots * radius * 2 + Math.max(0, config.slots - 1) * gap + pad * 2;
+    const height = radius * 2 + pad * 2;
+    const left = cx - width / 2;
+    const y = top - height - 3;
+    ctx.fillStyle = 'rgba(20,24,28,0.88)';
+    ctx.strokeStyle = 'rgba(217,164,65,0.58)';
+    ctx.lineWidth = 1;
+    ctx.fillRect(left, y, width, height);
+    ctx.strokeRect(left + 0.5, y + 0.5, width - 1, height - 1);
+    for (let i = 0; i < config.slots; i++) {
+      const worker = workers[i];
+      const dotX = left + pad + radius + i * (radius * 2 + gap);
+      const dotY = y + height / 2;
+      drawSlotDot(
+        ctx,
+        dotX,
+        dotY,
+        radius,
+        worker ? JOB_COLORS[worker.job] : emptyFill,
+        worker ? 'rgba(246,225,178,0.9)' : emptyStroke,
+        worker ? 1.2 : 1,
+      );
+    }
+    ctx.restore();
+    return;
+  }
+
+  const radius = 2.4;
+  const gap = 5.5;
+  const startX = cx - ((config.slots - 1) * gap) / 2;
+  const y = top - 4;
+  for (let i = 0; i < config.slots; i++) {
+    const worker = workers[i];
+    drawSlotDot(
+      ctx,
+      startX + i * gap,
+      y,
+      radius,
+      worker ? JOB_COLORS[worker.job] : emptyFill,
+      worker ? 'rgba(20,24,28,0.82)' : emptyStroke,
+    );
+  }
+  ctx.restore();
+}
+
+function drawWorkerSlotOverlays(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  buildings: Building[],
+  selectedBuildingId?: number | null,
+): void {
+  for (const building of buildings) {
+    drawWorkerSlotOverlay(ctx, state, building, selectedBuildingId === building.id);
+  }
+}
+
 function drawFogOverlay(ctx: CanvasRenderingContext2D, state: GameState): void {
   ctx.save();
   for (let y = 0; y < state.map.length; y++) {
@@ -262,6 +363,8 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       drawSmoke(ctx, b.x * TILE, b.y * TILE, b.id, footprint);
     }
   }
+
+  drawWorkerSlotOverlays(ctx, state, sorted, o.selectedBuildingId);
 
   // 3) 선택 주민의 예정 경로 — 행군하는 점선(개미행렬) 애니메이션
   if (o.selectedResidentId != null) {

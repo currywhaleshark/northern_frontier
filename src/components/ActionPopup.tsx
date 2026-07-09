@@ -3,9 +3,10 @@ import {
   SMITHY_PRODUCT_ORDER, smithyProductOf,
 } from '../game/buildings';
 import { CONFIG } from '../game/config';
-import { FACTIONS, RANK_NAMES, RESOURCE_NAMES } from '../game/constants';
+import { FACTIONS, JOB_COLORS, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES } from '../game/constants';
 import { canRequestTrade } from '../game/events';
 import { getBuildingActions } from '../game/selectionActions';
+import { assignedWorkers, availableWorkerSlots, workerSlotConfig } from '../game/workerSlots';
 import type { BuildingTypeId, GameState, ResourceId, SmithyProductId } from '../game/types';
 import { FactionName } from './FactionName';
 
@@ -18,6 +19,9 @@ interface Props {
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
   onRequestTrade: (factionName: string) => void;
   onToggleNitre: () => void;
+  onAssignNearestWorker: (buildingId: number) => void;
+  onUnassignWorker: (residentId: number) => void;
+  onSelectResident: (residentId: number) => void;
   onClose: () => void;
 }
 
@@ -36,12 +40,16 @@ export function ActionPopup({
   onSetSmithyProduct,
   onRequestTrade,
   onToggleNitre,
+  onAssignNearestWorker,
+  onUnassignWorker,
+  onSelectResident,
   onClose,
 }: Props) {
   const building = getBuilding(state, buildingId);
   if (!building) return null;
   const actions = getBuildingActions(state, building);
-  if (actions.length === 0) return null;
+  const slotConfig = building.built ? workerSlotConfig(building.type) : null;
+  if (actions.length === 0 && !slotConfig) return null;
 
   const def = BUILDING_DEFS[building.type];
   const footprint = buildingFootprintTiles(state, building.type, building.x, building.y) ?? [];
@@ -51,6 +59,8 @@ export function ActionPopup({
     left: (maxX + 1) * TILE + 8,
     top: minY * TILE,
   };
+  const slotWorkers = slotConfig ? assignedWorkers(state, building) : [];
+  const openSlots = slotConfig ? availableWorkerSlots(state, building) : 0;
 
   return (
     <div className="action-popup" style={style}>
@@ -58,6 +68,59 @@ export function ActionPopup({
         <span>{def.emoji} {def.name}</span>
         <button className="icon-btn" type="button" onClick={onClose} aria-label="닫기">x</button>
       </div>
+
+      {slotConfig && (
+        <div className="worker-slot-panel">
+          <div className="worker-slot-summary">
+            <span>작업 슬롯</span>
+            <span className="muted small">{JOB_NAMES[slotConfig.job]} {slotWorkers.length}/{slotConfig.slots}</span>
+          </div>
+          {Array.from({ length: slotConfig.slots }, (_value, index) => {
+            const worker = slotWorkers[index];
+            const disabled = !worker && openSlots <= 0;
+            return (
+              <div
+                className={`worker-slot-row${worker ? '' : ' empty'}${disabled ? ' disabled' : ''}`}
+                key={worker?.id ?? `empty-${index}`}
+              >
+                <button
+                  className="worker-slot-main"
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => {
+                    if (worker) onSelectResident(worker.id);
+                    else onAssignNearestWorker(building.id);
+                  }}
+                  title={worker ? `${worker.name} 선택` : '가까운 일꾼 배정'}
+                >
+                  <span
+                    className="worker-slot-dot"
+                    style={worker ? { backgroundColor: JOB_COLORS[worker.job] } : undefined}
+                  />
+                  <span className="worker-slot-text">
+                    <span className="worker-slot-name">{worker ? worker.name : '빈 슬롯 배정'}</span>
+                    <span className="muted small">{worker ? JOB_NAMES[worker.job] : JOB_NAMES[slotConfig.job]}</span>
+                  </span>
+                </button>
+                {worker && (
+                  <button
+                    className="icon-btn worker-slot-unassign"
+                    type="button"
+                    onClick={event => {
+                      event.stopPropagation();
+                      onUnassignWorker(worker.id);
+                    }}
+                    aria-label={`${worker.name} 배정 해제`}
+                    title="배정 해제"
+                  >
+                    -
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {building.type === 'hut' && (
         <button className="action-command" type="button" onClick={() => onUpgradeHousing(building.id, 'ondol')}>
