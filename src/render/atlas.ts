@@ -413,6 +413,7 @@ const CHAR_BY_JOB: Record<JobId, CR> = {
   fisher:     [1, 10],
   charcoalBurner: [1, 9],
   herder:     [1, 7],
+  tanner:     [1, 7],
   powderMaker: [1, 9],
   clerk:      [1, 7],
   watchman:   [0, 11],
