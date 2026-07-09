@@ -5,6 +5,7 @@ import { collectHuntableTiles } from './habitats';
 import { isPassable } from './agents';
 import { getSeason } from './seasons';
 import { isExplored } from './exploration';
+import { canAssignResidentToBuilding, workerSlotConfig } from './workerSlots';
 import type { Building, GameState, JobId, PointerAction, SelectedEntity, Tile } from './types';
 
 export interface BuildingActionItem {
@@ -50,6 +51,27 @@ function workLabel(job: JobId, tile: Tile, building?: Building): string {
 
 function isMoveTargetTile(tile: Tile): boolean {
   return tile.terrain !== 'forest' && tile.terrain !== 'rock';
+}
+
+function slottedAssignmentAction(state: GameState, residentId: number, tile: Tile): PointerAction | null {
+  const building = tileBuilding(state, tile);
+  if (!building || !building.built || tile.buildingId !== building.id || !workerSlotConfig(building.type)) {
+    return null;
+  }
+
+  const reason = canAssignResidentToBuilding(state, residentId, building.id);
+  if (reason) {
+    return actionInvalid(reason === 'no available worker slots' ? 'No available worker slots' : reason);
+  }
+
+  return {
+    kind: 'work',
+    cursor: 'copy',
+    label: `${BUILDING_DEFS[building.type].name} assignment`,
+    x: tile.x,
+    y: tile.y,
+    buildingId: building.id,
+  };
 }
 
 export function canResidentWorkTarget(
@@ -159,6 +181,9 @@ export function getPointerAction(
       ? { kind: 'move', cursor: 'move', label: '탐색 이동', x: tile.x, y: tile.y }
       : actionInvalid('길을 찾을 수 없습니다');
   }
+
+  const assignment = slottedAssignmentAction(state, resident.id, tile);
+  if (assignment) return assignment;
 
   const work = canResidentWorkTarget(state, resident.job, tile);
   if (work.ok) {

@@ -30,6 +30,7 @@ const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
 const selectionActions = await import(pathToFileURL(join(compiledDir, 'selectionActions.mjs')).href);
+const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
 
 function clearMapToPlain(state) {
   for (const row of state.map) {
@@ -61,6 +62,12 @@ function addBuilt(state, type, x, y) {
 function onlyResident(state, job, x, y) {
   const resident = state.residents[0];
   for (const other of state.residents) other.alive = other.id === resident.id;
+  prepareResident(resident, job, x, y);
+  state.weather = 'clear';
+  return resident;
+}
+
+function prepareResident(resident, job, x, y) {
   Object.assign(resident, {
     alive: true,
     sick: false,
@@ -79,8 +86,8 @@ function onlyResident(state, job, x, y) {
     targetId: null,
     carrying: {},
     manualOrder: null,
+    assignedBuildingId: null,
   });
-  state.weather = 'clear';
   return resident;
 }
 
@@ -122,6 +129,42 @@ function onlyResident(state, job, x, y) {
     'building',
     'selected building exposes building action over its footprint',
   );
+}
+
+{
+  const state = simulation.newGame(2026070803);
+  clearMapToPlain(state);
+  state.rank = 'bu';
+  const smithy = addBuilt(state, 'smithy', 15, 15);
+  const smithyTile = state.map[15][15];
+  const resident = onlyResident(state, 'idle', 14, 15);
+
+  const action = selectionActions.getPointerAction(state, { kind: 'resident', id: resident.id }, smithyTile);
+
+  assert.equal(action.kind, 'work', 'idle resident can target a built smithy for slot assignment');
+  assert.equal(action.buildingId, smithy.id, 'smithy assignment action includes the target building id');
+  assert.equal(simulation.issueResidentWorkOrder(state, resident.id, action), null);
+  assert.equal(resident.job, 'smith', 'work order switches resident to the smith slot job');
+  assert.equal(resident.assignedBuildingId, smithy.id, 'work order assigns resident to smithy slot');
+  assert.equal(resident.manualOrder, null, 'slot assignment does not leave a manual work order');
+}
+
+{
+  const state = simulation.newGame(2026070804);
+  clearMapToPlain(state);
+  state.rank = 'bu';
+  const field = addBuilt(state, 'field', 15, 15);
+  const fieldTile = state.map[15][15];
+  const first = prepareResident(state.residents[0], 'idle', 14, 15);
+  const second = prepareResident(state.residents[1], 'idle', 16, 15);
+  for (const resident of state.residents) resident.alive = resident.id === first.id || resident.id === second.id;
+
+  assert.equal(workerSlots.assignResidentToBuilding(state, first.id, field.id), null);
+
+  const action = selectionActions.getPointerAction(state, { kind: 'resident', id: second.id }, fieldTile);
+
+  assert.equal(action.kind, 'invalid', 'full field slot rejects a second resident assignment');
+  assert.match(action.label, /slot|worker|full|available/i, 'full slot action has a useful label');
 }
 
 console.log('selection action tests passed');

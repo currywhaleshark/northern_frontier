@@ -26,7 +26,13 @@ import { firewoodWeatherMult, rollWeather } from './weather';
 import { defaultProcessingReserves, processableAmount } from './processing';
 import { getPointerAction } from './selectionActions';
 import { createExploration, isBuildingFootprintExplored, refreshExploration } from './exploration';
-import { clearIncompatibleAssignment } from './workerSlots';
+import {
+  assignNearestWorkerToBuilding as assignNearestWorkerToSlot,
+  assignResidentToBuilding as assignResidentToSlot,
+  clearIncompatibleAssignment,
+  unassignResidentFromBuilding as unassignResidentFromSlot,
+  workerSlotConfig,
+} from './workerSlots';
 import type {
   Building, BuildingTypeId, Difficulty, GameState, JobId, PointerAction, Resident, ResourceId, SmithyProductId,
 } from './types';
@@ -250,6 +256,32 @@ function interruptResidentForManualOrder(resident: Resident): void {
   resident.targetId = null;
 }
 
+export function assignResidentToBuilding(state: GameState, residentId: number, buildingId: number): string | null {
+  const resident = state.residents.find(res => res.id === residentId);
+  const reason = assignResidentToSlot(state, residentId, buildingId);
+  if (reason) return reason;
+  if (resident) resetAgent(state, resident);
+  return null;
+}
+
+export function assignNearestWorkerToBuilding(state: GameState, buildingId: number): string | null {
+  const previousAssignments = new Map(state.residents.map(resident => [resident.id, resident.assignedBuildingId]));
+  const reason = assignNearestWorkerToSlot(state, buildingId);
+  if (reason) return reason;
+
+  const changedResident = state.residents.find(
+    resident => previousAssignments.get(resident.id) !== resident.assignedBuildingId,
+  );
+  if (changedResident) resetAgent(state, changedResident);
+  return null;
+}
+
+export function unassignResidentFromBuilding(state: GameState, residentId: number): void {
+  const resident = state.residents.find(res => res.id === residentId);
+  unassignResidentFromSlot(state, residentId);
+  if (resident) resetAgent(state, resident);
+}
+
 export function issueResidentMoveOrder(state: GameState, residentId: number, x: number, y: number): string | null {
   const resident = state.residents.find(res => res.id === residentId && res.alive);
   if (!resident) return '선택한 주민이 없습니다.';
@@ -278,6 +310,11 @@ export function issueResidentWorkOrder(
 
   const action = getPointerAction(state, { kind: 'resident', id: residentId }, tile);
   if (action.kind !== 'work') return action.label || '작업할 수 없습니다.';
+
+  const targetBuilding = action.buildingId == null ? undefined : getBuilding(state, action.buildingId);
+  if (targetBuilding && workerSlotConfig(targetBuilding.type)) {
+    return assignResidentToBuilding(state, residentId, targetBuilding.id);
+  }
 
   resident.manualOrder = {
     kind: 'work',
