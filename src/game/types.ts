@@ -50,6 +50,7 @@ export type JobId =
   | 'fisher'     // 어부
   | 'charcoalBurner' // 숯쟁이
   | 'herder'     // 목동
+  | 'tanner'     // 무두장이
   | 'powderMaker' // 염초장이
   | 'clerk'      // 아전
   | 'watchman'   // 파수꾼
@@ -151,6 +152,7 @@ export interface Resident {
   health: number;   // 0 사망
   morale: number;   // 0 ~ 100
   skills: Partial<Record<JobId, number>>; // 0 ~ 1 숙련도
+  assignedBuildingId: number | null;
   task: string;     // 현재 작업 설명
   alive: boolean;
   sick: boolean;

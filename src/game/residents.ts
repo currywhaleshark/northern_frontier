@@ -58,6 +58,7 @@ export function createResident(state: GameState, rng: () => number, job: JobId =
     health: 100,
     morale: 60,
     skills: {},
+    assignedBuildingId: null,
     task: JOB_NAMES[job],
     alive: true,
     sick: false,

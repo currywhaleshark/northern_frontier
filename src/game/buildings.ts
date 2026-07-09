@@ -61,7 +61,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   field: {
     id: 'field', name: '밭', emoji: '🌾',
     desc: '봄에 갈고 가을에 곡물을 거둔다. 비옥한 땅이면 소출 +30%.',
-    cost: { wood: 2, tools: 1 }, buildDays: 3, slots: 2, capacity: 0, defense: 0,
+    cost: { wood: 2, tools: 1 }, buildDays: 3, slots: 1, capacity: 0, defense: 0,
     winterBonus: false, placement: 'field', unique: false,
   },
   smithy: {
@@ -79,7 +79,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   ferry: {
     id: 'ferry', name: '나루터', emoji: '⛵',
     desc: '보(堡) 승격 후 건설. 육지와 맞닿은 강 타일에 두어 어부가 식량을 얻는 거점.',
-    cost: { wood: 14, stone: 4, tools: 1 }, buildDays: 7, slots: 4, capacity: 0, defense: 0,
+    cost: { wood: 14, stone: 4, tools: 1 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'riverbank', unique: false, minRank: 'bo',
   },
   charcoalKiln: {
@@ -91,13 +91,13 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   stable: {
     id: 'stable', name: '축사', emoji: '🐂',
     desc: '진(鎭) 승격 후 건설. 목동이 가축을 돌보며 식량과 가죽을 꾸준히 보탠다.',
-    cost: { wood: 16, stone: 6, grain: 8, tools: 1 }, buildDays: 9, slots: 3, capacity: 0, defense: 0,
+    cost: { wood: 16, stone: 6, grain: 8, tools: 1 }, buildDays: 9, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
   },
   nitreYard: {
     id: 'nitreYard', name: '염초장', emoji: '⚗️',
     desc: '부(府) 승격 후 건설. 염초장이 장작과 돌에서 염초를 걸러 화약을 만든다.',
-    cost: { wood: 18, stone: 18, iron: 2, tools: 3 }, buildDays: 12, slots: 3, capacity: 0, defense: 0,
+    cost: { wood: 18, stone: 18, iron: 2, tools: 3 }, buildDays: 12, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'bu',
   },
   dock: {
