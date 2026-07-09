@@ -167,4 +167,54 @@ function prepareResident(resident, job, x, y) {
   assert.match(action.label, /slot|worker|full|available/i, 'full slot action has a useful label');
 }
 
+{
+  const state = simulation.newGame(2026070805);
+  clearMapToPlain(state);
+  state.rank = 'bu';
+  const smithy = addBuilt(state, 'smithy', 15, 15);
+  const resident = onlyResident(state, 'idle', 14, 15);
+
+  assert.equal(simulation.assignResidentToBuilding(state, resident.id, smithy.id), null);
+  resident.path = [{ x: 1, y: 1 }];
+
+  assert.equal(simulation.assignResidentToBuilding(state, resident.id, smithy.id), null);
+
+  assert.deepEqual(
+    resident.path,
+    [{ x: 1, y: 1 }],
+    'idempotent building assignment does not reset resident path',
+  );
+}
+
+{
+  const state = simulation.newGame(2026070806);
+  clearMapToPlain(state);
+  const resident = onlyResident(state, 'idle', 14, 15);
+  resident.path = [{ x: 1, y: 1 }];
+
+  simulation.unassignResidentFromBuilding(state, resident.id);
+
+  assert.deepEqual(
+    resident.path,
+    [{ x: 1, y: 1 }],
+    'unassigning an unassigned resident does not reset path',
+  );
+}
+
+{
+  const state = simulation.newGame(2026070807);
+  clearMapToPlain(state);
+  state.rank = 'bu';
+  const smithy = addBuilt(state, 'smithy', 15, 15);
+  const resident = onlyResident(state, 'idle', 14, 15);
+
+  assert.equal(simulation.assignResidentToBuilding(state, resident.id, smithy.id), null);
+  resident.path = [{ x: 1, y: 1 }];
+
+  simulation.unassignResidentFromBuilding(state, resident.id);
+
+  assert.equal(resident.assignedBuildingId, null, 'successful unassign clears building assignment');
+  assert.deepEqual(resident.path, [], 'successful unassign resets resident path');
+}
+
 console.log('selection action tests passed');

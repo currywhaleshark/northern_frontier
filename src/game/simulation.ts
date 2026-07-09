@@ -258,9 +258,13 @@ function interruptResidentForManualOrder(resident: Resident): void {
 
 export function assignResidentToBuilding(state: GameState, residentId: number, buildingId: number): string | null {
   const resident = state.residents.find(res => res.id === residentId);
+  const previousJob = resident?.job;
+  const previousAssignment = resident?.assignedBuildingId;
   const reason = assignResidentToSlot(state, residentId, buildingId);
   if (reason) return reason;
-  if (resident) resetAgent(state, resident);
+  if (resident && (resident.job !== previousJob || resident.assignedBuildingId !== previousAssignment)) {
+    resetAgent(state, resident);
+  }
   return null;
 }
 
@@ -278,8 +282,9 @@ export function assignNearestWorkerToBuilding(state: GameState, buildingId: numb
 
 export function unassignResidentFromBuilding(state: GameState, residentId: number): void {
   const resident = state.residents.find(res => res.id === residentId);
+  const previousAssignment = resident?.assignedBuildingId;
   unassignResidentFromSlot(state, residentId);
-  if (resident) resetAgent(state, resident);
+  if (resident && previousAssignment != null && resident.assignedBuildingId == null) resetAgent(state, resident);
 }
 
 export function issueResidentMoveOrder(state: GameState, residentId: number, x: number, y: number): string | null {
