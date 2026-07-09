@@ -4,7 +4,8 @@ import { CONFIG } from './game/config';
 import {
   assignNearestWorkerToBuilding, assignResidentToBuilding,
   advanceDay, advanceTick, continueAfterVictory, demolishBuilding, newGame, reassignJob, resolveChoice, setResidentJob,
-  setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
+  setBuildingCrop, setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
+  convertFieldToPaddy,
   unassignResidentFromBuilding, SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
 import { clearSave, hasSave, loadGame, saveGame } from './game/saveLoad';
@@ -28,7 +29,7 @@ import { nextRank } from './game/promotion';
 import { getPointerAction, selectedEntityFromTile } from './game/selectionActions';
 import { isExplored } from './game/exploration';
 import type {
-  BuildingTypeId, Difficulty, JobId, ProcessingInputId, SelectedEntity, SmithyProductId,
+  BuildingTypeId, CropId, Difficulty, JobId, ProcessingInputId, SelectedEntity, SmithyProductId,
 } from './game/types';
 
 export default function App() {
@@ -116,6 +117,8 @@ export default function App() {
       build: (type: BuildingTypeId, x: number, y: number) => tryPlaceBuilding(stateRef.current, type, x, y),
       job: (from: JobId, to: JobId) => reassignJob(stateRef.current, from, to),
       smithy: (id: number, product: SmithyProductId) => setSmithyProduct(stateRef.current, id, product),
+      crop: (id: number, crop: CropId, mode: 'queue' | 'uproot' = 'uproot') => setBuildingCrop(stateRef.current, id, crop, mode),
+      paddy: (id: number) => convertFieldToPaddy(stateRef.current, id),
       assign: (residentId: number, buildingId: number) => assignResidentToBuilding(stateRef.current, residentId, buildingId),
       reset: () => { stateRef.current = newGame(); bump(); },
     };
@@ -201,6 +204,19 @@ export default function App() {
   const handleSetSmithyProduct = (buildingId: number, product: SmithyProductId) => {
     const err = setSmithyProduct(stateRef.current, buildingId, product);
     if (err) addLog(stateRef.current, err, 'info');
+    bump();
+  };
+
+  const handleSetBuildingCrop = (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => {
+    const err = setBuildingCrop(stateRef.current, buildingId, cropId, mode);
+    if (err) addLog(stateRef.current, err, 'info');
+    bump();
+  };
+
+  const handleConvertFieldToPaddy = (buildingId: number) => {
+    const err = convertFieldToPaddy(stateRef.current, buildingId);
+    if (err) addLog(stateRef.current, err, 'info');
+    else playSfx('hammer');
     bump();
   };
 
@@ -401,6 +417,8 @@ export default function App() {
             onContextAction={handleContextAction}
             onUpgradeHousing={handleUpgradeHousing}
             onSetSmithyProduct={handleSetSmithyProduct}
+            onSetBuildingCrop={handleSetBuildingCrop}
+            onConvertFieldToPaddy={handleConvertFieldToPaddy}
             onRequestTrade={handleRequestTrade}
             onToggleNitre={handleToggleNitre}
             onAssignNearestWorker={handleAssignNearestWorker}

@@ -182,7 +182,7 @@ function runTicks(state, ticks) {
   assert.equal(workerSlots.assignResidentToBuilding(state, herder.id, stable.id), null);
   runTicks(state, 8);
 
-  assert.ok((herder.carrying.food ?? 0) > 0, 'herder carries food from a stable');
+  assert.ok((herder.carrying.meat ?? 0) > 0, 'herder carries meat from a stable');
   assert.ok((herder.carrying.hide ?? 0) > 0, 'herder carries hide from a stable');
 }
 

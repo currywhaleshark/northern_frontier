@@ -10,7 +10,7 @@ interface Props {
 export function ProcessingPanel({ state, onSetReserve }: Props) {
   return (
     <div className="section">
-      <div className="panel-title">가공 조절</div>
+      <div className="panel-title">가공/비축 조절</div>
       {PROCESSING_INPUTS.map(id => {
         const stock = Math.floor(state.resources[id]);
         const reserve = state.processingReserves?.[id] ?? 0;
@@ -37,7 +37,7 @@ export function ProcessingPanel({ state, onSetReserve }: Props) {
               <button className="job-btn" title="5 늘리기" onClick={() => onSetReserve(id, reserve + 5)}>+5</button>
             </div>
             <div className="processing-meta">
-              보유 {stock} · 가공 {Math.floor(processable)}
+              보유 {stock} · 사용 가능 {Math.floor(processable)}
             </div>
           </div>
         );

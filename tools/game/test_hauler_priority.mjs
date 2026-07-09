@@ -59,6 +59,7 @@ function setupSingleHauler(seed = 9001) {
 
   state.weather = 'clear';
   state.resources.food = 0;
+  state.resources.meat = 0;
   state.resources.game = 1;
   state.resources.grain = 0;
   state.resources.wood = CONFIG.production.woodReserve;
@@ -74,7 +75,7 @@ function setupSingleHauler(seed = 9001) {
 
   assert.equal(hauler.task, '사냥감 손질');
   assert.ok(state.resources.game < 1, 'game was processed before urgent stone quarrying');
-  assert.ok(state.resources.food > 0, 'processed game became food');
+  assert.ok(state.resources.meat > 0, 'processed game became meat');
   assert.equal(Object.keys(hauler.carrying).length, 0);
 }
 
@@ -88,7 +89,7 @@ function setupSingleHauler(seed = 9001) {
   assert.equal(hauler.task, '사냥감 손질');
   assert.equal(hauler.phase, 'rest');
   assert.deepEqual(hauler.path, []);
-  assert.ok(state.resources.food > 0, 'empty-handed quarry travel was interrupted for food processing');
+  assert.ok(state.resources.meat > 0, 'empty-handed quarry travel was interrupted for game processing');
 }
 
 console.log('hauler priority tests passed');

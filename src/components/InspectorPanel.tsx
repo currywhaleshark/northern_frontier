@@ -3,6 +3,7 @@ import {
   BUILDING_DEFS, getBuilding, isSmithyProductUnlocked, SMITHY_PRODUCT_DEFS, SMITHY_PRODUCT_ORDER, smithyProductOf,
 } from '../game/buildings';
 import { FACTIONS, isJobUnlocked, JOB_NAMES, JOB_ORDER, RANK_NAMES, RESOURCE_NAMES, TERRAIN_NAMES } from '../game/constants';
+import { cropIdForBuilding, CROP_DEFS } from '../game/crops';
 import { canRequestTrade } from '../game/events';
 import { canPetition } from '../game/petition';
 import { nextRank, promotionConditions } from '../game/promotion';
@@ -256,8 +257,22 @@ export function InspectorPanel({
                   <>
                     <tr><td>건물</td><td>{def.emoji} {def.name}</td></tr>
                     <tr><td>상태</td><td>{building.built ? '완공' : `건설 중 ${Math.floor((building.progress / Math.max(1, def.buildDays)) * 100)}%`}</td></tr>
-                    {building.type === 'field' && building.built && (
-                      <tr><td>작물</td><td><Bar value={building.fieldGrowth} color="#6fbf73" /></td></tr>
+                    {(building.type === 'field' || building.type === 'paddy') && building.built && (
+                      <>
+                        <tr>
+                          <td>작물</td>
+                          <td>
+                            {(() => {
+                              const cropId = cropIdForBuilding(building);
+                              const queuedCrop = building.queuedCropId;
+                              return cropId
+                                ? `${CROP_DEFS[cropId].name}${queuedCrop ? ` -> ${CROP_DEFS[queuedCrop].name}` : ''}`
+                                : queuedCrop ? `${CROP_DEFS[queuedCrop].name} 예약` : '미선택';
+                            })()}
+                          </td>
+                        </tr>
+                        <tr><td>성장</td><td><Bar value={building.fieldGrowth} color="#6fbf73" /></td></tr>
+                      </>
                     )}
                     {building.type === 'smithy' && building.built && (
                       <tr>

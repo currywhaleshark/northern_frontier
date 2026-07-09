@@ -14,6 +14,7 @@ const RESIDENT_COLUMNS: Record<JobId, number> = {
   woodcutter: 1,
   hunter: 2,
   farmer: 3,
+  miller: 5,
   builder: 4,
   hauler: 5,
   herbalist: 6,

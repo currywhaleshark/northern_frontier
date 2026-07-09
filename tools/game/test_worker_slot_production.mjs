@@ -185,7 +185,7 @@ function prepareState(seed) {
 
   for (let i = 0; i < 6; i++) simulation.advanceTick(state);
 
-  assert.equal(fisher.carrying.food ?? 0, 0, 'unassigned fisher does not produce food');
+  assert.equal(fisher.carrying.fish ?? 0, 0, 'unassigned fisher does not produce fish');
 }
 
 {
@@ -197,7 +197,7 @@ function prepareState(seed) {
 
   for (let i = 0; i < 6; i++) simulation.advanceTick(state);
 
-  assert.ok((fisher.carrying.food ?? 0) > 0, 'assigned fisher produces food at the assigned ferry');
+  assert.ok((fisher.carrying.fish ?? 0) > 0, 'assigned fisher produces fish at the assigned ferry');
 }
 
 {
@@ -209,7 +209,7 @@ function prepareState(seed) {
 
   for (let i = 0; i < 8; i++) simulation.advanceTick(state);
 
-  assert.equal(herder.carrying.food ?? 0, 0, 'unassigned herder does not produce food');
+  assert.equal(herder.carrying.meat ?? 0, 0, 'unassigned herder does not produce meat');
   assert.equal(herder.carrying.hide ?? 0, 0, 'unassigned herder does not produce hide');
 }
 
@@ -223,7 +223,7 @@ function prepareState(seed) {
 
   for (let i = 0; i < 8; i++) simulation.advanceTick(state);
 
-  assert.ok((herder.carrying.food ?? 0) > 0, 'assigned herder produces food at the assigned stable');
+  assert.ok((herder.carrying.meat ?? 0) > 0, 'assigned herder produces meat at the assigned stable');
   assert.ok((herder.carrying.hide ?? 0) > 0, 'assigned herder produces hide at the assigned stable');
 }
 
@@ -310,13 +310,13 @@ function prepareState(seed) {
   const storehouse = addBuilt(state, 'storehouse', 15, 10);
   const spot = interactionTileForBuilding(state, storehouse);
   const fisher = workableResident(state, 0, 'fisher', spot.x, spot.y);
-  fisher.carrying = { food: 2 };
-  state.resources.food = 0;
+  fisher.carrying = { fish: 2 };
+  state.resources.fish = 0;
 
   simulation.advanceTick(state);
 
   assert.deepEqual(fisher.carrying, {}, 'unassigned fisher deposits carried resources before waiting');
-  assert.equal(state.resources.food, 2, 'unassigned fisher deposit reaches storage');
+  assert.equal(state.resources.fish, 2, 'unassigned fisher deposit reaches storage');
 }
 
 {
@@ -326,14 +326,14 @@ function prepareState(seed) {
   const storehouse = addBuilt(state, 'storehouse', 15, 10);
   const spot = interactionTileForBuilding(state, storehouse);
   const herder = workableResident(state, 0, 'herder', spot.x, spot.y);
-  herder.carrying = { food: 2, hide: 1 };
-  state.resources.food = 0;
+  herder.carrying = { meat: 2, hide: 1 };
+  state.resources.meat = 0;
   state.resources.hide = 0;
 
   simulation.advanceTick(state);
 
   assert.deepEqual(herder.carrying, {}, 'unassigned herder deposits carried resources before waiting');
-  assert.equal(state.resources.food, 2, 'unassigned herder food deposit reaches storage');
+  assert.equal(state.resources.meat, 2, 'unassigned herder meat deposit reaches storage');
   assert.equal(state.resources.hide, 1, 'unassigned herder hide deposit reaches storage');
 }
 

@@ -9,6 +9,7 @@ import { countBuilt } from './buildings';
 import { FACTIONS, RANK_NAMES, RANK_ORDER } from './constants';
 import { addLog } from './events';
 import { getRelation } from './relations';
+import { consumeEdibleFood, edibleFoodTotal } from './resources';
 import type { GameState, Rank } from './types';
 
 export interface SuspicionFactor {
@@ -83,7 +84,7 @@ function seizeFirearms(state: GameState, ratio: number): string {
 
 export function openInspection(state: GameState): void {
   const s = CONFIG.suspicion;
-  const canBribe = state.resources.food >= s.bribeCost.food && state.resources.hide >= s.bribeCost.hide;
+  const canBribe = edibleFoodTotal(state) >= s.bribeCost.food && state.resources.hide >= s.bribeCost.hide;
   const hasYards = countBuilt(state, 'nitreYard') > 0;
   state.pendingChoice = {
     kind: 'inspection',
@@ -121,8 +122,8 @@ export function resolveInspection(state: GameState, optionId: string, rng: () =>
   const s = CONFIG.suspicion;
 
   if (optionId === 'bribe' &&
-      state.resources.food >= s.bribeCost.food && state.resources.hide >= s.bribeCost.hide) {
-    state.resources.food -= s.bribeCost.food;
+      edibleFoodTotal(state) >= s.bribeCost.food && state.resources.hide >= s.bribeCost.hide) {
+    consumeEdibleFood(state, s.bribeCost.food);
     state.resources.hide -= s.bribeCost.hide;
     lowerSuspicion(state, s.bribeDecay);
     addLog(state, '어사는 후한 대접을 받고 좋은 장계를 올리기로 했습니다. 의심이 가라앉습니다.', 'good');

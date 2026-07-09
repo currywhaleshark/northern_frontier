@@ -6,7 +6,7 @@ import { isJobUnlocked, RANK_NAMES, SEASON_NAMES } from './constants';
 import {
   BUILDING_DEFS, buildingFootprintTiles, canAfford, cannonPlacementsUsed, canPlaceBuildingAt, canPlaceOn,
   clearBuildingTiles, computeDefense, countBuilt, getBuilding, housingCapacity, isBuildingUnlocked,
-  isSmithyProductUnlocked, occupyBuildingTiles, SMITHY_PRODUCT_DEFS,
+  isPaddyEligibleTile, isSmithyProductUnlocked, occupyBuildingTiles, SMITHY_PRODUCT_DEFS,
 } from './buildings';
 import { isWallBuilding } from './walls';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
@@ -24,6 +24,10 @@ import { avg, createResident, livingResidents, updateMorale, updateResidentNeeds
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { firewoodWeatherMult, rollWeather } from './weather';
 import { defaultProcessingReserves } from './processing';
+import {
+  canPlantCropNow, cropIdForBuilding, CROP_DEFS, defaultCropForBuildingType, isCropAllowedOnBuilding,
+} from './crops';
+import { consumeEdibleFood, edibleFoodTotal } from './resources';
 import { getPointerAction } from './selectionActions';
 import { createExploration, isBuildingFootprintExplored, refreshExploration } from './exploration';
 import {
@@ -35,7 +39,7 @@ import {
   workerSlotConfig,
 } from './workerSlots';
 import type {
-  Building, BuildingTypeId, Difficulty, GameState, JobId, PointerAction, Resident, ResourceId, SmithyProductId,
+  Building, BuildingTypeId, CropId, Difficulty, GameState, JobId, PointerAction, Resident, ResourceId, SmithyProductId,
 } from './types';
 
 // ─────────────────────────── 새 게임 ───────────────────────────
@@ -128,6 +132,8 @@ function placePrebuilt(state: GameState, type: BuildingTypeId, x: number, y: num
   const b: Building = {
     id: state.nextBuildingId++, type, x, y,
     progress: BUILDING_DEFS[type].buildDays, built: true, fieldGrowth: 0,
+    cropId: defaultCropForBuildingType(type),
+    queuedCropId: null,
   };
   state.buildings.push(b);
   const tiles = buildingFootprintTiles(state, type, x, y) ?? [];
@@ -194,6 +200,8 @@ export function tryPlaceBuilding(state: GameState, type: BuildingTypeId, x: numb
   }
   const b: Building = {
     id: state.nextBuildingId++, type, x, y, progress: 0, built: false, fieldGrowth: 0,
+    cropId: defaultCropForBuildingType(type),
+    queuedCropId: null,
   };
   if (type === 'smithy') b.smithyProduct = 'tools';
   state.buildings.push(b);
@@ -371,6 +379,64 @@ export function upgradeHousingBuilding(
   return null;
 }
 
+export function setBuildingCrop(
+  state: GameState,
+  buildingId: number,
+  cropId: CropId,
+  mode: 'queue' | 'uproot',
+): string | null {
+  const building = state.buildings.find(b => b.id === buildingId);
+  if (!building || (building.type !== 'field' && building.type !== 'paddy')) return '작물을 고를 수 있는 건물이 아닙니다.';
+  if (!building.built) return '완공된 밭이나 논에서만 작물을 고를 수 있습니다.';
+  if (!isCropAllowedOnBuilding(cropId, building.type)) return `${CROP_DEFS[cropId].name}은(는) 이곳에서 기를 수 없습니다.`;
+
+  const currentCrop = cropIdForBuilding(building);
+  const hasStandingCrop = currentCrop != null && building.fieldGrowth > 0.5;
+  const season = getSeason(state.day);
+
+  if (mode === 'queue' && hasStandingCrop && currentCrop !== cropId) {
+    building.queuedCropId = cropId;
+    addLog(state, `${BUILDING_DEFS[building.type].name}의 다음 작물을 ${CROP_DEFS[cropId].name}(으)로 예약했습니다.`, 'info');
+    return null;
+  }
+
+  building.fieldGrowth = 0;
+  building.queuedCropId = null;
+  if (canPlantCropNow(cropId, building.type, season)) {
+    building.cropId = cropId;
+    addLog(state, `${BUILDING_DEFS[building.type].name}에 ${CROP_DEFS[cropId].name}을(를) 심기로 했습니다.`, 'info');
+  } else {
+    building.cropId = null;
+    building.queuedCropId = cropId;
+    addLog(state, `${CROP_DEFS[cropId].name} 파종철이 아니어서 다음 가능 시기로 예약했습니다.`, 'info');
+  }
+  return null;
+}
+
+export function convertFieldToPaddy(state: GameState, buildingId: number): string | null {
+  const building = state.buildings.find(b => b.id === buildingId);
+  if (!building || building.type !== 'field') return '논으로 전환할 밭을 찾을 수 없습니다.';
+  if (!building.built) return '완공된 밭만 논으로 전환할 수 있습니다.';
+  const def = BUILDING_DEFS.paddy;
+  if (!isBuildingUnlocked(state.rank, 'paddy')) return `${RANK_NAMES[def.minRank ?? 'bo']} 승격 후 논을 만들 수 있습니다.`;
+  const tile = state.map[building.y]?.[building.x];
+  if (!tile || !isPaddyEligibleTile(state, tile)) return '논은 강가의 비옥한 땅에만 만들 수 있습니다.';
+  if (!canAfford(state, def)) return '자원이 부족합니다.';
+
+  for (const [res, amt] of Object.entries(def.cost)) {
+    state.resources[res as keyof typeof state.resources] -= amt ?? 0;
+  }
+  building.type = 'paddy';
+  building.progress = 0;
+  building.built = false;
+  building.fieldGrowth = 0;
+  building.cropId = 'rice';
+  building.queuedCropId = null;
+  occupyBuildingTiles(state, building);
+  addLog(state, '밭을 논으로 바꾸는 공사를 시작했습니다.', 'info');
+  return null;
+}
+
 export function setSmithyProduct(state: GameState, buildingId: number, product: SmithyProductId): string | null {
   const building = state.buildings.find(b => b.id === buildingId);
   if (!building || building.type !== 'smithy') return '대장간을 찾을 수 없습니다.';
@@ -478,8 +544,11 @@ function onSeasonChange(state: GameState, prev: string, next: string): void {
     // 거두지 못한 곡식은 서리에 얼어붙는다
     let lost = false;
     for (const b of state.buildings) {
-      if (b.type === 'field' && b.fieldGrowth > 1) lost = true;
-      if (b.type === 'field') b.fieldGrowth = 0;
+      if (b.type !== 'field' && b.type !== 'paddy') continue;
+      const cropId = cropIdForBuilding(b);
+      if (cropId && CROP_DEFS[cropId].survivesWinter) continue;
+      if (b.fieldGrowth > 1) lost = true;
+      b.fieldGrowth = 0;
     }
     if (lost) addLog(state, '거두지 못한 곡식이 서리에 얼어붙었습니다.', 'bad');
   }
@@ -493,7 +562,7 @@ function onSeasonChange(state: GameState, prev: string, next: string): void {
   }
   if (next === 'spring') {
     state.starvationDeathsThisYear = 0;
-    addLog(state, '파종철입니다. 밭에 농부를 배정하면 가을에 곡물을 거둘 수 있습니다.', 'info');
+    addLog(state, '파종철입니다. 밭과 논의 작물 선택을 확인하고 농부를 배정하십시오.', 'info');
     announceCourtTribute(state); // 새해 세공 공지
     grantYearlyPowder(state);    // 진(鎭) 이상: 연례 화약 배급
   }
@@ -554,7 +623,7 @@ function updateHabitats(state: GameState): void {
 // 도구 마모: 생산직 인원 수에 비례
 function runToolWear(state: GameState): void {
   const producing = [
-    'woodcutter', 'hunter', 'farmer', 'builder', 'smith', 'miner', 'fisher',
+    'woodcutter', 'hunter', 'farmer', 'miller', 'builder', 'smith', 'miner', 'fisher',
     'charcoalBurner', 'herder', 'powderMaker', 'tanner', 'herbalist', 'hauler',
   ];
   const n = state.residents.filter(r => r.alive && !r.sick && producing.includes(r.job)).length;
@@ -570,8 +639,9 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
 
   // 식량
   const foodNeed = pop * cfg.foodPerDay;
-  const fedRatio = foodNeed > 0 ? Math.min(1, state.resources.food / foodNeed) : 1;
-  state.resources.food = Math.max(0, state.resources.food - foodNeed);
+  const availableFood = edibleFoodTotal(state);
+  const fedRatio = foodNeed > 0 ? Math.min(1, availableFood / foodNeed) : 1;
+  consumeEdibleFood(state, foodNeed);
 
   // 장작
   const fwNeed = pop * cfg.firewoodPerPerson *
@@ -588,7 +658,7 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
   const rng2 = makeRng(state.seed + state.day * 104729);
   updateResidentNeeds(state, rng2, fedRatio, firewoodRatio, clothesCoverage);
 
-  const foodOk = state.resources.food > pop * cfg.foodPerDay * 6;
+  const foodOk = edibleFoodTotal(state) > pop * cfg.foodPerDay * 6;
   updateMorale(state, foodOk, avg(state, 'warmth'), countBuilt(state, 'market') > 0);
 
   if (fedRatio < 1) addLog(state, '식량이 모자라 주민들이 배를 곯았습니다.', 'bad');
@@ -608,7 +678,7 @@ function runImmigration(state: GameState, rng: () => number): void {
   const pop = living.length;
   const housing = housingCapacity(state);
   if (housing.total - pop <= 0) return;
-  if (state.resources.food < pop * im.minFoodPerPerson) return;
+  if (edibleFoodTotal(state) < pop * im.minFoodPerPerson) return;
   if (avg(state, 'morale') < im.minMorale) return;
   if (rng() >= im.dailyChance * rankEffects(state.rank).immigration) return; // 승격할수록 사람이 모인다
 

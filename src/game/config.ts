@@ -18,7 +18,7 @@ export const CONFIG = {
   start: {
     residents: 12,
     resources: {
-      food: 100, firewood: 45, wood: 30, stone: 12, iron: 4, tools: 10,
+      food: 100, meat: 0, fish: 0, firewood: 45, wood: 30, stone: 12, iron: 4, tools: 10,
       hide: 6, clothes: 12, herbs: 5, grain: 0, game: 0,
       gunpowder: 0, spears: 0, hornBows: 0, muskets: 0,
       reputation: 50, defense: 0,
@@ -91,8 +91,9 @@ export const CONFIG = {
     haulerGamePerDay: 2,       // 사냥감 손질량
     foodPerGame: 4,
     hidePerGame: 1,
-    haulerGrainPerDay: 4,      // 운반꾼 1인 하루 곡물 도정량
-    foodPerGrain: 1.5,         // 곡물 1 → 식량 1.5
+    haulerGrainPerDay: 4,      // 구버전 저장/테스트 호환용: 곡물 도정은 방아꾼이 맡는다
+    millerGrainPerDay: 4,      // 방아꾼 1인 하루 곡물 도정량
+    foodPerGrain: 1.5,         // 곡물 1 → 도정 곡식 1.5
     haulerStonePerDay: 0.4,    // 돌이 부족할 때 채석
     stoneReserveTarget: 40,
     woodReserve: 25,           // 건축용으로 남겨둘 목재 (이 이상만 장작으로 팬다)
@@ -121,7 +122,7 @@ export const CONFIG = {
     moveSpeedWinter: 1.5,     // 겨울 눈길
     moveSpeedSnow: 1,         // 폭설/눈보라
     shelterThreshold: 0.3,    // 실외작업 중단 기준 (날씨 효율이 이 밑이면 대피)
-    carryCap: { wood: 4, game: 2, herbs: 1.5, iron: 3, stone: 3, grain: 6, food: 5, hide: 2 },
+    carryCap: { wood: 4, game: 2, herbs: 1.5, iron: 3, stone: 3, grain: 6, food: 5, meat: 5, fish: 5, hide: 2 },
     work: {                   // 작업지에서 1회 채집에 드는 서브틱
       chop: 3, hunt: 5, herb: 3, mine: 4, quarry: 3, fish: 4,
       herd: 5,
@@ -215,7 +216,7 @@ export const CONFIG = {
   },
 
   // 조정 세공(歲貢) — 봄 첫날 공지, 겨울 첫날 수거.
-  // 겨울 생존 필수품(식량·장작)은 걷지 않는다. 곡물만 식량 경로와 겹치는 의도된 압박(밭 확장 동기).
+  // 장작은 걷지 않는다. 곡물은 먹을 수도 바칠 수도 있어 밭 확장과 비축 판단을 압박한다.
   tribute: {
     baseAmounts: { hide: 8, grain: 25, iron: 3, clothes: 6, herbs: 6 }, // 품목별 기준량
     yearScale: 0.3,        // 연차당 요구량 증가 (1 + 0.3×(연차-1))

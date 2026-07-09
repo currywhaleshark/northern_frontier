@@ -10,6 +10,7 @@ import { findPath } from './agents';
 import { damageBuildings, injure, loot, moraleShock } from './raidDamage';
 import { rankEffects } from './promotion';
 import { changeRelation, getRelation, hostileRelationsAvg } from './relations';
+import { consumeEdibleFood, edibleFoodTotal } from './resources';
 import { countJob } from './residents';
 import { getSeason, getYear } from './seasons';
 import type { Building, GameState, PendingChoice } from './types';
@@ -21,7 +22,7 @@ export function updateThreat(state: GameState): void {
   let delta = t.basePerDay;
   const season = getSeason(state.day);
   if (season === 'autumn' || season === 'winter') delta += t.coldSeasonExtra;
-  if (state.resources.food + state.resources.hide > t.wealthThreshold) delta += t.wealthExtra;
+  if (edibleFoodTotal(state) + state.resources.hide > t.wealthThreshold) delta += t.wealthExtra;
   if (state.resources.reputation < 35) delta += t.lowRepExtra;
   if (state.tradeRefusedDays > 0) delta += t.tradeRefusedExtra;
   delta -= countJob(state, 'watchman') * t.perWatchman;
@@ -42,7 +43,7 @@ export function updateThreat(state: GameState): void {
 
 function raidPower(state: GameState, rng: () => number): number {
   const r = CONFIG.raid;
-  const wealth = state.resources.food + state.resources.hide + state.resources.tools * 2;
+  const wealth = edibleFoodTotal(state) + state.resources.hide + state.resources.tools * 2;
   // 연차 스케일은 상한을 둔다 — 승격 후 장기전에서 습격이 무한정 세지지 않게
   const scaledYears = Math.min(getYear(state.day), r.powerYearCap) - 1;
   const base =
@@ -238,7 +239,7 @@ export function openRaidChoice(
   const hasBeacon = countBuilt(state, 'beacon') > 0;
   const hasMarket = countBuilt(state, 'market') > 0;
   const tributeCost = { food: 20, hide: 8, tools: 2 };
-  const canTribute = state.resources.food >= tributeCost.food;
+  const canTribute = edibleFoodTotal(state) >= tributeCost.food;
 
   const choice: PendingChoice = {
     kind: 'raid',
@@ -328,7 +329,7 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
       break;
     }
     case 'tribute': {
-      state.resources.food = Math.max(0, state.resources.food - 20);
+      consumeEdibleFood(state, 20);
       state.resources.hide = Math.max(0, state.resources.hide - 8);
       state.resources.tools = Math.max(0, state.resources.tools - 2);
       state.resources.reputation = Math.max(0, state.resources.reputation - 2);
@@ -343,8 +344,8 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
       const negotiateP = (state.resources.reputation * 0.6 + getRelation(state, faction) * 0.4) / 100 + 0.1;
       if (rng() < negotiateP) {
         // 협상 성공: 소규모 교환으로 마무리
-        const give = Math.min(10, state.resources.food);
-        state.resources.food -= give;
+        const give = Math.min(10, edibleFoodTotal(state));
+        consumeEdibleFood(state, give);
         state.resources.hide += 4;
         state.resources.reputation = Math.min(100, state.resources.reputation + 5);
         state.threat = Math.max(0, state.threat - 30);

@@ -386,6 +386,8 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   stable:     { base: TENT_TAN, glyph: HIDE },
   nitreYard:  { roof: ROOF_DARK, base: FACE_STONE, glyph: CAMPFIRE },
   dock:       { base: TENT_TAN, glyph: WATER },
+  paddy:      { base: WATER, glyph: CROP },
+  watermill:  { roof: ROOF_BROWN, base: FACE_DOOR, glyph: WATER },
   tannery:    { roof: ROOF_BROWN, base: FACE_DOOR, glyph: HIDE },
   beacon:     { base: ROCK_GRAY2, glyph: CAMPFIRE },
   palisade:   { base: FENCE },
@@ -405,6 +407,7 @@ const CHAR_BY_JOB: Record<JobId, CR> = {
   woodcutter: [1, 6],
   hunter:     [0, 10],
   farmer:     [0, 7],
+  miller:      [1, 7],
   builder:    [0, 8],
   hauler:     [1, 7],
   herbalist:  [1, 5],
@@ -833,7 +836,7 @@ export const atlasSprites: SpriteAPI = {
       blit(ctx, sheet, spr.glyph, p.x + p.size - s, p.y + p.size - s, s);
     }
     // 밭: 성장 단계 덧그림
-    if (p.type === 'field' && p.growth01 != null && p.growth01 > 0.05) {
+    if ((p.type === 'field' || p.type === 'paddy') && p.growth01 != null && p.growth01 > 0.05) {
       blit(ctx, sheet, p.growth01 < 0.55 ? SPROUT : CROP, p.x, p.y, p.size);
     }
     ctx.globalAlpha = 1;

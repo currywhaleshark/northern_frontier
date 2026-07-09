@@ -60,9 +60,21 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   field: {
     id: 'field', name: '밭', emoji: '🌾',
-    desc: '봄에 갈고 가을에 곡물을 거둔다. 비옥한 땅이면 소출 +30%.',
+    desc: '조·수수·메밀·보리 중 작물을 골라 기른다. 비옥한 땅이면 소출 +30%.',
     cost: { wood: 2, tools: 1 }, buildDays: 3, slots: 1, capacity: 0, defense: 0,
     winterBonus: false, placement: 'field', unique: false,
+  },
+  paddy: {
+    id: 'paddy', name: '논', emoji: '🌱',
+    desc: '보(堡) 승격 후 강가 비옥지에 짓는 벼 재배지. 많은 곡물을 거두고 방앗간으로 효율을 높일 수 있다.',
+    cost: { wood: 4, tools: 1 }, buildDays: 4, slots: 1, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'paddy', unique: false, minRank: 'bo',
+  },
+  watermill: {
+    id: 'watermill', name: '방앗간', emoji: '🛞',
+    desc: '보(堡) 승격 후 강가에 짓는 물레방아식 방앗간. 방아꾼이 곡물을 더 많은 식량으로 찧는다.',
+    cost: { wood: 16, stone: 10, tools: 2 }, buildDays: 10, slots: 2, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'watermill', unique: false, minRank: 'bo',
   },
   smithy: {
     id: 'smithy', name: '대장간', emoji: '⚒️',
@@ -175,8 +187,8 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
 };
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
-  'hut', 'ondol', 'tileHouse', 'storehouse', 'bridge', 'field', 'lumberCamp', 'huntLodge', 'herbHut',
-  'smithy', 'mine', 'ferry', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'market', 'office',
+  'hut', 'ondol', 'tileHouse', 'storehouse', 'bridge', 'field', 'paddy', 'lumberCamp', 'huntLodge', 'herbHut',
+  'smithy', 'mine', 'ferry', 'watermill', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'market', 'office',
   'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement',
 ];
@@ -188,6 +200,7 @@ export const SINGLE_TILE_BUILDINGS = [
   'herbHut',
   'mine',
   'field',
+  'paddy',
   'ferry',
   'dock',
   'palisade',
@@ -224,6 +237,7 @@ export function buildingFootprintTiles(
 export function canPlaceBuildingAt(state: GameState, type: BuildingTypeId, x: number, y: number): boolean {
   const tiles = buildingFootprintTiles(state, type, x, y);
   if (!tiles) return false;
+  if (type === 'watermill') return canPlaceWatermillAt(state, x, y);
   const def = BUILDING_DEFS[type];
   return tiles.every(tile => canPlaceOn(def, tile, state));
 }
@@ -301,12 +315,44 @@ function isRiverbank(state: GameState | undefined, tile: Tile): boolean {
   );
 }
 
+function hasAdjacentRiver(state: GameState | undefined, tile: Tile): boolean {
+  if (!state) return false;
+  return (
+    state.map[tile.y - 1]?.[tile.x]?.terrain === 'river' ||
+    state.map[tile.y + 1]?.[tile.x]?.terrain === 'river' ||
+    state.map[tile.y]?.[tile.x - 1]?.terrain === 'river' ||
+    state.map[tile.y]?.[tile.x + 1]?.terrain === 'river'
+  );
+}
+
+export function isPaddyEligibleTile(state: GameState | undefined, tile: Tile): boolean {
+  return tile.terrain === 'fertile' && hasAdjacentRiver(state, tile);
+}
+
+function isWatermillLandTile(tile: Tile): boolean {
+  return tile.terrain !== 'river' &&
+    tile.terrain !== 'mountain' &&
+    tile.terrain !== 'rock' &&
+    tile.terrain !== 'center';
+}
+
+function canPlaceWatermillAt(state: GameState, x: number, y: number): boolean {
+  const tiles = buildingFootprintTiles(state, 'watermill', x, y);
+  if (!tiles || tiles.some(tile => tile.buildingId != null)) return false;
+  const hasRiver = tiles.some(tile => tile.terrain === 'river');
+  const hasLand = tiles.some(isWatermillLandTile);
+  const allUsable = tiles.every(tile => tile.terrain === 'river' || isWatermillLandTile(tile));
+  return hasRiver && hasLand && allUsable;
+}
+
 export function canPlaceOn(def: BuildingDef, tile: Tile, state?: GameState): boolean {
   if (tile.buildingId != null) return false;
   if (def.placement === 'any') return true;
   if (def.placement === 'river') return tile.terrain === 'river';
   if (def.placement === 'rock') return tile.terrain === 'rock';
   if (def.placement === 'riverbank') return isRiverbank(state, tile);
+  if (def.placement === 'paddy') return isPaddyEligibleTile(state, tile);
+  if (def.placement === 'watermill') return false;
   if (def.placement === 'field') {
     return tile.terrain === 'fertile' || tile.terrain === 'plain';
   }

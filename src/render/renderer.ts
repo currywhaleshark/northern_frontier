@@ -22,9 +22,11 @@ const TILE = CONFIG.ui.tileSize;
 // 배치 모드에서 금색으로 짚어 주는 자원 지형 (건물 → 찾아야 할 지형)
 const PLACEMENT_HINT: Partial<Record<BuildingTypeId, Terrain>> = {
   field: 'fertile',
+  paddy: 'fertile',
   mine: 'rock',
   bridge: 'river',
   ferry: 'river',
+  watermill: 'river',
   dock: 'river',
 };
 
@@ -352,7 +354,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       type: b.type, built: b.built, ghost: false,
       season,
       progress01: def.buildDays > 0 ? b.progress / def.buildDays : 1,
-      growth01: b.type === 'field' ? b.fieldGrowth / 100 : undefined,
+      growth01: b.type === 'field' || b.type === 'paddy' ? b.fieldGrowth / 100 : undefined,
       connections: b.built && isWallBuilding(b.type)
         ? wallConnectionsFromSet(wallTiles, b.x, b.y)
         : undefined,

@@ -82,9 +82,13 @@ export function canResidentWorkTarget(
   const building = tileBuilding(state, tile);
   switch (job) {
     case 'farmer':
-      return buildingMatches(tile, building, ['field'])
-        ? { ok: true, label: '밭일', buildingId: building?.id }
+      return buildingMatches(tile, building, ['field', 'paddy'])
+        ? { ok: true, label: '농사', buildingId: building?.id }
         : { ok: false, label: '농부가 일할 수 없는 대상입니다' };
+    case 'miller':
+      return buildingMatches(tile, building, ['watermill'])
+        ? { ok: true, label: '방앗간 작업', buildingId: building?.id }
+        : { ok: false, label: '방앗간이 아닙니다' };
     case 'builder':
       return building && !building.built
         ? { ok: true, label: '건설', buildingId: building.id }

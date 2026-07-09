@@ -1,5 +1,6 @@
 // 주요 위기 알림 패널
 import { CONFIG } from '../game/config';
+import { edibleFoodTotal } from '../game/resources';
 import { avg, livingResidents } from '../game/residents';
 import { getSeason } from '../game/seasons';
 import { firewoodWeatherMult } from '../game/weather';
@@ -12,7 +13,7 @@ export function computeAlerts(state: GameState): AlertItem[] {
   if (pop === 0) return alerts;
   const season = getSeason(state.day);
 
-  const foodDays = state.resources.food / (pop * CONFIG.needs.foodPerDay);
+  const foodDays = edibleFoodTotal(state) / (pop * CONFIG.needs.foodPerDay);
   if (foodDays < 4) alerts.push({ id: 'food2', text: `식량 부족! 남은 식량이 ${Math.floor(foodDays)}일치뿐입니다.`, level: 'danger' });
   else if (foodDays < 10) alerts.push({ id: 'food1', text: `식량이 넉넉하지 않습니다. (약 ${Math.floor(foodDays)}일치)`, level: 'warn' });
 

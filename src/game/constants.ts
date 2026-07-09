@@ -37,6 +37,7 @@ export const TERRAIN_NAMES: Record<Terrain, string> = {
 
 export const JOB_NAMES: Record<JobId, string> = {
   idle: '무직', woodcutter: '벌목꾼', hunter: '사냥꾼', farmer: '농부',
+  miller: '방아꾼',
   builder: '건축가', hauler: '운반꾼', herbalist: '약초꾼', smith: '대장장이',
   miner: '채광꾼', fisher: '어부',
   charcoalBurner: '숯쟁이', herder: '목동',
@@ -46,13 +47,14 @@ export const JOB_NAMES: Record<JobId, string> = {
 };
 
 export const JOB_ORDER: JobId[] = [
-  'idle', 'woodcutter', 'hunter', 'farmer', 'builder',
+  'idle', 'woodcutter', 'hunter', 'farmer', 'miller', 'builder',
   'hauler', 'herbalist', 'smith', 'miner', 'fisher', 'charcoalBurner', 'herder',
   'tanner', 'powderMaker', 'clerk',
   'watchman', 'militia',
 ];
 
 export const JOB_MIN_RANK: Partial<Record<JobId, Rank>> = {
+  miller: 'bo',
   miner: 'bo',
   fisher: 'bo',
   charcoalBurner: 'jin',
@@ -69,9 +71,10 @@ export const JOB_DESC: Record<JobId, string> = {
   idle: '배정된 일이 없습니다.',
   woodcutter: '숲까지 걸어가 나무를 베고, 벌목장이나 창고로 목재를 나릅니다.',
   hunter: '짐승 서식지를 오가며 사냥감을 잡아 사냥막이나 창고로 나릅니다.',
-  farmer: '밭을 오가며 봄여름에 작물을 돌보고 가을에 곡물을 거둬 나릅니다.',
+  farmer: '밭과 논을 오가며 선택한 작물을 돌보고 수확물을 나릅니다.',
+  miller: '보(堡) 승격 후 방앗간에서 곡물을 더 많은 식량으로 찧습니다.',
   builder: '공사장까지 가서 건물을 짓습니다.',
-  hauler: '창고에서 장작을 패고 사냥감을 손질하고 곡물을 도정하며, 일이 없으면 채석을 다녀옵니다.',
+  hauler: '창고에서 장작을 패고 사냥감을 손질하며, 일이 없으면 채석을 다녀옵니다.',
   herbalist: '산기슭을 다니며 약초를 캐 약초막이나 창고로 나릅니다.',
   smith: '대장간에서 도구를 만듭니다. 채광꾼이 없을 때만 철광까지 보조 채굴을 다녀옵니다.',
   miner: '보(堡) 승격 후 배치할 수 있습니다. 채광장에서 돌과 철을 안정적으로 캡니다.',
@@ -88,6 +91,7 @@ export const JOB_DESC: Record<JobId, string> = {
 // 지도 위 주민 점 색상
 export const JOB_COLORS: Record<JobId, string> = {
   idle: '#9aa5ad', woodcutter: '#b0793a', hunter: '#7fa653', farmer: '#d9c26b',
+  miller: '#b9a27a',
   builder: '#d98d5f', hauler: '#8fb7c9', herbalist: '#6fce9e', smith: '#c96f6f',
   miner: '#9a8f7a', fisher: '#5ba7d8',
   charcoalBurner: '#d66f3f', herder: '#c7a85b',
@@ -97,22 +101,22 @@ export const JOB_COLORS: Record<JobId, string> = {
 };
 
 export const RESOURCE_NAMES: Record<ResourceId, string> = {
-  food: '식량', firewood: '장작', wood: '목재', stone: '돌', iron: '철',
+  food: '도정 곡식', meat: '고기', fish: '생선', firewood: '장작', wood: '목재', stone: '돌', iron: '철',
   tools: '도구', hide: '가죽', clothes: '옷', herbs: '약초', grain: '곡물',
   game: '사냥감', gunpowder: '화약', spears: '창', hornBows: '각궁',
   muskets: '조총', reputation: '명성', defense: '방어도',
 };
 
 export const RESOURCE_ICONS: Record<ResourceId, string> = {
-  food: '🍚', firewood: '🔥', wood: '🪵', stone: '🪨', iron: '⛏️',
+  food: '🍚', meat: '🥩', fish: '🐟', firewood: '🔥', wood: '🪵', stone: '🪨', iron: '⛏️',
   tools: '🔨', hide: '🦌', clothes: '🧥', herbs: '🌿', grain: '🌾',
   game: '🐗', gunpowder: '🧨', spears: '槍', hornBows: '弓',
   muskets: '🔫', reputation: '📜', defense: '🛡️',
 };
 
 export const RESOURCE_ORDER: ResourceId[] = [
-  'food', 'firewood', 'wood', 'stone', 'iron', 'tools', 'hide',
-  'clothes', 'herbs', 'grain', 'game', 'gunpowder', 'spears', 'hornBows', 'muskets', 'reputation', 'defense',
+  'food', 'meat', 'fish', 'grain', 'firewood', 'wood', 'stone', 'iron', 'tools', 'hide',
+  'clothes', 'herbs', 'game', 'gunpowder', 'spears', 'hornBows', 'muskets', 'reputation', 'defense',
 ];
 
 // 북방 세력 — 조선 기록의 두만강 방면 여진 집단들에서 딴 세력 구성.

@@ -1,6 +1,7 @@
 // localStorage 저장/불러오기
 import { CONFIG } from './config';
 import { rebuildBuildingFootprints } from './buildings';
+import { defaultCropForBuildingType } from './crops';
 import { rollCourtTribute } from './courtTribute';
 import { spawnAnimalHabitats } from './habitats';
 import { makeRng } from './map';
@@ -100,11 +101,21 @@ export function loadGame(): GameState | null {
     if (parsed.tributePaidStreak == null) parsed.tributePaidStreak = 0;
     // 화기 없는 구버전: 새 자원·청원 필드를 0으로 채운다
     if (parsed.resources.gunpowder == null) parsed.resources.gunpowder = 0;
+    if (parsed.resources.meat == null) parsed.resources.meat = 0;
+    if (parsed.resources.fish == null) parsed.resources.fish = 0;
     if (parsed.resources.spears == null) parsed.resources.spears = 0;
     if (parsed.resources.hornBows == null) parsed.resources.hornBows = 0;
     if (parsed.resources.muskets == null) parsed.resources.muskets = 0;
     for (const building of parsed.buildings) {
       if (building.type === 'smithy' && !building.smithyProduct) building.smithyProduct = 'tools';
+      if ((building.type === 'field' || building.type === 'paddy') &&
+          !Object.prototype.hasOwnProperty.call(building, 'cropId')) {
+        building.cropId = defaultCropForBuildingType(building.type);
+      }
+      if ((building.type === 'field' || building.type === 'paddy') &&
+          !Object.prototype.hasOwnProperty.call(building, 'queuedCropId')) {
+        building.queuedCropId = null;
+      }
     }
     ensureProcessingReserves(parsed);
     if (parsed.lastPetitionDay == null) parsed.lastPetitionDay = 0;

@@ -7,9 +7,9 @@ import type { GameState, ResourceId } from './types';
 export function loot(state: GameState, ratio: number): string {
   const storeBonus = Math.min(0.3, countBuilt(state, 'storehouse') * 0.1);
   const r = Math.max(0.05, ratio - storeBonus);
-  const targets: ResourceId[] = ['food', 'grain', 'hide', 'tools', 'clothes', 'firewood'];
+  const targets: ResourceId[] = ['food', 'meat', 'fish', 'grain', 'hide', 'tools', 'clothes', 'firewood'];
   const names: Partial<Record<ResourceId, string>> = {
-    food: '식량', grain: '곡물', hide: '가죽', tools: '도구', clothes: '옷', firewood: '장작',
+    food: '곡식', meat: '고기', fish: '생선', grain: '곡물', hide: '가죽', tools: '도구', clothes: '옷', firewood: '장작',
   };
   const parts: string[] = [];
   for (const res of targets) {

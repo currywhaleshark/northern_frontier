@@ -6,7 +6,7 @@ import { JOB_NAMES } from '../game/constants';
 import { getActiveSprites } from '../render/atlas';
 import { findResidentAt, renderScene } from '../render/renderer';
 import { getPointerAction } from '../game/selectionActions';
-import type { BuildingTypeId, GameState, SelectedEntity, SmithyProductId } from '../game/types';
+import type { BuildingTypeId, CropId, GameState, SelectedEntity, SmithyProductId } from '../game/types';
 import { ActionPopup } from './ActionPopup';
 import { FactionName } from './FactionName';
 
@@ -27,6 +27,8 @@ interface Props {
   onContextAction: (x: number, y: number) => void;
   onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
+  onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
+  onConvertFieldToPaddy: (buildingId: number) => void;
   onRequestTrade: (factionName: string) => void;
   onToggleNitre: () => void;
   onAssignNearestWorker: (buildingId: number) => void;
@@ -38,7 +40,8 @@ interface Props {
 export function GameCanvas({
   state, version, placingType, selected, selectedEntity, selectedResidentId, anim,
   onTileClick, onResidentClick, onContextAction, onUpgradeHousing, onSetSmithyProduct, onRequestTrade,
-  onToggleNitre, onAssignNearestWorker, onUnassignWorker, onCloseBuildingActions, onCancelPlace,
+  onSetBuildingCrop, onConvertFieldToPaddy, onToggleNitre, onAssignNearestWorker, onUnassignWorker,
+  onCloseBuildingActions, onCancelPlace,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mouse, setMouse] = useState<{ mx: number; my: number } | null>(null);
@@ -193,6 +196,8 @@ export function GameCanvas({
           buildingId={selectedEntity.id}
           onUpgradeHousing={onUpgradeHousing}
           onSetSmithyProduct={onSetSmithyProduct}
+          onSetBuildingCrop={onSetBuildingCrop}
+          onConvertFieldToPaddy={onConvertFieldToPaddy}
           onRequestTrade={onRequestTrade}
           onToggleNitre={onToggleNitre}
           onAssignNearestWorker={onAssignNearestWorker}

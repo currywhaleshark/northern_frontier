@@ -34,8 +34,8 @@ const agents = await import(pathToFileURL(join(compiledDir, 'agents.mjs')).href)
 const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-const BO_BUILDINGS = ['mine', 'tileHouse', 'ferry'];
-const BO_JOBS = ['miner', 'fisher'];
+const BO_BUILDINGS = ['mine', 'tileHouse', 'ferry', 'paddy', 'watermill'];
+const BO_JOBS = ['miner', 'fisher', 'miller'];
 
 function boostResources(state) {
   for (const key of Object.keys(state.resources)) state.resources[key] = 1000;
@@ -71,6 +71,26 @@ function prepareRiverEdge(state) {
   river.hasIron = false;
   river.buildingId = null;
   return { bank, river };
+}
+
+function preparePaddyTile(state) {
+  const { bank } = prepareRiverEdge(state);
+  bank.terrain = 'fertile';
+  return bank;
+}
+
+function prepareWatermillEdge(state) {
+  const { bank, river } = prepareRiverEdge(state);
+  const lowerBank = state.map[bank.y + 1]?.[bank.x];
+  const lowerRiver = state.map[river.y + 1]?.[river.x];
+  assert.ok(lowerBank && lowerRiver, 'watermill footprint exists');
+  lowerBank.terrain = 'plain';
+  lowerBank.hasIron = false;
+  lowerBank.buildingId = null;
+  lowerRiver.terrain = 'river';
+  lowerRiver.hasIron = false;
+  lowerRiver.buildingId = null;
+  return bank;
 }
 
 function placeBuilt(state, type, tile) {
@@ -159,7 +179,11 @@ function runTicks(state, ticks) {
         ? prepareTile(state, 'rock')
         : building === 'ferry'
           ? prepareRiverEdge(state).river
-          : prepareTile(state, 'plain');
+          : building === 'paddy'
+            ? preparePaddyTile(state)
+            : building === 'watermill'
+              ? prepareWatermillEdge(state)
+              : prepareTile(state, 'plain');
     if (building === 'mine') tile.hasIron = true;
 
     assert.equal(simulation.tryPlaceBuilding(state, building, tile.x, tile.y), null, `${building} can be placed at bo`);
@@ -231,7 +255,7 @@ function runTicks(state, ticks) {
   assert.equal(workerSlots.assignResidentToBuilding(state, fisher.id, ferry.id), null);
   runTicks(state, 6);
 
-  assert.ok((fisher.carrying.food ?? 0) > 0, 'fisher carries food from ferry fishing');
+  assert.ok((fisher.carrying.fish ?? 0) > 0, 'fisher carries fish from ferry fishing');
 }
 
 console.log('bo rank unlock tests passed');

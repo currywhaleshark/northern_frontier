@@ -9,6 +9,8 @@ export interface WorkerSlotConfig {
 
 export const SLOTTED_BUILDING_CONFIG: Partial<Record<BuildingTypeId, WorkerSlotConfig>> = {
   field: { job: 'farmer', slots: 1 },
+  paddy: { job: 'farmer', slots: 1 },
+  watermill: { job: 'miller', slots: 2 },
   smithy: { job: 'smith', slots: 2 },
   stable: { job: 'herder', slots: 2 },
   nitreYard: { job: 'powderMaker', slots: 2 },

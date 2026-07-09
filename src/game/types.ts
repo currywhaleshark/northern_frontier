@@ -42,6 +42,7 @@ export type JobId =
   | 'woodcutter' // 벌목꾼
   | 'hunter'     // 사냥꾼
   | 'farmer'     // 농부
+  | 'miller'     // 방아꾼
   | 'builder'    // 건축가
   | 'hauler'     // 운반꾼
   | 'herbalist'  // 약초꾼
@@ -57,7 +58,9 @@ export type JobId =
   | 'militia';   // 수비병 (내부 id는 저장 호환을 위해 유지)
 
 export type ResourceId =
-  | 'food'       // 식량
+  | 'food'       // 먹을 수 있는 곡식
+  | 'meat'       // 고기
+  | 'fish'       // 생선
   | 'firewood'   // 장작
   | 'wood'       // 목재
   | 'stone'      // 돌
@@ -76,6 +79,8 @@ export type ResourceId =
   | 'defense';   // 방어도
 
 export type SmithyProductId = 'tools' | 'spears' | 'hornBows' | 'muskets';
+
+export type CropId = 'millet' | 'sorghum' | 'buckwheat' | 'barley' | 'rice';
 
 export type ProcessingInputId = 'wood' | 'grain' | 'game' | 'hide' | 'iron';
 
@@ -96,6 +101,8 @@ export type BuildingTypeId =
   | 'nitreYard'  // 염초장
   | 'dock'       // 부두
   | 'field'      // 밭
+  | 'paddy'      // 논
+  | 'watermill'  // 방앗간
   | 'smithy'     // 대장간
   | 'tannery'    // 가죽공방
   | 'beacon'     // 봉수대
@@ -177,6 +184,8 @@ export interface Building {
   progress: number;   // 투입된 건축가-일수
   built: boolean;
   fieldGrowth: number; // 밭 전용: 작물 성장도 0~100
+  cropId?: CropId | null; // 밭/논 전용: 현재 선택/재배 작물
+  queuedCropId?: CropId | null; // 밭/논 전용: 수확 뒤 또는 다음 파종철에 적용할 작물
   smithyProduct?: SmithyProductId; // 대장간 전용: 현재 생산품
 }
 
@@ -191,7 +200,7 @@ export interface BuildingDef {
   capacity: number;         // 주거 수용 인원
   defense: number;          // 제공 방어도
   winterBonus: boolean;     // 겨울 보너스 여부
-  placement: 'land' | 'field' | 'river' | 'rock' | 'riverbank' | 'any';
+  placement: 'land' | 'field' | 'paddy' | 'river' | 'rock' | 'riverbank' | 'watermill' | 'any';
   unique: boolean;          // 하나만 건설 가능 여부
   minRank?: Rank;
 }
@@ -304,7 +313,7 @@ export interface GameState {
   nextBuildingId: number;
   nextResidentId: number;
   resources: Record<ResourceId, number>;
-  processingReserves: Record<ProcessingInputId, number>; // 자동 가공 전에 남길 원자재 수량
+  processingReserves: Record<ProcessingInputId, number>; // 자동 가공/소비 전에 남길 원자재 수량
   threat: number;         // 습격 위협도 0~100
   relations: Record<string, number>; // 세력별 우호도 0~100 (키: 세력 이름)
   raiders: RaiderBand | null; // 접근 중인 습격 무리

@@ -11,6 +11,7 @@ import { makeRng } from './map';
 import { getSeason } from './seasons';
 import { outdoorMult } from './weather';
 import { processableAmount } from './processing';
+import { canGrowCropNow, canHarvestCropNow, canPlantCropNow, cropIdForBuilding, CROP_DEFS } from './crops';
 import { isExplored, refreshExploration } from './exploration';
 import { isGateBuilding } from './walls';
 import { assignedBuildingForResident, isResidentInAssignedSlot } from './workerSlots';
@@ -32,7 +33,7 @@ interface Ctx {
 }
 
 const PRODUCING_JOBS = [
-  'woodcutter', 'hunter', 'farmer', 'builder', 'smith', 'miner', 'fisher',
+  'woodcutter', 'hunter', 'farmer', 'miller', 'builder', 'smith', 'miner', 'fisher',
   'charcoalBurner', 'herder', 'powderMaker', 'tanner', 'herbalist', 'hauler',
 ];
 const OUTDOOR_JOBS = [
@@ -80,6 +81,7 @@ export function resetAgent(state: GameState, r: Resident): void {
 
 const PASSABLE_BUILDING_TYPES: ReadonlySet<BuildingTypeId> = new Set<BuildingTypeId>([
   'field',
+  'paddy',
   'bridge',
   'ferry',
   'dock',
@@ -665,20 +667,34 @@ function herbalistTick(state: GameState, r: Resident, ctx: Ctx): void {
   });
 }
 
+function maybeApplyQueuedCrop(farm: Building, season: Season): void {
+  if (!farm.queuedCropId) return;
+  const currentCrop = cropIdForBuilding(farm);
+  if (currentCrop && farm.fieldGrowth > 0.5) return;
+  if (!canPlantCropNow(farm.queuedCropId, farm.type, season)) return;
+  farm.cropId = farm.queuedCropId;
+  farm.queuedCropId = null;
+  farm.fieldGrowth = 0;
+}
+
 function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
   const p = CONFIG.production;
-  const field = assignedBuildingForResident(state, r);
+  const farm = assignedBuildingForResident(state, r);
 
-  if (!field || field.type !== 'field' || !isResidentInAssignedSlot(state, r, field)) {
+  if (!farm || (farm.type !== 'field' && farm.type !== 'paddy') || !isResidentInAssignedSlot(state, r, farm)) {
     if (carryTotal(r) > 0) {
       const st = goTo(state, r, ctx, depositGoal(state, []));
       if (st === 'arrived' || st === 'stuck') depositAll(state, r);
       return;
     }
-    assignedWorkplace(state, r, ctx, 'field', '밭 배정 없음');
+    loiterNearCenter(state, r, ctx, '밭 배정 없음');
     return;
   }
+
+  maybeApplyQueuedCrop(farm, ctx.season);
+  const cropId = cropIdForBuilding(farm);
+  const crop = cropId ? CROP_DEFS[cropId] : null;
 
   if (ctx.season === 'winter') {
     if (carryTotal(r) > 0) {
@@ -686,25 +702,31 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
       if (st === 'arrived' || st === 'stuck') depositAll(state, r);
       return;
     }
-    loiterNearBuilding(state, r, ctx, field, 3, '겨울 채비');
+    loiterNearBuilding(state, r, ctx, farm, 3, crop?.survivesWinter ? '월동 작물 관리' : '겨울 채비');
     return;
   }
 
-  // 곡물을 지고 있으면 하역
+  // 수확물을 지고 있으면 하역
   if (carryTotal(r) >= a.carryCap.grain || (r.phase === 'toDeposit' && carryTotal(r) > 0)) {
     r.phase = 'toDeposit';
-    r.task = '곡물 운반';
+    r.task = '수확물 운반';
     const st = goTo(state, r, ctx, depositGoal(state, []));
     if (st === 'arrived' || st === 'stuck') { depositAll(state, r); r.phase = 'rest'; }
     return;
   }
 
-  if (ctx.season === 'autumn') {
-    // 수확: 성장도가 남은 밭에서 곡물을 거둔다
-    const target = field.fieldGrowth > 0.5 ? field : null;
+  if (!cropId || !crop) {
+    loiterNearBuilding(state, r, ctx, farm, 3, farm.queuedCropId ? '파종철 대기' : '작물 미선택');
+    return;
+  }
+
+  if (canHarvestCropNow(cropId, farm.type, ctx.season)) {
+    // 수확: 성장도가 남은 밭/논에서 선택 작물을 거둔다
+    const target = farm.fieldGrowth > 0.5 ? farm : null;
     if (!target) {
       if (carryTotal(r) > 0) { r.phase = 'toDeposit'; return; }
-      loiterNearBuilding(state, r, ctx, field, 3, '수확 마무리');
+      if (farm.queuedCropId) maybeApplyQueuedCrop(farm, ctx.season);
+      loiterNearBuilding(state, r, ctx, farm, 3, '수확 마무리');
       return;
     }
     const st = goTo(state, r, ctx, buildingGoal(state, target.id));
@@ -713,29 +735,39 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
       const take = Math.min(target.fieldGrowth, a.work.harvestPerSubtick * ctx.outdoor * effOf(r));
       target.fieldGrowth -= take;
       const tile = state.map[target.y][target.x];
-      const fertile = tile.terrain === 'fertile' ? p.fertileBonus : 1;
-      addCarry(r, 'grain', (take / 100) * p.fieldGrainYield * fertile * ctx.mMod);
+      const fertile = target.type === 'field' && tile.terrain === 'fertile' ? p.fertileBonus : 1;
+      addCarry(r, crop.output, (take / 100) * crop.yield * fertile * ctx.mMod);
+      if (target.fieldGrowth <= 0.5 && target.queuedCropId) {
+        target.cropId = target.queuedCropId;
+        target.queuedCropId = null;
+        target.fieldGrowth = 0;
+      }
       gainSkillTick(r);
     } else {
-      r.task = st === 'stuck' ? '길이 막힘' : '밭으로 이동';
+      r.task = st === 'stuck' ? '길이 막힘' : `${BUILDING_DEFS[farm.type].name}(으)로 이동`;
     }
     return;
   }
 
-  // 봄/여름: 아직 안 자란 밭을 돌본다
-  const target = field.fieldGrowth < 100 ? field : null;
+  if (!canGrowCropNow(cropId, farm.type, ctx.season)) {
+    loiterNearBuilding(state, r, ctx, farm, 3, '파종철 대기');
+    return;
+  }
+
+  // 생육철: 아직 안 자란 작물을 돌본다
+  const target = farm.fieldGrowth < 100 ? farm : null;
   if (!target) {
-    loiterNearBuilding(state, r, ctx, field, 3, '밭 관리');
+    loiterNearBuilding(state, r, ctx, farm, 3, `${BUILDING_DEFS[farm.type].name} 관리`);
     return;
   }
   const st = goTo(state, r, ctx, buildingGoal(state, target.id));
   if (st === 'arrived') {
-    r.task = '농사 중';
+    r.task = `${crop.name} 재배 중`;
     const weatherGrow = state.weather === 'rain' ? 1.2 : state.weather === 'frost' ? 0.7 : 1;
     target.fieldGrowth = Math.min(100, target.fieldGrowth + a.work.growPerSubtick * weatherGrow * effOf(r));
     gainSkillTick(r);
   } else {
-    r.task = st === 'stuck' ? '길이 막힘' : '밭으로 이동';
+    r.task = st === 'stuck' ? '길이 막힘' : `${BUILDING_DEFS[farm.type].name}(으)로 이동`;
   }
 }
 
@@ -775,9 +807,8 @@ function haulerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   const processableGame = processableAmount(state, 'game');
-  const processableGrain = processableAmount(state, 'grain');
   const processableWood = processableAmount(state, 'wood');
-  const hasProcessing = processableGame > 0.2 || processableGrain > 0.2 || processableWood > 0.5;
+  const hasProcessing = processableGame > 0.2 || processableWood > 0.5;
   if (hasProcessing) {
     // 창고/중심지에서 가공 작업. 채석 이동/작업 중 새 가공물이 생기면 생존 자원 처리를 우선한다.
     if (r.phase === 'toWork' || r.phase === 'working' || r.phase === 'toDeposit') {
@@ -796,15 +827,9 @@ function haulerTick(state: GameState, r: Resident, ctx: Ctx): void {
     const g = Math.min(processableAmount(state, 'game'), (p.haulerGamePerDay / 5) * eff);
     if (g > 0) {
       state.resources.game -= g;
-      state.resources.food += g * p.foodPerGame;
+      state.resources.meat += g * p.foodPerGame;
       state.resources.hide += g * p.hidePerGame;
       label = '사냥감 손질';
-    }
-    const q = Math.min(processableAmount(state, 'grain'), (p.haulerGrainPerDay / 5) * eff);
-    if (q > 0) {
-      state.resources.grain -= q;
-      state.resources.food += q * p.foodPerGrain;
-      label = '곡물 도정';
     }
     const w = Math.min(processableAmount(state, 'wood'), (p.haulerWoodToFirewood / 5) * eff);
     if (w > 0) {
@@ -831,6 +856,32 @@ function haulerTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
   loiterNearCenter(state, r, ctx, '대기');
+}
+
+function millerTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const p = CONFIG.production;
+  const mill = assignedWorkplace(state, r, ctx, 'watermill', '방앗간 배정 없음');
+  if (!mill) return;
+
+  const st = goTo(state, r, ctx, buildingGoal(state, mill.id));
+  if (st !== 'arrived') {
+    r.phase = st === 'stuck' ? 'rest' : 'toWork';
+    r.task = st === 'stuck' ? '길이 막힘' : '방앗간으로 이동';
+    return;
+  }
+
+  const q = Math.min(processableAmount(state, 'grain'), (p.millerGrainPerDay / 5) * effOf(r) * ctx.mMod);
+  if (q <= 0.05) {
+    r.phase = 'rest';
+    loiterNearBuilding(state, r, ctx, mill, 3, '도정할 곡물 없음');
+    return;
+  }
+
+  state.resources.grain -= q;
+  state.resources.food += q * p.foodPerGrain;
+  r.phase = 'working';
+  r.task = '방아 찧기';
+  gainSkillTick(r);
 }
 
 function isSmithProcessableResource(resource: ResourceId): resource is ProcessingInputId {
@@ -966,9 +1017,9 @@ function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
   gatherJob(state, r, ctx, {
     goal: t => isBuildingInteractionTile(state, t, ferry.id),
     workTicks: a.work.fish,
-    yieldRes: 'food',
+    yieldRes: 'fish',
     yieldAmt: a.yields.fish * CONFIG.seasons.fishMult[ctx.season] * floodMult,
-    cap: a.carryCap.food,
+    cap: a.carryCap.fish,
     depositExtra: ['ferry'],
     taskWork: '고기잡이 중',
     taskMove: '나루터로 이동',
@@ -1015,9 +1066,9 @@ function herderTick(state: GameState, r: Resident, ctx: Ctx): void {
   gatherJob(state, r, ctx, {
     goal: t => isBuildingInteractionTile(state, t, stable.id),
     workTicks: a.work.herd,
-    yieldRes: 'food',
+    yieldRes: 'meat',
     yieldAmt: a.yields.herdFood,
-    cap: a.carryCap.food,
+    cap: a.carryCap.meat,
     depositExtra: ['stable'],
     taskWork: '가축 돌보기',
     taskMove: '축사로 이동',
@@ -1219,6 +1270,7 @@ export function agentsTick(state: GameState): void {
       case 'hunter': hunterTick(state, r, ctx); break;
       case 'herbalist': herbalistTick(state, r, ctx); break;
       case 'farmer': farmerTick(state, r, ctx); break;
+      case 'miller': millerTick(state, r, ctx); break;
       case 'builder': builderTick(state, r, ctx); break;
       case 'hauler': haulerTick(state, r, ctx); break;
       case 'smith': smithTick(state, r, ctx); break;

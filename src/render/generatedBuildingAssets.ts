@@ -33,6 +33,8 @@ const BUILDING_COLUMNS: Record<BuildingTypeId, number> = {
   nitreYard: 9,
   dock: 5,
   field: 7,
+  paddy: 7,
+  watermill: 5,
   smithy: 8,
   tannery: 9,
   beacon: 10,
@@ -57,8 +59,8 @@ const FIELD_SEASON_COLUMNS: Record<Season, number> = {
 export function generatedBuildingSourceRect(type: BuildingTypeId, season: Season) {
   const tile = GENERATED_BUILDING_SHEET.tileSize;
   const height = GENERATED_BUILDING_SHEET.spriteHeight;
-  const col = type === 'field' ? FIELD_SEASON_COLUMNS[season] : BUILDING_COLUMNS[type];
-  const row = type === 'field' ? 2 : season === 'winter' ? 1 : 0;
+  const col = type === 'field' || type === 'paddy' ? FIELD_SEASON_COLUMNS[season] : BUILDING_COLUMNS[type];
+  const row = type === 'field' || type === 'paddy' ? 2 : season === 'winter' ? 1 : 0;
   return {
     sx: col * tile,
     sy: row * height,
@@ -70,7 +72,7 @@ export function generatedBuildingSourceRect(type: BuildingTypeId, season: Season
 export function generatedLargeBuildingSourceRect(type: BuildingTypeId, season: Season) {
   const tile = GENERATED_LARGE_BUILDING_SHEET.tileSize;
   const height = GENERATED_LARGE_BUILDING_SHEET.spriteHeight;
-  const col = type === 'field' ? FIELD_SEASON_COLUMNS[season] : BUILDING_COLUMNS[type];
+  const col = type === 'field' || type === 'paddy' ? FIELD_SEASON_COLUMNS[season] : BUILDING_COLUMNS[type];
   const row = season === 'winter' ? 1 : 0;
   return {
     sx: col * tile,

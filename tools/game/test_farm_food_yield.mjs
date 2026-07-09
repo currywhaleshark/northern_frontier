@@ -30,6 +30,7 @@ const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
+const { CROP_DEFS } = await import(pathToFileURL(join(compiledDir, 'crops.mjs')).href);
 
 function centerTile(state) {
   const center = state.buildings.find(b => b.type === 'center');
@@ -96,6 +97,9 @@ function runTicks(state, ticks) {
 
 {
   assert.equal(CONFIG.production.fieldGrainYield, 36, 'full-growth field yield reflects stronger agriculture');
+  assert.ok(CROP_DEFS.millet.yield < CONFIG.production.fieldGrainYield, 'early millet yields less than dense paddy grain');
+  assert.equal(CROP_DEFS.millet.output, 'grain', 'millet harvests as tribute-ready grain');
+  assert.equal(CROP_DEFS.rice.output, 'grain', 'rice harvests as grain for efficient milling');
   assert.equal(CONFIG.production.foodPerGrain, 1.5, 'grain milling preserves agriculture as dense food');
 }
 
@@ -112,13 +116,18 @@ function runTicks(state, ticks) {
   runTicks(state, 1);
 
   assert.equal(field.fieldGrowth, 92, 'farmer harvests one subtick worth of field growth');
-  assert.ok(Math.abs((farmer.carrying.grain ?? 0) - 2.88) < 0.001, 'harvested grain uses the higher field yield');
+  const harvested = (8 / 100) * CROP_DEFS.millet.yield;
+  assert.ok(Math.abs((farmer.carrying.grain ?? 0) - harvested) < 0.001, 'millet harvest becomes stored grain');
+  assert.equal(farmer.carrying.food ?? 0, 0, 'millet no longer bypasses the grain stockpile');
 }
 
 {
   const state = simulation.newGame(8202);
-  const tile = centerTile(state);
-  const hauler = onlyWorkerAt(state, 'hauler', tile);
+  state.rank = 'bo';
+  const tile = openInteriorTile(state);
+  const watermill = placeBuilt(state, 'watermill', tile);
+  const miller = onlyWorkerAt(state, 'miller', state.map[tile.y][Math.max(0, tile.x - 1)]);
+  assert.equal(workerSlots.assignResidentToBuilding(state, miller.id, watermill.id), null);
   state.resources.game = 0;
   state.resources.wood = 0;
   state.resources.grain = 10;
@@ -128,9 +137,9 @@ function runTicks(state, ticks) {
 
   runTicks(state, 1);
 
-  const milled = CONFIG.production.haulerGrainPerDay / 5;
-  assert.equal(hauler.task, '곡물 도정');
-  assert.ok(Math.abs(state.resources.grain - (10 - milled)) < 0.001, 'hauler mills the expected grain amount');
+  const milled = CONFIG.production.millerGrainPerDay / 5;
+  assert.equal(miller.task, '방아 찧기');
+  assert.ok(Math.abs(state.resources.grain - (10 - milled)) < 0.001, 'miller mills the expected grain amount');
   assert.ok(Math.abs(state.resources.food - (milled * 1.5)) < 0.001, 'milled grain creates 1.5 food per grain');
 }
 

@@ -12,7 +12,7 @@ const CATEGORIES: { name: string; types: BuildingTypeId[] }[] = [
   {
     name: '생산',
     types: [
-      'field', 'lumberCamp', 'huntLodge', 'herbHut', 'smithy', 'mine', 'ferry',
+      'field', 'paddy', 'lumberCamp', 'huntLodge', 'herbHut', 'smithy', 'mine', 'ferry', 'watermill',
       'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'market', 'office',
     ],
   },
@@ -55,7 +55,7 @@ function BuildingThumb({ type, state }: { type: BuildingTypeId; state: GameState
     getActiveSprites().drawBuilding(ctx, {
       type, built: true, ghost: false, progress01: 1,
       season: getSeason(state.day),
-      growth01: type === 'field' ? 0.8 : undefined,
+      growth01: type === 'field' || type === 'paddy' ? 0.8 : undefined,
       x: 3, y: 17, size: 22,
     });
   });

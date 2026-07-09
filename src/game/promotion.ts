@@ -5,6 +5,7 @@ import { CONFIG } from './config';
 import { BUILDING_DEFS, countBuilt } from './buildings';
 import { RANK_NAMES, RANK_ORDER } from './constants';
 import { addLog } from './events';
+import { edibleFoodTotal } from './resources';
 import { livingResidents } from './residents';
 import type { BuildingTypeId, GameState, Rank } from './types';
 
@@ -33,7 +34,7 @@ export function promotionConditions(state: GameState, target: Rank): [boolean, s
       [living >= v.population, `인구 ${v.population}명 (현재 ${living}명)`],
       [state.lastWinterDeathRate <= v.maxWinterDeathRate, `겨울 사망률 10% 이하 (직전 ${(state.lastWinterDeathRate * 100).toFixed(0)}%)`],
       [state.resources.defense >= v.defense, `방어도 ${v.defense} (현재 ${state.resources.defense})`],
-      [state.resources.food >= v.food, `식량 ${v.food} 비축 (현재 ${Math.floor(state.resources.food)})`],
+      [edibleFoodTotal(state) >= v.food, `식량 ${v.food} 비축 (현재 ${Math.floor(edibleFoodTotal(state))})`],
       [state.resources.firewood >= v.firewood, `장작 ${v.firewood} 비축 (현재 ${Math.floor(state.resources.firewood)})`],
       [countBuilt(state, 'beacon') > 0, '봉수대 건설'],
       [countBuilt(state, 'garrison') > 0, '군영 건설'],
@@ -77,7 +78,7 @@ function promote(state: GameState, target: Rank): void {
 
   if (target === 'bo') {
     addLog(state, '조정이 개척지를 보(堡)로 승격하였습니다! 첨사의 이름이 한양까지 알려집니다.', 'good');
-    addLog(state, '보 승격으로 채광장·기와집·나루터와 채광꾼·어부가 열렸습니다.', 'good');
+    addLog(state, '보 승격으로 채광장·기와집·나루터·논·방앗간과 채광꾼·어부·방아꾼이 열렸습니다.', 'good');
     addLog(state, '보가 되니 남쪽에서 사람이 모여들지만, 부유해진 만큼 국경 너머의 눈길도 잦아집니다. 조정의 세공도 무거워질 것입니다.', 'info');
   } else if (target === 'jin') {
     addLog(state, '조정이 보를 진(鎭)으로 승격하였습니다! 첨사는 이제 첨절제사라 불립니다.', 'good');

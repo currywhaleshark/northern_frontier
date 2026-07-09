@@ -4,10 +4,11 @@ import {
 } from '../game/buildings';
 import { CONFIG } from '../game/config';
 import { FACTIONS, JOB_COLORS, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES } from '../game/constants';
+import { allowedCropsForBuilding, cropIdForBuilding, CROP_DEFS } from '../game/crops';
 import { canRequestTrade } from '../game/events';
 import { getBuildingActions } from '../game/selectionActions';
 import { assignedWorkers, availableWorkerSlots, workerSlotConfig } from '../game/workerSlots';
-import type { BuildingTypeId, GameState, ResourceId, SmithyProductId } from '../game/types';
+import type { BuildingTypeId, CropId, GameState, ResourceId, SmithyProductId } from '../game/types';
 import { FactionName } from './FactionName';
 
 const TILE = CONFIG.ui.tileSize;
@@ -17,6 +18,8 @@ interface Props {
   buildingId: number;
   onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
+  onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
+  onConvertFieldToPaddy: (buildingId: number) => void;
   onRequestTrade: (factionName: string) => void;
   onToggleNitre: () => void;
   onAssignNearestWorker: (buildingId: number) => void;
@@ -38,6 +41,8 @@ export function ActionPopup({
   buildingId,
   onUpgradeHousing,
   onSetSmithyProduct,
+  onSetBuildingCrop,
+  onConvertFieldToPaddy,
   onRequestTrade,
   onToggleNitre,
   onAssignNearestWorker,
@@ -61,6 +66,10 @@ export function ActionPopup({
   };
   const slotWorkers = slotConfig ? assignedWorkers(state, building) : [];
   const openSlots = slotConfig ? availableWorkerSlots(state, building) : 0;
+  const isCropBuilding = building.built && (building.type === 'field' || building.type === 'paddy');
+  const currentCrop = isCropBuilding ? cropIdForBuilding(building) : null;
+  const queuedCrop = isCropBuilding ? building.queuedCropId ?? null : null;
+  const hasStandingCrop = isCropBuilding && currentCrop != null && building.fieldGrowth > 0.5;
 
   return (
     <div className="action-popup" style={style}>
@@ -120,6 +129,70 @@ export function ActionPopup({
             );
           })}
         </div>
+      )}
+
+      {isCropBuilding && (
+        <div className="worker-slot-panel">
+          <div className="worker-slot-summary">
+            <span>작물</span>
+            <span className="muted small">
+              {currentCrop ? CROP_DEFS[currentCrop].name : '비어 있음'}
+              {queuedCrop ? ` -> ${CROP_DEFS[queuedCrop].name}` : ''}
+              {' · '}{Math.floor(building.fieldGrowth)}%
+            </span>
+          </div>
+          {hasStandingCrop ? (
+            <div style={{ display: 'grid', gap: 4 }}>
+              {allowedCropsForBuilding(building.type).map(cropId => {
+                const crop = CROP_DEFS[cropId];
+                const active = currentCrop === cropId;
+                return (
+                  <div key={cropId} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4, alignItems: 'center' }}>
+                    <span className="small" title={crop.desc}>{crop.name}{active ? ' 재배 중' : ''}</span>
+                    <button
+                      className={`action-chip${queuedCrop === cropId ? ' active' : ''}`}
+                      type="button"
+                      disabled={active}
+                      title="현재 작물을 수확한 뒤 바꿉니다"
+                      onClick={() => onSetBuildingCrop(building.id, cropId, 'queue')}
+                    >
+                      예약
+                    </button>
+                    <button
+                      className="action-chip"
+                      type="button"
+                      title="현재 작물을 갈아엎고 선택합니다"
+                      onClick={() => onSetBuildingCrop(building.id, cropId, 'uproot')}
+                    >
+                      갈아엎기
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="action-grid">
+              {allowedCropsForBuilding(building.type).map(cropId => (
+                <button
+                  key={cropId}
+                  className={`action-chip${currentCrop === cropId || queuedCrop === cropId ? ' active' : ''}`}
+                  type="button"
+                  title={CROP_DEFS[cropId].desc}
+                  onClick={() => onSetBuildingCrop(building.id, cropId, 'uproot')}
+                >
+                  {CROP_DEFS[cropId].name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {building.type === 'field' && building.built && (
+        <button className="action-command" type="button" onClick={() => onConvertFieldToPaddy(building.id)}>
+          <span>논으로 전환</span>
+          <CostLine type="paddy" />
+        </button>
       )}
 
       {building.type === 'hut' && (
