@@ -153,8 +153,7 @@ export function assignNearestWorkerToBuilding(state: GameState, buildingId: numb
   const candidate = state.residents
     .filter(resident =>
       resident.assignedBuildingId == null &&
-      isWorkableResident(resident) &&
-      (resident.job === 'idle' || resident.job === config.job))
+      isWorkableResident(resident))
     .sort((a, b) => {
       const jobPreference = Number(b.job === config.job) - Number(a.job === config.job);
       if (jobPreference !== 0) return jobPreference;

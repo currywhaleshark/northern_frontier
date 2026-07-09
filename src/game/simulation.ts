@@ -26,6 +26,7 @@ import { firewoodWeatherMult, rollWeather } from './weather';
 import { defaultProcessingReserves, processableAmount } from './processing';
 import { getPointerAction } from './selectionActions';
 import { createExploration, isBuildingFootprintExplored, refreshExploration } from './exploration';
+import { clearIncompatibleAssignment } from './workerSlots';
 import type {
   Building, BuildingTypeId, Difficulty, GameState, JobId, PointerAction, Resident, ResourceId, SmithyProductId,
 } from './types';
@@ -227,6 +228,7 @@ export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
   const r = state.residents.find(res => res.alive && res.job === from);
   if (!r) return false;
   r.job = to;
+  clearIncompatibleAssignment(state, r);
   resetAgent(state, r);
   return true;
 }
@@ -236,6 +238,7 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
   const r = state.residents.find(res => res.id === id);
   if (r && r.alive) {
     r.job = job;
+    clearIncompatibleAssignment(state, r);
     resetAgent(state, r);
   }
 }

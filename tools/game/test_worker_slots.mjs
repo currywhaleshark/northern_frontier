@@ -180,4 +180,44 @@ function prepareState(seed = 2026070901, rank = 'bu') {
   assert.equal(idleNearest.assignedBuildingId, null);
 }
 
+{
+  const state = prepareState();
+  const stable = addBuilt(state, 'stable', 20, 20);
+  const nearestBuilder = workableResident(state, 0, 'builder', 19, 20);
+  for (let i = 1; i < state.residents.length; i++) {
+    workableResident(state, i, 'hauler', 30 + i, 30);
+  }
+
+  assert.equal(workerSlots.assignNearestWorkerToBuilding(state, stable.id), null);
+  assert.equal(nearestBuilder.assignedBuildingId, stable.id);
+  assert.equal(nearestBuilder.job, 'herder');
+}
+
+{
+  const state = prepareState();
+  const stable = addBuilt(state, 'stable', 20, 20);
+  const closerBuilder = workableResident(state, 0, 'builder', 19, 20);
+  const fartherHerder = workableResident(state, 1, 'herder', 12, 20);
+  for (let i = 2; i < state.residents.length; i++) {
+    workableResident(state, i, 'hauler', 30 + i, 30);
+  }
+
+  assert.equal(workerSlots.assignNearestWorkerToBuilding(state, stable.id), null);
+  assert.equal(fartherHerder.assignedBuildingId, stable.id);
+  assert.equal(fartherHerder.job, 'herder');
+  assert.equal(closerBuilder.assignedBuildingId, null);
+}
+
+{
+  const state = prepareState();
+  const tannery = addBuilt(state, 'tannery', 10, 10);
+  const resident = state.residents[0];
+
+  assert.equal(workerSlots.assignResidentToBuilding(state, resident.id, tannery.id), null);
+  assert.equal(resident.assignedBuildingId, tannery.id);
+  simulation.setResidentJob(state, resident.id, 'farmer');
+  assert.equal(resident.job, 'farmer');
+  assert.equal(resident.assignedBuildingId, null);
+}
+
 console.log('worker slot tests passed');
