@@ -37,6 +37,7 @@ const compiledDir = compileGameModules();
 const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
+const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 function openTile(state) {
@@ -113,7 +114,8 @@ function keepOnlyResident(state, index, job, tile) {
   const spearSmithy = addBuilt(state, 'smithy');
   simulation.setSmithyProduct(state, spearSmithy.id, 'spears');
 
-  keepOnlyResident(state, 0, 'smith', state.map[spearSmithy.y][spearSmithy.x]);
+  const smith = keepOnlyResident(state, 0, 'smith', state.map[spearSmithy.y][spearSmithy.x]);
+  assert.equal(workerSlots.assignResidentToBuilding(state, smith.id, spearSmithy.id), null);
   state.weather = 'clear';
   state.resources.tools = 100;
   state.resources.iron = 10;
@@ -135,7 +137,8 @@ function keepOnlyResident(state, index, job, tile) {
   state.rank = 'bu';
   const smithy = addBuilt(state, 'smithy');
   simulation.setSmithyProduct(state, smithy.id, 'muskets');
-  keepOnlyResident(state, 0, 'smith', state.map[smithy.y][smithy.x]);
+  const smith = keepOnlyResident(state, 0, 'smith', state.map[smithy.y][smithy.x]);
+  assert.equal(workerSlots.assignResidentToBuilding(state, smith.id, smithy.id), null);
   state.weather = 'clear';
   state.resources.iron = 10;
   state.resources.wood = 10;

@@ -28,6 +28,7 @@ function compileGameModules() {
 
 const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
+const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 function centerTile(state) {
@@ -106,6 +107,7 @@ function runTicks(state, ticks) {
   fieldTile.terrain = 'plain';
   const field = placeBuilt(state, 'field', fieldTile, { fieldGrowth: 100 });
   const farmer = onlyWorkerAt(state, 'farmer', fieldTile);
+  assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, field.id), null);
 
   runTicks(state, 1);
 

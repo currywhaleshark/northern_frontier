@@ -13,6 +13,7 @@ import { outdoorMult } from './weather';
 import { processableAmount } from './processing';
 import { isExplored, refreshExploration } from './exploration';
 import { isGateBuilding } from './walls';
+import { assignedBuildingForResident, isResidentInAssignedSlot } from './workerSlots';
 import type {
   Building, BuildingTypeId, GameState, ManualOrder, ProcessingInputId, Resident, ResourceId, Season,
   SmithyProductId, Tile,
@@ -32,7 +33,7 @@ interface Ctx {
 
 const PRODUCING_JOBS = [
   'woodcutter', 'hunter', 'farmer', 'builder', 'smith', 'miner', 'fisher',
-  'charcoalBurner', 'herder', 'powderMaker', 'herbalist', 'hauler',
+  'charcoalBurner', 'herder', 'powderMaker', 'tanner', 'herbalist', 'hauler',
 ];
 const OUTDOOR_JOBS = [
   'woodcutter', 'hunter', 'herbalist', 'farmer', 'builder', 'miner', 'fisher',
@@ -361,6 +362,21 @@ function loiterNearBuilding(
   return 'arrived';
 }
 
+function assignedWorkplace(
+  state: GameState,
+  r: Resident,
+  ctx: Ctx,
+  type: BuildingTypeId,
+  waitTask: string,
+): Building | null {
+  const building = assignedBuildingForResident(state, r);
+  if (!building || building.type !== type || !isResidentInAssignedSlot(state, r, building)) {
+    loiterNearCenter(state, r, ctx, waitTask);
+    return null;
+  }
+  return building;
+}
+
 function nearestPassableTile(state: GameState, x: number, y: number, maxRadius = 8): Tile | null {
   for (let radius = 1; radius <= maxRadius; radius++) {
     for (let ty = y - radius; ty <= y + radius; ty++) {
@@ -633,15 +649,25 @@ function herbalistTick(state: GameState, r: Resident, ctx: Ctx): void {
 function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
   const p = CONFIG.production;
-  const fields = state.buildings.filter(b => b.type === 'field' && b.built);
+  const field = assignedBuildingForResident(state, r);
 
-  if (ctx.season === 'winter' || fields.length === 0) {
+  if (!field || field.type !== 'field' || !isResidentInAssignedSlot(state, r, field)) {
     if (carryTotal(r) > 0) {
       const st = goTo(state, r, ctx, depositGoal(state, []));
       if (st === 'arrived' || st === 'stuck') depositAll(state, r);
       return;
     }
-    loiterNearCenter(state, r, ctx, ctx.season === 'winter' ? '겨울 채비' : '밭 없음');
+    assignedWorkplace(state, r, ctx, 'field', '밭 배정 없음');
+    return;
+  }
+
+  if (ctx.season === 'winter') {
+    if (carryTotal(r) > 0) {
+      const st = goTo(state, r, ctx, depositGoal(state, []));
+      if (st === 'arrived' || st === 'stuck') depositAll(state, r);
+      return;
+    }
+    loiterNearBuilding(state, r, ctx, field, 3, '겨울 채비');
     return;
   }
 
@@ -656,12 +682,10 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
 
   if (ctx.season === 'autumn') {
     // 수확: 성장도가 남은 밭에서 곡물을 거둔다
-    const target = nearestBuilding(r, fields.filter(f => f.fieldGrowth > 0.5));
+    const target = field.fieldGrowth > 0.5 ? field : null;
     if (!target) {
       if (carryTotal(r) > 0) { r.phase = 'toDeposit'; return; }
-      const cleanupField = nearestBuilding(r, fields);
-      if (cleanupField) loiterNearBuilding(state, r, ctx, cleanupField, 3, '수확 마무리');
-      else loiterNearCenter(state, r, ctx, '수확 마무리');
+      loiterNearBuilding(state, r, ctx, field, 3, '수확 마무리');
       return;
     }
     const st = goTo(state, r, ctx, buildingGoal(state, target.id));
@@ -680,11 +704,9 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   // 봄/여름: 아직 안 자란 밭을 돌본다
-  const target = nearestBuilding(r, fields.filter(f => f.fieldGrowth < 100));
+  const target = field.fieldGrowth < 100 ? field : null;
   if (!target) {
-    const careField = nearestBuilding(r, fields);
-    if (careField) loiterNearBuilding(state, r, ctx, careField, 3, '밭 관리');
-    else loiterNearCenter(state, r, ctx, '김매기');
+    loiterNearBuilding(state, r, ctx, field, 3, '밭 관리');
     return;
   }
   const st = goTo(state, r, ctx, buildingGoal(state, target.id));
@@ -828,58 +850,51 @@ interface SmithWork {
   made: number;
 }
 
-function findSmithWork(state: GameState, r: Resident, ctx: Ctx, pop: number): SmithWork | null {
-  const smithies = state.buildings.filter(b => b.type === 'smithy' && b.built);
-  let best: SmithWork | null = null;
-  let bestDistance = Infinity;
-  for (const smithy of smithies) {
-    const product = smithyProductOf(smithy);
-    if (!isSmithyProductUnlocked(state.rank, product)) continue;
-    if (!smithNeedsOutput(state, product, pop)) continue;
-    const def = SMITHY_PRODUCT_DEFS[product];
-    const target = (def.ratePerDay / 5) * effOf(r) * ctx.mMod;
-    const made = Math.min(target, smithMaxCraftable(state, product));
-    if (made <= 0.02) continue;
-    const distance = Math.abs(r.x - smithy.x) + Math.abs(r.y - smithy.y);
-    if (distance < bestDistance) {
-      best = { smithy, product, made };
-      bestDistance = distance;
-    }
-  }
-  return best;
+function findSmithWork(state: GameState, r: Resident, ctx: Ctx, pop: number, smithy: Building): SmithWork | null {
+  const product = smithyProductOf(smithy);
+  if (!isSmithyProductUnlocked(state.rank, product)) return null;
+  if (!smithNeedsOutput(state, product, pop)) return null;
+  const def = SMITHY_PRODUCT_DEFS[product];
+  const target = (def.ratePerDay / 5) * effOf(r) * ctx.mMod;
+  const made = Math.min(target, smithMaxCraftable(state, product));
+  if (made <= 0.02) return null;
+  return { smithy, product, made };
 }
 
-function smithWantsIron(state: GameState, pop: number): boolean {
-  const smithies = state.buildings.filter(b => b.type === 'smithy' && b.built);
-  if (smithies.length === 0) return true;
-  return smithies.some(smithy => {
-    const product = smithyProductOf(smithy);
-    if (!isSmithyProductUnlocked(state.rank, product)) return false;
-    if (!smithNeedsOutput(state, product, pop)) return false;
-    return (SMITHY_PRODUCT_DEFS[product].inputPerUnit.iron ?? 0) > 0 &&
-      processableAmount(state, 'iron') <= 0.02;
-  });
+function smithWantsIron(state: GameState, pop: number, smithy: Building): boolean {
+  const product = smithyProductOf(smithy);
+  if (!isSmithyProductUnlocked(state.rank, product)) return false;
+  if (!smithNeedsOutput(state, product, pop)) return false;
+  return (SMITHY_PRODUCT_DEFS[product].inputPerUnit.iron ?? 0) > 0 &&
+    processableAmount(state, 'iron') <= 0.02;
 }
 
-function smithWaitTask(state: GameState, pop: number, r: Resident, ctx: Ctx): string {
+function smithWaitTask(state: GameState, pop: number, r: Resident, ctx: Ctx, smithy: Building): string {
   const toolsRate = (CONFIG.production.toolsPerDay / 5) * effOf(r) * ctx.mMod;
   const needTools = state.resources.tools < pop * 0.7;
   if (needTools) return processableAmount(state, 'iron') < toolsRate ? '철 대기' : '재료 대기';
-  const hasWeaponSmithy = state.buildings.some(b => {
-    if (b.type !== 'smithy' || !b.built) return false;
-    const product = smithyProductOf(b);
-    return product !== 'tools' && isSmithyProductUnlocked(state.rank, product);
-  });
+  const product = smithyProductOf(smithy);
+  const hasWeaponSmithy = product !== 'tools' && isSmithyProductUnlocked(state.rank, product);
   return hasWeaponSmithy ? '재료 대기' : '도구 충분';
 }
 
 function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
-  const smithies = state.buildings.filter(b => b.type === 'smithy' && b.built);
-  const waitSmithy = nearestBuilding(r, smithies);
   const pop = state.residents.filter(x => x.alive).length;
   const hasMinerSupply = state.buildings.some(b => b.type === 'mine' && b.built) &&
     state.residents.some(x => x.alive && !x.sick && x.health >= 20 && x.job === 'miner');
+  const smithy = assignedBuildingForResident(state, r);
+
+  if (!smithy || smithy.type !== 'smithy' || !isResidentInAssignedSlot(state, r, smithy)) {
+    if (carryTotal(r) > 0) {
+      r.task = '철 운반';
+      const st = goTo(state, r, ctx, depositGoal(state, ['smithy']));
+      if (st === 'arrived' || st === 'stuck') { depositAll(state, r); r.phase = 'rest'; }
+      return;
+    }
+    assignedWorkplace(state, r, ctx, 'smithy', '대장간 배정 없음');
+    return;
+  }
 
   // 캐 온 철 하역 (대장간도 하역 거점). 채광꾼이 있으면 들고 있던 철은 바로 내려놓고 대장간으로 복귀한다.
   if (carryTotal(r) > 0 && (r.phase === 'toDeposit' || hasMinerSupply)) {
@@ -889,7 +904,7 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
 
-  const work = findSmithWork(state, r, ctx, pop);
+  const work = findSmithWork(state, r, ctx, pop, smithy);
   if (work) {
     const st = goTo(state, r, ctx, buildingGoal(state, work.smithy.id));
     if (st === 'arrived') {
@@ -904,13 +919,13 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
 
-  if (waitSmithy && hasMinerSupply) {
+  if (hasMinerSupply) {
     r.path = [];
     r.workTimer = 0;
-    const st = goTo(state, r, ctx, buildingGoal(state, waitSmithy.id));
+    const st = goTo(state, r, ctx, buildingGoal(state, smithy.id));
     if (st === 'arrived') {
       r.phase = 'rest';
-      r.task = smithWaitTask(state, pop, r, ctx);
+      r.task = smithWaitTask(state, pop, r, ctx, smithy);
     } else {
       r.phase = st === 'stuck' ? 'rest' : 'toWork';
       r.task = st === 'stuck' ? '길이 막힘' : '대장간으로 이동';
@@ -920,7 +935,7 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
 
   // 재료가 없거나 도구가 충분하면 필요한 경우에만 철광 채굴
   const hasIron = state.map.some(row => row.some(t => isExplored(state, t.x, t.y) && t.terrain === 'rock' && t.hasIron));
-  if (hasIron && smithWantsIron(state, pop)) {
+  if (hasIron && smithWantsIron(state, pop, smithy)) {
     gatherJob(state, r, ctx, {
       goal: t => t.terrain === 'rock' && t.hasIron,
       workTicks: a.work.mine,
@@ -958,9 +973,10 @@ function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
 function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
   const floodMult = state.weather === 'thawFlood' ? 0.25 : 1;
+  const ferry = assignedWorkplace(state, r, ctx, 'ferry', '나루터 배정 없음');
+  if (!ferry) return;
   gatherJob(state, r, ctx, {
-    goal: t => t.buildingId != null && state.buildings.some(b =>
-      b.id === t.buildingId && b.built && b.type === 'ferry'),
+    goal: t => isBuildingInteractionTile(state, t, ferry.id),
     workTicks: a.work.fish,
     yieldRes: 'food',
     yieldAmt: a.yields.fish * CONFIG.seasons.fishMult[ctx.season] * floodMult,
@@ -1006,9 +1022,10 @@ function charcoalBurnerTick(state: GameState, r: Resident, ctx: Ctx): void {
 
 function herderTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
-  const stables = state.buildings.filter(b => b.type === 'stable' && b.built);
+  const stable = assignedWorkplace(state, r, ctx, 'stable', '축사 배정 없음');
+  if (!stable) return;
   gatherJob(state, r, ctx, {
-    goal: t => stables.some(stable => isBuildingInteractionTile(state, t, stable.id)),
+    goal: t => isBuildingInteractionTile(state, t, stable.id),
     workTicks: a.work.herd,
     yieldRes: 'food',
     yieldAmt: a.yields.herdFood,
@@ -1028,11 +1045,8 @@ function powderMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
     loiterNearCenter(state, r, ctx, '염초장 가동 중지');
     return;
   }
-  const yard = nearestBuilding(r, state.buildings.filter(b => b.type === 'nitreYard' && b.built));
-  if (!yard) {
-    loiterNearCenter(state, r, ctx, '염초장 없음');
-    return;
-  }
+  const yard = assignedWorkplace(state, r, ctx, 'nitreYard', '질초장 배정 없음');
+  if (!yard) return;
 
   const st = goTo(state, r, ctx, buildingGoal(state, yard.id));
   if (st !== 'arrived') {
@@ -1056,6 +1070,35 @@ function powderMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
   state.resources.gunpowder += made;
   r.phase = 'working';
   r.task = '화약 제조';
+  gainSkillTick(r);
+}
+
+function tannerTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const p = CONFIG.production;
+  const tannery = assignedWorkplace(state, r, ctx, 'tannery', '무두장 배정 없음');
+  if (!tannery) return;
+
+  const st = goTo(state, r, ctx, buildingGoal(state, tannery.id));
+  if (st !== 'arrived') {
+    r.phase = st === 'stuck' ? 'rest' : 'toWork';
+    r.task = st === 'stuck' ? '길이 막힘' : '무두장으로 이동';
+    return;
+  }
+
+  const hideUsed = Math.min(
+    processableAmount(state, 'hide'),
+    (p.tanneryHidePerDay / 5) * effOf(r) * ctx.mMod,
+  );
+  if (hideUsed <= 0.05) {
+    r.phase = 'rest';
+    loiterNearBuilding(state, r, ctx, tannery, 3, '가죽 대기');
+    return;
+  }
+
+  state.resources.hide -= hideUsed;
+  state.resources.clothes += hideUsed / 2;
+  r.phase = 'working';
+  r.task = '무두질';
   gainSkillTick(r);
 }
 
@@ -1196,6 +1239,7 @@ export function agentsTick(state: GameState): void {
       case 'charcoalBurner': charcoalBurnerTick(state, r, ctx); break;
       case 'herder': herderTick(state, r, ctx); break;
       case 'powderMaker': powderMakerTick(state, r, ctx); break;
+      case 'tanner': tannerTick(state, r, ctx); break;
       case 'clerk': clerkTick(state, r, ctx); break;
       case 'watchman': watchmanTick(state, r, ctx); break;
       case 'militia': militiaTick(state, r, ctx); break;

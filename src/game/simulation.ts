@@ -23,7 +23,7 @@ import { driftRelations, initRelations } from './relations';
 import { avg, createResident, livingResidents, updateMorale, updateResidentNeeds } from './residents';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { firewoodWeatherMult, rollWeather } from './weather';
-import { defaultProcessingReserves, processableAmount } from './processing';
+import { defaultProcessingReserves } from './processing';
 import { getPointerAction } from './selectionActions';
 import { createExploration, isBuildingFootprintExplored, refreshExploration } from './exploration';
 import {
@@ -448,7 +448,6 @@ function endOfDay(state: GameState): void {
 
   regrowForest(state, rng, season);
   updateHabitats(state);
-  runTannery(state);
   runToolWear(state);
   runConsumptionAndNeeds(state, rng);
 
@@ -550,23 +549,11 @@ function updateHabitats(state: GameState): void {
   }
 }
 
-// 가죽공방: 자동으로 가죽 → 옷
-function runTannery(state: GameState): void {
-  const tanneries = countBuilt(state, 'tannery');
-  if (tanneries === 0) return;
-  const hideUsed = Math.min(processableAmount(state, 'hide'), tanneries * CONFIG.production.tanneryHidePerDay);
-  if (hideUsed >= 2) {
-    const made = Math.floor(hideUsed / 2);
-    state.resources.hide -= made * 2;
-    state.resources.clothes += made;
-  }
-}
-
 // 도구 마모: 생산직 인원 수에 비례
 function runToolWear(state: GameState): void {
   const producing = [
     'woodcutter', 'hunter', 'farmer', 'builder', 'smith', 'miner', 'fisher',
-    'charcoalBurner', 'herder', 'powderMaker', 'herbalist', 'hauler',
+    'charcoalBurner', 'herder', 'powderMaker', 'tanner', 'herbalist', 'hauler',
   ];
   const n = state.residents.filter(r => r.alive && !r.sick && producing.includes(r.job)).length;
   state.resources.tools = Math.max(0, state.resources.tools - n * CONFIG.production.toolWearPerWorker);
