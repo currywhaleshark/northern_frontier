@@ -48,6 +48,12 @@ function migrateResidentManualOrders(state: GameState): void {
   }
 }
 
+function migrateResidentAssignedBuildingIds(state: GameState): void {
+  for (const resident of state.residents as Array<Resident & { assignedBuildingId?: unknown }>) {
+    if (!Number.isInteger(resident.assignedBuildingId)) resident.assignedBuildingId = null;
+  }
+}
+
 export function saveGame(state: GameState): boolean {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(state));
@@ -124,6 +130,7 @@ export function loadGame(): GameState | null {
     if (parsed.tributeFailStreak == null) parsed.tributeFailStreak = 0;
     migrateResidentGender(parsed);
     migrateResidentManualOrders(parsed);
+    migrateResidentAssignedBuildingIds(parsed);
     rebuildBuildingFootprints(parsed);
     ensureExploration(parsed);
     refreshExploration(parsed);
