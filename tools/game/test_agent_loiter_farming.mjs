@@ -29,6 +29,7 @@ function compileGameModules() {
 const compiledDir = compileGameModules();
 const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
+const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
 
 function clearMapToPlain(state) {
   for (const row of state.map) {
@@ -80,6 +81,7 @@ function onlyResidentAt(state, job, x, y) {
     path: [],
     workTimer: 0,
     targetId: null,
+    assignedBuildingId: null,
     carrying: {},
   });
   state.weather = 'clear';
@@ -122,6 +124,7 @@ function advance(state, ticks) {
   addBuilt(state, 'center', 4, 4);
   const field = addBuilt(state, 'field', 18, 18, { fieldGrowth: 100 });
   const farmer = onlyResidentAt(state, 'farmer', 6, 4);
+  assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, field.id), null);
   state.day = 13; // summer
 
   advance(state, 56);
