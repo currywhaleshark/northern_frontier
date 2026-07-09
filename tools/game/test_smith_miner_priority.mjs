@@ -30,6 +30,7 @@ const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
 const agents = await import(pathToFileURL(join(compiledDir, 'agents.mjs')).href);
+const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 function centerBuilding(state) {
@@ -137,6 +138,7 @@ function setupSmithScenario(seed, withMiner) {
   state.resources.tools = 0;
   state.processingReserves.iron = 0;
   state.processingReserves.wood = 0;
+  assert.equal(workerSlots.assignResidentToBuilding(state, smith.id, smithy.id), null);
 
   return { state, smith, smithy };
 }
@@ -155,12 +157,15 @@ function setupSmithScenario(seed, withMiner) {
 }
 
 {
-  const { state, smith } = setupSmithScenario(8102, false);
+  const { state, smith, smithy } = setupSmithScenario(8102, false);
 
-  simulation.advanceTick(state);
+  for (let i = 0; i < 8; i++) simulation.advanceTick(state);
 
-  assert.equal(smith.task, '철광으로 이동');
-  assert.ok(smith.path.length > 0 || smith.phase === 'toWork', 'smith still self-mines when no miner is available');
+  assert.ok(
+    isBuildingInteractionTile(state, smithy, smith.x, smith.y),
+    'smith waits at the assigned smithy when no processable iron is available',
+  );
+  assert.equal(smith.carrying.iron ?? 0, 0, 'assigned smith does not self-mine iron');
 }
 
 console.log('smith miner priority tests passed');

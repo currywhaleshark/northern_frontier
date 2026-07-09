@@ -86,6 +86,21 @@ function workableResident(state, index, job, x, y) {
   return resident;
 }
 
+function interactionTileForBuilding(state, building) {
+  const footprint = buildings.buildingFootprintTiles(state, building.type, building.x, building.y);
+  assert.ok(footprint, `${building.type} footprint exists`);
+  for (const part of footprint) {
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const tile = state.map[part.y + dy]?.[part.x + dx];
+      if (!tile || tile.buildingId != null || tile.terrain === 'mountain') continue;
+      tile.terrain = 'plain';
+      tile.hasIron = false;
+      return tile;
+    }
+  }
+  throw new Error(`no interaction tile for ${building.type}`);
+}
+
 function prepareState(seed) {
   const state = simulation.newGame(seed);
   clearMapToPlain(state);
@@ -160,6 +175,166 @@ function prepareState(seed) {
   simulation.advanceTick(state);
 
   assert.ok(state.resources.spears > 0, 'assigned smith produces the selected assigned smithy product');
+}
+
+{
+  const state = prepareState(2026070916);
+  state.rank = 'bo';
+  const ferry = addBuilt(state, 'ferry', 10, 10);
+  const fisher = workableResident(state, 0, 'fisher', ferry.x, ferry.y);
+
+  for (let i = 0; i < 6; i++) simulation.advanceTick(state);
+
+  assert.equal(fisher.carrying.food ?? 0, 0, 'unassigned fisher does not produce food');
+}
+
+{
+  const state = prepareState(2026070917);
+  state.rank = 'bo';
+  const ferry = addBuilt(state, 'ferry', 10, 10);
+  const fisher = workableResident(state, 0, 'fisher', ferry.x, ferry.y);
+  assert.equal(workerSlots.assignResidentToBuilding(state, fisher.id, ferry.id), null);
+
+  for (let i = 0; i < 6; i++) simulation.advanceTick(state);
+
+  assert.ok((fisher.carrying.food ?? 0) > 0, 'assigned fisher produces food at the assigned ferry');
+}
+
+{
+  const state = prepareState(2026070918);
+  state.rank = 'jin';
+  const stable = addBuilt(state, 'stable', 10, 10);
+  const spot = interactionTileForBuilding(state, stable);
+  const herder = workableResident(state, 0, 'herder', spot.x, spot.y);
+
+  for (let i = 0; i < 8; i++) simulation.advanceTick(state);
+
+  assert.equal(herder.carrying.food ?? 0, 0, 'unassigned herder does not produce food');
+  assert.equal(herder.carrying.hide ?? 0, 0, 'unassigned herder does not produce hide');
+}
+
+{
+  const state = prepareState(2026070919);
+  state.rank = 'jin';
+  const stable = addBuilt(state, 'stable', 10, 10);
+  const spot = interactionTileForBuilding(state, stable);
+  const herder = workableResident(state, 0, 'herder', spot.x, spot.y);
+  assert.equal(workerSlots.assignResidentToBuilding(state, herder.id, stable.id), null);
+
+  for (let i = 0; i < 8; i++) simulation.advanceTick(state);
+
+  assert.ok((herder.carrying.food ?? 0) > 0, 'assigned herder produces food at the assigned stable');
+  assert.ok((herder.carrying.hide ?? 0) > 0, 'assigned herder produces hide at the assigned stable');
+}
+
+{
+  const state = prepareState(2026070920);
+  state.rank = 'bu';
+  const yard = addBuilt(state, 'nitreYard', 10, 10);
+  const spot = interactionTileForBuilding(state, yard);
+  workableResident(state, 0, 'powderMaker', spot.x, spot.y);
+  state.resources.firewood = 10;
+  state.resources.stone = 10;
+  state.resources.gunpowder = 0;
+  state.nitrePaused = false;
+  state.nitreHiddenUntil = 0;
+
+  simulation.advanceTick(state);
+
+  assert.equal(state.resources.gunpowder, 0, 'unassigned powder maker does not produce gunpowder');
+}
+
+{
+  const state = prepareState(2026070921);
+  state.rank = 'bu';
+  const yard = addBuilt(state, 'nitreYard', 10, 10);
+  const spot = interactionTileForBuilding(state, yard);
+  const powderMaker = workableResident(state, 0, 'powderMaker', spot.x, spot.y);
+  assert.equal(workerSlots.assignResidentToBuilding(state, powderMaker.id, yard.id), null);
+  state.resources.firewood = 10;
+  state.resources.stone = 10;
+  state.resources.gunpowder = 0;
+  state.nitrePaused = false;
+  state.nitreHiddenUntil = 0;
+
+  simulation.advanceTick(state);
+
+  assert.ok(state.resources.gunpowder > 0, 'assigned powder maker produces gunpowder when inputs are available');
+  assert.ok(state.resources.firewood < 10, 'assigned powder maker consumes firewood');
+  assert.ok(state.resources.stone < 10, 'assigned powder maker consumes stone');
+}
+
+{
+  const state = prepareState(2026070922);
+  state.rank = 'bo';
+  const assignedSmithy = addBuilt(state, 'smithy', 10, 10);
+  const otherSmithy = addBuilt(state, 'smithy', 15, 10);
+  simulation.setSmithyProduct(state, assignedSmithy.id, 'tools');
+  simulation.setSmithyProduct(state, otherSmithy.id, 'spears');
+  const smith = workableResident(state, 0, 'smith', 9, 10);
+  assert.equal(workerSlots.assignResidentToBuilding(state, smith.id, assignedSmithy.id), null);
+  state.resources.tools = 0;
+  state.resources.spears = 0;
+  state.resources.iron = 10;
+  state.resources.wood = 10;
+
+  simulation.advanceTick(state);
+
+  assert.ok(state.resources.tools > 0, 'assigned smith uses the assigned smithy product');
+  assert.equal(state.resources.spears, 0, 'assigned smith ignores another unassigned smithy product');
+}
+
+{
+  const state = prepareState(2026070923);
+  state.rank = 'bo';
+  const smithy = addBuilt(state, 'smithy', 10, 10);
+  const rock = state.map[18][18];
+  rock.terrain = 'rock';
+  rock.hasIron = true;
+  const smith = workableResident(state, 0, 'smith', 9, 10);
+  assert.equal(workerSlots.assignResidentToBuilding(state, smith.id, smithy.id), null);
+  state.resources.tools = 0;
+  state.resources.iron = 0;
+  state.resources.wood = 10;
+
+  for (let i = 0; i < 8; i++) simulation.advanceTick(state);
+
+  assert.equal(smith.carrying.iron ?? 0, 0, 'assigned smith does not self-mine iron away from the smithy');
+  assert.equal(state.resources.iron, 0, 'assigned smith does not deposit self-mined iron');
+}
+
+{
+  const state = prepareState(2026070924);
+  state.rank = 'bo';
+  addBuilt(state, 'ferry', 10, 10);
+  const storehouse = addBuilt(state, 'storehouse', 15, 10);
+  const spot = interactionTileForBuilding(state, storehouse);
+  const fisher = workableResident(state, 0, 'fisher', spot.x, spot.y);
+  fisher.carrying = { food: 2 };
+  state.resources.food = 0;
+
+  simulation.advanceTick(state);
+
+  assert.deepEqual(fisher.carrying, {}, 'unassigned fisher deposits carried resources before waiting');
+  assert.equal(state.resources.food, 2, 'unassigned fisher deposit reaches storage');
+}
+
+{
+  const state = prepareState(2026070925);
+  state.rank = 'jin';
+  addBuilt(state, 'stable', 10, 10);
+  const storehouse = addBuilt(state, 'storehouse', 15, 10);
+  const spot = interactionTileForBuilding(state, storehouse);
+  const herder = workableResident(state, 0, 'herder', spot.x, spot.y);
+  herder.carrying = { food: 2, hide: 1 };
+  state.resources.food = 0;
+  state.resources.hide = 0;
+
+  simulation.advanceTick(state);
+
+  assert.deepEqual(herder.carrying, {}, 'unassigned herder deposits carried resources before waiting');
+  assert.equal(state.resources.food, 2, 'unassigned herder food deposit reaches storage');
+  assert.equal(state.resources.hide, 1, 'unassigned herder hide deposit reaches storage');
 }
 
 console.log('worker slot production tests passed');

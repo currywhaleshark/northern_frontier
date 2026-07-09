@@ -362,6 +362,24 @@ function loiterNearBuilding(
   return 'arrived';
 }
 
+function depositCarriedResources(
+  state: GameState,
+  r: Resident,
+  ctx: Ctx,
+  extra: BuildingTypeId[],
+  task: string,
+): boolean {
+  if (carryTotal(r) <= 0) return false;
+  r.phase = 'toDeposit';
+  r.task = task;
+  const st = goTo(state, r, ctx, depositGoal(state, extra));
+  if (st === 'arrived' || st === 'stuck') {
+    depositAll(state, r);
+    r.phase = 'rest';
+  }
+  return true;
+}
+
 function assignedWorkplace(
   state: GameState,
   r: Resident,
@@ -371,6 +389,7 @@ function assignedWorkplace(
 ): Building | null {
   const building = assignedBuildingForResident(state, r);
   if (!building || building.type !== type || !isResidentInAssignedSlot(state, r, building)) {
+    if (depositCarriedResources(state, r, ctx, [type], waitTask)) return null;
     loiterNearCenter(state, r, ctx, waitTask);
     return null;
   }
@@ -861,14 +880,6 @@ function findSmithWork(state: GameState, r: Resident, ctx: Ctx, pop: number, smi
   return { smithy, product, made };
 }
 
-function smithWantsIron(state: GameState, pop: number, smithy: Building): boolean {
-  const product = smithyProductOf(smithy);
-  if (!isSmithyProductUnlocked(state.rank, product)) return false;
-  if (!smithNeedsOutput(state, product, pop)) return false;
-  return (SMITHY_PRODUCT_DEFS[product].inputPerUnit.iron ?? 0) > 0 &&
-    processableAmount(state, 'iron') <= 0.02;
-}
-
 function smithWaitTask(state: GameState, pop: number, r: Resident, ctx: Ctx, smithy: Building): string {
   const toolsRate = (CONFIG.production.toolsPerDay / 5) * effOf(r) * ctx.mMod;
   const needTools = state.resources.tools < pop * 0.7;
@@ -879,10 +890,7 @@ function smithWaitTask(state: GameState, pop: number, r: Resident, ctx: Ctx, smi
 }
 
 function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
-  const a = CONFIG.agents;
   const pop = state.residents.filter(x => x.alive).length;
-  const hasMinerSupply = state.buildings.some(b => b.type === 'mine' && b.built) &&
-    state.residents.some(x => x.alive && !x.sick && x.health >= 20 && x.job === 'miner');
   const smithy = assignedBuildingForResident(state, r);
 
   if (!smithy || smithy.type !== 'smithy' || !isResidentInAssignedSlot(state, r, smithy)) {
@@ -896,8 +904,8 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
 
-  // 캐 온 철 하역 (대장간도 하역 거점). 채광꾼이 있으면 들고 있던 철은 바로 내려놓고 대장간으로 복귀한다.
-  if (carryTotal(r) > 0 && (r.phase === 'toDeposit' || hasMinerSupply)) {
+  // 캐 온 재료 하역 (대장간도 하역 거점). 남은 짐은 내려놓고 대장간으로 복귀한다.
+  if (carryTotal(r) > 0) {
     r.task = '철 운반';
     const st = goTo(state, r, ctx, depositGoal(state, ['smithy']));
     if (st === 'arrived' || st === 'stuck') { depositAll(state, r); r.phase = 'rest'; }
@@ -919,36 +927,16 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
 
-  if (hasMinerSupply) {
-    r.path = [];
-    r.workTimer = 0;
-    const st = goTo(state, r, ctx, buildingGoal(state, smithy.id));
-    if (st === 'arrived') {
-      r.phase = 'rest';
-      r.task = smithWaitTask(state, pop, r, ctx, smithy);
-    } else {
-      r.phase = st === 'stuck' ? 'rest' : 'toWork';
-      r.task = st === 'stuck' ? '길이 막힘' : '대장간으로 이동';
-    }
-    return;
+  r.path = [];
+  r.workTimer = 0;
+  const st = goTo(state, r, ctx, buildingGoal(state, smithy.id));
+  if (st === 'arrived') {
+    r.phase = 'rest';
+    r.task = smithWaitTask(state, pop, r, ctx, smithy);
+  } else {
+    r.phase = st === 'stuck' ? 'rest' : 'toWork';
+    r.task = st === 'stuck' ? '길이 막힘' : '대장간으로 이동';
   }
-
-  // 재료가 없거나 도구가 충분하면 필요한 경우에만 철광 채굴
-  const hasIron = state.map.some(row => row.some(t => isExplored(state, t.x, t.y) && t.terrain === 'rock' && t.hasIron));
-  if (hasIron && smithWantsIron(state, pop, smithy)) {
-    gatherJob(state, r, ctx, {
-      goal: t => t.terrain === 'rock' && t.hasIron,
-      workTicks: a.work.mine,
-      yieldRes: 'iron',
-      yieldAmt: a.yields.iron,
-      cap: a.carryCap.iron,
-      depositExtra: ['smithy'],
-      taskWork: '철광 채굴 중', taskMove: '철광으로 이동', taskHaul: '철 운반',
-      onHarvest: (_t, res) => addCarry(res, 'stone', a.yields.mineStone),
-    });
-    return;
-  }
-  loiterNearCenter(state, r, ctx, '재료 없음');
 }
 
 function minerTick(state: GameState, r: Resident, ctx: Ctx): void {

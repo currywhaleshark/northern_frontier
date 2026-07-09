@@ -31,6 +31,7 @@ const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs'
 const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
 const constants = await import(pathToFileURL(join(compiledDir, 'constants.mjs')).href);
 const agents = await import(pathToFileURL(join(compiledDir, 'agents.mjs')).href);
+const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 const BO_BUILDINGS = ['mine', 'tileHouse', 'ferry'];
@@ -225,8 +226,9 @@ function runTicks(state, ticks) {
 {
   const state = simulation.newGame(47);
   const ferryTile = prepareRiverEdge(state).river;
-  placeBuilt(state, 'ferry', ferryTile);
+  const ferry = placeBuilt(state, 'ferry', ferryTile);
   const fisher = onlyWorkerAt(state, 'fisher', ferryTile);
+  assert.equal(workerSlots.assignResidentToBuilding(state, fisher.id, ferry.id), null);
   runTicks(state, 6);
 
   assert.ok((fisher.carrying.food ?? 0) > 0, 'fisher carries food from ferry fishing');

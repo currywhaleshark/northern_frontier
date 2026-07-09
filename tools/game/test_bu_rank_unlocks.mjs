@@ -31,6 +31,7 @@ const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs'
 const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
 const constants = await import(pathToFileURL(join(compiledDir, 'constants.mjs')).href);
 const events = await import(pathToFileURL(join(compiledDir, 'events.mjs')).href);
+const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 const { FACTIONS } = constants;
 
@@ -220,8 +221,9 @@ function runTicks(state, ticks) {
 {
   const state = simulation.newGame(202607084);
   const yardTile = prepareLandTile(state, 'nitreYard');
-  placeBuilt(state, 'nitreYard', yardTile);
-  onlyWorkerAt(state, 'powderMaker', yardTile);
+  const yard = placeBuilt(state, 'nitreYard', yardTile);
+  const powderMaker = onlyWorkerAt(state, 'powderMaker', yardTile);
+  assert.equal(workerSlots.assignResidentToBuilding(state, powderMaker.id, yard.id), null);
   state.resources.firewood = 10;
   state.resources.stone = 10;
   state.resources.gunpowder = 0;

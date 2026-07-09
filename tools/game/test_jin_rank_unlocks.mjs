@@ -30,6 +30,7 @@ const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
 const constants = await import(pathToFileURL(join(compiledDir, 'constants.mjs')).href);
+const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 const JIN_BUILDINGS = ['earthFort', 'charcoalKiln', 'stable'];
@@ -176,8 +177,9 @@ function runTicks(state, ticks) {
 {
   const state = simulation.newGame(202607075);
   const stableTile = prepareLandTile(state);
-  placeBuilt(state, 'stable', stableTile);
+  const stable = placeBuilt(state, 'stable', stableTile);
   const herder = onlyWorkerAt(state, 'herder', stableTile);
+  assert.equal(workerSlots.assignResidentToBuilding(state, herder.id, stable.id), null);
   runTicks(state, 8);
 
   assert.ok((herder.carrying.food ?? 0) > 0, 'herder carries food from a stable');
