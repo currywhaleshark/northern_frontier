@@ -29,6 +29,7 @@ import { createExploration, isBuildingFootprintExplored, refreshExploration } fr
 import {
   assignNearestWorkerToBuilding as assignNearestWorkerToSlot,
   assignResidentToBuilding as assignResidentToSlot,
+  clearAssignmentsForBuilding,
   clearIncompatibleAssignment,
   unassignResidentFromBuilding as unassignResidentFromSlot,
   workerSlotConfig,
@@ -222,6 +223,7 @@ export function demolishBuilding(state: GameState, x: number, y: number): string
   }
 
   clearBuildingTiles(state, building.id);
+  clearAssignmentsForBuilding(state, building.id);
   state.buildings = state.buildings.filter(b => b.id !== building.id);
   state.resources.defense = computeDefense(state);
   addLog(state, `${def.name}을(를) 철거했습니다.`, 'info');

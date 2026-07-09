@@ -220,4 +220,33 @@ function prepareState(seed = 2026070901, rank = 'bu') {
   assert.equal(resident.assignedBuildingId, null);
 }
 
+{
+  const state = prepareState();
+  const field = addBuilt(state, 'field', 10, 10);
+  const farmer = state.residents[0];
+  workableResident(state, 1, 'woodcutter', 12, 10);
+
+  assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, field.id), null);
+  assert.equal(farmer.job, 'farmer');
+  assert.equal(farmer.assignedBuildingId, field.id);
+  assert.equal(simulation.reassignJob(state, 'farmer', 'woodcutter'), true);
+  assert.equal(farmer.job, 'woodcutter');
+  assert.equal(farmer.assignedBuildingId, null);
+}
+
+{
+  const state = prepareState();
+  const smithy = addBuilt(state, 'smithy', 10, 10);
+  const first = state.residents[0];
+  const second = state.residents[1];
+
+  assert.equal(workerSlots.assignResidentToBuilding(state, first.id, smithy.id), null);
+  assert.equal(workerSlots.assignResidentToBuilding(state, second.id, smithy.id), null);
+  assert.equal(first.assignedBuildingId, smithy.id);
+  assert.equal(second.assignedBuildingId, smithy.id);
+  workerSlots.clearAssignmentsForBuilding(state, smithy.id);
+  assert.equal(first.assignedBuildingId, null);
+  assert.equal(second.assignedBuildingId, null);
+}
+
 console.log('worker slot tests passed');
