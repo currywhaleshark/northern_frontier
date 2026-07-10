@@ -130,6 +130,7 @@ export interface Faction {
   tradeValues: Partial<Record<ResourceId, number>>;
   exports: ResourceId[];
   imports: ResourceId[];
+  extortionDemands?: { resource: ResourceId; baseAmount: number }[];
   initialRelation: number; // 시작 우호도 (0~100)
 }
 
@@ -194,6 +195,11 @@ export const FACTIONS: Faction[] = [
     tradeValues: {},
     exports: [],
     imports: [],
+    extortionDemands: [
+      { resource: 'grain', baseAmount: 18 },
+      { resource: 'hide', baseAmount: 7 },
+      { resource: 'tools', baseAmount: 3 },
+    ],
     initialRelation: 35,
   },
   {
@@ -204,6 +210,11 @@ export const FACTIONS: Faction[] = [
     tradeValues: {},
     exports: [],
     imports: [],
+    extortionDemands: [
+      { resource: 'grain', baseAmount: 15 },
+      { resource: 'tools', baseAmount: 4 },
+      { resource: 'hide', baseAmount: 6 },
+    ],
     initialRelation: 25,
   },
 ];

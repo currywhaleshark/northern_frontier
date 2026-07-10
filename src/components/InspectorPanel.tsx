@@ -14,11 +14,11 @@ import { getRelation } from '../game/relations';
 import { isExplored } from '../game/exploration';
 import { mineralRemaining } from '../game/minerals';
 import { isWallBuilding } from '../game/walls';
-import { quoteTrade } from '../game/tradeValues';
+import { FACTION_ARTWORK } from '../game/tradePresentation';
 import { LUXURY_RESOURCES } from '../game/resourceCatalog';
 import { tributeReserved } from '../game/tributeReserve';
 import { residentHome } from '../game/residents';
-import type { GameState, JobId, Resident, ResourceId, SmithyProductId, TradeRequest } from '../game/types';
+import type { GameState, JobId, Resident, ResourceId, SmithyProductId } from '../game/types';
 import { FactionName } from './FactionName';
 
 export type InspectorTab = 'tile' | 'people' | 'factions' | 'court';
@@ -28,7 +28,7 @@ interface Props {
   selected: { x: number; y: number } | null;
   onSetResidentJob: (id: number, job: JobId) => void;
   onToggleResidentCart: (id: number) => void;
-  onRequestTrade: (factionName: string, request?: TradeRequest) => void;
+  onRequestTrade: (factionName: string) => void;
   onPetition: () => void;
   onSetTributeReserve: (resource: ResourceId, amount: number) => void;
   onUseLuxuryGood: (resource: ResourceId) => void;
@@ -39,49 +39,6 @@ interface Props {
   setTab: (t: InspectorTab) => void;
   residentId: number | null;
   setResidentId: (id: number | null) => void;
-}
-
-function TradeControls({ state, factionName, onRequestTrade }: {
-  state: GameState;
-  factionName: string;
-  onRequestTrade: (name: string, request?: TradeRequest) => void;
-}) {
-  const faction = FACTIONS.find(candidate => candidate.name === factionName)!;
-  const [give, setGive] = useState<ResourceId>(faction.imports[0]);
-  const [get, setGet] = useState<ResourceId>(faction.exports[0]);
-  const [giveAmt, setGiveAmt] = useState(1);
-  const reason = canRequestTrade(state, factionName);
-  const request = { give, giveAmt, get } satisfies TradeRequest;
-  const quote = quoteTrade(state, factionName, request);
-  return (
-    <div className="trade-controls">
-      <select value={give} onChange={event => setGive(event.target.value as ResourceId)} aria-label="내줄 물품">
-        {faction.imports.map(resource => (
-          <option key={resource} value={resource}>
-            {RESOURCE_NAMES[resource]} ({Math.floor(state.resources[resource])})
-          </option>
-        ))}
-      </select>
-      <input
-        type="number" min={1} step={1} value={giveAmt} aria-label="내줄 수량"
-        onChange={event => setGiveAmt(Number(event.target.value))}
-      />
-      <span>↔</span>
-      <select value={get} onChange={event => setGet(event.target.value as ResourceId)} aria-label="받을 물품">
-        {faction.exports.map(resource => (
-          <option key={resource} value={resource}>{RESOURCE_NAMES[resource]}</option>
-        ))}
-      </select>
-      <button
-        className="btn small" type="button"
-        disabled={!!reason || !quote.ok}
-        title={reason ?? quote.reason ?? `관계 할증 x${quote.margin.toFixed(2)}`}
-        onClick={() => onRequestTrade(factionName, request)}
-      >
-        {quote.ok ? `${quote.getAmt} 받기` : '견적 불가'}
-      </button>
-    </div>
-  );
 }
 
 function Bar({ value, color }: { value: number; color: string }) {
@@ -490,28 +447,52 @@ export function InspectorPanel({
       {tab === 'factions' && (
         <div>
           <div className="muted small" style={{ marginBottom: 6 }}>
-            교역·공물·협상은 관계를 데우고, 거절과 전투는 식힙니다. 관계가 나쁜 세력일수록 습격에 나서기 쉽습니다.
+            교역·공물·협상은 관계를 데우고, 거절과 전투는 식힙니다. 홀라온과 마적은 습격 전에 대가를 요구할 수 있습니다.
           </div>
           {FACTIONS.map(f => {
             const rel = getRelation(state, f.name);
             const color = rel >= 60 ? '#6fbf73' : rel >= 40 ? '#d9a441' : '#e06c5c';
+            const artwork = FACTION_ARTWORK[f.name];
+            const tradeReason = f.exports.length > 0 ? canRequestTrade(state, f.name) : null;
             return (
-              <div key={f.name} style={{ marginBottom: 9 }} title={f.desc}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{f.hostile ? '⚔️' : '🤝'} <FactionName name={f.name} /></span>
-                  <span className="muted small">{Math.round(rel)}</span>
-                </div>
-                <Bar value={rel} color={color} />
-                <div className="muted small">
-                  {f.exports.length > 0
-                    ? '판매: ' + f.exports.map(resource => RESOURCE_NAMES[resource]).join(', ')
-                    : '교역하지 않음'}
-                </div>
-                {f.exports.length > 0 && (
-                  <div style={{ marginTop: 3 }}>
-                    <TradeControls state={state} factionName={f.name} onRequestTrade={onRequestTrade} />
-                  </div>
+              <div key={f.name} className="faction-entry" title={f.desc}>
+                {artwork && (
+                  <img
+                    className="faction-entry-art"
+                    src={artwork.src}
+                    alt={artwork.alt}
+                    loading="lazy"
+                    style={{ objectPosition: artwork.position }}
+                  />
                 )}
+                <div className="faction-entry-body">
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{f.hostile ? '⚔️' : '🤝'} <FactionName name={f.name} /></span>
+                    <span className="muted small">{Math.round(rel)}</span>
+                  </div>
+                  <Bar value={rel} color={color} />
+                  <div className="muted small">
+                    {f.exports.length > 0
+                      ? '내놓음: ' + f.exports.map(resource => RESOURCE_NAMES[resource]).join(', ')
+                      : f.extortionDemands?.length
+                        ? '선제 요구: ' + f.extortionDemands.map(demand => RESOURCE_NAMES[demand.resource]).join(', ')
+                        : '교역하지 않음'}
+                  </div>
+                  {f.imports.length > 0 && (
+                    <div className="muted small">원함: {f.imports.map(resource => RESOURCE_NAMES[resource]).join(', ')}</div>
+                  )}
+                  {f.exports.length > 0 && (
+                    <button
+                      className="btn small faction-trade-button"
+                      type="button"
+                      disabled={!!tradeReason}
+                      title={tradeReason ?? `${f.name}과 교역 협상을 엽니다`}
+                      onClick={() => onRequestTrade(f.name)}
+                    >
+                      교역
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}

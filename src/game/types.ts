@@ -256,6 +256,30 @@ export interface TradeQuote {
   margin: number;
 }
 
+export type TradeNegotiationPhase = 'selecting' | 'countered' | 'accepted' | 'rejected';
+
+export interface TradeNegotiation {
+  faction: string;
+  initiatedBy: 'player' | 'faction';
+  mode?: 'trade' | 'extortion';
+  phase: TradeNegotiationPhase;
+  give: ResourceId | null; // 마을이 내놓는 물품
+  giveAmt: number;
+  get: ResourceId | null;  // 마을이 받는 물품
+  getAmt: number;
+  round: number;
+  margin: number;
+  message: string;
+  maxAcceptGetAmt?: number;
+}
+
+export interface TradeEvaluation {
+  outcome: Extract<TradeNegotiationPhase, 'accepted' | 'countered' | 'rejected'>;
+  offer: TradeOffer;
+  maxGetAmt: number;
+  message: string;
+}
+
 export interface LogEntry {
   day: number;
   text: string;
@@ -272,7 +296,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'trade' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration';
+  kind: 'raid' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration';
   title: string;
   body: string;
   illustration?: {

@@ -258,6 +258,16 @@ export const CONFIG = {
     playerCooldownDays: 6,  // 플레이어 주도 교역의 세력별 간격 (교환비 고정이라 반복 차익 방지)
     dockOfferScale: 1.5,
     dockPlayerCooldownDays: 4,
+    haggleMarginStep: 0.1,
+    maxHaggleRounds: 2,
+    counterTolerance: 1.45,
+  },
+
+  extortion: {
+    powerAmountDiv: 22,
+    payThreatReduction: 25,
+    payReputationLoss: 1,
+    payMoraleLoss: 4,
   },
 
   // 조정 세공(歲貢) — 봄 첫날 공지, 겨울 첫날 수거.

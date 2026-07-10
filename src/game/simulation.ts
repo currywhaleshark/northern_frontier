@@ -18,7 +18,7 @@ import { generateMap, makeRng } from './map';
 import { isHabitatActive, spawnAnimalHabitats } from './habitats';
 import { agentsTick, resetAgent, SUBTICKS } from './agents';
 import { battleTick } from './battles';
-import { checkRaidTrigger, raidersTick, resolveRaid, updateThreat } from './raids';
+import { checkRaidTrigger, raidersTick, resolveExtortion, resolveRaid, updateThreat } from './raids';
 import { driftRelations, initRelations } from './relations';
 import {
   avg, createResident, livingResidents, reconcileResidentHomes, updateMorale, updateResidentNeeds,
@@ -491,6 +491,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   if (!state.pendingChoice) return;
   const rng = makeRng(state.seed + state.day * 7919 + 31);
   if (state.pendingChoice.kind === 'raid') resolveRaid(state, optionId, rng);
+  else if (state.pendingChoice.kind === 'extortion') resolveExtortion(state, optionId, rng);
   else if (state.pendingChoice.kind === 'tribute') resolveCourtTribute(state, optionId);
   else if (state.pendingChoice.kind === 'petition') resolvePetition(state, optionId);
   else if (state.pendingChoice.kind === 'inspection') resolveInspection(state, optionId, rng);

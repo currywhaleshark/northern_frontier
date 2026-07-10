@@ -95,4 +95,37 @@ assert.ok(faction);
   assert.equal(state.resources.tools, 10);
 }
 
+{
+  const state = simulation.newGame(2026071021);
+  state.resources.tools = 100;
+  state.resources.hideClothes = 0;
+  state.relations[faction.name] = 60;
+  const demand = tradeValues.quoteFactionDemand(state, faction.name, 'grain', 12);
+  assert.equal(demand.ok, true);
+  assert.equal(demand.give, 'tools');
+  assert.equal(demand.get, 'grain');
+  assert.equal(demand.getAmt, 12);
+  assert.ok(demand.giveAmt > 0);
+}
+
+{
+  const state = simulation.newGame(2026071022);
+  state.relations[faction.name] = 60;
+  const accepted = tradeValues.evaluateFactionProposal(state, faction.name, {
+    give: 'tools', giveAmt: 3, get: 'grain', getAmt: 1,
+  });
+  assert.equal(accepted.outcome, 'accepted');
+
+  const countered = tradeValues.evaluateFactionProposal(state, faction.name, {
+    give: 'tools', giveAmt: 3, get: 'grain', getAmt: accepted.maxGetAmt + 1,
+  });
+  assert.equal(countered.outcome, 'countered');
+  assert.equal(countered.offer.getAmt, countered.maxGetAmt);
+
+  const rejected = tradeValues.evaluateFactionProposal(state, faction.name, {
+    give: 'tools', giveAmt: 3, get: 'grain', getAmt: 999,
+  });
+  assert.equal(rejected.outcome, 'rejected');
+}
+
 console.log('trade value tests passed');
