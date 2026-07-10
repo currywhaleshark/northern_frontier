@@ -12,6 +12,7 @@ export const GENERATED_CHARACTER_SHEET = {
 const RESIDENT_COLUMNS: Record<JobId, number> = {
   idle: 0,
   woodcutter: 1,
+  woodSplitter: 1,
   hunter: 2,
   farmer: 3,
   miller: 5,
@@ -24,6 +25,7 @@ const RESIDENT_COLUMNS: Record<JobId, number> = {
   charcoalBurner: 7,
   herder: 5,
   tanner: 5,
+  weaver: 5,
   powderMaker: 7,
   clerk: 5,
   watchman: 8,

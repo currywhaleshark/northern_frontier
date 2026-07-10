@@ -45,6 +45,38 @@ html, body, #root {
   gap: 10px;
   flex-wrap: wrap;
 }
+.topbar-objectives {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ongoing-objective {
+  min-height: 30px;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 4px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: #242a30;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ongoing-objective:hover { background: #2b3239; }
+.ongoing-objective.ready { border-color: var(--good); }
+.ongoing-objective.urgent { border-color: var(--bad); }
+.objective-title { color: var(--accent); font-weight: 700; white-space: nowrap; }
+.ongoing-objective.ready .objective-title { color: var(--good); }
+.ongoing-objective.urgent .objective-title { color: var(--bad); }
+.objective-deadline { color: var(--muted); white-space: nowrap; }
+.objective-items { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.objective-items > span { white-space: nowrap; }
+.objective-items > span.complete { color: var(--good); }
 .res-item {
   display: inline-flex;
   align-items: center;
@@ -56,6 +88,40 @@ html, body, #root {
 }
 .res-item.low { color: var(--bad); font-weight: bold; }
 .res-item small { color: var(--muted); }
+.res-item.grouped { position: relative; cursor: default; }
+.resource-breakdown-popover {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 40;
+  min-width: 180px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+  font-weight: normal;
+}
+.resource-breakdown-head,
+.resource-breakdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.resource-breakdown-head { margin-bottom: 4px; }
+.resource-breakdown-row { padding: 2px 0; }
+.resource-breakdown-head .icon-btn {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel2);
+  color: var(--muted);
+  cursor: pointer;
+}
+.resource-breakdown-head .icon-btn.active { color: var(--accent); border-color: var(--accent); }
 .date-box {
   font-weight: bold;
   color: var(--accent);
@@ -63,6 +129,7 @@ html, body, #root {
 }
 .pop-box { color: var(--muted); white-space: nowrap; }
 .pop-box b { color: var(--text); }
+.pop-box .housing-shortage { color: var(--bad); }
 .threat-box { white-space: nowrap; }
 .threat-high { color: var(--bad); font-weight: bold; }
 
@@ -84,6 +151,7 @@ html, body, #root {
 .side.right { border-left: 1px solid var(--border); }
 
 .canvas-wrap {
+  position: relative;
   overflow: auto;
   background: #0d1013;
   padding: 8px;
@@ -91,6 +159,70 @@ html, body, #root {
      스크롤을 막으므로 쓰지 않는다. inline-block 캔버스가 자연스럽게 스크롤된다. */
 }
 .canvas-wrap canvas { image-rendering: pixelated; display: block; }
+
+/* ── 지도 위 주요 소식 ── */
+.important-log-overlay {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  width: min(420px, calc(100% - 8px));
+  height: 0;
+  pointer-events: none;
+}
+.important-log-stack {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.important-log-item {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid rgba(216, 222, 229, 0.16);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: rgba(20, 24, 28, 0.94);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+}
+.important-log-symbol {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  font-weight: 700;
+}
+.important-log-content { min-width: 0; }
+.important-log-day {
+  display: block;
+  margin-bottom: 1px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.important-log-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.35;
+}
+.important-log-good { border-left-color: var(--good); }
+.important-log-good .important-log-symbol { color: var(--good); }
+.important-log-bad { border-left-color: var(--bad); }
+.important-log-bad .important-log-symbol { color: var(--bad); }
+.important-log-raid { border-left-color: var(--raid); }
+.important-log-raid .important-log-symbol { color: var(--raid); }
+.important-log-weather { border-left-color: var(--weather); }
+.important-log-weather .important-log-symbol { color: var(--weather); }
+.important-log-trade { border-left-color: var(--trade); }
+.important-log-trade .important-log-symbol { color: var(--trade); }
 
 /* ── 패널 공통 ── */
 .panel-title {
@@ -252,6 +384,49 @@ html, body, #root {
 .insp-table { width: 100%; font-size: 12px; border-collapse: collapse; }
 .insp-table td { padding: 2px 4px; border-bottom: 1px dotted var(--border); }
 .insp-table td:first-child { color: var(--muted); width: 40%; }
+.trade-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px auto minmax(0, 1fr);
+  gap: 4px;
+  align-items: center;
+  margin-top: 4px;
+}
+.trade-controls select,
+.trade-controls input,
+.tribute-reserve-controls input {
+  min-width: 0;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel2);
+  color: var(--text);
+  font: inherit;
+}
+.trade-controls button { grid-column: 1 / -1; }
+.tribute-reserve-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  padding: 4px 0;
+  border-bottom: 1px dotted var(--border);
+  font-size: 12px;
+}
+.tribute-reserve-controls {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 34px 28px minmax(48px, 1fr) 28px 34px;
+  gap: 3px;
+}
+.tribute-reserve-controls button {
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel2);
+  color: var(--text);
+  cursor: pointer;
+}
+.luxury-actions { display: flex; flex-wrap: wrap; gap: 4px; }
 .resident-row {
   display: flex; justify-content: space-between;
   padding: 3px 4px; cursor: pointer; border-radius: 3px; font-size: 12px;

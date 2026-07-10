@@ -1,5 +1,6 @@
 // 명칭, 텍스트, 정적 정의 모음
 import type { JobId, Rank, ResourceId, Season, Terrain, TradeOffer, WeatherId } from './types';
+import { RESOURCE_DEFS, RESOURCE_ORDER as CATALOG_RESOURCE_ORDER } from './resourceCatalog';
 
 export const SEASON_NAMES: Record<Season, string> = {
   spring: '봄', summer: '여름', autumn: '가을', winter: '겨울',
@@ -37,19 +38,21 @@ export const TERRAIN_NAMES: Record<Terrain, string> = {
 
 export const JOB_NAMES: Record<JobId, string> = {
   idle: '무직', woodcutter: '벌목꾼', hunter: '사냥꾼', farmer: '농부',
+  woodSplitter: '장작꾼',
   miller: '방아꾼',
   builder: '건축가', hauler: '운반꾼', herbalist: '약초꾼', smith: '대장장이',
   miner: '채광꾼', fisher: '어부',
   charcoalBurner: '숯쟁이', herder: '목동',
   tanner: '무두장이',
+  weaver: '직조공',
   powderMaker: '염초장이', clerk: '아전',
   watchman: '파수꾼', militia: '수비병',
 };
 
 export const JOB_ORDER: JobId[] = [
-  'idle', 'woodcutter', 'hunter', 'farmer', 'miller', 'builder',
+  'idle', 'woodcutter', 'woodSplitter', 'hunter', 'farmer', 'miller', 'builder',
   'hauler', 'herbalist', 'smith', 'miner', 'fisher', 'charcoalBurner', 'herder',
-  'tanner', 'powderMaker', 'clerk',
+  'tanner', 'weaver', 'powderMaker', 'clerk',
   'watchman', 'militia',
 ];
 
@@ -57,6 +60,7 @@ export const JOB_MIN_RANK: Partial<Record<JobId, Rank>> = {
   miller: 'bo',
   miner: 'bo',
   fisher: 'bo',
+  weaver: 'bo',
   charcoalBurner: 'jin',
   herder: 'jin',
   powderMaker: 'bu',
@@ -70,18 +74,20 @@ export function isJobUnlocked(rank: Rank | undefined, job: JobId): boolean {
 export const JOB_DESC: Record<JobId, string> = {
   idle: '배정된 일이 없습니다.',
   woodcutter: '숲까지 걸어가 나무를 베고, 벌목장이나 창고로 목재를 나릅니다.',
+  woodSplitter: '창고에서 목재를 가져와 장작마당에 쌓고 난방 효율이 좋은 장작으로 팹니다.',
   hunter: '짐승 서식지를 오가며 사냥감을 잡아 사냥막이나 창고로 나릅니다.',
   farmer: '밭과 논을 오가며 선택한 작물을 돌보고 수확물을 나릅니다.',
-  miller: '보(堡) 승격 후 방앗간에서 곡물을 더 많은 식량으로 찧습니다.',
+  miller: '보(堡) 승격 후 창고의 벼를 방앗간으로 가져와 먹을 수 있는 곡물로 도정합니다.',
   builder: '공사장까지 가서 건물을 짓습니다.',
-  hauler: '창고에서 장작을 패고 사냥감을 손질하며, 일이 없으면 채석을 다녀옵니다.',
+  hauler: '생산지의 현장 재고를 중심지와 창고로 나르며, 일이 없으면 채석을 다녀옵니다. 수레를 장비하면 적재량이 크게 늘어납니다.',
   herbalist: '산기슭을 다니며 약초를 캐 약초막이나 창고로 나릅니다.',
-  smith: '대장간에서 도구를 만듭니다. 채광꾼이 없을 때만 철광까지 보조 채굴을 다녀옵니다.',
+  smith: '창고에서 철과 필요한 재료를 가져와 지정 대장간에서 도구와 무기를 만듭니다.',
   miner: '보(堡) 승격 후 배치할 수 있습니다. 채광장에서 돌과 철을 안정적으로 캡니다.',
   fisher: '보(堡) 승격 후 배치할 수 있습니다. 나루터에서 강고기를 잡아 식량을 보탭니다.',
-  charcoalBurner: '진(鎭) 승격 후 배치할 수 있습니다. 숯가마에서 목재를 장작으로 효율적으로 굽습니다.',
+  charcoalBurner: '진(鎭) 승격 후 창고에서 목재를 가져와 지정 숯가마에서 숯으로 굽습니다.',
   herder: '진(鎭) 승격 후 배치할 수 있습니다. 축사에서 가축을 돌보며 식량과 가죽을 보탭니다.',
   tanner: '무두질 작업장에서 가죽을 손질해 옷감과 방한용 의복 생산을 돕습니다.',
+  weaver: '베틀집에서 목화를 무명옷으로 짭니다.',
   powderMaker: '부(府) 승격 후 배치할 수 있습니다. 염초장에서 장작과 돌을 써서 화약을 만듭니다.',
   clerk: '부(府) 승격 후 배치할 수 있습니다. 관청에서 행정을 맡아 자원 수집과 생산 효율을 높입니다.',
   watchman: '방어 시설 사이를 순찰합니다. 방어도가 오르고 위협도 증가가 줄어듭니다.',
@@ -91,33 +97,26 @@ export const JOB_DESC: Record<JobId, string> = {
 // 지도 위 주민 점 색상
 export const JOB_COLORS: Record<JobId, string> = {
   idle: '#9aa5ad', woodcutter: '#b0793a', hunter: '#7fa653', farmer: '#d9c26b',
+  woodSplitter: '#c48b46',
   miller: '#b9a27a',
   builder: '#d98d5f', hauler: '#8fb7c9', herbalist: '#6fce9e', smith: '#c96f6f',
   miner: '#9a8f7a', fisher: '#5ba7d8',
   charcoalBurner: '#d66f3f', herder: '#c7a85b',
   tanner: '#b9825a',
+  weaver: '#8f9fbd',
   powderMaker: '#b47cc7', clerk: '#d0b36a',
   watchman: '#7f8fd9', militia: '#e05f5f',
 };
 
-export const RESOURCE_NAMES: Record<ResourceId, string> = {
-  food: '도정 곡식', meat: '고기', fish: '생선', firewood: '장작', wood: '목재', stone: '돌', iron: '철',
-  tools: '도구', hide: '가죽', clothes: '옷', herbs: '약초', grain: '곡물',
-  game: '사냥감', gunpowder: '화약', spears: '창', hornBows: '각궁',
-  muskets: '조총', reputation: '명성', defense: '방어도',
-};
+export const RESOURCE_NAMES = Object.fromEntries(
+  Object.entries(RESOURCE_DEFS).map(([id, def]) => [id, def.name]),
+) as Record<ResourceId, string>;
 
-export const RESOURCE_ICONS: Record<ResourceId, string> = {
-  food: '🍚', meat: '🥩', fish: '🐟', firewood: '🔥', wood: '🪵', stone: '🪨', iron: '⛏️',
-  tools: '🔨', hide: '🦌', clothes: '🧥', herbs: '🌿', grain: '🌾',
-  game: '🐗', gunpowder: '🧨', spears: '槍', hornBows: '弓',
-  muskets: '🔫', reputation: '📜', defense: '🛡️',
-};
+export const RESOURCE_ICONS = Object.fromEntries(
+  Object.entries(RESOURCE_DEFS).map(([id, def]) => [id, def.icon]),
+) as Record<ResourceId, string>;
 
-export const RESOURCE_ORDER: ResourceId[] = [
-  'food', 'meat', 'fish', 'grain', 'firewood', 'wood', 'stone', 'iron', 'tools', 'hide',
-  'clothes', 'herbs', 'game', 'gunpowder', 'spears', 'hornBows', 'muskets', 'reputation', 'defense',
-];
+export const RESOURCE_ORDER: ResourceId[] = CATALOG_RESOURCE_ORDER;
 
 // 북방 세력 — 조선 기록의 두만강 방면 여진 집단들에서 딴 세력 구성.
 // 단일 악역이 아니라, 습격 성향(hostile)과 교역(trades)이 따로 논다:
@@ -128,6 +127,9 @@ export interface Faction {
   desc: string;
   color: string;
   trades: TradeOffer[];  // 비어 있으면 교역하지 않는 세력
+  tradeValues: Partial<Record<ResourceId, number>>;
+  exports: ResourceId[];
+  imports: ResourceId[];
   initialRelation: number; // 시작 우호도 (0~100)
 }
 
@@ -138,8 +140,11 @@ export const FACTIONS: Faction[] = [
     color: '#58b6a4',
     trades: [
       { give: 'tools', giveAmt: 3, get: 'grain', getAmt: 16 },
-      { give: 'clothes', giveAmt: 4, get: 'hide', getAmt: 9 },
+      { give: 'hideClothes', giveAmt: 4, get: 'hide', getAmt: 9 },
     ],
+    tradeValues: { grain: 0.9, hide: 1.6, tools: 4.5, hideClothes: 3.6 },
+    exports: ['grain', 'hide'],
+    imports: ['tools', 'hideClothes'],
     initialRelation: 60,
   },
   {
@@ -148,8 +153,11 @@ export const FACTIONS: Faction[] = [
     color: '#d6a84f',
     trades: [
       { give: 'grain', giveAmt: 12, get: 'hide', getAmt: 8 },
-      { give: 'clothes', giveAmt: 3, get: 'game', getAmt: 10 },
+      { give: 'hideClothes', giveAmt: 3, get: 'meat', getAmt: 10 },
     ],
+    tradeValues: { grain: 1.1, hide: 1.5, meat: 1.35, hideClothes: 3.4 },
+    exports: ['hide', 'meat'],
+    imports: ['grain', 'hideClothes'],
     initialRelation: 55,
   },
   {
@@ -157,9 +165,12 @@ export const FACTIONS: Faction[] = [
     desc: '두만강 하구 바닷가에서 고기잡이하는 올적합 갈래, 마른 생선과 소금을 가져온다',
     color: '#5ba7d8',
     trades: [
-      { give: 'iron', giveAmt: 4, get: 'food', getAmt: 22 },
-      { give: 'tools', giveAmt: 2, get: 'food', getAmt: 15 },
+      { give: 'iron', giveAmt: 4, get: 'grain', getAmt: 22 },
+      { give: 'tools', giveAmt: 2, get: 'grain', getAmt: 15 },
     ],
+    tradeValues: { grain: 0.85, fish: 1.1, iron: 2.7, tools: 4.4 },
+    exports: ['grain', 'fish'],
+    imports: ['iron', 'tools'],
     initialRelation: 55,
   },
   {
@@ -168,8 +179,11 @@ export const FACTIONS: Faction[] = [
     color: '#78b95e',
     trades: [
       { give: 'grain', giveAmt: 14, get: 'hide', getAmt: 12 },
-      { give: 'food', giveAmt: 16, get: 'herbs', getAmt: 7 },
+      { give: 'grain', giveAmt: 16, get: 'herbs', getAmt: 7 },
     ],
+    tradeValues: { grain: 1.2, hide: 1.45, herbs: 1.35 },
+    exports: ['hide', 'herbs'],
+    imports: ['grain'],
     initialRelation: 45,
   },
   {
@@ -177,6 +191,9 @@ export const FACTIONS: Faction[] = [
     desc: '송화강 쪽에서 말을 몰고 내려오는 무리, 먼 길을 온 만큼 빈손으로 돌아가지 않는다',
     color: '#d96f5f',
     trades: [],
+    tradeValues: {},
+    exports: [],
+    imports: [],
     initialRelation: 35,
   },
   {
@@ -184,6 +201,9 @@ export const FACTIONS: Faction[] = [
     desc: '국경을 떠도는 혼성 무장 무리, 조선 유민도 여진 낙오자도 섞여 있다',
     color: '#b56f7a',
     trades: [],
+    tradeValues: {},
+    exports: [],
+    imports: [],
     initialRelation: 25,
   },
 ];

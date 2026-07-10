@@ -5,8 +5,8 @@ import {
   assignNearestWorkerToBuilding, assignResidentToBuilding,
   advanceDay, advanceTick, continueAfterVictory, demolishBuilding, newGame, reassignJob, resolveChoice, setResidentJob,
   setBuildingCrop, setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
-  convertFieldToPaddy,
-  unassignResidentFromBuilding, SUBTICKS, tryPlaceBuilding,
+  convertFieldToPaddy, toggleResidentCart,
+  unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
 import { clearSave, hasSave, loadGame, saveGame } from './game/saveLoad';
 import { addLog, requestTrade } from './game/events';
@@ -17,6 +17,7 @@ import { EventLog } from './components/EventLog';
 import { EventModal } from './components/EventModal';
 import { GameCanvas } from './components/GameCanvas';
 import { InspectorPanel, type InspectorTab } from './components/InspectorPanel';
+import { ImportantLogOverlay } from './components/ImportantLogOverlay';
 import { JobPanel } from './components/JobPanel';
 import { MainMenu } from './components/MainMenu';
 import { ProcessingPanel } from './components/ProcessingPanel';
@@ -25,11 +26,13 @@ import { RANK_NAMES } from './game/constants';
 import { requestPetition } from './game/petition';
 import { toggleNitreYards } from './game/suspicion';
 import { setProcessingReserve } from './game/processing';
+import { setTributeReserve } from './game/tributeReserve';
 import { nextRank } from './game/promotion';
 import { getPointerAction, selectedEntityFromTile } from './game/selectionActions';
 import { isExplored } from './game/exploration';
 import type {
-  BuildingTypeId, CropId, Difficulty, JobId, ProcessingInputId, SelectedEntity, SmithyProductId,
+  BuildingTypeId, CropId, Difficulty, JobId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
+  TradeRequest,
 } from './game/types';
 
 export default function App() {
@@ -196,6 +199,12 @@ export default function App() {
     bump();
   };
 
+  const handleToggleResidentCart = (id: number) => {
+    const err = toggleResidentCart(stateRef.current, id);
+    if (err) addLog(stateRef.current, err, 'info');
+    bump();
+  };
+
   const handleSetProcessingReserve = (resource: ProcessingInputId, amount: number) => {
     setProcessingReserve(stateRef.current, resource, amount);
     bump();
@@ -260,9 +269,26 @@ export default function App() {
   };
 
   // 세력 탭/장터 타일에서 먼저 거래를 청한다 (버튼이 미리 비활성화되지만 안전망으로 사유를 로그에)
-  const handleRequestTrade = (factionName: string) => {
-    const err = requestTrade(stateRef.current, factionName);
+  const handleRequestTrade = (factionName: string, request?: TradeRequest) => {
+    if (!request) {
+      setInspTab('factions');
+      bump();
+      return;
+    }
+    const err = requestTrade(stateRef.current, factionName, request);
     if (err) addLog(stateRef.current, err, 'info');
+    bump();
+  };
+
+  const handleSetTributeReserve = (resource: ResourceId, amount: number) => {
+    const message = setTributeReserve(stateRef.current, resource, amount);
+    if (message) addLog(stateRef.current, message, 'info');
+    bump();
+  };
+
+  const handleUseLuxuryGood = (resource: ResourceId) => {
+    const error = useLuxuryGood(stateRef.current, resource);
+    if (error) addLog(stateRef.current, error, 'info');
     bump();
   };
 
@@ -396,6 +422,10 @@ export default function App() {
         canLoad={canLoad}
         soundOn={soundOn}
         onToggleSound={handleToggleSound}
+        onOpenCourt={() => {
+          setInspResidentId(null);
+          setInspTab('court');
+        }}
       />
       <div className="main">
         <div className="side left">
@@ -404,6 +434,7 @@ export default function App() {
           <ProcessingPanel state={state} onSetReserve={handleSetProcessingReserve} />
         </div>
         <div className="canvas-wrap">
+          <ImportantLogOverlay state={state} />
           <GameCanvas
             state={state}
             version={version}
@@ -441,8 +472,11 @@ export default function App() {
             state={state}
             selected={selected}
             onSetResidentJob={handleSetResidentJob}
+            onToggleResidentCart={handleToggleResidentCart}
             onRequestTrade={handleRequestTrade}
             onPetition={handlePetition}
+            onSetTributeReserve={handleSetTributeReserve}
+            onUseLuxuryGood={handleUseLuxuryGood}
             onToggleNitre={handleToggleNitre}
             onSetSmithyProduct={handleSetSmithyProduct}
             onDemolishBuilding={handleDemolishBuilding}

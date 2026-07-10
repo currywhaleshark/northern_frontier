@@ -99,10 +99,10 @@ function prepareState(seed = 2026070911, rank = 'bo') {
   state.resources.wood = 500;
   state.resources.stone = 500;
   state.resources.tools = 500;
-  state.resources.food = 0;
   state.resources.meat = 0;
   state.resources.fish = 0;
   state.resources.grain = 0;
+  state.resources.rice = 0;
   for (let i = 0; i < state.residents.length; i++) {
     workableResident(state, i, 'idle', 2 + i, 2);
   }
@@ -122,7 +122,7 @@ function makePaddyEligibleTile(state, x, y) {
 
 {
   assert.equal(crops.CROP_DEFS.millet.output, 'grain', 'millet harvests as tribute-ready grain');
-  assert.equal(crops.CROP_DEFS.rice.output, 'grain', 'rice harvests as grain before efficient milling');
+  assert.equal(crops.CROP_DEFS.rice.output, 'rice', 'paddy harvests unmilled rice');
   assert.deepEqual(workerSlots.workerSlotConfig('paddy'), { job: 'farmer', slots: 1 });
   assert.deepEqual(workerSlots.workerSlotConfig('watermill'), { job: 'miller', slots: 2 });
 }
@@ -173,33 +173,34 @@ function makePaddyEligibleTile(state, x, y) {
 {
   const state = prepareState();
   state.day = 25; // autumn
-  const paddy = addBuilt(state, 'paddy', 9, 9, { cropId: 'rice', fieldGrowth: 100 });
+  const paddy = addBuilt(state, 'paddy', 9, 9, { cropId: 'rice', fieldGrowth: 100, inventory: {} });
   const farmer = workableResident(state, 0, 'farmer', 9, 9);
   assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, paddy.id), null);
 
   runTicks(state, 1);
 
   assert.equal(paddy.fieldGrowth, 92, 'rice harvest removes one harvest step');
-  assert.ok((farmer.carrying.grain ?? 0) > 0, 'rice harvest carries grain');
-  assert.equal(farmer.carrying.food ?? 0, 0, 'rice harvest is not already milled');
+  assert.ok((paddy.inventory.rice ?? 0) > 0, 'paddy stores unmilled rice locally');
+  assert.equal(paddy.inventory.grain ?? 0, 0, 'rice harvest is not already milled');
 }
 
 {
   const state = prepareState();
   state.day = 3;
-  const mill = addBuilt(state, 'watermill', 12, 12);
+  const mill = addBuilt(state, 'watermill', 12, 12, { inventory: { rice: 10 } });
   const miller = workableResident(state, 0, 'miller', 11, 12);
-  state.resources.grain = 10;
-  state.resources.food = 0;
-  state.processingReserves.grain = 0;
+  state.resources.rice = 0;
+  state.resources.grain = 0;
+  state.processingReserves.rice = 0;
   assert.equal(workerSlots.assignResidentToBuilding(state, miller.id, mill.id), null);
 
   runTicks(state, 1);
 
-  const milled = CONFIG.production.millerGrainPerDay / 5;
+  const milled = CONFIG.production.millerRicePerDay / 5;
   assert.equal(miller.task, '방아 찧기');
-  assert.ok(Math.abs(state.resources.grain - (10 - milled)) < 0.001, 'miller consumes grain');
-  assert.ok(Math.abs(state.resources.food - (milled * CONFIG.production.foodPerGrain)) < 0.001, 'miller produces milled food');
+  assert.ok(Math.abs(mill.inventory.rice - (10 - milled)) < 0.001, 'miller consumes rice delivered to the mill');
+  assert.ok(Math.abs((mill.inventory.grain ?? 0) - (milled * CONFIG.production.grainPerRice)) < 0.001, 'miller stores edible grain at the mill');
+  assert.equal(state.resources.grain, 0, 'milled grain waits for a hauler');
 }
 
 {
@@ -207,17 +208,18 @@ function makePaddyEligibleTile(state, x, y) {
   for (const resident of state.residents) resident.alive = false;
   const first = workableResident(state, 0, 'idle', 2, 2);
   first.alive = true;
-  state.resources.food = 0;
   state.resources.meat = 0;
   state.resources.fish = 0;
-  state.resources.grain = 9.5;
-  processing.setProcessingReserve(state, 'grain', 9);
+  state.resources.vegetables = 0;
+  state.resources.grain = 0;
+  state.resources.rice = 9.5;
+  processing.setProcessingReserve(state, 'rice', 9);
 
   simulation.advanceDay(state);
 
-  assert.equal(resources.edibleFoodTotal(state), 0, 'reserved grain is not counted as available food');
-  assert.equal(state.resources.grain, 9, 'daily consumption eats only unreserved grain');
-  assert.equal(first.hunger, 100, 'resident can eat unreserved grain directly');
+  assert.equal(resources.edibleFoodTotal(state), 0, 'unmilled rice is not counted as food');
+  assert.equal(state.resources.rice, 9.5, 'daily consumption never eats unmilled rice');
+  assert.equal(first.hunger, 70, 'a resident cannot eat unmilled rice');
 }
 
 console.log('crop, paddy, and milling tests passed');

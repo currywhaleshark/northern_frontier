@@ -96,15 +96,38 @@ function keepOnlyResident(state, index, job, tile) {
   const smithy = addBuilt(state, 'smithy');
 
   assert.equal(buildings.smithyProductOf(smithy), 'tools');
-  assert.deepEqual(buildings.availableSmithyProducts('settlement'), ['tools']);
-  assert.deepEqual(buildings.availableSmithyProducts('bo'), ['tools', 'spears']);
-  assert.deepEqual(buildings.availableSmithyProducts('jin'), ['tools', 'spears', 'hornBows']);
-  assert.deepEqual(buildings.availableSmithyProducts('bu'), ['tools', 'spears', 'hornBows', 'muskets']);
+  assert.deepEqual(buildings.availableSmithyProducts('settlement'), ['tools', 'carts']);
+  assert.deepEqual(buildings.availableSmithyProducts('bo'), ['tools', 'carts', 'spears']);
+  assert.deepEqual(buildings.availableSmithyProducts('jin'), ['tools', 'carts', 'spears', 'hornBows']);
+  assert.deepEqual(buildings.availableSmithyProducts('bu'), ['tools', 'carts', 'spears', 'hornBows', 'muskets']);
 
   assert.ok(simulation.setSmithyProduct(state, smithy.id, 'spears')?.includes('승격'));
   state.rank = 'bo';
   assert.equal(simulation.setSmithyProduct(state, smithy.id, 'spears'), null);
   assert.equal(smithy.smithyProduct, 'spears');
+}
+
+{
+  const state = simulation.newGame(9106);
+  const smithy = addBuilt(state, 'smithy');
+  assert.equal(simulation.setSmithyProduct(state, smithy.id, 'carts'), null);
+  const smith = keepOnlyResident(state, 0, 'smith', state.map[smithy.y][smithy.x]);
+  assert.equal(workerSlots.assignResidentToBuilding(state, smith.id, smithy.id), null);
+  state.weather = 'clear';
+  state.resources.iron = 10;
+  state.resources.wood = 20;
+  state.resources.tools = 10;
+  state.resources.carts = 0;
+  state.processingReserves.iron = 0;
+  state.processingReserves.wood = 0;
+  smithy.inventory = { iron: 10, wood: 20, tools: 10 };
+
+  for (let i = 0; i < 30; i++) simulation.advanceTick(state);
+
+  assert.ok((smithy.inventory?.carts ?? 0) >= 1, 'settlement smithies can complete a usable cart');
+  assert.ok(smithy.inventory.iron < 10);
+  assert.ok(smithy.inventory.wood < 20);
+  assert.ok(smithy.inventory.tools < 10);
 }
 
 {
@@ -123,13 +146,14 @@ function keepOnlyResident(state, index, job, tile) {
   state.resources.spears = 0;
   state.processingReserves.iron = 0;
   state.processingReserves.wood = 0;
+  spearSmithy.inventory = { iron: 10, wood: 10 };
 
   simulation.advanceTick(state);
 
   assert.equal(buildings.smithyProductOf(toolsSmithy), 'tools');
-  assert.ok(state.resources.spears > 0, 'smith uses the smithy whose selected product can be made');
-  assert.ok(state.resources.iron < 10, 'spear production consumes processable iron');
-  assert.ok(state.resources.wood < 10, 'spear production consumes processable wood');
+  assert.ok((spearSmithy.inventory?.spears ?? 0) > 0, 'smith uses the smithy whose selected product can be made');
+  assert.ok(spearSmithy.inventory.iron < 10, 'spear production consumes iron delivered to the smithy');
+  assert.ok(spearSmithy.inventory.wood < 10, 'spear production consumes wood delivered to the smithy');
 }
 
 {
@@ -147,10 +171,11 @@ function keepOnlyResident(state, index, job, tile) {
   state.resources.muskets = 0;
   state.processingReserves.iron = 0;
   state.processingReserves.wood = 0;
+  smithy.inventory = { iron: 10, wood: 10, tools: 10 };
 
   simulation.advanceTick(state);
 
-  assert.ok(state.resources.muskets > 0, 'bu smithies can make muskets');
+  assert.ok((smithy.inventory?.muskets ?? 0) > 0, 'bu smithies can make muskets');
   assert.equal(state.resources.gunpowder, 0, 'gunpowder is ammunition, not a musket crafting input');
 }
 
@@ -191,6 +216,8 @@ function keepOnlyResident(state, index, job, tile) {
   const smithy = addBuilt(state, 'smithy');
   delete state.resources.spears;
   delete state.resources.hornBows;
+  delete state.resources.carts;
+  delete state.residents[0].cartEquipped;
   delete smithy.smithyProduct;
 
   saveLoad.saveGame(state);
@@ -198,7 +225,24 @@ function keepOnlyResident(state, index, job, tile) {
 
   assert.equal(loaded.resources.spears, 0);
   assert.equal(loaded.resources.hornBows, 0);
+  assert.equal(loaded.resources.carts, 0);
+  assert.equal(loaded.residents[0].cartEquipped, false);
   assert.equal(buildings.smithyProductOf(loaded.buildings.find(b => b.id === smithy.id)), 'tools');
+}
+
+{
+  const state = simulation.newGame(9107);
+  const hauler = state.residents.find(resident => resident.job === 'hauler');
+  assert.ok(hauler);
+  state.resources.carts = 1;
+  assert.equal(simulation.toggleResidentCart(state, hauler.id), null);
+
+  saveLoad.saveGame(state);
+  const loaded = saveLoad.loadGame();
+  const loadedHauler = loaded.residents.find(resident => resident.id === hauler.id);
+
+  assert.equal(loadedHauler.cartEquipped, true, 'equipped carts survive save and load');
+  assert.equal(loaded.resources.carts, 0);
 }
 
 console.log('smithy product tests passed');

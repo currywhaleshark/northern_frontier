@@ -123,6 +123,21 @@ function drawSmoke(ctx: CanvasRenderingContext2D, bx: number, by: number, id: nu
   }
 }
 
+function drawBuildingDamage(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(116,42,34,0.9)';
+  ctx.lineWidth = Math.max(1.5, size / 18);
+  ctx.beginPath();
+  ctx.moveTo(x + size * 0.28, y + size * 0.2);
+  ctx.lineTo(x + size * 0.48, y + size * 0.42);
+  ctx.lineTo(x + size * 0.38, y + size * 0.62);
+  ctx.moveTo(x + size * 0.7, y + size * 0.25);
+  ctx.lineTo(x + size * 0.58, y + size * 0.48);
+  ctx.lineTo(x + size * 0.73, y + size * 0.7);
+  ctx.stroke();
+  ctx.restore();
+}
+
 // 눈밭 발자국: 지나온 자취를 따라 어긋난 점 두 줄, 오래된 것일수록 옅게
 function drawFootprints(ctx: CanvasRenderingContext2D, trail: { x: number; y: number }[]): void {
   const len = trail.length;
@@ -360,6 +375,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
         : undefined,
       x: b.x * TILE, y: b.y * TILE, size,
     });
+    if (b.repairing) drawBuildingDamage(ctx, b.x * TILE, b.y * TILE, size);
     // 아궁이에 불을 땔 때 온돌집/중심지 굴뚝에서 연기가 오른다
     if (b.built && heating && (b.type === 'ondol' || b.type === 'center')) {
       drawSmoke(ctx, b.x * TILE, b.y * TILE, b.id, footprint);

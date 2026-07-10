@@ -33,9 +33,9 @@ export const PETITION_OFFERS: PetitionOffer[] = [
     gives: { tools: 5 },
   },
   {
-    id: 'clothes', minRank: 'bo', repMin: 30, repCost: 5,
-    label: '겨울옷을 청한다', desc: '옷 8. 혹한을 나는 무명옷.',
-    gives: { clothes: 8 },
+    id: 'cotton-clothes', minRank: 'bo', repMin: 30, repCost: 5,
+    label: '겨울옷을 청한다', desc: '무명옷 8. 혹한을 나는 조정의 구휼품.',
+    gives: { cottonClothes: 8 },
   },
   {
     id: 'powder-small', minRank: 'bo', repMin: 45, repCost: 8,
@@ -53,9 +53,29 @@ export const PETITION_OFFERS: PetitionOffer[] = [
     gives: { gunpowder: 10 },
   },
   {
-    id: 'luxury', minRank: 'jin', repMin: 45, repCost: 6,
-    label: '비단과 소금을 청한다', desc: '사치품 하사 — 전 주민의 사기가 크게 오른다.',
-    morale: CONFIG.petition.luxuryMorale,
+    id: 'porcelain', minRank: 'jin', repMin: 45, repCost: 6,
+    label: '자기를 청한다', desc: '자기 2. 교역과 사기 진작에 쓸 수 있다.',
+    gives: { porcelain: 2 },
+  },
+  {
+    id: 'brassware', minRank: 'jin', repMin: 45, repCost: 6,
+    label: '유기를 청한다', desc: '유기 2. 교역과 사기 진작에 쓸 수 있다.',
+    gives: { brassware: 2 },
+  },
+  {
+    id: 'lacquerware', minRank: 'jin', repMin: 45, repCost: 6,
+    label: '칠기를 청한다', desc: '칠기 2. 교역과 사기 진작에 쓸 수 있다.',
+    gives: { lacquerware: 2 },
+  },
+  {
+    id: 'silk', minRank: 'jin', repMin: 50, repCost: 8,
+    label: '비단을 청한다', desc: '비단 2. 고가 교역품이자 사치품이다.',
+    gives: { silk: 2 },
+  },
+  {
+    id: 'preciousMetal', minRank: 'bu', repMin: 65, repCost: 12,
+    label: '귀금속을 청한다', desc: '귀금속 1. 매우 높은 가치의 사치품이다.',
+    gives: { preciousMetal: 1 },
   },
   {
     id: 'cannon', minRank: 'bu', repMin: 70, repCost: 18,

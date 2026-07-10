@@ -3,10 +3,18 @@ import { CONFIG } from './config';
 import { FACTIONS, FLAVOR_LOGS_CALM, FLAVOR_LOGS_TENSE, RESOURCE_NAMES } from './constants';
 import { countBuilt } from './buildings';
 import { changeRelation, getRelation } from './relations';
-import type { GameState, LogEntry, PendingChoice, ResourceId, TradeOffer } from './types';
+import { applyQuotedTrade, quoteTrade } from './tradeValues';
+import type { GameState, LogEntry, PendingChoice, TradeOffer, TradeQuote, TradeRequest } from './types';
 
-export function addLog(state: GameState, text: string, kind: LogEntry['kind'] = 'info'): void {
-  state.log.push({ day: state.day, text, kind });
+export function addLog(
+  state: GameState,
+  text: string,
+  kind: LogEntry['kind'] = 'info',
+  important = kind === 'raid',
+): void {
+  const entry: LogEntry = { day: state.day, text, kind };
+  if (important) entry.important = true;
+  state.log.push(entry);
   if (state.log.length > CONFIG.ui.logLimit) {
     state.log.splice(0, state.log.length - CONFIG.ui.logLimit);
   }
@@ -76,7 +84,7 @@ export function maybeOfferTrade(state: GameState, rng: () => number, daysSinceTr
 // 플레이어가 먼저 교역을 청할 수 있는지 — 불가하면 사유 문자열 (UI 버튼 비활성 사유와 공유)
 export function canRequestTrade(state: GameState, factionName: string): string | null {
   const faction = FACTIONS.find(f => f.name === factionName);
-  if (!faction || faction.trades.length === 0) return '교역 품목이 없는 세력입니다';
+  if (!faction || faction.exports.length === 0 || faction.imports.length === 0) return '교역 품목이 없는 세력입니다';
   if (countBuilt(state, 'market') === 0) return '장터가 필요합니다';
   if (state.pendingChoice || state.battle) return '지금은 거래할 수 없습니다';
   if (getRelation(state, factionName) < CONFIG.trade.minRelationToTrade) {
@@ -90,28 +98,29 @@ export function canRequestTrade(state: GameState, factionName: string): string |
   return null;
 }
 
-// 플레이어 주도 교역: 그 세력의 교환 목록 전체를 선택지 모달로 연다
-export function requestTrade(state: GameState, factionName: string): string | null {
+// 플레이어가 구성한 가치 기반 견적을 확인 모달로 연다.
+export function requestTrade(state: GameState, factionName: string, request?: TradeRequest): string | null {
   const reason = canRequestTrade(state, factionName);
   if (reason) return reason;
-  const faction = FACTIONS.find(f => f.name === factionName)!;
-  const offers = faction.trades.map(t => scaledTradeOffer(state, t));
+  if (!request) return '거래할 품목과 수량을 먼저 정해야 합니다';
+  const quote = quoteTrade(state, factionName, request);
+  if (!quote.ok) return quote.reason ?? '거래할 수 없습니다';
 
   const choice: PendingChoice = {
     kind: 'trade',
-    title: `장터 교역 — ${faction.name}`,
-    body: `${faction.name}에 먼저 사람을 보냈습니다.\n무엇을 바꾸시겠습니까?`,
+    title: `장터 교역 — ${factionName}`,
+    body: `${factionName}에 먼저 사람을 보냈습니다.\n` +
+      `${RESOURCE_NAMES[quote.give]} ${quote.giveAmt}을(를) ` +
+      `${RESOURCE_NAMES[quote.get]} ${quote.getAmt}과(와) 바꾸겠습니까?`,
     options: [
-      ...offers.map((t, i) => ({
-        id: `offer-${i}`,
-        label: `${RESOURCE_NAMES[t.give]} ${t.giveAmt} ↔ ${RESOURCE_NAMES[t.get]} ${t.getAmt}`,
-        desc: `${RESOURCE_NAMES[t.give]} -${t.giveAmt}, ${RESOURCE_NAMES[t.get]} +${t.getAmt}, 명성 +1`,
-        disabled: state.resources[t.give] < t.giveAmt,
-        disabledReason: `${RESOURCE_NAMES[t.give]}이(가) 부족합니다`,
-      })),
+      {
+        id: 'accept-quote',
+        label: '이 조건으로 교환한다',
+        desc: `${RESOURCE_NAMES[quote.give]} -${quote.giveAmt}, ${RESOURCE_NAMES[quote.get]} +${quote.getAmt}, 명성 +1`,
+      },
       { id: 'cancel', label: '돌려보낸다', desc: '거래 없이 상단을 돌려보냅니다. 불이익은 없습니다.' },
     ],
-    data: { faction: faction.name, initiated: true, offers },
+    data: { faction: factionName, initiated: true, quote },
   };
   state.pendingChoice = choice;
   return null;
@@ -122,19 +131,21 @@ export function requestTrade(state: GameState, factionName: string): string | nu
 function resolveInitiatedTrade(state: GameState, optionId: string): void {
   const c = state.pendingChoice!;
   const faction = c.data.faction as string;
-  const offers = c.data.offers as TradeOffer[];
-  const picked = /^offer-(\d+)$/.exec(optionId);
-  const offer = picked ? offers[Number(picked[1])] : undefined;
-  if (offer && state.resources[offer.give] >= offer.giveAmt) {
-    state.resources[offer.give] -= offer.giveAmt;
-    state.resources[offer.get] += offer.getAmt;
+  const quote = c.data.quote as TradeQuote;
+  if (optionId === 'accept-quote') {
+    const error = applyQuotedTrade(state, quote);
+    if (error) {
+      addLog(state, error, 'bad');
+      state.pendingChoice = null;
+      return;
+    }
     // 먼저 아쉬운 소리를 한 쪽이므로 명성 보상은 제안 수락(+2)보다 작다
     state.resources.reputation = Math.min(100, state.resources.reputation + 1);
     state.lastTradeByFaction[faction] = state.day;
     // 먼저 사람을 보낸 거래는 조정의 눈에 밀무역으로 비친다 (모반 의심 계산용)
     state.initiatedTradeDays = [...(state.initiatedTradeDays ?? []), state.day].slice(-20);
     changeRelation(state, faction, CONFIG.relations.tradeAccept);
-    addLog(state, `장터에서 ${faction}과(와) ${RESOURCE_NAMES[offer.give]}을(를) ${RESOURCE_NAMES[offer.get]}(으)로 교환했습니다.`, 'trade');
+    addLog(state, `장터에서 ${faction}과(와) ${RESOURCE_NAMES[quote.give]}을(를) ${RESOURCE_NAMES[quote.get]}(으)로 교환했습니다.`, 'trade');
   }
   state.pendingChoice = null;
 }

@@ -13,49 +13,55 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   hut: {
     id: 'hut', name: '초가집', emoji: '🛖',
     desc: '4명이 사는 움집. 겨울엔 웃풍이 심하다.',
-    cost: { wood: 8 }, buildDays: 5, slots: 0, capacity: 4, defense: 0,
+    cost: { wood: 7 }, buildDays: 5, slots: 0, capacity: 4, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   ondol: {
     id: 'ondol', name: '온돌집', emoji: '🏠',
-    desc: '구들을 놓은 집. 장작만 있으면 겨울 체온 손실이 크게 줄어든다. 5명 수용.',
+    desc: '보(堡) 승격 후 건설. 구들을 놓아 겨울 체온 손실을 크게 줄인다. 5명 수용.',
     cost: { wood: 12, stone: 8 }, buildDays: 10, slots: 0, capacity: 5, defense: 0,
-    winterBonus: true, placement: 'land', unique: false,
+    winterBonus: true, placement: 'land', unique: false, minRank: 'bo',
   },
   tileHouse: {
     id: 'tileHouse', name: '기와집', emoji: '🏘️',
-    desc: '보(堡) 승격 후 건설. 온돌을 갖춘 상위 주거. 7명 수용.',
+    desc: '진(鎭) 승격 후 건설. 온돌을 갖춘 상위 주거. 7명 수용.',
     cost: { wood: 18, stone: 16, tools: 2 }, buildDays: 14, slots: 0, capacity: 7, defense: 0,
-    winterBonus: true, placement: 'land', unique: false, minRank: 'bo',
+    winterBonus: true, placement: 'land', unique: false, minRank: 'jin',
   },
   storehouse: {
     id: 'storehouse', name: '창고', emoji: '🏚️',
     desc: '모든 짐을 부리는 하역 거점. 작업지 가까이 지으면 운반이 빨라지고, 습격 약탈 피해도 조금 줄인다.',
-    cost: { wood: 10, stone: 2 }, buildDays: 6, slots: 0, capacity: 0, defense: 0,
+    cost: { wood: 9, stone: 2 }, buildDays: 6, slots: 0, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   bridge: {
     id: 'bridge', name: '다리', emoji: '🌉',
     desc: '강 위에 놓아 사계절 주민 통행을 가능하게 한다.',
-    cost: { wood: 16, stone: 10 }, buildDays: 8, slots: 0, capacity: 0, defense: 0,
+    cost: { wood: 14, stone: 9 }, buildDays: 8, slots: 0, capacity: 0, defense: 0,
     winterBonus: false, placement: 'river', unique: false,
   },
   lumberCamp: {
     id: 'lumberCamp', name: '벌목장', emoji: '🪓',
     desc: '벌목꾼이 목재를 부리는 거점. 숲 가까이 지으면 나르는 거리가 크게 줄어든다.',
-    cost: { wood: 6 }, buildDays: 4, slots: 4, capacity: 0, defense: 0,
+    cost: { wood: 5 }, buildDays: 4, slots: 4, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false,
+  },
+  woodShed: {
+    id: 'woodShed', name: '장작마당', emoji: '🪓',
+    desc: '장작꾼이 창고에서 목재를 가져와 쌓아 두고 장작으로 패는 작업장.',
+    cost: { wood: 7, stone: 2, tools: 1 }, buildDays: 5, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   huntLodge: {
     id: 'huntLodge', name: '사냥막', emoji: '🏹',
     desc: '사냥꾼이 사냥감을 부리는 거점. 짐승 서식지 가까이 지으면 왕복이 줄어든다.',
-    cost: { wood: 8, hide: 2 }, buildDays: 4, slots: 4, capacity: 0, defense: 0,
+    cost: { wood: 7, hide: 2 }, buildDays: 4, slots: 4, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   herbHut: {
     id: 'herbHut', name: '약초막', emoji: '🌿',
     desc: '약초꾼이 약초를 부리는 거점. 숲 가까이 지으면 채집 왕복이 줄어든다.',
-    cost: { wood: 6 }, buildDays: 3, slots: 2, capacity: 0, defense: 0,
+    cost: { wood: 5 }, buildDays: 3, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   field: {
@@ -72,14 +78,14 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   watermill: {
     id: 'watermill', name: '방앗간', emoji: '🛞',
-    desc: '보(堡) 승격 후 강가에 짓는 물레방아식 방앗간. 방아꾼이 곡물을 더 많은 식량으로 찧는다.',
+    desc: '보(堡) 승격 후 강가에 짓는 물레방아식 방앗간. 창고의 벼를 가져와 먹을 수 있는 곡물로 도정한다.',
     cost: { wood: 16, stone: 10, tools: 2 }, buildDays: 10, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'watermill', unique: false, minRank: 'bo',
   },
   smithy: {
     id: 'smithy', name: '대장간', emoji: '⚒️',
-    desc: '철과 목재로 도구를 만든다. 채광꾼이 없을 때만 대장장이가 철광을 보조 채굴한다.',
-    cost: { wood: 10, stone: 6 }, buildDays: 8, slots: 2, capacity: 0, defense: 0,
+    desc: '대장장이가 창고에서 철과 재료를 가져와 도구, 수레와 무기를 만드는 작업장.',
+    cost: { wood: 9, stone: 5 }, buildDays: 8, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   mine: {
@@ -96,7 +102,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   charcoalKiln: {
     id: 'charcoalKiln', name: '숯가마', emoji: '🔥',
-    desc: '진(鎭) 승격 후 건설. 숯쟁이가 목재를 장작으로 더 효율적으로 굽는 생산 거점.',
+    desc: '진(鎭) 승격 후 건설. 숯쟁이가 창고의 목재를 가져와 고효율 연료인 숯으로 굽는다.',
     cost: { wood: 12, stone: 12, tools: 1 }, buildDays: 8, slots: 3, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
   },
@@ -120,14 +126,20 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   tannery: {
     id: 'tannery', name: '가죽공방', emoji: '🧵',
-    desc: '가죽 2를 옷 1로 만든다. (자동, 하루 2가죽 처리)',
-    cost: { wood: 8, tools: 1 }, buildDays: 5, slots: 2, capacity: 0, defense: 0,
+    desc: '가죽을 손질해 방한 성능이 좋은 가죽옷을 만든다.',
+    cost: { wood: 7, tools: 1 }, buildDays: 5, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
+  },
+  weavingHouse: {
+    id: 'weavingHouse', name: '베틀집', emoji: '🧶',
+    desc: '목화를 무명옷으로 짜는 작업장.',
+    cost: { wood: 14, tools: 2 }, buildDays: 8, slots: 2, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false, minRank: 'bo',
   },
   beacon: {
     id: 'beacon', name: '봉수대', emoji: '🗻',
     desc: '습격 조기 경보 확률이 크게 오르고, 습격 시 경보 대응이 가능해진다.',
-    cost: { wood: 6, stone: 12 }, buildDays: 8, slots: 1, capacity: 0, defense: 4,
+    cost: { wood: 5, stone: 11 }, buildDays: 8, slots: 1, capacity: 0, defense: 4,
     winterBonus: false, placement: 'land', unique: true,
   },
   palisade: {
@@ -151,19 +163,19 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   gate: {
     id: 'gate', name: '성문', emoji: '🚪',
     desc: '성벽 사이의 출입구. 주민은 드나들 수 있지만 습격자는 막힌다.',
-    cost: { wood: 6 }, buildDays: 2, slots: 0, capacity: 0, defense: 2,
+    cost: { wood: 5 }, buildDays: 2, slots: 0, capacity: 0, defense: 2,
     winterBonus: false, placement: 'land', unique: false,
   },
   watchtower: {
     id: 'watchtower', name: '망루', emoji: '🗼',
     desc: '방어도 +8, 조기 경보 확률 증가.',
-    cost: { wood: 10, stone: 2 }, buildDays: 6, slots: 2, capacity: 0, defense: 8,
+    cost: { wood: 9, stone: 2 }, buildDays: 6, slots: 2, capacity: 0, defense: 8,
     winterBonus: false, placement: 'land', unique: false,
   },
   garrison: {
     id: 'garrison', name: '군영', emoji: '⛺',
     desc: '방어도 +25. 수비병의 방어 기여가 커진다. 승리 조건에 필요하다.',
-    cost: { wood: 20, stone: 10, iron: 4 }, buildDays: 14, slots: 6, capacity: 0, defense: 25,
+    cost: { wood: 18, stone: 9, iron: 4 }, buildDays: 14, slots: 6, capacity: 0, defense: 25,
     winterBonus: false, placement: 'land', unique: true,
   },
   office: {
@@ -175,7 +187,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   market: {
     id: 'market', name: '장터', emoji: '🏮',
     desc: '북방 세력과의 교역이 열리고, 습격 시 협상을 시도할 수 있다.',
-    cost: { wood: 12, stone: 4 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
+    cost: { wood: 11, stone: 4 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: true,
   },
   cannonEmplacement: {
@@ -187,8 +199,8 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
 };
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
-  'hut', 'ondol', 'tileHouse', 'storehouse', 'bridge', 'field', 'paddy', 'lumberCamp', 'huntLodge', 'herbHut',
-  'smithy', 'mine', 'ferry', 'watermill', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'market', 'office',
+  'hut', 'ondol', 'tileHouse', 'storehouse', 'bridge', 'field', 'paddy', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut',
+  'smithy', 'mine', 'ferry', 'watermill', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office',
   'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement',
 ];
@@ -378,7 +390,7 @@ export interface SmithyProductDef {
   task: string;
 }
 
-export const SMITHY_PRODUCT_ORDER: SmithyProductId[] = ['tools', 'spears', 'hornBows', 'muskets'];
+export const SMITHY_PRODUCT_ORDER: SmithyProductId[] = ['tools', 'carts', 'spears', 'hornBows', 'muskets'];
 
 export const SMITHY_PRODUCT_DEFS: Record<SmithyProductId, SmithyProductDef> = {
   tools: {
@@ -388,6 +400,18 @@ export const SMITHY_PRODUCT_DEFS: Record<SmithyProductId, SmithyProductDef> = {
     inputPerUnit: { iron: 1, wood: 1 },
     ratePerDay: CONFIG.production.toolsPerDay,
     task: '도구 제작 중',
+  },
+  carts: {
+    id: 'carts',
+    name: '수레',
+    output: 'carts',
+    inputPerUnit: {
+      wood: CONFIG.production.cartWoodPerUnit,
+      iron: CONFIG.production.cartIronPerUnit,
+      tools: CONFIG.production.cartToolsPerUnit,
+    },
+    ratePerDay: CONFIG.production.cartsPerDay,
+    task: '수레 제작 중',
   },
   spears: {
     id: 'spears',

@@ -92,8 +92,7 @@ function runTicks(state, ticks) {
   const state = simulation.newGame(701);
   assert.deepEqual(state.processingReserves, {
     wood: CONFIG.production.woodReserve,
-    grain: 0,
-    game: 0,
+    rice: 0,
     hide: 0,
     iron: 0,
   });
@@ -101,65 +100,30 @@ function runTicks(state, ticks) {
 
 {
   const state = simulation.newGame(702);
-  const tile = centerTile(state);
-  onlyWorkerAt(state, 'hauler', tile);
-  state.resources.game = 0;
-  state.resources.wood = 0;
-  state.resources.grain = 10;
-  state.resources.food = 0;
-  processing.setProcessingReserve(state, 'grain', 10);
-
-  runTicks(state, 6);
-
-  assert.equal(state.resources.grain, 10, 'hauler leaves reserved grain untouched');
-  assert.equal(state.resources.food, 0, 'reserved grain is not milled into food');
+  state.resources.rice = 10;
+  processing.setProcessingReserve(state, 'rice', 10);
+  assert.equal(processing.processableAmount(state, 'rice'), 0, 'watermill cannot use reserved rice');
 }
 
 {
   const state = simulation.newGame(703);
-  const tile = centerTile(state);
-  onlyWorkerAt(state, 'hauler', tile);
-  state.resources.game = 0;
-  state.resources.grain = 0;
   state.resources.wood = 40;
-  state.resources.firewood = 0;
-  state.resources.stone = CONFIG.production.stoneReserveTarget;
   processing.setProcessingReserve(state, 'wood', 40);
-
-  runTicks(state, 6);
-
-  assert.equal(state.resources.wood, 40, 'hauler leaves reserved wood untouched');
-  assert.equal(state.resources.firewood, 0, 'reserved wood is not split into firewood');
+  assert.equal(processing.processableAmount(state, 'wood'), 0, 'fuel processors cannot use reserved wood');
 }
 
 {
   const state = simulation.newGame(704);
-  const tile = centerTile(state);
-  addBuilt(state, 'smithy', tile);
-  onlyWorkerAt(state, 'smith', tile);
   state.resources.iron = 8;
-  state.resources.wood = 100;
-  state.resources.tools = 0;
   processing.setProcessingReserve(state, 'iron', 8);
-
-  runTicks(state, 4);
-
-  assert.equal(state.resources.iron, 8, 'smith leaves reserved iron untouched');
-  assert.equal(state.resources.tools, 0, 'reserved iron is not made into tools');
+  assert.equal(processing.processableAmount(state, 'iron'), 0, 'smith cannot use reserved iron');
 }
 
 {
   const state = simulation.newGame(705);
-  const tile = centerTile(state);
-  addBuilt(state, 'tannery', tile);
   state.resources.hide = 6;
-  state.resources.clothes = 0;
   processing.setProcessingReserve(state, 'hide', 6);
-
-  simulation.advanceDay(state);
-
-  assert.equal(state.resources.hide, 6, 'tannery leaves reserved hide untouched');
-  assert.equal(state.resources.clothes, 0, 'reserved hide is not made into clothes');
+  assert.equal(processing.processableAmount(state, 'hide'), 0, 'tannery cannot use reserved hide');
 }
 
 {
@@ -171,8 +135,7 @@ function runTicks(state, ticks) {
   assert.ok(loaded, 'old save loads');
   assert.deepEqual(loaded.processingReserves, {
     wood: CONFIG.production.woodReserve,
-    grain: 0,
-    game: 0,
+    rice: 0,
     hide: 0,
     iron: 0,
   });

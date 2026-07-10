@@ -112,7 +112,7 @@ export function openInspection(state: GameState): void {
     ],
     data: {},
   };
-  addLog(state, '감찰 어사가 마을에 들었습니다. 조정이 이곳을 의심하고 있습니다.', 'bad');
+  addLog(state, '감찰 어사가 마을에 들었습니다. 조정이 이곳을 의심하고 있습니다.', 'bad', true);
 }
 
 export function resolveInspection(state: GameState, optionId: string, rng: () => number): void {
@@ -240,9 +240,9 @@ export function updateSuspicion(state: GameState, rng: () => number): void {
     state.suspicion = s.crackdownStartSuspicion;
     state.crackdownDeadline = state.day + s.crackdownGraceDays;
     if (before !== after) {
-      addLog(state, `조정이 모반 혐의로 ${RANK_NAMES[before]}을(를) ${RANK_NAMES[after]}(으)로 강등하였습니다. (몰수: ${seized})`, 'bad');
+      addLog(state, `조정이 모반 혐의로 ${RANK_NAMES[before]}을(를) ${RANK_NAMES[after]}(으)로 강등하였습니다. (몰수: ${seized})`, 'bad', true);
     } else {
-      addLog(state, `조정이 모반 혐의를 물어 물자를 몰수했습니다. (몰수: ${seized})`, 'bad');
+      addLog(state, `조정이 모반 혐의를 물어 물자를 몰수했습니다. (몰수: ${seized})`, 'bad', true);
     }
     addLog(state, `조정이 마지막 기회를 주었습니다 — ${s.crackdownGraceDays}일 안에 의심을 ${s.crackdownClearBelow} 아래로 내려 결백을 증명하십시오. 못하면 토벌군이 내려옵니다.`, 'raid');
     return;
@@ -253,7 +253,7 @@ export function updateSuspicion(state: GameState, rng: () => number): void {
     state.censured = true;
     const seized = seizeFirearms(state, s.censureSeizeRatio);
     state.resources.reputation = Math.max(0, state.resources.reputation - s.censureRep);
-    addLog(state, `조정의 견책이 내려왔습니다. 명성이 크게 깎이고 화기가 몰수되었습니다. (몰수: ${seized}) 이대로면 강등을 면치 못합니다.`, 'bad');
+    addLog(state, `조정의 견책이 내려왔습니다. 명성이 크게 깎이고 화기가 몰수되었습니다. (몰수: ${seized}) 이대로면 강등을 면치 못합니다.`, 'bad', true);
     return;
   }
 

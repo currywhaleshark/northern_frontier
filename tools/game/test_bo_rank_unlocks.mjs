@@ -32,9 +32,10 @@ const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs'))
 const constants = await import(pathToFileURL(join(compiledDir, 'constants.mjs')).href);
 const agents = await import(pathToFileURL(join(compiledDir, 'agents.mjs')).href);
 const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
+const selectionActions = await import(pathToFileURL(join(compiledDir, 'selectionActions.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-const BO_BUILDINGS = ['mine', 'tileHouse', 'ferry', 'paddy', 'watermill'];
+const BO_BUILDINGS = ['ondol', 'mine', 'ferry', 'paddy', 'watermill'];
 const BO_JOBS = ['miner', 'fisher', 'miller'];
 
 function boostResources(state) {
@@ -191,6 +192,21 @@ function runTicks(state, ticks) {
 }
 
 {
+  const state = simulation.newGame(420);
+  boostResources(state);
+  const hut = state.buildings.find(building => building.type === 'hut');
+  assert.ok(hut, 'new game has a hut to upgrade');
+  assert.deepEqual(selectionActions.getBuildingActions(state, hut), [], 'ondol upgrade action is hidden before bo');
+  assert.ok(simulation.upgradeHousingBuilding(state, hut.id, 'ondol'), 'ondol upgrade is locked before bo');
+  assert.equal(hut.type, 'hut');
+
+  state.rank = 'bo';
+  assert.equal(selectionActions.getBuildingActions(state, hut)[0]?.id, 'upgrade:ondol');
+  assert.equal(simulation.upgradeHousingBuilding(state, hut.id, 'ondol'), null, 'hut upgrades to ondol at bo');
+  assert.equal(hut.type, 'ondol');
+}
+
+{
   const state = simulation.newGame(43);
   boostResources(state);
   state.rank = 'bo';
@@ -239,12 +255,16 @@ function runTicks(state, ticks) {
   const state = simulation.newGame(46);
   const mineTile = prepareTile(state, 'rock');
   mineTile.hasIron = true;
+  mineTile.mineralRemaining = 1;
   placeBuilt(state, 'mine', mineTile);
   const miner = onlyWorkerAt(state, 'miner', mineTile);
   runTicks(state, 6);
 
   assert.ok((miner.carrying.iron ?? 0) > 0, 'miner carries iron from an iron mine');
   assert.ok((miner.carrying.stone ?? 0) > 0, 'miner also brings stone from an iron mine');
+  assert.equal(mineTile.terrain, 'plain', 'the mine deposit disappears when exhausted');
+  assert.equal(mineTile.mineralRemaining, 0);
+  assert.ok(state.log.some(entry => entry.text.includes('철광맥') && entry.text.includes('고갈')));
 }
 
 {

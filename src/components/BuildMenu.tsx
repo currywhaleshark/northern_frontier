@@ -13,7 +13,7 @@ const CATEGORIES: { name: string; types: BuildingTypeId[] }[] = [
     name: '생산',
     types: [
       'field', 'paddy', 'lumberCamp', 'huntLodge', 'herbHut', 'smithy', 'mine', 'ferry', 'watermill',
-      'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'market', 'office',
+      'woodShed', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office',
     ],
   },
   { name: '방어·군사', types: ['palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison', 'cannonEmplacement'] },

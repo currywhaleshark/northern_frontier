@@ -1,5 +1,7 @@
 # Resource Logistics And Trade Overhaul Implementation Plan
 
+**Status:** Implemented and verified on 2026-07-10. The review amendments below are the final contracts used by the code.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the current direct-to-stock resource model with production-site storage, hauler logistics, richer food/fuel/clothing categories, luxury goods, and value-based faction trade.
@@ -21,6 +23,19 @@ This is five related subsystems, not a single balance tweak:
 5. Value-based trade.
 
 Implement in the order below. Each task must leave the game buildable and the relevant tests green. Do not batch all tasks into one unreviewed change.
+
+## Review Amendments (Implemented)
+
+These decisions override any older example later in this document that conflicts with them:
+
+- The resource taxonomy migration is atomic across all consumers. Removing `food`, `clothes`, and `game` is not considered complete until agents, consumption, processing, tribute, petitions, raids, trade, UI, and existing tests compile against the new IDs.
+- Save migration covers settlement resources, resident cargo, building inventories, processing reserves, active court tribute items, tribute reserves, and pending resource-based choices. Legacy trade, tribute, and petition modals are closed and regenerated under current rules.
+- Field cereals produce edible `grain`. Paddies produce non-edible `rice`; only an assigned watermill worker converts settlement-stock `rice` into local mill `grain` inventory.
+- Production and processing outputs remain in local building inventory until hauled. Haulers persist `{ sourceBuildingId, resource, amount }` tasks and subtract other haulers' reservations before claiming stock.
+- Clothing coverage and winter wear are separate calculations. Coverage uses clothing values; physical wear consumes clothing units so clothing stock is not permanent.
+- Refusing tribute or announcing a new year's tribute releases every unconsumed reserved item. Multi-item partial payment uses the average fulfillment ratio of each requested line, rather than adding unlike item units.
+- Trade requests require a positive finite integer amount, distinct resources, faction import/export membership, and non-abstract resources. Quotes below one received unit are rejected; there is no unconditional minimum-one payout. Applying a quote recalculates it to reject stale or forged terms.
+- Incoming merchant offers may continue using deterministic fixed templates. Player-initiated trade uses the validated value quote engine and preserves reputation, relationship, cooldown, and suspicion side effects.
 
 ## Current Structure Notes
 
@@ -53,6 +68,7 @@ Modify:
 - `src/game/config.ts`: starting resource values, production rates, consumption weights, shortage penalties, trade margins.
 - `src/game/saveLoad.ts`: migrate new resource IDs and building inventories.
 - `src/game/resources.ts`: either re-export category helpers from `consumption.ts` or shrink to primitive add/spend helpers.
+- `src/game/processing.ts`: make unmilled rice, not edible grain, the watermill processing input.
 - `src/game/agents.ts`: route producers into building inventories, make haulers move inventory to stock, move processing to dedicated jobs.
 - `src/game/crops.ts`: add `vegetables` and `cotton` crop definitions.
 - `src/game/buildings.ts`: add wood shed, weaving house, and storage metadata.
@@ -62,6 +78,7 @@ Modify:
 - `src/game/petition.ts`: luxury goods as actual resources, not only instant morale.
 - `src/game/events.ts`: replace fixed player-initiated offers with value quotes.
 - `src/components/TopBar.tsx`: grouped resource category display.
+- `src/components/ProcessingPanel.tsx`: replace the obsolete grain milling reserve with an unmilled-rice reserve.
 - `src/styles/global.css`: hover/pinned resource breakdown styling.
 - `src/components/InspectorPanel.tsx`: building inventory display and trade controls.
 - `src/components/ActionPopup.tsx`: market/dock trade entry if needed.
@@ -74,6 +91,7 @@ Use these visible resources after the taxonomy step:
 ```ts
 export type ResourceId =
   | 'grain'
+  | 'rice'
   | 'meat'
   | 'fish'
   | 'vegetables'
@@ -105,6 +123,7 @@ export type ResourceId =
 Category display:
 
 - Food total: `grain + meat + fish + vegetables`.
+- `rice` means harvested, unmilled paddy rice (`벼`). It is not edible and is excluded from `FOOD_RESOURCES`; a watermill converts it into edible `grain`.
 - Fuel total: `brushwood * 0.6 + firewood * 1.0 + charcoal * 1.5`.
 - Clothing coverage: `hideClothes * 1.1 + cottonClothes * 1.0`.
 - Luxury stock: `porcelain + brassware + lacquerware + silk + preciousMetal`.
@@ -118,7 +137,7 @@ Tribute reserve:
 - Full tribute consumes the required reserve and gives the full reward.
 - Partial tribute consumes the prepared reserve and scales reputation loss, threat gain, and suspicion relief by the delivered ratio.
 
-Do not keep generic `food`, `clothes`, or `game` as player-facing resources after the migration. `grain` remains the court tribute and trade grain resource.
+Do not keep generic `food`, `clothes`, or `game` as player-facing resources after the migration. `grain` remains the edible court tribute and trade grain resource. Field cereals harvest directly as `grain`; only paddies harvest `rice`, which must be milled before consumption or tribute.
 
 ## Task 1: Resource Catalog And Migration
 
@@ -169,6 +188,8 @@ const constants = await import(pathToFileURL(join(compiledDir, 'constants.mjs'))
   assert.deepEqual(catalog.FUEL_RESOURCES, ['brushwood', 'firewood', 'charcoal']);
   assert.deepEqual(catalog.CLOTHING_RESOURCES, ['hideClothes', 'cottonClothes']);
   assert.equal(catalog.RESOURCE_DEFS.grain.category, 'food');
+  assert.equal(catalog.RESOURCE_DEFS.rice.category, 'material');
+  assert.equal(catalog.FOOD_RESOURCES.includes('rice'), false, 'unmilled paddy rice is not edible');
   assert.equal(catalog.RESOURCE_DEFS.charcoal.fuelValue, 1.5);
   assert.equal(constants.RESOURCE_NAMES.hideClothes, '가죽옷');
   assert.equal(constants.RESOURCE_NAMES.cottonClothes, '무명옷');
@@ -231,6 +252,7 @@ export const LUXURY_RESOURCES = ['porcelain', 'brassware', 'lacquerware', 'silk'
 
 export const RESOURCE_DEFS: Record<ResourceId, ResourceDef> = {
   grain: { id: 'grain', name: '곡물', icon: '🌾', category: 'food', foodWeight: 2, tradeBaseValue: 1.0 },
+  rice: { id: 'rice', name: '벼', icon: '🌾', category: 'material', tradeBaseValue: 0.8 },
   meat: { id: 'meat', name: '고기', icon: '🥩', category: 'food', foodWeight: 1, tradeBaseValue: 1.6 },
   fish: { id: 'fish', name: '생선', icon: '🐟', category: 'food', foodWeight: 1, tradeBaseValue: 1.3 },
   vegetables: { id: 'vegetables', name: '채소', icon: '🥬', category: 'food', foodWeight: 1, tradeBaseValue: 1.1 },
@@ -261,7 +283,7 @@ export const RESOURCE_DEFS: Record<ResourceId, ResourceDef> = {
 
 export const RESOURCE_IDS = Object.keys(RESOURCE_DEFS) as ResourceId[];
 export const RESOURCE_ORDER: ResourceId[] = [
-  'grain', 'meat', 'fish', 'vegetables',
+  'grain', 'rice', 'meat', 'fish', 'vegetables',
   'brushwood', 'firewood', 'charcoal',
   'wood', 'stone', 'iron', 'tools', 'hide', 'cotton', 'herbs',
   'hideClothes', 'cottonClothes',
@@ -278,7 +300,7 @@ In `CONFIG.start.resources`, use:
 
 ```ts
 resources: {
-  grain: 100, meat: 0, fish: 0, vegetables: 0,
+  grain: 100, rice: 0, meat: 0, fish: 0, vegetables: 0,
   brushwood: 12, firewood: 45, charcoal: 0,
   wood: 30, stone: 12, iron: 4, tools: 10,
   hide: 6, cotton: 0, hideClothes: 12, cottonClothes: 0, herbs: 5,
@@ -461,7 +483,7 @@ Priority order:
 
 ```ts
 const HAUL_PRIORITY: ResourceId[] = [
-  'grain', 'vegetables', 'meat', 'fish',
+  'grain', 'rice', 'vegetables', 'meat', 'fish',
   'firewood', 'brushwood', 'charcoal',
   'wood', 'hide', 'cotton', 'herbs', 'stone', 'iron',
 ];
@@ -786,13 +808,14 @@ const consumption = await import(pathToFileURL(join(compiledDir, 'consumption.mj
   const state = simulation.newGame(2026071004);
   for (const id of Object.keys(state.resources)) state.resources[id] = 0;
   state.resources.grain = 20;
+  state.resources.rice = 10;
   state.resources.meat = 10;
   state.resources.fish = 10;
   state.resources.vegetables = 10;
   const result = consumption.consumeFoodByDiet(state, 5);
   assert.equal(result.totalConsumed, 5);
   assert.ok(result.byResource.grain > result.byResource.meat, 'grain has 2 weight in the 2:1:1:1 diet');
-  assert.equal(consumption.foodTotal(state), 45);
+  assert.equal(consumption.foodTotal(state), 45, 'unmilled rice is excluded from edible food');
 }
 
 {
@@ -993,7 +1016,7 @@ In `TopBar.tsx`, do not render every subresource as a permanent top-bar item. Sh
 - `옷`: coverage total from `clothingCoverageTotal`, breakdown `hideClothes`, `cottonClothes`.
 - `사치품`: unit total from `LUXURY_RESOURCES`, breakdown `porcelain`, `brassware`, `lacquerware`, `silk`, `preciousMetal`.
 
-Show essential non-subcategory resources as normal compact entries: `wood`, `stone`, `iron`, `tools`, `hide`, `cotton`, `herbs`, `gunpowder`, `spears`, `hornBows`, `muskets`, `reputation`, `defense`.
+Show essential non-subcategory resources as normal compact entries: `rice`, `wood`, `stone`, `iron`, `tools`, `hide`, `cotton`, `herbs`, `gunpowder`, `spears`, `hornBows`, `muskets`, `reputation`, `defense`.
 
 Add local UI state:
 
@@ -1225,7 +1248,10 @@ Expected: pass.
 - Modify: `src/game/constants.ts`
 - Modify: `src/game/config.ts`
 - Modify: `src/game/agents.ts`
+- Modify: `src/game/processing.ts`
+- Modify: `src/game/saveLoad.ts`
 - Modify: `src/game/workerSlots.ts`
+- Modify: `src/components/ProcessingPanel.tsx`
 - Test: `tools/game/test_fuel_and_clothing_chains.mjs`
 - Test: `tools/game/test_crop_paddy_milling.mjs`
 
@@ -1268,15 +1294,61 @@ Add cases:
 }
 ```
 
+Update `tools/game/test_crop_paddy_milling.mjs` so the paddy and watermill contract is explicit:
+
+```js
+{
+  assert.equal(crops.CROP_DEFS.millet.output, 'grain', 'field cereals harvest as edible grain');
+  assert.equal(crops.CROP_DEFS.rice.output, 'rice', 'paddies harvest unmilled rice');
+}
+
+{
+  const state = prepareState();
+  state.day = 25;
+  const paddy = addBuilt(state, 'paddy', 9, 9, { cropId: 'rice', fieldGrowth: 100, inventory: {} });
+  const farmer = workableResident(state, 0, 'farmer', 9, 9);
+  workerSlots.assignResidentToBuilding(state, farmer.id, paddy.id);
+  runTicks(state, 1);
+  assert.ok((paddy.inventory?.rice ?? 0) > 0, 'paddy harvest stays as unmilled rice at the production site');
+  assert.equal(paddy.inventory?.grain ?? 0, 0, 'paddy does not produce edible grain directly');
+}
+
+{
+  const state = prepareState();
+  const mill = addBuilt(state, 'watermill', 12, 12);
+  const miller = workableResident(state, 0, 'miller', 11, 12);
+  state.resources.rice = 10;
+  state.resources.grain = 0;
+  state.processingReserves.rice = 0;
+  workerSlots.assignResidentToBuilding(state, miller.id, mill.id);
+  runTicks(state, 1);
+  const milled = CONFIG.production.millerRicePerDay / 5;
+  assert.ok(Math.abs(state.resources.rice - (10 - milled)) < 0.001, 'watermill consumes only unmilled rice');
+  assert.ok(Math.abs(state.resources.grain - (milled * CONFIG.production.grainPerRice)) < 0.001, 'watermill produces edible grain');
+}
+
+{
+  const state = prepareState();
+  const mill = addBuilt(state, 'watermill', 12, 12);
+  const miller = workableResident(state, 0, 'miller', 11, 12);
+  state.resources.rice = 0;
+  state.resources.grain = 10;
+  workerSlots.assignResidentToBuilding(state, miller.id, mill.id);
+  runTicks(state, 1);
+  assert.equal(state.resources.grain, 10, 'watermill never consumes field grain');
+}
+```
+
 - [ ] **Step 2: Run test to verify it fails**
 
 Run:
 
 ```powershell
 node tools\game\test_fuel_and_clothing_chains.mjs
+node tools\game\test_crop_paddy_milling.mjs
 ```
 
-Expected: fail because hunter still produces `game`, tannery makes generic clothes, and weaving does not exist.
+Expected: fail because paddy rice still goes straight to `grain`, the mill still consumes `grain`, hunter still produces `game`, tannery makes generic clothes, and weaving does not exist.
 
 - [ ] **Step 3: Add crops**
 
@@ -1316,7 +1388,48 @@ cotton: {
 },
 ```
 
-- [ ] **Step 4: Change hunter responsibility**
+Change the existing `rice` crop definition to output unmilled rice:
+
+```ts
+rice: {
+  // existing seasons, building type, and yield stay unchanged
+  output: 'rice',
+}
+```
+
+All field cereals (`millet`, `sorghum`, `buckwheat`, and `barley`) continue to output edible `grain`.
+
+- [ ] **Step 4: Make the watermill rice-only**
+
+In `types.ts`, remove obsolete milling inputs and make rice the only food-processing reserve:
+
+```ts
+export type ProcessingInputId = 'wood' | 'rice' | 'hide' | 'iron';
+```
+
+In `processing.ts` and `ProcessingPanel.tsx`, replace the `grain` and removed `game` entries with `rice`. Existing save values for `processingReserves.grain` and `processingReserves.game` are legacy controls and must be discarded; initialize `processingReserves.rice` to `0` rather than transferring those amounts.
+
+Rename the production settings:
+
+```ts
+millerRicePerDay: 4,
+grainPerRice: 1.5,
+```
+
+Change `millerTick` to consume only settlement-stock rice and produce edible grain:
+
+```ts
+const rice = Math.min(
+  processableAmount(state, 'rice'),
+  (p.millerRicePerDay / 5) * effOf(r) * ctx.mMod,
+);
+state.resources.rice -= rice;
+state.resources.grain += rice * p.grainPerRice;
+```
+
+Raw `rice` is excluded from `foodTotal` and `consumeFoodByDiet`, cannot satisfy grain tribute, and must reach settlement stock through a hauler before the watermill can process it.
+
+- [ ] **Step 5: Change hunter responsibility**
 
 Remove normal `game` output. In `hunterTick`, successful hunt should add:
 
@@ -1327,7 +1440,7 @@ addCarry(r, 'hide', gameAmount * CONFIG.production.hidePerGame);
 
 Deposit to hunt lodge inventory.
 
-- [ ] **Step 5: Add weaving house and weaver**
+- [ ] **Step 6: Add weaving house and weaver**
 
 In `types.ts`, add `weaver` job and `weavingHouse` building.
 
@@ -1352,7 +1465,7 @@ state.resources.cottonClothes += cotton * p.cottonClothesPerCotton;
 
 Change `tannerTick` to output `hideClothes`.
 
-- [ ] **Step 6: Verify**
+- [ ] **Step 7: Verify**
 
 Run:
 

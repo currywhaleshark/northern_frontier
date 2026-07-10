@@ -9,8 +9,8 @@ import { addLog } from './events';
 import { changeRelation } from './relations';
 import { resetAgent } from './agents';
 import { livingResidents } from './residents';
-import { damageBuildings, injure, loot, moraleShock } from './raidDamage';
-import type { Battle, BattleMode, BattleOutcome, GameState, Resident, WeatherId } from './types';
+import { damageBuildings, injure, killResidents, loot, moraleShock } from './raidDamage';
+import type { Battle, BattleLocation, BattleMode, BattleOutcome, GameState, RaiderBand, Resident, WeatherId } from './types';
 
 export const BATTLE_MUSTER_DEADLINE = 5;
 export const BATTLE_CLASH_TICK_LIMIT = 8;
@@ -78,6 +78,33 @@ function battleSideName(mode: BattleMode): string {
   return mode === 'levy' ? '징집된 주민들' : '수비병';
 }
 
+function battleLocation(battle: Pick<Battle, 'mode' | 'location'>): BattleLocation {
+  return battle.location ?? (battle.mode === 'levy' ? 'village' : 'outskirts');
+}
+
+function villageBattleFront(state: GameState, band: RaiderBand): { x: number; y: number } {
+  const center = state.buildings.find(building => building.type === 'center' && building.built);
+  if (!center) return { x: band.x, y: band.y };
+
+  const candidates: { x: number; y: number; approach: number; centerDistance: number }[] = [];
+  for (let y = Math.max(0, center.y - 4); y <= Math.min(state.map.length - 1, center.y + 4); y++) {
+    for (let x = Math.max(0, center.x - 4); x <= Math.min(state.map[y].length - 1, center.x + 4); x++) {
+      const tile = state.map[y][x];
+      const centerDistance = Math.abs(x - center.x) + Math.abs(y - center.y);
+      if (centerDistance < 2 || centerDistance > 4) continue;
+      if (tile.buildingId != null || tile.terrain === 'mountain' || tile.terrain === 'river') continue;
+      candidates.push({
+        x,
+        y,
+        approach: Math.abs(x - band.x) + Math.abs(y - band.y),
+        centerDistance,
+      });
+    }
+  }
+  candidates.sort((a, b) => a.approach - b.approach || a.centerDistance - b.centerDistance || a.y - b.y || a.x - b.x);
+  return candidates[0] ?? { x: band.x, y: band.y };
+}
+
 // 지도에 무리가 있을 때만 전투를 연다. 무리 없이 열린 폴백 습격(접근 경로 없음)은
 // false를 반환해 resolveRaid의 즉시 판정으로 처리하게 한다.
 export function startBattle(state: GameState, mode: BattleMode): boolean {
@@ -95,11 +122,22 @@ export function startBattle(state: GameState, mode: BattleMode): boolean {
     defender.task = '출전 준비';
   }
 
+  const location: BattleLocation = mode === 'garrison' ? 'outskirts' : 'village';
+  const front = location === 'village' ? villageBattleFront(state, band) : { x: band.x, y: band.y };
+  if (location === 'village') {
+    band.x = front.x;
+    band.y = front.y;
+    band.px = front.x;
+    band.py = front.y;
+    band.path = [];
+  }
+
   state.battle = {
     phase: 'muster',
     mode,
-    frontX: band.x,
-    frontY: band.y,
+    location,
+    frontX: front.x,
+    frontY: front.y,
     initialPower: band.power,
     defenderIds: defenders.map(r => r.id),
     levyBonus: mode === 'levy' ? levyDefenseBonus(state) : 0,
@@ -112,8 +150,8 @@ export function startBattle(state: GameState, mode: BattleMode): boolean {
   };
   state.pendingChoice = null;
   addLog(state, mode === 'levy'
-    ? `온 마을이 낫과 도끼를 들었습니다. ${state.battle.faction}에 맞서 주민들이 나섭니다.`
-    : `수비병이 요격에 나섭니다. ${state.battle.faction}이(가) 마을 어귀에서 진을 칩니다.`, 'raid');
+    ? `온 마을이 낫과 도끼를 들었습니다. ${state.battle.faction}이(가) 마을 안으로 밀고 들어와 방어전이 벌어집니다.`
+    : `수비병이 마을 밖으로 요격에 나섭니다. ${state.battle.faction}과(와) 외곽에서 맞붙습니다.`, 'raid');
   return true;
 }
 
@@ -209,25 +247,59 @@ function finishBattle(state: GameState, outcome: BattleOutcome, rng: () => numbe
   const battle = state.battle;
   if (!battle) return;
   const mode = battle.mode ?? 'garrison';
+  const location = battleLocation(battle);
   const side = battleSideName(mode);
   const activeDefenderIds = [...battle.defenderIds];
   const draftedJobs = battle.draftedJobs ?? [];
   const resetIds = new Set([...activeDefenderIds, ...draftedJobs.map(d => d.id)]);
 
   if (outcome === 'victory') {
+    const injuryAttempts = mode === 'levy' ? 2 : 1;
+    let injured = 0;
+    for (let i = 0; i < injuryAttempts; i++) {
+      if (activeDefenderIds.length > 0 && rng() < CONFIG.raid.victoryInjuryChance[mode]) {
+        injured += injure(state, rng, 1, mode === 'levy' ? 24 : 18, activeDefenderIds);
+      }
+    }
+    const damaged = location === 'village'
+      ? damageBuildings(state, rng, CONFIG.raid.buildingDamage.villageVictory)
+      : [];
     state.resources.reputation = Math.min(100, state.resources.reputation + 5);
     moraleShock(state, -8);
     changeRelation(state, battle.faction, CONFIG.relations.militiaWin);
-    addLog(state, `${side}이(가) ${battle.faction}을(를) 전선에서 몰아냈습니다! 마을의 사기와 명성이 올랐습니다.`, 'good');
+    addLog(
+      state,
+      location === 'outskirts'
+        ? `${side}이(가) ${battle.faction}을(를) 외곽에서 몰아냈습니다! 부상자 ${injured}명, 건물 피해는 없습니다.`
+        : `${side}이(가) ${battle.faction}을(를) 마을 안에서 물리쳤습니다! 부상자 ${injured}명, 건물 ${damaged.length}채가 파손되었습니다.`,
+      'good',
+      true,
+    );
   } else {
-    // 징집전 패배는 훈련 안 된 주민이 흩어지며 부상이 더 넓게 퍼진다
+    const killed = killResidents(
+      state,
+      rng,
+      activeDefenderIds.length,
+      CONFIG.raid.defeatDeathRate[mode],
+      activeDefenderIds,
+    );
+    // 징집전 패배는 훈련 안 된 주민이 흩어지며 부상이 더 넓게 퍼진다.
     const injuredCount = mode === 'levy' ? 2 + Math.floor(rng() * 3) : 1 + Math.floor(rng() * 2);
     const injured = injure(state, rng, injuredCount, 30, activeDefenderIds);
     const lootMsg = loot(state, 0.2 + rng() * 0.1);
-    const destroyed = damageBuildings(state, rng, rng() < 0.5 ? 1 : 0);
+    const damageCount = location === 'village'
+      ? CONFIG.raid.buildingDamage.villageDefeat
+      : CONFIG.raid.buildingDamage.interceptDefeat;
+    const damaged = damageBuildings(state, rng, damageCount);
     moraleShock(state, 15);
     changeRelation(state, battle.faction, CONFIG.relations.militiaLoss);
-    addLog(state, `${side}이(가) 밀려났습니다. 부상자 ${injured}명, ${lootMsg}.${destroyed.length > 0 ? ' 건물이 파손되었습니다.' : ''}`, 'raid');
+    addLog(
+      state,
+      location === 'outskirts'
+        ? `외곽 요격선이 무너져 적이 마을로 들이닥쳤습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`
+        : `${side}이(가) 마을 안에서 밀려났습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`,
+      'raid',
+    );
   }
 
   state.threat = CONFIG.threat.afterRaidThreat;
@@ -241,6 +313,6 @@ function finishBattle(state: GameState, outcome: BattleOutcome, rng: () => numbe
   }
   for (const id of resetIds) {
     const resident = state.residents.find(r => r.id === id);
-    if (resident) resetAgent(state, resident);
+    if (resident?.alive) resetAgent(state, resident);
   }
 }

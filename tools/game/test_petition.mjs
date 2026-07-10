@@ -96,7 +96,8 @@ function prepareBuildableLandTile(state, type) {
   requestPetition(state);
   const jinIds = state.pendingChoice.options.map(o => o.id);
   assert.ok(jinIds.includes('muskets'));
-  assert.ok(jinIds.includes('luxury'));
+  assert.ok(jinIds.includes('porcelain'));
+  assert.ok(jinIds.includes('silk'));
   assert.ok(!jinIds.includes('cannon'));
   state.pendingChoice = null;
 }
@@ -135,15 +136,21 @@ function prepareBuildableLandTile(state, type) {
   assert.equal(canPetition(state), null);
 }
 
-// ── 사치품: 전 주민 사기 상승 ──
+// ── 사치품: 청원으로 재고를 받고, 사용할 때만 사기가 오른다 ──
 {
   const state = simulation.newGame(11);
   state.rank = 'jin';
   state.resources.reputation = 80;
   for (const r of state.residents) r.morale = 50;
   requestPetition(state);
-  resolvePetition(state, 'luxury');
+  resolvePetition(state, 'silk');
+  assert.equal(state.resources.silk, 2);
+  assert.ok(state.residents.every(r => r.morale === 50));
+
+  assert.equal(simulation.useLuxuryGood(state, 'silk'), null);
+  assert.equal(state.resources.silk, 1);
   assert.ok(state.residents.every(r => r.morale === 50 + CONFIG.petition.luxuryMorale));
+  assert.equal(simulation.useLuxuryGood(state, 'grain'), '사치품이 아닙니다.');
 }
 
 // ── 불랑기포: 배치권 부여, 배치권 없으면 건설 불가 ──

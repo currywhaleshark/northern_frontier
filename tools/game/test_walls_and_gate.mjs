@@ -32,6 +32,7 @@ const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs'))
 const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const walls = await import(pathToFileURL(join(compiledDir, 'walls.mjs')).href);
+const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 function clearMapToPlain(state) {
   for (const row of state.map) {
@@ -226,8 +227,14 @@ function spawnXRoll(state, x) {
 
   raids.spawnRaiders(state, sequenceRng([0.4, 0.4, spawnXRoll(state, centerX)]), false);
 
-  assert.equal(state.raiders, null, 'raiders do not spawn a map path across a thawed river barrier');
-  assert.equal(state.pendingChoice?.kind, 'raid', 'blocked river approach falls back to an immediate raid choice');
+  assert.ok(state.raiders, 'blocked raiders are staged near the settlement before the choice opens');
+  assert.equal(state.raiders.path.length, 0);
+  const center = state.buildings.find(building => building.type === 'center');
+  assert.ok(
+    Math.abs(state.raiders.x - center.x) + Math.abs(state.raiders.y - center.y) <= CONFIG.raid.arriveDistance,
+    'fallback raiders appear within the configured decision distance',
+  );
+  assert.equal(state.pendingChoice?.kind, 'raid', 'blocked river approach opens the nearby raid choice');
 }
 
 {
@@ -239,7 +246,11 @@ function spawnXRoll(state, x) {
   state.resources.defense = buildings.computeDefense(state);
 
   assert.equal(simulation.demolishBuilding(state, 5, 5), null, 'demolishing gate succeeds');
-  assert.equal(state.resources.wood, 3, 'demolishing gate refunds half wood cost');
+  assert.equal(
+    state.resources.wood,
+    Math.floor(buildings.BUILDING_DEFS.gate.cost.wood * 0.5),
+    'demolishing gate refunds half wood cost',
+  );
   assert.equal(state.map[5][5].buildingId, null, 'demolishing gate clears tile occupancy');
   assert.equal(state.buildings.some(building => building.id === gate.id), false, 'demolished gate is removed');
   assert.equal(state.resources.defense, buildings.computeDefense(state), 'defense is recalculated');

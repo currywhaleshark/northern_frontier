@@ -34,6 +34,8 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
 
 const TRADER = FACTIONS.find(f => f.trades.length > 0).name;       // 오도리 씨족
 const NON_TRADER = FACTIONS.find(f => f.trades.length === 0).name; // 홀라온 야인
+const TRADE_FACTION = FACTIONS.find(f => f.name === TRADER);
+const PLAYER_REQUEST = { give: TRADE_FACTION.imports[0], giveAmt: 3, get: TRADE_FACTION.exports[0] };
 
 function withMarket(state) {
   state.buildings.push({
@@ -69,35 +71,34 @@ function withMarket(state) {
   assert.equal(events.canRequestTrade(state, TRADER), null);
 }
 
-// ── requestTrade: 교환 목록 전체 + 돌려보내기 옵션이 모달로 열린다 ──
+// ── requestTrade: 계산된 견적 + 돌려보내기 옵션이 모달로 열린다 ──
 {
   const state = withMarket(simulation.newGame(22));
   state.relations[TRADER] = 60;
-  assert.equal(events.requestTrade(state, TRADER), null);
+  state.resources[PLAYER_REQUEST.give] = 10;
+  assert.equal(events.requestTrade(state, TRADER, PLAYER_REQUEST), null);
 
   const c = state.pendingChoice;
-  const trades = FACTIONS.find(f => f.name === TRADER).trades;
   const faction = FACTIONS.find(f => f.name === TRADER);
   assert.equal(c.kind, 'trade');
   assert.equal(c.data.initiated, true);
   assert.ok(c.body.includes(TRADER));
   assert.equal(c.body.includes(`(${faction.desc})`), false);
-  assert.equal(c.options.length, trades.length + 1);
+  assert.equal(c.options.length, 2);
   assert.equal(c.options.at(-1).id, 'cancel');
 
   // 수락: 자원 이동 + 명성 +1 + 관계 상승 + 쿨다운 기록
-  const offer = trades[0];
-  state.resources[offer.give] = offer.giveAmt + 5;
+  const quote = c.data.quote;
   const before = {
-    give: state.resources[offer.give],
-    get: state.resources[offer.get],
+    give: state.resources[quote.give],
+    get: state.resources[quote.get],
     rep: state.resources.reputation,
     rel: state.relations[TRADER],
   };
-  simulation.resolveChoice(state, 'offer-0');
+  simulation.resolveChoice(state, 'accept-quote');
   assert.equal(state.pendingChoice, null);
-  assert.equal(state.resources[offer.give], before.give - offer.giveAmt);
-  assert.equal(state.resources[offer.get], before.get + offer.getAmt);
+  assert.equal(state.resources[quote.give], before.give - quote.giveAmt);
+  assert.equal(state.resources[quote.get], before.get + quote.getAmt);
   assert.equal(state.resources.reputation, before.rep + 1);
   assert.ok(state.relations[TRADER] > before.rel);
   assert.equal(state.lastTradeByFaction[TRADER], state.day);
@@ -107,35 +108,30 @@ function withMarket(state) {
 {
   const state = withMarket(simulation.newGame(33));
   state.relations[TRADER] = 60;
-  assert.equal(events.requestTrade(state, TRADER), null);
+  state.resources[PLAYER_REQUEST.give] = 10;
+  assert.equal(events.requestTrade(state, TRADER, PLAYER_REQUEST), null);
 
   const before = {
     rep: state.resources.reputation,
     refused: state.tradeRefusedDays,
     rel: state.relations[TRADER],
-    food: state.resources.food,
+    grain: state.resources.grain,
   };
   simulation.resolveChoice(state, 'cancel');
   assert.equal(state.pendingChoice, null);
   assert.equal(state.resources.reputation, before.rep);
   assert.equal(state.tradeRefusedDays, before.refused);
   assert.equal(state.relations[TRADER], before.rel);
-  assert.equal(state.resources.food, before.food);
+  assert.equal(state.resources.grain, before.grain);
   assert.equal(state.lastTradeByFaction[TRADER], undefined); // 쿨다운도 안 걸린다
 }
 
-// ── 자원 부족 offer는 비활성으로 표시되고, 강제로 골라도 적용되지 않는다 ──
+// ── 자원 부족 견적은 모달을 열지 않는다 ──
 {
   const state = withMarket(simulation.newGame(44));
   state.relations[TRADER] = 60;
-  const offer = FACTIONS.find(f => f.name === TRADER).trades[0];
-  state.resources[offer.give] = offer.giveAmt - 1;
-  events.requestTrade(state, TRADER);
-  assert.equal(state.pendingChoice.options[0].disabled, true);
-
-  const before = state.resources[offer.get];
-  simulation.resolveChoice(state, 'offer-0');
-  assert.equal(state.resources[offer.get], before); // 교환 미적용
+  state.resources[PLAYER_REQUEST.give] = 0;
+  assert.ok(events.requestTrade(state, TRADER, PLAYER_REQUEST).includes('부족'));
   assert.equal(state.pendingChoice, null);
 }
 

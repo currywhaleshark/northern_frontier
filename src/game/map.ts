@@ -1,5 +1,8 @@
 // 절차적 지도 생성 + 시드 난수
 import { CONFIG } from './config';
+import {
+  mineralRemaining, rollMineralDepositAmount, setMineralDeposit,
+} from './minerals';
 import type { Tile, Terrain } from './types';
 
 // mulberry32 시드 난수 — 지도 생성과 시뮬레이션 전반에서 사용
@@ -36,6 +39,53 @@ function blob(tiles: Tile[][], rng: () => number, cx: number, cy: number, size: 
     x = Math.max(0, Math.min(w - 1, x));
     y = Math.max(0, Math.min(h - 1, y));
   }
+}
+
+function reachableFromCenter(tiles: Tile[][], centerX: number, centerY: number): Set<string> {
+  const reachable = new Set<string>([centerX + ',' + centerY]);
+  const queue = [{ x: centerX, y: centerY }];
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const next = tiles[current.y + dy]?.[current.x + dx];
+      if (!next || next.terrain === 'river' || next.terrain === 'mountain') continue;
+      const key = next.x + ',' + next.y;
+      if (reachable.has(key)) continue;
+      reachable.add(key);
+      queue.push({ x: next.x, y: next.y });
+    }
+  }
+  return reachable;
+}
+
+function placeNearbyMineralDeposits(
+  tiles: Tile[][],
+  centerX: number,
+  centerY: number,
+  rng: () => number,
+): void {
+  const reachable = reachableFromCenter(tiles, centerX, centerY);
+  const collect = (maxDistance: number): Tile[] => tiles.flat().filter(tile => {
+    const distance = Math.abs(tile.x - centerX) + Math.abs(tile.y - centerY);
+    return distance >= CONFIG.minerals.nearbyMinDistance &&
+      distance <= maxDistance &&
+      reachable.has(tile.x + ',' + tile.y) &&
+      (tile.terrain === 'plain' || tile.terrain === 'forest' || tile.terrain === 'fertile');
+  });
+  let candidates = collect(CONFIG.minerals.nearbyMaxDistance);
+  if (candidates.length < 2) candidates = collect(CONFIG.minerals.nearbyMaxDistance + 5);
+  const nonFertile = candidates.filter(tile => tile.terrain !== 'fertile');
+  if (nonFertile.length >= 2) candidates = nonFertile;
+  if (candidates.length < 2) return;
+
+  const stoneIndex = Math.floor(rng() * candidates.length);
+  const stone = candidates.splice(stoneIndex, 1)[0];
+  const separated = candidates.filter(tile =>
+    Math.abs(tile.x - stone.x) + Math.abs(tile.y - stone.y) >= 2);
+  const ironPool = separated.length > 0 ? separated : candidates;
+  const iron = ironPool[Math.floor(rng() * ironPool.length)];
+  setMineralDeposit(stone, false, CONFIG.minerals.nearbyStone);
+  setMineralDeposit(iron, true, CONFIG.minerals.nearbyIron);
 }
 
 // 두만강 이북 개척지 지형 생성
@@ -106,8 +156,8 @@ export function generateMap(seed: number): { tiles: Tile[][]; centerX: number; c
         return t && t.terrain !== 'mountain' && t.terrain !== 'rock' && t.terrain !== 'river';
       });
       if (edge && rng() < 0.25) {
-        tiles[y][x].terrain = 'rock';
-        tiles[y][x].hasIron = rng() < 0.5;
+        const hasIron = rng() < 0.5;
+        setMineralDeposit(tiles[y][x], hasIron, rollMineralDepositAmount(hasIron, rng));
       }
     }
   }
@@ -145,19 +195,24 @@ export function generateMap(seed: number): { tiles: Tile[][]; centerX: number; c
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       const t = tiles[centerY + dy]?.[centerX + dx];
-      if (t && t.terrain !== 'river') t.terrain = 'plain';
+      if (t && t.terrain !== 'river') {
+        t.terrain = 'plain';
+        t.hasIron = false;
+        delete t.mineralRemaining;
+      }
     }
   }
   tiles[centerY][centerX].terrain = 'center';
+  placeNearbyMineralDeposits(tiles, centerX, centerY, rng);
 
   return { tiles, centerX, centerY };
 }
 
 // 지도에 철광 타일이 있는지 (대장장이 채광 가능 여부)
 export function hasIronTiles(tiles: Tile[][]): boolean {
-  return tiles.some(row => row.some(t => t.terrain === 'rock' && t.hasIron));
+  return tiles.some(row => row.some(t => t.terrain === 'rock' && t.hasIron && mineralRemaining(t) > 0));
 }
 
 export function hasRockTiles(tiles: Tile[][]): boolean {
-  return tiles.some(row => row.some(t => t.terrain === 'rock' || t.terrain === 'mountain'));
+  return tiles.some(row => row.some(t => t.terrain === 'rock' && mineralRemaining(t) > 0));
 }

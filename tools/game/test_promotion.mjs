@@ -92,7 +92,7 @@ function addBuilt(state, type, n = 1) {
   fillResidents(state, v.population);
   state.lastWinterDeathRate = 0;
   state.resources.defense = v.defense;
-  state.resources.food = v.food;
+  state.resources.grain = v.food;
   state.resources.firewood = v.firewood;
   addBuilt(state, 'beacon');
   addBuilt(state, 'garrison');
@@ -167,9 +167,13 @@ function addBuilt(state, type, n = 1) {
 // ── 세공 납부/미납이 성실도(연속 납부)를 갱신한다 ──
 {
   const state = simulation.newGame(11);
-  for (const [res, amt] of Object.entries(state.courtTribute.items)) state.resources[res] = amt;
+  const reserveMod = await import(pathToFileURL(join(compiledDir, 'tributeReserve.mjs')).href);
+  for (const [res, amt] of Object.entries(state.courtTribute.items)) {
+    state.resources[res] = amt;
+    reserveMod.setTributeReserve(state, res, amt);
+  }
   tributeMod.openCourtTributeChoice(state);
-  tributeMod.resolveCourtTribute(state, 'pay');
+  tributeMod.resolveCourtTribute(state, 'pay-full');
   assert.equal(state.tributePaidStreak, 1);
 
   state.courtTribute = tributeMod.rollCourtTribute(state.seed, 2, 12);

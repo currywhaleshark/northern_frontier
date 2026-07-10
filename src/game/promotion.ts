@@ -5,7 +5,7 @@ import { CONFIG } from './config';
 import { BUILDING_DEFS, countBuilt } from './buildings';
 import { RANK_NAMES, RANK_ORDER } from './constants';
 import { addLog } from './events';
-import { edibleFoodTotal } from './resources';
+import { foodTotal, fuelHeatTotal } from './consumption';
 import { livingResidents } from './residents';
 import type { BuildingTypeId, GameState, Rank } from './types';
 
@@ -34,8 +34,8 @@ export function promotionConditions(state: GameState, target: Rank): [boolean, s
       [living >= v.population, `인구 ${v.population}명 (현재 ${living}명)`],
       [state.lastWinterDeathRate <= v.maxWinterDeathRate, `겨울 사망률 10% 이하 (직전 ${(state.lastWinterDeathRate * 100).toFixed(0)}%)`],
       [state.resources.defense >= v.defense, `방어도 ${v.defense} (현재 ${state.resources.defense})`],
-      [edibleFoodTotal(state) >= v.food, `식량 ${v.food} 비축 (현재 ${Math.floor(edibleFoodTotal(state))})`],
-      [state.resources.firewood >= v.firewood, `장작 ${v.firewood} 비축 (현재 ${Math.floor(state.resources.firewood)})`],
+      [foodTotal(state) >= v.food, `식량 ${v.food} 비축 (현재 ${Math.floor(foodTotal(state))})`],
+      [fuelHeatTotal(state) >= v.firewood, `땔감 ${v.firewood} 비축 (현재 ${Math.floor(fuelHeatTotal(state))})`],
       [countBuilt(state, 'beacon') > 0, '봉수대 건설'],
       [countBuilt(state, 'garrison') > 0, '군영 건설'],
     ];
@@ -77,12 +77,12 @@ function promote(state: GameState, target: Rank): void {
   state.resources.reputation = Math.min(100, state.resources.reputation + CONFIG.ranks.promotionReputation);
 
   if (target === 'bo') {
-    addLog(state, '조정이 개척지를 보(堡)로 승격하였습니다! 첨사의 이름이 한양까지 알려집니다.', 'good');
-    addLog(state, '보 승격으로 채광장·기와집·나루터·논·방앗간과 채광꾼·어부·방아꾼이 열렸습니다.', 'good');
+    addLog(state, '조정이 개척지를 보(堡)로 승격하였습니다! 첨사의 이름이 한양까지 알려집니다.', 'good', true);
+    addLog(state, '보 승격으로 온돌집·채광장·나루터·논·방앗간과 채광꾼·어부·방아꾼이 열렸습니다.', 'good');
     addLog(state, '보가 되니 남쪽에서 사람이 모여들지만, 부유해진 만큼 국경 너머의 눈길도 잦아집니다. 조정의 세공도 무거워질 것입니다.', 'info');
   } else if (target === 'jin') {
-    addLog(state, '조정이 보를 진(鎭)으로 승격하였습니다! 첨사는 이제 첨절제사라 불립니다.', 'good');
-    addLog(state, '진 승격으로 토성·숯가마·축사와 숯쟁이·목동이 열렸습니다.', 'good');
+    addLog(state, '조정이 보를 진(鎭)으로 승격하였습니다! 첨사는 이제 첨절제사라 불립니다.', 'good', true);
+    addLog(state, '진 승격으로 기와집·토성·숯가마·축사와 숯쟁이·목동이 열렸습니다.', 'good');
     addLog(state, '진이 된 마을은 변경 방어의 요충이 되었습니다. 조정의 기대와 세공 요구가 한층 무거워집니다.', 'info');
   } else if (target === 'bu') {
     state.gameOver = {
@@ -92,7 +92,7 @@ function promote(state: GameState, target: Rank): void {
         '조정은 당신의 공을 사서에 남기게 하였고, 두만강 이북의 혹한도 이 고을의 등불을 끄지 못할 것입니다. ' +
         '원한다면 승리 이후에도 개척을 계속 이어갈 수 있습니다.',
     };
-    addLog(state, '부(府) 승격 — 개척의 대업이 완성되었습니다!', 'good');
+    addLog(state, '부(府) 승격 — 개척의 대업이 완성되었습니다!', 'good', true);
     addLog(state, '부 승격으로 염초장·석벽·관청·부두와 염초장이·아전 직업이 열렸습니다.', 'good');
   }
 }

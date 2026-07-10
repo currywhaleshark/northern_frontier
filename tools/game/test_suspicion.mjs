@@ -112,9 +112,13 @@ const factorOf = (state, id) => suspicionBreakdown(state).find(f => f.id === id)
 {
   const state = simulation.newGame(11);
   state.suspicion = 30;
-  for (const [res, amt] of Object.entries(state.courtTribute.items)) state.resources[res] = amt;
+  const reserveMod = await import(pathToFileURL(join(compiledDir, 'tributeReserve.mjs')).href);
+  for (const [res, amt] of Object.entries(state.courtTribute.items)) {
+    state.resources[res] = amt;
+    reserveMod.setTributeReserve(state, res, amt);
+  }
   tributeMod.openCourtTributeChoice(state);
-  tributeMod.resolveCourtTribute(state, 'pay');
+  tributeMod.resolveCourtTribute(state, 'pay-full');
   assert.equal(state.suspicion, 30 - S.tributeDecay);
 
   state.rank = 'bo';
@@ -133,12 +137,12 @@ const factorOf = (state, id) => suspicionBreakdown(state).find(f => f.id === id)
   assert.ok(state.inspectionCooldownUntil > state.day, '쿨다운 시작');
 
   // 뇌물
-  state.resources.food = 100;
+  state.resources.grain = 100;
   state.resources.hide = 20;
   const s0 = state.suspicion;
   resolveInspection(state, 'bribe', () => 0.5);
   assert.equal(state.suspicion, s0 - S.bribeDecay);
-  assert.equal(state.resources.food, 100 - S.bribeCost.food);
+  assert.equal(state.resources.grain, 100 - S.bribeCost.food);
 
   // 은닉
   openInspection(state);

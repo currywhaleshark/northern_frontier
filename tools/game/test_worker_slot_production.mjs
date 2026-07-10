@@ -104,6 +104,7 @@ function interactionTileForBuilding(state, building) {
 function prepareState(seed) {
   const state = simulation.newGame(seed);
   clearMapToPlain(state);
+  addBuilt(state, 'center', 2, 2);
   state.rank = 'bu';
   state.day = 1;
   state.weather = 'clear';
@@ -140,31 +141,32 @@ function prepareState(seed) {
   addBuilt(state, 'tannery', 10, 10);
   workableResident(state, 0, 'tanner', 9, 10);
   state.resources.hide = 10;
-  state.resources.clothes = 0;
+  state.resources.hideClothes = 0;
 
   simulation.advanceDay(state);
 
   assert.equal(state.resources.hide, 10, 'unassigned tannery leaves hide untouched');
-  assert.equal(state.resources.clothes, 0, 'unassigned tannery does not make clothes');
+  assert.equal(state.resources.hideClothes, 0, 'unassigned tannery does not make clothes');
 }
 
 {
   const state = prepareState(2026070914);
-  const tannery = addBuilt(state, 'tannery', 10, 10);
+  const tannery = addBuilt(state, 'tannery', 10, 10, { inventory: { hide: 10 } });
   const tanner = workableResident(state, 0, 'tanner', 9, 10);
   assert.equal(workerSlots.assignResidentToBuilding(state, tanner.id, tannery.id), null);
   state.resources.hide = 10;
-  state.resources.clothes = 0;
+  state.resources.hideClothes = 0;
 
   simulation.advanceTick(state);
 
-  assert.ok(state.resources.hide < 10, 'assigned tanner consumes hide at the assigned tannery');
-  assert.ok(state.resources.clothes > 0, 'assigned tanner produces clothes at the assigned tannery');
+  assert.ok(tannery.inventory.hide < 10, 'assigned tanner consumes hide stored at the assigned tannery');
+  assert.equal(state.resources.hide, 10, 'workplace stock is consumed instead of remote settlement stock');
+  assert.ok((tannery.inventory?.hideClothes ?? 0) > 0, 'assigned tanner stores clothes at the assigned tannery');
 }
 
 {
   const state = prepareState(2026070915);
-  const smithy = addBuilt(state, 'smithy', 10, 10);
+  const smithy = addBuilt(state, 'smithy', 10, 10, { inventory: { iron: 10, wood: 10 } });
   simulation.setSmithyProduct(state, smithy.id, 'spears');
   const smith = workableResident(state, 0, 'smith', 9, 10);
   assert.equal(workerSlots.assignResidentToBuilding(state, smith.id, smithy.id), null);
@@ -174,7 +176,7 @@ function prepareState(seed) {
 
   simulation.advanceTick(state);
 
-  assert.ok(state.resources.spears > 0, 'assigned smith produces the selected assigned smithy product');
+  assert.ok((smithy.inventory?.spears ?? 0) > 0, 'assigned smith stores the selected assigned smithy product');
 }
 
 {
@@ -247,7 +249,7 @@ function prepareState(seed) {
 {
   const state = prepareState(2026070921);
   state.rank = 'bu';
-  const yard = addBuilt(state, 'nitreYard', 10, 10);
+  const yard = addBuilt(state, 'nitreYard', 10, 10, { inventory: { firewood: 10, stone: 10 } });
   const spot = interactionTileForBuilding(state, yard);
   const powderMaker = workableResident(state, 0, 'powderMaker', spot.x, spot.y);
   assert.equal(workerSlots.assignResidentToBuilding(state, powderMaker.id, yard.id), null);
@@ -259,15 +261,15 @@ function prepareState(seed) {
 
   simulation.advanceTick(state);
 
-  assert.ok(state.resources.gunpowder > 0, 'assigned powder maker produces gunpowder when inputs are available');
-  assert.ok(state.resources.firewood < 10, 'assigned powder maker consumes firewood');
-  assert.ok(state.resources.stone < 10, 'assigned powder maker consumes stone');
+  assert.ok((yard.inventory?.gunpowder ?? 0) > 0, 'assigned powder maker stores gunpowder when inputs are available');
+  assert.ok(yard.inventory.firewood < 10, 'assigned powder maker consumes local firewood');
+  assert.ok(yard.inventory.stone < 10, 'assigned powder maker consumes local stone');
 }
 
 {
   const state = prepareState(2026070922);
   state.rank = 'bo';
-  const assignedSmithy = addBuilt(state, 'smithy', 10, 10);
+  const assignedSmithy = addBuilt(state, 'smithy', 10, 10, { inventory: { iron: 10, wood: 10 } });
   const otherSmithy = addBuilt(state, 'smithy', 15, 10);
   simulation.setSmithyProduct(state, assignedSmithy.id, 'tools');
   simulation.setSmithyProduct(state, otherSmithy.id, 'spears');
@@ -280,7 +282,7 @@ function prepareState(seed) {
 
   simulation.advanceTick(state);
 
-  assert.ok(state.resources.tools > 0, 'assigned smith uses the assigned smithy product');
+  assert.ok((assignedSmithy.inventory?.tools ?? 0) > 0, 'assigned smith uses the assigned smithy product');
   assert.equal(state.resources.spears, 0, 'assigned smith ignores another unassigned smithy product');
 }
 

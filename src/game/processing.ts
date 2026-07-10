@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import type { GameState, ProcessingInputId } from './types';
 
-export const PROCESSING_INPUTS: ProcessingInputId[] = ['wood', 'grain', 'game', 'hide', 'iron'];
+export const PROCESSING_INPUTS: ProcessingInputId[] = ['wood', 'rice', 'hide', 'iron'];
 
 export function defaultProcessingReserves(): Record<ProcessingInputId, number> {
   return { ...CONFIG.production.processingReserves };

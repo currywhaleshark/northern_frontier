@@ -222,6 +222,7 @@ function runTicks(state, ticks) {
   const state = simulation.newGame(202607084);
   const yardTile = prepareLandTile(state, 'nitreYard');
   const yard = placeBuilt(state, 'nitreYard', yardTile);
+  yard.inventory = { firewood: 5, stone: 5 };
   const powderMaker = onlyWorkerAt(state, 'powderMaker', yardTile);
   assert.equal(workerSlots.assignResidentToBuilding(state, powderMaker.id, yard.id), null);
   state.resources.firewood = 10;
@@ -229,9 +230,9 @@ function runTicks(state, ticks) {
   state.resources.gunpowder = 0;
   runTicks(state, 8);
 
-  assert.ok(state.resources.gunpowder > 0, 'powder maker produces gunpowder at a nitre yard');
-  assert.ok(state.resources.firewood < 10, 'powder maker consumes firewood');
-  assert.ok(state.resources.stone < 10, 'powder maker consumes stone');
+  assert.ok((yard.inventory?.gunpowder ?? 0) > 0, 'powder maker stores gunpowder at a nitre yard');
+  assert.ok(yard.inventory.firewood < 5, 'powder maker consumes delivered firewood');
+  assert.ok(yard.inventory.stone < 5, 'powder maker consumes delivered stone');
 }
 
 {
@@ -266,19 +267,10 @@ function runTicks(state, ticks) {
   const scaledGive = Math.ceil(original.giveAmt * CONFIG.trade.dockOfferScale);
   const scaledGet = Math.ceil(original.getAmt * CONFIG.trade.dockOfferScale);
 
-  assert.equal(events.requestTrade(state, TRADER), null);
-  const offer = state.pendingChoice.data.offers[0];
+  const offer = events.scaledTradeOffer(state, original);
   assert.equal(offer.giveAmt, scaledGive, 'dock expands trade offer give amount');
   assert.equal(offer.getAmt, scaledGet, 'dock expands trade offer get amount');
-
-  state.resources[offer.give] = offer.giveAmt + 5;
-  const before = {
-    give: state.resources[offer.give],
-    get: state.resources[offer.get],
-  };
-  simulation.resolveChoice(state, 'offer-0');
-  assert.equal(state.resources[offer.give], before.give - scaledGive);
-  assert.equal(state.resources[offer.get], before.get + scaledGet);
+  assert.equal(events.playerTradeCooldownDays(state), CONFIG.trade.dockPlayerCooldownDays);
 
   state.lastTradeByFaction[TRADER] = state.day;
   state.day += CONFIG.trade.dockPlayerCooldownDays - 1;

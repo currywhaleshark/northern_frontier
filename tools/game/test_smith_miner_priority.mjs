@@ -80,6 +80,7 @@ function setupSmithScenario(seed, withMiner) {
   smithyTile.terrain = 'plain';
   state.exploration.explored[smithyTile.y][smithyTile.x] = true;
   const smithy = placeBuilt(state, 'smithy', smithyTile);
+  smithy.inventory = { wood: 100 };
 
   const mineTile = openInteriorTile(state);
   mineTile.terrain = 'rock';

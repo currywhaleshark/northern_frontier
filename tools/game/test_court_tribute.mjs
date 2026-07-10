@@ -38,6 +38,7 @@ const compiledDir = compileGameModules();
 const tributeMod = await import(pathToFileURL(join(compiledDir, 'courtTribute.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
+const reserveMod = await import(pathToFileURL(join(compiledDir, 'tributeReserve.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 const {
@@ -48,6 +49,10 @@ const {
   rollCourtTribute,
   tributeScale,
 } = tributeMod;
+const {
+  setTributeReserve,
+  tributeReserveRatio,
+} = reserveMod;
 
 const POOL = Object.keys(CONFIG.tribute.baseAmounts);
 
@@ -94,6 +99,7 @@ assert.ok(tributeScale(1, 40) > tributeScale(1, 12));
   assert.equal(state.courtTribute.year, 1);
   assert.equal(state.courtTribute.resolved, false);
   assert.equal(state.tributeFailStreak, 0);
+  assert.deepEqual(state.tributeReserve, {});
   assert.ok(state.log.some(e => e.text.includes('세공')), '공지 로그');
 }
 
@@ -135,20 +141,24 @@ assert.ok(tributeScale(1, 40) > tributeScale(1, 12));
 {
   const state = simulation.newGame(11);
   const tribute = state.courtTribute;
-  for (const [res, amt] of Object.entries(tribute.items)) state.resources[res] = amt + 5;
+  for (const [res, amt] of Object.entries(tribute.items)) {
+    state.resources[res] = amt + 5;
+    assert.equal(setTributeReserve(state, res, amt), null);
+  }
   assert.equal(canPayTribute(state, tribute), true);
   state.tributeFailStreak = 1;
   state.day = tribute.dueDay;
   openCourtTributeChoice(state);
   assert.equal(state.pendingChoice.options[0].disabled, false);
   const repBefore = state.resources.reputation;
-  resolveCourtTribute(state, 'pay');
+  resolveCourtTribute(state, 'pay-full');
   assert.equal(state.pendingChoice, null);
   assert.equal(tribute.paid, true);
   assert.equal(tribute.resolved, true);
   assert.equal(state.tributeFailStreak, 0);
   assert.equal(state.resources.reputation, Math.min(100, repBefore + CONFIG.tribute.repPaid));
   for (const [res] of Object.entries(tribute.items)) assert.equal(state.resources[res], 5);
+  assert.deepEqual(state.tributeReserve, {});
 }
 
 // ── 자원 부족이면 납부 선택지가 비활성화된다 ──
@@ -158,6 +168,7 @@ assert.ok(tributeScale(1, 40) > tributeScale(1, 12));
   openCourtTributeChoice(state);
   assert.equal(state.pendingChoice.options[0].disabled, true);
   assert.ok(state.pendingChoice.options[0].disabledReason.includes('부족'));
+  assert.equal(state.pendingChoice.options[1].disabled, true);
   state.pendingChoice = null;
 }
 
@@ -165,15 +176,63 @@ assert.ok(tributeScale(1, 40) > tributeScale(1, 12));
 {
   const state = simulation.newGame(11);
   state.courtTribute = rollCourtTribute(state.seed, 2, 12);
-  for (const [res, amt] of Object.entries(state.courtTribute.items)) state.resources[res] = amt;
-  const before = state.resources.tools + state.resources.clothes;
+  for (const [res, amt] of Object.entries(state.courtTribute.items)) {
+    state.resources[res] = amt;
+    setTributeReserve(state, res, amt);
+  }
+  const before = state.resources.tools + state.resources.cottonClothes;
   openCourtTributeChoice(state);
-  resolveCourtTribute(state, 'pay');
-  const gained = state.resources.tools + state.resources.clothes - before;
+  resolveCourtTribute(state, 'pay-full');
+  const gained = state.resources.tools + state.resources.cottonClothes - before;
   assert.ok(
-    gained === CONFIG.tribute.rewardTools || gained === CONFIG.tribute.rewardClothes,
+    gained === CONFIG.tribute.rewardTools || gained === CONFIG.tribute.rewardCottonClothes,
     `하사품 지급 (${gained})`,
   );
+}
+
+// ── 부분 납부: 품목별 충족률 평균 + 비례 불이익 ──
+{
+  const state = simulation.newGame(2026071020);
+  state.courtTribute = {
+    year: 1, items: { grain: 20, iron: 2 }, dueDay: 37, resolved: false, paid: false,
+  };
+  state.resources.grain = 10;
+  state.resources.iron = 2;
+  setTributeReserve(state, 'grain', 10);
+  setTributeReserve(state, 'iron', 2);
+  assert.equal(tributeReserveRatio(state, state.courtTribute), 0.75, 'each tribute line has equal weight');
+
+  const repBefore = state.resources.reputation;
+  const threatBefore = state.threat;
+  state.tributeFailStreak = 1;
+  openCourtTributeChoice(state);
+  assert.equal(state.pendingChoice.options[1].disabled, false);
+  resolveCourtTribute(state, 'pay-partial');
+
+  assert.equal(state.courtTribute.paid, false);
+  assert.equal(state.tributePaidStreak, 0);
+  assert.equal(state.tributeFailStreak, 0, 'at least half payment breaks failure streak');
+  assert.ok(state.resources.reputation < repBefore);
+  assert.ok(state.threat > threatBefore);
+  assert.deepEqual(state.tributeReserve, {});
+}
+
+// ── 거절/연도 갱신: 잠근 자원이 usable stock으로 돌아온다 ──
+{
+  const state = simulation.newGame(2026071021);
+  state.courtTribute = { year: 1, items: { grain: 10 }, dueDay: 37, resolved: false, paid: false };
+  state.resources.grain = 10;
+  setTributeReserve(state, 'grain', 10);
+  openCourtTributeChoice(state);
+  resolveCourtTribute(state, 'refuse');
+  assert.equal(state.resources.grain, 10);
+  assert.deepEqual(state.tributeReserve, {});
+
+  state.courtTribute = { year: 2, items: { grain: 10 }, dueDay: 85, resolved: false, paid: false };
+  setTributeReserve(state, 'grain', 6);
+  state.day = 49;
+  tributeMod.announceCourtTribute(state);
+  assert.equal(state.resources.grain, 10, 'new tribute announcement releases the previous reserve');
 }
 
 // ── 미납: 명성 하락 + 위협 상승 + streak, 2년 연속이면 가중 ──

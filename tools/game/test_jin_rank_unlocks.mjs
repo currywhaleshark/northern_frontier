@@ -31,9 +31,10 @@ const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs'
 const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
 const constants = await import(pathToFileURL(join(compiledDir, 'constants.mjs')).href);
 const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
+const selectionActions = await import(pathToFileURL(join(compiledDir, 'selectionActions.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-const JIN_BUILDINGS = ['earthFort', 'charcoalKiln', 'stable'];
+const JIN_BUILDINGS = ['tileHouse', 'earthFort', 'charcoalKiln', 'stable'];
 const JIN_JOBS = ['charcoalBurner', 'herder'];
 
 function boostResources(state) {
@@ -160,18 +161,39 @@ function runTicks(state, ticks) {
 }
 
 {
+  const state = simulation.newGame(2026070720);
+  boostResources(state);
+  state.rank = 'bo';
+  const hut = state.buildings.find(building => building.type === 'hut');
+  assert.ok(hut, 'new game has a hut to upgrade');
+  assert.equal(simulation.upgradeHousingBuilding(state, hut.id, 'ondol'), null);
+  hut.progress = buildings.BUILDING_DEFS.ondol.buildDays;
+  hut.built = true;
+  assert.deepEqual(selectionActions.getBuildingActions(state, hut), [], 'tile house upgrade action is hidden before jin');
+  assert.ok(simulation.upgradeHousingBuilding(state, hut.id, 'tileHouse'), 'tile house upgrade is locked before jin');
+  assert.equal(hut.type, 'ondol');
+
+  state.rank = 'jin';
+  assert.equal(selectionActions.getBuildingActions(state, hut)[0]?.id, 'upgrade:tileHouse');
+  assert.equal(simulation.upgradeHousingBuilding(state, hut.id, 'tileHouse'), null, 'ondol upgrades to tile house at jin');
+  assert.equal(hut.type, 'tileHouse');
+}
+
+{
   const state = simulation.newGame(202607074);
   const kilnTile = prepareLandTile(state);
-  placeBuilt(state, 'charcoalKiln', kilnTile);
-  onlyWorkerAt(state, 'charcoalBurner', kilnTile);
+  const kiln = placeBuilt(state, 'charcoalKiln', kilnTile);
+  kiln.inventory = { wood: 2 };
+  const burner = onlyWorkerAt(state, 'charcoalBurner', kilnTile);
+  assert.equal(workerSlots.assignResidentToBuilding(state, burner.id, kiln.id), null);
   state.resources.wood = 10;
   state.resources.firewood = 0;
   state.processingReserves.wood = 8;
   runTicks(state, 8);
 
-  assert.ok(state.resources.firewood > 0, 'charcoal burner makes firewood at a kiln');
-  assert.ok(state.resources.wood < 10, 'charcoal burner consumes processable wood');
-  assert.ok(state.resources.wood >= 8, 'charcoal burner respects wood processing reserve');
+  assert.ok((kiln.inventory?.charcoal ?? 0) > 0, 'charcoal burner stores charcoal at a kiln');
+  assert.equal(state.resources.firewood, 0, 'charcoal is a distinct fuel');
+  assert.ok(kiln.inventory.wood < 2, 'charcoal burner consumes wood delivered to the kiln');
 }
 
 {

@@ -90,6 +90,19 @@ function onlyBuilderAt(state, x, y) {
 }
 
 {
+  const state = simulation.newGame(2026071202);
+  const center = state.buildings.find(building => building.type === 'center');
+  assert.ok(center, 'new game has a center');
+  for (const resident of state.residents) {
+    assert.equal(agents.isPassable(state, resident.x, resident.y), true, 'resident starts on a passable tile');
+    const path = agents.findPath(state, resident.x, resident.y, tile =>
+      Math.abs(tile.x - center.x) + Math.abs(tile.y - center.y) >= 10 &&
+      agents.isPassable(state, tile.x, tile.y));
+    assert.ok(path, `resident ${resident.id} can leave the starting settlement`);
+  }
+}
+
+{
   const state = simulation.newGame(2026070710);
   clearMapToPlain(state);
   addBuilt(state, 'storehouse', 5, 5);

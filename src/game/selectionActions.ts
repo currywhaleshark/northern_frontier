@@ -1,10 +1,11 @@
-import { BUILDING_DEFS, buildingFootprintTiles, getBuilding } from './buildings';
+import { BUILDING_DEFS, buildingFootprintTiles, getBuilding, isBuildingUnlocked } from './buildings';
 import { CONFIG } from './config';
 import { JOB_NAMES } from './constants';
 import { collectHuntableTiles } from './habitats';
 import { isPassable } from './agents';
 import { getSeason } from './seasons';
 import { isExplored } from './exploration';
+import { isHaulSourceBuilding } from './inventory';
 import { canAssignResidentToBuilding, workerSlotConfig } from './workerSlots';
 import type { Building, GameState, JobId, PointerAction, SelectedEntity, Tile } from './types';
 
@@ -119,6 +120,13 @@ export function canResidentWorkTarget(
         : { ok: false, label: '대장간이 아닙니다' };
     case 'hauler':
       if (tile.terrain === 'rock') return { ok: true, label: workLabel(job, tile) };
+      if (building && tile.buildingId === building.id && isHaulSourceBuilding(building)) {
+        return {
+          ok: true,
+          label: `${BUILDING_DEFS[building.type].name} 강제 운송`,
+          buildingId: building.id,
+        };
+      }
       return buildingMatches(tile, building, ['center', 'storehouse'])
         ? { ok: true, label: '하역/가공', buildingId: building?.id }
         : { ok: false, label: '운반꾼이 처리할 수 없는 대상입니다' };
@@ -186,7 +194,9 @@ export function getPointerAction(
       : actionInvalid('길을 찾을 수 없습니다');
   }
 
-  const assignment = slottedAssignmentAction(state, resident.id, tile);
+  const targetBuilding = tileBuilding(state, tile);
+  const forcedHaulTarget = resident.job === 'hauler' && !!targetBuilding && isHaulSourceBuilding(targetBuilding);
+  const assignment = forcedHaulTarget ? null : slottedAssignmentAction(state, resident.id, tile);
   if (assignment) return assignment;
 
   const work = canResidentWorkTarget(state, resident.job, tile);
@@ -210,8 +220,12 @@ export function getPointerAction(
 
 export function getBuildingActions(state: GameState, building: Building): BuildingActionItem[] {
   if (!building.built) return [];
-  if (building.type === 'hut') return [{ id: 'upgrade:ondol', label: '온돌집으로 개량' }];
-  if (building.type === 'ondol') return [{ id: 'upgrade:tileHouse', label: '기와집으로 개량' }];
+  if (building.type === 'hut' && isBuildingUnlocked(state.rank, 'ondol')) {
+    return [{ id: 'upgrade:ondol', label: '온돌집으로 개량' }];
+  }
+  if (building.type === 'ondol' && isBuildingUnlocked(state.rank, 'tileHouse')) {
+    return [{ id: 'upgrade:tileHouse', label: '기와집으로 개량' }];
+  }
   if (building.type === 'smithy') return [{ id: 'smithy', label: '생산 전환' }];
   if (building.type === 'market' || building.type === 'dock') return [{ id: 'trade', label: '교역 대상 선택' }];
   if (building.type === 'nitreYard') {

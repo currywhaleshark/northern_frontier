@@ -66,18 +66,42 @@ export const CROP_DEFS: Record<CropId, CropDef> = {
   rice: {
     id: 'rice',
     name: '벼',
-    desc: '논에서만 기르는 고효율 곡물. 방앗간에서 찧으면 더 많은 식량이 됩니다.',
+    desc: '논에서만 기르는 벼. 수확한 뒤 방앗간에서 찧어야 먹을 수 있는 곡물이 됩니다.',
     buildingTypes: ['paddy'],
     plantSeasons: ['spring', 'summer'],
     growSeasons: ['spring', 'summer'],
     harvestSeasons: ['autumn'],
-    output: 'grain',
+    output: 'rice',
     yield: CONFIG.production.fieldGrainYield * 0.95,
+    survivesWinter: false,
+  },
+  vegetables: {
+    id: 'vegetables',
+    name: '채소',
+    desc: '여름과 가을 식단을 보완하는 밭 작물입니다.',
+    buildingTypes: ['field'],
+    plantSeasons: ['spring', 'summer'],
+    growSeasons: ['spring', 'summer', 'autumn'],
+    harvestSeasons: ['summer', 'autumn'],
+    output: 'vegetables',
+    yield: CONFIG.production.fieldGrainYield * 0.45,
+    survivesWinter: false,
+  },
+  cotton: {
+    id: 'cotton',
+    name: '목화',
+    desc: '무명옷 재료. 식량은 아니지만 겨울 대비에 중요합니다.',
+    buildingTypes: ['field'],
+    plantSeasons: ['spring'],
+    growSeasons: ['spring', 'summer'],
+    harvestSeasons: ['autumn'],
+    output: 'cotton',
+    yield: CONFIG.production.fieldGrainYield * 0.35,
     survivesWinter: false,
   },
 };
 
-export const CROP_ORDER: CropId[] = ['millet', 'sorghum', 'buckwheat', 'barley', 'rice'];
+export const CROP_ORDER: CropId[] = ['millet', 'sorghum', 'buckwheat', 'barley', 'rice', 'vegetables', 'cotton'];
 
 export function defaultCropForBuildingType(type: BuildingTypeId): CropId | null {
   if (type === 'field') return 'millet';

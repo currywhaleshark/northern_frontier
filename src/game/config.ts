@@ -7,6 +7,19 @@ export const CONFIG = {
     height: 56,
   },
 
+  minerals: {
+    stoneMin: 120,
+    stoneMax: 180,
+    ironMin: 100,
+    ironMax: 140,
+    legacyStone: 150,
+    legacyIron: 120,
+    nearbyStone: 36,
+    nearbyIron: 16,
+    nearbyMinDistance: 4,
+    nearbyMaxDistance: 7,
+  },
+
   time: {
     seasonDays: 12,           // 한 계절 길이(일)
     yearDays: 48,             // 1년 = 4계절
@@ -18,8 +31,11 @@ export const CONFIG = {
   start: {
     residents: 12,
     resources: {
-      food: 100, meat: 0, fish: 0, firewood: 45, wood: 30, stone: 12, iron: 4, tools: 10,
-      hide: 6, clothes: 12, herbs: 5, grain: 0, game: 0,
+      grain: 100, rice: 0, meat: 0, fish: 0, vegetables: 0,
+      brushwood: 12, firewood: 45, charcoal: 0,
+      wood: 30, stone: 12, iron: 4, tools: 10, carts: 0,
+      hide: 6, hideClothes: 12, cotton: 0, cottonClothes: 0, herbs: 5,
+      porcelain: 0, brassware: 0, lacquerware: 0, silk: 0, preciousMetal: 0,
       gunpowder: 0, spears: 0, hornBows: 0, muskets: 0,
       reputation: 50, defense: 0,
     },
@@ -39,10 +55,12 @@ export const CONFIG = {
     warmthLossWinterBase: 13, // 겨울 기본 체온 손실
     warmthRegenWarmSeason: 20,
     heatOndol: 12,            // 장작이 충분할 때 온돌집 난방량
-    heatHut: 8,               // 초가집 난방량
+    heatHut: 11,              // 초가집 난방량 — 평시 겨울은 안정적으로 버티되 혹한에는 여전히 취약
     heatHomeless: 3,          // 노숙 난방량
     homelessLossMult: 1.7,
     noClothesLossMult: 0.9,   // 옷 없는 비율만큼 추가 손실 (×이 값)
+    monotonyMoralePenalty: 8,
+    vegetableShortageHealthPenalty: 1,
   },
 
   health: {
@@ -60,6 +78,7 @@ export const CONFIG = {
     recoverChance: 0.10,
     recoverChanceHerbs: 0.28,
     herbsPerSickPerDay: 0.5,
+    poorDietDamage: 1,
   },
 
   production: {
@@ -67,6 +86,10 @@ export const CONFIG = {
     gamePerDay: 0.9,
     herbsPerDay: 0.5,
     toolsPerDay: 1.0,
+    cartsPerDay: 0.2,
+    cartWoodPerUnit: 6,
+    cartIronPerUnit: 3,
+    cartToolsPerUnit: 1,
     spearsPerDay: 0.8,
     spearIronPerUnit: 1.0,
     spearWoodPerUnit: 0.6,
@@ -79,32 +102,32 @@ export const CONFIG = {
     musketToolsPerUnit: 0.45,
     ironMinePerDay: 0.8,
     fishPerDay: 1.4,
-    haulerWoodToFirewood: 2.5, // 운반꾼 1인 하루 목재 가공량
+    brushwoodPerWood: 0.35,
+    firewoodWoodPerDay: 2.5,
     firewoodPerWood: 1.4,
     charcoalWoodPerDay: 2.2,    // 숯쟁이 1인 하루 목재 처리량
-    charcoalFirewoodPerWood: 2.0,
+    charcoalPerWood: 1.4,
     gunpowderPerDay: 0.9,
     gunpowderFirewoodPerPowder: 1.0,
     gunpowderStonePerPowder: 0.6,
     officeBonusPerClerk: 0.05,
     officeMaxBonus: 0.2,
-    haulerGamePerDay: 2,       // 사냥감 손질량
-    foodPerGame: 4,
+    meatPerGame: 4,
     hidePerGame: 1,
-    haulerGrainPerDay: 4,      // 구버전 저장/테스트 호환용: 곡물 도정은 방아꾼이 맡는다
-    millerGrainPerDay: 4,      // 방아꾼 1인 하루 곡물 도정량
-    foodPerGrain: 1.5,         // 곡물 1 → 도정 곡식 1.5
+    millerRicePerDay: 4,       // 방아꾼 1인 하루 벼 도정량
+    grainPerRice: 1.5,         // 벼 1 → 먹을 수 있는 곡물 1.5
     haulerStonePerDay: 0.4,    // 돌이 부족할 때 채석
     stoneReserveTarget: 40,
     woodReserve: 25,           // 건축용으로 남겨둘 목재 (이 이상만 장작으로 팬다)
     processingReserves: {
       wood: 25,
-      grain: 0,
-      game: 0,
+      rice: 0,
       hide: 0,
       iron: 0,
     } as Record<ProcessingInputId, number>,
     tanneryHidePerDay: 2,      // 가죽공방 하루 가죽 소비 (가죽 2 → 옷 1)
+    weaverCottonPerDay: 2,
+    cottonClothesPerCotton: 0.5,
     fieldGrainYield: 36,       // 밭 1개가 만작일 때 곡물 수확량
     fertileBonus: 1.3,
     lumberCampBonus: 1.4,
@@ -122,7 +145,17 @@ export const CONFIG = {
     moveSpeedWinter: 1.5,     // 겨울 눈길
     moveSpeedSnow: 1,         // 폭설/눈보라
     shelterThreshold: 0.3,    // 실외작업 중단 기준 (날씨 효율이 이 밑이면 대피)
-    carryCap: { wood: 4, game: 2, herbs: 1.5, iron: 3, stone: 3, grain: 6, food: 5, meat: 5, fish: 5, hide: 2 },
+    carryCap: {
+      grain: 6, rice: 6, meat: 5, fish: 5, vegetables: 5,
+      brushwood: 4, firewood: 4, charcoal: 3, wood: 4,
+      stone: 3, iron: 3, hide: 2, cotton: 3, herbs: 1.5,
+    },
+    haulerCarryCap: 10,       // 운반꾼 전용 적재량 (채석 귀환에도 사용)
+    haulerBatchMin: 2,        // 평시 소량 왕복을 막는 작업장 최소 수거량
+    haulerQuarryBatchMin: 6,  // 돌 비축 부족 시 이만큼 모인 짐만 채석을 중단하고 수거
+    haulerCartCarryCap: 24,   // 수레 장비 운반꾼 적재량
+    haulerCartBatchMin: 8,
+    haulerCartQuarryBatchMin: 14,
     work: {                   // 작업지에서 1회 채집에 드는 서브틱
       chop: 3, hunt: 5, herb: 3, mine: 4, quarry: 3, fish: 4,
       herd: 5,
@@ -172,10 +205,11 @@ export const CONFIG = {
     wealthThreshold: 160,
     perWatchman: 0.08,         // 파수꾼 1인당 감소
     defenseFactor: 500,        // 방어도/이 값 만큼 매일 감소
+    maxDefenseThreatReduction: 0.35, // 높은 방어도가 습격 발생 자체를 완전히 지우지 못하게 하는 일일 상한
     lowRepExtra: 0.2,          // 명성 35 미만
     tradeRefusedExtra: 0.6,    // 교역 거절 여파 기간 동안
     raidThreshold: 60,
-    raidChanceDiv: 180,        // (위협-60)/이 값 = 일일 습격 확률
+    raidChanceDiv: 140,        // (위협-60)/이 값 = 일일 습격 확률
     afterRaidThreat: 20,
     raidCooldownDays: 10,
     earlyWarnChance: 0.65,     // 봉수대/망루 보유 시 조기 경보 확률
@@ -202,8 +236,18 @@ export const CONFIG = {
     raiderSpeedWarned: 1.2,   // 경보된 습격: 천천히 접근 (대비 시간)
     raiderSpeedSurprise: 2.0, // 기습: 빠르게 들이닥침
     spotDistance: 12,         // 이 거리 안이면 경계병이 발견 로그를 띄움
-    arriveDistance: 2,        // 중심지에서 이 거리면 위기 이벤트 발생
+    arriveDistance: 6,        // 중심지에서 이 거리면 대응 선택 모달 발생
     siegeDefenseMult: 1.15,   // 목책이 무리를 막아섰을 때 방어 보정
+    victoryInjuryChance: { garrison: 0.35, levy: 0.6 },
+    defeatDeathRate: { garrison: 0.12, levy: 0.12 }, // 패배 시 전투 참가자 1인당 전사 확률
+    buildingDamage: {
+      shelter: 1,
+      villageVictory: 1,
+      interceptDefeat: 2,
+      villageDefeat: 3,
+    },
+    repairProgressMin: 0.35,  // 파손 직후 남는 공정률 하한
+    repairProgressMax: 0.6,   // 파손 직후 남는 공정률 상한
   },
 
   trade: {
@@ -218,7 +262,7 @@ export const CONFIG = {
   // 조정 세공(歲貢) — 봄 첫날 공지, 겨울 첫날 수거.
   // 장작은 걷지 않는다. 곡물은 먹을 수도 바칠 수도 있어 밭 확장과 비축 판단을 압박한다.
   tribute: {
-    baseAmounts: { hide: 8, grain: 25, iron: 3, clothes: 6, herbs: 6 }, // 품목별 기준량
+    baseAmounts: { hide: 8, grain: 25, iron: 3, hideClothes: 6, herbs: 6 }, // 품목별 기준량
     yearScale: 0.3,        // 연차당 요구량 증가 (1 + 0.3×(연차-1))
     popScaleBase: 0.7,     // 인구 배율 = 0.7 + 인구/40
     popScaleDiv: 40,
@@ -226,8 +270,10 @@ export const CONFIG = {
     repFail: 12,           // 미납 시 명성 하락
     repFailStreakExtra: 8, // 2년 연속 미납 시 추가 하락 (합계 -20)
     threatFail: 8,         // 미납 시 위협도 상승
+    partialFailStreakAvoidRatio: 0.5,
+    partialSuspicionDecayMult: 0.5,
     rewardTools: 2,        // 격년 하사품 (도구 또는 옷, 결정적 롤)
-    rewardClothes: 3,
+    rewardCottonClothes: 3,
   },
 
   // 세력별 우호도 증감

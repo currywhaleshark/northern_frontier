@@ -5,13 +5,80 @@ import { defaultCropForBuildingType } from './crops';
 import { rollCourtTribute } from './courtTribute';
 import { spawnAnimalHabitats } from './habitats';
 import { makeRng } from './map';
+import { ensureMineralDeposits } from './minerals';
 import { ensureProcessingReserves } from './processing';
 import { initRelations } from './relations';
 import { getSeason, getYear } from './seasons';
 import { ensureExploration, refreshExploration } from './exploration';
-import type { GameState, Gender, Resident } from './types';
+import { RESOURCE_IDS } from './resourceCatalog';
+import { reconcileTributeReserve } from './tributeReserve';
+import { reconcileResidentHomes } from './residents';
+import type { CourtTribute, GameState, Gender, Resident, ResourceId } from './types';
 
 const SAVE_KEY = 'buksae-save-v3'; // v3: 이동 보간(px/py)과 지도 위 습격 무리 추가
+const RESOURCE_ID_SET = new Set<string>(RESOURCE_IDS);
+
+function normalizedAmount(value: unknown): number {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? Math.max(0, amount) : 0;
+}
+
+function migrateResourceBag(
+  raw: unknown,
+  complete: boolean,
+): Partial<Record<ResourceId, number>> {
+  const source = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  const next: Partial<Record<ResourceId, number>> = {};
+  for (const id of RESOURCE_IDS) {
+    const amount = normalizedAmount(source[id]);
+    if (complete || amount > 0) next[id] = amount;
+  }
+
+  const legacyFood = normalizedAmount(source.food);
+  if (legacyFood > 0) next.grain = (next.grain ?? 0) + legacyFood;
+  const legacyClothes = normalizedAmount(source.clothes);
+  if (legacyClothes > 0) next.hideClothes = (next.hideClothes ?? 0) + legacyClothes;
+  const game = normalizedAmount(source.game);
+  if (game > 0) {
+    next.meat = (next.meat ?? 0) + game * CONFIG.production.meatPerGame;
+    next.hide = (next.hide ?? 0) + game * CONFIG.production.hidePerGame;
+  }
+  return next;
+}
+
+function migrateTributeItems(items: CourtTribute['items']): CourtTribute['items'] {
+  const next: CourtTribute['items'] = {};
+  for (const [legacyId, rawAmount] of Object.entries(items ?? {})) {
+    const mappedId = legacyId === 'food' ? 'grain'
+      : legacyId === 'clothes' ? 'hideClothes'
+      : legacyId === 'game' ? 'meat'
+      : legacyId;
+    if (!RESOURCE_ID_SET.has(mappedId)) continue;
+    const id = mappedId as ResourceId;
+    const multiplier = legacyId === 'game' ? CONFIG.production.meatPerGame : 1;
+    next[id] = (next[id] ?? 0) + normalizedAmount(rawAmount) * multiplier;
+  }
+  return next;
+}
+
+function migrateResourceTaxonomy(state: GameState): void {
+  state.resources = migrateResourceBag(state.resources, true) as Record<ResourceId, number>;
+  const legacyState = state as GameState & { tributeReserve?: unknown };
+  state.tributeReserve = migrateResourceBag(legacyState.tributeReserve, false);
+  for (const resident of state.residents) {
+    resident.carrying = migrateResourceBag(resident.carrying, false);
+  }
+  for (const building of state.buildings ?? []) {
+    building.inventory = migrateResourceBag(building.inventory, false);
+  }
+  if (state.courtTribute) state.courtTribute.items = migrateTributeItems(state.courtTribute.items);
+
+  // 레거시 모달에는 삭제된 자원 ID와 이미 계산된 교환량이 들어 있을 수 있다.
+  // 다시 열 수 있는 선택지만 닫아 두어 다음 틱에 현재 규칙으로 재생성한다.
+  if (state.pendingChoice && ['trade', 'tribute', 'petition'].includes(state.pendingChoice.kind)) {
+    state.pendingChoice = null;
+  }
+}
 
 function isGender(value: unknown): value is Gender {
   return value === 'male' || value === 'female';
@@ -55,6 +122,33 @@ function migrateResidentAssignedBuildingIds(state: GameState): void {
   }
 }
 
+function migrateResidentHomeBuildingIds(state: GameState): void {
+  for (const resident of state.residents as Array<Resident & { homeBuildingId?: unknown }>) {
+    if (!Number.isInteger(resident.homeBuildingId)) resident.homeBuildingId = null;
+  }
+}
+
+function migrateResidentCarts(state: GameState): void {
+  for (const resident of state.residents as Array<Resident & { cartEquipped?: unknown }>) {
+    resident.cartEquipped = resident.cartEquipped === true;
+    if (resident.cartEquipped && (!resident.alive || resident.job !== 'hauler')) {
+      resident.cartEquipped = false;
+      state.resources.carts += 1;
+    }
+  }
+}
+
+function migrateResidentHaulTasks(state: GameState): void {
+  for (const resident of state.residents as Array<Resident & { haulTask?: Resident['haulTask'] }>) {
+    const task = resident.haulTask;
+    const valid = task != null &&
+      Number.isInteger(task.sourceBuildingId) &&
+      RESOURCE_ID_SET.has(task.resource) &&
+      Number.isFinite(task.amount) && task.amount > 0;
+    if (!valid) resident.haulTask = null;
+  }
+}
+
 export function saveGame(state: GameState): boolean {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(state));
@@ -70,12 +164,17 @@ export function loadGame(): GameState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as GameState;
     // 최소한의 유효성 검사 (구버전 저장은 무시)
-    if (!parsed.map || !parsed.residents || !parsed.resources) return null;
+    if (!parsed.map || !parsed.residents || !parsed.resources || !parsed.buildings) return null;
     if (parsed.subTick == null || parsed.residents.some(r => r.x == null || r.px == null)) return null;
     if (!('raiders' in parsed)) return null;
     if (!Object.prototype.hasOwnProperty.call(parsed, 'battle')) parsed.battle = null;
+    ensureMineralDeposits(parsed.map);
     if (parsed.battle && !parsed.battle.mode) parsed.battle.mode = 'garrison';
+    if (parsed.battle && !parsed.battle.location) {
+      parsed.battle.location = parsed.battle.mode === 'levy' ? 'village' : 'outskirts';
+    }
     if (!parsed.lastTradeByFaction) parsed.lastTradeByFaction = {};
+    migrateResourceTaxonomy(parsed);
     // 구버전 저장 마이그레이션: 없는 필드는 기본값으로 채운다
     if (!parsed.relations) parsed.relations = initRelations();
     if (!parsed.difficulty) parsed.difficulty = 'normal';
@@ -99,14 +198,8 @@ export function loadGame(): GameState | null {
       parsed.rank = parsed.gameOver?.won ? 'bo' : 'settlement';
     }
     if (parsed.tributePaidStreak == null) parsed.tributePaidStreak = 0;
-    // 화기 없는 구버전: 새 자원·청원 필드를 0으로 채운다
-    if (parsed.resources.gunpowder == null) parsed.resources.gunpowder = 0;
-    if (parsed.resources.meat == null) parsed.resources.meat = 0;
-    if (parsed.resources.fish == null) parsed.resources.fish = 0;
-    if (parsed.resources.spears == null) parsed.resources.spears = 0;
-    if (parsed.resources.hornBows == null) parsed.resources.hornBows = 0;
-    if (parsed.resources.muskets == null) parsed.resources.muskets = 0;
     for (const building of parsed.buildings) {
+      if (building.built) building.repairing = false;
       if (building.type === 'smithy' && !building.smithyProduct) building.smithyProduct = 'tools';
       if ((building.type === 'field' || building.type === 'paddy') &&
           !Object.prototype.hasOwnProperty.call(building, 'cropId')) {
@@ -139,10 +232,15 @@ export function loadGame(): GameState | null {
       parsed.courtTribute = tribute;
     }
     if (parsed.tributeFailStreak == null) parsed.tributeFailStreak = 0;
+    reconcileTributeReserve(parsed);
     migrateResidentGender(parsed);
+    migrateResidentCarts(parsed);
     migrateResidentManualOrders(parsed);
     migrateResidentAssignedBuildingIds(parsed);
+    migrateResidentHomeBuildingIds(parsed);
+    migrateResidentHaulTasks(parsed);
     rebuildBuildingFootprints(parsed);
+    reconcileResidentHomes(parsed, makeRng((parsed.seed ?? 1) + parsed.day * 32452843));
     ensureExploration(parsed);
     refreshExploration(parsed);
     return parsed;

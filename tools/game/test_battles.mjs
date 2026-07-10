@@ -30,6 +30,7 @@ const compiledDir = compileGameModules();
 const battles = await import(pathToFileURL(join(compiledDir, 'battles.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
+const residents = await import(pathToFileURL(join(compiledDir, 'residents.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 const { makeRng } = await import(pathToFileURL(join(compiledDir, 'map.mjs')).href);
 const { computeDefense } = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
@@ -73,6 +74,8 @@ assert.equal(
   assert.equal(state.raiders.power, 80);
   assert.equal(state.battle.phase, 'muster');
   assert.equal(state.battle.mode, 'garrison');
+  assert.equal(state.battle.location, 'outskirts');
+  assert.deepEqual([state.battle.frontX, state.battle.frontY], [10, 8]);
   assert.equal(state.battle.outcome, null); // 승패는 교전 시작 때 굴린다
   assert.deepEqual(state.battle.defenderIds, []);
 }
@@ -285,6 +288,10 @@ assert.equal(
   const civilians = able.filter(r => r.job !== 'militia' && r.job !== 'watchman').length;
   assert.equal(battles.startBattle(state, 'levy'), true);
   assert.equal(state.battle.mode, 'levy');
+  assert.equal(state.battle.location, 'village');
+  const center = state.buildings.find(building => building.type === 'center');
+  assert.ok(Math.abs(state.battle.frontX - center.x) + Math.abs(state.battle.frontY - center.y) <= 4);
+  assert.deepEqual([state.raiders.x, state.raiders.y], [state.battle.frontX, state.battle.frontY]);
   assert.equal(state.battle.defenderIds.length, able.length);
   assert.equal(state.battle.levyBonus, civilians * CONFIG.raid.levyDefensePerResident);
   assert.equal(computeDefense(state), defenseBefore);
@@ -426,6 +433,160 @@ assert.equal(
   battles.battleTick(state, () => 0);
   assert.equal(state.battle, null);
   assert.equal(defender.job, 'watchman');
+}
+
+// 대응 모달은 습격 발생 즉시가 아니라 무리가 마을 외곽 결정 거리까지 접근했을 때 열린다.
+{
+  const state = simulation.newGame(2026071101);
+  const center = state.buildings.find(building => building.type === 'center');
+  state.raiders = {
+    x: center.x + CONFIG.raid.arriveDistance + 2,
+    y: center.y,
+    px: center.x + CONFIG.raid.arriveDistance + 2,
+    py: center.y,
+    path: [
+      { x: center.x + CONFIG.raid.arriveDistance + 1, y: center.y },
+      { x: center.x + CONFIG.raid.arriveDistance, y: center.y },
+    ],
+    power: 50, size: 5, faction: 'test faction', warned: false,
+    spotted: false, siege: false, speed: 1, trail: [],
+  };
+
+  raids.raidersTick(state, () => 0);
+  assert.equal(state.pendingChoice, null, 'modal stays closed outside the decision distance');
+  raids.raidersTick(state, () => 0);
+  assert.equal(state.pendingChoice?.kind, 'raid');
+}
+
+// 외곽 요격 승리는 부상 가능성이 있지만 건물 피해가 없다.
+{
+  const state = simulation.newGame(2026071102);
+  for (const resident of state.residents) resident.job = 'idle';
+  const defender = state.residents[0];
+  defender.job = 'militia';
+  const healthBefore = defender.health;
+  state.raiders = {
+    x: 10, y: 10, px: 10, py: 10, path: [], power: 34, size: 4,
+    faction: 'test faction', warned: false, spotted: true, siege: false, speed: 1, trail: [],
+  };
+  state.battle = {
+    phase: 'clash', mode: 'garrison', location: 'outskirts', frontX: 10, frontY: 10,
+    initialPower: 100, defenderIds: [defender.id], ticks: 0,
+    musterDeadline: battles.BATTLE_MUSTER_DEADLINE, faction: 'test faction',
+    warned: false, siege: false, outcome: 'victory',
+  };
+
+  battles.battleTick(state, () => 0);
+  assert.equal(state.battle, null);
+  assert.ok(defender.health < healthBefore, 'victorious interceptors can still be injured');
+  assert.equal(state.buildings.filter(building => building.repairing).length, 0);
+}
+
+// 마을 안 방어전은 승리해도 교전 중 건물이 파손된다.
+{
+  const state = simulation.newGame(2026071103);
+  const defender = state.residents[0];
+  state.raiders = {
+    x: 10, y: 10, px: 10, py: 10, path: [], power: 34, size: 4,
+    faction: 'test faction', warned: false, spotted: true, siege: false, speed: 1, trail: [],
+  };
+  state.battle = {
+    phase: 'clash', mode: 'levy', location: 'village', frontX: 10, frontY: 10,
+    initialPower: 100, defenderIds: [defender.id], levyBonus: 4, ticks: 0,
+    musterDeadline: battles.BATTLE_MUSTER_DEADLINE, faction: 'test faction',
+    warned: false, siege: false, outcome: 'victory',
+  };
+
+  battles.battleTick(state, () => 0);
+  assert.equal(state.battle, null);
+  assert.equal(state.buildings.filter(building => building.repairing).length, 1);
+}
+
+// 패배하면 전투 참가자가 전사할 수 있고, 외곽 요격 실패도 마을 건물 피해로 이어진다.
+{
+  const state = simulation.newGame(2026071104);
+  for (const resident of state.residents) resident.job = 'idle';
+  const defenders = state.residents.slice(0, 6);
+  for (const defender of defenders) defender.job = 'militia';
+  state.raiders = {
+    x: 10, y: 10, px: 10, py: 10, path: [], power: 100, size: 6,
+    faction: 'test faction', warned: false, spotted: true, siege: false, speed: 1, trail: [],
+  };
+  state.battle = {
+    phase: 'clash', mode: 'garrison', location: 'outskirts', frontX: 10, frontY: 10,
+    initialPower: 100, defenderIds: defenders.map(defender => defender.id),
+    ticks: battles.BATTLE_CLASH_TICK_LIMIT - 1,
+    musterDeadline: battles.BATTLE_MUSTER_DEADLINE, faction: 'test faction',
+    warned: false, siege: false, outcome: 'defeat',
+  };
+
+  battles.battleTick(state, () => 0);
+  assert.equal(state.battle, null);
+  assert.equal(state.totalDeaths, defenders.length, 'forced rolls show that deaths are not capped at three');
+  assert.equal(state.buildings.filter(building => building.repairing).length, 2);
+  assert.ok(state.log.some(entry => entry.text.includes(`전사 ${defenders.length}명`)));
+  const deathLogs = state.log.filter(entry => entry.text.includes('전투 중 전사했습니다'));
+  assert.equal(deathLogs.length, defenders.length);
+  assert.ok(deathLogs.every(entry => entry.kind === 'raid'));
+  assert.equal(deathLogs.some(entry => entry.text.includes('동상과 추위')), false);
+}
+
+// 겨울 전투 도중 일일 냉해 피해가 치명타가 되어도 일반 동사가 아니라 전사로 기록한다.
+{
+  const state = simulation.newGame(2026071105);
+  for (const resident of state.residents) resident.alive = false;
+  const defender = state.residents[0];
+  defender.alive = true;
+  defender.health = 1;
+  defender.warmth = 0;
+  defender.hunger = 100;
+  defender.sick = false;
+  defender.task = '전투 중';
+  state.day = CONFIG.time.seasonDays * 3 + 1;
+  state.weather = 'coldSnap';
+  state.battle = {
+    phase: 'clash', mode: 'levy', location: 'village', frontX: defender.x, frontY: defender.y,
+    initialPower: 100, defenderIds: [defender.id], levyBonus: 4, ticks: 0,
+    musterDeadline: battles.BATTLE_MUSTER_DEADLINE, faction: 'test faction',
+    warned: false, siege: false, outcome: 'defeat',
+  };
+
+  residents.updateResidentNeeds(state, () => 0.99, 1, 0, 0, 1, 1);
+
+  assert.equal(defender.alive, false);
+  const deathLog = state.log.at(-1);
+  assert.ok(deathLog.text.includes('전투 중 전사했습니다'));
+  assert.ok(deathLog.text.includes('혹한과 탈진'));
+  assert.equal(deathLog.text.includes('동상과 추위'), false);
+  assert.equal(state.lastDeathCause, 'combat');
+
+  state.battle = null;
+  simulation.advanceDay(state);
+  assert.ok(state.gameOver.reason.includes('전투에서 전사'));
+  assert.equal(state.gameOver.reason.includes('눈 속에 묻혔'), false);
+}
+
+// 전투와 무관한 실제 냉해 전멸은 기존처럼 혹한 사망으로 구분한다.
+{
+  const state = simulation.newGame(2026071106);
+  for (const resident of state.residents) resident.alive = false;
+  const victim = state.residents[0];
+  victim.alive = true;
+  victim.health = 1;
+  victim.warmth = 0;
+  victim.hunger = 100;
+  victim.sick = false;
+  victim.task = '대기';
+  state.day = CONFIG.time.seasonDays * 3 + 1;
+  state.weather = 'coldSnap';
+
+  residents.updateResidentNeeds(state, () => 0.99, 1, 0, 0, 1, 1);
+
+  assert.equal(state.lastDeathCause, 'cold');
+  assert.ok(state.log.at(-1).text.includes('동상과 추위'));
+  simulation.advanceDay(state);
+  assert.ok(state.gameOver.reason.includes('혹한'));
+  assert.ok(state.gameOver.reason.includes('눈 속에 묻혔'));
 }
 
 // 습격 모달 본문은 세력 설명을 괄호로 붙이지 않고 UI 툴팁에 맡긴다

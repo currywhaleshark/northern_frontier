@@ -180,7 +180,9 @@ export function GameCanvas({
           ) : raiderHovered ? (
             <>
               <b><FactionName name={state.raiders!.faction} /></b>
-              <div className="muted">{state.raiders!.siege ? '목책 앞 공성 중' : '무장 무리 접근 중'}</div>
+              <div className="muted">{state.battle
+                ? state.battle.location === 'village' || state.battle.mode === 'levy' ? '마을 안 방어전' : '마을 외곽 요격전'
+                : state.raiders!.siege ? '목책 앞 공성 중' : '무장 무리 접근 중'}</div>
             </>
           ) : actionTooltip ? (
             <>

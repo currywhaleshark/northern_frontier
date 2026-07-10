@@ -7,13 +7,13 @@ import {
   applyBattleDefenseMultipliers, cannonBattleMult, consumeBattlePowder, levyDefenseBonus, startBattle,
 } from './battles';
 import { findPath } from './agents';
-import { damageBuildings, injure, loot, moraleShock } from './raidDamage';
+import { damageBuildings, injure, killResidents, loot, moraleShock } from './raidDamage';
 import { rankEffects } from './promotion';
 import { changeRelation, getRelation, hostileRelationsAvg } from './relations';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
 import { countJob } from './residents';
 import { getSeason, getYear } from './seasons';
-import type { Building, GameState, PendingChoice } from './types';
+import type { BattleMode, Building, GameState, PendingChoice } from './types';
 import { isWallBuilding } from './walls';
 
 // 위협도 일일 갱신
@@ -26,7 +26,7 @@ export function updateThreat(state: GameState): void {
   if (state.resources.reputation < 35) delta += t.lowRepExtra;
   if (state.tradeRefusedDays > 0) delta += t.tradeRefusedExtra;
   delta -= countJob(state, 'watchman') * t.perWatchman;
-  delta -= state.resources.defense / t.defenseFactor;
+  delta -= Math.min(state.resources.defense / t.defenseFactor, t.maxDefenseThreatReduction);
   // 적대 세력들과의 관계가 나쁠수록 국경이 험악해진다
   const avgRel = hostileRelationsAvg(state);
   if (avgRel < CONFIG.relations.lowRelThreatBelow) {
@@ -155,8 +155,29 @@ export function spawnRaiders(state: GameState, rng: () => number, warned: boolea
     if (path) spawn = { x: sx, y: sy };
   }
   if (!spawn || !path) {
-    // 지형상 접근 경로가 없으면 안전망으로 즉시 위기 이벤트 처리
-    openRaidChoice(state, rng, warned, power, faction.name);
+    // 완전히 막힌 지도에서도 선택 모달은 습격대를 마을 외곽에 배치한 뒤 연다.
+    const fallbackTiles = state.map.flat().filter(tile => {
+      const distance = Math.abs(tile.x - center.x) + Math.abs(tile.y - center.y);
+      return raiderPassable(state, tile.x, tile.y) &&
+        distance >= 2 && distance <= CONFIG.raid.arriveDistance;
+    });
+    const fallback = fallbackTiles[Math.floor(rng() * fallbackTiles.length)];
+    if (fallback) {
+      state.raiders = {
+        x: fallback.x, y: fallback.y, px: fallback.x, py: fallback.y, path: [],
+        power,
+        size: Math.min(6, 3 + Math.floor(power / 25)),
+        faction: faction.name,
+        warned,
+        spotted: true,
+        siege: true,
+        speed: 0,
+        trail: [],
+      };
+      openRaidChoice(state, rng, warned, power, faction.name, true);
+    } else {
+      openRaidChoice(state, rng, warned, power, faction.name);
+    }
     return;
   }
 
@@ -211,21 +232,46 @@ export function raidersTick(state: GameState, rng: () => number): void {
 
 // 무리 없는 폴백 습격의 즉시 전투 판정 (요격/징집 공용) — 승패 확률만 다르고 결과 처리는 같다
 function resolveFightFallback(
-  state: GameState, rng: () => number, faction: string, successP: number, side: string,
+  state: GameState, rng: () => number, faction: string, successP: number, side: string, mode: BattleMode,
 ): void {
+  const defenderIds = state.residents
+    .filter(resident => resident.alive && !resident.sick && resident.health >= 20 &&
+      (mode === 'levy' || resident.job === 'militia' || resident.job === 'watchman'))
+    .map(resident => resident.id);
   if (rng() < successP) {
-    const injured = injure(state, rng, 1 + Math.floor(rng() * 2), 20);
+    const injuryAttempts = mode === 'levy' ? 2 : 1;
+    let injured = 0;
+    for (let i = 0; i < injuryAttempts; i++) {
+      if (defenderIds.length > 0 && rng() < CONFIG.raid.victoryInjuryChance[mode]) {
+        injured += injure(state, rng, 1, mode === 'levy' ? 24 : 18, defenderIds);
+      }
+    }
+    const damaged = mode === 'levy'
+      ? damageBuildings(state, rng, CONFIG.raid.buildingDamage.villageVictory)
+      : [];
     state.resources.reputation = Math.min(100, state.resources.reputation + 5);
     moraleShock(state, -8); // 사기 상승
     changeRelation(state, faction, CONFIG.relations.militiaWin); // 물리치면 원한이 남는다
-    addLog(state, `${side}이(가) ${faction}을(를) 물리쳤습니다! 부상자 ${injured}명. 마을의 사기와 명성이 올랐습니다.`, 'good');
+    addLog(state, mode === 'garrison'
+      ? `${side}이(가) ${faction}을(를) 외곽에서 물리쳤습니다! 부상자 ${injured}명, 건물 피해는 없습니다.`
+      : `${side}이(가) ${faction}을(를) 마을 안에서 물리쳤습니다! 부상자 ${injured}명, 건물 ${damaged.length}채가 파손되었습니다.`, 'good', true);
   } else {
+    const killed = killResidents(
+      state,
+      rng,
+      defenderIds.length,
+      CONFIG.raid.defeatDeathRate[mode],
+      defenderIds,
+    );
     const injured = injure(state, rng, 2 + Math.floor(rng() * 3), 30);
     const lootMsg = loot(state, 0.2 + rng() * 0.1);
-    const destroyed = damageBuildings(state, rng, rng() < 0.5 ? 1 : 0);
+    const damageCount = mode === 'levy'
+      ? CONFIG.raid.buildingDamage.villageDefeat
+      : CONFIG.raid.buildingDamage.interceptDefeat;
+    const damaged = damageBuildings(state, rng, damageCount);
     moraleShock(state, 15);
     changeRelation(state, faction, CONFIG.relations.militiaLoss);
-    addLog(state, `${side}이(가) 밀려났습니다. 부상자 ${injured}명, ${lootMsg}.${destroyed.length > 0 ? ' 건물이 파손되었습니다.' : ''}`, 'raid');
+    addLog(state, `${side}이(가) 밀려났습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`, 'raid');
   }
 }
 
@@ -243,9 +289,9 @@ export function openRaidChoice(
 
   const choice: PendingChoice = {
     kind: 'raid',
-    title: `습격! — ${faction.name}`,
+    title: `습격 임박! — ${faction.name}`,
     body:
-      `${faction.name}이 마을로 몰려오고 있습니다.` +
+      `${faction.name}이 마을 외곽에 도달했습니다. 지금 대응을 정해야 합니다.` +
       (warned ? ' 경보 덕분에 미리 대비할 시간이 있었습니다.' : ' 아무런 경보도 없이 들이닥쳤습니다!') +
       (siege ? '\n방책이 무리를 가로막고 있어 방어에 유리합니다.' : '') +
       (getRelation(state, faction.name) >= 60 ? '\n낯익은 얼굴들입니다. 말이 통할지도 모릅니다.'
@@ -254,15 +300,15 @@ export function openRaidChoice(
     options: [
       {
         id: 'shelter', label: '목책 안으로 피난한다',
-        desc: '인명 피해는 거의 없지만 창고 자원의 일부를 약탈당합니다.',
+        desc: '전투를 피하지만 적이 마을에 들어와 자원을 약탈하고 건물을 파손합니다.',
       },
       {
         id: 'militia', label: '수비병으로 요격한다',
-        desc: '수비병과 파수꾼이 전선으로 출전합니다. 훈련된 소수의 싸움입니다.',
+        desc: '수비병과 파수꾼이 마을 밖에서 맞섭니다. 승리하면 건물 피해가 없지만 패배하면 적이 마을까지 밀고 들어옵니다.',
       },
       {
         id: 'levy', label: '민병을 징집한다',
-        desc: '성한 주민 모두가 무기를 듭니다. 방어도가 오르지만 부상이 널리 퍼지고, 며칠간 일손이 흔들립니다.',
+        desc: '성한 주민 모두가 마을 안에서 방어전을 벌입니다. 방어도는 오르지만 승리해도 부상과 건물 파손이 생깁니다.',
       },
       {
         id: 'tribute', label: '공물을 내어보낸다',
@@ -304,9 +350,10 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
     case 'shelter': {
       const lootMsg = loot(state, 0.22 + rng() * 0.1);
       const injured = rng() < 0.25 ? injure(state, rng, 1, 15) : 0;
+      const damaged = damageBuildings(state, rng, CONFIG.raid.buildingDamage.shelter);
       moraleShock(state, 8);
       changeRelation(state, faction, CONFIG.relations.shelter);
-      addLog(state, `주민들이 목책 안으로 피했습니다. ${lootMsg}.${injured > 0 ? ` 미처 피하지 못한 ${injured}명이 다쳤습니다.` : ''}`, 'raid');
+      addLog(state, `주민들이 피신한 사이 적이 마을을 휩쓸었습니다. ${lootMsg}. 건물 ${damaged.length}채 파손.${injured > 0 ? ` 미처 피하지 못한 ${injured}명이 다쳤습니다.` : ''}`, 'raid');
       break;
     }
     // 요격/징집: 지도에 무리가 있으면 실제 전투를 연다 (승패·후처리는 battleTick이 맡는다).
@@ -316,7 +363,7 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
       const fightDefense = applyBattleDefenseMultipliers(
         state.resources.defense * cannonBattleMult(state), battleMods, state.weather);
       consumeBattlePowder(state);
-      resolveFightFallback(state, rng, faction, fightDefense / (fightDefense + power), '수비병');
+      resolveFightFallback(state, rng, faction, fightDefense / (fightDefense + power), '수비병', 'garrison');
       break;
     }
     case 'levy': {
@@ -325,7 +372,7 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
         (state.resources.defense + levyDefenseBonus(state)) * cannonBattleMult(state),
         battleMods, state.weather);
       consumeBattlePowder(state);
-      resolveFightFallback(state, rng, faction, levyDefense / (levyDefense + power), '징집된 주민들');
+      resolveFightFallback(state, rng, faction, levyDefense / (levyDefense + power), '징집된 주민들', 'levy');
       break;
     }
     case 'tribute': {
@@ -350,13 +397,14 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
         state.resources.reputation = Math.min(100, state.resources.reputation + 5);
         state.threat = Math.max(0, state.threat - 30);
         changeRelation(state, faction, CONFIG.relations.negotiateSuccess);
-        addLog(state, `장터에서의 협상이 통했습니다. ${faction}이(가) 식량 ${give}을(를) 받고 가죽 4를 남기고 물러갑니다. 명성이 올랐습니다.`, 'good');
+        addLog(state, `장터에서의 협상이 통했습니다. ${faction}이(가) 식량 ${give}을(를) 받고 가죽 4를 남기고 물러갑니다. 명성이 올랐습니다.`, 'good', true);
       } else {
         const injured = injure(state, rng, 2, 25);
         const lootMsg = loot(state, 0.3 + rng() * 0.1);
+        const damaged = damageBuildings(state, rng, CONFIG.raid.buildingDamage.shelter + 1);
         moraleShock(state, 12);
         changeRelation(state, faction, CONFIG.relations.negotiateFail);
-        addLog(state, `협상이 결렬되었습니다. 격분한 ${faction}이(가) 마을을 휩쓸었습니다. 부상자 ${injured}명, ${lootMsg}.`, 'raid');
+        addLog(state, `협상이 결렬되었습니다. 격분한 ${faction}이(가) 마을을 휩쓸었습니다. 부상자 ${injured}명, ${lootMsg}, 건물 ${damaged.length}채 파손.`, 'raid');
       }
       break;
     }
@@ -365,7 +413,7 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
       state.threat = Math.max(0, state.threat - 35);
       const lootMsg = loot(state, 0.1);
       changeRelation(state, faction, CONFIG.relations.beacon);
-      addLog(state, `봉수대에 불길이 올랐습니다. 인근 진보의 응원 신호에 ${faction}이(가) 서둘러 물러갑니다. ${lootMsg}.`, 'good');
+      addLog(state, `봉수대에 불길이 올랐습니다. 인근 진보의 응원 신호에 ${faction}이(가) 서둘러 물러갑니다. ${lootMsg}.`, 'good', true);
       break;
     }
   }

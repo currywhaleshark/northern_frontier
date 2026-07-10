@@ -2,7 +2,7 @@
 // 하루는 SUBTICKS개의 서브틱으로 나뉜다. 서브틱마다 주민 에이전트가 이동/작업/운반하고,
 // 하루가 넘어갈 때 소비/생존/위협/이벤트 등 일일 처리를 한다.
 import { CONFIG } from './config';
-import { isJobUnlocked, RANK_NAMES, SEASON_NAMES } from './constants';
+import { isJobUnlocked, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } from './constants';
 import {
   BUILDING_DEFS, buildingFootprintTiles, canAfford, cannonPlacementsUsed, canPlaceBuildingAt, canPlaceOn,
   clearBuildingTiles, computeDefense, countBuilt, getBuilding, housingCapacity, isBuildingUnlocked,
@@ -20,16 +20,23 @@ import { agentsTick, resetAgent, SUBTICKS } from './agents';
 import { battleTick } from './battles';
 import { checkRaidTrigger, raidersTick, resolveRaid, updateThreat } from './raids';
 import { driftRelations, initRelations } from './relations';
-import { avg, createResident, livingResidents, updateMorale, updateResidentNeeds } from './residents';
+import {
+  avg, createResident, livingResidents, reconcileResidentHomes, updateMorale, updateResidentNeeds,
+} from './residents';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { firewoodWeatherMult, rollWeather } from './weather';
 import { defaultProcessingReserves } from './processing';
 import {
   canPlantCropNow, cropIdForBuilding, CROP_DEFS, defaultCropForBuildingType, isCropAllowedOnBuilding,
 } from './crops';
-import { consumeEdibleFood, edibleFoodTotal } from './resources';
+import {
+  clothingCoverageTotal, consumeClothingWear, consumeFoodByDiet, consumeFuelHeat, foodTotal,
+} from './consumption';
 import { getPointerAction } from './selectionActions';
 import { createExploration, isBuildingFootprintExplored, refreshExploration } from './exploration';
+import { LUXURY_RESOURCES } from './resourceCatalog';
+import { returnResidentCart, setResidentCartEquipped } from './equipment';
+import { isHaulSourceBuilding } from './inventory';
 import {
   assignNearestWorkerToBuilding as assignNearestWorkerToSlot,
   assignResidentToBuilding as assignResidentToSlot,
@@ -83,6 +90,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     lastTradeByFaction: {},
     pendingChoice: null,
     courtTribute: null,
+    tributeReserve: {},
     tributeFailStreak: 0,
     tributePaidStreak: 0,
     rank: 'settlement',
@@ -103,6 +111,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     lastWinterDeathRate: 0,
     badWinterStreak: 0,
     gameOver: null,
+    lastDeathCause: 'other',
     victoryProgressNote: '',
   };
 
@@ -117,6 +126,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
       state.residents.push(createResident(state, rng, job as JobId));
     }
   }
+  reconcileResidentHomes(state, rng);
 
   state.weather = rollWeather(1, rng);
   state.resources.defense = computeDefense(state);
@@ -229,6 +239,9 @@ export function demolishBuilding(state: GameState, x: number, y: number): string
     const refund = Math.max(1, Math.floor((amount ?? 0) / 2));
     state.resources[res as ResourceId] += refund;
   }
+  for (const [res, amount] of Object.entries(building.inventory ?? {})) {
+    state.resources[res as ResourceId] += amount ?? 0;
+  }
 
   clearBuildingTiles(state, building.id);
   clearAssignmentsForBuilding(state, building.id);
@@ -243,6 +256,7 @@ export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
   if (!isJobUnlocked(state.rank, to)) return false;
   const r = state.residents.find(res => res.alive && res.job === from);
   if (!r) return false;
+  if (to !== 'hauler') returnResidentCart(state, r);
   r.job = to;
   clearIncompatibleAssignment(state, r);
   resetAgent(state, r);
@@ -253,10 +267,28 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
   if (!isJobUnlocked(state.rank, job)) return;
   const r = state.residents.find(res => res.id === id);
   if (r && r.alive) {
+    if (job !== 'hauler') returnResidentCart(state, r);
     r.job = job;
     clearIncompatibleAssignment(state, r);
     resetAgent(state, r);
   }
+}
+
+export function toggleResidentCart(state: GameState, id: number): string | null {
+  const resident = state.residents.find(candidate => candidate.id === id);
+  if (!resident) return '주민을 찾을 수 없습니다.';
+  const equipping = !resident.cartEquipped;
+  const error = setResidentCartEquipped(state, resident, equipping);
+  if (error) return error;
+  resetAgent(state, resident);
+  addLog(
+    state,
+    equipping
+      ? `${resident.name}에게 수레를 장비했습니다. 적재량이 ${CONFIG.agents.haulerCartCarryCap}(으)로 늘어납니다.`
+      : `${resident.name}의 수레를 마을 비축으로 돌려보냈습니다.`,
+    'good',
+  );
+  return null;
 }
 
 function interruptResidentForManualOrder(resident: Resident): void {
@@ -264,6 +296,7 @@ function interruptResidentForManualOrder(resident: Resident): void {
   resident.phase = 'rest';
   resident.workTimer = 0;
   resident.targetId = null;
+  resident.haulTask = null;
 }
 
 export function assignResidentToBuilding(state: GameState, residentId: number, buildingId: number): string | null {
@@ -327,7 +360,8 @@ export function issueResidentWorkOrder(
   if (action.kind !== 'work') return action.label || '작업할 수 없습니다.';
 
   const targetBuilding = action.buildingId == null ? undefined : getBuilding(state, action.buildingId);
-  if (targetBuilding && workerSlotConfig(targetBuilding.type)) {
+  const forcedHaulTarget = resident.job === 'hauler' && !!targetBuilding && isHaulSourceBuilding(targetBuilding);
+  if (targetBuilding && workerSlotConfig(targetBuilding.type) && !forcedHaulTarget) {
     return assignResidentToBuilding(state, residentId, targetBuilding.id);
   }
 
@@ -336,7 +370,7 @@ export function issueResidentWorkOrder(
     x: action.x,
     y: action.y,
     buildingId: action.buildingId,
-    repeat: resident.job === 'hauler' && tile.terrain === 'rock',
+    repeat: resident.job === 'hauler' && (tile.terrain === 'rock' || forcedHaulTarget),
   };
   interruptResidentForManualOrder(resident);
   resident.task = action.label;
@@ -375,6 +409,7 @@ export function upgradeHousingBuilding(
   building.progress = 0;
   building.built = false;
   occupyBuildingTiles(state, building);
+  reconcileResidentHomes(state, makeRng(state.seed + state.day * 32452843 + building.id));
   addLog(state, `${def.name} 개량 공사를 시작했습니다.`, 'info');
   return null;
 }
@@ -462,6 +497,17 @@ export function resolveChoice(state: GameState, optionId: string): void {
   state.resources.defense = computeDefense(state);
 }
 
+export function useLuxuryGood(state: GameState, resource: ResourceId): string | null {
+  if (!(LUXURY_RESOURCES as readonly ResourceId[]).includes(resource)) return '사치품이 아닙니다.';
+  if ((state.resources[resource] ?? 0) < 1) return '사치품이 부족합니다.';
+  state.resources[resource] -= 1;
+  for (const resident of livingResidents(state)) {
+    resident.morale = Math.min(100, resident.morale + CONFIG.petition.luxuryMorale);
+  }
+  addLog(state, `${RESOURCE_NAMES[resource]}을(를) 나누어 주민들의 사기를 북돋았습니다.`, 'good');
+  return null;
+}
+
 export function continueAfterVictory(state: GameState): boolean {
   if (!state.gameOver?.won) return false;
   state.gameOver = null;
@@ -508,8 +554,8 @@ function endOfDay(state: GameState): void {
   const prevWeather = state.weather;
   state.weather = rollWeather(state.day, rng);
   if (state.weather !== prevWeather) {
-    if (state.weather === 'blizzard') addLog(state, '눈보라가 몰아칩니다. 장작 소모가 크게 증가하고 바깥일이 멈춥니다.', 'weather');
-    else if (state.weather === 'coldSnap') addLog(state, '살을 에는 혹한이 닥쳤습니다. 밖에 오래 있으면 위험합니다.', 'weather');
+    if (state.weather === 'blizzard') addLog(state, '눈보라가 몰아칩니다. 장작 소모가 크게 증가하고 바깥일이 멈춥니다.', 'weather', true);
+    else if (state.weather === 'coldSnap') addLog(state, '살을 에는 혹한이 닥쳤습니다. 밖에 오래 있으면 위험합니다.', 'weather', true);
     else if (state.weather === 'heavySnow') addLog(state, '폭설이 내려 발이 푹푹 빠집니다. 이동이 더뎌집니다.', 'weather');
     else if (state.weather === 'thawFlood') addLog(state, '해빙기 홍수로 강물이 불었습니다. 얼음 위로는 다닐 수 없습니다.', 'weather');
   }
@@ -540,7 +586,7 @@ function onSeasonChange(state: GameState, prev: string, next: string): void {
   if (next === 'winter') {
     state.winterStartPop = livingResidents(state).length;
     state.winterDeaths = 0;
-    addLog(state, '강이 얼어붙기 시작합니다. 장작과 식량이 겨울을 버틸 만큼 있는지 확인하십시오.', 'weather');
+    addLog(state, '강이 얼어붙기 시작합니다. 장작과 식량이 겨울을 버틸 만큼 있는지 확인하십시오.', 'weather', true);
     // 거두지 못한 곡식은 서리에 얼어붙는다
     let lost = false;
     for (const b of state.buildings) {
@@ -550,7 +596,7 @@ function onSeasonChange(state: GameState, prev: string, next: string): void {
       if (b.fieldGrowth > 1) lost = true;
       b.fieldGrowth = 0;
     }
-    if (lost) addLog(state, '거두지 못한 곡식이 서리에 얼어붙었습니다.', 'bad');
+    if (lost) addLog(state, '거두지 못한 곡식이 서리에 얼어붙었습니다.', 'bad', true);
   }
   if (prev === 'winter') {
     state.lastWinterDeathRate = state.winterStartPop > 0 ? state.winterDeaths / state.winterStartPop : 0;
@@ -623,8 +669,8 @@ function updateHabitats(state: GameState): void {
 // 도구 마모: 생산직 인원 수에 비례
 function runToolWear(state: GameState): void {
   const producing = [
-    'woodcutter', 'hunter', 'farmer', 'miller', 'builder', 'smith', 'miner', 'fisher',
-    'charcoalBurner', 'herder', 'powderMaker', 'tanner', 'herbalist', 'hauler',
+    'woodcutter', 'woodSplitter', 'hunter', 'farmer', 'miller', 'builder', 'smith', 'miner', 'fisher',
+    'charcoalBurner', 'herder', 'powderMaker', 'tanner', 'weaver', 'herbalist', 'hauler',
   ];
   const n = state.residents.filter(r => r.alive && !r.sick && producing.includes(r.job)).length;
   state.resources.tools = Math.max(0, state.resources.tools - n * CONFIG.production.toolWearPerWorker);
@@ -639,27 +685,32 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
 
   // 식량
   const foodNeed = pop * cfg.foodPerDay;
-  const availableFood = edibleFoodTotal(state);
-  const fedRatio = foodNeed > 0 ? Math.min(1, availableFood / foodNeed) : 1;
-  consumeEdibleFood(state, foodNeed);
+  const foodResult = consumeFoodByDiet(state, foodNeed);
+  const fedRatio = foodResult.shortageRatio;
 
   // 장작
   const fwNeed = pop * cfg.firewoodPerPerson *
     CONFIG.seasons.firewoodMult[season] * firewoodWeatherMult(state.weather);
-  const firewoodRatio = fwNeed > 0 ? Math.min(1, state.resources.firewood / fwNeed) : 1;
-  state.resources.firewood = Math.max(0, state.resources.firewood - fwNeed);
+  const heatProvided = consumeFuelHeat(state, fwNeed);
+  const firewoodRatio = fwNeed > 0 ? Math.min(1, heatProvided / fwNeed) : 1;
 
   // 옷
-  const clothesCoverage = Math.min(1, state.resources.clothes / pop);
+  const clothesCoverage = Math.min(1, clothingCoverageTotal(state) / pop);
   if (season === 'winter') {
-    state.resources.clothes = Math.max(0, state.resources.clothes - pop * cfg.clothesWearWinter);
+    consumeClothingWear(state, pop * cfg.clothesWearWinter);
   }
 
   const rng2 = makeRng(state.seed + state.day * 104729);
-  updateResidentNeeds(state, rng2, fedRatio, firewoodRatio, clothesCoverage);
+  updateResidentNeeds(
+    state, rng2, fedRatio, firewoodRatio, clothesCoverage,
+    foodResult.varietyScore, foodResult.vegetableRatio,
+  );
 
-  const foodOk = edibleFoodTotal(state) > pop * cfg.foodPerDay * 6;
-  updateMorale(state, foodOk, avg(state, 'warmth'), countBuilt(state, 'market') > 0);
+  const foodOk = foodTotal(state) > pop * cfg.foodPerDay * 6;
+  updateMorale(
+    state, foodOk, avg(state, 'warmth'), countBuilt(state, 'market') > 0,
+    foodResult.varietyScore,
+  );
 
   if (fedRatio < 1) addLog(state, '식량이 모자라 주민들이 배를 곯았습니다.', 'bad');
   if (firewoodRatio < 1 && (season === 'winter' || season === 'autumn')) {
@@ -678,7 +729,7 @@ function runImmigration(state: GameState, rng: () => number): void {
   const pop = living.length;
   const housing = housingCapacity(state);
   if (housing.total - pop <= 0) return;
-  if (edibleFoodTotal(state) < pop * im.minFoodPerPerson) return;
+  if (foodTotal(state) < pop * im.minFoodPerPerson) return;
   if (avg(state, 'morale') < im.minMorale) return;
   if (rng() >= im.dailyChance * rankEffects(state.rank).immigration) return; // 승격할수록 사람이 모인다
 
@@ -690,7 +741,8 @@ function runImmigration(state: GameState, rng: () => number): void {
   for (let i = 0; i < count; i++) {
     state.residents.push(createResident(state, rngN, 'idle'));
   }
-  addLog(state, `살 곳을 찾아 남쪽에서 이주민 ${count}명이 도착했습니다. 직업을 배정해 주십시오.`, 'good');
+  reconcileResidentHomes(state, rngN);
+    addLog(state, `살 곳을 찾아 남쪽에서 이주민 ${count}명이 도착했습니다. 직업을 배정해 주십시오.`, 'good', true);
 }
 
 // ─────────────────────────── 승패 판정 ───────────────────────────
@@ -700,7 +752,16 @@ function checkEndConditions(state: GameState): void {
   const living = livingResidents(state);
 
   if (living.length === 0) {
-    state.gameOver = { won: false, reason: '모든 주민이 죽었습니다. 개척지는 눈 속에 묻혔습니다.' };
+    const reason = state.lastDeathCause === 'combat'
+      ? '주민 전원이 전투에서 전사했습니다. 개척지는 습격대에게 무너졌습니다.'
+      : state.lastDeathCause === 'starvation'
+        ? '굶주림으로 주민 전원이 쓰러졌습니다. 개척지는 끝내 버려졌습니다.'
+        : state.lastDeathCause === 'cold'
+          ? '혹한으로 주민 전원이 숨졌습니다. 개척지는 눈 속에 묻혔습니다.'
+          : state.lastDeathCause === 'disease'
+            ? '질병으로 주민 전원이 숨졌습니다. 개척지는 끝내 버려졌습니다.'
+            : '주민 전원이 숨져 개척지가 버려졌습니다.';
+    state.gameOver = { won: false, reason };
     return;
   }
   if (!state.buildings.some(b => b.type === 'center' && b.built)) {

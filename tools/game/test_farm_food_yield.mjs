@@ -99,8 +99,8 @@ function runTicks(state, ticks) {
   assert.equal(CONFIG.production.fieldGrainYield, 36, 'full-growth field yield reflects stronger agriculture');
   assert.ok(CROP_DEFS.millet.yield < CONFIG.production.fieldGrainYield, 'early millet yields less than dense paddy grain');
   assert.equal(CROP_DEFS.millet.output, 'grain', 'millet harvests as tribute-ready grain');
-  assert.equal(CROP_DEFS.rice.output, 'grain', 'rice harvests as grain for efficient milling');
-  assert.equal(CONFIG.production.foodPerGrain, 1.5, 'grain milling preserves agriculture as dense food');
+  assert.equal(CROP_DEFS.rice.output, 'rice', 'paddy harvests unmilled rice');
+  assert.equal(CONFIG.production.grainPerRice, 1.5, 'rice milling preserves agriculture as dense food');
 }
 
 {
@@ -117,30 +117,28 @@ function runTicks(state, ticks) {
 
   assert.equal(field.fieldGrowth, 92, 'farmer harvests one subtick worth of field growth');
   const harvested = (8 / 100) * CROP_DEFS.millet.yield;
-  assert.ok(Math.abs((farmer.carrying.grain ?? 0) - harvested) < 0.001, 'millet harvest becomes stored grain');
-  assert.equal(farmer.carrying.food ?? 0, 0, 'millet no longer bypasses the grain stockpile');
+  assert.ok(Math.abs((field.inventory?.grain ?? 0) - harvested) < 0.001, 'millet harvest stays in field inventory');
 }
 
 {
   const state = simulation.newGame(8202);
   state.rank = 'bo';
   const tile = openInteriorTile(state);
-  const watermill = placeBuilt(state, 'watermill', tile);
+  const watermill = placeBuilt(state, 'watermill', tile, { inventory: { rice: 10 } });
   const miller = onlyWorkerAt(state, 'miller', state.map[tile.y][Math.max(0, tile.x - 1)]);
   assert.equal(workerSlots.assignResidentToBuilding(state, miller.id, watermill.id), null);
-  state.resources.game = 0;
   state.resources.wood = 0;
-  state.resources.grain = 10;
-  state.resources.food = 0;
+  state.resources.rice = 0;
+  state.resources.grain = 0;
   state.resources.stone = CONFIG.production.stoneReserveTarget;
-  state.processingReserves.grain = 0;
+  state.processingReserves.rice = 0;
 
   runTicks(state, 1);
 
-  const milled = CONFIG.production.millerGrainPerDay / 5;
+  const milled = CONFIG.production.millerRicePerDay / 5;
   assert.equal(miller.task, '방아 찧기');
-  assert.ok(Math.abs(state.resources.grain - (10 - milled)) < 0.001, 'miller mills the expected grain amount');
-  assert.ok(Math.abs(state.resources.food - (milled * 1.5)) < 0.001, 'milled grain creates 1.5 food per grain');
+  assert.ok(Math.abs(watermill.inventory.rice - (10 - milled)) < 0.001, 'miller mills the expected local rice amount');
+  assert.ok(Math.abs((watermill.inventory?.grain ?? 0) - (milled * 1.5)) < 0.001, 'milled rice creates grain at the mill');
 }
 
 console.log('farm food yield tests passed');

@@ -376,6 +376,7 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   storehouse: { roof: ROOF_BROWN, base: FACE_SHOP },
   bridge:     { base: FENCE },
   lumberCamp: { base: LOGS },
+  woodShed:   { base: LOGS, glyph: CAMPFIRE },
   huntLodge:  { base: TENT_TAN },
   herbHut:    { roof: ROOF_BROWN, base: FACE_DOOR, glyph: HERB },
   field:      { base: DIRT }, // 성장 단계는 drawBuilding에서 덧그림
@@ -389,6 +390,7 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   paddy:      { base: WATER, glyph: CROP },
   watermill:  { roof: ROOF_BROWN, base: FACE_DOOR, glyph: WATER },
   tannery:    { roof: ROOF_BROWN, base: FACE_DOOR, glyph: HIDE },
+  weavingHouse: { roof: ROOF_BROWN, base: FACE_SHOP, glyph: HIDE },
   beacon:     { base: ROCK_GRAY2, glyph: CAMPFIRE },
   palisade:   { base: FENCE },
   earthFort:  { base: FACE_STONE, glyph: FENCE },
@@ -405,6 +407,7 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
 const CHAR_BY_JOB: Record<JobId, CR> = {
   idle:       [1, 8],
   woodcutter: [1, 6],
+  woodSplitter: [1, 6],
   hunter:     [0, 10],
   farmer:     [0, 7],
   miller:      [1, 7],
@@ -417,6 +420,7 @@ const CHAR_BY_JOB: Record<JobId, CR> = {
   charcoalBurner: [1, 9],
   herder:     [1, 7],
   tanner:     [1, 7],
+  weaver:     [1, 7],
   powderMaker: [1, 9],
   clerk:      [1, 7],
   watchman:   [0, 11],

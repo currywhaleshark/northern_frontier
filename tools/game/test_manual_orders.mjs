@@ -112,6 +112,8 @@ function onlyResident(state, job, x, y) {
   state.resources.stone = 0;
   const rockTile = state.map[4][12];
   rockTile.terrain = 'rock';
+  rockTile.hasIron = false;
+  rockTile.mineralRemaining = 2;
   const hauler = onlyResident(state, 'hauler', 7, 4);
 
   const action = selectionActions.getPointerAction(state, { kind: 'resident', id: hauler.id }, rockTile);
@@ -128,7 +130,77 @@ function onlyResident(state, job, x, y) {
 
   assert.equal(sawCarry, true, 'hauler should quarry stone before depositing');
   assert.ok(state.resources.stone > 0, 'hauler should deposit manually quarried stone');
-  assert.equal(hauler.manualOrder?.kind, 'work', 'manual quarry order persists after deposit');
+  assert.equal(rockTile.terrain, 'plain', 'depleted stone outcrops disappear');
+  assert.equal(rockTile.mineralRemaining, 0);
+  assert.ok(state.log.some(entry => entry.text.includes('석재 노두') && entry.text.includes('고갈')));
+}
+
+{
+  const state = simulation.newGame(20260708041);
+  clearMapToPlain(state);
+  addBuilt(state, 'center', 4, 4);
+  state.resources.iron = 0;
+  const ironTile = state.map[4][12];
+  ironTile.terrain = 'rock';
+  ironTile.hasIron = true;
+  ironTile.mineralRemaining = 1.5;
+  const hauler = onlyResident(state, 'hauler', 7, 4);
+
+  const action = selectionActions.getPointerAction(state, { kind: 'resident', id: hauler.id }, ironTile);
+  assert.equal(action.kind, 'work');
+  assert.ok(action.label.includes('철광'));
+  assert.equal(simulation.issueResidentWorkOrder(state, hauler.id, action), null);
+
+  for (let i = 0; i < 180 && state.resources.iron <= 0; i++) {
+    agents.agentsTick(state);
+    state.subTick++;
+  }
+
+  assert.ok(state.resources.iron > 0, 'manual iron orders deliver iron instead of stone');
+  assert.equal(ironTile.terrain, 'plain');
+  assert.equal(ironTile.mineralRemaining, 0);
+}
+
+{
+  const state = simulation.newGame(2026070805);
+  clearMapToPlain(state);
+  addBuilt(state, 'center', 4, 4);
+  const camp = addBuilt(state, 'lumberCamp', 12, 4);
+  const lodge = addBuilt(state, 'huntLodge', 12, 8);
+  camp.inventory = { wood: 8 };
+  lodge.inventory = { meat: 5 };
+  state.resources.wood = 0;
+  state.resources.meat = 0;
+  const hauler = onlyResident(state, 'hauler', 7, 4);
+
+  const targetTile = state.map[camp.y][camp.x];
+  const action = selectionActions.getPointerAction(
+    state,
+    { kind: 'resident', id: hauler.id },
+    targetTile,
+  );
+  assert.equal(action.kind, 'work');
+  assert.ok(action.label.includes('강제 운송'));
+  assert.equal(simulation.issueResidentWorkOrder(state, hauler.id, action), null);
+  assert.equal(hauler.manualOrder?.buildingId, camp.id);
+  assert.equal(hauler.manualOrder?.repeat, true);
+
+  for (let i = 0; i < 80 && state.resources.wood < 8; i++) {
+    agents.agentsTick(state);
+    state.subTick++;
+  }
+
+  assert.equal(state.resources.wood, 8, 'the selected production building is hauled');
+  assert.equal(state.resources.meat, 0, 'other production buildings are ignored');
+  assert.equal(lodge.inventory.meat, 5);
+  assert.equal(hauler.manualOrder?.buildingId, camp.id, 'forced hauling remains active after delivery');
+
+  camp.inventory.wood = 4;
+  for (let i = 0; i < 80 && state.resources.wood < 12; i++) {
+    agents.agentsTick(state);
+    state.subTick++;
+  }
+  assert.equal(state.resources.wood, 12, 'new stock at the forced source is hauled again');
 }
 
 console.log('manual order tests passed');

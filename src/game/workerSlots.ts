@@ -11,11 +11,14 @@ export const SLOTTED_BUILDING_CONFIG: Partial<Record<BuildingTypeId, WorkerSlotC
   field: { job: 'farmer', slots: 1 },
   paddy: { job: 'farmer', slots: 1 },
   watermill: { job: 'miller', slots: 2 },
+  woodShed: { job: 'woodSplitter', slots: 2 },
+  charcoalKiln: { job: 'charcoalBurner', slots: 3 },
   smithy: { job: 'smith', slots: 2 },
   stable: { job: 'herder', slots: 2 },
   nitreYard: { job: 'powderMaker', slots: 2 },
   ferry: { job: 'fisher', slots: 2 },
   tannery: { job: 'tanner', slots: 2 },
+  weavingHouse: { job: 'weaver', slots: 2 },
 };
 
 function isWorkableResident(resident: Resident | undefined): resident is Resident {
@@ -65,6 +68,34 @@ export function availableWorkerSlots(state: GameState, building: Building): numb
   const config = slottedConfigForBuilding(state, building);
   if (!config) return 0;
   return Math.max(0, config.slots - assignedWorkers(state, building).length);
+}
+
+export function autoAssignWorkersToBuilding(state: GameState, buildingId: number): Resident[] {
+  const building = state.buildings.find(candidate => candidate.id === buildingId);
+  const config = slottedConfigForBuilding(state, building);
+  if (!building || !config) return [];
+
+  // 병자처럼 잠시 일을 못 하는 기존 배정자도 자리는 유지한다.
+  const reservedSlots = state.residents.filter(resident =>
+    resident.alive &&
+    resident.job === config.job &&
+    resident.assignedBuildingId === building.id).length;
+  const vacancies = Math.max(0, config.slots - reservedSlots);
+  if (vacancies === 0) return [];
+
+  const candidates = state.residents
+    .filter(resident =>
+      resident.assignedBuildingId == null &&
+      resident.job === config.job &&
+      isWorkableResident(resident))
+    .sort((a, b) => distance(a, building) - distance(b, building) || a.id - b.id)
+    .slice(0, vacancies);
+
+  const assigned: Resident[] = [];
+  for (const resident of candidates) {
+    if (assignResidentToBuilding(state, resident.id, building.id) == null) assigned.push(resident);
+  }
+  return assigned;
 }
 
 export function assignedBuildingForResident(state: GameState, resident: Resident): Building | null {

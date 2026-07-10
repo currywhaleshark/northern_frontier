@@ -40,6 +40,7 @@ export interface AnimalHabitat {
 export type JobId =
   | 'idle'       // 무직
   | 'woodcutter' // 벌목꾼
+  | 'woodSplitter' // 장작꾼
   | 'hunter'     // 사냥꾼
   | 'farmer'     // 농부
   | 'miller'     // 방아꾼
@@ -52,37 +53,48 @@ export type JobId =
   | 'charcoalBurner' // 숯쟁이
   | 'herder'     // 목동
   | 'tanner'     // 무두장이
+  | 'weaver'     // 베 짜는 이
   | 'powderMaker' // 염초장이
   | 'clerk'      // 아전
   | 'watchman'   // 파수꾼
   | 'militia';   // 수비병 (내부 id는 저장 호환을 위해 유지)
 
 export type ResourceId =
-  | 'food'       // 먹을 수 있는 곡식
+  | 'grain'      // 먹을 수 있는 곡물(밭 수확물 + 도정한 벼)
+  | 'rice'       // 논에서 수확한 도정 전 벼
   | 'meat'       // 고기
   | 'fish'       // 생선
+  | 'vegetables' // 채소
+  | 'brushwood'  // 땔나무
   | 'firewood'   // 장작
+  | 'charcoal'   // 숯
   | 'wood'       // 목재
   | 'stone'      // 돌
   | 'iron'       // 철
   | 'tools'      // 도구
+  | 'carts'      // 운반꾼이 장비하는 수레
   | 'hide'       // 가죽
-  | 'clothes'    // 옷
+  | 'hideClothes' // 가죽옷
+  | 'cotton'     // 목화
+  | 'cottonClothes' // 무명옷
   | 'herbs'      // 약초
-  | 'grain'      // 곡물
-  | 'game'       // 사냥감
   | 'gunpowder'  // 화약 (조정 지급 — 조총·포대가 전투마다 소모)
   | 'spears'     // 창
   | 'hornBows'   // 각궁
   | 'muskets'    // 조총 (조정 하사 — 수비병을 무장시킨다)
+  | 'porcelain'  // 자기
+  | 'brassware'  // 유기
+  | 'lacquerware' // 칠기
+  | 'silk'       // 비단
+  | 'preciousMetal' // 귀금속
   | 'reputation' // 명성
   | 'defense';   // 방어도
 
-export type SmithyProductId = 'tools' | 'spears' | 'hornBows' | 'muskets';
+export type SmithyProductId = 'tools' | 'carts' | 'spears' | 'hornBows' | 'muskets';
 
-export type CropId = 'millet' | 'sorghum' | 'buckwheat' | 'barley' | 'rice';
+export type CropId = 'millet' | 'sorghum' | 'buckwheat' | 'barley' | 'rice' | 'vegetables' | 'cotton';
 
-export type ProcessingInputId = 'wood' | 'grain' | 'game' | 'hide' | 'iron';
+export type ProcessingInputId = 'wood' | 'rice' | 'hide' | 'iron';
 
 export type BuildingTypeId =
   | 'center'     // 마을 중심지
@@ -92,6 +104,7 @@ export type BuildingTypeId =
   | 'storehouse' // 창고
   | 'bridge'     // 다리
   | 'lumberCamp' // 벌목장
+  | 'woodShed'   // 장작마당
   | 'huntLodge'  // 사냥막
   | 'herbHut'    // 약초막
   | 'mine'       // 채광장
@@ -105,6 +118,7 @@ export type BuildingTypeId =
   | 'watermill'  // 방앗간
   | 'smithy'     // 대장간
   | 'tannery'    // 가죽공방
+  | 'weavingHouse' // 베틀집
   | 'beacon'     // 봉수대
   | 'palisade'   // 목책
   | 'earthFort'  // 토성
@@ -121,6 +135,7 @@ export interface Tile {
   y: number;
   terrain: Terrain;
   hasIron: boolean;       // rock 타일 중 철광 여부
+  mineralRemaining?: number; // 바위/철광의 남은 주 광물량. 구버전 저장은 없음
   buildingId: number | null;
 }
 
@@ -148,6 +163,12 @@ export type ManualOrder =
 
 export type AgentPhase = 'rest' | 'toWork' | 'working' | 'toDeposit';
 
+export interface HaulTask {
+  sourceBuildingId: number;
+  resource: ResourceId;
+  amount: number;
+}
+
 export interface Resident {
   id: number;
   name: string;
@@ -160,6 +181,7 @@ export interface Resident {
   morale: number;   // 0 ~ 100
   skills: Partial<Record<JobId, number>>; // 0 ~ 1 숙련도
   assignedBuildingId: number | null;
+  homeBuildingId: number | null; // 실제 입주 중인 주거 건물. null이면 노숙
   task: string;     // 현재 작업 설명
   alive: boolean;
   sick: boolean;
@@ -173,6 +195,8 @@ export interface Resident {
   workTimer: number;                // 현재 작업지에서 남은 작업량(서브틱)
   targetId: number | null;          // 목표 건물 id (밭/건설현장/순찰지 등)
   carrying: Partial<Record<ResourceId, number>>; // 지고 있는 짐
+  cartEquipped: boolean; // 운반용 수레 장비 여부
+  haulTask: HaulTask | null; // 생산지 재고 운반 예약
   manualOrder: ManualOrder | null;  // 플레이어가 우클릭으로 지정한 이동/작업 명령
 }
 
@@ -187,6 +211,8 @@ export interface Building {
   cropId?: CropId | null; // 밭/논 전용: 현재 선택/재배 작물
   queuedCropId?: CropId | null; // 밭/논 전용: 수확 뒤 또는 다음 파종철에 적용할 작물
   smithyProduct?: SmithyProductId; // 대장간 전용: 현재 생산품
+  inventory?: Partial<Record<ResourceId, number>>; // 운반 전 생산지 현장 재고
+  repairing?: boolean; // 습격으로 파손되어 건설담당의 수리가 필요한 상태
 }
 
 export interface BuildingDef {
@@ -213,10 +239,28 @@ export interface TradeOffer {
   getAmt: number;
 }
 
+export interface TradeRequest {
+  give: ResourceId;
+  giveAmt: number;
+  get: ResourceId;
+}
+
+export interface TradeQuote {
+  ok: boolean;
+  reason?: string;
+  faction: string;
+  give: ResourceId;
+  giveAmt: number;
+  get: ResourceId;
+  getAmt: number;
+  margin: number;
+}
+
 export interface LogEntry {
   day: number;
   text: string;
   kind: 'info' | 'good' | 'bad' | 'raid' | 'weather' | 'trade';
+  important?: boolean; // 지도 좌상단 주요 소식에 별도 노출
 }
 
 export interface ChoiceOption {
@@ -266,10 +310,12 @@ export type BattlePhase = 'muster' | 'clash';
 export type BattleOutcome = 'victory' | 'defeat';
 // garrison: 수비병+파수꾼 요격 / levy: 성한 주민 전체 징집
 export type BattleMode = 'garrison' | 'levy';
+export type BattleLocation = 'outskirts' | 'village';
 
 export interface Battle {
   phase: BattlePhase;
   mode: BattleMode;
+  location?: BattleLocation; // 구버전 저장은 mode에서 복원
   frontX: number;
   frontY: number;
   initialPower: number;
@@ -299,6 +345,8 @@ export interface GameOverState {
   reason: string;
 }
 
+export type DeathCauseId = 'combat' | 'starvation' | 'cold' | 'disease' | 'other';
+
 export interface GameState {
   day: number;          // 경과 일수 (1부터)
   subTick: number;      // 하루 안의 서브틱 (0 ~ SUBTICKS-1)
@@ -324,6 +372,7 @@ export interface GameState {
   lastTradeByFaction: Record<string, number>; // 세력별 마지막 플레이어 주도 교역일 (쿨다운용)
   pendingChoice: PendingChoice | null;
   courtTribute: CourtTribute | null;  // 올해 세공 (봄 공지 때 설정)
+  tributeReserve: Partial<Record<ResourceId, number>>; // 올해 세공용으로 잠근 중심지 재고
   tributeFailStreak: number;          // 연속 미납 횟수 (2년 연속이면 명성 하락 가중)
   tributePaidStreak: number;          // 연속 납부 년수 (승격 조건의 "공물 성실도")
   rank: Rank;                         // 현재 승격 단계
@@ -345,5 +394,6 @@ export interface GameState {
   lastWinterDeathRate: number; // 직전 겨울 사망률
   badWinterStreak: number;     // 겨울 직후 인구 5명 미만 연속 횟수
   gameOver: GameOverState | null;
+  lastDeathCause?: DeathCauseId; // 구버전 저장에는 없을 수 있음
   victoryProgressNote: string;
 }

@@ -8,6 +8,9 @@ import { makeRng } from './map';
 import { rankEffects } from './promotion';
 import { lowerSuspicion } from './suspicion';
 import { getSeason, getYear } from './seasons';
+import {
+  consumeTributeReserve, releaseTributeReserve, tributeReserveRatio,
+} from './tributeReserve';
 import type { CourtTribute, GameState, Rank, ResourceId } from './types';
 
 const TRIBUTE_POOL = Object.keys(CONFIG.tribute.baseAmounts) as ResourceId[];
@@ -41,13 +44,12 @@ export function tributeItemsLabel(items: CourtTribute['items']): string {
 }
 
 export function canPayTribute(state: GameState, tribute: CourtTribute): boolean {
-  return Object.entries(tribute.items).every(
-    ([res, amt]) => state.resources[res as ResourceId] >= (amt ?? 0),
-  );
+  return tributeReserveRatio(state, tribute) >= 1;
 }
 
 // 봄 첫날: 올해 세공 공지
 export function announceCourtTribute(state: GameState): void {
+  releaseTributeReserve(state);
   const year = getYear(state.day);
   const pop = state.residents.filter(r => r.alive).length;
   state.courtTribute = rollCourtTribute(state.seed, year, pop, state.rank);
@@ -55,6 +57,7 @@ export function announceCourtTribute(state: GameState): void {
     state,
     `조정에서 파발이 왔습니다. 올해 세공: ${tributeItemsLabel(state.courtTribute.items)} — 겨울이 오기 전까지 준비하십시오.`,
     'info',
+    true,
   );
 }
 
@@ -64,9 +67,7 @@ export function openCourtTributeChoice(state: GameState): void {
   if (!tribute || tribute.resolved) return;
   const t = CONFIG.tribute;
   const label = tributeItemsLabel(tribute.items);
-  const lacking = Object.entries(tribute.items)
-    .filter(([res, amt]) => state.resources[res as ResourceId] < (amt ?? 0))
-    .map(([res]) => RESOURCE_NAMES[res as ResourceId]);
+  const preparedRatio = tributeReserveRatio(state, tribute);
   const failStreakNext = state.tributeFailStreak + 1;
   const repLoss = t.repFail + (failStreakNext >= 2 ? t.repFailStreakExtra : 0);
 
@@ -78,11 +79,19 @@ export function openCourtTributeChoice(state: GameState): void {
       `요구: ${label}`,
     options: [
       {
-        id: 'pay',
-        label: '공물을 바친다',
+        id: 'pay-full',
+        label: '세공을 모두 바친다',
         desc: `${label} 납부. 명성 +${t.repPaid}. 성실히 바치면 격년으로 조정의 하사품이 내려옵니다.`,
-        disabled: lacking.length > 0,
-        disabledReason: lacking.length > 0 ? `${lacking.join(', ')}이(가) 부족합니다` : undefined,
+        disabled: preparedRatio < 1,
+        disabledReason: preparedRatio < 1 ? '세공고 준비량이 부족합니다' : undefined,
+      },
+      {
+        id: 'pay-partial',
+        label: '준비한 만큼 바친다',
+        desc: `현재 준비율 ${(preparedRatio * 100).toFixed(0)}%. 모자란 비율만큼 명성과 위협 불이익을 받습니다.`,
+        disabled: preparedRatio <= 0 || preparedRatio >= 1,
+        disabledReason: preparedRatio <= 0 ? '세공고에 준비한 물자가 없습니다'
+          : preparedRatio >= 1 ? '전량 납부가 준비되었습니다' : undefined,
       },
       {
         id: 'refuse',
@@ -94,6 +103,19 @@ export function openCourtTributeChoice(state: GameState): void {
   };
 }
 
+function grantFullTributeReward(state: GameState, tribute: CourtTribute): void {
+  const t = CONFIG.tribute;
+  if (tribute.year % 2 !== 0) return;
+  const rng = makeRng(state.seed + tribute.year * 9203 + 5);
+  if (rng() < 0.5) {
+    state.resources.tools += t.rewardTools;
+    addLog(state, `조정에서 하사품이 내려왔습니다. 도구 ${t.rewardTools}을(를) 받았습니다.`, 'good', true);
+  } else {
+    state.resources.cottonClothes += t.rewardCottonClothes;
+    addLog(state, `조정에서 하사품이 내려왔습니다. 무명옷 ${t.rewardCottonClothes}벌을 받았습니다.`, 'good', true);
+  }
+}
+
 // 세공 선택 처리 — 효과 적용 + resolved 표시 + 모달 해제
 export function resolveCourtTribute(state: GameState, optionId: string): void {
   const c = state.pendingChoice;
@@ -102,33 +124,47 @@ export function resolveCourtTribute(state: GameState, optionId: string): void {
   const tribute = state.courtTribute;
   if (!tribute || tribute.resolved) return;
   const t = CONFIG.tribute;
+  if (optionId === 'pay') optionId = 'pay-full';
   tribute.resolved = true;
 
-  if (optionId === 'pay' && canPayTribute(state, tribute)) {
-    for (const [res, amt] of Object.entries(tribute.items)) {
-      state.resources[res as ResourceId] = Math.max(0, state.resources[res as ResourceId] - (amt ?? 0));
-    }
+  if (optionId === 'pay-full' && canPayTribute(state, tribute)) {
+    consumeTributeReserve(state, tribute);
+    releaseTributeReserve(state);
     tribute.paid = true;
     state.tributeFailStreak = 0;
     state.tributePaidStreak += 1; // 승격 조건의 "공물 성실도"
     state.resources.reputation = Math.min(100, state.resources.reputation + t.repPaid);
     lowerSuspicion(state, CONFIG.suspicion.tributeDecay); // 성실한 납부는 모반 의심을 씻는다
-    addLog(state, '세공을 온전히 바쳤습니다. 조정이 개척지의 공을 기억할 것입니다.', 'good');
-    // 격년 하사품: 성실 납부에 대한 답례 (결정적 롤)
-    if (tribute.year % 2 === 0) {
-      const rng = makeRng(state.seed + tribute.year * 9203 + 5);
-      if (rng() < 0.5) {
-        state.resources.tools += t.rewardTools;
-        addLog(state, `조정에서 하사품이 내려왔습니다. 도구 ${t.rewardTools}을(를) 받았습니다.`, 'good');
-      } else {
-        state.resources.clothes += t.rewardClothes;
-        addLog(state, `조정에서 하사품이 내려왔습니다. 옷 ${t.rewardClothes}벌을 받았습니다.`, 'good');
-      }
-    }
+    addLog(state, '세공을 온전히 바쳤습니다. 조정이 개척지의 공을 기억할 것입니다.', 'good', true);
+    grantFullTributeReward(state, tribute);
+    return;
+  }
+
+  if (optionId === 'pay-partial' && tributeReserveRatio(state, tribute) > 0) {
+    const ratio = consumeTributeReserve(state, tribute);
+    releaseTributeReserve(state);
+    tribute.paid = false;
+    state.tributePaidStreak = 0;
+    if (ratio >= t.partialFailStreakAvoidRatio) state.tributeFailStreak = 0;
+    else state.tributeFailStreak += 1;
+    const missing = 1 - ratio;
+    const streakExtra = state.tributeFailStreak >= 2 ? t.repFailStreakExtra : 0;
+    const repLoss = Math.round((t.repFail + streakExtra) * missing);
+    const threatGain = Math.round(t.threatFail * missing);
+    state.resources.reputation = Math.max(0, state.resources.reputation - repLoss);
+    state.threat = Math.min(100, state.threat + threatGain);
+    lowerSuspicion(state, CONFIG.suspicion.tributeDecay * ratio * t.partialSuspicionDecayMult);
+    addLog(
+      state,
+      `준비한 만큼 세공을 바쳤습니다. 납부율 ${(ratio * 100).toFixed(0)}%. 성실 납부로 인정되지는 않습니다.`,
+      'bad',
+      true,
+    );
     return;
   }
 
   // 미납 — 명성 하락(연속이면 가중), 위협 상승, 성실도 초기화
+  releaseTributeReserve(state);
   state.tributeFailStreak += 1;
   state.tributePaidStreak = 0;
   const repLoss = t.repFail + (state.tributeFailStreak >= 2 ? t.repFailStreakExtra : 0);
@@ -140,6 +176,7 @@ export function resolveCourtTribute(state: GameState, optionId: string): void {
       ? '두 해 연속 세공을 바치지 못했습니다. 조정의 눈 밖에 났고, 변방의 소문이 흉흉해집니다.'
       : '올해 세공을 바치지 못했습니다. 조정의 눈 밖에 났습니다.',
     'bad',
+    true,
   );
 }
 

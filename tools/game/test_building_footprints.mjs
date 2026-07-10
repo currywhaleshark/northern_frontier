@@ -170,9 +170,27 @@ function footprintIds(state, type, x, y) {
   });
   buildings.rebuildBuildingFootprints(state);
 
-  raidDamage.damageBuildings(state, () => 0, 1);
-  assert.equal(state.buildings.length, 0, 'destroyed storehouse is removed');
-  assert.deepEqual(footprintIds(state, 'storehouse', 2, 2), [null, null, null, null]);
+  const damaged = raidDamage.damageBuildings(state, () => 0, 1);
+  const storehouse = state.buildings.find(building => building.id === 601);
+  assert.deepEqual(damaged, ['storehouse']);
+  assert.ok(storehouse, 'damaged storehouse remains available for repair');
+  assert.equal(storehouse.built, false);
+  assert.equal(storehouse.repairing, true);
+  assert.ok(storehouse.progress > 0 && storehouse.progress < 99);
+  assert.deepEqual(footprintIds(state, 'storehouse', 2, 2), [601, 601, 601, 601]);
+
+  for (const resident of state.residents) resident.job = 'idle';
+  const builder = state.residents[0];
+  builder.job = 'builder';
+  builder.x = 1;
+  builder.y = 2;
+  builder.px = 1;
+  builder.py = 2;
+  builder.path = [];
+  for (let tick = 0; tick < 40 && !storehouse.built; tick++) agents.agentsTick(state);
+  assert.equal(storehouse.built, true, 'a builder repairs the damaged building');
+  assert.equal(storehouse.repairing, false);
+  assert.ok(state.log.some(entry => entry.text.includes('수리가 끝나')));
 }
 
 console.log('building footprint tests passed');

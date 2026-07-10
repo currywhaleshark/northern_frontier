@@ -1,5 +1,5 @@
 import {
-  BUILDING_DEFS, buildingFootprintTiles, getBuilding, isSmithyProductUnlocked, SMITHY_PRODUCT_DEFS,
+  BUILDING_DEFS, buildingFootprintTiles, getBuilding, isBuildingUnlocked, isSmithyProductUnlocked, SMITHY_PRODUCT_DEFS,
   SMITHY_PRODUCT_ORDER, smithyProductOf,
 } from '../game/buildings';
 import { CONFIG } from '../game/config';
@@ -195,14 +195,14 @@ export function ActionPopup({
         </button>
       )}
 
-      {building.type === 'hut' && (
+      {building.type === 'hut' && isBuildingUnlocked(state.rank, 'ondol') && (
         <button className="action-command" type="button" onClick={() => onUpgradeHousing(building.id, 'ondol')}>
           <span>온돌집으로 개량</span>
           <CostLine type="ondol" />
         </button>
       )}
 
-      {building.type === 'ondol' && (
+      {building.type === 'ondol' && isBuildingUnlocked(state.rank, 'tileHouse') && (
         <button className="action-command" type="button" onClick={() => onUpgradeHousing(building.id, 'tileHouse')}>
           <span>기와집으로 개량</span>
           <CostLine type="tileHouse" />
@@ -236,7 +236,7 @@ export function ActionPopup({
 
       {(building.type === 'market' || building.type === 'dock') && (
         <div className="action-grid">
-          {FACTIONS.filter(faction => faction.trades.length > 0).map(faction => {
+          {FACTIONS.filter(faction => faction.exports.length > 0).map(faction => {
             const reason = canRequestTrade(state, faction.name);
             return (
               <button

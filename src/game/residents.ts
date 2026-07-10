@@ -1,11 +1,12 @@
 // 주민 생성과 일일 생존 판정
 import { CONFIG } from './config';
 import { GIVEN_NAMES, JOB_NAMES, SURNAMES } from './constants';
-import { housingCapacity } from './buildings';
+import { BUILDING_DEFS } from './buildings';
 import { addLog } from './events';
+import { returnResidentCart } from './equipment';
 import { getSeason } from './seasons';
 import { warmthLossWeatherMult } from './weather';
-import type { GameState, Gender, JobId, Resident, Tile } from './types';
+import type { Building, GameState, Gender, JobId, Resident, Tile } from './types';
 
 export function rollResidentGender(rng: () => number): Gender {
   return rng() < 0.5 ? 'female' : 'male';
@@ -13,6 +14,31 @@ export function rollResidentGender(rng: () => number): Gender {
 
 function isResidentSpawnTile(tile: Tile): boolean {
   return tile.buildingId == null && tile.terrain !== 'mountain' && tile.terrain !== 'river';
+}
+
+function hasSpawnExit(state: GameState, start: Tile, cx: number, cy: number): boolean {
+  const queue: { tile: Tile; steps: number }[] = [{ tile: start, steps: 0 }];
+  const seen = new Set<string>([`${start.x},${start.y}`]);
+  for (let index = 0; index < queue.length; index++) {
+    const { tile, steps } = queue[index];
+    if (steps >= 4 && Math.abs(tile.x - cx) + Math.abs(tile.y - cy) >= 10) return true;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        if (dx !== 0 && dy !== 0) {
+          const horizontal = state.map[tile.y]?.[tile.x + dx];
+          const vertical = state.map[tile.y + dy]?.[tile.x];
+          if (!horizontal || !vertical || !isResidentSpawnTile(horizontal) || !isResidentSpawnTile(vertical)) continue;
+        }
+        const next = state.map[tile.y + dy]?.[tile.x + dx];
+        const key = next ? `${next.x},${next.y}` : '';
+        if (!next || seen.has(key) || !isResidentSpawnTile(next)) continue;
+        seen.add(key);
+        queue.push({ tile: next, steps: steps + 1 });
+      }
+    }
+  }
+  return false;
 }
 
 function residentSpawnPoint(
@@ -27,7 +53,7 @@ function residentSpawnPoint(
       for (let x = cx - radius; x <= cx + radius; x++) {
         if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) !== radius) continue;
         const tile = state.map[y]?.[x];
-        if (tile && isResidentSpawnTile(tile)) candidates.push(tile);
+        if (tile && isResidentSpawnTile(tile) && hasSpawnExit(state, tile, cx, cy)) candidates.push(tile);
       }
     }
     if (candidates.length > 0) {
@@ -35,6 +61,9 @@ function residentSpawnPoint(
       return { x: tile.x, y: tile.y };
     }
   }
+  const connectedFallback = state.map.flat().find(tile =>
+    isResidentSpawnTile(tile) && hasSpawnExit(state, tile, cx, cy));
+  if (connectedFallback) return { x: connectedFallback.x, y: connectedFallback.y };
   const fallback = state.map[cy]?.[cx];
   if (fallback && isResidentSpawnTile(fallback)) return { x: cx, y: cy };
   return { x: Math.floor(state.map[0].length / 2), y: Math.floor(state.map.length / 2) };
@@ -59,6 +88,7 @@ export function createResident(state: GameState, rng: () => number, job: JobId =
     morale: 60,
     skills: {},
     assignedBuildingId: null,
+    homeBuildingId: null,
     task: JOB_NAMES[job],
     alive: true,
     sick: false,
@@ -71,12 +101,80 @@ export function createResident(state: GameState, rng: () => number, job: JobId =
     workTimer: 0,
     targetId: null,
     carrying: {},
+    cartEquipped: false,
+    haulTask: null,
     manualOrder: null,
   };
 }
 
 export function livingResidents(state: GameState): Resident[] {
   return state.residents.filter(r => r.alive);
+}
+
+function shuffleInPlace<T>(items: T[], rng: () => number): void {
+  for (let i = items.length - 1; i > 0; i--) {
+    const roll = Math.max(0, Math.min(0.999999999999, rng()));
+    const j = Math.floor(roll * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+}
+
+export function residentHome(
+  state: GameState,
+  resident: Pick<Resident, 'homeBuildingId'>,
+): Building | null {
+  if (resident.homeBuildingId == null) return null;
+  const building = state.buildings.find(candidate => candidate.id === resident.homeBuildingId);
+  if (!building?.built || BUILDING_DEFS[building.type].capacity <= 0) return null;
+  return building;
+}
+
+// 유효한 기존 입주는 유지하고, 비어 있는 자리만 무작위로 배정한다.
+export function reconcileResidentHomes(state: GameState, rng: () => number): void {
+  const homes = state.buildings.filter(building =>
+    building.built && BUILDING_DEFS[building.type].capacity > 0);
+  const homeById = new Map(homes.map(home => [home.id, home]));
+  const occupants = new Map<number, Resident[]>();
+
+  for (const resident of state.residents) {
+    if (!resident.alive) {
+      resident.homeBuildingId = null;
+      continue;
+    }
+    const home = resident.homeBuildingId == null ? null : homeById.get(resident.homeBuildingId);
+    if (!home) {
+      resident.homeBuildingId = null;
+      continue;
+    }
+    const group = occupants.get(home.id) ?? [];
+    group.push(resident);
+    occupants.set(home.id, group);
+  }
+
+  for (const home of homes) {
+    const group = occupants.get(home.id) ?? [];
+    const capacity = BUILDING_DEFS[home.type].capacity;
+    if (group.length <= capacity) continue;
+    shuffleInPlace(group, rng);
+    for (const resident of group.slice(capacity)) resident.homeBuildingId = null;
+  }
+
+  const unhoused = state.residents.filter(resident => resident.alive && resident.homeBuildingId == null);
+  if (unhoused.length === 0) return;
+
+  const vacantSlots: number[] = [];
+  for (const home of homes) {
+    const capacity = BUILDING_DEFS[home.type].capacity;
+    const occupied = state.residents.filter(resident =>
+      resident.alive && resident.homeBuildingId === home.id).length;
+    for (let i = occupied; i < capacity; i++) vacantSlots.push(home.id);
+  }
+  if (vacantSlots.length === 0) return;
+
+  shuffleInPlace(unhoused, rng);
+  shuffleInPlace(vacantSlots, rng);
+  const assignCount = Math.min(unhoused.length, vacantSlots.length);
+  for (let i = 0; i < assignCount; i++) unhoused[i].homeBuildingId = vacantSlots[i];
 }
 
 export function countJob(state: GameState, job: JobId): number {
@@ -92,14 +190,42 @@ export function gainSkill(r: Resident): void {
   r.skills[r.job] = Math.min(1, cur + CONFIG.production.skillGainPerDay);
 }
 
-function kill(state: GameState, r: Resident, cause: string, starvation: boolean): void {
+const COMBAT_TASKS = new Set(['출전 준비', '출전 중', '전선 대기', '전투 중', '전투 부상']);
+
+function isCombatDeathContext(state: GameState, resident: Resident): boolean {
+  return state.battle?.defenderIds.includes(resident.id) === true || COMBAT_TASKS.has(resident.task);
+}
+
+export function killResident(
+  state: GameState,
+  r: Resident,
+  cause: string,
+  starvation = false,
+  combatDeath = false,
+): void {
+  if (!r.alive) return;
+  returnResidentCart(state, r);
   r.alive = false;
   r.health = 0;
+  r.homeBuildingId = null;
   r.task = '사망';
   state.totalDeaths++;
   if (getSeason(state.day) === 'winter') state.winterDeaths++;
   if (starvation) state.starvationDeathsThisYear++;
-  addLog(state, `${r.name}이(가) ${cause}(으)로 세상을 떠났습니다.`, 'bad');
+  state.lastDeathCause = combatDeath
+    ? 'combat'
+    : starvation
+      ? 'starvation'
+      : cause.includes('동상') || cause.includes('추위') || cause.includes('혹한')
+        ? 'cold'
+        : cause === '병' || cause.includes('질병')
+          ? 'disease'
+          : 'other';
+  if (combatDeath) {
+    addLog(state, `${r.name}이(가) 전투 중 전사했습니다. (${cause})`, 'raid', true);
+  } else {
+    addLog(state, `${r.name}이(가) ${cause}(으)로 세상을 떠났습니다.`, 'bad', true);
+  }
   // 이웃의 죽음은 마을 전체의 사기를 깎는다
   for (const other of state.residents) {
     if (other.alive) other.morale = Math.max(0, other.morale - 6);
@@ -113,16 +239,14 @@ export function updateResidentNeeds(
   fedRatio: number,        // 0~1, 식량이 부족하면 1 미만
   firewoodRatio: number,   // 0~1, 장작 충족률
   clothesCoverage: number, // 0~1, 옷 보급률
+  dietVarietyScore: number, // 0~1, 그날 먹은 식품군 다양성
+  vegetableRatio: number,   // 0~1, 권장 채소 몫 충족률
 ): void {
   const cfg = CONFIG.needs;
   const hcfg = CONFIG.health;
   const season = getSeason(state.day);
   const living = livingResidents(state);
-  const housing = housingCapacity(state);
-
-  // 온돌집 → 초가집 → 노숙 순으로 배정된다고 가정
-  let ondolLeft = housing.ondol;
-  let hutLeft = housing.total - housing.ondol;
+  reconcileResidentHomes(state, rng);
 
   for (const r of living) {
     // ── 식사 ──
@@ -130,10 +254,11 @@ export function updateResidentNeeds(
     if (ate) r.hunger = Math.min(100, r.hunger + cfg.hungerGainFed);
     else r.hunger = Math.max(0, r.hunger - cfg.hungerLossUnfed);
 
-    // ── 주거 배정 ──
-    let housingType: 'ondol' | 'hut' | 'none' = 'none';
-    if (ondolLeft > 0) { ondolLeft--; housingType = 'ondol'; }
-    else if (hutLeft > 0) { hutLeft--; housingType = 'hut'; }
+    // ── 실제 입주 중인 집의 난방만 적용 ──
+    const home = residentHome(state, r);
+    const housingType: 'ondol' | 'hut' | 'none' = home
+      ? BUILDING_DEFS[home.type].winterBonus ? 'ondol' : 'hut'
+      : 'none';
 
     // ── 체온 ──
     if (season === 'spring' || season === 'summer') {
@@ -169,6 +294,8 @@ export function updateResidentNeeds(
     else if (r.warmth < 25) r.health -= hcfg.coldDamage;
     if (r.hunger <= 0) { r.health -= hcfg.starveDamage; starving = true; }
     else if (r.hunger < 25) { r.health -= hcfg.hungryDamage; starving = true; }
+    if (r.hunger > 25 && dietVarietyScore < 0.5) r.health -= hcfg.poorDietDamage;
+    if (r.hunger > 25 && vegetableRatio < 0.5) r.health -= cfg.vegetableShortageHealthPenalty;
 
     if (r.sick) {
       const hasHerbs = state.resources.herbs >= hcfg.herbsPerSickPerDay;
@@ -186,17 +313,35 @@ export function updateResidentNeeds(
     r.health = Math.max(0, Math.min(100, r.health));
     if (r.health <= 0) {
       const cause = starving ? '굶주림' : r.warmth < 25 ? '동상과 추위' : r.sick ? '병' : '쇠약';
-      kill(state, r, cause, starving);
+      const combatDeath = isCombatDeathContext(state, r);
+      const combatCause = starving && r.warmth < 25
+        ? '혹한, 굶주림과 탈진'
+        : starving
+          ? '굶주림과 탈진'
+          : r.warmth < 25
+            ? '혹한과 탈진'
+            : r.sick
+              ? '질병과 부상'
+              : '교전 중 입은 부상';
+      killResident(state, r, combatDeath ? combatCause : cause, starving, combatDeath);
     }
   }
+  reconcileResidentHomes(state, rng);
 }
 
 // 사기: 식량/추위/장터 상태에 따라 목표치로 수렴
-export function updateMorale(state: GameState, foodOk: boolean, warmthAvg: number, hasMarket: boolean): void {
+export function updateMorale(
+  state: GameState,
+  foodOk: boolean,
+  warmthAvg: number,
+  hasMarket: boolean,
+  dietVarietyScore = 1,
+): void {
   let target = 50;
   target += foodOk ? 10 : -18;
   target += warmthAvg > 60 ? 8 : warmthAvg < 35 ? -12 : 0;
   target += hasMarket ? 5 : 0;
+  if (dietVarietyScore < 0.5) target -= CONFIG.needs.monotonyMoralePenalty;
   for (const r of livingResidents(state)) {
     const diff = target - r.morale;
     r.morale = Math.max(0, Math.min(100, r.morale + Math.sign(diff) * Math.min(4, Math.abs(diff))));
