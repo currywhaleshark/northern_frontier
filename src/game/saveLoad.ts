@@ -174,6 +174,7 @@ export function loadGame(): GameState | null {
       parsed.battle.location = parsed.battle.mode === 'levy' ? 'village' : 'outskirts';
     }
     if (!parsed.lastTradeByFaction) parsed.lastTradeByFaction = {};
+    if (parsed.lastImmigrationDay == null) parsed.lastImmigrationDay = -999;
     migrateResourceTaxonomy(parsed);
     // 구버전 저장 마이그레이션: 없는 필드는 기본값으로 채운다
     if (!parsed.relations) parsed.relations = initRelations();

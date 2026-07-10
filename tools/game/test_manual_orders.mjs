@@ -31,6 +31,7 @@ const agents = await import(pathToFileURL(join(compiledDir, 'agents.mjs')).href)
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
 const selectionActions = await import(pathToFileURL(join(compiledDir, 'selectionActions.mjs')).href);
+const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 function clearMapToPlain(state) {
   for (const row of state.map) {
@@ -159,6 +160,36 @@ function onlyResident(state, job, x, y) {
   assert.ok(state.resources.iron > 0, 'manual iron orders deliver iron instead of stone');
   assert.equal(ironTile.terrain, 'plain');
   assert.equal(ironTile.mineralRemaining, 0);
+}
+
+{
+  const state = simulation.newGame(20260708042);
+  clearMapToPlain(state);
+  addBuilt(state, 'center', 4, 4);
+  const forestTile = state.map[4][10];
+  forestTile.terrain = 'forest';
+  const herbalist = onlyResident(state, 'herbalist', 7, 4);
+
+  const action = selectionActions.getPointerAction(
+    state,
+    { kind: 'resident', id: herbalist.id },
+    forestTile,
+  );
+  assert.equal(action.kind, 'work');
+  assert.ok(action.label.includes('산물'));
+  assert.equal(simulation.issueResidentWorkOrder(state, herbalist.id, action), null);
+
+  for (let i = 0; i < 80 && (herbalist.carrying.herbs ?? 0) <= 0; i++) {
+    agents.agentsTick(state);
+    state.subTick++;
+  }
+
+  assert.ok((herbalist.carrying.herbs ?? 0) > 0, 'herbalist gathers herbs');
+  assert.ok((herbalist.carrying.vegetables ?? 0) > 0, 'herbalist gathers wild food with herbs');
+  assert.ok(Math.abs(
+    (herbalist.carrying.vegetables ?? 0) /
+      (herbalist.carrying.herbs ?? 1) - CONFIG.production.foragedVegetablesPerHerb,
+  ) < 0.000001, 'wild food scales with gathered herbs');
 }
 
 {

@@ -272,11 +272,15 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'trade' | 'tribute' | 'petition' | 'inspection' | 'crackdown';
+  kind: 'raid' | 'trade' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration';
   title: string;
   body: string;
+  illustration?: {
+    src: string;
+    alt: string;
+  };
   options: ChoiceOption[];
-  // raid: { power, faction, warned } / trade: { give, giveAmt, get, getAmt, faction } / tribute: { year }
+  // raid: { power, faction, warned } / trade: { give, giveAmt, get, getAmt, faction } / immigration: { count }
   data: Record<string, unknown>;
 }
 
@@ -370,6 +374,7 @@ export interface GameState {
   tradeRefusedDays: number; // 최근 교역 거절 여파 남은 일수
   lastTradeDay: number;     // 마지막 교역 제안이 온 날
   lastTradeByFaction: Record<string, number>; // 세력별 마지막 플레이어 주도 교역일 (쿨다운용)
+  lastImmigrationDay: number; // 마지막 이주민 수용 여부 선택지가 열린 날
   pendingChoice: PendingChoice | null;
   courtTribute: CourtTribute | null;  // 올해 세공 (봄 공지 때 설정)
   tributeReserve: Partial<Record<ResourceId, number>>; // 올해 세공용으로 잠근 중심지 재고

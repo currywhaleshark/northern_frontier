@@ -595,6 +595,8 @@ assert.equal(
   const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs')).href);
   const faction = FACTIONS.find(f => f.hostile);
   raids.openRaidChoice(state, () => 0, true, 42, faction.name);
+  assert.equal(state.pendingChoice.illustration.src, '/assets/events/raid-charge-v2.png');
+  assert.ok(state.pendingChoice.illustration.alt.includes('마적'));
   assert.ok(state.pendingChoice.body.includes(faction.name));
   assert.equal(state.pendingChoice.body.includes(`(${faction.desc})`), false);
 }

@@ -104,7 +104,7 @@ export function canResidentWorkTarget(
         : { ok: false, label: '사냥 가능한 서식지가 아닙니다' };
     case 'herbalist':
       return getSeason(state.day) !== 'winter' && tile.terrain === 'forest'
-        ? { ok: true, label: '약초 채집' }
+        ? { ok: true, label: '약초·산물 채집' }
         : { ok: false, label: '약초꾼이 일할 수 없는 대상입니다' };
     case 'miner':
       return buildingMatches(tile, building, ['mine'])

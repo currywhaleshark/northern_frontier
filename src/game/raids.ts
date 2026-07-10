@@ -290,6 +290,10 @@ export function openRaidChoice(
   const choice: PendingChoice = {
     kind: 'raid',
     title: `습격 임박! — ${faction.name}`,
+    illustration: {
+      src: '/assets/events/raid-charge-v2.png',
+      alt: '무기를 들고 말을 몰아 마을로 돌진하는 마적들',
+    },
     body:
       `${faction.name}이 마을 외곽에 도달했습니다. 지금 대응을 정해야 합니다.` +
       (warned ? ' 경보 덕분에 미리 대비할 시간이 있었습니다.' : ' 아무런 경보도 없이 들이닥쳤습니다!') +

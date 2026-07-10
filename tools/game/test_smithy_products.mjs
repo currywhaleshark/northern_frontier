@@ -122,7 +122,10 @@ function keepOnlyResident(state, index, job, tile) {
   state.processingReserves.wood = 0;
   smithy.inventory = { iron: 10, wood: 20, tools: 10 };
 
-  for (let i = 0; i < 30; i++) simulation.advanceTick(state);
+  for (let i = 0; i < 100 && (smithy.inventory?.carts ?? 0) < 1; i++) {
+    state.pendingChoice = null;
+    simulation.advanceTick(state);
+  }
 
   assert.ok((smithy.inventory?.carts ?? 0) >= 1, 'settlement smithies can complete a usable cart');
   assert.ok(smithy.inventory.iron < 10);
@@ -243,6 +246,23 @@ function keepOnlyResident(state, index, job, tile) {
 
   assert.equal(loadedHauler.cartEquipped, true, 'equipped carts survive save and load');
   assert.equal(loaded.resources.carts, 0);
+}
+
+{
+  const state = simulation.newGame(9108);
+  const smithy = addBuilt(state, 'smithy');
+  const smith = keepOnlyResident(state, 0, 'smith', state.map[smithy.y][smithy.x]);
+  assert.equal(workerSlots.assignResidentToBuilding(state, smith.id, smithy.id), null);
+  state.weather = 'clear';
+  state.resources.tools = 100;
+  state.processingReserves.iron = 0;
+  state.processingReserves.wood = 0;
+  smithy.inventory = { iron: 10, wood: 10, tools: 0 };
+
+  simulation.advanceTick(state);
+
+  assert.ok((smithy.inventory.tools ?? 0) > 0, 'tool production continues regardless of current stock');
+  assert.equal(smith.task, '도구 제작 중');
 }
 
 console.log('smithy product tests passed');

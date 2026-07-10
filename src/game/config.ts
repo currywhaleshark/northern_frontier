@@ -85,6 +85,7 @@ export const CONFIG = {
     woodPerDay: 1.3,
     gamePerDay: 0.9,
     herbsPerDay: 0.5,
+    foragedVegetablesPerHerb: 2.5, // 약초 채집 1당 야생과일·버섯·산나물
     toolsPerDay: 1.0,
     cartsPerDay: 0.2,
     cartWoodPerUnit: 6,
@@ -294,10 +295,10 @@ export const CONFIG = {
 
   immigration: {
     dailyChance: 0.12,
-    minFoodPerPerson: 8,
-    minMorale: 45,
+    cooldownDays: 8,
     groupMin: 2,
     groupMax: 5,
+    rejectReputation: 2,
   },
 
   // 난이도별 보정 (메인 메뉴에서 선택)

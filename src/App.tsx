@@ -90,7 +90,9 @@ export default function App() {
       m.logLen = s.log.length;
     }
     const pk = s.pendingChoice?.kind ?? null;
-    if (pk && pk !== m.pending) playSfx(pk === 'raid' || pk === 'crackdown' ? 'raidHorn' : 'tradeBell');
+    if (pk && pk !== m.pending) {
+      playSfx(pk === 'raid' || pk === 'crackdown' ? 'raidHorn' : pk === 'immigration' ? 'welcome' : 'tradeBell');
+    }
     m.pending = pk;
     if (s.gameOver && !m.over) playSfx(s.gameOver.won ? 'win' : 'lose');
     m.over = !!s.gameOver;

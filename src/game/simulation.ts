@@ -5,14 +5,14 @@ import { CONFIG } from './config';
 import { isJobUnlocked, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } from './constants';
 import {
   BUILDING_DEFS, buildingFootprintTiles, canAfford, cannonPlacementsUsed, canPlaceBuildingAt, canPlaceOn,
-  clearBuildingTiles, computeDefense, countBuilt, getBuilding, housingCapacity, isBuildingUnlocked,
+  clearBuildingTiles, computeDefense, countBuilt, getBuilding, isBuildingUnlocked,
   isPaddyEligibleTile, isSmithyProductUnlocked, occupyBuildingTiles, SMITHY_PRODUCT_DEFS,
 } from './buildings';
 import { isWallBuilding } from './walls';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
 import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
 import { grantYearlyPowder, resolvePetition } from './petition';
-import { checkPromotion, rankEffects } from './promotion';
+import { checkPromotion } from './promotion';
 import { resolveCrackdown, resolveInspection, updateSuspicion } from './suspicion';
 import { generateMap, makeRng } from './map';
 import { isHabitatActive, spawnAnimalHabitats } from './habitats';
@@ -37,6 +37,7 @@ import { createExploration, isBuildingFootprintExplored, refreshExploration } fr
 import { LUXURY_RESOURCES } from './resourceCatalog';
 import { returnResidentCart, setResidentCartEquipped } from './equipment';
 import { isHaulSourceBuilding } from './inventory';
+import { maybeOfferImmigration, resolveImmigration } from './immigration';
 import {
   assignNearestWorkerToBuilding as assignNearestWorkerToSlot,
   assignResidentToBuilding as assignResidentToSlot,
@@ -88,6 +89,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     tradeRefusedDays: 0,
     lastTradeDay: 0,
     lastTradeByFaction: {},
+    lastImmigrationDay: -999,
     pendingChoice: null,
     courtTribute: null,
     tributeReserve: {},
@@ -493,6 +495,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'petition') resolvePetition(state, optionId);
   else if (state.pendingChoice.kind === 'inspection') resolveInspection(state, optionId, rng);
   else if (state.pendingChoice.kind === 'crackdown') resolveCrackdown(state, optionId, rng);
+  else if (state.pendingChoice.kind === 'immigration') resolveImmigration(state, optionId);
   else resolveTrade(state, optionId);
   state.resources.defense = computeDefense(state);
 }
@@ -571,7 +574,7 @@ function endOfDay(state: GameState): void {
   if (maybeOfferTrade(state, rng, state.day - state.lastTradeDay)) {
     state.lastTradeDay = state.day;
   }
-  runImmigration(state, rng);
+  maybeOfferImmigration(state, rng);
   maybeFlavorLog(state, rng);
   maybeCollectTribute(state); // 겨울: 조정의 사자가 세공을 거둔다 (모달 충돌 시 다음 날로)
   updateSuspicion(state, rng); // 모반 의심 누적과 감찰/견책/토벌 사건
@@ -719,30 +722,6 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
   if ((state.weather === 'coldSnap' || state.weather === 'blizzard') && rng() < 0.2) {
     addLog(state, '혹한으로 약한 주민들이 앓기 시작합니다.', 'bad');
   }
-}
-
-function runImmigration(state: GameState, rng: () => number): void {
-  const season = getSeason(state.day);
-  if (season !== 'spring' && season !== 'summer') return;
-  const im = CONFIG.immigration;
-  const living = livingResidents(state);
-  const pop = living.length;
-  const housing = housingCapacity(state);
-  if (housing.total - pop <= 0) return;
-  if (foodTotal(state) < pop * im.minFoodPerPerson) return;
-  if (avg(state, 'morale') < im.minMorale) return;
-  if (rng() >= im.dailyChance * rankEffects(state.rank).immigration) return; // 승격할수록 사람이 모인다
-
-  const rngN = makeRng(state.seed + state.day * 15485863);
-  const count = Math.min(
-    housing.total - pop,
-    im.groupMin + Math.floor(rngN() * (im.groupMax - im.groupMin + 1)),
-  );
-  for (let i = 0; i < count; i++) {
-    state.residents.push(createResident(state, rngN, 'idle'));
-  }
-  reconcileResidentHomes(state, rngN);
-    addLog(state, `살 곳을 찾아 남쪽에서 이주민 ${count}명이 도착했습니다. 직업을 배정해 주십시오.`, 'good', true);
 }
 
 // ─────────────────────────── 승패 판정 ───────────────────────────

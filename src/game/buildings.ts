@@ -60,7 +60,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   herbHut: {
     id: 'herbHut', name: '약초막', emoji: '🌿',
-    desc: '약초꾼이 약초를 부리는 거점. 숲 가까이 지으면 채집 왕복이 줄어든다.',
+    desc: '약초꾼이 약초와 야생 먹거리를 부리는 거점. 숲 가까이 지으면 채집 왕복이 줄어든다.',
     cost: { wood: 5 }, buildDays: 3, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },

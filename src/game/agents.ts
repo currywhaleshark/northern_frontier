@@ -890,6 +890,7 @@ function hunterTick(state: GameState, r: Resident, ctx: Ctx): void {
 
 function herbalistTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
+  const forageRatio = CONFIG.production.foragedVegetablesPerHerb;
   if (ctx.season === 'winter') {
     if (carryTotal(r) > 0) { r.phase = 'toDeposit'; }
     if (carryTotal(r) > 0) {
@@ -905,9 +906,12 @@ function herbalistTick(state: GameState, r: Resident, ctx: Ctx): void {
     workTicks: a.work.herb,
     yieldRes: 'herbs',
     yieldAmt: a.yields.herbs,
-    cap: a.carryCap.herbs,
+    cap: a.carryCap.herbs * (1 + forageRatio),
     depositExtra: ['herbHut'],
-    taskWork: '약초 채집 중', taskMove: '산기슭으로 이동', taskHaul: '약초 운반',
+    taskWork: '약초·산물 채집 중', taskMove: '산기슭으로 이동', taskHaul: '약초·산물 운반',
+    onHarvest: (_tile, worker, herbAmount) => {
+      addCarry(worker, 'vegetables', herbAmount * forageRatio);
+    },
   });
 }
 
@@ -1312,11 +1316,6 @@ function consumeSmithInputs(smithy: Building, product: SmithyProductId, made: nu
   }
 }
 
-function smithNeedsOutput(state: GameState, smithy: Building, product: SmithyProductId, pop: number): boolean {
-  if (product === 'tools') return state.resources.tools + buildingStock(smithy, 'tools') < pop * 0.7;
-  return true;
-}
-
 function smithInputRequirements(product: SmithyProductId, target: number): WorkplaceInputs {
   const def = SMITHY_PRODUCT_DEFS[product];
   return Object.fromEntries(
@@ -1332,7 +1331,6 @@ function smithInputWaitTask(smithy: Building, requirements: WorkplaceInputs): st
 }
 
 function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
-  const pop = state.residents.filter(x => x.alive).length;
   const smithy = assignedWorkplace(state, r, ctx, 'smithy', '대장간 배정 없음');
   if (!smithy) return;
   const product = smithyProductOf(smithy);
@@ -1345,10 +1343,10 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
 
-  if (!isSmithyProductUnlocked(state.rank, product) || !smithNeedsOutput(state, smithy, product, pop)) {
+  if (!isSmithyProductUnlocked(state.rank, product)) {
     const st = goTo(state, r, ctx, buildingGoal(state, smithy.id));
     r.phase = st === 'moving' ? 'toWork' : 'rest';
-    r.task = st === 'stuck' ? '길이 막힘' : st === 'arrived' ? '도구 충분' : '대장간으로 이동';
+    r.task = st === 'stuck' ? '길이 막힘' : st === 'arrived' ? '생산 잠김' : '대장간으로 이동';
     return;
   }
 
