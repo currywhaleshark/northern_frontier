@@ -43,6 +43,7 @@ function prepare(seed) {
   state.weather = 'clear';
   state.pendingChoice = null;
   state.gameOver = null;
+  state.resources.grain = 100;
   state.processingReserves.wood = 0;
   return state;
 }
@@ -69,7 +70,10 @@ function worker(state, job, x, y) {
 }
 
 function runTicks(state, ticks) {
-  for (let i = 0; i < ticks; i++) simulation.advanceTick(state);
+  for (let i = 0; i < ticks; i++) {
+    state.pendingChoice = null;
+    simulation.advanceTick(state);
+  }
 }
 
 {
