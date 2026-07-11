@@ -50,6 +50,45 @@ export function computeAlerts(state: GameState): AlertItem[] {
     });
   }
 
+  const wolfThreat = state.incidents?.predatorThreats.wolf;
+  const tigerThreat = state.incidents?.predatorThreats.tiger;
+  const boarThreat = state.incidents?.predatorThreats.boar;
+  if (tigerThreat) {
+    alerts.push({
+      id: 'tigerThreat',
+      text: `호랑이 출몰 ${Math.max(1, tigerThreat.untilDay - state.day)}일: 낮의 숲과 밤의 마을이 위험합니다.`,
+      level: 'danger',
+    });
+  }
+  if (wolfThreat) {
+    alerts.push({
+      id: 'wolfThreat',
+      text: `늑대 출몰 ${Math.max(1, wolfThreat.untilDay - state.day)}일: 숲에 드나드는 주민이 위험합니다.`,
+      level: 'warn',
+    });
+  }
+  if (boarThreat) {
+    alerts.push({
+      id: 'boarThreat',
+      text: `멧돼지 출몰 ${Math.max(1, boarThreat.untilDay - state.day)}일: 밤마다 농작물과 저장 식량이 위험합니다.`,
+      level: 'warn',
+    });
+  }
+  if (state.incidents?.plagueCase) {
+    alerts.push({
+      id: 'plagueCase',
+      text: `역병 의심 환자 관찰 중: ${Math.max(1, state.incidents.plagueCase.resolvesOnDay - state.day)}일 뒤 경과를 확인합니다.`,
+      level: state.incidents.plagueCase.isolated ? 'warn' : 'danger',
+    });
+  }
+  if (state.incidents?.epidemic) {
+    alerts.push({
+      id: 'epidemic',
+      text: `역병 유행: 환자 ${state.incidents.epidemic.infectedIds.length}명${state.incidents.epidemic.mode === 'isolated' ? ' 격리 중' : ''}.`,
+      level: 'danger',
+    });
+  }
+
   if (state.raiders) {
     alerts.push({
       id: 'raidIncoming',

@@ -13,6 +13,8 @@ import { ensureExploration, refreshExploration } from './exploration';
 import { RESOURCE_IDS } from './resourceCatalog';
 import { reconcileTributeReserve } from './tributeReserve';
 import { reconcileResidentHomes } from './residents';
+import { ensureIncidentState } from './specialEvents';
+import { ensureForeignSiteState, revealForeignSitesFromExploration } from './foreignSites';
 import type { CourtTribute, GameState, Gender, Resident, ResourceId } from './types';
 
 const SAVE_KEY = 'buksae-save-v3'; // v3: 이동 보간(px/py)과 지도 위 습격 무리 추가
@@ -182,6 +184,8 @@ export function loadGame(): GameState | null {
       parsed.tradeCapacityUsed = {};
     }
     if (parsed.lastImmigrationDay == null) parsed.lastImmigrationDay = -999;
+    ensureIncidentState(parsed);
+    ensureForeignSiteState(parsed);
     migrateResourceTaxonomy(parsed);
     // 구버전 저장 마이그레이션: 없는 필드는 기본값으로 채운다
     if (!parsed.relations) parsed.relations = initRelations();
@@ -251,6 +255,7 @@ export function loadGame(): GameState | null {
     reconcileResidentHomes(parsed, makeRng((parsed.seed ?? 1) + parsed.day * 32452843));
     ensureExploration(parsed);
     refreshExploration(parsed);
+    revealForeignSitesFromExploration(parsed);
     return parsed;
   } catch {
     return null;

@@ -4,10 +4,13 @@ import { FACTIONS, FLAVOR_LOGS_CALM, FLAVOR_LOGS_TENSE, RESOURCE_NAMES } from '.
 import { countBuilt } from './buildings';
 import { changeRelation, getRelation } from './relations';
 import {
-  applyQuotedTrade, evaluateFactionProposal, quoteFactionDemand, quoteTrade, relationMargin,
-  useFactionTradeCapacity,
+  applyQuotedTrade, evaluateFactionProposal, factionTradeCapacity, factionValue, quoteFactionDemand, quoteTrade,
+  relationMargin, useFactionTradeCapacity, visitorTradeMultiplier,
 } from './tradeValues';
-import type { GameState, LogEntry, PendingChoice, ResourceId, TradeNegotiation, TradeOffer, TradeQuote } from './types';
+import { SPECIAL_ITEM_DEFS } from './specialItems';
+import type {
+  GameState, LogEntry, PendingChoice, ResourceId, SpecialItemId, TradeNegotiation, TradeOffer, TradeQuote,
+} from './types';
 
 export function addLog(
   state: GameState,
@@ -63,7 +66,7 @@ function updateTradeNegotiation(state: GameState, negotiation: TradeNegotiation)
   choice.data = { faction: negotiation.faction, negotiation };
 }
 
-function factionTradeUnlockReason(state: GameState, factionName: string): string | null {
+export function factionTradeUnlockReason(state: GameState, factionName: string): string | null {
   const faction = FACTIONS.find(candidate => candidate.name === factionName);
   if (!faction?.tradeUnlockBuilding) return null;
   if (countBuilt(state, faction.tradeUnlockBuilding) > 0) return null;
@@ -147,7 +150,12 @@ export function requestTrade(state: GameState, factionName: string): string | nu
   return null;
 }
 
-export function negotiateTrade(state: GameState, get: ResourceId, getAmt: number): string | null {
+export function negotiateTrade(
+  state: GameState,
+  get: ResourceId,
+  getAmt: number,
+  specialItem?: SpecialItemId,
+): string | null {
   const negotiation = tradeNegotiationOf(state.pendingChoice);
   if (!negotiation) return '진행 중인 교역 협상이 없습니다.';
   if (!Number.isFinite(getAmt) || !Number.isInteger(getAmt) || getAmt <= 0) {
@@ -156,6 +164,53 @@ export function negotiateTrade(state: GameState, get: ResourceId, getAmt: number
     updateTradeNegotiation(state, negotiation);
     return negotiation.message;
   }
+
+  if (specialItem) {
+    const faction = FACTIONS.find(candidate => candidate.name === negotiation.faction);
+    const item = SPECIAL_ITEM_DEFS[specialItem];
+    if (!faction || !item || (state.specialItems[specialItem] ?? 0) < 1) {
+      negotiation.message = '제시할 기물이 없습니다.';
+      updateTradeNegotiation(state, negotiation);
+      return negotiation.message;
+    }
+    if (negotiation.mode === 'extortion' || !faction.exports.includes(get)) {
+      negotiation.message = '이 거래에는 기물을 제시할 수 없습니다.';
+      updateTradeNegotiation(state, negotiation);
+      return negotiation.message;
+    }
+    const capacity = factionTradeCapacity(state, negotiation.faction, get);
+    const getUnitValue = factionValue(negotiation.faction, get);
+    const valueMultiplier = negotiation.initiatedBy === 'player'
+      ? 1 / relationMargin(getRelation(state, negotiation.faction))
+      : visitorTradeMultiplier(getRelation(state, negotiation.faction));
+    const maxGetAmt = Math.min(capacity, Math.floor((item.tradeValue * valueMultiplier) / getUnitValue));
+    negotiation.specialItem = specialItem;
+    negotiation.get = get;
+    negotiation.getAmt = Math.min(getAmt, Math.max(0, maxGetAmt));
+    negotiation.maxAcceptGetAmt = maxGetAmt;
+    negotiation.round += 1;
+    if (maxGetAmt < 1) {
+      negotiation.phase = 'rejected';
+      negotiation.message = `${item.name}을(를) 내놓아도 받을 만한 몫이 나오지 않는다고 합니다.`;
+    } else if (getAmt <= maxGetAmt) {
+      negotiation.phase = 'accepted';
+      negotiation.getAmt = getAmt;
+      negotiation.message = `${item.name}을(를) 보자 상대가 바로 조건을 받아들입니다.`;
+    } else if (getAmt <= Math.ceil(maxGetAmt * CONFIG.trade.counterTolerance)) {
+      negotiation.phase = 'countered';
+      negotiation.message = `${item.name} 한 점이라면 ${RESOURCE_NAMES[get]} ${maxGetAmt}까지 내놓겠다고 합니다.`;
+    } else {
+      negotiation.phase = 'rejected';
+      negotiation.getAmt = getAmt;
+      negotiation.message = getAmt > capacity
+        ? `${RESOURCE_NAMES[get]}은(는) 이번 철 최대 ${capacity}까지만 교역할 수 있습니다.`
+        : `${item.name} 한 점으로는 요구한 수량을 맞출 수 없습니다.`;
+    }
+    updateTradeNegotiation(state, negotiation);
+    return negotiation.phase === 'rejected' ? negotiation.message : null;
+  }
+
+  negotiation.specialItem = null;
 
   if (negotiation.initiatedBy === 'player') {
     const sameTerms = negotiation.phase === 'countered' && negotiation.get === get && negotiation.getAmt === getAmt;
@@ -245,19 +300,27 @@ export function resolveTrade(state: GameState, optionId: string): void {
   if (negotiation) {
     if (optionId === 'confirm') {
       const canConfirm = negotiation.initiatedBy === 'player'
-        ? negotiation.phase === 'countered'
+        ? negotiation.phase === 'accepted' || negotiation.phase === 'countered'
         : negotiation.phase === 'accepted' || negotiation.phase === 'countered';
-      if (!canConfirm || !negotiation.give || !negotiation.get || negotiation.giveAmt <= 0 || negotiation.getAmt <= 0) {
+      const specialItem = negotiation.specialItem ?? null;
+      if (!canConfirm || (!specialItem && (!negotiation.give || negotiation.giveAmt <= 0)) ||
+          !negotiation.get || negotiation.getAmt <= 0) {
         negotiation.message = '먼저 양쪽 조건을 확정해야 합니다.';
         updateTradeNegotiation(state, negotiation);
         return;
       }
-      if ((state.resources[negotiation.give] ?? 0) < negotiation.giveAmt) {
+      if (specialItem && (state.specialItems[specialItem] ?? 0) < 1) {
+        negotiation.message = `${SPECIAL_ITEM_DEFS[specialItem].name}이(가) 기물함에 없습니다.`;
+        updateTradeNegotiation(state, negotiation);
+        return;
+      }
+      if (!specialItem && negotiation.give && (state.resources[negotiation.give] ?? 0) < negotiation.giveAmt) {
         negotiation.message = `${RESOURCE_NAMES[negotiation.give]}이(가) 부족해 거래를 확정할 수 없습니다.`;
         updateTradeNegotiation(state, negotiation);
         return;
       }
-      state.resources[negotiation.give] -= negotiation.giveAmt;
+      if (specialItem) state.specialItems[specialItem] -= 1;
+      else if (negotiation.give) state.resources[negotiation.give] -= negotiation.giveAmt;
       state.resources[negotiation.get] += negotiation.getAmt;
       useFactionTradeCapacity(state, negotiation.faction, negotiation.get, negotiation.getAmt);
       state.resources.reputation = Math.min(100, state.resources.reputation + (negotiation.initiatedBy === 'player' ? 1 : 2));
@@ -270,7 +333,7 @@ export function resolveTrade(state: GameState, optionId: string): void {
       }
       addLog(
         state,
-        `${negotiation.faction}과(와) ${RESOURCE_NAMES[negotiation.give]} ${negotiation.giveAmt}을(를) ` +
+        `${negotiation.faction}과(와) ${specialItem ? `${SPECIAL_ITEM_DEFS[specialItem].name} 1` : `${RESOURCE_NAMES[negotiation.give!]} ${negotiation.giveAmt}`}을(를) ` +
           `${RESOURCE_NAMES[negotiation.get]} ${negotiation.getAmt}(으)로 교환했습니다.`,
         'trade',
       );

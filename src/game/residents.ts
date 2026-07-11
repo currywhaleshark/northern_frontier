@@ -1,6 +1,12 @@
 // 주민 생성과 일일 생존 판정
 import { CONFIG } from './config';
-import { GIVEN_NAMES, JOB_NAMES, SURNAMES } from './constants';
+import {
+  FEMALE_GIVEN_NAMES,
+  JOB_NAMES,
+  MALE_GIVEN_NAMES,
+  SURNAMES,
+  SURNAME_WEIGHTS,
+} from './constants';
 import { BUILDING_DEFS } from './buildings';
 import { addLog } from './events';
 import { returnResidentCart } from './equipment';
@@ -10,6 +16,35 @@ import type { Building, GameState, Gender, JobId, Resident, Tile } from './types
 
 export function rollResidentGender(rng: () => number): Gender {
   return rng() < 0.5 ? 'female' : 'male';
+}
+
+function weightedSurnameIndex(rng: () => number): number {
+  const total = SURNAME_WEIGHTS.reduce((sum, weight) => sum + weight, 0);
+  let roll = rng() * total;
+  for (let index = 0; index < SURNAME_WEIGHTS.length; index++) {
+    roll -= SURNAME_WEIGHTS[index];
+    if (roll < 0) return index;
+  }
+  return SURNAME_WEIGHTS.length - 1;
+}
+
+export function rollResidentName(state: GameState, rng: () => number, gender: Gender): string {
+  const givenNames = gender === 'female' ? FEMALE_GIVEN_NAMES : MALE_GIVEN_NAMES;
+  const surnameStart = weightedSurnameIndex(rng);
+  const givenStart = Math.floor(rng() * givenNames.length);
+  const usedNames = new Set(state.residents.map(resident => resident.name));
+
+  // 뽑힌 조합부터 순회해 같은 마을 안에서는 가능한 한 동명이인을 피한다.
+  for (let offset = 0; offset < SURNAMES.length * givenNames.length; offset++) {
+    const surnameOffset = Math.floor(offset / givenNames.length);
+    const givenOffset = offset % givenNames.length;
+    const surname = SURNAMES[(surnameStart + surnameOffset) % SURNAMES.length];
+    const given = givenNames[(givenStart + givenOffset) % givenNames.length];
+    const name = surname + given;
+    if (!usedNames.has(name)) return name;
+  }
+
+  return SURNAMES[surnameStart] + givenNames[givenStart];
 }
 
 function isResidentSpawnTile(tile: Tile): boolean {
@@ -70,7 +105,8 @@ function residentSpawnPoint(
 }
 
 export function createResident(state: GameState, rng: () => number, job: JobId = 'idle'): Resident {
-  const name = SURNAMES[Math.floor(rng() * SURNAMES.length)] + GIVEN_NAMES[Math.floor(rng() * GIVEN_NAMES.length)];
+  const gender = rollResidentGender(rng);
+  const name = rollResidentName(state, rng, gender);
   // 마을 중심지 주변에서 출발한다. 중심지 자체는 solid footprint라 주민을 올려두지 않는다.
   const center = state.buildings.find(b => b.type === 'center');
   const cx = center ? center.x : Math.floor(state.map[0].length / 2);
@@ -80,7 +116,7 @@ export function createResident(state: GameState, rng: () => number, job: JobId =
     id: state.nextResidentId++,
     name,
     age: 16 + Math.floor(rng() * 34),
-    gender: rollResidentGender(rng),
+    gender,
     job,
     hunger: 80,
     warmth: 80,
@@ -218,11 +254,15 @@ export function killResident(
       ? 'starvation'
       : cause.includes('동상') || cause.includes('추위') || cause.includes('혹한')
         ? 'cold'
-        : cause === '병' || cause.includes('질병')
+        : cause === '병' || cause.includes('질병') || cause.includes('역병')
           ? 'disease'
           : 'other';
   if (combatDeath) {
     addLog(state, `${r.name}이(가) 전투 중 전사했습니다. (${cause})`, 'raid', true);
+  } else if (cause === '호환') {
+    addLog(state, `${r.name}이(가) 호환을 당해 목숨을 잃었습니다.`, 'bad', true);
+  } else if (cause === '늑대 습격') {
+    addLog(state, `${r.name}이(가) 늑대 떼의 습격으로 목숨을 잃었습니다.`, 'bad', true);
   } else {
     addLog(state, `${r.name}이(가) ${cause}(으)로 세상을 떠났습니다.`, 'bad', true);
   }

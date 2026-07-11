@@ -9,13 +9,14 @@ import {
 } from '../game/tradeValues';
 import { RESOURCE_DEFS, type ResourceCategory } from '../game/resourceCatalog';
 import { getSeason } from '../game/seasons';
-import type { GameState, ResourceId } from '../game/types';
+import { SPECIAL_ITEM_DEFS } from '../game/specialItems';
+import type { GameState, ResourceId, SpecialItemId } from '../game/types';
 import { FactionName } from './FactionName';
 import { TradeResourceIcon } from './TradeResourceIcon';
 
 interface Props {
   state: GameState;
-  onNegotiate: (get: ResourceId, getAmt: number) => void;
+  onNegotiate: (get: ResourceId, getAmt: number, specialItem?: SpecialItemId) => void;
   onChoose: (optionId: string) => void;
 }
 
@@ -91,9 +92,12 @@ export function TradeDialog({ state, onNegotiate, onChoose }: Props) {
   const visibleExports = useMemo(() => faction
     ? faction.exports.filter(resource => tradeCategoryOf(resource) === category)
     : [], [faction, category]);
-  const giveValue = negotiation?.give && faction
-    ? negotiation.giveAmt * factionValue(faction.name, negotiation.give)
-    : 0;
+  const offeredSpecial = negotiation?.specialItem ?? null;
+  const giveValue = offeredSpecial
+    ? SPECIAL_ITEM_DEFS[offeredSpecial].tradeValue
+    : negotiation?.give && faction
+      ? negotiation.giveAmt * factionValue(faction.name, negotiation.give)
+      : 0;
 
   if (!negotiation || !faction) return null;
   const isExtortion = negotiation.mode === 'extortion';
@@ -102,10 +106,13 @@ export function TradeDialog({ state, onNegotiate, onChoose }: Props) {
   const capacitySummary = factionTradeCapacitySummary(state, faction.name, get);
   const capacity = capacitySummary.remaining;
   const dockActive = state.buildings.some(building => building.built && building.type === 'dock');
-  const canConfirm = isExtortion ? Boolean(negotiation.give) : negotiation.initiatedBy === 'player'
-    ? negotiation.phase === 'countered'
-    : negotiation.phase === 'accepted' || negotiation.phase === 'countered';
-  const hasPayment = !negotiation.give || (state.resources[negotiation.give] ?? 0) >= negotiation.giveAmt;
+  const displayedTermsMatch = negotiation.get === get && negotiation.getAmt === getAmt;
+  const canConfirm = isExtortion ? Boolean(negotiation.give) : displayedTermsMatch && (
+    negotiation.phase === 'accepted' || negotiation.phase === 'countered'
+  );
+  const hasPayment = offeredSpecial
+    ? (state.specialItems[offeredSpecial] ?? 0) >= 1
+    : !negotiation.give || (state.resources[negotiation.give] ?? 0) >= negotiation.giveAmt;
   const actionLabel = negotiation.initiatedBy === 'player'
     ? negotiation.phase === 'countered' ? '조금 더 흥정한다' : '조건을 묻는다'
     : '이 조건을 제시한다';
@@ -137,7 +144,17 @@ export function TradeDialog({ state, onNegotiate, onChoose }: Props) {
         <div className="trade-offer-grid">
           <section className="trade-offer-side">
             <div className="trade-side-label">{isExtortion ? '그들이 요구하는 것' : '우리가 내놓는 것'}</div>
-            {negotiation.give ? (
+            {offeredSpecial ? (
+              <div className="trade-locked-resource trade-special-offer">
+                <span className="trade-special-icon" aria-hidden="true">{SPECIAL_ITEM_DEFS[offeredSpecial].icon}</span>
+                <div>
+                  <strong>{SPECIAL_ITEM_DEFS[offeredSpecial].name} 1</strong>
+                  <div className={hasPayment ? 'muted small' : 'small trade-shortage'}>
+                    기물함 {state.specialItems[offeredSpecial] ?? 0}
+                  </div>
+                </div>
+              </div>
+            ) : negotiation.give ? (
               <div className="trade-locked-resource">
                 <TradeResourceIcon resource={negotiation.give} size={58} />
                 <div>
@@ -149,6 +166,25 @@ export function TradeDialog({ state, onNegotiate, onChoose }: Props) {
               </div>
             ) : (
               <div className="trade-empty-offer">상대의 요구를 기다리는 중</div>
+            )}
+            {!isExtortion && (Object.keys(SPECIAL_ITEM_DEFS) as SpecialItemId[]).some(item => state.specialItems[item] > 0 && SPECIAL_ITEM_DEFS[item].tradeValue > 0) && (
+              <div className="trade-special-choices">
+                <div className="muted small">기물로 조건 제시</div>
+                {(Object.keys(SPECIAL_ITEM_DEFS) as SpecialItemId[])
+                  .filter(item => state.specialItems[item] > 0 && SPECIAL_ITEM_DEFS[item].tradeValue > 0)
+                  .map(item => (
+                    <button
+                      key={item}
+                      type="button"
+                      className={offeredSpecial === item ? 'active' : ''}
+                      title={`${SPECIAL_ITEM_DEFS[item].desc} 가치 ${SPECIAL_ITEM_DEFS[item].tradeValue}`}
+                      onClick={() => onNegotiate(get, getAmt, item)}
+                    >
+                      <span aria-hidden="true">{SPECIAL_ITEM_DEFS[item].icon}</span>
+                      {SPECIAL_ITEM_DEFS[item].name} ({state.specialItems[item]})
+                    </button>
+                  ))}
+              </div>
             )}
           </section>
 
@@ -215,7 +251,7 @@ export function TradeDialog({ state, onNegotiate, onChoose }: Props) {
           </section>
         </div>
 
-        {negotiation.give && !isExtortion && (
+        {(negotiation.give || offeredSpecial) && !isExtortion && (
           <div className="trade-value-compare">
             <div>
               <span>제공 가치 {giveValue.toFixed(1)}</span>

@@ -29,10 +29,17 @@ import { toggleNitreYards } from './game/suspicion';
 import { setProcessingReserve } from './game/processing';
 import { setTributeReserve } from './game/tributeReserve';
 import { nextRank } from './game/promotion';
+import { openPredatorHunt } from './game/specialEvents';
 import { getPointerAction, selectedEntityFromTile } from './game/selectionActions';
 import { isExplored } from './game/exploration';
+import { makeRng } from './game/map';
+import {
+  raidBanditLair, requestHuntingRights, requestPassagePermission, scoutBanditLair, sendGiftToSite,
+  type SiteGiftType,
+} from './game/siteDiplomacy';
 import type {
   BuildingTypeId, CropId, Difficulty, JobId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
+  SpecialItemId, WildlifeKind,
 } from './game/types';
 
 export default function App() {
@@ -277,8 +284,8 @@ export default function App() {
     bump();
   };
 
-  const handleNegotiateTrade = (get: ResourceId, getAmt: number) => {
-    negotiateTrade(stateRef.current, get, getAmt);
+  const handleNegotiateTrade = (get: ResourceId, getAmt: number, specialItem?: SpecialItemId) => {
+    negotiateTrade(stateRef.current, get, getAmt, specialItem);
     bump();
   };
 
@@ -306,6 +313,35 @@ export default function App() {
     toggleNitreYards(stateRef.current);
     bump();
   };
+
+  const handleOrganizeHunt = (kind: WildlifeKind) => {
+    const error = openPredatorHunt(stateRef.current, kind);
+    if (error) addLog(stateRef.current, error, 'info');
+    bump();
+  };
+
+  const siteActionRng = (siteId: number) => {
+    const state = stateRef.current;
+    const site = state.foreignSites.find(candidate => candidate.id === siteId);
+    return makeRng(state.seed + state.day * 104729 + siteId * 7919 + (site?.memories.length ?? 0) * 131);
+  };
+
+  const handleSiteAction = (action: () => string | null) => {
+    const error = action();
+    if (error) addLog(stateRef.current, error, 'info', true);
+    bump();
+  };
+
+  const handleSendSiteGift = (siteId: number, gift: SiteGiftType) =>
+    handleSiteAction(() => sendGiftToSite(stateRef.current, siteId, gift));
+  const handleRequestSitePassage = (siteId: number) =>
+    handleSiteAction(() => requestPassagePermission(stateRef.current, siteId));
+  const handleRequestSiteHunting = (siteId: number) =>
+    handleSiteAction(() => requestHuntingRights(stateRef.current, siteId));
+  const handleScoutBanditLair = (siteId: number) =>
+    handleSiteAction(() => scoutBanditLair(stateRef.current, siteId, siteActionRng(siteId)));
+  const handleRaidBanditLair = (siteId: number) =>
+    handleSiteAction(() => raidBanditLair(stateRef.current, siteId, siteActionRng(siteId)));
 
   const handleSave = () => {
     if (saveGame(stateRef.current)) {
@@ -482,6 +518,12 @@ export default function App() {
             onToggleNitre={handleToggleNitre}
             onSetSmithyProduct={handleSetSmithyProduct}
             onDemolishBuilding={handleDemolishBuilding}
+            onOrganizeHunt={handleOrganizeHunt}
+            onSendSiteGift={handleSendSiteGift}
+            onRequestSitePassage={handleRequestSitePassage}
+            onRequestSiteHunting={handleRequestSiteHunting}
+            onScoutBanditLair={handleScoutBanditLair}
+            onRaidBanditLair={handleRaidBanditLair}
             tab={inspTab}
             setTab={setInspTab}
             residentId={inspResidentId}

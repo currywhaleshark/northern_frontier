@@ -77,6 +77,10 @@ export function openCourtTributeChoice(state: GameState): void {
     body:
       `한양에서 조정의 사자가 당도했습니다. 올해 세공을 거두러 왔습니다.\n` +
       `요구: ${label}`,
+    illustration: {
+      src: '/assets/events/court-tribute-v1.png',
+      alt: '눈 덮인 개척지에서 곡물과 가죽 세공품을 검사하는 조정 관리들',
+    },
     options: [
       {
         id: 'pay-full',
@@ -186,5 +190,16 @@ export function maybeCollectTribute(state: GameState): void {
   if (getSeason(state.day) !== 'winter') return;
   if (!state.courtTribute || state.courtTribute.resolved) return;
   if (state.pendingChoice || state.battle) return;
+  if (state.tributeWaivers > 0) {
+    releaseTributeReserve(state);
+    state.tributeWaivers -= 1;
+    state.courtTribute.resolved = true;
+    state.courtTribute.paid = true;
+    state.tributeFailStreak = 0;
+    state.tributePaidStreak += 1;
+    lowerSuspicion(state, CONFIG.suspicion.tributeDecay);
+    addLog(state, '산삼 진상의 공으로 올해 세공이 면제되었습니다. 조정은 이를 성실 납부로 인정했습니다.', 'good', true);
+    return;
+  }
   openCourtTributeChoice(state);
 }

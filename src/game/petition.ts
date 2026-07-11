@@ -123,6 +123,10 @@ export function requestPetition(state: GameState): string | null {
     body:
       `한양에 사자를 보내 지원을 청합니다. 조정은 명성이 높은 수령의 청을 후하게 듣습니다.\n` +
       `현재 명성: ${Math.floor(state.resources.reputation)} · 청원은 계절당 한 번입니다.`,
+    illustration: {
+      src: '/assets/events/court-petition-v1.png',
+      alt: '변방의 청원서를 한양으로 가져가는 조정의 기마 파발',
+    },
     options: [
       ...offers.map(o => ({
         id: o.id,

@@ -7,7 +7,7 @@
 // SpriteAPI 구현체만 교체하면 된다.
 import { CONFIG } from '../game/config';
 import { BUILDING_DEFS, buildingFootprintSize, canAfford, canPlaceBuildingAt } from '../game/buildings';
-import { JOB_COLORS } from '../game/constants';
+import { FACTIONS, JOB_COLORS } from '../game/constants';
 import { getSeason } from '../game/seasons';
 import { findHabitatIconAtTile } from '../game/habitats';
 import { isBuildingFootprintExplored, isExplored } from '../game/exploration';
@@ -15,7 +15,9 @@ import { builtWallTileSet, isWallBuilding, wallConnectionsFromSet } from '../gam
 import { assignedWorkers, workerSlotConfig } from '../game/workerSlots';
 import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
 import { militiaWeaponForResident } from './militiaWeaponAssignment';
-import type { AnimalHabitat, Building, BuildingTypeId, GameState, Resident, Terrain } from '../game/types';
+import { claimZonesAt } from '../game/claimZones';
+import { foreignSiteAt } from '../game/foreignSites';
+import type { AnimalHabitat, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, Resident, Terrain } from '../game/types';
 
 const TILE = CONFIG.ui.tileSize;
 
@@ -110,7 +112,7 @@ function drawTerrainLayer(state: GameState, width: number, height: number, sprit
 }
 
 // 굴뚝 연기: 위로 오르며 흩어지는 회백색 입자 (건물 id로 위상을 어긋나게)
-function drawSmoke(ctx: CanvasRenderingContext2D, bx: number, by: number, id: number, footprint: number): void {
+function drawChimneySmoke(ctx: CanvasRenderingContext2D, bx: number, by: number, id: number, footprint: number): void {
   const t = performance.now() / 1000;
   for (let k = 0; k < 4; k++) {
     const ph = ((t / 2.6) + k / 4 + (id % 7) / 7) % 1; // 0(굴뚝)→1(소멸)
@@ -123,19 +125,20 @@ function drawSmoke(ctx: CanvasRenderingContext2D, bx: number, by: number, id: nu
   }
 }
 
-function drawBuildingDamage(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-  ctx.save();
-  ctx.strokeStyle = 'rgba(116,42,34,0.9)';
-  ctx.lineWidth = Math.max(1.5, size / 18);
-  ctx.beginPath();
-  ctx.moveTo(x + size * 0.28, y + size * 0.2);
-  ctx.lineTo(x + size * 0.48, y + size * 0.42);
-  ctx.lineTo(x + size * 0.38, y + size * 0.62);
-  ctx.moveTo(x + size * 0.7, y + size * 0.25);
-  ctx.lineTo(x + size * 0.58, y + size * 0.48);
-  ctx.lineTo(x + size * 0.73, y + size * 0.7);
-  ctx.stroke();
-  ctx.restore();
+function drawDamageSmoke(ctx: CanvasRenderingContext2D, bx: number, by: number, id: number, footprint: number): void {
+  const t = performance.now() / 1000;
+  const size = TILE * footprint;
+  for (let k = 0; k < 6; k++) {
+    const ph = ((t / 3.8) + k / 6 + (id % 11) / 11) % 1;
+    const sway = Math.sin(ph * 7 + id * 0.9 + k) * (2 + ph * 3);
+    const sx = bx + size * 0.52 + sway;
+    const sy = by + size * 0.5 - ph * (15 + size * 0.28);
+    const alpha = 0.5 * (1 - ph) * (0.72 + (k % 3) * 0.12);
+    ctx.fillStyle = `rgba(73,67,62,${alpha.toFixed(2)})`;
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, 2.3 + ph * 4.2, 1.8 + ph * 3.2, sway * 0.025, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 // 눈밭 발자국: 지나온 자취를 따라 어긋난 점 두 줄, 오래된 것일수록 옅게
@@ -337,6 +340,109 @@ function drawFogOverlay(ctx: CanvasRenderingContext2D, state: GameState): void {
   ctx.restore();
 }
 
+function siteColor(site: ForeignSite): string {
+  return FACTIONS.find(faction => faction.name === site.factionName)?.color ?? '#9aa0a6';
+}
+
+function drawClaimZone(ctx: CanvasRenderingContext2D, zone: ClaimZone, color: string): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc((zone.x + 0.5) * TILE, (zone.y + 0.5) * TILE, zone.radius * TILE, 0, Math.PI * 2);
+  ctx.fillStyle = color + '18';
+  ctx.strokeStyle = color + '99';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([5, 4]);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawForeignSite(ctx: CanvasRenderingContext2D, site: ForeignSite, selected: boolean): void {
+  const x = site.x * TILE;
+  const y = site.y * TILE;
+  const w = site.width * TILE;
+  const h = site.height * TILE;
+  const color = siteColor(site);
+  const inactive = site.type === 'seasonalCamp' && site.seasonalActive === false;
+  ctx.save();
+  ctx.globalAlpha = inactive ? 0.45 : 1;
+
+  if (site.type === 'village' || site.type === 'fishingVillage') {
+    ctx.fillStyle = '#4f3c2d';
+    ctx.fillRect(x + w * 0.12, y + h * 0.46, w * 0.34, h * 0.3);
+    ctx.fillRect(x + w * 0.56, y + h * 0.38, w * 0.3, h * 0.34);
+    ctx.fillStyle = '#85705a';
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.07, y + h * 0.48);
+    ctx.lineTo(x + w * 0.3, y + h * 0.2);
+    ctx.lineTo(x + w * 0.5, y + h * 0.48);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.5, y + h * 0.4);
+    ctx.lineTo(x + w * 0.72, y + h * 0.12);
+    ctx.lineTo(x + w * 0.92, y + h * 0.4);
+    ctx.fill();
+    if (site.type === 'fishingVillage') {
+      ctx.strokeStyle = '#8fc1d4';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + w * 0.18, y + h * 0.86);
+      ctx.quadraticCurveTo(x + w * 0.5, y + h * 0.98, x + w * 0.8, y + h * 0.82);
+      ctx.stroke();
+    }
+  } else if (site.type === 'seasonalCamp') {
+    ctx.fillStyle = inactive ? '#67615b' : '#8d7659';
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.12, y + h * 0.76);
+    ctx.lineTo(x + w * 0.5, y + h * 0.16);
+    ctx.lineTo(x + w * 0.88, y + h * 0.76);
+    ctx.fill();
+    if (!inactive) {
+      ctx.fillStyle = '#e9a34a';
+      ctx.beginPath();
+      ctx.arc(x + w * 0.5, y + h * 0.82, Math.max(2, TILE * 0.1), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (site.type === 'banditLair') {
+    ctx.fillStyle = site.status === 'burned' ? '#2b211e' : '#30292a';
+    ctx.fillRect(x + w * 0.15, y + h * 0.4, w * 0.68, h * 0.38);
+    ctx.fillStyle = '#1f1b1c';
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.08, y + h * 0.42);
+    ctx.lineTo(x + w * 0.5, y + h * 0.12);
+    ctx.lineTo(x + w * 0.9, y + h * 0.42);
+    ctx.fill();
+    ctx.strokeStyle = '#b9473f';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.78, y + h * 0.38);
+    ctx.lineTo(x + w * 0.78, y + h * 0.08);
+    ctx.lineTo(x + w * 0.95, y + h * 0.16);
+    ctx.stroke();
+  } else if (site.type === 'outpost') {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + w * 0.25, y + h * 0.25, w * 0.5, h * 0.55);
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.5, y + h * 0.25);
+    ctx.lineTo(x + w * 0.5, y + h * 0.04);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = '#77756f';
+    ctx.fillRect(x + w * 0.15, y + h * 0.58, w * 0.28, h * 0.18);
+    ctx.fillRect(x + w * 0.48, y + h * 0.42, w * 0.34, h * 0.2);
+  }
+
+  ctx.fillStyle = color;
+  ctx.fillRect(x + 2, y + 2, Math.max(4, w * 0.12), 3);
+  if (selected) {
+    ctx.strokeStyle = '#f3ce68';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+  }
+  ctx.restore();
+}
+
 export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: SceneOptions): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -353,6 +459,18 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   ctx.drawImage(layer, 0, 0);
   if (hoveredHabitat) drawHabitatRange(ctx, hoveredHabitat);
   for (const habitat of habitats) drawHabitatIcon(ctx, habitat);
+
+  const activeClaimZones = new Map<number, ClaimZone>();
+  for (const point of [o.hover, o.selected]) {
+    if (!point) continue;
+    for (const zone of claimZonesAt(state, point.x, point.y)) {
+      if (zone.discovered) activeClaimZones.set(zone.id, zone);
+    }
+  }
+  for (const zone of activeClaimZones.values()) {
+    const owner = state.foreignSites.find(site => site.id === zone.siteId);
+    drawClaimZone(ctx, zone, owner ? siteColor(owner) : '#aab1b8');
+  }
 
   // 2) 건물 — 지붕이 위 타일에 겹치므로 y 순서로 그린다
   const season = getSeason(state.day);
@@ -375,11 +493,19 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
         : undefined,
       x: b.x * TILE, y: b.y * TILE, size,
     });
-    if (b.repairing) drawBuildingDamage(ctx, b.x * TILE, b.y * TILE, size);
+    if (b.repairing) {
+      sprites.drawBuildingDamage(ctx, { season, x: b.x * TILE, y: b.y * TILE, size });
+      drawDamageSmoke(ctx, b.x * TILE, b.y * TILE, b.id, footprint);
+    }
     // 아궁이에 불을 땔 때 온돌집/중심지 굴뚝에서 연기가 오른다
     if (b.built && heating && (b.type === 'ondol' || b.type === 'center')) {
-      drawSmoke(ctx, b.x * TILE, b.y * TILE, b.id, footprint);
+      drawChimneySmoke(ctx, b.x * TILE, b.y * TILE, b.id, footprint);
     }
+  }
+
+  for (const site of state.foreignSites.filter(candidate => candidate.discovered)) {
+    const selected = !!o.selected && foreignSiteAt(state, o.selected.x, o.selected.y)?.id === site.id;
+    drawForeignSite(ctx, site, selected);
   }
 
   drawWorkerSlotOverlays(ctx, state, sorted, o.selectedBuildingId);
@@ -435,6 +561,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       spotted: b.spotted,
       moving: b.px !== b.x || b.py !== b.y,
       facing: b.x < b.px ? -1 : 1,
+      faction: b.faction,
     });
     if (state.battle?.phase === 'clash') drawBattleClash(ctx, state.battle.frontX, state.battle.frontY);
   }
@@ -485,9 +612,13 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     const def = BUILDING_DEFS[o.placingType];
     const footprint = buildingFootprintSize(o.placingType);
     const size = TILE * footprint;
+    const overlapsForeignSite = Array.from({ length: footprint }, (_, dy) =>
+      Array.from({ length: footprint }, (_unused, dx) => foreignSiteAt(state, o.hover!.x + dx, o.hover!.y + dy)))
+      .flat()
+      .some(site => site != null);
     const ok = isBuildingFootprintExplored(state, o.placingType, o.hover.x, o.hover.y) &&
       canPlaceBuildingAt(state, o.placingType, o.hover.x, o.hover.y) &&
-      canAfford(state, def);
+      canAfford(state, def) && !overlapsForeignSite;
     ctx.fillStyle = ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
     ctx.fillRect(o.hover.x * TILE, o.hover.y * TILE, size, size);
     sprites.drawBuilding(ctx, {

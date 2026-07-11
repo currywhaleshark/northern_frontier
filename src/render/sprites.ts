@@ -85,12 +85,21 @@ export interface RaiderDrawParams {
   spotted: boolean;
   moving?: boolean;
   facing?: 1 | -1;
+  faction?: string;
+}
+
+export interface BuildingDamageDrawParams {
+  season: Season;
+  x: number;
+  y: number;
+  size: number;
 }
 
 export interface SpriteAPI {
   id: string; // 지형 레이어 캐시 키에 들어간다 — 스프라이트 세트가 바뀌면 다시 그린다
   drawTerrain(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): void;
   drawBuilding(ctx: CanvasRenderingContext2D, p: BuildingDrawParams): void;
+  drawBuildingDamage(ctx: CanvasRenderingContext2D, p: BuildingDamageDrawParams): void;
   drawResident(ctx: CanvasRenderingContext2D, p: ResidentDrawParams): void;
   drawRaiders(ctx: CanvasRenderingContext2D, p: RaiderDrawParams): void;
 }
@@ -155,6 +164,21 @@ export const placeholderSprites: SpriteAPI = {
     } else {
       ctx.fillText(def.emoji, cx, cy);
     }
+  },
+
+  drawBuildingDamage(ctx, p) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(116,42,34,0.9)';
+    ctx.lineWidth = Math.max(1.5, p.size / 18);
+    ctx.beginPath();
+    ctx.moveTo(p.x + p.size * 0.28, p.y + p.size * 0.2);
+    ctx.lineTo(p.x + p.size * 0.48, p.y + p.size * 0.42);
+    ctx.lineTo(p.x + p.size * 0.38, p.y + p.size * 0.62);
+    ctx.moveTo(p.x + p.size * 0.7, p.y + p.size * 0.25);
+    ctx.lineTo(p.x + p.size * 0.58, p.y + p.size * 0.48);
+    ctx.lineTo(p.x + p.size * 0.73, p.y + p.size * 0.7);
+    ctx.stroke();
+    ctx.restore();
   },
 
   drawResident(ctx, p) {

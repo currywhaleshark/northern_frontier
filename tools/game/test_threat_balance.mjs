@@ -85,7 +85,7 @@ function makeHighDefenseBuState() {
   ]));
 
   assert.ok(
-    state.raiders || state.pendingChoice?.kind === 'raid',
+    state.raiders || state.pendingChoice?.kind === 'raid' || state.pendingChoice?.kind === 'extortion',
     'threat 75 should have a meaningful daily raid trigger chance',
   );
 }

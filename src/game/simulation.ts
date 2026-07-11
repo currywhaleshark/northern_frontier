@@ -39,6 +39,11 @@ import { LUXURY_RESOURCES } from './resourceCatalog';
 import { returnResidentCart, setResidentCartEquipped } from './equipment';
 import { isHaulSourceBuilding } from './inventory';
 import { maybeOfferImmigration, resolveImmigration } from './immigration';
+import { createIncidentState, resolveSpecialEvent, updateSpecialEvents } from './specialEvents';
+import { dailyClaimTensionTick, noteBuildingClaimIntrusions } from './claimZones';
+import {
+  foreignSiteAt, generateForeignSites, revealForeignSitesFromExploration, updateSeasonalForeignSites,
+} from './foreignSites';
 import {
   assignNearestWorkerToBuilding as assignNearestWorkerToSlot,
   assignResidentToBuilding as assignResidentToSlot,
@@ -76,6 +81,10 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     exploration: createExploration({ map: tiles }),
     // 짐승 서식지: 숲 덩어리마다 난이도별 확률로 자리 잡는다 (마을 근처 하나는 보장)
     habitats: spawnAnimalHabitats(tiles, centerX, centerY, rng, diff.habitatChance),
+    foreignSites: [],
+    claimZones: [],
+    nextForeignSiteId: 1,
+    nextClaimZoneId: 1,
     residents: [],
     buildings: [],
     nextBuildingId: 1,
@@ -93,6 +102,10 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     tradeCapacitySeason: 0,
     tradeCapacityUsed: {},
     lastImmigrationDay: -999,
+    incidents: createIncidentState(s),
+    specialItems: { wildGinseng: 0, tigerPelt: 0, gyrfalcon: 0 },
+    discoveredSpecialItems: [],
+    tributeWaivers: 0,
     pendingChoice: null,
     courtTribute: null,
     tributeReserve: {},
@@ -124,6 +137,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
   placePrebuilt(state, 'center', centerX, centerY);
   const hutSpots = findNearbySpots(state, centerX, centerY, 'hut', 2);
   for (const spot of hutSpots) placePrebuilt(state, 'hut', spot.x, spot.y);
+  generateForeignSites(state, rng);
 
   // 시작 주민 (마을 중심에서 출발)
   for (const [job, count] of Object.entries(CONFIG.start.jobs)) {
@@ -136,6 +150,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
   state.weather = rollWeather(1, rng);
   state.resources.defense = computeDefense(state);
   refreshExploration(state);
+  revealForeignSitesFromExploration(state);
 
   addLog(state, '조정의 명을 받아 두만강 이북 개척지에 도착했습니다. 짧은 봄 동안 겨울을 준비해야 합니다.', 'info');
   addLog(state, '나무를 베고, 집을 짓고, 식량과 장작을 모으십시오. 첫 겨울이 모든 것을 시험할 것입니다.', 'info');
@@ -203,6 +218,11 @@ export function tryPlaceBuilding(state: GameState, type: BuildingTypeId, x: numb
     return `${rankName} 승격 후 지을 수 있습니다.`;
   }
   if (!isBuildingFootprintExplored(state, type, x, y)) return '아직 답사하지 않은 곳입니다.';
+  revealForeignSitesFromExploration(state);
+  const proposedTiles = buildingFootprintTiles(state, type, x, y) ?? [];
+  if (proposedTiles.some(proposed => foreignSiteAt(state, proposed.x, proposed.y))) {
+    return '현지 거점이 자리한 곳에는 건물을 지을 수 없습니다.';
+  }
   if (!canPlaceBuildingAt(state, type, x, y)) return '이곳에는 지을 수 없습니다.';
   if (def.unique && state.buildings.some(b => b.type === type)) return '이미 건설 중이거나 완공되었습니다.';
   if (type === 'cannonEmplacement' && cannonPlacementsUsed(state) >= state.cannonsGranted) {
@@ -229,6 +249,7 @@ export function tryPlaceBuilding(state: GameState, type: BuildingTypeId, x: numb
     }
   }
   addLog(state, `${def.name} 건설을 시작했습니다.`, 'info');
+  noteBuildingClaimIntrusions(state, b);
   return null;
 }
 
@@ -492,7 +513,10 @@ export function setSmithyProduct(state: GameState, buildingId: number, product: 
 
 export function resolveChoice(state: GameState, optionId: string): void {
   if (!state.pendingChoice) return;
-  const rng = makeRng(state.seed + state.day * 7919 + 31);
+  const incidentNonce = state.pendingChoice.kind === 'incident'
+    ? state.incidents.resolutionCount++
+    : 0;
+  const rng = makeRng(state.seed + state.day * 7919 + incidentNonce * 104729 + 31);
   if (state.pendingChoice.kind === 'raid') resolveRaid(state, optionId, rng);
   else if (state.pendingChoice.kind === 'extortion') resolveExtortion(state, optionId, rng);
   else if (state.pendingChoice.kind === 'tribute') resolveCourtTribute(state, optionId);
@@ -500,6 +524,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'inspection') resolveInspection(state, optionId, rng);
   else if (state.pendingChoice.kind === 'crackdown') resolveCrackdown(state, optionId, rng);
   else if (state.pendingChoice.kind === 'immigration') resolveImmigration(state, optionId);
+  else if (state.pendingChoice.kind === 'incident') resolveSpecialEvent(state, optionId, rng);
   else resolveTrade(state, optionId);
   state.resources.defense = computeDefense(state);
 }
@@ -529,6 +554,7 @@ export function advanceTick(state: GameState): void {
   if (state.gameOver || state.pendingChoice) return;
   agentsTick(state);
   refreshExploration(state);
+  revealForeignSitesFromExploration(state);
   const tickRng = makeRng(state.seed + state.day * 7919 + state.subTick * 131 + 3);
   battleTick(state, tickRng);
   raidersTick(state, tickRng);
@@ -582,6 +608,8 @@ function endOfDay(state: GameState): void {
   maybeFlavorLog(state, rng);
   maybeCollectTribute(state); // 겨울: 조정의 사자가 세공을 거둔다 (모달 충돌 시 다음 날로)
   updateSuspicion(state, rng); // 모반 의심 누적과 감찰/견책/토벌 사건
+  updateSpecialEvents(state, rng); // 기존 제도권 사건과 모달이 겹치면 예정일을 넘겨 다음 날 재시도
+  dailyClaimTensionTick(state);
 
   state.resources.defense = computeDefense(state);
   checkEndConditions(state);
@@ -589,6 +617,7 @@ function endOfDay(state: GameState): void {
 
 function onSeasonChange(state: GameState, prev: string, next: string): void {
   resetFactionTradeCapacityUsage(state);
+  updateSeasonalForeignSites(state, next as ReturnType<typeof getSeason>);
   addLog(state, `${SEASON_NAMES[next as keyof typeof SEASON_NAMES]}이(가) 시작되었습니다. (${getYear(state.day)}년차)`, 'weather');
 
   if (next === 'winter') {
@@ -680,7 +709,8 @@ function runToolWear(state: GameState): void {
     'woodcutter', 'woodSplitter', 'hunter', 'farmer', 'miller', 'builder', 'smith', 'miner', 'fisher',
     'charcoalBurner', 'herder', 'powderMaker', 'tanner', 'weaver', 'herbalist', 'hauler',
   ];
-  const n = state.residents.filter(r => r.alive && !r.sick && producing.includes(r.job)).length;
+  const n = state.residents.filter(r =>
+    r.alive && !r.sick && state.day >= (r.quarantinedUntil ?? 0) && producing.includes(r.job)).length;
   state.resources.tools = Math.max(0, state.resources.tools - n * CONFIG.production.toolWearPerWorker);
 }
 

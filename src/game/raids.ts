@@ -15,6 +15,7 @@ import { countJob } from './residents';
 import { getSeason, getYear } from './seasons';
 import type { BattleMode, Building, GameState, PendingChoice, TradeNegotiation } from './types';
 import { isWallBuilding } from './walls';
+import { findRaidOriginSite } from './foreignSites';
 
 // 위협도 일일 갱신
 export function updateThreat(state: GameState): void {
@@ -164,10 +165,18 @@ export function checkRaidTrigger(state: GameState, rng: () => number): void {
   if (season === 'autumn' || season === 'winter') chance *= 1.5;
   if (rng() >= chance) return;
 
-  const hasWarning = countBuilt(state, 'beacon') > 0 || countBuilt(state, 'watchtower') > 0;
-  const warned = hasWarning && rng() < t.earlyWarnChance;
+  const hasStructureWarning = countBuilt(state, 'beacon') > 0 || countBuilt(state, 'watchtower') > 0;
+  const hasGyrfalcon = (state.specialItems?.gyrfalcon ?? 0) > 0;
+  const warningChance = Math.min(0.95,
+    (hasStructureWarning ? t.earlyWarnChance : 0) +
+    (hasGyrfalcon ? CONFIG.specialEvents.gyrfalconWarningBonus : 0));
+  let warned = warningChance > 0 && rng() < warningChance;
   const power = raidPower(state, rng);
   const faction = pickFaction(state, rng);
+  const originSite = findRaidOriginSite(state, faction.name);
+  if (!warned && originSite && (originSite.scoutedUntilDay ?? 0) >= state.day) {
+    warned = rng() < CONFIG.foreignSites.banditScoutWarningBonus;
+  }
   if (openExtortionDemand(state, rng, warned, power, faction.name)) return;
   spawnRaiders(state, rng, warned, faction.name, power);
 }
@@ -197,6 +206,33 @@ export function spawnRaiders(
   let spawn: { x: number; y: number } | null = null;
   let path: { x: number; y: number }[] | null = null;
   let siege = false;
+  let originUsed = false;
+  const originSite = findRaidOriginSite(state, faction.name);
+  if (originSite) {
+    const starts: Array<{ x: number; y: number; order: number }> = [];
+    for (let y = originSite.y - 1; y <= originSite.y + originSite.height; y++) {
+      for (let x = originSite.x - 1; x <= originSite.x + originSite.width; x++) {
+        const perimeter = x === originSite.x - 1 || x === originSite.x + originSite.width ||
+          y === originSite.y - 1 || y === originSite.y + originSite.height;
+        if (perimeter && raiderPassable(state, x, y)) starts.push({ x, y, order: rng() });
+      }
+    }
+    starts.sort((a, b) => a.order - b.order);
+    for (const start of starts) {
+      const pass = (x: number, y: number) => raiderPassable(state, x, y);
+      path = findPath(state, start.x, start.y, raiderBuildingApproachGoal(state, center), pass);
+      if (!path && barrierTiles.size > 0) {
+        path = findPath(state, start.x, start.y, tile => nearBarrier(tile.x, tile.y), pass);
+        siege = !!path;
+      }
+      if (path) {
+        spawn = { x: start.x, y: start.y };
+        originUsed = true;
+        originSite.lastRaidDay = state.day;
+        break;
+      }
+    }
+  }
   for (let tryI = 0; tryI < 12 && !path; tryI++) {
     let sx: number, sy: number;
     if (tryI < 6) { sx = 2 + Math.floor(rng() * (w - 4)); sy = 0; }          // 북쪽 우선
@@ -252,7 +288,7 @@ export function spawnRaiders(
     trail: [],
   };
   if (warned) {
-    addLog(state, `봉수와 망루에서 경보! ${faction.name}이(가) 북쪽에서 접근하고 있습니다. 들이닥치기 전에 대비하십시오.`, 'raid');
+    addLog(state, `${originUsed && originSite?.scoutedUntilDay && originSite.scoutedUntilDay >= state.day ? '정찰해 둔 산길에서 움직임을 포착했습니다!' : '봉수와 망루에서 경보!'} ${faction.name}이(가) 접근하고 있습니다. 들이닥치기 전에 대비하십시오.`, 'raid');
   }
 }
 

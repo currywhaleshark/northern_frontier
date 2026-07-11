@@ -21,8 +21,9 @@ export const SLOTTED_BUILDING_CONFIG: Partial<Record<BuildingTypeId, WorkerSlotC
   weavingHouse: { job: 'weaver', slots: 2 },
 };
 
-function isWorkableResident(resident: Resident | undefined): resident is Resident {
-  return resident != null && resident.alive && !resident.sick && resident.health >= 20;
+function isWorkableResident(state: GameState, resident: Resident | undefined): resident is Resident {
+  return resident != null && resident.alive && !resident.sick &&
+    state.day >= (resident.quarantinedUntil ?? 0) && resident.health >= 20;
 }
 
 function slottedConfigForBuilding(
@@ -54,7 +55,7 @@ export function assignedWorkers(state: GameState, building: Building): Resident[
   return state.residents
     .filter(resident =>
       resident.assignedBuildingId === building.id &&
-      isWorkableResident(resident) &&
+      isWorkableResident(state, resident) &&
       resident.job === config.job)
     .sort((a, b) => a.id - b.id)
     .slice(0, config.slots);
@@ -87,7 +88,7 @@ export function autoAssignWorkersToBuilding(state: GameState, buildingId: number
     .filter(resident =>
       resident.assignedBuildingId == null &&
       resident.job === config.job &&
-      isWorkableResident(resident))
+      isWorkableResident(state, resident))
     .sort((a, b) => distance(a, building) - distance(b, building) || a.id - b.id)
     .slice(0, vacancies);
 
@@ -114,6 +115,7 @@ export function canAssignResidentToBuilding(
   if (!resident) return 'resident missing';
   if (!resident.alive) return 'resident is dead';
   if (resident.sick) return 'resident is sick';
+  if (state.day < (resident.quarantinedUntil ?? 0)) return 'resident is quarantined';
   if (resident.health < 20) return 'resident health is too low';
 
   const building = state.buildings.find(candidate => candidate.id === buildingId);
@@ -186,7 +188,7 @@ export function assignNearestWorkerToBuilding(state: GameState, buildingId: numb
   const candidate = state.residents
     .filter(resident =>
       resident.assignedBuildingId == null &&
-      isWorkableResident(resident))
+      isWorkableResident(state, resident))
     .sort((a, b) => {
       const jobPreference = Number(b.job === config.job) - Number(a.job === config.job);
       if (jobPreference !== 0) return jobPreference;

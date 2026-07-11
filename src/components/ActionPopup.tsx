@@ -5,7 +5,7 @@ import {
 import { CONFIG } from '../game/config';
 import { FACTIONS, JOB_COLORS, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES } from '../game/constants';
 import { allowedCropsForBuilding, cropIdForBuilding, CROP_DEFS } from '../game/crops';
-import { canRequestTrade } from '../game/events';
+import { canRequestTrade, factionTradeUnlockReason } from '../game/events';
 import { getBuildingActions } from '../game/selectionActions';
 import { assignedWorkers, availableWorkerSlots, workerSlotConfig } from '../game/workerSlots';
 import type { BuildingTypeId, CropId, GameState, ResourceId, SmithyProductId } from '../game/types';
@@ -236,7 +236,8 @@ export function ActionPopup({
 
       {(building.type === 'market' || building.type === 'dock') && (
         <div className="action-grid">
-          {FACTIONS.filter(faction => faction.exports.length > 0).map(faction => {
+          {FACTIONS.filter(faction =>
+            faction.exports.length > 0 && !factionTradeUnlockReason(state, faction.name)).map(faction => {
             const reason = canRequestTrade(state, faction.name);
             return (
               <button

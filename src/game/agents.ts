@@ -1653,7 +1653,8 @@ export function agentsTick(state: GameState): void {
   const living = state.residents.filter(r => r.alive);
   if (living.length === 0) return;
 
-  const producers = living.filter(r => PRODUCING_JOBS.includes(r.job) && !r.sick && r.health >= 20).length;
+  const producers = living.filter(r =>
+    PRODUCING_JOBS.includes(r.job) && !r.sick && state.day >= (r.quarantinedUntil ?? 0) && r.health >= 20).length;
   const t = state.resources.tools;
   const tMod = producers <= 0 || t >= producers ? 1 : 0.6 + 0.4 * (t / producers);
   const mAvg = living.reduce((s, r) => s + r.morale, 0) / living.length;
@@ -1674,9 +1675,9 @@ export function agentsTick(state: GameState): void {
     // 보간용 직전 위치 기록
     r.px = r.x;
     r.py = r.y;
-    // 병자/중상자는 마을 중심에서 앓는다
-    if (r.sick || r.health < 20) {
-      r.task = '앓아누움';
+    // 병자/격리자/중상자는 마을 중심에서 쉬며 배정은 유지한다
+    if (r.sick || state.day < (r.quarantinedUntil ?? 0) || r.health < 20) {
+      r.task = state.day < (r.quarantinedUntil ?? 0) ? '격리 중' : '앓아누움';
       clearHaulTask(r);
       if (carryTotal(r) > 0) depositAll(state, r); // 짐은 이웃이 거둬 간다
       goToCenter(state, r, ctx);

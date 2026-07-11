@@ -93,6 +93,10 @@ export function openInspection(state: GameState): void {
     body:
       '한양에서 감찰 어사가 내려왔습니다. 변방 수령이 화약을 만들고 오랑캐와 내통한다는\n' +
       `소문의 진위를 캐러 온 것입니다. (현재 모반 의심: ${Math.round(state.suspicion)})`,
+    illustration: {
+      src: '/assets/events/royal-inspection-v1.png',
+      alt: '개척지 창고와 장부를 조사하는 감찰 어사와 서리',
+    },
     options: [
       {
         id: 'bribe', label: '후하게 대접한다',
@@ -162,6 +166,10 @@ export function openCrackdown(state: GameState): void {
       '유예가 끝났습니다. 조정이 모반 혐의로 토벌군을 내려보냈습니다.\n' +
       '어떤 습격 무리보다 크고, 깃발에는 관군의 위엄이 서려 있습니다.\n' +
       `추정 규모: ${s.crackdownPower} / 현재 방어도: ${state.resources.defense}`,
+    illustration: {
+      src: '/assets/events/royal-crackdown-v1.png',
+      alt: '눈 덮인 개척지 성책으로 진군하는 조정 토벌군',
+    },
     options: [
       {
         id: 'surrender', label: '성문을 열고 결백을 빈다',

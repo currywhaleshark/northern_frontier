@@ -51,6 +51,7 @@ const {
 } = tributeMod;
 const {
   setTributeReserve,
+  tributeReserved,
   tributeReserveRatio,
 } = reserveMod;
 
@@ -170,6 +171,23 @@ assert.ok(tributeScale(1, 40) > tributeScale(1, 12));
   assert.ok(state.pendingChoice.options[0].disabledReason.includes('부족'));
   assert.equal(state.pendingChoice.options[1].disabled, true);
   state.pendingChoice = null;
+}
+
+// ── 세공고는 정수 단위만 보관하고, 구버전 소수 잔량은 일반 재고로 돌린다 ──
+{
+  const state = simulation.newGame(12);
+  state.courtTribute = { year: 1, items: { hide: 8 }, dueDay: 37, resolved: false, paid: false };
+  state.tributeReserve.hide = 6.64;
+  state.resources.hide = 0.36;
+  assert.equal(setTributeReserve(state, 'hide', tributeReserved(state, 'hide') + 1), null);
+  assert.equal(state.tributeReserve.hide, 7);
+  assert.equal(tributeReserved(state, 'hide'), 7);
+  assert.ok(Math.abs(state.resources.hide) < 1e-9);
+
+  state.resources.hide = 10.5;
+  assert.equal(setTributeReserve(state, 'hide', 8), null);
+  assert.equal(state.tributeReserve.hide, 8, '최대 채우기는 요구량을 넘지 않는다');
+  assert.equal(state.resources.hide, 9.5);
 }
 
 // ── 격년(짝수 연차) 납부 하사품 ──
