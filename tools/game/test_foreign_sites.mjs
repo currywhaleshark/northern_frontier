@@ -28,6 +28,7 @@ const foreignSites = await import(pathToFileURL(join(compiledDir, 'foreignSites.
 const claimZones = await import(pathToFileURL(join(compiledDir, 'claimZones.mjs')).href);
 const diplomacy = await import(pathToFileURL(join(compiledDir, 'siteDiplomacy.mjs')).href);
 const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
+const minimap = await import(pathToFileURL(join(compiledDir, 'minimap.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 {
@@ -119,6 +120,24 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
   assert.deepEqual(state.claimZones, []);
   assert.equal(state.nextForeignSiteId, 1);
   assert.equal(state.nextClaimZoneId, 1);
+}
+
+{
+  const state = simulation.newGame(2026071207);
+  state.foreignSites.forEach(site => { site.discovered = false; });
+  state.foreignSites[0].discovered = true;
+  assert.deepEqual(minimap.visibleMinimapSites(state).map(site => site.id), [state.foreignSites[0].id]);
+
+  state.raiders = {
+    x: 1, y: 1, px: 1, py: 1, path: [], power: 10, size: 3,
+    faction: '변경 마적', warned: false, spotted: false, siege: false, speed: 1, trail: [],
+  };
+  assert.equal(minimap.visibleMinimapRaid(state), null, 'undetected raiders stay hidden');
+  state.raiders.warned = true;
+  assert.equal(minimap.visibleMinimapRaid(state), state.raiders, 'beacon warning reveals raiders');
+  state.raiders.warned = false;
+  state.raiders.spotted = true;
+  assert.equal(minimap.visibleMinimapRaid(state), state.raiders, 'spotted raiders remain visible');
 }
 
 console.log('foreign site tests passed');

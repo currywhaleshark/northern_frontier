@@ -155,8 +155,16 @@ html, body, #root {
 .side.left { border-right: 1px solid var(--border); }
 .side.right { border-left: 1px solid var(--border); }
 
-.canvas-wrap {
+.canvas-stage {
   position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #0d1013;
+}
+.canvas-wrap {
+  position: absolute;
+  inset: 0;
   overflow: auto;
   background: #0d1013;
   padding: 8px;
@@ -164,6 +172,121 @@ html, body, #root {
      스크롤을 막으므로 쓰지 않는다. inline-block 캔버스가 자연스럽게 스크롤된다. */
 }
 .canvas-wrap canvas { image-rendering: pixelated; display: block; }
+
+/* ── 미니맵 ── */
+.minimap-overlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 40;
+  width: 204px;
+  pointer-events: none;
+}
+.minimap-panel {
+  width: 204px;
+  padding: 7px;
+  border: 1px solid rgba(214, 221, 224, 0.26);
+  border-radius: 6px;
+  background: rgba(17, 21, 24, 0.96);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.42);
+  pointer-events: auto;
+}
+.minimap-panel.raid-alert {
+  border-color: rgba(224, 93, 74, 0.9);
+  box-shadow: 0 0 0 2px rgba(224, 93, 74, 0.16), 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+.minimap-heading {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+.minimap-heading strong { font-size: 12px; }
+.minimap-alert-label {
+  color: #f08b78;
+  font-size: 11px;
+  font-weight: 700;
+  animation: minimap-alert-text 1s steps(2, end) infinite;
+}
+.minimap-center-btn {
+  width: 25px;
+  height: 25px;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel2);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.minimap-center-btn:hover { border-color: var(--accent); color: var(--accent); }
+.minimap-canvas-wrap {
+  position: relative;
+  width: 188px;
+  overflow: hidden;
+  border: 1px solid rgba(220, 229, 232, 0.22);
+  background: #090b0d;
+}
+.minimap-canvas-wrap canvas {
+  width: 188px;
+  height: auto;
+  cursor: crosshair;
+  touch-action: none;
+}
+.minimap-raid-ping {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #ff6e59;
+  border-radius: 50%;
+  background: rgba(206, 44, 32, 0.75);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 3px rgba(255, 83, 62, 0.2);
+  pointer-events: none;
+  animation: minimap-raid-pulse 0.9s ease-out infinite;
+}
+.minimap-tooltip {
+  position: absolute;
+  left: 5px;
+  bottom: 5px;
+  max-width: calc(100% - 10px);
+  padding: 3px 5px;
+  border: 1px solid rgba(220, 229, 232, 0.22);
+  background: rgba(10, 12, 14, 0.94);
+  color: var(--text);
+  font-size: 11px;
+  pointer-events: none;
+}
+.minimap-legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 5px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 9px;
+}
+.minimap-legend span { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.minimap-legend i { width: 6px; height: 6px; display: inline-block; background: #d9d2bd; }
+.minimap-legend i.foreign { background: #58b6a4; }
+.minimap-legend i.hostile { background: #d45e52; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+
+@keyframes minimap-raid-pulse {
+  0% { transform: translate(-50%, -50%) scale(0.7); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0.28; }
+}
+@keyframes minimap-alert-text {
+  50% { color: #ffd1c8; }
+}
+
+@media (max-width: 900px) {
+  .minimap-overlay { width: 156px; }
+  .minimap-panel { width: 156px; padding: 5px; }
+  .minimap-canvas-wrap { width: 144px; }
+  .minimap-canvas-wrap canvas { width: 144px; }
+  .minimap-legend span:nth-child(2) { display: none; }
+}
 
 /* ── 지도 위 주요 소식 ── */
 .important-log-overlay {

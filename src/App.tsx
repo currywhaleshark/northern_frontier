@@ -21,6 +21,7 @@ import { InspectorPanel, type InspectorTab } from './components/InspectorPanel';
 import { ImportantLogOverlay } from './components/ImportantLogOverlay';
 import { JobPanel } from './components/JobPanel';
 import { MainMenu } from './components/MainMenu';
+import { Minimap } from './components/Minimap';
 import { ProcessingPanel } from './components/ProcessingPanel';
 import { TopBar } from './components/TopBar';
 import { RANK_NAMES } from './game/constants';
@@ -45,6 +46,7 @@ import type {
 export default function App() {
   // 게임 상태는 ref에 두고, version 증가로 리렌더를 트리거한다
   const stateRef = useRef(newGame());
+  const mapViewportRef = useRef<HTMLDivElement>(null);
   const [version, setVersion] = useState(0);
   const bump = useCallback(() => setVersion(v => v + 1), []);
 
@@ -476,30 +478,35 @@ export default function App() {
           <JobPanel state={state} onReassign={handleReassign} />
           <ProcessingPanel state={state} onSetReserve={handleSetProcessingReserve} />
         </div>
-        <div className="canvas-wrap">
-          <ImportantLogOverlay state={state} />
-          <GameCanvas
-            state={state}
-            version={version}
-            placingType={placingType}
-            selected={selected}
-            selectedEntity={selectedEntity}
-            selectedResidentId={inspResidentId}
-            anim={animRef.current}
-            onTileClick={handleTileClick}
-            onResidentClick={handleResidentClick}
-            onContextAction={handleContextAction}
-            onUpgradeHousing={handleUpgradeHousing}
-            onSetSmithyProduct={handleSetSmithyProduct}
-            onSetBuildingCrop={handleSetBuildingCrop}
-            onConvertFieldToPaddy={handleConvertFieldToPaddy}
-            onRequestTrade={handleRequestTrade}
-            onToggleNitre={handleToggleNitre}
-            onAssignNearestWorker={handleAssignNearestWorker}
-            onUnassignWorker={handleUnassignWorker}
-            onCloseBuildingActions={handleCloseBuildingActions}
-            onCancelPlace={() => setPlacingType(null)}
-          />
+        <div className="canvas-stage">
+          <div className="minimap-overlay">
+            <Minimap state={state} version={version} viewportRef={mapViewportRef} selected={selected} />
+          </div>
+          <div className="canvas-wrap" ref={mapViewportRef}>
+            <ImportantLogOverlay state={state} />
+            <GameCanvas
+              state={state}
+              version={version}
+              placingType={placingType}
+              selected={selected}
+              selectedEntity={selectedEntity}
+              selectedResidentId={inspResidentId}
+              anim={animRef.current}
+              onTileClick={handleTileClick}
+              onResidentClick={handleResidentClick}
+              onContextAction={handleContextAction}
+              onUpgradeHousing={handleUpgradeHousing}
+              onSetSmithyProduct={handleSetSmithyProduct}
+              onSetBuildingCrop={handleSetBuildingCrop}
+              onConvertFieldToPaddy={handleConvertFieldToPaddy}
+              onRequestTrade={handleRequestTrade}
+              onToggleNitre={handleToggleNitre}
+              onAssignNearestWorker={handleAssignNearestWorker}
+              onUnassignWorker={handleUnassignWorker}
+              onCloseBuildingActions={handleCloseBuildingActions}
+              onCancelPlace={() => setPlacingType(null)}
+            />
+          </div>
         </div>
         <div className="side right">
           <AlertsPanel state={state} />
