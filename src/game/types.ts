@@ -256,6 +256,30 @@ export interface TradeQuote {
   margin: number;
 }
 
+export type TradeNegotiationPhase = 'selecting' | 'countered' | 'accepted' | 'rejected';
+
+export interface TradeNegotiation {
+  faction: string;
+  initiatedBy: 'player' | 'faction';
+  mode?: 'trade' | 'extortion';
+  phase: TradeNegotiationPhase;
+  give: ResourceId | null; // 마을이 내놓는 물품
+  giveAmt: number;
+  get: ResourceId | null;  // 마을이 받는 물품
+  getAmt: number;
+  round: number;
+  margin: number;
+  message: string;
+  maxAcceptGetAmt?: number;
+}
+
+export interface TradeEvaluation {
+  outcome: Extract<TradeNegotiationPhase, 'accepted' | 'countered' | 'rejected'>;
+  offer: TradeOffer;
+  maxGetAmt: number;
+  message: string;
+}
+
 export interface LogEntry {
   day: number;
   text: string;
@@ -272,7 +296,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'trade' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration';
+  kind: 'raid' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration';
   title: string;
   body: string;
   illustration?: {
@@ -374,6 +398,8 @@ export interface GameState {
   tradeRefusedDays: number; // 최근 교역 거절 여파 남은 일수
   lastTradeDay: number;     // 마지막 교역 제안이 온 날
   lastTradeByFaction: Record<string, number>; // 세력별 마지막 플레이어 주도 교역일 (쿨다운용)
+  tradeCapacitySeason: number; // 교역 물동량 사용량이 속한 계절 번호
+  tradeCapacityUsed: Record<string, Partial<Record<ResourceId, number>>>; // 세력별 이번 계절 출고량
   lastImmigrationDay: number; // 마지막 이주민 수용 여부 선택지가 열린 날
   pendingChoice: PendingChoice | null;
   courtTribute: CourtTribute | null;  // 올해 세공 (봄 공지 때 설정)

@@ -18,8 +18,9 @@ import { generateMap, makeRng } from './map';
 import { isHabitatActive, spawnAnimalHabitats } from './habitats';
 import { agentsTick, resetAgent, SUBTICKS } from './agents';
 import { battleTick } from './battles';
-import { checkRaidTrigger, raidersTick, resolveRaid, updateThreat } from './raids';
+import { checkRaidTrigger, raidersTick, resolveExtortion, resolveRaid, updateThreat } from './raids';
 import { driftRelations, initRelations } from './relations';
+import { resetFactionTradeCapacityUsage } from './tradeValues';
 import {
   avg, createResident, livingResidents, reconcileResidentHomes, updateMorale, updateResidentNeeds,
 } from './residents';
@@ -89,6 +90,8 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     tradeRefusedDays: 0,
     lastTradeDay: 0,
     lastTradeByFaction: {},
+    tradeCapacitySeason: 0,
+    tradeCapacityUsed: {},
     lastImmigrationDay: -999,
     pendingChoice: null,
     courtTribute: null,
@@ -491,6 +494,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   if (!state.pendingChoice) return;
   const rng = makeRng(state.seed + state.day * 7919 + 31);
   if (state.pendingChoice.kind === 'raid') resolveRaid(state, optionId, rng);
+  else if (state.pendingChoice.kind === 'extortion') resolveExtortion(state, optionId, rng);
   else if (state.pendingChoice.kind === 'tribute') resolveCourtTribute(state, optionId);
   else if (state.pendingChoice.kind === 'petition') resolvePetition(state, optionId);
   else if (state.pendingChoice.kind === 'inspection') resolveInspection(state, optionId, rng);
@@ -584,6 +588,7 @@ function endOfDay(state: GameState): void {
 }
 
 function onSeasonChange(state: GameState, prev: string, next: string): void {
+  resetFactionTradeCapacityUsage(state);
   addLog(state, `${SEASON_NAMES[next as keyof typeof SEASON_NAMES]}이(가) 시작되었습니다. (${getYear(state.day)}년차)`, 'weather');
 
   if (next === 'winter') {

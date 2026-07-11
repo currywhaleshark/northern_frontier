@@ -91,6 +91,9 @@ const factorOf = (state, id) => suspicionBreakdown(state).find(f => f.id === id)
   const hostileName = '니마차 우디캐';
   state.relations[hostileName] = 80;
   assert.equal(factorOf(state, 'cozy').delta, 2 * S.perCozyFaction);
+  state.relations['만상'] = 90;
+  state.relations['송상'] = 90;
+  assert.equal(factorOf(state, 'cozy').delta, 2 * S.perCozyFaction, '국내 상단은 북방 유착으로 세지 않는다');
 }
 
 // ── 일일 갱신: 누적과 상하한 ──
@@ -261,6 +264,8 @@ const factorOf = (state, id) => suspicionBreakdown(state).find(f => f.id === id)
   delete state.nitrePaused;
   delete state.nitreHiddenUntil;
   delete state.initiatedTradeDays;
+  delete state.tradeCapacitySeason;
+  delete state.tradeCapacityUsed;
   delete state.inspectionCooldownUntil;
   delete state.censured;
   delete state.crackdownDeadline;
@@ -270,6 +275,8 @@ const factorOf = (state, id) => suspicionBreakdown(state).find(f => f.id === id)
   assert.equal(loaded.nitrePaused, false);
   assert.equal(loaded.nitreHiddenUntil, 0);
   assert.deepEqual(loaded.initiatedTradeDays, []);
+  assert.equal(loaded.tradeCapacitySeason, Math.floor((loaded.day - 1) / CONFIG.time.seasonDays));
+  assert.deepEqual(loaded.tradeCapacityUsed, {});
   assert.equal(loaded.inspectionCooldownUntil, 0);
   assert.equal(loaded.censured, false);
   assert.equal(loaded.crackdownDeadline, 0);

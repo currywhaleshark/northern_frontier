@@ -9,12 +9,13 @@ import {
   unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
 import { clearSave, hasSave, loadGame, saveGame } from './game/saveLoad';
-import { addLog, requestTrade } from './game/events';
+import { addLog, negotiateTrade, requestTrade, tradeNegotiationOf } from './game/events';
 import { initAudio, isMuted, playSfx, setMuted, setWeatherAmbient } from './sound/sfx';
 import { AlertsPanel } from './components/AlertsPanel';
 import { BuildMenu } from './components/BuildMenu';
 import { EventLog } from './components/EventLog';
 import { EventModal } from './components/EventModal';
+import { TradeDialog } from './components/TradeDialog';
 import { GameCanvas } from './components/GameCanvas';
 import { InspectorPanel, type InspectorTab } from './components/InspectorPanel';
 import { ImportantLogOverlay } from './components/ImportantLogOverlay';
@@ -32,7 +33,6 @@ import { getPointerAction, selectedEntityFromTile } from './game/selectionAction
 import { isExplored } from './game/exploration';
 import type {
   BuildingTypeId, CropId, Difficulty, JobId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
-  TradeRequest,
 } from './game/types';
 
 export default function App() {
@@ -270,15 +270,15 @@ export default function App() {
     bump();
   };
 
-  // 세력 탭/장터 타일에서 먼저 거래를 청한다 (버튼이 미리 비활성화되지만 안전망으로 사유를 로그에)
-  const handleRequestTrade = (factionName: string, request?: TradeRequest) => {
-    if (!request) {
-      setInspTab('factions');
-      bump();
-      return;
-    }
-    const err = requestTrade(stateRef.current, factionName, request);
+  // 세력 탭/장터 타일에서 해당 세력의 전용 협상창을 연다.
+  const handleRequestTrade = (factionName: string) => {
+    const err = requestTrade(stateRef.current, factionName);
     if (err) addLog(stateRef.current, err, 'info');
+    bump();
+  };
+
+  const handleNegotiateTrade = (get: ResourceId, getAmt: number) => {
+    negotiateTrade(stateRef.current, get, getAmt);
     bump();
   };
 
@@ -491,7 +491,11 @@ export default function App() {
         </div>
       </div>
 
-      {state.pendingChoice && <EventModal choice={state.pendingChoice} onChoose={handleChoose} />}
+      {tradeNegotiationOf(state.pendingChoice) ? (
+        <TradeDialog state={state} onNegotiate={handleNegotiateTrade} onChoose={handleChoose} />
+      ) : state.pendingChoice ? (
+        <EventModal choice={state.pendingChoice} onChoose={handleChoose} />
+      ) : null}
 
       {state.gameOver && (
         <div className="modal-overlay">

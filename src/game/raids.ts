@@ -1,6 +1,6 @@
 // 습격 시스템 — 위협도 누적, 지도 위 습격 무리 접근, 위기 선택지와 결과 판정
 import { CONFIG } from './config';
-import { FACTIONS, type Faction } from './constants';
+import { FACTIONS, RESOURCE_NAMES, type Faction } from './constants';
 import { buildingFootprintTiles, countBuilt } from './buildings';
 import { addLog } from './events';
 import {
@@ -13,7 +13,7 @@ import { changeRelation, getRelation, hostileRelationsAvg } from './relations';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
 import { countJob } from './residents';
 import { getSeason, getYear } from './seasons';
-import type { BattleMode, Building, GameState, PendingChoice } from './types';
+import type { BattleMode, Building, GameState, PendingChoice, TradeNegotiation } from './types';
 import { isWallBuilding } from './walls';
 
 // 위협도 일일 갱신
@@ -57,6 +57,7 @@ function pickFaction(state: GameState, rng: () => number): Faction {
   // 위협도가 아주 높으면 평화 성향 씨족도 굶주림에 몰려 내려올 수 있다 (절반 가중).
   const cands: { f: Faction; w: number }[] = [];
   for (const f of FACTIONS) {
+    if (f.raidEligible === false) continue;
     const rel = getRelation(state, f.name);
     if (f.hostile) cands.push({ f, w: Math.max(5, 110 - rel) });
     else if (state.threat > 85) cands.push({ f, w: Math.max(2, (90 - rel) * 0.5) });
@@ -67,6 +68,55 @@ function pickFaction(state: GameState, rng: () => number): Faction {
     if (r <= 0) return c.f;
   }
   return cands[cands.length - 1].f;
+}
+
+export function isExtortionFaction(factionName: string): boolean {
+  return Boolean(FACTIONS.find(faction => faction.name === factionName)?.extortionDemands?.length);
+}
+
+export function openExtortionDemand(
+  state: GameState,
+  rng: () => number,
+  warned: boolean,
+  power: number,
+  factionName: string,
+): boolean {
+  const faction = FACTIONS.find(candidate => candidate.name === factionName);
+  if (!faction?.extortionDemands?.length) return false;
+
+  const demands = faction.extortionDemands.map(demand => ({
+    resource: demand.resource,
+    amount: demand.baseAmount + Math.ceil(power / CONFIG.extortion.powerAmountDiv),
+  }));
+  const affordable = demands.filter(demand => (state.resources[demand.resource] ?? 0) >= demand.amount);
+  const pool = affordable.length > 0 ? affordable : demands;
+  const demand = pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))];
+  const resourceName = RESOURCE_NAMES[demand.resource];
+  const message =
+    `${faction.name}의 무장 사절이 ${resourceName} ${demand.amount}을(를) 내놓으라고 통보합니다. ` +
+    '요구를 들어주면 이번에는 물러나지만, 거절하면 대기 중인 무리가 곧장 마을로 향합니다.';
+  const negotiation: TradeNegotiation = {
+    faction: faction.name,
+    initiatedBy: 'faction',
+    mode: 'extortion',
+    phase: 'countered',
+    give: demand.resource,
+    giveAmt: demand.amount,
+    get: null,
+    getAmt: 0,
+    round: 0,
+    margin: 1,
+    message,
+  };
+  state.pendingChoice = {
+    kind: 'extortion',
+    title: `칼끝의 거래 — ${faction.name}`,
+    body: message,
+    options: [],
+    data: { faction: faction.name, power, warned, negotiation },
+  };
+  addLog(state, `${faction.name}의 무장 사절이 공물을 요구하며 최후통첩을 전했습니다.`, 'raid', true);
+  return true;
 }
 
 function buildingAt(state: GameState, buildingId: number): Building | undefined {
@@ -116,15 +166,24 @@ export function checkRaidTrigger(state: GameState, rng: () => number): void {
 
   const hasWarning = countBuilt(state, 'beacon') > 0 || countBuilt(state, 'watchtower') > 0;
   const warned = hasWarning && rng() < t.earlyWarnChance;
-  spawnRaiders(state, rng, warned);
+  const power = raidPower(state, rng);
+  const faction = pickFaction(state, rng);
+  if (openExtortionDemand(state, rng, warned, power, faction.name)) return;
+  spawnRaiders(state, rng, warned, faction.name, power);
 }
 
 // 지도 가장자리(주로 북쪽)에서 습격 무리를 스폰
-export function spawnRaiders(state: GameState, rng: () => number, warned: boolean): void {
+export function spawnRaiders(
+  state: GameState,
+  rng: () => number,
+  warned: boolean,
+  factionName?: string,
+  powerIn?: number,
+): void {
   const center = state.buildings.find(b => b.type === 'center');
   if (!center) return;
-  const power = raidPower(state, rng);
-  const faction = pickFaction(state, rng);
+  const power = powerIn ?? raidPower(state, rng);
+  const faction = FACTIONS.find(candidate => candidate.name === factionName) ?? pickFaction(state, rng);
   const h = state.map.length, w = state.map[0]?.length ?? 0;
   if (w <= 0 || h <= 0) return;
 
@@ -272,6 +331,47 @@ function resolveFightFallback(
     moraleShock(state, 15);
     changeRelation(state, faction, CONFIG.relations.militiaLoss);
     addLog(state, `${side}이(가) 밀려났습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`, 'raid');
+  }
+}
+
+export function resolveExtortion(state: GameState, optionId: string, rng: () => number): void {
+  const choice = state.pendingChoice;
+  if (!choice || choice.kind !== 'extortion') return;
+  const negotiation = choice.data.negotiation as TradeNegotiation;
+  const faction = choice.data.faction as string;
+  const power = choice.data.power as number;
+  const warned = Boolean(choice.data.warned);
+  if (!negotiation.give || negotiation.giveAmt <= 0) return;
+
+  if (optionId === 'pay') {
+    const stock = state.resources[negotiation.give] ?? 0;
+    if (stock < negotiation.giveAmt) {
+      negotiation.message = `${RESOURCE_NAMES[negotiation.give]}이(가) 부족합니다. 요구를 거절하고 침입에 대비해야 합니다.`;
+      choice.body = negotiation.message;
+      return;
+    }
+    state.resources[negotiation.give] -= negotiation.giveAmt;
+    state.resources.reputation = Math.max(0, state.resources.reputation - CONFIG.extortion.payReputationLoss);
+    state.threat = Math.max(0, state.threat - CONFIG.extortion.payThreatReduction);
+    state.raidCooldown = CONFIG.threat.raidCooldownDays;
+    state.raiders = null;
+    moraleShock(state, CONFIG.extortion.payMoraleLoss);
+    changeRelation(state, faction, CONFIG.relations.tribute);
+    addLog(
+      state,
+      `${faction}에게 ${RESOURCE_NAMES[negotiation.give]} ${negotiation.giveAmt}을(를) 넘겼습니다. 무리는 약속대로 길을 돌렸습니다.`,
+      'trade',
+      true,
+    );
+    state.pendingChoice = null;
+    return;
+  }
+
+  if (optionId === 'refuse') {
+    state.pendingChoice = null;
+    changeRelation(state, faction, CONFIG.relations.negotiateFail);
+    addLog(state, `${faction}의 요구를 거부했습니다. 무장한 무리가 마을을 향해 움직이기 시작합니다!`, 'raid', true);
+    spawnRaiders(state, rng, warned, faction, power);
   }
 }
 

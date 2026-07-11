@@ -1,6 +1,7 @@
-import { RESOURCE_ICONS, RESOURCE_NAMES } from '../game/constants';
+import { RESOURCE_NAMES } from '../game/constants';
 import { PROCESSING_INPUTS } from '../game/processing';
 import type { GameState, ProcessingInputId } from '../game/types';
+import { ResourceIcon } from './TradeResourceIcon';
 
 interface Props {
   state: GameState;
@@ -18,7 +19,7 @@ export function ProcessingPanel({ state, onSetReserve }: Props) {
         return (
           <div className="processing-row" key={id}>
             <div className="processing-name" title={`${RESOURCE_NAMES[id]} ${stock}`}>
-              <span>{RESOURCE_ICONS[id]}</span>
+              <ResourceIcon resource={id} size={22} />
               <span>{RESOURCE_NAMES[id]}</span>
             </div>
             <div className="processing-controls">

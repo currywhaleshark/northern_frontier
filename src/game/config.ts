@@ -1,5 +1,5 @@
 // 시뮬레이션 밸런스 값 모음 — 숫자 튜닝은 전부 여기서 한다.
-import type { ProcessingInputId } from './types';
+import type { ProcessingInputId, Rank, ResourceId, Season } from './types';
 
 export const CONFIG = {
   map: {
@@ -180,7 +180,7 @@ export const CONFIG = {
   },
 
   seasons: {
-    firewoodMult: { spring: 1, summer: 0.6, autumn: 1.5, winter: 3 },
+    firewoodMult: { spring: 0.9, summer: 0.5, autumn: 1.35, winter: 3 },
     woodMult:     { spring: 1, summer: 1.3, autumn: 1.1, winter: 0.7 },
     gameMult:     { spring: 1.25, summer: 1, autumn: 1.1, winter: 0.5 },
     fishMult:     { spring: 1.2, summer: 1.15, autumn: 0.9, winter: 0.45 },
@@ -258,6 +258,51 @@ export const CONFIG = {
     playerCooldownDays: 6,  // 플레이어 주도 교역의 세력별 간격 (교환비 고정이라 반복 차익 방지)
     dockOfferScale: 1.5,
     dockPlayerCooldownDays: 4,
+    haggleMarginStep: 0.1,
+    maxHaggleRounds: 2,
+    counterTolerance: 1.45,
+    capacityBase: {
+      grain: 28, rice: 24, meat: 16, fish: 18, vegetables: 14,
+      brushwood: 24, firewood: 20, charcoal: 12,
+      wood: 24, stone: 20, iron: 9, tools: 6, carts: 2,
+      hide: 14, hideClothes: 7, cotton: 12, cottonClothes: 7, herbs: 10,
+      gunpowder: 4, spears: 6, hornBows: 4, muskets: 3,
+      porcelain: 5, brassware: 5, lacquerware: 5, silk: 4, preciousMetal: 3,
+      reputation: 0, defense: 0,
+    } as Record<ResourceId, number>,
+    capacitySeasonMult: {
+      spring: {
+        grain: 0.65, rice: 0.55, fish: 1.25, vegetables: 0.85,
+        brushwood: 1.1, wood: 1.05, herbs: 1.25,
+      },
+      summer: {
+        grain: 0.85, rice: 0.9, meat: 1.1, fish: 1.2, vegetables: 1.4,
+        brushwood: 1.2, firewood: 1.1, wood: 1.15, herbs: 1.4,
+      },
+      autumn: {
+        grain: 1.65, rice: 1.7, meat: 1.25, vegetables: 1.5,
+        brushwood: 1.3, firewood: 1.35, wood: 1.2, hide: 1.3, herbs: 1.1,
+      },
+      winter: {
+        grain: 0.8, rice: 0.75, meat: 0.75, fish: 0.35, vegetables: 0.4,
+        brushwood: 0.55, firewood: 0.5, charcoal: 0.8,
+        wood: 0.7, stone: 0.8, iron: 0.8, herbs: 0.45,
+      },
+    } as Record<Season, Partial<Record<ResourceId, number>>>,
+    capacityRankMult: {
+      settlement: 1,
+      bo: 1.2,
+      jin: 1.45,
+      bu: 1.75,
+    } as Record<Rank, number>,
+    dockCapacityMult: 2,
+  },
+
+  extortion: {
+    powerAmountDiv: 22,
+    payThreatReduction: 25,
+    payReputationLoss: 1,
+    payMoraleLoss: 4,
   },
 
   // 조정 세공(歲貢) — 봄 첫날 공지, 겨울 첫날 수거.

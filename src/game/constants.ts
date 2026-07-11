@@ -1,5 +1,5 @@
 // 명칭, 텍스트, 정적 정의 모음
-import type { JobId, Rank, ResourceId, Season, Terrain, TradeOffer, WeatherId } from './types';
+import type { BuildingTypeId, JobId, Rank, ResourceId, Season, Terrain, TradeOffer, WeatherId } from './types';
 import { RESOURCE_DEFS, RESOURCE_ORDER as CATALOG_RESOURCE_ORDER } from './resourceCatalog';
 
 export const SEASON_NAMES: Record<Season, string> = {
@@ -130,8 +130,22 @@ export interface Faction {
   tradeValues: Partial<Record<ResourceId, number>>;
   exports: ResourceId[];
   imports: ResourceId[];
+  extortionDemands?: { resource: ResourceId; baseAmount: number }[];
+  tradeUnlockBuilding?: BuildingTypeId;
+  tradeUnlockLabel?: string;
+  raidEligible?: boolean;
+  foreignTrade?: boolean;
+  tradeCapacityMult?: number;
+  tradeCapacityByResource?: Partial<Record<ResourceId, number>>;
   initialRelation: number; // 시작 우호도 (0~100)
 }
+
+export const COMMON_TRADE_RESOURCES: ResourceId[] = [
+  'grain', 'rice', 'meat', 'fish', 'vegetables',
+  'brushwood', 'firewood', 'charcoal',
+  'wood', 'stone', 'iron', 'tools', 'hide', 'herbs',
+  'hideClothes', 'cotton', 'cottonClothes',
+];
 
 export const FACTIONS: Faction[] = [
   {
@@ -141,10 +155,20 @@ export const FACTIONS: Faction[] = [
     trades: [
       { give: 'tools', giveAmt: 3, get: 'grain', getAmt: 16 },
       { give: 'hideClothes', giveAmt: 4, get: 'hide', getAmt: 9 },
+      { give: 'stone', giveAmt: 8, get: 'wood', getAmt: 6 },
     ],
-    tradeValues: { grain: 0.9, hide: 1.6, tools: 4.5, hideClothes: 3.6 },
-    exports: ['grain', 'hide'],
-    imports: ['tools', 'hideClothes'],
+    tradeValues: {
+      grain: 0.8, rice: 0.65, meat: 1.7, fish: 1.4, vegetables: 0.9,
+      brushwood: 0.5, firewood: 0.85, charcoal: 1.3,
+      wood: 1.05, stone: 0.75, iron: 2.5, tools: 4.5,
+      hide: 1.6, herbs: 1.4, hideClothes: 3.6, cotton: 1.6, cottonClothes: 3.1,
+    },
+    exports: [...COMMON_TRADE_RESOURCES],
+    imports: [...COMMON_TRADE_RESOURCES],
+    tradeCapacityByResource: {
+      grain: 1.45, rice: 1.4, vegetables: 1.35, stone: 1.1,
+      meat: 0.75, fish: 0.7, hide: 0.8, herbs: 0.9,
+    },
     initialRelation: 60,
   },
   {
@@ -154,10 +178,21 @@ export const FACTIONS: Faction[] = [
     trades: [
       { give: 'grain', giveAmt: 12, get: 'hide', getAmt: 8 },
       { give: 'hideClothes', giveAmt: 3, get: 'meat', getAmt: 10 },
+      { give: 'stone', giveAmt: 8, get: 'firewood', getAmt: 9 },
     ],
-    tradeValues: { grain: 1.1, hide: 1.5, meat: 1.35, hideClothes: 3.4 },
-    exports: ['hide', 'meat'],
-    imports: ['grain', 'hideClothes'],
+    tradeValues: {
+      grain: 1.1, rice: 0.9, meat: 1.2, fish: 1.5, vegetables: 1.2,
+      brushwood: 0.45, firewood: 1.05, charcoal: 1.5,
+      wood: 1.2, stone: 0.9, iron: 2.6, tools: 4.2,
+      hide: 1.35, herbs: 1.2, hideClothes: 3.4, cotton: 1.8, cottonClothes: 3.3,
+    },
+    exports: [...COMMON_TRADE_RESOURCES],
+    imports: [...COMMON_TRADE_RESOURCES],
+    tradeCapacityByResource: {
+      meat: 1.45, hide: 1.5, hideClothes: 1.2,
+      firewood: 1.15, wood: 1.1,
+      grain: 0.85, rice: 0.8, fish: 0.75, cotton: 0.8,
+    },
     initialRelation: 55,
   },
   {
@@ -167,10 +202,20 @@ export const FACTIONS: Faction[] = [
     trades: [
       { give: 'iron', giveAmt: 4, get: 'grain', getAmt: 22 },
       { give: 'tools', giveAmt: 2, get: 'grain', getAmt: 15 },
+      { give: 'firewood', giveAmt: 12, get: 'stone', getAmt: 10 },
     ],
-    tradeValues: { grain: 0.85, fish: 1.1, iron: 2.7, tools: 4.4 },
-    exports: ['grain', 'fish'],
-    imports: ['iron', 'tools'],
+    tradeValues: {
+      grain: 0.85, rice: 0.75, meat: 1.7, fish: 0.9, vegetables: 1.1,
+      brushwood: 0.55, firewood: 1.15, charcoal: 1.3,
+      wood: 1.45, stone: 0.85, iron: 2.7, tools: 4.4,
+      hide: 1.9, herbs: 1.5, hideClothes: 3.6, cotton: 1.7, cottonClothes: 3.2,
+    },
+    exports: [...COMMON_TRADE_RESOURCES],
+    imports: [...COMMON_TRADE_RESOURCES],
+    tradeCapacityByResource: {
+      fish: 1.8, grain: 1.1, tools: 1.1,
+      wood: 0.75, firewood: 0.9, hide: 0.8, meat: 0.9,
+    },
     initialRelation: 55,
   },
   {
@@ -180,10 +225,21 @@ export const FACTIONS: Faction[] = [
     trades: [
       { give: 'grain', giveAmt: 14, get: 'hide', getAmt: 12 },
       { give: 'grain', giveAmt: 16, get: 'herbs', getAmt: 7 },
+      { give: 'stone', giveAmt: 8, get: 'wood', getAmt: 12 },
     ],
-    tradeValues: { grain: 1.2, hide: 1.45, herbs: 1.35 },
-    exports: ['hide', 'herbs'],
-    imports: ['grain'],
+    tradeValues: {
+      grain: 1.2, rice: 1, meat: 1.2, fish: 1.7, vegetables: 1.4,
+      brushwood: 0.35, firewood: 0.65, charcoal: 1.2,
+      wood: 0.7, stone: 1.15, iron: 2.8, tools: 4.6,
+      hide: 1.25, herbs: 1.1, hideClothes: 3, cotton: 2, cottonClothes: 3.5,
+    },
+    exports: [...COMMON_TRADE_RESOURCES],
+    imports: [...COMMON_TRADE_RESOURCES],
+    tradeCapacityByResource: {
+      brushwood: 1.8, firewood: 1.6, wood: 1.75,
+      hide: 1.45, herbs: 1.6, meat: 1.25,
+      grain: 0.55, rice: 0.5, fish: 0.6, stone: 0.7, iron: 0.75, cotton: 0.6,
+    },
     initialRelation: 45,
   },
   {
@@ -194,6 +250,11 @@ export const FACTIONS: Faction[] = [
     tradeValues: {},
     exports: [],
     imports: [],
+    extortionDemands: [
+      { resource: 'grain', baseAmount: 18 },
+      { resource: 'hide', baseAmount: 7 },
+      { resource: 'tools', baseAmount: 3 },
+    ],
     initialRelation: 35,
   },
   {
@@ -204,7 +265,71 @@ export const FACTIONS: Faction[] = [
     tradeValues: {},
     exports: [],
     imports: [],
+    extortionDemands: [
+      { resource: 'grain', baseAmount: 15 },
+      { resource: 'tools', baseAmount: 4 },
+      { resource: 'hide', baseAmount: 6 },
+    ],
     initialRelation: 25,
+  },
+  {
+    name: '만상', hostile: false,
+    desc: '의주와 북관의 길을 잇는 거상들, 부두가 열리면 목화와 비단, 귀금속을 싣고 찾아온다',
+    color: '#55a79a',
+    trades: [
+      { give: 'hide', giveAmt: 10, get: 'cotton', getAmt: 10 },
+      { give: 'iron', giveAmt: 5, get: 'cottonClothes', getAmt: 4 },
+      { give: 'grain', giveAmt: 25, get: 'silk', getAmt: 3 },
+      { give: 'wood', giveAmt: 18, get: 'preciousMetal', getAmt: 2 },
+    ],
+    tradeValues: {
+      grain: 1.1, rice: 0.9, meat: 1.8, fish: 1.6, vegetables: 1.2,
+      brushwood: 0.55, firewood: 1, charcoal: 1.5,
+      wood: 1.3, stone: 0.85, iron: 2.6, tools: 4.2,
+      hide: 2, herbs: 1.6, hideClothes: 3.5, cotton: 1.5, cottonClothes: 3.2,
+      porcelain: 6.2, brassware: 5.5, lacquerware: 5.8, silk: 7.5, preciousMetal: 10,
+    },
+    exports: [...COMMON_TRADE_RESOURCES, 'brassware', 'silk', 'preciousMetal'],
+    imports: [...COMMON_TRADE_RESOURCES, 'porcelain', 'lacquerware'],
+    tradeUnlockBuilding: 'dock',
+    tradeUnlockLabel: '부두 건설 후 의주 상로가 열립니다',
+    raidEligible: false,
+    foreignTrade: false,
+    tradeCapacityMult: 1.3,
+    tradeCapacityByResource: {
+      cotton: 1.5, cottonClothes: 1.4, silk: 1.5, preciousMetal: 1.3,
+    },
+    initialRelation: 55,
+  },
+  {
+    name: '송상', hostile: false,
+    desc: '개성에서 온 상단, 부두 창고를 거점으로 자기와 유기, 칠기와 비단을 대량으로 유통한다',
+    color: '#c18a55',
+    trades: [
+      { give: 'hide', giveAmt: 10, get: 'porcelain', getAmt: 3 },
+      { give: 'herbs', giveAmt: 10, get: 'brassware', getAmt: 3 },
+      { give: 'preciousMetal', giveAmt: 2, get: 'lacquerware', getAmt: 4 },
+      { give: 'wood', giveAmt: 18, get: 'silk', getAmt: 3 },
+    ],
+    tradeValues: {
+      grain: 1, rice: 0.8, meat: 1.7, fish: 1.5, vegetables: 1.1,
+      brushwood: 0.5, firewood: 0.95, charcoal: 1.45,
+      wood: 1.1, stone: 1, iron: 2.5, tools: 4,
+      hide: 2.1, herbs: 1.7, hideClothes: 3.4, cotton: 1.8, cottonClothes: 3.1,
+      porcelain: 6.5, brassware: 5.2, lacquerware: 4.8,
+      silk: 6.4, preciousMetal: 9.5,
+    },
+    exports: [...COMMON_TRADE_RESOURCES, 'porcelain', 'brassware', 'lacquerware', 'silk'],
+    imports: [...COMMON_TRADE_RESOURCES, 'preciousMetal'],
+    tradeUnlockBuilding: 'dock',
+    tradeUnlockLabel: '부두 건설 후 개성 상단과 거래할 수 있습니다',
+    raidEligible: false,
+    foreignTrade: false,
+    tradeCapacityMult: 1.25,
+    tradeCapacityByResource: {
+      cottonClothes: 1.3, porcelain: 1.6, brassware: 1.5, lacquerware: 1.6, silk: 1.4,
+    },
+    initialRelation: 60,
   },
 ];
 
