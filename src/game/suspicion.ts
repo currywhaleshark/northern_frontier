@@ -48,6 +48,7 @@ export function suspicionBreakdown(state: GameState): SuspicionFactor[] {
   }
   let cozy = 0;
   for (const f of FACTIONS) {
+    if (f.foreignTrade === false) continue;
     if (getRelation(state, f.name) >= s.cozyRelationAbove) cozy += f.hostile ? 2 : 1;
   }
   if (cozy > 0) {

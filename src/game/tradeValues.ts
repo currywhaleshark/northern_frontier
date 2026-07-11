@@ -1,7 +1,9 @@
 import { CONFIG } from './config';
-import { FACTIONS, RESOURCE_NAMES } from './constants';
+import { FACTIONS, RESOURCE_NAMES, SEASON_NAMES } from './constants';
+import { countBuilt } from './buildings';
 import { RESOURCE_DEFS } from './resourceCatalog';
 import { getRelation } from './relations';
+import { getSeason } from './seasons';
 import type { GameState, ResourceId, TradeEvaluation, TradeOffer, TradeQuote, TradeRequest } from './types';
 
 const ABSTRACT_RESOURCES = new Set<ResourceId>(['reputation', 'defense']);
@@ -16,6 +18,67 @@ export function relationMargin(relation: number): number {
 export function factionValue(factionName: string, resource: ResourceId): number {
   const faction = FACTIONS.find(candidate => candidate.name === factionName);
   return faction?.tradeValues[resource] ?? RESOURCE_DEFS[resource].tradeBaseValue;
+}
+
+export interface FactionTradeCapacitySummary {
+  total: number;
+  used: number;
+  remaining: number;
+}
+
+function tradeCapacitySeason(day: number): number {
+  return Math.floor((Math.max(1, day) - 1) / CONFIG.time.seasonDays);
+}
+
+function factionTradeCapacityTotal(state: GameState, factionName: string, resource: ResourceId): number {
+  const faction = FACTIONS.find(candidate => candidate.name === factionName);
+  if (!faction?.exports.includes(resource)) return 0;
+  const base = CONFIG.trade.capacityBase[resource] ?? 0;
+  if (!(base > 0)) return 0;
+  const seasonMult = CONFIG.trade.capacitySeasonMult[getSeason(state.day)][resource] ?? 1;
+  const factionMult = (faction.tradeCapacityMult ?? 1) * (faction.tradeCapacityByResource?.[resource] ?? 1);
+  const rankMult = CONFIG.trade.capacityRankMult[state.rank ?? 'settlement'];
+  const dockMult = countBuilt(state, 'dock') > 0 ? CONFIG.trade.dockCapacityMult : 1;
+  return Math.max(1, Math.floor(base * seasonMult * factionMult * rankMult * dockMult));
+}
+
+export function factionTradeCapacitySummary(
+  state: GameState,
+  factionName: string,
+  resource: ResourceId,
+): FactionTradeCapacitySummary {
+  const total = factionTradeCapacityTotal(state, factionName, resource);
+  const currentSeason = tradeCapacitySeason(state.day);
+  const used = state.tradeCapacitySeason === currentSeason
+    ? Math.max(0, state.tradeCapacityUsed?.[factionName]?.[resource] ?? 0)
+    : 0;
+  return { total, used, remaining: Math.max(0, total - used) };
+}
+
+export function factionTradeCapacity(state: GameState, factionName: string, resource: ResourceId): number {
+  return factionTradeCapacitySummary(state, factionName, resource).remaining;
+}
+
+export function useFactionTradeCapacity(
+  state: GameState,
+  factionName: string,
+  resource: ResourceId,
+  amount: number,
+): void {
+  if (!(amount > 0)) return;
+  const currentSeason = tradeCapacitySeason(state.day);
+  if (state.tradeCapacitySeason !== currentSeason || !state.tradeCapacityUsed) {
+    state.tradeCapacitySeason = currentSeason;
+    state.tradeCapacityUsed = {};
+  }
+  const factionUsage = state.tradeCapacityUsed[factionName] ?? {};
+  factionUsage[resource] = (factionUsage[resource] ?? 0) + amount;
+  state.tradeCapacityUsed[factionName] = factionUsage;
+}
+
+export function resetFactionTradeCapacityUsage(state: GameState): void {
+  state.tradeCapacitySeason = tradeCapacitySeason(state.day);
+  state.tradeCapacityUsed = {};
 }
 
 function validTradeAmount(amount: number): boolean {
@@ -66,7 +129,10 @@ export function quoteTrade(state: GameState, factionName: string, request: Trade
   if (!(giveUnitValue > 0) || !(getUnitValue > 0)) {
     return rejected(factionName, request, '거래 가치가 없는 물품입니다.', margin);
   }
-  const getAmt = Math.floor((request.giveAmt * giveUnitValue) / (getUnitValue * margin));
+  const getAmt = Math.min(
+    factionTradeCapacity(state, factionName, request.get),
+    Math.floor((request.giveAmt * giveUnitValue) / (getUnitValue * margin)),
+  );
   if (getAmt < 1) return rejected(factionName, request, '제시한 물품의 가치가 너무 낮습니다.', margin);
   return {
     ok: true, faction: factionName,
@@ -93,6 +159,12 @@ export function quoteFactionDemand(
   if (!validTradeAmount(getAmt)) return rejectedDemand('받을 수량은 1 이상의 정수여야 합니다.');
   if (!faction.exports.includes(get) || ABSTRACT_RESOURCES.has(get)) {
     return rejectedDemand(`${faction.name}이(가) 내놓지 않는 물품입니다.`);
+  }
+  const capacity = factionTradeCapacity(state, factionName, get);
+  if (getAmt > capacity) {
+    return rejectedDemand(
+      `${SEASON_NAMES[getSeason(state.day)]}에는 ${RESOURCE_NAMES[get]}을(를) ${capacity}까지만 내놓을 수 있습니다.`,
+    );
   }
   const getUnitValue = factionValue(factionName, get);
   if (!(getUnitValue > 0)) return rejectedDemand('거래 가치가 없는 물품입니다.');
@@ -142,9 +214,11 @@ export function evaluateFactionProposal(
   }
   const giveValue = offer.giveAmt * factionValue(factionName, offer.give);
   const getUnitValue = factionValue(factionName, offer.get);
-  const maxGetAmt = Math.max(0, Math.floor(
+  const capacity = factionTradeCapacity(state, factionName, offer.get);
+  const valueLimit = Math.max(0, Math.floor(
     (giveValue * visitorTradeMultiplier(getRelation(state, factionName))) / getUnitValue,
   ));
+  const maxGetAmt = Math.min(capacity, valueLimit);
   if (maxGetAmt < 1) {
     return { outcome: 'rejected', offer, maxGetAmt, message: '그 물품으로는 바꿀 만한 몫이 나오지 않는다고 합니다.' };
   }
@@ -155,12 +229,16 @@ export function evaluateFactionProposal(
     const counter = { ...offer, getAmt: maxGetAmt };
     return {
       outcome: 'countered', offer: counter, maxGetAmt,
-      message: `${RESOURCE_NAMES[offer.get]} ${maxGetAmt}이라면 거래하겠다고 역제안합니다.`,
+      message: offer.getAmt > capacity
+        ? `${RESOURCE_NAMES[offer.get]}은(는) 이번 철에 ${capacity}까지만 내놓을 수 있다고 합니다.`
+        : `${RESOURCE_NAMES[offer.get]} ${maxGetAmt}이라면 거래하겠다고 역제안합니다.`,
     };
   }
   return {
     outcome: 'rejected', offer, maxGetAmt,
-    message: '요구가 지나치다며 제안을 거부했습니다. 수량을 낮춰 다시 협상할 수 있습니다.',
+    message: offer.getAmt > capacity
+      ? `${RESOURCE_NAMES[offer.get]}은(는) 이번 철 최대 ${capacity}까지만 교역할 수 있습니다.`
+      : '요구가 지나치다며 제안을 거부했습니다. 수량을 낮춰 다시 협상할 수 있습니다.',
   };
 }
 
@@ -175,5 +253,6 @@ export function applyQuotedTrade(state: GameState, quote: TradeQuote): string | 
   }
   state.resources[quote.give] -= quote.giveAmt;
   state.resources[quote.get] += quote.getAmt;
+  useFactionTradeCapacity(state, quote.faction, quote.get, quote.getAmt);
   return null;
 }

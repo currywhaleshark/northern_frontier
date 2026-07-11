@@ -1,21 +1,26 @@
 import { RESOURCE_ICONS } from '../game/constants';
-import { TRADE_RESOURCE_SPRITES } from '../game/tradePresentation';
+import { RESOURCE_SPRITES, type ResourceIconId } from '../game/tradePresentation';
 import type { ResourceId } from '../game/types';
 
-export function TradeResourceIcon({ resource, size = 38 }: { resource: ResourceId; size?: number }) {
-  const sprite = TRADE_RESOURCE_SPRITES[resource];
+export function ResourceIcon({ resource, size = 38 }: { resource: ResourceIconId; size?: number }) {
+  const sprite = RESOURCE_SPRITES[resource];
   if (!sprite) {
-    return <span className="trade-resource-fallback" style={{ width: size, height: size }}>{RESOURCE_ICONS[resource]}</span>;
+    const fallback = RESOURCE_ICONS[resource as ResourceId] ?? '•';
+    return <span className="resource-icon-fallback" style={{ width: size, height: size }}>{fallback}</span>;
   }
   return (
     <span
-      className="trade-resource-icon"
+      className="resource-icon"
       aria-hidden="true"
       style={{
         width: size,
         height: size,
-        backgroundPosition: `${sprite.column * (100 / 3)}% ${sprite.row * 100}%`,
+        backgroundImage: `url('${sprite.atlas}')`,
+        backgroundSize: `${sprite.columns * 100}% ${sprite.rows * 100}%`,
+        backgroundPosition: `${sprite.column * (100 / (sprite.columns - 1))}% ${sprite.row * (100 / (sprite.rows - 1))}%`,
       }}
     />
   );
 }
+
+export const TradeResourceIcon = ResourceIcon;

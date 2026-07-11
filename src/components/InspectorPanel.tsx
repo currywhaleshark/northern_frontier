@@ -454,6 +454,9 @@ export function InspectorPanel({
             const color = rel >= 60 ? '#6fbf73' : rel >= 40 ? '#d9a441' : '#e06c5c';
             const artwork = FACTION_ARTWORK[f.name];
             const tradeReason = f.exports.length > 0 ? canRequestTrade(state, f.name) : null;
+            const unlockLocked = f.tradeUnlockBuilding
+              ? !state.buildings.some(building => building.built && building.type === f.tradeUnlockBuilding)
+              : false;
             return (
               <div key={f.name} className="faction-entry" title={f.desc}>
                 {artwork && (
@@ -471,6 +474,9 @@ export function InspectorPanel({
                     <span className="muted small">{Math.round(rel)}</span>
                   </div>
                   <Bar value={rel} color={color} />
+                  {unlockLocked && (
+                    <div className="faction-unlock-note">부두 건설 후 교역로 개방</div>
+                  )}
                   <div className="muted small">
                     {f.exports.length > 0
                       ? '내놓음: ' + f.exports.map(resource => RESOURCE_NAMES[resource]).join(', ')

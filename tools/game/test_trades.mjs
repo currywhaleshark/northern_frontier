@@ -30,6 +30,7 @@ const compiledDir = compileGameModules();
 const events = await import(pathToFileURL(join(compiledDir, 'events.mjs')).href);
 const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
+const tradeValues = await import(pathToFileURL(join(compiledDir, 'tradeValues.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs')).href);
 
@@ -39,6 +40,7 @@ const TRADE_FACTION = FACTIONS.find(f => f.name === TRADER);
 const PLAYER_GET = TRADE_FACTION.exports[0];
 const EXTORTION_FACTION = FACTIONS.find(f => f.name === '홀라온 야인');
 const BANDIT_FACTION = FACTIONS.find(f => f.name === '변경 마적');
+const DOMESTIC_MERCHANT = FACTIONS.find(f => f.name === '만상');
 
 function withMarket(state) {
   state.buildings.push({
@@ -47,10 +49,17 @@ function withMarket(state) {
   return state;
 }
 
+function withDock(state) {
+  state.buildings.push({
+    id: 9002, type: 'dock', x: 2, y: 2, progress: 12, built: true, fieldGrowth: 0,
+  });
+  return state;
+}
+
 // ── canRequestTrade 거부 사유들 ──
 {
   const state = simulation.newGame(11);
-  assert.equal(events.canRequestTrade(state, TRADER), '장터가 필요합니다');
+  assert.equal(events.canRequestTrade(state, TRADER), '장터나 부두가 필요합니다');
   assert.equal(events.canRequestTrade(state, NON_TRADER), '교역 품목이 없는 세력입니다');
 
   withMarket(state);
@@ -72,6 +81,40 @@ function withMarket(state) {
   assert.ok(events.canRequestTrade(state, TRADER).includes('상단이 아직'));
   state.day += CONFIG.trade.playerCooldownDays;
   assert.equal(events.canRequestTrade(state, TRADER), null);
+}
+
+// ── 만상·송상은 부두가 열린 뒤에만 나타나며 국내 거래는 월경 의심을 남기지 않는다 ──
+{
+  const locked = withMarket(simulation.newGame(12));
+  assert.equal(events.canRequestTrade(locked, DOMESTIC_MERCHANT.name), DOMESTIC_MERCHANT.tradeUnlockLabel);
+
+  const state = withDock(simulation.newGame(13));
+  state.relations[DOMESTIC_MERCHANT.name] = 60;
+  for (const resource of DOMESTIC_MERCHANT.imports) state.resources[resource] = 100;
+  assert.equal(events.canRequestTrade(state, DOMESTIC_MERCHANT.name), null);
+  assert.equal(events.requestTrade(state, DOMESTIC_MERCHANT.name), null);
+  assert.equal(events.negotiateTrade(state, 'cotton', 5), null);
+  const negotiation = events.tradeNegotiationOf(state.pendingChoice);
+  assert.equal(negotiation.faction, DOMESTIC_MERCHANT.name);
+  assert.equal(negotiation.get, 'cotton');
+  const suspicionTradeCount = state.initiatedTradeDays.length;
+  simulation.resolveChoice(state, 'confirm');
+  assert.equal(state.pendingChoice, null);
+  assert.equal(state.initiatedTradeDays.length, suspicionTradeCount);
+  assert.equal(state.lastTradeByFaction[DOMESTIC_MERCHANT.name], state.day);
+}
+
+// ── 부두가 없으면 국내 상단의 선제 제안이 오지 않고, 부두 뒤에는 제안 대상이 된다 ──
+{
+  const marketOnly = withMarket(simulation.newGame(14));
+  let rolls = [0, 0.999, 0];
+  assert.equal(events.maybeOfferTrade(marketOnly, () => rolls.shift() ?? 0, 999), true);
+  assert.equal(FACTIONS.find(f => f.name === events.tradeNegotiationOf(marketOnly.pendingChoice).faction).foreignTrade, undefined);
+
+  const dockOpen = withDock(simulation.newGame(15));
+  rolls = [0, 0.999, 0];
+  assert.equal(events.maybeOfferTrade(dockOpen, () => rolls.shift() ?? 0, 999), true);
+  assert.equal(events.tradeNegotiationOf(dockOpen.pendingChoice).faction, '송상');
 }
 
 // ── 플레이어가 먼저 찾아가 원하는 물품을 고르면 상대 요구가 생긴다 ──
@@ -129,6 +172,32 @@ function withMarket(state) {
   assert.equal(second.round, 1);
   assert.ok(second.giveAmt <= first.giveAmt);
   assert.ok(second.margin <= first.margin);
+}
+
+// ── 성사된 출고량은 같은 계절의 다음 거래에도 남고 새 계절에 초기화된다 ──
+{
+  const state = withMarket(simulation.newGame(24));
+  state.relations[TRADER] = 60;
+  for (const resource of TRADE_FACTION.imports) state.resources[resource] = 1000;
+  const before = tradeValues.factionTradeCapacitySummary(state, TRADER, PLAYER_GET);
+
+  assert.equal(events.requestTrade(state, TRADER), null);
+  assert.equal(events.negotiateTrade(state, PLAYER_GET, 4), null);
+  simulation.resolveChoice(state, 'confirm');
+  const after = tradeValues.factionTradeCapacitySummary(state, TRADER, PLAYER_GET);
+  assert.equal(after.total, before.total);
+  assert.equal(after.used, 4);
+  assert.equal(after.remaining, before.remaining - 4);
+
+  state.day += CONFIG.trade.playerCooldownDays;
+  assert.equal(events.requestTrade(state, TRADER), null);
+  assert.equal(tradeValues.factionTradeCapacitySummary(state, TRADER, PLAYER_GET).remaining, after.remaining);
+  simulation.resolveChoice(state, 'break');
+
+  state.day = CONFIG.time.seasonDays + 1;
+  const nextSeason = tradeValues.factionTradeCapacitySummary(state, TRADER, PLAYER_GET);
+  assert.equal(nextSeason.used, 0);
+  assert.equal(nextSeason.remaining, nextSeason.total);
 }
 
 // ── 플레이어가 먼저 찾아간 협상 결렬은 무벌칙 ──
@@ -196,7 +265,7 @@ function withMarket(state) {
   const faction = TRADE_FACTION;
   state.resources[faction.trades[0].give] = 100;
   assert.equal(events.maybeOfferTrade(state, () => 0, 999), true);
-  assert.ok(events.negotiateTrade(state, faction.exports[0], 999)?.includes('지나치'));
+  assert.ok(events.negotiateTrade(state, faction.exports[0], 999)?.includes('최대'));
   assert.equal(events.tradeNegotiationOf(state.pendingChoice).phase, 'rejected');
   assert.equal(events.negotiateTrade(state, faction.exports[0], 1), null);
   assert.equal(events.tradeNegotiationOf(state.pendingChoice).phase, 'accepted');

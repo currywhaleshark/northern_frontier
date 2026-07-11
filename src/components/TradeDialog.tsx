@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FACTIONS, RESOURCE_NAMES } from '../game/constants';
+import { CONFIG } from '../game/config';
+import { FACTIONS, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } from '../game/constants';
 import { tradeNegotiationOf } from '../game/events';
 import { getRelation } from '../game/relations';
 import { FACTION_ARTWORK } from '../game/tradePresentation';
-import { factionValue, visitorTradeMultiplier } from '../game/tradeValues';
+import {
+  factionTradeCapacity, factionTradeCapacitySummary, factionValue, visitorTradeMultiplier,
+} from '../game/tradeValues';
+import { RESOURCE_DEFS, type ResourceCategory } from '../game/resourceCatalog';
+import { getSeason } from '../game/seasons';
 import type { GameState, ResourceId } from '../game/types';
 import { FactionName } from './FactionName';
 import { TradeResourceIcon } from './TradeResourceIcon';
@@ -14,24 +19,41 @@ interface Props {
   onChoose: (optionId: string) => void;
 }
 
+type TradeCategory = Exclude<ResourceCategory, 'abstract'>;
+
+const TRADE_CATEGORY_ORDER: TradeCategory[] = ['food', 'fuel', 'material', 'clothing', 'military', 'luxury'];
+const TRADE_CATEGORY_LABELS: Record<TradeCategory, string> = {
+  food: '식량',
+  fuel: '연료',
+  material: '자재',
+  clothing: '의복',
+  military: '군수',
+  luxury: '사치',
+};
+
+function tradeCategoryOf(resource: ResourceId): TradeCategory {
+  return RESOURCE_DEFS[resource].category as TradeCategory;
+}
+
 function suggestedAmount(state: GameState, factionName: string, give: ResourceId | null, giveAmt: number, get: ResourceId): number {
+  const capacity = factionTradeCapacity(state, factionName, get);
   if (!give || giveAmt <= 0) return 1;
   const getValue = factionValue(factionName, get);
   if (!(getValue > 0)) return 1;
-  return Math.max(1, Math.floor(
+  return Math.max(1, Math.min(capacity, Math.floor(
     (giveAmt * factionValue(factionName, give) * visitorTradeMultiplier(getRelation(state, factionName))) / getValue,
-  ));
+  )));
 }
 
-function AmountStepper({ value, onChange }: { value: number; onChange: (amount: number) => void }) {
-  const set = (next: number) => onChange(Math.max(1, Math.min(999, Math.floor(next) || 1)));
+function AmountStepper({ value, max, onChange }: { value: number; max: number; onChange: (amount: number) => void }) {
+  const set = (next: number) => onChange(Math.max(1, Math.min(max, Math.floor(next) || 1)));
   return (
     <div className="trade-amount-stepper">
       <button type="button" aria-label="수량 줄이기" onClick={() => set(value - 1)}>−</button>
       <input
         type="number"
         min={1}
-        max={999}
+        max={max}
         step={1}
         value={value}
         aria-label="받을 수량"
@@ -47,6 +69,7 @@ export function TradeDialog({ state, onNegotiate, onChoose }: Props) {
   const faction = FACTIONS.find(candidate => candidate.name === negotiation?.faction);
   const initialGet = negotiation?.get ?? faction?.exports[0] ?? 'grain';
   const [get, setGet] = useState<ResourceId>(initialGet);
+  const [category, setCategory] = useState<TradeCategory>(() => tradeCategoryOf(initialGet));
   const [getAmt, setGetAmt] = useState(() => negotiation?.getAmt && negotiation.getAmt > 0
     ? negotiation.getAmt
     : negotiation && faction
@@ -54,11 +77,20 @@ export function TradeDialog({ state, onNegotiate, onChoose }: Props) {
       : 1);
 
   useEffect(() => {
-    if (negotiation?.get) setGet(negotiation.get);
+    if (negotiation?.get) {
+      setGet(negotiation.get);
+      setCategory(tradeCategoryOf(negotiation.get));
+    }
     if (negotiation?.getAmt && negotiation.getAmt > 0) setGetAmt(negotiation.getAmt);
   }, [negotiation?.get, negotiation?.getAmt]);
 
   const receiveValue = useMemo(() => faction ? getAmt * factionValue(faction.name, get) : 0, [faction, get, getAmt]);
+  const availableCategories = useMemo(() => faction
+    ? TRADE_CATEGORY_ORDER.filter(candidate => faction.exports.some(resource => tradeCategoryOf(resource) === candidate))
+    : [], [faction]);
+  const visibleExports = useMemo(() => faction
+    ? faction.exports.filter(resource => tradeCategoryOf(resource) === category)
+    : [], [faction, category]);
   const giveValue = negotiation?.give && faction
     ? negotiation.giveAmt * factionValue(faction.name, negotiation.give)
     : 0;
@@ -67,6 +99,9 @@ export function TradeDialog({ state, onNegotiate, onChoose }: Props) {
   const isExtortion = negotiation.mode === 'extortion';
   const artwork = FACTION_ARTWORK[faction.name];
   const relation = getRelation(state, faction.name);
+  const capacitySummary = factionTradeCapacitySummary(state, faction.name, get);
+  const capacity = capacitySummary.remaining;
+  const dockActive = state.buildings.some(building => building.built && building.type === 'dock');
   const canConfirm = isExtortion ? Boolean(negotiation.give) : negotiation.initiatedBy === 'player'
     ? negotiation.phase === 'countered'
     : negotiation.phase === 'accepted' || negotiation.phase === 'countered';
@@ -128,8 +163,29 @@ export function TradeDialog({ state, onNegotiate, onChoose }: Props) {
               </div>
             ) : (
               <>
+                <div className="trade-resource-tabs" role="tablist" aria-label="교역품 분류">
+                  {availableCategories.map(candidate => (
+                    <button
+                      key={candidate}
+                      type="button"
+                      role="tab"
+                      aria-selected={category === candidate}
+                      className={category === candidate ? 'active' : ''}
+                      onClick={() => {
+                        setCategory(candidate);
+                        const resource = faction.exports.find(item => tradeCategoryOf(item) === candidate);
+                        if (resource) {
+                          setGet(resource);
+                          setGetAmt(suggestedAmount(state, faction.name, negotiation.give, negotiation.giveAmt, resource));
+                        }
+                      }}
+                    >
+                      {TRADE_CATEGORY_LABELS[candidate]}
+                    </button>
+                  ))}
+                </div>
                 <div className="trade-resource-picker" role="radiogroup" aria-label="받을 물품">
-                  {faction.exports.map(resource => (
+                  {visibleExports.map(resource => (
                     <button
                       key={resource}
                       type="button"
@@ -147,7 +203,13 @@ export function TradeDialog({ state, onNegotiate, onChoose }: Props) {
                     </button>
                   ))}
                 </div>
-                <AmountStepper value={getAmt} onChange={setGetAmt} />
+                <AmountStepper value={getAmt} max={Math.max(1, capacity)} onChange={setGetAmt} />
+                <div className="trade-capacity">
+                  <span>{SEASON_NAMES[getSeason(state.day)]} · {RANK_NAMES[state.rank]} 교역 한도</span>
+                  <strong>잔여 {capacity} / 총 {capacitySummary.total}</strong>
+                  {capacitySummary.used > 0 && <em>사용 {capacitySummary.used}</em>}
+                  {dockActive && <em>부두 ×{CONFIG.trade.dockCapacityMult}</em>}
+                </div>
               </>
             )}
           </section>
@@ -198,7 +260,15 @@ export function TradeDialog({ state, onNegotiate, onChoose }: Props) {
               >
                 확정
               </button>
-              <button className="btn" type="button" onClick={() => onNegotiate(get, getAmt)}>{actionLabel}</button>
+              <button
+                className="btn"
+                type="button"
+                disabled={capacity <= 0}
+                title={capacity <= 0 ? '이번 계절 물동량을 모두 사용했습니다' : undefined}
+                onClick={() => onNegotiate(get, getAmt)}
+              >
+                {actionLabel}
+              </button>
               <button className="btn trade-break" type="button" onClick={() => onChoose('break')}>결렬</button>
             </>
           )}

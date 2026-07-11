@@ -1,4 +1,5 @@
 import type { ResourceId } from '../game/types';
+import { ResourceIcon } from './TradeResourceIcon';
 
 export interface ResourceBreakdownItem {
   id: ResourceId;
@@ -33,7 +34,10 @@ export function ResourceBreakdownPopover({ title, items, pinned, onTogglePinned 
       </div>
       {items.map(item => (
         <div key={item.id} className="resource-breakdown-row">
-          <span>{item.label}</span>
+          <span className="resource-breakdown-label">
+            <ResourceIcon resource={item.id} size={20} />
+            {item.label}
+          </span>
           <span>{item.amount.toFixed(1)}</span>
         </div>
       ))}

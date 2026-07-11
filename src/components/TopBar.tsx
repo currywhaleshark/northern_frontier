@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { housingCapacity } from '../game/buildings';
 import { CONFIG } from '../game/config';
-import { RESOURCE_ICONS, RESOURCE_NAMES, RESOURCE_ORDER, SEASON_NAMES, WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
+import { RESOURCE_NAMES, RESOURCE_ORDER, SEASON_NAMES, WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
 import { clothingCoverageTotal, foodTotal, fuelHeatTotal, luxuryStockTotal } from '../game/consumption';
 import { CLOTHING_RESOURCES, FOOD_RESOURCES, FUEL_RESOURCES, LUXURY_RESOURCES } from '../game/resourceCatalog';
 import { avg, livingResidents, residentHome } from '../game/residents';
@@ -10,6 +10,8 @@ import { getDayOfSeason, getSeason, getYear } from '../game/seasons';
 import { tributeReserved, tributeReserveRatio } from '../game/tributeReserve';
 import { TimeControls } from './TimeControls';
 import { ResourceBreakdownPopover } from './ResourceBreakdownPopover';
+import { ResourceIcon } from './TradeResourceIcon';
+import type { ResourceIconId } from '../game/tradePresentation';
 import type { GameState, ResourceId } from '../game/types';
 
 interface Props {
@@ -64,15 +66,15 @@ export function TopBar({
   const groups: Array<{
     id: ResourceGroupId;
     title: string;
-    icon: string;
+    icon: ResourceIconId;
     total: number;
     low: boolean;
     resources: readonly ResourceId[];
   }> = [
-    { id: 'food', title: '식량', icon: '🍲', total: food, low: food < pop * 3, resources: FOOD_RESOURCES },
-    { id: 'fuel', title: '땔감', icon: '🔥', total: fuel, low: fuel < pop * 2, resources: FUEL_RESOURCES },
-    { id: 'clothing', title: '옷', icon: '🧥', total: clothing, low: clothing < pop * 0.5, resources: CLOTHING_RESOURCES },
-    { id: 'luxury', title: '사치품', icon: '🏺', total: luxuries, low: false, resources: LUXURY_RESOURCES },
+    { id: 'food', title: '식량', icon: 'foodGroup', total: food, low: food < pop * 3, resources: FOOD_RESOURCES },
+    { id: 'fuel', title: '땔감', icon: 'fuelGroup', total: fuel, low: fuel < pop * 2, resources: FUEL_RESOURCES },
+    { id: 'clothing', title: '옷', icon: 'clothingGroup', total: clothing, low: clothing < pop * 0.5, resources: CLOTHING_RESOURCES },
+    { id: 'luxury', title: '사치품', icon: 'luxuryGroup', total: luxuries, low: false, resources: LUXURY_RESOURCES },
   ];
 
   return (
@@ -87,7 +89,8 @@ export function TopBar({
               onMouseEnter={() => setHoveredGroup(group.id)}
               onMouseLeave={() => setHoveredGroup(current => current === group.id ? null : current)}
             >
-              {group.icon} <small>{group.title}</small> {Math.floor(group.total)}
+              <ResourceIcon resource={group.icon} size={18} />
+              <small>{group.title}</small> {Math.floor(group.total)}
               {open && (
                 <ResourceBreakdownPopover
                   title={group.title}
@@ -109,7 +112,8 @@ export function TopBar({
             className={`res-item${isLow(state, id, pop) ? ' low' : ''}`}
             title={RESOURCE_NAMES[id]}
           >
-            {RESOURCE_ICONS[id]} <small>{RESOURCE_NAMES[id]}</small>{' '}
+            <ResourceIcon resource={id} size={18} />
+            <small>{RESOURCE_NAMES[id]}</small>{' '}
             {Math.floor(state.resources[id])}
           </span>
         ))}
@@ -130,7 +134,8 @@ export function TopBar({
               <span className="objective-items">
                 {(Object.entries(tribute.items) as [ResourceId, number][]).map(([resource, required]) => (
                   <span key={resource} className={tributeReserved(state, resource) >= required ? 'complete' : undefined}>
-                    {RESOURCE_ICONS[resource]} {RESOURCE_NAMES[resource]} {Math.floor(tributeReserved(state, resource))}/{required}
+                    <ResourceIcon resource={resource} size={18} />
+                    {RESOURCE_NAMES[resource]} {Math.floor(tributeReserved(state, resource))}/{required}
                   </span>
                 ))}
               </span>

@@ -57,6 +57,7 @@ function pickFaction(state: GameState, rng: () => number): Faction {
   // 위협도가 아주 높으면 평화 성향 씨족도 굶주림에 몰려 내려올 수 있다 (절반 가중).
   const cands: { f: Faction; w: number }[] = [];
   for (const f of FACTIONS) {
+    if (f.raidEligible === false) continue;
     const rel = getRelation(state, f.name);
     if (f.hostile) cands.push({ f, w: Math.max(5, 110 - rel) });
     else if (state.threat > 85) cands.push({ f, w: Math.max(2, (90 - rel) * 0.5) });

@@ -5,6 +5,7 @@ import { countBuilt } from './buildings';
 import { changeRelation, getRelation } from './relations';
 import {
   applyQuotedTrade, evaluateFactionProposal, quoteFactionDemand, quoteTrade, relationMargin,
+  useFactionTradeCapacity,
 } from './tradeValues';
 import type { GameState, LogEntry, PendingChoice, ResourceId, TradeNegotiation, TradeOffer, TradeQuote } from './types';
 
@@ -62,17 +63,28 @@ function updateTradeNegotiation(state: GameState, negotiation: TradeNegotiation)
   choice.data = { faction: negotiation.faction, negotiation };
 }
 
+function factionTradeUnlockReason(state: GameState, factionName: string): string | null {
+  const faction = FACTIONS.find(candidate => candidate.name === factionName);
+  if (!faction?.tradeUnlockBuilding) return null;
+  if (countBuilt(state, faction.tradeUnlockBuilding) > 0) return null;
+  return faction.tradeUnlockLabel ?? `${faction.tradeUnlockBuilding} 건설 후 교역할 수 있습니다`;
+}
+
+function isForeignTradeFaction(factionName: string): boolean {
+  return FACTIONS.find(candidate => candidate.name === factionName)?.foreignTrade !== false;
+}
+
 // 장터가 있으면 주기적으로 교역 제안이 온다.
 // 교역 상대와 품목은 세력 정의(FACTIONS.trades)를 따른다 — 습격 성향이 있어도
 // 교역품이 있는 세력(니마차 등)은 평시엔 장사꾼으로 온다.
 export function maybeOfferTrade(state: GameState, rng: () => number, daysSinceTrade: number): boolean {
-  if (countBuilt(state, 'market') === 0) return false;
+  if (countBuilt(state, 'market') === 0 && countBuilt(state, 'dock') === 0) return false;
   if (state.pendingChoice || state.battle) return false;
   if (daysSinceTrade < CONFIG.trade.minIntervalDays) return false;
   if (rng() >= CONFIG.trade.dailyChance) return false;
 
   // 관계가 좋은 세력일수록 장터에 자주 온다
-  const traders = FACTIONS.filter(f => f.trades.length > 0);
+  const traders = FACTIONS.filter(f => f.trades.length > 0 && !factionTradeUnlockReason(state, f.name));
   if (traders.length === 0) return false;
   const weights = traders.map(f => 20 + getRelation(state, f.name));
   let pick = rng() * weights.reduce((s, w) => s + w, 0);
@@ -101,7 +113,9 @@ export function maybeOfferTrade(state: GameState, rng: () => number, daysSinceTr
 export function canRequestTrade(state: GameState, factionName: string): string | null {
   const faction = FACTIONS.find(f => f.name === factionName);
   if (!faction || faction.exports.length === 0 || faction.imports.length === 0) return '교역 품목이 없는 세력입니다';
-  if (countBuilt(state, 'market') === 0) return '장터가 필요합니다';
+  const unlockReason = factionTradeUnlockReason(state, factionName);
+  if (unlockReason) return unlockReason;
+  if (countBuilt(state, 'market') === 0 && countBuilt(state, 'dock') === 0) return '장터나 부두가 필요합니다';
   if (state.pendingChoice || state.battle) return '지금은 거래할 수 없습니다';
   if (getRelation(state, factionName) < CONFIG.trade.minRelationToTrade) {
     return '관계가 나빠 상대해 주지 않습니다';
@@ -215,7 +229,9 @@ function resolveInitiatedTrade(state: GameState, optionId: string): void {
     state.resources.reputation = Math.min(100, state.resources.reputation + 1);
     state.lastTradeByFaction[faction] = state.day;
     // 먼저 사람을 보낸 거래는 조정의 눈에 밀무역으로 비친다 (모반 의심 계산용)
-    state.initiatedTradeDays = [...(state.initiatedTradeDays ?? []), state.day].slice(-20);
+    if (isForeignTradeFaction(faction)) {
+      state.initiatedTradeDays = [...(state.initiatedTradeDays ?? []), state.day].slice(-20);
+    }
     changeRelation(state, faction, CONFIG.relations.tradeAccept);
     addLog(state, `장터에서 ${faction}과(와) ${RESOURCE_NAMES[quote.give]}을(를) ${RESOURCE_NAMES[quote.get]}(으)로 교환했습니다.`, 'trade');
   }
@@ -243,11 +259,14 @@ export function resolveTrade(state: GameState, optionId: string): void {
       }
       state.resources[negotiation.give] -= negotiation.giveAmt;
       state.resources[negotiation.get] += negotiation.getAmt;
+      useFactionTradeCapacity(state, negotiation.faction, negotiation.get, negotiation.getAmt);
       state.resources.reputation = Math.min(100, state.resources.reputation + (negotiation.initiatedBy === 'player' ? 1 : 2));
       changeRelation(state, negotiation.faction, CONFIG.relations.tradeAccept);
       if (negotiation.initiatedBy === 'player') {
         state.lastTradeByFaction[negotiation.faction] = state.day;
-        state.initiatedTradeDays = [...(state.initiatedTradeDays ?? []), state.day].slice(-20);
+        if (isForeignTradeFaction(negotiation.faction)) {
+          state.initiatedTradeDays = [...(state.initiatedTradeDays ?? []), state.day].slice(-20);
+        }
       }
       addLog(
         state,
@@ -280,6 +299,7 @@ export function resolveTrade(state: GameState, optionId: string): void {
   if (optionId === 'accept') {
     state.resources[d.give] = Math.max(0, state.resources[d.give] - d.giveAmt);
     state.resources[d.get] += d.getAmt;
+    useFactionTradeCapacity(state, d.faction, d.get, d.getAmt);
     state.resources.reputation = Math.min(100, state.resources.reputation + 2);
     changeRelation(state, d.faction, CONFIG.relations.tradeAccept);
     addLog(state, `장터에서 ${d.faction}과(와) ${RESOURCE_NAMES[d.give]}을(를) ${RESOURCE_NAMES[d.get]}(으)로 교환했습니다.`, 'trade');
