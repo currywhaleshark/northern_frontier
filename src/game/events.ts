@@ -103,6 +103,7 @@ export function maybeOfferTrade(state: GameState, rng: () => number, daysSinceTr
     phase: 'selecting',
     give: tpl.give,
     giveAmt: tpl.giveAmt,
+    originalGiveAmt: tpl.giveAmt,
     get: null,
     getAmt: 0,
     round: 0,
@@ -155,6 +156,7 @@ export function negotiateTrade(
   get: ResourceId,
   getAmt: number,
   specialItem?: SpecialItemId,
+  proposedGiveAmt?: number,
 ): string | null {
   const negotiation = tradeNegotiationOf(state.pendingChoice);
   if (!negotiation) return '진행 중인 교역 협상이 없습니다.';
@@ -247,13 +249,28 @@ export function negotiateTrade(
   }
 
   if (!negotiation.give || negotiation.giveAmt <= 0) return '상대의 요구품이 정해지지 않았습니다.';
+  const giveAmt = proposedGiveAmt ?? negotiation.giveAmt;
+  const originalGiveAmt = negotiation.originalGiveAmt ?? negotiation.giveAmt;
+  if (!Number.isFinite(giveAmt) || !Number.isInteger(giveAmt) || giveAmt <= 0) {
+    negotiation.phase = 'rejected';
+    negotiation.message = '내줄 수량은 1 이상의 정수여야 합니다.';
+    updateTradeNegotiation(state, negotiation);
+    return negotiation.message;
+  }
+  if (giveAmt > originalGiveAmt) {
+    negotiation.phase = 'rejected';
+    negotiation.message = `상대가 처음 요구한 수량은 ${RESOURCE_NAMES[negotiation.give]} ${originalGiveAmt}입니다.`;
+    updateTradeNegotiation(state, negotiation);
+    return negotiation.message;
+  }
   const evaluation = evaluateFactionProposal(state, negotiation.faction, {
     give: negotiation.give,
-    giveAmt: negotiation.giveAmt,
+    giveAmt,
     get,
     getAmt,
   });
   negotiation.phase = evaluation.outcome;
+  negotiation.giveAmt = evaluation.offer.giveAmt;
   negotiation.get = evaluation.offer.get;
   negotiation.getAmt = evaluation.offer.getAmt;
   negotiation.maxAcceptGetAmt = evaluation.maxGetAmt;
@@ -306,6 +323,12 @@ export function resolveTrade(state: GameState, optionId: string): void {
       if (!canConfirm || (!specialItem && (!negotiation.give || negotiation.giveAmt <= 0)) ||
           !negotiation.get || negotiation.getAmt <= 0) {
         negotiation.message = '먼저 양쪽 조건을 확정해야 합니다.';
+        updateTradeNegotiation(state, negotiation);
+        return;
+      }
+      if (!specialItem && negotiation.give === negotiation.get) {
+        negotiation.phase = 'rejected';
+        negotiation.message = '같은 물품끼리는 거래할 수 없습니다.';
         updateTradeNegotiation(state, negotiation);
         return;
       }

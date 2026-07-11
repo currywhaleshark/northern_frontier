@@ -284,8 +284,13 @@ export default function App() {
     bump();
   };
 
-  const handleNegotiateTrade = (get: ResourceId, getAmt: number, specialItem?: SpecialItemId) => {
-    negotiateTrade(stateRef.current, get, getAmt, specialItem);
+  const handleNegotiateTrade = (
+    get: ResourceId,
+    getAmt: number,
+    specialItem?: SpecialItemId,
+    giveAmt?: number,
+  ) => {
+    negotiateTrade(stateRef.current, get, getAmt, specialItem, giveAmt);
     bump();
   };
 

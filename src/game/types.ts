@@ -333,6 +333,7 @@ export interface TradeNegotiation {
   phase: TradeNegotiationPhase;
   give: ResourceId | null; // 마을이 내놓는 물품
   giveAmt: number;
+  originalGiveAmt?: number; // 상대가 먼저 요구한 최초 수량 (역제안 상한)
   get: ResourceId | null;  // 마을이 받는 물품
   getAmt: number;
   round: number;

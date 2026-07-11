@@ -271,6 +271,39 @@ function withDock(state) {
   assert.equal(events.tradeNegotiationOf(state.pendingChoice).phase, 'accepted');
 }
 
+// ── 상대 요구량보다 재고가 적으면 보유량 안에서 줄 수량을 역제안할 수 있다 ──
+{
+  const state = withMarket(simulation.newGame(671));
+  const faction = TRADE_FACTION;
+  const demand = faction.trades[0];
+  state.resources[demand.give] = demand.giveAmt - 1;
+  assert.equal(events.maybeOfferTrade(state, () => 0, 999), true);
+  let negotiation = events.tradeNegotiationOf(state.pendingChoice);
+  assert.equal(negotiation.originalGiveAmt, demand.giveAmt);
+
+  const receive = faction.exports.find(resource => resource !== demand.give);
+  assert.ok(receive);
+  assert.equal(events.negotiateTrade(state, receive, 1, undefined, demand.giveAmt - 1), null);
+  negotiation = events.tradeNegotiationOf(state.pendingChoice);
+  assert.equal(negotiation.giveAmt, demand.giveAmt - 1);
+  assert.equal(negotiation.phase, 'accepted');
+  simulation.resolveChoice(state, 'confirm');
+  assert.equal(state.pendingChoice, null);
+  assert.equal(state.resources[demand.give], 0);
+}
+
+// ── 같은 물품끼리의 교환은 가치와 무관하게 거절한다 ──
+{
+  const state = withMarket(simulation.newGame(672));
+  const faction = TRADE_FACTION;
+  const resource = faction.trades[0].give;
+  const result = tradeValues.evaluateFactionProposal(state, faction.name, {
+    give: resource, giveAmt: 2, get: resource, getAmt: 1,
+  });
+  assert.equal(result.outcome, 'rejected');
+  assert.ok(result.message.includes('같은 물품'));
+}
+
 // ── 상대가 먼저 찾아온 협상 결렬은 기존 거절 벌칙을 유지한다 ──
 {
   const state = withMarket(simulation.newGame(68));
