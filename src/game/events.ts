@@ -8,6 +8,7 @@ import {
   relationMargin, useFactionTradeCapacity, visitorTradeMultiplier,
 } from './tradeValues';
 import { SPECIAL_ITEM_DEFS } from './specialItems';
+import { hasActivePassageForFaction } from './passage';
 import type {
   GameState, LogEntry, PendingChoice, ResourceId, SpecialItemId, TradeNegotiation, TradeOffer, TradeQuote,
 } from './types';
@@ -26,10 +27,13 @@ export function addLog(
   }
 }
 
-export function playerTradeCooldownDays(state: GameState): number {
-  return countBuilt(state, 'dock') > 0
+export function playerTradeCooldownDays(state: GameState, factionName?: string): number {
+  const base = countBuilt(state, 'dock') > 0
     ? CONFIG.trade.dockPlayerCooldownDays
     : CONFIG.trade.playerCooldownDays;
+  return factionName && hasActivePassageForFaction(state, factionName)
+    ? Math.max(1, base - CONFIG.foreignSites.passageTradeCooldownReduction)
+    : base;
 }
 
 export function scaledTradeOffer(state: GameState, offer: TradeOffer): TradeOffer {
@@ -108,7 +112,7 @@ export function maybeOfferTrade(state: GameState, rng: () => number, daysSinceTr
     getAmt: 0,
     round: 0,
     margin: relationMargin(getRelation(state, faction.name)),
-    message: `${faction.name} 상단이 ${RESOURCE_NAMES[tpl.give]} ${tpl.giveAmt}을(를) 구하러 왔습니다. 받을 물품과 수량을 제시하십시오.`,
+    message: `${faction.name} 상단이 ${RESOURCE_NAMES[tpl.give]} ${tpl.giveAmt}을(를) 급히 구하러 왔습니다. 평소보다 후하게 쳐주겠다고 하니 받을 물품과 수량을 제시하십시오.`,
   });
   return true;
 }
@@ -125,7 +129,7 @@ export function canRequestTrade(state: GameState, factionName: string): string |
     return '관계가 나빠 상대해 주지 않습니다';
   }
   const last = state.lastTradeByFaction[factionName];
-  const cooldown = playerTradeCooldownDays(state);
+  const cooldown = playerTradeCooldownDays(state, factionName);
   if (last != null && state.day - last < cooldown) {
     return `상단이 아직 돌아오지 않았습니다 (${cooldown - (state.day - last)}일 뒤)`;
   }

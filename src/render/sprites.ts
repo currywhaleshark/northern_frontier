@@ -5,8 +5,8 @@
 // 게임 로직과 렌더러는 "무엇을 그릴지"만 알고, "어떻게 그릴지"는 여기서 결정한다.
 // 현재 구현(placeholderSprites)은 단색 사각형 + 이모지 임시 그래픽이다.
 import { BUILDING_DEFS } from '../game/buildings';
-import { JOB_COLORS } from '../game/constants';
-import type { BuildingTypeId, Gender, JobId, Season, Terrain } from '../game/types';
+import { FACTIONS, JOB_COLORS } from '../game/constants';
+import type { BuildingTypeId, ForeignSiteStatus, ForeignSiteType, Gender, JobId, Season, Terrain } from '../game/types';
 import type { MilitiaWeaponSpriteId } from './militiaWeaponAssets';
 
 // 계절별 지형 팔레트 (임시 그래픽용)
@@ -76,6 +76,18 @@ export interface ResidentDrawParams {
   moving?: boolean;   // 이번 서브틱에 이동 중 (걷기 연출)
   facing?: 1 | -1;    // 1 오른쪽, -1 왼쪽
   militiaWeapon?: MilitiaWeaponSpriteId;
+  foreignFaction?: string;
+}
+
+export interface ForeignStructureDrawParams {
+  factionName: string | null;
+  siteType: ForeignSiteType;
+  status: ForeignSiteStatus;
+  variant: 'core' | 'prop';
+  season: Season;
+  x: number;
+  y: number;
+  size: number;
 }
 
 export interface RaiderDrawParams {
@@ -100,6 +112,7 @@ export interface SpriteAPI {
   drawTerrain(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): void;
   drawBuilding(ctx: CanvasRenderingContext2D, p: BuildingDrawParams): void;
   drawBuildingDamage(ctx: CanvasRenderingContext2D, p: BuildingDamageDrawParams): void;
+  drawForeignStructure(ctx: CanvasRenderingContext2D, p: ForeignStructureDrawParams): boolean;
   drawResident(ctx: CanvasRenderingContext2D, p: ResidentDrawParams): void;
   drawRaiders(ctx: CanvasRenderingContext2D, p: RaiderDrawParams): void;
 }
@@ -181,8 +194,14 @@ export const placeholderSprites: SpriteAPI = {
     ctx.restore();
   },
 
+  drawForeignStructure() {
+    return false;
+  },
+
   drawResident(ctx, p) {
-    ctx.fillStyle = JOB_COLORS[p.job];
+    ctx.fillStyle = p.foreignFaction
+      ? FACTIONS.find(faction => faction.name === p.foreignFaction)?.color ?? '#d2a958'
+      : JOB_COLORS[p.job];
     ctx.beginPath();
     ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
     ctx.fill();

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type RefObject } from 'react';
 import { CONFIG } from '../game/config';
+import { buildingFootprintSize } from '../game/buildings';
 import { FACTIONS } from '../game/constants';
 import { visibleMinimapRaid, visibleMinimapSites } from '../game/minimap';
 import type { ForeignSite, GameState, Terrain } from '../game/types';
@@ -7,6 +8,16 @@ import type { ForeignSite, GameState, Terrain } from '../game/types';
 const TILE = CONFIG.ui.tileSize;
 const MAP_SIZE = 188;
 const MAP_PADDING = 8;
+
+export function centerViewportOnSettlement(state: GameState, box: HTMLDivElement): void {
+  const center = state.buildings.find(building => building.type === 'center');
+  if (!center) return;
+  const size = buildingFootprintSize(center.type);
+  box.scrollTo({
+    left: MAP_PADDING + (center.x + size / 2) * TILE - box.clientWidth / 2,
+    top: MAP_PADDING + (center.y + size / 2) * TILE - box.clientHeight / 2,
+  });
+}
 
 const TERRAIN_COLORS: Record<Terrain, string> = {
   forest: '#274938',
@@ -84,7 +95,6 @@ function drawSite(ctx: CanvasRenderingContext2D, site: ForeignSite, sx: number, 
 export function Minimap({ state, version, viewportRef, selected }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragging = useRef(false);
-  const centeredOnce = useRef(false);
   const [viewport, setViewport] = useState<ViewportRect>({ left: 0, top: 0, width: 1, height: 1 });
   const [hoverLabel, setHoverLabel] = useState<string | null>(null);
   const mapHeight = state.map.length;
@@ -194,19 +204,9 @@ export function Minimap({ state, version, viewportRef, selected }: Props) {
   };
 
   const navigateToCenter = () => {
-    const center = state.buildings.find(building => building.type === 'center');
-    const canvas = canvasRef.current;
-    if (!center || !canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    navigate(rect.left + ((center.x + 0.5) / mapWidth) * rect.width, rect.top + ((center.y + 0.5) / mapHeight) * rect.height);
+    const box = viewportRef.current;
+    if (box) centerViewportOnSettlement(state, box);
   };
-
-  useEffect(() => {
-    if (centeredOnce.current) return;
-    centeredOnce.current = true;
-    const frame = requestAnimationFrame(navigateToCenter);
-    return () => cancelAnimationFrame(frame);
-  }, [mapHeight, mapWidth, viewportRef]);
 
   const markerLabelAt = (clientX: number, clientY: number): string | null => {
     const canvas = canvasRef.current;

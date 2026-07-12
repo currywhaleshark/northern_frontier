@@ -3,8 +3,8 @@ import type { ProcessingInputId, Rank, ResourceId, Season } from './types';
 
 export const CONFIG = {
   map: {
-    width: 56,
-    height: 56,
+    width: 72,
+    height: 72,
   },
 
   minerals: {
@@ -26,6 +26,21 @@ export const CONFIG = {
     // 하루당 실시간(ms). 밤낮 사이클을 느긋하게 볼 수 있도록 1배속을 8초/일로 늦췄다.
     // (3배 ≈ 2.7초/일, 10배 ≈ 0.8초/일로 빨리감기)
     msPerDay: { 1: 8000, 3: 2700, 10: 800 } as Record<number, number>,
+  },
+
+  exploration: {
+    residentRadius: 7,
+    buildingRadius: 9,
+    nightMult: 0.7,
+    weatherMult: {
+      clear: 1,
+      rain: 0.85,
+      frost: 0.9,
+      heavySnow: 0.7,
+      blizzard: 0.45,
+      coldSnap: 0.75,
+      thawFlood: 0.85,
+    },
   },
 
   start: {
@@ -82,10 +97,13 @@ export const CONFIG = {
   },
 
   foreignSites: {
-    minCenterDistance: 12,
-    minSiteSpacing: 9,
-    minRaidOriginDistance: 10,
+    minCenterDistance: 16,
+    minSiteSpacing: 11,
+    minRaidOriginDistance: 14,
     passageDays: 48,
+    passageRevealRadius: 1,
+    passageTradeCapacityMult: 1.2,
+    passageTradeCooldownReduction: 2,
     huntingRightsDays: 48,
     passageGiftGrain: 8,
     huntingGiftGrain: 10,
@@ -94,6 +112,11 @@ export const CONFIG = {
     giftRelation: 3,
     giftFavor: 1,
     claimDailyInterval: 6,
+    violationWarningDelay: [2, 4] as const,
+    violationCompensationGrain: 8,
+    violationCompensationRelation: -1,
+    violationApologyRelation: -3,
+    violationIgnoreRelation: -8,
     banditScoutWarningBonus: 0.25,
     lairSuppressionDays: 18,
   },
@@ -326,6 +349,7 @@ export const CONFIG = {
     playerCooldownDays: 6,  // 플레이어 주도 교역의 세력별 간격 (교환비 고정이라 반복 차익 방지)
     dockOfferScale: 1.5,
     dockPlayerCooldownDays: 4,
+    incomingOfferPremium: 1.25,
     haggleMarginStep: 0.1,
     maxHaggleRounds: 2,
     counterTolerance: 1.45,

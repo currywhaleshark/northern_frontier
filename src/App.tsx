@@ -21,7 +21,7 @@ import { InspectorPanel, type InspectorTab } from './components/InspectorPanel';
 import { ImportantLogOverlay } from './components/ImportantLogOverlay';
 import { JobPanel } from './components/JobPanel';
 import { MainMenu } from './components/MainMenu';
-import { Minimap } from './components/Minimap';
+import { centerViewportOnSettlement, Minimap } from './components/Minimap';
 import { ProcessingPanel } from './components/ProcessingPanel';
 import { TopBar } from './components/TopBar';
 import { RANK_NAMES } from './game/constants';
@@ -34,6 +34,7 @@ import { openPredatorHunt } from './game/specialEvents';
 import { getPointerAction, selectedEntityFromTile } from './game/selectionActions';
 import { isExplored } from './game/exploration';
 import { makeRng } from './game/map';
+import { openTerritoryOrderConfirmation } from './game/territory';
 import {
   raidBanditLair, requestHuntingRights, requestPassagePermission, scoutBanditLair, sendGiftToSite,
   type SiteGiftType,
@@ -109,6 +110,21 @@ export default function App() {
   });
 
   const state = stateRef.current;
+
+  useEffect(() => {
+    if (screen !== 'game') return;
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        const box = mapViewportRef.current;
+        if (box) centerViewportOnSettlement(stateRef.current, box);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      if (secondFrame) cancelAnimationFrame(secondFrame);
+    };
+  }, [screen]);
 
   // 개발용 콘솔 훅 (window.__game.run(n)으로 n일 빨리감기)
   useEffect(() => {
@@ -396,6 +412,12 @@ export default function App() {
     if (!tile) return;
     const action = getPointerAction(stateRef.current, selectedEntity, tile);
     if (selectedEntity?.kind !== 'resident') return;
+
+    if ((action.kind === 'move' || action.kind === 'work') && (action.unauthorizedSiteIds?.length ?? 0) > 0) {
+      openTerritoryOrderConfirmation(stateRef.current, selectedEntity.id, action);
+      bump();
+      return;
+    }
 
     let err: string | null = null;
     if (action.kind === 'move') {

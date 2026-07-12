@@ -17,6 +17,8 @@ import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
 import { militiaWeaponForResident } from './militiaWeaponAssignment';
 import { claimZonesAt } from '../game/claimZones';
 import { foreignSiteAt } from '../game/foreignSites';
+import { foreignSiteActors, foreignSiteProps, type ForeignSiteProp } from '../game/foreignSiteActivity';
+import { activePassageRoutes } from '../game/passage';
 import type { AnimalHabitat, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, Resident, Terrain } from '../game/types';
 
 const TILE = CONFIG.ui.tileSize;
@@ -357,7 +359,30 @@ function drawClaimZone(ctx: CanvasRenderingContext2D, zone: ClaimZone, color: st
   ctx.restore();
 }
 
-function drawForeignSite(ctx: CanvasRenderingContext2D, site: ForeignSite, selected: boolean): void {
+function drawPassageRoute(ctx: CanvasRenderingContext2D, route: ReturnType<typeof activePassageRoutes>[number]): void {
+  if (route.tiles.length < 2) return;
+  ctx.save();
+  ctx.strokeStyle = siteColor(route.site) + 'cc';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 4]);
+  ctx.beginPath();
+  route.tiles.forEach((tile, index) => {
+    const x = (tile.x + 0.5) * TILE;
+    const y = (tile.y + 0.5) * TILE;
+    if (index === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawForeignSite(
+  ctx: CanvasRenderingContext2D,
+  sprites: SpriteAPI,
+  site: ForeignSite,
+  selected: boolean,
+  season: ReturnType<typeof getSeason>,
+): void {
   const x = site.x * TILE;
   const y = site.y * TILE;
   const w = site.width * TILE;
@@ -366,6 +391,28 @@ function drawForeignSite(ctx: CanvasRenderingContext2D, site: ForeignSite, selec
   const inactive = site.type === 'seasonalCamp' && site.seasonalActive === false;
   ctx.save();
   ctx.globalAlpha = inactive ? 0.45 : 1;
+
+  const drewSprite = sprites.drawForeignStructure(ctx, {
+    factionName: site.factionName,
+    siteType: site.type,
+    status: site.status,
+    variant: 'core',
+    season,
+    x,
+    y,
+    size: Math.max(w, h),
+  });
+  if (drewSprite) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x + 2, y + 2, Math.max(4, w * 0.12), 3);
+    if (selected) {
+      ctx.strokeStyle = '#f3ce68';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+    }
+    ctx.restore();
+    return;
+  }
 
   if (site.type === 'village' || site.type === 'fishingVillage') {
     ctx.fillStyle = '#4f3c2d';
@@ -443,6 +490,78 @@ function drawForeignSite(ctx: CanvasRenderingContext2D, site: ForeignSite, selec
   ctx.restore();
 }
 
+function drawForeignSiteProp(
+  ctx: CanvasRenderingContext2D,
+  sprites: SpriteAPI,
+  prop: ForeignSiteProp,
+  site: ForeignSite,
+  season: ReturnType<typeof getSeason>,
+  day: number,
+): void {
+  const x = prop.x * TILE;
+  const y = prop.y * TILE;
+  if (prop.kind === 'field' || prop.kind === 'hut' || prop.kind === 'storehouse' || prop.kind === 'huntLodge') {
+    const type = prop.kind === 'field' ? 'field'
+      : prop.kind === 'hut' ? 'hut'
+        : prop.kind === 'huntLodge' ? 'huntLodge' : 'storehouse';
+    const seasonalGrowth = season === 'spring' ? 0.35 : season === 'summer' ? 0.72 : season === 'autumn' ? 0.95 : 0.08;
+    const drewForeign = prop.kind !== 'field' && sprites.drawForeignStructure(ctx, {
+      factionName: site.factionName,
+      siteType: site.type,
+      status: site.status,
+      variant: 'prop',
+      season,
+      x,
+      y,
+      size: TILE,
+    });
+    if (!drewForeign) {
+      sprites.drawBuilding(ctx, {
+        type,
+        built: true,
+        ghost: false,
+        progress01: 1,
+        growth01: prop.kind === 'field' ? Math.min(1, seasonalGrowth + ((day + prop.x + prop.y) % 4) * 0.04) : undefined,
+        x,
+        y,
+        size: TILE,
+        season,
+      });
+    }
+    ctx.fillStyle = siteColor(site);
+    ctx.fillRect(x + 4, y + TILE - 3, TILE - 8, 2);
+    return;
+  }
+  ctx.save();
+  if (prop.kind === 'dryingRack') {
+    ctx.strokeStyle = '#8b6c48';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + 5, y + TILE - 5);
+    ctx.lineTo(x + 9, y + 7);
+    ctx.lineTo(x + TILE - 7, y + 7);
+    ctx.lineTo(x + TILE - 4, y + TILE - 5);
+    ctx.moveTo(x + 8, y + 12);
+    ctx.lineTo(x + TILE - 6, y + 12);
+    ctx.stroke();
+    ctx.fillStyle = '#b7c2b0';
+    for (let i = 0; i < 3; i++) ctx.fillRect(x + 10 + i * 4, y + 13, 2, 6);
+  } else {
+    ctx.fillStyle = '#67513a';
+    ctx.strokeStyle = '#9ac2d0';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(x + TILE / 2, y + TILE / 2 + 2, TILE * 0.38, TILE * 0.16, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + TILE * 0.34, y + TILE * 0.38);
+    ctx.lineTo(x + TILE * 0.66, y + TILE * 0.62);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: SceneOptions): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -471,6 +590,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     const owner = state.foreignSites.find(site => site.id === zone.siteId);
     drawClaimZone(ctx, zone, owner ? siteColor(owner) : '#aab1b8');
   }
+  for (const route of activePassageRoutes(state)) drawPassageRoute(ctx, route);
 
   // 2) 건물 — 지붕이 위 타일에 겹치므로 y 순서로 그린다
   const season = getSeason(state.day);
@@ -503,9 +623,13 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     }
   }
 
-  for (const site of state.foreignSites.filter(candidate => candidate.discovered)) {
+  const discoveredSites = state.foreignSites.filter(candidate => candidate.discovered);
+  for (const site of discoveredSites) {
+    for (const prop of foreignSiteProps(state, site)) drawForeignSiteProp(ctx, sprites, prop, site, season, state.day);
+  }
+  for (const site of discoveredSites) {
     const selected = !!o.selected && foreignSiteAt(state, o.selected.x, o.selected.y)?.id === site.id;
-    drawForeignSite(ctx, site, selected);
+    drawForeignSite(ctx, sprites, site, selected, season);
   }
 
   drawWorkerSlotOverlays(ctx, state, sorted, o.selectedBuildingId);
@@ -530,7 +654,24 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     }
   }
 
-  // 4) 주민
+  // 4) 외부 거점 생활 인구와 개척지 주민
+  const activityTime = (state.day - 1) * CONFIG.agents.subticksPerDay + state.subTick + o.alpha;
+  for (const site of discoveredSites) {
+    for (const actor of foreignSiteActors(state, site, activityTime)) {
+      sprites.drawResident(ctx, {
+        job: actor.job,
+        gender: actor.gender,
+        x: actor.x * TILE,
+        y: actor.y * TILE,
+        sick: false,
+        carrying: actor.carrying,
+        selected: false,
+        moving: actor.moving,
+        facing: actor.facing,
+        foreignFaction: site.factionName ?? undefined,
+      });
+    }
+  }
   for (const r of state.residents) {
     if (!r.alive) continue;
     const p = residentPixelPos(r, o.alpha);

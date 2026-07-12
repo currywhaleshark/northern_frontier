@@ -219,14 +219,14 @@ export type SelectedEntity =
 
 export type PointerAction =
   | { kind: 'none'; cursor: PointerCursor; label: string }
-  | { kind: 'move'; cursor: PointerCursor; label: string; x: number; y: number }
-  | { kind: 'work'; cursor: PointerCursor; label: string; x: number; y: number; buildingId?: number }
+  | { kind: 'move'; cursor: PointerCursor; label: string; x: number; y: number; unauthorizedSiteIds?: number[] }
+  | { kind: 'work'; cursor: PointerCursor; label: string; x: number; y: number; buildingId?: number; unauthorizedSiteIds?: number[] }
   | { kind: 'building'; cursor: PointerCursor; label: string; buildingId: number }
   | { kind: 'invalid'; cursor: PointerCursor; label: string };
 
 export type ManualOrder =
-  | { kind: 'move'; x: number; y: number }
-  | { kind: 'work'; x: number; y: number; buildingId?: number; repeat?: boolean };
+  | { kind: 'move'; x: number; y: number; unauthorizedSiteIds?: number[] }
+  | { kind: 'work'; x: number; y: number; buildingId?: number; repeat?: boolean; unauthorizedSiteIds?: number[]; started?: boolean };
 
 export type AgentPhase = 'rest' | 'toWork' | 'working' | 'toDeposit';
 
@@ -366,7 +366,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident';
+  kind: 'raid' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory';
   title: string;
   body: string;
   illustration?: {
@@ -376,6 +376,18 @@ export interface PendingChoice {
   options: ChoiceOption[];
   // raid: { power, faction, warned } / trade: { give, giveAmt, get, getAmt, faction } / immigration: { count }
   data: Record<string, unknown>;
+}
+
+export interface TerritoryViolation {
+  siteId: number;
+  firstDay: number;
+  lastDay: number;
+  warningDay: number;
+  passage: boolean;
+  work: boolean;
+  count: number;
+  lastPassageDay?: number;
+  lastWorkDay?: number;
 }
 
 export type SpecialItemId = 'wildGinseng' | 'tigerPelt' | 'gyrfalcon';
@@ -492,6 +504,7 @@ export interface GameState {
   claimZones: ClaimZone[];
   nextForeignSiteId: number;
   nextClaimZoneId: number;
+  territoryViolations: TerritoryViolation[];
   residents: Resident[];
   buildings: Building[];
   nextBuildingId: number;

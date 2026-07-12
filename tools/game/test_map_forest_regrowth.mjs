@@ -52,12 +52,12 @@ function stockpile(state) {
 }
 
 {
-  assert.equal(CONFIG.map.width, 56, 'long-game map width is expanded');
-  assert.equal(CONFIG.map.height, 56, 'long-game map height is expanded');
+  assert.equal(CONFIG.map.width, 72, 'long-game map width is expanded');
+  assert.equal(CONFIG.map.height, 72, 'long-game map height is expanded');
 
   const generated = mapModule.generateMap(20260707).tiles;
-  assert.equal(generated.length, 56, 'generated map uses expanded height');
-  assert.equal(generated[0].length, 56, 'generated map uses expanded width');
+  assert.equal(generated.length, 72, 'generated map uses expanded height');
+  assert.equal(generated[0].length, 72, 'generated map uses expanded width');
   assert.ok(countTerrain(generated, 'forest') >= 500, 'expanded map starts with a deeper forest reserve');
 }
 

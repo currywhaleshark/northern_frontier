@@ -186,6 +186,16 @@ function runTicks(state, ticks) {
               ? prepareWatermillEdge(state)
               : prepareTile(state, 'plain');
     if (building === 'mine') tile.hasIron = true;
+    if (building === 'ondol') {
+      const size = buildings.buildingFootprintSize(building);
+      for (let dy = 0; dy < size; dy++) {
+        for (let dx = 0; dx < size; dx++) {
+          const footprintTile = state.map[tile.y + dy][tile.x + dx];
+          footprintTile.terrain = 'plain';
+          footprintTile.buildingId = null;
+        }
+      }
+    }
 
     assert.equal(simulation.tryPlaceBuilding(state, building, tile.x, tile.y), null, `${building} can be placed at bo`);
   }

@@ -186,6 +186,7 @@ export function loadGame(): GameState | null {
     if (parsed.lastImmigrationDay == null) parsed.lastImmigrationDay = -999;
     ensureIncidentState(parsed);
     ensureForeignSiteState(parsed);
+    if (!Array.isArray(parsed.territoryViolations)) parsed.territoryViolations = [];
     migrateResourceTaxonomy(parsed);
     // 구버전 저장 마이그레이션: 없는 필드는 기본값으로 채운다
     if (!parsed.relations) parsed.relations = initRelations();

@@ -41,6 +41,7 @@ import { isHaulSourceBuilding } from './inventory';
 import { maybeOfferImmigration, resolveImmigration } from './immigration';
 import { createIncidentState, resolveSpecialEvent, updateSpecialEvents } from './specialEvents';
 import { dailyClaimTensionTick, noteBuildingClaimIntrusions } from './claimZones';
+import { resolveTerritoryWarning, updateTerritoryWarnings } from './territory';
 import {
   foreignSiteAt, generateForeignSites, revealForeignSitesFromExploration, updateSeasonalForeignSites,
 } from './foreignSites';
@@ -85,6 +86,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     claimZones: [],
     nextForeignSiteId: 1,
     nextClaimZoneId: 1,
+    territoryViolations: [],
     residents: [],
     buildings: [],
     nextBuildingId: 1,
@@ -356,7 +358,17 @@ export function unassignResidentFromBuilding(state: GameState, residentId: numbe
   if (resident && previousAssignment != null && resident.assignedBuildingId == null) resetAgent(state, resident);
 }
 
-export function issueResidentMoveOrder(state: GameState, residentId: number, x: number, y: number): string | null {
+function hasForcedTerritoryAccess(required: readonly number[] | undefined, forced: readonly number[]): boolean {
+  return (required ?? []).every(siteId => forced.includes(siteId));
+}
+
+export function issueResidentMoveOrder(
+  state: GameState,
+  residentId: number,
+  x: number,
+  y: number,
+  forcedSiteIds: readonly number[] = [],
+): string | null {
   const resident = state.residents.find(res => res.id === residentId && res.alive);
   if (!resident) return '선택한 주민이 없습니다.';
   const tile = state.map[y]?.[x];
@@ -364,8 +376,9 @@ export function issueResidentMoveOrder(state: GameState, residentId: number, x: 
 
   const action = getPointerAction(state, { kind: 'resident', id: residentId }, tile);
   if (action.kind !== 'move') return action.label || '이동할 수 없습니다.';
+  if (!hasForcedTerritoryAccess(action.unauthorizedSiteIds, forcedSiteIds)) return '통행 허락이 없는 세력권입니다.';
 
-  resident.manualOrder = { kind: 'move', x, y };
+  resident.manualOrder = { kind: 'move', x, y, unauthorizedSiteIds: [...forcedSiteIds] };
   interruptResidentForManualOrder(resident);
   resident.task = '이동 명령';
   return null;
@@ -375,6 +388,7 @@ export function issueResidentWorkOrder(
   state: GameState,
   residentId: number,
   requestedAction: PointerAction,
+  forcedSiteIds: readonly number[] = [],
 ): string | null {
   if (requestedAction.kind !== 'work') return '작업 명령이 아닙니다.';
   const resident = state.residents.find(res => res.id === residentId && res.alive);
@@ -384,10 +398,11 @@ export function issueResidentWorkOrder(
 
   const action = getPointerAction(state, { kind: 'resident', id: residentId }, tile);
   if (action.kind !== 'work') return action.label || '작업할 수 없습니다.';
+  if (!hasForcedTerritoryAccess(action.unauthorizedSiteIds, forcedSiteIds)) return '작업 허락이 없는 세력권입니다.';
 
   const targetBuilding = action.buildingId == null ? undefined : getBuilding(state, action.buildingId);
   const forcedHaulTarget = resident.job === 'hauler' && !!targetBuilding && isHaulSourceBuilding(targetBuilding);
-  if (targetBuilding && workerSlotConfig(targetBuilding.type) && !forcedHaulTarget) {
+  if (targetBuilding && workerSlotConfig(targetBuilding.type) && !forcedHaulTarget && forcedSiteIds.length === 0) {
     return assignResidentToBuilding(state, residentId, targetBuilding.id);
   }
 
@@ -397,6 +412,7 @@ export function issueResidentWorkOrder(
     y: action.y,
     buildingId: action.buildingId,
     repeat: resident.job === 'hauler' && (tile.terrain === 'rock' || forcedHaulTarget),
+    unauthorizedSiteIds: [...forcedSiteIds],
   };
   interruptResidentForManualOrder(resident);
   resident.task = action.label;
@@ -513,6 +529,22 @@ export function setSmithyProduct(state: GameState, buildingId: number, product: 
 
 export function resolveChoice(state: GameState, optionId: string): void {
   if (!state.pendingChoice) return;
+  if (state.pendingChoice.kind === 'territory' && state.pendingChoice.data.mode === 'orderConfirm') {
+    const choice = state.pendingChoice;
+    const action = choice.data.action as PointerAction;
+    const residentId = choice.data.residentId as number;
+    const siteIds = choice.data.siteIds as number[];
+    state.pendingChoice = null;
+    if (optionId === 'force') {
+      const error = action.kind === 'move'
+        ? issueResidentMoveOrder(state, residentId, action.x, action.y, siteIds)
+        : action.kind === 'work'
+          ? issueResidentWorkOrder(state, residentId, action, siteIds)
+          : '강행할 명령이 없습니다.';
+      if (error) addLog(state, error, 'bad');
+    }
+    return;
+  }
   const incidentNonce = state.pendingChoice.kind === 'incident'
     ? state.incidents.resolutionCount++
     : 0;
@@ -525,6 +557,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'crackdown') resolveCrackdown(state, optionId, rng);
   else if (state.pendingChoice.kind === 'immigration') resolveImmigration(state, optionId);
   else if (state.pendingChoice.kind === 'incident') resolveSpecialEvent(state, optionId, rng);
+  else if (state.pendingChoice.kind === 'territory') resolveTerritoryWarning(state, optionId);
   else resolveTrade(state, optionId);
   state.resources.defense = computeDefense(state);
 }
@@ -609,6 +642,7 @@ function endOfDay(state: GameState): void {
   maybeCollectTribute(state); // 겨울: 조정의 사자가 세공을 거둔다 (모달 충돌 시 다음 날로)
   updateSuspicion(state, rng); // 모반 의심 누적과 감찰/견책/토벌 사건
   updateSpecialEvents(state, rng); // 기존 제도권 사건과 모달이 겹치면 예정일을 넘겨 다음 날 재시도
+  updateTerritoryWarnings(state);
   dailyClaimTensionTick(state);
 
   state.resources.defense = computeDefense(state);

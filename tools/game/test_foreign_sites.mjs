@@ -29,7 +29,15 @@ const claimZones = await import(pathToFileURL(join(compiledDir, 'claimZones.mjs'
 const diplomacy = await import(pathToFileURL(join(compiledDir, 'siteDiplomacy.mjs')).href);
 const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
 const minimap = await import(pathToFileURL(join(compiledDir, 'minimap.mjs')).href);
+const activity = await import(pathToFileURL(join(compiledDir, 'foreignSiteActivity.mjs')).href);
+const passage = await import(pathToFileURL(join(compiledDir, 'passage.mjs')).href);
+const events = await import(pathToFileURL(join(compiledDir, 'events.mjs')).href);
+const tradeValues = await import(pathToFileURL(join(compiledDir, 'tradeValues.mjs')).href);
+const agents = await import(pathToFileURL(join(compiledDir, 'agents.mjs')).href);
+const selectionActions = await import(pathToFileURL(join(compiledDir, 'selectionActions.mjs')).href);
+const territory = await import(pathToFileURL(join(compiledDir, 'territory.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
+const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs')).href);
 
 {
   const state = simulation.newGame(2026071201);
@@ -65,7 +73,9 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
   const relationBefore = state.relations[zone.factionName];
   const alarmBefore = site.alarm;
   const building = {
-    id: state.nextBuildingId++, type: 'hut', x: zone.x + Math.max(0, zone.radius - 1), y: zone.y,
+    id: state.nextBuildingId++, type: 'hut',
+    x: Math.min(state.map[0].length - 2, Math.max(0, zone.x)),
+    y: Math.min(state.map.length - 2, Math.max(0, zone.y)),
     progress: 0, built: false, fieldGrowth: 0,
   };
   state.buildings.push(building);
@@ -79,6 +89,8 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
   const state = simulation.newGame(2026071204);
   const camp = state.foreignSites.find(site => site.type === 'seasonalCamp');
   camp.discovered = true;
+  assert.equal(activity.foreignSiteProps(state, camp).filter(prop => prop.kind === 'huntLodge').length, 1,
+    'seasonal camp has one faction hunting lodge');
   camp.seasonalActive = true;
   camp.goodwill = 80;
   camp.trust = 80;
@@ -138,6 +150,127 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
   state.raiders.warned = false;
   state.raiders.spotted = true;
   assert.equal(minimap.visibleMinimapRaid(state), state.raiders, 'spotted raiders remain visible');
+}
+
+{
+  const state = simulation.newGame(2026071208);
+  const village = state.foreignSites.find(site => site.type === 'village' || site.type === 'fishingVillage');
+  village.discovered = true;
+  const props = activity.foreignSiteProps(state, village);
+  assert.ok(props.some(prop => prop.kind === 'field'), 'settlement has a working field');
+  assert.ok(props.some(prop => prop.kind !== 'field'), 'settlement has outbuildings');
+  const villagersAtStart = activity.foreignSiteActors(state, village, 0);
+  const villagersLater = activity.foreignSiteActors(state, village, 8);
+  assert.ok(villagersAtStart.length >= 2, 'settlement has ambient workers');
+  assert.notDeepEqual(
+    villagersAtStart.map(actor => [actor.x, actor.y]),
+    villagersLater.map(actor => [actor.x, actor.y]),
+    'settlement workers move between work sites',
+  );
+
+  const camp = state.foreignSites.find(site => site.type === 'seasonalCamp');
+  camp.discovered = true;
+  camp.seasonalActive = false;
+  assert.deepEqual(activity.foreignSiteActors(state, camp, 0), [], 'inactive camp stays empty');
+  camp.seasonalActive = true;
+  camp.activeSeasons = ['spring'];
+  state.day = 1;
+  const arriving = activity.foreignSiteActors(state, camp, 0);
+  const mapWidth = state.map[0].length;
+  const mapHeight = state.map.length;
+  assert.ok(arriving.length >= 3, 'active camp receives a hunting party');
+  assert.ok(arriving.some(actor => actor.x <= 0.6 || actor.y <= 0.6 || actor.x >= mapWidth - 0.6 || actor.y >= mapHeight - 0.6),
+    'hunters enter from a map edge');
+}
+
+{
+  const state = simulation.newGame(2026071209);
+  const site = state.foreignSites.find(candidate => candidate.type === 'village' || candidate.type === 'fishingVillage');
+  site.discovered = true;
+  site.goodwill = 90;
+  site.trust = 90;
+  state.relations[site.factionName] = 90;
+  state.resources.grain = 100;
+  const resource = FACTIONS.find(faction => faction.name === site.factionName).exports[0];
+  const capacityBefore = tradeValues.factionTradeCapacitySummary(state, site.factionName, resource).total;
+  const cooldownBefore = events.playerTradeCooldownDays(state, site.factionName);
+  assert.equal(diplomacy.requestPassagePermission(state, site.id), null);
+  assert.equal(passage.hasActivePassageForFaction(state, site.factionName), true);
+  const route = passage.passageRouteToSite(state, site);
+  assert.ok(route.length > 2, 'permission establishes a visible route');
+  assert.ok(route.every(tile => state.exploration.explored[tile.y][tile.x]), 'guides reveal the passage route');
+  assert.ok(tradeValues.factionTradeCapacitySummary(state, site.factionName, resource).total > capacityBefore,
+    'passage raises seasonal trade capacity');
+  assert.equal(events.playerTradeCooldownDays(state, site.factionName), cooldownBefore - CONFIG.foreignSites.passageTradeCooldownReduction,
+    'passage shortens caravan turnaround');
+}
+
+{
+  const state = simulation.newGame(2026071210);
+  const site = state.foreignSites.find(candidate => candidate.type === 'village' || candidate.type === 'fishingVillage');
+  site.discovered = true;
+  const zones = state.claimZones.filter(zone => zone.siteId === site.id);
+  zones.forEach(zone => { zone.discovered = true; delete zone.permittedUntilDay; });
+  const tile = state.map[site.y][site.x];
+  tile.terrain = 'grass';
+  tile.buildingId = null;
+  state.exploration.explored[tile.y][tile.x] = true;
+  const resident = state.residents.find(candidate => candidate.alive);
+
+  assert.equal(agents.isPassable(state, tile.x, tile.y), false, 'known foreign territory blocks automatic movement');
+  const forcedMove = selectionActions.getPointerAction(state, { kind: 'resident', id: resident.id }, tile);
+  assert.equal(forcedMove.kind, 'move');
+  assert.deepEqual(forcedMove.unauthorizedSiteIds, [site.id], 'manual movement is offered as a forced trespass');
+
+  territory.openTerritoryOrderConfirmation(state, resident.id, forcedMove);
+  assert.equal(state.pendingChoice.kind, 'territory');
+  simulation.resolveChoice(state, 'force');
+  assert.deepEqual(resident.manualOrder.unauthorizedSiteIds, [site.id], 'confirmed order carries a scoped territory override');
+
+  resident.manualOrder = null;
+  site.goodwill = 90;
+  site.trust = 90;
+  state.relations[site.factionName] = 90;
+  state.resources.grain = 100;
+  assert.equal(diplomacy.requestPassagePermission(state, site.id), null);
+  assert.equal(agents.isPassable(state, tile.x, tile.y), true, 'passage permission opens resident movement');
+
+  resident.x = tile.x;
+  resident.y = tile.y;
+  resident.px = tile.x;
+  resident.py = tile.y;
+  resident.phase = 'working';
+  resident.workTimer = 10;
+  agents.agentsTick(state);
+  assert.equal(resident.task, '작업 허가 없음', 'passage permission does not let automatic work continue');
+
+  tile.terrain = 'forest';
+  resident.job = 'woodcutter';
+  const forcedWork = selectionActions.getPointerAction(state, { kind: 'resident', id: resident.id }, tile);
+  assert.equal(forcedWork.kind, 'work');
+  assert.deepEqual(forcedWork.unauthorizedSiteIds, [site.id], 'passage permission alone does not grant resource work rights');
+}
+
+{
+  const state = simulation.newGame(2026071211);
+  const site = state.foreignSites.find(candidate => candidate.type === 'village' || candidate.type === 'fishingVillage');
+  site.discovered = true;
+  state.claimZones.filter(zone => zone.siteId === site.id).forEach(zone => {
+    zone.discovered = true;
+    delete zone.permittedUntilDay;
+  });
+  const relationBefore = state.relations[site.factionName];
+  territory.noteTerritoryViolation(state, [site.id], site.x, site.y, 'passage');
+  assert.equal(state.territoryViolations.length, 1);
+  const warningDay = state.territoryViolations[0].warningDay;
+  assert.ok(warningDay >= state.day + CONFIG.foreignSites.violationWarningDelay[0]);
+  state.day = warningDay;
+  territory.updateTerritoryWarnings(state);
+  assert.equal(state.pendingChoice.kind, 'territory', 'a delayed diplomatic warning opens');
+  assert.equal(state.pendingChoice.data.mode, 'warning');
+  simulation.resolveChoice(state, 'ignore');
+  assert.ok(state.relations[site.factionName] < relationBefore, 'ignoring the warning damages faction relations');
+  assert.equal(state.territoryViolations.length, 0, 'resolved warning clears the violation');
 }
 
 console.log('foreign site tests passed');

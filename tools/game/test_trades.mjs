@@ -241,6 +241,7 @@ function withDock(state) {
   state.resources[faction.trades[0].give] = faction.trades[0].giveAmt + 5;
   assert.equal(events.maybeOfferTrade(state, () => 0, 999), true);
   assert.ok(state.pendingChoice.body.includes(TRADER));
+  assert.ok(state.pendingChoice.body.includes('후하게'));
   assert.equal(state.pendingChoice.body.includes(`(${faction.desc})`), false);
   let negotiation = events.tradeNegotiationOf(state.pendingChoice);
   assert.equal(negotiation.initiatedBy, 'faction');

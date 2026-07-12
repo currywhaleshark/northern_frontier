@@ -209,17 +209,21 @@ export function spawnRaiders(
   let originUsed = false;
   const originSite = findRaidOriginSite(state, faction.name);
   if (originSite) {
+    const originPassable = (x: number, y: number) =>
+      raiderPassable(state, x, y) ||
+      (state.map[y]?.[x]?.buildingId == null &&
+        (state.map[y]?.[x]?.terrain === 'mountain' || state.map[y]?.[x]?.terrain === 'river'));
     const starts: Array<{ x: number; y: number; order: number }> = [];
     for (let y = originSite.y - 1; y <= originSite.y + originSite.height; y++) {
       for (let x = originSite.x - 1; x <= originSite.x + originSite.width; x++) {
         const perimeter = x === originSite.x - 1 || x === originSite.x + originSite.width ||
           y === originSite.y - 1 || y === originSite.y + originSite.height;
-        if (perimeter && raiderPassable(state, x, y)) starts.push({ x, y, order: rng() });
+        if (perimeter && originPassable(x, y)) starts.push({ x, y, order: rng() });
       }
     }
     starts.sort((a, b) => a.order - b.order);
     for (const start of starts) {
-      const pass = (x: number, y: number) => raiderPassable(state, x, y);
+      const pass = (x: number, y: number) => originPassable(x, y);
       path = findPath(state, start.x, start.y, raiderBuildingApproachGoal(state, center), pass);
       if (!path && barrierTiles.size > 0) {
         path = findPath(state, start.x, start.y, tile => nearBarrier(tile.x, tile.y), pass);

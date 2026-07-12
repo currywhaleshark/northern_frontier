@@ -61,6 +61,26 @@ const constants = await import(pathToFileURL(join(compiledDir, 'constants.mjs'))
 }
 
 {
+  const state = simulation.newGame(2026071201);
+  const center = state.buildings.find(building => building.type === 'center');
+  const reachable = new Set([`${center.x},${center.y}`]);
+  const queue = [{ x: center.x, y: center.y }];
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const next = state.map[current.y + dy]?.[current.x + dx];
+      if (!next || next.terrain === 'river' || next.terrain === 'mountain') continue;
+      const key = `${next.x},${next.y}`;
+      if (reachable.has(key)) continue;
+      reachable.add(key);
+      queue.push({ x: next.x, y: next.y });
+    }
+  }
+  assert.ok(state.residents.every(resident => reachable.has(`${resident.x},${resident.y}`)),
+    'starting residents spawn on the settlement side of rivers');
+}
+
+{
   const state = simulation.newGame(456);
   const createdFemale = residents.createResident(state, () => 0.25, 'farmer');
   const createdMale = residents.createResident(state, () => 0.75, 'hunter');

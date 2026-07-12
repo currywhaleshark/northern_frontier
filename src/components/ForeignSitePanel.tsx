@@ -1,4 +1,5 @@
 import { FACTIONS, RESOURCE_NAMES } from '../game/constants';
+import { CONFIG } from '../game/config';
 import { isClaimPermissionActive } from '../game/claimZones';
 import { SITE_GIFTS, type SiteGiftType } from '../game/siteDiplomacy';
 import type { ClaimKind, ForeignSite, ForeignSiteStatus, ForeignSiteType, GameState } from '../game/types';
@@ -63,6 +64,7 @@ export function ForeignSitePanel({
   const inactive = site.type === 'seasonalCamp' && site.seasonalActive === false;
   const operational = site.status !== 'burned' && site.status !== 'abandoned';
   const hasPassage = zones.some(zone => zone.kind === 'passage');
+  const passageActive = zones.some(zone => zone.kind === 'passage' && isClaimPermissionActive(state, zone));
   const hasHunting = zones.some(zone => zone.kind === 'hunting' || zone.kind === 'forest');
 
   return (
@@ -81,6 +83,16 @@ export function ForeignSitePanel({
           : '이곳 사람들은 우리가 오기 전부터 강과 숲과 산길을 함께 써 왔습니다.'}
       </div>
       {inactive && <div className="foreign-site-notice">계절이 바뀌어 야영지가 비어 있습니다.</div>}
+      {passageActive && (
+        <div className="foreign-site-notice">
+          산길 개방 · 교역 한도 +{Math.round((CONFIG.foreignSites.passageTradeCapacityMult - 1) * 100)}% · 상단 회전 {CONFIG.foreignSites.passageTradeCooldownReduction}일 단축
+        </div>
+      )}
+      {hasPassage && operational && !passageActive && (
+        <div className="foreign-site-notice">
+          통행 제한 · 일반 이동과 작업은 생활권을 우회하며, 강제 명령은 외교 항의로 이어질 수 있습니다
+        </div>
+      )}
 
       <table className="insp-table foreign-site-table">
         <tbody>

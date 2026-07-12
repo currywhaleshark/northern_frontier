@@ -3,6 +3,7 @@ import { RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
 import { addForeignSiteMemory, isForeignSiteOperational } from './foreignSites';
 import { changeRelation, getRelation } from './relations';
+import { revealPassageRoute } from './passage';
 import { livingResidents } from './residents';
 import type { ForeignSite, GameState, ResourceId } from './types';
 
@@ -74,11 +75,15 @@ export function requestPassagePermission(state: GameState, siteId: number): stri
   state.resources.grain -= cost;
   const until = state.day + CONFIG.foreignSites.passageDays;
   for (const zone of zones) zone.permittedUntilDay = until;
+  const revealed = revealPassageRoute(state, site);
   site.trust = Math.min(100, site.trust + 5);
   site.goodwill = Math.min(100, site.goodwill + 3);
   site.lastInteractionDay = state.day;
-  addForeignSiteMemory(state, site.id, `${until}일까지 산길 통행을 묵인하기로 약조했습니다.`, 'good');
-  addLog(state, `${site.name}에 통행을 청해 ${CONFIG.foreignSites.passageDays}일 동안 산길을 이용하기로 약조했습니다${cost > 0 ? ` (곡물 -${cost})` : ''}.`, 'good', true);
+  addForeignSiteMemory(state, site.id, `${until}일까지 산길 통행과 상단 왕래를 보장하기로 약조했습니다.`, 'good');
+  addLog(state,
+    `${site.name}에 통행을 청해 ${CONFIG.foreignSites.passageDays}일 동안 산길을 이용하기로 약조했습니다` +
+      `${cost > 0 ? ` (곡물 -${cost})` : ''}. 길잡이가 산길 ${revealed}칸을 새로 알려 주었습니다.`,
+    'good', true);
   return null;
 }
 

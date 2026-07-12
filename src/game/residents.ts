@@ -76,19 +76,38 @@ function hasSpawnExit(state: GameState, start: Tile, cx: number, cy: number): bo
   return false;
 }
 
+function centerLandTiles(state: GameState, cx: number, cy: number): Set<string> {
+  const reachable = new Set<string>([`${cx},${cy}`]);
+  const queue = [{ x: cx, y: cy }];
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const next = state.map[current.y + dy]?.[current.x + dx];
+      if (!next || next.terrain === 'river' || next.terrain === 'mountain') continue;
+      const key = `${next.x},${next.y}`;
+      if (reachable.has(key)) continue;
+      reachable.add(key);
+      queue.push({ x: next.x, y: next.y });
+    }
+  }
+  return reachable;
+}
+
 function residentSpawnPoint(
   state: GameState,
   rng: () => number,
   cx: number,
   cy: number,
 ): { x: number; y: number } {
+  const centerLand = centerLandTiles(state, cx, cy);
   for (let radius = 1; radius <= 6; radius++) {
     const candidates: Tile[] = [];
     for (let y = cy - radius; y <= cy + radius; y++) {
       for (let x = cx - radius; x <= cx + radius; x++) {
         if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) !== radius) continue;
         const tile = state.map[y]?.[x];
-        if (tile && isResidentSpawnTile(tile) && hasSpawnExit(state, tile, cx, cy)) candidates.push(tile);
+        if (tile && centerLand.has(`${tile.x},${tile.y}`) &&
+            isResidentSpawnTile(tile) && hasSpawnExit(state, tile, cx, cy)) candidates.push(tile);
       }
     }
     if (candidates.length > 0) {
@@ -97,7 +116,7 @@ function residentSpawnPoint(
     }
   }
   const connectedFallback = state.map.flat().find(tile =>
-    isResidentSpawnTile(tile) && hasSpawnExit(state, tile, cx, cy));
+    centerLand.has(`${tile.x},${tile.y}`) && isResidentSpawnTile(tile) && hasSpawnExit(state, tile, cx, cy));
   if (connectedFallback) return { x: connectedFallback.x, y: connectedFallback.y };
   const fallback = state.map[cy]?.[cx];
   if (fallback && isResidentSpawnTile(fallback)) return { x: cx, y: cy };
