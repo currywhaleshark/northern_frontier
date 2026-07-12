@@ -445,8 +445,9 @@ function event(
   kind: TacticalAnimationEvent['kind'],
   text: string,
   durationMs = 650,
+  extra?: Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'casualties' | 'float'>,
 ): void {
-  events.push({ zoneId, kind, text, durationMs });
+  events.push({ zoneId, kind, text, durationMs, ...extra });
 }
 
 function summaryForOutcome(outcome: TacticalRoundReport['outcome']): string {
@@ -531,7 +532,10 @@ export function resolveTacticalRound(state: GameState): string | null {
       roundWounded += wounded;
       roundKilled += killed;
       if (wounded + killed > 0) {
-        event(events, zone.id, 'casualty', `${defender.label}에서 전사 ${killed}, 부상 ${wounded}명이 발생했습니다.`, 520);
+        const parts = [killed > 0 ? `전사 ${killed}` : '', wounded > 0 ? `부상 ${wounded}` : ''].filter(Boolean);
+        event(events, zone.id, 'casualty', `${defender.label}에서 전사 ${killed}, 부상 ${wounded}명이 발생했습니다.`, 520, {
+          side: 'defender', groupId: defender.id, casualties: wounded + killed, float: parts.join('·'),
+        });
       }
     }
 
@@ -542,7 +546,9 @@ export function resolveTacticalRound(state: GameState): string | null {
     const breachAt = zone.id === 'approach' ? 62 : 100;
     if (!zone.breached && zone.pressure >= breachAt) {
       zone.breached = true;
-      event(events, zone.id, zone.id === 'wall' ? 'wallHit' : 'advance', `${zone.name}이(가) 뚫렸습니다.`, 720);
+      event(events, zone.id, zone.id === 'wall' ? 'wallHit' : 'advance', `${zone.name}이(가) 뚫렸습니다.`, 720, {
+        side: 'defender', float: '돌파!',
+      });
       if (zone.id === 'wall') buildingsDamaged += 1;
     }
 
@@ -558,7 +564,9 @@ export function resolveTacticalRound(state: GameState): string | null {
       roundRaidersKilled += killed;
       attacker.power = Math.max(0, attacker.power * (1 - raiderLossRate));
       if (killed > 0) {
-        event(events, zone.id, 'casualty', `${attacker.label}에서 ${killed}명이 쓰러졌습니다.`, 480);
+        event(events, zone.id, 'casualty', `${attacker.label}에서 ${killed}명이 쓰러졌습니다.`, 480, {
+          side: 'raider', groupId: attacker.id, casualties: killed, float: `-${killed}`,
+        });
       }
     }
 
@@ -570,7 +578,9 @@ export function resolveTacticalRound(state: GameState): string | null {
       const guarded = commands.has('guardStorehouse');
       if (!guarded || enemyShare > 0.68) {
         addLoot(state, battle, lootBag, zone.pressure + zone.lootRisk);
-        event(events, zone.id, 'loot', '약탈조가 창고 문을 부수고 비축을 빼냅니다.', 760);
+        event(events, zone.id, 'loot', '약탈조가 창고 문을 부수고 비축을 빼냅니다.', 760, {
+          side: 'raider', float: '약탈!',
+        });
         if (rng() < 0.35 + enemyShare * 0.25) buildingsDamaged += 1;
       } else {
         lines.push('창고 수비대가 약탈조를 물자 더미 앞에서 막아냈습니다.');
@@ -590,7 +600,9 @@ export function resolveTacticalRound(state: GameState): string | null {
     const share = dominance.get(attacker.zoneId) ?? 0;
     if (attacker.morale <= 18 || attacker.power <= battle.originalPower * 0.035) {
       attacker.intent = 'withdraw';
-      event(events, attacker.zoneId, 'moraleBreak', `${attacker.label}의 대열이 흩어집니다.`, 650);
+      event(events, attacker.zoneId, 'moraleBreak', `${attacker.label}의 대열이 흩어집니다.`, 650, {
+        side: 'raider', groupId: attacker.id, float: '궤주!',
+      });
     } else if (index >= 0 && index < route.length - 1 && (zone?.breached || share > 0.52 || battle.round >= 2)) {
       attacker.zoneId = route[index + 1];
       attacker.targetZoneId = route[Math.min(route.length - 1, index + 2)];

@@ -1481,6 +1481,40 @@ html, body, #root {
 .tactical-zone.event-moraleBreak .tactical-raider-rank { animation: tactical-break 700ms ease forwards; }
 .tactical-zone.event-loot .tactical-raider-rank { animation: tactical-loot 380ms ease 2; }
 
+/* 개별 스프라이트 쓰러짐 — 피해 이벤트 동안 임시로 추가된 스프라이트가 넘어지며 사라진다 */
+.tactical-sprite.falling {
+  animation: tactical-fall 620ms ease-in forwards;
+  pointer-events: none;
+}
+@keyframes tactical-fall {
+  0% { transform: rotate(0) translateY(0); opacity: 1; }
+  38% { transform: rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
+  100% { transform: rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
+}
+
+/* 전황 플로팅 텍스트 — 피해·돌파·약탈 순간 해당 진영 위로 떠오른다 */
+.tactical-float {
+  position: absolute;
+  z-index: 9;
+  bottom: 210px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: rgba(20, 14, 12, 0.82);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  animation: tactical-float-up 950ms ease-out forwards;
+}
+.tactical-float.defender { left: 64%; color: #f2b9ac; border: 1px solid rgba(185, 95, 79, 0.7); }
+.tactical-float.raider { left: 22%; color: #f6dfa8; border: 1px solid rgba(214, 175, 91, 0.65); }
+@keyframes tactical-float-up {
+  0% { transform: translateY(14px); opacity: 0; }
+  18% { transform: translateY(0); opacity: 1; }
+  72% { opacity: 1; }
+  100% { transform: translateY(-26px); opacity: 0; }
+}
+
 @keyframes tactical-spin { to { transform: rotate(360deg); } }
 @keyframes tactical-hit { 0%, 100% { transform: translateX(0); } 35% { transform: translateX(-7px); } 70% { transform: translateX(6px); } }
 @keyframes tactical-volley { from { transform: translate(-80px, 28px); opacity: 0; } to { transform: translate(60px, -10px); opacity: 1; } }

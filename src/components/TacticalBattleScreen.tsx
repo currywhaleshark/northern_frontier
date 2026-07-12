@@ -14,6 +14,7 @@ import { tacticalBackgroundAsset } from '../render/tacticalBackgroundAssets';
 import {
   TACTICAL_CHARACTER_SHEET, TACTICAL_MILITIA_SHEET, TACTICAL_RAIDER_SHEET, tacticalRaiderColumn,
 } from '../render/tacticalCharacterAssets';
+import { playSfx, setBattleDrums, type SfxName } from '../sound/sfx';
 
 interface Props {
   state: GameState;
@@ -51,6 +52,19 @@ const COMMAND_LABELS: Record<TacticalCommandId, string> = {
   openRetreat: '퇴로 개방',
 };
 
+// 연출 이벤트 종류별 효과음 매핑 — camera/report처럼 소리가 없는 이벤트는 생략
+const EVENT_SFX: Partial<Record<TacticalAnimationEvent['kind'], SfxName>> = {
+  volley: 'volley',
+  melee: 'melee',
+  ambush: 'ambush',
+  casualty: 'casualty',
+  wallHit: 'wallHit',
+  moraleBreak: 'moraleBreak',
+  loot: 'lootCrash',
+  advance: 'raidDrum',
+  retreat: 'raidDrum',
+};
+
 const KIND_COLUMNS: Partial<Record<DefenderGroupKind, number>> = {
   'militia-unarmed': 9,
   watchman: 8,
@@ -64,10 +78,11 @@ const WEAPON_COLUMNS: Partial<Record<DefenderGroupKind, number>> = {
   'militia-musket': 2,
 };
 
-function DefenderSprite({ kind, gender, faded = false }: {
+function DefenderSprite({ kind, gender, faded = false, falling = false }: {
   kind: DefenderGroupKind;
   gender: 'male' | 'female';
   faded?: boolean;
+  falling?: boolean;
 }) {
   const weaponColumn = WEAPON_COLUMNS[kind];
   const row = gender === 'female' ? 1 : 0;
@@ -79,7 +94,7 @@ function DefenderSprite({ kind, gender, faded = false }: {
     : TACTICAL_CHARACTER_SHEET.residentColumns * TACTICAL_CHARACTER_SHEET.residentWidth + TACTICAL_CHARACTER_SHEET.mountedWidth;
   return (
     <span
-      className={`tactical-sprite tactical-defender${faded ? ' faded' : ''}`}
+      className={`tactical-sprite tactical-defender${faded ? ' faded' : ''}${falling ? ' falling' : ''}`}
       style={{
         backgroundImage: `url(${sheet.src})`,
         backgroundPosition: `${-column * sheet.residentWidth}px ${-row * sheet.spriteHeight}px`,
@@ -90,12 +105,17 @@ function DefenderSprite({ kind, gender, faded = false }: {
   );
 }
 
-function RaiderSprite({ faction, hidden, offset }: { faction: string; hidden: boolean; offset: number }) {
+function RaiderSprite({ faction, hidden, offset, falling = false }: {
+  faction: string;
+  hidden: boolean;
+  offset: number;
+  falling?: boolean;
+}) {
   const column = tacticalRaiderColumn(faction);
   if (hidden || column == null) return <span className="tactical-raider-unknown" aria-hidden="true">?</span>;
   return (
     <span
-      className="tactical-sprite tactical-raider"
+      className={`tactical-sprite tactical-raider${falling ? ' falling' : ''}`}
       style={{
         backgroundImage: `url(${TACTICAL_RAIDER_SHEET.src})`,
         backgroundPosition: `${-column * TACTICAL_RAIDER_SHEET.spriteWidth}px 0px`,
@@ -107,18 +127,28 @@ function RaiderSprite({ faction, hidden, offset }: { faction: string; hidden: bo
   );
 }
 
-function GroupSprites({ state, group }: { state: GameState; group: TacticalDefenderGroup }) {
+function GroupSprites({ state, group, falling = 0 }: {
+  state: GameState;
+  group: TacticalDefenderGroup;
+  falling?: number; // 지금 재생 중인 피해 이벤트로 쓰러지는 인원 — 그만큼 추가로 그려 쓰러뜨린다
+}) {
   const active = Math.max(0, group.count - group.wounded - group.killed);
   const shown = Math.min(4, active);
+  const fallingShown = Math.min(2, falling);
+  const gender = (index: number) => {
+    const residentId = group.residentIds[index];
+    return state.residents.find(resident => resident.id === residentId)?.gender ?? (index % 2 ? 'female' : 'male');
+  };
   return (
     <div className="tactical-unit-line" aria-label={`${group.label} ${active}명 전투 가능`}>
-      {Array.from({ length: shown }, (_, index) => {
-        const residentId = group.residentIds[index];
-        const gender = state.residents.find(resident => resident.id === residentId)?.gender ?? (index % 2 ? 'female' : 'male');
-        return <DefenderSprite key={`${group.id}-${index}`} kind={group.kind} gender={gender} />;
-      })}
+      {Array.from({ length: shown }, (_, index) => (
+        <DefenderSprite key={`${group.id}-${index}`} kind={group.kind} gender={gender(index)} />
+      ))}
+      {Array.from({ length: fallingShown }, (_, index) => (
+        <DefenderSprite key={`${group.id}-fall-${index}`} kind={group.kind} gender={gender(shown + index)} falling />
+      ))}
       {active > shown && <span className="tactical-unit-more">+{active - shown}</span>}
-      {active === 0 && <span className="tactical-unit-none">전투 불능</span>}
+      {active === 0 && fallingShown === 0 && <span className="tactical-unit-none">전투 불능</span>}
     </div>
   );
 }
@@ -165,18 +195,23 @@ export function TacticalBattleScreen({
     let cancelled = false;
     let timer = 0;
     const events = battle.pendingReport.events;
+    setBattleDrums(true);
     const play = (index: number) => {
       if (cancelled) return;
       if (index >= events.length) {
+        setBattleDrums(false);
         timer = window.setTimeout(onCompleteSimulation, 240);
         return;
       }
       setEventIndex(index);
+      const sfx = EVENT_SFX[events[index].kind];
+      if (sfx) playSfx(sfx);
       timer = window.setTimeout(() => play(index + 1), events[index].durationMs);
     };
     play(0);
     return () => {
       cancelled = true;
+      setBattleDrums(false);
       window.clearTimeout(timer);
     };
     // The battle round and phase are the stable playback identity.
@@ -288,6 +323,9 @@ export function TacticalBattleScreen({
                           {raider.revealed && raider.power > battle.originalPower * 0.2 && (
                             <RaiderSprite faction={battle.factionName} hidden={false} offset={1} />
                           )}
+                          {activeEvent?.kind === 'casualty' && activeEvent.groupId === raider.id && raider.revealed && (
+                            <RaiderSprite key={`fall-${eventIndex}`} faction={battle.factionName} hidden={false} offset={1} falling />
+                          )}
                         </div>
                         <span>{raider.revealed ? `${raider.label} ${Math.max(0, raider.count - raider.killed)}명 · ${raider.intent === 'loot' ? '약탈' : raider.intent === 'flank' ? '우회' : '전진'}` : '정체불명'}</span>
                       </div>
@@ -296,11 +334,20 @@ export function TacticalBattleScreen({
                   <div className="tactical-defender-rank">
                     {defenders.map(group => (
                       <div className="tactical-field-group" key={group.id}>
-                        <GroupSprites state={state} group={group} />
+                        <GroupSprites
+                          state={state}
+                          group={group}
+                          falling={activeEvent?.kind === 'casualty' && activeEvent.groupId === group.id ? activeEvent.casualties ?? 0 : 0}
+                        />
                         <span>{group.label}</span>
                       </div>
                     ))}
                   </div>
+                  {activeEvent?.float && activeEvent.zoneId === zone.id && (
+                    <span key={`float-${eventIndex}`} className={`tactical-float ${activeEvent.side ?? 'defender'}`}>
+                      {activeEvent.float}
+                    </span>
+                  )}
                   <p>{zone.description}</p>
                 </section>
                 );

@@ -108,7 +108,8 @@ function noiseBurst(dur: number, o: NoiseOpts = {}): void {
 export type SfxName =
   | 'good' | 'hunt' | 'heal' | 'welcome' | 'warn'
   | 'bad' | 'death' | 'raidDrum' | 'raidHorn'
-  | 'tradeBell' | 'gust' | 'hammer' | 'win' | 'lose';
+  | 'tradeBell' | 'gust' | 'hammer' | 'win' | 'lose'
+  | 'volley' | 'melee' | 'ambush' | 'casualty' | 'moraleBreak' | 'lootCrash' | 'wallHit';
 
 export function playSfx(name: SfxName): void {
   if (!ctx || !master || muted) return;
@@ -178,7 +179,69 @@ export function playSfx(name: SfxName): void {
       notes.forEach((f, i) => tone(f, 0.55, { type: 'sawtooth', vol: 0.14, delay: i * 0.3, slide: -12 }));
       break;
     }
+    case 'volley': // 일제 사격 — 총성 크랙 연발 + 낮은 포연 울림
+      [0, 0.06, 0.14, 0.23].forEach(d => noiseBurst(0.06, { filter: 2100 + Math.random() * 600, q: 1.1, vol: 0.24, delay: d }));
+      tone(92, 0.24, { vol: 0.28, slide: -26, delay: 0.02 });
+      noiseBurst(0.3, { filter: 500, q: 0.7, vol: 0.1, delay: 0.2, attack: 0.08 });
+      break;
+    case 'melee': // 백병전 — 금속 부딪힘 두어 번 + 함성 스웰
+      noiseBurst(0.05, { filter: 3400, q: 2.2, vol: 0.26 });
+      noiseBurst(0.05, { filter: 2800, q: 2.2, vol: 0.2, delay: 0.13 });
+      tone(1240, 0.06, { type: 'triangle', vol: 0.1, delay: 0.13, humanize: 30 });
+      noiseBurst(0.55, { filter: 320, q: 0.6, vol: 0.16, attack: 0.16 });
+      break;
+    case 'ambush': // 매복 — 수풀 휘익 + 기습 함성 북
+      noiseBurst(0.22, { filter: 750, q: 1.4, vol: 0.24, attack: 0.02 });
+      tone(110, 0.2, { vol: 0.32, slide: -30, delay: 0.14 });
+      noiseBurst(0.06, { filter: 1900, q: 1.2, vol: 0.18, delay: 0.16 });
+      break;
+    case 'casualty': // 인명 피해 — 짧고 둔한 낙하음
+      tone(150, 0.12, { vol: 0.2, slide: -60 });
+      noiseBurst(0.08, { filter: 420, q: 0.8, vol: 0.18, delay: 0.02 });
+      break;
+    case 'moraleBreak': // 대열 붕괴 — 내려가는 뿔나팔
+      tone(196, 0.7, { type: 'sawtooth', vol: 0.16, slide: -62, attack: 0.09 });
+      tone(147, 0.6, { type: 'sawtooth', vol: 0.1, delay: 0.24, slide: -40, attack: 0.1 });
+      break;
+    case 'lootCrash': // 약탈 — 창고 문 부서지는 소리 + 곡물 쏟아짐
+      noiseBurst(0.07, { filter: 1500, q: 1, vol: 0.28 });
+      tone(120, 0.16, { vol: 0.2, slide: -44, delay: 0.02 });
+      noiseBurst(0.32, { filter: 900, q: 0.5, vol: 0.12, delay: 0.14, attack: 0.06 });
+      break;
+    case 'wallHit': // 방어선 붕괴 — 무겁게 무너지는 충격음
+      tone(64, 0.42, { vol: 0.4, slide: -20 });
+      noiseBurst(0.28, { filter: 240, q: 0.6, vol: 0.34 });
+      noiseBurst(0.4, { filter: 1100, q: 0.5, vol: 0.14, delay: 0.08, attack: 0.05 });
+      break;
   }
+}
+
+// ── 전투 북 루프: 전술 전투 연출(simulating) 동안 낮게 깔리는 군고(軍鼓) ──
+
+let battleDrumTimer: number | null = null;
+let battleDrumBeat = 0;
+
+function battleDrumHit(accent: boolean): void {
+  if (!ctx || !master) return;
+  noiseBurst(0.1, { filter: 210, q: 0.7, vol: accent ? 0.34 : 0.2 });
+  tone(78, 0.24, { vol: accent ? 0.36 : 0.22, slide: -22 });
+}
+
+export function setBattleDrums(active: boolean): void {
+  if (!active) {
+    if (battleDrumTimer != null) {
+      clearInterval(battleDrumTimer);
+      battleDrumTimer = null;
+    }
+    return;
+  }
+  if (battleDrumTimer != null || !ctx || !master) return;
+  battleDrumBeat = 0;
+  battleDrumHit(true);
+  battleDrumTimer = window.setInterval(() => {
+    battleDrumBeat = (battleDrumBeat + 1) % 4;
+    battleDrumHit(battleDrumBeat === 0);
+  }, 640);
 }
 
 // ── 바람 앰비언트: 악천후 동안 낮게 깔리는 루프 ──
