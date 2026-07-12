@@ -5,12 +5,26 @@ function normalized(value: unknown): number {
   return Number.isFinite(amount) ? Math.max(0, amount) : 0;
 }
 
+function wholeUnits(value: unknown): number {
+  const amount = normalized(value);
+  return Math.floor(Math.round(amount * 1_000_000_000) / 1_000_000_000);
+}
+
 export function tributeRequirement(tribute: CourtTribute | null, resource: ResourceId): number {
-  return normalized(tribute?.items[resource]);
+  return wholeUnits(tribute?.items[resource]);
 }
 
 export function tributeReserved(state: GameState, resource: ResourceId): number {
-  return normalized(state.tributeReserve?.[resource]);
+  return wholeUnits(state.tributeReserve?.[resource]);
+}
+
+function normalizeReserveLine(state: GameState, resource: ResourceId): number {
+  const raw = normalized(state.tributeReserve?.[resource]);
+  const whole = wholeUnits(raw);
+  const remainder = Math.max(0, raw - whole);
+  state.tributeReserve[resource] = whole;
+  if (remainder > 0) state.resources[resource] = normalized(state.resources[resource]) + remainder;
+  return whole;
 }
 
 export function tributeReserveRatio(state: GameState, tribute: CourtTribute): number {
@@ -30,10 +44,10 @@ export function setTributeReserve(
   const required = tributeRequirement(state.courtTribute, resource);
   if (required <= 0 || state.courtTribute?.resolved) return '올해 세공 품목이 아닙니다.';
   if (!state.tributeReserve) state.tributeReserve = {};
-  const current = tributeReserved(state, resource);
-  const target = Math.max(0, Math.min(required, Math.floor(normalized(requestedAmount))));
+  const current = normalizeReserveLine(state, resource);
+  const target = Math.max(0, Math.min(required, wholeUnits(requestedAmount)));
   if (target > current) {
-    const moved = Math.min(target - current, normalized(state.resources[resource]));
+    const moved = Math.min(target - current, wholeUnits(state.resources[resource]));
     state.resources[resource] = Math.max(0, state.resources[resource] - moved);
     state.tributeReserve[resource] = current + moved;
     return moved === target - current ? null : '사용 가능한 재고만큼만 세공고에 옮겼습니다.';
@@ -60,10 +74,11 @@ export function reconcileTributeReserve(state: GameState): void {
   }
   const next: Partial<Record<ResourceId, number>> = {};
   for (const [resource, rawAmount] of Object.entries(state.tributeReserve ?? {}) as [ResourceId, number][]) {
-    const amount = normalized(rawAmount);
+    const raw = normalized(rawAmount);
+    const amount = wholeUnits(raw);
     const required = tributeRequirement(tribute, resource);
     const kept = Math.min(amount, required);
-    const released = amount - kept;
+    const released = raw - kept;
     if (kept > 0) next[resource] = kept;
     if (released > 0) state.resources[resource] = normalized(state.resources[resource]) + released;
   }

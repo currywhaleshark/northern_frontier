@@ -21,6 +21,7 @@ import { InspectorPanel, type InspectorTab } from './components/InspectorPanel';
 import { ImportantLogOverlay } from './components/ImportantLogOverlay';
 import { JobPanel } from './components/JobPanel';
 import { MainMenu } from './components/MainMenu';
+import { centerViewportOnSettlement, Minimap } from './components/Minimap';
 import { ProcessingPanel } from './components/ProcessingPanel';
 import { TopBar } from './components/TopBar';
 import { RANK_NAMES } from './game/constants';
@@ -29,15 +30,24 @@ import { toggleNitreYards } from './game/suspicion';
 import { setProcessingReserve } from './game/processing';
 import { setTributeReserve } from './game/tributeReserve';
 import { nextRank } from './game/promotion';
+import { openPredatorHunt } from './game/specialEvents';
 import { getPointerAction, selectedEntityFromTile } from './game/selectionActions';
 import { isExplored } from './game/exploration';
+import { makeRng } from './game/map';
+import { openTerritoryOrderConfirmation } from './game/territory';
+import {
+  raidBanditLair, requestHuntingRights, requestPassagePermission, scoutBanditLair, sendGiftToSite,
+  type SiteGiftType,
+} from './game/siteDiplomacy';
 import type {
   BuildingTypeId, CropId, Difficulty, JobId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
+  SpecialItemId, WildlifeKind,
 } from './game/types';
 
 export default function App() {
   // 게임 상태는 ref에 두고, version 증가로 리렌더를 트리거한다
   const stateRef = useRef(newGame());
+  const mapViewportRef = useRef<HTMLDivElement>(null);
   const [version, setVersion] = useState(0);
   const bump = useCallback(() => setVersion(v => v + 1), []);
 
@@ -100,6 +110,21 @@ export default function App() {
   });
 
   const state = stateRef.current;
+
+  useEffect(() => {
+    if (screen !== 'game') return;
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        const box = mapViewportRef.current;
+        if (box) centerViewportOnSettlement(stateRef.current, box);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      if (secondFrame) cancelAnimationFrame(secondFrame);
+    };
+  }, [screen]);
 
   // 개발용 콘솔 훅 (window.__game.run(n)으로 n일 빨리감기)
   useEffect(() => {
@@ -277,8 +302,13 @@ export default function App() {
     bump();
   };
 
-  const handleNegotiateTrade = (get: ResourceId, getAmt: number) => {
-    negotiateTrade(stateRef.current, get, getAmt);
+  const handleNegotiateTrade = (
+    get: ResourceId,
+    getAmt: number,
+    specialItem?: SpecialItemId,
+    giveAmt?: number,
+  ) => {
+    negotiateTrade(stateRef.current, get, getAmt, specialItem, giveAmt);
     bump();
   };
 
@@ -306,6 +336,35 @@ export default function App() {
     toggleNitreYards(stateRef.current);
     bump();
   };
+
+  const handleOrganizeHunt = (kind: WildlifeKind) => {
+    const error = openPredatorHunt(stateRef.current, kind);
+    if (error) addLog(stateRef.current, error, 'info');
+    bump();
+  };
+
+  const siteActionRng = (siteId: number) => {
+    const state = stateRef.current;
+    const site = state.foreignSites.find(candidate => candidate.id === siteId);
+    return makeRng(state.seed + state.day * 104729 + siteId * 7919 + (site?.memories.length ?? 0) * 131);
+  };
+
+  const handleSiteAction = (action: () => string | null) => {
+    const error = action();
+    if (error) addLog(stateRef.current, error, 'info', true);
+    bump();
+  };
+
+  const handleSendSiteGift = (siteId: number, gift: SiteGiftType) =>
+    handleSiteAction(() => sendGiftToSite(stateRef.current, siteId, gift));
+  const handleRequestSitePassage = (siteId: number) =>
+    handleSiteAction(() => requestPassagePermission(stateRef.current, siteId));
+  const handleRequestSiteHunting = (siteId: number) =>
+    handleSiteAction(() => requestHuntingRights(stateRef.current, siteId));
+  const handleScoutBanditLair = (siteId: number) =>
+    handleSiteAction(() => scoutBanditLair(stateRef.current, siteId, siteActionRng(siteId)));
+  const handleRaidBanditLair = (siteId: number) =>
+    handleSiteAction(() => raidBanditLair(stateRef.current, siteId, siteActionRng(siteId)));
 
   const handleSave = () => {
     if (saveGame(stateRef.current)) {
@@ -353,6 +412,12 @@ export default function App() {
     if (!tile) return;
     const action = getPointerAction(stateRef.current, selectedEntity, tile);
     if (selectedEntity?.kind !== 'resident') return;
+
+    if ((action.kind === 'move' || action.kind === 'work') && (action.unauthorizedSiteIds?.length ?? 0) > 0) {
+      openTerritoryOrderConfirmation(stateRef.current, selectedEntity.id, action);
+      bump();
+      return;
+    }
 
     let err: string | null = null;
     if (action.kind === 'move') {
@@ -435,30 +500,35 @@ export default function App() {
           <JobPanel state={state} onReassign={handleReassign} />
           <ProcessingPanel state={state} onSetReserve={handleSetProcessingReserve} />
         </div>
-        <div className="canvas-wrap">
-          <ImportantLogOverlay state={state} />
-          <GameCanvas
-            state={state}
-            version={version}
-            placingType={placingType}
-            selected={selected}
-            selectedEntity={selectedEntity}
-            selectedResidentId={inspResidentId}
-            anim={animRef.current}
-            onTileClick={handleTileClick}
-            onResidentClick={handleResidentClick}
-            onContextAction={handleContextAction}
-            onUpgradeHousing={handleUpgradeHousing}
-            onSetSmithyProduct={handleSetSmithyProduct}
-            onSetBuildingCrop={handleSetBuildingCrop}
-            onConvertFieldToPaddy={handleConvertFieldToPaddy}
-            onRequestTrade={handleRequestTrade}
-            onToggleNitre={handleToggleNitre}
-            onAssignNearestWorker={handleAssignNearestWorker}
-            onUnassignWorker={handleUnassignWorker}
-            onCloseBuildingActions={handleCloseBuildingActions}
-            onCancelPlace={() => setPlacingType(null)}
-          />
+        <div className="canvas-stage">
+          <div className="minimap-overlay">
+            <Minimap state={state} version={version} viewportRef={mapViewportRef} selected={selected} />
+          </div>
+          <div className="canvas-wrap" ref={mapViewportRef}>
+            <ImportantLogOverlay state={state} />
+            <GameCanvas
+              state={state}
+              version={version}
+              placingType={placingType}
+              selected={selected}
+              selectedEntity={selectedEntity}
+              selectedResidentId={inspResidentId}
+              anim={animRef.current}
+              onTileClick={handleTileClick}
+              onResidentClick={handleResidentClick}
+              onContextAction={handleContextAction}
+              onUpgradeHousing={handleUpgradeHousing}
+              onSetSmithyProduct={handleSetSmithyProduct}
+              onSetBuildingCrop={handleSetBuildingCrop}
+              onConvertFieldToPaddy={handleConvertFieldToPaddy}
+              onRequestTrade={handleRequestTrade}
+              onToggleNitre={handleToggleNitre}
+              onAssignNearestWorker={handleAssignNearestWorker}
+              onUnassignWorker={handleUnassignWorker}
+              onCloseBuildingActions={handleCloseBuildingActions}
+              onCancelPlace={() => setPlacingType(null)}
+            />
+          </div>
         </div>
         <div className="side right">
           <AlertsPanel state={state} />
@@ -482,6 +552,12 @@ export default function App() {
             onToggleNitre={handleToggleNitre}
             onSetSmithyProduct={handleSetSmithyProduct}
             onDemolishBuilding={handleDemolishBuilding}
+            onOrganizeHunt={handleOrganizeHunt}
+            onSendSiteGift={handleSendSiteGift}
+            onRequestSitePassage={handleRequestSitePassage}
+            onRequestSiteHunting={handleRequestSiteHunting}
+            onScoutBanditLair={handleScoutBanditLair}
+            onRaidBanditLair={handleRaidBanditLair}
             tab={inspTab}
             setTab={setInspTab}
             residentId={inspResidentId}

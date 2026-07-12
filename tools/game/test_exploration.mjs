@@ -133,6 +133,39 @@ function onlyResident(state, job, x, y) {
 }
 
 {
+  const state = simulation.newGame(2026070810);
+  clearMapToPlain(state);
+  const scout = onlyResident(state, 'idle', 20, 20);
+  state.buildings = [];
+
+  state.weather = 'clear';
+  state.subTick = 2;
+  state.exploration = exploration.createExploration(state);
+  exploration.refreshExploration(state);
+  assert.equal(exploration.residentRevealRadius(state), 7, 'clear daytime sight should be wider');
+  assert.equal(exploration.buildingRevealRadius(state), 9, 'clear daytime building sight should be wider');
+  assert.equal(exploration.isExplored(state, scout.x + 7, scout.y), true);
+  assert.equal(exploration.isExplored(state, scout.x + 8, scout.y), false);
+
+  state.subTick = 6;
+  state.exploration = exploration.createExploration(state);
+  exploration.refreshExploration(state);
+  assert.equal(exploration.residentRevealRadius(state), 5, 'night should reduce sight');
+  assert.equal(exploration.buildingRevealRadius(state), 6, 'night should reduce building sight');
+  assert.equal(exploration.isExplored(state, scout.x + 5, scout.y), true);
+  assert.equal(exploration.isExplored(state, scout.x + 6, scout.y), false);
+
+  state.weather = 'blizzard';
+  state.subTick = 2;
+  state.exploration = exploration.createExploration(state);
+  exploration.refreshExploration(state);
+  assert.equal(exploration.residentRevealRadius(state), 3, 'blizzard should sharply reduce sight');
+  assert.equal(exploration.buildingRevealRadius(state), 4, 'blizzard should sharply reduce building sight');
+  assert.equal(exploration.isExplored(state, scout.x + 3, scout.y), true);
+  assert.equal(exploration.isExplored(state, scout.x + 4, scout.y), false);
+}
+
+{
   const state = simulation.newGame(2026070808);
   clearMapToPlain(state);
   addBuilt(state, 'center', 5, 5);

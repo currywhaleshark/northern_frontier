@@ -29,6 +29,13 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
 const faction = FACTIONS.find(candidate => candidate.imports.includes('tools') && candidate.exports.includes('grain'));
 assert.ok(faction);
 
+for (const relation of [35, 50, 65, 80]) {
+  const playerMultiplier = 1 / tradeValues.relationMargin(relation);
+  assert.ok(Math.abs(
+    tradeValues.visitorTradeMultiplier(relation) - playerMultiplier * CONFIG.trade.incomingOfferPremium,
+  ) < 1e-9, `incoming proposal premium stays at ${CONFIG.trade.incomingOfferPremium}x for relation ${relation}`);
+}
+
 {
   const northernTraders = FACTIONS.filter(candidate => candidate.trades.length > 0 && candidate.foreignTrade !== false);
   assert.ok(northernTraders.length >= 4);

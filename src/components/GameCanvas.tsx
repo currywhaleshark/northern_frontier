@@ -6,6 +6,7 @@ import { JOB_NAMES } from '../game/constants';
 import { getActiveSprites } from '../render/atlas';
 import { findResidentAt, renderScene } from '../render/renderer';
 import { getPointerAction } from '../game/selectionActions';
+import { foreignSiteAt } from '../game/foreignSites';
 import type { BuildingTypeId, CropId, GameState, SelectedEntity, SmithyProductId } from '../game/types';
 import { ActionPopup } from './ActionPopup';
 import { FactionName } from './FactionName';
@@ -87,14 +88,17 @@ export function GameCanvas({
     const by = (b.py + (b.y - b.py) * alpha) * TILE + TILE / 2;
     raiderHovered = Math.hypot(bx - mouse.mx, by - mouse.my) <= 14;
   }
-  const actionTooltip = mouse && !hoveredResident && !raiderHovered && pointerAction && pointerAction.kind !== 'none'
+  const hoveredSite = !hoveredResident && !raiderHovered && hoverTile
+    ? foreignSiteAt(state, hoverTile.x, hoverTile.y)
+    : null;
+  const actionTooltip = mouse && !hoveredResident && !raiderHovered && !hoveredSite && pointerAction && pointerAction.kind !== 'none'
     ? pointerAction
     : null;
   const canvasCursor = placingType
     ? 'crosshair'
     : panning
       ? 'grabbing'
-      : hoveredResident
+      : hoveredResident || hoveredSite
         ? 'pointer'
         : pointerAction && pointerAction.kind !== 'none'
           ? pointerAction.cursor
@@ -170,7 +174,7 @@ export function GameCanvas({
           onContextAction(tx, ty);
         }}
       />
-      {mouse && (hoveredResident || raiderHovered || actionTooltip) && (
+      {mouse && (hoveredResident || raiderHovered || hoveredSite || actionTooltip) && (
         <div className="map-tooltip" style={{ left: mouse.mx + 14, top: mouse.my + 8 }}>
           {hoveredResident ? (
             <>
@@ -183,6 +187,11 @@ export function GameCanvas({
               <div className="muted">{state.battle
                 ? state.battle.location === 'village' || state.battle.mode === 'levy' ? '마을 안 방어전' : '마을 외곽 요격전'
                 : state.raiders!.siege ? '목책 앞 공성 중' : '무장 무리 접근 중'}</div>
+            </>
+          ) : hoveredSite ? (
+            <>
+              <b>{hoveredSite.name}</b>
+              <div className="muted">{hoveredSite.factionName ? <FactionName name={hoveredSite.factionName} /> : '주인 없는 거점'} · 클릭해 살펴보기</div>
             </>
           ) : actionTooltip ? (
             <>

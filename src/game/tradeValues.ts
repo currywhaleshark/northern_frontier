@@ -4,6 +4,7 @@ import { countBuilt } from './buildings';
 import { RESOURCE_DEFS } from './resourceCatalog';
 import { getRelation } from './relations';
 import { getSeason } from './seasons';
+import { hasActivePassageForFaction } from './passage';
 import type { GameState, ResourceId, TradeEvaluation, TradeOffer, TradeQuote, TradeRequest } from './types';
 
 const ABSTRACT_RESOURCES = new Set<ResourceId>(['reputation', 'defense']);
@@ -39,7 +40,10 @@ function factionTradeCapacityTotal(state: GameState, factionName: string, resour
   const factionMult = (faction.tradeCapacityMult ?? 1) * (faction.tradeCapacityByResource?.[resource] ?? 1);
   const rankMult = CONFIG.trade.capacityRankMult[state.rank ?? 'settlement'];
   const dockMult = countBuilt(state, 'dock') > 0 ? CONFIG.trade.dockCapacityMult : 1;
-  return Math.max(1, Math.floor(base * seasonMult * factionMult * rankMult * dockMult));
+  const passageMult = hasActivePassageForFaction(state, factionName)
+    ? CONFIG.foreignSites.passageTradeCapacityMult
+    : 1;
+  return Math.max(1, Math.floor(base * seasonMult * factionMult * rankMult * dockMult * passageMult));
 }
 
 export function factionTradeCapacitySummary(
@@ -194,10 +198,7 @@ export function quoteFactionDemand(
 }
 
 export function visitorTradeMultiplier(relation: number): number {
-  if (relation >= 75) return 1.15;
-  if (relation >= 60) return 1.05;
-  if (relation >= 45) return 0.95;
-  return 0.8;
+  return CONFIG.trade.incomingOfferPremium / relationMargin(relation);
 }
 
 export function evaluateFactionProposal(

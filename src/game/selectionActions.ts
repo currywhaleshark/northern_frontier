@@ -2,11 +2,12 @@ import { BUILDING_DEFS, buildingFootprintTiles, getBuilding, isBuildingUnlocked 
 import { CONFIG } from './config';
 import { JOB_NAMES } from './constants';
 import { collectHuntableTiles } from './habitats';
-import { isPassable } from './agents';
+import { isPassable, isTerrainPassable } from './agents';
 import { getSeason } from './seasons';
 import { isExplored } from './exploration';
 import { isHaulSourceBuilding } from './inventory';
 import { canAssignResidentToBuilding, workerSlotConfig } from './workerSlots';
+import { unauthorizedTerritorySiteIds } from './territory';
 import type { Building, GameState, JobId, PointerAction, SelectedEntity, Tile } from './types';
 
 export interface BuildingActionItem {
@@ -25,6 +26,20 @@ function actionBuilding(state: GameState, building: Building): PointerAction {
 
 function actionInvalid(label: string): PointerAction {
   return { kind: 'invalid', cursor: 'not-allowed', label };
+}
+
+function withTerritoryWarning(
+  state: GameState,
+  action: Extract<PointerAction, { kind: 'move' | 'work' }>,
+  use: 'passage' | 'work',
+): PointerAction {
+  const siteIds = unauthorizedTerritorySiteIds(state, action.x, action.y, use);
+  if (siteIds.length === 0) return action;
+  return {
+    ...action,
+    label: `${action.label} · 무단 강행`,
+    unauthorizedSiteIds: siteIds,
+  };
 }
 
 function tileBuilding(state: GameState, tile: Tile): Building | undefined {
@@ -197,22 +212,25 @@ export function getPointerAction(
   const targetBuilding = tileBuilding(state, tile);
   const forcedHaulTarget = resident.job === 'hauler' && !!targetBuilding && isHaulSourceBuilding(targetBuilding);
   const assignment = forcedHaulTarget ? null : slottedAssignmentAction(state, resident.id, tile);
+  if (assignment && (assignment.kind === 'move' || assignment.kind === 'work')) {
+    return withTerritoryWarning(state, assignment, 'work');
+  }
   if (assignment) return assignment;
 
   const work = canResidentWorkTarget(state, resident.job, tile);
   if (work.ok) {
-    return {
+    return withTerritoryWarning(state, {
       kind: 'work',
       cursor: 'copy',
       label: work.label,
       x: tile.x,
       y: tile.y,
       buildingId: work.buildingId,
-    };
+    }, 'work');
   }
 
-  if (tile.buildingId == null && isMoveTargetTile(tile) && isPassable(state, tile.x, tile.y)) {
-    return { kind: 'move', cursor: 'move', label: '이동', x: tile.x, y: tile.y };
+  if (tile.buildingId == null && isMoveTargetTile(tile) && isTerrainPassable(state, tile.x, tile.y)) {
+    return withTerritoryWarning(state, { kind: 'move', cursor: 'move', label: '이동', x: tile.x, y: tile.y }, 'passage');
   }
 
   return actionInvalid(work.label);

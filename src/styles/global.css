@@ -155,8 +155,16 @@ html, body, #root {
 .side.left { border-right: 1px solid var(--border); }
 .side.right { border-left: 1px solid var(--border); }
 
-.canvas-wrap {
+.canvas-stage {
   position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #0d1013;
+}
+.canvas-wrap {
+  position: absolute;
+  inset: 0;
   overflow: auto;
   background: #0d1013;
   padding: 8px;
@@ -164,6 +172,121 @@ html, body, #root {
      스크롤을 막으므로 쓰지 않는다. inline-block 캔버스가 자연스럽게 스크롤된다. */
 }
 .canvas-wrap canvas { image-rendering: pixelated; display: block; }
+
+/* ── 미니맵 ── */
+.minimap-overlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 40;
+  width: 204px;
+  pointer-events: none;
+}
+.minimap-panel {
+  width: 204px;
+  padding: 7px;
+  border: 1px solid rgba(214, 221, 224, 0.26);
+  border-radius: 6px;
+  background: rgba(17, 21, 24, 0.96);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.42);
+  pointer-events: auto;
+}
+.minimap-panel.raid-alert {
+  border-color: rgba(224, 93, 74, 0.9);
+  box-shadow: 0 0 0 2px rgba(224, 93, 74, 0.16), 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+.minimap-heading {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+.minimap-heading strong { font-size: 12px; }
+.minimap-alert-label {
+  color: #f08b78;
+  font-size: 11px;
+  font-weight: 700;
+  animation: minimap-alert-text 1s steps(2, end) infinite;
+}
+.minimap-center-btn {
+  width: 25px;
+  height: 25px;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel2);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.minimap-center-btn:hover { border-color: var(--accent); color: var(--accent); }
+.minimap-canvas-wrap {
+  position: relative;
+  width: 188px;
+  overflow: hidden;
+  border: 1px solid rgba(220, 229, 232, 0.22);
+  background: #090b0d;
+}
+.minimap-canvas-wrap canvas {
+  width: 188px;
+  height: auto;
+  cursor: crosshair;
+  touch-action: none;
+}
+.minimap-raid-ping {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #ff6e59;
+  border-radius: 50%;
+  background: rgba(206, 44, 32, 0.75);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 3px rgba(255, 83, 62, 0.2);
+  pointer-events: none;
+  animation: minimap-raid-pulse 0.9s ease-out infinite;
+}
+.minimap-tooltip {
+  position: absolute;
+  left: 5px;
+  bottom: 5px;
+  max-width: calc(100% - 10px);
+  padding: 3px 5px;
+  border: 1px solid rgba(220, 229, 232, 0.22);
+  background: rgba(10, 12, 14, 0.94);
+  color: var(--text);
+  font-size: 11px;
+  pointer-events: none;
+}
+.minimap-legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 5px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 9px;
+}
+.minimap-legend span { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.minimap-legend i { width: 6px; height: 6px; display: inline-block; background: #d9d2bd; }
+.minimap-legend i.foreign { background: #58b6a4; }
+.minimap-legend i.hostile { background: #d45e52; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+
+@keyframes minimap-raid-pulse {
+  0% { transform: translate(-50%, -50%) scale(0.7); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0.28; }
+}
+@keyframes minimap-alert-text {
+  50% { color: #ffd1c8; }
+}
+
+@media (max-width: 900px) {
+  .minimap-overlay { width: 156px; }
+  .minimap-panel { width: 156px; padding: 5px; }
+  .minimap-canvas-wrap { width: 144px; }
+  .minimap-canvas-wrap canvas { width: 144px; }
+  .minimap-legend span:nth-child(2) { display: none; }
+}
 
 /* ── 지도 위 주요 소식 ── */
 .important-log-overlay {
@@ -410,26 +533,68 @@ html, body, #root {
 .trade-controls button { grid-column: 1 / -1; }
 .faction-entry {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
+  grid-template-columns: 74px minmax(0, 1fr);
   gap: 8px;
-  padding: 7px 0;
+  padding: 6px 0;
   border-bottom: 1px dotted var(--border);
 }
 .faction-entry-art {
-  width: 92px;
-  height: 68px;
+  width: 74px;
+  height: 56px;
   object-fit: cover;
   border: 1px solid var(--border);
   border-radius: 5px;
 }
 .faction-entry-body { min-width: 0; }
-.faction-trade-button { margin-top: 5px; width: 100%; }
-.faction-unlock-note {
-  margin: 3px 0;
-  color: #d2a15e;
+.faction-entry-heading,
+.faction-entry-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.faction-entry-heading { min-height: 21px; }
+.faction-relation {
+  flex: 0 0 auto;
   font-size: 11px;
   font-weight: 700;
 }
+.faction-entry .bar-outer { margin: 2px 0 5px; }
+.faction-entry-actions { justify-content: flex-end; }
+.faction-trade-button { flex: 0 0 56px; }
+.faction-info { position: relative; }
+.faction-trade-toggle {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+}
+.faction-trade-toggle:hover,
+.faction-trade-toggle:focus-visible { color: var(--text); }
+.faction-trade-detail-body {
+  display: none;
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 3px);
+  right: 0;
+  width: 240px;
+  max-width: calc(100vw - 32px);
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel2);
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.faction-info:hover .faction-trade-detail-body,
+.faction-info:focus-within .faction-trade-detail-body { display: block; }
+.faction-trade-detail-body > div + div { margin-top: 4px; }
 .tribute-reserve-row {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -441,7 +606,7 @@ html, body, #root {
 .tribute-reserve-controls {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 34px 28px minmax(48px, 1fr) 28px 34px;
+  grid-template-columns: 34px 28px minmax(48px, 1fr) 28px 34px 42px;
   gap: 3px;
 }
 .tribute-reserve-controls button {
@@ -982,9 +1147,53 @@ html, body, #root {
     grid-template-columns: 1fr;
     padding: 0 12px 12px;
   }
-  .faction-entry { grid-template-columns: 76px minmax(0, 1fr); }
-  .faction-entry-art { width: 76px; height: 58px; }
+  .faction-entry { grid-template-columns: 64px minmax(0, 1fr); }
+  .faction-entry-art { width: 64px; height: 50px; }
+  .faction-trade-detail-body {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    top: auto;
+    bottom: 16px;
+    width: auto;
+    max-width: none;
+  }
 }
+.trade-counter-amount {
+  display: grid;
+  gap: 2px;
+  margin-top: 3px;
+}
+
+.foreign-site-panel { display: grid; gap: 7px; }
+.foreign-site-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.foreign-site-heading > div { min-width: 0; display: grid; gap: 2px; }
+.foreign-site-heading strong { font-size: 13px; overflow-wrap: anywhere; }
+.foreign-site-heading span { font-size: 11px; color: var(--muted); }
+.foreign-site-status {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--gold) !important;
+}
+.foreign-site-description { line-height: 1.45; }
+.foreign-site-notice { padding-left: 7px; border-left: 2px solid #d9a441; color: #d9a441; font-size: 11px; }
+.foreign-site-table { margin: 0; }
+.foreign-site-color { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border: 1px solid rgba(255,255,255,0.35); }
+.foreign-site-claims { display: grid; gap: 3px; padding: 5px 0; border-top: 1px dotted var(--border); border-bottom: 1px dotted var(--border); }
+.foreign-site-claims > div:not(:first-child) { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
+.foreign-site-actions { display: grid; gap: 5px; }
+.foreign-site-gifts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.foreign-site-gifts .btn { min-width: 0; padding-inline: 3px; }
+.foreign-site-requests, .foreign-site-lair-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.foreign-site-requests .btn, .foreign-site-lair-actions .btn { min-width: 0; white-space: normal; line-height: 1.25; }
+.foreign-site-lair-actions .danger { border-color: #a94f48; color: #ef8d82; }
+.foreign-site-memory-title { margin-top: 2px; }
+.foreign-site-memory { display: grid; grid-template-columns: 34px 1fr; gap: 5px; font-size: 11px; line-height: 1.4; }
+.foreign-site-memory span { color: var(--muted); }
+.foreign-site-memory.good { color: #8bcf8f; }
+.foreign-site-memory.bad { color: #e38a7d; }
 
 /* ── 게임오버 ── */
 .gameover {
@@ -1008,3 +1217,69 @@ html, body, #root {
 .muted { color: var(--muted); }
 .small { font-size: 11px; }
 .victory-note { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+/* ── 돌발 사건·기물함 ── */
+.incident-panel .panel-title { font-size: 12px; }
+.incident-threat {
+  margin-top: 5px;
+  padding: 7px;
+  border: 1px solid rgba(217, 164, 65, 0.45);
+  background: rgba(217, 164, 65, 0.07);
+}
+.incident-threat.danger {
+  border-color: rgba(224, 95, 95, 0.55);
+  background: rgba(224, 95, 95, 0.08);
+}
+.incident-threat > div:first-child,
+.incident-hunt-row,
+.special-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.incident-threat > div:first-child span,
+.incident-hunt-row { font-size: 11px; }
+.incident-hunt-row { margin-top: 5px; }
+.special-item-row {
+  min-height: 42px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.special-item-row > div {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+.special-item-icon,
+.trade-special-icon {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid rgba(217, 164, 65, 0.45);
+  background: rgba(18, 22, 25, 0.85);
+  color: #ead7a5;
+  font: 700 18px serif;
+}
+.trade-special-choices {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+.trade-special-choices button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  border: 1px solid rgba(217, 164, 65, 0.35);
+  background: rgba(20, 25, 28, 0.82);
+  color: var(--text);
+  cursor: pointer;
+}
+.trade-special-choices button:hover,
+.trade-special-choices button.active {
+  border-color: #d9a441;
+  background: rgba(217, 164, 65, 0.12);
+}

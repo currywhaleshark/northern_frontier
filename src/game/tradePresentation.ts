@@ -62,6 +62,7 @@ export interface TradeResourceSprite {
 const BASE_ATLAS = '/assets/resources/trade-resource-atlas-v1.png';
 const EXTENDED_ATLAS = '/assets/resources/trade-resource-atlas-v2.png';
 const COMPLETE_ATLAS = '/assets/resources/trade-resource-atlas-v3.png';
+const FUEL_GROUP_ICON = '/assets/resources/fuel-group-v1.png';
 
 export const RESOURCE_SPRITES: Record<ResourceIconId, TradeResourceSprite> = {
   grain: { atlas: BASE_ATLAS, columns: 4, rows: 2, column: 0, row: 0 },
@@ -96,7 +97,7 @@ export const RESOURCE_SPRITES: Record<ResourceIconId, TradeResourceSprite> = {
   foodGroup: { atlas: COMPLETE_ATLAS, columns: 4, rows: 3, column: 1, row: 2 },
   clothingGroup: { atlas: COMPLETE_ATLAS, columns: 4, rows: 3, column: 2, row: 2 },
   luxuryGroup: { atlas: COMPLETE_ATLAS, columns: 4, rows: 3, column: 3, row: 2 },
-  fuelGroup: { atlas: EXTENDED_ATLAS, columns: 4, rows: 3, column: 1, row: 0 },
+  fuelGroup: { atlas: FUEL_GROUP_ICON, columns: 1, rows: 1, column: 0, row: 0 },
 };
 
 export const TRADE_RESOURCE_SPRITES = RESOURCE_SPRITES;

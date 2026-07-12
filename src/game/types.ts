@@ -143,6 +143,73 @@ export interface ExplorationState {
   explored: boolean[][];  // 한 번이라도 답사한 타일. 미답사는 지형/자원/건물을 알 수 없다.
 }
 
+export type ForeignSiteType =
+  | 'village'
+  | 'fishingVillage'
+  | 'seasonalCamp'
+  | 'outpost'
+  | 'banditLair'
+  | 'ruin';
+
+export type ForeignSiteStatus =
+  | 'hidden'
+  | 'stable'
+  | 'prosperous'
+  | 'hungry'
+  | 'sick'
+  | 'hostile'
+  | 'fortified'
+  | 'abandoned'
+  | 'burned';
+
+export type ClaimKind = 'hunting' | 'fishing' | 'forest' | 'field' | 'sacred' | 'passage';
+
+export interface ClaimZone {
+  id: number;
+  siteId: number;
+  factionName: string | null;
+  kind: ClaimKind;
+  x: number;
+  y: number;
+  radius: number;
+  discovered: boolean;
+  permittedUntilDay?: number;
+}
+
+export interface ForeignSiteMemory {
+  day: number;
+  text: string;
+  kind: 'good' | 'bad' | 'neutral';
+}
+
+export interface ForeignSite {
+  id: number;
+  type: ForeignSiteType;
+  name: string;
+  factionName: string | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  discovered: boolean;
+  status: ForeignSiteStatus;
+  population: number;
+  militaryPower: number;
+  foodStock: number;
+  tradeStock: Partial<Record<ResourceId, number>>;
+  influenceRadius: number;
+  goodwill: number;
+  trust: number;
+  alarm: number;
+  favors: number;
+  memories: ForeignSiteMemory[];
+  seasonalActive?: boolean;
+  activeSeasons?: Season[];
+  lastInteractionDay: number;
+  lastRaidDay?: number;
+  scoutedUntilDay?: number;
+}
+
 export type PointerCursor = 'default' | 'move' | 'copy' | 'pointer' | 'not-allowed';
 
 export type SelectedEntity =
@@ -152,14 +219,14 @@ export type SelectedEntity =
 
 export type PointerAction =
   | { kind: 'none'; cursor: PointerCursor; label: string }
-  | { kind: 'move'; cursor: PointerCursor; label: string; x: number; y: number }
-  | { kind: 'work'; cursor: PointerCursor; label: string; x: number; y: number; buildingId?: number }
+  | { kind: 'move'; cursor: PointerCursor; label: string; x: number; y: number; unauthorizedSiteIds?: number[] }
+  | { kind: 'work'; cursor: PointerCursor; label: string; x: number; y: number; buildingId?: number; unauthorizedSiteIds?: number[] }
   | { kind: 'building'; cursor: PointerCursor; label: string; buildingId: number }
   | { kind: 'invalid'; cursor: PointerCursor; label: string };
 
 export type ManualOrder =
-  | { kind: 'move'; x: number; y: number }
-  | { kind: 'work'; x: number; y: number; buildingId?: number; repeat?: boolean };
+  | { kind: 'move'; x: number; y: number; unauthorizedSiteIds?: number[] }
+  | { kind: 'work'; x: number; y: number; buildingId?: number; repeat?: boolean; unauthorizedSiteIds?: number[]; started?: boolean };
 
 export type AgentPhase = 'rest' | 'toWork' | 'working' | 'toDeposit';
 
@@ -185,6 +252,7 @@ export interface Resident {
   task: string;     // 현재 작업 설명
   alive: boolean;
   sick: boolean;
+  quarantinedUntil?: number; // 이 날까지 격리되어 배정은 유지하지만 일을 하지 못한다
   // ── 에이전트 상태 (지도 위 이동/작업/운반) ──
   x: number;
   y: number;
@@ -265,12 +333,14 @@ export interface TradeNegotiation {
   phase: TradeNegotiationPhase;
   give: ResourceId | null; // 마을이 내놓는 물품
   giveAmt: number;
+  originalGiveAmt?: number; // 상대가 먼저 요구한 최초 수량 (역제안 상한)
   get: ResourceId | null;  // 마을이 받는 물품
   getAmt: number;
   round: number;
   margin: number;
   message: string;
   maxAcceptGetAmt?: number;
+  specialItem?: SpecialItemId | null;
 }
 
 export interface TradeEvaluation {
@@ -296,7 +366,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration';
+  kind: 'raid' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory';
   title: string;
   body: string;
   illustration?: {
@@ -306,6 +376,52 @@ export interface PendingChoice {
   options: ChoiceOption[];
   // raid: { power, faction, warned } / trade: { give, giveAmt, get, getAmt, faction } / immigration: { count }
   data: Record<string, unknown>;
+}
+
+export interface TerritoryViolation {
+  siteId: number;
+  firstDay: number;
+  lastDay: number;
+  warningDay: number;
+  passage: boolean;
+  work: boolean;
+  count: number;
+  lastPassageDay?: number;
+  lastWorkDay?: number;
+}
+
+export type SpecialItemId = 'wildGinseng' | 'tigerPelt' | 'gyrfalcon';
+export type PredatorKind = 'wolf' | 'tiger';
+export type WildlifeKind = PredatorKind | 'boar';
+export type SpecialEventId = WildlifeKind | 'wildGinseng' | 'plagueSuspicion' | 'grainRequisition' |
+  'shipwreck' | 'earlyFrost' | 'gyrfalcon';
+
+export interface PredatorThreat {
+  kind: WildlifeKind;
+  untilDay: number;
+}
+
+export interface PlagueCase {
+  residentId: number;
+  resolvesOnDay: number;
+  real: boolean;
+  isolated: boolean;
+}
+
+export interface EpidemicState {
+  infectedIds: number[];
+  untilDay: number;
+  mode: 'pending' | 'isolated' | 'uncontained';
+}
+
+export interface IncidentState {
+  year: number;
+  scheduledDays: number[];
+  resolutionCount: number;
+  cooldownUntil: Partial<Record<SpecialEventId, number>>;
+  predatorThreats: Partial<Record<WildlifeKind, PredatorThreat>>;
+  plagueCase: PlagueCase | null;
+  epidemic: EpidemicState | null;
 }
 
 // 조정 세공(歲貢) — 봄 첫날 그해 요구량이 공지되고, 겨울 첫날 사자가 거둬 간다
@@ -384,6 +500,11 @@ export interface GameState {
   map: Tile[][];
   exploration: ExplorationState;
   habitats: AnimalHabitat[];
+  foreignSites: ForeignSite[];
+  claimZones: ClaimZone[];
+  nextForeignSiteId: number;
+  nextClaimZoneId: number;
+  territoryViolations: TerritoryViolation[];
   residents: Resident[];
   buildings: Building[];
   nextBuildingId: number;
@@ -401,6 +522,10 @@ export interface GameState {
   tradeCapacitySeason: number; // 교역 물동량 사용량이 속한 계절 번호
   tradeCapacityUsed: Record<string, Partial<Record<ResourceId, number>>>; // 세력별 이번 계절 출고량
   lastImmigrationDay: number; // 마지막 이주민 수용 여부 선택지가 열린 날
+  incidents: IncidentState;    // 연간 돌발 사건 일정과 지속 중인 맹수 위험
+  specialItems: Record<SpecialItemId, number>; // 산삼·호피 등 일반 자원과 분리한 기물함
+  discoveredSpecialItems: SpecialItemId[];     // 소모해도 남는 기물 도감
+  tributeWaivers: number;      // 산삼 진상으로 얻은 세공 면제 횟수
   pendingChoice: PendingChoice | null;
   courtTribute: CourtTribute | null;  // 올해 세공 (봄 공지 때 설정)
   tributeReserve: Partial<Record<ResourceId, number>>; // 올해 세공용으로 잠근 중심지 재고

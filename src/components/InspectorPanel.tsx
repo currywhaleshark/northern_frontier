@@ -1,11 +1,10 @@
 // 선택한 타일/건물/주민 정보 패널 + 조정(승격·세공·청원) 창구
-import { useState } from 'react';
 import {
   BUILDING_DEFS, getBuilding, isSmithyProductUnlocked, SMITHY_PRODUCT_DEFS, SMITHY_PRODUCT_ORDER, smithyProductOf,
 } from '../game/buildings';
 import { FACTIONS, isJobUnlocked, JOB_NAMES, JOB_ORDER, RANK_NAMES, RESOURCE_NAMES, TERRAIN_NAMES } from '../game/constants';
 import { cropIdForBuilding, CROP_DEFS } from '../game/crops';
-import { canRequestTrade } from '../game/events';
+import { canRequestTrade, factionTradeUnlockReason } from '../game/events';
 import { haulerCarryCapacity } from '../game/equipment';
 import { canPetition } from '../game/petition';
 import { nextRank, promotionConditions } from '../game/promotion';
@@ -18,10 +17,15 @@ import { FACTION_ARTWORK } from '../game/tradePresentation';
 import { LUXURY_RESOURCES } from '../game/resourceCatalog';
 import { tributeReserved } from '../game/tributeReserve';
 import { residentHome } from '../game/residents';
-import type { GameState, JobId, Resident, ResourceId, SmithyProductId } from '../game/types';
+import { predatorHuntChance } from '../game/specialEvents';
+import { SPECIAL_ITEM_DEFS } from '../game/specialItems';
+import { foreignSiteAt } from '../game/foreignSites';
+import type { SiteGiftType } from '../game/siteDiplomacy';
+import type { GameState, JobId, Resident, ResourceId, SmithyProductId, SpecialItemId, WildlifeKind } from '../game/types';
 import { FactionName } from './FactionName';
+import { ForeignSitePanel } from './ForeignSitePanel';
 
-export type InspectorTab = 'tile' | 'people' | 'factions' | 'court';
+export type InspectorTab = 'tile' | 'people' | 'factions' | 'court' | 'incidents';
 
 interface Props {
   state: GameState;
@@ -35,6 +39,12 @@ interface Props {
   onToggleNitre: () => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
   onDemolishBuilding: (x: number, y: number) => void;
+  onOrganizeHunt: (kind: WildlifeKind) => void;
+  onSendSiteGift: (siteId: number, gift: SiteGiftType) => void;
+  onRequestSitePassage: (siteId: number) => void;
+  onRequestSiteHunting: (siteId: number) => void;
+  onScoutBanditLair: (siteId: number) => void;
+  onRaidBanditLair: (siteId: number) => void;
   tab: InspectorTab;
   setTab: (t: InspectorTab) => void;
   residentId: number | null;
@@ -45,6 +55,77 @@ function Bar({ value, color }: { value: number; color: string }) {
   return (
     <div className="bar-outer">
       <div className="bar-inner" style={{ width: `${Math.max(0, Math.min(100, value))}%`, background: color }} />
+    </div>
+  );
+}
+
+function IncidentsTab({ state, onOrganizeHunt }: { state: GameState; onOrganizeHunt: (kind: WildlifeKind) => void }) {
+  const threats = (['wolf', 'tiger', 'boar'] as const)
+    .map(kind => state.incidents.predatorThreats[kind])
+    .filter(threat => threat != null);
+  const itemIds = Object.keys(SPECIAL_ITEM_DEFS) as SpecialItemId[];
+  const discovered = itemIds.filter(item => state.discoveredSpecialItems.includes(item));
+  return (
+    <div className="incident-panel">
+      <div className="panel-title">활성 위험</div>
+      {threats.length === 0 ? (
+        <div className="muted small">현재 추적 중인 맹수가 없습니다.</div>
+      ) : threats.map(threat => {
+        const kind = threat.kind;
+        const tiger = kind === 'tiger';
+        const boar = kind === 'boar';
+        return (
+          <div key={kind} className={`incident-threat ${tiger ? 'danger' : 'warn'}`}>
+            <div>
+              <strong>{tiger ? '호랑이 출몰' : boar ? '멧돼지 출몰' : '늑대 출몰'}</strong>
+              <span>{Math.max(1, threat.untilDay - state.day)}일 남음</span>
+            </div>
+            <div className="muted small">
+              {tiger ? '낮에는 숲, 밤에는 모든 주민이 위험' : boar ? '밤마다 농작물과 저장 식량이 위험' : '숲에 드나드는 주민이 위험'}
+            </div>
+            <div className="incident-hunt-row">
+              <span>예상 성공 {Math.round(predatorHuntChance(state, kind) * 100)}%</span>
+              <button className="btn small" type="button" onClick={() => onOrganizeHunt(kind)}>토벌대 조직</button>
+            </div>
+          </div>
+        );
+      })}
+      {state.incidents.plagueCase && (
+        <div className="incident-threat warn">
+          <div><strong>역병 의심 환자 관찰</strong><span>{Math.max(1, state.incidents.plagueCase.resolvesOnDay - state.day)}일 남음</span></div>
+          <div className="muted small">{state.incidents.plagueCase.isolated ? '격리 중: 배정은 유지되지만 작업 중단' : '미격리: 실제 역병이면 후속 확산 사건 발생'}</div>
+        </div>
+      )}
+      {state.incidents.epidemic && (
+        <div className="incident-threat danger">
+          <div><strong>역병 유행</strong><span>환자 {state.incidents.epidemic.infectedIds.length}명</span></div>
+          <div className="muted small">{state.incidents.epidemic.mode === 'isolated' ? '환자 전원 격리 중' : state.incidents.epidemic.mode === 'pending' ? '대응 결정 대기 중' : '격리 없이 전염 중'}</div>
+        </div>
+      )}
+
+      <div className="panel-title" style={{ marginTop: 10 }}>기물함</div>
+      {discovered.length === 0 ? (
+        <div className="muted small">아직 얻은 기물이 없습니다.</div>
+      ) : discovered.map(item => {
+        const def = SPECIAL_ITEM_DEFS[item];
+        return (
+          <div key={item} className="special-item-row" title={def.desc}>
+            <span className="special-item-icon" aria-hidden="true">{def.icon}</span>
+            <div>
+              <strong>{def.name}</strong>
+              <span className="muted small">{def.tradeValue > 0 ? `교역 가치 ${def.tradeValue}` : '보유 중 습격 조기발견 보너스'}</span>
+            </div>
+            <b>{state.specialItems[item]}</b>
+          </div>
+        );
+      })}
+      {state.tributeWaivers > 0 && (
+        <div className="special-item-row tribute-waiver-row">
+          <span className="special-item-icon" aria-hidden="true">免</span>
+          <div><strong>세공 면제권</strong><span className="muted small">겨울 세공 수거 때 자동 사용</span></div>
+          <b>{state.tributeWaivers}</b>
+        </div>
+      )}
     </div>
   );
 }
@@ -87,6 +168,11 @@ function CourtTab({ state, onPetition, onToggleNitre, onSetTributeReserve, onUse
       {tribute && (
         <>
           <div className="panel-title" style={{ marginTop: 8 }}>올해 세공 ({tribute.year}년차)</div>
+          {state.tributeWaivers > 0 && !tribute.resolved && (
+            <div className="small" style={{ color: '#6fbf73', marginBottom: 4 }}>
+              산삼 진상 면제권이 겨울 수거 때 자동 적용됩니다.
+            </div>
+          )}
           {tribute.resolved ? (
             <div className="small" style={{ color: tribute.paid ? '#6fbf73' : '#e06c5c' }}>
               {tribute.paid ? '올해 세공 납부 완료 ✓' : '올해 세공을 바치지 못했습니다'}
@@ -115,6 +201,13 @@ function CourtTab({ state, onPetition, onToggleNitre, onSetTributeReserve, onUse
                       />
                       <button type="button" title="1 늘리기" onClick={() => onSetTributeReserve(resource, reserved + 1)}>+</button>
                       <button type="button" title="5 늘리기" onClick={() => onSetTributeReserve(resource, reserved + 5)}>+5</button>
+                      <button
+                        type="button"
+                        title="사용 가능한 재고로 세공 요구량까지 채우기"
+                        aria-label={`${RESOURCE_NAMES[resource]} 세공고 최대치 채우기`}
+                        disabled={reserved >= required || usable <= 0}
+                        onClick={() => onSetTributeReserve(resource, required)}
+                      >최대</button>
                     </div>
                   </div>
                 );
@@ -209,7 +302,7 @@ function ResidentDetail({ state, r, rank, onSetJob, onToggleCart }: {
   return (
     <table className="insp-table">
       <tbody>
-        <tr><td>이름</td><td>{r.name} ({r.age}세){r.sick ? ' 🤒' : ''}</td></tr>
+        <tr><td>이름</td><td>{r.name} ({r.age}세){r.sick ? ' 🤒' : ''}{state.day < (r.quarantinedUntil ?? 0) ? ' · 격리' : ''}</td></tr>
         <tr>
           <td>직업</td>
           <td>
@@ -276,11 +369,13 @@ function ResidentDetail({ state, r, rank, onSetJob, onToggleCart }: {
 
 export function InspectorPanel({
   state, selected, onSetResidentJob, onToggleResidentCart, onRequestTrade, onPetition, onToggleNitre, onSetSmithyProduct,
-  onSetTributeReserve, onUseLuxuryGood, onDemolishBuilding, tab, setTab, residentId, setResidentId,
+  onSetTributeReserve, onUseLuxuryGood, onDemolishBuilding, onOrganizeHunt, tab, setTab, residentId, setResidentId,
+  onSendSiteGift, onRequestSitePassage, onRequestSiteHunting, onScoutBanditLair, onRaidBanditLair,
 }: Props) {
   const tile = selected ? state.map[selected.y]?.[selected.x] : null;
   const explored = tile ? isExplored(state, tile.x, tile.y) : false;
   const building = tile && explored ? getBuilding(state, tile.buildingId) : undefined;
+  const foreignSite = tile && explored ? foreignSiteAt(state, tile.x, tile.y) : null;
   const resident = state.residents.find(r => r.id === residentId) ?? null;
 
   return (
@@ -290,7 +385,10 @@ export function InspectorPanel({
         <span style={{ cursor: 'pointer', opacity: tab === 'people' ? 1 : 0.5 }} onClick={() => setTab('people')}>주민</span>
         <span style={{ cursor: 'pointer', opacity: tab === 'factions' ? 1 : 0.5 }} onClick={() => setTab('factions')}>세력</span>
         <span style={{ cursor: 'pointer', opacity: tab === 'court' ? 1 : 0.5 }} onClick={() => setTab('court')}>조정</span>
+        <span style={{ cursor: 'pointer', opacity: tab === 'incidents' ? 1 : 0.5 }} onClick={() => setTab('incidents')}>사건</span>
       </div>
+
+      {tab === 'incidents' && <IncidentsTab state={state} onOrganizeHunt={onOrganizeHunt} />}
 
       {tab === 'court' && (
         <CourtTab
@@ -303,7 +401,17 @@ export function InspectorPanel({
       )}
 
       {tab === 'tile' && (
-        !tile ? <div className="muted small">지도를 클릭해 타일을 선택하세요.</div> : (
+        foreignSite ? (
+          <ForeignSitePanel
+            state={state}
+            site={foreignSite}
+            onSendGift={onSendSiteGift}
+            onRequestPassage={onRequestSitePassage}
+            onRequestHunting={onRequestSiteHunting}
+            onScoutLair={onScoutBanditLair}
+            onRaidLair={onRaidBanditLair}
+          />
+        ) : !tile ? <div className="muted small">지도를 클릭해 타일을 선택하세요.</div> : (
           <table className="insp-table">
             <tbody>
               <tr><td>위치</td><td>({tile.x}, {tile.y})</td></tr>
@@ -390,7 +498,7 @@ export function InspectorPanel({
                       <tr>
                         <td>교역</td>
                         <td>
-                          {FACTIONS.filter(f => f.exports.length > 0).map(f => {
+                          {FACTIONS.filter(f => f.exports.length > 0 && !factionTradeUnlockReason(state, f.name)).map(f => {
                             const reason = canRequestTrade(state, f.name);
                             return (
                               <button
@@ -449,14 +557,11 @@ export function InspectorPanel({
           <div className="muted small" style={{ marginBottom: 6 }}>
             교역·공물·협상은 관계를 데우고, 거절과 전투는 식힙니다. 홀라온과 마적은 습격 전에 대가를 요구할 수 있습니다.
           </div>
-          {FACTIONS.map(f => {
+          {FACTIONS.filter(f => !factionTradeUnlockReason(state, f.name)).map(f => {
             const rel = getRelation(state, f.name);
             const color = rel >= 60 ? '#6fbf73' : rel >= 40 ? '#d9a441' : '#e06c5c';
             const artwork = FACTION_ARTWORK[f.name];
             const tradeReason = f.exports.length > 0 ? canRequestTrade(state, f.name) : null;
-            const unlockLocked = f.tradeUnlockBuilding
-              ? !state.buildings.some(building => building.built && building.type === f.tradeUnlockBuilding)
-              : false;
             return (
               <div key={f.name} className="faction-entry" title={f.desc}>
                 {artwork && (
@@ -469,35 +574,46 @@ export function InspectorPanel({
                   />
                 )}
                 <div className="faction-entry-body">
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div className="faction-entry-heading">
                     <span>{f.hostile ? '⚔️' : '🤝'} <FactionName name={f.name} /></span>
-                    <span className="muted small">{Math.round(rel)}</span>
+                    <span className="faction-relation" style={{ color }}>{Math.round(rel)}</span>
                   </div>
                   <Bar value={rel} color={color} />
-                  {unlockLocked && (
-                    <div className="faction-unlock-note">부두 건설 후 교역로 개방</div>
-                  )}
-                  <div className="muted small">
-                    {f.exports.length > 0
-                      ? '내놓음: ' + f.exports.map(resource => RESOURCE_NAMES[resource]).join(', ')
-                      : f.extortionDemands?.length
-                        ? '선제 요구: ' + f.extortionDemands.map(demand => RESOURCE_NAMES[demand.resource]).join(', ')
-                        : '교역하지 않음'}
+                  <div className="faction-entry-actions">
+                    <div className="faction-info">
+                      <button
+                        className="faction-trade-toggle"
+                        type="button"
+                        aria-label={`${f.name} 정보와 교역품`}
+                      >
+                        ⓘ
+                      </button>
+                      <div className="faction-trade-detail-body" role="tooltip">
+                        <div>{f.desc}</div>
+                        <div>
+                          {f.exports.length > 0
+                            ? '내놓음: ' + f.exports.map(resource => RESOURCE_NAMES[resource]).join(', ')
+                            : f.extortionDemands?.length
+                              ? '선제 요구: ' + f.extortionDemands.map(demand => RESOURCE_NAMES[demand.resource]).join(', ')
+                              : '교역하지 않음'}
+                        </div>
+                        {f.imports.length > 0 && (
+                          <div>원함: {f.imports.map(resource => RESOURCE_NAMES[resource]).join(', ')}</div>
+                        )}
+                      </div>
+                    </div>
+                    {f.exports.length > 0 && (
+                      <button
+                        className="btn small faction-trade-button"
+                        type="button"
+                        disabled={!!tradeReason}
+                        title={tradeReason ?? `${f.name}과 교역 협상을 엽니다`}
+                        onClick={() => onRequestTrade(f.name)}
+                      >
+                        교역
+                      </button>
+                    )}
                   </div>
-                  {f.imports.length > 0 && (
-                    <div className="muted small">원함: {f.imports.map(resource => RESOURCE_NAMES[resource]).join(', ')}</div>
-                  )}
-                  {f.exports.length > 0 && (
-                    <button
-                      className="btn small faction-trade-button"
-                      type="button"
-                      disabled={!!tradeReason}
-                      title={tradeReason ?? `${f.name}과 교역 협상을 엽니다`}
-                      onClick={() => onRequestTrade(f.name)}
-                    >
-                      교역
-                    </button>
-                  )}
                 </div>
               </div>
             );
@@ -526,7 +642,7 @@ export function InspectorPanel({
                   className={`resident-row${r.alive ? '' : ' dead'}`}
                   onClick={() => r.alive && setResidentId(r.id)}
                 >
-                  <span>{r.name}{r.sick ? ' 🤒' : ''}</span>
+                  <span>{r.name}{r.sick ? ' 🤒' : ''}{state.day < (r.quarantinedUntil ?? 0) ? ' · 격리' : ''}</span>
                   <span className="muted">{r.alive
                     ? `${r.cartEquipped ? '🛒 ' : ''}${JOB_NAMES[r.job]}`
                     : '사망'}</span>

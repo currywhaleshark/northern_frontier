@@ -52,6 +52,7 @@ const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const residents = await import(pathToFileURL(join(compiledDir, 'residents.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
+const constants = await import(pathToFileURL(join(compiledDir, 'constants.mjs')).href);
 
 {
   const state = simulation.newGame(123);
@@ -60,11 +61,61 @@ const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).h
 }
 
 {
+  const state = simulation.newGame(2026071201);
+  const center = state.buildings.find(building => building.type === 'center');
+  const reachable = new Set([`${center.x},${center.y}`]);
+  const queue = [{ x: center.x, y: center.y }];
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const next = state.map[current.y + dy]?.[current.x + dx];
+      if (!next || next.terrain === 'river' || next.terrain === 'mountain') continue;
+      const key = `${next.x},${next.y}`;
+      if (reachable.has(key)) continue;
+      reachable.add(key);
+      queue.push({ x: next.x, y: next.y });
+    }
+  }
+  assert.ok(state.residents.every(resident => reachable.has(`${resident.x},${resident.y}`)),
+    'starting residents spawn on the settlement side of rivers');
+}
+
+{
   const state = simulation.newGame(456);
   const createdFemale = residents.createResident(state, () => 0.25, 'farmer');
   const createdMale = residents.createResident(state, () => 0.75, 'hunter');
   assert.equal(createdFemale.gender, 'female');
   assert.equal(createdMale.gender, 'male');
+  assert.ok(constants.FEMALE_GIVEN_NAMES.some(name => createdFemale.name.endsWith(name)));
+  assert.ok(constants.MALE_GIVEN_NAMES.some(name => createdMale.name.endsWith(name)));
+}
+
+{
+  assert.ok(constants.SURNAMES.length >= 15 && constants.SURNAMES.length <= 20);
+  assert.equal(constants.SURNAME_WEIGHTS.length, constants.SURNAMES.length);
+  assert.ok(constants.SURNAME_WEIGHTS[0] > constants.SURNAME_WEIGHTS.at(-1));
+  assert.ok(constants.FEMALE_GIVEN_NAMES.length >= 60);
+  assert.ok(constants.MALE_GIVEN_NAMES.length >= 60);
+  assert.equal(
+    constants.FEMALE_GIVEN_NAMES.some(name => constants.MALE_GIVEN_NAMES.includes(name)),
+    false,
+  );
+
+  const state = simulation.newGame(2024);
+  let seed = 0x12345678;
+  const rng = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
+  for (let i = 0; i < 120; i++) state.residents.push(residents.createResident(state, rng));
+  const names = state.residents.map(resident => resident.name);
+  assert.equal(new Set(names).size, names.length);
+  for (const resident of state.residents) {
+    const pool = resident.gender === 'female'
+      ? constants.FEMALE_GIVEN_NAMES
+      : constants.MALE_GIVEN_NAMES;
+    assert.ok(pool.some(name => resident.name.endsWith(name)), `${resident.name} matches ${resident.gender}`);
+  }
 }
 
 {

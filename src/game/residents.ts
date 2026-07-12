@@ -1,6 +1,12 @@
 // 주민 생성과 일일 생존 판정
 import { CONFIG } from './config';
-import { GIVEN_NAMES, JOB_NAMES, SURNAMES } from './constants';
+import {
+  FEMALE_GIVEN_NAMES,
+  JOB_NAMES,
+  MALE_GIVEN_NAMES,
+  SURNAMES,
+  SURNAME_WEIGHTS,
+} from './constants';
 import { BUILDING_DEFS } from './buildings';
 import { addLog } from './events';
 import { returnResidentCart } from './equipment';
@@ -10,6 +16,35 @@ import type { Building, GameState, Gender, JobId, Resident, Tile } from './types
 
 export function rollResidentGender(rng: () => number): Gender {
   return rng() < 0.5 ? 'female' : 'male';
+}
+
+function weightedSurnameIndex(rng: () => number): number {
+  const total = SURNAME_WEIGHTS.reduce((sum, weight) => sum + weight, 0);
+  let roll = rng() * total;
+  for (let index = 0; index < SURNAME_WEIGHTS.length; index++) {
+    roll -= SURNAME_WEIGHTS[index];
+    if (roll < 0) return index;
+  }
+  return SURNAME_WEIGHTS.length - 1;
+}
+
+export function rollResidentName(state: GameState, rng: () => number, gender: Gender): string {
+  const givenNames = gender === 'female' ? FEMALE_GIVEN_NAMES : MALE_GIVEN_NAMES;
+  const surnameStart = weightedSurnameIndex(rng);
+  const givenStart = Math.floor(rng() * givenNames.length);
+  const usedNames = new Set(state.residents.map(resident => resident.name));
+
+  // 뽑힌 조합부터 순회해 같은 마을 안에서는 가능한 한 동명이인을 피한다.
+  for (let offset = 0; offset < SURNAMES.length * givenNames.length; offset++) {
+    const surnameOffset = Math.floor(offset / givenNames.length);
+    const givenOffset = offset % givenNames.length;
+    const surname = SURNAMES[(surnameStart + surnameOffset) % SURNAMES.length];
+    const given = givenNames[(givenStart + givenOffset) % givenNames.length];
+    const name = surname + given;
+    if (!usedNames.has(name)) return name;
+  }
+
+  return SURNAMES[surnameStart] + givenNames[givenStart];
 }
 
 function isResidentSpawnTile(tile: Tile): boolean {
@@ -41,19 +76,38 @@ function hasSpawnExit(state: GameState, start: Tile, cx: number, cy: number): bo
   return false;
 }
 
+function centerLandTiles(state: GameState, cx: number, cy: number): Set<string> {
+  const reachable = new Set<string>([`${cx},${cy}`]);
+  const queue = [{ x: cx, y: cy }];
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const next = state.map[current.y + dy]?.[current.x + dx];
+      if (!next || next.terrain === 'river' || next.terrain === 'mountain') continue;
+      const key = `${next.x},${next.y}`;
+      if (reachable.has(key)) continue;
+      reachable.add(key);
+      queue.push({ x: next.x, y: next.y });
+    }
+  }
+  return reachable;
+}
+
 function residentSpawnPoint(
   state: GameState,
   rng: () => number,
   cx: number,
   cy: number,
 ): { x: number; y: number } {
+  const centerLand = centerLandTiles(state, cx, cy);
   for (let radius = 1; radius <= 6; radius++) {
     const candidates: Tile[] = [];
     for (let y = cy - radius; y <= cy + radius; y++) {
       for (let x = cx - radius; x <= cx + radius; x++) {
         if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) !== radius) continue;
         const tile = state.map[y]?.[x];
-        if (tile && isResidentSpawnTile(tile) && hasSpawnExit(state, tile, cx, cy)) candidates.push(tile);
+        if (tile && centerLand.has(`${tile.x},${tile.y}`) &&
+            isResidentSpawnTile(tile) && hasSpawnExit(state, tile, cx, cy)) candidates.push(tile);
       }
     }
     if (candidates.length > 0) {
@@ -62,7 +116,7 @@ function residentSpawnPoint(
     }
   }
   const connectedFallback = state.map.flat().find(tile =>
-    isResidentSpawnTile(tile) && hasSpawnExit(state, tile, cx, cy));
+    centerLand.has(`${tile.x},${tile.y}`) && isResidentSpawnTile(tile) && hasSpawnExit(state, tile, cx, cy));
   if (connectedFallback) return { x: connectedFallback.x, y: connectedFallback.y };
   const fallback = state.map[cy]?.[cx];
   if (fallback && isResidentSpawnTile(fallback)) return { x: cx, y: cy };
@@ -70,7 +124,8 @@ function residentSpawnPoint(
 }
 
 export function createResident(state: GameState, rng: () => number, job: JobId = 'idle'): Resident {
-  const name = SURNAMES[Math.floor(rng() * SURNAMES.length)] + GIVEN_NAMES[Math.floor(rng() * GIVEN_NAMES.length)];
+  const gender = rollResidentGender(rng);
+  const name = rollResidentName(state, rng, gender);
   // 마을 중심지 주변에서 출발한다. 중심지 자체는 solid footprint라 주민을 올려두지 않는다.
   const center = state.buildings.find(b => b.type === 'center');
   const cx = center ? center.x : Math.floor(state.map[0].length / 2);
@@ -80,7 +135,7 @@ export function createResident(state: GameState, rng: () => number, job: JobId =
     id: state.nextResidentId++,
     name,
     age: 16 + Math.floor(rng() * 34),
-    gender: rollResidentGender(rng),
+    gender,
     job,
     hunger: 80,
     warmth: 80,
@@ -218,11 +273,15 @@ export function killResident(
       ? 'starvation'
       : cause.includes('동상') || cause.includes('추위') || cause.includes('혹한')
         ? 'cold'
-        : cause === '병' || cause.includes('질병')
+        : cause === '병' || cause.includes('질병') || cause.includes('역병')
           ? 'disease'
           : 'other';
   if (combatDeath) {
     addLog(state, `${r.name}이(가) 전투 중 전사했습니다. (${cause})`, 'raid', true);
+  } else if (cause === '호환') {
+    addLog(state, `${r.name}이(가) 호환을 당해 목숨을 잃었습니다.`, 'bad', true);
+  } else if (cause === '늑대 습격') {
+    addLog(state, `${r.name}이(가) 늑대 떼의 습격으로 목숨을 잃었습니다.`, 'bad', true);
   } else {
     addLog(state, `${r.name}이(가) ${cause}(으)로 세상을 떠났습니다.`, 'bad', true);
   }

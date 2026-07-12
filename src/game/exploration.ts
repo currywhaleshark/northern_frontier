@@ -1,8 +1,29 @@
 import { buildingFootprintSize, buildingFootprintTiles } from './buildings';
+import { CONFIG } from './config';
 import type { Building, BuildingTypeId, ExplorationState, GameState } from './types';
 
-const RESIDENT_REVEAL_RADIUS = 5;
-const BUILDING_REVEAL_RADIUS = 8;
+function isNight(state: Pick<GameState, 'subTick'>): boolean {
+  const dayFraction = state.subTick / CONFIG.agents.subticksPerDay;
+  return dayFraction > 0.5;
+}
+
+function sightMultiplier(state: Pick<GameState, 'subTick' | 'weather'>): number {
+  const weatherMult = CONFIG.exploration.weatherMult[state.weather] ?? 1;
+  const nightMult = isNight(state) ? CONFIG.exploration.nightMult : 1;
+  return weatherMult * nightMult;
+}
+
+export function residentRevealRadius(
+  state: Pick<GameState, 'subTick' | 'weather'>,
+): number {
+  return Math.max(2, Math.round(CONFIG.exploration.residentRadius * sightMultiplier(state)));
+}
+
+export function buildingRevealRadius(
+  state: Pick<GameState, 'subTick' | 'weather'>,
+): number {
+  return Math.max(3, Math.round(CONFIG.exploration.buildingRadius * sightMultiplier(state)));
+}
 
 export function createExploration(state: Pick<GameState, 'map'>): ExplorationState {
   return {
@@ -45,15 +66,16 @@ function revealBuilding(state: GameState, building: Building): void {
   const size = buildingFootprintSize(building.type);
   const cx = building.x + Math.floor((size - 1) / 2);
   const cy = building.y + Math.floor((size - 1) / 2);
-  revealAround(state, cx, cy, BUILDING_REVEAL_RADIUS);
+  revealAround(state, cx, cy, buildingRevealRadius(state));
 }
 
 export function refreshExploration(state: GameState): void {
   ensureExploration(state);
   for (const building of state.buildings) revealBuilding(state, building);
+  const radius = residentRevealRadius(state);
   for (const resident of state.residents) {
     if (!resident.alive) continue;
-    revealAround(state, resident.x, resident.y, RESIDENT_REVEAL_RADIUS);
+    revealAround(state, resident.x, resident.y, radius);
   }
 }
 

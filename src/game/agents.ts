@@ -20,6 +20,7 @@ import { isExplored, refreshExploration } from './exploration';
 import { FOOD_RESOURCES, FUEL_RESOURCES } from './resourceCatalog';
 import { isGateBuilding } from './walls';
 import { reconcileResidentHomes } from './residents';
+import { canEnterForeignTerritory, canWorkForeignTerritory, noteTerritoryViolation } from './territory';
 import {
   assignedBuildingForResident, autoAssignWorkersToBuilding, isResidentInAssignedSlot,
 } from './workerSlots';
@@ -110,7 +111,7 @@ function isPassableBuilding(type: BuildingTypeId): boolean {
   return PASSABLE_BUILDING_TYPES.has(type) || isGateBuilding(type);
 }
 
-export function isPassable(state: GameState, x: number, y: number): boolean {
+export function isTerrainPassable(state: GameState, x: number, y: number): boolean {
   const t = state.map[y]?.[x];
   if (!t) return false;
   const building = buildingAtTile(state, t);
@@ -122,6 +123,15 @@ export function isPassable(state: GameState, x: number, y: number): boolean {
     return getSeason(state.day) === 'winter' && state.weather !== 'thawFlood';
   }
   return true;
+}
+
+export function isPassable(
+  state: GameState,
+  x: number,
+  y: number,
+  ignoredTerritorySiteIds: readonly number[] = [],
+): boolean {
+  return isTerrainPassable(state, x, y) && canEnterForeignTerritory(state, x, y, ignoredTerritorySiteIds);
 }
 
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
@@ -241,19 +251,28 @@ function moveSteps(state: GameState, ctx: Ctx): number {
 type GoResult = 'arrived' | 'moving' | 'stuck';
 
 // 목표 조건을 향해 이동. 이미 목표 위면 arrived.
-function goTo(state: GameState, r: Resident, ctx: Ctx, isGoal: (t: Tile) => boolean): GoResult {
+function goTo(
+  state: GameState,
+  r: Resident,
+  ctx: Ctx,
+  isGoal: (t: Tile) => boolean,
+  passable?: (x: number, y: number) => boolean,
+  onStep?: (x: number, y: number) => void,
+): GoResult {
+  const canPass = passable ?? ((x: number, y: number) => isPassable(state, x, y));
   if (isGoal(state.map[r.y][r.x])) { r.path = []; return 'arrived'; }
   if (r.path.length === 0) {
-    const p = bfs(state, r.x, r.y, isGoal);
+    const p = bfs(state, r.x, r.y, isGoal, canPass);
     if (!p) return 'stuck';
     r.path = p;
   }
   const steps = moveSteps(state, ctx);
   for (let i = 0; i < steps && r.path.length > 0; i++) {
     const next = r.path[0];
-    if (!isPassable(state, next.x, next.y)) { r.path = []; return 'moving'; } // 다음 틱에 재탐색
+    if (!canPass(next.x, next.y)) { r.path = []; return 'moving'; } // 다음 틱에 재탐색
     r.path.shift();
     r.x = next.x; r.y = next.y;
+    onStep?.(next.x, next.y);
   }
   return isGoal(state.map[r.y][r.x]) ? 'arrived' : 'moving';
 }
@@ -550,7 +569,8 @@ function nearestPassableTile(state: GameState, x: number, y: number, maxRadius =
 }
 
 function ensureResidentOnPassableTile(state: GameState, r: Resident): void {
-  if (isPassable(state, r.x, r.y)) return;
+  const ignored = r.manualOrder?.unauthorizedSiteIds ?? [];
+  if (isPassable(state, r.x, r.y, ignored)) return;
   const tile = nearestPassableTile(state, r.x, r.y);
   if (!tile) return;
   r.x = tile.x;
@@ -578,7 +598,9 @@ interface GatherOpts {
 }
 
 function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void {
-  const knownGoal = (tile: Tile): boolean => isExplored(state, tile.x, tile.y) && o.goal(tile);
+  const forced = r.manualOrder?.kind === 'work' ? r.manualOrder.unauthorizedSiteIds ?? [] : [];
+  const knownGoal = (tile: Tile): boolean => isExplored(state, tile.x, tile.y) && o.goal(tile) &&
+    canWorkForeignTerritory(state, tile.x, tile.y, forced);
   // 짐이 찼거나 하역 중이면 거점으로
   if (carryTotal(r) >= o.cap || (r.phase === 'toDeposit' && carryTotal(r) > 0)) {
     r.phase = 'toDeposit';
@@ -639,6 +661,24 @@ function exactTileGoal(x: number, y: number): (t: Tile) => boolean {
   return t => t.x === x && t.y === y;
 }
 
+function manualGoTo(
+  state: GameState,
+  resident: Resident,
+  ctx: Ctx,
+  order: ManualOrder,
+  goal: (tile: Tile) => boolean,
+): GoResult {
+  const siteIds = order.unauthorizedSiteIds ?? [];
+  return goTo(
+    state,
+    resident,
+    ctx,
+    goal,
+    (x, y) => isPassable(state, x, y, siteIds),
+    (x, y) => noteTerritoryViolation(state, siteIds, x, y, 'passage'),
+  );
+}
+
 function logMineralDepletion(state: GameState, tile: Tile, resource: 'stone' | 'iron'): void {
   const mine = tile.buildingId == null
     ? undefined
@@ -655,13 +695,13 @@ function logMineralDepletion(state: GameState, tile: Tile, resource: 'stone' | '
 }
 
 function handleManualMoveOrder(state: GameState, r: Resident, ctx: Ctx, order: ManualOrder & { kind: 'move' }): boolean {
-  if (!isPassable(state, order.x, order.y)) {
+  if (!isPassable(state, order.x, order.y, order.unauthorizedSiteIds)) {
     r.task = '명령 지점 막힘';
     clearManualOrder(r);
     return true;
   }
 
-  const st = goTo(state, r, ctx, exactTileGoal(order.x, order.y));
+  const st = manualGoTo(state, r, ctx, order, exactTileGoal(order.x, order.y));
   if (st === 'arrived') {
     r.task = '이동 완료';
     clearManualOrder(r);
@@ -685,7 +725,7 @@ function handleManualHaulerQuarry(
   if (carryTotal(r) >= haulerCarryCapacity(r) || (r.phase === 'toDeposit' && carryTotal(r) > 0)) {
     r.phase = 'toDeposit';
     r.task = (r.carrying.iron ?? 0) > 0 ? '철 운반' : '돌 운반';
-    const st = goTo(state, r, ctx, depositGoal(state, []));
+    const st = manualGoTo(state, r, ctx, order, depositGoal(state, []));
     if (st === 'arrived' || st === 'stuck') {
       depositAll(state, r);
       r.phase = 'rest';
@@ -708,6 +748,7 @@ function handleManualHaulerQuarry(
       return true;
     }
     r.task = miningIron ? '철광 채취 중' : '채석 중';
+    noteTerritoryViolation(state, order.unauthorizedSiteIds ?? [], r.x, r.y, 'work');
     r.workTimer -= ctx.outdoor;
     gainSkillTick(r);
     if (r.workTimer <= 0) {
@@ -723,8 +764,9 @@ function handleManualHaulerQuarry(
     return true;
   }
 
-  const st = goTo(state, r, ctx, exactTileGoal(order.x, order.y));
+  const st = manualGoTo(state, r, ctx, order, exactTileGoal(order.x, order.y));
   if (st === 'arrived') {
+    noteTerritoryViolation(state, order.unauthorizedSiteIds ?? [], order.x, order.y, 'work');
     r.phase = 'working';
     r.workTimer = miningIron ? a.work.mine : a.work.quarry;
     r.task = miningIron ? '철광 채취 중' : '채석 중';
@@ -777,7 +819,7 @@ function handleManualHaulerTransport(
   if (carryTotal(resident) > 0) {
     resident.phase = 'toDeposit';
     resident.task = `${BUILDING_DEFS[source.type].name} 강제 운송`;
-    const st = goTo(state, resident, ctx, depositGoal(state, []));
+    const st = manualGoTo(state, resident, ctx, order, depositGoal(state, []));
     if (st === 'arrived' || st === 'stuck') {
       depositResidentToSettlement(state, resident);
       clearHaulTask(resident);
@@ -791,8 +833,9 @@ function handleManualHaulerTransport(
   resident.task = hasLoad
     ? `${BUILDING_DEFS[source.type].name} 지정 수거`
     : `${BUILDING_DEFS[source.type].name} 운송 대기`;
-  const st = goTo(state, resident, ctx, buildingGoal(state, source.id));
+  const st = manualGoTo(state, resident, ctx, order, buildingGoal(state, source.id));
   if (st === 'arrived') {
+    noteTerritoryViolation(state, order.unauthorizedSiteIds ?? [], resident.x, resident.y, 'work');
     if (hasLoad && collectHaulLoad(state, resident, source) > 0) {
       resident.phase = 'toDeposit';
       resident.path = [];
@@ -823,10 +866,17 @@ function handleManualWorkOrder(state: GameState, r: Resident, ctx: Ctx, order: M
     return true;
   }
 
-  const goal = order.buildingId != null ? buildingGoal(state, order.buildingId) : exactTileGoal(order.x, order.y);
-  const st = goTo(state, r, ctx, goal);
-  if (st === 'arrived') {
+  if (order.started) {
+    if (r.phase === 'working') return false;
     clearManualOrder(r);
+    return true;
+  }
+
+  const goal = order.buildingId != null ? buildingGoal(state, order.buildingId) : exactTileGoal(order.x, order.y);
+  const st = manualGoTo(state, r, ctx, order, goal);
+  if (st === 'arrived') {
+    order.started = true;
+    noteTerritoryViolation(state, order.unauthorizedSiteIds ?? [], r.x, r.y, 'work');
     return false;
   }
   if (st === 'stuck') {
@@ -1653,7 +1703,8 @@ export function agentsTick(state: GameState): void {
   const living = state.residents.filter(r => r.alive);
   if (living.length === 0) return;
 
-  const producers = living.filter(r => PRODUCING_JOBS.includes(r.job) && !r.sick && r.health >= 20).length;
+  const producers = living.filter(r =>
+    PRODUCING_JOBS.includes(r.job) && !r.sick && state.day >= (r.quarantinedUntil ?? 0) && r.health >= 20).length;
   const t = state.resources.tools;
   const tMod = producers <= 0 || t >= producers ? 1 : 0.6 + 0.4 * (t / producers);
   const mAvg = living.reduce((s, r) => s + r.morale, 0) / living.length;
@@ -1674,9 +1725,9 @@ export function agentsTick(state: GameState): void {
     // 보간용 직전 위치 기록
     r.px = r.x;
     r.py = r.y;
-    // 병자/중상자는 마을 중심에서 앓는다
-    if (r.sick || r.health < 20) {
-      r.task = '앓아누움';
+    // 병자/격리자/중상자는 마을 중심에서 쉬며 배정은 유지한다
+    if (r.sick || state.day < (r.quarantinedUntil ?? 0) || r.health < 20) {
+      r.task = state.day < (r.quarantinedUntil ?? 0) ? '격리 중' : '앓아누움';
       clearHaulTask(r);
       if (carryTotal(r) > 0) depositAll(state, r); // 짐은 이웃이 거둬 간다
       goToCenter(state, r, ctx);
@@ -1690,6 +1741,15 @@ export function agentsTick(state: GameState): void {
     // 심한 악천후엔 실외 작업자는 대피한다
     if (OUTDOOR_JOBS.includes(r.job) && ctx.outdoor < CONFIG.agents.shelterThreshold) {
       r.task = '악천후 대피';
+      goToCenter(state, r, ctx);
+      continue;
+    }
+    const forcedWorkSites = r.manualOrder?.kind === 'work' ? r.manualOrder.unauthorizedSiteIds ?? [] : [];
+    if (r.phase === 'working' && !canWorkForeignTerritory(state, r.x, r.y, forcedWorkSites)) {
+      r.phase = 'rest';
+      r.workTimer = 0;
+      r.path = [];
+      r.task = '작업 허가 없음';
       goToCenter(state, r, ctx);
       continue;
     }
