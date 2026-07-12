@@ -170,6 +170,21 @@ export function loadGame(): GameState | null {
     if (parsed.subTick == null || parsed.residents.some(r => r.x == null || r.px == null)) return null;
     if (!('raiders' in parsed)) return null;
     if (!Object.prototype.hasOwnProperty.call(parsed, 'battle')) parsed.battle = null;
+    if (!Object.prototype.hasOwnProperty.call(parsed, 'tacticalBattle')) parsed.tacticalBattle = null;
+    if (!Object.prototype.hasOwnProperty.call(parsed, 'tacticalBattleReport')) parsed.tacticalBattleReport = null;
+    if (parsed.tacticalBattle) {
+      const totalPower = parsed.tacticalBattle.raiderGroups.reduce((sum, group) => sum + group.power, 0);
+      const estimatedTotal = Math.max(3, Math.round(parsed.tacticalBattle.originalPower / CONFIG.tacticalBattle.raiderPowerPerFighter));
+      for (const group of parsed.tacticalBattle.raiderGroups) {
+        if (group.count == null) {
+          group.count = Math.max(1, Math.round(estimatedTotal * (totalPower > 0 ? group.power / totalPower : 1 / 3)));
+        }
+        if (group.killed == null) group.killed = 0;
+      }
+      for (const report of parsed.tacticalBattle.reports) {
+        if (report.raidersKilled == null) report.raidersKilled = 0;
+      }
+    }
     ensureMineralDeposits(parsed.map);
     if (parsed.battle && !parsed.battle.mode) parsed.battle.mode = 'garrison';
     if (parsed.battle && !parsed.battle.location) {

@@ -171,7 +171,7 @@ export function TopBar({
         <span className={`threat-box${state.threat > 60 ? ' threat-high' : ''}`}>
           위협도 {state.threat.toFixed(0)}
         </span>
-        <TimeControls speed={speed} setSpeed={setSpeed} paused={state.pendingChoice != null || state.gameOver != null} />
+          <TimeControls speed={speed} setSpeed={setSpeed} paused={state.pendingChoice != null || state.tacticalBattle != null || state.tacticalBattleReport != null || state.gameOver != null} />
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
           <button className="btn" onClick={onToggleSound} title={soundOn ? '소리 끄기' : '소리 켜기'}>
             {soundOn ? '🔊' : '🔇'}

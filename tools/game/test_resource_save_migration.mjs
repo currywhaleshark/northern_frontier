@@ -48,6 +48,8 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
     data: { give: 'food', giveAmt: 2, get: 'game', getAmt: 1 },
   };
   delete legacy.lastImmigrationDay;
+  delete legacy.tacticalBattle;
+  delete legacy.tacticalBattleReport;
   const legacyStone = legacy.map.flat().find(tile => tile.terrain === 'rock' && !tile.hasIron);
   const legacyIron = legacy.map.flat().find(tile => tile.terrain === 'rock' && tile.hasIron);
   assert.ok(legacyStone && legacyIron);
@@ -73,6 +75,8 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
   assert.equal(loaded.processingReserves.rice, 0);
   assert.equal(loaded.pendingChoice, null);
   assert.equal(loaded.lastImmigrationDay, -999);
+  assert.equal(loaded.tacticalBattle, null);
+  assert.equal(loaded.tacticalBattleReport, null);
   for (const id of catalog.RESOURCE_IDS) assert.equal(typeof loaded.resources[id], 'number');
   assert.equal(Object.hasOwn(loaded.resources, 'food'), false);
   assert.equal(Object.hasOwn(loaded.resources, 'clothes'), false);

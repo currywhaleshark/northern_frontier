@@ -97,6 +97,8 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     relations: initRelations(),
     raiders: null,
     battle: null,
+    tacticalBattle: null,
+    tacticalBattleReport: null,
     raidCooldown: 0,
     tradeRefusedDays: 0,
     lastTradeDay: 0,
@@ -584,7 +586,7 @@ export function continueAfterVictory(state: GameState): boolean {
 
 // 서브틱 1회: 에이전트 갱신, 하루가 차면 일일 처리
 export function advanceTick(state: GameState): void {
-  if (state.gameOver || state.pendingChoice) return;
+  if (state.gameOver || state.pendingChoice || state.tacticalBattle || state.tacticalBattleReport) return;
   agentsTick(state);
   refreshExploration(state);
   revealForeignSitesFromExploration(state);
@@ -601,7 +603,7 @@ export function advanceTick(state: GameState): void {
 // 하루 통째로 진행 (테스트/디버그용)
 export function advanceDay(state: GameState): void {
   for (let i = 0; i < SUBTICKS; i++) {
-    if (state.gameOver || state.pendingChoice) break;
+    if (state.gameOver || state.pendingChoice || state.tacticalBattle || state.tacticalBattleReport) break;
     advanceTick(state);
   }
 }

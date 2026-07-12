@@ -16,6 +16,7 @@ import { getSeason, getYear } from './seasons';
 import type { BattleMode, Building, GameState, PendingChoice, TradeNegotiation } from './types';
 import { isWallBuilding } from './walls';
 import { findRaidOriginSite } from './foreignSites';
+import { createTacticalBattle } from './tacticalBattle';
 
 // 위협도 일일 갱신
 export function updateThreat(state: GameState): void {
@@ -158,7 +159,7 @@ function raiderBuildingApproachGoal(state: GameState, building: Building): (tile
 // 습격 발생 판정: 성사되면 지도 가장자리에 습격 무리가 나타나 마을로 접근한다
 export function checkRaidTrigger(state: GameState, rng: () => number): void {
   const t = CONFIG.threat;
-  if (state.pendingChoice || state.raidCooldown > 0 || state.raiders || state.battle) return;
+  if (state.pendingChoice || state.raidCooldown > 0 || state.raiders || state.battle || state.tacticalBattle) return;
   if (state.threat < t.raidThreshold) return;
   let chance = (state.threat - t.raidThreshold) / t.raidChanceDiv;
   const season = getSeason(state.day);
@@ -455,6 +456,14 @@ export function openRaidChoice(
         desc: '성한 주민 모두가 마을 안에서 방어전을 벌입니다. 방어도는 오르지만 승리해도 부상과 건물 파손이 생깁니다.',
       },
       {
+        id: 'manual-garrison', label: '직접 지휘한다 — 수비병 요격',
+        desc: '전투 두루마리에서 수비병·파수꾼·사냥꾼을 배치하고 라운드별 전략을 선택합니다.',
+      },
+      {
+        id: 'manual-levy', label: '직접 지휘한다 — 민병 방어',
+        desc: '성한 주민을 소집해 마을 안에서 방어전을 지휘합니다. 병력을 보존하거나 물자를 지킬 방향을 정할 수 있습니다.',
+      },
+      {
         id: 'tribute', label: '공물을 내어보낸다',
         desc: `식량 ${tributeCost.food}, 가죽 ${tributeCost.hide}, 도구 ${tributeCost.tools}을(를) 내주고 싸움을 피합니다.`,
         disabled: !canTribute,
@@ -518,6 +527,26 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
       consumeBattlePowder(state);
       resolveFightFallback(state, rng, faction, levyDefense / (levyDefense + power), '징집된 주민들', 'levy');
       break;
+    }
+    case 'manual-garrison': {
+      createTacticalBattle(state, {
+        factionName: faction,
+        power,
+        warned,
+        siege: battleMods.siege,
+        mode: 'garrison',
+      });
+      return;
+    }
+    case 'manual-levy': {
+      createTacticalBattle(state, {
+        factionName: faction,
+        power,
+        warned,
+        siege: battleMods.siege,
+        mode: 'levy',
+      });
+      return;
     }
     case 'tribute': {
       consumeEdibleFood(state, 20);

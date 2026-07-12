@@ -24,6 +24,8 @@ import { MainMenu } from './components/MainMenu';
 import { centerViewportOnSettlement, Minimap } from './components/Minimap';
 import { ProcessingPanel } from './components/ProcessingPanel';
 import { TopBar } from './components/TopBar';
+import { TacticalBattleScreen } from './components/TacticalBattleScreen';
+import { TacticalBattleReportModal } from './components/TacticalBattleReportModal';
 import { RANK_NAMES } from './game/constants';
 import { requestPetition } from './game/petition';
 import { toggleNitreYards } from './game/suspicion';
@@ -39,9 +41,13 @@ import {
   raidBanditLair, requestHuntingRights, requestPassagePermission, scoutBanditLair, sendGiftToSite,
   type SiteGiftType,
 } from './game/siteDiplomacy';
+import {
+  acknowledgeTacticalReport, advanceTacticalPhase, assignDefenderGroup, completeTacticalSimulation,
+  dismissTacticalBattleReport, finishTacticalBattle, resolveTacticalRound, setTacticalCommand, spendPreparationAction,
+} from './game/tacticalBattle';
 import type {
   BuildingTypeId, CropId, Difficulty, JobId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
-  SpecialItemId, WildlifeKind,
+  PreparationActionId, SpecialItemId, TacticalCommandId, WildlifeKind,
 } from './game/types';
 
 export default function App() {
@@ -111,6 +117,12 @@ export default function App() {
 
   const state = stateRef.current;
 
+  // 직접 지휘를 시작하면 기존 배속을 버린다. 전투 종료 뒤 10배속이
+  // 갑자기 재개되어 장작 고갈이나 동사 판정이 연달아 진행되는 일을 막는다.
+  useEffect(() => {
+    if (state.tacticalBattle) setSpeed(0);
+  }, [state.tacticalBattle?.id]);
+
   useEffect(() => {
     if (screen !== 'game') return;
     let secondFrame = 0;
@@ -134,7 +146,7 @@ export default function App() {
         for (let i = 0; i < days; i++) {
           const s = stateRef.current;
           if (s.gameOver) break;
-          if (s.pendingChoice) break;
+          if (s.pendingChoice || s.tacticalBattle || s.tacticalBattleReport) break;
           advanceDay(s);
         }
         bump();
@@ -163,6 +175,11 @@ export default function App() {
     let acc = 0;
     const timer = setInterval(() => {
       const now = performance.now();
+      if (stateRef.current.tacticalBattle || stateRef.current.tacticalBattleReport) {
+        last = now;
+        acc = 0;
+        return;
+      }
       acc = Math.min(acc + (now - last), msPerTick * 24); // 탭 복귀 시 폭주 방지
       last = now;
       let n = Math.floor(acc / msPerTick);
@@ -170,7 +187,7 @@ export default function App() {
         acc -= n * msPerTick;
         const s = stateRef.current;
         while (n-- > 0) {
-          if (s.pendingChoice || s.gameOver) break; // 이벤트/종료 시 자동 정지
+          if (s.pendingChoice || s.tacticalBattle || s.tacticalBattleReport || s.gameOver) break; // 이벤트/전술전/장계/종료 시 자동 정지
           advanceTick(s);
         }
         animRef.current = { at: now, ms: msPerTick };
@@ -287,6 +304,35 @@ export default function App() {
 
   const handleChoose = (optionId: string) => {
     resolveChoice(stateRef.current, optionId);
+    bump();
+  };
+
+  const handleTacticalAction = (action: () => string | null) => {
+    const error = action();
+    if (error) addLog(stateRef.current, error, 'info');
+    bump();
+  };
+
+  const handleSpendPreparation = (actionId: PreparationActionId) =>
+    handleTacticalAction(() => spendPreparationAction(stateRef.current, actionId));
+  const handleAdvanceTacticalPhase = () =>
+    handleTacticalAction(() => advanceTacticalPhase(stateRef.current));
+  const handleAssignTacticalGroup = (groupId: string, zoneId: string) =>
+    handleTacticalAction(() => assignDefenderGroup(stateRef.current, groupId, zoneId));
+  const handleSetTacticalCommand = (groupId: string, command: TacticalCommandId) =>
+    handleTacticalAction(() => setTacticalCommand(stateRef.current, groupId, command));
+  const handleResolveTacticalRound = () =>
+    handleTacticalAction(() => resolveTacticalRound(stateRef.current));
+  const handleCompleteTacticalSimulation = () =>
+    handleTacticalAction(() => completeTacticalSimulation(stateRef.current));
+  const handleAcknowledgeTacticalReport = () =>
+    handleTacticalAction(() => acknowledgeTacticalReport(stateRef.current));
+  const handleFinishTacticalBattle = () => {
+    finishTacticalBattle(stateRef.current);
+    bump();
+  };
+  const handleDismissTacticalBattleReport = () => {
+    dismissTacticalBattleReport(stateRef.current);
     bump();
   };
 
@@ -590,6 +636,23 @@ export default function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {state.tacticalBattle && (
+        <TacticalBattleScreen
+          state={state}
+          onSpendPreparation={handleSpendPreparation}
+          onAdvancePhase={handleAdvanceTacticalPhase}
+          onAssignGroup={handleAssignTacticalGroup}
+          onSetCommand={handleSetTacticalCommand}
+          onResolveRound={handleResolveTacticalRound}
+          onCompleteSimulation={handleCompleteTacticalSimulation}
+          onAcknowledgeReport={handleAcknowledgeTacticalReport}
+          onFinishBattle={handleFinishTacticalBattle}
+        />
+      )}
+      {state.tacticalBattleReport && (
+        <TacticalBattleReportModal report={state.tacticalBattleReport} onClose={handleDismissTacticalBattleReport} />
       )}
     </div>
   );

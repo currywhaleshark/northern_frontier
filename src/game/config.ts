@@ -342,6 +342,32 @@ export const CONFIG = {
     repairProgressMax: 0.6,   // 파손 직후 남는 공정률 상한
   },
 
+  tacticalBattle: {
+    maxRounds: 5,
+    raiderPowerPerFighter: 4,
+    prep: {
+      surpriseBase: 1,
+      warned: 3,
+      beacon: 1,
+      watchtowerMax: 2,
+      watchmenPerPoint: 2,
+      watchmenMax: 2,
+      severeWeatherPenalty: 1,
+      max: 8,
+    },
+    groupPower: {
+      militiaMusket: 18,
+      militiaBow: 16,
+      militiaSpear: 14,
+      militiaUnarmed: 9,
+      watchman: 6,
+      hunter: 8,
+      civilian: 1,
+    },
+    raiderSplit: { main: 0.55, looters: 0.25, flankers: 0.2 },
+    morale: { village: 70, warnedBonus: 8, siegeBonus: 4, raiders: 72 },
+  },
+
   trade: {
     minIntervalDays: 14,
     dailyChance: 0.07,

@@ -478,6 +478,190 @@ export interface Battle {
   draftedJobs?: { id: number; job: JobId }[];
 }
 
+export type TacticalBattlePhase =
+  | 'preparation'
+  | 'deployment'
+  | 'command'
+  | 'simulating'
+  | 'report'
+  | 'finished';
+
+export type TacticalZoneKind =
+  | 'approach'
+  | 'forest'
+  | 'ford'
+  | 'wall'
+  | 'storehouse'
+  | 'center';
+
+export type DefenderGroupKind =
+  | 'militia-spear'
+  | 'militia-bow'
+  | 'militia-musket'
+  | 'militia-unarmed'
+  | 'watchman'
+  | 'hunter'
+  | 'civilian';
+
+export type RaiderGroupKind = 'main' | 'looters' | 'flankers';
+
+export type TacticalCommandId =
+  | 'hold'
+  | 'volley'
+  | 'ambush'
+  | 'guardStorehouse'
+  | 'protectCivilians'
+  | 'fallback'
+  | 'counterattack'
+  | 'openRetreat';
+
+export type PreparationActionId =
+  | 'evacuateCivilians'
+  | 'hideSupplies'
+  | 'repairWall'
+  | 'setAmbush'
+  | 'prepareVolley'
+  | 'musterMilitia';
+
+export interface TacticalBattleZone {
+  id: string;
+  name: string;
+  kind: TacticalZoneKind;
+  order: number;
+  pressure: number;
+  breached: boolean;
+  defenseBonus: number;
+  ambushBonus: number;
+  lootRisk: number;
+  civilianRisk: number;
+  description: string;
+}
+
+export interface TacticalDefenderGroup {
+  id: string;
+  kind: DefenderGroupKind;
+  label: string;
+  residentIds: number[];
+  count: number;
+  zoneId: string;
+  command: TacticalCommandId | null;
+  power: number;
+  wounded: number;
+  killed: number;
+}
+
+export interface TacticalRaiderGroup {
+  id: string;
+  kind: RaiderGroupKind;
+  label: string;
+  zoneId: string;
+  targetZoneId: string;
+  power: number;
+  count: number;
+  killed: number;
+  morale: number;
+  intent: 'advance' | 'loot' | 'flank' | 'breakWall' | 'withdraw';
+  revealed: boolean;
+}
+
+export interface TacticalPreparationEffect {
+  id: PreparationActionId;
+  label: string;
+  cost: number;
+  applied: boolean;
+}
+
+export interface TacticalAnimationEvent {
+  zoneId: string;
+  kind:
+    | 'camera'
+    | 'advance'
+    | 'ambush'
+    | 'volley'
+    | 'melee'
+    | 'wallHit'
+    | 'loot'
+    | 'retreat'
+    | 'fire'
+    | 'casualty'
+    | 'moraleBreak'
+    | 'report';
+  text?: string;
+  durationMs: number;
+}
+
+export interface TacticalRoundReport {
+  round: number;
+  focusZoneId: string;
+  nextFocusZoneId: string;
+  summary: string;
+  lines: string[];
+  events: TacticalAnimationEvent[];
+  wounded: number;
+  killed: number;
+  raidersKilled: number;
+  loot: Partial<Record<ResourceId, number>>;
+  buildingsDamaged: number;
+  villageMoraleDelta: number;
+  raiderMoraleDelta: number;
+  ended?: boolean;
+  outcome?: 'defenseSuccess' | 'partialLoss' | 'raidersLooted' | 'villageRouted' | 'negotiated';
+}
+
+export interface TacticalBattlePersonReport {
+  residentId: number;
+  name: string;
+  groupLabel: string;
+  healthAfter: number;
+}
+
+export interface TacticalBattleReport {
+  battleId: number;
+  date: string;
+  factionName: string;
+  mode: BattleMode;
+  warned: boolean;
+  outcome: NonNullable<TacticalRoundReport['outcome']>;
+  outcomeLabel: string;
+  rounds: number;
+  villageMorale: number;
+  raiderMorale: number;
+  defendersCommitted: number;
+  defendersSurvived: number;
+  killed: TacticalBattlePersonReport[];
+  wounded: TacticalBattlePersonReport[];
+  raidersCommitted: number;
+  raidersKilled: number;
+  raidersEscaped: number;
+  damagedBuildings: BuildingTypeId[];
+  loot: Partial<Record<ResourceId, number>>;
+  reputationDelta: number;
+  relationDelta: number;
+  threatAfter: number;
+  highlights: string[];
+}
+
+export interface TacticalBattle {
+  id: number;
+  factionName: string;
+  warned: boolean;
+  siege: boolean;
+  originalPower: number;
+  phase: TacticalBattlePhase;
+  round: number;
+  prepPoints: number;
+  prepActions: TacticalPreparationEffect[];
+  zones: TacticalBattleZone[];
+  defenderGroups: TacticalDefenderGroup[];
+  raiderGroups: TacticalRaiderGroup[];
+  currentZoneId: string;
+  villageMorale: number;
+  raiderMorale: number;
+  reports: TacticalRoundReport[];
+  pendingReport: TacticalRoundReport | null;
+  mode: BattleMode;
+}
+
 export interface AlertItem {
   id: string;
   text: string;
@@ -515,6 +699,8 @@ export interface GameState {
   relations: Record<string, number>; // 세력별 우호도 0~100 (키: 세력 이름)
   raiders: RaiderBand | null; // 접근 중인 습격 무리
   battle: Battle | null;      // 지도 위에서 진행 중인 습격 전투
+  tacticalBattle: TacticalBattle | null; // 직접 지휘하는 두루마리형 습격 전투
+  tacticalBattleReport: TacticalBattleReport | null; // 전투 종료 뒤 확인하는 상세 장계
   raidCooldown: number;     // 습격 후 유예 기간
   tradeRefusedDays: number; // 최근 교역 거절 여파 남은 일수
   lastTradeDay: number;     // 마지막 교역 제안이 온 날
