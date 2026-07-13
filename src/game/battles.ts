@@ -6,6 +6,7 @@
 import { CONFIG } from './config';
 import { armedMusketeers, computeDefense, countBuilt } from './buildings';
 import { addLog } from './events';
+import { activePredatorScoutIds } from './expeditionIntel';
 import { changeRelation } from './relations';
 import { resetAgent } from './agents';
 import { livingResidents } from './residents';
@@ -66,11 +67,13 @@ export function consumeBattlePowder(state: GameState): void {
   addLog(state, `전선에 총성과 포성이 울립니다! (화약 -${used.toFixed(1)})`, 'raid');
 }
 
-// 징집(levy) 시 일반 주민(수비병/파수꾼 제외)이 보태는 방어도.
+// 징집(levy) 시 일반 주민(수비병/파수꾼/사냥꾼 제외)이 보태는 방어도.
 // 직업을 바꾸는 방식은 금지 — computeDefense가 주민 전원을 수비병(12)으로 세어 폭증한다.
 export function levyDefenseBonus(state: GameState): number {
+  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
   const civilians = livingResidents(state)
-    .filter(r => !r.sick && r.health >= 20 && r.job !== 'militia' && r.job !== 'watchman')
+    .filter(r => !away.has(r.id) && !r.sick && r.health >= 20 &&
+      r.job !== 'militia' && r.job !== 'watchman' && r.job !== 'hunter')
     .length;
   return civilians * CONFIG.raid.levyDefensePerResident;
 }
@@ -115,8 +118,9 @@ export function startBattle(state: GameState, mode: BattleMode): boolean {
   if (!band) return false;
 
   // 요격: 훈련된 수비병+파수꾼만 / 징집: 앓지 않는 성한 주민 전체
+  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
   const defenders = livingResidents(state).filter(r =>
-    !r.sick && r.health >= 20 &&
+    !away.has(r.id) && !r.sick && r.health >= 20 &&
     (mode === 'levy' || r.job === 'militia' || r.job === 'watchman'));
   for (const defender of defenders) {
     resetAgent(state, defender);

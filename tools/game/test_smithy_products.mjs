@@ -209,9 +209,14 @@ function keepOnlyResident(state, index, job, tile) {
   assert.deepEqual(buildings.militiaWeaponAllocation(state), {
     muskets: 0,
     hornBows: 3,
-    spears: 5,
-    unarmed: 0,
+    spears: 3,
+    unarmed: 2,
   });
+  assert.equal(
+    Object.values(state.weaponAssignments).filter(weapon => weapon === 'musket').length,
+    2,
+    'assigned muskets remain with their residents when powder runs out',
+  );
 }
 
 {

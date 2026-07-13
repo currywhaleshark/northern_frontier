@@ -17,6 +17,7 @@ import { processableAmount } from './processing';
 import { canGrowCropNow, canHarvestCropNow, canPlantCropNow, cropIdForBuilding, CROP_DEFS } from './crops';
 import { clothingCoverageTotal, foodTotal, fuelHeatTotal } from './consumption';
 import { isExplored, refreshExploration } from './exploration';
+import { activePredatorScoutIds } from './expeditionIntel';
 import { FOOD_RESOURCES, FUEL_RESOURCES } from './resourceCatalog';
 import { isGateBuilding } from './walls';
 import { reconcileResidentHomes } from './residents';
@@ -1701,6 +1702,7 @@ export function agentsTick(state: GameState): void {
   const rng = makeRng(state.seed + state.day * 7919 + state.subTick * 101 + 7);
   const season = getSeason(state.day);
   const living = state.residents.filter(r => r.alive);
+  const predatorScouts = activePredatorScoutIds(state);
   if (living.length === 0) return;
 
   const producers = living.filter(r =>
@@ -1725,6 +1727,33 @@ export function agentsTick(state: GameState): void {
     // 보간용 직전 위치 기록
     r.px = r.x;
     r.py = r.y;
+    if (predatorScouts.has(r.id)) {
+      r.task = '맹수 흔적 추적 중';
+      clearHaulTask(r);
+      r.path = [];
+      r.manualOrder = null;
+      if (carryTotal(r) > 0) depositAll(state, r);
+      continue;
+    }
+    // 원정 참여자는 expeditionTick이 집결·행군·귀환을 전담한다.
+    if (state.expedition?.memberIds.includes(r.id)) {
+      r.task = state.expedition.phase === 'muster'
+        ? '토벌 집결 중'
+        : state.expedition.phase === 'return'
+          ? '토벌 귀환 중'
+          : state.expedition.phase === 'engage'
+            ? '토벌 교전 대기'
+            : '토벌 출정';
+      clearHaulTask(r);
+      continue;
+    }
+    if (state.raidHold) {
+      r.task = '완전 수성 중';
+      clearHaulTask(r);
+      if (carryTotal(r) > 0) depositAll(state, r);
+      goToCenter(state, r, ctx);
+      continue;
+    }
     // 병자/격리자/중상자는 마을 중심에서 쉬며 배정은 유지한다
     if (r.sick || state.day < (r.quarantinedUntil ?? 0) || r.health < 20) {
       r.task = state.day < (r.quarantinedUntil ?? 0) ? '격리 중' : '앓아누움';

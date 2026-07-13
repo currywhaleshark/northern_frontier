@@ -10,13 +10,15 @@ import {
 import { RESOURCE_DEFS, type ResourceCategory } from '../game/resourceCatalog';
 import { getSeason } from '../game/seasons';
 import { SPECIAL_ITEM_DEFS } from '../game/specialItems';
-import type { GameState, ResourceId, SpecialItemId } from '../game/types';
+import { predatorIntelOffers } from '../game/predatorIntelTrade';
+import type { GameState, PredatorKind, ResourceId, SpecialItemId } from '../game/types';
 import { FactionName } from './FactionName';
 import { TradeResourceIcon } from './TradeResourceIcon';
 
 interface Props {
   state: GameState;
   onNegotiate: (get: ResourceId, getAmt: number, specialItem?: SpecialItemId, giveAmt?: number) => void;
+  onBuyPredatorIntel: (kind: PredatorKind) => void;
   onChoose: (optionId: string) => void;
 }
 
@@ -75,7 +77,7 @@ function AmountStepper({
   );
 }
 
-export function TradeDialog({ state, onNegotiate, onChoose }: Props) {
+export function TradeDialog({ state, onNegotiate, onBuyPredatorIntel, onChoose }: Props) {
   const negotiation = tradeNegotiationOf(state.pendingChoice);
   const faction = FACTIONS.find(candidate => candidate.name === negotiation?.faction);
   const incomingTrade = negotiation?.initiatedBy === 'faction' && negotiation.mode !== 'extortion';
@@ -128,6 +130,7 @@ export function TradeDialog({ state, onNegotiate, onChoose }: Props) {
   const relation = getRelation(state, faction.name);
   const capacitySummary = factionTradeCapacitySummary(state, faction.name, get);
   const capacity = capacitySummary.remaining;
+  const intelOffers = predatorIntelOffers(state, faction.name);
   const dockActive = state.buildings.some(building => building.built && building.type === 'dock');
   const displayedTermsMatch = negotiation.get === get && negotiation.getAmt === getAmt &&
     (!incomingTrade || negotiation.giveAmt === giveAmt);
@@ -243,6 +246,33 @@ export function TradeDialog({ state, onNegotiate, onChoose }: Props) {
               </div>
             ) : (
               <>
+                {intelOffers.length > 0 && (
+                  <div className="trade-intel-offers">
+                    <div className="muted small">주변 토벌 정보</div>
+                    {intelOffers.map(offer => {
+                      const affordable = state.resources[offer.priceResource] >= offer.priceAmount;
+                      return (
+                        <button
+                          key={offer.kind}
+                          type="button"
+                          disabled={!affordable}
+                          title={affordable
+                            ? `${offer.siteName}에서 목표까지 약 ${offer.distance}칸`
+                            : `곡식 ${offer.priceAmount}이 필요합니다`}
+                          onClick={() => onBuyPredatorIntel(offer.kind)}
+                        >
+                          <span aria-hidden="true">卷</span>
+                          <div>
+                            <strong>{offer.label}</strong>
+                            <small>{offer.precision === 'exact' ? '정확한 정보' : '대략 정보'} · {offer.siteName}</small>
+                          </div>
+                          <b>곡식 {offer.priceAmount}</b>
+                        </button>
+                      );
+                    })}
+                    <p>관계 {Math.round(relation)} · 우호도가 높을수록 값이 크게 내려갑니다.</p>
+                  </div>
+                )}
                 <div className="trade-resource-tabs" role="tablist" aria-label="교역품 분류">
                   {availableCategories.map(candidate => (
                     <button

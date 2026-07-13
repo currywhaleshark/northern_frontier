@@ -1,9 +1,15 @@
 import { CONFIG } from './config';
 import { cropIdForBuilding, CROP_DEFS } from './crops';
 import { addLog } from './events';
+import { consumeExpeditionPowder, expeditionResidentsForIds } from './expedition';
+import {
+  activePredatorScoutIds, availablePredatorScouts, generatedPredatorThreatProfile, materializePredatorThreat,
+  predatorScoutDuration, predatorThreatProfile,
+} from './expeditionIntel';
 import { makeRng } from './map';
 import { killResident, livingResidents } from './residents';
 import { getSeason, getYear } from './seasons';
+import { weaponCountsForResidents } from './weapons';
 import type {
   Building,
   EpidemicState,
@@ -11,6 +17,7 @@ import type {
   IncidentState,
   Resident,
   ResourceId,
+  PredatorKind,
   SpecialEventId,
   SpecialItemId,
   WildlifeKind,
@@ -79,6 +86,13 @@ export function ensureIncidentState(state: GameState): void {
   state.specialItems.gyrfalcon ??= 0;
   state.discoveredSpecialItems ??= [];
   state.tributeWaivers ??= 0;
+  for (const kind of ['wolf', 'tiger', 'boar'] as const) {
+    const threat = state.incidents.predatorThreats[kind];
+    if (!threat || (threat.size != null && threat.strength != null)) continue;
+    const generated = generatedPredatorThreatProfile(state.seed, kind, threat.untilDay);
+    threat.size ??= generated.size;
+    threat.strength ??= generated.strength;
+  }
   for (const resident of state.residents) resident.quarantinedUntil ??= 0;
 }
 
@@ -99,31 +113,51 @@ function standingFarms(state: GameState): Building[] {
     building.fieldGrowth > 1);
 }
 
-function weaponReadiness(state: GameState) {
-  const available = livingResidents(state).filter(resident => state.day >= (resident.quarantinedUntil ?? 0));
+function weaponReadiness(state: GameState, memberIds?: Iterable<number>) {
+  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
+  const selected = memberIds ? new Set(memberIds) : null;
+  const available = livingResidents(state).filter(resident =>
+    (selected ? selected.has(resident.id) : !away.has(resident.id)) &&
+    !resident.sick && resident.health >= 20 && state.day >= (resident.quarantinedUntil ?? 0));
   const hunters = available.filter(resident => resident.job === 'hunter').length;
   const militia = available.filter(resident => resident.job === 'militia').length;
   const watchmen = available.filter(resident => resident.job === 'watchman').length;
   const team = hunters + militia + watchmen;
-  const bows = Math.min(hunters + watchmen, Math.floor(state.resources.hornBows));
-  const spears = Math.min(team, Math.floor(state.resources.spears));
-  const muskets = Math.min(militia + watchmen, Math.floor(state.resources.muskets), Math.floor(state.resources.gunpowder));
+  const combatants = available.filter(resident =>
+    resident.job === 'hunter' || resident.job === 'militia' || resident.job === 'watchman');
+  const weapons = weaponCountsForResidents(state, combatants);
+  const bows = weapons.hornBows;
+  const spears = weapons.spears;
+  const muskets = weapons.readyMuskets;
   return { hunters, militia, watchmen, team, bows, spears, muskets };
 }
 
-export function predatorHuntChance(state: GameState, kind: WildlifeKind): number {
-  const r = weaponReadiness(state);
+export function predatorHuntChance(
+  state: GameState,
+  kind: WildlifeKind,
+  memberIds?: Iterable<number>,
+): number {
+  const r = weaponReadiness(state, memberIds);
   const base = kind === 'wolf' ? 0.34 : kind === 'tiger' ? 0.16 : 0.48;
   const hunterValue = kind === 'wolf' ? 0.11 : kind === 'tiger' ? 0.09 : 0.1;
+  const baselineStrength = kind === 'wolf' ? 55 : kind === 'tiger' ? 67 : 48;
+  const threatAdjustment = (predatorThreatProfile(state, kind).strength - baselineStrength) / 280;
   const chance = base + r.hunters * hunterValue + r.militia * 0.1 +
-    r.watchmen * 0.045 + r.bows * 0.045 + r.spears * 0.025 + r.muskets * 0.09;
+    r.watchmen * 0.045 + r.bows * 0.045 + r.spears * 0.025 + r.muskets * 0.09 - threatAdjustment;
   return Math.max(0.12, Math.min(0.94, chance));
 }
 
 export function predatorReadinessLabel(state: GameState, kind: WildlifeKind): string {
   const r = weaponReadiness(state);
+  const intel = state.incidents.predatorThreats[kind]?.intel;
+  const chance = Math.round(predatorHuntChance(state, kind) * 100);
+  const chanceLabel = kind === 'boar' || intel?.precision === 'exact'
+    ? `${chance}%`
+    : intel?.precision === 'rough'
+      ? `약 ${Math.round(chance / 5) * 5}%`
+      : '???';
   return `사냥꾼 ${r.hunters} · 수비병 ${r.militia} · 파수꾼 ${r.watchmen} · ` +
-    `각궁 ${r.bows} · 창 ${r.spears} · 조총 ${r.muskets} / 예상 성공 ${Math.round(predatorHuntChance(state, kind) * 100)}%`;
+    `각궁 ${r.bows} · 창 ${r.spears} · 조총 ${r.muskets} / 예상 성공 ${chanceLabel}`;
 }
 
 function wildlifeName(kind: WildlifeKind): string {
@@ -177,6 +211,7 @@ function openWildlifeEvent(state: GameState, kind: WildlifeKind, rng: () => numb
   }
 
   const wolf = kind === 'wolf';
+  const scoutAvailable = availablePredatorScouts(state).length > 0;
   state.pendingChoice = {
     kind: 'incident',
     title: wolf ? '늑대 떼 발견' : '호랑이 출몰',
@@ -186,10 +221,17 @@ function openWildlifeEvent(state: GameState, kind: WildlifeKind, rng: () => numb
     options: [
       {
         id: 'hunt-now',
-        label: '즉시 토벌한다',
+        label: '토벌대를 즉시 소집한다',
         desc: wolf
-          ? '성공하면 고기와 가죽을 얻습니다. 실패하면 토벌대가 다칠 수 있습니다.'
-          : '성공하면 고기·명성·호피를 얻습니다. 실패하면 중상이나 사망자가 나올 수 있습니다.',
+          ? '편성창에서 출정 인원과 무장을 정한 뒤 늑대 서식지로 보냅니다.'
+          : '편성창에서 출정 인원과 무장을 정한 뒤 호랑이 서식지로 보냅니다.',
+      },
+      {
+        id: 'track-first',
+        label: '우선 흔적을 쫓는다',
+        desc: '사냥꾼 한 명을 골라 2~4일 동안 파견한 뒤 규모를 파악합니다. 그동안에도 맹수의 위협은 계속됩니다.',
+        disabled: !scoutAvailable,
+        disabledReason: '파견할 수 있는 건강한 사냥꾼이 없습니다',
       },
       {
         id: 'prepare',
@@ -389,7 +431,8 @@ function threatDuration(kind: WildlifeKind, rng: () => number): number {
 function activateWildlifeThreat(state: GameState, kind: WildlifeKind, rng: () => number): void {
   const untilDay = state.day + threatDuration(kind, rng);
   const existing = state.incidents.predatorThreats[kind];
-  state.incidents.predatorThreats[kind] = { kind, untilDay: Math.max(existing?.untilDay ?? 0, untilDay) };
+  const finalUntilDay = Math.max(existing?.untilDay ?? 0, untilDay);
+  state.incidents.predatorThreats[kind] = materializePredatorThreat(state, kind, finalUntilDay, existing);
   const message = kind === 'wolf'
     ? `늑대 떼가 숲에 자리를 잡았습니다. ${untilDay - state.day}일 동안 숲에 드나드는 주민이 위험합니다.`
     : kind === 'tiger'
@@ -398,16 +441,31 @@ function activateWildlifeThreat(state: GameState, kind: WildlifeKind, rng: () =>
   addLog(state, message, 'bad', true);
 }
 
-function huntCandidates(state: GameState): Resident[] {
-  const available = livingResidents(state).filter(resident => state.day >= (resident.quarantinedUntil ?? 0));
+function huntCandidates(state: GameState, memberIds?: Iterable<number>): Resident[] {
+  const selected = memberIds ? new Set(memberIds) : null;
+  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
+  const available = livingResidents(state).filter(resident =>
+    (selected ? selected.has(resident.id) : !away.has(resident.id)) &&
+    state.day >= (resident.quarantinedUntil ?? 0));
   const trained = available.filter(resident => resident.job === 'hunter' || resident.job === 'militia' || resident.job === 'watchman');
   return trained.length > 0 ? trained : available;
 }
 
-function huntFailure(state: GameState, kind: WildlifeKind, rng: () => number): void {
-  const candidates = huntCandidates(state);
+interface HuntCasualty {
+  residentId: number;
+  killed: boolean;
+  damage?: number;
+}
+
+function huntFailure(
+  state: GameState,
+  kind: WildlifeKind,
+  memberIds: Iterable<number>,
+  rng: () => number,
+): HuntCasualty | null {
+  const candidates = huntCandidates(state, memberIds);
   const victim = candidates[Math.floor(rng() * candidates.length)];
-  if (!victim) return;
+  if (!victim) return null;
   const deathChance = kind === 'wolf'
     ? CONFIG.specialEvents.wolfHuntDeathChance
     : kind === 'tiger'
@@ -415,7 +473,7 @@ function huntFailure(state: GameState, kind: WildlifeKind, rng: () => number): v
       : 0;
   if (rng() < deathChance) {
     killResident(state, victim, kind === 'tiger' ? '호환' : '늑대 습격');
-    return;
+    return { residentId: victim.id, killed: true };
   }
   const damage = kind === 'wolf'
     ? 24 + Math.floor(rng() * 13)
@@ -424,12 +482,33 @@ function huntFailure(state: GameState, kind: WildlifeKind, rng: () => number): v
       : 18 + Math.floor(rng() * 13);
   victim.health = Math.max(1, victim.health - damage);
   addLog(state, `${victim.name}이(가) ${wildlifeName(kind)} 토벌 중 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
+  return { residentId: victim.id, killed: false, damage };
 }
 
-function resolveWildlifeHunt(state: GameState, kind: WildlifeKind, rng: () => number): void {
-  const readiness = weaponReadiness(state);
-  if (readiness.muskets > 0 && state.resources.gunpowder >= 1) state.resources.gunpowder -= 1;
-  if (rng() < predatorHuntChance(state, kind)) {
+export type WildlifeHuntOutcome = 'victory' | 'defeat';
+
+export interface WildlifeStrategicResult {
+  loot: Partial<Record<ResourceId, number>>;
+  specialItem?: SpecialItemId;
+}
+
+export interface WildlifeHuntResult extends WildlifeStrategicResult {
+  outcome: WildlifeHuntOutcome;
+  chance: number;
+  powderUsed: number;
+  injuredResidentId?: number;
+  injuryDamage?: number;
+  killedResidentId?: number;
+}
+
+export function applyWildlifeHuntOutcome(
+  state: GameState,
+  kind: WildlifeKind,
+  outcome: WildlifeHuntOutcome,
+  rng: () => number,
+): WildlifeStrategicResult {
+  ensureIncidentState(state);
+  if (outcome === 'victory') {
     delete state.incidents.predatorThreats[kind];
     if (kind === 'wolf') {
       const meat = 10 + Math.floor(rng() * 7);
@@ -438,6 +517,7 @@ function resolveWildlifeHunt(state: GameState, kind: WildlifeKind, rng: () => nu
       state.resources.hide += hide;
       state.resources.reputation = Math.min(100, state.resources.reputation + 2);
       addLog(state, `늑대 떼를 토벌했습니다. 고기 ${meat}, 가죽 ${hide}, 명성 +2.`, 'good', true);
+      return { loot: { meat, hide } };
     } else if (kind === 'tiger') {
       const meat = 12 + Math.floor(rng() * 7);
       state.resources.meat += meat;
@@ -445,17 +525,44 @@ function resolveWildlifeHunt(state: GameState, kind: WildlifeKind, rng: () => nu
       state.resources.reputation = Math.min(100, state.resources.reputation + 7);
       discoverItem(state, 'tigerPelt');
       addLog(state, `호랑이를 토벌했습니다. 고기 ${meat}, 가죽 4, 호피 1, 명성 +7.`, 'good', true);
+      return { loot: { meat, hide: 4 }, specialItem: 'tigerPelt' };
     } else {
       const meat = 13 + Math.floor(rng() * 8);
       const hide = 5 + Math.floor(rng() * 4);
       state.resources.meat += meat;
       state.resources.hide += hide;
       addLog(state, `멧돼지 떼를 토벌했습니다. 고기 ${meat}, 가죽 ${hide}.`, 'good', true);
+      return { loot: { meat, hide } };
     }
-    return;
   }
-  huntFailure(state, kind, rng);
   activateWildlifeThreat(state, kind, rng);
+  return { loot: {} };
+}
+
+export function resolveWildlifeHunt(
+  state: GameState,
+  kind: WildlifeKind,
+  memberIds: Iterable<number>,
+  rng: () => number,
+): WildlifeHuntResult | string {
+  ensureIncidentState(state);
+  const members = expeditionResidentsForIds(state, memberIds);
+  if (members.length === 0) return '토벌에 나설 주민이 없습니다.';
+  const ids = members.map(resident => resident.id);
+  const chance = predatorHuntChance(state, kind, ids);
+  const powderUsed = consumeExpeditionPowder(state, ids);
+  const outcome = rng() < chance ? 'victory' : 'defeat';
+  const casualty = outcome === 'defeat' ? huntFailure(state, kind, ids, rng) : null;
+  const strategic = applyWildlifeHuntOutcome(state, kind, outcome, rng);
+  return {
+    ...strategic,
+    outcome,
+    chance,
+    powderUsed,
+    injuredResidentId: casualty && !casualty.killed ? casualty.residentId : undefined,
+    injuryDamage: casualty && !casualty.killed ? casualty.damage : undefined,
+    killedResidentId: casualty?.killed ? casualty.residentId : undefined,
+  };
 }
 
 export function openPredatorHunt(state: GameState, kind: WildlifeKind): string | null {
@@ -474,6 +581,66 @@ export function openPredatorHunt(state: GameState, kind: WildlifeKind): string |
     data: { eventId: 'predator-hunt', predator: kind },
   };
   return null;
+}
+
+export function startPredatorScout(state: GameState, kind: PredatorKind, residentId: number): string | null {
+  ensureIncidentState(state);
+  const threat = state.incidents.predatorThreats[kind];
+  if (!threat) return '현재 추적 중인 맹수가 없습니다.';
+  if (threat.scouting) return '이미 사냥꾼 한 명이 흔적을 쫓고 있습니다.';
+  if (threat.intel?.precision === 'exact') return '이미 맹수 규모를 정확히 파악했습니다.';
+  if (state.battle || state.raiders || state.raidHold) return '습격 대응 중에는 사냥꾼을 추적에 보낼 수 없습니다.';
+  const hunter = availablePredatorScouts(state).find(resident => resident.id === residentId);
+  if (!hunter) return '지금 흔적 추적에 보낼 수 있는 사냥꾼이 아닙니다.';
+
+  const hunterSkill = hunter.skills.hunter ?? 0;
+  const usedGyrfalcon = (state.specialItems?.gyrfalcon ?? 0) > 0;
+  const duration = predatorScoutDuration(hunterSkill, usedGyrfalcon);
+  const completesOnDay = state.day + duration;
+  if (completesOnDay > threat.untilDay) return '흔적이 사라지기 전에 정찰을 마칠 시간이 부족합니다.';
+
+  threat.scouting = {
+    residentId: hunter.id,
+    startedDay: state.day,
+    completesOnDay,
+    hunterSkill,
+    usedGyrfalcon,
+  };
+  hunter.path = [];
+  hunter.manualOrder = null;
+  hunter.task = `${kind === 'wolf' ? '늑대' : '호랑이'} 흔적 추적 출발`;
+  addLog(
+    state,
+    `${hunter.name}이(가) ${kind === 'wolf' ? '늑대 떼' : '호랑이'}의 흔적을 쫓으러 떠났습니다. ${duration}일 뒤 규모를 보고합니다.` +
+      (usedGyrfalcon ? ' 해동청도 함께 띄웠습니다.' : ''),
+    'info',
+    true,
+  );
+  return null;
+}
+
+function openPredatorScoutSelection(state: GameState, kind: PredatorKind): void {
+  const usedGyrfalcon = (state.specialItems?.gyrfalcon ?? 0) > 0;
+  const scouts = availablePredatorScouts(state);
+  state.pendingChoice = {
+    kind: 'incident',
+    title: `${kind === 'wolf' ? '늑대 떼' : '호랑이'} 흔적 추적`,
+    body: '흔적을 쫓을 사냥꾼을 고르십시오. 숙련된 사냥꾼은 더 빨리 돌아오며, 해동청이 있으면 추적 기간과 정보 정확도가 좋아집니다.',
+    illustration: wildlifeIllustration(kind),
+    options: [
+      ...scouts.map(scout => {
+        const skill = scout.skills.hunter ?? 0;
+        const duration = predatorScoutDuration(skill, usedGyrfalcon);
+        return {
+          id: `scout:${scout.id}`,
+          label: `${scout.name}을(를) 보낸다`,
+          desc: `사냥 숙련 ${Math.round(skill * 100)}% · ${duration}일 소요${usedGyrfalcon ? ' · 해동청 동행' : ''}`,
+        };
+      }),
+      { id: 'cancel-scout', label: '나중에 정한다', desc: '맹수 위협은 유지되며 사건 탭에서 다시 추적을 지시할 수 있습니다.' },
+    ],
+    data: { eventId: 'predator-scout-select', predator: kind },
+  };
 }
 
 function resolveGinseng(state: GameState, optionId: string): void {
@@ -635,12 +802,31 @@ export function resolveSpecialEvent(state: GameState, optionId: string, rng: () 
   if (eventId === 'earlyFrost') return resolveEarlyFrost(state, optionId, choice.data.targetBuildingId as number, rng);
   if (eventId === 'gyrfalcon') return resolveGyrfalcon(state, optionId);
   if (!wildlife) return;
+  if (eventId === 'predator-scout-select') {
+    if ((wildlife === 'wolf' || wildlife === 'tiger') && optionId.startsWith('scout:')) {
+      const error = startPredatorScout(state, wildlife, Number(optionId.slice('scout:'.length)));
+      if (error) addLog(state, error, 'info', true);
+    }
+    return;
+  }
   if (eventId === 'predator-hunt') {
-    if (optionId === 'hunt') resolveWildlifeHunt(state, wildlife, rng);
+    if (optionId === 'hunt') {
+      const memberIds = huntCandidates(state).map(resident => resident.id);
+      resolveWildlifeHunt(state, wildlife, memberIds, rng);
+    }
     return;
   }
   if (optionId === 'hunt-now') {
-    resolveWildlifeHunt(state, wildlife, rng);
+    if (wildlife === 'boar') {
+      const memberIds = huntCandidates(state).map(resident => resident.id);
+      resolveWildlifeHunt(state, wildlife, memberIds, rng);
+    } else {
+      activateWildlifeThreat(state, wildlife, rng);
+      addLog(state, `${wildlifeName(wildlife)} 토벌대를 소집합니다. 출정 인원과 무장을 정해야 합니다.`, 'info', true);
+    }
+  } else if (optionId === 'track-first' && (wildlife === 'wolf' || wildlife === 'tiger')) {
+    activateWildlifeThreat(state, wildlife, rng);
+    openPredatorScoutSelection(state, wildlife);
   } else if (optionId === 'prepare' || optionId === 'leave') {
     activateWildlifeThreat(state, wildlife, rng);
   } else if (wildlife === 'wolf' && optionId === 'bait' && state.resources.meat >= CONFIG.specialEvents.wolfBaitMeat) {
@@ -662,7 +848,9 @@ export function resolveSpecialEvent(state: GameState, optionId: string, rng: () 
 }
 
 function forestResidents(state: GameState): Resident[] {
-  return livingResidents(state).filter(resident => state.map[resident.y]?.[resident.x]?.terrain === 'forest');
+  const scouts = activePredatorScoutIds(state);
+  return livingResidents(state).filter(resident =>
+    !scouts.has(resident.id) && state.map[resident.y]?.[resident.x]?.terrain === 'forest');
 }
 
 function predatorEncounter(state: GameState, kind: 'wolf' | 'tiger', candidates: Resident[], rng: () => number): void {
@@ -773,8 +961,43 @@ function updateEpidemic(state: GameState, rng: () => number): void {
   }
 }
 
+function updatePredatorScouting(state: GameState): void {
+  for (const kind of ['wolf', 'tiger'] as const) {
+    const threat = state.incidents.predatorThreats[kind];
+    const scouting = threat?.scouting;
+    if (!threat || !scouting) continue;
+    const hunter = state.residents.find(resident => resident.id === scouting.residentId && resident.alive);
+    if (!hunter) {
+      delete threat.scouting;
+      addLog(state, `${kind === 'wolf' ? '늑대' : '호랑이'} 흔적을 쫓던 사냥꾼에게서 보고가 오지 않습니다.`, 'bad', true);
+      continue;
+    }
+    if (state.day < scouting.completesOnDay) continue;
+
+    const exact = scouting.hunterSkill >= 0.72 ||
+      (scouting.usedGyrfalcon && scouting.hunterSkill >= 0.35);
+    threat.intel = {
+      precision: exact ? 'exact' : 'rough',
+      revealedDay: state.day,
+      scoutResidentId: scouting.residentId,
+      hunterSkill: scouting.hunterSkill,
+      usedGyrfalcon: scouting.usedGyrfalcon,
+    };
+    delete threat.scouting;
+    hunter.task = '흔적 추적 보고 후 귀환';
+    addLog(
+      state,
+      `${hunter.name}이(가) ${kind === 'wolf' ? '늑대 떼' : '호랑이'}의 흔적을 쫓고 돌아왔습니다. ` +
+        `적 규모를 ${exact ? '정확히' : '대략'} 파악했습니다.`,
+      exact ? 'good' : 'info',
+      true,
+    );
+  }
+}
+
 export function updateSpecialEvents(state: GameState, rng: () => number): void {
   ensureIncidentState(state);
+  updatePredatorScouting(state);
   for (const kind of ['wolf', 'tiger', 'boar'] as const) {
     const threat = state.incidents.predatorThreats[kind];
     if (!threat) continue;

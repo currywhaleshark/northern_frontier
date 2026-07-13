@@ -100,6 +100,19 @@ export interface RaiderDrawParams {
   faction?: string;
 }
 
+export interface ExpeditionDrawParams {
+  x: number;
+  y: number;
+  members: Array<{
+    job: JobId;
+    gender: Gender;
+    militiaWeapon?: MilitiaWeaponSpriteId;
+  }>;
+  total: number;
+  moving?: boolean;
+  facing?: 1 | -1;
+}
+
 export interface BuildingDamageDrawParams {
   season: Season;
   x: number;
@@ -114,6 +127,7 @@ export interface SpriteAPI {
   drawBuildingDamage(ctx: CanvasRenderingContext2D, p: BuildingDamageDrawParams): void;
   drawForeignStructure(ctx: CanvasRenderingContext2D, p: ForeignStructureDrawParams): boolean;
   drawResident(ctx: CanvasRenderingContext2D, p: ResidentDrawParams): void;
+  drawExpedition(ctx: CanvasRenderingContext2D, p: ExpeditionDrawParams): void;
   drawRaiders(ctx: CanvasRenderingContext2D, p: RaiderDrawParams): void;
 }
 
@@ -219,6 +233,35 @@ export const placeholderSprites: SpriteAPI = {
       ctx.arc(p.x, p.y, 5.5, 0, Math.PI * 2);
       ctx.stroke();
       ctx.lineWidth = 1;
+    }
+  },
+
+  drawExpedition(ctx, p) {
+    const visible = Math.min(p.members.length, 5);
+    for (let i = 0; i < visible; i++) {
+      const member = p.members[i];
+      const ox = ((i * 17) % 11 - 5) * 1.25;
+      const oy = ((i * 29) % 9 - 4) * 1.1;
+      ctx.fillStyle = JOB_COLORS[member.job];
+      ctx.beginPath();
+      ctx.arc(p.x + ox, p.y + oy, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#1f3f5d';
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#324c62';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(p.x + 7, p.y + 4);
+    ctx.lineTo(p.x + 7, p.y - 13);
+    ctx.stroke();
+    ctx.fillStyle = '#4f83a8';
+    ctx.fillRect(p.x + 8, p.y - 13, 9, 6);
+    if (p.total > visible) {
+      ctx.fillStyle = '#dfeaf2';
+      ctx.font = 'bold 8px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(String(p.total), p.x, p.y - 11);
     }
   },
 

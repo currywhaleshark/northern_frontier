@@ -1,5 +1,5 @@
 import { resetAgent } from './agents';
-import { countBuilt, militiaWeaponAllocation } from './buildings';
+import { countBuilt } from './buildings';
 import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
@@ -10,6 +10,7 @@ import {
 import { changeRelation } from './relations';
 import { livingResidents } from './residents';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
+import { assignedWeapon, synchronizeWeaponAssignments } from './weapons';
 import type {
   DefenderGroupKind,
   GameState,
@@ -142,6 +143,7 @@ function group(
   residentIds: number[],
   zoneId: string,
   suffix = '',
+  powerOverride?: number,
 ): TacticalDefenderGroup | null {
   if (residentIds.length === 0) return null;
   return {
@@ -152,7 +154,7 @@ function group(
     count: residentIds.length,
     zoneId,
     command: null,
-    power: residentIds.length * GROUP_POWER[kind],
+    power: powerOverride ?? residentIds.length * GROUP_POWER[kind],
     wounded: 0,
     killed: 0,
     line: defaultFormationLine(kind),
@@ -161,21 +163,26 @@ function group(
 }
 
 function defenderGroups(state: GameState, mode: TacticalBattle['mode']): TacticalDefenderGroup[] {
-  const combatReady = state.residents.filter(healthy);
+  synchronizeWeaponAssignments(state);
+  const away = new Set(state.expedition?.memberIds ?? []);
+  const combatReady = state.residents.filter(resident => healthy(resident) && !away.has(resident.id));
   const militia = combatReady.filter(resident => resident.job === 'militia').sort((a, b) => a.id - b.id);
-  const allocation = militiaWeaponAllocation(state);
-  let cursor = 0;
-  const muskets = militia.slice(cursor, cursor += allocation.muskets).map(resident => resident.id);
-  const bows = militia.slice(cursor, cursor += allocation.hornBows).map(resident => resident.id);
-  const spears = militia.slice(cursor, cursor += allocation.spears).map(resident => resident.id);
-  const unarmedMilitia = militia.slice(cursor).map(resident => resident.id);
+  const muskets = militia
+    .filter(resident => assignedWeapon(state, resident.id) === 'musket' && state.resources.gunpowder > 0)
+    .map(resident => resident.id);
+  const bows = militia.filter(resident => assignedWeapon(state, resident.id) === 'hornBow').map(resident => resident.id);
+  const spears = militia.filter(resident => assignedWeapon(state, resident.id) === 'spear').map(resident => resident.id);
+  const armedMilitia = new Set([...muskets, ...bows, ...spears]);
+  const unarmedMilitia = militia.filter(resident => !armedMilitia.has(resident.id)).map(resident => resident.id);
   const used = new Set(militia.map(resident => resident.id));
 
-  const watchmen = combatReady.filter(resident => resident.job === 'watchman').map(resident => resident.id);
-  const hunters = combatReady.filter(resident => resident.job === 'hunter').map(resident => resident.id);
+  const watchmanResidents = combatReady.filter(resident => resident.job === 'watchman');
+  const hunterResidents = combatReady.filter(resident => resident.job === 'hunter');
+  const watchmen = watchmanResidents.map(resident => resident.id);
+  const hunters = hunterResidents.map(resident => resident.id);
   for (const id of [...watchmen, ...hunters]) used.add(id);
 
-  const others = state.residents.filter(resident => resident.alive && !used.has(resident.id));
+  const others = state.residents.filter(resident => resident.alive && !away.has(resident.id) && !used.has(resident.id));
   const levyCandidates = others.filter(healthy);
   const levyCount = mode === 'levy' ? Math.ceil(levyCandidates.length * 0.65) : 0;
   const levyIds = levyCandidates.slice(0, levyCount).map(resident => resident.id);
@@ -187,8 +194,28 @@ function defenderGroups(state: GameState, mode: TacticalBattle['mode']): Tactica
     group('militia-bow', bows, 'wall'),
     group('militia-spear', spears, 'wall'),
     group('militia-unarmed', [...unarmedMilitia, ...levyIds], mode === 'levy' ? 'storehouse' : 'wall'),
-    group('watchman', watchmen, 'wall'),
-    group('hunter', hunters, 'approach'),
+    group('watchman', watchmen, 'wall', '', watchmanResidents.reduce((sum, resident) => {
+      const weapon = assignedWeapon(state, resident.id);
+      const power = weapon === 'musket' && state.resources.gunpowder > 0
+        ? GROUP_POWER['militia-musket']
+        : weapon === 'hornBow'
+          ? GROUP_POWER['militia-bow']
+          : weapon === 'spear'
+            ? GROUP_POWER['militia-spear']
+            : GROUP_POWER.watchman;
+      return sum + power;
+    }, 0)),
+    group('hunter', hunters, 'approach', '', hunterResidents.reduce((sum, resident) => {
+      const weapon = assignedWeapon(state, resident.id);
+      const power = weapon === 'musket' && state.resources.gunpowder > 0
+        ? GROUP_POWER['militia-musket']
+        : weapon === 'hornBow'
+          ? GROUP_POWER['militia-bow']
+          : weapon === 'spear'
+            ? GROUP_POWER['militia-spear']
+            : GROUP_POWER.hunter;
+      return sum + power;
+    }, 0)),
     group('civilian', civilianIds, 'center'),
   ].filter((candidate): candidate is TacticalDefenderGroup => candidate != null);
 }
@@ -198,7 +225,9 @@ function preparationPoints(state: GameState, warned: boolean): number {
   let points = warned ? prep.warned : prep.surpriseBase;
   points += countBuilt(state, 'beacon') > 0 ? prep.beacon : 0;
   points += Math.min(prep.watchtowerMax, countBuilt(state, 'watchtower'));
-  const watchmen = state.residents.filter(resident => resident.alive && resident.job === 'watchman').length;
+  const away = new Set(state.expedition?.memberIds ?? []);
+  const watchmen = state.residents.filter(resident =>
+    resident.alive && resident.job === 'watchman' && !away.has(resident.id)).length;
   points += Math.min(prep.watchmenMax, Math.floor(watchmen / prep.watchmenPerPoint));
   if (state.weather === 'blizzard' || state.weather === 'coldSnap') points -= prep.severeWeatherPenalty;
   return clamp(points, 0, prep.max);

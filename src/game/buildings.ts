@@ -1,6 +1,8 @@
 // 건물 정의와 배치/방어 관련 헬퍼
 import { CONFIG } from './config';
 import { rankAtLeast } from './constants';
+import { residentDefenseContribution, synchronizeWeaponAssignments, weaponCountsForResidents } from './weapons';
+import { activePredatorScoutIds } from './expeditionIntel';
 import type { Building, BuildingDef, BuildingTypeId, GameState, Rank, ResourceId, SmithyProductId, Tile } from './types';
 
 export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
@@ -471,9 +473,13 @@ export function housingCapacity(state: GameState): { total: number; ondol: numbe
   return { total, ondol };
 }
 
-// 조총으로 무장 가능한 수비병 수 — 화약이 없으면 냉병기로 환원된다
+// 실제로 조총을 배정받아 사격 가능한 전투원 수.
 export function armedMusketeers(state: GameState): number {
-  return militiaWeaponAllocation(state).muskets;
+  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
+  const combatants = state.residents.filter(resident =>
+    resident.alive && !away.has(resident.id) &&
+    (resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter'));
+  return weaponCountsForResidents(state, combatants).readyMuskets;
 }
 
 export interface MilitiaWeaponAllocation {
@@ -484,33 +490,39 @@ export interface MilitiaWeaponAllocation {
 }
 
 export function militiaWeaponAllocation(state: GameState): MilitiaWeaponAllocation {
-  const militia = state.residents.filter(r => r.alive && r.job === 'militia').length;
-  const muskets = state.resources.gunpowder > 0
-    ? Math.min(militia, Math.floor(state.resources.muskets))
-    : 0;
-  let remaining = militia - muskets;
-  const hornBows = Math.min(remaining, Math.floor(state.resources.hornBows));
-  remaining -= hornBows;
-  const spears = Math.min(remaining, Math.floor(state.resources.spears));
-  remaining -= spears;
-  return { muskets, hornBows, spears, unarmed: remaining };
+  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
+  const militia = state.residents.filter(resident =>
+    resident.alive && resident.job === 'militia' && !away.has(resident.id));
+  const counts = weaponCountsForResidents(state, militia);
+  // 탄약 없는 조총수는 배정을 유지하지만 현재 전투 계산에서는 비무장 수비병으로 취급한다.
+  return {
+    muskets: counts.readyMuskets,
+    hornBows: counts.hornBows,
+    spears: counts.spears,
+    unarmed: counts.unarmed + (counts.muskets - counts.readyMuskets),
+  };
 }
 
-// 방어도 = 건물 + 파수꾼 + 수비병 (조총 무장 수비병은 기여가 크다)
-export function computeDefense(state: GameState): number {
+// 방어도 = 건물 + 마을에 남은 전투원의 직업·실제 배정 무기.
+export function computeDefense(
+  state: GameState,
+  options: { includeExpedition?: boolean; excludedResidentIds?: Iterable<number> } = {},
+): number {
+  synchronizeWeaponAssignments(state);
+  const away = options.includeExpedition ? new Set<number>() : new Set(state.expedition?.memberIds ?? []);
+  for (const residentId of activePredatorScoutIds(state)) away.add(residentId);
+  for (const residentId of options.excludedResidentIds ?? []) away.add(residentId);
   let d = 0;
   for (const b of state.buildings) {
     if (b.built) d += BUILDING_DEFS[b.type].defense;
   }
-  const watchmen = state.residents.filter(r => r.alive && r.job === 'watchman').length;
-  d += watchmen * CONFIG.raid.watchmanDefense;
   const garrisonMult = countBuilt(state, 'garrison') > 0 ? 1.3 : 1;
-  const armed = militiaWeaponAllocation(state);
-  d += Math.round(
-    (armed.muskets * CONFIG.raid.musketDefense +
-      armed.hornBows * CONFIG.raid.hornBowDefense +
-      armed.spears * CONFIG.raid.spearDefense +
-      armed.unarmed * CONFIG.raid.militiaDefense) * garrisonMult,
-  );
+  let peopleDefense = 0;
+  for (const resident of state.residents) {
+    if (!resident.alive || away.has(resident.id)) continue;
+    if (resident.job !== 'militia' && resident.job !== 'watchman' && resident.job !== 'hunter') continue;
+    peopleDefense += residentDefenseContribution(state, resident, state.weaponAssignments[resident.id] ?? null);
+  }
+  d += Math.round(peopleDefense * garrisonMult);
   return Math.round(d);
 }

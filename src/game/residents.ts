@@ -300,11 +300,12 @@ export function updateResidentNeeds(
   clothesCoverage: number, // 0~1, 옷 보급률
   dietVarietyScore: number, // 0~1, 그날 먹은 식품군 다양성
   vegetableRatio: number,   // 0~1, 권장 채소 몫 충족률
+  excludedResidentIds: ReadonlySet<number> = new Set(),
 ): void {
   const cfg = CONFIG.needs;
   const hcfg = CONFIG.health;
   const season = getSeason(state.day);
-  const living = livingResidents(state);
+  const living = livingResidents(state).filter(resident => !excludedResidentIds.has(resident.id));
   reconcileResidentHomes(state, rng);
 
   for (const r of living) {

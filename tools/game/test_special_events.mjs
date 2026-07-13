@@ -79,8 +79,9 @@ const tribute = await import(pathToFileURL(join(compiledDir, 'courtTribute.mjs')
   assert.equal(specialEvents.maybeOpenSpecialEvent(state, () => 0), true);
   assert.equal(state.pendingChoice?.data.eventId, 'tiger');
   specialEvents.resolveSpecialEvent(state, 'hunt-now', () => 0);
-  assert.equal(state.specialItems.tigerPelt, 1);
-  assert.ok(state.discoveredSpecialItems.includes('tigerPelt'));
+  assert.ok(state.incidents.predatorThreats.tiger, 'initial tiger hunt now prepares an expedition threat');
+  assert.equal(state.specialItems.tigerPelt, 0, 'initial choice no longer resolves combat immediately');
+  assert.ok(!state.discoveredSpecialItems.includes('tigerPelt'));
 }
 
 {

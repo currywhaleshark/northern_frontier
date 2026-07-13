@@ -18,8 +18,10 @@ import { LUXURY_RESOURCES } from '../game/resourceCatalog';
 import { tributeReserved } from '../game/tributeReserve';
 import { residentHome } from '../game/residents';
 import { predatorHuntChance } from '../game/specialEvents';
+import { availablePredatorScouts, predatorScoutDuration } from '../game/expeditionIntel';
 import { SPECIAL_ITEM_DEFS } from '../game/specialItems';
 import { foreignSiteAt } from '../game/foreignSites';
+import { COMBAT_WEAPON_NAMES } from '../game/weapons';
 import type { SiteGiftType } from '../game/siteDiplomacy';
 import type { GameState, JobId, Resident, ResourceId, SmithyProductId, SpecialItemId, WildlifeKind } from '../game/types';
 import { FactionName } from './FactionName';
@@ -40,11 +42,13 @@ interface Props {
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
   onDemolishBuilding: (x: number, y: number) => void;
   onOrganizeHunt: (kind: WildlifeKind) => void;
+  onScoutPredator: (kind: 'wolf' | 'tiger', residentId: number) => void;
   onSendSiteGift: (siteId: number, gift: SiteGiftType) => void;
   onRequestSitePassage: (siteId: number) => void;
   onRequestSiteHunting: (siteId: number) => void;
   onScoutBanditLair: (siteId: number) => void;
   onRaidBanditLair: (siteId: number) => void;
+  onOpenWeaponAllocation: () => void;
   tab: InspectorTab;
   setTab: (t: InspectorTab) => void;
   residentId: number | null;
@@ -59,7 +63,11 @@ function Bar({ value, color }: { value: number; color: string }) {
   );
 }
 
-function IncidentsTab({ state, onOrganizeHunt }: { state: GameState; onOrganizeHunt: (kind: WildlifeKind) => void }) {
+function IncidentsTab({ state, onOrganizeHunt, onScoutPredator }: {
+  state: GameState;
+  onOrganizeHunt: (kind: WildlifeKind) => void;
+  onScoutPredator: (kind: 'wolf' | 'tiger', residentId: number) => void;
+}) {
   const threats = (['wolf', 'tiger', 'boar'] as const)
     .map(kind => state.incidents.predatorThreats[kind])
     .filter(threat => threat != null);
@@ -74,6 +82,14 @@ function IncidentsTab({ state, onOrganizeHunt }: { state: GameState; onOrganizeH
         const kind = threat.kind;
         const tiger = kind === 'tiger';
         const boar = kind === 'boar';
+        const scouts = boar ? [] : availablePredatorScouts(state);
+        const intel = threat.intel;
+        const success = Math.round(predatorHuntChance(state, kind) * 100);
+        const successLabel = boar || intel?.precision === 'exact'
+          ? `${success}%`
+          : intel?.precision === 'rough'
+            ? `약 ${Math.round(success / 5) * 5}%`
+            : '???';
         return (
           <div key={kind} className={`incident-threat ${tiger ? 'danger' : 'warn'}`}>
             <div>
@@ -84,9 +100,50 @@ function IncidentsTab({ state, onOrganizeHunt }: { state: GameState; onOrganizeH
               {tiger ? '낮에는 숲, 밤에는 모든 주민이 위험' : boar ? '밤마다 농작물과 저장 식량이 위험' : '숲에 드나드는 주민이 위험'}
             </div>
             <div className="incident-hunt-row">
-              <span>예상 성공 {Math.round(predatorHuntChance(state, kind) * 100)}%</span>
-              <button className="btn small" type="button" onClick={() => onOrganizeHunt(kind)}>토벌대 조직</button>
+              <span>예상 성공 {successLabel}</span>
+              <button className="btn small" type="button" onClick={() => onOrganizeHunt(kind)}>
+                {boar ? '토벌 준비' : '즉시 토벌'}
+              </button>
             </div>
+            {!boar && (
+              <div className="incident-scout-box">
+                {threat.scouting ? (
+                  <div>
+                    <strong>흔적 추적 중</strong>
+                    <span>
+                      {state.residents.find(resident => resident.id === threat.scouting?.residentId)?.name ?? '사냥꾼'} ·
+                      {' '}{Math.max(0, threat.scouting.completesOnDay - state.day)}일 남음
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <strong>규모 정보 {intel?.precision === 'exact' ? '정확' : intel?.precision === 'rough' ? '대략' : '???'}</strong>
+                      <span>{intel ? '더 숙련된 사냥꾼으로 재추적할 수 있습니다.' : '사냥꾼을 며칠간 보내 흔적을 쫓습니다.'}</span>
+                    </div>
+                    {intel?.precision !== 'exact' && (
+                      <select
+                        defaultValue=""
+                        aria-label={`${tiger ? '호랑이' : '늑대'} 흔적을 쫓을 사냥꾼`}
+                        disabled={scouts.length === 0}
+                        onChange={event => {
+                          const residentId = Number(event.target.value);
+                          if (residentId) onScoutPredator(kind, residentId);
+                          event.currentTarget.value = '';
+                        }}
+                      >
+                        <option value="">{scouts.length > 0 ? '사냥꾼 선택…' : '파견 가능 사냥꾼 없음'}</option>
+                        {scouts.map(scout => {
+                          const skill = scout.skills.hunter ?? 0;
+                          const days = predatorScoutDuration(skill, (state.specialItems.gyrfalcon ?? 0) > 0);
+                          return <option key={scout.id} value={scout.id}>{scout.name} · 숙련 {Math.round(skill * 100)}% · {days}일</option>;
+                        })}
+                      </select>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
@@ -337,6 +394,14 @@ function ResidentDetail({ state, r, rank, onSetJob, onToggleCart }: {
             </td>
           </tr>
         )}
+        {r.alive && (r.job === 'militia' || r.job === 'watchman' || r.job === 'hunter') && (
+          <tr>
+            <td>전투 무기</td>
+            <td>{state.weaponAssignments[r.id]
+              ? COMBAT_WEAPON_NAMES[state.weaponAssignments[r.id]!]
+              : '비무장'}</td>
+          </tr>
+        )}
         <tr><td>현재 작업</td><td>{r.task}</td></tr>
         {r.alive && (
           <tr>
@@ -369,8 +434,9 @@ function ResidentDetail({ state, r, rank, onSetJob, onToggleCart }: {
 
 export function InspectorPanel({
   state, selected, onSetResidentJob, onToggleResidentCart, onRequestTrade, onPetition, onToggleNitre, onSetSmithyProduct,
-  onSetTributeReserve, onUseLuxuryGood, onDemolishBuilding, onOrganizeHunt, tab, setTab, residentId, setResidentId,
+  onSetTributeReserve, onUseLuxuryGood, onDemolishBuilding, onOrganizeHunt, onScoutPredator, tab, setTab, residentId, setResidentId,
   onSendSiteGift, onRequestSitePassage, onRequestSiteHunting, onScoutBanditLair, onRaidBanditLair,
+  onOpenWeaponAllocation,
 }: Props) {
   const tile = selected ? state.map[selected.y]?.[selected.x] : null;
   const explored = tile ? isExplored(state, tile.x, tile.y) : false;
@@ -388,7 +454,9 @@ export function InspectorPanel({
         <span style={{ cursor: 'pointer', opacity: tab === 'incidents' ? 1 : 0.5 }} onClick={() => setTab('incidents')}>사건</span>
       </div>
 
-      {tab === 'incidents' && <IncidentsTab state={state} onOrganizeHunt={onOrganizeHunt} />}
+      {tab === 'incidents' && (
+        <IncidentsTab state={state} onOrganizeHunt={onOrganizeHunt} onScoutPredator={onScoutPredator} />
+      )}
 
       {tab === 'court' && (
         <CourtTab
@@ -635,20 +703,27 @@ export function InspectorPanel({
               />
             </>
           ) : (
-            <div style={{ maxHeight: 260, overflowY: 'auto' }}>
-              {state.residents.map(r => (
-                <div
-                  key={r.id}
-                  className={`resident-row${r.alive ? '' : ' dead'}`}
-                  onClick={() => r.alive && setResidentId(r.id)}
-                >
-                  <span>{r.name}{r.sick ? ' 🤒' : ''}{state.day < (r.quarantinedUntil ?? 0) ? ' · 격리' : ''}</span>
-                  <span className="muted">{r.alive
-                    ? `${r.cartEquipped ? '🛒 ' : ''}${JOB_NAMES[r.job]}`
-                    : '사망'}</span>
-                </div>
-              ))}
-            </div>
+            <>
+              <button type="button" className="btn small weapon-allocation-open" onClick={onOpenWeaponAllocation}>
+                ⚔ 병기고 무기 배분
+              </button>
+              <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                {state.residents.map(r => (
+                  <div
+                    key={r.id}
+                    className={`resident-row${r.alive ? '' : ' dead'}`}
+                    onClick={() => r.alive && setResidentId(r.id)}
+                  >
+                    <span>{r.name}{r.sick ? ' 🤒' : ''}{state.day < (r.quarantinedUntil ?? 0) ? ' · 격리' : ''}</span>
+                    <span className="muted">{r.alive
+                      ? `${r.cartEquipped ? '🛒 ' : ''}${JOB_NAMES[r.job]}${state.weaponAssignments[r.id]
+                        ? ` · ${COMBAT_WEAPON_NAMES[state.weaponAssignments[r.id]!]}`
+                        : ''}`
+                      : '사망'}</span>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       )}

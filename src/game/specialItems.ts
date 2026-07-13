@@ -22,7 +22,7 @@ export const SPECIAL_ITEM_DEFS: Record<SpecialItemId, {
   gyrfalcon: {
     name: '해동청',
     icon: '鷹',
-    desc: '북방의 귀한 매. 기물함에 두면 습격 무리를 더 일찍 발견할 수 있습니다.',
+    desc: '북방의 귀한 매. 습격 무리를 더 일찍 발견하고 맹수 토벌의 규모 파악을 돕습니다.',
     tradeValue: 0,
   },
 };

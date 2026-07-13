@@ -5,6 +5,10 @@ import { addForeignSiteMemory, isForeignSiteOperational } from './foreignSites';
 import { changeRelation, getRelation } from './relations';
 import { revealPassageRoute } from './passage';
 import { livingResidents } from './residents';
+import {
+  consumeExpeditionPowder, expeditionCombatPower, expeditionResidentsForIds,
+} from './expedition';
+import { weaponCountsForResidents } from './weapons';
 import type { ForeignSite, GameState, ResourceId } from './types';
 
 export type SiteGiftType = 'grain' | 'hide' | 'tools';
@@ -115,8 +119,12 @@ export function requestHuntingRights(state: GameState, siteId: number): string |
   return null;
 }
 
-function fieldTeam(state: GameState) {
-  const available = livingResidents(state).filter(resident => state.day >= (resident.quarantinedUntil ?? 0) && !resident.sick);
+function fieldTeam(state: GameState, memberIds?: Iterable<number>) {
+  const away = new Set(state.expedition?.memberIds ?? []);
+  const selected = memberIds ? new Set(memberIds) : null;
+  const available = livingResidents(state).filter(resident =>
+    (selected ? selected.has(resident.id) : !away.has(resident.id)) &&
+    state.day >= (resident.quarantinedUntil ?? 0) && !resident.sick && resident.health >= 20);
   const hunters = available.filter(resident => resident.job === 'hunter').length;
   const watchmen = available.filter(resident => resident.job === 'watchman').length;
   const militia = available.filter(resident => resident.job === 'militia').length;
@@ -153,20 +161,27 @@ export function scoutBanditLair(state: GameState, siteId: number, rng: () => num
   return '정찰대가 발각되었습니다. 산채의 경계가 강화되고 전역 위협이 높아졌습니다.';
 }
 
-export function raidBanditLair(state: GameState, siteId: number, rng: () => number): string | null {
+export type BanditLairOutcome = 'victory' | 'defeat' | 'withdrawal';
+
+export interface BanditLairAssaultResult {
+  outcome: Exclude<BanditLairOutcome, 'withdrawal'>;
+  chance: number;
+  powderUsed: number;
+  injuredResidentId?: number;
+  injuryDamage?: number;
+  loot: Partial<Record<ResourceId, number>>;
+}
+
+export function applyBanditLairOutcome(
+  state: GameState,
+  siteId: number,
+  outcome: BanditLairOutcome,
+): string | null {
   const site = getSite(state, siteId);
   if (!site || site.type !== 'banditLair') return '정주 부락은 공격 대상이 아닙니다.';
   if (!isForeignSiteOperational(site)) return '이미 비어 있거나 불탄 산채입니다.';
-  if (state.battle || state.raiders) return '습격에 대응 중에는 산채 토벌대를 보낼 수 없습니다.';
-  const team = fieldTeam(state);
-  const muskets = Math.min(team.militia + team.watchmen, Math.floor(state.resources.muskets));
-  const armed = Math.min(team.hunters + team.watchmen + team.militia, Math.floor(state.resources.spears + state.resources.hornBows));
-  const chance = Math.max(0.1, Math.min(0.9,
-    0.18 + state.resources.defense / 240 + team.militia * 0.07 + team.watchmen * 0.045 +
-    team.hunters * 0.04 + muskets * 0.08 + armed * 0.018 - site.militaryPower / 180));
-  if (muskets > 0 && state.resources.gunpowder >= 1) state.resources.gunpowder -= 1;
   site.lastInteractionDay = state.day;
-  if (rng() < chance) {
+  if (outcome === 'victory') {
     site.status = 'burned';
     site.alarm = 100;
     state.threat = Math.max(0, state.threat - 25);
@@ -181,16 +196,82 @@ export function raidBanditLair(state: GameState, siteId: number, rng: () => numb
     addLog(state, `변경 마적 산채를 토벌했습니다. 곡물 8, 가죽 6, 도구 2, 명성 +5. 한동안 산채발 습격이 줄어듭니다.`, 'good', true);
     return null;
   }
+  if (outcome === 'withdrawal') {
+    site.alarm = Math.min(100, site.alarm + 10);
+    addForeignSiteMemory(state, site.id, '개척지 토벌대가 교전을 피하고 물러났습니다.', 'neutral');
+    addLog(state, '토벌대가 산채 공격을 중지하고 철수했습니다. 산채의 경계가 높아집니다.', 'info', true);
+    return null;
+  }
   site.status = 'fortified';
   site.alarm = 100;
   state.threat = Math.min(100, state.threat + 12);
-  const candidates = team.available.filter(resident => resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter');
-  const victim = (candidates.length > 0 ? candidates : team.available)[Math.floor(rng() * Math.max(1, candidates.length || team.available.length))];
+  addForeignSiteMemory(state, site.id, '산채가 개척지 토벌대를 물리치고 방비를 강화했습니다.', 'bad');
+  addLog(state, '산채 토벌에 실패했습니다. 변경 마적의 보복 움직임으로 전역 위협이 높아졌습니다.', 'bad', true);
+  return null;
+}
+
+export function resolveBanditLairAssault(
+  state: GameState,
+  siteId: number,
+  memberIds: Iterable<number>,
+  rng: () => number,
+): BanditLairAssaultResult | string {
+  const site = getSite(state, siteId);
+  if (!site || site.type !== 'banditLair') return '정주 부락은 공격 대상이 아닙니다.';
+  if (!site.discovered) return '위치를 확인한 산채만 토벌할 수 있습니다.';
+  if (!isForeignSiteOperational(site)) return '이미 비어 있거나 불탄 산채입니다.';
+  const members = expeditionResidentsForIds(state, memberIds).filter(resident =>
+    resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter');
+  if (members.length < 2) return '교전할 수 있는 토벌대원이 부족합니다.';
+  const ids = members.map(resident => resident.id);
+  const chance = banditLairRaidChance(state, siteId, ids);
+  const powderUsed = consumeExpeditionPowder(state, ids);
+  const outcome = rng() < chance ? 'victory' : 'defeat';
+  const applyError = applyBanditLairOutcome(state, siteId, outcome);
+  if (applyError) return applyError;
+  const result: BanditLairAssaultResult = {
+    outcome,
+    chance,
+    powderUsed,
+    loot: outcome === 'victory' ? { grain: 8, hide: 6, tools: 2 } : {},
+  };
+  if (outcome === 'victory') return result;
+  const victim = members[Math.floor(rng() * members.length)];
   if (victim) {
     const damage = 24 + Math.floor(rng() * 25);
     victim.health = Math.max(1, victim.health - damage);
+    result.injuredResidentId = victim.id;
+    result.injuryDamage = damage;
     addLog(state, `${victim.name}이(가) 산채 토벌 실패로 중상을 입었습니다. (건강 -${damage})`, 'bad', true);
   }
-  addForeignSiteMemory(state, site.id, '산채가 개척지 토벌대를 물리치고 방비를 강화했습니다.', 'bad');
-  return '산채 토벌에 실패했습니다. 변경 마적의 보복 움직임으로 전역 위협이 높아졌습니다.';
+  return result;
+}
+
+export function raidBanditLair(state: GameState, siteId: number, rng: () => number): string | null {
+  if (state.battle || state.raiders) return '습격에 대응 중에는 산채 토벌대를 보낼 수 없습니다.';
+  const team = fieldTeam(state);
+  const combatants = team.available.filter(resident =>
+    resident.job === 'hunter' || resident.job === 'watchman' || resident.job === 'militia');
+  const result = resolveBanditLairAssault(state, siteId, combatants.map(resident => resident.id), rng);
+  return typeof result === 'string' ? result : null;
+}
+
+export function banditLairRaidChance(
+  state: GameState,
+  siteId: number,
+  memberIds?: Iterable<number>,
+): number {
+  const site = getSite(state, siteId);
+  if (!site || site.type !== 'banditLair' || !site.discovered || !isForeignSiteOperational(site)) return 0;
+  const team = fieldTeam(state, memberIds);
+  const combatants = team.available.filter(resident =>
+    resident.job === 'hunter' || resident.job === 'watchman' || resident.job === 'militia');
+  const weapons = weaponCountsForResidents(state, combatants);
+  const militia = combatants.filter(resident => resident.job === 'militia').length;
+  const watchmen = combatants.filter(resident => resident.job === 'watchman').length;
+  const hunters = combatants.filter(resident => resident.job === 'hunter').length;
+  const power = expeditionCombatPower(state, combatants.map(resident => resident.id));
+  return Math.max(0.1, Math.min(0.9,
+    0.18 + power / 240 + militia * 0.07 + watchmen * 0.045 + hunters * 0.04 +
+    weapons.readyMuskets * 0.08 + (weapons.hornBows + weapons.spears) * 0.018 - site.militaryPower / 180));
 }

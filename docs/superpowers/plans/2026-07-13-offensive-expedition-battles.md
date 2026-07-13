@@ -5,12 +5,14 @@
 **Goal:** 지금까지의 전술 전투는 전부 방어전이다. 마적 산채 토벌과 호랑이·늑대 사냥을 **공격전**으로 승격한다: 메인 화면에서 주민을 개별로 움직이는 대신 **토벌대 소집**으로 수비병·사냥꾼 등을 몇 명 데려갈지 정해 하나의 부대로 묶고, 지도 위에서 목표 지점까지 이동한 뒤 공격전을 개시한다. 방어전과 마찬가지로 **자동 전투와 직접 지휘 둘 다** 지원한다. 산채 토벌(공성 양상)과 맹수 사냥(몰이 양상)은 서로 다른 구조로 만든다.
 
 **Architecture:** 기존 자산을 최대한 재활용한다.
+- 무기 배분: 현재의 직업·재고 기반 자동 배분을 주민별 명시 배분으로 승격한다. `residentId → weapon` 배정표를 방어도·원정대 예상 전력·자동 전투·직접 지휘가 함께 쓰는 단일 진실 공급원으로 삼고, 기존 자동 배분은 플레이어가 누를 수 있는 편의 기능으로 남긴다.
 - 지도 이동·집결: `src/game/battles.ts`의 muster→clash 패턴과 `drawMusterFlag`/`drawBattleClash`/`battleScars`(renderer.ts) 재사용.
 - 전술 화면: `TacticalBattleScreen.tsx`의 이벤트 재생 파이프라인(`TacticalAnimationEvent` 큐, 스팅어, 배속, 자막, FX 레이어)은 그대로 쓴다. 구역(zone)의 이름·설명·배경은 이미 데이터 주도이므로 공격전용 구역 세트만 새로 정의하면 된다.
 - 자동 전투: 기존 즉석 판정(`raidBanditLair` in siteDiplomacy.ts, `resolveWildlifeHunt` in specialEvents.ts)을 **원정대 구성원 기준**으로 재산정해 재사용한다 — 보상/페널티 적용 코드는 자동·직접 지휘가 공유한다.
 - 전투 시뮬레이션 모드(`battleSimulation.ts`)에 공격전 모드를 추가해 밸런스 실측 루프를 확보한다.
 
 **현재 코드의 출발점 (2026-07-13):**
+- `militiaWeaponAllocation`: 살아 있는 수비병 전원에게 조총→각궁→창→비무장 순으로 자동 배분한다. 파수꾼·사냥꾼은 실제 무기 소유자로 기록되지 않으므로, 원정 인원이 무엇을 들고 나가고 마을에 무엇이 남는지 일관되게 계산할 수 없다.
 - `raidBanditLair`: 마을 전체 fieldTeam 기준 성공률 한 방 판정. 성공 시 산채 burned + 고정 노획, 실패 시 1명 중상 + fortified.
 - `resolveWildlifeHunt`: `weaponReadiness`(마을 전체) 기준 한 방 판정. 늑대/호랑이/멧돼지 기본 성공률·실패 피해가 다름. 호랑이 실패는 사망 확률 존재.
 - 맹수 위협은 `state.incidents.predatorThreats[kind]`(위치 없음). 원정 목표 지점이 되려면 지도 앵커가 필요 — 서식지(`state.habitats`) 또는 사건 발생 지점을 쓴다.
@@ -20,21 +22,55 @@
 
 ## Phase A: 토벌대 공통 파이프라인 (소집 → 이동 → 개전 선택 → 귀환)
 
+### Task A0: 주민별 무기 배분과 병기고 UI
+
+원정대 편성보다 먼저 구현한다. 누가 어떤 무기를 들고 있는지가 정해져야 출정 전력과 출정 후 마을 방어도를 같은 규칙으로 계산할 수 있다.
+
+**Files:**
+- Modify: `src/game/types.ts`
+- Create: `src/game/weapons.ts`
+- Modify: `src/game/buildings.ts`
+- Modify: `src/game/tacticalBattle.ts`
+- Modify: `src/game/siteDiplomacy.ts`
+- Modify: `src/game/specialEvents.ts`
+- Create: `src/components/WeaponAllocationDialog.tsx`
+- Modify: `src/components/InspectorPanel.tsx` 또는 병기고/수비대 관리 진입점
+- Modify: `src/App.tsx`
+- Modify: `src/styles/global.css`
+- Modify: `src/game/saveLoad.ts`
+- Modify: `tools/game/test_tactical_battle.mjs`
+- Modify: `tools/game/test_resource_save_migration.mjs`
+- Create: `tools/game/test_weapon_assignments.mjs`
+
+- [x] `CombatWeaponId = 'musket' | 'hornBow' | 'spear'`, 희소 배정표 `GameState.weaponAssignments`, `weaponAllocationMode: 'auto' | 'manual'`을 추가한다. 키는 주민 id이며 값이 없으면 비무장이다.
+- [x] 수비병·파수꾼·사냥꾼에게 무기를 배정할 수 있다. 보유 수량을 넘는 배정은 금지하고, 사망·직업 변경·주민 이탈·재고 감소로 무효가 된 배정은 주민 id 우선순위로 결정적으로 정리한다.
+- [x] 병기고 UI에서 주민별 수동 배정, 무기 해제, 기존 우선순위 기반 `자동 배분`, `모두 해제`를 제공한다. 직업·현재 임무·건강·무기별 방어 기여와 전체 방어도를 함께 보여준다. 원정 전력·출정 후 방어도 비교는 A2 편성창에서 같은 계산 함수를 연결한다.
+- [x] 조총은 화약이 없어도 배정 자체는 유지한다. 다만 방어도·자동 전투·직접 지휘에서는 탄약 부족 상태를 표시하고 조총 화력 보너스를 적용하지 않는다.
+- [x] `militiaWeaponAllocation`은 실제 배정표를 집계하도록 전환한다. `weaponCountsForResidents`가 임의의 주민 집합을 받아 마을 잔류군과 원정대를 같은 규칙으로 계산할 수 있다.
+- [x] `computeDefense`, 산채·맹수 자동 판정, 전술 조 편성이 실제 주민별 배정을 사용한다. 원정 참여자 제외 연결은 A1의 `memberIds`가 생길 때 같은 주민 집합 계산으로 적용한다.
+- [x] 구버전 저장에는 기존 규칙으로 최초 자동 배분한 뒤 `weaponAssignments`를 저장한다. 신규 게임도 자동 모드로 시작하며, 플레이어가 직접 변경하면 수동 모드로 고정된다.
+- [x] 회귀 테스트: 중복 배정 금지, 재고 상한, 화약 부족 시 배정 유지, 사망/직업 변경 정리, 결정적 재고 축소, 구버전 저장 마이그레이션을 검증한다. 원정자 제외는 A1 통합 테스트에서 검증한다.
+
 ### Task A1: Expedition 상태 모델
 
 **Files:**
 - Modify: `src/game/types.ts`
 - Create: `src/game/expedition.ts`
+- Modify: `src/game/agents.ts`
+- Modify: `src/game/buildings.ts`
+- Modify: `src/game/raids.ts`
+- Modify: `src/game/residents.ts`
 - Modify: `src/game/simulation.ts` (newGame 초기값, 틱 진행 연결)
 - Modify: `src/game/saveLoad.ts` (마이그레이션: 없으면 null)
+- Create: `tools/game/test_expedition.mjs`
 
-- [ ] `GameState.expedition: Expedition | null` 추가 (동시에 1개만).
-- [ ] Expedition 모델(권장):
+- [x] `GameState.expedition: Expedition | null` 추가 (동시에 1개만). 원정대 귀환을 기다리는 습격은 `raidHold`로 별도 보존한다.
+- [x] Expedition 모델:
   ```ts
   interface Expedition {
     kind: 'lairAssault' | 'predatorHunt';
     targetSiteId?: number;        // lairAssault: ForeignSite id
-    predatorKind?: WildlifeKind;  // predatorHunt: wolf | tiger
+    predatorKind?: PredatorKind;  // predatorHunt: wolf | tiger
     targetX: number; targetY: number;
     phase: 'muster' | 'march' | 'engage' | 'return';
     memberIds: number[];          // 참여 주민
@@ -44,9 +80,16 @@
     carriedLoot?: Partial<Record<ResourceId, number>>; // 귀환 연출용 (적용은 전투 종료 시점)
   }
   ```
-- [ ] 원정 참여자는 `resident.task = '토벌 출정'`으로 표시하고 에이전트 루프(작업 배정·이동)에서 제외한다. 원정 중 사망/부상 판정은 전투 결과에서만 발생.
-- [ ] `computeDefense`(buildings.ts)가 원정 참여자를 제외하도록 한다 — 토벌대가 나가 있는 동안 마을 방어도가 실제로 낮아지는 것이 이 시스템의 핵심 트레이드오프.
-- [ ] 원정 중 습격(`openRaidChoice`)이 오면: 원정대는 자동으로 `return` 전환(강제 회군)하되 도착 전까지 방어전에 참여 불가. 회군 중 습격 전투가 끝나 있으면 그대로 귀환. (v1은 이 정도로 단순하게 — 요격 합류 같은 고급 동작은 후속.)
+- [x] 원정 참여자는 집결/출정/교전 대기/귀환 작업으로 표시하고 일반 에이전트 작업에서 제외한다. `expeditionTick`이 집결·단일 부대 행군·귀환을 전담하며, 일일 굶주림·추위 피해도 제외해 원정 중 사망/부상은 전투 결과에서만 발생하게 한다.
+- [x] A0의 실제 무기 배정과 원정 참여자를 기준으로 `computeDefense`를 다시 계산한다 — 토벌대가 사람과 무기를 가져간 동안 마을 방어도가 실제로 낮아진다. 자동 습격·직접 지휘·산채·맹수 후보에서도 원정자를 제외한다.
+- [x] 원정 중 습격(`openRaidChoice`)이 오면 자동 회군시키지 않고 **원정대 명령 → 마을 대응** 순서의 두 결정을 연다. 첫 결정 결과를 습격 문맥에 저장한 뒤 기존 `pendingChoice`를 닫고 두 번째 결정을 열어 선택지가 서로 덮어쓰이지 않는다. 원정이 없으면 기존 `openRaidChoice` 흐름을 그대로 쓴다.
+  - 원정대 명령: **즉시 회군** / **원정 계속**. 즉시 회군은 현재 단계에서 목표 행동을 중단하고 `return`으로 전환하며, 실제로 마을에 도착하기 전에는 방어전에 참여하지 못한다. 원정 계속은 기존 목표·전투·귀환 일정을 유지한다.
+  - 마을 대응 ① **원정대를 기다리지 않고 싸운다**: 현재 마을에 남은 주민과 무기만으로 기존 자동 전투/직접 지휘를 시작한다.
+  - 마을 대응 ② **완전 수성으로 굳히고 원정대를 기다린다**: 주민을 방책 안으로 모으고 일반 작업을 중단한다. 제한된 수성 대기 시간 동안 방책 보너스를 받으며, 원정대가 제때 도착하면 잔류 수비대에 합류한다. 적의 공격 시한이 먼저 끝나면 원정대 없이 전투를 시작한다.
+  - 마을 대응 ③ **협상한다**: 기존 공물·거래·관계 기반 협상 선택지를 그대로 제공한다. 협상 성공 여부와 무관하게 원정대는 앞에서 선택한 명령을 따른다. 협상 실패로 전투가 시작될 때 아직 귀환하지 않은 원정대는 참가하지 못한다.
+- [x] 습격 결정 UI에 귀환 예상 시간, 8틱 공격 시한, 현재 잔류 방어도와 원정대 합류 시 방어도를 표시한다. `원정 계속 + 수성 대기` 조합도 허용한다.
+- [x] 완전 수성 대기는 `raidHold` 상태와 공격 시한을 사용한다. 대기 중 생산·건설·채집을 멈추고 주민을 중심지로 모으며, 원정대 도착 또는 시한 만료 중 먼저 발생한 사건으로 참전 인원을 확정한다. 이후 자동/직접 민병 수성 중 하나를 선택한다.
+- [ ] 공격전 직접 지휘 중 습격이 발생하면 현재 라운드/명령 처리를 끝낸 안전한 경계에서 일시 정지하고 습격 결정을 연다. 회군을 택하면 현재 원정 전투는 자진 철수 결과로 수렴한다. (B/C 공격전 전술 상태가 추가될 때 연결.)
 
 ### Task A2: 소집 UI (토벌대 편성)
 
@@ -57,10 +100,10 @@
 - Modify: `src/App.tsx` (핸들러 연결)
 - Modify: `src/styles/global.css`
 
-- [ ] 편성 다이얼로그: 직업군별(수비병/파수꾼/사냥꾼) 가용 인원에서 **몇 명 데려갈지 수량 선택**. 무기 배분(`militiaWeaponAllocation` 로직 재사용)을 미리 보여주고, 예상 전력·예상 성공률(자동 전투 기준)·**출정 후 마을 방어도**를 함께 표시해 트레이드오프를 보이게 한다.
-- [ ] 최소 인원(예: 2명) 미달, 이미 원정 중, 습격 대응 중이면 소집 불가 사유 표시.
-- [ ] 산채 토벌은 발견된(`discovered`) 산채만, 맹수 사냥은 활성 `predatorThreats`가 있을 때만 진입 가능. 맹수 목표 지점: 늑대 = 마을에서 가장 가까운 활성 서식지(`habitats`), 호랑이 = 최근 사건 발생 지점 또는 가장 깊은 숲 타일 (v1은 서식지 앵커로 단순화).
-- [ ] 소집 확정 → `expedition` 생성(phase 'muster'), 참여자들이 집결 지점(마을 어귀)으로 걸어온 뒤 'march'로 전환 — `battles.ts`의 muster 준비 판정(60% 도착 or 마감) 패턴 재사용.
+- [x] 편성 다이얼로그: 직업군별(수비병/파수꾼/사냥꾼) 가용 인원에서 **몇 명 데려갈지 수량 선택**. A0에서 정한 주민별 실제 무기를 보여주고, 이 화면에서도 출정 전까지 재배정할 수 있게 한다. 예상 전력·예상 성공률(자동 전투 기준)·**출정 후 마을 방어도와 잔류 무기**를 함께 표시해 트레이드오프를 보이게 한다.
+- [x] 최소 인원(예: 2명) 미달, 이미 원정 중, 습격 대응 중이면 소집 불가 사유 표시.
+- [x] 산채 토벌은 발견된(`discovered`) 산채만, 맹수 사냥은 활성 `predatorThreats`가 있을 때만 진입 가능. 맹수 목표 지점: 늑대 = 마을에서 가장 가까운 활성 서식지(`habitats`), 호랑이 = 최근 사건 발생 지점 또는 가장 깊은 숲 타일 (v1은 서식지 앵커로 단순화).
+- [x] 소집 확정 → `expedition` 생성(phase 'muster'), 참여자들이 집결 지점(마을 어귀)으로 걸어온 뒤 'march'로 전환 — `battles.ts`의 muster 준비 판정(60% 도착 or 마감) 패턴 재사용.
 
 ### Task A3: 지도 이동·연출·개전 선택
 
@@ -70,13 +113,13 @@
 - Modify: `src/render/sprites.ts` (부대 스프라이트 — 초기엔 `drawRaiders` 변형/아군 색으로 충분)
 - Modify: `src/App.tsx`
 
-- [ ] march: 부대를 단일 이동체로 경로 이동(길찾기는 습격 무리와 동일 규칙). 겨울 발자국 trail, 집결 깃발(`drawMusterFlag` 재사용)을 마을 어귀에 표시.
-- [ ] 목표 도착 → phase 'engage' + `pendingChoice`(kind 'raid' 유사한 신규 kind 'expedition') 모달:
+- [x] march: 부대를 단일 이동체로 경로 이동(길찾기는 습격 무리와 동일 규칙). 겨울 발자국 trail, 집결 깃발(`drawMusterFlag` 재사용)을 마을 어귀에 표시.
+- [x] 목표 도착 → phase 'engage' + `pendingChoice`(kind 'raid' 유사한 신규 kind 'expedition') 모달:
   - **자동 전투** — 즉석 판정(Task A4). 결과 로그 + 귀환.
-  - **직접 지휘** — 공격전 전술 전투 개시(Phase B/C).
+  - **직접 지휘** — 공격전 전술 전투 개시(Phase B/C). A3에서는 진입 선택을 표시하되 B/C 엔진 구현 전까지 비활성화한다.
   - **철수** — 전투 없이 회군 (산채: alarm 상승만 / 맹수: 위협 유지).
-- [ ] 전투 종료 후 phase 'return': 부대가 마을로 회군(부상자가 있으면 speed 감소), 도착 시 expedition 해제 + 참여자 resetAgent. 노획물·위협 변화 등 **결과 적용은 전투 종료 즉시**(회군은 연출), 단 로그에 "토벌대가 돌아왔습니다" 귀환 로그를 남긴다.
-- [ ] 지도 연출: engage 중 목표 지점에 `drawBattleClash` 재사용(산채 위엔 화염 연기 추가 가능), 종료 후 `battleScars` 데칼. 산채 소각 성공 시 기존 burned 상태 렌더가 이미 있음.
+- [x] 전투 종료 후 phase 'return': 부대가 마을로 회군(부상자가 있으면 speed 감소), 도착 시 expedition 해제 + 참여자 resetAgent. 노획물·위협 변화 등 **결과 적용은 전투 종료 즉시**(회군은 연출), 단 로그에 "토벌대가 돌아왔습니다" 귀환 로그를 남긴다.
+- [x] 지도 연출: engage 중 목표 지점에 `drawBattleClash` 재사용(산채 위엔 화염 연기 추가 가능), 종료 후 `battleScars` 데칼. 산채 소각 성공 시 기존 burned 상태 렌더가 이미 있음.
 
 ### Task A4: 자동 전투를 원정대 기준으로 재산정
 
@@ -85,9 +128,9 @@
 - Modify: `src/game/specialEvents.ts` (`resolveWildlifeHunt` — 동일)
 - Modify: `tools/game/test_battles.mjs` 또는 신규 테스트
 
-- [ ] 성공률 산식의 입력(fieldTeam/weaponReadiness)을 **원정대 memberIds 기준**으로 바꾼다 (기존 마을 전체 버전은 제거하거나 위임). 부상·사망 피해자도 원정대 안에서만 뽑는다.
-- [ ] 보상/페널티 적용부(산채 burned·loot·threat / 맹수 고기·가죽·호피·위협 해제)를 **직접 지휘 결과에서도 호출할 수 있게 함수로 분리**한다 — 자동과 직접 지휘가 같은 결과 코드로 수렴해야 밸런스가 갈라지지 않는다.
-- [ ] 회귀 테스트: 같은 구성일 때 원정대 기준 성공률이 기존 마을 전체 기준과 논리적으로 일관(부분 인원 → 더 낮음)한지, 화약 소모가 원정대 조총 수 기준인지.
+- [x] 성공률 산식의 입력(fieldTeam/weaponReadiness)을 **원정대 memberIds 기준**으로 바꾼다 (기존 마을 전체 버전은 제거하거나 위임). 부상·사망 피해자도 원정대 안에서만 뽑는다.
+- [x] 보상/페널티 적용부(산채 burned·loot·threat / 맹수 고기·가죽·호피·위협 해제)를 **직접 지휘 결과에서도 호출할 수 있게 함수로 분리**한다 — 자동과 직접 지휘가 같은 결과 코드로 수렴해야 밸런스가 갈라지지 않는다.
+- [x] 회귀 테스트: 같은 구성일 때 원정대 기준 성공률이 기존 마을 전체 기준과 논리적으로 일관(부분 인원 → 더 낮음)한지, 화약 소모가 원정대 조총 수 기준인지.
 
 ---
 
@@ -207,12 +250,13 @@ node tools/game/test_resource_save_migration.mjs
 ```
 
 - [ ] 신규 엔진 단위 테스트: (a) 산채 — 동일 원정대로 자동 전투 성공률과 직접 지휘 승률이 비슷한 구간에 있는지(±15%p), 퇴로 차단 시 두목 도주 실패, 방화 시 노획 감소. (b) 사냥 — 우두머리 처치 → 늑대 궤주, 포위망 미완성 5교전 → 도주(사상 없음), 호랑이 급습이 한 조 집중인지.
-- [ ] 파이프라인 실측: 소집 → 행군 → 개전 선택(자동/직접/철수 3경로) → 귀환까지 지도에서 육안 확인. 원정 중 마을 방어도 하락 표시, 습격 발생 시 강제 회군.
+- [ ] 파이프라인 실측: 소집 → 행군 → 개전 선택(자동/직접/철수 3경로) → 귀환까지 지도에서 육안 확인. 원정 중 사람과 무기에 따른 마을 방어도 하락, 습격 발생 시 원정대 명령과 마을 대응의 순차 결정을 확인한다.
+- [ ] 원정 중 습격 분기 실측: `회군/계속 × 즉시 전투/완전 수성 대기/협상` 조합을 검증한다. 회군 예상 시간과 공격 시한 비교, 제때 귀환한 원정대의 합류, 미도착 시 잔류군만 참전, 협상 성공/실패 뒤 원정 명령 유지가 모두 일관되어야 한다.
 - [ ] 저장 호환: 원정 중 저장/로드, 구버전 저장(expedition 없음) 로드.
 - [ ] 시뮬레이터로 기준 시나리오 실측: 산채(militaryPower 60, 정찰 있음/없음), 호랑이(사냥꾼 4+조총 2), 늑대(혼성 6명) — 각각 「준비를 갖추면 유리하고 맨몸 강행은 참패 위험」이 체감되는지.
 
 ---
 
-**우선순위:** A1 → A2 → A3 → A4 (파이프라인이 먼저 — 자동 전투만으로도 완결된 가치가 있다) → B1 → B2 (산채가 엔진 재사용률이 높아 먼저) → C1 → C2 (사냥은 신규 메커니즘이 많아 뒤에) → D1 → D2.
+**우선순위:** A0 → A1 → A2 → A4의 공통 결과 함수·원정대 기준 산식 → A3 (파이프라인이 먼저 — 자동 전투만으로도 완결된 가치가 있다) → B1 → B2 (산채가 엔진 재사용률이 높아 먼저) → C1 → C2 (사냥은 신규 메커니즘이 많아 뒤에) → D1 → D2.
 
 **의도적으로 미룬 것 (후속 계획):** 원정 보급(식량 소모)·다중 원정·정주 부락 공격(외교 대참사 경로)·조정 토벌군과의 야전·원정 중 랜덤 조우. v1은 「산채 하나, 맹수 하나를 부대로 때린다」에 집중한다.

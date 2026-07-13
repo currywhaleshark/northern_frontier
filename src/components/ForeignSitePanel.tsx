@@ -146,7 +146,7 @@ export function ForeignSitePanel({
       {site.type === 'banditLair' && operational && (
         <div className="foreign-site-actions foreign-site-lair-actions">
           <button className="btn small" type="button" onClick={() => onScoutLair(site.id)}>산채 정찰</button>
-          <button className="btn small danger" type="button" onClick={() => onRaidLair(site.id)}>토벌대 조직</button>
+          <button className="btn small danger" type="button" onClick={() => onRaidLair(site.id)}>토벌대 소집</button>
         </div>
       )}
 

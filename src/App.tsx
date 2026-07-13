@@ -28,19 +28,30 @@ import { ProcessingPanel } from './components/ProcessingPanel';
 import { TopBar } from './components/TopBar';
 import { TacticalBattleScreen } from './components/TacticalBattleScreen';
 import { TacticalBattleReportModal } from './components/TacticalBattleReportModal';
+import { WeaponAllocationDialog } from './components/WeaponAllocationDialog';
+import {
+  ExpeditionMusterDialog, type ExpeditionMusterRequest,
+} from './components/ExpeditionMusterDialog';
 import { RANK_NAMES } from './game/constants';
 import { requestPetition } from './game/petition';
 import { toggleNitreYards } from './game/suspicion';
 import { setProcessingReserve } from './game/processing';
 import { setTributeReserve } from './game/tributeReserve';
 import { nextRank } from './game/promotion';
-import { openPredatorHunt } from './game/specialEvents';
+import { openPredatorHunt, startPredatorScout } from './game/specialEvents';
 import { getPointerAction, selectedEntityFromTile } from './game/selectionActions';
 import { isExplored } from './game/exploration';
 import { makeRng } from './game/map';
 import { openTerritoryOrderConfirmation } from './game/territory';
+import { computeDefense } from './game/buildings';
+import { createExpedition, predatorExpeditionTarget } from './game/expedition';
+import { purchasePredatorIntel } from './game/predatorIntelTrade';
+import { isForeignSiteOperational } from './game/foreignSites';
 import {
-  raidBanditLair, requestHuntingRights, requestPassagePermission, scoutBanditLair, sendGiftToSite,
+  clearWeaponAssignments, setAutomaticWeaponAllocation, setResidentWeapon, synchronizeWeaponAssignments,
+} from './game/weapons';
+import {
+  requestHuntingRights, requestPassagePermission, scoutBanditLair, sendGiftToSite,
   type SiteGiftType,
 } from './game/siteDiplomacy';
 import {
@@ -49,8 +60,8 @@ import {
   setTacticalCommand, spendPreparationAction,
 } from './game/tacticalBattle';
 import type {
-  BuildingTypeId, CropId, Difficulty, JobId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
-  PreparationActionId, SpecialItemId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
+  BuildingTypeId, CombatWeaponId, CropId, Difficulty, JobId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
+  PreparationActionId, PredatorKind, SpecialItemId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
 
 export default function App() {
@@ -72,6 +83,8 @@ export default function App() {
   const [inspTab, setInspTab] = useState<InspectorTab>('tile');
   const [inspResidentId, setInspResidentId] = useState<number | null>(null);
   const [soundOn, setSoundOn] = useState(!isMuted());
+  const [weaponDialogOpen, setWeaponDialogOpen] = useState(false);
+  const [expeditionMusterRequest, setExpeditionMusterRequest] = useState<ExpeditionMusterRequest | null>(null);
   // 이동 보간용: 마지막 서브틱 처리 시각과 서브틱 간격
   const animRef = useRef({ at: performance.now(), ms: 175 });
   // 사운드 트리거 추적 (로그 증가분/모달 전환/게임 종료/지도 전투)
@@ -134,6 +147,7 @@ export default function App() {
     setWeatherAmbient(s.weather);
   });
 
+  synchronizeWeaponAssignments(stateRef.current);
   const state = stateRef.current;
 
   // 직접 지휘를 시작하면 기존 배속을 버린다. 전투 종료 뒤 10배속이
@@ -268,6 +282,27 @@ export default function App() {
     bump();
   };
 
+  const refreshWeaponDefense = () => {
+    stateRef.current.resources.defense = computeDefense(stateRef.current);
+    bump();
+  };
+
+  const handleSetResidentWeapon = (id: number, weapon: CombatWeaponId | null) => {
+    const error = setResidentWeapon(stateRef.current, id, weapon);
+    if (error) addLog(stateRef.current, error, 'info');
+    refreshWeaponDefense();
+  };
+
+  const handleAutoAssignWeapons = () => {
+    setAutomaticWeaponAllocation(stateRef.current);
+    refreshWeaponDefense();
+  };
+
+  const handleClearWeaponAssignments = () => {
+    clearWeaponAssignments(stateRef.current);
+    refreshWeaponDefense();
+  };
+
   const handleSetProcessingReserve = (resource: ProcessingInputId, amount: number) => {
     setProcessingReserve(stateRef.current, resource, amount);
     bump();
@@ -322,7 +357,21 @@ export default function App() {
   };
 
   const handleChoose = (optionId: string) => {
+    const choice = stateRef.current.pendingChoice;
+    const predator = choice?.kind === 'incident' && optionId === 'hunt-now' &&
+      (choice.data.predator === 'wolf' || choice.data.predator === 'tiger')
+      ? choice.data.predator
+      : null;
     resolveChoice(stateRef.current, optionId);
+    if (predator) {
+      if (predatorExpeditionTarget(stateRef.current, predator)) {
+        setSpeed(0);
+        setWeaponDialogOpen(false);
+        setExpeditionMusterRequest({ kind: 'predatorHunt', predatorKind: predator });
+      } else {
+        addLog(stateRef.current, '토벌대가 향할 활성 짐승 서식지가 없습니다.', 'info', true);
+      }
+    }
     bump();
   };
 
@@ -377,6 +426,7 @@ export default function App() {
     setSelectedEntity(null);
     setPlacingType(null);
     setInspResidentId(null);
+    setExpeditionMusterRequest(null);
     setSpeed(0);
     setSimMode(true);
     setScreen('game');
@@ -431,6 +481,22 @@ export default function App() {
   };
 
   const handleOrganizeHunt = (kind: WildlifeKind) => {
+    if (kind !== 'boar') {
+      if (!stateRef.current.incidents.predatorThreats[kind]) {
+        addLog(stateRef.current, '현재 추적 중인 맹수가 없습니다.', 'info');
+        bump();
+        return;
+      }
+      if (!predatorExpeditionTarget(stateRef.current, kind)) {
+        addLog(stateRef.current, '토벌대가 향할 활성 짐승 서식지가 없습니다.', 'info');
+        bump();
+        return;
+      }
+      setSpeed(0);
+      setWeaponDialogOpen(false);
+      setExpeditionMusterRequest({ kind: 'predatorHunt', predatorKind: kind });
+      return;
+    }
     const error = openPredatorHunt(stateRef.current, kind);
     if (error) addLog(stateRef.current, error, 'info');
     bump();
@@ -456,8 +522,74 @@ export default function App() {
     handleSiteAction(() => requestHuntingRights(stateRef.current, siteId));
   const handleScoutBanditLair = (siteId: number) =>
     handleSiteAction(() => scoutBanditLair(stateRef.current, siteId, siteActionRng(siteId)));
-  const handleRaidBanditLair = (siteId: number) =>
-    handleSiteAction(() => raidBanditLair(stateRef.current, siteId, siteActionRng(siteId)));
+  const handleRaidBanditLair = (siteId: number) => {
+    const site = stateRef.current.foreignSites.find(candidate => candidate.id === siteId);
+    const error = !site || site.type !== 'banditLair'
+      ? '토벌할 산채를 찾을 수 없습니다.'
+      : !site.discovered
+        ? '위치를 확인한 산채만 토벌할 수 있습니다.'
+        : !isForeignSiteOperational(site)
+          ? '이미 비어 있거나 불탄 산채입니다.'
+          : null;
+    if (error) {
+      addLog(stateRef.current, error, 'info', true);
+      bump();
+      return;
+    }
+    setSpeed(0);
+    setWeaponDialogOpen(false);
+    setExpeditionMusterRequest({ kind: 'lairAssault', siteId });
+  };
+
+  const handleBuyPredatorIntel = (kind: PredatorKind) => {
+    const negotiation = tradeNegotiationOf(stateRef.current.pendingChoice);
+    const error = negotiation
+      ? purchasePredatorIntel(stateRef.current, negotiation.faction, kind)
+      : '정보를 살 거래 상대가 없습니다.';
+    if (error) addLog(stateRef.current, error, 'info', true);
+    bump();
+  };
+
+  const handleScoutPredator = (kind: PredatorKind, residentId: number) => {
+    const error = startPredatorScout(stateRef.current, kind, residentId);
+    if (error) addLog(stateRef.current, error, 'info', true);
+    bump();
+  };
+
+  const handleConfirmExpedition = (memberIds: number[]): string | null => {
+    const request = expeditionMusterRequest;
+    if (!request) return '편성할 토벌 목표가 없습니다.';
+    let error: string | null;
+    if (request.kind === 'lairAssault') {
+      const site = stateRef.current.foreignSites.find(candidate => candidate.id === request.siteId);
+      if (!site) return '토벌할 산채를 찾을 수 없습니다.';
+      error = createExpedition(stateRef.current, {
+        kind: 'lairAssault',
+        memberIds,
+        targetX: site.x,
+        targetY: site.y,
+        targetSiteId: site.id,
+      });
+    } else {
+      const target = predatorExpeditionTarget(stateRef.current, request.predatorKind);
+      if (!target) return '토벌대가 향할 활성 짐승 서식지가 없습니다.';
+      error = createExpedition(stateRef.current, {
+        kind: 'predatorHunt',
+        memberIds,
+        targetX: target.x,
+        targetY: target.y,
+        predatorKind: request.predatorKind as PredatorKind,
+      });
+    }
+    if (error) {
+      addLog(stateRef.current, error, 'info', true);
+    } else {
+      stateRef.current.resources.defense = computeDefense(stateRef.current);
+      setExpeditionMusterRequest(null);
+    }
+    bump();
+    return error;
+  };
 
   const handleSave = () => {
     if (saveGame(stateRef.current)) {
@@ -479,6 +611,8 @@ export default function App() {
       setSelectedEntity(null);
       setPlacingType(null);
       setInspResidentId(null);
+      setWeaponDialogOpen(false);
+      setExpeditionMusterRequest(null);
       setScreen('game');
       bump();
     }
@@ -543,6 +677,8 @@ export default function App() {
     setSelectedEntity(null);
     setPlacingType(null);
     setInspResidentId(null);
+    setWeaponDialogOpen(false);
+    setExpeditionMusterRequest(null);
     setInspTab('tile');
     setSpeed(1);
     setScreen('game');
@@ -657,11 +793,16 @@ export default function App() {
             onSetSmithyProduct={handleSetSmithyProduct}
             onDemolishBuilding={handleDemolishBuilding}
             onOrganizeHunt={handleOrganizeHunt}
+            onScoutPredator={handleScoutPredator}
             onSendSiteGift={handleSendSiteGift}
             onRequestSitePassage={handleRequestSitePassage}
             onRequestSiteHunting={handleRequestSiteHunting}
             onScoutBanditLair={handleScoutBanditLair}
             onRaidBanditLair={handleRaidBanditLair}
+            onOpenWeaponAllocation={() => {
+              setSpeed(0);
+              setWeaponDialogOpen(true);
+            }}
             tab={inspTab}
             setTab={setInspTab}
             residentId={inspResidentId}
@@ -671,8 +812,29 @@ export default function App() {
         </div>
       </div>
 
-      {tradeNegotiationOf(state.pendingChoice) ? (
-        <TradeDialog state={state} onNegotiate={handleNegotiateTrade} onChoose={handleChoose} />
+      {expeditionMusterRequest ? (
+        <ExpeditionMusterDialog
+          state={state}
+          request={expeditionMusterRequest}
+          onAssignWeapon={handleSetResidentWeapon}
+          onConfirm={handleConfirmExpedition}
+          onClose={() => setExpeditionMusterRequest(null)}
+        />
+      ) : weaponDialogOpen ? (
+        <WeaponAllocationDialog
+          state={state}
+          onAssign={handleSetResidentWeapon}
+          onAutoAssign={handleAutoAssignWeapons}
+          onClear={handleClearWeaponAssignments}
+          onClose={() => setWeaponDialogOpen(false)}
+        />
+      ) : tradeNegotiationOf(state.pendingChoice) ? (
+        <TradeDialog
+          state={state}
+          onNegotiate={handleNegotiateTrade}
+          onBuyPredatorIntel={handleBuyPredatorIntel}
+          onChoose={handleChoose}
+        />
       ) : state.pendingChoice ? (
         <EventModal choice={state.pendingChoice} onChoose={handleChoose} />
       ) : null}

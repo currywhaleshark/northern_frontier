@@ -195,6 +195,7 @@ html, body, #root {
   border-color: rgba(224, 93, 74, 0.9);
   box-shadow: 0 0 0 2px rgba(224, 93, 74, 0.16), 0 4px 16px rgba(0, 0, 0, 0.5);
 }
+.minimap-panel.hunt-alert { border-color: rgba(226, 153, 55, 0.72); }
 .minimap-heading {
   height: 26px;
   display: flex;
@@ -209,6 +210,7 @@ html, body, #root {
   font-weight: 700;
   animation: minimap-alert-text 1s steps(2, end) infinite;
 }
+.minimap-target-label { color: #e6a84f; font-size: 10px; font-weight: 700; }
 .minimap-center-btn {
   width: 25px;
   height: 25px;
@@ -271,6 +273,7 @@ html, body, #root {
 .minimap-legend i { width: 6px; height: 6px; display: inline-block; background: #d9d2bd; }
 .minimap-legend i.foreign { background: #58b6a4; }
 .minimap-legend i.hostile { background: #d45e52; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.minimap-legend i.target { background: #e29937; transform: rotate(45deg); }
 
 @keyframes minimap-raid-pulse {
   0% { transform: translate(-50%, -50%) scale(0.7); opacity: 1; }
@@ -626,6 +629,11 @@ html, body, #root {
 .resident-row:hover { background: var(--panel); }
 .resident-row.dead { color: var(--muted); text-decoration: line-through; }
 .resident-row.selected { background: #33301f; }
+.weapon-allocation-open {
+  width: 100%;
+  margin-bottom: 6px;
+  border-color: rgba(217, 164, 65, 0.55);
+}
 .bar-outer { background: #10141a; border-radius: 3px; height: 8px; width: 100%; overflow: hidden; }
 .bar-inner { height: 100%; border-radius: 3px; }
 .faction-name {
@@ -994,6 +1002,225 @@ html, body, #root {
   margin-bottom: 12px;
 }
 .modal .body { white-space: pre-line; margin-bottom: 12px; line-height: 1.5; }
+.modal.weapon-allocation-dialog { max-width: 680px; }
+.weapon-allocation-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.weapon-allocation-heading h2 { margin: 0 0 3px; }
+.weapon-stock-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-bottom: 10px;
+}
+.weapon-stock-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: rgba(20, 24, 28, 0.5);
+}
+.weapon-stock-card strong { color: var(--accent); }
+.weapon-stock-card span { color: var(--muted); font-size: 11px; }
+.weapon-stock-card em { color: #d88979; font-size: 10px; font-style: normal; }
+.weapon-allocation-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.weapon-allocation-actions > span { margin-left: auto; }
+.weapon-allocation-list {
+  max-height: 52vh;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+}
+.weapon-allocation-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 4px;
+  border-bottom: 1px dotted var(--border);
+}
+.weapon-allocation-row > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.weapon-allocation-row small { color: var(--muted); }
+.weapon-allocation-row select {
+  width: 100%;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #1e242b;
+  color: var(--text);
+}
+@media (max-width: 560px) {
+  .weapon-stock-grid { grid-template-columns: 1fr; }
+  .weapon-allocation-row { grid-template-columns: minmax(0, 1fr) 130px; }
+  .weapon-allocation-actions > span { width: 100%; margin-left: 0; }
+}
+.modal.expedition-muster-dialog { max-width: 780px; padding: 0; overflow: hidden; }
+.expedition-muster-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 11px;
+  border-bottom: 1px solid var(--border);
+}
+.expedition-muster-heading h2 { margin: 2px 0 3px; }
+.expedition-muster-kicker { color: var(--gold); font-size: 10px; font-weight: 700; }
+.expedition-role-grid,
+.expedition-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  padding: 10px 16px 0;
+}
+.expedition-role-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 42px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  background: rgba(20, 24, 28, 0.5);
+}
+.expedition-role-card > span { color: var(--muted); font-size: 11px; }
+.expedition-role-card > div { display: flex; align-items: center; gap: 7px; }
+.expedition-role-card button {
+  width: 25px;
+  height: 25px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--panel2);
+  color: var(--text);
+  cursor: pointer;
+}
+.expedition-role-card button:disabled { opacity: 0.35; cursor: not-allowed; }
+.expedition-preview-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.expedition-preview-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  border-left: 2px solid #66775f;
+  background: var(--panel2);
+}
+.expedition-preview-grid span { color: var(--muted); font-size: 10px; }
+.expedition-preview-grid strong { color: var(--text); font-size: 15px; }
+.expedition-preview-grid .danger { border-left-color: var(--bad); }
+.expedition-preview-grid .danger strong { color: var(--bad); }
+.expedition-enemy-intel {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 5px 10px;
+  margin: 8px 16px 0;
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-left: 3px solid #7b8287;
+  background: rgba(20, 24, 28, 0.56);
+}
+.expedition-enemy-intel.rough { border-left-color: var(--gold); }
+.expedition-enemy-intel.exact { border-left-color: #6fa876; }
+.expedition-enemy-intel-heading { display: flex; flex-direction: column; }
+.expedition-enemy-intel-heading span { color: var(--muted); font-size: 9px; }
+.expedition-enemy-intel-heading strong { color: var(--gold); font-size: 13px; }
+.expedition-enemy-intel-values { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 14px; }
+.expedition-enemy-intel-values b { font-size: 12px; }
+.expedition-enemy-intel p { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 10px; }
+.expedition-remaining-weapons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 8px 16px 0;
+  padding: 7px 9px;
+  border: 1px dotted var(--border);
+  font-size: 11px;
+}
+.expedition-remaining-weapons > span { margin-right: auto; color: var(--muted); }
+.expedition-remaining-weapons em { color: var(--bad); font-style: normal; }
+.expedition-muster-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 9px 16px 7px;
+}
+.expedition-muster-actions > span { margin-left: auto; }
+.expedition-member-list {
+  max-height: 38vh;
+  overflow-y: auto;
+  margin: 0 16px;
+  border: 1px solid var(--border);
+}
+.expedition-member-group + .expedition-member-group { border-top: 1px solid var(--border); }
+.expedition-member-group h3 {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 5px 8px;
+  background: #22282e;
+  color: var(--gold);
+  font-size: 11px;
+}
+.expedition-member-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px;
+  align-items: center;
+  gap: 10px;
+  min-height: 49px;
+  padding: 6px 8px;
+  border-top: 1px dotted var(--border);
+  opacity: 0.58;
+}
+.expedition-member-row.selected { background: rgba(92, 117, 78, 0.16); opacity: 1; }
+.expedition-member-row label { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; }
+.expedition-member-row label > span { display: flex; flex-direction: column; min-width: 0; }
+.expedition-member-row small { overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
+.expedition-member-row select {
+  width: 100%;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #1e242b;
+  color: var(--text);
+}
+.expedition-empty { padding: 18px 10px; text-align: center; }
+.expedition-muster-error {
+  margin: 8px 16px 0;
+  padding: 7px 9px;
+  border-left: 2px solid var(--bad);
+  background: rgba(125, 48, 43, 0.18);
+  color: var(--bad);
+  font-size: 11px;
+}
+.expedition-muster-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 10px 16px 14px;
+}
+@media (max-width: 620px) {
+  .modal.expedition-muster-dialog { width: 96%; }
+  .expedition-role-grid { grid-template-columns: 1fr; }
+  .expedition-preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .expedition-member-row { grid-template-columns: minmax(0, 1fr) 130px; }
+  .expedition-muster-actions > span { width: 100%; margin-left: 0; }
+}
 .choice-btn {
   display: block;
   width: 100%;
@@ -2771,6 +2998,58 @@ html, body, #root {
 .incident-threat > div:first-child span,
 .incident-hunt-row { font-size: 11px; }
 .incident-hunt-row { margin-top: 5px; }
+.incident-scout-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dotted rgba(255, 255, 255, 0.14);
+}
+.incident-scout-box > div { display: flex; min-width: 0; flex-direction: column; }
+.incident-scout-box strong { color: var(--gold); font-size: 10px; }
+.incident-scout-box span { color: var(--muted); font-size: 9px; }
+.incident-scout-box select {
+  min-width: 150px;
+  max-width: 190px;
+  padding: 4px 5px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--panel2);
+  color: var(--text);
+  font-size: 10px;
+}
+.trade-intel-offers {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 9px;
+  padding: 7px;
+  border: 1px solid rgba(217, 164, 65, 0.48);
+  background: rgba(217, 164, 65, 0.07);
+}
+.trade-intel-offers > button {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel2);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.trade-intel-offers > button:hover:not(:disabled) { border-color: var(--accent); }
+.trade-intel-offers > button:disabled { opacity: 0.45; cursor: not-allowed; }
+.trade-intel-offers > button > span { color: var(--gold); font-size: 18px; text-align: center; }
+.trade-intel-offers > button > div { display: flex; min-width: 0; flex-direction: column; }
+.trade-intel-offers small { color: var(--muted); font-size: 9px; }
+.trade-intel-offers b { color: var(--gold); font-size: 10px; white-space: nowrap; }
+.trade-intel-offers p { margin: 0; color: var(--muted); font-size: 9px; }
 .special-item-row {
   min-height: 42px;
   padding: 5px 0;

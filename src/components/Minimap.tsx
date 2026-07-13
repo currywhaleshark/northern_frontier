@@ -3,6 +3,7 @@ import { CONFIG } from '../game/config';
 import { buildingFootprintSize } from '../game/buildings';
 import { FACTIONS } from '../game/constants';
 import { visibleMinimapRaid, visibleMinimapSites } from '../game/minimap';
+import { activeExpeditionTargetMarkers } from '../game/expeditionTargets';
 import type { ForeignSite, GameState, Terrain } from '../game/types';
 
 const TILE = CONFIG.ui.tileSize;
@@ -102,6 +103,7 @@ export function Minimap({ state, version, viewportRef, selected }: Props) {
   const minimapHeight = Math.round(MAP_SIZE * mapHeight / mapWidth);
   const visibleRaid = visibleMinimapRaid(state);
   const visibleSites = visibleMinimapSites(state);
+  const targetMarkers = activeExpeditionTargetMarkers(state);
 
   const readViewport = useCallback(() => {
     const box = viewportRef.current;
@@ -172,6 +174,29 @@ export function Minimap({ state, version, viewportRef, selected }: Props) {
       drawSite(ctx, site, (site.x + site.width / 2) * scaleX, (site.y + site.height / 2) * scaleY);
     }
 
+    for (const marker of targetMarkers) {
+      const x = (marker.x + 0.5) * scaleX;
+      const y = (marker.y + 0.5) * scaleY;
+      const color = marker.kind === 'tiger' ? '#e05f52' : marker.kind === 'wolf' ? '#e29937' : '#c84f45';
+      const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 260);
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(5, marker.radius * (scaleX + scaleY) * 0.5), 0, Math.PI * 2);
+      ctx.fillStyle = marker.kind === 'wolf' ? 'rgba(226,153,55,0.16)' : 'rgba(224,95,82,0.16)';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1 + pulse;
+      ctx.fill();
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#111518';
+      ctx.lineWidth = 1;
+      ctx.fillRect(-3, -3, 6, 6);
+      ctx.strokeRect(-3.5, -3.5, 7, 7);
+      ctx.restore();
+    }
+
     if (selected) {
       ctx.strokeStyle = '#eff7fb';
       ctx.lineWidth = 1;
@@ -188,7 +213,7 @@ export function Minimap({ state, version, viewportRef, selected }: Props) {
       Math.max(2, Math.round(viewport.width * canvas.width) - 1),
       Math.max(2, Math.round(viewport.height * canvas.height) - 1),
     );
-  }, [mapHeight, mapWidth, selected, state, version, viewport, visibleSites]);
+  }, [mapHeight, mapWidth, selected, state, targetMarkers, version, viewport, visibleSites]);
 
   const navigate = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
@@ -220,6 +245,11 @@ export function Minimap({ state, version, viewportRef, selected }: Props) {
       const distance = Math.hypot(px - (visibleRaid.x + 0.5) * scaleX, py - (visibleRaid.y + 0.5) * scaleY);
       if (distance <= 9) return `습격 경보 · ${visibleRaid.faction}`;
     }
+    const target = targetMarkers.find(candidate => Math.hypot(
+      px - (candidate.x + 0.5) * scaleX,
+      py - (candidate.y + 0.5) * scaleY,
+    ) <= Math.max(8, candidate.radius * (scaleX + scaleY) * 0.5));
+    if (target) return target.label;
     const site = visibleSites.find(candidate => Math.hypot(
       px - (candidate.x + candidate.width / 2) * scaleX,
       py - (candidate.y + candidate.height / 2) * scaleY,
@@ -233,10 +263,11 @@ export function Minimap({ state, version, viewportRef, selected }: Props) {
   };
 
   return (
-    <div className={`minimap-panel${visibleRaid ? ' raid-alert' : ''}`}>
+    <div className={`minimap-panel${visibleRaid ? ' raid-alert' : targetMarkers.length > 0 ? ' hunt-alert' : ''}`}>
       <div className="minimap-heading">
         <strong>지도</strong>
         {visibleRaid && <span className="minimap-alert-label">습격 경보</span>}
+        {!visibleRaid && targetMarkers.length > 0 && <span className="minimap-target-label">토벌 목표</span>}
         <button type="button" className="minimap-center-btn" title="마을 중심으로 이동" aria-label="마을 중심으로 이동" onClick={navigateToCenter}>◎</button>
       </div>
       <div className="minimap-canvas-wrap">
@@ -275,6 +306,7 @@ export function Minimap({ state, version, viewportRef, selected }: Props) {
         <span><i className="village" />마을</span>
         <span><i className="foreign" />외부 거점</span>
         <span><i className="hostile" />적대 세력</span>
+        {targetMarkers.length > 0 && <span><i className="target" />토벌 목표</span>}
       </div>
     </div>
   );

@@ -59,6 +59,9 @@ export type JobId =
   | 'watchman'   // 파수꾼
   | 'militia';   // 수비병 (내부 id는 저장 호환을 위해 유지)
 
+export type CombatWeaponId = 'musket' | 'hornBow' | 'spear';
+export type WeaponAllocationMode = 'auto' | 'manual';
+
 export type ResourceId =
   | 'grain'      // 먹을 수 있는 곡물(밭 수확물 + 도정한 벼)
   | 'rice'       // 논에서 수확한 도정 전 벼
@@ -366,7 +369,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory';
   title: string;
   body: string;
   illustration?: {
@@ -399,6 +402,24 @@ export type SpecialEventId = WildlifeKind | 'wildGinseng' | 'plagueSuspicion' | 
 export interface PredatorThreat {
   kind: WildlifeKind;
   untilDay: number;
+  size?: number;     // 저장 호환을 위해 선택값, 새 위협에는 실제 무리 규모를 기록한다
+  strength?: number; // 편성 정보와 토벌 판정이 함께 참조하는 숨은 위협 전력
+  scouting?: {
+    residentId: number;
+    startedDay: number;
+    completesOnDay: number;
+    hunterSkill: number;
+    usedGyrfalcon: boolean;
+  };
+  intel?: {
+    precision: 'rough' | 'exact';
+    revealedDay: number;
+    source?: 'scout' | 'trade';
+    scoutResidentId?: number;
+    sourceFaction?: string;
+    hunterSkill?: number;
+    usedGyrfalcon?: boolean;
+  };
 }
 
 export interface PlagueCase {
@@ -448,6 +469,40 @@ export interface RaiderBand {
   siege: boolean;    // 목책에 막혀 공성 중인지
   speed: number;     // 서브틱당 이동 타일
   trail: { x: number; y: number }[]; // 지나온 자취 (눈밭 발자국 렌더링용)
+}
+
+export type ExpeditionKind = 'lairAssault' | 'predatorHunt';
+export type ExpeditionPhase = 'muster' | 'march' | 'engage' | 'return';
+export type ExpeditionRaidOrder = 'return' | 'continue';
+
+export interface Expedition {
+  kind: ExpeditionKind;
+  targetSiteId?: number;
+  predatorKind?: PredatorKind;
+  targetX: number;
+  targetY: number;
+  musterX: number;
+  musterY: number;
+  phase: ExpeditionPhase;
+  memberIds: number[];
+  x: number;
+  y: number;
+  px: number;
+  py: number;
+  path: { x: number; y: number }[];
+  trail: { x: number; y: number }[];
+  speed: number;
+  ticks: number;
+  carriedLoot?: Partial<Record<ResourceId, number>>;
+}
+
+export interface RaidHoldState {
+  power: number;
+  faction: string;
+  warned: boolean;
+  siege: boolean;
+  expeditionOrder: ExpeditionRaidOrder;
+  ticksRemaining: number;
 }
 
 export type BattlePhase = 'muster' | 'clash';
@@ -753,9 +808,13 @@ export interface GameState {
   nextBuildingId: number;
   nextResidentId: number;
   resources: Record<ResourceId, number>;
+  weaponAssignments: Partial<Record<number, CombatWeaponId>>; // 주민별 전투 무기. 없으면 비무장
+  weaponAllocationMode: WeaponAllocationMode; // 자동 배분을 유지할지 플레이어 배정을 고정할지
   processingReserves: Record<ProcessingInputId, number>; // 자동 가공/소비 전에 남길 원자재 수량
   threat: number;         // 습격 위협도 0~100
   relations: Record<string, number>; // 세력별 우호도 0~100 (키: 세력 이름)
+  expedition: Expedition | null; // 지도 위 토벌 원정대. 동시에 하나만 운용
+  raidHold: RaidHoldState | null; // 원정대 귀환을 기다리는 완전 수성 상태
   raiders: RaiderBand | null; // 접근 중인 습격 무리
   battle: Battle | null;      // 지도 위에서 진행 중인 습격 전투
   battleScars?: BattleScar[]; // 끝난 전투 자리의 교란 자국 (구버전 저장에는 없음)

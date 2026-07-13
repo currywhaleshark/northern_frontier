@@ -1,6 +1,6 @@
 // localStorage 저장/불러오기
 import { CONFIG } from './config';
-import { rebuildBuildingFootprints } from './buildings';
+import { computeDefense, rebuildBuildingFootprints } from './buildings';
 import { defaultCropForBuildingType } from './crops';
 import { rollCourtTribute } from './courtTribute';
 import { spawnAnimalHabitats } from './habitats';
@@ -15,6 +15,7 @@ import { reconcileTributeReserve } from './tributeReserve';
 import { reconcileResidentHomes } from './residents';
 import { ensureIncidentState } from './specialEvents';
 import { ensureForeignSiteState, revealForeignSitesFromExploration } from './foreignSites';
+import { synchronizeWeaponAssignments } from './weapons';
 import type { CourtTribute, GameState, Gender, Resident, ResourceId } from './types';
 
 const SAVE_KEY = 'buksae-save-v3'; // v3: 이동 보간(px/py)과 지도 위 습격 무리 추가
@@ -148,6 +149,64 @@ function migrateResidentHaulTasks(state: GameState): void {
       RESOURCE_ID_SET.has(task.resource) &&
       Number.isFinite(task.amount) && task.amount > 0;
     if (!valid) resident.haulTask = null;
+  }
+}
+
+function migrateWeaponAssignments(state: GameState): void {
+  const legacy = state as GameState & {
+    weaponAssignments?: unknown;
+    weaponAllocationMode?: unknown;
+  };
+  if (!legacy.weaponAssignments || typeof legacy.weaponAssignments !== 'object') {
+    state.weaponAssignments = {};
+  }
+  state.weaponAllocationMode = legacy.weaponAllocationMode === 'manual' ? 'manual' : 'auto';
+  synchronizeWeaponAssignments(state);
+}
+
+function migrateExpeditionState(state: GameState): void {
+  const legacy = state as GameState & { expedition?: unknown; raidHold?: unknown };
+  const raw = legacy.expedition;
+  if (!raw || typeof raw !== 'object') {
+    state.expedition = null;
+  } else {
+    const expedition = raw as GameState['expedition'];
+    const validPhase = expedition?.phase === 'muster' || expedition?.phase === 'march' ||
+      expedition?.phase === 'engage' || expedition?.phase === 'return';
+    const validKind = expedition?.kind === 'lairAssault' || expedition?.kind === 'predatorHunt';
+    if (!expedition || !validPhase || !validKind || !Array.isArray(expedition.memberIds) ||
+        !Number.isFinite(expedition.x) || !Number.isFinite(expedition.y)) {
+      state.expedition = null;
+    } else {
+      expedition.memberIds = [...new Set(expedition.memberIds.filter(id => Number.isInteger(id) &&
+        state.residents.some(resident => resident.id === id && resident.alive)))];
+      expedition.path = Array.isArray(expedition.path) ? expedition.path : [];
+      expedition.trail = Array.isArray(expedition.trail) ? expedition.trail.slice(-30) : [];
+      expedition.px = Number.isFinite(expedition.px) ? expedition.px : expedition.x;
+      expedition.py = Number.isFinite(expedition.py) ? expedition.py : expedition.y;
+      expedition.musterX = Number.isFinite(expedition.musterX) ? expedition.musterX : expedition.x;
+      expedition.musterY = Number.isFinite(expedition.musterY) ? expedition.musterY : expedition.y;
+      expedition.speed = Number.isFinite(expedition.speed) ? Math.max(0.25, expedition.speed) : 1.25;
+      expedition.ticks = Number.isFinite(expedition.ticks) ? Math.max(0, expedition.ticks) : 0;
+      state.expedition = expedition.memberIds.length >= 1 ? expedition : null;
+    }
+  }
+
+  const hold = legacy.raidHold;
+  if (!hold || typeof hold !== 'object') {
+    state.raidHold = null;
+  } else {
+    const candidate = hold as GameState['raidHold'];
+    state.raidHold = candidate && Number.isFinite(candidate.power) && Number.isFinite(candidate.ticksRemaining) &&
+      typeof candidate.faction === 'string' &&
+      (candidate.expeditionOrder === 'return' || candidate.expeditionOrder === 'continue')
+      ? { ...candidate, ticksRemaining: Math.max(0, candidate.ticksRemaining) }
+      : null;
+  }
+  if (state.expedition) {
+    for (const resident of state.residents) {
+      if (state.expedition.memberIds.includes(resident.id)) resident.task = '토벌 출정';
+    }
   }
 }
 
@@ -303,11 +362,14 @@ export function loadGame(): GameState | null {
     migrateResidentAssignedBuildingIds(parsed);
     migrateResidentHomeBuildingIds(parsed);
     migrateResidentHaulTasks(parsed);
+    migrateExpeditionState(parsed);
+    migrateWeaponAssignments(parsed);
     rebuildBuildingFootprints(parsed);
     reconcileResidentHomes(parsed, makeRng((parsed.seed ?? 1) + parsed.day * 32452843));
     ensureExploration(parsed);
     refreshExploration(parsed);
     revealForeignSitesFromExploration(parsed);
+    parsed.resources.defense = computeDefense(parsed);
     return parsed;
   } catch {
     return null;

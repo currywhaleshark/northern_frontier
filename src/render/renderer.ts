@@ -20,6 +20,9 @@ import { claimZonesAt } from '../game/claimZones';
 import { foreignSiteAt } from '../game/foreignSites';
 import { foreignSiteActors, foreignSiteProps, type ForeignSiteProp } from '../game/foreignSiteActivity';
 import { activePassageRoutes } from '../game/passage';
+import { weaponCountsForResidents } from '../game/weapons';
+import { activePredatorScoutIds } from '../game/expeditionIntel';
+import { activeExpeditionTargetMarkers, type ExpeditionTargetMarker } from '../game/expeditionTargets';
 import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, Resident, Terrain } from '../game/types';
 
 const TILE = CONFIG.ui.tileSize;
@@ -58,8 +61,12 @@ export function residentPixelPos(r: Resident, alpha: number): { x: number; y: nu
 export function findResidentAt(state: GameState, mx: number, my: number, alpha: number, radius = 10): Resident | null {
   let best: Resident | null = null;
   let bestD = radius;
+  const expeditionUnitIds = state.expedition && state.expedition.phase !== 'muster'
+    ? new Set(state.expedition.memberIds)
+    : new Set<number>();
   for (const r of state.residents) {
     if (!r.alive) continue;
+    if (expeditionUnitIds.has(r.id)) continue;
     const p = residentPixelPos(r, alpha);
     const d = Math.hypot(p.x - mx, p.y - my);
     if (d <= bestD) { bestD = d; best = r; }
@@ -341,6 +348,52 @@ function drawHabitatIcon(ctx: CanvasRenderingContext2D, habitat: AnimalHabitat):
   ctx.beginPath();
   ctx.ellipse(cx, cy + 5 * s, 5.2 * s, 3.7 * s, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+function drawExpeditionTargetMarker(ctx: CanvasRenderingContext2D, marker: ExpeditionTargetMarker): void {
+  const cx = (marker.x + 0.5) * TILE;
+  const cy = (marker.y + 0.5) * TILE;
+  const color = marker.kind === 'tiger' ? '224,95,82' : marker.kind === 'wolf' ? '226,153,55' : '194,76,66';
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 260);
+  const radius = marker.radius * TILE * (1 + pulse * 0.045);
+  ctx.save();
+  ctx.fillStyle = `rgba(${color},${(0.08 + pulse * 0.05).toFixed(3)})`;
+  ctx.strokeStyle = `rgba(${color},${(0.72 + pulse * 0.24).toFixed(3)})`;
+  ctx.lineWidth = marker.expeditionTarget ? 3 : 2;
+  ctx.setLineDash([10, 6]);
+  ctx.lineDashOffset = -(performance.now() / 45) % 16;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = `rgb(${color})`;
+  ctx.strokeStyle = 'rgba(18,20,22,0.95)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 11);
+  ctx.lineTo(cx + 9, cy);
+  ctx.lineTo(cx, cy + 11);
+  ctx.lineTo(cx - 9, cy);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.font = '700 11px sans-serif';
+  const width = ctx.measureText(marker.label).width + 14;
+  const labelX = cx - width / 2;
+  const labelY = cy - radius - 25;
+  ctx.fillStyle = 'rgba(22,24,26,0.92)';
+  ctx.strokeStyle = `rgba(${color},0.9)`;
+  ctx.lineWidth = 1;
+  ctx.fillRect(labelX, labelY, width, 19);
+  ctx.strokeRect(labelX + 0.5, labelY + 0.5, width - 1, 18);
+  ctx.fillStyle = '#f4ead4';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(marker.label, cx, labelY + 10);
   ctx.restore();
 }
 
@@ -683,6 +736,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   const sprites = o.sprites ?? placeholderSprites;
+  const predatorScoutIds = activePredatorScoutIds(state);
   const lerp = (a: number, b: number) => a + (b - a) * o.alpha;
   ctx.imageSmoothingEnabled = false;
 
@@ -796,7 +850,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     }
   }
   for (const r of state.residents) {
-    if (!r.alive) continue;
+    if (!r.alive || predatorScoutIds.has(r.id)) continue;
     const p = residentPixelPos(r, o.alpha);
     sprites.drawResident(ctx, {
       job: r.job,
@@ -812,7 +866,34 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     });
   }
 
-  // 5) 습격 무리 (+겨울 눈밭 발자국)
+  // 5) 아군 원정부대 — 집결 중에는 개별 주민, 출발 후에는 단일 부대로 표시한다.
+  if (state.expedition) {
+    const expedition = state.expedition;
+    if (expedition.phase === 'muster') {
+      drawMusterFlag(ctx, expedition.musterX, expedition.musterY);
+    } else {
+      if (season === 'winter' && expedition.trail.length > 0) drawFootprints(ctx, expedition.trail);
+      const members = state.residents.filter(resident => resident.alive && expedition.memberIds.includes(resident.id));
+      sprites.drawExpedition(ctx, {
+        x: lerp(expedition.px, expedition.x) * TILE + TILE / 2,
+        y: lerp(expedition.py, expedition.y) * TILE + TILE / 2,
+        members: members.map(member => ({
+          job: member.job,
+          gender: member.gender,
+          militiaWeapon: militiaWeaponForResident(state, member),
+        })),
+        total: members.length,
+        moving: expedition.px !== expedition.x || expedition.py !== expedition.y,
+        facing: expedition.x < expedition.px ? -1 : 1,
+      });
+      if (expedition.phase === 'engage') {
+        const muskets = weaponCountsForResidents(state, members).readyMuskets > 0;
+        drawBattleClash(ctx, expedition.targetX, expedition.targetY, muskets);
+      }
+    }
+  }
+
+  // 6) 습격 무리 (+겨울 눈밭 발자국)
   if (state.raiders) {
     const b = state.raiders;
     if (getSeason(state.day) === 'winter' && b.trail && b.trail.length > 0) {
@@ -844,7 +925,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     }
   }
 
-  // 6) 밤낮 색조 — 하루 진행도(subTick+보간)로 계산. 세계를 물들이고 창에는 불이 켜진다.
+  // 7) 밤낮 색조 — 하루 진행도(subTick+보간)로 계산. 세계를 물들이고 창에는 불이 켜진다.
   const SUB = CONFIG.agents.subticksPerDay;
   const dayFrac = ((state.subTick + o.alpha) % SUB) / SUB;
   drawDayNight(ctx, state, dayFrac, canvas.width, canvas.height);
@@ -862,6 +943,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
 
   // 9) 미답사 안개 — 지형/자원/건물/서식지를 탐색 전까지 가린다
   drawFogOverlay(ctx, state);
+
+  // 활성 토벌 목표는 미답사 안개 위에도 표시해 위치를 잃지 않게 한다.
+  for (const marker of activeExpeditionTargetMarkers(state)) drawExpeditionTargetMarker(ctx, marker);
 
   // 10) 배치 모드: 관련 자원 하이라이트 (사냥막→서식지 범위, 밭→비옥한 땅)
   if (o.placingType) {

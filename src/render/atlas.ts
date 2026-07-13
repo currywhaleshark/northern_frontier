@@ -8,6 +8,7 @@ import {
   placeholderSprites,
   type BuildingDamageDrawParams,
   type BuildingDrawParams,
+  type ExpeditionDrawParams,
   type ForeignStructureDrawParams,
   type RaiderDrawParams,
   type ResidentDrawParams,
@@ -1061,6 +1062,54 @@ export const atlasSprites: SpriteAPI = {
       ctx.stroke();
       ctx.lineWidth = 1;
     }
+  },
+
+  drawExpedition(ctx, p: ExpeditionDrawParams) {
+    const visible = Math.min(p.members.length, 4);
+    for (let i = 0; i < visible; i++) {
+      const member = p.members[i];
+      const ox = ((i * 17) % 15 - 7) * 0.8 * CF;
+      const oy = ((i * 29) % 11 - 5) * 0.75 * CF;
+      atlasSprites.drawResident(ctx, {
+        job: member.job,
+        gender: member.gender,
+        x: p.x + ox,
+        y: p.y + oy,
+        sick: false,
+        carrying: false,
+        selected: false,
+        moving: p.moving,
+        facing: p.facing,
+        militiaWeapon: member.militiaWeapon,
+      });
+    }
+    ctx.save();
+    ctx.strokeStyle = '#263d50';
+    ctx.lineWidth = Math.max(1.5, 1.5 * CF);
+    ctx.beginPath();
+    ctx.moveTo(p.x + 9 * CF, p.y + 7 * CF);
+    ctx.lineTo(p.x + 9 * CF, p.y - 15 * CF);
+    ctx.stroke();
+    ctx.fillStyle = '#4f83a8';
+    ctx.strokeStyle = '#d7e5ee';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(p.x + 10 * CF, p.y - 15 * CF);
+    ctx.lineTo(p.x + 22 * CF, p.y - 12 * CF);
+    ctx.lineTo(p.x + 10 * CF, p.y - 7 * CF);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    if (p.total > visible) {
+      ctx.fillStyle = '#edf4f7';
+      ctx.strokeStyle = '#263d50';
+      ctx.font = `bold ${Math.round(8 * CF)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.strokeText(String(p.total), p.x, p.y - 13 * CF);
+      ctx.fillText(String(p.total), p.x, p.y - 13 * CF);
+    }
+    ctx.restore();
   },
 
   drawRaiders(ctx, p) {

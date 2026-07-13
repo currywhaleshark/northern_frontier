@@ -18,7 +18,9 @@ import { generateMap, makeRng } from './map';
 import { isHabitatActive, spawnAnimalHabitats } from './habitats';
 import { agentsTick, resetAgent, SUBTICKS } from './agents';
 import { battleTick } from './battles';
-import { checkRaidTrigger, raidersTick, resolveExtortion, resolveRaid, updateThreat } from './raids';
+import {
+  checkRaidTrigger, raidHoldTick, raidersTick, resolveExpeditionRaidOrder, resolveExtortion, resolveRaid, updateThreat,
+} from './raids';
 import { driftRelations, initRelations } from './relations';
 import { resetFactionTradeCapacityUsage } from './tradeValues';
 import {
@@ -37,6 +39,11 @@ import { getPointerAction } from './selectionActions';
 import { createExploration, isBuildingFootprintExplored, refreshExploration } from './exploration';
 import { LUXURY_RESOURCES } from './resourceCatalog';
 import { returnResidentCart, setResidentCartEquipped } from './equipment';
+import { setAutomaticWeaponAllocation, synchronizeWeaponAssignments } from './weapons';
+import { expeditionTick } from './expedition';
+import {
+  maybeOpenExpeditionEngagementChoice, resolveExpeditionEngagementChoice,
+} from './expeditionEngagement';
 import { isHaulSourceBuilding } from './inventory';
 import { maybeOfferImmigration, resolveImmigration } from './immigration';
 import { createIncidentState, resolveSpecialEvent, updateSpecialEvents } from './specialEvents';
@@ -92,9 +99,13 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     nextBuildingId: 1,
     nextResidentId: 1,
     resources: startRes,
+    weaponAssignments: {},
+    weaponAllocationMode: 'auto',
     processingReserves: defaultProcessingReserves(),
     threat: 25,
     relations: initRelations(),
+    expedition: null,
+    raidHold: null,
     raiders: null,
     battle: null,
     battleScars: [],
@@ -150,6 +161,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
       state.residents.push(createResident(state, rng, job as JobId));
     }
   }
+  setAutomaticWeaponAllocation(state);
   reconcileResidentHomes(state, rng);
 
   state.weather = rollWeather(1, rng);
@@ -291,6 +303,8 @@ export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
   r.job = to;
   clearIncompatibleAssignment(state, r);
   resetAgent(state, r);
+  synchronizeWeaponAssignments(state);
+  state.resources.defense = computeDefense(state);
   return true;
 }
 
@@ -302,6 +316,8 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
     r.job = job;
     clearIncompatibleAssignment(state, r);
     resetAgent(state, r);
+    synchronizeWeaponAssignments(state);
+    state.resources.defense = computeDefense(state);
   }
 }
 
@@ -532,6 +548,8 @@ export function setSmithyProduct(state: GameState, buildingId: number, product: 
 
 export function resolveChoice(state: GameState, optionId: string): void {
   if (!state.pendingChoice) return;
+  const selectedOption = state.pendingChoice.options.find(option => option.id === optionId);
+  if (selectedOption?.disabled || (state.pendingChoice.options.length > 0 && !selectedOption)) return;
   if (state.pendingChoice.kind === 'territory' && state.pendingChoice.data.mode === 'orderConfirm') {
     const choice = state.pendingChoice;
     const action = choice.data.action as PointerAction;
@@ -552,7 +570,9 @@ export function resolveChoice(state: GameState, optionId: string): void {
     ? state.incidents.resolutionCount++
     : 0;
   const rng = makeRng(state.seed + state.day * 7919 + incidentNonce * 104729 + 31);
-  if (state.pendingChoice.kind === 'raid') resolveRaid(state, optionId, rng);
+  if (state.pendingChoice.kind === 'expedition') resolveExpeditionEngagementChoice(state, optionId, rng);
+  else if (state.pendingChoice.kind === 'expeditionRaidOrder') resolveExpeditionRaidOrder(state, optionId);
+  else if (state.pendingChoice.kind === 'raid') resolveRaid(state, optionId, rng);
   else if (state.pendingChoice.kind === 'extortion') resolveExtortion(state, optionId, rng);
   else if (state.pendingChoice.kind === 'tribute') resolveCourtTribute(state, optionId);
   else if (state.pendingChoice.kind === 'petition') resolvePetition(state, optionId);
@@ -589,9 +609,12 @@ export function continueAfterVictory(state: GameState): boolean {
 export function advanceTick(state: GameState): void {
   if (state.gameOver || state.pendingChoice || state.tacticalBattle || state.tacticalBattleReport) return;
   agentsTick(state);
+  expeditionTick(state);
+  maybeOpenExpeditionEngagementChoice(state);
+  const tickRng = makeRng(state.seed + state.day * 7919 + state.subTick * 131 + 3);
+  raidHoldTick(state, tickRng);
   refreshExploration(state);
   revealForeignSitesFromExploration(state);
-  const tickRng = makeRng(state.seed + state.day * 7919 + state.subTick * 131 + 3);
   battleTick(state, tickRng);
   raidersTick(state, tickRng);
   state.subTick++;
@@ -779,6 +802,7 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
   updateResidentNeeds(
     state, rng2, fedRatio, firewoodRatio, clothesCoverage,
     foodResult.varietyScore, foodResult.vegetableRatio,
+    new Set(state.expedition?.memberIds ?? []),
   );
 
   const foodOk = foodTotal(state) > pop * cfg.foodPerDay * 6;
