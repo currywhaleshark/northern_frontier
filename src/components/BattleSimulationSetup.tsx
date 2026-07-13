@@ -1,8 +1,11 @@
 // 전투 시뮬레이션 설정 화면 — 메인 메뉴에서 진입해 조건을 지정/랜덤으로 고르고 전투만 테스트한다
 import { useState } from 'react';
 import { CONFIG } from '../game/config';
-import { FACTIONS, WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
-import type { BattleSimDefenderCounts, BattleSimulationOptions, SimSetting } from '../game/battleSimulation';
+import { WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
+import {
+  BATTLE_SIMULATION_ENEMIES,
+  type BattleSimDefenderCounts, type BattleSimulationOptions, type SimSetting,
+} from '../game/battleSimulation';
 import type { BattleMode, Season, WeatherId } from '../game/types';
 
 interface Props {
@@ -35,7 +38,7 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
   const [mode, setMode] = useState<SimSetting<BattleMode>>('garrison');
   const [factionName, setFactionName] = useState<SimSetting<string>>(RANDOM);
   const [powerRandom, setPowerRandom] = useState(true);
-  const [power, setPower] = useState(45);
+  const [power, setPower] = useState(75);
   const [warned, setWarned] = useState<SimSetting<boolean>>(RANDOM);
   const [siege, setSiege] = useState<SimSetting<boolean>>(false);
   const [season, setSeason] = useState<SimSetting<Season>>('winter');
@@ -44,6 +47,12 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
   const [prepPoints, setPrepPoints] = useState(4);
   const [defendersRandom, setDefendersRandom] = useState(true);
   const [defenders, setDefenders] = useState<BattleSimDefenderCounts>(DEFAULT_DEFENDERS);
+  const [cannonMode, setCannonMode] = useState<'none' | 'fixed' | 'random'>('none');
+  const [cannonCount, setCannonCount] = useState(1);
+  const selectedEnemy = factionName === RANDOM
+    ? null
+    : BATTLE_SIMULATION_ENEMIES.find(enemy => enemy.name === factionName);
+  const courtArmy = factionName === '조정 토벌군';
 
   const setCount = (key: keyof BattleSimDefenderCounts, value: number) =>
     setDefenders(prev => ({ ...prev, [key]: Math.max(0, Math.min(20, Math.round(value) || 0)) }));
@@ -58,6 +67,7 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
     weather,
     prepPoints: prepMode === 'auto' ? 'auto' : prepMode === 'random' ? RANDOM : prepPoints,
     defenders: defendersRandom ? RANDOM : defenders,
+    cannonEmplacements: cannonMode === 'random' ? RANDOM : cannonMode === 'fixed' ? cannonCount : 0,
   });
 
   // boolean 항목용 3택(랜덤/예/아니오) 버튼 열
@@ -101,20 +111,31 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
             </label>
             <label className="sim-field">
               <span>습격 세력</span>
-              <select value={factionName} onChange={event => setFactionName(event.target.value)}>
+              <select value={factionName} onChange={event => {
+                const next = event.target.value;
+                setFactionName(next);
+                if (next === '조정 토벌군') setPower(current => Math.max(140, current));
+              }}>
                 <option value={RANDOM}>랜덤</option>
-                {FACTIONS.map(faction => <option key={faction.name} value={faction.name}>{faction.name}</option>)}
+                {BATTLE_SIMULATION_ENEMIES.map(enemy => (
+                  <option key={enemy.name} value={enemy.name}>{enemy.name}</option>
+                ))}
               </select>
+              <small className={`sim-enemy-note${courtArmy ? ' danger' : ''}`}>
+                {selectedEnemy?.description ?? '니마차·홀라온·변경 마적·조정 토벌군 가운데 하나가 출현합니다.'}
+              </small>
             </label>
             <label className="sim-field">
-              <span>적 전력 {powerRandom ? '(랜덤 20~70)' : `— ${power}`}</span>
+              <span>적 전력 {powerRandom
+                ? (courtArmy ? '(랜덤 140~180)' : '(랜덤 55~100)')
+                : `— ${power}`}</span>
               <div className="sim-inline">
                 <button
                   className={`sim-choice${powerRandom ? ' active' : ''}`}
                   onClick={() => setPowerRandom(!powerRandom)}
                 >랜덤</button>
                 <input
-                  type="range" min={15} max={90} value={power} disabled={powerRandom}
+                  type="range" min={courtArmy ? 120 : 15} max={180} value={power} disabled={powerRandom}
                   onChange={event => setPower(Number(event.target.value))}
                 />
               </div>
@@ -194,8 +215,26 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
                 ))}
               </div>
             )}
+            <label className="sim-field">
+              <span>불랑기포대 {cannonMode === 'fixed' ? `— ${cannonCount}문` : ''}</span>
+              <div className="sim-choice-row">
+                {([['none', '없음'], ['fixed', '보유'], ['random', '랜덤']] as const).map(([option, label]) => (
+                  <button
+                    key={option}
+                    className={`sim-choice${cannonMode === option ? ' active' : ''}`}
+                    onClick={() => setCannonMode(option)}
+                  >{label}</button>
+                ))}
+              </div>
+              {cannonMode === 'fixed' && (
+                <input
+                  type="number" min={1} max={8} value={cannonCount}
+                  onChange={event => setCannonCount(Math.max(1, Math.min(8, Math.round(Number(event.target.value)) || 1)))}
+                />
+              )}
+            </label>
             <p className="sim-note">
-              조총 수비대를 넣으면 화약이 자동으로 지급됩니다. 민병 방어를 고르면 피난 주민 일부가 소집 민병으로 합류합니다.
+              조총 수비대나 불랑기포대를 넣으면 화약이 자동으로 지급됩니다. 민병 방어를 고르면 피난 주민 일부가 소집 민병으로 합류합니다.
             </p>
           </section>
         </div>

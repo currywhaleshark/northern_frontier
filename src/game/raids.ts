@@ -457,7 +457,7 @@ export function openRaidChoice(
       },
       {
         id: 'manual-garrison', label: '직접 지휘한다 — 수비병 요격',
-        desc: '전투 두루마리에서 수비병·파수꾼·사냥꾼을 배치하고 라운드별 전략을 선택합니다.',
+        desc: '전투 두루마리에서 수비병·파수꾼·사냥꾼을 배치하고 교전별 전략을 선택합니다.',
       },
       {
         id: 'manual-levy', label: '직접 지휘한다 — 민병 방어',

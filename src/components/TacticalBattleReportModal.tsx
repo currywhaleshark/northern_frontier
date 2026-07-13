@@ -33,7 +33,7 @@ export function TacticalBattleReportModal({ report, onClose }: Props) {
 
         <div className={`battle-report-outcome ${outcomeTone(report.outcome)}`}>
           <strong>{report.outcomeLabel}</strong>
-          <span>{report.rounds}개 라운드 · 최종 기세 아군 {report.villageMorale}, 적 {report.raiderMorale}</span>
+          <span>{report.rounds}회 교전 · 최종 기세 아군 {report.villageMorale}, 적 {report.raiderMorale}</span>
         </div>
 
         <div className="battle-report-totals">

@@ -2,7 +2,6 @@
 // 격리된 샌드박스 GameState를 만들어 지정/랜덤 조건으로 createTacticalBattle을 연다.
 // 결과는 저장되지 않고, 전투가 끝나면 메뉴로 돌아간다.
 import { CONFIG } from './config';
-import { FACTIONS } from './constants';
 import { addLog } from './events';
 import { makeRng } from './map';
 import { createResident } from './residents';
@@ -26,18 +25,38 @@ export interface BattleSimDefenderCounts {
 export interface BattleSimulationOptions {
   mode: SimSetting<BattleMode>;
   factionName: SimSetting<string>;
-  power: SimSetting<number>;          // 적 전력 (15~90 권장)
+  power: SimSetting<number>;          // 적 전력 (일반 15~180, 토벌군 최소 120)
   warned: SimSetting<boolean>;        // 경보 여부
   siege: SimSetting<boolean>;         // 방책 공성 여부
   season: SimSetting<Season>;
   weather: SimSetting<WeatherId>;
   prepPoints: SimSetting<number> | 'auto'; // 'auto'면 기존 규칙대로 계산
   defenders: SimSetting<BattleSimDefenderCounts>;
+  cannonEmplacements: SimSetting<number>; // 완성된 불랑기포대 수
   seed?: number;
 }
 
 const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter'];
 const WEATHERS: WeatherId[] = ['clear', 'rain', 'frost', 'heavySnow', 'blizzard', 'coldSnap', 'thawFlood'];
+
+export const BATTLE_SIMULATION_ENEMIES = [
+  {
+    name: '니마차 우디캐',
+    description: '숲 사냥꾼과 창잡이 우회대가 매복과 측면 공격을 노립니다.',
+  },
+  {
+    name: '홀라온 야인',
+    description: '기마 선봉과 기마 궁수가 빠르게 방어선의 빈틈을 파고듭니다.',
+  },
+  {
+    name: '변경 마적',
+    description: '두목 친위대와 기마 마적, 약탈패가 창고와 주민을 노립니다.',
+  },
+  {
+    name: '조정 토벌군',
+    description: '훈련도감식 포수·사수·살수에 관군 기병과 화포대가 합류한 최고 난도 편제입니다.',
+  },
+] as const;
 
 // 계절 중간 날짜 — getSeason이 해당 계절을 돌려주는 day 값
 function dayForSeason(season: Season): number {
@@ -92,13 +111,37 @@ export function createBattleSimulation(options: BattleSimulationOptions): GameSt
   state.resources.muskets = counts.muskets;
   state.resources.hornBows = counts.bows;
   state.resources.spears = counts.spears;
-  state.resources.gunpowder = counts.muskets > 0 ? Math.max(10, state.resources.gunpowder) : 0;
+  const cannonSetting = options.cannonEmplacements ?? 0;
+  const cannonCount = Math.max(0, Math.min(8, Math.round(
+    pick(cannonSetting, () => Math.floor(rng() * 5)),
+  )));
+  state.cannonsGranted = Math.max(state.cannonsGranted, cannonCount);
+  for (let i = 0; i < cannonCount; i++) {
+    state.buildings.push({
+      id: state.nextBuildingId++,
+      type: 'cannonEmplacement',
+      x: 0,
+      y: 0,
+      progress: 999,
+      built: true,
+      fieldGrowth: 0,
+    });
+  }
+  state.resources.gunpowder = counts.muskets > 0 || cannonCount > 0
+    ? Math.max(10, cannonCount * CONFIG.raid.powderPerCannon, state.resources.gunpowder)
+    : 0;
 
-  const factionName = pick(options.factionName, () => FACTIONS[Math.floor(rng() * FACTIONS.length)].name);
+  const factionName = pick(options.factionName, () =>
+    BATTLE_SIMULATION_ENEMIES[Math.floor(rng() * BATTLE_SIMULATION_ENEMIES.length)].name);
   const mode = pick(options.mode, () => (rng() < 0.5 ? 'garrison' : 'levy'));
   const warned = pick(options.warned, () => rng() < 0.5);
   const siege = pick(options.siege, () => rng() < 0.35);
-  const power = Math.round(pick(options.power, () => 20 + rng() * 50));
+  const rolledPower = pick(options.power, () =>
+    factionName === '조정 토벌군' ? 140 + rng() * 40 : 55 + rng() * 45);
+  // 토벌군은 낮은 수치를 골라도 정예 상비군 편제 자체가 무너지지 않도록 최소 전력을 보장한다.
+  const power = factionName === '조정 토벌군'
+    ? Math.max(120, Math.round(rolledPower))
+    : Math.round(rolledPower);
 
   const battle = createTacticalBattle(state, { factionName, power, warned, siege, mode });
   if (options.prepPoints !== 'auto') {

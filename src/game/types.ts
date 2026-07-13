@@ -487,6 +487,7 @@ export interface BattleScar {
 
 export type TacticalBattlePhase =
   | 'preparation'
+  | 'preparationExecution'
   | 'deployment'
   | 'command'
   | 'simulating'
@@ -511,6 +512,21 @@ export type DefenderGroupKind =
   | 'civilian';
 
 export type RaiderGroupKind = 'main' | 'looters' | 'flankers';
+export type RaiderUnitType =
+  | 'nimacha-hunter'
+  | 'nimacha-spearman'
+  | 'nimacha-looter'
+  | 'holaon-lancer'
+  | 'holaon-horse-archer'
+  | 'holaon-raider'
+  | 'bandit-vanguard'
+  | 'bandit-rider'
+  | 'bandit-looter'
+  | 'court-gunner'
+  | 'court-archer'
+  | 'court-melee'
+  | 'court-cavalry'
+  | 'court-artillery';
 
 export type TacticalCommandId =
   | 'hold'
@@ -519,6 +535,8 @@ export type TacticalCommandId =
   | 'guardStorehouse'
   | 'protectCivilians'
   | 'fallback'
+  | 'advance'
+  | 'charge'
   | 'counterattack'
   | 'openRetreat';
 
@@ -528,6 +546,7 @@ export type PreparationActionId =
   | 'repairWall'
   | 'setAmbush'
   | 'prepareVolley'
+  | 'preliminaryBombardment'
   | 'musterMilitia';
 
 export interface TacticalBattleZone {
@@ -555,13 +574,16 @@ export interface TacticalDefenderGroup {
   power: number;
   wounded: number;
   killed: number;
+  ambushed?: boolean;
 }
 
 export interface TacticalRaiderGroup {
   id: string;
   kind: RaiderGroupKind;
+  unitType?: RaiderUnitType;
   label: string;
   zoneId: string;
+  pendingZoneId?: string;
   targetZoneId: string;
   power: number;
   count: number;
@@ -569,12 +591,17 @@ export interface TacticalRaiderGroup {
   morale: number;
   intent: 'advance' | 'loot' | 'flank' | 'breakWall' | 'withdraw';
   revealed: boolean;
+  confused?: boolean;
+  combatMultiplier?: number;
+  lossResistance?: number;
+  wallPressureBonus?: number;
 }
 
 export interface TacticalPreparationEffect {
   id: PreparationActionId;
   label: string;
   cost: number;
+  selected: boolean;
   applied: boolean;
 }
 
@@ -582,6 +609,13 @@ export interface TacticalAnimationEvent {
   zoneId: string;
   kind:
     | 'camera'
+    | 'bombardment'
+    | 'fortify'
+    | 'prepareAmbush'
+    | 'readyVolley'
+    | 'muster'
+    | 'evacuate'
+    | 'conceal'
     | 'advance'
     | 'ambush'
     | 'volley'
@@ -663,6 +697,7 @@ export interface TacticalBattle {
   round: number;
   prepPoints: number;
   prepActions: TacticalPreparationEffect[];
+  preparationEvents: TacticalAnimationEvent[];
   zones: TacticalBattleZone[];
   defenderGroups: TacticalDefenderGroup[];
   raiderGroups: TacticalRaiderGroup[];
@@ -672,6 +707,8 @@ export interface TacticalBattle {
   reports: TacticalRoundReport[];
   pendingReport: TacticalRoundReport | null;
   mode: BattleMode;
+  preliminaryBombardmentCannons?: number;
+  preliminaryBombardmentCasualties?: number;
 }
 
 export interface AlertItem {

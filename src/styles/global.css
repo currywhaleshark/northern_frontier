@@ -728,6 +728,12 @@ html, body, #root {
   margin-bottom: 11px;
 }
 .sim-field > span { color: #aeb6ba; font-size: 11px; }
+.sim-enemy-note {
+  color: #8f979b;
+  font-size: 10px;
+  line-height: 1.45;
+}
+.sim-enemy-note.danger { color: #d79b8e; }
 .sim-field select,
 .sim-count input {
   padding: 6px 8px;
@@ -1202,6 +1208,112 @@ html, body, #root {
   color: #b8dbb5;
   font-size: 9px;
 }
+.tactical-barricade {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  bottom: 64px;
+  width: 116px;
+  height: 112px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+  filter: drop-shadow(0 4px 3px rgba(16, 10, 6, 0.65));
+}
+.tactical-barricade::before {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  left: 5px;
+  right: 5px;
+  bottom: 30px;
+  height: 13px;
+  border: 1px solid #3b2414;
+  border-radius: 4px;
+  background: linear-gradient(#8b6238, #51341d);
+  box-shadow: 0 18px 0 -2px #5a3a20;
+}
+.tactical-barricade > b {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 50%;
+  width: max-content;
+  transform: translateX(-50%);
+  padding: 2px 5px;
+  border: 1px solid rgba(221, 190, 127, 0.5);
+  border-radius: 3px;
+  background: rgba(30, 23, 17, 0.82);
+  color: #dcc28b;
+  font-size: 8px;
+}
+.tactical-barricade > i {
+  position: relative;
+  z-index: 1;
+  width: 15px;
+  height: 82px;
+  margin: 0 -1px;
+  clip-path: polygon(50% 0, 100% 13%, 92% 100%, 8% 100%, 0 13%);
+  border: 1px solid #382112;
+  background: linear-gradient(90deg, #4a2d18 0 18%, #956a3b 48%, #5b381d 78%);
+}
+.tactical-barricade > i:nth-of-type(even) { height: 75px; transform: rotate(2deg); }
+.tactical-barricade > i:nth-of-type(3n) { height: 88px; transform: rotate(-2deg); }
+.tactical-barricade.destroyed::before {
+  bottom: 12px;
+  transform: rotate(-11deg);
+  box-shadow: none;
+}
+.tactical-barricade.destroyed > b { color: #e29a82; border-color: rgba(190, 89, 68, 0.65); }
+.tactical-barricade.destroyed > i { height: 38px; transform: translateY(18px) rotate(-54deg); opacity: 0.9; }
+.tactical-barricade.destroyed > i:nth-of-type(even) { transform: translateY(22px) rotate(61deg); }
+.tactical-barricade.destroyed > i:nth-of-type(3n) { transform: translateY(12px) rotate(-24deg); }
+.tactical-barricade.breaking { animation: tactical-barricade-break 720ms ease-out; }
+.tactical-barricade.breaking::after {
+  content: '✶  ·  ╱  ·  ✶';
+  position: absolute;
+  z-index: 5;
+  left: -24px;
+  right: -24px;
+  top: 42px;
+  color: #d6a360;
+  font-size: 20px;
+  letter-spacing: 9px;
+  animation: tactical-splinters 720ms ease-out forwards;
+}
+.tactical-barricade.fortifying { animation: tactical-fortify 480ms ease-in-out 2; }
+.tactical-barricade.fortifying::after {
+  content: '✦  ╱  ✦  ╲  ✦';
+  position: absolute;
+  z-index: 5;
+  left: -30px;
+  right: -30px;
+  top: 32px;
+  color: #f0cd79;
+  font-size: 17px;
+  letter-spacing: 7px;
+  animation: tactical-fortify-sparks 980ms ease-out forwards;
+}
+@keyframes tactical-fortify {
+  35% { transform: translateX(-50%) scale(1.06); filter: drop-shadow(0 0 8px rgba(227, 185, 90, 0.75)); }
+}
+@keyframes tactical-fortify-sparks {
+  from { transform: translateY(16px); opacity: 0; }
+  30% { opacity: 1; }
+  to { transform: translateY(-24px); opacity: 0; }
+}
+@keyframes tactical-barricade-break {
+  25% { transform: translateX(-50%) rotate(-4deg); }
+  52% { transform: translateX(-50%) rotate(5deg) translateY(5px); }
+  100% { transform: translateX(-50%) translateY(16px); }
+}
+@keyframes tactical-splinters {
+  from { transform: translateY(12px) scale(0.55); opacity: 0; }
+  35% { opacity: 1; }
+  to { transform: translateY(-48px) scale(1.25); opacity: 0; }
+}
 .tactical-raider-rank {
   position: absolute;
   z-index: 4;
@@ -1216,7 +1328,8 @@ html, body, #root {
   transform-origin: bottom right;
 }
 .tactical-raider-group {
-  min-width: 112px;
+  min-width: 0;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1232,7 +1345,53 @@ html, body, #root {
   border-radius: 3px;
   background: rgba(17, 20, 21, 0.78);
 }
-.tactical-raider-sprites { height: 120px; display: flex; align-items: flex-end; }
+.tactical-state-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 5px;
+  padding: 1px 4px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.2;
+  vertical-align: 1px;
+}
+.tactical-state-badge.ambushed { color: #a8d6a1; background: rgba(31, 67, 36, 0.78); }
+.tactical-state-badge.confused { color: #e3bd78; background: rgba(83, 54, 25, 0.82); }
+.tactical-raider-group.confused .tactical-raider-sprites {
+  opacity: 0.62;
+  filter: grayscale(0.45) saturate(0.65);
+}
+.tactical-raider-sprites {
+  width: 100%;
+  height: 120px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: visible;
+}
+.tactical-raider-sprites.clustered {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+}
+.tactical-formation-slot {
+  position: absolute;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+}
+.tactical-formation-slot.defender-slot { width: 84px; height: 120px; }
+.tactical-formation-slot.raider-slot { width: 168px; height: 120px; justify-content: center; }
+.tactical-formation-slot .tactical-defender,
+.tactical-formation-slot .tactical-raider,
+.tactical-formation-slot .tactical-raider-unknown {
+  margin-left: 0 !important;
+  margin-bottom: 0 !important;
+}
 .tactical-raider-unknown {
   width: 68px;
   height: 68px;
@@ -1268,6 +1427,8 @@ html, body, #root {
   font-weight: 700;
   text-shadow: 0 1px 3px #0b160d;
 }
+.tactical-field-group.formation-ranged { margin: 0 0 16px 4px; }
+.tactical-field-group.formation-civilian { margin: 0 0 26px 8px; opacity: 0.88; }
 .tactical-unit-line {
   min-height: 120px;
   display: flex;
@@ -1293,7 +1454,23 @@ html, body, #root {
   width: 168px;
   height: 120px;
   filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.7));
+  transform: scaleX(-1);
   transform-origin: bottom center;
+}
+.tactical-court-raider {
+  --raider-scale: 1;
+  width: 168px;
+  height: 120px;
+  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.72));
+  transform: scaleX(-1) scale(var(--raider-scale));
+  transform-origin: bottom center;
+}
+.tactical-court-raider.unit-court-melee { --raider-scale: 1.2; }
+.tactical-court-raider.unit-court-cavalry { --raider-scale: 1.18; }
+.tactical-unit-line.full-formation {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
 }
 .tactical-unit-more {
   align-self: center;
@@ -1412,6 +1589,7 @@ html, body, #root {
 }
 .tactical-action:hover:not(:disabled) { border-color: #d0a651; background: #30373a; }
 .tactical-action:disabled { cursor: not-allowed; opacity: 0.52; }
+.tactical-action.selected { border-color: #d0a651; background: #353a34; box-shadow: inset 0 0 0 1px #8f7439; }
 .tactical-action.applied { border-color: #55835f; opacity: 0.78; }
 .tactical-action > span {
   grid-row: 1 / 3;
@@ -1424,6 +1602,7 @@ html, body, #root {
   font-weight: 700;
 }
 .tactical-action.applied > span { color: #91c699; }
+.tactical-action.selected > span { color: #f0cf78; }
 .tactical-action strong { font-size: 12px; }
 .tactical-action small { color: #aeb6ba; font-size: 10px; line-height: 1.35; }
 
@@ -1439,11 +1618,17 @@ html, body, #root {
 }
 .tactical-deployment-unit {
   display: grid;
-  grid-template-columns: 96px 1fr auto;
+  grid-template-columns: 160px minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px;
 }
+.tactical-deployment-unit .tactical-unit-line {
+  width: 160px;
+  justify-content: flex-start;
+  overflow: hidden;
+}
 .tactical-deployment-unit > span { color: var(--muted); }
+.tactical-deployment-unit > strong { display: flex; align-items: center; min-width: 0; }
 .tactical-zone-buttons { display: grid; grid-template-columns: repeat(4, minmax(88px, 1fr)); gap: 4px; }
 .tactical-zone-buttons button,
 .tactical-group-tabs button,
@@ -1457,7 +1642,8 @@ html, body, #root {
 .tactical-zone-buttons button { min-height: 32px; padding: 4px; font-size: 10px; }
 .tactical-zone-buttons button:hover,
 .tactical-group-tabs button:hover,
-.tactical-command-grid button:hover { border-color: #b9944f; }
+.tactical-command-grid button:hover:not(:disabled) { border-color: #b9944f; }
+.tactical-command-grid button:disabled { opacity: 0.42; cursor: not-allowed; }
 .tactical-zone-buttons button.active,
 .tactical-group-tabs button.active,
 .tactical-command-grid button.active {
@@ -1566,6 +1752,16 @@ html, body, #root {
 .tactical-report-numbers strong { color: #e3e6e7; font-size: 11px; overflow-wrap: anywhere; }
 
 .tactical-zone.event-ambush .tactical-raider-rank { animation: tactical-hit 420ms ease 2; }
+.tactical-zone.event-bombardment .tactical-raider-rank { animation: tactical-bombardment-hit 220ms ease-in-out 4; }
+.tactical-zone.event-conceal::after {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  background: radial-gradient(ellipse at 66% 64%, rgba(28, 39, 31, 0.66), transparent 48%);
+  pointer-events: none;
+  animation: tactical-conceal 950ms ease-out forwards;
+}
 .tactical-zone.event-volley .tactical-raider-rank::after {
   content: '➶  ·  ·  ✦';
   position: absolute;
@@ -1582,16 +1778,28 @@ html, body, #root {
 .tactical-zone.event-casualty .tactical-defender-rank { animation: tactical-casualty 520ms ease; }
 .tactical-zone.event-moraleBreak .tactical-raider-rank { animation: tactical-break 700ms ease forwards; }
 .tactical-zone.event-loot .tactical-raider-rank { animation: tactical-loot 380ms ease 2; }
+.tactical-zone.moving-raiders .tactical-raider-rank { animation: tactical-advance-after-combat 620ms ease-in forwards; }
+.tactical-field-group.prep-prepareAmbush { animation: tactical-prep-ambush 1050ms ease-out forwards; }
+.tactical-field-group.prep-muster { animation: tactical-prep-muster 1050ms ease-out; }
+.tactical-field-group.prep-evacuate { animation: tactical-prep-evacuate 950ms ease-in-out; }
+.tactical-field-group.prep-readyVolley { animation: tactical-prep-ready 420ms ease-in-out 2; }
 
 /* 개별 스프라이트 쓰러짐 — 피해 이벤트 동안 임시로 추가된 스프라이트가 넘어지며 사라진다 */
 .tactical-sprite.falling {
   animation: tactical-fall 620ms ease-in forwards;
   pointer-events: none;
 }
+.tactical-raider.falling { animation-name: tactical-raider-fall; }
+.tactical-court-raider.falling { animation-name: tactical-raider-fall; }
 @keyframes tactical-fall {
   0% { transform: rotate(0) translateY(0); opacity: 1; }
   38% { transform: rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
   100% { transform: rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
+}
+@keyframes tactical-raider-fall {
+  0% { transform: scaleX(-1) scale(var(--raider-scale, 1)) rotate(0) translateY(0); opacity: 1; }
+  38% { transform: scaleX(-1) scale(var(--raider-scale, 1)) rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
+  100% { transform: scaleX(-1) scale(var(--raider-scale, 1)) rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
 }
 
 /* 전황 플로팅 텍스트 — 피해·돌파·약탈 순간 해당 진영 위로 떠오른다 */
@@ -1619,12 +1827,44 @@ html, body, #root {
 
 @keyframes tactical-spin { to { transform: rotate(360deg); } }
 @keyframes tactical-hit { 0%, 100% { transform: translateX(0); } 35% { transform: translateX(-7px); } 70% { transform: translateX(6px); } }
+@keyframes tactical-bombardment-hit {
+  0%, 100% { transform: translate(0, 0); }
+  45% { transform: translate(-9px, 5px); filter: sepia(0.9) saturate(2.2); }
+}
+@keyframes tactical-conceal {
+  0% { opacity: 0; }
+  42% { opacity: 1; }
+  100% { opacity: 0.25; }
+}
+@keyframes tactical-prep-ambush {
+  0% { transform: translate(40px, 0); opacity: 1; }
+  55% { transform: translate(-22px, 12px) scale(0.94); opacity: 0.72; }
+  100% { transform: translate(-34px, 18px) scale(0.9); opacity: 0.48; filter: saturate(0.65); }
+}
+@keyframes tactical-prep-muster {
+  0% { transform: translateX(150px); opacity: 0; }
+  70% { transform: translateX(-8px); opacity: 1; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes tactical-prep-evacuate {
+  0% { transform: translateX(0); opacity: 1; }
+  55% { transform: translateX(110px); opacity: 0.35; }
+  100% { transform: translateX(150px); opacity: 0; }
+}
+@keyframes tactical-prep-ready {
+  35% { transform: translateY(-7px); filter: drop-shadow(0 0 5px rgba(239, 210, 131, 0.75)); }
+}
 @keyframes tactical-volley { from { transform: translate(-80px, 28px); opacity: 0; } to { transform: translate(60px, -10px); opacity: 1; } }
 @keyframes tactical-casualty { 45% { filter: sepia(1) saturate(4); transform: translateY(4px); } }
 @keyframes tactical-break { to { transform: translateX(-80px); opacity: 0.25; } }
 @keyframes tactical-loot { 50% { transform: translateY(-6px) rotate(-1deg); } }
 @keyframes tactical-charge-right { 45% { transform: translateX(46px); } }
 @keyframes tactical-charge-left { 45% { transform: translateX(-46px); } }
+@keyframes tactical-advance-after-combat {
+  0% { transform: translateX(0); opacity: 1; }
+  70% { transform: translateX(86px); opacity: 1; }
+  100% { transform: translateX(132px); opacity: 0.22; }
+}
 
 /* ── 투사체·타격 이펙트 레이어 ── */
 .tactical-fx-layer {
@@ -1677,6 +1917,52 @@ html, body, #root {
   filter: blur(3px);
   opacity: 0;
   animation: fx-smoke-drift 950ms ease-out forwards;
+}
+.tactical-fx-layer.bombardment { z-index: 9; }
+.fx-cannon-flash,
+.fx-cannon-shell,
+.fx-explosion { position: absolute; display: block; opacity: 0; }
+.fx-cannon-flash {
+  bottom: 148px;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff9da 0 8%, #ffca58 18%, rgba(221, 87, 25, 0.72) 42%, transparent 70%);
+  animation: fx-cannon-flash 480ms ease-out forwards;
+}
+.fx-cannon-shell {
+  right: 18%;
+  width: 18px;
+  height: 7px;
+  border-radius: 50%;
+  background: #28221b;
+  box-shadow: 0 0 10px 4px rgba(255, 167, 62, 0.8), 24px 0 18px 5px rgba(190, 190, 180, 0.35);
+  animation: fx-cannon-shell 680ms cubic-bezier(0.3, 0.05, 0.65, 1) forwards;
+}
+.fx-explosion {
+  bottom: 118px;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff5bd 0 7%, #ffbd45 18%, #b9401f 42%, rgba(45, 40, 35, 0.82) 58%, transparent 72%);
+  filter: blur(1px);
+  animation: fx-explosion 720ms ease-out forwards;
+}
+@keyframes fx-cannon-flash {
+  0% { transform: scale(0.2); opacity: 0; }
+  25% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+@keyframes fx-cannon-shell {
+  0% { transform: translate(0, 0) rotate(-8deg); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: translate(min(-52vw, -520px), -42px) rotate(-22deg); opacity: 0.85; }
+}
+@keyframes fx-explosion {
+  0% { transform: scale(0.15); opacity: 0; }
+  18% { transform: scale(1.05); opacity: 1; }
+  55% { transform: scale(1.5); opacity: 0.82; }
+  100% { transform: scale(2.1) translateY(-20px); opacity: 0; filter: blur(8px); }
 }
 @keyframes fx-smoke-drift {
   0% { opacity: 0; transform: translate(0, 0) scale(0.5); }

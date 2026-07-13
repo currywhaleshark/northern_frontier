@@ -174,6 +174,20 @@ export function loadGame(): GameState | null {
     if (!Object.prototype.hasOwnProperty.call(parsed, 'tacticalBattle')) parsed.tacticalBattle = null;
     if (!Object.prototype.hasOwnProperty.call(parsed, 'tacticalBattleReport')) parsed.tacticalBattleReport = null;
     if (parsed.tacticalBattle) {
+      if (!Array.isArray(parsed.tacticalBattle.preparationEvents)) parsed.tacticalBattle.preparationEvents = [];
+      for (const action of parsed.tacticalBattle.prepActions) {
+        if (action.selected == null) action.selected = action.applied;
+        if (action.id === 'setAmbush' || action.id === 'prepareVolley') action.cost = 2;
+      }
+      if (!parsed.tacticalBattle.prepActions.some(action => action.id === 'preliminaryBombardment')) {
+        parsed.tacticalBattle.prepActions.push({
+          id: 'preliminaryBombardment',
+          label: '사전포격',
+          cost: 3,
+          selected: false,
+          applied: false,
+        });
+      }
       const totalPower = parsed.tacticalBattle.raiderGroups.reduce((sum, group) => sum + group.power, 0);
       const estimatedTotal = Math.max(3, Math.round(parsed.tacticalBattle.originalPower / CONFIG.tacticalBattle.raiderPowerPerFighter));
       for (const group of parsed.tacticalBattle.raiderGroups) {
@@ -181,6 +195,16 @@ export function loadGame(): GameState | null {
           group.count = Math.max(1, Math.round(estimatedTotal * (totalPower > 0 ? group.power / totalPower : 1 / 3)));
         }
         if (group.killed == null) group.killed = 0;
+        if (group.confused == null) group.confused = false;
+      }
+      const preparedAmbush = parsed.tacticalBattle.prepActions.some(action =>
+        action.id === 'setAmbush' && action.applied);
+      for (const group of parsed.tacticalBattle.defenderGroups) {
+        if (group.ambushed != null) continue;
+        group.ambushed = group.kind === 'hunter' && group.zoneId === 'approach' && preparedAmbush;
+        const enemyHere = parsed.tacticalBattle.raiderGroups.some(raider =>
+          raider.zoneId === group.zoneId && raider.intent !== 'withdraw' && raider.power > 0);
+        if (group.command === 'ambush' && !group.ambushed && enemyHere) group.command = 'hold';
       }
       for (const report of parsed.tacticalBattle.reports) {
         if (report.raidersKilled == null) report.raidersKilled = 0;

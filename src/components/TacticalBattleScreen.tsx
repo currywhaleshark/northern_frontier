@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { RESOURCE_NAMES, WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
+import { countBuilt } from '../game/buildings';
 import { getSeason } from '../game/seasons';
-import { tacticalCommandDescription, tacticalLootText } from '../game/tacticalBattle';
+import {
+  tacticalCommandDescription, tacticalCommandUnavailableReason, tacticalLootText,
+  tacticalPreparationUnavailableReason,
+} from '../game/tacticalBattle';
 import type {
   DefenderGroupKind,
   GameState,
@@ -9,10 +13,12 @@ import type {
   TacticalAnimationEvent,
   TacticalCommandId,
   TacticalDefenderGroup,
+  RaiderUnitType,
 } from '../game/types';
 import { tacticalBackgroundAsset } from '../render/tacticalBackgroundAssets';
 import {
-  TACTICAL_CHARACTER_SHEET, TACTICAL_MILITIA_SHEET, TACTICAL_RAIDER_SHEET, tacticalRaiderColumn,
+  TACTICAL_CHARACTER_SHEET, TACTICAL_COURT_ARMY_SHEET, TACTICAL_MILITIA_SHEET,
+  TACTICAL_RAIDER_SHEET, tacticalRaiderColumn,
 } from '../render/tacticalCharacterAssets';
 import { playSfx, setBattleDrums, type SfxName } from '../sound/sfx';
 
@@ -32,28 +38,42 @@ const PREP_DESCRIPTIONS: Record<PreparationActionId, string> = {
   evacuateCivilians: '중심지 주민 피해를 크게 줄이고 마을 기세를 높입니다.',
   hideSupplies: '창고가 뚫려도 곡물과 땔감 약탈량을 줄입니다.',
   repairWall: '방어선의 방어 보너스를 높이고 초기 압박을 낮춥니다.',
-  setAmbush: '접근로 매복을 강화하고 숨은 적 조를 미리 드러냅니다.',
+  setAmbush: '접근로 사냥꾼을 즉시 매복중 상태로 만들고 숨은 적 조를 미리 드러냅니다.',
   prepareVolley: '각궁·조총·파수꾼의 일제 사격 효과를 높입니다.',
+  preliminaryBombardment: '보유한 불랑기포대로 접전 전에 포격합니다. 포대 1문당 화약 2를 소모합니다.',
   musterMilitia: '피난 주민 일부를 민병으로 소집합니다. 마을 기세가 조금 낮아집니다.',
 };
 
 const COMMANDS: TacticalCommandId[] = [
-  'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'fallback',
+  'hold', 'charge', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'fallback', 'advance',
 ];
 
 const COMMAND_LABELS: Record<TacticalCommandId, string> = {
   hold: '고수',
+  charge: '돌격',
   volley: '일제 사격',
   ambush: '매복',
   guardStorehouse: '창고 사수',
   protectCivilians: '주민 보호',
   fallback: '후퇴',
+  advance: '전진',
   counterattack: '반격',
   openRetreat: '퇴로 개방',
 };
 
+function commandLabel(command: TacticalCommandId, group: TacticalDefenderGroup): string {
+  return command === 'ambush' && group.ambushed ? '급습' : COMMAND_LABELS[command];
+}
+
 // 연출 이벤트 종류별 효과음 매핑 — camera/report처럼 소리가 없는 이벤트는 생략
 const EVENT_SFX: Partial<Record<TacticalAnimationEvent['kind'], SfxName>> = {
+  bombardment: 'wallHit',
+  fortify: 'hammer',
+  prepareAmbush: 'ambush',
+  readyVolley: 'good',
+  muster: 'welcome',
+  evacuate: 'raidDrum',
+  conceal: 'good',
   volley: 'volley',
   melee: 'melee',
   ambush: 'ambush',
@@ -66,7 +86,20 @@ const EVENT_SFX: Partial<Record<TacticalAnimationEvent['kind'], SfxName>> = {
 };
 
 // 일제 사격 명령이 유효한 원거리 병종 — volley 이벤트 때 반동 모션을 준다
-const RANGED_KINDS = new Set<DefenderGroupKind>(['militia-bow', 'militia-musket', 'watchman']);
+const RANGED_KINDS = new Set<DefenderGroupKind>(['militia-bow', 'militia-musket']);
+const MELEE_FORMATION_KINDS = new Set<DefenderGroupKind>(['militia-spear', 'militia-unarmed', 'watchman']);
+const RANGED_FORMATION_KINDS = new Set<DefenderGroupKind>(['militia-bow', 'militia-musket', 'hunter']);
+
+function defenderFormationRole(kind: DefenderGroupKind): 'melee' | 'ranged' | 'civilian' {
+  if (MELEE_FORMATION_KINDS.has(kind)) return 'melee';
+  if (RANGED_FORMATION_KINDS.has(kind)) return 'ranged';
+  return 'civilian';
+}
+
+function defenderFormationOrder(kind: DefenderGroupKind): number {
+  const role = defenderFormationRole(kind);
+  return role === 'melee' ? 0 : role === 'ranged' ? 1 : 2;
+}
 
 const KIND_COLUMNS: Partial<Record<DefenderGroupKind, number>> = {
   'militia-unarmed': 9,
@@ -108,14 +141,47 @@ function DefenderSprite({ kind, gender, faded = false, falling = false }: {
   );
 }
 
-function RaiderSprite({ faction, hidden, offset, falling = false }: {
+const COURT_UNIT_COLUMNS: Partial<Record<RaiderUnitType, number>> = {
+  'court-gunner': 0,
+  'court-archer': 1,
+  'court-melee': 2,
+  'court-cavalry': 3,
+  'court-artillery': 4,
+};
+
+function CourtRaiderSprite({ unitType, falling }: { unitType: RaiderUnitType; falling: boolean }) {
+  const column = COURT_UNIT_COLUMNS[unitType] ?? 0;
+  return (
+    <span
+      className={`tactical-sprite tactical-court-raider unit-${unitType}${falling ? ' falling' : ''}`}
+      style={{
+        backgroundImage: `url(${TACTICAL_COURT_ARMY_SHEET.src})`,
+        backgroundPosition: `${-column * TACTICAL_COURT_ARMY_SHEET.spriteWidth}px 0px`,
+        backgroundSize: `${TACTICAL_COURT_ARMY_SHEET.columns * TACTICAL_COURT_ARMY_SHEET.spriteWidth}px ${TACTICAL_COURT_ARMY_SHEET.spriteHeight}px`,
+      }}
+      aria-hidden="true"
+    />
+  );
+}
+
+function RaiderSprite({ faction, unitType, hidden, offset, falling = false }: {
   faction: string;
+  unitType?: RaiderUnitType;
   hidden: boolean;
   offset: number;
   falling?: boolean;
 }) {
+  if (!hidden && faction === '조정 토벌군' && unitType?.startsWith('court-')) {
+    return <CourtRaiderSprite unitType={unitType} falling={falling} />;
+  }
   const column = tacticalRaiderColumn(faction);
-  if (hidden || column == null) return <span className="tactical-raider-unknown" aria-hidden="true">?</span>;
+  if (hidden || column == null) return (
+    <span
+      className="tactical-raider-unknown"
+      style={{ marginLeft: offset > 0 ? -52 : 0, marginBottom: (offset % 3) * 4 }}
+      aria-hidden="true"
+    >?</span>
+  );
   return (
     <span
       className={`tactical-sprite tactical-raider${falling ? ' falling' : ''}`}
@@ -123,27 +189,102 @@ function RaiderSprite({ faction, hidden, offset, falling = false }: {
         backgroundImage: `url(${TACTICAL_RAIDER_SHEET.src})`,
         backgroundPosition: `${-column * TACTICAL_RAIDER_SHEET.spriteWidth}px 0px`,
         backgroundSize: `${TACTICAL_RAIDER_SHEET.columns * TACTICAL_RAIDER_SHEET.spriteWidth}px ${TACTICAL_RAIDER_SHEET.spriteHeight}px`,
-        marginLeft: offset > 0 ? -54 : 0,
+        marginLeft: offset > 0 ? -140 : 0,
+        marginBottom: (offset % 3) * 4,
       }}
       aria-hidden="true"
     />
   );
 }
 
-function GroupSprites({ state, group, falling = 0 }: {
+function formationDimensions(
+  count: number,
+  spriteWidth: number,
+  spriteHeight: number,
+  xStep: number,
+  yStep: number,
+  maxColumns: number,
+): { columns: number; rows: number; width: number; height: number } {
+  const columns = Math.max(1, Math.min(maxColumns, count, Math.ceil(Math.sqrt(Math.max(1, count) * 1.5))));
+  const rows = Math.max(1, Math.ceil(Math.max(1, count) / columns));
+  return {
+    columns,
+    rows,
+    width: spriteWidth + (columns - 1) * xStep,
+    height: spriteHeight + (rows - 1) * yStep,
+  };
+}
+
+function formationSlotStyle(
+  index: number,
+  count: number,
+  spriteWidth: number,
+  spriteHeight: number,
+  xStep: number,
+  yStep: number,
+  maxColumns: number,
+): CSSProperties {
+  const formation = formationDimensions(count, spriteWidth, spriteHeight, xStep, yStep, maxColumns);
+  const row = Math.floor(index / formation.columns);
+  const column = index % formation.columns;
+  const rowCount = Math.min(formation.columns, count - row * formation.columns);
+  const rowWidth = spriteWidth + (rowCount - 1) * xStep;
+  const rowInset = (formation.width - rowWidth) / 2;
+  const jitterX = ((index * 17) % 7) - 3;
+  const jitterY = ((index * 11) % 5) - 2;
+  return {
+    left: rowInset + column * xStep + jitterX,
+    bottom: (formation.rows - 1 - row) * yStep + jitterY,
+    zIndex: 20 + row * formation.columns + column,
+  };
+}
+
+function GroupSprites({ state, group, falling = 0, maxVisible = 4, showAll = false }: {
   state: GameState;
   group: TacticalDefenderGroup;
   falling?: number; // 지금 재생 중인 피해 이벤트로 쓰러지는 인원 — 그만큼 추가로 그려 쓰러뜨린다
+  maxVisible?: number;
+  showAll?: boolean;
 }) {
   const active = Math.max(0, group.count - group.wounded - group.killed);
-  const shown = Math.min(4, active);
-  const fallingShown = Math.min(2, falling);
+  const shown = showAll ? active : Math.min(maxVisible, active);
+  const fallingShown = showAll ? falling : Math.min(2, falling);
   const gender = (index: number) => {
     const residentId = group.residentIds[index];
     return state.residents.find(resident => resident.id === residentId)?.gender ?? (index % 2 ? 'female' : 'male');
   };
+  if (showAll && shown + fallingShown > 0) {
+    const total = shown + fallingShown;
+    const formation = formationDimensions(total, 84, 120, 20, 13, 6);
+    return (
+      <div
+        className="tactical-unit-line full-formation"
+        style={{ width: formation.width, height: formation.height }}
+        aria-label={`${group.label} ${active}명 전투 가능`}
+      >
+        {Array.from({ length: shown }, (_, index) => (
+          <span
+            className="tactical-formation-slot defender-slot"
+            style={formationSlotStyle(index, total, 84, 120, 20, 13, 6)}
+            key={`${group.id}-${index}`}
+          >
+            <DefenderSprite kind={group.kind} gender={gender(index)} />
+          </span>
+        ))}
+        {Array.from({ length: fallingShown }, (_, index) => (
+          <span
+            className="tactical-formation-slot defender-slot"
+            style={formationSlotStyle(shown + index, total, 84, 120, 20, 13, 6)}
+            key={`${group.id}-fall-${index}`}
+          >
+            <DefenderSprite kind={group.kind} gender={gender(shown + index)} falling />
+          </span>
+        ))}
+      </div>
+    );
+  }
   return (
-    <div className="tactical-unit-line" aria-label={`${group.label} ${active}명 전투 가능`}>
+    <div className={`tactical-unit-line${showAll ? ' full-formation' : ''}`} aria-label={`${group.label} ${active}명 전투 가능`}>
       {Array.from({ length: shown }, (_, index) => (
         <DefenderSprite key={`${group.id}-${index}`} kind={group.kind} gender={gender(index)} />
       ))}
@@ -159,7 +300,10 @@ function GroupSprites({ state, group, falling = 0 }: {
 function zoneEffects(zoneId: string, battle: NonNullable<GameState['tacticalBattle']>): string[] {
   const active = new Set(battle.prepActions.filter(action => action.applied).map(action => action.id));
   const labels: string[] = [];
-  if (zoneId === 'approach' && active.has('setAmbush')) labels.push('매복 준비');
+  if (zoneId === 'approach' && active.has('setAmbush')) labels.push('사냥꾼 매복 배치');
+  if (zoneId === 'approach' && active.has('preliminaryBombardment')) {
+    labels.push(`사전포격 ${battle.preliminaryBombardmentCannons ?? 0}문`);
+  }
   if (zoneId === 'wall' && active.has('repairWall')) labels.push('응급 수리');
   if (zoneId === 'wall' && active.has('prepareVolley')) labels.push('사격 준비');
   if (zoneId === 'storehouse' && active.has('hideSupplies')) labels.push('물자 은닉');
@@ -226,10 +370,42 @@ export function TacticalBattleScreen({
   const [stingerRound, setStingerRound] = useState<number | null>(null);
   const [fast, setFast] = useState(false);
   const fastRef = useRef(false);
-  const activeEvent = battle?.phase === 'simulating'
-    ? battle.pendingReport?.events[eventIndex] ?? null
-    : null;
+  const preparationPlayback = battle?.phase === 'preparationExecution';
+  const combatPlayback = battle?.phase === 'simulating';
+  const playbackActive = preparationPlayback || combatPlayback;
+  const activeEvent = preparationPlayback
+    ? battle.preparationEvents[eventIndex] ?? null
+    : combatPlayback ? battle.pendingReport?.events[eventIndex] ?? null : null;
   const activeZoneId = activeEvent?.zoneId ?? viewedZoneId;
+
+  useEffect(() => {
+    if (!battle || battle.phase !== 'preparationExecution') return;
+    let cancelled = false;
+    let timer = 0;
+    const events = battle.preparationEvents;
+    fastRef.current = false;
+    setFast(false);
+    const play = (index: number) => {
+      if (cancelled) return;
+      if (index >= events.length) {
+        timer = window.setTimeout(onAdvancePhase, 360);
+        return;
+      }
+      setEventIndex(index);
+      const sfx = EVENT_SFX[events[index].kind];
+      if (sfx) playSfx(sfx);
+      const duration = fastRef.current ? Math.min(180, events[index].durationMs) : events[index].durationMs;
+      timer = window.setTimeout(() => play(index + 1), duration);
+    };
+    setEventIndex(0);
+    timer = window.setTimeout(() => play(0), 260);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+    // Phase and battle id uniquely identify a preparation playback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [battle?.id, battle?.phase]);
 
   useEffect(() => {
     if (!battle || battle.phase !== 'simulating' || !battle.pendingReport) return;
@@ -276,7 +452,7 @@ export function TacticalBattleScreen({
 
   // 재생 중 스페이스로 남은 연출을 배속한다 (클릭은 무대 영역에서 처리)
   useEffect(() => {
-    if (battle?.phase !== 'simulating') return;
+    if (!playbackActive) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.code !== 'Space') return;
       event.preventDefault();
@@ -285,7 +461,7 @@ export function TacticalBattleScreen({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [battle?.phase]);
+  }, [playbackActive]);
 
   useEffect(() => {
     if (!battle) return;
@@ -337,7 +513,7 @@ export function TacticalBattleScreen({
     });
   }
   const enableFastForward = () => {
-    if (battle.phase !== 'simulating') return;
+    if (!playbackActive) return;
     fastRef.current = true;
     setFast(true);
   };
@@ -346,14 +522,14 @@ export function TacticalBattleScreen({
 
   return (
     <div className="tactical-overlay" role="dialog" aria-modal="true" aria-label={`${battle.factionName} 습격 직접 지휘`}>
-      <div className={`tactical-screen${activeEvent?.kind === 'wallHit' ? ' shaking' : ''}`}>
+      <div className={`tactical-screen${activeEvent?.kind === 'wallHit' || activeEvent?.kind === 'bombardment' ? ' shaking' : ''}`}>
         <header className="tactical-header">
           <div>
             <div className="tactical-kicker">습격 방어 지휘</div>
             <h1>{battle.factionName}</h1>
           </div>
           <div className="tactical-status-row">
-            <div><span>라운드</span><strong>{Math.min(roundLabel, 5)} / 5</strong></div>
+            <div><span>교전</span><strong>{Math.min(roundLabel, 5)} / 5</strong></div>
             <div className="tactical-morale-board">
               <div className="tactical-morale-row village">
                 <span>우리 기세</span>
@@ -380,24 +556,36 @@ export function TacticalBattleScreen({
           <div className="tactical-battlefield" ref={viewportRef}>
             <div className="tactical-strip">
               {battle.zones.map(zone => {
-              const defenders = battle.defenderGroups.filter(group => group.zoneId === zone.id);
+              const defenders = battle.defenderGroups
+                .filter(group => group.zoneId === zone.id)
+                .sort((a, b) => defenderFormationOrder(a.kind) - defenderFormationOrder(b.kind));
               const raiders = battle.raiderGroups.filter(group => group.zoneId === zone.id && group.intent !== 'withdraw');
               const effects = zoneEffects(zone.id, battle);
               const zoneVolley = activeEvent?.kind === 'volley' && activeEvent.zoneId === zone.id;
+              const zoneBombardment = activeEvent?.kind === 'bombardment' && activeEvent.zoneId === zone.id;
               const musketsFiring = zoneVolley && defenders.some(group =>
                 group.kind === 'militia-musket' && group.count - group.wounded - group.killed > 0);
               const scars = Math.min(9, zoneScarCounts[zone.id] ?? 0);
+              const liveBreachEventIndex = battle.phase === 'simulating'
+                ? battle.pendingReport?.events.findIndex(item =>
+                  item.zoneId === zone.id && item.side === 'defender' &&
+                  (item.kind === 'wallHit' || item.float === '돌파!')) ?? -1
+                : -1;
+              const visibleBreached = zone.breached &&
+                (liveBreachEventIndex < 0 || eventIndex >= liveBreachEventIndex);
+              const raidersAdvancing = activeEvent?.kind === 'advance' &&
+                activeEvent.zoneId === zone.id && activeEvent.side !== 'defender';
               return (
                 <section
                   key={zone.id}
                   data-zone-id={zone.id}
-                  className={`tactical-zone zone-${zone.kind}${zone.id === activeZoneId ? ' focused' : ''}${zone.breached ? ' breached' : ''}${eventClass(activeEvent, zone.id)}`}
+                  className={`tactical-zone zone-${zone.kind}${zone.id === activeZoneId ? ' focused' : ''}${visibleBreached ? ' breached' : ''}${raidersAdvancing ? ' moving-raiders' : ''}${eventClass(activeEvent, zone.id)}`}
                   style={{ backgroundImage: `url(${tacticalBackgroundAsset(zone.kind, season)})` }}
                 >
                   <div className="tactical-zone-heading">
                     <div>
                       <strong>{zone.name}</strong>
-                      <span>{zone.breached ? '돌파됨' : `압박 ${Math.round(zone.pressure)}`}</span>
+                      <span>{visibleBreached ? '돌파됨' : `압박 ${Math.round(zone.pressure)}`}</span>
                     </div>
                     <div className="tactical-pressure" aria-label={`압박 ${Math.round(zone.pressure)}`}>
                       <i style={{ width: `${zone.pressure}%` }} />
@@ -413,7 +601,7 @@ export function TacticalBattleScreen({
                       ))}
                     </div>
                   )}
-                  {zone.breached && (
+                  {visibleBreached && (
                     <div className="tactical-ruin-layer" aria-hidden="true">
                       <span className="ruin-ember" />
                       <span className="ruin-smoke" style={{ left: '24%' }} />
@@ -440,37 +628,97 @@ export function TacticalBattleScreen({
                       )}
                     </div>
                   )}
+                  {zoneBombardment && (
+                    <div className="tactical-fx-layer bombardment" key={`bombardment-${eventIndex}`} aria-hidden="true">
+                      {Array.from({ length: Math.max(1, battle.preliminaryBombardmentCannons ?? 1) }, (_, index) => (
+                        <span key={index}>
+                          <i
+                            className="fx-cannon-flash"
+                            style={{ animationDelay: `${index * 95}ms`, right: `${11 + (index % 4) * 3}%` }}
+                          />
+                          <i
+                            className="fx-cannon-shell"
+                            style={{ animationDelay: `${index * 95}ms`, bottom: `${150 + (index % 3) * 18}px` }}
+                          />
+                          <i
+                            className="fx-explosion"
+                            style={{ animationDelay: `${430 + index * 95}ms`, left: `${13 + (index * 17) % 31}%` }}
+                          />
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {zone.kind === 'wall' && (
+                    <div
+                      className={`tactical-barricade${visibleBreached ? ' destroyed' : ''}${activeEvent?.kind === 'wallHit' && activeEvent.zoneId === zone.id ? ' breaking' : ''}${activeEvent?.kind === 'fortify' && activeEvent.zoneId === zone.id ? ' fortifying' : ''}`}
+                      aria-label={visibleBreached ? '파괴된 방책' : '방어선 방책'}
+                    >
+                      <b>{visibleBreached ? '방책 파괴' : '방책'}</b>
+                      {Array.from({ length: 7 }, (_, index) => <i key={index} />)}
+                    </div>
+                  )}
                   <div className="tactical-raider-rank">
-                    {raiders.map((raider, index) => (
-                      <div className="tactical-raider-group" key={raider.id}>
-                        <div className="tactical-raider-sprites">
-                          <RaiderSprite faction={battle.factionName} hidden={!raider.revealed} offset={index} />
-                          {raider.revealed && raider.power > battle.originalPower * 0.2 && (
-                            <RaiderSprite faction={battle.factionName} hidden={false} offset={1} />
-                          )}
-                          {activeEvent?.kind === 'casualty' && activeEvent.groupId === raider.id && raider.revealed && (
-                            <RaiderSprite key={`fall-${eventIndex}`} faction={battle.factionName} hidden={false} offset={1} falling />
-                          )}
+                    {raiders.map(raider => {
+                      const activeRaiders = Math.max(0, raider.count - raider.killed);
+                      const fallingRaiders = raider.revealed && activeEvent?.kind === 'casualty' && activeEvent.groupId === raider.id
+                        ? activeEvent.casualties ?? 0 : 0;
+                      const totalRaiders = activeRaiders + fallingRaiders;
+                      const formation = formationDimensions(totalRaiders, 168, 120, 22, 14, 5);
+                      return (
+                        <div className={`tactical-raider-group${raider.confused ? ' confused' : ''}`} key={raider.id}>
+                          <div
+                            className="tactical-raider-sprites clustered"
+                            style={{ width: formation.width, height: formation.height }}
+                            aria-label={`${raider.label} ${activeRaiders}명`}
+                          >
+                            {Array.from({ length: activeRaiders }, (_, spriteIndex) => (
+                              <span
+                                className="tactical-formation-slot raider-slot"
+                                style={formationSlotStyle(spriteIndex, totalRaiders, 168, 120, 22, 14, 5)}
+                                key={`${raider.id}-${spriteIndex}`}
+                              >
+                                <RaiderSprite faction={battle.factionName} unitType={raider.unitType} hidden={!raider.revealed} offset={0} />
+                              </span>
+                            ))}
+                            {Array.from({ length: fallingRaiders }, (_, casualtyIndex) => (
+                              <span
+                                className="tactical-formation-slot raider-slot"
+                                style={formationSlotStyle(activeRaiders + casualtyIndex, totalRaiders, 168, 120, 22, 14, 5)}
+                                key={`${raider.id}-fall-${eventIndex}-${casualtyIndex}`}
+                              >
+                                <RaiderSprite faction={battle.factionName} unitType={raider.unitType} hidden={false} offset={0} falling />
+                              </span>
+                            ))}
+                          </div>
+                          <span>
+                            {raider.revealed ? `${raider.label} ${activeRaiders}명 · ${raider.intent === 'loot' ? '약탈' : raider.intent === 'flank' ? '우회' : raider.intent === 'breakWall' ? '공성' : '전진'}` : '정체불명'}
+                            {raider.confused && <em className="tactical-state-badge confused">혼란</em>}
+                          </span>
                         </div>
-                        <span>{raider.revealed ? `${raider.label} ${Math.max(0, raider.count - raider.killed)}명 · ${raider.intent === 'loot' ? '약탈' : raider.intent === 'flank' ? '우회' : '전진'}` : '정체불명'}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <div className="tactical-defender-rank">
                     {defenders.map(group => {
                       // volley 순간 사격 병종은 반동 모션 — key를 바꿔 애니메이션을 다시 튼다
                       const recoiling = zoneVolley && RANGED_KINDS.has(group.kind);
+                      const prepMotion = activeEvent?.kind === 'readyVolley' && activeEvent.zoneId === zone.id && RANGED_KINDS.has(group.kind)
+                        ? ' prep-readyVolley'
+                        : activeEvent?.groupId === group.id && activeEvent.zoneId === zone.id
+                          ? ` prep-${activeEvent.kind}`
+                          : '';
                       return (
                         <div
-                          className={`tactical-field-group${recoiling ? ' recoil' : ''}`}
-                          key={recoiling ? `${group.id}-recoil-${eventIndex}` : group.id}
+                          className={`tactical-field-group formation-${defenderFormationRole(group.kind)}${recoiling ? ' recoil' : ''}${prepMotion}`}
+                          key={recoiling || prepMotion ? `${group.id}-motion-${eventIndex}` : group.id}
                         >
                           <GroupSprites
                             state={state}
                             group={group}
+                            showAll
                             falling={activeEvent?.kind === 'casualty' && activeEvent.groupId === group.id ? activeEvent.casualties ?? 0 : 0}
                           />
-                          <span>{group.label}</span>
+                          <span>{group.label}{group.ambushed && <em className="tactical-state-badge ambushed">매복중</em>}</span>
                         </div>
                       );
                     })}
@@ -489,7 +737,7 @@ export function TacticalBattleScreen({
           <button
             type="button"
             className="tactical-stage-nav previous"
-            disabled={activeZoneIndex <= 0 || battle.phase === 'simulating'}
+            disabled={activeZoneIndex <= 0 || playbackActive}
             onClick={() => showZone(activeZoneIndex - 1)}
             title="이전 방어선"
             aria-label="이전 방어선"
@@ -497,7 +745,7 @@ export function TacticalBattleScreen({
           <button
             type="button"
             className="tactical-stage-nav next"
-            disabled={activeZoneIndex >= battle.zones.length - 1 || battle.phase === 'simulating'}
+            disabled={activeZoneIndex >= battle.zones.length - 1 || playbackActive}
             onClick={() => showZone(activeZoneIndex + 1)}
             title="다음 방어선"
             aria-label="다음 방어선"
@@ -521,11 +769,13 @@ export function TacticalBattleScreen({
             </div>
           )}
           {state.weather === 'blizzard' && <div className="tactical-visibility-veil" aria-hidden="true" />}
-          {activeEvent?.kind === 'wallHit' && <div className="tactical-vignette" key={`vignette-${eventIndex}`} aria-hidden="true" />}
+          {(activeEvent?.kind === 'wallHit' || activeEvent?.kind === 'bombardment') && (
+            <div className="tactical-vignette" key={`vignette-${eventIndex}`} aria-hidden="true" />
+          )}
           {stingerRound != null && (
             <div className="tactical-round-stinger" key={`stinger-${stingerRound}`} aria-hidden="true">
               <div>
-                <strong>제{Math.min(stingerRound, 5)}라운드</strong>
+                <strong>제{Math.min(stingerRound, 5)}차 교전</strong>
                 <span>{battle.factionName} 습격 방어</span>
               </div>
             </div>
@@ -541,38 +791,64 @@ export function TacticalBattleScreen({
           {battle.phase === 'preparation' && (
             <>
               <div className="tactical-panel-heading">
-                <div><strong>전투 준비</strong><span>남은 준비점수 {battle.prepPoints}</span></div>
-                <button className="btn primary" onClick={onAdvancePhase}>배치로 이동</button>
+                <div>
+                  <strong>준비태세 선택</strong>
+                  <span>남은 준비점수 {battle.prepPoints} · 선택한 태세는 실행 전까지 취소할 수 있습니다.</span>
+                </div>
+                <button className="btn primary" onClick={onAdvancePhase}>선택한 준비 실행</button>
               </div>
               <div className="tactical-action-grid">
-                {battle.prepActions.map(action => (
-                  <button
-                    key={action.id}
-                    className={`tactical-action${action.applied ? ' applied' : ''}`}
-                    disabled={action.applied || battle.prepPoints < action.cost}
-                    onClick={() => onSpendPreparation(action.id)}
-                  >
-                    <span>{action.applied ? '완료' : `${action.cost}점`}</span>
-                    <strong>{action.label}</strong>
-                    <small>{PREP_DESCRIPTIONS[action.id]}</small>
-                  </button>
-                ))}
+                {battle.prepActions
+                  .filter(action => action.id !== 'preliminaryBombardment' || countBuilt(state, 'cannonEmplacement') > 0)
+                  .map(action => {
+                    const unavailableReason = tacticalPreparationUnavailableReason(state, action.id);
+                    const disabled = action.applied || (!action.selected && (
+                      battle.prepPoints < action.cost || unavailableReason != null
+                    ));
+                    return (
+                      <button
+                        key={action.id}
+                        className={`tactical-action${action.selected ? ' selected' : ''}${action.applied ? ' applied' : ''}`}
+                        disabled={disabled}
+                        onClick={() => onSpendPreparation(action.id)}
+                      >
+                        <span>{action.applied ? '완료' : action.selected ? '취소' : `${action.cost}점`}</span>
+                        <strong>{action.label}</strong>
+                        <small>{unavailableReason ?? PREP_DESCRIPTIONS[action.id]}</small>
+                      </button>
+                    );
+                  })}
               </div>
             </>
+          )}
+
+          {battle.phase === 'preparationExecution' && (
+            <div className="tactical-simulating preparation-execution">
+              <div className="tactical-loader" />
+              <strong>{activeEvent?.text ?? '선택한 준비태세를 실행하고 있습니다.'}</strong>
+              <span>준비 실행 {Math.min(eventIndex + 1, battle.preparationEvents.length)} / {battle.preparationEvents.length}</span>
+              <span className={`tactical-fast-hint${fast ? ' active' : ''}`}>
+                {fast ? '배속 재생 중' : '화면 클릭 또는 스페이스로 빨리감기'}</span>
+            </div>
           )}
 
           {battle.phase === 'deployment' && (
             <>
               <div className="tactical-panel-heading">
-                <div><strong>수비대 배치</strong><span>각 병력을 지킬 구역에 배치합니다.</span></div>
+                <div>
+                  <strong>수비대 배치</strong>
+                  <span>{battle.preliminaryBombardmentCannons
+                    ? `사전포격 ${battle.preliminaryBombardmentCannons}문 · 적 ${battle.preliminaryBombardmentCasualties ?? 0}명 전투불능`
+                    : '각 병력을 지킬 구역에 배치합니다.'}</span>
+                </div>
                 <button className="btn primary" onClick={onAdvancePhase}>전투 시작</button>
               </div>
               <div className="tactical-deployment-list">
                 {battle.defenderGroups.map(group => (
                   <div className="tactical-deployment-row" key={group.id}>
                     <div className="tactical-deployment-unit">
-                      <GroupSprites state={state} group={group} />
-                      <strong>{group.label}</strong>
+                      <GroupSprites state={state} group={group} maxVisible={2} />
+                      <strong>{group.label}{group.ambushed && <em className="tactical-state-badge ambushed">매복중</em>}</strong>
                       <span>{group.count}명</span>
                     </div>
                     <div className="tactical-zone-buttons">
@@ -593,8 +869,8 @@ export function TacticalBattleScreen({
           {battle.phase === 'command' && selectedGroup && (
             <>
               <div className="tactical-panel-heading">
-                <div><strong>{battle.round}라운드 지휘</strong><span>현재 초점: {battle.zones.find(zone => zone.id === battle.currentZoneId)?.name}</span></div>
-                <button className="btn primary" onClick={onResolveRound}>라운드 진행</button>
+                <div><strong>제{battle.round}차 교전 지휘</strong><span>현재 초점: {battle.zones.find(zone => zone.id === battle.currentZoneId)?.name}</span></div>
+                <button className="btn primary" onClick={onResolveRound}>교전 개시</button>
               </div>
               <div className="tactical-command-layout">
                 <div className="tactical-group-tabs">
@@ -605,26 +881,28 @@ export function TacticalBattleScreen({
                       onClick={() => setSelectedGroupId(group.id)}
                     >
                       <strong>{group.label}</strong>
-                      <span>{battle.zones.find(zone => zone.id === group.zoneId)?.name} · {group.command ? COMMAND_LABELS[group.command] : '명령 대기'}</span>
+                      <span>{battle.zones.find(zone => zone.id === group.zoneId)?.name} · {group.command ? commandLabel(group.command, group) : '명령 대기'}{group.ambushed ? ' · 매복중' : ''}</span>
                     </button>
                   ))}
                 </div>
                 <div className="tactical-command-options">
                   <div className="tactical-selected-group">
                     <GroupSprites state={state} group={selectedGroup} />
-                    <div><strong>{selectedGroup.label}</strong><span>{battle.zones.find(zone => zone.id === selectedGroup.zoneId)?.name}</span></div>
+                    <div><strong>{selectedGroup.label}</strong><span>{battle.zones.find(zone => zone.id === selectedGroup.zoneId)?.name}{selectedGroup.ambushed ? ' · 매복중' : ''}</span></div>
                   </div>
                   <div className="tactical-command-grid">
-                    {COMMANDS.map(command => (
-                      <button
-                        key={command}
-                        className={selectedGroup.command === command ? 'active' : ''}
-                        onClick={() => onSetCommand(selectedGroup.id, command)}
-                      >
-                        <strong>{COMMAND_LABELS[command]}</strong>
-                        <span>{tacticalCommandDescription(command)}</span>
-                      </button>
-                    ))}
+                    {COMMANDS
+                      .filter(command => tacticalCommandUnavailableReason(battle, selectedGroup, command) == null)
+                      .map(command => (
+                        <button
+                          key={command}
+                          className={selectedGroup.command === command ? 'active' : ''}
+                          onClick={() => onSetCommand(selectedGroup.id, command)}
+                        >
+                          <strong>{commandLabel(command, selectedGroup)}</strong>
+                          <span>{tacticalCommandDescription(command, selectedGroup.ambushed)}</span>
+                        </button>
+                      ))}
                   </div>
                 </div>
               </div>
@@ -635,7 +913,7 @@ export function TacticalBattleScreen({
             <div className="tactical-simulating">
               <div className="tactical-loader" />
               <strong>{activeEvent?.text ?? '전황을 살피는 중입니다.'}</strong>
-              <span>제{battle.pendingReport?.round ?? battle.round}라운드</span>
+              <span>제{battle.pendingReport?.round ?? battle.round}차 교전</span>
               <span className={`tactical-fast-hint${fast ? ' active' : ''}`}>
                 {fast ? '배속 재생 중 — 결과는 온전히 표시됩니다' : '화면 클릭 또는 스페이스로 빨리감기'}
               </span>
@@ -645,7 +923,7 @@ export function TacticalBattleScreen({
           {battle.phase === 'report' && report && (
             <div className="tactical-report">
               <div>
-                <span className="tactical-report-label">제{report.round}라운드 보고</span>
+                <span className="tactical-report-label">제{report.round}차 교전 보고</span>
                 <h2>{report.summary}</h2>
                 {report.lines.map((line, index) => <p key={`${line}-${index}`}>{line}</p>)}
               </div>
@@ -656,7 +934,7 @@ export function TacticalBattleScreen({
                 <div><span>약탈</span><strong>{tacticalLootText(report) || '없음'}</strong></div>
               </div>
               <button className="btn primary" onClick={onAcknowledgeReport}>
-                {report.ended ? '전투 장계 확인' : '다음 라운드 지휘'}
+                {report.ended ? '전투 장계 확인' : '다음 교전 지휘'}
               </button>
             </div>
           )}

@@ -22,6 +22,13 @@ export const TACTICAL_RAIDER_SHEET = {
   src: '/assets/tactical/faction-raiders-tactical-v1.png',
 } as const;
 
+export const TACTICAL_COURT_ARMY_SHEET = {
+  spriteWidth: 168,
+  spriteHeight: 120,
+  columns: 5,
+  src: '/assets/tactical/court-army-tactical-v1.png',
+} as const;
+
 const RAIDER_COLUMNS: Record<string, number> = {
   '오도리 씨족': 0,
   '올량합 부락': 1,
