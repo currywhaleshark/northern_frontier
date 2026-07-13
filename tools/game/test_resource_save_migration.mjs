@@ -30,6 +30,7 @@ globalThis.localStorage = {
 const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
+const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
@@ -83,6 +84,33 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
   assert.equal(Object.hasOwn(loaded.resources, 'game'), false);
   assert.equal(loaded.map[legacyStone.y][legacyStone.x].mineralRemaining, CONFIG.minerals.legacyStone);
   assert.equal(loaded.map[legacyIron.y][legacyIron.x].mineralRemaining, CONFIG.minerals.legacyIron);
+}
+
+{
+  const legacy = simulation.newGame(2026071331);
+  const battle = tactical.createTacticalBattle(legacy, {
+    factionName: '변경 마적', power: 70, warned: true, siege: false, mode: 'garrison',
+  });
+  for (const group of battle.defenderGroups) delete group.line;
+  for (const group of battle.raiderGroups) {
+    delete group.engagementsInZone;
+    delete group.flankPlan;
+    delete group.flankPlanRevealed;
+    delete group.rearAssault;
+  }
+  assert.equal(saveLoad.saveGame(legacy), true);
+  const loaded = saveLoad.loadGame();
+  assert.ok(loaded?.tacticalBattle);
+  assert.ok(loaded.tacticalBattle.defenderGroups.every(group => group.line === 'front' || group.line === 'rear'));
+  assert.ok(loaded.tacticalBattle.defenderGroups
+    .filter(group => ['militia-spear', 'militia-unarmed', 'watchman'].includes(group.kind))
+    .every(group => group.line === 'front'));
+  assert.ok(loaded.tacticalBattle.raiderGroups.every(group => group.engagementsInZone === 0));
+  const flankers = loaded.tacticalBattle.raiderGroups.find(group => group.kind === 'flankers');
+  assert.ok(flankers);
+  assert.equal(flankers.flankPlan, 'breakthrough');
+  assert.equal(flankers.flankPlanRevealed, false);
+  assert.equal(flankers.rearAssault, false);
 }
 
 console.log('resource save migration tests passed');

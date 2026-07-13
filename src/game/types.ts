@@ -512,6 +512,8 @@ export type DefenderGroupKind =
   | 'civilian';
 
 export type RaiderGroupKind = 'main' | 'looters' | 'flankers';
+export type TacticalFormationLine = 'front' | 'rear';
+export type TacticalFlankPlan = 'breakthrough' | 'rearAssault';
 export type RaiderUnitType =
   | 'nimacha-hunter'
   | 'nimacha-spearman'
@@ -574,6 +576,7 @@ export interface TacticalDefenderGroup {
   power: number;
   wounded: number;
   killed: number;
+  line: TacticalFormationLine;
   ambushed?: boolean;
 }
 
@@ -595,6 +598,10 @@ export interface TacticalRaiderGroup {
   combatMultiplier?: number;
   lossResistance?: number;
   wallPressureBonus?: number;
+  engagementsInZone: number;
+  flankPlan?: TacticalFlankPlan;
+  flankPlanRevealed?: boolean;
+  rearAssault?: boolean;
 }
 
 export interface TacticalPreparationEffect {
@@ -616,6 +623,9 @@ export interface TacticalAnimationEvent {
     | 'muster'
     | 'evacuate'
     | 'conceal'
+    | 'zoneFall'
+    | 'artilleryHit'
+    | 'rearAssault'
     | 'advance'
     | 'ambush'
     | 'volley'

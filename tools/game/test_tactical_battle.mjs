@@ -79,6 +79,15 @@ function addBuiltMarker(state, type) {
   assert.ok(battle.defenderGroups.some(group => group.kind === 'militia-musket'));
   assert.ok(battle.defenderGroups.some(group => group.kind === 'militia-bow'));
   assert.ok(battle.defenderGroups.some(group => group.kind === 'militia-spear'));
+  assert.ok(battle.defenderGroups
+    .filter(group => ['militia-spear', 'militia-unarmed', 'watchman'].includes(group.kind))
+    .every(group => group.line === 'front'));
+  assert.ok(battle.defenderGroups
+    .filter(group => ['militia-musket', 'militia-bow', 'hunter', 'civilian'].includes(group.kind))
+    .every(group => group.line === 'rear'));
+  assert.ok(battle.raiderGroups
+    .filter(group => group.kind === 'flankers')
+    .every(group => group.flankPlan === 'breakthrough' || group.flankPlan === 'rearAssault'));
   assert.ok(battle.prepPoints >= 1 && battle.prepPoints <= 8);
   assert.deepEqual(
     Object.fromEntries(battle.prepActions.map(action => [action.id, action.cost])),
@@ -129,9 +138,13 @@ function addBuiltMarker(state, type) {
   assert.ok(movable);
   assert.equal(tactical.assignDefenderGroup(state, movable.id, 'storehouse'), null);
   assert.equal(movable.zoneId, 'storehouse');
+  assert.equal(tactical.setDefenderFormationLine(state, movable.id, 'rear'), null);
+  assert.equal(movable.line, 'rear');
 
   assert.equal(tactical.advanceTacticalPhase(state), null);
   assert.equal(battle.phase, 'command');
+  assert.equal(tactical.setDefenderFormationLine(state, movable.id, 'front'), null);
+  assert.equal(movable.line, 'front');
   assert.equal(tactical.setTacticalCommand(state, movable.id, 'guardStorehouse'), null);
   assert.equal(movable.command, 'guardStorehouse');
 
@@ -263,7 +276,7 @@ function addBuiltMarker(state, type) {
   const raiderZones = new Map(battle.raiderGroups.map(group => [group.id, group.zoneId]));
   assert.equal(tactical.resolveTacticalRound(state), null);
   assert.equal(hunters.ambushed, false, 'a surprise attack consumes the ambushed state');
-  assert.equal(hunters.command, null, 'a consumed surprise attack waits for a new order');
+  assert.equal(hunters.command, 'fallback', 'hunters disengage automatically after a surprise attack');
   assert.ok(battle.raiderGroups.every(group => group.confused), 'guaranteed test chance confuses every raider group');
   assert.ok(battle.pendingReport.events.some(event => event.kind === 'ambush' && event.float === '혼란!'));
   assert.ok(
@@ -273,6 +286,8 @@ function addBuiltMarker(state, type) {
   assert.equal(tactical.completeTacticalSimulation(state), null);
   assert.equal(tactical.acknowledgeTacticalReport(state), null);
   assert.ok(battle.raiderGroups.every(group => !group.confused), 'confusion expires before the next engagement');
+  assert.equal(hunters.zoneId, 'wall', 'hunters fall back one line after their surprise attack');
+  assert.equal(hunters.command, 'hold', 'the automatic fallback is consumed after movement');
 }
 
 {
@@ -332,6 +347,23 @@ function addBuiltMarker(state, type) {
   assert.equal(civilians.count + mustered.count, civiliansBefore);
   assert.ok(battle.preparationEvents.some(event =>
     event.kind === 'muster' && event.zoneId === 'wall' && event.groupId === mustered.id));
+}
+
+{
+  const state = simulation.newGame(2026071313);
+  prepareDefenders(state);
+  addBuiltMarker(state, 'cannonEmplacement');
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'preparation-camera-order-test', power: 80, warned: true, siege: true, mode: 'garrison',
+  });
+  battle.prepPoints = 8;
+  for (const actionId of ['repairWall', 'setAmbush', 'prepareVolley', 'preliminaryBombardment']) {
+    assert.equal(tactical.spendPreparationAction(state, actionId), null);
+  }
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  const zoneOrder = new Map(battle.zones.map(zone => [zone.id, zone.order]));
+  const eventOrders = battle.preparationEvents.map(event => zoneOrder.get(event.zoneId));
+  assert.ok(eventOrders.every((order, index) => index === 0 || eventOrders[index - 1] <= order));
 }
 
 {
@@ -456,6 +488,28 @@ function addBuiltMarker(state, type) {
 }
 
 {
+  const state = simulation.newGame(2026071326);
+  prepareDefenders(state);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: '조정 토벌군', power: 160, warned: true, siege: true, mode: 'garrison',
+  });
+  tactical.advanceTacticalPhase(state);
+  battle.defenderGroups.forEach(group => { group.zoneId = 'center'; });
+  tactical.advanceTacticalPhase(state);
+  const mainGroups = battle.raiderGroups.filter(group => group.kind === 'main');
+  assert.ok(mainGroups.length >= 3);
+  mainGroups.forEach(group => { group.zoneId = 'wall'; group.morale = 100; });
+  battle.raiderGroups.filter(group => group.kind !== 'main').forEach(group => { group.intent = 'withdraw'; });
+  battle.zones.find(zone => zone.id === 'wall').breached = true;
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.ok(battle.pendingReport.events.some(event => event.kind === 'artilleryHit' && event.zoneId === 'wall'));
+  const groupedAdvances = battle.pendingReport.events.filter(event =>
+    event.kind === 'advance' && event.zoneId === 'wall' && event.text.includes('교전을 마치고'));
+  assert.equal(groupedAdvances.length, 1, 'same-route raider groups share one advance event');
+  assert.ok(groupedAdvances[0].text.includes('·'), 'the grouped advance caption lists participating units');
+}
+
+{
   const state = simulation.newGame(2026071216);
   prepareDefenders(state);
   const battle = tactical.createTacticalBattle(state, {
@@ -503,6 +557,7 @@ function addBuiltMarker(state, type) {
   assert.equal(tactical.completeTacticalSimulation(state), null);
   assert.equal(tactical.acknowledgeTacticalReport(state), null);
   assert.equal(advancingGroup.zoneId, 'storehouse', 'defender advances one line after the report');
+  assert.equal(advancingGroup.command, 'hold', 'advance is a one-engagement movement command');
 }
 
 {
@@ -522,6 +577,7 @@ function addBuiltMarker(state, type) {
   assert.equal(tactical.completeTacticalSimulation(state), null);
   assert.equal(tactical.acknowledgeTacticalReport(state), null);
   assert.equal(retreatingGroup.zoneId, 'wall', 'retreating defenders move to the next rear line');
+  assert.equal(retreatingGroup.command, 'hold', 'fallback is consumed after movement');
   retreatingGroup.zoneId = 'center';
   assert.match(
     tactical.setTacticalCommand(state, retreatingGroup.id, 'fallback'),
@@ -550,6 +606,182 @@ function addBuiltMarker(state, type) {
 }
 
 {
+  const state = simulation.newGame(2026071320);
+  prepareDefenders(state);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'flanker-center-pressure-test', power: 90, warned: true, siege: false, mode: 'garrison',
+  });
+  tactical.advanceTacticalPhase(state);
+  battle.defenderGroups.filter(group => group.kind !== 'civilian').forEach(group => { group.zoneId = 'wall'; });
+  tactical.advanceTacticalPhase(state);
+  const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
+  assert.ok(flanker);
+  flanker.zoneId = 'center';
+  flanker.power = 90;
+  flanker.morale = 100;
+  battle.raiderGroups.filter(group => group !== flanker).forEach(group => { group.intent = 'withdraw'; });
+  const center = battle.zones.find(zone => zone.id === 'center');
+  center.pressure = 0;
+  for (let engagement = 0; engagement < 2; engagement++) {
+    assert.equal(tactical.resolveTacticalRound(state), null);
+    assert.notEqual(battle.pendingReport.outcome, 'villageRouted');
+    if (engagement === 0) {
+      assert.equal(tactical.completeTacticalSimulation(state), null);
+      assert.equal(tactical.acknowledgeTacticalReport(state), null);
+      flanker.morale = 100;
+      battle.raiderMorale = 100;
+    }
+  }
+  assert.ok(center.pressure <= 68, 'rear-line pressure is capped per engagement');
+  assert.equal(center.breached, false, 'flankers cannot rout a civilian-only center within two engagements');
+}
+
+{
+  const state = simulation.newGame(2026071321);
+  prepareDefenders(state);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'guarded-flanker-delay-test', power: 90, warned: true, siege: false, mode: 'garrison',
+  });
+  tactical.advanceTacticalPhase(state);
+  battle.defenderGroups.forEach(group => { group.zoneId = 'storehouse'; });
+  tactical.advanceTacticalPhase(state);
+  const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
+  assert.ok(flanker);
+  flanker.zoneId = 'storehouse';
+  flanker.power = 180;
+  flanker.morale = 100;
+  flanker.engagementsInZone = 0;
+  battle.round = 3;
+  battle.raiderGroups.filter(group => group !== flanker).forEach(group => { group.intent = 'withdraw'; });
+  battle.defenderGroups.forEach(group => { group.command = 'hold'; });
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.equal(flanker.pendingZoneId, undefined, 'a guarded storehouse forces flankers to fight on arrival');
+  assert.equal(tactical.completeTacticalSimulation(state), null);
+  assert.equal(tactical.acknowledgeTacticalReport(state), null);
+  flanker.morale = 100;
+  battle.raiderMorale = 100;
+  battle.defenderGroups.forEach(group => { group.command = 'hold'; });
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.equal(flanker.pendingZoneId, 'center', 'flankers may continue after fighting one storehouse engagement');
+  assert.ok(battle.pendingReport.lines.some(line => line.includes('방책을 우회')));
+}
+
+{
+  const state = simulation.newGame(2026071322);
+  prepareDefenders(state);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'looter-infiltration-test', power: 90, warned: true, siege: false, mode: 'garrison',
+  });
+  tactical.advanceTacticalPhase(state);
+  battle.defenderGroups.forEach(group => { group.zoneId = 'wall'; });
+  tactical.advanceTacticalPhase(state);
+  const looters = battle.raiderGroups.find(group => group.kind === 'looters');
+  assert.ok(looters);
+  looters.zoneId = 'wall';
+  looters.engagementsInZone = 2;
+  looters.morale = 100;
+  battle.raiderGroups.filter(group => group !== looters).forEach(group => { group.intent = 'withdraw'; });
+  battle.defenderGroups.forEach(group => { group.command = 'hold'; });
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.equal(looters.pendingZoneId, 'storehouse', 'looters infiltrate after waiting at an intact wall');
+  assert.ok(battle.pendingReport.lines.some(line => line.includes('방책의 틈')));
+  assert.equal(tactical.completeTacticalSimulation(state), null);
+  assert.equal(tactical.acknowledgeTacticalReport(state), null);
+  battle.defenderGroups.forEach(group => { group.zoneId = 'wall'; group.command = 'hold'; });
+  looters.power = 180;
+  looters.morale = 100;
+  battle.raiderMorale = 100;
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.ok(battle.pendingReport.events.some(event => event.kind === 'loot'), 'infiltrated looters threaten stored supplies');
+}
+
+{
+  const state = simulation.newGame(2026071323);
+  prepareDefenders(state);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'empty-zone-event-test', power: 70, warned: true, siege: false, mode: 'garrison',
+  });
+  tactical.advanceTacticalPhase(state);
+  battle.defenderGroups.forEach(group => { group.zoneId = 'center'; });
+  tactical.advanceTacticalPhase(state);
+  const main = battle.raiderGroups.find(group => group.kind === 'main');
+  assert.ok(main);
+  main.zoneId = 'storehouse';
+  battle.raiderGroups.filter(group => group !== main).forEach(group => { group.intent = 'withdraw'; });
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  const storehouseEvents = battle.pendingReport.events.filter(event => event.zoneId === 'storehouse');
+  assert.ok(storehouseEvents.some(event => event.kind === 'advance' && event.text.includes('저항 없이')));
+  assert.ok(!storehouseEvents.some(event => event.kind === 'melee'), 'empty zones do not play melee captions or sounds');
+}
+
+{
+  const state = simulation.newGame(2026071324);
+  prepareDefenders(state);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'center-fall-event-test', power: 100, warned: true, siege: false, mode: 'garrison',
+  });
+  tactical.advanceTacticalPhase(state);
+  battle.defenderGroups.forEach(group => { group.zoneId = 'wall'; });
+  tactical.advanceTacticalPhase(state);
+  const main = battle.raiderGroups.find(group => group.kind === 'main');
+  assert.ok(main);
+  main.zoneId = 'center';
+  main.power = 160;
+  main.morale = 100;
+  battle.raiderGroups.filter(group => group !== main).forEach(group => { group.intent = 'withdraw'; });
+  battle.zones.find(zone => zone.id === 'center').pressure = 90;
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.equal(battle.pendingReport.outcome, 'villageRouted');
+  assert.ok(battle.pendingReport.events.some(event =>
+    event.kind === 'zoneFall' && event.zoneId === 'center' && event.durationMs >= 900));
+}
+
+{
+  const wallPressureAfter = defensePowerRatio => {
+    const state = simulation.newGame(2026071325 + defensePowerRatio);
+    prepareDefenders(state);
+    const battle = tactical.createTacticalBattle(state, {
+      factionName: 'wall-pressure-balance-test', power: 100, warned: true, siege: false, mode: 'garrison',
+    });
+    tactical.advanceTacticalPhase(state);
+    battle.defenderGroups.forEach(group => { group.zoneId = 'wall'; });
+    tactical.advanceTacticalPhase(state);
+    const main = battle.raiderGroups.find(group => group.kind === 'main');
+    assert.ok(main);
+    main.zoneId = 'wall';
+    main.power = 100;
+    main.count = 25;
+    main.morale = 100;
+    battle.originalPower = 100;
+    battle.raiderGroups.filter(group => group !== main).forEach(group => { group.intent = 'withdraw'; group.power = 0; });
+    const wall = battle.zones.find(zone => zone.id === 'wall');
+    wall.pressure = 0;
+    wall.breached = false;
+    const baseDefense = battle.defenderGroups.reduce((sum, group) => sum + group.power * 0.82, 0) *
+      (1 + wall.defenseBonus / 100);
+    const scale = 100 * defensePowerRatio / Math.max(1, baseDefense);
+    battle.defenderGroups.forEach(group => { group.power *= scale; });
+    for (let engagement = 0; engagement < 5; engagement++) {
+      battle.defenderGroups.forEach(group => { group.command = 'hold'; });
+      main.morale = 100;
+      battle.raiderMorale = 100;
+      assert.equal(tactical.resolveTacticalRound(state), null);
+      if (engagement < 4 && !battle.pendingReport.ended) {
+        assert.equal(tactical.completeTacticalSimulation(state), null);
+        assert.equal(tactical.acknowledgeTacticalReport(state), null);
+      } else if (battle.pendingReport.ended) {
+        break;
+      }
+    }
+    return { pressure: wall.pressure, breached: wall.breached };
+  };
+  const equalLine = wallPressureAfter(1);
+  const overwhelmingDefense = wallPressureAfter(2);
+  assert.ok(equalLine.pressure >= 60, 'equal forces put an intact wall under meaningful five-engagement pressure');
+  assert.equal(overwhelmingDefense.breached, false, 'two-to-one defenders still prevent a wall breach');
+}
+
+{
   const wallPressureAfter = mixedCommands => {
     const state = simulation.newGame(2026071317);
     prepareDefenders(state);
@@ -572,6 +804,110 @@ function addBuiltMarker(state, type) {
     mixedLine > allHolding + 2,
     'one holding unit must not grant the full pressure reduction to an entire mixed defensive line',
   );
+}
+
+{
+  const runFlankAssault = ({ rearAssault, rearGuard }) => {
+    const state = battleSimulation.createBattleSimulation({
+      mode: 'garrison', factionName: '변경 마적', power: 120, warned: true, siege: false,
+      season: 'winter', weather: 'clear', prepPoints: 0, seed: 2026071330,
+      defenders: {
+        muskets: 0, bows: 18, spears: 18, unarmedMilitia: 0,
+        watchmen: 0, hunters: 0, civilians: 4,
+      },
+      cannonEmplacements: 0,
+    });
+    const battle = state.tacticalBattle;
+    tactical.advanceTacticalPhase(state);
+    const bow = battle.defenderGroups.find(group => group.kind === 'militia-bow');
+    const spear = battle.defenderGroups.find(group => group.kind === 'militia-spear');
+    assert.ok(bow && spear);
+    battle.defenderGroups.forEach(group => {
+      group.zoneId = group === bow || group === spear ? 'wall' : 'center';
+      group.command = 'hold';
+    });
+    bow.line = 'rear';
+    spear.line = rearGuard ? 'rear' : 'front';
+    tactical.advanceTacticalPhase(state);
+    const flankers = battle.raiderGroups.find(group => group.kind === 'flankers');
+    assert.ok(flankers);
+    battle.raiderGroups.forEach(group => {
+      group.intent = group === flankers ? 'flank' : 'withdraw';
+      if (group !== flankers) group.power = 0;
+    });
+    Object.assign(flankers, {
+      zoneId: 'wall', targetZoneId: rearAssault ? 'wall' : 'center',
+      flankPlan: rearAssault ? 'rearAssault' : 'breakthrough', rearAssault,
+      revealed: true, count: 200, killed: 0, power: 800, morale: 100, engagementsInZone: 0,
+    });
+    battle.raiderMorale = 100;
+    const wall = battle.zones.find(zone => zone.id === 'wall');
+    wall.pressure = 0;
+    assert.equal(tactical.resolveTacticalRound(state), null);
+    return {
+      bowCasualties: bow.wounded + bow.killed,
+      spearCasualties: spear.wounded + spear.killed,
+      wallPressure: wall.pressure,
+      flankersKilled: flankers.killed,
+      events: battle.pendingReport.events,
+      lines: battle.pendingReport.lines,
+    };
+  };
+
+  const breakthrough = runFlankAssault({ rearAssault: false, rearGuard: false });
+  const exposedRear = runFlankAssault({ rearAssault: true, rearGuard: false });
+  const guardedRear = runFlankAssault({ rearAssault: true, rearGuard: true });
+  assert.ok(exposedRear.events.some(event => event.kind === 'rearAssault' && event.float === '후방 급습!'));
+  assert.ok(exposedRear.bowCasualties > exposedRear.spearCasualties,
+    'an unguarded rear assault concentrates casualties on rear ranged troops');
+  assert.ok(guardedRear.bowCasualties < exposedRear.bowCasualties,
+    'rear-line melee troops shield ranged troops from a rear assault');
+  assert.ok(guardedRear.flankersKilled > exposedRear.flankersKilled,
+    'rear-line melee troops remove the flankers’ loss-resistance advantage');
+  assert.ok(exposedRear.wallPressure <= breakthrough.wallPressure / 2,
+    'rear assault flankers contribute no more than half normal wall pressure');
+  assert.ok(exposedRear.lines.some(line => line.includes('후방 급습')));
+}
+
+{
+  const runDefaultScenario = (factionName, power, seed) => {
+    const state = battleSimulation.createBattleSimulation({
+      mode: 'garrison', factionName, power, warned: true, siege: true,
+      season: 'winter', weather: 'clear', prepPoints: 'auto', seed,
+      defenders: {
+        muskets: 3, bows: 3, spears: 4, unarmedMilitia: 0,
+        watchmen: 2, hunters: 3, civilians: 6,
+      },
+      cannonEmplacements: 0,
+    });
+    const battle = state.tacticalBattle;
+    tactical.advanceTacticalPhase(state);
+    tactical.advanceTacticalPhase(state);
+    const wallPressure = [];
+    while (battle.phase === 'command') {
+      assert.equal(tactical.resolveTacticalRound(state), null);
+      wallPressure.push(Math.round(battle.zones.find(zone => zone.id === 'wall').pressure));
+      if (battle.pendingReport.ended) break;
+      assert.equal(tactical.completeTacticalSimulation(state), null);
+      assert.equal(tactical.acknowledgeTacticalReport(state), null);
+    }
+    return {
+      factionName,
+      outcome: battle.pendingReport?.outcome,
+      wallPressure,
+      wallBreached: battle.zones.find(zone => zone.id === 'wall').breached,
+      centerBreached: battle.zones.find(zone => zone.id === 'center').breached,
+      lootEvents: battle.reports.flatMap(report => report.events).filter(event => event.kind === 'loot').length,
+    };
+  };
+  const bandits = runDefaultScenario('변경 마적', 78, 2026071378);
+  const court = runDefaultScenario('조정 토벌군', 166, 2026071366);
+  assert.ok(Math.max(...bandits.wallPressure) >= 20, 'bandit main force creates meaningful wall pressure');
+  assert.equal(bandits.centerBreached, false, 'bandit cavalry alone does not rout the village center');
+  assert.ok(bandits.lootEvents >= 1, 'an unattended bandit raid gets at least one looting attempt');
+  assert.notEqual(court.outcome, 'defenseSuccess', 'the court punitive force remains a losing matchup by default');
+  assert.equal(court.wallBreached, true, 'court artillery and main forces can break the wall within five engagements');
+  assert.ok(Math.max(...court.wallPressure) >= 100);
 }
 
 for (const optionId of ['militia', 'levy']) {

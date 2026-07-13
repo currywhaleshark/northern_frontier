@@ -196,10 +196,21 @@ export function loadGame(): GameState | null {
         }
         if (group.killed == null) group.killed = 0;
         if (group.confused == null) group.confused = false;
+        if (group.engagementsInZone == null) group.engagementsInZone = 0;
+        if (group.kind === 'flankers' && group.flankPlan !== 'rearAssault' && group.flankPlan !== 'breakthrough') {
+          group.flankPlan = 'breakthrough';
+        }
+        if (group.rearAssault == null) group.rearAssault = false;
+        if (group.flankPlanRevealed == null) group.flankPlanRevealed = false;
       }
       const preparedAmbush = parsed.tacticalBattle.prepActions.some(action =>
         action.id === 'setAmbush' && action.applied);
       for (const group of parsed.tacticalBattle.defenderGroups) {
+        if (group.line !== 'front' && group.line !== 'rear') {
+          group.line = group.kind === 'militia-spear' || group.kind === 'militia-unarmed' || group.kind === 'watchman'
+            ? 'front'
+            : 'rear';
+        }
         if (group.ambushed != null) continue;
         group.ambushed = group.kind === 'hunter' && group.zoneId === 'approach' && preparedAmbush;
         const enemyHere = parsed.tacticalBattle.raiderGroups.some(raider =>

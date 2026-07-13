@@ -20,6 +20,7 @@ import type {
   TacticalBattleZone,
   TacticalCommandId,
   TacticalDefenderGroup,
+  TacticalFormationLine,
   TacticalRaiderGroup,
   RaiderUnitType,
   TacticalRoundReport,
@@ -73,6 +74,11 @@ const ROUTES: Record<TacticalRaiderGroup['kind'], string[]> = {
   flankers: ['approach', 'storehouse', 'center'],
 };
 
+function routeForRaider(attacker: TacticalRaiderGroup): string[] {
+  if (attacker.kind === 'flankers' && attacker.flankPlan === 'rearAssault') return ['approach', 'wall'];
+  return ROUTES[attacker.kind];
+}
+
 function nextRearZoneId(battle: TacticalBattle, zoneId: string): string | null {
   const currentOrder = battle.zones.find(zone => zone.id === zoneId)?.order;
   if (currentOrder == null) return null;
@@ -94,9 +100,11 @@ function applyNextEngagementStates(battle: TacticalBattle): void {
     if (defender.command === 'fallback') {
       const rearZoneId = nextRearZoneId(battle, defender.zoneId);
       if (rearZoneId) defender.zoneId = rearZoneId;
+      defender.command = 'hold';
     } else if (defender.command === 'advance') {
       const forwardZoneId = nextForwardZoneId(battle, defender.zoneId);
       if (forwardZoneId) defender.zoneId = forwardZoneId;
+      defender.command = 'hold';
     } else if (defender.command === 'ambush' && !defender.ambushed) {
       defender.ambushed = true;
     }
@@ -105,6 +113,9 @@ function applyNextEngagementStates(battle: TacticalBattle): void {
     if (attacker.pendingZoneId) {
       attacker.zoneId = attacker.pendingZoneId;
       attacker.pendingZoneId = undefined;
+      attacker.engagementsInZone = 0;
+      attacker.rearAssault = attacker.kind === 'flankers' &&
+        attacker.flankPlan === 'rearAssault' && attacker.zoneId === 'wall';
     }
     attacker.confused = false;
   });
@@ -120,6 +131,10 @@ function applied(battle: TacticalBattle, id: PreparationActionId): boolean {
 
 function healthy(resident: GameState['residents'][number]): boolean {
   return resident.alive && !resident.sick && resident.health >= 20;
+}
+
+function defaultFormationLine(kind: DefenderGroupKind): TacticalFormationLine {
+  return MELEE_DEFENDER_KINDS.has(kind) ? 'front' : 'rear';
 }
 
 function group(
@@ -140,6 +155,7 @@ function group(
     power: residentIds.length * GROUP_POWER[kind],
     wounded: 0,
     killed: 0,
+    line: defaultFormationLine(kind),
     ambushed: false,
   };
 }
@@ -239,10 +255,14 @@ function raiderGroups(
   factionName: string,
   power: number,
   warned: boolean,
-  scouting: { watchmen: number; watchtowers: number; hunters: number },
+  scouting: { watchmen: number; watchtowers: number; hunters: number; flankRoll: number },
 ): TacticalRaiderGroup[] {
   const scoutsReady = warned || scouting.watchtowers > 0 || scouting.watchmen >= 2;
   const deepScouted = warned || (scouting.watchtowers > 0 && scouting.hunters > 0);
+  const rearAssaultChance = factionName === '홀라온 야인' || factionName === '변경 마적' || factionName === '조정 토벌군'
+    ? 0.6
+    : factionName === '니마차 우디캐' ? 0.3 : 0.5;
+  const flankPlan = scouting.flankRoll < rearAssaultChance ? 'rearAssault' : 'breakthrough';
   type Visibility = 'open' | 'scouts' | 'deep';
   type Composition = {
     id: string;
@@ -321,7 +341,9 @@ function raiderGroups(
     unitType: entry.unitType,
     label: entry.label,
     zoneId: 'approach',
-    targetZoneId: entry.kind === 'looters' ? 'storehouse' : entry.kind === 'flankers' ? 'center' : 'wall',
+    targetZoneId: entry.kind === 'looters'
+      ? 'storehouse'
+      : entry.kind === 'flankers' ? (flankPlan === 'rearAssault' ? 'wall' : 'center') : 'wall',
     power: powers[index],
     count: counts[index],
     killed: 0,
@@ -331,6 +353,10 @@ function raiderGroups(
     combatMultiplier: entry.combatMultiplier,
     lossResistance: entry.lossResistance,
     wallPressureBonus: entry.wallPressureBonus,
+    engagementsInZone: 0,
+    flankPlan: entry.kind === 'flankers' ? flankPlan : undefined,
+    flankPlanRevealed: entry.kind === 'flankers' ? deepScouted : undefined,
+    rearAssault: false,
   }));
 }
 
@@ -367,6 +393,7 @@ export function createTacticalBattle(
       watchmen,
       watchtowers: countBuilt(state, 'watchtower'),
       hunters,
+      flankRoll: makeRng(state.seed + state.day * 4099 + state.subTick * 131 + originalPower)(),
     }),
     currentZoneId: 'approach',
     villageMorale: clamp(
@@ -568,6 +595,7 @@ function applySelectedPreparationActions(state: GameState, battle: TacticalBattl
         militia = {
           id: 'militia-unarmed-mustered', kind: 'militia-unarmed', label: '긴급 소집 민병',
           residentIds: [], count: 0, zoneId: 'wall', command: null, power: 0, wounded: 0, killed: 0,
+          line: 'front',
         };
         battle.defenderGroups.push(militia);
       }
@@ -584,7 +612,12 @@ function applySelectedPreparationActions(state: GameState, battle: TacticalBattl
 
     action.applied = true;
   }
-  return events;
+  const zoneOrder = new Map(battle.zones.map(zone => [zone.id, zone.order]));
+  return events
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) =>
+      (zoneOrder.get(a.item.zoneId) ?? 99) - (zoneOrder.get(b.item.zoneId) ?? 99) || a.index - b.index)
+    .map(entry => entry.item);
 }
 
 export function assignDefenderGroup(state: GameState, groupId: string, zoneId: string): string | null {
@@ -598,6 +631,22 @@ export function assignDefenderGroup(state: GameState, groupId: string, zoneId: s
   if (defender.kind === 'hunter') {
     defender.ambushed = zoneId === 'approach' && applied(battle, 'setAmbush');
   }
+  return null;
+}
+
+export function setDefenderFormationLine(
+  state: GameState,
+  groupId: string,
+  line: TacticalFormationLine,
+): string | null {
+  const battle = state.tacticalBattle;
+  if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  if (battle.phase !== 'deployment' && battle.phase !== 'command') {
+    return '배치 또는 지휘 단계에서만 전열을 바꿀 수 있습니다.';
+  }
+  const defender = battle.defenderGroups.find(candidate => candidate.id === groupId);
+  if (!defender) return '수비 그룹을 찾을 수 없습니다.';
+  defender.line = line;
   return null;
 }
 
@@ -745,10 +794,12 @@ function formationExposureMultiplier(
   defender: TacticalDefenderGroup,
   defenders: TacticalDefenderGroup[],
 ): number {
+  if (defender.kind === 'hunter' && defender.ambushed) return 0.55;
   const chargingMelee = defenders.some(group =>
-    MELEE_DEFENDER_KINDS.has(group.kind) && group.command === 'charge' && activeCount(group) > 0);
+    group.line === 'front' && MELEE_DEFENDER_KINDS.has(group.kind) &&
+    group.command === 'charge' && activeCount(group) > 0);
   const screeningMelee = defenders.some(group =>
-    MELEE_DEFENDER_KINDS.has(group.kind) &&
+    group.line === 'front' && MELEE_DEFENDER_KINDS.has(group.kind) &&
     group.command !== 'charge' && group.command !== 'fallback' && group.command !== 'advance' &&
     activeCount(group) > 0);
   if (RANGED_DEFENDER_KINDS.has(defender.kind)) {
@@ -758,6 +809,20 @@ function formationExposureMultiplier(
   }
   if (MELEE_DEFENDER_KINDS.has(defender.kind) && screeningMelee) return 1.25;
   return 1;
+}
+
+function rearAssaultExposureMultiplier(
+  defender: TacticalDefenderGroup,
+  defenders: TacticalDefenderGroup[],
+): number {
+  const rearMeleeGuard = defenders.some(group =>
+    group.line === 'rear' && MELEE_DEFENDER_KINDS.has(group.kind) &&
+    group.command !== 'fallback' && group.command !== 'advance' && activeCount(group) > 0);
+  if (defender.line === 'front') return 0.5;
+  if (rearMeleeGuard) return MELEE_DEFENDER_KINDS.has(defender.kind) ? 1.65 : 0.48;
+  if (RANGED_DEFENDER_KINDS.has(defender.kind)) return 2.2;
+  if (defender.kind === 'civilian') return 1.8;
+  return 1.45;
 }
 
 function surpriseConfusionChance(zone: TacticalBattleZone, defenders: TacticalDefenderGroup[]): number {
@@ -781,10 +846,14 @@ function shouldRaiderAdvance(
     return zone.breached || undefended || enemyShare >= 0.62;
   }
   if (attacker.kind === 'looters' && zone.id === 'wall') {
-    return zone.breached || undefended || enemyShare >= 0.7;
+    return zone.breached || undefended || enemyShare >= 0.55 || attacker.engagementsInZone >= 2;
+  }
+  if (attacker.kind === 'flankers') {
+    // 창고에 수비대가 있으면 도착한 교전에서 곧바로 통과하지 못하고 최소 한 차례 맞붙는다.
+    if (zone.id === 'storehouse' && !undefended && attacker.engagementsInZone < 1) return false;
+    return zone.breached || enemyShare > 0.52 || battle.round >= 3;
   }
   return zone.breached || enemyShare > 0.52 ||
-    (attacker.kind === 'flankers' && battle.round >= 2) ||
     (attacker.kind === 'looters' && battle.round >= 3);
 }
 
@@ -873,6 +942,14 @@ export function resolveTacticalRound(state: GameState): string | null {
     }
     const assignedDefenders = battle.defenderGroups.filter(group => group.zoneId === zone.id);
     const defenders = assignedDefenders.filter(group => activeCount(group) > 0);
+    const rearAttackers = attackers.filter(attacker => attacker.rearAssault);
+    for (const attacker of rearAttackers.filter(group => group.engagementsInZone === 0)) {
+      attacker.revealed = true;
+      event(events, zone.id, 'rearAssault', `${attacker.label}이(가) 수비대 후열에 갑자기 모습을 드러냅니다.`, 760, {
+        side: 'defender', groupId: attacker.id, float: '후방 급습!',
+      });
+      lines.push(`${attacker.label}이(가) ${zone.name} 후열을 급습했습니다.`);
+    }
     const assignedCount = assignedDefenders.reduce((sum, defender) => sum + defender.count, 0);
     const readyCount = assignedDefenders.reduce((sum, defender) => sum + activeCount(defender), 0);
     defenderReadiness.set(zone.id, assignedCount > 0 ? readyCount / assignedCount : 0);
@@ -895,7 +972,14 @@ export function resolveTacticalRound(state: GameState): string | null {
         : group.power * (group.morale / 100) * (group.combatMultiplier ?? 1)),
       0,
     );
+    const rawRearEnemyPower = rearAttackers.reduce(
+      (sum, group) => sum + (group.confused
+        ? 0
+        : group.power * (group.morale / 100) * (group.combatMultiplier ?? 1)),
+      0,
+    );
     const enemyPower = rawEnemyPower * (0.88 + rng() * 0.24);
+    const rearEnemyShare = rawEnemyPower > 0 ? rawRearEnemyPower / rawEnemyPower : 0;
     let defensePower = defenders.reduce((sum, defender) => {
       const active = activeCount(defender);
       const survivingShare = defender.count > 0 ? active / defender.count : 0;
@@ -938,14 +1022,32 @@ export function resolveTacticalRound(state: GameState): string | null {
       lines.push(`${zone.name}에서 근접대의 돌격으로 후열 원거리 병종이 우회 타격에 노출됐습니다.`);
     }
     if (!commands.has('volley') && !surpriseAttack && !commands.has('charge')) {
-      event(events, zone.id, 'melee', '방어선에서 짧고 거친 백병전이 벌어집니다.');
+      if (defenders.length === 0) {
+        event(events, zone.id, 'advance', `적이 저항 없이 ${zone.name}을(를) 휩쓸고 지나갑니다.`, 560);
+      } else if (defenders.every(defender => defender.kind === 'civilian')) {
+        event(events, zone.id, 'advance', '무장하지 못한 주민들이 비명을 지르며 전선 뒤로 흩어집니다.', 620, {
+          side: 'defender', float: '주민 피난',
+        });
+      } else {
+        event(events, zone.id, 'melee', '방어선에서 짧고 거친 백병전이 벌어집니다.');
+      }
+    }
+    if (zone.id === 'wall' && attackers.some(attacker =>
+      attacker.unitType === 'court-artillery' && !attacker.confused)) {
+      event(events, zone.id, 'artilleryHit', '토벌군 화포대의 포탄이 방책을 뒤흔듭니다.', 720, {
+        side: 'defender', float: '적 화포 사격!',
+      });
     }
 
+    let rearAssaultCasualties = 0;
     for (const defender of defenders) {
       const active = activeCount(defender);
       if (active <= 0) continue;
+      const normalExposure = formationExposureMultiplier(defender, defenders);
+      const rearExposure = rearAssaultExposureMultiplier(defender, defenders);
+      const exposure = normalExposure * (1 - rearEnemyShare) + rearExposure * rearEnemyShare;
       let risk = enemyShare * (0.16 + zone.pressure / 650) *
-        casualtyMultiplier(battle, defender) * formationExposureMultiplier(defender, defenders);
+        casualtyMultiplier(battle, defender) * exposure;
       if (defender.kind === 'civilian') risk *= zone.civilianRisk / 50;
       risk = clamp(risk, 0, 0.48);
       const expected = active * risk;
@@ -959,6 +1061,7 @@ export function resolveTacticalRound(state: GameState): string | null {
       defender.killed += killed;
       roundWounded += wounded;
       roundKilled += killed;
+      if (rearAttackers.length > 0 && defender.line === 'rear') rearAssaultCasualties += wounded + killed;
       if (wounded + killed > 0) {
         const parts = [killed > 0 ? `전사 ${killed}` : '', wounded > 0 ? `부상 ${wounded}` : ''].filter(Boolean);
         event(events, zone.id, 'casualty', `${defender.label}에서 전사 ${killed}, 부상 ${wounded}명이 발생했습니다.`, 520, {
@@ -966,11 +1069,19 @@ export function resolveTacticalRound(state: GameState): string | null {
         });
       }
     }
+    if (rearAssaultCasualties > 0) {
+      villageMoraleDelta -= 3;
+      lines.push(`후방 급습으로 후열에서 ${rearAssaultCasualties}명의 사상자가 발생해 마을 기세가 흔들렸습니다.`);
+    }
 
     const activeDefenders = Math.max(1, defenders.reduce((sum, defender) => sum + activeCount(defender), 0));
     const commandShare = (command: TacticalCommandId): number => defenders.reduce((sum, defender) =>
       sum + (defender.command === command ? activeCount(defender) : 0), 0) / activeDefenders;
-    let pressureDelta = 15 + enemyShare * 32 - defenseShare * 17;
+    const pressureEnemyPower = enemyPower * (1 - rearEnemyShare * 0.6);
+    const pressureTotal = Math.max(1, pressureEnemyPower + defensePower);
+    const pressureEnemyShare = pressureEnemyPower / pressureTotal;
+    const pressureDefenseShare = defensePower / pressureTotal;
+    let pressureDelta = 15 + pressureEnemyShare * 32 - pressureDefenseShare * 12;
     if (zone.id === 'wall') {
       pressureDelta += attackers.reduce((sum, attacker) =>
         sum + (attacker.confused ? 0 : attacker.wallPressureBonus ?? 0), 0);
@@ -979,15 +1090,27 @@ export function resolveTacticalRound(state: GameState): string | null {
     pressureDelta -= commandShare('charge') * 6;
     pressureDelta += commandShare('fallback') * 28;
     pressureDelta += commandShare('advance') * 10;
+    pressureDelta *= 1 - rearEnemyShare * 0.55;
+    if (zone.id === 'wall' && attackers.some(attacker => attacker.kind === 'main' && !attacker.confused)) {
+      pressureDelta = Math.max(6, pressureDelta);
+    }
+    if (zone.id === 'storehouse' || zone.id === 'center') pressureDelta = Math.min(34, pressureDelta);
     zone.pressure = clamp(zone.pressure + pressureDelta, 0, 100);
     const breachAt = zone.id === 'approach' ? 62 : 100;
     if (!zone.breached && zone.pressure >= breachAt) {
       zone.breached = true;
       const wallBroken = zone.id === 'wall';
-      event(events, zone.id, wallBroken ? 'wallHit' : 'advance', wallBroken
+      const innerLineFallen = zone.id === 'storehouse' || zone.id === 'center';
+      const breachText = wallBroken
         ? `${zone.name}의 방책이 부서져 길이 열립니다.`
-        : `${zone.name}이(가) 뚫렸습니다.`, 720, {
-        side: 'defender', float: wallBroken ? '방책 파괴!' : '돌파!',
+        : zone.id === 'center'
+          ? '적이 마을 중심지로 쏟아져 들어옵니다 — 최후 방어선이 무너졌습니다.'
+          : zone.id === 'storehouse'
+            ? '적이 창고 구역으로 밀려들어 비축 방어선이 무너집니다.'
+            : `${zone.name}이(가) 뚫렸습니다.`;
+      event(events, zone.id, wallBroken ? 'wallHit' : innerLineFallen ? 'zoneFall' : 'advance', breachText,
+        innerLineFallen ? 980 : 720, {
+        side: 'defender', float: wallBroken ? '방책 파괴!' : innerLineFallen ? '방어선 붕괴!' : '돌파!',
       });
       if (wallBroken) {
         buildingsDamaged += 1;
@@ -1001,9 +1124,17 @@ export function resolveTacticalRound(state: GameState): string | null {
       commands.has('charge') ? 0.12 : 0,
     );
     const raiderLossRate = clamp(defenseShare * (0.08 + commandEdge), 0.01, 0.24);
+    const rearMeleeGuard = defenders.some(defender =>
+      defender.line === 'rear' && MELEE_DEFENDER_KINDS.has(defender.kind) &&
+      activeCount(defender) > 0 && defender.command !== 'fallback' && defender.command !== 'advance');
     for (const attacker of attackers) {
       const activeRaiders = Math.max(0, attacker.count - attacker.killed);
-      const groupLossRate = clamp(raiderLossRate * (attacker.lossResistance ?? 1), 0.005, 0.24);
+      const rearAssaultResistance = attacker.rearAssault && !rearMeleeGuard ? 0.55 : 1;
+      const groupLossRate = clamp(
+        raiderLossRate * (attacker.lossResistance ?? 1) * rearAssaultResistance,
+        0.005,
+        0.24,
+      );
       const expectedKilled = activeRaiders * groupLossRate * (0.55 + defenseShare * 0.7);
       let killed = Math.floor(expectedKilled);
       if (killed < activeRaiders && rng() < expectedKilled - killed) killed += 1;
@@ -1040,7 +1171,10 @@ export function resolveTacticalRound(state: GameState): string | null {
     if (surpriseAttack) {
       surpriseDefenders.forEach(defender => {
         defender.ambushed = false;
-        defender.command = null;
+        defender.command = 'fallback';
+      });
+      event(events, zone.id, 'retreat', '급습을 마친 사냥꾼들이 추격을 피해 다음 방어선으로 빠집니다.', 620, {
+        side: 'defender', float: '이탈!',
       });
     }
   }
@@ -1049,9 +1183,14 @@ export function resolveTacticalRound(state: GameState): string | null {
   raiderMoraleDelta = Math.round(clamp(raiderMoraleDelta, -22, 0));
   battle.villageMorale = clamp(battle.villageMorale + villageMoraleDelta, 0, 100);
   battle.raiderMorale = clamp(battle.raiderMorale + raiderMoraleDelta, 0, 100);
+  const scheduledAdvances = new Map<string, {
+    fromZoneId: string;
+    destinationName: string;
+    groupLabels: string[];
+  }>();
   for (const attacker of battle.raiderGroups) {
     attacker.morale = clamp(attacker.morale + raiderMoraleDelta, 0, 100);
-    const route = ROUTES[attacker.kind];
+    const route = routeForRaider(attacker);
     const index = route.indexOf(attacker.zoneId);
     const zone = battle.zones.find(candidate => candidate.id === attacker.zoneId);
     const share = dominance.get(attacker.zoneId) ?? 0;
@@ -1067,9 +1206,28 @@ export function resolveTacticalRound(state: GameState): string | null {
       attacker.pendingZoneId = route[index + 1];
       attacker.targetZoneId = route[Math.min(route.length - 1, index + 2)];
       const destinationName = battle.zones.find(candidate => candidate.id === attacker.pendingZoneId)?.name;
-      event(events, fromZoneId, 'advance', `${attacker.label}이(가) 교전을 마치고 ${destinationName}(으)로 밀려듭니다.`, 620);
+      const advanceKey = `${fromZoneId}->${attacker.pendingZoneId}`;
+      const scheduled = scheduledAdvances.get(advanceKey) ?? {
+        fromZoneId,
+        destinationName: destinationName ?? '다음 방어선',
+        groupLabels: [],
+      };
+      scheduled.groupLabels.push(attacker.label);
+      scheduledAdvances.set(advanceKey, scheduled);
+      if (attacker.kind === 'flankers') {
+        lines.push(attacker.flankPlan === 'rearAssault'
+          ? `${attacker.label}이(가) 주 방어선의 뒤편을 노리며 ${destinationName}(으)로 우회합니다.`
+          : `${attacker.label}이(가) 방책을 우회해 ${destinationName}(으)로 접근합니다.`);
+      } else if (attacker.kind === 'looters' && fromZoneId === 'wall' && !zone?.breached) {
+        lines.push(`${attacker.label}이(가) 방책의 틈으로 새어 나가 ${destinationName}(으)로 침투합니다.`);
+      }
     }
+    attacker.engagementsInZone = (attacker.engagementsInZone ?? 0) + 1;
     if (!attacker.revealed && (battle.round >= 2 || applied(battle, 'setAmbush'))) attacker.revealed = true;
+  }
+  for (const advance of scheduledAdvances.values()) {
+    const subject = advance.groupLabels.join('·');
+    event(events, advance.fromZoneId, 'advance', `${subject}이(가) 교전을 마치고 ${advance.destinationName}(으)로 밀려듭니다.`, 620);
   }
 
   const activeRaiders = battle.raiderGroups.filter(group => group.intent !== 'withdraw' && group.power > 0);
