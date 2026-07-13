@@ -99,9 +99,7 @@ function reachEngagement(state, limit = 300) {
   simulation.advanceTick(state);
   assert.equal(state.pendingChoice?.kind, 'expedition');
   assert.deepEqual(state.pendingChoice.options.map(option => option.id), ['auto', 'direct', 'withdraw']);
-  assert.equal(state.pendingChoice.options.find(option => option.id === 'direct')?.disabled, true);
-  engagement.resolveExpeditionEngagementChoice(state, 'direct', () => 0);
-  assert.equal(state.pendingChoice?.kind, 'expedition', 'disabled direct command leaves the decision open');
+  assert.equal(state.pendingChoice.options.find(option => option.id === 'direct')?.disabled, false);
 
   const powderBefore = state.resources.gunpowder;
   const outsiderHealth = outsider.health;
@@ -146,6 +144,7 @@ function reachEngagement(state, limit = 300) {
   });
   reachEngagement(state);
   engagement.maybeOpenExpeditionEngagementChoice(state);
+  assert.equal(state.pendingChoice?.options.find(option => option.id === 'direct')?.disabled, false);
   engagement.resolveExpeditionEngagementChoice(state, 'auto', () => 0);
   assert.equal(state.incidents.predatorThreats.wolf, undefined);
   assert.equal(state.expedition?.phase, 'return');

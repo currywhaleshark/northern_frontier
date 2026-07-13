@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CONFIG } from './game/config';
 import {
   assignNearestWorkerToBuilding, assignResidentToBuilding,
-  advanceDay, advanceTick, continueAfterVictory, demolishBuilding, newGame, reassignJob, resolveChoice, setResidentJob,
+  advanceDay, advanceTick, cancelBuildingConstruction, continueAfterVictory, demolishBuilding, newGame, reassignJob, resolveChoice, setResidentJob,
   setBuildingCrop, setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
   convertFieldToPaddy, toggleResidentCart,
   unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
@@ -375,6 +375,18 @@ export default function App() {
     bump();
   };
 
+  const handleCancelBuildingConstruction = (buildingId: number) => {
+    const err = cancelBuildingConstruction(stateRef.current, buildingId);
+    if (err) {
+      addLog(stateRef.current, err, 'info');
+    } else {
+      playSfx('hammer');
+      setSelected(null);
+      setSelectedEntity(null);
+    }
+    bump();
+  };
+
   const handleTacticalAction = (action: () => string | null) => {
     const error = action();
     if (error) addLog(stateRef.current, error, 'info');
@@ -399,6 +411,11 @@ export default function App() {
     handleTacticalAction(() => acknowledgeTacticalReport(stateRef.current));
   const handleFinishTacticalBattle = () => {
     finishTacticalBattle(stateRef.current);
+    // 공격전은 별도 장계를 만들지 않고 원정 귀환으로 넘어가므로, 시뮬레이션에서는 즉시 설정 화면으로 복귀한다.
+    if (simMode && !stateRef.current.tacticalBattle && !stateRef.current.tacticalBattleReport) {
+      exitBattleSimulation();
+      return;
+    }
     bump();
   };
   const handleDismissTacticalBattleReport = () => {
@@ -791,6 +808,7 @@ export default function App() {
             onUseLuxuryGood={handleUseLuxuryGood}
             onToggleNitre={handleToggleNitre}
             onSetSmithyProduct={handleSetSmithyProduct}
+            onCancelBuildingConstruction={handleCancelBuildingConstruction}
             onDemolishBuilding={handleDemolishBuilding}
             onOrganizeHunt={handleOrganizeHunt}
             onScoutPredator={handleScoutPredator}

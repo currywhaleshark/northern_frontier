@@ -124,6 +124,20 @@ function footprintIds(state, type, x, y) {
     simulation.tryPlaceBuilding(state, 'market', state.map[0].length - 1, state.map.length - 1),
     '2x2 market rejects placement outside the map',
   );
+
+  const woodBeforeMarket = state.resources.wood;
+  const stoneBeforeMarket = state.resources.stone;
+  assert.equal(simulation.tryPlaceBuilding(state, 'market', 9, 9), null);
+  const market = state.buildings.find(building => building.type === 'market');
+  assert.ok(market);
+  assert.ok(state.resources.wood < woodBeforeMarket || state.resources.stone < stoneBeforeMarket);
+  assert.equal(simulation.cancelBuildingConstruction(state, market.id), null);
+  assert.equal(state.resources.wood, woodBeforeMarket, 'cancel refunds all committed wood');
+  assert.equal(state.resources.stone, stoneBeforeMarket, 'cancel refunds all committed stone');
+  assert.equal(state.buildings.some(building => building.id === market.id), false);
+  assert.deepEqual(footprintIds(state, 'market', 9, 9), [null, null, null, null]);
+  smithy.built = true;
+  assert.match(simulation.cancelBuildingConstruction(state, smithy.id), /완공된 건물/);
 }
 
 {

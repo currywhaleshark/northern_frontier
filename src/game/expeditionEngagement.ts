@@ -2,17 +2,22 @@ import { addLog } from './events';
 import {
   beginExpeditionReturn, expeditionCombatPower, expeditionResidentsForIds,
 } from './expedition';
+import { predatorThreatProfile, tigerTierLabel } from './expeditionIntel';
 import {
   applyBanditLairOutcome, banditLairRaidChance, resolveBanditLairAssault,
 } from './siteDiplomacy';
 import { predatorHuntChance, resolveWildlifeHunt } from './specialEvents';
 import { weaponCountsForResidents } from './weapons';
+import { createBanditLairTacticalAssault } from './tacticalAssault';
+import { createPredatorTacticalHunt } from './tacticalHunt';
 import type { GameState, ResourceId } from './types';
 
 const EXPEDITION_SCAR_DAYS = 4;
 
-function predatorName(kind: 'wolf' | 'tiger'): string {
-  return kind === 'wolf' ? '늑대 떼' : '호랑이';
+function predatorName(state: GameState, kind: 'wolf' | 'tiger'): string {
+  if (kind === 'wolf') return '늑대 떼';
+  const exact = state.incidents.predatorThreats.tiger?.intel?.precision === 'exact';
+  return exact ? tigerTierLabel(predatorThreatProfile(state, kind).tigerTier) : '호랑이';
 }
 
 function engagementChance(state: GameState): number {
@@ -29,7 +34,7 @@ function engagementTargetName(state: GameState): string {
   if (expedition.kind === 'lairAssault') {
     return state.foreignSites.find(site => site.id === expedition.targetSiteId)?.name ?? '변경 마적 산채';
   }
-  return predatorName(expedition.predatorKind ?? 'wolf');
+  return predatorName(state, expedition.predatorKind ?? 'wolf');
 }
 
 export function maybeOpenExpeditionEngagementChoice(state: GameState): void {
@@ -39,9 +44,6 @@ export function maybeOpenExpeditionEngagementChoice(state: GameState): void {
   const weapons = weaponCountsForResidents(state, members);
   const chance = engagementChance(state);
   const targetName = engagementTargetName(state);
-  const directReason = expedition.kind === 'lairAssault'
-    ? '산채 공격전 직접 지휘는 다음 전술 단계에서 개방됩니다.'
-    : '맹수 사냥 직접 지휘는 다음 전술 단계에서 개방됩니다.';
   state.pendingChoice = {
     kind: 'expedition',
     title: `${targetName} 개전 결정`,
@@ -56,8 +58,7 @@ export function maybeOpenExpeditionEngagementChoice(state: GameState): void {
         id: 'direct',
         label: '직접 지휘',
         desc: '공격전 전술 화면에서 직접 명령합니다.',
-        disabled: true,
-        disabledReason: directReason,
+        disabled: false,
       },
       {
         id: 'withdraw',
@@ -107,7 +108,13 @@ export function resolveExpeditionEngagementChoice(
   if (!choice || choice.kind !== 'expedition' || !expedition || expedition.phase !== 'engage') return;
   const option = choice.options.find(candidate => candidate.id === optionId);
   if (!option || option.disabled) return;
-  if (optionId === 'direct') return;
+  if (optionId === 'direct') {
+    const result = expedition.kind === 'lairAssault'
+      ? createBanditLairTacticalAssault(state)
+      : createPredatorTacticalHunt(state);
+    if (typeof result === 'string') addLog(state, result, 'bad', true);
+    return;
+  }
   state.pendingChoice = null;
 
   if (optionId === 'withdraw') {
@@ -115,7 +122,7 @@ export function resolveExpeditionEngagementChoice(
       const error = applyBanditLairOutcome(state, expedition.targetSiteId ?? -1, 'withdrawal');
       if (error) addLog(state, error, 'bad', true);
     } else {
-      addLog(state, `${predatorName(expedition.predatorKind ?? 'wolf')}의 흔적을 뒤로하고 교전 없이 철수했습니다.`, 'info', true);
+      addLog(state, `${predatorName(state, expedition.predatorKind ?? 'wolf')}의 흔적을 뒤로하고 교전 없이 철수했습니다.`, 'info', true);
     }
     returnAfterEngagement(state, false, '토벌대가 공격을 중지하고 귀환길에 올랐습니다.');
     return;

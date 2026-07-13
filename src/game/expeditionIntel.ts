@@ -1,4 +1,4 @@
-import type { GameState, PredatorKind, PredatorThreat, WildlifeKind } from './types';
+import type { GameState, PredatorKind, PredatorThreat, TigerTier, WildlifeKind } from './types';
 
 export type EnemyIntelPrecision = 'exact' | 'rough' | 'unknown';
 
@@ -17,6 +17,33 @@ export interface EnemyIntel {
 export interface PredatorThreatProfile {
   size: number;
   strength: number;
+  tigerTier?: TigerTier;
+}
+
+const TIGER_TIER_LABELS: Record<TigerTier, string> = {
+  tiger: '호랑이',
+  greatTiger: '대호',
+  mountainLord: '산군',
+};
+
+const TIGER_TIER_DANGER: Record<TigerTier, number> = {
+  tiger: 0.86,
+  greatTiger: 1.16,
+  mountainLord: 1.55,
+};
+
+export function tigerTierFromStrength(strength: number): TigerTier {
+  if (strength >= 88) return 'mountainLord';
+  if (strength >= 68) return 'greatTiger';
+  return 'tiger';
+}
+
+export function tigerTierLabel(tier: TigerTier = 'tiger'): string {
+  return TIGER_TIER_LABELS[tier];
+}
+
+export function tigerTierDangerMultiplier(tier: TigerTier = 'tiger'): number {
+  return TIGER_TIER_DANGER[tier];
 }
 
 const KIND_SALT: Record<WildlifeKind, number> = {
@@ -38,10 +65,20 @@ export function generatedPredatorThreatProfile(
 ): PredatorThreatProfile {
   const hash = threatHash(seed, kind, untilDay);
   if (kind === 'wolf') {
-    const size = 4 + (hash % 7);
-    return { size, strength: 35 + size * 3 + ((hash >>> 8) % 6) };
+    const size = 3 + (hash % 10);
+    return { size, strength: 28 + size * 4 + ((hash >>> 8) % 7) };
   }
-  if (kind === 'tiger') return { size: 1, strength: 58 + (hash % 19) };
+  if (kind === 'tiger') {
+    const roll = hash % 100;
+    const tigerTier: TigerTier = roll < 55 ? 'tiger' : roll < 88 ? 'greatTiger' : 'mountainLord';
+    const tierHash = hash >>> 8;
+    const strength = tigerTier === 'tiger'
+      ? 56 + (tierHash % 9)
+      : tigerTier === 'greatTiger'
+        ? 70 + (tierHash % 12)
+        : 90 + (tierHash % 15);
+    return { size: 1, strength, tigerTier };
+  }
   const size = 5 + (hash % 8);
   return { size, strength: 31 + size * 2 + ((hash >>> 8) % 5) };
 }
@@ -49,9 +86,15 @@ export function generatedPredatorThreatProfile(
 export function predatorThreatProfile(state: GameState, kind: WildlifeKind): PredatorThreatProfile {
   const threat = state.incidents.predatorThreats[kind];
   const generated = generatedPredatorThreatProfile(state.seed, kind, threat?.untilDay ?? state.day);
+  const strength = threat?.strength ?? generated.strength;
   return {
     size: threat?.size ?? generated.size,
-    strength: threat?.strength ?? generated.strength,
+    strength,
+    tigerTier: kind === 'tiger'
+      ? threat?.tigerTier ?? (threat?.strength != null
+        ? tigerTierFromStrength(strength)
+        : generated.tigerTier ?? tigerTierFromStrength(strength))
+      : undefined,
   };
 }
 
@@ -67,6 +110,11 @@ export function materializePredatorThreat(
     untilDay,
     size: existing?.size ?? generated.size,
     strength: existing?.strength ?? generated.strength,
+    tigerTier: kind === 'tiger'
+      ? existing?.tigerTier ?? (existing?.strength != null
+        ? tigerTierFromStrength(existing.strength)
+        : generated.tigerTier ?? tigerTierFromStrength(generated.strength))
+      : undefined,
     scouting: existing?.scouting,
     intel: existing?.intel,
   };
@@ -132,14 +180,21 @@ function lairIntel(state: GameState, siteId: number): EnemyIntel {
   };
 }
 
-function predatorSizeText(kind: PredatorKind, size: number, strength: number, exact: boolean): string {
+function predatorSizeText(
+  kind: PredatorKind,
+  size: number,
+  tigerTier: TigerTier | undefined,
+  exact: boolean,
+): string {
   if (kind === 'wolf') {
     if (exact) return `늑대 ${size}마리`;
     return `늑대 약 ${Math.max(2, size - 2)}~${size + 2}마리`;
   }
-  if (!exact) return '호랑이 성체 1마리 추정';
-  const build = strength >= 71 ? '매우 큰' : strength >= 64 ? '큰' : '보통 체구의';
-  return `${build} 성체 1마리`;
+  const tier = tigerTier ?? 'tiger';
+  if (exact) return `${tigerTierLabel(tier)} 1마리`;
+  if (tier === 'mountainLord') return '산을 울릴 만큼 거대한 호랑이 1마리 추정';
+  if (tier === 'greatTiger') return '유난히 큰 호랑이 1마리 추정';
+  return '호랑이 성체 1마리 추정';
 }
 
 function predatorIntel(state: GameState, kind: PredatorKind): EnemyIntel {
@@ -167,7 +222,7 @@ function predatorIntel(state: GameState, kind: PredatorKind): EnemyIntel {
     return {
       precision: 'rough',
       precisionLabel: '대략',
-      sizeText: predatorSizeText(kind, profile.size, profile.strength, false),
+      sizeText: predatorSizeText(kind, profile.size, profile.tigerTier, false),
       powerText: `위협 전력 약 ${range.low}~${range.high}`,
       detail: `${source} · 더 숙련된 사냥꾼으로 다시 추적하면 정확도가 오를 수 있습니다.`,
     };
@@ -175,7 +230,7 @@ function predatorIntel(state: GameState, kind: PredatorKind): EnemyIntel {
   return {
     precision: 'exact',
     precisionLabel: '정확',
-    sizeText: predatorSizeText(kind, profile.size, profile.strength, true),
+    sizeText: predatorSizeText(kind, profile.size, profile.tigerTier, true),
     powerText: `위협 전력 ${profile.strength}`,
     detail: `${source} · 흔적과 움직임을 정확히 판독했습니다.`,
   };

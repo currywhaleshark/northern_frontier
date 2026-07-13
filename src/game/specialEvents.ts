@@ -4,7 +4,7 @@ import { addLog } from './events';
 import { consumeExpeditionPowder, expeditionResidentsForIds } from './expedition';
 import {
   activePredatorScoutIds, availablePredatorScouts, generatedPredatorThreatProfile, materializePredatorThreat,
-  predatorScoutDuration, predatorThreatProfile,
+  predatorScoutDuration, predatorThreatProfile, tigerTierDangerMultiplier, tigerTierFromStrength, tigerTierLabel,
 } from './expeditionIntel';
 import { makeRng } from './map';
 import { killResident, livingResidents } from './residents';
@@ -88,10 +88,15 @@ export function ensureIncidentState(state: GameState): void {
   state.tributeWaivers ??= 0;
   for (const kind of ['wolf', 'tiger', 'boar'] as const) {
     const threat = state.incidents.predatorThreats[kind];
-    if (!threat || (threat.size != null && threat.strength != null)) continue;
-    const generated = generatedPredatorThreatProfile(state.seed, kind, threat.untilDay);
-    threat.size ??= generated.size;
-    threat.strength ??= generated.strength;
+    if (!threat) continue;
+    if (threat.size == null || threat.strength == null) {
+      const generated = generatedPredatorThreatProfile(state.seed, kind, threat.untilDay);
+      threat.size ??= generated.size;
+      threat.strength ??= generated.strength;
+    }
+    if (kind === 'tiger' && threat.strength != null) {
+      threat.tigerTier ??= tigerTierFromStrength(threat.strength);
+    }
   }
   for (const resident of state.residents) resident.quarantinedUntil ??= 0;
 }
@@ -141,7 +146,8 @@ export function predatorHuntChance(
   const base = kind === 'wolf' ? 0.34 : kind === 'tiger' ? 0.16 : 0.48;
   const hunterValue = kind === 'wolf' ? 0.11 : kind === 'tiger' ? 0.09 : 0.1;
   const baselineStrength = kind === 'wolf' ? 55 : kind === 'tiger' ? 67 : 48;
-  const threatAdjustment = (predatorThreatProfile(state, kind).strength - baselineStrength) / 280;
+  const threatAdjustment = (predatorThreatProfile(state, kind).strength - baselineStrength) /
+    (kind === 'tiger' ? 160 : 280);
   const chance = base + r.hunters * hunterValue + r.militia * 0.1 +
     r.watchmen * 0.045 + r.bows * 0.045 + r.spears * 0.025 + r.muskets * 0.09 - threatAdjustment;
   return Math.max(0.12, Math.min(0.94, chance));
@@ -160,9 +166,12 @@ export function predatorReadinessLabel(state: GameState, kind: WildlifeKind): st
     `각궁 ${r.bows} · 창 ${r.spears} · 조총 ${r.muskets} / 예상 성공 ${chanceLabel}`;
 }
 
-function wildlifeName(kind: WildlifeKind): string {
+function wildlifeName(kind: WildlifeKind, state?: GameState): string {
   if (kind === 'wolf') return '늑대 떼';
-  if (kind === 'tiger') return '호랑이';
+  if (kind === 'tiger') {
+    const exact = state?.incidents.predatorThreats.tiger?.intel?.precision === 'exact';
+    return state && exact ? tigerTierLabel(predatorThreatProfile(state, kind).tigerTier) : '호랑이';
+  }
   return '멧돼지 떼';
 }
 
@@ -433,10 +442,11 @@ function activateWildlifeThreat(state: GameState, kind: WildlifeKind, rng: () =>
   const existing = state.incidents.predatorThreats[kind];
   const finalUntilDay = Math.max(existing?.untilDay ?? 0, untilDay);
   state.incidents.predatorThreats[kind] = materializePredatorThreat(state, kind, finalUntilDay, existing);
+  const threatName = wildlifeName(kind, state);
   const message = kind === 'wolf'
     ? `늑대 떼가 숲에 자리를 잡았습니다. ${untilDay - state.day}일 동안 숲에 드나드는 주민이 위험합니다.`
     : kind === 'tiger'
-      ? `호랑이가 개척지 주변에 자리를 잡았습니다. ${untilDay - state.day}일 동안 낮의 숲과 밤의 마을이 위험합니다.`
+      ? `${threatName}이(가) 개척지 주변에 자리를 잡았습니다. ${untilDay - state.day}일 동안 낮의 숲과 밤의 마을이 위험합니다.`
       : `멧돼지 떼가 개척지 주변에 눌러앉았습니다. ${untilDay - state.day}일 동안 밤마다 농작물과 저장 식량이 위험합니다.`;
   addLog(state, message, 'bad', true);
 }
@@ -466,11 +476,14 @@ function huntFailure(
   const candidates = huntCandidates(state, memberIds);
   const victim = candidates[Math.floor(rng() * candidates.length)];
   if (!victim) return null;
-  const deathChance = kind === 'wolf'
+  const tigerDanger = kind === 'tiger'
+    ? tigerTierDangerMultiplier(predatorThreatProfile(state, kind).tigerTier)
+    : 1;
+  const deathChance = (kind === 'wolf'
     ? CONFIG.specialEvents.wolfHuntDeathChance
     : kind === 'tiger'
       ? CONFIG.specialEvents.tigerHuntDeathChance
-      : 0;
+      : 0) * tigerDanger;
   if (rng() < deathChance) {
     killResident(state, victim, kind === 'tiger' ? '호환' : '늑대 습격');
     return { residentId: victim.id, killed: true };
@@ -478,14 +491,14 @@ function huntFailure(
   const damage = kind === 'wolf'
     ? 24 + Math.floor(rng() * 13)
     : kind === 'tiger'
-      ? 38 + Math.floor(rng() * 23)
+      ? Math.round((38 + Math.floor(rng() * 23)) * tigerDanger)
       : 18 + Math.floor(rng() * 13);
   victim.health = Math.max(1, victim.health - damage);
-  addLog(state, `${victim.name}이(가) ${wildlifeName(kind)} 토벌 중 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
+  addLog(state, `${victim.name}이(가) ${wildlifeName(kind, state)} 토벌 중 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
   return { residentId: victim.id, killed: false, damage };
 }
 
-export type WildlifeHuntOutcome = 'victory' | 'defeat';
+export type WildlifeHuntOutcome = 'victory' | 'repelled' | 'escaped' | 'defeat';
 
 export interface WildlifeStrategicResult {
   loot: Partial<Record<ResourceId, number>>;
@@ -508,24 +521,35 @@ export function applyWildlifeHuntOutcome(
   rng: () => number,
 ): WildlifeStrategicResult {
   ensureIncidentState(state);
+  const threatProfile = predatorThreatProfile(state, kind);
+  const knownThreatName = wildlifeName(kind, state);
+  const defeatedThreatName = kind === 'tiger'
+    ? tigerTierLabel(threatProfile.tigerTier)
+    : knownThreatName;
+  const tigerTier = kind === 'tiger' ? threatProfile.tigerTier ?? 'tiger' : undefined;
   if (outcome === 'victory') {
     delete state.incidents.predatorThreats[kind];
     if (kind === 'wolf') {
-      const meat = 10 + Math.floor(rng() * 7);
-      const hide = 4 + Math.floor(rng() * 4);
+      const meat = 4 + threatProfile.size + Math.floor(rng() * (3 + Math.ceil(threatProfile.size / 2)));
+      const hide = Math.max(2, Math.floor(threatProfile.size * 0.6) + Math.floor(rng() * 3));
+      const reputation = 1 + Math.floor(threatProfile.size / 5);
       state.resources.meat += meat;
       state.resources.hide += hide;
-      state.resources.reputation = Math.min(100, state.resources.reputation + 2);
-      addLog(state, `늑대 떼를 토벌했습니다. 고기 ${meat}, 가죽 ${hide}, 명성 +2.`, 'good', true);
+      state.resources.reputation = Math.min(100, state.resources.reputation + reputation);
+      addLog(state, `늑대 ${threatProfile.size}마리 무리를 토벌했습니다. 고기 ${meat}, 가죽 ${hide}, 명성 +${reputation}.`, 'good', true);
       return { loot: { meat, hide } };
     } else if (kind === 'tiger') {
-      const meat = 12 + Math.floor(rng() * 7);
+      const meatBase = tigerTier === 'mountainLord' ? 28 : tigerTier === 'greatTiger' ? 18 : 12;
+      const meatRange = tigerTier === 'mountainLord' ? 13 : tigerTier === 'greatTiger' ? 9 : 7;
+      const hide = tigerTier === 'mountainLord' ? 9 : tigerTier === 'greatTiger' ? 6 : 4;
+      const reputation = tigerTier === 'mountainLord' ? 15 : tigerTier === 'greatTiger' ? 10 : 7;
+      const meat = meatBase + Math.floor(rng() * meatRange);
       state.resources.meat += meat;
-      state.resources.hide += 4;
-      state.resources.reputation = Math.min(100, state.resources.reputation + 7);
+      state.resources.hide += hide;
+      state.resources.reputation = Math.min(100, state.resources.reputation + reputation);
       discoverItem(state, 'tigerPelt');
-      addLog(state, `호랑이를 토벌했습니다. 고기 ${meat}, 가죽 4, 호피 1, 명성 +7.`, 'good', true);
-      return { loot: { meat, hide: 4 }, specialItem: 'tigerPelt' };
+      addLog(state, `${defeatedThreatName}를 토벌했습니다. 고기 ${meat}, 가죽 ${hide}, 호피 1, 명성 +${reputation}.`, 'good', true);
+      return { loot: { meat, hide }, specialItem: 'tigerPelt' };
     } else {
       const meat = 13 + Math.floor(rng() * 8);
       const hide = 5 + Math.floor(rng() * 4);
@@ -534,6 +558,21 @@ export function applyWildlifeHuntOutcome(
       addLog(state, `멧돼지 떼를 토벌했습니다. 고기 ${meat}, 가죽 ${hide}.`, 'good', true);
       return { loot: { meat, hide } };
     }
+  }
+  if (outcome === 'repelled' && kind === 'wolf') {
+    delete state.incidents.predatorThreats.wolf;
+    const meat = 3 + Math.ceil(threatProfile.size * 0.45) + Math.floor(rng() * 3);
+    const hide = 1 + Math.floor(threatProfile.size * 0.25) + Math.floor(rng() * 2);
+    const reputation = threatProfile.size >= 10 ? 2 : 1;
+    state.resources.meat += meat;
+    state.resources.hide += hide;
+    state.resources.reputation = Math.min(100, state.resources.reputation + reputation);
+    addLog(state, `우두머리를 잃은 늑대 ${threatProfile.size}마리 무리를 쫓아냈습니다. 고기 ${meat}, 가죽 ${hide}, 명성 +${reputation}.`, 'good', true);
+    return { loot: { meat, hide } };
+  }
+  if (outcome === 'escaped') {
+    addLog(state, `${knownThreatName}이(가) 포위망을 빠져나갔습니다. 위협은 그대로 남습니다.`, 'info', true);
+    return { loot: {} };
   }
   activateWildlifeThreat(state, kind, rng);
   return { loot: {} };
@@ -571,7 +610,7 @@ export function openPredatorHunt(state: GameState, kind: WildlifeKind): string |
   if (state.pendingChoice || state.battle) return '지금은 토벌대를 조직할 수 없습니다.';
   state.pendingChoice = {
     kind: 'incident',
-    title: `${wildlifeName(kind)} 토벌대 조직`,
+    title: `${wildlifeName(kind, state)} 토벌대 조직`,
     body: `현재 인원과 무장을 점검했습니다.\n${predatorReadinessLabel(state, kind)}`,
     illustration: wildlifeIllustration(kind),
     options: [
@@ -822,7 +861,7 @@ export function resolveSpecialEvent(state: GameState, optionId: string, rng: () 
       resolveWildlifeHunt(state, wildlife, memberIds, rng);
     } else {
       activateWildlifeThreat(state, wildlife, rng);
-      addLog(state, `${wildlifeName(wildlife)} 토벌대를 소집합니다. 출정 인원과 무장을 정해야 합니다.`, 'info', true);
+      addLog(state, `${wildlifeName(wildlife, state)} 토벌대를 소집합니다. 출정 인원과 무장을 정해야 합니다.`, 'info', true);
     }
   } else if (optionId === 'track-first' && (wildlife === 'wolf' || wildlife === 'tiger')) {
     activateWildlifeThreat(state, wildlife, rng);
@@ -856,14 +895,21 @@ function forestResidents(state: GameState): Resident[] {
 function predatorEncounter(state: GameState, kind: 'wolf' | 'tiger', candidates: Resident[], rng: () => number): void {
   const victim = candidates[Math.floor(rng() * candidates.length)];
   if (!victim) return;
-  const deathChance = kind === 'wolf' ? CONFIG.specialEvents.wolfEncounterDeathChance : CONFIG.specialEvents.tigerEncounterDeathChance;
+  const tigerDanger = kind === 'tiger'
+    ? tigerTierDangerMultiplier(predatorThreatProfile(state, kind).tigerTier)
+    : 1;
+  const deathChance = (kind === 'wolf'
+    ? CONFIG.specialEvents.wolfEncounterDeathChance
+    : CONFIG.specialEvents.tigerEncounterDeathChance) * tigerDanger;
   if (rng() < deathChance) {
     killResident(state, victim, kind === 'tiger' ? '호환' : '늑대 습격');
     return;
   }
-  const damage = kind === 'wolf' ? 16 + Math.floor(rng() * 13) : 28 + Math.floor(rng() * 19);
+  const damage = kind === 'wolf'
+    ? 16 + Math.floor(rng() * 13)
+    : Math.round((28 + Math.floor(rng() * 19)) * tigerDanger);
   victim.health = Math.max(1, victim.health - damage);
-  addLog(state, `${victim.name}이(가) ${kind === 'wolf' ? '숲에서 늑대에게 물려' : '호랑이의 습격을 받아'} 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
+  addLog(state, `${victim.name}이(가) ${kind === 'wolf' ? '숲에서 늑대에게 물려' : `${wildlifeName(kind, state)}의 습격을 받아`} 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
 }
 
 function damageBoarTargets(state: GameState, rng: () => number): void {
@@ -987,7 +1033,7 @@ function updatePredatorScouting(state: GameState): void {
     hunter.task = '흔적 추적 보고 후 귀환';
     addLog(
       state,
-      `${hunter.name}이(가) ${kind === 'wolf' ? '늑대 떼' : '호랑이'}의 흔적을 쫓고 돌아왔습니다. ` +
+      `${hunter.name}이(가) ${kind === 'wolf' ? '늑대 떼' : exact ? wildlifeName(kind, state) : '큰 호랑이'}의 흔적을 쫓고 돌아왔습니다. ` +
         `적 규모를 ${exact ? '정확히' : '대략'} 파악했습니다.`,
       exact ? 'good' : 'info',
       true,
@@ -1002,11 +1048,12 @@ export function updateSpecialEvents(state: GameState, rng: () => number): void {
     const threat = state.incidents.predatorThreats[kind];
     if (!threat) continue;
     if (state.day > threat.untilDay) {
+      const expiredName = wildlifeName(kind, state);
       delete state.incidents.predatorThreats[kind];
       const message = kind === 'wolf'
         ? '늑대 떼의 흔적이 숲에서 사라졌습니다.'
         : kind === 'tiger'
-          ? '호랑이가 다른 산줄기로 자취를 감췄습니다.'
+          ? `${expiredName}가 다른 산줄기로 자취를 감췄습니다.`
           : '멧돼지 떼가 다른 골짜기로 이동해 밤의 피해가 멎었습니다.';
       addLog(state, message, 'info', true);
     }

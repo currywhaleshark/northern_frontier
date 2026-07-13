@@ -161,10 +161,10 @@ export function scoutBanditLair(state: GameState, siteId: number, rng: () => num
   return '정찰대가 발각되었습니다. 산채의 경계가 강화되고 전역 위협이 높아졌습니다.';
 }
 
-export type BanditLairOutcome = 'victory' | 'defeat' | 'withdrawal';
+export type BanditLairOutcome = 'victory' | 'raid' | 'abandoned' | 'defeat' | 'withdrawal';
 
 export interface BanditLairAssaultResult {
-  outcome: Exclude<BanditLairOutcome, 'withdrawal'>;
+  outcome: 'victory' | 'defeat';
   chance: number;
   powderUsed: number;
   injuredResidentId?: number;
@@ -176,30 +176,66 @@ export function applyBanditLairOutcome(
   state: GameState,
   siteId: number,
   outcome: BanditLairOutcome,
+  options: { lootDamage?: number } = {},
 ): string | null {
   const site = getSite(state, siteId);
   if (!site || site.type !== 'banditLair') return '정주 부락은 공격 대상이 아닙니다.';
   if (!isForeignSiteOperational(site)) return '이미 비어 있거나 불탄 산채입니다.';
   site.lastInteractionDay = state.day;
+  const lootDamage = Math.max(0, Math.min(3, Math.floor(options.lootDamage ?? 0)));
   if (outcome === 'victory') {
     site.status = 'burned';
     site.alarm = 100;
     state.threat = Math.max(0, state.threat - 25);
     state.raidCooldown = Math.max(state.raidCooldown, CONFIG.foreignSites.lairSuppressionDays);
-    state.resources.grain += 8;
-    state.resources.hide += 6;
-    state.resources.tools += 2;
+    const grain = Math.max(2, 8 - lootDamage * 2);
+    const hide = Math.max(2, 6 - lootDamage);
+    const tools = Math.max(0, 2 - Math.floor(lootDamage / 2));
+    state.resources.grain += grain;
+    state.resources.hide += hide;
+    state.resources.tools += tools;
     state.resources.reputation = Math.min(100, state.resources.reputation + 5);
     if (site.factionName) changeRelation(state, site.factionName, -10);
     addForeignSiteMemory(state, site.id, '개척지 토벌대가 산채를 무너뜨리고 불태웠습니다.', 'bad');
     // TODO: 조정 전초기지 시스템에서 futureCourtMerit 보고 훅으로 연결한다.
-    addLog(state, `변경 마적 산채를 토벌했습니다. 곡물 8, 가죽 6, 도구 2, 명성 +5. 한동안 산채발 습격이 줄어듭니다.`, 'good', true);
+    addLog(state, `변경 마적 산채를 토벌했습니다. 곡물 ${grain}, 가죽 ${hide}, 도구 ${tools}, 명성 +5. 한동안 산채발 습격이 줄어듭니다.`, 'good', true);
     return null;
   }
   if (outcome === 'withdrawal') {
     site.alarm = Math.min(100, site.alarm + 10);
     addForeignSiteMemory(state, site.id, '개척지 토벌대가 교전을 피하고 물러났습니다.', 'neutral');
     addLog(state, '토벌대가 산채 공격을 중지하고 철수했습니다. 산채의 경계가 높아집니다.', 'info', true);
+    return null;
+  }
+  if (outcome === 'raid') {
+    site.status = 'fortified';
+    site.alarm = Math.min(100, site.alarm + 25);
+    state.threat = Math.max(0, state.threat - 5);
+    const grain = Math.max(1, 4 - lootDamage);
+    const hide = Math.max(1, 3 - lootDamage);
+    const tools = lootDamage < 2 ? 1 : 0;
+    state.resources.grain += grain;
+    state.resources.hide += hide;
+    state.resources.tools += tools;
+    state.resources.reputation = Math.min(100, state.resources.reputation + 2);
+    if (site.factionName) changeRelation(state, site.factionName, -5);
+    addForeignSiteMemory(state, site.id, '토벌대가 산채 마당과 창고를 털고 물러났습니다.', 'bad');
+    addLog(state, `토벌대가 산채 마당까지 돌파해 곡물 ${grain}, 가죽 ${hide}, 도구 ${tools}을 빼앗고 이탈했습니다. 산채는 남았습니다.`, 'good', true);
+    return null;
+  }
+  if (outcome === 'abandoned') {
+    site.status = 'abandoned';
+    site.alarm = 70;
+    state.threat = Math.max(0, state.threat - 14);
+    state.raidCooldown = Math.max(state.raidCooldown, Math.floor(CONFIG.foreignSites.lairSuppressionDays * 0.6));
+    const grain = Math.max(1, 4 - lootDamage);
+    const hide = Math.max(1, 3 - lootDamage);
+    state.resources.grain += grain;
+    state.resources.hide += hide;
+    state.resources.reputation = Math.min(100, state.resources.reputation + 3);
+    if (site.factionName) changeRelation(state, site.factionName, -7);
+    addForeignSiteMemory(state, site.id, '두목과 잔당이 달아나 산채가 버려졌습니다.', 'bad');
+    addLog(state, `두목과 잔당이 노획 일부를 챙겨 달아났습니다. 버려진 산채에서 곡물 ${grain}, 가죽 ${hide}을 거두었습니다.`, 'good', true);
     return null;
   }
   site.status = 'fortified';

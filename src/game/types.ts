@@ -395,6 +395,7 @@ export interface TerritoryViolation {
 
 export type SpecialItemId = 'wildGinseng' | 'tigerPelt' | 'gyrfalcon';
 export type PredatorKind = 'wolf' | 'tiger';
+export type TigerTier = 'tiger' | 'greatTiger' | 'mountainLord';
 export type WildlifeKind = PredatorKind | 'boar';
 export type SpecialEventId = WildlifeKind | 'wildGinseng' | 'plagueSuspicion' | 'grainRequisition' |
   'shipwreck' | 'earlyFrost' | 'gyrfalcon';
@@ -404,6 +405,7 @@ export interface PredatorThreat {
   untilDay: number;
   size?: number;     // 저장 호환을 위해 선택값, 새 위협에는 실제 무리 규모를 기록한다
   strength?: number; // 편성 정보와 토벌 판정이 함께 참조하는 숨은 위협 전력
+  tigerTier?: TigerTier; // 단독 호랑이 위협의 체급. 구버전 저장은 strength로 복원한다
   scouting?: {
     residentId: number;
     startedDay: number;
@@ -594,6 +596,8 @@ export type TacticalCommandId =
   | 'fallback'
   | 'advance'
   | 'charge'
+  | 'arson'
+  | 'blockEscape'
   | 'counterattack'
   | 'openRetreat';
 
@@ -604,7 +608,14 @@ export type PreparationActionId =
   | 'setAmbush'
   | 'prepareVolley'
   | 'preliminaryBombardment'
-  | 'musterMilitia';
+  | 'musterMilitia'
+  | 'nightAssault'
+  | 'prepareFireArrows'
+  | 'blockLeaderEscape'
+  | 'lureGuards'
+  | 'setHuntTraps'
+  | 'placeBait'
+  | 'splitDrivers';
 
 export interface TacticalBattleZone {
   id: string;
@@ -647,7 +658,7 @@ export interface TacticalRaiderGroup {
   count: number;
   killed: number;
   morale: number;
-  intent: 'advance' | 'loot' | 'flank' | 'breakWall' | 'withdraw';
+  intent: 'advance' | 'loot' | 'flank' | 'breakWall' | 'defend' | 'escape' | 'withdraw';
   revealed: boolean;
   confused?: boolean;
   combatMultiplier?: number;
@@ -657,6 +668,9 @@ export interface TacticalRaiderGroup {
   flankPlan?: TacticalFlankPlan;
   flankPlanRevealed?: boolean;
   rearAssault?: boolean;
+  beastKind?: PredatorKind;
+  tigerTier?: TigerTier;
+  leader?: boolean;
 }
 
 export interface TacticalPreparationEffect {
@@ -689,6 +703,11 @@ export interface TacticalAnimationEvent {
     | 'loot'
     | 'retreat'
     | 'fire'
+    | 'leaderEscape'
+    | 'escapeBlocked'
+    | 'beastReveal'
+    | 'beastAmbush'
+    | 'beastRout'
     | 'casualty'
     | 'moraleBreak'
     | 'report';
@@ -716,7 +735,21 @@ export interface TacticalRoundReport {
   villageMoraleDelta: number;
   raiderMoraleDelta: number;
   ended?: boolean;
-  outcome?: 'defenseSuccess' | 'partialLoss' | 'raidersLooted' | 'villageRouted' | 'negotiated';
+  outcome?:
+    | 'defenseSuccess'
+    | 'partialLoss'
+    | 'raidersLooted'
+    | 'villageRouted'
+    | 'negotiated'
+    | 'assaultVictory'
+    | 'assaultRaid'
+    | 'assaultAbandoned'
+    | 'assaultDefeat'
+    | 'assaultWithdrawal'
+    | 'huntKill'
+    | 'huntRepelled'
+    | 'huntEscaped'
+    | 'huntDefeat';
 }
 
 export interface TacticalBattlePersonReport {
@@ -772,6 +805,21 @@ export interface TacticalBattle {
   reports: TacticalRoundReport[];
   pendingReport: TacticalRoundReport | null;
   mode: BattleMode;
+  orientation?: 'defense' | 'assault';
+  assaultKind?: 'banditLair' | 'predatorHunt';
+  assaultTargetSiteId?: number;
+  leaderEscapeBlocked?: boolean;
+  leaderEscaped?: boolean;
+  assaultFireDamage?: number;
+  huntPredatorKind?: PredatorKind;
+  huntTigerTier?: TigerTier;
+  huntPredatorState?: 'hidden' | 'revealed' | 'wounded' | 'fled';
+  huntEncirclement?: number;
+  huntEngagements?: number;
+  huntDriversSplit?: boolean;
+  huntTrapSet?: boolean;
+  huntBaitPlaced?: boolean;
+  huntLeaderKilled?: boolean;
   preliminaryBombardmentCannons?: number;
   preliminaryBombardmentCasualties?: number;
 }

@@ -11,6 +11,17 @@ import { changeRelation } from './relations';
 import { livingResidents } from './residents';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { assignedWeapon, synchronizeWeaponAssignments } from './weapons';
+import {
+  acknowledgeAssaultReport, advanceAssaultPhase, assaultCommandUnavailableReason,
+  assaultPreparationUnavailableReason, assignAssaultGroup, chooseDefaultAssaultCommands,
+  finishBanditLairTacticalAssault, resolveAssaultRound, setAssaultCommand,
+  spendAssaultPreparationAction,
+} from './tacticalAssault';
+import {
+  acknowledgeHuntReport, advanceHuntPhase, assignHuntGroup, chooseDefaultHuntCommands,
+  finishPredatorTacticalHunt, huntCommandUnavailableReason, huntPreparationUnavailableReason,
+  resolveHuntRound, setHuntCommand, spendHuntPreparationAction,
+} from './tacticalHunt';
 import type {
   DefenderGroupKind,
   GameState,
@@ -449,6 +460,8 @@ export function createTacticalBattle(
 export function spendPreparationAction(state: GameState, actionId: PreparationActionId): string | null {
   const battle = state.tacticalBattle;
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  if (battle.assaultKind === 'predatorHunt') return spendHuntPreparationAction(state, actionId);
+  if (battle.orientation === 'assault') return spendAssaultPreparationAction(state, actionId);
   if (battle.phase !== 'preparation') return '준비 단계가 이미 끝났습니다.';
   const action = battle.prepActions.find(candidate => candidate.id === actionId);
   if (!action) return '알 수 없는 준비 행동입니다.';
@@ -473,6 +486,8 @@ export function tacticalPreparationUnavailableReason(
 ): string | null {
   const battle = state.tacticalBattle;
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  if (battle.assaultKind === 'predatorHunt') return huntPreparationUnavailableReason(state, actionId);
+  if (battle.orientation === 'assault') return assaultPreparationUnavailableReason(state, actionId);
   if (actionId === 'setAmbush' && !battle.defenderGroups.some(group => group.kind === 'hunter' && group.count > 0)) {
     return '매복시킬 사냥꾼이 없습니다.';
   }
@@ -652,6 +667,8 @@ function applySelectedPreparationActions(state: GameState, battle: TacticalBattl
 export function assignDefenderGroup(state: GameState, groupId: string, zoneId: string): string | null {
   const battle = state.tacticalBattle;
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  if (battle.assaultKind === 'predatorHunt') return assignHuntGroup(state, groupId, zoneId);
+  if (battle.orientation === 'assault') return assignAssaultGroup(state, groupId, zoneId);
   if (battle.phase !== 'deployment') return '배치 단계에서만 병력을 옮길 수 있습니다.';
   const defender = battle.defenderGroups.find(candidate => candidate.id === groupId);
   if (!defender) return '수비 그룹을 찾을 수 없습니다.';
@@ -686,6 +703,8 @@ export function setTacticalCommand(
 ): string | null {
   const battle = state.tacticalBattle;
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  if (battle.assaultKind === 'predatorHunt') return setHuntCommand(state, groupId, command);
+  if (battle.orientation === 'assault') return setAssaultCommand(state, groupId, command);
   if (battle.phase !== 'command') return '지휘 단계에서만 명령을 내릴 수 있습니다.';
   if (!IMPLEMENTED_COMMANDS.has(command)) return '이 명령은 아직 사용할 수 없습니다.';
   const defender = battle.defenderGroups.find(candidate => candidate.id === groupId);
@@ -701,6 +720,8 @@ export function tacticalCommandUnavailableReason(
   defender: TacticalDefenderGroup,
   command: TacticalCommandId,
 ): string | null {
+  if (battle.assaultKind === 'predatorHunt') return huntCommandUnavailableReason(battle, defender, command);
+  if (battle.orientation === 'assault') return assaultCommandUnavailableReason(battle, defender, command);
   if (!IMPLEMENTED_COMMANDS.has(command)) return '이 명령은 아직 사용할 수 없습니다.';
   if (command === 'hold') return null;
   if (command === 'charge') {
@@ -740,6 +761,14 @@ export function tacticalCommandUnavailableReason(
 }
 
 export function chooseDefaultTacticalCommands(battle: TacticalBattle): void {
+  if (battle.assaultKind === 'predatorHunt') {
+    chooseDefaultHuntCommands(battle);
+    return;
+  }
+  if (battle.orientation === 'assault') {
+    chooseDefaultAssaultCommands(battle);
+    return;
+  }
   for (const defender of battle.defenderGroups) {
     if (defender.command) continue;
     if (defender.kind === 'civilian') defender.command = 'protectCivilians';
@@ -757,6 +786,8 @@ export function chooseDefaultTacticalCommands(battle: TacticalBattle): void {
 export function advanceTacticalPhase(state: GameState): string | null {
   const battle = state.tacticalBattle;
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  if (battle.assaultKind === 'predatorHunt') return advanceHuntPhase(state);
+  if (battle.orientation === 'assault') return advanceAssaultPhase(state);
   if (battle.phase === 'preparation') {
     battle.preparationEvents = applySelectedPreparationActions(state, battle);
     battle.phase = battle.preparationEvents.length > 0 ? 'preparationExecution' : 'deployment';
@@ -932,6 +963,8 @@ function summaryForOutcome(outcome: TacticalRoundReport['outcome']): string {
 export function resolveTacticalRound(state: GameState): string | null {
   const battle = state.tacticalBattle;
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  if (battle.assaultKind === 'predatorHunt') return resolveHuntRound(state);
+  if (battle.orientation === 'assault') return resolveAssaultRound(state);
   if (battle.phase !== 'command') return '교전을 진행할 지휘 단계가 아닙니다.';
   chooseDefaultTacticalCommands(battle);
   const rng = makeRng(state.seed + battle.id * 8191 + battle.round * 131071);
@@ -1326,6 +1359,8 @@ export function completeTacticalSimulation(state: GameState): string | null {
 export function acknowledgeTacticalReport(state: GameState): string | null {
   const battle = state.tacticalBattle;
   if (!battle || !battle.pendingReport) return '확인할 전투 보고가 없습니다.';
+  if (battle.assaultKind === 'predatorHunt') return acknowledgeHuntReport(state);
+  if (battle.orientation === 'assault') return acknowledgeAssaultReport(state);
   if (battle.phase !== 'report') return '아직 전투 연출이 끝나지 않았습니다.';
   if (battle.pendingReport.ended) {
     battle.phase = 'finished';
@@ -1361,6 +1396,14 @@ function outcomeLabel(outcome: TacticalRoundReport['outcome']): string {
 export function finishTacticalBattle(state: GameState): void {
   const battle = state.tacticalBattle;
   if (!battle) return;
+  if (battle.assaultKind === 'predatorHunt') {
+    finishPredatorTacticalHunt(state);
+    return;
+  }
+  if (battle.orientation === 'assault') {
+    finishBanditLairTacticalAssault(state);
+    return;
+  }
   const finalReport = [...battle.reports].reverse().find(report => report.ended) ?? battle.reports[battle.reports.length - 1];
   const outcome = finalReport?.outcome ?? 'partialLoss';
   const rng = makeRng(state.seed + battle.id * 524287 + 97);
@@ -1487,8 +1530,10 @@ export function tacticalCommandDescription(command: TacticalCommandId, ambushed 
     protectCivilians: '주민 피해를 줄이지만 건물과 물자를 포기할 수 있습니다.',
     fallback: '병력을 보존하며 구역을 내주고 다음 방어선으로 물러납니다.',
     advance: '이번 교전을 마친 뒤 한 단계 앞선 방어선으로 이동합니다.',
+    arson: '준비한 불화살로 목책과 움막의 돌파를 앞당기지만 노획 일부가 불탑니다.',
+    blockEscape: '사냥꾼을 본대에서 빼 두목의 산길 퇴로를 감시합니다.',
     counterattack: '후속 구현 예정입니다.',
-    openRetreat: '후속 구현 예정입니다.',
+    openRetreat: '현재 성과를 포기하거나 챙긴 뒤 토벌대 전체가 질서 있게 철수합니다.',
   };
   return descriptions[command];
 }

@@ -239,6 +239,39 @@ function addBuiltMarker(state, type) {
 }
 
 {
+  const offensiveOptions = {
+    mode: 'garrison', factionName: '변경 마적', power: 88, warned: true, siege: false,
+    season: 'autumn', weather: 'clear', prepPoints: 3, seed: 2026071411,
+    defenders: { muskets: 1, bows: 2, spears: 2, unarmedMilitia: 1, watchmen: 1, hunters: 3, civilians: 0 },
+    cannonEmplacements: 0,
+  };
+  const bandit = battleSimulation.createBattleSimulation({ ...offensiveOptions, scenario: 'banditLair' });
+  assert.equal(bandit.tacticalBattle?.assaultKind, 'banditLair');
+  assert.equal(bandit.tacticalBattle?.originalPower, 88);
+  assert.equal(bandit.tacticalBattle?.warned, true);
+  assert.equal(bandit.tacticalBattle?.prepPoints, 3);
+  assert.equal(bandit.expedition?.kind, 'lairAssault');
+
+  const tiger = battleSimulation.createBattleSimulation({
+    ...offensiveOptions, scenario: 'tigerHunt', tigerTier: 'mountainLord', warned: false,
+  });
+  assert.equal(tiger.tacticalBattle?.assaultKind, 'predatorHunt');
+  assert.equal(tiger.tacticalBattle?.huntPredatorKind, 'tiger');
+  assert.equal(tiger.tacticalBattle?.huntTigerTier, 'mountainLord');
+  assert.equal(tiger.tacticalBattle?.warned, false);
+
+  const wolves = battleSimulation.createBattleSimulation({
+    ...offensiveOptions, scenario: 'wolfHunt', wolfCount: 11,
+  });
+  assert.equal(wolves.tacticalBattle?.huntPredatorKind, 'wolf');
+  assert.equal(
+    wolves.tacticalBattle?.raiderGroups.reduce((sum, group) => sum + group.count, 0),
+    11,
+    'wolf hunt simulator preserves the selected pack size',
+  );
+}
+
+{
   const expectedTypes = new Map([
     ['니마차 우디캐', ['nimacha-hunter', 'nimacha-looter', 'nimacha-spearman']],
     ['홀라온 야인', ['holaon-lancer', 'holaon-raider', 'holaon-horse-archer']],

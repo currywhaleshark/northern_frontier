@@ -10,6 +10,7 @@ import { ensureProcessingReserves } from './processing';
 import { initRelations } from './relations';
 import { getSeason, getYear } from './seasons';
 import { ensureExploration, refreshExploration } from './exploration';
+import { tigerTierFromStrength } from './expeditionIntel';
 import { RESOURCE_IDS } from './resourceCatalog';
 import { reconcileTributeReserve } from './tributeReserve';
 import { reconcileResidentHomes } from './residents';
@@ -233,12 +234,14 @@ export function loadGame(): GameState | null {
     if (!Object.prototype.hasOwnProperty.call(parsed, 'tacticalBattle')) parsed.tacticalBattle = null;
     if (!Object.prototype.hasOwnProperty.call(parsed, 'tacticalBattleReport')) parsed.tacticalBattleReport = null;
     if (parsed.tacticalBattle) {
+      parsed.tacticalBattle.orientation = parsed.tacticalBattle.orientation === 'assault' ? 'assault' : 'defense';
+      const assault = parsed.tacticalBattle.orientation === 'assault';
       if (!Array.isArray(parsed.tacticalBattle.preparationEvents)) parsed.tacticalBattle.preparationEvents = [];
       for (const action of parsed.tacticalBattle.prepActions) {
         if (action.selected == null) action.selected = action.applied;
-        if (action.id === 'setAmbush' || action.id === 'prepareVolley') action.cost = 2;
+        if (!assault && (action.id === 'setAmbush' || action.id === 'prepareVolley')) action.cost = 2;
       }
-      if (!parsed.tacticalBattle.prepActions.some(action => action.id === 'preliminaryBombardment')) {
+      if (!assault && !parsed.tacticalBattle.prepActions.some(action => action.id === 'preliminaryBombardment')) {
         parsed.tacticalBattle.prepActions.push({
           id: 'preliminaryBombardment',
           label: '사전포격',
@@ -256,7 +259,7 @@ export function loadGame(): GameState | null {
         if (group.killed == null) group.killed = 0;
         if (group.confused == null) group.confused = false;
         if (group.engagementsInZone == null) group.engagementsInZone = 0;
-        if (group.kind === 'flankers' && group.flankPlan !== 'rearAssault' && group.flankPlan !== 'breakthrough') {
+        if (!assault && group.kind === 'flankers' && group.flankPlan !== 'rearAssault' && group.flankPlan !== 'breakthrough') {
           group.flankPlan = 'breakthrough';
         }
         if (group.rearAssault == null) group.rearAssault = false;
@@ -271,13 +274,36 @@ export function loadGame(): GameState | null {
             : 'rear';
         }
         if (group.ambushed != null) continue;
-        group.ambushed = group.kind === 'hunter' && group.zoneId === 'approach' && preparedAmbush;
+        group.ambushed = !assault && group.kind === 'hunter' && group.zoneId === 'approach' && preparedAmbush;
         const enemyHere = parsed.tacticalBattle.raiderGroups.some(raider =>
           raider.zoneId === group.zoneId && raider.intent !== 'withdraw' && raider.power > 0);
         if (group.command === 'ambush' && !group.ambushed && enemyHere) group.command = 'hold';
       }
       for (const report of parsed.tacticalBattle.reports) {
         if (report.raidersKilled == null) report.raidersKilled = 0;
+      }
+      if (assault) {
+        parsed.tacticalBattle.assaultKind ??= 'banditLair';
+        if (parsed.tacticalBattle.assaultKind === 'predatorHunt') {
+          parsed.tacticalBattle.huntPredatorKind ??= parsed.expedition?.predatorKind ?? 'wolf';
+          if (parsed.tacticalBattle.huntPredatorKind === 'tiger') {
+            parsed.tacticalBattle.huntTigerTier ??= tigerTierFromStrength(parsed.tacticalBattle.originalPower);
+            for (const group of parsed.tacticalBattle.raiderGroups) {
+              if (group.beastKind === 'tiger') group.tigerTier ??= parsed.tacticalBattle.huntTigerTier;
+            }
+          }
+          parsed.tacticalBattle.huntPredatorState ??= 'hidden';
+          parsed.tacticalBattle.huntEncirclement ??= 0;
+          parsed.tacticalBattle.huntEngagements ??= Math.max(0, parsed.tacticalBattle.round - 1);
+          parsed.tacticalBattle.huntDriversSplit ??= false;
+          parsed.tacticalBattle.huntTrapSet ??= false;
+          parsed.tacticalBattle.huntBaitPlaced ??= false;
+          parsed.tacticalBattle.huntLeaderKilled ??= false;
+        } else {
+          parsed.tacticalBattle.leaderEscapeBlocked ??= false;
+          parsed.tacticalBattle.leaderEscaped ??= false;
+          parsed.tacticalBattle.assaultFireDamage ??= 0;
+        }
       }
     }
     ensureMineralDeposits(parsed.map);

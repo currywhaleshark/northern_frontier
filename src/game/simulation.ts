@@ -294,6 +294,33 @@ export function demolishBuilding(state: GameState, x: number, y: number): string
   return null;
 }
 
+export function cancelBuildingConstruction(state: GameState, buildingId: number): string | null {
+  const building = getBuilding(state, buildingId);
+  if (!building) return '취소할 건설 현장이 없습니다.';
+  if (building.built) return '완공된 건물은 건설 취소할 수 없습니다.';
+  if (building.repairing) return '수리 중인 건물은 건설 취소할 수 없습니다.';
+
+  const def = BUILDING_DEFS[building.type];
+  for (const [res, amount] of Object.entries(def.cost)) {
+    state.resources[res as ResourceId] += amount ?? 0;
+  }
+  for (const [res, amount] of Object.entries(building.inventory ?? {})) {
+    state.resources[res as ResourceId] += amount ?? 0;
+  }
+
+  clearBuildingTiles(state, building.id);
+  clearAssignmentsForBuilding(state, building.id);
+  state.buildings = state.buildings.filter(candidate => candidate.id !== building.id);
+  for (const resident of state.residents) {
+    if (!resident.alive || resident.job !== 'builder') continue;
+    resetAgent(state, resident);
+    resident.task = '새 공사 확인 중';
+  }
+  state.resources.defense = computeDefense(state);
+  addLog(state, `${def.name} 건설을 취소했습니다. 투입 자재를 모두 회수했습니다.`, 'info');
+  return null;
+}
+
 // 직업 재배정: from 직업의 산 주민 1명을 to 직업으로
 export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
   if (!isJobUnlocked(state.rank, to)) return false;
@@ -421,7 +448,7 @@ export function issueResidentWorkOrder(
 
   const targetBuilding = action.buildingId == null ? undefined : getBuilding(state, action.buildingId);
   const forcedHaulTarget = resident.job === 'hauler' && !!targetBuilding && isHaulSourceBuilding(targetBuilding);
-  if (targetBuilding && workerSlotConfig(targetBuilding.type) && !forcedHaulTarget && forcedSiteIds.length === 0) {
+  if (targetBuilding?.built && workerSlotConfig(targetBuilding.type) && !forcedHaulTarget && forcedSiteIds.length === 0) {
     return assignResidentToBuilding(state, residentId, targetBuilding.id);
   }
 

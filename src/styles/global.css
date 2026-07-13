@@ -1327,6 +1327,10 @@ html, body, #root {
 }
 .tactical-morale-row.village .tactical-morale-gauge i { background: #6fa876; }
 .tactical-morale-row.raiders .tactical-morale-gauge i { background: #b65c4d; }
+.tactical-morale-row.encirclement .tactical-morale-gauge i {
+  background: linear-gradient(90deg, #8c6932, #e1b456);
+  box-shadow: 0 0 8px rgba(225, 180, 86, 0.36);
+}
 
 .tactical-stage-shell {
   position: relative;
@@ -1418,6 +1422,19 @@ html, body, #root {
   background: #b95f4f;
   transition: width 400ms ease;
 }
+.tactical-screen.assault .tactical-pressure i { background: #c99643; }
+.tactical-zone.assault-zone.breached::after {
+  content: '공략 완료';
+  border-color: #a77b38;
+  background: rgba(63, 43, 19, 0.9);
+  color: #f0d69b;
+}
+.tactical-zone.hunt-zone.breached::after {
+  content: '몰이 전진';
+  border-color: #5f875a;
+  background: rgba(29, 55, 31, 0.9);
+  color: #b9d9ae;
+}
 .tactical-prep-tags {
   position: absolute;
   z-index: 5;
@@ -1473,6 +1490,12 @@ html, body, #root {
 .tactical-barricade.reinforced {
   width: 184px;
   filter: drop-shadow(0 5px 4px rgba(16, 10, 6, 0.72));
+}
+.tactical-barricade.enemy-held { left: 43%; }
+.tactical-barricade.enemy-held > b {
+  border-color: rgba(181, 94, 71, 0.72);
+  background: rgba(54, 25, 20, 0.88);
+  color: #e9b19e;
 }
 .tactical-barricade.reinforced > b { color: #f0d69b; border-color: rgba(221, 190, 127, 0.72); }
 .tactical-barricade.broken > b { color: #e29a82; border-color: rgba(190, 89, 68, 0.65); }
@@ -1607,6 +1630,16 @@ html, body, #root {
   opacity: 0.62;
   filter: grayscale(0.45) saturate(0.65);
 }
+.tactical-raider-group.beast-group {
+  flex: 0 1 auto;
+  min-width: 118px;
+  color: #efd29d;
+}
+.tactical-raider-group.beast-group.tier-mountainLord > span {
+  color: #f2d88d;
+  border: 1px solid rgba(197, 139, 50, 0.55);
+  box-shadow: 0 0 12px rgba(172, 100, 35, 0.18);
+}
 .tactical-raider-sprites {
   width: 100%;
   height: 120px;
@@ -1631,7 +1664,9 @@ html, body, #root {
 .tactical-formation-slot.raider-slot { width: 168px; height: 120px; justify-content: center; }
 .tactical-formation-slot .tactical-defender,
 .tactical-formation-slot .tactical-raider,
-.tactical-formation-slot .tactical-raider-unknown {
+.tactical-formation-slot .tactical-raider-unknown,
+.tactical-formation-slot .tactical-beast,
+.tactical-formation-slot .tactical-beast-trace {
   margin-left: 0 !important;
   margin-bottom: 0 !important;
 }
@@ -1646,6 +1681,36 @@ html, body, #root {
   color: #d39d8f;
   font-size: 30px;
 }
+.tactical-beast-trace {
+  position: relative;
+  width: 76px;
+  height: 54px;
+  display: block;
+  border-radius: 52% 48% 44% 56%;
+  background:
+    radial-gradient(ellipse at 30% 82%, rgba(23, 35, 22, 0.9) 0 24%, transparent 25%),
+    radial-gradient(ellipse at 70% 78%, rgba(31, 48, 28, 0.92) 0 28%, transparent 29%);
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.68));
+  transform: rotate(-8deg);
+  animation: tactical-trace-stir 1.8s ease-in-out infinite;
+}
+.tactical-beast-trace i,
+.tactical-beast-trace b {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  background: #9a7449;
+  box-shadow: 0 1px 0 rgba(20, 14, 9, 0.8);
+}
+.tactical-beast-trace i { width: 8px; height: 10px; top: 12px; }
+.tactical-beast-trace i:nth-child(1) { left: 25px; transform: rotate(-20deg); }
+.tactical-beast-trace i:nth-child(2) { left: 35px; top: 8px; }
+.tactical-beast-trace i:nth-child(3) { left: 45px; transform: rotate(20deg); }
+.tactical-beast-trace b { width: 24px; height: 18px; left: 27px; top: 21px; }
+@keyframes tactical-trace-stir {
+  0%, 100% { transform: rotate(-8deg) translateX(0); }
+  50% { transform: rotate(-5deg) translateX(3px); }
+}
 .tactical-defender-rank {
   position: absolute;
   z-index: 5;
@@ -1659,6 +1724,21 @@ html, body, #root {
   gap: 6px;
   transform-origin: bottom left;
 }
+/* 공격전은 토벌대가 왼쪽에서 오른쪽으로 진군하고, 적이 오른쪽 방어선을 지킨다. */
+.tactical-screen.assault .tactical-raider-rank {
+  left: 51%;
+  right: 6%;
+  justify-content: flex-start;
+  transform-origin: bottom left;
+}
+.tactical-screen.assault .tactical-defender-rank {
+  left: 6%;
+  right: 51%;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  transform-origin: bottom right;
+}
+.tactical-screen.assault .tactical-barricade.enemy-held { left: 57%; }
 .tactical-zone.has-rear-assault .tactical-defender-rank {
   right: 22%;
   gap: 4px;
@@ -1716,6 +1796,26 @@ html, body, #root {
   transform: scaleX(-1);
   transform-origin: bottom center;
 }
+.tactical-beast {
+  --beast-scale: 0.86;
+  width: 192px;
+  height: 192px;
+  image-rendering: auto;
+  filter: drop-shadow(0 5px 3px rgba(0, 0, 0, 0.74));
+  transform: scale(var(--beast-scale));
+  transform-origin: bottom center;
+  transition: background-position 90ms steps(1), filter 180ms ease;
+}
+.tactical-beast.beast-wolf { --beast-scale: 0.70; }
+.tactical-beast.beast-tiger { --beast-scale: 0.84; }
+.tactical-beast.beast-greatTiger { --beast-scale: 1.02; }
+.tactical-beast.beast-mountainLord {
+  --beast-scale: 1.18;
+  filter: drop-shadow(0 7px 5px rgba(0, 0, 0, 0.82));
+}
+.tactical-beast.pose-wounded {
+  filter: sepia(0.22) saturate(0.82) drop-shadow(0 5px 3px rgba(0, 0, 0, 0.75));
+}
 .tactical-court-raider {
   --raider-scale: 1;
   width: 168px;
@@ -1726,6 +1826,10 @@ html, body, #root {
 }
 .tactical-court-raider.unit-court-melee { --raider-scale: 1.2; }
 .tactical-court-raider.unit-court-cavalry { --raider-scale: 1.18; }
+.tactical-screen.assault .tactical-defender { transform: scaleX(-1); }
+.tactical-screen.assault .tactical-raider { transform: scaleX(1); }
+.tactical-screen.assault .tactical-court-raider { transform: scaleX(1) scale(var(--raider-scale)); }
+.tactical-screen.assault .tactical-beast { transform: scaleX(-1) scale(var(--beast-scale)); }
 .tactical-unit-line.full-formation {
   position: relative;
   display: block;
@@ -2030,6 +2134,9 @@ html, body, #root {
 .tactical-report-numbers strong { color: #e3e6e7; font-size: 11px; overflow-wrap: anywhere; }
 
 .tactical-zone.event-ambush .tactical-raider-rank { animation: tactical-hit 420ms ease 2; }
+.tactical-zone.event-beastReveal .beast-group { animation: tactical-beast-reveal 720ms ease-out; }
+.tactical-zone.event-beastAmbush .beast-group { animation: tactical-beast-lunge 650ms cubic-bezier(0.16, 0.72, 0.24, 1); }
+.tactical-zone.event-beastRout .beast-group { animation: tactical-beast-rout 760ms ease-in forwards; }
 .tactical-zone.event-bombardment .tactical-raider-rank { animation: tactical-bombardment-hit 220ms ease-in-out 4; }
 .tactical-zone.event-conceal::after {
   content: '';
@@ -2059,6 +2166,24 @@ html, body, #root {
 .tactical-zone.event-moraleBreak .tactical-raider-rank { animation: tactical-break 700ms ease forwards; }
 .tactical-zone.event-loot .tactical-raider-rank { animation: tactical-loot 380ms ease 2; }
 .tactical-zone.moving-raiders .tactical-raider-rank { animation: tactical-advance-after-combat 620ms ease-in forwards; }
+.tactical-screen.assault .tactical-zone.event-melee .tactical-raider-rank,
+.tactical-screen.assault .tactical-zone.event-zoneFall .tactical-raider-rank {
+  animation-name: tactical-charge-left;
+}
+.tactical-screen.assault .tactical-zone.event-melee .tactical-defender-rank,
+.tactical-screen.assault .tactical-zone.event-wallHit .tactical-defender-rank,
+.tactical-screen.assault .tactical-zone.event-zoneFall .tactical-defender-rank {
+  animation-name: tactical-charge-right;
+}
+.tactical-screen.assault .tactical-zone.event-beastReveal .beast-group { animation-name: tactical-assault-beast-reveal; }
+.tactical-screen.assault .tactical-zone.event-beastAmbush .beast-group { animation-name: tactical-assault-beast-lunge; }
+.tactical-screen.assault .tactical-zone.event-beastRout .beast-group { animation-name: tactical-assault-beast-rout; }
+.tactical-screen.assault .tactical-raider-group.leader-escaping { animation-name: tactical-assault-leader-escape; }
+.tactical-screen.assault .tactical-raider-group.escape-blocked { animation-name: tactical-assault-escape-blocked; }
+.tactical-screen.assault .tactical-field-group.leader-blocking { animation-name: tactical-assault-leader-blocking; }
+.tactical-raider-group.leader-escaping { animation: tactical-leader-escape 920ms cubic-bezier(0.2, 0.68, 0.2, 1) forwards; }
+.tactical-raider-group.escape-blocked { animation: tactical-escape-blocked 780ms ease-out; }
+.tactical-field-group.leader-blocking { animation: tactical-leader-blocking 780ms cubic-bezier(0.16, 0.78, 0.25, 1); }
 .tactical-field-group.prep-prepareAmbush { animation: tactical-prep-ambush 1050ms ease-out forwards; }
 .tactical-field-group.prep-muster { animation: tactical-prep-muster 1050ms ease-out; }
 .tactical-field-group.prep-evacuate { animation: tactical-prep-evacuate 950ms ease-in-out; }
@@ -2071,6 +2196,11 @@ html, body, #root {
 }
 .tactical-raider.falling { animation-name: tactical-raider-fall; }
 .tactical-court-raider.falling { animation-name: tactical-raider-fall; }
+.tactical-beast.falling { animation-name: tactical-beast-fall; }
+.tactical-screen.assault .tactical-defender.falling { animation-name: tactical-assault-defender-fall; }
+.tactical-screen.assault .tactical-raider.falling,
+.tactical-screen.assault .tactical-court-raider.falling { animation-name: tactical-assault-raider-fall; }
+.tactical-screen.assault .tactical-beast.falling { animation-name: tactical-assault-beast-fall; }
 @keyframes tactical-fall {
   0% { transform: rotate(0) translateY(0); opacity: 1; }
   38% { transform: rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
@@ -2080,6 +2210,56 @@ html, body, #root {
   0% { transform: scaleX(-1) scale(var(--raider-scale, 1)) rotate(0) translateY(0); opacity: 1; }
   38% { transform: scaleX(-1) scale(var(--raider-scale, 1)) rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
   100% { transform: scaleX(-1) scale(var(--raider-scale, 1)) rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
+}
+@keyframes tactical-beast-fall {
+  0% { transform: scale(var(--beast-scale)) rotate(0) translateY(0); opacity: 1; }
+  38% { transform: scale(var(--beast-scale)) rotate(8deg) translateY(3px); filter: sepia(1) saturate(2.5); opacity: 1; }
+  100% { transform: scale(var(--beast-scale)) rotate(62deg) translateY(22px); filter: sepia(1) saturate(1.8); opacity: 0; }
+}
+@keyframes tactical-assault-defender-fall {
+  0% { transform: scaleX(-1) rotate(0) translateY(0); opacity: 1; }
+  38% { transform: scaleX(-1) rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
+  100% { transform: scaleX(-1) rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
+}
+@keyframes tactical-assault-raider-fall {
+  0% { transform: scale(var(--raider-scale, 1)) rotate(0) translateY(0); opacity: 1; }
+  38% { transform: scale(var(--raider-scale, 1)) rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
+  100% { transform: scale(var(--raider-scale, 1)) rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
+}
+@keyframes tactical-assault-beast-fall {
+  0% { transform: scaleX(-1) scale(var(--beast-scale)) rotate(0) translateY(0); opacity: 1; }
+  38% { transform: scaleX(-1) scale(var(--beast-scale)) rotate(8deg) translateY(3px); filter: sepia(1) saturate(2.5); opacity: 1; }
+  100% { transform: scaleX(-1) scale(var(--beast-scale)) rotate(62deg) translateY(22px); filter: sepia(1) saturate(1.8); opacity: 0; }
+}
+@keyframes tactical-beast-reveal {
+  0% { opacity: 0; transform: translateX(-46px) scale(0.82); filter: brightness(2.2); }
+  42% { opacity: 1; transform: translateX(8px) scale(1.04); filter: brightness(1.55); }
+  100% { transform: translateX(0) scale(1); filter: brightness(1); }
+}
+@keyframes tactical-beast-lunge {
+  0% { transform: translateX(-12px); }
+  48% { transform: translateX(96px) translateY(-9px); }
+  70% { transform: translateX(72px) translateY(2px); }
+  100% { transform: translateX(0); }
+}
+@keyframes tactical-beast-rout {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-150px); }
+}
+@keyframes tactical-assault-beast-reveal {
+  0% { opacity: 0; transform: translateX(46px) scale(0.82); filter: brightness(2.2); }
+  42% { opacity: 1; transform: translateX(-8px) scale(1.04); filter: brightness(1.55); }
+  100% { transform: translateX(0) scale(1); filter: brightness(1); }
+}
+@keyframes tactical-assault-beast-lunge {
+  0% { transform: translateX(12px); }
+  48% { transform: translateX(-96px) translateY(-9px); }
+  70% { transform: translateX(-72px) translateY(2px); }
+  100% { transform: translateX(0); }
+}
+@keyframes tactical-assault-beast-rout {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(150px); }
 }
 
 /* 전황 플로팅 텍스트 — 피해·돌파·약탈 순간 해당 진영 위로 떠오른다 */
@@ -2098,6 +2278,8 @@ html, body, #root {
 }
 .tactical-float.defender { left: 64%; color: #f2b9ac; border: 1px solid rgba(185, 95, 79, 0.7); }
 .tactical-float.raider { left: 22%; color: #f6dfa8; border: 1px solid rgba(214, 175, 91, 0.65); }
+.tactical-screen.assault .tactical-float.defender { left: 22%; }
+.tactical-screen.assault .tactical-float.raider { left: 64%; }
 @keyframes tactical-float-up {
   0% { transform: translateY(14px); opacity: 0; }
   18% { transform: translateY(0); opacity: 1; }
@@ -2137,6 +2319,38 @@ html, body, #root {
 @keyframes tactical-volley { from { transform: translate(-80px, 28px); opacity: 0; } to { transform: translate(60px, -10px); opacity: 1; } }
 @keyframes tactical-casualty { 45% { filter: sepia(1) saturate(4); transform: translateY(4px); } }
 @keyframes tactical-break { to { transform: translateX(-80px); opacity: 0.25; } }
+@keyframes tactical-leader-escape {
+  0% { transform: translate(0, 0); opacity: 1; }
+  24% { transform: translate(-16px, -5px) rotate(-2deg); opacity: 1; }
+  100% { transform: translate(-190px, -36px) rotate(-8deg); opacity: 0; }
+}
+@keyframes tactical-escape-blocked {
+  0%, 100% { transform: translate(0, 0); filter: none; }
+  28% { transform: translate(-40px, -10px); }
+  48% { transform: translate(18px, 4px) rotate(5deg); filter: sepia(1) saturate(2.6); }
+  68% { transform: translate(-8px, 2px) rotate(-3deg); }
+}
+@keyframes tactical-leader-blocking {
+  0% { transform: translate(90px, 18px); opacity: 0.2; }
+  55% { transform: translate(-72px, -4px); opacity: 1; filter: drop-shadow(0 0 7px rgba(231, 204, 124, 0.9)); }
+  100% { transform: translate(-18px, 0); opacity: 1; }
+}
+@keyframes tactical-assault-leader-escape {
+  0% { transform: translate(0, 0); opacity: 1; }
+  24% { transform: translate(16px, -5px) rotate(2deg); opacity: 1; }
+  100% { transform: translate(190px, -36px) rotate(8deg); opacity: 0; }
+}
+@keyframes tactical-assault-escape-blocked {
+  0%, 100% { transform: translate(0, 0); filter: none; }
+  28% { transform: translate(40px, -10px); }
+  48% { transform: translate(-18px, 4px) rotate(-5deg); filter: sepia(1) saturate(2.6); }
+  68% { transform: translate(8px, 2px) rotate(3deg); }
+}
+@keyframes tactical-assault-leader-blocking {
+  0% { transform: translate(-90px, 18px); opacity: 0.2; }
+  55% { transform: translate(72px, -4px); opacity: 1; filter: drop-shadow(0 0 7px rgba(231, 204, 124, 0.9)); }
+  100% { transform: translate(18px, 0); opacity: 1; }
+}
 @keyframes tactical-loot { 50% { transform: translateY(-6px) rotate(-1deg); } }
 @keyframes tactical-charge-right { 45% { transform: translateX(46px); } }
 @keyframes tactical-charge-left { 45% { transform: translateX(-46px); } }
@@ -2165,11 +2379,63 @@ html, body, #root {
   opacity: 0;
   animation: fx-arrow-flight 560ms ease-in forwards;
 }
+.tactical-screen.assault .fx-arrow {
+  left: 42%;
+  background: linear-gradient(270deg, #f7efd2, #e8d9a8 55%, transparent);
+  animation-name: fx-assault-arrow-flight;
+}
+.fx-fire-arrow {
+  height: 3px;
+  background: linear-gradient(90deg, #fff4c4, #ffb52f 42%, #dc4d1d 68%, transparent);
+  box-shadow: 0 0 7px 2px rgba(255, 115, 30, 0.78);
+}
+.tactical-screen.assault .fx-fire-arrow {
+  background: linear-gradient(270deg, #fff4c4, #ffb52f 42%, #dc4d1d 68%, transparent);
+}
+.fx-fire-arrow::after {
+  content: '';
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff6b0 0 12%, #ff9d24 38%, #b92e16 62%, transparent 72%);
+  animation: fx-fire-flicker 130ms ease-in-out infinite alternate;
+}
+.tactical-screen.assault .fx-fire-arrow::after { right: auto; left: -4px; }
+.tactical-fx-layer.arson { z-index: 10; }
+.fx-fire-impact {
+  position: absolute;
+  left: 18%;
+  bottom: 96px;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  opacity: 0;
+  background: radial-gradient(circle, #fff4b5 0 5%, #ffb12f 18%, rgba(204, 54, 19, 0.9) 40%, rgba(54, 41, 35, 0.6) 58%, transparent 72%);
+  filter: blur(1px);
+  animation: fx-fire-impact 820ms 380ms ease-out forwards;
+}
+.tactical-screen.assault .fx-fire-impact { left: auto; right: 18%; }
+@keyframes fx-fire-flicker { to { transform: scale(1.35) translateX(2px); opacity: 0.7; } }
+@keyframes fx-fire-impact {
+  0% { transform: scale(0.2); opacity: 0; }
+  22% { transform: scale(1); opacity: 1; }
+  62% { transform: scale(1.45) translateY(-8px); opacity: 0.9; }
+  100% { transform: scale(1.8) translateY(-24px); opacity: 0; filter: blur(8px); }
+}
 @keyframes fx-arrow-flight {
   0% { opacity: 0; transform: translate(0, 0) rotate(197deg); }
   12% { opacity: 1; }
   48% { transform: translate(min(-24vw, -180px), -52px) rotate(184deg); opacity: 1; }
   100% { transform: translate(min(-46vw, -350px), 30px) rotate(158deg); opacity: 0.9; }
+}
+@keyframes fx-assault-arrow-flight {
+  0% { opacity: 0; transform: translate(0, 0) rotate(-17deg); }
+  12% { opacity: 1; }
+  48% { transform: translate(max(24vw, 180px), -52px) rotate(-4deg); opacity: 1; }
+  100% { transform: translate(max(46vw, 350px), 30px) rotate(22deg); opacity: 0.9; }
 }
 /* 조총 총구 섬광 + 퍼지는 초연 */
 .fx-muzzle-flash {
@@ -2182,6 +2448,7 @@ html, body, #root {
   background: radial-gradient(circle, rgba(255, 252, 230, 0.95), rgba(255, 224, 130, 0.55) 40%, transparent 70%);
   animation: fx-flash 240ms ease-out forwards;
 }
+.tactical-screen.assault .fx-muzzle-flash { left: 44%; }
 @keyframes fx-flash {
   0% { opacity: 0; transform: scale(0.4); }
   25% { opacity: 1; transform: scale(1); }
@@ -2251,9 +2518,15 @@ html, body, #root {
 }
 /* volley 순간 사격 병종 반동 */
 .tactical-field-group.recoil { animation: tactical-recoil 320ms ease; }
+.tactical-screen.assault .tactical-field-group.recoil { animation-name: tactical-assault-recoil; }
 @keyframes tactical-recoil {
   0% { transform: translateX(0); }
   28% { transform: translateX(8px); }
+  100% { transform: translateX(0); }
+}
+@keyframes tactical-assault-recoil {
+  0% { transform: translateX(0); }
+  28% { transform: translateX(-8px); }
   100% { transform: translateX(0); }
 }
 /* 방어선 붕괴: 화면 전체 흔들림 + 붉은 비네트 플래시 */
@@ -2279,6 +2552,15 @@ html, body, #root {
 .tactical-vignette.rear-assault {
   background: radial-gradient(ellipse at 76% 48%, transparent 30%, rgba(168, 31, 24, 0.5) 100%);
 }
+.tactical-vignette.arson {
+  background: radial-gradient(ellipse at 24% 68%, rgba(242, 154, 48, 0.14), rgba(153, 48, 21, 0.46) 68%, rgba(48, 22, 16, 0.6));
+}
+.tactical-vignette.leader-escape {
+  background: linear-gradient(90deg, rgba(12, 15, 17, 0.72), transparent 48%, rgba(128, 64, 31, 0.18));
+}
+.tactical-vignette.escape-blocked {
+  background: radial-gradient(ellipse at 31% 55%, transparent 20%, rgba(210, 164, 62, 0.38) 60%, rgba(73, 33, 22, 0.48));
+}
 @keyframes tactical-vignette-flash {
   0% { opacity: 0; }
   18% { opacity: 1; }
@@ -2301,6 +2583,25 @@ html, body, #root {
   height: 96px;
   background: linear-gradient(0deg, rgba(142, 62, 26, 0.32), transparent 82%);
   animation: ruin-ember-flicker 2.4s ease-in-out infinite alternate;
+}
+.tactical-ruin-layer.burning .ruin-ember {
+  height: 150px;
+  background: linear-gradient(0deg, rgba(183, 54, 19, 0.56), rgba(229, 129, 28, 0.2) 46%, transparent 88%);
+}
+.ruin-flame {
+  position: absolute;
+  bottom: 30px;
+  width: 38px;
+  height: 82px;
+  border-radius: 48% 52% 48% 52% / 72% 72% 28% 28%;
+  background: radial-gradient(ellipse at 50% 78%, #ffe89d 0 12%, #f5a62f 28%, #c4431c 52%, transparent 70%);
+  filter: blur(1px) drop-shadow(0 0 10px rgba(240, 101, 28, 0.75));
+  transform-origin: center bottom;
+  animation: ruin-flame-flicker 620ms ease-in-out infinite alternate;
+}
+@keyframes ruin-flame-flicker {
+  from { transform: scale(0.82, 0.9) skewX(-4deg); opacity: 0.72; }
+  to { transform: scale(1.08, 1.2) skewX(5deg) translateY(-5px); opacity: 1; }
 }
 @keyframes ruin-ember-flicker {
   from { opacity: 0.5; }

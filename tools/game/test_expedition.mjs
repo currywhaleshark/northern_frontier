@@ -89,6 +89,13 @@ function tickUntil(state, predicate, limit = 300) {
   assert.ok(predicate(), `condition not reached within ${limit} expedition ticks`);
 }
 
+function addBuiltMarket(state) {
+  state.buildings.push({
+    id: state.nextBuildingId++, type: 'market', x: 0, y: 0,
+    progress: 999, built: true, fieldGrowth: 0,
+  });
+}
+
 {
   const state = simulation.newGame(2026071351);
   for (const resident of state.residents) resident.job = 'idle';
@@ -158,6 +165,31 @@ function tickUntil(state, predicate, limit = 300) {
 
   for (let i = 0; i < 8 && !state.pendingChoice; i++) raids.raidHoldTick(state, () => 0.5);
   assert.ok(state.expedition, 'continuing expedition remains away when the deadline expires');
+  assert.equal(state.pendingChoice?.kind, 'raid');
+  assert.deepEqual(state.pendingChoice.options.map(option => option.id), ['levy', 'manual-levy']);
+}
+
+{
+  const { state } = prepareState(20260713531, 0.5);
+  addBuiltMarket(state);
+  tickUntil(state, () => state.expedition?.phase === 'march');
+  raids.openRaidChoice(state, () => 0.5, true, 45, '변경 마적', true);
+  simulation.resolveChoice(state, 'continue');
+  assert.ok(state.pendingChoice?.options.some(option => option.id === 'negotiate'));
+  raids.resolveRaid(state, 'negotiate', () => 0);
+  assert.equal(state.pendingChoice, null);
+  assert.equal(state.expedition?.phase, 'march', 'successful negotiation preserves the continue order');
+}
+
+{
+  const { state } = prepareState(20260713532, 0.5);
+  addBuiltMarket(state);
+  tickUntil(state, () => state.expedition?.phase === 'march');
+  raids.openRaidChoice(state, () => 0.5, true, 45, '변경 마적', true);
+  simulation.resolveChoice(state, 'return');
+  assert.equal(state.expedition?.phase, 'return');
+  raids.resolveRaid(state, 'negotiate', () => 0.99);
+  assert.equal(state.expedition?.phase, 'return', 'failed negotiation preserves the return order');
   assert.equal(state.pendingChoice?.kind, 'raid');
   assert.deepEqual(state.pendingChoice.options.map(option => option.id), ['levy', 'manual-levy']);
 }

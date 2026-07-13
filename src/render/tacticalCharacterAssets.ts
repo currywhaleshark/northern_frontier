@@ -29,6 +29,17 @@ export const TACTICAL_COURT_ARMY_SHEET = {
   src: '/assets/tactical/court-army-tactical-v1.png',
 } as const;
 
+export const TACTICAL_BEAST_SHEETS = {
+  wolf: '/assets/tactical/beasts/wolf/sheet-transparent.png',
+  tiger: '/assets/tactical/beasts/tiger/sheet-transparent.png',
+  greatTiger: '/assets/tactical/beasts/great-tiger/sheet-transparent.png',
+  mountainLord: '/assets/tactical/beasts/mountain-lord/sheet-transparent.png',
+} as const;
+
+export function tacticalBeastSheet(kind: PredatorKind, tigerTier?: TigerTier): string {
+  return kind === 'wolf' ? TACTICAL_BEAST_SHEETS.wolf : TACTICAL_BEAST_SHEETS[tigerTier ?? 'tiger'];
+}
+
 const RAIDER_COLUMNS: Record<string, number> = {
   '오도리 씨족': 0,
   '올량합 부락': 1,
@@ -41,3 +52,4 @@ const RAIDER_COLUMNS: Record<string, number> = {
 export function tacticalRaiderColumn(faction: string): number | null {
   return RAIDER_COLUMNS[faction] ?? null;
 }
+import type { PredatorKind, TigerTier } from '../game/types';

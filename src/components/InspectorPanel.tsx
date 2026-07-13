@@ -40,6 +40,7 @@ interface Props {
   onUseLuxuryGood: (resource: ResourceId) => void;
   onToggleNitre: () => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
+  onCancelBuildingConstruction: (buildingId: number) => void;
   onDemolishBuilding: (x: number, y: number) => void;
   onOrganizeHunt: (kind: WildlifeKind) => void;
   onScoutPredator: (kind: 'wolf' | 'tiger', residentId: number) => void;
@@ -434,7 +435,7 @@ function ResidentDetail({ state, r, rank, onSetJob, onToggleCart }: {
 
 export function InspectorPanel({
   state, selected, onSetResidentJob, onToggleResidentCart, onRequestTrade, onPetition, onToggleNitre, onSetSmithyProduct,
-  onSetTributeReserve, onUseLuxuryGood, onDemolishBuilding, onOrganizeHunt, onScoutPredator, tab, setTab, residentId, setResidentId,
+  onSetTributeReserve, onUseLuxuryGood, onCancelBuildingConstruction, onDemolishBuilding, onOrganizeHunt, onScoutPredator, tab, setTab, residentId, setResidentId,
   onSendSiteGift, onRequestSitePassage, onRequestSiteHunting, onScoutBanditLair, onRaidBanditLair,
   onOpenWeaponAllocation,
 }: Props) {
@@ -592,6 +593,24 @@ export function InspectorPanel({
                             .filter((entry): entry is [string, number] => (entry[1] ?? 0) > 0.05)
                             .map(([resource, amount]) => `${RESOURCE_NAMES[resource as ResourceId]} ${amount.toFixed(1)}`)
                             .join(', ')}
+                        </td>
+                      </tr>
+                    )}
+                    {!building.built && !building.repairing && (
+                      <tr>
+                        <td>건설</td>
+                        <td>
+                          <button
+                            className="btn small"
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`${def.name} 건설을 취소할까요? 투입 자재는 모두 반환됩니다.`)) {
+                                onCancelBuildingConstruction(building.id);
+                              }
+                            }}
+                          >
+                            건설 취소
+                          </button>
                         </td>
                       </tr>
                     )}
