@@ -7,11 +7,12 @@ interface Props {
   canContinue: boolean;
   onStart: (difficulty: Difficulty) => void;
   onContinue: () => void;
+  onOpenBattleSim: () => void;
 }
 
 const DIFF_ORDER: Difficulty[] = ['easy', 'normal', 'hard'];
 
-export function MainMenu({ canContinue, onStart, onContinue }: Props) {
+export function MainMenu({ canContinue, onStart, onContinue, onOpenBattleSim }: Props) {
   const [diff, setDiff] = useState<Difficulty>('normal');
 
   return (
@@ -47,6 +48,7 @@ export function MainMenu({ canContinue, onStart, onContinue }: Props) {
           {canContinue && (
             <button className="btn menu-btn" onClick={onContinue}>이어하기</button>
           )}
+          <button className="btn menu-btn" onClick={onOpenBattleSim}>전투 시뮬레이션</button>
         </div>
 
         <div className="menu-footer muted small">

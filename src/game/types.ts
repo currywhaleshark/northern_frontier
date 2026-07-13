@@ -478,6 +478,13 @@ export interface Battle {
   draftedJobs?: { id: number; job: JobId }[];
 }
 
+// 전투가 끝난 자리에 며칠간 남는 눈밭/땅 교란 자국 (연출 전용)
+export interface BattleScar {
+  x: number;
+  y: number;
+  until: number; // 이 날까지 자국이 남는다
+}
+
 export type TacticalBattlePhase =
   | 'preparation'
   | 'deployment'
@@ -704,6 +711,7 @@ export interface GameState {
   relations: Record<string, number>; // 세력별 우호도 0~100 (키: 세력 이름)
   raiders: RaiderBand | null; // 접근 중인 습격 무리
   battle: Battle | null;      // 지도 위에서 진행 중인 습격 전투
+  battleScars?: BattleScar[]; // 끝난 전투 자리의 교란 자국 (구버전 저장에는 없음)
   tacticalBattle: TacticalBattle | null; // 직접 지휘하는 두루마리형 습격 전투
   tacticalBattleReport: TacticalBattleReport | null; // 전투 종료 뒤 확인하는 상세 장계
   raidCooldown: number;     // 습격 후 유예 기간

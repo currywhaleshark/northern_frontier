@@ -170,6 +170,7 @@ export function loadGame(): GameState | null {
     if (parsed.subTick == null || parsed.residents.some(r => r.x == null || r.px == null)) return null;
     if (!('raiders' in parsed)) return null;
     if (!Object.prototype.hasOwnProperty.call(parsed, 'battle')) parsed.battle = null;
+    if (!Array.isArray(parsed.battleScars)) parsed.battleScars = [];
     if (!Object.prototype.hasOwnProperty.call(parsed, 'tacticalBattle')) parsed.tacticalBattle = null;
     if (!Object.prototype.hasOwnProperty.call(parsed, 'tacticalBattleReport')) parsed.tacticalBattleReport = null;
     if (parsed.tacticalBattle) {

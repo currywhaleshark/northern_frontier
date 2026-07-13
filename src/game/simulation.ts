@@ -97,6 +97,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     relations: initRelations(),
     raiders: null,
     battle: null,
+    battleScars: [],
     tacticalBattle: null,
     tacticalBattleReport: null,
     raidCooldown: 0,

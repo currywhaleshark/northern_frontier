@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { RESOURCE_NAMES, WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
 import { getSeason } from '../game/seasons';
 import { tacticalCommandDescription, tacticalLootText } from '../game/tacticalBattle';
@@ -64,6 +64,9 @@ const EVENT_SFX: Partial<Record<TacticalAnimationEvent['kind'], SfxName>> = {
   advance: 'raidDrum',
   retreat: 'raidDrum',
 };
+
+// 일제 사격 명령이 유효한 원거리 병종 — volley 이벤트 때 반동 모션을 준다
+const RANGED_KINDS = new Set<DefenderGroupKind>(['militia-bow', 'militia-musket', 'watchman']);
 
 const KIND_COLUMNS: Partial<Record<DefenderGroupKind, number>> = {
   'militia-unarmed': 9,
@@ -169,6 +172,41 @@ function eventClass(event: TacticalAnimationEvent | null, zoneId: string): strin
   return ` event-${event.kind}`;
 }
 
+// 자막 타자기 효과 — 텍스트가 바뀔 때마다 한 글자씩 드러난다. 배속 중에는 즉시 표시.
+function TypewriterCaption({ text, instant }: { text: string; instant: boolean }) {
+  const [shown, setShown] = useState(text.length);
+  useEffect(() => {
+    if (instant) {
+      setShown(text.length);
+      return;
+    }
+    setShown(0);
+    let revealed = 0;
+    const timer = window.setInterval(() => {
+      revealed += 1;
+      setShown(revealed);
+      if (revealed >= text.length) window.clearInterval(timer);
+    }, 24);
+    return () => window.clearInterval(timer);
+  }, [text, instant]);
+  return (
+    <div className="tactical-caption" aria-label={text}>
+      {text.slice(0, shown)}
+      {shown < text.length && <span className="tactical-caption-cursor" aria-hidden="true" />}
+    </div>
+  );
+}
+
+// 누적 피해 자국의 결정적 배치 — 같은 구역·순번이면 항상 같은 자리에 남는다
+function scarStyle(zoneId: string, index: number): CSSProperties {
+  const seed = (zoneId.charCodeAt(0) + zoneId.length * 7) * 31 + index * 53;
+  return {
+    left: `${14 + (seed * 13) % 70}%`,
+    bottom: `${26 + (seed * 29) % 48}px`,
+    transform: `rotate(${(seed * 17) % 72 - 36}deg)`,
+  };
+}
+
 export function TacticalBattleScreen({
   state,
   onSpendPreparation,
@@ -185,6 +223,9 @@ export function TacticalBattleScreen({
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(battle?.defenderGroups[0]?.id ?? null);
   const [eventIndex, setEventIndex] = useState(0);
   const [viewedZoneId, setViewedZoneId] = useState(battle?.currentZoneId ?? 'approach');
+  const [stingerRound, setStingerRound] = useState<number | null>(null);
+  const [fast, setFast] = useState(false);
+  const fastRef = useRef(false);
   const activeEvent = battle?.phase === 'simulating'
     ? battle.pendingReport?.events[eventIndex] ?? null
     : null;
@@ -195,6 +236,10 @@ export function TacticalBattleScreen({
     let cancelled = false;
     let timer = 0;
     const events = battle.pendingReport.events;
+    const round = battle.pendingReport.round;
+    fastRef.current = false;
+    setFast(false);
+    setEventIndex(-1); // 스팅어 동안 이전 라운드 이벤트 연출이 남지 않게
     setBattleDrums(true);
     const play = (index: number) => {
       if (cancelled) return;
@@ -206,17 +251,41 @@ export function TacticalBattleScreen({
       setEventIndex(index);
       const sfx = EVENT_SFX[events[index].kind];
       if (sfx) playSfx(sfx);
-      timer = window.setTimeout(() => play(index + 1), events[index].durationMs);
+      // 배속 중에도 마지막(결과) 이벤트는 온전한 길이로 보여준다
+      const duration = fastRef.current && index < events.length - 1
+        ? Math.min(150, events[index].durationMs)
+        : events[index].durationMs;
+      timer = window.setTimeout(() => play(index + 1), duration);
     };
-    play(0);
+    // 라운드 스팅어 배너 + 북 1타 뒤에 이벤트 재생을 시작한다
+    setStingerRound(round);
+    playSfx('raidDrum');
+    timer = window.setTimeout(() => {
+      setStingerRound(null);
+      play(0);
+    }, 820);
     return () => {
       cancelled = true;
       setBattleDrums(false);
+      setStingerRound(null);
       window.clearTimeout(timer);
     };
     // The battle round and phase are the stable playback identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [battle?.id, battle?.phase, battle?.pendingReport?.round]);
+
+  // 재생 중 스페이스로 남은 연출을 배속한다 (클릭은 무대 영역에서 처리)
+  useEffect(() => {
+    if (battle?.phase !== 'simulating') return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.code !== 'Space') return;
+      event.preventDefault();
+      fastRef.current = true;
+      setFast(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [battle?.phase]);
 
   useEffect(() => {
     if (!battle) return;
@@ -257,9 +326,27 @@ export function TacticalBattleScreen({
   const finalKilled = battle.reports.reduce((sum, item) => sum + item.killed, 0);
   const finalDamaged = battle.reports.reduce((sum, item) => sum + item.buildingsDamaged, 0);
 
+  // 구역별 누적 피해 자국 — 지나간 라운드 전체 + 지금 재생 중인 라운드는 재생된 이벤트까지만
+  const zoneScarCounts: Record<string, number> = {};
+  for (const roundReport of battle.reports) {
+    const isLive = battle.phase === 'simulating' && roundReport === battle.pendingReport;
+    roundReport.events.forEach((item, index) => {
+      if (item.kind !== 'casualty') return;
+      if (isLive && index > eventIndex) return;
+      zoneScarCounts[item.zoneId] = (zoneScarCounts[item.zoneId] ?? 0) + 1;
+    });
+  }
+  const enableFastForward = () => {
+    if (battle.phase !== 'simulating') return;
+    fastRef.current = true;
+    setFast(true);
+  };
+  const snowfall = state.weather === 'heavySnow' || state.weather === 'blizzard' || state.weather === 'coldSnap';
+  const flakeCount = state.weather === 'blizzard' ? 70 : state.weather === 'heavySnow' ? 42 : 16;
+
   return (
     <div className="tactical-overlay" role="dialog" aria-modal="true" aria-label={`${battle.factionName} 습격 직접 지휘`}>
-      <div className="tactical-screen">
+      <div className={`tactical-screen${activeEvent?.kind === 'wallHit' ? ' shaking' : ''}`}>
         <header className="tactical-header">
           <div>
             <div className="tactical-kicker">습격 방어 지휘</div>
@@ -289,13 +376,17 @@ export function TacticalBattleScreen({
           </div>
         </header>
 
-        <div className="tactical-stage-shell">
+        <div className="tactical-stage-shell" onClick={enableFastForward}>
           <div className="tactical-battlefield" ref={viewportRef}>
             <div className="tactical-strip">
               {battle.zones.map(zone => {
               const defenders = battle.defenderGroups.filter(group => group.zoneId === zone.id);
               const raiders = battle.raiderGroups.filter(group => group.zoneId === zone.id && group.intent !== 'withdraw');
               const effects = zoneEffects(zone.id, battle);
+              const zoneVolley = activeEvent?.kind === 'volley' && activeEvent.zoneId === zone.id;
+              const musketsFiring = zoneVolley && defenders.some(group =>
+                group.kind === 'militia-musket' && group.count - group.wounded - group.killed > 0);
+              const scars = Math.min(9, zoneScarCounts[zone.id] ?? 0);
               return (
                 <section
                   key={zone.id}
@@ -315,6 +406,40 @@ export function TacticalBattleScreen({
                   <div className="tactical-prep-tags">
                     {effects.map(label => <span key={label}>{label}</span>)}
                   </div>
+                  {scars > 0 && (
+                    <div className="tactical-scar-layer" aria-hidden="true">
+                      {Array.from({ length: scars }, (_, index) => (
+                        <span key={index} className="tactical-scar" style={scarStyle(zone.id, index)} />
+                      ))}
+                    </div>
+                  )}
+                  {zone.breached && (
+                    <div className="tactical-ruin-layer" aria-hidden="true">
+                      <span className="ruin-ember" />
+                      <span className="ruin-smoke" style={{ left: '24%' }} />
+                      <span className="ruin-smoke" style={{ left: '47%', animationDelay: '1.4s' }} />
+                      <span className="ruin-smoke" style={{ left: '68%', animationDelay: '2.6s' }} />
+                    </div>
+                  )}
+                  {zoneVolley && (
+                    <div className="tactical-fx-layer" key={`fx-${eventIndex}`} aria-hidden="true">
+                      {Array.from({ length: 5 }, (_, index) => (
+                        <span
+                          key={index}
+                          className="fx-arrow"
+                          style={{ animationDelay: `${index * 60}ms`, bottom: `${168 + (index * 23) % 60}px` }}
+                        />
+                      ))}
+                      {musketsFiring && (
+                        <>
+                          <span className="fx-muzzle-flash" />
+                          <span className="fx-smoke" style={{ left: '52%' }} />
+                          <span className="fx-smoke" style={{ left: '57%', animationDelay: '130ms' }} />
+                          <span className="fx-smoke" style={{ left: '54%', animationDelay: '270ms' }} />
+                        </>
+                      )}
+                    </div>
+                  )}
                   <div className="tactical-raider-rank">
                     {raiders.map((raider, index) => (
                       <div className="tactical-raider-group" key={raider.id}>
@@ -332,16 +457,23 @@ export function TacticalBattleScreen({
                     ))}
                   </div>
                   <div className="tactical-defender-rank">
-                    {defenders.map(group => (
-                      <div className="tactical-field-group" key={group.id}>
-                        <GroupSprites
-                          state={state}
-                          group={group}
-                          falling={activeEvent?.kind === 'casualty' && activeEvent.groupId === group.id ? activeEvent.casualties ?? 0 : 0}
-                        />
-                        <span>{group.label}</span>
-                      </div>
-                    ))}
+                    {defenders.map(group => {
+                      // volley 순간 사격 병종은 반동 모션 — key를 바꿔 애니메이션을 다시 튼다
+                      const recoiling = zoneVolley && RANGED_KINDS.has(group.kind);
+                      return (
+                        <div
+                          className={`tactical-field-group${recoiling ? ' recoil' : ''}`}
+                          key={recoiling ? `${group.id}-recoil-${eventIndex}` : group.id}
+                        >
+                          <GroupSprites
+                            state={state}
+                            group={group}
+                            falling={activeEvent?.kind === 'casualty' && activeEvent.groupId === group.id ? activeEvent.casualties ?? 0 : 0}
+                          />
+                          <span>{group.label}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                   {activeEvent?.float && activeEvent.zoneId === zone.id && (
                     <span key={`float-${eventIndex}`} className={`tactical-float ${activeEvent.side ?? 'defender'}`}>
@@ -370,11 +502,39 @@ export function TacticalBattleScreen({
             title="다음 방어선"
             aria-label="다음 방어선"
           >&#x203A;</button>
+          {snowfall && (
+            <div className={`tactical-weather-layer weather-${state.weather}`} aria-hidden="true">
+              {Array.from({ length: flakeCount }, (_, index) => (
+                <span
+                  key={index}
+                  className="tactical-snowflake"
+                  style={{
+                    left: `${(index * 37) % 100}%`,
+                    width: 2 + (index * 5) % 3,
+                    height: 2 + (index * 5) % 3,
+                    opacity: 0.45 + ((index * 11) % 5) / 10,
+                    animationDuration: `${2.4 + ((index * 13) % 12) / 4}s`,
+                    animationDelay: `${-(((index * 7) % 30) / 6)}s`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+          {state.weather === 'blizzard' && <div className="tactical-visibility-veil" aria-hidden="true" />}
+          {activeEvent?.kind === 'wallHit' && <div className="tactical-vignette" key={`vignette-${eventIndex}`} aria-hidden="true" />}
+          {stingerRound != null && (
+            <div className="tactical-round-stinger" key={`stinger-${stingerRound}`} aria-hidden="true">
+              <div>
+                <strong>제{Math.min(stingerRound, 5)}라운드</strong>
+                <span>{battle.factionName} 습격 방어</span>
+              </div>
+            </div>
+          )}
           <div className="tactical-stage-index">
             <strong>{battle.zones[activeZoneIndex]?.name}</strong>
             <span>{activeZoneIndex + 1} / {battle.zones.length}</span>
           </div>
-          {activeEvent?.text && <div className="tactical-caption">{activeEvent.text}</div>}
+          {activeEvent?.text && <TypewriterCaption text={activeEvent.text} instant={fast} />}
         </div>
 
         <div className="tactical-controls">
@@ -476,6 +636,9 @@ export function TacticalBattleScreen({
               <div className="tactical-loader" />
               <strong>{activeEvent?.text ?? '전황을 살피는 중입니다.'}</strong>
               <span>제{battle.pendingReport?.round ?? battle.round}라운드</span>
+              <span className={`tactical-fast-hint${fast ? ' active' : ''}`}>
+                {fast ? '배속 재생 중 — 결과는 온전히 표시됩니다' : '화면 클릭 또는 스페이스로 빨리감기'}
+              </span>
             </div>
           )}
 

@@ -6,7 +6,8 @@
 // 그리기 자체는 SpriteAPI(sprites.ts)에 위임하므로, 진짜 그래픽을 붙일 때는
 // SpriteAPI 구현체만 교체하면 된다.
 import { CONFIG } from '../game/config';
-import { BUILDING_DEFS, buildingFootprintSize, canAfford, canPlaceBuildingAt } from '../game/buildings';
+import { armedMusketeers, BUILDING_DEFS, buildingFootprintSize, canAfford, canPlaceBuildingAt } from '../game/buildings';
+import { COLLAPSE_RATIO } from '../game/battles';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
 import { getSeason } from '../game/seasons';
 import { findHabitatIconAtTile } from '../game/habitats';
@@ -19,7 +20,7 @@ import { claimZonesAt } from '../game/claimZones';
 import { foreignSiteAt } from '../game/foreignSites';
 import { foreignSiteActors, foreignSiteProps, type ForeignSiteProp } from '../game/foreignSiteActivity';
 import { activePassageRoutes } from '../game/passage';
-import type { AnimalHabitat, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, Resident, Terrain } from '../game/types';
+import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, Resident, Terrain } from '../game/types';
 
 const TILE = CONFIG.ui.tileSize;
 
@@ -160,7 +161,7 @@ function drawFootprints(ctx: CanvasRenderingContext2D, trail: { x: number; y: nu
 }
 
 
-function drawBattleClash(ctx: CanvasRenderingContext2D, frontX: number, frontY: number): void {
+function drawBattleClash(ctx: CanvasRenderingContext2D, frontX: number, frontY: number, muskets: boolean): void {
   const t = performance.now() / 140;
   const cx = frontX * TILE + TILE / 2;
   const cy = frontY * TILE + TILE / 2;
@@ -184,6 +185,122 @@ function drawBattleClash(ctx: CanvasRenderingContext2D, frontX: number, frontY: 
   ctx.beginPath();
   ctx.ellipse(cx, cy, TILE * 1.45, TILE * 0.9, 0, 0, Math.PI * 2);
   ctx.stroke();
+  if (muskets) {
+    // 조총 무장 + 화약 보유: 먼지구름 사이 총구 섬광 점멸 + 흰 초연이 피어오른다
+    for (let i = 0; i < 4; i++) {
+      const flick = fract(t * 0.23 + i * 0.334);
+      if (flick < 0.09) {
+        const angle = i * 1.71 + Math.floor(t * 0.23 + i * 0.334) * 2.4;
+        const fx = cx + Math.cos(angle) * TILE * 1.05;
+        const fy = cy + Math.sin(angle) * TILE * 0.62;
+        const a = 0.9 * (1 - flick / 0.09);
+        ctx.strokeStyle = `rgba(255,244,196,${a.toFixed(2)})`;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(fx - 4, fy);
+        ctx.lineTo(fx + 4, fy);
+        ctx.moveTo(fx, fy - 4);
+        ctx.lineTo(fx, fy + 4);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(255,252,232,${(a * 0.8).toFixed(2)})`;
+        ctx.beginPath();
+        ctx.arc(fx, fy, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    for (let i = 0; i < 5; i++) {
+      const phase = fract(t * 0.05 + i * 0.21);
+      const sx = cx + Math.sin(i * 2.1) * TILE * 0.9 + Math.sin(phase * 5 + i) * 3;
+      const sy = cy - TILE * 0.3 - phase * TILE * 1.1;
+      ctx.fillStyle = `rgba(235,235,228,${(0.4 * (1 - phase)).toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2 + phase * 4.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+// 집결 단계: 전선 지점에 펄럭이는 깃발과 집결 링을 그린다
+function drawMusterFlag(ctx: CanvasRenderingContext2D, frontX: number, frontY: number): void {
+  const t = performance.now() / 1000;
+  const cx = frontX * TILE + TILE / 2;
+  const cy = frontY * TILE + TILE / 2;
+  ctx.save();
+  // 집결 지점 링 — 천천히 맥동
+  const pulse = 0.5 + 0.5 * Math.sin(t * 2.4);
+  ctx.strokeStyle = `rgba(233,163,74,${(0.3 + pulse * 0.35).toFixed(2)})`;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 5]);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, TILE * (1.15 + pulse * 0.12), TILE * (0.72 + pulse * 0.08), 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // 장대
+  ctx.strokeStyle = '#6b5232';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + 5);
+  ctx.lineTo(cx, cy - 26);
+  ctx.stroke();
+  // 펄럭이는 깃발 — 끝단이 바람에 흔들린다
+  const wave = Math.sin(t * 6) * 3;
+  ctx.fillStyle = '#b6412f';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 26);
+  ctx.quadraticCurveTo(cx + 9, cy - 25 + wave * 0.4, cx + 17, cy - 23 + wave);
+  ctx.lineTo(cx + 15, cy - 16 + wave * 0.6);
+  ctx.quadraticCurveTo(cx + 8, cy - 18, cx, cy - 15);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// 승기가 기운 습격 무리: 도주 방향으로 흘러나가는 작은 인영 입자
+function drawRoutStream(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  dirX: number,
+  dirY: number,
+): void {
+  const t = performance.now() / 900;
+  ctx.save();
+  for (let i = 0; i < 10; i++) {
+    const phase = fract(t + i * 0.137);
+    const spread = ((i % 5) - 2) * 4;
+    const x = cx + dirX * phase * TILE * 2.7 - dirY * spread;
+    const y = cy + dirY * phase * TILE * 2.7 * 0.62 + dirX * spread;
+    const alpha = 0.55 * (1 - phase);
+    ctx.fillStyle = `rgba(72,58,48,${alpha.toFixed(2)})`;
+    ctx.fillRect(x - 1, y - 2, 2, 4);
+  }
+  ctx.restore();
+}
+
+// 전투가 끝난 자리의 교란 자국 — 겨울엔 짓밟힌 눈, 그 외 계절엔 파헤쳐진 땅.
+// 남은 날수에 따라 옅어진다.
+function drawBattleScarDecal(ctx: CanvasRenderingContext2D, scar: BattleScar, day: number, winter: boolean): void {
+  const cx = scar.x * TILE + TILE / 2;
+  const cy = scar.y * TILE + TILE / 2;
+  const fade = Math.max(0.25, Math.min(1, (scar.until - day) / 4));
+  const col = winter ? '88,98,114' : '66,54,40';
+  ctx.save();
+  ctx.fillStyle = `rgba(${col},${(0.16 * fade).toFixed(2)})`;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, TILE * 1.3, TILE * 0.8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // 흩어진 짧은 긁힘 자국 (자리 좌표로 결정적 배치)
+  for (let i = 0; i < 14; i++) {
+    const s = (scar.x * 31 + scar.y * 57 + i * 97) % 113;
+    const ox = ((s * 13) % 60 - 30) / 30;
+    const oy = ((s * 29) % 60 - 30) / 30;
+    const px = cx + ox * TILE * 1.1;
+    const py = cy + oy * TILE * 0.65;
+    ctx.fillStyle = `rgba(${col},${((0.22 + (s % 3) * 0.06) * fade).toFixed(2)})`;
+    if (s % 2 === 0) ctx.fillRect(px - 1, py - 1, 2, 3);
+    else ctx.fillRect(px - 2, py - 1, 4, 2);
+  }
   ctx.restore();
 }
 
@@ -595,6 +712,12 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   // 2) 건물 — 지붕이 위 타일에 겹치므로 y 순서로 그린다
   const season = getSeason(state.day);
   const heating = (season === 'autumn' || season === 'winter') && state.resources.firewood > 0;
+  // 끝난 전투 자리의 교란 자국 — 건물·주민 아래 바닥 데칼로 깔린다
+  for (const scar of state.battleScars ?? []) {
+    if (scar.until < state.day) continue;
+    if (!isExplored(state, scar.x, scar.y)) continue;
+    drawBattleScarDecal(ctx, scar, state.day, season === 'winter');
+  }
   const wallTiles = builtWallTileSet(state);
   const sorted = [...state.buildings].sort((a, b) =>
     (a.y + buildingFootprintSize(a.type)) - (b.y + buildingFootprintSize(b.type)) || a.x - b.x);
@@ -704,7 +827,21 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       facing: b.x < b.px ? -1 : 1,
       faction: b.faction,
     });
-    if (state.battle?.phase === 'clash') drawBattleClash(ctx, state.battle.frontX, state.battle.frontY);
+    const battle = state.battle;
+    if (battle?.phase === 'muster') drawMusterFlag(ctx, battle.frontX, battle.frontY);
+    if (battle?.phase === 'clash') {
+      const muskets = armedMusketeers(state) > 0 && state.resources.gunpowder > 0;
+      drawBattleClash(ctx, battle.frontX, battle.frontY, muskets);
+      // 무리 전력이 붕괴선에 가까워지면 습격자 입자가 도주 방향(마을 반대편)으로 흘러나간다
+      const ratio = battle.initialPower > 0 ? b.power / battle.initialPower : 1;
+      if (battle.outcome === 'victory' && ratio <= COLLAPSE_RATIO + 0.18) {
+        const center = state.buildings.find(candidate => candidate.type === 'center' && candidate.built);
+        const dx = battle.frontX - (center?.x ?? battle.frontX);
+        const dy = battle.frontY - (center?.y ?? battle.frontY + 2);
+        const len = Math.hypot(dx, dy) || 1;
+        drawRoutStream(ctx, battle.frontX * TILE + TILE / 2, battle.frontY * TILE + TILE / 2, dx / len, dy / len);
+      }
+    }
   }
 
   // 6) 밤낮 색조 — 하루 진행도(subTick+보간)로 계산. 세계를 물들이고 창에는 불이 켜진다.

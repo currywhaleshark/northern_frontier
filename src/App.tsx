@@ -21,6 +21,8 @@ import { InspectorPanel, type InspectorTab } from './components/InspectorPanel';
 import { ImportantLogOverlay } from './components/ImportantLogOverlay';
 import { JobPanel } from './components/JobPanel';
 import { MainMenu } from './components/MainMenu';
+import { BattleSimulationSetup } from './components/BattleSimulationSetup';
+import { createBattleSimulation, type BattleSimulationOptions } from './game/battleSimulation';
 import { centerViewportOnSettlement, Minimap } from './components/Minimap';
 import { ProcessingPanel } from './components/ProcessingPanel';
 import { TopBar } from './components/TopBar';
@@ -58,6 +60,9 @@ export default function App() {
   const bump = useCallback(() => setVersion(v => v + 1), []);
 
   const [screen, setScreen] = useState<'menu' | 'game'>('menu');
+  const [menuView, setMenuView] = useState<'main' | 'battleSim'>('main');
+  // 전투 시뮬레이션 모드: 샌드박스 상태에서 전술 전투만 테스트, 끝나면 메뉴로 복귀
+  const [simMode, setSimMode] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [placingType, setPlacingType] = useState<BuildingTypeId | null>(null);
   const [selected, setSelected] = useState<{ x: number; y: number } | null>(null);
@@ -68,8 +73,14 @@ export default function App() {
   const [soundOn, setSoundOn] = useState(!isMuted());
   // 이동 보간용: 마지막 서브틱 처리 시각과 서브틱 간격
   const animRef = useRef({ at: performance.now(), ms: 175 });
-  // 사운드 트리거 추적 (로그 증가분/모달 전환/게임 종료)
-  const sndRef = useRef({ logLen: 0, pending: null as string | null, over: false });
+  // 사운드 트리거 추적 (로그 증가분/모달 전환/게임 종료/지도 전투)
+  const sndRef = useRef({
+    logLen: 0,
+    pending: null as string | null,
+    over: false,
+    battleActive: false,
+    battleOutcome: null as 'victory' | 'defeat' | null,
+  });
 
   // 브라우저 자동재생 정책: 첫 입력 때 오디오 시작
   useEffect(() => {
@@ -112,6 +123,13 @@ export default function App() {
     m.pending = pk;
     if (s.gameOver && !m.over) playSfx(s.gameOver.won ? 'win' : 'lose');
     m.over = !!s.gameOver;
+    // 지도 위 습격 전투: 집결 개시에 북, 종료 시 승리면 뿔나팔·패배면 저음 조종
+    if (s.battle && !m.battleActive) playSfx('raidDrum');
+    if (!s.battle && m.battleActive && m.battleOutcome) {
+      playSfx(m.battleOutcome === 'victory' ? 'raidHorn' : 'death');
+    }
+    m.battleActive = !!s.battle;
+    m.battleOutcome = s.battle?.outcome ?? (s.battle ? m.battleOutcome : null);
     setWeatherAmbient(s.weather);
   });
 
@@ -333,6 +351,32 @@ export default function App() {
   };
   const handleDismissTacticalBattleReport = () => {
     dismissTacticalBattleReport(stateRef.current);
+    // 시뮬레이션 모드는 장계를 닫으면 샌드박스를 버리고 설정 화면으로 돌아간다
+    if (simMode) {
+      exitBattleSimulation();
+      return;
+    }
+    bump();
+  };
+
+  // 시뮬레이션 샌드박스를 버리고 메뉴(시뮬레이션 설정)로 복귀
+  const exitBattleSimulation = () => {
+    stateRef.current = newGame();
+    setSimMode(false);
+    setScreen('menu');
+    setMenuView('battleSim');
+    bump();
+  };
+
+  const startBattleSimulation = (options: BattleSimulationOptions) => {
+    stateRef.current = createBattleSimulation(options);
+    setSelected(null);
+    setSelectedEntity(null);
+    setPlacingType(null);
+    setInspResidentId(null);
+    setSpeed(0);
+    setSimMode(true);
+    setScreen('game');
     bump();
   };
 
@@ -425,6 +469,7 @@ export default function App() {
   const handleLoad = () => {
     const loaded = loadGame();
     if (loaded) {
+      setSimMode(false);
       stateRef.current = loaded;
       addLog(stateRef.current, '저장된 진행 상황을 불러왔습니다.', 'info');
       setSelected(null);
@@ -489,6 +534,7 @@ export default function App() {
 
   // 선택 상태를 비우고 새 판을 시작
   const startNewGame = (difficulty: Difficulty) => {
+    setSimMode(false);
     stateRef.current = newGame(undefined, difficulty);
     setSelected(null);
     setSelectedEntity(null);
@@ -513,11 +559,20 @@ export default function App() {
   };
 
   if (screen === 'menu') {
+    if (menuView === 'battleSim') {
+      return (
+        <BattleSimulationSetup
+          onStart={startBattleSimulation}
+          onBack={() => setMenuView('main')}
+        />
+      );
+    }
     return (
       <MainMenu
         canContinue={canLoad}
         onStart={startNewGame}
         onContinue={handleLoad}
+        onOpenBattleSim={() => setMenuView('battleSim')}
       />
     );
   }
@@ -653,6 +708,11 @@ export default function App() {
       )}
       {state.tacticalBattleReport && (
         <TacticalBattleReportModal report={state.tacticalBattleReport} onClose={handleDismissTacticalBattleReport} />
+      )}
+      {simMode && (
+        <button className="sim-exit-button" onClick={exitBattleSimulation}>
+          시뮬레이션 종료
+        </button>
       )}
     </div>
   );

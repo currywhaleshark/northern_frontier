@@ -15,7 +15,8 @@ import type { Battle, BattleLocation, BattleMode, BattleOutcome, GameState, Raid
 export const BATTLE_MUSTER_DEADLINE = 5;
 export const BATTLE_CLASH_TICK_LIMIT = 8;
 const MUSTER_RADIUS = 2;
-const COLLAPSE_RATIO = 0.35; // 무리 전력이 이 비율 밑으로 떨어지면 붕괴(승리 연출 종료)
+export const COLLAPSE_RATIO = 0.35; // 무리 전력이 이 비율 밑으로 떨어지면 붕괴(승리 연출 종료)
+const BATTLE_SCAR_DAYS = 4; // 전투 자국이 남는 기간
 
 export function rollBattleOutcome(defense: number, power: number, rng: () => number): BattleOutcome {
   const successP = defense + power <= 0 ? 1 : defense / (defense + power);
@@ -304,6 +305,11 @@ function finishBattle(state: GameState, outcome: BattleOutcome, rng: () => numbe
 
   state.threat = CONFIG.threat.afterRaidThreat;
   state.raidCooldown = CONFIG.threat.raidCooldownDays;
+  // 전투가 벌어졌던 자리에 며칠간 교란 자국을 남긴다 (만료분은 이때 정리)
+  state.battleScars = [
+    ...(state.battleScars ?? []).filter(scar => scar.until >= state.day),
+    { x: battle.frontX, y: battle.frontY, until: state.day + BATTLE_SCAR_DAYS },
+  ];
   state.raiders = null;
   state.battle = null;
 
