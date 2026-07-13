@@ -665,7 +665,10 @@ export function TacticalBattleScreen({
                       const totalRaiders = activeRaiders + fallingRaiders;
                       const formation = formationDimensions(totalRaiders, 168, 120, 22, 14, 5);
                       return (
-                        <div className={`tactical-raider-group${raider.confused ? ' confused' : ''}`} key={raider.id}>
+                        <div
+                          className={`tactical-raider-group${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}`}
+                          key={raider.id}
+                        >
                           <div
                             className="tactical-raider-sprites clustered"
                             style={{ width: formation.width, height: formation.height }}

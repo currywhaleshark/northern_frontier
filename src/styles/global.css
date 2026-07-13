@@ -1339,6 +1339,8 @@ html, body, #root {
   font-weight: 700;
   text-shadow: 0 1px 3px #1a0d0b;
 }
+/* 적은 오른쪽을 향하므로 flex 열의 왼쪽 끝이 후열이다. 화포대는 항상 그 후열에 둔다. */
+.tactical-raider-group.unit-court-artillery { order: -1; }
 .tactical-raider-group > span,
 .tactical-field-group > span {
   padding: 3px 7px;
