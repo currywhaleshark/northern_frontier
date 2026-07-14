@@ -21,7 +21,9 @@ import {
   captureTacticalResources, gradeTacticalBattle, TACTICAL_BATTLE_GRADE_LABELS,
   raidDefenseObjectiveResult, tacticalClosingSummary, tacticalPeopleReport, tacticalResourceDelta,
 } from './tacticalCore';
-import { applyDefenseZoneConsequences, resolveEngagementExchange } from './tacticalEngagement';
+import {
+  applyDefenseZoneConsequences, resolveEngagementExchange, splitTacticalEngagementDefenders,
+} from './tacticalEngagement';
 import {
   acknowledgeAssaultReport, advanceAssaultPhase, assaultCommandUnavailableReason,
   assaultPreparationUnavailableReason, assignAssaultGroup, chooseDefaultAssaultCommands,
@@ -61,7 +63,8 @@ const PREPARATION_ACTIONS: Array<{ id: PreparationActionId; label: string; cost:
 ];
 
 const IMPLEMENTED_COMMANDS = new Set<TacticalCommandId>([
-  'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'fallback', 'advance', 'charge',
+  'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'reinforceRear',
+  'fallback', 'advance', 'charge',
 ]);
 
 const FORMATION_LINE_ORDER: readonly TacticalFormationLine[] = ['front', 'middle', 'rear'];
@@ -793,6 +796,13 @@ export function tacticalCommandUnavailableReason(
       ? null
       : '한 라운드에는 인접한 전열로만 재배치할 수 있습니다.';
   }
+  if (command === 'reinforceRear') {
+    if (defender.line !== 'middle') return '후방 증원은 중열 부대만 수행할 수 있습니다.';
+    if (!tacticalGroupCapabilities(defender).has('melee')) return '후방 증원은 근접 전투가 가능한 부대가 필요합니다.';
+    const rearAttackHere = battle.raiderGroups.some(group =>
+      group.zoneId === defender.zoneId && group.rearAssault && group.intent !== 'withdraw' && group.power > 0);
+    return rearAttackHere ? null : '같은 구역에 대응할 후방 급습대가 없습니다.';
+  }
   if (command === 'hold') return null;
   if (command === 'volley') {
     return tacticalGroupCapabilities(defender).has('volley')
@@ -846,6 +856,14 @@ export function chooseDefaultTacticalCommands(battle: TacticalBattle): void {
       continue;
     }
     if (activeCount(defender) <= 0) continue;
+    const shouldReinforceRear = defender.line === 'middle' && tacticalGroupCapabilities(defender).has('melee') &&
+      battle.raiderGroups.some(group => group.zoneId === defender.zoneId && group.rearAssault &&
+        group.intent !== 'withdraw' && group.power > 0);
+    if (shouldReinforceRear && defender.commandSource !== 'player') {
+      defender.command = 'reinforceRear';
+      defender.commandSource = 'recommended';
+      continue;
+    }
     if (defender.command) {
       defender.commandSource ??= 'recommended';
       continue;
@@ -978,6 +996,7 @@ export function resolveTacticalRound(state: GameState): string | null {
   const lines: string[] = [];
   const lootBag: Partial<Record<ResourceId, number>> = {};
   const dominance = new Map<string, number>();
+  const rearDominance = new Map<string, number>();
   const defenderReadiness = new Map<string, number>();
   let roundWounded = 0;
   let roundKilled = 0;
@@ -1011,6 +1030,7 @@ export function resolveTacticalRound(state: GameState): string | null {
     const assignedDefenders = battle.defenderGroups.filter(group => group.zoneId === zone.id);
     const defenders = assignedDefenders.filter(group => activeCount(group) > 0);
     const rearAttackers = attackers.filter(attacker => attacker.rearAssault);
+    const frontalAttackers = attackers.filter(attacker => !attacker.rearAssault);
     for (const attacker of rearAttackers.filter(group => group.engagementsInZone === 0)) {
       attacker.revealed = true;
       event(events, zone.id, 'rearAssault', `${attacker.label}이(가) 수비대 후열에 갑자기 모습을 드러냅니다.`, 760, {
@@ -1018,79 +1038,112 @@ export function resolveTacticalRound(state: GameState): string | null {
       });
       lines.push(`${attacker.label}이(가) ${zone.name} 후열을 급습했습니다.`);
     }
-    defenderReadiness.set(zone.id, tacticalDefenderReadiness(assignedDefenders));
-    const exchange = resolveEngagementExchange({
-      zone,
-      defenders,
-      attackers,
-      weather: state.weather,
-      prepareVolleyApplied: applied(battle, 'prepareVolley'),
-      evacuateCiviliansApplied: applied(battle, 'evacuateCivilians'),
-      roundStartingRaiderPower,
-      rng,
-    });
-    for (const loss of exchange.raiderLosses) {
-      const attacker = attackers.find(group => group.id === loss.groupId);
-      if (attacker) attacker.confused = loss.confused;
+    const assignedEngagements = splitTacticalEngagementDefenders(assignedDefenders, rearAttackers.length > 0);
+    const engagementDefenders = splitTacticalEngagementDefenders(defenders, rearAttackers.length > 0);
+    defenderReadiness.set(zone.id, tacticalDefenderReadiness(assignedEngagements.frontal));
+    if (frontalAttackers.length === 0) {
+      zone.pressure = Math.max(0, zone.pressure - 5);
+      dominance.set(zone.id, 0);
     }
-    events.push(...exchange.preDefenseEvents);
-    lines.push(...exchange.preDefenseLines);
-    for (const loss of exchange.defenderLosses) {
-      const defender = defenders.find(group => group.id === loss.groupId);
-      if (!defender) continue;
-      defender.wounded += loss.wounded;
-      defender.killed += loss.killed;
-      roundWounded += loss.wounded;
-      roundKilled += loss.killed;
+    const engagements: Array<{
+      direction: 'frontal' | 'rear';
+      defenders: TacticalDefenderGroup[];
+      attackers: TacticalRaiderGroup[];
+    }> = [];
+    if (frontalAttackers.length > 0) {
+      engagements.push({
+        direction: 'frontal',
+        defenders: rearAttackers.length > 0
+          ? engagementDefenders.frontal
+          : [...engagementDefenders.frontal, ...engagementDefenders.protectedTargets],
+        attackers: frontalAttackers,
+      });
     }
-    const consequences = applyDefenseZoneConsequences({
-      zone,
-      defenders,
-      attackers,
-      commands: exchange.commands,
-      enemyPower: exchange.enemyPower,
-      defensePower: exchange.defensePower,
-      enemyShare: exchange.enemyShare,
-      rearEnemyShare: exchange.rearEnemyShare,
-      originalPower: battle.originalPower,
-      availableLoot: {
-        grain: pendingLootAvailable(state, battle, 'grain'),
-        firewood: pendingLootAvailable(state, battle, 'firewood'),
-        hide: pendingLootAvailable(state, battle, 'hide'),
-      },
-      rng,
-    });
-    zone.pressure = consequences.pressure;
-    zone.breached = consequences.breached;
-    events.push(...consequences.breachEvents);
-    lines.push(...consequences.breachLines);
-    for (const loss of exchange.raiderLosses) {
-      const attacker = attackers.find(group => group.id === loss.groupId);
-      if (!attacker) continue;
-      attacker.killed += loss.killed;
-      attacker.power = loss.powerAfter;
-      roundRaidersKilled += loss.killed;
+    if (rearAttackers.length > 0) {
+      engagements.push({
+        direction: 'rear',
+        defenders: [...engagementDefenders.rear, ...engagementDefenders.protectedTargets],
+        attackers: rearAttackers,
+      });
     }
-    events.push(...exchange.postDefenseEvents);
-    villageMoraleDelta += exchange.villageMoraleDelta;
-    raiderMoraleDelta += exchange.raiderMoraleDelta;
-    buildingsDamaged += consequences.buildingsDamaged;
-    for (const [key, amount] of Object.entries(consequences.loot)) {
-      const resource = key as ResourceId;
-      lootBag[resource] = (lootBag[resource] ?? 0) + (amount ?? 0);
-    }
-    events.push(...consequences.lootEvents);
-    lines.push(...consequences.lootLines);
-    if (exchange.surpriseAttack) {
-      for (const defenderId of exchange.surpriseDefenderIds) {
-        const defender = defenders.find(group => group.id === defenderId);
-        if (!defender) continue;
-        defender.ambushed = false;
-        defender.command = 'fallback';
+    for (const engagement of engagements) {
+      const exchange = resolveEngagementExchange({
+        zone,
+        defenders: engagement.defenders,
+        attackers: engagement.attackers,
+        direction: engagement.direction,
+        weather: state.weather,
+        prepareVolleyApplied: applied(battle, 'prepareVolley'),
+        evacuateCiviliansApplied: applied(battle, 'evacuateCivilians'),
+        roundStartingRaiderPower,
+        rng,
+      });
+      for (const loss of exchange.raiderLosses) {
+        const attacker = engagement.attackers.find(group => group.id === loss.groupId);
+        if (attacker) attacker.confused = loss.confused;
       }
-      events.push(...exchange.afterConsequencesEvents);
+      events.push(...exchange.preDefenseEvents);
+      lines.push(...exchange.preDefenseLines);
+      for (const loss of exchange.defenderLosses) {
+        const defender = engagement.defenders.find(group => group.id === loss.groupId);
+        if (!defender) continue;
+        defender.wounded += loss.wounded;
+        defender.killed += loss.killed;
+        roundWounded += loss.wounded;
+        roundKilled += loss.killed;
+      }
+      if (engagement.direction === 'frontal') {
+        const consequences = applyDefenseZoneConsequences({
+          zone,
+          defenders: engagement.defenders,
+          attackers: engagement.attackers,
+          commands: exchange.commands,
+          enemyPower: exchange.enemyPower,
+          defensePower: exchange.defensePower,
+          enemyShare: exchange.enemyShare,
+          originalPower: battle.originalPower,
+          availableLoot: {
+            grain: pendingLootAvailable(state, battle, 'grain'),
+            firewood: pendingLootAvailable(state, battle, 'firewood'),
+            hide: pendingLootAvailable(state, battle, 'hide'),
+          },
+          rng,
+        });
+        zone.pressure = consequences.pressure;
+        zone.breached = consequences.breached;
+        events.push(...consequences.breachEvents);
+        lines.push(...consequences.breachLines);
+        buildingsDamaged += consequences.buildingsDamaged;
+        for (const [key, amount] of Object.entries(consequences.loot)) {
+          const resource = key as ResourceId;
+          lootBag[resource] = (lootBag[resource] ?? 0) + (amount ?? 0);
+        }
+        events.push(...consequences.lootEvents);
+        lines.push(...consequences.lootLines);
+        dominance.set(zone.id, exchange.enemyShare);
+      } else {
+        rearDominance.set(zone.id, exchange.enemyShare);
+      }
+      for (const loss of exchange.raiderLosses) {
+        const attacker = engagement.attackers.find(group => group.id === loss.groupId);
+        if (!attacker) continue;
+        attacker.killed += loss.killed;
+        attacker.power = loss.powerAfter;
+        roundRaidersKilled += loss.killed;
+      }
+      events.push(...exchange.postDefenseEvents);
+      villageMoraleDelta += exchange.villageMoraleDelta;
+      raiderMoraleDelta += exchange.raiderMoraleDelta;
+      if (exchange.surpriseAttack) {
+        for (const defenderId of exchange.surpriseDefenderIds) {
+          const defender = engagement.defenders.find(group => group.id === defenderId);
+          if (!defender) continue;
+          defender.ambushed = false;
+          defender.command = 'fallback';
+        }
+        events.push(...exchange.afterConsequencesEvents);
+      }
     }
-    dominance.set(zone.id, exchange.enemyShare);
   }
 
   villageMoraleDelta = Math.round(clamp(villageMoraleDelta, -18, 5));
@@ -1114,6 +1167,14 @@ export function resolveTacticalRound(state: GameState): string | null {
       event(events, attacker.zoneId, 'moraleBreak', `${attacker.label}의 대열이 흩어집니다.`, 650, {
         side: 'raider', groupId: attacker.id, float: '궤주!',
       });
+    } else if (attacker.rearAssault && attacker.engagementsInZone >= 1 &&
+      (rearDominance.get(attacker.zoneId) ?? 0) >= 0.6) {
+      attacker.intent = 'withdraw';
+      attacker.pendingZoneId = undefined;
+      event(events, attacker.zoneId, 'retreat', `${attacker.label}이(가) 후열을 휘저은 뒤 추격을 피해 이탈합니다.`, 650, {
+        side: 'raider', groupId: attacker.id, float: '급습 이탈!',
+      });
+      lines.push(`${attacker.label}이(가) 후방 급습 목표를 달성하고 전장에서 이탈했습니다.`);
     } else if (!attacker.confused && index >= 0 && index < route.length - 1 &&
       shouldRaiderAdvance(attacker, battle, zone, share, defenderReadiness.get(attacker.zoneId) ?? 0)) {
       const fromZoneId = attacker.zoneId;
@@ -1465,6 +1526,7 @@ export function tacticalCommandDescription(command: TacticalCommandId, ambushed 
     guardStorehouse: '약탈 피해를 줄이는 대신 수비대가 더 큰 위험을 집니다.',
     protectCivilians: '주민 피해를 줄이지만 건물과 물자를 포기할 수 있습니다.',
     redeploy: '이번 교전 전력을 줄여 인접한 전열로 이동하고 다음 라운드부터 새 위치에서 싸웁니다.',
+    reinforceRear: '중열 근접 예비대가 정면을 비우고 같은 구역의 후방 급습대를 막습니다.',
     fallback: '병력을 보존하며 구역을 내주고 다음 방어선으로 물러납니다.',
     advance: '이번 교전을 마친 뒤 한 단계 앞선 방어선으로 이동합니다.',
     arson: '준비한 불화살로 목책과 움막의 돌파를 앞당기지만 노획 일부가 불탑니다.',

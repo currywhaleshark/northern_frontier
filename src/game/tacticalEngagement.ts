@@ -166,6 +166,7 @@ export interface EngagementExchangeInput {
   zone: TacticalBattleZone;
   defenders: ReadonlyArray<TacticalDefenderGroup>;
   attackers: ReadonlyArray<TacticalRaiderGroup>;
+  direction: 'frontal' | 'rear';
   weather: WeatherId;
   prepareVolleyApplied: boolean;
   evacuateCiviliansApplied: boolean;
@@ -191,7 +192,6 @@ export interface EngagementExchangeResult {
   defensePower: number;
   enemyShare: number;
   defenseShare: number;
-  rearEnemyShare: number;
   commands: TacticalCommandId[];
   surpriseAttack: boolean;
   surpriseDefenderIds: string[];
@@ -206,11 +206,32 @@ export interface EngagementExchangeResult {
   afterConsequencesEvents: TacticalAnimationEvent[];
 }
 
+export function splitTacticalEngagementDefenders(
+  defenders: ReadonlyArray<TacticalDefenderGroup>,
+  rearAssaultActive: boolean,
+): {
+  frontal: TacticalDefenderGroup[];
+  rear: TacticalDefenderGroup[];
+  protectedTargets: TacticalDefenderGroup[];
+} {
+  const combatants = defenders.filter(defender => defender.commandable !== false);
+  const protectedTargets = defenders.filter(defender => defender.commandable === false);
+  if (!rearAssaultActive) return { frontal: combatants, rear: [], protectedTargets };
+  return {
+    frontal: combatants.filter(defender =>
+      (defender.line === 'front' || (defender.line === 'middle' && defender.command !== 'reinforceRear'))),
+    rear: combatants.filter(defender => defender.line === 'rear' ||
+      (defender.line === 'middle' && defender.command === 'reinforceRear')),
+    protectedTargets,
+  };
+}
+
 export function resolveEngagementExchange(input: EngagementExchangeInput): EngagementExchangeResult {
   const zone = { ...input.zone };
   const defenders = input.defenders.map(group => ({ ...group, residentIds: [...group.residentIds] }));
   const attackers = input.attackers.map(group => ({ ...group }));
-  const rearAttackers = attackers.filter(attacker => attacker.rearAssault);
+  const rearEngagement = input.direction === 'rear';
+  const rearAttackers = rearEngagement ? attackers : [];
   const combatDefenders = defenders.filter(defender => defender.commandable !== false);
   const surpriseDefenders = defenders.filter(defender => defender.command === 'ambush' && defender.ambushed);
   const surpriseAttack = surpriseDefenders.length > 0;
@@ -243,14 +264,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
       : group.power * (group.morale / 100) * (group.combatMultiplier ?? 1)),
     0,
   );
-  const rawRearEnemyPower = rearAttackers.reduce(
-    (sum, group) => sum + (group.confused
-      ? 0
-      : group.power * (group.morale / 100) * (group.combatMultiplier ?? 1)),
-    0,
-  );
   const enemyPower = rawEnemyPower * (0.88 + input.rng() * 0.24);
-  const rearEnemyShare = rawEnemyPower > 0 ? rawRearEnemyPower / rawEnemyPower : 0;
   let defensePower = combatDefenders.reduce((sum, defender) => {
     const active = activeDefenderCount(defender);
     const survivingShare = defender.count > 0 ? active / defender.count : 0;
@@ -369,9 +383,9 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
   for (const defender of defenders) {
     const active = activeDefenderCount(defender);
     if (active <= 0) continue;
-    const normalExposure = formationExposureMultiplier(defender, defenders);
-    const rearExposure = rearAssaultExposureMultiplier(defender, defenders);
-    const exposure = normalExposure * (1 - rearEnemyShare) + rearExposure * rearEnemyShare;
+    const exposure = rearEngagement
+      ? rearAssaultExposureMultiplier(defender, defenders)
+      : formationExposureMultiplier(defender, defenders);
     let risk = enemyShare * (0.16 + zone.pressure / 650) * casualtyMultiplier(input, defender) * exposure;
     if (defender.kind === 'civilian') risk *= zone.civilianRisk / 50;
     risk = clamp(risk, 0, 0.48);
@@ -383,7 +397,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     killed = Math.min(killed, Math.max(0, active - wounded));
     if (killed > 0 && wounded > 0 && wounded + killed > active) wounded = active - killed;
     defenderLosses.push({ groupId: defender.id, wounded, killed });
-    if (rearAttackers.length > 0 && defender.line === rearContactLine) {
+    if (rearEngagement && defender.line === rearContactLine) {
       rearAssaultCasualties += wounded + killed;
     }
     if (wounded + killed > 0) {
@@ -466,7 +480,6 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     defensePower,
     enemyShare,
     defenseShare,
-    rearEnemyShare,
     commands,
     surpriseAttack,
     surpriseDefenderIds: surpriseDefenders.map(defender => defender.id),
@@ -490,7 +503,6 @@ export interface DefenseZoneConsequencesInput {
   enemyPower: number;
   defensePower: number;
   enemyShare: number;
-  rearEnemyShare: number;
   originalPower: number;
   availableLoot: Partial<Record<ResourceId, number>>;
   rng: () => number;
@@ -523,9 +535,8 @@ export function applyDefenseZoneConsequences(
     (sum, defender) => sum + (defender.command === command ? activeDefenderCount(defender) : 0),
     0,
   ) / activeDefenders;
-  const pressureEnemyPower = input.enemyPower * (1 - input.rearEnemyShare * 0.6);
-  const pressureTotal = Math.max(1, pressureEnemyPower + input.defensePower);
-  const pressureEnemyShare = pressureEnemyPower / pressureTotal;
+  const pressureTotal = Math.max(1, input.enemyPower + input.defensePower);
+  const pressureEnemyShare = input.enemyPower / pressureTotal;
   const pressureDefenseShare = input.defensePower / pressureTotal;
   let pressureDelta = 15 + pressureEnemyShare * 32 - pressureDefenseShare * 12;
   if (zone.id === 'wall') {
@@ -536,7 +547,6 @@ export function applyDefenseZoneConsequences(
   pressureDelta -= commandShare('charge') * 6;
   pressureDelta += commandShare('fallback') * 28;
   pressureDelta += commandShare('advance') * 10;
-  pressureDelta *= 1 - input.rearEnemyShare * 0.55;
   if (zone.id === 'wall' && attackers.some(attacker => attacker.kind === 'main' && !attacker.confused)) {
     pressureDelta = Math.max(6, pressureDelta);
   }

@@ -309,10 +309,12 @@ function addBuiltMarker(state, type) {
   const holdExchange = tacticalEngagement.resolveEngagementExchange({
     ...exchangeInput,
     defenders: [{ ...muskets, command: 'hold' }],
+    direction: 'frontal',
   });
   const redeployExchange = tacticalEngagement.resolveEngagementExchange({
     ...exchangeInput,
     defenders: [{ ...muskets, command: 'redeploy' }],
+    direction: 'frontal',
   });
   assert.ok(Math.abs(redeployExchange.defensePower / holdExchange.defensePower - 0.35 / 0.82) < 1e-9,
     'redeploy uses a 0.35 round power multiplier');
@@ -330,6 +332,107 @@ function addBuiltMarker(state, type) {
   assert.equal(tactical.acknowledgeTacticalReport(state), null);
   assert.equal(muskets.line, 'front', 'the queued adjacent line applies after acknowledging the report');
   assert.equal(muskets.pendingLine, undefined);
+}
+
+{
+  const state = simulation.newGame(2026071463);
+  prepareDefenders(state);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'rear engagement assignment', power: 80, warned: true, siege: true, mode: 'garrison',
+  });
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  const spear = battle.defenderGroups.find(group => group.kind === 'militia-spear');
+  const bow = battle.defenderGroups.find(group => group.kind === 'militia-bow');
+  const civilians = battle.defenderGroups.find(group => group.kind === 'civilian');
+  const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
+  assert.ok(spear && bow && civilians && flanker);
+
+  const front = { ...spear, id: 'front', line: 'front', command: 'hold' };
+  const middleFront = { ...spear, id: 'middle-front', line: 'middle', command: 'hold' };
+  const middleRear = { ...spear, id: 'middle-rear', line: 'middle', command: 'reinforceRear' };
+  const rear = { ...bow, id: 'rear', line: 'rear', command: 'volley' };
+  const protectedCivilians = { ...civilians, id: 'protected-civilians', line: 'rear', command: null };
+  const split = tacticalEngagement.splitTacticalEngagementDefenders(
+    [front, middleFront, middleRear, rear, protectedCivilians],
+    true,
+  );
+  assert.deepEqual(split.frontal.map(group => group.id), ['front', 'middle-front']);
+  assert.deepEqual(split.rear.map(group => group.id), ['middle-rear', 'rear']);
+  assert.deepEqual(split.protectedTargets.map(group => group.id), ['protected-civilians']);
+  assert.equal(new Set([...split.frontal, ...split.rear, ...split.protectedTargets].map(group => group.id)).size, 5,
+    'no defender contributes to both engagements');
+  const noRearSplit = tacticalEngagement.splitTacticalEngagementDefenders(
+    [front, middleFront, middleRear, rear, protectedCivilians],
+    false,
+  );
+  assert.equal(noRearSplit.frontal.length, 4, 'without a rear engagement all combatants remain on the normal front');
+  assert.equal(noRearSplit.rear.length, 0);
+  assert.deepEqual(noRearSplit.protectedTargets.map(group => group.id), ['protected-civilians']);
+
+  spear.zoneId = 'wall';
+  spear.line = 'middle';
+  bow.zoneId = 'wall';
+  bow.line = 'middle';
+  flanker.zoneId = 'wall';
+  flanker.rearAssault = true;
+  flanker.intent = 'flank';
+  assert.equal(tactical.tacticalCommandUnavailableReason(battle, spear, 'reinforceRear'), null);
+  assert.ok(tactical.tacticalCommandUnavailableReason(battle, bow, 'reinforceRear'),
+    'ranged middle-line groups cannot act as a rear melee reserve');
+  spear.line = 'front';
+  assert.ok(tactical.tacticalCommandUnavailableReason(battle, spear, 'reinforceRear'),
+    'only a middle-line melee group can reinforce the rear');
+  spear.line = 'middle';
+  spear.command = 'hold';
+  spear.commandSource = 'recommended';
+  tactical.chooseDefaultTacticalCommands(battle);
+  assert.equal(spear.command, 'reinforceRear');
+  assert.equal(spear.commandSource, 'recommended');
+  assert.equal(tactical.setTacticalCommand(state, spear.id, 'reinforceRear'), null);
+  assert.equal(spear.commandSource, 'player');
+
+  const civilianRearExchange = tacticalEngagement.resolveEngagementExchange({
+    zone: { ...battle.zones.find(zone => zone.id === 'center'), pressure: 100, civilianRisk: 100 },
+    defenders: [protectedCivilians],
+    attackers: [{ ...flanker, power: 300, morale: 100, count: 20, killed: 0, rearAssault: true }],
+    direction: 'rear',
+    weather: state.weather,
+    prepareVolleyApplied: false,
+    evacuateCiviliansApplied: false,
+    roundStartingRaiderPower: 300,
+    rng: () => 0,
+  });
+  assert.equal(civilianRearExchange.defensePower, 0, 'protected civilians never add rear defense power');
+  assert.deepEqual(civilianRearExchange.commands, [], 'protected civilians never contribute to command ratios');
+  assert.equal(tactical.tacticalDefenderReadiness([protectedCivilians]), 0,
+    'protected civilians never contribute to tactical readiness');
+  assert.ok(civilianRearExchange.defenderLosses.find(loss => loss.groupId === protectedCivilians.id)?.wounded > 0,
+    'protected civilians remain rear-engagement damage targets');
+}
+
+{
+  const state = simulation.newGame(2026071464);
+  prepareDefenders(state);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'rear-only pressure test', power: 84, warned: true, siege: true, mode: 'garrison',
+  });
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  battle.defenderGroups.forEach(group => { group.zoneId = 'center'; });
+  const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
+  assert.ok(flanker);
+  battle.raiderGroups.filter(group => group.id !== flanker.id).forEach(group => { group.intent = 'withdraw'; });
+  flanker.zoneId = 'wall';
+  flanker.rearAssault = true;
+  flanker.intent = 'flank';
+  flanker.engagementsInZone = 1;
+  flanker.morale = 100;
+  battle.zones.find(zone => zone.id === 'wall').pressure = 40;
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.equal(battle.zones.find(zone => zone.id === 'wall').pressure, 35,
+    'a rear-only engagement cannot add frontal zone pressure');
+  assert.equal(flanker.intent, 'withdraw', 'a dominant rear assault exits after completing its second engagement');
 }
 
 {
@@ -466,6 +569,7 @@ function addBuiltMarker(state, type) {
     zone,
     defenders,
     attackers,
+    direction: 'frontal',
     weather: state.weather,
     prepareVolleyApplied: false,
     evacuateCiviliansApplied: false,
@@ -501,7 +605,6 @@ function addBuiltMarker(state, type) {
     enemyPower: exchange.enemyPower,
     defensePower: exchange.defensePower,
     enemyShare: exchange.enemyShare,
-    rearEnemyShare: exchange.rearEnemyShare,
     originalPower: battle.originalPower,
     availableLoot: { grain: 10, firewood: 10, hide: 10 },
     rng: () => 0.5,
@@ -1198,22 +1301,15 @@ function addBuiltMarker(state, type) {
   battle.raiderGroups.filter(group => group !== flanker).forEach(group => { group.intent = 'withdraw'; });
   const center = battle.zones.find(zone => zone.id === 'center');
   center.pressure = 0;
-  for (let engagement = 0; engagement < 2; engagement++) {
-    assert.equal(tactical.resolveTacticalRound(state), null);
-    assert.notEqual(battle.pendingReport.outcome, 'villageRouted');
-    assert.ok(battle.pendingReport.events.some(event =>
-      event.kind === 'melee' && event.side === 'raider' && event.groupId === flanker.id &&
-      (event.meleeParticipants ?? 0) > 0),
-    'a revealed rear assault group keeps attacking after its entry event');
-    if (engagement === 0) {
-      assert.equal(tactical.completeTacticalSimulation(state), null);
-      assert.equal(tactical.acknowledgeTacticalReport(state), null);
-      flanker.morale = 100;
-      battle.raiderMorale = 100;
-    }
-  }
-  assert.ok(center.pressure <= 68, 'rear-line pressure is capped per engagement');
-  assert.equal(center.breached, false, 'flankers cannot rout a civilian-only center within two engagements');
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.notEqual(battle.pendingReport.outcome, 'villageRouted');
+  assert.ok(battle.pendingReport.events.some(event =>
+    event.kind === 'melee' && event.side === 'raider' && event.groupId === flanker.id &&
+    (event.meleeParticipants ?? 0) > 0),
+  'a revealed rear assault group keeps attacking after its entry event');
+  assert.equal(flanker.intent, 'withdraw', 'a dominant rear assault exits after completing its objective');
+  assert.equal(center.pressure, 0, 'a rear-only engagement does not create center pressure');
+  assert.equal(center.breached, false, 'flankers cannot rout a civilian-only center through frontal pressure');
 }
 
 {

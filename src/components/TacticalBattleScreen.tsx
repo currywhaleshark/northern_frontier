@@ -55,7 +55,8 @@ const PREP_DESCRIPTIONS: Record<PreparationActionId, string> = {
 };
 
 const COMMANDS: TacticalCommandId[] = [
-  'hold', 'charge', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'fallback', 'advance',
+  'hold', 'charge', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'reinforceRear',
+  'fallback', 'advance',
   'arson', 'blockEscape', 'openRetreat',
 ];
 
@@ -67,6 +68,7 @@ const COMMAND_LABELS: Record<TacticalCommandId, string> = {
   guardStorehouse: '창고 사수',
   protectCivilians: '주민 보호',
   redeploy: '전열 재배치',
+  reinforceRear: '후방 증원',
   fallback: '후퇴',
   advance: '전진',
   arson: '방화',

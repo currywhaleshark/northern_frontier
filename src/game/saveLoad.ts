@@ -97,7 +97,8 @@ const DEFENDER_KINDS = new Set<DefenderGroupKind>([
   'militia-spear', 'militia-bow', 'militia-musket', 'militia-unarmed', 'watchman', 'hunter', 'civilian',
 ]);
 const TACTICAL_COMMANDS = new Set<TacticalCommandId>([
-  'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'fallback', 'advance', 'charge',
+  'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'reinforceRear',
+  'fallback', 'advance', 'charge',
   'arson', 'blockEscape', 'openRetreat',
 ]);
 const PREPARATION_ACTION_IDS = new Set<PreparationActionId>([

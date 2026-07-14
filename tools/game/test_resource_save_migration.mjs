@@ -201,6 +201,29 @@ function prepareFormationTestCombatants(state) {
 }
 
 {
+  const rearReserveSave = simulation.newGame(2026071465);
+  prepareFormationTestCombatants(rearReserveSave);
+  const battle = tactical.createTacticalBattle(rearReserveSave, {
+    factionName: 'rear reserve save', power: 40, warned: true, siege: false, mode: 'garrison',
+  });
+  assert.equal(tactical.advanceTacticalPhase(rearReserveSave), null);
+  assert.equal(tactical.advanceTacticalPhase(rearReserveSave), null);
+  const spear = battle.defenderGroups.find(group => group.kind === 'militia-spear');
+  const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
+  assert.ok(spear && flanker);
+  spear.line = 'middle';
+  spear.zoneId = 'wall';
+  flanker.zoneId = 'wall';
+  flanker.rearAssault = true;
+  assert.equal(tactical.setTacticalCommand(rearReserveSave, spear.id, 'reinforceRear'), null);
+  assert.equal(saveLoad.saveGame(rearReserveSave), true);
+  const loaded = saveLoad.loadGame();
+  const loadedSpear = loaded?.tacticalBattle?.defenderGroups.find(group => group.id === spear.id);
+  assert.equal(loadedSpear?.command, 'reinforceRear');
+  assert.equal(loadedSpear?.commandSource, 'player');
+}
+
+{
   const invalidLines = simulation.newGame(2026071459);
   prepareFormationTestCombatants(invalidLines);
   const battle = tactical.createTacticalBattle(invalidLines, {

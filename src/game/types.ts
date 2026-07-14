@@ -611,6 +611,7 @@ export type TacticalCommandId =
   | 'guardStorehouse'
   | 'protectCivilians'
   | 'redeploy'
+  | 'reinforceRear'
   | 'fallback'
   | 'advance'
   | 'charge'
