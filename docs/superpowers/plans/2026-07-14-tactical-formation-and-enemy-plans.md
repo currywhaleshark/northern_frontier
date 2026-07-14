@@ -208,9 +208,9 @@
 - Modify: `src/components/tactical/TacticalZoneColumn.tsx`
 - Modify: `tools/game/test_tactical_battle.mjs`
 
-- [ ] 지휘 단계에서 구역의 적 그룹을 클릭해 집중 표적 지정. 미지정이면 `auto`(현행 균일 배분과 동일). 표적이 궤주·전멸·구역 이탈하면 `auto` 복귀 — 라운드마다 재지정 강요하지 않는다.
-- [ ] `revealed === false`인 적은 표적 지정 불가.
-- [ ] 전투 중 저장 호환: 필드 없으면 `auto`.
+- [x] 지휘 단계에서 구역의 적 그룹을 클릭해 집중 표적 지정. 미지정이면 `auto`(현행 균일 배분과 동일). 표적이 궤주·전멸·구역 이탈하면 `auto` 복귀 — 라운드마다 재지정 강요하지 않는다.
+- [x] `revealed === false`인 적은 표적 지정 불가.
+- [x] 전투 중 저장 호환: 필드 없으면 `auto`.
 
 ### Task 3.2: 병과별 표적 가능 열 규칙
 

@@ -31,6 +31,7 @@ interface Props {
   onAssignGroup: (groupId: string, zoneId: string) => void;
   onSetFormationLine: (groupId: string, line: TacticalFormationLine) => void;
   onSetCommand: (groupId: string, command: TacticalCommandId) => void;
+  onSetFocusTarget: (zoneId: string, groupId: string | null) => void;
   onResolveRound: () => void;
   onCompleteSimulation: () => void;
   onAcknowledgeReport: () => void;
@@ -224,6 +225,7 @@ export function TacticalBattleScreen({
   onAssignGroup,
   onSetFormationLine,
   onSetCommand,
+  onSetFocusTarget,
   onResolveRound,
   onCompleteSimulation,
   onAcknowledgeReport,
@@ -529,6 +531,12 @@ export function TacticalBattleScreen({
                   commandable={commandable}
                   selectedGroupId={selectedGroup?.id ?? null}
                   onSelectGroup={selectGroup}
+                  onSelectTarget={(zoneId, groupId) => onSetFocusTarget(
+                    zoneId,
+                    battle.zones.find(candidate => candidate.id === zoneId)?.focusTargetGroupId === groupId
+                      ? null
+                      : groupId,
+                  )}
                 />
               ))}
             </div>

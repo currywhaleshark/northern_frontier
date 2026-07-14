@@ -224,6 +224,33 @@ function prepareFormationTestCombatants(state) {
 }
 
 {
+  const focusTargetSave = simulation.newGame(2026071488);
+  prepareFormationTestCombatants(focusTargetSave);
+  const battle = tactical.createTacticalBattle(focusTargetSave, {
+    factionName: 'focus target save', power: 40, warned: true, siege: false, mode: 'garrison',
+  });
+  assert.equal(tactical.advanceTacticalPhase(focusTargetSave), null);
+  assert.equal(tactical.advanceTacticalPhase(focusTargetSave), null);
+  const zone = battle.zones.find(candidate => candidate.id === 'wall');
+  const target = battle.raiderGroups[0];
+  assert.ok(zone && target);
+  Object.assign(target, { zoneId: zone.id, revealed: true, intent: 'advance', power: 50 });
+  assert.equal(tactical.setTacticalFocusTarget(focusTargetSave, zone.id, target.id), null);
+  assert.equal(saveLoad.saveGame(focusTargetSave), true);
+  const loaded = saveLoad.loadGame();
+  const loadedZone = loaded?.tacticalBattle?.zones.find(candidate => candidate.id === zone.id);
+  assert.equal(loadedZone?.focusTargetGroupId, target.id);
+  assert.equal(loadedZone?.focusTargetSource, 'player');
+
+  delete zone.focusTargetGroupId;
+  delete zone.focusTargetSource;
+  assert.equal(saveLoad.saveGame(focusTargetSave), true);
+  const legacyLoadedZone = saveLoad.loadGame()?.tacticalBattle?.zones.find(candidate => candidate.id === zone.id);
+  assert.equal(legacyLoadedZone?.focusTargetGroupId, undefined);
+  assert.equal(legacyLoadedZone?.focusTargetSource, 'auto', 'a save without targeting fields defaults to auto');
+}
+
+{
   const invalidLines = simulation.newGame(2026071459);
   prepareFormationTestCombatants(invalidLines);
   const battle = tactical.createTacticalBattle(invalidLines, {

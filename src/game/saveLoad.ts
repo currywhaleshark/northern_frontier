@@ -28,7 +28,7 @@ import {
 import type {
   CombatWeaponId, CourtTribute, DefenderGroupKind, GameState, Gender, Resident, ResourceId,
   PreparationActionId, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
-  TacticalFormationLine, TacticalPreparationEffect, TacticalRoundReport,
+  TacticalFormationLine, TacticalPreparationEffect, TacticalRaiderGroup, TacticalRoundReport,
 } from './types';
 
 export { CURRENT_SCHEMA_VERSION } from './saveSchema';
@@ -216,6 +216,8 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     lootRisk: Math.max(0, Number(zone.lootRisk) || 0),
     civilianRisk: Math.max(0, Number(zone.civilianRisk) || 0),
     description: typeof zone.description === 'string' ? zone.description : '',
+    focusTargetGroupId: typeof zone.focusTargetGroupId === 'string' ? zone.focusTargetGroupId : undefined,
+    focusTargetSource: zone.focusTargetSource === 'player' ? 'player' : 'auto',
   }));
 
   const defenderGroups = (source.defenderGroups as unknown[]).flatMap((entry, index) => {
@@ -312,7 +314,18 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       flankPlanRevealed: derivedFlankPlanRevealed,
       rearAssault: group.rearAssault === true,
     }
-    : group);
+    : group) as unknown as TacticalRaiderGroup[];
+  for (const zone of zones) {
+    const validTarget = zone.focusTargetGroupId && raiderGroups.some(group =>
+      group.id === zone.focusTargetGroupId && group.zoneId === zone.id && group.revealed !== false &&
+      group.intent !== 'withdraw' && group.power > 0 && group.count - group.killed > 0);
+    if (!validTarget) {
+      zone.focusTargetGroupId = undefined;
+      zone.focusTargetSource = 'auto';
+    } else {
+      zone.focusTargetSource = zone.focusTargetSource === 'player' ? 'player' : 'auto';
+    }
+  }
   if (!defenderGroups.some(group => group.count > 0) || !raiderGroups.some(group => group.count > 0)) return null;
 
   const reports = (Array.isArray(source.reports) ? source.reports : [])

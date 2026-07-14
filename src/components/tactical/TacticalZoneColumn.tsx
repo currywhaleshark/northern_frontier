@@ -53,6 +53,7 @@ interface Props {
   commandable: boolean;
   selectedGroupId: string | null;
   onSelectGroup: (groupId: string) => void;
+  onSelectTarget: (zoneId: string, groupId: string) => void;
 }
 
 function defenderFormationRole(group: TacticalDefenderGroup): 'melee' | 'ranged' | 'civilian' {
@@ -512,6 +513,7 @@ export function TacticalZoneColumn({
   commandable,
   selectedGroupId,
   onSelectGroup,
+  onSelectTarget,
 }: Props) {
   const focused = zone.id === activeZoneId;
   const defenders = battle.defenderGroups
@@ -656,6 +658,9 @@ export function TacticalZoneColumn({
             <span className="tactical-formation-line-label">적 {formationLineLabel(line)}</span>
             {raiders.filter(raider => raiderFormationLine(raider) === line).map(raider => {
           const activeRaiders = Math.max(0, raider.count - raider.killed);
+          const targetable = battle.phase === 'command' && !assault && !hunt && raider.revealed &&
+            raider.intent !== 'withdraw' && activeRaiders > 0;
+          const focusTarget = zone.focusTargetGroupId === raider.id;
           const fallingRaiders = raider.revealed && activeEvent?.kind === 'casualty' && activeEvent.groupId === raider.id
             ? activeEvent.casualties ?? 0 : 0;
           const totalRaiders = activeRaiders + fallingRaiders;
@@ -675,8 +680,21 @@ export function TacticalZoneColumn({
           const raiderPose = raider.beastKind ? beastPose : raiderPoseForEvent(activeEvent, raider);
           return (
             <div
-              className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${leaderMotion}`}
+              className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : ''}${focusTarget ? ' focus-target' : ''}${leaderMotion}`}
               key={leaderMotion ? `${raider.id}-${activeEvent?.kind}-${eventIndex}` : raider.id}
+              onClick={targetable ? event => {
+                event.stopPropagation();
+                onSelectTarget(zone.id, raider.id);
+              } : undefined}
+              role={targetable ? 'button' : undefined}
+              tabIndex={targetable ? 0 : undefined}
+              aria-pressed={targetable ? focusTarget : undefined}
+              title={targetable ? focusTarget ? '집중 표적 해제' : '이 적 부대를 집중 표적으로 지정' : undefined}
+              onKeyDown={targetable ? event => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                onSelectTarget(zone.id, raider.id);
+              } : undefined}
             >
               <div
                 className="tactical-raider-sprites clustered"
@@ -705,6 +723,7 @@ export function TacticalZoneColumn({
               <span>
                 {raider.revealed ? `${raider.label} ${activeRaiders}${raider.beastKind ? '마리' : '명'} · ${raider.beastKind ? battle.huntPredatorState === 'wounded' ? '부상' : '경계' : raider.intent === 'loot' ? '약탈' : raider.intent === 'flank' ? '우회' : raider.intent === 'breakWall' ? '공성' : raider.intent === 'defend' ? '수비' : raider.intent === 'escape' ? '도주' : '전진'}` : raider.beastKind ? '덤불 속 흔적' : '정체불명'}
                 {raider.confused && <em className="tactical-state-badge confused">혼란</em>}
+                {focusTarget && <em className="tactical-state-badge focus-target">집중 표적</em>}
               </span>
             </div>
           );
@@ -718,12 +737,31 @@ export function TacticalZoneColumn({
       <div className={`tactical-rear-assault-rank${activeEvent?.kind === 'rearAssault' && activeEvent.zoneId === zone.id ? ' entering' : ''}${activeEvent?.kind === 'melee' && activeEvent.side === 'raider' && activeEvent.zoneId === zone.id && rearAssaulters.some(group => activeEvent.groupId == null || activeEvent.groupId === group.id) ? ' attacking' : ''}`}>
         {rearAssaulters.map(raider => {
           const activeRaiders = Math.max(0, raider.count - raider.killed);
+          const targetable = battle.phase === 'command' && !assault && !hunt && raider.revealed &&
+            raider.intent !== 'withdraw' && activeRaiders > 0;
+          const focusTarget = zone.focusTargetGroupId === raider.id;
           const fallingRaiders = activeEvent?.kind === 'casualty' && activeEvent.groupId === raider.id
             ? activeEvent.casualties ?? 0 : 0;
           const totalRaiders = activeRaiders + fallingRaiders;
           const formation = formationDimensions(totalRaiders, 132, 100, 20, 13, 5);
           return (
-            <div className={`tactical-raider-group rear-assault${raider.confused ? ' confused' : ''}`} key={raider.id}>
+            <div
+              className={`tactical-raider-group rear-assault${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : ''}${focusTarget ? ' focus-target' : ''}`}
+              key={raider.id}
+              onClick={targetable ? event => {
+                event.stopPropagation();
+                onSelectTarget(zone.id, raider.id);
+              } : undefined}
+              role={targetable ? 'button' : undefined}
+              tabIndex={targetable ? 0 : undefined}
+              aria-pressed={targetable ? focusTarget : undefined}
+              title={targetable ? focusTarget ? '집중 표적 해제' : '이 적 부대를 집중 표적으로 지정' : undefined}
+              onKeyDown={targetable ? event => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                onSelectTarget(zone.id, raider.id);
+              } : undefined}
+            >
               <div
                 className="tactical-raider-sprites clustered"
                 style={{ width: formation.width, height: formation.height }}
@@ -748,7 +786,10 @@ export function TacticalZoneColumn({
                   </span>
                 ))}
               </div>
-              <span>{raider.label} {activeRaiders}명 · 후방 급습</span>
+              <span>
+                {raider.label} {activeRaiders}명 · 후방 급습
+                {focusTarget && <em className="tactical-state-badge focus-target">집중 표적</em>}
+              </span>
             </div>
           );
         })}

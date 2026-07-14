@@ -238,6 +238,27 @@ export function tacticalRearResponseOptions(
   return options;
 }
 
+function validTacticalFocusTarget(
+  battle: TacticalBattle,
+  zoneId: string,
+  groupId: string,
+): TacticalRaiderGroup | undefined {
+  return battle.raiderGroups.find(group =>
+    group.id === groupId && group.zoneId === zoneId && group.revealed !== false &&
+    group.intent !== 'withdraw' && group.power > 0 && group.count - group.killed > 0);
+}
+
+export function normalizeTacticalFocusTargets(battle: TacticalBattle): void {
+  for (const zone of battle.zones) {
+    if (zone.focusTargetGroupId && validTacticalFocusTarget(battle, zone.id, zone.focusTargetGroupId)) {
+      zone.focusTargetSource = zone.focusTargetSource === 'player' ? 'player' : 'auto';
+      continue;
+    }
+    zone.focusTargetGroupId = undefined;
+    zone.focusTargetSource = 'auto';
+  }
+}
+
 function snapshotGroup(
   snapshots: CombatantSnapshot[],
   role: CombatRole,
@@ -517,7 +538,7 @@ export function createTacticalBattle(
     prepPoints: preparationPoints(state, params.warned),
     prepActions: PREPARATION_ACTIONS.map(action => ({ ...action, selected: false, applied: false })),
     preparationEvents: [],
-    zones: createZones(state, params.siege, groups),
+    zones: createZones(state, params.siege, groups).map(zone => ({ ...zone, focusTargetSource: 'auto' })),
     defenderGroups: groups,
     raiderGroups: enemies,
     enemyPlan,
@@ -839,6 +860,33 @@ export function setTacticalCommand(
   return null;
 }
 
+export function setTacticalFocusTarget(
+  state: GameState,
+  zoneId: string,
+  groupId: string | null,
+): string | null {
+  const battle = state.tacticalBattle;
+  if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  if (battle.orientation === 'assault' || battle.assaultKind === 'predatorHunt') {
+    return '방어전에서만 집중 표적을 지정할 수 있습니다.';
+  }
+  if (battle.phase !== 'command') return '지휘 단계에서만 집중 표적을 지정할 수 있습니다.';
+  const zone = battle.zones.find(candidate => candidate.id === zoneId);
+  if (!zone) return '표적을 지정할 전투 구역을 찾을 수 없습니다.';
+  if (groupId == null) {
+    zone.focusTargetGroupId = undefined;
+    zone.focusTargetSource = 'auto';
+    return null;
+  }
+  const target = battle.raiderGroups.find(group => group.id === groupId);
+  if (!target || target.zoneId !== zoneId || target.intent === 'withdraw' || target.power <= 0 ||
+      target.count - target.killed <= 0) return '해당 구역에 유효한 적 표적이 없습니다.';
+  if (!target.revealed) return '아직 드러나지 않은 적은 집중 표적으로 지정할 수 없습니다.';
+  zone.focusTargetGroupId = target.id;
+  zone.focusTargetSource = 'player';
+  return null;
+}
+
 export function tacticalCommandUnavailableReason(
   battle: TacticalBattle,
   defender: TacticalDefenderGroup,
@@ -1034,6 +1082,7 @@ export function resolveTacticalRound(state: GameState): string | null {
   if (battle.assaultKind === 'predatorHunt') return resolveHuntRound(state);
   if (battle.orientation === 'assault') return resolveAssaultRound(state);
   if (battle.phase !== 'command') return '교전을 진행할 지휘 단계가 아닙니다.';
+  normalizeTacticalFocusTargets(battle);
   chooseDefaultTacticalCommands(battle);
   const firingMusketGroups = battle.defenderGroups.filter(group =>
     group.weapon === 'musket' && group.command === 'volley' && activeCount(group) > 0 &&
@@ -1263,6 +1312,8 @@ export function resolveTacticalRound(state: GameState): string | null {
     event(events, advance.fromZoneId, 'advance', `${subject}이(가) 교전을 마치고 ${advance.destinationName}(으)로 밀려듭니다.`, 620);
   }
 
+  normalizeTacticalFocusTargets(battle);
+
   const activeRaiders = battle.raiderGroups.filter(group => group.intent !== 'withdraw' && group.power > 0);
   const nextFocusZoneId = activeRaiders
     .map(group => {
@@ -1348,6 +1399,7 @@ export function acknowledgeTacticalReport(state: GameState): string | null {
   }
   // 후퇴 연출은 원래 구역에서 보여준 뒤, 다음 교전을 준비할 때 실제 배치를 후방으로 옮긴다.
   applyNextEngagementStates(battle);
+  normalizeTacticalFocusTargets(battle);
   battle.currentZoneId = battle.pendingReport.nextFocusZoneId;
   battle.defenderGroups.forEach(group => {
     if (group.command && tacticalCommandUnavailableReason(battle, group, group.command)) {

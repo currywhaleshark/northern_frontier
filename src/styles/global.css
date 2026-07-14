@@ -1653,6 +1653,19 @@ html, body, #root {
 }
 .tactical-state-badge.ambushed { color: #a8d6a1; background: rgba(31, 67, 36, 0.78); }
 .tactical-state-badge.confused { color: #e3bd78; background: rgba(83, 54, 25, 0.82); }
+.tactical-state-badge.focus-target { color: #ffd576; background: rgba(94, 48, 20, 0.88); }
+.tactical-raider-group.targetable {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+.tactical-raider-group.targetable:focus-visible { outline: 2px solid #f2c35f; outline-offset: 3px; }
+.tactical-raider-group.focus-target > span {
+  outline: 1px solid #f0b94f;
+  box-shadow: 0 0 12px rgba(238, 154, 43, 0.42);
+}
+.tactical-raider-group.focus-target .tactical-raider-sprites {
+  filter: drop-shadow(0 0 6px rgba(255, 181, 64, 0.72));
+}
 .tactical-raider-group.confused .tactical-raider-sprites {
   opacity: 0.62;
   filter: grayscale(0.45) saturate(0.65);

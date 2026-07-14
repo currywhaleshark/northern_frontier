@@ -647,6 +647,8 @@ export interface TacticalBattleZone {
   lootRisk: number;
   civilianRisk: number;
   description: string;
+  focusTargetGroupId?: string;
+  focusTargetSource?: 'auto' | 'player';
 }
 
 export interface TacticalDefenderGroup {

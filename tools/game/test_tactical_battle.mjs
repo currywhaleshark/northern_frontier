@@ -494,6 +494,51 @@ function addBuiltMarker(state, type) {
 }
 
 {
+  const state = simulation.newGame(2026071487);
+  prepareDefenders(state);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'zone focus target', power: 72, warned: true, siege: false, mode: 'garrison',
+  });
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  const zone = battle.zones.find(candidate => candidate.id === 'wall');
+  const target = battle.raiderGroups[0];
+  assert.ok(zone && target);
+  Object.assign(target, {
+    zoneId: zone.id, revealed: true, intent: 'advance', power: 200, count: 50, killed: 0,
+  });
+
+  assert.equal(tactical.setTacticalFocusTarget(state, zone.id, target.id), null);
+  assert.equal(zone.focusTargetGroupId, target.id);
+  assert.equal(zone.focusTargetSource, 'player');
+  tactical.normalizeTacticalFocusTargets(battle);
+  assert.equal(zone.focusTargetGroupId, target.id, 'a valid player target persists across command refreshes');
+
+  target.revealed = false;
+  assert.match(tactical.setTacticalFocusTarget(state, zone.id, target.id), /드러나지 않은/);
+  assert.equal(zone.focusTargetGroupId, target.id, 'a rejected hidden target does not replace the prior selection');
+  target.revealed = true;
+  target.zoneId = 'storehouse';
+  tactical.normalizeTacticalFocusTargets(battle);
+  assert.equal(zone.focusTargetGroupId, undefined, 'a target that leaves the zone returns that zone to auto');
+  assert.equal(zone.focusTargetSource, 'auto');
+
+  target.zoneId = zone.id;
+  target.intent = 'withdraw';
+  zone.focusTargetGroupId = target.id;
+  zone.focusTargetSource = 'player';
+  tactical.normalizeTacticalFocusTargets(battle);
+  assert.equal(zone.focusTargetSource, 'auto', 'a withdrawing target returns to auto');
+
+  target.intent = 'advance';
+  target.killed = target.count;
+  zone.focusTargetGroupId = target.id;
+  zone.focusTargetSource = 'player';
+  tactical.normalizeTacticalFocusTargets(battle);
+  assert.equal(zone.focusTargetSource, 'auto', 'an eliminated target returns to auto');
+}
+
+{
   const defender = (id, line, weapon, overrides = {}) => ({
     id,
     kind: weapon === 'spear' ? 'militia-spear'

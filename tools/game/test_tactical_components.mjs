@@ -20,6 +20,10 @@ for (const className of [
 }
 assert.match(zoneSource, /data-zone-id=\{zone\.id\}/, 'zone identity must remain on the extracted section');
 assert.match(zoneSource, /onSelectGroup\(group\.id\)/, 'battlefield groups must remain selectable');
+assert.match(zoneSource, /onSelectTarget/,
+  'revealed enemy groups must expose the zone focus-target callback');
+assert.match(zoneSource, /focus-target/,
+  'the selected enemy group must have a persistent focus-target marker');
 assert.match(zoneSource, /\['front', 'middle', 'rear'\]/,
   'focused battlefields must render all three defender formation lines');
 assert.match(zoneSource, /\['rear', 'middle', 'front'\]/,
