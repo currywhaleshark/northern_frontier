@@ -1,8 +1,7 @@
 // 건물 정의와 배치/방어 관련 헬퍼
 import { CONFIG } from './config';
 import { rankAtLeast } from './constants';
-import { residentDefenseContribution, synchronizeWeaponAssignments, weaponCountsForResidents } from './weapons';
-import { activePredatorScoutIds } from './expeditionIntel';
+import { createCombatRoster } from './combatRoster';
 import type { Building, BuildingDef, BuildingTypeId, GameState, Rank, ResourceId, SmithyProductId, Tile } from './types';
 
 export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
@@ -475,11 +474,8 @@ export function housingCapacity(state: GameState): { total: number; ondol: numbe
 
 // 실제로 조총을 배정받아 사격 가능한 전투원 수.
 export function armedMusketeers(state: GameState): number {
-  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
-  const combatants = state.residents.filter(resident =>
-    resident.alive && !away.has(resident.id) &&
-    (resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter'));
-  return weaponCountsForResidents(state, combatants).readyMuskets;
+  return createCombatRoster(state, { context: 'villageDefense' }).combatants
+    .filter(combatant => combatant.readyWeapon === 'musket').length;
 }
 
 export interface MilitiaWeaponAllocation {
@@ -490,16 +486,14 @@ export interface MilitiaWeaponAllocation {
 }
 
 export function militiaWeaponAllocation(state: GameState): MilitiaWeaponAllocation {
-  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
-  const militia = state.residents.filter(resident =>
-    resident.alive && resident.job === 'militia' && !away.has(resident.id));
-  const counts = weaponCountsForResidents(state, militia);
+  const militia = createCombatRoster(state, { context: 'villageDefense' }).combatants
+    .filter(combatant => combatant.role === 'militia');
   // 탄약 없는 조총수는 배정을 유지하지만 현재 전투 계산에서는 비무장 수비병으로 취급한다.
   return {
-    muskets: counts.readyMuskets,
-    hornBows: counts.hornBows,
-    spears: counts.spears,
-    unarmed: counts.unarmed + (counts.muskets - counts.readyMuskets),
+    muskets: militia.filter(combatant => combatant.readyWeapon === 'musket').length,
+    hornBows: militia.filter(combatant => combatant.readyWeapon === 'hornBow').length,
+    spears: militia.filter(combatant => combatant.readyWeapon === 'spear').length,
+    unarmed: militia.filter(combatant => combatant.readyWeapon == null).length,
   };
 }
 
@@ -508,21 +502,21 @@ export function computeDefense(
   state: GameState,
   options: { includeExpedition?: boolean; excludedResidentIds?: Iterable<number> } = {},
 ): number {
-  synchronizeWeaponAssignments(state);
-  const away = options.includeExpedition ? new Set<number>() : new Set(state.expedition?.memberIds ?? []);
-  for (const residentId of activePredatorScoutIds(state)) away.add(residentId);
-  for (const residentId of options.excludedResidentIds ?? []) away.add(residentId);
+  const combatants = [...createCombatRoster(state, { context: 'villageDefense' }).combatants];
+  if (options.includeExpedition && state.expedition) {
+    combatants.push(...createCombatRoster(state, {
+      context: 'expedition', memberIds: state.expedition.memberIds,
+    }).combatants);
+  }
+  const excluded = new Set(options.excludedResidentIds ?? []);
   let d = 0;
   for (const b of state.buildings) {
     if (b.built) d += BUILDING_DEFS[b.type].defense;
   }
   const garrisonMult = countBuilt(state, 'garrison') > 0 ? 1.3 : 1;
-  let peopleDefense = 0;
-  for (const resident of state.residents) {
-    if (!resident.alive || away.has(resident.id)) continue;
-    if (resident.job !== 'militia' && resident.job !== 'watchman' && resident.job !== 'hunter') continue;
-    peopleDefense += residentDefenseContribution(state, resident, state.weaponAssignments[resident.id] ?? null);
-  }
+  const unique = new Map(combatants.map(combatant => [combatant.residentId, combatant]));
+  const peopleDefense = [...unique.values()].reduce((sum, combatant) =>
+    excluded.has(combatant.residentId) ? sum : sum + combatant.basePower + combatant.weaponPower, 0);
   d += Math.round(peopleDefense * garrisonMult);
   return Math.round(d);
 }

@@ -36,6 +36,7 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
 
 {
   const legacy = simulation.newGame(2026071010);
+  delete legacy.schemaVersion;
   legacy.resources = {
     food: 11, clothes: 2, game: 3, grain: 5, meat: 1, hide: 1,
     wood: 20, stone: 10, tools: 4, reputation: 50, defense: 0,
@@ -60,6 +61,7 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
   assert.equal(saveLoad.saveGame(legacy), true);
   const loaded = saveLoad.loadGame();
   assert.ok(loaded);
+  assert.equal(loaded.schemaVersion, saveLoad.CURRENT_SCHEMA_VERSION);
 
   assert.equal(loaded.resources.grain, 16);
   assert.equal(loaded.resources.meat, 13);
@@ -87,6 +89,13 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
 }
 
 {
+  const source = { schemaVersion: 3, residents: [] };
+  const migrated = saveLoad.migrateToCurrent(source);
+  assert.equal(source.schemaVersion, 3, 'schema migration must not mutate its input');
+  assert.equal(migrated.schemaVersion, saveLoad.CURRENT_SCHEMA_VERSION);
+}
+
+{
   const legacy = simulation.newGame(2026071331);
   const battle = tactical.createTacticalBattle(legacy, {
     factionName: '변경 마적', power: 70, warned: true, siege: false, mode: 'garrison',
@@ -101,6 +110,8 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
   assert.equal(saveLoad.saveGame(legacy), true);
   const loaded = saveLoad.loadGame();
   assert.ok(loaded?.tacticalBattle);
+  assert.ok(loaded.tacticalBattle.initialFriendlyPower > 0);
+  assert.ok(loaded.tacticalBattle.initialEnemyPower > 0);
   assert.ok(loaded.tacticalBattle.defenderGroups.every(group => group.line === 'front' || group.line === 'rear'));
   assert.ok(loaded.tacticalBattle.defenderGroups
     .filter(group => ['militia-spear', 'militia-unarmed', 'watchman'].includes(group.kind))
@@ -111,6 +122,59 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
   assert.equal(flankers.flankPlan, 'breakthrough');
   assert.equal(flankers.flankPlanRevealed, false);
   assert.equal(flankers.rearAssault, false);
+}
+
+{
+  const partial = simulation.newGame(2026071441);
+  const battle = tactical.createTacticalBattle(partial, {
+    factionName: 'migration test', power: 40, warned: true, siege: false, mode: 'garrison',
+  });
+  delete battle.prepActions;
+  delete battle.preparationEvents;
+  delete battle.reports;
+  assert.equal(saveLoad.saveGame(partial), true);
+  const loaded = saveLoad.loadGame();
+  assert.ok(loaded?.tacticalBattle, 'missing optional tactical arrays are reconstructed');
+  assert.ok(Array.isArray(loaded.tacticalBattle.prepActions));
+  assert.ok(Array.isArray(loaded.tacticalBattle.preparationEvents));
+  assert.ok(Array.isArray(loaded.tacticalBattle.reports));
+}
+
+{
+  const corrupted = simulation.newGame(2026071442);
+  const members = corrupted.residents.slice(0, 2);
+  members.forEach(resident => { resident.job = 'militia'; resident.sick = false; resident.health = 100; });
+  corrupted.expedition = {
+    kind: 'lairAssault', targetX: 0, targetY: 0, musterX: members[0].x, musterY: members[0].y,
+    phase: 'engage', memberIds: members.map(member => member.id), x: 0, y: 0, px: 0, py: 0,
+    path: [], trail: [], speed: 1, ticks: 0,
+  };
+  corrupted.tacticalBattle = { phase: 'command', zones: 'broken', defenderGroups: [], raiderGroups: [] };
+  corrupted.tacticalBattleReport = { broken: true };
+  assert.equal(saveLoad.saveGame(corrupted), true);
+  const loaded = saveLoad.loadGame();
+  assert.ok(loaded, 'a broken tactical battle must not discard the whole save');
+  assert.equal(loaded.tacticalBattle, null);
+  assert.equal(loaded.tacticalBattleReport, null);
+  assert.ok(loaded.expedition == null || loaded.expedition.phase === 'return');
+  assert.ok(loaded.log.some(entry => entry.text.includes('전술전 데이터가 손상')));
+}
+
+{
+  const legacyReport = simulation.newGame(2026071443);
+  legacyReport.tacticalBattleReport = {
+    battleId: 77,
+    outcome: 'partialLoss',
+    factionName: '변경 마적',
+    outcomeLabel: '마을을 지켰으나 일부 피해를 입었습니다',
+  };
+  assert.equal(saveLoad.saveGame(legacyReport), true);
+  const loaded = saveLoad.loadGame();
+  assert.equal(loaded?.tacticalBattleReport?.result, 'victory');
+  assert.ok(['greatVictory', 'victory', 'narrowVictory'].includes(loaded?.tacticalBattleReport?.grade));
+  assert.ok(Number.isFinite(loaded?.tacticalBattleReport?.gradeScore));
+  assert.equal(loaded?.tacticalBattleReport?.closingSummary, '습격대가 약탈을 포기하고 물러납니다.');
+  assert.deepEqual(loaded?.tacticalBattleReport?.recoveredLoot, {});
 }
 
 console.log('resource save migration tests passed');

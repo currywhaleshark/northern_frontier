@@ -48,7 +48,7 @@ import { createExpedition, predatorExpeditionTarget } from './game/expedition';
 import { purchasePredatorIntel } from './game/predatorIntelTrade';
 import { isForeignSiteOperational } from './game/foreignSites';
 import {
-  clearWeaponAssignments, setAutomaticWeaponAllocation, setResidentWeapon, synchronizeWeaponAssignments,
+  clearWeaponAssignments, setAutomaticWeaponAllocation, setResidentWeapon,
 } from './game/weapons';
 import {
   requestHuntingRights, requestPassagePermission, scoutBanditLair, sendGiftToSite,
@@ -147,7 +147,6 @@ export default function App() {
     setWeatherAmbient(s.weather);
   });
 
-  synchronizeWeaponAssignments(stateRef.current);
   const state = stateRef.current;
 
   // 직접 지휘를 시작하면 기존 배속을 버린다. 전투 종료 뒤 10배속이

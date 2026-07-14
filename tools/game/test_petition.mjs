@@ -218,12 +218,13 @@ function prepareBuildableLandTile(state, type) {
   battles.consumeBattlePowder(state);
   assert.equal(state.resources.gunpowder, 5 - CONFIG.raid.powderPerCannon);
 
-  // 화약이 모자라면 있는 만큼만
+  // 포 1문분보다 적으면 발사하지 않고 화약을 보존한다
   state.resources.gunpowder = 0.5;
   battles.consumeBattlePowder(state);
-  assert.equal(state.resources.gunpowder, 0);
+  assert.equal(state.resources.gunpowder, 0.5);
 
   // 화약이 0이면 아무 일도 없다
+  state.resources.gunpowder = 0;
   battles.consumeBattlePowder(state);
   assert.equal(state.resources.gunpowder, 0);
 }

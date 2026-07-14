@@ -6,26 +6,30 @@ import {
   tacticalCommandDescription, tacticalCommandUnavailableReason, tacticalLootText,
   tacticalPreparationUnavailableReason,
 } from '../game/tacticalBattle';
+import { combatSpriteDescriptor, tacticalGroupCapabilities } from '../game/combatCapabilities';
 import { assaultMaxRounds } from '../game/tacticalAssault';
 import { huntMaxRounds } from '../game/tacticalHunt';
 import type {
-  DefenderGroupKind,
   GameState,
   PreparationActionId,
   TacticalAnimationEvent,
   TacticalCommandId,
   TacticalDefenderGroup,
   TacticalFormationLine,
+  TacticalRaiderGroup,
   RaiderUnitType,
   PredatorKind,
   TigerTier,
 } from '../game/types';
 import { tacticalBackgroundAsset } from '../render/tacticalBackgroundAssets';
 import {
-  TACTICAL_CHARACTER_SHEET, TACTICAL_COURT_ARMY_SHEET, TACTICAL_MILITIA_SHEET,
-  TACTICAL_RAIDER_SHEET, tacticalBeastSheet, tacticalRaiderColumn,
+  TACTICAL_COURT_POSE_SHEET, TACTICAL_DEFENDER_ROLE_POSE_SHEET,
+  TACTICAL_DEFENDER_WEAPON_POSE_SHEET, TACTICAL_RAIDER_POSE_SHEET,
+  tacticalBeastSheet, tacticalCourtMuzzleAnchor, tacticalCourtPoseCell,
+  tacticalDefenderMuzzleAnchor, tacticalDefenderPoseCell, tacticalRaiderPoseCell,
+  type TacticalMuzzleAnchor, type TacticalSpritePose,
 } from '../render/tacticalCharacterAssets';
-import { playSfx, setBattleDrums, type SfxName } from '../sound/sfx';
+import { playMeleeClash, playSfx, playWeaponSalvo, playWeaponVolley, setBattleDrums, type SfxName } from '../sound/sfx';
 
 interface Props {
   state: GameState;
@@ -79,7 +83,6 @@ const COMMAND_LABELS: Record<TacticalCommandId, string> = {
   advance: '전진',
   arson: '방화',
   blockEscape: '퇴로 차단',
-  counterattack: '반격',
   openRetreat: '자진 철수',
 };
 
@@ -110,18 +113,15 @@ function commandDescription(command: TacticalCommandId, group: TacticalDefenderG
 
 // 연출 이벤트 종류별 효과음 매핑 — camera/report처럼 소리가 없는 이벤트는 생략
 const EVENT_SFX: Partial<Record<TacticalAnimationEvent['kind'], SfxName>> = {
-  bombardment: 'wallHit',
   fortify: 'hammer',
   prepareAmbush: 'ambush',
-  readyVolley: 'hunt',
-  muster: 'raidDrum',
+  readyVolley: 'battleReady',
+  muster: 'militiaMuster',
   evacuate: 'raidDrum',
   conceal: 'hammer',
   zoneFall: 'wallHit',
-  artilleryHit: 'wallHit',
+  wallAssault: 'wallHit',
   rearAssault: 'raidHorn',
-  volley: 'volley',
-  melee: 'melee',
   ambush: 'ambush',
   casualty: 'casualty',
   wallHit: 'wallHit',
@@ -129,7 +129,6 @@ const EVENT_SFX: Partial<Record<TacticalAnimationEvent['kind'], SfxName>> = {
   loot: 'lootCrash',
   advance: 'raidDrum',
   retreat: 'raidDrum',
-  fire: 'volley',
   leaderEscape: 'raidHorn',
   escapeBlocked: 'ambush',
   beastReveal: 'hunt',
@@ -137,87 +136,119 @@ const EVENT_SFX: Partial<Record<TacticalAnimationEvent['kind'], SfxName>> = {
   beastRout: 'moraleBreak',
 };
 
-// 일제 사격 명령이 유효한 원거리 병종 — volley 이벤트 때 반동 모션을 준다
-const RANGED_KINDS = new Set<DefenderGroupKind>(['militia-bow', 'militia-musket', 'hunter']);
-const MELEE_FORMATION_KINDS = new Set<DefenderGroupKind>(['militia-spear', 'militia-unarmed', 'watchman']);
-const RANGED_FORMATION_KINDS = new Set<DefenderGroupKind>(['militia-bow', 'militia-musket', 'hunter']);
+function playTacticalEventSfx(event: TacticalAnimationEvent): void {
+  const shots = event.shots;
+  if (shots && (shots.arrows ?? 0) + (shots.muskets ?? 0) + (shots.cannons ?? 0) > 0) {
+    playWeaponSalvo(shots);
+    return;
+  }
+  if (event.kind === 'bombardment' || event.kind === 'artilleryHit') {
+    playWeaponVolley('cannon', 1);
+    return;
+  }
+  if (event.kind === 'volley') {
+    playWeaponVolley('arrow', 1);
+    playWeaponVolley('musket', 1);
+    return;
+  }
+  if (event.kind === 'fire') {
+    playWeaponVolley('arrow', 1);
+    return;
+  }
+  if (event.kind === 'melee') {
+    playMeleeClash(event.meleeParticipants ?? 2);
+    return;
+  }
+  const sfx = EVENT_SFX[event.kind];
+  if (sfx) playSfx(sfx);
+}
 
-function defenderFormationRole(kind: DefenderGroupKind): 'melee' | 'ranged' | 'civilian' {
-  if (MELEE_FORMATION_KINDS.has(kind)) return 'melee';
-  if (RANGED_FORMATION_KINDS.has(kind)) return 'ranged';
+// 일제 사격 명령이 유효한 원거리 병종 — volley 이벤트 때 반동 모션을 준다
+function defenderFormationRole(group: TacticalDefenderGroup): 'melee' | 'ranged' | 'civilian' {
+  if (group.role === 'civilian') return 'civilian';
+  if (group.weapon === 'spear' || (group.weapon == null && tacticalGroupCapabilities(group).has('melee'))) return 'melee';
+  if (tacticalGroupCapabilities(group).has('volley')) return 'ranged';
   return 'civilian';
 }
 
 function defenderFormationOrder(group: TacticalDefenderGroup): number {
-  const role = defenderFormationRole(group.kind);
+  const role = defenderFormationRole(group);
   const roleOrder = role === 'melee' ? 0 : role === 'ranged' ? 1 : 2;
   return (group.line === 'front' ? 0 : 10) + roleOrder;
 }
 
-const KIND_COLUMNS: Partial<Record<DefenderGroupKind, number>> = {
-  'militia-unarmed': 9,
-  watchman: 8,
-  hunter: 2,
-  civilian: 0,
-};
+function UnitMuzzleFlash({ anchor }: { anchor: TacticalMuzzleAnchor }) {
+  return (
+    <i
+      className={`tactical-unit-muzzle-flash ${anchor.size}`}
+      style={{ left: `${anchor.x}px`, top: `${anchor.y}px` }}
+      aria-hidden="true"
+    />
+  );
+}
 
-const WEAPON_COLUMNS: Partial<Record<DefenderGroupKind, number>> = {
-  'militia-spear': 0,
-  'militia-bow': 1,
-  'militia-musket': 2,
-};
-
-function DefenderSprite({ kind, gender, faded = false, falling = false }: {
-  kind: DefenderGroupKind;
+function DefenderSprite({ group, gender, pose = 'idle', firing = false, faded = false, falling = false }: {
+  group: TacticalDefenderGroup;
   gender: 'male' | 'female';
+  pose?: TacticalSpritePose;
+  firing?: boolean;
   faded?: boolean;
   falling?: boolean;
 }) {
-  const weaponColumn = WEAPON_COLUMNS[kind];
-  const row = gender === 'female' ? 1 : 0;
-  const isWeapon = weaponColumn != null;
-  const column = isWeapon ? weaponColumn : KIND_COLUMNS[kind] ?? 0;
-  const sheet = isWeapon ? TACTICAL_MILITIA_SHEET : TACTICAL_CHARACTER_SHEET;
-  const sheetWidth = isWeapon
-    ? TACTICAL_MILITIA_SHEET.columns * TACTICAL_MILITIA_SHEET.residentWidth
-    : TACTICAL_CHARACTER_SHEET.residentColumns * TACTICAL_CHARACTER_SHEET.residentWidth + TACTICAL_CHARACTER_SHEET.mountedWidth;
+  const descriptor = combatSpriteDescriptor(group.role, group.weapon);
+  const resolvedPose = falling ? 'hurt' : pose;
+  const cell = tacticalDefenderPoseCell(
+    group.role,
+    descriptor.source === 'weapon' ? descriptor.id : null,
+    gender,
+    resolvedPose,
+  );
+  const muzzleAnchor = firing && resolvedPose === 'attack'
+    ? tacticalDefenderMuzzleAnchor(group.weapon, gender)
+    : null;
+  const sheet = cell.sheet === 'weapons'
+    ? TACTICAL_DEFENDER_WEAPON_POSE_SHEET
+    : TACTICAL_DEFENDER_ROLE_POSE_SHEET;
   return (
     <span
-      className={`tactical-sprite tactical-defender${faded ? ' faded' : ''}${falling ? ' falling' : ''}`}
+      className={`tactical-sprite tactical-defender role-${group.role} weapon-${group.weapon ?? 'unarmed'} pose-${resolvedPose}${faded ? ' faded' : ''}${falling ? ' falling' : ''}`}
       style={{
         backgroundImage: `url(${sheet.src})`,
-        backgroundPosition: `${-column * sheet.residentWidth}px ${-row * sheet.spriteHeight}px`,
-        backgroundSize: `${sheetWidth}px ${sheet.rows * sheet.spriteHeight}px`,
+        backgroundPosition: `${-cell.column * sheet.spriteWidth}px ${-cell.row * sheet.spriteHeight}px`,
+        backgroundSize: `${sheet.columns * sheet.spriteWidth}px ${sheet.rows * sheet.spriteHeight}px`,
       }}
       aria-hidden="true"
-    />
+    >
+      {muzzleAnchor && <UnitMuzzleFlash anchor={muzzleAnchor} />}
+    </span>
   );
 }
 
-const COURT_UNIT_COLUMNS: Partial<Record<RaiderUnitType, number>> = {
-  'court-gunner': 0,
-  'court-archer': 1,
-  'court-melee': 2,
-  'court-cavalry': 3,
-  'court-artillery': 4,
-};
-
-function CourtRaiderSprite({ unitType, falling }: { unitType: RaiderUnitType; falling: boolean }) {
-  const column = COURT_UNIT_COLUMNS[unitType] ?? 0;
+function CourtRaiderSprite({ unitType, pose, firing, falling }: {
+  unitType: RaiderUnitType;
+  pose: TacticalSpritePose;
+  firing: boolean;
+  falling: boolean;
+}) {
+  const resolvedPose = falling ? 'hurt' : pose;
+  const cell = tacticalCourtPoseCell(unitType, resolvedPose);
+  const muzzleAnchor = firing && resolvedPose === 'attack' ? tacticalCourtMuzzleAnchor(unitType) : null;
   return (
     <span
-      className={`tactical-sprite tactical-court-raider unit-${unitType}${falling ? ' falling' : ''}`}
+      className={`tactical-sprite tactical-court-raider unit-${unitType} pose-${resolvedPose}${falling ? ' falling' : ''}`}
       style={{
-        backgroundImage: `url(${TACTICAL_COURT_ARMY_SHEET.src})`,
-        backgroundPosition: `${-column * TACTICAL_COURT_ARMY_SHEET.spriteWidth}px 0px`,
-        backgroundSize: `${TACTICAL_COURT_ARMY_SHEET.columns * TACTICAL_COURT_ARMY_SHEET.spriteWidth}px ${TACTICAL_COURT_ARMY_SHEET.spriteHeight}px`,
+        backgroundImage: `url(${TACTICAL_COURT_POSE_SHEET.src})`,
+        backgroundPosition: `${-cell.column * TACTICAL_COURT_POSE_SHEET.spriteWidth}px ${-cell.row * TACTICAL_COURT_POSE_SHEET.spriteHeight}px`,
+        backgroundSize: `${TACTICAL_COURT_POSE_SHEET.columns * TACTICAL_COURT_POSE_SHEET.spriteWidth}px ${TACTICAL_COURT_POSE_SHEET.rows * TACTICAL_COURT_POSE_SHEET.spriteHeight}px`,
       }}
       aria-hidden="true"
-    />
+    >
+      {muzzleAnchor && <UnitMuzzleFlash anchor={muzzleAnchor} />}
+    </span>
   );
 }
 
-type BeastPose = 'idle' | 'attack' | 'hurt' | 'wounded';
+type BeastPose = TacticalSpritePose;
 
 function BeastSprite({ kind, tigerTier, hidden, pose, falling }: {
   kind: PredatorKind;
@@ -250,7 +281,7 @@ function BeastSprite({ kind, tigerTier, hidden, pose, falling }: {
   );
 }
 
-function RaiderSprite({ faction, unitType, beastKind, tigerTier, hidden, offset, pose = 'idle', falling = false }: {
+function RaiderSprite({ faction, unitType, beastKind, tigerTier, hidden, offset, pose = 'idle', firing = false, falling = false }: {
   faction: string;
   unitType?: RaiderUnitType;
   beastKind?: PredatorKind;
@@ -258,16 +289,17 @@ function RaiderSprite({ faction, unitType, beastKind, tigerTier, hidden, offset,
   hidden: boolean;
   offset: number;
   pose?: BeastPose;
+  firing?: boolean;
   falling?: boolean;
 }) {
   if (beastKind) return (
     <BeastSprite kind={beastKind} tigerTier={tigerTier} hidden={hidden} pose={pose} falling={falling} />
   );
   if (!hidden && faction === '조정 토벌군' && unitType?.startsWith('court-')) {
-    return <CourtRaiderSprite unitType={unitType} falling={falling} />;
+    return <CourtRaiderSprite unitType={unitType} pose={pose} firing={firing} falling={falling} />;
   }
-  const column = tacticalRaiderColumn(faction);
-  if (hidden || column == null) return (
+  const cell = tacticalRaiderPoseCell(faction, falling ? 'hurt' : pose);
+  if (hidden || cell == null) return (
     <span
       className="tactical-raider-unknown"
       style={{ marginLeft: offset > 0 ? -52 : 0, marginBottom: (offset % 3) * 4 }}
@@ -276,11 +308,11 @@ function RaiderSprite({ faction, unitType, beastKind, tigerTier, hidden, offset,
   );
   return (
     <span
-      className={`tactical-sprite tactical-raider${falling ? ' falling' : ''}`}
+      className={`tactical-sprite tactical-raider pose-${falling ? 'hurt' : pose}${falling ? ' falling' : ''}`}
       style={{
-        backgroundImage: `url(${TACTICAL_RAIDER_SHEET.src})`,
-        backgroundPosition: `${-column * TACTICAL_RAIDER_SHEET.spriteWidth}px 0px`,
-        backgroundSize: `${TACTICAL_RAIDER_SHEET.columns * TACTICAL_RAIDER_SHEET.spriteWidth}px ${TACTICAL_RAIDER_SHEET.spriteHeight}px`,
+        backgroundImage: `url(${TACTICAL_RAIDER_POSE_SHEET.src})`,
+        backgroundPosition: `${-cell.column * TACTICAL_RAIDER_POSE_SHEET.spriteWidth}px ${-cell.row * TACTICAL_RAIDER_POSE_SHEET.spriteHeight}px`,
+        backgroundSize: `${TACTICAL_RAIDER_POSE_SHEET.columns * TACTICAL_RAIDER_POSE_SHEET.spriteWidth}px ${TACTICAL_RAIDER_POSE_SHEET.rows * TACTICAL_RAIDER_POSE_SHEET.spriteHeight}px`,
         marginLeft: offset > 0 ? -140 : 0,
         marginBottom: (offset % 3) * 4,
       }}
@@ -332,24 +364,29 @@ function formationSlotStyle(
 }
 
 function GroupSprites({
-  state, group, falling = 0, maxVisible = 4, showAll = false, formationGroupCount = 1,
+  state, group, pose = 'idle', firing = false, falling = 0, maxVisible = 4, showAll = false,
+  formationGroupCount = 1,
 }: {
   state: GameState;
   group: TacticalDefenderGroup;
+  pose?: TacticalSpritePose;
+  firing?: boolean;
   falling?: number; // 지금 재생 중인 피해 이벤트로 쓰러지는 인원 — 그만큼 추가로 그려 쓰러뜨린다
   maxVisible?: number;
   showAll?: boolean;
   formationGroupCount?: number;
 }) {
   const active = Math.max(0, group.count - group.wounded - group.killed);
+  const wounded = Math.max(0, Math.min(group.wounded, group.count - group.killed));
   const shown = showAll ? active : Math.min(maxVisible, active);
+  const woundedShown = showAll ? Math.min(3, wounded) : Math.min(1, wounded);
   const fallingShown = showAll ? falling : Math.min(2, falling);
   const gender = (index: number) => {
     const residentId = group.residentIds[index];
     return state.residents.find(resident => resident.id === residentId)?.gender ?? (index % 2 ? 'female' : 'male');
   };
-  if (showAll && shown + fallingShown > 0) {
-    const total = shown + fallingShown;
+  if (showAll && shown + woundedShown + fallingShown > 0) {
+    const total = shown + woundedShown + fallingShown;
     const denseFormation = formationGroupCount >= 5
       ? { spriteWidth: 58, xStep: 9, maxColumns: 3 }
       : formationGroupCount >= 4
@@ -372,19 +409,31 @@ function GroupSprites({
             )}
             key={`${group.id}-${index}`}
           >
-            <DefenderSprite kind={group.kind} gender={gender(index)} />
+            <DefenderSprite group={group} gender={gender(index)} pose={pose} firing={firing} />
           </span>
         ))}
-        {Array.from({ length: fallingShown }, (_, index) => (
+        {Array.from({ length: woundedShown }, (_, index) => (
           <span
             className="tactical-formation-slot defender-slot"
             style={formationSlotStyle(
               shown + index, total, denseFormation.spriteWidth, 120, denseFormation.xStep, 13,
               denseFormation.maxColumns,
             )}
+            key={`${group.id}-wounded-${index}`}
+          >
+            <DefenderSprite group={group} gender={gender(shown + index)} pose="wounded" faded />
+          </span>
+        ))}
+        {Array.from({ length: fallingShown }, (_, index) => (
+          <span
+            className="tactical-formation-slot defender-slot"
+            style={formationSlotStyle(
+              shown + woundedShown + index, total, denseFormation.spriteWidth, 120, denseFormation.xStep, 13,
+              denseFormation.maxColumns,
+            )}
             key={`${group.id}-fall-${index}`}
           >
-            <DefenderSprite kind={group.kind} gender={gender(shown + index)} falling />
+            <DefenderSprite group={group} gender={gender(shown + woundedShown + index)} pose="hurt" falling />
           </span>
         ))}
       </div>
@@ -393,13 +442,28 @@ function GroupSprites({
   return (
     <div className={`tactical-unit-line${showAll ? ' full-formation' : ''}`} aria-label={`${group.label} ${active}명 전투 가능`}>
       {Array.from({ length: shown }, (_, index) => (
-        <DefenderSprite key={`${group.id}-${index}`} kind={group.kind} gender={gender(index)} />
+        <DefenderSprite key={`${group.id}-${index}`} group={group} gender={gender(index)} pose={pose} firing={firing} />
+      ))}
+      {Array.from({ length: woundedShown }, (_, index) => (
+        <DefenderSprite
+          key={`${group.id}-wounded-${index}`}
+          group={group}
+          gender={gender(shown + index)}
+          pose="wounded"
+          faded
+        />
       ))}
       {Array.from({ length: fallingShown }, (_, index) => (
-        <DefenderSprite key={`${group.id}-fall-${index}`} kind={group.kind} gender={gender(shown + index)} falling />
+        <DefenderSprite
+          key={`${group.id}-fall-${index}`}
+          group={group}
+          gender={gender(shown + woundedShown + index)}
+          pose="hurt"
+          falling
+        />
       ))}
       {active > shown && <span className="tactical-unit-more">+{active - shown}</span>}
-      {active === 0 && fallingShown === 0 && <span className="tactical-unit-none">전투 불능</span>}
+      {active === 0 && woundedShown === 0 && fallingShown === 0 && <span className="tactical-unit-none">전투 불능</span>}
     </div>
   );
 }
@@ -425,6 +489,96 @@ function zoneEffects(zoneId: string, battle: NonNullable<GameState['tacticalBatt
 function eventClass(event: TacticalAnimationEvent | null, zoneId: string): string {
   if (!event || event.zoneId !== zoneId) return '';
   return ` event-${event.kind}`;
+}
+
+function defenderPoseForEvent(
+  event: TacticalAnimationEvent | null,
+  group: TacticalDefenderGroup,
+): TacticalSpritePose {
+  if (!event || event.zoneId !== group.zoneId) return 'idle';
+  if (event.kind === 'casualty' && event.groupId === group.id) return 'hurt';
+  if ((event.kind === 'wallHit' || event.kind === 'zoneFall' || event.kind === 'artilleryHit' ||
+      event.kind === 'beastAmbush') && event.side === 'defender') return 'hurt';
+  const capabilities = tacticalGroupCapabilities(group);
+  if (defenderFiringForEvent(event, group)) return 'attack';
+  if (event.kind === 'ambush' && event.side !== 'raider' && capabilities.has('ambush')) return 'attack';
+  if (event.kind === 'melee' && event.side !== 'raider' && capabilities.has('melee')) return 'attack';
+  if (event.kind === 'escapeBlocked' && group.role === 'hunter') return 'attack';
+  return 'idle';
+}
+
+function defenderFiringForEvent(
+  event: TacticalAnimationEvent | null,
+  group: TacticalDefenderGroup,
+): boolean {
+  if (!event || event.zoneId !== group.zoneId || event.side === 'raider') return false;
+  if (event.kind !== 'volley' && event.kind !== 'fire') return false;
+  if (!tacticalGroupCapabilities(group).has('volley')) return false;
+  if (event.kind === 'volley' && group.command != null && group.command !== 'volley') return false;
+  if (event.kind === 'fire' && group.command != null && group.command !== 'arson') return false;
+  if (!event.shots) return true;
+  return group.weapon === 'musket'
+    ? event.kind === 'volley' && (event.shots.muskets ?? 0) > 0
+    : (event.shots.arrows ?? 0) > 0;
+}
+
+function raiderShotKind(group: TacticalRaiderGroup): 'arrow' | 'musket' | 'cannon' | null {
+  if (group.unitType === 'court-gunner') return 'musket';
+  if (group.unitType === 'court-artillery') return 'cannon';
+  if (group.unitType === 'nimacha-hunter' || group.unitType === 'holaon-horse-archer' ||
+      group.unitType === 'bandit-rider' || group.unitType === 'court-archer') return 'arrow';
+  return null;
+}
+
+function raiderPoseForEvent(
+  event: TacticalAnimationEvent | null,
+  group: TacticalRaiderGroup,
+): TacticalSpritePose {
+  if (!event || event.zoneId !== group.zoneId) return 'idle';
+  if (event.kind === 'casualty' && event.groupId === group.id) return 'hurt';
+  if (event.kind === 'ambush' && event.side === 'raider' &&
+      (event.groupId == null || event.groupId === group.id)) return 'hurt';
+  if (event.kind === 'rearAssault' && event.groupId === group.id) return 'attack';
+  if (event.kind === 'wallAssault' && event.groupId === group.id) return 'attack';
+  if (raiderFiringForEvent(event, group)) return 'attack';
+  if (event.kind === 'melee' && event.side === 'raider' &&
+      (event.groupId == null || event.groupId === group.id)) return 'attack';
+  if (event.kind === 'melee' && event.side == null) return 'attack';
+  if (event.kind === 'advance' && event.side !== 'defender') return 'attack';
+  if (event.kind === 'leaderEscape' && event.groupId === group.id) return 'attack';
+  return 'idle';
+}
+
+function raiderFiringForEvent(
+  event: TacticalAnimationEvent | null,
+  group: TacticalRaiderGroup,
+): boolean {
+  if (!event || event.zoneId !== group.zoneId) return false;
+  const shotKind = raiderShotKind(group);
+  if (event.kind === 'artilleryHit') {
+    return shotKind === 'cannon' && (!event.shots || (event.shots.cannons ?? 0) > 0);
+  }
+  if (event.kind !== 'volley' || event.side !== 'raider' || shotKind == null) return false;
+  if (!event.shots) return true;
+  if (shotKind === 'arrow') return (event.shots.arrows ?? 0) > 0;
+  if (shotKind === 'musket') return (event.shots.muskets ?? 0) > 0;
+  return (event.shots.cannons ?? 0) > 0;
+}
+
+function arrowProjectileCountForZone(
+  event: TacticalAnimationEvent | null,
+  defenders: TacticalDefenderGroup[],
+  raiders: TacticalRaiderGroup[],
+): number {
+  if (!event || (event.kind !== 'volley' && event.kind !== 'fire')) return 0;
+  const requestedArrows = Math.max(0, Math.floor(event.shots?.arrows ?? (event.shots ? 0 : 1)));
+  if (requestedArrows === 0) return 0;
+  const hasArrowShooter = event.side === 'raider'
+    ? raiders.some(group => group.count - group.killed > 0 && group.revealed &&
+      raiderShotKind(group) === 'arrow' && raiderFiringForEvent(event, group))
+    : defenders.some(group => group.count - group.wounded - group.killed > 0 &&
+      group.weapon !== 'musket' && defenderFiringForEvent(event, group));
+  return hasArrowShooter ? Math.min(12, requestedArrows) : 0;
 }
 
 // 자막 타자기 효과 — 텍스트가 바뀔 때마다 한 글자씩 드러난다. 배속 중에는 즉시 표시.
@@ -491,6 +645,11 @@ export function TacticalBattleScreen({
   const activeZoneId = activeEvent?.zoneId ?? viewedZoneId;
 
   useEffect(() => {
+    if (!battle) return;
+    playSfx('raidHorn');
+  }, [battle?.id]);
+
+  useEffect(() => {
     if (!battle || battle.phase !== 'preparationExecution') return;
     let cancelled = false;
     let timer = 0;
@@ -504,8 +663,7 @@ export function TacticalBattleScreen({
         return;
       }
       setEventIndex(index);
-      const sfx = EVENT_SFX[events[index].kind];
-      if (sfx) playSfx(sfx);
+      playTacticalEventSfx(events[index]);
       const duration = fastRef.current ? Math.min(180, events[index].durationMs) : events[index].durationMs;
       timer = window.setTimeout(() => play(index + 1), duration);
     };
@@ -537,8 +695,7 @@ export function TacticalBattleScreen({
         return;
       }
       setEventIndex(index);
-      const sfx = EVENT_SFX[events[index].kind];
-      if (sfx) playSfx(sfx);
+      playTacticalEventSfx(events[index]);
       // 배속 중에도 마지막(결과) 이벤트는 온전한 길이로 보여준다
       const duration = fastRef.current && index < events.length - 1
         ? Math.min(150, events[index].durationMs)
@@ -654,7 +811,7 @@ export function TacticalBattleScreen({
 
   return (
     <div className="tactical-overlay" role="dialog" aria-modal="true" aria-label={`${displayedFactionName} ${hunt ? '사냥' : assault ? '토벌' : '습격'} 직접 지휘`}>
-      <div className={`tactical-screen${assault ? ' assault' : ' defense'}${hunt ? ' hunt' : ''}${activeEvent?.kind === 'wallHit' || activeEvent?.kind === 'bombardment' || activeEvent?.kind === 'zoneFall' || activeEvent?.kind === 'artilleryHit' || activeEvent?.kind === 'beastAmbush' ? ' shaking' : ''}`}>
+      <div className={`tactical-screen${assault ? ' assault' : ' defense'}${hunt ? ' hunt' : ''}${activeEvent?.kind === 'wallAssault' || activeEvent?.kind === 'wallHit' || activeEvent?.kind === 'bombardment' || activeEvent?.kind === 'zoneFall' || activeEvent?.kind === 'artilleryHit' || activeEvent?.kind === 'beastAmbush' ? ' shaking' : ''}`}>
         <header className="tactical-header">
           <div>
             <div className="tactical-kicker">{hunt ? '맹수 몰이사냥 지휘' : assault ? '산채 토벌 지휘' : '습격 방어 지휘'}</div>
@@ -707,10 +864,12 @@ export function TacticalBattleScreen({
               const zoneVolley = activeEvent?.kind === 'volley' && activeEvent.zoneId === zone.id;
               const zoneArson = activeEvent?.kind === 'fire' && activeEvent.zoneId === zone.id;
               const zoneBombardment = activeEvent?.kind === 'bombardment' && activeEvent.zoneId === zone.id;
+              const arrowProjectileCount = arrowProjectileCountForZone(activeEvent, defenders, raiders);
+              const projectileMovesRight = assault
+                ? activeEvent?.side !== 'raider'
+                : activeEvent?.side === 'raider';
               const zoneBurning = burningZoneIds.has(zone.id);
               const background = tacticalBackgroundAsset(zone.kind, season, battle.assaultKind, zone.order);
-              const musketsFiring = zoneVolley && defenders.some(group =>
-                group.kind === 'militia-musket' && group.count - group.wounded - group.killed > 0);
               const scars = Math.min(9, zoneScarCounts[zone.id] ?? 0);
               const liveBreachEventIndex = battle.phase === 'simulating'
                 ? battle.pendingReport?.events.findIndex(item =>
@@ -768,35 +927,27 @@ export function TacticalBattleScreen({
                       )}
                     </div>
                   )}
-                  {zoneArson && (
+                  {zoneArson && arrowProjectileCount > 0 && (
                     <div className="tactical-fx-layer arson" key={`arson-${eventIndex}`} aria-hidden="true">
-                      {Array.from({ length: 6 }, (_, index) => (
+                      {Array.from({ length: arrowProjectileCount }, (_, index) => (
                         <span
                           key={index}
-                          className="fx-arrow fx-fire-arrow"
+                          className={`fx-arrow fx-fire-arrow moves-${projectileMovesRight ? 'right' : 'left'}`}
                           style={{ animationDelay: `${index * 55}ms`, bottom: `${164 + (index * 19) % 68}px` }}
                         />
                       ))}
-                      <span className="fx-fire-impact" />
+                      <span className={`fx-fire-impact moves-${projectileMovesRight ? 'right' : 'left'}`} />
                     </div>
                   )}
-                  {zoneVolley && (
+                  {zoneVolley && arrowProjectileCount > 0 && (
                     <div className="tactical-fx-layer" key={`fx-${eventIndex}`} aria-hidden="true">
-                      {Array.from({ length: 5 }, (_, index) => (
+                      {Array.from({ length: arrowProjectileCount }, (_, index) => (
                         <span
                           key={index}
-                          className="fx-arrow"
+                          className={`fx-arrow moves-${projectileMovesRight ? 'right' : 'left'}`}
                           style={{ animationDelay: `${index * 60}ms`, bottom: `${168 + (index * 23) % 60}px` }}
                         />
                       ))}
-                      {musketsFiring && (
-                        <>
-                          <span className="fx-muzzle-flash" />
-                          <span className="fx-smoke" style={{ left: assault ? '44%' : '52%' }} />
-                          <span className="fx-smoke" style={{ left: assault ? '39%' : '57%', animationDelay: '130ms' }} />
-                          <span className="fx-smoke" style={{ left: assault ? '42%' : '54%', animationDelay: '270ms' }} />
-                        </>
-                      )}
                     </div>
                   )}
                   {zoneBombardment && (
@@ -821,7 +972,7 @@ export function TacticalBattleScreen({
                   )}
                   {zone.kind === 'wall' && (
                     <div
-                      className={`tactical-barricade ${barricadeState}${assault ? ' enemy-held' : ' village-held'}${activeEvent?.kind === 'wallHit' && activeEvent.zoneId === zone.id ? ' breaking' : ''}${activeEvent?.kind === 'fortify' && activeEvent.zoneId === zone.id ? ' fortifying' : ''}${activeEvent?.kind === 'artilleryHit' && activeEvent.zoneId === zone.id ? ' bombarded' : ''}`}
+                      className={`tactical-barricade ${barricadeState}${assault ? ' enemy-held' : ' village-held'}${activeEvent?.kind === 'wallAssault' && activeEvent.zoneId === zone.id ? ' under-attack' : ''}${activeEvent?.kind === 'wallHit' && activeEvent.zoneId === zone.id ? ' breaking' : ''}${activeEvent?.kind === 'fortify' && activeEvent.zoneId === zone.id ? ' fortifying' : ''}${activeEvent?.kind === 'artilleryHit' && activeEvent.zoneId === zone.id ? ' bombarded' : ''}`}
                       aria-label={visibleBreached ? '파괴된 방책' : assault ? '마적이 지키는 산채 목책' : barricadeReinforced ? '강화된 방책' : '일반 방책'}
                     >
                       <img src={BARRICADE_SPRITES[barricadeState]} alt="" aria-hidden="true" />
@@ -847,6 +998,7 @@ export function TacticalBattleScreen({
                         : activeEvent?.kind === 'beastAmbush' && activeEvent.zoneId === zone.id
                           ? 'attack'
                           : hunt && battle.huntPredatorState === 'wounded' ? 'wounded' : 'idle';
+                      const raiderPose = raider.beastKind ? beastPose : raiderPoseForEvent(activeEvent, raider);
                       return (
                         <div
                           className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${leaderMotion}`}
@@ -863,7 +1015,7 @@ export function TacticalBattleScreen({
                                 style={formationSlotStyle(spriteIndex, totalRaiders, 168, 120, 22, 14, 5)}
                                 key={`${raider.id}-${spriteIndex}`}
                               >
-                                <RaiderSprite faction={battle.factionName} unitType={raider.unitType} beastKind={raider.beastKind} tigerTier={raider.tigerTier} hidden={!raider.revealed} offset={0} pose={beastPose} />
+                                <RaiderSprite faction={battle.factionName} unitType={raider.unitType} beastKind={raider.beastKind} tigerTier={raider.tigerTier} hidden={!raider.revealed} offset={0} pose={raiderPose} firing={raiderFiringForEvent(activeEvent, raider)} />
                               </span>
                             ))}
                             {Array.from({ length: fallingRaiders }, (_, casualtyIndex) => (
@@ -884,7 +1036,7 @@ export function TacticalBattleScreen({
                       );
                     })}
                   </div>
-                  <div className={`tactical-rear-assault-rank${activeEvent?.kind === 'rearAssault' && activeEvent.zoneId === zone.id ? ' entering' : ''}`}>
+                  <div className={`tactical-rear-assault-rank${activeEvent?.kind === 'rearAssault' && activeEvent.zoneId === zone.id ? ' entering' : ''}${activeEvent?.kind === 'melee' && activeEvent.side === 'raider' && activeEvent.zoneId === zone.id && rearAssaulters.some(group => activeEvent.groupId == null || activeEvent.groupId === group.id) ? ' attacking' : ''}`}>
                     {rearAssaulters.map(raider => {
                       const activeRaiders = Math.max(0, raider.count - raider.killed);
                       const fallingRaiders = activeEvent?.kind === 'casualty' && activeEvent.groupId === raider.id
@@ -904,7 +1056,7 @@ export function TacticalBattleScreen({
                                 style={formationSlotStyle(spriteIndex, totalRaiders, 132, 100, 20, 13, 5)}
                                 key={`${raider.id}-rear-${spriteIndex}`}
                               >
-                                <RaiderSprite faction={battle.factionName} unitType={raider.unitType} hidden={false} offset={0} />
+                                <RaiderSprite faction={battle.factionName} unitType={raider.unitType} hidden={false} offset={0} pose={raiderPoseForEvent(activeEvent, raider)} />
                               </span>
                             ))}
                             {Array.from({ length: fallingRaiders }, (_, casualtyIndex) => (
@@ -913,7 +1065,7 @@ export function TacticalBattleScreen({
                                 style={formationSlotStyle(activeRaiders + casualtyIndex, totalRaiders, 132, 100, 20, 13, 5)}
                                 key={`${raider.id}-rear-fall-${eventIndex}-${casualtyIndex}`}
                               >
-                                <RaiderSprite faction={battle.factionName} unitType={raider.unitType} hidden={false} offset={0} falling />
+                                <RaiderSprite faction={battle.factionName} unitType={raider.unitType} hidden={false} offset={0} pose="hurt" falling />
                               </span>
                             ))}
                           </div>
@@ -925,22 +1077,24 @@ export function TacticalBattleScreen({
                   <div className="tactical-defender-rank">
                     {defenders.map(group => {
                       // volley 순간 사격 병종은 반동 모션 — key를 바꿔 애니메이션을 다시 튼다
-                      const recoiling = zoneVolley && RANGED_KINDS.has(group.kind);
+                      const recoiling = zoneVolley && defenderFiringForEvent(activeEvent, group);
                       const blockingEscape = activeEvent?.kind === 'escapeBlocked' &&
                         activeEvent.zoneId === zone.id && group.kind === 'hunter';
-                      const prepMotion = activeEvent?.kind === 'readyVolley' && activeEvent.zoneId === zone.id && RANGED_KINDS.has(group.kind)
+                      const prepMotion = activeEvent?.kind === 'readyVolley' && activeEvent.zoneId === zone.id && tacticalGroupCapabilities(group).has('volley')
                         ? ' prep-readyVolley'
                         : activeEvent?.groupId === group.id && activeEvent.zoneId === zone.id
                           ? ` prep-${activeEvent.kind}`
                           : '';
                       return (
                         <div
-                          className={`tactical-field-group formation-${defenderFormationRole(group.kind)} line-${group.line}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${prepMotion}`}
+                          className={`tactical-field-group formation-${defenderFormationRole(group)} line-${group.line}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${prepMotion}`}
                           key={recoiling || blockingEscape || prepMotion ? `${group.id}-motion-${eventIndex}` : group.id}
                         >
                           <GroupSprites
                             state={state}
                             group={group}
+                            pose={defenderPoseForEvent(activeEvent, group)}
+                            firing={recoiling}
                             showAll
                             formationGroupCount={defenders.length + (rearAssaulters.length > 0 ? 2 : 0)}
                             falling={activeEvent?.kind === 'casualty' && activeEvent.groupId === group.id ? activeEvent.casualties ?? 0 : 0}
@@ -1140,18 +1294,21 @@ export function TacticalBattleScreen({
                     </div>
                   </div>
                   <div className="tactical-command-grid">
-                    {COMMANDS
-                      .filter(command => tacticalCommandUnavailableReason(battle, selectedGroup, command) == null)
-                      .map(command => (
+                    {COMMANDS.map(command => {
+                      const unavailableReason = tacticalCommandUnavailableReason(battle, selectedGroup, command);
+                      return (
                         <button
                           key={command}
                           className={selectedGroup.command === command ? 'active' : ''}
+                          disabled={unavailableReason != null}
+                          title={unavailableReason ?? commandDescription(command, selectedGroup, hunt)}
                           onClick={() => onSetCommand(selectedGroup.id, command)}
                         >
-                          <strong>{commandLabel(command, selectedGroup, hunt)}</strong>
-                          <span>{commandDescription(command, selectedGroup, hunt)}</span>
+                          <strong>{commandLabel(command, selectedGroup, hunt)}{unavailableReason ? ' — 사용 불가' : ''}</strong>
+                          <span>{unavailableReason ?? commandDescription(command, selectedGroup, hunt)}</span>
                         </button>
-                      ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>

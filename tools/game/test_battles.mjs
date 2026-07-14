@@ -312,6 +312,12 @@ assert.equal(
   const TRIALS = 300;
   let wins = 0;
   for (let i = 0; i < TRIALS; i++) {
+    for (const resident of state.residents) {
+      resident.alive = true;
+      resident.sick = false;
+      resident.health = 100;
+      resident.quarantinedUntil = 0;
+    }
     state.weather = 'clear';
     state.resources.reputation = 50;
     state.raiders = {
@@ -350,6 +356,12 @@ assert.equal(
   const TRIALS = 300;
   let wins = 0;
   for (let i = 0; i < TRIALS; i++) {
+    for (const resident of state.residents) {
+      resident.alive = true;
+      resident.sick = false;
+      resident.health = 100;
+      resident.quarantinedUntil = 0;
+    }
     state.weather = 'clear';
     state.resources.reputation = 50;
     state.raiders = {

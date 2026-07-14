@@ -5,10 +5,10 @@ import { addForeignSiteMemory, isForeignSiteOperational } from './foreignSites';
 import { changeRelation, getRelation } from './relations';
 import { revealPassageRoute } from './passage';
 import { livingResidents } from './residents';
+import { createCombatRoster } from './combatRoster';
 import {
-  consumeExpeditionPowder, expeditionCombatPower, expeditionResidentsForIds,
+  consumeExpeditionPowder,
 } from './expedition';
-import { weaponCountsForResidents } from './weapons';
 import type { ForeignSite, GameState, ResourceId } from './types';
 
 export type SiteGiftType = 'grain' | 'hide' | 'tools';
@@ -256,8 +256,9 @@ export function resolveBanditLairAssault(
   if (!site || site.type !== 'banditLair') return '정주 부락은 공격 대상이 아닙니다.';
   if (!site.discovered) return '위치를 확인한 산채만 토벌할 수 있습니다.';
   if (!isForeignSiteOperational(site)) return '이미 비어 있거나 불탄 산채입니다.';
-  const members = expeditionResidentsForIds(state, memberIds).filter(resident =>
-    resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter');
+  const memberSnapshots = createCombatRoster(state, { context: 'expedition', memberIds }).combatants;
+  const memberSet = new Set(memberSnapshots.map(member => member.residentId));
+  const members = state.residents.filter(resident => memberSet.has(resident.id));
   if (members.length < 2) return '교전할 수 있는 토벌대원이 부족합니다.';
   const ids = members.map(resident => resident.id);
   const chance = banditLairRaidChance(state, siteId, ids);
@@ -285,10 +286,8 @@ export function resolveBanditLairAssault(
 
 export function raidBanditLair(state: GameState, siteId: number, rng: () => number): string | null {
   if (state.battle || state.raiders) return '습격에 대응 중에는 산채 토벌대를 보낼 수 없습니다.';
-  const team = fieldTeam(state);
-  const combatants = team.available.filter(resident =>
-    resident.job === 'hunter' || resident.job === 'watchman' || resident.job === 'militia');
-  const result = resolveBanditLairAssault(state, siteId, combatants.map(resident => resident.id), rng);
+  const combatants = createCombatRoster(state, { context: 'villageDefense' }).combatants;
+  const result = resolveBanditLairAssault(state, siteId, combatants.map(resident => resident.residentId), rng);
   return typeof result === 'string' ? result : null;
 }
 
@@ -299,15 +298,17 @@ export function banditLairRaidChance(
 ): number {
   const site = getSite(state, siteId);
   if (!site || site.type !== 'banditLair' || !site.discovered || !isForeignSiteOperational(site)) return 0;
-  const team = fieldTeam(state, memberIds);
-  const combatants = team.available.filter(resident =>
-    resident.job === 'hunter' || resident.job === 'watchman' || resident.job === 'militia');
-  const weapons = weaponCountsForResidents(state, combatants);
-  const militia = combatants.filter(resident => resident.job === 'militia').length;
-  const watchmen = combatants.filter(resident => resident.job === 'watchman').length;
-  const hunters = combatants.filter(resident => resident.job === 'hunter').length;
-  const power = expeditionCombatPower(state, combatants.map(resident => resident.id));
+  const combatants = memberIds
+    ? createCombatRoster(state, { context: 'expedition', memberIds }).combatants
+    : createCombatRoster(state, { context: 'villageDefense' }).combatants;
+  const militia = combatants.filter(resident => resident.role === 'militia').length;
+  const watchmen = combatants.filter(resident => resident.role === 'watchman').length;
+  const hunters = combatants.filter(resident => resident.role === 'hunter').length;
+  const power = combatants.reduce((sum, resident) => sum + resident.basePower + resident.weaponPower, 0);
+  const readyMuskets = combatants.filter(resident => resident.readyWeapon === 'musket').length;
+  const bowsAndSpears = combatants.filter(resident =>
+    resident.readyWeapon === 'hornBow' || resident.readyWeapon === 'spear').length;
   return Math.max(0.1, Math.min(0.9,
     0.18 + power / 240 + militia * 0.07 + watchmen * 0.045 + hunters * 0.04 +
-    weapons.readyMuskets * 0.08 + (weapons.hornBows + weapons.spears) * 0.018 - site.militaryPower / 180));
+    readyMuskets * 0.08 + bowsAndSpears * 0.018 - site.militaryPower / 180));
 }

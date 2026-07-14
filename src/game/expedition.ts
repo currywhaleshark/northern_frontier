@@ -1,8 +1,8 @@
 import { findPath, isTerrainPassable, resetAgent } from './agents';
 import { CONFIG } from './config';
 import { addLog } from './events';
-import { activePredatorScoutIds } from './expeditionIntel';
-import { residentDefenseContribution, weaponCountsForResidents } from './weapons';
+import { createCombatRoster, isCombatReadyResident } from './combatRoster';
+import { consumeMusketPowder, reconcileWeaponAssignments } from './weapons';
 import type {
   Expedition, ExpeditionKind, GameState, PredatorKind, Resident, ResourceId,
 } from './types';
@@ -31,9 +31,7 @@ export function isExpeditionMember(state: GameState, residentId: number): boolea
 }
 
 function expeditionEligible(state: GameState, resident: Resident): boolean {
-  return resident.alive && !resident.sick && resident.health >= 20 &&
-    state.day >= (resident.quarantinedUntil ?? 0) &&
-    !activePredatorScoutIds(state).has(resident.id) &&
+  return isCombatReadyResident(state, resident, 'expedition', new Set([resident.id])) &&
     (resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter');
 }
 
@@ -47,11 +45,8 @@ export function availableExpeditionResidents(state: GameState): Resident[] {
 }
 
 export function expeditionCombatPower(state: GameState, memberIds: Iterable<number>): number {
-  const ids = new Set(memberIds);
-  return state.residents.reduce((total, resident) => {
-    if (!ids.has(resident.id) || !expeditionEligible(state, resident)) return total;
-    return total + residentDefenseContribution(state, resident, state.weaponAssignments[resident.id] ?? null);
-  }, 0);
+  return createCombatRoster(state, { context: 'expedition', memberIds }).combatants
+    .reduce((total, combatant) => total + combatant.basePower + combatant.weaponPower, 0);
 }
 
 export function expeditionResidentsForIds(state: GameState, memberIds: Iterable<number>): Resident[] {
@@ -60,12 +55,11 @@ export function expeditionResidentsForIds(state: GameState, memberIds: Iterable<
 }
 
 export function consumeExpeditionPowder(state: GameState, memberIds: Iterable<number>): number {
-  const members = expeditionResidentsForIds(state, memberIds);
-  const muskets = weaponCountsForResidents(state, members).muskets;
-  const need = muskets * CONFIG.raid.powderPerMusket;
-  const used = Math.min(state.resources.gunpowder, need);
+  const musketIds = createCombatRoster(state, { context: 'expedition', memberIds }).combatants
+    .filter(combatant => combatant.assignedWeapon === 'musket')
+    .map(combatant => combatant.residentId);
+  const used = consumeMusketPowder(state, musketIds, CONFIG.raid.powderPerMusket);
   if (used <= 0) return 0;
-  state.resources.gunpowder = Math.max(0, state.resources.gunpowder - used);
   addLog(state, `토벌대의 조총 사격이 울립니다. (화약 -${used.toFixed(1)})`, 'raid');
   return used;
 }
@@ -160,6 +154,7 @@ export function createExpedition(state: GameState, input: CreateExpeditionInput)
   if (!muster) return '토벌대가 집결할 마을 중심지를 찾을 수 없습니다.';
   const marchPath = routeTo(state, muster.x, muster.y, input.targetX, input.targetY);
   if (!marchPath) return '목표 지점까지 이동할 길을 찾을 수 없습니다.';
+  reconcileWeaponAssignments(state);
 
   const expedition: Expedition = {
     kind: input.kind,

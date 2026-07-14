@@ -147,6 +147,10 @@ function finishBattle(state) {
   assert.equal(tactical.acknowledgeTacticalReport(state), null);
   assert.equal(state.tacticalBattle.phase, 'finished');
   tactical.finishTacticalBattle(state);
+  assert.equal(state.tacticalBattleReport?.encounterKind, 'predatorHunt');
+  assert.equal(state.tacticalBattleReport?.title, '사냥 장계');
+  assert.ok(state.tacticalBattleReport?.resourceDelta);
+  assert.equal(state.expedition?.phase, 'return');
 }
 
 {
@@ -194,6 +198,9 @@ function finishBattle(state) {
   assert.equal(tactical.resolveTacticalRound(state), null);
   const ambush = battle.pendingReport.events.find(event => event.kind === 'beastAmbush');
   assert.ok(ambush?.groupId, 'a tiger ambush targets one specific group');
+  assert.ok(battle.pendingReport.events.some(event =>
+    event.kind === 'melee' && (event.meleeParticipants ?? 0) > 0),
+  'revealed predator engagements expose their melee participant count');
   assert.ok(battle.pendingReport.events
     .filter(event => event.kind === 'casualty' && event.side === 'defender')
     .every(event => event.groupId === ambush.groupId));

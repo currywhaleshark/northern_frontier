@@ -118,6 +118,10 @@ function finishPendingBattle(state) {
   assert.equal(tactical.acknowledgeTacticalReport(state), null);
   assert.equal(state.tacticalBattle.phase, 'finished');
   tactical.finishTacticalBattle(state);
+  assert.equal(state.tacticalBattleReport?.encounterKind, 'banditLair');
+  assert.equal(state.tacticalBattleReport?.title, '토벌 장계');
+  assert.ok(state.tacticalBattleReport?.resourceDelta);
+  assert.equal(state.expedition?.phase, 'return');
 }
 
 {
@@ -161,8 +165,11 @@ function finishPendingBattle(state) {
   battle.currentZoneId = 'lairWall';
   battle.defenderGroups.forEach(group => { group.zoneId = 'lairWall'; });
   assert.equal(tactical.setTacticalCommand(state, hunter.id, 'arson'), null);
+  assert.equal(tactical.setTacticalCommand(state, melee.id, 'charge'), null);
   assert.equal(tactical.resolveTacticalRound(state), null);
   assert.ok(battle.pendingReport.events.some(event => event.kind === 'fire' && event.zoneId === 'lairWall'));
+  assert.ok(battle.pendingReport.events.some(event =>
+    event.kind === 'melee' && (event.meleeParticipants ?? 0) >= melee.count));
   assert.equal(battle.assaultFireDamage, 1);
 }
 

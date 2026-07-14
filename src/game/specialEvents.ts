@@ -9,7 +9,7 @@ import {
 import { makeRng } from './map';
 import { killResident, livingResidents } from './residents';
 import { getSeason, getYear } from './seasons';
-import { weaponCountsForResidents } from './weapons';
+import { createCombatRoster } from './combatRoster';
 import type {
   Building,
   EpidemicState,
@@ -119,21 +119,16 @@ function standingFarms(state: GameState): Building[] {
 }
 
 function weaponReadiness(state: GameState, memberIds?: Iterable<number>) {
-  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
-  const selected = memberIds ? new Set(memberIds) : null;
-  const available = livingResidents(state).filter(resident =>
-    (selected ? selected.has(resident.id) : !away.has(resident.id)) &&
-    !resident.sick && resident.health >= 20 && state.day >= (resident.quarantinedUntil ?? 0));
-  const hunters = available.filter(resident => resident.job === 'hunter').length;
-  const militia = available.filter(resident => resident.job === 'militia').length;
-  const watchmen = available.filter(resident => resident.job === 'watchman').length;
+  const combatants = memberIds
+    ? createCombatRoster(state, { context: 'expedition', memberIds }).combatants
+    : createCombatRoster(state, { context: 'villageDefense' }).combatants;
+  const hunters = combatants.filter(resident => resident.role === 'hunter').length;
+  const militia = combatants.filter(resident => resident.role === 'militia').length;
+  const watchmen = combatants.filter(resident => resident.role === 'watchman').length;
   const team = hunters + militia + watchmen;
-  const combatants = available.filter(resident =>
-    resident.job === 'hunter' || resident.job === 'militia' || resident.job === 'watchman');
-  const weapons = weaponCountsForResidents(state, combatants);
-  const bows = weapons.hornBows;
-  const spears = weapons.spears;
-  const muskets = weapons.readyMuskets;
+  const bows = combatants.filter(resident => resident.readyWeapon === 'hornBow').length;
+  const spears = combatants.filter(resident => resident.readyWeapon === 'spear').length;
+  const muskets = combatants.filter(resident => resident.readyWeapon === 'musket').length;
   return { hunters, militia, watchmen, team, bows, spears, muskets };
 }
 
@@ -585,7 +580,9 @@ export function resolveWildlifeHunt(
   rng: () => number,
 ): WildlifeHuntResult | string {
   ensureIncidentState(state);
-  const members = expeditionResidentsForIds(state, memberIds);
+  const readyIds = new Set(createCombatRoster(state, { context: 'expedition', memberIds }).combatants
+    .map(member => member.residentId));
+  const members = expeditionResidentsForIds(state, readyIds);
   if (members.length === 0) return '토벌에 나설 주민이 없습니다.';
   const ids = members.map(resident => resident.id);
   const chance = predatorHuntChance(state, kind, ids);

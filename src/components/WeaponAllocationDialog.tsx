@@ -1,7 +1,10 @@
 import { JOB_NAMES } from '../game/constants';
 import {
-  COMBAT_WEAPON_IDS, COMBAT_WEAPON_NAMES, residentDefenseContribution, weaponStock,
+  COMBAT_WEAPON_IDS, COMBAT_WEAPON_NAMES, musketReadiness, residentDefenseContribution,
+  resolvedWeaponAssignments, weaponStock,
 } from '../game/weapons';
+import { createCombatRoster } from '../game/combatRoster';
+import { CONFIG } from '../game/config';
 import type { CombatWeaponId, GameState } from '../game/types';
 
 interface Props {
@@ -13,6 +16,9 @@ interface Props {
 }
 
 export function WeaponAllocationDialog({ state, onAssign, onAutoAssign, onClear, onClose }: Props) {
+  const assignments = resolvedWeaponAssignments(state);
+  const snapshots = new Map(createCombatRoster(state, { context: 'villageDefense' }).combatants
+    .map(snapshot => [snapshot.residentId, snapshot]));
   const residents = state.residents
     .filter(resident => resident.alive &&
       (resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter'))
@@ -22,7 +28,7 @@ export function WeaponAllocationDialog({ state, onAssign, onAutoAssign, onClear,
     });
   const used: Record<CombatWeaponId, number> = { musket: 0, hornBow: 0, spear: 0 };
   for (const resident of residents) {
-    const weapon = state.weaponAssignments[resident.id];
+    const weapon = assignments[resident.id];
     if (weapon) used[weapon] += 1;
   }
 
@@ -46,9 +52,14 @@ export function WeaponAllocationDialog({ state, onAssign, onAutoAssign, onClear,
             <div key={weapon} className="weapon-stock-card">
               <strong>{COMBAT_WEAPON_NAMES[weapon]}</strong>
               <span>{used[weapon]} / {weaponStock(state, weapon)} 배정</span>
-              {weapon === 'musket' && state.resources.gunpowder <= 0 && (
-                <em>화약 없음 · 화력 비활성</em>
-              )}
+              {weapon === 'musket' && (() => {
+                const readiness = musketReadiness(
+                  state,
+                  residents.filter(resident => assignments[resident.id] === 'musket').map(resident => resident.id),
+                  CONFIG.raid.powderPerMusket,
+                );
+                return <em>사격 가능 {readiness.ready} / 배정 {readiness.assigned}</em>;
+              })()}
             </div>
           ))}
         </div>
@@ -63,14 +74,15 @@ export function WeaponAllocationDialog({ state, onAssign, onAutoAssign, onClear,
           {residents.length === 0 ? (
             <div className="muted small">무기를 배정할 수 있는 수비병·파수꾼·사냥꾼이 없습니다.</div>
           ) : residents.map(resident => {
-            const current = state.weaponAssignments[resident.id] ?? '';
+            const current = assignments[resident.id] ?? '';
+            const snapshot = snapshots.get(resident.id);
             return (
               <label key={resident.id} className="weapon-allocation-row">
                 <span>
                   <strong>{resident.name}</strong>
                   <small>
                     {JOB_NAMES[resident.job]} · {resident.task} · 건강 {Math.round(resident.health)} · 방어 기여 +
-                    {residentDefenseContribution(state, resident, current ? current as CombatWeaponId : null)}
+                    {snapshot ? snapshot.basePower + snapshot.weaponPower : 0}
                   </small>
                 </span>
                 <select

@@ -38,6 +38,7 @@ const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs'))
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
 const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
+const weapons = await import(pathToFileURL(join(compiledDir, 'weapons.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 function openTile(state) {
@@ -190,6 +191,7 @@ function keepOnlyResident(state, index, job, tile) {
   state.resources.gunpowder = 5;
   state.resources.hornBows = 3;
   state.resources.spears = 10;
+  weapons.reconcileWeaponAssignments(state);
 
   assert.deepEqual(buildings.militiaWeaponAllocation(state), {
     muskets: 2,

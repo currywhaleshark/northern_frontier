@@ -29,8 +29,10 @@ function compileGameModules() {
 const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
+const tacticalCore = await import(pathToFileURL(join(compiledDir, 'tacticalCore.mjs')).href);
 const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
 const battleSimulation = await import(pathToFileURL(join(compiledDir, 'battleSimulation.mjs')).href);
+const reportModalSource = readFileSync(new URL('../../src/components/TacticalBattleReportModal.tsx', import.meta.url), 'utf8');
 
 function prepareDefenders(state) {
   state.weather = 'clear';
@@ -194,7 +196,8 @@ function addBuiltMarker(state, type) {
   assert.equal(state.battle, null);
   assert.ok(state.raidCooldown > 0);
   assert.ok(state.threat <= 40);
-  assert.equal(state.resources.grain, grainBeforeFinish - 5);
+  assert.equal(state.resources.grain, grainBeforeFinish - 2.5);
+  assert.equal(state.tacticalBattleReport.recoveredLoot.grain, 2.5);
   assert.ok(state.buildings.some(building => building.repairing), 'deferred building damage should be applied on finish');
   assert.ok(state.residents.some(resident => resident.alive && resident.health < 100), 'deferred wounds should be applied on finish');
   assert.ok(state.log.some(entry => entry.text.startsWith('전투 장계:')));
@@ -210,6 +213,131 @@ function addBuiltMarker(state, type) {
   assert.equal(state.tacticalBattleReport, null);
   simulation.advanceTick(state);
   assert.notEqual(state.subTick, pausedAtReport, 'simulation may resume after the detailed report is dismissed');
+}
+
+{
+  const grade = input => tacticalCore.gradeTacticalBattle({
+    encounterKind: 'raidDefense',
+    result: 'victory',
+    friendlyPower: 100,
+    enemyPower: 100,
+    defendersCommitted: 20,
+    defendersKilled: 0,
+    defendersWounded: 0,
+    enemiesCommitted: 20,
+    enemiesKilled: 0,
+    loot: {},
+    ...input,
+  }).grade;
+
+  assert.equal(grade({ enemyPower: 200, enemiesKilled: 18 }), 'greatVictory');
+  assert.equal(grade({ enemiesKilled: 8, defendersWounded: 2 }), 'victory');
+  assert.equal(grade({ friendlyPower: 200, enemyPower: 100, enemiesKilled: 2,
+    defendersKilled: 4, defendersWounded: 6, loot: { grain: 12 } }), 'narrowVictory');
+  assert.equal(grade({ result: 'defeat', enemyPower: 220, enemiesKilled: 10,
+    defendersKilled: 1, defendersWounded: 2 }), 'narrowDefeat');
+  assert.equal(grade({ result: 'defeat', enemiesKilled: 4, defendersKilled: 2,
+    defendersWounded: 4, loot: { grain: 5 } }), 'defeat');
+  assert.equal(grade({ result: 'defeat', friendlyPower: 200, enemyPower: 100,
+    defendersKilled: 6, defendersWounded: 8, loot: { grain: 20 } }), 'crushingDefeat');
+  assert.deepEqual(tacticalCore.TACTICAL_BATTLE_GRADE_LABELS, {
+    greatVictory: '대승',
+    victory: '승리',
+    narrowVictory: '아쉬운 승리',
+    narrowDefeat: '아쉬운 패배',
+    defeat: '패배',
+    crushingDefeat: '대패',
+  });
+  assert.deepEqual(tacticalCore.tacticalDefenderShotCounts([
+    { role: 'militia', weapon: 'musket', count: 5, killed: 0, readyMuskets: 2 },
+    { role: 'watchman', weapon: 'hornBow', count: 4, killed: 1, readyMuskets: 0 },
+  ]), { arrows: 3, muskets: 2 });
+  assert.deepEqual(tacticalCore.tacticalRaiderShotCounts([
+    { unitType: 'court-gunner', count: 4, killed: 1 },
+    { unitType: 'court-archer', count: 3, killed: 1 },
+    { unitType: 'court-artillery', count: 2, killed: 0 },
+  ]), { arrows: 2, muskets: 3, cannons: 2 });
+  assert.deepEqual(tacticalCore.raidDefenseObjectiveResult({
+    factionName: '변경 마적', outcome: 'partialLoss', enemyRouted: false, looted: false,
+    defendersCommitted: 20, defendersKilled: 0, defendersWounded: 3,
+  }), { result: 'victory' });
+  assert.deepEqual(tacticalCore.raidDefenseObjectiveResult({
+    factionName: '변경 마적', outcome: 'partialLoss', enemyRouted: false, looted: false,
+    defendersCommitted: 20, defendersKilled: 7, defendersWounded: 6,
+  }), { result: 'defeat', forcedGrade: 'narrowDefeat' });
+  assert.deepEqual(tacticalCore.raidDefenseObjectiveResult({
+    factionName: '변경 마적', outcome: 'partialLoss', enemyRouted: false, looted: true,
+    defendersCommitted: 20, defendersKilled: 0, defendersWounded: 0,
+  }), { result: 'defeat' });
+  assert.deepEqual(tacticalCore.raidDefenseObjectiveResult({
+    factionName: '변경 마적', outcome: 'defenseSuccess', enemyRouted: true, looted: true,
+    defendersCommitted: 20, defendersKilled: 0, defendersWounded: 2,
+  }), { result: 'victory' });
+}
+
+{
+  function finishDefenseReport(factionName, outcome, seed, options = {}) {
+    const state = simulation.newGame(seed);
+    prepareDefenders(state);
+    const grainBefore = state.resources.grain;
+    const battle = tactical.createTacticalBattle(state, {
+      factionName, power: 60, warned: true, siege: false, mode: 'garrison',
+    });
+    if (options.raiderMorale != null) battle.raiderMorale = options.raiderMorale;
+    battle.reports.push({
+      round: 5,
+      focusZoneId: 'center',
+      nextFocusZoneId: 'center',
+      summary: 'final report',
+      lines: [],
+      events: [],
+      wounded: 0,
+      killed: 0,
+      raidersKilled: 1,
+      loot: options.loot ?? (outcome === 'defenseSuccess' ? {} : { grain: 3 }),
+      buildingsDamaged: 0,
+      villageMoraleDelta: 0,
+      raiderMoraleDelta: 0,
+      ended: true,
+      outcome,
+    });
+    battle.phase = 'finished';
+    tactical.finishTacticalBattle(state);
+    assert.ok(state.tacticalBattleReport);
+    return { report: state.tacticalBattleReport, state, grainBefore };
+  }
+
+  const { report: raidLoss } = finishDefenseReport('변경 마적', 'partialLoss', 2026071411);
+  assert.equal(raidLoss.result, 'defeat');
+  assert.equal(raidLoss.closingSummary, '습격대가 약탈을 마치고 물러납니다.');
+
+  const { report: courtLoss } = finishDefenseReport('조정 토벌군', 'partialLoss', 2026071412);
+  assert.equal(courtLoss.result, 'defeat');
+  assert.equal(courtLoss.closingSummary, '토벌대가 공격을 마치고 물러납니다.');
+
+  const { report: victory } = finishDefenseReport('변경 마적', 'defenseSuccess', 2026071413);
+  assert.equal(victory.result, 'victory');
+  assert.equal(victory.closingSummary, '습격대가 약탈을 포기하고 물러납니다.');
+
+  const noLoot = finishDefenseReport('변경 마적', 'partialLoss', 2026071414, { loot: {} }).report;
+  assert.equal(noLoot.result, 'victory', 'preventing all loot fulfills the village defense objective');
+  assert.equal(noLoot.closingSummary, '습격대가 약탈을 포기하고 물러납니다.');
+
+  const routed = finishDefenseReport('변경 마적', 'defenseSuccess', 2026071415, {
+    loot: { grain: 10 }, raiderMorale: 0,
+  });
+  assert.equal(routed.report.result, 'victory');
+  assert.equal(routed.report.closingSummary, '적의 기세가 꺾여 대열이 무너지고 도주합니다.');
+  assert.equal(routed.report.recoveredLoot.grain, 5, 'routing raiders recovers half of their stolen goods');
+  assert.equal(routed.report.loot.grain, 5, 'the report records only the net loot loss after recovery');
+  assert.equal(routed.state.resources.grain, routed.grainBefore - 5);
+
+  assert.match(reportModalSource, /['"]물러난 적['"]/, 'enemy survivors must be labelled as withdrawn, not deserters');
+  assert.doesNotMatch(reportModalSource, /대열 이탈·도주|적 도주/,
+    'the final report must not describe all surviving enemies as deserters or escapees');
+  assert.match(reportModalSource, /report\.closingSummary/, 'the final report must display its battle-specific closing line');
+  assert.match(reportModalSource, /TACTICAL_BATTLE_GRADE_LABELS\[report\.grade\]/,
+    'the final report must display the six-level battle grade');
 }
 
 {
@@ -355,7 +483,10 @@ function addBuiltMarker(state, type) {
   assert.equal(state.resources.gunpowder, powderBefore - 2 * 2);
   assert.ok(battle.preliminaryBombardmentCasualties > 0);
   assert.ok(battle.raiderGroups.reduce((sum, group) => sum + group.power, 0) < powerBefore);
-  assert.ok(battle.preparationEvents.some(event => event.kind === 'bombardment'));
+  const bombardmentEvent = battle.preparationEvents.find(event => event.kind === 'bombardment');
+  assert.ok(bombardmentEvent);
+  assert.equal(bombardmentEvent.shots?.cannons, battle.preliminaryBombardmentCannons,
+    'preliminary bulwangi fire schedules one cannon sample per firing emplacement');
   assert.ok(battle.preparationEvents.some(event => event.kind === 'casualty' && event.side === 'raider'));
   assert.equal(tactical.advanceTacticalPhase(state), null);
   assert.equal(battle.phase, 'deployment');
@@ -397,6 +528,8 @@ function addBuiltMarker(state, type) {
   const zoneOrder = new Map(battle.zones.map(zone => [zone.id, zone.order]));
   const eventOrders = battle.preparationEvents.map(event => zoneOrder.get(event.zoneId));
   assert.ok(eventOrders.every((order, index) => index === 0 || eventOrders[index - 1] <= order));
+  assert.ok(battle.preparationEvents.some(event => event.kind === 'readyVolley'),
+    'volley preparation emits the event routed to the supplied ready sample');
 }
 
 {
@@ -457,6 +590,11 @@ function addBuiltMarker(state, type) {
   assert.equal(tactical.resolveTacticalRound(state), null);
   assert.equal(main.zoneId, 'wall');
   assert.equal(main.pendingZoneId, undefined, 'main force cannot pass an intact, well-manned defensive line');
+  const wallAssault = battle.pendingReport.events.find(event =>
+    event.kind === 'wallAssault' && event.zoneId === 'wall');
+  assert.ok(wallAssault, 'an intact wall under pressure gets a visible enemy strike event');
+  assert.equal(wallAssault.side, 'raider');
+  assert.equal(wallAssault.groupId, main.id);
 }
 
 {
@@ -471,6 +609,8 @@ function addBuiltMarker(state, type) {
   const main = battle.raiderGroups.find(group => group.kind === 'main');
   assert.ok(main);
   main.zoneId = 'wall';
+  main.unitType = 'court-archer';
+  main.revealed = true;
   battle.raiderGroups.filter(group => group !== main).forEach(group => { group.intent = 'withdraw'; });
   battle.round = 2;
   battle.zones.find(zone => zone.id === 'wall').breached = true;
@@ -480,6 +620,16 @@ function addBuiltMarker(state, type) {
   assert.ok(
     battle.pendingReport.events.some(event => event.kind === 'advance' && event.zoneId === 'wall'),
     'advance animation is emitted from the line where combat occurred',
+  );
+  assert.equal(
+    battle.pendingReport.events.some(event => event.kind === 'volley' && event.zoneId === 'wall'),
+    false,
+    'ranged raiders do not fire into an undefended zone before advancing',
+  );
+  assert.equal(
+    battle.pendingReport.events.some(event => event.kind === 'melee' && event.zoneId === 'wall'),
+    false,
+    'undefended zones do not create phantom melee events',
   );
   assert.equal(tactical.completeTacticalSimulation(state), null);
   assert.equal(tactical.acknowledgeTacticalReport(state), null);
@@ -535,7 +685,11 @@ function addBuiltMarker(state, type) {
   battle.raiderGroups.filter(group => group.kind !== 'main').forEach(group => { group.intent = 'withdraw'; });
   battle.zones.find(zone => zone.id === 'wall').breached = true;
   assert.equal(tactical.resolveTacticalRound(state), null);
-  assert.ok(battle.pendingReport.events.some(event => event.kind === 'artilleryHit' && event.zoneId === 'wall'));
+  const artilleryEvent = battle.pendingReport.events.find(event => event.kind === 'artilleryHit' && event.zoneId === 'wall');
+  assert.ok(artilleryEvent);
+  const artilleryGroup = battle.raiderGroups.find(group => group.unitType === 'court-artillery');
+  assert.equal(artilleryEvent.shots?.cannons, Math.max(0, artilleryGroup.count - artilleryGroup.killed),
+    'court artillery schedules one cannon sample per surviving gun crew');
   const groupedAdvances = battle.pendingReport.events.filter(event =>
     event.kind === 'advance' && event.zoneId === 'wall' && event.text.includes('교전을 마치고'));
   assert.equal(groupedAdvances.length, 1, 'same-route raider groups share one advance event');
@@ -558,6 +712,11 @@ function addBuiltMarker(state, type) {
   assert.equal(tactical.setTacticalCommand(state, spear.id, 'charge'), null);
   assert.equal(tactical.setTacticalCommand(state, bow.id, 'volley'), null);
   assert.equal(tactical.resolveTacticalRound(state), null);
+  const meleeAudioEvent = battle.pendingReport.events.find(event =>
+    event.kind === 'melee' && (event.meleeParticipants ?? 0) > 0);
+  assert.ok(meleeAudioEvent, 'melee playback carries its engagement size');
+  assert.ok(meleeAudioEvent.meleeParticipants >= spear.count,
+    'the engagement size includes the charging group');
   assert.ok(
     battle.pendingReport.events.some(event => event.kind === 'melee' && event.float === '돌격!'),
     'melee charge produces a dedicated combat event',
@@ -652,12 +811,19 @@ function addBuiltMarker(state, type) {
   flanker.zoneId = 'center';
   flanker.power = 90;
   flanker.morale = 100;
+  flanker.rearAssault = true;
+  flanker.revealed = true;
+  flanker.engagementsInZone = 1;
   battle.raiderGroups.filter(group => group !== flanker).forEach(group => { group.intent = 'withdraw'; });
   const center = battle.zones.find(zone => zone.id === 'center');
   center.pressure = 0;
   for (let engagement = 0; engagement < 2; engagement++) {
     assert.equal(tactical.resolveTacticalRound(state), null);
     assert.notEqual(battle.pendingReport.outcome, 'villageRouted');
+    assert.ok(battle.pendingReport.events.some(event =>
+      event.kind === 'melee' && event.side === 'raider' && event.groupId === flanker.id &&
+      (event.meleeParticipants ?? 0) > 0),
+    'a revealed rear assault group keeps attacking after its entry event');
     if (engagement === 0) {
       assert.equal(tactical.completeTacticalSimulation(state), null);
       assert.equal(tactical.acknowledgeTacticalReport(state), null);

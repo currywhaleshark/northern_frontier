@@ -5,11 +5,11 @@
 // 그 결과를 향해 수렴하는 연출이다 — 밸런스가 기존 공식과 정확히 일치한다.
 import { CONFIG } from './config';
 import { armedMusketeers, computeDefense, countBuilt } from './buildings';
+import { createCombatRoster } from './combatRoster';
 import { addLog } from './events';
-import { activePredatorScoutIds } from './expeditionIntel';
 import { changeRelation } from './relations';
 import { resetAgent } from './agents';
-import { livingResidents } from './residents';
+import { consumeMusketPowder } from './weapons';
 import { damageBuildings, injure, killResidents, loot, moraleShock } from './raidDamage';
 import type { Battle, BattleLocation, BattleMode, BattleOutcome, GameState, RaiderBand, Resident, WeatherId } from './types';
 
@@ -50,31 +50,34 @@ export function raidBandSize(power: number): number {
 
 // 포대 가동 여부 — 완공 포대가 있고 화약이 있으면 전투 방어 배율이 붙는다
 export function cannonBattleMult(state: GameState): number {
-  return countBuilt(state, 'cannonEmplacement') > 0 && state.resources.gunpowder > 0
+  const musketPowder = armedMusketeers(state) * CONFIG.raid.powderPerMusket;
+  const cannonPowder = Math.max(0, state.resources.gunpowder - musketPowder);
+  return countBuilt(state, 'cannonEmplacement') > 0 && cannonPowder >= CONFIG.raid.powderPerCannon
     ? CONFIG.raid.cannonBattleMult
     : 1;
 }
 
 // 교전 개시 시 화약 소모: 조총 무장 수비병 + 가동 포대. 비축분이 모자라면 있는 만큼만 쓴다.
 export function consumeBattlePowder(state: GameState): void {
-  const need =
-    armedMusketeers(state) * CONFIG.raid.powderPerMusket +
-    (state.resources.gunpowder > 0 ? countBuilt(state, 'cannonEmplacement') * CONFIG.raid.powderPerCannon : 0);
-  if (need <= 0) return;
-  const used = Math.min(state.resources.gunpowder, need);
+  const musketIds = createCombatRoster(state, { context: 'villageDefense' }).combatants
+    .filter(combatant => combatant.assignedWeapon === 'musket')
+    .map(combatant => combatant.residentId);
+  const musketUsed = consumeMusketPowder(state, musketIds, CONFIG.raid.powderPerMusket);
+  const firingCannons = Math.min(
+    countBuilt(state, 'cannonEmplacement'),
+    Math.floor((state.resources.gunpowder + 1e-9) / CONFIG.raid.powderPerCannon),
+  );
+  const cannonUsed = firingCannons * CONFIG.raid.powderPerCannon;
+  state.resources.gunpowder = Math.max(0, state.resources.gunpowder - cannonUsed);
+  const used = musketUsed + cannonUsed;
   if (used <= 0) return;
-  state.resources.gunpowder = Math.max(0, state.resources.gunpowder - used);
   addLog(state, `전선에 총성과 포성이 울립니다! (화약 -${used.toFixed(1)})`, 'raid');
 }
 
 // 징집(levy) 시 일반 주민(수비병/파수꾼/사냥꾼 제외)이 보태는 방어도.
 // 직업을 바꾸는 방식은 금지 — computeDefense가 주민 전원을 수비병(12)으로 세어 폭증한다.
 export function levyDefenseBonus(state: GameState): number {
-  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
-  const civilians = livingResidents(state)
-    .filter(r => !away.has(r.id) && !r.sick && r.health >= 20 &&
-      r.job !== 'militia' && r.job !== 'watchman' && r.job !== 'hunter')
-    .length;
+  const civilians = createCombatRoster(state, { context: 'villageDefense', includeCivilians: true }).civilians.length;
   return civilians * CONFIG.raid.levyDefensePerResident;
 }
 
@@ -118,10 +121,12 @@ export function startBattle(state: GameState, mode: BattleMode): boolean {
   if (!band) return false;
 
   // 요격: 훈련된 수비병+파수꾼만 / 징집: 앓지 않는 성한 주민 전체
-  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
-  const defenders = livingResidents(state).filter(r =>
-    !away.has(r.id) && !r.sick && r.health >= 20 &&
-    (mode === 'levy' || r.job === 'militia' || r.job === 'watchman'));
+  const roster = createCombatRoster(state, { context: 'villageDefense', includeCivilians: mode === 'levy' });
+  const defenderIds = mode === 'levy'
+    ? [...roster.combatants.map(combatant => combatant.residentId), ...roster.civilians]
+    : roster.combatants.map(combatant => combatant.residentId);
+  const defenderSet = new Set(defenderIds);
+  const defenders = state.residents.filter(resident => defenderSet.has(resident.id));
   for (const defender of defenders) {
     resetAgent(state, defender);
     defender.task = '출전 준비';

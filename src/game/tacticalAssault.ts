@@ -1,12 +1,17 @@
 import { addLog } from './events';
 import { CONFIG } from './config';
-import { beginExpeditionReturn, expeditionResidentsForIds } from './expedition';
+import { beginExpeditionReturn } from './expedition';
+import { combatGroupLabel, tacticalGroupCapabilities, tacticalGroupPower } from './combatCapabilities';
+import { createCombatRoster, type CombatantSnapshot } from './combatRoster';
 import { makeRng } from './map';
 import { injure, killResidents } from './raidDamage';
 import { applyBanditLairOutcome, type BanditLairOutcome } from './siteDiplomacy';
+import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
 import {
-  assignedWeapon, synchronizeWeaponAssignments,
-} from './weapons';
+  captureTacticalResources, gradeTacticalBattle, tacticalClosingSummary, tacticalDateLabel,
+  tacticalDefenderShotCounts, tacticalOutcomeResult, tacticalPeopleReport,
+  tacticalRaiderShotCounts, tacticalResourceDelta,
+} from './tacticalCore';
 import type {
   DefenderGroupKind, GameState, PreparationActionId, ResourceId, TacticalAnimationEvent,
   TacticalBattle, TacticalBattleZone, TacticalCommandId, TacticalDefenderGroup,
@@ -23,18 +28,6 @@ const ASSAULT_PREPARATIONS: Array<{ id: PreparationActionId; label: string; cost
   { id: 'lureGuards', label: '초병 유인', cost: 1 },
 ];
 
-const MELEE_KINDS = new Set<DefenderGroupKind>(['militia-spear', 'militia-unarmed', 'watchman']);
-const RANGED_KINDS = new Set<DefenderGroupKind>(['militia-bow', 'militia-musket', 'hunter']);
-const GROUP_POWER: Record<DefenderGroupKind, number> = {
-  'militia-musket': CONFIG.tacticalBattle.groupPower.militiaMusket,
-  'militia-bow': CONFIG.tacticalBattle.groupPower.militiaBow,
-  'militia-spear': CONFIG.tacticalBattle.groupPower.militiaSpear,
-  'militia-unarmed': CONFIG.tacticalBattle.groupPower.militiaUnarmed,
-  watchman: CONFIG.tacticalBattle.groupPower.watchman,
-  hunter: CONFIG.tacticalBattle.groupPower.hunter,
-  civilian: CONFIG.tacticalBattle.groupPower.civilian,
-};
-
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -49,55 +42,52 @@ function preparationApplied(battle: TacticalBattle, id: PreparationActionId): bo
 
 function makePlayerGroup(
   state: GameState,
-  kind: DefenderGroupKind,
-  residentIds: number[],
-  label: string,
+  snapshots: CombatantSnapshot[],
 ): TacticalDefenderGroup | null {
-  if (residentIds.length === 0) return null;
-  const residents = state.residents.filter(resident => residentIds.includes(resident.id));
+  if (snapshots.length === 0) return null;
+  const role = snapshots[0].role;
+  const weapon = snapshots[0].assignedWeapon;
+  const kind: DefenderGroupKind = weapon === 'musket' ? 'militia-musket'
+    : weapon === 'hornBow' ? 'militia-bow'
+      : weapon === 'spear' ? 'militia-spear'
+        : role === 'watchman' ? 'watchman' : role === 'hunter' ? 'hunter' : 'militia-unarmed';
   return {
-    id: `assault-${kind}`,
+    id: `assault-${role}-${weapon ?? 'unarmed'}`,
     kind,
-    label,
-    residentIds,
-    count: residentIds.length,
+    role,
+    weapon,
+    readyMuskets: snapshots.filter(snapshot => snapshot.readyWeapon === 'musket').length,
+    label: combatGroupLabel(role, weapon),
+    residentIds: snapshots.map(snapshot => snapshot.residentId),
+    count: snapshots.length,
     zoneId: 'lairTrail',
     command: null,
-    power: residents.reduce((sum, resident) => {
-      const skillMultiplier = kind === 'hunter'
+    power: snapshots.reduce((sum, snapshot) => {
+      const resident = state.residents.find(candidate => candidate.id === snapshot.residentId)!;
+      const skillMultiplier = role === 'hunter'
         ? 0.75 + (resident.skills.hunter ?? 0) * 0.5
         : 1;
-      return sum + GROUP_POWER[kind] * skillMultiplier;
+      return sum + (snapshot.basePower + snapshot.weaponPower) * skillMultiplier;
     }, 0),
     wounded: 0,
     killed: 0,
-    line: MELEE_KINDS.has(kind) ? 'front' : 'rear',
+    line: weapon === 'spear' || (weapon == null && (role === 'militia' || role === 'watchman')) ? 'front' : 'rear',
     ambushed: false,
   };
 }
 
 export function createExpeditionTacticalGroups(state: GameState, memberIds: number[]): TacticalDefenderGroup[] {
-  synchronizeWeaponAssignments(state);
-  const members = expeditionResidentsForIds(state, memberIds).filter(resident =>
-    !resident.sick && resident.health >= 20 &&
-    (resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter'));
-  const militia = members.filter(resident => resident.job === 'militia');
-  const hunters = members.filter(resident => resident.job === 'hunter');
-  const watchmen = members.filter(resident => resident.job === 'watchman');
-  const idsWith = (weapon: ReturnType<typeof assignedWeapon>) => militia
-    .filter(resident => assignedWeapon(state, resident.id) === weapon)
-    .map(resident => resident.id);
-  const armed = new Set([
-    ...idsWith('musket'), ...idsWith('hornBow'), ...idsWith('spear'),
-  ]);
-  return [
-    makePlayerGroup(state, 'militia-musket', idsWith('musket'), '조총 돌격대'),
-    makePlayerGroup(state, 'militia-bow', idsWith('hornBow'), '각궁 사격대'),
-    makePlayerGroup(state, 'militia-spear', idsWith('spear'), '창 돌격대'),
-    makePlayerGroup(state, 'militia-unarmed', militia.filter(resident => !armed.has(resident.id)).map(resident => resident.id), '경무장 토벌대'),
-    makePlayerGroup(state, 'watchman', watchmen.map(resident => resident.id), '파수꾼 선도대'),
-    makePlayerGroup(state, 'hunter', hunters.map(resident => resident.id), '사냥꾼 척후대'),
-  ].filter((group): group is TacticalDefenderGroup => group != null);
+  const snapshots = createCombatRoster(state, { context: 'expedition', memberIds }).combatants;
+  const grouped = new Map<string, CombatantSnapshot[]>();
+  for (const snapshot of snapshots) {
+    const key = `${snapshot.role}:${snapshot.assignedWeapon ?? 'unarmed'}`;
+    const list = grouped.get(key) ?? [];
+    list.push(snapshot);
+    grouped.set(key, list);
+  }
+  return [...grouped.values()]
+    .map(group => makePlayerGroup(state, group))
+    .filter((group): group is TacticalDefenderGroup => group != null);
 }
 
 function assaultZones(scouted: boolean, alarm: number): TacticalBattleZone[] {
@@ -175,12 +165,16 @@ export function createBanditLairTacticalAssault(state: GameState): TacticalBattl
   const groups = createExpeditionTacticalGroups(state, expedition.memberIds);
   if (groups.reduce((sum, group) => sum + group.count, 0) < 2) return '직접 지휘할 토벌대원이 부족합니다.';
   const scouted = (site.scoutedUntilDay ?? 0) >= state.day;
+  const enemies = banditDefenders(site.militaryPower * LAIR_POSITION_POWER_MULTIPLIER, scouted);
   const battle: TacticalBattle = {
+    encounterKind: 'banditLair',
     id: state.day * 1000 + state.subTick * 10 + 7,
     factionName: site.name,
     warned: scouted,
     siege: true,
     originalPower: Math.max(10, Math.round(site.militaryPower)),
+    initialFriendlyPower: groups.reduce((sum, group) => sum + group.power, 0),
+    initialEnemyPower: enemies.reduce((sum, group) => sum + group.power, 0),
     phase: 'preparation',
     round: 1,
     prepPoints: preparationPoints(groups, scouted),
@@ -188,7 +182,7 @@ export function createBanditLairTacticalAssault(state: GameState): TacticalBattl
     preparationEvents: [],
     zones: assaultZones(scouted, site.alarm),
     defenderGroups: groups,
-    raiderGroups: banditDefenders(site.militaryPower * LAIR_POSITION_POWER_MULTIPLIER, scouted),
+    raiderGroups: enemies,
     currentZoneId: 'lairTrail',
     villageMorale: clamp(64 + groups.length * 2 + (scouted ? 8 : 0), 0, 100),
     raiderMorale: clamp(68 + site.alarm * 0.18, 0, 100),
@@ -201,6 +195,7 @@ export function createBanditLairTacticalAssault(state: GameState): TacticalBattl
     leaderEscapeBlocked: false,
     leaderEscaped: false,
     assaultFireDamage: 0,
+    resourceSnapshot: captureTacticalResources(state),
   };
   state.tacticalBattle = battle;
   state.pendingChoice = null;
@@ -316,17 +311,17 @@ export function assaultCommandUnavailableReason(
 ): string | null {
   if (battle.orientation !== 'assault') return '산채 공격전 명령이 아닙니다.';
   if (command === 'hold' || command === 'fallback' || command === 'advance' || command === 'openRetreat') return null;
-  if (command === 'charge') return MELEE_KINDS.has(group.kind) ? null : '돌격은 근접 부대만 수행할 수 있습니다.';
-  if (command === 'volley') return RANGED_KINDS.has(group.kind) ? null : '일제 사격은 원거리 부대만 수행할 수 있습니다.';
+  if (command === 'charge') return tacticalGroupCapabilities(group).has('charge') ? null : '돌격은 창을 갖춘 부대만 수행할 수 있습니다.';
+  if (command === 'volley') return tacticalGroupCapabilities(group).has('volley') ? null : '원거리 부대가 필요합니다. 각궁 또는 화약이 준비된 조총이 필요합니다.';
   if (command === 'ambush') {
-    return group.kind === 'hunter' && group.zoneId === 'lairTrail' ? null : '숲길의 사냥꾼만 급습할 수 있습니다.';
+    return tacticalGroupCapabilities(group).has('ambush') && group.zoneId === 'lairTrail' ? null : '숲길의 사냥꾼만 급습할 수 있습니다.';
   }
   if (command === 'arson') {
     if (!preparationApplied(battle, 'prepareFireArrows')) return '먼저 불화살을 준비해야 합니다.';
-    if (!RANGED_KINDS.has(group.kind)) return '원거리 부대만 화공을 실행할 수 있습니다.';
+    if (!tacticalGroupCapabilities(group).has('volley')) return '원거리 부대만 화공을 실행할 수 있습니다.';
     return group.zoneId === 'lairWall' || group.zoneId === 'lairKeep' ? null : '목책이나 두목 움막에서만 불을 지를 수 있습니다.';
   }
-  if (command === 'blockEscape') return group.kind === 'hunter' ? null : '사냥꾼만 두목의 퇴로를 차단할 수 있습니다.';
+  if (command === 'blockEscape') return tacticalGroupCapabilities(group).has('ambush') ? null : '사냥꾼만 두목의 퇴로를 차단할 수 있습니다.';
   return '이 명령은 산채 공격에서 사용할 수 없습니다.';
 }
 
@@ -345,8 +340,8 @@ export function setAssaultCommand(state: GameState, groupId: string, command: Ta
 export function chooseDefaultAssaultCommands(battle: TacticalBattle): void {
   for (const group of battle.defenderGroups) {
     if (group.command || activeCount(group) <= 0) continue;
-    if (group.kind === 'hunter' && group.zoneId === 'lairTrail') group.command = 'ambush';
-    else if (RANGED_KINDS.has(group.kind)) group.command = 'volley';
+    if (tacticalGroupCapabilities(group).has('ambush') && group.zoneId === 'lairTrail') group.command = 'ambush';
+    else if (tacticalGroupCapabilities(group).has('volley')) group.command = 'volley';
     else group.command = 'advance';
   }
 }
@@ -366,15 +361,15 @@ function commandPower(group: TacticalDefenderGroup): number {
 
 function casualtyExposure(group: TacticalDefenderGroup, hasMeleeScreen: boolean): number {
   let exposure = group.command === 'charge' ? 1.38 : group.command === 'fallback' ? 0.38 : group.command === 'hold' ? 0.68 : 1;
-  if (RANGED_KINDS.has(group.kind) && hasMeleeScreen) exposure *= 0.48;
-  else if (RANGED_KINDS.has(group.kind)) exposure *= 1.35;
+  if (tacticalGroupCapabilities(group).has('volley') && hasMeleeScreen) exposure *= 0.48;
+  else if (tacticalGroupCapabilities(group).has('volley')) exposure *= 1.35;
   if (group.command === 'blockEscape') exposure *= 0.25;
   return exposure;
 }
 
 function addEvent(
   events: TacticalAnimationEvent[], zoneId: string, kind: TacticalAnimationEvent['kind'], text: string,
-  extra: Partial<Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'casualties' | 'float'>> = {},
+  extra: Partial<Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'casualties' | 'float' | 'shots' | 'meleeParticipants'>> = {},
 ): void {
   events.push({ zoneId, kind, text, durationMs: 620, ...extra });
 }
@@ -414,10 +409,26 @@ export function resolveAssaultRound(state: GameState): string | null {
   const retreatOrdered = players.some(group => group.command === 'openRetreat');
   addEvent(events, zone.id, 'camera', `${zone.name} 공략을 시작합니다.`);
 
+  const musketAllocation = consumeMusketVolleys(
+    state,
+    players
+      .filter(group => group.weapon === 'musket' && group.command === 'volley')
+      .map(group => ({ id: group.id, residentIds: group.residentIds.slice(0, activeCount(group)) })),
+    CONFIG.raid.powderPerMusket,
+  );
+  for (const group of players.filter(group => group.weapon === 'musket')) {
+    group.readyMuskets = musketAllocation.byGroup[group.id] ?? 0;
+  }
+  if (musketAllocation.powderRequired > 0) {
+    lines.push(`조총 사격에 화약 ${musketAllocation.powderRequired.toFixed(1)}을 소모했습니다.`);
+  }
+
   const activePlayers = Math.max(1, players.reduce((sum, group) => sum + activeCount(group), 0));
   let playerPower = players.reduce((sum, group) => {
-    const share = group.count > 0 ? activeCount(group) / group.count : 0;
-    return sum + group.power * share * commandPower(group);
+    const active = activeCount(group);
+    const share = group.count > 0 ? active / group.count : 0;
+    const readyPower = group.weapon === 'musket' ? tacticalGroupPower(group, active) : group.power * share;
+    return sum + readyPower * commandPower(group);
   }, 0);
   const enemyPower = enemies.reduce((sum, group) => sum + group.power * (Math.max(30, group.morale) / 100), 0) *
     (1 + zone.defenseBonus / 100);
@@ -429,19 +440,31 @@ export function resolveAssaultRound(state: GameState): string | null {
 
   if (commands.has('ambush')) addEvent(events, zone.id, 'ambush', '사냥꾼 척후대가 숲길 초병의 측면을 덮칩니다.', { side: 'raider', float: '기습!' });
   if (commands.has('volley')) {
-    const musketeers = players.filter(group => group.kind === 'militia-musket' && group.command === 'volley')
-      .reduce((sum, group) => sum + activeCount(group), 0);
-    if (musketeers > 0 && state.resources.gunpowder > 0) {
-      const powder = Math.min(state.resources.gunpowder, musketeers * 0.15);
-      state.resources.gunpowder -= powder;
-      lines.push(`조총 사격에 화약 ${powder.toFixed(1)}을 소모했습니다.`);
-    }
-    addEvent(events, zone.id, 'volley', '목책과 적 대열을 향해 활과 조총을 일제히 쏩니다.', { side: 'defender' });
+    addEvent(events, zone.id, 'volley', '목책과 적 대열을 향해 활과 조총을 일제히 쏩니다.', {
+      side: 'defender', shots: tacticalDefenderShotCounts(players.filter(group => group.command === 'volley')),
+    });
   }
-  if (commands.has('charge') || commands.has('advance')) addEvent(events, zone.id, 'melee', '토벌대 전열이 방어선을 밀어붙입니다.', { side: 'defender', float: '공세!' });
+  const enemyShots = tacticalRaiderShotCounts(enemies);
+  if ((enemyShots.arrows ?? 0) + (enemyShots.muskets ?? 0) > 0) {
+    addEvent(events, zone.id, 'volley', '산채 사격대가 원정대를 향해 화살을 퍼붓습니다.', {
+      side: 'raider', shots: { arrows: enemyShots.arrows, muskets: enemyShots.muskets },
+    });
+  }
+  if (commands.has('charge') || commands.has('advance')) {
+    const meleeParticipants = players
+      .filter(group => group.command === 'charge' || group.command === 'advance')
+      .reduce((sum, group) => sum + activeCount(group), 0) +
+      enemies.reduce((sum, group) => sum + Math.max(0, group.count - group.killed), 0);
+    addEvent(events, zone.id, 'melee', '토벌대 전열이 방어선을 밀어붙입니다.', {
+      side: 'defender', float: '공세!', meleeParticipants: meleeParticipants,
+    });
+  }
   if (commands.has('arson')) {
     battle.assaultFireDamage = (battle.assaultFireDamage ?? 0) + 1;
-    addEvent(events, zone.id, 'fire', '불화살이 목책과 움막에 꽂혀 불길이 번집니다.', { side: 'raider', float: '화공!' });
+    const fireShots = tacticalDefenderShotCounts(players.filter(group => group.command === 'arson'));
+    addEvent(events, zone.id, 'fire', '불화살이 목책과 움막에 꽂혀 불길이 번집니다.', {
+      side: 'defender', float: '화공!', shots: { arrows: fireShots.arrows ?? 1 },
+    });
     lines.push('화공으로 돌파가 빨라지지만 회수할 노획 일부가 불탑니다.');
   }
   if (commands.has('blockEscape')) lines.push('사냥꾼이 본대 화력에서 빠져 두목의 퇴로를 감시합니다.');
@@ -461,7 +484,7 @@ export function resolveAssaultRound(state: GameState): string | null {
     });
   }
 
-  const hasMeleeScreen = players.some(group => MELEE_KINDS.has(group.kind) && group.line === 'front' && activeCount(group) > 0);
+  const hasMeleeScreen = players.some(group => tacticalGroupCapabilities(group).has('melee') && group.line === 'front' && activeCount(group) > 0);
   for (const group of players) {
     const active = activeCount(group);
     if (active <= 0) continue;
@@ -568,6 +591,15 @@ export function resolveAssaultRound(state: GameState): string | null {
   battle.reports.push(report);
   battle.pendingReport = report;
   battle.round += 1;
+  const remainingMusketReadiness = allocateMusketReadiness(
+    state,
+    battle.defenderGroups.filter(group => group.weapon === 'musket' && activeCount(group) > 0)
+      .map(group => ({ id: group.id, residentIds: group.residentIds.slice(0, activeCount(group)) })),
+    CONFIG.raid.powderPerMusket,
+  );
+  for (const group of battle.defenderGroups.filter(group => group.weapon === 'musket')) {
+    group.readyMuskets = remainingMusketReadiness.byGroup[group.id] ?? 0;
+  }
   battle.phase = 'simulating';
   return null;
 }
@@ -607,6 +639,9 @@ export function finishBanditLairTacticalAssault(state: GameState): void {
   const finalReport = [...battle.reports].reverse().find(report => report.ended) ?? battle.reports[battle.reports.length - 1];
   const outcome = finalReport?.outcome ?? 'assaultDefeat';
   const rng = makeRng(state.seed + battle.id * 524287 + 211);
+  const targetSite = state.foreignSites.find(site => site.id === battle.assaultTargetSiteId);
+  const reputationBefore = state.resources.reputation;
+  const relationBefore = targetSite?.factionName ? state.relations[targetSite.factionName] ?? 50 : 0;
   let casualties = 0;
   for (const group of battle.defenderGroups) {
     if (group.killed > 0) killResidents(state, rng, group.killed, 1, group.residentIds);
@@ -638,8 +673,68 @@ export function finishBanditLairTacticalAssault(state: GameState): void {
       { x: state.expedition.targetX, y: state.expedition.targetY, until: state.day + 4 },
     ];
   }
+  const people = tacticalPeopleReport(state, battle);
+  const raidersCommitted = battle.raiderGroups.reduce((sum, group) => sum + group.count, 0);
+  const raidersKilled = Math.min(raidersCommitted, battle.raiderGroups.reduce((sum, group) => sum + group.killed, 0));
+  const battleDefendersKilled = battle.defenderGroups.reduce((sum, group) => sum + group.killed, 0);
+  const battleDefendersWounded = battle.defenderGroups.reduce((sum, group) => sum + group.wounded, 0);
+  const result = tacticalOutcomeResult(outcome);
+  const grade = gradeTacticalBattle({
+    encounterKind: 'banditLair',
+    result,
+    friendlyPower: battle.initialFriendlyPower,
+    enemyPower: battle.initialEnemyPower,
+    defendersCommitted: people.committed,
+    defendersKilled: battleDefendersKilled,
+    defendersWounded: battleDefendersWounded,
+    enemiesCommitted: raidersCommitted,
+    enemiesKilled: raidersKilled,
+    loot,
+  });
+  const relationAfter = targetSite?.factionName ? state.relations[targetSite.factionName] ?? relationBefore : relationBefore;
+  const outcomeLabels: Partial<Record<NonNullable<TacticalRoundReport['outcome']>, string>> = {
+    assaultVictory: '산채 완전 제압', assaultRaid: '노획 후 철수', assaultAbandoned: '빈 산채 확보',
+    assaultDefeat: '토벌대 패퇴', assaultWithdrawal: '질서 있는 철수',
+  };
+  state.tacticalBattleReport = {
+    encounterKind: 'banditLair',
+    title: '토벌 장계',
+    friendlyLabel: '원정대',
+    enemyLabel: battle.factionName,
+    battleId: battle.id,
+    date: tacticalDateLabel(state),
+    factionName: battle.factionName,
+    mode: battle.mode,
+    warned: battle.warned,
+    outcome,
+    outcomeLabel: outcomeLabels[outcome] ?? '산채 교전 종료',
+    result,
+    grade: grade.grade,
+    gradeScore: grade.score,
+    closingSummary: tacticalClosingSummary('banditLair', outcome, battle.factionName),
+    initialFriendlyPower: battle.initialFriendlyPower,
+    initialEnemyPower: battle.initialEnemyPower,
+    rounds: battle.reports.length,
+    villageMorale: Math.round(battle.villageMorale),
+    raiderMorale: Math.round(battle.raiderMorale),
+    defendersCommitted: people.committed,
+    defendersSurvived: people.survived,
+    killed: people.killed,
+    wounded: people.wounded,
+    raidersCommitted,
+    raidersKilled,
+    raidersEscaped: Math.max(0, raidersCommitted - raidersKilled),
+    damagedBuildings: [],
+    loot,
+    recoveredLoot: {},
+    reputationDelta: state.resources.reputation - reputationBefore,
+    relationDelta: relationAfter - relationBefore,
+    threatAfter: state.threat,
+    highlights: battle.reports.flatMap(report => report.lines).filter((line, index, all) => all.indexOf(line) === index).slice(0, 10),
+    resourceDelta: tacticalResourceDelta(state, battle),
+    siteOutcome: strategicOutcome === 'victory' ? 'burned' : strategicOutcome === 'abandoned' ? 'abandoned' : 'fortified',
+  };
   state.tacticalBattle = null;
-  state.tacticalBattleReport = null;
   const returnError = beginExpeditionReturn(state, '토벌대가 산채 직접 지휘전을 마치고 귀환길에 올랐습니다.');
   if (returnError) addLog(state, returnError, 'bad', true);
 }

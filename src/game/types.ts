@@ -1,4 +1,5 @@
 // 게임 전역 타입 정의
+import type { CombatRole } from './combatRoster';
 
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
@@ -598,7 +599,6 @@ export type TacticalCommandId =
   | 'charge'
   | 'arson'
   | 'blockEscape'
-  | 'counterattack'
   | 'openRetreat';
 
 export type PreparationActionId =
@@ -634,6 +634,9 @@ export interface TacticalBattleZone {
 export interface TacticalDefenderGroup {
   id: string;
   kind: DefenderGroupKind;
+  role: CombatRole;
+  weapon: CombatWeaponId | null;
+  readyMuskets?: number;
   label: string;
   residentIds: number[];
   count: number;
@@ -699,6 +702,7 @@ export interface TacticalAnimationEvent {
     | 'ambush'
     | 'volley'
     | 'melee'
+    | 'wallAssault'
     | 'wallHit'
     | 'loot'
     | 'retreat'
@@ -718,6 +722,12 @@ export interface TacticalAnimationEvent {
   groupId?: string;      // 피해를 입은 그룹 — 화면에서 해당 스프라이트를 쓰러뜨린다
   casualties?: number;   // 이 이벤트로 쓰러지는 인원(전사+부상)
   float?: string;        // 랭크 위로 떠오르는 짧은 전황 텍스트
+  meleeParticipants?: number;
+  shots?: {
+    arrows?: number;
+    muskets?: number;
+    cannons?: number;
+  };
 }
 
 export interface TacticalRoundReport {
@@ -759,7 +769,19 @@ export interface TacticalBattlePersonReport {
   healthAfter: number;
 }
 
+export type TacticalBattleGrade =
+  | 'greatVictory'
+  | 'victory'
+  | 'narrowVictory'
+  | 'narrowDefeat'
+  | 'defeat'
+  | 'crushingDefeat';
+
 export interface TacticalBattleReport {
+  encounterKind: 'raidDefense' | 'banditLair' | 'predatorHunt';
+  title: string;
+  friendlyLabel: string;
+  enemyLabel: string;
   battleId: number;
   date: string;
   factionName: string;
@@ -767,6 +789,12 @@ export interface TacticalBattleReport {
   warned: boolean;
   outcome: NonNullable<TacticalRoundReport['outcome']>;
   outcomeLabel: string;
+  result: 'victory' | 'defeat';
+  grade: TacticalBattleGrade;
+  gradeScore: number;
+  closingSummary: string;
+  initialFriendlyPower: number;
+  initialEnemyPower: number;
   rounds: number;
   villageMorale: number;
   raiderMorale: number;
@@ -779,18 +807,26 @@ export interface TacticalBattleReport {
   raidersEscaped: number;
   damagedBuildings: BuildingTypeId[];
   loot: Partial<Record<ResourceId, number>>;
+  recoveredLoot: Partial<Record<ResourceId, number>>;
+  enemyRouted?: boolean;
   reputationDelta: number;
   relationDelta: number;
   threatAfter: number;
   highlights: string[];
+  resourceDelta: Partial<Record<ResourceId, number>>;
+  siteOutcome?: 'burned' | 'abandoned' | 'fortified';
+  predatorOutcome?: 'killed' | 'repelled' | 'escaped';
 }
 
 export interface TacticalBattle {
+  encounterKind: 'raidDefense' | 'banditLair' | 'predatorHunt';
   id: number;
   factionName: string;
   warned: boolean;
   siege: boolean;
   originalPower: number;
+  initialFriendlyPower: number;
+  initialEnemyPower: number;
   phase: TacticalBattlePhase;
   round: number;
   prepPoints: number;
@@ -822,6 +858,7 @@ export interface TacticalBattle {
   huntLeaderKilled?: boolean;
   preliminaryBombardmentCannons?: number;
   preliminaryBombardmentCasualties?: number;
+  resourceSnapshot?: Partial<Record<ResourceId, number>>;
 }
 
 export interface AlertItem {
@@ -838,6 +875,7 @@ export interface GameOverState {
 export type DeathCauseId = 'combat' | 'starvation' | 'cold' | 'disease' | 'other';
 
 export interface GameState {
+  schemaVersion: number;
   day: number;          // 경과 일수 (1부터)
   subTick: number;      // 하루 안의 서브틱 (0 ~ SUBTICKS-1)
   difficulty: Difficulty;

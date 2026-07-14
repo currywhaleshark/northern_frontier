@@ -1,13 +1,13 @@
 import { addLog } from './events';
 import {
-  beginExpeditionReturn, expeditionCombatPower, expeditionResidentsForIds,
+  beginExpeditionReturn, expeditionCombatPower,
 } from './expedition';
 import { predatorThreatProfile, tigerTierLabel } from './expeditionIntel';
 import {
   applyBanditLairOutcome, banditLairRaidChance, resolveBanditLairAssault,
 } from './siteDiplomacy';
 import { predatorHuntChance, resolveWildlifeHunt } from './specialEvents';
-import { weaponCountsForResidents } from './weapons';
+import { createCombatRoster } from './combatRoster';
 import { createBanditLairTacticalAssault } from './tacticalAssault';
 import { createPredatorTacticalHunt } from './tacticalHunt';
 import type { GameState, ResourceId } from './types';
@@ -40,8 +40,12 @@ function engagementTargetName(state: GameState): string {
 export function maybeOpenExpeditionEngagementChoice(state: GameState): void {
   const expedition = state.expedition;
   if (!expedition || expedition.phase !== 'engage' || state.pendingChoice) return;
-  const members = expeditionResidentsForIds(state, expedition.memberIds);
-  const weapons = weaponCountsForResidents(state, members);
+  const roster = createCombatRoster(state, { context: 'expedition', memberIds: expedition.memberIds }).combatants;
+  const weapons = {
+    readyMuskets: roster.filter(member => member.readyWeapon === 'musket').length,
+    hornBows: roster.filter(member => member.readyWeapon === 'hornBow').length,
+    spears: roster.filter(member => member.readyWeapon === 'spear').length,
+  };
   const chance = engagementChance(state);
   const targetName = engagementTargetName(state);
   state.pendingChoice = {
@@ -49,7 +53,7 @@ export function maybeOpenExpeditionEngagementChoice(state: GameState): void {
     title: `${targetName} 개전 결정`,
     body:
       `토벌대가 목표 지점에 도착했습니다.\n` +
-      `인원 ${members.length}명 · 전력 ${expeditionCombatPower(state, expedition.memberIds)} · ` +
+      `전투 가능 ${roster.length}명 · 전력 ${expeditionCombatPower(state, expedition.memberIds)} · ` +
       `조총 ${weapons.readyMuskets} · 각궁 ${weapons.hornBows} · 창 ${weapons.spears}\n` +
       `자동 전투 예상 성공 ${Math.round(chance * 100)}%`,
     options: [

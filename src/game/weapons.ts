@@ -25,6 +25,19 @@ export interface WeaponCounts {
   readyMuskets: number;
 }
 
+export interface MusketReadiness {
+  assigned: number;
+  ready: number;
+  dry: number;
+  powderRequired: number;
+}
+
+export interface MusketGroupReadiness {
+  byGroup: Readonly<Record<string, number>>;
+  ready: number;
+  powderRequired: number;
+}
+
 export function isCombatWeaponId(value: unknown): value is CombatWeaponId {
   return value === 'musket' || value === 'hornBow' || value === 'spear';
 }
@@ -47,7 +60,7 @@ export function residentDefenseContribution(
     : resident.job === 'watchman'
       ? CONFIG.raid.watchmanDefense
       : 0;
-  if (weapon === 'musket' && state.resources.gunpowder > 0) {
+  if (weapon === 'musket' && state.resources.gunpowder + 1e-9 >= CONFIG.raid.powderPerMusket) {
     return Math.max(base, CONFIG.raid.musketDefense);
   }
   if (weapon === 'hornBow') return Math.max(base, CONFIG.raid.hornBowDefense);
@@ -124,16 +137,29 @@ function reconciledManualAssignments(state: GameState): Partial<Record<number, C
   return next;
 }
 
-export function synchronizeWeaponAssignments(state: GameState): void {
+export function resolvedWeaponAssignments(
+  state: GameState,
+): Readonly<Partial<Record<number, CombatWeaponId>>> {
+  return state.weaponAllocationMode === 'manual'
+    ? reconciledManualAssignments(state)
+    : automaticWeaponAssignments(state);
+}
+
+export function reconcileWeaponAssignments(state: GameState): void {
   if (state.weaponAllocationMode !== 'manual') state.weaponAllocationMode = 'auto';
   state.weaponAssignments = state.weaponAllocationMode === 'auto'
     ? automaticWeaponAssignments(state)
     : reconciledManualAssignments(state);
 }
 
+/** @deprecated Use reconcileWeaponAssignments at explicit mutation boundaries. */
+export function synchronizeWeaponAssignments(state: GameState): void {
+  reconcileWeaponAssignments(state);
+}
+
 export function setAutomaticWeaponAllocation(state: GameState): void {
   state.weaponAllocationMode = 'auto';
-  synchronizeWeaponAssignments(state);
+  reconcileWeaponAssignments(state);
 }
 
 export function clearWeaponAssignments(state: GameState): void {
@@ -146,7 +172,7 @@ export function setResidentWeapon(
   residentId: number,
   weapon: CombatWeaponId | null,
 ): string | null {
-  synchronizeWeaponAssignments(state);
+  reconcileWeaponAssignments(state);
   const resident = state.residents.find(candidate => candidate.id === residentId);
   if (!resident) return '주민을 찾을 수 없습니다.';
   if (!isCombatResident(resident)) return '수비병·파수꾼·사냥꾼에게만 전투 무기를 배정할 수 있습니다.';
@@ -173,23 +199,93 @@ export function setResidentWeapon(
 }
 
 export function assignedWeapon(state: GameState, residentId: number): CombatWeaponId | null {
-  synchronizeWeaponAssignments(state);
-  return state.weaponAssignments[residentId] ?? null;
+  return resolvedWeaponAssignments(state)[residentId] ?? null;
+}
+
+export function musketReadiness(
+  state: GameState,
+  musketUsers: Iterable<number>,
+  powderPerShooter: number,
+): MusketReadiness {
+  const assigned = new Set(musketUsers).size;
+  const perShooter = Math.max(0, powderPerShooter);
+  const ready = perShooter === 0
+    ? assigned
+    : Math.min(assigned, Math.floor((Math.max(0, state.resources.gunpowder) + 1e-9) / perShooter));
+  return {
+    assigned,
+    ready,
+    dry: assigned - ready,
+    powderRequired: ready * perShooter,
+  };
+}
+
+export function consumeMusketPowder(
+  state: GameState,
+  musketUsers: Iterable<number>,
+  powderPerShooter: number,
+): number {
+  const readiness = musketReadiness(state, musketUsers, powderPerShooter);
+  const used = Math.min(Math.max(0, state.resources.gunpowder), readiness.powderRequired);
+  state.resources.gunpowder = Math.max(0, state.resources.gunpowder - used);
+  return used;
+}
+
+export function allocateMusketReadiness(
+  state: GameState,
+  requests: Iterable<{ id: string; residentIds: Iterable<number> }>,
+  powderPerShooter: number,
+): MusketGroupReadiness {
+  const groups = [...requests]
+    .map(request => ({ id: request.id, count: new Set(request.residentIds).size }))
+    .filter(request => request.count > 0)
+    .sort((a, b) => a.id.localeCompare(b.id));
+  const totalAssigned = groups.reduce((sum, group) => sum + group.count, 0);
+  const ready = musketReadiness(
+    state,
+    Array.from({ length: totalAssigned }, (_, index) => index),
+    powderPerShooter,
+  ).ready;
+  const byGroup: Record<string, number> = Object.fromEntries(groups.map(group => [group.id, 0]));
+  let remaining = ready;
+  while (remaining > 0) {
+    let allocated = false;
+    for (const group of groups) {
+      if (remaining <= 0) break;
+      if (byGroup[group.id] >= group.count) continue;
+      byGroup[group.id] += 1;
+      remaining -= 1;
+      allocated = true;
+    }
+    if (!allocated) break;
+  }
+  return { byGroup, ready, powderRequired: ready * Math.max(0, powderPerShooter) };
+}
+
+export function consumeMusketVolleys(
+  state: GameState,
+  requests: Iterable<{ id: string; residentIds: Iterable<number> }>,
+  powderPerShooter: number,
+): MusketGroupReadiness {
+  const allocation = allocateMusketReadiness(state, requests, powderPerShooter);
+  state.resources.gunpowder = Math.max(0, state.resources.gunpowder - allocation.powderRequired);
+  return allocation;
 }
 
 export function weaponCountsForResidents(
   state: GameState,
   residents: Iterable<Pick<Resident, 'id'>>,
 ): WeaponCounts {
-  synchronizeWeaponAssignments(state);
+  const assignments = resolvedWeaponAssignments(state);
   let muskets = 0;
   let hornBows = 0;
   let spears = 0;
   let total = 0;
+  const musketUsers: number[] = [];
   for (const resident of residents) {
     total += 1;
-    const weapon = state.weaponAssignments[resident.id];
-    if (weapon === 'musket') muskets += 1;
+    const weapon = assignments[resident.id];
+    if (weapon === 'musket') { muskets += 1; musketUsers.push(resident.id); }
     else if (weapon === 'hornBow') hornBows += 1;
     else if (weapon === 'spear') spears += 1;
   }
@@ -198,7 +294,7 @@ export function weaponCountsForResidents(
     hornBows,
     spears,
     unarmed: Math.max(0, total - muskets - hornBows - spears),
-    readyMuskets: state.resources.gunpowder > 0 ? muskets : 0,
+    readyMuskets: musketReadiness(state, musketUsers, CONFIG.raid.powderPerMusket).ready,
   };
 }
 

@@ -16,11 +16,281 @@ import { reconcileTributeReserve } from './tributeReserve';
 import { reconcileResidentHomes } from './residents';
 import { ensureIncidentState } from './specialEvents';
 import { ensureForeignSiteState, revealForeignSitesFromExploration } from './foreignSites';
-import { synchronizeWeaponAssignments } from './weapons';
-import type { CourtTribute, GameState, Gender, Resident, ResourceId } from './types';
+import { allocateMusketReadiness, reconcileWeaponAssignments, resolvedWeaponAssignments } from './weapons';
+import { beginExpeditionReturn } from './expedition';
+import { CURRENT_SCHEMA_VERSION } from './saveSchema';
+import {
+  gradeTacticalBattle, raidDefenseObjectiveResult, tacticalClosingSummary, tacticalOutcomeResult,
+} from './tacticalCore';
+import type {
+  CombatWeaponId, CourtTribute, DefenderGroupKind, GameState, Gender, Resident, ResourceId,
+  TacticalBattle, TacticalBattleReport, TacticalCommandId, TacticalRoundReport,
+} from './types';
+
+export { CURRENT_SCHEMA_VERSION } from './saveSchema';
 
 const SAVE_KEY = 'buksae-save-v3'; // v3: 이동 보간(px/py)과 지도 위 습격 무리 추가
 const RESOURCE_ID_SET = new Set<string>(RESOURCE_IDS);
+
+type RawSave = Record<string, unknown>;
+
+function clonedRecord(raw: unknown): RawSave {
+  if (!raw || typeof raw !== 'object') return {};
+  return JSON.parse(JSON.stringify(raw)) as RawSave;
+}
+
+export function migrateV3ToV4(raw: RawSave): RawSave {
+  return { ...raw, schemaVersion: 4 };
+}
+
+export function migrateV4ToV5(raw: RawSave): RawSave {
+  return {
+    ...raw,
+    weaponAssignments: raw.weaponAssignments && typeof raw.weaponAssignments === 'object' ? raw.weaponAssignments : {},
+    weaponAllocationMode: raw.weaponAllocationMode === 'manual' ? 'manual' : 'auto',
+    schemaVersion: 5,
+  };
+}
+
+export function migrateV5ToV6(raw: RawSave): RawSave {
+  return {
+    ...raw,
+    tacticalBattle: Object.prototype.hasOwnProperty.call(raw, 'tacticalBattle') ? raw.tacticalBattle : null,
+    tacticalBattleReport: Object.prototype.hasOwnProperty.call(raw, 'tacticalBattleReport') ? raw.tacticalBattleReport : null,
+    schemaVersion: 6,
+  };
+}
+
+export function migrateV6ToV7(raw: RawSave): RawSave {
+  return { ...raw, schemaVersion: 7 };
+}
+
+export function migrateToCurrent(raw: unknown): RawSave {
+  let migrated = clonedRecord(raw);
+  let version = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
+  while (version < CURRENT_SCHEMA_VERSION) {
+    if (version === 3) migrated = migrateV3ToV4(migrated);
+    else if (version === 4) migrated = migrateV4ToV5(migrated);
+    else if (version === 5) migrated = migrateV5ToV6(migrated);
+    else if (version === 6) migrated = migrateV6ToV7(migrated);
+    else break;
+    version = Number(migrated.schemaVersion);
+  }
+  migrated.schemaVersion = CURRENT_SCHEMA_VERSION;
+  return migrated;
+}
+
+const TACTICAL_PHASES = new Set(['preparation', 'preparationExecution', 'deployment', 'command', 'simulating', 'report', 'finished']);
+const DEFENDER_KINDS = new Set<DefenderGroupKind>([
+  'militia-spear', 'militia-bow', 'militia-musket', 'militia-unarmed', 'watchman', 'hunter', 'civilian',
+]);
+const TACTICAL_COMMANDS = new Set<TacticalCommandId>([
+  'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'fallback', 'advance', 'charge',
+  'arson', 'blockEscape', 'openRetreat',
+]);
+
+function inferredGroupIdentity(kind: DefenderGroupKind): {
+  role: TacticalBattle['defenderGroups'][number]['role']; weapon: CombatWeaponId | null;
+} {
+  if (kind === 'watchman') return { role: 'watchman', weapon: null };
+  if (kind === 'hunter') return { role: 'hunter', weapon: null };
+  if (kind === 'civilian') return { role: 'civilian', weapon: null };
+  if (kind === 'militia-musket') return { role: 'militia', weapon: 'musket' };
+  if (kind === 'militia-bow') return { role: 'militia', weapon: 'hornBow' };
+  if (kind === 'militia-spear') return { role: 'militia', weapon: 'spear' };
+  return { role: 'militia', weapon: null };
+}
+
+export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalBattle | null {
+  if (raw == null) return null;
+  if (typeof raw !== 'object') return null;
+  const source = clonedRecord(raw);
+  if (!Array.isArray(source.zones) || source.zones.length === 0 ||
+      !Array.isArray(source.defenderGroups) || !Array.isArray(source.raiderGroups)) return null;
+  if (!TACTICAL_PHASES.has(String(source.phase))) return null;
+
+  const rawZones = source.zones.filter(zone => zone && typeof zone === 'object') as Array<Record<string, unknown>>;
+  const zoneIds = new Set(rawZones.map(zone => String(zone.id ?? '')).filter(Boolean));
+  if (zoneIds.size === 0) return null;
+  const residentIds = new Set(state.residents.map(resident => resident.id));
+  const defaultZoneId = zoneIds.has(String(source.currentZoneId)) ? String(source.currentZoneId) : [...zoneIds][0];
+  const encounterKind = source.encounterKind === 'banditLair' || source.assaultKind === 'banditLair'
+    ? 'banditLair'
+    : source.encounterKind === 'predatorHunt' || source.assaultKind === 'predatorHunt'
+      ? 'predatorHunt'
+      : 'raidDefense';
+  const zones = rawZones.filter(zone => zoneIds.has(String(zone.id))).map((zone, index) => ({
+    ...zone,
+    id: String(zone.id),
+    name: typeof zone.name === 'string' ? zone.name : String(zone.id),
+    kind: zone.kind === 'approach' || zone.kind === 'forest' || zone.kind === 'ford' || zone.kind === 'wall' ||
+      zone.kind === 'storehouse' || zone.kind === 'center' ? zone.kind : 'approach',
+    order: Number.isFinite(zone.order) ? Number(zone.order) : index,
+    pressure: Math.max(0, Number(zone.pressure) || 0),
+    breached: zone.breached === true,
+    defenseBonus: Number(zone.defenseBonus) || 0,
+    ambushBonus: Number(zone.ambushBonus) || 0,
+    lootRisk: Math.max(0, Number(zone.lootRisk) || 0),
+    civilianRisk: Math.max(0, Number(zone.civilianRisk) || 0),
+    description: typeof zone.description === 'string' ? zone.description : '',
+  }));
+
+  const defenderGroups = (source.defenderGroups as unknown[]).flatMap((entry, index) => {
+    if (!entry || typeof entry !== 'object') return [];
+    const group = entry as Record<string, unknown>;
+    if (!DEFENDER_KINDS.has(group.kind as DefenderGroupKind)) return [];
+    const kind = group.kind as DefenderGroupKind;
+    const inferred = inferredGroupIdentity(kind);
+    const ids = Array.isArray(group.residentIds)
+      ? [...new Set(group.residentIds.filter(id => Number.isInteger(id) && residentIds.has(Number(id))).map(Number))]
+      : [];
+    const count = ids.length;
+    const killed = Math.min(count, Math.max(0, Math.floor(Number(group.killed) || 0)));
+    const wounded = Math.min(count - killed, Math.max(0, Math.floor(Number(group.wounded) || 0)));
+    const weapon = group.weapon === 'musket' || group.weapon === 'hornBow' || group.weapon === 'spear'
+      ? group.weapon as CombatWeaponId
+      : group.weapon === null ? null : inferred.weapon;
+    const role = group.role === 'militia' || group.role === 'watchman' || group.role === 'hunter' || group.role === 'civilian'
+      ? group.role : inferred.role;
+    return [{
+      ...group,
+      id: typeof group.id === 'string' ? group.id : `migrated-defender-${index}`,
+      kind, role, weapon,
+      readyMuskets: weapon === 'musket' ? Math.min(count, Math.max(0, Math.floor(Number(group.readyMuskets) || count))) : 0,
+      label: typeof group.label === 'string' ? group.label : String(group.id ?? kind),
+      residentIds: ids, count, killed, wounded,
+      zoneId: zoneIds.has(String(group.zoneId)) ? String(group.zoneId) : defaultZoneId,
+      command: TACTICAL_COMMANDS.has(group.command as TacticalCommandId) ? group.command as TacticalCommandId : null,
+      power: Math.max(0, Number(group.power) || 0),
+      line: group.line === 'front' || group.line === 'rear'
+        ? group.line
+        : weapon === 'spear' || (weapon == null && (role === 'militia' || role === 'watchman')) ? 'front' : 'rear',
+      ambushed: group.ambushed === true,
+    }];
+  });
+
+  const rawRaiderPower = (source.raiderGroups as unknown[]).reduce<number>((sum, entry) =>
+    entry && typeof entry === 'object' ? sum + Math.max(0, Number((entry as Record<string, unknown>).power) || 0) : sum, 0);
+  const estimatedRaiders = Math.max(1, Math.round((Number(source.originalPower) || 3) / CONFIG.tacticalBattle.raiderPowerPerFighter));
+  const raiderGroups = (source.raiderGroups as unknown[]).flatMap((entry, index) => {
+    if (!entry || typeof entry !== 'object') return [];
+    const group = entry as Record<string, unknown>;
+    const count = Number.isFinite(group.count)
+      ? Math.max(0, Math.floor(Number(group.count)))
+      : Math.max(1, Math.round(estimatedRaiders * (rawRaiderPower > 0 ? (Number(group.power) || 0) / rawRaiderPower : 1 / 3)));
+    return [{
+      ...group,
+      id: typeof group.id === 'string' ? group.id : `migrated-raider-${index}`,
+      zoneId: zoneIds.has(String(group.zoneId)) ? String(group.zoneId) : defaultZoneId,
+      targetZoneId: zoneIds.has(String(group.targetZoneId)) ? String(group.targetZoneId) : defaultZoneId,
+      count,
+      killed: Math.min(count, Math.max(0, Math.floor(Number(group.killed) || 0))),
+      power: Math.max(0, Number(group.power) || 0),
+      morale: Math.max(0, Math.min(100, Number(group.morale) || 0)),
+      engagementsInZone: Math.max(0, Math.floor(Number(group.engagementsInZone) || 0)),
+    }];
+  });
+  if (!defenderGroups.some(group => group.count > 0) || !raiderGroups.some(group => group.count > 0)) return null;
+
+  const reports = (Array.isArray(source.reports) ? source.reports : [])
+    .filter(report => report && typeof report === 'object')
+    .map(report => {
+      const item = report as Record<string, unknown>;
+      return {
+        ...item,
+        lines: Array.isArray(item.lines) ? item.lines.filter(line => typeof line === 'string') : [],
+        events: Array.isArray(item.events) ? item.events : [],
+        raidersKilled: Math.max(0, Number(item.raidersKilled) || 0),
+      } as unknown as TacticalRoundReport;
+    });
+  const migrated = {
+    ...source,
+    encounterKind,
+    orientation: encounterKind === 'raidDefense' ? 'defense' : 'assault',
+    assaultKind: encounterKind === 'raidDefense' ? undefined : encounterKind,
+    phase: source.phase,
+    prepActions: (Array.isArray(source.prepActions) ? source.prepActions : [])
+      .filter(action => action && typeof action === 'object'),
+    preparationEvents: Array.isArray(source.preparationEvents) ? source.preparationEvents : [],
+    zones,
+    defenderGroups,
+    raiderGroups,
+    initialFriendlyPower: Number.isFinite(source.initialFriendlyPower)
+      ? Math.max(1, Number(source.initialFriendlyPower))
+      : Math.max(1, defenderGroups.reduce((sum, group) => sum + group.power, 0)),
+    initialEnemyPower: Number.isFinite(source.initialEnemyPower)
+      ? Math.max(1, Number(source.initialEnemyPower))
+      : Math.max(1, raiderGroups.reduce((sum, group) => sum + group.power, 0)),
+    reports,
+    pendingReport: source.pendingReport && typeof source.pendingReport === 'object' ? source.pendingReport : null,
+    currentZoneId: defaultZoneId,
+  } as unknown as TacticalBattle;
+  return migrated;
+}
+
+function migrateTacticalBattleReport(raw: unknown): TacticalBattleReport | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const report = clonedRecord(raw) as unknown as TacticalBattleReport;
+  if (!Number.isFinite(report.battleId) || typeof report.outcome !== 'string') return null;
+  report.encounterKind ??= 'raidDefense';
+  report.title ??= report.encounterKind === 'banditLair' ? '토벌 장계' : report.encounterKind === 'predatorHunt' ? '사냥 장계' : '전투 장계';
+  report.friendlyLabel ??= report.encounterKind === 'raidDefense' ? '수비대' : report.encounterKind === 'banditLair' ? '원정대' : '사냥대';
+  report.enemyLabel ??= report.factionName ?? '적';
+  report.result = report.result === 'victory' || report.result === 'defeat'
+    ? report.result
+    : tacticalOutcomeResult(report.outcome);
+  report.killed = Array.isArray(report.killed) ? report.killed : [];
+  report.wounded = Array.isArray(report.wounded) ? report.wounded : [];
+  report.damagedBuildings = Array.isArray(report.damagedBuildings) ? report.damagedBuildings : [];
+  report.highlights = Array.isArray(report.highlights) ? report.highlights : [];
+  report.loot = report.loot && typeof report.loot === 'object' ? report.loot : {};
+  report.recoveredLoot = report.recoveredLoot && typeof report.recoveredLoot === 'object' ? report.recoveredLoot : {};
+  const looted = Object.values(report.loot).some(amount => (amount ?? 0) > 1e-9);
+  report.enemyRouted = report.enemyRouted === true || (
+    report.encounterKind === 'raidDefense' && report.outcome === 'defenseSuccess' &&
+    (Number(report.raiderMorale) <= 20 ||
+      Number(report.raidersKilled) / Math.max(1, Number(report.raidersCommitted) || 0) >= 0.65)
+  );
+  const objective = report.encounterKind === 'raidDefense'
+    ? raidDefenseObjectiveResult({
+      factionName: report.factionName ?? report.enemyLabel,
+      outcome: report.outcome,
+      enemyRouted: report.enemyRouted,
+      looted,
+      defendersCommitted: Number(report.defendersCommitted) || 0,
+      defendersKilled: report.killed.length,
+      defendersWounded: report.wounded.length,
+    })
+    : null;
+  if (objective) report.result = objective.result;
+  report.closingSummary = typeof report.closingSummary === 'string' && report.closingSummary.length > 0
+    ? report.closingSummary
+    : tacticalClosingSummary(report.encounterKind, report.outcome, report.factionName ?? report.enemyLabel, {
+      looted,
+      enemyRouted: report.enemyRouted,
+    });
+  report.initialFriendlyPower = Math.max(1, Number(report.initialFriendlyPower) || Number(report.defendersCommitted) || 1);
+  report.initialEnemyPower = Math.max(1, Number(report.initialEnemyPower) || Number(report.raidersCommitted) || 1);
+  const migratedGrade = gradeTacticalBattle({
+    encounterKind: report.encounterKind,
+    result: report.result,
+    friendlyPower: report.initialFriendlyPower,
+    enemyPower: report.initialEnemyPower,
+    defendersCommitted: Number(report.defendersCommitted) || 0,
+    defendersKilled: report.killed.length,
+    defendersWounded: report.wounded.length,
+    enemiesCommitted: Number(report.raidersCommitted) || 0,
+    enemiesKilled: Number(report.raidersKilled) || 0,
+    loot: report.loot,
+  });
+  report.grade = objective?.forcedGrade ?? migratedGrade.grade;
+  report.gradeScore = migratedGrade.score;
+  report.resourceDelta = report.resourceDelta && typeof report.resourceDelta === 'object'
+    ? report.resourceDelta
+    : Object.fromEntries(Object.entries(report.loot).map(([id, amount]) =>
+      [id, report.encounterKind === 'raidDefense' ? -Number(amount) : Number(amount)]));
+  return report;
+}
 
 function normalizedAmount(value: unknown): number {
   const amount = Number(value);
@@ -162,7 +432,7 @@ function migrateWeaponAssignments(state: GameState): void {
     state.weaponAssignments = {};
   }
   state.weaponAllocationMode = legacy.weaponAllocationMode === 'manual' ? 'manual' : 'auto';
-  synchronizeWeaponAssignments(state);
+  reconcileWeaponAssignments(state);
 }
 
 function migrateExpeditionState(state: GameState): void {
@@ -213,7 +483,7 @@ function migrateExpeditionState(state: GameState): void {
 
 export function saveGame(state: GameState): boolean {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...state, schemaVersion: CURRENT_SCHEMA_VERSION }));
     return true;
   } catch {
     return false;
@@ -224,7 +494,8 @@ export function loadGame(): GameState | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as GameState;
+    const decoded = JSON.parse(raw) as RawSave;
+    const parsed = migrateToCurrent(decoded) as unknown as GameState;
     // 최소한의 유효성 검사 (구버전 저장은 무시)
     if (!parsed.map || !parsed.residents || !parsed.resources || !parsed.buildings) return null;
     if (parsed.subTick == null || parsed.residents.some(r => r.x == null || r.px == null)) return null;
@@ -233,6 +504,10 @@ export function loadGame(): GameState | null {
     if (!Array.isArray(parsed.battleScars)) parsed.battleScars = [];
     if (!Object.prototype.hasOwnProperty.call(parsed, 'tacticalBattle')) parsed.tacticalBattle = null;
     if (!Object.prototype.hasOwnProperty.call(parsed, 'tacticalBattleReport')) parsed.tacticalBattleReport = null;
+    const tacticalBattleWasPresent = decoded.tacticalBattle != null;
+    parsed.tacticalBattle = migrateTacticalBattle(parsed.tacticalBattle, parsed);
+    const tacticalRecoveryNeeded = tacticalBattleWasPresent && parsed.tacticalBattle == null;
+    parsed.tacticalBattleReport = migrateTacticalBattleReport(parsed.tacticalBattleReport);
     if (parsed.tacticalBattle) {
       parsed.tacticalBattle.orientation = parsed.tacticalBattle.orientation === 'assault' ? 'assault' : 'defense';
       const assault = parsed.tacticalBattle.orientation === 'assault';
@@ -390,6 +665,48 @@ export function loadGame(): GameState | null {
     migrateResidentHaulTasks(parsed);
     migrateExpeditionState(parsed);
     migrateWeaponAssignments(parsed);
+    if (parsed.tacticalBattle) {
+      const assignments = resolvedWeaponAssignments(parsed);
+      for (const group of parsed.tacticalBattle.defenderGroups) {
+        if (group.weapon == null && (group.role === 'watchman' || group.role === 'hunter')) {
+          const assigned = [...new Set(group.residentIds.map(id => assignments[id] ?? null))];
+          if (assigned.length === 1) group.weapon = assigned[0];
+        }
+      }
+      const musketGroups = parsed.tacticalBattle.defenderGroups.filter(group => group.weapon === 'musket');
+      const readiness = allocateMusketReadiness(
+        parsed,
+        musketGroups.map(group => ({ id: group.id, residentIds: group.residentIds })),
+        CONFIG.raid.powderPerMusket,
+      );
+      for (const group of musketGroups) group.readyMuskets = readiness.byGroup[group.id] ?? 0;
+    }
+    if (tacticalRecoveryNeeded) {
+      parsed.tacticalBattle = null;
+      parsed.tacticalBattleReport = null;
+      if (parsed.expedition?.phase === 'engage') {
+        const returnError = beginExpeditionReturn(parsed);
+        if (returnError && parsed.expedition) {
+          const expedition = parsed.expedition;
+          for (const resident of parsed.residents.filter(candidate => expedition.memberIds.includes(candidate.id))) {
+            resident.x = expedition.musterX;
+            resident.y = expedition.musterY;
+            resident.px = expedition.musterX;
+            resident.py = expedition.musterY;
+            resident.path = [];
+            resident.task = '대기';
+          }
+          parsed.expedition = null;
+        }
+      }
+      parsed.log ??= [];
+      parsed.log.push({
+        day: parsed.day,
+        text: '저장된 전술전 데이터가 손상되어 전투만 취소하고 원정대의 안전 귀환을 처리했습니다.',
+        kind: 'info',
+        important: true,
+      });
+    }
     rebuildBuildingFootprints(parsed);
     reconcileResidentHomes(parsed, makeRng((parsed.seed ?? 1) + parsed.day * 32452843));
     ensureExploration(parsed);

@@ -39,7 +39,8 @@ import { getPointerAction } from './selectionActions';
 import { createExploration, isBuildingFootprintExplored, refreshExploration } from './exploration';
 import { LUXURY_RESOURCES } from './resourceCatalog';
 import { returnResidentCart, setResidentCartEquipped } from './equipment';
-import { setAutomaticWeaponAllocation, synchronizeWeaponAssignments } from './weapons';
+import { reconcileWeaponAssignments, setAutomaticWeaponAllocation } from './weapons';
+import { CURRENT_SCHEMA_VERSION } from './saveSchema';
 import { expeditionTick } from './expedition';
 import {
   maybeOpenExpeditionEngagementChoice, resolveExpeditionEngagementChoice,
@@ -80,6 +81,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
   }
 
   const state: GameState = {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     day: 1,
     subTick: 0,
     difficulty,
@@ -330,7 +332,7 @@ export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
   r.job = to;
   clearIncompatibleAssignment(state, r);
   resetAgent(state, r);
-  synchronizeWeaponAssignments(state);
+  reconcileWeaponAssignments(state);
   state.resources.defense = computeDefense(state);
   return true;
 }
@@ -343,7 +345,7 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
     r.job = job;
     clearIncompatibleAssignment(state, r);
     resetAgent(state, r);
-    synchronizeWeaponAssignments(state);
+    reconcileWeaponAssignments(state);
     state.resources.defense = computeDefense(state);
   }
 }
@@ -609,6 +611,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'incident') resolveSpecialEvent(state, optionId, rng);
   else if (state.pendingChoice.kind === 'territory') resolveTerritoryWarning(state, optionId);
   else resolveTrade(state, optionId);
+  reconcileWeaponAssignments(state);
   state.resources.defense = computeDefense(state);
 }
 
@@ -636,6 +639,8 @@ export function continueAfterVictory(state: GameState): boolean {
 export function advanceTick(state: GameState): void {
   if (state.gameOver || state.pendingChoice || state.tacticalBattle || state.tacticalBattleReport) return;
   agentsTick(state);
+  reconcileWeaponAssignments(state);
+  state.resources.defense = computeDefense(state);
   expeditionTick(state);
   maybeOpenExpeditionEngagementChoice(state);
   const tickRng = makeRng(state.seed + state.day * 7919 + state.subTick * 131 + 3);

@@ -9,7 +9,8 @@ import { expeditionEnemyIntel } from '../game/expeditionIntel';
 import { banditLairRaidChance } from '../game/siteDiplomacy';
 import { predatorHuntChance } from '../game/specialEvents';
 import {
-  COMBAT_WEAPON_IDS, COMBAT_WEAPON_NAMES, residentDefenseContribution, weaponCountsForResidents, weaponStock,
+  COMBAT_WEAPON_IDS, COMBAT_WEAPON_NAMES, residentDefenseContribution, resolvedWeaponAssignments,
+  weaponCountsForResidents, weaponStock,
 } from '../game/weapons';
 import type { CombatWeaponId, GameState, PredatorKind } from '../game/types';
 
@@ -37,6 +38,7 @@ export function ExpeditionMusterDialog({
   state, request, onAssignWeapon, onConfirm, onClose,
 }: Props) {
   const available = availableExpeditionResidents(state);
+  const assignments = resolvedWeaponAssignments(state);
   const [selectedIds, setSelectedIds] = useState<number[]>(() => available.map(resident => resident.id));
   const [submitError, setSubmitError] = useState<string | null>(null);
   const availableIds = new Set(available.map(resident => resident.id));
@@ -87,7 +89,7 @@ export function ExpeditionMusterDialog({
   const used: Record<CombatWeaponId, number> = { musket: 0, hornBow: 0, spear: 0 };
   for (const resident of state.residents) {
     if (!resident.alive) continue;
-    const weapon = state.weaponAssignments[resident.id];
+    const weapon = assignments[resident.id];
     if (weapon) used[weapon] += 1;
   }
 
@@ -200,7 +202,7 @@ export function ExpeditionMusterDialog({
               <section key={role} className="expedition-member-group">
                 <h3>{JOB_NAMES[role]}</h3>
                 {residents.map(resident => {
-                  const current = state.weaponAssignments[resident.id] ?? '';
+                  const current = assignments[resident.id] ?? '';
                   return (
                     <div key={resident.id} className={`expedition-member-row ${selectedSet.has(resident.id) ? 'selected' : ''}`}>
                       <label>

@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:game": "node tools/run-game-tests.mjs",
+    "test:combat": "node tools/game/test_tactical_battle.mjs",
+    "check": "npm run test:game && npm run build"
   },
   "dependencies": {
     "react": "^18.3.1",

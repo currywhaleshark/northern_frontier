@@ -1,12 +1,19 @@
 import { addLog } from './events';
+import { CONFIG } from './config';
+import { combatGroupLabel, tacticalGroupCapabilities, tacticalGroupPower } from './combatCapabilities';
 import { beginExpeditionReturn, expeditionResidentsForIds } from './expedition';
 import { predatorThreatProfile, tigerTierDangerMultiplier, tigerTierLabel } from './expeditionIntel';
 import { makeRng } from './map';
 import { injure, killResidents } from './raidDamage';
 import { applyWildlifeHuntOutcome, type WildlifeHuntOutcome } from './specialEvents';
 import { createExpeditionTacticalGroups } from './tacticalAssault';
+import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
+import {
+  captureTacticalResources, gradeTacticalBattle, tacticalClosingSummary, tacticalDateLabel,
+  tacticalDefenderShotCounts, tacticalOutcomeResult, tacticalPeopleReport, tacticalResourceDelta,
+} from './tacticalCore';
 import type {
-  DefenderGroupKind, GameState, PreparationActionId, TacticalAnimationEvent, TacticalBattle,
+  GameState, PreparationActionId, TacticalAnimationEvent, TacticalBattle,
   TacticalBattleZone, TacticalCommandId, TacticalDefenderGroup, TacticalRaiderGroup, TacticalRoundReport, TigerTier,
 } from './types';
 
@@ -17,9 +24,6 @@ const HUNT_PREPARATIONS: Array<{ id: PreparationActionId; label: string; cost: n
   { id: 'placeBait', label: '미끼 놓기', cost: 1 },
   { id: 'splitDrivers', label: '몰이꾼 나누기', cost: 2 },
 ];
-
-const MELEE_KINDS = new Set<DefenderGroupKind>(['militia-spear', 'militia-unarmed', 'watchman']);
-const RANGED_KINDS = new Set<DefenderGroupKind>(['militia-bow', 'militia-musket', 'hunter']);
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -98,16 +102,8 @@ function beastGroups(
 }
 
 function renameHuntGroups(groups: TacticalDefenderGroup[]): void {
-  const labels: Partial<Record<DefenderGroupKind, string>> = {
-    'militia-musket': '조총 사냥조',
-    'militia-bow': '각궁 사냥조',
-    'militia-spear': '창벽조',
-    'militia-unarmed': '몰이꾼',
-    watchman: '파수꾼 몰이조',
-    hunter: '사냥꾼 추적조',
-  };
   groups.forEach(group => {
-    group.label = labels[group.kind] ?? group.label;
+    group.label = combatGroupLabel(group.role, group.weapon);
     group.zoneId = 'huntTracks';
     group.command = null;
   });
@@ -134,12 +130,16 @@ export function createPredatorTacticalHunt(state: GameState): TacticalBattle | s
   const tigerTier = predatorKind === 'tiger' ? profile.tigerTier ?? 'tiger' : undefined;
   const predatorLabel = predatorKind === 'tiger' ? tigerTierLabel(tigerTier) : '늑대 떼';
   const exactIntel = threat.intel?.precision === 'exact';
+  const enemies = beastGroups(predatorKind, profile.strength, profile.size, tigerTier);
   const battle: TacticalBattle = {
+    encounterKind: 'predatorHunt',
     id: state.day * 1000 + state.subTick * 10 + 9,
     factionName: exactIntel ? predatorLabel : predatorKind === 'tiger' ? '호랑이' : predatorLabel,
     warned: exactIntel,
     siege: false,
     originalPower: profile.strength,
+    initialFriendlyPower: groups.reduce((sum, group) => sum + group.power, 0),
+    initialEnemyPower: enemies.reduce((sum, group) => sum + group.power, 0),
     phase: 'preparation',
     round: 1,
     prepPoints: huntPrepPoints(state, expedition.memberIds, exactIntel),
@@ -147,7 +147,7 @@ export function createPredatorTacticalHunt(state: GameState): TacticalBattle | s
     preparationEvents: [],
     zones: huntZones(),
     defenderGroups: groups,
-    raiderGroups: beastGroups(predatorKind, profile.strength, profile.size, tigerTier),
+    raiderGroups: enemies,
     currentZoneId: 'huntTracks',
     villageMorale: clamp(66 + groups.length * 2 + (exactIntel ? 6 : 0), 0, 100),
     raiderMorale: predatorKind === 'tiger'
@@ -167,6 +167,7 @@ export function createPredatorTacticalHunt(state: GameState): TacticalBattle | s
     huntTrapSet: false,
     huntBaitPlaced: false,
     huntLeaderKilled: false,
+    resourceSnapshot: captureTacticalResources(state),
   };
   state.tacticalBattle = battle;
   state.pendingChoice = null;
@@ -179,7 +180,7 @@ export function huntPreparationUnavailableReason(state: GameState, actionId: Pre
   if (!battle || battle.assaultKind !== 'predatorHunt') return '진행 중인 맹수 사냥이 없습니다.';
   if (!HUNT_PREPARATIONS.some(action => action.id === actionId)) return '이 준비는 몰이사냥에서 사용할 수 없습니다.';
   if (actionId === 'placeBait' && state.resources.meat < BAIT_MEAT_COST) return `미끼로 쓸 고기 ${BAIT_MEAT_COST}이 필요합니다.`;
-  if (actionId === 'setHuntTraps' && !battle.defenderGroups.some(group => group.kind === 'hunter' || group.kind === 'watchman')) {
+  if (actionId === 'setHuntTraps' && !battle.defenderGroups.some(group => group.role === 'hunter' || group.role === 'watchman')) {
     return '함정을 놓을 사냥꾼이나 파수꾼이 없습니다.';
   }
   if (actionId === 'splitDrivers' && battle.defenderGroups.filter(group => activeCount(group) > 0).length < 2) {
@@ -272,10 +273,10 @@ export function huntCommandUnavailableReason(
 ): string | null {
   if (battle.assaultKind !== 'predatorHunt') return '몰이사냥 명령이 아닙니다.';
   if (command === 'hold' || command === 'advance' || command === 'fallback' || command === 'openRetreat') return null;
-  if (command === 'volley') return RANGED_KINDS.has(group.kind) ? null : '사격 대기는 원거리 조만 수행할 수 있습니다.';
-  if (command === 'ambush') return group.kind === 'hunter' ? null : '사냥꾼만 숨은 길목을 지킬 수 있습니다.';
+  if (command === 'volley') return tacticalGroupCapabilities(group).has('volley') ? null : '각궁 또는 화약이 준비된 조총이 필요합니다.';
+  if (command === 'ambush') return tacticalGroupCapabilities(group).has('ambush') ? null : '사냥꾼만 숨은 길목을 지킬 수 있습니다.';
   if (command === 'charge') {
-    if (!MELEE_KINDS.has(group.kind)) return '창 돌입은 근접 조만 수행할 수 있습니다.';
+    if (!tacticalGroupCapabilities(group).has('charge')) return '창 돌입은 창을 갖춘 조만 수행할 수 있습니다.';
     return battle.huntPredatorState === 'hidden' ? '짐승의 위치를 먼저 밝혀야 합니다.' : null;
   }
   return '이 명령은 몰이사냥에서 사용할 수 없습니다.';
@@ -296,21 +297,21 @@ export function setHuntCommand(state: GameState, groupId: string, command: Tacti
 export function chooseDefaultHuntCommands(battle: TacticalBattle): void {
   for (const group of battle.defenderGroups) {
     if (group.command || activeCount(group) <= 0) continue;
-    if (group.kind === 'hunter') group.command = 'advance';
-    else if (RANGED_KINDS.has(group.kind)) group.command = 'volley';
+    if (tacticalGroupCapabilities(group).has('ambush')) group.command = 'advance';
+    else if (tacticalGroupCapabilities(group).has('volley')) group.command = 'volley';
     else group.command = 'hold';
   }
 }
 
 function addEvent(
   events: TacticalAnimationEvent[], zoneId: string, kind: TacticalAnimationEvent['kind'], text: string,
-  extra: Partial<Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'casualties' | 'float'>> = {},
+  extra: Partial<Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'casualties' | 'float' | 'shots' | 'meleeParticipants'>> = {},
 ): void {
   events.push({ zoneId, kind, text, durationMs: 650, ...extra });
 }
 
 function hunterSkill(state: GameState, groups: TacticalDefenderGroup[]): number {
-  const ids = new Set(groups.filter(group => group.kind === 'hunter').flatMap(group => group.residentIds));
+  const ids = new Set(groups.filter(group => group.role === 'hunter').flatMap(group => group.residentIds));
   const hunters = state.residents.filter(resident => ids.has(resident.id));
   return hunters.length > 0
     ? hunters.reduce((sum, resident) => sum + (resident.skills.hunter ?? 0), 0) / hunters.length
@@ -350,7 +351,7 @@ function beastAttack(
     ? living[Math.floor(rng() * living.length)]
     : weakestGroup(living);
   if (!target) return { wounded: 0, killed: 0 };
-  const spearWall = target.command === 'hold' && MELEE_KINDS.has(target.kind);
+  const spearWall = target.command === 'hold' && tacticalGroupCapabilities(target).has('melee');
   let hitChance = kind === 'tiger'
     ? clamp(0.68 * danger, 0.46, 0.92)
     : clamp(0.31 + Math.max(0, packSize - 3) * 0.035, 0.28, 0.64);
@@ -388,7 +389,7 @@ function applyWolfDamage(
   const leader = battle.raiderGroups.find(group => group.leader);
   const pack = battle.raiderGroups.find(group => !group.leader);
   if (!leader || !pack) return 0;
-  const hunterFocus = battle.defenderGroups.some(group => group.kind === 'hunter' && group.command === 'ambush');
+  const hunterFocus = battle.defenderGroups.some(group => tacticalGroupCapabilities(group).has('ambush') && group.command === 'ambush');
   const leaderShare = hunterFocus ? 0.55 : 0.28;
   const leaderDamage = damage * leaderShare;
   const packDamage = damage - leaderDamage;
@@ -466,7 +467,7 @@ export function resolveHuntRound(state: GameState): string | null {
   let revealedThisRound = false;
   if (battle.huntPredatorState === 'hidden') {
     const revealChance = clamp(
-      0.16 + driveGroups.length * 0.08 + players.filter(group => group.kind === 'hunter').length * 0.12 +
+      0.16 + driveGroups.length * 0.08 + players.filter(group => group.role === 'hunter').length * 0.12 +
       skill * 0.24 + weatherTrackingModifier(state.weather),
       0.08,
       0.92,
@@ -494,6 +495,16 @@ export function resolveHuntRound(state: GameState): string | null {
   }
 
   if (!retreatOrdered && battle.huntPredatorState !== 'hidden') {
+    const musketAllocation = consumeMusketVolleys(
+      state,
+      players
+        .filter(group => group.weapon === 'musket' && group.command === 'volley')
+        .map(group => ({ id: group.id, residentIds: group.residentIds.slice(0, activeCount(group)) })),
+      CONFIG.raid.powderPerMusket,
+    );
+    for (const group of players.filter(group => group.weapon === 'musket')) {
+      group.readyMuskets = musketAllocation.byGroup[group.id] ?? 0;
+    }
     let attackPower = 0;
     let musketeers = 0;
     for (const group of players) {
@@ -509,17 +520,30 @@ export function resolveHuntRound(state: GameState): string | null {
             : group.command === 'advance'
               ? 0.72
               : 0.28;
-      if (group.kind === 'militia-musket' && state.resources.gunpowder > 0) {
-        musketeers += active;
+      if (group.weapon === 'musket' && (group.readyMuskets ?? 0) > 0) {
+        musketeers += Math.min(active, group.readyMuskets ?? 0);
         if (battle.huntPredatorKind === 'tiger') multiplier *= 1.45;
       }
-      attackPower += group.power * share * multiplier;
+      const readyPower = group.weapon === 'musket' ? tacticalGroupPower(group, active) : group.power * share;
+      attackPower += readyPower * multiplier;
     }
+    const volleyShots = tacticalDefenderShotCounts(players.filter(group => group.command === 'volley'));
     if (musketeers > 0) {
-      const powder = Math.min(state.resources.gunpowder, musketeers * 0.15);
-      state.resources.gunpowder -= powder;
-      lines.push(`조총 사격에 화약 ${powder.toFixed(1)}을 소모했습니다.`);
-      addEvent(events, zone.id, 'volley', '발각된 짐승을 향해 조총과 각궁을 일제히 쏩니다.', { side: 'defender' });
+      lines.push(`조총 사격에 화약 ${musketAllocation.powderRequired.toFixed(1)}을 소모했습니다.`);
+    }
+    if ((volleyShots.arrows ?? 0) + (volleyShots.muskets ?? 0) > 0) {
+      addEvent(events, zone.id, 'volley', '발각된 짐승을 향해 조총과 각궁을 일제히 쏩니다.', {
+        side: 'defender', shots: volleyShots,
+      });
+    }
+    const meleeParticipants = players
+      .filter(group => tacticalGroupCapabilities(group).has('melee') && group.command !== 'fallback')
+      .reduce((sum, group) => sum + activeCount(group), 0) +
+      beasts.reduce((sum, group) => sum + activeBeasts(group), 0);
+    if (meleeParticipants > 0) {
+      addEvent(events, zone.id, 'melee', '창과 사냥칼을 든 사냥대가 짐승과 뒤엉켜 근접전을 벌입니다.', {
+        side: 'defender', meleeParticipants: meleeParticipants,
+      });
     }
     let damage = attackPower * (0.17 + rng() * 0.06) * (0.65 + (battle.huntEncirclement ?? 0) / 190);
     if (battle.huntTrapSet && zone.id === 'huntDrive') {
@@ -603,6 +627,15 @@ export function resolveHuntRound(state: GameState): string | null {
   battle.reports.push(report);
   battle.pendingReport = report;
   battle.round += 1;
+  const remainingMusketReadiness = allocateMusketReadiness(
+    state,
+    battle.defenderGroups.filter(group => group.weapon === 'musket' && activeCount(group) > 0)
+      .map(group => ({ id: group.id, residentIds: group.residentIds.slice(0, activeCount(group)) })),
+    CONFIG.raid.powderPerMusket,
+  );
+  for (const group of battle.defenderGroups.filter(group => group.weapon === 'musket')) {
+    group.readyMuskets = remainingMusketReadiness.byGroup[group.id] ?? 0;
+  }
   battle.phase = 'simulating';
   return null;
 }
@@ -633,6 +666,7 @@ export function finishPredatorTacticalHunt(state: GameState): void {
   const finalReport = [...battle.reports].reverse().find(report => report.ended) ?? battle.reports[battle.reports.length - 1];
   const outcome = finalReport?.outcome ?? 'huntDefeat';
   const rng = makeRng(state.seed + battle.id * 524287 + 307);
+  const reputationBefore = state.resources.reputation;
   let casualties = 0;
   for (const group of battle.defenderGroups) {
     if (group.killed > 0) killResidents(state, rng, group.killed, 1, group.residentIds);
@@ -657,8 +691,70 @@ export function finishPredatorTacticalHunt(state: GameState): void {
       ];
     }
   }
+  const people = tacticalPeopleReport(state, battle);
+  const raidersCommitted = battle.raiderGroups.reduce((sum, group) => sum + group.count, 0);
+  const raidersKilled = Math.min(raidersCommitted, battle.raiderGroups.reduce((sum, group) => sum + group.killed, 0));
+  const battleDefendersKilled = battle.defenderGroups.reduce((sum, group) => sum + group.killed, 0);
+  const battleDefendersWounded = battle.defenderGroups.reduce((sum, group) => sum + group.wounded, 0);
+  const reportResult = tacticalOutcomeResult(outcome);
+  const grade = gradeTacticalBattle({
+    encounterKind: 'predatorHunt',
+    result: reportResult,
+    friendlyPower: battle.initialFriendlyPower,
+    enemyPower: battle.initialEnemyPower,
+    defendersCommitted: people.committed,
+    defendersKilled: battleDefendersKilled,
+    defendersWounded: battleDefendersWounded,
+    enemiesCommitted: raidersCommitted,
+    enemiesKilled: raidersKilled,
+    loot: result.loot,
+  });
+  const outcomeLabels: Partial<Record<NonNullable<TacticalRoundReport['outcome']>, string>> = {
+    huntKill: '맹수 사살', huntRepelled: '맹수 격퇴', huntEscaped: '맹수 도주', huntDefeat: '사냥대 패퇴',
+  };
+  const predatorDetail = battle.huntPredatorKind === 'tiger'
+    ? `${tigerTierLabel(battle.huntTigerTier)} 1마리`
+    : `늑대 ${raidersCommitted}마리`;
+  state.tacticalBattleReport = {
+    encounterKind: 'predatorHunt',
+    title: '사냥 장계',
+    friendlyLabel: '사냥대',
+    enemyLabel: battle.factionName,
+    battleId: battle.id,
+    date: tacticalDateLabel(state),
+    factionName: battle.factionName,
+    mode: battle.mode,
+    warned: battle.warned,
+    outcome,
+    outcomeLabel: outcomeLabels[outcome] ?? '사냥 종료',
+    result: reportResult,
+    grade: grade.grade,
+    gradeScore: grade.score,
+    closingSummary: tacticalClosingSummary('predatorHunt', outcome, battle.factionName),
+    initialFriendlyPower: battle.initialFriendlyPower,
+    initialEnemyPower: battle.initialEnemyPower,
+    rounds: battle.reports.length,
+    villageMorale: Math.round(battle.villageMorale),
+    raiderMorale: Math.round(battle.raiderMorale),
+    defendersCommitted: people.committed,
+    defendersSurvived: people.survived,
+    killed: people.killed,
+    wounded: people.wounded,
+    raidersCommitted,
+    raidersKilled,
+    raidersEscaped: Math.max(0, raidersCommitted - raidersKilled),
+    damagedBuildings: [],
+    loot: result.loot,
+    recoveredLoot: {},
+    reputationDelta: state.resources.reputation - reputationBefore,
+    relationDelta: 0,
+    threatAfter: state.threat,
+    highlights: [predatorDetail, ...battle.reports.flatMap(report => report.lines)]
+      .filter((line, index, all) => all.indexOf(line) === index).slice(0, 10),
+    resourceDelta: tacticalResourceDelta(state, battle),
+    predatorOutcome: outcome === 'huntKill' ? 'killed' : outcome === 'huntRepelled' ? 'repelled' : 'escaped',
+  };
   state.tacticalBattle = null;
-  state.tacticalBattleReport = null;
   const error = beginExpeditionReturn(state, '사냥대가 맹수 직접 지휘전을 마치고 귀환길에 올랐습니다.');
   if (error) addLog(state, error, 'bad', true);
 }
