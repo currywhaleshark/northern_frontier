@@ -63,7 +63,7 @@ export function TacticalGroupChip({
           {group.label}
           <em>{active === 0 ? '전투 불능' : `${active}명`}</em>
         </strong>
-        <span>{zoneName} · {group.line === 'front' ? '전열' : '후열'}{group.ambushed ? ' · 매복중' : ''}</span>
+        <span>{zoneName} · {group.line === 'front' ? '전열' : group.line === 'middle' ? '중열' : '후열'}{group.ambushed ? ' · 매복중' : ''}</span>
         {mode === 'command' && (
           <span className={`tactical-dock-command${pending ? ' waiting' : ''}`}>
             {group.commandable === false

@@ -8,6 +8,7 @@ import type {
   TacticalAnimationEvent,
   TacticalBattleZone,
   TacticalDefenderGroup,
+  TacticalFormationLine,
   TacticalRaiderGroup,
   TigerTier,
 } from '../../game/types';
@@ -32,6 +33,9 @@ const BARRICADE_SPRITES = {
   reinforced: '/assets/tactical/barricade-reinforced-v1.png',
   broken: '/assets/tactical/barricade-broken-v1.png',
 } as const;
+
+const DEFENDER_FORMATION_LINES: readonly TacticalFormationLine[] = ['front', 'middle', 'rear'];
+const RAIDER_FORMATION_LINES: readonly TacticalFormationLine[] = ['rear', 'middle', 'front'];
 
 interface Props {
   state: GameState;
@@ -61,7 +65,20 @@ function defenderFormationRole(group: TacticalDefenderGroup): 'melee' | 'ranged'
 function defenderFormationOrder(group: TacticalDefenderGroup): number {
   const role = defenderFormationRole(group);
   const roleOrder = role === 'melee' ? 0 : role === 'ranged' ? 1 : 2;
-  return (group.line === 'front' ? 0 : 10) + roleOrder;
+  const lineOrder = group.line === 'front' ? 0 : group.line === 'middle' ? 10 : 20;
+  return lineOrder + roleOrder;
+}
+
+function formationLineLabel(line: TacticalFormationLine): string {
+  return line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열';
+}
+
+function raiderFormationLine(group: TacticalRaiderGroup): TacticalFormationLine {
+  if (group.unitType === 'court-artillery') return 'rear';
+  if (group.unitType === 'nimacha-hunter' || group.unitType === 'holaon-horse-archer' ||
+      group.unitType === 'bandit-rider' || group.unitType === 'court-gunner' ||
+      group.unitType === 'court-archer') return 'middle';
+  return 'front';
 }
 
 function UnitMuzzleFlash({ anchor }: { anchor: TacticalMuzzleAnchor }) {
@@ -496,6 +513,7 @@ export function TacticalZoneColumn({
   selectedGroupId,
   onSelectGroup,
 }: Props) {
+  const focused = zone.id === activeZoneId;
   const defenders = battle.defenderGroups
     .filter(group => group.zoneId === zone.id)
     .sort((a, b) => defenderFormationOrder(a) - defenderFormationOrder(b));
@@ -533,7 +551,7 @@ export function TacticalZoneColumn({
   return (
     <section
       data-zone-id={zone.id}
-      className={`tactical-zone zone-${zone.kind}${hunt ? ' hunt-zone' : assault ? ' assault-zone' : ' defense-zone'}${zone.id === activeZoneId ? ' focused' : ''}${visibleBreached ? ' breached' : ''}${burning ? ' burning' : ''}${raidersAdvancing ? ' moving-raiders' : ''}${rearAssaulters.length > 0 ? ' has-rear-assault' : ''}${eventClass(activeEvent, zone.id)}`}
+      className={`tactical-zone zone-${zone.kind}${hunt ? ' hunt-zone' : assault ? ' assault-zone' : ' defense-zone'}${focused ? ' focused' : ''}${visibleBreached ? ' breached' : ''}${burning ? ' burning' : ''}${raidersAdvancing ? ' moving-raiders' : ''}${rearAssaulters.length > 0 ? ' has-rear-assault' : ''}${eventClass(activeEvent, zone.id)}`}
       style={{
         backgroundImage: `url(${background.src})`,
         backgroundSize: background.size,
@@ -628,7 +646,15 @@ export function TacticalZoneColumn({
         </div>
       )}
       <div className="tactical-raider-rank">
-        {raiders.map(raider => {
+        {RAIDER_FORMATION_LINES.map(line => (
+          <div
+            className={`tactical-formation-lane line-${line}`}
+            data-formation-line={line}
+            aria-label={`적 ${formationLineLabel(line)}`}
+            key={line}
+          >
+            <span className="tactical-formation-line-label">적 {formationLineLabel(line)}</span>
+            {raiders.filter(raider => raiderFormationLine(raider) === line).map(raider => {
           const activeRaiders = Math.max(0, raider.count - raider.killed);
           const fallingRaiders = raider.revealed && activeEvent?.kind === 'casualty' && activeEvent.groupId === raider.id
             ? activeEvent.casualties ?? 0 : 0;
@@ -682,7 +708,12 @@ export function TacticalZoneColumn({
               </span>
             </div>
           );
-        })}
+            })}
+          </div>
+        ))}
+      </div>
+      <div className="tactical-contact-line" aria-hidden={!focused}>
+        <span>교전선</span>
       </div>
       <div className={`tactical-rear-assault-rank${activeEvent?.kind === 'rearAssault' && activeEvent.zoneId === zone.id ? ' entering' : ''}${activeEvent?.kind === 'melee' && activeEvent.side === 'raider' && activeEvent.zoneId === zone.id && rearAssaulters.some(group => activeEvent.groupId == null || activeEvent.groupId === group.id) ? ' attacking' : ''}`}>
         {rearAssaulters.map(raider => {
@@ -723,7 +754,15 @@ export function TacticalZoneColumn({
         })}
       </div>
       <div className="tactical-defender-rank">
-        {defenders.map(group => {
+        {DEFENDER_FORMATION_LINES.map(line => (
+          <div
+            className={`tactical-formation-lane line-${line}`}
+            data-formation-line={line}
+            aria-label={`아군 ${formationLineLabel(line)}`}
+            key={line}
+          >
+            <span className="tactical-formation-line-label">아군 {formationLineLabel(line)}</span>
+            {defenders.filter(group => group.line === line).map(group => {
           const recoiling = zoneVolley && defenderFiringForEvent(activeEvent, group);
           const blockingEscape = activeEvent?.kind === 'escapeBlocked' &&
             activeEvent.zoneId === zone.id && group.kind === 'hunter';
@@ -760,7 +799,9 @@ export function TacticalZoneColumn({
               <span>{group.label}{group.ambushed && <em className="tactical-state-badge ambushed">매복중</em>}</span>
             </div>
           );
-        })}
+            })}
+          </div>
+        ))}
       </div>
       {activeEvent?.float && activeEvent.zoneId === zone.id && (
         <span key={`float-${eventIndex}`} className={`tactical-float ${activeEvent.side ?? 'defender'}`}>

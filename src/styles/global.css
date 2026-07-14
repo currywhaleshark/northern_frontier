@@ -1605,6 +1605,9 @@ html, body, #root {
 .tactical-rear-assault-rank .tactical-court-raider { transform: scaleX(1) scale(var(--raider-scale)); }
 .tactical-rear-assault-rank.entering { animation: tactical-rear-assault-enter 820ms cubic-bezier(0.18, 0.75, 0.25, 1); }
 .tactical-rear-assault-rank.attacking { animation: tactical-rear-assault-strike 620ms ease-in-out; }
+.tactical-formation-lane { display: contents; }
+.tactical-formation-line-label,
+.tactical-contact-line { display: none; }
 @keyframes tactical-rear-assault-enter {
   from { opacity: 0; transform: translate(130px, -22px); }
   55% { opacity: 1; }
@@ -1767,6 +1770,95 @@ html, body, #root {
   right: 22%;
   gap: 4px;
 }
+.tactical-zone.focused .tactical-raider-rank,
+.tactical-zone.focused .tactical-defender-rank {
+  bottom: 30px;
+  min-height: 244px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 2px;
+}
+.tactical-zone.focused .tactical-raider-rank { left: 3%; right: 51%; }
+.tactical-zone.focused .tactical-defender-rank { left: 51%; right: 3%; }
+.tactical-zone.focused.has-rear-assault .tactical-defender-rank { right: 3%; }
+.tactical-zone.focused .tactical-formation-lane {
+  position: relative;
+  min-width: 0;
+  height: 224px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 18px;
+}
+.tactical-zone.focused .tactical-formation-line-label {
+  position: absolute;
+  z-index: 8;
+  top: 0;
+  left: 50%;
+  display: block;
+  width: max-content;
+  transform: translateX(-50%);
+  padding: 1px 4px;
+  border: 1px solid rgba(207, 213, 211, 0.25);
+  border-radius: 3px;
+  background: rgba(20, 24, 25, 0.7);
+  color: #b7bdbe;
+  font-size: 8px;
+  font-weight: 700;
+  pointer-events: none;
+}
+.tactical-zone.focused .tactical-raider-rank .tactical-formation-line-label { color: #d9aaa0; }
+.tactical-zone.focused .tactical-defender-rank .tactical-formation-line-label { color: #b9d8b9; }
+.tactical-zone.focused .tactical-formation-lane > .tactical-raider-group,
+.tactical-zone.focused .tactical-formation-lane > .tactical-field-group {
+  width: 100%;
+  min-height: 0;
+  flex: 0 0 102px;
+  gap: 2px;
+  scale: 0.78;
+  transform-origin: center bottom;
+}
+.tactical-zone.focused .tactical-formation-lane > .tactical-raider-group > span,
+.tactical-zone.focused .tactical-formation-lane > .tactical-field-group > span {
+  max-width: 116px;
+  padding: 2px 4px;
+  font-size: 8px;
+}
+.tactical-zone.focused .tactical-contact-line {
+  position: absolute;
+  z-index: 3;
+  top: 102px;
+  bottom: 28px;
+  left: 50%;
+  display: block;
+  width: 1px;
+  border-left: 1px dashed rgba(231, 213, 170, 0.5);
+  pointer-events: none;
+}
+.tactical-zone.focused .tactical-contact-line span {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 4px;
+  border: 1px solid rgba(217, 190, 127, 0.36);
+  border-radius: 3px;
+  background: rgba(30, 26, 20, 0.72);
+  color: #d8c28d;
+  font-size: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.tactical-screen.assault .tactical-zone.focused .tactical-raider-rank { left: 51%; right: 3%; }
+.tactical-screen.assault .tactical-zone.focused .tactical-defender-rank { left: 3%; right: 51%; }
+.tactical-screen.assault .tactical-zone.focused .tactical-raider-rank .line-front,
+.tactical-screen.assault .tactical-zone.focused .tactical-defender-rank .line-rear { grid-column: 1; grid-row: 1; }
+.tactical-screen.assault .tactical-zone.focused .tactical-raider-rank .line-middle,
+.tactical-screen.assault .tactical-zone.focused .tactical-defender-rank .line-middle { grid-column: 2; grid-row: 1; }
+.tactical-screen.assault .tactical-zone.focused .tactical-raider-rank .line-rear,
+.tactical-screen.assault .tactical-zone.focused .tactical-defender-rank .line-front { grid-column: 3; grid-row: 1; }
 .tactical-field-group {
   min-width: 0;
   flex: 0 1 auto;
@@ -2096,7 +2188,7 @@ html, body, #root {
   cursor: pointer;
 }
 .tactical-zone-buttons button { min-height: 32px; padding: 4px; font-size: 10px; }
-.tactical-line-toggle { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+.tactical-line-toggle { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .tactical-line-toggle button {
   min-height: 30px;
   padding: 4px 7px;
@@ -2132,7 +2224,7 @@ html, body, #root {
 }
 .tactical-command-bar-row .tactical-line-toggle {
   flex: 0 0 auto;
-  grid-template-columns: repeat(2, 52px);
+  grid-template-columns: repeat(3, 52px);
   align-content: stretch;
 }
 .tactical-command-bar {
@@ -2882,7 +2974,7 @@ html, body, #root {
   .tactical-action-grid { grid-template-columns: 1fr; }
   .tactical-zone-buttons { grid-template-columns: repeat(2, 1fr); }
   .tactical-command-bar-row { flex-direction: column; gap: 6px; }
-  .tactical-command-bar-row .tactical-line-toggle { grid-template-columns: repeat(2, 1fr); }
+  .tactical-command-bar-row .tactical-line-toggle { grid-template-columns: repeat(3, 1fr); }
   .tactical-command-hint { white-space: normal; }
   .tactical-report-numbers { grid-template-columns: repeat(2, 1fr); }
 }

@@ -647,13 +647,13 @@ export function TacticalBattleScreen({
                   ))}
                 </div>
                 <div className="tactical-line-toggle" aria-label={`${selectedGroup.label} 전열 선택`}>
-                  {(['front', 'rear'] as const).map(line => (
+                  {(['front', 'middle', 'rear'] as const).map(line => (
                     <button
                       key={line}
                       className={selectedGroup.line === line ? 'active' : ''}
                       disabled={selectedGroup.commandable === false || tacticalActiveDefenderCount(selectedGroup) <= 0}
                       onClick={() => onSetFormationLine(selectedGroup.id, line)}
-                    >{line === 'front' ? '전열' : '후열'}</button>
+                    >{line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열'}</button>
                   ))}
                 </div>
               </div>
@@ -682,12 +682,12 @@ export function TacticalBattleScreen({
                 <>
                   <div className="tactical-command-bar-row">
                     <div className="tactical-line-toggle" aria-label={`${selectedGroup.label} 전열 선택`}>
-                      {(['front', 'rear'] as const).map(line => (
+                      {(['front', 'middle', 'rear'] as const).map(line => (
                         <button
                           key={line}
                           className={selectedGroup.line === line ? 'active' : ''}
                           onClick={() => onSetFormationLine(selectedGroup.id, line)}
-                        >{line === 'front' ? '전열' : '후열'}</button>
+                        >{line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열'}</button>
                       ))}
                     </div>
                     <div className="tactical-command-bar" role="group" aria-label={`${selectedGroup.label} 명령 선택`}>
