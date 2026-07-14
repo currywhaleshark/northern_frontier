@@ -153,6 +153,54 @@ function prepareFormationTestCombatants(state) {
 }
 
 {
+  const redeploySave = simulation.newGame(2026071461);
+  prepareFormationTestCombatants(redeploySave);
+  const battle = tactical.createTacticalBattle(redeploySave, {
+    factionName: 'redeploy save continuation', power: 40, warned: true, siege: false, mode: 'garrison',
+  });
+  assert.equal(tactical.advanceTacticalPhase(redeploySave), null);
+  assert.equal(tactical.advanceTacticalPhase(redeploySave), null);
+  const muskets = battle.defenderGroups.find(group => group.kind === 'militia-musket');
+  assert.ok(muskets);
+  assert.equal(tactical.setDefenderFormationLine(redeploySave, muskets.id, 'front'), null);
+  assert.equal(muskets.line, 'middle');
+  assert.equal(muskets.pendingLine, 'front');
+  assert.equal(muskets.command, 'redeploy');
+  assert.equal(saveLoad.saveGame(redeploySave), true);
+  const loaded = saveLoad.loadGame();
+  const loadedMuskets = loaded?.tacticalBattle?.defenderGroups.find(group => group.id === muskets.id);
+  assert.equal(loadedMuskets?.line, 'middle');
+  assert.equal(loadedMuskets?.pendingLine, 'front');
+  assert.equal(loadedMuskets?.command, 'redeploy');
+  assert.equal(tactical.resolveTacticalRound(loaded), null);
+  assert.equal(loadedMuskets.line, 'middle');
+  assert.equal(tactical.completeTacticalSimulation(loaded), null);
+  assert.equal(loaded.tacticalBattle.pendingReport.ended, false);
+  assert.equal(tactical.acknowledgeTacticalReport(loaded), null);
+  assert.equal(loadedMuskets.line, 'front', 'saved redeployment continues after load and report acknowledgement');
+  assert.equal(loadedMuskets.pendingLine, undefined);
+}
+
+{
+  const invalidPendingLine = simulation.newGame(2026071462);
+  prepareFormationTestCombatants(invalidPendingLine);
+  const battle = tactical.createTacticalBattle(invalidPendingLine, {
+    factionName: 'invalid pending line recovery', power: 40, warned: true, siege: false, mode: 'garrison',
+  });
+  const spear = battle.defenderGroups.find(group => group.kind === 'militia-spear');
+  assert.ok(spear);
+  spear.command = 'redeploy';
+  spear.commandSource = 'player';
+  spear.pendingLine = 'rear';
+  assert.equal(saveLoad.saveGame(invalidPendingLine), true);
+  const loaded = saveLoad.loadGame();
+  const loadedSpear = loaded?.tacticalBattle?.defenderGroups.find(group => group.id === spear.id);
+  assert.equal(loadedSpear?.line, 'front');
+  assert.equal(loadedSpear?.pendingLine, undefined, 'non-adjacent pendingLine is cleared field-by-field');
+  assert.equal(loadedSpear?.command, null, 'redeploy without a valid target is cleared safely');
+}
+
+{
   const invalidLines = simulation.newGame(2026071459);
   prepareFormationTestCombatants(invalidLines);
   const battle = tactical.createTacticalBattle(invalidLines, {

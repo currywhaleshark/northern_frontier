@@ -154,9 +154,9 @@
 - Modify: `src/game/saveLoad.ts` (`TACTICAL_COMMANDS` 집합)
 - Modify: `tools/game/test_tactical_battle.mjs`
 
-- [ ] `redeploy`: 지휘 단계에서 목표 열(인접 열만)을 함께 지정. 해당 라운드 전투력 배율 0.3~0.4(advance 0.45 대비 소폭 낮게), 라운드 종료 후 `applyNextEngagementStates`에서 `line = pendingLine` 적용 — fallback/advance와 동일 패턴.
-- [ ] 피난 주민(`commandable === false`)은 대상 제외. 한 라운드에 열 이동과 구역 이동(fallback/advance)을 동시에 할 수 없다.
-- [ ] 테스트: 인접 열 제한, 라운드 페널티, 이동 적용 시점, 전투 중 저장·복원.
+- [x] `redeploy`: 지휘 단계에서 목표 열(인접 열만)을 함께 지정. 해당 라운드 전투력 배율 0.35(advance 0.45 대비 소폭 낮음), 라운드 종료 후 `applyNextEngagementStates`에서 `line = pendingLine` 적용 — fallback/advance와 동일 패턴.
+- [x] 피난 주민(`commandable === false`)은 대상 제외. 한 라운드에 열 이동과 구역 이동(fallback/advance)을 동시에 할 수 없다.
+- [x] 테스트: 인접 열 제한, 라운드 페널티, 이동 적용 시점, 전투 중 저장·복원.
 
 ### Task 2.2: 후방 급습을 별도 교전 판정으로 승격
 

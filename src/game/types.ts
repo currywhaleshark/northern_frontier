@@ -610,6 +610,7 @@ export type TacticalCommandId =
   | 'ambush'
   | 'guardStorehouse'
   | 'protectCivilians'
+  | 'redeploy'
   | 'fallback'
   | 'advance'
   | 'charge'
@@ -663,6 +664,7 @@ export interface TacticalDefenderGroup {
   wounded: number;
   killed: number;
   line: TacticalFormationLine;
+  pendingLine?: TacticalFormationLine;
   ambushed?: boolean;
   commandable?: boolean;
   lockedZoneId?: string;

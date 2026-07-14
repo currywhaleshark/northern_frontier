@@ -245,10 +245,13 @@ function addBuiltMarker(state, type) {
   const activeCommandGroups = battle.defenderGroups.filter(tacticalCommandState.tacticalGroupCanReceiveCommand);
   assert.ok(activeCommandGroups.every(group => group.command != null && group.commandSource === 'recommended'));
   assert.equal(tacticalCommandState.pendingTacticalCommandCount(battle.defenderGroups), activeCommandGroups.length);
-  assert.equal(tactical.setDefenderFormationLine(state, movable.id, 'front'), null);
-  assert.equal(movable.line, 'front');
+  assert.equal(tactical.setDefenderFormationLine(state, movable.id, 'middle'), null);
+  assert.equal(movable.line, 'rear', 'command-phase formation changes wait until the round report is acknowledged');
+  assert.equal(movable.pendingLine, 'middle');
+  assert.equal(movable.command, 'redeploy');
   assert.equal(tactical.setTacticalCommand(state, movable.id, 'guardStorehouse'), null);
   assert.equal(movable.command, 'guardStorehouse');
+  assert.equal(movable.pendingLine, undefined, 'a zone command cancels a queued line redeployment');
   assert.equal(movable.commandSource, 'player');
   assert.equal(
     tacticalCommandState.pendingTacticalCommandCount(battle.defenderGroups),
@@ -262,6 +265,71 @@ function addBuiltMarker(state, type) {
   assert.equal(battle.pendingReport, battle.reports[0]);
   assert.ok(battle.pendingReport.events.length > 0);
   assert.ok(battle.pendingReport.raidersKilled >= 0);
+}
+
+{
+  const state = simulation.newGame(2026071460);
+  prepareDefenders(state);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'redeploy timing test', power: 76, warned: true, siege: true, mode: 'garrison',
+  });
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  const muskets = battle.defenderGroups.find(group => group.kind === 'militia-musket');
+  const spear = battle.defenderGroups.find(group => group.kind === 'militia-spear');
+  const civilians = battle.defenderGroups.find(group => group.kind === 'civilian');
+  assert.ok(muskets && spear && civilians);
+  assert.equal(muskets.line, 'middle');
+  assert.ok(tactical.tacticalCommandUnavailableReason(battle, muskets, 'redeploy'),
+    'redeploy requires a target line');
+  assert.ok(tactical.setDefenderFormationLine(state, spear.id, 'rear'),
+    'a unit cannot skip from front directly to rear');
+  assert.equal(spear.line, 'front');
+  assert.ok(tactical.setDefenderFormationLine(state, civilians.id, 'middle'),
+    'protected civilians cannot redeploy');
+
+  assert.equal(tactical.setDefenderFormationLine(state, muskets.id, 'front'), null);
+  assert.equal(muskets.line, 'middle', 'redeploy does not move the unit immediately');
+  assert.equal(muskets.pendingLine, 'front');
+  assert.equal(muskets.command, 'redeploy');
+  assert.equal(muskets.commandSource, 'player');
+  assert.equal(tactical.tacticalCommandUnavailableReason(battle, muskets, 'redeploy'), null);
+
+  const zone = battle.zones.find(candidate => candidate.id === muskets.zoneId);
+  assert.ok(zone);
+  const exchangeInput = {
+    zone,
+    attackers: [],
+    weather: state.weather,
+    prepareVolleyApplied: false,
+    evacuateCiviliansApplied: false,
+    roundStartingRaiderPower: 1,
+    rng: () => 0.99,
+  };
+  const holdExchange = tacticalEngagement.resolveEngagementExchange({
+    ...exchangeInput,
+    defenders: [{ ...muskets, command: 'hold' }],
+  });
+  const redeployExchange = tacticalEngagement.resolveEngagementExchange({
+    ...exchangeInput,
+    defenders: [{ ...muskets, command: 'redeploy' }],
+  });
+  assert.ok(Math.abs(redeployExchange.defensePower / holdExchange.defensePower - 0.35 / 0.82) < 1e-9,
+    'redeploy uses a 0.35 round power multiplier');
+
+  muskets.zoneId = 'wall';
+  assert.equal(tactical.setTacticalCommand(state, muskets.id, 'fallback'), null);
+  assert.equal(muskets.pendingLine, undefined, 'fallback cannot coexist with line movement');
+  assert.equal(tactical.setDefenderFormationLine(state, muskets.id, 'front'), null);
+  assert.equal(muskets.command, 'redeploy', 'choosing an adjacent line replaces the zone movement command');
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.equal(muskets.line, 'middle', 'the current round still resolves from the original line');
+  assert.equal(muskets.pendingLine, 'front');
+  assert.equal(tactical.completeTacticalSimulation(state), null);
+  assert.equal(battle.pendingReport.ended, false);
+  assert.equal(tactical.acknowledgeTacticalReport(state), null);
+  assert.equal(muskets.line, 'front', 'the queued adjacent line applies after acknowledging the report');
+  assert.equal(muskets.pendingLine, undefined);
 }
 
 {

@@ -45,6 +45,7 @@ function commandPowerMultiplier(
   const command = defender.command ?? 'hold';
   if (command === 'hold') return 0.82;
   if (command === 'charge') return 1.72;
+  if (command === 'redeploy') return 0.35;
   if (command === 'fallback') return 0.22;
   if (command === 'advance') return 0.45;
   if (command === 'guardStorehouse') return zone.id === 'storehouse' ? 1.42 : 0.78;

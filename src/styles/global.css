@@ -2200,6 +2200,7 @@ html, body, #root {
   cursor: pointer;
 }
 .tactical-line-toggle button:hover { border-color: #b9944f; }
+.tactical-line-toggle button:disabled { opacity: 0.38; cursor: not-allowed; }
 .tactical-line-toggle button.active {
   border-color: #d0a651;
   background: #3a372d;

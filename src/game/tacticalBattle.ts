@@ -61,8 +61,10 @@ const PREPARATION_ACTIONS: Array<{ id: PreparationActionId; label: string; cost:
 ];
 
 const IMPLEMENTED_COMMANDS = new Set<TacticalCommandId>([
-  'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'fallback', 'advance', 'charge',
+  'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'fallback', 'advance', 'charge',
 ]);
+
+const FORMATION_LINE_ORDER: readonly TacticalFormationLine[] = ['front', 'middle', 'rear'];
 
 const GROUP_LABELS: Record<DefenderGroupKind, string> = {
   'militia-musket': '조총 수비대',
@@ -113,13 +115,20 @@ function nextForwardZoneId(battle: TacticalBattle, zoneId: string): string | nul
 
 function applyNextEngagementStates(battle: TacticalBattle): void {
   for (const defender of battle.defenderGroups) {
-    if (defender.command === 'fallback') {
+    if (defender.command === 'redeploy' && defender.pendingLine &&
+        tacticalFormationLinesAdjacent(defender.line, defender.pendingLine)) {
+      defender.line = defender.pendingLine;
+      defender.pendingLine = undefined;
+      defender.command = 'hold';
+    } else if (defender.command === 'fallback') {
       const rearZoneId = nextRearZoneId(battle, defender.zoneId);
       if (rearZoneId) defender.zoneId = rearZoneId;
+      defender.pendingLine = undefined;
       defender.command = 'hold';
     } else if (defender.command === 'advance') {
       const forwardZoneId = nextForwardZoneId(battle, defender.zoneId);
       if (forwardZoneId) defender.zoneId = forwardZoneId;
+      defender.pendingLine = undefined;
       defender.command = 'hold';
     } else if (defender.command === 'ambush' && !defender.ambushed) {
       defender.ambushed = true;
@@ -159,6 +168,13 @@ function defaultFormationLine(role: CombatRole, weapon: TacticalDefenderGroup['w
   if (role === 'civilian') return 'rear';
   if (weapon === 'musket') return 'middle';
   return weapon === 'spear' || (weapon == null && (role === 'militia' || role === 'watchman')) ? 'front' : 'rear';
+}
+
+export function tacticalFormationLinesAdjacent(
+  from: TacticalFormationLine,
+  to: TacticalFormationLine,
+): boolean {
+  return Math.abs(FORMATION_LINE_ORDER.indexOf(from) - FORMATION_LINE_ORDER.indexOf(to)) === 1;
 }
 
 function snapshotGroup(
@@ -716,7 +732,27 @@ export function setDefenderFormationLine(
   const defender = battle.defenderGroups.find(candidate => candidate.id === groupId);
   if (!defender) return '수비 그룹을 찾을 수 없습니다.';
   if (defender.commandable === false) return '피난 주민은 전열을 바꿀 수 없습니다.';
-  defender.line = line;
+  const deferredRedeploy = battle.phase === 'command' && battle.orientation !== 'assault' &&
+    battle.assaultKind !== 'predatorHunt';
+  if (!deferredRedeploy) {
+    defender.line = line;
+    defender.pendingLine = undefined;
+    return null;
+  }
+  if (line === defender.line) {
+    defender.pendingLine = undefined;
+    if (defender.command === 'redeploy') {
+      defender.command = 'hold';
+      defender.commandSource = 'player';
+    }
+    return null;
+  }
+  if (!tacticalFormationLinesAdjacent(defender.line, line)) {
+    return '한 라운드에는 인접한 전열로만 재배치할 수 있습니다.';
+  }
+  defender.pendingLine = line;
+  defender.command = 'redeploy';
+  defender.commandSource = 'player';
   return null;
 }
 
@@ -737,6 +773,7 @@ export function setTacticalCommand(
   const unavailableReason = tacticalCommandUnavailableReason(battle, defender, command);
   if (unavailableReason) return unavailableReason;
   defender.command = command;
+  if (command !== 'redeploy') defender.pendingLine = undefined;
   defender.commandSource = 'player';
   return null;
 }
@@ -750,6 +787,12 @@ export function tacticalCommandUnavailableReason(
   if (battle.assaultKind === 'predatorHunt') return huntCommandUnavailableReason(battle, defender, command);
   if (battle.orientation === 'assault') return assaultCommandUnavailableReason(battle, defender, command);
   if (!IMPLEMENTED_COMMANDS.has(command)) return '이 명령은 아직 사용할 수 없습니다.';
+  if (command === 'redeploy') {
+    if (!defender.pendingLine) return '먼저 인접한 목표 전열을 선택하십시오.';
+    return tacticalFormationLinesAdjacent(defender.line, defender.pendingLine)
+      ? null
+      : '한 라운드에는 인접한 전열로만 재배치할 수 있습니다.';
+  }
   if (command === 'hold') return null;
   if (command === 'volley') {
     return tacticalGroupCapabilities(defender).has('volley')
@@ -1421,6 +1464,7 @@ export function tacticalCommandDescription(command: TacticalCommandId, ambushed 
       : '적이 없는 현재 구역에 몸을 숨겨 다음 교전부터 매복중 상태가 됩니다.',
     guardStorehouse: '약탈 피해를 줄이는 대신 수비대가 더 큰 위험을 집니다.',
     protectCivilians: '주민 피해를 줄이지만 건물과 물자를 포기할 수 있습니다.',
+    redeploy: '이번 교전 전력을 줄여 인접한 전열로 이동하고 다음 라운드부터 새 위치에서 싸웁니다.',
     fallback: '병력을 보존하며 구역을 내주고 다음 방어선으로 물러납니다.',
     advance: '이번 교전을 마친 뒤 한 단계 앞선 방어선으로 이동합니다.',
     arson: '준비한 불화살로 목책과 움막의 돌파를 앞당기지만 노획 일부가 불탑니다.',

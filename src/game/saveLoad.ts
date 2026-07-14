@@ -97,7 +97,7 @@ const DEFENDER_KINDS = new Set<DefenderGroupKind>([
   'militia-spear', 'militia-bow', 'militia-musket', 'militia-unarmed', 'watchman', 'hunter', 'civilian',
 ]);
 const TACTICAL_COMMANDS = new Set<TacticalCommandId>([
-  'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'fallback', 'advance', 'charge',
+  'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'fallback', 'advance', 'charge',
   'arson', 'blockEscape', 'openRetreat',
 ]);
 const PREPARATION_ACTION_IDS = new Set<PreparationActionId>([
@@ -174,6 +174,15 @@ function defaultMigratedFormationLine(
     : 'rear';
 }
 
+function isTacticalFormationLine(value: unknown): value is TacticalFormationLine {
+  return value === 'front' || value === 'middle' || value === 'rear';
+}
+
+function migratedFormationLinesAdjacent(from: TacticalFormationLine, to: TacticalFormationLine): boolean {
+  const lines: readonly TacticalFormationLine[] = ['front', 'middle', 'rear'];
+  return Math.abs(lines.indexOf(from) - lines.indexOf(to)) === 1;
+}
+
 export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalBattle | null {
   if (raw == null) return null;
   if (typeof raw !== 'object') return null;
@@ -227,6 +236,17 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       ? group.role : inferred.role;
     const protectedCivilian = kind === 'civilian';
     const civilianZoneId = zoneIds.has('center') ? 'center' : defaultZoneId;
+    const line = isTacticalFormationLine(group.line)
+      ? group.line
+      : defaultMigratedFormationLine(role, weapon);
+    const storedCommand = protectedCivilian || !TACTICAL_COMMANDS.has(group.command as TacticalCommandId)
+      ? null
+      : group.command as TacticalCommandId;
+    const pendingLine = storedCommand === 'redeploy' && isTacticalFormationLine(group.pendingLine) &&
+        migratedFormationLinesAdjacent(line, group.pendingLine)
+      ? group.pendingLine
+      : undefined;
+    const command = storedCommand === 'redeploy' && pendingLine == null ? null : storedCommand;
     return [{
       ...group,
       id: typeof group.id === 'string' ? group.id : `migrated-defender-${index}`,
@@ -237,18 +257,15 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       zoneId: protectedCivilian
         ? civilianZoneId
         : zoneIds.has(String(group.zoneId)) ? String(group.zoneId) : defaultZoneId,
-      command: protectedCivilian
-        ? null
-        : TACTICAL_COMMANDS.has(group.command as TacticalCommandId) ? group.command as TacticalCommandId : null,
-      commandSource: protectedCivilian || !TACTICAL_COMMANDS.has(group.command as TacticalCommandId)
+      command,
+      commandSource: command == null
         ? undefined
         : group.commandSource === 'player' ? 'player' : 'recommended',
       commandable: protectedCivilian ? false : group.commandable === false ? false : undefined,
       lockedZoneId: protectedCivilian ? civilianZoneId : undefined,
       power: protectedCivilian ? 0 : Math.max(0, Number(group.power) || 0),
-      line: group.line === 'front' || group.line === 'middle' || group.line === 'rear'
-        ? group.line
-        : defaultMigratedFormationLine(role, weapon),
+      line,
+      pendingLine,
       ambushed: group.ambushed === true,
     }];
   });

@@ -4,7 +4,7 @@ import { countBuilt } from '../game/buildings';
 import { getSeason } from '../game/seasons';
 import {
   tacticalCommandDescription, tacticalCommandUnavailableReason, tacticalLootText,
-  tacticalPreparationUnavailableReason,
+  tacticalFormationLinesAdjacent, tacticalPreparationUnavailableReason,
 } from '../game/tacticalBattle';
 import { assaultMaxRounds } from '../game/tacticalAssault';
 import { huntMaxRounds } from '../game/tacticalHunt';
@@ -55,7 +55,7 @@ const PREP_DESCRIPTIONS: Record<PreparationActionId, string> = {
 };
 
 const COMMANDS: TacticalCommandId[] = [
-  'hold', 'charge', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'fallback', 'advance',
+  'hold', 'charge', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'fallback', 'advance',
   'arson', 'blockEscape', 'openRetreat',
 ];
 
@@ -66,6 +66,7 @@ const COMMAND_LABELS: Record<TacticalCommandId, string> = {
   ambush: '매복',
   guardStorehouse: '창고 사수',
   protectCivilians: '주민 보호',
+  redeploy: '전열 재배치',
   fallback: '후퇴',
   advance: '전진',
   arson: '방화',
@@ -82,6 +83,10 @@ function commandLabel(command: TacticalCommandId, group: TacticalDefenderGroup, 
     if (command === 'charge') return '창 돌입';
     if (command === 'fallback') return '포위 유지';
     if (command === 'openRetreat') return '사냥 중지';
+  }
+  if (command === 'redeploy' && group.pendingLine) {
+    const target = group.pendingLine === 'front' ? '전열' : group.pendingLine === 'middle' ? '중열' : '후열';
+    return `재배치 → ${target}`;
   }
   return command === 'ambush' && group.ambushed ? '급습' : COMMAND_LABELS[command];
 }
@@ -388,6 +393,15 @@ export function TacticalBattleScreen({
     const nextId = nextPendingTacticalGroupId(battle.defenderGroups, selectedGroup.id);
     if (nextId) selectGroup(nextId);
   };
+  const assignFormationLine = (line: TacticalFormationLine) => {
+    if (!selectedGroup) return;
+    const queuesRedeploy = battle.phase === 'command' && !assault && !hunt && line !== selectedGroup.line;
+    const firstAssignment = selectedGroup.commandSource !== 'player';
+    onSetFormationLine(selectedGroup.id, line);
+    if (!queuesRedeploy || !firstAssignment) return;
+    const nextId = nextPendingTacticalGroupId(battle.defenderGroups, selectedGroup.id);
+    if (nextId) selectGroup(nextId);
+  };
   const season = getSeason(state.day);
   const wallRepairApplied = battle.prepActions.some(action => action.id === 'repairWall' && action.applied);
   const fortifyEventIndex = battle.preparationEvents.findIndex(event => event.kind === 'fortify' && event.zoneId === 'wall');
@@ -685,8 +699,14 @@ export function TacticalBattleScreen({
                       {(['front', 'middle', 'rear'] as const).map(line => (
                         <button
                           key={line}
-                          className={selectedGroup.line === line ? 'active' : ''}
-                          onClick={() => onSetFormationLine(selectedGroup.id, line)}
+                          className={(selectedGroup.pendingLine ?? selectedGroup.line) === line ? 'active' : ''}
+                          disabled={!assault && !hunt && line !== selectedGroup.line &&
+                            !tacticalFormationLinesAdjacent(selectedGroup.line, line)}
+                          title={!assault && !hunt && line !== selectedGroup.line &&
+                            !tacticalFormationLinesAdjacent(selectedGroup.line, line)
+                            ? '한 라운드에는 인접한 전열로만 재배치할 수 있습니다.'
+                            : line === selectedGroup.line ? '현재 전열' : '다음 라운드 목표 전열'}
+                          onClick={() => assignFormationLine(line)}
                         >{line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열'}</button>
                       ))}
                     </div>
