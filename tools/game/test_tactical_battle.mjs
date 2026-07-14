@@ -31,6 +31,7 @@ const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs'
 const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
 const tacticalCore = await import(pathToFileURL(join(compiledDir, 'tacticalCore.mjs')).href);
 const tacticalEngagement = await import(pathToFileURL(join(compiledDir, 'tacticalEngagement.mjs')).href);
+const enemyPlan = await import(pathToFileURL(join(compiledDir, 'enemyPlan.mjs')).href);
 const tacticalCommandState = await import(pathToFileURL(join(compiledDir, 'tacticalCommandState.mjs')).href);
 const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
 const battleSimulation = await import(pathToFileURL(join(compiledDir, 'battleSimulation.mjs')).href);
@@ -92,6 +93,11 @@ function addBuiltMarker(state, type) {
   assert.ok(battle.raiderGroups
     .filter(group => group.kind === 'flankers')
     .every(group => group.flankPlan === 'breakthrough' || group.flankPlan === 'rearAssault'));
+  assert.ok(battle.enemyPlan, 'raid defenses fix their enemy plan before preparation starts');
+  assert.equal(
+    battle.raiderGroups.find(group => group.kind === 'flankers')?.flankPlan,
+    enemyPlan.flankPlanFromEnemyPlan(battle.enemyPlan),
+  );
   assert.ok(battle.prepPoints >= 1 && battle.prepPoints <= 8);
   assert.deepEqual(
     Object.fromEntries(battle.prepActions.map(action => [action.id, action.cost])),
@@ -104,6 +110,45 @@ function addBuiltMarker(state, type) {
       preliminaryBombardment: 3,
       musterMilitia: 1,
     },
+  );
+}
+
+{
+  const rearPlan = enemyPlan.createEnemyPlan({
+    factionName: '변경 마적', flankRoll: 0.2, revealed: true,
+  });
+  assert.equal(rearPlan.objective, 'breakthrough');
+  assert.equal(rearPlan.objectiveRevealed, true);
+  assert.deepEqual(rearPlan.stratagems, [
+    { id: 'rearManeuver', revealed: true, counterLevel: 0 },
+  ]);
+  assert.equal(enemyPlan.flankPlanFromEnemyPlan(rearPlan), 'rearAssault');
+  assert.equal(enemyPlan.flankPlanRevealedFromEnemyPlan(rearPlan), true);
+
+  const frontalPlan = enemyPlan.createEnemyPlan({
+    factionName: '니마차 우디캐', flankRoll: 0.8, revealed: false,
+  });
+  assert.deepEqual(frontalPlan.stratagems, []);
+  assert.equal(enemyPlan.flankPlanFromEnemyPlan(frontalPlan), 'breakthrough');
+  assert.equal(enemyPlan.flankPlanRevealedFromEnemyPlan(frontalPlan), false);
+
+  assert.deepEqual(
+    enemyPlan.migrateEnemyPlan({
+      objective: 'unknown-objective',
+      objectiveRevealed: 'yes',
+      stratagemPoints: -4,
+      stratagems: [
+        { id: 'rearManeuver', revealed: 'yes', counterLevel: 9 },
+        { id: 'unknown-stratagem', revealed: true, counterLevel: 2 },
+      ],
+    }),
+    {
+      objective: 'breakthrough',
+      objectiveRevealed: false,
+      stratagemPoints: 0,
+      stratagems: [{ id: 'rearManeuver', revealed: false, counterLevel: 0 }],
+    },
+    'enemy plan migration repairs fields independently and drops only unknown stratagems',
   );
 }
 

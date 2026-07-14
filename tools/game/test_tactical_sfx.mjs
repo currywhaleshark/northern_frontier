@@ -11,6 +11,7 @@ const sfxSource = readFileSync(new URL('../../src/sound/sfx.ts', import.meta.url
 const typeSource = readFileSync(new URL('../../src/game/types.ts', import.meta.url), 'utf8');
 const screenSource = readFileSync(new URL('../../src/components/TacticalBattleScreen.tsx', import.meta.url), 'utf8');
 const battleSource = readFileSync(new URL('../../src/game/tacticalBattle.ts', import.meta.url), 'utf8');
+const engagementSource = readFileSync(new URL('../../src/game/tacticalEngagement.ts', import.meta.url), 'utf8');
 const assaultSource = readFileSync(new URL('../../src/game/tacticalAssault.ts', import.meta.url), 'utf8');
 const huntSource = readFileSync(new URL('../../src/game/tacticalHunt.ts', import.meta.url), 'utf8');
 
@@ -96,7 +97,7 @@ assert.equal(new Set(meleeSchedule.map(hit => hit.delaySeconds)).size, meleeSche
   'each melee impact needs a distinct onset');
 assert.match(typeSource, /meleeParticipants\?: number;/,
   'melee animation events must carry their engagement size');
-assert.match(battleSource, /meleeParticipants:/,
+assert.match(`${battleSource}\n${engagementSource}`, /meleeParticipants:/,
   'village defense melee must expose its participant count');
 assert.match(assaultSource, /meleeParticipants:/,
   'lair assault melee must expose its participant count');

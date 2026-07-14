@@ -857,12 +857,23 @@ export function TacticalBattleScreen({
   const barricadeReinforced = wallRepairApplied && (
     !preparationPlayback || fortifyEventIndex < 0 || eventIndex >= fortifyEventIndex
   );
-  const scoutedFlankers = battle.raiderGroups.find(group => group.kind === 'flankers' && group.flankPlanRevealed);
-  const flankerIntel = scoutedFlankers?.flankPlan === 'rearAssault'
-    ? '정찰 보고: 적 우회대가 방어선 뒤편을 노리는 듯합니다.'
-    : scoutedFlankers
-      ? '정찰 보고: 적 우회대가 마을 안쪽으로 파고들 낌새입니다.'
-      : null;
+  const plannedRearManeuver = battle.enemyPlan?.stratagems.find(stratagem => stratagem.id === 'rearManeuver');
+  const legacyScoutedFlankers = battle.enemyPlan == null
+    ? battle.raiderGroups.find(group => group.kind === 'flankers' && group.flankPlanRevealed)
+    : undefined;
+  const flankerIntel = battle.enemyPlan
+    ? plannedRearManeuver
+      ? plannedRearManeuver.revealed
+        ? '정찰 보고: 적 우회대가 방어선 뒤편을 노리는 듯합니다.'
+        : null
+      : battle.enemyPlan.objectiveRevealed
+        ? '정찰 보고: 적 우회대가 마을 안쪽으로 파고들 낌새입니다.'
+        : null
+    : legacyScoutedFlankers?.flankPlan === 'rearAssault'
+      ? '정찰 보고: 적 우회대가 방어선 뒤편을 노리는 듯합니다.'
+      : legacyScoutedFlankers
+        ? '정찰 보고: 적 우회대가 마을 안쪽으로 파고들 낌새입니다.'
+        : null;
   const activeZoneIndex = Math.max(0, battle.zones.findIndex(zone => zone.id === activeZoneId));
   const showZone = (index: number) => {
     const zone = battle.zones[Math.max(0, Math.min(battle.zones.length - 1, index))];

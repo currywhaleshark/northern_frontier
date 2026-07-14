@@ -4,6 +4,9 @@ import { combatGroupLabel, tacticalGroupCapabilities } from './combatCapabilitie
 import { createCombatRoster, isCombatReadyResident, type CombatantSnapshot, type CombatRole } from './combatRoster';
 import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
+import {
+  createEnemyPlan, flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
+} from './enemyPlan';
 import { addLog } from './events';
 import { makeRng } from './map';
 import {
@@ -32,6 +35,7 @@ import {
 } from './tacticalHunt';
 import type {
   DefenderGroupKind,
+  EnemyPlan,
   GameState,
   PreparationActionId,
   ResourceId,
@@ -294,15 +298,11 @@ function createZones(state: GameState, siege: boolean, groups: TacticalDefenderG
 function raiderGroups(
   factionName: string,
   power: number,
-  warned: boolean,
-  scouting: { watchmen: number; watchtowers: number; hunters: number; flankRoll: number },
+  visibility: { scoutsReady: boolean; deepScouted: boolean },
+  enemyPlan: EnemyPlan,
 ): TacticalRaiderGroup[] {
-  const scoutsReady = warned || scouting.watchtowers > 0 || scouting.watchmen >= 2;
-  const deepScouted = warned || (scouting.watchtowers > 0 && scouting.hunters > 0);
-  const rearAssaultChance = factionName === '홀라온 야인' || factionName === '변경 마적' || factionName === '조정 토벌군'
-    ? 0.6
-    : factionName === '니마차 우디캐' ? 0.3 : 0.5;
-  const flankPlan = scouting.flankRoll < rearAssaultChance ? 'rearAssault' : 'breakthrough';
+  const flankPlan = flankPlanFromEnemyPlan(enemyPlan);
+  const flankPlanRevealed = flankPlanRevealedFromEnemyPlan(enemyPlan);
   type Visibility = 'open' | 'scouts' | 'deep';
   type Composition = {
     id: string;
@@ -372,8 +372,8 @@ function raiderGroups(
   const powers = distribute(power);
   const totalCount = Math.max(composition.length, Math.round(power / CONFIG.tacticalBattle.raiderPowerPerFighter));
   const counts = distribute(totalCount);
-  const visible = (visibility: Visibility) => visibility === 'open' ||
-    (visibility === 'scouts' ? scoutsReady : deepScouted);
+  const visible = (requiredVisibility: Visibility) => requiredVisibility === 'open' ||
+    (requiredVisibility === 'scouts' ? visibility.scoutsReady : visibility.deepScouted);
 
   return composition.map((entry, index) => ({
     id: entry.id,
@@ -395,7 +395,7 @@ function raiderGroups(
     wallPressureBonus: entry.wallPressureBonus,
     engagementsInZone: 0,
     flankPlan: entry.kind === 'flankers' ? flankPlan : undefined,
-    flankPlanRevealed: entry.kind === 'flankers' ? deepScouted : undefined,
+    flankPlanRevealed: entry.kind === 'flankers' ? flankPlanRevealed : undefined,
     rearAssault: false,
   }));
 }
@@ -416,12 +416,15 @@ export function createTacticalBattle(
   const originalPower = params.factionName === '조정 토벌군'
     ? Math.max(120, Math.round(params.power))
     : Math.max(3, Math.round(params.power));
-  const enemies = raiderGroups(params.factionName, originalPower, params.warned, {
-    watchmen,
-    watchtowers: countBuilt(state, 'watchtower'),
-    hunters,
+  const watchtowers = countBuilt(state, 'watchtower');
+  const scoutsReady = params.warned || watchtowers > 0 || watchmen >= 2;
+  const deepScouted = params.warned || (watchtowers > 0 && hunters > 0);
+  const enemyPlan = createEnemyPlan({
+    factionName: params.factionName,
     flankRoll: makeRng(state.seed + state.day * 4099 + state.subTick * 131 + originalPower)(),
+    revealed: deepScouted,
   });
+  const enemies = raiderGroups(params.factionName, originalPower, { scoutsReady, deepScouted }, enemyPlan);
   const battle: TacticalBattle = {
     encounterKind: 'raidDefense',
     id: state.day * 1000 + state.subTick * 10 + (params.mode === 'levy' ? 2 : 1),
@@ -439,6 +442,7 @@ export function createTacticalBattle(
     zones: createZones(state, params.siege, groups),
     defenderGroups: groups,
     raiderGroups: enemies,
+    enemyPlan,
     currentZoneId: 'approach',
     villageMorale: clamp(
       CONFIG.tacticalBattle.morale.village +

@@ -3,6 +3,9 @@ import { CONFIG } from './config';
 import { computeDefense, rebuildBuildingFootprints } from './buildings';
 import { defaultCropForBuildingType } from './crops';
 import { rollCourtTribute } from './courtTribute';
+import {
+  flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan, migrateEnemyPlan,
+} from './enemyPlan';
 import { spawnAnimalHabitats } from './habitats';
 import { makeRng } from './map';
 import { ensureMineralDeposits } from './minerals';
@@ -237,7 +240,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
   const rawRaiderPower = (source.raiderGroups as unknown[]).reduce<number>((sum, entry) =>
     entry && typeof entry === 'object' ? sum + Math.max(0, Number((entry as Record<string, unknown>).power) || 0) : sum, 0);
   const estimatedRaiders = Math.max(1, Math.round((Number(source.originalPower) || 3) / CONFIG.tacticalBattle.raiderPowerPerFighter));
-  const raiderGroups = (source.raiderGroups as unknown[]).flatMap((entry, index) => {
+  const migratedRaiderGroups = (source.raiderGroups as unknown[]).flatMap((entry, index) => {
     if (!entry || typeof entry !== 'object') return [];
     const group = entry as Record<string, unknown>;
     const count = Number.isFinite(group.count)
@@ -246,6 +249,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     return [{
       ...group,
       id: typeof group.id === 'string' ? group.id : `migrated-raider-${index}`,
+      kind: group.kind === 'looters' || group.kind === 'flankers' ? group.kind : 'main',
       zoneId: zoneIds.has(String(group.zoneId)) ? String(group.zoneId) : defaultZoneId,
       targetZoneId: zoneIds.has(String(group.targetZoneId)) ? String(group.targetZoneId) : defaultZoneId,
       count,
@@ -253,8 +257,28 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       power: Math.max(0, Number(group.power) || 0),
       morale: Math.max(0, Math.min(100, Number(group.morale) || 0)),
       engagementsInZone: Math.max(0, Math.floor(Number(group.engagementsInZone) || 0)),
+      flankPlan: group.flankPlan === 'rearAssault' || group.flankPlan === 'breakthrough' ? group.flankPlan : undefined,
+      flankPlanRevealed: group.flankPlanRevealed === true,
+      rearAssault: group.rearAssault === true,
     }];
   });
+  const legacyFlankers = migratedRaiderGroups.find(group => group.kind === 'flankers');
+  const enemyPlan = encounterKind === 'raidDefense'
+    ? migrateEnemyPlan(source.enemyPlan, {
+      flankPlan: legacyFlankers?.flankPlan === 'rearAssault' ? 'rearAssault' : 'breakthrough',
+      revealed: legacyFlankers?.flankPlanRevealed === true,
+    })
+    : undefined;
+  const derivedFlankPlan = enemyPlan ? flankPlanFromEnemyPlan(enemyPlan) : undefined;
+  const derivedFlankPlanRevealed = enemyPlan ? flankPlanRevealedFromEnemyPlan(enemyPlan) : undefined;
+  const raiderGroups = migratedRaiderGroups.map(group => encounterKind === 'raidDefense' && group.kind === 'flankers'
+    ? {
+      ...group,
+      flankPlan: derivedFlankPlan,
+      flankPlanRevealed: derivedFlankPlanRevealed,
+      rearAssault: group.rearAssault === true,
+    }
+    : group);
   if (!defenderGroups.some(group => group.count > 0) || !raiderGroups.some(group => group.count > 0)) return null;
 
   const reports = (Array.isArray(source.reports) ? source.reports : [])
@@ -292,6 +316,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     zones,
     defenderGroups,
     raiderGroups,
+    enemyPlan,
     initialFriendlyPower: Number.isFinite(source.initialFriendlyPower)
       ? Math.max(1, Number(source.initialFriendlyPower))
       : Math.max(1, defenderGroups.reduce((sum, group) => sum + group.power, 0)),

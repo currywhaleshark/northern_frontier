@@ -572,6 +572,22 @@ export type DefenderGroupKind =
 export type RaiderGroupKind = 'main' | 'looters' | 'flankers';
 export type TacticalFormationLine = 'front' | 'rear';
 export type TacticalFlankPlan = 'breakthrough' | 'rearAssault';
+export type EnemyObjectiveId = 'breakthrough';
+export type EnemyStratagemId = 'rearManeuver';
+
+export interface EnemyStratagemState {
+  id: EnemyStratagemId;
+  revealed: boolean;
+  counterLevel: 0 | 1 | 2;
+}
+
+export interface EnemyPlan {
+  objective: EnemyObjectiveId;
+  objectiveRevealed: boolean;
+  stratagemPoints: number;
+  stratagems: EnemyStratagemState[];
+}
+
 export type RaiderUnitType =
   | 'nimacha-hunter'
   | 'nimacha-spearman'
@@ -838,6 +854,7 @@ export interface TacticalBattle {
   zones: TacticalBattleZone[];
   defenderGroups: TacticalDefenderGroup[];
   raiderGroups: TacticalRaiderGroup[];
+  enemyPlan?: EnemyPlan;
   currentZoneId: string;
   villageMorale: number;
   raiderMorale: number;

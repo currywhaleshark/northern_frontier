@@ -167,6 +167,7 @@ for (const [field, seed] of [['events', 2026071451], ['lines', 2026071452]]) {
   const battle = tactical.createTacticalBattle(legacy, {
     factionName: '변경 마적', power: 70, warned: true, siege: false, mode: 'garrison',
   });
+  delete battle.enemyPlan;
   for (const group of battle.defenderGroups) delete group.line;
   for (const group of battle.raiderGroups) {
     delete group.engagementsInZone;
@@ -189,6 +190,49 @@ for (const [field, seed] of [['events', 2026071451], ['lines', 2026071452]]) {
   assert.equal(flankers.flankPlan, 'breakthrough');
   assert.equal(flankers.flankPlanRevealed, false);
   assert.equal(flankers.rearAssault, false);
+}
+
+{
+  const legacyPlan = simulation.newGame(2026071455);
+  const battle = tactical.createTacticalBattle(legacyPlan, {
+    factionName: 'legacy rear plan', power: 70, warned: true, siege: false, mode: 'garrison',
+  });
+  delete battle.enemyPlan;
+  const flankers = battle.raiderGroups.find(group => group.kind === 'flankers');
+  assert.ok(flankers);
+  flankers.flankPlan = 'rearAssault';
+  flankers.flankPlanRevealed = true;
+  assert.equal(saveLoad.saveGame(legacyPlan), true);
+  const loaded = saveLoad.loadGame();
+  assert.deepEqual(loaded?.tacticalBattle?.enemyPlan, {
+    objective: 'breakthrough',
+    objectiveRevealed: true,
+    stratagemPoints: 0,
+    stratagems: [{ id: 'rearManeuver', revealed: true, counterLevel: 0 }],
+  }, 'legacy flank fields synthesize the equivalent enemy plan');
+}
+
+{
+  const malformedPlan = simulation.newGame(2026071456);
+  const battle = tactical.createTacticalBattle(malformedPlan, {
+    factionName: 'malformed plan', power: 70, warned: false, siege: false, mode: 'garrison',
+  });
+  battle.enemyPlan = {
+    objective: 'invalid', objectiveRevealed: 'yes', stratagemPoints: 'many',
+    stratagems: [
+      { id: 'rearManeuver', revealed: 'yes', counterLevel: 7 },
+      { id: 'unknown', revealed: true, counterLevel: 2 },
+    ],
+  };
+  assert.equal(saveLoad.saveGame(malformedPlan), true);
+  const loaded = saveLoad.loadGame();
+  assert.ok(loaded?.tacticalBattle, 'a malformed enemy plan never discards the tactical battle');
+  assert.deepEqual(loaded.tacticalBattle.enemyPlan, {
+    objective: 'breakthrough',
+    objectiveRevealed: false,
+    stratagemPoints: 0,
+    stratagems: [{ id: 'rearManeuver', revealed: false, counterLevel: 0 }],
+  });
 }
 
 {
