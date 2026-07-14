@@ -18,10 +18,12 @@ export interface TacticalTargetingResult {
   reason: string | null;
 }
 
-type TargetingAttacker = Pick<TacticalDefenderGroup, 'weapon' | 'role' | 'readyMuskets' | 'line'> | Pick<
+export type TacticalTargetingAttacker = Pick<TacticalDefenderGroup, 'weapon' | 'role' | 'readyMuskets' | 'line'> | Pick<
   TacticalRaiderGroup,
   'unitType' | 'line'
 >;
+
+export type TacticalTargetingRole = 'melee' | 'musket' | 'bow';
 
 const RANGED_RAIDER_TYPES = new Set<RaiderUnitType>([
   'nimacha-hunter', 'holaon-horse-archer', 'bandit-rider', 'court-gunner', 'court-archer',
@@ -35,7 +37,7 @@ export function defaultRaiderFormationLine(
   return unitType && RANGED_RAIDER_TYPES.has(unitType) ? 'middle' : 'front';
 }
 
-function targetingWeapon(attacker: TargetingAttacker): 'melee' | 'musket' | 'bow' {
+export function tacticalTargetingRole(attacker: TacticalTargetingAttacker): TacticalTargetingRole {
   if ('weapon' in attacker) {
     const weapon: CombatWeaponId | null = attacker.weapon;
     if (weapon === 'musket' && (attacker.readyMuskets ?? 0) > 0) return 'musket';
@@ -44,6 +46,10 @@ function targetingWeapon(attacker: TargetingAttacker): 'melee' | 'musket' | 'bow
   }
   if (attacker.unitType === 'court-gunner' || attacker.unitType === 'court-artillery') return 'musket';
   return attacker.unitType && RANGED_RAIDER_TYPES.has(attacker.unitType) ? 'bow' : 'melee';
+}
+
+export function tacticalTargetingConcentration(attacker: TacticalTargetingAttacker): number {
+  return CONFIG.tacticalBattle.targeting.concentration[tacticalTargetingRole(attacker)];
 }
 
 export function tacticalContactLine(
@@ -58,11 +64,11 @@ export function tacticalContactLine(
 }
 
 export function canTargetLine(
-  attacker: TargetingAttacker,
+  attacker: TacticalTargetingAttacker,
   targetLine: TacticalFormationLine,
   context: TacticalTargetingContext,
 ): TacticalTargetingResult {
-  const weapon = targetingWeapon(attacker);
+  const weapon = tacticalTargetingRole(attacker);
   if (weapon === 'melee') {
     if (context.contactLine === targetLine) return { allowed: true, efficiency: 1, reason: null };
     return { allowed: false, efficiency: 0, reason: '근접 부대는 첫 접촉 열만 공격할 수 있습니다.' };

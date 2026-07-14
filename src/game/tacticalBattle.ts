@@ -1226,6 +1226,9 @@ export function resolveTacticalRound(state: GameState): string | null {
         prepareVolleyApplied: applied(battle, 'prepareVolley'),
         evacuateCiviliansApplied: applied(battle, 'evacuateCivilians'),
         roundStartingRaiderPower,
+        focusTargetGroupId: engagement.attackers.some(group => group.id === zone.focusTargetGroupId)
+          ? zone.focusTargetGroupId
+          : undefined,
         rng,
       });
       for (const loss of exchange.raiderLosses) {

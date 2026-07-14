@@ -69,5 +69,8 @@ assert.equal(targeting.canTargetLine(defender('musket'), 'middle', {
 assert.equal(targeting.canTargetLine(defender('hornBow'), 'front', frontal).efficiency, 1);
 assert.equal(targeting.canTargetLine(defender('hornBow'), 'middle', frontal).efficiency, 0.9);
 assert.equal(targeting.canTargetLine(defender('hornBow'), 'rear', frontal).efficiency, 0.75);
+assert.equal(targeting.tacticalTargetingConcentration(defender('spear')), 0.85);
+assert.equal(targeting.tacticalTargetingConcentration(defender('musket')), 0.8);
+assert.equal(targeting.tacticalTargetingConcentration(defender('hornBow')), 0.65);
 
 console.log('tactical targeting tests passed');
