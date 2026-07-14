@@ -6,6 +6,7 @@ import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import {
   applyEnemyPlanPreparationCounter, createEnemyPlan, enemyObjectiveProfile,
+  enemyIntelLevel,
   enemyPlanFirstRoundMoraleBonus, enemyPlanPreparationPenalty, enemyPlanRangedEfficiency,
   enemyPlanStratagemScale, enemyPlanWarningLines, flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
 } from './enemyPlan';
@@ -543,8 +544,9 @@ export function createTacticalBattle(
     ? Math.max(120, Math.round(params.power))
     : Math.max(3, Math.round(params.power));
   const watchtowers = countBuilt(state, 'watchtower');
-  const scoutsReady = params.warned || watchtowers > 0 || watchmen >= 2;
-  const deepScouted = params.warned || (watchtowers > 0 && hunters > 0);
+  const intelLevel = enemyIntelLevel({ watchtowers, watchmen, hunters });
+  const scoutsReady = intelLevel >= 2;
+  const deepScouted = intelLevel >= 3;
   const planRng = makeRng(state.seed + state.day * 4099 + state.subTick * 131 + originalPower);
   const enemyPlan = createEnemyPlan({
     factionName: params.factionName,
@@ -553,7 +555,9 @@ export function createTacticalBattle(
     flankRoll: planRng(),
     objectiveRoll: planRng(),
     stratagemRoll: planRng(),
-    revealed: deepScouted,
+    intelLevel,
+    intelRoll: planRng(),
+    revealed: false,
   });
   const enemies = raiderGroups(params.factionName, originalPower, { scoutsReady, deepScouted }, enemyPlan);
   const battle: TacticalBattle = {

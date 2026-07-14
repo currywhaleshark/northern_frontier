@@ -233,4 +233,37 @@ assert.ok(mainPowerAfterFeint < mainPowerBeforeFeint, 'an uncountered feint tran
 assert.ok(feintBattle.raiderGroups.some(group => group.estimatedPower !== undefined &&
   group.estimatedPower !== group.power), 'feint display power remains distinct from real power');
 
+const intelInput = {
+  factionName: '변경 마적', power: 160, relation: 0,
+  objectiveRoll: 0.7, flankRoll: 0.2, stratagemRoll: 0.4, intelRoll: 0.3, revealed: false,
+};
+const intelPlans = Array.from({ length: 5 }, (_unused, intelLevel) => enemyPlan.createEnemyPlan({
+  ...intelInput, intelLevel,
+}));
+const revealedCount = plan => Number(plan.objectiveRevealed) +
+  plan.stratagems.filter(stratagem => stratagem.revealed).length;
+assert.equal(revealedCount(intelPlans[0]), 0);
+assert.equal(revealedCount(intelPlans[1]), 0, 'intel level 1 exposes warning signs but no exact plan IDs');
+assert.equal(revealedCount(intelPlans[2]), 1, 'intel level 2 identifies the objective or one stratagem');
+assert.ok(revealedCount(intelPlans[3]) >= 2, 'intel level 3 reveals most of the plan');
+assert.ok(intelPlans[4].objectiveRevealed && intelPlans[4].stratagems.every(stratagem => stratagem.revealed));
+assert.equal(intelPlans[4].stratagems.filter(stratagem => stratagem.counterLevel === 2).length, 1,
+  'intel level 4 fully counters exactly one first activation');
+assert.equal(enemyPlan.enemyIntelLevel({ watchtowers: 0, watchmen: 0, hunters: 0 }), 0);
+assert.equal(enemyPlan.enemyIntelLevel({ watchtowers: 1, watchmen: 2, hunters: 2 }), 4);
+const unwarnedState = simulation.newGame(2026071505);
+const warnedState = simulation.newGame(2026071505);
+unwarnedState.relations['변경 마적'] = 0;
+warnedState.relations['변경 마적'] = 0;
+const unwarnedBattle = tactical.createTacticalBattle(unwarnedState, {
+  factionName: '변경 마적', power: 110, warned: false, siege: true, mode: 'garrison',
+});
+const warnedBattle = tactical.createTacticalBattle(warnedState, {
+  factionName: '변경 마적', power: 110, warned: true, siege: true, mode: 'garrison',
+});
+assert.deepEqual(warnedBattle.enemyPlan, unwarnedBattle.enemyPlan,
+  'early warning no longer leaks exact enemy plan information');
+assert.ok(warnedBattle.prepPoints > unwarnedBattle.prepPoints,
+  'early warning still increases preparation points independently of plan intel');
+
 console.log('enemy plan tests passed');

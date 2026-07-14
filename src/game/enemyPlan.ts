@@ -10,6 +10,8 @@ type EnemyPlanCreationInput = {
   objectiveRoll?: number;
   flankRoll: number;
   stratagemRoll?: number;
+  intelLevel?: number;
+  intelRoll?: number;
   revealed: boolean;
 };
 
@@ -176,6 +178,40 @@ export function enemyPlanWarningLines(plan: EnemyPlan | undefined): string[] {
   return plan?.stratagems.map(stratagem => STRATAGEM_DETAILS[stratagem.id].warning) ?? [];
 }
 
+export function enemyIntelLevel(input: {
+  watchtowers: number;
+  watchmen: number;
+  hunters: number;
+}): 0 | 1 | 2 | 3 | 4 {
+  const score = Number(input.watchtowers > 0) + Number(input.watchmen >= 2) +
+    Number(input.hunters >= 2) + Number(input.watchtowers > 0 && input.hunters > 0);
+  return clamp(score, 0, 4) as 0 | 1 | 2 | 3 | 4;
+}
+
+function applyEnemyPlanIntel(plan: EnemyPlan, level: number, roll: number): EnemyPlan {
+  const intelLevel = clamp(Math.floor(level), 0, 4);
+  plan.objectiveRevealed = false;
+  plan.stratagems.forEach(stratagem => { stratagem.revealed = false; });
+  if (intelLevel <= 1) return plan;
+  if (intelLevel === 2) {
+    const options = ['objective', ...plan.stratagems.map((_stratagem, index) => index)] as Array<'objective' | number>;
+    const selected = options[Math.floor(clamp(roll, 0, 0.999999999) * options.length)];
+    if (selected === 'objective') plan.objectiveRevealed = true;
+    else if (selected != null) plan.stratagems[selected].revealed = true;
+    return plan;
+  }
+  plan.objectiveRevealed = true;
+  const revealCount = intelLevel === 3
+    ? Math.max(1, Math.ceil(plan.stratagems.length * 0.67))
+    : plan.stratagems.length;
+  plan.stratagems.slice(0, revealCount).forEach(stratagem => { stratagem.revealed = true; });
+  if (intelLevel === 4 && plan.stratagems.length > 0) {
+    const counterIndex = Math.floor(clamp(roll, 0, 0.999999999) * plan.stratagems.length);
+    plan.stratagems[counterIndex].counterLevel = 2;
+  }
+  return plan;
+}
+
 export function enemyStratagemPoints(factionName: string, power: number, relation: number): number {
   const config = CONFIG.tacticalBattle.enemyPlan.stratagemPoints;
   const key = factionKey(factionName);
@@ -234,7 +270,8 @@ export function createEnemyPlan(input: EnemyPlanCreationInput): EnemyPlan {
     ? 'rearAssault'
     : 'breakthrough';
   if (relation >= CONFIG.tacticalBattle.enemyPlan.objectiveActivationRelation[factionKey(input.factionName)]) {
-    return planFromLegacyFlank({ flankPlan: legacyFlankPlan, revealed: input.revealed });
+    const plan = planFromLegacyFlank({ flankPlan: legacyFlankPlan, revealed: input.revealed });
+    return input.intelLevel == null ? plan : applyEnemyPlanIntel(plan, input.intelLevel, input.intelRoll ?? 0);
   }
   const objective = chooseEnemyObjective(
     input.factionName,
@@ -243,7 +280,7 @@ export function createEnemyPlan(input: EnemyPlanCreationInput): EnemyPlan {
     input.objectiveRoll ?? 0,
   );
   const stratagemPoints = enemyStratagemPoints(input.factionName, power, relation);
-  return {
+  const plan: EnemyPlan = {
     objective,
     objectiveRevealed: input.revealed,
     stratagemPoints,
@@ -255,6 +292,7 @@ export function createEnemyPlan(input: EnemyPlanCreationInput): EnemyPlan {
       input.revealed,
     ),
   };
+  return input.intelLevel == null ? plan : applyEnemyPlanIntel(plan, input.intelLevel, input.intelRoll ?? 0);
 }
 
 export function flankPlanFromEnemyPlan(plan: EnemyPlan): TacticalFlankPlan {
