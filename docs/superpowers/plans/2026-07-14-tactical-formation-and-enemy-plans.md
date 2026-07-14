@@ -316,7 +316,7 @@
 - Modify: `src/components/TacticalBattleScreen.tsx` (준비 단계에 배치)
 - Modify: `src/styles/global.css`
 
-- [ ] 준비 화면에 표시: 예상 목적(공개 시), 확인된 계책 목록, 미확인 계책 **개수**, 계책별 대응 상태(미대응/부분/완전). 기존 `flankerIntel` 한 줄 표기를 이 패널로 대체.
+- [x] 준비 화면에 표시: 예상 목적(공개 시), 확인된 계책 목록, 미확인 계책 **개수**, 계책별 대응 상태(미대응/부분/완전). 기존 `flankerIntel` 한 줄 표기를 이 패널로 대체.
 
 ### Task 5.2: 준비 행동 대응 태그
 
@@ -324,7 +324,7 @@
 - Modify: `src/components/TacticalBattleScreen.tsx` (준비 행동 카드)
 - Modify: `src/game/tacticalBattle.ts` (`PREPARATION_ACTIONS`에 대응 계책 메타)
 
-- [ ] 각 준비 행동 카드에 "대응: 방책 파괴조" 식의 태그를 표시하고, 공개된 계책과 매칭되면 강조한다. 신규 행동 `firePrevention`·`torchWatch`·후열 경비 안내를 포함한다.
+- [x] 각 준비 행동 카드에 "대응: 방책 파괴조" 식의 태그를 표시하고, 공개된 계책과 매칭되면 강조한다. 신규 행동 `firePrevention`·`torchWatch`·후열 경비 안내를 포함한다.
 
 ---
 

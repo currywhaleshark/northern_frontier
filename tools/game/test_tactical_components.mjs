@@ -4,10 +4,20 @@ import { readFileSync } from 'node:fs';
 const screenSource = readFileSync(new URL('../../src/components/TacticalBattleScreen.tsx', import.meta.url), 'utf8');
 const zoneSource = readFileSync(new URL('../../src/components/tactical/TacticalZoneColumn.tsx', import.meta.url), 'utf8');
 const chipSource = readFileSync(new URL('../../src/components/tactical/TacticalGroupChip.tsx', import.meta.url), 'utf8');
+const planSource = readFileSync(new URL('../../src/components/tactical/EnemyPlanPanel.tsx', import.meta.url), 'utf8');
 const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
 
 assert.match(screenSource, /<TacticalZoneColumn\b/, 'the battle screen must delegate each battlefield zone');
 assert.match(screenSource, /<TacticalGroupChip\b/, 'the unit dock must delegate each group chip');
+assert.match(screenSource, /<EnemyPlanPanel\b/, 'the preparation screen must delegate enemy plan intel');
+assert.doesNotMatch(screenSource, /flankerIntel/, 'the legacy one-line flanker intel must be removed');
+assert.match(screenSource, /enemyPlanCounterLabelsForAction/,
+  'preparation cards must derive counter tags from revealed stratagems');
+
+assert.match(planSource, /objectiveRevealed/, 'enemy plan panel must hide an unrevealed objective');
+assert.match(planSource, /미확인 계책/, 'enemy plan panel must show the hidden stratagem count');
+assert.match(planSource, /완전 대응/, 'enemy plan panel must label fully countered stratagems');
+assert.match(planSource, /부분 대응/, 'enemy plan panel must label partially countered stratagems');
 
 for (const className of [
   'tactical-zone-heading',

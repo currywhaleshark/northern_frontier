@@ -69,6 +69,13 @@ const STRATAGEM_DETAILS: Record<EnemyStratagemId, {
   },
 };
 
+const PREPARATION_COUNTERS: Partial<Record<PreparationActionId, readonly EnemyStratagemId[]>> = {
+  repairWall: ['wallBreakers'],
+  prepareVolley: ['wallBreakers'],
+  firePrevention: ['fireArrows'],
+  torchWatch: ['nightApproach'],
+};
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -162,16 +169,20 @@ export function enemyPlanFirstRoundMoraleBonus(plan: EnemyPlan | undefined): num
 
 export function applyEnemyPlanPreparationCounter(plan: EnemyPlan | undefined, actionId: PreparationActionId): void {
   if (!plan) return;
-  const countered: Partial<Record<PreparationActionId, readonly EnemyStratagemId[]>> = {
-    repairWall: ['wallBreakers'],
-    prepareVolley: ['wallBreakers'],
-    firePrevention: ['fireArrows'],
-    torchWatch: ['nightApproach'],
-  };
-  const ids = countered[actionId] ?? [];
+  const ids = PREPARATION_COUNTERS[actionId] ?? [];
   for (const stratagem of plan.stratagems) {
     if (ids.includes(stratagem.id) && stratagem.counterLevel < 1) stratagem.counterLevel = 1;
   }
+}
+
+export function enemyPlanCounterLabelsForAction(
+  plan: EnemyPlan | undefined,
+  actionId: PreparationActionId,
+): string[] {
+  const ids = PREPARATION_COUNTERS[actionId] ?? [];
+  return plan?.stratagems
+    .filter(stratagem => stratagem.revealed && ids.includes(stratagem.id))
+    .map(stratagem => STRATAGEM_DETAILS[stratagem.id].label) ?? [];
 }
 
 export function enemyPlanWarningLines(plan: EnemyPlan | undefined): string[] {

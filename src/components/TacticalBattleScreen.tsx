@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { RESOURCE_NAMES, WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
 import { countBuilt } from '../game/buildings';
 import { getSeason } from '../game/seasons';
+import { enemyPlanCounterLabelsForAction } from '../game/enemyPlan';
 import {
   tacticalCommandDescription, tacticalCommandUnavailableReason, tacticalLootText,
   tacticalFormationLinesAdjacent, tacticalPreparationUnavailableReason, tacticalRearResponseOptions,
@@ -22,6 +23,7 @@ import type {
 } from '../game/types';
 import { playMeleeClash, playSfx, playWeaponSalvo, playWeaponVolley, setBattleDrums, type SfxName } from '../sound/sfx';
 import { TacticalGroupChip } from './tactical/TacticalGroupChip';
+import { EnemyPlanPanel } from './tactical/EnemyPlanPanel';
 import { TacticalZoneColumn } from './tactical/TacticalZoneColumn';
 
 interface Props {
@@ -421,23 +423,6 @@ export function TacticalBattleScreen({
   const barricadeReinforced = wallRepairApplied && (
     !preparationPlayback || fortifyEventIndex < 0 || eventIndex >= fortifyEventIndex
   );
-  const plannedRearManeuver = battle.enemyPlan?.stratagems.find(stratagem => stratagem.id === 'rearManeuver');
-  const legacyScoutedFlankers = battle.enemyPlan == null
-    ? battle.raiderGroups.find(group => group.kind === 'flankers' && group.flankPlanRevealed)
-    : undefined;
-  const flankerIntel = battle.enemyPlan
-    ? plannedRearManeuver
-      ? plannedRearManeuver.revealed
-        ? '정찰 보고: 적 우회대가 방어선 뒤편을 노리는 듯합니다.'
-        : null
-      : battle.enemyPlan.objectiveRevealed
-        ? '정찰 보고: 적 우회대가 마을 안쪽으로 파고들 낌새입니다.'
-        : null
-    : legacyScoutedFlankers?.flankPlan === 'rearAssault'
-      ? '정찰 보고: 적 우회대가 방어선 뒤편을 노리는 듯합니다.'
-      : legacyScoutedFlankers
-        ? '정찰 보고: 적 우회대가 마을 안쪽으로 파고들 낌새입니다.'
-        : null;
   const activeZoneIndex = Math.max(0, battle.zones.findIndex(zone => zone.id === activeZoneId));
   const showZone = (index: number) => {
     const zone = battle.zones[Math.max(0, Math.min(battle.zones.length - 1, index))];
@@ -603,6 +588,7 @@ export function TacticalBattleScreen({
         <div className="tactical-controls">
           {battle.phase === 'preparation' && (
             <>
+              {battle.enemyPlan && !assault && !hunt && <EnemyPlanPanel plan={battle.enemyPlan} />}
               <div className="tactical-panel-heading">
                 <div>
                   <strong>준비태세 선택</strong>
@@ -618,16 +604,18 @@ export function TacticalBattleScreen({
                     const disabled = action.applied || (!action.selected && (
                       battle.prepPoints < action.cost || unavailableReason != null
                     ));
+                    const counterLabels = enemyPlanCounterLabelsForAction(battle.enemyPlan, action.id);
                     return (
                       <button
                         key={action.id}
-                        className={`tactical-action${action.selected ? ' selected' : ''}${action.applied ? ' applied' : ''}`}
+                        className={`tactical-action${action.selected ? ' selected' : ''}${action.applied ? ' applied' : ''}${counterLabels.length > 0 ? ' counters-plan' : ''}`}
                         disabled={disabled}
                         onClick={() => onSpendPreparation(action.id)}
                       >
                         <span>{action.applied ? '완료' : action.selected ? '취소' : `${action.cost}점`}</span>
                         <strong>{action.label}</strong>
                         <small>{unavailableReason ?? PREP_DESCRIPTIONS[action.id]}</small>
+                        {counterLabels.length > 0 && <em>대응: {counterLabels.join(' · ')}</em>}
                       </button>
                     );
                   })}
@@ -652,7 +640,7 @@ export function TacticalBattleScreen({
                   <strong>{hunt ? '사냥대 배치' : assault ? '토벌대 배치' : '수비대 배치'}</strong>
                   <span>{battle.preliminaryBombardmentCannons
                     ? `사전포격 ${battle.preliminaryBombardmentCannons}문 · 적 ${battle.preliminaryBombardmentCasualties ?? 0}명 전투불능`
-                    : '부대를 고른 뒤 지킬 구역과 전열을 지정합니다.'}{flankerIntel ? ` · ${flankerIntel}` : ''}</span>
+                    : '부대를 고른 뒤 지킬 구역과 전열을 지정합니다.'}</span>
                 </div>
                 <button className="btn primary" onClick={onAdvancePhase}>전투 시작</button>
               </div>
