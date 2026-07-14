@@ -30,6 +30,7 @@ const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
 const tacticalCore = await import(pathToFileURL(join(compiledDir, 'tacticalCore.mjs')).href);
+const tacticalEngagement = await import(pathToFileURL(join(compiledDir, 'tacticalEngagement.mjs')).href);
 const tacticalCommandState = await import(pathToFileURL(join(compiledDir, 'tacticalCommandState.mjs')).href);
 const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
 const battleSimulation = await import(pathToFileURL(join(compiledDir, 'battleSimulation.mjs')).href);
@@ -245,6 +246,78 @@ function addBuiltMarker(state, type) {
     0,
     'a civilian-only zone has no combat readiness',
   );
+}
+
+{
+  const state = battleSimulation.createBattleSimulation({
+    mode: 'garrison', factionName: '변경 마적', power: 72, warned: true, siege: true,
+    season: 'winter', weather: 'clear', prepPoints: 'auto', seed: 2026071415,
+    defenders: {
+      muskets: 2, bows: 2, spears: 3, unarmedMilitia: 1,
+      watchmen: 2, hunters: 2, civilians: 4,
+    },
+    cannonEmplacements: 0,
+  });
+  const battle = state.tacticalBattle;
+  const zone = battle.zones.find(candidate => candidate.id === 'approach');
+  assert.ok(zone);
+  const defenders = structuredClone(battle.defenderGroups);
+  const attackers = structuredClone(battle.raiderGroups.filter(group => group.zoneId === zone.id));
+  const defendersBefore = structuredClone(defenders);
+  const attackersBefore = structuredClone(attackers);
+  const zoneBefore = structuredClone(zone);
+  let rollIndex = 0;
+  const rolls = [0.12, 0.84, 0.31, 0.67, 0.45, 0.93];
+  const exchange = tacticalEngagement.resolveEngagementExchange({
+    zone,
+    defenders,
+    attackers,
+    weather: state.weather,
+    prepareVolleyApplied: false,
+    evacuateCiviliansApplied: false,
+    roundStartingRaiderPower: attackers.reduce((sum, group) => sum + group.power, 0),
+    rng: () => rolls[rollIndex++ % rolls.length],
+  });
+  assert.deepEqual(defenders, defendersBefore, 'engagement exchange must not mutate defender input');
+  assert.deepEqual(attackers, attackersBefore, 'engagement exchange must not mutate attacker input');
+  assert.deepEqual(zone, zoneBefore, 'engagement exchange must not mutate zone input');
+  assert.ok(Number.isFinite(exchange.enemyShare));
+  assert.equal(exchange.raiderLosses.length, attackers.length);
+
+  const consequenceDefenders = structuredClone(defenders);
+  for (const loss of exchange.defenderLosses) {
+    const defender = consequenceDefenders.find(group => group.id === loss.groupId);
+    if (defender) {
+      defender.wounded += loss.wounded;
+      defender.killed += loss.killed;
+    }
+  }
+  const consequenceAttackers = structuredClone(attackers);
+  for (const loss of exchange.raiderLosses) {
+    const attacker = consequenceAttackers.find(group => group.id === loss.groupId);
+    if (attacker) attacker.confused = loss.confused;
+  }
+  const consequenceDefendersBefore = structuredClone(consequenceDefenders);
+  const consequenceAttackersBefore = structuredClone(consequenceAttackers);
+  const consequences = tacticalEngagement.applyDefenseZoneConsequences({
+    zone,
+    defenders: consequenceDefenders,
+    attackers: consequenceAttackers,
+    commands: exchange.commands,
+    enemyPower: exchange.enemyPower,
+    defensePower: exchange.defensePower,
+    enemyShare: exchange.enemyShare,
+    rearEnemyShare: exchange.rearEnemyShare,
+    originalPower: battle.originalPower,
+    availableLoot: { grain: 10, firewood: 10, hide: 10 },
+    rng: () => 0.5,
+  });
+  assert.deepEqual(consequenceDefenders, consequenceDefendersBefore,
+    'defense consequences must not mutate defender input');
+  assert.deepEqual(consequenceAttackers, consequenceAttackersBefore,
+    'defense consequences must not mutate attacker input');
+  assert.deepEqual(zone, zoneBefore, 'defense consequences must not mutate zone input');
+  assert.ok(Number.isFinite(consequences.pressure));
 }
 
 {
