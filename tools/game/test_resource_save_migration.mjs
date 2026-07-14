@@ -241,9 +241,11 @@ function prepareFormationTestCombatants(state) {
   const loadedZone = loaded?.tacticalBattle?.zones.find(candidate => candidate.id === zone.id);
   assert.equal(loadedZone?.focusTargetGroupId, target.id);
   assert.equal(loadedZone?.focusTargetSource, 'player');
+  assert.equal(loaded?.tacticalBattle?.raiderGroups.find(group => group.id === target.id)?.line, 'front');
 
   delete zone.focusTargetGroupId;
   delete zone.focusTargetSource;
+  delete target.line;
   assert.equal(saveLoad.saveGame(focusTargetSave), true);
   const legacyLoadedZone = saveLoad.loadGame()?.tacticalBattle?.zones.find(candidate => candidate.id === zone.id);
   assert.equal(legacyLoadedZone?.focusTargetGroupId, undefined);

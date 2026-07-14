@@ -22,12 +22,13 @@ import { ensureForeignSiteState, revealForeignSitesFromExploration } from './for
 import { allocateMusketReadiness, reconcileWeaponAssignments, resolvedWeaponAssignments } from './weapons';
 import { beginExpeditionReturn } from './expedition';
 import { CURRENT_SCHEMA_VERSION } from './saveSchema';
+import { defaultRaiderFormationLine } from './tacticalTargeting';
 import {
   gradeTacticalBattle, raidDefenseObjectiveResult, tacticalClosingSummary, tacticalOutcomeResult,
 } from './tacticalCore';
 import type {
   CombatWeaponId, CourtTribute, DefenderGroupKind, GameState, Gender, Resident, ResourceId,
-  PreparationActionId, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
+  PreparationActionId, RaiderUnitType, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
   TacticalFormationLine, TacticalPreparationEffect, TacticalRaiderGroup, TacticalRoundReport,
 } from './types';
 
@@ -287,6 +288,9 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       id: typeof group.id === 'string' ? group.id : `migrated-raider-${index}`,
       kind: group.kind === 'looters' || group.kind === 'flankers' ? group.kind : 'main',
       zoneId: zoneIds.has(String(group.zoneId)) ? String(group.zoneId) : defaultZoneId,
+      line: isTacticalFormationLine(group.line)
+        ? group.line
+        : defaultRaiderFormationLine(group.unitType as RaiderUnitType | undefined, group.leader === true),
       targetZoneId: zoneIds.has(String(group.targetZoneId)) ? String(group.targetZoneId) : defaultZoneId,
       count,
       killed: Math.min(count, Math.max(0, Math.floor(Number(group.killed) || 0))),

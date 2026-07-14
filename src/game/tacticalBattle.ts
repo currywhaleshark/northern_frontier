@@ -35,6 +35,7 @@ import {
   finishPredatorTacticalHunt, huntCommandUnavailableReason, huntPreparationUnavailableReason,
   resolveHuntRound, setHuntCommand, spendHuntPreparationAction,
 } from './tacticalHunt';
+import { canTargetLine, defaultRaiderFormationLine, tacticalContactLine } from './tacticalTargeting';
 import type {
   DefenderGroupKind,
   EnemyPlan,
@@ -480,6 +481,7 @@ function raiderGroups(
     unitType: entry.unitType,
     label: entry.label,
     zoneId: 'approach',
+    line: defaultRaiderFormationLine(entry.unitType),
     targetZoneId: entry.kind === 'looters'
       ? 'storehouse'
       : entry.kind === 'flankers' ? (flankPlan === 'rearAssault' ? 'wall' : 'center') : 'wall',
@@ -860,6 +862,48 @@ export function setTacticalCommand(
   return null;
 }
 
+export function tacticalFocusTargetUnavailableReason(
+  battle: TacticalBattle,
+  zoneId: string,
+  groupId: string,
+): string | null {
+  if (battle.orientation === 'assault' || battle.assaultKind === 'predatorHunt') {
+    return '방어전에서만 집중 표적을 지정할 수 있습니다.';
+  }
+  const target = battle.raiderGroups.find(group => group.id === groupId);
+  if (!target || target.zoneId !== zoneId || target.intent === 'withdraw' || target.power <= 0 ||
+      target.count - target.killed <= 0) return '해당 구역에 유효한 적 표적이 없습니다.';
+  if (!target.revealed) return '아직 드러나지 않은 적은 집중 표적으로 지정할 수 없습니다.';
+  const direction = target.rearAssault ? 'rear' : 'frontal';
+  const attackers = battle.raiderGroups.filter(group =>
+    group.zoneId === zoneId && group.rearAssault === target.rearAssault &&
+    group.intent !== 'withdraw' && group.power > 0 && group.count - group.killed > 0);
+  const contactLine = tacticalContactLine(attackers, direction);
+  const assignedDefenders = battle.defenderGroups.filter(group =>
+    group.zoneId === zoneId && group.commandable !== false && activeCount(group) > 0);
+  const rearAssaultActive = battle.raiderGroups.some(group =>
+    group.zoneId === zoneId && group.rearAssault && group.intent !== 'withdraw' && group.power > 0);
+  const split = splitTacticalEngagementDefenders(assignedDefenders, rearAssaultActive);
+  const defenders = direction === 'rear' ? split.rear : split.frontal;
+  if (defenders.length === 0) return '이 교전 방향에 집중 사격할 아군 부대가 없습니다.';
+  const defenderOrder: readonly TacticalFormationLine[] = direction === 'rear'
+    ? ['rear', 'middle', 'front']
+    : ['front', 'middle', 'rear'];
+  const defenderContactLine = defenderOrder.find(line => defenders.some(group => group.line === line)) ?? null;
+  const meleeContact = defenderContactLine != null && defenders.some(group =>
+    group.line === defenderContactLine && tacticalGroupCapabilities(group).has('melee'));
+  const context = {
+    direction,
+    contactLine,
+    meleeContact,
+    prepareVolleyApplied: applied(battle, 'prepareVolley'),
+  } as const;
+  const results = defenders.map(group => canTargetLine(group, target.line, context));
+  if (results.some(result => result.allowed)) return null;
+  const reasons = [...new Set(results.map(result => result.reason).filter((reason): reason is string => reason != null))];
+  return reasons[0] ?? '현재 아군 병과로 해당 열을 집중 공격할 수 없습니다.';
+}
+
 export function setTacticalFocusTarget(
   state: GameState,
   zoneId: string,
@@ -878,10 +922,9 @@ export function setTacticalFocusTarget(
     zone.focusTargetSource = 'auto';
     return null;
   }
-  const target = battle.raiderGroups.find(group => group.id === groupId);
-  if (!target || target.zoneId !== zoneId || target.intent === 'withdraw' || target.power <= 0 ||
-      target.count - target.killed <= 0) return '해당 구역에 유효한 적 표적이 없습니다.';
-  if (!target.revealed) return '아직 드러나지 않은 적은 집중 표적으로 지정할 수 없습니다.';
+  const unavailableReason = tacticalFocusTargetUnavailableReason(battle, zoneId, groupId);
+  if (unavailableReason) return unavailableReason;
+  const target = battle.raiderGroups.find(group => group.id === groupId)!;
   zone.focusTargetGroupId = target.id;
   zone.focusTargetSource = 'player';
   return null;

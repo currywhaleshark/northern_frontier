@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { combatSpriteDescriptor, tacticalGroupCapabilities } from '../../game/combatCapabilities';
+import { tacticalFocusTargetUnavailableReason } from '../../game/tacticalBattle';
 import type {
   GameState,
   PredatorKind,
@@ -72,14 +73,6 @@ function defenderFormationOrder(group: TacticalDefenderGroup): number {
 
 function formationLineLabel(line: TacticalFormationLine): string {
   return line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열';
-}
-
-function raiderFormationLine(group: TacticalRaiderGroup): TacticalFormationLine {
-  if (group.unitType === 'court-artillery') return 'rear';
-  if (group.unitType === 'nimacha-hunter' || group.unitType === 'holaon-horse-archer' ||
-      group.unitType === 'bandit-rider' || group.unitType === 'court-gunner' ||
-      group.unitType === 'court-archer') return 'middle';
-  return 'front';
 }
 
 function UnitMuzzleFlash({ anchor }: { anchor: TacticalMuzzleAnchor }) {
@@ -656,10 +649,13 @@ export function TacticalZoneColumn({
             key={line}
           >
             <span className="tactical-formation-line-label">적 {formationLineLabel(line)}</span>
-            {raiders.filter(raider => raiderFormationLine(raider) === line).map(raider => {
+            {raiders.filter(raider => raider.line === line).map(raider => {
           const activeRaiders = Math.max(0, raider.count - raider.killed);
-          const targetable = battle.phase === 'command' && !assault && !hunt && raider.revealed &&
-            raider.intent !== 'withdraw' && activeRaiders > 0;
+          const targetingActive = battle.phase === 'command' && !assault && !hunt && activeRaiders > 0;
+          const targetUnavailableReason = targetingActive
+            ? tacticalFocusTargetUnavailableReason(battle, zone.id, raider.id)
+            : null;
+          const targetable = targetingActive && targetUnavailableReason == null;
           const focusTarget = zone.focusTargetGroupId === raider.id;
           const fallingRaiders = raider.revealed && activeEvent?.kind === 'casualty' && activeEvent.groupId === raider.id
             ? activeEvent.casualties ?? 0 : 0;
@@ -680,7 +676,7 @@ export function TacticalZoneColumn({
           const raiderPose = raider.beastKind ? beastPose : raiderPoseForEvent(activeEvent, raider);
           return (
             <div
-              className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : ''}${focusTarget ? ' focus-target' : ''}${leaderMotion}`}
+              className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${leaderMotion}`}
               key={leaderMotion ? `${raider.id}-${activeEvent?.kind}-${eventIndex}` : raider.id}
               onClick={targetable ? event => {
                 event.stopPropagation();
@@ -689,7 +685,9 @@ export function TacticalZoneColumn({
               role={targetable ? 'button' : undefined}
               tabIndex={targetable ? 0 : undefined}
               aria-pressed={targetable ? focusTarget : undefined}
-              title={targetable ? focusTarget ? '집중 표적 해제' : '이 적 부대를 집중 표적으로 지정' : undefined}
+              title={targetable
+                ? focusTarget ? '집중 표적 해제' : '이 적 부대를 집중 표적으로 지정'
+                : targetUnavailableReason ?? undefined}
               onKeyDown={targetable ? event => {
                 if (event.key !== 'Enter' && event.key !== ' ') return;
                 event.preventDefault();
@@ -737,8 +735,11 @@ export function TacticalZoneColumn({
       <div className={`tactical-rear-assault-rank${activeEvent?.kind === 'rearAssault' && activeEvent.zoneId === zone.id ? ' entering' : ''}${activeEvent?.kind === 'melee' && activeEvent.side === 'raider' && activeEvent.zoneId === zone.id && rearAssaulters.some(group => activeEvent.groupId == null || activeEvent.groupId === group.id) ? ' attacking' : ''}`}>
         {rearAssaulters.map(raider => {
           const activeRaiders = Math.max(0, raider.count - raider.killed);
-          const targetable = battle.phase === 'command' && !assault && !hunt && raider.revealed &&
-            raider.intent !== 'withdraw' && activeRaiders > 0;
+          const targetingActive = battle.phase === 'command' && !assault && !hunt && activeRaiders > 0;
+          const targetUnavailableReason = targetingActive
+            ? tacticalFocusTargetUnavailableReason(battle, zone.id, raider.id)
+            : null;
+          const targetable = targetingActive && targetUnavailableReason == null;
           const focusTarget = zone.focusTargetGroupId === raider.id;
           const fallingRaiders = activeEvent?.kind === 'casualty' && activeEvent.groupId === raider.id
             ? activeEvent.casualties ?? 0 : 0;
@@ -746,7 +747,7 @@ export function TacticalZoneColumn({
           const formation = formationDimensions(totalRaiders, 132, 100, 20, 13, 5);
           return (
             <div
-              className={`tactical-raider-group rear-assault${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : ''}${focusTarget ? ' focus-target' : ''}`}
+              className={`tactical-raider-group rear-assault${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}`}
               key={raider.id}
               onClick={targetable ? event => {
                 event.stopPropagation();
@@ -755,7 +756,9 @@ export function TacticalZoneColumn({
               role={targetable ? 'button' : undefined}
               tabIndex={targetable ? 0 : undefined}
               aria-pressed={targetable ? focusTarget : undefined}
-              title={targetable ? focusTarget ? '집중 표적 해제' : '이 적 부대를 집중 표적으로 지정' : undefined}
+              title={targetable
+                ? focusTarget ? '집중 표적 해제' : '이 적 부대를 집중 표적으로 지정'
+                : targetUnavailableReason ?? undefined}
               onKeyDown={targetable ? event => {
                 if (event.key !== 'Enter' && event.key !== ' ') return;
                 event.preventDefault();

@@ -1658,6 +1658,10 @@ html, body, #root {
   pointer-events: auto;
   cursor: crosshair;
 }
+.tactical-raider-group.target-unavailable {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
 .tactical-raider-group.targetable:focus-visible { outline: 2px solid #f2c35f; outline-offset: 3px; }
 .tactical-raider-group.focus-target > span {
   outline: 1px solid #f0b94f;

@@ -679,6 +679,7 @@ export interface TacticalRaiderGroup {
   unitType?: RaiderUnitType;
   label: string;
   zoneId: string;
+  line: TacticalFormationLine;
   pendingZoneId?: string;
   targetZoneId: string;
   power: number;

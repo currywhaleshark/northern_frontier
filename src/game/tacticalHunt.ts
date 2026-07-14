@@ -8,6 +8,7 @@ import { injure, killResidents } from './raidDamage';
 import { applyWildlifeHuntOutcome, type WildlifeHuntOutcome } from './specialEvents';
 import { createExpeditionTacticalGroups } from './tacticalAssault';
 import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
+import { defaultRaiderFormationLine } from './tacticalTargeting';
 import {
   captureTacticalResources, gradeTacticalBattle, tacticalClosingSummary, tacticalDateLabel,
   tacticalDefenderShotCounts, tacticalOutcomeResult, tacticalPeopleReport, tacticalResourceDelta,
@@ -71,6 +72,7 @@ function beastGroup(
     kind: leader ? 'main' : 'flankers',
     label,
     zoneId: 'huntTracks',
+    line: defaultRaiderFormationLine(undefined, leader),
     targetZoneId: 'huntTracks',
     power,
     count,

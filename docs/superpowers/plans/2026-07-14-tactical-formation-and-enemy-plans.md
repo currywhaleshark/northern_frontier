@@ -220,13 +220,13 @@
 - Modify: `src/components/tactical/TacticalZoneColumn.tsx` (지정 불가 사유 표시)
 - Create: `tools/game/test_tactical_targeting.mjs`
 
-- [ ] 적 그룹에도 `line`을 부여한다(생성 시 unitType 기반: 근접 선봉 전열, 사격대 중열, 지휘·화포 후열). 저장 폴백은 unitType에서 재파생.
-- [ ] 표적 가능 판정 함수 `canTargetLine(attackerGroup, targetLine, context)`:
+- [x] 적 그룹에도 `line`을 부여한다(생성 시 unitType 기반: 근접 선봉 전열, 사격대 중열, 지휘·화포 후열). 저장 폴백은 unitType에서 재파생.
+- [x] 표적 가능 판정 함수 `canTargetLine(attackerGroup, targetLine, context)`:
   - 창·근접: 노출된 첫 접촉 열만 (정면은 전→중→후, 후방 교전은 역순).
   - 조총: 전열·중열. 아군 전열이 백병 접촉 중이고 표적이 적 전열 너머면 위력 감소 배율(기본 0.65, `prepareVolley` 적용 시 0.8) — 사격 불가 대신 감소로 통일.
   - 각궁: 전 열 가능, 열별 효율 100%/90%/75%.
   - 판정 불가 시 사유 문자열 반환 → UI에서 어둡게 + 사유 툴팁 (기존 `tacticalCommandUnavailableReason` 패턴).
-- [ ] 효율·집중도 수치는 전부 CONFIG.tacticalBattle로.
+- [x] 효율·집중도 수치는 전부 CONFIG.tacticalBattle로.
 
 ### Task 3.3: 손실 예산 재분배와 적 AI 대칭
 

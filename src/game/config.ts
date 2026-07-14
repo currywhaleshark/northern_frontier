@@ -367,6 +367,14 @@ export const CONFIG = {
         unguardedAttackerLossMultiplier: 0.55,
       },
     },
+    targeting: {
+      musketLineEfficiency: { front: 1, middle: 1, rear: 0 },
+      musketScreenedEfficiency: 0.65,
+      musketPreparedScreenedEfficiency: 0.8,
+      bowLineEfficiency: { front: 1, middle: 0.9, rear: 0.75 },
+      concentration: { melee: 0.85, musket: 0.8, bow: 0.65 },
+      maxFocusedLossShare: 0.7,
+    },
     prep: {
       surpriseBase: 1,
       warned: 3,

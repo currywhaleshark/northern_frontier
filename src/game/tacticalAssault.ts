@@ -7,6 +7,7 @@ import { makeRng } from './map';
 import { injure, killResidents } from './raidDamage';
 import { applyBanditLairOutcome, type BanditLairOutcome } from './siteDiplomacy';
 import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
+import { defaultRaiderFormationLine } from './tacticalTargeting';
 import {
   captureTacticalResources, gradeTacticalBattle, tacticalClosingSummary, tacticalDateLabel,
   tacticalDefenderShotCounts, tacticalOutcomeResult, tacticalPeopleReport,
@@ -135,7 +136,8 @@ function banditGroup(
 ): TacticalRaiderGroup {
   return {
     id, kind: id.includes('leader') ? 'main' : id.includes('archer') ? 'flankers' : 'looters',
-    unitType, label, zoneId, targetZoneId: zoneId, power: Math.max(1, power), count: Math.max(1, count),
+    unitType, label, zoneId, line: defaultRaiderFormationLine(unitType, id.includes('leader')),
+    targetZoneId: zoneId, power: Math.max(1, power), count: Math.max(1, count),
     killed: 0, morale, intent: 'defend', revealed, engagementsInZone: 0,
   };
 }

@@ -24,12 +24,16 @@ assert.match(zoneSource, /onSelectTarget/,
   'revealed enemy groups must expose the zone focus-target callback');
 assert.match(zoneSource, /focus-target/,
   'the selected enemy group must have a persistent focus-target marker');
+assert.match(zoneSource, /tacticalFocusTargetUnavailableReason/,
+  'enemy target controls must expose a line-reachability reason');
+assert.match(zoneSource, /target-unavailable/,
+  'enemy groups outside every friendly weapon reach must render disabled');
 assert.match(zoneSource, /\['front', 'middle', 'rear'\]/,
   'focused battlefields must render all three defender formation lines');
 assert.match(zoneSource, /\['rear', 'middle', 'front'\]/,
   'focused battlefields must render enemy lines from rear to contact');
-assert.match(zoneSource, /raiderFormationLine/,
-  'enemy groups need a visual formation line before persisted targeting lines are introduced');
+assert.match(zoneSource, /raider\.line/,
+  'enemy groups must render from their persisted tactical formation line');
 assert.match(zoneSource, /tactical-formation-lane/,
   'focused zones must stack groups inside formation lanes');
 assert.match(zoneSource, /tactical-contact-line/,
