@@ -4,7 +4,7 @@ import { computeDefense, rebuildBuildingFootprints } from './buildings';
 import { defaultCropForBuildingType } from './crops';
 import { rollCourtTribute } from './courtTribute';
 import {
-  flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan, migrateEnemyPlan,
+  flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan, migrateBanditLairDefensePlan, migrateEnemyPlan,
 } from './enemyPlan';
 import { spawnAnimalHabitats } from './habitats';
 import { makeRng } from './map';
@@ -373,6 +373,14 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     defenderGroups,
     raiderGroups,
     enemyPlan,
+    lairDefensePlan: encounterKind === 'banditLair'
+      ? migrateBanditLairDefensePlan(source.lairDefensePlan)
+      : undefined,
+    lairLootPreRemoved: encounterKind === 'banditLair'
+      ? Number.isFinite(source.lairLootPreRemoved)
+        ? Math.min(3, Math.max(0, Math.floor(Number(source.lairLootPreRemoved))))
+        : 0
+      : undefined,
     initialFriendlyPower: Number.isFinite(source.initialFriendlyPower)
       ? Math.max(1, Number(source.initialFriendlyPower))
       : Math.max(1, defenderGroups.reduce((sum, group) => sum + group.power, 0)),

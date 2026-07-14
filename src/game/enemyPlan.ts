@@ -1,6 +1,7 @@
 import { CONFIG } from './config';
 import type {
-  EnemyObjectiveId, EnemyPlan, EnemyStratagemId, EnemyStratagemState, PreparationActionId, TacticalFlankPlan,
+  BanditLairDefensePlan, BanditLairDoctrineId, EnemyObjectiveId, EnemyPlan, EnemyStratagemId,
+  EnemyStratagemState, ForeignSite, PreparationActionId, TacticalFlankPlan,
 } from './types';
 
 type EnemyPlanCreationInput = {
@@ -24,6 +25,24 @@ const OBJECTIVES: readonly EnemyObjectiveId[] = ['breakthrough', 'plunder', 'ars
 const STRATAGEMS: readonly EnemyStratagemId[] = [
   'rearManeuver', 'wallBreakers', 'fireArrows', 'feint', 'nightApproach',
 ];
+const BANDIT_LAIR_DOCTRINES: readonly BanditLairDoctrineId[] = [
+  'trailAttrition', 'wallHold', 'leaderEscape',
+];
+
+const BANDIT_LAIR_DOCTRINE_DETAILS: Record<BanditLairDoctrineId, { label: string; effect: string }> = {
+  trailAttrition: {
+    label: '길목 소모전',
+    effect: '숲길 초병과 매복대를 보강해 목책에 닿기 전부터 토벌대를 소모시킵니다.',
+  },
+  wallHold: {
+    label: '목책 고수',
+    effect: '사격대를 목책에 집중하는 대신 산채 안쪽 방어가 얇아집니다.',
+  },
+  leaderEscape: {
+    label: '두목 탈출 우선',
+    effect: '가짜 움막과 우회 퇴로를 준비하고 노획물을 미리 빼돌립니다.',
+  },
+};
 
 const STRATAGEM_DETAILS: Record<EnemyStratagemId, {
   label: string;
@@ -78,6 +97,93 @@ const PREPARATION_COUNTERS: Partial<Record<PreparationActionId, readonly EnemySt
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+type BanditLairPlanInput = {
+  alarm: number;
+  scoutFailures: number;
+  assaultDefeats: number;
+  militaryPower: number;
+};
+
+export function banditLairStratagemPoints(input: BanditLairPlanInput): number {
+  const config = CONFIG.foreignSites.banditLairDefense;
+  const alarmPoints = Math.min(config.maxAlarmPoints, Math.floor(Math.max(0, input.alarm) / config.alarmPerPoint));
+  const scoutFailurePoints = Math.min(
+    config.maxScoutFailurePoints,
+    Math.max(0, Math.floor(input.scoutFailures)) * config.scoutFailurePoints,
+  );
+  const assaultDefeatPoints = Math.min(
+    config.maxAssaultDefeatPoints,
+    Math.max(0, Math.floor(input.assaultDefeats)) * config.assaultDefeatPoints,
+  );
+  const militaryPowerPoints = Math.min(
+    config.maxMilitaryPowerPoints,
+    Math.floor(Math.max(0, input.militaryPower) / config.militaryPowerPerPoint),
+  );
+  return clamp(
+    config.baseStratagemPoints + alarmPoints + scoutFailurePoints + assaultDefeatPoints + militaryPowerPoints,
+    config.baseStratagemPoints,
+    config.maxStratagemPoints,
+  );
+}
+
+export function chooseBanditLairDoctrine(
+  input: BanditLairPlanInput,
+  roll: number,
+): BanditLairDoctrineId {
+  const weights: Record<BanditLairDoctrineId, number> = {
+    trailAttrition: 1 + clamp(input.alarm / 100, 0, 1) + Math.max(0, input.scoutFailures) * 0.5,
+    wallHold: 1 + clamp(input.militaryPower / 50, 0, 2) + Math.max(0, input.assaultDefeats) * 0.25,
+    leaderEscape: 1 + clamp((50 - input.militaryPower) / 50, 0, 1) +
+      Math.max(0, input.assaultDefeats) * 1.2 + clamp(input.alarm / 200, 0, 0.5),
+  };
+  const total = BANDIT_LAIR_DOCTRINES.reduce((sum, doctrine) => sum + weights[doctrine], 0);
+  let cursor = clamp(roll, 0, 0.999999999) * total;
+  for (const doctrine of BANDIT_LAIR_DOCTRINES) {
+    cursor -= weights[doctrine];
+    if (cursor < 0) return doctrine;
+  }
+  return 'leaderEscape';
+}
+
+export function banditLairDoctrineDefinition(doctrine: BanditLairDoctrineId) {
+  return { id: doctrine, ...BANDIT_LAIR_DOCTRINE_DETAILS[doctrine] };
+}
+
+function banditLairDoctrineRoll(site: ForeignSite): number {
+  let hash = Math.imul(site.id + 17, 0x45d9f3b);
+  hash ^= Math.imul(site.x + 101, 0x119de1f3);
+  hash ^= Math.imul(site.y + 211, 0x3449f5);
+  return (hash >>> 0) / 0x100000000;
+}
+
+export function ensureBanditLairDefensePlan(site: ForeignSite): BanditLairDefensePlan {
+  const input: BanditLairPlanInput = {
+    alarm: site.alarm,
+    scoutFailures: site.lairScoutFailures ?? 0,
+    assaultDefeats: site.lairAssaultDefeats ?? 0,
+    militaryPower: site.militaryPower,
+  };
+  site.lairDoctrine ??= chooseBanditLairDoctrine(input, banditLairDoctrineRoll(site));
+  return {
+    doctrine: site.lairDoctrine,
+    doctrineRevealed: site.lairDoctrineRevealed === true,
+    stratagemPoints: banditLairStratagemPoints(input),
+  };
+}
+
+export function migrateBanditLairDefensePlan(raw: unknown): BanditLairDefensePlan | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const source = raw as Record<string, unknown>;
+  if (!BANDIT_LAIR_DOCTRINES.includes(source.doctrine as BanditLairDoctrineId)) return undefined;
+  return {
+    doctrine: source.doctrine as BanditLairDoctrineId,
+    doctrineRevealed: source.doctrineRevealed === true,
+    stratagemPoints: Number.isFinite(source.stratagemPoints)
+      ? clamp(Math.floor(Number(source.stratagemPoints)), 0, CONFIG.foreignSites.banditLairDefense.maxStratagemPoints)
+      : 0,
+  };
 }
 
 function factionKey(factionName: string): 'nimacha' | 'holaon' | 'bandit' | 'court' | 'default' {

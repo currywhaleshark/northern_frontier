@@ -6,6 +6,7 @@ import { changeRelation, getRelation } from './relations';
 import { revealPassageRoute } from './passage';
 import { livingResidents } from './residents';
 import { createCombatRoster } from './combatRoster';
+import { banditLairDoctrineDefinition, ensureBanditLairDefensePlan } from './enemyPlan';
 import {
   consumeExpeditionPowder,
 } from './expedition';
@@ -135,20 +136,29 @@ export function scoutBanditLair(state: GameState, siteId: number, rng: () => num
   const site = getSite(state, siteId);
   if (!site || site.type !== 'banditLair') return '정찰할 산채가 아닙니다.';
   if (!isForeignSiteOperational(site)) return '이미 비어 있거나 불탄 산채입니다.';
+  const chance = banditLairScoutChance(state, siteId);
   const team = fieldTeam(state);
-  const weatherPenalty = state.weather === 'blizzard' ? 0.24 : state.weather === 'coldSnap' ? 0.12 : 0;
-  const chance = Math.max(0.12, Math.min(0.92,
-    0.28 + team.hunters * 0.09 + team.watchmen * 0.07 + team.militia * 0.06 - weatherPenalty));
+  const scoutConfig = CONFIG.foreignSites.banditLairScouting;
   site.lastInteractionDay = state.day;
+  site.lairScoutAttempts = (site.lairScoutAttempts ?? 0) + 1;
   if (rng() < chance) {
+    const plan = ensureBanditLairDefensePlan(site);
     site.discovered = true;
-    site.scoutedUntilDay = state.day + 48;
-    site.alarm = Math.min(100, site.alarm + 4);
-    addForeignSiteMemory(state, site.id, '정찰대가 산채의 인원과 드나드는 길을 파악했습니다.', 'good');
-    addLog(state, `정찰대가 ${site.name}의 규모와 길목을 파악했습니다. 다음 산채발 습격을 더 일찍 발견할 수 있습니다.`, 'good', true);
+    site.scoutedUntilDay = state.day + scoutConfig.intelDays;
+    site.alarm = Math.min(100, site.alarm + scoutConfig.successAlarm);
+    site.lairDoctrineRevealed = true;
+    const doctrine = banditLairDoctrineDefinition(plan.doctrine);
+    addForeignSiteMemory(state, site.id,
+      `정찰대가 산채의 인원과 드나드는 길, ${doctrine.label} 교리를 파악했습니다.`, 'good');
+    addLog(state,
+      `정찰대가 ${site.name}의 규모와 길목을 파악했습니다. 방어 교리는 '${doctrine.label}'입니다.`,
+      'good', true);
     return null;
   }
-  site.alarm = Math.min(100, site.alarm + 12);
+  const previousFailures = site.lairScoutFailures ?? 0;
+  site.lairScoutFailures = previousFailures + 1;
+  site.alarm = Math.min(100, site.alarm + scoutConfig.failureAlarm +
+    previousFailures * scoutConfig.repeatedFailureAlarm);
   state.threat = Math.min(100, state.threat + 6);
   const candidates = team.available.filter(resident => resident.job === 'hunter' || resident.job === 'watchman' || resident.job === 'militia');
   const victim = (candidates.length > 0 ? candidates : team.available)[Math.floor(rng() * Math.max(1, candidates.length || team.available.length))];
@@ -159,6 +169,22 @@ export function scoutBanditLair(state: GameState, siteId: number, rng: () => num
   }
   addForeignSiteMemory(state, site.id, '개척지 정찰대가 접근했다가 산채 경계병에게 발각되었습니다.', 'bad');
   return '정찰대가 발각되었습니다. 산채의 경계가 강화되고 전역 위협이 높아졌습니다.';
+}
+
+export function banditLairScoutChance(state: GameState, siteId: number): number {
+  const site = getSite(state, siteId);
+  if (!site || site.type !== 'banditLair' || !isForeignSiteOperational(site)) return 0;
+  const team = fieldTeam(state);
+  const config = CONFIG.foreignSites.banditLairScouting;
+  const weatherPenalty = state.weather === 'blizzard'
+    ? config.blizzardPenalty
+    : state.weather === 'coldSnap' ? config.coldSnapPenalty : 0;
+  return Math.max(config.minChance, Math.min(config.maxChance,
+    config.baseChance + Math.min(config.maxHunters, team.hunters) * config.hunterBonus +
+    Math.min(config.maxWatchmen, team.watchmen) * config.watchmanBonus +
+    Math.min(config.maxMilitia, team.militia) * config.militiaBonus - weatherPenalty -
+    site.alarm * config.alarmPenaltyPerPoint -
+    (site.lairScoutAttempts ?? 0) * config.repeatAttemptPenalty));
 }
 
 export type BanditLairOutcome = 'victory' | 'raid' | 'abandoned' | 'defeat' | 'withdrawal';
@@ -240,6 +266,7 @@ export function applyBanditLairOutcome(
   }
   site.status = 'fortified';
   site.alarm = 100;
+  site.lairAssaultDefeats = (site.lairAssaultDefeats ?? 0) + 1;
   state.threat = Math.min(100, state.threat + 12);
   addForeignSiteMemory(state, site.id, '산채가 개척지 토벌대를 물리치고 방비를 강화했습니다.', 'bad');
   addLog(state, '산채 토벌에 실패했습니다. 변경 마적의 보복 움직임으로 전역 위협이 높아졌습니다.', 'bad', true);

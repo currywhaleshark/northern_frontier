@@ -8,6 +8,9 @@ import { injure, killResidents } from './raidDamage';
 import { applyBanditLairOutcome, type BanditLairOutcome } from './siteDiplomacy';
 import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
 import { resolveEngagementExchange } from './tacticalEngagement';
+import {
+  banditLairDoctrineDefinition, ensureBanditLairDefensePlan,
+} from './enemyPlan';
 import { defaultRaiderFormationLine } from './tacticalTargeting';
 import {
   captureTacticalResources, gradeTacticalBattle, tacticalClosingSummary, tacticalDateLabel,
@@ -15,8 +18,8 @@ import {
   tacticalRaiderShotCounts, tacticalResourceDelta,
 } from './tacticalCore';
 import type {
-  DefenderGroupKind, GameState, PreparationActionId, ResourceId, TacticalAnimationEvent,
-  TacticalBattle, TacticalBattleZone, TacticalCommandId, TacticalDefenderGroup,
+  BanditLairDefensePlan, DefenderGroupKind, GameState, PreparationActionId, ResourceId,
+  TacticalAnimationEvent, TacticalBattle, TacticalBattleZone, TacticalCommandId, TacticalDefenderGroup,
   TacticalRaiderGroup, TacticalRoundReport,
 } from './types';
 
@@ -94,31 +97,54 @@ export function createExpeditionTacticalGroups(state: GameState, memberIds: numb
     .filter((group): group is TacticalDefenderGroup => group != null);
 }
 
-function assaultZones(scouted: boolean, alarm: number): TacticalBattleZone[] {
+function doctrineEffectScale(plan: BanditLairDefensePlan): number {
+  const config = CONFIG.foreignSites.banditLairDefense;
+  return 1 + Math.min(
+    config.maxPointEffectBonus,
+    Math.max(0, plan.stratagemPoints - config.baseStratagemPoints) * config.pointEffectStep,
+  );
+}
+
+function assaultZones(scouted: boolean, alarm: number, plan: BanditLairDefensePlan): TacticalBattleZone[] {
+  const config = CONFIG.foreignSites.banditLairDefense;
+  const effectScale = doctrineEffectScale(plan);
+  const trailDefenseBonus = plan.doctrine === 'trailAttrition'
+    ? Math.round(config.trailAttrition.trailDefenseBonus * effectScale)
+    : 0;
+  const wallDefenseBonus = plan.doctrine === 'wallHold'
+    ? Math.round(config.wallHold.wallDefenseBonus * effectScale)
+    : 0;
+  const innerDefensePenalty = plan.doctrine === 'wallHold'
+    ? Math.round(config.wallHold.innerDefensePenalty * effectScale)
+    : 0;
+  const doctrine = banditLairDoctrineDefinition(plan.doctrine);
+  const doctrineIntel = plan.doctrineRevealed
+    ? ` 정찰로 산채의 '${doctrine.label}' 교리(계책점수 ${plan.stratagemPoints})를 확인했습니다. ${doctrine.effect}`
+    : '';
   return [
     {
       id: 'lairTrail', name: '숲길 잠입로', kind: 'forest', order: 0,
-      pressure: scouted ? 12 : 0, breached: false, defenseBonus: scouted ? 0 : 8,
+      pressure: scouted ? 12 : 0, breached: false, defenseBonus: (scouted ? 0 : 8) + trailDefenseBonus,
       ambushBonus: scouted ? 12 : 0, lootRisk: 0, civilianRisk: 0,
       description: scouted
-        ? '정찰로 초병의 교대와 사각을 파악했습니다. 산채 목책까지 조용히 접근할 수 있습니다.'
-        : '초병과 매복을 경계하며 산채로 이어지는 좁은 숲길을 뚫어야 합니다.',
+        ? `정찰로 초병의 교대와 사각을 파악했습니다. 산채 목책까지 조용히 접근할 수 있습니다.${doctrineIntel}`
+        : `초병과 매복을 경계하며 산채로 이어지는 좁은 숲길을 뚫어야 합니다.${doctrineIntel}`,
     },
     {
       id: 'lairWall', name: '산채 목책', kind: 'wall', order: 1,
-      pressure: 0, breached: false, defenseBonus: 18 + Math.round(alarm / 8),
+      pressure: 0, breached: false, defenseBonus: 18 + Math.round(alarm / 8) + wallDefenseBonus,
       ambushBonus: 0, lootRisk: 5, civilianRisk: 0,
       description: '높은 목책과 사격 구멍을 돌파해야 산채 안으로 진입할 수 있습니다.',
     },
     {
       id: 'lairYard', name: '산채 마당', kind: 'storehouse', order: 2,
-      pressure: 0, breached: false, defenseBonus: 10,
+      pressure: 0, breached: false, defenseBonus: Math.max(0, 10 - innerDefensePenalty),
       ambushBonus: 0, lootRisk: 55, civilianRisk: 0,
       description: '마적 주력과 맞붙는 마당입니다. 이곳을 장악하면 창고를 털고 이탈할 수 있습니다.',
     },
     {
       id: 'lairKeep', name: '두목 움막·노획 창고', kind: 'center', order: 3,
-      pressure: 0, breached: false, defenseBonus: 16,
+      pressure: 0, breached: false, defenseBonus: Math.max(0, 16 - innerDefensePenalty),
       ambushBonus: 0, lootRisk: 80, civilianRisk: 0,
       description: '두목 친위대가 지키는 최종 목표입니다. 두목을 놓치지 않아야 산채를 완전히 소탕합니다.',
     },
@@ -143,14 +169,28 @@ function banditGroup(
   };
 }
 
-function banditDefenders(power: number, scouted: boolean): TacticalRaiderGroup[] {
+function banditDefenders(
+  power: number,
+  scouted: boolean,
+  plan: BanditLairDefensePlan,
+): TacticalRaiderGroup[] {
+  const config = CONFIG.foreignSites.banditLairDefense;
+  const effectScale = doctrineEffectScale(plan);
   const totalCount = Math.max(4, Math.round(power / 9));
   return [
     banditGroup('lair-sentries', '산채 초병', 'lairTrail', power * 0.16, totalCount * 0.18, 'bandit-vanguard', true, 68),
     banditGroup('lair-archers', '목책 궁수', 'lairWall', power * 0.27, totalCount * 0.27, 'bandit-rider', scouted, 74),
     banditGroup('lair-yard', '마적 주력', 'lairYard', power * 0.31, totalCount * 0.31, 'bandit-vanguard', scouted, 78),
     banditGroup('lair-leader', '두목 친위대', 'lairKeep', power * 0.26, totalCount * 0.24, 'bandit-looter', scouted, 86),
-  ].map(group => ({ ...group, count: Math.max(1, Math.round(group.count)) }));
+  ].map(group => ({
+    ...group,
+    count: Math.max(1, Math.round(group.count)),
+    combatMultiplier: group.id === 'lair-sentries' && plan.doctrine === 'trailAttrition'
+      ? 1 + config.trailAttrition.sentryCombatBonus * effectScale
+      : group.id === 'lair-archers' && plan.doctrine === 'wallHold'
+        ? 1 + config.wallHold.wallCombatBonus * effectScale
+        : group.combatMultiplier,
+  }));
 }
 
 function preparationPoints(groups: TacticalDefenderGroup[], scouted: boolean): number {
@@ -170,7 +210,12 @@ export function createBanditLairTacticalAssault(state: GameState): TacticalBattl
   const groups = createExpeditionTacticalGroups(state, expedition.memberIds);
   if (groups.reduce((sum, group) => sum + group.count, 0) < 2) return '직접 지휘할 토벌대원이 부족합니다.';
   const scouted = (site.scoutedUntilDay ?? 0) >= state.day;
-  const enemies = banditDefenders(site.militaryPower * LAIR_POSITION_POWER_MULTIPLIER, scouted);
+  const storedLairDefensePlan = ensureBanditLairDefensePlan(site);
+  const lairDefensePlan: BanditLairDefensePlan = {
+    ...storedLairDefensePlan,
+    doctrineRevealed: scouted && storedLairDefensePlan.doctrineRevealed,
+  };
+  const enemies = banditDefenders(site.militaryPower * LAIR_POSITION_POWER_MULTIPLIER, scouted, lairDefensePlan);
   const battle: TacticalBattle = {
     encounterKind: 'banditLair',
     id: state.day * 1000 + state.subTick * 10 + 7,
@@ -185,7 +230,7 @@ export function createBanditLairTacticalAssault(state: GameState): TacticalBattl
     prepPoints: preparationPoints(groups, scouted),
     prepActions: ASSAULT_PREPARATIONS.map(action => ({ ...action, selected: false, applied: false })),
     preparationEvents: [],
-    zones: assaultZones(scouted, site.alarm),
+    zones: assaultZones(scouted, site.alarm, lairDefensePlan),
     defenderGroups: groups,
     raiderGroups: enemies,
     currentZoneId: 'lairTrail',
@@ -197,6 +242,10 @@ export function createBanditLairTacticalAssault(state: GameState): TacticalBattl
     orientation: 'assault',
     assaultKind: 'banditLair',
     assaultTargetSiteId: site.id,
+    lairDefensePlan,
+    lairLootPreRemoved: lairDefensePlan.doctrine === 'leaderEscape'
+      ? CONFIG.foreignSites.banditLairDefense.leaderEscape.preRemovedLootDamage
+      : 0,
     leaderEscapeBlocked: false,
     leaderEscaped: false,
     assaultFireDamage: 0,
@@ -545,17 +594,29 @@ export function resolveAssaultRound(state: GameState): string | null {
   const yardBreached = battle.zones.find(candidate => candidate.id === 'lairYard')?.breached ?? false;
   const keepBreached = battle.zones.find(candidate => candidate.id === 'lairKeep')?.breached ?? false;
   const allPlayersDown = battle.defenderGroups.every(group => activeCount(group) <= 0);
-  const escapeBlockedThisRound = battle.leaderEscapeBlocked || players.some(group => group.command === 'blockEscape' && activeCount(group) > 0);
+  const activeEscapeBlock = players.some(group => group.command === 'blockEscape' && activeCount(group) > 0);
+  const leaderEscapeDoctrine = battle.lairDefensePlan?.doctrine === 'leaderEscape';
+  const leaderEscapeConfig = CONFIG.foreignSites.banditLairDefense.leaderEscape;
+  const escapeBlockStrength = activeEscapeBlock
+    ? 1
+    : battle.leaderEscapeBlocked
+      ? leaderEscapeDoctrine ? leaderEscapeConfig.preparedBlockEffectiveness : 1
+      : 0;
+  const escapeBlockedThisRound = escapeBlockStrength > 0;
+  const keepEscapeChance = (leaderEscapeDoctrine ? leaderEscapeConfig.keepEscapeChance : 0.55) *
+    (1 - escapeBlockStrength);
+  const moraleEscapeChance = (leaderEscapeDoctrine ? leaderEscapeConfig.moraleEscapeChance : 0.38) *
+    (1 - escapeBlockStrength);
   let outcome: TacticalRoundReport['outcome'];
   if (retreatOrdered) outcome = yardBreached ? 'assaultRaid' : 'assaultWithdrawal';
   else if (allPlayersDown || battle.villageMorale <= 0) outcome = 'assaultDefeat';
   // 산채 기세가 먼저 무너져도 두목 움막을 돌파하기 전에는 완전 소탕할 수 없다.
   else if (keepBreached) {
-    if (!escapeBlockedThisRound && rng() < 0.55) {
+    if (keepEscapeChance > 0 && rng() < keepEscapeChance) {
       battle.leaderEscaped = true;
       outcome = 'assaultAbandoned';
     } else outcome = 'assaultVictory';
-  } else if (battle.raiderMorale <= 28 && !escapeBlockedThisRound && rng() < 0.38) {
+  } else if (battle.raiderMorale <= 28 && moraleEscapeChance > 0 && rng() < moraleEscapeChance) {
     battle.leaderEscaped = true;
     outcome = 'assaultAbandoned';
   } else if (battle.round >= ASSAULT_MAX_ROUNDS) outcome = yardBreached ? 'assaultRaid' : 'assaultDefeat';
@@ -677,14 +738,15 @@ export function finishBanditLairTacticalAssault(state: GameState): void {
         : outcome === 'assaultWithdrawal'
           ? 'withdrawal'
           : 'defeat';
+  const lootDamage = (battle.assaultFireDamage ?? 0) + (battle.lairLootPreRemoved ?? 0);
   const error = applyBanditLairOutcome(
     state,
     battle.assaultTargetSiteId ?? -1,
     strategicOutcome,
-    { lootDamage: battle.assaultFireDamage ?? 0 },
+    { lootDamage },
   );
   if (error) addLog(state, error, 'bad', true);
-  const loot = assaultLoot(outcome, battle.assaultFireDamage ?? 0);
+  const loot = assaultLoot(outcome, lootDamage);
   if (state.expedition) {
     state.expedition.carriedLoot = loot;
     if (casualties > 0) state.expedition.speed = Math.max(0.25, state.expedition.speed * 0.7);

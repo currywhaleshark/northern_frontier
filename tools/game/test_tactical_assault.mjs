@@ -37,10 +37,11 @@ const engagement = await import(pathToFileURL(join(compiledDir, 'expeditionEngag
 const battleSimulation = await import(pathToFileURL(join(compiledDir, 'battleSimulation.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
 const siteDiplomacy = await import(pathToFileURL(join(compiledDir, 'siteDiplomacy.mjs')).href);
+const enemyPlan = await import(pathToFileURL(join(compiledDir, 'enemyPlan.mjs')).href);
 const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
 const weapons = await import(pathToFileURL(join(compiledDir, 'weapons.mjs')).href);
 
-function prepareState(seed, scouted = true) {
+function prepareState(seed, scouted = true, configureLair = undefined) {
   const state = simulation.newGame(seed);
   for (const resident of state.residents) {
     resident.job = 'idle';
@@ -69,6 +70,7 @@ function prepareState(seed, scouted = true) {
   lair.militaryPower = 45;
   lair.alarm = 20;
   lair.scoutedUntilDay = scouted ? state.day + 2 : 0;
+  configureLair?.(lair);
   createReachableExpedition(state, {
     kind: 'lairAssault', targetSiteId: lair.id, memberIds: members.map(member => member.id),
   });
@@ -142,6 +144,7 @@ function finishPendingBattle(state) {
   assert.equal(loaded?.tacticalBattle?.orientation, 'assault');
   assert.equal(loaded?.tacticalBattle?.assaultKind, 'banditLair');
   assert.equal(loaded?.tacticalBattle?.assaultTargetSiteId, battle.assaultTargetSiteId);
+  assert.deepEqual(loaded?.tacticalBattle?.lairDefensePlan, battle.lairDefensePlan);
 
   const sentries = battle.raiderGroups.find(group => group.zoneId === 'lairTrail');
   const hunter = battle.defenderGroups.find(group => group.kind === 'hunter');
@@ -223,6 +226,109 @@ assert.match(
 );
 
 {
+  const baselineInput = { alarm: 10, scoutFailures: 0, assaultDefeats: 0, militaryPower: 20 };
+  const low = enemyPlan.banditLairStratagemPoints(baselineInput);
+  const high = enemyPlan.banditLairStratagemPoints({
+    alarm: 90, scoutFailures: 2, assaultDefeats: 2, militaryPower: 90,
+  });
+  assert.ok(high > low, 'alarm, scout failures, assault defeats, and remaining troops must raise lair stratagem points');
+  for (const input of [
+    { ...baselineInput, alarm: 40 },
+    { ...baselineInput, scoutFailures: 1 },
+    { ...baselineInput, assaultDefeats: 1 },
+    { ...baselineInput, militaryPower: 45 },
+  ]) {
+    assert.ok(enemyPlan.banditLairStratagemPoints(input) > low,
+      `each lair history input must independently raise stratagem points: ${JSON.stringify(input)}`);
+  }
+  const doctrineInput = { alarm: 50, scoutFailures: 0, assaultDefeats: 0, militaryPower: 50 };
+  assert.deepEqual(new Set([0.05, 0.5, 0.95].map(roll =>
+    enemyPlan.chooseBanditLairDoctrine(doctrineInput, roll))),
+  new Set(['trailAttrition', 'wallHold', 'leaderEscape']), 'all three lair doctrines must be selectable');
+}
+
+{
+  const state = simulation.newGame(2026071411);
+  for (const resident of state.residents) {
+    resident.job = 'hunter';
+    resident.sick = false;
+    resident.health = 100;
+    resident.quarantinedUntil = 0;
+  }
+  const lair = state.foreignSites.find(site => site.type === 'banditLair');
+  assert.ok(lair);
+  lair.discovered = true;
+  lair.status = 'active';
+  lair.alarm = 20;
+  const initialChance = siteDiplomacy.banditLairScoutChance(state, lair.id);
+  lair.lairScoutAttempts = 3;
+  lair.alarm = 60;
+  assert.ok(siteDiplomacy.banditLairScoutChance(state, lair.id) < initialChance,
+    'repeated scouting and higher alarm must reduce scouting success chance');
+  lair.lairScoutAttempts = 0;
+  lair.alarm = 20;
+  assert.equal(siteDiplomacy.scoutBanditLair(state, lair.id, () => 0), null);
+  assert.equal(lair.lairDoctrineRevealed, true, 'successful scouting must reveal the current lair doctrine');
+  assert.ok(['trailAttrition', 'wallHold', 'leaderEscape'].includes(lair.lairDoctrine));
+}
+
+{
+  const state = simulation.newGame(2026071412);
+  for (const resident of state.residents) {
+    resident.job = 'hunter';
+    resident.sick = false;
+    resident.health = 100;
+    resident.quarantinedUntil = 0;
+  }
+  const lair = state.foreignSites.find(site => site.type === 'banditLair');
+  assert.ok(lair);
+  lair.discovered = true;
+  lair.status = 'active';
+  lair.alarm = 0;
+  assert.match(siteDiplomacy.scoutBanditLair(state, lair.id, () => 0.999), /발각/);
+  const firstAlarmGain = lair.alarm;
+  assert.match(siteDiplomacy.scoutBanditLair(state, lair.id, () => 0.999), /발각/);
+  assert.ok(lair.alarm - firstAlarmGain > firstAlarmGain,
+    'a repeated scouting failure must raise alarm more than the first failure');
+  assert.equal(lair.lairScoutAttempts, 2);
+  assert.equal(lair.lairScoutFailures, 2);
+}
+
+{
+  const trail = prepareState(2026071413, true, lair => {
+    lair.lairDoctrine = 'trailAttrition';
+    lair.lairDoctrineRevealed = true;
+  }).battle;
+  assert.equal(trail.lairDefensePlan?.doctrine, 'trailAttrition');
+  assert.ok(trail.zones.find(zone => zone.id === 'lairTrail').defenseBonus > 0,
+    'trail attrition must reinforce the infiltration route');
+
+  const wall = prepareState(2026071414, true, lair => {
+    lair.lairDoctrine = 'wallHold';
+    lair.lairDoctrineRevealed = true;
+  }).battle;
+  assert.equal(wall.lairDefensePlan?.doctrine, 'wallHold');
+  assert.ok(wall.zones.find(zone => zone.id === 'lairWall').defenseBonus > 21,
+    'wall hold must strengthen the palisade beyond the normal alarm bonus');
+  assert.ok(wall.zones.find(zone => zone.id === 'lairYard').defenseBonus < 10,
+    'wall hold must weaken the inner yard');
+
+  const escape = prepareState(2026071415, true, lair => {
+    lair.lairDoctrine = 'leaderEscape';
+    lair.lairDoctrineRevealed = true;
+  }).battle;
+  assert.equal(escape.lairDefensePlan?.doctrine, 'leaderEscape');
+  assert.ok((escape.lairLootPreRemoved ?? 0) > 0, 'leader escape doctrine must pre-remove some loot');
+
+  const expiredIntel = prepareState(2026071416, false, lair => {
+    lair.lairDoctrine = 'wallHold';
+    lair.lairDoctrineRevealed = true;
+  }).battle;
+  assert.equal(expiredIntel.lairDefensePlan?.doctrineRevealed, false,
+    'expired scoutedUntilDay intel must not keep revealing the lair doctrine in battle');
+}
+
+{
   const { state, battle } = prepareState(2026071410, true);
   enterCommandPhase(state);
   const target = battle.raiderGroups.find(group => group.zoneId === battle.currentZoneId);
@@ -240,6 +346,7 @@ assert.match(
   assert.equal(battle.pendingReport.outcome, 'assaultDefeat');
   finishPendingBattle(state);
   assert.equal(lair.status, 'fortified');
+  assert.equal(lair.lairAssaultDefeats, 1);
   assert.equal(state.tacticalBattleReport?.siteOutcome, 'fortified');
   assert.match(state.tacticalBattleReport?.outcomeLabel ?? '', /패퇴/);
 }
@@ -264,6 +371,8 @@ assert.match(
   let totalDirectRounds = 0;
   let totalDirectCasualties = 0;
   const roundsByZone = { lairTrail: 0, lairWall: 0, lairYard: 0, lairKeep: 0 };
+  const doctrines = { trailAttrition: 0, wallHold: 0, leaderEscape: 0 };
+  const outcomes = {};
   for (let index = 0; index < samples; index++) {
     const state = battleSimulation.createBattleSimulation({
       scenario: 'banditLair', mode: 'garrison', factionName: '변경 마적', power: 60,
@@ -278,6 +387,7 @@ assert.match(
     const battle = state.tacticalBattle;
     const activeExpedition = state.expedition;
     assert.ok(battle && activeExpedition?.targetSiteId != null);
+    doctrines[battle.lairDefensePlan?.doctrine ?? 'wallHold']++;
     expectedAutomaticWins += siteDiplomacy.banditLairRaidChance(
       state, activeExpedition.targetSiteId, activeExpedition.memberIds,
     );
@@ -295,6 +405,7 @@ assert.match(
       (sum, group) => sum + group.wounded + group.killed, 0,
     );
     if (battle.pendingReport?.outcome === 'assaultVictory') directWins++;
+    outcomes[battle.pendingReport?.outcome ?? 'none'] = (outcomes[battle.pendingReport?.outcome ?? 'none'] ?? 0) + 1;
   }
   const automaticRate = expectedAutomaticWins / samples;
   const directRate = directWins / samples;
@@ -306,6 +417,8 @@ assert.match(
     averageRounds,
     averageCasualties,
     roundsByZone,
+    doctrines,
+    outcomes,
   }));
   assert.ok(
     Math.abs(automaticRate - directRate) <= 0.15,

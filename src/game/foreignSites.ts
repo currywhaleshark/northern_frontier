@@ -198,6 +198,10 @@ export function generateForeignSites(state: GameState, rng: () => number): void 
     trust: 5,
     alarm: 55,
     favors: 0,
+    lairScoutAttempts: 0,
+    lairScoutFailures: 0,
+    lairAssaultDefeats: 0,
+    lairDoctrineRevealed: false,
   });
   addClaimZone(state, lair, 'passage', 4);
 }
@@ -215,6 +219,17 @@ export function ensureForeignSiteState(state: GameState): void {
     site.alarm ??= 0;
     site.favors ??= 0;
     site.lastInteractionDay ??= -999;
+    if (site.type === 'banditLair') {
+      site.lairScoutAttempts = Number.isFinite(site.lairScoutAttempts)
+        ? Math.max(0, Math.floor(site.lairScoutAttempts!)) : 0;
+      site.lairScoutFailures = Number.isFinite(site.lairScoutFailures)
+        ? Math.max(0, Math.floor(site.lairScoutFailures!)) : 0;
+      site.lairAssaultDefeats = Number.isFinite(site.lairAssaultDefeats)
+        ? Math.max(0, Math.floor(site.lairAssaultDefeats!)) : 0;
+      if (site.lairDoctrine !== 'trailAttrition' && site.lairDoctrine !== 'wallHold' &&
+          site.lairDoctrine !== 'leaderEscape') site.lairDoctrine = undefined;
+      site.lairDoctrineRevealed = site.lairDoctrine != null && site.lairDoctrineRevealed === true;
+    }
   }
 }
 

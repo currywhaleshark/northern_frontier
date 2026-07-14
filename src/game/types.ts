@@ -186,6 +186,14 @@ export interface ForeignSiteMemory {
   kind: 'good' | 'bad' | 'neutral';
 }
 
+export type BanditLairDoctrineId = 'trailAttrition' | 'wallHold' | 'leaderEscape';
+
+export interface BanditLairDefensePlan {
+  doctrine: BanditLairDoctrineId;
+  doctrineRevealed: boolean;
+  stratagemPoints: number;
+}
+
 export interface ForeignSite {
   id: number;
   type: ForeignSiteType;
@@ -212,6 +220,11 @@ export interface ForeignSite {
   lastInteractionDay: number;
   lastRaidDay?: number;
   scoutedUntilDay?: number;
+  lairScoutAttempts?: number;
+  lairScoutFailures?: number;
+  lairAssaultDefeats?: number;
+  lairDoctrine?: BanditLairDoctrineId;
+  lairDoctrineRevealed?: boolean;
 }
 
 export type PointerCursor = 'default' | 'move' | 'copy' | 'pointer' | 'not-allowed';
@@ -873,6 +886,8 @@ export interface TacticalBattle {
   orientation?: 'defense' | 'assault';
   assaultKind?: 'banditLair' | 'predatorHunt';
   assaultTargetSiteId?: number;
+  lairDefensePlan?: BanditLairDefensePlan;
+  lairLootPreRemoved?: number;
   leaderEscapeBlocked?: boolean;
   leaderEscaped?: boolean;
   assaultFireDamage?: number;

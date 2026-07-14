@@ -347,9 +347,9 @@
 - Modify: `src/game/siteDiplomacy.ts` (경계도·토벌 실패 이력 연동)
 - Modify: `tools/game/test_tactical_assault.mjs`
 
-- [ ] 산채 계책점수: `site.alarm`, 정찰 발각 이력, 이전 토벌 실패, 잔여 병력에서 산출.
-- [ ] 교리 3종: `trailAttrition`(길목 소모전 — 잠입로 방어·매복 강화), `wallHold`(목책 고수 — lairWall 방어·사격 보너스, 안쪽 약화), `leaderEscape`(두목 탈출 우선 — 기존 `leaderEscaped`/`blockLeaderEscape` 메커니즘에 가짜 움막·선반출 결합).
-- [ ] 정찰 상충: 정찰 성공 시 교리 공개(기존 `scoutedUntilDay` 활용), 실패 시 `alarm` 상승 → 산채 계책점수 증가. 다회 정찰이 항상 정답이 되지 않게 실패 확률·경계 상승 폭을 CONFIG로 조정.
+- [x] 산채 계책점수: `site.alarm`, 정찰 발각 이력, 이전 토벌 실패, 잔여 병력에서 산출.
+- [x] 교리 3종: `trailAttrition`(길목 소모전 — 잠입로 방어·매복 강화), `wallHold`(목책 고수 — lairWall 방어·사격 보너스, 안쪽 약화), `leaderEscape`(두목 탈출 우선 — 기존 `leaderEscaped`/`blockLeaderEscape` 메커니즘에 가짜 움막·선반출 결합).
+- [x] 정찰 상충: 정찰 성공 시 교리 공개(기존 `scoutedUntilDay` 활용), 실패 시 `alarm` 상승 → 산채 계책점수 증가. 다회 정찰이 항상 정답이 되지 않게 실패 확률·경계 상승 폭을 CONFIG로 조정.
 
 ---
 
