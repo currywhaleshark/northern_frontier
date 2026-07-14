@@ -91,6 +91,8 @@ function snapshotRound(battle, report) {
     raidersKilled: report.raidersKilled,
     buildingsDamaged: report.buildingsDamaged,
     loot: report.loot,
+    summary: report.summary,
+    lines: report.lines,
     events: report.events.map(event => ({
       zoneId: event.zoneId,
       kind: event.kind,
