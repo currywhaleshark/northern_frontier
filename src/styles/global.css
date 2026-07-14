@@ -2252,6 +2252,41 @@ html, body, #root {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+.tactical-rear-response-guide {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid #66543d;
+  border-radius: 5px;
+  background: #2a2722;
+}
+.tactical-rear-response-guide > strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #e6c987;
+  font-size: 11px;
+}
+.tactical-rear-response-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+.tactical-rear-response-options > button,
+.tactical-rear-response-option {
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid #514c42;
+  border-radius: 4px;
+  background: #24282b;
+  color: #c8c2b3;
+  text-align: left;
+}
+.tactical-rear-response-options > button { cursor: pointer; }
+.tactical-rear-response-options > button:hover { border-color: #a27d45; background: #302d27; }
+.tactical-rear-response-options b,
+.tactical-rear-response-options span { display: block; }
+.tactical-rear-response-options b { color: #e4d3a9; font-size: 10px; }
+.tactical-rear-response-options span { margin-top: 2px; font-size: 9px; line-height: 1.35; }
+.tactical-rear-response-option.passive { opacity: 0.78; }
 
 /* ── 배치 단계 — 선택 부대의 구역·전열 지정 행 ── */
 .tactical-deploy-row {
@@ -2956,6 +2991,7 @@ html, body, #root {
   .tactical-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tactical-deploy-row { grid-template-columns: 1fr; gap: 6px; }
   .tactical-zone-buttons { grid-template-columns: repeat(4, minmax(72px, 1fr)); }
+  .tactical-rear-response-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tactical-report,
   .tactical-final-report { grid-template-columns: 1fr; gap: 8px; }
   .tactical-report-numbers { grid-template-columns: repeat(4, minmax(64px, 1fr)); }

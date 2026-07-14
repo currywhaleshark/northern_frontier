@@ -41,6 +41,12 @@ const threeLineToggleCount = [...screenSource.matchAll(/\['front', 'middle', 're
 assert.equal(threeLineToggleCount, 2, 'deployment and command controls must both expose three formation lines');
 assert.match(screenSource, /line === 'middle' \? '중열'/,
   'formation controls must label the middle line');
+assert.match(screenSource, /tacticalRearResponseOptions/,
+  'the command panel must derive the available rear-assault response combinations');
+assert.match(screenSource, /tactical-rear-response-guide/,
+  'the command panel must expose rear-assault response tradeoffs');
+assert.match(cssSource, /\.tactical-rear-response-guide/,
+  'rear-assault response guidance must remain readable inside the command panel');
 assert.match(cssSource, /\.tactical-zone\.focused \.tactical-raider-rank[\s\S]*grid-template-columns:\s*repeat\(3,/,
   'focused enemy formations must receive three visual columns');
 assert.match(cssSource, /\.tactical-zone\.focused \.tactical-defender-rank[\s\S]*grid-template-columns:\s*repeat\(3,/,

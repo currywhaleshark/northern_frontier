@@ -436,6 +436,50 @@ function addBuiltMarker(state, type) {
 }
 
 {
+  const state = simulation.newGame(2026071486);
+  prepareDefenders(state);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'rear response options', power: 84, warned: true, siege: true, mode: 'garrison',
+  });
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  const spear = battle.defenderGroups.find(group => group.kind === 'militia-spear');
+  const bow = battle.defenderGroups.find(group => group.kind === 'militia-bow');
+  const watchman = battle.defenderGroups.find(group => group.kind === 'watchman');
+  const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
+  assert.ok(spear && bow && watchman && flanker);
+  Object.assign(spear, { zoneId: 'wall', line: 'middle', command: 'hold', commandSource: 'recommended' });
+  Object.assign(bow, { zoneId: 'wall', line: 'rear', command: 'volley', commandSource: 'recommended' });
+  Object.assign(watchman, { zoneId: 'wall', line: 'front', command: 'hold', commandSource: 'recommended' });
+  Object.assign(flanker, { zoneId: 'wall', rearAssault: true, intent: 'flank', power: 30 });
+
+  const options = tactical.tacticalRearResponseOptions(battle, 'wall');
+  assert.deepEqual(options.map(option => option.id), [
+    'reinforceRear', 'redeployRear', 'rangedRear', 'unopposed',
+  ]);
+  assert.deepEqual(options.find(option => option.id === 'reinforceRear').groupIds, [spear.id]);
+  assert.ok(options.find(option => option.id === 'redeployRear').groupIds.includes(watchman.id));
+  assert.deepEqual(options.find(option => option.id === 'rangedRear').groupIds, [bow.id]);
+  assert.match(options.find(option => option.id === 'redeployRear').description, /정면 압박/);
+
+  tactical.chooseDefaultTacticalCommands(battle);
+  assert.equal(spear.command, 'reinforceRear', 'the middle melee reserve is recommended for an active rear assault');
+  const split = tacticalEngagement.splitTacticalEngagementDefenders([spear, bow, watchman], true);
+  assert.deepEqual(split.rear.map(group => group.id), [spear.id, bow.id],
+    'the reserve and rear ranged group answer the rear engagement without a new command system');
+  assert.deepEqual(split.frontal.map(group => group.id), [watchman.id]);
+
+  assert.equal(tactical.setDefenderFormationLine(state, watchman.id, 'middle'), null);
+  assert.equal(watchman.command, 'redeploy');
+  assert.equal(watchman.pendingLine, 'middle');
+  assert.ok(tacticalEngagement.splitTacticalEngagementDefenders([watchman], true).frontal.includes(watchman),
+    'a front-line redeploy weakens the current frontal exchange before it can reach the rear');
+
+  flanker.rearAssault = false;
+  assert.deepEqual(tactical.tacticalRearResponseOptions(battle, 'wall'), []);
+}
+
+{
   const groups = [
     { id: 'recommended', count: 2, wounded: 0, killed: 0, command: 'hold', commandSource: 'recommended' },
     { id: 'player', count: 2, wounded: 0, killed: 0, command: 'volley', commandSource: 'player' },

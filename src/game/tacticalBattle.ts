@@ -180,6 +180,64 @@ export function tacticalFormationLinesAdjacent(
   return Math.abs(FORMATION_LINE_ORDER.indexOf(from) - FORMATION_LINE_ORDER.indexOf(to)) === 1;
 }
 
+export type TacticalRearResponseOptionId = 'reinforceRear' | 'redeployRear' | 'rangedRear' | 'unopposed';
+
+export interface TacticalRearResponseOption {
+  id: TacticalRearResponseOptionId;
+  label: string;
+  description: string;
+  groupIds: string[];
+}
+
+export function tacticalRearResponseOptions(
+  battle: TacticalBattle,
+  zoneId: string,
+): TacticalRearResponseOption[] {
+  if (battle.orientation === 'assault' || battle.assaultKind === 'predatorHunt') return [];
+  const rearAssaultActive = battle.raiderGroups.some(group =>
+    group.zoneId === zoneId && group.rearAssault && group.intent !== 'withdraw' && group.power > 0);
+  if (!rearAssaultActive) return [];
+  const defenders = battle.defenderGroups.filter(group =>
+    group.zoneId === zoneId && group.commandable !== false && activeCount(group) > 0);
+  const middleMelee = defenders.filter(group =>
+    group.line === 'middle' && tacticalGroupCapabilities(group).has('melee'));
+  const rearwardRedeploy = defenders.filter(group => group.line === 'front' || group.line === 'middle');
+  const rearRanged = defenders.filter(group =>
+    group.line === 'rear' && tacticalGroupCapabilities(group).has('volley'));
+  const options: TacticalRearResponseOption[] = [];
+  if (middleMelee.length > 0) {
+    options.push({
+      id: 'reinforceRear',
+      label: '중열 예비대',
+      description: '중열 근접대에 후방 증원을 내려 이번 라운드 후방 교전에 투입합니다.',
+      groupIds: middleMelee.map(group => group.id),
+    });
+  }
+  if (rearwardRedeploy.length > 0) {
+    options.push({
+      id: 'redeployRear',
+      label: '후열 쪽 재배치',
+      description: '인접 열로 후퇴 배치합니다. 재배치 중 전력이 줄어 정면 압박이 커질 수 있습니다.',
+      groupIds: rearwardRedeploy.map(group => group.id),
+    });
+  }
+  if (rearRanged.length > 0) {
+    options.push({
+      id: 'rangedRear',
+      label: '후열 원거리 대응',
+      description: '후열 원거리대는 자동으로 맞서지만 근접전에 노출되어 피해 위험이 큽니다.',
+      groupIds: rearRanged.map(group => group.id),
+    });
+  }
+  options.push({
+    id: 'unopposed',
+    label: '무대응',
+    description: '후방 대응 부대를 두지 않으면 피난 주민이 급습 피해에 직접 노출됩니다.',
+    groupIds: [],
+  });
+  return options;
+}
+
 function snapshotGroup(
   snapshots: CombatantSnapshot[],
   role: CombatRole,

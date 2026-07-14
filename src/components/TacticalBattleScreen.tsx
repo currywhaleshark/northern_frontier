@@ -4,7 +4,7 @@ import { countBuilt } from '../game/buildings';
 import { getSeason } from '../game/seasons';
 import {
   tacticalCommandDescription, tacticalCommandUnavailableReason, tacticalLootText,
-  tacticalFormationLinesAdjacent, tacticalPreparationUnavailableReason,
+  tacticalFormationLinesAdjacent, tacticalPreparationUnavailableReason, tacticalRearResponseOptions,
 } from '../game/tacticalBattle';
 import { assaultMaxRounds } from '../game/tacticalAssault';
 import { huntMaxRounds } from '../game/tacticalHunt';
@@ -382,6 +382,13 @@ export function TacticalBattleScreen({
   const roundLimit = hunt ? huntMaxRounds() : assault ? assaultMaxRounds() : 5;
   const commandable = battle.phase === 'command' || battle.phase === 'deployment';
   const pendingCommandCount = pendingTacticalCommandCount(battle.defenderGroups);
+  const rearResponseZoneId = !assault && !hunt
+    ? battle.raiderGroups.find(group =>
+      group.rearAssault && group.intent !== 'withdraw' && group.power > 0)?.zoneId ?? null
+    : null;
+  const rearResponseOptions = rearResponseZoneId
+    ? tacticalRearResponseOptions(battle, rearResponseZoneId)
+    : [];
   const hintCommand = hoveredCommand ?? selectedGroup?.command ?? null;
   const commandHint = selectedGroup && hintCommand
     ? `${commandLabel(hintCommand, selectedGroup, hunt)} — ${tacticalCommandUnavailableReason(battle, selectedGroup, hintCommand) ?? commandDescription(hintCommand, selectedGroup, hunt)}`
@@ -694,6 +701,29 @@ export function TacticalBattleScreen({
                 selectedGroupId={selectedGroup.id}
                 onSelect={selectGroup}
               />
+              {rearResponseZoneId && rearResponseOptions.length > 0 && (
+                <div className="tactical-rear-response-guide" role="status">
+                  <strong>{battle.zones.find(zone => zone.id === rearResponseZoneId)?.name} 후방 급습 대응</strong>
+                  <div className="tactical-rear-response-options">
+                    {rearResponseOptions.map(option => option.groupIds.length > 0 ? (
+                      <button
+                        type="button"
+                        key={option.id}
+                        onClick={() => selectGroup(option.groupIds[0])}
+                        title={`${option.description} 해당 부대를 선택합니다.`}
+                      >
+                        <b>{option.label}</b>
+                        <span>{option.description}</span>
+                      </button>
+                    ) : (
+                      <span className="tactical-rear-response-option passive" key={option.id}>
+                        <b>{option.label}</b>
+                        <span>{option.description}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               {tacticalGroupCanReceiveCommand(selectedGroup) ? (
                 <>
                   <div className="tactical-command-bar-row">
