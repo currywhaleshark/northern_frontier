@@ -932,9 +932,7 @@ export function tacticalFocusTargetUnavailableReason(
   zoneId: string,
   groupId: string,
 ): string | null {
-  if (battle.orientation === 'assault' || battle.assaultKind === 'predatorHunt') {
-    return '방어전에서만 집중 표적을 지정할 수 있습니다.';
-  }
+  if (battle.assaultKind === 'predatorHunt') return '맹수 사냥에서는 집중 표적을 지정할 수 없습니다.';
   const target = battle.raiderGroups.find(group => group.id === groupId);
   if (!target || target.zoneId !== zoneId || target.intent === 'withdraw' || target.power <= 0 ||
       target.count - target.killed <= 0) return '해당 구역에 유효한 적 표적이 없습니다.';
@@ -961,7 +959,7 @@ export function tacticalFocusTargetUnavailableReason(
     direction,
     contactLine,
     meleeContact,
-    prepareVolleyApplied: applied(battle, 'prepareVolley'),
+    prepareVolleyApplied: battle.orientation !== 'assault' && applied(battle, 'prepareVolley'),
   } as const;
   const results = defenders.map(group => canTargetLine(group, target.line, context));
   if (results.some(result => result.allowed)) return null;
@@ -976,9 +974,7 @@ export function setTacticalFocusTarget(
 ): string | null {
   const battle = state.tacticalBattle;
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
-  if (battle.orientation === 'assault' || battle.assaultKind === 'predatorHunt') {
-    return '방어전에서만 집중 표적을 지정할 수 있습니다.';
-  }
+  if (battle.assaultKind === 'predatorHunt') return '맹수 사냥에서는 집중 표적을 지정할 수 없습니다.';
   if (battle.phase !== 'command') return '지휘 단계에서만 집중 표적을 지정할 수 있습니다.';
   const zone = battle.zones.find(candidate => candidate.id === zoneId);
   if (!zone) return '표적을 지정할 전투 구역을 찾을 수 없습니다.';

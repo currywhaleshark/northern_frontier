@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 
+const assaultSource = readFileSync(new URL('../../src/game/tacticalAssault.ts', import.meta.url), 'utf8');
+
 const store = new Map();
 globalThis.localStorage = {
   getItem: key => store.get(key) ?? null,
@@ -214,6 +216,22 @@ function finishPendingBattle(state) {
   assert.equal(state.expedition?.phase, 'return');
 }
 
+assert.match(
+  assaultSource,
+  /resolveEngagementExchange\s*\(/,
+  'directed lair assaults must resolve casualties through the shared tactical engagement exchange',
+);
+
+{
+  const { state, battle } = prepareState(2026071410, true);
+  enterCommandPhase(state);
+  const target = battle.raiderGroups.find(group => group.zoneId === battle.currentZoneId);
+  assert.ok(target);
+  assert.equal(tactical.setTacticalFocusTarget(state, battle.currentZoneId, target.id), null,
+    'lair assaults must allow a revealed defender to be selected as the focus target');
+  assert.equal(battle.zones.find(zone => zone.id === battle.currentZoneId)?.focusTargetGroupId, target.id);
+}
+
 {
   const { state, battle, lair } = prepareState(2026071407, true);
   enterCommandPhase(state);
@@ -280,12 +298,39 @@ function finishPendingBattle(state) {
   }
   const automaticRate = expectedAutomaticWins / samples;
   const directRate = directWins / samples;
+  const averageRounds = totalDirectRounds / samples;
+  const averageCasualties = totalDirectCasualties / samples;
+  console.log('tactical assault balance', JSON.stringify({
+    automaticRate,
+    directRate,
+    averageRounds,
+    averageCasualties,
+    roundsByZone,
+  }));
   assert.ok(
     Math.abs(automaticRate - directRate) <= 0.15,
     `direct assault win rate ${directRate.toFixed(3)} should stay within 0.15 of automatic ${automaticRate.toFixed(3)} ` +
       `(avg rounds ${(totalDirectRounds / samples).toFixed(2)}, casualties ${(totalDirectCasualties / samples).toFixed(2)}) ` +
       `zone rounds ${JSON.stringify(roundsByZone)}`,
   );
+  const baseline = {
+    directRate: 0.5625,
+    averageRounds: 7,
+    averageCasualties: 1.3125,
+    roundsByZone: { lairTrail: 32, lairWall: 65, lairYard: 69, lairKeep: 58 },
+  };
+  const withinFifteenPercent = (actual, expected) =>
+    Math.abs(actual - expected) <= Math.max(0.0001, Math.abs(expected) * 0.15);
+  assert.ok(withinFifteenPercent(directRate, baseline.directRate),
+    `direct win rate ${directRate.toFixed(4)} drifted over 15% from ${baseline.directRate}`);
+  assert.ok(withinFifteenPercent(averageRounds, baseline.averageRounds),
+    `average rounds ${averageRounds.toFixed(4)} drifted over 15% from ${baseline.averageRounds}`);
+  assert.ok(withinFifteenPercent(averageCasualties, baseline.averageCasualties),
+    `average casualties ${averageCasualties.toFixed(4)} drifted over 15% from ${baseline.averageCasualties}`);
+  for (const [zoneId, baselineRounds] of Object.entries(baseline.roundsByZone)) {
+    assert.ok(withinFifteenPercent(roundsByZone[zoneId], baselineRounds),
+      `${zoneId} rounds ${roundsByZone[zoneId]} drifted over 15% from ${baselineRounds}`);
+  }
 }
 
 {

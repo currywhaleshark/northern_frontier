@@ -653,7 +653,7 @@ export function TacticalZoneColumn({
             <span className="tactical-formation-line-label">적 {formationLineLabel(line)}</span>
             {raiders.filter(raider => raider.line === line).map(raider => {
           const activeRaiders = Math.max(0, raider.count - raider.killed);
-          const targetingActive = battle.phase === 'command' && !assault && !hunt && activeRaiders > 0;
+          const targetingActive = battle.phase === 'command' && !hunt && activeRaiders > 0;
           const targetUnavailableReason = targetingActive
             ? tacticalFocusTargetUnavailableReason(battle, zone.id, raider.id)
             : null;
@@ -737,7 +737,7 @@ export function TacticalZoneColumn({
       <div className={`tactical-rear-assault-rank${activeEvent?.kind === 'rearAssault' && activeEvent.zoneId === zone.id ? ' entering' : ''}${activeEvent?.kind === 'melee' && activeEvent.side === 'raider' && activeEvent.zoneId === zone.id && rearAssaulters.some(group => activeEvent.groupId == null || activeEvent.groupId === group.id) ? ' attacking' : ''}`}>
         {rearAssaulters.map(raider => {
           const activeRaiders = Math.max(0, raider.count - raider.killed);
-          const targetingActive = battle.phase === 'command' && !assault && !hunt && activeRaiders > 0;
+          const targetingActive = battle.phase === 'command' && !hunt && activeRaiders > 0;
           const targetUnavailableReason = targetingActive
             ? tacticalFocusTargetUnavailableReason(battle, zone.id, raider.id)
             : null;

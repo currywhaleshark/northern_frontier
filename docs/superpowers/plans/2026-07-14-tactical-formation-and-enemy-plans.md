@@ -336,8 +336,8 @@
 - Modify: `src/game/tacticalAssault.ts` (`resolveAssaultRound`를 Task 0.1 교전 함수 기반으로 재작성)
 - Modify: `tools/game/test_tactical_assault.mjs`
 
-- [ ] 공격전 라운드 판정을 `tacticalEngagement.ts` 공통 함수로 이관하고 3열·표적 지정을 활성화한다. 사냥(`tacticalHunt.ts`)은 손대지 않는다.
-- [ ] 회귀 실측: 기존 공격전 시드별 결과 분포 ±15% 이내.
+- [x] 공격전 라운드 판정을 `tacticalEngagement.ts` 공통 함수로 이관하고 3열·표적 지정을 활성화한다. 사냥(`tacticalHunt.ts`)은 손대지 않는다.
+- [x] 회귀 실측: 32개 고정 시드에서 직접 승률 0.5625→0.59375, 평균 라운드 7→7, 평균 사상자 1.3125→1.34375. 구역별 라운드 32/65/69/58→32/66/68/58로 모두 기존 분포 ±15% 이내.
 
 ### Task 6.2: 산채 방어 교리 3종
 

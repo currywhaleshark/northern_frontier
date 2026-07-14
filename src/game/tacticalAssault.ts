@@ -1,12 +1,13 @@
 import { addLog } from './events';
 import { CONFIG } from './config';
 import { beginExpeditionReturn } from './expedition';
-import { combatGroupLabel, tacticalGroupCapabilities, tacticalGroupPower } from './combatCapabilities';
+import { combatGroupLabel, tacticalGroupCapabilities } from './combatCapabilities';
 import { createCombatRoster, type CombatantSnapshot } from './combatRoster';
 import { makeRng } from './map';
 import { injure, killResidents } from './raidDamage';
 import { applyBanditLairOutcome, type BanditLairOutcome } from './siteDiplomacy';
 import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
+import { resolveEngagementExchange } from './tacticalEngagement';
 import { defaultRaiderFormationLine } from './tacticalTargeting';
 import {
   captureTacticalResources, gradeTacticalBattle, tacticalClosingSummary, tacticalDateLabel,
@@ -369,12 +370,10 @@ function commandPower(group: TacticalDefenderGroup): number {
   return 0.8;
 }
 
-function casualtyExposure(group: TacticalDefenderGroup, hasMeleeScreen: boolean): number {
+function assaultCommandCasualtyMultiplier(group: TacticalDefenderGroup): number {
   let exposure = group.command === 'charge' ? 1.38 : group.command === 'fallback' ? 0.38 : group.command === 'hold' ? 0.68 : 1;
-  if (tacticalGroupCapabilities(group).has('volley') && hasMeleeScreen) exposure *= 0.48;
-  else if (tacticalGroupCapabilities(group).has('volley')) exposure *= 1.35;
   if (group.command === 'blockEscape') exposure *= 0.25;
-  return exposure;
+  return exposure * 0.58;
 }
 
 function addEvent(
@@ -433,19 +432,6 @@ export function resolveAssaultRound(state: GameState): string | null {
     lines.push(`조총 사격에 화약 ${musketAllocation.powderRequired.toFixed(1)}을 소모했습니다.`);
   }
 
-  const activePlayers = Math.max(1, players.reduce((sum, group) => sum + activeCount(group), 0));
-  let playerPower = players.reduce((sum, group) => {
-    const active = activeCount(group);
-    const share = group.count > 0 ? active / group.count : 0;
-    const readyPower = group.weapon === 'musket' ? tacticalGroupPower(group, active) : group.power * share;
-    return sum + readyPower * commandPower(group);
-  }, 0);
-  const enemyPower = enemies.reduce((sum, group) => sum + group.power * (Math.max(30, group.morale) / 100), 0) *
-    (1 + zone.defenseBonus / 100);
-  playerPower *= 0.9 + rng() * 0.2;
-  const totalPower = Math.max(1, playerPower + enemyPower);
-  const playerShare = playerPower / totalPower;
-  const enemyShare = enemyPower / totalPower;
   const commands = new Set(players.map(group => group.command));
 
   if (commands.has('ambush')) addEvent(events, zone.id, 'ambush', '사냥꾼 척후대가 숲길 초병의 측면을 덮칩니다.', { side: 'raider', float: '기습!' });
@@ -479,37 +465,54 @@ export function resolveAssaultRound(state: GameState): string | null {
   }
   if (commands.has('blockEscape')) lines.push('사냥꾼이 본대 화력에서 빠져 두목의 퇴로를 감시합니다.');
 
-  const activeEnemyCount = Math.max(0, enemies.reduce((sum, group) => sum + Math.max(0, group.count - group.killed), 0));
-  const enemyLossRate = clamp(0.04 + playerShare * 0.2 + (commands.has('charge') ? 0.05 : 0) + (commands.has('ambush') ? 0.06 : 0), 0.03, 0.32);
-  for (const enemy of enemies) {
-    const active = Math.max(0, enemy.count - enemy.killed);
-    const expected = active * enemyLossRate;
-    let losses = Math.min(active, Math.floor(expected) + (rng() < expected % 1 ? 1 : 0));
-    if (activeEnemyCount > 0 && playerShare > 0.72 && losses === 0) losses = 1;
-    enemy.killed += losses;
-    raidersKilled += losses;
-    enemy.power = Math.max(0, enemy.power * (1 - enemyLossRate));
-    if (losses > 0) addEvent(events, zone.id, 'casualty', `${enemy.label}에서 ${losses}명이 쓰러집니다.`, {
-      side: 'raider', groupId: enemy.id, casualties: losses, float: `-${losses}`,
+  const fortificationMultiplier = 1 + zone.defenseBonus / 100;
+  const engagementEnemies = enemies.map(group => ({
+    ...group,
+    combatMultiplier: (group.combatMultiplier ?? 1) * fortificationMultiplier,
+  }));
+  const exchange = resolveEngagementExchange({
+    zone: { ...zone, defenseBonus: 0 },
+    defenders: players,
+    attackers: engagementEnemies,
+    direction: 'frontal',
+    weather: state.weather,
+    prepareVolleyApplied: false,
+    evacuateCiviliansApplied: false,
+    roundStartingRaiderPower: Math.max(1, enemies.reduce((sum, group) => sum + group.power, 0)),
+    focusTargetGroupId: enemies.some(group => group.id === zone.focusTargetGroupId)
+      ? zone.focusTargetGroupId
+      : undefined,
+    defenderPowerMultiplier: commandPower,
+    defenderCasualtyMultiplier: assaultCommandCasualtyMultiplier,
+    raiderLossRateScale: 2,
+    rng,
+  });
+  const playerShare = exchange.defenseShare;
+  const enemyShare = exchange.enemyShare;
+
+  for (const loss of exchange.raiderLosses) {
+    const enemy = enemies.find(group => group.id === loss.groupId);
+    if (!enemy) continue;
+    enemy.killed += loss.killed;
+    enemy.power = loss.powerAfter;
+    enemy.confused = loss.confused;
+    raidersKilled += loss.killed;
+    if (loss.killed > 0) addEvent(events, zone.id, 'casualty', `${enemy.label}에서 ${loss.killed}명이 쓰러집니다.`, {
+      side: 'raider', groupId: enemy.id, casualties: loss.killed, float: `-${loss.killed}`,
     });
   }
 
-  const hasMeleeScreen = players.some(group => tacticalGroupCapabilities(group).has('melee') && group.line === 'front' && activeCount(group) > 0);
-  for (const group of players) {
-    const active = activeCount(group);
-    if (active <= 0) continue;
-    const risk = clamp(enemyShare * (0.1 + zone.pressure / 900) * casualtyExposure(group, hasMeleeScreen), 0, 0.42);
-    const expected = active * risk;
-    let losses = Math.min(active, Math.floor(expected) + (rng() < expected % 1 ? 1 : 0));
-    let dead = losses > 0 && enemyShare > 0.58 && rng() < risk * 0.28 ? 1 : 0;
-    dead = Math.min(dead, losses);
-    const hurt = losses - dead;
-    group.killed += dead;
-    group.wounded += hurt;
-    killed += dead;
-    wounded += hurt;
-    if (losses > 0) addEvent(events, zone.id, 'casualty', `${group.label}에서 전사 ${dead}, 부상 ${hurt}명이 발생합니다.`, {
-      side: 'defender', groupId: group.id, casualties: losses, float: dead > 0 ? `전사 ${dead}·부상 ${hurt}` : `부상 ${hurt}`,
+  for (const loss of exchange.defenderLosses) {
+    const group = players.find(candidate => candidate.id === loss.groupId);
+    if (!group) continue;
+    group.killed += loss.killed;
+    group.wounded += loss.wounded;
+    killed += loss.killed;
+    wounded += loss.wounded;
+    const losses = loss.killed + loss.wounded;
+    if (losses > 0) addEvent(events, zone.id, 'casualty', `${group.label}에서 전사 ${loss.killed}, 부상 ${loss.wounded}명이 발생합니다.`, {
+      side: 'defender', groupId: group.id, casualties: losses,
+      float: loss.killed > 0 ? `전사 ${loss.killed}·부상 ${loss.wounded}` : `부상 ${loss.wounded}`,
     });
   }
 

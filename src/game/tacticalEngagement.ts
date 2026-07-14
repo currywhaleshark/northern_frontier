@@ -370,6 +370,9 @@ export interface EngagementExchangeInput {
   roundStartingRaiderPower: number;
   focusTargetGroupId?: string;
   rangedEfficiency?: number;
+  defenderPowerMultiplier?: (defender: TacticalDefenderGroup) => number;
+  defenderCasualtyMultiplier?: (defender: TacticalDefenderGroup) => number;
+  raiderLossRateScale?: number;
   rng: () => number;
 }
 
@@ -471,7 +474,8 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     const readyPower = defender.weapon === 'musket'
       ? tacticalGroupPower(defender, active)
       : defender.power * survivingShare;
-    return sum + readyPower * commandPowerMultiplier(input, defender);
+    const powerMultiplier = input.defenderPowerMultiplier?.(defender) ?? commandPowerMultiplier(input, defender);
+    return sum + readyPower * powerMultiplier;
   }, 0);
   defensePower *= 1 + zone.defenseBonus / 100;
   const total = Math.max(1, enemyPower + defensePower);
@@ -586,7 +590,8 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     const exposure = rearEngagement
       ? rearAssaultExposureMultiplier(defender, defenders)
       : formationExposureMultiplier(defender, defenders);
-    let risk = enemyShare * (0.16 + zone.pressure / 650) * casualtyMultiplier(input, defender) * exposure;
+    const commandCasualtyMultiplier = input.defenderCasualtyMultiplier?.(defender) ?? casualtyMultiplier(input, defender);
+    let risk = enemyShare * (0.16 + zone.pressure / 650) * commandCasualtyMultiplier * exposure;
     if (defender.kind === 'civilian') risk *= zone.civilianRisk / 50;
     risk = clamp(risk, 0, 0.48);
     const expectedDeaths = enemyShare > 0.55 ? risk * 0.32 : 0;
@@ -683,7 +688,11 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     commands.includes('volley') ? 0.06 : 0,
     commands.includes('charge') ? 0.12 : 0,
   );
-  const raiderLossRate = clamp(defenseShare * (0.08 + commandEdge), 0.01, 0.24);
+  const raiderLossRate = clamp(
+    defenseShare * (0.08 + commandEdge) * (input.raiderLossRateScale ?? 1),
+    0.01,
+    0.24,
+  );
   const rearGuardStrength = rearAssaultGuardStrength(defenders);
   const rearExposure = CONFIG.tacticalBattle.formationExposure.rearAssault;
   const raiderLosses: TacticalRaiderLoss[] = [];
@@ -722,7 +731,8 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
       const readyPower = defender.weapon === 'musket'
         ? tacticalGroupPower(defender, active)
         : defender.power * survivingShare;
-      const effectivePower = readyPower * commandPowerMultiplier(input, defender);
+      const powerMultiplier = input.defenderPowerMultiplier?.(defender) ?? commandPowerMultiplier(input, defender);
+      const effectivePower = readyPower * powerMultiplier;
       totalFriendlyPower += effectivePower;
       const targeting = canTargetLine(defender, target.line, context);
       if (!targeting.allowed) continue;
