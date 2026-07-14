@@ -50,7 +50,11 @@ assert.deepEqual(assets.tacticalCourtMuzzleAnchor('court-artillery'), {
   x: 58, y: 72, size: 'cannon',
 });
 
-const screenSource = readFileSync(new URL('../../src/components/TacticalBattleScreen.tsx', import.meta.url), 'utf8');
+const screenSource = [
+  readFileSync(new URL('../../src/components/TacticalBattleScreen.tsx', import.meta.url), 'utf8'),
+  readFileSync(new URL('../../src/components/tactical/TacticalZoneColumn.tsx', import.meta.url), 'utf8'),
+  readFileSync(new URL('../../src/components/tactical/TacticalGroupChip.tsx', import.meta.url), 'utf8'),
+].join('\n');
 const tacticalCss = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
 assert.doesNotMatch(screenSource, /className="fx-muzzle-flash"/, 'zone-fixed musket flash must be removed');
 assert.match(screenSource, /tactical-unit-muzzle-flash/, 'muzzle flash must be anchored inside each firing sprite');

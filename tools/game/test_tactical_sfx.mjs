@@ -9,7 +9,10 @@ import ts from 'typescript';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const sfxSource = readFileSync(new URL('../../src/sound/sfx.ts', import.meta.url), 'utf8');
 const typeSource = readFileSync(new URL('../../src/game/types.ts', import.meta.url), 'utf8');
-const screenSource = readFileSync(new URL('../../src/components/TacticalBattleScreen.tsx', import.meta.url), 'utf8');
+const screenSource = [
+  readFileSync(new URL('../../src/components/TacticalBattleScreen.tsx', import.meta.url), 'utf8'),
+  readFileSync(new URL('../../src/components/tactical/TacticalZoneColumn.tsx', import.meta.url), 'utf8'),
+].join('\n');
 const battleSource = readFileSync(new URL('../../src/game/tacticalBattle.ts', import.meta.url), 'utf8');
 const engagementSource = readFileSync(new URL('../../src/game/tacticalEngagement.ts', import.meta.url), 'utf8');
 const assaultSource = readFileSync(new URL('../../src/game/tacticalAssault.ts', import.meta.url), 'utf8');
