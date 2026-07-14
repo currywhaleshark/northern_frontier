@@ -468,6 +468,52 @@ function GroupSprites({
   );
 }
 
+// 하단 부대 독 — 배치·지휘 단계에서 모든 부대를 가로 한 줄 칩으로 보여준다
+function UnitDock({ state, battle, hunt, mode, selectedGroupId, onSelect }: {
+  state: GameState;
+  battle: NonNullable<GameState['tacticalBattle']>;
+  hunt: boolean;
+  mode: 'deployment' | 'command';
+  selectedGroupId: string | null;
+  onSelect: (groupId: string) => void;
+}) {
+  return (
+    <div className="tactical-unit-dock" role="group" aria-label="부대 목록">
+      {battle.defenderGroups.map(group => {
+        const active = Math.max(0, group.count - group.wounded - group.killed);
+        const zoneName = battle.zones.find(zone => zone.id === group.zoneId)?.name ?? '';
+        const pending = mode === 'command' && group.command == null && active > 0;
+        const gender = state.residents.find(resident => resident.id === group.residentIds[0])?.gender ?? 'male';
+        return (
+          <button
+            key={group.id}
+            type="button"
+            className={`tactical-dock-chip${selectedGroupId === group.id ? ' active' : ''}${pending ? ' pending' : ''}${active === 0 ? ' routed' : ''}`}
+            onClick={() => onSelect(group.id)}
+            aria-label={`${group.label} 선택`}
+          >
+            <span className="tactical-dock-thumb" aria-hidden="true">
+              <DefenderSprite group={group} gender={gender} />
+            </span>
+            <span className="tactical-dock-info">
+              <strong>
+                {group.label}
+                <em>{active === 0 ? '전투 불능' : `${active}명`}</em>
+              </strong>
+              <span>{zoneName} · {group.line === 'front' ? '전열' : '후열'}{group.ambushed ? ' · 매복중' : ''}</span>
+              {mode === 'command' && (
+                <span className={`tactical-dock-command${pending ? ' waiting' : ''}`}>
+                  {group.command ? commandLabel(group.command, group, hunt) : active === 0 ? '—' : '명령 대기'}
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function zoneEffects(zoneId: string, battle: NonNullable<GameState['tacticalBattle']>): string[] {
   const active = new Set(battle.prepActions.filter(action => action.applied).map(action => action.id));
   const labels: string[] = [];
@@ -631,6 +677,7 @@ export function TacticalBattleScreen({
   const battle = state.tacticalBattle;
   const viewportRef = useRef<HTMLDivElement>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(battle?.defenderGroups[0]?.id ?? null);
+  const [hoveredCommand, setHoveredCommand] = useState<TacticalCommandId | null>(null);
   const [eventIndex, setEventIndex] = useState(0);
   const [viewedZoneId, setViewedZoneId] = useState(battle?.currentZoneId ?? 'approach');
   const [stingerRound, setStingerRound] = useState<number | null>(null);
@@ -752,11 +799,41 @@ export function TacticalBattleScreen({
     [battle?.defenderGroups, selectedGroupId],
   );
 
+  // 부대 선택 시 무대도 해당 부대의 구역으로 따라간다 (독 칩·무대 클릭 공용)
+  const selectGroup = (groupId: string) => {
+    setSelectedGroupId(groupId);
+    const zoneId = battle?.defenderGroups.find(group => group.id === groupId)?.zoneId;
+    if (zoneId) setViewedZoneId(zoneId);
+  };
+
   if (!battle) return null;
   const assault = battle.orientation === 'assault';
   const hunt = battle.assaultKind === 'predatorHunt';
   const lairAssault = assault && !hunt;
   const roundLimit = hunt ? huntMaxRounds() : assault ? assaultMaxRounds() : 5;
+  const commandable = battle.phase === 'command' || battle.phase === 'deployment';
+  const pendingCommandCount = battle.defenderGroups.filter(group =>
+    group.command == null && group.count - group.wounded - group.killed > 0).length;
+  const hintCommand = hoveredCommand ?? selectedGroup?.command ?? null;
+  const commandHint = selectedGroup && hintCommand
+    ? `${commandLabel(hintCommand, selectedGroup, hunt)} — ${tacticalCommandUnavailableReason(battle, selectedGroup, hintCommand) ?? commandDescription(hintCommand, selectedGroup, hunt)}`
+    : '명령 단추 위에 올리면 설명이 여기에 표시됩니다.';
+  // 첫 명령 지정이면 아직 명령 대기 중인 다음 부대로 선택을 넘겨 클릭 수를 줄인다
+  const assignCommand = (command: TacticalCommandId) => {
+    if (!selectedGroup) return;
+    const firstAssignment = selectedGroup.command == null;
+    onSetCommand(selectedGroup.id, command);
+    if (!firstAssignment) return;
+    const groups = battle.defenderGroups;
+    const currentIndex = groups.findIndex(group => group.id === selectedGroup.id);
+    for (let step = 1; step < groups.length; step += 1) {
+      const candidate = groups[(currentIndex + step) % groups.length];
+      if (candidate.command != null) continue;
+      if (candidate.count - candidate.wounded - candidate.killed <= 0) continue;
+      selectGroup(candidate.id);
+      return;
+    }
+  };
   const season = getSeason(state.day);
   const wallRepairApplied = battle.prepActions.some(action => action.id === 'repairWall' && action.applied);
   const fortifyEventIndex = battle.preparationEvents.findIndex(event => event.kind === 'fortify' && event.zoneId === 'wall');
@@ -1087,8 +1164,19 @@ export function TacticalBattleScreen({
                           : '';
                       return (
                         <div
-                          className={`tactical-field-group formation-${defenderFormationRole(group)} line-${group.line}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${prepMotion}`}
+                          className={`tactical-field-group formation-${defenderFormationRole(group)} line-${group.line}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${prepMotion}${commandable ? ' selectable' : ''}${commandable && selectedGroup?.id === group.id ? ' selected' : ''}`}
                           key={recoiling || blockingEscape || prepMotion ? `${group.id}-motion-${eventIndex}` : group.id}
+                          onClick={commandable ? event => {
+                            event.stopPropagation();
+                            selectGroup(group.id);
+                          } : undefined}
+                          role={commandable ? 'button' : undefined}
+                          tabIndex={commandable ? 0 : undefined}
+                          onKeyDown={commandable ? event => {
+                            if (event.key !== 'Enter' && event.key !== ' ') return;
+                            event.preventDefault();
+                            selectGroup(group.id);
+                          } : undefined}
                         >
                           <GroupSprites
                             state={state}
@@ -1217,45 +1305,48 @@ export function TacticalBattleScreen({
             </div>
           )}
 
-          {battle.phase === 'deployment' && (
+          {battle.phase === 'deployment' && selectedGroup && (
             <>
               <div className="tactical-panel-heading">
                 <div>
                   <strong>{hunt ? '사냥대 배치' : assault ? '토벌대 배치' : '수비대 배치'}</strong>
                   <span>{battle.preliminaryBombardmentCannons
                     ? `사전포격 ${battle.preliminaryBombardmentCannons}문 · 적 ${battle.preliminaryBombardmentCasualties ?? 0}명 전투불능`
-                    : '각 병력을 지킬 구역에 배치합니다.'}{flankerIntel ? ` · ${flankerIntel}` : ''}</span>
+                    : '부대를 고른 뒤 지킬 구역과 전열을 지정합니다.'}{flankerIntel ? ` · ${flankerIntel}` : ''}</span>
                 </div>
                 <button className="btn primary" onClick={onAdvancePhase}>전투 시작</button>
               </div>
-              <div className="tactical-deployment-list">
-                {battle.defenderGroups.map(group => (
-                  <div className="tactical-deployment-row" key={group.id}>
-                    <div className="tactical-deployment-unit">
-                      <GroupSprites state={state} group={group} maxVisible={2} />
-                      <strong>{group.label}{group.ambushed && <em className="tactical-state-badge ambushed">매복중</em>}</strong>
-                      <span>{group.count}명</span>
-                    </div>
-                    <div className="tactical-zone-buttons">
-                      {battle.zones.map(zone => (
-                        <button
-                          key={zone.id}
-                          className={group.zoneId === zone.id ? 'active' : ''}
-                          onClick={() => onAssignGroup(group.id, zone.id)}
-                        >{zone.name}</button>
-                      ))}
-                    </div>
-                    <div className="tactical-line-toggle" aria-label={`${group.label} 전열 선택`}>
-                      {(['front', 'rear'] as const).map(line => (
-                        <button
-                          key={line}
-                          className={group.line === line ? 'active' : ''}
-                          onClick={() => onSetFormationLine(group.id, line)}
-                        >{line === 'front' ? '전열' : '후열'}</button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+              <UnitDock
+                state={state}
+                battle={battle}
+                hunt={hunt}
+                mode="deployment"
+                selectedGroupId={selectedGroup.id}
+                onSelect={selectGroup}
+              />
+              <div className="tactical-deploy-row">
+                <strong>{selectedGroup.label}{selectedGroup.ambushed && <em className="tactical-state-badge ambushed">매복중</em>}</strong>
+                <div className="tactical-zone-buttons" aria-label={`${selectedGroup.label} 배치 구역 선택`}>
+                  {battle.zones.map(zone => (
+                    <button
+                      key={zone.id}
+                      className={selectedGroup.zoneId === zone.id ? 'active' : ''}
+                      onClick={() => {
+                        onAssignGroup(selectedGroup.id, zone.id);
+                        setViewedZoneId(zone.id);
+                      }}
+                    >{zone.name}</button>
+                  ))}
+                </div>
+                <div className="tactical-line-toggle" aria-label={`${selectedGroup.label} 전열 선택`}>
+                  {(['front', 'rear'] as const).map(line => (
+                    <button
+                      key={line}
+                      className={selectedGroup.line === line ? 'active' : ''}
+                      onClick={() => onSetFormationLine(selectedGroup.id, line)}
+                    >{line === 'front' ? '전열' : '후열'}</button>
+                  ))}
+                </div>
               </div>
             </>
           )}
@@ -1263,55 +1354,51 @@ export function TacticalBattleScreen({
           {battle.phase === 'command' && selectedGroup && (
             <>
               <div className="tactical-panel-heading">
-                <div><strong>제{battle.round}차 교전 지휘</strong><span>현재 초점: {battle.zones.find(zone => zone.id === battle.currentZoneId)?.name}</span></div>
+                <div>
+                  <strong>제{battle.round}차 교전 지휘</strong>
+                  <span>현재 초점: {battle.zones.find(zone => zone.id === battle.currentZoneId)?.name}
+                    {pendingCommandCount > 0 ? ` · 명령 대기 ${pendingCommandCount}개 부대` : ' · 모든 부대 명령 지정 완료'}</span>
+                </div>
                 <button className="btn primary" onClick={onResolveRound}>교전 개시</button>
               </div>
-              <div className="tactical-command-layout">
-                <div className="tactical-group-tabs">
-                  {battle.defenderGroups.map(group => (
+              <UnitDock
+                state={state}
+                battle={battle}
+                hunt={hunt}
+                mode="command"
+                selectedGroupId={selectedGroup.id}
+                onSelect={selectGroup}
+              />
+              <div className="tactical-command-bar-row">
+                <div className="tactical-line-toggle" aria-label={`${selectedGroup.label} 전열 선택`}>
+                  {(['front', 'rear'] as const).map(line => (
                     <button
-                      key={group.id}
-                      className={selectedGroup.id === group.id ? 'active' : ''}
-                      onClick={() => setSelectedGroupId(group.id)}
-                    >
-                      <strong>{group.label}</strong>
-                      <span>{battle.zones.find(zone => zone.id === group.zoneId)?.name} · {group.line === 'front' ? '전열' : '후열'} · {group.command ? commandLabel(group.command, group, hunt) : '명령 대기'}{group.ambushed ? ' · 매복중' : ''}</span>
-                    </button>
+                      key={line}
+                      className={selectedGroup.line === line ? 'active' : ''}
+                      onClick={() => onSetFormationLine(selectedGroup.id, line)}
+                    >{line === 'front' ? '전열' : '후열'}</button>
                   ))}
                 </div>
-                <div className="tactical-command-options">
-                  <div className="tactical-selected-group">
-                    <GroupSprites state={state} group={selectedGroup} />
-                    <div><strong>{selectedGroup.label}</strong><span>{battle.zones.find(zone => zone.id === selectedGroup.zoneId)?.name} · {selectedGroup.line === 'front' ? '전열' : '후열'}{selectedGroup.ambushed ? ' · 매복중' : ''}</span></div>
-                    <div className="tactical-line-toggle" aria-label={`${selectedGroup.label} 전열 선택`}>
-                      {(['front', 'rear'] as const).map(line => (
-                        <button
-                          key={line}
-                          className={selectedGroup.line === line ? 'active' : ''}
-                          onClick={() => onSetFormationLine(selectedGroup.id, line)}
-                        >{line === 'front' ? '전열' : '후열'}</button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="tactical-command-grid">
-                    {COMMANDS.map(command => {
-                      const unavailableReason = tacticalCommandUnavailableReason(battle, selectedGroup, command);
-                      return (
-                        <button
-                          key={command}
-                          className={selectedGroup.command === command ? 'active' : ''}
-                          disabled={unavailableReason != null}
-                          title={unavailableReason ?? commandDescription(command, selectedGroup, hunt)}
-                          onClick={() => onSetCommand(selectedGroup.id, command)}
-                        >
-                          <strong>{commandLabel(command, selectedGroup, hunt)}{unavailableReason ? ' — 사용 불가' : ''}</strong>
-                          <span>{unavailableReason ?? commandDescription(command, selectedGroup, hunt)}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                <div className="tactical-command-bar" role="group" aria-label={`${selectedGroup.label} 명령 선택`}>
+                  {COMMANDS.map(command => {
+                    const unavailableReason = tacticalCommandUnavailableReason(battle, selectedGroup, command);
+                    return (
+                      <button
+                        key={command}
+                        className={selectedGroup.command === command ? 'active' : ''}
+                        disabled={unavailableReason != null}
+                        title={unavailableReason ?? commandDescription(command, selectedGroup, hunt)}
+                        onMouseEnter={() => setHoveredCommand(command)}
+                        onMouseLeave={() => setHoveredCommand(current => (current === command ? null : current))}
+                        onFocus={() => setHoveredCommand(command)}
+                        onBlur={() => setHoveredCommand(current => (current === command ? null : current))}
+                        onClick={() => assignCommand(command)}
+                      >{commandLabel(command, selectedGroup, hunt)}</button>
+                    );
+                  })}
                 </div>
               </div>
+              <div className="tactical-command-hint">{commandHint}</div>
             </>
           )}
 
