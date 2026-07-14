@@ -101,4 +101,77 @@ assert.match(battleSource, /meleeParticipants:/,
 assert.match(assaultSource, /meleeParticipants:/,
   'lair assault melee must expose its participant count');
 
+function audioParam(initial = 0) {
+  return {
+    value: initial,
+    setValueAtTime() {},
+    linearRampToValueAtTime() {},
+    exponentialRampToValueAtTime() {},
+    cancelScheduledValues() {},
+  };
+}
+
+function audioNode(extra = {}) {
+  return { connect(target) { return target; }, ...extra };
+}
+
+class FakeAudioContext {
+  state = 'running';
+  currentTime = 0;
+  sampleRate = 1;
+  destination = audioNode();
+  createGain() { return audioNode({ gain: audioParam() }); }
+  createDynamicsCompressor() {
+    return audioNode({
+      threshold: audioParam(), knee: audioParam(), ratio: audioParam(),
+      attack: audioParam(), release: audioParam(),
+    });
+  }
+  createBuffer() { return { getChannelData: () => new Float32Array(1) }; }
+  createBufferSource() {
+    return audioNode({ buffer: null, loop: false, playbackRate: audioParam(1), start() {}, stop() {} });
+  }
+  createBiquadFilter() {
+    return audioNode({ type: 'bandpass', frequency: audioParam(), Q: audioParam() });
+  }
+  createOscillator() {
+    return audioNode({ frequency: audioParam(), detune: audioParam(), start() {}, stop() {} });
+  }
+  createStereoPanner() { return audioNode({ pan: audioParam() }); }
+  async decodeAudioData(data) { return { data }; }
+  async resume() {}
+}
+
+globalThis.AudioContext = FakeAudioContext;
+const fetchCounts = new Map();
+let failMusket = true;
+globalThis.fetch = async input => {
+  const path = String(input);
+  fetchCounts.set(path, (fetchCounts.get(path) ?? 0) + 1);
+  if (path.endsWith('/musket.mp3') && failMusket) {
+    failMusket = false;
+    return { ok: false, arrayBuffer: async () => new ArrayBuffer(1) };
+  }
+  return { ok: true, arrayBuffer: async () => new ArrayBuffer(1) };
+};
+
+assert.equal(typeof sfx.ensureBattleSamples, 'function');
+const originalWarn = console.warn;
+console.warn = () => {};
+try {
+  sfx.initAudio();
+  await sfx.ensureBattleSamples();
+  await sfx.ensureBattleSamples();
+  assert.equal(fetchCounts.get(sfx.BATTLE_SAMPLE_PATHS.musket), 2,
+    'a failed sample is retried on the next load attempt');
+  for (const [name, path] of Object.entries(sfx.BATTLE_SAMPLE_PATHS)) {
+    if (name !== 'musket') assert.equal(fetchCounts.get(path), 1, `${name} must not be downloaded again`);
+  }
+  await sfx.ensureBattleSamples();
+  assert.equal([...fetchCounts.values()].reduce((sum, count) => sum + count, 0), 10,
+    'once every sample is loaded, later initialization performs no downloads');
+} finally {
+  console.warn = originalWarn;
+}
+
 console.log('tactical sample sfx tests passed');

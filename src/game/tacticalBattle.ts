@@ -17,7 +17,7 @@ import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
 import {
   captureTacticalResources, gradeTacticalBattle, TACTICAL_BATTLE_GRADE_LABELS,
   raidDefenseObjectiveResult, tacticalClosingSummary, tacticalDefenderShotCounts,
-  tacticalRaiderShotCounts, tacticalResourceDelta,
+  tacticalPeopleReport, tacticalRaiderShotCounts, tacticalResourceDelta,
 } from './tacticalCore';
 import {
   acknowledgeAssaultReport, advanceAssaultPhase, assaultCommandUnavailableReason,
@@ -224,8 +224,9 @@ function defenderGroups(state: GameState, mode: TacticalBattle['mode']): Tactica
     result.push({
       id: 'civilian-unarmed', kind: 'civilian', role: 'civilian', weapon: null,
       readyMuskets: 0, label: GROUP_LABELS.civilian, residentIds: civilianIds, count: civilianIds.length,
-      zoneId: 'center', command: null, power: civilianIds.length * GROUP_POWER.civilian,
+      zoneId: 'center', command: null, power: 0,
       wounded: 0, killed: 0, line: 'rear', ambushed: false,
+      commandable: false, lockedZoneId: 'center',
     });
   }
   return result;
@@ -647,7 +648,7 @@ function applySelectedPreparationActions(state: GameState, battle: TacticalBattl
       const musteredSet = new Set(musteredIds);
       civilians.residentIds = civilians.residentIds.filter(id => !musteredSet.has(id));
       civilians.count = civilians.residentIds.length;
-      civilians.power = civilians.count * GROUP_POWER.civilian;
+      civilians.power = 0;
       let militia = battle.defenderGroups.find(candidate => candidate.id === 'militia-unarmed-mustered');
       if (!militia) {
         militia = {
@@ -682,11 +683,12 @@ function applySelectedPreparationActions(state: GameState, battle: TacticalBattl
 export function assignDefenderGroup(state: GameState, groupId: string, zoneId: string): string | null {
   const battle = state.tacticalBattle;
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  const defender = battle.defenderGroups.find(candidate => candidate.id === groupId);
+  if (!defender) return '수비 그룹을 찾을 수 없습니다.';
+  if (defender.commandable === false || defender.lockedZoneId) return '피난 주민은 마을 중심지에서 이동할 수 없습니다.';
   if (battle.assaultKind === 'predatorHunt') return assignHuntGroup(state, groupId, zoneId);
   if (battle.orientation === 'assault') return assignAssaultGroup(state, groupId, zoneId);
   if (battle.phase !== 'deployment') return '배치 단계에서만 병력을 옮길 수 있습니다.';
-  const defender = battle.defenderGroups.find(candidate => candidate.id === groupId);
-  if (!defender) return '수비 그룹을 찾을 수 없습니다.';
   if (!battle.zones.some(zone => zone.id === zoneId)) return '전투 구역을 찾을 수 없습니다.';
   defender.zoneId = zoneId;
   if (tacticalGroupCapabilities(defender).has('ambush')) {
@@ -707,6 +709,7 @@ export function setDefenderFormationLine(
   }
   const defender = battle.defenderGroups.find(candidate => candidate.id === groupId);
   if (!defender) return '수비 그룹을 찾을 수 없습니다.';
+  if (defender.commandable === false) return '피난 주민은 전열을 바꿀 수 없습니다.';
   defender.line = line;
   return null;
 }
@@ -718,15 +721,17 @@ export function setTacticalCommand(
 ): string | null {
   const battle = state.tacticalBattle;
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  const defender = battle.defenderGroups.find(candidate => candidate.id === groupId);
+  if (!defender) return '수비 그룹을 찾을 수 없습니다.';
+  if (defender.commandable === false) return '피난 주민은 전투 명령 대상이 아닙니다.';
   if (battle.assaultKind === 'predatorHunt') return setHuntCommand(state, groupId, command);
   if (battle.orientation === 'assault') return setAssaultCommand(state, groupId, command);
   if (battle.phase !== 'command') return '지휘 단계에서만 명령을 내릴 수 있습니다.';
   if (!IMPLEMENTED_COMMANDS.has(command)) return '이 명령은 아직 사용할 수 없습니다.';
-  const defender = battle.defenderGroups.find(candidate => candidate.id === groupId);
-  if (!defender) return '수비 그룹을 찾을 수 없습니다.';
   const unavailableReason = tacticalCommandUnavailableReason(battle, defender, command);
   if (unavailableReason) return unavailableReason;
   defender.command = command;
+  defender.commandSource = 'player';
   return null;
 }
 
@@ -735,6 +740,7 @@ export function tacticalCommandUnavailableReason(
   defender: TacticalDefenderGroup,
   command: TacticalCommandId,
 ): string | null {
+  if (defender.commandable === false) return '피난 주민은 전투 명령 대상이 아닙니다.';
   if (battle.assaultKind === 'predatorHunt') return huntCommandUnavailableReason(battle, defender, command);
   if (battle.orientation === 'assault') return assaultCommandUnavailableReason(battle, defender, command);
   if (!IMPLEMENTED_COMMANDS.has(command)) return '이 명령은 아직 사용할 수 없습니다.';
@@ -785,9 +791,17 @@ export function chooseDefaultTacticalCommands(battle: TacticalBattle): void {
     return;
   }
   for (const defender of battle.defenderGroups) {
-    if (defender.command) continue;
-    if (defender.role === 'civilian') defender.command = 'protectCivilians';
-    else if (tacticalGroupCapabilities(defender).has('ambush')) {
+    if (defender.commandable === false) {
+      defender.command = null;
+      defender.commandSource = undefined;
+      continue;
+    }
+    if (activeCount(defender) <= 0) continue;
+    if (defender.command) {
+      defender.commandSource ??= 'recommended';
+      continue;
+    }
+    if (tacticalGroupCapabilities(defender).has('ambush')) {
       const enemyHere = battle.raiderGroups.some(group =>
         group.zoneId === defender.zoneId && group.intent !== 'withdraw' && group.power > 0);
       defender.command = (defender.ambushed && enemyHere) || (!defender.ambushed && !enemyHere) ? 'ambush' : 'hold';
@@ -795,6 +809,7 @@ export function chooseDefaultTacticalCommands(battle: TacticalBattle): void {
     else if (tacticalGroupCapabilities(defender).has('volley')) defender.command = 'volley';
     else if (defender.zoneId === 'storehouse') defender.command = 'guardStorehouse';
     else defender.command = 'hold';
+    defender.commandSource = 'recommended';
   }
 }
 
@@ -822,6 +837,19 @@ export function advanceTacticalPhase(state: GameState): string | null {
 
 function activeCount(group: TacticalDefenderGroup): number {
   return Math.max(0, group.count - group.wounded - group.killed);
+}
+
+export function tacticalDefenderReadiness(
+  groups: ReadonlyArray<Pick<TacticalDefenderGroup, 'count' | 'wounded' | 'killed' | 'commandable'>>,
+): number {
+  const combatGroups = groups.filter(group => group.commandable !== false);
+  const assignedCount = combatGroups.reduce((sum, group) => sum + group.count, 0);
+  if (assignedCount <= 0) return 0;
+  const readyCount = combatGroups.reduce(
+    (sum, group) => sum + Math.max(0, group.count - group.wounded - group.killed),
+    0,
+  );
+  return readyCount / assignedCount;
 }
 
 function commandPowerMultiplier(
@@ -1040,9 +1068,8 @@ export function resolveTacticalRound(state: GameState): string | null {
       });
       lines.push(`${attacker.label}이(가) ${zone.name} 후열을 급습했습니다.`);
     }
-    const assignedCount = assignedDefenders.reduce((sum, defender) => sum + defender.count, 0);
-    const readyCount = assignedDefenders.reduce((sum, defender) => sum + activeCount(defender), 0);
-    defenderReadiness.set(zone.id, assignedCount > 0 ? readyCount / assignedCount : 0);
+    defenderReadiness.set(zone.id, tacticalDefenderReadiness(assignedDefenders));
+    const combatDefenders = defenders.filter(defender => defender.commandable !== false);
     const surpriseDefenders = defenders.filter(defender => defender.command === 'ambush' && defender.ambushed);
     const surpriseAttack = surpriseDefenders.length > 0;
     if (surpriseAttack) {
@@ -1070,7 +1097,7 @@ export function resolveTacticalRound(state: GameState): string | null {
     );
     const enemyPower = rawEnemyPower * (0.88 + rng() * 0.24);
     const rearEnemyShare = rawEnemyPower > 0 ? rawRearEnemyPower / rawEnemyPower : 0;
-    let defensePower = defenders.reduce((sum, defender) => {
+    let defensePower = combatDefenders.reduce((sum, defender) => {
       const active = activeCount(defender);
       const survivingShare = defender.count > 0 ? active / defender.count : 0;
       const readyPower = defender.weapon === 'musket'
@@ -1084,12 +1111,12 @@ export function resolveTacticalRound(state: GameState): string | null {
     const defenseShare = defensePower / total;
     dominance.set(zone.id, enemyShare);
 
-    const commands = new Set(defenders.map(defender => defender.command));
-    const chargingMelee = defenders.filter(defender =>
+    const commands = new Set(combatDefenders.map(defender => defender.command));
+    const chargingMelee = combatDefenders.filter(defender =>
       tacticalGroupCapabilities(defender).has('melee') && defender.command === 'charge');
-    const exposedRanged = defenders.filter(defender => tacticalGroupCapabilities(defender).has('volley'));
+    const exposedRanged = combatDefenders.filter(defender => tacticalGroupCapabilities(defender).has('volley'));
     const activeAttackerCount = attackers.reduce((sum, attacker) => sum + Math.max(0, attacker.count - attacker.killed), 0);
-    const activeDefenderCount = defenders.reduce((sum, defender) => sum + activeCount(defender), 0);
+    const activeDefenderCount = combatDefenders.reduce((sum, defender) => sum + activeCount(defender), 0);
     const chargingMeleeCount = chargingMelee.reduce((sum, defender) => sum + activeCount(defender), 0);
     const exposedRangedCount = exposedRanged.reduce((sum, defender) => sum + activeCount(defender), 0);
     const activeRearTargetCount = defenders
@@ -1211,8 +1238,8 @@ export function resolveTacticalRound(state: GameState): string | null {
       lines.push(`후방 급습으로 후열에서 ${rearAssaultCasualties}명의 사상자가 발생해 마을 기세가 흔들렸습니다.`);
     }
 
-    const activeDefenders = Math.max(1, defenders.reduce((sum, defender) => sum + activeCount(defender), 0));
-    const commandShare = (command: TacticalCommandId): number => defenders.reduce((sum, defender) =>
+    const activeDefenders = Math.max(1, combatDefenders.reduce((sum, defender) => sum + activeCount(defender), 0));
+    const commandShare = (command: TacticalCommandId): number => combatDefenders.reduce((sum, defender) =>
       sum + (defender.command === command ? activeCount(defender) : 0), 0) / activeDefenders;
     const pressureEnemyPower = enemyPower * (1 - rearEnemyShare * 0.6);
     const pressureTotal = Math.max(1, pressureEnemyPower + defensePower);
@@ -1231,7 +1258,10 @@ export function resolveTacticalRound(state: GameState): string | null {
     if (zone.id === 'wall' && attackers.some(attacker => attacker.kind === 'main' && !attacker.confused)) {
       pressureDelta = Math.max(6, pressureDelta);
     }
-    if (zone.id === 'storehouse' || zone.id === 'center') pressureDelta = Math.min(34, pressureDelta);
+    const protectedCiviliansOnly = zone.id === 'center' && defenders.length > 0 &&
+      defenders.every(defender => defender.commandable === false);
+    if (protectedCiviliansOnly) pressureDelta = Math.min(32, pressureDelta);
+    else if (zone.id === 'storehouse' || zone.id === 'center') pressureDelta = Math.min(34, pressureDelta);
     zone.pressure = clamp(zone.pressure + pressureDelta, 0, 100);
     const breachAt = zone.id === 'approach' ? 62 : 100;
     if (!zone.breached && zone.pressure >= breachAt) {
@@ -1453,6 +1483,13 @@ export function acknowledgeTacticalReport(state: GameState): string | null {
   // 후퇴 연출은 원래 구역에서 보여준 뒤, 다음 교전을 준비할 때 실제 배치를 후방으로 옮긴다.
   applyNextEngagementStates(battle);
   battle.currentZoneId = battle.pendingReport.nextFocusZoneId;
+  battle.defenderGroups.forEach(group => {
+    if (group.command && tacticalCommandUnavailableReason(battle, group, group.command)) {
+      group.command = null;
+      group.commandSource = undefined;
+    } else if (group.command) group.commandSource = 'recommended';
+  });
+  chooseDefaultTacticalCommands(battle);
   battle.pendingReport = null;
   battle.phase = 'command';
   return null;
@@ -1527,16 +1564,11 @@ export function finishTacticalBattle(state: GameState): void {
   const finalReport = [...battle.reports].reverse().find(report => report.ended) ?? battle.reports[battle.reports.length - 1];
   const outcome = finalReport?.outcome ?? 'partialLoss';
   const rng = makeRng(state.seed + battle.id * 524287 + 97);
-  const beforeAlive = new Map(state.residents.filter(resident => resident.alive).map(resident => [resident.id, resident.name]));
   const beforeHealth = new Map(state.residents.map(resident => [resident.id, resident.health]));
   const participantIds = new Set<number>();
-  const groupLabelByResident = new Map<number, string>();
 
   for (const defender of battle.defenderGroups) {
-    defender.residentIds.forEach(id => {
-      participantIds.add(id);
-      groupLabelByResident.set(id, defender.label);
-    });
+    defender.residentIds.forEach(id => participantIds.add(id));
     if (defender.killed > 0) {
       killResidents(state, rng, defender.killed, 1, defender.residentIds);
     }
@@ -1544,25 +1576,9 @@ export function finishTacticalBattle(state: GameState): void {
       injure(state, rng, defender.wounded, battle.mode === 'levy' ? 24 : 18, defender.residentIds, true);
     }
   }
-  const killedPeople = [...participantIds]
-    .map(id => state.residents.find(resident => resident.id === id))
-    .filter((resident): resident is GameState['residents'][number] => resident != null && !resident.alive)
-    .map(resident => ({
-      residentId: resident.id,
-      name: beforeAlive.get(resident.id) ?? resident.name,
-      groupLabel: groupLabelByResident.get(resident.id) ?? '수비대',
-      healthAfter: 0,
-    }));
-  const woundedPeople = [...participantIds]
-    .map(id => state.residents.find(resident => resident.id === id))
-    .filter((resident): resident is GameState['residents'][number] =>
-      resident != null && resident.alive && resident.health < (beforeHealth.get(resident.id) ?? resident.health))
-    .map(resident => ({
-      residentId: resident.id,
-      name: resident.name,
-      groupLabel: groupLabelByResident.get(resident.id) ?? '수비대',
-      healthAfter: Math.round(resident.health),
-    }));
+  const people = tacticalPeopleReport(state, battle, beforeHealth);
+  const killedPeople = people.killed;
+  const woundedPeople = people.wounded;
   const remainingEnemyPower = battle.raiderGroups.reduce((sum, group) => sum + Math.max(0, group.power), 0);
   const enemyRouted = outcome === 'defenseSuccess' && (
     battle.raiderMorale <= 20 ||

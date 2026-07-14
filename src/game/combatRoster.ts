@@ -65,20 +65,25 @@ export function createCombatRoster(
     context: CombatContext;
     memberIds?: Iterable<number>;
     includeCivilians?: boolean;
+    excludedResidentIds?: Iterable<number>;
+    gunpowderAvailable?: number;
   },
 ): { combatants: CombatantSnapshot[]; civilians: number[] } {
   const allowed = options.context === 'expedition'
     ? new Set(options.memberIds ?? [])
     : undefined;
+  const excluded = new Set(options.excludedResidentIds ?? []);
   const eligible = state.residents
-    .filter(resident => isCombatReadyResident(state, resident, options.context, allowed))
+    .filter(resident => !excluded.has(resident.id) && isCombatReadyResident(state, resident, options.context, allowed))
     .sort((a, b) => a.id - b.id);
   const fighters = eligible.filter(resident => combatRoleForResident(resident) !== 'civilian');
   const assignments = resolvedWeaponAssignments(state);
   const musketIds = fighters
     .filter(resident => assignments[resident.id] === 'musket')
     .map(resident => resident.id);
-  const readiness = musketReadiness(state, musketIds, CONFIG.raid.powderPerMusket);
+  const readiness = musketReadiness(
+    state, musketIds, CONFIG.raid.powderPerMusket, options.gunpowderAvailable,
+  );
   const readyMusketIds = new Set(musketIds.slice(0, readiness.ready));
 
   const combatants = fighters.map(resident => {

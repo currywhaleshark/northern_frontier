@@ -500,15 +500,22 @@ export function militiaWeaponAllocation(state: GameState): MilitiaWeaponAllocati
 // 방어도 = 건물 + 마을에 남은 전투원의 직업·실제 배정 무기.
 export function computeDefense(
   state: GameState,
-  options: { includeExpedition?: boolean; excludedResidentIds?: Iterable<number> } = {},
+  options: {
+    includeExpedition?: boolean;
+    excludedResidentIds?: Iterable<number>;
+    gunpowderAvailable?: number;
+  } = {},
 ): number {
-  const combatants = [...createCombatRoster(state, { context: 'villageDefense' }).combatants];
+  const excludedResidentIds = [...(options.excludedResidentIds ?? [])];
+  const combatants = [...createCombatRoster(state, {
+    context: 'villageDefense', excludedResidentIds, gunpowderAvailable: options.gunpowderAvailable,
+  }).combatants];
   if (options.includeExpedition && state.expedition) {
     combatants.push(...createCombatRoster(state, {
-      context: 'expedition', memberIds: state.expedition.memberIds,
+      context: 'expedition', memberIds: state.expedition.memberIds, excludedResidentIds,
+      gunpowderAvailable: options.gunpowderAvailable,
     }).combatants);
   }
-  const excluded = new Set(options.excludedResidentIds ?? []);
   let d = 0;
   for (const b of state.buildings) {
     if (b.built) d += BUILDING_DEFS[b.type].defense;
@@ -516,7 +523,7 @@ export function computeDefense(
   const garrisonMult = countBuilt(state, 'garrison') > 0 ? 1.3 : 1;
   const unique = new Map(combatants.map(combatant => [combatant.residentId, combatant]));
   const peopleDefense = [...unique.values()].reduce((sum, combatant) =>
-    excluded.has(combatant.residentId) ? sum : sum + combatant.basePower + combatant.weaponPower, 0);
+    sum + combatant.basePower + combatant.weaponPower, 0);
   d += Math.round(peopleDefense * garrisonMult);
   return Math.round(d);
 }

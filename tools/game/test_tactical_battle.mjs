@@ -30,6 +30,7 @@ const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
 const tacticalCore = await import(pathToFileURL(join(compiledDir, 'tacticalCore.mjs')).href);
+const tacticalCommandState = await import(pathToFileURL(join(compiledDir, 'tacticalCommandState.mjs')).href);
 const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
 const battleSimulation = await import(pathToFileURL(join(compiledDir, 'battleSimulation.mjs')).href);
 const reportModalSource = readFileSync(new URL('../../src/components/TacticalBattleReportModal.tsx', import.meta.url), 'utf8');
@@ -106,6 +107,53 @@ function addBuiltMarker(state, type) {
 }
 
 {
+  const state = simulation.newGame(2026071401);
+  prepareDefenders(state);
+  const sick = state.residents[0];
+  const critical = state.residents[1];
+  const quarantined = state.residents[2];
+  sick.sick = true;
+  critical.health = 19;
+  quarantined.quarantinedUntil = state.day + 2;
+
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'civilian-protection-test', power: 60, warned: true, siege: false, mode: 'garrison',
+  });
+  const civilians = battle.defenderGroups.find(group => group.kind === 'civilian');
+  assert.ok(civilians);
+  assert.ok(civilians.residentIds.includes(sick.id));
+  assert.ok(civilians.residentIds.includes(critical.id));
+  assert.ok(civilians.residentIds.includes(quarantined.id));
+  assert.equal(civilians.power, 0, 'protected civilians never add combat power');
+  assert.equal(civilians.commandable, false);
+  assert.equal(civilians.lockedZoneId, 'center');
+
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  assert.equal(battle.phase, 'deployment');
+  assert.ok(tactical.assignDefenderGroup(state, civilians.id, 'wall'));
+  assert.ok(tactical.assignDefenderGroup(state, civilians.id, 'storehouse'));
+  assert.ok(tactical.setDefenderFormationLine(state, civilians.id, 'front'));
+  assert.equal(civilians.zoneId, 'center');
+  assert.equal(civilians.line, 'rear');
+
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  for (const command of ['hold', 'advance', 'fallback']) {
+    assert.ok(tactical.setTacticalCommand(state, civilians.id, command));
+  }
+  assert.equal(civilians.command, null);
+
+  battle.phase = 'preparation';
+  battle.prepPoints = 8;
+  assert.equal(tactical.spendPreparationAction(state, 'musterMilitia'), null);
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  const mustered = battle.defenderGroups.find(group => group.id === 'militia-unarmed-mustered');
+  const musteredIds = new Set(mustered?.residentIds ?? []);
+  assert.equal(musteredIds.has(sick.id), false);
+  assert.equal(musteredIds.has(critical.id), false);
+  assert.equal(musteredIds.has(quarantined.id), false);
+}
+
+{
   const state = simulation.newGame(2026071202);
   prepareDefenders(state);
   addBuiltMarker(state, 'beacon');
@@ -145,10 +193,18 @@ function addBuiltMarker(state, type) {
 
   assert.equal(tactical.advanceTacticalPhase(state), null);
   assert.equal(battle.phase, 'command');
+  const activeCommandGroups = battle.defenderGroups.filter(tacticalCommandState.tacticalGroupCanReceiveCommand);
+  assert.ok(activeCommandGroups.every(group => group.command != null && group.commandSource === 'recommended'));
+  assert.equal(tacticalCommandState.pendingTacticalCommandCount(battle.defenderGroups), activeCommandGroups.length);
   assert.equal(tactical.setDefenderFormationLine(state, movable.id, 'front'), null);
   assert.equal(movable.line, 'front');
   assert.equal(tactical.setTacticalCommand(state, movable.id, 'guardStorehouse'), null);
   assert.equal(movable.command, 'guardStorehouse');
+  assert.equal(movable.commandSource, 'player');
+  assert.equal(
+    tacticalCommandState.pendingTacticalCommandCount(battle.defenderGroups),
+    activeCommandGroups.length - 1,
+  );
 
   assert.equal(tactical.resolveTacticalRound(state), null);
   assert.equal(battle.phase, 'simulating');
@@ -157,6 +213,38 @@ function addBuiltMarker(state, type) {
   assert.equal(battle.pendingReport, battle.reports[0]);
   assert.ok(battle.pendingReport.events.length > 0);
   assert.ok(battle.pendingReport.raidersKilled >= 0);
+}
+
+{
+  const groups = [
+    { id: 'recommended', count: 2, wounded: 0, killed: 0, command: 'hold', commandSource: 'recommended' },
+    { id: 'player', count: 2, wounded: 0, killed: 0, command: 'volley', commandSource: 'player' },
+    { id: 'down', count: 2, wounded: 1, killed: 1, command: 'hold', commandSource: 'recommended' },
+    { id: 'civilians', count: 4, wounded: 0, killed: 0, command: null, commandable: false },
+  ];
+  assert.equal(tacticalCommandState.pendingTacticalCommandCount(groups), 1);
+  assert.equal(tacticalCommandState.nextPendingTacticalGroupId(groups, 'player'), 'recommended');
+  assert.equal(tacticalCommandState.nextActiveTacticalGroupId(groups, 'down'), 'recommended');
+  assert.equal(tacticalCommandState.tacticalGroupCanReceiveCommand(groups[2]), false);
+  assert.equal(tacticalCommandState.tacticalGroupCanReceiveCommand(groups[3]), false);
+}
+
+{
+  assert.equal(typeof tactical.tacticalDefenderReadiness, 'function');
+  const combatants = { id: 'combatants', count: 2, wounded: 1, killed: 0 };
+  const protectedCivilians = {
+    id: 'protected-civilians', count: 8, wounded: 0, killed: 0, commandable: false,
+  };
+  assert.equal(
+    tactical.tacticalDefenderReadiness([combatants, protectedCivilians]),
+    0.5,
+    'protected civilians must not change combat readiness',
+  );
+  assert.equal(
+    tactical.tacticalDefenderReadiness([protectedCivilians]),
+    0,
+    'a civilian-only zone has no combat readiness',
+  );
 }
 
 {
@@ -252,11 +340,37 @@ function addBuiltMarker(state, type) {
     { role: 'militia', weapon: 'musket', count: 5, killed: 0, readyMuskets: 2 },
     { role: 'watchman', weapon: 'hornBow', count: 4, killed: 1, readyMuskets: 0 },
   ]), { arrows: 3, muskets: 2 });
+  assert.deepEqual(tacticalCore.tacticalDefenderShotCounts([
+    { role: 'militia', weapon: 'musket', count: 5, wounded: 2, killed: 1, readyMuskets: 5 },
+    { role: 'watchman', weapon: 'hornBow', count: 5, wounded: 2, killed: 1, readyMuskets: 0 },
+  ]), { arrows: 2, muskets: 2 });
+  assert.deepEqual(tacticalCore.tacticalDefenderShotCounts([
+    { role: 'militia', weapon: 'musket', count: 5, wounded: 1, killed: 0, readyMuskets: 2 },
+  ]), { muskets: 2 }, 'musket effects never exceed ready muskets');
   assert.deepEqual(tacticalCore.tacticalRaiderShotCounts([
     { unitType: 'court-gunner', count: 4, killed: 1 },
     { unitType: 'court-archer', count: 3, killed: 1 },
     { unitType: 'court-artillery', count: 2, killed: 0 },
   ]), { arrows: 2, muskets: 3, cannons: 2 });
+
+  const peopleState = simulation.newGame(2026071402);
+  const [unhurt, newlyWounded, killed] = peopleState.residents;
+  unhurt.health = 70;
+  newlyWounded.health = 45;
+  killed.health = 0;
+  killed.alive = false;
+  const people = tacticalCore.tacticalPeopleReport(peopleState, {
+    defenderGroups: [{ label: '회귀 시험대', residentIds: [unhurt.id, newlyWounded.id, killed.id] }],
+  }, new Map([
+    [unhurt.id, 70],
+    [newlyWounded.id, 70],
+    [killed.id, 100],
+  ]));
+  assert.deepEqual(people.wounded.map(person => person.residentId), [newlyWounded.id]);
+  assert.deepEqual(people.killed.map(person => person.residentId), [killed.id]);
+  assert.equal(people.wounded.some(person => person.residentId === killed.id), false,
+    'killed residents must not also appear as wounded');
+
   assert.deepEqual(tacticalCore.raidDefenseObjectiveResult({
     factionName: '변경 마적', outcome: 'partialLoss', enemyRouted: false, looted: false,
     defendersCommitted: 20, defendersKilled: 0, defendersWounded: 3,

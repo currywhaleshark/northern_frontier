@@ -24,7 +24,8 @@ import {
 } from './tacticalCore';
 import type {
   CombatWeaponId, CourtTribute, DefenderGroupKind, GameState, Gender, Resident, ResourceId,
-  TacticalBattle, TacticalBattleReport, TacticalCommandId, TacticalRoundReport,
+  PreparationActionId, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
+  TacticalPreparationEffect, TacticalRoundReport,
 } from './types';
 
 export { CURRENT_SCHEMA_VERSION } from './saveSchema';
@@ -68,6 +69,9 @@ export function migrateV6ToV7(raw: RawSave): RawSave {
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   let version = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
+  if (version > CURRENT_SCHEMA_VERSION) {
+    throw new Error(`Unsupported future schema version: ${version}`);
+  }
   while (version < CURRENT_SCHEMA_VERSION) {
     if (version === 3) migrated = migrateV3ToV4(migrated);
     else if (version === 4) migrated = migrateV4ToV5(migrated);
@@ -88,6 +92,56 @@ const TACTICAL_COMMANDS = new Set<TacticalCommandId>([
   'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'fallback', 'advance', 'charge',
   'arson', 'blockEscape', 'openRetreat',
 ]);
+const PREPARATION_ACTION_IDS = new Set<PreparationActionId>([
+  'evacuateCivilians', 'hideSupplies', 'repairWall', 'setAmbush', 'prepareVolley',
+  'preliminaryBombardment', 'musterMilitia', 'nightAssault', 'prepareFireArrows',
+  'blockLeaderEscape', 'lureGuards', 'setHuntTraps', 'placeBait', 'splitDrivers',
+]);
+
+function migratePreparationAction(raw: unknown): TacticalPreparationEffect | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const action = raw as Record<string, unknown>;
+  if (!PREPARATION_ACTION_IDS.has(action.id as PreparationActionId)) return null;
+  if (!Number.isFinite(action.cost) || Number(action.cost) < 0) return null;
+  if (typeof action.selected !== 'boolean' || typeof action.applied !== 'boolean') return null;
+  return {
+    ...action,
+    id: action.id as PreparationActionId,
+    label: typeof action.label === 'string' ? action.label : String(action.id),
+    cost: Number(action.cost),
+    selected: action.selected,
+    applied: action.applied,
+  } as TacticalPreparationEffect;
+}
+
+function migratePendingReport(raw: unknown, zoneIds: ReadonlySet<string>): TacticalRoundReport | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const report = raw as Record<string, unknown>;
+  if (!Number.isInteger(report.round) || Number(report.round) < 1) return null;
+  if (!zoneIds.has(String(report.focusZoneId)) || !zoneIds.has(String(report.nextFocusZoneId))) return null;
+  if (!Array.isArray(report.events) || !Array.isArray(report.lines)) return null;
+  if (!report.lines.every(line => typeof line === 'string')) return null;
+  if (!report.events.every(event => event && typeof event === 'object' &&
+    zoneIds.has(String((event as Record<string, unknown>).zoneId)))) return null;
+  return {
+    ...report,
+    round: Number(report.round),
+    focusZoneId: String(report.focusZoneId),
+    nextFocusZoneId: String(report.nextFocusZoneId),
+    summary: typeof report.summary === 'string' ? report.summary : '',
+    lines: [...report.lines] as string[],
+    events: report.events.map(event => ({
+      ...(event as Record<string, unknown>),
+    })) as unknown as TacticalAnimationEvent[],
+    wounded: Math.max(0, Number(report.wounded) || 0),
+    killed: Math.max(0, Number(report.killed) || 0),
+    raidersKilled: Math.max(0, Number(report.raidersKilled) || 0),
+    loot: report.loot && typeof report.loot === 'object' ? report.loot : {},
+    buildingsDamaged: Math.max(0, Number(report.buildingsDamaged) || 0),
+    villageMoraleDelta: Number(report.villageMoraleDelta) || 0,
+    raiderMoraleDelta: Number(report.raiderMoraleDelta) || 0,
+  } as TacticalRoundReport;
+}
 
 function inferredGroupIdentity(kind: DefenderGroupKind): {
   role: TacticalBattle['defenderGroups'][number]['role']; weapon: CombatWeaponId | null;
@@ -152,6 +206,8 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       : group.weapon === null ? null : inferred.weapon;
     const role = group.role === 'militia' || group.role === 'watchman' || group.role === 'hunter' || group.role === 'civilian'
       ? group.role : inferred.role;
+    const protectedCivilian = kind === 'civilian';
+    const civilianZoneId = zoneIds.has('center') ? 'center' : defaultZoneId;
     return [{
       ...group,
       id: typeof group.id === 'string' ? group.id : `migrated-defender-${index}`,
@@ -159,9 +215,18 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       readyMuskets: weapon === 'musket' ? Math.min(count, Math.max(0, Math.floor(Number(group.readyMuskets) || count))) : 0,
       label: typeof group.label === 'string' ? group.label : String(group.id ?? kind),
       residentIds: ids, count, killed, wounded,
-      zoneId: zoneIds.has(String(group.zoneId)) ? String(group.zoneId) : defaultZoneId,
-      command: TACTICAL_COMMANDS.has(group.command as TacticalCommandId) ? group.command as TacticalCommandId : null,
-      power: Math.max(0, Number(group.power) || 0),
+      zoneId: protectedCivilian
+        ? civilianZoneId
+        : zoneIds.has(String(group.zoneId)) ? String(group.zoneId) : defaultZoneId,
+      command: protectedCivilian
+        ? null
+        : TACTICAL_COMMANDS.has(group.command as TacticalCommandId) ? group.command as TacticalCommandId : null,
+      commandSource: protectedCivilian || !TACTICAL_COMMANDS.has(group.command as TacticalCommandId)
+        ? undefined
+        : group.commandSource === 'player' ? 'player' : 'recommended',
+      commandable: protectedCivilian ? false : group.commandable === false ? false : undefined,
+      lockedZoneId: protectedCivilian ? civilianZoneId : undefined,
+      power: protectedCivilian ? 0 : Math.max(0, Number(group.power) || 0),
       line: group.line === 'front' || group.line === 'rear'
         ? group.line
         : weapon === 'spear' || (weapon == null && (role === 'militia' || role === 'watchman')) ? 'front' : 'rear',
@@ -203,14 +268,26 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
         raidersKilled: Math.max(0, Number(item.raidersKilled) || 0),
       } as unknown as TacticalRoundReport;
     });
+  const phase = String(source.phase);
+  const pendingRequired = phase === 'simulating' || phase === 'report' || phase === 'finished';
+  const pendingForbidden = phase === 'preparation' || phase === 'preparationExecution' ||
+    phase === 'deployment' || phase === 'command';
+  const pendingReport = source.pendingReport == null ? null : migratePendingReport(source.pendingReport, zoneIds);
+  if (pendingRequired && !pendingReport) return null;
+  if (pendingForbidden && source.pendingReport != null) return null;
+  if (pendingReport && !reports.some(report => report.round === pendingReport.round &&
+    report.focusZoneId === pendingReport.focusZoneId)) reports.push(pendingReport);
   const migrated = {
     ...source,
     encounterKind,
     orientation: encounterKind === 'raidDefense' ? 'defense' : 'assault',
     assaultKind: encounterKind === 'raidDefense' ? undefined : encounterKind,
-    phase: source.phase,
+    phase,
     prepActions: (Array.isArray(source.prepActions) ? source.prepActions : [])
-      .filter(action => action && typeof action === 'object'),
+      .flatMap(action => {
+        const migratedAction = migratePreparationAction(action);
+        return migratedAction ? [migratedAction] : [];
+      }),
     preparationEvents: Array.isArray(source.preparationEvents) ? source.preparationEvents : [],
     zones,
     defenderGroups,
@@ -222,7 +299,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       ? Math.max(1, Number(source.initialEnemyPower))
       : Math.max(1, raiderGroups.reduce((sum, group) => sum + group.power, 0)),
     reports,
-    pendingReport: source.pendingReport && typeof source.pendingReport === 'object' ? source.pendingReport : null,
+    pendingReport,
     currentZoneId: defaultZoneId,
   } as unknown as TacticalBattle;
   return migrated;

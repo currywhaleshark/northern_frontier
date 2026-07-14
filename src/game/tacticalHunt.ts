@@ -291,15 +291,21 @@ export function setHuntCommand(state: GameState, groupId: string, command: Tacti
   const reason = huntCommandUnavailableReason(battle, group, command);
   if (reason) return reason;
   group.command = command;
+  group.commandSource = 'player';
   return null;
 }
 
 export function chooseDefaultHuntCommands(battle: TacticalBattle): void {
   for (const group of battle.defenderGroups) {
-    if (group.command || activeCount(group) <= 0) continue;
+    if (activeCount(group) <= 0) continue;
+    if (group.command) {
+      group.commandSource ??= 'recommended';
+      continue;
+    }
     if (tacticalGroupCapabilities(group).has('ambush')) group.command = 'advance';
     else if (tacticalGroupCapabilities(group).has('volley')) group.command = 'volley';
     else group.command = 'hold';
+    group.commandSource = 'recommended';
   }
 }
 
@@ -565,7 +571,10 @@ export function resolveHuntRound(state: GameState): string | null {
     }
   }
 
-  if (retreatOrdered) outcome = 'huntEscaped';
+  if (retreatOrdered) {
+    battle.huntWithdrawn = true;
+    outcome = 'huntEscaped';
+  }
   else if (battle.defenderGroups.every(group => activeCount(group) <= 0) || battle.villageMorale + villageMoraleDelta <= 0) {
     outcome = 'huntDefeat';
   } else if (battle.raiderGroups.every(group => activeBeasts(group) <= 0)) outcome = 'huntKill';
@@ -654,7 +663,13 @@ export function acknowledgeHuntReport(state: GameState): string | null {
     battle.raiderGroups.forEach(group => { if (activeBeasts(group) > 0) group.zoneId = nextZoneId; });
   }
   battle.currentZoneId = nextZoneId;
-  battle.defenderGroups.forEach(group => { group.command = null; });
+  battle.defenderGroups.forEach(group => {
+    if (group.command && huntCommandUnavailableReason(battle, group, group.command)) {
+      group.command = null;
+      group.commandSource = undefined;
+    } else if (group.command) group.commandSource = 'recommended';
+  });
+  chooseDefaultHuntCommands(battle);
   battle.pendingReport = null;
   battle.phase = 'command';
   return null;
@@ -667,6 +682,7 @@ export function finishPredatorTacticalHunt(state: GameState): void {
   const outcome = finalReport?.outcome ?? 'huntDefeat';
   const rng = makeRng(state.seed + battle.id * 524287 + 307);
   const reputationBefore = state.resources.reputation;
+  const beforeHealth = new Map(state.residents.map(resident => [resident.id, resident.health]));
   let casualties = 0;
   for (const group of battle.defenderGroups) {
     if (group.killed > 0) killResidents(state, rng, group.killed, 1, group.residentIds);
@@ -691,7 +707,7 @@ export function finishPredatorTacticalHunt(state: GameState): void {
       ];
     }
   }
-  const people = tacticalPeopleReport(state, battle);
+  const people = tacticalPeopleReport(state, battle, beforeHealth);
   const raidersCommitted = battle.raiderGroups.reduce((sum, group) => sum + group.count, 0);
   const raidersKilled = Math.min(raidersCommitted, battle.raiderGroups.reduce((sum, group) => sum + group.killed, 0));
   const battleDefendersKilled = battle.defenderGroups.reduce((sum, group) => sum + group.killed, 0);
@@ -712,6 +728,7 @@ export function finishPredatorTacticalHunt(state: GameState): void {
   const outcomeLabels: Partial<Record<NonNullable<TacticalRoundReport['outcome']>, string>> = {
     huntKill: '맹수 사살', huntRepelled: '맹수 격퇴', huntEscaped: '맹수 도주', huntDefeat: '사냥대 패퇴',
   };
+  const withdrawn = outcome === 'huntEscaped' && battle.huntWithdrawn === true;
   const predatorDetail = battle.huntPredatorKind === 'tiger'
     ? `${tigerTierLabel(battle.huntTigerTier)} 1마리`
     : `늑대 ${raidersCommitted}마리`;
@@ -726,11 +743,13 @@ export function finishPredatorTacticalHunt(state: GameState): void {
     mode: battle.mode,
     warned: battle.warned,
     outcome,
-    outcomeLabel: outcomeLabels[outcome] ?? '사냥 종료',
+    outcomeLabel: withdrawn ? '사냥대 철수' : outcomeLabels[outcome] ?? '사냥 종료',
     result: reportResult,
     grade: grade.grade,
     gradeScore: grade.score,
-    closingSummary: tacticalClosingSummary('predatorHunt', outcome, battle.factionName),
+    closingSummary: withdrawn
+      ? '사냥대가 사냥을 중지하고 질서 있게 철수합니다.'
+      : tacticalClosingSummary('predatorHunt', outcome, battle.factionName),
     initialFriendlyPower: battle.initialFriendlyPower,
     initialEnemyPower: battle.initialEnemyPower,
     rounds: battle.reports.length,
@@ -752,7 +771,13 @@ export function finishPredatorTacticalHunt(state: GameState): void {
     highlights: [predatorDetail, ...battle.reports.flatMap(report => report.lines)]
       .filter((line, index, all) => all.indexOf(line) === index).slice(0, 10),
     resourceDelta: tacticalResourceDelta(state, battle),
-    predatorOutcome: outcome === 'huntKill' ? 'killed' : outcome === 'huntRepelled' ? 'repelled' : 'escaped',
+    predatorOutcome: outcome === 'huntKill'
+      ? 'killed'
+      : outcome === 'huntRepelled'
+        ? 'repelled'
+        : outcome === 'huntDefeat'
+          ? 'huntersDefeated'
+          : withdrawn ? 'withdrawn' : 'escaped',
   };
   state.tacticalBattle = null;
   const error = beginExpeditionReturn(state, '사냥대가 맹수 직접 지휘전을 마치고 귀환길에 올랐습니다.');

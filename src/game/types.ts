@@ -642,11 +642,14 @@ export interface TacticalDefenderGroup {
   count: number;
   zoneId: string;
   command: TacticalCommandId | null;
+  commandSource?: 'recommended' | 'player';
   power: number;
   wounded: number;
   killed: number;
   line: TacticalFormationLine;
   ambushed?: boolean;
+  commandable?: boolean;
+  lockedZoneId?: string;
 }
 
 export interface TacticalRaiderGroup {
@@ -814,8 +817,8 @@ export interface TacticalBattleReport {
   threatAfter: number;
   highlights: string[];
   resourceDelta: Partial<Record<ResourceId, number>>;
-  siteOutcome?: 'burned' | 'abandoned' | 'fortified';
-  predatorOutcome?: 'killed' | 'repelled' | 'escaped';
+  siteOutcome?: 'burned' | 'abandoned' | 'fortified' | 'unchanged';
+  predatorOutcome?: 'killed' | 'repelled' | 'escaped' | 'huntersDefeated' | 'withdrawn';
 }
 
 export interface TacticalBattle {
@@ -856,6 +859,7 @@ export interface TacticalBattle {
   huntTrapSet?: boolean;
   huntBaitPlaced?: boolean;
   huntLeaderKilled?: boolean;
+  huntWithdrawn?: boolean;
   preliminaryBombardmentCannons?: number;
   preliminaryBombardmentCasualties?: number;
   resourceSnapshot?: Partial<Record<ResourceId, number>>;

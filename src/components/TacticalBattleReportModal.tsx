@@ -26,8 +26,18 @@ export function TacticalBattleReportModal({ report, onClose }: Props) {
   const contextLine = report.encounterKind === 'raidDefense'
     ? `${report.mode === 'levy' ? '민병 방어' : '수비병 요격'} · ${report.warned ? '사전 경보' : '기습 대응'}`
     : report.encounterKind === 'banditLair'
-      ? `산채 상태 ${report.siteOutcome === 'burned' ? '소각' : report.siteOutcome === 'abandoned' ? '폐기' : '요새화'}`
-      : `결과 ${report.predatorOutcome === 'killed' ? '사살' : report.predatorOutcome === 'repelled' ? '격퇴' : '도주'}`;
+      ? `산채 상태 ${report.siteOutcome === 'burned'
+        ? '소각'
+        : report.siteOutcome === 'abandoned'
+          ? '폐기'
+          : report.siteOutcome === 'unchanged' ? '유지 · 철수' : '요새화'}`
+      : `결과 ${report.predatorOutcome === 'killed'
+        ? '사살'
+        : report.predatorOutcome === 'repelled'
+          ? '격퇴'
+          : report.predatorOutcome === 'huntersDefeated'
+            ? '사냥대 패퇴'
+            : report.predatorOutcome === 'withdrawn' ? '사냥 중지 · 철수' : '맹수 도주'}`;
   return (
     <div className="battle-report-overlay" role="dialog" aria-modal="true" aria-label="상세 전투 장계">
       <article className="battle-report-modal">

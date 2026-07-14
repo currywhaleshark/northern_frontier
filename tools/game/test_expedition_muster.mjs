@@ -105,4 +105,56 @@ function prepareCombatants(seed) {
   );
 }
 
+{
+  const { state, combatants } = prepareCombatants(2026071406);
+  const [sick, injured, quarantined, scout] = state.residents.slice(5, 9);
+  for (const resident of [...combatants, sick, injured, quarantined, scout]) resident.job = 'militia';
+  sick.sick = true;
+  injured.health = 19;
+  quarantined.quarantinedUntil = state.day + 2;
+  state.incidents.predatorThreats.wolf = {
+    kind: 'wolf', untilDay: state.day + 2,
+    scouting: {
+      residentId: scout.id, startedDay: state.day, completesOnDay: state.day + 1,
+      hunterSkill: 0, usedGyrfalcon: false,
+    },
+  };
+  state.resources.muskets = 9;
+  state.resources.hornBows = 0;
+  state.resources.spears = 0;
+  state.resources.gunpowder = 0.8;
+  state.weaponAllocationMode = 'manual';
+  state.weaponAssignments = Object.fromEntries(
+    [...combatants, sick, injured, quarantined, scout].map(resident => [resident.id, 'musket']),
+  );
+
+  const all = expedition.expeditionMusterPreview(state, combatants.map(resident => resident.id));
+  assert.equal(all.expeditionWeapons.assignedMuskets, 5);
+  assert.equal(all.expeditionWeapons.readyMuskets, 2);
+  assert.equal(all.expeditionWeapons.dryMuskets, 3);
+  assert.equal(all.expeditionPower, 2 * 18 + 3 * 12);
+  assert.deepEqual(
+    all.expeditionCombatants.map(combatant => combatant.readyWeapon),
+    ['musket', 'musket', null, null, null],
+    'individual rows distinguish ready and dry muskets deterministically',
+  );
+
+  const one = expedition.expeditionMusterPreview(state, [combatants[0].id]);
+  assert.equal(one.expeditionWeapons.readyMuskets, 1);
+  assert.equal(one.remainingWeapons.assignedMuskets, 4);
+  assert.equal(one.remainingWeapons.readyMuskets, 1,
+    'powder left by the selected expedition is reassigned to remaining defenders');
+  assert.equal(one.remainingWeapons.dryMuskets, 3);
+  const remainingIds = new Set(one.remainingCombatants.map(combatant => combatant.residentId));
+  for (const excluded of [sick, injured, quarantined, scout]) assert.equal(remainingIds.has(excluded.id), false);
+}
+
+{
+  const source = readFileSync(new URL('../../src/components/ExpeditionMusterDialog.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /residentDefenseContribution/,
+    'the muster UI must not use the legacy per-resident defense helper');
+  assert.match(source, /조총 준비/);
+  assert.match(source, /화약 부족/);
+}
+
 console.log('expedition muster tests passed');

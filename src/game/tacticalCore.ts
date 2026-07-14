@@ -18,7 +18,7 @@ export function tacticalDefenderShotCounts(groups: TacticalDefenderGroup[]): Tac
   let arrows = 0;
   let muskets = 0;
   for (const group of groups) {
-    const active = Math.max(0, group.count - group.killed);
+    const active = Math.max(0, group.count - (group.wounded ?? 0) - group.killed);
     if (active <= 0 || !tacticalGroupCapabilities(group).has('volley')) continue;
     if (group.weapon === 'musket') muskets += Math.min(active, group.readyMuskets ?? 0);
     else arrows += active;
@@ -200,6 +200,7 @@ export function tacticalResourceDelta(
 export function tacticalPeopleReport(
   state: GameState,
   battle: Pick<TacticalBattle, 'defenderGroups'>,
+  beforeHealth: ReadonlyMap<number, number>,
 ): { committed: number; survived: number; killed: TacticalBattlePersonReport[]; wounded: TacticalBattlePersonReport[] } {
   const groupByResident = new Map<number, string>();
   for (const group of battle.defenderGroups) {
@@ -216,6 +217,9 @@ export function tacticalPeopleReport(
     committed: residents.length,
     survived: residents.filter(resident => resident.alive).length,
     killed: residents.filter(resident => !resident.alive).map(person),
-    wounded: residents.filter(resident => resident.alive && resident.health < 100).map(person),
+    wounded: residents.filter(resident => {
+      const healthBefore = beforeHealth.get(resident.id);
+      return resident.alive && healthBefore != null && resident.health < healthBefore;
+    }).map(person),
   };
 }

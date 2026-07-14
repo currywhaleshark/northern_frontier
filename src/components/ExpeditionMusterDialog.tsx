@@ -2,15 +2,14 @@ import { useState } from 'react';
 import { computeDefense } from '../game/buildings';
 import { JOB_NAMES } from '../game/constants';
 import {
-  availableExpeditionResidents, expeditionCombatPower, expeditionStateBlockReason, predatorExpeditionTarget,
+  availableExpeditionResidents, expeditionMusterPreview, expeditionStateBlockReason, predatorExpeditionTarget,
 } from '../game/expedition';
 import { isForeignSiteOperational } from '../game/foreignSites';
 import { expeditionEnemyIntel } from '../game/expeditionIntel';
 import { banditLairRaidChance } from '../game/siteDiplomacy';
 import { predatorHuntChance } from '../game/specialEvents';
 import {
-  COMBAT_WEAPON_IDS, COMBAT_WEAPON_NAMES, residentDefenseContribution, resolvedWeaponAssignments,
-  weaponCountsForResidents, weaponStock,
+  COMBAT_WEAPON_IDS, COMBAT_WEAPON_NAMES, resolvedWeaponAssignments, weaponStock,
 } from '../game/weapons';
 import type { CombatWeaponId, GameState, PredatorKind } from '../game/types';
 
@@ -68,9 +67,13 @@ export function ExpeditionMusterDialog({
   const selectionError = selected.length < 2 ? '토벌대는 최소 2명이어야 합니다.' : null;
   const blockingError = targetError ?? stateError ?? selectionError;
 
+  const musterPreview = expeditionMusterPreview(state, selected);
   const currentDefense = computeDefense(state);
-  const remainingDefense = computeDefense(state, { excludedResidentIds: selected });
-  const expeditionPower = expeditionCombatPower(state, selected);
+  const remainingDefense = computeDefense(state, {
+    excludedResidentIds: selected,
+    gunpowderAvailable: musterPreview.remainingGunpowder,
+  });
+  const expeditionPower = musterPreview.expeditionPower;
   const successChance = request.kind === 'lairAssault'
     ? banditLairRaidChance(state, request.siteId, selected)
     : predatorHuntChance(state, request.predatorKind, selected);
@@ -81,11 +84,11 @@ export function ExpeditionMusterDialog({
       ? `약 ${Math.round(successChance * 20) * 5}%`
       : `${Math.round(successChance * 100)}%`;
 
-  const remainingCombatants = state.residents.filter(resident =>
-    resident.alive && !selectedSet.has(resident.id) &&
-    !state.expedition?.memberIds.includes(resident.id) &&
-    (resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter'));
-  const remainingWeapons = weaponCountsForResidents(state, remainingCombatants);
+  const remainingWeapons = musterPreview.remainingWeapons;
+  const previewByResidentId = new Map(
+    [...musterPreview.expeditionCombatants, ...musterPreview.remainingCombatants]
+      .map(combatant => [combatant.residentId, combatant]),
+  );
   const used: Record<CombatWeaponId, number> = { musket: 0, hornBow: 0, spear: 0 };
   for (const resident of state.residents) {
     if (!resident.alive) continue;
@@ -159,11 +162,17 @@ export function ExpeditionMusterDialog({
         <div className="expedition-preview-grid">
           <div><span>출정 인원</span><strong>{selected.length}명</strong></div>
           <div><span>원정 전력</span><strong>{expeditionPower}</strong></div>
+          <div><span>조총 준비</span><strong>{musterPreview.expeditionWeapons.readyMuskets} / 배정 {musterPreview.expeditionWeapons.assignedMuskets}</strong></div>
           <div><span>예상 성공</span><strong>{successText}</strong></div>
           <div className={remainingDefense < currentDefense * 0.6 ? 'danger' : ''}>
             <span>마을 방어도</span><strong>{currentDefense} → {remainingDefense}</strong>
           </div>
         </div>
+        {musterPreview.expeditionWeapons.dryMuskets > 0 && (
+          <div className="muted small expedition-powder-warning">
+            화약 부족으로 {musterPreview.expeditionWeapons.dryMuskets}명은 기본 전력만 발휘
+          </div>
+        )}
 
         <div className={`expedition-enemy-intel ${enemyIntel.precision}`}>
           <div className="expedition-enemy-intel-heading">
@@ -179,11 +188,13 @@ export function ExpeditionMusterDialog({
 
         <div className="expedition-remaining-weapons">
           <span>잔류 무장</span>
-          <strong>조총 {remainingWeapons.readyMuskets}</strong>
+          <strong>조총 준비 {remainingWeapons.readyMuskets} / 배정 {remainingWeapons.assignedMuskets}</strong>
           <strong>각궁 {remainingWeapons.hornBows}</strong>
           <strong>창 {remainingWeapons.spears}</strong>
           <strong>비무장 {remainingWeapons.unarmed}</strong>
-          {remainingWeapons.muskets > remainingWeapons.readyMuskets && <em>화약 없음</em>}
+          {remainingWeapons.dryMuskets > 0 && (
+            <em>화약 부족으로 {remainingWeapons.dryMuskets}명은 기본 전력만 발휘</em>
+          )}
         </div>
 
         <div className="expedition-muster-actions">
@@ -203,6 +214,11 @@ export function ExpeditionMusterDialog({
                 <h3>{JOB_NAMES[role]}</h3>
                 {residents.map(resident => {
                   const current = assignments[resident.id] ?? '';
+                  const combatant = previewByResidentId.get(resident.id);
+                  const personalPower = combatant ? combatant.basePower + combatant.weaponPower : 0;
+                  const musketStatus = combatant?.assignedWeapon === 'musket'
+                    ? combatant.readyWeapon === 'musket' ? ' · 조총 준비' : ' · 조총 배정·화약 부족'
+                    : '';
                   return (
                     <div key={resident.id} className={`expedition-member-row ${selectedSet.has(resident.id) ? 'selected' : ''}`}>
                       <label>
@@ -215,7 +231,7 @@ export function ExpeditionMusterDialog({
                           <strong>{resident.name}</strong>
                           <small>
                             건강 {Math.round(resident.health)} · {resident.task} · 전력 +
-                            {residentDefenseContribution(state, resident, current ? current as CombatWeaponId : null)}
+                            {personalPower}{musketStatus}
                           </small>
                         </span>
                       </label>

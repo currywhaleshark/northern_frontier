@@ -334,15 +334,21 @@ export function setAssaultCommand(state: GameState, groupId: string, command: Ta
   const unavailable = assaultCommandUnavailableReason(battle, group, command);
   if (unavailable) return unavailable;
   group.command = command;
+  group.commandSource = 'player';
   return null;
 }
 
 export function chooseDefaultAssaultCommands(battle: TacticalBattle): void {
   for (const group of battle.defenderGroups) {
-    if (group.command || activeCount(group) <= 0) continue;
+    if (activeCount(group) <= 0) continue;
+    if (group.command) {
+      group.commandSource ??= 'recommended';
+      continue;
+    }
     if (tacticalGroupCapabilities(group).has('ambush') && group.zoneId === 'lairTrail') group.command = 'ambush';
     else if (tacticalGroupCapabilities(group).has('volley')) group.command = 'volley';
     else group.command = 'advance';
+    group.commandSource = 'recommended';
   }
 }
 
@@ -619,7 +625,13 @@ export function acknowledgeAssaultReport(state: GameState): string | null {
     }
   }
   battle.currentZoneId = nextZoneId;
-  battle.defenderGroups.forEach(group => { group.command = null; });
+  battle.defenderGroups.forEach(group => {
+    if (group.command && assaultCommandUnavailableReason(battle, group, group.command)) {
+      group.command = null;
+      group.commandSource = undefined;
+    } else if (group.command) group.commandSource = 'recommended';
+  });
+  chooseDefaultAssaultCommands(battle);
   battle.pendingReport = null;
   battle.phase = 'command';
   return null;
@@ -642,6 +654,7 @@ export function finishBanditLairTacticalAssault(state: GameState): void {
   const targetSite = state.foreignSites.find(site => site.id === battle.assaultTargetSiteId);
   const reputationBefore = state.resources.reputation;
   const relationBefore = targetSite?.factionName ? state.relations[targetSite.factionName] ?? 50 : 0;
+  const beforeHealth = new Map(state.residents.map(resident => [resident.id, resident.health]));
   let casualties = 0;
   for (const group of battle.defenderGroups) {
     if (group.killed > 0) killResidents(state, rng, group.killed, 1, group.residentIds);
@@ -673,7 +686,7 @@ export function finishBanditLairTacticalAssault(state: GameState): void {
       { x: state.expedition.targetX, y: state.expedition.targetY, until: state.day + 4 },
     ];
   }
-  const people = tacticalPeopleReport(state, battle);
+  const people = tacticalPeopleReport(state, battle, beforeHealth);
   const raidersCommitted = battle.raiderGroups.reduce((sum, group) => sum + group.count, 0);
   const raidersKilled = Math.min(raidersCommitted, battle.raiderGroups.reduce((sum, group) => sum + group.killed, 0));
   const battleDefendersKilled = battle.defenderGroups.reduce((sum, group) => sum + group.killed, 0);
@@ -732,7 +745,11 @@ export function finishBanditLairTacticalAssault(state: GameState): void {
     threatAfter: state.threat,
     highlights: battle.reports.flatMap(report => report.lines).filter((line, index, all) => all.indexOf(line) === index).slice(0, 10),
     resourceDelta: tacticalResourceDelta(state, battle),
-    siteOutcome: strategicOutcome === 'victory' ? 'burned' : strategicOutcome === 'abandoned' ? 'abandoned' : 'fortified',
+    siteOutcome: strategicOutcome === 'victory'
+      ? 'burned'
+      : strategicOutcome === 'abandoned'
+        ? 'abandoned'
+        : strategicOutcome === 'withdrawal' ? 'unchanged' : 'fortified',
   };
   state.tacticalBattle = null;
   const returnError = beginExpeditionReturn(state, '토벌대가 산채 직접 지휘전을 마치고 귀환길에 올랐습니다.');

@@ -96,6 +96,73 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
 }
 
 {
+  const future = { schemaVersion: saveLoad.CURRENT_SCHEMA_VERSION + 1 };
+  assert.throws(() => saveLoad.migrateToCurrent(future), /future|미래|지원하지/i);
+  store.set('buksae-save-v3', JSON.stringify(future));
+  assert.equal(saveLoad.loadGame(), null, 'a future schema save is rejected instead of being downgraded');
+}
+
+function simulatingState(seed) {
+  const state = simulation.newGame(seed);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'pending report validation', power: 30, warned: true, siege: false, mode: 'garrison',
+  });
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.equal(battle.phase, 'simulating');
+  assert.ok(battle.pendingReport);
+  return { state, battle };
+}
+
+{
+  const { state, battle } = simulatingState(2026071450);
+  battle.pendingReport = null;
+  assert.equal(saveLoad.saveGame(state), true);
+  const loaded = saveLoad.loadGame();
+  assert.ok(loaded, 'missing pendingReport only cancels the tactical battle');
+  assert.equal(loaded.tacticalBattle, null);
+  assert.ok(loaded.log.some(entry => entry.text.includes('전술전 데이터가 손상')));
+}
+
+for (const [field, seed] of [['events', 2026071451], ['lines', 2026071452]]) {
+  const { state, battle } = simulatingState(seed);
+  delete battle.pendingReport[field];
+  assert.equal(saveLoad.saveGame(state), true);
+  const loaded = saveLoad.loadGame();
+  assert.ok(loaded, `missing pendingReport.${field} only cancels the tactical battle`);
+  assert.equal(loaded.tacticalBattle, null);
+}
+
+{
+  const { state, battle } = simulatingState(2026071453);
+  battle.pendingReport.events[0].zoneId = 'missing-zone';
+  assert.equal(saveLoad.saveGame(state), true);
+  const loaded = saveLoad.loadGame();
+  assert.ok(loaded, 'an event referencing an unknown zone only cancels the tactical battle');
+  assert.equal(loaded.tacticalBattle, null);
+}
+
+{
+  const state = simulation.newGame(2026071454);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'prep action validation', power: 30, warned: true, siege: false, mode: 'garrison',
+  });
+  const valid = battle.prepActions.find(action => action.id === 'preliminaryBombardment');
+  assert.ok(valid);
+  battle.prepActions = [
+    { ...valid },
+    { id: 'not-an-action', label: 'bad id', cost: 1, selected: false, applied: false },
+    { id: 'repairWall', label: 'bad cost', cost: -1, selected: false, applied: false },
+    { id: 'hideSupplies', label: 'bad selected', cost: 1, selected: 'yes', applied: false },
+    { id: 'musterMilitia', label: 'bad applied', cost: 1, selected: false, applied: 'yes' },
+  ];
+  assert.equal(saveLoad.saveGame(state), true);
+  const loaded = saveLoad.loadGame();
+  assert.deepEqual(loaded?.tacticalBattle?.prepActions.map(action => action.id), ['preliminaryBombardment']);
+}
+
+{
   const legacy = simulation.newGame(2026071331);
   const battle = tactical.createTacticalBattle(legacy, {
     factionName: '변경 마적', power: 70, warned: true, siege: false, mode: 'garrison',

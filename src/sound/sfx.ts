@@ -61,6 +61,7 @@ const lastPlay: Record<string, number> = {};
 export function initAudio(): void {
   if (ctx) {
     if (ctx.state === 'suspended') void ctx.resume();
+    void ensureBattleSamples();
     return;
   }
   try {
@@ -86,17 +87,25 @@ export function initAudio(): void {
   }
 }
 
-function ensureBattleSamples(): Promise<void> {
+export function ensureBattleSamples(): Promise<void> {
   if (battleSamplesPromise) return battleSamplesPromise;
   if (!ctx) return Promise.resolve();
   const audioContext = ctx;
-  battleSamplesPromise = Promise.all(Object.entries(BATTLE_SAMPLE_PATHS).map(async ([name, path]) => {
-    const response = await fetch(path);
-    if (!response.ok) throw new Error(`전투 음원 로드 실패: ${path}`);
-    const data = await response.arrayBuffer();
-    battleSamples.set(name as BattleSampleName, await audioContext.decodeAudioData(data));
-  })).then(() => undefined).catch(error => {
-    console.warn(error);
+  const missingSamples = Object.entries(BATTLE_SAMPLE_PATHS)
+    .filter(([name]) => !battleSamples.has(name as BattleSampleName));
+  if (missingSamples.length === 0) return Promise.resolve();
+
+  battleSamplesPromise = Promise.all(missingSamples.map(async ([name, path]) => {
+    try {
+      const response = await fetch(path);
+      if (!response.ok) throw new Error(`전투 음원 로드 실패: ${path}`);
+      const data = await response.arrayBuffer();
+      battleSamples.set(name as BattleSampleName, await audioContext.decodeAudioData(data));
+    } catch (error) {
+      console.warn(error);
+    }
+  })).then(() => undefined).finally(() => {
+    battleSamplesPromise = null;
   });
   return battleSamplesPromise;
 }

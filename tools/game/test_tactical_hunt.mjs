@@ -252,6 +252,46 @@ function finishBattle(state) {
   finishBattle(state);
   assert.ok(state.incidents.predatorThreats.wolf, 'an escaped pack remains a threat');
   assert.deepEqual(state.expedition?.carriedLoot, {});
+  assert.equal(state.tacticalBattleReport?.predatorOutcome, 'escaped');
+  assert.equal(state.tacticalBattleReport?.outcomeLabel, '맹수 도주');
+}
+
+{
+  const { state, battle } = prepareHunt(2026071408, 'tiger');
+  enterCommand(state);
+  battle.defenderGroups.forEach(group => { group.wounded = group.count; });
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.equal(battle.pendingReport.outcome, 'huntDefeat');
+  finishBattle(state);
+  assert.equal(state.tacticalBattleReport?.predatorOutcome, 'huntersDefeated');
+  assert.equal(state.tacticalBattleReport?.outcomeLabel, '사냥대 패퇴');
+}
+
+{
+  const { state, battle } = prepareHunt(2026071409, 'wolf');
+  enterCommand(state);
+  const group = battle.defenderGroups[0];
+  assert.equal(tactical.setTacticalCommand(state, group.id, 'openRetreat'), null);
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.equal(battle.pendingReport.outcome, 'huntEscaped');
+  finishBattle(state);
+  assert.equal(state.tacticalBattleReport?.predatorOutcome, 'withdrawn');
+  assert.match(state.tacticalBattleReport?.outcomeLabel ?? '', /철수|중지/);
+}
+
+for (const [kind, seed] of [['tiger', 2026071404], ['wolf', 2026071405]]) {
+  const { state, battle, members } = prepareHunt(seed, kind);
+  const veteran = members[0];
+  veteran.health = 70;
+  battle.reports = [{
+    round: 1, focusZoneId: 'huntTracks', nextFocusZoneId: 'huntTracks', summary: 'escaped',
+    lines: [], events: [], wounded: 0, killed: 0, raidersKilled: 0, loot: {}, buildingsDamaged: 0,
+    villageMoraleDelta: 0, raiderMoraleDelta: 0, ended: true, outcome: 'huntEscaped',
+  }];
+  battle.phase = 'finished';
+  tactical.finishTacticalBattle(state);
+  assert.equal(state.tacticalBattleReport?.wounded.some(person => person.residentId === veteran.id), false,
+    `an already-wounded but unharmed ${kind} hunter is not reported as newly wounded`);
 }
 
 console.log('tactical hunt tests passed');

@@ -1,7 +1,7 @@
 import { findPath, isTerrainPassable, resetAgent } from './agents';
 import { CONFIG } from './config';
 import { addLog } from './events';
-import { createCombatRoster, isCombatReadyResident } from './combatRoster';
+import { createCombatRoster, isCombatReadyResident, type CombatantSnapshot } from './combatRoster';
 import { consumeMusketPowder, reconcileWeaponAssignments } from './weapons';
 import type {
   Expedition, ExpeditionKind, GameState, PredatorKind, Resident, ResourceId,
@@ -47,6 +47,66 @@ export function availableExpeditionResidents(state: GameState): Resident[] {
 export function expeditionCombatPower(state: GameState, memberIds: Iterable<number>): number {
   return createCombatRoster(state, { context: 'expedition', memberIds }).combatants
     .reduce((total, combatant) => total + combatant.basePower + combatant.weaponPower, 0);
+}
+
+export interface CombatRosterWeaponSummary {
+  assignedMuskets: number;
+  readyMuskets: number;
+  dryMuskets: number;
+  hornBows: number;
+  spears: number;
+  unarmed: number;
+}
+
+export interface ExpeditionMusterPreview {
+  expeditionCombatants: CombatantSnapshot[];
+  remainingCombatants: CombatantSnapshot[];
+  expeditionPower: number;
+  expeditionWeapons: CombatRosterWeaponSummary;
+  remainingWeapons: CombatRosterWeaponSummary;
+  remainingGunpowder: number;
+}
+
+function combatRosterWeapons(combatants: CombatantSnapshot[]): CombatRosterWeaponSummary {
+  const assignedMuskets = combatants.filter(combatant => combatant.assignedWeapon === 'musket').length;
+  const readyMuskets = combatants.filter(combatant => combatant.readyWeapon === 'musket').length;
+  return {
+    assignedMuskets,
+    readyMuskets,
+    dryMuskets: assignedMuskets - readyMuskets,
+    hornBows: combatants.filter(combatant => combatant.assignedWeapon === 'hornBow').length,
+    spears: combatants.filter(combatant => combatant.assignedWeapon === 'spear').length,
+    unarmed: combatants.filter(combatant => combatant.assignedWeapon == null).length,
+  };
+}
+
+export function expeditionMusterPreview(
+  state: GameState,
+  memberIds: Iterable<number>,
+): ExpeditionMusterPreview {
+  const selectedIds = [...new Set(memberIds)];
+  const expeditionCombatants = createCombatRoster(state, {
+    context: 'expedition', memberIds: selectedIds,
+  }).combatants;
+  const expeditionWeapons = combatRosterWeapons(expeditionCombatants);
+  const remainingGunpowder = Math.max(
+    0,
+    state.resources.gunpowder - expeditionWeapons.readyMuskets * CONFIG.raid.powderPerMusket,
+  );
+  const remainingCombatants = createCombatRoster(state, {
+    context: 'villageDefense', excludedResidentIds: selectedIds, gunpowderAvailable: remainingGunpowder,
+  }).combatants;
+  return {
+    expeditionCombatants,
+    remainingCombatants,
+    expeditionPower: expeditionCombatants.reduce(
+      (total, combatant) => total + combatant.basePower + combatant.weaponPower,
+      0,
+    ),
+    expeditionWeapons,
+    remainingWeapons: combatRosterWeapons(remainingCombatants),
+    remainingGunpowder,
+  };
 }
 
 export function expeditionResidentsForIds(state: GameState, memberIds: Iterable<number>): Resident[] {

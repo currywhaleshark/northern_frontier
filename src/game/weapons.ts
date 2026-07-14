@@ -206,12 +206,13 @@ export function musketReadiness(
   state: GameState,
   musketUsers: Iterable<number>,
   powderPerShooter: number,
+  availableGunpowder = state.resources.gunpowder,
 ): MusketReadiness {
   const assigned = new Set(musketUsers).size;
   const perShooter = Math.max(0, powderPerShooter);
   const ready = perShooter === 0
     ? assigned
-    : Math.min(assigned, Math.floor((Math.max(0, state.resources.gunpowder) + 1e-9) / perShooter));
+    : Math.min(assigned, Math.floor((Math.max(0, availableGunpowder) + 1e-9) / perShooter));
   return {
     assigned,
     ready,

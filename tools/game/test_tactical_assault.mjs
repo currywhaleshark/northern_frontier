@@ -208,7 +208,21 @@ function finishPendingBattle(state) {
   assert.equal(battle.pendingReport.outcome, 'assaultWithdrawal');
   finishPendingBattle(state);
   assert.equal(lair.status, 'active');
+  assert.equal(state.tacticalBattleReport?.siteOutcome, 'unchanged');
+  assert.match(state.tacticalBattleReport?.outcomeLabel ?? '', /철수/);
   assert.equal(state.expedition?.phase, 'return');
+}
+
+{
+  const { state, battle, lair } = prepareState(2026071407, true);
+  enterCommandPhase(state);
+  battle.defenderGroups.forEach(group => { group.wounded = group.count; });
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.equal(battle.pendingReport.outcome, 'assaultDefeat');
+  finishPendingBattle(state);
+  assert.equal(lair.status, 'fortified');
+  assert.equal(state.tacticalBattleReport?.siteOutcome, 'fortified');
+  assert.match(state.tacticalBattleReport?.outcomeLabel ?? '', /패퇴/);
 }
 
 {
@@ -271,6 +285,21 @@ function finishPendingBattle(state) {
       `(avg rounds ${(totalDirectRounds / samples).toFixed(2)}, casualties ${(totalDirectCasualties / samples).toFixed(2)}) ` +
       `zone rounds ${JSON.stringify(roundsByZone)}`,
   );
+}
+
+{
+  const { state, battle, members } = prepareState(2026071403, true);
+  const veteran = members[0];
+  veteran.health = 70;
+  battle.reports = [{
+    round: 1, focusZoneId: 'lairTrail', nextFocusZoneId: 'lairTrail', summary: 'withdrawal',
+    lines: [], events: [], wounded: 0, killed: 0, raidersKilled: 0, loot: {}, buildingsDamaged: 0,
+    villageMoraleDelta: 0, raiderMoraleDelta: 0, ended: true, outcome: 'assaultWithdrawal',
+  }];
+  battle.phase = 'finished';
+  tactical.finishTacticalBattle(state);
+  assert.equal(state.tacticalBattleReport?.wounded.some(person => person.residentId === veteran.id), false,
+    'an already-wounded but unharmed assault member is not reported as newly wounded');
 }
 
 console.log('tactical assault tests passed');
