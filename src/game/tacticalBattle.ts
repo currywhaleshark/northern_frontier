@@ -5,7 +5,7 @@ import { createCombatRoster, isCombatReadyResident, type CombatantSnapshot, type
 import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import {
-  createEnemyPlan, flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
+  createEnemyPlan, enemyObjectiveProfile, flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
 } from './enemyPlan';
 import { addLog } from './events';
 import { makeRng } from './map';
@@ -417,7 +417,7 @@ function raiderGroups(
     lossResistance?: number;
     wallPressureBonus?: number;
   };
-  const split = CONFIG.tacticalBattle.raiderSplit;
+  const split = enemyObjectiveProfile(enemyPlan.objective).raiderSplit;
   let composition: Composition[];
   if (factionName === '니마차 우디캐') {
     composition = [
@@ -451,6 +451,24 @@ function raiderGroups(
       { id: 'raider-looters', kind: 'looters', label: '약탈조', weight: split.looters, morale: 68, intent: 'loot', visibility: 'scouts' },
       { id: 'raider-flankers', kind: 'flankers', label: '우회조', weight: split.flankers, morale: 70, intent: 'flank', visibility: 'deep' },
     ];
+  }
+
+  if (enemyPlan.objective !== 'breakthrough') {
+    const kinds: readonly TacticalRaiderGroup['kind'][] = ['main', 'looters', 'flankers'];
+    const baseTotals = Object.fromEntries(kinds.map(kind => [
+      kind,
+      composition.reduce((sum, entry) => sum + (entry.kind === kind ? entry.weight : 0), 0),
+    ])) as Record<TacticalRaiderGroup['kind'], number>;
+    const availableTargetTotal = kinds.reduce(
+      (sum, kind) => sum + (baseTotals[kind] > 0 ? split[kind] : 0),
+      0,
+    );
+    composition = composition.map(entry => ({
+      ...entry,
+      weight: baseTotals[entry.kind] > 0 && availableTargetTotal > 0
+        ? entry.weight / baseTotals[entry.kind] * split[entry.kind] / availableTargetTotal
+        : entry.weight,
+    }));
   }
 
   const distribute = (total: number): number[] => {
@@ -520,9 +538,14 @@ export function createTacticalBattle(
   const watchtowers = countBuilt(state, 'watchtower');
   const scoutsReady = params.warned || watchtowers > 0 || watchmen >= 2;
   const deepScouted = params.warned || (watchtowers > 0 && hunters > 0);
+  const planRng = makeRng(state.seed + state.day * 4099 + state.subTick * 131 + originalPower);
   const enemyPlan = createEnemyPlan({
     factionName: params.factionName,
-    flankRoll: makeRng(state.seed + state.day * 4099 + state.subTick * 131 + originalPower)(),
+    power: originalPower,
+    relation: state.relations[params.factionName] ?? 50,
+    flankRoll: planRng(),
+    objectiveRoll: planRng(),
+    stratagemRoll: planRng(),
     revealed: deepScouted,
   });
   const enemies = raiderGroups(params.factionName, originalPower, { scoutsReady, deepScouted }, enemyPlan);
@@ -1119,6 +1142,19 @@ function summaryForOutcome(outcome: TacticalRoundReport['outcome']): string {
   return '전선의 압박이 다음 구역으로 옮겨갑니다.';
 }
 
+export function tacticalEnemyObjectiveOutcome(
+  objective: EnemyPlan['objective'],
+  priorLootRounds: number,
+  thisRoundLooted: boolean,
+  priorBuildingDamage: number,
+  thisRoundBuildingDamage: number,
+): TacticalRoundReport['outcome'] {
+  const profile = enemyObjectiveProfile(objective);
+  if (priorLootRounds + Number(thisRoundLooted) >= profile.lootRoundsToExit) return 'raidersLooted';
+  if (priorBuildingDamage + thisRoundBuildingDamage >= profile.damageToExit) return 'partialLoss';
+  return undefined;
+}
+
 export function resolveTacticalRound(state: GameState): string | null {
   const battle = state.tacticalBattle;
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
@@ -1370,6 +1406,14 @@ export function resolveTacticalRound(state: GameState): string | null {
 
   const priorLootRounds = battle.reports.filter(report => Object.values(report.loot).some(amount => (amount ?? 0) > 0)).length;
   const thisRoundLooted = Object.values(lootBag).some(amount => (amount ?? 0) > 0);
+  const priorBuildingDamage = battle.reports.reduce((sum, report) => sum + report.buildingsDamaged, 0);
+  const objectiveOutcome = tacticalEnemyObjectiveOutcome(
+    battle.enemyPlan?.objective ?? 'breakthrough',
+    priorLootRounds,
+    thisRoundLooted,
+    priorBuildingDamage,
+    buildingsDamaged,
+  );
   const totalRaiderPower = battle.raiderGroups.reduce((sum, group) => sum + group.power, 0);
   const center = battle.zones.find(zone => zone.id === 'center')!;
   let outcome: TacticalRoundReport['outcome'];
@@ -1377,8 +1421,8 @@ export function resolveTacticalRound(state: GameState): string | null {
     outcome = 'defenseSuccess';
   } else if (battle.villageMorale <= 0 || center.breached) {
     outcome = 'villageRouted';
-  } else if (priorLootRounds + Number(thisRoundLooted) >= 2) {
-    outcome = 'raidersLooted';
+  } else if (objectiveOutcome) {
+    outcome = objectiveOutcome;
   } else if (battle.round >= CONFIG.tacticalBattle.maxRounds) {
     const sufferedLoss = battle.zones.some(zone => zone.breached) || priorLootRounds > 0 || thisRoundLooted;
     outcome = !sufferedLoss && battle.raiderMorale < battle.villageMorale ? 'defenseSuccess' : 'partialLoss';

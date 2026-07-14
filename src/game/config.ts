@@ -395,6 +395,57 @@ export const CONFIG = {
       civilian: 1,
     },
     raiderSplit: { main: 0.55, looters: 0.25, flankers: 0.2 },
+    enemyPlan: {
+      objectiveActivationRelation: { default: 50, nimacha: 45, holaon: 35, bandit: 25, court: 50 },
+      objectiveWeights: {
+        default: { breakthrough: 0.45, plunder: 0.35, arson: 0.2 },
+        nimacha: { breakthrough: 0.35, plunder: 0.45, arson: 0.2 },
+        holaon: { breakthrough: 0.45, plunder: 0.35, arson: 0.2 },
+        bandit: { breakthrough: 0.25, plunder: 0.55, arson: 0.2 },
+        court: { breakthrough: 0.7, plunder: 0.1, arson: 0.2 },
+      },
+      objectivePowerBreakthroughBonus: 0.65,
+      objectiveLowPowerPlunderBonus: 0.25,
+      objectiveHostilityArsonBonus: 0.8,
+      objectiveProfiles: {
+        breakthrough: {
+          raiderSplit: { main: 0.55, looters: 0.25, flankers: 0.2 },
+          lootRoundsToExit: 2,
+          damageToExit: Number.POSITIVE_INFINITY,
+        },
+        plunder: {
+          raiderSplit: { main: 0.4, looters: 0.4, flankers: 0.2 },
+          lootRoundsToExit: 1,
+          damageToExit: Number.POSITIVE_INFINITY,
+        },
+        arson: {
+          raiderSplit: { main: 0.45, looters: 0.2, flankers: 0.35 },
+          lootRoundsToExit: 2,
+          damageToExit: 2,
+        },
+      },
+      stratagemPoints: {
+        factionBase: { default: 2, nimacha: 2, holaon: 2, bandit: 2, court: 3 },
+        powerPerPoint: 70,
+        maxPowerBonus: 2,
+        hostilityBonusAt: 10,
+        grudgeBonusAt: 20,
+        max: 7,
+      },
+      stratagemCosts: {
+        rearManeuver: 2,
+        wallBreakers: 2,
+        fireArrows: 3,
+        feint: 2,
+        nightApproach: 2,
+      },
+      objectiveCandidates: {
+        breakthrough: ['wallBreakers', 'feint', 'nightApproach', 'fireArrows'],
+        plunder: ['feint', 'nightApproach', 'wallBreakers', 'fireArrows'],
+        arson: ['fireArrows', 'nightApproach', 'feint', 'wallBreakers'],
+      },
+      maxStratagems: 3,
+    },
     morale: { village: 70, warnedBonus: 8, siegeBonus: 4, raiders: 72 },
   },
 

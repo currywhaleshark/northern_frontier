@@ -572,8 +572,8 @@ export type DefenderGroupKind =
 export type RaiderGroupKind = 'main' | 'looters' | 'flankers';
 export type TacticalFormationLine = 'front' | 'middle' | 'rear';
 export type TacticalFlankPlan = 'breakthrough' | 'rearAssault';
-export type EnemyObjectiveId = 'breakthrough';
-export type EnemyStratagemId = 'rearManeuver';
+export type EnemyObjectiveId = 'breakthrough' | 'plunder' | 'arson';
+export type EnemyStratagemId = 'rearManeuver' | 'wallBreakers' | 'fireArrows' | 'feint' | 'nightApproach';
 
 export interface EnemyStratagemState {
   id: EnemyStratagemId;

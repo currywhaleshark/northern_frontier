@@ -266,9 +266,10 @@
 - Modify: `src/game/config.ts`
 - Create: `tools/game/test_enemy_plan.mjs`
 
-- [ ] `EnemyObjectiveId`를 `'breakthrough' | 'plunder' | 'arson'`으로 확장. 세력·전력·관계에서 결정적 RNG로 목적을 정하고, 목적이 적 편성 비중(`raiderSplit`)과 승리 조건 가중(약탈 라운드 수, 방화 목표)을 조정한다.
-- [ ] 계책점수: 세력 성향·전력·원한(관계 악화)에서 산출, 목적별 계책 후보 풀에서 1~3개를 점수 내에서 구매. **전부 `createTacticalBattle`에서 확정 — 플레이어 배치·준비를 보기 전에 잠긴다.**
-- [ ] 한 전투 계책 수 상한 3개(원칙: 과다 사용 금지).
+- [x] `EnemyObjectiveId`를 `'breakthrough' | 'plunder' | 'arson'`으로 확장. 세력·전력·관계에서 결정적 RNG로 목적을 정하고, 목적이 적 편성 비중(`raiderSplit`)과 승리 조건 가중(약탈 라운드 수, 방화 목표)을 조정한다.
+- [x] 계책점수: 세력 성향·전력·원한(관계 악화)에서 산출, 목적별 계책 후보 풀에서 1~3개를 점수 내에서 구매. **전부 `createTacticalBattle`에서 확정 — 플레이어 배치·준비를 보기 전에 잠긴다.**
+- [x] 한 전투 계책 수 상한 3개(원칙: 과다 사용 금지).
+  - 세력별 기본 관계까지는 기존 `breakthrough` 편성과 종료 규칙을 유지하고, 그보다 관계가 악화된 경우부터 세력·전력 가중 목적을 굴린다. 이 호환 경계로 기존 tactical golden은 fixture 갱신 없이 완전 일치한다.
 
 ### Task 4.2: 계책 5종
 
