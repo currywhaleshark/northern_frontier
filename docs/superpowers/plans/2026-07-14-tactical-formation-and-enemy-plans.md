@@ -168,13 +168,17 @@
 - Modify: `src/components/TacticalBattleScreen.tsx` (명령 버튼·라벨)
 - Modify: `tools/game/test_tactical_battle.mjs`
 
-- [ ] 신규 명령 `reinforceRear` 정식 등록: `TacticalCommandId` 유니언, `IMPLEMENTED_COMMANDS`, saveLoad의 `TACTICAL_COMMANDS`, `tacticalCommandDescription` 설명 문구, UI 명령 버튼. 사용 가능 조건(`tacticalCommandUnavailableReason`): 같은 구역에 후방 교전이 존재 + 근접 능력 보유 + 중열 배치.
-- [ ] 구역에 `rearAssault` 적이 있으면 Task 0.1의 `resolveEngagementExchange`를 **두 번 호출**한다: 정면 교전(비급습 적 vs 정면 대응 부대), 후방 교전(급습 적 vs 후방 대응 부대). 기존 `rearEnemyShare` 블렌딩 코드는 제거한다.
-- [ ] 부대의 대응 방향은 파생 규칙으로 정한다: 후방 교전이 존재하면 후열은 후방, 전열은 정면. 중열은 명령으로 결정 — `hold`/`volley` 등 일반 명령이면 정면, `reinforceRear`면 후방. 한 부대는 한 라운드에 한 교전에만 기여한다.
-- [ ] **피난 주민 불변식을 테스트로 고정**: 피난 주민(`commandable === false`, `power: 0`)은 정면/후방 어느 교전의 전투 부대로도 배정되지 않고, 전투력·준비도·명령 비율에 기여하지 않으며, 후방 교전 패배 시 **피해 대상으로만** 남는다. 중심지 고정(`lockedZoneId`)도 유지.
-- [ ] 압박은 정면 교전에서만 발생시킨다(후방 급습으로 목책이 무너지지 않는 원칙을 구조로 보장). 후방 교전의 패배는 후열 사상·주민 위험·마을 사기 하락으로만 반영한다.
-- [ ] 후방 교전 소멸 조건: 급습대 궤주·전멸 또는 자체 목표 달성 후 이탈. 기존 `rearAssault` 진입 연출(`rearAssault` 이벤트)은 유지.
-- [ ] 테스트: `reinforceRear`의 기본 추천 명령 채움(`chooseDefaultTacticalCommands`), 전투 중 저장·복원(구버전 명령 집합과의 호환), 사용 불가 사유.
+- [x] 신규 명령 `reinforceRear` 정식 등록: `TacticalCommandId` 유니언, `IMPLEMENTED_COMMANDS`, saveLoad의 `TACTICAL_COMMANDS`, `tacticalCommandDescription` 설명 문구, UI 명령 버튼. 사용 가능 조건(`tacticalCommandUnavailableReason`): 같은 구역에 후방 교전이 존재 + 근접 능력 보유 + 중열 배치.
+- [x] 구역에 `rearAssault` 적이 있으면 Task 0.1의 `resolveEngagementExchange`를 **두 번 호출**한다: 정면 교전(비급습 적 vs 정면 대응 부대), 후방 교전(급습 적 vs 후방 대응 부대). 기존 `rearEnemyShare` 블렌딩 코드는 제거한다.
+- [x] 부대의 대응 방향은 파생 규칙으로 정한다: 후방 교전이 존재하면 후열은 후방, 전열은 정면. 중열은 명령으로 결정 — `hold`/`volley` 등 일반 명령이면 정면, `reinforceRear`면 후방. 한 부대는 한 라운드에 한 교전에만 기여한다.
+- [x] **피난 주민 불변식을 테스트로 고정**: 피난 주민(`commandable === false`, `power: 0`)은 정면/후방 어느 교전의 전투 부대로도 배정되지 않고, 전투력·준비도·명령 비율에 기여하지 않으며, 후방 교전 패배 시 **피해 대상으로만** 남는다. 중심지 고정(`lockedZoneId`)도 유지.
+- [x] 압박은 정면 교전에서만 발생시킨다(후방 급습으로 목책이 무너지지 않는 원칙을 구조로 보장). 후방 교전의 패배는 후열 사상·주민 위험·마을 사기 하락으로만 반영한다.
+- [x] 후방 교전 소멸 조건: 급습대 궤주·전멸 또는 자체 목표 달성 후 이탈. 기존 `rearAssault` 진입 연출(`rearAssault` 이벤트)은 유지.
+- [x] 테스트: `reinforceRear`의 기본 추천 명령 채움(`chooseDefaultTacticalCommands`), 전투 중 저장·복원(구버전 명령 집합과의 호환), 사용 불가 사유.
+  - 실측 스크립트: `node tools/game/measure_tactical_rear_engagement_balance.mjs` (각 조건 20개 고정 시드).
+  - 후열 창병 경비: 주민 사상 0.55명, 적 잔여 전력 16.01, 적 처치 0.30명, 마을 사기 변화 -0.95.
+  - 중열 `reinforceRear` 예비대: 주민 사상 0.80명, 적 잔여 전력 16.17, 적 처치 0.25명, 마을 사기 변화 -1.40.
+  - 무대응: 주민 사상 3.15명, 적 잔여 전력 16.91, 적 처치 0.05명, 마을 사기 변화 -12.00.
 - [ ] 밸런스 실측: `rearManeuver` 계획 시드에서 (a) 후열에 창병을 미리 둔 경우, (b) 중열 예비대를 `reinforceRear`로 돌린 경우, (c) 무대응의 세 시나리오가 문서의 상충 관계 표대로 차등 결과를 내는지 확인한다.
 
 ### Task 2.3: 긴급 후방 대응 선택지 정리
