@@ -283,15 +283,16 @@
 
 각 계책은 `{ 효과, 사전 징후 텍스트, 대응 준비 행동, 적의 대가 }` 4요소를 반드시 갖는다. 효과는 가능한 한 기존 그룹 속성(`combatMultiplier`, `lossResistance`, `wallPressureBonus`)과 구역 수치로 표현한다.
 
-- [ ] 신규 준비 행동 정식 등록: `firePrevention`(화재 대비)·`torchWatch`(횃불 경계)를 `PreparationActionId` 유니언, `PREPARATION_ACTIONS` 목록(라벨·비용), saveLoad의 `PREPARATION_ACTION_IDS` 화이트리스트, 사용 불가 사유(`tacticalPreparationUnavailableReason`)에 모두 추가한다.
+- [x] 신규 준비 행동 정식 등록: `firePrevention`(화재 대비)·`torchWatch`(횃불 경계)를 `PreparationActionId` 유니언, `PREPARATION_ACTIONS` 목록(라벨·비용), saveLoad의 `PREPARATION_ACTION_IDS` 화이트리스트, 사용 불가 사유(`tacticalPreparationUnavailableReason`)에 모두 추가한다.
 
-- [ ] `rearManeuver`(후방 우회) — 기존 flankPlan 이관분에 4요소 부착. 대응: 후열 경비.
-- [ ] `wallBreakers`(방책 파괴조) — 주력 일부에 `wallPressureBonus`, 대가로 `lossResistance` 악화(사격 우선 표적화 용이). 대응: `repairWall`·사격 준비.
-- [ ] `fireArrows`(불화살) — 병력 대신 목책·창고 압박/건물 파손 확률 증가. 대응: 신규 준비 행동 `firePrevention`(화재 대비, 1점). 공격전의 `arson`/`prepareFireArrows` 자산 재사용.
-- [ ] `feint`(정면 기만) — 실제 전력 일부를 약탈·우회조로 이전하고, 정면 주력의 **표시 전력을 과장**한다. 표시 전력은 실제 `power`와 분리된 신규 필드 `TacticalRaiderGroup.estimatedPower?`(UI·정보판이 읽는 값)로 표현한다 — `revealed` 불리언 왜곡이나 실제 전력 조작으로 구현하지 않는다. 정찰 공개(`counterLevel >= 1`) 시 `estimatedPower`가 실제값으로 정정된다. 대응: 예비대 유지(중열 근접 보유 시 자동 부분 대응). 저장 폴백: 필드 없으면 실제 `power` 표시.
-- [ ] `nightApproach`(야간 접근) — 준비점수 감소(`preparationPoints`에 페널티)와 첫 라운드 적 기세 보너스, 양측 사격 효율 감소. 대응: 신규 준비 행동 `torchWatch`(횃불 경계, 1점). 단 준비점수를 깎는 계책이므로 징후는 반드시 전투 전 로그로 노출한다.
-- [ ] `counterLevel` 처리: 대응 준비 행동 적용 시 계책 효과 50~70% 감쇠(부분), 정찰 4단계급 정보가 있으면 첫 발동 무력화(완전). 발견해도 삭제하지 않는다.
-- [ ] 테스트: 계책 잠금의 결정성(같은 시드 → 같은 계획), 대응 유무별 효과 차등, 상한 3개.
+- [x] `rearManeuver`(후방 우회) — 기존 flankPlan 이관분에 4요소 부착. 대응: 후열 경비.
+- [x] `wallBreakers`(방책 파괴조) — 주력 일부에 `wallPressureBonus`, 대가로 `lossResistance` 악화(사격 우선 표적화 용이). 대응: `repairWall`·사격 준비.
+- [x] `fireArrows`(불화살) — 병력 대신 목책·창고 압박/건물 파손 확률 증가. 대응: 신규 준비 행동 `firePrevention`(화재 대비, 1점). 공격전의 `arson`/`prepareFireArrows` 자산 재사용.
+- [x] `feint`(정면 기만) — 실제 전력 일부를 약탈·우회조로 이전하고, 정면 주력의 **표시 전력을 과장**한다. 표시 전력은 실제 `power`와 분리된 신규 필드 `TacticalRaiderGroup.estimatedPower?`(UI·정보판이 읽는 값)로 표현한다 — `revealed` 불리언 왜곡이나 실제 전력 조작으로 구현하지 않는다. 정찰 공개(`counterLevel >= 1`) 시 `estimatedPower`가 실제값으로 정정된다. 대응: 예비대 유지(중열 근접 보유 시 자동 부분 대응). 저장 폴백: 필드 없으면 실제 `power` 표시.
+- [x] `nightApproach`(야간 접근) — 준비점수 감소(`preparationPoints`에 페널티)와 첫 라운드 적 기세 보너스, 양측 사격 효율 감소. 대응: 신규 준비 행동 `torchWatch`(횃불 경계, 1점). 단 준비점수를 깎는 계책이므로 징후는 반드시 전투 전 로그로 노출한다.
+- [x] `counterLevel` 처리: 대응 준비 행동 적용 시 계책 효과 50~70% 감쇠(부분), 정찰 4단계급 정보가 있으면 첫 발동 무력화(완전). 발견해도 삭제하지 않는다.
+- [x] 테스트: 계책 잠금의 결정성(같은 시드 → 같은 계획), 대응 유무별 효과 차등, 상한 3개.
+  - 신규 계책 효과는 세력 기본 관계보다 관계가 악화된 전투에서만 활성화한다. 기본 관계 전투는 기존 `flankPlan`만 유지해 tactical golden을 갱신하지 않는다.
 
 ### Task 4.3: 조기 경보와 계책 정보의 분리
 

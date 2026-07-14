@@ -625,6 +625,8 @@ export type PreparationActionId =
   | 'repairWall'
   | 'setAmbush'
   | 'prepareVolley'
+  | 'firePrevention'
+  | 'torchWatch'
   | 'preliminaryBombardment'
   | 'musterMilitia'
   | 'nightAssault'
@@ -683,6 +685,7 @@ export interface TacticalRaiderGroup {
   pendingZoneId?: string;
   targetZoneId: string;
   power: number;
+  estimatedPower?: number;
   count: number;
   killed: number;
   morale: number;

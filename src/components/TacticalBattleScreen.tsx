@@ -44,6 +44,8 @@ const PREP_DESCRIPTIONS: Record<PreparationActionId, string> = {
   repairWall: '방어선의 방어 보너스를 높이고 초기 압박을 낮춥니다.',
   setAmbush: '접근로 사냥꾼을 즉시 매복중 상태로 만들고 숨은 적 조를 미리 드러냅니다.',
   prepareVolley: '각궁·조총·파수꾼의 일제 사격 효과를 높입니다.',
+  firePrevention: '물통과 젖은 가죽을 배치해 적 불화살의 압박과 화재 피해를 줄입니다.',
+  torchWatch: '접근로를 밝혀 야간 접근의 첫 교전 기세와 사격 교란을 줄입니다.',
   preliminaryBombardment: '보유한 불랑기포대로 접전 전에 포격합니다. 포대 1문당 화약 2를 소모합니다.',
   musterMilitia: '피난 주민 일부를 민병으로 소집합니다. 마을 기세가 조금 낮아집니다.',
   nightAssault: '밤이 깊기를 기다려 숲길 초기 돌파와 기습 효과를 얻습니다.',

@@ -110,6 +110,8 @@ function addBuiltMarker(state, type) {
       repairWall: 1,
       setAmbush: 2,
       prepareVolley: 2,
+      firePrevention: 1,
+      torchWatch: 1,
       preliminaryBombardment: 3,
       musterMilitia: 1,
     },
@@ -131,9 +133,7 @@ function addBuiltMarker(state, type) {
   const frontalPlan = enemyPlan.createEnemyPlan({
     factionName: '니마차 우디캐', flankRoll: 0.8, revealed: false,
   });
-  assert.deepEqual(frontalPlan.stratagems, [
-    { id: 'wallBreakers', revealed: false, counterLevel: 0 },
-  ]);
+  assert.deepEqual(frontalPlan.stratagems, []);
   assert.equal(enemyPlan.flankPlanFromEnemyPlan(frontalPlan), 'breakthrough');
   assert.equal(enemyPlan.flankPlanRevealedFromEnemyPlan(frontalPlan), false);
 

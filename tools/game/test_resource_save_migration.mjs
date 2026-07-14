@@ -445,6 +445,23 @@ for (const [field, seed] of [['events', 2026071451], ['lines', 2026071452]]) {
 }
 
 {
+  const stratagemSave = simulation.newGame(2026071503);
+  const battle = tactical.createTacticalBattle(stratagemSave, {
+    factionName: '변경 마적', power: 90, warned: true, siege: true, mode: 'garrison',
+  });
+  battle.raiderGroups[0].estimatedPower = 123;
+  battle.raiderGroups[1].estimatedPower = 'invalid';
+  assert.equal(saveLoad.saveGame(stratagemSave), true);
+  const loaded = saveLoad.loadGame();
+  assert.ok(loaded?.tacticalBattle);
+  assert.equal(loaded.tacticalBattle.raiderGroups[0].estimatedPower, 123);
+  assert.equal(loaded.tacticalBattle.raiderGroups[1].estimatedPower, undefined,
+    'invalid estimated power falls back to the live power display');
+  assert.ok(loaded.tacticalBattle.prepActions.some(action => action.id === 'firePrevention'));
+  assert.ok(loaded.tacticalBattle.prepActions.some(action => action.id === 'torchWatch'));
+}
+
+{
   const legacyReport = simulation.newGame(2026071443);
   legacyReport.tacticalBattleReport = {
     battleId: 77,

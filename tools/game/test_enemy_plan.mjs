@@ -26,6 +26,7 @@ const compiledDir = compileGameModules();
 const enemyPlan = await import(pathToFileURL(join(compiledDir, 'enemyPlan.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
+const engagement = await import(pathToFileURL(join(compiledDir, 'tacticalEngagement.mjs')).href);
 
 const neutral = enemyPlan.createEnemyPlan({
   factionName: '변경 마적', power: 140, relation: 50,
@@ -52,7 +53,7 @@ assert.notDeepEqual(factionWeights, courtWeights, 'faction identity changes obje
 assert.notDeepEqual(factionWeights, highPowerWeights, 'enemy power changes objective preference');
 
 const lowBudget = enemyPlan.createEnemyPlan({
-  factionName: '니마차 우디캐', power: 35, relation: 45,
+  factionName: '니마차 우디캐', power: 35, relation: 35,
   objectiveRoll: 0, flankRoll: 0.9, stratagemRoll: 0, revealed: false,
 });
 const highBudget = enemyPlan.createEnemyPlan({
@@ -110,9 +111,126 @@ state.relations['변경 마적'] = 5;
 const battle = tactical.createTacticalBattle(state, {
   factionName: '변경 마적', power: 140, warned: true, siege: true, mode: 'garrison',
 });
+assert.ok(state.log.some(log => log.text.startsWith('적의 계책 징후:')),
+  'every locked plan emits at least one pre-battle warning sign');
 const lockedPlan = structuredClone(battle.enemyPlan);
 state.relations['변경 마적'] = 100;
 assert.equal(tactical.advanceTacticalPhase(state), null);
 assert.deepEqual(battle.enemyPlan, lockedPlan, 'deployment and preparation changes cannot rewrite the locked enemy plan');
+
+const stratagemIds = ['rearManeuver', 'wallBreakers', 'fireArrows', 'feint', 'nightApproach'];
+for (const id of stratagemIds) {
+  const definition = enemyPlan.enemyStratagemDefinition(id);
+  assert.equal(definition.id, id);
+  assert.ok(definition.effect.length > 0, `${id} defines an effect`);
+  assert.ok(definition.warning.length > 0, `${id} defines a warning sign`);
+  assert.ok(definition.counter.length > 0, `${id} defines a counter`);
+  assert.ok(definition.drawback.length > 0, `${id} defines an enemy drawback`);
+}
+assert.equal(enemyPlan.enemyStratagemEffectScale({ counterLevel: 0 }), 1);
+assert.equal(enemyPlan.enemyStratagemEffectScale({ counterLevel: 1 }), 0.4);
+assert.equal(enemyPlan.enemyStratagemEffectScale({ counterLevel: 2 }), 0);
+assert.ok(enemyPlan.enemyPlanRangedEfficiency({
+  objective: 'breakthrough', objectiveRevealed: false, stratagemPoints: 2,
+  stratagems: [{ id: 'nightApproach', revealed: false, counterLevel: 0 }],
+}) < 1, 'night approach reduces both sides ranged efficiency');
+
+const counterState = simulation.newGame(2026071500);
+const counterBattle = tactical.createTacticalBattle(counterState, {
+  factionName: '변경 마적', power: 90, warned: true, siege: true, mode: 'garrison',
+});
+counterBattle.enemyPlan = {
+  objective: 'arson', objectiveRevealed: true, stratagemPoints: 5,
+  stratagems: [
+    { id: 'fireArrows', revealed: true, counterLevel: 0 },
+    { id: 'nightApproach', revealed: true, counterLevel: 0 },
+  ],
+};
+counterBattle.prepPoints = 5;
+assert.ok(counterBattle.prepActions.some(action => action.id === 'firePrevention'));
+assert.ok(counterBattle.prepActions.some(action => action.id === 'torchWatch'));
+assert.equal(tactical.spendPreparationAction(counterState, 'firePrevention'), null);
+assert.equal(tactical.spendPreparationAction(counterState, 'torchWatch'), null);
+assert.equal(tactical.advanceTacticalPhase(counterState), null);
+assert.ok(counterBattle.enemyPlan.stratagems.every(stratagem => stratagem.counterLevel === 1),
+  'selected preparation counters partially suppress matching stratagems without deleting them');
+const irrelevantState = simulation.newGame(2026071504);
+const irrelevantBattle = tactical.createTacticalBattle(irrelevantState, {
+  factionName: '변경 마적', power: 70, warned: false, siege: true, mode: 'garrison',
+});
+irrelevantBattle.enemyPlan = {
+  objective: 'breakthrough', objectiveRevealed: false, stratagemPoints: 0, stratagems: [],
+};
+assert.match(tactical.tacticalPreparationUnavailableReason(irrelevantState, 'firePrevention'), /징후/);
+assert.match(tactical.tacticalPreparationUnavailableReason(irrelevantState, 'torchWatch'), /징후/);
+
+function wallBreakerBattle(seed, countered) {
+  const wallState = simulation.newGame(seed);
+  const wallBattle = tactical.createTacticalBattle(wallState, {
+    factionName: '변경 마적', power: 90, warned: false, siege: true, mode: 'garrison',
+  });
+  wallBattle.enemyPlan = {
+    objective: 'breakthrough', objectiveRevealed: true, stratagemPoints: 2,
+    stratagems: [{ id: 'wallBreakers', revealed: true, counterLevel: 0 }],
+  };
+  wallBattle.prepPoints = 5;
+  if (countered) assert.equal(tactical.spendPreparationAction(wallState, 'repairWall'), null);
+  assert.equal(tactical.advanceTacticalPhase(wallState), null);
+  return wallBattle.raiderGroups.find(group => group.kind === 'main');
+}
+const fullBreakers = wallBreakerBattle(2026071502, false);
+const counteredBreakers = wallBreakerBattle(2026071502, true);
+assert.ok(fullBreakers.wallPressureBonus > counteredBreakers.wallPressureBonus,
+  'wall repair attenuates the wall-breaker pressure bonus');
+assert.ok(fullBreakers.lossResistance > counteredBreakers.lossResistance,
+  'countered wall breakers lose most of their extra casualty vulnerability');
+
+const consequenceInput = {
+  zone: {
+    id: 'wall', name: 'wall', kind: 'wall', order: 1, pressure: 0, breached: false,
+    defenseBonus: 0, ambushBonus: 0, lootRisk: 0, civilianRisk: 10, description: 'test',
+  },
+  defenders: [],
+  attackers: [{
+    id: 'fire-archers', kind: 'flankers', unitType: 'bandit-rider', label: 'fire archers',
+    zoneId: 'wall', line: 'middle', targetZoneId: 'wall', power: 80, count: 10, killed: 0,
+    morale: 80, intent: 'flank', revealed: true, engagementsInZone: 0,
+  }],
+  commands: [], enemyPower: 80, defensePower: 20, enemyShare: 0.8, originalPower: 100,
+  availableLoot: {}, rng: () => 0.2,
+};
+const fullFire = engagement.applyDefenseZoneConsequences({ ...consequenceInput, fireArrowEffectScale: 1 });
+const counteredFire = engagement.applyDefenseZoneConsequences({ ...consequenceInput, fireArrowEffectScale: 0.4 });
+assert.ok(fullFire.pressure > counteredFire.pressure, 'fire prevention attenuates fire-arrow pressure');
+assert.ok(fullFire.buildingsDamaged > counteredFire.buildingsDamaged,
+  'fire prevention lowers fire-arrow building damage chance');
+
+const fullNight = {
+  objective: 'breakthrough', objectiveRevealed: false, stratagemPoints: 2,
+  stratagems: [{ id: 'nightApproach', revealed: false, counterLevel: 0 }],
+};
+const counteredNight = structuredClone(fullNight);
+counteredNight.stratagems[0].counterLevel = 1;
+assert.ok(enemyPlan.enemyPlanRangedEfficiency(counteredNight) > enemyPlan.enemyPlanRangedEfficiency(fullNight));
+assert.ok(enemyPlan.enemyPlanFirstRoundMoraleBonus(counteredNight) <
+  enemyPlan.enemyPlanFirstRoundMoraleBonus(fullNight));
+
+const feintState = simulation.newGame(2026071501);
+const feintBattle = tactical.createTacticalBattle(feintState, {
+  factionName: '변경 마적', power: 100, warned: false, siege: true, mode: 'garrison',
+});
+feintBattle.enemyPlan = {
+  objective: 'plunder', objectiveRevealed: false, stratagemPoints: 2,
+  stratagems: [{ id: 'feint', revealed: false, counterLevel: 0 }],
+};
+assert.equal(tactical.advanceTacticalPhase(feintState), null);
+const mainPowerBeforeFeint = feintBattle.raiderGroups.filter(group => group.kind === 'main')
+  .reduce((sum, group) => sum + group.power, 0);
+assert.equal(tactical.advanceTacticalPhase(feintState), null);
+const mainPowerAfterFeint = feintBattle.raiderGroups.filter(group => group.kind === 'main')
+  .reduce((sum, group) => sum + group.power, 0);
+assert.ok(mainPowerAfterFeint < mainPowerBeforeFeint, 'an uncountered feint transfers real power out of the main force');
+assert.ok(feintBattle.raiderGroups.some(group => group.estimatedPower !== undefined &&
+  group.estimatedPower !== group.power), 'feint display power remains distinct from real power');
 
 console.log('enemy plan tests passed');

@@ -1,6 +1,6 @@
 import { CONFIG } from './config';
 import type {
-  EnemyObjectiveId, EnemyPlan, EnemyStratagemId, EnemyStratagemState, TacticalFlankPlan,
+  EnemyObjectiveId, EnemyPlan, EnemyStratagemId, EnemyStratagemState, PreparationActionId, TacticalFlankPlan,
 } from './types';
 
 type EnemyPlanCreationInput = {
@@ -22,6 +22,50 @@ const OBJECTIVES: readonly EnemyObjectiveId[] = ['breakthrough', 'plunder', 'ars
 const STRATAGEMS: readonly EnemyStratagemId[] = [
   'rearManeuver', 'wallBreakers', 'fireArrows', 'feint', 'nightApproach',
 ];
+
+const STRATAGEM_DETAILS: Record<EnemyStratagemId, {
+  label: string;
+  effect: string;
+  warning: string;
+  counter: string;
+  drawback: string;
+}> = {
+  rearManeuver: {
+    label: '후방 우회',
+    effect: '우회대가 방어선 후열에 별도 교전선을 엽니다.',
+    warning: '주력과 떨어진 말발굽과 발자국이 방책 뒤편으로 갈라집니다.',
+    counter: '후열 근접 경비 또는 중열 예비대의 후방 증원',
+    drawback: '우회대는 본대 지원에서 떨어져 후열 경비에 막히면 전투력이 낮아집니다.',
+  },
+  wallBreakers: {
+    label: '방책 파괴조',
+    effect: '주력이 방책 압박을 빠르게 쌓습니다.',
+    warning: '도끼와 갈고리, 굵은 밧줄을 든 무리가 선봉 뒤에 모입니다.',
+    counter: '방책 응급 수리 또는 망루·사격 준비',
+    drawback: '무거운 파괴 도구 때문에 사격 피해에 더 취약합니다.',
+  },
+  fireArrows: {
+    label: '불화살',
+    effect: '방책과 창고에 추가 압박과 화재 피해를 가합니다.',
+    warning: '기름 먹인 천을 감은 화살촉과 화로가 행렬 사이로 보입니다.',
+    counter: '화재 대비',
+    drawback: '불길이 번지면 빼앗을 물자도 함께 손상됩니다.',
+  },
+  feint: {
+    label: '정면 기만',
+    effect: '표시상 주력을 부풀리고 실제 전력을 약탈·우회조로 돌립니다.',
+    warning: '같은 깃발이 여러 대열을 오가며 주력의 규모를 부풀립니다.',
+    counter: '중열 근접 예비대 유지와 심층 정찰',
+    drawback: '기만이 드러나면 실제 정면 주력이 얇아집니다.',
+  },
+  nightApproach: {
+    label: '야간 접근',
+    effect: '준비점수를 줄이고 첫 교전 기세를 높이는 대신 양측 사격을 흐트러뜨립니다.',
+    warning: '횃불을 가린 적이 해가 진 뒤 소리 없이 거리를 좁힙니다.',
+    counter: '횃불 경계',
+    drawback: '어둠 때문에 적 사격대의 명중과 지휘도 함께 나빠집니다.',
+  },
+};
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -85,6 +129,53 @@ export function enemyStratagemCost(stratagem: EnemyStratagemId): number {
   return CONFIG.tacticalBattle.enemyPlan.stratagemCosts[stratagem];
 }
 
+export function enemyStratagemDefinition(stratagem: EnemyStratagemId) {
+  return { id: stratagem, cost: enemyStratagemCost(stratagem), ...STRATAGEM_DETAILS[stratagem] };
+}
+
+export function enemyStratagemEffectScale(stratagem: Pick<EnemyStratagemState, 'counterLevel'>): number {
+  if (stratagem.counterLevel === 2) return 0;
+  return stratagem.counterLevel === 1 ? CONFIG.tacticalBattle.enemyPlan.counteredEffectScale : 1;
+}
+
+export function enemyPlanStratagemScale(plan: EnemyPlan | undefined, id: EnemyStratagemId): number {
+  const stratagem = plan?.stratagems.find(candidate => candidate.id === id);
+  return stratagem ? enemyStratagemEffectScale(stratagem) : 0;
+}
+
+export function enemyPlanPreparationPenalty(plan: EnemyPlan | undefined): number {
+  return Math.round(CONFIG.tacticalBattle.enemyPlan.effects.nightApproach.prepPointPenalty *
+    enemyPlanStratagemScale(plan, 'nightApproach'));
+}
+
+export function enemyPlanRangedEfficiency(plan: EnemyPlan | undefined): number {
+  return 1 - CONFIG.tacticalBattle.enemyPlan.effects.nightApproach.rangedEfficiencyPenalty *
+    enemyPlanStratagemScale(plan, 'nightApproach');
+}
+
+export function enemyPlanFirstRoundMoraleBonus(plan: EnemyPlan | undefined): number {
+  return Math.round(CONFIG.tacticalBattle.enemyPlan.effects.nightApproach.firstRoundMoraleBonus *
+    enemyPlanStratagemScale(plan, 'nightApproach'));
+}
+
+export function applyEnemyPlanPreparationCounter(plan: EnemyPlan | undefined, actionId: PreparationActionId): void {
+  if (!plan) return;
+  const countered: Partial<Record<PreparationActionId, readonly EnemyStratagemId[]>> = {
+    repairWall: ['wallBreakers'],
+    prepareVolley: ['wallBreakers'],
+    firePrevention: ['fireArrows'],
+    torchWatch: ['nightApproach'],
+  };
+  const ids = countered[actionId] ?? [];
+  for (const stratagem of plan.stratagems) {
+    if (ids.includes(stratagem.id) && stratagem.counterLevel < 1) stratagem.counterLevel = 1;
+  }
+}
+
+export function enemyPlanWarningLines(plan: EnemyPlan | undefined): string[] {
+  return plan?.stratagems.map(stratagem => STRATAGEM_DETAILS[stratagem.id].warning) ?? [];
+}
+
 export function enemyStratagemPoints(factionName: string, power: number, relation: number): number {
   const config = CONFIG.tacticalBattle.enemyPlan.stratagemPoints;
   const key = factionKey(factionName);
@@ -139,6 +230,12 @@ function planFromLegacyFlank({ flankPlan = 'breakthrough', revealed = false }: L
 export function createEnemyPlan(input: EnemyPlanCreationInput): EnemyPlan {
   const power = Math.max(0, input.power ?? 0);
   const relation = clamp(input.relation ?? 50, 0, 100);
+  const legacyFlankPlan = input.flankRoll < rearManeuverChance(input.factionName)
+    ? 'rearAssault'
+    : 'breakthrough';
+  if (relation >= CONFIG.tacticalBattle.enemyPlan.objectiveActivationRelation[factionKey(input.factionName)]) {
+    return planFromLegacyFlank({ flankPlan: legacyFlankPlan, revealed: input.revealed });
+  }
   const objective = chooseEnemyObjective(
     input.factionName,
     power,
@@ -153,7 +250,7 @@ export function createEnemyPlan(input: EnemyPlanCreationInput): EnemyPlan {
     stratagems: purchaseStratagems(
       objective,
       stratagemPoints,
-      input.flankRoll < rearManeuverChance(input.factionName),
+      legacyFlankPlan === 'rearAssault',
       input.stratagemRoll ?? 0,
       input.revealed,
     ),

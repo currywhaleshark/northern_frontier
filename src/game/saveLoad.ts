@@ -104,6 +104,7 @@ const TACTICAL_COMMANDS = new Set<TacticalCommandId>([
 ]);
 const PREPARATION_ACTION_IDS = new Set<PreparationActionId>([
   'evacuateCivilians', 'hideSupplies', 'repairWall', 'setAmbush', 'prepareVolley',
+  'firePrevention', 'torchWatch',
   'preliminaryBombardment', 'musterMilitia', 'nightAssault', 'prepareFireArrows',
   'blockLeaderEscape', 'lureGuards', 'setHuntTraps', 'placeBait', 'splitDrivers',
 ]);
@@ -280,6 +281,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
   const migratedRaiderGroups = (source.raiderGroups as unknown[]).flatMap((entry, index) => {
     if (!entry || typeof entry !== 'object') return [];
     const group = entry as Record<string, unknown>;
+    const power = Math.max(0, Number(group.power) || 0);
     const count = Number.isFinite(group.count)
       ? Math.max(0, Math.floor(Number(group.count)))
       : Math.max(1, Math.round(estimatedRaiders * (rawRaiderPower > 0 ? (Number(group.power) || 0) / rawRaiderPower : 1 / 3)));
@@ -294,7 +296,10 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       targetZoneId: zoneIds.has(String(group.targetZoneId)) ? String(group.targetZoneId) : defaultZoneId,
       count,
       killed: Math.min(count, Math.max(0, Math.floor(Number(group.killed) || 0))),
-      power: Math.max(0, Number(group.power) || 0),
+      power,
+      estimatedPower: Number.isFinite(group.estimatedPower) && Number(group.estimatedPower) >= 0
+        ? Number(group.estimatedPower)
+        : undefined,
       morale: Math.max(0, Math.min(100, Number(group.morale) || 0)),
       engagementsInZone: Math.max(0, Math.floor(Number(group.engagementsInZone) || 0)),
       flankPlan: group.flankPlan === 'rearAssault' || group.flankPlan === 'breakthrough' ? group.flankPlan : undefined,

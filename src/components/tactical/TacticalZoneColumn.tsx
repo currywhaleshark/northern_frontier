@@ -377,6 +377,8 @@ function zoneEffects(zoneId: string, battle: NonNullable<GameState['tacticalBatt
   }
   if (zoneId === 'wall' && active.has('repairWall')) labels.push('응급 수리');
   if (zoneId === 'wall' && active.has('prepareVolley')) labels.push('사격 준비');
+  if (zoneId === 'wall' && active.has('firePrevention')) labels.push('화재 대비');
+  if (zoneId === 'approach' && active.has('torchWatch')) labels.push('횃불 경계');
   if (zoneId === 'storehouse' && active.has('hideSupplies')) labels.push('물자 은닉');
   if (zoneId === 'center' && active.has('evacuateCivilians')) labels.push('주민 대피');
   if (zoneId === 'lairTrail' && active.has('nightAssault')) labels.push('야습 접근');
@@ -719,7 +721,7 @@ export function TacticalZoneColumn({
                 ))}
               </div>
               <span>
-                {raider.revealed ? `${raider.label} ${activeRaiders}${raider.beastKind ? '마리' : '명'} · ${raider.beastKind ? battle.huntPredatorState === 'wounded' ? '부상' : '경계' : raider.intent === 'loot' ? '약탈' : raider.intent === 'flank' ? '우회' : raider.intent === 'breakWall' ? '공성' : raider.intent === 'defend' ? '수비' : raider.intent === 'escape' ? '도주' : '전진'}` : raider.beastKind ? '덤불 속 흔적' : '정체불명'}
+                {raider.revealed ? `${raider.label} ${activeRaiders}${raider.beastKind ? '마리' : '명'}${raider.beastKind ? '' : ` · 전력 ${Math.round(raider.estimatedPower ?? raider.power)}`} · ${raider.beastKind ? battle.huntPredatorState === 'wounded' ? '부상' : '경계' : raider.intent === 'loot' ? '약탈' : raider.intent === 'flank' ? '우회' : raider.intent === 'breakWall' ? '공성' : raider.intent === 'defend' ? '수비' : raider.intent === 'escape' ? '도주' : '전진'}` : raider.beastKind ? '덤불 속 흔적' : '정체불명'}
                 {raider.confused && <em className="tactical-state-badge confused">혼란</em>}
                 {focusTarget && <em className="tactical-state-badge focus-target">집중 표적</em>}
               </span>

@@ -256,6 +256,7 @@ function commandPowerMultiplier(
     let mult = 1.38 + (input.prepareVolleyApplied ? 0.22 : 0);
     if (input.weather === 'blizzard') mult *= 0.62;
     else if (input.weather === 'heavySnow') mult *= 0.82;
+    mult *= input.rangedEfficiency ?? 1;
     return mult;
   }
   return 1;
@@ -368,6 +369,7 @@ export interface EngagementExchangeInput {
   evacuateCiviliansApplied: boolean;
   roundStartingRaiderPower: number;
   focusTargetGroupId?: string;
+  rangedEfficiency?: number;
   rng: () => number;
 }
 
@@ -458,7 +460,8 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
   const rawEnemyPower = attackers.reduce(
     (sum, group) => sum + (group.confused
       ? 0
-      : group.power * (group.morale / 100) * (group.combatMultiplier ?? 1)),
+      : group.power * (group.morale / 100) * (group.combatMultiplier ?? 1) *
+        (tacticalTargetingRole(group) === 'melee' ? 1 : input.rangedEfficiency ?? 1)),
     0,
   );
   const enemyPower = rawEnemyPower * (0.88 + input.rng() * 0.24);
@@ -821,6 +824,7 @@ export interface DefenseZoneConsequencesInput {
   enemyShare: number;
   originalPower: number;
   availableLoot: Partial<Record<ResourceId, number>>;
+  fireArrowEffectScale?: number;
   rng: () => number;
 }
 
@@ -866,6 +870,13 @@ export function applyDefenseZoneConsequences(
   if (zone.id === 'wall' && attackers.some(attacker => attacker.kind === 'main' && !attacker.confused)) {
     pressureDelta = Math.max(6, pressureDelta);
   }
+  const fireArrowAttack = (input.fireArrowEffectScale ?? 0) > 0 &&
+    (zone.id === 'wall' || zone.id === 'storehouse') && attackers.some(attacker =>
+      !attacker.confused && tacticalTargetingRole(attacker) !== 'melee');
+  if (fireArrowAttack) {
+    pressureDelta += CONFIG.tacticalBattle.enemyPlan.effects.fireArrows.pressureBonus *
+      (input.fireArrowEffectScale ?? 0);
+  }
   const protectedCiviliansOnly = zone.id === 'center' && defenders.length > 0 &&
     defenders.every(defender => defender.commandable === false);
   if (protectedCiviliansOnly) pressureDelta = Math.min(32, pressureDelta);
@@ -880,6 +891,15 @@ export function applyDefenseZoneConsequences(
   const lootEvents: TacticalAnimationEvent[] = [];
   const lootLines: string[] = [];
   const loot: Partial<Record<ResourceId, number>> = {};
+
+  if (fireArrowAttack && input.rng() < CONFIG.tacticalBattle.enemyPlan.effects.fireArrows.buildingDamageChance *
+      (input.fireArrowEffectScale ?? 0)) {
+    buildingsDamaged += 1;
+    breachEvents.push(animationEvent(zone.id, 'fire', '적 불화살이 방책과 지붕에 불씨를 흩뿌립니다.', 720, {
+      side: 'raider', float: '불화살!',
+    }));
+    breachLines.push(`${zone.name}에 불화살이 떨어져 화재 피해가 발생했습니다.`);
+  }
 
   if (breachedNow) {
     const wallBroken = zone.id === 'wall';

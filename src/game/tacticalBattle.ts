@@ -5,7 +5,9 @@ import { createCombatRoster, isCombatReadyResident, type CombatantSnapshot, type
 import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import {
-  createEnemyPlan, enemyObjectiveProfile, flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
+  applyEnemyPlanPreparationCounter, createEnemyPlan, enemyObjectiveProfile,
+  enemyPlanFirstRoundMoraleBonus, enemyPlanPreparationPenalty, enemyPlanRangedEfficiency,
+  enemyPlanStratagemScale, enemyPlanWarningLines, flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
 } from './enemyPlan';
 import { addLog } from './events';
 import { makeRng } from './map';
@@ -59,6 +61,8 @@ const PREPARATION_ACTIONS: Array<{ id: PreparationActionId; label: string; cost:
   { id: 'repairWall', label: '목책 응급 수리', cost: 1 },
   { id: 'setAmbush', label: '사냥꾼 매복 배치', cost: 2 },
   { id: 'prepareVolley', label: '망루·사격 준비', cost: 2 },
+  { id: 'firePrevention', label: '화재 대비', cost: 1 },
+  { id: 'torchWatch', label: '횃불 경계', cost: 1 },
   { id: 'preliminaryBombardment', label: '사전포격', cost: 3 },
   { id: 'musterMilitia', label: '민병 소집', cost: 1 },
 ];
@@ -504,6 +508,9 @@ function raiderGroups(
       ? 'storehouse'
       : entry.kind === 'flankers' ? (flankPlan === 'rearAssault' ? 'wall' : 'center') : 'wall',
     power: powers[index],
+    estimatedPower: enemyPlanStratagemScale(enemyPlan, 'feint') > 0 && entry.kind === 'main'
+      ? powers[index] * CONFIG.tacticalBattle.enemyPlan.effects.feint.estimatedMainMultiplier
+      : undefined,
     count: counts[index],
     killed: 0,
     morale: entry.morale,
@@ -560,7 +567,7 @@ export function createTacticalBattle(
     initialEnemyPower: enemies.reduce((sum, group) => sum + group.power, 0),
     phase: 'preparation',
     round: 1,
-    prepPoints: preparationPoints(state, params.warned),
+    prepPoints: Math.max(0, preparationPoints(state, params.warned) - enemyPlanPreparationPenalty(enemyPlan)),
     prepActions: PREPARATION_ACTIONS.map(action => ({ ...action, selected: false, applied: false })),
     preparationEvents: [],
     zones: createZones(state, params.siege, groups).map(zone => ({ ...zone, focusTargetSource: 'auto' })),
@@ -587,6 +594,7 @@ export function createTacticalBattle(
   state.battle = null;
   state.pendingChoice = null;
   addLog(state, `${params.factionName}의 습격에 맞서 직접 방어 지휘를 시작합니다.`, 'raid', true);
+  for (const warning of enemyPlanWarningLines(enemyPlan)) addLog(state, `적의 계책 징후: ${warning}`, 'raid');
   return battle;
 }
 
@@ -623,6 +631,12 @@ export function tacticalPreparationUnavailableReason(
   if (battle.orientation === 'assault') return assaultPreparationUnavailableReason(state, actionId);
   if (actionId === 'setAmbush' && !battle.defenderGroups.some(group => tacticalGroupCapabilities(group).has('ambush') && group.count > 0)) {
     return '매복시킬 사냥꾼이 없습니다.';
+  }
+  if (actionId === 'firePrevention' && !battle.enemyPlan?.stratagems.some(stratagem => stratagem.id === 'fireArrows')) {
+    return '불화살을 준비하는 징후가 없습니다.';
+  }
+  if (actionId === 'torchWatch' && !battle.enemyPlan?.stratagems.some(stratagem => stratagem.id === 'nightApproach')) {
+    return '야간 접근을 시도하는 징후가 없습니다.';
   }
   if (actionId === 'musterMilitia') {
     const civilians = battle.defenderGroups.find(group => group.kind === 'civilian');
@@ -695,6 +709,16 @@ function preparationEvent(
   events.push({ zoneId, kind, text, durationMs, ...extra });
 }
 
+function applyEnemyPlanPreparationEffects(battle: TacticalBattle): void {
+  const scale = enemyPlanStratagemScale(battle.enemyPlan, 'wallBreakers');
+  if (scale <= 0) return;
+  const main = battle.raiderGroups.find(group => group.kind === 'main');
+  if (!main) return;
+  const effect = CONFIG.tacticalBattle.enemyPlan.effects.wallBreakers;
+  main.wallPressureBonus = (main.wallPressureBonus ?? 0) + effect.wallPressureBonus * scale;
+  main.lossResistance = (main.lossResistance ?? 1) * (1 + effect.lossResistancePenalty * scale);
+}
+
 function applySelectedPreparationActions(state: GameState, battle: TacticalBattle): TacticalAnimationEvent[] {
   const zone = (id: string) => battle.zones.find(candidate => candidate.id === id)!;
   const events: TacticalAnimationEvent[] = [];
@@ -748,6 +772,18 @@ function applySelectedPreparationActions(state: GameState, battle: TacticalBattl
         '사수들이 시위를 걸고 화승을 살피며 첫 일제사격을 준비합니다.', 1050,
         { side: 'defender', groupId: rangedGroup?.id, float: '사격 준비' },
       );
+    } else if (actionId === 'firePrevention') {
+      preparationEvent(
+        events, 'wall', 'fortify',
+        '물통과 젖은 가죽을 방책과 창고 곁에 배치해 불화살에 대비합니다.', 900,
+        { side: 'defender', float: '화재 대비' },
+      );
+    } else if (actionId === 'torchWatch') {
+      preparationEvent(
+        events, 'approach', 'fortify',
+        '횃불 경계조가 어둠 속 접근로를 번갈아 비추며 야습을 감시합니다.', 900,
+        { side: 'defender', float: '횃불 경계' },
+      );
     } else if (actionId === 'preliminaryBombardment') {
       const casualtyGroups = applyPreliminaryBombardment(state, battle);
       const cannons = battle.preliminaryBombardmentCannons ?? 0;
@@ -798,8 +834,10 @@ function applySelectedPreparationActions(state: GameState, battle: TacticalBattl
       );
     }
 
+    applyEnemyPlanPreparationCounter(battle.enemyPlan, actionId);
     action.applied = true;
   }
+  applyEnemyPlanPreparationEffects(battle);
   const zoneOrder = new Map(battle.zones.map(zone => [zone.id, zone.order]));
   return events
     .map((item, index) => ({ item, index }))
@@ -1052,6 +1090,43 @@ export function chooseDefaultTacticalCommands(battle: TacticalBattle): void {
   }
 }
 
+export function applyTacticalEnemyPlanDeployment(battle: TacticalBattle): void {
+  const rearManeuver = battle.enemyPlan?.stratagems.find(stratagem => stratagem.id === 'rearManeuver');
+  if (rearManeuver && rearManeuver.counterLevel < 1 && battle.defenderGroups.some(group =>
+    group.line === 'rear' && group.commandable !== false && group.count - group.wounded - group.killed > 0 &&
+    tacticalGroupCapabilities(group).has('melee'))) rearManeuver.counterLevel = 1;
+  if (rearManeuver && (battle.enemyPlan?.stratagemPoints ?? 0) > 0) {
+    const scale = enemyPlanStratagemScale(battle.enemyPlan, 'rearManeuver');
+    const penalty = CONFIG.tacticalBattle.enemyPlan.effects.rearManeuver.counteredCombatPenalty * (1 - scale);
+    for (const group of battle.raiderGroups.filter(group => group.kind === 'flankers')) {
+      group.combatMultiplier = (group.combatMultiplier ?? 1) * (1 - penalty);
+    }
+  }
+
+  const feint = battle.enemyPlan?.stratagems.find(stratagem => stratagem.id === 'feint');
+  if (!feint) return;
+  if (feint.counterLevel < 1 && battle.defenderGroups.some(group =>
+    group.line === 'middle' && group.commandable !== false && group.count - group.wounded - group.killed > 0 &&
+    tacticalGroupCapabilities(group).has('melee'))) feint.counterLevel = 1;
+  const scale = enemyPlanStratagemScale(battle.enemyPlan, 'feint');
+  const main = battle.raiderGroups.filter(group => group.kind === 'main');
+  const diverted = battle.raiderGroups.filter(group => group.kind === 'looters' || group.kind === 'flankers');
+  const mainPower = main.reduce((sum, group) => sum + group.power, 0);
+  const divertedPower = diverted.reduce((sum, group) => sum + group.power, 0);
+  const shift = Math.min(mainPower * 0.45, battle.originalPower * CONFIG.tacticalBattle.enemyPlan.effects.feint.powerShift * scale);
+  if (shift > 0 && mainPower > 0 && divertedPower > 0) {
+    for (const group of main) group.power -= shift * group.power / mainPower;
+    for (const group of diverted) group.power += shift * group.power / divertedPower;
+  }
+  for (const group of battle.raiderGroups) {
+    group.estimatedPower = feint.counterLevel >= 1
+      ? undefined
+      : group.kind === 'main'
+        ? group.power * CONFIG.tacticalBattle.enemyPlan.effects.feint.estimatedMainMultiplier
+        : undefined;
+  }
+}
+
 export function advanceTacticalPhase(state: GameState): string | null {
   const battle = state.tacticalBattle;
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
@@ -1067,6 +1142,7 @@ export function advanceTacticalPhase(state: GameState): string | null {
     return null;
   }
   if (battle.phase === 'deployment') {
+    applyTacticalEnemyPlanDeployment(battle);
     chooseDefaultTacticalCommands(battle);
     battle.phase = 'command';
     return null;
@@ -1180,6 +1256,15 @@ export function resolveTacticalRound(state: GameState): string | null {
   const rng = makeRng(state.seed + battle.id * 8191 + battle.round * 131071);
   const events: TacticalAnimationEvent[] = [];
   const lines: string[] = [];
+  const rangedEfficiency = enemyPlanRangedEfficiency(battle.enemyPlan);
+  if (battle.round === 1) {
+    const moraleBonus = enemyPlanFirstRoundMoraleBonus(battle.enemyPlan);
+    if (moraleBonus > 0) {
+      battle.raiderMorale = clamp(battle.raiderMorale + moraleBonus, 0, 100);
+      battle.raiderGroups.forEach(group => { group.morale = clamp(group.morale + moraleBonus, 0, 100); });
+      lines.push(`야간 접근으로 적이 첫 교전 기세 +${moraleBonus}을 얻었습니다.`);
+    }
+  }
   const lootBag: Partial<Record<ResourceId, number>> = {};
   const dominance = new Map<string, number>();
   const rearDominance = new Map<string, number>();
@@ -1265,6 +1350,7 @@ export function resolveTacticalRound(state: GameState): string | null {
         focusTargetGroupId: engagement.attackers.some(group => group.id === zone.focusTargetGroupId)
           ? zone.focusTargetGroupId
           : undefined,
+        rangedEfficiency,
         rng,
       });
       for (const loss of exchange.raiderLosses) {
@@ -1296,6 +1382,7 @@ export function resolveTacticalRound(state: GameState): string | null {
             firewood: pendingLootAvailable(state, battle, 'firewood'),
             hide: pendingLootAvailable(state, battle, 'hide'),
           },
+          fireArrowEffectScale: enemyPlanStratagemScale(battle.enemyPlan, 'fireArrows'),
           rng,
         });
         zone.pressure = consequences.pressure;
