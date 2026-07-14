@@ -1226,9 +1226,9 @@
             "breached": false
           }
         ],
-        "villageMorale": 74,
+        "villageMorale": 77,
         "raiderMorale": 52,
-        "villageMoraleDelta": -2,
+        "villageMoraleDelta": 1,
         "raiderMoraleDelta": -9,
         "wounded": 1,
         "killed": 0,
@@ -1237,10 +1237,9 @@
         "loot": {},
         "summary": "제3차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
         "lines": [
-          "후방 급습으로 후열에서 1명의 사상자가 발생해 마을 기세가 흔들렸습니다.",
           "이번 교전 수비 피해: 전사 0명, 부상 1명.",
           "이번 교전 적 피해: 3명 처치.",
-          "마을 기세 -2, 적 기세 -9."
+          "마을 기세 +1, 적 기세 -9."
         ],
         "events": [
           {
@@ -1387,7 +1386,7 @@
             "breached": false
           }
         ],
-        "villageMorale": 75,
+        "villageMorale": 78,
         "raiderMorale": 43,
         "villageMoraleDelta": 1,
         "raiderMoraleDelta": -9,
@@ -1547,7 +1546,7 @@
             "breached": false
           }
         ],
-        "villageMorale": 67,
+        "villageMorale": 70,
         "raiderMorale": 36,
         "villageMoraleDelta": -8,
         "raiderMoraleDelta": -7,

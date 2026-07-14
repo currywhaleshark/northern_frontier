@@ -570,7 +570,7 @@ export type DefenderGroupKind =
   | 'civilian';
 
 export type RaiderGroupKind = 'main' | 'looters' | 'flankers';
-export type TacticalFormationLine = 'front' | 'rear';
+export type TacticalFormationLine = 'front' | 'middle' | 'rear';
 export type TacticalFlankPlan = 'breakthrough' | 'rearAssault';
 export type EnemyObjectiveId = 'breakthrough';
 export type EnemyStratagemId = 'rearManeuver';

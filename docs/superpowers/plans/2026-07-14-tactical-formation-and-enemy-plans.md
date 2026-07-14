@@ -108,11 +108,11 @@
 - Modify: `src/game/saveLoad.ts` (`migrateV7ToV8`, line 폴백)
 - Modify: `tools/game/test_resource_save_migration.mjs`
 
-- [ ] 유니언에 `'middle'` 추가. 기본 배치 규칙 변경: 창병·민병·파수꾼 → 전열, 조총 → **중열**, 각궁·사냥꾼·피난 주민 → 후열. (기존 저장의 front/rear 배치는 그대로 유효 — 강제 이전하지 않는다.)
-- [ ] **schemaVersion 7 → 8 인상.** `'middle'`이 저장에 처음 기록되는 시점이므로 버전을 올린다 — `migrateToCurrent`가 미래 버전을 throw로 거절하므로(saveLoad.ts:72), 인상해야 구버전 빌드가 새 저장을 line 폴백으로 조용히 재작성하는 대신 명시적으로 거절한다. `migrateV7ToV8`은 통과 마이그레이션(필드 변형 없음)이다.
-- [ ] `migrateTacticalBattle`의 line 폴백에 `'middle'` 허용 추가. 이후 Phase에서 추가되는 저장 필드(`pendingLine`, `focusTargetGroupId`/`focusTargetSource`, `enemyPlan`)도 각각 엄격 검증한다: 알 수 없는 값·존재하지 않는 그룹 ID는 **해당 필드만** 안전 초기화(`undefined`/`auto`)하고 전투 전체를 버리지 않는다.
-- [ ] 저장 테스트: v7 저장(front/rear) 로드, v8 저장 로드, 미래 버전(v9) 거절, 잘못된 line 값 폴백을 모두 검증한다.
-- [ ] 산채 공격전(`makePlayerGroup`)의 기본 열도 같은 규칙으로 갱신하되, 공격전 판정의 3열 반영은 Phase 6까지 보류(중열은 당분간 후열과 동일 취급).
+- [x] 유니언에 `'middle'` 추가. 기본 배치 규칙 변경: 창병·민병·파수꾼 → 전열, 조총 → **중열**, 각궁·사냥꾼·피난 주민 → 후열. (기존 저장의 front/rear 배치는 그대로 유효 — 강제 이전하지 않는다.)
+- [x] **schemaVersion 7 → 8 인상.** `'middle'`이 저장에 처음 기록되는 시점이므로 버전을 올린다 — `migrateToCurrent`가 미래 버전을 throw로 거절하므로(saveLoad.ts:72), 인상해야 구버전 빌드가 새 저장을 line 폴백으로 조용히 재작성하는 대신 명시적으로 거절한다. `migrateV7ToV8`은 통과 마이그레이션(필드 변형 없음)이다.
+- [x] `migrateTacticalBattle`의 line 폴백에 `'middle'` 허용 추가. 이후 Phase에서 추가되는 저장 필드(`pendingLine`, `focusTargetGroupId`/`focusTargetSource`, `enemyPlan`)도 각각 엄격 검증한다: 알 수 없는 값·존재하지 않는 그룹 ID는 **해당 필드만** 안전 초기화(`undefined`/`auto`)하고 전투 전체를 버리지 않는다.
+- [x] 저장 테스트: v7 저장(front/rear) 로드, v8 저장 로드, 미래 버전(v9) 거절, 잘못된 line 값 폴백을 모두 검증한다.
+- [x] 산채 공격전(`makePlayerGroup`)의 기본 열도 같은 규칙으로 갱신하되, 공격전 판정의 3열 반영은 Phase 6까지 보류(중열은 당분간 후열과 동일 취급).
 
 ### Task 1.2: 3열 노출·차폐 계수 재조정
 
@@ -121,9 +121,12 @@
 - Modify: `src/game/config.ts` (계수를 CONFIG.tacticalBattle로 승격)
 - Modify: `tools/game/test_tactical_battle.mjs`
 
-- [ ] `formationExposureMultiplier`를 3열로 확장: 정면 접촉 순서 전열→중열→후열. 전열이 건재하면 중·후열 노출 감소, 전열 궤멸 시 중열이 접촉 열로 승격. 하드코딩된 배율(0.42/1.25/1.45/1.7 등)을 CONFIG로 옮겨 조정 가능하게 한다.
-- [ ] `rearAssaultExposureMultiplier`를 역순(후열→중열→전열)으로 확장. 후열 근접병의 급습 차단 역할(현재 `rearMeleeGuard`)은 유지하되 중열 근접병도 부분 기여하게 한다.
-- [ ] 밸런스 실측: 고정 시드 20판(세력 4종 × 경보 유무 등)의 평균 아군 사상·적 처치·판정 결과 분포가 2열 기준선에서 ±15% 이내인지 확인하고 계수를 맞춘다. 기준선 수치는 이 작업 시작 시점에 스크립트로 채록한다.
+- [x] `formationExposureMultiplier`를 3열로 확장: 정면 접촉 순서 전열→중열→후열. 전열이 건재하면 중·후열 노출 감소, 전열 궤멸 시 중열이 접촉 열로 승격. 하드코딩된 배율(0.42/1.25/1.45/1.7 등)을 CONFIG로 옮겨 조정 가능하게 한다.
+- [x] `rearAssaultExposureMultiplier`를 역순(후열→중열→전열)으로 확장. 후열 근접병의 급습 차단 역할(현재 `rearMeleeGuard`)은 유지하되 중열 근접병도 부분 기여하게 한다.
+- [x] 밸런스 실측: 고정 시드 20판(세력 4종 × 경보 유무 등)의 평균 아군 사상·적 처치·판정 결과 분포가 2열 기준선에서 ±15% 이내인지 확인하고 계수를 맞춘다. 기준선 수치는 이 작업 시작 시점에 스크립트로 채록한다.
+  - 실측 스크립트: `node tools/game/measure_tactical_formation_balance.mjs`
+  - 2열 기준선(중열을 후열로 강제): 평균 아군 사상 3.15명, 평균 적 처치 7.40명, 부분 손실 18회·방어 성공 2회.
+  - 3열 결과: 평균 아군 사상 2.95명(-6.35%), 평균 적 처치 7.40명(0%), 부분 손실 18회·방어 성공 2회. 두 핵심 평균 모두 ±15% 게이트 이내이며 판정 결과 분포는 동일하다.
 
 ### Task 1.3: 3열 세로 쌓기 렌더링
 

@@ -157,6 +157,7 @@ function kindForCombatant(role: CombatRole, weapon: TacticalDefenderGroup['weapo
 
 function defaultFormationLine(role: CombatRole, weapon: TacticalDefenderGroup['weapon']): TacticalFormationLine {
   if (role === 'civilian') return 'rear';
+  if (weapon === 'musket') return 'middle';
   return weapon === 'spear' || (weapon == null && (role === 'militia' || role === 'watchman')) ? 'front' : 'rear';
 }
 
@@ -708,6 +709,7 @@ export function setDefenderFormationLine(
 ): string | null {
   const battle = state.tacticalBattle;
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  if (line !== 'front' && line !== 'middle' && line !== 'rear') return '알 수 없는 전열입니다.';
   if (battle.phase !== 'deployment' && battle.phase !== 'command') {
     return '배치 또는 지휘 단계에서만 전열을 바꿀 수 있습니다.';
   }

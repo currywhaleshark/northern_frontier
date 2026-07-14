@@ -1,4 +1,5 @@
 import { tacticalGroupCapabilities, tacticalGroupPower } from './combatCapabilities';
+import { CONFIG } from './config';
 import { tacticalDefenderShotCounts, tacticalRaiderShotCounts } from './tacticalCore';
 import type {
   ResourceId,
@@ -6,9 +7,13 @@ import type {
   TacticalBattleZone,
   TacticalCommandId,
   TacticalDefenderGroup,
+  TacticalFormationLine,
   TacticalRaiderGroup,
   WeatherId,
 } from './types';
+
+const FRONTAL_LINE_ORDER: readonly TacticalFormationLine[] = ['front', 'middle', 'rear'];
+const REAR_ASSAULT_LINE_ORDER: readonly TacticalFormationLine[] = ['rear', 'middle', 'front'];
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -74,39 +79,81 @@ function casualtyMultiplier(
   return mult;
 }
 
-function formationExposureMultiplier(
+function activeContactLine(
+  defenders: TacticalDefenderGroup[],
+  lineOrder: readonly TacticalFormationLine[],
+): TacticalFormationLine | null {
+  return lineOrder.find(line => defenders.some(group =>
+    group.line === line && activeDefenderCount(group) > 0)) ?? null;
+}
+
+function activeMeleeGuard(
+  defenders: TacticalDefenderGroup[],
+  line: TacticalFormationLine,
+): boolean {
+  return defenders.some(group =>
+    group.line === line && tacticalGroupCapabilities(group).has('melee') &&
+    group.command !== 'fallback' && group.command !== 'advance' &&
+    activeDefenderCount(group) > 0);
+}
+
+function rearAssaultGuardStrength(defenders: TacticalDefenderGroup[]): number {
+  if (activeMeleeGuard(defenders, 'rear')) return 1;
+  if (activeMeleeGuard(defenders, 'middle')) {
+    return CONFIG.tacticalBattle.formationExposure.rearAssault.middleGuardStrength;
+  }
+  return 0;
+}
+
+export function formationExposureMultiplier(
   defender: TacticalDefenderGroup,
   defenders: TacticalDefenderGroup[],
 ): number {
-  if (tacticalGroupCapabilities(defender).has('ambush') && defender.ambushed) return 0.55;
+  const exposure = CONFIG.tacticalBattle.formationExposure;
+  if (tacticalGroupCapabilities(defender).has('ambush') && defender.ambushed) return exposure.ambushed;
+  const contactLine = activeContactLine(defenders, FRONTAL_LINE_ORDER);
+  const contactIndex = contactLine == null ? -1 : FRONTAL_LINE_ORDER.indexOf(contactLine);
+  const defenderIndex = FRONTAL_LINE_ORDER.indexOf(defender.line);
+  const screenedByEarlierLine = contactIndex >= 0 && defenderIndex > contactIndex;
   const chargingMelee = defenders.some(group =>
-    group.line === 'front' && tacticalGroupCapabilities(group).has('melee') &&
+    group.line === contactLine && tacticalGroupCapabilities(group).has('melee') &&
     group.command === 'charge' && activeDefenderCount(group) > 0);
   const screeningMelee = defenders.some(group =>
-    group.line === 'front' && tacticalGroupCapabilities(group).has('melee') &&
+    group.line === contactLine && tacticalGroupCapabilities(group).has('melee') &&
     group.command !== 'charge' && group.command !== 'fallback' && group.command !== 'advance' &&
     activeDefenderCount(group) > 0);
   if (tacticalGroupCapabilities(defender).has('volley')) {
-    if (chargingMelee) return 1.7;
-    if (screeningMelee) return 0.42;
-    return 1.45;
+    if (chargingMelee) return exposure.frontal.chargingRanged;
+    if (screeningMelee) return exposure.frontal.meleeScreenedRanged;
+    return screenedByEarlierLine ? exposure.frontal.lineScreened : exposure.frontal.exposedRanged;
   }
-  if (tacticalGroupCapabilities(defender).has('melee') && screeningMelee) return 1.25;
-  return 1;
+  if (screenedByEarlierLine) return exposure.frontal.lineScreened;
+  if (tacticalGroupCapabilities(defender).has('melee') && screeningMelee) {
+    return exposure.frontal.screeningMelee;
+  }
+  return exposure.frontal.exposed;
 }
 
-function rearAssaultExposureMultiplier(
+export function rearAssaultExposureMultiplier(
   defender: TacticalDefenderGroup,
   defenders: TacticalDefenderGroup[],
 ): number {
-  const rearMeleeGuard = defenders.some(group =>
-    group.line === 'rear' && tacticalGroupCapabilities(group).has('melee') &&
-    group.command !== 'fallback' && group.command !== 'advance' && activeDefenderCount(group) > 0);
-  if (defender.line === 'front') return 0.5;
-  if (rearMeleeGuard) return tacticalGroupCapabilities(defender).has('melee') ? 1.65 : 0.48;
-  if (tacticalGroupCapabilities(defender).has('volley')) return 2.2;
-  if (defender.kind === 'civilian') return 1.8;
-  return 1.45;
+  const rearExposure = CONFIG.tacticalBattle.formationExposure.rearAssault;
+  const contactLine = activeContactLine(defenders, REAR_ASSAULT_LINE_ORDER);
+  const contactIndex = contactLine == null ? -1 : REAR_ASSAULT_LINE_ORDER.indexOf(contactLine);
+  const defenderIndex = REAR_ASSAULT_LINE_ORDER.indexOf(defender.line);
+  const distanceBehindContact = contactIndex < 0 ? 0 : defenderIndex - contactIndex;
+  if (distanceBehindContact > 0) {
+    return distanceBehindContact === 1 ? rearExposure.adjacentProtected : rearExposure.deepProtected;
+  }
+
+  const capabilities = tacticalGroupCapabilities(defender);
+  const exposed = capabilities.has('volley') ? rearExposure.exposedRanged
+    : defender.kind === 'civilian' ? rearExposure.exposedCivilian
+      : rearExposure.exposedOther;
+  const guarded = capabilities.has('melee') ? rearExposure.guardedMelee : rearExposure.guardedRanged;
+  const guardStrength = rearAssaultGuardStrength(defenders);
+  return exposed + (guarded - exposed) * guardStrength;
 }
 
 function surpriseConfusionChance(zone: TacticalBattleZone, defenders: TacticalDefenderGroup[]): number {
@@ -225,8 +272,9 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
   const activeCombatDefenderCount = combatDefenders.reduce((sum, defender) => sum + activeDefenderCount(defender), 0);
   const chargingMeleeCount = chargingMelee.reduce((sum, defender) => sum + activeDefenderCount(defender), 0);
   const exposedRangedCount = exposedRanged.reduce((sum, defender) => sum + activeDefenderCount(defender), 0);
+  const rearContactLine = activeContactLine(defenders, REAR_ASSAULT_LINE_ORDER);
   const activeRearTargetCount = defenders
-    .filter(defender => defender.line === 'rear')
+    .filter(defender => defender.line === rearContactLine)
     .reduce((sum, defender) => sum + activeDefenderCount(defender), 0);
   const chargeOpensFlank = chargingMelee.length > 0 && exposedRanged.length > 0 &&
     attackers.some(attacker => !attacker.confused);
@@ -334,7 +382,9 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     killed = Math.min(killed, Math.max(0, active - wounded));
     if (killed > 0 && wounded > 0 && wounded + killed > active) wounded = active - killed;
     defenderLosses.push({ groupId: defender.id, wounded, killed });
-    if (rearAttackers.length > 0 && defender.line === 'rear') rearAssaultCasualties += wounded + killed;
+    if (rearAttackers.length > 0 && defender.line === rearContactLine) {
+      rearAssaultCasualties += wounded + killed;
+    }
     if (wounded + killed > 0) {
       const parts = [killed > 0 ? `전사 ${killed}` : '', wounded > 0 ? `부상 ${wounded}` : ''].filter(Boolean);
       preDefenseEvents.push(animationEvent(
@@ -362,13 +412,15 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     commands.includes('charge') ? 0.12 : 0,
   );
   const raiderLossRate = clamp(defenseShare * (0.08 + commandEdge), 0.01, 0.24);
-  const rearMeleeGuard = defenders.some(defender =>
-    defender.line === 'rear' && tacticalGroupCapabilities(defender).has('melee') &&
-    activeDefenderCount(defender) > 0 && defender.command !== 'fallback' && defender.command !== 'advance');
+  const rearGuardStrength = rearAssaultGuardStrength(defenders);
+  const rearExposure = CONFIG.tacticalBattle.formationExposure.rearAssault;
   const raiderLosses: TacticalRaiderLoss[] = [];
   for (const attacker of attackers) {
     const activeRaiders = activeRaiderCount(attacker);
-    const rearAssaultResistance = attacker.rearAssault && !rearMeleeGuard ? 0.55 : 1;
+    const rearAssaultResistance = attacker.rearAssault
+      ? rearExposure.unguardedAttackerLossMultiplier +
+        (1 - rearExposure.unguardedAttackerLossMultiplier) * rearGuardStrength
+      : 1;
     const groupLossRate = clamp(
       raiderLossRate * (attacker.lossResistance ?? 1) * rearAssaultResistance,
       0.005,

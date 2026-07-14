@@ -345,6 +345,28 @@ export const CONFIG = {
   tacticalBattle: {
     maxRounds: 5,
     raiderPowerPerFighter: 4,
+    formationExposure: {
+      ambushed: 0.55,
+      frontal: {
+        chargingRanged: 1.7,
+        meleeScreenedRanged: 0.42,
+        lineScreened: 0.72,
+        exposedRanged: 1.45,
+        screeningMelee: 1.25,
+        exposed: 1,
+      },
+      rearAssault: {
+        adjacentProtected: 0.85,
+        deepProtected: 0.5,
+        guardedMelee: 1.65,
+        guardedRanged: 0.48,
+        exposedRanged: 2.2,
+        exposedCivilian: 1.8,
+        exposedOther: 1.45,
+        middleGuardStrength: 0.55,
+        unguardedAttackerLossMultiplier: 0.55,
+      },
+    },
     prep: {
       surpriseBase: 1,
       warned: 3,

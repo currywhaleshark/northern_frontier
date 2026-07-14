@@ -28,7 +28,7 @@ import {
 import type {
   CombatWeaponId, CourtTribute, DefenderGroupKind, GameState, Gender, Resident, ResourceId,
   PreparationActionId, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
-  TacticalPreparationEffect, TacticalRoundReport,
+  TacticalFormationLine, TacticalPreparationEffect, TacticalRoundReport,
 } from './types';
 
 export { CURRENT_SCHEMA_VERSION } from './saveSchema';
@@ -69,6 +69,10 @@ export function migrateV6ToV7(raw: RawSave): RawSave {
   return { ...raw, schemaVersion: 7 };
 }
 
+export function migrateV7ToV8(raw: RawSave): RawSave {
+  return { ...raw, schemaVersion: 8 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   let version = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -80,6 +84,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 4) migrated = migrateV4ToV5(migrated);
     else if (version === 5) migrated = migrateV5ToV6(migrated);
     else if (version === 6) migrated = migrateV6ToV7(migrated);
+    else if (version === 7) migrated = migrateV7ToV8(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -158,6 +163,17 @@ function inferredGroupIdentity(kind: DefenderGroupKind): {
   return { role: 'militia', weapon: null };
 }
 
+function defaultMigratedFormationLine(
+  role: TacticalBattle['defenderGroups'][number]['role'],
+  weapon: CombatWeaponId | null,
+): TacticalFormationLine {
+  if (role === 'civilian') return 'rear';
+  if (weapon === 'musket') return 'middle';
+  return weapon === 'spear' || (weapon == null && (role === 'militia' || role === 'watchman'))
+    ? 'front'
+    : 'rear';
+}
+
 export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalBattle | null {
   if (raw == null) return null;
   if (typeof raw !== 'object') return null;
@@ -230,9 +246,9 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       commandable: protectedCivilian ? false : group.commandable === false ? false : undefined,
       lockedZoneId: protectedCivilian ? civilianZoneId : undefined,
       power: protectedCivilian ? 0 : Math.max(0, Number(group.power) || 0),
-      line: group.line === 'front' || group.line === 'rear'
+      line: group.line === 'front' || group.line === 'middle' || group.line === 'rear'
         ? group.line
-        : weapon === 'spear' || (weapon == null && (role === 'militia' || role === 'watchman')) ? 'front' : 'rear',
+        : defaultMigratedFormationLine(role, weapon),
       ambushed: group.ambushed === true,
     }];
   });
@@ -645,10 +661,8 @@ export function loadGame(): GameState | null {
       const preparedAmbush = parsed.tacticalBattle.prepActions.some(action =>
         action.id === 'setAmbush' && action.applied);
       for (const group of parsed.tacticalBattle.defenderGroups) {
-        if (group.line !== 'front' && group.line !== 'rear') {
-          group.line = group.kind === 'militia-spear' || group.kind === 'militia-unarmed' || group.kind === 'watchman'
-            ? 'front'
-            : 'rear';
+        if (group.line !== 'front' && group.line !== 'middle' && group.line !== 'rear') {
+          group.line = defaultMigratedFormationLine(group.role, group.weapon);
         }
         if (group.ambushed != null) continue;
         group.ambushed = !assault && group.kind === 'hunter' && group.zoneId === 'approach' && preparedAmbush;

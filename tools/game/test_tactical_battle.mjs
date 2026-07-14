@@ -88,7 +88,10 @@ function addBuiltMarker(state, type) {
     .filter(group => ['militia-spear', 'militia-unarmed', 'watchman'].includes(group.kind))
     .every(group => group.line === 'front'));
   assert.ok(battle.defenderGroups
-    .filter(group => ['militia-musket', 'militia-bow', 'hunter', 'civilian'].includes(group.kind))
+    .filter(group => group.kind === 'militia-musket')
+    .every(group => group.line === 'middle'));
+  assert.ok(battle.defenderGroups
+    .filter(group => ['militia-bow', 'hunter', 'civilian'].includes(group.kind))
     .every(group => group.line === 'rear'));
   assert.ok(battle.raiderGroups
     .filter(group => group.kind === 'flankers')
@@ -273,6 +276,84 @@ function addBuiltMarker(state, type) {
   assert.equal(tacticalCommandState.nextActiveTacticalGroupId(groups, 'down'), 'recommended');
   assert.equal(tacticalCommandState.tacticalGroupCanReceiveCommand(groups[2]), false);
   assert.equal(tacticalCommandState.tacticalGroupCanReceiveCommand(groups[3]), false);
+}
+
+{
+  const defender = (id, line, weapon, overrides = {}) => ({
+    id,
+    kind: weapon === 'spear' ? 'militia-spear'
+      : weapon === 'musket' ? 'militia-musket'
+        : 'militia-bow',
+    role: 'militia',
+    weapon,
+    readyMuskets: weapon === 'musket' ? 4 : undefined,
+    label: id,
+    residentIds: [1, 2, 3, 4],
+    count: 4,
+    zoneId: 'wall',
+    command: weapon === 'spear' ? 'hold' : 'volley',
+    power: 40,
+    wounded: 0,
+    killed: 0,
+    line,
+    ambushed: false,
+    ...overrides,
+  });
+  const frontGuard = defender('front-guard', 'front', 'spear');
+  const middleMuskets = defender('middle-muskets', 'middle', 'musket');
+  const rearBows = defender('rear-bows', 'rear', 'hornBow');
+
+  const screenedMiddle = tacticalEngagement.formationExposureMultiplier(
+    middleMuskets,
+    [frontGuard, middleMuskets, rearBows],
+  );
+  const exposedMiddle = tacticalEngagement.formationExposureMultiplier(
+    middleMuskets,
+    [{ ...frontGuard, killed: frontGuard.count }, middleMuskets, rearBows],
+  );
+  const screenedRear = tacticalEngagement.formationExposureMultiplier(
+    rearBows,
+    [{ ...frontGuard, killed: frontGuard.count }, middleMuskets, rearBows],
+  );
+  const exposedRear = tacticalEngagement.formationExposureMultiplier(
+    rearBows,
+    [
+      { ...frontGuard, killed: frontGuard.count },
+      { ...middleMuskets, killed: middleMuskets.count },
+      rearBows,
+    ],
+  );
+  assert.ok(screenedMiddle < exposedMiddle, 'an active front line shields the middle line');
+  assert.ok(exposedMiddle > screenedRear, 'the middle line becomes the contact line after the front falls');
+  assert.ok(exposedRear > screenedRear, 'the rear line becomes the contact line after front and middle fall');
+
+  const rearWithoutGuard = tacticalEngagement.rearAssaultExposureMultiplier(
+    rearBows,
+    [frontGuard, middleMuskets, rearBows],
+  );
+  const middleWithoutGuard = tacticalEngagement.rearAssaultExposureMultiplier(
+    middleMuskets,
+    [frontGuard, middleMuskets, rearBows],
+  );
+  const frontWithoutGuard = tacticalEngagement.rearAssaultExposureMultiplier(
+    frontGuard,
+    [frontGuard, middleMuskets, rearBows],
+  );
+  assert.ok(rearWithoutGuard > middleWithoutGuard && middleWithoutGuard > frontWithoutGuard,
+    'rear assaults expose rear, middle, then front in that order');
+
+  const middleGuard = defender('middle-guard', 'middle', 'spear');
+  const rearGuard = defender('rear-guard', 'rear', 'spear');
+  const partiallyGuardedRear = tacticalEngagement.rearAssaultExposureMultiplier(
+    rearBows,
+    [frontGuard, middleGuard, rearBows],
+  );
+  const fullyGuardedRear = tacticalEngagement.rearAssaultExposureMultiplier(
+    rearBows,
+    [frontGuard, middleMuskets, rearBows, rearGuard],
+  );
+  assert.ok(fullyGuardedRear < partiallyGuardedRear && partiallyGuardedRear < rearWithoutGuard,
+    'middle melee guards give partial protection while rear melee guards give full protection');
 }
 
 {

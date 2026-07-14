@@ -71,7 +71,9 @@ function makePlayerGroup(
     }, 0),
     wounded: 0,
     killed: 0,
-    line: weapon === 'spear' || (weapon == null && (role === 'militia' || role === 'watchman')) ? 'front' : 'rear',
+    line: weapon === 'musket'
+      ? 'middle'
+      : weapon === 'spear' || (weapon == null && (role === 'militia' || role === 'watchman')) ? 'front' : 'rear',
     ambushed: false,
   };
 }

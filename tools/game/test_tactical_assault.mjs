@@ -134,6 +134,7 @@ function finishPendingBattle(state) {
   assert.equal(battle.prepPoints, 6);
   const memberIds = new Set(members.map(member => member.id));
   assert.ok(battle.defenderGroups.flatMap(group => group.residentIds).every(id => memberIds.has(id)));
+  assert.equal(battle.defenderGroups.find(group => group.kind === 'militia-musket')?.line, 'middle');
   assert.equal(saveLoad.saveGame(state), true);
   const loaded = saveLoad.loadGame();
   assert.equal(loaded?.tacticalBattle?.orientation, 'assault');

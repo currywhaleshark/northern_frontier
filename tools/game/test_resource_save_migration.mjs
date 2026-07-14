@@ -34,6 +34,9 @@ const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mj
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 8, 'three-line formations require schema version 8');
+assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
+
 {
   const legacy = simulation.newGame(2026071010);
   delete legacy.schemaVersion;
@@ -100,6 +103,72 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
   assert.throws(() => saveLoad.migrateToCurrent(future), /future|미래|지원하지/i);
   store.set('buksae-save-v3', JSON.stringify(future));
   assert.equal(saveLoad.loadGame(), null, 'a future schema save is rejected instead of being downgraded');
+}
+
+function prepareFormationTestCombatants(state) {
+  state.resources.muskets = 1;
+  state.resources.hornBows = 1;
+  state.resources.spears = 1;
+  state.resources.gunpowder = 10;
+  state.residents.slice(0, 3).forEach(resident => {
+    resident.job = 'militia';
+    resident.sick = false;
+    resident.health = 100;
+    resident.quarantinedUntil = 0;
+  });
+}
+
+{
+  const v7 = simulation.newGame(2026071457);
+  prepareFormationTestCombatants(v7);
+  const battle = tactical.createTacticalBattle(v7, {
+    factionName: 'v7 formation preservation', power: 40, warned: true, siege: false, mode: 'garrison',
+  });
+  const muskets = battle.defenderGroups.find(group => group.kind === 'militia-musket');
+  assert.ok(muskets);
+  muskets.line = 'rear';
+  store.set('buksae-save-v3', JSON.stringify({ ...v7, schemaVersion: 7 }));
+  const loaded = saveLoad.loadGame();
+  assert.equal(loaded?.schemaVersion, 8);
+  assert.equal(
+    loaded?.tacticalBattle?.defenderGroups.find(group => group.id === muskets.id)?.line,
+    'rear',
+    'valid v7 front/rear placements remain unchanged',
+  );
+}
+
+{
+  const v8 = simulation.newGame(2026071458);
+  prepareFormationTestCombatants(v8);
+  const battle = tactical.createTacticalBattle(v8, {
+    factionName: 'v8 formation load', power: 40, warned: true, siege: false, mode: 'garrison',
+  });
+  const muskets = battle.defenderGroups.find(group => group.kind === 'militia-musket');
+  assert.ok(muskets);
+  assert.equal(muskets.line, 'middle');
+  assert.equal(saveLoad.saveGame(v8), true);
+  const loaded = saveLoad.loadGame();
+  assert.equal(loaded?.schemaVersion, 8);
+  assert.equal(loaded?.tacticalBattle?.defenderGroups.find(group => group.id === muskets.id)?.line, 'middle');
+}
+
+{
+  const invalidLines = simulation.newGame(2026071459);
+  prepareFormationTestCombatants(invalidLines);
+  const battle = tactical.createTacticalBattle(invalidLines, {
+    factionName: 'invalid formation recovery', power: 40, warned: true, siege: false, mode: 'garrison',
+  });
+  for (const group of battle.defenderGroups) group.line = 'sideways';
+  assert.equal(saveLoad.saveGame(invalidLines), true);
+  const loaded = saveLoad.loadGame();
+  assert.ok(loaded?.tacticalBattle, 'invalid lines repair only the affected fields');
+  assert.equal(loaded.tacticalBattle.defenderGroups.find(group => group.kind === 'militia-musket')?.line, 'middle');
+  assert.ok(loaded.tacticalBattle.defenderGroups
+    .filter(group => ['militia-spear', 'militia-unarmed', 'watchman'].includes(group.kind))
+    .every(group => group.line === 'front'));
+  assert.ok(loaded.tacticalBattle.defenderGroups
+    .filter(group => ['militia-bow', 'hunter', 'civilian'].includes(group.kind))
+    .every(group => group.line === 'rear'));
 }
 
 function simulatingState(seed) {
@@ -180,7 +249,11 @@ for (const [field, seed] of [['events', 2026071451], ['lines', 2026071452]]) {
   assert.ok(loaded?.tacticalBattle);
   assert.ok(loaded.tacticalBattle.initialFriendlyPower > 0);
   assert.ok(loaded.tacticalBattle.initialEnemyPower > 0);
-  assert.ok(loaded.tacticalBattle.defenderGroups.every(group => group.line === 'front' || group.line === 'rear'));
+  assert.ok(loaded.tacticalBattle.defenderGroups
+    .every(group => group.line === 'front' || group.line === 'middle' || group.line === 'rear'));
+  assert.ok(loaded.tacticalBattle.defenderGroups
+    .filter(group => group.kind === 'militia-musket')
+    .every(group => group.line === 'middle'));
   assert.ok(loaded.tacticalBattle.defenderGroups
     .filter(group => ['militia-spear', 'militia-unarmed', 'watchman'].includes(group.kind))
     .every(group => group.line === 'front'));
