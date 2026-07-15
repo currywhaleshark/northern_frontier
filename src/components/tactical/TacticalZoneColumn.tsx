@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { combatSpriteDescriptor, tacticalGroupCapabilities } from '../../game/combatCapabilities';
-import { tacticalFocusTargetUnavailableReason } from '../../game/tacticalBattle';
+import { tacticalGroupTargetUnavailableReason } from '../../game/tacticalBattle';
 import type {
   GameState,
   PredatorKind,
@@ -54,7 +54,7 @@ interface Props {
   commandable: boolean;
   selectedGroupId: string | null;
   onSelectGroup: (groupId: string) => void;
-  onSelectTarget: (zoneId: string, groupId: string) => void;
+  onSelectTarget: (defenderGroupId: string, enemyGroupId: string) => void;
 }
 
 function defenderFormationRole(group: TacticalDefenderGroup): 'melee' | 'ranged' | 'civilian' {
@@ -653,12 +653,13 @@ export function TacticalZoneColumn({
             <span className="tactical-formation-line-label">적 {formationLineLabel(line)}</span>
             {raiders.filter(raider => raider.line === line).map(raider => {
           const activeRaiders = Math.max(0, raider.count - raider.killed);
-          const targetingActive = battle.phase === 'command' && !hunt && activeRaiders > 0;
-          const targetUnavailableReason = targetingActive
-            ? tacticalFocusTargetUnavailableReason(battle, zone.id, raider.id)
-            : null;
+          const targetingActive = battle.phase === 'command' && !hunt && activeRaiders > 0 && selectedGroupId != null;
+          const targetUnavailableReason = targetingActive && selectedGroupId
+            ? tacticalGroupTargetUnavailableReason(battle, selectedGroupId, raider.id)
+            : selectedGroupId == null ? '먼저 표적을 지정할 아군 부대를 선택하십시오.' : null;
           const targetable = targetingActive && targetUnavailableReason == null;
-          const focusTarget = zone.focusTargetGroupId === raider.id;
+          const selectedGroup = battle.defenderGroups.find(group => group.id === selectedGroupId);
+          const focusTarget = selectedGroup?.targetSource === 'player' && selectedGroup.targetGroupId === raider.id;
           const fallingRaiders = raider.revealed && activeEvent?.kind === 'casualty' && activeEvent.groupId === raider.id
             ? activeEvent.casualties ?? 0 : 0;
           const totalRaiders = activeRaiders + fallingRaiders;
@@ -682,7 +683,7 @@ export function TacticalZoneColumn({
               key={leaderMotion ? `${raider.id}-${activeEvent?.kind}-${eventIndex}` : raider.id}
               onClick={targetable ? event => {
                 event.stopPropagation();
-                onSelectTarget(zone.id, raider.id);
+                onSelectTarget(selectedGroupId!, raider.id);
               } : undefined}
               role={targetable ? 'button' : undefined}
               tabIndex={targetable ? 0 : undefined}
@@ -693,7 +694,7 @@ export function TacticalZoneColumn({
               onKeyDown={targetable ? event => {
                 if (event.key !== 'Enter' && event.key !== ' ') return;
                 event.preventDefault();
-                onSelectTarget(zone.id, raider.id);
+                onSelectTarget(selectedGroupId!, raider.id);
               } : undefined}
             >
               <div
@@ -737,12 +738,13 @@ export function TacticalZoneColumn({
       <div className={`tactical-rear-assault-rank${activeEvent?.kind === 'rearAssault' && activeEvent.zoneId === zone.id ? ' entering' : ''}${activeEvent?.kind === 'melee' && activeEvent.side === 'raider' && activeEvent.zoneId === zone.id && rearAssaulters.some(group => activeEvent.groupId == null || activeEvent.groupId === group.id) ? ' attacking' : ''}`}>
         {rearAssaulters.map(raider => {
           const activeRaiders = Math.max(0, raider.count - raider.killed);
-          const targetingActive = battle.phase === 'command' && !hunt && activeRaiders > 0;
-          const targetUnavailableReason = targetingActive
-            ? tacticalFocusTargetUnavailableReason(battle, zone.id, raider.id)
-            : null;
+          const targetingActive = battle.phase === 'command' && !hunt && activeRaiders > 0 && selectedGroupId != null;
+          const targetUnavailableReason = targetingActive && selectedGroupId
+            ? tacticalGroupTargetUnavailableReason(battle, selectedGroupId, raider.id)
+            : selectedGroupId == null ? '먼저 표적을 지정할 아군 부대를 선택하십시오.' : null;
           const targetable = targetingActive && targetUnavailableReason == null;
-          const focusTarget = zone.focusTargetGroupId === raider.id;
+          const selectedGroup = battle.defenderGroups.find(group => group.id === selectedGroupId);
+          const focusTarget = selectedGroup?.targetSource === 'player' && selectedGroup.targetGroupId === raider.id;
           const fallingRaiders = activeEvent?.kind === 'casualty' && activeEvent.groupId === raider.id
             ? activeEvent.casualties ?? 0 : 0;
           const totalRaiders = activeRaiders + fallingRaiders;
@@ -753,7 +755,7 @@ export function TacticalZoneColumn({
               key={raider.id}
               onClick={targetable ? event => {
                 event.stopPropagation();
-                onSelectTarget(zone.id, raider.id);
+                onSelectTarget(selectedGroupId!, raider.id);
               } : undefined}
               role={targetable ? 'button' : undefined}
               tabIndex={targetable ? 0 : undefined}
@@ -764,7 +766,7 @@ export function TacticalZoneColumn({
               onKeyDown={targetable ? event => {
                 if (event.key !== 'Enter' && event.key !== ' ') return;
                 event.preventDefault();
-                onSelectTarget(zone.id, raider.id);
+                onSelectTarget(selectedGroupId!, raider.id);
               } : undefined}
             >
               <div

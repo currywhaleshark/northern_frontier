@@ -47,31 +47,43 @@ function normalizedWeights(weights: ReadonlyArray<number>): number[] {
   return positive.map(() => 0);
 }
 
-function focusedAllocationWeights(
+export function targetedAllocationWeights(
   baseWeights: ReadonlyArray<number>,
-  focusIndex: number,
-  focusStrength: number,
+  targetDemands: ReadonlyArray<number>,
+  capacities: ReadonlyArray<number>,
+  maxFocusedShare = CONFIG.tacticalBattle.targeting.maxFocusedLossShare,
 ): number[] {
-  const weights = normalizedWeights(baseWeights);
-  if (focusIndex < 0 || focusIndex >= weights.length || focusStrength <= 0) return weights;
-  const otherShare = 1 - weights[focusIndex];
-  if (otherShare <= 0) return weights;
-  const maxShare = CONFIG.tacticalBattle.targeting.maxFocusedLossShare;
-  const focusedShare = Math.min(
-    maxShare,
-    weights[focusIndex] + otherShare * clamp(focusStrength, 0, 1),
-  );
-  const remainingShare = 1 - focusedShare;
-  return weights.map((weight, index) => index === focusIndex
-    ? focusedShare
-    : weight / otherShare * remainingShare);
+  const base = normalizedWeights(baseWeights);
+  const demands = targetDemands.map((demand, index) => capacities[index] > 0 ? Math.max(0, demand) : 0);
+  const demandTotal = demands.reduce((sum, demand) => sum + demand, 0);
+  if (demandTotal <= 0) return base;
+  const manualShare = clamp(demandTotal, 0, 1);
+  const demandDistribution = demands.map(demand => demand / demandTotal);
+  let weights = normalizedWeights(base.map((weight, index) =>
+    weight * (1 - manualShare) + demandDistribution[index] * manualShare));
+  const live = capacities.filter(capacity => capacity > 0).length;
+  if (live <= 1 || maxFocusedShare >= 1) return weights;
+  for (let pass = 0; pass < weights.length; pass += 1) {
+    const over = weights.map((weight, index) => capacities[index] > 0 ? Math.max(0, weight - maxFocusedShare) : 0);
+    const excess = over.reduce((sum, value) => sum + value, 0);
+    if (excess <= 1e-12) break;
+    weights = weights.map((weight, index) => weight - over[index]);
+    const receivers = weights.map((_weight, index) => index)
+      .filter(index => capacities[index] > 0 && weights[index] < maxFocusedShare - 1e-12);
+    if (receivers.length === 0) break;
+    const roomWeight = receivers.reduce((sum, index) => sum + Math.max(base[index], 1e-9), 0);
+    for (const index of receivers) {
+      weights[index] += excess * Math.max(base[index], 1e-9) / roomWeight;
+    }
+  }
+  return normalizedWeights(weights);
 }
 
 function integerAllocation(
   total: number,
   weights: ReadonlyArray<number>,
   capacities: ReadonlyArray<number>,
-  focusIndex = -1,
+  enforceFocusedCap = false,
 ): number[] {
   const allocation = weights.map(() => 0);
   let remaining = Math.min(
@@ -79,14 +91,14 @@ function integerAllocation(
     capacities.reduce((sum, capacity) => sum + Math.max(0, Math.floor(capacity)), 0),
   );
   const effectiveCapacities = capacities.map(capacity => Math.max(0, Math.floor(capacity)));
-  if (focusIndex >= 0 && focusIndex < effectiveCapacities.length) {
+  if (enforceFocusedCap && effectiveCapacities.filter(capacity => capacity > 0).length > 1) {
     const focusedCap = Math.ceil(remaining * CONFIG.tacticalBattle.targeting.maxFocusedLossShare);
-    const otherCapacity = effectiveCapacities.reduce(
-      (sum, capacity, index) => sum + (index === focusIndex ? 0 : capacity),
-      0,
-    );
-    if (otherCapacity >= remaining - focusedCap) {
-      effectiveCapacities[focusIndex] = Math.min(effectiveCapacities[focusIndex], focusedCap);
+    for (let index = 0; index < effectiveCapacities.length; index += 1) {
+      const otherCapacity = effectiveCapacities.reduce((sum, capacity, other) =>
+        sum + (other === index ? 0 : capacity), 0);
+      if (otherCapacity >= remaining - focusedCap) {
+        effectiveCapacities[index] = Math.min(effectiveCapacities[index], focusedCap);
+      }
     }
   }
 
@@ -124,7 +136,7 @@ function continuousAllocation(
   total: number,
   weights: ReadonlyArray<number>,
   capacities: ReadonlyArray<number>,
-  focusIndex = -1,
+  enforceFocusedCap = false,
 ): number[] {
   const allocation = weights.map(() => 0);
   let remaining = Math.min(
@@ -132,14 +144,14 @@ function continuousAllocation(
     capacities.reduce((sum, capacity) => sum + Math.max(0, capacity), 0),
   );
   const effectiveCapacities = capacities.map(capacity => Math.max(0, capacity));
-  if (focusIndex >= 0 && focusIndex < effectiveCapacities.length) {
+  if (enforceFocusedCap && effectiveCapacities.filter(capacity => capacity > 0).length > 1) {
     const focusedCap = remaining * CONFIG.tacticalBattle.targeting.maxFocusedLossShare;
-    const otherCapacity = effectiveCapacities.reduce(
-      (sum, capacity, index) => sum + (index === focusIndex ? 0 : capacity),
-      0,
-    );
-    if (otherCapacity >= remaining - focusedCap) {
-      effectiveCapacities[focusIndex] = Math.min(effectiveCapacities[focusIndex], focusedCap);
+    for (let index = 0; index < effectiveCapacities.length; index += 1) {
+      const otherCapacity = effectiveCapacities.reduce((sum, capacity, other) =>
+        sum + (other === index ? 0 : capacity), 0);
+      if (otherCapacity >= remaining - focusedCap) {
+        effectiveCapacities[index] = Math.min(effectiveCapacities[index], focusedCap);
+      }
     }
   }
   let eligible = weights.map((_, index) => index)
@@ -368,7 +380,6 @@ export interface EngagementExchangeInput {
   prepareVolleyApplied: boolean;
   evacuateCiviliansApplied: boolean;
   roundStartingRaiderPower: number;
-  focusTargetGroupId?: string;
   rangedEfficiency?: number;
   defenderPowerMultiplier?: (defender: TacticalDefenderGroup) => number;
   defenderCasualtyMultiplier?: (defender: TacticalDefenderGroup) => number;
@@ -597,33 +608,33 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     const expectedDeaths = enemyShare > 0.55 ? risk * 0.32 : 0;
     return [{ defender, active, risk, expectedCasualties: active * risk + expectedDeaths, expectedDeaths }];
   });
-  const enemyFocusTargetId = chooseTacticalEnemyFocusTarget(defenders, attackers, input.direction, zone.id);
-  const enemyFocusIndex = defenderRiskEntries.findIndex(entry => entry.defender.id === enemyFocusTargetId);
-  let enemyFocusStrength = 0;
-  if (enemyFocusIndex >= 0) {
-    const target = defenderRiskEntries[enemyFocusIndex].defender;
-    const targetContactLine = defenderContactLine(defenders, input.direction);
-    const enemyTargetingContext: TacticalTargetingContext = {
-      direction: input.direction,
-      contactLine: targetContactLine,
-      meleeContact: targetContactLine != null && defenders.some(group =>
-        group.line === targetContactLine && activeDefenderCount(group) > 0 &&
-        tacticalGroupCapabilities(group).has('melee')),
-      prepareVolleyApplied: false,
-    };
-    const focusedPower = attackers.reduce((sum, attacker) => {
-      if (attacker.confused || activeRaiderCount(attacker) <= 0) return sum;
-      const targeting = canTargetLine(attacker, target.line, enemyTargetingContext);
-      if (!targeting.allowed) return sum;
-      const power = attacker.power * (attacker.morale / 100) * (attacker.combatMultiplier ?? 1);
-      return sum + power * targeting.efficiency * tacticalTargetingConcentration(attacker);
-    }, 0);
-    enemyFocusStrength = rawEnemyPower > 0 ? clamp(focusedPower / rawEnemyPower, 0, 1) : 0;
+  const defenderCapacities = defenderRiskEntries.map(entry => entry.active);
+  const enemyTargetDemands = defenderRiskEntries.map(() => 0);
+  const targetContactLine = defenderContactLine(defenders, input.direction);
+  const enemyTargetingContext: TacticalTargetingContext = {
+    direction: input.direction,
+    contactLine: targetContactLine,
+    meleeContact: targetContactLine != null && defenders.some(group =>
+      group.line === targetContactLine && activeDefenderCount(group) > 0 &&
+      tacticalGroupCapabilities(group).has('melee')),
+    prepareVolleyApplied: false,
+  };
+  for (const attacker of attackers) {
+    if (attacker.confused || activeRaiderCount(attacker) <= 0 || !attacker.targetGroupId) continue;
+    const targetIndex = defenderRiskEntries.findIndex(entry => entry.defender.id === attacker.targetGroupId);
+    if (targetIndex < 0) continue;
+    const targeting = canTargetLine(attacker, defenderRiskEntries[targetIndex].defender.line, enemyTargetingContext);
+    if (!targeting.allowed) continue;
+    const effectivePower = attacker.power * (attacker.morale / 100) * (attacker.combatMultiplier ?? 1) *
+      (tacticalTargetingRole(attacker) === 'melee' ? 1 : input.rangedEfficiency ?? 1);
+    enemyTargetDemands[targetIndex] += rawEnemyPower > 0
+      ? effectivePower * targeting.efficiency * tacticalTargetingConcentration(attacker) / rawEnemyPower
+      : 0;
   }
-  const defenderWeights = focusedAllocationWeights(
+  const defenderWeights = targetedAllocationWeights(
     defenderRiskEntries.map(entry => entry.expectedCasualties),
-    enemyFocusIndex,
-    enemyFocusStrength,
+    enemyTargetDemands,
+    defenderCapacities,
   );
   const defenderCapacity = defenderRiskEntries.reduce((sum, entry) => sum + entry.active, 0);
   const defenderCasualtyBudget = randomRoundedBudget(
@@ -634,25 +645,25 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
   const defenderCasualties = integerAllocation(
     defenderCasualtyBudget,
     defenderWeights,
-    defenderRiskEntries.map(entry => entry.active),
-    enemyFocusIndex,
+    defenderCapacities,
+    enemyTargetDemands.some(demand => demand > 0),
   );
   const defenderDeathBudget = randomRoundedBudget(
     defenderRiskEntries.reduce((sum, entry) => sum + entry.expectedDeaths, 0),
     defenderCasualtyBudget,
     input.rng,
   );
-  const defenderDeathWeights = focusedAllocationWeights(
+  const defenderDeathWeights = targetedAllocationWeights(
     defenderRiskEntries.map(entry => entry.expectedDeaths),
-    enemyFocusIndex,
-    enemyFocusStrength,
+    enemyTargetDemands,
+    defenderCapacities,
   );
   const defenderDeaths = integerAllocation(
     defenderDeathBudget,
     defenderDeathWeights,
     defenderCasualties.map((casualties, index) =>
       Math.min(casualties, Math.max(0, defenderRiskEntries[index].active - 1))),
-    enemyFocusIndex,
+    enemyTargetDemands.some(demand => demand > 0),
   );
   for (let index = 0; index < defenderRiskEntries.length; index += 1) {
     const { defender } = defenderRiskEntries[index];
@@ -715,37 +726,36 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
       expectedPowerLoss: attacker.power * groupLossRate,
     };
   });
-  const playerFocusIndex = raiderLossEntries.findIndex(entry =>
-    entry.attacker.id === input.focusTargetGroupId && entry.activeRaiders > 0 &&
-    entry.attacker.intent !== 'withdraw' && entry.attacker.power > 0);
-  let playerFocusStrength = 0;
-  if (playerFocusIndex >= 0) {
-    const target = raiderLossEntries[playerFocusIndex].attacker;
-    const context = targetingContext(combatDefenders, attackers, input.direction, input.prepareVolleyApplied);
-    let totalFriendlyPower = 0;
-    let focusedFriendlyPower = 0;
-    for (const defender of combatDefenders) {
-      const active = activeDefenderCount(defender);
-      if (active <= 0) continue;
-      const survivingShare = defender.count > 0 ? active / defender.count : 0;
-      const readyPower = defender.weapon === 'musket'
-        ? tacticalGroupPower(defender, active)
-        : defender.power * survivingShare;
-      const powerMultiplier = input.defenderPowerMultiplier?.(defender) ?? commandPowerMultiplier(input, defender);
-      const effectivePower = readyPower * powerMultiplier;
-      totalFriendlyPower += effectivePower;
-      const targeting = canTargetLine(defender, target.line, context);
-      if (!targeting.allowed) continue;
-      focusedFriendlyPower += effectivePower * targeting.efficiency * tacticalTargetingConcentration(defender);
-    }
-    playerFocusStrength = totalFriendlyPower > 0
-      ? clamp(focusedFriendlyPower / totalFriendlyPower, 0, 1)
+  const raiderCapacities = raiderLossEntries.map(entry => entry.activeRaiders);
+  const playerTargetDemands = raiderLossEntries.map(() => 0);
+  const context = targetingContext(combatDefenders, attackers, input.direction, input.prepareVolleyApplied);
+  const defenderEffectivePowers = combatDefenders.map(defender => {
+    const active = activeDefenderCount(defender);
+    if (active <= 0) return 0;
+    const survivingShare = defender.count > 0 ? active / defender.count : 0;
+    const readyPower = defender.weapon === 'musket'
+      ? tacticalGroupPower(defender, active)
+      : defender.power * survivingShare;
+    return readyPower * (input.defenderPowerMultiplier?.(defender) ?? commandPowerMultiplier(input, defender));
+  });
+  const totalFriendlyPower = defenderEffectivePowers.reduce((sum, power) => sum + power, 0);
+  for (let defenderIndex = 0; defenderIndex < combatDefenders.length; defenderIndex += 1) {
+    const defender = combatDefenders[defenderIndex];
+    if (defender.targetSource !== 'player' || !defender.targetGroupId) continue;
+    const targetIndex = raiderLossEntries.findIndex(entry => entry.attacker.id === defender.targetGroupId &&
+      entry.activeRaiders > 0 && entry.attacker.intent !== 'withdraw' && entry.attacker.power > 0);
+    if (targetIndex < 0) continue;
+    const targeting = canTargetLine(defender, raiderLossEntries[targetIndex].attacker.line, context);
+    if (!targeting.allowed) continue;
+    playerTargetDemands[targetIndex] += totalFriendlyPower > 0
+      ? defenderEffectivePowers[defenderIndex] * targeting.efficiency * tacticalTargetingConcentration(defender) /
+        totalFriendlyPower
       : 0;
   }
-  const raiderCasualtyWeights = focusedAllocationWeights(
+  const raiderCasualtyWeights = targetedAllocationWeights(
     raiderLossEntries.map(entry => entry.expectedKilled),
-    playerFocusIndex,
-    playerFocusStrength,
+    playerTargetDemands,
+    raiderCapacities,
   );
   const raiderCasualtyCapacity = raiderLossEntries.reduce((sum, entry) => sum + entry.activeRaiders, 0);
   const raiderCasualtyBudget = randomRoundedBudget(
@@ -756,20 +766,20 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
   const raiderCasualties = integerAllocation(
     raiderCasualtyBudget,
     raiderCasualtyWeights,
-    raiderLossEntries.map(entry => entry.activeRaiders),
-    playerFocusIndex,
+    raiderCapacities,
+    playerTargetDemands.some(demand => demand > 0),
   );
-  const powerLossWeights = focusedAllocationWeights(
+  const powerLossWeights = targetedAllocationWeights(
     raiderLossEntries.map(entry => entry.expectedPowerLoss),
-    playerFocusIndex,
-    playerFocusStrength,
+    playerTargetDemands,
+    raiderLossEntries.map(entry => entry.attacker.power),
   );
   const totalPowerLoss = raiderLossEntries.reduce((sum, entry) => sum + entry.expectedPowerLoss, 0);
   const allocatedPowerLoss = continuousAllocation(
     totalPowerLoss,
     powerLossWeights,
     raiderLossEntries.map(entry => entry.attacker.power),
-    playerFocusIndex,
+    playerTargetDemands.some(demand => demand > 0),
   );
   for (let index = 0; index < raiderLossEntries.length; index += 1) {
     const { attacker } = raiderLossEntries[index];

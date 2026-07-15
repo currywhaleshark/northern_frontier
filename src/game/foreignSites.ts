@@ -229,6 +229,16 @@ export function ensureForeignSiteState(state: GameState): void {
       if (site.lairDoctrine !== 'trailAttrition' && site.lairDoctrine !== 'wallHold' &&
           site.lairDoctrine !== 'leaderEscape') site.lairDoctrine = undefined;
       site.lairDoctrineRevealed = site.lairDoctrine != null && site.lairDoctrineRevealed === true;
+      site.lairDoctrineRevision = Number.isFinite(site.lairDoctrineRevision)
+        ? Math.max(0, Math.floor(site.lairDoctrineRevision!)) : 0;
+      site.lairDoctrineChosenDay = Number.isFinite(site.lairDoctrineChosenDay)
+        ? Math.floor(site.lairDoctrineChosenDay!) : state.day;
+      site.lairDoctrineNextReviewDay = Number.isFinite(site.lairDoctrineNextReviewDay)
+        ? Math.floor(site.lairDoctrineNextReviewDay!)
+        : Math.max(
+          state.day + CONFIG.foreignSites.banditLairDefense.doctrineReviewIntervalDays,
+          (site.scoutedUntilDay ?? -1) + 1,
+        );
     }
   }
 }

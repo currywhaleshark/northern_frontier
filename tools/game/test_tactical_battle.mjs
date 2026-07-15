@@ -499,45 +499,52 @@ function addBuiltMarker(state, type) {
   const state = simulation.newGame(2026071487);
   prepareDefenders(state);
   const battle = tactical.createTacticalBattle(state, {
-    factionName: 'zone focus target', power: 72, warned: true, siege: false, mode: 'garrison',
+    factionName: 'group target selection', power: 72, warned: true, siege: false, mode: 'garrison',
   });
   assert.equal(tactical.advanceTacticalPhase(state), null);
   assert.equal(tactical.advanceTacticalPhase(state), null);
   const zone = battle.zones.find(candidate => candidate.id === 'wall');
-  const target = battle.raiderGroups[0];
-  assert.ok(zone && target);
-  Object.assign(target, {
-    zoneId: zone.id, revealed: true, intent: 'advance', power: 200, count: 50, killed: 0,
-  });
+  const spear = battle.defenderGroups.find(group => group.weapon === 'spear');
+  const musket = battle.defenderGroups.find(group => group.weapon === 'musket');
+  const bow = battle.defenderGroups.find(group => group.weapon === 'hornBow');
+  assert.ok(zone && spear && musket && bow);
+  Object.assign(spear, { zoneId: zone.id, line: 'front', command: 'hold' });
+  Object.assign(musket, { zoneId: zone.id, line: 'middle', command: 'volley' });
+  Object.assign(bow, { zoneId: zone.id, line: 'rear', command: 'volley' });
+  const [front, middle, rear] = battle.raiderGroups;
+  Object.assign(front, { zoneId: zone.id, line: 'front', revealed: true, intent: 'advance', power: 90, count: 30, killed: 0, rearAssault: false });
+  Object.assign(middle, { zoneId: zone.id, line: 'middle', revealed: true, intent: 'advance', power: 90, count: 30, killed: 0, rearAssault: false });
+  Object.assign(rear, { zoneId: zone.id, line: 'rear', revealed: true, intent: 'advance', power: 90, count: 30, killed: 0, rearAssault: false });
 
-  assert.equal(tactical.setTacticalFocusTarget(state, zone.id, target.id), null);
-  assert.equal(zone.focusTargetGroupId, target.id);
-  assert.equal(zone.focusTargetSource, 'player');
-  tactical.normalizeTacticalFocusTargets(battle);
-  assert.equal(zone.focusTargetGroupId, target.id, 'a valid player target persists across command refreshes');
+  assert.match(tactical.tacticalGroupTargetUnavailableReason(battle, spear.id, rear.id), /접촉 열/);
+  assert.match(tactical.tacticalGroupTargetUnavailableReason(battle, musket.id, rear.id), /후열/);
+  assert.equal(tactical.tacticalGroupTargetUnavailableReason(battle, bow.id, rear.id), null);
+  assert.equal(tactical.setTacticalGroupTarget(state, spear.id, front.id), null);
+  assert.equal(tactical.setTacticalGroupTarget(state, musket.id, middle.id), null);
+  assert.equal(tactical.setTacticalGroupTarget(state, bow.id, rear.id), null);
+  assert.deepEqual([spear.targetGroupId, musket.targetGroupId, bow.targetGroupId], [front.id, middle.id, rear.id],
+    'three friendly groups can keep three independent targets in one zone');
+  assert.ok([spear, musket, bow].every(group => group.targetSource === 'player'));
 
-  target.revealed = false;
-  assert.match(tactical.setTacticalFocusTarget(state, zone.id, target.id), /드러나지 않은/);
-  assert.equal(zone.focusTargetGroupId, target.id, 'a rejected hidden target does not replace the prior selection');
-  target.revealed = true;
-  target.zoneId = 'storehouse';
-  tactical.normalizeTacticalFocusTargets(battle);
-  assert.equal(zone.focusTargetGroupId, undefined, 'a target that leaves the zone returns that zone to auto');
-  assert.equal(zone.focusTargetSource, 'auto');
+  rear.revealed = false;
+  assert.match(tactical.setTacticalGroupTarget(state, bow.id, rear.id), /드러나지 않은/);
+  assert.equal(bow.targetGroupId, rear.id, 'a rejected hidden target does not replace the prior target');
+  rear.revealed = true;
+  rear.zoneId = 'storehouse';
+  tactical.normalizeTacticalGroupTargets(battle);
+  assert.equal(bow.targetSource, 'auto', 'a target that leaves the zone returns only its attacker to auto');
+  assert.equal(spear.targetGroupId, front.id, 'another group keeps its still-valid independent target');
 
-  target.zoneId = zone.id;
-  target.intent = 'withdraw';
-  zone.focusTargetGroupId = target.id;
-  zone.focusTargetSource = 'player';
-  tactical.normalizeTacticalFocusTargets(battle);
-  assert.equal(zone.focusTargetSource, 'auto', 'a withdrawing target returns to auto');
-
-  target.intent = 'advance';
-  target.killed = target.count;
-  zone.focusTargetGroupId = target.id;
-  zone.focusTargetSource = 'player';
-  tactical.normalizeTacticalFocusTargets(battle);
-  assert.equal(zone.focusTargetSource, 'auto', 'an eliminated target returns to auto');
+  rear.zoneId = zone.id;
+  rear.rearAssault = true;
+  rear.line = 'rear';
+  tactical.normalizeTacticalGroupTargets(battle);
+  assert.match(tactical.tacticalGroupTargetUnavailableReason(battle, spear.id, rear.id), /정면 교전/);
+  Object.assign(spear, { line: 'middle', command: 'reinforceRear' });
+  assert.equal(tactical.tacticalGroupTargetUnavailableReason(battle, spear.id, rear.id), null,
+    'a middle melee reserve ordered to reinforce the rear may target the rear assault');
+  assert.equal(tactical.setTacticalGroupTarget(state, bow.id, null), null);
+  assert.equal(bow.targetSource, 'auto');
 }
 
 {
@@ -1436,8 +1443,11 @@ function addBuiltMarker(state, type) {
     roundStartingRaiderPower: attackers.reduce((sum, group) => sum + group.power, 0),
   };
   const auto = tacticalEngagement.resolveEngagementExchange({ ...input, rng: () => 0.2 });
+  const focusedDefenders = defenders.map(group => group.id === 'rear-bow'
+    ? { ...group, targetGroupId: 'rear-command', targetSource: 'player' }
+    : { ...group, targetSource: 'auto' });
   const focused = tacticalEngagement.resolveEngagementExchange({
-    ...input, focusTargetGroupId: 'rear-command', rng: () => 0.2,
+    ...input, defenders: focusedDefenders, rng: () => 0.2,
   });
   const totalKilled = result => result.raiderLosses.reduce((sum, loss) => sum + loss.killed, 0);
   const totalPowerLost = result => attackers.reduce((sum, group) => {
@@ -1466,10 +1476,30 @@ function addBuiltMarker(state, type) {
     ...input, defenders: defenders.slice(0, 2), rng: () => 0.2,
   });
   const unreachableFocus = tacticalEngagement.resolveEngagementExchange({
-    ...input, defenders: defenders.slice(0, 2), focusTargetGroupId: 'rear-command', rng: () => 0.2,
+    ...input,
+    defenders: defenders.slice(0, 2).map(group => ({
+      ...group, targetGroupId: 'rear-command', targetSource: 'player',
+    })),
+    rng: () => 0.2,
   });
   assert.deepEqual(unreachableFocus.raiderLosses, unreachableAuto.raiderLosses,
     'troops that cannot reach the selected line leave the automatic loss distribution unchanged');
+
+  const multiTarget = tacticalEngagement.resolveEngagementExchange({
+    ...input,
+    defenders: defenders.map((group, index) => ({
+      ...group,
+      targetGroupId: attackers[index].id,
+      targetSource: 'player',
+    })),
+    rng: () => 0.2,
+  });
+  assert.equal(totalKilled(multiTarget), totalKilled(auto),
+    'multiple friendly targets preserve the fixed integer casualty budget');
+  assert.ok(Math.abs(totalPowerLost(multiTarget) - totalPowerLost(auto)) < 1e-9,
+    'multiple friendly targets preserve the fixed continuous power-loss budget');
+  assert.ok(multiTarget.raiderLosses.every(loss => loss.killed <= Math.ceil(totalKilled(multiTarget) * 0.7)),
+    'no one of several surviving targets receives more than 70% of the casualty budget');
 
   const civilian = {
     ...defender('protected-civilians', null, 'rear', null, 0),
@@ -1478,19 +1508,35 @@ function addBuiltMarker(state, type) {
   const rearAttacker = raider('rear-flanker', 'rear', 'bandit-rider', 'flank', {
     kind: 'flankers', rearAssault: true,
   });
-  assert.equal(tacticalEngagement.chooseTacticalEnemyFocusTarget(
-    [...defenders, civilian], [raider('main', 'front', 'bandit-vanguard')], 'frontal', 'wall',
-  ), 'front-spear');
-  assert.equal(tacticalEngagement.chooseTacticalEnemyFocusTarget(
-    [...defenders, { ...defenders[0], id: 'store-guard', command: 'guardStorehouse', zoneId: 'storehouse' }],
-    [raider('looter', 'front', 'bandit-looter', 'loot', { zoneId: 'storehouse' })], 'frontal', 'storehouse',
-  ), 'store-guard');
-  assert.equal(tacticalEngagement.chooseTacticalEnemyFocusTarget(
-    [...defenders, civilian], [rearAttacker], 'rear', 'wall',
-  ), 'rear-bow');
-  assert.equal(tacticalEngagement.chooseTacticalEnemyFocusTarget(
-    defenders, [raider('gunner', 'middle', 'court-gunner')], 'frontal', 'wall',
-  ), 'middle-musket');
+  const frontalMelee = raider('main', 'front', 'bandit-vanguard');
+  const rangedAttacker = raider('gunner', 'middle', 'court-gunner');
+  const targetingBattle = {
+    ...input,
+    zones: [zone],
+    defenderGroups: [...defenders, civilian],
+    raiderGroups: [frontalMelee, rangedAttacker, rearAttacker],
+    prepActions: [],
+  };
+  assert.equal(tactical.chooseAutomaticRaiderTarget(targetingBattle, frontalMelee), 'front-spear');
+  assert.equal(tactical.chooseAutomaticRaiderTarget(targetingBattle, rangedAttacker), 'middle-musket');
+  assert.equal(tactical.chooseAutomaticRaiderTarget(targetingBattle, rearAttacker), 'rear-bow');
+  const storeGuard = { ...defenders[0], id: 'store-guard', command: 'guardStorehouse', zoneId: 'storehouse' };
+  const looter = raider('looter', 'front', 'bandit-looter', 'loot', { zoneId: 'storehouse' });
+  targetingBattle.defenderGroups.push(storeGuard);
+  targetingBattle.raiderGroups.push(looter);
+  assert.equal(tactical.chooseAutomaticRaiderTarget(targetingBattle, looter), 'store-guard');
+
+  const aiAuto = tacticalEngagement.resolveEngagementExchange({ ...input, rng: () => 0.2 });
+  const aiTargeted = tacticalEngagement.resolveEngagementExchange({
+    ...input,
+    attackers: attackers.map((group, index) => ({
+      ...group, targetGroupId: defenders[index].id, targetSource: 'ai',
+    })),
+    rng: () => 0.2,
+  });
+  assert.equal(aiTargeted.defenderLosses.reduce((sum, loss) => sum + loss.wounded + loss.killed, 0),
+    aiAuto.defenderLosses.reduce((sum, loss) => sum + loss.wounded + loss.killed, 0),
+    'enemy group targets redistribute but never create a new friendly casualty budget');
 }
 
 {

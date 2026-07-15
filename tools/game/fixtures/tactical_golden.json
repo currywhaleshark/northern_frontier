@@ -1024,7 +1024,7 @@
           {
             "id": "nimacha-spears",
             "killed": 0,
-            "power": 13.742484140907097,
+            "power": 13.704959400430344,
             "morale": 63,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -1189,7 +1189,7 @@
           {
             "id": "nimacha-spears",
             "killed": 0,
-            "power": 12.794390896665838,
+            "power": 12.733996627384172,
             "morale": 54,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -1349,7 +1349,7 @@
           {
             "id": "nimacha-spears",
             "killed": 1,
-            "power": 11.903860101375619,
+            "power": 11.825543540126512,
             "morale": 45,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -1526,7 +1526,7 @@
           {
             "id": "nimacha-spears",
             "killed": 1,
-            "power": 11.089006937791002,
+            "power": 10.99247708561465,
             "morale": 38,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -1840,7 +1840,7 @@
           {
             "id": "holaon-archers",
             "killed": 0,
-            "power": 14.78262510494297,
+            "power": 14.746477914294445,
             "morale": 69,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -2007,7 +2007,7 @@
           {
             "id": "holaon-archers",
             "killed": 0,
-            "power": 13.929846681866643,
+            "power": 13.8540594183549,
             "morale": 60,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -2161,7 +2161,7 @@
           {
             "id": "holaon-archers",
             "killed": 0,
-            "power": 13.090713271965207,
+            "power": 12.986508027837681,
             "morale": 51,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -2321,7 +2321,7 @@
           {
             "id": "holaon-archers",
             "killed": 1,
-            "power": 12.282793926431312,
+            "power": 12.157698449175669,
             "morale": 44,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -3913,12 +3913,12 @@
           },
           {
             "id": "militia-spear",
-            "wounded": 1,
+            "wounded": 0,
             "killed": 0
           },
           {
             "id": "militia-unarmed",
-            "wounded": 0,
+            "wounded": 1,
             "killed": 0
           },
           {
@@ -4031,7 +4031,7 @@
           {
             "zoneId": "wall",
             "kind": "casualty",
-            "groupId": "militia-spear"
+            "groupId": "militia-unarmed"
           },
           {
             "zoneId": "wall",

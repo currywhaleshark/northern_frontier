@@ -9,9 +9,8 @@ import { applyBanditLairOutcome, type BanditLairOutcome } from './siteDiplomacy'
 import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
 import { resolveEngagementExchange } from './tacticalEngagement';
 import {
-  banditLairDoctrineDefinition, ensureBanditLairDefensePlan,
+  banditLairDoctrineDefinition, ensureBanditLairDefensePlan, refreshBanditLairDoctrine,
 } from './enemyPlan';
-import { defaultRaiderFormationLine } from './tacticalTargeting';
 import {
   captureTacticalResources, gradeTacticalBattle, tacticalClosingSummary, tacticalDateLabel,
   tacticalDefenderShotCounts, tacticalOutcomeResult, tacticalPeopleReport,
@@ -158,15 +157,33 @@ function banditGroup(
   power: number,
   count: number,
   unitType: TacticalRaiderGroup['unitType'],
+  line: TacticalRaiderGroup['line'],
+  kind: TacticalRaiderGroup['kind'],
   revealed: boolean,
   morale: number,
+  leader = false,
 ): TacticalRaiderGroup {
   return {
-    id, kind: id.includes('leader') ? 'main' : id.includes('archer') ? 'flankers' : 'looters',
-    unitType, label, zoneId, line: defaultRaiderFormationLine(unitType, id.includes('leader')),
-    targetZoneId: zoneId, power: Math.max(1, power), count: Math.max(1, count),
+    id, kind,
+    unitType, label, zoneId, line,
+    targetZoneId: zoneId, power, count,
     killed: 0, morale, intent: 'defend', revealed, engagementsInZone: 0,
+    leader,
   };
+}
+
+type LairGroupKey = keyof typeof CONFIG.foreignSites.banditLairDefense.groupPowerShares.base;
+
+function largestRemainder(total: number, weights: ReadonlyArray<number>): number[] {
+  const normalizedTotal = weights.reduce((sum, weight) => sum + Math.max(0, weight), 0);
+  if (total <= 0 || normalizedTotal <= 0) return weights.map(() => 0);
+  const quotas = weights.map(weight => total * Math.max(0, weight) / normalizedTotal);
+  const result = quotas.map(Math.floor);
+  let remaining = total - result.reduce((sum, value) => sum + value, 0);
+  const ranked = quotas.map((quota, index) => ({ index, remainder: quota - Math.floor(quota) }))
+    .sort((a, b) => b.remainder - a.remainder || a.index - b.index);
+  for (let index = 0; index < remaining; index += 1) result[ranked[index].index] += 1;
+  return result;
 }
 
 function banditDefenders(
@@ -177,20 +194,46 @@ function banditDefenders(
   const config = CONFIG.foreignSites.banditLairDefense;
   const effectScale = doctrineEffectScale(plan);
   const totalCount = Math.max(4, Math.round(power / 9));
-  return [
-    banditGroup('lair-sentries', '산채 초병', 'lairTrail', power * 0.16, totalCount * 0.18, 'bandit-vanguard', true, 68),
-    banditGroup('lair-archers', '목책 궁수', 'lairWall', power * 0.27, totalCount * 0.27, 'bandit-rider', scouted, 74),
-    banditGroup('lair-yard', '마적 주력', 'lairYard', power * 0.31, totalCount * 0.31, 'bandit-vanguard', scouted, 78),
-    banditGroup('lair-leader', '두목 친위대', 'lairKeep', power * 0.26, totalCount * 0.24, 'bandit-looter', scouted, 86),
-  ].map(group => ({
-    ...group,
-    count: Math.max(1, Math.round(group.count)),
-    combatMultiplier: group.id === 'lair-sentries' && plan.doctrine === 'trailAttrition'
-      ? 1 + config.trailAttrition.sentryCombatBonus * effectScale
-      : group.id === 'lair-archers' && plan.doctrine === 'wallHold'
-        ? 1 + config.wallHold.wallCombatBonus * effectScale
-        : group.combatMultiplier,
-  }));
+  const definitions: Array<{
+    key: LairGroupKey;
+    id: string;
+    label: string;
+    zoneId: string;
+    unitType: NonNullable<TacticalRaiderGroup['unitType']>;
+    line: TacticalRaiderGroup['line'];
+    kind: TacticalRaiderGroup['kind'];
+    morale: number;
+    leader?: boolean;
+  }> = [
+    { key: 'sentries', id: 'lair-sentries', label: '산채 초병', zoneId: 'lairTrail', unitType: 'bandit-vanguard', line: 'front', kind: 'main', morale: 68 },
+    { key: 'trailArchers', id: 'lair-trail-archers', label: '숲길 매복 사수', zoneId: 'lairTrail', unitType: 'bandit-rider', line: 'middle', kind: 'flankers', morale: 72 },
+    { key: 'wallSpears', id: 'lair-wall-spears', label: '목책 창잡이', zoneId: 'lairWall', unitType: 'bandit-vanguard', line: 'front', kind: 'main', morale: 76 },
+    { key: 'wallArchers', id: 'lair-wall-archers', label: '목책 궁수', zoneId: 'lairWall', unitType: 'bandit-rider', line: 'middle', kind: 'flankers', morale: 74 },
+    { key: 'yardVanguard', id: 'lair-yard-vanguard', label: '마적 주력', zoneId: 'lairYard', unitType: 'bandit-vanguard', line: 'front', kind: 'main', morale: 78 },
+    { key: 'yardSkirmishers', id: 'lair-yard-skirmishers', label: '마적 사수', zoneId: 'lairYard', unitType: 'bandit-rider', line: 'middle', kind: 'looters', morale: 76 },
+    { key: 'leaderGuard', id: 'lair-leader-guard', label: '두목 친위대', zoneId: 'lairKeep', unitType: 'bandit-vanguard', line: 'front', kind: 'main', morale: 86 },
+    { key: 'keepArchers', id: 'lair-keep-archers', label: '움막 사수', zoneId: 'lairKeep', unitType: 'bandit-rider', line: 'middle', kind: 'flankers', morale: 80 },
+    { key: 'leaderEscapeGroup', id: 'lair-leader', label: '두목·탈출 준비조', zoneId: 'lairKeep', unitType: 'bandit-looter', line: 'rear', kind: 'looters', morale: 88, leader: true },
+  ];
+  const shifts = config.groupPowerShares.doctrineShift[plan.doctrine];
+  const weights = definitions.map(definition => Math.max(0, config.groupPowerShares.base[definition.key] + shifts[definition.key]));
+  const counts = largestRemainder(totalCount, weights);
+  const included = definitions.map((definition, index) => ({ definition, count: counts[index], weight: weights[index] }))
+    .filter(entry => entry.count > 0);
+  const includedWeight = included.reduce((sum, entry) => sum + entry.weight, 0);
+  return included.map(({ definition, count, weight }) => {
+    const group = banditGroup(
+      definition.id, definition.label, definition.zoneId, power * weight / includedWeight, count,
+      definition.unitType, definition.line, definition.kind,
+      definition.id === 'lair-sentries' || scouted, definition.morale, definition.leader,
+    );
+    if (plan.doctrine === 'trailAttrition' && definition.zoneId === 'lairTrail') {
+      group.combatMultiplier = 1 + config.trailAttrition.sentryCombatBonus * effectScale;
+    } else if (plan.doctrine === 'wallHold' && definition.zoneId === 'lairWall') {
+      group.combatMultiplier = 1 + config.wallHold.wallCombatBonus * effectScale;
+    }
+    return group;
+  });
 }
 
 function preparationPoints(groups: TacticalDefenderGroup[], scouted: boolean): number {
@@ -210,6 +253,7 @@ export function createBanditLairTacticalAssault(state: GameState): TacticalBattl
   const groups = createExpeditionTacticalGroups(state, expedition.memberIds);
   if (groups.reduce((sum, group) => sum + group.count, 0) < 2) return '직접 지휘할 토벌대원이 부족합니다.';
   const scouted = (site.scoutedUntilDay ?? 0) >= state.day;
+  refreshBanditLairDoctrine(state, site);
   const storedLairDefensePlan = ensureBanditLairDefensePlan(site);
   const lairDefensePlan: BanditLairDefensePlan = {
     ...storedLairDefensePlan,
@@ -434,7 +478,7 @@ function addEvent(
 
 function breachThreshold(zoneId: string): number {
   if (zoneId === 'lairTrail') return 50;
-  if (zoneId === 'lairWall') return 95;
+  if (zoneId === 'lairWall') return 93;
   if (zoneId === 'lairYard') return 90;
   return 95;
 }
@@ -528,9 +572,6 @@ export function resolveAssaultRound(state: GameState): string | null {
     prepareVolleyApplied: false,
     evacuateCiviliansApplied: false,
     roundStartingRaiderPower: Math.max(1, enemies.reduce((sum, group) => sum + group.power, 0)),
-    focusTargetGroupId: enemies.some(group => group.id === zone.focusTargetGroupId)
-      ? zone.focusTargetGroupId
-      : undefined,
     defenderPowerMultiplier: commandPower,
     defenderCasualtyMultiplier: assaultCommandCasualtyMultiplier,
     raiderLossRateScale: 2,

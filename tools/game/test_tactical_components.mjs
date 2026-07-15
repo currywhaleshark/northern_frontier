@@ -16,8 +16,13 @@ assert.match(screenSource, /enemyPlanCounterLabelsForAction/,
 
 assert.match(planSource, /objectiveRevealed/, 'enemy plan panel must hide an unrevealed objective');
 assert.match(planSource, /미확인 계책/, 'enemy plan panel must show the hidden stratagem count');
-assert.match(planSource, /완전 대응/, 'enemy plan panel must label fully countered stratagems');
-assert.match(planSource, /부분 대응/, 'enemy plan panel must label partially countered stratagems');
+assert.match(planSource, /enemyStratagemCounterStrength/,
+  'enemy plan panel must derive a continuous combined counter percentage');
+assert.match(planSource, /완전 대응/, 'enemy plan panel must label only 100% counters as complete');
+assert.match(planSource, /부분 대응.*%/, 'enemy plan panel must show partial counters as a percentage');
+assert.match(screenSource, /산채 교리:.*미확인/, 'expired lair intel must render doctrine as unidentified');
+assert.match(screenSource, /이전 정찰 정보가 오래되었습니다/, 'expired lair intel must warn that prior scouting is stale');
+assert.match(screenSource, /계책점수/, 'revealed lair doctrine summary must include its stratagem score');
 
 for (const className of [
   'tactical-zone-heading',
@@ -31,11 +36,13 @@ for (const className of [
 assert.match(zoneSource, /data-zone-id=\{zone\.id\}/, 'zone identity must remain on the extracted section');
 assert.match(zoneSource, /onSelectGroup\(group\.id\)/, 'battlefield groups must remain selectable');
 assert.match(zoneSource, /onSelectTarget/,
-  'revealed enemy groups must expose the zone focus-target callback');
+  'revealed enemy groups must expose the selected friendly group target callback');
 assert.match(zoneSource, /focus-target/,
   'the selected enemy group must have a persistent focus-target marker');
-assert.match(zoneSource, /tacticalFocusTargetUnavailableReason/,
-  'enemy target controls must expose a line-reachability reason');
+assert.match(zoneSource, /tacticalGroupTargetUnavailableReason/,
+  'enemy target controls must validate reach for the currently selected friendly group');
+assert.match(zoneSource, /selectedGroupId/,
+  'enemy target controls must be scoped to the currently selected friendly group');
 assert.match(zoneSource, /target-unavailable/,
   'enemy groups outside every friendly weapon reach must render disabled');
 assert.match(zoneSource, /\['front', 'middle', 'rear'\]/,
@@ -54,6 +61,11 @@ assert.match(chipSource, /disabled=\{active === 0\}/, 'routed group chips must r
 assert.match(chipSource, /tactical-dock-command/, 'command status must remain inside each chip');
 assert.match(chipSource, /group\.line === 'middle' \? '중열'/,
   'group chips must distinguish the middle line');
+assert.match(chipSource, /표적:/, 'group chips must show their own target state');
+assert.match(chipSource, /자동/, 'automatic target state must be explicit');
+assert.match(screenSource, /자동 표적/, 'the command panel must provide an explicit automatic-target button');
+assert.match(screenSource, /onSetGroupTarget/, 'the screen must update one friendly group target at a time');
+assert.doesNotMatch(screenSource, /focusTargetGroupId/, 'the current UI must not use the legacy zone focus target');
 
 const threeLineToggleCount = [...screenSource.matchAll(/\['front', 'middle', 'rear'\] as const/g)].length;
 assert.equal(threeLineToggleCount, 2, 'deployment and command controls must both expose three formation lines');

@@ -23,6 +23,7 @@ import { allocateMusketReadiness, reconcileWeaponAssignments, resolvedWeaponAssi
 import { beginExpeditionReturn } from './expedition';
 import { CURRENT_SCHEMA_VERSION } from './saveSchema';
 import { defaultRaiderFormationLine } from './tacticalTargeting';
+import { normalizeTacticalGroupTargets } from './tacticalBattle';
 import {
   gradeTacticalBattle, raidDefenseObjectiveResult, tacticalClosingSummary, tacticalOutcomeResult,
 } from './tacticalCore';
@@ -74,6 +75,45 @@ export function migrateV7ToV8(raw: RawSave): RawSave {
   return { ...raw, schemaVersion: 8 };
 }
 
+export function migrateV8ToV9(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const battle = migrated.tacticalBattle && typeof migrated.tacticalBattle === 'object'
+    ? migrated.tacticalBattle as RawSave
+    : null;
+  const plan = battle?.enemyPlan && typeof battle.enemyPlan === 'object'
+    ? battle.enemyPlan as RawSave
+    : null;
+  if (Array.isArray(plan?.stratagems)) {
+    for (const entry of plan.stratagems) {
+      if (!entry || typeof entry !== 'object') continue;
+      const stratagem = entry as RawSave;
+      stratagem.counter = stratagem.counterLevel === 2
+        ? { intelligence: 1 }
+        : stratagem.counterLevel === 1 ? { preparation: 0.6 } : {};
+    }
+  }
+  const day = Number.isFinite(migrated.day) ? Math.max(1, Math.floor(Number(migrated.day))) : 1;
+  if (Array.isArray(migrated.foreignSites)) {
+    for (const entry of migrated.foreignSites) {
+      if (!entry || typeof entry !== 'object') continue;
+      const site = entry as RawSave;
+      if (site.type !== 'banditLair') continue;
+      site.lairDoctrineRevision = Number.isFinite(site.lairDoctrineRevision)
+        ? Math.max(0, Math.floor(Number(site.lairDoctrineRevision))) : 0;
+      site.lairDoctrineChosenDay = Number.isFinite(site.lairDoctrineChosenDay)
+        ? Math.floor(Number(site.lairDoctrineChosenDay)) : day;
+      site.lairDoctrineNextReviewDay = Number.isFinite(site.lairDoctrineNextReviewDay)
+        ? Math.floor(Number(site.lairDoctrineNextReviewDay))
+        : Math.max(
+          day + CONFIG.foreignSites.banditLairDefense.doctrineReviewIntervalDays,
+          (Number.isFinite(site.scoutedUntilDay) ? Math.floor(Number(site.scoutedUntilDay)) : -1) + 1,
+        );
+    }
+  }
+  migrated.schemaVersion = 9;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   let version = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -86,6 +126,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 5) migrated = migrateV5ToV6(migrated);
     else if (version === 6) migrated = migrateV6ToV7(migrated);
     else if (version === 7) migrated = migrateV7ToV8(migrated);
+    else if (version === 8) migrated = migrateV8ToV9(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -272,6 +313,8 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       line,
       pendingLine,
       ambushed: group.ambushed === true,
+      targetGroupId: typeof group.targetGroupId === 'string' ? group.targetGroupId : undefined,
+      targetSource: group.targetSource === 'player' ? 'player' : 'auto',
     }];
   });
 
@@ -305,6 +348,8 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       flankPlan: group.flankPlan === 'rearAssault' || group.flankPlan === 'breakthrough' ? group.flankPlan : undefined,
       flankPlanRevealed: group.flankPlanRevealed === true,
       rearAssault: group.rearAssault === true,
+      targetGroupId: typeof group.targetGroupId === 'string' ? group.targetGroupId : undefined,
+      targetSource: 'ai',
     }];
   });
   const legacyFlankers = migratedRaiderGroups.find(group => group.kind === 'flankers');
@@ -324,17 +369,6 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       rearAssault: group.rearAssault === true,
     }
     : group) as unknown as TacticalRaiderGroup[];
-  for (const zone of zones) {
-    const validTarget = zone.focusTargetGroupId && raiderGroups.some(group =>
-      group.id === zone.focusTargetGroupId && group.zoneId === zone.id && group.revealed !== false &&
-      group.intent !== 'withdraw' && group.power > 0 && group.count - group.killed > 0);
-    if (!validTarget) {
-      zone.focusTargetGroupId = undefined;
-      zone.focusTargetSource = 'auto';
-    } else {
-      zone.focusTargetSource = zone.focusTargetSource === 'player' ? 'player' : 'auto';
-    }
-  }
   if (!defenderGroups.some(group => group.count > 0) || !raiderGroups.some(group => group.count > 0)) return null;
 
   const reports = (Array.isArray(source.reports) ? source.reports : [])
@@ -390,7 +424,21 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     reports,
     pendingReport,
     currentZoneId: defaultZoneId,
+    enemyPlanDeploymentApplied: source.enemyPlanDeploymentApplied === true,
   } as unknown as TacticalBattle;
+  for (const zone of zones) {
+    if (zone.focusTargetSource !== 'player' || !zone.focusTargetGroupId) continue;
+    for (const defender of migrated.defenderGroups.filter(group =>
+      group.zoneId === zone.id && group.commandable !== false && group.targetSource !== 'player')) {
+      defender.targetGroupId = zone.focusTargetGroupId;
+      defender.targetSource = 'player';
+    }
+  }
+  normalizeTacticalGroupTargets(migrated);
+  for (const zone of migrated.zones) {
+    zone.focusTargetGroupId = undefined;
+    zone.focusTargetSource = undefined;
+  }
   return migrated;
 }
 

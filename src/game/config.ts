@@ -139,6 +139,8 @@ export const CONFIG = {
       intelDays: 48,
     },
     banditLairDefense: {
+      doctrineReviewIntervalDays: 24,
+      doctrineChangeChance: 0.65,
       baseStratagemPoints: 1,
       alarmPerPoint: 25,
       maxAlarmPoints: 4,
@@ -151,6 +153,36 @@ export const CONFIG = {
       maxStratagemPoints: 8,
       pointEffectStep: 0.06,
       maxPointEffectBonus: 0.3,
+      groupPowerShares: {
+        base: {
+          sentries: 0.10,
+          trailArchers: 0.06,
+          wallSpears: 0.11,
+          wallArchers: 0.16,
+          yardVanguard: 0.20,
+          yardSkirmishers: 0.11,
+          leaderGuard: 0.14,
+          keepArchers: 0.07,
+          leaderEscapeGroup: 0.05,
+        },
+        doctrineShift: {
+          trailAttrition: {
+            sentries: 0.02, trailArchers: 0.01, wallSpears: 0, wallArchers: 0,
+            yardVanguard: -0.02, yardSkirmishers: 0, leaderGuard: -0.01,
+            keepArchers: 0, leaderEscapeGroup: 0,
+          },
+          wallHold: {
+            sentries: 0, trailArchers: 0, wallSpears: 0.015, wallArchers: 0.02,
+            yardVanguard: -0.015, yardSkirmishers: 0, leaderGuard: -0.01,
+            keepArchers: -0.01, leaderEscapeGroup: 0,
+          },
+          leaderEscape: {
+            sentries: -0.01, trailArchers: 0, wallSpears: -0.01, wallArchers: -0.01,
+            yardVanguard: -0.005, yardSkirmishers: 0, leaderGuard: 0.015,
+            keepArchers: 0, leaderEscapeGroup: 0.02,
+          },
+        },
+      },
       trailAttrition: {
         trailDefenseBonus: 2,
         sentryCombatBonus: 0.02,
@@ -494,6 +526,11 @@ export const CONFIG = {
       },
       maxStratagems: 3,
       counteredEffectScale: 0.4,
+      counterStrength: {
+        preparation: 0.6,
+        intelFull: 1,
+        formationCurveExponent: 1,
+      },
       effects: {
         rearManeuver: { counteredCombatPenalty: 0.25 },
         wallBreakers: { wallPressureBonus: 10, lossResistancePenalty: 0.2 },

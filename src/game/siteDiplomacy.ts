@@ -6,7 +6,9 @@ import { changeRelation, getRelation } from './relations';
 import { revealPassageRoute } from './passage';
 import { livingResidents } from './residents';
 import { createCombatRoster } from './combatRoster';
-import { banditLairDoctrineDefinition, ensureBanditLairDefensePlan } from './enemyPlan';
+import {
+  banditLairDoctrineDefinition, ensureBanditLairDefensePlan, refreshBanditLairDoctrine,
+} from './enemyPlan';
 import {
   consumeExpeditionPowder,
 } from './expedition';
@@ -142,6 +144,7 @@ export function scoutBanditLair(state: GameState, siteId: number, rng: () => num
   site.lastInteractionDay = state.day;
   site.lairScoutAttempts = (site.lairScoutAttempts ?? 0) + 1;
   if (rng() < chance) {
+    refreshBanditLairDoctrine(state, site);
     const plan = ensureBanditLairDefensePlan(site);
     site.discovered = true;
     site.scoutedUntilDay = state.day + scoutConfig.intelDays;

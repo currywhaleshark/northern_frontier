@@ -57,7 +57,7 @@ import {
 import {
   acknowledgeTacticalReport, advanceTacticalPhase, assignDefenderGroup, completeTacticalSimulation,
   dismissTacticalBattleReport, finishTacticalBattle, resolveTacticalRound, setDefenderFormationLine,
-  setTacticalCommand, setTacticalFocusTarget, spendPreparationAction,
+  setTacticalCommand, setTacticalGroupTarget, spendPreparationAction,
 } from './game/tacticalBattle';
 import type {
   BuildingTypeId, CombatWeaponId, CropId, Difficulty, JobId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
@@ -402,8 +402,8 @@ export default function App() {
     handleTacticalAction(() => setDefenderFormationLine(stateRef.current, groupId, line));
   const handleSetTacticalCommand = (groupId: string, command: TacticalCommandId) =>
     handleTacticalAction(() => setTacticalCommand(stateRef.current, groupId, command));
-  const handleSetTacticalFocusTarget = (zoneId: string, groupId: string | null) =>
-    handleTacticalAction(() => setTacticalFocusTarget(stateRef.current, zoneId, groupId));
+  const handleSetTacticalGroupTarget = (defenderGroupId: string, enemyGroupId: string | null) =>
+    handleTacticalAction(() => setTacticalGroupTarget(stateRef.current, defenderGroupId, enemyGroupId));
   const handleResolveTacticalRound = () =>
     handleTacticalAction(() => resolveTacticalRound(stateRef.current));
   const handleCompleteTacticalSimulation = () =>
@@ -885,7 +885,7 @@ export default function App() {
           onAssignGroup={handleAssignTacticalGroup}
           onSetFormationLine={handleSetTacticalFormationLine}
           onSetCommand={handleSetTacticalCommand}
-          onSetFocusTarget={handleSetTacticalFocusTarget}
+          onSetGroupTarget={handleSetTacticalGroupTarget}
           onResolveRound={handleResolveTacticalRound}
           onCompleteSimulation={handleCompleteTacticalSimulation}
           onAcknowledgeReport={handleAcknowledgeTacticalReport}

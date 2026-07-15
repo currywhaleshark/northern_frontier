@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import type {
   BanditLairDefensePlan, BanditLairDoctrineId, EnemyObjectiveId, EnemyPlan, EnemyStratagemId,
-  EnemyStratagemState, ForeignSite, PreparationActionId, TacticalFlankPlan,
+  EnemyCounterBreakdown, EnemyStratagemState, ForeignSite, GameState, PreparationActionId, TacticalFlankPlan,
 } from './types';
 
 type EnemyPlanCreationInput = {
@@ -147,6 +147,85 @@ export function chooseBanditLairDoctrine(
   return 'leaderEscape';
 }
 
+function deterministicUnit(...values: number[]): number {
+  let hash = 0x811c9dc5;
+  for (const value of values) {
+    const normalized = Math.floor(Number.isFinite(value) ? value * 1000 : 0);
+    hash ^= normalized;
+    hash = Math.imul(hash, 0x01000193);
+    hash ^= hash >>> 13;
+  }
+  return (hash >>> 0) / 0x100000000;
+}
+
+function chooseDifferentBanditLairDoctrine(
+  current: BanditLairDoctrineId,
+  input: BanditLairPlanInput,
+  roll: number,
+): BanditLairDoctrineId {
+  for (let attempt = 0; attempt < BANDIT_LAIR_DOCTRINES.length; attempt += 1) {
+    const selected = chooseBanditLairDoctrine(input, (roll + attempt / BANDIT_LAIR_DOCTRINES.length) % 1);
+    if (selected !== current) return selected;
+  }
+  return BANDIT_LAIR_DOCTRINES[(BANDIT_LAIR_DOCTRINES.indexOf(current) + 1) % BANDIT_LAIR_DOCTRINES.length];
+}
+
+export function refreshBanditLairDoctrine(state: GameState, site: ForeignSite): void {
+  if (site.type !== 'banditLair') return;
+  const config = CONFIG.foreignSites.banditLairDefense;
+  const revision = Number.isFinite(site.lairDoctrineRevision)
+    ? Math.max(0, Math.floor(site.lairDoctrineRevision!))
+    : 0;
+  const input: BanditLairPlanInput = {
+    alarm: site.alarm,
+    scoutFailures: site.lairScoutFailures ?? 0,
+    assaultDefeats: site.lairAssaultDefeats ?? 0,
+    militaryPower: site.militaryPower,
+  };
+  if (!site.lairDoctrine) {
+    site.lairDoctrine = chooseBanditLairDoctrine(input, deterministicUnit(
+      state.seed, site.id, revision, state.day, site.alarm, site.militaryPower,
+    ));
+    site.lairDoctrineRevision = revision;
+    site.lairDoctrineChosenDay = state.day;
+    site.lairDoctrineNextReviewDay = Math.max(
+      state.day + config.doctrineReviewIntervalDays,
+      (site.scoutedUntilDay ?? -1) + 1,
+    );
+    site.lairDoctrineRevealed ??= false;
+    return;
+  }
+  site.lairDoctrineRevision = revision;
+  site.lairDoctrineChosenDay = Number.isFinite(site.lairDoctrineChosenDay)
+    ? Math.floor(site.lairDoctrineChosenDay!)
+    : state.day;
+  site.lairDoctrineNextReviewDay = Number.isFinite(site.lairDoctrineNextReviewDay)
+    ? Math.floor(site.lairDoctrineNextReviewDay!)
+    : Math.max(state.day + config.doctrineReviewIntervalDays, (site.scoutedUntilDay ?? -1) + 1);
+  if (site.status === 'burned' || site.status === 'abandoned') return;
+  if (state.tacticalBattle?.encounterKind === 'banditLair' &&
+      state.tacticalBattle.assaultTargetSiteId === site.id) return;
+  if (state.day <= (site.scoutedUntilDay ?? -1)) return;
+  if (state.day < site.lairDoctrineNextReviewDay) return;
+
+  const reviewDay = site.lairDoctrineNextReviewDay;
+  const changeRoll = deterministicUnit(
+    state.seed, site.id, revision, reviewDay, site.alarm,
+    site.lairScoutFailures ?? 0, site.lairAssaultDefeats ?? 0, site.militaryPower,
+  );
+  if (changeRoll < config.doctrineChangeChance) {
+    const selectionRoll = deterministicUnit(
+      state.seed, site.id, revision, reviewDay, site.militaryPower,
+      site.lairAssaultDefeats ?? 0, site.lairScoutFailures ?? 0, 97,
+    );
+    site.lairDoctrine = chooseDifferentBanditLairDoctrine(site.lairDoctrine, input, selectionRoll);
+    site.lairDoctrineRevision = revision + 1;
+    site.lairDoctrineChosenDay = state.day;
+    site.lairDoctrineRevealed = false;
+  }
+  site.lairDoctrineNextReviewDay = state.day + config.doctrineReviewIntervalDays;
+}
+
 export function banditLairDoctrineDefinition(doctrine: BanditLairDoctrineId) {
   return { id: doctrine, ...BANDIT_LAIR_DOCTRINE_DETAILS[doctrine] };
 }
@@ -248,9 +327,27 @@ export function enemyStratagemDefinition(stratagem: EnemyStratagemId) {
   return { id: stratagem, cost: enemyStratagemCost(stratagem), ...STRATAGEM_DETAILS[stratagem] };
 }
 
-export function enemyStratagemEffectScale(stratagem: Pick<EnemyStratagemState, 'counterLevel'>): number {
-  if (stratagem.counterLevel === 2) return 0;
-  return stratagem.counterLevel === 1 ? CONFIG.tacticalBattle.enemyPlan.counteredEffectScale : 1;
+export function enemyCombinedCounterStrength(counter: Partial<EnemyCounterBreakdown> = {}): number {
+  const intelligence = clamp(counter.intelligence ?? 0, 0, 1);
+  const preparation = clamp(counter.preparation ?? 0, 0, 1);
+  const formation = clamp(counter.formation ?? 0, 0, 1);
+  return clamp(1 - (1 - intelligence) * (1 - preparation) * (1 - formation), 0, 1);
+}
+
+export function enemyStratagemCounterStrength(
+  stratagem: Pick<EnemyStratagemState, 'counterLevel' | 'counter'>,
+): number {
+  if (stratagem.counter && Object.keys(stratagem.counter).length > 0) {
+    return enemyCombinedCounterStrength(stratagem.counter);
+  }
+  if (stratagem.counterLevel === 2) return 1;
+  return stratagem.counterLevel === 1 ? CONFIG.tacticalBattle.enemyPlan.counterStrength.preparation : 0;
+}
+
+export function enemyStratagemEffectScale(
+  stratagem: Pick<EnemyStratagemState, 'counterLevel' | 'counter'>,
+): number {
+  return 1 - enemyStratagemCounterStrength(stratagem);
 }
 
 export function enemyPlanStratagemScale(plan: EnemyPlan | undefined, id: EnemyStratagemId): number {
@@ -277,7 +374,15 @@ export function applyEnemyPlanPreparationCounter(plan: EnemyPlan | undefined, ac
   if (!plan) return;
   const ids = PREPARATION_COUNTERS[actionId] ?? [];
   for (const stratagem of plan.stratagems) {
-    if (ids.includes(stratagem.id) && stratagem.counterLevel < 1) stratagem.counterLevel = 1;
+    if (!ids.includes(stratagem.id)) continue;
+    stratagem.counter = {
+      ...stratagem.counter,
+      preparation: Math.max(
+        stratagem.counter?.preparation ?? 0,
+        CONFIG.tacticalBattle.enemyPlan.counterStrength.preparation,
+      ),
+    };
+    stratagem.counterLevel = enemyStratagemCounterStrength(stratagem) >= 1 ? 2 : 1;
   }
 }
 
@@ -292,7 +397,26 @@ export function enemyPlanCounterLabelsForAction(
 }
 
 export function enemyPlanWarningLines(plan: EnemyPlan | undefined): string[] {
-  return plan?.stratagems.map(stratagem => STRATAGEM_DETAILS[stratagem.id].warning) ?? [];
+  if (!plan) return [];
+  const intelLevel = plan.intelLevel ?? (plan.objectiveRevealed || plan.stratagems.some(stratagem => stratagem.revealed)
+    ? 2
+    : 0);
+  if (intelLevel <= 0) return ['적의 접근 방식은 알 수 없습니다.'];
+  const revealed = plan.stratagems.filter(stratagem => stratagem.revealed);
+  if (intelLevel === 1) {
+    const sign = plan.stratagems[0];
+    return sign ? [STRATAGEM_DETAILS[sign.id].warning] : ['적의 움직임에서 뚜렷한 의도를 읽기 어렵습니다.'];
+  }
+  if (intelLevel === 2) {
+    const lines = revealed.slice(0, 1).map(stratagem => STRATAGEM_DETAILS[stratagem.id].warning);
+    if (lines.length === 0 && plan.objectiveRevealed) lines.push('적의 주된 목적이 정찰로 확인되었습니다.');
+    if (plan.stratagems.length > revealed.length) lines.push('이와 다른 움직임도 감지됩니다.');
+    return lines;
+  }
+  const visible = intelLevel === 3 ? revealed : plan.stratagems;
+  const lines = visible.map(stratagem => STRATAGEM_DETAILS[stratagem.id].warning);
+  if (intelLevel === 3 && plan.stratagems.length > visible.length) lines.push('아직 확인되지 않은 다른 움직임도 있습니다.');
+  return lines.length > 0 ? lines : ['적의 대열에서 별도의 계책 징후는 보이지 않습니다.'];
 }
 
 export function enemyIntelLevel(input: {
@@ -307,6 +431,7 @@ export function enemyIntelLevel(input: {
 
 function applyEnemyPlanIntel(plan: EnemyPlan, level: number, roll: number): EnemyPlan {
   const intelLevel = clamp(Math.floor(level), 0, 4);
+  plan.intelLevel = intelLevel as 0 | 1 | 2 | 3 | 4;
   plan.objectiveRevealed = false;
   plan.stratagems.forEach(stratagem => { stratagem.revealed = false; });
   if (intelLevel <= 1) return plan;
@@ -324,6 +449,10 @@ function applyEnemyPlanIntel(plan: EnemyPlan, level: number, roll: number): Enem
   plan.stratagems.slice(0, revealCount).forEach(stratagem => { stratagem.revealed = true; });
   if (intelLevel === 4 && plan.stratagems.length > 0) {
     const counterIndex = Math.floor(clamp(roll, 0, 0.999999999) * plan.stratagems.length);
+    plan.stratagems[counterIndex].counter = {
+      ...plan.stratagems[counterIndex].counter,
+      intelligence: CONFIG.tacticalBattle.enemyPlan.counterStrength.intelFull,
+    };
     plan.stratagems[counterIndex].counterLevel = 2;
   }
   return plan;
@@ -439,6 +568,15 @@ export function migrateEnemyPlan(raw: unknown, legacy: LegacyFlankPlan = {}): En
       id: stratagem.id as EnemyStratagemId,
       revealed: typeof stratagem.revealed === 'boolean' ? stratagem.revealed : false,
       counterLevel: stratagem.counterLevel === 1 || stratagem.counterLevel === 2 ? stratagem.counterLevel : 0,
+      ...(() => {
+        if (!stratagem.counter || typeof stratagem.counter !== 'object') return {};
+        const sourceCounter = stratagem.counter as Record<string, unknown>;
+        const counter: Partial<EnemyCounterBreakdown> = {};
+        if (Number.isFinite(sourceCounter.intelligence)) counter.intelligence = clamp(Number(sourceCounter.intelligence), 0, 1);
+        if (Number.isFinite(sourceCounter.preparation)) counter.preparation = clamp(Number(sourceCounter.preparation), 0, 1);
+        if (Number.isFinite(sourceCounter.formation)) counter.formation = clamp(Number(sourceCounter.formation), 0, 1);
+        return Object.keys(counter).length > 0 ? { counter } : {};
+      })(),
     });
   }
 
@@ -451,6 +589,9 @@ export function migrateEnemyPlan(raw: unknown, legacy: LegacyFlankPlan = {}): En
     stratagemPoints: Number.isFinite(source.stratagemPoints) && Number(source.stratagemPoints) >= 0
       ? Math.floor(Number(source.stratagemPoints))
       : 0,
+    ...(Number.isFinite(source.intelLevel) ? {
+      intelLevel: clamp(Math.floor(Number(source.intelLevel)), 0, 4) as 0 | 1 | 2 | 3 | 4,
+    } : {}),
     stratagems,
   };
 }

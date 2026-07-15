@@ -6,6 +6,7 @@ import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import {
   applyEnemyPlanPreparationCounter, createEnemyPlan, enemyObjectiveProfile,
+  enemyStratagemCounterStrength,
   enemyIntelLevel,
   enemyPlanFirstRoundMoraleBonus, enemyPlanPreparationPenalty, enemyPlanRangedEfficiency,
   enemyPlanStratagemScale, enemyPlanWarningLines, flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
@@ -38,7 +39,9 @@ import {
   finishPredatorTacticalHunt, huntCommandUnavailableReason, huntPreparationUnavailableReason,
   resolveHuntRound, setHuntCommand, spendHuntPreparationAction,
 } from './tacticalHunt';
-import { canTargetLine, defaultRaiderFormationLine, tacticalContactLine } from './tacticalTargeting';
+import {
+  canTargetLine, defaultRaiderFormationLine, tacticalContactLine, tacticalTargetingRole,
+} from './tacticalTargeting';
 import type {
   DefenderGroupKind,
   EnemyPlan,
@@ -244,26 +247,198 @@ export function tacticalRearResponseOptions(
   return options;
 }
 
-function validTacticalFocusTarget(
-  battle: TacticalBattle,
-  zoneId: string,
-  groupId: string,
-): TacticalRaiderGroup | undefined {
-  return battle.raiderGroups.find(group =>
-    group.id === groupId && group.zoneId === zoneId && group.revealed !== false &&
-    group.intent !== 'withdraw' && group.power > 0 && group.count - group.killed > 0);
+function activeRaider(group: TacticalRaiderGroup): boolean {
+  return group.intent !== 'withdraw' && group.power > 0 && group.count - group.killed > 0;
 }
 
-export function normalizeTacticalFocusTargets(battle: TacticalBattle): void {
+function defenderEngagementDirection(
+  battle: TacticalBattle,
+  defender: TacticalDefenderGroup,
+): 'frontal' | 'rear' {
+  const rearActive = battle.raiderGroups.some(group =>
+    group.zoneId === defender.zoneId && group.rearAssault && activeRaider(group));
+  if (rearActive && (defender.line === 'rear' ||
+      (defender.line === 'middle' && defender.command === 'reinforceRear'))) return 'rear';
+  return 'frontal';
+}
+
+function defendersForDirection(
+  battle: TacticalBattle,
+  zoneId: string,
+  direction: 'frontal' | 'rear',
+): TacticalDefenderGroup[] {
+  const assigned = battle.defenderGroups.filter(group => group.zoneId === zoneId && activeCount(group) > 0);
+  const rearActive = battle.raiderGroups.some(group => group.zoneId === zoneId && group.rearAssault && activeRaider(group));
+  const split = splitTacticalEngagementDefenders(assigned, rearActive);
+  return direction === 'rear'
+    ? [...split.rear, ...split.protectedTargets]
+    : rearActive ? split.frontal : [...split.frontal, ...split.protectedTargets];
+}
+
+function targetContextForDefender(
+  battle: TacticalBattle,
+  defender: TacticalDefenderGroup,
+  direction: 'frontal' | 'rear',
+) {
+  const attackers = battle.raiderGroups.filter(group =>
+    group.zoneId === defender.zoneId && Boolean(group.rearAssault) === (direction === 'rear') && activeRaider(group));
+  const defenders = defendersForDirection(battle, defender.zoneId, direction);
+  const defenderOrder: readonly TacticalFormationLine[] = direction === 'rear'
+    ? ['rear', 'middle', 'front']
+    : ['front', 'middle', 'rear'];
+  const defenderContactLine = defenderOrder.find(line => defenders.some(group =>
+    group.line === line && group.commandable !== false && activeCount(group) > 0)) ?? null;
+  return {
+    direction,
+    contactLine: tacticalContactLine(attackers, direction),
+    meleeContact: defenderContactLine != null && defenders.some(group =>
+      group.line === defenderContactLine && group.commandable !== false && activeCount(group) > 0 &&
+      tacticalGroupCapabilities(group).has('melee')),
+    prepareVolleyApplied: battle.orientation !== 'assault' && applied(battle, 'prepareVolley'),
+  } as const;
+}
+
+export function tacticalGroupTargetUnavailableReason(
+  battle: TacticalBattle,
+  defenderGroupId: string,
+  enemyGroupId: string,
+): string | null {
+  if (battle.assaultKind === 'predatorHunt') return '맹수 사냥에서는 개별 표적을 지정할 수 없습니다.';
+  const defender = battle.defenderGroups.find(group => group.id === defenderGroupId);
+  if (!defender || defender.commandable === false || activeCount(defender) <= 0) {
+    return '표적 명령을 내릴 수 있는 아군 부대가 아닙니다.';
+  }
+  if (defender.command === 'fallback' || defender.command === 'openRetreat') {
+    return '퇴각 중인 부대는 표적을 지정할 수 없습니다.';
+  }
+  const target = battle.raiderGroups.find(group => group.id === enemyGroupId);
+  if (!target || target.zoneId !== defender.zoneId || !activeRaider(target)) {
+    return '같은 전장 구역에 생존한 적 표적이 없습니다.';
+  }
+  if (!target.revealed) return '아직 드러나지 않은 적은 표적으로 지정할 수 없습니다.';
+  const defenderDirection = defenderEngagementDirection(battle, defender);
+  const targetDirection = target.rearAssault ? 'rear' : 'frontal';
+  if (defenderDirection !== targetDirection) {
+    return defenderDirection === 'frontal'
+      ? '이 부대는 정면 교전에 배정되어 후방 급습대를 공격할 수 없습니다.'
+      : '이 부대는 후방 교전에 배정되어 정면의 적을 공격할 수 없습니다.';
+  }
+  const targeting = canTargetLine(defender, target.line,
+    targetContextForDefender(battle, defender, defenderDirection));
+  return targeting.allowed ? null : targeting.reason;
+}
+
+function strongest<T extends { power: number }>(groups: T[]): T | undefined {
+  return [...groups].sort((a, b) => b.power - a.power)[0];
+}
+
+export function chooseAutomaticDefenderTarget(
+  battle: TacticalBattle,
+  defender: TacticalDefenderGroup,
+): string | undefined {
+  const candidates = battle.raiderGroups.filter(group =>
+    tacticalGroupTargetUnavailableReason(battle, defender.id, group.id) == null);
+  if (candidates.length === 0) return undefined;
+  const pick = (predicate: (group: TacticalRaiderGroup) => boolean): TacticalRaiderGroup | undefined =>
+    strongest(candidates.filter(predicate));
+  const role = tacticalTargetingRole(defender);
+  if (defender.command === 'reinforceRear') {
+    return (pick(group => group.rearAssault === true) ?? strongest(candidates))?.id;
+  }
+  if (role === 'melee') {
+    return (pick(group => tacticalTargetingRole(group) === 'melee')
+      ?? pick(group => group.intent === 'breakWall' || group.intent === 'loot')
+      ?? strongest(candidates))?.id;
+  }
+  if (role === 'musket') {
+    return (pick(group => tacticalTargetingRole(group) !== 'melee')
+      ?? pick(group => group.intent === 'breakWall')
+      ?? pick(group => group.line === 'middle')
+      ?? pick(group => group.line === 'front')
+      ?? strongest(candidates))?.id;
+  }
+  return (pick(group => group.line === 'rear' && (group.leader || group.unitType === 'court-artillery'))
+    ?? pick(group => tacticalTargetingRole(group) !== 'melee')
+    ?? pick(group => group.kind === 'flankers')
+    ?? strongest(candidates))?.id;
+}
+
+function raiderTargetingResult(
+  battle: TacticalBattle,
+  attacker: TacticalRaiderGroup,
+  target: TacticalDefenderGroup,
+) {
+  const direction = attacker.rearAssault ? 'rear' : 'frontal';
+  const defenders = defendersForDirection(battle, attacker.zoneId, direction);
+  if (!defenders.some(group => group.id === target.id)) {
+    return { allowed: false, efficiency: 0, reason: direction === 'rear'
+      ? '후방 급습대는 후방 교전에 배정된 표적만 공격할 수 있습니다.'
+      : '정면 공격대는 정면 교전에 배정된 표적만 공격할 수 있습니다.' };
+  }
+  const order: readonly TacticalFormationLine[] = direction === 'rear'
+    ? ['rear', 'middle', 'front']
+    : ['front', 'middle', 'rear'];
+  const contactLine = order.find(line => defenders.some(group => group.line === line && activeCount(group) > 0)) ?? null;
+  return canTargetLine(attacker, target.line, {
+    direction,
+    contactLine,
+    meleeContact: contactLine != null && defenders.some(group => group.line === contactLine &&
+      activeCount(group) > 0 && tacticalGroupCapabilities(group).has('melee')),
+    prepareVolleyApplied: false,
+  });
+}
+
+export function chooseAutomaticRaiderTarget(
+  battle: TacticalBattle,
+  attacker: TacticalRaiderGroup,
+): string | undefined {
+  if (!activeRaider(attacker)) return undefined;
+  const candidates = battle.defenderGroups.filter(group =>
+    group.zoneId === attacker.zoneId && activeCount(group) > 0 &&
+    raiderTargetingResult(battle, attacker, group).allowed);
+  if (candidates.length === 0) return undefined;
+  const pick = (predicate: (group: TacticalDefenderGroup) => boolean): TacticalDefenderGroup | undefined =>
+    [...candidates.filter(predicate)].sort((a, b) => a.power - b.power)[0];
+  const ranged = (group: TacticalDefenderGroup) => tacticalGroupCapabilities(group).has('volley');
+  const melee = (group: TacticalDefenderGroup) => tacticalGroupCapabilities(group).has('melee');
+  if (attacker.rearAssault) {
+    return (pick(group => group.line === 'rear' && ranged(group))
+      ?? pick(group => group.line === 'rear' && group.commandable === false)
+      ?? pick(group => group.command === 'reinforceRear')
+      ?? pick(group => group.line === 'rear')
+      ?? candidates[0])?.id;
+  }
+  if (attacker.kind === 'looters' || attacker.intent === 'loot') {
+    return (pick(group => group.command === 'guardStorehouse') ?? pick(() => true))?.id;
+  }
+  if (tacticalTargetingRole(attacker) !== 'melee') {
+    return (pick(group => group.weapon === 'musket')
+      ?? pick(ranged)
+      ?? pick(group => group.commandable === false)
+      ?? pick(() => true))?.id;
+  }
+  return (pick(group => melee(group)) ?? pick(() => true))?.id;
+}
+
+export function normalizeTacticalGroupTargets(battle: TacticalBattle): void {
+  for (const defender of battle.defenderGroups) {
+    if (defender.targetSource === 'player' && defender.targetGroupId &&
+        tacticalGroupTargetUnavailableReason(battle, defender.id, defender.targetGroupId) == null) continue;
+    defender.targetSource = 'auto';
+    defender.targetGroupId = chooseAutomaticDefenderTarget(battle, defender);
+  }
+  for (const attacker of battle.raiderGroups) {
+    attacker.targetSource = 'ai';
+    attacker.targetGroupId = chooseAutomaticRaiderTarget(battle, attacker);
+  }
   for (const zone of battle.zones) {
-    if (zone.focusTargetGroupId && validTacticalFocusTarget(battle, zone.id, zone.focusTargetGroupId)) {
-      zone.focusTargetSource = zone.focusTargetSource === 'player' ? 'player' : 'auto';
-      continue;
-    }
     zone.focusTargetGroupId = undefined;
-    zone.focusTargetSource = 'auto';
+    zone.focusTargetSource = undefined;
   }
 }
+
+/** @deprecated v8 zone focus is read only during save migration. */
+export const normalizeTacticalFocusTargets = normalizeTacticalGroupTargets;
 
 function snapshotGroup(
   snapshots: CombatantSnapshot[],
@@ -574,7 +749,7 @@ export function createTacticalBattle(
     prepPoints: Math.max(0, preparationPoints(state, params.warned) - enemyPlanPreparationPenalty(enemyPlan)),
     prepActions: PREPARATION_ACTIONS.map(action => ({ ...action, selected: false, applied: false })),
     preparationEvents: [],
-    zones: createZones(state, params.siege, groups).map(zone => ({ ...zone, focusTargetSource: 'auto' })),
+    zones: createZones(state, params.siege, groups),
     defenderGroups: groups,
     raiderGroups: enemies,
     enemyPlan,
@@ -635,12 +810,6 @@ export function tacticalPreparationUnavailableReason(
   if (battle.orientation === 'assault') return assaultPreparationUnavailableReason(state, actionId);
   if (actionId === 'setAmbush' && !battle.defenderGroups.some(group => tacticalGroupCapabilities(group).has('ambush') && group.count > 0)) {
     return '매복시킬 사냥꾼이 없습니다.';
-  }
-  if (actionId === 'firePrevention' && !battle.enemyPlan?.stratagems.some(stratagem => stratagem.id === 'fireArrows')) {
-    return '불화살을 준비하는 징후가 없습니다.';
-  }
-  if (actionId === 'torchWatch' && !battle.enemyPlan?.stratagems.some(stratagem => stratagem.id === 'nightApproach')) {
-    return '야간 접근을 시도하는 징후가 없습니다.';
   }
   if (actionId === 'musterMilitia') {
     const civilians = battle.defenderGroups.find(group => group.kind === 'civilian');
@@ -916,7 +1085,11 @@ export function setTacticalCommand(
   if (!defender) return '수비 그룹을 찾을 수 없습니다.';
   if (defender.commandable === false) return '피난 주민은 전투 명령 대상이 아닙니다.';
   if (battle.assaultKind === 'predatorHunt') return setHuntCommand(state, groupId, command);
-  if (battle.orientation === 'assault') return setAssaultCommand(state, groupId, command);
+  if (battle.orientation === 'assault') {
+    const result = setAssaultCommand(state, groupId, command);
+    if (!result) normalizeTacticalGroupTargets(battle);
+    return result;
+  }
   if (battle.phase !== 'command') return '지휘 단계에서만 명령을 내릴 수 있습니다.';
   if (!IMPLEMENTED_COMMANDS.has(command)) return '이 명령은 아직 사용할 수 없습니다.';
   const unavailableReason = tacticalCommandUnavailableReason(battle, defender, command);
@@ -924,6 +1097,7 @@ export function setTacticalCommand(
   defender.command = command;
   if (command !== 'redeploy') defender.pendingLine = undefined;
   defender.commandSource = 'player';
+  normalizeTacticalGroupTargets(battle);
   return null;
 }
 
@@ -967,6 +1141,29 @@ export function tacticalFocusTargetUnavailableReason(
   return reasons[0] ?? '현재 아군 병과로 해당 열을 집중 공격할 수 없습니다.';
 }
 
+export function setTacticalGroupTarget(
+  state: GameState,
+  defenderGroupId: string,
+  enemyGroupId: string | null,
+): string | null {
+  const battle = state.tacticalBattle;
+  if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  if (battle.assaultKind === 'predatorHunt') return '맹수 사냥에서는 개별 표적을 지정할 수 없습니다.';
+  if (battle.phase !== 'command') return '지휘 단계에서만 표적을 지정할 수 있습니다.';
+  const defender = battle.defenderGroups.find(group => group.id === defenderGroupId);
+  if (!defender) return '표적 명령을 내릴 아군 부대를 찾을 수 없습니다.';
+  if (enemyGroupId == null) {
+    defender.targetSource = 'auto';
+    defender.targetGroupId = chooseAutomaticDefenderTarget(battle, defender);
+    return null;
+  }
+  const unavailableReason = tacticalGroupTargetUnavailableReason(battle, defenderGroupId, enemyGroupId);
+  if (unavailableReason) return unavailableReason;
+  defender.targetGroupId = enemyGroupId;
+  defender.targetSource = 'player';
+  return null;
+}
+
 export function setTacticalFocusTarget(
   state: GameState,
   zoneId: string,
@@ -979,15 +1176,21 @@ export function setTacticalFocusTarget(
   const zone = battle.zones.find(candidate => candidate.id === zoneId);
   if (!zone) return '표적을 지정할 전투 구역을 찾을 수 없습니다.';
   if (groupId == null) {
-    zone.focusTargetGroupId = undefined;
-    zone.focusTargetSource = 'auto';
+    for (const defender of battle.defenderGroups.filter(group =>
+      group.zoneId === zoneId && group.commandable !== false && activeCount(group) > 0)) {
+      defender.targetSource = 'auto';
+      defender.targetGroupId = chooseAutomaticDefenderTarget(battle, defender);
+    }
     return null;
   }
   const unavailableReason = tacticalFocusTargetUnavailableReason(battle, zoneId, groupId);
   if (unavailableReason) return unavailableReason;
-  const target = battle.raiderGroups.find(group => group.id === groupId)!;
-  zone.focusTargetGroupId = target.id;
-  zone.focusTargetSource = 'player';
+  for (const defender of battle.defenderGroups.filter(group =>
+    group.zoneId === zoneId && group.commandable !== false && activeCount(group) > 0 &&
+    tacticalGroupTargetUnavailableReason(battle, group.id, groupId) == null)) {
+    defender.targetGroupId = groupId;
+    defender.targetSource = 'player';
+  }
   return null;
 }
 
@@ -1090,24 +1293,75 @@ export function chooseDefaultTacticalCommands(battle: TacticalBattle): void {
   }
 }
 
-export function applyTacticalEnemyPlanDeployment(battle: TacticalBattle): void {
-  const rearManeuver = battle.enemyPlan?.stratagems.find(stratagem => stratagem.id === 'rearManeuver');
-  if (rearManeuver && rearManeuver.counterLevel < 1 && battle.defenderGroups.some(group =>
-    group.line === 'rear' && group.commandable !== false && group.count - group.wounded - group.killed > 0 &&
-    tacticalGroupCapabilities(group).has('melee'))) rearManeuver.counterLevel = 1;
-  if (rearManeuver && (battle.enemyPlan?.stratagemPoints ?? 0) > 0) {
-    const scale = enemyPlanStratagemScale(battle.enemyPlan, 'rearManeuver');
-    const penalty = CONFIG.tacticalBattle.enemyPlan.effects.rearManeuver.counteredCombatPenalty * (1 - scale);
-    for (const group of battle.raiderGroups.filter(group => group.kind === 'flankers')) {
-      group.combatMultiplier = (group.combatMultiplier ?? 1) * (1 - penalty);
+function defenderSurvivingPower(group: TacticalDefenderGroup): number {
+  const active = activeCount(group);
+  return group.count > 0 ? group.power * active / group.count : 0;
+}
+
+function raiderSurvivingPower(group: TacticalRaiderGroup): number {
+  if (!activeRaider(group) || group.confused) return 0;
+  return group.power * clamp(group.morale / 100, 0, 1) * (group.combatMultiplier ?? 1);
+}
+
+function formationPowerRatio(guardPower: number, assaultPower: number): number {
+  if (guardPower <= 0) return 0;
+  if (assaultPower <= 0) return 1;
+  const raw = guardPower / (guardPower + assaultPower);
+  return clamp(Math.pow(raw, CONFIG.tacticalBattle.enemyPlan.counterStrength.formationCurveExponent), 0, 1);
+}
+
+export function tacticalRearManeuverFormationCounter(battle: TacticalBattle): number {
+  const guardPower = battle.defenderGroups.reduce((sum, group) => {
+    if (group.commandable === false || activeCount(group) <= 0 ||
+        group.command === 'redeploy' || group.command === 'fallback' || group.command === 'advance' ||
+        group.command === 'openRetreat' || !tacticalGroupCapabilities(group).has('melee')) return sum;
+    if (group.line === 'rear' || (group.line === 'middle' && group.command === 'reinforceRear')) {
+      return sum + defenderSurvivingPower(group);
     }
+    return sum;
+  }, 0);
+  const assaultPower = battle.raiderGroups.reduce((sum, group) =>
+    sum + ((group.rearAssault || (group.kind === 'flankers' && group.flankPlan === 'rearAssault'))
+      ? raiderSurvivingPower(group)
+      : 0), 0);
+  return formationPowerRatio(guardPower, assaultPower);
+}
+
+export function tacticalFeintFormationCounter(battle: TacticalBattle): number {
+  const reservePower = battle.defenderGroups.reduce((sum, group) => {
+    if (group.line !== 'middle' || group.commandable === false || activeCount(group) <= 0 ||
+        group.command === 'redeploy' || group.command === 'fallback' || group.command === 'advance' ||
+        group.command === 'openRetreat' || !tacticalGroupCapabilities(group).has('melee')) return sum;
+    return sum + defenderSurvivingPower(group);
+  }, 0);
+  const divertedPower = battle.raiderGroups.reduce((sum, group) =>
+    sum + (group.kind === 'looters' || group.kind === 'flankers' ? raiderSurvivingPower(group) : 0), 0);
+  return formationPowerRatio(reservePower, divertedPower);
+}
+
+export function applyTacticalEnemyPlanDeployment(battle: TacticalBattle): void {
+  if (battle.enemyPlanDeploymentApplied) return;
+  const rearManeuver = battle.enemyPlan?.stratagems.find(stratagem => stratagem.id === 'rearManeuver');
+  if (rearManeuver) {
+    rearManeuver.counter = {
+      ...rearManeuver.counter,
+      formation: tacticalRearManeuverFormationCounter(battle),
+    };
+    const strength = enemyStratagemCounterStrength(rearManeuver);
+    rearManeuver.counterLevel = strength >= 1 ? 2 : strength > 0 ? 1 : 0;
   }
 
   const feint = battle.enemyPlan?.stratagems.find(stratagem => stratagem.id === 'feint');
-  if (!feint) return;
-  if (feint.counterLevel < 1 && battle.defenderGroups.some(group =>
-    group.line === 'middle' && group.commandable !== false && group.count - group.wounded - group.killed > 0 &&
-    tacticalGroupCapabilities(group).has('melee'))) feint.counterLevel = 1;
+  if (!feint) {
+    battle.enemyPlanDeploymentApplied = true;
+    return;
+  }
+  feint.counter = {
+    ...feint.counter,
+    formation: tacticalFeintFormationCounter(battle),
+  };
+  const feintCounterStrength = enemyStratagemCounterStrength(feint);
+  feint.counterLevel = feintCounterStrength >= 1 ? 2 : feintCounterStrength > 0 ? 1 : 0;
   const scale = enemyPlanStratagemScale(battle.enemyPlan, 'feint');
   const main = battle.raiderGroups.filter(group => group.kind === 'main');
   const diverted = battle.raiderGroups.filter(group => group.kind === 'looters' || group.kind === 'flankers');
@@ -1119,19 +1373,24 @@ export function applyTacticalEnemyPlanDeployment(battle: TacticalBattle): void {
     for (const group of diverted) group.power += shift * group.power / divertedPower;
   }
   for (const group of battle.raiderGroups) {
-    group.estimatedPower = feint.counterLevel >= 1
+    group.estimatedPower = feintCounterStrength > 0
       ? undefined
       : group.kind === 'main'
         ? group.power * CONFIG.tacticalBattle.enemyPlan.effects.feint.estimatedMainMultiplier
         : undefined;
   }
+  battle.enemyPlanDeploymentApplied = true;
 }
 
 export function advanceTacticalPhase(state: GameState): string | null {
   const battle = state.tacticalBattle;
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
   if (battle.assaultKind === 'predatorHunt') return advanceHuntPhase(state);
-  if (battle.orientation === 'assault') return advanceAssaultPhase(state);
+  if (battle.orientation === 'assault') {
+    const result = advanceAssaultPhase(state);
+    if (!result && battle.phase === 'command') normalizeTacticalGroupTargets(battle);
+    return result;
+  }
   if (battle.phase === 'preparation') {
     battle.preparationEvents = applySelectedPreparationActions(state, battle);
     battle.phase = battle.preparationEvents.length > 0 ? 'preparationExecution' : 'deployment';
@@ -1144,6 +1403,7 @@ export function advanceTacticalPhase(state: GameState): string | null {
   if (battle.phase === 'deployment') {
     applyTacticalEnemyPlanDeployment(battle);
     chooseDefaultTacticalCommands(battle);
+    normalizeTacticalGroupTargets(battle);
     battle.phase = 'command';
     return null;
   }
@@ -1235,10 +1495,13 @@ export function resolveTacticalRound(state: GameState): string | null {
   const battle = state.tacticalBattle;
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
   if (battle.assaultKind === 'predatorHunt') return resolveHuntRound(state);
-  if (battle.orientation === 'assault') return resolveAssaultRound(state);
+  if (battle.orientation === 'assault') {
+    normalizeTacticalGroupTargets(battle);
+    return resolveAssaultRound(state);
+  }
   if (battle.phase !== 'command') return '교전을 진행할 지휘 단계가 아닙니다.';
-  normalizeTacticalFocusTargets(battle);
   chooseDefaultTacticalCommands(battle);
+  normalizeTacticalGroupTargets(battle);
   const firingMusketGroups = battle.defenderGroups.filter(group =>
     group.weapon === 'musket' && group.command === 'volley' && activeCount(group) > 0 &&
     battle.raiderGroups.some(enemy => enemy.zoneId === group.zoneId && enemy.intent !== 'withdraw' && enemy.power > 0));
@@ -1338,18 +1601,25 @@ export function resolveTacticalRound(state: GameState): string | null {
       });
     }
     for (const engagement of engagements) {
+      const rearCounterPenalty = engagement.direction === 'rear'
+        ? CONFIG.tacticalBattle.enemyPlan.effects.rearManeuver.counteredCombatPenalty *
+          (1 - enemyPlanStratagemScale(battle.enemyPlan, 'rearManeuver'))
+        : 0;
+      const effectiveAttackers = rearCounterPenalty > 0
+        ? engagement.attackers.map(group => ({
+          ...group,
+          combatMultiplier: (group.combatMultiplier ?? 1) * (1 - rearCounterPenalty),
+        }))
+        : engagement.attackers;
       const exchange = resolveEngagementExchange({
         zone,
         defenders: engagement.defenders,
-        attackers: engagement.attackers,
+        attackers: effectiveAttackers,
         direction: engagement.direction,
         weather: state.weather,
         prepareVolleyApplied: applied(battle, 'prepareVolley'),
         evacuateCiviliansApplied: applied(battle, 'evacuateCivilians'),
         roundStartingRaiderPower,
-        focusTargetGroupId: engagement.attackers.some(group => group.id === zone.focusTargetGroupId)
-          ? zone.focusTargetGroupId
-          : undefined,
         rangedEfficiency,
         rng,
       });
@@ -1481,7 +1751,7 @@ export function resolveTacticalRound(state: GameState): string | null {
     event(events, advance.fromZoneId, 'advance', `${subject}이(가) 교전을 마치고 ${advance.destinationName}(으)로 밀려듭니다.`, 620);
   }
 
-  normalizeTacticalFocusTargets(battle);
+  normalizeTacticalGroupTargets(battle);
 
   const activeRaiders = battle.raiderGroups.filter(group => group.intent !== 'withdraw' && group.power > 0);
   const nextFocusZoneId = activeRaiders
@@ -1576,7 +1846,7 @@ export function acknowledgeTacticalReport(state: GameState): string | null {
   }
   // 후퇴 연출은 원래 구역에서 보여준 뒤, 다음 교전을 준비할 때 실제 배치를 후방으로 옮긴다.
   applyNextEngagementStates(battle);
-  normalizeTacticalFocusTargets(battle);
+  normalizeTacticalGroupTargets(battle);
   battle.currentZoneId = battle.pendingReport.nextFocusZoneId;
   battle.defenderGroups.forEach(group => {
     if (group.command && tacticalCommandUnavailableReason(battle, group, group.command)) {

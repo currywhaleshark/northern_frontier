@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { RESOURCE_NAMES, WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
 import { countBuilt } from '../game/buildings';
 import { getSeason } from '../game/seasons';
-import { enemyPlanCounterLabelsForAction } from '../game/enemyPlan';
+import { banditLairDoctrineDefinition, enemyPlanCounterLabelsForAction } from '../game/enemyPlan';
 import {
   tacticalCommandDescription, tacticalCommandUnavailableReason, tacticalLootText,
   tacticalFormationLinesAdjacent, tacticalPreparationUnavailableReason, tacticalRearResponseOptions,
@@ -33,7 +33,7 @@ interface Props {
   onAssignGroup: (groupId: string, zoneId: string) => void;
   onSetFormationLine: (groupId: string, line: TacticalFormationLine) => void;
   onSetCommand: (groupId: string, command: TacticalCommandId) => void;
-  onSetFocusTarget: (zoneId: string, groupId: string | null) => void;
+  onSetGroupTarget: (defenderGroupId: string, enemyGroupId: string | null) => void;
   onResolveRound: () => void;
   onCompleteSimulation: () => void;
   onAcknowledgeReport: () => void;
@@ -178,6 +178,9 @@ function UnitDock({ state, battle, hunt, mode, selectedGroupId, onSelect }: {
         const zoneName = battle.zones.find(zone => zone.id === group.zoneId)?.name ?? '';
         const pending = mode === 'command' && tacticalGroupHasPendingCommand(group);
         const gender = state.residents.find(resident => resident.id === group.residentIds[0])?.gender ?? 'male';
+        const targetText = group.targetSource === 'player'
+          ? battle.raiderGroups.find(enemy => enemy.id === group.targetGroupId)?.label ?? '자동'
+          : '자동';
         return (
           <TacticalGroupChip
             key={group.id}
@@ -189,6 +192,7 @@ function UnitDock({ state, battle, hunt, mode, selectedGroupId, onSelect }: {
             selected={selectedGroupId === group.id}
             pending={pending}
             commandText={group.command ? commandLabel(group.command, group, hunt) : null}
+            targetText={targetText}
             onSelect={() => onSelect(group.id)}
           />
         );
@@ -229,7 +233,7 @@ export function TacticalBattleScreen({
   onAssignGroup,
   onSetFormationLine,
   onSetCommand,
-  onSetFocusTarget,
+  onSetGroupTarget,
   onResolveRound,
   onCompleteSimulation,
   onAcknowledgeReport,
@@ -518,12 +522,13 @@ export function TacticalBattleScreen({
                   commandable={commandable}
                   selectedGroupId={selectedGroup?.id ?? null}
                   onSelectGroup={selectGroup}
-                  onSelectTarget={(zoneId, groupId) => onSetFocusTarget(
-                    zoneId,
-                    battle.zones.find(candidate => candidate.id === zoneId)?.focusTargetGroupId === groupId
-                      ? null
-                      : groupId,
-                  )}
+                  onSelectTarget={(defenderGroupId, enemyGroupId) => {
+                    const defender = battle.defenderGroups.find(group => group.id === defenderGroupId);
+                    onSetGroupTarget(defenderGroupId,
+                      defender?.targetSource === 'player' && defender.targetGroupId === enemyGroupId
+                        ? null
+                        : enemyGroupId);
+                  }}
                 />
               ))}
             </div>
@@ -586,6 +591,23 @@ export function TacticalBattleScreen({
         </div>
 
         <div className="tactical-controls">
+          {battle.enemyPlan && !assault && !hunt && battle.phase === 'command' && (
+            <EnemyPlanPanel plan={battle.enemyPlan} />
+          )}
+          {assault && !hunt && battle.lairDefensePlan &&
+            (battle.phase === 'preparation' || battle.phase === 'deployment' || battle.phase === 'command') && (
+            <aside className="tactical-enemy-plan tactical-lair-intel" aria-label="산채 방어 정보">
+              <div className="tactical-enemy-plan-heading">
+                <strong>{battle.lairDefensePlan.doctrineRevealed
+                  ? `산채 교리: ${banditLairDoctrineDefinition(battle.lairDefensePlan.doctrine).label}`
+                  : '산채 교리: 미확인'}</strong>
+                {battle.lairDefensePlan.doctrineRevealed &&
+                  <span>계책점수 {battle.lairDefensePlan.stratagemPoints}</span>}
+              </div>
+              {!battle.lairDefensePlan.doctrineRevealed &&
+                <span className="muted small">이전 정찰 정보가 오래되었습니다.</span>}
+            </aside>
+          )}
           {battle.phase === 'preparation' && (
             <>
               {battle.enemyPlan && !assault && !hunt && <EnemyPlanPanel plan={battle.enemyPlan} />}
@@ -758,6 +780,14 @@ export function TacticalBattleScreen({
                         );
                       })}
                     </div>
+                    {!hunt && (
+                      <button
+                        type="button"
+                        className={`tactical-auto-target${selectedGroup.targetSource !== 'player' ? ' active' : ''}`}
+                        onClick={() => onSetGroupTarget(selectedGroup.id, null)}
+                        title="이 부대가 현재 교전 방향에서 자동으로 유효 표적을 선택합니다."
+                      >자동 표적</button>
+                    )}
                   </div>
                   <div className="tactical-command-hint">{commandHint}</div>
                 </>

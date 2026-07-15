@@ -130,6 +130,12 @@ for (const id of stratagemIds) {
 assert.equal(enemyPlan.enemyStratagemEffectScale({ counterLevel: 0 }), 1);
 assert.equal(enemyPlan.enemyStratagemEffectScale({ counterLevel: 1 }), 0.4);
 assert.equal(enemyPlan.enemyStratagemEffectScale({ counterLevel: 2 }), 0);
+assert.equal(enemyPlan.enemyCombinedCounterStrength({ preparation: 0.6, formation: 0.5 }), 0.8,
+  'preparation and formation counters combine multiplicatively');
+assert.equal(enemyPlan.enemyCombinedCounterStrength({ intelligence: 1, preparation: 0.6, formation: 0.5 }), 1,
+  'a full intelligence counter remains exactly complete');
+assert.ok(enemyPlan.enemyCombinedCounterStrength({ intelligence: 4, preparation: -2, formation: 3 }) <= 1,
+  'combined counter strength is clamped to the 0-1 interval');
 assert.ok(enemyPlan.enemyPlanRangedEfficiency({
   objective: 'breakthrough', objectiveRevealed: false, stratagemPoints: 2,
   stratagems: [{ id: 'nightApproach', revealed: false, counterLevel: 0 }],
@@ -159,10 +165,43 @@ const irrelevantBattle = tactical.createTacticalBattle(irrelevantState, {
   factionName: '변경 마적', power: 70, warned: false, siege: true, mode: 'garrison',
 });
 irrelevantBattle.enemyPlan = {
-  objective: 'breakthrough', objectiveRevealed: false, stratagemPoints: 0, stratagems: [],
+  objective: 'breakthrough', objectiveRevealed: false, stratagemPoints: 0, intelLevel: 0, stratagems: [],
 };
-assert.match(tactical.tacticalPreparationUnavailableReason(irrelevantState, 'firePrevention'), /징후/);
-assert.match(tactical.tacticalPreparationUnavailableReason(irrelevantState, 'torchWatch'), /징후/);
+irrelevantBattle.prepPoints = 2;
+assert.equal(tactical.tacticalPreparationUnavailableReason(irrelevantState, 'firePrevention'), null,
+  'fire prevention stays available when the enemy has no fire arrows');
+assert.equal(tactical.tacticalPreparationUnavailableReason(irrelevantState, 'torchWatch'), null,
+  'torch watch stays available when the enemy has no night approach');
+assert.equal(tactical.spendPreparationAction(irrelevantState, 'firePrevention'), null);
+assert.equal(tactical.spendPreparationAction(irrelevantState, 'torchWatch'), null);
+assert.equal(irrelevantBattle.prepPoints, 0, 'unneeded counters still consume their normal preparation points');
+
+const hiddenCounterPlan = {
+  objective: 'arson', objectiveRevealed: false, stratagemPoints: 3, intelLevel: 1,
+  stratagems: [{ id: 'fireArrows', revealed: false, counterLevel: 0 }],
+};
+assert.deepEqual(enemyPlan.enemyPlanCounterLabelsForAction(hiddenCounterPlan, 'firePrevention'), [],
+  'a hidden fire-arrow plan never appears in the counter label');
+hiddenCounterPlan.stratagems[0].revealed = true;
+assert.deepEqual(enemyPlan.enemyPlanCounterLabelsForAction(hiddenCounterPlan, 'firePrevention'), ['불화살'],
+  'a revealed fire-arrow plan appears in the counter label');
+
+const noIntelPlan = {
+  objective: 'arson', objectiveRevealed: false, stratagemPoints: 7, intelLevel: 0,
+  stratagems: stratagemIds.map(id => ({ id, revealed: false, counterLevel: 0 })),
+};
+const noIntelWarnings = enemyPlan.enemyPlanWarningLines(noIntelPlan);
+assert.deepEqual(noIntelWarnings, ['적의 접근 방식은 알 수 없습니다.'],
+  'intel zero exposes no individual stratagem warning');
+
+const physicalState = simulation.newGame(2026071506);
+const physicalBattle = tactical.createTacticalBattle(physicalState, {
+  factionName: '변경 마적', power: 70, warned: false, siege: true, mode: 'garrison',
+});
+physicalBattle.prepPoints = 8;
+physicalState.resources.gunpowder = 0;
+assert.match(tactical.tacticalPreparationUnavailableReason(physicalState, 'preliminaryBombardment'),
+  /불랑기포대|화약/, 'physical building and powder requirements still disable impossible preparation');
 
 function wallBreakerBattle(seed, countered) {
   const wallState = simulation.newGame(seed);
@@ -232,6 +271,68 @@ const mainPowerAfterFeint = feintBattle.raiderGroups.filter(group => group.kind 
 assert.ok(mainPowerAfterFeint < mainPowerBeforeFeint, 'an uncountered feint transfers real power out of the main force');
 assert.ok(feintBattle.raiderGroups.some(group => group.estimatedPower !== undefined &&
   group.estimatedPower !== group.power), 'feint display power remains distinct from real power');
+
+function formationCounterBattle(seed, stratagemId, reservePower, divertedPower) {
+  const formationState = simulation.newGame(seed);
+  formationState.resources.spears = 3;
+  formationState.residents.slice(0, 3).forEach(resident => {
+    resident.job = 'militia';
+    resident.sick = false;
+    resident.health = 100;
+  });
+  const formationBattle = tactical.createTacticalBattle(formationState, {
+    factionName: '변경 마적', power: 100, warned: true, siege: true, mode: 'garrison',
+  });
+  formationBattle.enemyPlan = {
+    objective: 'plunder', objectiveRevealed: true, stratagemPoints: 4, intelLevel: 3,
+    stratagems: [{ id: stratagemId, revealed: true, counterLevel: 0 }],
+  };
+  formationBattle.defenderGroups.forEach(group => { group.wounded = group.count; });
+  const reserve = formationBattle.defenderGroups.find(group => group.weapon === 'spear') ??
+    formationBattle.defenderGroups.find(group => group.commandable !== false);
+  reserve.count = 1;
+  reserve.wounded = 0;
+  reserve.killed = 0;
+  reserve.power = reservePower;
+  reserve.line = stratagemId === 'rearManeuver' ? 'rear' : 'middle';
+  reserve.command = 'hold';
+  const diverted = formationBattle.raiderGroups.find(group => group.kind === 'flankers');
+  diverted.power = divertedPower;
+  diverted.count = Math.max(1, Math.round(divertedPower));
+  diverted.killed = 0;
+  diverted.morale = 100;
+  diverted.combatMultiplier = 1;
+  diverted.flankPlan = 'rearAssault';
+  for (const group of formationBattle.raiderGroups.filter(group => group !== diverted)) {
+    if (stratagemId === 'rearManeuver') group.power = 0;
+    else if (group.kind === 'looters') group.power = divertedPower;
+  }
+  tactical.applyTacticalEnemyPlanDeployment(formationBattle);
+  return { formationBattle, stratagem: formationBattle.enemyPlan.stratagems[0], diverted };
+}
+
+const tinyRearGuard = formationCounterBattle(2026071510, 'rearManeuver', 1, 100);
+const equalRearGuard = formationCounterBattle(2026071511, 'rearManeuver', 100, 100);
+const strongRearGuard = formationCounterBattle(2026071512, 'rearManeuver', 400, 100);
+const counterFormation = result => result.stratagem.counter?.formation ?? 0;
+assert.ok(counterFormation(tinyRearGuard) < 0.05, 'one point of rear guard barely counters a 100-power maneuver');
+assert.ok(Math.abs(counterFormation(equalRearGuard) - 0.5) < 0.05, 'equal rear forces produce a middle counter');
+assert.ok(counterFormation(strongRearGuard) >= 0.78, 'a four-to-one rear guard strongly counters the maneuver');
+
+tinyRearGuard.stratagem.counter = { preparation: 0.6, formation: counterFormation(tinyRearGuard) };
+assert.ok(enemyPlan.enemyStratagemCounterStrength(tinyRearGuard.stratagem) > 0.6,
+  'preparation and the small formation contribution both remain represented');
+const multiplierBeforeRepeat = tinyRearGuard.diverted.combatMultiplier;
+const powerBeforeRepeat = tinyRearGuard.diverted.power;
+tactical.applyTacticalEnemyPlanDeployment(tinyRearGuard.formationBattle);
+assert.equal(tinyRearGuard.diverted.combatMultiplier, multiplierBeforeRepeat,
+  'reapplying deployment never compounds a combat multiplier penalty');
+assert.equal(tinyRearGuard.diverted.power, powerBeforeRepeat,
+  'reapplying deployment never shifts or reduces force a second time');
+
+const weakFeintReserve = formationCounterBattle(2026071513, 'feint', 1, 100);
+assert.ok(counterFormation(weakFeintReserve) < 0.02,
+  'a tiny middle reserve cannot counter a large diverted feint force by a fixed fraction');
 
 const intelInput = {
   factionName: '변경 마적', power: 160, relation: 0,

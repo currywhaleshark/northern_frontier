@@ -1,4 +1,4 @@
-import { enemyStratagemDefinition } from '../../game/enemyPlan';
+import { enemyStratagemCounterStrength, enemyStratagemDefinition } from '../../game/enemyPlan';
 import type { EnemyObjectiveId, EnemyPlan } from '../../game/types';
 
 const OBJECTIVE_LABELS: Record<EnemyObjectiveId, string> = {
@@ -7,9 +7,10 @@ const OBJECTIVE_LABELS: Record<EnemyObjectiveId, string> = {
   arson: '방책·창고 방화',
 };
 
-function counterLabel(counterLevel: 0 | 1 | 2): string {
-  if (counterLevel === 2) return '완전 대응';
-  if (counterLevel === 1) return '부분 대응';
+function counterLabel(strength: number): string {
+  const percent = Math.round(Math.max(0, Math.min(1, strength)) * 100);
+  if (percent >= 100) return '완전 대응 100%';
+  if (percent > 0) return `부분 대응 ${percent}%`;
   return '미대응';
 }
 
@@ -29,11 +30,12 @@ export function EnemyPlanPanel({ plan }: { plan: EnemyPlan }) {
       <div className="tactical-enemy-stratagems">
         {revealed.map(stratagem => {
           const definition = enemyStratagemDefinition(stratagem.id);
+          const counterStrength = enemyStratagemCounterStrength(stratagem);
           return (
-            <div className={`tactical-enemy-stratagem counter-${stratagem.counterLevel}`} key={stratagem.id}>
+            <div className={`tactical-enemy-stratagem counter-${counterStrength >= 1 ? 2 : counterStrength > 0 ? 1 : 0}`} key={stratagem.id}>
               <strong>{definition.label}</strong>
               <span>{definition.effect}</span>
-              <em>{counterLabel(stratagem.counterLevel)}</em>
+              <em>{counterLabel(counterStrength)}</em>
             </div>
           );
         })}

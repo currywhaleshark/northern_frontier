@@ -225,6 +225,9 @@ export interface ForeignSite {
   lairAssaultDefeats?: number;
   lairDoctrine?: BanditLairDoctrineId;
   lairDoctrineRevealed?: boolean;
+  lairDoctrineRevision?: number;
+  lairDoctrineChosenDay?: number;
+  lairDoctrineNextReviewDay?: number;
 }
 
 export type PointerCursor = 'default' | 'move' | 'copy' | 'pointer' | 'not-allowed';
@@ -585,19 +588,28 @@ export type DefenderGroupKind =
 export type RaiderGroupKind = 'main' | 'looters' | 'flankers';
 export type TacticalFormationLine = 'front' | 'middle' | 'rear';
 export type TacticalFlankPlan = 'breakthrough' | 'rearAssault';
+export type TacticalTargetSource = 'auto' | 'player' | 'ai';
 export type EnemyObjectiveId = 'breakthrough' | 'plunder' | 'arson';
 export type EnemyStratagemId = 'rearManeuver' | 'wallBreakers' | 'fireArrows' | 'feint' | 'nightApproach';
+
+export interface EnemyCounterBreakdown {
+  intelligence: number;
+  preparation: number;
+  formation: number;
+}
 
 export interface EnemyStratagemState {
   id: EnemyStratagemId;
   revealed: boolean;
   counterLevel: 0 | 1 | 2;
+  counter?: Partial<EnemyCounterBreakdown>;
 }
 
 export interface EnemyPlan {
   objective: EnemyObjectiveId;
   objectiveRevealed: boolean;
   stratagemPoints: number;
+  intelLevel?: 0 | 1 | 2 | 3 | 4;
   stratagems: EnemyStratagemState[];
 }
 
@@ -683,6 +695,8 @@ export interface TacticalDefenderGroup {
   killed: number;
   line: TacticalFormationLine;
   pendingLine?: TacticalFormationLine;
+  targetGroupId?: string;
+  targetSource?: 'auto' | 'player';
   ambushed?: boolean;
   commandable?: boolean;
   lockedZoneId?: string;
@@ -696,6 +710,8 @@ export interface TacticalRaiderGroup {
   zoneId: string;
   line: TacticalFormationLine;
   pendingZoneId?: string;
+  targetGroupId?: string;
+  targetSource?: 'ai';
   targetZoneId: string;
   power: number;
   estimatedPower?: number;
@@ -877,6 +893,7 @@ export interface TacticalBattle {
   defenderGroups: TacticalDefenderGroup[];
   raiderGroups: TacticalRaiderGroup[];
   enemyPlan?: EnemyPlan;
+  enemyPlanDeploymentApplied?: boolean;
   currentZoneId: string;
   villageMorale: number;
   raiderMorale: number;

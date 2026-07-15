@@ -14,6 +14,7 @@ interface Props {
   selected: boolean;
   pending: boolean;
   commandText: string | null;
+  targetText: string;
   onSelect: () => void;
 }
 
@@ -45,7 +46,7 @@ function DockDefenderSprite({ group, gender }: {
 }
 
 export function TacticalGroupChip({
-  group, gender, active, zoneName, mode, selected, pending, commandText, onSelect,
+  group, gender, active, zoneName, mode, selected, pending, commandText, targetText, onSelect,
 }: Props) {
   return (
     <button
@@ -65,15 +66,18 @@ export function TacticalGroupChip({
         </strong>
         <span>{zoneName} · {group.line === 'front' ? '전열' : group.line === 'middle' ? '중열' : '후열'}{group.ambushed ? ' · 매복중' : ''}</span>
         {mode === 'command' && (
-          <span className={`tactical-dock-command${pending ? ' waiting' : ''}`}>
-            {group.commandable === false
-              ? '보호 대상'
-              : active === 0
-                ? '—'
-                : pending
-                  ? `명령 대기 · ${commandText ?? '추천 없음'}`
-                  : commandText ?? '—'}
-          </span>
+          <>
+            <span className={`tactical-dock-command${pending ? ' waiting' : ''}`}>
+              {group.commandable === false
+                ? '보호 대상'
+                : active === 0
+                  ? '—'
+                  : pending
+                    ? `명령 대기 · ${commandText ?? '추천 없음'}`
+                    : commandText ?? '—'}
+            </span>
+            {group.commandable !== false && active > 0 && <span className="tactical-dock-target">표적: {targetText || '자동'}</span>}
+          </>
         )}
       </span>
     </button>

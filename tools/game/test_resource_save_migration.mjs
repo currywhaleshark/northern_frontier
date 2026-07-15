@@ -34,8 +34,54 @@ const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mj
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 8, 'three-line formations require schema version 8');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 9, 'individual tactical targets require schema version 9');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
+assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
+
+{
+  const migrated = saveLoad.migrateV8ToV9({
+    schemaVersion: 8,
+    day: 40,
+    foreignSites: [{ type: 'banditLair', scoutedUntilDay: 60, lairDoctrine: 'wallHold' }],
+    tacticalBattle: {
+      enemyPlan: {
+        stratagems: [
+          { id: 'rearManeuver', counterLevel: 0 },
+          { id: 'fireArrows', counterLevel: 1 },
+          { id: 'nightApproach', counterLevel: 2 },
+        ],
+      },
+    },
+  });
+  assert.equal(migrated.schemaVersion, 9);
+  assert.deepEqual(migrated.tacticalBattle.enemyPlan.stratagems.map(entry => entry.counter), [
+    {}, { preparation: 0.6 }, { intelligence: 1 },
+  ]);
+  assert.equal(migrated.foreignSites[0].lairDoctrineRevision, 0);
+  assert.ok(migrated.foreignSites[0].lairDoctrineNextReviewDay > 60,
+    'legacy doctrine review never predates active scouting intel');
+}
+
+{
+  const state = simulation.newGame(2026071511);
+  const lair = state.foreignSites.find(site => site.type === 'banditLair');
+  assert.ok(lair);
+  lair.lairDoctrine = 'leaderEscape';
+  lair.lairDoctrineRevealed = false;
+  lair.lairDoctrineRevision = 3;
+  lair.lairDoctrineChosenDay = 77;
+  lair.lairDoctrineNextReviewDay = 101;
+  assert.equal(saveLoad.saveGame(state), true);
+  const loaded = saveLoad.loadGame();
+  const loadedLair = loaded?.foreignSites.find(site => site.id === lair.id);
+  assert.ok(loadedLair);
+  assert.equal(loadedLair.lairDoctrine, 'leaderEscape');
+  assert.equal(loadedLair.lairDoctrineRevealed, false);
+  assert.equal(loadedLair.lairDoctrineRevision, 3);
+  assert.equal(loadedLair.lairDoctrineChosenDay, 77);
+  assert.equal(loadedLair.lairDoctrineNextReviewDay, 101,
+    'doctrine revision scheduling survives a save/load round trip');
+}
 
 {
   const legacy = simulation.newGame(2026071010);
@@ -129,7 +175,7 @@ function prepareFormationTestCombatants(state) {
   muskets.line = 'rear';
   store.set('buksae-save-v3', JSON.stringify({ ...v7, schemaVersion: 7 }));
   const loaded = saveLoad.loadGame();
-  assert.equal(loaded?.schemaVersion, 8);
+  assert.equal(loaded?.schemaVersion, 9);
   assert.equal(
     loaded?.tacticalBattle?.defenderGroups.find(group => group.id === muskets.id)?.line,
     'rear',
@@ -148,7 +194,7 @@ function prepareFormationTestCombatants(state) {
   assert.equal(muskets.line, 'middle');
   assert.equal(saveLoad.saveGame(v8), true);
   const loaded = saveLoad.loadGame();
-  assert.equal(loaded?.schemaVersion, 8);
+  assert.equal(loaded?.schemaVersion, 9);
   assert.equal(loaded?.tacticalBattle?.defenderGroups.find(group => group.id === muskets.id)?.line, 'middle');
 }
 
@@ -232,24 +278,31 @@ function prepareFormationTestCombatants(state) {
   assert.equal(tactical.advanceTacticalPhase(focusTargetSave), null);
   assert.equal(tactical.advanceTacticalPhase(focusTargetSave), null);
   const zone = battle.zones.find(candidate => candidate.id === 'wall');
+  const muskets = battle.defenderGroups.find(group => group.kind === 'militia-musket');
   const target = battle.raiderGroups[0];
-  assert.ok(zone && target);
+  assert.ok(zone && target && muskets);
   Object.assign(target, { zoneId: zone.id, revealed: true, intent: 'advance', power: 50 });
-  assert.equal(tactical.setTacticalFocusTarget(focusTargetSave, zone.id, target.id), null);
+  muskets.zoneId = zone.id;
+  assert.equal(tactical.setTacticalGroupTarget(focusTargetSave, muskets.id, target.id), null);
   assert.equal(saveLoad.saveGame(focusTargetSave), true);
   const loaded = saveLoad.loadGame();
-  const loadedZone = loaded?.tacticalBattle?.zones.find(candidate => candidate.id === zone.id);
-  assert.equal(loadedZone?.focusTargetGroupId, target.id);
-  assert.equal(loadedZone?.focusTargetSource, 'player');
+  const loadedMuskets = loaded?.tacticalBattle?.defenderGroups.find(group => group.id === muskets.id);
+  assert.equal(loadedMuskets?.targetGroupId, target.id);
+  assert.equal(loadedMuskets?.targetSource, 'player');
   assert.equal(loaded?.tacticalBattle?.raiderGroups.find(group => group.id === target.id)?.line, 'front');
 
-  delete zone.focusTargetGroupId;
-  delete zone.focusTargetSource;
-  delete target.line;
-  assert.equal(saveLoad.saveGame(focusTargetSave), true);
-  const legacyLoadedZone = saveLoad.loadGame()?.tacticalBattle?.zones.find(candidate => candidate.id === zone.id);
-  assert.equal(legacyLoadedZone?.focusTargetGroupId, undefined);
-  assert.equal(legacyLoadedZone?.focusTargetSource, 'auto', 'a save without targeting fields defaults to auto');
+  delete muskets.targetGroupId;
+  delete muskets.targetSource;
+  zone.focusTargetGroupId = target.id;
+  zone.focusTargetSource = 'player';
+  store.set('buksae-save-v3', JSON.stringify({ ...focusTargetSave, schemaVersion: 8 }));
+  const legacyLoaded = saveLoad.loadGame();
+  const legacyMuskets = legacyLoaded?.tacticalBattle?.defenderGroups.find(group => group.id === muskets.id);
+  assert.equal(legacyMuskets?.targetGroupId, target.id,
+    'a reachable v8 zone focus migrates to each capable group target');
+  assert.equal(legacyMuskets?.targetSource, 'player');
+  assert.ok(legacyLoaded?.tacticalBattle?.zones.every(candidate => candidate.focusTargetGroupId == null),
+    'legacy zone focus is cleared after migration and never remains runtime truth');
 }
 
 {

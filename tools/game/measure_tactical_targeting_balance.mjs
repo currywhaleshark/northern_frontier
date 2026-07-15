@@ -63,13 +63,14 @@ function advanceToCommand(tactical, state) {
 
 function assignEveryReachableFocus(tactical, battle, state) {
   for (const group of battle.raiderGroups) group.revealed = true;
-  for (const zone of battle.zones) {
+  for (const defender of battle.defenderGroups.filter(group =>
+    group.commandable !== false && group.count - group.wounded - group.killed > 0)) {
     const target = battle.raiderGroups
-      .filter(group => group.zoneId === zone.id && group.intent !== 'withdraw' &&
+      .filter(group => group.zoneId === defender.zoneId && group.intent !== 'withdraw' &&
         group.power > 0 && group.count - group.killed > 0)
       .reverse()
-      .find(group => tactical.tacticalFocusTargetUnavailableReason(battle, zone.id, group.id) == null);
-    if (target) assert.equal(tactical.setTacticalFocusTarget(state, zone.id, target.id), null);
+      .find(group => tactical.tacticalGroupTargetUnavailableReason(battle, defender.id, group.id) == null);
+    if (target) assert.equal(tactical.setTacticalGroupTarget(state, defender.id, target.id), null);
   }
 }
 
@@ -128,19 +129,82 @@ function relativeDelta(current, baseline) {
   return baseline === 0 ? (current === 0 ? 0 : Number.POSITIVE_INFINITY) : (current - baseline) / baseline;
 }
 
+function measureFixedBudget(tacticalEngagement) {
+  const zone = {
+    id: 'wall', name: 'target budget wall', kind: 'wall', order: 1,
+    pressure: 30, breached: false, defenseBonus: 10, ambushBonus: 0,
+    lootRisk: 0, civilianRisk: 10, description: 'target budget measurement',
+  };
+  const defender = (id, weapon, line, command, power) => ({
+    id,
+    kind: weapon === 'spear' ? 'militia-spear' : weapon === 'musket' ? 'militia-musket' : 'militia-bow',
+    role: 'militia', weapon, readyMuskets: weapon === 'musket' ? 20 : 0,
+    label: id, residentIds: Array.from({ length: 20 }, (_unused, index) => index + 1), count: 20,
+    zoneId: zone.id, command, commandSource: 'player', power, wounded: 0, killed: 0, line,
+  });
+  const raider = (id, line, unitType) => ({
+    id, kind: 'main', unitType, label: id, zoneId: zone.id, line,
+    targetZoneId: zone.id, power: 120, count: 30, killed: 0, morale: 100,
+    intent: 'advance', revealed: true, engagementsInZone: 0,
+  });
+  const defenders = [
+    defender('front-spear', 'spear', 'front', 'hold', 80),
+    defender('middle-musket', 'musket', 'middle', 'volley', 160),
+    defender('rear-bow', 'hornBow', 'rear', 'volley', 120),
+  ];
+  const attackers = [
+    raider('front-main', 'front', 'bandit-vanguard'),
+    raider('middle-rider', 'middle', 'bandit-rider'),
+    raider('rear-command', 'rear', 'court-artillery'),
+  ];
+  const input = {
+    zone, defenders, attackers, direction: 'frontal', weather: 'clear',
+    prepareVolleyApplied: false, evacuateCiviliansApplied: false,
+    roundStartingRaiderPower: attackers.reduce((sum, group) => sum + group.power, 0),
+  };
+  const automatic = tacticalEngagement.resolveEngagementExchange({ ...input, rng: () => 0.2 });
+  const targeted = tacticalEngagement.resolveEngagementExchange({
+    ...input,
+    defenders: defenders.map((group, index) => ({
+      ...group, targetGroupId: attackers[index].id, targetSource: 'player',
+    })),
+    rng: () => 0.2,
+  });
+  const killed = result => result.raiderLosses.reduce((sum, loss) => sum + loss.killed, 0);
+  const powerLost = result => result.raiderLosses.reduce((sum, loss) => {
+    const original = attackers.find(group => group.id === loss.groupId);
+    return sum + original.power - loss.powerAfter;
+  }, 0);
+  return {
+    automaticKilled: killed(automatic),
+    targetedKilled: killed(targeted),
+    killedDelta: killed(targeted) - killed(automatic),
+    automaticPowerLoss: powerLost(automatic),
+    targetedPowerLoss: powerLost(targeted),
+    powerLossDelta: powerLost(targeted) - powerLost(automatic),
+  };
+}
+
 const compiledDir = compileGameModules();
 const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
+const tacticalEngagement = await import(pathToFileURL(join(compiledDir, 'tacticalEngagement.mjs')).href);
 const battleSimulation = await import(pathToFileURL(join(compiledDir, 'battleSimulation.mjs')).href);
 const autoResults = SCENARIOS.map(scenario => runScenario(tactical, battleSimulation, scenario, 'auto'));
 const focusResults = SCENARIOS.map(scenario => runScenario(tactical, battleSimulation, scenario, 'focus'));
 const auto = summarize(autoResults);
 const focus = summarize(focusResults);
-const totalCasualtyDelta = relativeDelta(focus.averageTotalCasualties, auto.averageTotalCasualties);
+const downstreamTotalCasualtyDelta = relativeDelta(focus.averageTotalCasualties, auto.averageTotalCasualties);
+const fixedBudget = measureFixedBudget(tacticalEngagement);
 const changedDistributions = autoResults.filter((result, index) =>
   result.enemyDistribution.some((killed, groupIndex) => killed !== focusResults[index].enemyDistribution[groupIndex])).length;
 
-assert.ok(Math.abs(totalCasualtyDelta) <= 0.1,
-  `focused targeting changed average total casualties by more than 10%: ${totalCasualtyDelta}`);
+assert.equal(fixedBudget.killedDelta, 0, 'targeting must preserve the integer casualty budget exactly');
+assert.ok(Math.abs(fixedBudget.powerLossDelta) < 1e-9,
+  `targeting must preserve the continuous power-loss budget: ${fixedBudget.powerLossDelta}`);
+assert.ok(Math.abs(downstreamTotalCasualtyDelta) <= 0.1,
+  `focused targeting changed downstream average total casualties by more than 10%: ${downstreamTotalCasualtyDelta}`);
 assert.ok(changedDistributions > 0, 'focused targeting should change who receives the fixed loss budget');
 
-console.log(JSON.stringify({ auto, focus, totalCasualtyDelta, changedDistributions }, null, 2));
+console.log(JSON.stringify({
+  auto, focus, fixedBudget, downstreamTotalCasualtyDelta, changedDistributions,
+}, null, 2));

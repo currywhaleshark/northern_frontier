@@ -40,6 +40,7 @@ const siteDiplomacy = await import(pathToFileURL(join(compiledDir, 'siteDiplomac
 const enemyPlan = await import(pathToFileURL(join(compiledDir, 'enemyPlan.mjs')).href);
 const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
 const weapons = await import(pathToFileURL(join(compiledDir, 'weapons.mjs')).href);
+const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 function prepareState(seed, scouted = true, configureLair = undefined) {
   const state = simulation.newGame(seed);
@@ -134,6 +135,14 @@ function finishPendingBattle(state) {
   assert.equal(battle.assaultKind, 'banditLair');
   assert.equal(state.pendingChoice, null);
   assert.deepEqual(battle.zones.map(zone => zone.id), ['lairTrail', 'lairWall', 'lairYard', 'lairKeep']);
+  assert.ok(battle.raiderGroups.filter(group => group.zoneId === 'lairTrail').length >= 2,
+    'the trail contains sentries and a separate ambush shooting group');
+  assert.ok(battle.raiderGroups.filter(group => group.zoneId === 'lairWall').length >= 2,
+    'the palisade contains separate spear and archer groups');
+  assert.ok(battle.raiderGroups.filter(group => group.zoneId === 'lairYard').length >= 2,
+    'the yard contains separate vanguard and skirmisher groups');
+  assert.ok(battle.raiderGroups.filter(group => group.zoneId === 'lairKeep').length >= 2,
+    'the keep contains multiple defensive groups');
   assert.ok(battle.raiderGroups.every(group => group.revealed), 'scouting reveals all lair defenders');
   assert.equal(battle.prepPoints, 6);
   const memberIds = new Set(members.map(member => member.id));
@@ -248,6 +257,61 @@ assert.match(
 }
 
 {
+  const state = simulation.newGame(2026071514);
+  const lair = state.foreignSites.find(site => site.type === 'banditLair');
+  assert.ok(lair);
+  lair.status = 'active';
+  enemyPlan.refreshBanditLairDoctrine(state, lair);
+  assert.ok(lair.lairDoctrine);
+  assert.equal(lair.lairDoctrineRevision, 0);
+  assert.ok(lair.lairDoctrineNextReviewDay > state.day);
+
+  const fixedDoctrine = lair.lairDoctrine;
+  lair.lairDoctrineRevealed = true;
+  lair.scoutedUntilDay = state.day + 100;
+  lair.lairDoctrineNextReviewDay = state.day;
+  enemyPlan.refreshBanditLairDoctrine(state, lair);
+  assert.equal(lair.lairDoctrine, fixedDoctrine, 'valid scouting intel freezes the actual doctrine');
+  assert.equal(lair.lairDoctrineRevision, 0);
+
+  lair.scoutedUntilDay = state.day - 1;
+  lair.lairDoctrineNextReviewDay = state.day;
+  let changedState;
+  for (let seed = 1; seed <= 200 && !changedState; seed += 1) {
+    const candidate = structuredClone(state);
+    candidate.seed = seed;
+    const candidateLair = candidate.foreignSites.find(site => site.id === lair.id);
+    enemyPlan.refreshBanditLairDoctrine(candidate, candidateLair);
+    if (candidateLair.lairDoctrineRevision === 1) changedState = candidate;
+  }
+  assert.ok(changedState, 'an expired doctrine can deterministically change at review time');
+  const changedLair = changedState.foreignSites.find(site => site.id === lair.id);
+  assert.notEqual(changedLair.lairDoctrine, fixedDoctrine);
+  assert.equal(changedLair.lairDoctrineRevealed, false, 'changed doctrine invalidates old revealed intel');
+  const deterministicCopy = structuredClone(state);
+  deterministicCopy.seed = changedState.seed;
+  const deterministicLair = deterministicCopy.foreignSites.find(site => site.id === lair.id);
+  enemyPlan.refreshBanditLairDoctrine(deterministicCopy, deterministicLair);
+  assert.equal(deterministicLair.lairDoctrine, changedLair.lairDoctrine,
+    'same seed and review state choose the same new doctrine');
+  const revision = changedLair.lairDoctrineRevision;
+  const reviewDay = changedLair.lairDoctrineNextReviewDay;
+  enemyPlan.refreshBanditLairDoctrine(changedState, changedLair);
+  assert.equal(changedLair.lairDoctrineRevision, revision, 'the same day is reviewed only once');
+  assert.equal(changedLair.lairDoctrineNextReviewDay, reviewDay);
+
+  const battleLockedState = structuredClone(state);
+  battleLockedState.scoutedUntilDay = undefined;
+  const battleLockedLair = battleLockedState.foreignSites.find(site => site.id === lair.id);
+  battleLockedLair.scoutedUntilDay = state.day - 1;
+  battleLockedLair.lairDoctrineNextReviewDay = state.day;
+  battleLockedState.tacticalBattle = { assaultTargetSiteId: lair.id, encounterKind: 'banditLair' };
+  enemyPlan.refreshBanditLairDoctrine(battleLockedState, battleLockedLair);
+  assert.equal(battleLockedLair.lairDoctrine, fixedDoctrine,
+    'an already-created lair battle locks its defense doctrine');
+}
+
+{
   const state = simulation.newGame(2026071411);
   for (const resident of state.residents) {
     resident.job = 'hunter';
@@ -326,16 +390,40 @@ assert.match(
   }).battle;
   assert.equal(expiredIntel.lairDefensePlan?.doctrineRevealed, false,
     'expired scoutedUntilDay intel must not keep revealing the lair doctrine in battle');
+
+  const battles = [trail, wall, escape];
+  const powerTotals = battles.map(battle => battle.raiderGroups.reduce((sum, group) => sum + group.power, 0));
+  const countTotals = battles.map(battle => battle.raiderGroups.reduce((sum, group) => sum + group.count, 0));
+  assert.ok(powerTotals.every(total => Math.abs(total - powerTotals[0]) < 1e-9),
+    'doctrine redistribution preserves total lair combat power');
+  assert.ok(countTotals.every(total => total === countTotals[0]),
+    'largest-remainder doctrine redistribution preserves total lair headcount');
+  assert.ok(trail.raiderGroups.find(group => group.id === 'lair-sentries').power >
+    wall.raiderGroups.find(group => group.id === 'lair-sentries').power,
+  'trail attrition shifts real power into the infiltration route');
+  assert.ok(wall.raiderGroups.find(group => group.id === 'lair-wall-archers').power >
+    trail.raiderGroups.find(group => group.id === 'lair-wall-archers').power,
+  'wall hold shifts real power into the palisade archers');
+  assert.ok(escape.raiderGroups.find(group => group.id === 'lair-leader').power >
+    trail.raiderGroups.find(group => group.id === 'lair-leader').power,
+  'leader escape shifts real power into the escape group');
 }
 
 {
   const { state, battle } = prepareState(2026071410, true);
   enterCommandPhase(state);
-  const target = battle.raiderGroups.find(group => group.zoneId === battle.currentZoneId);
-  assert.ok(target);
-  assert.equal(tactical.setTacticalFocusTarget(state, battle.currentZoneId, target.id), null,
-    'lair assaults must allow a revealed defender to be selected as the focus target');
-  assert.equal(battle.zones.find(zone => zone.id === battle.currentZoneId)?.focusTargetGroupId, target.id);
+  battle.currentZoneId = 'lairWall';
+  battle.defenderGroups.forEach(group => { group.zoneId = 'lairWall'; });
+  const spear = battle.defenderGroups.find(group => group.weapon === 'spear');
+  const musket = battle.defenderGroups.find(group => group.weapon === 'musket');
+  const wallSpears = battle.raiderGroups.find(group => group.id === 'lair-wall-spears');
+  const wallArchers = battle.raiderGroups.find(group => group.id === 'lair-wall-archers');
+  assert.ok(spear && musket && wallSpears && wallArchers);
+  assert.equal(tactical.setTacticalGroupTarget(state, spear.id, wallSpears.id), null);
+  assert.equal(tactical.setTacticalGroupTarget(state, musket.id, wallArchers.id), null);
+  assert.equal(spear.targetGroupId, wallSpears.id);
+  assert.equal(musket.targetGroupId, wallArchers.id,
+    'lair palisade melee and shooting defenders can be targeted independently');
 }
 
 {
@@ -372,6 +460,7 @@ assert.match(
   let totalDirectCasualties = 0;
   const roundsByZone = { lairTrail: 0, lairWall: 0, lairYard: 0, lairKeep: 0 };
   const doctrines = { trailAttrition: 0, wallHold: 0, leaderEscape: 0 };
+  const doctrineWins = { trailAttrition: 0, wallHold: 0, leaderEscape: 0 };
   const outcomes = {};
   for (let index = 0; index < samples; index++) {
     const state = battleSimulation.createBattleSimulation({
@@ -387,7 +476,8 @@ assert.match(
     const battle = state.tacticalBattle;
     const activeExpedition = state.expedition;
     assert.ok(battle && activeExpedition?.targetSiteId != null);
-    doctrines[battle.lairDefensePlan?.doctrine ?? 'wallHold']++;
+    const doctrine = battle.lairDefensePlan?.doctrine ?? 'wallHold';
+    doctrines[doctrine]++;
     expectedAutomaticWins += siteDiplomacy.banditLairRaidChance(
       state, activeExpedition.targetSiteId, activeExpedition.memberIds,
     );
@@ -404,13 +494,20 @@ assert.match(
     totalDirectCasualties += battle.defenderGroups.reduce(
       (sum, group) => sum + group.wounded + group.killed, 0,
     );
-    if (battle.pendingReport?.outcome === 'assaultVictory') directWins++;
+    if (battle.pendingReport?.outcome === 'assaultVictory') {
+      directWins++;
+      doctrineWins[doctrine]++;
+    }
     outcomes[battle.pendingReport?.outcome ?? 'none'] = (outcomes[battle.pendingReport?.outcome ?? 'none'] ?? 0) + 1;
   }
   const automaticRate = expectedAutomaticWins / samples;
   const directRate = directWins / samples;
   const averageRounds = totalDirectRounds / samples;
   const averageCasualties = totalDirectCasualties / samples;
+  const doctrineWinRates = Object.fromEntries(Object.keys(doctrines).map(doctrine => [
+    doctrine,
+    doctrines[doctrine] > 0 ? doctrineWins[doctrine] / doctrines[doctrine] : null,
+  ]));
   console.log('tactical assault balance', JSON.stringify({
     automaticRate,
     directRate,
@@ -418,6 +515,7 @@ assert.match(
     averageCasualties,
     roundsByZone,
     doctrines,
+    doctrineWinRates,
     outcomes,
   }));
   assert.ok(
