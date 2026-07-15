@@ -1872,6 +1872,20 @@ html, body, #root {
   padding: 2px 4px;
   font-size: 8px;
 }
+.tactical-zone.formation-view .tactical-field-group[data-stack-count="2"] > span,
+.tactical-zone.formation-view .tactical-field-group[data-stack-count="3"] > span {
+  max-width: 72px;
+}
+.tactical-zone.formation-view .tactical-field-group[data-stack-count="2"][data-stack-index="1"] > span,
+.tactical-zone.formation-view .tactical-field-group[data-stack-count="3"][data-stack-index="1"] > span {
+  translate: 0 10px;
+}
+.tactical-zone.formation-view .tactical-field-group[data-stack-count="2"]:hover > span,
+.tactical-zone.formation-view .tactical-field-group[data-stack-count="3"]:hover > span,
+.tactical-zone.formation-view .tactical-field-group[data-stack-count="2"].selected > span,
+.tactical-zone.formation-view .tactical-field-group[data-stack-count="3"].selected > span {
+  max-width: 116px;
+}
 .tactical-zone.formation-view .tactical-contact-line {
   position: absolute;
   z-index: 3;

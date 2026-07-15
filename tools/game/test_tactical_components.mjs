@@ -194,12 +194,26 @@ assert.match(zoneSource, /function formationStackStyle/,
   'focused formation groups must receive deterministic depth offsets');
 assert.match(zoneSource, /const center = \(groupCount - 1\) \/ 2;/,
   'groups sharing a line must spread symmetrically around the field center');
-assert.match(zoneSource, /Math\.min\(96, 44 \+ Math\.max\(0, groupCount - 2\) \* 16\)/,
-  'formation spacing must expand with the number of groups without leaving the field');
+assert.match(zoneSource, /Math\.min\(112, 64 \+ Math\.max\(0, groupCount - 2\) \* 20\)/,
+  'formation spacing must separate two and three groups more clearly without leaving the field');
 assert.match(zoneSource, /zIndex:\s*60 - Math\.round\(distanceFromCenter \* 10\) \+ index/,
   'lower formation groups must paint above groups placed farther back');
 assert.match(zoneSource, /--formation-stack-y/,
   'formation depth must use a shallow vertical offset instead of full-height stacking');
+assert.match(zoneSource, /formationGroupCount=\{lineGroups\.length\}/,
+  'one, two, or three friendly groups must compact according to their own shared line only');
+assert.doesNotMatch(zoneSource, /formationGroupCount=\{defenders\.length/,
+  'three groups split across separate lines must not compact one another');
+assert.match(zoneSource, /compactFormation=\{rearAssaulters\.length > 0\}/,
+  'rear assault width pressure must remain separate from the same-line group count');
+assert.match(zoneSource, /formationGroupCount >= 3[\s\S]*formationGroupCount >= 2/,
+  'friendly formations must use distinct compact tiers for three and two same-line groups');
+assert.match(zoneSource, /className=\{`tactical-field-group[\s\S]*data-stack-count=\{lineGroups\.length\}/,
+  'same-line groups must expose their crowding count for label collision handling');
+assert.match(cssSource, /data-stack-count="[23]"[\s\S]*data-stack-index="1"[\s\S]*translate:\s*0 10px/,
+  'the middle label in a crowded friendly line must be vertically staggered');
+assert.match(cssSource, /data-stack-count="[23]"[\s\S]*\.selected > span[\s\S]*max-width:\s*116px/,
+  'selected crowded groups must restore the full readable label width');
 assert.match(cssSource, /\.tactical-zone\.formation-view \.tactical-formation-lane[\s\S]*display:\s*grid;/,
   'groups sharing a formation line must overlap in one grid cell during viewport movement');
 assert.match(cssSource,

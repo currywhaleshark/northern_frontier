@@ -270,7 +270,7 @@ function formationStackStyle(index: number, groupCount: number): CSSProperties {
   const center = (groupCount - 1) / 2;
   const totalSpread = groupCount <= 1
     ? 0
-    : Math.min(96, 44 + Math.max(0, groupCount - 2) * 16);
+    : Math.min(112, 64 + Math.max(0, groupCount - 2) * 20);
   const gap = groupCount > 1 ? totalSpread / (groupCount - 1) : 0;
   const distanceFromCenter = Math.abs(index - center);
   return {
@@ -310,7 +310,7 @@ function playbackCasualties(
 
 function GroupSprites({
   state, group, pose = 'idle', firing = false, falling = 0, maxVisible = 4, showAll = false,
-  formationGroupCount = 1, activeOverride, woundedOverride,
+  formationGroupCount = 1, compactFormation = false, activeOverride, woundedOverride,
 }: {
   state: GameState;
   group: TacticalDefenderGroup;
@@ -320,6 +320,7 @@ function GroupSprites({
   maxVisible?: number;
   showAll?: boolean;
   formationGroupCount?: number;
+  compactFormation?: boolean;
   activeOverride?: number;
   woundedOverride?: number;
 }) {
@@ -337,9 +338,9 @@ function GroupSprites({
   };
   if (showAll && shown + woundedShown + fallingShown > 0) {
     const total = shown + woundedShown + fallingShown;
-    const denseFormation = formationGroupCount >= 5
+    const denseFormation = compactFormation || formationGroupCount >= 3
       ? { spriteWidth: 58, xStep: 9, maxColumns: 3 }
-      : formationGroupCount >= 4
+      : formationGroupCount >= 2
         ? { spriteWidth: 68, xStep: 12, maxColumns: 4 }
         : { spriteWidth: 84, xStep: 20, maxColumns: 6 };
     const formation = formationDimensions(
@@ -950,6 +951,8 @@ export function TacticalZoneColumn({
             <div
               className={`tactical-field-group formation-${defenderFormationRole(group)} line-${group.line}${rearFacing ? ' rear-facing' : ''}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${meleeAttacker ? ' melee-attacker' : ''}${casualtyHit ? ' casualty-hit' : ''}${prepMotion}${commandable ? ' selectable' : ''}${commandable && selectedGroupId === group.id ? ' selected' : ''}`}
               style={formationStackStyle(stackIndex, lineGroups.length)}
+              data-stack-index={stackIndex}
+              data-stack-count={lineGroups.length}
               data-stack-depth={lineGroups.length - 1 - stackIndex}
               key={recoiling || blockingEscape || prepMotion ? `${group.id}-motion-${eventIndex}` : group.id}
               onClick={commandable ? event => {
@@ -970,7 +973,8 @@ export function TacticalZoneColumn({
                 pose={defenderPoseForEvent(activeEvent, group)}
                 firing={recoiling}
                 showAll
-                formationGroupCount={defenders.length + (rearAssaulters.length > 0 ? 2 : 0)}
+                formationGroupCount={lineGroups.length}
+                compactFormation={rearAssaulters.length > 0}
                 activeOverride={visualActive}
                 woundedOverride={visualWounded}
                 falling={activeEvent?.kind === 'casualty' && activeEvent.groupId === group.id ? activeEvent.casualties ?? 0 : 0}
