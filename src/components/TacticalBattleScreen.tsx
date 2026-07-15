@@ -27,6 +27,7 @@ import type {
 import { playMeleeClash, playSfx, playWeaponSalvo, playWeaponVolley, setBattleDrums, type SfxName } from '../sound/sfx';
 import { TacticalGroupChip } from './tactical/TacticalGroupChip';
 import { TacticalCommandPopover } from './tactical/TacticalCommandPopover';
+import { TacticalMiniMap } from './tactical/TacticalMiniMap';
 import { EnemyPlanPanel } from './tactical/EnemyPlanPanel';
 import { TacticalZoneColumn } from './tactical/TacticalZoneColumn';
 import { commandDescription, commandLabel } from './tactical/commandText';
@@ -453,6 +454,8 @@ export function TacticalBattleScreen({
   const huntDeploymentReason = hunt ? huntDeploymentUnavailableReason(state) : null;
   const roundLimit = hunt ? huntMaxRounds() : assault ? assaultMaxRounds() : 5;
   const commandable = battle.phase === 'command' || battle.phase === 'deployment';
+  const showTacticalMiniMap = battle.phase === 'deployment' || battle.phase === 'command' ||
+    battle.phase === 'simulating' || battle.phase === 'report';
   const pendingCommandCount = pendingTacticalCommandCount(battle.defenderGroups);
   const rearResponseZoneIds = !assault && !hunt
     ? [...new Set(battle.raiderGroups.filter(group =>
@@ -636,6 +639,19 @@ export function TacticalBattleScreen({
             title={assault ? '다음 공략 구역' : '다음 방어선'}
             aria-label={assault ? '다음 공략 구역' : '다음 방어선'}
           >&#x203A;</button>
+          {showTacticalMiniMap && (
+            <TacticalMiniMap
+              battle={battle}
+              hunt={hunt}
+              assault={assault}
+              viewedZoneId={activeZoneId}
+              selectedGroupId={selectedGroupId}
+              eventIndex={eventIndex}
+              playback={playbackActive}
+              onViewZone={setViewedZoneId}
+              onSelectGroup={selectGroup}
+            />
+          )}
           {snowfall && (
             <div className={`tactical-weather-layer weather-${state.weather}`} aria-hidden="true">
               {Array.from({ length: flakeCount }, (_, index) => (
@@ -670,10 +686,6 @@ export function TacticalBattleScreen({
               </div>
             </div>
           )}
-          <div className="tactical-stage-index">
-            <strong>{battle.zones[activeZoneIndex]?.name}</strong>
-            <span>{activeZoneIndex + 1} / {battle.zones.length}</span>
-          </div>
           {activeEvent?.text && <TypewriterCaption text={activeEvent.text} instant={fast} />}
           {commandPopover && popoverGroup && battle.phase === 'command' && (
             <TacticalCommandPopover

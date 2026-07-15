@@ -79,6 +79,25 @@ function formationLineLabel(line: TacticalFormationLine): string {
   return line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열';
 }
 
+export function tacticalRaiderIntentLabel(
+  battle: NonNullable<GameState['tacticalBattle']>,
+  raider: TacticalRaiderGroup,
+): string {
+  if (raider.beastKind) {
+    if (!raider.revealed || battle.huntPredatorState === 'hidden') return '은닉';
+    if (battle.huntPredatorState === 'wounded') return '부상';
+    if (battle.huntPredatorState === 'fled') return '도주';
+    return '경계';
+  }
+  if (raider.intent === 'loot') return '약탈';
+  if (raider.intent === 'flank') return '우회';
+  if (raider.intent === 'breakWall') return '공성';
+  if (raider.intent === 'defend') return '수비';
+  if (raider.intent === 'escape') return '도주';
+  if (raider.intent === 'withdraw') return '퇴각';
+  return '전진';
+}
+
 function UnitMuzzleFlash({ anchor }: { anchor: TacticalMuzzleAnchor }) {
   return (
     <i
@@ -281,7 +300,7 @@ function formationStackStyle(index: number, groupCount: number): CSSProperties {
   } as CSSProperties;
 }
 
-function playbackCasualties(
+export function tacticalPlaybackCasualties(
   battle: NonNullable<GameState['tacticalBattle']>,
   eventIndex: number,
   side: 'defender' | 'raider',
@@ -581,13 +600,7 @@ export function TacticalZoneColumn({
   const zoneRaiders = battle.raiderGroups.filter(group => group.zoneId === zone.id &&
     tacticalRaiderVisibleDuringPlayback(battle, group, eventIndex));
   const raiders = zoneRaiders.filter(group => !group.rearAssault);
-  const rearAssaulters = zoneRaiders.filter(group => {
-    if (!group.rearAssault) return false;
-    if (battle.phase !== 'simulating') return group.engagementsInZone > 0;
-    const revealIndex = battle.pendingReport?.events.findIndex(event =>
-      event.kind === 'rearAssault' && event.groupId === group.id) ?? -1;
-    return revealIndex < 0 || eventIndex >= revealIndex;
-  });
+  const rearAssaulters = zoneRaiders.filter(group => group.rearAssault);
   const effects = zoneEffects(zone.id, battle);
   const zoneVolley = activeEvent?.kind === 'volley' && activeEvent.zoneId === zone.id;
   const zoneArson = activeEvent?.kind === 'fire' && activeEvent.zoneId === zone.id;
@@ -742,7 +755,7 @@ export function TacticalZoneColumn({
           >
             {showFormationGuides && <span className="tactical-formation-line-label">적 {formationLineLabel(line)}</span>}
             {raiders.filter(raider => raider.line === line).map((raider, stackIndex, lineGroups) => {
-          const playbackLoss = playbackCasualties(battle, eventIndex, 'raider', raider.id);
+          const playbackLoss = tacticalPlaybackCasualties(battle, eventIndex, 'raider', raider.id);
           const activeRaiders = Math.min(
             raider.count,
             Math.max(0, raider.count - raider.killed) + playbackLoss.futureTotal,
@@ -825,7 +838,7 @@ export function TacticalZoneColumn({
                 ))}
               </div>
               <span>
-                {raider.revealed ? `${raider.label} ${activeRaiders}${raider.beastKind ? '마리' : '명'}${raider.beastKind ? '' : ` · 전력 ${Math.round(raider.estimatedPower ?? raider.power)}`} · ${raider.beastKind ? battle.huntPredatorState === 'wounded' ? '부상' : '경계' : raider.intent === 'loot' ? '약탈' : raider.intent === 'flank' ? '우회' : raider.intent === 'breakWall' ? '공성' : raider.intent === 'defend' ? '수비' : raider.intent === 'escape' ? '도주' : '전진'}` : raider.beastKind ? '덤불 속 흔적' : '정체불명'}
+                {raider.revealed ? `${raider.label} ${activeRaiders}${raider.beastKind ? '마리' : '명'}${raider.beastKind ? '' : ` · 전력 ${Math.round(raider.estimatedPower ?? raider.power)}`} · ${tacticalRaiderIntentLabel(battle, raider)}` : raider.beastKind ? '덤불 속 흔적' : '정체불명'}
                 {raider.confused && <em className="tactical-state-badge confused">혼란</em>}
                 {focusTarget && <em className="tactical-state-badge focus-target">집중 표적</em>}
               </span>
@@ -842,7 +855,7 @@ export function TacticalZoneColumn({
       )}
       <div className={`tactical-rear-assault-rank${activeEvent?.kind === 'rearAssault' && activeEvent.zoneId === zone.id ? ' entering' : ''}`}>
         {rearAssaulters.map(raider => {
-          const playbackLoss = playbackCasualties(battle, eventIndex, 'raider', raider.id);
+          const playbackLoss = tacticalPlaybackCasualties(battle, eventIndex, 'raider', raider.id);
           const activeRaiders = Math.min(
             raider.count,
             Math.max(0, raider.count - raider.killed) + playbackLoss.futureTotal,
@@ -938,7 +951,7 @@ export function TacticalZoneColumn({
               ? ` prep-${activeEvent.kind}`
               : '';
           const meleeAttacker = meleeActorForEvent(activeEvent, 'defender', group.id);
-          const playbackLoss = playbackCasualties(battle, eventIndex, 'defender', group.id);
+          const playbackLoss = tacticalPlaybackCasualties(battle, eventIndex, 'defender', group.id);
           const visualActive = Math.min(
             group.count,
             Math.max(0, group.count - group.wounded - group.killed) + playbackLoss.futureTotal,

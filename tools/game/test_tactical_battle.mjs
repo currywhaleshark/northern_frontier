@@ -450,6 +450,8 @@ function addBuiltMarker(state, type) {
   flanker.rearAssault = true;
   flanker.intent = 'flank';
   flanker.engagementsInZone = 0;
+  assert.equal(tactical.tacticalRaiderVisibleDuringPlayback(battle, flanker, 0), false,
+    'the shared battlefield visibility contract hides a rear assault before first contact');
   assert.ok(tactical.tacticalCommandUnavailableReason(battle, spear, 'reinforceRear'),
     'a planned but not-yet-revealed rear assault must not unlock the rear response command');
   spear.command = 'hold';
@@ -459,6 +461,8 @@ function addBuiltMarker(state, type) {
     'a hidden pending rear assault must not reclassify the middle reserve before it happens');
 
   flanker.engagementsInZone = 1;
+  assert.equal(tactical.tacticalRaiderVisibleDuringPlayback(battle, flanker, 0), true,
+    'the shared battlefield visibility contract reveals a rear assault after first contact');
   assert.equal(tactical.tacticalCommandUnavailableReason(battle, spear, 'reinforceRear'), null);
   assert.ok(tactical.tacticalCommandUnavailableReason(battle, bow, 'reinforceRear'),
     'ranged middle-line groups cannot act as a rear melee reserve');

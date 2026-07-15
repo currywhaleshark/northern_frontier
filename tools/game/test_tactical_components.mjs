@@ -7,6 +7,7 @@ const zoneSource = readFileSync(new URL('../../src/components/tactical/TacticalZ
 const chipSource = readFileSync(new URL('../../src/components/tactical/TacticalGroupChip.tsx', import.meta.url), 'utf8');
 const planSource = readFileSync(new URL('../../src/components/tactical/EnemyPlanPanel.tsx', import.meta.url), 'utf8');
 const popoverSource = readFileSync(new URL('../../src/components/tactical/TacticalCommandPopover.tsx', import.meta.url), 'utf8');
+const minimapSource = readFileSync(new URL('../../src/components/tactical/TacticalMiniMap.tsx', import.meta.url), 'utf8');
 const commandTextSource = readFileSync(new URL('../../src/components/tactical/commandText.ts', import.meta.url), 'utf8');
 const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
 
@@ -125,6 +126,20 @@ assert.match(cssSource, /\.tactical-field-group\.next-pending > span[\s\S]*tacti
   'the next automatically selected command group must receive a temporary pulse');
 assert.match(cssSource, /@media \(max-width:\s*900px\)[\s\S]*\.tactical-command-popover/,
   'narrow screens must turn the popover into a bottom sheet');
+assert.match(minimapSource, /tacticalRaiderVisibleDuringPlayback/,
+  'the tactical minimap must reuse the battlefield raider visibility contract');
+assert.match(minimapSource, /from ['"]\.\/commandText['"]/,
+  'the tactical minimap must reuse shared command labels');
+assert.match(minimapSource, /tacticalRaiderIntentLabel/,
+  'the tactical minimap must reuse the battlefield raider intent label');
+assert.match(screenSource, /<TacticalMiniMap\b/,
+  'the battle stage must render the tactical minimap');
+assert.doesNotMatch(screenSource, /tactical-stage-index/,
+  'the tactical minimap must replace the legacy stage index');
+assert.match(cssSource, /\.tactical-minimap\s*\{[\s\S]*z-index:\s*70;/,
+  'the tactical minimap must paint above ordinary units and below selection and popovers');
+assert.match(cssSource, /@media \(max-width:\s*900px\)[\s\S]*\.tactical-minimap\s*\{\s*display:\s*none;/,
+  'the first minimap slice must stay hidden on narrow screens');
 assert.match(zoneSource, /focus-target/,
   'the selected enemy group must have a persistent focus-target marker');
 assert.match(zoneSource, /tacticalGroupTargetUnavailableReason/,

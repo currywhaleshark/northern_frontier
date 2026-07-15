@@ -456,6 +456,15 @@ export function tacticalRaiderVisibleDuringPlayback(
   attacker: TacticalRaiderGroup,
   eventIndex: number,
 ): boolean {
+  if (attacker.rearAssault) {
+    if (battle.phase !== 'simulating') {
+      if (attacker.engagementsInZone <= 0) return false;
+    } else {
+      const revealIndex = battle.pendingReport?.events.findIndex(playbackEvent =>
+        playbackEvent.kind === 'rearAssault' && playbackEvent.groupId === attacker.id) ?? -1;
+      if (revealIndex >= 0 && eventIndex < revealIndex) return false;
+    }
+  }
   if (attacker.intent !== 'withdraw') return true;
   if (battle.phase !== 'simulating' || !battle.pendingReport) return false;
   const departureIndex = battle.pendingReport.events.findIndex(playbackEvent =>

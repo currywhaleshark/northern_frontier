@@ -2212,24 +2212,190 @@ html, body, #root {
 .tactical-stage-nav:disabled { opacity: 0.24; cursor: default; }
 .tactical-stage-nav.previous { left: 12px; }
 .tactical-stage-nav.next { right: 12px; }
-.tactical-stage-index {
+.tactical-minimap {
   position: absolute;
-  z-index: 13;
-  left: 50%;
-  bottom: 12px;
-  width: max-content;
+  z-index: 70;
+  top: 34px;
+  right: 10px;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  transform: translateX(-50%);
-  padding: 5px 9px;
-  border: 1px solid rgba(224, 210, 171, 0.38);
-  border-radius: 3px;
-  background: rgba(17, 20, 21, 0.82);
-  color: #e9dab2;
-  font-size: 10px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid rgba(143, 110, 57, 0.45);
+  border-radius: 4px;
+  background: rgba(14, 17, 19, 0.82);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.32);
 }
-.tactical-stage-index span { color: #aeb4b5; }
+.tactical-minimap.playback { pointer-events: none; opacity: 0.85; }
+.tactical-minimap-strip-map {
+  width: 224px;
+  height: 56px;
+  display: flex;
+  overflow: visible;
+}
+.tactical-minimap-strip.assault .tactical-minimap-strip-map { flex-direction: row-reverse; }
+.tactical-minimap-segment {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+  border: 1px solid rgba(143, 151, 155, 0.32);
+  border-left-width: 0;
+  background: rgba(28, 33, 36, 0.82);
+  cursor: pointer;
+}
+.tactical-minimap-segment:first-child { border-left-width: 1px; }
+.tactical-minimap-strip.assault .tactical-minimap-segment:first-child { border-left-width: 0; }
+.tactical-minimap-strip.assault .tactical-minimap-segment:last-child { border-left-width: 1px; }
+.tactical-minimap-segment:hover,
+.tactical-minimap-segment:focus-visible { background: rgba(55, 51, 40, 0.9); outline: none; }
+.tactical-minimap-segment.viewed { z-index: 1; border-color: #d0a651; box-shadow: inset 0 0 0 1px #d0a651; }
+.tactical-minimap-segment.breached { background: rgba(160, 58, 44, 0.25); }
+.tactical-minimap-segment-body {
+  height: 51px;
+  display: grid;
+  grid-template-columns: 40% 60%;
+  grid-template-areas: 'enemy friendly';
+  align-items: stretch;
+}
+.tactical-minimap-strip.assault .tactical-minimap-segment-body {
+  grid-template-columns: 60% 40%;
+  grid-template-areas: 'friendly enemy';
+}
+.tactical-minimap-enemies {
+  grid-area: enemy;
+  display: flex;
+  align-content: center;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  padding: 3px 1px 5px;
+}
+.tactical-minimap-friendlies {
+  position: relative;
+  grid-area: friendly;
+  display: flex;
+  align-items: stretch;
+  padding: 2px 3px 5px 1px;
+}
+.tactical-minimap-strip.assault .tactical-minimap-friendlies {
+  flex-direction: row-reverse;
+  padding: 2px 1px 5px 3px;
+}
+.tactical-minimap-line {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.tactical-minimap-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: #d2a958;
+}
+.tactical-minimap-dot.large { width: 8px; height: 8px; }
+.tactical-minimap-dot.friendly { border-radius: 1px; cursor: pointer; }
+.tactical-minimap-dot.friendly.civilian {
+  border: 1px solid #9fb3a8;
+  border-radius: 50%;
+  background: transparent;
+}
+.tactical-minimap-dot.friendly.selected { box-shadow: 0 0 0 2px #f2c35f; }
+.tactical-minimap-dot.enemy { border-radius: 50%; background: #c96f57; }
+.tactical-minimap-dot.enemy.unknown { border: 1px solid #8f979b; background: transparent; }
+.tactical-minimap-dot.enemy.rear-assault { box-shadow: 0 0 0 1px #e8b9ae; }
+.tactical-minimap-dot.subdued { opacity: 0.45; }
+.tactical-minimap-dot.aggregate { opacity: 0.78; }
+.tactical-minimap-rear-attackers {
+  position: absolute;
+  right: -4px;
+  top: 3px;
+  bottom: 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+.tactical-minimap-strip.assault .tactical-minimap-rear-attackers { right: auto; left: -4px; }
+.tactical-minimap-pressure {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  left: 1px;
+  height: 3px;
+  overflow: hidden;
+  background: rgba(9, 12, 13, 0.8);
+}
+.tactical-minimap-pressure i { display: block; height: 100%; background: #a9634b; }
+.tactical-minimap-focus {
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+  border-top: 4px solid #d2a958;
+}
+.tactical-minimap-name {
+  height: 14px;
+  overflow: hidden;
+  color: #8f979b;
+  font-size: 9px;
+  line-height: 14px;
+  text-align: center;
+  white-space: nowrap;
+}
+.tactical-minimap-hunt-map { width: 128px; height: 128px; display: block; overflow: visible; }
+.tactical-minimap-encirclement-track,
+.tactical-minimap-encirclement {
+  fill: none;
+  stroke-width: 3;
+}
+.tactical-minimap-encirclement-track { stroke: rgba(143, 151, 155, 0.24); }
+.tactical-minimap-encirclement { stroke: #d2a958; stroke-linecap: round; }
+.tactical-minimap-sector {
+  fill: rgba(28, 33, 36, 0.9);
+  stroke: rgba(143, 151, 155, 0.38);
+  stroke-width: 1;
+  cursor: pointer;
+}
+.tactical-minimap-sector:hover,
+.tactical-minimap-sector.hovered,
+.tactical-minimap-sector:focus-visible { fill: rgba(210, 169, 88, 0.14); outline: none; }
+.tactical-minimap-sector.viewed { stroke: #d0a651; stroke-width: 1.5; }
+.tactical-minimap-sector.breached { fill: rgba(160, 58, 44, 0.25); }
+.tactical-minimap-den {
+  fill: rgba(28, 33, 36, 0.96);
+  stroke: rgba(143, 151, 155, 0.45);
+  stroke-width: 1;
+  cursor: pointer;
+}
+.tactical-minimap-den.viewed { stroke: #d0a651; stroke-width: 1.5; }
+.tactical-minimap-svg-dot { pointer-events: all; }
+.tactical-minimap-svg-dot.friendly { fill: #d2a958; cursor: pointer; }
+.tactical-minimap-svg-dot.friendly.civilian { fill: none; stroke: #9fb3a8; stroke-width: 1; }
+.tactical-minimap-svg-dot.friendly.selected { stroke: #f2c35f; stroke-width: 2; }
+.tactical-minimap-svg-dot.enemy { fill: #c96f57; }
+.tactical-minimap-svg-dot.enemy.unknown { fill: none; stroke: #8f979b; stroke-width: 1; }
+.tactical-minimap-svg-dot.enemy.rear-assault { stroke: #e8b9ae; stroke-width: 1; }
+.tactical-minimap-svg-dot.subdued { opacity: 0.45; }
+.tactical-minimap-svg-dot.beast.state-wounded { fill: #e0a33f; }
+.tactical-minimap-svg-dot.beast.state-fled { fill: #8f979b; }
+.tactical-minimap-prep { stroke-width: 0.5; }
+.tactical-minimap-prep.bait { fill: #e0a33f; stroke: #f1c16e; }
+.tactical-minimap-prep.trap { fill: #7f9bb3; stroke: #b5cbdb; }
+.tactical-minimap-tracks { fill: #8f979b; }
+.tactical-caption {
+}
 .tactical-caption {
   position: absolute;
   z-index: 12;
@@ -3353,6 +3519,7 @@ html, body, #root {
   .tactical-report,
   .tactical-final-report { grid-template-columns: 1fr; gap: 8px; }
   .tactical-report-numbers { grid-template-columns: repeat(4, minmax(64px, 1fr)); }
+  .tactical-minimap { display: none; }
   .tactical-command-popover {
     left: 50% !important;
     top: auto !important;
