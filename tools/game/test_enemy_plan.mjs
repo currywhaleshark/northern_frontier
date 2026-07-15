@@ -311,24 +311,165 @@ function formationCounterBattle(seed, stratagemId, reservePower, divertedPower) 
   return { formationBattle, stratagem: formationBattle.enemyPlan.stratagems[0], diverted };
 }
 
-const tinyRearGuard = formationCounterBattle(2026071510, 'rearManeuver', 1, 100);
-const equalRearGuard = formationCounterBattle(2026071511, 'rearManeuver', 100, 100);
-const strongRearGuard = formationCounterBattle(2026071512, 'rearManeuver', 400, 100);
 const counterFormation = result => result.stratagem.counter?.formation ?? 0;
-assert.ok(counterFormation(tinyRearGuard) < 0.05, 'one point of rear guard barely counters a 100-power maneuver');
-assert.ok(Math.abs(counterFormation(equalRearGuard) - 0.5) < 0.05, 'equal rear forces produce a middle counter');
-assert.ok(counterFormation(strongRearGuard) >= 0.78, 'a four-to-one rear guard strongly counters the maneuver');
 
-tinyRearGuard.stratagem.counter = { preparation: 0.6, formation: counterFormation(tinyRearGuard) };
-assert.ok(enemyPlan.enemyStratagemCounterStrength(tinyRearGuard.stratagem) > 0.6,
-  'preparation and the small formation contribution both remain represented');
-const multiplierBeforeRepeat = tinyRearGuard.diverted.combatMultiplier;
-const powerBeforeRepeat = tinyRearGuard.diverted.power;
-tactical.applyTacticalEnemyPlanDeployment(tinyRearGuard.formationBattle);
-assert.equal(tinyRearGuard.diverted.combatMultiplier, multiplierBeforeRepeat,
-  'reapplying deployment never compounds a combat multiplier penalty');
-assert.equal(tinyRearGuard.diverted.power, powerBeforeRepeat,
-  'reapplying deployment never shifts or reduces force a second time');
+const rearDefender = (id, zoneId, power, overrides = {}) => ({
+  id, kind: 'militia-spear', role: 'militia', weapon: 'spear', label: id,
+  residentIds: Array.from({ length: 10 }, (_unused, index) => `${id}-${index}`),
+  zoneId, line: 'rear', command: 'hold', commandSource: 'player', power,
+  count: 10, wounded: 0, killed: 0, ...overrides,
+});
+const rearAttacker = (id, zoneId, power, overrides = {}) => ({
+  id, kind: 'flankers', unitType: 'bandit-rider', label: id, zoneId, targetZoneId: zoneId,
+  line: 'rear', power, count: 10, killed: 0, morale: 100, intent: 'flank', revealed: true,
+  engagementsInZone: 0, rearAssault: true, flankPlan: 'rearAssault', combatMultiplier: 1,
+  ...overrides,
+});
+const rearBattle = (defenderGroups, raiderGroups, enemyPlanState = undefined) => ({
+  defenderGroups, raiderGroups, enemyPlan: enemyPlanState,
+  zones: [
+    { id: 'wall', name: '목책' },
+    { id: 'center', name: '중심지' },
+    { id: 'storehouse', name: '창고' },
+  ],
+});
+const rearCounter = (battle, zoneId, attackers, defenders) =>
+  tactical.tacticalRearManeuverFormationCounterForEngagement(battle, zoneId, attackers, defenders);
+const closeTo = (actual, expected, message) =>
+  assert.ok(Math.abs(actual - expected) < 1e-9, `${message}: expected ${expected}, received ${actual}`);
+
+const wallGuard = rearDefender('wall-guard', 'wall', 80);
+const centerGuard = rearDefender('center-guard', 'center', 60);
+const wallFlanker = rearAttacker('wall-flanker', 'wall', 100);
+const centerFlanker = rearAttacker('center-flanker', 'center', 30);
+const multiZoneRearBattle = rearBattle([wallGuard, centerGuard], [wallFlanker, centerFlanker]);
+closeTo(rearCounter(multiZoneRearBattle, 'wall', [wallFlanker], [wallGuard, centerGuard]), 80 / 180,
+  'the wall counter uses only the wall rear guard and wall assault');
+closeTo(rearCounter(multiZoneRearBattle, 'center', [centerFlanker], [wallGuard, centerGuard]), 60 / 90,
+  'simultaneous rear engagements calculate an independent center counter');
+centerGuard.power = 600;
+closeTo(rearCounter(multiZoneRearBattle, 'wall', [wallFlanker], [wallGuard, centerGuard]), 80 / 180,
+  'a center rear guard never raises the wall rear-maneuver counter');
+
+for (const [guardPower, expected, description] of [
+  [1, 1 / 101, 'one point of guard barely counters a 100-power maneuver'],
+  [100, 0.5, 'equal rear forces produce a middle counter'],
+  [400, 0.8, 'a four-to-one rear guard strongly counters the maneuver'],
+]) {
+  const guard = rearDefender(`ratio-guard-${guardPower}`, 'wall', guardPower);
+  const attacker = rearAttacker(`ratio-attacker-${guardPower}`, 'wall', 100);
+  const value = rearCounter(rearBattle([guard], [attacker]), 'wall', [attacker], [guard]);
+  closeTo(value, expected, description);
+  assert.ok(value >= 0 && value <= 1, 'rear formation counters stay in the 0-1 interval');
+}
+
+const firstGuard = rearDefender('first-guard', 'wall', 50);
+const middleReserve = rearDefender('middle-reserve', 'wall', 100, { line: 'middle' });
+const firstAssault = rearAttacker('first-assault', 'wall', 100, { engagementsInZone: 0 });
+const firstAssaultBattle = rearBattle([firstGuard, middleReserve], [firstAssault]);
+const firstCounter = rearCounter(firstAssaultBattle, 'wall', [firstAssault], [firstGuard, middleReserve]);
+closeTo(firstCounter, 1 / 3, 'the first ambush includes a predeployed rear melee guard');
+middleReserve.command = 'reinforceRear';
+const reinforcedCounter = rearCounter(firstAssaultBattle, 'wall', [firstAssault], [firstGuard, middleReserve]);
+closeTo(reinforcedCounter, 0.6, 'a middle melee reserve joins the next rear engagement after reinforceRear');
+middleReserve.command = 'hold';
+closeTo(rearCounter(firstAssaultBattle, 'wall', [firstAssault], [firstGuard, middleReserve]), firstCounter,
+  'removing reinforceRear immediately removes the middle reserve from the counter');
+firstAssaultBattle.enemyPlan = {
+  objective: 'breakthrough', objectiveRevealed: true, stratagemPoints: 2,
+  stratagems: [{
+    id: 'rearManeuver', revealed: true, counterLevel: 1, counter: { preparation: 0.6 },
+  }],
+};
+assert.equal(tactical.tacticalRearManeuverEffectiveCounterStrengthForZone(firstAssaultBattle, 'wall'), undefined,
+  'the UI counter remains unavailable before the first rear-assault event has occurred');
+firstAssault.engagementsInZone = 1;
+closeTo(tactical.tacticalRearManeuverEffectiveCounterStrengthForZone(firstAssaultBattle, 'wall'),
+  1 - (1 - 0.6) * (1 - firstCounter),
+  'the UI counter combines fixed preparation with the currently engaged zone guard');
+middleReserve.command = 'reinforceRear';
+assert.ok(tactical.tacticalRearManeuverEffectiveCounterStrengthForZone(firstAssaultBattle, 'wall') >
+  1 - (1 - 0.6) * (1 - firstCounter),
+  'the UI counter rises after a live middle reserve receives reinforceRear');
+middleReserve.command = 'hold';
+
+const attritionGuard = rearDefender('attrition-guard', 'wall', 100);
+const attritionAssault = rearAttacker('attrition-assault', 'wall', 100);
+const attritionBattle = rearBattle([attritionGuard], [attritionAssault]);
+const currentAttritionCounter = () => rearCounter(
+  attritionBattle, 'wall', [attritionAssault], [attritionGuard],
+);
+closeTo(currentAttritionCounter(), 0.5, 'full surviving equal forces start at an equal counter');
+attritionGuard.wounded = 5;
+closeTo(currentAttritionCounter(), 1 / 3, 'wounded rear guards contribute only surviving power');
+attritionGuard.wounded = 0;
+attritionGuard.killed = 5;
+closeTo(currentAttritionCounter(), 1 / 3, 'dead rear guards contribute only surviving power');
+attritionGuard.killed = 0;
+attritionGuard.zoneId = 'center';
+assert.equal(currentAttritionCounter(), 0, 'a guard moved to another zone contributes nothing');
+attritionGuard.zoneId = 'wall';
+for (const command of ['redeploy', 'fallback', 'advance', 'openRetreat']) {
+  attritionGuard.command = command;
+  assert.equal(currentAttritionCounter(), 0, `${command} groups do not contribute rear guard power`);
+}
+attritionGuard.command = 'hold';
+attritionGuard.commandable = false;
+assert.equal(currentAttritionCounter(), 0, 'non-commandable civilians never contribute rear guard power');
+attritionGuard.commandable = true;
+attritionGuard.weapon = 'hornBow';
+assert.equal(currentAttritionCounter(), 0, 'ranged-only groups never contribute rear guard power');
+attritionGuard.weapon = 'spear';
+attritionAssault.power = 50;
+attritionAssault.killed = 5;
+closeTo(currentAttritionCounter(), 2 / 3, 'losses to the rear assault raise the current formation counter');
+attritionAssault.power = 100;
+attritionAssault.killed = 0;
+attritionAssault.morale = 50;
+closeTo(currentAttritionCounter(), 2 / 3, 'lower rear-assault morale reduces current assault power');
+attritionAssault.morale = 100;
+attritionAssault.combatMultiplier = 0.5;
+closeTo(currentAttritionCounter(), 2 / 3, 'the current rear-assault combat multiplier affects assault power');
+const originalCombatMultiplier = attritionAssault.combatMultiplier;
+closeTo(currentAttritionCounter(), currentAttritionCounter(), 'repeating the same engagement calculation is stable');
+assert.equal(attritionAssault.combatMultiplier, originalCombatMultiplier,
+  'formation-counter calculation never mutates the original attacker multiplier');
+attritionAssault.confused = true;
+assert.equal(currentAttritionCounter(), 1, 'confused rear attackers contribute no assault power');
+attritionAssault.confused = false;
+attritionAssault.intent = 'withdraw';
+assert.equal(currentAttritionCounter(), 1, 'withdrawing rear attackers contribute no assault power');
+
+const dynamicCounterStratagem = {
+  counterLevel: 1,
+  counter: { intelligence: 0, preparation: 0.6, formation: 0.99 },
+};
+closeTo(enemyPlan.enemyStratagemCounterStrengthForEngagement(dynamicCounterStratagem, 0.5), 0.8,
+  'engagement counters combine fixed preparation with the current formation value');
+closeTo(enemyPlan.enemyStratagemCounterStrengthForEngagement({
+  counterLevel: 2, counter: { intelligence: 1, preparation: 0, formation: 0 },
+}, 0), 1, 'a full intelligence counter remains complete in an engagement');
+assert.ok(enemyPlan.enemyStratagemCounterStrengthForEngagement(dynamicCounterStratagem, 4) <= 1,
+  'engagement counter strength remains clamped even with an invalid formation input');
+
+const storedCounter = { preparation: 0.6, formation: 0.99 };
+const deploymentRearPlan = {
+  objective: 'breakthrough', objectiveRevealed: true, stratagemPoints: 2,
+  stratagems: [{ id: 'rearManeuver', revealed: true, counterLevel: 1, counter: { ...storedCounter } }],
+};
+const deploymentGuard = rearDefender('deployment-guard', 'center', 500);
+const deploymentAttacker = rearAttacker('deployment-attacker', 'wall', 100);
+const deploymentRearBattle = rearBattle([deploymentGuard], [deploymentAttacker], deploymentRearPlan);
+const deploymentPowerBefore = deploymentAttacker.power;
+const deploymentMultiplierBefore = deploymentAttacker.combatMultiplier;
+tactical.applyTacticalEnemyPlanDeployment(deploymentRearBattle);
+assert.deepEqual(deploymentRearPlan.stratagems[0].counter, storedCounter,
+  'deployment does not replace a rear maneuver with a global fixed formation truth');
+tactical.applyTacticalEnemyPlanDeployment(deploymentRearBattle);
+assert.equal(deploymentAttacker.power, deploymentPowerBefore,
+  'reapplying deployment never reduces rear-assault power a second time');
+assert.equal(deploymentAttacker.combatMultiplier, deploymentMultiplierBefore,
+  'reapplying deployment never compounds a rear-assault combat penalty');
 
 const weakFeintReserve = formationCounterBattle(2026071513, 'feint', 1, 100);
 assert.ok(counterFormation(weakFeintReserve) < 0.02,

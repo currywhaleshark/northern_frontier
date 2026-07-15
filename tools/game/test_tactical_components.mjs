@@ -45,6 +45,16 @@ assert.match(planSource, /enemyStratagemCounterStrength/,
   'enemy plan panel must derive a continuous combined counter percentage');
 assert.match(planSource, /완전 대응/, 'enemy plan panel must label only 100% counters as complete');
 assert.match(planSource, /부분 대응.*%/, 'enemy plan panel must show partial counters as a percentage');
+assert.match(planSource, /effectiveCounterStrengths/,
+  'enemy plan panel must accept current engagement counter strengths instead of trusting a cached formation value');
+assert.match(planSource, /진형 대응은 실제 급습 전선에서 계산됩니다/,
+  'a revealed rear maneuver without a live engagement must explain that formation is dynamic');
+assert.match(planSource, /후열 경비 반영/,
+  'a live rear engagement counter must say that the current zone guard is reflected');
+assert.match(screenSource, /tacticalRearManeuverEffectiveCounterStrengthForZone/,
+  'the battle screen must derive the panel counter from an actually engaged rear-assault zone');
+assert.match(screenSource, /effectiveCounterStrengths=/,
+  'the battle screen must pass the current rear-engagement counter into the enemy plan panel');
 assert.match(screenSource, /산채 교리:.*미확인/, 'expired lair intel must render doctrine as unidentified');
 assert.match(screenSource, /이전 정찰 정보가 오래되었습니다/, 'expired lair intel must warn that prior scouting is stale');
 assert.match(screenSource, /계책점수/, 'revealed lair doctrine summary must include its stratagem score');

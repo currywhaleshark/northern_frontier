@@ -7,7 +7,7 @@ import {
   applyTacticalPlaybackEvent,
   tacticalCommandDescription, tacticalCommandUnavailableReason, tacticalLootText,
   tacticalFormationLinesAdjacent, tacticalPreparationUnavailableReason, tacticalRearResponseOptions,
-  tacticalRearAssaultIsEngaged,
+  tacticalRearAssaultIsEngaged, tacticalRearManeuverEffectiveCounterStrengthForZone,
 } from '../game/tacticalBattle';
 import { assaultMaxRounds } from '../game/tacticalAssault';
 import { huntDeploymentUnavailableReason, huntMaxRounds } from '../game/tacticalHunt';
@@ -419,13 +419,26 @@ export function TacticalBattleScreen({
   const roundLimit = hunt ? huntMaxRounds() : assault ? assaultMaxRounds() : 5;
   const commandable = battle.phase === 'command' || battle.phase === 'deployment';
   const pendingCommandCount = pendingTacticalCommandCount(battle.defenderGroups);
-  const rearResponseZoneId = !assault && !hunt
-    ? battle.raiderGroups.find(group =>
-      tacticalRearAssaultIsEngaged(group) && group.intent !== 'withdraw' && group.power > 0)?.zoneId ?? null
-    : null;
+  const rearResponseZoneIds = !assault && !hunt
+    ? [...new Set(battle.raiderGroups.filter(group =>
+      tacticalRearAssaultIsEngaged(group) && group.intent !== 'withdraw' && group.power > 0 &&
+      group.count - group.killed > 0).map(group => group.zoneId))]
+    : [];
+  const rearResponseZoneId = rearResponseZoneIds.includes(viewedZoneId)
+    ? viewedZoneId
+    : rearResponseZoneIds[0] ?? null;
   const rearResponseOptions = rearResponseZoneId
     ? tacticalRearResponseOptions(battle, rearResponseZoneId)
     : [];
+  const effectiveRearCounterStrength = rearResponseZoneId
+    ? tacticalRearManeuverEffectiveCounterStrengthForZone(battle, rearResponseZoneId)
+    : undefined;
+  const effectiveCounterStrengths = effectiveRearCounterStrength == null
+    ? undefined
+    : { rearManeuver: effectiveRearCounterStrength };
+  const effectiveRearCounterZoneName = rearResponseZoneId
+    ? battle.zones.find(zone => zone.id === rearResponseZoneId)?.name
+    : undefined;
   const hintCommand = hoveredCommand ?? selectedGroup?.command ?? null;
   const commandHint = selectedGroup && hintCommand
     ? `${commandLabel(hintCommand, selectedGroup, hunt)} — ${tacticalCommandUnavailableReason(battle, selectedGroup, hintCommand) ?? commandDescription(hintCommand, selectedGroup, hunt)}`
@@ -619,7 +632,11 @@ export function TacticalBattleScreen({
 
         <div className="tactical-controls">
           {battle.enemyPlan && !assault && !hunt && battle.phase === 'command' && (
-            <EnemyPlanPanel plan={battle.enemyPlan} />
+            <EnemyPlanPanel
+              plan={battle.enemyPlan}
+              effectiveCounterStrengths={effectiveCounterStrengths}
+              effectiveRearCounterZoneName={effectiveRearCounterZoneName}
+            />
           )}
           {assault && !hunt && battle.lairDefensePlan &&
             (battle.phase === 'preparation' || battle.phase === 'deployment' || battle.phase === 'command') && (
@@ -637,7 +654,13 @@ export function TacticalBattleScreen({
           )}
           {battle.phase === 'preparation' && (
             <>
-              {battle.enemyPlan && !assault && !hunt && <EnemyPlanPanel plan={battle.enemyPlan} />}
+              {battle.enemyPlan && !assault && !hunt && (
+                <EnemyPlanPanel
+                  plan={battle.enemyPlan}
+                  effectiveCounterStrengths={effectiveCounterStrengths}
+                  effectiveRearCounterZoneName={effectiveRearCounterZoneName}
+                />
+              )}
               <div className="tactical-panel-heading">
                 <div>
                   <strong>준비태세 선택</strong>

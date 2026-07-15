@@ -6,10 +6,11 @@ import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import {
   applyEnemyPlanPreparationCounter, createEnemyPlan, enemyObjectiveProfile,
-  enemyStratagemCounterStrength,
+  enemyStratagemCounterStrength, enemyStratagemCounterStrengthForEngagement,
   enemyIntelLevel,
   enemyPlanFirstRoundMoraleBonus, enemyPlanPreparationPenalty, enemyPlanRangedEfficiency,
-  enemyPlanStratagemScale, enemyPlanWarningLines, flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
+  enemyPlanStratagemScale, enemyPlanStratagemScaleForEngagement, enemyPlanWarningLines,
+  flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
 } from './enemyPlan';
 import { addLog } from './events';
 import { makeRng } from './map';
@@ -1161,6 +1162,10 @@ export function setTacticalCommand(
   return null;
 }
 
+/**
+ * @deprecated Runtime command UI uses per-group targets through
+ * tacticalGroupTargetUnavailableReason and setTacticalGroupTarget.
+ */
 export function tacticalFocusTargetUnavailableReason(
   battle: TacticalBattle,
   zoneId: string,
@@ -1228,6 +1233,10 @@ export function setTacticalGroupTarget(
   return null;
 }
 
+/**
+ * @deprecated Kept as a compatibility shim for legacy callers. New runtime
+ * code must use setTacticalGroupTarget; save migration owns zone focus data.
+ */
 export function setTacticalFocusTarget(
   state: GameState,
   zoneId: string,
@@ -1374,21 +1383,51 @@ function formationPowerRatio(guardPower: number, assaultPower: number): number {
   return clamp(Math.pow(raw, CONFIG.tacticalBattle.enemyPlan.counterStrength.formationCurveExponent), 0, 1);
 }
 
-export function tacticalRearManeuverFormationCounter(battle: TacticalBattle): number {
+export function tacticalRearManeuverFormationCounterForEngagement(
+  battle: TacticalBattle,
+  zoneId: string,
+  rearAttackers: readonly TacticalRaiderGroup[],
+  rearDefenders: readonly TacticalDefenderGroup[],
+): number {
+  const rearAttackerIds = new Set(rearAttackers.map(group => group.id));
+  const currentRearAttackers = battle.raiderGroups.filter(group =>
+    rearAttackerIds.has(group.id) && group.zoneId === zoneId && group.rearAssault === true);
+  if (currentRearAttackers.length === 0) return 0;
+
+  const rearDefenderIds = new Set(rearDefenders.map(group => group.id));
   const guardPower = battle.defenderGroups.reduce((sum, group) => {
-    if (group.commandable === false || activeCount(group) <= 0 ||
-        group.command === 'redeploy' || group.command === 'fallback' || group.command === 'advance' ||
-        group.command === 'openRetreat' || !tacticalGroupCapabilities(group).has('melee')) return sum;
+    if (!rearDefenderIds.has(group.id) || group.zoneId !== zoneId || group.commandable === false ||
+        activeCount(group) <= 0 || group.command === 'redeploy' || group.command === 'fallback' ||
+        group.command === 'advance' || group.command === 'openRetreat' ||
+        !tacticalGroupCapabilities(group).has('melee')) return sum;
     if (group.line === 'rear' || (group.line === 'middle' && group.command === 'reinforceRear')) {
       return sum + defenderSurvivingPower(group);
     }
     return sum;
   }, 0);
-  const assaultPower = battle.raiderGroups.reduce((sum, group) =>
-    sum + ((group.rearAssault || (group.kind === 'flankers' && group.flankPlan === 'rearAssault'))
-      ? raiderSurvivingPower(group)
-      : 0), 0);
+  const assaultPower = currentRearAttackers.reduce((sum, group) => sum + raiderSurvivingPower(group), 0);
   return formationPowerRatio(guardPower, assaultPower);
+}
+
+export function tacticalRearManeuverEffectiveCounterStrengthForZone(
+  battle: TacticalBattle,
+  zoneId: string,
+): number | undefined {
+  const stratagem = battle.enemyPlan?.stratagems.find(candidate => candidate.id === 'rearManeuver');
+  if (!stratagem) return undefined;
+  const rearAttackers = battle.raiderGroups.filter(group =>
+    group.zoneId === zoneId && tacticalRearAssaultIsEngaged(group) && activeRaider(group));
+  if (rearAttackers.length === 0) return undefined;
+  const defenders = battle.defenderGroups.filter(group => group.zoneId === zoneId && activeCount(group) > 0);
+  const split = splitTacticalEngagementDefenders(defenders, true);
+  const rearDefenders = [...split.rear, ...split.protectedTargets];
+  const formationCounter = tacticalRearManeuverFormationCounterForEngagement(
+    battle,
+    zoneId,
+    rearAttackers,
+    rearDefenders,
+  );
+  return enemyStratagemCounterStrengthForEngagement(stratagem, formationCounter);
 }
 
 export function tacticalFeintFormationCounter(battle: TacticalBattle): number {
@@ -1405,16 +1444,6 @@ export function tacticalFeintFormationCounter(battle: TacticalBattle): number {
 
 export function applyTacticalEnemyPlanDeployment(battle: TacticalBattle): void {
   if (battle.enemyPlanDeploymentApplied) return;
-  const rearManeuver = battle.enemyPlan?.stratagems.find(stratagem => stratagem.id === 'rearManeuver');
-  if (rearManeuver) {
-    rearManeuver.counter = {
-      ...rearManeuver.counter,
-      formation: tacticalRearManeuverFormationCounter(battle),
-    };
-    const strength = enemyStratagemCounterStrength(rearManeuver);
-    rearManeuver.counterLevel = strength >= 1 ? 2 : strength > 0 ? 1 : 0;
-  }
-
   const feint = battle.enemyPlan?.stratagems.find(stratagem => stratagem.id === 'feint');
   if (!feint) {
     battle.enemyPlanDeploymentApplied = true;
@@ -1669,9 +1698,21 @@ export function resolveTacticalRound(state: GameState): string | null {
       });
     }
     for (const engagement of engagements) {
+      const rearFormationCounter = engagement.direction === 'rear'
+        ? tacticalRearManeuverFormationCounterForEngagement(
+          battle,
+          zone.id,
+          engagement.attackers,
+          engagement.defenders,
+        )
+        : 0;
       const rearCounterPenalty = engagement.direction === 'rear'
         ? CONFIG.tacticalBattle.enemyPlan.effects.rearManeuver.counteredCombatPenalty *
-          (1 - enemyPlanStratagemScale(battle.enemyPlan, 'rearManeuver'))
+          (1 - enemyPlanStratagemScaleForEngagement(
+            battle.enemyPlan,
+            'rearManeuver',
+            rearFormationCounter,
+          ))
         : 0;
       const effectiveAttackers = rearCounterPenalty > 0
         ? engagement.attackers.map(group => ({

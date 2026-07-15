@@ -43,9 +43,9 @@ const DEFENDERS = {
   civilians: 6,
 };
 
-const MODES = ['rearGuard', 'middleReserve', 'unopposed'];
+const MODES = ['rearGuard', 'preparedRearGuard', 'middleReserve', 'unopposed'];
 
-function runExchange(tacticalEngagement, battleSimulation, seed, mode) {
+function runExchange(tactical, enemyPlan, tacticalEngagement, battleSimulation, seed, mode, applyDynamicCounter) {
   const state = battleSimulation.createBattleSimulation({
     mode: 'garrison',
     factionName: '변경 마적',
@@ -66,15 +66,51 @@ function runExchange(tacticalEngagement, battleSimulation, seed, mode) {
   const zone = battle.zones.find(candidate => candidate.id === 'center');
   assert.ok(spear && civilians && flanker && zone);
 
-  const rearDefenders = [{ ...civilians, line: 'rear', command: null }];
-  if (mode === 'rearGuard') rearDefenders.unshift({ ...spear, line: 'rear', command: 'hold' });
-  if (mode === 'middleReserve') {
-    rearDefenders.unshift({ ...spear, line: 'middle', command: 'reinforceRear' });
+  const rearDefenders = [{ ...civilians, zoneId: zone.id, line: 'rear', command: null }];
+  if (mode === 'rearGuard' || mode === 'preparedRearGuard') {
+    rearDefenders.unshift({ ...spear, zoneId: zone.id, line: 'rear', command: 'hold' });
   }
+  if (mode === 'middleReserve') {
+    rearDefenders.unshift({ ...spear, zoneId: zone.id, line: 'middle', command: 'reinforceRear' });
+  }
+  const rearAttackers = [{
+    ...flanker,
+    zoneId: zone.id,
+    rearAssault: true,
+    morale: 100,
+    confused: false,
+    intent: 'flank',
+  }];
+  const stratagem = {
+    id: 'rearManeuver', revealed: true, counterLevel: mode === 'preparedRearGuard' ? 1 : 0,
+    counter: mode === 'preparedRearGuard' ? { preparation: 0.6 } : {},
+  };
+  const counterBattle = {
+    ...battle,
+    defenderGroups: rearDefenders,
+    raiderGroups: rearAttackers,
+    enemyPlan: {
+      objective: 'breakthrough', objectiveRevealed: true, stratagemPoints: 2,
+      stratagems: [stratagem],
+    },
+  };
+  const formationCounter = tactical.tacticalRearManeuverFormationCounterForEngagement(
+    counterBattle,
+    zone.id,
+    rearAttackers,
+    rearDefenders,
+  );
+  const effectScale = enemyPlan.enemyStratagemEffectScaleForEngagement(stratagem, formationCounter);
+  const counterStrength = 1 - effectScale;
+  const counteredCombatPenalty = applyDynamicCounter ? 0.25 * counterStrength : 0;
+  const effectiveAttackers = rearAttackers.map(group => ({
+    ...group,
+    combatMultiplier: (group.combatMultiplier ?? 1) * (1 - counteredCombatPenalty),
+  }));
   const exchange = tacticalEngagement.resolveEngagementExchange({
     zone: { ...zone, pressure: 45, civilianRisk: 100 },
     defenders: rearDefenders,
-    attackers: [{ ...flanker, rearAssault: true, morale: 100, confused: false }],
+    attackers: effectiveAttackers,
     direction: 'rear',
     weather: 'clear',
     prepareVolleyApplied: false,
@@ -93,6 +129,9 @@ function runExchange(tacticalEngagement, battleSimulation, seed, mode) {
     enemyPowerAfter: raiderLoss.powerAfter,
     enemyShare: exchange.enemyShare,
     villageMoraleDelta: exchange.villageMoraleDelta,
+    formationCounter,
+    counterStrength,
+    counteredCombatPenalty,
   };
 }
 
@@ -109,21 +148,48 @@ function summarize(results) {
     averageEnemyPowerAfter: average(results, 'enemyPowerAfter'),
     averageEnemyShare: average(results, 'enemyShare'),
     averageVillageMoraleDelta: average(results, 'villageMoraleDelta'),
+    averageFormationCounter: average(results, 'formationCounter'),
+    averageCounterStrength: average(results, 'counterStrength'),
+    averageCounteredCombatPenalty: average(results, 'counteredCombatPenalty'),
   };
 }
 
 const compiledDir = compileGameModules();
+const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
+const enemyPlan = await import(pathToFileURL(join(compiledDir, 'enemyPlan.mjs')).href);
 const tacticalEngagement = await import(pathToFileURL(join(compiledDir, 'tacticalEngagement.mjs')).href);
 const battleSimulation = await import(pathToFileURL(join(compiledDir, 'battleSimulation.mjs')).href);
-const measurements = Object.fromEntries(MODES.map(mode => [
+const measure = applyDynamicCounter => Object.fromEntries(MODES.map(mode => [
   mode,
-  summarize(Array.from({ length: 20 }, (_unused, index) =>
-    runExchange(tacticalEngagement, battleSimulation, 2026071466 + index, mode))),
+  summarize(Array.from({ length: 20 }, (_unused, index) => runExchange(
+    tactical,
+    enemyPlan,
+    tacticalEngagement,
+    battleSimulation,
+    2026071466 + index,
+    mode,
+    applyDynamicCounter,
+  ))),
 ]));
+const exposureOnly = measure(false);
+const measurements = measure(true);
 
 assert.ok(measurements.rearGuard.averageCivilianCasualties < measurements.middleReserve.averageCivilianCasualties);
 assert.ok(measurements.middleReserve.averageCivilianCasualties < measurements.unopposed.averageCivilianCasualties);
 assert.ok(measurements.rearGuard.averageEnemyPowerAfter < measurements.middleReserve.averageEnemyPowerAfter);
 assert.ok(measurements.middleReserve.averageEnemyPowerAfter < measurements.unopposed.averageEnemyPowerAfter);
+assert.equal(measurements.unopposed.averageFormationCounter, 0);
+assert.equal(measurements.unopposed.averageCounteredCombatPenalty, 0);
+assert.ok(measurements.unopposed.averageCivilianCasualties > 0,
+  'an unopposed rear assault remains dangerous to civilians');
+assert.ok(measurements.rearGuard.averageFormationCounter > 0 &&
+  measurements.rearGuard.averageFormationCounter < 1,
+  'a live rear guard meaningfully counters but does not nullify the maneuver');
+assert.ok(measurements.preparedRearGuard.averageCounterStrength > measurements.rearGuard.averageCounterStrength,
+  'preparation combines with the live formation counter');
+assert.ok(measurements.preparedRearGuard.averageCounteredCombatPenalty < 0.25,
+  'combined preparation and formation remain below the maximum combat penalty');
+assert.ok(measurements.preparedRearGuard.averageCivilianCasualties <= measurements.rearGuard.averageCivilianCasualties,
+  'preparation never makes the guarded rear engagement more dangerous');
 
-console.log(JSON.stringify(measurements, null, 2));
+console.log(JSON.stringify({ exposureOnly, dynamicCounter: measurements }, null, 2));

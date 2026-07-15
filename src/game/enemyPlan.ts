@@ -350,9 +350,44 @@ export function enemyStratagemEffectScale(
   return 1 - enemyStratagemCounterStrength(stratagem);
 }
 
+export function enemyStratagemCounterStrengthForEngagement(
+  stratagem: Pick<EnemyStratagemState, 'counterLevel' | 'counter'>,
+  formationCounter: number,
+): number {
+  if (stratagem.counter && Object.keys(stratagem.counter).length > 0) {
+    return enemyCombinedCounterStrength({
+      ...stratagem.counter,
+      formation: formationCounter,
+    });
+  }
+  if (stratagem.counterLevel === 2) return 1;
+  return enemyCombinedCounterStrength({
+    preparation: stratagem.counterLevel === 1
+      ? CONFIG.tacticalBattle.enemyPlan.counterStrength.preparation
+      : 0,
+    formation: formationCounter,
+  });
+}
+
+export function enemyStratagemEffectScaleForEngagement(
+  stratagem: Pick<EnemyStratagemState, 'counterLevel' | 'counter'>,
+  formationCounter: number,
+): number {
+  return 1 - enemyStratagemCounterStrengthForEngagement(stratagem, formationCounter);
+}
+
 export function enemyPlanStratagemScale(plan: EnemyPlan | undefined, id: EnemyStratagemId): number {
   const stratagem = plan?.stratagems.find(candidate => candidate.id === id);
   return stratagem ? enemyStratagemEffectScale(stratagem) : 0;
+}
+
+export function enemyPlanStratagemScaleForEngagement(
+  plan: EnemyPlan | undefined,
+  id: EnemyStratagemId,
+  formationCounter: number,
+): number {
+  const stratagem = plan?.stratagems.find(candidate => candidate.id === id);
+  return stratagem ? enemyStratagemEffectScaleForEngagement(stratagem, formationCounter) : 0;
 }
 
 export function enemyPlanPreparationPenalty(plan: EnemyPlan | undefined): number {

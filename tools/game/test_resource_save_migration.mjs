@@ -314,6 +314,48 @@ function prepareFormationTestCombatants(state) {
 }
 
 {
+  const rearPenaltySave = simulation.newGame(2026071591);
+  prepareFormationTestCombatants(rearPenaltySave);
+  const battle = tactical.createTacticalBattle(rearPenaltySave, {
+    factionName: 'rear penalty save', power: 60, warned: true, siege: false, mode: 'garrison',
+  });
+  assert.equal(tactical.advanceTacticalPhase(rearPenaltySave), null);
+  assert.equal(tactical.advanceTacticalPhase(rearPenaltySave), null);
+  const spear = battle.defenderGroups.find(group => group.kind === 'militia-spear');
+  const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
+  assert.ok(spear && flanker);
+  battle.enemyPlan = {
+    objective: 'breakthrough', objectiveRevealed: true, stratagemPoints: 2,
+    stratagems: [{
+      id: 'rearManeuver', revealed: true, counterLevel: 1,
+      counter: { preparation: 0.6, formation: 0.95 },
+    }],
+  };
+  battle.defenderGroups.forEach(group => {
+    group.zoneId = group === spear ? 'wall' : 'center';
+    group.command = 'hold';
+  });
+  spear.line = 'rear';
+  battle.raiderGroups.forEach(group => {
+    if (group !== flanker) group.intent = 'withdraw';
+  });
+  Object.assign(flanker, {
+    zoneId: 'wall', targetZoneId: 'wall', flankPlan: 'rearAssault', rearAssault: true,
+    revealed: false, engagementsInZone: 0, intent: 'flank', power: 120, count: 20, killed: 0,
+    morale: 100, combatMultiplier: 0.8,
+  });
+  const originalCombatMultiplier = flanker.combatMultiplier;
+  assert.equal(tactical.resolveTacticalRound(rearPenaltySave), null);
+  assert.equal(flanker.combatMultiplier, originalCombatMultiplier,
+    'resolving a rear engagement applies its counter penalty only to an effective attacker copy');
+  assert.equal(saveLoad.saveGame(rearPenaltySave), true);
+  const loaded = saveLoad.loadGame();
+  const loadedFlanker = loaded?.tacticalBattle?.raiderGroups.find(group => group.id === flanker.id);
+  assert.equal(loadedFlanker?.combatMultiplier, originalCombatMultiplier,
+    'saving and loading after a rear engagement never persists or compounds its temporary penalty');
+}
+
+{
   const focusTargetSave = simulation.newGame(2026071488);
   prepareFormationTestCombatants(focusTargetSave);
   const battle = tactical.createTacticalBattle(focusTargetSave, {

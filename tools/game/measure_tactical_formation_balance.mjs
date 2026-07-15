@@ -102,9 +102,27 @@ function runScenario(tactical, battleSimulation, scenario, formationMode) {
     }
   }
   advanceToCommand(tactical, state);
-  const rearFormationCounter = tactical.tacticalRearManeuverFormationCounter(battle);
+  const rearFormationCounters = [];
 
   for (let guard = 0; guard < 10 && battle.phase === 'command'; guard += 1) {
+    const rearZoneIds = [...new Set(battle.raiderGroups.filter(group =>
+      group.rearAssault && group.intent !== 'withdraw' && group.power > 0 && group.count - group.killed > 0)
+      .map(group => group.zoneId))];
+    for (const zoneId of rearZoneIds) {
+      const rearAttackers = battle.raiderGroups.filter(group =>
+        group.zoneId === zoneId && group.rearAssault && group.intent !== 'withdraw' &&
+        group.power > 0 && group.count - group.killed > 0);
+      const rearDefenders = battle.defenderGroups.filter(group =>
+        group.zoneId === zoneId && group.count - group.wounded - group.killed > 0 &&
+        (group.commandable === false || group.line === 'rear' ||
+          (group.line === 'middle' && group.command === 'reinforceRear')));
+      rearFormationCounters.push(tactical.tacticalRearManeuverFormationCounterForEngagement(
+        battle,
+        zoneId,
+        rearAttackers,
+        rearDefenders,
+      ));
+    }
     assert.equal(tactical.resolveTacticalRound(state), null);
     assert.equal(tactical.completeTacticalSimulation(state), null);
     assert.equal(tactical.acknowledgeTacticalReport(state), null);
@@ -118,7 +136,9 @@ function runScenario(tactical, battleSimulation, scenario, formationMode) {
       0,
     ),
     enemyKills: battle.raiderGroups.reduce((sum, group) => sum + group.killed, 0),
-    rearFormationCounter,
+    rearFormationCounter: rearFormationCounters.length > 0
+      ? rearFormationCounters.reduce((sum, value) => sum + value, 0) / rearFormationCounters.length
+      : 0,
     outcome,
   };
 }

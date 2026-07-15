@@ -1,5 +1,9 @@
-import { enemyStratagemCounterStrength, enemyStratagemDefinition } from '../../game/enemyPlan';
-import type { EnemyObjectiveId, EnemyPlan } from '../../game/types';
+import {
+  enemyStratagemCounterStrength,
+  enemyStratagemCounterStrengthForEngagement,
+  enemyStratagemDefinition,
+} from '../../game/enemyPlan';
+import type { EnemyObjectiveId, EnemyPlan, EnemyStratagemId } from '../../game/types';
 
 const OBJECTIVE_LABELS: Record<EnemyObjectiveId, string> = {
   breakthrough: '방어선 돌파',
@@ -14,7 +18,17 @@ function counterLabel(strength: number): string {
   return '미대응';
 }
 
-export function EnemyPlanPanel({ plan }: { plan: EnemyPlan }) {
+interface Props {
+  plan: EnemyPlan;
+  effectiveCounterStrengths?: Partial<Record<EnemyStratagemId, number>>;
+  effectiveRearCounterZoneName?: string;
+}
+
+export function EnemyPlanPanel({
+  plan,
+  effectiveCounterStrengths,
+  effectiveRearCounterZoneName,
+}: Props) {
   const revealed = plan.stratagems.filter(stratagem => stratagem.revealed);
   const hiddenCount = plan.stratagems.length - revealed.length;
   return (
@@ -30,12 +44,20 @@ export function EnemyPlanPanel({ plan }: { plan: EnemyPlan }) {
       <div className="tactical-enemy-stratagems">
         {revealed.map(stratagem => {
           const definition = enemyStratagemDefinition(stratagem.id);
-          const counterStrength = enemyStratagemCounterStrength(stratagem);
+          const effectiveCounterStrength = effectiveCounterStrengths?.[stratagem.id];
+          const counterStrength = effectiveCounterStrength ?? (stratagem.id === 'rearManeuver'
+            ? enemyStratagemCounterStrengthForEngagement(stratagem, 0)
+            : enemyStratagemCounterStrength(stratagem));
           return (
             <div className={`tactical-enemy-stratagem counter-${counterStrength >= 1 ? 2 : counterStrength > 0 ? 1 : 0}`} key={stratagem.id}>
               <strong>{definition.label}</strong>
               <span>{definition.effect}</span>
               <em>{counterLabel(counterStrength)}</em>
+              {stratagem.id === 'rearManeuver' && (
+                <small>{effectiveCounterStrength != null
+                  ? `현재 ${effectiveRearCounterZoneName ?? '급습 전선'} 후열 경비 반영`
+                  : '진형 대응은 실제 급습 전선에서 계산됩니다.'}</small>
+              )}
             </div>
           );
         })}
