@@ -46,10 +46,12 @@ interface Props {
 }
 ```
 
-렌더 위치: `.tactical-stage-shell`의 자식 (팝오버와 형제). 절대 배치 우상단.
+렌더 위치: `.tactical-stage-shell`의 자식 (팝오버와 형제). 절대 배치 우상단에서
+구역 헤더 아래에 둔다. 같은 높이의 지역 설명은 미니맵 폭만큼 오른쪽 여백을 예약해
+서로 겹치지 않는다. 사냥은 봉쇄 게이지가 포함된 헤더가 더 높으므로 8px 더 내린다.
 `z-index: 70` — 계층 계약: 부대 인라인 z ≤ 60대 < **미니맵 70** < 선택 부대 80 < **팝오버 90**.
-미니맵은 70으로 **일반 스프라이트와 무대 연출 요소 위, 선택 부대·팝오버 아래**이며
-우상단 코너라 실제 겹침은 드물다. 팝오버가 미니맵을 덮는 것은 허용(팝오버가 우선).
+미니맵은 70으로 **일반 스프라이트와 무대 연출 요소 위, 선택 부대·팝오버 아래**다.
+팝오버가 미니맵을 덮는 것은 허용(팝오버가 우선).
 
 데이터는 전부 기존 상태에서 파생 (새 상태 없음):
 `battle.zones`(id/name/pressure/breached), `defenderGroups`(zoneId/line/kind/label/count/
@@ -103,7 +105,10 @@ intent/revealed/rearAssault/confused/beastKind), `huntEncirclement`,
   좌우가 항상 일치해야 한다.
 - 아군 60% 영역은 전열→중열→후열 3개 서브 컬럼 (전열이 적 쪽). 컬럼 안에서 점을
   세로로 쌓는다 (최대 4개, 그 이상은 마지막 점을 8px 대형으로 대체).
-- **후방 급습대는 아군 후열 컬럼 뒤(바깥쪽)에** 배치 — "뒤를 잡혔다"가 지도에서 보인다.
+- 적 40% 영역도 후열→중열→전열 3개 서브 컬럼 (전열이 아군 쪽)으로 분리한다.
+  같은 구역의 적·아군 3열은 접촉선을 사이에 둔 별도 영역이라 서로 겹치지 않는다.
+- **후방 급습대는 아군 후열 컬럼 뒤(바깥쪽)의 예약 여백에** 배치 — "뒤를 잡혔다"가
+  지도에서 보이되 아군 후열 점과 겹치지 않는다.
 - 돌파(`zone.breached`): 세그먼트 배경에 붉은 톤 `rgba(160,58,44,0.25)`.
 - **점 = `<span title=...>`이고 클릭 불가가 기본. 아군 점만 `<button tabIndex={-1}>`**
   (마우스 클릭 → `onSelectGroup`, `event.stopPropagation()`; Tab 순회에는 안 잡힘 —
@@ -155,12 +160,13 @@ export function encirclementDash(percent: number, radius?: number): string;
 - 호버 섹터는 채움을 `rgba(210,169,88,0.14)`로.
 - 아군 점은 `<circle>`/`<rect>` + `<title>` 자식 요소 (SVG 네이티브 툴팁) +
   `pointer-events: all`, 클릭 → `onSelectGroup`.
+- 사냥 구역은 선형 전장이 아니므로 섹터·심처 이동 시 좌우 smooth scroll을 사용하지 않고
+  선택한 화면으로 즉시 전환한다.
 
 ## 6. 상태·수명 규칙
 
-- **표시 대상 phase**: `deployment`, `command`, `simulating`, `report`.
-  `preparation`/`preparationExecution`에서는 렌더하지 않는다 (배치 전이라 지도가 비고,
-  준비 연출과 겹침).
+- **표시 대상 phase**: `preparation`, `preparationExecution`, `deployment`, `command`,
+  `simulating`, `report`. 준비 실행 연출 중에는 다른 재생 단계처럼 클릭만 잠근다.
 - **재생 중(`playback === true`)**: 클릭 전부 잠금 (`pointer-events: none`) +
   opacity 0.85. 표시는 상태를 따라 자동 갱신 — 라이브 전황판 역할.
 - 적 노출 판정: 무대와 동일하게 `tacticalRaiderVisibleDuringPlayback(battle, group,
@@ -174,7 +180,7 @@ export function encirclementDash(percent: number, radius?: number): string;
 .tactical-minimap {
   position: absolute;
   z-index: 70;
-  top: 34px;            /* 구역 헤더 바(이름/압박) 아래 */
+  top: 72px;            /* 구역 헤더 아래, 지역 설명과 수평 분리 */
   right: 10px;
   display: flex;
   flex-direction: column;
@@ -184,6 +190,10 @@ export function encirclementDash(percent: number, radius?: number): string;
   border-radius: 4px;
   background: rgba(14, 17, 19, 0.82);
 }
+.tactical-screen.hunt .tactical-minimap { top: 80px; }
+.tactical-screen:not(.hunt) .tactical-zone > p { right: 256px; }
+.tactical-screen.hunt .tactical-zone > p { right: 160px; }
+.tactical-screen.hunt .tactical-battlefield { scroll-behavior: auto; }
 .tactical-minimap.playback { pointer-events: none; opacity: 0.85; }
 .tactical-minimap-strip { display: flex; width: 224px; height: 56px; }
 .tactical-minimap-strip.assault { flex-direction: row-reverse; }
@@ -218,15 +228,18 @@ export function encirclementDash(percent: number, radius?: number): string;
 
 수동 (전투 시뮬레이션 1280×720):
 - [ ] 방어전: 4세그먼트, 아군 점이 배치대로, 적은 확인된 조만. 정체불명 = 속 빈 원
+- [ ] 준비단계 시작부터 미니맵 표시, 준비 실행 연출 중에는 클릭 잠금
+- [ ] 지역 설명·구역 헤더·사냥 봉쇄 게이지와 미니맵이 겹치지 않음
+- [ ] 같은 구역 적 3열·아군 3열과 후방 급습대가 서로 겹치지 않음
 - [ ] 배치 단계에서 부대를 옮기면 즉시 반영, 아군 점 클릭 → 해당 부대 선택 + 무대 이동
 - [ ] 세그먼트 클릭 → 무대 이동, 이름 슬롯 갱신, ▾(현재 초점)와 테두리(보는 구역) 구분
 - [ ] 후방 급습 라운드: 급습대 점이 아군 후열 바깥에 링 달고 표시
 - [ ] 재생 중: 클릭 잠김, 사상·퇴각에 따라 점이 사라지고 흐려짐
 - [ ] 토벌전: 좌우 반전이 무대와 일치
 - [ ] 사냥: 섹터 3 + 중앙, 은닉 시 발자국·발각 시 실구역 마름모, 미끼/함정 아이콘,
-      포위망 링이 헤더 %와 일치, 섹터 클릭 이동
+      포위망 링이 헤더 %와 일치, 섹터 클릭 시 좌우 연출 없이 즉시 이동
 - [ ] 하단 stage-index가 사라졌고 ‹ ›는 동작
-- [ ] 팝오버와 동시 표시 시 팝오버가 위 (z 90 > 50)
+- [ ] 팝오버와 동시 표시 시 팝오버가 위 (z 90 > 70)
 
 자동:
 - `test_minimap_geometry.mjs`: `annularSectorPath` 시작/끝점 좌표, `huntDotPosition`

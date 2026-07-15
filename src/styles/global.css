@@ -1352,6 +1352,7 @@ html, body, #root {
   scrollbar-width: none;
 }
 .tactical-battlefield::-webkit-scrollbar { display: none; }
+.tactical-screen.hunt .tactical-battlefield { scroll-behavior: auto; }
 .tactical-strip {
   height: 100%;
   min-height: 390px;
@@ -2194,6 +2195,8 @@ html, body, #root {
   font-size: 10px;
   line-height: 1.35;
 }
+.tactical-screen:not(.hunt) .tactical-zone > p { right: 256px; }
+.tactical-screen.hunt .tactical-zone > p { right: 160px; }
 .tactical-stage-nav {
   position: absolute;
   z-index: 14;
@@ -2215,7 +2218,7 @@ html, body, #root {
 .tactical-minimap {
   position: absolute;
   z-index: 70;
-  top: 34px;
+  top: 72px;
   right: 10px;
   display: flex;
   flex-direction: column;
@@ -2226,6 +2229,7 @@ html, body, #root {
   background: rgba(14, 17, 19, 0.82);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.32);
 }
+.tactical-screen.hunt .tactical-minimap { top: 80px; }
 .tactical-minimap.playback { pointer-events: none; opacity: 0.85; }
 .tactical-minimap-strip-map {
   width: 224px;
@@ -2264,13 +2268,10 @@ html, body, #root {
 .tactical-minimap-enemies {
   grid-area: enemy;
   display: flex;
-  align-content: center;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  flex-wrap: wrap;
+  align-items: stretch;
   padding: 3px 1px 5px;
 }
+.tactical-minimap-strip.assault .tactical-minimap-enemies { flex-direction: row-reverse; }
 .tactical-minimap-friendlies {
   position: relative;
   grid-area: friendly;
@@ -2281,6 +2282,11 @@ html, body, #root {
 .tactical-minimap-strip.assault .tactical-minimap-friendlies {
   flex-direction: row-reverse;
   padding: 2px 1px 5px 3px;
+}
+.tactical-minimap-friendlies.has-rear-attackers { padding-right: 9px; }
+.tactical-minimap-strip.assault .tactical-minimap-friendlies.has-rear-attackers {
+  padding-right: 1px;
+  padding-left: 9px;
 }
 .tactical-minimap-line {
   min-width: 0;
@@ -3520,6 +3526,8 @@ html, body, #root {
   .tactical-final-report { grid-template-columns: 1fr; gap: 8px; }
   .tactical-report-numbers { grid-template-columns: repeat(4, minmax(64px, 1fr)); }
   .tactical-minimap { display: none; }
+  .tactical-screen:not(.hunt) .tactical-zone > p,
+  .tactical-screen.hunt .tactical-zone > p { right: 12px; }
   .tactical-command-popover {
     left: 50% !important;
     top: auto !important;

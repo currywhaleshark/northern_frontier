@@ -34,7 +34,8 @@ interface Props {
   onSelectGroup: (groupId: string) => void;
 }
 
-const FORMATION_LINES: readonly TacticalFormationLine[] = ['front', 'middle', 'rear'];
+const DEFENDER_FORMATION_LINES: readonly TacticalFormationLine[] = ['front', 'middle', 'rear'];
+const RAIDER_FORMATION_LINES: readonly TacticalFormationLine[] = ['rear', 'middle', 'front'];
 
 function lineLabel(line: TacticalFormationLine): string {
   return line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열';
@@ -207,19 +208,26 @@ function StripMiniMap({
             >
               <div className="tactical-minimap-segment-body">
                 <div className="tactical-minimap-enemies">
-                  {cappedItems(frontalRaiders).map((entry, index) => entry.item ? (
-                    <EnemyHtmlMarker
-                      battle={battle}
-                      group={entry.item}
-                      active={raiderVisualActive(battle, entry.item, eventIndex)}
-                      key={entry.item.id}
-                    />
-                  ) : (
-                    <AggregateHtmlMarker side="enemy" count={entry.aggregate} key={`enemy-more-${index}`} />
-                  ))}
+                  {RAIDER_FORMATION_LINES.map(line => {
+                    const lineGroups = frontalRaiders.filter(group => group.line === line);
+                    return (
+                      <div className={`tactical-minimap-line line-${line}`} key={line}>
+                        {cappedItems(lineGroups).map((entry, index) => entry.item ? (
+                          <EnemyHtmlMarker
+                            battle={battle}
+                            group={entry.item}
+                            active={raiderVisualActive(battle, entry.item, eventIndex)}
+                            key={entry.item.id}
+                          />
+                        ) : (
+                          <AggregateHtmlMarker side="enemy" count={entry.aggregate} key={`enemy-${line}-more-${index}`} />
+                        ))}
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="tactical-minimap-friendlies">
-                  {FORMATION_LINES.map(line => {
+                <div className={`tactical-minimap-friendlies${rearRaiders.length > 0 ? ' has-rear-attackers' : ''}`}>
+                  {DEFENDER_FORMATION_LINES.map(line => {
                     const lineGroups = defenders.filter(group => group.line === line);
                     return (
                       <div className={`tactical-minimap-line line-${line}`} key={line}>

@@ -134,12 +134,30 @@ assert.match(minimapSource, /tacticalRaiderIntentLabel/,
   'the tactical minimap must reuse the battlefield raider intent label');
 assert.match(screenSource, /<TacticalMiniMap\b/,
   'the battle stage must render the tactical minimap');
+assert.match(screenSource, /battle\.phase === 'preparation'[\s\S]*battle\.phase === 'deployment'/,
+  'the tactical minimap must be available from the preparation phase');
+assert.match(screenSource, /behavior:\s*battle\?\.assaultKind === 'predatorHunt' \? 'auto' : 'smooth'/,
+  'hunt zone changes must switch instantly instead of implying a linear battlefield');
 assert.doesNotMatch(screenSource, /tactical-stage-index/,
   'the tactical minimap must replace the legacy stage index');
 assert.match(cssSource, /\.tactical-minimap\s*\{[\s\S]*z-index:\s*70;/,
   'the tactical minimap must paint above ordinary units and below selection and popovers');
+assert.match(cssSource, /\.tactical-minimap\s*\{[\s\S]*top:\s*72px;/,
+  'the tactical minimap must sit below the full-width zone heading');
+assert.match(cssSource, /\.tactical-screen\.hunt \.tactical-minimap\s*\{\s*top:\s*80px;/,
+  'the taller hunt heading and blockade gauge must have extra clearance');
+assert.match(cssSource, /\.tactical-screen:not\(\.hunt\) \.tactical-zone > p[\s\S]*right:\s*256px;/,
+  'strip minimaps must reserve horizontal space beside the zone description');
+assert.match(cssSource, /\.tactical-screen\.hunt \.tactical-zone > p[\s\S]*right:\s*160px;/,
+  'hunt minimaps must reserve horizontal space beside the zone description');
+assert.match(cssSource, /\.tactical-screen\.hunt \.tactical-battlefield\s*\{[\s\S]*scroll-behavior:\s*auto;/,
+  'hunt battlefields must disable the linear smooth-scroll transition');
 assert.match(cssSource, /@media \(max-width:\s*900px\)[\s\S]*\.tactical-minimap\s*\{\s*display:\s*none;/,
   'the first minimap slice must stay hidden on narrow screens');
+assert.match(minimapSource, /const RAIDER_FORMATION_LINES:[\s\S]*\['rear', 'middle', 'front'\]/,
+  'the strip minimap must order enemy lines from rear to the contact line');
+assert.match(minimapSource, /RAIDER_FORMATION_LINES\.map\(line =>[\s\S]*group\.line === line/,
+  'the strip minimap must place enemy groups in their persisted formation line');
 assert.match(zoneSource, /focus-target/,
   'the selected enemy group must have a persistent focus-target marker');
 assert.match(zoneSource, /tacticalGroupTargetUnavailableReason/,

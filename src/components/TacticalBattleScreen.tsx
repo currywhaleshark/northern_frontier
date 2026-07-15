@@ -377,9 +377,9 @@ export function TacticalBattleScreen({
     if (!viewport || !zone) return;
     viewport.scrollTo({
       left: Math.max(0, zone.offsetLeft - (viewport.clientWidth - zone.clientWidth) / 2),
-      behavior: 'smooth',
+      behavior: battle?.assaultKind === 'predatorHunt' ? 'auto' : 'smooth',
     });
-  }, [activeZoneId]);
+  }, [activeZoneId, battle?.assaultKind]);
 
   const selectedGroup = useMemo(
     () => battle?.defenderGroups.find(group => group.id === selectedGroupId) ??
@@ -454,8 +454,9 @@ export function TacticalBattleScreen({
   const huntDeploymentReason = hunt ? huntDeploymentUnavailableReason(state) : null;
   const roundLimit = hunt ? huntMaxRounds() : assault ? assaultMaxRounds() : 5;
   const commandable = battle.phase === 'command' || battle.phase === 'deployment';
-  const showTacticalMiniMap = battle.phase === 'deployment' || battle.phase === 'command' ||
-    battle.phase === 'simulating' || battle.phase === 'report';
+  const showTacticalMiniMap = battle.phase === 'preparation' || battle.phase === 'preparationExecution' ||
+    battle.phase === 'deployment' || battle.phase === 'command' || battle.phase === 'simulating' ||
+    battle.phase === 'report';
   const pendingCommandCount = pendingTacticalCommandCount(battle.defenderGroups);
   const rearResponseZoneIds = !assault && !hunt
     ? [...new Set(battle.raiderGroups.filter(group =>
