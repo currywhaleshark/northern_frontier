@@ -2111,6 +2111,14 @@ html, body, #root {
   gap: 12px;
   margin-bottom: 8px;
 }
+.tactical-controls > .tactical-panel-heading {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  background: #202428;
+  box-shadow: 0 6px 8px #202428;
+}
+.tactical-controls button { scroll-margin-top: 48px; }
 .tactical-panel-heading > div { display: flex; flex-direction: column; gap: 2px; }
 .tactical-panel-heading strong { color: #ead8ac; font-size: 14px; }
 .tactical-panel-heading span { color: var(--muted); font-size: 11px; }

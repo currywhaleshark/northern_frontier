@@ -40,6 +40,11 @@ assert.equal(
 );
 assert.match(cssSource, /\.tactical-simulating\s*\{[\s\S]*grid-template-columns:\s*34px 1fr auto;/,
   'playback panels must keep the three-column loader, progress, and fast-forward layout');
+assert.match(cssSource,
+  /\.tactical-controls > \.tactical-panel-heading\s*\{[\s\S]*position:\s*sticky;[\s\S]*top:\s*0;[\s\S]*z-index:\s*12;[\s\S]*background:\s*#202428;/,
+  'scrolling tactical controls must keep an opaque actionable heading visible');
+assert.match(cssSource, /\.tactical-controls button\s*\{\s*scroll-margin-top:\s*48px;\s*\}/,
+  'keyboard focus must scroll buttons below the sticky tactical heading');
 assert.match(cssSource, /\.tactical-screen\.fast-playback\s*\{\s*--tactical-playback-scale:\s*1;/,
   'fast-forward must restore authored animation timing');
 assert.match(cssSource,
