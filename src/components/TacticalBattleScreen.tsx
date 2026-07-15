@@ -227,6 +227,13 @@ function TypewriterCaption({ text, instant }: { text: string; instant: boolean }
   );
 }
 
+// 기존 이벤트 길이는 빠른 재생 기준으로 보존하고, 기본 재생에서는 동작과 자막을 여유 있게 보여준다.
+const TACTICAL_PLAYBACK_NORMAL_SCALE = 1.6;
+
+function tacticalPlaybackDuration(durationMs: number, fast: boolean): number {
+  return Math.round(durationMs * (fast ? 1 : TACTICAL_PLAYBACK_NORMAL_SCALE));
+}
+
 export function TacticalBattleScreen({
   state,
   onSpendPreparation,
@@ -277,16 +284,16 @@ export function TacticalBattleScreen({
     const play = (index: number) => {
       if (cancelled) return;
       if (index >= events.length) {
-        timer = window.setTimeout(onAdvancePhase, 360);
+        timer = window.setTimeout(onAdvancePhase, tacticalPlaybackDuration(360, fastRef.current));
         return;
       }
       setEventIndex(index);
       playTacticalEventSfx(events[index]);
-      const duration = fastRef.current ? Math.min(180, events[index].durationMs) : events[index].durationMs;
+      const duration = tacticalPlaybackDuration(events[index].durationMs, fastRef.current);
       timer = window.setTimeout(() => play(index + 1), duration);
     };
     setEventIndex(0);
-    timer = window.setTimeout(() => play(0), 260);
+    timer = window.setTimeout(() => play(0), tacticalPlaybackDuration(260, false));
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
@@ -309,15 +316,12 @@ export function TacticalBattleScreen({
       if (cancelled) return;
       if (index >= events.length) {
         setBattleDrums(false);
-        timer = window.setTimeout(onCompleteSimulation, 240);
+        timer = window.setTimeout(onCompleteSimulation, tacticalPlaybackDuration(240, fastRef.current));
         return;
       }
       setEventIndex(index);
       playTacticalEventSfx(events[index]);
-      // 배속 중에도 마지막(결과) 이벤트는 온전한 길이로 보여준다
-      const duration = fastRef.current && index < events.length - 1
-        ? Math.min(150, events[index].durationMs)
-        : events[index].durationMs;
+      const duration = tacticalPlaybackDuration(events[index].durationMs, fastRef.current);
       timer = window.setTimeout(() => play(index + 1), duration);
     };
     // 라운드 스팅어 배너 + 북 1타 뒤에 이벤트 재생을 시작한다
@@ -326,7 +330,7 @@ export function TacticalBattleScreen({
     timer = window.setTimeout(() => {
       setStingerRound(null);
       play(0);
-    }, 820);
+    }, tacticalPlaybackDuration(820, false));
     return () => {
       cancelled = true;
       setBattleDrums(false);
@@ -487,7 +491,7 @@ export function TacticalBattleScreen({
 
   return (
     <div className="tactical-overlay" role="dialog" aria-modal="true" aria-label={`${displayedFactionName} ${hunt ? '사냥' : assault ? '토벌' : '습격'} 직접 지휘`}>
-      <div className={`tactical-screen${assault ? ' assault' : ' defense'}${hunt ? ' hunt' : ''}${activeEvent?.kind === 'wallAssault' || activeEvent?.kind === 'wallHit' || activeEvent?.kind === 'bombardment' || activeEvent?.kind === 'zoneFall' || activeEvent?.kind === 'artilleryHit' || activeEvent?.kind === 'beastAmbush' ? ' shaking' : ''}`}>
+      <div className={`tactical-screen${assault ? ' assault' : ' defense'}${hunt ? ' hunt' : ''}${fast ? ' fast-playback' : ''}${activeEvent?.kind === 'wallAssault' || activeEvent?.kind === 'wallHit' || activeEvent?.kind === 'bombardment' || activeEvent?.kind === 'zoneFall' || activeEvent?.kind === 'artilleryHit' || activeEvent?.kind === 'beastAmbush' ? ' shaking' : ''}`}>
         <header className="tactical-header">
           <div>
             <div className="tactical-kicker">{hunt ? '맹수 몰이사냥 지휘' : assault ? '산채 토벌 지휘' : '습격 방어 지휘'}</div>

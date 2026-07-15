@@ -1250,6 +1250,7 @@ html, body, #root {
   background: rgba(5, 7, 9, 0.88);
 }
 .tactical-screen {
+  --tactical-playback-scale: 1.6;
   width: min(1480px, 100%);
   height: min(920px, 96vh);
   display: grid;
@@ -1260,6 +1261,7 @@ html, body, #root {
   background: #171b1e;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.68);
 }
+.tactical-screen.fast-playback { --tactical-playback-scale: 1; }
 .tactical-header {
   min-height: 72px;
   display: flex;
@@ -2522,11 +2524,11 @@ html, body, #root {
 .tactical-report-numbers span { color: var(--muted); font-size: 9px; }
 .tactical-report-numbers strong { color: #e3e6e7; font-size: 11px; overflow-wrap: anywhere; }
 
-.tactical-zone.event-ambush .tactical-raider-rank { animation: tactical-hit 420ms ease 2; }
-.tactical-zone.event-beastReveal .beast-group { animation: tactical-beast-reveal 720ms ease-out; }
-.tactical-zone.event-beastAmbush .beast-group { animation: tactical-beast-lunge 650ms cubic-bezier(0.16, 0.72, 0.24, 1); }
-.tactical-zone.event-beastRout .beast-group { animation: tactical-beast-rout 760ms ease-in forwards; }
-.tactical-zone.event-bombardment .tactical-raider-rank { animation: tactical-bombardment-hit 220ms ease-in-out 4; }
+.tactical-zone.event-ambush .tactical-raider-rank { animation: tactical-hit calc(420ms * var(--tactical-playback-scale)) ease 2; }
+.tactical-zone.event-beastReveal .beast-group { animation: tactical-beast-reveal calc(720ms * var(--tactical-playback-scale)) ease-out; }
+.tactical-zone.event-beastAmbush .beast-group { animation: tactical-beast-lunge calc(650ms * var(--tactical-playback-scale)) cubic-bezier(0.16, 0.72, 0.24, 1); }
+.tactical-zone.event-beastRout .beast-group { animation: tactical-beast-rout calc(760ms * var(--tactical-playback-scale)) ease-in forwards; }
+.tactical-zone.event-bombardment .tactical-raider-rank { animation: tactical-bombardment-hit calc(220ms * var(--tactical-playback-scale)) ease-in-out 4; }
 .tactical-zone.event-conceal::after {
   content: '';
   position: absolute;
@@ -2534,18 +2536,18 @@ html, body, #root {
   inset: 0;
   background: radial-gradient(ellipse at 66% 64%, rgba(28, 39, 31, 0.66), transparent 48%);
   pointer-events: none;
-  animation: tactical-conceal 950ms ease-out forwards;
+  animation: tactical-conceal calc(950ms * var(--tactical-playback-scale)) ease-out forwards;
 }
-.tactical-zone.event-melee .tactical-raider-group.melee-attacker { animation: tactical-charge-right 520ms ease 1; }
-.tactical-zone.event-wallAssault .tactical-raider-rank { animation: tactical-charge-right 580ms ease 1; }
-.tactical-zone.event-melee .tactical-field-group.melee-attacker { animation: tactical-charge-left 520ms ease 1; }
+.tactical-zone.event-melee .tactical-raider-group.melee-attacker { animation: tactical-charge-right calc(520ms * var(--tactical-playback-scale)) ease 1; }
+.tactical-zone.event-wallAssault .tactical-raider-rank { animation: tactical-charge-right calc(580ms * var(--tactical-playback-scale)) ease 1; }
+.tactical-zone.event-melee .tactical-field-group.melee-attacker { animation: tactical-charge-left calc(520ms * var(--tactical-playback-scale)) ease 1; }
 .tactical-zone.event-wallHit .tactical-defender-rank,
-.tactical-zone.event-zoneFall .tactical-defender-rank { animation: tactical-charge-left 520ms ease 1; }
-.tactical-zone.event-zoneFall .tactical-raider-rank { animation: tactical-charge-right 700ms ease 1; }
-.tactical-zone.event-casualty .tactical-defender-rank { animation: tactical-casualty 520ms ease; }
-.tactical-zone.event-moraleBreak .tactical-raider-rank { animation: tactical-break 700ms ease forwards; }
-.tactical-zone.event-loot .tactical-raider-rank { animation: tactical-loot 380ms ease 2; }
-.tactical-zone.moving-raiders .tactical-raider-rank { animation: tactical-advance-after-combat 620ms ease-in forwards; }
+.tactical-zone.event-zoneFall .tactical-defender-rank { animation: tactical-charge-left calc(520ms * var(--tactical-playback-scale)) ease 1; }
+.tactical-zone.event-zoneFall .tactical-raider-rank { animation: tactical-charge-right calc(700ms * var(--tactical-playback-scale)) ease 1; }
+.tactical-zone.event-casualty .tactical-defender-rank { animation: tactical-casualty calc(520ms * var(--tactical-playback-scale)) ease; }
+.tactical-zone.event-moraleBreak .tactical-raider-rank { animation: tactical-break calc(700ms * var(--tactical-playback-scale)) ease forwards; }
+.tactical-zone.event-loot .tactical-raider-rank { animation: tactical-loot calc(380ms * var(--tactical-playback-scale)) ease 2; }
+.tactical-zone.moving-raiders .tactical-raider-rank { animation: tactical-advance-after-combat calc(620ms * var(--tactical-playback-scale)) ease-in forwards; }
 .tactical-screen.assault .tactical-zone.event-melee .tactical-raider-group.melee-attacker,
 .tactical-screen.assault .tactical-zone.event-zoneFall .tactical-raider-rank {
   animation-name: tactical-charge-left;
@@ -2561,17 +2563,17 @@ html, body, #root {
 .tactical-screen.assault .tactical-raider-group.leader-escaping { animation-name: tactical-assault-leader-escape; }
 .tactical-screen.assault .tactical-raider-group.escape-blocked { animation-name: tactical-assault-escape-blocked; }
 .tactical-screen.assault .tactical-field-group.leader-blocking { animation-name: tactical-assault-leader-blocking; }
-.tactical-raider-group.leader-escaping { animation: tactical-leader-escape 920ms cubic-bezier(0.2, 0.68, 0.2, 1) forwards; }
-.tactical-raider-group.escape-blocked { animation: tactical-escape-blocked 780ms ease-out; }
-.tactical-field-group.leader-blocking { animation: tactical-leader-blocking 780ms cubic-bezier(0.16, 0.78, 0.25, 1); }
-.tactical-field-group.prep-prepareAmbush { animation: tactical-prep-ambush 1050ms ease-out forwards; }
-.tactical-field-group.prep-muster { animation: tactical-prep-muster 1050ms ease-out; }
-.tactical-field-group.prep-evacuate { animation: tactical-prep-evacuate 950ms ease-in-out; }
-.tactical-field-group.prep-readyVolley { animation: tactical-prep-ready 420ms ease-in-out 2; }
+.tactical-raider-group.leader-escaping { animation: tactical-leader-escape calc(920ms * var(--tactical-playback-scale)) cubic-bezier(0.2, 0.68, 0.2, 1) forwards; }
+.tactical-raider-group.escape-blocked { animation: tactical-escape-blocked calc(780ms * var(--tactical-playback-scale)) ease-out; }
+.tactical-field-group.leader-blocking { animation: tactical-leader-blocking calc(780ms * var(--tactical-playback-scale)) cubic-bezier(0.16, 0.78, 0.25, 1); }
+.tactical-field-group.prep-prepareAmbush { animation: tactical-prep-ambush calc(1050ms * var(--tactical-playback-scale)) ease-out forwards; }
+.tactical-field-group.prep-muster { animation: tactical-prep-muster calc(1050ms * var(--tactical-playback-scale)) ease-out; }
+.tactical-field-group.prep-evacuate { animation: tactical-prep-evacuate calc(950ms * var(--tactical-playback-scale)) ease-in-out; }
+.tactical-field-group.prep-readyVolley { animation: tactical-prep-ready calc(420ms * var(--tactical-playback-scale)) ease-in-out 2; }
 
 /* 개별 스프라이트 쓰러짐 — 피해 이벤트 동안 임시로 추가된 스프라이트가 넘어지며 사라진다 */
 .tactical-sprite.falling {
-  animation: tactical-fall 620ms ease-in forwards;
+  animation: tactical-fall calc(620ms * var(--tactical-playback-scale)) ease-in forwards;
   pointer-events: none;
 }
 .tactical-raider.falling { animation-name: tactical-raider-fall; }
@@ -2654,7 +2656,7 @@ html, body, #root {
   font-weight: 800;
   letter-spacing: 0.04em;
   pointer-events: none;
-  animation: tactical-float-up 950ms ease-out forwards;
+  animation: tactical-float-up calc(950ms * var(--tactical-playback-scale)) ease-out forwards;
 }
 .tactical-float.defender { left: 64%; color: #f2b9ac; border: 1px solid rgba(185, 95, 79, 0.7); }
 .tactical-float.raider { left: 22%; color: #f6dfa8; border: 1px solid rgba(214, 175, 91, 0.65); }
@@ -2757,7 +2759,7 @@ html, body, #root {
   border-radius: 1px;
   background: linear-gradient(90deg, #f7efd2, #e8d9a8 55%, transparent);
   opacity: 0;
-  animation: fx-arrow-flight 560ms ease-in forwards;
+  animation: fx-arrow-flight calc(560ms * var(--tactical-playback-scale)) ease-in forwards;
 }
 .fx-arrow.moves-right {
   left: 42%;
@@ -2795,7 +2797,7 @@ html, body, #root {
   opacity: 0;
   background: radial-gradient(circle, #fff4b5 0 5%, #ffb12f 18%, rgba(204, 54, 19, 0.9) 40%, rgba(54, 41, 35, 0.6) 58%, transparent 72%);
   filter: blur(1px);
-  animation: fx-fire-impact 820ms 380ms ease-out forwards;
+  animation: fx-fire-impact calc(820ms * var(--tactical-playback-scale)) calc(380ms * var(--tactical-playback-scale)) ease-out forwards;
 }
 .fx-fire-impact.moves-right { left: auto; right: 18%; }
 @keyframes fx-fire-flicker { to { transform: scale(1.35) translateX(2px); opacity: 0.7; } }
@@ -2829,7 +2831,7 @@ html, body, #root {
     radial-gradient(circle at 84% 50%, #fffdf0 0 8%, #ffd770 9% 20%, transparent 48%),
     conic-gradient(from 90deg at 100% 50%, transparent 0 17%, #ffb430 18% 27%, transparent 28% 39%, #ff8b20 40% 53%, transparent 54% 100%);
   filter: drop-shadow(-3px 0 3px rgba(255, 166, 38, 0.8));
-  animation: tactical-unit-muzzle-flash 240ms ease-out forwards;
+  animation: tactical-unit-muzzle-flash calc(240ms * var(--tactical-playback-scale)) ease-out forwards;
 }
 .tactical-unit-muzzle-flash.cannon {
   width: 52px;
@@ -2846,7 +2848,7 @@ html, body, #root {
   border-radius: 50%;
   background: radial-gradient(circle, rgba(230, 230, 224, 0.58), rgba(190, 190, 184, 0.22) 56%, transparent 76%);
   filter: blur(2px);
-  animation: tactical-unit-muzzle-smoke 800ms ease-out forwards;
+  animation: tactical-unit-muzzle-smoke calc(800ms * var(--tactical-playback-scale)) ease-out forwards;
 }
 .tactical-unit-muzzle-flash.cannon::after {
   width: 42px;
@@ -2872,7 +2874,7 @@ html, body, #root {
   height: 62px;
   border-radius: 50%;
   background: radial-gradient(circle, #fff9da 0 8%, #ffca58 18%, rgba(221, 87, 25, 0.72) 42%, transparent 70%);
-  animation: fx-cannon-flash 480ms ease-out forwards;
+  animation: fx-cannon-flash calc(480ms * var(--tactical-playback-scale)) ease-out forwards;
 }
 .fx-cannon-shell {
   right: 18%;
@@ -2881,7 +2883,7 @@ html, body, #root {
   border-radius: 50%;
   background: #28221b;
   box-shadow: 0 0 10px 4px rgba(255, 167, 62, 0.8), 24px 0 18px 5px rgba(190, 190, 180, 0.35);
-  animation: fx-cannon-shell 680ms cubic-bezier(0.3, 0.05, 0.65, 1) forwards;
+  animation: fx-cannon-shell calc(680ms * var(--tactical-playback-scale)) cubic-bezier(0.3, 0.05, 0.65, 1) forwards;
 }
 .fx-explosion {
   bottom: 118px;
@@ -2890,7 +2892,7 @@ html, body, #root {
   border-radius: 50%;
   background: radial-gradient(circle, #fff5bd 0 7%, #ffbd45 18%, #b9401f 42%, rgba(45, 40, 35, 0.82) 58%, transparent 72%);
   filter: blur(1px);
-  animation: fx-explosion 720ms ease-out forwards;
+  animation: fx-explosion calc(720ms * var(--tactical-playback-scale)) ease-out forwards;
 }
 @keyframes fx-cannon-flash {
   0% { transform: scale(0.2); opacity: 0; }
@@ -2909,7 +2911,7 @@ html, body, #root {
   100% { transform: scale(2.1) translateY(-20px); opacity: 0; filter: blur(8px); }
 }
 /* volley 순간 사격 병종 반동 */
-.tactical-field-group.recoil { animation: tactical-recoil 320ms ease; }
+.tactical-field-group.recoil { animation: tactical-recoil calc(320ms * var(--tactical-playback-scale)) ease; }
 .tactical-screen.assault .tactical-field-group.recoil { animation-name: tactical-assault-recoil; }
 @keyframes tactical-recoil {
   0% { transform: translateX(0); }
@@ -2922,7 +2924,7 @@ html, body, #root {
   100% { transform: translateX(0); }
 }
 /* 방어선 붕괴: 화면 전체 흔들림 + 붉은 비네트 플래시 */
-.tactical-screen.shaking { animation: tactical-screen-shake 480ms ease; }
+.tactical-screen.shaking { animation: tactical-screen-shake calc(480ms * var(--tactical-playback-scale)) ease; }
 @keyframes tactical-screen-shake {
   0%, 100% { transform: translate(0, 0); }
   15% { transform: translate(-8px, 4px); }
@@ -2936,7 +2938,7 @@ html, body, #root {
   inset: 0;
   pointer-events: none;
   background: radial-gradient(ellipse at center, transparent 40%, rgba(158, 38, 24, 0.46) 100%);
-  animation: tactical-vignette-flash 640ms ease-out forwards;
+  animation: tactical-vignette-flash calc(640ms * var(--tactical-playback-scale)) ease-out forwards;
 }
 .tactical-vignette.bombardment {
   background: radial-gradient(ellipse at center, transparent 45%, rgba(178, 94, 28, 0.38) 100%);
@@ -3102,7 +3104,7 @@ html, body, #root {
   place-items: center;
   pointer-events: none;
   background: rgba(8, 10, 11, 0.42);
-  animation: tactical-stinger-fade 820ms ease forwards;
+  animation: tactical-stinger-fade calc(820ms * var(--tactical-playback-scale)) ease forwards;
 }
 .tactical-round-stinger > div {
   display: flex;
@@ -3112,7 +3114,7 @@ html, body, #root {
   padding: 14px 34px;
   border-top: 1px solid rgba(214, 175, 91, 0.7);
   border-bottom: 1px solid rgba(214, 175, 91, 0.7);
-  animation: tactical-stinger-zoom 820ms ease forwards;
+  animation: tactical-stinger-zoom calc(820ms * var(--tactical-playback-scale)) ease forwards;
 }
 .tactical-round-stinger strong {
   color: #f2dfb0;

@@ -14,6 +14,24 @@ assert.match(screenSource, /<EnemyPlanPanel\b/, 'the preparation screen must del
 assert.doesNotMatch(screenSource, /flankerIntel/, 'the legacy one-line flanker intel must be removed');
 assert.match(screenSource, /enemyPlanCounterLabelsForAction/,
   'preparation cards must derive counter tags from revealed stratagems');
+assert.match(screenSource, /const TACTICAL_PLAYBACK_NORMAL_SCALE = 1\.6;/,
+  'normal tactical playback must run slower than the authored event timing');
+assert.equal(
+  [...screenSource.matchAll(/tacticalPlaybackDuration\(events\[index\]\.durationMs, fastRef\.current\)/g)].length,
+  2,
+  'preparation and combat playback must share the same pacing rule',
+);
+assert.doesNotMatch(screenSource, /Math\.min\((?:150|180), events\[index\]\.durationMs\)/,
+  'fast-forward must preserve the previous normal event timing instead of skipping events');
+assert.match(screenSource, /fast \? ' fast-playback' : ''/,
+  'the tactical screen must expose fast-forward state to visual effects');
+assert.match(cssSource, /--tactical-playback-scale:\s*1\.6;/,
+  'battlefield motion must use the same slower normal playback scale');
+assert.match(cssSource, /\.tactical-screen\.fast-playback\s*\{\s*--tactical-playback-scale:\s*1;/,
+  'fast-forward must restore authored animation timing');
+assert.match(cssSource,
+  /\.tactical-zone\.event-melee \.tactical-raider-group\.melee-attacker\s*\{\s*animation:\s*tactical-charge-right calc\(520ms \* var\(--tactical-playback-scale\)\)/,
+  'melee motion must slow together with event pacing');
 
 assert.match(planSource, /objectiveRevealed/, 'enemy plan panel must hide an unrevealed objective');
 assert.match(planSource, /미확인 계책/, 'enemy plan panel must show the hidden stratagem count');
