@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
 import {
   tacticalCommandUnavailableReason,
-  tacticalFormationLinesAdjacent,
+  tacticalFormationLineUnavailableReason,
   tacticalSupportedCommands,
 } from '../../game/tacticalBattle';
 import {
@@ -20,7 +20,6 @@ interface Props {
   battle: NonNullable<GameState['tacticalBattle']>;
   group: TacticalDefenderGroup;
   hunt: boolean;
-  assault: boolean;
   placement: 'above' | 'below';
   style: CSSProperties;
   maxHeight: number;
@@ -40,7 +39,6 @@ export function TacticalCommandPopover({
   battle,
   group,
   hunt,
-  assault,
   placement,
   style,
   maxHeight,
@@ -115,16 +113,13 @@ export function TacticalCommandPopover({
           ) : (
             <div className="tactical-command-popover-lines" role="group" aria-label="전열 선택">
               {FORMATION_LINES.map(line => {
-                const adjacent = tacticalFormationLinesAdjacent(group.line, line);
-                const disabled = !assault && line !== group.line && !adjacent;
+                const unavailableReason = tacticalFormationLineUnavailableReason(battle, group, line);
                 return (
                   <button
                     type="button"
                     className={displayedLine === line ? 'active' : ''}
-                    disabled={disabled}
-                    title={disabled
-                      ? '한 라운드에는 인접한 전열로만 재배치할 수 있습니다.'
-                      : line === group.line ? '현재 전열' : '다음 라운드 목표 전열'}
+                    disabled={unavailableReason != null}
+                    title={unavailableReason ?? (line === group.line ? '현재 전열' : '다음 라운드 목표 전열')}
                     onClick={() => onSetLine(line)}
                     key={line}
                   >{lineLabel(line)}{group.pendingLine === line && line !== group.line && <small> 예약</small>}</button>

@@ -294,10 +294,16 @@ function addBuiltMarker(state, type) {
   assert.ok(battle.preparationEvents.some(event => event.kind === 'fortify' && event.zoneId === 'wall'));
   assert.equal(tactical.advanceTacticalPhase(state), null);
   assert.equal(battle.phase, 'deployment');
-  const movable = battle.defenderGroups.find(group => group.kind !== 'civilian');
+  const movable = battle.defenderGroups.find(group => group.commandable !== false && group.line === 'front');
   assert.ok(movable);
   assert.equal(tactical.assignDefenderGroup(state, movable.id, 'storehouse'), null);
   assert.equal(movable.zoneId, 'storehouse');
+  const nonAdjacentDeploymentLine = 'rear';
+  assert.equal(
+    tactical.tacticalFormationLineUnavailableReason(battle, movable, nonAdjacentDeploymentLine),
+    null,
+    'deployment allows a unit to move directly between non-adjacent formation lines',
+  );
   assert.equal(tactical.setDefenderFormationLine(state, movable.id, 'rear'), null);
   assert.equal(movable.line, 'rear');
 
@@ -306,6 +312,11 @@ function addBuiltMarker(state, type) {
   const activeCommandGroups = battle.defenderGroups.filter(tacticalCommandState.tacticalGroupCanReceiveCommand);
   assert.ok(activeCommandGroups.every(group => group.command != null && group.commandSource === 'recommended'));
   assert.equal(tacticalCommandState.pendingTacticalCommandCount(battle.defenderGroups), activeCommandGroups.length);
+  assert.match(
+    tactical.tacticalFormationLineUnavailableReason(battle, movable, 'front'),
+    /한 라운드에는 인접한 전열/,
+    'command-phase defense redeployment still cannot skip a formation line',
+  );
   assert.equal(tactical.setDefenderFormationLine(state, movable.id, 'middle'), null);
   assert.equal(movable.line, 'rear', 'command-phase formation changes wait until the round report is acknowledged');
   assert.equal(movable.pendingLine, 'middle');

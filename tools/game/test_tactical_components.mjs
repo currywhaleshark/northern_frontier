@@ -204,6 +204,10 @@ assert.match(cssSource, /\.tactical-hunt-moved/,
 
 const threeLineToggleCount = [...screenSource.matchAll(/\['front', 'middle', 'rear'\] as const/g)].length;
 assert.equal(threeLineToggleCount, 2, 'deployment and command controls must both expose three formation lines');
+assert.match(screenSource, /tacticalFormationLineUnavailableReason\(battle, selectedGroup, line\)/,
+  'formation controls must use the phase-aware game-layer movement contract');
+assert.match(popoverSource, /tacticalFormationLineUnavailableReason\(battle, group, line\)/,
+  'the command popover must share the phase-aware formation movement contract');
 assert.match(screenSource, /line === 'middle' \? '중열'/,
   'formation controls must label the middle line');
 assert.match(screenSource, /tacticalRearResponseOptions/,

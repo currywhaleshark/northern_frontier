@@ -1113,6 +1113,24 @@ export function assignDefenderGroup(state: GameState, groupId: string, zoneId: s
   return null;
 }
 
+export function tacticalFormationLineUnavailableReason(
+  battle: TacticalBattle,
+  defender: TacticalDefenderGroup,
+  line: TacticalFormationLine,
+): string | null {
+  if (battle.phase !== 'deployment' && battle.phase !== 'command') {
+    return '배치 또는 지휘 단계에서만 전열을 바꿀 수 있습니다.';
+  }
+  if (defender.commandable === false) return '피난 주민은 전열을 바꿀 수 없습니다.';
+  const deferredRedeploy = battle.phase === 'command' && battle.orientation !== 'assault' &&
+    battle.assaultKind !== 'predatorHunt';
+  if (deferredRedeploy && line !== defender.line &&
+      !tacticalFormationLinesAdjacent(defender.line, line)) {
+    return '한 라운드에는 인접한 전열로만 재배치할 수 있습니다.';
+  }
+  return null;
+}
+
 export function setDefenderFormationLine(
   state: GameState,
   groupId: string,
@@ -1126,7 +1144,8 @@ export function setDefenderFormationLine(
   }
   const defender = battle.defenderGroups.find(candidate => candidate.id === groupId);
   if (!defender) return '수비 그룹을 찾을 수 없습니다.';
-  if (defender.commandable === false) return '피난 주민은 전열을 바꿀 수 없습니다.';
+  const unavailableReason = tacticalFormationLineUnavailableReason(battle, defender, line);
+  if (unavailableReason) return unavailableReason;
   const deferredRedeploy = battle.phase === 'command' && battle.orientation !== 'assault' &&
     battle.assaultKind !== 'predatorHunt';
   if (!deferredRedeploy) {
@@ -1141,9 +1160,6 @@ export function setDefenderFormationLine(
       defender.commandSource = 'player';
     }
     return null;
-  }
-  if (!tacticalFormationLinesAdjacent(defender.line, line)) {
-    return '한 라운드에는 인접한 전열로만 재배치할 수 있습니다.';
   }
   defender.pendingLine = line;
   defender.command = 'redeploy';

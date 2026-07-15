@@ -7,7 +7,7 @@ import { withJosa } from '../game/josa';
 import {
   applyTacticalPlaybackEvent,
   tacticalCommandUnavailableReason, tacticalLootText,
-  tacticalFormationLinesAdjacent, tacticalPreparationUnavailableReason, tacticalRearResponseOptions,
+  tacticalFormationLineUnavailableReason, tacticalPreparationUnavailableReason, tacticalRearResponseOptions,
   tacticalRearAssaultIsEngaged, tacticalRearManeuverEffectiveCounterStrengthForZone,
   tacticalSupportedCommands,
 } from '../game/tacticalBattle';
@@ -680,7 +680,6 @@ export function TacticalBattleScreen({
               battle={battle}
               group={popoverGroup}
               hunt={hunt}
-              assault={assault}
               placement={commandPopover.placement}
               style={{
                 left: commandPopover.x,
@@ -881,14 +880,20 @@ export function TacticalBattleScreen({
                 </div>
                 {!hunt && (
                   <div className="tactical-line-toggle" aria-label={`${selectedGroup.label} 전열 선택`}>
-                    {(['front', 'middle', 'rear'] as const).map(line => (
-                      <button
-                        key={line}
-                        className={selectedGroup.line === line ? 'active' : ''}
-                        disabled={selectedGroup.commandable === false || tacticalActiveDefenderCount(selectedGroup) <= 0}
-                        onClick={() => onSetFormationLine(selectedGroup.id, line)}
-                      >{line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열'}</button>
-                    ))}
+                    {(['front', 'middle', 'rear'] as const).map(line => {
+                      const unavailableReason = tacticalFormationLineUnavailableReason(battle, selectedGroup, line);
+                      return (
+                        <button
+                          key={line}
+                          className={selectedGroup.line === line ? 'active' : ''}
+                          disabled={unavailableReason != null || tacticalActiveDefenderCount(selectedGroup) <= 0}
+                          title={unavailableReason ?? (line === selectedGroup.line
+                            ? '현재 전열'
+                            : '배치 단계에서는 원하는 전열로 즉시 이동합니다.')}
+                          onClick={() => onSetFormationLine(selectedGroup.id, line)}
+                        >{line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열'}</button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -969,19 +974,20 @@ export function TacticalBattleScreen({
                     )}
                     {!hunt && (
                       <div className="tactical-line-toggle" aria-label={`${selectedGroup.label} 전열 선택`}>
-                        {(['front', 'middle', 'rear'] as const).map(line => (
-                          <button
-                            key={line}
-                            className={(selectedGroup.pendingLine ?? selectedGroup.line) === line ? 'active' : ''}
-                            disabled={!assault && line !== selectedGroup.line &&
-                              !tacticalFormationLinesAdjacent(selectedGroup.line, line)}
-                            title={!assault && line !== selectedGroup.line &&
-                              !tacticalFormationLinesAdjacent(selectedGroup.line, line)
-                              ? '한 라운드에는 인접한 전열로만 재배치할 수 있습니다.'
-                              : line === selectedGroup.line ? '현재 전열' : '다음 라운드 목표 전열'}
-                            onClick={() => assignFormationLineTo(selectedGroup.id, line)}
-                          >{line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열'}</button>
-                        ))}
+                        {(['front', 'middle', 'rear'] as const).map(line => {
+                          const unavailableReason = tacticalFormationLineUnavailableReason(battle, selectedGroup, line);
+                          return (
+                            <button
+                              key={line}
+                              className={(selectedGroup.pendingLine ?? selectedGroup.line) === line ? 'active' : ''}
+                              disabled={unavailableReason != null}
+                              title={unavailableReason ?? (line === selectedGroup.line
+                                ? '현재 전열'
+                                : '다음 라운드 목표 전열')}
+                              onClick={() => assignFormationLineTo(selectedGroup.id, line)}
+                            >{line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열'}</button>
+                          );
+                        })}
                       </div>
                     )}
                     <div className="tactical-command-bar" role="group" aria-label={`${selectedGroup.label} 명령 선택`}>
