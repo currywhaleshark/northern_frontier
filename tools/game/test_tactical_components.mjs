@@ -147,14 +147,16 @@ assert.match(screenSource, /tactical-rear-response-guide/,
   'the command panel must expose rear-assault response tradeoffs');
 assert.match(cssSource, /\.tactical-rear-response-guide/,
   'rear-assault response guidance must remain readable inside the command panel');
-assert.match(cssSource, /\.tactical-zone\.focused \.tactical-raider-rank[\s\S]*grid-template-columns:\s*repeat\(3,/,
-  'focused enemy formations must receive three visual columns');
-assert.match(cssSource, /\.tactical-zone\.focused \.tactical-defender-rank[\s\S]*grid-template-columns:\s*repeat\(3,/,
-  'focused defender formations must receive three visual columns');
+assert.match(zoneSource, /formation-view/,
+  'every battlefield keeps the full formation layout while the viewport moves between zones');
+assert.match(cssSource, /\.tactical-zone\.formation-view \.tactical-raider-rank[\s\S]*grid-template-columns:\s*repeat\(3,/,
+  'enemy formations must keep three visual columns during zone movement');
+assert.match(cssSource, /\.tactical-zone\.formation-view \.tactical-defender-rank[\s\S]*grid-template-columns:\s*repeat\(3,/,
+  'friendly formations must keep three visual columns during zone movement');
 assert.match(cssSource, /\.tactical-line-toggle\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,/,
   'formation toggles must lay out three buttons');
-assert.match(cssSource, /\.tactical-formation-lane\s*\{\s*display:\s*contents;/,
-  'non-focused zones must keep the compact rank layout');
+assert.match(zoneSource, /tacticalRaiderVisibleDuringPlayback/,
+  'withdrawing raiders must use event-aware playback visibility');
 assert.match(zoneSource, /function formationStackStyle/,
   'focused formation groups must receive deterministic depth offsets');
 assert.match(zoneSource, /const center = \(groupCount - 1\) \/ 2;/,
@@ -165,10 +167,10 @@ assert.match(zoneSource, /zIndex:\s*60 - Math\.round\(distanceFromCenter \* 10\)
   'lower formation groups must paint above groups placed farther back');
 assert.match(zoneSource, /--formation-stack-y/,
   'formation depth must use a shallow vertical offset instead of full-height stacking');
-assert.match(cssSource, /\.tactical-zone\.focused \.tactical-formation-lane[\s\S]*display:\s*grid;/,
-  'groups sharing a focused formation line must overlap in one grid cell');
+assert.match(cssSource, /\.tactical-zone\.formation-view \.tactical-formation-lane[\s\S]*display:\s*grid;/,
+  'groups sharing a formation line must overlap in one grid cell during viewport movement');
 assert.match(cssSource,
-  /\.tactical-zone\.focused \.tactical-formation-lane > \.tactical-raider-group,[\s\S]*grid-area:\s*1\s*\/\s*1;/,
+  /\.tactical-zone\.formation-view \.tactical-formation-lane > \.tactical-raider-group,[\s\S]*grid-area:\s*1\s*\/\s*1;/,
   'each group in one line must occupy the same battlefield footprint');
 assert.match(cssSource, /translate:\s*var\(--formation-stack-x[\s\S]*--formation-stack-y/,
   'overlapping groups must be staggered only by small ground-plane offsets');
@@ -184,6 +186,16 @@ assert.match(cssSource, /\.tactical-zone\.event-melee \.tactical-raider-group\.m
   'the attacking enemy group must move independently');
 assert.match(cssSource, /\.tactical-zone\.event-melee \.tactical-field-group\.melee-attacker/,
   'the attacking friendly group must move independently');
+assert.match(zoneSource, /casualty-hit/,
+  'only the group named by a casualty event must receive the hit flash class');
+assert.doesNotMatch(cssSource, /\.tactical-zone\.event-casualty \.tactical-defender-rank/,
+  'casualty playback must not flash the entire friendly rank');
+assert.match(cssSource, /\.tactical-zone\.event-casualty \.tactical-raider-group\.casualty-hit/,
+  'enemy hit flashes must target only the damaged enemy group');
+assert.match(cssSource, /\.tactical-zone\.event-casualty \.tactical-field-group\.casualty-hit/,
+  'friendly hit flashes must target only the damaged friendly group');
+assert.match(zoneSource, /rear-withdrawing/,
+  'a rear assaulter must animate its exit before disappearing');
 assert.match(zoneSource, /rear-facing/,
   'defenders assigned to a rear engagement must expose a facing class');
 assert.match(cssSource, /\.tactical-field-group\.rear-facing \.tactical-defender[\s\S]*scaleX\(-1\)/,
@@ -193,10 +205,10 @@ assert.match(cssSource, /\.tactical-screen\.assault \.tactical-field-group\.rear
 assert.match(cssSource, /\.tactical-rear-assault-rank\s*\{[\s\S]*left:\s*86%;[\s\S]*right:\s*-2%;/,
   'rear assaulters must stand beyond the defender rear line');
 assert.match(cssSource,
-  /\.tactical-screen\.assault \.tactical-zone\.focused \.tactical-raider-rank \.line-front[\s\S]*grid-column:\s*1;/,
+  /\.tactical-screen\.assault \.tactical-zone\.formation-view \.tactical-raider-rank \.line-front[\s\S]*grid-column:\s*1;/,
   'assault zones must put the enemy front line next to the reversed contact line');
 assert.match(cssSource,
-  /\.tactical-screen\.assault \.tactical-zone\.focused \.tactical-defender-rank \.line-rear[\s\S]*grid-column:\s*1;/,
+  /\.tactical-screen\.assault \.tactical-zone\.formation-view \.tactical-defender-rank \.line-rear[\s\S]*grid-column:\s*1;/,
   'assault zones must put the player rear line at the outer left edge');
 
 console.log('tactical component extraction tests passed');

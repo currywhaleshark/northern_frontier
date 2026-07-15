@@ -34,6 +34,14 @@ function activeRaiderCount(group: TacticalRaiderGroup): number {
   return Math.max(0, group.count - group.killed);
 }
 
+function defenderVolleyCaption(shots: { arrows?: number; muskets?: number }): string {
+  const arrows = (shots.arrows ?? 0) > 0;
+  const muskets = (shots.muskets ?? 0) > 0;
+  if (arrows && muskets) return '활시위와 총성이 한꺼번에 터집니다.';
+  if (muskets) return '조총대의 총성이 한꺼번에 터집니다.';
+  return '궁수대의 활시위가 한꺼번에 울립니다.';
+}
+
 function randomRoundedBudget(expected: number, capacity: number, rng: () => number): number {
   const bounded = clamp(expected, 0, capacity);
   const base = Math.floor(bounded);
@@ -456,6 +464,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
   const maneuverEvents: TacticalAnimationEvent[] = [];
   const defenderCasualtyEvents: TacticalAnimationEvent[] = [];
   const raiderCasualtyEvents: TacticalAnimationEvent[] = [];
+  const confusionEvents: TacticalAnimationEvent[] = [];
   const preDefenseLines: string[] = [];
   const afterConsequencesEvents: TacticalAnimationEvent[] = [];
   const confusedAttackerIds: string[] = [];
@@ -467,7 +476,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
       if (attacker.confused || input.rng() >= confusionChance) continue;
       attacker.confused = true;
       confusedAttackerIds.push(attacker.id);
-      friendlyActionEvents.push(animationEvent(
+      confusionEvents.push(animationEvent(
         zone.id,
         'ambush',
         `${attacker.label}이(가) 급습에 주저앉아 이번 교전에서 행동하지 못합니다.`,
@@ -519,7 +528,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
 
   if (commands.includes('volley')) {
     const shots = tacticalDefenderShotCounts(defenders.filter(defender => defender.command === 'volley'));
-    friendlyActionEvents.push(animationEvent(zone.id, 'volley', '활시위와 총성이 한꺼번에 터집니다.', 650, {
+    friendlyActionEvents.push(animationEvent(zone.id, 'volley', defenderVolleyCaption(shots), 650, {
       side: 'defender', shots,
     }));
   }
@@ -961,6 +970,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     preDefenseEvents: [
       ...friendlyActionEvents,
       ...raiderCasualtyEvents,
+      ...confusionEvents,
       ...raiderRetreatEvents,
       ...resolvedEnemyActionEvents,
       ...defenderCasualtyEvents,

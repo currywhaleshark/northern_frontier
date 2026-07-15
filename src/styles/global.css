@@ -1816,8 +1816,8 @@ html, body, #root {
   right: 22%;
   gap: 4px;
 }
-.tactical-zone.focused .tactical-raider-rank,
-.tactical-zone.focused .tactical-defender-rank {
+.tactical-zone.formation-view .tactical-raider-rank,
+.tactical-zone.formation-view .tactical-defender-rank {
   bottom: 30px;
   min-height: 244px;
   display: grid;
@@ -1825,10 +1825,10 @@ html, body, #root {
   align-items: end;
   gap: 2px;
 }
-.tactical-zone.focused .tactical-raider-rank { left: 3%; right: 51%; }
-.tactical-zone.focused .tactical-defender-rank { left: 51%; right: 3%; }
-.tactical-zone.focused.has-rear-assault .tactical-defender-rank { right: 12%; }
-.tactical-zone.focused .tactical-formation-lane {
+.tactical-zone.formation-view .tactical-raider-rank { left: 3%; right: 51%; }
+.tactical-zone.formation-view .tactical-defender-rank { left: 51%; right: 3%; }
+.tactical-zone.formation-view.has-rear-assault .tactical-defender-rank { right: 12%; }
+.tactical-zone.formation-view .tactical-formation-lane {
   position: relative;
   min-width: 0;
   height: 154px;
@@ -1836,7 +1836,7 @@ html, body, #root {
   place-items: end center;
   padding-top: 18px;
 }
-.tactical-zone.focused .tactical-formation-line-label {
+.tactical-zone.formation-view .tactical-formation-line-label {
   position: absolute;
   z-index: 8;
   top: 0;
@@ -1853,10 +1853,10 @@ html, body, #root {
   font-weight: 700;
   pointer-events: none;
 }
-.tactical-zone.focused .tactical-raider-rank .tactical-formation-line-label { color: #d9aaa0; }
-.tactical-zone.focused .tactical-defender-rank .tactical-formation-line-label { color: #b9d8b9; }
-.tactical-zone.focused .tactical-formation-lane > .tactical-raider-group,
-.tactical-zone.focused .tactical-formation-lane > .tactical-field-group {
+.tactical-zone.formation-view .tactical-raider-rank .tactical-formation-line-label { color: #d9aaa0; }
+.tactical-zone.formation-view .tactical-defender-rank .tactical-formation-line-label { color: #b9d8b9; }
+.tactical-zone.formation-view .tactical-formation-lane > .tactical-raider-group,
+.tactical-zone.formation-view .tactical-formation-lane > .tactical-field-group {
   grid-area: 1 / 1;
   align-self: end;
   width: 100%;
@@ -1866,13 +1866,13 @@ html, body, #root {
   translate: var(--formation-stack-x, 0) calc(-1 * var(--formation-stack-y, 0px));
   transform-origin: center bottom;
 }
-.tactical-zone.focused .tactical-formation-lane > .tactical-raider-group > span,
-.tactical-zone.focused .tactical-formation-lane > .tactical-field-group > span {
+.tactical-zone.formation-view .tactical-formation-lane > .tactical-raider-group > span,
+.tactical-zone.formation-view .tactical-formation-lane > .tactical-field-group > span {
   max-width: 116px;
   padding: 2px 4px;
   font-size: 8px;
 }
-.tactical-zone.focused .tactical-contact-line {
+.tactical-zone.formation-view .tactical-contact-line {
   position: absolute;
   z-index: 3;
   top: 102px;
@@ -1883,7 +1883,7 @@ html, body, #root {
   border-left: 1px dashed rgba(231, 213, 170, 0.5);
   pointer-events: none;
 }
-.tactical-zone.focused .tactical-contact-line span {
+.tactical-zone.formation-view .tactical-contact-line span {
   position: absolute;
   top: 10px;
   left: 50%;
@@ -1897,14 +1897,14 @@ html, body, #root {
   font-weight: 700;
   white-space: nowrap;
 }
-.tactical-screen.assault .tactical-zone.focused .tactical-raider-rank { left: 51%; right: 3%; }
-.tactical-screen.assault .tactical-zone.focused .tactical-defender-rank { left: 3%; right: 51%; }
-.tactical-screen.assault .tactical-zone.focused .tactical-raider-rank .line-front,
-.tactical-screen.assault .tactical-zone.focused .tactical-defender-rank .line-rear { grid-column: 1; grid-row: 1; }
-.tactical-screen.assault .tactical-zone.focused .tactical-raider-rank .line-middle,
-.tactical-screen.assault .tactical-zone.focused .tactical-defender-rank .line-middle { grid-column: 2; grid-row: 1; }
-.tactical-screen.assault .tactical-zone.focused .tactical-raider-rank .line-rear,
-.tactical-screen.assault .tactical-zone.focused .tactical-defender-rank .line-front { grid-column: 3; grid-row: 1; }
+.tactical-screen.assault .tactical-zone.formation-view .tactical-raider-rank { left: 51%; right: 3%; }
+.tactical-screen.assault .tactical-zone.formation-view .tactical-defender-rank { left: 3%; right: 51%; }
+.tactical-screen.assault .tactical-zone.formation-view .tactical-raider-rank .line-front,
+.tactical-screen.assault .tactical-zone.formation-view .tactical-defender-rank .line-rear { grid-column: 1; grid-row: 1; }
+.tactical-screen.assault .tactical-zone.formation-view .tactical-raider-rank .line-middle,
+.tactical-screen.assault .tactical-zone.formation-view .tactical-defender-rank .line-middle { grid-column: 2; grid-row: 1; }
+.tactical-screen.assault .tactical-zone.formation-view .tactical-raider-rank .line-rear,
+.tactical-screen.assault .tactical-zone.formation-view .tactical-defender-rank .line-front { grid-column: 3; grid-row: 1; }
 .tactical-field-group {
   min-width: 0;
   flex: 0 1 auto;
@@ -2544,8 +2544,19 @@ html, body, #root {
 .tactical-zone.event-wallHit .tactical-defender-rank,
 .tactical-zone.event-zoneFall .tactical-defender-rank { animation: tactical-charge-left calc(520ms * var(--tactical-playback-scale)) ease 1; }
 .tactical-zone.event-zoneFall .tactical-raider-rank { animation: tactical-charge-right calc(700ms * var(--tactical-playback-scale)) ease 1; }
-.tactical-zone.event-casualty .tactical-defender-rank { animation: tactical-casualty calc(520ms * var(--tactical-playback-scale)) ease; }
-.tactical-zone.event-moraleBreak .tactical-raider-rank { animation: tactical-break calc(700ms * var(--tactical-playback-scale)) ease forwards; }
+.tactical-zone.event-casualty .tactical-raider-group.casualty-hit,
+.tactical-zone.event-casualty .tactical-field-group.casualty-hit {
+  animation: tactical-casualty calc(520ms * var(--tactical-playback-scale)) ease;
+}
+.tactical-zone.event-moraleBreak:not(.targeted-group-event) .tactical-raider-rank {
+  animation: tactical-break calc(700ms * var(--tactical-playback-scale)) ease forwards;
+}
+.tactical-zone .tactical-raider-group.withdrawing {
+  animation: tactical-break calc(650ms * var(--tactical-playback-scale)) ease forwards;
+}
+.tactical-zone .tactical-raider-group.rear-withdrawing {
+  animation: tactical-rear-withdraw calc(650ms * var(--tactical-playback-scale)) ease-in forwards;
+}
 .tactical-zone.event-loot .tactical-raider-rank { animation: tactical-loot calc(380ms * var(--tactical-playback-scale)) ease 2; }
 .tactical-zone.moving-raiders .tactical-raider-rank { animation: tactical-advance-after-combat calc(620ms * var(--tactical-playback-scale)) ease-in forwards; }
 .tactical-zone .tactical-raider-group.advancing { animation: tactical-advance-after-combat calc(620ms * var(--tactical-playback-scale)) ease-in forwards; }
@@ -2702,6 +2713,7 @@ html, body, #root {
 @keyframes tactical-volley { from { transform: translate(-80px, 28px); opacity: 0; } to { transform: translate(60px, -10px); opacity: 1; } }
 @keyframes tactical-casualty { 45% { filter: sepia(1) saturate(4); transform: translateY(4px); } }
 @keyframes tactical-break { to { transform: translateX(-80px); opacity: 0.25; } }
+@keyframes tactical-rear-withdraw { to { transform: translateX(110px); opacity: 0; } }
 @keyframes tactical-leader-escape {
   0% { transform: translate(0, 0); opacity: 1; }
   24% { transform: translate(-16px, -5px) rotate(-2deg); opacity: 1; }

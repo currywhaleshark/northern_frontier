@@ -1,7 +1,9 @@
 import type { CSSProperties } from 'react';
 import { combatSpriteDescriptor, tacticalGroupCapabilities } from '../../game/combatCapabilities';
 import { CONFIG } from '../../game/config';
-import { tacticalGroupTargetUnavailableReason } from '../../game/tacticalBattle';
+import {
+  tacticalGroupTargetUnavailableReason, tacticalRaiderVisibleDuringPlayback,
+} from '../../game/tacticalBattle';
 import type {
   GameState,
   PredatorKind,
@@ -572,7 +574,7 @@ export function TacticalZoneColumn({
     .filter(group => group.zoneId === zone.id)
     .sort((a, b) => defenderFormationOrder(a) - defenderFormationOrder(b));
   const zoneRaiders = battle.raiderGroups.filter(group => group.zoneId === zone.id &&
-    (group.intent !== 'withdraw' || activeEvent?.groupId === group.id));
+    tacticalRaiderVisibleDuringPlayback(battle, group, eventIndex));
   const raiders = zoneRaiders.filter(group => !group.rearAssault);
   const rearAssaulters = zoneRaiders.filter(group => {
     if (!group.rearAssault) return false;
@@ -616,7 +618,7 @@ export function TacticalZoneColumn({
   return (
     <section
       data-zone-id={zone.id}
-      className={`tactical-zone zone-${zone.kind}${hunt ? ` hunt-zone${zone.id === 'huntDen' ? ' hunt-den' : ' hunt-sector'}` : assault ? ' assault-zone' : ' defense-zone'}${focused ? ' focused' : ''}${visibleBreached ? ' breached' : ''}${burning ? ' burning' : ''}${raidersAdvancing ? ' moving-raiders' : ''}${rearAssaulters.length > 0 ? ' has-rear-assault' : ''}${eventClass(activeEvent, zone.id)}`}
+      className={`tactical-zone formation-view zone-${zone.kind}${hunt ? ` hunt-zone${zone.id === 'huntDen' ? ' hunt-den' : ' hunt-sector'}` : assault ? ' assault-zone' : ' defense-zone'}${focused ? ' focused' : ''}${visibleBreached ? ' breached' : ''}${burning ? ' burning' : ''}${raidersAdvancing ? ' moving-raiders' : ''}${rearAssaulters.length > 0 ? ' has-rear-assault' : ''}${activeEvent?.groupId ? ' targeted-group-event' : ''}${eventClass(activeEvent, zone.id)}`}
       style={{
         backgroundImage: `url(${background.src})`,
         backgroundSize: background.size,
@@ -764,9 +766,13 @@ export function TacticalZoneColumn({
           const meleeAttacker = meleeActorForEvent(activeEvent, 'raider', raider.id);
           const advancing = activeEvent?.kind === 'advance' && activeEvent.side === 'raider' &&
             (activeEvent.actorGroupIds?.includes(raider.id) ?? false);
+          const casualtyHit = activeEvent?.kind === 'casualty' && activeEvent.side === 'raider' &&
+            activeEvent.groupId === raider.id;
+          const withdrawing = activeEvent?.groupId === raider.id &&
+            (activeEvent.kind === 'retreat' || activeEvent.kind === 'moraleBreak');
           return (
             <div
-              className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${advancing ? ' advancing' : ''}${leaderMotion}`}
+              className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${advancing ? ' advancing' : ''}${casualtyHit ? ' casualty-hit' : ''}${withdrawing ? ' withdrawing' : ''}${leaderMotion}`}
               style={formationStackStyle(stackIndex, lineGroups.length)}
               data-stack-depth={lineGroups.length - 1 - stackIndex}
               key={leaderMotion ? `${raider.id}-${activeEvent?.kind}-${eventIndex}` : raider.id}
@@ -847,9 +853,13 @@ export function TacticalZoneColumn({
           const meleeAttacker = meleeActorForEvent(activeEvent, 'raider', raider.id);
           const advancing = activeEvent?.kind === 'advance' && activeEvent.side === 'raider' &&
             (activeEvent.actorGroupIds?.includes(raider.id) ?? false);
+          const casualtyHit = activeEvent?.kind === 'casualty' && activeEvent.side === 'raider' &&
+            activeEvent.groupId === raider.id;
+          const rearWithdrawing = activeEvent?.groupId === raider.id &&
+            (activeEvent.kind === 'retreat' || activeEvent.kind === 'moraleBreak');
           return (
             <div
-              className={`tactical-raider-group rear-assault${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${advancing ? ' advancing' : ''}`}
+              className={`tactical-raider-group rear-assault${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${advancing ? ' advancing' : ''}${casualtyHit ? ' casualty-hit' : ''}${rearWithdrawing ? ' rear-withdrawing' : ''}`}
               key={raider.id}
               onClick={targetable ? event => {
                 event.stopPropagation();
@@ -929,9 +939,11 @@ export function TacticalZoneColumn({
             0,
             group.wounded - playbackLoss.futureWounded - playbackLoss.currentWounded,
           );
+          const casualtyHit = activeEvent?.kind === 'casualty' && activeEvent.side === 'defender' &&
+            activeEvent.groupId === group.id;
           return (
             <div
-              className={`tactical-field-group formation-${defenderFormationRole(group)} line-${group.line}${rearFacing ? ' rear-facing' : ''}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${meleeAttacker ? ' melee-attacker' : ''}${prepMotion}${commandable ? ' selectable' : ''}${commandable && selectedGroupId === group.id ? ' selected' : ''}`}
+              className={`tactical-field-group formation-${defenderFormationRole(group)} line-${group.line}${rearFacing ? ' rear-facing' : ''}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${meleeAttacker ? ' melee-attacker' : ''}${casualtyHit ? ' casualty-hit' : ''}${prepMotion}${commandable ? ' selectable' : ''}${commandable && selectedGroupId === group.id ? ' selected' : ''}`}
               style={formationStackStyle(stackIndex, lineGroups.length)}
               data-stack-depth={lineGroups.length - 1 - stackIndex}
               key={recoiling || blockingEscape || prepMotion ? `${group.id}-motion-${eventIndex}` : group.id}

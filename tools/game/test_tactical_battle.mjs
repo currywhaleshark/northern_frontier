@@ -1468,6 +1468,15 @@ function addBuiltMarker(state, type) {
     (event.meleeParticipants ?? 0) > 0),
   'a revealed rear assault group keeps attacking after its entry event');
   assert.equal(flanker.intent, 'withdraw', 'a dominant rear assault exits after completing its objective');
+  const rearExitIndex = battle.pendingReport.events.findIndex(event =>
+    event.kind === 'retreat' && event.groupId === flanker.id);
+  assert.ok(rearExitIndex > 0, 'the rear assault exit has its own playback beat');
+  assert.equal(tactical.tacticalRaiderVisibleDuringPlayback(battle, flanker, rearExitIndex - 1), true,
+    'a withdrawing rear assaulter stays visible until its exit beat');
+  assert.equal(tactical.tacticalRaiderVisibleDuringPlayback(battle, flanker, rearExitIndex), true,
+    'a withdrawing rear assaulter remains visible during its exit beat');
+  assert.equal(tactical.tacticalRaiderVisibleDuringPlayback(battle, flanker, rearExitIndex + 1), false,
+    'the rear assaulter disappears only after its exit beat finishes');
   assert.equal(center.pressure, 0, 'a rear-only engagement does not create center pressure');
   assert.equal(center.breached, false, 'flankers cannot rout a civilian-only center through frontal pressure');
 }
@@ -1515,6 +1524,61 @@ function addBuiltMarker(state, type) {
   'exchange playback follows friendly attack, enemy damage, enemy attack, friendly damage');
   assert.equal(exchange.postDefenseEvents.length, 0,
     'damage is no longer deferred to a post-defense animation batch');
+  const musketVolley = exchange.preDefenseEvents.find(event =>
+    event.kind === 'volley' && event.side === 'defender');
+  assert.ok(musketVolley.text.includes('총성') && !musketVolley.text.includes('활시위'),
+    'a musket-only volley caption mentions gunfire but not bowstrings');
+
+  const bowDefender = {
+    ...volleyDefender,
+    id: 'sequential-bow',
+    kind: 'militia-bow',
+    weapon: 'bow',
+    readyMuskets: 0,
+    label: '각궁 수비대',
+  };
+  const bowExchange = tacticalEngagement.resolveEngagementExchange({
+    zone,
+    defenders: [bowDefender],
+    attackers: [shootingRaider],
+    direction: 'frontal',
+    weather: 'clear',
+    prepareVolleyApplied: false,
+    evacuateCiviliansApplied: false,
+    roundStartingRaiderPower: shootingRaider.power,
+    rng: () => 0,
+  });
+  const bowVolley = bowExchange.preDefenseEvents.find(event =>
+    event.kind === 'volley' && event.side === 'defender');
+  assert.ok(bowVolley.text.includes('활시위') && !bowVolley.text.includes('총성'),
+    'a bow-only volley caption mentions bowstrings but not gunfire');
+
+  const ambushDefender = {
+    ...bowDefender,
+    id: 'sequential-ambusher',
+    kind: 'hunter',
+    role: 'hunter',
+    label: '매복 사냥꾼',
+    command: 'ambush',
+    ambushed: true,
+  };
+  const ambushExchange = tacticalEngagement.resolveEngagementExchange({
+    zone: { ...zone, ambushBonus: 100 },
+    defenders: [ambushDefender],
+    attackers: [shootingRaider],
+    direction: 'frontal',
+    weather: 'clear',
+    prepareVolleyApplied: false,
+    evacuateCiviliansApplied: false,
+    roundStartingRaiderPower: shootingRaider.power,
+    rng: () => 0,
+  });
+  const ambushDamageIndex = ambushExchange.preDefenseEvents.findIndex(event =>
+    event.kind === 'casualty' && event.side === 'raider');
+  const ambushConfusionIndex = ambushExchange.preDefenseEvents.findIndex(event =>
+    event.kind === 'ambush' && event.side === 'raider' && event.groupId === shootingRaider.id);
+  assert.ok(ambushDamageIndex >= 0 && ambushConfusionIndex > ambushDamageIndex,
+    'ambush playback shows inflicted damage before revealing enemy confusion');
 
   const decisiveDefender = {
     ...volleyDefender,

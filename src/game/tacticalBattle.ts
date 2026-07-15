@@ -418,6 +418,20 @@ export function applyTacticalPlaybackEvent(
   if (moved) normalizeTacticalGroupTargets(battle);
 }
 
+export function tacticalRaiderVisibleDuringPlayback(
+  battle: TacticalBattle,
+  attacker: TacticalRaiderGroup,
+  eventIndex: number,
+): boolean {
+  if (attacker.intent !== 'withdraw') return true;
+  if (battle.phase !== 'simulating' || !battle.pendingReport) return false;
+  const departureIndex = battle.pendingReport.events.findIndex(playbackEvent =>
+    playbackEvent.groupId === attacker.id &&
+    (playbackEvent.kind === 'retreat' || playbackEvent.kind === 'moraleBreak' ||
+      playbackEvent.kind === 'leaderEscape'));
+  return departureIndex >= 0 && eventIndex <= departureIndex;
+}
+
 export function chooseAutomaticRaiderTarget(
   battle: TacticalBattle,
   attacker: TacticalRaiderGroup,
