@@ -47,6 +47,15 @@ assert.match(cssSource,
   'scrolling tactical controls must keep an opaque actionable heading visible');
 assert.match(cssSource, /\.tactical-controls button\s*\{\s*scroll-margin-top:\s*48px;\s*\}/,
   'keyboard focus must scroll buttons below the sticky tactical heading');
+assert.match(cssSource,
+  /\.tactical-screen\s*\{[\s\S]*--tactical-controls-height:\s*min\(34vh,\s*250px\);[\s\S]*grid-template-rows:\s*auto minmax\(300px,\s*1fr\) var\(--tactical-controls-height\);/,
+  'the battlefield grid must reserve one stable command-sized row for every lower battle phase');
+assert.match(cssSource,
+  /\.tactical-controls\s*\{[\s\S]*height:\s*100%;[\s\S]*max-height:\s*none;/,
+  'phase content must scroll inside the reserved lower row instead of resizing the battlefield');
+assert.match(cssSource,
+  /@media \(max-height:\s*650px\)[\s\S]*--tactical-controls-height:\s*190px;/,
+  'short viewports must keep a stable compact lower row');
 assert.match(cssSource, /\.tactical-screen\.fast-playback\s*\{\s*--tactical-playback-scale:\s*1;/,
   'fast-forward must restore authored animation timing');
 assert.match(cssSource,

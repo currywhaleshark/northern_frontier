@@ -1251,10 +1251,11 @@ html, body, #root {
 }
 .tactical-screen {
   --tactical-playback-scale: 1.6;
+  --tactical-controls-height: min(34vh, 250px);
   width: min(1480px, 100%);
   height: min(920px, 96vh);
   display: grid;
-  grid-template-rows: auto minmax(300px, 1fr) auto;
+  grid-template-rows: auto minmax(300px, 1fr) var(--tactical-controls-height);
   overflow: hidden;
   border: 1px solid #8f6e39;
   border-radius: 6px;
@@ -2247,8 +2248,8 @@ html, body, #root {
 }
 
 .tactical-controls {
-  height: auto;
-  max-height: min(34vh, 250px);
+  height: 100%;
+  max-height: none;
   overflow-y: auto;
   border-top: 1px solid #4e493d;
   background: #202428;
@@ -3326,7 +3327,13 @@ html, body, #root {
 
 @media (max-width: 900px) {
   .tactical-overlay { padding: 0; }
-  .tactical-screen { width: 100%; height: 100vh; border: 0; border-radius: 0; }
+  .tactical-screen {
+    --tactical-controls-height: min(38vh, 250px);
+    width: 100%;
+    height: 100vh;
+    border: 0;
+    border-radius: 0;
+  }
   .tactical-header { align-items: flex-start; padding: 8px 10px; }
   .tactical-header h1 { font-size: 16px; }
   .tactical-status-row > div { min-width: 72px; height: 39px; }
@@ -3338,7 +3345,7 @@ html, body, #root {
   .tactical-rear-assault-rank { left: 86%; right: -2%; width: auto; bottom: 36px; }
   .tactical-defender-rank { left: 51%; right: 5%; gap: 5px; }
   .tactical-zone.has-rear-assault .tactical-defender-rank { right: 23%; gap: 3px; }
-  .tactical-controls { max-height: min(38vh, 250px); padding: 8px; }
+  .tactical-controls { padding: 8px; }
   .tactical-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tactical-deploy-row { grid-template-columns: 1fr; gap: 6px; }
   .tactical-zone-buttons { grid-template-columns: repeat(4, minmax(72px, 1fr)); }
@@ -3361,10 +3368,12 @@ html, body, #root {
 }
 
 @media (max-height: 650px) {
-  .tactical-screen { grid-template-rows: auto minmax(260px, 1fr) auto; }
+  .tactical-screen {
+    --tactical-controls-height: 190px;
+    grid-template-rows: auto minmax(260px, 1fr) var(--tactical-controls-height);
+  }
   .tactical-header { min-height: 54px; padding-top: 5px; padding-bottom: 5px; }
   .tactical-status-row > div { height: 34px; }
-  .tactical-controls { max-height: 190px; }
 }
 
 @media (max-width: 560px) {
