@@ -56,7 +56,8 @@ interface Props {
   barricadeReinforced: boolean;
   commandable: boolean;
   selectedGroupId: string | null;
-  onSelectGroup: (groupId: string) => void;
+  nextPendingGroupId: string | null;
+  onSelectGroup: (groupId: string, element: HTMLElement) => void;
   onSelectTarget: (defenderGroupId: string, enemyGroupId: string) => void;
 }
 
@@ -568,6 +569,7 @@ export function TacticalZoneColumn({
   barricadeReinforced,
   commandable,
   selectedGroupId,
+  nextPendingGroupId,
   onSelectGroup,
   onSelectTarget,
 }: Props) {
@@ -949,22 +951,25 @@ export function TacticalZoneColumn({
             activeEvent.groupId === group.id;
           return (
             <div
-              className={`tactical-field-group formation-${defenderFormationRole(group)} line-${group.line}${rearFacing ? ' rear-facing' : ''}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${meleeAttacker ? ' melee-attacker' : ''}${casualtyHit ? ' casualty-hit' : ''}${prepMotion}${commandable ? ' selectable' : ''}${commandable && selectedGroupId === group.id ? ' selected' : ''}`}
-              style={formationStackStyle(stackIndex, lineGroups.length)}
+              className={`tactical-field-group formation-${defenderFormationRole(group)} line-${group.line}${rearFacing ? ' rear-facing' : ''}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${meleeAttacker ? ' melee-attacker' : ''}${casualtyHit ? ' casualty-hit' : ''}${prepMotion}${commandable ? ' selectable' : ''}${commandable && selectedGroupId === group.id ? ' selected' : ''}${nextPendingGroupId === group.id ? ' next-pending' : ''}`}
+              style={{
+                ...formationStackStyle(stackIndex, lineGroups.length),
+                ...(commandable && selectedGroupId === group.id ? { zIndex: 80 } : {}),
+              }}
               data-stack-index={stackIndex}
               data-stack-count={lineGroups.length}
               data-stack-depth={lineGroups.length - 1 - stackIndex}
               key={recoiling || blockingEscape || prepMotion ? `${group.id}-motion-${eventIndex}` : group.id}
               onClick={commandable ? event => {
                 event.stopPropagation();
-                onSelectGroup(group.id);
+                onSelectGroup(group.id, event.currentTarget);
               } : undefined}
               role={commandable ? 'button' : undefined}
               tabIndex={commandable ? 0 : undefined}
               onKeyDown={commandable ? event => {
                 if (event.key !== 'Enter' && event.key !== ' ') return;
                 event.preventDefault();
-                onSelectGroup(group.id);
+                onSelectGroup(group.id, event.currentTarget);
               } : undefined}
             >
               <GroupSprites

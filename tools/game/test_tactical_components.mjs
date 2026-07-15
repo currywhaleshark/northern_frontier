@@ -6,6 +6,8 @@ const appSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'u
 const zoneSource = readFileSync(new URL('../../src/components/tactical/TacticalZoneColumn.tsx', import.meta.url), 'utf8');
 const chipSource = readFileSync(new URL('../../src/components/tactical/TacticalGroupChip.tsx', import.meta.url), 'utf8');
 const planSource = readFileSync(new URL('../../src/components/tactical/EnemyPlanPanel.tsx', import.meta.url), 'utf8');
+const popoverSource = readFileSync(new URL('../../src/components/tactical/TacticalCommandPopover.tsx', import.meta.url), 'utf8');
+const commandTextSource = readFileSync(new URL('../../src/components/tactical/commandText.ts', import.meta.url), 'utf8');
 const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
 
 assert.match(screenSource, /<TacticalZoneColumn\b/, 'the battle screen must delegate each battlefield zone');
@@ -81,9 +83,39 @@ for (const className of [
   assert.match(zoneSource, new RegExp(className), `zone extraction must preserve .${className}`);
 }
 assert.match(zoneSource, /data-zone-id=\{zone\.id\}/, 'zone identity must remain on the extracted section');
-assert.match(zoneSource, /onSelectGroup\(group\.id\)/, 'battlefield groups must remain selectable');
+assert.match(zoneSource, /onSelectGroup\(group\.id,/, 'battlefield groups must remain selectable');
 assert.match(zoneSource, /onSelectTarget/,
   'revealed enemy groups must expose the selected friendly group target callback');
+assert.match(popoverSource, /from ['"]\.\/commandText['"]/,
+  'the command popover must reuse shared command labels and descriptions');
+assert.match(commandTextSource, /export function commandLabel[\s\S]*export function commandDescription/,
+  'the lower command bar and popover must share one command text source');
+assert.match(popoverSource, /tacticalSupportedCommands\(battle\)[\s\S]*tacticalCommandUnavailableReason\(battle, group, command\) == null/,
+  'the popover must show only supported commands that are currently available');
+assert.doesNotMatch(popoverSource, /COMMAND_LABELS|const\s+commandDescription/,
+  'the popover must not duplicate command strings');
+assert.match(screenSource, /<div className="tactical-stage-shell" ref=\{stageShellRef\}/,
+  'the stage shell must own the popover positioning reference');
+assert.ok(screenSource.indexOf('<TacticalCommandPopover') > screenSource.indexOf('<div className="tactical-battlefield"'),
+  'the command popover must render in the stage shell after the clipped battlefield');
+assert.match(screenSource, /commandPopover && selectedGroupId !== commandPopover\.groupId[\s\S]*setCommandPopover\(null\)/,
+  'selection changes close the popover only when the selected group actually differs');
+assert.match(screenSource, /assignCommandTo\(popoverGroup\.id, command\)/,
+  'popover commands must target their explicit group instead of a selected-group closure');
+assert.match(screenSource, /popoverAnchorRef\.current\?\.focus\(\)/,
+  'Escape closing must restore focus to the battlefield unit anchor');
+assert.match(zoneSource, /onSelectGroup\(group\.id, event\.currentTarget\)/,
+  'battlefield selection must pass its unit element as the popover anchor');
+assert.match(zoneSource, /\.\.\.formationStackStyle\(stackIndex, lineGroups\.length\)[\s\S]*zIndex:\s*80/,
+  'the selected battlefield group must paint above ordinary inline formation depths');
+assert.match(cssSource, /\.tactical-command-popover[\s\S]*z-index:\s*90;/,
+  'the command popover must paint above the selected unit');
+assert.match(cssSource, /left:\s*calc\(50% \+ var\(--caret-shift, 0px\)\)/,
+  'the command popover caret must consume the clamped anchor shift');
+assert.match(cssSource, /\.tactical-field-group\.next-pending > span[\s\S]*tactical-next-pulse/,
+  'the next automatically selected command group must receive a temporary pulse');
+assert.match(cssSource, /@media \(max-width:\s*900px\)[\s\S]*\.tactical-command-popover/,
+  'narrow screens must turn the popover into a bottom sheet');
 assert.match(zoneSource, /focus-target/,
   'the selected enemy group must have a persistent focus-target marker');
 assert.match(zoneSource, /tacticalGroupTargetUnavailableReason/,
@@ -138,8 +170,8 @@ assert.match(screenSource, /tactical-hunt-sector-movement/,
   'hunt command controls must allow moving an existing detachment between sectors');
 assert.match(screenSource, /이동한 조는 이번 라운드 몰이 기여가 절반/,
   'hunt command controls must explain the movement penalty');
-assert.match(screenSource, /반격 대기/, 'hunt ambush command must be relabeled as counter-wait');
-assert.match(screenSource, /모든 전투조/, 'counter-wait guidance must not imply a hunter-only restriction');
+assert.match(commandTextSource, /반격 대기/, 'hunt ambush command must be relabeled as counter-wait');
+assert.match(commandTextSource, /모든 전투조/, 'counter-wait guidance must not imply a hunter-only restriction');
 assert.match(screenSource, /tacticalSupportedCommands\(battle\)\.map\(command =>/,
   'the command bar must render the game-layer supported command contract');
 assert.doesNotMatch(screenSource, /COMMANDS\.filter\(/,
@@ -212,8 +244,8 @@ assert.match(zoneSource, /className=\{`tactical-field-group[\s\S]*data-stack-cou
   'same-line groups must expose their crowding count for label collision handling');
 assert.match(cssSource, /data-stack-count="[23]"[\s\S]*data-stack-index="1"[\s\S]*translate:\s*0 10px/,
   'the middle label in a crowded friendly line must be vertically staggered');
-assert.match(cssSource, /data-stack-count="[23]"[\s\S]*\.selected > span[\s\S]*max-width:\s*116px/,
-  'selected crowded groups must restore the full readable label width');
+assert.match(cssSource, /data-stack-count="[23]"[\s\S]*\.selected > span[\s\S]*max-width:\s*none;[\s\S]*overflow:\s*visible/,
+  'selected crowded groups must restore the complete readable label');
 assert.match(cssSource, /\.tactical-zone\.formation-view \.tactical-formation-lane[\s\S]*display:\s*grid;/,
   'groups sharing a formation line must overlap in one grid cell during viewport movement');
 assert.match(cssSource,

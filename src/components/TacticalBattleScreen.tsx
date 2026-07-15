@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { RESOURCE_NAMES, WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
 import { countBuilt } from '../game/buildings';
 import { getSeason } from '../game/seasons';
@@ -6,7 +6,7 @@ import { banditLairDoctrineDefinition, enemyPlanCounterLabelsForAction } from '.
 import { withJosa } from '../game/josa';
 import {
   applyTacticalPlaybackEvent,
-  tacticalCommandDescription, tacticalCommandUnavailableReason, tacticalLootText,
+  tacticalCommandUnavailableReason, tacticalLootText,
   tacticalFormationLinesAdjacent, tacticalPreparationUnavailableReason, tacticalRearResponseOptions,
   tacticalRearAssaultIsEngaged, tacticalRearManeuverEffectiveCounterStrengthForZone,
   tacticalSupportedCommands,
@@ -22,13 +22,15 @@ import type {
   PreparationActionId,
   TacticalAnimationEvent,
   TacticalCommandId,
-  TacticalDefenderGroup,
   TacticalFormationLine,
 } from '../game/types';
 import { playMeleeClash, playSfx, playWeaponSalvo, playWeaponVolley, setBattleDrums, type SfxName } from '../sound/sfx';
 import { TacticalGroupChip } from './tactical/TacticalGroupChip';
+import { TacticalCommandPopover } from './tactical/TacticalCommandPopover';
 import { EnemyPlanPanel } from './tactical/EnemyPlanPanel';
 import { TacticalZoneColumn } from './tactical/TacticalZoneColumn';
+import { commandDescription, commandLabel } from './tactical/commandText';
+import { computeCommandPopoverPlacement } from './tactical/popoverPlacement';
 
 interface Props {
   state: GameState;
@@ -66,47 +68,13 @@ const PREP_DESCRIPTIONS: Record<PreparationActionId, string> = {
   splitDrivers: '구 형식 저장 호환용 행동이며 새 사냥에서는 실제 분견대 편성을 사용합니다.',
 };
 
-const COMMAND_LABELS: Record<TacticalCommandId, string> = {
-  hold: '고수',
-  charge: '돌격',
-  volley: '일제 사격',
-  ambush: '매복',
-  guardStorehouse: '창고 사수',
-  protectCivilians: '주민 보호',
-  redeploy: '전열 재배치',
-  reinforceRear: '후방 증원',
-  fallback: '후퇴',
-  advance: '전진',
-  arson: '방화',
-  blockEscape: '퇴로 차단',
-  openRetreat: '자진 철수',
-};
-
-function commandLabel(command: TacticalCommandId, group: TacticalDefenderGroup, hunt = false): string {
-  if (hunt) {
-    if (command === 'hold') return '창벽';
-    if (command === 'volley') return '사격 대기';
-    if (command === 'advance') return '몰이';
-    if (command === 'ambush') return '반격 대기';
-    if (command === 'charge') return '창 돌입';
-    if (command === 'openRetreat') return '사냥 중지';
-  }
-  if (command === 'redeploy' && group.pendingLine) {
-    const target = group.pendingLine === 'front' ? '전열' : group.pendingLine === 'middle' ? '중열' : '후열';
-    return `재배치 → ${target}`;
-  }
-  return command === 'ambush' && group.ambushed ? '급습' : COMMAND_LABELS[command];
-}
-
-function commandDescription(command: TacticalCommandId, group: TacticalDefenderGroup, hunt: boolean): string {
-  if (!hunt) return tacticalCommandDescription(command, group.ambushed);
-  if (command === 'hold') return '창과 방패를 세워 짐승 급습 피해를 줄입니다.';
-  if (command === 'volley') return '짐승이 모습을 드러내는 순간 활과 조총을 집중합니다.';
-  if (command === 'advance') return '소리와 불빛으로 짐승을 밀어 포위망을 빠르게 좁힙니다.';
-  if (command === 'ambush') return '모든 전투조가 짐승이 자기 또는 인접 길목에 나타나는 순간 반격합니다. 사냥꾼·파수꾼은 더 능숙합니다.';
-  if (command === 'charge') return '발각된 짐승에게 근접 조가 창으로 돌입합니다.';
-  if (command === 'openRetreat') return '사냥을 중지하고 맹수 위협을 남긴 채 귀환합니다.';
-  return tacticalCommandDescription(command, group.ambushed);
+interface CommandPopoverState {
+  groupId: string;
+  x: number;
+  y: number;
+  placement: 'above' | 'below';
+  caretShift: number;
+  maxHeight: number;
 }
 
 // 연출 이벤트 종류별 효과음 매핑 — camera/report처럼 소리가 없는 이벤트는 생략
@@ -250,6 +218,9 @@ export function TacticalBattleScreen({
 }: Props) {
   const battle = state.tacticalBattle;
   const viewportRef = useRef<HTMLDivElement>(null);
+  const stageShellRef = useRef<HTMLDivElement>(null);
+  const popoverAnchorRef = useRef<HTMLElement | null>(null);
+  const nextPendingTimerRef = useRef<number | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(() => battle
     ? nextActiveTacticalGroupId(battle.defenderGroups, null) ?? battle.defenderGroups[0]?.id ?? null
     : null);
@@ -258,6 +229,8 @@ export function TacticalBattleScreen({
   const [viewedZoneId, setViewedZoneId] = useState(battle?.currentZoneId ?? 'approach');
   const [stingerRound, setStingerRound] = useState<number | null>(null);
   const [fast, setFast] = useState(false);
+  const [commandPopover, setCommandPopover] = useState<CommandPopoverState | null>(null);
+  const [nextPendingGroupId, setNextPendingGroupId] = useState<string | null>(null);
   const fastRef = useRef(false);
   const preparationPlayback = battle?.phase === 'preparationExecution';
   const combatPlayback = battle?.phase === 'simulating';
@@ -266,6 +239,43 @@ export function TacticalBattleScreen({
     ? battle.preparationEvents[eventIndex] ?? null
     : combatPlayback ? battle.pendingReport?.events[eventIndex] ?? null : null;
   const activeZoneId = activeEvent?.zoneId ?? viewedZoneId;
+
+  const closePopover = (options?: { restoreFocus?: boolean }) => {
+    setCommandPopover(null);
+    if (options?.restoreFocus) popoverAnchorRef.current?.focus();
+  };
+
+  const pulseNextPending = (groupId: string) => {
+    if (nextPendingTimerRef.current != null) window.clearTimeout(nextPendingTimerRef.current);
+    setNextPendingGroupId(groupId);
+    nextPendingTimerRef.current = window.setTimeout(() => {
+      setNextPendingGroupId(null);
+      nextPendingTimerRef.current = null;
+    }, 1800);
+  };
+
+  useEffect(() => () => {
+    if (nextPendingTimerRef.current != null) window.clearTimeout(nextPendingTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (commandPopover && selectedGroupId !== commandPopover.groupId) setCommandPopover(null);
+  }, [selectedGroupId, commandPopover?.groupId]);
+
+  useEffect(() => {
+    setCommandPopover(null);
+  }, [battle?.phase, viewedZoneId]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const close = () => setCommandPopover(null);
+    window.addEventListener('resize', close);
+    viewport?.addEventListener('scroll', close);
+    return () => {
+      window.removeEventListener('resize', close);
+      viewport?.removeEventListener('scroll', close);
+    };
+  }, [battle?.id]);
 
   useEffect(() => {
     if (!battle) return;
@@ -375,6 +385,9 @@ export function TacticalBattleScreen({
       battle?.defenderGroups.find(tacticalGroupCanReceiveCommand) ?? battle?.defenderGroups[0] ?? null,
     [battle?.defenderGroups, selectedGroupId],
   );
+  const popoverGroup = commandPopover
+    ? battle?.defenderGroups.find(group => group.id === commandPopover.groupId) ?? null
+    : null;
 
   useEffect(() => {
     if (!battle) return;
@@ -392,6 +405,32 @@ export function TacticalBattleScreen({
     setSelectedGroupId(groupId);
     const zoneId = battle?.defenderGroups.find(group => group.id === groupId)?.zoneId;
     if (zoneId) setViewedZoneId(zoneId);
+  };
+
+  const openCommandPopover = (groupId: string, element: HTMLElement) => {
+    const shell = stageShellRef.current;
+    if (!shell || battle?.phase !== 'command') {
+      selectGroup(groupId);
+      return;
+    }
+    if (commandPopover?.groupId === groupId) {
+      closePopover();
+      return;
+    }
+    const unit = element.getBoundingClientRect();
+    const shellRect = shell.getBoundingClientRect();
+    const placement = computeCommandPopoverPlacement({
+      left: unit.left - shellRect.left,
+      top: unit.top - shellRect.top,
+      width: unit.width,
+      height: unit.height,
+    }, {
+      width: shellRect.width,
+      height: shellRect.height,
+    });
+    popoverAnchorRef.current = element;
+    selectGroup(groupId);
+    setCommandPopover({ groupId, ...placement });
   };
 
   if (!battle) return null;
@@ -440,22 +479,30 @@ export function TacticalBattleScreen({
     ? `${commandLabel(hintCommand, selectedGroup, hunt)} — ${tacticalCommandUnavailableReason(battle, selectedGroup, hintCommand) ?? commandDescription(hintCommand, selectedGroup, hunt)}`
     : '명령 단추 위에 올리면 설명이 여기에 표시됩니다.';
   // 첫 명령 지정이면 아직 명령 대기 중인 다음 부대로 선택을 넘겨 클릭 수를 줄인다
-  const assignCommand = (command: TacticalCommandId) => {
-    if (!selectedGroup || !tacticalGroupCanReceiveCommand(selectedGroup)) return;
-    const firstAssignment = selectedGroup.commandSource !== 'player';
-    onSetCommand(selectedGroup.id, command);
+  const assignCommandTo = (groupId: string, command: TacticalCommandId) => {
+    const group = battle.defenderGroups.find(candidate => candidate.id === groupId);
+    if (!group || !tacticalGroupCanReceiveCommand(group)) return;
+    const firstAssignment = group.commandSource !== 'player';
+    onSetCommand(group.id, command);
     if (!firstAssignment) return;
-    const nextId = nextPendingTacticalGroupId(battle.defenderGroups, selectedGroup.id);
-    if (nextId) selectGroup(nextId);
+    const nextId = nextPendingTacticalGroupId(battle.defenderGroups, group.id);
+    if (nextId) {
+      selectGroup(nextId);
+      pulseNextPending(nextId);
+    }
   };
-  const assignFormationLine = (line: TacticalFormationLine) => {
-    if (!selectedGroup) return;
-    const queuesRedeploy = battle.phase === 'command' && !assault && !hunt && line !== selectedGroup.line;
-    const firstAssignment = selectedGroup.commandSource !== 'player';
-    onSetFormationLine(selectedGroup.id, line);
+  const assignFormationLineTo = (groupId: string, line: TacticalFormationLine) => {
+    const group = battle.defenderGroups.find(candidate => candidate.id === groupId);
+    if (!group) return;
+    const queuesRedeploy = battle.phase === 'command' && !assault && !hunt && line !== group.line;
+    const firstAssignment = group.commandSource !== 'player';
+    onSetFormationLine(group.id, line);
     if (!queuesRedeploy || !firstAssignment) return;
-    const nextId = nextPendingTacticalGroupId(battle.defenderGroups, selectedGroup.id);
-    if (nextId) selectGroup(nextId);
+    const nextId = nextPendingTacticalGroupId(battle.defenderGroups, group.id);
+    if (nextId) {
+      selectGroup(nextId);
+      pulseNextPending(nextId);
+    }
   };
   const season = getSeason(state.day);
   const wallRepairApplied = battle.prepActions.some(action => action.id === 'repairWall' && action.applied);
@@ -537,7 +584,10 @@ export function TacticalBattleScreen({
           </div>
         </header>
 
-        <div className="tactical-stage-shell" onClick={enableFastForward}>
+        <div className="tactical-stage-shell" ref={stageShellRef} onClick={() => {
+          setCommandPopover(null);
+          enableFastForward();
+        }}>
           <div className="tactical-battlefield" ref={viewportRef}>
             <div className="tactical-strip" style={{ width: `${battle.zones.length * 100}%` }}>
               {battle.zones.map(zone => (
@@ -557,7 +607,8 @@ export function TacticalBattleScreen({
                   barricadeReinforced={barricadeReinforced}
                   commandable={commandable}
                   selectedGroupId={selectedGroup?.id ?? null}
-                  onSelectGroup={selectGroup}
+                  nextPendingGroupId={nextPendingGroupId}
+                  onSelectGroup={openCommandPopover}
                   onSelectTarget={(defenderGroupId, enemyGroupId) => {
                     const defender = battle.defenderGroups.find(group => group.id === defenderGroupId);
                     onSetGroupTarget(defenderGroupId,
@@ -624,6 +675,37 @@ export function TacticalBattleScreen({
             <span>{activeZoneIndex + 1} / {battle.zones.length}</span>
           </div>
           {activeEvent?.text && <TypewriterCaption text={activeEvent.text} instant={fast} />}
+          {commandPopover && popoverGroup && battle.phase === 'command' && (
+            <TacticalCommandPopover
+              battle={battle}
+              group={popoverGroup}
+              hunt={hunt}
+              assault={assault}
+              placement={commandPopover.placement}
+              style={{
+                left: commandPopover.x,
+                top: commandPopover.y,
+                '--caret-shift': `${commandPopover.caretShift}px`,
+              } as CSSProperties}
+              maxHeight={commandPopover.maxHeight}
+              onCommand={command => {
+                assignCommandTo(popoverGroup.id, command);
+                closePopover();
+              }}
+              onSetLine={line => {
+                const displayedLine = popoverGroup.pendingLine ?? popoverGroup.line;
+                assignFormationLineTo(popoverGroup.id, line);
+                if (line !== displayedLine) closePopover();
+              }}
+              onMoveZone={zoneId => {
+                if (zoneId === popoverGroup.zoneId) return;
+                onAssignGroup(popoverGroup.id, zoneId);
+                setViewedZoneId(zoneId);
+                closePopover();
+              }}
+              onClose={restoreFocus => closePopover({ restoreFocus })}
+            />
+          )}
         </div>
 
         <div className="tactical-controls">
@@ -821,7 +903,10 @@ export function TacticalBattleScreen({
                   <span>현재 초점: {battle.zones.find(zone => zone.id === battle.currentZoneId)?.name}
                     {pendingCommandCount > 0 ? ` · 자동 명령 ${pendingCommandCount}개 부대` : ' · 모든 부대 직접 명령 완료'}</span>
                 </div>
-                <button className="btn primary" onClick={onResolveRound}>교전 개시</button>
+                <button className="btn primary" onClick={() => {
+                  closePopover();
+                  onResolveRound();
+                }}>교전 개시</button>
               </div>
               <UnitDock
                 state={state}
@@ -829,7 +914,10 @@ export function TacticalBattleScreen({
                 hunt={hunt}
                 mode="command"
                 selectedGroupId={selectedGroup.id}
-                onSelect={selectGroup}
+                onSelect={groupId => {
+                  closePopover();
+                  selectGroup(groupId);
+                }}
               />
               {rearResponseZoneId && rearResponseOptions.length > 0 && (
                 <div className="tactical-rear-response-guide" role="status">
@@ -839,7 +927,10 @@ export function TacticalBattleScreen({
                       <button
                         type="button"
                         key={option.id}
-                        onClick={() => selectGroup(option.groupIds[0])}
+                        onClick={() => {
+                          closePopover();
+                          selectGroup(option.groupIds[0]);
+                        }}
                         title={`${option.description} 해당 부대를 선택합니다.`}
                       >
                         <b>{option.label}</b>
@@ -888,7 +979,7 @@ export function TacticalBattleScreen({
                               !tacticalFormationLinesAdjacent(selectedGroup.line, line)
                               ? '한 라운드에는 인접한 전열로만 재배치할 수 있습니다.'
                               : line === selectedGroup.line ? '현재 전열' : '다음 라운드 목표 전열'}
-                            onClick={() => assignFormationLine(line)}
+                            onClick={() => assignFormationLineTo(selectedGroup.id, line)}
                           >{line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열'}</button>
                         ))}
                       </div>
@@ -906,7 +997,7 @@ export function TacticalBattleScreen({
                             onMouseLeave={() => setHoveredCommand(current => (current === command ? null : current))}
                             onFocus={() => setHoveredCommand(command)}
                             onBlur={() => setHoveredCommand(current => (current === command ? null : current))}
-                            onClick={() => assignCommand(command)}
+                            onClick={() => assignCommandTo(selectedGroup.id, command)}
                           >{commandLabel(command, selectedGroup, hunt)}</button>
                         );
                       })}
