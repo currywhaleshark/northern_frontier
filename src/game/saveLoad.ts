@@ -114,6 +114,26 @@ export function migrateV8ToV9(raw: RawSave): RawSave {
   return migrated;
 }
 
+export function migrateV9ToV10(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const battle = migrated.tacticalBattle && typeof migrated.tacticalBattle === 'object'
+    ? migrated.tacticalBattle as RawSave
+    : null;
+  const predatorHunt = battle?.assaultKind === 'predatorHunt' || battle?.encounterKind === 'predatorHunt';
+  const legacyZoneIds = new Set(Array.isArray(battle?.zones)
+    ? battle.zones.flatMap(entry => entry && typeof entry === 'object' && 'id' in entry
+      ? [String((entry as RawSave).id)]
+      : [])
+    : []);
+  if (predatorHunt && (legacyZoneIds.has('huntTracks') || legacyZoneIds.has('huntDrive'))) {
+    migrated.tacticalBattle = null;
+    migrated.pendingChoice = null;
+    migrated.legacyHuntRecoveryNeeded = true;
+  }
+  migrated.schemaVersion = 10;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   let version = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -127,6 +147,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 6) migrated = migrateV6ToV7(migrated);
     else if (version === 7) migrated = migrateV7ToV8(migrated);
     else if (version === 8) migrated = migrateV8ToV9(migrated);
+    else if (version === 9) migrated = migrateV9ToV10(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -715,6 +736,7 @@ export function loadGame(): GameState | null {
     if (!raw) return null;
     const decoded = JSON.parse(raw) as RawSave;
     const parsed = migrateToCurrent(decoded) as unknown as GameState;
+    const legacyHuntRecoveryNeeded = (parsed as unknown as RawSave).legacyHuntRecoveryNeeded === true;
     // 최소한의 유효성 검사 (구버전 저장은 무시)
     if (!parsed.map || !parsed.residents || !parsed.resources || !parsed.buildings) return null;
     if (parsed.subTick == null || parsed.residents.some(r => r.x == null || r.px == null)) return null;
@@ -725,7 +747,7 @@ export function loadGame(): GameState | null {
     if (!Object.prototype.hasOwnProperty.call(parsed, 'tacticalBattleReport')) parsed.tacticalBattleReport = null;
     const tacticalBattleWasPresent = decoded.tacticalBattle != null;
     parsed.tacticalBattle = migrateTacticalBattle(parsed.tacticalBattle, parsed);
-    const tacticalRecoveryNeeded = tacticalBattleWasPresent && parsed.tacticalBattle == null;
+    const tacticalRecoveryNeeded = tacticalBattleWasPresent && parsed.tacticalBattle == null && !legacyHuntRecoveryNeeded;
     parsed.tacticalBattleReport = migrateTacticalBattleReport(parsed.tacticalBattleReport);
     if (parsed.tacticalBattle) {
       parsed.tacticalBattle.orientation = parsed.tacticalBattle.orientation === 'assault' ? 'assault' : 'defense';
@@ -792,6 +814,11 @@ export function loadGame(): GameState | null {
           parsed.tacticalBattle.huntBaitPlaced ??= false;
           parsed.tacticalBattle.huntLeaderKilled ??= false;
           parsed.tacticalBattle.huntDetachmentSerial ??= 0;
+          parsed.tacticalBattle.huntOpenSectorRounds ??= Object.fromEntries(
+            parsed.tacticalBattle.zones
+              .filter(zone => zone.id !== 'huntDen')
+              .map(zone => [zone.id, 0]),
+          );
           for (const group of parsed.tacticalBattle.defenderGroups) group.huntOriginGroupId ??= group.id;
         } else {
           parsed.tacticalBattle.leaderEscapeBlocked ??= false;
@@ -900,7 +927,20 @@ export function loadGame(): GameState | null {
       );
       for (const group of musketGroups) group.readyMuskets = readiness.byGroup[group.id] ?? 0;
     }
-    if (tacticalRecoveryNeeded) {
+    if (legacyHuntRecoveryNeeded) {
+      parsed.tacticalBattle = null;
+      parsed.tacticalBattleReport = null;
+      parsed.pendingChoice = null;
+      if (parsed.expedition?.kind === 'predatorHunt') parsed.expedition.phase = 'engage';
+      delete (parsed as unknown as RawSave).legacyHuntRecoveryNeeded;
+      parsed.log ??= [];
+      parsed.log.push({
+        day: parsed.day,
+        text: '이전 형식의 사냥 전투를 닫았습니다. 현장에서 사냥 방식을 다시 선택할 수 있습니다.',
+        kind: 'info',
+        important: true,
+      });
+    } else if (tacticalRecoveryNeeded) {
       parsed.tacticalBattle = null;
       parsed.tacticalBattleReport = null;
       if (parsed.expedition?.phase === 'engage') {

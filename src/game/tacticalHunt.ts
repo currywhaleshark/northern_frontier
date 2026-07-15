@@ -40,19 +40,24 @@ function activeBeasts(group: TacticalRaiderGroup): number {
 function huntZones(): TacticalBattleZone[] {
   return [
     {
-      id: 'huntTracks', name: '자취 지대', kind: 'forest', order: 0,
+      id: 'huntSectorRidge', name: '능선길', kind: 'forest', order: 0,
       pressure: 0, breached: false, defenseBonus: 0, ambushBonus: 0, lootRisk: 0, civilianRisk: 0,
-      description: '발자국과 털, 꺾인 가지를 더듬어 숨어 있는 짐승의 위치를 좁힙니다.',
+      description: '바람이 세고 시야가 트인 능선입니다. 봉쇄가 약하면 짐승이 산등성이로 빠져나갑니다.',
     },
     {
-      id: 'huntDrive', name: '몰이 숲', kind: 'forest', order: 1,
+      id: 'huntSectorRavine', name: '골짜기', kind: 'forest', order: 0,
       pressure: 0, breached: false, defenseBonus: 0, ambushBonus: 0, lootRisk: 0, civilianRisk: 0,
-      description: '몰이꾼이 소리를 내며 짐승을 막다른 지형으로 밀어붙입니다.',
+      description: '수풀이 빽빽한 골짜기입니다. 숨기 좋지만 얇은 조는 가까운 급습에 취약합니다.',
     },
     {
-      id: 'huntDen', name: '막다른 굴·덤불', kind: 'center', order: 2,
+      id: 'huntSectorBrook', name: '개울가', kind: 'forest', order: 0,
       pressure: 0, breached: false, defenseBonus: 0, ambushBonus: 0, lootRisk: 0, civilianRisk: 0,
-      description: '포위망을 닫고 짐승과 결착을 내는 마지막 사냥터입니다.',
+      description: '물소리가 발소리를 덮는 개울가입니다. 흔적을 놓치면 열린 물길이 도주로가 됩니다.',
+    },
+    {
+      id: 'huntDen', name: '덤불 심처', kind: 'center', order: 1,
+      pressure: 0, breached: false, defenseBonus: 0, ambushBonus: 0, lootRisk: 0, civilianRisk: 0,
+      description: '포위망이 완성된 뒤 짐승과 결착을 내는 심처입니다. 결착 전에는 사냥대를 배치할 수 없습니다.',
     },
   ];
 }
@@ -70,9 +75,9 @@ function beastGroup(
     id,
     kind: leader ? 'main' : 'flankers',
     label,
-    zoneId: 'huntTracks',
+    zoneId: 'huntDen',
     line: defaultRaiderFormationLine(undefined, leader),
-    targetZoneId: 'huntTracks',
+    targetZoneId: 'huntDen',
     power,
     count,
     killed: 0,
@@ -105,7 +110,7 @@ function beastGroups(
 function renameHuntGroups(groups: TacticalDefenderGroup[]): void {
   groups.forEach(group => {
     group.label = combatGroupLabel(group.role, group.weapon);
-    group.zoneId = 'huntTracks';
+    group.zoneId = 'huntSectorRidge';
     group.command = null;
     group.huntOriginGroupId = group.id;
   });
@@ -150,7 +155,7 @@ export function createPredatorTacticalHunt(state: GameState): TacticalBattle | s
     zones: huntZones(),
     defenderGroups: groups,
     raiderGroups: enemies,
-    currentZoneId: 'huntTracks',
+    currentZoneId: 'huntSectorRidge',
     villageMorale: clamp(66 + groups.length * 2 + (exactIntel ? 6 : 0), 0, 100),
     raiderMorale: predatorKind === 'tiger'
       ? tigerTier === 'mountainLord' ? 98 : tigerTier === 'greatTiger' ? 93 : 86
@@ -170,6 +175,11 @@ export function createPredatorTacticalHunt(state: GameState): TacticalBattle | s
     huntBaitPlaced: false,
     huntLeaderKilled: false,
     huntDetachmentSerial: 0,
+    huntOpenSectorRounds: {
+      huntSectorRidge: 0,
+      huntSectorRavine: 0,
+      huntSectorBrook: 0,
+    },
     resourceSnapshot: captureTacticalResources(state),
   };
   state.tacticalBattle = battle;
@@ -227,17 +237,17 @@ export function advanceHuntPhase(state: GameState): string | null {
     for (const action of battle.prepActions.filter(candidate => candidate.selected && !candidate.applied)) {
       if (action.id === 'setHuntTraps') {
         battle.huntTrapSet = true;
-        prepEvent(events, 'huntDrive', 'prepareAmbush', '짐승이 지날 만한 좁은 길목에 덫과 올가미를 숨깁니다.');
+        prepEvent(events, 'huntSectorRavine', 'prepareAmbush', '짐승이 지날 만한 골짜기 길목에 덫과 올가미를 숨깁니다.');
       } else if (action.id === 'placeBait') {
         state.resources.meat = Math.max(0, state.resources.meat - HUNT_CONFIG.baitMeatCost);
         battle.huntBaitPlaced = true;
         battle.huntPredatorState = 'revealed';
         battle.raiderGroups.forEach(group => { group.revealed = true; });
-        prepEvent(events, 'huntTracks', 'beastReveal', '피 냄새를 맡은 짐승이 미끼 앞에 모습을 드러냅니다.');
+        prepEvent(events, 'huntSectorRidge', 'beastReveal', '피 냄새를 맡은 짐승이 능선 아래에 모습을 드러냅니다.');
       } else if (action.id === 'splitDrivers') {
         battle.huntDriversSplit = true;
         battle.huntEncirclement = clamp((battle.huntEncirclement ?? 0) + 12, 0, 100);
-        prepEvent(events, 'huntDrive', 'advance', '몰이꾼을 여러 갈래로 나눠 달아날 틈을 미리 좁힙니다.');
+        prepEvent(events, 'huntSectorRavine', 'advance', '몰이꾼을 여러 갈래로 나눠 달아날 틈을 미리 좁힙니다.');
       }
       action.applied = true;
     }
@@ -260,14 +270,18 @@ export function advanceHuntPhase(state: GameState): string | null {
 export function assignHuntGroup(state: GameState, groupId: string, zoneId: string): string | null {
   const battle = state.tacticalBattle;
   if (!battle || battle.assaultKind !== 'predatorHunt') return '진행 중인 맹수 사냥이 없습니다.';
-  if (battle.phase !== 'deployment') return '배치 단계에서만 사냥대를 옮길 수 있습니다.';
+  if (battle.phase !== 'deployment' && battle.phase !== 'command') {
+    return '배치 또는 지휘 단계에서만 사냥대를 옮길 수 있습니다.';
+  }
   const group = battle.defenderGroups.find(candidate => candidate.id === groupId);
   const zone = battle.zones.find(candidate => candidate.id === zoneId);
-  const currentOrder = battle.zones.find(candidate => candidate.id === battle.currentZoneId)?.order ?? 0;
   if (!group) return '사냥대 그룹을 찾을 수 없습니다.';
   if (!zone) return '사냥 구역을 찾을 수 없습니다.';
-  if (zone.order > currentOrder) return '아직 몰아넣지 못한 안쪽 구역에는 배치할 수 없습니다.';
+  if (group.commandable === false || activeCount(group) <= 0) return '전투 가능한 사냥대 조만 옮길 수 있습니다.';
+  if (zone.id === 'huntDen') return '결착 전에는 덤불 심처에 사냥대를 배치할 수 없습니다.';
+  if (group.zoneId === zoneId) return null;
   group.zoneId = zoneId;
+  if (battle.phase === 'command') group.huntMovedRound = battle.round;
   return null;
 }
 
@@ -571,8 +585,9 @@ export function resolveHuntRound(state: GameState): string | null {
   chooseDefaultHuntCommands(battle);
   const rng = makeRng(state.seed + battle.id * 65537 + battle.round * 131071);
   const zone = battle.zones.find(candidate => candidate.id === battle.currentZoneId)!;
-  const players = battle.defenderGroups.filter(group => group.zoneId === zone.id && activeCount(group) > 0);
-  const beasts = battle.raiderGroups.filter(group => group.zoneId === zone.id && activeBeasts(group) > 0);
+  const sectorIds = new Set(battle.zones.filter(candidate => candidate.id !== 'huntDen').map(candidate => candidate.id));
+  const players = battle.defenderGroups.filter(group => sectorIds.has(group.zoneId) && activeCount(group) > 0);
+  const beasts = battle.raiderGroups.filter(group => activeBeasts(group) > 0);
   const events: TacticalAnimationEvent[] = [];
   const lines: string[] = [];
   const retreatOrdered = players.some(group => group.command === 'openRetreat');
@@ -585,13 +600,29 @@ export function resolveHuntRound(state: GameState): string | null {
   addEvent(events, zone.id, 'camera', `${zone.name}에서 포위망을 좁히기 시작합니다.`);
 
   battle.huntEngagements = (battle.huntEngagements ?? 0) + 1;
+  const sectorZones = battle.zones.filter(candidate => candidate.id !== 'huntDen');
+  const sectorConfig = HUNT_CONFIG.sectors;
+  battle.huntOpenSectorRounds ??= {};
+  for (const sector of sectorZones) {
+    const blockade = battle.defenderGroups
+      .filter(group => group.zoneId === sector.id && activeCount(group) > 0)
+      .reduce((sum, group) => sum + group.power * activeCount(group) / Math.max(1, group.count), 0);
+    sector.sectorBlockade = blockade;
+    battle.huntOpenSectorRounds[sector.id] = blockade < sectorConfig.blockadeThreshold
+      ? (battle.huntOpenSectorRounds[sector.id] ?? 0) + 1
+      : 0;
+  }
   const driveGroups = players.filter(group => group.command === 'advance' || group.command === 'ambush');
   const skill = hunterSkill(state, players);
   const encirclement = HUNT_CONFIG.encirclement;
-  let encirclementGain = encirclement.baseGain + driveGroups.reduce(
-    (sum, group) => sum + Math.max(1, activeCount(group) * encirclement.perDriver),
-    0,
-  ) + skill * encirclement.hunterSkillMultiplier;
+  const driveGain = sectorZones.reduce((total, sector) => total + driveGroups
+    .filter(group => group.zoneId === sector.id)
+    .reduce((sum, group) => sum + Math.max(1, activeCount(group) * encirclement.perDriver) *
+      (group.huntMovedRound === battle.round ? encirclement.movedDriveMultiplier : 1), 0), 0);
+  const openSectorCount = sectorZones.filter(sector =>
+    (sector.sectorBlockade ?? 0) < sectorConfig.blockadeThreshold).length;
+  let encirclementGain = (encirclement.baseGain + driveGain + skill * encirclement.hunterSkillMultiplier) *
+    Math.pow(sectorConfig.holeGainMultiplier, openSectorCount);
   if (battle.huntPredatorKind === 'tiger') {
     encirclementGain /= tigerTierDangerMultiplier(battle.huntTigerTier ?? 'tiger');
   } else {
@@ -611,10 +642,24 @@ export function resolveHuntRound(state: GameState): string | null {
     0,
     100,
   );
-  battle.zones.forEach(candidate => { candidate.pressure = battle.huntEncirclement ?? 0; });
+
+  const escapeSector = sectorZones
+    .filter(sector => (battle.huntOpenSectorRounds?.[sector.id] ?? 0) >= sectorConfig.openEscapeRounds)
+    .sort((left, right) =>
+      (battle.huntOpenSectorRounds?.[right.id] ?? 0) - (battle.huntOpenSectorRounds?.[left.id] ?? 0) ||
+      (left.sectorBlockade ?? 0) - (right.sectorBlockade ?? 0) || left.id.localeCompare(right.id))[0];
+  if (escapeSector && (battle.huntEncirclement ?? 0) >= sectorConfig.openEscapeEncirclementMin) {
+    const escapeRng = makeRng(state.seed + battle.id * 104729 + battle.round * 15485863 + 911);
+    if (escapeRng() < sectorConfig.openEscapeChance) {
+      outcome = 'huntEscaped';
+      const escapeText = `포위가 비어 있던 ${escapeSector.name} 쪽으로 맹수가 소리 없이 빠져나갔습니다.`;
+      lines.push(escapeText);
+      addEvent(events, escapeSector.id, 'retreat', escapeText, { side: 'raider', float: '포위 이탈' });
+    }
+  }
 
   let revealedThisRound = false;
-  if (battle.huntPredatorState === 'hidden') {
+  if (!outcome && battle.huntPredatorState === 'hidden') {
     const revealChance = clamp(
       0.16 + driveGroups.length * 0.08 + players.filter(group => group.role === 'hunter').length * 0.12 +
       skill * 0.24 + weatherTrackingModifier(state.weather),
@@ -631,7 +676,7 @@ export function resolveHuntRound(state: GameState): string | null {
     }
   }
 
-  if (!retreatOrdered && beasts.length > 0) {
+  if (!outcome && !retreatOrdered && beasts.length > 0) {
     if (battle.huntPredatorState === 'hidden') {
       battle.huntPredatorState = 'revealed';
       beasts.forEach(group => { group.revealed = true; });
@@ -643,7 +688,7 @@ export function resolveHuntRound(state: GameState): string | null {
     villageMoraleDelta -= casualty.wounded * 6 + casualty.killed * 14;
   }
 
-  if (!retreatOrdered && battle.huntPredatorState !== 'hidden') {
+  if (!outcome && !retreatOrdered && battle.huntPredatorState !== 'hidden') {
     const musketAllocation = consumeMusketVolleys(
       state,
       players
@@ -695,7 +740,7 @@ export function resolveHuntRound(state: GameState): string | null {
       });
     }
     let damage = attackPower * (0.17 + rng() * 0.06) * (0.65 + (battle.huntEncirclement ?? 0) / 190);
-    if (battle.huntTrapSet && zone.id === 'huntDrive') {
+    if (battle.huntTrapSet && zone.id === 'huntSectorRavine') {
       damage += battle.originalPower * 0.13;
       battle.huntTrapSet = false;
       addEvent(events, zone.id, 'ambush', '몰이 숲의 함정이 닫히며 짐승의 움직임을 꺾습니다.', {
@@ -714,15 +759,17 @@ export function resolveHuntRound(state: GameState): string | null {
     }
   }
 
-  if (retreatOrdered) {
-    battle.huntWithdrawn = true;
-    outcome = 'huntEscaped';
+  if (!outcome) {
+    if (retreatOrdered) {
+      battle.huntWithdrawn = true;
+      outcome = 'huntEscaped';
+    }
+    else if (battle.defenderGroups.every(group => activeCount(group) <= 0) || battle.villageMorale + villageMoraleDelta <= 0) {
+      outcome = 'huntDefeat';
+    } else if (battle.raiderGroups.every(group => activeBeasts(group) <= 0)) outcome = 'huntKill';
+    else if (battle.huntPredatorKind === 'wolf' && battle.huntLeaderKilled) outcome = 'huntRepelled';
+    else if ((battle.huntEngagements ?? 0) >= HUNT_CONFIG.maxEngagements) outcome = 'huntEscaped';
   }
-  else if (battle.defenderGroups.every(group => activeCount(group) <= 0) || battle.villageMorale + villageMoraleDelta <= 0) {
-    outcome = 'huntDefeat';
-  } else if (battle.raiderGroups.every(group => activeBeasts(group) <= 0)) outcome = 'huntKill';
-  else if (battle.huntPredatorKind === 'wolf' && battle.huntLeaderKilled) outcome = 'huntRepelled';
-  else if ((battle.huntEngagements ?? 0) >= HUNT_CONFIG.maxEngagements) outcome = 'huntEscaped';
 
   const rehidingChance = HUNT_CONFIG.rehideChance[battle.huntTigerTier ?? 'tiger'];
   if (!outcome && battle.huntPredatorKind === 'tiger' && battle.huntPredatorState !== 'hidden' &&
@@ -743,16 +790,7 @@ export function resolveHuntRound(state: GameState): string | null {
     group.engagementsInZone += 1;
   });
 
-  let nextZoneId = zone.id;
-  if (!outcome && zone.id === 'huntTracks' && battle.huntPredatorState !== 'hidden' && (battle.huntEncirclement ?? 0) >= 20) {
-    zone.breached = true;
-    nextZoneId = 'huntDrive';
-    addEvent(events, zone.id, 'advance', '짐승의 퇴로를 확인해 몰이 숲으로 포위망을 전진시킵니다.', { side: 'defender', float: '몰이 전진' });
-  } else if (!outcome && zone.id === 'huntDrive' && (battle.huntEncirclement ?? 0) >= 70) {
-    zone.breached = true;
-    nextZoneId = 'huntDen';
-    addEvent(events, zone.id, 'advance', '달아날 길을 막아 짐승을 막다른 굴과 덤불로 몰아넣습니다.', { side: 'defender', float: '포위 완성' });
-  }
+  const nextZoneId = zone.id;
   if (wounded + killed > 0) lines.push(`사냥대 피해: 전사 ${killed}명, 부상 ${wounded}명.`);
   lines.push(`포위망 ${Math.round(battle.huntEncirclement ?? 0)}% · 사냥대 기세 ${villageMoraleDelta >= 0 ? '+' : ''}${villageMoraleDelta}.`);
   if (outcome) addEvent(events, zone.id, outcome === 'huntRepelled' ? 'beastRout' : outcome === 'huntEscaped' ? 'retreat' : outcome === 'huntKill' ? 'moraleBreak' : 'report', outcomeText(outcome));
@@ -798,12 +836,7 @@ export function acknowledgeHuntReport(state: GameState): string | null {
     battle.phase = 'finished';
     return null;
   }
-  const nextZoneId = battle.pendingReport.nextFocusZoneId;
-  if (nextZoneId !== battle.currentZoneId) {
-    battle.defenderGroups.forEach(group => { if (activeCount(group) > 0) group.zoneId = nextZoneId; });
-    battle.raiderGroups.forEach(group => { if (activeBeasts(group) > 0) group.zoneId = nextZoneId; });
-  }
-  battle.currentZoneId = nextZoneId;
+  battle.currentZoneId = battle.pendingReport.nextFocusZoneId;
   battle.defenderGroups.forEach(group => {
     if (group.command && huntCommandUnavailableReason(battle, group, group.command)) {
       group.command = null;

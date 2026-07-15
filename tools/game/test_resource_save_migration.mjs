@@ -31,12 +31,14 @@ const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
 const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
+const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'expeditionEngagement.mjs')).href);
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 9, 'individual tactical targets require schema version 9');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 10, 'encirclement hunts require schema version 10');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
+assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
 
 {
   const migrated = saveLoad.migrateV8ToV9({
@@ -60,6 +62,47 @@ assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
   assert.equal(migrated.foreignSites[0].lairDoctrineRevision, 0);
   assert.ok(migrated.foreignSites[0].lairDoctrineNextReviewDay > 60,
     'legacy doctrine review never predates active scouting intel');
+}
+
+{
+  const migrated = saveLoad.migrateV9ToV10({
+    schemaVersion: 9,
+    tacticalBattle: {
+      assaultKind: 'predatorHunt',
+      zones: [{ id: 'huntTracks' }, { id: 'huntDrive' }, { id: 'huntDen' }],
+    },
+  });
+  assert.equal(migrated.schemaVersion, 10);
+  assert.equal(migrated.tacticalBattle, null);
+  assert.equal(migrated.legacyHuntRecoveryNeeded, true);
+}
+
+{
+  const legacyHunt = simulation.newGame(2026071516);
+  const memberIds = legacyHunt.residents.slice(0, 2).map(resident => resident.id);
+  legacyHunt.residents.slice(0, 2).forEach(resident => { resident.job = 'hunter'; });
+  legacyHunt.incidents.predatorThreats.tiger = {
+    kind: 'tiger', untilDay: legacyHunt.day + 10, size: 1, strength: 60, tigerTier: 'tiger',
+  };
+  legacyHunt.expedition = {
+    kind: 'predatorHunt', predatorKind: 'tiger', targetX: 10, targetY: 10,
+    musterX: 9, musterY: 10, phase: 'engage', memberIds,
+    x: 10, y: 10, px: 10, py: 10, path: [], trail: [], speed: 1, ticks: 0,
+  };
+  legacyHunt.pendingChoice = { kind: 'expeditionEngagement', title: 'old', body: '', options: [], data: {} };
+  legacyHunt.tacticalBattle = {
+    assaultKind: 'predatorHunt', encounterKind: 'predatorHunt',
+    zones: [{ id: 'huntTracks' }, { id: 'huntDrive' }, { id: 'huntDen' }],
+  };
+  store.set('buksae-save-v3', JSON.stringify({ ...legacyHunt, schemaVersion: 9 }));
+  const loaded = saveLoad.loadGame();
+  assert.ok(loaded);
+  assert.equal(loaded.tacticalBattle, null);
+  assert.equal(loaded.expedition?.phase, 'engage', 'legacy hunt recovery keeps the expedition at the encounter');
+  assert.equal(loaded.pendingChoice, null);
+  expeditionEngagement.maybeOpenExpeditionEngagementChoice(loaded);
+  assert.equal(loaded.pendingChoice?.kind, 'expedition', 'the direct/automatic engagement choice reopens');
+  assert.ok(loaded.pendingChoice?.options.some(option => option.id === 'direct'));
 }
 
 {
@@ -175,7 +218,7 @@ function prepareFormationTestCombatants(state) {
   muskets.line = 'rear';
   store.set('buksae-save-v3', JSON.stringify({ ...v7, schemaVersion: 7 }));
   const loaded = saveLoad.loadGame();
-  assert.equal(loaded?.schemaVersion, 9);
+  assert.equal(loaded?.schemaVersion, 10);
   assert.equal(
     loaded?.tacticalBattle?.defenderGroups.find(group => group.id === muskets.id)?.line,
     'rear',
@@ -194,7 +237,7 @@ function prepareFormationTestCombatants(state) {
   assert.equal(muskets.line, 'middle');
   assert.equal(saveLoad.saveGame(v8), true);
   const loaded = saveLoad.loadGame();
-  assert.equal(loaded?.schemaVersion, 9);
+  assert.equal(loaded?.schemaVersion, 10);
   assert.equal(loaded?.tacticalBattle?.defenderGroups.find(group => group.id === muskets.id)?.line, 'middle');
 }
 

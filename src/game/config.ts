@@ -468,6 +468,7 @@ export const CONFIG = {
         wolfMaxMultiplier: 1.16,
         splitDriversMultiplier: 1.42,
         fallbackMultiplier: 0.55,
+        movedDriveMultiplier: 0.5,
         minimumGain: 2,
       },
       beastAI: {
@@ -489,6 +490,13 @@ export const CONFIG = {
           baitPenalty: 12,
           trapBonus: 15,
         },
+      },
+      sectors: {
+        blockadeThreshold: 6,
+        holeGainMultiplier: 0.5,
+        openEscapeRounds: 2,
+        openEscapeEncirclementMin: 35,
+        openEscapeChance: 0.35,
       },
       rehideChance: { tiger: 0.46, greatTiger: 0.38, mountainLord: 0.30 },
       rehideEncirclementMax: 70,

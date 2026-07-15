@@ -727,7 +727,7 @@ export function TacticalBattleScreen({
               <div className="tactical-deploy-row">
                 <strong>{selectedGroup.label}{selectedGroup.ambushed && <em className="tactical-state-badge ambushed">매복중</em>}</strong>
                 <div className="tactical-zone-buttons" aria-label={`${selectedGroup.label} 배치 구역 선택`}>
-                  {battle.zones.map(zone => (
+                  {battle.zones.filter(zone => !hunt || zone.id !== 'huntDen').map(zone => (
                     <button
                       key={zone.id}
                       className={selectedGroup.zoneId === zone.id ? 'active' : ''}
@@ -739,16 +739,18 @@ export function TacticalBattleScreen({
                     >{zone.name}</button>
                   ))}
                 </div>
-                <div className="tactical-line-toggle" aria-label={`${selectedGroup.label} 전열 선택`}>
-                  {(['front', 'middle', 'rear'] as const).map(line => (
-                    <button
-                      key={line}
-                      className={selectedGroup.line === line ? 'active' : ''}
-                      disabled={selectedGroup.commandable === false || tacticalActiveDefenderCount(selectedGroup) <= 0}
-                      onClick={() => onSetFormationLine(selectedGroup.id, line)}
-                    >{line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열'}</button>
-                  ))}
-                </div>
+                {!hunt && (
+                  <div className="tactical-line-toggle" aria-label={`${selectedGroup.label} 전열 선택`}>
+                    {(['front', 'middle', 'rear'] as const).map(line => (
+                      <button
+                        key={line}
+                        className={selectedGroup.line === line ? 'active' : ''}
+                        disabled={selectedGroup.commandable === false || tacticalActiveDefenderCount(selectedGroup) <= 0}
+                        onClick={() => onSetFormationLine(selectedGroup.id, line)}
+                      >{line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열'}</button>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -797,21 +799,42 @@ export function TacticalBattleScreen({
               {tacticalGroupCanReceiveCommand(selectedGroup) ? (
                 <>
                   <div className="tactical-command-bar-row">
-                    <div className="tactical-line-toggle" aria-label={`${selectedGroup.label} 전열 선택`}>
-                      {(['front', 'middle', 'rear'] as const).map(line => (
-                        <button
-                          key={line}
-                          className={(selectedGroup.pendingLine ?? selectedGroup.line) === line ? 'active' : ''}
-                          disabled={!assault && !hunt && line !== selectedGroup.line &&
-                            !tacticalFormationLinesAdjacent(selectedGroup.line, line)}
-                          title={!assault && !hunt && line !== selectedGroup.line &&
-                            !tacticalFormationLinesAdjacent(selectedGroup.line, line)
-                            ? '한 라운드에는 인접한 전열로만 재배치할 수 있습니다.'
-                            : line === selectedGroup.line ? '현재 전열' : '다음 라운드 목표 전열'}
-                          onClick={() => assignFormationLine(line)}
-                        >{line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열'}</button>
-                      ))}
-                    </div>
+                    {hunt && (
+                      <div className="tactical-hunt-sector-movement" role="group" aria-label={`${selectedGroup.label} 길목 이동`}>
+                        {battle.zones.filter(zone => zone.id !== 'huntDen').map(zone => (
+                          <button
+                            type="button"
+                            key={zone.id}
+                            className={selectedGroup.zoneId === zone.id ? 'active' : ''}
+                            title={selectedGroup.zoneId === zone.id
+                              ? '현재 지키는 길목입니다.'
+                              : '이동한 조는 이번 라운드 몰이 기여가 절반으로 줄어듭니다.'}
+                            onClick={() => {
+                              onAssignGroup(selectedGroup.id, zone.id);
+                              setViewedZoneId(zone.id);
+                            }}
+                          >{zone.name}</button>
+                        ))}
+                        <small>이동한 조는 이번 라운드 몰이 기여가 절반입니다.</small>
+                      </div>
+                    )}
+                    {!hunt && (
+                      <div className="tactical-line-toggle" aria-label={`${selectedGroup.label} 전열 선택`}>
+                        {(['front', 'middle', 'rear'] as const).map(line => (
+                          <button
+                            key={line}
+                            className={(selectedGroup.pendingLine ?? selectedGroup.line) === line ? 'active' : ''}
+                            disabled={!assault && line !== selectedGroup.line &&
+                              !tacticalFormationLinesAdjacent(selectedGroup.line, line)}
+                            title={!assault && line !== selectedGroup.line &&
+                              !tacticalFormationLinesAdjacent(selectedGroup.line, line)
+                              ? '한 라운드에는 인접한 전열로만 재배치할 수 있습니다.'
+                              : line === selectedGroup.line ? '현재 전열' : '다음 라운드 목표 전열'}
+                            onClick={() => assignFormationLine(line)}
+                          >{line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열'}</button>
+                        ))}
+                      </div>
+                    )}
                     <div className="tactical-command-bar" role="group" aria-label={`${selectedGroup.label} 명령 선택`}>
                       {COMMANDS.map(command => {
                         const unavailableReason = tacticalCommandUnavailableReason(battle, selectedGroup, command);

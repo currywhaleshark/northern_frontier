@@ -674,6 +674,7 @@ export interface TacticalBattleZone {
   lootRisk: number;
   civilianRisk: number;
   description: string;
+  sectorBlockade?: number;
   focusTargetGroupId?: string;
   focusTargetSource?: 'auto' | 'player';
 }
@@ -701,6 +702,7 @@ export interface TacticalDefenderGroup {
   commandable?: boolean;
   lockedZoneId?: string;
   huntOriginGroupId?: string;
+  huntMovedRound?: number;
 }
 
 export interface TacticalRaiderGroup {
@@ -920,6 +922,7 @@ export interface TacticalBattle {
   huntLeaderKilled?: boolean;
   huntWithdrawn?: boolean;
   huntDetachmentSerial?: number;
+  huntOpenSectorRounds?: Record<string, number>;
   preliminaryBombardmentCannons?: number;
   preliminaryBombardmentCasualties?: number;
   resourceSnapshot?: Partial<Record<ResourceId, number>>;

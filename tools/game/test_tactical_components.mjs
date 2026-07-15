@@ -76,6 +76,12 @@ assert.match(screenSource, /길목을 모두 막으려면 조를 나누십시오
   'undersized hunt deployment must explain why detachments matter');
 assert.match(appSource, /splitHuntGroup/, 'App must route hunt split actions into game state');
 assert.match(appSource, /mergeHuntGroups/, 'App must route hunt merge actions into game state');
+assert.match(screenSource, /tactical-hunt-sector-movement/,
+  'hunt command controls must allow moving an existing detachment between sectors');
+assert.match(screenSource, /이동한 조는 이번 라운드 몰이 기여가 절반/,
+  'hunt command controls must explain the movement penalty');
+assert.match(screenSource, /!hunt && \(\s*<div className="tactical-line-toggle"/,
+  'hunt deployment and command controls must hide formation-line toggles');
 
 const threeLineToggleCount = [...screenSource.matchAll(/\['front', 'middle', 'rear'\] as const/g)].length;
 assert.equal(threeLineToggleCount, 2, 'deployment and command controls must both expose three formation lines');

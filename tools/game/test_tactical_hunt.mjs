@@ -61,6 +61,7 @@ const tacticalHunt = await import(pathToFileURL(join(compiledDir, 'tacticalHunt.
     wolfMaxMultiplier: 1.16,
     splitDriversMultiplier: 1.42,
     fallbackMultiplier: 0.55,
+    movedDriveMultiplier: 0.5,
     minimumGain: 2,
   });
   assert.deepEqual(hunt.rehideChance, { tiger: 0.46, greatTiger: 0.38, mountainLord: 0.30 });
@@ -161,6 +162,23 @@ function enterDeployment(state) {
   assert.equal(state.tacticalBattle.phase, 'deployment');
 }
 
+function prepareSplitSectorHunt(seed, spreadAcrossSectors) {
+  const prepared = prepareUniformHunterGroup(seed, 3);
+  enterDeployment(prepared.state);
+  const original = prepared.battle.defenderGroups[0];
+  assert.equal(tacticalHunt.splitHuntGroup(prepared.state, original.id, 1), null);
+  assert.equal(tacticalHunt.splitHuntGroup(prepared.state, original.id, 1), null);
+  const groups = [...prepared.battle.defenderGroups].sort((left, right) => left.id.localeCompare(right.id));
+  if (spreadAcrossSectors) {
+    ['huntSectorRidge', 'huntSectorRavine', 'huntSectorBrook'].forEach((sectorId, index) => {
+      assert.equal(tactical.assignDefenderGroup(prepared.state, groups[index].id, sectorId), null);
+    });
+  }
+  assert.equal(tactical.advanceTacticalPhase(prepared.state), null);
+  groups.forEach(group => assert.equal(tactical.setTacticalCommand(prepared.state, group.id, 'advance'), null));
+  return { ...prepared, groups };
+}
+
 {
   const state = simulation.newGame(2026071394);
   const tiers = [
@@ -219,7 +237,11 @@ function finishBattle(state) {
   assert.equal(battle.assaultKind, 'predatorHunt');
   assert.equal(battle.huntPredatorKind, 'wolf');
   assert.equal(battle.huntPredatorState, 'hidden');
-  assert.deepEqual(battle.zones.map(zone => zone.id), ['huntTracks', 'huntDrive', 'huntDen']);
+  assert.deepEqual(battle.zones.map(zone => zone.id), [
+    'huntSectorRidge', 'huntSectorRavine', 'huntSectorBrook', 'huntDen',
+  ]);
+  assert.deepEqual(battle.zones.slice(0, 3).map(zone => zone.order), [0, 0, 0]);
+  assert.ok(battle.raiderGroups.every(group => group.zoneId === 'huntDen'));
   assert.equal(battle.raiderGroups.filter(group => group.leader).length, 1);
   const wolfCount = battle.raiderGroups.reduce((sum, group) => sum + group.count, 0);
   assert.ok(wolfCount >= 3 && wolfCount <= 12);
@@ -272,6 +294,14 @@ function finishBattle(state) {
     `${original.label.replace(/ [A-Z]조$/, '')} B조`,
     `${original.label.replace(/ [A-Z]조$/, '')} C조`,
   ]);
+  const splitGroups = [...battle.defenderGroups].sort((left, right) => left.id.localeCompare(right.id));
+  for (const [index, sectorId] of ['huntSectorRidge', 'huntSectorRavine', 'huntSectorBrook'].entries()) {
+    assert.equal(tactical.assignDefenderGroup(state, splitGroups[index].id, sectorId), null);
+  }
+  assert.deepEqual(new Set(battle.defenderGroups.map(group => group.zoneId)), new Set([
+    'huntSectorRidge', 'huntSectorRavine', 'huntSectorBrook',
+  ]));
+  assert.match(tactical.assignDefenderGroup(state, original.id, 'huntDen'), /심처/);
 
   assert.equal(saveLoad.saveGame(state), true);
   const loaded = saveLoad.loadGame();
@@ -283,6 +313,7 @@ function finishBattle(state) {
 
   const source = battle.defenderGroups.find(group => group.id !== original.id);
   assert.ok(source);
+  assert.equal(tactical.assignDefenderGroup(state, source.id, original.zoneId), null);
   assert.equal(tacticalHunt.mergeHuntGroups(state, original.id, source.id), null);
   assert.equal(battle.defenderGroups.length, 2);
   assert.equal(battle.defenderGroups.reduce((sum, group) => sum + group.count, 0), 3);
@@ -299,6 +330,76 @@ function finishBattle(state) {
   battle.assaultKind = 'predatorHunt';
   assert.equal(tactical.advanceTacticalPhase(state), null);
   assert.match(tacticalHunt.splitHuntGroup(state, original.id, 1), /배치 단계/);
+}
+
+{
+  const stationary = prepareUniformHunterGroup(2026071515, 3);
+  const moving = prepareUniformHunterGroup(2026071515, 3);
+  enterDeployment(stationary.state);
+  enterDeployment(moving.state);
+  assert.equal(tactical.advanceTacticalPhase(stationary.state), null);
+  assert.equal(tactical.advanceTacticalPhase(moving.state), null);
+  const stationaryGroup = stationary.battle.defenderGroups[0];
+  const movingGroup = moving.battle.defenderGroups[0];
+  assert.equal(tactical.assignDefenderGroup(stationary.state, stationaryGroup.id, 'huntSectorRidge'), null);
+  assert.equal(stationaryGroup.huntMovedRound, undefined, 'reselecting the same sector is not movement');
+  assert.equal(tactical.assignDefenderGroup(moving.state, movingGroup.id, 'huntSectorRavine'), null);
+  assert.equal(movingGroup.huntMovedRound, moving.battle.round);
+  assert.equal(tactical.resolveTacticalRound(stationary.state), null);
+  assert.equal(tactical.resolveTacticalRound(moving.state), null);
+  assert.ok((moving.battle.huntEncirclement ?? 0) < (stationary.battle.huntEncirclement ?? 0),
+    'a group moved during command contributes only half drive power that round');
+  assert.equal(tactical.completeTacticalSimulation(moving.state), null);
+  assert.equal(tactical.acknowledgeTacticalReport(moving.state), null);
+  assert.equal(movingGroup.zoneId, 'huntSectorRavine', 'round acknowledgement does not regroup every hunter');
+}
+
+{
+  const covered = prepareSplitSectorHunt(2026071517, true);
+  const open = prepareSplitSectorHunt(2026071517, false);
+  assert.equal(tactical.resolveTacticalRound(covered.state), null);
+  assert.equal(tactical.resolveTacticalRound(open.state), null);
+  const coveredSectors = covered.battle.zones.filter(zone => zone.id !== 'huntDen');
+  const openSectors = open.battle.zones.filter(zone => zone.id !== 'huntDen');
+  assert.ok(coveredSectors.every(zone => (zone.sectorBlockade ?? 0) > 0));
+  assert.deepEqual(openSectors.map(zone => (zone.sectorBlockade ?? 0) > 0), [true, false, false]);
+  assert.ok((covered.battle.huntEncirclement ?? 0) > (open.battle.huntEncirclement ?? 0),
+    'empty sectors attenuate the total encirclement gain');
+  assert.ok(openSectors.some(zone => zone.pressure !== open.battle.huntEncirclement),
+    'sector pressure is no longer overwritten with one global encirclement value');
+  assert.deepEqual(open.battle.huntOpenSectorRounds, {
+    huntSectorRidge: 0,
+    huntSectorRavine: 1,
+    huntSectorBrook: 1,
+  });
+
+  assert.equal(tactical.completeTacticalSimulation(open.state), null);
+  assert.equal(tactical.acknowledgeTacticalReport(open.state), null);
+  const moved = open.groups[1];
+  assert.equal(tactical.assignDefenderGroup(open.state, moved.id, 'huntSectorRavine'), null);
+  open.battle.huntEncirclement = 0;
+  assert.equal(tactical.resolveTacticalRound(open.state), null);
+  assert.equal(open.battle.huntOpenSectorRounds.huntSectorRavine, 0, 'restored blockade resets its hole counter');
+  assert.equal(open.battle.huntOpenSectorRounds.huntSectorBrook, 2);
+}
+
+{
+  const escaping = prepareSplitSectorHunt(2026071518, false);
+  escaping.battle.huntEncirclement = 45;
+  escaping.battle.huntOpenSectorRounds = {
+    huntSectorRidge: 0,
+    huntSectorRavine: 1,
+    huntSectorBrook: 1,
+  };
+  const sectorsConfig = config.CONFIG.tacticalBattle.hunt.sectors;
+  const originalChance = sectorsConfig.openEscapeChance;
+  sectorsConfig.openEscapeChance = 1;
+  assert.equal(tactical.resolveTacticalRound(escaping.state), null);
+  sectorsConfig.openEscapeChance = originalChance;
+  assert.equal(escaping.battle.pendingReport.outcome, 'huntEscaped');
+  assert.ok(escaping.battle.pendingReport.events.some(event =>
+    event.kind === 'retreat' && /빠져나/.test(event.text ?? '')),
+  'a sector left open for two rounds becomes a deterministic escape route');
 }
 
 {

@@ -2388,6 +2388,28 @@ html, body, #root {
   color: #ddc89a;
   font-size: 0.82rem;
 }
+
+.tactical-hunt-sector-movement {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(76px, 1fr));
+  gap: 5px;
+}
+
+.tactical-hunt-sector-movement button {
+  min-height: 34px;
+}
+
+.tactical-hunt-sector-movement button.active {
+  border-color: #d7b86f;
+  color: #f5dfaa;
+  background: rgba(132, 91, 36, 0.5);
+}
+
+.tactical-hunt-sector-movement small {
+  grid-column: 1 / -1;
+  color: #bcae8c;
+  font-size: 0.72rem;
+}
 .tactical-deploy-row > strong { color: #ead8ac; font-size: 12px; }
 
 .tactical-simulating {
