@@ -886,7 +886,7 @@ function preparationEvent(
   kind: TacticalAnimationEvent['kind'],
   text: string,
   durationMs: number,
-  extra?: Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'casualties' | 'float' | 'shots' | 'meleeParticipants'>,
+  extra?: Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'actorGroupIds' | 'casualties' | 'float' | 'shots' | 'meleeParticipants'>,
 ): void {
   events.push({ zoneId, kind, text, durationMs, ...extra });
 }
@@ -1474,7 +1474,7 @@ function event(
   kind: TacticalAnimationEvent['kind'],
   text: string,
   durationMs = 650,
-  extra?: Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'casualties' | 'float' | 'shots' | 'meleeParticipants'>,
+  extra?: Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'actorGroupIds' | 'casualties' | 'float' | 'shots' | 'meleeParticipants'>,
 ): void {
   events.push({ zoneId, kind, text, durationMs, ...extra });
 }
@@ -1541,6 +1541,7 @@ export function resolveTacticalRound(state: GameState): string | null {
   const dominance = new Map<string, number>();
   const rearDominance = new Map<string, number>();
   const defenderReadiness = new Map<string, number>();
+  const undefendedFrontalZones = new Set<string>();
   let roundWounded = 0;
   let roundKilled = 0;
   let roundRaidersKilled = 0;
@@ -1594,11 +1595,13 @@ export function resolveTacticalRound(state: GameState): string | null {
       attackers: TacticalRaiderGroup[];
     }> = [];
     if (frontalAttackers.length > 0) {
+      const frontalDefenders = rearAttackers.length > 0
+        ? engagementDefenders.frontal
+        : [...engagementDefenders.frontal, ...engagementDefenders.protectedTargets];
+      if (frontalDefenders.length === 0) undefendedFrontalZones.add(zone.id);
       engagements.push({
         direction: 'frontal',
-        defenders: rearAttackers.length > 0
-          ? engagementDefenders.frontal
-          : [...engagementDefenders.frontal, ...engagementDefenders.protectedTargets],
+        defenders: frontalDefenders,
         attackers: frontalAttackers,
       });
     }
@@ -1707,8 +1710,11 @@ export function resolveTacticalRound(state: GameState): string | null {
   battle.raiderMorale = clamp(battle.raiderMorale + raiderMoraleDelta, 0, 100);
   const scheduledAdvances = new Map<string, {
     fromZoneId: string;
+    fromZoneName: string;
     destinationName: string;
     groupLabels: string[];
+    groupIds: string[];
+    undefended: boolean;
   }>();
   for (const attacker of battle.raiderGroups) {
     attacker.morale = clamp(attacker.morale + raiderMoraleDelta, 0, 100);
@@ -1739,10 +1745,14 @@ export function resolveTacticalRound(state: GameState): string | null {
       const advanceKey = `${fromZoneId}->${attacker.pendingZoneId}`;
       const scheduled = scheduledAdvances.get(advanceKey) ?? {
         fromZoneId,
+        fromZoneName: zone?.name ?? '무방비 전선',
         destinationName: destinationName ?? '다음 방어선',
         groupLabels: [],
+        groupIds: [],
+        undefended: undefendedFrontalZones.has(fromZoneId),
       };
       scheduled.groupLabels.push(attacker.label);
+      scheduled.groupIds.push(attacker.id);
       scheduledAdvances.set(advanceKey, scheduled);
       if (attacker.kind === 'flankers') {
         lines.push(attacker.flankPlan === 'rearAssault'
@@ -1757,7 +1767,24 @@ export function resolveTacticalRound(state: GameState): string | null {
   }
   for (const advance of scheduledAdvances.values()) {
     const subject = advance.groupLabels.join('·');
-    event(events, advance.fromZoneId, 'advance', `${subject}이(가) 교전을 마치고 ${advance.destinationName}(으)로 밀려듭니다.`, 620);
+    const movementEvents: TacticalAnimationEvent[] = [];
+    event(
+      movementEvents,
+      advance.fromZoneId,
+      'advance',
+      advance.undefended
+        ? `${subject}이(가) 저항 없이 ${advance.fromZoneName}을(를) 휩쓸고 ${advance.destinationName}(으)로 진입합니다.`
+        : `${subject}이(가) 교전을 마치고 ${advance.destinationName}(으)로 밀려듭니다.`,
+      620,
+      { side: 'raider', actorGroupIds: advance.groupIds },
+    );
+    let insertionIndex = events.length;
+    for (let index = events.length - 1; index >= 0; index -= 1) {
+      if (events[index].zoneId !== advance.fromZoneId) continue;
+      insertionIndex = index + 1;
+      break;
+    }
+    events.splice(insertionIndex, 0, ...movementEvents);
   }
 
   normalizeTacticalGroupTargets(battle);

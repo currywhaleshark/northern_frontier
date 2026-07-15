@@ -2548,6 +2548,7 @@ html, body, #root {
 .tactical-zone.event-moraleBreak .tactical-raider-rank { animation: tactical-break calc(700ms * var(--tactical-playback-scale)) ease forwards; }
 .tactical-zone.event-loot .tactical-raider-rank { animation: tactical-loot calc(380ms * var(--tactical-playback-scale)) ease 2; }
 .tactical-zone.moving-raiders .tactical-raider-rank { animation: tactical-advance-after-combat calc(620ms * var(--tactical-playback-scale)) ease-in forwards; }
+.tactical-zone .tactical-raider-group.advancing { animation: tactical-advance-after-combat calc(620ms * var(--tactical-playback-scale)) ease-in forwards; }
 .tactical-screen.assault .tactical-zone.event-melee .tactical-raider-group.melee-attacker,
 .tactical-screen.assault .tactical-zone.event-zoneFall .tactical-raider-rank {
   animation-name: tactical-charge-left;

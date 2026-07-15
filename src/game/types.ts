@@ -782,6 +782,8 @@ export interface TacticalAnimationEvent {
   groupId?: string;      // 피해를 입은 그룹 — 화면에서 해당 스프라이트를 쓰러뜨린다
   actorGroupIds?: string[]; // 이 이벤트에서 실제로 전진하거나 공격 동작을 하는 그룹
   casualties?: number;   // 이 이벤트로 쓰러지는 인원(전사+부상)
+  wounded?: number;      // 재생 중 부상자가 생기는 시점을 복원하기 위한 세부 수치
+  killed?: number;       // 재생 중 전사자가 생기는 시점을 복원하기 위한 세부 수치
   float?: string;        // 랭크 위로 떠오르는 짧은 전황 텍스트
   meleeParticipants?: number;
   shots?: {

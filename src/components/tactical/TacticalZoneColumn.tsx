@@ -278,9 +278,37 @@ function formationStackStyle(index: number, groupCount: number): CSSProperties {
   } as CSSProperties;
 }
 
+function playbackCasualties(
+  battle: NonNullable<GameState['tacticalBattle']>,
+  eventIndex: number,
+  side: 'defender' | 'raider',
+  groupId: string,
+): { futureTotal: number; futureWounded: number; currentWounded: number } {
+  if (battle.phase !== 'simulating' || !battle.pendingReport) {
+    return { futureTotal: 0, futureWounded: 0, currentWounded: 0 };
+  }
+  const events = battle.pendingReport.events;
+  const appliesToGroup = (item: TacticalAnimationEvent): boolean =>
+    item.kind === 'casualty' && item.side === side && item.groupId === groupId;
+  let futureTotal = 0;
+  let futureWounded = 0;
+  for (let index = Math.max(0, eventIndex + 1); index < events.length; index += 1) {
+    const item = events[index];
+    if (!appliesToGroup(item)) continue;
+    futureTotal += item.casualties ?? 0;
+    futureWounded += item.wounded ?? 0;
+  }
+  const current = events[eventIndex];
+  return {
+    futureTotal,
+    futureWounded,
+    currentWounded: current && appliesToGroup(current) ? current.wounded ?? 0 : 0,
+  };
+}
+
 function GroupSprites({
   state, group, pose = 'idle', firing = false, falling = 0, maxVisible = 4, showAll = false,
-  formationGroupCount = 1,
+  formationGroupCount = 1, activeOverride, woundedOverride,
 }: {
   state: GameState;
   group: TacticalDefenderGroup;
@@ -290,9 +318,14 @@ function GroupSprites({
   maxVisible?: number;
   showAll?: boolean;
   formationGroupCount?: number;
+  activeOverride?: number;
+  woundedOverride?: number;
 }) {
-  const active = Math.max(0, group.count - group.wounded - group.killed);
-  const wounded = Math.max(0, Math.min(group.wounded, group.count - group.killed));
+  const active = Math.max(0, activeOverride ?? group.count - group.wounded - group.killed);
+  const wounded = Math.max(0, Math.min(
+    woundedOverride ?? group.wounded,
+    group.count - group.killed,
+  ));
   const shown = showAll ? active : Math.min(maxVisible, active);
   const woundedShown = showAll ? Math.min(3, wounded) : Math.min(1, wounded);
   const fallingShown = showAll ? falling : Math.min(2, falling);
@@ -567,7 +600,8 @@ export function TacticalZoneColumn({
     (liveBreachEventIndex < 0 || eventIndex >= liveBreachEventIndex);
   const barricadeState = visibleBreached ? 'broken' : barricadeReinforced ? 'reinforced' : 'normal';
   const raidersAdvancing = activeEvent?.kind === 'advance' &&
-    activeEvent.zoneId === zone.id && activeEvent.side !== 'defender';
+    activeEvent.zoneId === zone.id && activeEvent.side !== 'defender' &&
+    !activeEvent.actorGroupIds?.length;
   const huntSector = hunt && zone.id !== 'huntDen';
   const blockadeThreshold = CONFIG.tacticalBattle.hunt.sectors.blockadeThreshold;
   const currentBlockade = huntSector
@@ -698,7 +732,11 @@ export function TacticalZoneColumn({
           >
             {showFormationGuides && <span className="tactical-formation-line-label">적 {formationLineLabel(line)}</span>}
             {raiders.filter(raider => raider.line === line).map((raider, stackIndex, lineGroups) => {
-          const activeRaiders = Math.max(0, raider.count - raider.killed);
+          const playbackLoss = playbackCasualties(battle, eventIndex, 'raider', raider.id);
+          const activeRaiders = Math.min(
+            raider.count,
+            Math.max(0, raider.count - raider.killed) + playbackLoss.futureTotal,
+          );
           const targetingActive = battle.phase === 'command' && !hunt && activeRaiders > 0 && selectedGroupId != null;
           const targetUnavailableReason = targetingActive && selectedGroupId
             ? tacticalGroupTargetUnavailableReason(battle, selectedGroupId, raider.id)
@@ -724,9 +762,11 @@ export function TacticalZoneColumn({
               : hunt && battle.huntPredatorState === 'wounded' ? 'wounded' : 'idle';
           const raiderPose = raider.beastKind ? beastPose : raiderPoseForEvent(activeEvent, raider);
           const meleeAttacker = meleeActorForEvent(activeEvent, 'raider', raider.id);
+          const advancing = activeEvent?.kind === 'advance' && activeEvent.side === 'raider' &&
+            (activeEvent.actorGroupIds?.includes(raider.id) ?? false);
           return (
             <div
-              className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${leaderMotion}`}
+              className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${advancing ? ' advancing' : ''}${leaderMotion}`}
               style={formationStackStyle(stackIndex, lineGroups.length)}
               data-stack-depth={lineGroups.length - 1 - stackIndex}
               key={leaderMotion ? `${raider.id}-${activeEvent?.kind}-${eventIndex}` : raider.id}
@@ -788,7 +828,11 @@ export function TacticalZoneColumn({
       )}
       <div className={`tactical-rear-assault-rank${activeEvent?.kind === 'rearAssault' && activeEvent.zoneId === zone.id ? ' entering' : ''}`}>
         {rearAssaulters.map(raider => {
-          const activeRaiders = Math.max(0, raider.count - raider.killed);
+          const playbackLoss = playbackCasualties(battle, eventIndex, 'raider', raider.id);
+          const activeRaiders = Math.min(
+            raider.count,
+            Math.max(0, raider.count - raider.killed) + playbackLoss.futureTotal,
+          );
           const targetingActive = battle.phase === 'command' && !hunt && activeRaiders > 0 && selectedGroupId != null;
           const targetUnavailableReason = targetingActive && selectedGroupId
             ? tacticalGroupTargetUnavailableReason(battle, selectedGroupId, raider.id)
@@ -801,9 +845,11 @@ export function TacticalZoneColumn({
           const totalRaiders = activeRaiders + fallingRaiders;
           const formation = formationDimensions(totalRaiders, 132, 100, 20, 13, 5);
           const meleeAttacker = meleeActorForEvent(activeEvent, 'raider', raider.id);
+          const advancing = activeEvent?.kind === 'advance' && activeEvent.side === 'raider' &&
+            (activeEvent.actorGroupIds?.includes(raider.id) ?? false);
           return (
             <div
-              className={`tactical-raider-group rear-assault${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}`}
+              className={`tactical-raider-group rear-assault${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${advancing ? ' advancing' : ''}`}
               key={raider.id}
               onClick={targetable ? event => {
                 event.stopPropagation();
@@ -874,6 +920,15 @@ export function TacticalZoneColumn({
               ? ` prep-${activeEvent.kind}`
               : '';
           const meleeAttacker = meleeActorForEvent(activeEvent, 'defender', group.id);
+          const playbackLoss = playbackCasualties(battle, eventIndex, 'defender', group.id);
+          const visualActive = Math.min(
+            group.count,
+            Math.max(0, group.count - group.wounded - group.killed) + playbackLoss.futureTotal,
+          );
+          const visualWounded = Math.max(
+            0,
+            group.wounded - playbackLoss.futureWounded - playbackLoss.currentWounded,
+          );
           return (
             <div
               className={`tactical-field-group formation-${defenderFormationRole(group)} line-${group.line}${rearFacing ? ' rear-facing' : ''}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${meleeAttacker ? ' melee-attacker' : ''}${prepMotion}${commandable ? ' selectable' : ''}${commandable && selectedGroupId === group.id ? ' selected' : ''}`}
@@ -899,6 +954,8 @@ export function TacticalZoneColumn({
                 firing={recoiling}
                 showAll
                 formationGroupCount={defenders.length + (rearAssaulters.length > 0 ? 2 : 0)}
+                activeOverride={visualActive}
+                woundedOverride={visualWounded}
                 falling={activeEvent?.kind === 'casualty' && activeEvent.groupId === group.id ? activeEvent.casualties ?? 0 : 0}
               />
               <span>

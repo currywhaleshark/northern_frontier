@@ -130,13 +130,18 @@
           },
           {
             "zoneId": "approach",
-            "kind": "melee",
+            "kind": "casualty",
+            "groupId": "nimacha-hunters"
+          },
+          {
+            "zoneId": "approach",
+            "kind": "volley",
             "groupId": null
           },
           {
             "zoneId": "approach",
-            "kind": "casualty",
-            "groupId": "nimacha-hunters"
+            "kind": "melee",
+            "groupId": null
           },
           {
             "zoneId": "approach",
@@ -280,16 +285,6 @@
           },
           {
             "zoneId": "wall",
-            "kind": "volley",
-            "groupId": null
-          },
-          {
-            "zoneId": "wall",
-            "kind": "wallAssault",
-            "groupId": "nimacha-looters"
-          },
-          {
-            "zoneId": "wall",
             "kind": "casualty",
             "groupId": "nimacha-hunters"
           },
@@ -299,9 +294,14 @@
             "groupId": "nimacha-looters"
           },
           {
-            "zoneId": "storehouse",
-            "kind": "advance",
+            "zoneId": "wall",
+            "kind": "volley",
             "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "nimacha-looters"
           },
           {
             "zoneId": "storehouse",
@@ -440,22 +440,22 @@
           },
           {
             "zoneId": "wall",
-            "kind": "volley",
-            "groupId": null
-          },
-          {
-            "zoneId": "wall",
-            "kind": "wallAssault",
-            "groupId": "nimacha-looters"
-          },
-          {
-            "zoneId": "wall",
             "kind": "casualty",
             "groupId": "nimacha-hunters"
           },
           {
             "zoneId": "wall",
             "kind": "casualty",
+            "groupId": "nimacha-looters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
             "groupId": "nimacha-looters"
           },
           {
@@ -601,6 +601,11 @@
           },
           {
             "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "nimacha-hunters"
+          },
+          {
+            "zoneId": "wall",
             "kind": "volley",
             "groupId": null
           },
@@ -611,8 +616,8 @@
           },
           {
             "zoneId": "wall",
-            "kind": "casualty",
-            "groupId": "nimacha-hunters"
+            "kind": "advance",
+            "groupId": null
           },
           {
             "zoneId": "center",
@@ -623,11 +628,6 @@
             "zoneId": "center",
             "kind": "casualty",
             "groupId": "civilian-unarmed"
-          },
-          {
-            "zoneId": "wall",
-            "kind": "advance",
-            "groupId": null
           },
           {
             "zoneId": "center",
@@ -766,17 +766,12 @@
           },
           {
             "zoneId": "wall",
-            "kind": "volley",
-            "groupId": null
-          },
-          {
-            "zoneId": "wall",
             "kind": "casualty",
             "groupId": "nimacha-hunters"
           },
           {
-            "zoneId": "storehouse",
-            "kind": "advance",
+            "zoneId": "wall",
+            "kind": "volley",
             "groupId": null
           },
           {
@@ -1087,22 +1082,22 @@
           },
           {
             "zoneId": "wall",
-            "kind": "volley",
-            "groupId": null
-          },
-          {
-            "zoneId": "wall",
-            "kind": "wallAssault",
-            "groupId": "nimacha-looters"
-          },
-          {
-            "zoneId": "wall",
             "kind": "casualty",
             "groupId": "nimacha-hunters"
           },
           {
             "zoneId": "wall",
             "kind": "casualty",
+            "groupId": "nimacha-looters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
             "groupId": "nimacha-looters"
           },
           {
@@ -1247,6 +1242,11 @@
           },
           {
             "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "nimacha-hunters"
+          },
+          {
+            "zoneId": "wall",
             "kind": "volley",
             "groupId": null
           },
@@ -1259,11 +1259,6 @@
             "zoneId": "wall",
             "kind": "casualty",
             "groupId": "militia-musket"
-          },
-          {
-            "zoneId": "wall",
-            "kind": "casualty",
-            "groupId": "nimacha-hunters"
           },
           {
             "zoneId": "wall",
@@ -1409,6 +1404,11 @@
           },
           {
             "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "nimacha-hunters"
+          },
+          {
+            "zoneId": "wall",
             "kind": "volley",
             "groupId": null
           },
@@ -1424,13 +1424,13 @@
           },
           {
             "zoneId": "wall",
-            "kind": "casualty",
-            "groupId": "nimacha-hunters"
+            "kind": "volley",
+            "groupId": null
           },
           {
             "zoneId": "wall",
-            "kind": "volley",
-            "groupId": null
+            "kind": "casualty",
+            "groupId": "nimacha-spears"
           },
           {
             "zoneId": "wall",
@@ -1441,11 +1441,6 @@
             "zoneId": "wall",
             "kind": "casualty",
             "groupId": "militia-hornBow"
-          },
-          {
-            "zoneId": "wall",
-            "kind": "casualty",
-            "groupId": "nimacha-spears"
           },
           {
             "zoneId": "wall",
@@ -1588,11 +1583,6 @@
           },
           {
             "zoneId": "wall",
-            "kind": "volley",
-            "groupId": null
-          },
-          {
-            "zoneId": "wall",
             "kind": "casualty",
             "groupId": "nimacha-hunters"
           },
@@ -1603,13 +1593,13 @@
           },
           {
             "zoneId": "wall",
-            "kind": "melee",
-            "groupId": "nimacha-spears"
+            "kind": "volley",
+            "groupId": null
           },
           {
-            "zoneId": "storehouse",
-            "kind": "advance",
-            "groupId": null
+            "zoneId": "wall",
+            "kind": "melee",
+            "groupId": "nimacha-spears"
           },
           {
             "zoneId": "storehouse",
@@ -1905,12 +1895,12 @@
           },
           {
             "zoneId": "wall",
-            "kind": "wallAssault",
+            "kind": "casualty",
             "groupId": "holaon-lancers"
           },
           {
             "zoneId": "wall",
-            "kind": "casualty",
+            "kind": "wallAssault",
             "groupId": "holaon-lancers"
           },
           {
@@ -2064,12 +2054,12 @@
           },
           {
             "zoneId": "wall",
-            "kind": "wallAssault",
+            "kind": "casualty",
             "groupId": "holaon-lancers"
           },
           {
             "zoneId": "wall",
-            "kind": "casualty",
+            "kind": "wallAssault",
             "groupId": "holaon-lancers"
           },
           {
@@ -2219,12 +2209,12 @@
           },
           {
             "zoneId": "wall",
-            "kind": "wallAssault",
+            "kind": "casualty",
             "groupId": "holaon-lancers"
           },
           {
             "zoneId": "wall",
-            "kind": "casualty",
+            "kind": "wallAssault",
             "groupId": "holaon-lancers"
           },
           {
@@ -2384,18 +2374,23 @@
           },
           {
             "zoneId": "wall",
-            "kind": "wallAssault",
+            "kind": "casualty",
             "groupId": "holaon-lancers"
           },
           {
             "zoneId": "wall",
-            "kind": "casualty",
+            "kind": "wallAssault",
             "groupId": "holaon-lancers"
           },
           {
             "zoneId": "wall",
             "kind": "volley",
             "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "holaon-archers"
           },
           {
             "zoneId": "wall",
@@ -2406,16 +2401,6 @@
             "zoneId": "wall",
             "kind": "melee",
             "groupId": "holaon-archers"
-          },
-          {
-            "zoneId": "wall",
-            "kind": "casualty",
-            "groupId": "holaon-archers"
-          },
-          {
-            "zoneId": "storehouse",
-            "kind": "advance",
-            "groupId": null
           },
           {
             "zoneId": "storehouse",
@@ -2566,6 +2551,16 @@
           },
           {
             "zoneId": "approach",
+            "kind": "casualty",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "approach",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
             "kind": "melee",
             "groupId": null
           },
@@ -2573,11 +2568,6 @@
             "zoneId": "approach",
             "kind": "casualty",
             "groupId": "hunter-unarmed"
-          },
-          {
-            "zoneId": "approach",
-            "kind": "casualty",
-            "groupId": "holaon-lancers"
           },
           {
             "zoneId": "approach",
@@ -2721,11 +2711,6 @@
           },
           {
             "zoneId": "wall",
-            "kind": "wallAssault",
-            "groupId": "holaon-lancers"
-          },
-          {
-            "zoneId": "wall",
             "kind": "casualty",
             "groupId": "holaon-lancers"
           },
@@ -2735,9 +2720,9 @@
             "groupId": "holaon-raiders"
           },
           {
-            "zoneId": "storehouse",
-            "kind": "advance",
-            "groupId": null
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "holaon-lancers"
           },
           {
             "zoneId": "storehouse",
@@ -2876,11 +2861,6 @@
           },
           {
             "zoneId": "wall",
-            "kind": "wallAssault",
-            "groupId": "holaon-lancers"
-          },
-          {
-            "zoneId": "wall",
             "kind": "casualty",
             "groupId": "holaon-lancers"
           },
@@ -2888,6 +2868,11 @@
             "zoneId": "wall",
             "kind": "casualty",
             "groupId": "holaon-raiders"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "holaon-lancers"
           },
           {
             "zoneId": "center",
@@ -3037,13 +3022,18 @@
           },
           {
             "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "wall",
             "kind": "wallAssault",
             "groupId": "holaon-lancers"
           },
           {
             "zoneId": "wall",
-            "kind": "casualty",
-            "groupId": "holaon-lancers"
+            "kind": "advance",
+            "groupId": null
           },
           {
             "zoneId": "center",
@@ -3059,11 +3049,6 @@
             "zoneId": "center",
             "kind": "casualty",
             "groupId": "civilian-unarmed"
-          },
-          {
-            "zoneId": "wall",
-            "kind": "advance",
-            "groupId": null
           },
           {
             "zoneId": "center",
@@ -3202,18 +3187,13 @@
           },
           {
             "zoneId": "wall",
-            "kind": "wallAssault",
-            "groupId": "holaon-lancers"
-          },
-          {
-            "zoneId": "wall",
             "kind": "casualty",
             "groupId": "holaon-lancers"
           },
           {
-            "zoneId": "storehouse",
-            "kind": "advance",
-            "groupId": null
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "holaon-lancers"
           },
           {
             "zoneId": "storehouse",
@@ -3530,11 +3510,6 @@
           },
           {
             "zoneId": "wall",
-            "kind": "wallAssault",
-            "groupId": "bandit-vanguard"
-          },
-          {
-            "zoneId": "wall",
             "kind": "casualty",
             "groupId": "bandit-vanguard"
           },
@@ -3542,6 +3517,11 @@
             "zoneId": "wall",
             "kind": "casualty",
             "groupId": "bandit-looters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "bandit-vanguard"
           },
           {
             "zoneId": "wall",
@@ -3694,11 +3674,6 @@
           },
           {
             "zoneId": "wall",
-            "kind": "wallAssault",
-            "groupId": "bandit-vanguard"
-          },
-          {
-            "zoneId": "wall",
             "kind": "casualty",
             "groupId": "bandit-vanguard"
           },
@@ -3709,8 +3684,18 @@
           },
           {
             "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "bandit-vanguard"
+          },
+          {
+            "zoneId": "wall",
             "kind": "volley",
             "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "bandit-riders"
           },
           {
             "zoneId": "wall",
@@ -3720,11 +3705,6 @@
           {
             "zoneId": "wall",
             "kind": "melee",
-            "groupId": "bandit-riders"
-          },
-          {
-            "zoneId": "wall",
-            "kind": "casualty",
             "groupId": "bandit-riders"
           },
           {
@@ -3859,12 +3839,12 @@
           },
           {
             "zoneId": "wall",
-            "kind": "wallAssault",
+            "kind": "casualty",
             "groupId": "bandit-vanguard"
           },
           {
             "zoneId": "wall",
-            "kind": "casualty",
+            "kind": "wallAssault",
             "groupId": "bandit-vanguard"
           },
           {
@@ -4025,6 +4005,11 @@
           },
           {
             "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "bandit-vanguard"
+          },
+          {
+            "zoneId": "wall",
             "kind": "wallAssault",
             "groupId": "bandit-vanguard"
           },
@@ -4032,11 +4017,6 @@
             "zoneId": "wall",
             "kind": "casualty",
             "groupId": "militia-unarmed"
-          },
-          {
-            "zoneId": "wall",
-            "kind": "casualty",
-            "groupId": "bandit-vanguard"
           },
           {
             "zoneId": "wall",
@@ -4052,11 +4032,6 @@
             "zoneId": "wall",
             "kind": "melee",
             "groupId": "bandit-riders"
-          },
-          {
-            "zoneId": "storehouse",
-            "kind": "advance",
-            "groupId": null
           },
           {
             "zoneId": "storehouse",
@@ -4227,6 +4202,16 @@
           },
           {
             "zoneId": "approach",
+            "kind": "casualty",
+            "groupId": "court-gunners"
+          },
+          {
+            "zoneId": "approach",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
             "kind": "melee",
             "groupId": null
           },
@@ -4234,11 +4219,6 @@
             "zoneId": "approach",
             "kind": "casualty",
             "groupId": "hunter-unarmed"
-          },
-          {
-            "zoneId": "approach",
-            "kind": "casualty",
-            "groupId": "court-gunners"
           },
           {
             "zoneId": "approach",
@@ -4403,6 +4383,16 @@
           },
           {
             "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "court-gunners"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "court-melee"
+          },
+          {
+            "zoneId": "wall",
             "kind": "volley",
             "groupId": null
           },
@@ -4420,21 +4410,6 @@
             "zoneId": "wall",
             "kind": "casualty",
             "groupId": "militia-musket"
-          },
-          {
-            "zoneId": "wall",
-            "kind": "casualty",
-            "groupId": "court-gunners"
-          },
-          {
-            "zoneId": "wall",
-            "kind": "casualty",
-            "groupId": "court-melee"
-          },
-          {
-            "zoneId": "storehouse",
-            "kind": "advance",
-            "groupId": null
           },
           {
             "zoneId": "storehouse",
@@ -4593,6 +4568,16 @@
           },
           {
             "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "court-gunners"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "court-melee"
+          },
+          {
+            "zoneId": "wall",
             "kind": "volley",
             "groupId": null
           },
@@ -4610,16 +4595,6 @@
             "zoneId": "wall",
             "kind": "casualty",
             "groupId": "militia-musket"
-          },
-          {
-            "zoneId": "wall",
-            "kind": "casualty",
-            "groupId": "court-gunners"
-          },
-          {
-            "zoneId": "wall",
-            "kind": "casualty",
-            "groupId": "court-melee"
           },
           {
             "zoneId": "center",
@@ -4783,6 +4758,16 @@
           },
           {
             "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "court-gunners"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "court-melee"
+          },
+          {
+            "zoneId": "wall",
             "kind": "volley",
             "groupId": null
           },
@@ -4795,16 +4780,6 @@
             "zoneId": "wall",
             "kind": "artilleryHit",
             "groupId": null
-          },
-          {
-            "zoneId": "wall",
-            "kind": "casualty",
-            "groupId": "court-gunners"
-          },
-          {
-            "zoneId": "wall",
-            "kind": "casualty",
-            "groupId": "court-melee"
           },
           {
             "zoneId": "center",
@@ -4970,6 +4945,11 @@
           },
           {
             "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "court-gunners"
+          },
+          {
+            "zoneId": "wall",
             "kind": "volley",
             "groupId": null
           },
@@ -4992,11 +4972,6 @@
             "zoneId": "wall",
             "kind": "wallHit",
             "groupId": null
-          },
-          {
-            "zoneId": "wall",
-            "kind": "casualty",
-            "groupId": "court-gunners"
           },
           {
             "zoneId": "center",

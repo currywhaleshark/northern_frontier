@@ -8,6 +8,7 @@ import { injure, killResidents } from './raidDamage';
 import { applyBanditLairOutcome, type BanditLairOutcome } from './siteDiplomacy';
 import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
 import { resolveEngagementExchange } from './tacticalEngagement';
+import { tacticalTargetingRole } from './tacticalTargeting';
 import {
   banditLairDoctrineDefinition, ensureBanditLairDefensePlan, refreshBanditLairDoctrine,
 } from './enemyPlan';
@@ -471,7 +472,7 @@ function assaultCommandCasualtyMultiplier(group: TacticalDefenderGroup): number 
 
 function addEvent(
   events: TacticalAnimationEvent[], zoneId: string, kind: TacticalAnimationEvent['kind'], text: string,
-  extra: Partial<Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'actorGroupIds' | 'casualties' | 'float' | 'shots' | 'meleeParticipants'>> = {},
+  extra: Partial<Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'actorGroupIds' | 'casualties' | 'wounded' | 'killed' | 'float' | 'shots' | 'meleeParticipants'>> = {},
 ): void {
   events.push({ zoneId, kind, text, durationMs: 620, ...extra });
 }
@@ -502,6 +503,8 @@ export function resolveAssaultRound(state: GameState): string | null {
   const players = battle.defenderGroups.filter(group => group.zoneId === zone.id && activeCount(group) > 0);
   const enemies = battle.raiderGroups.filter(group => group.zoneId === zone.id && group.intent !== 'withdraw' && group.power > 0);
   const events: TacticalAnimationEvent[] = [];
+  const friendlyActionEvents: TacticalAnimationEvent[] = [];
+  const enemyActionEvents: TacticalAnimationEvent[] = [];
   const lines: string[] = [];
   let wounded = 0;
   let killed = 0;
@@ -527,15 +530,15 @@ export function resolveAssaultRound(state: GameState): string | null {
 
   const commands = new Set(players.map(group => group.command));
 
-  if (commands.has('ambush')) addEvent(events, zone.id, 'ambush', '사냥꾼 척후대가 숲길 초병의 측면을 덮칩니다.', { side: 'raider', float: '기습!' });
+  if (commands.has('ambush')) addEvent(friendlyActionEvents, zone.id, 'ambush', '사냥꾼 척후대가 숲길 초병의 측면을 덮칩니다.', { side: 'raider', float: '기습!' });
   if (commands.has('volley')) {
-    addEvent(events, zone.id, 'volley', '목책과 적 대열을 향해 활과 조총을 일제히 쏩니다.', {
+    addEvent(friendlyActionEvents, zone.id, 'volley', '목책과 적 대열을 향해 활과 조총을 일제히 쏩니다.', {
       side: 'defender', shots: tacticalDefenderShotCounts(players.filter(group => group.command === 'volley')),
     });
   }
   const enemyShots = tacticalRaiderShotCounts(enemies);
   if ((enemyShots.arrows ?? 0) + (enemyShots.muskets ?? 0) > 0) {
-    addEvent(events, zone.id, 'volley', '산채 사격대가 원정대를 향해 화살을 퍼붓습니다.', {
+    addEvent(enemyActionEvents, zone.id, 'volley', '산채 사격대가 원정대를 향해 화살을 퍼붓습니다.', {
       side: 'raider', shots: { arrows: enemyShots.arrows, muskets: enemyShots.muskets },
     });
   }
@@ -546,7 +549,7 @@ export function resolveAssaultRound(state: GameState): string | null {
     const meleeParticipants = meleeActors
       .reduce((sum, group) => sum + activeCount(group), 0) +
       enemies.reduce((sum, group) => sum + Math.max(0, group.count - group.killed), 0);
-    addEvent(events, zone.id, 'melee', '토벌대 전열이 방어선을 밀어붙입니다.', {
+    addEvent(friendlyActionEvents, zone.id, 'melee', '토벌대 전열이 방어선을 밀어붙입니다.', {
       side: 'defender', actorGroupIds: meleeActors.map(group => group.id),
       float: '공세!', meleeParticipants: meleeParticipants,
     });
@@ -554,7 +557,7 @@ export function resolveAssaultRound(state: GameState): string | null {
   if (commands.has('arson')) {
     battle.assaultFireDamage = (battle.assaultFireDamage ?? 0) + 1;
     const fireShots = tacticalDefenderShotCounts(players.filter(group => group.command === 'arson'));
-    addEvent(events, zone.id, 'fire', '불화살이 목책과 움막에 꽂혀 불길이 번집니다.', {
+    addEvent(friendlyActionEvents, zone.id, 'fire', '불화살이 목책과 움막에 꽂혀 불길이 번집니다.', {
       side: 'defender', float: '화공!', shots: { arrows: fireShots.arrows ?? 1 },
     });
     lines.push('화공으로 돌파가 빨라지지만 회수할 노획 일부가 불탑니다.');
@@ -582,6 +585,7 @@ export function resolveAssaultRound(state: GameState): string | null {
   });
   const playerShare = exchange.defenseShare;
   const enemyShare = exchange.enemyShare;
+  events.push(...friendlyActionEvents);
 
   for (const loss of exchange.raiderLosses) {
     const enemy = enemies.find(group => group.id === loss.groupId);
@@ -591,9 +595,22 @@ export function resolveAssaultRound(state: GameState): string | null {
     enemy.confused = loss.confused;
     raidersKilled += loss.killed;
     if (loss.killed > 0) addEvent(events, zone.id, 'casualty', `${enemy.label}에서 ${loss.killed}명이 쓰러집니다.`, {
-      side: 'raider', groupId: enemy.id, casualties: loss.killed, float: `-${loss.killed}`,
+      side: 'raider', groupId: enemy.id, casualties: loss.killed, killed: loss.killed, float: `-${loss.killed}`,
     });
   }
+
+  const survivingEnemies = enemies.some(enemy =>
+    enemy.power > 0 && enemy.killed < enemy.count && enemy.intent !== 'withdraw' && !enemy.confused);
+  if (survivingEnemies && enemyActionEvents.length === 0 && exchange.defenderLosses.some(loss => loss.wounded + loss.killed > 0)) {
+    const meleeActors = enemies.filter(enemy =>
+      enemy.power > 0 && enemy.killed < enemy.count && !enemy.confused && tacticalTargetingRole(enemy) === 'melee');
+    addEvent(enemyActionEvents, zone.id, 'melee', '산채 수비대가 밀려드는 토벌대를 맞받아칩니다.', {
+      side: 'raider', actorGroupIds: meleeActors.map(enemy => enemy.id),
+      meleeParticipants: meleeActors.reduce((sum, enemy) => sum + Math.max(0, enemy.count - enemy.killed), 0) +
+        players.reduce((sum, group) => sum + activeCount(group), 0),
+    });
+  }
+  if (survivingEnemies) events.push(...enemyActionEvents);
 
   for (const loss of exchange.defenderLosses) {
     const group = players.find(candidate => candidate.id === loss.groupId);
@@ -604,7 +621,7 @@ export function resolveAssaultRound(state: GameState): string | null {
     wounded += loss.wounded;
     const losses = loss.killed + loss.wounded;
     if (losses > 0) addEvent(events, zone.id, 'casualty', `${group.label}에서 전사 ${loss.killed}, 부상 ${loss.wounded}명이 발생합니다.`, {
-      side: 'defender', groupId: group.id, casualties: losses,
+      side: 'defender', groupId: group.id, casualties: losses, wounded: loss.wounded, killed: loss.killed,
       float: loss.killed > 0 ? `전사 ${loss.killed}·부상 ${loss.wounded}` : `부상 ${loss.wounded}`,
     });
   }

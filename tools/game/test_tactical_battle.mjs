@@ -1203,6 +1203,14 @@ function addBuiltMarker(state, type) {
     battle.pendingReport.events.some(event => event.kind === 'advance' && event.zoneId === 'wall'),
     'advance animation is emitted from the line where combat occurred',
   );
+  const undefendedAdvances = battle.pendingReport.events.filter(event =>
+    event.kind === 'advance' && event.zoneId === 'wall' && event.actorGroupIds?.includes(main.id));
+  assert.equal(undefendedAdvances.length, 1,
+    'an undefended-line traversal is the group\'s only actual movement event');
+  assert.ok(undefendedAdvances[0].text.includes('저항 없이'),
+    'the actual movement event carries the undefended-line traversal presentation');
+  assert.equal(undefendedAdvances[0].text.includes('교전을 마치고'), false,
+    'undefended traversal does not also emit the generic post-engagement advance');
   assert.equal(
     battle.pendingReport.events.some(event => event.kind === 'volley' && event.zoneId === 'wall'),
     false,
@@ -1276,9 +1284,12 @@ function addBuiltMarker(state, type) {
   assert.equal(artilleryEvent.shots?.cannons, Math.max(0, artilleryGroup.count - artilleryGroup.killed),
     'court artillery schedules one cannon sample per surviving gun crew');
   const groupedAdvances = battle.pendingReport.events.filter(event =>
-    event.kind === 'advance' && event.zoneId === 'wall' && event.text.includes('교전을 마치고'));
+    event.kind === 'advance' && event.zoneId === 'wall' &&
+    mainGroups.some(group => event.actorGroupIds?.includes(group.id)));
   assert.equal(groupedAdvances.length, 1, 'same-route raider groups share one advance event');
   assert.ok(groupedAdvances[0].text.includes('·'), 'the grouped advance caption lists participating units');
+  assert.ok(groupedAdvances[0].text.includes('저항 없이'),
+    'an undefended grouped advance uses the traversal event as the actual movement');
 }
 
 {
@@ -1421,6 +1432,80 @@ function addBuiltMarker(state, type) {
   assert.equal(flanker.intent, 'withdraw', 'a dominant rear assault exits after completing its objective');
   assert.equal(center.pressure, 0, 'a rear-only engagement does not create center pressure');
   assert.equal(center.breached, false, 'flankers cannot rout a civilian-only center through frontal pressure');
+}
+
+{
+  const zone = {
+    id: 'wall', name: '순차 교전 목책', kind: 'wall', order: 1,
+    pressure: 30, breached: true, defenseBonus: 0, ambushBonus: 0,
+    lootRisk: 0, civilianRisk: 10, description: 'sequential exchange test',
+  };
+  const volleyDefender = {
+    id: 'sequential-musket', kind: 'militia-musket', role: 'militia', weapon: 'musket',
+    readyMuskets: 20, label: '조총 수비대', residentIds: Array.from({ length: 20 }, (_, index) => index + 1),
+    count: 20, zoneId: zone.id, command: 'volley', commandSource: 'player', power: 400,
+    wounded: 0, killed: 0, line: 'middle',
+  };
+  const shootingRaider = {
+    id: 'sequential-archer', kind: 'main', unitType: 'court-archer', label: '적 궁수대',
+    zoneId: zone.id, line: 'front', targetZoneId: zone.id, power: 1000, count: 20,
+    killed: 0, morale: 100, intent: 'advance', revealed: true, engagementsInZone: 0,
+  };
+  const exchange = tacticalEngagement.resolveEngagementExchange({
+    zone,
+    defenders: [volleyDefender],
+    attackers: [shootingRaider],
+    direction: 'frontal',
+    weather: 'clear',
+    prepareVolleyApplied: false,
+    evacuateCiviliansApplied: false,
+    roundStartingRaiderPower: shootingRaider.power,
+    rng: () => 0,
+  });
+  const friendlyAttackIndex = exchange.preDefenseEvents.findIndex(event =>
+    event.kind === 'volley' && event.side === 'defender');
+  const enemyDamageIndex = exchange.preDefenseEvents.findIndex(event =>
+    event.kind === 'casualty' && event.side === 'raider');
+  const enemyAttackIndex = exchange.preDefenseEvents.findIndex(event =>
+    event.kind === 'volley' && event.side === 'raider');
+  const friendlyDamageIndex = exchange.preDefenseEvents.findIndex(event =>
+    event.kind === 'casualty' && event.side === 'defender');
+  assert.ok(friendlyAttackIndex >= 0 && enemyDamageIndex >= 0 && enemyAttackIndex >= 0 && friendlyDamageIndex >= 0,
+    'sequential exchange emits both attacks and their immediate damage events');
+  assert.ok(friendlyAttackIndex < enemyDamageIndex && enemyDamageIndex < enemyAttackIndex &&
+    enemyAttackIndex < friendlyDamageIndex,
+  'exchange playback follows friendly attack, enemy damage, enemy attack, friendly damage');
+  assert.equal(exchange.postDefenseEvents.length, 0,
+    'damage is no longer deferred to a post-defense animation batch');
+
+  const decisiveDefender = {
+    ...volleyDefender,
+    id: 'decisive-musket',
+    label: '결정적 선제사격대',
+    power: 10000,
+  };
+  const loneRaider = {
+    ...shootingRaider,
+    id: 'lone-raider',
+    label: '고립된 적 사수',
+    count: 1,
+    power: 1000,
+  };
+  const decisive = tacticalEngagement.resolveEngagementExchange({
+    zone,
+    defenders: [decisiveDefender],
+    attackers: [loneRaider],
+    direction: 'frontal',
+    weather: 'clear',
+    prepareVolleyApplied: true,
+    evacuateCiviliansApplied: false,
+    roundStartingRaiderPower: loneRaider.power,
+    rng: () => 0,
+  });
+  assert.equal(decisive.raiderLosses[0].killed, 1,
+    'the prepared first strike removes the lone attacker before retaliation');
+  assert.equal(decisive.defenderLosses.reduce((sum, loss) => sum + loss.wounded + loss.killed, 0), 0,
+    'an attacker destroyed by the first strike contributes no retaliation damage');
 }
 
 {
@@ -1620,10 +1705,12 @@ function addBuiltMarker(state, type) {
   tactical.advanceTacticalPhase(state);
   battle.defenderGroups.forEach(group => { group.zoneId = 'center'; });
   tactical.advanceTacticalPhase(state);
-  const main = battle.raiderGroups.find(group => group.kind === 'main');
-  assert.ok(main);
-  main.zoneId = 'storehouse';
-  battle.raiderGroups.filter(group => group !== main).forEach(group => { group.intent = 'withdraw'; });
+  const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
+  assert.ok(flanker);
+  flanker.zoneId = 'storehouse';
+  flanker.flankPlan = 'breakthrough';
+  flanker.rearAssault = false;
+  battle.raiderGroups.filter(group => group !== flanker).forEach(group => { group.intent = 'withdraw'; });
   assert.equal(tactical.resolveTacticalRound(state), null);
   const storehouseEvents = battle.pendingReport.events.filter(event => event.zoneId === 'storehouse');
   assert.ok(storehouseEvents.some(event => event.kind === 'advance' && event.text.includes('저항 없이')));

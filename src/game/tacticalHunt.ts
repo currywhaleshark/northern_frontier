@@ -472,7 +472,7 @@ export function chooseDefaultHuntCommands(battle: TacticalBattle): void {
 
 function addEvent(
   events: TacticalAnimationEvent[], zoneId: string, kind: TacticalAnimationEvent['kind'], text: string,
-  extra: Partial<Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'actorGroupIds' | 'casualties' | 'float' | 'shots' | 'meleeParticipants'>> = {},
+  extra: Partial<Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'actorGroupIds' | 'casualties' | 'wounded' | 'killed' | 'float' | 'shots' | 'meleeParticipants'>> = {},
 ): void {
   events.push({ zoneId, kind, text, durationMs: 650, ...extra });
 }
@@ -551,7 +551,7 @@ function beastAttack(
   target.killed += killed;
   target.wounded += wounded;
   addEvent(events, zoneId, 'casualty', `${target.label}에서 전사 ${killed}, 부상 ${wounded}명이 발생합니다.`, {
-    side: 'defender', groupId: target.id, casualties: losses,
+    side: 'defender', groupId: target.id, casualties: losses, wounded, killed,
     float: killed > 0 ? `전사 ${killed}·부상 ${wounded}` : `부상 ${wounded}`,
   });
   return { wounded, killed };
@@ -591,7 +591,7 @@ function applyWolfDamage(
     pack.killed += packKilled;
     killed += packKilled;
     if (packKilled > 0) addEvent(events, zoneId, 'casualty', `늑대 ${packKilled}마리가 쓰러집니다.`, {
-      side: 'raider', groupId: pack.id, casualties: packKilled, float: `-${packKilled}`,
+      side: 'raider', groupId: pack.id, casualties: packKilled, killed: packKilled, float: `-${packKilled}`,
     });
   }
   return killed;

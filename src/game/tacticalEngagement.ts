@@ -240,7 +240,7 @@ function animationEvent(
   kind: TacticalAnimationEvent['kind'],
   text: string,
   durationMs = 650,
-  extra?: Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'actorGroupIds' | 'casualties' | 'float' | 'shots' | 'meleeParticipants'>,
+  extra?: Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'actorGroupIds' | 'casualties' | 'wounded' | 'killed' | 'float' | 'shots' | 'meleeParticipants'>,
 ): TacticalAnimationEvent {
   return { zoneId, kind, text, durationMs, ...extra };
 }
@@ -448,20 +448,23 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
   const combatDefenders = defenders.filter(defender => defender.commandable !== false);
   const surpriseDefenders = defenders.filter(defender => defender.command === 'ambush' && defender.ambushed);
   const surpriseAttack = surpriseDefenders.length > 0;
-  const preDefenseEvents: TacticalAnimationEvent[] = [];
+  const friendlyActionEvents: TacticalAnimationEvent[] = [];
+  const enemyActionEvents: TacticalAnimationEvent[] = [];
+  const maneuverEvents: TacticalAnimationEvent[] = [];
+  const defenderCasualtyEvents: TacticalAnimationEvent[] = [];
+  const raiderCasualtyEvents: TacticalAnimationEvent[] = [];
   const preDefenseLines: string[] = [];
-  const postDefenseEvents: TacticalAnimationEvent[] = [];
   const afterConsequencesEvents: TacticalAnimationEvent[] = [];
   const confusedAttackerIds: string[] = [];
 
   if (surpriseAttack) {
-    preDefenseEvents.push(animationEvent(zone.id, 'ambush', '매복중이던 사냥꾼이 적의 측면을 급습합니다.'));
+    friendlyActionEvents.push(animationEvent(zone.id, 'ambush', '매복중이던 사냥꾼이 적의 측면을 급습합니다.'));
     const confusionChance = surpriseConfusionChance(zone, surpriseDefenders);
     for (const attacker of attackers) {
       if (attacker.confused || input.rng() >= confusionChance) continue;
       attacker.confused = true;
       confusedAttackerIds.push(attacker.id);
-      preDefenseEvents.push(animationEvent(
+      friendlyActionEvents.push(animationEvent(
         zone.id,
         'ambush',
         `${attacker.label}이(가) 급습에 주저앉아 이번 교전에서 행동하지 못합니다.`,
@@ -513,13 +516,13 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
 
   if (commands.includes('volley')) {
     const shots = tacticalDefenderShotCounts(defenders.filter(defender => defender.command === 'volley'));
-    preDefenseEvents.push(animationEvent(zone.id, 'volley', '활시위와 총성이 한꺼번에 터집니다.', 650, {
+    friendlyActionEvents.push(animationEvent(zone.id, 'volley', '활시위와 총성이 한꺼번에 터집니다.', 650, {
       side: 'defender', shots,
     }));
   }
   const raiderShots = tacticalRaiderShotCounts(attackers);
   if (defenders.length > 0 && (raiderShots.arrows ?? 0) + (raiderShots.muskets ?? 0) > 0) {
-    preDefenseEvents.push(animationEvent(zone.id, 'volley', '적 사격대가 방어선을 향해 일제히 사격합니다.', 650, {
+    enemyActionEvents.push(animationEvent(zone.id, 'volley', '적 사격대가 방어선을 향해 일제히 사격합니다.', 650, {
       side: 'raider', shots: { arrows: raiderShots.arrows, muskets: raiderShots.muskets },
     }));
   }
@@ -527,7 +530,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     const attackerCount = activeRaiderCount(attacker);
     if (attackerCount <= 0) continue;
     const continuing = (attacker.engagementsInZone ?? 0) > 0;
-    preDefenseEvents.push(animationEvent(
+    enemyActionEvents.push(animationEvent(
       zone.id,
       'melee',
       continuing
@@ -551,42 +554,41 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
         (attacker.unitType == null || !rangedWallUnits.has(attacker.unitType)))
       .sort((a, b) => b.power - a.power)[0];
     if (wallStriker) {
-      preDefenseEvents.push(animationEvent(zone.id, 'wallAssault',
+      enemyActionEvents.push(animationEvent(zone.id, 'wallAssault',
         `${wallStriker.label}이(가) 도끼와 장대로 목책을 거칠게 두드립니다.`, 580, {
           side: 'raider', groupId: wallStriker.id, float: '목책 타격!',
         }));
     }
   }
   if (commands.includes('fallback')) {
-    preDefenseEvents.push(animationEvent(zone.id, 'retreat', '수비대가 병력을 보존하며 다음 구역으로 물러납니다.'));
+    maneuverEvents.push(animationEvent(zone.id, 'retreat', '수비대가 병력을 보존하며 다음 구역으로 물러납니다.'));
   }
   if (commands.includes('advance')) {
-    preDefenseEvents.push(animationEvent(zone.id, 'advance', '수비대가 교전을 마친 뒤 앞선 방어선으로 전진할 채비를 합니다.', 520, {
+    maneuverEvents.push(animationEvent(zone.id, 'advance', '수비대가 교전을 마친 뒤 앞선 방어선으로 전진할 채비를 합니다.', 520, {
       side: 'defender', float: '전진 준비',
     }));
   }
   if (commands.includes('charge')) {
-    preDefenseEvents.push(animationEvent(zone.id, 'melee', '근접 수비대가 대열을 깨고 적진으로 돌격합니다.', 620, {
+    friendlyActionEvents.push(animationEvent(zone.id, 'melee', '근접 수비대가 대열을 깨고 적진으로 돌격합니다.', 620, {
       side: 'defender', actorGroupIds: chargingMelee.map(group => group.id),
       float: '돌격!', meleeParticipants: chargingMeleeCount + activeAttackerCount,
     }));
   }
   if (chargeOpensFlank) {
-    preDefenseEvents.push(animationEvent(zone.id, 'melee', '돌격대가 비운 전열의 틈으로 적이 파고들어 후열 원거리 병종을 우회 타격합니다.', 580, {
+    enemyActionEvents.push(animationEvent(zone.id, 'melee', '돌격대가 비운 전열의 틈으로 적이 파고들어 후열 원거리 병종을 우회 타격합니다.', 580, {
       side: 'raider', actorGroupIds: attackingMelee.map(group => group.id),
       float: '후열 노출!', meleeParticipants: exposedRangedCount + activeAttackerCount,
     }));
     preDefenseLines.push(`${zone.name}에서 근접대의 돌격으로 후열 원거리 병종이 우회 타격에 노출됐습니다.`);
   }
   if (!commands.includes('volley') && !surpriseAttack && !commands.includes('charge')) {
-    if (defenders.length === 0) {
-      preDefenseEvents.push(animationEvent(zone.id, 'advance', `적이 저항 없이 ${zone.name}을(를) 휩쓸고 지나갑니다.`, 560));
-    } else if (defenders.every(defender => defender.kind === 'civilian')) {
-      preDefenseEvents.push(animationEvent(zone.id, 'advance', '무장하지 못한 주민들이 비명을 지르며 전선 뒤로 흩어집니다.', 620, {
+    // Undefended lines get their sole presentation from the scheduled route movement below.
+    if (defenders.length > 0 && defenders.every(defender => defender.kind === 'civilian')) {
+      enemyActionEvents.push(animationEvent(zone.id, 'advance', '무장하지 못한 주민들이 비명을 지르며 전선 뒤로 흩어집니다.', 620, {
         side: 'defender', float: '주민 피난',
       }));
-    } else {
-      preDefenseEvents.push(animationEvent(zone.id, 'melee', '방어선에서 짧고 거친 백병전이 벌어집니다.', 650, {
+    } else if (defenders.length > 0) {
+      enemyActionEvents.push(animationEvent(zone.id, 'melee', '방어선에서 짧고 거친 백병전이 벌어집니다.', 650, {
         side: 'raider', actorGroupIds: attackingMelee.map(group => group.id),
         meleeParticipants: activeCombatDefenderCount + activeAttackerCount,
       }));
@@ -594,7 +596,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
   }
   if (zone.id === 'wall' && attackers.some(attacker =>
     attacker.unitType === 'court-artillery' && !attacker.confused)) {
-    preDefenseEvents.push(animationEvent(zone.id, 'artilleryHit', '토벌군 화포대의 포탄이 방책을 뒤흔듭니다.', 720, {
+    enemyActionEvents.push(animationEvent(zone.id, 'artilleryHit', '토벌군 화포대의 포탄이 방책을 뒤흔듭니다.', 720, {
       side: 'raider', float: '적 화포 사격!', shots: { cannons: raiderShots.cannons ?? 1 },
     }));
   }
@@ -676,28 +678,6 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     const killed = defenderDeaths[index];
     const wounded = defenderCasualties[index] - killed;
     defenderLosses.push({ groupId: defender.id, wounded, killed });
-    if (rearEngagement && defender.line === rearContactLine) {
-      rearAssaultCasualties += wounded + killed;
-    }
-    if (wounded + killed > 0) {
-      const parts = [killed > 0 ? `전사 ${killed}` : '', wounded > 0 ? `부상 ${wounded}` : ''].filter(Boolean);
-      preDefenseEvents.push(animationEvent(
-        zone.id,
-        'casualty',
-        `${defender.label}에서 전사 ${killed}, 부상 ${wounded}명이 발생했습니다.`,
-        520,
-        { side: 'defender', groupId: defender.id, casualties: wounded + killed, float: parts.join('·') },
-      ));
-    }
-  }
-  if (rearAssaultCasualties > 0) {
-    preDefenseLines.push(`후방 급습으로 후열에서 ${rearAssaultCasualties}명의 사상자가 발생해 마을 기세가 흔들렸습니다.`);
-  }
-  for (const loss of defenderLosses) {
-    const defender = defenders.find(group => group.id === loss.groupId);
-    if (!defender) continue;
-    defender.wounded += loss.wounded;
-    defender.killed += loss.killed;
   }
 
   const commandEdge = Math.max(
@@ -798,15 +778,123 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
       confused: attacker.confused === true,
     });
     if (killed > 0) {
-      postDefenseEvents.push(animationEvent(zone.id, 'casualty', `${attacker.label}에서 ${killed}명이 쓰러졌습니다.`, 480, {
-        side: 'raider', groupId: attacker.id, casualties: killed, float: `-${killed}`,
+      raiderCasualtyEvents.push(animationEvent(zone.id, 'casualty', `${attacker.label}에서 ${killed}명이 쓰러졌습니다.`, 480, {
+        side: 'raider', groupId: attacker.id, casualties: killed, killed, float: `-${killed}`,
       }));
     }
   }
 
+  for (const loss of raiderLosses) {
+    const attacker = attackers.find(group => group.id === loss.groupId);
+    if (!attacker) continue;
+    attacker.killed += loss.killed;
+    attacker.power = loss.powerAfter;
+  }
+  const postStrikeRawEnemyPower = attackers.reduce(
+    (sum, group) => sum + (group.confused || activeRaiderCount(group) <= 0
+      ? 0
+      : group.power * (group.morale / 100) * (group.combatMultiplier ?? 1) *
+        (tacticalTargetingRole(group) === 'melee' ? 1 : input.rangedEfficiency ?? 1)),
+    0,
+  );
+  const retaliationScale = rawEnemyPower > 0
+    ? clamp(postStrikeRawEnemyPower / rawEnemyPower, 0, 1)
+    : 0;
+  const adjustedDefenderCasualtyBudget = Math.min(
+    defenderCasualtyBudget,
+    Math.round(defenderCasualtyBudget * retaliationScale),
+  );
+  const adjustedDefenderCasualties = integerAllocation(
+    adjustedDefenderCasualtyBudget,
+    defenderCasualties,
+    defenderCapacities,
+    enemyTargetDemands.some(demand => demand > 0),
+  );
+  const adjustedDefenderDeathBudget = Math.min(
+    adjustedDefenderCasualtyBudget,
+    Math.round(defenderDeathBudget * retaliationScale),
+  );
+  const adjustedDefenderDeaths = integerAllocation(
+    adjustedDefenderDeathBudget,
+    defenderDeaths,
+    adjustedDefenderCasualties.map((casualties, index) =>
+      Math.min(casualties, Math.max(0, defenderRiskEntries[index].active - 1))),
+    enemyTargetDemands.some(demand => demand > 0),
+  );
+  defenderLosses.length = 0;
+  for (let index = 0; index < defenderRiskEntries.length; index += 1) {
+    const { defender } = defenderRiskEntries[index];
+    const killed = adjustedDefenderDeaths[index];
+    const wounded = adjustedDefenderCasualties[index] - killed;
+    defenderLosses.push({ groupId: defender.id, wounded, killed });
+    if (rearEngagement && defender.line === rearContactLine) {
+      rearAssaultCasualties += wounded + killed;
+    }
+    if (wounded + killed <= 0) continue;
+    const parts = [killed > 0 ? `전사 ${killed}` : '', wounded > 0 ? `부상 ${wounded}` : ''].filter(Boolean);
+    defenderCasualtyEvents.push(animationEvent(
+      zone.id,
+      'casualty',
+      `${defender.label}에서 전사 ${killed}, 부상 ${wounded}명이 발생했습니다.`,
+      520,
+      {
+        side: 'defender', groupId: defender.id, casualties: wounded + killed, wounded, killed,
+        float: parts.join('·'),
+      },
+    ));
+  }
+  if (rearAssaultCasualties > 0) {
+    preDefenseLines.push(`후방 급습으로 후열에서 ${rearAssaultCasualties}명의 사상자가 발생해 마을 기세가 흔들렸습니다.`);
+  }
+
+  const survivingAttackerIds = new Set(attackers
+    .filter(attacker => !attacker.confused && activeRaiderCount(attacker) > 0 && attacker.power > 0)
+    .map(attacker => attacker.id));
+  const survivingRaiderShots = tacticalRaiderShotCounts(attackers);
+  if (raiderCasualtyEvents.length > 0 && friendlyActionEvents.length === 0 && combatDefenders.length > 0) {
+    const counterActors = combatDefenders.filter(defender => activeDefenderCount(defender) > 0);
+    const counterMeleeActors = counterActors.filter(defender => tacticalGroupCapabilities(defender).has('melee'));
+    if (counterMeleeActors.length > 0) {
+      friendlyActionEvents.push(animationEvent(
+        zone.id,
+        'melee',
+        '근접 수비대가 달려드는 적을 맞받아칩니다.',
+        620,
+        {
+          side: 'defender', actorGroupIds: counterMeleeActors.map(defender => defender.id),
+          meleeParticipants: counterMeleeActors.reduce((sum, defender) => sum + activeDefenderCount(defender), 0) +
+            attackers.reduce((sum, attacker) => sum + activeRaiderCount(attacker), 0),
+        },
+      ));
+    } else {
+      const shots = tacticalDefenderShotCounts(counterActors);
+      friendlyActionEvents.push(animationEvent(
+        zone.id,
+        'volley',
+        '수비대가 접근하는 적을 향해 견제 사격을 퍼붓습니다.',
+        620,
+        { side: 'defender', shots },
+      ));
+    }
+  }
+  const resolvedEnemyActionEvents: TacticalAnimationEvent[] = [];
+  for (const currentEvent of enemyActionEvents) {
+    if (survivingAttackerIds.size === 0) continue;
+    if (currentEvent.groupId && !survivingAttackerIds.has(currentEvent.groupId)) continue;
+    const actorGroupIds = currentEvent.actorGroupIds?.filter(groupId => survivingAttackerIds.has(groupId));
+    if (currentEvent.actorGroupIds && actorGroupIds?.length === 0) continue;
+    if (currentEvent.kind === 'volley' && currentEvent.side === 'raider') {
+      const shots = { arrows: survivingRaiderShots.arrows, muskets: survivingRaiderShots.muskets };
+      if ((shots.arrows ?? 0) + (shots.muskets ?? 0) <= 0) continue;
+      resolvedEnemyActionEvents.push({ ...currentEvent, shots, actorGroupIds });
+      continue;
+    }
+    if (currentEvent.kind === 'artilleryHit' && (survivingRaiderShots.cannons ?? 0) <= 0) continue;
+    resolvedEnemyActionEvents.push({ ...currentEvent, actorGroupIds });
+  }
+
   const postLossPower = attackers.reduce((sum, attacker) => {
-    const loss = raiderLosses.find(candidate => candidate.groupId === attacker.id);
-    return sum + (loss?.powerAfter ?? attacker.power);
+    return sum + attacker.power;
   }, 0);
   const zoneRaiderWeight = postLossPower / input.roundStartingRaiderPower;
   const raiderMoraleDelta = -(defenseShare * 10 + (surpriseAttack ? 3 : 0) +
@@ -833,9 +921,15 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     raiderLosses,
     villageMoraleDelta,
     raiderMoraleDelta,
-    preDefenseEvents,
+    preDefenseEvents: [
+      ...friendlyActionEvents,
+      ...raiderCasualtyEvents,
+      ...resolvedEnemyActionEvents,
+      ...defenderCasualtyEvents,
+      ...maneuverEvents,
+    ],
     preDefenseLines,
-    postDefenseEvents,
+    postDefenseEvents: [],
     afterConsequencesEvents,
   };
 }
