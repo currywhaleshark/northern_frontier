@@ -93,7 +93,7 @@ export function WeaponAllocationDialog({ state, onAssign, onAutoAssign, onClear,
                     event.target.value ? event.target.value as CombatWeaponId : null,
                   )}
                 >
-                  <option value="">비무장</option>
+                  <option value="">기본 무장</option>
                   {COMBAT_WEAPON_IDS.map(weapon => (
                     <option
                       key={weapon}

@@ -60,6 +60,14 @@ export const TACTICAL_DEFENDER_WEAPON_POSE_SHEET = {
   src: '/assets/tactical/defender-weapons-poses-v2.png',
 } as const;
 
+export const TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET = {
+  spriteWidth: 84,
+  spriteHeight: 120,
+  columns: 6,
+  rows: 4,
+  src: '/assets/tactical/defender-default-weapons-poses-v1.png',
+} as const;
+
 export const TACTICAL_RAIDER_POSE_SHEET = {
   spriteWidth: 168,
   spriteHeight: 120,
@@ -89,15 +97,41 @@ const WEAPON_COLUMNS = {
   musket: 4,
 } as const;
 
+export type TacticalDefaultWeaponPose = 'bambooSpear' | 'farmTools' | 'watchmanBaton';
+
+const DEFAULT_WEAPON_COLUMNS: Readonly<Record<TacticalDefaultWeaponPose, number>> = {
+  bambooSpear: 0,
+  farmTools: 2,
+  watchmanBaton: 4,
+};
+
+export function tacticalDefaultWeaponPose(group: Pick<
+  import('../game/types').TacticalDefenderGroup,
+  'id' | 'role' | 'weapon'
+>): TacticalDefaultWeaponPose | null {
+  if (group.weapon != null) return null;
+  if (group.role === 'watchman') return 'watchmanBaton';
+  if (group.role !== 'militia') return null;
+  return group.id.includes('levy') || group.id.includes('mustered') ? 'farmTools' : 'bambooSpear';
+}
+
 export function tacticalDefenderPoseCell(
   role: import('../game/combatRoster').CombatRole,
   weapon: import('../game/types').CombatWeaponId | null,
   gender: 'male' | 'female',
   pose: TacticalSpritePose,
-): { sheet: 'roles' | 'weapons'; column: number; row: number } {
+  defaultWeapon: TacticalDefaultWeaponPose | null = null,
+): { sheet: 'roles' | 'weapons' | 'defaultWeapons'; column: number; row: number } {
   const genderOffset = gender === 'female' ? 1 : 0;
   if (weapon) {
     return { sheet: 'weapons', column: WEAPON_COLUMNS[weapon] + genderOffset, row: TACTICAL_POSE_ROWS[pose] };
+  }
+  if (defaultWeapon) {
+    return {
+      sheet: 'defaultWeapons',
+      column: DEFAULT_WEAPON_COLUMNS[defaultWeapon] + genderOffset,
+      row: TACTICAL_POSE_ROWS[pose],
+    };
   }
   return { sheet: 'roles', column: ROLE_COLUMNS[role] + genderOffset, row: TACTICAL_POSE_ROWS[pose] };
 }

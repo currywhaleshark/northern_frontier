@@ -29,6 +29,13 @@ const tacticalAssault = await import(pathToFileURL(join(compiledDir, 'tacticalAs
 const tacticalBattle = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
 const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
 
+assert.equal(capabilities.combatDefaultWeaponName('militia'), '죽창');
+assert.equal(capabilities.combatDefaultWeaponName('watchman'), '육모방망이');
+assert.equal(capabilities.combatDefaultWeaponName('hunter'), '사냥활');
+assert.equal(capabilities.combatGroupLabel('militia', null), '죽창 수비병');
+assert.equal(capabilities.combatGroupLabel('watchman', null), '육모방망이 파수꾼');
+assert.equal(capabilities.combatGroupLabel('hunter', null), '사냥활 사냥꾼');
+
 function reset(state) {
   for (const resident of state.residents) {
     resident.job = 'idle';

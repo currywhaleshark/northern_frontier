@@ -21,8 +21,27 @@ assert.deepEqual(assets.TACTICAL_POSE_ROWS, {
   wounded: 3,
 });
 
-assert.deepEqual(assets.tacticalDefenderPoseCell('watchman', null, 'male', 'attack'), {
-  sheet: 'roles', column: 4, row: 1,
+assert.equal(assets.TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET.src,
+  '/assets/tactical/defender-default-weapons-poses-v1.png');
+assert.equal(assets.tacticalDefaultWeaponPose({ id: 'militia-unarmed', role: 'militia', weapon: null }),
+  'bambooSpear');
+assert.equal(assets.tacticalDefaultWeaponPose({ id: 'militia-unarmed-levy', role: 'militia', weapon: null }),
+  'farmTools');
+assert.equal(assets.tacticalDefaultWeaponPose({ id: 'militia-unarmed-mustered', role: 'militia', weapon: null }),
+  'farmTools');
+assert.equal(assets.tacticalDefaultWeaponPose({ id: 'watchman-unarmed', role: 'watchman', weapon: null }),
+  'watchmanBaton');
+assert.equal(assets.tacticalDefaultWeaponPose({ id: 'hunter-unarmed', role: 'hunter', weapon: null }), null);
+assert.equal(assets.tacticalDefaultWeaponPose({ id: 'militia-spear', role: 'militia', weapon: 'spear' }), null);
+
+assert.deepEqual(assets.tacticalDefenderPoseCell('watchman', null, 'male', 'attack', 'watchmanBaton'), {
+  sheet: 'defaultWeapons', column: 4, row: 1,
+});
+assert.deepEqual(assets.tacticalDefenderPoseCell('militia', null, 'female', 'idle', 'bambooSpear'), {
+  sheet: 'defaultWeapons', column: 1, row: 0,
+});
+assert.deepEqual(assets.tacticalDefenderPoseCell('militia', null, 'male', 'wounded', 'farmTools'), {
+  sheet: 'defaultWeapons', column: 2, row: 3,
 });
 assert.deepEqual(assets.tacticalDefenderPoseCell('hunter', null, 'female', 'wounded'), {
   sheet: 'roles', column: 7, row: 3,
@@ -90,6 +109,10 @@ assert.match(screenSource, /weapon-\$\{group\.weapon \?\? 'unarmed'\}/,
   'defender sprites must expose their assigned weapon to visual sizing rules');
 assert.match(screenSource, /role-\$\{group\.role\}/,
   'defender sprites must expose their role to visual sizing rules');
+assert.match(screenSource, /tacticalDefaultWeaponPose\(group\)/,
+  'defender rendering must resolve role-specific default weapons from the live group');
+assert.match(screenSource, /TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET/,
+  'defender rendering must use the dedicated default weapon pose sheet');
 assert.match(tacticalCss, /\.tactical-defender\.role-watchman\s*\{\s*--defender-scale:\s*1\.08;/,
   'watchmen must be enlarged enough to match other human silhouettes');
 assert.match(tacticalCss, /\.tactical-defender\.weapon-spear\s*\{\s*--defender-scale:\s*1\.12;/,

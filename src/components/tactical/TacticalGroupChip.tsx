@@ -1,7 +1,10 @@
 import { combatSpriteDescriptor } from '../../game/combatCapabilities';
 import type { TacticalDefenderGroup } from '../../game/types';
 import {
-  TACTICAL_DEFENDER_ROLE_POSE_SHEET, TACTICAL_DEFENDER_WEAPON_POSE_SHEET,
+  TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET,
+  TACTICAL_DEFENDER_ROLE_POSE_SHEET,
+  TACTICAL_DEFENDER_WEAPON_POSE_SHEET,
+  tacticalDefaultWeaponPose,
   tacticalDefenderPoseCell,
 } from '../../render/tacticalCharacterAssets';
 
@@ -23,18 +26,22 @@ function DockDefenderSprite({ group, gender }: {
   gender: 'male' | 'female';
 }) {
   const descriptor = combatSpriteDescriptor(group.role, group.weapon);
+  const defaultWeapon = tacticalDefaultWeaponPose(group);
   const cell = tacticalDefenderPoseCell(
     group.role,
     descriptor.source === 'weapon' ? descriptor.id : null,
     gender,
     'idle',
+    defaultWeapon,
   );
   const sheet = cell.sheet === 'weapons'
     ? TACTICAL_DEFENDER_WEAPON_POSE_SHEET
-    : TACTICAL_DEFENDER_ROLE_POSE_SHEET;
+    : cell.sheet === 'defaultWeapons'
+      ? TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET
+      : TACTICAL_DEFENDER_ROLE_POSE_SHEET;
   return (
     <span
-      className={`tactical-sprite tactical-defender role-${group.role} weapon-${group.weapon ?? 'unarmed'} pose-idle`}
+      className={`tactical-sprite tactical-defender role-${group.role} weapon-${group.weapon ?? 'unarmed'} default-weapon-${defaultWeapon ?? 'none'} pose-idle`}
       style={{
         backgroundImage: `url(${sheet.src})`,
         backgroundPosition: `${-cell.column * sheet.spriteWidth}px ${-cell.row * sheet.spriteHeight}px`,

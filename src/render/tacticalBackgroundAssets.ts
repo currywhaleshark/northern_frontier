@@ -23,12 +23,29 @@ function offensivePanorama(kind: OffensiveBackgroundKind, season: Season): strin
   return `/assets/tactical/offensive-backgrounds/${family}-panorama-${season}-v1.webp`;
 }
 
+const HUNT_SECTOR_BACKGROUND_FAMILY: Readonly<Record<string, 'ridge' | 'brook' | 'ravine'>> = {
+  huntSectorRidge: 'ridge',
+  huntSectorBrook: 'brook',
+  huntSectorRavine: 'ravine',
+};
+
 export function tacticalBackgroundAsset(
   kind: TacticalZoneKind,
   season: Season,
   assaultKind?: OffensiveBackgroundKind,
   zoneOrder = 0,
+  zoneId?: string,
 ): TacticalBackgroundAsset {
+  const huntSectorFamily = assaultKind === 'predatorHunt' && zoneId
+    ? HUNT_SECTOR_BACKGROUND_FAMILY[zoneId]
+    : undefined;
+  if (huntSectorFamily) {
+    return {
+      src: `/assets/tactical/offensive-backgrounds/hunt-${huntSectorFamily}-${season}-v2.webp`,
+      size: 'cover',
+      position: 'center center',
+    };
+  }
   if (assaultKind) {
     return {
       src: offensivePanorama(assaultKind, season),

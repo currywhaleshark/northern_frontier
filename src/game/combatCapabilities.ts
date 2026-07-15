@@ -60,6 +60,13 @@ export function combatSpriteDescriptor(
   return weapon ? { source: 'weapon', id: weapon } : { source: 'role', id: role };
 }
 
+export function combatDefaultWeaponName(role: CombatRole): string {
+  if (role === 'militia') return '죽창';
+  if (role === 'watchman') return '육모방망이';
+  if (role === 'hunter') return '사냥활';
+  return '생활 도구';
+}
+
 export function combatGroupLabel(role: CombatRole, weapon: CombatWeaponId | null): string {
   const roleName: Record<CombatRole, string> = {
     militia: '수비병', watchman: '파수꾼', hunter: '사냥꾼', civilian: '민간인',
@@ -67,7 +74,9 @@ export function combatGroupLabel(role: CombatRole, weapon: CombatWeaponId | null
   const weaponName: Record<CombatWeaponId, string> = {
     musket: '조총', hornBow: '각궁', spear: '창',
   };
-  return weapon ? `${weaponName[weapon]} ${roleName[role]}` : `비무장 ${roleName[role]}`;
+  if (weapon) return `${weaponName[weapon]} ${roleName[role]}`;
+  if (role === 'civilian') return roleName.civilian;
+  return `${combatDefaultWeaponName(role)} ${roleName[role]}`;
 }
 
 export function tacticalGroupCapabilities(group: {

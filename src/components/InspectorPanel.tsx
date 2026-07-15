@@ -22,6 +22,7 @@ import { availablePredatorScouts, predatorScoutDuration } from '../game/expediti
 import { SPECIAL_ITEM_DEFS } from '../game/specialItems';
 import { foreignSiteAt } from '../game/foreignSites';
 import { COMBAT_WEAPON_NAMES } from '../game/weapons';
+import { combatDefaultWeaponName } from '../game/combatCapabilities';
 import type { SiteGiftType } from '../game/siteDiplomacy';
 import type { GameState, JobId, Resident, ResourceId, SmithyProductId, SpecialItemId, WildlifeKind } from '../game/types';
 import { FactionName } from './FactionName';
@@ -400,7 +401,7 @@ function ResidentDetail({ state, r, rank, onSetJob, onToggleCart }: {
             <td>전투 무기</td>
             <td>{state.weaponAssignments[r.id]
               ? COMBAT_WEAPON_NAMES[state.weaponAssignments[r.id]!]
-              : '비무장'}</td>
+              : `${combatDefaultWeaponName(r.job)} (기본 무장)`}</td>
           </tr>
         )}
         <tr><td>현재 작업</td><td>{r.task}</td></tr>

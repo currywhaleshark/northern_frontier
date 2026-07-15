@@ -19,12 +19,14 @@ import type {
 import { tacticalBackgroundAsset } from '../../render/tacticalBackgroundAssets';
 import {
   TACTICAL_COURT_POSE_SHEET,
+  TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET,
   TACTICAL_DEFENDER_ROLE_POSE_SHEET,
   TACTICAL_DEFENDER_WEAPON_POSE_SHEET,
   TACTICAL_RAIDER_POSE_SHEET,
   tacticalBeastSheet,
   tacticalCourtMuzzleAnchor,
   tacticalCourtPoseCell,
+  tacticalDefaultWeaponPose,
   tacticalDefenderMuzzleAnchor,
   tacticalDefenderPoseCell,
   tacticalRaiderPoseCell,
@@ -118,21 +120,25 @@ function DefenderSprite({ group, gender, pose = 'idle', firing = false, faded = 
 }) {
   const descriptor = combatSpriteDescriptor(group.role, group.weapon);
   const resolvedPose = falling ? 'hurt' : pose;
+  const defaultWeapon = tacticalDefaultWeaponPose(group);
   const cell = tacticalDefenderPoseCell(
     group.role,
     descriptor.source === 'weapon' ? descriptor.id : null,
     gender,
     resolvedPose,
+    defaultWeapon,
   );
   const muzzleAnchor = firing && resolvedPose === 'attack'
     ? tacticalDefenderMuzzleAnchor(group.weapon, gender)
     : null;
   const sheet = cell.sheet === 'weapons'
     ? TACTICAL_DEFENDER_WEAPON_POSE_SHEET
-    : TACTICAL_DEFENDER_ROLE_POSE_SHEET;
+    : cell.sheet === 'defaultWeapons'
+      ? TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET
+      : TACTICAL_DEFENDER_ROLE_POSE_SHEET;
   return (
     <span
-      className={`tactical-sprite tactical-defender role-${group.role} weapon-${group.weapon ?? 'unarmed'} pose-${resolvedPose}${faded ? ' faded' : ''}${falling ? ' falling' : ''}`}
+      className={`tactical-sprite tactical-defender role-${group.role} weapon-${group.weapon ?? 'unarmed'} default-weapon-${defaultWeapon ?? 'none'} pose-${resolvedPose}${faded ? ' faded' : ''}${falling ? ' falling' : ''}`}
       style={{
         backgroundImage: `url(${sheet.src})`,
         backgroundPosition: `${-cell.column * sheet.spriteWidth}px ${-cell.row * sheet.spriteHeight}px`,
@@ -612,7 +618,7 @@ export function TacticalZoneColumn({
   const projectileMovesRight = activeEvent?.direction === 'rear'
     ? !frontalProjectileMovesRight
     : frontalProjectileMovesRight;
-  const background = tacticalBackgroundAsset(zone.kind, season, battle.assaultKind, zone.order);
+  const background = tacticalBackgroundAsset(zone.kind, season, battle.assaultKind, zone.order, zone.id);
   const scars = Math.min(9, scarCount);
   const liveBreachEventIndex = battle.phase === 'simulating'
     ? battle.pendingReport?.events.findIndex(item =>

@@ -191,7 +191,7 @@ export function ExpeditionMusterDialog({
           <strong>조총 준비 {remainingWeapons.readyMuskets} / 배정 {remainingWeapons.assignedMuskets}</strong>
           <strong>각궁 {remainingWeapons.hornBows}</strong>
           <strong>창 {remainingWeapons.spears}</strong>
-          <strong>비무장 {remainingWeapons.unarmed}</strong>
+          <strong>기본 무장 {remainingWeapons.unarmed}</strong>
           {remainingWeapons.dryMuskets > 0 && (
             <em>화약 부족으로 {remainingWeapons.dryMuskets}명은 기본 전력만 발휘</em>
           )}
@@ -243,7 +243,7 @@ export function ExpeditionMusterDialog({
                           event.target.value ? event.target.value as CombatWeaponId : null,
                         )}
                       >
-                        <option value="">비무장</option>
+                        <option value="">기본 무장</option>
                         {COMBAT_WEAPON_IDS.map(weapon => (
                           <option
                             key={weapon}
