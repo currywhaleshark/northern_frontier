@@ -37,6 +37,36 @@ const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).h
 const weapons = await import(pathToFileURL(join(compiledDir, 'weapons.mjs')).href);
 const intel = await import(pathToFileURL(join(compiledDir, 'expeditionIntel.mjs')).href);
 const specialEvents = await import(pathToFileURL(join(compiledDir, 'specialEvents.mjs')).href);
+const config = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
+const tacticalHunt = await import(pathToFileURL(join(compiledDir, 'tacticalHunt.mjs')).href);
+
+{
+  const hunt = config.CONFIG.tacticalBattle.hunt;
+  assert.equal(hunt.maxEngagements, 5);
+  assert.equal(hunt.baitMeatCost, 3);
+  assert.deepEqual(hunt.ambush.tigerHitChance, { base: 0.68, min: 0.46, max: 0.92 });
+  assert.deepEqual(hunt.ambush.wolfHitChance, {
+    base: 0.31, packThreshold: 3, perExtraBeast: 0.035, min: 0.28, max: 0.64,
+  });
+  assert.deepEqual(hunt.ambush.spearWallMultiplier, { tiger: 0.38, wolf: 0.55 });
+  assert.equal(hunt.ambush.splitDriversHitMultiplier, 1.35);
+  assert.deepEqual(hunt.encirclement, {
+    baseGain: 7,
+    perDriver: 1.8,
+    hunterSkillMultiplier: 12,
+    wolfBaseMultiplier: 1.16,
+    wolfPackThreshold: 3,
+    wolfPenaltyPerExtraBeast: 0.038,
+    wolfMinMultiplier: 0.82,
+    wolfMaxMultiplier: 1.16,
+    splitDriversMultiplier: 1.42,
+    fallbackMultiplier: 0.55,
+    minimumGain: 2,
+  });
+  assert.deepEqual(hunt.rehideChance, { tiger: 0.46, greatTiger: 0.38, mountainLord: 0.30 });
+  assert.equal(hunt.rehideEncirclementMax, 70);
+  assert.equal(tacticalHunt.huntMaxRounds(), hunt.maxEngagements);
+}
 
 function targets(state) {
   const center = state.buildings.find(building => building.type === 'center' && building.built);
@@ -98,6 +128,37 @@ function prepareHunt(seed, kind, threatProfile = {}) {
   engagement.resolveExpeditionEngagementChoice(state, 'direct', () => 0);
   assert.ok(state.tacticalBattle);
   return { state, battle: state.tacticalBattle, members, outsider };
+}
+
+function prepareUniformHunterGroup(seed, count, weapon = null) {
+  const state = simulation.newGame(seed);
+  for (const resident of state.residents) {
+    resident.job = 'idle';
+    resident.sick = false;
+    resident.health = 100;
+    resident.quarantinedUntil = 0;
+  }
+  const members = state.residents.slice(0, count);
+  members.forEach(resident => { resident.job = weapon ? 'militia' : 'hunter'; });
+  state.resources.muskets = weapon === 'musket' ? count : 0;
+  state.resources.gunpowder = 20;
+  weapons.clearWeaponAssignments(state);
+  if (weapon) members.forEach(resident => assert.equal(weapons.setResidentWeapon(state, resident.id, weapon), null));
+  state.incidents.predatorThreats.wolf = { kind: 'wolf', untilDay: state.day + 12, size: 6, strength: 52 };
+  createReachableExpedition(state, {
+    kind: 'predatorHunt', predatorKind: 'wolf', memberIds: members.map(member => member.id),
+  });
+  reachEngagement(state);
+  engagement.maybeOpenExpeditionEngagementChoice(state);
+  engagement.resolveExpeditionEngagementChoice(state, 'direct', () => 0);
+  assert.ok(state.tacticalBattle);
+  return { state, battle: state.tacticalBattle, members };
+}
+
+function enterDeployment(state) {
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  if (state.tacticalBattle.phase === 'preparationExecution') assert.equal(tactical.advanceTacticalPhase(state), null);
+  assert.equal(state.tacticalBattle.phase, 'deployment');
 }
 
 {
@@ -180,6 +241,84 @@ function finishBattle(state) {
   assert.equal(battle.huntPredatorState, 'revealed');
   assert.equal(state.resources.meat, meatBefore - 3);
   assert.ok((battle.huntEncirclement ?? 0) >= 12);
+}
+
+{
+  const { state, battle, members } = prepareUniformHunterGroup(2026071512, 3);
+  assert.equal(battle.defenderGroups.length, 1, 'same-role hunters begin as one tactical group');
+  const original = battle.defenderGroups[0];
+  assert.equal(original.count, 3);
+  assert.equal(original.huntOriginGroupId, original.id);
+  assert.equal(battle.huntDetachmentSerial, 0);
+  const originalPower = original.power;
+  const originalIds = [...original.residentIds].sort((a, b) => a - b);
+  enterDeployment(state);
+
+  assert.equal(tacticalHunt.splitHuntGroup(state, original.id, 1), null);
+  assert.equal(tacticalHunt.splitHuntGroup(state, original.id, 1), null);
+  assert.equal(battle.defenderGroups.length, 3);
+  assert.equal(battle.huntDetachmentSerial, 2);
+  assert.deepEqual(battle.defenderGroups.map(group => group.count).sort(), [1, 1, 1]);
+  assert.deepEqual(
+    battle.defenderGroups.flatMap(group => group.residentIds).sort((a, b) => a - b),
+    originalIds,
+    'splitting neither duplicates nor loses expedition residents',
+  );
+  assert.equal(new Set(battle.defenderGroups.flatMap(group => group.residentIds)).size, members.length);
+  assert.ok(Math.abs(battle.defenderGroups.reduce((sum, group) => sum + group.power, 0) - originalPower) < 1e-9);
+  assert.ok(battle.defenderGroups.every(group => group.huntOriginGroupId === original.id));
+  assert.deepEqual(battle.defenderGroups.map(group => group.label).sort(), [
+    `${original.label.replace(/ [A-Z]조$/, '')} A조`,
+    `${original.label.replace(/ [A-Z]조$/, '')} B조`,
+    `${original.label.replace(/ [A-Z]조$/, '')} C조`,
+  ]);
+
+  assert.equal(saveLoad.saveGame(state), true);
+  const loaded = saveLoad.loadGame();
+  assert.equal(loaded?.tacticalBattle?.huntDetachmentSerial, 2);
+  assert.deepEqual(
+    loaded?.tacticalBattle?.defenderGroups.map(group => group.huntOriginGroupId),
+    battle.defenderGroups.map(group => group.huntOriginGroupId),
+  );
+
+  const source = battle.defenderGroups.find(group => group.id !== original.id);
+  assert.ok(source);
+  assert.equal(tacticalHunt.mergeHuntGroups(state, original.id, source.id), null);
+  assert.equal(battle.defenderGroups.length, 2);
+  assert.equal(battle.defenderGroups.reduce((sum, group) => sum + group.count, 0), 3);
+  assert.ok(Math.abs(battle.defenderGroups.reduce((sum, group) => sum + group.power, 0) - originalPower) < 1e-9);
+
+  const unrelated = battle.defenderGroups.find(group => group.id !== original.id);
+  assert.ok(unrelated);
+  unrelated.huntOriginGroupId = 'different-origin';
+  assert.match(tacticalHunt.mergeHuntGroups(state, original.id, unrelated.id), /같은 원래 조/);
+  unrelated.huntOriginGroupId = original.id;
+
+  battle.assaultKind = 'banditLair';
+  assert.match(tacticalHunt.splitHuntGroup(state, original.id, 1), /맹수 사냥/);
+  battle.assaultKind = 'predatorHunt';
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  assert.match(tacticalHunt.splitHuntGroup(state, original.id, 1), /배치 단계/);
+}
+
+{
+  const { state, battle } = prepareUniformHunterGroup(2026071513, 3, 'musket');
+  const group = battle.defenderGroups[0];
+  assert.equal(group.readyMuskets, 3);
+  enterDeployment(state);
+  assert.equal(tacticalHunt.splitHuntGroup(state, group.id, 1), null);
+  assert.equal(tacticalHunt.splitHuntGroup(state, group.id, 1), null);
+  assert.equal(battle.defenderGroups.reduce((sum, candidate) => sum + (candidate.readyMuskets ?? 0), 0), 3,
+    'musket readiness is reallocated without changing its total');
+}
+
+{
+  const { state, battle } = prepareUniformHunterGroup(2026071514, 2);
+  const group = battle.defenderGroups[0];
+  enterDeployment(state);
+  assert.equal(tacticalHunt.splitHuntGroup(state, group.id, 1), null);
+  assert.equal(battle.defenderGroups.length, 2);
+  assert.match(tacticalHunt.splitHuntGroup(state, group.id, 1), /최소 2명/);
 }
 
 {

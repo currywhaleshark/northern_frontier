@@ -700,6 +700,7 @@ export interface TacticalDefenderGroup {
   ambushed?: boolean;
   commandable?: boolean;
   lockedZoneId?: string;
+  huntOriginGroupId?: string;
 }
 
 export interface TacticalRaiderGroup {
@@ -918,6 +919,7 @@ export interface TacticalBattle {
   huntBaitPlaced?: boolean;
   huntLeaderKilled?: boolean;
   huntWithdrawn?: boolean;
+  huntDetachmentSerial?: number;
   preliminaryBombardmentCannons?: number;
   preliminaryBombardmentCasualties?: number;
   resourceSnapshot?: Partial<Record<ResourceId, number>>;

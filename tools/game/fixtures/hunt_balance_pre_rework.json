@@ -1,0 +1,21 @@
+{
+  "recordedAtCommit": "aad40b9",
+  "runsPerCohort": 40,
+  "seedBase": 2026071500,
+  "weather": "clear",
+  "season": "autumn",
+  "results": [
+    { "predator": "tiger", "partySize": 2, "killRate": 0, "repelRate": 0, "escapeRate": 0.375, "defeatRate": 0.625, "averageCasualties": 1.625, "averageRounds": 3.925 },
+    { "predator": "tiger", "partySize": 4, "killRate": 0.025, "repelRate": 0, "escapeRate": 0.85, "defeatRate": 0.125, "averageCasualties": 2.25, "averageRounds": 4.925 },
+    { "predator": "tiger", "partySize": 6, "killRate": 0.075, "repelRate": 0, "escapeRate": 0.925, "defeatRate": 0, "averageCasualties": 2.15, "averageRounds": 5 },
+    { "predator": "greatTiger", "partySize": 2, "killRate": 0, "repelRate": 0, "escapeRate": 0.3, "defeatRate": 0.7, "averageCasualties": 1.65, "averageRounds": 3.775 },
+    { "predator": "greatTiger", "partySize": 4, "killRate": 0, "repelRate": 0, "escapeRate": 0.775, "defeatRate": 0.225, "averageCasualties": 3, "averageRounds": 4.95 },
+    { "predator": "greatTiger", "partySize": 6, "killRate": 0, "repelRate": 0, "escapeRate": 0.9, "defeatRate": 0.1, "averageCasualties": 2.95, "averageRounds": 5 },
+    { "predator": "mountainLord", "partySize": 2, "killRate": 0, "repelRate": 0, "escapeRate": 0.225, "defeatRate": 0.775, "averageCasualties": 1.775, "averageRounds": 3.55 },
+    { "predator": "mountainLord", "partySize": 4, "killRate": 0, "repelRate": 0, "escapeRate": 0.45, "defeatRate": 0.55, "averageCasualties": 3.4, "averageRounds": 4.725 },
+    { "predator": "mountainLord", "partySize": 6, "killRate": 0, "repelRate": 0, "escapeRate": 0.975, "defeatRate": 0.025, "averageCasualties": 3, "averageRounds": 5 },
+    { "predator": "wolfPack6", "partySize": 2, "killRate": 0, "repelRate": 0, "escapeRate": 0.55, "defeatRate": 0.45, "averageCasualties": 1.4, "averageRounds": 4.15 },
+    { "predator": "wolfPack6", "partySize": 4, "killRate": 0, "repelRate": 0, "escapeRate": 0.975, "defeatRate": 0.025, "averageCasualties": 1.5, "averageRounds": 4.975 },
+    { "predator": "wolfPack6", "partySize": 6, "killRate": 0, "repelRate": 0, "escapeRate": 1, "defeatRate": 0, "averageCasualties": 1.425, "averageRounds": 5 }
+  ]
+}

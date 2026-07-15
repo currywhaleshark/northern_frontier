@@ -2365,6 +2365,29 @@ html, body, #root {
   gap: 10px;
   margin-top: 7px;
 }
+
+.tactical-hunt-split-guide {
+  padding: 8px 10px;
+  border: 1px solid rgba(202, 161, 84, 0.45);
+  border-radius: 6px;
+  color: #e8cf9a;
+  background: rgba(89, 57, 24, 0.28);
+  font-size: 0.82rem;
+}
+
+.tactical-hunt-detachment-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 8px 0;
+}
+
+.tactical-hunt-detachment-controls > strong {
+  margin-right: 3px;
+  color: #ddc89a;
+  font-size: 0.82rem;
+}
 .tactical-deploy-row > strong { color: #ead8ac; font-size: 12px; }
 
 .tactical-simulating {

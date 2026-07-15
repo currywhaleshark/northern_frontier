@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const screenSource = readFileSync(new URL('../../src/components/TacticalBattleScreen.tsx', import.meta.url), 'utf8');
+const appSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
 const zoneSource = readFileSync(new URL('../../src/components/tactical/TacticalZoneColumn.tsx', import.meta.url), 'utf8');
 const chipSource = readFileSync(new URL('../../src/components/tactical/TacticalGroupChip.tsx', import.meta.url), 'utf8');
 const planSource = readFileSync(new URL('../../src/components/tactical/EnemyPlanPanel.tsx', import.meta.url), 'utf8');
@@ -66,6 +67,15 @@ assert.match(chipSource, /자동/, 'automatic target state must be explicit');
 assert.match(screenSource, /자동 표적/, 'the command panel must provide an explicit automatic-target button');
 assert.match(screenSource, /onSetGroupTarget/, 'the screen must update one friendly group target at a time');
 assert.doesNotMatch(screenSource, /focusTargetGroupId/, 'the current UI must not use the legacy zone focus target');
+assert.match(screenSource, /onSplitHuntGroup/, 'the hunt deployment UI must expose group splitting');
+assert.match(screenSource, /onMergeHuntGroups/, 'the hunt deployment UI must expose detachment merging');
+assert.match(screenSource, /1명 분리/, 'the selected hunt group must offer a one-person detachment');
+assert.match(screenSource, /반으로 나누기/, 'the selected hunt group must offer a half-group detachment');
+assert.match(screenSource, /같은 조 합류/, 'compatible hunt detachments must offer merging');
+assert.match(screenSource, /길목을 모두 막으려면 조를 나누십시오/,
+  'undersized hunt deployment must explain why detachments matter');
+assert.match(appSource, /splitHuntGroup/, 'App must route hunt split actions into game state');
+assert.match(appSource, /mergeHuntGroups/, 'App must route hunt merge actions into game state');
 
 const threeLineToggleCount = [...screenSource.matchAll(/\['front', 'middle', 'rear'\] as const/g)].length;
 assert.equal(threeLineToggleCount, 2, 'deployment and command controls must both expose three formation lines');

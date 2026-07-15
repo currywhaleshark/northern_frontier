@@ -31,6 +31,8 @@ interface Props {
   onSpendPreparation: (actionId: PreparationActionId) => void;
   onAdvancePhase: () => void;
   onAssignGroup: (groupId: string, zoneId: string) => void;
+  onSplitHuntGroup: (groupId: string, detachCount: number) => void;
+  onMergeHuntGroups: (destinationGroupId: string, sourceGroupId: string) => void;
   onSetFormationLine: (groupId: string, line: TacticalFormationLine) => void;
   onSetCommand: (groupId: string, command: TacticalCommandId) => void;
   onSetGroupTarget: (defenderGroupId: string, enemyGroupId: string | null) => void;
@@ -231,6 +233,8 @@ export function TacticalBattleScreen({
   onSpendPreparation,
   onAdvancePhase,
   onAssignGroup,
+  onSplitHuntGroup,
+  onMergeHuntGroups,
   onSetFormationLine,
   onSetCommand,
   onSetGroupTarget,
@@ -389,6 +393,19 @@ export function TacticalBattleScreen({
   const assault = battle.orientation === 'assault';
   const hunt = battle.assaultKind === 'predatorHunt';
   const lairAssault = assault && !hunt;
+  const mergeableHuntGroups = hunt && selectedGroup
+    ? battle.defenderGroups.filter(group =>
+      group.id !== selectedGroup.id &&
+      group.huntOriginGroupId === selectedGroup.huntOriginGroupId &&
+      group.role === selectedGroup.role &&
+      group.weapon === selectedGroup.weapon &&
+      group.zoneId === selectedGroup.zoneId &&
+      group.wounded === 0 && group.killed === 0)
+    : [];
+  const huntNeedsMoreGroups = hunt && battle.defenderGroups.reduce(
+    (sum, group) => sum + tacticalActiveDefenderCount(group),
+    0,
+  ) >= 3 && battle.defenderGroups.filter(group => tacticalActiveDefenderCount(group) > 0).length < 3;
   const roundLimit = hunt ? huntMaxRounds() : assault ? assaultMaxRounds() : 5;
   const commandable = battle.phase === 'command' || battle.phase === 'deployment';
   const pendingCommandCount = pendingTacticalCommandCount(battle.defenderGroups);
@@ -674,6 +691,39 @@ export function TacticalBattleScreen({
                 selectedGroupId={selectedGroup.id}
                 onSelect={selectGroup}
               />
+              {huntNeedsMoreGroups && (
+                <div className="tactical-hunt-split-guide" role="status">
+                  길목을 모두 막으려면 조를 나누십시오. 얇은 분견대는 급습에 더 취약합니다.
+                </div>
+              )}
+              {hunt && (
+                <div className="tactical-hunt-detachment-controls" role="group" aria-label="사냥대 분견대 편성">
+                  <strong>분견대 편성</strong>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={selectedGroup.count < 2 || selectedGroup.wounded > 0 || selectedGroup.killed > 0}
+                    title={selectedGroup.count < 2 ? '최소 2명인 조만 나눌 수 있습니다.' : '선택한 조에서 1명을 분리합니다.'}
+                    onClick={() => onSplitHuntGroup(selectedGroup.id, 1)}
+                  >1명 분리</button>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={selectedGroup.count < 2 || selectedGroup.wounded > 0 || selectedGroup.killed > 0}
+                    title={selectedGroup.count < 2 ? '최소 2명인 조만 나눌 수 있습니다.' : '선택한 조를 가능한 한 반으로 나눕니다.'}
+                    onClick={() => onSplitHuntGroup(selectedGroup.id, Math.floor(selectedGroup.count / 2))}
+                  >반으로 나누기</button>
+                  {mergeableHuntGroups.map(group => (
+                    <button
+                      type="button"
+                      className="btn"
+                      key={group.id}
+                      title={`${group.label}을(를) 선택한 조에 합칩니다.`}
+                      onClick={() => onMergeHuntGroups(selectedGroup.id, group.id)}
+                    >같은 조 합류 · {group.label}</button>
+                  ))}
+                </div>
+              )}
               <div className="tactical-deploy-row">
                 <strong>{selectedGroup.label}{selectedGroup.ambushed && <em className="tactical-state-badge ambushed">매복중</em>}</strong>
                 <div className="tactical-zone-buttons" aria-label={`${selectedGroup.label} 배치 구역 선택`}>

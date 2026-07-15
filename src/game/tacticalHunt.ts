@@ -18,8 +18,7 @@ import type {
   TacticalBattleZone, TacticalCommandId, TacticalDefenderGroup, TacticalRaiderGroup, TacticalRoundReport, TigerTier,
 } from './types';
 
-const HUNT_MAX_ENGAGEMENTS = 5;
-const BAIT_MEAT_COST = 3;
+const HUNT_CONFIG = CONFIG.tacticalBattle.hunt;
 const HUNT_PREPARATIONS: Array<{ id: PreparationActionId; label: string; cost: number }> = [
   { id: 'setHuntTraps', label: '함정 설치', cost: 2 },
   { id: 'placeBait', label: '미끼 놓기', cost: 1 },
@@ -108,6 +107,7 @@ function renameHuntGroups(groups: TacticalDefenderGroup[]): void {
     group.label = combatGroupLabel(group.role, group.weapon);
     group.zoneId = 'huntTracks';
     group.command = null;
+    group.huntOriginGroupId = group.id;
   });
 }
 
@@ -169,6 +169,7 @@ export function createPredatorTacticalHunt(state: GameState): TacticalBattle | s
     huntTrapSet: false,
     huntBaitPlaced: false,
     huntLeaderKilled: false,
+    huntDetachmentSerial: 0,
     resourceSnapshot: captureTacticalResources(state),
   };
   state.tacticalBattle = battle;
@@ -181,7 +182,9 @@ export function huntPreparationUnavailableReason(state: GameState, actionId: Pre
   const battle = state.tacticalBattle;
   if (!battle || battle.assaultKind !== 'predatorHunt') return '진행 중인 맹수 사냥이 없습니다.';
   if (!HUNT_PREPARATIONS.some(action => action.id === actionId)) return '이 준비는 몰이사냥에서 사용할 수 없습니다.';
-  if (actionId === 'placeBait' && state.resources.meat < BAIT_MEAT_COST) return `미끼로 쓸 고기 ${BAIT_MEAT_COST}이 필요합니다.`;
+  if (actionId === 'placeBait' && state.resources.meat < HUNT_CONFIG.baitMeatCost) {
+    return `미끼로 쓸 고기 ${HUNT_CONFIG.baitMeatCost}이 필요합니다.`;
+  }
   if (actionId === 'setHuntTraps' && !battle.defenderGroups.some(group => group.role === 'hunter' || group.role === 'watchman')) {
     return '함정을 놓을 사냥꾼이나 파수꾼이 없습니다.';
   }
@@ -226,7 +229,7 @@ export function advanceHuntPhase(state: GameState): string | null {
         battle.huntTrapSet = true;
         prepEvent(events, 'huntDrive', 'prepareAmbush', '짐승이 지날 만한 좁은 길목에 덫과 올가미를 숨깁니다.');
       } else if (action.id === 'placeBait') {
-        state.resources.meat = Math.max(0, state.resources.meat - BAIT_MEAT_COST);
+        state.resources.meat = Math.max(0, state.resources.meat - HUNT_CONFIG.baitMeatCost);
         battle.huntBaitPlaced = true;
         battle.huntPredatorState = 'revealed';
         battle.raiderGroups.forEach(group => { group.revealed = true; });
@@ -265,6 +268,121 @@ export function assignHuntGroup(state: GameState, groupId: string, zoneId: strin
   if (!zone) return '사냥 구역을 찾을 수 없습니다.';
   if (zone.order > currentOrder) return '아직 몰아넣지 못한 안쪽 구역에는 배치할 수 없습니다.';
   group.zoneId = zoneId;
+  return null;
+}
+
+function huntGroupBaseLabel(group: TacticalDefenderGroup): string {
+  return group.label.replace(/ [A-Z]조$/u, '');
+}
+
+function relabelHuntOriginGroups(battle: TacticalBattle, originGroupId: string): void {
+  const siblings = battle.defenderGroups
+    .filter(group => group.huntOriginGroupId === originGroupId)
+    .sort((left, right) => left.id.localeCompare(right.id));
+  if (siblings.length === 0) return;
+  const baseLabel = huntGroupBaseLabel(siblings[0]);
+  siblings.forEach((group, index) => {
+    const suffix = index < 26 ? String.fromCharCode(65 + index) : String(index + 1);
+    group.label = siblings.length === 1 ? baseLabel : `${baseLabel} ${suffix}조`;
+  });
+}
+
+function reallocateHuntMusketReadiness(state: GameState, battle: TacticalBattle): void {
+  const musketGroups = battle.defenderGroups.filter(group => group.weapon === 'musket' && activeCount(group) > 0);
+  const readiness = allocateMusketReadiness(
+    state,
+    musketGroups.map(group => ({ id: group.id, residentIds: group.residentIds })),
+    CONFIG.raid.powderPerMusket,
+  );
+  for (const group of battle.defenderGroups) {
+    if (group.weapon === 'musket') group.readyMuskets = readiness.byGroup[group.id] ?? 0;
+  }
+}
+
+export function splitHuntGroup(state: GameState, groupId: string, detachCount: number): string | null {
+  const battle = state.tacticalBattle;
+  if (!battle || battle.assaultKind !== 'predatorHunt') return '맹수 사냥 전투에서만 분견대를 나눌 수 있습니다.';
+  if (battle.phase !== 'deployment' || battle.round !== 1 || battle.reports.length > 0) {
+    return '첫 교전 전 배치 단계에서만 분견대를 나눌 수 있습니다.';
+  }
+  const group = battle.defenderGroups.find(candidate => candidate.id === groupId);
+  if (!group) return '나눌 사냥대 조를 찾을 수 없습니다.';
+  if (group.commandable === false || activeCount(group) <= 0) return '전투 가능한 사냥대 조만 나눌 수 있습니다.';
+  if (group.wounded > 0 || group.killed > 0) return '사상자가 생긴 조는 분견대로 나눌 수 없습니다.';
+  if (!Number.isInteger(detachCount) || detachCount < 1) return '분리할 인원은 1명 이상이어야 합니다.';
+  if (group.count < 2 || detachCount >= group.count) return '최소 2명인 조에서 원대에 1명 이상 남도록 나누어야 합니다.';
+
+  const orderedIds = [...group.residentIds].sort((left, right) => left - right);
+  const retainedIds = orderedIds.slice(0, orderedIds.length - detachCount);
+  const detachedIds = orderedIds.slice(orderedIds.length - detachCount);
+  const originalCount = group.count;
+  const detachedPower = group.power * detachCount / originalCount;
+  const originGroupId = group.huntOriginGroupId ?? group.id;
+  group.huntOriginGroupId = originGroupId;
+  group.residentIds = retainedIds;
+  group.count = retainedIds.length;
+  group.power -= detachedPower;
+
+  const serial = (battle.huntDetachmentSerial ?? 0) + 1;
+  battle.huntDetachmentSerial = serial;
+  battle.defenderGroups.push({
+    ...group,
+    id: `${originGroupId}-detachment-${serial}`,
+    label: huntGroupBaseLabel(group),
+    residentIds: detachedIds,
+    count: detachedIds.length,
+    power: detachedPower,
+    readyMuskets: 0,
+    wounded: 0,
+    killed: 0,
+    command: null,
+    commandSource: undefined,
+    targetGroupId: undefined,
+    targetSource: 'auto',
+    huntOriginGroupId: originGroupId,
+  });
+  relabelHuntOriginGroups(battle, originGroupId);
+  reallocateHuntMusketReadiness(state, battle);
+  return null;
+}
+
+export function mergeHuntGroups(
+  state: GameState,
+  destinationGroupId: string,
+  sourceGroupId: string,
+): string | null {
+  const battle = state.tacticalBattle;
+  if (!battle || battle.assaultKind !== 'predatorHunt') return '맹수 사냥 전투에서만 분견대를 합칠 수 있습니다.';
+  if (battle.phase !== 'deployment' || battle.round !== 1 || battle.reports.length > 0) {
+    return '첫 교전 전 배치 단계에서만 분견대를 합칠 수 있습니다.';
+  }
+  if (destinationGroupId === sourceGroupId) return '서로 다른 분견대 두 조를 선택해야 합니다.';
+  const destination = battle.defenderGroups.find(group => group.id === destinationGroupId);
+  const source = battle.defenderGroups.find(group => group.id === sourceGroupId);
+  if (!destination || !source) return '합칠 사냥대 분견대를 찾을 수 없습니다.';
+  const destinationOrigin = destination.huntOriginGroupId ?? destination.id;
+  const sourceOrigin = source.huntOriginGroupId ?? source.id;
+  if (destinationOrigin !== sourceOrigin) return '같은 원래 조에서 나뉜 분견대끼리만 합칠 수 있습니다.';
+  if (destination.role !== source.role || destination.weapon !== source.weapon) {
+    return '역할과 무기가 같은 분견대끼리만 합칠 수 있습니다.';
+  }
+  if (destination.zoneId !== source.zoneId) return '같은 사냥 구역에 있는 분견대끼리만 합칠 수 있습니다.';
+  if (destination.wounded > 0 || destination.killed > 0 || source.wounded > 0 || source.killed > 0) {
+    return '사상자가 생긴 분견대는 합칠 수 없습니다.';
+  }
+  const mergedIds = [...new Set([...destination.residentIds, ...source.residentIds])].sort((left, right) => left - right);
+  if (mergedIds.length !== destination.count + source.count) return '주민이 중복된 분견대는 합칠 수 없습니다.';
+  destination.residentIds = mergedIds;
+  destination.count += source.count;
+  destination.power += source.power;
+  destination.huntOriginGroupId = destinationOrigin;
+  destination.command = null;
+  destination.commandSource = undefined;
+  destination.targetGroupId = undefined;
+  destination.targetSource = 'auto';
+  battle.defenderGroups = battle.defenderGroups.filter(group => group.id !== source.id);
+  relabelHuntOriginGroups(battle, destinationOrigin);
+  reallocateHuntMusketReadiness(state, battle);
   return null;
 }
 
@@ -360,22 +478,32 @@ function beastAttack(
     : weakestGroup(living);
   if (!target) return { wounded: 0, killed: 0 };
   const spearWall = target.command === 'hold' && tacticalGroupCapabilities(target).has('melee');
+  const tigerHitChance = HUNT_CONFIG.ambush.tigerHitChance;
+  const wolfHitChance = HUNT_CONFIG.ambush.wolfHitChance;
   let hitChance = kind === 'tiger'
-    ? clamp(0.68 * danger, 0.46, 0.92)
-    : clamp(0.31 + Math.max(0, packSize - 3) * 0.035, 0.28, 0.64);
-  if (spearWall) hitChance *= kind === 'tiger' ? 0.38 : 0.55;
-  if (battle.huntDriversSplit) hitChance *= 1.35;
+    ? clamp(tigerHitChance.base * danger, tigerHitChance.min, tigerHitChance.max)
+    : clamp(
+      wolfHitChance.base + Math.max(0, packSize - wolfHitChance.packThreshold) * wolfHitChance.perExtraBeast,
+      wolfHitChance.min,
+      wolfHitChance.max,
+    );
+  if (spearWall) hitChance *= HUNT_CONFIG.ambush.spearWallMultiplier[kind];
+  if (battle.huntDriversSplit) hitChance *= HUNT_CONFIG.ambush.splitDriversHitMultiplier;
   addEvent(events, zoneId, 'beastAmbush', `${beastName}가 ${target.label} 한 곳을 노려 덮칩니다.`, {
     side: 'raider', groupId: target.id, float: '급습!',
   });
   if (rng() >= hitChance) return { wounded: 0, killed: 0 };
+  const multipleLoss = HUNT_CONFIG.ambush.multipleLossChance;
   const multipleLossChance = kind === 'tiger'
-    ? tigerTier === 'mountainLord' ? 0.54 : tigerTier === 'greatTiger' ? 0.30 : 0.12
-    : packSize >= 9 ? 0.28 : packSize >= 7 ? 0.12 : 0;
+    ? multipleLoss[tigerTier]
+    : packSize >= multipleLoss.wolfLargePackThreshold
+      ? multipleLoss.wolfLargePack
+      : packSize >= multipleLoss.wolfMediumPackThreshold ? multipleLoss.wolfMediumPack : 0;
   const losses = Math.min(activeCount(target), rng() < multipleLossChance ? 2 : 1);
+  const death = HUNT_CONFIG.ambush.deathChance;
   const deathChance = kind === 'tiger'
-    ? clamp(0.15 * danger, 0.1, 0.28)
-    : clamp(0.045 + packSize * 0.006, 0.06, 0.12);
+    ? clamp(death.tigerBase * danger, death.tigerMin, death.tigerMax)
+    : clamp(death.wolfBase + packSize * death.wolfPerBeast, death.wolfMin, death.wolfMax);
   let killed = losses > 0 && rng() < deathChance ? 1 : 0;
   killed = Math.min(killed, losses);
   const wounded = losses - killed;
@@ -459,17 +587,30 @@ export function resolveHuntRound(state: GameState): string | null {
   battle.huntEngagements = (battle.huntEngagements ?? 0) + 1;
   const driveGroups = players.filter(group => group.command === 'advance' || group.command === 'ambush');
   const skill = hunterSkill(state, players);
-  let encirclementGain = 7 + driveGroups.reduce((sum, group) => sum + Math.max(1, activeCount(group) * 1.8), 0) + skill * 12;
+  const encirclement = HUNT_CONFIG.encirclement;
+  let encirclementGain = encirclement.baseGain + driveGroups.reduce(
+    (sum, group) => sum + Math.max(1, activeCount(group) * encirclement.perDriver),
+    0,
+  ) + skill * encirclement.hunterSkillMultiplier;
   if (battle.huntPredatorKind === 'tiger') {
     encirclementGain /= tigerTierDangerMultiplier(battle.huntTigerTier ?? 'tiger');
   } else {
     const wolfCount = battle.raiderGroups.reduce((sum, group) => sum + group.count, 0);
-    encirclementGain *= clamp(1.16 - Math.max(0, wolfCount - 3) * 0.038, 0.82, 1.16);
+    encirclementGain *= clamp(
+      encirclement.wolfBaseMultiplier -
+      Math.max(0, wolfCount - encirclement.wolfPackThreshold) * encirclement.wolfPenaltyPerExtraBeast,
+      encirclement.wolfMinMultiplier,
+      encirclement.wolfMaxMultiplier,
+    );
   }
   encirclementGain *= 1 + weatherTrackingModifier(state.weather);
-  if (battle.huntDriversSplit) encirclementGain *= 1.42;
-  if (players.some(group => group.command === 'fallback')) encirclementGain *= 0.55;
-  battle.huntEncirclement = clamp((battle.huntEncirclement ?? 0) + Math.max(2, encirclementGain), 0, 100);
+  if (battle.huntDriversSplit) encirclementGain *= encirclement.splitDriversMultiplier;
+  if (players.some(group => group.command === 'fallback')) encirclementGain *= encirclement.fallbackMultiplier;
+  battle.huntEncirclement = clamp(
+    (battle.huntEncirclement ?? 0) + Math.max(encirclement.minimumGain, encirclementGain),
+    0,
+    100,
+  );
   battle.zones.forEach(candidate => { candidate.pressure = battle.huntEncirclement ?? 0; });
 
   let revealedThisRound = false;
@@ -581,13 +722,11 @@ export function resolveHuntRound(state: GameState): string | null {
     outcome = 'huntDefeat';
   } else if (battle.raiderGroups.every(group => activeBeasts(group) <= 0)) outcome = 'huntKill';
   else if (battle.huntPredatorKind === 'wolf' && battle.huntLeaderKilled) outcome = 'huntRepelled';
-  else if ((battle.huntEngagements ?? 0) >= HUNT_MAX_ENGAGEMENTS) outcome = 'huntEscaped';
+  else if ((battle.huntEngagements ?? 0) >= HUNT_CONFIG.maxEngagements) outcome = 'huntEscaped';
 
-  const rehidingChance = battle.huntTigerTier === 'mountainLord'
-    ? 0.30
-    : battle.huntTigerTier === 'greatTiger' ? 0.38 : 0.46;
+  const rehidingChance = HUNT_CONFIG.rehideChance[battle.huntTigerTier ?? 'tiger'];
   if (!outcome && battle.huntPredatorKind === 'tiger' && battle.huntPredatorState !== 'hidden' &&
-    (battle.huntEncirclement ?? 0) < 70 && rng() < rehidingChance) {
+    (battle.huntEncirclement ?? 0) < HUNT_CONFIG.rehideEncirclementMax && rng() < rehidingChance) {
     battle.huntPredatorState = 'hidden';
     battle.raiderGroups.forEach(group => { group.revealed = false; });
     addEvent(events, zone.id, 'conceal', `${tigerTierLabel(battle.huntTigerTier ?? 'tiger')}가 우거진 덤불 속으로 몸을 감춰 다시 위치를 잃습니다.`, {
@@ -787,5 +926,5 @@ export function finishPredatorTacticalHunt(state: GameState): void {
 }
 
 export function huntMaxRounds(): number {
-  return HUNT_MAX_ENGAGEMENTS;
+  return HUNT_CONFIG.maxEngagements;
 }

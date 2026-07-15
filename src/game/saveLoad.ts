@@ -315,6 +315,11 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       ambushed: group.ambushed === true,
       targetGroupId: typeof group.targetGroupId === 'string' ? group.targetGroupId : undefined,
       targetSource: group.targetSource === 'player' ? 'player' : 'auto',
+      huntOriginGroupId: encounterKind === 'predatorHunt'
+        ? (typeof group.huntOriginGroupId === 'string'
+          ? group.huntOriginGroupId
+          : String(group.id ?? `migrated-defender-${index}`))
+        : undefined,
     }];
   });
 
@@ -786,6 +791,8 @@ export function loadGame(): GameState | null {
           parsed.tacticalBattle.huntTrapSet ??= false;
           parsed.tacticalBattle.huntBaitPlaced ??= false;
           parsed.tacticalBattle.huntLeaderKilled ??= false;
+          parsed.tacticalBattle.huntDetachmentSerial ??= 0;
+          for (const group of parsed.tacticalBattle.defenderGroups) group.huntOriginGroupId ??= group.id;
         } else {
           parsed.tacticalBattle.leaderEscapeBlocked ??= false;
           parsed.tacticalBattle.leaderEscaped ??= false;
