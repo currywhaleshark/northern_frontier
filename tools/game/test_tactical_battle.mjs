@@ -37,6 +37,19 @@ const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
 const battleSimulation = await import(pathToFileURL(join(compiledDir, 'battleSimulation.mjs')).href);
 const reportModalSource = readFileSync(new URL('../../src/components/TacticalBattleReportModal.tsx', import.meta.url), 'utf8');
 
+{
+  assert.deepEqual(tactical.tacticalSupportedCommands({ orientation: 'defense' }), [
+    'hold', 'charge', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians',
+    'reinforceRear', 'fallback', 'advance',
+  ], 'raid defense must expose only commands supported by the defensive battle system');
+  assert.deepEqual(tactical.tacticalSupportedCommands({ orientation: 'assault', assaultKind: 'banditLair' }), [
+    'hold', 'charge', 'volley', 'ambush', 'fallback', 'advance', 'arson', 'blockEscape', 'openRetreat',
+  ], 'bandit-lair assaults must expose only assault commands');
+  assert.deepEqual(tactical.tacticalSupportedCommands({ orientation: 'assault', assaultKind: 'predatorHunt' }), [
+    'hold', 'charge', 'volley', 'ambush', 'advance', 'openRetreat',
+  ], 'predator hunts must expose only hunt commands');
+}
+
 function prepareDefenders(state) {
   state.weather = 'clear';
   state.resources.spears = 2;

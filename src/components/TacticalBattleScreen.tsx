@@ -8,6 +8,7 @@ import {
   tacticalCommandDescription, tacticalCommandUnavailableReason, tacticalLootText,
   tacticalFormationLinesAdjacent, tacticalPreparationUnavailableReason, tacticalRearResponseOptions,
   tacticalRearAssaultIsEngaged, tacticalRearManeuverEffectiveCounterStrengthForZone,
+  tacticalSupportedCommands,
 } from '../game/tacticalBattle';
 import { assaultMaxRounds } from '../game/tacticalAssault';
 import { huntDeploymentUnavailableReason, huntMaxRounds } from '../game/tacticalHunt';
@@ -63,12 +64,6 @@ const PREP_DESCRIPTIONS: Record<PreparationActionId, string> = {
   placeBait: '고기 3을 예약하고 배치 단계에서 길목 하나를 골라 첫 급습을 그쪽으로 유도합니다.',
   splitDrivers: '구 형식 저장 호환용 행동이며 새 사냥에서는 실제 분견대 편성을 사용합니다.',
 };
-
-const COMMANDS: TacticalCommandId[] = [
-  'hold', 'charge', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'reinforceRear',
-  'fallback', 'advance',
-  'arson', 'blockEscape', 'openRetreat',
-];
 
 const COMMAND_LABELS: Record<TacticalCommandId, string> = {
   hold: '고수',
@@ -362,7 +357,7 @@ export function TacticalBattleScreen({
   useEffect(() => {
     if (!battle) return;
     setViewedZoneId(battle.currentZoneId);
-  }, [battle?.currentZoneId]);
+  }, [battle?.currentZoneId, battle?.phase]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -698,7 +693,6 @@ export function TacticalBattleScreen({
           {battle.phase === 'preparationExecution' && (
             <div className="tactical-simulating preparation-execution">
               <div className="tactical-loader" />
-              <strong>{activeEvent?.text ?? '선택한 준비태세를 실행하고 있습니다.'}</strong>
               <span>준비 실행 {Math.min(eventIndex + 1, battle.preparationEvents.length)} / {battle.preparationEvents.length}</span>
               <span className={`tactical-fast-hint${fast ? ' active' : ''}`}>
                 {fast ? '배속 재생 중' : '화면 클릭 또는 스페이스로 빨리감기'}</span>
@@ -824,7 +818,7 @@ export function TacticalBattleScreen({
                 <div>
                   <strong>제{battle.round}차 교전 지휘</strong>
                   <span>현재 초점: {battle.zones.find(zone => zone.id === battle.currentZoneId)?.name}
-                    {pendingCommandCount > 0 ? ` · 명령 대기 ${pendingCommandCount}개 부대` : ' · 모든 부대 명령 지정 완료'}</span>
+                    {pendingCommandCount > 0 ? ` · 자동 명령 ${pendingCommandCount}개 부대` : ' · 모든 부대 직접 명령 완료'}</span>
                 </div>
                 <button className="btn primary" onClick={onResolveRound}>교전 개시</button>
               </div>
@@ -899,7 +893,7 @@ export function TacticalBattleScreen({
                       </div>
                     )}
                     <div className="tactical-command-bar" role="group" aria-label={`${selectedGroup.label} 명령 선택`}>
-                      {COMMANDS.filter(command => !hunt || command !== 'fallback').map(command => {
+                      {tacticalSupportedCommands(battle).map(command => {
                         const unavailableReason = tacticalCommandUnavailableReason(battle, selectedGroup, command);
                         return (
                           <button
@@ -940,7 +934,6 @@ export function TacticalBattleScreen({
           {battle.phase === 'simulating' && (
             <div className="tactical-simulating">
               <div className="tactical-loader" />
-              <strong>{activeEvent?.text ?? '전황을 살피는 중입니다.'}</strong>
               <span>제{battle.pendingReport?.round ?? battle.round}차 교전</span>
               <span className={`tactical-fast-hint${fast ? ' active' : ''}`}>
                 {fast ? '배속 재생 중 — 결과는 온전히 표시됩니다' : '화면 클릭 또는 스페이스로 빨리감기'}

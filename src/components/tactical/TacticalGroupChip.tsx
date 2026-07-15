@@ -73,7 +73,7 @@ export function TacticalGroupChip({
                 : active === 0
                   ? '—'
                   : pending
-                    ? `명령 대기 · ${commandText ?? '추천 없음'}`
+                    ? `자동: ${commandText ?? '추천 없음'}`
                     : commandText ?? '—'}
             </span>
             {group.commandable !== false && active > 0 && <span className="tactical-dock-target">표적: {targetText || '자동'}</span>}

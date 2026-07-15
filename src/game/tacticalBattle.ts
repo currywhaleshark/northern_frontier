@@ -72,10 +72,25 @@ const PREPARATION_ACTIONS: Array<{ id: PreparationActionId; label: string; cost:
   { id: 'musterMilitia', label: '민병 소집', cost: 1 },
 ];
 
-const IMPLEMENTED_COMMANDS = new Set<TacticalCommandId>([
-  'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'reinforceRear',
-  'fallback', 'advance', 'charge',
-]);
+const DEFENSE_SUPPORTED_COMMANDS: readonly TacticalCommandId[] = [
+  'hold', 'charge', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians',
+  'reinforceRear', 'fallback', 'advance',
+];
+const ASSAULT_SUPPORTED_COMMANDS: readonly TacticalCommandId[] = [
+  'hold', 'charge', 'volley', 'ambush', 'fallback', 'advance', 'arson', 'blockEscape', 'openRetreat',
+];
+const HUNT_SUPPORTED_COMMANDS: readonly TacticalCommandId[] = [
+  'hold', 'charge', 'volley', 'ambush', 'advance', 'openRetreat',
+];
+const IMPLEMENTED_COMMANDS = new Set<TacticalCommandId>([...DEFENSE_SUPPORTED_COMMANDS, 'redeploy']);
+
+export function tacticalSupportedCommands(
+  battle: Pick<TacticalBattle, 'orientation' | 'assaultKind'>,
+): readonly TacticalCommandId[] {
+  if (battle.assaultKind === 'predatorHunt') return HUNT_SUPPORTED_COMMANDS;
+  if (battle.orientation === 'assault') return ASSAULT_SUPPORTED_COMMANDS;
+  return DEFENSE_SUPPORTED_COMMANDS;
+}
 
 const FORMATION_LINE_ORDER: readonly TacticalFormationLine[] = ['front', 'middle', 'rear'];
 

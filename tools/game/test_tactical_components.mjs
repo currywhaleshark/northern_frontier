@@ -33,6 +33,13 @@ assert.match(screenSource, /fast \? ' fast-playback' : ''/,
   'the tactical screen must expose fast-forward state to visual effects');
 assert.match(cssSource, /--tactical-playback-scale:\s*1\.6;/,
   'battlefield motion must use the same slower normal playback scale');
+assert.equal(
+  [...screenSource.matchAll(/<strong>\{activeEvent\?\.text \?\?/g)].length,
+  0,
+  'playback panels must not duplicate the active event caption already rendered on the battlefield',
+);
+assert.match(cssSource, /\.tactical-simulating\s*\{[\s\S]*grid-template-columns:\s*34px 1fr auto;/,
+  'playback panels must keep the three-column loader, progress, and fast-forward layout');
 assert.match(cssSource, /\.tactical-screen\.fast-playback\s*\{\s*--tactical-playback-scale:\s*1;/,
   'fast-forward must restore authored animation timing');
 assert.match(cssSource,
@@ -128,8 +135,19 @@ assert.match(screenSource, /이동한 조는 이번 라운드 몰이 기여가 �
   'hunt command controls must explain the movement penalty');
 assert.match(screenSource, /반격 대기/, 'hunt ambush command must be relabeled as counter-wait');
 assert.match(screenSource, /모든 전투조/, 'counter-wait guidance must not imply a hunter-only restriction');
-assert.match(screenSource, /COMMANDS\.filter\(command => !hunt \|\| command !== 'fallback'\)/,
-  'fallback must be absent from the hunt command bar');
+assert.match(screenSource, /tacticalSupportedCommands\(battle\)\.map\(command =>/,
+  'the command bar must render the game-layer supported command contract');
+assert.doesNotMatch(screenSource, /COMMANDS\.filter\(/,
+  'the command bar must not keep a separate battle-mode filter');
+assert.match(chipSource, /`자동: \$\{commandText \?\? '추천 없음'\}`/,
+  'recommended commands must be labeled as automatic actions that will execute');
+assert.doesNotMatch(chipSource, /명령 대기 ·/,
+  'group chips must not imply that recommended commands are idle');
+assert.match(screenSource, /자동 명령 \$\{pendingCommandCount\}개 부대/,
+  'the command header must use the same automatic-command terminology as group chips');
+assert.match(screenSource,
+  /setViewedZoneId\(battle\.currentZoneId\);\s*\}, \[battle\?\.currentZoneId, battle\?\.phase\]\);/,
+  'entering the command phase must resynchronize the viewed zone with the current battle focus');
 assert.match(screenSource, /!hunt && \(\s*<div className="tactical-line-toggle"/,
   'hunt deployment and command controls must hide formation-line toggles');
 assert.match(zoneSource, /tactical-sector-blockade/,
