@@ -397,6 +397,27 @@ function raiderTargetingResult(
   });
 }
 
+export function applyTacticalPlaybackEvent(
+  battle: TacticalBattle,
+  playbackEvent: TacticalAnimationEvent,
+): void {
+  if (playbackEvent.kind !== 'advance' || playbackEvent.side !== 'raider') return;
+  const actorGroupIds = playbackEvent.actorGroupIds;
+  if (!actorGroupIds || actorGroupIds.length === 0) return;
+  const movingGroupIds = new Set(actorGroupIds);
+  let moved = false;
+  for (const attacker of battle.raiderGroups) {
+    if (!movingGroupIds.has(attacker.id) || !attacker.pendingZoneId) continue;
+    attacker.zoneId = attacker.pendingZoneId;
+    attacker.pendingZoneId = undefined;
+    attacker.engagementsInZone = 0;
+    attacker.rearAssault = attacker.kind === 'flankers' &&
+      attacker.flankPlan === 'rearAssault' && attacker.zoneId === 'wall';
+    moved = true;
+  }
+  if (moved) normalizeTacticalGroupTargets(battle);
+}
+
 export function chooseAutomaticRaiderTarget(
   battle: TacticalBattle,
   attacker: TacticalRaiderGroup,
@@ -1542,6 +1563,7 @@ export function resolveTacticalRound(state: GameState): string | null {
   const rearDominance = new Map<string, number>();
   const defenderReadiness = new Map<string, number>();
   const undefendedFrontalZones = new Set<string>();
+  const moraleBrokenAttackerIds = new Set<string>();
   let roundWounded = 0;
   let roundKilled = 0;
   let roundRaidersKilled = 0;
@@ -1633,11 +1655,20 @@ export function resolveTacticalRound(state: GameState): string | null {
         evacuateCiviliansApplied: applied(battle, 'evacuateCivilians'),
         roundStartingRaiderPower,
         rangedEfficiency,
+        priorRaiderMoraleDelta: raiderMoraleDelta,
+        retreatPowerThreshold: battle.originalPower * 0.035,
         rng,
       });
       for (const loss of exchange.raiderLosses) {
         const attacker = engagement.attackers.find(group => group.id === loss.groupId);
         if (attacker) attacker.confused = loss.confused;
+      }
+      for (const attackerId of exchange.retreatingAttackerIds) {
+        const attacker = engagement.attackers.find(group => group.id === attackerId);
+        if (!attacker) continue;
+        attacker.intent = 'withdraw';
+        attacker.pendingZoneId = undefined;
+        moraleBrokenAttackerIds.add(attacker.id);
       }
       events.push(...exchange.preDefenseEvents);
       lines.push(...exchange.preDefenseLines);
@@ -1650,23 +1681,35 @@ export function resolveTacticalRound(state: GameState): string | null {
         roundKilled += loss.killed;
       }
       if (engagement.direction === 'frontal') {
-        const consequences = applyDefenseZoneConsequences({
-          zone,
-          defenders: engagement.defenders,
-          attackers: engagement.attackers,
-          commands: exchange.commands,
-          enemyPower: exchange.enemyPower,
-          defensePower: exchange.defensePower,
-          enemyShare: exchange.enemyShare,
-          originalPower: battle.originalPower,
-          availableLoot: {
-            grain: pendingLootAvailable(state, battle, 'grain'),
-            firewood: pendingLootAvailable(state, battle, 'firewood'),
-            hide: pendingLootAvailable(state, battle, 'hide'),
-          },
-          fireArrowEffectScale: enemyPlanStratagemScale(battle.enemyPlan, 'fireArrows'),
-          rng,
-        });
+        const consequenceAttackers = engagement.attackers.filter(attacker => attacker.intent !== 'withdraw');
+        const consequences = consequenceAttackers.length > 0 && exchange.enemyPower > 0
+          ? applyDefenseZoneConsequences({
+            zone,
+            defenders: engagement.defenders,
+            attackers: consequenceAttackers,
+            commands: exchange.commands,
+            enemyPower: exchange.enemyPower,
+            defensePower: exchange.defensePower,
+            enemyShare: exchange.enemyShare,
+            originalPower: battle.originalPower,
+            availableLoot: {
+              grain: pendingLootAvailable(state, battle, 'grain'),
+              firewood: pendingLootAvailable(state, battle, 'firewood'),
+              hide: pendingLootAvailable(state, battle, 'hide'),
+            },
+            fireArrowEffectScale: enemyPlanStratagemScale(battle.enemyPlan, 'fireArrows'),
+            rng,
+          })
+          : {
+            pressure: zone.pressure,
+            breached: zone.breached,
+            buildingsDamaged: 0,
+            loot: {},
+            breachEvents: [],
+            breachLines: [],
+            lootEvents: [],
+            lootLines: [],
+          };
         zone.pressure = consequences.pressure;
         zone.breached = consequences.breached;
         events.push(...consequences.breachEvents);
@@ -1722,7 +1765,10 @@ export function resolveTacticalRound(state: GameState): string | null {
     const index = route.indexOf(attacker.zoneId);
     const zone = battle.zones.find(candidate => candidate.id === attacker.zoneId);
     const share = dominance.get(attacker.zoneId) ?? 0;
-    if (attacker.morale <= 18 || attacker.power <= battle.originalPower * 0.035) {
+    if (moraleBrokenAttackerIds.has(attacker.id)) {
+      attacker.intent = 'withdraw';
+      attacker.pendingZoneId = undefined;
+    } else if (attacker.morale <= 18 || attacker.power <= battle.originalPower * 0.035) {
       attacker.intent = 'withdraw';
       attacker.pendingZoneId = undefined;
       event(events, attacker.zoneId, 'moraleBreak', `${attacker.label}의 대열이 흩어집니다.`, 650, {

@@ -598,6 +598,15 @@ export function resolveAssaultRound(state: GameState): string | null {
       side: 'raider', groupId: enemy.id, casualties: loss.killed, killed: loss.killed, float: `-${loss.killed}`,
     });
   }
+  for (const enemyId of exchange.retreatingAttackerIds) {
+    const enemy = enemies.find(group => group.id === enemyId);
+    if (!enemy) continue;
+    enemy.intent = 'withdraw';
+    enemy.pendingZoneId = undefined;
+    addEvent(events, zone.id, 'moraleBreak', `${enemy.label}의 기세가 꺾여 공격을 포기하고 물러납니다.`, {
+      side: 'raider', groupId: enemy.id, actorGroupIds: [enemy.id], float: '퇴각!',
+    });
+  }
 
   const survivingEnemies = enemies.some(enemy =>
     enemy.power > 0 && enemy.killed < enemy.count && enemy.intent !== 'withdraw' && !enemy.confused);

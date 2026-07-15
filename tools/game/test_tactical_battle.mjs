@@ -1293,6 +1293,44 @@ function addBuiltMarker(state, type) {
 }
 
 {
+  const state = simulation.newGame(2026071511);
+  prepareDefenders(state);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'sequential-advance-playback-test', power: 90, warned: true, siege: false, mode: 'garrison',
+  });
+  tactical.advanceTacticalPhase(state);
+  battle.defenderGroups.forEach(group => { group.zoneId = 'center'; });
+  tactical.advanceTacticalPhase(state);
+  battle.raiderGroups.forEach(group => {
+    group.zoneId = 'approach';
+    group.morale = 100;
+    group.rearAssault = false;
+    if (group.kind === 'flankers') group.flankPlan = 'breakthrough';
+  });
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  const advances = battle.pendingReport.events.filter(event =>
+    event.kind === 'advance' && event.side === 'raider' && (event.actorGroupIds?.length ?? 0) > 0);
+  assert.ok(advances.length >= 2, 'different routes produce separate movement beats');
+  const firstAdvanceIds = new Set(advances[0].actorGroupIds);
+  const laterAdvanceIds = new Set(advances.slice(1).flatMap(event => event.actorGroupIds));
+  const firstGroups = battle.raiderGroups.filter(group => firstAdvanceIds.has(group.id));
+  const laterGroups = battle.raiderGroups.filter(group => laterAdvanceIds.has(group.id));
+  assert.ok(firstGroups.every(group => group.zoneId === 'approach' && group.pendingZoneId),
+    'scheduled movers stay at the origin before their animation finishes');
+  tactical.applyTacticalPlaybackEvent(battle, advances[0]);
+  assert.ok(firstGroups.every(group => group.zoneId !== 'approach' && group.pendingZoneId == null),
+    'the first movement beat immediately commits only its participating groups');
+  assert.ok(laterGroups.every(group => group.zoneId === 'approach' && group.pendingZoneId),
+    'later movers remain at the origin until their own movement beat');
+  for (const advance of advances.slice(1)) tactical.applyTacticalPlaybackEvent(battle, advance);
+  assert.ok(laterGroups.every(group => group.zoneId !== 'approach' && group.pendingZoneId == null),
+    'each later movement beat leaves its participants at the new front immediately');
+  assert.equal(tactical.completeTacticalSimulation(state), null);
+  assert.ok([...firstGroups, ...laterGroups].every(group => group.pendingZoneId == null),
+    'report completion does not apply already committed movement twice');
+}
+
+{
   const state = simulation.newGame(2026071216);
   prepareDefenders(state);
   const battle = tactical.createTacticalBattle(state, {
@@ -1506,6 +1544,38 @@ function addBuiltMarker(state, type) {
     'the prepared first strike removes the lone attacker before retaliation');
   assert.equal(decisive.defenderLosses.reduce((sum, loss) => sum + loss.wounded + loss.killed, 0), 0,
     'an attacker destroyed by the first strike contributes no retaliation damage');
+
+  const waveringRaider = {
+    ...shootingRaider,
+    id: 'wavering-raider',
+    label: '동요한 적 사수',
+    morale: 20,
+  };
+  const moraleBreak = tacticalEngagement.resolveEngagementExchange({
+    zone,
+    defenders: [volleyDefender],
+    attackers: [waveringRaider],
+    direction: 'frontal',
+    weather: 'clear',
+    prepareVolleyApplied: true,
+    evacuateCiviliansApplied: false,
+    roundStartingRaiderPower: waveringRaider.power,
+    priorRaiderMoraleDelta: -4,
+    rng: () => 0,
+  });
+  assert.ok(moraleBreak.retreatingAttackerIds.includes(waveringRaider.id),
+    'an attacker whose morale breaks during the exchange receives the retreat flag immediately');
+  assert.equal(moraleBreak.preDefenseEvents.some(event =>
+    event.side === 'raider' && event.kind === 'volley'), false,
+  'a retreating attacker cancels its queued ranged attack');
+  assert.equal(moraleBreak.defenderLosses.reduce((sum, loss) => sum + loss.wounded + loss.killed, 0), 0,
+    'an attacker that retreats before acting contributes no retaliation casualties');
+  const retreatIndex = moraleBreak.preDefenseEvents.findIndex(event =>
+    event.kind === 'moraleBreak' && event.groupId === waveringRaider.id);
+  const enemyActionIndex = moraleBreak.preDefenseEvents.findIndex(event =>
+    event.side === 'raider' && (event.kind === 'volley' || event.kind === 'melee' || event.kind === 'wallAssault'));
+  assert.ok(retreatIndex >= 0 && enemyActionIndex < 0,
+    'morale-break presentation replaces the cancelled next action');
 }
 
 {

@@ -384,6 +384,8 @@ export interface EngagementExchangeInput {
   defenderPowerMultiplier?: (defender: TacticalDefenderGroup) => number;
   defenderCasualtyMultiplier?: (defender: TacticalDefenderGroup) => number;
   raiderLossRateScale?: number;
+  priorRaiderMoraleDelta?: number;
+  retreatPowerThreshold?: number;
   rng: () => number;
 }
 
@@ -409,6 +411,7 @@ export interface EngagementExchangeResult {
   surpriseAttack: boolean;
   surpriseDefenderIds: string[];
   confusedAttackerIds: string[];
+  retreatingAttackerIds: string[];
   defenderLosses: TacticalDefenderLoss[];
   raiderLosses: TacticalRaiderLoss[];
   villageMoraleDelta: number;
@@ -790,8 +793,37 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     attacker.killed += loss.killed;
     attacker.power = loss.powerAfter;
   }
-  const postStrikeRawEnemyPower = attackers.reduce(
+  const postLossPower = attackers.reduce((sum, attacker) => sum + attacker.power, 0);
+  const zoneRaiderWeight = postLossPower / input.roundStartingRaiderPower;
+  const raiderMoraleDelta = -(defenseShare * 10 + (surpriseAttack ? 3 : 0) +
+    (commands.includes('volley') ? 2 : 0) + (commands.includes('charge') ? 4 : 0)) * zoneRaiderWeight;
+  const projectedMoraleDelta = (input.priorRaiderMoraleDelta ?? 0) + raiderMoraleDelta;
+  const retreatingAttackerIds = attackers
+    .filter(attacker => activeRaiderCount(attacker) > 0 && attacker.power > 0 && (
+      attacker.morale + projectedMoraleDelta <= 18 ||
+      (input.retreatPowerThreshold != null && attacker.power <= input.retreatPowerThreshold)
+    ))
+    .map(attacker => attacker.id);
+  const retreatingAttackerIdSet = new Set(retreatingAttackerIds);
+  const raiderRetreatEvents = retreatingAttackerIds.map(attackerId => {
+    const attacker = attackers.find(group => group.id === attackerId)!;
+    return animationEvent(
+      zone.id,
+      'moraleBreak',
+      `${attacker.label}의 기세가 꺾여 공격을 포기하고 물러납니다.`,
+      650,
+      { side: 'raider', groupId: attacker.id, actorGroupIds: [attacker.id], float: '퇴각!' },
+    );
+  });
+  const postLossRawEnemyPower = attackers.reduce(
     (sum, group) => sum + (group.confused || activeRaiderCount(group) <= 0
+      ? 0
+      : group.power * (group.morale / 100) * (group.combatMultiplier ?? 1) *
+        (tacticalTargetingRole(group) === 'melee' ? 1 : input.rangedEfficiency ?? 1)),
+    0,
+  );
+  const postStrikeRawEnemyPower = attackers.reduce(
+    (sum, group) => sum + (group.confused || retreatingAttackerIdSet.has(group.id) || activeRaiderCount(group) <= 0
       ? 0
       : group.power * (group.morale / 100) * (group.combatMultiplier ?? 1) *
         (tacticalTargetingRole(group) === 'melee' ? 1 : input.rangedEfficiency ?? 1)),
@@ -848,9 +880,12 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
   }
 
   const survivingAttackerIds = new Set(attackers
-    .filter(attacker => !attacker.confused && activeRaiderCount(attacker) > 0 && attacker.power > 0)
+    .filter(attacker => !attacker.confused && !retreatingAttackerIdSet.has(attacker.id) &&
+      activeRaiderCount(attacker) > 0 && attacker.power > 0)
     .map(attacker => attacker.id));
-  const survivingRaiderShots = tacticalRaiderShotCounts(attackers);
+  const survivingRaiderShots = tacticalRaiderShotCounts(
+    attackers.filter(attacker => survivingAttackerIds.has(attacker.id)),
+  );
   if (raiderCasualtyEvents.length > 0 && friendlyActionEvents.length === 0 && combatDefenders.length > 0) {
     const counterActors = combatDefenders.filter(defender => activeDefenderCount(defender) > 0);
     const counterMeleeActors = counterActors.filter(defender => tacticalGroupCapabilities(defender).has('melee'));
@@ -893,13 +928,14 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     resolvedEnemyActionEvents.push({ ...currentEvent, actorGroupIds });
   }
 
-  const postLossPower = attackers.reduce((sum, attacker) => {
-    return sum + attacker.power;
-  }, 0);
-  const zoneRaiderWeight = postLossPower / input.roundStartingRaiderPower;
-  const raiderMoraleDelta = -(defenseShare * 10 + (surpriseAttack ? 3 : 0) +
-    (commands.includes('volley') ? 2 : 0) + (commands.includes('charge') ? 4 : 0)) * zoneRaiderWeight;
-  const villageMoraleDelta = (enemyShare > 0.5 ? -(2 + enemyShare * 7) : 1) -
+  const remainingActionShare = retreatingAttackerIds.length > 0 && postLossRawEnemyPower > 0
+    ? clamp(postStrikeRawEnemyPower / postLossRawEnemyPower, 0, 1)
+    : 1;
+  const resolvedEnemyPower = enemyPower * remainingActionShare;
+  const resolvedTotal = Math.max(1, resolvedEnemyPower + defensePower);
+  const resolvedEnemyShare = resolvedEnemyPower / resolvedTotal;
+  const resolvedDefenseShare = defensePower / resolvedTotal;
+  const villageMoraleDelta = (resolvedEnemyShare > 0.5 ? -(2 + resolvedEnemyShare * 7) : 1) -
     (rearAssaultCasualties > 0 ? 3 : 0);
 
   if (surpriseAttack) {
@@ -909,14 +945,15 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
   }
 
   return {
-    enemyPower,
+    enemyPower: resolvedEnemyPower,
     defensePower,
-    enemyShare,
-    defenseShare,
+    enemyShare: resolvedEnemyShare,
+    defenseShare: resolvedDefenseShare,
     commands,
     surpriseAttack,
     surpriseDefenderIds: surpriseDefenders.map(defender => defender.id),
     confusedAttackerIds,
+    retreatingAttackerIds,
     defenderLosses,
     raiderLosses,
     villageMoraleDelta,
@@ -924,6 +961,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     preDefenseEvents: [
       ...friendlyActionEvents,
       ...raiderCasualtyEvents,
+      ...raiderRetreatEvents,
       ...resolvedEnemyActionEvents,
       ...defenderCasualtyEvents,
       ...maneuverEvents,

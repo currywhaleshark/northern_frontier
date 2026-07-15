@@ -23,6 +23,12 @@ assert.equal(
 );
 assert.doesNotMatch(screenSource, /Math\.min\((?:150|180), events\[index\]\.durationMs\)/,
   'fast-forward must preserve the previous normal event timing instead of skipping events');
+const simulationPlaybackSource = screenSource.slice(
+  screenSource.indexOf("battle.phase !== 'simulating'"),
+  screenSource.indexOf('// The battle round and phase are the stable playback identity.'),
+);
+assert.match(simulationPlaybackSource, /applyTacticalPlaybackEvent\(battle, events\[index\]\)/,
+  'combat playback must commit each movement event before starting the next event');
 assert.match(screenSource, /fast \? ' fast-playback' : ''/,
   'the tactical screen must expose fast-forward state to visual effects');
 assert.match(cssSource, /--tactical-playback-scale:\s*1\.6;/,

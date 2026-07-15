@@ -4,6 +4,7 @@ import { countBuilt } from '../game/buildings';
 import { getSeason } from '../game/seasons';
 import { banditLairDoctrineDefinition, enemyPlanCounterLabelsForAction } from '../game/enemyPlan';
 import {
+  applyTacticalPlaybackEvent,
   tacticalCommandDescription, tacticalCommandUnavailableReason, tacticalLootText,
   tacticalFormationLinesAdjacent, tacticalPreparationUnavailableReason, tacticalRearResponseOptions,
 } from '../game/tacticalBattle';
@@ -322,7 +323,10 @@ export function TacticalBattleScreen({
       setEventIndex(index);
       playTacticalEventSfx(events[index]);
       const duration = tacticalPlaybackDuration(events[index].durationMs, fastRef.current);
-      timer = window.setTimeout(() => play(index + 1), duration);
+      timer = window.setTimeout(() => {
+        applyTacticalPlaybackEvent(battle, events[index]);
+        play(index + 1);
+      }, duration);
     };
     // 라운드 스팅어 배너 + 북 1타 뒤에 이벤트 재생을 시작한다
     setStingerRound(round);
