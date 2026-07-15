@@ -3,6 +3,7 @@ import { RESOURCE_NAMES, WEATHER_ICONS, WEATHER_NAMES } from '../game/constants'
 import { countBuilt } from '../game/buildings';
 import { getSeason } from '../game/seasons';
 import { banditLairDoctrineDefinition, enemyPlanCounterLabelsForAction } from '../game/enemyPlan';
+import { withJosa } from '../game/josa';
 import {
   applyTacticalPlaybackEvent,
   tacticalCommandDescription, tacticalCommandUnavailableReason, tacticalLootText,
@@ -775,7 +776,7 @@ export function TacticalBattleScreen({
                       type="button"
                       className="btn"
                       key={group.id}
-                      title={`${group.label}을(를) 선택한 조에 합칩니다.`}
+                      title={`${withJosa(group.label, '을/를')} 선택한 조에 합칩니다.`}
                       onClick={() => onMergeHuntGroups(selectedGroup.id, group.id)}
                     >같은 조 합류 · {group.label}</button>
                   ))}

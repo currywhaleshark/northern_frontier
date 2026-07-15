@@ -1,5 +1,6 @@
 import { tacticalGroupCapabilities, tacticalGroupPower } from './combatCapabilities';
 import { CONFIG } from './config';
+import { withJosa } from './josa';
 import { tacticalDefenderShotCounts, tacticalRaiderShotCounts } from './tacticalCore';
 import {
   canTargetLine,
@@ -253,6 +254,39 @@ function animationEvent(
   return { zoneId, kind, text, durationMs, ...extra };
 }
 
+export function stabilizeTacticalCasualtyCaptions(
+  events: ReadonlyArray<TacticalAnimationEvent>,
+  groupLabels: Readonly<Record<string, string>>,
+): TacticalAnimationEvent[] {
+  const stabilized = events.map(event => ({ ...event }));
+  let start = 0;
+  while (start < stabilized.length) {
+    const first = stabilized[start];
+    if (first.kind !== 'casualty' || !first.side) {
+      start += 1;
+      continue;
+    }
+    let end = start + 1;
+    while (end < stabilized.length && stabilized[end].kind === 'casualty' && stabilized[end].side === first.side) {
+      end += 1;
+    }
+    const block = stabilized.slice(start, end);
+    const labels = [...new Set(block.map(event => event.groupId ? groupLabels[event.groupId] ?? event.groupId : '피해 부대'))];
+    const killed = block.reduce((sum, event) => sum + (event.killed ?? 0), 0);
+    const wounded = block.reduce((sum, event) => sum + (event.wounded ?? 0), 0);
+    const casualties = block.reduce((sum, event) => sum + (event.casualties ?? event.killed ?? 0), 0);
+    const caption = first.side === 'raider'
+      ? `${labels.join('·')}에서 ${casualties}명이 쓰러졌습니다.`
+      : `${labels.join('·')} 피해: ${[
+        killed > 0 ? `전사 ${killed}명` : '',
+        wounded > 0 ? `부상 ${wounded}명` : '',
+      ].filter(Boolean).join(', ')}.`;
+    for (let index = start; index < end; index += 1) stabilized[index].text = caption;
+    start = end;
+  }
+  return stabilized;
+}
+
 function commandPowerMultiplier(
   input: EngagementExchangeInput,
   defender: TacticalDefenderGroup,
@@ -479,7 +513,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
       confusionEvents.push(animationEvent(
         zone.id,
         'ambush',
-        `${attacker.label}이(가) 급습에 주저앉아 이번 교전에서 행동하지 못합니다.`,
+        `${withJosa(attacker.label, '이/가')} 급습에 주저앉아 이번 교전에서 행동하지 못합니다.`,
         560,
         { side: 'raider', groupId: attacker.id, float: '혼란!' },
       ));
@@ -549,8 +583,8 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
       zone.id,
       'melee',
       continuing
-        ? `${attacker.label}이(가) 급습 이후에도 후열 수비대를 계속 몰아붙입니다.`
-        : `${attacker.label}이(가) 방어선 뒤로 파고들어 후열 수비대와 맞붙습니다.`,
+        ? `${withJosa(attacker.label, '이/가')} 급습 이후에도 후열 수비대를 계속 몰아붙입니다.`
+        : `${withJosa(attacker.label, '이/가')} 방어선 뒤로 파고들어 후열 수비대와 맞붙습니다.`,
       620,
       {
         side: 'raider', groupId: attacker.id, actorGroupIds: [attacker.id],
@@ -570,7 +604,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
       .sort((a, b) => b.power - a.power)[0];
     if (wallStriker) {
       enemyActionEvents.push(animationEvent(zone.id, 'wallAssault',
-        `${wallStriker.label}이(가) 도끼와 장대로 목책을 거칠게 두드립니다.`, 580, {
+        `${withJosa(wallStriker.label, '이/가')} 도끼와 장대로 목책을 거칠게 두드립니다.`, 580, {
           side: 'raider', groupId: wallStriker.id, float: '목책 타격!',
         }));
     }
@@ -970,7 +1004,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     raiderLosses,
     villageMoraleDelta,
     raiderMoraleDelta,
-    preDefenseEvents: [
+    preDefenseEvents: stabilizeTacticalCasualtyCaptions([
       ...friendlyActionEvents,
       ...raiderCasualtyEvents,
       ...confusionEvents,
@@ -978,7 +1012,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
       ...resolvedEnemyActionEvents,
       ...defenderCasualtyEvents,
       ...maneuverEvents,
-    ],
+    ], Object.fromEntries([...defenders, ...attackers].map(group => [group.id, group.label]))),
     preDefenseLines,
     postDefenseEvents: [],
     afterConsequencesEvents,
@@ -1081,7 +1115,7 @@ export function applyDefenseZoneConsequences(
         ? '적이 마을 중심지로 쏟아져 들어옵니다 — 최후 방어선이 무너졌습니다.'
         : zone.id === 'storehouse'
           ? '적이 창고 구역으로 밀려들어 비축 방어선이 무너집니다.'
-          : `${zone.name}이(가) 뚫렸습니다.`;
+          : `${withJosa(zone.name, '이/가')} 뚫렸습니다.`;
     breachEvents.push(animationEvent(
       zone.id,
       wallBroken ? 'wallHit' : innerLineFallen ? 'zoneFall' : 'advance',

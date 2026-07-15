@@ -170,12 +170,37 @@ const actual = SCENARIOS.map(scenario => runScenario(tactical, battleSimulation,
 
 const fixtureDir = new URL('./fixtures/', import.meta.url);
 const fixtureUrl = new URL('./fixtures/tactical_golden.json', import.meta.url);
+const expected = JSON.parse(readFileSync(fixtureUrl, 'utf8'));
 if (process.argv.includes('--update')) {
   mkdirSync(fixtureDir, { recursive: true });
   writeFileSync(fixtureUrl, `${JSON.stringify(actual, null, 2)}\n`, 'utf8');
   console.log('tactical golden fixture updated');
+} else if (process.argv.includes('--verify-narrative-update')) {
+  const withoutLines = scenarios => scenarios.map(scenario => ({
+    ...scenario,
+    rounds: scenario.rounds.map(({ lines: _lines, ...round }) => round),
+  }));
+  assert.deepEqual(withoutLines(actual), withoutLines(expected),
+    'a narrative-only golden update must preserve every combat state and outcome field');
+  let changedLines = 0;
+  for (let scenarioIndex = 0; scenarioIndex < actual.length; scenarioIndex += 1) {
+    for (let roundIndex = 0; roundIndex < actual[scenarioIndex].rounds.length; roundIndex += 1) {
+      const actualLines = actual[scenarioIndex].rounds[roundIndex].lines;
+      const expectedLines = expected[scenarioIndex].rounds[roundIndex].lines;
+      assert.equal(actualLines.length, expectedLines.length);
+      for (let lineIndex = 0; lineIndex < actualLines.length; lineIndex += 1) {
+        if (actualLines[lineIndex] === expectedLines[lineIndex]) continue;
+        changedLines += 1;
+        assert.match(expectedLines[lineIndex], /이\(가\)|을\(를\)|\(으\)로/,
+          'every changed golden line must previously contain a parenthesized particle');
+        assert.doesNotMatch(actualLines[lineIndex], /이\(가\)|을\(를\)|\(으\)로/,
+          'updated golden lines must resolve their Korean particles');
+      }
+    }
+  }
+  assert.ok(changedLines > 0, 'the narrative verification must observe at least one intended line change');
+  console.log(`tactical golden narrative update verified (${changedLines} lines)`);
 } else {
-  const expected = JSON.parse(readFileSync(fixtureUrl, 'utf8'));
   assert.deepEqual(actual, expected);
   console.log('tactical golden tests passed');
 }

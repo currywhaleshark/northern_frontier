@@ -12,13 +12,21 @@ function signed(value: number): string {
   return `${value > 0 ? '+' : ''}${value}`;
 }
 
+function roundedResourceAmount(value: number | undefined): number {
+  return Math.round(value ?? 0);
+}
+
 function outcomeTone(result: TacticalBattleReport['result']): string {
   return result === 'victory' ? 'victory' : 'defeat';
 }
 
 export function TacticalBattleReportModal({ report, onClose }: Props) {
-  const resourceDelta = Object.entries(report.resourceDelta).filter(([, amount]) => Math.abs(amount ?? 0) > 1e-9);
-  const recoveredLoot = Object.entries(report.recoveredLoot ?? {}).filter(([, amount]) => (amount ?? 0) > 1e-9);
+  const resourceDelta = Object.entries(report.resourceDelta)
+    .map(([resource, amount]) => [resource, roundedResourceAmount(amount)] as const)
+    .filter(([, amount]) => amount !== 0);
+  const recoveredLoot = Object.entries(report.recoveredLoot ?? {})
+    .map(([resource, amount]) => [resource, roundedResourceAmount(amount)] as const)
+    .filter(([, amount]) => amount > 0);
   const enemySurvivorLabel = report.encounterKind === 'predatorHunt'
     ? '남은 맹수'
     : report.enemyRouted ? '도주한 적' : '물러난 적';
@@ -117,14 +125,14 @@ export function TacticalBattleReportModal({ report, onClose }: Props) {
             <div className="battle-report-subsection">
               <strong>자원 변동</strong>
               {resourceDelta.length > 0 ? (
-                <ul>{resourceDelta.map(([resource, amount]) => <li key={resource}><b>{RESOURCE_NAMES[resource as ResourceId]}</b><span>{signed(Number((amount ?? 0).toFixed(2)))}</span></li>)}</ul>
+                <ul>{resourceDelta.map(([resource, amount]) => <li key={resource}><b>{RESOURCE_NAMES[resource as ResourceId]}</b><span>{signed(amount)}</span></li>)}</ul>
               ) : <p>자원 변동 없음</p>}
             </div>
             {recoveredLoot.length > 0 && (
               <div className="battle-report-subsection">
                 <strong>궤주 후 회수</strong>
                 <ul>{recoveredLoot.map(([resource, amount]) => (
-                  <li key={resource}><b>{RESOURCE_NAMES[resource as ResourceId]}</b><span>+{Number((amount ?? 0).toFixed(2))}</span></li>
+                  <li key={resource}><b>{RESOURCE_NAMES[resource as ResourceId]}</b><span>+{amount}</span></li>
                 ))}</ul>
               </div>
             )}

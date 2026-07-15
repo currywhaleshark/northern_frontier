@@ -35,7 +35,53 @@ const enemyPlan = await import(pathToFileURL(join(compiledDir, 'enemyPlan.mjs'))
 const tacticalCommandState = await import(pathToFileURL(join(compiledDir, 'tacticalCommandState.mjs')).href);
 const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
 const battleSimulation = await import(pathToFileURL(join(compiledDir, 'battleSimulation.mjs')).href);
+const josa = await import(pathToFileURL(join(compiledDir, 'josa.mjs')).href);
 const reportModalSource = readFileSync(new URL('../../src/components/TacticalBattleReportModal.tsx', import.meta.url), 'utf8');
+
+{
+  assert.equal(josa.withJosa('창잡이 우회대', '이/가'), '창잡이 우회대가');
+  assert.equal(josa.withJosa('마을 방어선', '으로/로'), '마을 방어선으로');
+  assert.equal(josa.withJosa('후열', '으로/로'), '후열로', 'rieul-final words use 로 instead of 으로');
+  assert.equal(josa.withJosa('노획조', '을/를'), '노획조를');
+}
+
+{
+  const casualtyEvents = [
+    {
+      zoneId: 'wall', kind: 'casualty', text: '첫 자막', durationMs: 480,
+      side: 'raider', groupId: 'vanguard', casualties: 1, killed: 1,
+    },
+    {
+      zoneId: 'wall', kind: 'casualty', text: '둘째 자막', durationMs: 480,
+      side: 'raider', groupId: 'looters', casualties: 2, killed: 2,
+    },
+  ];
+  const combined = tacticalEngagement.stabilizeTacticalCasualtyCaptions(casualtyEvents, {
+    vanguard: '적 선봉', looters: '노획조',
+  });
+  assert.equal(combined.length, 2, 'caption grouping must not merge casualty events');
+  assert.equal(combined[0].text, combined[1].text,
+    'consecutive same-side casualty events keep one stable caption during playback');
+  assert.equal(combined[0].text, '적 선봉·노획조에서 3명이 쓰러졌습니다.');
+  assert.deepEqual(combined.map(event => [event.groupId, event.killed]), [
+    ['vanguard', 1], ['looters', 2],
+  ], 'caption grouping preserves per-group casualty animation data');
+
+  const woundedOnly = tacticalEngagement.stabilizeTacticalCasualtyCaptions([{
+    zoneId: 'wall', kind: 'casualty', text: '이전 자막', durationMs: 520,
+    side: 'defender', groupId: 'guards', casualties: 1, wounded: 1, killed: 0,
+  }], { guards: '창 수비병' });
+  assert.equal(woundedOnly[0].text, '창 수비병 피해: 부상 1명.');
+  assert.doesNotMatch(woundedOnly[0].text, /전사 0|부상 0/,
+    'casualty captions omit zero-valued categories');
+}
+
+{
+  assert.equal(tactical.tacticalMaximumRoundOutcome(false), 'defenseSuccess',
+    'reaching the maximum round without a breach or loot is a defense success regardless of morale comparison');
+  assert.equal(tactical.tacticalMaximumRoundOutcome(true), 'partialLoss',
+    'concrete breach or loot losses remain a partial loss at the round limit');
+}
 
 {
   assert.deepEqual(tactical.tacticalSupportedCommands({ orientation: 'defense' }), [
@@ -954,6 +1000,10 @@ function addBuiltMarker(state, type) {
   assert.equal(routed.state.resources.grain, routed.grainBefore - 5);
 
   assert.match(reportModalSource, /['"]물러난 적['"]/, 'enemy survivors must be labelled as withdrawn, not deserters');
+  assert.match(reportModalSource, /roundedResourceAmount/,
+    'battle report resource changes must share one whole-number display policy');
+  assert.doesNotMatch(reportModalSource, /amount \?\? 0\)\.toFixed\(2\)/,
+    'battle reports must not expose fractional resource deltas');
   assert.doesNotMatch(reportModalSource, /대열 이탈·도주|적 도주/,
     'the final report must not describe all surviving enemies as deserters or escapees');
   assert.match(reportModalSource, /report\.closingSummary/, 'the final report must display its battle-specific closing line');

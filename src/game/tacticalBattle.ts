@@ -13,6 +13,7 @@ import {
   flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
 } from './enemyPlan';
 import { addLog } from './events';
+import { withJosa } from './josa';
 import { makeRng } from './map';
 import {
   applyLootLosses, damageBuildings, describeLootLosses, injure, killResidents, moraleShock,
@@ -1586,6 +1587,12 @@ function summaryForOutcome(outcome: TacticalRoundReport['outcome']): string {
   return '전선의 압박이 다음 구역으로 옮겨갑니다.';
 }
 
+export function tacticalMaximumRoundOutcome(
+  sufferedLoss: boolean,
+): Extract<TacticalRoundReport['outcome'], 'defenseSuccess' | 'partialLoss'> {
+  return sufferedLoss ? 'partialLoss' : 'defenseSuccess';
+}
+
 export function tacticalEnemyObjectiveOutcome(
   objective: EnemyPlan['objective'],
   priorLootRounds: number,
@@ -1652,15 +1659,16 @@ export function resolveTacticalRound(state: GameState): string | null {
   const roundStartingRaiderPower = Math.max(1, battle.raiderGroups.reduce((sum, group) =>
     sum + (group.intent === 'withdraw' ? 0 : group.power), 0));
 
-  event(events, focusZoneId, 'camera', `${battle.zones.find(zone => zone.id === focusZoneId)?.name ?? '전선'}으로 시선을 옮깁니다.`, 450);
+  const focusZoneName = battle.zones.find(zone => zone.id === focusZoneId)?.name ?? '전선';
+  event(events, focusZoneId, 'camera', `${withJosa(focusZoneName, '으로/로')} 시선을 옮깁니다.`, 450);
   for (const defender of battle.defenderGroups.filter(group => group.command === 'ambush' && !group.ambushed)) {
-    event(events, defender.zoneId, 'camera', `${defender.label}이(가) 숨을 죽이고 매복 자리를 잡습니다.`, 420);
-    lines.push(`${defender.label}이(가) 다음 교전을 위해 매복합니다.`);
+    event(events, defender.zoneId, 'camera', `${withJosa(defender.label, '이/가')} 숨을 죽이고 매복 자리를 잡습니다.`, 420);
+    lines.push(`${withJosa(defender.label, '이/가')} 다음 교전을 위해 매복합니다.`);
   }
   for (const defender of battle.defenderGroups.filter(group => group.command === 'advance')) {
     const enemyHere = battle.raiderGroups.some(attacker =>
       attacker.zoneId === defender.zoneId && attacker.intent !== 'withdraw' && attacker.power > 0);
-    if (!enemyHere) event(events, defender.zoneId, 'advance', `${defender.label}이(가) 앞선 방어선으로 전진할 채비를 합니다.`, 520, {
+    if (!enemyHere) event(events, defender.zoneId, 'advance', `${withJosa(defender.label, '이/가')} 앞선 방어선으로 전진할 채비를 합니다.`, 520, {
       side: 'defender', float: '전진 준비',
     });
   }
@@ -1677,10 +1685,10 @@ export function resolveTacticalRound(state: GameState): string | null {
     const frontalAttackers = attackers.filter(attacker => !attacker.rearAssault);
     for (const attacker of rearAttackers.filter(group => group.engagementsInZone === 0)) {
       attacker.revealed = true;
-      event(events, zone.id, 'rearAssault', `${attacker.label}이(가) 수비대 후열에 갑자기 모습을 드러냅니다.`, 760, {
+      event(events, zone.id, 'rearAssault', `${withJosa(attacker.label, '이/가')} 수비대 후열에 갑자기 모습을 드러냅니다.`, 760, {
         side: 'defender', groupId: attacker.id, float: '후방 급습!',
       });
-      lines.push(`${attacker.label}이(가) ${zone.name} 후열을 급습했습니다.`);
+      lines.push(`${withJosa(attacker.label, '이/가')} ${zone.name} 후열을 급습했습니다.`);
     }
     const assignedEngagements = splitTacticalEngagementDefenders(assignedDefenders, rearAttackers.length > 0);
     const engagementDefenders = splitTacticalEngagementDefenders(defenders, rearAttackers.length > 0);
@@ -1868,10 +1876,10 @@ export function resolveTacticalRound(state: GameState): string | null {
       (rearDominance.get(attacker.zoneId) ?? 0) >= 0.6) {
       attacker.intent = 'withdraw';
       attacker.pendingZoneId = undefined;
-      event(events, attacker.zoneId, 'retreat', `${attacker.label}이(가) 후열을 휘저은 뒤 추격을 피해 이탈합니다.`, 650, {
+      event(events, attacker.zoneId, 'retreat', `${withJosa(attacker.label, '이/가')} 후열을 휘저은 뒤 추격을 피해 이탈합니다.`, 650, {
         side: 'raider', groupId: attacker.id, float: '급습 이탈!',
       });
-      lines.push(`${attacker.label}이(가) 후방 급습 목표를 달성하고 전장에서 이탈했습니다.`);
+      lines.push(`${withJosa(attacker.label, '이/가')} 후방 급습 목표를 달성하고 전장에서 이탈했습니다.`);
     } else if (!attacker.confused && index >= 0 && index < route.length - 1 &&
       shouldRaiderAdvance(attacker, battle, zone, share, defenderReadiness.get(attacker.zoneId) ?? 0)) {
       const fromZoneId = attacker.zoneId;
@@ -1890,12 +1898,13 @@ export function resolveTacticalRound(state: GameState): string | null {
       scheduled.groupLabels.push(attacker.label);
       scheduled.groupIds.push(attacker.id);
       scheduledAdvances.set(advanceKey, scheduled);
+      const destinationWithJosa = withJosa(destinationName ?? '다음 방어선', '으로/로');
       if (attacker.kind === 'flankers') {
         lines.push(attacker.flankPlan === 'rearAssault'
-          ? `${attacker.label}이(가) 주 방어선의 뒤편을 노리며 ${destinationName}(으)로 우회합니다.`
-          : `${attacker.label}이(가) 방책을 우회해 ${destinationName}(으)로 접근합니다.`);
+          ? `${withJosa(attacker.label, '이/가')} 주 방어선의 뒤편을 노리며 ${destinationWithJosa} 우회합니다.`
+          : `${withJosa(attacker.label, '이/가')} 방책을 우회해 ${destinationWithJosa} 접근합니다.`);
       } else if (attacker.kind === 'looters' && fromZoneId === 'wall' && !zone?.breached) {
-        lines.push(`${attacker.label}이(가) 방책의 틈으로 새어 나가 ${destinationName}(으)로 침투합니다.`);
+        lines.push(`${withJosa(attacker.label, '이/가')} 방책의 틈으로 새어 나가 ${destinationWithJosa} 침투합니다.`);
       }
     }
     attacker.engagementsInZone = (attacker.engagementsInZone ?? 0) + 1;
@@ -1909,8 +1918,8 @@ export function resolveTacticalRound(state: GameState): string | null {
       advance.fromZoneId,
       'advance',
       advance.undefended
-        ? `${subject}이(가) 저항 없이 ${advance.fromZoneName}을(를) 휩쓸고 ${advance.destinationName}(으)로 진입합니다.`
-        : `${subject}이(가) 교전을 마치고 ${advance.destinationName}(으)로 밀려듭니다.`,
+        ? `${withJosa(subject, '이/가')} 저항 없이 ${withJosa(advance.fromZoneName, '을/를')} 휩쓸고 ${withJosa(advance.destinationName, '으로/로')} 진입합니다.`
+        : `${withJosa(subject, '이/가')} 교전을 마치고 ${withJosa(advance.destinationName, '으로/로')} 밀려듭니다.`,
       620,
       { side: 'raider', actorGroupIds: advance.groupIds },
     );
@@ -1954,7 +1963,7 @@ export function resolveTacticalRound(state: GameState): string | null {
     outcome = objectiveOutcome;
   } else if (battle.round >= CONFIG.tacticalBattle.maxRounds) {
     const sufferedLoss = battle.zones.some(zone => zone.breached) || priorLootRounds > 0 || thisRoundLooted;
-    outcome = !sufferedLoss && battle.raiderMorale < battle.villageMorale ? 'defenseSuccess' : 'partialLoss';
+    outcome = tacticalMaximumRoundOutcome(sufferedLoss);
   }
 
   if (roundWounded > 0 || roundKilled > 0) lines.push(`이번 교전 수비 피해: 전사 ${roundKilled}명, 부상 ${roundWounded}명.`);
@@ -2190,7 +2199,7 @@ export function finishTacticalBattle(state: GameState): void {
   const casualtyText = `전사 ${killedPeople.length}명${killedNames.length > 0 ? ` (${killedNames.join(', ')})` : ''}, 부상 ${woundedPeople.length}명`;
   const lootText = describeLootLosses(lootLosses);
   const highlights = [
-    ...(hasLoot(recoveredLoot) ? [`적의 궤주 과정에서 ${describeLootLosses(recoveredLoot)}을(를) 회수했습니다.`] : []),
+    ...(hasLoot(recoveredLoot) ? [`적의 궤주 과정에서 회수한 물자: ${describeLootLosses(recoveredLoot)}.`] : []),
     ...battle.reports.flatMap(report => report.lines),
   ].filter((line, index, all) => all.indexOf(line) === index).slice(0, 10);
   state.tacticalBattleReport = {
