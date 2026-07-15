@@ -125,8 +125,27 @@ assert.match(cssSource, /\.tactical-line-toggle\s*\{[\s\S]*grid-template-columns
   'formation toggles must lay out three buttons');
 assert.match(cssSource, /\.tactical-formation-lane\s*\{\s*display:\s*contents;/,
   'non-focused zones must keep the compact rank layout');
-assert.match(cssSource, /\.tactical-zone\.focused \.tactical-formation-lane[\s\S]*flex-direction:\s*column-reverse;/,
-  'groups sharing a focused formation line must stack vertically from the battlefield floor');
+assert.match(zoneSource, /function formationStackStyle/,
+  'focused formation groups must receive deterministic depth offsets');
+assert.match(zoneSource, /zIndex:\s*\d+\s*\+\s*index/,
+  'later and lower formation groups must paint above earlier groups');
+assert.match(zoneSource, /--formation-stack-y/,
+  'formation depth must use a shallow vertical offset instead of full-height stacking');
+assert.match(cssSource, /\.tactical-zone\.focused \.tactical-formation-lane[\s\S]*display:\s*grid;/,
+  'groups sharing a focused formation line must overlap in one grid cell');
+assert.match(cssSource,
+  /\.tactical-zone\.focused \.tactical-formation-lane > \.tactical-raider-group,[\s\S]*grid-area:\s*1\s*\/\s*1;/,
+  'each group in one line must occupy the same battlefield footprint');
+assert.match(cssSource, /translate:\s*var\(--formation-stack-x[\s\S]*--formation-stack-y/,
+  'overlapping groups must be staggered only by small ground-plane offsets');
+assert.match(zoneSource, /rear-facing/,
+  'defenders assigned to a rear engagement must expose a facing class');
+assert.match(cssSource, /\.tactical-field-group\.rear-facing \.tactical-defender[\s\S]*scaleX\(-1\)/,
+  'rear-engagement defenders must turn around in defensive battles');
+assert.match(cssSource, /\.tactical-screen\.assault \.tactical-field-group\.rear-facing \.tactical-defender[\s\S]*scaleX\(1\)/,
+  'rear-engagement facing must reverse relative to offensive battle orientation');
+assert.match(cssSource, /\.tactical-rear-assault-rank\s*\{[\s\S]*left:\s*86%;[\s\S]*right:\s*-2%;/,
+  'rear assaulters must stand beyond the defender rear line');
 assert.match(cssSource,
   /\.tactical-screen\.assault \.tactical-zone\.focused \.tactical-raider-rank \.line-front[\s\S]*grid-column:\s*1;/,
   'assault zones must put the enemy front line next to the reversed contact line');

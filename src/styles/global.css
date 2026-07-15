@@ -1604,9 +1604,9 @@ html, body, #root {
 }
 .tactical-rear-assault-rank {
   position: absolute;
-  z-index: 6;
-  left: 77%;
-  right: 2%;
+  z-index: 7;
+  left: 86%;
+  right: -2%;
   bottom: 36px;
   width: auto;
   min-height: 112px;
@@ -1825,15 +1825,13 @@ html, body, #root {
 }
 .tactical-zone.focused .tactical-raider-rank { left: 3%; right: 51%; }
 .tactical-zone.focused .tactical-defender-rank { left: 51%; right: 3%; }
-.tactical-zone.focused.has-rear-assault .tactical-defender-rank { right: 3%; }
+.tactical-zone.focused.has-rear-assault .tactical-defender-rank { right: 12%; }
 .tactical-zone.focused .tactical-formation-lane {
   position: relative;
   min-width: 0;
-  height: 224px;
-  display: flex;
-  flex-direction: column-reverse;
-  align-items: center;
-  justify-content: flex-start;
+  height: 154px;
+  display: grid;
+  place-items: end center;
   padding-top: 18px;
 }
 .tactical-zone.focused .tactical-formation-line-label {
@@ -1857,11 +1855,13 @@ html, body, #root {
 .tactical-zone.focused .tactical-defender-rank .tactical-formation-line-label { color: #b9d8b9; }
 .tactical-zone.focused .tactical-formation-lane > .tactical-raider-group,
 .tactical-zone.focused .tactical-formation-lane > .tactical-field-group {
+  grid-area: 1 / 1;
+  align-self: end;
   width: 100%;
   min-height: 0;
-  flex: 0 0 102px;
   gap: 2px;
   scale: 0.78;
+  translate: var(--formation-stack-x, 0) calc(-1 * var(--formation-stack-y, 0px));
   transform-origin: center bottom;
 }
 .tactical-zone.focused .tactical-formation-lane > .tactical-raider-group > span,
@@ -2006,6 +2006,12 @@ html, body, #root {
 .tactical-screen.assault .tactical-raider { transform: scaleX(1); }
 .tactical-screen.assault .tactical-court-raider { transform: scaleX(1) scale(var(--raider-scale)); }
 .tactical-screen.assault .tactical-beast { transform: scaleX(-1) scale(var(--beast-scale)); }
+.tactical-field-group.rear-facing .tactical-defender {
+  transform: scaleX(-1) scale(var(--defender-scale));
+}
+.tactical-screen.assault .tactical-field-group.rear-facing .tactical-defender {
+  transform: scaleX(1) scale(var(--defender-scale));
+}
 .tactical-unit-line.full-formation {
   position: relative;
   display: block;
@@ -3154,7 +3160,7 @@ html, body, #root {
   .tactical-strip { width: 400%; }
   .tactical-zone { flex-basis: 25%; }
   .tactical-raider-rank { left: 5%; right: 51%; gap: 12px; }
-  .tactical-rear-assault-rank { left: 77%; right: 1%; width: auto; bottom: 36px; }
+  .tactical-rear-assault-rank { left: 86%; right: -2%; width: auto; bottom: 36px; }
   .tactical-defender-rank { left: 51%; right: 5%; gap: 5px; }
   .tactical-zone.has-rear-assault .tactical-defender-rank { right: 23%; gap: 3px; }
   .tactical-controls { max-height: min(38vh, 250px); padding: 8px; }

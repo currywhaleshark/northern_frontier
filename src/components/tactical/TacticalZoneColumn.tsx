@@ -264,6 +264,16 @@ function formationSlotStyle(
   };
 }
 
+function formationStackStyle(index: number, groupCount: number): CSSProperties {
+  const depth = Math.max(0, groupCount - 1 - index);
+  const horizontalOffsets = [0, -18, 18, -30, 30];
+  return {
+    '--formation-stack-x': `${horizontalOffsets[depth % horizontalOffsets.length]}px`,
+    '--formation-stack-y': `${Math.min(24, depth * 8)}px`,
+    zIndex: 30 + index,
+  } as CSSProperties;
+}
+
 function GroupSprites({
   state, group, pose = 'idle', firing = false, falling = 0, maxVisible = 4, showAll = false,
   formationGroupCount = 1,
@@ -674,7 +684,7 @@ export function TacticalZoneColumn({
             key={line}
           >
             <span className="tactical-formation-line-label">적 {formationLineLabel(line)}</span>
-            {raiders.filter(raider => raider.line === line).map(raider => {
+            {raiders.filter(raider => raider.line === line).map((raider, stackIndex, lineGroups) => {
           const activeRaiders = Math.max(0, raider.count - raider.killed);
           const targetingActive = battle.phase === 'command' && !hunt && activeRaiders > 0 && selectedGroupId != null;
           const targetUnavailableReason = targetingActive && selectedGroupId
@@ -703,6 +713,8 @@ export function TacticalZoneColumn({
           return (
             <div
               className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${leaderMotion}`}
+              style={formationStackStyle(stackIndex, lineGroups.length)}
+              data-stack-depth={lineGroups.length - 1 - stackIndex}
               key={leaderMotion ? `${raider.id}-${activeEvent?.kind}-${eventIndex}` : raider.id}
               onClick={targetable ? event => {
                 event.stopPropagation();
@@ -833,8 +845,10 @@ export function TacticalZoneColumn({
             key={line}
           >
             <span className="tactical-formation-line-label">아군 {formationLineLabel(line)}</span>
-            {defenders.filter(group => group.line === line).map(group => {
+            {defenders.filter(group => group.line === line).map((group, stackIndex, lineGroups) => {
           const recoiling = zoneVolley && defenderFiringForEvent(activeEvent, group);
+          const rearFacing = rearAssaulters.length > 0 &&
+            (group.line === 'rear' || (group.line === 'middle' && group.command === 'reinforceRear'));
           const blockingEscape = activeEvent?.kind === 'escapeBlocked' &&
             activeEvent.zoneId === zone.id && group.kind === 'hunter';
           const prepMotion = activeEvent?.kind === 'readyVolley' && activeEvent.zoneId === zone.id && tacticalGroupCapabilities(group).has('volley')
@@ -844,7 +858,9 @@ export function TacticalZoneColumn({
               : '';
           return (
             <div
-              className={`tactical-field-group formation-${defenderFormationRole(group)} line-${group.line}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${prepMotion}${commandable ? ' selectable' : ''}${commandable && selectedGroupId === group.id ? ' selected' : ''}`}
+              className={`tactical-field-group formation-${defenderFormationRole(group)} line-${group.line}${rearFacing ? ' rear-facing' : ''}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${prepMotion}${commandable ? ' selectable' : ''}${commandable && selectedGroupId === group.id ? ' selected' : ''}`}
+              style={formationStackStyle(stackIndex, lineGroups.length)}
+              data-stack-depth={lineGroups.length - 1 - stackIndex}
               key={recoiling || blockingEscape || prepMotion ? `${group.id}-motion-${eventIndex}` : group.id}
               onClick={commandable ? event => {
                 event.stopPropagation();
