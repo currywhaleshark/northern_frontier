@@ -304,6 +304,7 @@ function prepareFormationTestCombatants(state) {
   spear.zoneId = 'wall';
   flanker.zoneId = 'wall';
   flanker.rearAssault = true;
+  flanker.engagementsInZone = 1;
   assert.equal(tactical.setTacticalCommand(rearReserveSave, spear.id, 'reinforceRear'), null);
   assert.equal(saveLoad.saveGame(rearReserveSave), true);
   const loaded = saveLoad.loadGame();

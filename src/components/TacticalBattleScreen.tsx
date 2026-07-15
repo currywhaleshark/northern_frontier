@@ -7,6 +7,7 @@ import {
   applyTacticalPlaybackEvent,
   tacticalCommandDescription, tacticalCommandUnavailableReason, tacticalLootText,
   tacticalFormationLinesAdjacent, tacticalPreparationUnavailableReason, tacticalRearResponseOptions,
+  tacticalRearAssaultIsEngaged,
 } from '../game/tacticalBattle';
 import { assaultMaxRounds } from '../game/tacticalAssault';
 import { huntDeploymentUnavailableReason, huntMaxRounds } from '../game/tacticalHunt';
@@ -420,7 +421,7 @@ export function TacticalBattleScreen({
   const pendingCommandCount = pendingTacticalCommandCount(battle.defenderGroups);
   const rearResponseZoneId = !assault && !hunt
     ? battle.raiderGroups.find(group =>
-      group.rearAssault && group.intent !== 'withdraw' && group.power > 0)?.zoneId ?? null
+      tacticalRearAssaultIsEngaged(group) && group.intent !== 'withdraw' && group.power > 0)?.zoneId ?? null
     : null;
   const rearResponseOptions = rearResponseZoneId
     ? tacticalRearResponseOptions(battle, rearResponseZoneId)

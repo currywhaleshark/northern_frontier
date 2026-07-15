@@ -379,6 +379,16 @@ function addBuiltMarker(state, type) {
   flanker.zoneId = 'wall';
   flanker.rearAssault = true;
   flanker.intent = 'flank';
+  flanker.engagementsInZone = 0;
+  assert.ok(tactical.tacticalCommandUnavailableReason(battle, spear, 'reinforceRear'),
+    'a planned but not-yet-revealed rear assault must not unlock the rear response command');
+  spear.command = 'hold';
+  spear.commandSource = 'recommended';
+  tactical.chooseDefaultTacticalCommands(battle);
+  assert.equal(spear.command, 'hold',
+    'a hidden pending rear assault must not reclassify the middle reserve before it happens');
+
+  flanker.engagementsInZone = 1;
   assert.equal(tactical.tacticalCommandUnavailableReason(battle, spear, 'reinforceRear'), null);
   assert.ok(tactical.tacticalCommandUnavailableReason(battle, bow, 'reinforceRear'),
     'ranged middle-line groups cannot act as a rear melee reserve');
@@ -453,7 +463,13 @@ function addBuiltMarker(state, type) {
   Object.assign(spear, { zoneId: 'wall', line: 'middle', command: 'hold', commandSource: 'recommended' });
   Object.assign(bow, { zoneId: 'wall', line: 'rear', command: 'volley', commandSource: 'recommended' });
   Object.assign(watchman, { zoneId: 'wall', line: 'front', command: 'hold', commandSource: 'recommended' });
-  Object.assign(flanker, { zoneId: 'wall', rearAssault: true, intent: 'flank', power: 30 });
+  Object.assign(flanker, {
+    zoneId: 'wall', rearAssault: true, intent: 'flank', power: 30, engagementsInZone: 0,
+  });
+
+  assert.deepEqual(tactical.tacticalRearResponseOptions(battle, 'wall'), [],
+    'rear response choices stay hidden until the rear assault has actually occurred');
+  flanker.engagementsInZone = 1;
 
   const options = tactical.tacticalRearResponseOptions(battle, 'wall');
   assert.deepEqual(options.map(option => option.id), [
@@ -537,8 +553,18 @@ function addBuiltMarker(state, type) {
 
   rear.zoneId = zone.id;
   rear.rearAssault = true;
+  rear.engagementsInZone = 0;
   rear.line = 'rear';
   tactical.normalizeTacticalGroupTargets(battle);
+  assert.deepEqual(tactical.tacticalRearResponseOptions(battle, zone.id), [],
+    'a pending rear assault does not expose rear response information');
+  assert.equal(tactical.tacticalGroupTargetUnavailableReason(battle, bow.id, front.id), null,
+    'a rear-line defender remains assigned to the frontal engagement before the rear assault happens');
+
+  rear.engagementsInZone = 1;
+  tactical.normalizeTacticalGroupTargets(battle);
+  assert.ok(tactical.tacticalGroupTargetUnavailableReason(battle, bow.id, front.id),
+    'after the rear assault occurs, a rear-line defender no longer attacks the frontal engagement');
   assert.match(tactical.tacticalGroupTargetUnavailableReason(battle, spear.id, rear.id), /정면 교전/);
   Object.assign(spear, { line: 'middle', command: 'reinforceRear' });
   assert.equal(tactical.tacticalGroupTargetUnavailableReason(battle, spear.id, rear.id), null,
@@ -1552,6 +1578,22 @@ function addBuiltMarker(state, type) {
     event.kind === 'volley' && event.side === 'defender');
   assert.ok(bowVolley.text.includes('활시위') && !bowVolley.text.includes('총성'),
     'a bow-only volley caption mentions bowstrings but not gunfire');
+
+  const rearBowExchange = tacticalEngagement.resolveEngagementExchange({
+    zone,
+    defenders: [{ ...bowDefender, line: 'rear' }],
+    attackers: [{ ...shootingRaider, rearAssault: true, line: 'rear' }],
+    direction: 'rear',
+    weather: 'clear',
+    prepareVolleyApplied: false,
+    evacuateCiviliansApplied: false,
+    roundStartingRaiderPower: shootingRaider.power,
+    rng: () => 0,
+  });
+  const rearBowVolley = rearBowExchange.preDefenseEvents.find(event =>
+    event.kind === 'volley' && event.side === 'defender');
+  assert.equal(rearBowVolley?.direction, 'rear',
+    'rear-engagement volleys carry their direction into visual playback');
 
   const ambushDefender = {
     ...bowDefender,

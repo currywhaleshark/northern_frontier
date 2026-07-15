@@ -248,7 +248,7 @@ function animationEvent(
   kind: TacticalAnimationEvent['kind'],
   text: string,
   durationMs = 650,
-  extra?: Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'actorGroupIds' | 'casualties' | 'wounded' | 'killed' | 'float' | 'shots' | 'meleeParticipants'>,
+  extra?: Pick<TacticalAnimationEvent, 'side' | 'direction' | 'groupId' | 'actorGroupIds' | 'casualties' | 'wounded' | 'killed' | 'float' | 'shots' | 'meleeParticipants'>,
 ): TacticalAnimationEvent {
   return { zoneId, kind, text, durationMs, ...extra };
 }
@@ -527,15 +527,18 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     attackers.some(attacker => !attacker.confused);
 
   if (commands.includes('volley')) {
-    const shots = tacticalDefenderShotCounts(defenders.filter(defender => defender.command === 'volley'));
+    const volleyDefenders = defenders.filter(defender => defender.command === 'volley');
+    const shots = tacticalDefenderShotCounts(volleyDefenders);
     friendlyActionEvents.push(animationEvent(zone.id, 'volley', defenderVolleyCaption(shots), 650, {
-      side: 'defender', shots,
+      side: 'defender', direction: input.direction,
+      actorGroupIds: volleyDefenders.map(group => group.id), shots,
     }));
   }
   const raiderShots = tacticalRaiderShotCounts(attackers);
   if (defenders.length > 0 && (raiderShots.arrows ?? 0) + (raiderShots.muskets ?? 0) > 0) {
     enemyActionEvents.push(animationEvent(zone.id, 'volley', '적 사격대가 방어선을 향해 일제히 사격합니다.', 650, {
-      side: 'raider', shots: { arrows: raiderShots.arrows, muskets: raiderShots.muskets },
+      side: 'raider', direction: input.direction, actorGroupIds: attackers.map(group => group.id),
+      shots: { arrows: raiderShots.arrows, muskets: raiderShots.muskets },
     }));
   }
   for (const attacker of rearAttackers.filter(group => !group.confused && defenders.length > 0)) {

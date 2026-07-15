@@ -476,6 +476,7 @@ function defenderFiringForEvent(
   if (!event || event.zoneId !== group.zoneId || event.side === 'raider') return false;
   if (event.kind !== 'volley' && event.kind !== 'fire') return false;
   if (!tacticalGroupCapabilities(group).has('volley')) return false;
+  if (event.actorGroupIds != null && !event.actorGroupIds.includes(group.id)) return false;
   if (event.kind === 'volley' && group.command != null && group.command !== 'volley') return false;
   if (event.kind === 'fire' && group.command != null && group.command !== 'arson') return false;
   if (!event.shots) return true;
@@ -519,6 +520,7 @@ function raiderFiringForEvent(
     return shotKind === 'cannon' && (!event.shots || (event.shots.cannons ?? 0) > 0);
   }
   if (event.kind !== 'volley' || event.side !== 'raider' || shotKind == null) return false;
+  if (event.actorGroupIds != null && !event.actorGroupIds.includes(group.id)) return false;
   if (!event.shots) return true;
   if (shotKind === 'arrow') return (event.shots.arrows ?? 0) > 0;
   if (shotKind === 'musket') return (event.shots.muskets ?? 0) > 0;
@@ -587,10 +589,13 @@ export function TacticalZoneColumn({
   const zoneVolley = activeEvent?.kind === 'volley' && activeEvent.zoneId === zone.id;
   const zoneArson = activeEvent?.kind === 'fire' && activeEvent.zoneId === zone.id;
   const zoneBombardment = activeEvent?.kind === 'bombardment' && activeEvent.zoneId === zone.id;
-  const arrowProjectileCount = arrowProjectileCountForZone(activeEvent, defenders, raiders);
-  const projectileMovesRight = assault
+  const arrowProjectileCount = arrowProjectileCountForZone(activeEvent, defenders, zoneRaiders);
+  const frontalProjectileMovesRight = assault
     ? activeEvent?.side !== 'raider'
     : activeEvent?.side === 'raider';
+  const projectileMovesRight = activeEvent?.direction === 'rear'
+    ? !frontalProjectileMovesRight
+    : frontalProjectileMovesRight;
   const background = tacticalBackgroundAsset(zone.kind, season, battle.assaultKind, zone.order);
   const scars = Math.min(9, scarCount);
   const liveBreachEventIndex = battle.phase === 'simulating'

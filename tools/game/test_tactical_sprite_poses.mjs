@@ -76,6 +76,8 @@ assert.doesNotMatch(tacticalCss, /\.tactical-zone\.event-volley \.tactical-raide
   'generic volley CSS must not paint arrows in empty zones or musket-only volleys');
 assert.match(screenSource, /moves-\$\{projectileMovesRight \? 'right' : 'left'\}/,
   'arrow direction must follow the firing side and battle orientation');
+assert.match(screenSource, /activeEvent\?\.direction === 'rear'[\s\S]*!frontalProjectileMovesRight/,
+  'rear-engagement arrows must reverse the normal frontal projectile direction');
 assert.match(screenSource, /event\.kind === 'wallAssault'[\s\S]*event\.groupId === group\.id/,
   'the wall-striking enemy group must use its attack pose');
 assert.match(screenSource, /event\.kind === 'melee'[\s\S]*event\.side === 'raider'[\s\S]*event\.groupId/,
