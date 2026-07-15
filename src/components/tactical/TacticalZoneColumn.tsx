@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { combatSpriteDescriptor, tacticalGroupCapabilities } from '../../game/combatCapabilities';
+import { CONFIG } from '../../game/config';
 import { tacticalGroupTargetUnavailableReason } from '../../game/tacticalBattle';
 import type {
   GameState,
@@ -544,11 +545,21 @@ export function TacticalZoneColumn({
   const barricadeState = visibleBreached ? 'broken' : barricadeReinforced ? 'reinforced' : 'normal';
   const raidersAdvancing = activeEvent?.kind === 'advance' &&
     activeEvent.zoneId === zone.id && activeEvent.side !== 'defender';
+  const huntSector = hunt && zone.id !== 'huntDen';
+  const blockadeThreshold = CONFIG.tacticalBattle.hunt.sectors.blockadeThreshold;
+  const currentBlockade = huntSector
+    ? zone.sectorBlockade ?? defenders.reduce((sum, group) => {
+      const active = Math.max(0, group.count - group.wounded - group.killed);
+      return sum + group.power * active / Math.max(1, group.count);
+    }, 0)
+    : 0;
+  const blockadePercent = Math.min(100, currentBlockade / Math.max(0.01, blockadeThreshold) * 100);
+  const openRounds = huntSector ? battle.huntOpenSectorRounds?.[zone.id] ?? 0 : 0;
 
   return (
     <section
       data-zone-id={zone.id}
-      className={`tactical-zone zone-${zone.kind}${hunt ? ' hunt-zone' : assault ? ' assault-zone' : ' defense-zone'}${focused ? ' focused' : ''}${visibleBreached ? ' breached' : ''}${burning ? ' burning' : ''}${raidersAdvancing ? ' moving-raiders' : ''}${rearAssaulters.length > 0 ? ' has-rear-assault' : ''}${eventClass(activeEvent, zone.id)}`}
+      className={`tactical-zone zone-${zone.kind}${hunt ? ` hunt-zone${zone.id === 'huntDen' ? ' hunt-den' : ' hunt-sector'}` : assault ? ' assault-zone' : ' defense-zone'}${focused ? ' focused' : ''}${visibleBreached ? ' breached' : ''}${burning ? ' burning' : ''}${raidersAdvancing ? ' moving-raiders' : ''}${rearAssaulters.length > 0 ? ' has-rear-assault' : ''}${eventClass(activeEvent, zone.id)}`}
       style={{
         backgroundImage: `url(${background.src})`,
         backgroundSize: background.size,
@@ -564,6 +575,18 @@ export function TacticalZoneColumn({
         <div className="tactical-pressure" aria-label={`압박 ${Math.round(zone.pressure)}`}>
           <i style={{ width: `${zone.pressure}%` }} />
         </div>
+        {huntSector && (
+          <div
+            className={`tactical-sector-blockade${openRounds > 0 ? ' open' : ''}`}
+            aria-label={`${zone.name} 봉쇄 ${currentBlockade.toFixed(1)}, 구멍 ${openRounds}라운드`}
+            title={openRounds > 0
+              ? `봉쇄 기준 미달 · 구멍이 ${openRounds}라운드째 열려 있습니다.`
+              : `봉쇄 기준 ${blockadeThreshold.toFixed(1)} 이상`}
+          >
+            <span>{openRounds > 0 ? `구멍 ${openRounds}R` : `봉쇄 ${currentBlockade.toFixed(1)}`}</span>
+            <div><i style={{ width: `${blockadePercent}%` }} /></div>
+          </div>
+        )}
       </div>
       <div className="tactical-prep-tags">
         {effects.map(label => <span key={label}>{label}</span>)}
@@ -844,7 +867,15 @@ export function TacticalZoneColumn({
                 formationGroupCount={defenders.length + (rearAssaulters.length > 0 ? 2 : 0)}
                 falling={activeEvent?.kind === 'casualty' && activeEvent.groupId === group.id ? activeEvent.casualties ?? 0 : 0}
               />
-              <span>{group.label}{group.ambushed && <em className="tactical-state-badge ambushed">매복중</em>}</span>
+              <span>
+                {group.label}
+                {group.ambushed && <em className="tactical-state-badge ambushed">매복중</em>}
+                {hunt && group.huntMovedRound === battle.round && (
+                  <em className="tactical-state-badge tactical-hunt-moved" title="이번 라운드 이동으로 몰이 기여가 절반입니다.">
+                    이동 · 몰이 ½
+                  </em>
+                )}
+              </span>
             </div>
           );
             })}

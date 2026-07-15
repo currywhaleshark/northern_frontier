@@ -925,12 +925,23 @@ export interface TacticalBattle {
   huntWithdrawn?: boolean;
   huntDetachmentSerial?: number;
   huntOpenSectorRounds?: Record<string, number>;
+  huntBlockadeHistory?: Array<{
+    round: number;
+    sectors: Record<string, number>;
+  }>;
+  huntEscapeCause?: 'openSector' | 'breakout' | 'timeout' | 'withdrawn';
+  huntEscapeZoneId?: string;
   huntCornered?: boolean;
   huntLastBeastAction?: {
     kind: 'lurk' | 'ambush' | 'breakout' | 'cornered';
     sectorId?: string;
     targetGroupId?: string;
   };
+  huntLastBeastActions?: Array<{
+    kind: 'lurk' | 'ambush' | 'breakout' | 'cornered';
+    sectorId?: string;
+    targetGroupId?: string;
+  }>;
   huntCounterattackCount?: number;
   preliminaryBombardmentCannons?: number;
   preliminaryBombardmentCasualties?: number;

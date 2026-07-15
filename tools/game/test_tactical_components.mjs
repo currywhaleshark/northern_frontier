@@ -92,6 +92,20 @@ assert.match(screenSource, /COMMANDS\.filter\(command => !hunt \|\| command !== 
   'fallback must be absent from the hunt command bar');
 assert.match(screenSource, /!hunt && \(\s*<div className="tactical-line-toggle"/,
   'hunt deployment and command controls must hide formation-line toggles');
+assert.match(zoneSource, /tactical-sector-blockade/,
+  'each hunt sector must render its own blockade gauge');
+assert.match(zoneSource, /sectorBlockade/,
+  'hunt sector reconnaissance must read the current blockade value');
+assert.match(zoneSource, /huntOpenSectorRounds/,
+  'open-sector reconnaissance must expose how long a hole has remained open');
+assert.match(zoneSource, /huntMovedRound/,
+  'groups moved during the current hunt round must carry a visible drive penalty marker');
+assert.match(zoneSource, /tactical-beast-trace/,
+  'a hidden predator must remain represented by an uncertain trace instead of disappearing');
+assert.match(cssSource, /\.tactical-sector-blockade/,
+  'the sector blockade gauge must have dedicated visual styling');
+assert.match(cssSource, /\.tactical-hunt-moved/,
+  'the hunt movement penalty marker must have dedicated visual styling');
 
 const threeLineToggleCount = [...screenSource.matchAll(/\['front', 'middle', 'rear'\] as const/g)].length;
 assert.equal(threeLineToggleCount, 2, 'deployment and command controls must both expose three formation lines');

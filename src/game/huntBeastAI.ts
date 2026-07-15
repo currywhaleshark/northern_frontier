@@ -76,14 +76,20 @@ function ambushExposureThreshold(input: ChooseBeastActionInput): number {
   return HUNT_AI.ambushExposureThreshold[input.tigerTier ?? 'tiger'];
 }
 
+function predatorProfileKey(input: ChooseBeastActionInput): 'wolf' | TigerTier {
+  return input.predatorKind === 'wolf' ? 'wolf' : input.tigerTier ?? 'tiger';
+}
+
 export function chooseBeastAction(input: ChooseBeastActionInput): BeastAction {
   if (input.encirclement >= HUNT_AI.corneredEncirclement) return { kind: 'cornered' };
 
   const thinnestSector = weakestSector(input.sectors);
+  const profileKey = predatorProfileKey(input);
   const shouldBreakOut = input.predatorState === 'wounded' ||
     input.remainingPowerShare <= HUNT_AI.woundedPowerShare ||
-    input.encirclement >= HUNT_AI.breakoutEncirclement;
-  if (shouldBreakOut && thinnestSector && thinnestSector.blockade <= HUNT_AI.breakoutBlockadeMax) {
+    input.encirclement >= HUNT_AI.breakoutEncirclement[profileKey];
+  if (shouldBreakOut && thinnestSector &&
+      thinnestSector.blockade <= HUNT_AI.breakoutBlockadeMax[profileKey]) {
     return { kind: 'breakout', sectorId: thinnestSector.id };
   }
 
@@ -93,4 +99,25 @@ export function chooseBeastAction(input: ChooseBeastActionInput): BeastAction {
     return { kind: 'ambush', sectorId: target.sectorId, targetGroupId: target.groupId };
   }
   return { kind: 'lurk' };
+}
+
+export function chooseWolfPackActions(
+  input: ChooseBeastActionInput,
+  secondaryDecisionRoll: number,
+): BeastAction[] {
+  const primary = chooseBeastAction({ ...input, predatorKind: 'wolf' });
+  if (primary.kind === 'cornered' || primary.kind === 'breakout') return [primary];
+  const actions: BeastAction[] = primary.kind === 'ambush' ? [primary] : [];
+  const secondarySectors = input.sectors.filter(sector =>
+    sector.groups.length > 0 && (primary.kind !== 'ambush' || sector.id !== primary.sectorId));
+  if (secondarySectors.length > 0) {
+    const secondary = chooseBeastAction({
+      ...input,
+      predatorKind: 'wolf',
+      sectors: secondarySectors,
+      decisionRoll: secondaryDecisionRoll,
+    });
+    if (secondary.kind === 'ambush') actions.push(secondary);
+  }
+  return actions.length > 0 ? actions : [{ kind: 'lurk' }];
 }

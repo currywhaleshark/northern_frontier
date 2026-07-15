@@ -21,7 +21,7 @@ function compileGameModules() {
 }
 
 const compiledDir = compileGameModules();
-const { chooseBeastAction } = await import(pathToFileURL(join(compiledDir, 'huntBeastAI.mjs')).href);
+const { chooseBeastAction, chooseWolfPackActions } = await import(pathToFileURL(join(compiledDir, 'huntBeastAI.mjs')).href);
 
 function group(id, effectivePower, options = {}) {
   return {
@@ -101,6 +101,29 @@ function input(overrides = {}) {
   assert.deepEqual(chooseBeastAction(input({ decisionRoll: 0.99, baitSectorId: 'ravine' })), {
     kind: 'ambush', sectorId: 'ravine', targetGroupId: 'ravine-weak',
   }, 'bait makes the first viable ambush deterministic even when the normal decision roll would lurk');
+}
+
+{
+  const actions = chooseWolfPackActions(input({ predatorKind: 'wolf', decisionRoll: 0.1 }), 0.2);
+  assert.equal(actions.length, 2);
+  assert.ok(actions.every(action => action.kind === 'ambush'));
+  assert.equal(new Set(actions.map(action => action.sectorId)).size, 2,
+    'the leader and pack probe different sectors in one round');
+}
+
+{
+  const patientTarget = [sector('ravine', 30, [group('guarded-target', 18, { meleeCapable: true })])];
+  assert.equal(chooseBeastAction(input({ sectors: patientTarget, tigerTier: 'tiger' })).kind, 'ambush');
+  assert.deepEqual(chooseBeastAction(input({ sectors: patientTarget, tigerTier: 'mountainLord' })), { kind: 'lurk' },
+    'a mountain lord waits for a clearer weakness than an ordinary tiger');
+}
+
+{
+  const guardedGap = [sector('ravine', 22, [group('strong-guard', 100, { count: 4, meleeCapable: true })])];
+  assert.deepEqual(chooseBeastAction(input({ sectors: guardedGap, encirclement: 60, tigerTier: 'tiger' })), { kind: 'lurk' });
+  assert.deepEqual(chooseBeastAction(input({ sectors: guardedGap, encirclement: 60, tigerTier: 'mountainLord' })), {
+    kind: 'breakout', sectorId: 'ravine',
+  }, 'a mountain lord attempts a stronger, earlier breakout');
 }
 
 console.log('hunt beast AI tests passed');

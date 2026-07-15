@@ -425,7 +425,7 @@ export const CONFIG = {
   tacticalBattle: {
     maxRounds: 5,
     hunt: {
-      maxEngagements: 5,
+      maxEngagements: 8,
       baitMeatCost: 3,
       ambush: {
         tigerHitChance: { base: 0.68, min: 0.46, max: 0.92 },
@@ -458,8 +458,8 @@ export const CONFIG = {
         },
       },
       encirclement: {
-        baseGain: 7,
-        perDriver: 1.8,
+        baseGain: 9,
+        perDriver: 2.2,
         hunterSkillMultiplier: 12,
         wolfBaseMultiplier: 1.16,
         wolfPackThreshold: 3,
@@ -473,15 +473,25 @@ export const CONFIG = {
       },
       beastAI: {
         corneredEncirclement: 100,
-        breakoutEncirclement: 65,
-        breakoutBlockadeMax: 24,
+        breakoutEncirclement: {
+          wolf: 60,
+          tiger: 70,
+          greatTiger: 62,
+          mountainLord: 55,
+        },
+        breakoutBlockadeMax: {
+          wolf: 24,
+          tiger: 20,
+          greatTiger: 25,
+          mountainLord: 30,
+        },
         woundedPowerShare: 0.45,
         ambushDecisionChance: 0.72,
         ambushExposureThreshold: {
-          wolf: 30,
-          tiger: 28,
-          greatTiger: 34,
-          mountainLord: 40,
+          wolf: 34,
+          tiger: 38,
+          greatTiger: 32,
+          mountainLord: 26,
         },
         exposure: {
           perMember: 2,
@@ -492,11 +502,11 @@ export const CONFIG = {
         },
       },
       sectors: {
-        blockadeThreshold: 6,
+        blockadeThreshold: 4,
         holeGainMultiplier: 0.5,
         openEscapeRounds: 2,
-        openEscapeEncirclementMin: 35,
-        openEscapeChance: 0.35,
+        openEscapeEncirclementMin: 10,
+        openEscapeChance: 0.45,
       },
       search: {
         baseChance: 0.16,
@@ -518,6 +528,7 @@ export const CONFIG = {
         specialistMultiplier: 1.15,
         searchRevealMultiplier: 0.9,
       },
+      wolfMultiAmbushHitMultiplier: 0.72,
       rehideChance: { tiger: 0.46, greatTiger: 0.38, mountainLord: 0.30 },
       rehideEncirclementMax: 70,
     },

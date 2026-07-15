@@ -4,7 +4,7 @@ import { combatGroupLabel, tacticalGroupCapabilities, tacticalGroupPower } from 
 import { beginExpeditionReturn, expeditionResidentsForIds } from './expedition';
 import { predatorThreatProfile, tigerTierDangerMultiplier, tigerTierLabel } from './expeditionIntel';
 import { makeRng } from './map';
-import { chooseBeastAction, type BeastAction } from './huntBeastAI';
+import { chooseBeastAction, chooseWolfPackActions, type BeastAction, type ChooseBeastActionInput } from './huntBeastAI';
 import { injure, killResidents } from './raidDamage';
 import { applyWildlifeHuntOutcome, type WildlifeHuntOutcome } from './specialEvents';
 import { createExpeditionTacticalGroups } from './tacticalAssault';
@@ -180,6 +180,7 @@ export function createPredatorTacticalHunt(state: GameState): TacticalBattle | s
       huntSectorRavine: 0,
       huntSectorBrook: 0,
     },
+    huntBlockadeHistory: [],
     huntCornered: false,
     huntCounterattackCount: 0,
     resourceSnapshot: captureTacticalResources(state),
@@ -506,6 +507,7 @@ function beastAttack(
   events: TacticalAnimationEvent[],
   zoneId: string,
   targetGroupId?: string,
+  hitChanceMultiplier = 1,
 ): { wounded: number; killed: number } {
   const kind = battle.huntPredatorKind ?? 'wolf';
   const tigerTier = battle.huntTigerTier ?? 'tiger';
@@ -527,6 +529,7 @@ function beastAttack(
       wolfHitChance.max,
     );
   if (spearWall) hitChance *= HUNT_CONFIG.ambush.spearWallMultiplier[kind];
+  hitChance *= hitChanceMultiplier;
   addEvent(events, zoneId, 'beastAmbush', `${beastName}가 ${target.label} 한 곳을 노려 덮칩니다.`, {
     side: 'raider', groupId: target.id, float: '급습!',
   });
@@ -619,16 +622,33 @@ function triggerHuntTrap(
   return applyWolfDamage(battle, damage, events, zone.id);
 }
 
-function outcomeText(outcome: NonNullable<TacticalRoundReport['outcome']>): string {
+function huntEscapeText(battle: TacticalBattle): string {
+  const zoneName = battle.zones.find(zone => zone.id === battle.huntEscapeZoneId)?.name ?? '봉쇄선';
+  if (battle.huntEscapeCause === 'openSector') {
+    return `${zoneName}의 봉쇄 구멍이 오래 열려 맹수가 소리 없이 포위망을 빠져나갔습니다.`;
+  }
+  if (battle.huntEscapeCause === 'breakout') {
+    return `${zoneName}의 얇은 봉쇄를 맹수가 정면으로 돌파해 숲 밖으로 빠져나갔습니다.`;
+  }
+  if (battle.huntEscapeCause === 'timeout') {
+    return '제한된 교전 시간이 끝날 때까지 포위망을 닫지 못해 맹수가 깊은 숲으로 빠져나갔습니다.';
+  }
+  if (battle.huntEscapeCause === 'withdrawn') {
+    return '사냥대가 맹수 위협을 남긴 채 질서 있게 사냥을 중지하고 철수했습니다.';
+  }
+  return '포위망이 닫히기 전에 맹수가 깊은 숲으로 빠져나갔습니다.';
+}
+
+function outcomeText(battle: TacticalBattle, outcome: NonNullable<TacticalRoundReport['outcome']>): string {
   if (outcome === 'huntKill') return '포위망 안의 맹수를 사살해 위협을 끝냈습니다.';
   if (outcome === 'huntRepelled') return '우두머리를 잃은 늑대 떼가 영역 밖으로 달아났습니다.';
-  if (outcome === 'huntEscaped') return '포위망이 닫히기 전에 맹수가 깊은 숲으로 빠져나갔습니다.';
+  if (outcome === 'huntEscaped') return huntEscapeText(battle);
   if (outcome === 'huntDefeat') return '사냥대의 기세가 무너져 부상자를 데리고 강제 철수합니다.';
   return '몰이사냥 교전이 끝났습니다.';
 }
 
-function chooseRoundBeastAction(battle: TacticalBattle, decisionRoll: number): BeastAction {
-  return chooseBeastAction({
+function roundBeastActionInput(battle: TacticalBattle, decisionRoll: number): ChooseBeastActionInput {
+  return {
     sectors: battle.zones.filter(zone => zone.id !== 'huntDen').map(zone => ({
       id: zone.id,
       blockade: zone.sectorBlockade ?? 0,
@@ -653,7 +673,18 @@ function chooseRoundBeastAction(battle: TacticalBattle, decisionRoll: number): B
     baitSectorId: battle.huntBaitZoneId,
     trapSectorId: battle.huntTrapZoneId,
     decisionRoll,
-  });
+  };
+}
+
+function chooseRoundBeastActions(
+  battle: TacticalBattle,
+  decisionRoll: number,
+  secondaryDecisionRoll: number,
+): BeastAction[] {
+  const input = roundBeastActionInput(battle, decisionRoll);
+  return battle.huntPredatorKind === 'wolf'
+    ? chooseWolfPackActions(input, secondaryDecisionRoll)
+    : [chooseBeastAction(input)];
 }
 
 function breakoutSuccessChance(blockade: number): number {
@@ -665,6 +696,14 @@ function breakoutSuccessChance(blockade: number): number {
     breakout.minSuccessChance,
     breakout.maxSuccessChance,
   );
+}
+
+export function huntOpenSectorEscapeChance(openSectorCount: number): number {
+  const baseChance = clamp(HUNT_CONFIG.sectors.openEscapeChance, 0, 1);
+  const opportunities = Math.max(0, Math.floor(openSectorCount));
+  if (opportunities <= 0) return 0;
+  if (opportunities === 1) return baseChance;
+  return clamp(1 - Math.pow(1 - baseChance, opportunities), 0, 1);
 }
 
 export function resolveHuntRound(state: GameState): string | null {
@@ -702,6 +741,11 @@ export function resolveHuntRound(state: GameState): string | null {
       ? (battle.huntOpenSectorRounds[sector.id] ?? 0) + 1
       : 0;
   }
+  battle.huntBlockadeHistory ??= [];
+  battle.huntBlockadeHistory.push({
+    round: battle.round,
+    sectors: Object.fromEntries(sectorZones.map(sector => [sector.id, sector.sectorBlockade ?? 0])),
+  });
   const driveGroups = players.filter(group => group.command === 'advance');
   const skill = hunterSkill(state, players);
   const encirclement = HUNT_CONFIG.encirclement;
@@ -731,11 +775,12 @@ export function resolveHuntRound(state: GameState): string | null {
     100,
   );
 
-  const escapeSector = sectorZones
+  const escapeSectors = sectorZones
     .filter(sector => (battle.huntOpenSectorRounds?.[sector.id] ?? 0) >= sectorConfig.openEscapeRounds)
     .sort((left, right) =>
       (battle.huntOpenSectorRounds?.[right.id] ?? 0) - (battle.huntOpenSectorRounds?.[left.id] ?? 0) ||
-      (left.sectorBlockade ?? 0) - (right.sectorBlockade ?? 0) || left.id.localeCompare(right.id))[0];
+      (left.sectorBlockade ?? 0) - (right.sectorBlockade ?? 0) || left.id.localeCompare(right.id));
+  const escapeSector = escapeSectors[0];
   if (escapeSector && (battle.huntEncirclement ?? 0) >= sectorConfig.openEscapeEncirclementMin) {
     const trapStopsEscape = battle.huntTrapSet && battle.huntTrapZoneId === escapeSector.id;
     if (trapStopsEscape) {
@@ -743,24 +788,32 @@ export function resolveHuntRound(state: GameState): string | null {
       lines.push(`${escapeSector.name}의 함정이 열린 길로 빠져나가려던 맹수를 붙잡았습니다.`);
     } else {
       const escapeRng = makeRng(state.seed + battle.id * 104729 + battle.round * 15485863 + 911);
-      if (escapeRng() < sectorConfig.openEscapeChance) {
-      outcome = 'huntEscaped';
-      const escapeText = `포위가 비어 있던 ${escapeSector.name} 쪽으로 맹수가 소리 없이 빠져나갔습니다.`;
-      lines.push(escapeText);
-      addEvent(events, escapeSector.id, 'retreat', escapeText, { side: 'raider', float: '포위 이탈' });
+      if (escapeRng() < huntOpenSectorEscapeChance(escapeSectors.length)) {
+        outcome = 'huntEscaped';
+        battle.huntEscapeCause = 'openSector';
+        battle.huntEscapeZoneId = escapeSector.id;
+        const escapeText = `포위가 비어 있던 ${escapeSector.name} 쪽으로 맹수가 소리 없이 빠져나갔습니다.`;
+        lines.push(escapeText);
+        addEvent(events, escapeSector.id, 'retreat', escapeText, { side: 'raider', float: '포위 이탈' });
       }
     }
   }
 
-  let action: BeastAction = { kind: 'lurk' };
+  let actions: BeastAction[] = [{ kind: 'lurk' }];
+  let action: BeastAction = actions[0];
   let actionZone = zone;
   let revealedThisRound = false;
   if (!outcome) {
-    action = chooseRoundBeastAction(battle, rng());
+    actions = chooseRoundBeastActions(battle, rng(), rng());
+    action = actions[0];
     battle.huntLastBeastAction = { ...action };
+    battle.huntLastBeastActions = actions.map(candidate => ({ ...candidate }));
     if (action.kind === 'lurk') {
       battle.huntPredatorState = 'hidden';
-      beasts.forEach(group => { group.revealed = false; });
+      beasts.forEach(group => {
+        group.revealed = false;
+        group.zoneId = 'huntDen';
+      });
       addEvent(events, zone.id, 'conceal', '산이 조용합니다. 짐승은 강한 포위선을 피해 모습을 감추고 있습니다.', {
         side: 'raider', float: '정적',
       });
@@ -777,7 +830,10 @@ export function resolveHuntRound(state: GameState): string | null {
         if (rng() < revealChance) {
           actionZone = battle.zones.find(candidate => candidate.id === searchGroups[0].zoneId) ?? zone;
           battle.huntPredatorState = 'revealed';
-          beasts.forEach(group => { group.revealed = true; });
+          beasts.forEach(group => {
+            group.revealed = true;
+            group.zoneId = actionZone.id;
+          });
           revealedThisRound = true;
           addEvent(events, actionZone.id, 'beastReveal', '사냥꾼이 수색으로 흔들리는 가지를 짚어 숨어 있던 짐승을 찾아냅니다.', {
             side: 'raider', float: '수색 발각!',
@@ -788,7 +844,13 @@ export function resolveHuntRound(state: GameState): string | null {
       const requestedZoneId = action.kind === 'cornered' ? 'huntDen' : action.sectorId;
       actionZone = battle.zones.find(candidate => candidate.id === requestedZoneId) ?? zone;
       battle.huntPredatorState = battle.huntPredatorState === 'wounded' ? 'wounded' : 'revealed';
-      beasts.forEach(group => { group.revealed = true; });
+      const attackActions = actions.filter(candidate => candidate.kind === 'ambush');
+      beasts.forEach((group, index) => {
+        group.revealed = true;
+        group.zoneId = attackActions.length > 0
+          ? attackActions[index % attackActions.length].sectorId
+          : actionZone.id;
+      });
       revealedThisRound = true;
       if (action.kind === 'breakout') {
         const blockade = actionZone.sectorBlockade ?? 0;
@@ -800,6 +862,8 @@ export function resolveHuntRound(state: GameState): string | null {
           });
         } else if (rng() < breakoutSuccessChance(blockade)) {
           outcome = 'huntEscaped';
+          battle.huntEscapeCause = 'breakout';
+          battle.huntEscapeZoneId = actionZone.id;
           const text = `${actionZone.name}의 얇은 봉쇄를 맹수가 정면으로 돌파해 숲 밖으로 빠져나갔습니다.`;
           lines.push(text);
           addEvent(events, actionZone.id, 'retreat', text, { side: 'raider', float: '돌파 성공!' });
@@ -820,13 +884,30 @@ export function resolveHuntRound(state: GameState): string | null {
     }
   }
 
-  if (!outcome && !retreatOrdered && beasts.length > 0 &&
-    (action.kind === 'ambush' || action.kind === 'cornered')) {
-    const targetGroupId = action.kind === 'ambush' ? action.targetGroupId : weakestGroup(players)?.id;
-    const casualty = beastAttack(battle, players, rng, events, actionZone.id, targetGroupId);
-    wounded += casualty.wounded;
-    killed += casualty.killed;
-    villageMoraleDelta -= casualty.wounded * 6 + casualty.killed * 14;
+  if (!outcome && !retreatOrdered && beasts.length > 0) {
+    const attackActions = action.kind === 'cornered'
+      ? [action]
+      : actions.filter(candidate => candidate.kind === 'ambush');
+    for (const attackAction of attackActions) {
+      const attackZone = attackAction.kind === 'ambush'
+        ? battle.zones.find(candidate => candidate.id === attackAction.sectorId) ?? actionZone
+        : actionZone;
+      const targetGroupId = attackAction.kind === 'ambush'
+        ? attackAction.targetGroupId
+        : weakestGroup(players)?.id;
+      const casualty = beastAttack(
+        battle,
+        players,
+        rng,
+        events,
+        attackZone.id,
+        targetGroupId,
+        attackActions.length > 1 ? HUNT_CONFIG.wolfMultiAmbushHitMultiplier : 1,
+      );
+      wounded += casualty.wounded;
+      killed += casualty.killed;
+      villageMoraleDelta -= casualty.wounded * 6 + casualty.killed * 14;
+    }
   }
 
   if (!outcome && !retreatOrdered && revealedThisRound) {
@@ -842,6 +923,8 @@ export function resolveHuntRound(state: GameState): string | null {
     }
     let attackPower = 0;
     let counterattackContributed = false;
+    const actionSectorIds = new Set(actions.flatMap(candidate =>
+      candidate.kind === 'ambush' || candidate.kind === 'breakout' ? [candidate.sectorId] : []));
     let musketeers = 0;
     for (const group of players) {
       const active = activeCount(group);
@@ -854,7 +937,7 @@ export function resolveHuntRound(state: GameState): string | null {
           : group.command === 'ambush'
             ? action.kind === 'lurk'
               ? HUNT_CONFIG.counterAttack.searchRevealMultiplier
-              : group.zoneId === actionZone.id
+              : actionSectorIds.has(group.zoneId) || group.zoneId === actionZone.id
                 ? HUNT_CONFIG.counterAttack.sameSectorMultiplier
                 : HUNT_CONFIG.counterAttack.adjacentSectorMultiplier
             : group.command === 'advance'
@@ -908,13 +991,17 @@ export function resolveHuntRound(state: GameState): string | null {
   if (!outcome) {
     if (retreatOrdered) {
       battle.huntWithdrawn = true;
+      battle.huntEscapeCause = 'withdrawn';
       outcome = 'huntEscaped';
     }
     else if (battle.defenderGroups.every(group => activeCount(group) <= 0) || battle.villageMorale + villageMoraleDelta <= 0) {
       outcome = 'huntDefeat';
     } else if (battle.raiderGroups.every(group => activeBeasts(group) <= 0)) outcome = 'huntKill';
     else if (battle.huntPredatorKind === 'wolf' && battle.huntLeaderKilled) outcome = 'huntRepelled';
-    else if ((battle.huntEngagements ?? 0) >= HUNT_CONFIG.maxEngagements) outcome = 'huntEscaped';
+    else if ((battle.huntEngagements ?? 0) >= HUNT_CONFIG.maxEngagements) {
+      battle.huntEscapeCause = 'timeout';
+      outcome = 'huntEscaped';
+    }
   }
 
   villageMoraleDelta += Math.round(clamp(2 + (battle.huntEncirclement ?? 0) / 28 - wounded * 3 - killed * 7, -18, 8));
@@ -930,14 +1017,14 @@ export function resolveHuntRound(state: GameState): string | null {
   if (wounded + killed > 0) lines.push(`사냥대 피해: 전사 ${killed}명, 부상 ${wounded}명.`);
   lines.push(`포위망 ${Math.round(battle.huntEncirclement ?? 0)}% · 사냥대 기세 ${villageMoraleDelta >= 0 ? '+' : ''}${villageMoraleDelta}.`);
   if (outcome && !events.some(event => event.kind === 'retreat' && event.zoneId === actionZone.id)) {
-    addEvent(events, actionZone.id, outcome === 'huntRepelled' ? 'beastRout' : outcome === 'huntEscaped' ? 'retreat' : outcome === 'huntKill' ? 'moraleBreak' : 'report', outcomeText(outcome));
+    addEvent(events, actionZone.id, outcome === 'huntRepelled' ? 'beastRout' : outcome === 'huntEscaped' ? 'retreat' : outcome === 'huntKill' ? 'moraleBreak' : 'report', outcomeText(battle, outcome));
   }
 
   const report: TacticalRoundReport = {
     round: battle.round,
     focusZoneId: actionZone.id,
     nextFocusZoneId: nextZoneId,
-    summary: outcome ? outcomeText(outcome) : `${actionZone.name} 교전이 끝났습니다.`,
+    summary: outcome ? outcomeText(battle, outcome) : `${actionZone.name} 교전이 끝났습니다.`,
     lines,
     events,
     wounded,
@@ -1044,6 +1131,15 @@ export function finishPredatorTacticalHunt(state: GameState): void {
   const predatorDetail = battle.huntPredatorKind === 'tiger'
     ? `${tigerTierLabel(battle.huntTigerTier)} 1마리`
     : `늑대 ${raidersCommitted}마리`;
+  const escapeDetail = outcome === 'huntEscaped' ? huntEscapeText(battle) : null;
+  const blockadeDetail = battle.huntBlockadeHistory && battle.huntBlockadeHistory.length > 0
+    ? `봉쇄 기록: ${battle.huntBlockadeHistory.map(entry => {
+      const sectors = battle.zones.filter(zone => zone.id !== 'huntDen').map(zone =>
+        `${zone.name} ${(entry.sectors[zone.id] ?? 0).toFixed(1)}`).join(' · ');
+      return `${entry.round}R ${sectors}`;
+    }).join(' / ')}`
+    : null;
+  const counterDetail = `반격 대기 가동 ${battle.huntCounterattackCount ?? 0}회`;
   state.tacticalBattleReport = {
     encounterKind: 'predatorHunt',
     title: '사냥 장계',
@@ -1059,8 +1155,8 @@ export function finishPredatorTacticalHunt(state: GameState): void {
     result: reportResult,
     grade: grade.grade,
     gradeScore: grade.score,
-    closingSummary: withdrawn
-      ? '사냥대가 사냥을 중지하고 질서 있게 철수합니다.'
+    closingSummary: outcome === 'huntEscaped'
+      ? huntEscapeText(battle)
       : tacticalClosingSummary('predatorHunt', outcome, battle.factionName),
     initialFriendlyPower: battle.initialFriendlyPower,
     initialEnemyPower: battle.initialEnemyPower,
@@ -1080,7 +1176,9 @@ export function finishPredatorTacticalHunt(state: GameState): void {
     reputationDelta: state.resources.reputation - reputationBefore,
     relationDelta: 0,
     threatAfter: state.threat,
-    highlights: [predatorDetail, ...battle.reports.flatMap(report => report.lines)]
+    highlights: [predatorDetail, escapeDetail, blockadeDetail, counterDetail,
+      ...battle.reports.flatMap(report => report.lines)]
+      .filter((line): line is string => line != null)
       .filter((line, index, all) => all.indexOf(line) === index).slice(0, 10),
     resourceDelta: tacticalResourceDelta(state, battle),
     predatorOutcome: outcome === 'huntKill'

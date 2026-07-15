@@ -42,7 +42,7 @@ const tacticalHunt = await import(pathToFileURL(join(compiledDir, 'tacticalHunt.
 
 {
   const hunt = config.CONFIG.tacticalBattle.hunt;
-  assert.equal(hunt.maxEngagements, 5);
+  assert.equal(hunt.maxEngagements, 8);
   assert.equal(hunt.baitMeatCost, 3);
   assert.deepEqual(hunt.ambush.tigerHitChance, { base: 0.68, min: 0.46, max: 0.92 });
   assert.deepEqual(hunt.ambush.wolfHitChance, {
@@ -51,8 +51,8 @@ const tacticalHunt = await import(pathToFileURL(join(compiledDir, 'tacticalHunt.
   assert.deepEqual(hunt.ambush.spearWallMultiplier, { tiger: 0.38, wolf: 0.55 });
   assert.equal(hunt.ambush.splitDriversHitMultiplier, 1.35);
   assert.deepEqual(hunt.encirclement, {
-    baseGain: 7,
-    perDriver: 1.8,
+    baseGain: 9,
+    perDriver: 2.2,
     hunterSkillMultiplier: 12,
     wolfBaseMultiplier: 1.16,
     wolfPackThreshold: 3,
@@ -67,6 +67,10 @@ const tacticalHunt = await import(pathToFileURL(join(compiledDir, 'tacticalHunt.
   assert.deepEqual(hunt.rehideChance, { tiger: 0.46, greatTiger: 0.38, mountainLord: 0.30 });
   assert.equal(hunt.rehideEncirclementMax, 70);
   assert.equal(tacticalHunt.huntMaxRounds(), hunt.maxEngagements);
+  assert.equal(tacticalHunt.huntOpenSectorEscapeChance(1), hunt.sectors.openEscapeChance);
+  assert.ok(tacticalHunt.huntOpenSectorEscapeChance(2) > tacticalHunt.huntOpenSectorEscapeChance(1),
+    'two open sectors create more escape opportunities than one open sector');
+  assert.ok(tacticalHunt.huntOpenSectorEscapeChance(99) <= 1);
 }
 
 function targets(state) {
@@ -396,6 +400,12 @@ function finishBattle(state) {
     huntSectorRavine: 1,
     huntSectorBrook: 1,
   });
+  assert.equal(open.battle.huntBlockadeHistory?.length, 1);
+  assert.deepEqual(open.battle.huntBlockadeHistory?.[0]?.sectors, {
+    huntSectorRidge: openSectors[0].sectorBlockade,
+    huntSectorRavine: openSectors[1].sectorBlockade,
+    huntSectorBrook: openSectors[2].sectorBlockade,
+  }, 'every round records the blockade state of all three sectors');
 
   assert.equal(tactical.completeTacticalSimulation(open.state), null);
   assert.equal(tactical.acknowledgeTacticalReport(open.state), null);
@@ -421,6 +431,10 @@ function finishBattle(state) {
   assert.equal(tactical.resolveTacticalRound(escaping.state), null);
   sectorsConfig.openEscapeChance = originalChance;
   assert.equal(escaping.battle.pendingReport.outcome, 'huntEscaped');
+  assert.equal(escaping.battle.huntEscapeCause, 'openSector');
+  assert.ok(['huntSectorRavine', 'huntSectorBrook'].includes(escaping.battle.huntEscapeZoneId));
+  assert.equal(escaping.battle.huntEscapeZoneId,
+    escaping.battle.pendingReport.events.find(event => event.kind === 'retreat')?.zoneId);
   assert.ok(escaping.battle.pendingReport.events.some(event =>
     event.kind === 'retreat' && /빠져나/.test(event.text ?? '')),
   'a sector left open for two rounds becomes a deterministic escape route');
@@ -456,6 +470,8 @@ function finishBattle(state) {
   assert.equal(battle.pendingReport.events.some(event => event.kind === 'beastAmbush'), false);
   assert.ok(battle.pendingReport.events.some(event => /산이 조용/.test(event.text ?? '')));
   assert.equal(battle.huntPredatorState, 'hidden');
+  assert.ok(battle.raiderGroups.every(group => group.zoneId === 'huntDen'),
+    'a lurking beast is shown only as an uncertain trace in the den');
   assert.deepEqual(battle.defenderGroups.map(group => [group.id, group.wounded, group.killed]), healthBefore,
     'lurk causes no automatic beast attack');
 }
@@ -479,6 +495,9 @@ function finishBattle(state) {
   assert.equal(battle.pendingReport.events.some(event => event.kind === 'beastAmbush'), false);
   assert.ok(battle.pendingReport.events.some(event => event.kind === 'beastReveal' && /수색/.test(event.text ?? '')));
   assert.equal(battle.huntPredatorState, 'revealed', 'hunter search can expose a lurking beast without granting it an attack');
+  assert.ok(battle.raiderGroups.every(group => group.zoneId === battle.pendingReport.events.find(
+    event => event.kind === 'beastReveal')?.zoneId),
+  'a beast exposed by search is rendered in the searched sector');
 }
 
 {
@@ -495,6 +514,8 @@ function finishBattle(state) {
   const ambush = battle.pendingReport.events.find(event => event.kind === 'beastAmbush');
   assert.equal(ambush?.groupId, weak.id, 'the tiger attacks the lowest-exposure group, not a random group');
   assert.equal(ambush?.zoneId, weak.zoneId);
+  assert.ok(battle.raiderGroups.every(group => group.zoneId === weak.zoneId),
+    'an exposed tiger is rendered only in its ambush sector');
 }
 
 {
@@ -512,6 +533,8 @@ function finishBattle(state) {
   assert.equal(tactical.resolveTacticalRound(failure.state), null);
   breakout.baseSuccessChance = originalChance;
   assert.equal(success.battle.pendingReport.outcome, 'huntEscaped');
+  assert.equal(success.battle.huntEscapeCause, 'breakout');
+  assert.ok(success.battle.huntEscapeZoneId?.startsWith('huntSector'));
   assert.ok(success.battle.pendingReport.events.some(event => event.kind === 'retreat' && /돌파/.test(event.text ?? '')));
   assert.notEqual(failure.battle.pendingReport.outcome, 'huntEscaped');
   assert.equal(failure.battle.huntPredatorState, 'revealed');
@@ -545,6 +568,24 @@ function finishBattle(state) {
   assert.equal(trapped.battle.huntTrapSet, false);
   assert.ok(trapped.battle.pendingReport.events.some(event =>
     event.zoneId === 'huntSectorBrook' && /함정/.test(event.text ?? '')));
+}
+
+{
+  const pack = prepareSplitSectorHunt(2026071526, true);
+  const aiConfig = config.CONFIG.tacticalBattle.hunt.beastAI;
+  const originalChance = aiConfig.ambushDecisionChance;
+  aiConfig.ambushDecisionChance = 1;
+  assert.equal(tactical.resolveTacticalRound(pack.state), null);
+  aiConfig.ambushDecisionChance = originalChance;
+  const ambushes = pack.battle.pendingReport.events.filter(event => event.kind === 'beastAmbush');
+  assert.equal(ambushes.length, 2, 'wolf leader and pack may launch two weaker ambushes');
+  assert.equal(new Set(ambushes.map(event => event.zoneId)).size, 2);
+  assert.equal(new Set(ambushes.map(event => event.groupId)).size, 2);
+  assert.deepEqual(
+    new Set(pack.battle.raiderGroups.filter(group => group.count > group.killed).map(group => group.zoneId)),
+    new Set(ambushes.map(event => event.zoneId)),
+    'the two exposed wolf groups are rendered in their respective ambush sectors',
+  );
 }
 
 {
@@ -630,16 +671,24 @@ function finishBattle(state) {
 {
   const { state, battle } = prepareHunt(2026071399, 'wolf');
   enterCommand(state);
-  battle.huntEngagements = 4;
+  battle.huntEngagements = config.CONFIG.tacticalBattle.hunt.maxEngagements - 1;
+  battle.huntCounterattackCount = 2;
   battle.defenderGroups.forEach(group => { group.power = 0.01; });
   battle.raiderGroups.forEach(group => { group.power = 10000; });
   assert.equal(tactical.resolveTacticalRound(state), null);
   assert.equal(battle.pendingReport.outcome, 'huntEscaped');
+  assert.equal(battle.huntEscapeCause, 'timeout');
+  const counterattackCount = battle.huntCounterattackCount;
   finishBattle(state);
   assert.ok(state.incidents.predatorThreats.wolf, 'an escaped pack remains a threat');
   assert.deepEqual(state.expedition?.carriedLoot, {});
   assert.equal(state.tacticalBattleReport?.predatorOutcome, 'escaped');
   assert.equal(state.tacticalBattleReport?.outcomeLabel, '맹수 도주');
+  assert.ok(state.tacticalBattleReport?.highlights.some(line => /교전.*끝|시간/.test(line)),
+    'the final report explains that the hunt timed out');
+  assert.ok(state.tacticalBattleReport?.highlights.some(line => /봉쇄 기록/.test(line)));
+  assert.ok(state.tacticalBattleReport?.highlights.some(line =>
+    line.includes(`반격 대기 가동 ${counterattackCount}회`)));
 }
 
 {
@@ -660,6 +709,7 @@ function finishBattle(state) {
   assert.equal(tactical.setTacticalCommand(state, group.id, 'openRetreat'), null);
   assert.equal(tactical.resolveTacticalRound(state), null);
   assert.equal(battle.pendingReport.outcome, 'huntEscaped');
+  assert.equal(battle.huntEscapeCause, 'withdrawn');
   finishBattle(state);
   assert.equal(state.tacticalBattleReport?.predatorOutcome, 'withdrawn');
   assert.match(state.tacticalBattleReport?.outcomeLabel ?? '', /철수|중지/);
