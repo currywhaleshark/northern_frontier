@@ -59,7 +59,7 @@ import {
   dismissTacticalBattleReport, finishTacticalBattle, resolveTacticalRound, setDefenderFormationLine,
   setTacticalCommand, setTacticalGroupTarget, spendPreparationAction,
 } from './game/tacticalBattle';
-import { mergeHuntGroups, splitHuntGroup } from './game/tacticalHunt';
+import { mergeHuntGroups, setHuntPreparationZone, splitHuntGroup } from './game/tacticalHunt';
 import type {
   BuildingTypeId, CombatWeaponId, CropId, Difficulty, JobId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
   PreparationActionId, PredatorKind, SpecialItemId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
@@ -403,6 +403,8 @@ export default function App() {
     handleTacticalAction(() => splitHuntGroup(stateRef.current, groupId, detachCount));
   const handleMergeHuntGroups = (destinationGroupId: string, sourceGroupId: string) =>
     handleTacticalAction(() => mergeHuntGroups(stateRef.current, destinationGroupId, sourceGroupId));
+  const handleSetHuntPreparationZone = (actionId: 'placeBait' | 'setHuntTraps', zoneId: string) =>
+    handleTacticalAction(() => setHuntPreparationZone(stateRef.current, actionId, zoneId));
   const handleSetTacticalFormationLine = (groupId: string, line: TacticalFormationLine) =>
     handleTacticalAction(() => setDefenderFormationLine(stateRef.current, groupId, line));
   const handleSetTacticalCommand = (groupId: string, command: TacticalCommandId) =>
@@ -890,6 +892,7 @@ export default function App() {
           onAssignGroup={handleAssignTacticalGroup}
           onSplitHuntGroup={handleSplitHuntGroup}
           onMergeHuntGroups={handleMergeHuntGroups}
+          onSetHuntPreparationZone={handleSetHuntPreparationZone}
           onSetFormationLine={handleSetTacticalFormationLine}
           onSetCommand={handleSetTacticalCommand}
           onSetGroupTarget={handleSetTacticalGroupTarget}

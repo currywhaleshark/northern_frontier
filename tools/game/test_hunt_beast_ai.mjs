@@ -97,5 +97,10 @@ function input(overrides = {}) {
   assert.deepEqual(chooseBeastAction(input({ decisionRoll: 0.99 })), { kind: 'lurk' });
 }
 
-console.log('hunt beast AI tests passed');
+{
+  assert.deepEqual(chooseBeastAction(input({ decisionRoll: 0.99, baitSectorId: 'ravine' })), {
+    kind: 'ambush', sectorId: 'ravine', targetGroupId: 'ravine-weak',
+  }, 'bait makes the first viable ambush deterministic even when the normal decision roll would lurk');
+}
 
+console.log('hunt beast AI tests passed');

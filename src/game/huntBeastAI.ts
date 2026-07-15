@@ -89,9 +89,8 @@ export function chooseBeastAction(input: ChooseBeastActionInput): BeastAction {
 
   const target = weakestTarget(input);
   if (target && target.exposure <= ambushExposureThreshold(input) &&
-    input.decisionRoll < HUNT_AI.ambushDecisionChance) {
+    (target.sectorId === input.baitSectorId || input.decisionRoll < HUNT_AI.ambushDecisionChance)) {
     return { kind: 'ambush', sectorId: target.sectorId, targetGroupId: target.groupId };
   }
   return { kind: 'lurk' };
 }
-

@@ -142,6 +142,8 @@ function prepareUniformHunterGroup(seed, count, weapon = null) {
   const members = state.residents.slice(0, count);
   members.forEach(resident => { resident.job = weapon ? 'militia' : 'hunter'; });
   state.resources.muskets = weapon === 'musket' ? count : 0;
+  state.resources.hornBows = weapon === 'hornBow' ? count : 0;
+  state.resources.spears = weapon === 'spear' ? count : 0;
   state.resources.gunpowder = 20;
   weapons.clearWeaponAssignments(state);
   if (weapon) members.forEach(resident => assert.equal(weapons.setResidentWeapon(state, resident.id, weapon), null));
@@ -255,14 +257,34 @@ function finishBattle(state) {
   const meatBefore = state.resources.meat;
   assert.equal(tactical.spendPreparationAction(state, 'setHuntTraps'), null);
   assert.equal(tactical.spendPreparationAction(state, 'placeBait'), null);
-  assert.equal(tactical.spendPreparationAction(state, 'splitDrivers'), null);
+  assert.match(tactical.spendPreparationAction(state, 'splitDrivers'), /사용할 수 없|준비/);
   assert.equal(tactical.advanceTacticalPhase(state), null);
-  assert.equal(battle.huntTrapSet, true);
-  assert.equal(battle.huntBaitPlaced, true);
-  assert.equal(battle.huntDriversSplit, true);
-  assert.equal(battle.huntPredatorState, 'revealed');
+  assert.equal(battle.phase, 'deployment');
+  assert.equal(battle.huntTrapSet, false);
+  assert.equal(battle.huntBaitPlaced, false);
+  assert.equal(battle.huntPredatorState, 'hidden');
+  assert.equal(state.resources.meat, meatBefore, 'reserved bait is not consumed before its sector is chosen');
+  assert.match(tacticalHunt.huntDeploymentUnavailableReason(state), /미끼|함정/);
+  assert.match(tacticalHunt.setHuntPreparationZone(state, 'placeBait', 'huntDen'), /심처/);
+  assert.equal(tacticalHunt.setHuntPreparationZone(state, 'placeBait', 'huntSectorRidge'), null);
   assert.equal(state.resources.meat, meatBefore - 3);
-  assert.ok((battle.huntEncirclement ?? 0) >= 12);
+  assert.equal(tacticalHunt.setHuntPreparationZone(state, 'placeBait', 'huntSectorRidge'), null);
+  assert.equal(state.resources.meat, meatBefore - 3, 'confirming the same bait sector never spends meat twice');
+  assert.equal(tacticalHunt.setHuntPreparationZone(state, 'setHuntTraps', 'huntSectorRavine'), null);
+  assert.equal(battle.huntBaitZoneId, 'huntSectorRidge');
+  assert.equal(battle.huntTrapZoneId, 'huntSectorRavine');
+  assert.equal(battle.huntBaitPlaced, true);
+  assert.equal(battle.huntTrapSet, true);
+  assert.equal(battle.huntPredatorState, 'hidden', 'placing bait does not reveal every hidden beast at deployment');
+  assert.equal(tacticalHunt.huntDeploymentUnavailableReason(state), null);
+  battle.prepActions.push({ id: 'splitDrivers', label: 'legacy split', cost: 2, selected: true, applied: false });
+  battle.huntDriversSplit = true;
+  assert.equal(saveLoad.saveGame(state), true);
+  const placed = saveLoad.loadGame();
+  assert.equal(placed?.tacticalBattle?.huntBaitZoneId, 'huntSectorRidge');
+  assert.equal(placed?.tacticalBattle?.huntTrapZoneId, 'huntSectorRavine');
+  assert.equal(placed?.tacticalBattle?.prepActions.some(action => action.id === 'splitDrivers'), false);
+  assert.equal(placed?.tacticalBattle?.huntDriversSplit, false);
 }
 
 {
@@ -341,6 +363,8 @@ function finishBattle(state) {
   assert.equal(tactical.advanceTacticalPhase(moving.state), null);
   const stationaryGroup = stationary.battle.defenderGroups[0];
   const movingGroup = moving.battle.defenderGroups[0];
+  assert.equal(tactical.setTacticalCommand(stationary.state, stationaryGroup.id, 'advance'), null);
+  assert.equal(tactical.setTacticalCommand(moving.state, movingGroup.id, 'advance'), null);
   assert.equal(tactical.assignDefenderGroup(stationary.state, stationaryGroup.id, 'huntSectorRidge'), null);
   assert.equal(stationaryGroup.huntMovedRound, undefined, 'reselecting the same sector is not movement');
   assert.equal(tactical.assignDefenderGroup(moving.state, movingGroup.id, 'huntSectorRavine'), null);
@@ -400,6 +424,127 @@ function finishBattle(state) {
   assert.ok(escaping.battle.pendingReport.events.some(event =>
     event.kind === 'retreat' && /빠져나/.test(event.text ?? '')),
   'a sector left open for two rounds becomes a deterministic escape route');
+}
+
+{
+  const { state, battle } = prepareHunt(2026071519, 'tiger');
+  enterCommand(state);
+  const hunter = battle.defenderGroups.find(group => group.role === 'hunter');
+  const spear = battle.defenderGroups.find(group => group.weapon === 'spear');
+  const ranged = battle.defenderGroups.find(group => group.weapon === 'musket');
+  assert.ok(hunter && spear && ranged);
+  assert.equal(hunter.command, 'ambush', 'hunters default to counter-wait while the beast is hidden');
+  assert.equal(spear.command, 'advance');
+  assert.equal(ranged.command, 'advance');
+  assert.equal(tactical.setTacticalCommand(state, ranged.id, 'ambush'), null,
+    'counter-wait is available to every living combat group');
+  assert.match(tactical.setTacticalCommand(state, ranged.id, 'fallback'), /사용할 수 없|사냥/);
+  ranged.commandSource = 'recommended';
+  battle.huntPredatorState = 'revealed';
+  tacticalHunt.chooseDefaultHuntCommands(battle);
+  assert.equal(hunter.command, 'ambush');
+  assert.equal(spear.command, 'hold');
+  assert.equal(ranged.command, 'volley');
+}
+
+{
+  const { state, battle } = prepareUniformHunterGroup(2026071520, 6, 'spear');
+  enterCommand(state);
+  const healthBefore = battle.defenderGroups.map(group => [group.id, group.wounded, group.killed]);
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.equal(battle.pendingReport.outcome, undefined);
+  assert.equal(battle.pendingReport.events.some(event => event.kind === 'beastAmbush'), false);
+  assert.ok(battle.pendingReport.events.some(event => /산이 조용/.test(event.text ?? '')));
+  assert.equal(battle.huntPredatorState, 'hidden');
+  assert.deepEqual(battle.defenderGroups.map(group => [group.id, group.wounded, group.killed]), healthBefore,
+    'lurk causes no automatic beast attack');
+}
+
+{
+  const { state, battle } = prepareUniformHunterGroup(2026071525, 3);
+  enterCommand(state);
+  const aiConfig = config.CONFIG.tacticalBattle.hunt.beastAI;
+  const searchConfig = config.CONFIG.tacticalBattle.hunt.search;
+  const originalAmbushChance = aiConfig.ambushDecisionChance;
+  const originalSearchMin = searchConfig.minChance;
+  const originalSearchMax = searchConfig.maxChance;
+  aiConfig.ambushDecisionChance = 0;
+  searchConfig.minChance = 1;
+  searchConfig.maxChance = 1;
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  aiConfig.ambushDecisionChance = originalAmbushChance;
+  searchConfig.minChance = originalSearchMin;
+  searchConfig.maxChance = originalSearchMax;
+  assert.equal(battle.huntLastBeastAction?.kind, 'lurk');
+  assert.equal(battle.pendingReport.events.some(event => event.kind === 'beastAmbush'), false);
+  assert.ok(battle.pendingReport.events.some(event => event.kind === 'beastReveal' && /수색/.test(event.text ?? '')));
+  assert.equal(battle.huntPredatorState, 'revealed', 'hunter search can expose a lurking beast without granting it an attack');
+}
+
+{
+  const { state, battle } = prepareHunt(2026071521, 'tiger');
+  enterCommand(state);
+  const weak = battle.defenderGroups.find(group => group.weapon === 'hornBow');
+  assert.ok(weak);
+  battle.defenderGroups.forEach(group => { group.power = group.id === weak.id ? 0.1 : 100; });
+  const aiConfig = config.CONFIG.tacticalBattle.hunt.beastAI;
+  const originalChance = aiConfig.ambushDecisionChance;
+  aiConfig.ambushDecisionChance = 1;
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  aiConfig.ambushDecisionChance = originalChance;
+  const ambush = battle.pendingReport.events.find(event => event.kind === 'beastAmbush');
+  assert.equal(ambush?.groupId, weak.id, 'the tiger attacks the lowest-exposure group, not a random group');
+  assert.equal(ambush?.zoneId, weak.zoneId);
+}
+
+{
+  const success = prepareSplitSectorHunt(2026071522, true);
+  const failure = prepareSplitSectorHunt(2026071522, true);
+  success.battle.huntEncirclement = 72;
+  failure.battle.huntEncirclement = 72;
+  success.groups.forEach(group => { group.power = 1; });
+  failure.groups.forEach(group => { group.power = 1; });
+  const breakout = config.CONFIG.tacticalBattle.hunt.breakout;
+  const originalChance = breakout.baseSuccessChance;
+  breakout.baseSuccessChance = 1;
+  assert.equal(tactical.resolveTacticalRound(success.state), null);
+  breakout.baseSuccessChance = 0;
+  assert.equal(tactical.resolveTacticalRound(failure.state), null);
+  breakout.baseSuccessChance = originalChance;
+  assert.equal(success.battle.pendingReport.outcome, 'huntEscaped');
+  assert.ok(success.battle.pendingReport.events.some(event => event.kind === 'retreat' && /돌파/.test(event.text ?? '')));
+  assert.notEqual(failure.battle.pendingReport.outcome, 'huntEscaped');
+  assert.equal(failure.battle.huntPredatorState, 'revealed');
+  assert.ok(failure.battle.pendingReport.events.some(event => event.kind === 'advance' && /돌파/.test(event.text ?? '')));
+}
+
+{
+  const cornered = prepareSplitSectorHunt(2026071523, true);
+  cornered.battle.huntEncirclement = 100;
+  assert.equal(tactical.resolveTacticalRound(cornered.state), null);
+  assert.equal(cornered.battle.huntCornered, true);
+  assert.equal(cornered.battle.currentZoneId, 'huntDen');
+  assert.ok(cornered.battle.defenderGroups.every(group => group.zoneId === 'huntDen'));
+  assert.ok(cornered.battle.pendingReport.events.some(event => event.zoneId === 'huntDen' && /결착/.test(event.text ?? '')));
+}
+
+{
+  const trapped = prepareHunt(2026071524, 'wolf');
+  assert.equal(tactical.spendPreparationAction(trapped.state, 'setHuntTraps'), null);
+  assert.equal(tactical.advanceTacticalPhase(trapped.state), null);
+  assert.equal(tacticalHunt.setHuntPreparationZone(trapped.state, 'setHuntTraps', 'huntSectorBrook'), null);
+  assert.equal(tactical.advanceTacticalPhase(trapped.state), null);
+  trapped.battle.huntEncirclement = 72;
+  const breakout = config.CONFIG.tacticalBattle.hunt.breakout;
+  const originalChance = breakout.baseSuccessChance;
+  breakout.baseSuccessChance = 1;
+  assert.equal(tactical.resolveTacticalRound(trapped.state), null);
+  breakout.baseSuccessChance = originalChance;
+  assert.notEqual(trapped.battle.pendingReport.outcome, 'huntEscaped',
+    'a prepared trap automatically stops the first breakout through its sector');
+  assert.equal(trapped.battle.huntTrapSet, false);
+  assert.ok(trapped.battle.pendingReport.events.some(event =>
+    event.zoneId === 'huntSectorBrook' && /함정/.test(event.text ?? '')));
 }
 
 {
@@ -472,6 +617,7 @@ function finishBattle(state) {
   const outsiderHealth = outsider.health;
   enterCommand(state);
   battle.huntPredatorState = 'revealed';
+  battle.huntEncirclement = 100;
   battle.raiderGroups.forEach(group => { group.revealed = true; group.power = 0.01; });
   assert.equal(tactical.resolveTacticalRound(state), null);
   assert.equal(battle.pendingReport.outcome, 'huntKill');

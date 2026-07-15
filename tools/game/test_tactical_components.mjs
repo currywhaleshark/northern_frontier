@@ -69,6 +69,12 @@ assert.match(screenSource, /onSetGroupTarget/, 'the screen must update one frien
 assert.doesNotMatch(screenSource, /focusTargetGroupId/, 'the current UI must not use the legacy zone focus target');
 assert.match(screenSource, /onSplitHuntGroup/, 'the hunt deployment UI must expose group splitting');
 assert.match(screenSource, /onMergeHuntGroups/, 'the hunt deployment UI must expose detachment merging');
+assert.match(screenSource, /onSetHuntPreparationZone/,
+  'the hunt deployment UI must confirm bait and trap sectors separately');
+assert.match(screenSource, /미끼 놓을 길목|함정 설치할 길목/,
+  'reserved hunt preparations must expose explicit sector selectors');
+assert.match(screenSource, /huntDeploymentUnavailableReason/,
+  'hunt deployment cannot start while a reserved preparation has no sector');
 assert.match(screenSource, /1명 분리/, 'the selected hunt group must offer a one-person detachment');
 assert.match(screenSource, /반으로 나누기/, 'the selected hunt group must offer a half-group detachment');
 assert.match(screenSource, /같은 조 합류/, 'compatible hunt detachments must offer merging');
@@ -80,6 +86,10 @@ assert.match(screenSource, /tactical-hunt-sector-movement/,
   'hunt command controls must allow moving an existing detachment between sectors');
 assert.match(screenSource, /이동한 조는 이번 라운드 몰이 기여가 절반/,
   'hunt command controls must explain the movement penalty');
+assert.match(screenSource, /반격 대기/, 'hunt ambush command must be relabeled as counter-wait');
+assert.match(screenSource, /모든 전투조/, 'counter-wait guidance must not imply a hunter-only restriction');
+assert.match(screenSource, /COMMANDS\.filter\(command => !hunt \|\| command !== 'fallback'\)/,
+  'fallback must be absent from the hunt command bar');
 assert.match(screenSource, /!hunt && \(\s*<div className="tactical-line-toggle"/,
   'hunt deployment and command controls must hide formation-line toggles');
 

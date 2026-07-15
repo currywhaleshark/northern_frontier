@@ -8,7 +8,7 @@ import {
   tacticalFormationLinesAdjacent, tacticalPreparationUnavailableReason, tacticalRearResponseOptions,
 } from '../game/tacticalBattle';
 import { assaultMaxRounds } from '../game/tacticalAssault';
-import { huntMaxRounds } from '../game/tacticalHunt';
+import { huntDeploymentUnavailableReason, huntMaxRounds } from '../game/tacticalHunt';
 import {
   nextActiveTacticalGroupId, nextPendingTacticalGroupId, pendingTacticalCommandCount,
   tacticalActiveDefenderCount, tacticalGroupCanReceiveCommand, tacticalGroupHasPendingCommand,
@@ -33,6 +33,7 @@ interface Props {
   onAssignGroup: (groupId: string, zoneId: string) => void;
   onSplitHuntGroup: (groupId: string, detachCount: number) => void;
   onMergeHuntGroups: (destinationGroupId: string, sourceGroupId: string) => void;
+  onSetHuntPreparationZone: (actionId: 'placeBait' | 'setHuntTraps', zoneId: string) => void;
   onSetFormationLine: (groupId: string, line: TacticalFormationLine) => void;
   onSetCommand: (groupId: string, command: TacticalCommandId) => void;
   onSetGroupTarget: (defenderGroupId: string, enemyGroupId: string | null) => void;
@@ -56,9 +57,9 @@ const PREP_DESCRIPTIONS: Record<PreparationActionId, string> = {
   prepareFireArrows: '목책·움막에 화공 명령을 쓸 수 있게 하지만 노획물이 불탈 수 있습니다.',
   blockLeaderEscape: '사냥꾼 일부를 본대에서 빼 두목의 산길 퇴로에 미리 매복시킵니다.',
   lureGuards: '척후가 초병 일부를 숲길 아래로 유인해 첫 방어대의 전력과 기세를 낮춥니다.',
-  setHuntTraps: '몰이 숲의 길목에 덫과 올가미를 설치해 짐승이 지나갈 때 피해를 줍니다.',
-  placeBait: '고기 3을 미끼로 써 첫 교전 전에 짐승을 자동으로 드러냅니다.',
-  splitDrivers: '포위망 상승이 빨라지지만 흩어진 조가 급습에 더 취약해집니다.',
+  setHuntTraps: '준비를 예약한 뒤 배치 단계에서 길목 하나를 골라 첫 돌파나 도주를 막습니다.',
+  placeBait: '고기 3을 예약하고 배치 단계에서 길목 하나를 골라 첫 급습을 그쪽으로 유도합니다.',
+  splitDrivers: '구 형식 저장 호환용 행동이며 새 사냥에서는 실제 분견대 편성을 사용합니다.',
 };
 
 const COMMANDS: TacticalCommandId[] = [
@@ -88,9 +89,8 @@ function commandLabel(command: TacticalCommandId, group: TacticalDefenderGroup, 
     if (command === 'hold') return '창벽';
     if (command === 'volley') return '사격 대기';
     if (command === 'advance') return '몰이';
-    if (command === 'ambush') return '길목 매복';
+    if (command === 'ambush') return '반격 대기';
     if (command === 'charge') return '창 돌입';
-    if (command === 'fallback') return '포위 유지';
     if (command === 'openRetreat') return '사냥 중지';
   }
   if (command === 'redeploy' && group.pendingLine) {
@@ -105,9 +105,8 @@ function commandDescription(command: TacticalCommandId, group: TacticalDefenderG
   if (command === 'hold') return '창과 방패를 세워 짐승 급습 피해를 줄입니다.';
   if (command === 'volley') return '짐승이 모습을 드러내는 순간 활과 조총을 집중합니다.';
   if (command === 'advance') return '소리와 불빛으로 짐승을 밀어 포위망을 빠르게 좁힙니다.';
-  if (command === 'ambush') return '사냥꾼이 달아날 길목을 지키며 우두머리를 노립니다.';
+  if (command === 'ambush') return '모든 전투조가 짐승이 자기 또는 인접 길목에 나타나는 순간 반격합니다. 사냥꾼·파수꾼은 더 능숙합니다.';
   if (command === 'charge') return '발각된 짐승에게 근접 조가 창으로 돌입합니다.';
-  if (command === 'fallback') return '무리한 공격을 피하고 현재 포위선을 유지합니다.';
   if (command === 'openRetreat') return '사냥을 중지하고 맹수 위협을 남긴 채 귀환합니다.';
   return tacticalCommandDescription(command, group.ambushed);
 }
@@ -235,6 +234,7 @@ export function TacticalBattleScreen({
   onAssignGroup,
   onSplitHuntGroup,
   onMergeHuntGroups,
+  onSetHuntPreparationZone,
   onSetFormationLine,
   onSetCommand,
   onSetGroupTarget,
@@ -406,6 +406,7 @@ export function TacticalBattleScreen({
     (sum, group) => sum + tacticalActiveDefenderCount(group),
     0,
   ) >= 3 && battle.defenderGroups.filter(group => tacticalActiveDefenderCount(group) > 0).length < 3;
+  const huntDeploymentReason = hunt ? huntDeploymentUnavailableReason(state) : null;
   const roundLimit = hunt ? huntMaxRounds() : assault ? assaultMaxRounds() : 5;
   const commandable = battle.phase === 'command' || battle.phase === 'deployment';
   const pendingCommandCount = pendingTacticalCommandCount(battle.defenderGroups);
@@ -681,7 +682,12 @@ export function TacticalBattleScreen({
                     ? `사전포격 ${battle.preliminaryBombardmentCannons}문 · 적 ${battle.preliminaryBombardmentCasualties ?? 0}명 전투불능`
                     : '부대를 고른 뒤 지킬 구역과 전열을 지정합니다.'}</span>
                 </div>
-                <button className="btn primary" onClick={onAdvancePhase}>전투 시작</button>
+                <button
+                  className="btn primary"
+                  disabled={huntDeploymentReason != null}
+                  title={huntDeploymentReason ?? undefined}
+                  onClick={onAdvancePhase}
+                >전투 시작</button>
               </div>
               <UnitDock
                 state={state}
@@ -691,6 +697,31 @@ export function TacticalBattleScreen({
                 selectedGroupId={selectedGroup.id}
                 onSelect={selectGroup}
               />
+              {hunt && battle.prepActions.filter(action =>
+                action.selected && (action.id === 'placeBait' || action.id === 'setHuntTraps')).map(action => {
+                const selectedZoneId = action.id === 'placeBait' ? battle.huntBaitZoneId : battle.huntTrapZoneId;
+                return (
+                  <div className="tactical-hunt-preparation-zone" key={action.id}>
+                    <strong>{action.id === 'placeBait' ? '미끼 놓을 길목' : '함정 설치할 길목'}</strong>
+                    <div role="group" aria-label={action.label}>
+                      {battle.zones.filter(zone => zone.id !== 'huntDen').map(zone => (
+                        <button
+                          type="button"
+                          key={zone.id}
+                          className={selectedZoneId === zone.id ? 'active' : ''}
+                          onClick={() => onSetHuntPreparationZone(
+                            action.id as 'placeBait' | 'setHuntTraps',
+                            zone.id,
+                          )}
+                        >{zone.name}</button>
+                      ))}
+                    </div>
+                    <small>{selectedZoneId
+                      ? `${battle.zones.find(zone => zone.id === selectedZoneId)?.name ?? '길목'}에 확정됨`
+                      : '길목을 정해야 전투를 시작할 수 있습니다.'}</small>
+                  </div>
+                );
+              })}
               {huntNeedsMoreGroups && (
                 <div className="tactical-hunt-split-guide" role="status">
                   길목을 모두 막으려면 조를 나누십시오. 얇은 분견대는 급습에 더 취약합니다.
@@ -836,7 +867,7 @@ export function TacticalBattleScreen({
                       </div>
                     )}
                     <div className="tactical-command-bar" role="group" aria-label={`${selectedGroup.label} 명령 선택`}>
-                      {COMMANDS.map(command => {
+                      {COMMANDS.filter(command => !hunt || command !== 'fallback').map(command => {
                         const unavailableReason = tacticalCommandUnavailableReason(battle, selectedGroup, command);
                         return (
                           <button

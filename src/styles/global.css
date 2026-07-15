@@ -2375,6 +2375,35 @@ html, body, #root {
   font-size: 0.82rem;
 }
 
+.tactical-hunt-preparation-zone {
+  display: grid;
+  grid-template-columns: minmax(100px, auto) 1fr;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(165, 137, 79, 0.4);
+  border-radius: 6px;
+  background: rgba(38, 31, 21, 0.52);
+}
+
+.tactical-hunt-preparation-zone > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(72px, 1fr));
+  gap: 5px;
+}
+
+.tactical-hunt-preparation-zone button.active {
+  border-color: #d7b86f;
+  color: #f5dfaa;
+  background: rgba(132, 91, 36, 0.5);
+}
+
+.tactical-hunt-preparation-zone small {
+  grid-column: 2;
+  color: #bcae8c;
+  font-size: 0.72rem;
+}
+
 .tactical-hunt-detachment-controls {
   display: flex;
   align-items: center;

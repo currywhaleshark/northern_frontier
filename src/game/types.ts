@@ -919,10 +919,19 @@ export interface TacticalBattle {
   huntDriversSplit?: boolean;
   huntTrapSet?: boolean;
   huntBaitPlaced?: boolean;
+  huntBaitZoneId?: string;
+  huntTrapZoneId?: string;
   huntLeaderKilled?: boolean;
   huntWithdrawn?: boolean;
   huntDetachmentSerial?: number;
   huntOpenSectorRounds?: Record<string, number>;
+  huntCornered?: boolean;
+  huntLastBeastAction?: {
+    kind: 'lurk' | 'ambush' | 'breakout' | 'cornered';
+    sectorId?: string;
+    targetGroupId?: string;
+  };
+  huntCounterattackCount?: number;
   preliminaryBombardmentCannons?: number;
   preliminaryBombardmentCasualties?: number;
   resourceSnapshot?: Partial<Record<ResourceId, number>>;

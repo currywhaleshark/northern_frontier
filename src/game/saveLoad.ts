@@ -799,6 +799,8 @@ export function loadGame(): GameState | null {
       if (assault) {
         parsed.tacticalBattle.assaultKind ??= 'banditLair';
         if (parsed.tacticalBattle.assaultKind === 'predatorHunt') {
+          parsed.tacticalBattle.prepActions = parsed.tacticalBattle.prepActions
+            .filter(action => action.id !== 'splitDrivers');
           parsed.tacticalBattle.huntPredatorKind ??= parsed.expedition?.predatorKind ?? 'wolf';
           if (parsed.tacticalBattle.huntPredatorKind === 'tiger') {
             parsed.tacticalBattle.huntTigerTier ??= tigerTierFromStrength(parsed.tacticalBattle.originalPower);
@@ -809,16 +811,29 @@ export function loadGame(): GameState | null {
           parsed.tacticalBattle.huntPredatorState ??= 'hidden';
           parsed.tacticalBattle.huntEncirclement ??= 0;
           parsed.tacticalBattle.huntEngagements ??= Math.max(0, parsed.tacticalBattle.round - 1);
-          parsed.tacticalBattle.huntDriversSplit ??= false;
+          parsed.tacticalBattle.huntDriversSplit = false;
           parsed.tacticalBattle.huntTrapSet ??= false;
           parsed.tacticalBattle.huntBaitPlaced ??= false;
           parsed.tacticalBattle.huntLeaderKilled ??= false;
+          parsed.tacticalBattle.huntCornered ??= false;
+          parsed.tacticalBattle.huntCounterattackCount ??= 0;
           parsed.tacticalBattle.huntDetachmentSerial ??= 0;
           parsed.tacticalBattle.huntOpenSectorRounds ??= Object.fromEntries(
             parsed.tacticalBattle.zones
               .filter(zone => zone.id !== 'huntDen')
               .map(zone => [zone.id, 0]),
           );
+          const huntSectorIds = new Set(parsed.tacticalBattle.zones
+            .filter(zone => zone.id !== 'huntDen').map(zone => zone.id));
+          if (!parsed.tacticalBattle.huntBaitZoneId ||
+              !huntSectorIds.has(parsed.tacticalBattle.huntBaitZoneId)) {
+            parsed.tacticalBattle.huntBaitZoneId = undefined;
+          }
+          if (!parsed.tacticalBattle.huntTrapZoneId ||
+              !huntSectorIds.has(parsed.tacticalBattle.huntTrapZoneId)) {
+            parsed.tacticalBattle.huntTrapZoneId = undefined;
+            parsed.tacticalBattle.huntTrapSet = false;
+          }
           for (const group of parsed.tacticalBattle.defenderGroups) group.huntOriginGroupId ??= group.id;
         } else {
           parsed.tacticalBattle.leaderEscapeBlocked ??= false;
