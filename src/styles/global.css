@@ -2536,9 +2536,9 @@ html, body, #root {
   pointer-events: none;
   animation: tactical-conceal 950ms ease-out forwards;
 }
-.tactical-zone.event-melee .tactical-raider-rank { animation: tactical-charge-right 520ms ease 1; }
+.tactical-zone.event-melee .tactical-raider-group.melee-attacker { animation: tactical-charge-right 520ms ease 1; }
 .tactical-zone.event-wallAssault .tactical-raider-rank { animation: tactical-charge-right 580ms ease 1; }
-.tactical-zone.event-melee .tactical-defender-rank,
+.tactical-zone.event-melee .tactical-field-group.melee-attacker { animation: tactical-charge-left 520ms ease 1; }
 .tactical-zone.event-wallHit .tactical-defender-rank,
 .tactical-zone.event-zoneFall .tactical-defender-rank { animation: tactical-charge-left 520ms ease 1; }
 .tactical-zone.event-zoneFall .tactical-raider-rank { animation: tactical-charge-right 700ms ease 1; }
@@ -2546,11 +2546,11 @@ html, body, #root {
 .tactical-zone.event-moraleBreak .tactical-raider-rank { animation: tactical-break 700ms ease forwards; }
 .tactical-zone.event-loot .tactical-raider-rank { animation: tactical-loot 380ms ease 2; }
 .tactical-zone.moving-raiders .tactical-raider-rank { animation: tactical-advance-after-combat 620ms ease-in forwards; }
-.tactical-screen.assault .tactical-zone.event-melee .tactical-raider-rank,
+.tactical-screen.assault .tactical-zone.event-melee .tactical-raider-group.melee-attacker,
 .tactical-screen.assault .tactical-zone.event-zoneFall .tactical-raider-rank {
   animation-name: tactical-charge-left;
 }
-.tactical-screen.assault .tactical-zone.event-melee .tactical-defender-rank,
+.tactical-screen.assault .tactical-zone.event-melee .tactical-field-group.melee-attacker,
 .tactical-screen.assault .tactical-zone.event-wallHit .tactical-defender-rank,
 .tactical-screen.assault .tactical-zone.event-zoneFall .tactical-defender-rank {
   animation-name: tactical-charge-right;

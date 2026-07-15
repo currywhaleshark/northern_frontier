@@ -292,6 +292,36 @@ function finishBattle(state) {
 }
 
 {
+  const { state, battle } = prepareHunt(2026071517, 'wolf');
+  battle.phase = 'simulating';
+  battle.currentZoneId = 'huntSectorRidge';
+  battle.pendingReport = {
+    round: 1,
+    focusZoneId: 'huntSectorRidge',
+    nextFocusZoneId: 'huntSectorRavine',
+    summary: '짐승의 이동 경로가 바뀌었습니다.',
+    lines: [],
+    events: [],
+    wounded: 0,
+    killed: 0,
+    raidersKilled: 0,
+    loot: {},
+    buildingsDamaged: 0,
+    villageMoraleDelta: 0,
+    raiderMoraleDelta: 0,
+    ended: false,
+  };
+  battle.reports.push(battle.pendingReport);
+  assert.equal(tactical.completeTacticalSimulation(state), null);
+  assert.equal(battle.currentZoneId, 'huntSectorRavine',
+    'the hunt report follows the sector reached by the engagement result');
+  assert.equal(battle.pendingReport.positionsApplied, true);
+  assert.equal(tactical.acknowledgeTacticalReport(state), null);
+  assert.equal(battle.currentZoneId, 'huntSectorRavine',
+    'hunt report acknowledgement must not replay the sector transition');
+}
+
+{
   const { state, battle, members } = prepareUniformHunterGroup(2026071512, 3);
   assert.equal(battle.defenderGroups.length, 1, 'same-role hunters begin as one tactical group');
   const original = battle.defenderGroups[0];

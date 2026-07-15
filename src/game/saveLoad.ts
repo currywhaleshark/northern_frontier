@@ -213,6 +213,7 @@ function migratePendingReport(raw: unknown, zoneIds: ReadonlySet<string>): Tacti
     buildingsDamaged: Math.max(0, Number(report.buildingsDamaged) || 0),
     villageMoraleDelta: Number(report.villageMoraleDelta) || 0,
     raiderMoraleDelta: Number(report.raiderMoraleDelta) || 0,
+    positionsApplied: report.positionsApplied === true,
   } as TacticalRoundReport;
 }
 

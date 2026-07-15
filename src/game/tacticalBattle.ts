@@ -29,13 +29,13 @@ import {
   applyDefenseZoneConsequences, resolveEngagementExchange, splitTacticalEngagementDefenders,
 } from './tacticalEngagement';
 import {
-  acknowledgeAssaultReport, advanceAssaultPhase, assaultCommandUnavailableReason,
+  acknowledgeAssaultReport, advanceAssaultPhase, applyAssaultReportPositions, assaultCommandUnavailableReason,
   assaultPreparationUnavailableReason, assignAssaultGroup, chooseDefaultAssaultCommands,
   finishBanditLairTacticalAssault, resolveAssaultRound, setAssaultCommand,
   spendAssaultPreparationAction,
 } from './tacticalAssault';
 import {
-  acknowledgeHuntReport, advanceHuntPhase, assignHuntGroup, chooseDefaultHuntCommands,
+  acknowledgeHuntReport, advanceHuntPhase, applyHuntReportPositions, assignHuntGroup, chooseDefaultHuntCommands,
   finishPredatorTacticalHunt, huntCommandUnavailableReason, huntPreparationUnavailableReason,
   resolveHuntRound, setHuntCommand, spendHuntPreparationAction,
 } from './tacticalHunt';
@@ -249,6 +249,15 @@ export function tacticalRearResponseOptions(
 
 function activeRaider(group: TacticalRaiderGroup): boolean {
   return group.intent !== 'withdraw' && group.power > 0 && group.count - group.killed > 0;
+}
+
+function applyDefenseReportPositions(battle: TacticalBattle): void {
+  const report = battle.pendingReport;
+  if (!report || report.positionsApplied) return;
+  applyNextEngagementStates(battle);
+  normalizeTacticalGroupTargets(battle);
+  battle.currentZoneId = report.nextFocusZoneId;
+  report.positionsApplied = true;
 }
 
 function defenderEngagementDirection(
@@ -1830,6 +1839,9 @@ export function completeTacticalSimulation(state: GameState): string | null {
   const battle = state.tacticalBattle;
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
   if (battle.phase !== 'simulating') return '재생 중인 교전이 없습니다.';
+  if (battle.assaultKind === 'predatorHunt') applyHuntReportPositions(battle);
+  else if (battle.orientation === 'assault') applyAssaultReportPositions(battle);
+  else applyDefenseReportPositions(battle);
   battle.phase = 'report';
   return null;
 }
@@ -1840,14 +1852,11 @@ export function acknowledgeTacticalReport(state: GameState): string | null {
   if (battle.assaultKind === 'predatorHunt') return acknowledgeHuntReport(state);
   if (battle.orientation === 'assault') return acknowledgeAssaultReport(state);
   if (battle.phase !== 'report') return '아직 전투 연출이 끝나지 않았습니다.';
+  applyDefenseReportPositions(battle);
   if (battle.pendingReport.ended) {
     battle.phase = 'finished';
     return null;
   }
-  // 후퇴 연출은 원래 구역에서 보여준 뒤, 다음 교전을 준비할 때 실제 배치를 후방으로 옮긴다.
-  applyNextEngagementStates(battle);
-  normalizeTacticalGroupTargets(battle);
-  battle.currentZoneId = battle.pendingReport.nextFocusZoneId;
   battle.defenderGroups.forEach(group => {
     if (group.command && tacticalCommandUnavailableReason(battle, group, group.command)) {
       group.command = null;

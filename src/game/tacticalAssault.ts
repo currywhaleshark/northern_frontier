@@ -471,7 +471,7 @@ function assaultCommandCasualtyMultiplier(group: TacticalDefenderGroup): number 
 
 function addEvent(
   events: TacticalAnimationEvent[], zoneId: string, kind: TacticalAnimationEvent['kind'], text: string,
-  extra: Partial<Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'casualties' | 'float' | 'shots' | 'meleeParticipants'>> = {},
+  extra: Partial<Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'actorGroupIds' | 'casualties' | 'float' | 'shots' | 'meleeParticipants'>> = {},
 ): void {
   events.push({ zoneId, kind, text, durationMs: 620, ...extra });
 }
@@ -540,12 +540,15 @@ export function resolveAssaultRound(state: GameState): string | null {
     });
   }
   if (commands.has('charge') || commands.has('advance')) {
-    const meleeParticipants = players
-      .filter(group => group.command === 'charge' || group.command === 'advance')
+    const meleeActors = players
+      .filter(group => (group.command === 'charge' || group.command === 'advance') &&
+        tacticalGroupCapabilities(group).has('melee'));
+    const meleeParticipants = meleeActors
       .reduce((sum, group) => sum + activeCount(group), 0) +
       enemies.reduce((sum, group) => sum + Math.max(0, group.count - group.killed), 0);
     addEvent(events, zone.id, 'melee', '토벌대 전열이 방어선을 밀어붙입니다.', {
-      side: 'defender', float: '공세!', meleeParticipants: meleeParticipants,
+      side: 'defender', actorGroupIds: meleeActors.map(group => group.id),
+      float: '공세!', meleeParticipants: meleeParticipants,
     });
   }
   if (commands.has('arson')) {
@@ -719,21 +722,28 @@ export function resolveAssaultRound(state: GameState): string | null {
   return null;
 }
 
-export function acknowledgeAssaultReport(state: GameState): string | null {
-  const battle = state.tacticalBattle;
-  if (!battle || battle.orientation !== 'assault' || !battle.pendingReport) return '확인할 산채 공격 보고가 없습니다.';
-  if (battle.phase !== 'report') return '아직 전투 연출이 끝나지 않았습니다.';
-  if (battle.pendingReport.ended) {
-    battle.phase = 'finished';
-    return null;
-  }
-  const nextZoneId = battle.pendingReport.nextFocusZoneId;
+export function applyAssaultReportPositions(battle: TacticalBattle): void {
+  const report = battle.pendingReport;
+  if (!report || report.positionsApplied) return;
+  const nextZoneId = report.nextFocusZoneId;
   if (nextZoneId !== battle.currentZoneId) {
     for (const group of battle.defenderGroups) {
       if (activeCount(group) > 0) group.zoneId = nextZoneId;
     }
   }
   battle.currentZoneId = nextZoneId;
+  report.positionsApplied = true;
+}
+
+export function acknowledgeAssaultReport(state: GameState): string | null {
+  const battle = state.tacticalBattle;
+  if (!battle || battle.orientation !== 'assault' || !battle.pendingReport) return '확인할 산채 공격 보고가 없습니다.';
+  if (battle.phase !== 'report') return '아직 전투 연출이 끝나지 않았습니다.';
+  applyAssaultReportPositions(battle);
+  if (battle.pendingReport.ended) {
+    battle.phase = 'finished';
+    return null;
+  }
   battle.defenderGroups.forEach(group => {
     if (group.command && assaultCommandUnavailableReason(battle, group, group.command)) {
       group.command = null;

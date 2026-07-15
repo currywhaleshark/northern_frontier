@@ -56,6 +56,12 @@ assert.match(zoneSource, /tactical-formation-lane/,
   'focused zones must stack groups inside formation lanes');
 assert.match(zoneSource, /tactical-contact-line/,
   'the seven-column formation view must mark the contact line');
+assert.match(zoneSource, /const showFormationGuides = battle\.phase === 'deployment';/,
+  'formation-line and contact-line guides must be limited to deployment');
+assert.match(zoneSource, /\{showFormationGuides && <span className="tactical-formation-line-label">/,
+  'formation-line labels must not render after deployment');
+assert.match(zoneSource, /\{showFormationGuides && \(\s*<div className="tactical-contact-line"/,
+  'the contact-line guide must not render after deployment');
 
 assert.match(chipSource, /tactical-dock-chip/, 'group chip class contract must be preserved');
 assert.match(chipSource, /disabled=\{active === 0\}/, 'routed group chips must remain disabled');
@@ -127,8 +133,12 @@ assert.match(cssSource, /\.tactical-formation-lane\s*\{\s*display:\s*contents;/,
   'non-focused zones must keep the compact rank layout');
 assert.match(zoneSource, /function formationStackStyle/,
   'focused formation groups must receive deterministic depth offsets');
-assert.match(zoneSource, /zIndex:\s*\d+\s*\+\s*index/,
-  'later and lower formation groups must paint above earlier groups');
+assert.match(zoneSource, /const center = \(groupCount - 1\) \/ 2;/,
+  'groups sharing a line must spread symmetrically around the field center');
+assert.match(zoneSource, /Math\.min\(96, 44 \+ Math\.max\(0, groupCount - 2\) \* 16\)/,
+  'formation spacing must expand with the number of groups without leaving the field');
+assert.match(zoneSource, /zIndex:\s*60 - Math\.round\(distanceFromCenter \* 10\) \+ index/,
+  'lower formation groups must paint above groups placed farther back');
 assert.match(zoneSource, /--formation-stack-y/,
   'formation depth must use a shallow vertical offset instead of full-height stacking');
 assert.match(cssSource, /\.tactical-zone\.focused \.tactical-formation-lane[\s\S]*display:\s*grid;/,
@@ -138,6 +148,18 @@ assert.match(cssSource,
   'each group in one line must occupy the same battlefield footprint');
 assert.match(cssSource, /translate:\s*var\(--formation-stack-x[\s\S]*--formation-stack-y/,
   'overlapping groups must be staggered only by small ground-plane offsets');
+assert.match(zoneSource, /function meleeActorForEvent/,
+  'melee motion must resolve the attacking groups recorded by the event');
+assert.match(zoneSource, /melee-attacker/,
+  'only melee actors must receive the charge animation class');
+assert.doesNotMatch(cssSource, /\.tactical-zone\.event-melee \.tactical-raider-rank\s*\{/,
+  'melee must not move the entire enemy rank');
+assert.doesNotMatch(cssSource, /\.tactical-zone\.event-melee \.tactical-defender-rank\s*[,\{]/,
+  'melee must not move the entire friendly rank');
+assert.match(cssSource, /\.tactical-zone\.event-melee \.tactical-raider-group\.melee-attacker/,
+  'the attacking enemy group must move independently');
+assert.match(cssSource, /\.tactical-zone\.event-melee \.tactical-field-group\.melee-attacker/,
+  'the attacking friendly group must move independently');
 assert.match(zoneSource, /rear-facing/,
   'defenders assigned to a rear engagement must expose a facing class');
 assert.match(cssSource, /\.tactical-field-group\.rear-facing \.tactical-defender[\s\S]*scaleX\(-1\)/,

@@ -257,6 +257,39 @@ assert.match(
 }
 
 {
+  const { state, battle } = prepareState(2026071516, true);
+  battle.phase = 'simulating';
+  battle.currentZoneId = 'lairTrail';
+  battle.defenderGroups.forEach(group => { group.zoneId = 'lairTrail'; });
+  battle.pendingReport = {
+    round: 1,
+    focusZoneId: 'lairTrail',
+    nextFocusZoneId: 'lairWall',
+    summary: '숲길 방어선을 돌파했습니다.',
+    lines: [],
+    events: [],
+    wounded: 0,
+    killed: 0,
+    raidersKilled: 0,
+    loot: {},
+    buildingsDamaged: 0,
+    villageMoraleDelta: 0,
+    raiderMoraleDelta: 0,
+    ended: false,
+  };
+  battle.reports.push(battle.pendingReport);
+  assert.equal(tactical.completeTacticalSimulation(state), null);
+  assert.equal(battle.currentZoneId, 'lairWall',
+    'the assault report opens on the newly reached battlefield zone');
+  assert.ok(battle.defenderGroups.every(group => group.zoneId === 'lairWall'),
+    'surviving assault groups remain visibly advanced after playback');
+  assert.equal(battle.pendingReport.positionsApplied, true);
+  assert.equal(tactical.acknowledgeTacticalReport(state), null);
+  assert.ok(battle.defenderGroups.every(group => group.zoneId === 'lairWall'),
+    'assault report acknowledgement must not apply the visual advance twice');
+}
+
+{
   const state = simulation.newGame(2026071514);
   const lair = state.foreignSites.find(site => site.type === 'banditLair');
   assert.ok(lair);

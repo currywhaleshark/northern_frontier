@@ -240,7 +240,7 @@ function animationEvent(
   kind: TacticalAnimationEvent['kind'],
   text: string,
   durationMs = 650,
-  extra?: Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'casualties' | 'float' | 'shots' | 'meleeParticipants'>,
+  extra?: Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'actorGroupIds' | 'casualties' | 'float' | 'shots' | 'meleeParticipants'>,
 ): TacticalAnimationEvent {
   return { zoneId, kind, text, durationMs, ...extra };
 }
@@ -497,6 +497,8 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     .filter((command): command is TacticalCommandId => command != null))];
   const chargingMelee = combatDefenders.filter(defender =>
     tacticalGroupCapabilities(defender).has('melee') && defender.command === 'charge');
+  const attackingMelee = attackers.filter(attacker =>
+    !attacker.confused && tacticalTargetingRole(attacker) === 'melee' && activeRaiderCount(attacker) > 0);
   const exposedRanged = combatDefenders.filter(defender => tacticalGroupCapabilities(defender).has('volley'));
   const activeAttackerCount = attackers.reduce((sum, attacker) => sum + activeRaiderCount(attacker), 0);
   const activeCombatDefenderCount = combatDefenders.reduce((sum, defender) => sum + activeDefenderCount(defender), 0);
@@ -533,7 +535,8 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
         : `${attacker.label}이(가) 방어선 뒤로 파고들어 후열 수비대와 맞붙습니다.`,
       620,
       {
-        side: 'raider', groupId: attacker.id, float: continuing ? '후열 공격!' : '후열 돌입!',
+        side: 'raider', groupId: attacker.id, actorGroupIds: [attacker.id],
+        float: continuing ? '후열 공격!' : '후열 돌입!',
         meleeParticipants: attackerCount + Math.max(1, activeRearTargetCount),
       },
     ));
@@ -564,12 +567,14 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
   }
   if (commands.includes('charge')) {
     preDefenseEvents.push(animationEvent(zone.id, 'melee', '근접 수비대가 대열을 깨고 적진으로 돌격합니다.', 620, {
-      side: 'defender', float: '돌격!', meleeParticipants: chargingMeleeCount + activeAttackerCount,
+      side: 'defender', actorGroupIds: chargingMelee.map(group => group.id),
+      float: '돌격!', meleeParticipants: chargingMeleeCount + activeAttackerCount,
     }));
   }
   if (chargeOpensFlank) {
     preDefenseEvents.push(animationEvent(zone.id, 'melee', '돌격대가 비운 전열의 틈으로 적이 파고들어 후열 원거리 병종을 우회 타격합니다.', 580, {
-      side: 'defender', float: '후열 노출!', meleeParticipants: exposedRangedCount + activeAttackerCount,
+      side: 'raider', actorGroupIds: attackingMelee.map(group => group.id),
+      float: '후열 노출!', meleeParticipants: exposedRangedCount + activeAttackerCount,
     }));
     preDefenseLines.push(`${zone.name}에서 근접대의 돌격으로 후열 원거리 병종이 우회 타격에 노출됐습니다.`);
   }
@@ -582,6 +587,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
       }));
     } else {
       preDefenseEvents.push(animationEvent(zone.id, 'melee', '방어선에서 짧고 거친 백병전이 벌어집니다.', 650, {
+        side: 'raider', actorGroupIds: attackingMelee.map(group => group.id),
         meleeParticipants: activeCombatDefenderCount + activeAttackerCount,
       }));
     }

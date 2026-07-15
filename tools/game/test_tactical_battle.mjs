@@ -1214,9 +1214,12 @@ function addBuiltMarker(state, type) {
     'undefended zones do not create phantom melee events',
   );
   assert.equal(tactical.completeTacticalSimulation(state), null);
-  assert.equal(tactical.acknowledgeTacticalReport(state), null);
-  assert.equal(main.zoneId, 'center', 'scheduled movement applies only after combat playback and its report');
+  assert.equal(main.zoneId, 'center', 'scheduled raider movement is visible as soon as combat playback ends');
   assert.equal(main.pendingZoneId, undefined);
+  assert.equal(battle.currentZoneId, 'center', 'the report view follows the resulting front');
+  assert.equal(battle.pendingReport.positionsApplied, true);
+  assert.equal(tactical.acknowledgeTacticalReport(state), null);
+  assert.equal(main.zoneId, 'center', 'acknowledging the report must not apply movement twice');
 }
 
 {
@@ -1303,6 +1306,12 @@ function addBuiltMarker(state, type) {
     battle.pendingReport.events.some(event => event.kind === 'melee' && event.float === '돌격!'),
     'melee charge produces a dedicated combat event',
   );
+  const chargeEvent = battle.pendingReport.events.find(event =>
+    event.kind === 'melee' && event.float === '돌격!');
+  assert.deepEqual(chargeEvent.actorGroupIds, [spear.id],
+    'only the group ordered to charge is marked as a melee actor');
+  assert.ok(!chargeEvent.actorGroupIds.includes(bow.id),
+    'a firing group in the same rank must not move with the charge animation');
   assert.ok(
     battle.pendingReport.events.some(event => event.kind === 'melee' && event.float === '후열 노출!'),
     'charging melee exposes ranged troops to a flanking strike',
@@ -1329,8 +1338,10 @@ function addBuiltMarker(state, type) {
     'defender advance is described after the engagement',
   );
   assert.equal(tactical.completeTacticalSimulation(state), null);
+  assert.equal(advancingGroup.zoneId, 'storehouse',
+    'the completed engagement leaves the advancing defender at its destination');
   assert.equal(tactical.acknowledgeTacticalReport(state), null);
-  assert.equal(advancingGroup.zoneId, 'storehouse', 'defender advances one line after the report');
+  assert.equal(advancingGroup.zoneId, 'storehouse', 'report acknowledgement does not repeat the advance');
   assert.equal(advancingGroup.command, 'hold', 'advance is a one-engagement movement command');
 }
 
@@ -1349,8 +1360,10 @@ function addBuiltMarker(state, type) {
   assert.equal(retreatingGroup.zoneId, 'approach', 'retreat animation should remain on the current line');
   assert.equal(battle.pendingReport.ended, false, 'retreat movement test requires another engagement');
   assert.equal(tactical.completeTacticalSimulation(state), null);
+  assert.equal(retreatingGroup.zoneId, 'wall',
+    'the completed engagement leaves retreating defenders on the rear line');
   assert.equal(tactical.acknowledgeTacticalReport(state), null);
-  assert.equal(retreatingGroup.zoneId, 'wall', 'retreating defenders move to the next rear line');
+  assert.equal(retreatingGroup.zoneId, 'wall', 'report acknowledgement does not repeat the retreat');
   assert.equal(retreatingGroup.command, 'hold', 'fallback is consumed after movement');
   retreatingGroup.zoneId = 'center';
   assert.match(

@@ -472,7 +472,7 @@ export function chooseDefaultHuntCommands(battle: TacticalBattle): void {
 
 function addEvent(
   events: TacticalAnimationEvent[], zoneId: string, kind: TacticalAnimationEvent['kind'], text: string,
-  extra: Partial<Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'casualties' | 'float' | 'shots' | 'meleeParticipants'>> = {},
+  extra: Partial<Pick<TacticalAnimationEvent, 'side' | 'groupId' | 'actorGroupIds' | 'casualties' | 'float' | 'shots' | 'meleeParticipants'>> = {},
 ): void {
   events.push({ zoneId, kind, text, durationMs: 650, ...extra });
 }
@@ -966,13 +966,14 @@ export function resolveHuntRound(state: GameState): string | null {
         side: 'defender', shots: volleyShots,
       });
     }
-    const meleeParticipants = players
-      .filter(group => tacticalGroupCapabilities(group).has('melee') && group.command !== 'fallback')
+    const meleeActors = players
+      .filter(group => tacticalGroupCapabilities(group).has('melee') && group.command !== 'fallback');
+    const meleeParticipants = meleeActors
       .reduce((sum, group) => sum + activeCount(group), 0) +
       beasts.reduce((sum, group) => sum + activeBeasts(group), 0);
     if (meleeParticipants > 0) {
       addEvent(events, actionZone.id, 'melee', '창과 사냥칼을 든 사냥대가 짐승과 뒤엉켜 근접전을 벌입니다.', {
-        side: 'defender', meleeParticipants: meleeParticipants,
+        side: 'defender', actorGroupIds: meleeActors.map(group => group.id), meleeParticipants: meleeParticipants,
       });
     }
     let damage = attackPower * (0.17 + rng() * 0.06) * (0.65 + (battle.huntEncirclement ?? 0) / 190);
@@ -1053,15 +1054,22 @@ export function resolveHuntRound(state: GameState): string | null {
   return null;
 }
 
+export function applyHuntReportPositions(battle: TacticalBattle): void {
+  const report = battle.pendingReport;
+  if (!report || report.positionsApplied) return;
+  battle.currentZoneId = report.nextFocusZoneId;
+  report.positionsApplied = true;
+}
+
 export function acknowledgeHuntReport(state: GameState): string | null {
   const battle = state.tacticalBattle;
   if (!battle || battle.assaultKind !== 'predatorHunt' || !battle.pendingReport) return '확인할 사냥 보고가 없습니다.';
   if (battle.phase !== 'report') return '아직 사냥 연출이 끝나지 않았습니다.';
+  applyHuntReportPositions(battle);
   if (battle.pendingReport.ended) {
     battle.phase = 'finished';
     return null;
   }
-  battle.currentZoneId = battle.pendingReport.nextFocusZoneId;
   battle.defenderGroups.forEach(group => {
     if (group.command && huntCommandUnavailableReason(battle, group, group.command)) {
       group.command = null;

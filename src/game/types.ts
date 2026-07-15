@@ -780,6 +780,7 @@ export interface TacticalAnimationEvent {
   // 연출 보강용 부가 정보 (구버전 저장에는 없을 수 있어 전부 선택)
   side?: 'defender' | 'raider';
   groupId?: string;      // 피해를 입은 그룹 — 화면에서 해당 스프라이트를 쓰러뜨린다
+  actorGroupIds?: string[]; // 이 이벤트에서 실제로 전진하거나 공격 동작을 하는 그룹
   casualties?: number;   // 이 이벤트로 쓰러지는 인원(전사+부상)
   float?: string;        // 랭크 위로 떠오르는 짧은 전황 텍스트
   meleeParticipants?: number;
@@ -804,6 +805,7 @@ export interface TacticalRoundReport {
   buildingsDamaged: number;
   villageMoraleDelta: number;
   raiderMoraleDelta: number;
+  positionsApplied?: boolean;
   ended?: boolean;
   outcome?:
     | 'defenseSuccess'

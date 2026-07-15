@@ -265,12 +265,16 @@ function formationSlotStyle(
 }
 
 function formationStackStyle(index: number, groupCount: number): CSSProperties {
-  const depth = Math.max(0, groupCount - 1 - index);
-  const horizontalOffsets = [0, -18, 18, -30, 30];
+  const center = (groupCount - 1) / 2;
+  const totalSpread = groupCount <= 1
+    ? 0
+    : Math.min(96, 44 + Math.max(0, groupCount - 2) * 16);
+  const gap = groupCount > 1 ? totalSpread / (groupCount - 1) : 0;
+  const distanceFromCenter = Math.abs(index - center);
   return {
-    '--formation-stack-x': `${horizontalOffsets[depth % horizontalOffsets.length]}px`,
-    '--formation-stack-y': `${Math.min(24, depth * 8)}px`,
-    zIndex: 30 + index,
+    '--formation-stack-x': `${(index - center) * gap}px`,
+    '--formation-stack-y': `${Math.min(10, distanceFromCenter * 4)}px`,
+    zIndex: 60 - Math.round(distanceFromCenter * 10) + index,
   } as CSSProperties;
 }
 
@@ -404,6 +408,16 @@ function eventClass(event: TacticalAnimationEvent | null, zoneId: string): strin
   return ` event-${event.kind}`;
 }
 
+function meleeActorForEvent(
+  event: TacticalAnimationEvent | null,
+  side: NonNullable<TacticalAnimationEvent['side']>,
+  groupId: string,
+): boolean {
+  if (!event || event.kind !== 'melee' || event.side !== side) return false;
+  if (event.actorGroupIds != null) return event.actorGroupIds.includes(groupId);
+  return event.groupId === groupId;
+}
+
 function defenderPoseForEvent(
   event: TacticalAnimationEvent | null,
   group: TacticalDefenderGroup,
@@ -415,7 +429,7 @@ function defenderPoseForEvent(
   const capabilities = tacticalGroupCapabilities(group);
   if (defenderFiringForEvent(event, group)) return 'attack';
   if (event.kind === 'ambush' && event.side !== 'raider' && capabilities.has('ambush')) return 'attack';
-  if (event.kind === 'melee' && event.side !== 'raider' && capabilities.has('melee')) return 'attack';
+  if (meleeActorForEvent(event, 'defender', group.id) && capabilities.has('melee')) return 'attack';
   if (event.kind === 'escapeBlocked' && group.role === 'hunter') return 'attack';
   return 'idle';
 }
@@ -454,9 +468,7 @@ function raiderPoseForEvent(
   if (event.kind === 'rearAssault' && event.groupId === group.id) return 'attack';
   if (event.kind === 'wallAssault' && event.groupId === group.id) return 'attack';
   if (raiderFiringForEvent(event, group)) return 'attack';
-  if (event.kind === 'melee' && event.side === 'raider' &&
-      (event.groupId == null || event.groupId === group.id)) return 'attack';
-  if (event.kind === 'melee' && event.side == null) return 'attack';
+  if (meleeActorForEvent(event, 'raider', group.id)) return 'attack';
   if (event.kind === 'advance' && event.side !== 'defender') return 'attack';
   if (event.kind === 'leaderEscape' && event.groupId === group.id) return 'attack';
   return 'idle';
@@ -522,6 +534,7 @@ export function TacticalZoneColumn({
   onSelectTarget,
 }: Props) {
   const focused = zone.id === activeZoneId;
+  const showFormationGuides = battle.phase === 'deployment';
   const defenders = battle.defenderGroups
     .filter(group => group.zoneId === zone.id)
     .sort((a, b) => defenderFormationOrder(a) - defenderFormationOrder(b));
@@ -683,7 +696,7 @@ export function TacticalZoneColumn({
             aria-label={`적 ${formationLineLabel(line)}`}
             key={line}
           >
-            <span className="tactical-formation-line-label">적 {formationLineLabel(line)}</span>
+            {showFormationGuides && <span className="tactical-formation-line-label">적 {formationLineLabel(line)}</span>}
             {raiders.filter(raider => raider.line === line).map((raider, stackIndex, lineGroups) => {
           const activeRaiders = Math.max(0, raider.count - raider.killed);
           const targetingActive = battle.phase === 'command' && !hunt && activeRaiders > 0 && selectedGroupId != null;
@@ -710,9 +723,10 @@ export function TacticalZoneColumn({
               ? 'attack'
               : hunt && battle.huntPredatorState === 'wounded' ? 'wounded' : 'idle';
           const raiderPose = raider.beastKind ? beastPose : raiderPoseForEvent(activeEvent, raider);
+          const meleeAttacker = meleeActorForEvent(activeEvent, 'raider', raider.id);
           return (
             <div
-              className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${leaderMotion}`}
+              className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${leaderMotion}`}
               style={formationStackStyle(stackIndex, lineGroups.length)}
               data-stack-depth={lineGroups.length - 1 - stackIndex}
               key={leaderMotion ? `${raider.id}-${activeEvent?.kind}-${eventIndex}` : raider.id}
@@ -767,10 +781,12 @@ export function TacticalZoneColumn({
           </div>
         ))}
       </div>
-      <div className="tactical-contact-line" aria-hidden={!focused}>
-        <span>교전선</span>
-      </div>
-      <div className={`tactical-rear-assault-rank${activeEvent?.kind === 'rearAssault' && activeEvent.zoneId === zone.id ? ' entering' : ''}${activeEvent?.kind === 'melee' && activeEvent.side === 'raider' && activeEvent.zoneId === zone.id && rearAssaulters.some(group => activeEvent.groupId == null || activeEvent.groupId === group.id) ? ' attacking' : ''}`}>
+      {showFormationGuides && (
+        <div className="tactical-contact-line" aria-hidden={!focused}>
+          <span>교전선</span>
+        </div>
+      )}
+      <div className={`tactical-rear-assault-rank${activeEvent?.kind === 'rearAssault' && activeEvent.zoneId === zone.id ? ' entering' : ''}`}>
         {rearAssaulters.map(raider => {
           const activeRaiders = Math.max(0, raider.count - raider.killed);
           const targetingActive = battle.phase === 'command' && !hunt && activeRaiders > 0 && selectedGroupId != null;
@@ -784,9 +800,10 @@ export function TacticalZoneColumn({
             ? activeEvent.casualties ?? 0 : 0;
           const totalRaiders = activeRaiders + fallingRaiders;
           const formation = formationDimensions(totalRaiders, 132, 100, 20, 13, 5);
+          const meleeAttacker = meleeActorForEvent(activeEvent, 'raider', raider.id);
           return (
             <div
-              className={`tactical-raider-group rear-assault${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}`}
+              className={`tactical-raider-group rear-assault${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}`}
               key={raider.id}
               onClick={targetable ? event => {
                 event.stopPropagation();
@@ -844,7 +861,7 @@ export function TacticalZoneColumn({
             aria-label={`아군 ${formationLineLabel(line)}`}
             key={line}
           >
-            <span className="tactical-formation-line-label">아군 {formationLineLabel(line)}</span>
+            {showFormationGuides && <span className="tactical-formation-line-label">아군 {formationLineLabel(line)}</span>}
             {defenders.filter(group => group.line === line).map((group, stackIndex, lineGroups) => {
           const recoiling = zoneVolley && defenderFiringForEvent(activeEvent, group);
           const rearFacing = rearAssaulters.length > 0 &&
@@ -856,9 +873,10 @@ export function TacticalZoneColumn({
             : activeEvent?.groupId === group.id && activeEvent.zoneId === zone.id
               ? ` prep-${activeEvent.kind}`
               : '';
+          const meleeAttacker = meleeActorForEvent(activeEvent, 'defender', group.id);
           return (
             <div
-              className={`tactical-field-group formation-${defenderFormationRole(group)} line-${group.line}${rearFacing ? ' rear-facing' : ''}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${prepMotion}${commandable ? ' selectable' : ''}${commandable && selectedGroupId === group.id ? ' selected' : ''}`}
+              className={`tactical-field-group formation-${defenderFormationRole(group)} line-${group.line}${rearFacing ? ' rear-facing' : ''}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${meleeAttacker ? ' melee-attacker' : ''}${prepMotion}${commandable ? ' selectable' : ''}${commandable && selectedGroupId === group.id ? ' selected' : ''}`}
               style={formationStackStyle(stackIndex, lineGroups.length)}
               data-stack-depth={lineGroups.length - 1 - stackIndex}
               key={recoiling || blockingEscape || prepMotion ? `${group.id}-motion-${eventIndex}` : group.id}
