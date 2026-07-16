@@ -35,8 +35,8 @@ assert.match(dockSource, /'--dock-strip-count': items\.length/,
 
 assert.match(cssSource, /\.main\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\);/,
   'the main layout must give the entire content width to the canvas');
-assert.match(cssSource, /\.right-overlay-stack\s*\{[\s\S]*right:\s*266px;/,
-  'the right overlay must reserve the minimap and dock icon strip width');
+assert.match(cssSource, /\.right-overlay-stack\s*\{[\s\S]*right:\s*54px;/,
+  'the upper-right alert overlay must sit directly beside the dock icon strip');
 assert.match(cssSource,
   /\.canvas-stage:has\(\.dock-frame\.has-open-windows\) \.right-overlay-stack\s*\{\s*right:\s*332px;/,
   'the right overlay must shift beside an open dock window');

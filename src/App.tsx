@@ -798,9 +798,6 @@ export default function App() {
       />
       <div className="main">
         <div className="canvas-stage">
-          <div className="minimap-overlay">
-            <Minimap state={state} version={version} viewportRef={mapViewportRef} selected={selected} />
-          </div>
           <div className="right-overlay-stack">
             <AlertsPanel state={state} />
           </div>
@@ -828,30 +825,35 @@ export default function App() {
             uiPrefs={uiPrefs}
             onUiPrefsChange={setUiPrefs}
           />
-          <SelectionContextBar
-            state={state}
-            selected={selected}
-            selectedEntity={selectedEntity}
-            onClear={handleClearSelection}
-            onSetResidentJob={handleSetResidentJob}
-            onToggleResidentCart={handleToggleResidentCart}
-            onUpgradeHousing={handleUpgradeHousing}
-            onSetSmithyProduct={handleSetSmithyProduct}
-            onSetBuildingCrop={handleSetBuildingCrop}
-            onConvertFieldToPaddy={handleConvertFieldToPaddy}
-            onRequestTrade={handleRequestTrade}
-            onToggleNitre={handleToggleNitre}
-            onAssignNearestWorker={handleAssignNearestWorker}
-            onUnassignWorker={handleUnassignWorker}
-            onSelectResident={handleResidentClick}
-            onCancelBuildingConstruction={handleCancelBuildingConstruction}
-            onDemolishBuilding={handleDemolishBuilding}
-            onSendSiteGift={handleSendSiteGift}
-            onRequestSitePassage={handleRequestSitePassage}
-            onRequestSiteHunting={handleRequestSiteHunting}
-            onScoutBanditLair={handleScoutBanditLair}
-            onRaidBanditLair={handleRaidBanditLair}
-          />
+          <div className="right-lower-stack">
+            <div className="minimap-overlay">
+              <Minimap state={state} version={version} viewportRef={mapViewportRef} selected={selected} />
+            </div>
+            <SelectionContextBar
+              state={state}
+              selected={selected}
+              selectedEntity={selectedEntity}
+              onClear={handleClearSelection}
+              onSetResidentJob={handleSetResidentJob}
+              onToggleResidentCart={handleToggleResidentCart}
+              onUpgradeHousing={handleUpgradeHousing}
+              onSetSmithyProduct={handleSetSmithyProduct}
+              onSetBuildingCrop={handleSetBuildingCrop}
+              onConvertFieldToPaddy={handleConvertFieldToPaddy}
+              onRequestTrade={handleRequestTrade}
+              onToggleNitre={handleToggleNitre}
+              onAssignNearestWorker={handleAssignNearestWorker}
+              onUnassignWorker={handleUnassignWorker}
+              onSelectResident={handleResidentClick}
+              onCancelBuildingConstruction={handleCancelBuildingConstruction}
+              onDemolishBuilding={handleDemolishBuilding}
+              onSendSiteGift={handleSendSiteGift}
+              onRequestSitePassage={handleRequestSitePassage}
+              onRequestSiteHunting={handleRequestSiteHunting}
+              onScoutBanditLair={handleScoutBanditLair}
+              onRaidBanditLair={handleRaidBanditLair}
+            />
+          </div>
           <DockFrame
             items={[
               {
