@@ -28,6 +28,7 @@ transpileDirectory(new URL('../../src/game/', import.meta.url), join(rootDir, 'g
 transpileDirectory(new URL('../../src/ui/', import.meta.url), join(rootDir, 'ui'));
 
 const display = await import(pathToFileURL(join(rootDir, 'ui', 'resourceDisplay.mjs')).href);
+const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
 const {
   DISPLAY_RESOURCE_ORDER,
   RESOURCE_DISPLAY_GROUPS,
@@ -70,5 +71,12 @@ assert.equal(resourceDisplayGroupTotal(state, 'luxury'), 5,
   'the luxury display total must not double-count the separate valuables group');
 assert.equal(resourceDisplayGroupTotal(state, 'valuables'), 11,
   'the valuables display total must contain precious metal');
+
+const popoverZIndexMatch = cssSource.match(/\.resource-breakdown-popover\s*\{[^}]*z-index:\s*(\d+);/);
+const unifiedLogZIndexMatch = cssSource.match(/\.unified-log\s*\{[^}]*z-index:\s*(\d+);/);
+assert.ok(popoverZIndexMatch, 'the resource popover must declare an explicit z-index');
+assert.ok(unifiedLogZIndexMatch, 'the unified log must declare an explicit z-index');
+assert.ok(Number(popoverZIndexMatch[1]) > Number(unifiedLogZIndexMatch[1]),
+  'resource popovers must remain interactive above the upper-left unified log');
 
 console.log('resource display tests passed');
