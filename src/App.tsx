@@ -64,6 +64,7 @@ import type {
   BuildingTypeId, CombatWeaponId, CropId, Difficulty, JobId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
   PreparationActionId, PredatorKind, SpecialItemId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
+import { loadUiPrefs, saveUiPrefs, type UiPrefs } from './ui/uiPrefs';
 
 export default function App() {
   // 게임 상태는 ref에 두고, version 증가로 리렌더를 트리거한다
@@ -84,6 +85,7 @@ export default function App() {
   const [inspTab, setInspTab] = useState<InspectorTab>('tile');
   const [inspResidentId, setInspResidentId] = useState<number | null>(null);
   const [soundOn, setSoundOn] = useState(!isMuted());
+  const [uiPrefs, setUiPrefs] = useState<UiPrefs>(() => loadUiPrefs());
   const [weaponDialogOpen, setWeaponDialogOpen] = useState(false);
   const [expeditionMusterRequest, setExpeditionMusterRequest] = useState<ExpeditionMusterRequest | null>(null);
   // 이동 보간용: 마지막 서브틱 처리 시각과 서브틱 간격
@@ -96,6 +98,10 @@ export default function App() {
     battleActive: false,
     battleOutcome: null as 'victory' | 'defeat' | null,
   });
+
+  useEffect(() => {
+    saveUiPrefs(uiPrefs);
+  }, [uiPrefs]);
 
   // 브라우저 자동재생 정책: 첫 입력 때 오디오 시작
   useEffect(() => {
@@ -754,6 +760,8 @@ export default function App() {
         canLoad={canLoad}
         soundOn={soundOn}
         onToggleSound={handleToggleSound}
+        uiPrefs={uiPrefs}
+        onUiPrefsChange={setUiPrefs}
         onOpenCourt={() => {
           setInspResidentId(null);
           setInspTab('court');

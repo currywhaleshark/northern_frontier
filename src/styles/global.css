@@ -45,6 +45,28 @@ html, body, #root {
   gap: 10px;
   flex-wrap: wrap;
 }
+.topbar-resource-row {
+  flex-wrap: nowrap;
+  gap: 6px;
+  min-width: 0;
+}
+.topbar-resource-fixed {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.topbar-starred-resources {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
 .topbar-objectives {
   display: flex;
   align-items: stretch;
@@ -88,7 +110,20 @@ html, body, #root {
 }
 .res-item.low { color: var(--bad); font-weight: bold; }
 .res-item small { color: var(--muted); }
-.res-item.grouped { position: relative; cursor: default; }
+.resource-group-wrap { position: relative; flex: 0 0 auto; }
+.res-item.grouped {
+  border: 1px solid transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.res-item.grouped.low { color: var(--bad); }
+.res-item.grouped:hover,
+.res-item.grouped:focus-visible,
+.res-item.grouped[aria-expanded="true"] { border-color: var(--border); background: #303944; }
+.res-item.grouped:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.res-item.metric { flex: 0 0 auto; }
+.res-item.starred { flex: 0 0 auto; }
 .resource-breakdown-popover {
   position: absolute;
   top: calc(100% + 5px);
@@ -117,6 +152,28 @@ html, body, #root {
   gap: 6px;
 }
 .resource-breakdown-row { padding: 2px 0; }
+.resource-breakdown-row.low { color: var(--bad); font-weight: 700; }
+.resource-breakdown-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 64px;
+}
+.resource-star-button {
+  width: 24px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.resource-star-button:hover,
+.resource-star-button:focus-visible { border-color: var(--accent); color: var(--text); }
+.resource-star-button.active { color: var(--accent); }
+.resource-star-button:disabled { color: #59636d; cursor: not-allowed; }
 .resource-breakdown-head .icon-btn {
   width: 24px;
   height: 24px;
@@ -127,6 +184,7 @@ html, body, #root {
   cursor: pointer;
 }
 .resource-breakdown-head .icon-btn.active { color: var(--accent); border-color: var(--accent); }
+.resource-breakdown-head .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .date-box {
   font-weight: bold;
   color: var(--accent);
