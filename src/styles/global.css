@@ -1116,6 +1116,16 @@ html, body, #root {
   display: flex; justify-content: space-between;
   padding: 3px 4px; cursor: pointer; border-radius: 3px; font-size: 12px;
 }
+.dock-resident-list .resident-row {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+.dock-resident-list .resident-row:focus-visible { outline: 1px solid var(--accent); }
+.dock-resident-list .resident-row:disabled { cursor: default; }
 .resident-row:hover { background: var(--panel); }
 .resident-row.dead { color: var(--muted); text-decoration: line-through; }
 .resident-row.selected { background: #33301f; }

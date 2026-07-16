@@ -10,14 +10,18 @@ const TILE = CONFIG.ui.tileSize;
 const MAP_SIZE = 188;
 const MAP_PADDING = 8;
 
+export function centerViewportOnTile(box: HTMLDivElement, x: number, y: number): void {
+  box.scrollTo({
+    left: MAP_PADDING + (x + 0.5) * TILE - box.clientWidth / 2,
+    top: MAP_PADDING + (y + 0.5) * TILE - box.clientHeight / 2,
+  });
+}
+
 export function centerViewportOnSettlement(state: GameState, box: HTMLDivElement): void {
   const center = state.buildings.find(building => building.type === 'center');
   if (!center) return;
   const size = buildingFootprintSize(center.type);
-  box.scrollTo({
-    left: MAP_PADDING + (center.x + size / 2) * TILE - box.clientWidth / 2,
-    top: MAP_PADDING + (center.y + size / 2) * TILE - box.clientHeight / 2,
-  });
+  centerViewportOnTile(box, center.x + (size - 1) / 2, center.y + (size - 1) / 2);
 }
 
 const TERRAIN_COLORS: Record<Terrain, string> = {

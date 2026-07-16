@@ -14,17 +14,20 @@ import { initAudio, isMuted, playSfx, setMuted, setWeatherAmbient } from './soun
 import { AlertsPanel } from './components/AlertsPanel';
 import { BuildDrawer } from './components/BuildDrawer';
 import { DockFrame } from './components/dock/DockFrame';
+import { CourtWindow } from './components/dock/CourtWindow';
+import { FactionsWindow } from './components/dock/FactionsWindow';
+import { ResidentsWindow } from './components/dock/ResidentsWindow';
 import { EventLog } from './components/EventLog';
 import { EventModal } from './components/EventModal';
 import { TradeDialog } from './components/TradeDialog';
 import { GameCanvas } from './components/GameCanvas';
-import { InspectorPanel, type InspectorTab } from './components/InspectorPanel';
+import { InspectorPanel } from './components/InspectorPanel';
 import { ImportantLogOverlay } from './components/ImportantLogOverlay';
 import { JobPanel } from './components/JobPanel';
 import { MainMenu } from './components/MainMenu';
 import { BattleSimulationSetup } from './components/BattleSimulationSetup';
 import { createBattleSimulation, type BattleSimulationOptions } from './game/battleSimulation';
-import { centerViewportOnSettlement, Minimap } from './components/Minimap';
+import { centerViewportOnSettlement, centerViewportOnTile, Minimap } from './components/Minimap';
 import { ProcessingPanel } from './components/ProcessingPanel';
 import { SelectionContextBar } from './components/SelectionContextBar';
 import { TopBar } from './components/TopBar';
@@ -66,6 +69,7 @@ import type {
   PreparationActionId, PredatorKind, SpecialItemId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
 import { loadUiPrefs, saveUiPrefs, togglePinnedDockWindow, type UiPrefs } from './ui/uiPrefs';
+import type { DockWindowId } from './ui/dockPresentation';
 import type { AutoAssignBuildingType } from './game/workerSlots';
 
 export default function App() {
@@ -84,10 +88,12 @@ export default function App() {
   const [selected, setSelected] = useState<{ x: number; y: number } | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
   const [canLoad, setCanLoad] = useState(hasSave());
-  const [inspTab, setInspTab] = useState<InspectorTab>('people');
   const [inspResidentId, setInspResidentId] = useState<number | null>(null);
   const [soundOn, setSoundOn] = useState(!isMuted());
   const [uiPrefs, setUiPrefs] = useState<UiPrefs>(() => loadUiPrefs());
+  const [openDockWindowIds, setOpenDockWindowIds] = useState<readonly DockWindowId[]>(
+    () => [...uiPrefs.pinnedDockWindows],
+  );
   const [weaponDialogOpen, setWeaponDialogOpen] = useState(false);
   const [expeditionMusterRequest, setExpeditionMusterRequest] = useState<ExpeditionMusterRequest | null>(null);
   // 이동 보간용: 마지막 서브틱 처리 시각과 서브틱 간격
@@ -104,6 +110,13 @@ export default function App() {
   useEffect(() => {
     saveUiPrefs(uiPrefs);
   }, [uiPrefs]);
+
+  useEffect(() => {
+    setOpenDockWindowIds(current => {
+      const added = uiPrefs.pinnedDockWindows.filter(id => !current.includes(id));
+      return added.length > 0 ? [...current, ...added] : current;
+    });
+  }, [uiPrefs.pinnedDockWindows]);
 
   // 브라우저 자동재생 정책: 첫 입력 때 오디오 시작
   useEffect(() => {
@@ -671,7 +684,6 @@ export default function App() {
   const handleResidentClick = (id: number) => {
     setSelected(null);
     setSelectedEntity({ kind: 'resident', id });
-    setInspTab('people');
     setInspResidentId(id);
   };
 
@@ -681,15 +693,23 @@ export default function App() {
     setInspResidentId(null);
   }, []);
 
-  const handleSetInspectorResidentId = (id: number | null) => {
-    setInspResidentId(id);
-    if (id != null) {
-      setSelected(null);
-      setSelectedEntity({ kind: 'resident', id });
-    } else {
-      setSelectedEntity(prev => prev?.kind === 'resident' ? null : prev);
-    }
+  const handleSelectResidentFromDock = (id: number) => {
+    const resident = stateRef.current.residents.find(candidate => candidate.id === id && candidate.alive);
+    if (!resident) return;
+    handleResidentClick(id);
+    const viewport = mapViewportRef.current;
+    if (viewport) centerViewportOnTile(viewport, resident.x, resident.y);
   };
+
+  const openDockWindow = useCallback((id: DockWindowId) => {
+    setOpenDockWindowIds(current => current.includes(id) ? current : [...current, id]);
+  }, []);
+
+  const toggleDockWindow = useCallback((id: DockWindowId) => {
+    setOpenDockWindowIds(current => current.includes(id)
+      ? current.filter(openId => openId !== id)
+      : [...current, id]);
+  }, []);
 
   const handleContextAction = (x: number, y: number) => {
     const tile = stateRef.current.map[y]?.[x];
@@ -726,7 +746,6 @@ export default function App() {
     setInspResidentId(null);
     setWeaponDialogOpen(false);
     setExpeditionMusterRequest(null);
-    setInspTab('people');
     setSpeed(1);
     setScreen('game');
     bump();
@@ -778,10 +797,7 @@ export default function App() {
         onToggleSound={handleToggleSound}
         uiPrefs={uiPrefs}
         onUiPrefsChange={setUiPrefs}
-        onOpenCourt={() => {
-          setInspResidentId(null);
-          setInspTab('court');
-        }}
+        onOpenCourt={() => openDockWindow('court')}
       />
       <div className="main">
         <div className="canvas-stage">
@@ -858,8 +874,46 @@ export default function App() {
                 icon: '⚙',
                 content: <ProcessingPanel state={state} onSetReserve={handleSetProcessingReserve} />,
               },
+              {
+                id: 'residents',
+                label: '주민',
+                icon: '民',
+                content: (
+                  <ResidentsWindow
+                    state={state}
+                    selectedResidentId={inspResidentId}
+                    onSelectResident={handleSelectResidentFromDock}
+                    onOpenWeaponAllocation={() => {
+                      setSpeed(0);
+                      setWeaponDialogOpen(true);
+                    }}
+                  />
+                ),
+              },
+              {
+                id: 'factions',
+                label: '세력',
+                icon: '交',
+                content: <FactionsWindow state={state} onRequestTrade={handleRequestTrade} />,
+              },
+              {
+                id: 'court',
+                label: '조정',
+                icon: '廷',
+                content: (
+                  <CourtWindow
+                    state={state}
+                    onPetition={handlePetition}
+                    onToggleNitre={handleToggleNitre}
+                    onSetTributeReserve={handleSetTributeReserve}
+                    onUseLuxuryGood={handleUseLuxuryGood}
+                  />
+                ),
+              },
             ]}
+            openWindowIds={openDockWindowIds}
             pinnedWindowIds={uiPrefs.pinnedDockWindows}
+            onToggleWindow={toggleDockWindow}
             onTogglePinned={id => setUiPrefs(current => togglePinnedDockWindow(current, id))}
           />
         </div>
@@ -875,21 +929,8 @@ export default function App() {
 
           <InspectorPanel
             state={state}
-            onRequestTrade={handleRequestTrade}
-            onPetition={handlePetition}
-            onSetTributeReserve={handleSetTributeReserve}
-            onUseLuxuryGood={handleUseLuxuryGood}
-            onToggleNitre={handleToggleNitre}
             onOrganizeHunt={handleOrganizeHunt}
             onScoutPredator={handleScoutPredator}
-            onOpenWeaponAllocation={() => {
-              setSpeed(0);
-              setWeaponDialogOpen(true);
-            }}
-            tab={inspTab}
-            setTab={setInspTab}
-            residentId={inspResidentId}
-            setResidentId={handleSetInspectorResidentId}
           />
           <EventLog state={state} />
         </div>

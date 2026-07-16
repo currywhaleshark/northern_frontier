@@ -75,7 +75,7 @@ const normalized = normalizeUiPrefs({
   pinnedResourceGroups: ['materials', 'unknown', 'materials', 'food'],
   buildDrawerLastCategory: 'farming',
   autoAssignBuildingTypes: ['field', 'field', 'unknown', 'smithy'],
-  pinnedDockWindows: ['jobs', 'unknown', 'jobs', 'processing'],
+  pinnedDockWindows: ['jobs', 'unknown', 'jobs', 'processing', 'residents', 'factions', 'court'],
 });
 assert.deepEqual(normalized.starredResources, ['tools', 'grain'],
   'prefs must remove duplicates, metrics, and unknown resources');
@@ -84,7 +84,7 @@ assert.deepEqual(normalized.pinnedResourceGroups, ['materials', 'food'],
 assert.equal(normalized.buildDrawerLastCategory, 'farming');
 assert.deepEqual(normalized.autoAssignBuildingTypes, ['field', 'smithy'],
   'auto-assign building preferences must remove duplicates and unknown building types');
-assert.deepEqual(normalized.pinnedDockWindows, ['jobs', 'processing'],
+assert.deepEqual(normalized.pinnedDockWindows, ['jobs', 'processing', 'residents', 'factions', 'court'],
   'dock preferences must remove duplicate and unknown window pins');
 
 const legacyStorage = memoryStorage({

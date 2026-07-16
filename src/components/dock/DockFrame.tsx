@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { DockWindowId } from '../../ui/dockPresentation';
 import { DockWindow } from './DockWindow';
 
@@ -11,30 +11,17 @@ export interface DockFrameItem {
 
 interface Props {
   items: readonly DockFrameItem[];
+  openWindowIds: readonly DockWindowId[];
   pinnedWindowIds: readonly DockWindowId[];
+  onToggleWindow: (id: DockWindowId) => void;
   onTogglePinned: (id: DockWindowId) => void;
 }
 
-export function DockFrame({ items, pinnedWindowIds, onTogglePinned }: Props) {
-  const [openWindowIds, setOpenWindowIds] = useState<readonly DockWindowId[]>(() => [...pinnedWindowIds]);
-
-  useEffect(() => {
-    setOpenWindowIds(current => {
-      const added = pinnedWindowIds.filter(id => !current.includes(id));
-      return added.length > 0 ? [...current, ...added] : current;
-    });
-  }, [pinnedWindowIds]);
-
+export function DockFrame({ items, openWindowIds, pinnedWindowIds, onToggleWindow, onTogglePinned }: Props) {
   const openItems = items.filter(item => openWindowIds.includes(item.id));
   const stackStyle = {
     '--dock-window-count': Math.max(1, openItems.length),
   } as CSSProperties;
-
-  const toggleWindow = (id: DockWindowId) => {
-    setOpenWindowIds(current => current.includes(id)
-      ? current.filter(openId => openId !== id)
-      : [...current, id]);
-  };
 
   return (
     <aside className={`dock-frame${openItems.length > 0 ? ' has-open-windows' : ''}`} aria-label="관리 창">
@@ -45,7 +32,7 @@ export function DockFrame({ items, pinnedWindowIds, onTogglePinned }: Props) {
             id={item.id}
             title={item.label}
             pinned={pinnedWindowIds.includes(item.id)}
-            onClose={() => toggleWindow(item.id)}
+            onClose={() => onToggleWindow(item.id)}
             onTogglePinned={() => onTogglePinned(item.id)}
           >
             {item.content}
@@ -64,7 +51,7 @@ export function DockFrame({ items, pinnedWindowIds, onTogglePinned }: Props) {
               aria-label={`${item.label} 창 ${open ? '닫기' : '열기'}`}
               aria-pressed={open}
               title={`${item.label}${pinned ? ' · 고정됨' : ''}`}
-              onClick={() => toggleWindow(item.id)}
+              onClick={() => onToggleWindow(item.id)}
             >
               <span aria-hidden="true">{item.icon}</span>
             </button>

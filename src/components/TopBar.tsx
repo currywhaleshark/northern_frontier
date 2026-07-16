@@ -147,7 +147,7 @@ export function TopBar({
             <button
               type="button"
               className={`ongoing-objective tribute ${tributeRatio >= 1 ? 'ready' : tributeDays <= 10 ? 'urgent' : ''}`}
-              title="조정 탭에서 세공고 비축량 관리"
+              title="조정 창에서 세공고 비축량 관리"
               onClick={onOpenCourt}
             >
               <span className="objective-title">세공</span>
@@ -168,7 +168,7 @@ export function TopBar({
             <button
               type="button"
               className="ongoing-objective urgent"
-              title="조정 탭에서 모반 의심 관리"
+              title="조정 창에서 모반 의심 관리"
               onClick={onOpenCourt}
             >
               <span className="objective-title">토벌 유예</span>
