@@ -4,7 +4,8 @@ import { CONFIG } from './game/config';
 import {
   assignNearestWorkerToBuilding, assignResidentToBuilding,
   advanceDay, advanceTick, autoAssignWorkersToBuildingTypes, cancelBuildingConstruction, continueAfterVictory, demolishBuilding, newGame, reassignJob, resolveChoice, setResidentJob,
-  setBuildingCrop, setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
+  setBuildingCrop, setDryingProduct, setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
+  setLivestockSpecies, slaughterLivestock,
   convertFieldToPaddy, toggleResidentCart,
   unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
@@ -62,7 +63,7 @@ import {
 } from './game/tacticalBattle';
 import { mergeHuntGroups, setHuntPreparationZone, splitHuntGroup } from './game/tacticalHunt';
 import type {
-  BuildingTypeId, CombatWeaponId, CropId, Difficulty, JobId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
+  BuildingTypeId, CombatWeaponId, CropId, Difficulty, DryingProductId, JobId, LivestockId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
   PreparationActionId, PredatorKind, SpecialItemId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
 import { loadUiPrefs, saveUiPrefs, togglePinnedDockWindow, type UiPrefs } from './ui/uiPrefs';
@@ -210,6 +211,9 @@ export default function App() {
       build: (type: BuildingTypeId, x: number, y: number) => tryPlaceBuilding(stateRef.current, type, x, y),
       job: (from: JobId, to: JobId) => reassignJob(stateRef.current, from, to),
       smithy: (id: number, product: SmithyProductId) => setSmithyProduct(stateRef.current, id, product),
+      drying: (id: number, product: DryingProductId) => setDryingProduct(stateRef.current, id, product),
+      livestock: (id: number, species: LivestockId) => setLivestockSpecies(stateRef.current, id, species),
+      slaughter: (id: number, amount = 1) => slaughterLivestock(stateRef.current, id, amount),
       crop: (id: number, crop: CropId, mode: 'queue' | 'uproot' = 'uproot') => setBuildingCrop(stateRef.current, id, crop, mode),
       paddy: (id: number) => convertFieldToPaddy(stateRef.current, id),
       assign: (residentId: number, buildingId: number) => assignResidentToBuilding(stateRef.current, residentId, buildingId),
@@ -345,6 +349,24 @@ export default function App() {
 
   const handleSetSmithyProduct = (buildingId: number, product: SmithyProductId) => {
     const err = setSmithyProduct(stateRef.current, buildingId, product);
+    if (err) addLog(stateRef.current, err, 'info');
+    bump();
+  };
+
+  const handleSetDryingProduct = (buildingId: number, product: DryingProductId) => {
+    const err = setDryingProduct(stateRef.current, buildingId, product);
+    if (err) addLog(stateRef.current, err, 'info');
+    bump();
+  };
+
+  const handleSetLivestockSpecies = (buildingId: number, species: LivestockId) => {
+    const err = setLivestockSpecies(stateRef.current, buildingId, species);
+    if (err) addLog(stateRef.current, err, 'info');
+    bump();
+  };
+
+  const handleSlaughterLivestock = (buildingId: number, amount: number) => {
+    const err = slaughterLivestock(stateRef.current, buildingId, amount);
     if (err) addLog(stateRef.current, err, 'info');
     bump();
   };
@@ -838,6 +860,9 @@ export default function App() {
               onToggleResidentCart={handleToggleResidentCart}
               onUpgradeHousing={handleUpgradeHousing}
               onSetSmithyProduct={handleSetSmithyProduct}
+              onSetDryingProduct={handleSetDryingProduct}
+              onSetLivestockSpecies={handleSetLivestockSpecies}
+              onSlaughterLivestock={handleSlaughterLivestock}
               onSetBuildingCrop={handleSetBuildingCrop}
               onConvertFieldToPaddy={handleConvertFieldToPaddy}
               onRequestTrade={handleRequestTrade}

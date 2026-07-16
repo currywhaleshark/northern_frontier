@@ -134,6 +134,14 @@ export function canResidentWorkTarget(
       return buildingMatches(tile, building, ['smithy'])
         ? { ok: true, label: '대장간 작업', buildingId: building?.id }
         : { ok: false, label: '대장간이 아닙니다' };
+    case 'curer':
+      return buildingMatches(tile, building, ['smokehouse', 'dryingRack'])
+        ? { ok: true, label: '갈무리 작업', buildingId: building?.id }
+        : { ok: false, label: '훈연소나 건조대가 아닙니다' };
+    case 'potter':
+      return buildingMatches(tile, building, ['onggiKiln'])
+        ? { ok: true, label: '옹기 굽기', buildingId: building?.id }
+        : { ok: false, label: '옹기가마가 아닙니다' };
     case 'hauler':
       if (tile.terrain === 'rock') return { ok: true, label: workLabel(job, tile) };
       if (building && tile.buildingId === building.id && isHaulSourceBuilding(building)) {

@@ -6,6 +6,7 @@ import { RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES, WEATHER_ICONS, WEATHER_NAMES 
 import { nextRank } from '../game/promotion';
 import { avg, livingResidents, residentHome } from '../game/residents';
 import { getDayOfSeason, getSeason, getYear } from '../game/seasons';
+import { spoilagePreview } from '../game/spoilage';
 import { tributeReserved, tributeReserveRatio } from '../game/tributeReserve';
 import {
   DISPLAY_RESOURCE_ORDER,
@@ -64,6 +65,7 @@ export function TopBar({
     ? Math.max(0, state.crackdownDeadline - state.day)
     : 0;
   const promotionTarget = state.victoryProgressNote ? nextRank(state.rank) : null;
+  const spoilage = spoilagePreview(state);
   return (
     <div className="topbar">
       <div className="topbar-row topbar-resource-row" aria-label="자원 현황">
@@ -111,6 +113,7 @@ export function TopBar({
                       id: resource,
                       label: RESOURCE_NAMES[resource],
                       amount: state.resources[resource],
+                      spoilagePerDay: spoilage.items[resource]?.loss ?? 0,
                       low: isResourceLow(state, resource, pop),
                       starred: uiPrefs.starredResources.includes(resource),
                     }))}

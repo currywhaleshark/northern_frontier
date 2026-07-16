@@ -23,12 +23,13 @@ import { allocateMusketReadiness, reconcileWeaponAssignments, resolvedWeaponAssi
 import { beginExpeditionReturn } from './expedition';
 import { CURRENT_SCHEMA_VERSION } from './saveSchema';
 import { defaultRaiderFormationLine } from './tacticalTargeting';
+import { isImplementedLivestockId, normalizeLivestockState } from './livestock';
 import { normalizeTacticalGroupTargets } from './tacticalBattle';
 import {
   gradeTacticalBattle, raidDefenseObjectiveResult, tacticalClosingSummary, tacticalOutcomeResult,
 } from './tacticalCore';
 import type {
-  CombatWeaponId, CourtTribute, DefenderGroupKind, GameState, Gender, Resident, ResourceId,
+  CombatWeaponId, CourtTribute, DefenderGroupKind, FermentBatch, GameState, Gender, Resident, ResourceId,
   PreparationActionId, RaiderUnitType, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
   TacticalFormationLine, TacticalPreparationEffect, TacticalRaiderGroup, TacticalRoundReport,
 } from './types';
@@ -134,6 +135,105 @@ export function migrateV9ToV10(raw: RawSave): RawSave {
   return migrated;
 }
 
+export function migrateV10ToV11(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const resources = migrated.resources && typeof migrated.resources === 'object'
+    ? { ...migrated.resources as RawSave }
+    : {};
+  resources.salt = normalizedAmount(resources.salt);
+  migrated.resources = resources;
+  migrated.schemaVersion = 11;
+  return migrated;
+}
+
+export function migrateV11ToV12(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const resources = migrated.resources && typeof migrated.resources === 'object'
+    ? { ...migrated.resources as RawSave }
+    : {};
+  resources.curedMeat = normalizedAmount(resources.curedMeat);
+  resources.saltedFish = normalizedAmount(resources.saltedFish);
+  resources.driedFish = normalizedAmount(resources.driedFish);
+  migrated.resources = resources;
+  if (Array.isArray(migrated.buildings)) {
+    for (const entry of migrated.buildings) {
+      if (!entry || typeof entry !== 'object') continue;
+      const building = entry as RawSave;
+      if (building.type === 'dryingRack' && building.dryingProduct !== 'driedFish') {
+        building.dryingProduct = 'saltedFish';
+      }
+    }
+  }
+  migrated.schemaVersion = 12;
+  return migrated;
+}
+
+export function migrateV12ToV13(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const resources = migrated.resources && typeof migrated.resources === 'object'
+    ? { ...migrated.resources as RawSave }
+    : {};
+  resources.beans = normalizedAmount(resources.beans);
+  resources.onggi = normalizedAmount(resources.onggi);
+  migrated.resources = resources;
+  migrated.schemaVersion = 13;
+  return migrated;
+}
+
+export function migrateV13ToV14(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const resources = migrated.resources && typeof migrated.resources === 'object'
+    ? { ...migrated.resources as RawSave }
+    : {};
+  resources.jang = normalizedAmount(resources.jang);
+  migrated.resources = resources;
+  if (Array.isArray(migrated.buildings)) {
+    for (const entry of migrated.buildings) {
+      if (!entry || typeof entry !== 'object') continue;
+      const building = entry as RawSave;
+      building.fermentBatches = migrateFermentBatches(building.fermentBatches);
+    }
+  }
+  migrated.schemaVersion = 14;
+  return migrated;
+}
+
+export function migrateV14ToV15(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const resources = migrated.resources && typeof migrated.resources === 'object'
+    ? { ...migrated.resources as RawSave }
+    : {};
+  resources.kimchi = normalizedAmount(resources.kimchi);
+  migrated.resources = resources;
+  const lastKimjangYear = Math.floor(Number(migrated.lastKimjangYear));
+  migrated.lastKimjangYear = Number.isFinite(lastKimjangYear) ? Math.max(0, lastKimjangYear) : 0;
+  migrated.schemaVersion = 15;
+  return migrated;
+}
+
+export function migrateV15ToV16(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const resources = migrated.resources && typeof migrated.resources === 'object'
+    ? { ...migrated.resources as RawSave }
+    : {};
+  resources.eggs = normalizedAmount(resources.eggs);
+  migrated.resources = resources;
+  migrated.unlockedLivestock = ['chicken'];
+  if (Array.isArray(migrated.buildings)) {
+    for (const entry of migrated.buildings) {
+      if (!entry || typeof entry !== 'object') continue;
+      const building = entry as RawSave;
+      if (building.type === 'stable') building.livestock = normalizeLivestockState(building.livestock);
+    }
+  }
+  migrated.schemaVersion = 16;
+  return migrated;
+}
+
+export function migrateV16ToV17(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 17 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   let version = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -148,6 +248,13 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 7) migrated = migrateV7ToV8(migrated);
     else if (version === 8) migrated = migrateV8ToV9(migrated);
     else if (version === 9) migrated = migrateV9ToV10(migrated);
+    else if (version === 10) migrated = migrateV10ToV11(migrated);
+    else if (version === 11) migrated = migrateV11ToV12(migrated);
+    else if (version === 12) migrated = migrateV12ToV13(migrated);
+    else if (version === 13) migrated = migrateV13ToV14(migrated);
+    else if (version === 14) migrated = migrateV14ToV15(migrated);
+    else if (version === 15) migrated = migrateV15ToV16(migrated);
+    else if (version === 16) migrated = migrateV16ToV17(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -538,6 +645,21 @@ function normalizedAmount(value: unknown): number {
   return Number.isFinite(amount) ? Math.max(0, amount) : 0;
 }
 
+function migrateFermentBatches(raw: unknown): FermentBatch[] {
+  if (!Array.isArray(raw)) return [];
+  const batches: FermentBatch[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const source = entry as RawSave;
+    const kind = source.kind === 'jang' || source.kind === 'kimchi' ? source.kind : null;
+    const amount = normalizedAmount(source.amount);
+    const readyOnDay = Math.floor(Number(source.readyOnDay));
+    if (!kind || amount <= 0 || !Number.isFinite(readyOnDay) || readyOnDay < 1) continue;
+    batches.push({ kind, amount, readyOnDay });
+  }
+  return batches;
+}
+
 function migrateResourceBag(
   raw: unknown,
   complete: boolean,
@@ -585,6 +707,7 @@ function migrateResourceTaxonomy(state: GameState): void {
   }
   for (const building of state.buildings ?? []) {
     building.inventory = migrateResourceBag(building.inventory, false);
+    building.fermentBatches = migrateFermentBatches(building.fermentBatches);
   }
   if (state.courtTribute) state.courtTribute.items = migrateTributeItems(state.courtTribute.items);
 
@@ -857,6 +980,7 @@ export function loadGame(): GameState | null {
       parsed.tradeCapacityUsed = {};
     }
     if (parsed.lastImmigrationDay == null) parsed.lastImmigrationDay = -999;
+    if (!Number.isFinite(parsed.lastKimjangYear)) parsed.lastKimjangYear = 0;
     ensureIncidentState(parsed);
     ensureForeignSiteState(parsed);
     if (!Array.isArray(parsed.territoryViolations)) parsed.territoryViolations = [];
@@ -884,9 +1008,16 @@ export function loadGame(): GameState | null {
       parsed.rank = parsed.gameOver?.won ? 'bo' : 'settlement';
     }
     if (parsed.tributePaidStreak == null) parsed.tributePaidStreak = 0;
+    parsed.unlockedLivestock = Array.isArray(parsed.unlockedLivestock)
+      ? parsed.unlockedLivestock.filter(isImplementedLivestockId)
+      : [];
+    if (!parsed.unlockedLivestock.includes('chicken')) parsed.unlockedLivestock.push('chicken');
     for (const building of parsed.buildings) {
       if (building.built) building.repairing = false;
       if (building.type === 'smithy' && !building.smithyProduct) building.smithyProduct = 'tools';
+      if (building.type === 'dryingRack' && building.dryingProduct !== 'driedFish') {
+        building.dryingProduct = 'saltedFish';
+      }
       if ((building.type === 'field' || building.type === 'paddy') &&
           !Object.prototype.hasOwnProperty.call(building, 'cropId')) {
         building.cropId = defaultCropForBuildingType(building.type);
@@ -895,6 +1026,7 @@ export function loadGame(): GameState | null {
           !Object.prototype.hasOwnProperty.call(building, 'queuedCropId')) {
         building.queuedCropId = null;
       }
+      if (building.type === 'stable') building.livestock = normalizeLivestockState(building.livestock);
     }
     ensureProcessingReserves(parsed);
     if (parsed.lastPetitionDay == null) parsed.lastPetitionDay = 0;

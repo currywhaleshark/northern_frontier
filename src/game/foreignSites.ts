@@ -130,7 +130,9 @@ export function generateForeignSites(state: GameState, rng: () => number): void 
     population: 34 + Math.floor(rng() * 35),
     militaryPower: 18 + Math.floor(rng() * 18),
     foodStock: 35 + Math.floor(rng() * 30),
-    tradeStock: localType === 'fishingVillage' ? { fish: 24, hide: 8, wood: 10 } : { grain: 22, meat: 12, hide: 10 },
+    tradeStock: localType === 'fishingVillage'
+      ? { fish: 24, salt: 18, hide: 8, wood: 10 }
+      : { grain: 22, meat: 12, hide: 10 },
     influenceRadius: 5,
     goodwill: Math.round(localFactionDef?.initialRelation ?? 50),
     trust: 45,
@@ -214,6 +216,9 @@ export function ensureForeignSiteState(state: GameState): void {
   for (const site of state.foreignSites) {
     site.memories ??= [];
     site.tradeStock ??= {};
+    if (site.type === 'fishingVillage' && !Number.isFinite(site.tradeStock.salt)) {
+      site.tradeStock.salt = 18;
+    }
     site.goodwill ??= 50;
     site.trust ??= 35;
     site.alarm ??= 0;

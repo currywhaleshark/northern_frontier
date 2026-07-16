@@ -1,11 +1,14 @@
 import { BUILDING_DEFS, getBuilding } from '../game/buildings';
 import { isJobUnlocked, JOB_NAMES, JOB_ORDER, RESOURCE_NAMES, TERRAIN_NAMES } from '../game/constants';
 import { cropIdForBuilding, CROP_DEFS } from '../game/crops';
+import { CONFIG } from '../game/config';
 import { haulerCarryCapacity } from '../game/equipment';
 import { isExplored } from '../game/exploration';
 import { foreignSiteAt } from '../game/foreignSites';
 import { mineralRemaining } from '../game/minerals';
+import { livestockDailyFeedNeed, livestockCapacity, LIVESTOCK_DEFS, normalizeLivestockState } from '../game/livestock';
 import { residentHome } from '../game/residents';
+import { spoilagePreview } from '../game/spoilage';
 import type { SiteGiftType } from '../game/siteDiplomacy';
 import { isWallBuilding } from '../game/walls';
 import { combatDefaultWeaponName } from '../game/combatCapabilities';
@@ -13,8 +16,10 @@ import { COMBAT_WEAPON_NAMES } from '../game/weapons';
 import type {
   BuildingTypeId,
   CropId,
+  DryingProductId,
   GameState,
   JobId,
+  LivestockId,
   Resident,
   ResourceId,
   SelectedEntity,
@@ -32,6 +37,9 @@ interface Props {
   onToggleResidentCart: (id: number) => void;
   onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
+  onSetDryingProduct: (buildingId: number, product: DryingProductId) => void;
+  onSetLivestockSpecies: (buildingId: number, species: LivestockId) => void;
+  onSlaughterLivestock: (buildingId: number, amount: number) => void;
   onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
   onConvertFieldToPaddy: (buildingId: number) => void;
   onRequestTrade: (factionName: string) => void;
@@ -147,6 +155,9 @@ export function SelectionContextBar({
   onToggleResidentCart,
   onUpgradeHousing,
   onSetSmithyProduct,
+  onSetDryingProduct,
+  onSetLivestockSpecies,
+  onSlaughterLivestock,
   onSetBuildingCrop,
   onConvertFieldToPaddy,
   onRequestTrade,
@@ -173,6 +184,7 @@ export function SelectionContextBar({
   const resident = selectedEntity.kind === 'resident'
     ? state.residents.find(candidate => candidate.id === selectedEntity.id) ?? null
     : null;
+  const spoilage = spoilagePreview(state);
 
   if (resident) {
     const jobName = JOB_NAMES[resident.job];
@@ -262,6 +274,15 @@ export function SelectionContextBar({
                             {def.capacity > 0 && (
                               <tr><td>입주</td><td>{occupants.length}/{building.built ? def.capacity : 0}명</td></tr>
                             )}
+                            {building.type === 'cellar' && building.built && (
+                              <tr>
+                                <td>저장 보호</td>
+                                <td>
+                                  {spoilage.protectedTotal.toFixed(1)}/{spoilage.rawFoodTotal.toFixed(1)}
+                                  {' '}· 총 용량 {spoilage.capacity}
+                                </td>
+                              </tr>
+                            )}
                             {(building.type === 'field' || building.type === 'paddy') && building.built && (
                               <>
                                 <tr>
@@ -272,6 +293,46 @@ export function SelectionContextBar({
                                 </tr>
                                 <tr><td>성장</td><td><Bar value={building.fieldGrowth} color="#6fbf73" /></td></tr>
                               </>
+                            )}
+                            {building.type === 'stable' && building.built && (() => {
+                              const livestock = normalizeLivestockState(building.livestock);
+                              const feedNeed = livestockDailyFeedNeed(livestock);
+                              return (
+                                <>
+                                  <tr><td>축종</td><td>{LIVESTOCK_DEFS.chicken.icon} {LIVESTOCK_DEFS.chicken.name}</td></tr>
+                                  <tr><td>마릿수</td><td>{livestock.headcount}/{livestockCapacity(livestock.species)}마리</td></tr>
+                                  <tr><td>번식</td><td><Bar value={livestock.growth * 100} color="#c99a4a" /></td></tr>
+                                  <tr>
+                                    <td>사료</td>
+                                    <td>
+                                      곡물 {feedNeed.toFixed(2)}/일
+                                      {livestock.feedShortageDays > 0 ? ` · ${livestock.feedShortageDays}일째 부족` : ''}
+                                    </td>
+                                  </tr>
+                                </>
+                              );
+                            })()}
+                            {building.type === 'jangdokdae' && building.built && (
+                              <tr>
+                                <td>숙성</td>
+                                <td>
+                                  {(building.fermentBatches?.length ?? 0) > 0
+                                    ? building.fermentBatches!.map((batch, index) => {
+                                      const duration = batch.kind === 'jang'
+                                        ? CONFIG.fermentation.jangMaturationDays
+                                        : CONFIG.fermentation.kimchiMaturationDays;
+                                      const remaining = Math.max(0, batch.readyOnDay - state.day);
+                                      const progress = Math.max(0, Math.min(100, ((duration - remaining) / duration) * 100));
+                                      return (
+                                        <div key={`${batch.kind}-${batch.readyOnDay}-${index}`} style={{ display: 'grid', gap: 2, marginBottom: 3 }}>
+                                          <span>{batch.kind === 'jang' ? '장' : '김치'} {batch.amount.toFixed(0)} · {remaining}일 남음</span>
+                                          <Bar value={progress} color="#9b6b3f" />
+                                        </div>
+                                      );
+                                    })
+                                    : '비어 있음 · 늦가을~초겨울에 담금'}
+                                </td>
+                              </tr>
                             )}
                             {building.inventory && Object.values(building.inventory).some(amount => (amount ?? 0) > 0.05) && (
                               <tr>
@@ -320,6 +381,9 @@ export function SelectionContextBar({
                 buildingId={building.id}
                 onUpgradeHousing={onUpgradeHousing}
                 onSetSmithyProduct={onSetSmithyProduct}
+                onSetDryingProduct={onSetDryingProduct}
+                onSetLivestockSpecies={onSetLivestockSpecies}
+                onSlaughterLivestock={onSlaughterLivestock}
                 onSetBuildingCrop={onSetBuildingCrop}
                 onConvertFieldToPaddy={onConvertFieldToPaddy}
                 onRequestTrade={onRequestTrade}

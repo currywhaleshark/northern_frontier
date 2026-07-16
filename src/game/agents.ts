@@ -14,12 +14,16 @@ import { extractMineralDeposit, mineralRemaining } from './minerals';
 import { getSeason } from './seasons';
 import { outdoorMult } from './weather';
 import { processableAmount } from './processing';
+import { DRYING_PRODUCT_DEFS, dryingProductOf } from './preservation';
+import { jangdokdaeInputNeeds } from './fermentation';
 import { canGrowCropNow, canHarvestCropNow, canPlantCropNow, cropIdForBuilding, CROP_DEFS } from './crops';
 import { clothingCoverageTotal, foodTotal, fuelHeatTotal } from './consumption';
 import { isExplored, refreshExploration } from './exploration';
 import { activePredatorScoutIds } from './expeditionIntel';
 import { FOOD_RESOURCES, FUEL_RESOURCES } from './resourceCatalog';
 import { isGateBuilding } from './walls';
+import { ensureLivestockState } from './livestock';
+import { performPhysicianTreatment } from './medicine';
 import { reconcileResidentHomes } from './residents';
 import { canEnterForeignTerritory, canWorkForeignTerritory, noteTerritoryViolation } from './territory';
 import {
@@ -47,7 +51,7 @@ interface Ctx {
 }
 
 const PRODUCING_JOBS = [
-  'woodcutter', 'woodSplitter', 'hunter', 'farmer', 'miller', 'builder', 'smith', 'miner', 'fisher',
+  'woodcutter', 'woodSplitter', 'hunter', 'farmer', 'miller', 'builder', 'curer', 'potter', 'smith', 'miner', 'fisher',
   'charcoalBurner', 'herder', 'powderMaker', 'tanner', 'weaver', 'herbalist', 'hauler',
 ];
 const OUTDOOR_JOBS = [
@@ -435,8 +439,18 @@ function assignedWorkplace(
   type: BuildingTypeId,
   waitTask: string,
 ): Building | null {
+  return assignedWorkplaceOfTypes(state, r, ctx, [type], waitTask);
+}
+
+function assignedWorkplaceOfTypes(
+  state: GameState,
+  r: Resident,
+  ctx: Ctx,
+  types: readonly BuildingTypeId[],
+  waitTask: string,
+): Building | null {
   const building = assignedBuildingForResident(state, r);
-  if (!building || building.type !== type || !isResidentInAssignedSlot(state, r, building)) {
+  if (!building || !types.includes(building.type) || !isResidentInAssignedSlot(state, r, building)) {
     if (depositCarriedResources(state, r, ctx, [], waitTask)) return null;
     loiterNearCenter(state, r, ctx, waitTask);
     return null;
@@ -447,7 +461,8 @@ function assignedWorkplace(
 type WorkplaceInputs = Partial<Record<ResourceId, number>>;
 
 function isReservedProcessingInput(resource: ResourceId): resource is ProcessingInputId {
-  return resource === 'wood' || resource === 'rice' || resource === 'hide' || resource === 'iron';
+  return resource === 'wood' || resource === 'rice' || resource === 'hide' || resource === 'iron'
+    || resource === 'meat' || resource === 'fish';
 }
 
 function settlementProcessingStock(state: GameState, resource: ResourceId): number {
@@ -463,6 +478,10 @@ function workplaceInputResources(building: Building): ResourceId[] {
     case 'weavingHouse': return ['cotton'];
     case 'nitreYard': return ['firewood', 'stone'];
     case 'smithy': return Object.keys(SMITHY_PRODUCT_DEFS[smithyProductOf(building)].inputPerUnit) as ResourceId[];
+    case 'smokehouse': return ['meat', 'firewood', 'charcoal'];
+    case 'dryingRack': return Object.keys(DRYING_PRODUCT_DEFS[dryingProductOf(building)].inputPerUnit) as ResourceId[];
+    case 'onggiKiln': return ['firewood', 'charcoal'];
+    case 'jangdokdae': return ['beans', 'salt', 'onggi'];
     default: return [];
   }
 }
@@ -1101,9 +1120,10 @@ function builderTick(state: GameState, r: Resident, ctx: Ctx): void {
 }
 
 const HAUL_PRIORITY: ResourceId[] = [
-  'grain', 'rice', 'vegetables', 'meat', 'fish',
+  'grain', 'rice', 'vegetables', 'kimchi', 'beans', 'meat', 'eggs', 'fish',
+  'curedMeat', 'saltedFish', 'driedFish', 'jang',
   'firewood', 'brushwood', 'charcoal', 'wood',
-  'hideClothes', 'cottonClothes', 'tools', 'carts', 'gunpowder', 'spears', 'hornBows', 'muskets',
+  'hideClothes', 'cottonClothes', 'tools', 'onggi', 'carts', 'gunpowder', 'spears', 'hornBows', 'muskets',
   'hide', 'cotton', 'herbs', 'stone', 'iron',
 ];
 
@@ -1111,6 +1131,78 @@ const FOOD_HAUL_RESOURCES = new Set<ResourceId>([...FOOD_RESOURCES, 'rice']);
 const FUEL_HAUL_RESOURCES = new Set<ResourceId>(FUEL_RESOURCES);
 const CLOTHING_HAUL_RESOURCES = new Set<ResourceId>(['hideClothes', 'cottonClothes']);
 const COMBAT_HAUL_RESOURCES = new Set<ResourceId>(['gunpowder', 'spears', 'hornBows', 'muskets']);
+const JANGDOKDAE_SUPPLY_PRIORITY = ['onggi', 'salt', 'beans'] as const satisfies readonly ResourceId[];
+
+function reservedSupplyAmount(
+  state: GameState,
+  targetBuildingId: number,
+  resource: ResourceId,
+  exceptResidentId: number,
+): number {
+  return state.residents.reduce((sum, resident) => {
+    const task = resident.haulTask;
+    if (!resident.alive || resident.id === exceptResidentId || task?.kind !== 'supply') return sum;
+    if (task.targetBuildingId !== targetBuildingId || task.resource !== resource) return sum;
+    return sum + task.amount;
+  }, 0);
+}
+
+function reservedSettlementSupplyAmount(
+  state: GameState,
+  resource: ResourceId,
+  exceptResidentId: number,
+): number {
+  return state.residents.reduce((sum, resident) => {
+    const task = resident.haulTask;
+    if (!resident.alive || resident.id === exceptResidentId || task?.kind !== 'supply') return sum;
+    if (task.resource !== resource || carryTotal(resident) > 0) return sum;
+    return sum + task.amount;
+  }, 0);
+}
+
+function assignJangdokdaeSupplyTask(state: GameState, resident: Resident): boolean {
+  const storage = state.buildings
+    .filter(isStorageBuilding)
+    .sort((a, b) => (
+      Math.abs(a.x - resident.x) + Math.abs(a.y - resident.y)
+      - Math.abs(b.x - resident.x) - Math.abs(b.y - resident.y)
+    ) || a.id - b.id)[0];
+  if (!storage) return false;
+
+  const targets = state.buildings
+    .filter(building => building.built && building.type === 'jangdokdae')
+    .sort((a, b) => (
+      Math.abs(a.x - resident.x) + Math.abs(a.y - resident.y)
+      - Math.abs(b.x - resident.x) - Math.abs(b.y - resident.y)
+    ) || a.id - b.id);
+  for (const target of targets) {
+    const needs = jangdokdaeInputNeeds(state, target);
+    for (const resource of JANGDOKDAE_SUPPLY_PRIORITY) {
+      const missing = Math.max(
+        0,
+        (needs[resource] ?? 0) - reservedSupplyAmount(state, target.id, resource, resident.id),
+      );
+      const available = Math.max(
+        0,
+        state.resources[resource]
+          - reservedSettlementSupplyAmount(state, resource, resident.id),
+      );
+      const amount = Math.min(haulerCarryCapacity(resident), missing, available);
+      if (amount <= 0.05) continue;
+      resident.haulTask = {
+        kind: 'supply',
+        sourceBuildingId: storage.id,
+        targetBuildingId: target.id,
+        resource,
+        amount,
+      };
+      resident.targetId = storage.id;
+      resident.path = [];
+      return true;
+    }
+  }
+  return false;
+}
 
 function reservedHaulAmount(
   state: GameState,
@@ -1121,6 +1213,7 @@ function reservedHaulAmount(
   return state.residents.reduce((sum, resident) => {
     const task = resident.haulTask;
     if (resident.id === exceptResidentId || !task || carryTotal(resident) > 0) return sum;
+    if (task.kind === 'supply') return sum;
     if (task.sourceBuildingId !== sourceBuildingId || task.resource !== resource) return sum;
     return sum + task.amount;
   }, 0);
@@ -1132,7 +1225,10 @@ function availableHaulAmount(
   resource: ResourceId,
   residentId: number,
 ): number {
-  if (isWorkplaceInputStock(building, resource)) return 0;
+  if (building.type === 'jangdokdae') {
+    const protectedInputs = jangdokdaeInputNeeds(state, building);
+    if (Object.prototype.hasOwnProperty.call(protectedInputs, resource)) return 0;
+  } else if (isWorkplaceInputStock(building, resource)) return 0;
   return Math.max(
     0,
     buildingStock(building, resource) - reservedHaulAmount(state, building.id, resource, residentId),
@@ -1174,6 +1270,7 @@ function haulBatchMinimum(state: GameState, resident: Resident): number {
 }
 
 function assignHaulTask(state: GameState, resident: Resident): boolean {
+  if (assignJangdokdaeSupplyTask(state, resident)) return true;
   for (const resource of HAUL_PRIORITY) {
     const source = state.buildings
       .filter(building => building.built && !isStorageBuilding(building))
@@ -1227,9 +1324,70 @@ function collectHaulLoad(state: GameState, resident: Resident, source: Building)
   return carryTotal(resident);
 }
 
+function handleSupplyHaulTask(state: GameState, resident: Resident, ctx: Ctx): void {
+  const task = resident.haulTask;
+  if (task?.kind !== 'supply' || task.targetBuildingId == null) return;
+  const target = state.buildings.find(building =>
+    building.id === task.targetBuildingId && building.built && building.type === 'jangdokdae');
+  if (!target) {
+    if (carryTotal(resident) > 0) depositResidentToSettlement(state, resident);
+    clearHaulTask(resident);
+    resident.phase = 'rest';
+    return;
+  }
+
+  if (carryTotal(resident) > 0) {
+    resident.phase = 'toDeposit';
+    resident.task = `${BUILDING_DEFS[target.type].name} 재료 운반`;
+    const status = goTo(state, resident, ctx, buildingGoal(state, target.id));
+    if (status === 'arrived') {
+      depositResidentToBuilding(target, resident);
+      clearHaulTask(resident);
+      resident.phase = 'rest';
+    } else if (status === 'stuck') {
+      depositResidentToSettlement(state, resident);
+      clearHaulTask(resident);
+      resident.phase = 'rest';
+    }
+    return;
+  }
+
+  const source = state.buildings.find(building =>
+    building.id === task.sourceBuildingId && isStorageBuilding(building));
+  if (!source || state.resources[task.resource] <= 0.05) {
+    clearHaulTask(resident);
+    resident.phase = 'rest';
+    return;
+  }
+  resident.phase = 'toWork';
+  resident.task = `${RESOURCE_NAMES[task.resource]} 싣는 중`;
+  const status = goTo(state, resident, ctx, buildingGoal(state, source.id));
+  if (status === 'arrived') {
+    const amount = Math.min(task.amount, haulerCarryCapacity(resident), state.resources[task.resource]);
+    if (amount > 0.05) {
+      state.resources[task.resource] -= amount;
+      addCarry(resident, task.resource, amount);
+      resident.phase = 'toDeposit';
+      resident.targetId = target.id;
+      resident.path = [];
+    } else {
+      clearHaulTask(resident);
+      resident.phase = 'rest';
+    }
+  } else if (status === 'stuck') {
+    clearHaulTask(resident);
+    resident.phase = 'rest';
+  }
+}
+
 function haulerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const p = CONFIG.production;
   const a = CONFIG.agents;
+
+  if (r.haulTask?.kind === 'supply') {
+    handleSupplyHaulTask(state, r, ctx);
+    return;
+  }
 
   // 생산지에서 실은 짐 또는 비상 채석물을 창고에 하역한다.
   if (carryTotal(r) > 0) {
@@ -1245,7 +1403,12 @@ function haulerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   if (!r.haulTask) assignHaulTask(state, r);
-  const task = r.haulTask;
+  const assignedTask = r.haulTask as Resident['haulTask'];
+  if (assignedTask?.kind === 'supply') {
+    handleSupplyHaulTask(state, r, ctx);
+    return;
+  }
+  const task = assignedTask;
   if (task) {
     const source = state.buildings.find(building =>
       building.id === task.sourceBuildingId && building.built && !isStorageBuilding(building));
@@ -1425,6 +1588,145 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 }
 
+function scaledRequirements(inputs: WorkplaceInputs, target: number): WorkplaceInputs {
+  return Object.fromEntries(
+    (Object.entries(inputs) as [ResourceId, number][])
+      .map(([resource, amount]) => [resource, amount * target]),
+  ) as WorkplaceInputs;
+}
+
+function maxCraftableFrom(workplace: Building, inputs: WorkplaceInputs): number {
+  let max = Infinity;
+  for (const [resource, perUnit] of Object.entries(inputs) as [ResourceId, number][]) {
+    if (perUnit <= 0) continue;
+    max = Math.min(max, buildingStock(workplace, resource) / perUnit);
+  }
+  return max === Infinity ? 0 : max;
+}
+
+function consumeRecipeInputs(workplace: Building, inputs: WorkplaceInputs, made: number): void {
+  for (const [resource, perUnit] of Object.entries(inputs) as [ResourceId, number][]) {
+    takeBuildingStock(workplace, resource, perUnit * made);
+  }
+}
+
+function inputWaitTask(workplace: Building, requirements: WorkplaceInputs): string {
+  const missing = (Object.entries(requirements) as [ResourceId, number][])
+    .find(([resource]) => buildingStock(workplace, resource) <= 0.02)?.[0];
+  return missing ? `${RESOURCE_NAMES[missing]} 대기` : '재료 대기';
+}
+
+function preferredKilnFuel(state: GameState, workplace: Building): 'firewood' | 'charcoal' {
+  if (buildingStock(workplace, 'charcoal') > 0.02) return 'charcoal';
+  if (buildingStock(workplace, 'firewood') > 0.02) return 'firewood';
+  if (state.resources.charcoal > 0.05) return 'charcoal';
+  return 'firewood';
+}
+
+function curerTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const workplace = assignedWorkplaceOfTypes(
+    state, r, ctx, ['smokehouse', 'dryingRack'], '갈무리 작업장 배정 없음',
+  );
+  if (!workplace) return;
+
+  let output: ResourceId;
+  let inputs: WorkplaceInputs;
+  let target: number;
+  let task: string;
+  let rainBlocked = false;
+
+  if (workplace.type === 'smokehouse') {
+    const fuel = preferredKilnFuel(state, workplace);
+    output = 'curedMeat';
+    inputs = {
+      meat: CONFIG.production.meatPerCuredMeat,
+      [fuel]: fuel === 'charcoal'
+        ? CONFIG.production.charcoalPerCuredMeat
+        : CONFIG.production.firewoodPerCuredMeat,
+    };
+    target = (CONFIG.production.curedMeatPerDay / 5) * effOf(r) * ctx.mMod;
+    task = '고기 훈연 중';
+  } else {
+    const def = DRYING_PRODUCT_DEFS[dryingProductOf(workplace)];
+    output = def.output;
+    inputs = def.inputPerUnit;
+    target = (def.ratePerDay / 5) * effOf(r) * ctx.mMod;
+    task = def.task;
+    rainBlocked = def.stopsInRain && state.weather === 'rain';
+  }
+
+  const requirements = scaledRequirements(inputs, target);
+  if (carryTotal(r) > 0) {
+    supplyWorkplaceInputs(state, r, ctx, workplace, requirements);
+    return;
+  }
+  if (supplyWorkplaceInputs(state, r, ctx, workplace, requirements)) return;
+
+  const st = goTo(state, r, ctx, buildingGoal(state, workplace.id));
+  if (st !== 'arrived') {
+    r.phase = st === 'stuck' ? 'rest' : 'toWork';
+    r.task = st === 'stuck' ? '길이 막힘' : `${BUILDING_DEFS[workplace.type].name}(으)로 이동`;
+    return;
+  }
+  if (rainBlocked) {
+    r.phase = 'rest';
+    r.task = '비가 그치기를 기다림';
+    return;
+  }
+
+  const made = Math.min(target, maxCraftableFrom(workplace, inputs));
+  if (made <= 0.02) {
+    r.phase = 'rest';
+    r.task = inputWaitTask(workplace, requirements);
+    return;
+  }
+
+  consumeRecipeInputs(workplace, inputs, made);
+  addBuildingStock(workplace, output, made);
+  r.phase = 'working';
+  r.task = task;
+  gainSkillTick(r);
+}
+
+function potterTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const kiln = assignedWorkplace(state, r, ctx, 'onggiKiln', '옹기가마 배정 없음');
+  if (!kiln) return;
+  const fuel = preferredKilnFuel(state, kiln);
+  const inputs: WorkplaceInputs = {
+    [fuel]: fuel === 'charcoal'
+      ? CONFIG.production.charcoalPerOnggi
+      : CONFIG.production.firewoodPerOnggi,
+  };
+  const target = (CONFIG.production.onggiPerDay / 5) * effOf(r) * ctx.mMod;
+  const requirements = scaledRequirements(inputs, target);
+
+  if (carryTotal(r) > 0) {
+    supplyWorkplaceInputs(state, r, ctx, kiln, requirements);
+    return;
+  }
+  if (supplyWorkplaceInputs(state, r, ctx, kiln, requirements)) return;
+
+  const st = goTo(state, r, ctx, buildingGoal(state, kiln.id));
+  if (st !== 'arrived') {
+    r.phase = st === 'stuck' ? 'rest' : 'toWork';
+    r.task = st === 'stuck' ? '길이 막힘' : '옹기가마로 이동';
+    return;
+  }
+
+  const made = Math.min(target, maxCraftableFrom(kiln, inputs));
+  if (made <= 0.02) {
+    r.phase = 'rest';
+    r.task = inputWaitTask(kiln, requirements);
+    return;
+  }
+
+  consumeRecipeInputs(kiln, inputs, made);
+  addBuildingStock(kiln, 'onggi', made);
+  r.phase = 'working';
+  r.task = '점토를 빚어 옹기 굽는 중';
+  gainSkillTick(r);
+}
+
 function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
   const miningTile = state.map[r.y]?.[r.x];
@@ -1503,21 +1805,60 @@ function charcoalBurnerTick(state: GameState, r: Resident, ctx: Ctx): void {
 }
 
 function herderTick(state: GameState, r: Resident, ctx: Ctx): void {
-  const a = CONFIG.agents;
   const stable = assignedWorkplace(state, r, ctx, 'stable', '축사 배정 없음');
   if (!stable) return;
-  gatherJob(state, r, ctx, {
-    goal: t => isBuildingInteractionTile(state, t, stable.id),
-    workTicks: a.work.herd,
-    yieldRes: 'meat',
-    yieldAmt: a.yields.herdFood,
-    cap: a.carryCap.meat,
-    depositExtra: ['stable'],
-    taskWork: '가축 돌보기',
-    taskMove: '축사로 이동',
-    taskHaul: '축산물 운반',
-    onHarvest: (_tile, worker) => addCarry(worker, 'hide', a.yields.herdHide),
-  });
+  const livestock = ensureLivestockState(stable);
+  if (livestock.headcount <= 0) {
+    loiterNearBuilding(state, r, ctx, stable, 3, '돌볼 가축 없음');
+    return;
+  }
+
+  const st = goTo(state, r, ctx, buildingGoal(state, stable.id));
+  if (st !== 'arrived') {
+    r.phase = st === 'stuck' ? 'rest' : 'toWork';
+    r.task = st === 'stuck' ? '길이 막힘' : '축사로 이동';
+    return;
+  }
+
+  const chicken = CONFIG.livestock.chicken;
+  const shortageMult = livestock.feedShortageDays > 0 ? 0.25 : 1;
+  const eggs = (chicken.eggPerHeadPerHerderDay / SUBTICKS)
+    * livestock.headcount
+    * chicken.eggSeasonMult[ctx.season]
+    * effOf(r)
+    * ctx.mMod
+    * shortageMult;
+  addBuildingStock(stable, 'eggs', eggs);
+  r.phase = 'working';
+  r.task = '달걀 거두기';
+  gainSkillTick(r);
+}
+
+function physicianTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const clinic = assignedWorkplace(state, r, ctx, 'clinic', '의원 배정 없음');
+  if (!clinic) return;
+  const st = goTo(state, r, ctx, buildingGoal(state, clinic.id));
+  if (st !== 'arrived') {
+    r.phase = st === 'stuck' ? 'rest' : 'toWork';
+    r.task = st === 'stuck' ? '길이 막힘' : '의원으로 이동';
+    return;
+  }
+
+  const result = performPhysicianTreatment(state, r, effOf(r) * ctx.mMod, ctx.rng);
+  if (result.status === 'no-patient') {
+    loiterNearBuilding(state, r, ctx, clinic, 3, '진료할 환자 없음');
+    return;
+  }
+  if (result.status === 'no-herbs') {
+    loiterNearBuilding(state, r, ctx, clinic, 3, '약초 대기');
+    return;
+  }
+  r.phase = 'working';
+  r.task = `${result.patient?.name ?? '환자'} 진료 중`;
+  gainSkillTick(r);
+  if (result.status === 'recovered' && result.patient) {
+    addLog(state, `의원 ${r.name}의 치료로 ${result.patient.name}이(가) 병에서 회복했습니다.`, 'good');
+  }
 }
 
 function powderMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
@@ -1792,11 +2133,14 @@ export function agentsTick(state: GameState): void {
       case 'miller': millerTick(state, r, ctx); break;
       case 'builder': builderTick(state, r, ctx); break;
       case 'hauler': haulerTick(state, r, ctx); break;
+      case 'curer': curerTick(state, r, ctx); break;
+      case 'potter': potterTick(state, r, ctx); break;
       case 'smith': smithTick(state, r, ctx); break;
       case 'miner': minerTick(state, r, ctx); break;
       case 'fisher': fisherTick(state, r, ctx); break;
       case 'charcoalBurner': charcoalBurnerTick(state, r, ctx); break;
       case 'herder': herderTick(state, r, ctx); break;
+      case 'physician': physicianTick(state, r, ctx); break;
       case 'powderMaker': powderMakerTick(state, r, ctx); break;
       case 'tanner': tannerTick(state, r, ctx); break;
       case 'weaver': weaverTick(state, r, ctx); break;

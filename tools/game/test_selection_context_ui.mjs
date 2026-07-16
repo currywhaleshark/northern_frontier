@@ -18,6 +18,12 @@ assert.match(contextSource, /foreignSiteAt[\s\S]*<ForeignSitePanel/,
   'foreign-site actions must remain available in the bottom context bar');
 assert.match(contextSource, /<ActionPopup[\s\S]*embedded/,
   'building actions must reuse the established action controls inside the context bar');
+assert.match(contextSource, /building\.type === 'cellar'[\s\S]*저장 보호[\s\S]*spoilage\.protectedTotal/,
+  'completed cellars must show the protected raw-food amount in the selection context');
+assert.match(contextSource, /building\.type === 'stable'[\s\S]*마릿수[\s\S]*번식[\s\S]*곡물/,
+  'completed stables must show flock size, breeding progress, and daily feed use');
+assert.match(appSource, /onSlaughterLivestock=\{handleSlaughterLivestock\}/,
+  'the stable slaughter action must be wired to the simulation from App');
 assert.doesNotMatch(canvasSource, /ActionPopup/,
   'the map canvas must not keep a duplicate building action popup');
 assert.doesNotMatch(inspectorSource, /tab === 'tile'|ResidentDetail/,

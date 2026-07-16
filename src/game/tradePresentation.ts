@@ -64,7 +64,8 @@ const EXTENDED_ATLAS = '/assets/resources/trade-resource-atlas-v2.png';
 const COMPLETE_ATLAS = '/assets/resources/trade-resource-atlas-v3.png';
 const FUEL_GROUP_ICON = '/assets/resources/fuel-group-v1.png';
 
-export const RESOURCE_SPRITES: Record<ResourceIconId, TradeResourceSprite> = {
+// 신규 자원은 전용 아틀라스가 준비되기 전 RESOURCE_ICONS의 이모지 폴백을 쓸 수 있다.
+export const RESOURCE_SPRITES: Partial<Record<ResourceIconId, TradeResourceSprite>> = {
   grain: { atlas: BASE_ATLAS, columns: 4, rows: 2, column: 0, row: 0 },
   hide: { atlas: BASE_ATLAS, columns: 4, rows: 2, column: 1, row: 0 },
   iron: { atlas: BASE_ATLAS, columns: 4, rows: 2, column: 2, row: 0 },

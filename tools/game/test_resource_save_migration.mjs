@@ -35,10 +35,17 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 10, 'encirclement hunts require schema version 10');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 17, 'the local physician building and job ship with schema version 17');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
+assert.equal(typeof saveLoad.migrateV10ToV11, 'function');
+assert.equal(typeof saveLoad.migrateV11ToV12, 'function');
+assert.equal(typeof saveLoad.migrateV12ToV13, 'function');
+assert.equal(typeof saveLoad.migrateV13ToV14, 'function');
+assert.equal(typeof saveLoad.migrateV14ToV15, 'function');
+assert.equal(typeof saveLoad.migrateV15ToV16, 'function');
+assert.equal(typeof saveLoad.migrateV16ToV17, 'function');
 
 {
   const migrated = saveLoad.migrateV8ToV9({
@@ -65,6 +72,26 @@ assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
 }
 
 {
+  const migrated = saveLoad.migrateV16ToV17({ schemaVersion: 16, resources: { eggs: 3 } });
+  assert.equal(migrated.schemaVersion, 17);
+  assert.equal(migrated.resources.eggs, 3);
+}
+
+{
+  const migrated = saveLoad.migrateV15ToV16({
+    schemaVersion: 15,
+    resources: { grain: 20 },
+    buildings: [{ type: 'stable', built: true }],
+  });
+  assert.equal(migrated.schemaVersion, 16);
+  assert.equal(migrated.resources.eggs, 0);
+  assert.deepEqual(migrated.unlockedLivestock, ['chicken']);
+  assert.deepEqual(migrated.buildings[0].livestock, {
+    species: 'chicken', headcount: 4, growth: 0, feedShortageDays: 0,
+  });
+}
+
+{
   const migrated = saveLoad.migrateV9ToV10({
     schemaVersion: 9,
     tacticalBattle: {
@@ -75,6 +102,99 @@ assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
   assert.equal(migrated.schemaVersion, 10);
   assert.equal(migrated.tacticalBattle, null);
   assert.equal(migrated.legacyHuntRecoveryNeeded, true);
+}
+
+{
+  const migrated = saveLoad.migrateV14ToV15({
+    schemaVersion: 14,
+    resources: { grain: 20 },
+  });
+  assert.equal(migrated.schemaVersion, 15);
+  assert.equal(migrated.resources.grain, 20);
+  assert.equal(migrated.resources.kimchi, 0);
+  assert.equal(migrated.lastKimjangYear, 0);
+}
+
+{
+  const migrated = saveLoad.migrateV12ToV13({
+    schemaVersion: 12,
+    resources: { grain: 20 },
+  });
+  assert.equal(migrated.schemaVersion, 13);
+  assert.equal(migrated.resources.grain, 20);
+  assert.equal(migrated.resources.beans, 0);
+  assert.equal(migrated.resources.onggi, 0);
+}
+
+{
+  const migrated = saveLoad.migrateV13ToV14({
+    schemaVersion: 13,
+    resources: { grain: 20 },
+    buildings: [
+      {
+        type: 'jangdokdae',
+        fermentBatches: [
+          { kind: 'jang', amount: 8, readyOnDay: 55 },
+          { kind: 'invalid', amount: 4, readyOnDay: 60 },
+        ],
+      },
+      { type: 'hut' },
+    ],
+  });
+  assert.equal(migrated.schemaVersion, 14);
+  assert.equal(migrated.resources.grain, 20);
+  assert.equal(migrated.resources.jang, 0);
+  assert.deepEqual(migrated.buildings[0].fermentBatches, [{ kind: 'jang', amount: 8, readyOnDay: 55 }]);
+  assert.deepEqual(migrated.buildings[1].fermentBatches, []);
+}
+
+{
+  const state = simulation.newGame(2026071617);
+  state.resources.kimchi = 7;
+  state.lastKimjangYear = 2;
+  const yard = {
+    id: state.nextBuildingId++, type: 'jangdokdae', x: 0, y: 0,
+    progress: 5, built: true, fieldGrowth: 0, inventory: { beans: 4 },
+    fermentBatches: [
+      { kind: 'jang', amount: 8, readyOnDay: 55 },
+      { kind: 'kimchi', amount: 6, readyOnDay: 39 },
+    ],
+  };
+  state.buildings.push(yard);
+  assert.equal(saveLoad.saveGame(state), true);
+  const loaded = saveLoad.loadGame();
+  const loadedYard = loaded?.buildings.find(building => building.id === yard.id);
+  assert.deepEqual(loadedYard?.fermentBatches, [
+    { kind: 'jang', amount: 8, readyOnDay: 55 },
+    { kind: 'kimchi', amount: 6, readyOnDay: 39 },
+  ]);
+  assert.equal(loadedYard?.inventory?.beans, 4);
+  assert.equal(loaded?.resources.kimchi, 7);
+  assert.equal(loaded?.lastKimjangYear, 2);
+}
+
+{
+  const migrated = saveLoad.migrateV11ToV12({
+    schemaVersion: 11,
+    resources: { grain: 20 },
+    buildings: [{ type: 'dryingRack' }],
+  });
+  assert.equal(migrated.schemaVersion, 12);
+  assert.equal(migrated.resources.grain, 20);
+  assert.equal(migrated.resources.curedMeat, 0);
+  assert.equal(migrated.resources.saltedFish, 0);
+  assert.equal(migrated.resources.driedFish, 0);
+  assert.equal(migrated.buildings[0].dryingProduct, 'saltedFish');
+}
+
+{
+  const migrated = saveLoad.migrateV10ToV11({
+    schemaVersion: 10,
+    resources: { grain: 20 },
+  });
+  assert.equal(migrated.schemaVersion, 11);
+  assert.equal(migrated.resources.grain, 20);
+  assert.equal(migrated.resources.salt, 0, 'legacy saves gain an empty salt stock');
 }
 
 {
@@ -159,6 +279,7 @@ assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
   assert.equal(loaded.resources.meat, 13);
   assert.equal(loaded.resources.hide, 4);
   assert.equal(loaded.resources.hideClothes, 2);
+  assert.equal(loaded.resources.salt, 0);
   assert.equal(loaded.residents[0].carrying.grain, 2);
   assert.equal(loaded.residents[0].carrying.meat, 4);
   assert.equal(loaded.residents[0].carrying.hide, 1);
@@ -218,7 +339,7 @@ function prepareFormationTestCombatants(state) {
   muskets.line = 'rear';
   store.set('buksae-save-v3', JSON.stringify({ ...v7, schemaVersion: 7 }));
   const loaded = saveLoad.loadGame();
-  assert.equal(loaded?.schemaVersion, 10);
+  assert.equal(loaded?.schemaVersion, 17);
   assert.equal(
     loaded?.tacticalBattle?.defenderGroups.find(group => group.id === muskets.id)?.line,
     'rear',
@@ -237,7 +358,7 @@ function prepareFormationTestCombatants(state) {
   assert.equal(muskets.line, 'middle');
   assert.equal(saveLoad.saveGame(v8), true);
   const loaded = saveLoad.loadGame();
-  assert.equal(loaded?.schemaVersion, 10);
+  assert.equal(loaded?.schemaVersion, 17);
   assert.equal(loaded?.tacticalBattle?.defenderGroups.find(group => group.id === muskets.id)?.line, 'middle');
 }
 

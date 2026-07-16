@@ -46,9 +46,9 @@ export const CONFIG = {
   start: {
     residents: 12,
     resources: {
-      grain: 100, rice: 0, meat: 0, fish: 0, vegetables: 0,
+      grain: 100, rice: 0, meat: 0, eggs: 0, fish: 0, curedMeat: 0, saltedFish: 0, driedFish: 0, vegetables: 0, kimchi: 0, beans: 0, jang: 0, salt: 0,
       brushwood: 12, firewood: 45, charcoal: 0,
-      wood: 30, stone: 12, iron: 4, tools: 10, carts: 0,
+      wood: 30, stone: 12, iron: 4, tools: 10, onggi: 0, carts: 0,
       hide: 6, hideClothes: 12, cotton: 0, cottonClothes: 0, herbs: 5,
       porcelain: 0, brassware: 0, lacquerware: 0, silk: 0, preciousMetal: 0,
       gunpowder: 0, spears: 0, hornBows: 0, muskets: 0,
@@ -94,6 +94,18 @@ export const CONFIG = {
     recoverChanceHerbs: 0.28,
     herbsPerSickPerDay: 0.5,
     poorDietDamage: 1,
+  },
+
+  medicine: {
+    patientHealthThreshold: 75,
+    treatmentHealthPerDay: 6,
+    herbsPerPhysicianPerDay: 0.6,
+    normalSickRecoveryBonusPerDay: 0.18,
+    diagnosisDays: 1,
+    isolationDaysReduction: 3,
+    epidemicSpreadMult: 0.5,
+    epidemicDeathMult: 0.4,
+    epidemicDamageMult: 0.6,
   },
 
   foreignSites: {
@@ -296,7 +308,21 @@ export const CONFIG = {
       rice: 0,
       hide: 0,
       iron: 0,
+      meat: 8,
+      fish: 8,
     } as Record<ProcessingInputId, number>,
+    curedMeatPerDay: 1.8,
+    meatPerCuredMeat: 1.15,
+    firewoodPerCuredMeat: 0.35,
+    charcoalPerCuredMeat: 0.22,
+    saltedFishPerDay: 2,
+    fishPerSaltedFish: 1,
+    saltPerSaltedFish: 0.25,
+    driedFishPerDay: 1.3,
+    fishPerDriedFish: 1.25,
+    onggiPerDay: 0.75,
+    firewoodPerOnggi: 1,
+    charcoalPerOnggi: 0.65,
     tanneryHidePerDay: 2,      // 가죽공방 하루 가죽 소비 (가죽 2 → 옷 1)
     weaverCottonPerDay: 2,
     cottonClothesPerCotton: 0.5,
@@ -310,6 +336,30 @@ export const CONFIG = {
     skillEffect: 0.5,          // 숙련 1.0일 때 생산 +50%
   },
 
+  fermentation: {
+    jangdokdaeOnggiCapacity: 4,
+    jangBeansPerOnggi: 4,
+    jangSaltPerOnggi: 1,
+    jangOutputPerOnggi: 4,
+    jangMaturationDays: 24,
+    onggiRecoveryRate: 0.9,
+    jangAutumnStartDay: 7,
+    jangWinterEndDay: 4,
+    kimchiVegetablesPerOnggi: 6,
+    kimchiSaltPerOnggi: 1,
+    kimchiOutputPerOnggi: 6,
+    kimchiMaturationDays: 4,
+    kimjangMoralePerOnggi: 1.5,
+    kimjangReservedOnggiPerYard: 2,
+    kimjangAutumnStartDay: 10,
+    kimjangWinterEndDay: 2,
+    kimjangSizes: {
+      small: 1,
+      medium: 2,
+      large: 4,
+    },
+  },
+
   // 주민 에이전트 (이동/작업/운반)
   agents: {
     subticksPerDay: 8,        // 하루를 나누는 서브틱 수
@@ -318,7 +368,7 @@ export const CONFIG = {
     moveSpeedSnow: 1,         // 폭설/눈보라
     shelterThreshold: 0.3,    // 실외작업 중단 기준 (날씨 효율이 이 밑이면 대피)
     carryCap: {
-      grain: 6, rice: 6, meat: 5, fish: 5, vegetables: 5,
+      grain: 6, rice: 6, meat: 5, eggs: 5, fish: 5, curedMeat: 5, saltedFish: 5, driedFish: 5, vegetables: 5, kimchi: 5, beans: 5, jang: 5,
       brushwood: 4, firewood: 4, charcoal: 3, wood: 4,
       stone: 3, iron: 3, hide: 2, cotton: 3, herbs: 1.5,
     },
@@ -337,7 +387,6 @@ export const CONFIG = {
     },
     yields: {                 // 1회 채집으로 지는 짐
       wood: 1.1, game: 0.75, herbs: 0.55, iron: 1.2, mineStone: 0.4, stone: 1.1, fish: 1.2,
-      herdFood: 1, herdHide: 0.25,
     },
     forestDepleteChance: 0.12, // 벌목 1회당 숲이 평지가 될 확률
     forestRegrowChance: 0.003,  // 봄여름, 숲 인접 평지가 숲이 될 하루 확률
@@ -355,6 +404,39 @@ export const CONFIG = {
     woodMult:     { spring: 1, summer: 1.3, autumn: 1.1, winter: 0.7 },
     gameMult:     { spring: 1.25, summer: 1, autumn: 1.1, winter: 0.5 },
     fishMult:     { spring: 1.2, summer: 1.15, autumn: 0.9, winter: 0.45 },
+  },
+
+  livestock: {
+    initialUnlocked: ['chicken'],
+    chicken: {
+      capacity: 8,
+      initialHeadcount: 4,
+      grainPerHeadPerDay: 0.06,
+      breedingPerHeadPerDay: 0.025,
+      eggPerHeadPerHerderDay: 0.12,
+      eggSeasonMult: { spring: 1, summer: 1, autumn: 0.9, winter: 0.65 } as Record<Season, number>,
+      shortageGraceDays: 3,
+      starvationLossIntervalDays: 2,
+      slaughterMeatPerHead: 0.75,
+    },
+  },
+
+  // K2 보존 경제. 생선·고기는 빠르게 상하므로 훈연·염장·건조로 손실을 피해야 한다.
+  spoilage: {
+    dailyRate: {
+      fish: 0.06,
+      meat: 0.04,
+      eggs: 0.025,
+      vegetables: 0.015,
+    },
+    seasonMult: {
+      spring: 0.9,
+      summer: 1.4,
+      autumn: 1,
+      winter: 0.25,
+    } as Record<Season, number>,
+    cellarCapacity: 36,
+    cellarRateMult: 0.3,
   },
 
   weather: {
@@ -662,10 +744,10 @@ export const CONFIG = {
     maxHaggleRounds: 2,
     counterTolerance: 1.45,
     capacityBase: {
-      grain: 28, rice: 24, meat: 16, fish: 18, vegetables: 14,
+      grain: 28, rice: 24, meat: 16, eggs: 14, fish: 18, curedMeat: 12, saltedFish: 12, driedFish: 12, vegetables: 14, beans: 14, jang: 8,
       brushwood: 24, firewood: 20, charcoal: 12,
-      wood: 24, stone: 20, iron: 9, tools: 6, carts: 2,
-      hide: 14, hideClothes: 7, cotton: 12, cottonClothes: 7, herbs: 10,
+      wood: 24, stone: 20, iron: 9, tools: 6, onggi: 4, carts: 2,
+      hide: 14, hideClothes: 7, cotton: 12, cottonClothes: 7, herbs: 10, salt: 12,
       gunpowder: 4, spears: 6, hornBows: 4, muskets: 3,
       porcelain: 5, brassware: 5, lacquerware: 5, silk: 4, preciousMetal: 3,
       reputation: 0, defense: 0,

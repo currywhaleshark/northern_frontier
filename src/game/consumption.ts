@@ -9,6 +9,18 @@ export interface ConsumptionResult {
   vegetableRatio: number;
 }
 
+export const FOOD_VARIETY_GROUPS = [
+  { id: 'grain', resources: ['grain'] as const, weight: 2 },
+  { id: 'meat', resources: ['meat', 'eggs', 'curedMeat'] as const, weight: 1 },
+  { id: 'fish', resources: ['fish', 'saltedFish', 'driedFish'] as const, weight: 1 },
+  { id: 'vegetables', resources: ['vegetables', 'kimchi'] as const, weight: 1 },
+  { id: 'beans', resources: ['beans', 'jang'] as const, weight: 0.5 },
+] as const;
+
+const FOOD_CONSUMPTION_ORDER: readonly ResourceId[] = [
+  'grain', 'meat', 'eggs', 'fish', 'vegetables', 'kimchi', 'beans', 'jang', 'curedMeat', 'saltedFish', 'driedFish',
+];
+
 function finitePositive(value: number): number {
   return Number.isFinite(value) ? Math.max(0, value) : 0;
 }
@@ -40,39 +52,46 @@ export function consumeFoodByDiet(state: GameState, requested: number): Consumpt
   const amount = finitePositive(requested);
   const byResource: Partial<Record<ResourceId, number>> = {};
   let remaining = amount;
-  const totalWeight = FOOD_RESOURCES.reduce(
-    (sum, id) => sum + (RESOURCE_DEFS[id].foodWeight ?? 1),
-    0,
-  );
+  const totalWeight = FOOD_VARIETY_GROUPS.reduce((sum, group) => sum + group.weight, 0);
 
-  for (const id of FOOD_RESOURCES) {
-    const desired = amount * ((RESOURCE_DEFS[id].foodWeight ?? 1) / totalWeight);
-    const taken = Math.min(finitePositive(state.resources[id] ?? 0), desired);
+  const takeFood = (id: ResourceId, wanted: number): number => {
+    const taken = Math.min(finitePositive(state.resources[id] ?? 0), Math.max(0, wanted));
     state.resources[id] = Math.max(0, (state.resources[id] ?? 0) - taken);
-    byResource[id] = taken;
-    remaining -= taken;
+    byResource[id] = (byResource[id] ?? 0) + taken;
+    remaining = Math.max(0, remaining - taken);
+    return taken;
+  };
+
+  for (const group of FOOD_VARIETY_GROUPS) {
+    let desired = amount * (group.weight / totalWeight);
+    for (const id of group.resources) {
+      if (desired <= 0) break;
+      desired -= takeFood(id, desired);
+    }
   }
 
   if (remaining > 0) {
-    for (const id of FOOD_RESOURCES) {
-      if (remaining <= 0) break;
-      const taken = Math.min(finitePositive(state.resources[id] ?? 0), remaining);
-      state.resources[id] = Math.max(0, (state.resources[id] ?? 0) - taken);
-      byResource[id] = (byResource[id] ?? 0) + taken;
-      remaining -= taken;
+    for (const id of FOOD_CONSUMPTION_ORDER) {
+      if (remaining <= 0.000000001) {
+        remaining = 0;
+        break;
+      }
+      takeFood(id, remaining);
     }
   }
 
   const totalConsumed = Math.max(0, amount - remaining);
-  const presentTypes = FOOD_RESOURCES.filter(id => (byResource[id] ?? 0) > 0.001).length;
-  const vegetableTarget = amount * ((RESOURCE_DEFS.vegetables.foodWeight ?? 1) / totalWeight);
+  const presentTypes = FOOD_VARIETY_GROUPS.filter(group =>
+    group.resources.some(id => (byResource[id] ?? 0) > 0.001)).length;
+  const vegetableGroup = FOOD_VARIETY_GROUPS.find(group => group.id === 'vegetables');
+  const vegetableTarget = amount * ((vegetableGroup?.weight ?? 1) / totalWeight);
   return {
     totalConsumed,
     byResource,
     shortageRatio: amount > 0 ? totalConsumed / amount : 1,
-    varietyScore: presentTypes / FOOD_RESOURCES.length,
+    varietyScore: presentTypes / FOOD_VARIETY_GROUPS.length,
     vegetableRatio: vegetableTarget > 0
-      ? Math.min(1, (byResource.vegetables ?? 0) / vegetableTarget)
+      ? Math.min(1, ((byResource.vegetables ?? 0) + (byResource.kimchi ?? 0)) / vegetableTarget)
       : 1,
   };
 }

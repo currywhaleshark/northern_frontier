@@ -6,9 +6,11 @@ import { CONFIG } from '../game/config';
 import { FACTIONS, JOB_COLORS, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES } from '../game/constants';
 import { allowedCropsForBuilding, cropIdForBuilding, CROP_DEFS } from '../game/crops';
 import { canRequestTrade, factionTradeUnlockReason } from '../game/events';
+import { DRYING_PRODUCT_DEFS, DRYING_PRODUCT_ORDER, dryingProductOf } from '../game/preservation';
+import { IMPLEMENTED_LIVESTOCK_IDS, LIVESTOCK_DEFS, normalizeLivestockState } from '../game/livestock';
 import { getBuildingActions } from '../game/selectionActions';
 import { assignedWorkers, availableWorkerSlots, workerSlotConfig } from '../game/workerSlots';
-import type { BuildingTypeId, CropId, GameState, ResourceId, SmithyProductId } from '../game/types';
+import type { BuildingTypeId, CropId, DryingProductId, GameState, LivestockId, ResourceId, SmithyProductId } from '../game/types';
 import { FactionName } from './FactionName';
 
 const TILE = CONFIG.ui.tileSize;
@@ -19,6 +21,9 @@ interface Props {
   embedded?: boolean;
   onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
+  onSetDryingProduct: (buildingId: number, product: DryingProductId) => void;
+  onSetLivestockSpecies: (buildingId: number, species: LivestockId) => void;
+  onSlaughterLivestock: (buildingId: number, amount: number) => void;
   onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
   onConvertFieldToPaddy: (buildingId: number) => void;
   onRequestTrade: (factionName: string) => void;
@@ -43,6 +48,9 @@ export function ActionPopup({
   embedded = false,
   onUpgradeHousing,
   onSetSmithyProduct,
+  onSetDryingProduct,
+  onSetLivestockSpecies,
+  onSlaughterLivestock,
   onSetBuildingCrop,
   onConvertFieldToPaddy,
   onRequestTrade,
@@ -237,6 +245,63 @@ export function ActionPopup({
           })}
         </div>
       )}
+
+      {building.type === 'dryingRack' && (
+        <div className="action-grid">
+          {DRYING_PRODUCT_ORDER.map(product => {
+            const productDef = DRYING_PRODUCT_DEFS[product];
+            const active = dryingProductOf(building) === product;
+            const recipe = Object.entries(productDef.inputPerUnit)
+              .map(([res, amt]) => `${RESOURCE_NAMES[res as ResourceId]} ${amt}`)
+              .join(' + ');
+            return (
+              <button
+                key={product}
+                className={`action-chip${active ? ' active' : ''}`}
+                type="button"
+                title={`${recipe}${productDef.stopsInRain ? ' · 비가 오면 생산 중단' : ''}`}
+                onClick={() => onSetDryingProduct(building.id, product)}
+              >
+                {productDef.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {building.type === 'stable' && building.built && (() => {
+        const livestock = normalizeLivestockState(building.livestock);
+        return (
+          <div className="worker-slot-panel">
+            <div className="worker-slot-summary">
+              <span>축종</span>
+              <span className="muted small">{LIVESTOCK_DEFS.chicken.icon} {LIVESTOCK_DEFS.chicken.name} {livestock.headcount}마리</span>
+            </div>
+            <div className="action-grid">
+              {IMPLEMENTED_LIVESTOCK_IDS.map(species => (
+                <button
+                  key={species}
+                  className={`action-chip${livestock.species === species ? ' active' : ''}`}
+                  type="button"
+                  disabled={!state.unlockedLivestock.includes(species)}
+                  onClick={() => onSetLivestockSpecies(building.id, species)}
+                >
+                  {LIVESTOCK_DEFS[species].icon} {LIVESTOCK_DEFS[species].name}
+                </button>
+              ))}
+            </div>
+            <button
+              className="action-command"
+              type="button"
+              disabled={livestock.headcount < 1}
+              title={`닭 1마리 → 고기 ${CONFIG.livestock.chicken.slaughterMeatPerHead}`}
+              onClick={() => onSlaughterLivestock(building.id, 1)}
+            >
+              닭 1마리 도축
+            </button>
+          </div>
+        );
+      })()}
 
       {(building.type === 'market' || building.type === 'dock') && (
         <div className="action-grid">

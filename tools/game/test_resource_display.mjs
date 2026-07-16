@@ -48,6 +48,7 @@ assert.deepEqual([...groupedResources].sort(), [...STOCK_RESOURCE_ORDER].sort(),
 assert.deepEqual(DISPLAY_RESOURCE_ORDER, groupedResources,
   'starred resource order must follow display group order');
 assert.equal(RESOURCE_DISPLAY_GROUP_BY_RESOURCE.rice, 'food', 'unmilled rice belongs in the food display group');
+assert.equal(RESOURCE_DISPLAY_GROUP_BY_RESOURCE.salt, 'materials', 'salt belongs in the materials display group');
 assert.equal(RESOURCE_DISPLAY_GROUP_BY_RESOURCE.preciousMetal, 'valuables',
   'precious metal has its own display group without changing gameplay luxury rules');
 assert.equal('reputation' in RESOURCE_DISPLAY_GROUP_BY_RESOURCE, false, 'reputation is a metric, not stock');

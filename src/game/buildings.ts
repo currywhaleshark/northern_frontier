@@ -35,6 +35,36 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     cost: { wood: 9, stone: 2 }, buildDays: 6, slots: 0, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
+  cellar: {
+    id: 'cellar', name: '움 저장고', emoji: '🕳️',
+    desc: `땅의 냉기를 이용해 생선·고기·채소 ${CONFIG.spoilage.cellarCapacity}만큼의 부패를 늦춘다. 여러 동의 보호 용량은 합산된다.`,
+    cost: { wood: 5, stone: 3 }, buildDays: 4, slots: 0, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false,
+  },
+  smokehouse: {
+    id: 'smokehouse', name: '훈연소', emoji: '♨️',
+    desc: '갈무리꾼이 고기와 장작 또는 숯을 써서 오래 두는 보존육을 만든다.',
+    cost: { wood: 8, stone: 4, tools: 1 }, buildDays: 6, slots: 2, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false,
+  },
+  dryingRack: {
+    id: 'dryingRack', name: '건조대', emoji: '🎏',
+    desc: '강가에서 생선을 자반이나 건어물로 갈무리한다. 건어물은 소금이 들지 않지만 비가 오면 작업이 멈춘다.',
+    cost: { wood: 8, stone: 2, tools: 1 }, buildDays: 5, slots: 2, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'riverbank', unique: false,
+  },
+  onggiKiln: {
+    id: 'onggiKiln', name: '옹기가마', emoji: '🏺',
+    desc: '보(堡) 승격 후 강가에 짓는다. 옹기장이가 현지 점토를 빚어 장작이나 숯으로 옹기를 굽는다.',
+    cost: { wood: 12, stone: 6, tools: 2 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'riverbank', unique: false, minRank: 'bo',
+  },
+  jangdokdae: {
+    id: 'jangdokdae', name: '장독대', emoji: '🫙',
+    desc: '보(堡) 승격 후 마당에 짓는다. 늦가을부터 초겨울까지 콩과 소금을 옹기에 담그면 시간이 장을 익힌다.',
+    cost: { wood: 6, stone: 3, tools: 1 }, buildDays: 5, slots: 0, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false, minRank: 'bo',
+  },
   bridge: {
     id: 'bridge', name: '다리', emoji: '🌉',
     desc: '강 위에 놓아 사계절 주민 통행을 가능하게 한다.',
@@ -65,9 +95,15 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     cost: { wood: 5 }, buildDays: 3, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
+  clinic: {
+    id: 'clinic', name: '의원', emoji: '⚕️',
+    desc: '진(鎭) 승격 후 건설. 의원이 약초로 병자와 중상자를 치료하고 역병의 진단과 방역을 돕는다.',
+    cost: { wood: 14, stone: 10, herbs: 4, tools: 2 }, buildDays: 9, slots: 2, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
+  },
   field: {
     id: 'field', name: '밭', emoji: '🌾',
-    desc: '조·수수·메밀·보리 중 작물을 골라 기른다. 비옥한 땅이면 소출 +30%.',
+    desc: '곡물·채소·콩·목화 중 작물을 골라 기른다. 비옥한 땅이면 소출 +30%.',
     cost: { wood: 2, tools: 1 }, buildDays: 3, slots: 1, capacity: 0, defense: 0,
     winterBonus: false, placement: 'field', unique: false,
   },
@@ -109,7 +145,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   stable: {
     id: 'stable', name: '축사', emoji: '🐂',
-    desc: '진(鎭) 승격 후 건설. 목동이 가축을 돌보며 식량과 가죽을 꾸준히 보탠다.',
+    desc: '진(鎭) 승격 후 건설. 목동이 닭을 돌보며 달걀을 거두고 필요하면 도축한다.',
     cost: { wood: 16, stone: 6, grain: 8, tools: 1 }, buildDays: 9, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
   },
@@ -200,8 +236,8 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
 };
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
-  'hut', 'ondol', 'tileHouse', 'storehouse', 'bridge', 'field', 'paddy', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut',
-  'smithy', 'mine', 'ferry', 'watermill', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office',
+  'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'field', 'paddy', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'clinic',
+  'smokehouse', 'dryingRack', 'smithy', 'mine', 'ferry', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office',
   'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement',
 ];
@@ -215,6 +251,8 @@ export const SINGLE_TILE_BUILDINGS = [
   'field',
   'paddy',
   'ferry',
+  'dryingRack',
+  'onggiKiln',
   'dock',
   'palisade',
   'earthFort',

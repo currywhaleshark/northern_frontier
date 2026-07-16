@@ -34,8 +34,8 @@ const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mj
 const selectionActions = await import(pathToFileURL(join(compiledDir, 'selectionActions.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-const JIN_BUILDINGS = ['tileHouse', 'earthFort', 'charcoalKiln', 'stable'];
-const JIN_JOBS = ['charcoalBurner', 'herder'];
+const JIN_BUILDINGS = ['tileHouse', 'earthFort', 'charcoalKiln', 'stable', 'clinic'];
+const JIN_JOBS = ['charcoalBurner', 'herder', 'physician'];
 
 function boostResources(state) {
   for (const key of Object.keys(state.resources)) state.resources[key] = 1000;
@@ -204,8 +204,9 @@ function runTicks(state, ticks) {
   assert.equal(workerSlots.assignResidentToBuilding(state, herder.id, stable.id), null);
   runTicks(state, 8);
 
-  assert.ok((herder.carrying.meat ?? 0) > 0, 'herder carries meat from a stable');
-  assert.ok((herder.carrying.hide ?? 0) > 0, 'herder carries hide from a stable');
+  assert.ok((stable.inventory?.eggs ?? 0) > 0, 'herder gathers eggs into the assigned stable inventory');
+  assert.equal(herder.carrying.meat ?? 0, 0, 'routine herding no longer creates meat without slaughter');
+  assert.equal(herder.carrying.hide ?? 0, 0, 'routine herding no longer creates hide');
 }
 
 console.log('jin rank unlock tests passed');

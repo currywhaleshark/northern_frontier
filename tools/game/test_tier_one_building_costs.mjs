@@ -27,6 +27,7 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
 const expected = {
   hut: { wood: 7 },
   storehouse: { wood: 9, stone: 2 },
+  cellar: { wood: 5, stone: 3 },
   bridge: { wood: 14, stone: 9 },
   lumberCamp: { wood: 5 },
   woodShed: { wood: 7, stone: 2, tools: 1 },

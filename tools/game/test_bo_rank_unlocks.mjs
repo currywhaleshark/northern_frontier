@@ -35,8 +35,8 @@ const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mj
 const selectionActions = await import(pathToFileURL(join(compiledDir, 'selectionActions.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-const BO_BUILDINGS = ['ondol', 'mine', 'ferry', 'paddy', 'watermill'];
-const BO_JOBS = ['miner', 'fisher', 'miller'];
+const BO_BUILDINGS = ['ondol', 'mine', 'ferry', 'paddy', 'watermill', 'onggiKiln', 'jangdokdae'];
+const BO_JOBS = ['miner', 'fisher', 'miller', 'potter'];
 
 function boostResources(state) {
   for (const key of Object.keys(state.resources)) state.resources[key] = 1000;
@@ -180,14 +180,16 @@ function runTicks(state, ticks) {
         ? prepareTile(state, 'rock')
         : building === 'ferry'
           ? prepareRiverEdge(state).river
+          : building === 'onggiKiln'
+            ? prepareRiverEdge(state).river
           : building === 'paddy'
             ? preparePaddyTile(state)
             : building === 'watermill'
               ? prepareWatermillEdge(state)
               : prepareTile(state, 'plain');
     if (building === 'mine') tile.hasIron = true;
-    if (building === 'ondol') {
-      const size = buildings.buildingFootprintSize(building);
+    const size = buildings.buildingFootprintSize(building);
+    if (building === 'ondol' || building === 'jangdokdae') {
       for (let dy = 0; dy < size; dy++) {
         for (let dx = 0; dx < size; dx++) {
           const footprintTile = state.map[tile.y + dy][tile.x + dx];

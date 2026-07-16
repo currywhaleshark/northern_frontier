@@ -38,6 +38,7 @@ import {
 import { getPointerAction } from './selectionActions';
 import { createExploration, isBuildingFootprintExplored, refreshExploration } from './exploration';
 import { LUXURY_RESOURCES } from './resourceCatalog';
+import { DRYING_PRODUCT_DEFS } from './preservation';
 import { returnResidentCart, setResidentCartEquipped } from './equipment';
 import { reconcileWeaponAssignments, setAutomaticWeaponAllocation } from './weapons';
 import { CURRENT_SCHEMA_VERSION } from './saveSchema';
@@ -49,6 +50,12 @@ import { isHaulSourceBuilding } from './inventory';
 import { maybeOfferImmigration, resolveImmigration } from './immigration';
 import { createIncidentState, resolveSpecialEvent, updateSpecialEvents } from './specialEvents';
 import { dailyClaimTensionTick, noteBuildingClaimIntrusions } from './claimZones';
+import { applyDailySpoilage } from './spoilage';
+import { updateFermentation } from './fermentation';
+import { isKimjangChoice, maybeOpenKimjangEvent, resolveKimjangChoice } from './kimjang';
+import {
+  createDefaultLivestockState, setStableLivestock, slaughterStableLivestock, updateLivestock,
+} from './livestock';
 import { resolveTerritoryWarning, updateTerritoryWarnings } from './territory';
 import {
   foreignSiteAt, generateForeignSites, revealForeignSitesFromExploration, updateSeasonalForeignSites,
@@ -64,7 +71,7 @@ import {
 } from './workerSlots';
 import type { AutoAssignBuildingType } from './workerSlots';
 import type {
-  Building, BuildingTypeId, CropId, Difficulty, GameState, JobId, PointerAction, Resident, ResourceId, SmithyProductId,
+  Building, BuildingTypeId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId, PointerAction, Resident, ResourceId, SmithyProductId,
 } from './types';
 
 // ─────────────────────────── 새 게임 ───────────────────────────
@@ -103,6 +110,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     nextBuildingId: 1,
     nextResidentId: 1,
     resources: startRes,
+    unlockedLivestock: [...CONFIG.livestock.initialUnlocked],
     weaponAssignments: {},
     weaponAllocationMode: 'auto',
     processingReserves: defaultProcessingReserves(),
@@ -122,6 +130,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     tradeCapacitySeason: 0,
     tradeCapacityUsed: {},
     lastImmigrationDay: -999,
+    lastKimjangYear: 0,
     incidents: createIncidentState(s),
     specialItems: { wildGinseng: 0, tigerPelt: 0, gyrfalcon: 0 },
     discoveredSpecialItems: [],
@@ -186,6 +195,8 @@ function placePrebuilt(state: GameState, type: BuildingTypeId, x: number, y: num
     cropId: defaultCropForBuildingType(type),
     queuedCropId: null,
   };
+  if (type === 'jangdokdae') b.fermentBatches = [];
+  if (type === 'stable') b.livestock = createDefaultLivestockState();
   state.buildings.push(b);
   const tiles = buildingFootprintTiles(state, type, x, y) ?? [];
   occupyBuildingTiles(state, b);
@@ -260,6 +271,9 @@ export function tryPlaceBuilding(state: GameState, type: BuildingTypeId, x: numb
     queuedCropId: null,
   };
   if (type === 'smithy') b.smithyProduct = 'tools';
+  if (type === 'dryingRack') b.dryingProduct = 'saltedFish';
+  if (type === 'jangdokdae') b.fermentBatches = [];
+  if (type === 'stable') b.livestock = createDefaultLivestockState();
   state.buildings.push(b);
   const tiles = buildingFootprintTiles(state, type, x, y) ?? [];
   occupyBuildingTiles(state, b);
@@ -578,6 +592,22 @@ export function setSmithyProduct(state: GameState, buildingId: number, product: 
   return null;
 }
 
+export function setLivestockSpecies(state: GameState, buildingId: number, species: LivestockId): string | null {
+  return setStableLivestock(state, buildingId, species);
+}
+
+export function slaughterLivestock(state: GameState, buildingId: number, amount = 1): string | null {
+  return slaughterStableLivestock(state, buildingId, amount);
+}
+
+export function setDryingProduct(state: GameState, buildingId: number, product: DryingProductId): string | null {
+  const building = state.buildings.find(b => b.id === buildingId);
+  if (!building || building.type !== 'dryingRack') return '건조대를 찾을 수 없습니다.';
+  building.dryingProduct = product;
+  addLog(state, `건조대 생산품을 ${DRYING_PRODUCT_DEFS[product].name}(으)로 바꿨습니다.`, 'info');
+  return null;
+}
+
 export function resolveChoice(state: GameState, optionId: string): void {
   if (!state.pendingChoice) return;
   const selectedOption = state.pendingChoice.options.find(option => option.id === optionId);
@@ -611,6 +641,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'inspection') resolveInspection(state, optionId, rng);
   else if (state.pendingChoice.kind === 'crackdown') resolveCrackdown(state, optionId, rng);
   else if (state.pendingChoice.kind === 'immigration') resolveImmigration(state, optionId);
+  else if (state.pendingChoice.kind === 'incident' && isKimjangChoice(state.pendingChoice)) resolveKimjangChoice(state, optionId);
   else if (state.pendingChoice.kind === 'incident') resolveSpecialEvent(state, optionId, rng);
   else if (state.pendingChoice.kind === 'territory') resolveTerritoryWarning(state, optionId);
   else resolveTrade(state, optionId);
@@ -700,6 +731,9 @@ function endOfDay(state: GameState): void {
   updateHabitats(state);
   runToolWear(state);
   runConsumptionAndNeeds(state, rng);
+  updateLivestock(state);
+  applyDailySpoilage(state);
+  updateFermentation(state);
 
   driftRelations(state);
   updateThreat(state);
@@ -711,6 +745,7 @@ function endOfDay(state: GameState): void {
   maybeFlavorLog(state, rng);
   maybeCollectTribute(state); // 겨울: 조정의 사자가 세공을 거둔다 (모달 충돌 시 다음 날로)
   updateSuspicion(state, rng); // 모반 의심 누적과 감찰/견책/토벌 사건
+  maybeOpenKimjangEvent(state); // 늦가을~입동의 연례 공동 김장. 다른 모달이 있으면 기간 안에 재시도
   updateSpecialEvents(state, rng); // 기존 제도권 사건과 모달이 겹치면 예정일을 넘겨 다음 날 재시도
   updateTerritoryWarnings(state);
   dailyClaimTensionTick(state);
@@ -810,7 +845,7 @@ function updateHabitats(state: GameState): void {
 // 도구 마모: 생산직 인원 수에 비례
 function runToolWear(state: GameState): void {
   const producing = [
-    'woodcutter', 'woodSplitter', 'hunter', 'farmer', 'miller', 'builder', 'smith', 'miner', 'fisher',
+    'woodcutter', 'woodSplitter', 'hunter', 'farmer', 'miller', 'builder', 'curer', 'potter', 'smith', 'miner', 'fisher',
     'charcoalBurner', 'herder', 'powderMaker', 'tanner', 'weaver', 'herbalist', 'hauler',
   ];
   const n = state.residents.filter(r =>

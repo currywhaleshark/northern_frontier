@@ -7,6 +7,7 @@ import {
   predatorScoutDuration, predatorThreatProfile, tigerTierDangerMultiplier, tigerTierFromStrength, tigerTierLabel,
 } from './expeditionIntel';
 import { makeRng } from './map';
+import { hasActivePhysician } from './medicine';
 import { killResident, livingResidents } from './residents';
 import { getSeason, getYear } from './seasons';
 import { createCombatRoster } from './combatRoster';
@@ -35,7 +36,7 @@ const EVENT_COOLDOWNS: Record<SpecialEventId, number> = {
   gyrfalcon: CONFIG.specialEvents.gyrfalconCooldownDays,
 };
 
-const FOOD_RESOURCES: ResourceId[] = ['grain', 'rice', 'meat', 'fish', 'vegetables'];
+const FOOD_RESOURCES: ResourceId[] = ['grain', 'rice', 'meat', 'eggs', 'fish', 'vegetables', 'beans'];
 
 function incidentSchedule(seed: number, year: number): number[] {
   const rng = makeRng(seed + year * 15485863 + 41);
@@ -276,13 +277,23 @@ function openPlagueSuspicionEvent(state: GameState, rng: () => number): void {
   const suspect = residents[Math.floor(rng() * residents.length)];
   if (!suspect) return;
   suspect.sick = true;
+  const localPhysician = hasActivePhysician(state);
+  const isolationDays = Math.max(
+    1,
+    CONFIG.specialEvents.plagueIsolationDays - (localPhysician ? CONFIG.medicine.isolationDaysReduction : 0),
+  );
   state.pendingChoice = {
     kind: 'incident',
     title: '역병 의심 증상',
     body: `${suspect.name}이(가) 고열과 기침으로 쓰러졌습니다. 단순한 병치레일 수도 있지만 역병의 첫 증상일 수도 있습니다.`,
     illustration: { src: '/assets/events/plague-suspicion-v1.png', alt: '고열로 누운 주민을 살피며 격리를 고민하는 개척지 사람들' },
     options: [
-      { id: 'isolate', label: '격리한다', desc: `${CONFIG.specialEvents.plagueIsolationDays}일 동안 일을 쉬게 합니다. 역병이라도 전염을 막을 수 있습니다.` },
+      ...(localPhysician ? [{
+        id: 'physician-diagnose',
+        label: '의원에게 진맥을 맡긴다',
+        desc: `${CONFIG.medicine.diagnosisDays}일 동안 안전하게 격리해 역병 여부를 빠르게 가립니다.`,
+      }] : []),
+      { id: 'isolate', label: '격리한다', desc: `${isolationDays}일 동안 일을 쉬게 합니다. 역병이라도 전염을 막을 수 있습니다.` },
       { id: 'observe', label: '그냥 둔다', desc: '단순한 병이면 혼자 낫지만 실제 역병이면 며칠 안에 마을로 번집니다.' },
     ],
     data: { eventId: 'plagueSuspicion', residentId: suspect.id, real: rng() < CONFIG.specialEvents.plagueRealChance },
@@ -293,13 +304,20 @@ function openEpidemicEvent(state: GameState): void {
   const epidemic = state.incidents.epidemic;
   if (!epidemic) return;
   const cost = CONFIG.specialEvents;
+  const localPhysician = hasActivePhysician(state);
   state.pendingChoice = {
     kind: 'incident',
     title: '역병이 돌기 시작했다',
     body: `의심 환자와 접촉한 주민들까지 같은 증상을 보입니다. 현재 환자 ${epidemic.infectedIds.length}명. 더 퍼지기 전에 결단해야 합니다.`,
     illustration: { src: '/assets/events/plague-outbreak-v1.png', alt: '역병 환자를 격리하고 의원의 진료를 준비하는 북방 개척지' },
     options: [
-      { id: 'isolate-all', label: '환자를 모두 격리한다', desc: '환자들의 작업을 중단하고 전염을 막습니다. 회복까지 시간이 걸립니다.' },
+      {
+        id: 'isolate-all',
+        label: '환자를 모두 격리한다',
+        desc: localPhysician
+          ? `의원이 방역과 치료를 맡아 격리 기간을 ${CONFIG.medicine.isolationDaysReduction}일 줄입니다.`
+          : '환자들의 작업을 중단하고 전염을 막습니다. 회복까지 시간이 걸립니다.',
+      },
       {
         id: 'request-physician',
         label: '의원 파견을 요청한다',
@@ -697,12 +715,21 @@ function resolvePlagueSuspicion(state: GameState, optionId: string, data: Record
   const residentId = data.residentId as number;
   const resident = state.residents.find(candidate => candidate.id === residentId && candidate.alive);
   if (!resident) return;
-  const isolated = optionId === 'isolate';
-  const duration = isolated ? CONFIG.specialEvents.plagueIsolationDays : CONFIG.specialEvents.plagueObservationDays;
+  const physicianDiagnosis = optionId === 'physician-diagnose' && hasActivePhysician(state);
+  const isolated = optionId === 'isolate' || physicianDiagnosis;
+  const isolationDays = Math.max(
+    1,
+    CONFIG.specialEvents.plagueIsolationDays - (hasActivePhysician(state) ? CONFIG.medicine.isolationDaysReduction : 0),
+  );
+  const duration = physicianDiagnosis
+    ? CONFIG.medicine.diagnosisDays
+    : isolated ? isolationDays : CONFIG.specialEvents.plagueObservationDays;
   if (isolated) {
     resident.quarantinedUntil = state.day + duration;
     resident.task = '격리 중';
-    addLog(state, `${resident.name}을(를) ${duration}일 동안 격리했습니다. 배정은 유지되지만 일을 쉬게 됩니다.`, 'info', true);
+    addLog(state, physicianDiagnosis
+      ? `의원이 ${resident.name}을(를) 진맥합니다. ${duration}일 동안 격리해 역병 여부를 가립니다.`
+      : `${resident.name}을(를) ${duration}일 동안 격리했습니다. 배정은 유지되지만 일을 쉬게 됩니다.`, 'info', true);
   } else {
     addLog(state, `${resident.name}을(를) 격리하지 않고 경과를 지켜봅니다.`, 'bad', true);
   }
@@ -737,6 +764,9 @@ function resolveEpidemic(state: GameState, optionId: string): void {
   const range = CONFIG.specialEvents.epidemicDays;
   epidemic.untilDay = state.day + range[0];
   if (optionId === 'isolate-all') {
+    if (hasActivePhysician(state)) {
+      epidemic.untilDay = state.day + Math.max(1, range[0] - CONFIG.medicine.isolationDaysReduction);
+    }
     epidemic.mode = 'isolated';
     for (const id of epidemic.infectedIds) {
       const resident = state.residents.find(candidate => candidate.id === id && candidate.alive);
@@ -982,7 +1012,10 @@ function updateEpidemic(state: GameState, rng: () => number): void {
     finishEpidemic(state, epidemic);
     return;
   }
-  if (epidemic.mode === 'uncontained' && rng() < CONFIG.specialEvents.epidemicSpreadChance) {
+  const physicianActive = hasActivePhysician(state);
+  const spreadChance = CONFIG.specialEvents.epidemicSpreadChance *
+    (physicianActive ? CONFIG.medicine.epidemicSpreadMult : 1);
+  if (epidemic.mode === 'uncontained' && rng() < spreadChance) {
     const candidates = livingResidents(state).filter(resident => !epidemic.infectedIds.includes(resident.id));
     const infected = candidates[Math.floor(rng() * candidates.length)];
     if (infected) {
@@ -995,11 +1028,16 @@ function updateEpidemic(state: GameState, rng: () => number): void {
     const resident = state.residents.find(candidate => candidate.id === id && candidate.alive);
     if (!resident) continue;
     resident.sick = true;
-    if (epidemic.mode === 'uncontained' && rng() < CONFIG.specialEvents.epidemicDeathChance) {
+    const deathChance = CONFIG.specialEvents.epidemicDeathChance *
+      (physicianActive ? CONFIG.medicine.epidemicDeathMult : 1);
+    if (epidemic.mode === 'uncontained' && rng() < deathChance) {
       killResident(state, resident, '역병');
       continue;
     }
-    const damage = epidemic.mode === 'isolated' ? 1 + Math.floor(rng() * 3) : 3 + Math.floor(rng() * 5);
+    const rawDamage = epidemic.mode === 'isolated' ? 1 + Math.floor(rng() * 3) : 3 + Math.floor(rng() * 5);
+    const damage = physicianActive
+      ? Math.max(1, Math.round(rawDamage * CONFIG.medicine.epidemicDamageMult))
+      : rawDamage;
     resident.health = Math.max(1, resident.health - damage);
   }
 }

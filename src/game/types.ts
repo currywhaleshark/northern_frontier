@@ -48,6 +48,9 @@ export type JobId =
   | 'builder'    // 건축가
   | 'hauler'     // 운반꾼
   | 'herbalist'  // 약초꾼
+  | 'physician'  // 의원
+  | 'curer'      // 갈무리꾼
+  | 'potter'     // 옹기장이
   | 'smith'      // 대장장이
   | 'miner'      // 채광꾼
   | 'fisher'     // 어부
@@ -67,8 +70,16 @@ export type ResourceId =
   | 'grain'      // 먹을 수 있는 곡물(밭 수확물 + 도정한 벼)
   | 'rice'       // 논에서 수확한 도정 전 벼
   | 'meat'       // 고기
+  | 'eggs'       // 달걀
   | 'fish'       // 생선
+  | 'curedMeat'  // 보존육
+  | 'saltedFish' // 자반
+  | 'driedFish'  // 건어물
   | 'vegetables' // 채소
+  | 'kimchi'     // 김치
+  | 'beans'      // 콩
+  | 'jang'       // 장
+  | 'salt'       // 소금 (교역 전용 보존 재료)
   | 'brushwood'  // 땔나무
   | 'firewood'   // 장작
   | 'charcoal'   // 숯
@@ -76,6 +87,7 @@ export type ResourceId =
   | 'stone'      // 돌
   | 'iron'       // 철
   | 'tools'      // 도구
+  | 'onggi'      // 옹기
   | 'carts'      // 운반꾼이 장비하는 수레
   | 'hide'       // 가죽
   | 'hideClothes' // 가죽옷
@@ -96,9 +108,11 @@ export type ResourceId =
 
 export type SmithyProductId = 'tools' | 'carts' | 'spears' | 'hornBows' | 'muskets';
 
-export type CropId = 'millet' | 'sorghum' | 'buckwheat' | 'barley' | 'rice' | 'vegetables' | 'cotton';
+export type DryingProductId = 'saltedFish' | 'driedFish';
 
-export type ProcessingInputId = 'wood' | 'rice' | 'hide' | 'iron';
+export type CropId = 'millet' | 'sorghum' | 'buckwheat' | 'barley' | 'rice' | 'vegetables' | 'beans' | 'cotton';
+
+export type ProcessingInputId = 'wood' | 'rice' | 'hide' | 'iron' | 'meat' | 'fish';
 
 export type BuildingTypeId =
   | 'center'     // 마을 중심지
@@ -106,11 +120,17 @@ export type BuildingTypeId =
   | 'ondol'      // 온돌집
   | 'tileHouse'  // 기와집
   | 'storehouse' // 창고
+  | 'cellar'     // 움 저장고
+  | 'smokehouse' // 훈연소
+  | 'dryingRack' // 건조대
+  | 'onggiKiln'  // 옹기가마
+  | 'jangdokdae' // 장독대
   | 'bridge'     // 다리
   | 'lumberCamp' // 벌목장
   | 'woodShed'   // 장작마당
   | 'huntLodge'  // 사냥막
   | 'herbHut'    // 약초막
+  | 'clinic'     // 의원
   | 'mine'       // 채광장
   | 'ferry'      // 나루터
   | 'charcoalKiln' // 숯가마
@@ -254,6 +274,8 @@ export interface HaulTask {
   sourceBuildingId: number;
   resource: ResourceId;
   amount: number;
+  kind?: 'collect' | 'supply'; // 구버전 작업은 collect로 해석
+  targetBuildingId?: number; // supply일 때 재료를 내려놓을 생산시설
 }
 
 export interface Resident {
@@ -288,6 +310,15 @@ export interface Resident {
   manualOrder: ManualOrder | null;  // 플레이어가 우클릭으로 지정한 이동/작업 명령
 }
 
+export type LivestockId = 'chicken' | 'goat' | 'sheep' | 'cattle' | 'horse';
+
+export interface LivestockState {
+  species: LivestockId;
+  headcount: number;
+  growth: number; // 다음 새끼가 태어나기까지의 진행도 0~1
+  feedShortageDays: number;
+}
+
 export interface Building {
   id: number;
   type: BuildingTypeId;
@@ -299,8 +330,17 @@ export interface Building {
   cropId?: CropId | null; // 밭/논 전용: 현재 선택/재배 작물
   queuedCropId?: CropId | null; // 밭/논 전용: 수확 뒤 또는 다음 파종철에 적용할 작물
   smithyProduct?: SmithyProductId; // 대장간 전용: 현재 생산품
+  dryingProduct?: DryingProductId; // 건조대 전용: 현재 생산품
+  fermentBatches?: FermentBatch[]; // 장독대 전용: 절대일 기준 숙성 배치
+  livestock?: LivestockState; // 축사 전용: 축종·마릿수·번식·사료 부족 상태
   inventory?: Partial<Record<ResourceId, number>>; // 운반 전 생산지 현장 재고
   repairing?: boolean; // 습격으로 파손되어 건설담당의 수리가 필요한 상태
+}
+
+export interface FermentBatch {
+  kind: 'jang' | 'kimchi';
+  amount: number; // 완성 시 산출되는 발효식품 수량
+  readyOnDay: number; // 저장/불러오기에도 흔들리지 않는 절대일
 }
 
 export interface BuildingDef {
@@ -986,6 +1026,7 @@ export interface GameState {
   nextBuildingId: number;
   nextResidentId: number;
   resources: Record<ResourceId, number>;
+  unlockedLivestock: LivestockId[];
   weaponAssignments: Partial<Record<number, CombatWeaponId>>; // 주민별 전투 무기. 없으면 비무장
   weaponAllocationMode: WeaponAllocationMode; // 자동 배분을 유지할지 플레이어 배정을 고정할지
   processingReserves: Record<ProcessingInputId, number>; // 자동 가공/소비 전에 남길 원자재 수량
@@ -1005,6 +1046,7 @@ export interface GameState {
   tradeCapacitySeason: number; // 교역 물동량 사용량이 속한 계절 번호
   tradeCapacityUsed: Record<string, Partial<Record<ResourceId, number>>>; // 세력별 이번 계절 출고량
   lastImmigrationDay: number; // 마지막 이주민 수용 여부 선택지가 열린 날
+  lastKimjangYear: number;    // 마지막으로 김장 규모를 결정한 연도 (0이면 아직 없음)
   incidents: IncidentState;    // 연간 돌발 사건 일정과 지속 중인 맹수 위험
   specialItems: Record<SpecialItemId, number>; // 산삼·호피 등 일반 자원과 분리한 기물함
   discoveredSpecialItems: SpecialItemId[];     // 소모해도 남는 기물 도감

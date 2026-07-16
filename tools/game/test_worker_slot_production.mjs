@@ -211,8 +211,7 @@ function prepareState(seed) {
 
   for (let i = 0; i < 8; i++) simulation.advanceTick(state);
 
-  assert.equal(herder.carrying.meat ?? 0, 0, 'unassigned herder does not produce meat');
-  assert.equal(herder.carrying.hide ?? 0, 0, 'unassigned herder does not produce hide');
+  assert.equal(stable.inventory?.eggs ?? 0, 0, 'unassigned herder does not gather eggs');
 }
 
 {
@@ -225,8 +224,8 @@ function prepareState(seed) {
 
   for (let i = 0; i < 8; i++) simulation.advanceTick(state);
 
-  assert.ok((herder.carrying.meat ?? 0) > 0, 'assigned herder produces meat at the assigned stable');
-  assert.ok((herder.carrying.hide ?? 0) > 0, 'assigned herder produces hide at the assigned stable');
+  assert.ok((stable.inventory?.eggs ?? 0) > 0, 'assigned herder gathers eggs at the assigned stable');
+  assert.equal(herder.carrying.meat ?? 0, 0, 'meat requires an explicit slaughter action');
 }
 
 {

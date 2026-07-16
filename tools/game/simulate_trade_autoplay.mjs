@@ -30,6 +30,9 @@ const runs = optionNumber('runs', 80);
 const maxYears = optionNumber('years', 10);
 const seedBase = optionNumber('seed', 2026071100);
 const trace = process.argv.includes('--trace');
+const spoilageEnabled = !process.argv.includes('--spoilage=off');
+const preservationEnabled = !process.argv.includes('--preservation=off');
+const kimjangEnabled = !process.argv.includes('--kimjang=off');
 const requestedModes = process.argv.find(arg => arg.startsWith('--modes='))
   ?.slice('--modes='.length)
   .split(',')
@@ -48,6 +51,12 @@ const tributeReserve = await load('tributeReserve');
 const relations = await load('relations');
 const { CONFIG } = await load('config');
 const { FACTIONS } = await load('constants');
+
+if (!spoilageEnabled) {
+  for (const resource of Object.keys(CONFIG.spoilage.dailyRate)) {
+    CONFIG.spoilage.dailyRate[resource] = 0;
+  }
+}
 
 const ordinaryFactions = FACTIONS.filter(faction => faction.trades.length > 0);
 const maxDay = CONFIG.time.yearDays * maxYears + 1;
@@ -106,7 +115,9 @@ function tryQueueBuilding(state, type, desired, candidates) {
   if (plannedCount(state, type) >= desired) return false;
   const def = buildings.BUILDING_DEFS[type];
   if (!buildings.canAfford(state, def)) return false;
-  const coreBuilding = ['field', 'woodShed', 'market', 'lumberCamp', 'huntLodge', 'herbHut'].includes(type);
+  const coreBuilding = [
+    'field', 'woodShed', 'market', 'lumberCamp', 'huntLodge', 'herbHut', 'cellar', 'smokehouse', 'dryingRack',
+  ].includes(type);
   const woodCost = def.cost.wood ?? 0;
   const fuelReserveWood = Math.max(24, living(state).length * 2.5);
   if (!coreBuilding && fuelDays(state) < 50 && state.resources.wood - woodCost < fuelReserveWood) return false;
@@ -139,6 +150,9 @@ function constructionPlan(state) {
     ['palisade', 14],
   ];
 
+  if (spoilageEnabled) targets.splice(8, 0, ['cellar', 1]);
+  if (preservationEnabled) targets.splice(9, 0, ['smokehouse', 1]);
+
   if (state.rank !== 'settlement') {
     targets.push(
       ['paddy', Math.min(4, Math.max(2, Math.ceil(pop / 14)))],
@@ -148,6 +162,8 @@ function constructionPlan(state) {
       ['weavingHouse', 1],
       ['ondol', Math.max(2, Math.ceil(pop / 15))],
     );
+    if (preservationEnabled) targets.push(['dryingRack', 1]);
+    if (kimjangEnabled) targets.push(['onggiKiln', 1], ['jangdokdae', 1]);
   }
   if (state.rank === 'jin' || state.rank === 'bu') {
     targets.push(['charcoalKiln', 1], ['stable', 1], ['earthFort', 8]);
@@ -187,6 +203,14 @@ function jobTargets(state) {
   add('woodcutter', Math.max(2, Math.floor(pop * 0.15)));
   add('hauler', Math.max(1, Math.floor(pop / 10)));
   add('herbalist', builtCount(state, 'herbHut') > 0 ? Math.max(1, Math.floor(pop / 22)) : 1);
+  if (preservationEnabled) {
+    const meatWork = builtCount(state, 'smokehouse') > 0 &&
+      state.resources.meat > state.processingReserves.meat + 1;
+    const fishWork = builtCount(state, 'dryingRack') > 0 &&
+      state.resources.fish > state.processingReserves.fish + 1;
+    add('curer', Number(meatWork) + Number(fishWork));
+  }
+  add('potter', kimjangEnabled && builtCount(state, 'onggiKiln') > 0 && state.resources.onggi < 6 ? 1 : 0);
   add('watchman', Math.max(1, Math.floor(pop / 12)));
   add('tanner', builtCount(state, 'tannery') > 0 && clothingTotal(state) < pop * 1.1 ? 1 : 0);
   add('fisher', builtCount(state, 'ferry') > 0 ? Math.max(1, Math.floor(pop / 20)) : 0);
@@ -210,6 +234,9 @@ function rebalanceJobs(state) {
     if (people[i].job !== targets[i]) simulation.setResidentJob(state, people[i].id, targets[i]);
   }
   for (const building of state.buildings.filter(candidate => candidate.built)) {
+    if (preservationEnabled && building.type === 'dryingRack') {
+      simulation.setDryingProduct(state, building.id, state.resources.salt >= 2 ? 'saltedFish' : 'driedFish');
+    }
     workerSlots.autoAssignWorkersToBuilding(state, building.id);
   }
 }
@@ -262,6 +289,9 @@ function chooseTradeTarget(state, excluded = null) {
   const season = simulation.getSeason(state.day);
   const tribute = tributeNeed(state);
   const targets = [];
+  if (kimjangEnabled && season === 'autumn' && state.resources.salt < 4) {
+    targets.push({ resource: 'salt', amount: Math.ceil(4 - state.resources.salt) });
+  }
   if (tribute) targets.push(tribute);
   if (fuelDays(state) < 18) targets.push({ resource: 'firewood', amount: Math.ceil(pop * 1.2) });
   if (foodDays(state) < 18) targets.push({ resource: 'grain', amount: Math.ceil(pop * 0.8) });
@@ -376,6 +406,14 @@ function handleChoice(state, mode, metrics) {
     simulation.resolveChoice(state, 'break');
     return;
   }
+  if (choice.kind === 'incident' && choice.data.eventId === 'kimjang') {
+    const option = kimjangEnabled
+      ? firstEnabledOption(choice, ['kimjang-large', 'kimjang-medium', 'kimjang-small', 'kimjang-skip'])
+      : 'kimjang-skip';
+    if (option !== 'kimjang-skip') metrics.kimjangs++;
+    simulation.resolveChoice(state, option);
+    return;
+  }
   if (choice.kind === 'immigration') {
     const count = Number(choice.data.count) || 0;
     const canHouse = housingCapacity(state) >= living(state).length + count;
@@ -436,6 +474,12 @@ function emptyMetrics() {
     minFoodDays: Infinity,
     minFuelDays: Infinity,
     victoryDay: null,
+    maxPreservedFood: 0,
+    maxKimchi: 0,
+    kimjangs: 0,
+    winterHealthTotal: 0,
+    winterMoraleTotal: 0,
+    winterSamples: 0,
   };
 }
 
@@ -473,6 +517,16 @@ function runOne(seed, mode) {
 
     metrics.minFoodDays = Math.min(metrics.minFoodDays, foodDays(state));
     metrics.minFuelDays = Math.min(metrics.minFuelDays, fuelDays(state));
+    metrics.maxPreservedFood = Math.max(
+      metrics.maxPreservedFood,
+      state.resources.curedMeat + state.resources.saltedFish + state.resources.driedFish,
+    );
+    metrics.maxKimchi = Math.max(metrics.maxKimchi, state.resources.kimchi);
+    if (simulation.getSeason(state.day) === 'winter' && living(state).length > 0) {
+      metrics.winterHealthTotal += residents.avg(state, 'health');
+      metrics.winterMoraleTotal += residents.avg(state, 'morale');
+      metrics.winterSamples++;
+    }
     if (trace && seed === seedBase && (state.day === 1 || simulation.getDayOfSeason(state.day) === 1)) {
       snapshots.push({
         day: state.day,
@@ -513,6 +567,8 @@ function runOne(seed, mode) {
     deaths: state.totalDeaths,
     rank: state.rank,
     food: Math.floor(consumption.foodTotal(state)),
+    preservedFood: state.resources.curedMeat + state.resources.saltedFish + state.resources.driedFish,
+    kimchi: state.resources.kimchi,
     fuel: Math.floor(consumption.fuelHeatTotal(state)),
     defense: Math.floor(state.resources.defense),
     reputation: Math.floor(state.resources.reputation),
@@ -550,6 +606,9 @@ function summarize(mode, results) {
   }
   return {
     mode,
+    spoilageEnabled,
+    preservationEnabled,
+    kimjangEnabled,
     runs: results.length,
     maxYears,
     survivalRate: 1 - failures.length / results.length,
@@ -566,8 +625,19 @@ function summarize(mode, results) {
     meanExtortions: results.reduce((sum, result) => sum + result.extortions, 0) / results.length,
     meanImmigrantsAccepted: results.reduce((sum, result) => sum + result.immigrantsAccepted, 0) / results.length,
     meanImmigrantsRejected: results.reduce((sum, result) => sum + result.immigrantsRejected, 0) / results.length,
+    meanFinalFood: results.reduce((sum, result) => sum + result.food, 0) / results.length,
     meanMinFoodDays: results.reduce((sum, result) => sum + result.minFoodDays, 0) / results.length,
     meanMinFuelDays: results.reduce((sum, result) => sum + result.minFuelDays, 0) / results.length,
+    meanFinalPreservedFood: results.reduce((sum, result) => sum + result.preservedFood, 0) / results.length,
+    meanMaxPreservedFood: results.reduce((sum, result) => sum + result.maxPreservedFood, 0) / results.length,
+    meanMaxKimchi: results.reduce((sum, result) => sum + result.maxKimchi, 0) / results.length,
+    meanKimjangs: results.reduce((sum, result) => sum + result.kimjangs, 0) / results.length,
+    meanWinterHealth: results.reduce((sum, result) => (
+      sum + result.winterHealthTotal / Math.max(1, result.winterSamples)
+    ), 0) / results.length,
+    meanWinterMorale: results.reduce((sum, result) => (
+      sum + result.winterMoraleTotal / Math.max(1, result.winterSamples)
+    ), 0) / results.length,
     ranks,
     failureReasons: reasons,
     censoredSeeds: results.filter(result => result.censored).map(result => result.seed),

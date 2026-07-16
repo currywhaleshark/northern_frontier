@@ -4,7 +4,7 @@
 
 - 저장소: `https://github.com/currywhaleshark/northern_frontier`
 - 브랜치: `codex/ui-reorganization`
-- 이 문서 작성 직전 HEAD: `a018733 feat: finalize overlay layout`
+- K1 착수 전 HEAD: `a568765 fix: keep resource popovers above settlement log`
 - 구현 계획: `docs/superpowers/plans/2026-07-14-ui-reorganization.md`
 - 전투 판정·명령 효과·자동 표적 로직은 이번 UI 재구성에서 변경하지 않았다.
 
@@ -77,27 +77,34 @@ U5.2 마감 시 다음을 실행해 통과했다.
 
 ## 현재 작업 트리의 다른 작업자 변경
 
-아래 파일과 디렉터리는 전술 스프라이트 크기·기준선 자동 보정 작업으로 보이며 이 핸드오프와 무관하다. 수정·삭제·스테이징·커밋하지 말고 담당 작업자가 처리하도록 그대로 둔다.
+아래 파일과 디렉터리는 현재 진행 중인 전투·성책 스프라이트 작업 또는 기존 사용자 작업이다. K1·K2 변경에 포함하지 않았으며 수정·삭제·스테이징·커밋하지 않는다.
 
-- `package.json`
-- `src/components/tactical/TacticalGroupChip.tsx`
-- `src/components/tactical/TacticalZoneColumn.tsx`
-- `src/styles/global.css`의 전술 스프라이트 관련 미스테이징 변경
-- `tools/game/test_tactical_sprite_poses.mjs`
 - `src/render/tacticalSpriteMetrics.ts`
-- `tools/game/generate_tactical_sprite_metrics.mjs`
-- `tools/game/head-boxes/`
+- `tools/game/head-boxes/PROMPT.md`
+- `tools/game/head-boxes/*.json`
+- `tools/game/debug-temp/`
 - `debug_output/`
-- `generate_boxes.js`
-- `generate_boxes.mjs`
-- `generate_boxes.py`
+- `debug_output_heuristic/`
+- `backup_json/`
+- `tools/render/source_images/wall-family-palisade-normal-source-*.png`
 
-`src/styles/global.css`에는 UI 재구성 커밋과 다른 작업자의 전술 변경이 함께 있었으나, UI 재구성 부분만 부분 스테이징해 이미 커밋했다. 현재 남아 있는 CSS diff는 다른 작업자 몫이다.
+## UI 이후 연속 작업 상태
 
-## 다음 작업자 권장 순서
+- 발효·보존 계획 Phase K1(3종 부패·소금·움 저장고), K2(훈연·염장·건조), K3(콩·옹기), K4(장독대·장), K5(김장·김치)를 완료했다.
+- K2는 갈무리꾼, 훈연소, 강가 건조대, 보존육·자반·건어물, 고기·생선 비축선, 원식품 우선 소비와 원물군 다양성 계산을 연결했다.
+- K3는 봄 파종·가을 수확의 비부패 콩 작물과 보 승격 강가 옹기가마, 옹기장이, 장작/숯 기반 옹기 생산을 연결했다. 점토는 현장 조달이며 별도 자원으로 만들지 않았다. 저장 스키마는 v13이다.
+- K4는 보 승격 2×2 장독대, 운반꾼의 콩·소금·옹기 배송, 늦가을~초겨울 자동 담금, 절대일 24일 숙성, 장 산출과 90% 옹기 회수, 선택 컨텍스트 진행도를 연결했다. 장독대 배치·현장 재고는 습격 약탈 풀에서 제외한다.
+- K5는 가을 10일차~겨울 2일차의 연례 김장 선택지, 소·중·대 규모별 재료/장독대 제한, 4일 김치 숙성, 90% 옹기 회수, 규모 비례 사기 상승과 채소 몫 충족을 연결했다. 김장 결정 전에는 장독대마다 2칸을 예약하며 현재 저장 스키마는 v15다.
+- 동일 열량·난방의 8시드 겨울 대조에서 김장 마을은 평균 건강 70.4, 미사용 마을은 64.0이었고 양쪽 모두 생존율 100%였다. 중간 규모 완성 직후 사기는 +3이었다.
+- K5 최종 게이트에서 전체 게임 테스트 77개, 프로덕션 빌드와 `git diff --check`가 통과했다. 빌드에는 기존 500kB 초과 번들 경고만 남아 있다.
+- 상세 구현값과 자동 플레이 비교는 `docs/superpowers/plans/2026-07-15-fermentation-kimjang.md`의 K1~K5 구현 기록에 남겼다.
+- 가축 Phase A의 닭 슬라이스를 완료했다. 축사는 닭 4마리로 시작해 8마리까지 번식하고, 곡물 사료 부족 시 3일 유예 뒤 이틀마다 1마리를 잃는다. 목동은 계절 산란율에 따라 신규 자원 달걀을 생산하며 도축 명령은 닭 1마리를 고기 0.75로 전환한다.
+- 달걀은 동물성 식품군·운반·상단 식량 표시·부패에 편입했다. 선택 컨텍스트에는 축종·마릿수·번식·사료 상태와 도축 액션, 경보에는 가을/겨울 사료 전망을 연결했다. 저장 스키마는 v16이며 기존 축사는 닭 4마리로 이전한다.
+- 가축 최종 게이트에서 전체 게임 테스트 78개와 프로덕션 빌드가 통과했다. 상세 수치와 남은 염소·양·소·군마 범위는 `docs/superpowers/plans/2026-07-14-livestock-physician-defectors-units.md`의 구현 기록에 남겼다.
 
-1. `git status --short`로 위 미커밋 파일이 유지되는지 확인한다.
-2. U1 자원 그룹 시각 검증을 짧게 수행하고 계획서를 완전히 마감한다.
-3. 새 UI 작업을 시작한다면 좌상단 로그, 우상단 경보, 우측 도크, 좌하단 건설, 우하단 미니맵·컨텍스트의 앵커 경계를 유지한다.
-4. 하단 명령판, 선택 컨텍스트, 건설 드로어를 서로 강하게 결합하지 않는다. 후속 기본 접힘이나 드래그 조작 작업이 독립적으로 들어갈 수 있어야 한다.
-5. 다른 작업자의 전술 스프라이트 변경이 커밋되기 전에는 전체 `src/styles/global.css`를 통째로 스테이징하지 않는다.
+## 나머지 계획 구현 순서
+
+1. **의원 Phase B** — 닭 기반 가축 슬라이스 다음의 독립 민생 확장으로 진행한다.
+2. 가축 후속은 E(소·염소·양)와 D(귀순병)를 먼저, C(팽배수)와 F(군마·기마병)를 전술 의존에 맞춰 잇는다. 닭 외 축종을 시작할 때 젖·양털·건초와 가축 약탈 연계를 함께 마감한다.
+
+새 UI를 추가할 때는 좌상단 로그, 우상단 경보, 우측 도크, 좌하단 건설, 우하단 미니맵·컨텍스트의 앵커 경계를 유지한다. 하단 명령판, 선택 컨텍스트, 건설 드로어는 후속 기본 접힘이나 드래그 조작이 독립적으로 들어갈 수 있도록 강하게 결합하지 않는다.

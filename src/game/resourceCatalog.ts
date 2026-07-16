@@ -20,7 +20,9 @@ export interface ResourceDef {
   tradeBaseValue: number;
 }
 
-export const FOOD_RESOURCES = ['grain', 'meat', 'fish', 'vegetables'] as const satisfies readonly ResourceId[];
+export const FOOD_RESOURCES = [
+  'grain', 'meat', 'eggs', 'fish', 'vegetables', 'kimchi', 'beans', 'jang', 'curedMeat', 'saltedFish', 'driedFish',
+] as const satisfies readonly ResourceId[];
 export const FUEL_RESOURCES = ['brushwood', 'firewood', 'charcoal'] as const satisfies readonly ResourceId[];
 export const CLOTHING_RESOURCES = ['hideClothes', 'cottonClothes'] as const satisfies readonly ResourceId[];
 export const LUXURY_RESOURCES = ['porcelain', 'brassware', 'lacquerware', 'silk', 'preciousMetal'] as const satisfies readonly ResourceId[];
@@ -29,8 +31,16 @@ export const RESOURCE_DEFS: Record<ResourceId, ResourceDef> = {
   grain: { id: 'grain', name: '곡물', icon: '🌾', category: 'food', foodWeight: 2, tradeBaseValue: 1 },
   rice: { id: 'rice', name: '벼', icon: '🌾', category: 'material', tradeBaseValue: 0.8 },
   meat: { id: 'meat', name: '고기', icon: '🥩', category: 'food', foodWeight: 1, tradeBaseValue: 1.6 },
+  eggs: { id: 'eggs', name: '달걀', icon: '🥚', category: 'food', foodWeight: 1, tradeBaseValue: 1.5 },
   fish: { id: 'fish', name: '생선', icon: '🐟', category: 'food', foodWeight: 1, tradeBaseValue: 1.3 },
+  curedMeat: { id: 'curedMeat', name: '보존육', icon: '🍖', category: 'food', foodWeight: 1, tradeBaseValue: 2.4 },
+  saltedFish: { id: 'saltedFish', name: '자반', icon: '🐟', category: 'food', foodWeight: 1, tradeBaseValue: 2.2 },
+  driedFish: { id: 'driedFish', name: '건어물', icon: '🐠', category: 'food', foodWeight: 1, tradeBaseValue: 2 },
   vegetables: { id: 'vegetables', name: '채소', icon: '🥬', category: 'food', foodWeight: 1, tradeBaseValue: 1.1 },
+  kimchi: { id: 'kimchi', name: '김치', icon: '🥬', category: 'food', foodWeight: 1, tradeBaseValue: 2.6 },
+  beans: { id: 'beans', name: '콩', icon: '🫘', category: 'food', foodWeight: 0.5, tradeBaseValue: 1.2 },
+  jang: { id: 'jang', name: '장', icon: '🥣', category: 'food', foodWeight: 0.5, tradeBaseValue: 3.4 },
+  salt: { id: 'salt', name: '소금', icon: '🧂', category: 'material', tradeBaseValue: 1.8 },
   brushwood: { id: 'brushwood', name: '땔나무', icon: '🪵', category: 'fuel', fuelValue: 0.6, tradeBaseValue: 0.5 },
   firewood: { id: 'firewood', name: '장작', icon: '🔥', category: 'fuel', fuelValue: 1, tradeBaseValue: 0.9 },
   charcoal: { id: 'charcoal', name: '숯', icon: '⚫', category: 'fuel', fuelValue: 1.5, tradeBaseValue: 1.4 },
@@ -38,6 +48,7 @@ export const RESOURCE_DEFS: Record<ResourceId, ResourceDef> = {
   stone: { id: 'stone', name: '돌', icon: '🪨', category: 'material', tradeBaseValue: 0.8 },
   iron: { id: 'iron', name: '철', icon: '⛏️', category: 'material', tradeBaseValue: 2.4 },
   tools: { id: 'tools', name: '도구', icon: '🔨', category: 'material', tradeBaseValue: 4 },
+  onggi: { id: 'onggi', name: '옹기', icon: '🏺', category: 'material', tradeBaseValue: 4 },
   carts: { id: 'carts', name: '수레', icon: '🛒', category: 'material', tradeBaseValue: 16 },
   hide: { id: 'hide', name: '가죽', icon: '🦌', category: 'material', tradeBaseValue: 1.8 },
   hideClothes: { id: 'hideClothes', name: '가죽옷', icon: '🧥', category: 'clothing', clothingValue: 1.1, tradeBaseValue: 3.4 },
@@ -60,9 +71,9 @@ export const RESOURCE_DEFS: Record<ResourceId, ResourceDef> = {
 export const RESOURCE_IDS = Object.keys(RESOURCE_DEFS) as ResourceId[];
 
 export const RESOURCE_ORDER: ResourceId[] = [
-  'grain', 'rice', 'meat', 'fish', 'vegetables',
+  'grain', 'rice', 'meat', 'eggs', 'fish', 'curedMeat', 'saltedFish', 'driedFish', 'vegetables', 'kimchi', 'beans', 'jang',
   'brushwood', 'firewood', 'charcoal',
-  'wood', 'stone', 'iron', 'tools', 'carts', 'hide', 'cotton', 'herbs',
+  'wood', 'stone', 'iron', 'tools', 'onggi', 'carts', 'hide', 'cotton', 'herbs', 'salt',
   'hideClothes', 'cottonClothes',
   'porcelain', 'brassware', 'lacquerware', 'silk', 'preciousMetal',
   'gunpowder', 'spears', 'hornBows', 'muskets', 'reputation', 'defense',

@@ -6,6 +6,7 @@ export interface ResourceBreakdownItem {
   id: StockResourceId;
   label: string;
   amount: number;
+  spoilagePerDay?: number;
   low: boolean;
   starred: boolean;
 }
@@ -18,6 +19,10 @@ interface Props {
   starLimitReached: boolean;
   onTogglePinned: () => void;
   onToggleStarred: (resource: StockResourceId) => void;
+}
+
+function formatSpoilagePerDay(value: number): string {
+  return value < 0.1 ? value.toFixed(2) : value.toFixed(1);
 }
 
 export function ResourceBreakdownPopover({
@@ -54,6 +59,12 @@ export function ResourceBreakdownPopover({
           </span>
           <span className="resource-breakdown-actions">
             <span>{item.amount.toFixed(1)}</span>
+            {item.spoilagePerDay !== undefined && item.spoilagePerDay > 0 && (
+              <small
+                className="muted"
+                title={`${item.label} 예상 일일 부패량`}
+              >부패 중 -{formatSpoilagePerDay(item.spoilagePerDay)}/일</small>
+            )}
             <button
               className={`resource-star-button${item.starred ? ' active' : ''}`}
               type="button"

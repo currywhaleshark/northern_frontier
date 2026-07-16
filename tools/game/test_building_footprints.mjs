@@ -41,6 +41,8 @@ const SINGLE_TILE = [
   'field',
   'paddy',
   'ferry',
+  'dryingRack',
+  'onggiKiln',
   'dock',
   'palisade',
   'earthFort',

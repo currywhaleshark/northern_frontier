@@ -9,7 +9,7 @@ export interface WorkerSlotConfig {
 
 export const AUTO_ASSIGN_BUILDING_TYPES = [
   'field', 'paddy', 'watermill', 'woodShed', 'charcoalKiln', 'smithy',
-  'stable', 'nitreYard', 'ferry', 'tannery', 'weavingHouse',
+  'stable', 'clinic', 'nitreYard', 'ferry', 'tannery', 'weavingHouse', 'smokehouse', 'dryingRack', 'onggiKiln',
 ] as const satisfies readonly BuildingTypeId[];
 export type AutoAssignBuildingType = typeof AUTO_ASSIGN_BUILDING_TYPES[number];
 
@@ -21,10 +21,14 @@ export const SLOTTED_BUILDING_CONFIG: Partial<Record<BuildingTypeId, WorkerSlotC
   charcoalKiln: { job: 'charcoalBurner', slots: 3 },
   smithy: { job: 'smith', slots: 2 },
   stable: { job: 'herder', slots: 2 },
+  clinic: { job: 'physician', slots: 2 },
   nitreYard: { job: 'powderMaker', slots: 2 },
   ferry: { job: 'fisher', slots: 2 },
   tannery: { job: 'tanner', slots: 2 },
   weavingHouse: { job: 'weaver', slots: 2 },
+  smokehouse: { job: 'curer', slots: 2 },
+  dryingRack: { job: 'curer', slots: 2 },
+  onggiKiln: { job: 'potter', slots: 2 },
 };
 
 function isWorkableResident(state: GameState, resident: Resident | undefined): resident is Resident {

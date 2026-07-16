@@ -33,6 +33,7 @@ const crops = await import(pathToFileURL(join(compiledDir, 'crops.mjs')).href);
 const resources = await import(pathToFileURL(join(compiledDir, 'resources.mjs')).href);
 const processing = await import(pathToFileURL(join(compiledDir, 'processing.mjs')).href);
 const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
+const spoilage = await import(pathToFileURL(join(compiledDir, 'spoilage.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 function clearMapToPlain(state) {
@@ -123,8 +124,27 @@ function makePaddyEligibleTile(state, x, y) {
 {
   assert.equal(crops.CROP_DEFS.millet.output, 'grain', 'millet harvests as tribute-ready grain');
   assert.equal(crops.CROP_DEFS.rice.output, 'rice', 'paddy harvests unmilled rice');
+  assert.equal(crops.CROP_DEFS.beans.output, 'beans', 'field beans harvest as edible dry beans');
+  assert.equal(crops.CROP_DEFS.beans.yield, CONFIG.production.fieldGrainYield * 0.5);
+  assert.equal(crops.allowedCropsForBuilding('field').includes('beans'), true);
+  assert.equal(crops.allowedCropsForBuilding('paddy').includes('beans'), false);
   assert.deepEqual(workerSlots.workerSlotConfig('paddy'), { job: 'farmer', slots: 1 });
   assert.deepEqual(workerSlots.workerSlotConfig('watermill'), { job: 'miller', slots: 2 });
+}
+
+{
+  const state = prepareState(2026071608);
+  state.day = 25; // autumn
+  const field = addBuilt(state, 'field', 9, 9, { cropId: 'beans', fieldGrowth: 100, inventory: {} });
+  const farmer = workableResident(state, 0, 'farmer', 9, 9);
+  assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, field.id), null);
+
+  runTicks(state, 1);
+
+  assert.ok((field.inventory.beans ?? 0) > 0, 'autumn bean harvest is stored at the field');
+  state.resources.beans = 10;
+  spoilage.applyDailySpoilage(state);
+  assert.equal(state.resources.beans, 10, 'dry beans do not spoil');
 }
 
 {
