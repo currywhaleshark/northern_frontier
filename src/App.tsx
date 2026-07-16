@@ -26,6 +26,7 @@ import { BattleSimulationSetup } from './components/BattleSimulationSetup';
 import { createBattleSimulation, type BattleSimulationOptions } from './game/battleSimulation';
 import { centerViewportOnSettlement, Minimap } from './components/Minimap';
 import { ProcessingPanel } from './components/ProcessingPanel';
+import { SelectionContextBar } from './components/SelectionContextBar';
 import { TopBar } from './components/TopBar';
 import { TacticalBattleScreen } from './components/TacticalBattleScreen';
 import { TacticalBattleReportModal } from './components/TacticalBattleReportModal';
@@ -84,7 +85,7 @@ export default function App() {
   const [selected, setSelected] = useState<{ x: number; y: number } | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
   const [canLoad, setCanLoad] = useState(hasSave());
-  const [inspTab, setInspTab] = useState<InspectorTab>('tile');
+  const [inspTab, setInspTab] = useState<InspectorTab>('people');
   const [inspResidentId, setInspResidentId] = useState<number | null>(null);
   const [soundOn, setSoundOn] = useState(!isMuted());
   const [uiPrefs, setUiPrefs] = useState<UiPrefs>(() => loadUiPrefs());
@@ -264,7 +265,6 @@ export default function App() {
       ? selectedEntityFromTile(stateRef.current, tile)
       : tile ? { kind: 'tile', x, y } : null);
     setInspResidentId(null);
-    setInspTab('tile');
   };
 
   const handleToggleSound = () => {
@@ -670,6 +670,12 @@ export default function App() {
     setInspResidentId(id);
   };
 
+  const handleClearSelection = useCallback(() => {
+    setSelected(null);
+    setSelectedEntity(null);
+    setInspResidentId(null);
+  }, []);
+
   const handleSetInspectorResidentId = (id: number | null) => {
     setInspResidentId(id);
     if (id != null) {
@@ -705,15 +711,6 @@ export default function App() {
     bump();
   };
 
-  const handleCloseBuildingActions = () => {
-    setSelectedEntity(prev => prev?.kind === 'building' ? null : prev);
-    setSelected(prev => {
-      if (!prev) return prev;
-      const tile = stateRef.current.map[prev.y]?.[prev.x];
-      return tile?.buildingId != null ? null : prev;
-    });
-  };
-
   // 선택 상태를 비우고 새 판을 시작
   const startNewGame = (difficulty: Difficulty) => {
     setSimMode(false);
@@ -724,7 +721,7 @@ export default function App() {
     setInspResidentId(null);
     setWeaponDialogOpen(false);
     setExpeditionMusterRequest(null);
-    setInspTab('tile');
+    setInspTab('people');
     setSpeed(1);
     setScreen('game');
     bump();
@@ -799,15 +796,6 @@ export default function App() {
               onTileClick={handleTileClick}
               onResidentClick={handleResidentClick}
               onContextAction={handleContextAction}
-              onUpgradeHousing={handleUpgradeHousing}
-              onSetSmithyProduct={handleSetSmithyProduct}
-              onSetBuildingCrop={handleSetBuildingCrop}
-              onConvertFieldToPaddy={handleConvertFieldToPaddy}
-              onRequestTrade={handleRequestTrade}
-              onToggleNitre={handleToggleNitre}
-              onAssignNearestWorker={handleAssignNearestWorker}
-              onUnassignWorker={handleUnassignWorker}
-              onCloseBuildingActions={handleCloseBuildingActions}
               onCancelPlace={() => setPlacingType(null)}
             />
           </div>
@@ -815,8 +803,34 @@ export default function App() {
             state={state}
             placingType={placingType}
             setPlacingType={setPlacingType}
+            selectionActive={selectedEntity != null}
+            onClearSelection={handleClearSelection}
             uiPrefs={uiPrefs}
             onUiPrefsChange={setUiPrefs}
+          />
+          <SelectionContextBar
+            state={state}
+            selected={selected}
+            selectedEntity={selectedEntity}
+            onClear={handleClearSelection}
+            onSetResidentJob={handleSetResidentJob}
+            onToggleResidentCart={handleToggleResidentCart}
+            onUpgradeHousing={handleUpgradeHousing}
+            onSetSmithyProduct={handleSetSmithyProduct}
+            onSetBuildingCrop={handleSetBuildingCrop}
+            onConvertFieldToPaddy={handleConvertFieldToPaddy}
+            onRequestTrade={handleRequestTrade}
+            onToggleNitre={handleToggleNitre}
+            onAssignNearestWorker={handleAssignNearestWorker}
+            onUnassignWorker={handleUnassignWorker}
+            onSelectResident={handleResidentClick}
+            onCancelBuildingConstruction={handleCancelBuildingConstruction}
+            onDemolishBuilding={handleDemolishBuilding}
+            onSendSiteGift={handleSendSiteGift}
+            onRequestSitePassage={handleRequestSitePassage}
+            onRequestSiteHunting={handleRequestSiteHunting}
+            onScoutBanditLair={handleScoutBanditLair}
+            onRaidBanditLair={handleRaidBanditLair}
           />
           <DockFrame
             items={[
@@ -857,24 +871,13 @@ export default function App() {
 
           <InspectorPanel
             state={state}
-            selected={selected}
-            onSetResidentJob={handleSetResidentJob}
-            onToggleResidentCart={handleToggleResidentCart}
             onRequestTrade={handleRequestTrade}
             onPetition={handlePetition}
             onSetTributeReserve={handleSetTributeReserve}
             onUseLuxuryGood={handleUseLuxuryGood}
             onToggleNitre={handleToggleNitre}
-            onSetSmithyProduct={handleSetSmithyProduct}
-            onCancelBuildingConstruction={handleCancelBuildingConstruction}
-            onDemolishBuilding={handleDemolishBuilding}
             onOrganizeHunt={handleOrganizeHunt}
             onScoutPredator={handleScoutPredator}
-            onSendSiteGift={handleSendSiteGift}
-            onRequestSitePassage={handleRequestSitePassage}
-            onRequestSiteHunting={handleRequestSiteHunting}
-            onScoutBanditLair={handleScoutBanditLair}
-            onRaidBanditLair={handleRaidBanditLair}
             onOpenWeaponAllocation={() => {
               setSpeed(0);
               setWeaponDialogOpen(true);

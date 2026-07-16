@@ -16,6 +16,7 @@ const TILE = CONFIG.ui.tileSize;
 interface Props {
   state: GameState;
   buildingId: number;
+  embedded?: boolean;
   onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
   onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
@@ -39,6 +40,7 @@ function CostLine({ type }: { type: BuildingTypeId }) {
 export function ActionPopup({
   state,
   buildingId,
+  embedded = false,
   onUpgradeHousing,
   onSetSmithyProduct,
   onSetBuildingCrop,
@@ -72,11 +74,13 @@ export function ActionPopup({
   const hasStandingCrop = isCropBuilding && currentCrop != null && building.fieldGrowth > 0.5;
 
   return (
-    <div className="action-popup" style={style}>
-      <div className="action-popup-head">
-        <span>{def.emoji} {def.name}</span>
-        <button className="icon-btn" type="button" onClick={onClose} aria-label="닫기">x</button>
-      </div>
+    <div className={embedded ? 'selection-building-actions' : 'action-popup'} style={embedded ? undefined : style}>
+      {!embedded && (
+        <div className="action-popup-head">
+          <span>{def.emoji} {def.name}</span>
+          <button className="icon-btn" type="button" onClick={onClose} aria-label="닫기">x</button>
+        </div>
+      )}
 
       {slotConfig && (
         <div className="worker-slot-panel">

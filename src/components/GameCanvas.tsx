@@ -7,8 +7,7 @@ import { getActiveSprites } from '../render/atlas';
 import { findResidentAt, renderScene } from '../render/renderer';
 import { getPointerAction } from '../game/selectionActions';
 import { foreignSiteAt } from '../game/foreignSites';
-import type { BuildingTypeId, CropId, GameState, SelectedEntity, SmithyProductId } from '../game/types';
-import { ActionPopup } from './ActionPopup';
+import type { BuildingTypeId, GameState, SelectedEntity } from '../game/types';
 import { FactionName } from './FactionName';
 
 const TILE = CONFIG.ui.tileSize;
@@ -26,23 +25,12 @@ interface Props {
   onTileClick: (x: number, y: number) => void;
   onResidentClick: (id: number) => void;
   onContextAction: (x: number, y: number) => void;
-  onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
-  onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
-  onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
-  onConvertFieldToPaddy: (buildingId: number) => void;
-  onRequestTrade: (factionName: string) => void;
-  onToggleNitre: () => void;
-  onAssignNearestWorker: (buildingId: number) => void;
-  onUnassignWorker: (residentId: number) => void;
-  onCloseBuildingActions: () => void;
   onCancelPlace: () => void;
 }
 
 export function GameCanvas({
   state, version, placingType, selected, selectedEntity, selectedResidentId, anim,
-  onTileClick, onResidentClick, onContextAction, onUpgradeHousing, onSetSmithyProduct, onRequestTrade,
-  onSetBuildingCrop, onConvertFieldToPaddy, onToggleNitre, onAssignNearestWorker, onUnassignWorker,
-  onCloseBuildingActions, onCancelPlace,
+  onTileClick, onResidentClick, onContextAction, onCancelPlace,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mouse, setMouse] = useState<{ mx: number; my: number } | null>(null);
@@ -200,22 +188,6 @@ export function GameCanvas({
             </>
           ) : null}
         </div>
-      )}
-      {selectedEntity?.kind === 'building' && (
-        <ActionPopup
-          state={state}
-          buildingId={selectedEntity.id}
-          onUpgradeHousing={onUpgradeHousing}
-          onSetSmithyProduct={onSetSmithyProduct}
-          onSetBuildingCrop={onSetBuildingCrop}
-          onConvertFieldToPaddy={onConvertFieldToPaddy}
-          onRequestTrade={onRequestTrade}
-          onToggleNitre={onToggleNitre}
-          onAssignNearestWorker={onAssignNearestWorker}
-          onUnassignWorker={onUnassignWorker}
-          onSelectResident={onResidentClick}
-          onClose={onCloseBuildingActions}
-        />
       )}
     </div>
   );

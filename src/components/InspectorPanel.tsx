@@ -1,55 +1,31 @@
-// 선택한 타일/건물/주민 정보 패널 + 조정(승격·세공·청원) 창구
-import {
-  BUILDING_DEFS, getBuilding, isSmithyProductUnlocked, SMITHY_PRODUCT_DEFS, SMITHY_PRODUCT_ORDER, smithyProductOf,
-} from '../game/buildings';
-import { FACTIONS, isJobUnlocked, JOB_NAMES, JOB_ORDER, RANK_NAMES, RESOURCE_NAMES, TERRAIN_NAMES } from '../game/constants';
-import { cropIdForBuilding, CROP_DEFS } from '../game/crops';
+// 주민 목록·세력·조정·사건 패널. 선택 상세는 SelectionContextBar가 소유한다.
+import { FACTIONS, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES } from '../game/constants';
 import { canRequestTrade, factionTradeUnlockReason } from '../game/events';
-import { haulerCarryCapacity } from '../game/equipment';
 import { canPetition } from '../game/petition';
 import { nextRank, promotionConditions } from '../game/promotion';
 import { suspicionBreakdown } from '../game/suspicion';
 import { getRelation } from '../game/relations';
-import { isExplored } from '../game/exploration';
-import { mineralRemaining } from '../game/minerals';
-import { isWallBuilding } from '../game/walls';
 import { FACTION_ARTWORK } from '../game/tradePresentation';
 import { LUXURY_RESOURCES } from '../game/resourceCatalog';
 import { tributeReserved } from '../game/tributeReserve';
-import { residentHome } from '../game/residents';
 import { predatorHuntChance } from '../game/specialEvents';
 import { availablePredatorScouts, predatorScoutDuration } from '../game/expeditionIntel';
 import { SPECIAL_ITEM_DEFS } from '../game/specialItems';
-import { foreignSiteAt } from '../game/foreignSites';
 import { COMBAT_WEAPON_NAMES } from '../game/weapons';
-import { combatDefaultWeaponName } from '../game/combatCapabilities';
-import type { SiteGiftType } from '../game/siteDiplomacy';
-import type { GameState, JobId, Resident, ResourceId, SmithyProductId, SpecialItemId, WildlifeKind } from '../game/types';
+import type { GameState, ResourceId, SpecialItemId, WildlifeKind } from '../game/types';
 import { FactionName } from './FactionName';
-import { ForeignSitePanel } from './ForeignSitePanel';
 
-export type InspectorTab = 'tile' | 'people' | 'factions' | 'court' | 'incidents';
+export type InspectorTab = 'people' | 'factions' | 'court' | 'incidents';
 
 interface Props {
   state: GameState;
-  selected: { x: number; y: number } | null;
-  onSetResidentJob: (id: number, job: JobId) => void;
-  onToggleResidentCart: (id: number) => void;
   onRequestTrade: (factionName: string) => void;
   onPetition: () => void;
   onSetTributeReserve: (resource: ResourceId, amount: number) => void;
   onUseLuxuryGood: (resource: ResourceId) => void;
   onToggleNitre: () => void;
-  onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
-  onCancelBuildingConstruction: (buildingId: number) => void;
-  onDemolishBuilding: (x: number, y: number) => void;
   onOrganizeHunt: (kind: WildlifeKind) => void;
   onScoutPredator: (kind: 'wolf' | 'tiger', residentId: number) => void;
-  onSendSiteGift: (siteId: number, gift: SiteGiftType) => void;
-  onRequestSitePassage: (siteId: number) => void;
-  onRequestSiteHunting: (siteId: number) => void;
-  onScoutBanditLair: (siteId: number) => void;
-  onRaidBanditLair: (siteId: number) => void;
   onOpenWeaponAllocation: () => void;
   tab: InspectorTab;
   setTab: (t: InspectorTab) => void;
@@ -350,106 +326,13 @@ function CourtTab({ state, onPetition, onToggleNitre, onSetTributeReserve, onUse
   );
 }
 
-function ResidentDetail({ state, r, rank, onSetJob, onToggleCart }: {
-  state: GameState;
-  r: Resident;
-  rank: GameState['rank'];
-  onSetJob: (job: JobId) => void;
-  onToggleCart: () => void;
-}) {
-  const home = r.alive ? residentHome(state, r) : null;
-  return (
-    <table className="insp-table">
-      <tbody>
-        <tr><td>이름</td><td>{r.name} ({r.age}세){r.sick ? ' 🤒' : ''}{state.day < (r.quarantinedUntil ?? 0) ? ' · 격리' : ''}</td></tr>
-        <tr>
-          <td>직업</td>
-          <td>
-            <select
-              value={r.job}
-              disabled={!r.alive}
-              onChange={e => onSetJob(e.target.value as JobId)}
-              style={{ background: '#1e242b', color: '#d8dee5', border: '1px solid #39434e', borderRadius: 4 }}
-            >
-              {JOB_ORDER.filter(j => j === r.job || isJobUnlocked(rank, j)).map(j => (
-                <option key={j} value={j}>{JOB_NAMES[j]}</option>
-              ))}
-            </select>
-          </td>
-        </tr>
-        {r.alive && r.job === 'hauler' && (
-          <tr>
-            <td>운반 장비</td>
-            <td>
-              <span>{r.cartEquipped ? `🛒 수레 · 적재 ${haulerCarryCapacity(r)}` : `지게 · 적재 ${haulerCarryCapacity(r)}`}</span>{' '}
-              <button
-                type="button"
-                className="btn small"
-                disabled={!r.cartEquipped && state.resources.carts < 1}
-                title={r.cartEquipped
-                  ? '짐을 기본 적재량 이하로 내린 뒤 수레를 마을에 반납합니다'
-                  : `마을 수레 ${Math.floor(state.resources.carts)}대`}
-                onClick={onToggleCart}
-              >
-                {r.cartEquipped ? '반납' : '수레 장비'}
-              </button>
-            </td>
-          </tr>
-        )}
-        {r.alive && (r.job === 'militia' || r.job === 'watchman' || r.job === 'hunter') && (
-          <tr>
-            <td>전투 무기</td>
-            <td>{state.weaponAssignments[r.id]
-              ? COMBAT_WEAPON_NAMES[state.weaponAssignments[r.id]!]
-              : `${combatDefaultWeaponName(r.job)} (기본 무장)`}</td>
-          </tr>
-        )}
-        <tr><td>현재 작업</td><td>{r.task}</td></tr>
-        {r.alive && (
-          <tr>
-            <td>주거</td>
-            <td>{home
-              ? `${BUILDING_DEFS[home.type].emoji} ${BUILDING_DEFS[home.type].name} (${home.x}, ${home.y})`
-              : '노숙'}</td>
-          </tr>
-        )}
-        <tr><td>위치</td><td>({r.x}, {r.y})</td></tr>
-        {Object.keys(r.carrying).length > 0 && (
-          <tr>
-            <td>{r.cartEquipped ? '수레 짐' : '지게 짐'}</td>
-            <td>
-              {Object.entries(r.carrying)
-                .map(([res, amt]) => `${RESOURCE_NAMES[res as ResourceId]} ${(amt ?? 0).toFixed(1)}`)
-                .join(', ')}
-            </td>
-          </tr>
-        )}
-        <tr><td>배고픔</td><td><Bar value={r.hunger} color="#d9a441" /></td></tr>
-        <tr><td>체온</td><td><Bar value={r.warmth} color="#7ab3d9" /></td></tr>
-        <tr><td>건강</td><td><Bar value={r.health} color="#6fbf73" /></td></tr>
-        <tr><td>사기</td><td><Bar value={r.morale} color="#b58ad9" /></td></tr>
-        <tr><td>숙련도</td><td>{(((r.skills[r.job] ?? 0)) * 100).toFixed(0)}%</td></tr>
-      </tbody>
-    </table>
-  );
-}
-
 export function InspectorPanel({
-  state, selected, onSetResidentJob, onToggleResidentCart, onRequestTrade, onPetition, onToggleNitre, onSetSmithyProduct,
-  onSetTributeReserve, onUseLuxuryGood, onCancelBuildingConstruction, onDemolishBuilding, onOrganizeHunt, onScoutPredator, tab, setTab, residentId, setResidentId,
-  onSendSiteGift, onRequestSitePassage, onRequestSiteHunting, onScoutBanditLair, onRaidBanditLair,
-  onOpenWeaponAllocation,
+  state, onRequestTrade, onPetition, onToggleNitre, onSetTributeReserve, onUseLuxuryGood,
+  onOrganizeHunt, onScoutPredator, tab, setTab, residentId, setResidentId, onOpenWeaponAllocation,
 }: Props) {
-  const tile = selected ? state.map[selected.y]?.[selected.x] : null;
-  const explored = tile ? isExplored(state, tile.x, tile.y) : false;
-  const building = tile && explored ? getBuilding(state, tile.buildingId) : undefined;
-  const foreignSite = tile && explored ? foreignSiteAt(state, tile.x, tile.y) : null;
-  const resident = state.residents.find(r => r.id === residentId) ?? null;
-
   return (
     <div className="section">
       <div className="panel-title" style={{ display: 'flex', gap: 8 }}>
-        <span style={{ cursor: 'pointer', opacity: tab === 'tile' ? 1 : 0.5 }} onClick={() => setTab('tile')}>정보</span>
         <span style={{ cursor: 'pointer', opacity: tab === 'people' ? 1 : 0.5 }} onClick={() => setTab('people')}>주민</span>
         <span style={{ cursor: 'pointer', opacity: tab === 'factions' ? 1 : 0.5 }} onClick={() => setTab('factions')}>세력</span>
         <span style={{ cursor: 'pointer', opacity: tab === 'court' ? 1 : 0.5 }} onClick={() => setTab('court')}>조정</span>
@@ -468,176 +351,6 @@ export function InspectorPanel({
           onSetTributeReserve={onSetTributeReserve}
           onUseLuxuryGood={onUseLuxuryGood}
         />
-      )}
-
-      {tab === 'tile' && (
-        foreignSite ? (
-          <ForeignSitePanel
-            state={state}
-            site={foreignSite}
-            onSendGift={onSendSiteGift}
-            onRequestPassage={onRequestSitePassage}
-            onRequestHunting={onRequestSiteHunting}
-            onScoutLair={onScoutBanditLair}
-            onRaidLair={onRaidBanditLair}
-          />
-        ) : !tile ? <div className="muted small">지도를 클릭해 타일을 선택하세요.</div> : (
-          <table className="insp-table">
-            <tbody>
-              <tr><td>위치</td><td>({tile.x}, {tile.y})</td></tr>
-              {!explored ? (
-                <>
-                  <tr><td>상태</td><td>미답사</td></tr>
-                  <tr><td colSpan={2} className="muted small">주민이 가까이 가면 지형과 자원을 확인할 수 있습니다.</td></tr>
-                </>
-              ) : (
-                <>
-              <tr><td>지형</td><td>{TERRAIN_NAMES[tile.terrain]}{tile.terrain === 'rock' && tile.hasIron ? ' (철맥)' : ''}</td></tr>
-              {(tile.terrain === 'rock' || building?.type === 'mine') && (
-                <tr>
-                  <td>광상</td>
-                  <td>{mineralRemaining(tile) > 0
-                    ? (tile.hasIron ? '철 ' : '석재 ') + mineralRemaining(tile).toFixed(1) + ' 남음'
-                    : '고갈'}</td>
-                </tr>
-              )}
-              {tile.terrain === 'forest' && state.habitats.some(h =>
-                h.active && (h.x - tile.x) ** 2 + (h.y - tile.y) ** 2 <= h.radius ** 2) && (
-                <tr><td>서식지</td><td>🐾 짐승 서식지 범위 (사냥 가능)</td></tr>
-              )}
-              {building && (() => {
-                const def = BUILDING_DEFS[building.type];
-                const occupants = state.residents.filter(candidate =>
-                  candidate.alive && candidate.homeBuildingId === building.id);
-                return (
-                  <>
-                    <tr><td>건물</td><td>{def.emoji} {def.name}</td></tr>
-                    <tr><td>상태</td><td>{building.built
-                      ? '완공'
-                      : `${building.repairing ? '수리 중' : '건설 중'} ${Math.floor((building.progress / Math.max(1, def.buildDays)) * 100)}%`}</td></tr>
-                    {def.capacity > 0 && (
-                      <tr><td>입주</td><td>{occupants.length}/{building.built ? def.capacity : 0}명</td></tr>
-                    )}
-                    {(building.type === 'field' || building.type === 'paddy') && building.built && (
-                      <>
-                        <tr>
-                          <td>작물</td>
-                          <td>
-                            {(() => {
-                              const cropId = cropIdForBuilding(building);
-                              const queuedCrop = building.queuedCropId;
-                              return cropId
-                                ? `${CROP_DEFS[cropId].name}${queuedCrop ? ` -> ${CROP_DEFS[queuedCrop].name}` : ''}`
-                                : queuedCrop ? `${CROP_DEFS[queuedCrop].name} 예약` : '미선택';
-                            })()}
-                          </td>
-                        </tr>
-                        <tr><td>성장</td><td><Bar value={building.fieldGrowth} color="#6fbf73" /></td></tr>
-                      </>
-                    )}
-                    {building.type === 'smithy' && building.built && (
-                      <tr>
-                        <td>생산</td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                            {SMITHY_PRODUCT_ORDER.map(product => {
-                              const def = SMITHY_PRODUCT_DEFS[product];
-                              const active = smithyProductOf(building) === product;
-                              const unlocked = isSmithyProductUnlocked(state.rank, product);
-                              const recipe = Object.entries(def.inputPerUnit)
-                                .map(([res, amt]) => `${RESOURCE_NAMES[res as ResourceId]} ${amt}`)
-                                .join(' + ');
-                              return (
-                                <button
-                                  key={product}
-                                  className="btn small"
-                                  disabled={!unlocked}
-                                  title={unlocked ? recipe : `${RANK_NAMES[def.minRank ?? 'bo']} 승격 후 생산`}
-                                  style={active ? { borderColor: '#d9a441', color: '#d9a441', fontWeight: 700 } : undefined}
-                                  onClick={() => onSetSmithyProduct(building.id, product)}
-                                >
-                                  {def.name}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                    {(building.type === 'market' || building.type === 'dock') && building.built && (
-                      <tr>
-                        <td>교역</td>
-                        <td>
-                          {FACTIONS.filter(f => f.exports.length > 0 && !factionTradeUnlockReason(state, f.name)).map(f => {
-                            const reason = canRequestTrade(state, f.name);
-                            return (
-                              <button
-                                key={f.name}
-                                className="btn small"
-                                disabled={!!reason}
-                                title={reason ?? `${f.name}에 먼저 거래를 청합니다`}
-                                style={{ margin: '2px 4px 2px 0' }}
-                                onClick={() => onRequestTrade(f.name)}
-                              >
-                                <FactionName name={f.name} />
-                              </button>
-                            );
-                          })}
-                        </td>
-                      </tr>
-                    )}
-                    {building.inventory && Object.values(building.inventory).some(amount => (amount ?? 0) > 0.05) && (
-                      <tr>
-                        <td>현장 재고</td>
-                        <td>
-                          {Object.entries(building.inventory)
-                            .filter((entry): entry is [string, number] => (entry[1] ?? 0) > 0.05)
-                            .map(([resource, amount]) => `${RESOURCE_NAMES[resource as ResourceId]} ${amount.toFixed(1)}`)
-                            .join(', ')}
-                        </td>
-                      </tr>
-                    )}
-                    {!building.built && !building.repairing && (
-                      <tr>
-                        <td>건설</td>
-                        <td>
-                          <button
-                            className="btn small"
-                            type="button"
-                            onClick={() => {
-                              if (window.confirm(`${def.name} 건설을 취소할까요? 투입 자재는 모두 반환됩니다.`)) {
-                                onCancelBuildingConstruction(building.id);
-                              }
-                            }}
-                          >
-                            건설 취소
-                          </button>
-                        </td>
-                      </tr>
-                    )}
-                    {isWallBuilding(building.type) && (
-                      <tr>
-                        <td>정비</td>
-                        <td>
-                          <button
-                            className="btn small"
-                            type="button"
-                            onClick={() => onDemolishBuilding(tile.x, tile.y)}
-                          >
-                            철거
-                          </button>
-                        </td>
-                      </tr>
-                    )}
-                    <tr><td colSpan={2} className="muted small">{def.desc}</td></tr>
-                  </>
-                );
-              })()}
-                </>
-              )}
-            </tbody>
-          </table>
-        )
       )}
 
       {tab === 'factions' && (
@@ -711,40 +424,25 @@ export function InspectorPanel({
 
       {tab === 'people' && (
         <div>
-          {resident ? (
-            <>
-              <button className="btn small" style={{ marginBottom: 6 }} onClick={() => setResidentId(null)}>← 목록으로</button>
-              <ResidentDetail
-                state={state}
-                r={resident}
-                rank={state.rank}
-                onSetJob={job => onSetResidentJob(resident.id, job)}
-                onToggleCart={() => onToggleResidentCart(resident.id)}
-              />
-            </>
-          ) : (
-            <>
-              <button type="button" className="btn small weapon-allocation-open" onClick={onOpenWeaponAllocation}>
-                ⚔ 병기고 무기 배분
-              </button>
-              <div style={{ maxHeight: 260, overflowY: 'auto' }}>
-                {state.residents.map(r => (
-                  <div
-                    key={r.id}
-                    className={`resident-row${r.alive ? '' : ' dead'}`}
-                    onClick={() => r.alive && setResidentId(r.id)}
-                  >
-                    <span>{r.name}{r.sick ? ' 🤒' : ''}{state.day < (r.quarantinedUntil ?? 0) ? ' · 격리' : ''}</span>
-                    <span className="muted">{r.alive
-                      ? `${r.cartEquipped ? '🛒 ' : ''}${JOB_NAMES[r.job]}${state.weaponAssignments[r.id]
-                        ? ` · ${COMBAT_WEAPON_NAMES[state.weaponAssignments[r.id]!]}`
-                        : ''}`
-                      : '사망'}</span>
-                  </div>
-                ))}
+          <button type="button" className="btn small weapon-allocation-open" onClick={onOpenWeaponAllocation}>
+            ⚔ 병기고 무기 배분
+          </button>
+          <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+            {state.residents.map(resident => (
+              <div
+                key={resident.id}
+                className={`resident-row${resident.alive ? '' : ' dead'}${resident.id === residentId ? ' selected' : ''}`}
+                onClick={() => resident.alive && setResidentId(resident.id)}
+              >
+                <span>{resident.name}{resident.sick ? ' 🤒' : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</span>
+                <span className="muted">{resident.alive
+                  ? `${resident.cartEquipped ? '🛒 ' : ''}${JOB_NAMES[resident.job]}${state.weaponAssignments[resident.id]
+                    ? ` · ${COMBAT_WEAPON_NAMES[state.weaponAssignments[resident.id]!]}`
+                    : ''}`
+                  : '사망'}</span>
               </div>
-            </>
-          )}
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -1,0 +1,338 @@
+import { BUILDING_DEFS, getBuilding } from '../game/buildings';
+import { isJobUnlocked, JOB_NAMES, JOB_ORDER, RESOURCE_NAMES, TERRAIN_NAMES } from '../game/constants';
+import { cropIdForBuilding, CROP_DEFS } from '../game/crops';
+import { haulerCarryCapacity } from '../game/equipment';
+import { isExplored } from '../game/exploration';
+import { foreignSiteAt } from '../game/foreignSites';
+import { mineralRemaining } from '../game/minerals';
+import { residentHome } from '../game/residents';
+import type { SiteGiftType } from '../game/siteDiplomacy';
+import { isWallBuilding } from '../game/walls';
+import { combatDefaultWeaponName } from '../game/combatCapabilities';
+import { COMBAT_WEAPON_NAMES } from '../game/weapons';
+import type {
+  BuildingTypeId,
+  CropId,
+  GameState,
+  JobId,
+  Resident,
+  ResourceId,
+  SelectedEntity,
+  SmithyProductId,
+} from '../game/types';
+import { ActionPopup } from './ActionPopup';
+import { ForeignSitePanel } from './ForeignSitePanel';
+
+interface Props {
+  state: GameState;
+  selected: { x: number; y: number } | null;
+  selectedEntity: SelectedEntity | null;
+  onClear: () => void;
+  onSetResidentJob: (id: number, job: JobId) => void;
+  onToggleResidentCart: (id: number) => void;
+  onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
+  onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
+  onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
+  onConvertFieldToPaddy: (buildingId: number) => void;
+  onRequestTrade: (factionName: string) => void;
+  onToggleNitre: () => void;
+  onAssignNearestWorker: (buildingId: number) => void;
+  onUnassignWorker: (residentId: number) => void;
+  onSelectResident: (residentId: number) => void;
+  onCancelBuildingConstruction: (buildingId: number) => void;
+  onDemolishBuilding: (x: number, y: number) => void;
+  onSendSiteGift: (siteId: number, gift: SiteGiftType) => void;
+  onRequestSitePassage: (siteId: number) => void;
+  onRequestSiteHunting: (siteId: number) => void;
+  onScoutBanditLair: (siteId: number) => void;
+  onRaidBanditLair: (siteId: number) => void;
+}
+
+function Bar({ value, color }: { value: number; color: string }) {
+  return (
+    <div className="bar-outer">
+      <div className="bar-inner" style={{ width: `${Math.max(0, Math.min(100, value))}%`, background: color }} />
+    </div>
+  );
+}
+
+function ResidentContext({ state, resident, onSetJob, onToggleCart }: {
+  state: GameState;
+  resident: Resident;
+  onSetJob: (job: JobId) => void;
+  onToggleCart: () => void;
+}) {
+  const home = resident.alive ? residentHome(state, resident) : null;
+  return (
+    <table className="insp-table">
+      <tbody>
+        <tr><td>이름</td><td>{resident.name} ({resident.age}세){resident.sick ? ' 🤒' : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</td></tr>
+        <tr>
+          <td>직업</td>
+          <td>
+            <select
+              value={resident.job}
+              disabled={!resident.alive}
+              onChange={event => onSetJob(event.target.value as JobId)}
+            >
+              {JOB_ORDER.filter(job => job === resident.job || isJobUnlocked(state.rank, job)).map(job => (
+                <option key={job} value={job}>{JOB_NAMES[job]}</option>
+              ))}
+            </select>
+          </td>
+        </tr>
+        {resident.alive && resident.job === 'hauler' && (
+          <tr>
+            <td>운반 장비</td>
+            <td>
+              <span>{resident.cartEquipped ? `🛒 수레 · 적재 ${haulerCarryCapacity(resident)}` : `지게 · 적재 ${haulerCarryCapacity(resident)}`}</span>{' '}
+              <button
+                type="button"
+                className="btn small"
+                disabled={!resident.cartEquipped && state.resources.carts < 1}
+                title={resident.cartEquipped
+                  ? '짐을 기본 적재량 이하로 내린 뒤 수레를 마을에 반납합니다'
+                  : `마을 수레 ${Math.floor(state.resources.carts)}대`}
+                onClick={onToggleCart}
+              >
+                {resident.cartEquipped ? '반납' : '수레 장비'}
+              </button>
+            </td>
+          </tr>
+        )}
+        {resident.alive && (resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter') && (
+          <tr>
+            <td>전투 무기</td>
+            <td>{state.weaponAssignments[resident.id]
+              ? COMBAT_WEAPON_NAMES[state.weaponAssignments[resident.id]!]
+              : `${combatDefaultWeaponName(resident.job)} (기본 무장)`}</td>
+          </tr>
+        )}
+        <tr><td>현재 작업</td><td>{resident.task}</td></tr>
+        {resident.alive && (
+          <tr>
+            <td>주거</td>
+            <td>{home
+              ? `${BUILDING_DEFS[home.type].emoji} ${BUILDING_DEFS[home.type].name} (${home.x}, ${home.y})`
+              : '노숙'}</td>
+          </tr>
+        )}
+        <tr><td>위치</td><td>({resident.x}, {resident.y})</td></tr>
+        {Object.keys(resident.carrying).length > 0 && (
+          <tr>
+            <td>{resident.cartEquipped ? '수레 짐' : '지게 짐'}</td>
+            <td>
+              {Object.entries(resident.carrying)
+                .map(([resource, amount]) => `${RESOURCE_NAMES[resource as ResourceId]} ${(amount ?? 0).toFixed(1)}`)
+                .join(', ')}
+            </td>
+          </tr>
+        )}
+        <tr><td>배고픔</td><td><Bar value={resident.hunger} color="#d9a441" /></td></tr>
+        <tr><td>체온</td><td><Bar value={resident.warmth} color="#7ab3d9" /></td></tr>
+        <tr><td>건강</td><td><Bar value={resident.health} color="#6fbf73" /></td></tr>
+        <tr><td>사기</td><td><Bar value={resident.morale} color="#b58ad9" /></td></tr>
+        <tr><td>숙련도</td><td>{((resident.skills[resident.job] ?? 0) * 100).toFixed(0)}%</td></tr>
+      </tbody>
+    </table>
+  );
+}
+
+export function SelectionContextBar({
+  state,
+  selected,
+  selectedEntity,
+  onClear,
+  onSetResidentJob,
+  onToggleResidentCart,
+  onUpgradeHousing,
+  onSetSmithyProduct,
+  onSetBuildingCrop,
+  onConvertFieldToPaddy,
+  onRequestTrade,
+  onToggleNitre,
+  onAssignNearestWorker,
+  onUnassignWorker,
+  onSelectResident,
+  onCancelBuildingConstruction,
+  onDemolishBuilding,
+  onSendSiteGift,
+  onRequestSitePassage,
+  onRequestSiteHunting,
+  onScoutBanditLair,
+  onRaidBanditLair,
+}: Props) {
+  if (!selectedEntity) return null;
+
+  const tile = selected ? state.map[selected.y]?.[selected.x] : null;
+  const explored = tile ? isExplored(state, tile.x, tile.y) : false;
+  const building = selectedEntity.kind === 'building' ? getBuilding(state, selectedEntity.id) : undefined;
+  const foreignSite = tile && explored && selectedEntity.kind === 'tile'
+    ? foreignSiteAt(state, tile.x, tile.y)
+    : null;
+  const resident = selectedEntity.kind === 'resident'
+    ? state.residents.find(candidate => candidate.id === selectedEntity.id) ?? null
+    : null;
+
+  if (resident) {
+    const jobName = JOB_NAMES[resident.job];
+    const summary = resident.task === jobName ? jobName : `${jobName} · ${resident.task}`;
+    return (
+      <section className="selection-context-bar" aria-label={`${resident.name} 선택 정보`}>
+        <header className="selection-context-head">
+          <div><strong>{resident.name}</strong><span>{summary}</span></div>
+          <button type="button" aria-label="선택 해제" title="선택 해제" onClick={onClear}>×</button>
+        </header>
+        <div className="selection-context-body">
+          <ResidentContext
+            state={state}
+            resident={resident}
+            onSetJob={job => onSetResidentJob(resident.id, job)}
+            onToggleCart={() => onToggleResidentCart(resident.id)}
+          />
+        </div>
+      </section>
+    );
+  }
+
+  if (!tile) return null;
+
+  const title = foreignSite
+    ? foreignSite.name
+    : building
+      ? `${BUILDING_DEFS[building.type].emoji} ${BUILDING_DEFS[building.type].name}`
+      : explored ? TERRAIN_NAMES[tile.terrain] : '미답사 지역';
+
+  return (
+    <section className="selection-context-bar" aria-label={`${title} 선택 정보`}>
+      <header className="selection-context-head">
+        <div><strong>{title}</strong><span>({tile.x}, {tile.y})</span></div>
+        <button type="button" aria-label="선택 해제" title="선택 해제" onClick={onClear}>×</button>
+      </header>
+      <div className="selection-context-body">
+        {foreignSite ? (
+          <ForeignSitePanel
+            state={state}
+            site={foreignSite}
+            onSendGift={onSendSiteGift}
+            onRequestPassage={onRequestSitePassage}
+            onRequestHunting={onRequestSiteHunting}
+            onScoutLair={onScoutBanditLair}
+            onRaidLair={onRaidBanditLair}
+          />
+        ) : (
+          <div className="selection-context-layout">
+            <div className="selection-context-info">
+              <table className="insp-table">
+                <tbody>
+                  <tr><td>위치</td><td>({tile.x}, {tile.y})</td></tr>
+                  {!explored ? (
+                    <>
+                      <tr><td>상태</td><td>미답사</td></tr>
+                      <tr><td colSpan={2} className="muted small">주민이 가까이 가면 지형과 자원을 확인할 수 있습니다.</td></tr>
+                    </>
+                  ) : (
+                    <>
+                      <tr><td>지형</td><td>{TERRAIN_NAMES[tile.terrain]}{tile.terrain === 'rock' && tile.hasIron ? ' (철맥)' : ''}</td></tr>
+                      {(tile.terrain === 'rock' || building?.type === 'mine') && (
+                        <tr>
+                          <td>광상</td>
+                          <td>{mineralRemaining(tile) > 0
+                            ? `${tile.hasIron ? '철 ' : '석재 '}${mineralRemaining(tile).toFixed(1)} 남음`
+                            : '고갈'}</td>
+                        </tr>
+                      )}
+                      {tile.terrain === 'forest' && state.habitats.some(habitat =>
+                        habitat.active && (habitat.x - tile.x) ** 2 + (habitat.y - tile.y) ** 2 <= habitat.radius ** 2) && (
+                        <tr><td>서식지</td><td>🐾 짐승 서식지 범위 (사냥 가능)</td></tr>
+                      )}
+                      {building && (() => {
+                        const def = BUILDING_DEFS[building.type];
+                        const occupants = state.residents.filter(candidate =>
+                          candidate.alive && candidate.homeBuildingId === building.id);
+                        const cropId = building.type === 'field' || building.type === 'paddy'
+                          ? cropIdForBuilding(building)
+                          : null;
+                        return (
+                          <>
+                            <tr><td>건물</td><td>{def.emoji} {def.name}</td></tr>
+                            <tr><td>상태</td><td>{building.built
+                              ? '완공'
+                              : `${building.repairing ? '수리 중' : '건설 중'} ${Math.floor((building.progress / Math.max(1, def.buildDays)) * 100)}%`}</td></tr>
+                            {def.capacity > 0 && (
+                              <tr><td>입주</td><td>{occupants.length}/{building.built ? def.capacity : 0}명</td></tr>
+                            )}
+                            {(building.type === 'field' || building.type === 'paddy') && building.built && (
+                              <>
+                                <tr>
+                                  <td>작물</td>
+                                  <td>{cropId
+                                    ? `${CROP_DEFS[cropId].name}${building.queuedCropId ? ` → ${CROP_DEFS[building.queuedCropId].name}` : ''}`
+                                    : building.queuedCropId ? `${CROP_DEFS[building.queuedCropId].name} 예약` : '미선택'}</td>
+                                </tr>
+                                <tr><td>성장</td><td><Bar value={building.fieldGrowth} color="#6fbf73" /></td></tr>
+                              </>
+                            )}
+                            {building.inventory && Object.values(building.inventory).some(amount => (amount ?? 0) > 0.05) && (
+                              <tr>
+                                <td>현장 재고</td>
+                                <td>{Object.entries(building.inventory)
+                                  .filter((entry): entry is [string, number] => (entry[1] ?? 0) > 0.05)
+                                  .map(([resource, amount]) => `${RESOURCE_NAMES[resource as ResourceId]} ${amount.toFixed(1)}`)
+                                  .join(', ')}</td>
+                              </tr>
+                            )}
+                            {!building.built && !building.repairing && (
+                              <tr>
+                                <td>건설</td>
+                                <td>
+                                  <button
+                                    className="btn small"
+                                    type="button"
+                                    onClick={() => {
+                                      if (window.confirm(`${def.name} 건설을 취소할까요? 투입 자재는 모두 반환됩니다.`)) {
+                                        onCancelBuildingConstruction(building.id);
+                                      }
+                                    }}
+                                  >건설 취소</button>
+                                </td>
+                              </tr>
+                            )}
+                            {isWallBuilding(building.type) && (
+                              <tr>
+                                <td>정비</td>
+                                <td><button className="btn small" type="button" onClick={() => onDemolishBuilding(tile.x, tile.y)}>철거</button></td>
+                              </tr>
+                            )}
+                            <tr><td colSpan={2} className="muted small">{def.desc}</td></tr>
+                          </>
+                        );
+                      })()}
+                    </>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {building && (
+              <ActionPopup
+                embedded
+                state={state}
+                buildingId={building.id}
+                onUpgradeHousing={onUpgradeHousing}
+                onSetSmithyProduct={onSetSmithyProduct}
+                onSetBuildingCrop={onSetBuildingCrop}
+                onConvertFieldToPaddy={onConvertFieldToPaddy}
+                onRequestTrade={onRequestTrade}
+                onToggleNitre={onToggleNitre}
+                onAssignNearestWorker={onAssignNearestWorker}
+                onUnassignWorker={onUnassignWorker}
+                onSelectResident={onSelectResident}
+                onClose={onClear}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}

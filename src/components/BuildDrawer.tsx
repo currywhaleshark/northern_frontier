@@ -22,6 +22,8 @@ interface Props {
   state: GameState;
   placingType: BuildingTypeId | null;
   setPlacingType: (type: BuildingTypeId | null) => void;
+  selectionActive: boolean;
+  onClearSelection: () => void;
   uiPrefs: UiPrefs;
   onUiPrefsChange: (update: (current: UiPrefs) => UiPrefs) => void;
 }
@@ -84,7 +86,9 @@ function BuildingThumb({ type, state }: { type: BuildableBuildingTypeId; state: 
   return <canvas ref={ref} className="build-drawer-thumb" width={32} height={44} aria-hidden="true" />;
 }
 
-export function BuildDrawer({ state, placingType, setPlacingType, uiPrefs, onUiPrefsChange }: Props) {
+export function BuildDrawer({
+  state, placingType, setPlacingType, selectionActive, onClearSelection, uiPrefs, onUiPrefsChange,
+}: Props) {
   const [drawerState, setDrawerState] = useState(closedBuildDrawerState);
   const [hoveredTooltipType, setHoveredTooltipType] = useState<BuildableBuildingTypeId | null>(null);
   const [focusedTooltipType, setFocusedTooltipType] = useState<BuildableBuildingTypeId | null>(null);
@@ -121,6 +125,14 @@ export function BuildDrawer({ state, placingType, setPlacingType, uiPrefs, onUiP
   }, [openCategory]);
 
   useEffect(() => {
+    if (selectionActive) {
+      setDrawerState(current => current.openCategory == null
+        ? current
+        : { ...current, openCategory: null });
+    }
+  }, [selectionActive]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() !== 'b' || event.altKey || event.ctrlKey || event.metaKey || isTextInput(event.target)) {
         return;
@@ -130,14 +142,16 @@ export function BuildDrawer({ state, placingType, setPlacingType, uiPrefs, onUiP
         setPlacingType(null);
         return;
       }
+      if (selectionActive) onClearSelection();
       setDrawerState(current => toggleBuildDrawerCategory(current, uiPrefs.buildDrawerLastCategory));
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [placingType, setPlacingType, uiPrefs.buildDrawerLastCategory]);
+  }, [placingType, selectionActive, setPlacingType, onClearSelection, uiPrefs.buildDrawerLastCategory]);
 
   const toggleCategory = (category: BuildCategoryId) => {
     rememberCategory(category);
+    if (selectionActive) onClearSelection();
     if (placingType) {
       setDrawerState({ openCategory: category, restoreCategory: category });
       setPlacingType(null);
@@ -149,6 +163,7 @@ export function BuildDrawer({ state, placingType, setPlacingType, uiPrefs, onUiP
   const startPlacement = (type: BuildableBuildingTypeId) => {
     const category = buildCategoryFor(type);
     rememberCategory(category);
+    onClearSelection();
     setDrawerState(current => beginBuildPlacement(current, category));
     setPlacingType(type);
   };

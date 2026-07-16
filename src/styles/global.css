@@ -339,6 +339,106 @@ html, body, #root {
   font-size: 11px;
 }
 
+/* ── 하단 선택 컨텍스트 ── */
+.selection-context-bar {
+  position: absolute;
+  z-index: 36;
+  right: 10px;
+  bottom: 58px;
+  left: 10px;
+  max-height: min(210px, 36vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(217, 164, 65, 0.58);
+  border-radius: 8px;
+  background: rgba(27, 33, 39, 0.98);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.48);
+  transition: right 120ms ease;
+}
+.canvas-stage:has(.dock-frame.has-open-windows) .selection-context-bar { right: 326px; }
+.selection-context-head {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 5px 4px 9px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.selection-context-head > div {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.selection-context-head strong {
+  overflow: hidden;
+  color: var(--accent);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selection-context-head span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selection-context-head button {
+  width: 25px;
+  height: 24px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel2);
+  color: var(--muted);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+.selection-context-head button:hover,
+.selection-context-head button:focus-visible { border-color: var(--accent); color: var(--text); outline: none; }
+.selection-context-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 7px 8px;
+  scrollbar-width: thin;
+}
+.selection-context-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: 8px;
+  align-items: start;
+}
+.selection-context-info,
+.selection-building-actions { min-width: 0; }
+.selection-building-actions {
+  display: grid;
+  gap: 5px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(20, 24, 28, 0.4);
+}
+.selection-building-actions .worker-slot-panel { margin-bottom: 0; }
+.selection-context-bar .insp-table td:first-child { width: 96px; }
+.selection-context-bar select {
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+@media (max-width: 900px) {
+  .canvas-stage:has(.dock-frame.has-open-windows) .selection-context-bar { right: 296px; }
+  .selection-context-bar { max-height: min(190px, 34vh); }
+}
+
 /* ── 미니맵 ── */
 .minimap-overlay {
   position: absolute;
