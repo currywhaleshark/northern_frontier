@@ -22,7 +22,6 @@ interface Props {
   state: GameState;
   placingType: BuildingTypeId | null;
   setPlacingType: (type: BuildingTypeId | null) => void;
-  selectionActive: boolean;
   onClearSelection: () => void;
   uiPrefs: UiPrefs;
   onUiPrefsChange: (update: (current: UiPrefs) => UiPrefs) => void;
@@ -87,7 +86,7 @@ function BuildingThumb({ type, state }: { type: BuildableBuildingTypeId; state: 
 }
 
 export function BuildDrawer({
-  state, placingType, setPlacingType, selectionActive, onClearSelection, uiPrefs, onUiPrefsChange,
+  state, placingType, setPlacingType, onClearSelection, uiPrefs, onUiPrefsChange,
 }: Props) {
   const [drawerState, setDrawerState] = useState(closedBuildDrawerState);
   const [hoveredTooltipType, setHoveredTooltipType] = useState<BuildableBuildingTypeId | null>(null);
@@ -125,14 +124,6 @@ export function BuildDrawer({
   }, [openCategory]);
 
   useEffect(() => {
-    if (selectionActive) {
-      setDrawerState(current => current.openCategory == null
-        ? current
-        : { ...current, openCategory: null });
-    }
-  }, [selectionActive]);
-
-  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() !== 'b' || event.altKey || event.ctrlKey || event.metaKey || isTextInput(event.target)) {
         return;
@@ -142,16 +133,14 @@ export function BuildDrawer({
         setPlacingType(null);
         return;
       }
-      if (selectionActive) onClearSelection();
       setDrawerState(current => toggleBuildDrawerCategory(current, uiPrefs.buildDrawerLastCategory));
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [placingType, selectionActive, setPlacingType, onClearSelection, uiPrefs.buildDrawerLastCategory]);
+  }, [placingType, setPlacingType, uiPrefs.buildDrawerLastCategory]);
 
   const toggleCategory = (category: BuildCategoryId) => {
     rememberCategory(category);
-    if (selectionActive) onClearSelection();
     if (placingType) {
       setDrawerState({ openCategory: category, restoreCategory: category });
       setPlacingType(null);

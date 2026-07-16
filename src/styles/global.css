@@ -641,19 +641,15 @@ html, body, #root {
 .build-drawer-shell {
   position: absolute;
   z-index: 35;
-  right: 10px;
   bottom: 10px;
   left: 10px;
+  width: clamp(250px, 20vw, 360px);
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 6px;
   pointer-events: none;
-  transition: right 120ms ease;
-}
-.canvas-stage:has(.dock-frame.has-open-windows) .build-drawer-shell { right: 326px; }
-@media (max-width: 900px) {
-  .canvas-stage:has(.dock-frame.has-open-windows) .build-drawer-shell { right: 296px; }
 }
 .build-drawer-shell > * { pointer-events: auto; }
 .build-placement-status {
@@ -686,10 +682,8 @@ html, body, #root {
 .build-drawer-head button:hover,
 .build-drawer-head button:focus-visible { border-color: var(--accent); outline: none; }
 .build-drawer-panel {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
-  width: clamp(250px, 20vw, 360px);
+  position: relative;
+  width: 100%;
   box-sizing: border-box;
   padding: 6px;
   overflow: visible;
@@ -782,12 +776,13 @@ html, body, #root {
   overflow-wrap: anywhere;
 }
 .build-category-bar {
-  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
   display: flex;
   align-items: stretch;
   gap: 3px;
   padding: 4px;
-  overflow-x: auto;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: rgba(30, 36, 43, 0.97);
@@ -795,11 +790,14 @@ html, body, #root {
   scrollbar-width: thin;
 }
 .build-category-bar-label {
+  flex: 0 0 26px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  padding: 0 7px;
+  padding: 0 3px;
   color: var(--accent);
+  font-size: 0;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -816,13 +814,15 @@ html, body, #root {
 }
 .build-category-bar button {
   position: relative;
-  min-width: 64px;
-  height: 38px;
+  min-width: 0;
+  height: 42px;
+  flex: 1 1 0;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 0 8px;
+  gap: 1px;
+  padding: 2px;
   border: 1px solid transparent;
   border-radius: 5px;
   background: transparent;
@@ -832,6 +832,7 @@ html, body, #root {
   white-space: nowrap;
 }
 .build-category-bar button > span:first-child { font-size: 17px; }
+.build-category-bar button > span:last-child { font-size: 9px; line-height: 1; }
 .build-category-bar button:hover,
 .build-category-bar button:focus-visible { border-color: var(--border); color: var(--text); outline: none; }
 .build-category-bar button.active { border-color: var(--accent); background: #383323; color: var(--text); }

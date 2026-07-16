@@ -21,16 +21,16 @@ assert.doesNotMatch(canvasSource, /ActionPopup/,
 assert.doesNotMatch(inspectorSource, /tab === 'tile'|ResidentDetail/,
   'the right inspector must no longer duplicate tile or resident selection details');
 
-assert.match(drawerSource, /if \(selectionActive\)[\s\S]*openCategory: null/,
-  'new selections must collapse an expanded build drawer');
+assert.doesNotMatch(drawerSource, /selectionActive/,
+  'selection state must not close or disable the independently positioned build drawer');
 assert.match(drawerSource, /const startPlacement[\s\S]*onClearSelection\(\)[\s\S]*setPlacingType\(type\)/,
   'starting construction placement must clear the current selection first');
 assert.match(cssSource, /\.selection-context-bar\s*\{[\s\S]*bottom:\s*58px;/,
   'the selection context must occupy the lower canvas above the build category bar');
 assert.match(cssSource, /\.selection-context-bar\s*\{[\s\S]*right:\s*10px;[\s\S]*width:\s*clamp\(250px, 20vw, 360px\);/,
   'the selection context must remain a compact right-aligned panel');
-assert.match(cssSource, /\.build-drawer-panel\s*\{[\s\S]*left:\s*0;[\s\S]*width:\s*clamp\(250px, 20vw, 360px\);/,
-  'the expanded build drawer must remain a compact left-aligned panel');
+assert.match(cssSource, /\.build-drawer-shell\s*\{[\s\S]*left:\s*10px;[\s\S]*width:\s*clamp\(250px, 20vw, 360px\);[\s\S]*align-items:\s*stretch;/,
+  'the build drawer and its category menu must share one compact left-aligned shell');
 assert.match(cssSource, /\.selection-context-body\s*\{[\s\S]*overflow:\s*auto;/,
   'long selection details must scroll inside the context bar');
 assert.match(cssSource,

@@ -5,6 +5,7 @@ import { collectHuntableTiles } from './habitats';
 import { isPassable, isTerrainPassable } from './agents';
 import { getSeason } from './seasons';
 import { isExplored } from './exploration';
+import { foreignSiteAt } from './foreignSites';
 import { isHaulSourceBuilding } from './inventory';
 import { canAssignResidentToBuilding, workerSlotConfig } from './workerSlots';
 import { unauthorizedTerritorySiteIds } from './territory';
@@ -177,6 +178,32 @@ export function canResidentWorkTarget(
 export function selectedEntityFromTile(state: GameState, tile: Tile): SelectedEntity {
   const building = tileBuilding(state, tile);
   return building ? { kind: 'building', id: building.id } : { kind: 'tile', x: tile.x, y: tile.y };
+}
+
+export function selectedEntityAfterTileClick(
+  state: GameState,
+  current: SelectedEntity | null,
+  tile: Tile,
+): SelectedEntity | null {
+  const explored = isExplored(state, tile.x, tile.y);
+  const next = explored
+    ? selectedEntityFromTile(state, tile)
+    : { kind: 'tile' as const, x: tile.x, y: tile.y };
+
+  if (current?.kind === 'tile'
+    && next.kind === 'tile'
+    && current.x === tile.x
+    && current.y === tile.y) {
+    return null;
+  }
+
+  if ((current?.kind === 'resident' || current?.kind === 'building')
+    && next.kind === 'tile'
+    && (!explored || !foreignSiteAt(state, tile.x, tile.y))) {
+    return null;
+  }
+
+  return next;
 }
 
 export function getPointerAction(

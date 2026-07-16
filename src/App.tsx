@@ -41,8 +41,7 @@ import { setProcessingReserve } from './game/processing';
 import { setTributeReserve } from './game/tributeReserve';
 import { nextRank } from './game/promotion';
 import { openPredatorHunt, startPredatorScout } from './game/specialEvents';
-import { getPointerAction, selectedEntityFromTile } from './game/selectionActions';
-import { isExplored } from './game/exploration';
+import { getPointerAction, selectedEntityAfterTileClick } from './game/selectionActions';
 import { makeRng } from './game/map';
 import { openTerritoryOrderConfirmation } from './game/territory';
 import { computeDefense } from './game/buildings';
@@ -260,10 +259,16 @@ export default function App() {
       return;
     }
     const tile = stateRef.current.map[y]?.[x];
+    if (!tile) return;
+    const nextSelection = selectedEntityAfterTileClick(stateRef.current, selectedEntity, tile);
+    if (!nextSelection) {
+      setSelected(null);
+      setSelectedEntity(null);
+      setInspResidentId(null);
+      return;
+    }
     setSelected({ x, y });
-    setSelectedEntity(tile && isExplored(stateRef.current, x, y)
-      ? selectedEntityFromTile(stateRef.current, tile)
-      : tile ? { kind: 'tile', x, y } : null);
+    setSelectedEntity(nextSelection);
     setInspResidentId(null);
   };
 
@@ -803,7 +808,6 @@ export default function App() {
             state={state}
             placingType={placingType}
             setPlacingType={setPlacingType}
-            selectionActive={selectedEntity != null}
             onClearSelection={handleClearSelection}
             uiPrefs={uiPrefs}
             onUiPrefsChange={setUiPrefs}
