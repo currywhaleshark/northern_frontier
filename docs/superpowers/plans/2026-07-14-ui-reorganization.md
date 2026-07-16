@@ -153,9 +153,15 @@
 - Modify: `src/components/AlertsPanel.tsx` (우상단 얇은 스택으로)
 - Modify: `src/components/TopBar.tsx` (`topbar-objectives`에 승격 진행 합류)
 - Modify: `src/App.tsx` (`.side.right` 제거 — EventLog는 Phase U5까지 임시로 우상단 유지)
+- Modify: `src/components/InspectorPanel.tsx`, `src/components/dock/DockFrame.tsx`, `src/ui/dockPresentation.ts` (사건·기물함을 도킹 창으로 보존)
+- Modify: `src/components/EventLog.tsx`, `src/styles/global.css` (우상단 임시 스택과 전체 폭 지도 배치)
+- Create: `tools/game/test_sidebar_removal_ui.mjs`
 
-- [ ] AlertsPanel을 캔버스 우상단 오버레이 스택으로 이전(도킹 창 아이콘 스트립과 겹치지 않게).
-- [ ] 승격 진행(현재 우측 사이드바의 "다음 승격" 섹션)을 상단바 목표 행으로 이전 — 세공·토벌 유예와 함께 "지속 관리 항목"의 단일 자리가 된다. 클릭 시 조정 창 열기.
+- [x] AlertsPanel을 캔버스 우상단 오버레이 스택으로 이전(도킹 창 아이콘 스트립과 겹치지 않게).
+- [x] 승격 진행(현재 우측 사이드바의 "다음 승격" 섹션)을 상단바 목표 행으로 이전 — 세공·토벌 유예와 함께 "지속 관리 항목"의 단일 자리가 된다. 클릭 시 조정 창 열기.
+- [x] 우측 사이드바 해체 뒤 고립되는 사건·기물함은 관리 도크로 이전하고, EventLog는 U5 통합 전까지 우상단 임시 기록 패널로 유지한다.
+
+검증 메모 (2026-07-16): 고정 300px 우측 열을 제거해 지도가 본문 전체 폭을 사용한다. 경보와 기존 기록은 미니맵 왼쪽의 우상단 스택에 두고 도크가 열리면 창 너비만큼 왼쪽으로 이동하게 했다. 사건·기물함은 여섯 번째 관리 도크 창으로 보존했으며 아이콘 수에 따라 창 스택 시작점이 자동 계산된다. 승격 진행은 세공·토벌 유예와 같은 상단 지속 목표 행에 합치고 클릭하면 조정 창을 연다. 1280×720에서 기록·미니맵·도크 스트립 및 열린 사건 창의 비겹침과 승격→조정 연결을 확인했다.
 
 ## Phase U5: 로그 통합 + 미니맵 재배치
 

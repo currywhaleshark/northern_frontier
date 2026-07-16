@@ -96,6 +96,17 @@ html, body, #root {
 .ongoing-objective.ready .objective-title { color: var(--good); }
 .ongoing-objective.urgent .objective-title { color: var(--bad); }
 .objective-deadline { color: var(--muted); white-space: nowrap; }
+.ongoing-objective.promotion {
+  flex: 1 1 280px;
+  max-width: 520px;
+}
+.objective-summary {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .objective-items { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .objective-items > span { white-space: nowrap; }
 .objective-items > span.complete { color: var(--good); }
@@ -199,18 +210,9 @@ html, body, #root {
 /* ── 본문: 확장 지도 + 우측 정보 ── */
 .main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 0;
 }
-.side {
-  background: var(--panel);
-  overflow-y: auto;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.side.right { border-left: 1px solid var(--border); }
 
 .canvas-stage {
   position: relative;
@@ -276,7 +278,7 @@ html, body, #root {
 }
 .dock-window-stack {
   position: absolute;
-  top: 220px;
+  top: calc(var(--dock-strip-count) * 43px + 5px);
   right: 0;
   bottom: 0;
   width: 100%;
@@ -560,7 +562,6 @@ html, body, #root {
   .minimap-canvas-wrap canvas { width: 144px; }
   .minimap-legend span:nth-child(2) { display: none; }
   .dock-frame { width: min(286px, calc(100% - 16px)); }
-  .dock-window-stack { top: 190px; }
 }
 
 /* ── 지도 위 주요 소식 ── */
@@ -971,6 +972,50 @@ html, body, #root {
   cursor: pointer;
 }
 .time-btn.active { border-color: var(--accent); color: var(--accent); font-weight: bold; }
+.right-overlay-stack {
+  position: absolute;
+  z-index: 42;
+  top: 8px;
+  right: 266px;
+  width: min(280px, calc(100% - 282px));
+  max-height: min(390px, calc(100% - 76px));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  transition: right 120ms ease;
+}
+.canvas-stage:has(.dock-frame.has-open-windows) .right-overlay-stack { right: 332px; }
+.alert-stack {
+  max-height: 158px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  pointer-events: auto;
+  scrollbar-width: thin;
+}
+.right-overlay-stack .event-log-panel {
+  min-height: 0;
+  max-height: 226px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(216, 222, 229, 0.16);
+  background: rgba(30, 36, 43, 0.94);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+.right-overlay-stack .event-log-panel .log-list { min-height: 72px; }
+
+@media (max-width: 900px) {
+  .right-overlay-stack {
+    right: 218px;
+    width: min(240px, calc(100% - 234px));
+  }
+  .canvas-stage:has(.dock-frame.has-open-windows) .right-overlay-stack { right: 302px; }
+}
+
 
 /* ── 알림 ── */
 .alert {
@@ -981,6 +1026,12 @@ html, body, #root {
   border-left: 3px solid;
 }
 .alert.warn { background: #33301f; border-color: var(--accent); }
+.alert-stack .alert {
+  margin-bottom: 0;
+  border: 1px solid rgba(216, 222, 229, 0.14);
+  border-left-width: 3px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+}
 .alert.danger { background: #3a221f; border-color: var(--bad); }
 
 /* ── 로그 ── */
@@ -993,6 +1044,7 @@ html, body, #root {
   font-size: 12px;
 }
 .log-entry { padding: 2px 4px; border-radius: 3px; line-height: 1.45; }
+.event-log-panel { min-height: 120px; }
 .log-entry .day { color: var(--muted); margin-right: 4px; font-size: 11px; }
 .log-info { color: var(--text); }
 .log-good { color: var(--good); }

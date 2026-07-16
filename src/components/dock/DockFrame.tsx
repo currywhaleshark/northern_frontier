@@ -21,6 +21,7 @@ export function DockFrame({ items, openWindowIds, pinnedWindowIds, onToggleWindo
   const openItems = items.filter(item => openWindowIds.includes(item.id));
   const stackStyle = {
     '--dock-window-count': Math.max(1, openItems.length),
+    '--dock-strip-count': items.length,
   } as CSSProperties;
 
   return (

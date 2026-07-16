@@ -11,7 +11,7 @@ const dockPresentationSource = readFileSync(new URL('../../src/ui/dockPresentati
 const minimapSource = readFileSync(new URL('../../src/components/Minimap.tsx', import.meta.url), 'utf8');
 const topBarSource = readFileSync(new URL('../../src/components/TopBar.tsx', import.meta.url), 'utf8');
 
-for (const id of ['residents', 'factions', 'court']) {
+for (const id of ['residents', 'factions', 'court', 'incidents']) {
   assert.match(dockPresentationSource, new RegExp(`['"]${id}['"]`), `${id} must be a supported dock window`);
   assert.match(appSource, new RegExp(`id: ['"]${id}['"]`), `${id} must be registered in the dock frame`);
 }

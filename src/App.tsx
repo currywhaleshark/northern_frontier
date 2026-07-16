@@ -37,12 +37,10 @@ import { WeaponAllocationDialog } from './components/WeaponAllocationDialog';
 import {
   ExpeditionMusterDialog, type ExpeditionMusterRequest,
 } from './components/ExpeditionMusterDialog';
-import { RANK_NAMES } from './game/constants';
 import { requestPetition } from './game/petition';
 import { toggleNitreYards } from './game/suspicion';
 import { setProcessingReserve } from './game/processing';
 import { setTributeReserve } from './game/tributeReserve';
-import { nextRank } from './game/promotion';
 import { openPredatorHunt, startPredatorScout } from './game/specialEvents';
 import { getPointerAction, selectedEntityAfterTileClick } from './game/selectionActions';
 import { makeRng } from './game/map';
@@ -804,6 +802,10 @@ export default function App() {
           <div className="minimap-overlay">
             <Minimap state={state} version={version} viewportRef={mapViewportRef} selected={selected} />
           </div>
+          <div className="right-overlay-stack">
+            <AlertsPanel state={state} />
+            <EventLog state={state} />
+          </div>
           <div className="canvas-wrap" ref={mapViewportRef}>
             <ImportantLogOverlay state={state} />
             <GameCanvas
@@ -910,29 +912,24 @@ export default function App() {
                   />
                 ),
               },
+              {
+                id: 'incidents',
+                label: '사건 · 기물함',
+                icon: '警',
+                content: (
+                  <InspectorPanel
+                    state={state}
+                    onOrganizeHunt={handleOrganizeHunt}
+                    onScoutPredator={handleScoutPredator}
+                  />
+                ),
+              },
             ]}
             openWindowIds={openDockWindowIds}
             pinnedWindowIds={uiPrefs.pinnedDockWindows}
             onToggleWindow={toggleDockWindow}
             onTogglePinned={id => setUiPrefs(current => togglePinnedDockWindow(current, id))}
           />
-        </div>
-        <div className="side right">
-          <AlertsPanel state={state} />
-          {state.victoryProgressNote && nextRank(state.rank) && (
-            <div className="section">
-              <div className="panel-title">다음 승격 — {RANK_NAMES[nextRank(state.rank)!]}</div>
-              <div className="muted small" style={{ marginBottom: 4 }}>현재: {RANK_NAMES[state.rank]}</div>
-              <div className="victory-note">{state.victoryProgressNote}</div>
-            </div>
-          )}
-
-          <InspectorPanel
-            state={state}
-            onOrganizeHunt={handleOrganizeHunt}
-            onScoutPredator={handleScoutPredator}
-          />
-          <EventLog state={state} />
         </div>
       </div>
 

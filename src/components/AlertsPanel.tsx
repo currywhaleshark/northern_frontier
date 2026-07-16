@@ -126,8 +126,7 @@ export function AlertsPanel({ state }: { state: GameState }) {
   const alerts = computeAlerts(state);
   if (alerts.length === 0) return null;
   return (
-    <div className="section">
-      <div className="panel-title">경보</div>
+    <div className="alert-stack" aria-label="경보" aria-live="polite">
       {alerts.map(a => (
         <div key={a.id} className={`alert ${a.level}`}>{a.text}</div>
       ))}

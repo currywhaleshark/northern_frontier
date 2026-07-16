@@ -1,4 +1,4 @@
-// U4.2 이후 우측 임시 패널은 사건·기물함만 소유한다.
+// 지도 선택 정보와 분리된 전역 사건·기물함 관리 창.
 import { availablePredatorScouts, predatorScoutDuration } from '../game/expeditionIntel';
 import { SPECIAL_ITEM_DEFS } from '../game/specialItems';
 import { predatorHuntChance } from '../game/specialEvents';
@@ -18,8 +18,7 @@ export function InspectorPanel({ state, onOrganizeHunt, onScoutPredator }: Props
   const discovered = itemIds.filter(item => state.discoveredSpecialItems.includes(item));
 
   return (
-    <div className="section incident-panel">
-      <div className="panel-title">사건 · 기물함</div>
+    <div className="incident-panel">
       <div className="panel-title">활성 위험</div>
       {threats.length === 0 ? (
         <div className="muted small">현재 추적 중인 맹수가 없습니다.</div>

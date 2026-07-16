@@ -18,7 +18,7 @@ export function EventLog({ state }: { state: GameState }) {
   }, [newest]);
 
   return (
-    <div className="section" style={{ flex: 1, minHeight: 120 }}>
+    <div className="section event-log-panel">
       <div className="panel-title">기록</div>
       <div className="log-list" ref={listRef}>
         {state.log.map((entry, i) => ({ entry, i })).reverse().map(({ entry, i }) => (

@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import { housingCapacity } from '../game/buildings';
 import { CONFIG } from '../game/config';
-import { RESOURCE_NAMES, SEASON_NAMES, WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
+import { RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES, WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
+import { nextRank } from '../game/promotion';
 import { avg, livingResidents, residentHome } from '../game/residents';
 import { getDayOfSeason, getSeason, getYear } from '../game/seasons';
 import { tributeReserved, tributeReserveRatio } from '../game/tributeReserve';
@@ -62,6 +63,7 @@ export function TopBar({
   const crackdownDays = state.crackdownDeadline > 0
     ? Math.max(0, state.crackdownDeadline - state.day)
     : 0;
+  const promotionTarget = state.victoryProgressNote ? nextRank(state.rank) : null;
   return (
     <div className="topbar">
       <div className="topbar-row topbar-resource-row" aria-label="자원 현황">
@@ -141,7 +143,7 @@ export function TopBar({
           </div>
         )}
       </div>
-      {(tribute || state.crackdownDeadline > 0) && (
+      {(tribute || state.crackdownDeadline > 0 || promotionTarget) && (
         <div className="topbar-objectives" aria-label="지속 관리 항목">
           {tribute && (
             <button
@@ -174,6 +176,18 @@ export function TopBar({
               <span className="objective-title">토벌 유예</span>
               <span className="objective-deadline">{crackdownDays}일 남음</span>
               <span>의심 {state.suspicion.toFixed(0)} / {CONFIG.suspicion.crackdownClearBelow} 미만</span>
+            </button>
+          )}
+          {promotionTarget && (
+            <button
+              type="button"
+              className="ongoing-objective promotion"
+              title="조정 창에서 다음 승격 조건 확인"
+              onClick={onOpenCourt}
+            >
+              <span className="objective-title">다음 승격</span>
+              <span className="objective-deadline">{RANK_NAMES[promotionTarget]}</span>
+              <span className="objective-summary">{state.victoryProgressNote}</span>
             </button>
           )}
         </div>
