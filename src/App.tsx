@@ -17,12 +17,10 @@ import { DockFrame } from './components/dock/DockFrame';
 import { CourtWindow } from './components/dock/CourtWindow';
 import { FactionsWindow } from './components/dock/FactionsWindow';
 import { ResidentsWindow } from './components/dock/ResidentsWindow';
-import { EventLog } from './components/EventLog';
 import { EventModal } from './components/EventModal';
 import { TradeDialog } from './components/TradeDialog';
 import { GameCanvas } from './components/GameCanvas';
 import { InspectorPanel } from './components/InspectorPanel';
-import { ImportantLogOverlay } from './components/ImportantLogOverlay';
 import { JobPanel } from './components/JobPanel';
 import { MainMenu } from './components/MainMenu';
 import { BattleSimulationSetup } from './components/BattleSimulationSetup';
@@ -31,6 +29,7 @@ import { centerViewportOnSettlement, centerViewportOnTile, Minimap } from './com
 import { ProcessingPanel } from './components/ProcessingPanel';
 import { SelectionContextBar } from './components/SelectionContextBar';
 import { TopBar } from './components/TopBar';
+import { UnifiedLog } from './components/UnifiedLog';
 import { TacticalBattleScreen } from './components/TacticalBattleScreen';
 import { TacticalBattleReportModal } from './components/TacticalBattleReportModal';
 import { WeaponAllocationDialog } from './components/WeaponAllocationDialog';
@@ -804,10 +803,9 @@ export default function App() {
           </div>
           <div className="right-overlay-stack">
             <AlertsPanel state={state} />
-            <EventLog state={state} />
           </div>
+          <UnifiedLog state={state} />
           <div className="canvas-wrap" ref={mapViewportRef}>
-            <ImportantLogOverlay state={state} />
             <GameCanvas
               state={state}
               version={version}

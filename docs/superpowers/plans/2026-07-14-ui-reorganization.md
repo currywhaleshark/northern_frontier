@@ -170,10 +170,14 @@
 **Files:**
 - Create: `src/components/UnifiedLog.tsx` (`ImportantLogOverlay` + `EventLog` 통합)
 - Modify: `src/App.tsx`, `src/styles/global.css`
+- Modify: `src/game/types.ts` (`important` 표시의 새 UI 역할 주석 정리)
+- Create: `tools/game/test_unified_log_ui.mjs`
 - Delete: `src/components/ImportantLogOverlay.tsx`, `src/components/EventLog.tsx` (통합 완료 후)
 
-- [ ] 좌상단 앵커: 최근 중요 로그 N줄 상시 표시(현행 토스트 대체) → 클릭/호버로 전체 이력 패널 확장. kind 필터(info/good/bad/raid/weather/trade)와 중요 표시(`important`)는 유지. 확장 패널이 열려 있어도 게임은 계속 진행.
-- [ ] 토스트의 자동 소멸 타이밍·중복 억제 등 기존 ImportantLogOverlay 동작을 회귀 없이 흡수한다.
+- [x] 좌상단 앵커: 최근 중요 로그 N줄 상시 표시(현행 토스트 대체) → 클릭/호버로 전체 이력 패널 확장. kind 필터(info/good/bad/raid/weather/trade)와 중요 표시(`important`)는 유지. 확장 패널이 열려 있어도 게임은 계속 진행.
+- [x] 현행 ImportantLogOverlay에는 자동 소멸 타이머·별도 중복 억제가 없으므로 새 동작을 추측해 추가하지 않는다. 대신 실제 동작인 `important || raid` 최근 4개 노출과 전체 로그 상한을 회귀 없이 흡수한다.
+
+검증 메모 (2026-07-16): 좌상단 `UnifiedLog`가 축약 상태에서 `important || raid` 최근 4건을 유지하고, 호버·키보드 포커스·클릭 고정으로 전체 이력을 연다. 전체/소식/호재/악재/전투/날씨/교역 필터와 중요 별표를 제공하며 기존 두 로그 컴포넌트와 중복 렌더링을 제거했다. 기록이 적을 때는 내용 높이만 차지하고 많을 때만 최대 520px 내부 스크롤로 전환해 하단 건설 메뉴를 비워 둔다. 1280×720에서 축약·확장·빈 필터 상태를 확인했고, 확장 중 10배속으로 날짜가 진행되어 게임 루프가 멈추지 않음을 확인했다.
 
 ### Task U5.2: 미니맵 재배치와 오버레이 충돌 정리
 

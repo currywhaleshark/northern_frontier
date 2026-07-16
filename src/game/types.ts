@@ -374,7 +374,7 @@ export interface LogEntry {
   day: number;
   text: string;
   kind: 'info' | 'good' | 'bad' | 'raid' | 'weather' | 'trade';
-  important?: boolean; // 지도 좌상단 주요 소식에 별도 노출
+  important?: boolean; // 통합 로그 축약 상태의 주요 소식에 노출
 }
 
 export interface ChoiceOption {

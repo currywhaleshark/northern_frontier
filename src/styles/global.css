@@ -564,29 +564,112 @@ html, body, #root {
   .dock-frame { width: min(286px, calc(100% - 16px)); }
 }
 
-/* ── 지도 위 주요 소식 ── */
-.important-log-overlay {
-  position: sticky;
-  top: 0;
-  left: 0;
-  z-index: 30;
-  width: min(420px, calc(100% - 8px));
-  height: 0;
-  pointer-events: none;
-}
-.important-log-stack {
+/* ── 좌상단 통합 로그 ── */
+.unified-log {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
+  z-index: 42;
+  top: 8px;
+  left: 8px;
+  width: min(420px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  pointer-events: auto;
+}
+.unified-log.expanded {
+  max-height: min(520px, calc(100% - 74px));
+  overflow: hidden;
+  border: 1px solid rgba(216, 222, 229, 0.24);
+  border-radius: 7px;
+  background: rgba(20, 24, 28, 0.97);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.unified-log-toggle {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid rgba(216, 222, 229, 0.24);
+  border-radius: 6px;
+  background: rgba(27, 33, 39, 0.97);
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+}
+.unified-log.expanded .unified-log-toggle {
+  flex: 0 0 auto;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+}
+.unified-log-toggle:hover,
+.unified-log-toggle:focus-visible { color: var(--text); outline: none; }
+.unified-log-toggle strong { color: var(--accent); }
+.unified-log-toggle span:nth-of-type(2) { margin-left: auto; }
+.unified-log-preview {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  margin-top: 5px;
 }
-.important-log-item {
+.unified-log-history {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+.unified-log-filters {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: thin;
+}
+.unified-log-filters button {
+  min-width: 42px;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel2);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.unified-log-filters button:hover,
+.unified-log-filters button:focus-visible,
+.unified-log-filters button.active { border-color: var(--accent); color: var(--text); outline: none; }
+.unified-log-filters button.active { background: #383323; color: var(--accent); }
+.unified-log-list {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  max-height: 430px;
+  overflow-y: auto;
+  padding: 4px 6px 6px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.unified-log-item {
+  position: relative;
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-columns: 20px minmax(0, 1fr) 14px;
   gap: 6px;
+  padding: 6px 5px;
+  border-bottom: 1px solid rgba(216, 222, 229, 0.1);
+  border-left: 3px solid var(--accent);
+}
+.unified-log-item.compact {
   padding: 6px 8px;
   border: 1px solid rgba(216, 222, 229, 0.16);
   border-left: 3px solid var(--accent);
@@ -594,7 +677,7 @@ html, body, #root {
   background: rgba(20, 24, 28, 0.94);
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
 }
-.important-log-symbol {
+.unified-log-symbol {
   width: 20px;
   height: 20px;
   display: inline-flex;
@@ -603,30 +686,43 @@ html, body, #root {
   color: var(--accent);
   font-weight: 700;
 }
-.important-log-content { min-width: 0; }
-.important-log-day {
+.unified-log-content { min-width: 0; }
+.unified-log-day {
   display: block;
   margin-bottom: 1px;
   color: var(--muted);
   font-size: 10px;
 }
-.important-log-text {
+.unified-log-text { line-height: 1.4; }
+.unified-log-item.compact .unified-log-text {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  line-height: 1.35;
 }
-.important-log-good { border-left-color: var(--good); }
-.important-log-good .important-log-symbol { color: var(--good); }
-.important-log-bad { border-left-color: var(--bad); }
-.important-log-bad .important-log-symbol { color: var(--bad); }
-.important-log-raid { border-left-color: var(--raid); }
-.important-log-raid .important-log-symbol { color: var(--raid); }
-.important-log-weather { border-left-color: var(--weather); }
-.important-log-weather .important-log-symbol { color: var(--weather); }
-.important-log-trade { border-left-color: var(--trade); }
-.important-log-trade .important-log-symbol { color: var(--trade); }
+.unified-log-important { color: var(--accent); font-size: 10px; }
+.unified-log-empty { padding: 16px 8px; color: var(--muted); text-align: center; }
+.unified-log-empty.compact {
+  padding: 8px;
+  border: 1px solid rgba(216, 222, 229, 0.14);
+  border-radius: 4px;
+  background: rgba(20, 24, 28, 0.9);
+  text-align: left;
+}
+.unified-log-good { border-left-color: var(--good); }
+.unified-log-good .unified-log-symbol { color: var(--good); }
+.unified-log-bad { border-left-color: var(--bad); }
+.unified-log-bad .unified-log-symbol { color: var(--bad); }
+.unified-log-raid { border-left-color: var(--raid); }
+.unified-log-raid .unified-log-symbol { color: var(--raid); }
+.unified-log-weather { border-left-color: var(--weather); }
+.unified-log-weather .unified-log-symbol { color: var(--weather); }
+.unified-log-trade { border-left-color: var(--trade); }
+.unified-log-trade .unified-log-symbol { color: var(--trade); }
+
+@media (max-width: 900px) {
+  .unified-log { width: min(380px, calc(100% - 16px)); }
+}
 
 /* ── 패널 공통 ── */
 .panel-title {
@@ -995,19 +1091,6 @@ html, body, #root {
   pointer-events: auto;
   scrollbar-width: thin;
 }
-.right-overlay-stack .event-log-panel {
-  min-height: 0;
-  max-height: 226px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid rgba(216, 222, 229, 0.16);
-  background: rgba(30, 36, 43, 0.94);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
-  pointer-events: auto;
-}
-.right-overlay-stack .event-log-panel .log-list { min-height: 72px; }
-
 @media (max-width: 900px) {
   .right-overlay-stack {
     right: 218px;
@@ -1033,25 +1116,6 @@ html, body, #root {
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
 }
 .alert.danger { background: #3a221f; border-color: var(--bad); }
-
-/* ── 로그 ── */
-.log-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow-y: auto;
-  max-height: 320px;
-  font-size: 12px;
-}
-.log-entry { padding: 2px 4px; border-radius: 3px; line-height: 1.45; }
-.event-log-panel { min-height: 120px; }
-.log-entry .day { color: var(--muted); margin-right: 4px; font-size: 11px; }
-.log-info { color: var(--text); }
-.log-good { color: var(--good); }
-.log-bad { color: var(--bad); }
-.log-raid { color: var(--raid); }
-.log-weather { color: var(--weather); }
-.log-trade { color: var(--trade); }
 
 /* ── 인스펙터 ── */
 .insp-table { width: 100%; font-size: 12px; border-collapse: collapse; }

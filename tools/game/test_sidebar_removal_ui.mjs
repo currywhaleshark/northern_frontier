@@ -10,8 +10,10 @@ const cssSource = readFileSync(new URL('../../src/styles/global.css', import.met
 
 assert.doesNotMatch(appSource, /className=["']side right["']/,
   'the fixed right sidebar must be removed so the map can use the full content width');
-assert.match(appSource, /className="right-overlay-stack"[\s\S]*<AlertsPanel[\s\S]*<EventLog/,
-  'alerts and the temporary event log must share the upper-right canvas overlay');
+assert.match(appSource, /className="right-overlay-stack"[\s\S]*<AlertsPanel/,
+  'alerts must remain in the upper-right canvas overlay');
+assert.doesNotMatch(appSource, /<EventLog/,
+  'the temporary event log must leave the upper-right overlay after log unification');
 assert.match(alertsSource, /className="alert-stack"/,
   'alerts must render as a thin overlay stack rather than a sidebar section');
 assert.doesNotMatch(alertsSource, /className="section"/,
