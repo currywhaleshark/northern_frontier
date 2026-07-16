@@ -345,7 +345,8 @@ html, body, #root {
   z-index: 36;
   right: 10px;
   bottom: 58px;
-  left: 10px;
+  width: clamp(250px, 20vw, 360px);
+  box-sizing: border-box;
   max-height: min(210px, 36vh);
   display: flex;
   flex-direction: column;
@@ -436,7 +437,10 @@ html, body, #root {
 
 @media (max-width: 900px) {
   .canvas-stage:has(.dock-frame.has-open-windows) .selection-context-bar { right: 296px; }
-  .selection-context-bar { max-height: min(190px, 34vh); }
+  .selection-context-bar {
+    width: clamp(220px, 24vw, 300px);
+    max-height: min(190px, 34vh);
+  }
 }
 
 /* ── 미니맵 ── */
@@ -682,8 +686,11 @@ html, body, #root {
 .build-drawer-head button:hover,
 .build-drawer-head button:focus-visible { border-color: var(--accent); outline: none; }
 .build-drawer-panel {
-  position: relative;
-  width: 100%;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  width: clamp(250px, 20vw, 360px);
+  box-sizing: border-box;
   padding: 6px;
   overflow: visible;
   border: 1px solid rgba(217, 164, 65, 0.55);

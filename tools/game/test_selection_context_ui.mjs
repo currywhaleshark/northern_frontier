@@ -27,6 +27,10 @@ assert.match(drawerSource, /const startPlacement[\s\S]*onClearSelection\(\)[\s\S
   'starting construction placement must clear the current selection first');
 assert.match(cssSource, /\.selection-context-bar\s*\{[\s\S]*bottom:\s*58px;/,
   'the selection context must occupy the lower canvas above the build category bar');
+assert.match(cssSource, /\.selection-context-bar\s*\{[\s\S]*right:\s*10px;[\s\S]*width:\s*clamp\(250px, 20vw, 360px\);/,
+  'the selection context must remain a compact right-aligned panel');
+assert.match(cssSource, /\.build-drawer-panel\s*\{[\s\S]*left:\s*0;[\s\S]*width:\s*clamp\(250px, 20vw, 360px\);/,
+  'the expanded build drawer must remain a compact left-aligned panel');
 assert.match(cssSource, /\.selection-context-body\s*\{[\s\S]*overflow:\s*auto;/,
   'long selection details must scroll inside the context bar');
 assert.match(cssSource,
