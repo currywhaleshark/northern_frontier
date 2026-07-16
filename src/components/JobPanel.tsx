@@ -31,8 +31,8 @@ export function JobPanel({ state, onReassign, uiPrefs, onUiPrefsChange, onAutoAs
   const selectedAutoAssignTypes = uiPrefs.autoAssignBuildingTypes;
   const allAutoAssignTypesSelected = selectedAutoAssignTypes.length === AUTO_ASSIGN_BUILDING_TYPES.length;
   return (
-    <div className="section">
-      <div className="panel-title">직업 배정 <span className="muted small">(무직 {idle}명)</span></div>
+    <div className="dock-panel-content job-panel-content">
+      <div className="dock-panel-summary">무직 {idle}명</div>
       <div className="auto-assign-panel">
         <div className="auto-assign-head">
           <span>건물 자동 배정 <small>선택 {selectedAutoAssignTypes.length}/{AUTO_ASSIGN_BUILDING_TYPES.length}</small></span>

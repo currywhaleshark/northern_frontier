@@ -10,8 +10,7 @@ interface Props {
 
 export function ProcessingPanel({ state, onSetReserve }: Props) {
   return (
-    <div className="section">
-      <div className="panel-title">가공/비축 조절</div>
+    <div className="dock-panel-content processing-panel-content">
       {PROCESSING_INPUTS.map(id => {
         const stock = Math.floor(state.resources[id]);
         const reserve = state.processingReserves?.[id] ?? 0;

@@ -14,10 +14,11 @@ import {
   isAutoAssignBuildingType,
   type AutoAssignBuildingType,
 } from '../game/workerSlots';
+import { isDockWindowId, type DockWindowId } from './dockPresentation';
 
 export const UI_PREFS_KEY = 'buksae-ui-prefs';
 export const LEGACY_BUILD_MENU_OPEN_KEY = 'buksae-buildmenu-open';
-export const UI_PREFS_VERSION = 3;
+export const UI_PREFS_VERSION = 4;
 export const MAX_STARRED_RESOURCES = 8;
 
 export interface UiPrefs {
@@ -26,6 +27,7 @@ export interface UiPrefs {
   pinnedResourceGroups: ResourceDisplayGroupId[];
   buildDrawerLastCategory: BuildCategoryId;
   autoAssignBuildingTypes: AutoAssignBuildingType[];
+  pinnedDockWindows: DockWindowId[];
 }
 
 export interface UiPrefsStorage {
@@ -41,6 +43,7 @@ export function defaultUiPrefs(buildDrawerLastCategory = DEFAULT_BUILD_CATEGORY)
     pinnedResourceGroups: [],
     buildDrawerLastCategory,
     autoAssignBuildingTypes: [...AUTO_ASSIGN_BUILDING_TYPES],
+    pinnedDockWindows: [],
   };
 }
 
@@ -69,21 +72,26 @@ export function normalizeUiPrefs(value: unknown, migratedBuildCategory = DEFAULT
     pinnedResourceGroups?: unknown;
     buildDrawerLastCategory?: unknown;
     autoAssignBuildingTypes?: unknown;
+    pinnedDockWindows?: unknown;
   };
-  if (candidate.version !== 1 && candidate.version !== 2 && candidate.version !== UI_PREFS_VERSION) {
+  if (candidate.version !== 1 && candidate.version !== 2
+    && candidate.version !== 3 && candidate.version !== UI_PREFS_VERSION) {
     return defaultUiPrefs();
   }
   return {
     version: UI_PREFS_VERSION,
     starredResources: uniqueValidValues(candidate.starredResources, isStockResourceId, MAX_STARRED_RESOURCES),
     pinnedResourceGroups: uniqueValidValues(candidate.pinnedResourceGroups, isResourceDisplayGroupId),
-    buildDrawerLastCategory: (candidate.version === 2 || candidate.version === UI_PREFS_VERSION)
+    buildDrawerLastCategory: candidate.version >= 2
       && isBuildCategoryId(candidate.buildDrawerLastCategory)
       ? candidate.buildDrawerLastCategory
       : migratedBuildCategory,
-    autoAssignBuildingTypes: candidate.version === UI_PREFS_VERSION
+    autoAssignBuildingTypes: candidate.version >= 3
       ? uniqueValidValues(candidate.autoAssignBuildingTypes, isAutoAssignBuildingType)
       : [...AUTO_ASSIGN_BUILDING_TYPES],
+    pinnedDockWindows: candidate.version === UI_PREFS_VERSION
+      ? uniqueValidValues(candidate.pinnedDockWindows, isDockWindowId)
+      : [],
   };
 }
 
@@ -177,4 +185,13 @@ export function toggleAutoAssignBuildingType(
   return prefs.autoAssignBuildingTypes.includes(type)
     ? setAutoAssignBuildingTypes(prefs, prefs.autoAssignBuildingTypes.filter(current => current !== type))
     : setAutoAssignBuildingTypes(prefs, [...prefs.autoAssignBuildingTypes, type]);
+}
+
+export function togglePinnedDockWindow(prefs: UiPrefs, id: DockWindowId): UiPrefs {
+  return {
+    ...prefs,
+    pinnedDockWindows: prefs.pinnedDockWindows.includes(id)
+      ? prefs.pinnedDockWindows.filter(current => current !== id)
+      : [...prefs.pinnedDockWindows, id],
+  };
 }

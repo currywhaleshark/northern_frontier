@@ -39,6 +39,7 @@ const {
   saveUiPrefs,
   setAutoAssignBuildingTypes,
   toggleAutoAssignBuildingType,
+  togglePinnedDockWindow,
   togglePinnedResourceGroup,
   toggleStarredResource,
 } = prefsModule;
@@ -69,11 +70,12 @@ assert.deepEqual(normalizeUiPrefs({ version: 99, starredResources: ['tools'] }),
   'an unknown prefs version must reset to defaults');
 
 const normalized = normalizeUiPrefs({
-  version: 3,
+  version: 4,
   starredResources: ['tools', 'tools', 'reputation', 'unknown', 'grain'],
   pinnedResourceGroups: ['materials', 'unknown', 'materials', 'food'],
   buildDrawerLastCategory: 'farming',
   autoAssignBuildingTypes: ['field', 'field', 'unknown', 'smithy'],
+  pinnedDockWindows: ['jobs', 'unknown', 'jobs', 'processing'],
 });
 assert.deepEqual(normalized.starredResources, ['tools', 'grain'],
   'prefs must remove duplicates, metrics, and unknown resources');
@@ -82,6 +84,8 @@ assert.deepEqual(normalized.pinnedResourceGroups, ['materials', 'food'],
 assert.equal(normalized.buildDrawerLastCategory, 'farming');
 assert.deepEqual(normalized.autoAssignBuildingTypes, ['field', 'smithy'],
   'auto-assign building preferences must remove duplicates and unknown building types');
+assert.deepEqual(normalized.pinnedDockWindows, ['jobs', 'processing'],
+  'dock preferences must remove duplicate and unknown window pins');
 
 const legacyStorage = memoryStorage({
   [UI_PREFS_KEY]: JSON.stringify({
@@ -92,7 +96,7 @@ const legacyStorage = memoryStorage({
   [LEGACY_BUILD_MENU_OPEN_KEY]: JSON.stringify({ 생산: true }),
 });
 const migrated = loadUiPrefs(legacyStorage);
-assert.equal(migrated.version, 3, 'v1 prefs must migrate to the current schema');
+assert.equal(migrated.version, 4, 'v1 prefs must migrate to the current schema');
 assert.deepEqual(migrated.starredResources, ['tools'], 'v1 stars must survive migration');
 assert.deepEqual(migrated.pinnedResourceGroups, ['materials'], 'v1 group pins must survive migration');
 assert.equal(migrated.buildDrawerLastCategory, 'production',
@@ -101,6 +105,7 @@ assert.equal(legacyStorage.has(LEGACY_BUILD_MENU_OPEN_KEY), false,
   'the legacy build-menu key must be removed after migration');
 assert.deepEqual(migrated.autoAssignBuildingTypes, AUTO_ASSIGN_BUILDING_TYPES,
   'pre-auto-assignment UI prefs must default to every supported building type');
+assert.deepEqual(migrated.pinnedDockWindows, [], 'older prefs must start with every dock window closed');
 
 const v2Migrated = normalizeUiPrefs({
   version: 2,
@@ -110,6 +115,17 @@ const v2Migrated = normalizeUiPrefs({
 });
 assert.deepEqual(v2Migrated.autoAssignBuildingTypes, AUTO_ASSIGN_BUILDING_TYPES,
   'v2 prefs must enable all building types when migrating to automatic assignment');
+
+const v3Migrated = normalizeUiPrefs({
+  version: 3,
+  starredResources: ['tools'],
+  pinnedResourceGroups: [],
+  buildDrawerLastCategory: 'production',
+  autoAssignBuildingTypes: ['field'],
+});
+assert.deepEqual(v3Migrated.autoAssignBuildingTypes, ['field'],
+  'v3 auto-assignment choices must survive dock preference migration');
+assert.deepEqual(v3Migrated.pinnedDockWindows, [], 'v3 prefs must default dock pins to closed');
 
 let prefs = defaultUiPrefs();
 for (const resource of DISPLAY_RESOURCE_ORDER.slice(0, MAX_STARRED_RESOURCES)) {
@@ -138,9 +154,16 @@ assert.deepEqual(prefs.autoAssignBuildingTypes, ['field', 'smithy']);
 prefs = toggleAutoAssignBuildingType(prefs, 'field');
 assert.deepEqual(prefs.autoAssignBuildingTypes, ['smithy']);
 
+prefs = togglePinnedDockWindow(prefs, 'jobs');
+assert.deepEqual(prefs.pinnedDockWindows, ['jobs']);
+prefs = togglePinnedDockWindow(prefs, 'processing');
+assert.deepEqual(prefs.pinnedDockWindows, ['jobs', 'processing']);
+prefs = togglePinnedDockWindow(prefs, 'jobs');
+assert.deepEqual(prefs.pinnedDockWindows, ['processing']);
+
 const storage = memoryStorage();
 saveUiPrefs(normalized, storage);
 assert.deepEqual(loadUiPrefs(storage), normalized, 'saved prefs must round-trip independently');
-assert.equal(JSON.parse(storage.value()).version, 3, 'saved prefs must retain their own schema version');
+assert.equal(JSON.parse(storage.value()).version, 4, 'saved prefs must retain their own schema version');
 
 console.log('ui prefs tests passed');

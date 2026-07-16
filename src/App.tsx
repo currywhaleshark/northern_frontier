@@ -13,6 +13,7 @@ import { addLog, negotiateTrade, requestTrade, tradeNegotiationOf } from './game
 import { initAudio, isMuted, playSfx, setMuted, setWeatherAmbient } from './sound/sfx';
 import { AlertsPanel } from './components/AlertsPanel';
 import { BuildDrawer } from './components/BuildDrawer';
+import { DockFrame } from './components/dock/DockFrame';
 import { EventLog } from './components/EventLog';
 import { EventModal } from './components/EventModal';
 import { TradeDialog } from './components/TradeDialog';
@@ -64,7 +65,7 @@ import type {
   BuildingTypeId, CombatWeaponId, CropId, Difficulty, JobId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
   PreparationActionId, PredatorKind, SpecialItemId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
-import { loadUiPrefs, saveUiPrefs, type UiPrefs } from './ui/uiPrefs';
+import { loadUiPrefs, saveUiPrefs, togglePinnedDockWindow, type UiPrefs } from './ui/uiPrefs';
 import type { AutoAssignBuildingType } from './game/workerSlots';
 
 export default function App() {
@@ -781,16 +782,6 @@ export default function App() {
         }}
       />
       <div className="main">
-        <div className="side left">
-          <JobPanel
-            state={state}
-            onReassign={handleReassign}
-            uiPrefs={uiPrefs}
-            onUiPrefsChange={setUiPrefs}
-            onAutoAssign={handleAutoAssignBuildings}
-          />
-          <ProcessingPanel state={state} onSetReserve={handleSetProcessingReserve} />
-        </div>
         <div className="canvas-stage">
           <div className="minimap-overlay">
             <Minimap state={state} version={version} viewportRef={mapViewportRef} selected={selected} />
@@ -826,6 +817,32 @@ export default function App() {
             setPlacingType={setPlacingType}
             uiPrefs={uiPrefs}
             onUiPrefsChange={setUiPrefs}
+          />
+          <DockFrame
+            items={[
+              {
+                id: 'jobs',
+                label: '직업 배정',
+                icon: '人',
+                content: (
+                  <JobPanel
+                    state={state}
+                    onReassign={handleReassign}
+                    uiPrefs={uiPrefs}
+                    onUiPrefsChange={setUiPrefs}
+                    onAutoAssign={handleAutoAssignBuildings}
+                  />
+                ),
+              },
+              {
+                id: 'processing',
+                label: '가공·비축',
+                icon: '⚙',
+                content: <ProcessingPanel state={state} onSetReserve={handleSetProcessingReserve} />,
+              },
+            ]}
+            pinnedWindowIds={uiPrefs.pinnedDockWindows}
+            onTogglePinned={id => setUiPrefs(current => togglePinnedDockWindow(current, id))}
           />
         </div>
         <div className="side right">

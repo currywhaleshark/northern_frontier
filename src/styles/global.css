@@ -196,10 +196,10 @@ html, body, #root {
 .threat-box { white-space: nowrap; }
 .threat-high { color: var(--bad); font-weight: bold; }
 
-/* ── 본문 3열 ── */
+/* ── 본문: 확장 지도 + 우측 정보 ── */
 .main {
   display: grid;
-  grid-template-columns: 230px 1fr 300px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   min-height: 0;
 }
 .side {
@@ -210,7 +210,6 @@ html, body, #root {
   flex-direction: column;
   gap: 10px;
 }
-.side.left { border-right: 1px solid var(--border); }
 .side.right { border-left: 1px solid var(--border); }
 
 .canvas-stage {
@@ -231,11 +230,120 @@ html, body, #root {
 }
 .canvas-wrap canvas { image-rendering: pixelated; display: block; }
 
+/* ── 우측 도킹 관리 창 ── */
+.dock-frame {
+  position: absolute;
+  z-index: 45;
+  inset: 8px 8px 56px auto;
+  width: min(316px, calc(100% - 16px));
+  pointer-events: none;
+}
+.dock-strip {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: auto;
+}
+.dock-strip button {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(214, 221, 224, 0.28);
+  border-radius: 6px;
+  background: rgba(25, 31, 36, 0.96);
+  color: var(--muted);
+  font: inherit;
+  font-size: 18px;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+.dock-strip button:hover,
+.dock-strip button:focus-visible,
+.dock-strip button.active { border-color: var(--accent); color: var(--text); outline: none; }
+.dock-strip button.active { background: #383323; }
+.dock-strip button.pinned::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.dock-window-stack {
+  position: absolute;
+  top: 220px;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  display: grid;
+  grid-template-rows: repeat(var(--dock-window-count), minmax(0, 1fr));
+  gap: 7px;
+  pointer-events: none;
+}
+.dock-window {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(214, 221, 224, 0.3);
+  border-radius: 7px;
+  background: rgba(27, 33, 39, 0.98);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.46);
+  pointer-events: auto;
+}
+.dock-window-head {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 5px 4px 9px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.dock-window-head strong { color: var(--accent); font-size: 12px; }
+.dock-window-actions { display: flex; gap: 4px; }
+.dock-window-actions button {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel2);
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.dock-window-actions button:last-child { font-size: 16px; }
+.dock-window-actions button:hover,
+.dock-window-actions button:focus-visible,
+.dock-window-actions button.active { border-color: var(--accent); color: var(--text); outline: none; }
+.dock-window-actions button.active { color: var(--accent); }
+.dock-window-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+  scrollbar-width: thin;
+}
+.dock-panel-content { min-width: 0; }
+.dock-panel-summary {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 /* ── 미니맵 ── */
 .minimap-overlay {
   position: absolute;
   top: 8px;
-  right: 8px;
+  right: 54px;
   z-index: 40;
   width: 204px;
   pointer-events: none;
@@ -347,6 +455,8 @@ html, body, #root {
   .minimap-canvas-wrap { width: 144px; }
   .minimap-canvas-wrap canvas { width: 144px; }
   .minimap-legend span:nth-child(2) { display: none; }
+  .dock-frame { width: min(286px, calc(100% - 16px)); }
+  .dock-window-stack { top: 190px; }
 }
 
 /* ── 지도 위 주요 소식 ── */
@@ -435,6 +545,11 @@ html, body, #root {
   align-items: center;
   gap: 6px;
   pointer-events: none;
+  transition: right 120ms ease;
+}
+.canvas-stage:has(.dock-frame.has-open-windows) .build-drawer-shell { right: 326px; }
+@media (max-width: 900px) {
+  .canvas-stage:has(.dock-frame.has-open-windows) .build-drawer-shell { right: 296px; }
 }
 .build-drawer-shell > * { pointer-events: auto; }
 .build-placement-status {
