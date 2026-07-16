@@ -16,21 +16,27 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
+// columnGroups: 열별 체형 그룹. 여성(f)은 남성(m, 기본값)보다 머리가 작게
+// 그려져 있어, 전체를 한 기준으로 맞추면 남성이 작아진다. 그룹별 중앙값을
+// 각자의 기준으로 써서 시트에 그려진 체형 비례를 유지한다.
 const SHEETS = [
   {
     key: 'defenderRoles',
     src: 'public/assets/tactical/defender-roles-poses-v2.png',
     cellWidth: 84, cellHeight: 120, columns: 8, rows: 4,
+    columnGroups: { 1: 'f', 3: 'f', 5: 'f', 7: 'f' },
   },
   {
     key: 'defenderWeapons',
     src: 'public/assets/tactical/defender-weapons-poses-v2.png',
     cellWidth: 84, cellHeight: 120, columns: 6, rows: 4,
+    columnGroups: { 1: 'f', 3: 'f', 5: 'f' },
   },
   {
     key: 'defenderDefaultWeapons',
     src: 'public/assets/tactical/defender-default-weapons-poses-v1.png',
     cellWidth: 84, cellHeight: 120, columns: 6, rows: 4,
+    columnGroups: { 1: 'f', 3: 'f', 5: 'f' },
   },
   {
     key: 'raiders',
@@ -53,7 +59,9 @@ const MAX_HEAD_RUN_WIDTH = 40;
 const HEAD_SPAN_HALF = 23;
 // 머리 탐색 시 몸통 중심에서 허용하는 가로 오프셋.
 const HEAD_CENTER_WINDOW = { narrow: 16, wide: 30 };
-const SCALE_CLAMP = { min: 0.72, max: 1.5 };
+// max 1.9: 공격(창 내지르기) 포즈처럼 가로로 길게 그려져 원본이 작은 셀을
+// 대기 포즈 크기까지 끌어올리는 데 최대 1.89가 필요하다.
+const SCALE_CLAMP = { min: 0.72, max: 1.9 };
 // 내장 휴리스틱은 비전 박스보다 오차가 커서 배율을 보수적으로 제한한다.
 // (비전 박스가 준비되면 SCALE_CLAMP 범위까지 허용된다.)
 const HEURISTIC_SCALE_CLAMP = { min: 0.82, max: 1.15 };
@@ -422,25 +430,41 @@ function main() {
   const sheetSizes = key => headSizes.get(key).flat().filter(value => value != null);
 
   // 기준 머리 크기: 아군 3개 시트는 공통 기준(전부 같은 소스일 때), 적 시트는 자기 시트 중앙값.
+  // 아군 공통 기준은 체형 그룹(columnGroups)별 중앙값으로 나눠 잡는다.
+  const groupOf = (sheet, column) => sheet.columnGroups?.[column] ?? 'm';
   const defenderSources = new Set(DEFENDER_SHEET_KEYS.map(key => headSources.get(key)));
-  const sharedDefenderReference = defenderSources.size === 1
-    ? median(DEFENDER_SHEET_KEYS.flatMap(sheetSizes))
-    : null;
-  if (sharedDefenderReference == null) {
+  const sharedDefenderGroupReference = new Map();
+  if (defenderSources.size === 1) {
+    const groupSizes = new Map();
+    for (const key of DEFENDER_SHEET_KEYS) {
+      const { sheet } = analyses.get(key);
+      headSizes.get(key).forEach(rowSizes => rowSizes.forEach((size, column) => {
+        if (size == null) return;
+        const group = groupOf(sheet, column);
+        if (!groupSizes.has(group)) groupSizes.set(group, []);
+        groupSizes.get(group).push(size);
+      }));
+    }
+    for (const [group, sizes] of groupSizes) sharedDefenderGroupReference.set(group, median(sizes));
+  } else {
     console.warn('경고: 아군 시트의 머리 박스가 일부만 있어 시트별 기준으로 정규화합니다. 아군 3개 시트를 모두 제공하는 것이 좋습니다.');
   }
-  const referenceFor = key => {
-    if (DEFENDER_SHEET_KEYS.includes(key) && sharedDefenderReference != null) return sharedDefenderReference;
-    return median(sheetSizes(key));
+  const sheetReference = new Map(SHEETS.map(sheet => [sheet.key, median(sheetSizes(sheet.key))]));
+  const referenceFor = (key, column) => {
+    if (DEFENDER_SHEET_KEYS.includes(key) && sharedDefenderGroupReference.size > 0) {
+      const { sheet } = analyses.get(key);
+      return sharedDefenderGroupReference.get(groupOf(sheet, column)) ?? sheetReference.get(key);
+    }
+    return sheetReference.get(key);
   };
 
   const metrics = {};
   const reportLines = [];
   for (const { sheet, cells } of analyses.values()) {
-    const reference = referenceFor(sheet.key);
     const clamp = headSources.get(sheet.key) === 'boxes' ? SCALE_CLAMP : HEURISTIC_SCALE_CLAMP;
     metrics[sheet.key] = cells.map((rowCells, row) => rowCells.map((cell, column) => {
       if (!cell) return { scale: 1, dy: 0 };
+      const reference = referenceFor(sheet.key, column);
       const headSize = headSizes.get(sheet.key)[row][column] ?? reference;
       const scale = Math.min(clamp.max, Math.max(clamp.min, reference / headSize));
       const gap = sheet.cellHeight - 1 - cell.bottom;
@@ -457,7 +481,13 @@ function main() {
   }
 
   for (const sheet of SHEETS) {
-    console.log(`${sheet.key}: 소스=${headSources.get(sheet.key) === 'boxes' ? '비전 박스' : '휴리스틱'}, 기준 머리 크기=${referenceFor(sheet.key).toFixed(1)}px`);
+    const source = headSources.get(sheet.key) === 'boxes' ? '비전 박스' : '휴리스틱';
+    if (DEFENDER_SHEET_KEYS.includes(sheet.key) && sharedDefenderGroupReference.size > 0) {
+      const groups = [...sharedDefenderGroupReference].map(([group, ref]) => `${group}=${ref.toFixed(1)}px`).join(', ');
+      console.log(`${sheet.key}: 소스=${source}, 기준 머리 크기(그룹별) ${groups}`);
+    } else {
+      console.log(`${sheet.key}: 소스=${source}, 기준 머리 크기=${sheetReference.get(sheet.key).toFixed(1)}px`);
+    }
   }
   console.log(reportLines.join('\n'));
   console.log('\n열(캐릭터)별 배율 — 같은 캐릭터는 포즈가 달라도 비슷해야 정상:');

@@ -14,546 +14,546 @@ export const TACTICAL_SPRITE_METRICS: Readonly<Record<
   defenderRoles: [
     [
       {
-        scale: 1,
+        scale: 0.914,
         dy: 0
       },
       {
-        scale: 1.045,
+        scale: 0.937,
         dy: 0
       },
       {
-        scale: 1.095,
+        scale: 0.959,
         dy: 0
       },
       {
-        scale: 1.045,
+        scale: 0.972,
         dy: 0
       },
       {
-        scale: 1.045,
+        scale: 0.944,
         dy: 0
       },
       {
-        scale: 1,
+        scale: 1.05,
         dy: 0
       },
       {
-        scale: 1,
+        scale: 0.944,
         dy: 0
       },
       {
-        scale: 0.92,
-        dy: 0
-      }
-    ],
-    [
-      {
-        scale: 1,
-        dy: 0
-      },
-      {
-        scale: 1.045,
-        dy: 0
-      },
-      {
-        scale: 1.15,
-        dy: 0
-      },
-      {
-        scale: 1.045,
-        dy: 0
-      },
-      {
-        scale: 1.045,
-        dy: 0
-      },
-      {
-        scale: 1,
-        dy: 0
-      },
-      {
-        scale: 0.92,
-        dy: 0
-      },
-      {
-        scale: 0.92,
+        scale: 0.905,
         dy: 0
       }
     ],
     [
       {
-        scale: 1,
-        dy: 5
+        scale: 0.914,
+        dy: 0
       },
       {
-        scale: 1,
-        dy: 5
+        scale: 0.905,
+        dy: 0
       },
       {
-        scale: 1.095,
-        dy: 4.4
+        scale: 1.009,
+        dy: 0
       },
       {
-        scale: 1,
-        dy: 6
+        scale: 1.01,
+        dy: 0
       },
       {
-        scale: 1.045,
-        dy: 4.2
+        scale: 0.992,
+        dy: 0
       },
       {
-        scale: 0.92,
-        dy: 5.5
+        scale: 1.01,
+        dy: 0
       },
       {
-        scale: 0.958,
-        dy: 4.8
+        scale: 0.914,
+        dy: 0
       },
       {
-        scale: 0.92,
+        scale: 0.937,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 0.914,
         dy: 4.6
+      },
+      {
+        scale: 0.905,
+        dy: 4.5
+      },
+      {
+        scale: 1.009,
+        dy: 4
+      },
+      {
+        scale: 0.972,
+        dy: 5.8
+      },
+      {
+        scale: 1.083,
+        dy: 4.3
+      },
+      {
+        scale: 0.991,
+        dy: 5.9
+      },
+      {
+        scale: 0.944,
+        dy: 4.7
+      },
+      {
+        scale: 0.89,
+        dy: 4.4
       }
     ],
     [
       {
-        scale: 0.958,
-        dy: 28.8
+        scale: 0.944,
+        dy: 28.3
       },
       {
-        scale: 0.958,
+        scale: 0.875,
+        dy: 25.4
+      },
+      {
+        scale: 0.959,
         dy: 27.8
       },
       {
-        scale: 0.958,
-        dy: 27.8
+        scale: 0.972,
+        dy: 29.2
       },
       {
-        scale: 0.958,
-        dy: 28.8
-      },
-      {
-        scale: 0.958,
-        dy: 27.8
-      },
-      {
-        scale: 0.885,
+        scale: 0.914,
         dy: 26.5
       },
       {
-        scale: 0.885,
-        dy: 25.7
+        scale: 0.972,
+        dy: 29.2
       },
       {
-        scale: 0.885,
-        dy: 25.7
+        scale: 0.914,
+        dy: 26.5
+      },
+      {
+        scale: 0.905,
+        dy: 26.2
       }
     ]
   ],
   defenderWeapons: [
     [
       {
-        scale: 1.15,
+        scale: 1.33,
         dy: 0
       },
       {
-        scale: 1.15,
+        scale: 1.25,
         dy: 0
       },
       {
-        scale: 1.15,
+        scale: 1.219,
         dy: 0
       },
       {
-        scale: 1.15,
+        scale: 1.221,
         dy: 0
       },
       {
-        scale: 1.15,
+        scale: 1.219,
         dy: 0
       },
       {
-        scale: 1.15,
+        scale: 1.221,
         dy: 0
       }
     ],
     [
       {
-        scale: 1.15,
-        dy: 8
+        scale: 1.17,
+        dy: 8.2
       },
       {
-        scale: 1.15,
-        dy: 9.2
+        scale: 1.05,
+        dy: 8.4
       },
       {
-        scale: 1.15,
-        dy: 6.9
+        scale: 1.272,
+        dy: 7.6
       },
       {
-        scale: 1.15,
-        dy: 6.9
+        scale: 1.141,
+        dy: 6.8
       },
       {
-        scale: 1.15,
-        dy: 8
+        scale: 1.083,
+        dy: 7.6
       },
       {
-        scale: 1.15,
-        dy: 8
+        scale: 1.094,
+        dy: 7.7
       }
     ],
     [
       {
-        scale: 1.045,
-        dy: 17.8
+        scale: 1.245,
+        dy: 21.2
       },
       {
-        scale: 1.15,
+        scale: 1.28,
+        dy: 23
+      },
+      {
+        scale: 1.219,
         dy: 20.7
       },
       {
-        scale: 1.095,
-        dy: 18.6
+        scale: 1.221,
+        dy: 20.8
       },
       {
-        scale: 1.15,
-        dy: 19.5
+        scale: 1.125,
+        dy: 19.1
       },
       {
-        scale: 1.095,
-        dy: 18.6
-      },
-      {
-        scale: 1.15,
-        dy: 20.7
+        scale: 1.193,
+        dy: 21.5
       }
     ],
     [
       {
-        scale: 1.045,
-        dy: 34.5
+        scale: 1.17,
+        dy: 38.6
       },
       {
-        scale: 1.095,
-        dy: 39.4
+        scale: 1.25,
+        dy: 45
       },
       {
-        scale: 0.852,
-        dy: 30.7
+        scale: 1.125,
+        dy: 40.5
       },
       {
-        scale: 1.15,
-        dy: 40.3
+        scale: 1.141,
+        dy: 39.9
       },
       {
-        scale: 1,
-        dy: 35
+        scale: 1.17,
+        dy: 40.9
       },
       {
-        scale: 1,
-        dy: 35
+        scale: 1.094,
+        dy: 38.3
       }
     ]
   ],
   defenderDefaultWeapons: [
     [
       {
-        scale: 0.885,
+        scale: 0.9,
         dy: 1.8
       },
       {
-        scale: 0.885,
-        dy: 1.8
-      },
-      {
-        scale: 0.885,
-        dy: 1.8
-      },
-      {
-        scale: 0.958,
+        scale: 0.937,
         dy: 1.9
       },
       {
-        scale: 0.852,
-        dy: 1.7
+        scale: 0.9,
+        dy: 1.8
       },
       {
-        scale: 0.852,
-        dy: 1.7
-      }
-    ],
-    [
-      {
-        scale: 1.15,
-        dy: 2.3
+        scale: 0.905,
+        dy: 1.8
       },
       {
-        scale: 1.15,
-        dy: 2.3
-      },
-      {
-        scale: 1.15,
-        dy: 2.3
-      },
-      {
-        scale: 1.15,
-        dy: 2.3
-      },
-      {
-        scale: 1,
-        dy: 2
-      },
-      {
-        scale: 1.045,
-        dy: 2.1
-      }
-    ],
-    [
-      {
-        scale: 1.095,
-        dy: 2.2
-      },
-      {
-        scale: 1.045,
-        dy: 2.1
-      },
-      {
-        scale: 1,
-        dy: 2
-      },
-      {
-        scale: 1,
-        dy: 2
-      },
-      {
-        scale: 0.821,
+        scale: 0.78,
         dy: 1.6
       },
       {
-        scale: 0.92,
+        scale: 0.72,
+        dy: 1.4
+      }
+    ],
+    [
+      {
+        scale: 1.887,
+        dy: 3.8
+      },
+      {
+        scale: 1.694,
+        dy: 3.4
+      },
+      {
+        scale: 1.5,
+        dy: 3
+      },
+      {
+        scale: 1.458,
+        dy: 2.9
+      },
+      {
+        scale: 1.245,
+        dy: 2.5
+      },
+      {
+        scale: 1.094,
+        dy: 2.2
+      }
+    ],
+    [
+      {
+        scale: 1.5,
+        dy: 3
+      },
+      {
+        scale: 1.28,
+        dy: 2.6
+      },
+      {
+        scale: 1.083,
+        dy: 2.2
+      },
+      {
+        scale: 1.094,
+        dy: 2.2
+      },
+      {
+        scale: 0.886,
+        dy: 1.8
+      },
+      {
+        scale: 0.905,
         dy: 1.8
       }
     ],
     [
       {
-        scale: 0.82,
+        scale: 0.873,
+        dy: 1.7
+      },
+      {
+        scale: 0.861,
+        dy: 1.7
+      },
+      {
+        scale: 0.944,
+        dy: 1.9
+      },
+      {
+        scale: 0.784,
         dy: 1.6
       },
       {
-        scale: 0.82,
+        scale: 0.78,
         dy: 1.6
       },
       {
-        scale: 0.821,
-        dy: 1.6
-      },
-      {
-        scale: 1.045,
-        dy: 2.1
-      },
-      {
-        scale: 0.821,
-        dy: 1.6
-      },
-      {
-        scale: 0.821,
-        dy: 1.6
+        scale: 0.72,
+        dy: 1.4
       }
     ]
   ],
   raiders: [
     [
       {
-        scale: 1.15,
+        scale: 0.89,
         dy: 0
       },
       {
-        scale: 1.048,
+        scale: 0.967,
         dy: 0
       },
       {
-        scale: 1.15,
+        scale: 0.967,
         dy: 0
       },
       {
-        scale: 1.1,
+        scale: 0.989,
         dy: 0
       },
       {
-        scale: 1.15,
+        scale: 1.035,
         dy: 0
       },
       {
-        scale: 0.957,
-        dy: 0
-      }
-    ],
-    [
-      {
-        scale: 1.15,
-        dy: 0
-      },
-      {
-        scale: 1.048,
-        dy: 0
-      },
-      {
-        scale: 1.048,
-        dy: 0
-      },
-      {
-        scale: 1.048,
-        dy: 0
-      },
-      {
-        scale: 1.048,
-        dy: 0
-      },
-      {
-        scale: 0.957,
+        scale: 1.06,
         dy: 0
       }
     ],
     [
       {
-        scale: 0.917,
-        dy: 7.3
+        scale: 0.989,
+        dy: 0
       },
       {
-        scale: 1.048,
-        dy: 8.4
+        scale: 0.89,
+        dy: 0
       },
       {
-        scale: 0.957,
-        dy: 8.6
+        scale: 1.06,
+        dy: 0
       },
       {
-        scale: 1.1,
-        dy: 9.9
+        scale: 0.967,
+        dy: 0
       },
       {
-        scale: 0.957,
-        dy: 8.6
+        scale: 1.085,
+        dy: 0
       },
       {
-        scale: 0.88,
-        dy: 7.9
+        scale: 0.989,
+        dy: 0
       }
     ],
     [
       {
-        scale: 0.88,
-        dy: 20.2
+        scale: 1.203,
+        dy: 9.6
       },
       {
-        scale: 0.917,
-        dy: 21.1
+        scale: 1.06,
+        dy: 8.5
       },
       {
-        scale: 0.846,
-        dy: 19.5
+        scale: 1.203,
+        dy: 10.8
       },
       {
-        scale: 0.846,
-        dy: 16.9
+        scale: 1.141,
+        dy: 10.3
       },
       {
-        scale: 0.846,
-        dy: 19.5
+        scale: 1.236,
+        dy: 11.1
       },
       {
-        scale: 0.82,
-        dy: 18.9
+        scale: 1.435,
+        dy: 12.9
+      }
+    ],
+    [
+      {
+        scale: 0.927,
+        dy: 21.3
+      },
+      {
+        scale: 0.927,
+        dy: 21.3
+      },
+      {
+        scale: 1.011,
+        dy: 23.3
+      },
+      {
+        scale: 0.967,
+        dy: 19.3
+      },
+      {
+        scale: 1.011,
+        dy: 23.3
+      },
+      {
+        scale: 0.989,
+        dy: 22.7
       }
     ]
   ],
   court: [
     [
       {
-        scale: 1.15,
+        scale: 0.967,
         dy: 0
       },
       {
-        scale: 1.15,
+        scale: 0.927,
         dy: 0
       },
       {
-        scale: 1.15,
+        scale: 0.989,
         dy: 0
       },
       {
-        scale: 1.15,
+        scale: 1.203,
         dy: 0
       },
       {
-        scale: 0.82,
-        dy: 0
-      }
-    ],
-    [
-      {
-        scale: 1.15,
-        dy: 0
-      },
-      {
-        scale: 1.15,
-        dy: 0
-      },
-      {
-        scale: 0.957,
-        dy: 0
-      },
-      {
-        scale: 0.846,
-        dy: 0
-      },
-      {
-        scale: 1.048,
+        scale: 0.927,
         dy: 0
       }
     ],
     [
       {
-        scale: 0.846,
-        dy: 8.5
+        scale: 0.927,
+        dy: 0
       },
       {
-        scale: 0.957,
-        dy: 9.6
+        scale: 0.927,
+        dy: 0
       },
       {
-        scale: 1.048,
-        dy: 11.5
+        scale: 1.011,
+        dy: 0
       },
       {
-        scale: 0.82,
-        dy: 9
+        scale: 1.113,
+        dy: 0
       },
       {
-        scale: 0.917,
-        dy: 2.8
+        scale: 1.06,
+        dy: 0
       }
     ],
     [
       {
-        scale: 1.048,
-        dy: 27.2
+        scale: 1.309,
+        dy: 13.1
       },
       {
-        scale: 0.82,
-        dy: 20.5
+        scale: 1.06,
+        dy: 10.6
       },
       {
-        scale: 1.1,
-        dy: 27.5
+        scale: 1.06,
+        dy: 11.7
       },
       {
-        scale: 0.82,
-        dy: 9
+        scale: 0.967,
+        dy: 10.6
       },
       {
-        scale: 0.957,
-        dy: 17.2
+        scale: 1.171,
+        dy: 3.5
+      }
+    ],
+    [
+      {
+        scale: 0.89,
+        dy: 23.1
+      },
+      {
+        scale: 0.927,
+        dy: 23.2
+      },
+      {
+        scale: 0.89,
+        dy: 22.3
+      },
+      {
+        scale: 1.141,
+        dy: 12.6
+      },
+      {
+        scale: 1.011,
+        dy: 18.2
       }
     ]
   ]

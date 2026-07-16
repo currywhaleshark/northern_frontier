@@ -146,7 +146,8 @@ for (const [sheetKey, shape] of Object.entries(expectedMetricShapes)) {
   for (const rowMetrics of sheetMetrics) {
     assert.equal(rowMetrics.length, shape.columns, `${sheetKey} metric columns`);
     for (const metric of rowMetrics) {
-      assert.ok(metric.scale >= 0.72 && metric.scale <= 1.5, `${sheetKey} scale in range: ${metric.scale}`);
+      // 생성 스크립트의 SCALE_CLAMP(0.72~1.9)와 일치해야 한다.
+      assert.ok(metric.scale >= 0.72 && metric.scale <= 1.9, `${sheetKey} scale in range: ${metric.scale}`);
       assert.ok(metric.dy >= -6 && metric.dy <= 60, `${sheetKey} dy in range: ${metric.dy}`);
     }
   }
