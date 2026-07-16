@@ -33,6 +33,15 @@ function costText(type: BuildableBuildingTypeId): string {
   return parts.length > 0 ? parts.join(' · ') : '무료';
 }
 
+function buildingTooltip(type: BuildableBuildingTypeId, reason: string | null): string {
+  const def = BUILDING_DEFS[type];
+  return [
+    def.desc,
+    `${costText(type)} · 공기 ${def.buildDays}일`,
+    reason ? `사용 불가: ${reason}` : null,
+  ].filter((line): line is string => line != null).join('\n');
+}
+
 function unavailableReason(state: GameState, type: BuildableBuildingTypeId): string | null {
   const def = BUILDING_DEFS[type];
   if (!isBuildingUnlocked(state.rank, type)) {
@@ -77,8 +86,11 @@ function BuildingThumb({ type, state }: { type: BuildableBuildingTypeId; state: 
 
 export function BuildDrawer({ state, placingType, setPlacingType, uiPrefs, onUiPrefsChange }: Props) {
   const [drawerState, setDrawerState] = useState(closedBuildDrawerState);
+  const [hoveredTooltipType, setHoveredTooltipType] = useState<BuildableBuildingTypeId | null>(null);
+  const [focusedTooltipType, setFocusedTooltipType] = useState<BuildableBuildingTypeId | null>(null);
   const previousPlacingRef = useRef<BuildingTypeId | null>(placingType);
   const openCategory = drawerState.openCategory;
+  const tooltipType = hoveredTooltipType ?? focusedTooltipType;
   const activeCategory = BUILD_CATEGORIES.find(category => category.id === openCategory) ?? null;
   const placingCategory = placingType && isBuildableBuildingType(placingType)
     ? buildCategoryFor(placingType)
@@ -102,6 +114,11 @@ export function BuildDrawer({ state, placingType, setPlacingType, uiPrefs, onUiP
     }
     previousPlacingRef.current = placingType;
   }, [placingType, uiPrefs.buildDrawerLastCategory]);
+
+  useEffect(() => {
+    setHoveredTooltipType(null);
+    setFocusedTooltipType(null);
+  }, [openCategory]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -153,6 +170,11 @@ export function BuildDrawer({ state, placingType, setPlacingType, uiPrefs, onUiP
           className="build-drawer-panel"
           aria-label={`${activeCategory.label} 건설 목록`}
         >
+          {tooltipType && activeCategory.types.includes(tooltipType) && (
+            <div id="build-drawer-tooltip" className="build-drawer-tooltip" role="tooltip">
+              {buildingTooltip(tooltipType, unavailableReason(state, tooltipType))}
+            </div>
+          )}
           <header className="build-drawer-head">
             <div>
               <span aria-hidden="true">{activeCategory.icon}</span>
@@ -174,20 +196,17 @@ export function BuildDrawer({ state, placingType, setPlacingType, uiPrefs, onUiP
                   key={type}
                   type="button"
                   className="build-drawer-item"
-                  disabled={reason != null}
-                  title={`${def.desc}${reason ? ` — ${reason}` : ''}`}
-                  onClick={() => startPlacement(type)}
+                  aria-disabled={reason != null}
+                  aria-describedby={tooltipType === type ? 'build-drawer-tooltip' : undefined}
+                  aria-label={def.name}
+                  onMouseEnter={() => setHoveredTooltipType(type)}
+                  onMouseLeave={() => setHoveredTooltipType(current => current === type ? null : current)}
+                  onFocus={() => setFocusedTooltipType(type)}
+                  onBlur={() => setFocusedTooltipType(current => current === type ? null : current)}
+                  onClick={() => { if (!reason) startPlacement(type); }}
                 >
                   <BuildingThumb type={type} state={state} />
-                  <span className="build-drawer-item-body">
-                    <span className="build-drawer-item-title">
-                      <strong>{def.name}</strong>
-                      {def.minRank && <small>{RANK_NAMES[def.minRank]}</small>}
-                    </span>
-                    <span className="build-drawer-item-desc">{def.desc}</span>
-                    <span className="build-drawer-item-meta">{costText(type)} · 공기 {def.buildDays}일</span>
-                    {reason && <span className="build-drawer-item-reason">{reason}</span>}
-                  </span>
+                  <strong className="build-drawer-item-name">{def.name}</strong>
                 </button>
               );
             })}

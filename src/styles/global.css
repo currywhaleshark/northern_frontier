@@ -467,20 +467,39 @@ html, body, #root {
 .build-drawer-head button:hover,
 .build-drawer-head button:focus-visible { border-color: var(--accent); outline: none; }
 .build-drawer-panel {
+  position: relative;
   width: 100%;
-  padding: 8px;
-  overflow: hidden;
+  padding: 6px;
+  overflow: visible;
   border: 1px solid rgba(217, 164, 65, 0.55);
   border-radius: 8px;
   background: rgba(27, 33, 39, 0.97);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.48);
+}
+.build-drawer-tooltip {
+  position: absolute;
+  z-index: 2;
+  bottom: calc(100% + 5px);
+  left: 7px;
+  width: max-content;
+  max-width: min(420px, calc(100% - 14px));
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: rgba(20, 25, 30, 0.98);
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  font-size: 11px;
+  line-height: 1.45;
+  pointer-events: none;
+  white-space: pre-line;
 }
 .build-drawer-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 7px;
+  margin-bottom: 4px;
 }
 .build-drawer-head > div { display: flex; align-items: center; gap: 7px; }
 .build-drawer-head > div > span { font-size: 18px; }
@@ -489,20 +508,20 @@ html, body, #root {
 .build-drawer-grid {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(205px, 225px);
-  gap: 7px;
+  grid-auto-columns: minmax(112px, 128px);
+  gap: 5px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 1px 1px 5px;
+  padding: 1px 1px 3px;
   scrollbar-width: thin;
 }
 .build-drawer-item {
-  min-height: 122px;
+  min-height: 56px;
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  align-items: start;
-  gap: 6px;
-  padding: 7px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--panel2);
@@ -511,41 +530,32 @@ html, body, #root {
   text-align: left;
   cursor: pointer;
 }
-.build-drawer-item:hover:not(:disabled),
-.build-drawer-item:focus-visible:not(:disabled) {
+.build-drawer-item:hover:not([aria-disabled="true"]) {
   border-color: var(--accent);
   background: #303740;
-  outline: none;
 }
-.build-drawer-item:disabled {
+.build-drawer-item:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.build-drawer-item[aria-disabled="true"] {
   border-color: #333b44;
   background: #20262c;
   color: #9ca5ae;
   cursor: not-allowed;
 }
-.build-drawer-thumb { width: 32px; height: 44px; flex: 0 0 auto; image-rendering: pixelated; }
-.build-drawer-item-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.build-drawer-item-title { display: flex; align-items: center; justify-content: space-between; gap: 5px; }
-.build-drawer-item-title strong { color: var(--text); }
-.build-drawer-item-title small {
-  flex: 0 0 auto;
-  padding: 1px 4px;
-  border: 1px solid rgba(217, 164, 65, 0.35);
-  border-radius: 3px;
-  color: var(--accent);
-  font-size: 9px;
-}
-.build-drawer-item-desc {
+.build-drawer-thumb { width: 28px; height: 38px; flex: 0 0 auto; image-rendering: pixelated; }
+.build-drawer-item-name {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  color: #b6bec7;
-  font-size: 10px;
-  line-height: 1.35;
+  color: inherit;
+  font-size: 11px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
-.build-drawer-item-meta { color: var(--muted); font-size: 10px; line-height: 1.3; }
-.build-drawer-item-reason { margin-top: auto; color: #dfa372; font-size: 10px; font-weight: 700; }
 .build-category-bar {
   max-width: 100%;
   display: flex;
