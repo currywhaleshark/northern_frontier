@@ -7,6 +7,12 @@ export interface WorkerSlotConfig {
   slots: number;
 }
 
+export const AUTO_ASSIGN_BUILDING_TYPES = [
+  'field', 'paddy', 'watermill', 'woodShed', 'charcoalKiln', 'smithy',
+  'stable', 'nitreYard', 'ferry', 'tannery', 'weavingHouse',
+] as const satisfies readonly BuildingTypeId[];
+export type AutoAssignBuildingType = typeof AUTO_ASSIGN_BUILDING_TYPES[number];
+
 export const SLOTTED_BUILDING_CONFIG: Partial<Record<BuildingTypeId, WorkerSlotConfig>> = {
   field: { job: 'farmer', slots: 1 },
   paddy: { job: 'farmer', slots: 1 },
@@ -47,6 +53,10 @@ export function workerSlotConfig(type: BuildingTypeId): WorkerSlotConfig | null 
 
 export function isSlottedProductionBuilding(type: BuildingTypeId): boolean {
   return workerSlotConfig(type) != null;
+}
+
+export function isAutoAssignBuildingType(value: unknown): value is AutoAssignBuildingType {
+  return typeof value === 'string' && (AUTO_ASSIGN_BUILDING_TYPES as readonly string[]).includes(value);
 }
 
 export function assignedWorkers(state: GameState, building: Building): Resident[] {
@@ -95,6 +105,49 @@ export function autoAssignWorkersToBuilding(state: GameState, buildingId: number
   const assigned: Resident[] = [];
   for (const resident of candidates) {
     if (assignResidentToBuilding(state, resident.id, building.id) == null) assigned.push(resident);
+  }
+  return assigned;
+}
+
+// 기존 건물 배정은 유지하고, 같은 직업의 미배정 주민만 빈 슬롯에 배치한다.
+export function autoAssignWorkersToSelectedBuildingTypes(
+  state: GameState,
+  selectedTypes: readonly AutoAssignBuildingType[],
+): Resident[] {
+  const selected = new Set(selectedTypes);
+  const targets = state.buildings
+    .filter(building => selected.has(building.type as AutoAssignBuildingType))
+    .sort((a, b) => a.id - b.id)
+    .flatMap(building => {
+      const config = slottedConfigForBuilding(state, building);
+      if (!config) return [];
+      // 병자 등 일시적으로 일하지 못하는 기존 배정자도 자리를 차지한다.
+      const reservedSlots = state.residents.filter(resident =>
+        resident.alive && resident.job === config.job && resident.assignedBuildingId === building.id).length;
+      const vacancies = Math.max(0, config.slots - reservedSlots);
+      return vacancies > 0 ? [{ building, config, vacancies }] : [];
+    });
+
+  const assigned: Resident[] = [];
+  while (true) {
+    let best: {
+      target: typeof targets[number]; resident: Resident; distance: number;
+    } | null = null;
+    for (const target of targets) {
+      if (target.vacancies <= 0) continue;
+      for (const resident of state.residents) {
+        if (resident.job !== target.config.job || resident.assignedBuildingId != null || !isWorkableResident(state, resident)) continue;
+        const candidate = { target, resident, distance: distance(resident, target.building) };
+        if (!best || candidate.distance < best.distance
+          || (candidate.distance === best.distance && candidate.target.building.id < best.target.building.id)
+          || (candidate.distance === best.distance && candidate.target.building.id === best.target.building.id
+            && candidate.resident.id < best.resident.id)) best = candidate;
+      }
+    }
+    if (!best) break;
+    if (assignResidentToBuilding(state, best.resident.id, best.target.building.id) != null) break;
+    best.target.vacancies--;
+    assigned.push(best.resident);
   }
   return assigned;
 }

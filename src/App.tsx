@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CONFIG } from './game/config';
 import {
   assignNearestWorkerToBuilding, assignResidentToBuilding,
-  advanceDay, advanceTick, cancelBuildingConstruction, continueAfterVictory, demolishBuilding, newGame, reassignJob, resolveChoice, setResidentJob,
+  advanceDay, advanceTick, autoAssignWorkersToBuildingTypes, cancelBuildingConstruction, continueAfterVictory, demolishBuilding, newGame, reassignJob, resolveChoice, setResidentJob,
   setBuildingCrop, setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
   convertFieldToPaddy, toggleResidentCart,
   unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
@@ -65,6 +65,7 @@ import type {
   PreparationActionId, PredatorKind, SpecialItemId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
 import { loadUiPrefs, saveUiPrefs, type UiPrefs } from './ui/uiPrefs';
+import type { AutoAssignBuildingType } from './game/workerSlots';
 
 export default function App() {
   // 게임 상태는 ref에 두고, version 증가로 리렌더를 트리거한다
@@ -274,6 +275,18 @@ export default function App() {
 
   const handleReassign = (from: JobId, to: JobId) => {
     reassignJob(stateRef.current, from, to);
+    bump();
+  };
+
+  const handleAutoAssignBuildings = (types: readonly AutoAssignBuildingType[]) => {
+    const assigned = autoAssignWorkersToBuildingTypes(stateRef.current, types);
+    addLog(
+      stateRef.current,
+      assigned.length > 0
+        ? `선택한 건물의 빈 자리에 주민 ${assigned.length}명을 자동 배정했습니다.`
+        : '선택한 건물에 배정할 수 있는 같은 직업의 미배정 주민이나 빈자리가 없습니다.',
+      assigned.length > 0 ? 'good' : 'info',
+    );
     bump();
   };
 
@@ -769,7 +782,13 @@ export default function App() {
       />
       <div className="main">
         <div className="side left">
-          <JobPanel state={state} onReassign={handleReassign} />
+          <JobPanel
+            state={state}
+            onReassign={handleReassign}
+            uiPrefs={uiPrefs}
+            onUiPrefsChange={setUiPrefs}
+            onAutoAssign={handleAutoAssignBuildings}
+          />
           <ProcessingPanel state={state} onSetReserve={handleSetProcessingReserve} />
         </div>
         <div className="canvas-stage">

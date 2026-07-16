@@ -117,4 +117,42 @@ function resident(state, index, job, x, y) {
   assert.equal(extra.assignedBuildingId, null);
 }
 
+// 대량 자동 배정은 선택한 건물 종류의 빈자리만 채우며, 기존 배정·다른 종류·직업은 보존한다.
+{
+  const state = prepare(2026071601);
+  const assignedField = addBuilding(state, 'field', 10, 10, true);
+  const emptyField = addBuilding(state, 'field', 24, 10, true);
+  const unselectedPaddy = addBuilding(state, 'paddy', 18, 10, true);
+  const existingFarmer = resident(state, 0, 'farmer', 10, 10);
+  const fieldFarmer = resident(state, 1, 'farmer', 23, 10);
+  const paddyFarmer = resident(state, 2, 'farmer', 18, 9);
+  const idleNearField = resident(state, 3, 'idle', 24, 9);
+  assert.equal(workerSlots.assignResidentToBuilding(state, existingFarmer.id, assignedField.id), null);
+
+  const assigned = workerSlots.autoAssignWorkersToSelectedBuildingTypes(state, ['field']);
+
+  assert.deepEqual(assigned.map(worker => worker.id), [fieldFarmer.id]);
+  assert.equal(existingFarmer.assignedBuildingId, assignedField.id, 'existing assignments must be preserved');
+  assert.equal(fieldFarmer.assignedBuildingId, emptyField.id, 'selected empty slots must be filled');
+  assert.equal(paddyFarmer.assignedBuildingId, null, 'unselected building types must not receive workers');
+  assert.equal(workerSlots.assignedWorkers(state, unselectedPaddy).length, 0,
+    'the unselected paddy must remain unfilled');
+  assert.equal(idleNearField.assignedBuildingId, null, 'automatic assignment must not change jobs');
+}
+
+// 직업 인원을 줄일 때는 건물 슬롯에 연결되지 않은 주민부터 무직으로 돌린다.
+{
+  const state = prepare(2026071602);
+  const field = addBuilding(state, 'field', 10, 10, true);
+  const assignedFarmer = resident(state, 0, 'farmer', 10, 10);
+  const unassignedFarmer = resident(state, 1, 'farmer', 14, 10);
+  assert.equal(workerSlots.assignResidentToBuilding(state, assignedFarmer.id, field.id), null);
+
+  assert.equal(simulation.reassignJob(state, 'farmer', 'idle'), true);
+  assert.equal(assignedFarmer.job, 'farmer');
+  assert.equal(assignedFarmer.assignedBuildingId, field.id);
+  assert.equal(unassignedFarmer.job, 'idle');
+  assert.equal(unassignedFarmer.assignedBuildingId, null);
+}
+
 console.log('automatic worker assignment tests passed');

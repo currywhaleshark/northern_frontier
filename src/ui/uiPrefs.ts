@@ -9,10 +9,15 @@ import {
   isBuildCategoryId,
   type BuildCategoryId,
 } from './buildPresentation';
+import {
+  AUTO_ASSIGN_BUILDING_TYPES,
+  isAutoAssignBuildingType,
+  type AutoAssignBuildingType,
+} from '../game/workerSlots';
 
 export const UI_PREFS_KEY = 'buksae-ui-prefs';
 export const LEGACY_BUILD_MENU_OPEN_KEY = 'buksae-buildmenu-open';
-export const UI_PREFS_VERSION = 2;
+export const UI_PREFS_VERSION = 3;
 export const MAX_STARRED_RESOURCES = 8;
 
 export interface UiPrefs {
@@ -20,6 +25,7 @@ export interface UiPrefs {
   starredResources: StockResourceId[];
   pinnedResourceGroups: ResourceDisplayGroupId[];
   buildDrawerLastCategory: BuildCategoryId;
+  autoAssignBuildingTypes: AutoAssignBuildingType[];
 }
 
 export interface UiPrefsStorage {
@@ -34,6 +40,7 @@ export function defaultUiPrefs(buildDrawerLastCategory = DEFAULT_BUILD_CATEGORY)
     starredResources: [],
     pinnedResourceGroups: [],
     buildDrawerLastCategory,
+    autoAssignBuildingTypes: [...AUTO_ASSIGN_BUILDING_TYPES],
   };
 }
 
@@ -61,16 +68,22 @@ export function normalizeUiPrefs(value: unknown, migratedBuildCategory = DEFAULT
     starredResources?: unknown;
     pinnedResourceGroups?: unknown;
     buildDrawerLastCategory?: unknown;
+    autoAssignBuildingTypes?: unknown;
   };
-  if (candidate.version !== 1 && candidate.version !== UI_PREFS_VERSION) return defaultUiPrefs();
+  if (candidate.version !== 1 && candidate.version !== 2 && candidate.version !== UI_PREFS_VERSION) {
+    return defaultUiPrefs();
+  }
   return {
     version: UI_PREFS_VERSION,
     starredResources: uniqueValidValues(candidate.starredResources, isStockResourceId, MAX_STARRED_RESOURCES),
     pinnedResourceGroups: uniqueValidValues(candidate.pinnedResourceGroups, isResourceDisplayGroupId),
-    buildDrawerLastCategory: candidate.version === UI_PREFS_VERSION
+    buildDrawerLastCategory: (candidate.version === 2 || candidate.version === UI_PREFS_VERSION)
       && isBuildCategoryId(candidate.buildDrawerLastCategory)
       ? candidate.buildDrawerLastCategory
       : migratedBuildCategory,
+    autoAssignBuildingTypes: candidate.version === UI_PREFS_VERSION
+      ? uniqueValidValues(candidate.autoAssignBuildingTypes, isAutoAssignBuildingType)
+      : [...AUTO_ASSIGN_BUILDING_TYPES],
   };
 }
 
@@ -145,4 +158,23 @@ export function togglePinnedResourceGroup(prefs: UiPrefs, groupId: ResourceDispl
     ...prefs,
     pinnedResourceGroups: [...prefs.pinnedResourceGroups, groupId],
   };
+}
+
+export function setAutoAssignBuildingTypes(
+  prefs: UiPrefs,
+  types: readonly AutoAssignBuildingType[],
+): UiPrefs {
+  return {
+    ...prefs,
+    autoAssignBuildingTypes: uniqueValidValues(types, isAutoAssignBuildingType),
+  };
+}
+
+export function toggleAutoAssignBuildingType(
+  prefs: UiPrefs,
+  type: AutoAssignBuildingType,
+): UiPrefs {
+  return prefs.autoAssignBuildingTypes.includes(type)
+    ? setAutoAssignBuildingTypes(prefs, prefs.autoAssignBuildingTypes.filter(current => current !== type))
+    : setAutoAssignBuildingTypes(prefs, [...prefs.autoAssignBuildingTypes, type]);
 }

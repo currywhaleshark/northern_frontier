@@ -54,6 +54,7 @@ import {
   foreignSiteAt, generateForeignSites, revealForeignSitesFromExploration, updateSeasonalForeignSites,
 } from './foreignSites';
 import {
+  autoAssignWorkersToSelectedBuildingTypes as autoAssignWorkersToSelectedSlots,
   assignNearestWorkerToBuilding as assignNearestWorkerToSlot,
   assignResidentToBuilding as assignResidentToSlot,
   clearAssignmentsForBuilding,
@@ -61,6 +62,7 @@ import {
   unassignResidentFromBuilding as unassignResidentFromSlot,
   workerSlotConfig,
 } from './workerSlots';
+import type { AutoAssignBuildingType } from './workerSlots';
 import type {
   Building, BuildingTypeId, CropId, Difficulty, GameState, JobId, PointerAction, Resident, ResourceId, SmithyProductId,
 } from './types';
@@ -326,7 +328,8 @@ export function cancelBuildingConstruction(state: GameState, buildingId: number)
 // 직업 재배정: from 직업의 산 주민 1명을 to 직업으로
 export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
   if (!isJobUnlocked(state.rank, to)) return false;
-  const r = state.residents.find(res => res.alive && res.job === from);
+  const r = state.residents.find(res => res.alive && res.job === from && res.assignedBuildingId == null)
+    ?? state.residents.find(res => res.alive && res.job === from);
   if (!r) return false;
   if (to !== 'hauler') returnResidentCart(state, r);
   r.job = to;
@@ -613,6 +616,15 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else resolveTrade(state, optionId);
   reconcileWeaponAssignments(state);
   state.resources.defense = computeDefense(state);
+}
+
+export function autoAssignWorkersToBuildingTypes(
+  state: GameState,
+  types: readonly AutoAssignBuildingType[],
+): Resident[] {
+  const assigned = autoAssignWorkersToSelectedSlots(state, types);
+  for (const resident of assigned) resetAgent(state, resident);
+  return assigned;
 }
 
 export function useLuxuryGood(state: GameState, resource: ResourceId): string | null {
