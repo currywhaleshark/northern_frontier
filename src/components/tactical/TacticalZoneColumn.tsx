@@ -33,6 +33,7 @@ import {
   type TacticalMuzzleAnchor,
   type TacticalSpritePose,
 } from '../../render/tacticalCharacterAssets';
+import { tacticalSpriteMetricVars } from '../../render/tacticalSpriteMetrics';
 
 const BARRICADE_SPRITES = {
   normal: '/assets/tactical/barricade-normal-v1.png',
@@ -136,6 +137,11 @@ function DefenderSprite({ group, gender, pose = 'idle', firing = false, faded = 
     : cell.sheet === 'defaultWeapons'
       ? TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET
       : TACTICAL_DEFENDER_ROLE_POSE_SHEET;
+  const metricSheet = cell.sheet === 'weapons'
+    ? 'defenderWeapons' as const
+    : cell.sheet === 'defaultWeapons'
+      ? 'defenderDefaultWeapons' as const
+      : 'defenderRoles' as const;
   return (
     <span
       className={`tactical-sprite tactical-defender role-${group.role} weapon-${group.weapon ?? 'unarmed'} default-weapon-${defaultWeapon ?? 'none'} pose-${resolvedPose}${faded ? ' faded' : ''}${falling ? ' falling' : ''}`}
@@ -143,7 +149,8 @@ function DefenderSprite({ group, gender, pose = 'idle', firing = false, faded = 
         backgroundImage: `url(${sheet.src})`,
         backgroundPosition: `${-cell.column * sheet.spriteWidth}px ${-cell.row * sheet.spriteHeight}px`,
         backgroundSize: `${sheet.columns * sheet.spriteWidth}px ${sheet.rows * sheet.spriteHeight}px`,
-      }}
+        ...tacticalSpriteMetricVars(metricSheet, cell.column, cell.row),
+      } as CSSProperties}
       aria-hidden="true"
     >
       {muzzleAnchor && <UnitMuzzleFlash anchor={muzzleAnchor} />}
@@ -167,7 +174,8 @@ function CourtRaiderSprite({ unitType, pose, firing, falling }: {
         backgroundImage: `url(${TACTICAL_COURT_POSE_SHEET.src})`,
         backgroundPosition: `${-cell.column * TACTICAL_COURT_POSE_SHEET.spriteWidth}px ${-cell.row * TACTICAL_COURT_POSE_SHEET.spriteHeight}px`,
         backgroundSize: `${TACTICAL_COURT_POSE_SHEET.columns * TACTICAL_COURT_POSE_SHEET.spriteWidth}px ${TACTICAL_COURT_POSE_SHEET.rows * TACTICAL_COURT_POSE_SHEET.spriteHeight}px`,
-      }}
+        ...tacticalSpriteMetricVars('court', cell.column, cell.row),
+      } as CSSProperties}
       aria-hidden="true"
     >
       {muzzleAnchor && <UnitMuzzleFlash anchor={muzzleAnchor} />}
@@ -244,7 +252,8 @@ function RaiderSprite({
         backgroundSize: `${TACTICAL_RAIDER_POSE_SHEET.columns * TACTICAL_RAIDER_POSE_SHEET.spriteWidth}px ${TACTICAL_RAIDER_POSE_SHEET.rows * TACTICAL_RAIDER_POSE_SHEET.spriteHeight}px`,
         marginLeft: offset > 0 ? -140 : 0,
         marginBottom: (offset % 3) * 4,
-      }}
+        ...tacticalSpriteMetricVars('raiders', cell.column, cell.row),
+      } as CSSProperties}
       aria-hidden="true"
     />
   );

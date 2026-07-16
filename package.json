@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test:game": "node tools/run-game-tests.mjs",
     "test:combat": "node tools/game/test_tactical_battle.mjs",
+    "gen:sprite-metrics": "node tools/game/generate_tactical_sprite_metrics.mjs",
     "check": "npm run test:game && npm run build"
   },
   "dependencies": {

@@ -1,5 +1,7 @@
+import type { CSSProperties } from 'react';
 import { combatSpriteDescriptor } from '../../game/combatCapabilities';
 import type { TacticalDefenderGroup } from '../../game/types';
+import { tacticalSpriteMetricVars } from '../../render/tacticalSpriteMetrics';
 import {
   TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET,
   TACTICAL_DEFENDER_ROLE_POSE_SHEET,
@@ -39,6 +41,11 @@ function DockDefenderSprite({ group, gender }: {
     : cell.sheet === 'defaultWeapons'
       ? TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET
       : TACTICAL_DEFENDER_ROLE_POSE_SHEET;
+  const metricSheet = cell.sheet === 'weapons'
+    ? 'defenderWeapons' as const
+    : cell.sheet === 'defaultWeapons'
+      ? 'defenderDefaultWeapons' as const
+      : 'defenderRoles' as const;
   return (
     <span
       className={`tactical-sprite tactical-defender role-${group.role} weapon-${group.weapon ?? 'unarmed'} default-weapon-${defaultWeapon ?? 'none'} pose-idle`}
@@ -46,7 +53,8 @@ function DockDefenderSprite({ group, gender }: {
         backgroundImage: `url(${sheet.src})`,
         backgroundPosition: `${-cell.column * sheet.spriteWidth}px ${-cell.row * sheet.spriteHeight}px`,
         backgroundSize: `${sheet.columns * sheet.spriteWidth}px ${sheet.rows * sheet.spriteHeight}px`,
-      }}
+        ...tacticalSpriteMetricVars(metricSheet, cell.column, cell.row),
+      } as CSSProperties}
       aria-hidden="true"
     />
   );

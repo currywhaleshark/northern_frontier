@@ -113,13 +113,47 @@ assert.match(screenSource, /tacticalDefaultWeaponPose\(group\)/,
   'defender rendering must resolve role-specific default weapons from the live group');
 assert.match(screenSource, /TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET/,
   'defender rendering must use the dedicated default weapon pose sheet');
-assert.match(tacticalCss, /\.tactical-defender\.role-watchman\s*\{\s*--defender-scale:\s*1\.08;/,
-  'watchmen must be enlarged enough to match other human silhouettes');
-assert.match(tacticalCss, /\.tactical-defender\.weapon-spear\s*\{\s*--defender-scale:\s*1\.12;/,
-  'spear defenders must be enlarged enough to match other human silhouettes');
-assert.match(tacticalCss, /\.tactical-court-raider\.unit-court-melee\s*\{\s*--raider-scale:\s*1\.26;/,
-  'court melee troops must be enlarged enough to match other human silhouettes');
-assert.match(tacticalCss, /tactical-assault-defender-fall[\s\S]*scaleX\(-1\) scale\(var\(--defender-scale/,
-  'spear sizing must survive assault-side fall animation');
+// 머리 크기 기준 정규화: 셀별 배율은 생성된 메트릭이 공급하고, CSS는 --unit-scale/--unit-dy를 반영해야 한다.
+assert.match(screenSource, /tacticalSpriteMetricVars\('court'/,
+  'court sprites must apply generated head-size metrics');
+assert.match(screenSource, /tacticalSpriteMetricVars\('raiders'/,
+  'raider sprites must apply generated head-size metrics');
+assert.match(screenSource, /tacticalSpriteMetricVars\(metricSheet/,
+  'defender sprites must apply generated head-size metrics');
+assert.ok(tacticalCss.includes(
+  'transform: translateY(var(--unit-dy, 0px)) scale(calc(var(--defender-scale) * var(--unit-scale, 1)))',
+), 'defender transform must honor head-size normalization variables');
+assert.match(tacticalCss, /tactical-assault-defender-fall[\s\S]*scaleX\(-1\) scale\(calc\(var\(--defender-scale, 1\) \* var\(--unit-scale, 1\)\)/,
+  'head-size scaling must survive assault-side fall animation');
+
+const metricsSource = readFileSync(new URL('../../src/render/tacticalSpriteMetrics.ts', import.meta.url), 'utf8');
+const metricsOutput = ts.transpileModule(metricsSource, {
+  compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+}).outputText;
+const metricsPath = join(outDir, 'tacticalSpriteMetrics.mjs');
+writeFileSync(metricsPath, metricsOutput, 'utf8');
+const metrics = await import(pathToFileURL(metricsPath).href);
+const expectedMetricShapes = {
+  defenderRoles: { rows: 4, columns: 8 },
+  defenderWeapons: { rows: 4, columns: 6 },
+  defenderDefaultWeapons: { rows: 4, columns: 6 },
+  raiders: { rows: 4, columns: 6 },
+  court: { rows: 4, columns: 5 },
+};
+for (const [sheetKey, shape] of Object.entries(expectedMetricShapes)) {
+  const sheetMetrics = metrics.TACTICAL_SPRITE_METRICS[sheetKey];
+  assert.equal(sheetMetrics.length, shape.rows, `${sheetKey} metric rows`);
+  for (const rowMetrics of sheetMetrics) {
+    assert.equal(rowMetrics.length, shape.columns, `${sheetKey} metric columns`);
+    for (const metric of rowMetrics) {
+      assert.ok(metric.scale >= 0.72 && metric.scale <= 1.5, `${sheetKey} scale in range: ${metric.scale}`);
+      assert.ok(metric.dy >= -6 && metric.dy <= 60, `${sheetKey} dy in range: ${metric.dy}`);
+    }
+  }
+}
+assert.deepEqual(metrics.tacticalSpriteMetricVars('defenderRoles', 0, 0), {
+  '--unit-scale': String(metrics.TACTICAL_SPRITE_METRICS.defenderRoles[0][0].scale),
+  '--unit-dy': `${metrics.TACTICAL_SPRITE_METRICS.defenderRoles[0][0].dy}px`,
+});
 
 console.log('tactical sprite pose tests passed');

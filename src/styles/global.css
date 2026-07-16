@@ -2260,8 +2260,12 @@ html, body, #root {
 }
 .tactical-rear-assault-rank .tactical-formation-slot.raider-slot { width: 132px; height: 100px; }
 .tactical-rear-assault-rank .tactical-raider-sprites { height: 100px; }
-.tactical-rear-assault-rank .tactical-raider { transform: scaleX(1); }
-.tactical-rear-assault-rank .tactical-court-raider { transform: scaleX(1) scale(var(--raider-scale)); }
+.tactical-rear-assault-rank .tactical-raider {
+  transform: translateY(var(--unit-dy, 0px)) scaleX(1) scale(var(--unit-scale, 1));
+}
+.tactical-rear-assault-rank .tactical-court-raider {
+  transform: translateY(var(--unit-dy, 0px)) scaleX(1) scale(calc(var(--raider-scale) * var(--unit-scale, 1)));
+}
 .tactical-rear-assault-rank.entering { animation: tactical-rear-assault-enter 820ms cubic-bezier(0.18, 0.75, 0.25, 1); }
 .tactical-rear-assault-rank.attacking { animation: tactical-rear-assault-strike 620ms ease-in-out; }
 .tactical-formation-lane { display: contents; }
@@ -2788,24 +2792,24 @@ html, body, #root {
   background-repeat: no-repeat;
   image-rendering: auto;
 }
+/* --unit-scale/--unit-dy: 시트 분석으로 산출된 셀별 머리 크기 정규화 배율과 발끝 기준선 보정.
+   (tools/game/generate_tactical_sprite_metrics.mjs 참고 — 인라인 스타일로 주입된다.) */
 .tactical-defender {
   --defender-scale: 1;
   width: 84px;
   height: 120px;
   margin-left: -42px;
   filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.6));
-  transform: scale(var(--defender-scale));
+  transform: translateY(var(--unit-dy, 0px)) scale(calc(var(--defender-scale) * var(--unit-scale, 1)));
   transform-origin: bottom center;
 }
-.tactical-defender.role-watchman { --defender-scale: 1.08; }
-.tactical-defender.weapon-spear { --defender-scale: 1.12; }
 .tactical-defender:first-child { margin-left: 0; }
 .tactical-defender.faded { opacity: 0.42; }
 .tactical-raider {
   width: 168px;
   height: 120px;
   filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.7));
-  transform: scaleX(-1);
+  transform: translateY(var(--unit-dy, 0px)) scaleX(-1) scale(var(--unit-scale, 1));
   transform-origin: bottom center;
 }
 .tactical-beast {
@@ -2833,20 +2837,24 @@ html, body, #root {
   width: 168px;
   height: 120px;
   filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.72));
-  transform: scaleX(-1) scale(var(--raider-scale));
+  transform: translateY(var(--unit-dy, 0px)) scaleX(-1) scale(calc(var(--raider-scale) * var(--unit-scale, 1)));
   transform-origin: bottom center;
 }
-.tactical-court-raider.unit-court-melee { --raider-scale: 1.26; }
-.tactical-court-raider.unit-court-cavalry { --raider-scale: 1.18; }
-.tactical-screen.assault .tactical-defender { transform: scaleX(-1) scale(var(--defender-scale)); }
-.tactical-screen.assault .tactical-raider { transform: scaleX(1); }
-.tactical-screen.assault .tactical-court-raider { transform: scaleX(1) scale(var(--raider-scale)); }
+.tactical-screen.assault .tactical-defender {
+  transform: translateY(var(--unit-dy, 0px)) scaleX(-1) scale(calc(var(--defender-scale) * var(--unit-scale, 1)));
+}
+.tactical-screen.assault .tactical-raider {
+  transform: translateY(var(--unit-dy, 0px)) scaleX(1) scale(var(--unit-scale, 1));
+}
+.tactical-screen.assault .tactical-court-raider {
+  transform: translateY(var(--unit-dy, 0px)) scaleX(1) scale(calc(var(--raider-scale) * var(--unit-scale, 1)));
+}
 .tactical-screen.assault .tactical-beast { transform: scaleX(-1) scale(var(--beast-scale)); }
 .tactical-field-group.rear-facing .tactical-defender {
-  transform: scaleX(-1) scale(var(--defender-scale));
+  transform: translateY(var(--unit-dy, 0px)) scaleX(-1) scale(calc(var(--defender-scale) * var(--unit-scale, 1)));
 }
 .tactical-screen.assault .tactical-field-group.rear-facing .tactical-defender {
-  transform: scaleX(1) scale(var(--defender-scale));
+  transform: translateY(var(--unit-dy, 0px)) scaleX(1) scale(calc(var(--defender-scale) * var(--unit-scale, 1)));
 }
 .tactical-unit-line.full-formation {
   position: relative;
@@ -3265,7 +3273,7 @@ html, body, #root {
   bottom: -2px;
   margin-left: 0;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
-  transform: translateX(-50%) scale(0.34);
+  transform: translateX(-50%) scale(calc(0.34 * var(--unit-scale, 1)));
   transform-origin: bottom center;
 }
 .tactical-dock-info {
@@ -3610,14 +3618,14 @@ html, body, #root {
 .tactical-screen.assault .tactical-court-raider.falling { animation-name: tactical-assault-raider-fall; }
 .tactical-screen.assault .tactical-beast.falling { animation-name: tactical-assault-beast-fall; }
 @keyframes tactical-fall {
-  0% { transform: scale(var(--defender-scale, 1)) rotate(0) translateY(0); opacity: 1; }
-  38% { transform: scale(var(--defender-scale, 1)) rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
-  100% { transform: scale(var(--defender-scale, 1)) rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
+  0% { transform: translateY(var(--unit-dy, 0px)) scale(calc(var(--defender-scale, 1) * var(--unit-scale, 1))) rotate(0) translateY(0); opacity: 1; }
+  38% { transform: translateY(var(--unit-dy, 0px)) scale(calc(var(--defender-scale, 1) * var(--unit-scale, 1))) rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
+  100% { transform: translateY(var(--unit-dy, 0px)) scale(calc(var(--defender-scale, 1) * var(--unit-scale, 1))) rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
 }
 @keyframes tactical-raider-fall {
-  0% { transform: scaleX(-1) scale(var(--raider-scale, 1)) rotate(0) translateY(0); opacity: 1; }
-  38% { transform: scaleX(-1) scale(var(--raider-scale, 1)) rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
-  100% { transform: scaleX(-1) scale(var(--raider-scale, 1)) rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
+  0% { transform: translateY(var(--unit-dy, 0px)) scaleX(-1) scale(calc(var(--raider-scale, 1) * var(--unit-scale, 1))) rotate(0) translateY(0); opacity: 1; }
+  38% { transform: translateY(var(--unit-dy, 0px)) scaleX(-1) scale(calc(var(--raider-scale, 1) * var(--unit-scale, 1))) rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
+  100% { transform: translateY(var(--unit-dy, 0px)) scaleX(-1) scale(calc(var(--raider-scale, 1) * var(--unit-scale, 1))) rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
 }
 @keyframes tactical-beast-fall {
   0% { transform: scale(var(--beast-scale)) rotate(0) translateY(0); opacity: 1; }
@@ -3625,14 +3633,14 @@ html, body, #root {
   100% { transform: scale(var(--beast-scale)) rotate(62deg) translateY(22px); filter: sepia(1) saturate(1.8); opacity: 0; }
 }
 @keyframes tactical-assault-defender-fall {
-  0% { transform: scaleX(-1) scale(var(--defender-scale, 1)) rotate(0) translateY(0); opacity: 1; }
-  38% { transform: scaleX(-1) scale(var(--defender-scale, 1)) rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
-  100% { transform: scaleX(-1) scale(var(--defender-scale, 1)) rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
+  0% { transform: translateY(var(--unit-dy, 0px)) scaleX(-1) scale(calc(var(--defender-scale, 1) * var(--unit-scale, 1))) rotate(0) translateY(0); opacity: 1; }
+  38% { transform: translateY(var(--unit-dy, 0px)) scaleX(-1) scale(calc(var(--defender-scale, 1) * var(--unit-scale, 1))) rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
+  100% { transform: translateY(var(--unit-dy, 0px)) scaleX(-1) scale(calc(var(--defender-scale, 1) * var(--unit-scale, 1))) rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
 }
 @keyframes tactical-assault-raider-fall {
-  0% { transform: scale(var(--raider-scale, 1)) rotate(0) translateY(0); opacity: 1; }
-  38% { transform: scale(var(--raider-scale, 1)) rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
-  100% { transform: scale(var(--raider-scale, 1)) rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
+  0% { transform: translateY(var(--unit-dy, 0px)) scale(calc(var(--raider-scale, 1) * var(--unit-scale, 1))) rotate(0) translateY(0); opacity: 1; }
+  38% { transform: translateY(var(--unit-dy, 0px)) scale(calc(var(--raider-scale, 1) * var(--unit-scale, 1))) rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
+  100% { transform: translateY(var(--unit-dy, 0px)) scale(calc(var(--raider-scale, 1) * var(--unit-scale, 1))) rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
 }
 @keyframes tactical-assault-beast-fall {
   0% { transform: scaleX(-1) scale(var(--beast-scale)) rotate(0) translateY(0); opacity: 1; }
