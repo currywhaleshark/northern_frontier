@@ -883,7 +883,8 @@ export function TacticalBattleScreen({
                     <button
                       key={zone.id}
                       className={selectedGroup.zoneId === zone.id ? 'active' : ''}
-                      disabled={selectedGroup.commandable === false || tacticalActiveDefenderCount(selectedGroup) <= 0}
+                      disabled={(selectedGroup.commandable === false && selectedGroup.kind !== 'healer') ||
+                        tacticalActiveDefenderCount(selectedGroup) <= 0}
                       onClick={() => {
                         onAssignGroup(selectedGroup.id, zone.id);
                         setViewedZoneId(zone.id);
@@ -1037,7 +1038,9 @@ export function TacticalBattleScreen({
               ) : (
                 <div className="tactical-command-hint">
                   {selectedGroup.commandable === false
-                    ? '피난 주민은 보호 대상이며 전투 명령을 받지 않습니다.'
+                    ? selectedGroup.kind === 'healer'
+                      ? '전술 치료반은 후열 보호 대상이며, 같은 구역의 부상자를 라운드 종료에 자동 치료합니다.'
+                      : '피난 주민은 보호 대상이며 전투 명령을 받지 않습니다.'
                     : '이 부대는 전투 불능이어서 명령을 내릴 수 없습니다.'}
                 </div>
               )}

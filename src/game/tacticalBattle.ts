@@ -102,6 +102,7 @@ const GROUP_LABELS: Record<DefenderGroupKind, string> = {
   'militia-unarmed': '소집 민병',
   watchman: '파수꾼',
   hunter: '사냥꾼',
+  healer: '전술 치료반',
   civilian: '피난 주민',
 };
 
@@ -112,6 +113,7 @@ const GROUP_POWER: Record<DefenderGroupKind, number> = {
   'militia-unarmed': CONFIG.tacticalBattle.groupPower.militiaUnarmed,
   watchman: CONFIG.tacticalBattle.groupPower.watchman,
   hunter: CONFIG.tacticalBattle.groupPower.hunter,
+  healer: CONFIG.tacticalBattle.groupPower.healer,
   civilian: CONFIG.tacticalBattle.groupPower.civilian,
 };
 
@@ -184,6 +186,7 @@ function applied(battle: TacticalBattle, id: PreparationActionId): boolean {
 }
 
 function kindForCombatant(role: CombatRole, weapon: TacticalDefenderGroup['weapon']): DefenderGroupKind {
+  if (role === 'healer') return 'healer';
   if (weapon === 'musket') return 'militia-musket';
   if (weapon === 'hornBow') return 'militia-bow';
   if (weapon === 'spear') return 'militia-spear';
@@ -194,7 +197,7 @@ function kindForCombatant(role: CombatRole, weapon: TacticalDefenderGroup['weapo
 }
 
 function defaultFormationLine(role: CombatRole, weapon: TacticalDefenderGroup['weapon']): TacticalFormationLine {
-  if (role === 'civilian') return 'rear';
+  if (role === 'civilian' || role === 'healer') return 'rear';
   if (weapon === 'musket') return 'middle';
   return weapon === 'spear' || (weapon == null && (role === 'militia' || role === 'watchman')) ? 'front' : 'rear';
 }
@@ -488,7 +491,8 @@ export function chooseAutomaticRaiderTarget(
   const ranged = (group: TacticalDefenderGroup) => tacticalGroupCapabilities(group).has('volley');
   const melee = (group: TacticalDefenderGroup) => tacticalGroupCapabilities(group).has('melee');
   if (attacker.rearAssault) {
-    return (pick(group => group.line === 'rear' && ranged(group))
+    return (pick(group => group.line === 'rear' && group.kind === 'healer')
+      ?? pick(group => group.line === 'rear' && ranged(group))
       ?? pick(group => group.line === 'rear' && group.commandable === false)
       ?? pick(group => group.command === 'reinforceRear')
       ?? pick(group => group.line === 'rear')
@@ -549,6 +553,7 @@ function snapshotGroup(
     killed: 0,
     line: defaultFormationLine(role, weapon),
     ambushed: false,
+    commandable: role === 'healer' ? false : undefined,
   };
 }
 
@@ -1110,7 +1115,8 @@ export function assignDefenderGroup(state: GameState, groupId: string, zoneId: s
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
   const defender = battle.defenderGroups.find(candidate => candidate.id === groupId);
   if (!defender) return '수비 그룹을 찾을 수 없습니다.';
-  if (defender.commandable === false || defender.lockedZoneId) return '피난 주민은 마을 중심지에서 이동할 수 없습니다.';
+  if (defender.lockedZoneId) return '피난 주민은 마을 중심지에서 이동할 수 없습니다.';
+  if (defender.commandable === false && defender.kind !== 'healer') return '이 보호 대상은 다른 구역으로 이동할 수 없습니다.';
   if (battle.assaultKind === 'predatorHunt') return assignHuntGroup(state, groupId, zoneId);
   if (battle.orientation === 'assault') return assignAssaultGroup(state, groupId, zoneId);
   if (battle.phase !== 'deployment') return '배치 단계에서만 병력을 옮길 수 있습니다.';
@@ -1130,6 +1136,7 @@ export function tacticalFormationLineUnavailableReason(
   if (battle.phase !== 'deployment' && battle.phase !== 'command') {
     return '배치 또는 지휘 단계에서만 전열을 바꿀 수 있습니다.';
   }
+  if (defender.kind === 'healer') return line === 'rear' ? null : '전술 치료반은 후열에만 배치할 수 있습니다.';
   if (defender.commandable === false) return '피난 주민은 전열을 바꿀 수 없습니다.';
   const deferredRedeploy = battle.phase === 'command' && battle.orientation !== 'assault' &&
     battle.assaultKind !== 'predatorHunt';
@@ -1185,7 +1192,9 @@ export function setTacticalCommand(
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
   const defender = battle.defenderGroups.find(candidate => candidate.id === groupId);
   if (!defender) return '수비 그룹을 찾을 수 없습니다.';
-  if (defender.commandable === false) return '피난 주민은 전투 명령 대상이 아닙니다.';
+  if (defender.commandable === false) return defender.kind === 'healer'
+    ? '전술 치료반은 라운드 종료에 자동으로 부상자를 돌봅니다.'
+    : '피난 주민은 전투 명령 대상이 아닙니다.';
   if (battle.assaultKind === 'predatorHunt') return setHuntCommand(state, groupId, command);
   if (battle.orientation === 'assault') {
     const result = setAssaultCommand(state, groupId, command);
@@ -1313,7 +1322,9 @@ export function tacticalCommandUnavailableReason(
   defender: TacticalDefenderGroup,
   command: TacticalCommandId,
 ): string | null {
-  if (defender.commandable === false) return '피난 주민은 전투 명령 대상이 아닙니다.';
+  if (defender.commandable === false) return defender.kind === 'healer'
+    ? '전술 치료반은 라운드 종료에 자동으로 부상자를 돌봅니다.'
+    : '피난 주민은 전투 명령 대상이 아닙니다.';
   if (battle.assaultKind === 'predatorHunt') return huntCommandUnavailableReason(battle, defender, command);
   if (battle.orientation === 'assault') return assaultCommandUnavailableReason(battle, defender, command);
   if (!IMPLEMENTED_COMMANDS.has(command)) return '이 명령은 아직 사용할 수 없습니다.';
@@ -1546,6 +1557,86 @@ export function advanceTacticalPhase(state: GameState): string | null {
 
 function activeCount(group: TacticalDefenderGroup): number {
   return Math.max(0, group.count - group.wounded - group.killed);
+}
+
+export interface TacticalFieldTreatmentResult {
+  treated: number;
+  herbsSpent: number;
+  byZone: Record<string, number>;
+}
+
+export function applyTacticalFieldTreatment(
+  state: GameState,
+  battle: TacticalBattle,
+  events: TacticalAnimationEvent[] = [],
+  lines: string[] = [],
+  rng: () => number = () => 0,
+): TacticalFieldTreatmentResult {
+  const returnsPerPhysician = Math.max(0, Math.floor(CONFIG.medicine.tacticalReturnsPerPhysicianPerRound));
+  const returnChance = clamp(CONFIG.medicine.tacticalReturnChance, 0, 1);
+  const herbsPerReturn = Math.max(0, CONFIG.medicine.tacticalHerbsPerReturn);
+  const herbCapacity = herbsPerReturn > 0
+    ? Math.floor(((state.resources.herbs ?? 0) + 1e-9) / herbsPerReturn)
+    : Number.MAX_SAFE_INTEGER;
+  if (returnsPerPhysician <= 0 || returnChance <= 0 || herbCapacity <= 0) {
+    return { treated: 0, herbsSpent: 0, byZone: {} };
+  }
+
+  const healers = battle.defenderGroups
+    .filter(group => group.kind === 'healer' && activeCount(group) > 0)
+    .map(group => ({ group, capacity: activeCount(group) * returnsPerPhysician }))
+    .sort((left, right) => left.group.zoneId.localeCompare(right.group.zoneId) || left.group.id.localeCompare(right.group.id));
+  let remainingHerbCapacity = herbCapacity;
+  let treated = 0;
+  const byZone: Record<string, number> = {};
+
+  for (const { group: healer, capacity } of healers) {
+    const candidates = battle.defenderGroups
+      .filter(group => group.zoneId === healer.zoneId && group.wounded > 0)
+      .sort((left, right) => {
+        const priority = (group: TacticalDefenderGroup) => group.kind === 'civilian' ? 2 : group.kind === 'healer' ? 1 : 0;
+        return priority(left) - priority(right) || right.wounded - left.wounded || right.power - left.power ||
+          left.id.localeCompare(right.id);
+      });
+    const woundedInZone = candidates.reduce((sum, candidate) => sum + candidate.wounded, 0);
+    const attempts = Math.min(capacity, remainingHerbCapacity, woundedInZone);
+    let remaining = 0;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      if (rng() < returnChance) remaining += 1;
+    }
+    if (remaining <= 0) continue;
+    let healerTreated = 0;
+    for (const candidate of candidates) {
+      if (remaining <= 0) break;
+      const returned = Math.min(candidate.wounded, remaining);
+      candidate.wounded -= returned;
+      remaining -= returned;
+      remainingHerbCapacity -= returned;
+      treated += returned;
+      healerTreated += returned;
+      byZone[healer.zoneId] = (byZone[healer.zoneId] ?? 0) + returned;
+    }
+    if (healerTreated > 0) {
+      event(events, healer.zoneId, 'report', `${healer.label}이 약초로 응급 처치를 마쳐 부상자 ${healerTreated}명을 전열에 복귀시킵니다.`, 620, {
+        side: 'defender', groupId: healer.id, float: `응급치료 +${healerTreated}`,
+      });
+      lines.push(`${healer.label}: 약초를 써 부상자 ${healerTreated}명이 전열에 복귀했습니다.`);
+    }
+  }
+
+  const herbsSpent = treated * herbsPerReturn;
+  if (herbsSpent > 0) state.resources.herbs = Math.max(0, state.resources.herbs - herbsSpent);
+  return { treated, herbsSpent, byZone };
+}
+
+export function tacticalInjurySeverityForGroup(
+  battle: TacticalBattle,
+  group: TacticalDefenderGroup,
+): number {
+  const base = battle.mode === 'levy' ? 24 : 18;
+  const stabilized = battle.defenderGroups.some(candidate =>
+    candidate.kind === 'healer' && candidate.zoneId === group.zoneId && activeCount(candidate) > 0);
+  return base * (stabilized ? CONFIG.medicine.tacticalInjurySeverityMult : 1);
 }
 
 export function tacticalDefenderReadiness(
@@ -1870,6 +1961,7 @@ export function resolveTacticalRound(state: GameState): string | null {
     }
   }
 
+  const treatment = applyTacticalFieldTreatment(state, battle, events, lines, rng);
   villageMoraleDelta = Math.round(clamp(villageMoraleDelta, -18, 5));
   raiderMoraleDelta = Math.round(clamp(raiderMoraleDelta, -22, 0));
   battle.villageMorale = clamp(battle.villageMorale + villageMoraleDelta, 0, 100);
@@ -2007,6 +2099,7 @@ export function resolveTacticalRound(state: GameState): string | null {
     lines,
     events,
     wounded: roundWounded,
+    treated: treatment.treated,
     killed: roundKilled,
     raidersKilled: roundRaidersKilled,
     loot: lootBag,
@@ -2144,7 +2237,7 @@ export function finishTacticalBattle(state: GameState): void {
       killResidents(state, rng, defender.killed, 1, defender.residentIds);
     }
     if (defender.wounded > 0) {
-      injure(state, rng, defender.wounded, battle.mode === 'levy' ? 24 : 18, defender.residentIds, true);
+      injure(state, rng, defender.wounded, tacticalInjurySeverityForGroup(battle, defender), defender.residentIds, true);
     }
   }
   const people = tacticalPeopleReport(state, battle, beforeHealth);

@@ -22,7 +22,7 @@ export function combatCapabilities(
     result.add('ambush');
     result.add('scout');
     if (weapon == null && HUNTER_DEFAULT_RANGED) result.add('volley');
-  } else {
+  } else if (role === 'civilian') {
     result.add('protect');
   }
 
@@ -39,6 +39,7 @@ export function combatBasePower(role: CombatRole): number {
   if (role === 'militia') return CONFIG.raid.militiaDefense;
   if (role === 'watchman') return CONFIG.raid.watchmanDefense;
   if (role === 'hunter') return CONFIG.tacticalBattle.groupPower.hunter;
+  if (role === 'healer') return CONFIG.tacticalBattle.groupPower.healer;
   return CONFIG.raid.levyDefensePerResident;
 }
 
@@ -64,17 +65,19 @@ export function combatDefaultWeaponName(role: CombatRole): string {
   if (role === 'militia') return '죽창';
   if (role === 'watchman') return '육모방망이';
   if (role === 'hunter') return '사냥활';
+  if (role === 'healer') return '의료 도구';
   return '생활 도구';
 }
 
 export function combatGroupLabel(role: CombatRole, weapon: CombatWeaponId | null): string {
   const roleName: Record<CombatRole, string> = {
-    militia: '수비병', watchman: '파수꾼', hunter: '사냥꾼', civilian: '민간인',
+    militia: '수비병', watchman: '파수꾼', hunter: '사냥꾼', healer: '치료반', civilian: '민간인',
   };
   const weaponName: Record<CombatWeaponId, string> = {
     musket: '조총', hornBow: '각궁', spear: '창',
   };
   if (weapon) return `${weaponName[weapon]} ${roleName[role]}`;
+  if (role === 'healer') return '전술 치료반';
   if (role === 'civilian') return roleName.civilian;
   return `${combatDefaultWeaponName(role)} ${roleName[role]}`;
 }

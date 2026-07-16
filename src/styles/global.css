@@ -3253,6 +3253,8 @@ html, body, #root {
   cursor: pointer;
 }
 .tactical-dock-chip:hover { border-color: #b9944f; }
+.tactical-dock-chip.healer { border-color: rgba(85, 167, 154, 0.7); }
+.tactical-dock-chip.healer .tactical-dock-command { color: #79c7ba; }
 .tactical-dock-chip.active {
   border-color: #d0a651;
   background: #3a372d;

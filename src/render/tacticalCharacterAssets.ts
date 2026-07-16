@@ -89,6 +89,7 @@ const ROLE_COLUMNS = {
   militia: 2,
   watchman: 4,
   hunter: 6,
+  healer: 0,
 } as const;
 
 const WEAPON_COLUMNS = {

@@ -106,6 +106,10 @@ export const CONFIG = {
     epidemicSpreadMult: 0.5,
     epidemicDeathMult: 0.4,
     epidemicDamageMult: 0.6,
+    tacticalReturnsPerPhysicianPerRound: 1,
+    tacticalReturnChance: 0.2,
+    tacticalHerbsPerReturn: 1,
+    tacticalInjurySeverityMult: 0.75,
   },
 
   foreignSites: {
@@ -662,6 +666,7 @@ export const CONFIG = {
       militiaUnarmed: 9,
       watchman: 6,
       hunter: 8,
+      healer: 0.5,
       civilian: 1,
     },
     raiderSplit: { main: 0.55, looters: 0.25, flankers: 0.2 },

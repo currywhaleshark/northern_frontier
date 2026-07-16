@@ -401,7 +401,7 @@ export function rearAssaultExposureMultiplier(
 
   const capabilities = tacticalGroupCapabilities(defender);
   const exposed = capabilities.has('volley') ? rearExposure.exposedRanged
-    : defender.kind === 'civilian' ? rearExposure.exposedCivilian
+    : defender.kind === 'civilian' || defender.kind === 'healer' ? rearExposure.exposedCivilian
       : rearExposure.exposedOther;
   const guarded = capabilities.has('melee') ? rearExposure.guardedMelee : rearExposure.guardedRanged;
   const guardStrength = rearAssaultGuardStrength(defenders);

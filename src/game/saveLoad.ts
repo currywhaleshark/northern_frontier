@@ -234,6 +234,10 @@ export function migrateV16ToV17(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 17 };
 }
 
+export function migrateV17ToV18(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 18 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   let version = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -255,6 +259,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 14) migrated = migrateV14ToV15(migrated);
     else if (version === 15) migrated = migrateV15ToV16(migrated);
     else if (version === 16) migrated = migrateV16ToV17(migrated);
+    else if (version === 17) migrated = migrateV17ToV18(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -264,7 +269,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
 
 const TACTICAL_PHASES = new Set(['preparation', 'preparationExecution', 'deployment', 'command', 'simulating', 'report', 'finished']);
 const DEFENDER_KINDS = new Set<DefenderGroupKind>([
-  'militia-spear', 'militia-bow', 'militia-musket', 'militia-unarmed', 'watchman', 'hunter', 'civilian',
+  'militia-spear', 'militia-bow', 'militia-musket', 'militia-unarmed', 'watchman', 'hunter', 'healer', 'civilian',
 ]);
 const TACTICAL_COMMANDS = new Set<TacticalCommandId>([
   'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'reinforceRear',
@@ -314,6 +319,7 @@ function migratePendingReport(raw: unknown, zoneIds: ReadonlySet<string>): Tacti
       ...(event as Record<string, unknown>),
     })) as unknown as TacticalAnimationEvent[],
     wounded: Math.max(0, Number(report.wounded) || 0),
+    treated: Math.max(0, Number(report.treated) || 0),
     killed: Math.max(0, Number(report.killed) || 0),
     raidersKilled: Math.max(0, Number(report.raidersKilled) || 0),
     loot: report.loot && typeof report.loot === 'object' ? report.loot : {},
@@ -329,6 +335,7 @@ function inferredGroupIdentity(kind: DefenderGroupKind): {
 } {
   if (kind === 'watchman') return { role: 'watchman', weapon: null };
   if (kind === 'hunter') return { role: 'hunter', weapon: null };
+  if (kind === 'healer') return { role: 'healer', weapon: null };
   if (kind === 'civilian') return { role: 'civilian', weapon: null };
   if (kind === 'militia-musket') return { role: 'militia', weapon: 'musket' };
   if (kind === 'militia-bow') return { role: 'militia', weapon: 'hornBow' };
@@ -340,7 +347,7 @@ function defaultMigratedFormationLine(
   role: TacticalBattle['defenderGroups'][number]['role'],
   weapon: CombatWeaponId | null,
 ): TacticalFormationLine {
-  if (role === 'civilian') return 'rear';
+  if (role === 'civilian' || role === 'healer') return 'rear';
   if (weapon === 'musket') return 'middle';
   return weapon === 'spear' || (weapon == null && (role === 'militia' || role === 'watchman'))
     ? 'front'
@@ -404,17 +411,19 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     const count = ids.length;
     const killed = Math.min(count, Math.max(0, Math.floor(Number(group.killed) || 0)));
     const wounded = Math.min(count - killed, Math.max(0, Math.floor(Number(group.wounded) || 0)));
-    const weapon = group.weapon === 'musket' || group.weapon === 'hornBow' || group.weapon === 'spear'
+    const weapon = kind === 'healer' ? null : group.weapon === 'musket' || group.weapon === 'hornBow' || group.weapon === 'spear'
       ? group.weapon as CombatWeaponId
       : group.weapon === null ? null : inferred.weapon;
-    const role = group.role === 'militia' || group.role === 'watchman' || group.role === 'hunter' || group.role === 'civilian'
+    const role = kind === 'healer' ? 'healer' : group.role === 'militia' || group.role === 'watchman' ||
+        group.role === 'hunter' || group.role === 'healer' || group.role === 'civilian'
       ? group.role : inferred.role;
     const protectedCivilian = kind === 'civilian';
+    const protectedSupport = protectedCivilian || kind === 'healer';
     const civilianZoneId = zoneIds.has('center') ? 'center' : defaultZoneId;
-    const line = isTacticalFormationLine(group.line)
+    const line = kind === 'healer' ? 'rear' : isTacticalFormationLine(group.line)
       ? group.line
       : defaultMigratedFormationLine(role, weapon);
-    const storedCommand = protectedCivilian || !TACTICAL_COMMANDS.has(group.command as TacticalCommandId)
+    const storedCommand = protectedSupport || !TACTICAL_COMMANDS.has(group.command as TacticalCommandId)
       ? null
       : group.command as TacticalCommandId;
     const pendingLine = storedCommand === 'redeploy' && isTacticalFormationLine(group.pendingLine) &&
@@ -436,7 +445,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       commandSource: command == null
         ? undefined
         : group.commandSource === 'player' ? 'player' : 'recommended',
-      commandable: protectedCivilian ? false : group.commandable === false ? false : undefined,
+      commandable: protectedSupport ? false : group.commandable === false ? false : undefined,
       lockedZoneId: protectedCivilian ? civilianZoneId : undefined,
       power: protectedCivilian ? 0 : Math.max(0, Number(group.power) || 0),
       line,

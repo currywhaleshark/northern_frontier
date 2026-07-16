@@ -66,7 +66,7 @@ export function TacticalGroupChip({
   return (
     <button
       type="button"
-      className={`tactical-dock-chip${selected ? ' active' : ''}${pending ? ' pending' : ''}${active === 0 ? ' routed' : ''}`}
+      className={`tactical-dock-chip${group.kind === 'healer' ? ' healer' : ''}${selected ? ' active' : ''}${pending ? ' pending' : ''}${active === 0 ? ' routed' : ''}`}
       onClick={onSelect}
       disabled={active === 0}
       aria-label={`${group.label} 선택`}
@@ -84,7 +84,7 @@ export function TacticalGroupChip({
           <>
             <span className={`tactical-dock-command${pending ? ' waiting' : ''}`}>
               {group.commandable === false
-                ? '보호 대상'
+                ? group.kind === 'healer' ? '후열 자동 치료' : '보호 대상'
                 : active === 0
                   ? '—'
                   : pending

@@ -623,6 +623,7 @@ export type DefenderGroupKind =
   | 'militia-unarmed'
   | 'watchman'
   | 'hunter'
+  | 'healer'
   | 'civilian';
 
 export type RaiderGroupKind = 'main' | 'looters' | 'flankers';
@@ -842,6 +843,7 @@ export interface TacticalRoundReport {
   lines: string[];
   events: TacticalAnimationEvent[];
   wounded: number;
+  treated?: number;
   killed: number;
   raidersKilled: number;
   loot: Partial<Record<ResourceId, number>>;

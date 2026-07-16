@@ -6,7 +6,7 @@ import type { CombatWeaponId, GameState, Resident } from './types';
 
 export type CombatContext = 'villageDefense' | 'expedition';
 
-export type CombatRole = 'militia' | 'watchman' | 'hunter' | 'civilian';
+export type CombatRole = 'militia' | 'watchman' | 'hunter' | 'healer' | 'civilian';
 
 export type CombatCapability =
   | 'hold'
@@ -29,6 +29,7 @@ export interface CombatantSnapshot {
 }
 
 export function combatRoleForResident(resident: Pick<Resident, 'job'>): CombatRole {
+  if (resident.job === 'physician') return 'healer';
   if (resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter') {
     return resident.job;
   }
@@ -88,7 +89,7 @@ export function createCombatRoster(
 
   const combatants = fighters.map(resident => {
     const role = combatRoleForResident(resident);
-    const assignedWeapon = assignments[resident.id] ?? null;
+    const assignedWeapon = role === 'healer' ? null : assignments[resident.id] ?? null;
     const readyWeapon = assignedWeapon === 'musket' && !readyMusketIds.has(resident.id)
       ? null
       : assignedWeapon;

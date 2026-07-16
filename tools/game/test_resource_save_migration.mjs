@@ -35,7 +35,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 17, 'the local physician building and job ship with schema version 17');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 18, 'the tactical healer group ships with schema version 18');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -46,6 +46,7 @@ assert.equal(typeof saveLoad.migrateV13ToV14, 'function');
 assert.equal(typeof saveLoad.migrateV14ToV15, 'function');
 assert.equal(typeof saveLoad.migrateV15ToV16, 'function');
 assert.equal(typeof saveLoad.migrateV16ToV17, 'function');
+assert.equal(typeof saveLoad.migrateV17ToV18, 'function');
 
 {
   const migrated = saveLoad.migrateV8ToV9({
@@ -75,6 +76,46 @@ assert.equal(typeof saveLoad.migrateV16ToV17, 'function');
   const migrated = saveLoad.migrateV16ToV17({ schemaVersion: 16, resources: { eggs: 3 } });
   assert.equal(migrated.schemaVersion, 17);
   assert.equal(migrated.resources.eggs, 3);
+}
+
+{
+  const migrated = saveLoad.migrateV17ToV18({ schemaVersion: 17, resources: { herbs: 3 } });
+  assert.equal(migrated.schemaVersion, 18);
+  assert.equal(migrated.resources.herbs, 3);
+}
+
+{
+  const state = simulation.newGame(2026071718);
+  state.residents.forEach(resident => {
+    resident.job = 'idle';
+    resident.alive = true;
+    resident.sick = false;
+    resident.health = 100;
+    resident.quarantinedUntil = 0;
+  });
+  state.residents[0].job = 'physician';
+  state.residents.slice(1, 3).forEach(resident => { resident.job = 'militia'; });
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'v18 healer save', power: 20, warned: true, siege: false, mode: 'garrison',
+  });
+  const raw = JSON.parse(JSON.stringify(battle));
+  const rawHealer = raw.defenderGroups.find(group => group.kind === 'healer');
+  assert.ok(rawHealer);
+  rawHealer.zoneId = 'storehouse';
+  rawHealer.line = 'front';
+  rawHealer.weapon = 'spear';
+  rawHealer.command = 'hold';
+  rawHealer.commandable = true;
+  const migratedBattle = saveLoad.migrateTacticalBattle(raw, state);
+  const healer = migratedBattle?.defenderGroups.find(group => group.kind === 'healer');
+  assert.ok(healer, 'v18 tactical saves preserve healer defender groups');
+  assert.equal(healer.role, 'healer');
+  assert.equal(healer.weapon, null);
+  assert.equal(healer.zoneId, 'storehouse');
+  assert.equal(healer.line, 'rear');
+  assert.equal(healer.command, null);
+  assert.equal(healer.commandable, false);
+  assert.equal(healer.lockedZoneId, undefined, 'healers remain movable between zones during deployment');
 }
 
 {
@@ -339,7 +380,7 @@ function prepareFormationTestCombatants(state) {
   muskets.line = 'rear';
   store.set('buksae-save-v3', JSON.stringify({ ...v7, schemaVersion: 7 }));
   const loaded = saveLoad.loadGame();
-  assert.equal(loaded?.schemaVersion, 17);
+  assert.equal(loaded?.schemaVersion, 18);
   assert.equal(
     loaded?.tacticalBattle?.defenderGroups.find(group => group.id === muskets.id)?.line,
     'rear',
@@ -358,7 +399,7 @@ function prepareFormationTestCombatants(state) {
   assert.equal(muskets.line, 'middle');
   assert.equal(saveLoad.saveGame(v8), true);
   const loaded = saveLoad.loadGame();
-  assert.equal(loaded?.schemaVersion, 17);
+  assert.equal(loaded?.schemaVersion, 18);
   assert.equal(loaded?.tacticalBattle?.defenderGroups.find(group => group.id === muskets.id)?.line, 'middle');
 }
 

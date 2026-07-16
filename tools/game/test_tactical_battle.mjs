@@ -33,6 +33,7 @@ const tacticalCore = await import(pathToFileURL(join(compiledDir, 'tacticalCore.
 const tacticalEngagement = await import(pathToFileURL(join(compiledDir, 'tacticalEngagement.mjs')).href);
 const enemyPlan = await import(pathToFileURL(join(compiledDir, 'enemyPlan.mjs')).href);
 const tacticalCommandState = await import(pathToFileURL(join(compiledDir, 'tacticalCommandState.mjs')).href);
+const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
 const battleSimulation = await import(pathToFileURL(join(compiledDir, 'battleSimulation.mjs')).href);
 const josa = await import(pathToFileURL(join(compiledDir, 'josa.mjs')).href);
@@ -2191,6 +2192,115 @@ for (const optionId of ['militia', 'levy']) {
   assert.ok(state.tacticalBattle);
   assert.equal(state.tacticalBattle.mode, 'garrison');
   assert.equal(state.pendingChoice, null);
+}
+
+{
+  const state = simulation.newGame(2026071701);
+  for (const resident of state.residents) {
+    resident.job = 'idle';
+    resident.alive = true;
+    resident.sick = false;
+    resident.health = 100;
+    resident.quarantinedUntil = 0;
+  }
+  const physician = state.residents[0];
+  physician.job = 'physician';
+  state.residents.slice(1, 4).forEach(resident => { resident.job = 'militia'; });
+  state.resources.herbs = 3;
+  state.resources.spears = 0;
+  state.resources.hornBows = 0;
+  state.resources.muskets = 0;
+
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: '치료반 배치 시험', power: 30, warned: true, siege: false, mode: 'garrison',
+  });
+  const healer = battle.defenderGroups.find(group => group.kind === 'healer');
+  const fighters = battle.defenderGroups.find(group => group.kind === 'militia-unarmed');
+  const civilians = battle.defenderGroups.find(group => group.kind === 'civilian');
+  assert.ok(healer && fighters && civilians);
+  assert.equal(healer.role, 'healer');
+  assert.equal(healer.weapon, null);
+  assert.equal(healer.line, 'rear');
+  assert.equal(healer.commandable, false);
+  assert.equal(healer.power, 0.5);
+
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  assert.equal(battle.phase, 'deployment');
+  assert.equal(tactical.assignDefenderGroup(state, healer.id, 'storehouse'), null,
+    'the non-commandable healer may still choose a deployment zone');
+  assert.equal(healer.zoneId, 'storehouse');
+  assert.match(tactical.setDefenderFormationLine(state, healer.id, 'middle'), /후열/);
+  assert.equal(tactical.setDefenderFormationLine(state, healer.id, 'rear'), null);
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  assert.match(tactical.setTacticalCommand(state, healer.id, 'hold'), /자동/);
+
+  fighters.zoneId = healer.zoneId;
+  fighters.wounded = 2;
+  fighters.killed = 1;
+  civilians.wounded = 1;
+  const killedBefore = fighters.killed;
+  const treatment = tactical.applyTacticalFieldTreatment(state, battle);
+  assert.deepEqual(treatment, { treated: 1, herbsSpent: 1, byZone: { storehouse: 1 } });
+  assert.equal(fighters.wounded, 1, 'one active physician returns at most one wounded fighter per round');
+  assert.equal(fighters.killed, killedBefore, 'field treatment never restores the dead');
+  assert.equal(civilians.wounded, 1, 'treatment never crosses zone boundaries');
+  assert.equal(state.resources.herbs, 2);
+  assert.equal(tactical.tacticalInjurySeverityForGroup(battle, fighters), 13.5,
+    'a surviving same-zone healer reduces final injury severity by 25%');
+  healer.zoneId = 'wall';
+  assert.equal(tactical.tacticalInjurySeverityForGroup(battle, fighters), 18);
+  healer.zoneId = 'storehouse';
+
+  const rearAttacker = battle.raiderGroups.find(group => group.kind === 'flankers');
+  assert.ok(rearAttacker);
+  rearAttacker.zoneId = healer.zoneId;
+  rearAttacker.rearAssault = true;
+  rearAttacker.engagementsInZone = 1;
+  rearAttacker.intent = 'flank';
+  rearAttacker.power = 30;
+  assert.equal(tactical.chooseAutomaticRaiderTarget(battle, rearAttacker), healer.id,
+    'rear attackers value the exposed treatment team as a target');
+
+  const exposed = tacticalEngagement.rearAssaultExposureMultiplier(healer, [healer]);
+  const rearGuard = { ...fighters, line: 'rear', commandable: undefined, command: 'hold' };
+  const guarded = tacticalEngagement.rearAssaultExposureMultiplier(healer, [healer, rearGuard]);
+  assert.ok(guarded < exposed, 'a rear-line melee guard protects the high-exposure healer group');
+
+  state.resources.herbs = 0;
+  const untreated = tactical.applyTacticalFieldTreatment(state, battle);
+  assert.equal(untreated.treated, 0, 'no herbs means no field return');
+}
+
+{
+  const state = simulation.newGame(2026071702);
+  for (const resident of state.residents) {
+    resident.job = 'idle';
+    resident.alive = true;
+    resident.sick = false;
+    resident.health = 100;
+    resident.quarantinedUntil = 0;
+  }
+  state.residents[0].job = 'physician';
+  state.residents.slice(1, 3).forEach(resident => { resident.job = 'militia'; });
+  state.resources.herbs = 1;
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: '치료반 라운드 통합 시험', power: 20, warned: true, siege: false, mode: 'garrison',
+  });
+  const healer = battle.defenderGroups.find(group => group.kind === 'healer');
+  const fighters = battle.defenderGroups.find(group => group.kind === 'militia-unarmed');
+  assert.ok(healer && fighters);
+  fighters.zoneId = healer.zoneId;
+  fighters.wounded = 1;
+  battle.raiderGroups.forEach(group => { group.intent = 'withdraw'; group.power = 0; });
+  battle.phase = 'command';
+  const originalReturnChance = CONFIG.medicine.tacticalReturnChance;
+  CONFIG.medicine.tacticalReturnChance = 1;
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  CONFIG.medicine.tacticalReturnChance = originalReturnChance;
+  assert.equal(fighters.wounded, 0);
+  assert.equal(battle.pendingReport.treated, 1);
+  assert.ok(battle.pendingReport.events.some(event => event.groupId === healer.id && event.float === '응급치료 +1'));
+  assert.ok(battle.pendingReport.lines.some(line => line.includes('약초를 써 부상자 1명')));
 }
 
 console.log('tactical battle tests passed');

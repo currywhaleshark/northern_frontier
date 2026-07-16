@@ -32,9 +32,11 @@ const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs'))
 assert.equal(capabilities.combatDefaultWeaponName('militia'), '죽창');
 assert.equal(capabilities.combatDefaultWeaponName('watchman'), '육모방망이');
 assert.equal(capabilities.combatDefaultWeaponName('hunter'), '사냥활');
+assert.equal(capabilities.combatDefaultWeaponName('healer'), '의료 도구');
 assert.equal(capabilities.combatGroupLabel('militia', null), '죽창 수비병');
 assert.equal(capabilities.combatGroupLabel('watchman', null), '육모방망이 파수꾼');
 assert.equal(capabilities.combatGroupLabel('hunter', null), '사냥활 사냥꾼');
+assert.equal(capabilities.combatGroupLabel('healer', null), '전술 치료반');
 
 function reset(state) {
   for (const resident of state.residents) {
@@ -53,6 +55,23 @@ function reset(state) {
   state.resources.hornBows = 0;
   state.resources.spears = 0;
   state.resources.gunpowder = 0;
+}
+
+{
+  const state = simulation.newGame(2026071400);
+  reset(state);
+  const physician = state.residents[0];
+  physician.job = 'physician';
+  state.weaponAssignments = { [physician.id]: 'spear' };
+
+  const snapshot = roster.createCombatRoster(state, { context: 'villageDefense' }).combatants;
+  assert.equal(snapshot.length, 1);
+  assert.equal(snapshot[0].residentId, physician.id);
+  assert.equal(snapshot[0].role, 'healer');
+  assert.equal(snapshot[0].assignedWeapon, null, 'physicians never take an inventory combat weapon');
+  assert.equal(snapshot[0].readyWeapon, null);
+  assert.deepEqual(snapshot[0].capabilities, ['hold']);
+  assert.equal(snapshot[0].basePower, 0.5, 'healers contribute only negligible combat power');
 }
 
 {
