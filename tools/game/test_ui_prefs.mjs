@@ -30,6 +30,7 @@ transpileDirectory(new URL('../../src/ui/', import.meta.url), join(rootDir, 'ui'
 const prefsModule = await import(pathToFileURL(join(rootDir, 'ui', 'uiPrefs.mjs')).href);
 const displayModule = await import(pathToFileURL(join(rootDir, 'ui', 'resourceDisplay.mjs')).href);
 const {
+  LEGACY_BUILD_MENU_OPEN_KEY,
   MAX_STARRED_RESOURCES,
   UI_PREFS_KEY,
   defaultUiPrefs,
@@ -41,18 +42,20 @@ const {
 } = prefsModule;
 const { DISPLAY_RESOURCE_ORDER } = displayModule;
 
-function memoryStorage(initial = null) {
-  let value = initial;
+function memoryStorage(initial = {}) {
+  const values = new Map(Object.entries(
+    typeof initial === 'string' ? { [UI_PREFS_KEY]: initial } : initial,
+  ));
   return {
     getItem(key) {
-      assert.equal(key, UI_PREFS_KEY);
-      return value;
+      return values.get(key) ?? null;
     },
     setItem(key, next) {
-      assert.equal(key, UI_PREFS_KEY);
-      value = next;
+      values.set(key, next);
     },
-    value() { return value; },
+    removeItem(key) { values.delete(key); },
+    has(key) { return values.has(key); },
+    value(key = UI_PREFS_KEY) { return values.get(key) ?? null; },
   };
 }
 
@@ -62,14 +65,33 @@ assert.deepEqual(normalizeUiPrefs({ version: 99, starredResources: ['tools'] }),
   'an unknown prefs version must reset to defaults');
 
 const normalized = normalizeUiPrefs({
-  version: 1,
+  version: 2,
   starredResources: ['tools', 'tools', 'reputation', 'unknown', 'grain'],
   pinnedResourceGroups: ['materials', 'unknown', 'materials', 'food'],
+  buildDrawerLastCategory: 'farming',
 });
 assert.deepEqual(normalized.starredResources, ['tools', 'grain'],
   'prefs must remove duplicates, metrics, and unknown resources');
 assert.deepEqual(normalized.pinnedResourceGroups, ['materials', 'food'],
   'prefs must remove duplicate and unknown group pins');
+assert.equal(normalized.buildDrawerLastCategory, 'farming');
+
+const legacyStorage = memoryStorage({
+  [UI_PREFS_KEY]: JSON.stringify({
+    version: 1,
+    starredResources: ['tools'],
+    pinnedResourceGroups: ['materials'],
+  }),
+  [LEGACY_BUILD_MENU_OPEN_KEY]: JSON.stringify({ 생산: true }),
+});
+const migrated = loadUiPrefs(legacyStorage);
+assert.equal(migrated.version, 2, 'v1 prefs must migrate to the U2 schema');
+assert.deepEqual(migrated.starredResources, ['tools'], 'v1 stars must survive migration');
+assert.deepEqual(migrated.pinnedResourceGroups, ['materials'], 'v1 group pins must survive migration');
+assert.equal(migrated.buildDrawerLastCategory, 'production',
+  'the old open build section should seed the new last category');
+assert.equal(legacyStorage.has(LEGACY_BUILD_MENU_OPEN_KEY), false,
+  'the legacy build-menu key must be removed after migration');
 
 let prefs = defaultUiPrefs();
 for (const resource of DISPLAY_RESOURCE_ORDER.slice(0, MAX_STARRED_RESOURCES)) {
@@ -90,6 +112,6 @@ assert.deepEqual(prefs.pinnedResourceGroups, []);
 const storage = memoryStorage();
 saveUiPrefs(normalized, storage);
 assert.deepEqual(loadUiPrefs(storage), normalized, 'saved prefs must round-trip independently');
-assert.equal(JSON.parse(storage.value()).version, 1, 'saved prefs must retain their own schema version');
+assert.equal(JSON.parse(storage.value()).version, 2, 'saved prefs must retain their own schema version');
 
 console.log('ui prefs tests passed');

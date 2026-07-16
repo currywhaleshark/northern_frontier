@@ -83,13 +83,19 @@
 
 **Files:**
 - Create: `src/components/BuildDrawer.tsx` (기존 `BuildMenu.tsx` 대체)
+- Create: `src/ui/buildPresentation.ts` (카테고리·드로어 전환 상태)
 - Modify: `src/App.tsx` (`.side.left`에서 BuildMenu 제거, 하단 배치)
 - Modify: `src/styles/global.css`
+- Modify: `src/ui/uiPrefs.ts` (v1 → v2 마이그레이션)
+- Delete: `src/components/BuildMenu.tsx`
+- Test: `tools/game/test_build_drawer_presentation.mjs`, `tools/game/test_ui_prefs.mjs`
 
-- [ ] 하단 상시 아이콘 바(건설 카테고리: 주거/생산/농사/방어/특수) → 클릭 시 해당 카테고리 드로어가 위로 펼쳐진다. 티어 잠금(`minRank`) 표시·비용·설명은 기존 BuildMenu 데이터 재사용.
-- [ ] 배치 흐름: 건물 선택 시 드로어 자동 접힘 → `placingType` 진행 → 배치 완료·취소(Esc/우클릭) 시 드로어 상태 복귀. 마지막 카테고리 기억(uiPrefs), 단축키 `B`로 드로어 토글. 전환 시 기존 `buksae-buildmenu-open` 키는 제거한다.
-- [ ] 드로어가 열려 있는 동안에도 캔버스 클릭·시간 진행은 정상 동작(모달이 아님).
-- [ ] 시각 검증: 배치 시작→취소→재개 흐름, 티어 잠금 표시, 겨울 시야에서의 대비.
+- [x] 하단 상시 아이콘 바(건설 카테고리: 주거/생산/농사/방어/특수) → 클릭 시 해당 카테고리 드로어가 위로 펼쳐진다. 티어 잠금(`minRank`) 표시·비용·설명은 기존 BuildMenu 데이터 재사용. 기존 메뉴가 숨기던 잠금 건물도 사유와 함께 비활성 카드로 노출한다.
+- [x] 배치 흐름: 건물 선택 시 드로어 자동 접힘 → `placingType` 진행 → 단일 배치 완료·취소(Esc/우클릭) 시 출발 카테고리 복귀. 마지막 카테고리 기억(uiPrefs), 단축키 `B`로 드로어 토글. 전환 시 기존 `buksae-buildmenu-open` 키는 v2 prefs에 흡수한 뒤 제거한다.
+- [x] 드로어가 열려 있는 동안에도 캔버스 클릭·시간 진행은 정상 동작(모달이 아님). 셸은 포인터 이벤트를 통과시키고 실제 패널·바만 입력을 소비한다.
+- [x] 시각 검증: 1280×800·1920×1080에서 배치 시작→취소→재개, 티어 잠금, 캔버스/좌우 패널 경계를 확인했다. 계절 지도와 분리된 97% 불투명 배경으로 대비를 고정했다.
+  - 2026-07-16: 1280에서는 카드 한 줄 가로 스크롤, 1920에서는 드로어가 캔버스 좌우 10px 안쪽에 수용됨을 스크린샷으로 확인. 열린 동안 시간 진행도 유지됐으며 `B` 닫기/재열기와 취소 후 주거 카테고리 복원을 브라우저에서 확인했다.
+  - 범위 경계: U2에서는 BuildMenu만 좌측에서 제거하고 JobPanel·ProcessingPanel은 U3 도킹 전환까지 유지한다.
 
 ## Phase U3: 도킹 핀 창 프레임 + 좌측 해체 완료
 

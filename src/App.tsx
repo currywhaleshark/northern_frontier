@@ -12,7 +12,7 @@ import { clearSave, hasSave, loadGame, saveGame } from './game/saveLoad';
 import { addLog, negotiateTrade, requestTrade, tradeNegotiationOf } from './game/events';
 import { initAudio, isMuted, playSfx, setMuted, setWeatherAmbient } from './sound/sfx';
 import { AlertsPanel } from './components/AlertsPanel';
-import { BuildMenu } from './components/BuildMenu';
+import { BuildDrawer } from './components/BuildDrawer';
 import { EventLog } from './components/EventLog';
 import { EventModal } from './components/EventModal';
 import { TradeDialog } from './components/TradeDialog';
@@ -251,7 +251,7 @@ export default function App() {
       if (err) addLog(stateRef.current, err, 'bad');
       else {
         playSfx('hammer');
-        if (stateRef.current.resources.wood < 4) setPlacingType(null);
+        setPlacingType(null);
       }
       bump();
       return;
@@ -769,7 +769,6 @@ export default function App() {
       />
       <div className="main">
         <div className="side left">
-          <BuildMenu state={state} placingType={placingType} setPlacingType={setPlacingType} />
           <JobPanel state={state} onReassign={handleReassign} />
           <ProcessingPanel state={state} onSetReserve={handleSetProcessingReserve} />
         </div>
@@ -802,6 +801,13 @@ export default function App() {
               onCancelPlace={() => setPlacingType(null)}
             />
           </div>
+          <BuildDrawer
+            state={state}
+            placingType={placingType}
+            setPlacingType={setPlacingType}
+            uiPrefs={uiPrefs}
+            onUiPrefsChange={setUiPrefs}
+          />
         </div>
         <div className="side right">
           <AlertsPanel state={state} />

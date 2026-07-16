@@ -423,42 +423,194 @@ html, body, #root {
 }
 .section { background: var(--panel2); border-radius: 6px; padding: 8px; }
 
-/* ── 건설 메뉴 ── */
-.build-item {
-  width: 100%;
-  text-align: left;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 5px;
-  padding: 5px 7px;
-  margin-bottom: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.build-item:hover:not(:disabled) { border-color: var(--accent); }
-.build-item.selected { border-color: var(--accent); background: #33301f; }
-.build-item:disabled { opacity: 0.45; cursor: not-allowed; }
-.build-item .cost { color: var(--muted); font-size: 11px; }
-
-/* 접이식 카테고리 헤더 */
-.cat-header {
-  width: 100%;
+/* ── 하단 건설 드로어 ── */
+.build-drawer-shell {
+  position: absolute;
+  z-index: 35;
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  color: var(--accent);
-  font-size: 12.5px;
-  font-weight: bold;
-  padding: 6px 2px 4px;
-  margin-bottom: 4px;
-  cursor: pointer;
-  text-align: left;
+  gap: 6px;
+  pointer-events: none;
 }
-.cat-header:hover { color: var(--text); }
+.build-drawer-shell > * { pointer-events: auto; }
+.build-placement-status {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 5px 7px 5px 10px;
+  border: 1px solid rgba(217, 164, 65, 0.7);
+  border-radius: 7px;
+  background: rgba(30, 36, 43, 0.96);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.38);
+}
+.build-placement-status > span:first-child { font-size: 18px; }
+.build-placement-status > span:not(:first-child) { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.build-placement-status button,
+.build-drawer-head button {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel2);
+  color: var(--text);
+  cursor: pointer;
+}
+.build-placement-status button { width: auto; padding: 0 8px; }
+.build-placement-status button:hover,
+.build-placement-status button:focus-visible,
+.build-drawer-head button:hover,
+.build-drawer-head button:focus-visible { border-color: var(--accent); outline: none; }
+.build-drawer-panel {
+  width: 100%;
+  padding: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(217, 164, 65, 0.55);
+  border-radius: 8px;
+  background: rgba(27, 33, 39, 0.97);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.48);
+}
+.build-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+.build-drawer-head > div { display: flex; align-items: center; gap: 7px; }
+.build-drawer-head > div > span { font-size: 18px; }
+.build-drawer-head strong { color: var(--accent); }
+.build-drawer-head small { color: var(--muted); }
+.build-drawer-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(205px, 225px);
+  gap: 7px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 1px 1px 5px;
+  scrollbar-width: thin;
+}
+.build-drawer-item {
+  min-height: 122px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: start;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.build-drawer-item:hover:not(:disabled),
+.build-drawer-item:focus-visible:not(:disabled) {
+  border-color: var(--accent);
+  background: #303740;
+  outline: none;
+}
+.build-drawer-item:disabled {
+  border-color: #333b44;
+  background: #20262c;
+  color: #9ca5ae;
+  cursor: not-allowed;
+}
+.build-drawer-thumb { width: 32px; height: 44px; flex: 0 0 auto; image-rendering: pixelated; }
+.build-drawer-item-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.build-drawer-item-title { display: flex; align-items: center; justify-content: space-between; gap: 5px; }
+.build-drawer-item-title strong { color: var(--text); }
+.build-drawer-item-title small {
+  flex: 0 0 auto;
+  padding: 1px 4px;
+  border: 1px solid rgba(217, 164, 65, 0.35);
+  border-radius: 3px;
+  color: var(--accent);
+  font-size: 9px;
+}
+.build-drawer-item-desc {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: #b6bec7;
+  font-size: 10px;
+  line-height: 1.35;
+}
+.build-drawer-item-meta { color: var(--muted); font-size: 10px; line-height: 1.3; }
+.build-drawer-item-reason { margin-top: auto; color: #dfa372; font-size: 10px; font-weight: 700; }
+.build-category-bar {
+  max-width: 100%;
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  padding: 4px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(30, 36, 43, 0.97);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42);
+  scrollbar-width: thin;
+}
+.build-category-bar-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+  color: var(--accent);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.build-category-bar-label kbd {
+  min-width: 18px;
+  padding: 1px 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: #151a1f;
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  text-align: center;
+}
+.build-category-bar button {
+  position: relative;
+  min-width: 64px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.build-category-bar button > span:first-child { font-size: 17px; }
+.build-category-bar button:hover,
+.build-category-bar button:focus-visible { border-color: var(--border); color: var(--text); outline: none; }
+.build-category-bar button.active { border-color: var(--accent); background: #383323; color: var(--text); }
+.build-category-bar button.placing { color: var(--accent); }
+.build-category-bar button i {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(217, 164, 65, 0.75);
+}
 
 /* ── 직업 패널 ── */
 .job-row {
