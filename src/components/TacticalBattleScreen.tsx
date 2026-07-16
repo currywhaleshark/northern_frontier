@@ -1030,7 +1030,9 @@ export function TacticalBattleScreen({
                       >자동 표적</button>
                     )}
                   </div>
-                  <div className="tactical-command-hint">{commandHint}</div>
+                  <div className={`tactical-command-hint${commandPopover ? ' popover-open' : ''}`}>
+                    {commandHint}
+                  </div>
                 </>
               ) : (
                 <div className="tactical-command-hint">

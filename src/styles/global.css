@@ -2008,92 +2008,141 @@ html, body, #root {
   border-left: 1px solid #8f6e39;
 }
 .tactical-command-popover-header {
-  padding: 8px 10px 6px;
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 7px 9px 5px;
   border-bottom: 1px solid rgba(143, 110, 57, 0.35);
 }
-.tactical-command-popover-header strong { display: block; color: #ead8ac; font-size: 11px; }
-.tactical-command-popover-header small { display: block; color: #8f979b; }
-.tactical-command-popover-header .tactical-state-badge { margin: 3px 0; }
-.tactical-command-popover-lines {
+.tactical-command-popover-title {
   display: flex;
+  align-items: center;
   gap: 4px;
-  padding: 6px 10px;
+  min-width: 0;
+  color: #9fa8aa;
+  white-space: nowrap;
+}
+.tactical-command-popover-title strong {
+  overflow: hidden;
+  color: #ead8ac;
+  font-size: 11px;
+  text-overflow: ellipsis;
+}
+.tactical-command-popover-header small {
+  display: block;
+  overflow: hidden;
+  margin-top: 1px;
+  color: #8f979b;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tactical-command-popover-title .tactical-state-badge {
+  flex: 0 0 auto;
+  margin: 0 0 0 auto;
+}
+.tactical-command-popover-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.tactical-command-popover-segment {
+  display: flex;
+  gap: 3px;
+  padding: 4px 8px;
   border-bottom: 1px solid rgba(143, 110, 57, 0.35);
 }
-.tactical-command-popover-lines button {
+.tactical-command-popover-segment button {
   flex: 1;
-  padding: 4px 0;
+  min-width: 0;
+  min-height: 22px;
+  padding: 2px 3px;
   border: 1px solid #4b5050;
   border-radius: 3px;
   background: #1c2124;
   color: #cfd6d4;
-  font-size: 10px;
+  font-size: 9px;
+  touch-action: manipulation;
   cursor: pointer;
 }
-.tactical-command-popover-lines button.active {
+.tactical-command-popover-segment button.active {
   border-color: #d0a651;
   background: rgba(64, 51, 24, 0.92);
   color: #f4dfa8;
 }
-.tactical-command-popover-lines button:disabled { opacity: 0.45; cursor: not-allowed; }
-.tactical-command-popover-lines button small { color: #d2a958; font-size: 8px; }
-.tactical-command-popover-list {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 4px;
+.tactical-command-popover-segment button:disabled { opacity: 0.45; cursor: not-allowed; }
+.tactical-command-popover-segment button small { color: #d2a958; font-size: 8px; }
+.tactical-command-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 6px 8px 5px;
 }
-.tactical-command-popover.constrained { overflow-y: auto; }
-.tactical-command-popover.constrained .tactical-command-popover-list {
-  flex: none;
-  min-height: auto;
-  overflow: visible;
-}
-.tactical-command-popover-list button {
-  position: relative;
-  display: block;
-  width: 100%;
-  min-height: 34px;
-  padding: 5px 8px 5px 22px;
-  border: 0;
+.tactical-command-option,
+.tactical-command-more-toggle {
+  min-width: 0;
+  border: 1px solid #454c4f;
   border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  text-align: left;
+  background: #1c2124;
+  color: #d8dddb;
+  font-size: 10px;
+  text-align: center;
+  touch-action: manipulation;
   cursor: pointer;
 }
-.tactical-command-popover-list button::before {
-  content: '';
-  position: absolute;
-  top: 9px;
-  left: 8px;
-  width: 7px;
-  height: 7px;
-  border: 1px solid #8f979b;
-  border-radius: 50%;
+.tactical-command-option {
+  position: relative;
+  overflow: hidden;
+  padding: 5px 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.tactical-command-popover-list button:hover,
-.tactical-command-popover-list button:focus-visible { background: rgba(210, 169, 88, 0.12); }
-.tactical-command-popover-list button.current { background: rgba(64, 51, 24, 0.55); }
-.tactical-command-popover-list button.current::before { border-color: #d2a958; background: #d2a958; }
-.tactical-command-popover-list b { display: block; color: #ead8ac; font-size: 11px; }
-.tactical-command-popover-list small {
+.tactical-command-option.quick { min-height: 29px; color: #ead8ac; font-size: 11px; }
+.tactical-command-option.more { min-height: 25px; padding-block: 3px; }
+.tactical-command-option:hover,
+.tactical-command-option:focus-visible,
+.tactical-command-more-toggle:hover,
+.tactical-command-more-toggle:focus-visible {
+  border-color: #a57e3e;
+  background: rgba(210, 169, 88, 0.12);
+  outline: none;
+}
+.tactical-command-option.current {
+  border-color: #d2a958;
+  background: rgba(64, 51, 24, 0.78);
+  color: #f4dfa8;
+  box-shadow: inset 2px 0 #d2a958;
+}
+.tactical-command-more-toggle { min-height: 29px; padding: 3px 7px; color: #aeb6b7; }
+.tactical-command-more-toggle.wide {
+  grid-column: 1 / -1;
+  min-height: 22px;
+}
+.tactical-command-more-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  max-height: 94px;
+  overflow-y: auto;
+  padding: 5px 8px;
+  border-top: 1px solid rgba(143, 110, 57, 0.25);
+}
+.tactical-command-popover-description {
+  position: sticky;
+  bottom: 0;
   display: -webkit-box;
   overflow: hidden;
+  min-height: 34px;
+  margin: 0;
+  padding: 5px 8px 6px;
+  border-top: 1px solid rgba(143, 110, 57, 0.35);
+  background: rgba(14, 17, 19, 0.98);
   color: #8f979b;
-  line-height: 1.35;
+  font-size: 9px;
+  line-height: 1.3;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
-.tactical-command-popover-list > p,
 .tactical-command-popover-message { margin: 0; padding: 10px; color: #aeb6b7; }
-.tactical-command-popover-footer {
-  padding: 5px 10px 7px;
-  border-top: 1px solid rgba(143, 110, 57, 0.35);
-  color: #8f979b;
-  font-size: 9px;
-  line-height: 1.4;
-}
+.tactical-command-hint.popover-open { opacity: 0.16; }
 .tactical-unit-line {
   min-height: 120px;
   display: flex;
@@ -3540,6 +3589,10 @@ html, body, #root {
   .tactical-command-popover.below { transform: translateX(-50%); }
   .tactical-command-popover::before,
   .tactical-command-popover::after { display: none; }
+  .tactical-command-popover-segment button { min-height: 32px; }
+  .tactical-command-option.quick,
+  .tactical-command-more-toggle { min-height: 38px; }
+  .tactical-command-option.more { min-height: 34px; }
 }
 
 @media (max-height: 650px) {

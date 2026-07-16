@@ -9,6 +9,10 @@ const planSource = readFileSync(new URL('../../src/components/tactical/EnemyPlan
 const popoverSource = readFileSync(new URL('../../src/components/tactical/TacticalCommandPopover.tsx', import.meta.url), 'utf8');
 const minimapSource = readFileSync(new URL('../../src/components/tactical/TacticalMiniMap.tsx', import.meta.url), 'utf8');
 const commandTextSource = readFileSync(new URL('../../src/components/tactical/commandText.ts', import.meta.url), 'utf8');
+const commandPresentationSource = readFileSync(
+  new URL('../../src/components/tactical/commandPresentation.ts', import.meta.url),
+  'utf8',
+);
 const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
 
 assert.match(screenSource, /<TacticalZoneColumn\b/, 'the battle screen must delegate each battlefield zone');
@@ -100,10 +104,36 @@ assert.match(popoverSource, /from ['"]\.\/commandText['"]/,
   'the command popover must reuse shared command labels and descriptions');
 assert.match(commandTextSource, /export function commandLabel[\s\S]*export function commandDescription/,
   'the lower command bar and popover must share one command text source');
-assert.match(popoverSource, /tacticalSupportedCommands\(battle\)[\s\S]*tacticalCommandUnavailableReason\(battle, group, command\) == null/,
-  'the popover must show only supported commands that are currently available');
+assert.match(commandPresentationSource,
+  /tacticalSupportedCommands\(battle\)\.filter\(command =>[\s\S]*tacticalCommandUnavailableReason\(battle, group, command\) == null/,
+  'the presentation helper must show only supported commands that are currently available');
+assert.match(popoverSource, /tacticalCommandPresentation\(battle, group\)/,
+  'the popover must consume the isolated quick-command presentation helper');
 assert.doesNotMatch(popoverSource, /COMMAND_LABELS|const\s+commandDescription/,
   'the popover must not duplicate command strings');
+assert.match(popoverSource, /quickCommands\.map\(command => renderCommandButton\(command, 'quick'\)\)/,
+  'the collapsed popover must render only the prioritized quick commands');
+assert.match(popoverSource, /expanded && moreCommands\.length > 0[\s\S]*moreCommands\.map\(command => renderCommandButton\(command, 'more'\)\)/,
+  'More must expand the remaining command list inside the same popover');
+assert.doesNotMatch(popoverSource, /<small>\{commandDescription|tactical-command-popover-footer/,
+  'the popover must not repeat a persistent description under every command or keep the legacy footer');
+assert.doesNotMatch(popoverSource, /적 부대를 클릭하면 집중 표적|전체 명령은 아래 명령판에서/,
+  'the compact popover must remove repetitive targeting and lower-panel instructions');
+assert.match(popoverSource, /className="tactical-command-popover-description"[\s\S]*aria-live="polite"/,
+  'one live description region must serve hovered and focused commands');
+assert.match(popoverSource, /aria-label=\{`\$\{label\}: \$\{commandHelp\}`\}[\s\S]*title=\{`\$\{label\} — \$\{commandHelp\}`\}/,
+  'command buttons must retain explicit accessible labels and tooltip descriptions');
+assert.match(popoverSource, /function TacticalPlacementSegment\([\s\S]*<TacticalPlacementSegment/,
+  'formation and hunt-route selection must remain an independently replaceable placement component');
+assert.match(popoverSource,
+  /setExpanded\(false\);\s*setHoveredCommand\(null\);[\s\S]*\}, \[group\.id\]\);/,
+  'changing groups must reset expanded and preview state');
+assert.match(popoverSource, /event\.key !== 'Escape'[\s\S]*onClose\(true\)/,
+  'Escape must continue closing the popover with focus restoration requested');
+assert.match(popoverSource, /피난 주민은 보호 대상이며 전투 명령을 받지 않습니다/,
+  'civilian groups must retain the description-only protection mode');
+assert.match(screenSource, /tactical-command-hint\$\{commandPopover \? ' popover-open' : ''\}/,
+  'the lower-panel hint must visually recede while the popover owns command explanation');
 assert.match(screenSource, /<div className="tactical-stage-shell" ref=\{stageShellRef\}/,
   'the stage shell must own the popover positioning reference');
 assert.ok(screenSource.indexOf('<TacticalCommandPopover') > screenSource.indexOf('<div className="tactical-battlefield"'),
