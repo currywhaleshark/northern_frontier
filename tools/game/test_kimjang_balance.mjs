@@ -92,13 +92,12 @@ function runWinter(seed, withKimchi) {
       meal.varietyScore,
       meal.vegetableRatio,
     );
-    residents.updateMorale(
-      state,
-      consumption.foodTotal(state) > population * CONFIG.needs.foodPerDay * 6,
-      residents.avg(state, 'warmth'),
-      false,
-      meal.varietyScore,
-    );
+    residents.updateMorale(state, {
+      foodOk: consumption.foodTotal(state) > population * CONFIG.needs.foodPerDay * 6,
+      warmthAvg: residents.avg(state, 'warmth'),
+      dietVarietyScore: meal.varietyScore,
+      clothesCoverage: 1,
+    });
     healthTotal += residents.avg(state, 'health');
     moraleTotal += residents.avg(state, 'morale');
     state.day++;

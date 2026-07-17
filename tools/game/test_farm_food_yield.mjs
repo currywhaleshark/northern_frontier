@@ -115,8 +115,10 @@ function runTicks(state, ticks) {
 
   runTicks(state, 1);
 
-  assert.equal(field.fieldGrowth, 92, 'farmer harvests one subtick worth of field growth');
-  const harvested = (8 / 100) * CROP_DEFS.millet.yield;
+  // 농부 1명이 tilesPerFarmer칸 몫을 감당한다 — 1×1 만작 밭은 기존보다 3배 빠르게 걷힌다
+  const take = CONFIG.agents.work.harvestPerSubtick * CONFIG.farming.tilesPerFarmer;
+  assert.equal(field.fieldGrowth, 100 - take, 'farmer harvests one subtick worth of field growth');
+  const harvested = (take / 100) * CROP_DEFS.millet.yield;
   assert.ok(Math.abs((field.inventory?.grain ?? 0) - harvested) < 0.001, 'millet harvest stays in field inventory');
 }
 
@@ -130,12 +132,12 @@ function runTicks(state, ticks) {
   state.resources.wood = 0;
   state.resources.rice = 0;
   state.resources.grain = 0;
-  state.resources.stone = CONFIG.production.stoneReserveTarget;
   state.processingReserves.rice = 0;
 
   runTicks(state, 1);
 
-  const milled = CONFIG.production.millerRicePerDay / 5;
+  const milled = (CONFIG.production.millerRicePerDay / 5)
+    * CONFIG.production.rankLaborEfficiency[state.rank];
   assert.equal(miller.task, '방아 찧기');
   assert.ok(Math.abs(watermill.inventory.rice - (10 - milled)) < 0.001, 'miller mills the expected local rice amount');
   assert.ok(Math.abs((watermill.inventory?.grain ?? 0) - (milled * 1.5)) < 0.001, 'milled rice creates grain at the mill');

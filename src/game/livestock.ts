@@ -177,6 +177,7 @@ export function updateLivestock(state: GameState): LivestockDailyReport {
   if (report.births > 0) addLog(state, `축사에서 새끼 가축 ${report.births}마리가 태어났습니다.`, 'good');
   if (report.deaths > 0) addLog(state, `먹이가 모자라 가축 ${report.deaths}마리를 잃었습니다.`, 'bad', true);
   reconcileMountAssignments(state);
+  reconcilePlowOxen(state);
   return report;
 }
 
@@ -201,17 +202,82 @@ export function livestockProductForHerder(
   return { resource: config.productResource, amount, task };
 }
 
-export function cattleFarmWorkMultiplier(state: GameState): number {
-  const cattleStables = state.buildings.filter(building => {
-    if (building.type !== 'stable' || !building.built) return false;
+// ── 농우(農牛) — 축사의 소를 경작지에 내주어 우경(牛耕) 효율을 얻는다 ──
+
+// 농우로 내줄 수 있는 소 마릿수 (완공된 소 축사의 마릿수 합)
+export function plowOxenPool(state: GameState): number {
+  return state.buildings.reduce((sum, building) => {
+    if (building.type !== 'stable' || !building.built) return sum;
     const livestock = normalizeLivestockState(building.livestock);
-    return livestock.species === 'cattle' && livestock.headcount > 0;
-  }).length;
-  const bonus = Math.min(
-    CONFIG.livestock.cattleFarmWorkMaxBonus,
-    cattleStables * CONFIG.livestock.cattleFarmWorkBonusPerStable,
-  );
-  return 1 + bonus;
+    return livestock.species === 'cattle' ? sum + Math.floor(livestock.headcount) : sum;
+  }, 0);
+}
+
+export function plowOxenOf(building: Pick<Building, 'plowOxen'>): number {
+  const raw = building.plowOxen;
+  return typeof raw === 'number' && Number.isFinite(raw) ? Math.max(0, Math.floor(raw)) : 0;
+}
+
+// 경작지들에 이미 배정된 농우 마릿수 합
+export function plowOxenAssigned(state: GameState): number {
+  return state.buildings.reduce((sum, building) =>
+    (building.type === 'field' || building.type === 'paddy') ? sum + plowOxenOf(building) : sum, 0);
+}
+
+// 경작지 하나가 받을 수 있는 농우 상한 — 대형(largePlotOxThreshold칸 이상)은 +1
+// (buildings.ts와의 순환 의존을 피하려고 면적을 여기서 직접 센다)
+function plotAreaOf(building: Pick<Building, 'w' | 'h'>): number {
+  const clampSide = (value: number | undefined): number =>
+    typeof value === 'number' && Number.isFinite(value)
+      ? Math.min(CONFIG.farming.maxPlotSide, Math.max(1, Math.floor(value)))
+      : 1;
+  return clampSide(building.w) * clampSide(building.h);
+}
+
+export function plotPlowOxenMax(building: Pick<Building, 'type' | 'w' | 'h'>): number {
+  if (building.type !== 'field' && building.type !== 'paddy') return 0;
+  const extra = plotAreaOf(building) >= CONFIG.farming.largePlotOxThreshold ? 1 : 0;
+  return CONFIG.farming.plowOxenPerPlotMax + extra;
+}
+
+// 농우 배정 경작지의 파종·생육·수확 작업 배수
+export function plotWorkMultiplier(_state: GameState, building: Pick<Building, 'type' | 'plowOxen'>): number {
+  const oxen = plowOxenOf(building);
+  return 1 + oxen * (CONFIG.farming.plowOxWorkMultiplier - 1);
+}
+
+// 경작지 농우 배정/해제 (양수: 배정, 0: 전부 해제)
+export function setPlotPlowOxen(state: GameState, buildingId: number, count: number): string | null {
+  const building = state.buildings.find(candidate => candidate.id === buildingId);
+  if (!building || (building.type !== 'field' && building.type !== 'paddy')) return '경작지가 아닙니다.';
+  if (!building.built) return '완공된 경작지에만 농우를 내줄 수 있습니다.';
+  const requested = Math.max(0, Math.floor(finiteNonNegative(count)));
+  const max = plotPlowOxenMax(building);
+  if (requested > max) return `이 경작지에는 농우를 ${max}마리까지만 부릴 수 있습니다.`;
+  const others = plowOxenAssigned(state) - plowOxenOf(building);
+  if (others + requested > plowOxenPool(state)) return '내줄 수 있는 소가 부족합니다. (소 축사 확인)';
+  building.plowOxen = requested;
+  return null;
+}
+
+// 소가 죽거나 도축되어 풀이 줄면 초과 배정을 해제한다 (나중에 지은 경작지부터)
+export function reconcilePlowOxen(state: GameState): void {
+  let excess = plowOxenAssigned(state) - plowOxenPool(state);
+  if (excess <= 0) return;
+  const plots = state.buildings
+    .filter(building => (building.type === 'field' || building.type === 'paddy') && plowOxenOf(building) > 0)
+    .sort((a, b) => b.id - a.id);
+  let released = 0;
+  for (const plot of plots) {
+    if (excess <= 0) break;
+    const take = Math.min(excess, plowOxenOf(plot));
+    plot.plowOxen = plowOxenOf(plot) - take;
+    excess -= take;
+    released += take;
+  }
+  if (released > 0) {
+    addLog(state, `소가 줄어 경작지의 농우 ${released}마리 배정이 풀렸습니다.`, 'bad', true);
+  }
 }
 
 export function hayFromHarvestProgress(progress: number): number {
@@ -246,6 +312,7 @@ export function lootLivestock(state: GameState, ratio: number): LivestockLootRep
     addLog(state, `습격대가 축사를 털어 ${details}를 끌고 갔습니다.`, 'bad', true);
   }
   reconcileMountAssignments(state);
+  reconcilePlowOxen(state);
   return report;
 }
 
@@ -259,6 +326,7 @@ export function setStableLivestock(state: GameState, buildingId: number, species
   if (livestock.headcount > 0) return '축사에 가축이 남아 있어 축종을 바꿀 수 없습니다.';
   stable.livestock = createLivestockState(species, 0);
   reconcileMountAssignments(state);
+  reconcilePlowOxen(state);
   return null;
 }
 
@@ -329,6 +397,7 @@ export function slaughterStableLivestock(state: GameState, buildingId: number, a
 
   livestock.headcount -= requested;
   reconcileMountAssignments(state);
+  reconcilePlowOxen(state);
   livestock.growth = Math.min(livestock.growth, livestock.headcount > 0 ? 0.999999 : 0);
   const config = speciesConfig(livestock.species);
   const meat = requested * config.slaughterMeatPerHead;

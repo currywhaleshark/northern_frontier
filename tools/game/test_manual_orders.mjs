@@ -145,21 +145,24 @@ function onlyResident(state, job, x, y) {
   rockTile.hasIron = false;
   rockTile.mineralRemaining = 2;
   const hauler = onlyResident(state, 'hauler', 7, 4);
+  const blockedAction = selectionActions.getPointerAction(state, { kind: 'resident', id: hauler.id }, rockTile);
+  assert.equal(blockedAction.kind, 'invalid', 'haulers cannot be ordered to quarry');
 
-  const action = selectionActions.getPointerAction(state, { kind: 'resident', id: hauler.id }, rockTile);
+  const miner = onlyResident(state, 'miner', 7, 4);
+  const action = selectionActions.getPointerAction(state, { kind: 'resident', id: miner.id }, rockTile);
   assert.equal(action.kind, 'work');
-  const error = simulation.issueResidentWorkOrder(state, hauler.id, action);
+  const error = simulation.issueResidentWorkOrder(state, miner.id, action);
   assert.equal(error, null);
 
   let sawCarry = false;
   for (let i = 0; i < 180 && state.resources.stone <= 0; i++) {
     agents.agentsTick(state);
     state.subTick++;
-    sawCarry ||= (hauler.carrying.stone ?? 0) > 0;
+    sawCarry ||= (miner.carrying.stone ?? 0) > 0;
   }
 
-  assert.equal(sawCarry, true, 'hauler should quarry stone before depositing');
-  assert.ok(state.resources.stone > 0, 'hauler should deposit manually quarried stone');
+  assert.equal(sawCarry, true, 'settlement-tier miner should quarry stone before depositing');
+  assert.ok(state.resources.stone > 0, 'miner should deposit manually quarried stone');
   assert.equal(rockTile.terrain, 'plain', 'depleted stone outcrops disappear');
   assert.equal(rockTile.mineralRemaining, 0);
   assert.ok(state.log.some(entry => entry.text.includes('석재 노두') && entry.text.includes('고갈')));
@@ -174,12 +177,12 @@ function onlyResident(state, job, x, y) {
   ironTile.terrain = 'rock';
   ironTile.hasIron = true;
   ironTile.mineralRemaining = 1.5;
-  const hauler = onlyResident(state, 'hauler', 7, 4);
+  const miner = onlyResident(state, 'miner', 7, 4);
 
-  const action = selectionActions.getPointerAction(state, { kind: 'resident', id: hauler.id }, ironTile);
+  const action = selectionActions.getPointerAction(state, { kind: 'resident', id: miner.id }, ironTile);
   assert.equal(action.kind, 'work');
   assert.ok(action.label.includes('철광'));
-  assert.equal(simulation.issueResidentWorkOrder(state, hauler.id, action), null);
+  assert.equal(simulation.issueResidentWorkOrder(state, miner.id, action), null);
 
   for (let i = 0; i < 180 && state.resources.iron <= 0; i++) {
     agents.agentsTick(state);

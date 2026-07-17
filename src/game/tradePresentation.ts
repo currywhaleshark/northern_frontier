@@ -62,9 +62,9 @@ export interface TradeResourceSprite {
 const BASE_ATLAS = '/assets/resources/trade-resource-atlas-v1.png';
 const EXTENDED_ATLAS = '/assets/resources/trade-resource-atlas-v2.png';
 const COMPLETE_ATLAS = '/assets/resources/trade-resource-atlas-v3.png';
+const NEW_CONTENT_ATLAS = '/assets/resources/new-content-resource-atlas-v1.png';
 const FUEL_GROUP_ICON = '/assets/resources/fuel-group-v1.png';
 
-// 신규 자원은 전용 아틀라스가 준비되기 전 RESOURCE_ICONS의 이모지 폴백을 쓸 수 있다.
 export const RESOURCE_SPRITES: Partial<Record<ResourceIconId, TradeResourceSprite>> = {
   grain: { atlas: BASE_ATLAS, columns: 4, rows: 2, column: 0, row: 0 },
   hide: { atlas: BASE_ATLAS, columns: 4, rows: 2, column: 1, row: 0 },
@@ -99,6 +99,19 @@ export const RESOURCE_SPRITES: Partial<Record<ResourceIconId, TradeResourceSprit
   clothingGroup: { atlas: COMPLETE_ATLAS, columns: 4, rows: 3, column: 2, row: 2 },
   luxuryGroup: { atlas: COMPLETE_ATLAS, columns: 4, rows: 3, column: 3, row: 2 },
   fuelGroup: { atlas: FUEL_GROUP_ICON, columns: 1, rows: 1, column: 0, row: 0 },
+  eggs: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 0, row: 0 },
+  milk: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 1, row: 0 },
+  curedMeat: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 2, row: 0 },
+  saltedFish: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 3, row: 0 },
+  driedFish: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 0, row: 1 },
+  kimchi: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 1, row: 1 },
+  beans: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 2, row: 1 },
+  jang: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 3, row: 1 },
+  salt: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 0, row: 2 },
+  onggi: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 1, row: 2 },
+  wool: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 2, row: 2 },
+  hay: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 3, row: 2 },
+  silver: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 0, row: 3 },
 };
 
 export const TRADE_RESOURCE_SPRITES = RESOURCE_SPRITES;

@@ -20,6 +20,7 @@ export const CONFIG = {
     nearbyIron: 16,
     nearbyMinDistance: 4,
     nearbyMaxDistance: 7,
+    mineWorkRadius: 6, // 채광장 거점에서 주변 광상을 찾아 왕복하는 반경
   },
 
   time: {
@@ -271,6 +272,14 @@ export const CONFIG = {
   },
 
   production: {
+    // 승격으로 전문직이 늘어나는 만큼 작업 조직·도구 운용이 정비된다.
+    // 개척지 초반 난이도는 유지하고 보 이후의 기초·가공 생산만 보완한다.
+    rankLaborEfficiency: {
+      settlement: 1,
+      bo: 1.1,
+      jin: 1.15,
+      bu: 1.18,
+    } as Record<Rank, number>,
     woodPerDay: 1.3,
     gamePerDay: 0.9,
     herbsPerDay: 0.5,
@@ -309,8 +318,6 @@ export const CONFIG = {
     hidePerGame: 1,
     millerRicePerDay: 4,       // 방아꾼 1인 하루 벼 도정량
     grainPerRice: 1.5,         // 벼 1 → 먹을 수 있는 곡물 1.5
-    haulerStonePerDay: 0.4,    // 돌이 부족할 때 채석
-    stoneReserveTarget: 40,
     woodReserve: 25,           // 건축용으로 남겨둘 목재 (이 이상만 장작으로 팬다)
     processingReserves: {
       wood: 25,
@@ -343,6 +350,18 @@ export const CONFIG = {
     toolWearPerWorker: 0.015,  // 생산직 1인당 하루 도구 마모
     skillGainPerDay: 0.012,
     skillEffect: 0.5,          // 숙련 1.0일 때 생산 +50%
+  },
+
+  // 경작지 (드래그 크기 지정 논밭)
+  farming: {
+    maxPlotSide: 3,       // 경작지 한 변 최대 칸수 (3×3 = 9칸 상한)
+    tilesPerFarmer: 3,    // 농부 1명이 감당하는 칸수 — 슬롯 수 = ceil(면적/이 값)
+    // 칸 1개 파종에 드는 농부 서브틱. 봄 96서브틱 기준: 혼자 3×3(9칸)은 5칸 남짓에서 봄이 끝나고
+    // (의도된 실패), 적정 인원 3명이면 7일째쯤 다 심고 생육으로 넘어간다.
+    sowWorkPerTile: 18,
+    plowOxWorkMultiplier: 1.4, // 농우 배정 시 파종·생육·수확 작업 배수
+    plowOxenPerPlotMax: 1,     // 경작지당 농우 상한 (9칸 대형은 +1)
+    largePlotOxThreshold: 7,   // 이 칸수 이상이면 농우 상한 +1
   },
 
   fermentation: {
@@ -381,14 +400,12 @@ export const CONFIG = {
       brushwood: 4, firewood: 4, charcoal: 3, wood: 4,
       stone: 3, iron: 3, hide: 2, cotton: 3, wool: 3, hay: 5, herbs: 1.5, silver: 2,
     },
-    haulerCarryCap: 10,       // 운반꾼 전용 적재량 (채석 귀환에도 사용)
+    haulerCarryCap: 10,       // 운반꾼 전용 적재량
     haulerBatchMin: 2,        // 평시 소량 왕복을 막는 작업장 최소 수거량
-    haulerQuarryBatchMin: 6,  // 돌 비축 부족 시 이만큼 모인 짐만 채석을 중단하고 수거
     haulerCartCarryCap: 24,   // 수레 장비 운반꾼 적재량
     haulerCartBatchMin: 8,
-    haulerCartQuarryBatchMin: 14,
     work: {                   // 작업지에서 1회 채집에 드는 서브틱
-      chop: 3, hunt: 5, herb: 3, mine: 4, quarry: 3, fish: 4,
+      chop: 3, hunt: 5, herb: 3, mine: 4, fish: 4,
       herd: 5,
       harvestPerSubtick: 8,   // 가을 수확: 서브틱당 깎는 성장도
       growPerSubtick: 1.4,    // 봄여름 농사: 서브틱당 올리는 성장도
@@ -418,8 +435,6 @@ export const CONFIG = {
 
   livestock: {
     initialUnlocked: ['chicken'] as LivestockId[],
-    cattleFarmWorkBonusPerStable: 0.08,
-    cattleFarmWorkMaxBonus: 0.24,
     hayPerHarvestProgress: 0.1,
     chicken: {
       capacity: 8,
@@ -939,6 +954,37 @@ export const CONFIG = {
     // 이주 가족 구성 — 홀몸만 오지 않는다
     immigrantChildChance: 0.4,   // 일행에 아이(어린이/소년) 1명이 섞일 확률
     immigrantElderChance: 0.15,  // 노부모(55~64세) 1명이 섞일 확률
+  },
+
+  // 만족도 — 티어가 오를수록 기대 항목이 늘어난다 (성분 기반, 잠긴 항목은 계산 제외)
+  // 계획: docs/superpowers/plans/2026-07-17-satisfaction-religion.md
+  satisfaction: {
+    base: 50,
+    mealOk: 10, mealShort: -18,            // 정착지: 끼니
+    warmthGood: 8, warmthBad: -12,         // 정착지: 온기 (60 이상 / 35 미만)
+    varietyPenalty: -8,                    // 정착지: 식단 단조 (다양성 0.5 미만)
+    clothingGood: 5, clothingBad: -6,      // 보: 입성 (보급률 0.8 이상 / 0.4 미만)
+    marketGood: 4, marketMissing: -3,      // 보: 장터
+    fermentGood: 6, fermentMissing: -6,    // 진: 밥상의 격 (최근 장·김치)
+    fermentWindowDays: 4,
+    educationGood: 6, educationMissing: -6, // 진: 서당 (훈장 배정)
+    luxuryGood: 6, luxuryMissing: -6,      // 부: 사치품 (인구당 재고)
+    luxuryPerCapita: 0.4,
+    religionGood: 6, religionMissing: -6,  // 부: 종교 시설
+    shamanCheer: 2,                        // 당집에 무당 상주 (부가)
+    promotionCheer: 8,                     // 승격 직후 완충 버프
+    promotionCheerDays: 12,
+    monkGriefRelief: 3,                    // 노승 상주 시 사망 사기 하락 6 → 3
+    monkBurialBonus: 2,                    // 노승 상주 시 안장 위로 +2
+  },
+
+  // 종교인 등장 — 사람이 먼저 온다. 네임드가 합류해야 그 갈래의 시설이 열린다.
+  religion: {
+    minRank: 'jin' as Rank,
+    dailyChance: 0.02,
+    declineRetryDays: 36,   // 거절해도 훗날 다시 문을 두드린다
+    mudangAge: 44,
+    nosungAge: 62,          // 노승은 자연사 시계도 함께 돈다
   },
 
   // 장례 — 모든 죽음은 시신을 남기고, 시신은 묘지에 묻힌다

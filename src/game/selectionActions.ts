@@ -1,12 +1,13 @@
-import { BUILDING_DEFS, buildingFootprintTiles, getBuilding, isBuildingUnlocked } from './buildings';
+import { BUILDING_DEFS, footprintTilesOf, getBuilding, isBuildingUnlocked } from './buildings';
 import { CONFIG } from './config';
-import { JOB_NAMES } from './constants';
 import { collectHuntableTiles } from './habitats';
 import { isPassable, isTerrainPassable } from './agents';
 import { getSeason } from './seasons';
 import { isExplored } from './exploration';
 import { foreignSiteAt } from './foreignSites';
 import { isHaulSourceBuilding } from './inventory';
+import { isMineralDeposit, servingMineForTile } from './miningSites';
+import { isVeinSealedTile } from './silver';
 import { canAssignResidentToBuilding, workerSlotConfig } from './workerSlots';
 import { unauthorizedTerritorySiteIds } from './territory';
 import type { Building, GameState, JobId, PointerAction, SelectedEntity, Tile } from './types';
@@ -48,7 +49,7 @@ function tileBuilding(state: GameState, tile: Tile): Building | undefined {
 }
 
 export function tileBelongsToBuilding(state: GameState, tile: Tile, building: Building): boolean {
-  const footprint = buildingFootprintTiles(state, building.type, building.x, building.y);
+  const footprint = footprintTilesOf(state, building);
   return !!footprint?.some(part => part.x === tile.x && part.y === tile.y);
 }
 
@@ -58,12 +59,6 @@ function activeHuntableTiles(state: GameState): Map<string, number> {
 
 function buildingMatches(tile: Tile, building: Building | undefined, types: readonly Building['type'][]): boolean {
   return !!building && building.built && tile.buildingId === building.id && types.includes(building.type);
-}
-
-function workLabel(job: JobId, tile: Tile, building?: Building): string {
-  if (job === 'hauler' && tile.terrain === 'rock') return tile.hasIron ? '철광 채석' : '채석';
-  if (building) return `${BUILDING_DEFS[building.type].name} 작업`;
-  return `${JOB_NAMES[job]} 작업`;
 }
 
 function isMoveTargetTile(tile: Tile): boolean {
@@ -123,9 +118,12 @@ export function canResidentWorkTarget(
         ? { ok: true, label: '약초·산물 채집' }
         : { ok: false, label: '약초꾼이 일할 수 없는 대상입니다' };
     case 'miner':
+      if (isMineralDeposit(tile) && !isVeinSealedTile(state, tile)) {
+        return { ok: true, label: tile.hasSilver ? '은맥 채굴' : tile.hasIron ? '철광 채굴' : '채석' };
+      }
       return buildingMatches(tile, building, ['mine'])
-        ? { ok: true, label: '채광', buildingId: building?.id }
-        : { ok: false, label: '채광장이 아닙니다' };
+        ? { ok: true, label: '주변 광상 채광', buildingId: building?.id }
+        : { ok: false, label: '채광장 작업 반경의 광상이 아닙니다' };
     case 'fisher':
       return buildingMatches(tile, building, ['ferry'])
         ? { ok: true, label: '고기잡이', buildingId: building?.id }
@@ -143,7 +141,6 @@ export function canResidentWorkTarget(
         ? { ok: true, label: '옹기 굽기', buildingId: building?.id }
         : { ok: false, label: '옹기가마가 아닙니다' };
     case 'hauler':
-      if (tile.terrain === 'rock') return { ok: true, label: workLabel(job, tile) };
       if (building && tile.buildingId === building.id && isHaulSourceBuilding(building)) {
         return {
           ok: true,
@@ -275,11 +272,12 @@ export function getBuildingActions(state: GameState, building: Building): Buildi
   if (!building.built) return [];
   if (building.type === 'mine') {
     const vein = state.silverVein;
-    const veinInMine = !!vein && state.map[vein.y]?.[vein.x]?.buildingId === building.id;
-    if (veinInMine && vein.status === 'sealed') {
+    const veinTile = vein ? state.map[vein.y]?.[vein.x] : undefined;
+    const veinInMine = !!veinTile && servingMineForTile(state, veinTile)?.id === building.id;
+    if (veinInMine && vein?.status === 'sealed') {
       return [{ id: 'silver-break-seal', label: '봉인을 어기고 은맥을 판다' }];
     }
-    if (veinInMine && vein.status === 'buried') {
+    if (veinInMine && vein?.status === 'buried') {
       return [{ id: 'silver-reopen', label: '묻어둔 은맥을 다시 연다' }];
     }
     return [];

@@ -62,6 +62,9 @@ export type JobId =
   | 'clerk'      // 아전
   | 'watchman'   // 파수꾼
   | 'undertaker' // 장의사 (묘지 배정 — 시신 수습과 안장)
+  | 'teacher'    // 훈장 (서당 배정 — 아이들을 가르친다)
+  | 'shaman'     // 무당 (당집 상주 — 네임드 전용)
+  | 'monk'       // 승려 (암자 상주 — 네임드 전용)
   | 'militia';   // 수비병 (내부 id는 저장 호환을 위해 유지)
 
 export type CombatWeaponId = 'musket' | 'hornBow' | 'spear';
@@ -159,6 +162,9 @@ export type BuildingTypeId =
   | 'office'     // 관청
   | 'market'     // 장터
   | 'cemetery'   // 묘지 (시신 안장 — 묘 자리가 차오른다)
+  | 'school'     // 서당 (훈장이 아이들을 가르친다 — 교육 만족)
+  | 'shrine'     // 당집 (무속 — 무당이 와야 지을 수 있다)
+  | 'hermitage'  // 암자 (불교 — 노승이 와야 지을 수 있다)
   | 'cannonEmplacement'; // 불랑기포대 (부 승격 후 조정 청원으로만 배치)
 
 export interface Tile {
@@ -289,6 +295,19 @@ export interface HaulTask {
 // 생애 단계 — 성장 게이지 모델(가축 growth 선례). 나이가 아니라 단계로 자란다.
 export type LifeStage = 'infant' | 'child' | 'youth';
 
+// 네임드 특수 주민 — 게임당 한 번만 오는 인물 (2026-07-17-special-residents.md의 첫 조각)
+export type SpecialResidentId = 'mudang' | 'nosung';
+
+export type ReligionId = 'shamanism' | 'buddhism';
+
+// 민심 내역 — 티어가 오를수록 기대 항목이 늘어난다 (조정 탭 의심 내역과 같은 문법)
+export interface MoraleFactor {
+  id: string;
+  label: string;
+  delta: number;      // 목표 사기 기여 (+만족 / -불만)
+  unlocked: boolean;  // 현 티어에서 기대 항목인지 (잠긴 항목은 계산 제외)
+}
+
 // 매장을 기다리는 시신. 방치가 길어지면 마을 사기가 상한다.
 export interface Corpse {
   id: number;
@@ -315,6 +334,7 @@ export interface Resident {
   spouseId?: number | null;    // 배우자 주민 id
   motherId?: number;           // "○○의 아이" 표기용
   fatherId?: number;
+  special?: SpecialResidentId; // 네임드 특수 주민 — 직업 고정, 게임당 1회
   birthRecoveryUntil?: number; // 산모 회복 — 이 날까지 노동 이탈
   corpseCarryId?: number | null; // 장의사가 운구 중인 시신 id
   hunger: number;   // 0(굶주림) ~ 100(포만)
@@ -337,6 +357,7 @@ export interface Resident {
   path: { x: number; y: number }[]; // 다음에 밟을 타일들
   workTimer: number;                // 현재 작업지에서 남은 작업량(서브틱)
   targetId: number | null;          // 목표 건물 id (밭/건설현장/순찰지 등)
+  miningDepositBuildingId?: number | null; // 현재 짐을 부릴 담당 채광장. 없으면 일반 저장 거점
   carrying: Partial<Record<ResourceId, number>>; // 지고 있는 짐
   cartEquipped: boolean; // 운반용 수레 장비 여부
   haulTask: HaulTask | null; // 생산지 재고 운반 예약
@@ -360,6 +381,10 @@ export interface Building {
   progress: number;   // 투입된 건축가-일수
   built: boolean;
   fieldGrowth: number; // 밭 전용: 작물 성장도 0~100
+  w?: number; // 밭/논 전용: 가로 칸 수 (기본 1, 최대 CONFIG.farming.maxPlotSide)
+  h?: number; // 밭/논 전용: 세로 칸 수 (기본 1, 최대 CONFIG.farming.maxPlotSide)
+  sownArea?: number; // 밭/논 전용: 이번 작기에 파종을 마친 칸 수 (0 ~ w*h)
+  plowOxen?: number; // 밭/논 전용: 배정된 농우(소) 마릿수
   cropId?: CropId | null; // 밭/논 전용: 현재 선택/재배 작물
   queuedCropId?: CropId | null; // 밭/논 전용: 수확 뒤 또는 다음 파종철에 적용할 작물
   smithyProduct?: SmithyProductId; // 대장간 전용: 현재 생산품
@@ -474,7 +499,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion';
   title: string;
   body: string;
   illustration?: {
@@ -1107,6 +1132,13 @@ export interface GameState {
   // ── 생애 주기·장례 (구버전 저장에는 없음) ──
   corpses?: Corpse[];          // 매장 대기 시신
   nextCorpseId?: number;
+  // ── 만족도·종교·특수 주민 (구버전 저장에는 없음) ──
+  moraleFactors?: MoraleFactor[];   // 어제 계산된 민심 내역 (UI 표시용 스냅숏)
+  lastFermentMealDay?: number;      // 마지막으로 밥상에 장·김치가 오른 날
+  promotionCheerUntil?: number;     // 승격 직후 완충 버프 종료일
+  unlockedReligions?: ReligionId[]; // 네임드가 와서 해금된 신앙 갈래
+  religionOfferCooldownUntil?: number; // 다음 종교인 등장 가능일
+  spentSpecialIds?: SpecialResidentId[]; // 이미 등장한 네임드 (게임당 1회)
   // ── 은맥 (게임당 1회 — 채광 중 발견 사건으로만 등장) ──
   silverVein?: SilverVeinState | null; // 구버전 저장에는 없음
   silverPityDays?: number;     // 발견 전 누적 채광일 (보장 발동용)

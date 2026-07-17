@@ -1,6 +1,7 @@
 import { RANK_NAMES, RESOURCE_NAMES } from '../../game/constants';
 import { canPetition } from '../../game/petition';
 import { nextRank, promotionConditions } from '../../game/promotion';
+import { rankProductionEfficiency } from '../../game/productionEfficiency';
 import { LUXURY_RESOURCES } from '../../game/resourceCatalog';
 import { suspicionBreakdown } from '../../game/suspicion';
 import { tributeReserved } from '../../game/tributeReserve';
@@ -36,12 +37,14 @@ export function CourtWindow({
   const suspicionColor = state.suspicion >= 70 ? '#e06c5c' : state.suspicion >= 40 ? '#d9a441' : '#6fbf73';
   const hasNitre = state.buildings.some(building => building.type === 'nitreYard');
   const hidden = state.day < state.nitreHiddenUntil;
+  const productionBonus = Math.round((rankProductionEfficiency(state.rank) - 1) * 100);
 
   return (
     <div>
       <table className="insp-table">
         <tbody>
           <tr><td>승격 단계</td><td>{RANK_NAMES[state.rank]}</td></tr>
+          <tr><td>생산 조직 효율</td><td>{productionBonus > 0 ? `+${productionBonus}%` : '기준'}</td></tr>
           <tr><td>명성</td><td>{Math.floor(state.resources.reputation)} <StatusBar value={state.resources.reputation} color="#d9a441" /></td></tr>
         </tbody>
       </table>

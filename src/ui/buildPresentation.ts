@@ -47,6 +47,9 @@ export const BUILD_CATEGORY_BY_TYPE = {
   market: 'special',
   office: 'special',
   cemetery: 'special',
+  school: 'special',
+  shrine: 'special',
+  hermitage: 'special',
 } as const satisfies Record<BuildableBuildingTypeId, BuildCategoryId>;
 
 export interface BuildCategory {

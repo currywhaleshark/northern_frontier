@@ -11,6 +11,7 @@ import { BUILDING_DEFS } from './buildings';
 import { addLog } from './events';
 import { returnResidentCart } from './equipment';
 import { addCorpse } from './lifecycle';
+import { hasResidentMonk, moraleBreakdown, moraleTarget, type MoraleInputs } from './morale';
 import { getSeason } from './seasons';
 import { warmthLossWeatherMult } from './weather';
 import { releaseResidentMount } from './weapons';
@@ -302,9 +303,10 @@ export function killResident(
   } else {
     addLog(state, `${r.name}이(가) ${cause}(으)로 세상을 떠났습니다.`, 'bad', true);
   }
-  // 이웃의 죽음은 마을 전체의 사기를 깎는다
+  // 이웃의 죽음은 마을 전체의 사기를 깎는다 — 노승의 재(齋)가 있으면 슬픔이 덜하다
+  const griefLoss = hasResidentMonk(state) ? CONFIG.satisfaction.monkGriefRelief : 6;
   for (const other of state.residents) {
-    if (other.alive) other.morale = Math.max(0, other.morale - 6);
+    if (other.alive) other.morale = Math.max(0, other.morale - griefLoss);
   }
 }
 
@@ -406,19 +408,10 @@ export function updateResidentNeeds(
   reconcileResidentHomes(state, rng);
 }
 
-// 사기: 식량/추위/장터 상태에 따라 목표치로 수렴
-export function updateMorale(
-  state: GameState,
-  foodOk: boolean,
-  warmthAvg: number,
-  hasMarket: boolean,
-  dietVarietyScore = 1,
-): void {
-  let target = 50;
-  target += foodOk ? 10 : -18;
-  target += warmthAvg > 60 ? 8 : warmthAvg < 35 ? -12 : 0;
-  target += hasMarket ? 5 : 0;
-  if (dietVarietyScore < 0.5) target -= CONFIG.needs.monotonyMoralePenalty;
+// 사기: 성분 기반 목표치로 수렴 — 티어가 오를수록 기대 항목이 늘어난다 (morale.ts)
+export function updateMorale(state: GameState, inputs: MoraleInputs): void {
+  state.moraleFactors = moraleBreakdown(state, inputs); // UI(민심 내역) 스냅숏
+  const target = moraleTarget(state, inputs);
   for (const r of livingResidents(state)) {
     const diff = target - r.morale;
     r.morale = Math.max(0, Math.min(100, r.morale + Math.sign(diff) * Math.min(4, Math.abs(diff))));

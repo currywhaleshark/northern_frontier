@@ -1,4 +1,5 @@
 import { CONFIG } from './config';
+import { footprintTilesOf, sownAreaOf } from './buildings';
 import { cropIdForBuilding, CROP_DEFS } from './crops';
 import { addLog } from './events';
 import { consumeExpeditionPowder, expeditionResidentsForIds } from './expedition';
@@ -868,12 +869,17 @@ function resolveEarlyFrost(state: GameState, optionId: string, buildingId: numbe
   if (!farm || !cropId || farm.fieldGrowth <= 0) return;
   const crop = CROP_DEFS[cropId];
   if (optionId === 'harvest-early') {
-    const tile = state.map[farm.y]?.[farm.x];
-    const fertile = farm.type === 'field' && tile?.terrain === 'fertile' ? CONFIG.production.fertileBonus : 1;
-    const amount = (farm.fieldGrowth / 100) * crop.yield * fertile * 0.55;
+    const footprint = footprintTilesOf(state, farm) ?? [];
+    const fertileFraction = footprint.length > 0
+      ? footprint.filter(tile => tile.terrain === 'fertile').length / footprint.length
+      : 0;
+    const fertile = farm.type === 'field' ? 1 + fertileFraction * (CONFIG.production.fertileBonus - 1) : 1;
+    const sown = Math.max(1, sownAreaOf(farm));
+    const amount = (farm.fieldGrowth / 100) * crop.yield * sown * fertile * 0.55;
     farm.inventory ??= {};
     farm.inventory[crop.output] = (farm.inventory[crop.output] ?? 0) + amount;
     farm.fieldGrowth = 0;
+    farm.sownArea = 0;
     addLog(state, `${crop.name}을(를) 서둘러 거두어 ${amount.toFixed(1)}을 확보했습니다.`, 'good', true);
   } else if (optionId === 'wait-harvest') {
     if (rng() < 0.58) {

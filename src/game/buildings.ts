@@ -2,6 +2,7 @@
 import { CONFIG } from './config';
 import { rankAtLeast } from './constants';
 import { createCombatRoster } from './combatRoster';
+import { hasKnownMineralDepositNear } from './miningSites';
 import type { Building, BuildingDef, BuildingTypeId, GameState, Rank, ResourceId, SmithyProductId, Tile } from './types';
 
 export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
@@ -127,9 +128,9 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   mine: {
     id: 'mine', name: '채광장', emoji: '⛏️',
-    desc: '보(堡) 승격 후 건설. 채광꾼이 돌과 철을 캐는 거점.',
+    desc: `보(堡) 승격 후 건설. 광상 위가 아닌 주변 빈 땅에 세우면 채광꾼이 반경 ${CONFIG.minerals.mineWorkRadius}칸의 돌·철·은을 캐 와 하역한다.`,
     cost: { wood: 10, stone: 8, tools: 2 }, buildDays: 8, slots: 4, capacity: 0, defense: 0,
-    winterBonus: false, placement: 'rock', unique: false, minRank: 'bo',
+    winterBonus: false, placement: 'land', unique: false, minRank: 'bo',
   },
   ferry: {
     id: 'ferry', name: '나루터', emoji: '⛵',
@@ -233,6 +234,24 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     cost: { wood: 4, stone: 6 }, buildDays: 4, slots: 1, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
+  school: {
+    id: 'school', name: '서당', emoji: '📖',
+    desc: '훈장이 아이들에게 글을 가르친다. 진(鎭)쯤 되는 고을의 주민들은 글 배울 곳을 바란다.',
+    cost: { wood: 10, stone: 4, tools: 1 }, buildDays: 8, slots: 1, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: true, minRank: 'jin',
+  },
+  shrine: {
+    id: 'shrine', name: '당집', emoji: '🎐',
+    desc: '마을의 안녕을 비는 무속의 당. 떠돌이 무당이 마을에 들어와야 지을 수 있다.',
+    cost: { wood: 8, stone: 2, hide: 2 }, buildDays: 6, slots: 1, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: true, minRank: 'jin',
+  },
+  hermitage: {
+    id: 'hermitage', name: '암자', emoji: '🕯️',
+    desc: '명복을 빌고 상례를 돕는 작은 절. 노승이 마을에 의탁해야 지을 수 있다.',
+    cost: { wood: 10, stone: 6 }, buildDays: 8, slots: 1, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: true, minRank: 'jin',
+  },
   cannonEmplacement: {
     id: 'cannonEmplacement', name: '불랑기포대', emoji: '💥',
     desc: '조정이 하사한 불랑기포를 얹은 포대. 방어도 +40, 화약이 있으면 전투 방어가 크게 오른다 (교전마다 화약 소모). 부(府) 승격 후 조정 청원으로만 받을 수 있다.',
@@ -243,7 +262,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
   'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'field', 'paddy', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'clinic',
-  'smokehouse', 'dryingRack', 'smithy', 'mine', 'ferry', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office', 'cemetery',
+  'smokehouse', 'dryingRack', 'smithy', 'mine', 'ferry', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office', 'cemetery', 'school', 'shrine', 'hermitage',
   'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement',
 ];
@@ -273,16 +292,54 @@ export function buildingFootprintSize(type: BuildingTypeId): 1 | 2 {
   return SINGLE_TILE_BUILDING_SET.has(type) ? 1 : 2;
 }
 
+// 밭·논은 드래그로 크기를 정하는 경작지 — 발자국이 타입이 아니라 인스턴스(w/h)에 달려 있다
+export function isPlotBuildingType(type: BuildingTypeId): type is 'field' | 'paddy' {
+  return type === 'field' || type === 'paddy';
+}
+
+export function clampPlotSide(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 1;
+  return Math.min(CONFIG.farming.maxPlotSide, Math.max(1, Math.floor(value)));
+}
+
+export interface FootprintDims { w: number; h: number }
+
+export function buildingFootprintDims(building: Pick<Building, 'type' | 'w' | 'h'>): FootprintDims {
+  if (isPlotBuildingType(building.type)) {
+    return { w: clampPlotSide(building.w ?? 1), h: clampPlotSide(building.h ?? 1) };
+  }
+  const size = buildingFootprintSize(building.type);
+  return { w: size, h: size };
+}
+
+export function plotArea(building: Pick<Building, 'type' | 'w' | 'h'>): number {
+  const { w, h } = buildingFootprintDims(building);
+  return w * h;
+}
+
+// 경작지의 파종 칸 수 — 구버전 세이브(sownArea 없음)는 자라던 밭이면 전체 파종으로 본다
+export function sownAreaOf(farm: Pick<Building, 'type' | 'w' | 'h' | 'sownArea' | 'fieldGrowth'>): number {
+  const area = plotArea(farm);
+  const raw = typeof farm.sownArea === 'number' && Number.isFinite(farm.sownArea)
+    ? farm.sownArea
+    : (farm.fieldGrowth > 0 ? area : 0);
+  return Math.min(area, Math.max(0, raw));
+}
+
 export function buildingFootprintTiles(
   state: Pick<GameState, 'map'>,
   type: BuildingTypeId,
   x: number,
   y: number,
+  w?: number,
+  h?: number,
 ): Tile[] | null {
   const size = buildingFootprintSize(type);
+  const width = w ?? size;
+  const height = h ?? size;
   const tiles: Tile[] = [];
-  for (let dy = 0; dy < size; dy++) {
-    for (let dx = 0; dx < size; dx++) {
+  for (let dy = 0; dy < height; dy++) {
+    for (let dx = 0; dx < width; dx++) {
       const tile = state.map[y + dy]?.[x + dx];
       if (!tile) return null;
       tiles.push(tile);
@@ -291,19 +348,59 @@ export function buildingFootprintTiles(
   return tiles;
 }
 
-export function canPlaceBuildingAt(state: GameState, type: BuildingTypeId, x: number, y: number): boolean {
-  const tiles = buildingFootprintTiles(state, type, x, y);
+// 기존 건물 인스턴스의 발자국 — 경작지는 저장된 w/h를 쓴다
+export function footprintTilesOf(
+  state: Pick<GameState, 'map'>,
+  building: Pick<Building, 'type' | 'x' | 'y' | 'w' | 'h'>,
+): Tile[] | null {
+  const { w, h } = buildingFootprintDims(building);
+  return buildingFootprintTiles(state, building.type, building.x, building.y, w, h);
+}
+
+export function canPlaceBuildingAt(
+  state: GameState,
+  type: BuildingTypeId,
+  x: number,
+  y: number,
+  w?: number,
+  h?: number,
+): boolean {
+  const tiles = buildingFootprintTiles(state, type, x, y, w, h);
   if (!tiles) return false;
   if (type === 'watermill') return canPlaceWatermillAt(state, x, y);
   const def = BUILDING_DEFS[type];
-  return tiles.every(tile => canPlaceOn(def, tile, state));
+  if (!tiles.every(tile => canPlaceOn(def, tile, state))) return false;
+  if (type === 'mine') return hasKnownMineralDepositNear(state, x, y);
+  return true;
+}
+
+// 경작지 건설비는 칸수 비례 (1×1이면 기본 비용 그대로)
+export function buildingCostFor(
+  type: BuildingTypeId,
+  w = 1,
+  h = 1,
+): Partial<Record<ResourceId, number>> {
+  const def = BUILDING_DEFS[type];
+  if (!isPlotBuildingType(type)) return def.cost;
+  const area = clampPlotSide(w) * clampPlotSide(h);
+  if (area === 1) return def.cost;
+  const scaled: Partial<Record<ResourceId, number>> = {};
+  for (const [res, amt] of Object.entries(def.cost)) {
+    scaled[res as ResourceId] = (amt ?? 0) * area;
+  }
+  return scaled;
+}
+
+export function canAffordCost(state: GameState, cost: Partial<Record<ResourceId, number>>): boolean {
+  return Object.entries(cost).every(([res, amt]) =>
+    state.resources[res as keyof typeof state.resources] >= (amt ?? 0));
 }
 
 export function occupyBuildingTiles(
   state: GameState,
-  building: Pick<Building, 'id' | 'type' | 'x' | 'y'>,
+  building: Pick<Building, 'id' | 'type' | 'x' | 'y' | 'w' | 'h'>,
 ): void {
-  const tiles = buildingFootprintTiles(state, building.type, building.x, building.y);
+  const tiles = footprintTilesOf(state, building);
   if (!tiles) return;
   for (const tile of tiles) tile.buildingId = building.id;
 }
@@ -321,7 +418,7 @@ export function rebuildBuildingFootprints(state: GameState): void {
     for (const tile of row) tile.buildingId = null;
   }
   for (const building of state.buildings) {
-    const tiles = buildingFootprintTiles(state, building.type, building.x, building.y);
+    const tiles = footprintTilesOf(state, building);
     if (!tiles) continue;
     for (const tile of tiles) {
       if (tile.buildingId == null) tile.buildingId = building.id;
@@ -421,8 +518,7 @@ export function canPlaceOn(def: BuildingDef, tile: Tile, state?: GameState): boo
 }
 
 export function canAfford(state: GameState, def: BuildingDef): boolean {
-  return Object.entries(def.cost).every(([res, amt]) =>
-    state.resources[res as keyof typeof state.resources] >= (amt ?? 0));
+  return canAffordCost(state, def.cost);
 }
 
 export interface SmithyProductDef {

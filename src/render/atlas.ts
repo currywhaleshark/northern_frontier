@@ -91,6 +91,14 @@ import {
   specializedResidentSourceRect,
 } from './specializedCharacterAssets';
 import {
+  NEW_CONTENT_BUILDING_SHEET,
+  NEW_CONTENT_LARGE_BUILDING_SHEET,
+  NEW_CONTENT_RESIDENT_SHEET,
+  isNewContentBuildingType,
+  newContentBuildingSourceRect,
+  newContentResidentSourceRect,
+} from './newContentAssets';
+import {
   FACTION_RAIDER_SHEET,
   factionRaiderSourceRect,
 } from './factionRaiderAssets';
@@ -131,6 +139,9 @@ let wallGateSheet: HTMLImageElement | null = null;
 let specializedBuildingSheet: HTMLImageElement | null = null;
 let specializedLargeBuildingSheet: HTMLImageElement | null = null;
 let specializedCharacterSheet: HTMLImageElement | null = null;
+let newContentBuildingSheet: HTMLImageElement | null = null;
+let newContentLargeBuildingSheet: HTMLImageElement | null = null;
+let newContentResidentSheet: HTMLImageElement | null = null;
 let factionRaiderSheet: HTMLImageElement | null = null;
 let buildingDamageSheet: HTMLImageElement | null = null;
 let foreignResidentSheet: HTMLImageElement | null = null;
@@ -196,6 +207,15 @@ function ensureLoaded(): void {
   specializedCharacterSheet = new Image();
   specializedCharacterSheet.onload = () => { loaded++; };
   specializedCharacterSheet.src = SPECIALIZED_CHARACTER_SHEET.src;
+  newContentBuildingSheet = new Image();
+  newContentBuildingSheet.onload = () => { loaded++; };
+  newContentBuildingSheet.src = NEW_CONTENT_BUILDING_SHEET.src;
+  newContentLargeBuildingSheet = new Image();
+  newContentLargeBuildingSheet.onload = () => { loaded++; };
+  newContentLargeBuildingSheet.src = NEW_CONTENT_LARGE_BUILDING_SHEET.src;
+  newContentResidentSheet = new Image();
+  newContentResidentSheet.onload = () => { loaded++; };
+  newContentResidentSheet.src = NEW_CONTENT_RESIDENT_SHEET.src;
   factionRaiderSheet = new Image();
   factionRaiderSheet.onload = () => { loaded++; };
   factionRaiderSheet.src = FACTION_RAIDER_SHEET.src;
@@ -221,7 +241,7 @@ function ensureLoaded(): void {
 
 export function atlasReady(): boolean {
   ensureLoaded();
-  return loaded >= 22;
+  return loaded >= 25;
 }
 
 // 아틀라스가 준비되면 아틀라스, 아니면 임시 그래픽
@@ -286,6 +306,19 @@ function blitSpecializedBuilding(
     ? SPECIALIZED_LARGE_BUILDING_SHEET.tileSize
     : SPECIALIZED_BUILDING_SHEET.tileSize;
   const destHeight = spriteHeight * (p.size / tileSize);
+  ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
+}
+
+function blitNewContentBuilding(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  p: BuildingDrawParams,
+  large: boolean,
+): void {
+  const rect = newContentBuildingSourceRect(p.type, p.season, large);
+  if (!rect) return;
+  const sheetMeta = large ? NEW_CONTENT_LARGE_BUILDING_SHEET : NEW_CONTENT_BUILDING_SHEET;
+  const destHeight = sheetMeta.spriteHeight * (p.size / sheetMeta.tileSize);
   ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
 }
 
@@ -504,6 +537,9 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   office:     { roof: ROOF_DARK, base: FACE_SHOP, glyph: BANNER_RED },
   market:     { roof: AWNING, base: COUNTER, roofLift: 12 },
   cemetery:   { base: FACE_STONE }, // 봉분·비석 (전용 그림 나오기 전 임시)
+  school:     { roof: ROOF_WHITE, base: FACE_SHOP }, // 전용 그림 나오기 전 임시
+  shrine:     { roof: ROOF_DARK, base: TENT_GREEN }, // 전용 그림 나오기 전 임시
+  hermitage:  { roof: ROOF_DARK, base: FACE_STONE }, // 전용 그림 나오기 전 임시
   cannonEmplacement: { base: FACE_STONE, glyph: BANNER_RED }, // 돌 포대 (전용 그림 나오기 전 임시)
 };
 
@@ -531,6 +567,9 @@ const CHAR_BY_JOB: Record<JobId, CR> = {
   powderMaker: [1, 9],
   clerk:      [1, 7],
   undertaker: [1, 7],
+  teacher:    [1, 7],
+  shaman:     [1, 8],
+  monk:       [1, 8],
   watchman:   [0, 11],
   militia:    [0, 9],
 };
@@ -887,6 +926,17 @@ export const atlasSprites: SpriteAPI = {
       return;
     }
 
+    if (isNewContentBuildingType(p.type)) {
+      const useLarge = p.size > NEW_CONTENT_BUILDING_SHEET.tileSize && newContentLargeBuildingSheet;
+      const image = useLarge ? newContentLargeBuildingSheet : newContentBuildingSheet;
+      if (image) {
+        blitNewContentBuilding(ctx, image, p, Boolean(useLarge));
+        ctx.globalAlpha = 1;
+        drawProgressBar(ctx, p);
+        return;
+      }
+    }
+
     if (isSpecializedBuildingType(p.type)) {
       const useLarge = p.size > SPECIALIZED_BUILDING_SHEET.tileSize && specializedLargeBuildingSheet;
       const image = useLarge ? specializedLargeBuildingSheet : specializedBuildingSheet;
@@ -1001,14 +1051,17 @@ export const atlasSprites: SpriteAPI = {
     const kenneyChars = chars;
     const specializedSheet = specializedCharacterSheet;
     const foreignRect = foreignResidentSourceRect(p.foreignFaction, p.gender);
+    const newContentRect = newContentResidentSourceRect(p.job, p.gender, p.stage);
     if (!characterSheet && !specializedSheet && !militiaSheet && !kenneyChars &&
-        (!foreignResidentSheet || !foreignRect)) return;
+        (!newContentResidentSheet || !newContentRect) && (!foreignResidentSheet || !foreignRect)) return;
     ctx.imageSmoothingEnabled = false;
     const half = CHALF;
     const bob = (p.moving ? Math.floor(performance.now() / 130) % 2 : 0) * CF;
 
     if (foreignResidentSheet && foreignRect) {
       drawGeneratedCharacterRect(ctx, foreignResidentSheet, foreignRect, p.x, p.y, p.facing, bob);
+    } else if (newContentResidentSheet && newContentRect) {
+      drawGeneratedCharacterRect(ctx, newContentResidentSheet, newContentRect, p.x, p.y, p.facing, bob);
     } else if (militiaSheet && p.job === 'militia' && p.militiaWeapon) {
       drawGeneratedCharacterRect(
         ctx,

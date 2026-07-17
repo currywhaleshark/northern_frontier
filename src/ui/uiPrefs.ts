@@ -14,11 +14,21 @@ import {
   isAutoAssignBuildingType,
   type AutoAssignBuildingType,
 } from '../game/workerSlots';
-import { isDockWindowId, type DockWindowId } from './dockPresentation';
+import {
+  isDockWindowId,
+  type DockWindowId,
+  type FloatingWindowId,
+} from './dockPresentation';
+import {
+  normalizeDockWindowLayout,
+  normalizeDockWindowLayouts,
+  type DockWindowLayout,
+  type DockWindowLayouts,
+} from './dockLayout';
 
 export const UI_PREFS_KEY = 'buksae-ui-prefs';
 export const LEGACY_BUILD_MENU_OPEN_KEY = 'buksae-buildmenu-open';
-export const UI_PREFS_VERSION = 4;
+export const UI_PREFS_VERSION = 5;
 export const MAX_STARRED_RESOURCES = 8;
 
 export interface UiPrefs {
@@ -28,6 +38,7 @@ export interface UiPrefs {
   buildDrawerLastCategory: BuildCategoryId;
   autoAssignBuildingTypes: AutoAssignBuildingType[];
   pinnedDockWindows: DockWindowId[];
+  dockWindowLayouts: DockWindowLayouts;
 }
 
 export interface UiPrefsStorage {
@@ -44,6 +55,7 @@ export function defaultUiPrefs(buildDrawerLastCategory = DEFAULT_BUILD_CATEGORY)
     buildDrawerLastCategory,
     autoAssignBuildingTypes: [...AUTO_ASSIGN_BUILDING_TYPES],
     pinnedDockWindows: [],
+    dockWindowLayouts: {},
   };
 }
 
@@ -73,9 +85,11 @@ export function normalizeUiPrefs(value: unknown, migratedBuildCategory = DEFAULT
     buildDrawerLastCategory?: unknown;
     autoAssignBuildingTypes?: unknown;
     pinnedDockWindows?: unknown;
+    dockWindowLayouts?: unknown;
   };
   if (candidate.version !== 1 && candidate.version !== 2
-    && candidate.version !== 3 && candidate.version !== UI_PREFS_VERSION) {
+    && candidate.version !== 3 && candidate.version !== 4
+    && candidate.version !== UI_PREFS_VERSION) {
     return defaultUiPrefs();
   }
   return {
@@ -89,9 +103,12 @@ export function normalizeUiPrefs(value: unknown, migratedBuildCategory = DEFAULT
     autoAssignBuildingTypes: candidate.version >= 3
       ? uniqueValidValues(candidate.autoAssignBuildingTypes, isAutoAssignBuildingType)
       : [...AUTO_ASSIGN_BUILDING_TYPES],
-    pinnedDockWindows: candidate.version === UI_PREFS_VERSION
+    pinnedDockWindows: candidate.version >= 4
       ? uniqueValidValues(candidate.pinnedDockWindows, isDockWindowId)
       : [],
+    dockWindowLayouts: candidate.version >= 5
+      ? normalizeDockWindowLayouts(candidate.dockWindowLayouts)
+      : {},
   };
 }
 
@@ -194,4 +211,27 @@ export function togglePinnedDockWindow(prefs: UiPrefs, id: DockWindowId): UiPref
       ? prefs.pinnedDockWindows.filter(current => current !== id)
       : [...prefs.pinnedDockWindows, id],
   };
+}
+
+export function setDockWindowLayout(
+  prefs: UiPrefs,
+  id: FloatingWindowId,
+  layout: DockWindowLayout,
+): UiPrefs {
+  const normalized = normalizeDockWindowLayout(layout);
+  if (!normalized) return prefs;
+  return {
+    ...prefs,
+    dockWindowLayouts: {
+      ...prefs.dockWindowLayouts,
+      [id]: normalized,
+    },
+  };
+}
+
+export function resetDockWindowLayout(prefs: UiPrefs, id: FloatingWindowId): UiPrefs {
+  if (!prefs.dockWindowLayouts[id]) return prefs;
+  const dockWindowLayouts = { ...prefs.dockWindowLayouts };
+  delete dockWindowLayouts[id];
+  return { ...prefs, dockWindowLayouts };
 }

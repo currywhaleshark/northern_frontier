@@ -1,6 +1,6 @@
 // localStorage 저장/불러오기
 import { CONFIG } from './config';
-import { computeDefense, rebuildBuildingFootprints } from './buildings';
+import { clampPlotSide, computeDefense, rebuildBuildingFootprints } from './buildings';
 import { defaultCropForBuildingType } from './crops';
 import { rollCourtTribute } from './courtTribute';
 import {
@@ -250,6 +250,16 @@ export function migrateV19ToV20(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 20 };
 }
 
+// v21: 성분 기반 만족도·서당·종교(당집/암자) — 가산적
+export function migrateV20ToV21(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 21 };
+}
+
+// v22: 드래그 크기 경작지(w/h/sownArea)와 농우(plowOxen) — 가산적, 필드 기본값은 로드 정규화에서 채운다
+export function migrateV21ToV22(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 22 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   let version = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -274,6 +284,8 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 17) migrated = migrateV17ToV18(migrated);
     else if (version === 18) migrated = migrateV18ToV19(migrated);
     else if (version === 19) migrated = migrateV19ToV20(migrated);
+    else if (version === 20) migrated = migrateV20ToV21(migrated);
+    else if (version === 21) migrated = migrateV21ToV22(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -1061,6 +1073,20 @@ export function loadGame(): GameState | null {
           !Object.prototype.hasOwnProperty.call(building, 'queuedCropId')) {
         building.queuedCropId = null;
       }
+      if (building.type === 'field' || building.type === 'paddy') {
+        // v22 경작지: 구버전 1×1은 크기 기본값을 채우고, 파종 칸 수는 자라던 밭이면 전체로 본다
+        building.w = clampPlotSide(building.w);
+        building.h = clampPlotSide(building.h);
+        const area = building.w * building.h;
+        const rawSown = typeof building.sownArea === 'number' && Number.isFinite(building.sownArea)
+          ? building.sownArea
+          : (building.fieldGrowth > 0 ? area : 0);
+        building.sownArea = Math.min(area, Math.max(0, rawSown));
+        const rawOxen = typeof building.plowOxen === 'number' && Number.isFinite(building.plowOxen)
+          ? Math.floor(building.plowOxen)
+          : 0;
+        building.plowOxen = Math.max(0, rawOxen);
+      }
       if (building.type === 'stable') building.livestock = normalizeLivestockState(building.livestock);
     }
     ensureProcessingReserves(parsed);
@@ -1080,6 +1106,11 @@ export function loadGame(): GameState | null {
     // 생애 주기·장례 없는 구버전
     if (!Array.isArray(parsed.corpses)) parsed.corpses = [];
     if (parsed.nextCorpseId == null) parsed.nextCorpseId = 1;
+    // 만족도·종교 없는 구버전
+    if (!Array.isArray(parsed.unlockedReligions)) parsed.unlockedReligions = [];
+    if (!Array.isArray(parsed.spentSpecialIds)) parsed.spentSpecialIds = [];
+    if (parsed.religionOfferCooldownUntil == null) parsed.religionOfferCooldownUntil = 0;
+    if (parsed.promotionCheerUntil == null) parsed.promotionCheerUntil = 0;
     // 세공 없는 구버전: 시드로 올해분을 재생성. 이미 겨울이면 올해분은 면제 (다음 봄부터 정상 진행)
     if (!Object.prototype.hasOwnProperty.call(parsed, 'courtTribute')) {
       const pop = parsed.residents.filter(r => r.alive).length;

@@ -37,7 +37,9 @@ const {
   loadUiPrefs,
   normalizeUiPrefs,
   saveUiPrefs,
+  setDockWindowLayout,
   setAutoAssignBuildingTypes,
+  resetDockWindowLayout,
   toggleAutoAssignBuildingType,
   togglePinnedDockWindow,
   togglePinnedResourceGroup,
@@ -86,6 +88,8 @@ assert.deepEqual(normalized.autoAssignBuildingTypes, ['field', 'smithy'],
   'auto-assign building preferences must remove duplicates and unknown building types');
 assert.deepEqual(normalized.pinnedDockWindows, ['jobs', 'processing', 'residents', 'factions', 'court'],
   'dock preferences must remove duplicate and unknown window pins');
+assert.deepEqual(normalized.dockWindowLayouts, {}, 'v4 prefs must start without saved window layouts');
+assert.equal(normalized.version, 5, 'v4 prefs must migrate to the current schema without resetting');
 
 const legacyStorage = memoryStorage({
   [UI_PREFS_KEY]: JSON.stringify({
@@ -96,7 +100,7 @@ const legacyStorage = memoryStorage({
   [LEGACY_BUILD_MENU_OPEN_KEY]: JSON.stringify({ 생산: true }),
 });
 const migrated = loadUiPrefs(legacyStorage);
-assert.equal(migrated.version, 4, 'v1 prefs must migrate to the current schema');
+assert.equal(migrated.version, 5, 'v1 prefs must migrate to the current schema');
 assert.deepEqual(migrated.starredResources, ['tools'], 'v1 stars must survive migration');
 assert.deepEqual(migrated.pinnedResourceGroups, ['materials'], 'v1 group pins must survive migration');
 assert.equal(migrated.buildDrawerLastCategory, 'production',
@@ -126,6 +130,29 @@ const v3Migrated = normalizeUiPrefs({
 assert.deepEqual(v3Migrated.autoAssignBuildingTypes, ['field'],
   'v3 auto-assignment choices must survive dock preference migration');
 assert.deepEqual(v3Migrated.pinnedDockWindows, [], 'v3 prefs must default dock pins to closed');
+
+const v5Layouts = normalizeUiPrefs({
+  version: 5,
+  starredResources: ['tools'],
+  pinnedResourceGroups: ['materials'],
+  buildDrawerLastCategory: 'production',
+  autoAssignBuildingTypes: ['field'],
+  pinnedDockWindows: ['jobs'],
+  dockWindowLayouts: {
+    jobs: { x: 10.4, y: 20.6, width: 340.2, height: 520.8 },
+    minimap: { x: 700, y: 30, width: 280, height: 280 },
+    selection: { x: 600, y: 330, width: 380, height: 260 },
+    residents: { x: 40, y: 30, width: -1, height: 540 },
+    unknown: { x: 1, y: 1, width: 300, height: 200 },
+  },
+});
+assert.deepEqual(v5Layouts.dockWindowLayouts, {
+  jobs: { x: 10, y: 21, width: 340, height: 521 },
+  minimap: { x: 700, y: 30, width: 280, height: 280 },
+  selection: { x: 600, y: 330, width: 380, height: 260 },
+}, 'one damaged or unknown window layout must not reset valid layouts or unrelated prefs');
+assert.deepEqual(v5Layouts.starredResources, ['tools']);
+assert.deepEqual(v5Layouts.pinnedDockWindows, ['jobs']);
 
 let prefs = defaultUiPrefs();
 for (const resource of DISPLAY_RESOURCE_ORDER.slice(0, MAX_STARRED_RESOURCES)) {
@@ -161,9 +188,14 @@ assert.deepEqual(prefs.pinnedDockWindows, ['jobs', 'processing']);
 prefs = togglePinnedDockWindow(prefs, 'jobs');
 assert.deepEqual(prefs.pinnedDockWindows, ['processing']);
 
+prefs = setDockWindowLayout(prefs, 'jobs', { x: 12.4, y: 18.8, width: 340, height: 520 });
+assert.deepEqual(prefs.dockWindowLayouts.jobs, { x: 12, y: 19, width: 340, height: 520 });
+prefs = resetDockWindowLayout(prefs, 'jobs');
+assert.deepEqual(prefs.dockWindowLayouts, {});
+
 const storage = memoryStorage();
 saveUiPrefs(normalized, storage);
 assert.deepEqual(loadUiPrefs(storage), normalized, 'saved prefs must round-trip independently');
-assert.equal(JSON.parse(storage.value()).version, 4, 'saved prefs must retain their own schema version');
+assert.equal(JSON.parse(storage.value()).version, 5, 'saved prefs must retain their own schema version');
 
 console.log('ui prefs tests passed');

@@ -6,6 +6,7 @@ import { haulerCarryCapacity } from '../game/equipment';
 import { isExplored } from '../game/exploration';
 import { foreignSiteAt } from '../game/foreignSites';
 import { mineralRemaining } from '../game/minerals';
+import { mineMineralSummary } from '../game/miningSites';
 import { livestockDailyFeedNeed, livestockCapacity, LIVESTOCK_DEFS, normalizeLivestockState } from '../game/livestock';
 import { residentHome } from '../game/residents';
 import { getSeason } from '../game/seasons';
@@ -43,6 +44,7 @@ interface Props {
   onSlaughterLivestock: (buildingId: number, amount: number) => void;
   onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
   onConvertFieldToPaddy: (buildingId: number) => void;
+  onSetPlotPlowOxen: (buildingId: number, count: number) => void;
   onRequestTrade: (factionName: string) => void;
   onToggleNitre: () => void;
   onSilverVeinAction: (action: 'break-seal' | 'reopen') => void;
@@ -167,6 +169,7 @@ export function SelectionContextBar({
   onSlaughterLivestock,
   onSetBuildingCrop,
   onConvertFieldToPaddy,
+  onSetPlotPlowOxen,
   onRequestTrade,
   onToggleNitre,
   onSilverVeinAction,
@@ -194,6 +197,7 @@ export function SelectionContextBar({
     ? state.residents.find(candidate => candidate.id === selectedEntity.id) ?? null
     : null;
   const spoilage = spoilagePreview(state);
+  const mineSummary = building?.type === 'mine' ? mineMineralSummary(state, building) : null;
 
   if (resident) {
     const jobName = JOB_NAMES[resident.job];
@@ -256,13 +260,29 @@ export function SelectionContextBar({
                   ) : (
                     <>
                       <tr><td>지형</td><td>{TERRAIN_NAMES[tile.terrain]}{tile.terrain === 'rock' && tile.hasIron ? ' (철맥)' : ''}</td></tr>
-                      {(tile.terrain === 'rock' || building?.type === 'mine') && (
+                      {tile.terrain === 'rock' && building?.type !== 'mine' && (
                         <tr>
                           <td>광상</td>
                           <td>{mineralRemaining(tile) > 0
                             ? `${tile.hasIron ? '철 ' : '석재 '}${mineralRemaining(tile).toFixed(1)} 남음`
                             : '고갈'}</td>
                         </tr>
+                      )}
+                      {mineSummary && (
+                        <>
+                          <tr>
+                            <td>작업 반경</td>
+                            <td>반경 {CONFIG.minerals.mineWorkRadius}칸 · 광상 {mineSummary.deposits}곳</td>
+                          </tr>
+                          <tr>
+                            <td>주변 매장량</td>
+                            <td>{[
+                              mineSummary.stone > 0 ? `석재 ${mineSummary.stone.toFixed(1)}` : '',
+                              mineSummary.iron > 0 ? `철 ${mineSummary.iron.toFixed(1)}` : '',
+                              mineSummary.silver > 0 ? `은 ${mineSummary.silver.toFixed(1)}` : '',
+                            ].filter(Boolean).join(' · ') || '고갈'}</td>
+                          </tr>
+                        </>
                       )}
                       {tile.terrain === 'forest' && state.habitats.some(habitat =>
                         habitat.active && (habitat.x - tile.x) ** 2 + (habitat.y - tile.y) ** 2 <= habitat.radius ** 2) && (
@@ -398,6 +418,7 @@ export function SelectionContextBar({
                 onSlaughterLivestock={onSlaughterLivestock}
                 onSetBuildingCrop={onSetBuildingCrop}
                 onConvertFieldToPaddy={onConvertFieldToPaddy}
+                onSetPlotPlowOxen={onSetPlotPlowOxen}
                 onRequestTrade={onRequestTrade}
                 onToggleNitre={onToggleNitre}
                 onSilverVeinAction={onSilverVeinAction}

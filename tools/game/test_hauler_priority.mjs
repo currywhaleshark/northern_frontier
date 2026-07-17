@@ -102,7 +102,7 @@ function setupSingleHauler(seed = 9001) {
 
   simulation.advanceTick(state);
 
-  assert.equal(hauler.carrying.grain, 3, 'new production stock interrupts fallback quarry travel');
+  assert.equal(hauler.carrying.grain, 3, 'new production stock interrupts stale travel');
   assert.equal(hauler.phase, 'toDeposit');
   assert.deepEqual(hauler.path, []);
 }
@@ -134,6 +134,7 @@ function setupSingleHauler(seed = 9001) {
     tile.buildingId == null && Math.abs(tile.x - hauler.x) + Math.abs(tile.y - hauler.y) === 1);
   assert.ok(rock, 'an adjacent quarry tile exists');
   rock.terrain = 'rock';
+  rock.mineralRemaining = 20;
   state.exploration.explored[rock.y][rock.x] = true;
   state.resources.grain = 100;
   state.resources.meat = 100;
@@ -144,13 +145,14 @@ function setupSingleHauler(seed = 9001) {
 
   assert.equal(hauler.carrying.grain ?? 0, 0, 'small non-urgent loads wait for a useful batch');
   assert.equal(site.inventory.grain, 1);
-  assert.match(hauler.task, /채석|바위/, 'stone shortage gets the freed hauling time');
+  assert.equal(hauler.carrying.stone ?? 0, 0, 'an idle hauler never mines stone');
+  assert.equal(rock.mineralRemaining, 20, 'idle hauling leaves the mineral deposit untouched');
+  assert.match(hauler.task, /대기/, 'an idle hauler waits for transport work');
 }
 
 {
   const { state, hauler, site } = setupSingleHauler();
   site.inventory.grain = 30;
-  state.resources.stone = CONFIG.production.stoneReserveTarget;
   state.resources.carts = 1;
 
   assert.equal(simulation.toggleResidentCart(state, hauler.id), null);

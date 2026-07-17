@@ -6,14 +6,17 @@
 // 그리기 자체는 SpriteAPI(sprites.ts)에 위임하므로, 진짜 그래픽을 붙일 때는
 // SpriteAPI 구현체만 교체하면 된다.
 import { CONFIG } from '../game/config';
-import { armedMusketeers, BUILDING_DEFS, buildingFootprintSize, canAfford, canPlaceBuildingAt } from '../game/buildings';
+import {
+  armedMusketeers, BUILDING_DEFS, buildingCostFor, buildingFootprintDims, buildingFootprintSize,
+  canAfford, canAffordCost, canPlaceBuildingAt, canPlaceOn, isPlotBuildingType,
+} from '../game/buildings';
 import { COLLAPSE_RATIO } from '../game/battles';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
 import { getSeason } from '../game/seasons';
 import { findHabitatIconAtTile } from '../game/habitats';
 import { isBuildingFootprintExplored, isExplored } from '../game/exploration';
 import { builtWallTileSet, isWallBuilding, wallConnectionsFromSet } from '../game/walls';
-import { assignedWorkers, workerSlotConfig } from '../game/workerSlots';
+import { assignedWorkers, workerSlotConfig, workerSlotCount } from '../game/workerSlots';
 import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
 import { militiaWeaponForResident } from './militiaWeaponAssignment';
 import { claimZonesAt } from '../game/claimZones';
@@ -42,6 +45,7 @@ export interface SceneOptions {
   alpha: number; // 서브틱 사이 이동 보간 계수 0~1
   hover: { x: number; y: number } | null;
   placingType: BuildingTypeId | null;
+  placingRect?: { x: number; y: number; w: number; h: number } | null; // 경작지 드래그 크기 지정 미리보기
   selected: { x: number; y: number } | null;
   selectedResidentId: number | null;
   selectedBuildingId?: number | null;
@@ -326,6 +330,21 @@ function drawHabitatRange(ctx: CanvasRenderingContext2D, habitat: AnimalHabitat)
   ctx.restore();
 }
 
+function drawMineWorkRange(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  const cx = (x + 0.5) * TILE;
+  const cy = (y + 0.5) * TILE;
+  ctx.save();
+  ctx.fillStyle = 'rgba(122,179,217,0.10)';
+  ctx.strokeStyle = 'rgba(122,179,217,0.9)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([7, 5]);
+  ctx.beginPath();
+  ctx.arc(cx, cy, CONFIG.minerals.mineWorkRadius * TILE, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawHabitatIcon(ctx: CanvasRenderingContext2D, habitat: AnimalHabitat): void {
   const cx = (habitat.x + 0.5) * TILE;
   const cy = (habitat.y + 0.5) * TILE;
@@ -425,11 +444,12 @@ function drawWorkerSlotOverlay(
   if (!building.built) return;
   const config = workerSlotConfig(building.type);
   if (!config) return;
-  if (!isBuildingFootprintExplored(state, building.type, building.x, building.y)) return;
+  if (!isBuildingFootprintExplored(state, building.type, building.x, building.y, building.w, building.h)) return;
 
+  const slotCount = workerSlotCount(building);
   const workers = assignedWorkers(state, building);
-  const footprint = buildingFootprintSize(building.type);
-  const cx = (building.x + footprint / 2) * TILE;
+  const dims = buildingFootprintDims(building);
+  const cx = (building.x + dims.w / 2) * TILE;
   const top = building.y * TILE;
   const emptyFill = 'rgba(30,36,43,0.78)';
   const emptyStroke = 'rgba(216,222,229,0.48)';
@@ -439,7 +459,7 @@ function drawWorkerSlotOverlay(
     const radius = 4.4;
     const gap = 3;
     const pad = 4;
-    const width = config.slots * radius * 2 + Math.max(0, config.slots - 1) * gap + pad * 2;
+    const width = slotCount * radius * 2 + Math.max(0, slotCount - 1) * gap + pad * 2;
     const height = radius * 2 + pad * 2;
     const left = cx - width / 2;
     const y = top - height - 3;
@@ -448,7 +468,7 @@ function drawWorkerSlotOverlay(
     ctx.lineWidth = 1;
     ctx.fillRect(left, y, width, height);
     ctx.strokeRect(left + 0.5, y + 0.5, width - 1, height - 1);
-    for (let i = 0; i < config.slots; i++) {
+    for (let i = 0; i < slotCount; i++) {
       const worker = workers[i];
       const dotX = left + pad + radius + i * (radius * 2 + gap);
       const dotY = y + height / 2;
@@ -468,9 +488,9 @@ function drawWorkerSlotOverlay(
 
   const radius = 2.4;
   const gap = 5.5;
-  const startX = cx - ((config.slots - 1) * gap) / 2;
+  const startX = cx - ((slotCount - 1) * gap) / 2;
   const y = top - 4;
-  for (let i = 0; i < config.slots; i++) {
+  for (let i = 0; i < slotCount; i++) {
     const worker = workers[i];
     drawSlotDot(
       ctx,
@@ -732,9 +752,25 @@ function drawForeignSiteProp(
   ctx.restore();
 }
 
+// 프레임 병목 계측 (옵트인) — 콘솔에서 `window.__renderPerf = {}`를 넣으면 구간별 누적 ms가 쌓인다
+type RenderPerfBucket = { total: number; count: number };
+declare global {
+  interface Window { __renderPerf?: Record<string, RenderPerfBucket> }
+}
+
 export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: SceneOptions): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
+  const perf = typeof window !== 'undefined' ? window.__renderPerf : undefined;
+  let perfLast = perf ? performance.now() : 0;
+  const lap = (name: string): void => {
+    if (!perf) return;
+    const now = performance.now();
+    const bucket = perf[name] ?? (perf[name] = { total: 0, count: 0 });
+    bucket.total += now - perfLast;
+    bucket.count++;
+    perfLast = now;
+  };
   const sprites = o.sprites ?? placeholderSprites;
   const predatorScoutIds = activePredatorScoutIds(state);
   const lerp = (a: number, b: number) => a + (b - a) * o.alpha;
@@ -762,6 +798,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     drawClaimZone(ctx, zone, owner ? siteColor(owner) : '#aab1b8');
   }
   for (const route of activePassageRoutes(state)) drawPassageRoute(ctx, route);
+  lap('1-terrain');
 
   // 2) 건물 — 지붕이 위 타일에 겹치므로 y 순서로 그린다
   const season = getSeason(state.day);
@@ -774,17 +811,37 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   }
   const wallTiles = builtWallTileSet(state);
   const sorted = [...state.buildings].sort((a, b) =>
-    (a.y + buildingFootprintSize(a.type)) - (b.y + buildingFootprintSize(b.type)) || a.x - b.x);
+    (a.y + buildingFootprintDims(a).h) - (b.y + buildingFootprintDims(b).h) || a.x - b.x);
   for (const b of sorted) {
-    if (!isBuildingFootprintExplored(state, b.type, b.x, b.y)) continue;
+    if (!isBuildingFootprintExplored(state, b.type, b.x, b.y, b.w, b.h)) continue;
     const def = BUILDING_DEFS[b.type];
-    const footprint = buildingFootprintSize(b.type);
-    const size = TILE * footprint;
+    const dims = buildingFootprintDims(b);
+    const size = TILE * dims.w;
+    if (isPlotBuildingType(b.type)) {
+      // 경작지는 발자국 칸마다 스프라이트를 타일링 — 파종을 마친 칸만 작물이 자라 보인다
+      const area = dims.w * dims.h;
+      const sown = b.built ? Math.min(area, Math.max(0, Math.floor(b.sownArea ?? area))) : 0;
+      for (let i = 0; i < area; i++) {
+        const cellX = b.x + (i % dims.w);
+        const cellY = b.y + Math.floor(i / dims.w);
+        sprites.drawBuilding(ctx, {
+          type: b.type, built: b.built, ghost: false,
+          season,
+          progress01: def.buildDays > 0 ? b.progress / def.buildDays : 1,
+          growth01: i < sown ? b.fieldGrowth / 100 : 0,
+          x: cellX * TILE, y: cellY * TILE, size: TILE,
+        });
+      }
+      if (b.repairing) {
+        sprites.drawBuildingDamage(ctx, { season, x: b.x * TILE, y: b.y * TILE, size });
+        drawDamageSmoke(ctx, b.x * TILE, b.y * TILE, b.id, dims.w);
+      }
+      continue;
+    }
     sprites.drawBuilding(ctx, {
       type: b.type, built: b.built, ghost: false,
       season,
       progress01: def.buildDays > 0 ? b.progress / def.buildDays : 1,
-      growth01: b.type === 'field' || b.type === 'paddy' ? b.fieldGrowth / 100 : undefined,
       connections: b.built && isWallBuilding(b.type)
         ? wallConnectionsFromSet(wallTiles, b.x, b.y)
         : undefined,
@@ -792,11 +849,11 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     });
     if (b.repairing) {
       sprites.drawBuildingDamage(ctx, { season, x: b.x * TILE, y: b.y * TILE, size });
-      drawDamageSmoke(ctx, b.x * TILE, b.y * TILE, b.id, footprint);
+      drawDamageSmoke(ctx, b.x * TILE, b.y * TILE, b.id, dims.w);
     }
     // 아궁이에 불을 땔 때 온돌집/중심지 굴뚝에서 연기가 오른다
     if (b.built && heating && (b.type === 'ondol' || b.type === 'center')) {
-      drawChimneySmoke(ctx, b.x * TILE, b.y * TILE, b.id, footprint);
+      drawChimneySmoke(ctx, b.x * TILE, b.y * TILE, b.id, dims.w);
     }
   }
 
@@ -809,7 +866,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     drawForeignSite(ctx, sprites, site, selected, season);
   }
 
+  lap('2-buildings');
   drawWorkerSlotOverlays(ctx, state, sorted, o.selectedBuildingId);
+  lap('2b-slotOverlays');
 
   // 3) 선택 주민의 예정 경로 — 행군하는 점선(개미행렬) 애니메이션
   if (o.selectedResidentId != null) {
@@ -859,7 +918,6 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   }
   for (const r of state.residents) {
     if (!r.alive || predatorScoutIds.has(r.id)) continue;
-    if (r.stage === 'infant') continue; // 아기는 집 안에서 자란다
     const p = residentPixelPos(r, o.alpha);
     sprites.drawResident(ctx, {
       job: r.job,
@@ -872,7 +930,8 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       moving: r.px !== r.x || r.py !== r.y,
       facing: r.x < r.px ? -1 : 1,
       militiaWeapon: militiaWeaponForResident(state, r),
-      sizeScale: r.stage === 'child' ? 0.62 : r.stage === 'youth' ? 0.8 : 1,
+      stage: r.stage,
+      sizeScale: r.stage === 'infant' ? 0.42 : r.stage === 'child' ? 0.62 : r.stage === 'youth' ? 0.8 : 1,
     });
   }
 
@@ -935,10 +994,13 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     }
   }
 
+  lap('3-6-actors');
+
   // 7) 밤낮 색조 — 하루 진행도(subTick+보간)로 계산. 세계를 물들이고 창에는 불이 켜진다.
   const SUB = CONFIG.agents.subticksPerDay;
   const dayFrac = ((state.subTick + o.alpha) % SUB) / SUB;
   drawDayNight(ctx, state, dayFrac, canvas.width, canvas.height);
+  lap('7-daynight');
 
   // 7) 선택 타일 표시 (밤에도 잘 보이게 색조 위에)
   if (o.selected) {
@@ -950,12 +1012,19 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
 
   // 8) 날씨 오버레이 (비/눈/눈보라/서리/혹한/해빙 홍수)
   drawWeather(ctx, state.weather, canvas.width, canvas.height);
+  lap('8-weather');
 
   // 9) 미답사 안개 — 지형/자원/건물/서식지를 탐색 전까지 가린다
   drawFogOverlay(ctx, state);
+  lap('9-fog');
 
   // 활성 토벌 목표는 미답사 안개 위에도 표시해 위치를 잃지 않게 한다.
   for (const marker of activeExpeditionTargetMarkers(state)) drawExpeditionTargetMarker(ctx, marker);
+
+  const selectedMine = o.selectedBuildingId == null
+    ? undefined
+    : state.buildings.find(building => building.id === o.selectedBuildingId && building.type === 'mine');
+  if (selectedMine) drawMineWorkRange(ctx, selectedMine.x, selectedMine.y);
 
   // 10) 배치 모드: 관련 자원 하이라이트 (사냥막→서식지 범위, 밭→비옥한 땅)
   if (o.placingType) {
@@ -963,6 +1032,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     if (o.placingType === 'huntLodge') {
       for (const habitat of habitats) drawHabitatRange(ctx, habitat);
     }
+    if (o.placingType === 'mine' && o.hover) drawMineWorkRange(ctx, o.hover.x, o.hover.y);
     const want = PLACEMENT_HINT[o.placingType];
     if (want) {
       const pulse = 0.22 + 0.14 * Math.sin(performance.now() / 280);
@@ -980,7 +1050,32 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   }
 
   // 11) 건설 배치 미리보기 — 날씨 위에 얹어 잘 보이게
-  if (o.placingType && o.hover) {
+  if (o.placingType && isPlotBuildingType(o.placingType) && o.placingRect) {
+    // 경작지: 드래그 사각형을 칸별 유효/무효로 칠한다
+    const def = BUILDING_DEFS[o.placingType];
+    const rect = o.placingRect;
+    const affordable = canAffordCost(state, buildingCostFor(o.placingType, rect.w, rect.h));
+    for (let dy = 0; dy < rect.h; dy++) {
+      for (let dx = 0; dx < rect.w; dx++) {
+        const tx = rect.x + dx;
+        const ty = rect.y + dy;
+        const tile = state.map[ty]?.[tx];
+        const ok = affordable && !!tile && isExplored(state, tx, ty) &&
+          canPlaceOn(def, tile, state) && !foreignSiteAt(state, tx, ty);
+        ctx.fillStyle = ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
+        ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE);
+        sprites.drawBuilding(ctx, {
+          type: o.placingType, built: true, ghost: true, progress01: 1,
+          season,
+          x: tx * TILE, y: ty * TILE, size: TILE,
+        });
+      }
+    }
+    ctx.strokeStyle = 'rgba(255,214,90,0.9)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(rect.x * TILE + 0.75, rect.y * TILE + 0.75, rect.w * TILE - 1.5, rect.h * TILE - 1.5);
+    ctx.lineWidth = 1;
+  } else if (o.placingType && o.hover) {
     const def = BUILDING_DEFS[o.placingType];
     const footprint = buildingFootprintSize(o.placingType);
     const size = TILE * footprint;
@@ -999,6 +1094,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       x: o.hover.x * TILE, y: o.hover.y * TILE, size,
     });
   }
+  lap('10-11-overlay');
 }
 
 // ── 밤낮 사이클 ──

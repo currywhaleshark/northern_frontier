@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const appSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
 const dockSource = readFileSync(new URL('../../src/components/dock/DockFrame.tsx', import.meta.url), 'utf8');
+const dockWindowSource = readFileSync(new URL('../../src/components/dock/DockWindow.tsx', import.meta.url), 'utf8');
 const residentSource = readFileSync(new URL('../../src/components/dock/ResidentsWindow.tsx', import.meta.url), 'utf8');
 const factionSource = readFileSync(new URL('../../src/components/dock/FactionsWindow.tsx', import.meta.url), 'utf8');
 const courtSource = readFileSync(new URL('../../src/components/dock/CourtWindow.tsx', import.meta.url), 'utf8');
@@ -18,6 +19,22 @@ for (const id of ['residents', 'factions', 'court', 'incidents']) {
 
 assert.match(dockSource, /openWindowIds: readonly DockWindowId\[\]/,
   'dock visibility must be controlled by App so other UI can open a window');
+assert.match(dockSource, /windowOrder: readonly FloatingWindowId\[\]/,
+  'management and HUD windows must share one global focus order');
+assert.match(dockSource, /overlayItems[\s\S]*windowOrder\.indexOf\(item\.id\)/,
+  'floating HUD items must use the same z-index layer as management windows');
+assert.match(appSource, /bringDockWindowToFront\(current, id\)/,
+  'opening or focusing an existing management window must bring it to the front');
+assert.match(appSource, /layouts=\{uiPrefs\.dockWindowLayouts\}/,
+  'saved management-window layouts must flow from UI preferences into the dock frame');
+assert.match(dockWindowSource, /setPointerCapture\(event\.pointerId\)/,
+  'dragging and resizing must keep pointer ownership outside the window bounds');
+assert.match(dockWindowSource, /RESIZE_EDGES[\s\S]*'n'[\s\S]*'ne'[\s\S]*'se'[\s\S]*'sw'[\s\S]*'nw'/,
+  'all four sides and four corners must expose resize handles');
+assert.match(dockWindowSource, /stopImmediatePropagation\(\)[\s\S]*settleGesture\(gesture\.pointerId, false\)/,
+  'Escape must cancel an active gesture before the App construction shortcut handles it');
+assert.match(dockWindowSource, /requestAnimationFrame[\s\S]*onLayoutCommit/,
+  'pointer movement must use temporary RAF DOM updates and commit through the layout callback');
 assert.match(appSource, /onOpenCourt=\{\(\) => openDockWindow\('court'\)\}/,
   'every TopBar court request must open the court dock window');
 assert.doesNotMatch(topBarSource, /조정 탭에서/,

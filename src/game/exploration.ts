@@ -1,4 +1,4 @@
-import { buildingFootprintSize, buildingFootprintTiles } from './buildings';
+import { buildingFootprintDims, buildingFootprintTiles } from './buildings';
 import { CONFIG } from './config';
 import type { Building, BuildingTypeId, ExplorationState, GameState } from './types';
 
@@ -63,9 +63,9 @@ export function revealAround(state: GameState, cx: number, cy: number, radius: n
 }
 
 function revealBuilding(state: GameState, building: Building): void {
-  const size = buildingFootprintSize(building.type);
-  const cx = building.x + Math.floor((size - 1) / 2);
-  const cy = building.y + Math.floor((size - 1) / 2);
+  const { w, h } = buildingFootprintDims(building);
+  const cx = building.x + Math.floor((w - 1) / 2);
+  const cy = building.y + Math.floor((h - 1) / 2);
   revealAround(state, cx, cy, buildingRevealRadius(state));
 }
 
@@ -84,7 +84,9 @@ export function isBuildingFootprintExplored(
   type: BuildingTypeId,
   x: number,
   y: number,
+  w?: number,
+  h?: number,
 ): boolean {
-  const tiles = buildingFootprintTiles(state, type, x, y);
+  const tiles = buildingFootprintTiles(state, type, x, y, w, h);
   return !!tiles && tiles.every(tile => isExplored(state, tile.x, tile.y));
 }

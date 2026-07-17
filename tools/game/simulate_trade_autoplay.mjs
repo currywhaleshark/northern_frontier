@@ -33,6 +33,8 @@ const trace = process.argv.includes('--trace');
 const spoilageEnabled = !process.argv.includes('--spoilage=off');
 const preservationEnabled = !process.argv.includes('--preservation=off');
 const kimjangEnabled = !process.argv.includes('--kimjang=off');
+const serviceLaborEnabled = process.argv.includes('--service-labor');
+const rankEfficiencyEnabled = !process.argv.includes('--rank-efficiency=off');
 const requestedModes = process.argv.find(arg => arg.startsWith('--modes='))
   ?.slice('--modes='.length)
   .split(',')
@@ -51,6 +53,15 @@ const tributeReserve = await load('tributeReserve');
 const relations = await load('relations');
 const { CONFIG } = await load('config');
 const { FACTIONS } = await load('constants');
+
+if (!rankEfficiencyEnabled) {
+  Object.assign(CONFIG.production.rankLaborEfficiency, {
+    settlement: 1,
+    bo: 1,
+    jin: 1,
+    bu: 1,
+  });
+}
 
 if (!spoilageEnabled) {
   for (const resource of Object.keys(CONFIG.spoilage.dailyRate)) {
@@ -214,11 +225,21 @@ function jobTargets(state) {
   add('watchman', Math.max(1, Math.floor(pop / 12)));
   add('tanner', builtCount(state, 'tannery') > 0 && clothingTotal(state) < pop * 1.1 ? 1 : 0);
   add('fisher', builtCount(state, 'ferry') > 0 ? Math.max(1, Math.floor(pop / 20)) : 0);
-  add('miner', builtCount(state, 'mine') > 0 ? Math.max(1, Math.floor(pop / 18)) : 0);
+  add('miner', Math.max(1, Math.floor(pop / 18)));
   add('miller', builtCount(state, 'watermill') > 0 && state.resources.rice > 2 ? 1 : 0);
   add('charcoalBurner', builtCount(state, 'charcoalKiln') > 0 && fuelDays(state) < 45 ? 1 : 0);
   add('herder', builtCount(state, 'stable') > 0 ? 1 : 0);
   add('weaver', builtCount(state, 'weavingHouse') > 0 && state.resources.cotton > 1 ? 1 : 0);
+  if (serviceLaborEnabled && (state.rank === 'jin' || state.rank === 'bu')) {
+    // 생산량을 직접 만들지 않지만 후기 고을 운영에 상시 필요한 인력.
+    add('physician', 1);
+    add('teacher', 1);
+    add('undertaker', 1);
+  }
+  if (serviceLaborEnabled && state.rank === 'bu') {
+    add('clerk', 1);
+    add('powderMaker', 1);
+  }
 
   while (targets.length < pop) {
     const index = targets.length % 4;
@@ -609,6 +630,8 @@ function summarize(mode, results) {
     spoilageEnabled,
     preservationEnabled,
     kimjangEnabled,
+    serviceLaborEnabled,
+    rankEfficiencyEnabled,
     runs: results.length,
     maxYears,
     survivalRate: 1 - failures.length / results.length,

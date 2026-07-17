@@ -30,17 +30,21 @@ assert.match(dockPresentationSource, /['"]incidents['"]/,
   'incidents and special items must remain reachable after sidebar removal');
 assert.match(appSource, /id: 'incidents'[\s\S]*<InspectorPanel/,
   'the incident and special-item panel must move into the management dock');
-assert.match(dockSource, /'--dock-strip-count': items\.length/,
-  'the dock window stack must reserve the actual icon-strip height');
+assert.match(dockSource, /items\.filter\(item => openWindowIds\.includes\(item\.id\)\)/,
+  'open dock DOM nodes must retain registration order rather than move when focused');
+assert.match(dockSource, /const orderIndex = windowOrder\.indexOf\(item\.id\)[\s\S]*zIndex=\{Math\.max\(0, orderIndex\) \+ 1\}/,
+  'global floating-window focus order must be expressed only through z-index');
 
 assert.match(cssSource, /\.main\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\);/,
   'the main layout must give the entire content width to the canvas');
 assert.match(cssSource, /\.right-overlay-stack\s*\{[\s\S]*right:\s*54px;/,
   'the upper-right alert overlay must sit directly beside the dock icon strip');
-assert.match(cssSource,
-  /\.canvas-stage:has\(\.dock-frame\.has-open-windows\) \.right-overlay-stack\s*\{\s*right:\s*332px;/,
-  'the right overlay must shift beside an open dock window');
-assert.match(cssSource, /\.dock-window-stack\s*\{[\s\S]*top:\s*calc\(var\(--dock-strip-count\) \* 43px \+ 5px\);/,
-  'dock windows must begin below every dock icon');
+assert.doesNotMatch(cssSource,
+  /\.canvas-stage:has\(\.dock-frame\.has-open-windows\) \.right-overlay-stack/,
+  'floating windows must leave the right alert overlay at its normal position');
+assert.match(cssSource, /\.dock-frame\s*\{[\s\S]*inset:\s*0;[\s\S]*pointer-events:\s*none;/,
+  'the dock frame must provide a pointer-through full-stage coordinate space');
+assert.match(cssSource, /\.dock-window-layer\s*\{[\s\S]*inset:\s*0;[\s\S]*pointer-events:\s*none;/,
+  'floating dock windows must live in a full-stage layer');
 
 console.log('sidebar removal UI tests passed');

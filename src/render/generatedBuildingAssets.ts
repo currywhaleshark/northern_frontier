@@ -55,6 +55,9 @@ const BUILDING_COLUMNS: Record<BuildingTypeId, number> = {
   office: 14,
   market: 14,
   cemetery: 3, // 전용 그림 나오기 전 임시 (움 저장고 봉분 재사용)
+  school: 14,    // 전용 그림 나오기 전 임시 (관청 재사용)
+  shrine: 9,     // 전용 그림 나오기 전 임시
+  hermitage: 6,  // 전용 그림 나오기 전 임시
   cannonEmplacement: 12, // 전용 그림이 나오기 전까지 망루 그림을 빌려 쓴다
 };
 

@@ -30,6 +30,7 @@ const compiledDir = compileGameModules();
 const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
+const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 function clearMapToPlain(state) {
   for (const row of state.map) {
@@ -133,7 +134,15 @@ function prepareState(seed) {
 
   simulation.advanceTick(state);
 
-  assert.ok(field.fieldGrowth > 0, 'assigned farmer grows the assigned field');
+  // 작기가 파종 단계부터 시작한다 — 씨를 다 넣은 뒤에야 성장이 오른다
+  assert.ok((field.sownArea ?? 0) > 0, 'assigned farmer starts sowing the assigned field');
+  const ticksToSowAndGrow = CONFIG.farming.sowWorkPerTile * 2 + 8;
+  for (let i = 0; i < ticksToSowAndGrow; i++) {
+    state.pendingChoice = null; // 사건 선택지가 시뮬레이션을 멈추지 않게
+    state.weather = 'clear';
+    simulation.advanceTick(state);
+  }
+  assert.ok(field.fieldGrowth > 0, 'assigned farmer grows the field once sowing is done');
 }
 
 {

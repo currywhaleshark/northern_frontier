@@ -1,0 +1,31 @@
+Create one exact 4 columns by 4 rows sprite contact sheet for a Joseon-frontier survival game. Match the attached reference sheets: compact 16-bit pixel art, warm earthy palette, crisp hard pixel clusters, three-quarter top-down game view, consistent lighting from upper left, and consistent object scale and ground baseline. Each cell contains exactly one complete isolated building or structure centered with generous margin. Do not draw grid lines, borders, labels, text, UI, scenery, terrain tiles, cast shadows extending into other cells, or anything crossing a cell boundary.
+
+The entire background, including all unused space and empty cells, must be perfectly uniform solid chroma-key magenta #FF00FF (RGB 255,0,255): no gradient, texture, noise, shadow, antialiasing haze, vignette, or other magenta tones.
+
+EXACT CELL ORDER, left to right:
+
+Row 1 — normal season:
+1. Cellar: low earth-covered storage mound with a short timber entry, wooden door, and a few descending stone steps.
+2. Smokehouse: compact timber-and-stone smoking shed with a small chimney and a visible attached hanging rack; keep smoke minimal and attached to the chimney.
+3. Drying rack: sturdy open wooden rack with several tied fish hanging to dry; no separate building.
+4. Onggi kiln: compact clay-and-stone pottery kiln with an arched firebox and two attached brown jars beside it.
+
+Row 2 — normal season:
+1. Jangdokdae: low stone platform holding a clustered group of dark brown lidded onggi fermentation jars, with a short simple fence.
+2. Clinic: tidy small Joseon timber clinic hut with a practical thatched roof, hanging medicinal herb bundles, and a mortar beside the entrance. No cross, icon, lettering, or sign text.
+3. Cemetery: one modest earthen burial mound, a plain upright stone marker, and a short wooden boundary fence. Solemn and clean; no corpse, coffin, bones, skull, ghost, gore, or religious symbol.
+4. EMPTY: pure #FF00FF only.
+
+Row 3 — winter versions in the exact same order and silhouette as row 1:
+1. Snow-covered cellar.
+2. Snow-covered smokehouse.
+3. Snow-covered drying rack.
+4. Snow-covered onggi kiln.
+
+Row 4 — winter versions in the exact same order and silhouette as row 2:
+1. Snow-covered jangdokdae.
+2. Snow-covered clinic.
+3. Snow-covered cemetery.
+4. EMPTY: pure #FF00FF only.
+
+Winter snow must rest on roofs, mounds, fences, racks, and jars; do not add falling snow, weather effects, or a ground scene. Preserve the same identity, footprint, orientation, scale, and baseline between each normal/winter pair. All fourteen sprites must be fully visible, separated, and safely inset from their cells.

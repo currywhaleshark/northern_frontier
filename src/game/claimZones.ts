@@ -1,4 +1,4 @@
-import { BUILDING_DEFS, buildingFootprintTiles } from './buildings';
+import { BUILDING_DEFS, footprintTilesOf } from './buildings';
 import { CONFIG } from './config';
 import { addLog } from './events';
 import { addForeignSiteMemory, isForeignSiteOperational } from './foreignSites';
@@ -49,7 +49,7 @@ export function noteClaimIntrusion(state: GameState, zone: ClaimZone, reason: st
 }
 
 export function noteBuildingClaimIntrusions(state: GameState, building: Building): void {
-  const footprint = buildingFootprintTiles(state, building.type, building.x, building.y) ?? [];
+  const footprint = footprintTilesOf(state, building) ?? [];
   const zones = new Map<number, ClaimZone>();
   for (const tile of footprint) {
     for (const zone of claimZonesAt(state, tile.x, tile.y)) zones.set(zone.id, zone);
@@ -66,7 +66,7 @@ export function dailyClaimTensionTick(state: GameState): void {
     const site = state.foreignSites.find(candidate => candidate.id === zone.siteId);
     if (!site || !isForeignSiteOperational(site)) continue;
     const occupied = state.buildings.some(building => {
-      const footprint = buildingFootprintTiles(state, building.type, building.x, building.y) ?? [];
+      const footprint = footprintTilesOf(state, building) ?? [];
       return footprint.some(tile => claimZonesAt(state, tile.x, tile.y).some(candidate => candidate.id === zone.id));
     });
     if (!occupied) continue;

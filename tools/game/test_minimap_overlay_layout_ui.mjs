@@ -2,23 +2,26 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const appSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+const dockSource = readFileSync(new URL('../../src/components/dock/DockFrame.tsx', import.meta.url), 'utf8');
 const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
 
 assert.match(appSource,
-  /className="right-lower-stack"[\s\S]*className="minimap-overlay"[\s\S]*<Minimap[\s\S]*<SelectionContextBar/,
-  'the minimap must precede the optional selection context in one lower-right stack');
+  /id:\s*'minimap'[\s\S]*className:\s*'hud-minimap-window'[\s\S]*className="minimap-overlay"[\s\S]*<Minimap/,
+  'the minimap must be registered as a floating HUD window');
+assert.match(dockSource, /overlayItems[\s\S]*floatingItems[\s\S]*windowOrder\.indexOf\(item\.id\)/,
+  'HUD windows must share the management-window layer and global focus order');
 assert.match(cssSource,
-  /\.right-lower-stack\s*\{[\s\S]*right:\s*10px;[\s\S]*bottom:\s*58px;[\s\S]*flex-direction:\s*column;[\s\S]*align-items:\s*flex-end;[\s\S]*pointer-events:\s*none;/,
-  'the lower-right stack must reserve the bottom controls and pass unused pointer input through');
-assert.match(cssSource, /\.minimap-overlay\s*\{[\s\S]*position:\s*relative;[\s\S]*flex:\s*0 0 auto;/,
-  'the minimap must flow inside the shared stack rather than use an independent top-right coordinate');
+  /\.hud-minimap-window \.minimap-overlay\s*\{[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*overflow:\s*auto;[\s\S]*pointer-events:\s*auto;/,
+  'the minimap content must fill and scroll inside its resizable floating window');
+assert.match(cssSource,
+  /\.hud-minimap-window \.minimap-canvas-wrap,[\s\S]*\.hud-minimap-window \.minimap-canvas-wrap canvas\s*\{[\s\S]*width:\s*100%;/,
+  'the minimap canvas must scale with the saved window width');
+assert.doesNotMatch(appSource, /right-lower-stack/,
+  'the fixed lower-right minimap stack must be removed');
 assert.doesNotMatch(cssSource, /\.minimap-overlay\s*\{[^}]*top:\s*8px;/,
   'the minimap must no longer be anchored to the upper edge');
-assert.match(cssSource,
-  /\.canvas-stage:has\(\.dock-frame\.has-open-windows\) \.right-lower-stack\s*\{\s*right:\s*332px;/,
-  'an open dock must shift the whole lower-right stack beside it');
-assert.match(cssSource,
-  /\.canvas-stage:has\(\.dock-frame\.has-open-windows\) \.right-overlay-stack\s*\{[\s\S]*right:\s*332px;/,
-  'an open dock must also shift upper-right alerts beside it');
+assert.doesNotMatch(cssSource,
+  /\.canvas-stage:has\(\.dock-frame\.has-open-windows\) \.(?:right-lower-stack|right-overlay-stack)/,
+  'floating management windows must not reserve a fixed-width lane by shifting right-side overlays');
 
 console.log('minimap overlay layout UI tests passed');

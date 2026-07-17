@@ -199,7 +199,11 @@ function makePaddyEligibleTile(state, x, y) {
 
   runTicks(state, 1);
 
-  assert.equal(paddy.fieldGrowth, 92, 'rice harvest removes one harvest step');
+  assert.equal(
+    paddy.fieldGrowth,
+    100 - CONFIG.agents.work.harvestPerSubtick * CONFIG.farming.tilesPerFarmer,
+    'rice harvest removes one harvest step (tilesPerFarmer-scaled)',
+  );
   assert.ok((paddy.inventory.rice ?? 0) > 0, 'paddy stores unmilled rice locally');
   assert.equal(paddy.inventory.grain ?? 0, 0, 'rice harvest is not already milled');
 }
@@ -216,7 +220,8 @@ function makePaddyEligibleTile(state, x, y) {
 
   runTicks(state, 1);
 
-  const milled = CONFIG.production.millerRicePerDay / 5;
+  const milled = (CONFIG.production.millerRicePerDay / 5)
+    * CONFIG.production.rankLaborEfficiency[state.rank];
   assert.equal(miller.task, '방아 찧기');
   assert.ok(Math.abs(mill.inventory.rice - (10 - milled)) < 0.001, 'miller consumes rice delivered to the mill');
   assert.ok(Math.abs((mill.inventory.grain ?? 0) - (milled * CONFIG.production.grainPerRice)) < 0.001, 'miller stores edible grain at the mill');

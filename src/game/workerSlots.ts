@@ -1,5 +1,6 @@
 import { isJobUnlocked } from './constants';
-import { isBuildingUnlocked } from './buildings';
+import { CONFIG } from './config';
+import { isBuildingUnlocked, isPlotBuildingType, plotArea } from './buildings';
 import type { Building, BuildingTypeId, GameState, JobId, Resident } from './types';
 
 export interface WorkerSlotConfig {
@@ -30,6 +31,9 @@ export const SLOTTED_BUILDING_CONFIG: Partial<Record<BuildingTypeId, WorkerSlotC
   dryingRack: { job: 'curer', slots: 2 },
   onggiKiln: { job: 'potter', slots: 2 },
   cemetery: { job: 'undertaker', slots: 1 },
+  school: { job: 'teacher', slots: 1 },
+  shrine: { job: 'shaman', slots: 1 },
+  hermitage: { job: 'monk', slots: 1 },
 };
 
 function isWorkableResident(state: GameState, resident: Resident | undefined): resident is Resident {
@@ -56,6 +60,16 @@ export function workerSlotConfig(type: BuildingTypeId): WorkerSlotConfig | null 
   return SLOTTED_BUILDING_CONFIG[type] ?? null;
 }
 
+// 건물 인스턴스의 실제 슬롯 수 — 경작지는 면적에 비례한다 (ceil(칸수/tilesPerFarmer))
+export function workerSlotCount(building: Pick<Building, 'type' | 'w' | 'h'>): number {
+  const config = workerSlotConfig(building.type);
+  if (!config) return 0;
+  if (isPlotBuildingType(building.type)) {
+    return Math.max(1, Math.ceil(plotArea(building) / CONFIG.farming.tilesPerFarmer));
+  }
+  return config.slots;
+}
+
 export function isSlottedProductionBuilding(type: BuildingTypeId): boolean {
   return workerSlotConfig(type) != null;
 }
@@ -73,7 +87,7 @@ export function assignedWorkers(state: GameState, building: Building): Resident[
       isWorkableResident(state, resident) &&
       resident.job === config.job)
     .sort((a, b) => a.id - b.id)
-    .slice(0, config.slots);
+    .slice(0, workerSlotCount(building));
 }
 
 export function isResidentInAssignedSlot(state: GameState, resident: Resident, building: Building): boolean {
@@ -83,7 +97,7 @@ export function isResidentInAssignedSlot(state: GameState, resident: Resident, b
 export function availableWorkerSlots(state: GameState, building: Building): number {
   const config = slottedConfigForBuilding(state, building);
   if (!config) return 0;
-  return Math.max(0, config.slots - assignedWorkers(state, building).length);
+  return Math.max(0, workerSlotCount(building) - assignedWorkers(state, building).length);
 }
 
 export function autoAssignWorkersToBuilding(state: GameState, buildingId: number): Resident[] {
@@ -96,7 +110,7 @@ export function autoAssignWorkersToBuilding(state: GameState, buildingId: number
     resident.alive &&
     resident.job === config.job &&
     resident.assignedBuildingId === building.id).length;
-  const vacancies = Math.max(0, config.slots - reservedSlots);
+  const vacancies = Math.max(0, workerSlotCount(building) - reservedSlots);
   if (vacancies === 0) return [];
 
   const candidates = state.residents
@@ -129,7 +143,7 @@ export function autoAssignWorkersToSelectedBuildingTypes(
       // 병자 등 일시적으로 일하지 못하는 기존 배정자도 자리를 차지한다.
       const reservedSlots = state.residents.filter(resident =>
         resident.alive && resident.job === config.job && resident.assignedBuildingId === building.id).length;
-      const vacancies = Math.max(0, config.slots - reservedSlots);
+      const vacancies = Math.max(0, workerSlotCount(building) - reservedSlots);
       return vacancies > 0 ? [{ building, config, vacancies }] : [];
     });
 
@@ -188,7 +202,7 @@ export function canAssignResidentToBuilding(
 
   const assigned = assignedWorkers(state, building);
   if (
-    assigned.length >= config.slots &&
+    assigned.length >= workerSlotCount(building) &&
     !assigned.some(worker => worker.id === resident.id)
   ) {
     return 'no available worker slots';

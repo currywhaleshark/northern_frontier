@@ -101,8 +101,15 @@ function prepareResident(resident, job, x, y) {
   const hauler = onlyResident(state, 'hauler', 9, 10);
   assert.equal(
     selectionActions.getPointerAction(state, { kind: 'resident', id: hauler.id }, rockTile).kind,
+    'invalid',
+    'hauler cannot manually quarry rock',
+  );
+
+  hauler.job = 'miner';
+  assert.equal(
+    selectionActions.getPointerAction(state, { kind: 'resident', id: hauler.id }, rockTile).kind,
     'work',
-    'hauler can manually quarry rock',
+    'settlement-tier miner can work rock without a mine',
   );
 
   hauler.job = 'farmer';

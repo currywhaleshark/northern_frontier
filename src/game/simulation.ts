@@ -4,9 +4,11 @@
 import { CONFIG } from './config';
 import { isJobUnlocked, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } from './constants';
 import {
-  BUILDING_DEFS, buildingFootprintTiles, canAfford, cannonPlacementsUsed, canPlaceBuildingAt, canPlaceOn,
+  BUILDING_DEFS, buildingCostFor, buildingFootprintTiles, canAfford, canAffordCost,
+  cannonPlacementsUsed, canPlaceBuildingAt, canPlaceOn, clampPlotSide,
   clearBuildingTiles, computeDefense, countBuilt, getBuilding, isBuildingUnlocked,
-  isPaddyEligibleTile, isSmithyProductUnlocked, occupyBuildingTiles, SMITHY_PRODUCT_DEFS,
+  footprintTilesOf, isPaddyEligibleTile, isPlotBuildingType, isSmithyProductUnlocked,
+  occupyBuildingTiles, plotArea, SMITHY_PRODUCT_DEFS,
 } from './buildings';
 import { isWallBuilding } from './walls';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
@@ -29,6 +31,7 @@ import {
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { firewoodWeatherMult, rollWeather } from './weather';
 import { defaultProcessingReserves } from './processing';
+import { hasKnownMineralDepositNear } from './miningSites';
 import {
   canPlantCropNow, cropIdForBuilding, CROP_DEFS, defaultCropForBuildingType, isCropAllowedOnBuilding,
 } from './crops';
@@ -52,11 +55,12 @@ import { createIncidentState, resolveSpecialEvent, updateSpecialEvents } from '.
 import { dailyClaimTensionTick, noteBuildingClaimIntrusions } from './claimZones';
 import { applyDailySpoilage } from './spoilage';
 import { consumptionWeight, lifecycleDailyTick, resolveWeddingChoice } from './lifecycle';
+import { dailyReligionTick, resolveReligionChoice } from './religion';
 import { dailySilverTick, resolveSilverVeinChoice } from './silver';
 import { updateFermentation } from './fermentation';
 import { isKimjangChoice, maybeOpenKimjangEvent, resolveKimjangChoice } from './kimjang';
 import {
-  createDefaultLivestockState, setStableLivestock, slaughterStableLivestock, updateLivestock,
+  createDefaultLivestockState, setPlotPlowOxen, setStableLivestock, slaughterStableLivestock, updateLivestock,
 } from './livestock';
 import { resolveTerritoryWarning, updateTerritoryWarnings } from './territory';
 import {
@@ -73,7 +77,7 @@ import {
 } from './workerSlots';
 import type { AutoAssignBuildingType } from './workerSlots';
 import type {
-  Building, BuildingTypeId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId, PointerAction, Resident, ResourceId, SmithyProductId,
+  Building, BuildingTypeId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId, PointerAction, Resident, ResourceId, Season, SmithyProductId,
 } from './types';
 
 // ─────────────────────────── 새 게임 ───────────────────────────
@@ -198,6 +202,12 @@ function placePrebuilt(state: GameState, type: BuildingTypeId, x: number, y: num
     cropId: defaultCropForBuildingType(type),
     queuedCropId: null,
   };
+  if (isPlotBuildingType(type)) {
+    b.w = 1;
+    b.h = 1;
+    b.sownArea = 0;
+    b.plowOxen = 0;
+  }
   if (type === 'jangdokdae') b.fermentBatches = [];
   if (type === 'stable') b.livestock = createDefaultLivestockState();
   state.buildings.push(b);
@@ -244,28 +254,47 @@ function findNearbySpots(
 
 // ─────────────────────────── 플레이어 행동 ───────────────────────────
 
-export function tryPlaceBuilding(state: GameState, type: BuildingTypeId, x: number, y: number): string | null {
+export function tryPlaceBuilding(
+  state: GameState,
+  type: BuildingTypeId,
+  x: number,
+  y: number,
+  plotW?: number,
+  plotH?: number,
+): string | null {
   const def = BUILDING_DEFS[type];
   const tile = state.map[y]?.[x];
   if (!tile) return '지도 밖입니다.';
+  // 경작지만 드래그 크기를 받는다 — 그 외 건물은 타입 고정 크기
+  const w = isPlotBuildingType(type) ? clampPlotSide(plotW ?? 1) : undefined;
+  const h = isPlotBuildingType(type) ? clampPlotSide(plotH ?? 1) : undefined;
   if (!isBuildingUnlocked(state.rank, type)) {
     const rankName = def.minRank ? RANK_NAMES[def.minRank] : RANK_NAMES.bo;
     return `${rankName} 승격 후 지을 수 있습니다.`;
   }
-  if (!isBuildingFootprintExplored(state, type, x, y)) return '아직 답사하지 않은 곳입니다.';
+  if (!isBuildingFootprintExplored(state, type, x, y, w, h)) return '아직 답사하지 않은 곳입니다.';
   revealForeignSitesFromExploration(state);
-  const proposedTiles = buildingFootprintTiles(state, type, x, y) ?? [];
+  const proposedTiles = buildingFootprintTiles(state, type, x, y, w, h) ?? [];
   if (proposedTiles.some(proposed => foreignSiteAt(state, proposed.x, proposed.y))) {
     return '현지 거점이 자리한 곳에는 건물을 지을 수 없습니다.';
   }
-  if (!canPlaceBuildingAt(state, type, x, y)) return '이곳에는 지을 수 없습니다.';
+  if (type === 'mine') {
+    if (!proposedTiles.every(proposed => canPlaceOn(def, proposed, state))) {
+      return '채광장은 광상 위가 아닌 비어 있는 육지에 지어야 합니다.';
+    }
+    if (!hasKnownMineralDepositNear(state, x, y)) {
+      return `반경 ${CONFIG.minerals.mineWorkRadius}칸 안에 발견된 광상이 있어야 합니다.`;
+    }
+  }
+  if (!canPlaceBuildingAt(state, type, x, y, w, h)) return '이곳에는 지을 수 없습니다.';
   if (def.unique && state.buildings.some(b => b.type === type)) return '이미 건설 중이거나 완공되었습니다.';
   if (type === 'cannonEmplacement' && cannonPlacementsUsed(state) >= state.cannonsGranted) {
     return '불랑기포는 조정의 하사가 있어야 합니다. (조정 탭에서 청원)';
   }
-  if (!canAfford(state, def)) return '자원이 부족합니다.';
+  const cost = buildingCostFor(type, w ?? 1, h ?? 1);
+  if (!canAffordCost(state, cost)) return '자원이 부족합니다.';
 
-  for (const [res, amt] of Object.entries(def.cost)) {
+  for (const [res, amt] of Object.entries(cost)) {
     state.resources[res as keyof typeof state.resources] -= amt ?? 0;
   }
   const b: Building = {
@@ -273,12 +302,18 @@ export function tryPlaceBuilding(state: GameState, type: BuildingTypeId, x: numb
     cropId: defaultCropForBuildingType(type),
     queuedCropId: null,
   };
+  if (isPlotBuildingType(type)) {
+    b.w = w;
+    b.h = h;
+    b.sownArea = 0;
+    b.plowOxen = 0;
+  }
   if (type === 'smithy') b.smithyProduct = 'tools';
   if (type === 'dryingRack') b.dryingProduct = 'saltedFish';
   if (type === 'jangdokdae') b.fermentBatches = [];
   if (type === 'stable') b.livestock = createDefaultLivestockState();
   state.buildings.push(b);
-  const tiles = buildingFootprintTiles(state, type, x, y) ?? [];
+  const tiles = buildingFootprintTiles(state, type, x, y, w, h) ?? [];
   occupyBuildingTiles(state, b);
   for (const footprintTile of tiles) {
     if (footprintTile.terrain === 'forest') {
@@ -365,6 +400,14 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
   const r = state.residents.find(res => res.id === id);
   if (r?.stage) {
     addLog(state, `${r.name}은(는) 아직 아이라 일을 맡길 수 없습니다.`, 'info');
+    return;
+  }
+  if (r?.special) {
+    addLog(state, `${r.name}은(는) 제 소명이 있는 사람이라 다른 일을 맡지 않습니다.`, 'info');
+    return;
+  }
+  if ((job === 'shaman' || job === 'monk') && !r?.special) {
+    addLog(state, '무당과 승려는 마을에 들어온 그 사람만 맡을 수 있습니다.', 'info');
     return;
   }
   if (r && r.alive) {
@@ -487,7 +530,7 @@ export function issueResidentWorkOrder(
     x: action.x,
     y: action.y,
     buildingId: action.buildingId,
-    repeat: resident.job === 'hauler' && (tile.terrain === 'rock' || forcedHaulTarget),
+    repeat: resident.job === 'hauler' && forcedHaulTarget,
     unauthorizedSiteIds: [...forcedSiteIds],
   };
   interruptResidentForManualOrder(resident);
@@ -554,6 +597,7 @@ export function setBuildingCrop(
   }
 
   building.fieldGrowth = 0;
+  building.sownArea = 0;
   building.queuedCropId = null;
   if (canPlantCropNow(cropId, building.type, season)) {
     building.cropId = cropId;
@@ -572,17 +616,22 @@ export function convertFieldToPaddy(state: GameState, buildingId: number): strin
   if (!building.built) return '완공된 밭만 논으로 전환할 수 있습니다.';
   const def = BUILDING_DEFS.paddy;
   if (!isBuildingUnlocked(state.rank, 'paddy')) return `${RANK_NAMES[def.minRank ?? 'bo']} 승격 후 논을 만들 수 있습니다.`;
-  const tile = state.map[building.y]?.[building.x];
-  if (!tile || !isPaddyEligibleTile(state, tile)) return '논은 강가의 비옥한 땅에만 만들 수 있습니다.';
-  if (!canAfford(state, def)) return '자원이 부족합니다.';
+  // 다칸 밭은 모든 칸이 강가 비옥지여야 논이 될 수 있다
+  const footprint = footprintTilesOf(state, building) ?? [];
+  if (footprint.length === 0 || !footprint.every(tile => isPaddyEligibleTile(state, tile))) {
+    return '논은 강가의 비옥한 땅에만 만들 수 있습니다.';
+  }
+  const cost = buildingCostFor('paddy', building.w ?? 1, building.h ?? 1);
+  if (!canAffordCost(state, cost)) return '자원이 부족합니다.';
 
-  for (const [res, amt] of Object.entries(def.cost)) {
+  for (const [res, amt] of Object.entries(cost)) {
     state.resources[res as keyof typeof state.resources] -= amt ?? 0;
   }
   building.type = 'paddy';
   building.progress = 0;
   building.built = false;
   building.fieldGrowth = 0;
+  building.sownArea = 0;
   building.cropId = 'rice';
   building.queuedCropId = null;
   occupyBuildingTiles(state, building);
@@ -609,6 +658,10 @@ export function setLivestockSpecies(state: GameState, buildingId: number, specie
 
 export function slaughterLivestock(state: GameState, buildingId: number, amount = 1): string | null {
   return slaughterStableLivestock(state, buildingId, amount);
+}
+
+export function assignPlotPlowOxen(state: GameState, buildingId: number, count: number): string | null {
+  return setPlotPlowOxen(state, buildingId, count);
 }
 
 export function setDryingProduct(state: GameState, buildingId: number, product: DryingProductId): string | null {
@@ -657,6 +710,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'territory') resolveTerritoryWarning(state, optionId);
   else if (state.pendingChoice.kind === 'silverVein') resolveSilverVeinChoice(state, optionId, rng);
   else if (state.pendingChoice.kind === 'wedding') resolveWeddingChoice(state, optionId);
+  else if (state.pendingChoice.kind === 'religion') resolveReligionChoice(state, optionId);
   else resolveTrade(state, optionId);
   reconcileWeaponAssignments(state);
   reconcileMountAssignments(state);
@@ -695,23 +749,41 @@ export function continueAfterVictory(state: GameState): boolean {
 // 서브틱 1회: 에이전트 갱신, 하루가 차면 일일 처리
 export function advanceTick(state: GameState): void {
   if (state.gameOver || state.pendingChoice || state.tacticalBattle || state.tacticalBattleReport) return;
+  // 틱 병목 계측 (옵트인) — window.__renderPerf가 있으면 단계별 누적 ms를 쌓는다
+  const perf = typeof window !== 'undefined' ? window.__renderPerf : undefined;
+  let perfLast = perf ? performance.now() : 0;
+  const lap = (name: string): void => {
+    if (!perf) return;
+    const now = performance.now();
+    const bucket = perf[name] ?? (perf[name] = { total: 0, count: 0 });
+    bucket.total += now - perfLast;
+    bucket.count++;
+    perfLast = now;
+  };
   agentsTick(state);
+  lap('t1-agents');
   reconcileWeaponAssignments(state);
   reconcileMountAssignments(state);
+  lap('t2-reconcile');
   state.resources.defense = computeDefense(state);
+  lap('t3-defense');
   expeditionTick(state);
   maybeOpenExpeditionEngagementChoice(state);
   const tickRng = makeRng(state.seed + state.day * 7919 + state.subTick * 131 + 3);
   raidHoldTick(state, tickRng);
+  lap('t4-expedition');
   refreshExploration(state);
   revealForeignSitesFromExploration(state);
+  lap('t5-exploration');
   battleTick(state, tickRng);
   raidersTick(state, tickRng);
+  lap('t6-battles');
   state.subTick++;
   if (state.subTick >= SUBTICKS) {
     state.subTick = 0;
     endOfDay(state);
   }
+  lap('t7-endOfDay');
 }
 
 // 하루 통째로 진행 (테스트/디버그용)
@@ -760,6 +832,7 @@ function endOfDay(state: GameState): void {
   if (!maybeOfferDefectorImmigration(state, rng)) maybeOfferImmigration(state, rng);
   maybeFlavorLog(state, rng);
   maybeCollectTribute(state); // 겨울: 조정의 사자가 세공을 거둔다 (모달 충돌 시 다음 날로)
+  dailyReligionTick(state, rng); // 떠돌이 무당/노승이 문을 두드린다 (진 이상)
   dailySilverTick(state, rng); // 은맥 발견/재제안/잠채 발각 — 의심 갱신보다 먼저
   updateSuspicion(state, rng); // 모반 의심 누적과 감찰/견책/토벌 사건
   maybeOpenKimjangEvent(state); // 늦가을~입동의 연례 공동 김장. 다른 모달이 있으면 기간 안에 재시도
@@ -771,10 +844,33 @@ function endOfDay(state: GameState): void {
   checkEndConditions(state);
 }
 
+// 파종철이 닫히는 계절 전환에서 못 심은 칸을 확정한다 — 그 칸은 이번 작기 내내 논다
+function settleSowingDeadline(state: GameState, prev: string, next: string): void {
+  let idleTiles = 0;
+  for (const b of state.buildings) {
+    if ((b.type !== 'field' && b.type !== 'paddy') || !b.built) continue;
+    const cropId = cropIdForBuilding(b);
+    if (!cropId) continue;
+    const crop = CROP_DEFS[cropId];
+    const wasPlantable = crop.plantSeasons.includes(prev as Season);
+    const stillPlantable = crop.plantSeasons.includes(next as Season);
+    if (!wasPlantable || stillPlantable) continue;
+    const area = plotArea(b);
+    // 반쯤 심다 만 칸은 버려진다 (정수 칸만 소출에 든다)
+    const sown = Math.min(area, Math.max(0, Math.floor(b.sownArea ?? 0)));
+    b.sownArea = sown;
+    if (sown < area) idleTiles += area - sown;
+  }
+  if (idleTiles > 0) {
+    addLog(state, `파종철이 끝났습니다. 일손이 모자라 경작지 ${idleTiles}칸이 씨를 넣지 못한 채 놀게 됩니다.`, 'bad', true);
+  }
+}
+
 function onSeasonChange(state: GameState, prev: string, next: string): void {
   resetFactionTradeCapacityUsage(state);
   updateSeasonalForeignSites(state, next as ReturnType<typeof getSeason>);
   addLog(state, `${SEASON_NAMES[next as keyof typeof SEASON_NAMES]}이(가) 시작되었습니다. (${getYear(state.day)}년차)`, 'weather');
+  settleSowingDeadline(state, prev, next);
 
   if (next === 'winter') {
     state.winterStartPop = livingResidents(state).length;
@@ -788,6 +884,7 @@ function onSeasonChange(state: GameState, prev: string, next: string): void {
       if (cropId && CROP_DEFS[cropId].survivesWinter) continue;
       if (b.fieldGrowth > 1) lost = true;
       b.fieldGrowth = 0;
+      b.sownArea = 0;
     }
     if (lost) addLog(state, '거두지 못한 곡식이 서리에 얼어붙었습니다.', 'bad', true);
   }
@@ -904,11 +1001,18 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
     new Set(state.expedition?.memberIds ?? []),
   );
 
+  // 밥상에 장·김치가 올랐는지 — 진 티어의 "밥상의 격" 성분이 이 날짜를 본다
+  if ((foodResult.byResource.kimchi ?? 0) + (foodResult.byResource.jang ?? 0) > 0) {
+    state.lastFermentMealDay = state.day;
+  }
+
   const foodOk = foodTotal(state) > weight * cfg.foodPerDay * 6;
-  updateMorale(
-    state, foodOk, avg(state, 'warmth'), countBuilt(state, 'market') > 0,
-    foodResult.varietyScore,
-  );
+  updateMorale(state, {
+    foodOk,
+    warmthAvg: avg(state, 'warmth'),
+    dietVarietyScore: foodResult.varietyScore,
+    clothesCoverage,
+  });
 
   if (fedRatio < 1) addLog(state, '식량이 모자라 주민들이 배를 곯았습니다.', 'bad');
   if (firewoodRatio < 1 && (season === 'winter' || season === 'autumn')) {

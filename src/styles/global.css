@@ -236,14 +236,14 @@ html, body, #root {
 .dock-frame {
   position: absolute;
   z-index: 45;
-  inset: 8px 8px 56px auto;
-  width: min(316px, calc(100% - 16px));
+  inset: 0;
   pointer-events: none;
 }
 .dock-strip {
   position: absolute;
-  top: 0;
-  right: 0;
+  z-index: 100;
+  top: 8px;
+  right: 8px;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -276,18 +276,16 @@ html, body, #root {
   border-radius: 50%;
   background: var(--accent);
 }
-.dock-window-stack {
+.dock-window-layer {
   position: absolute;
-  top: calc(var(--dock-strip-count) * 43px + 5px);
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  display: grid;
-  grid-template-rows: repeat(var(--dock-window-count), minmax(0, 1fr));
-  gap: 7px;
+  inset: 0;
   pointer-events: none;
 }
 .dock-window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -297,6 +295,11 @@ html, body, #root {
   background: rgba(27, 33, 39, 0.98);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.46);
   pointer-events: auto;
+  will-change: transform;
+}
+.dock-window.active {
+  border-color: rgba(217, 164, 65, 0.72);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.56), 0 0 0 1px rgba(217, 164, 65, 0.12);
 }
 .dock-window-head {
   min-height: 34px;
@@ -307,9 +310,13 @@ html, body, #root {
   padding: 4px 5px 4px 9px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
+  cursor: move;
+  touch-action: none;
+  user-select: none;
 }
 .dock-window-head strong { color: var(--accent); font-size: 12px; }
 .dock-window-actions { display: flex; gap: 4px; }
+.dock-window-actions button { cursor: pointer; touch-action: auto; }
 .dock-window-actions button {
   min-width: 26px;
   height: 24px;
@@ -328,11 +335,43 @@ html, body, #root {
 .dock-window-actions button.active { border-color: var(--accent); color: var(--text); outline: none; }
 .dock-window-actions button.active { color: var(--accent); }
 .dock-window-body {
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
-  overflow-y: auto;
+  overflow: auto;
   overscroll-behavior: contain;
   padding: 8px;
   scrollbar-width: thin;
+}
+.dock-window-resize {
+  position: absolute;
+  z-index: 3;
+  touch-action: none;
+  user-select: none;
+}
+.dock-window-resize[data-edge='n'] { top: 0; right: 13px; left: 13px; height: 9px; cursor: ns-resize; }
+.dock-window-resize[data-edge='e'] { top: 13px; right: 0; bottom: 13px; width: 9px; cursor: ew-resize; }
+.dock-window-resize[data-edge='s'] { right: 13px; bottom: 0; left: 13px; height: 9px; cursor: ns-resize; }
+.dock-window-resize[data-edge='w'] { top: 13px; bottom: 13px; left: 0; width: 9px; cursor: ew-resize; }
+.dock-window-resize[data-edge='ne'],
+.dock-window-resize[data-edge='se'],
+.dock-window-resize[data-edge='sw'],
+.dock-window-resize[data-edge='nw'] { width: 14px; height: 14px; }
+.dock-window-resize[data-edge='ne'] { top: 0; right: 0; cursor: nesw-resize; }
+.dock-window-resize[data-edge='se'] { right: 0; bottom: 0; cursor: nwse-resize; }
+.dock-window-resize[data-edge='sw'] { bottom: 0; left: 0; cursor: nesw-resize; }
+.dock-window-resize[data-edge='nw'] { top: 0; left: 0; cursor: nwse-resize; }
+.dock-window::after {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(217, 164, 65, 0.5);
+  border-bottom: 2px solid rgba(217, 164, 65, 0.5);
+  pointer-events: none;
 }
 .dock-panel-content { min-width: 0; }
 .dock-panel-summary {
@@ -341,22 +380,7 @@ html, body, #root {
   font-size: 11px;
 }
 
-/* ── 우하단 미니맵·선택 컨텍스트 스택 ── */
-.right-lower-stack {
-  position: absolute;
-  z-index: 40;
-  right: 10px;
-  bottom: 58px;
-  max-height: calc(100% - 74px);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-  pointer-events: none;
-  transition: right 120ms ease;
-}
-.canvas-stage:has(.dock-frame.has-open-windows) .right-lower-stack { right: 332px; }
-
+/* ── 선택 컨텍스트 창 내용 ── */
 .selection-context-bar {
   position: relative;
   z-index: 1;
@@ -450,7 +474,6 @@ html, body, #root {
 }
 
 @media (max-width: 900px) {
-  .canvas-stage:has(.dock-frame.has-open-windows) .right-lower-stack { right: 302px; }
   .selection-context-bar {
     width: clamp(220px, 24vw, 300px);
     max-height: min(190px, 34vh);
@@ -571,8 +594,43 @@ html, body, #root {
   .minimap-canvas-wrap { width: 144px; }
   .minimap-canvas-wrap canvas { width: 144px; }
   .minimap-legend span:nth-child(2) { display: none; }
-  .dock-frame { width: min(286px, calc(100% - 16px)); }
 }
+
+/* ── 부유 HUD 창 내용 ── */
+.hud-minimap-window .dock-window-body,
+.hud-selection-window .dock-window-body {
+  padding: 0;
+  overflow: hidden;
+}
+.hud-minimap-window .minimap-overlay {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  pointer-events: auto;
+  scrollbar-width: thin;
+}
+.hud-minimap-window .minimap-panel {
+  width: 100%;
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.hud-minimap-window .minimap-canvas-wrap,
+.hud-minimap-window .minimap-canvas-wrap canvas {
+  width: 100%;
+}
+.hud-minimap-window .minimap-canvas-wrap canvas { display: block; }
+.hud-selection-window .dock-window-body { display: flex; }
+.hud-selection-window .selection-context-bar {
+  width: 100%;
+  min-height: 100%;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.hud-selection-window .selection-context-body { flex: 1 1 auto; }
 
 /* ── 좌상단 통합 로그 ── */
 .unified-log {
@@ -1089,11 +1147,6 @@ html, body, #root {
   flex-direction: column;
   gap: 6px;
   pointer-events: none;
-  transition: right 120ms ease;
-}
-.canvas-stage:has(.dock-frame.has-open-windows) .right-overlay-stack {
-  right: 332px;
-  width: min(280px, calc(100% - 348px));
 }
 .alert-stack {
   max-height: 158px;
@@ -1108,10 +1161,6 @@ html, body, #root {
   .right-overlay-stack {
     right: 54px;
     width: min(240px, calc(100% - 70px));
-  }
-  .canvas-stage:has(.dock-frame.has-open-windows) .right-overlay-stack {
-    right: 302px;
-    width: min(240px, calc(100% - 318px));
   }
 }
 

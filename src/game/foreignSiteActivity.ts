@@ -1,4 +1,4 @@
-import { buildingFootprintSize } from './buildings';
+import { buildingFootprintDims } from './buildings';
 import { CONFIG } from './config';
 import { SEASON_ORDER } from './constants';
 import { getDayOfSeason, getSeason } from './seasons';
@@ -41,8 +41,8 @@ function tileOccupied(state: GameState, site: ForeignSite, x: number, y: number)
   if (!state.map[y]?.[x] || withinSite(site, x, y)) return true;
   if (state.foreignSites.some(candidate => candidate.id !== site.id && withinSite(candidate, x, y))) return true;
   return state.buildings.some(building => {
-    const size = buildingFootprintSize(building.type);
-    return x >= building.x && x < building.x + size && y >= building.y && y < building.y + size;
+    const { w, h } = buildingFootprintDims(building);
+    return x >= building.x && x < building.x + w && y >= building.y && y < building.y + h;
   });
 }
 

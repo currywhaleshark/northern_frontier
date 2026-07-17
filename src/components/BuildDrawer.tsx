@@ -54,6 +54,12 @@ function unavailableReason(state: GameState, type: BuildableBuildingTypeId): str
   if (type === 'cannonEmplacement' && cannonPlacementsUsed(state) >= state.cannonsGranted) {
     return '조정의 불랑기 하사 필요';
   }
+  if (type === 'shrine' && !(state.unlockedReligions ?? []).includes('shamanism')) {
+    return '무당이 마을에 들어와야 합니다';
+  }
+  if (type === 'hermitage' && !(state.unlockedReligions ?? []).includes('buddhism')) {
+    return '노승이 마을에 의탁해야 합니다';
+  }
   if (!canAfford(state, def)) return '자원 부족';
   return null;
 }

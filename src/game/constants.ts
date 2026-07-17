@@ -47,19 +47,19 @@ export const JOB_NAMES: Record<JobId, string> = {
   weaver: '직조공',
   powderMaker: '염초장이', clerk: '아전',
   undertaker: '장의사',
+  teacher: '훈장', shaman: '무당', monk: '승려',
   watchman: '파수꾼', militia: '수비병',
 };
 
 export const JOB_ORDER: JobId[] = [
   'idle', 'woodcutter', 'woodSplitter', 'hunter', 'farmer', 'miller', 'builder',
   'hauler', 'herbalist', 'physician', 'curer', 'potter', 'smith', 'miner', 'fisher', 'charcoalBurner', 'herder',
-  'tanner', 'weaver', 'powderMaker', 'clerk', 'undertaker',
+  'tanner', 'weaver', 'powderMaker', 'clerk', 'undertaker', 'teacher',
   'watchman', 'militia',
-];
+]; // shaman·monk는 네임드 전용이라 배정 목록에 없다
 
 export const JOB_MIN_RANK: Partial<Record<JobId, Rank>> = {
   miller: 'bo',
-  miner: 'bo',
   fisher: 'bo',
   potter: 'bo',
   weaver: 'bo',
@@ -68,6 +68,7 @@ export const JOB_MIN_RANK: Partial<Record<JobId, Rank>> = {
   physician: 'jin',
   powderMaker: 'bu',
   clerk: 'bu',
+  teacher: 'jin',
 };
 
 export function isJobUnlocked(rank: Rank | undefined, job: JobId): boolean {
@@ -82,13 +83,13 @@ export const JOB_DESC: Record<JobId, string> = {
   farmer: '밭과 논을 오가며 선택한 작물을 돌보고 수확물을 나릅니다.',
   miller: '보(堡) 승격 후 창고의 벼를 방앗간으로 가져와 먹을 수 있는 곡물로 도정합니다.',
   builder: '공사장까지 가서 건물을 짓습니다.',
-  hauler: '생산지의 현장 재고를 중심지와 창고로 나르며, 일이 없으면 채석을 다녀옵니다. 수레를 장비하면 적재량이 크게 늘어납니다.',
+  hauler: '생산지의 현장 재고를 중심지와 창고로 나릅니다. 수레를 장비하면 적재량이 크게 늘어납니다.',
   herbalist: '산기슭을 다니며 약초와 야생과일·버섯·산나물을 채집해 약초막이나 창고로 나릅니다.',
   physician: '진(鎭) 승격 후 의원에서 약초로 병자와 중상자를 치료하고 역병의 진단과 방역을 돕습니다.',
   curer: '훈연소에서 고기를 보존육으로 만들고, 건조대에서 생선을 자반이나 건어물로 갈무리합니다.',
   potter: '보(堡) 승격 후 강가의 점토를 빚고 연료로 구워 옹기를 만듭니다.',
   smith: '창고에서 철과 필요한 재료를 가져와 지정 대장간에서 도구와 무기를 만듭니다.',
-  miner: '보(堡) 승격 후 배치할 수 있습니다. 채광장에서 돌과 철을 안정적으로 캡니다.',
+  miner: '정착지 단계부터 광상을 찾아 돌·철·은을 캡니다. 채광장이 있으면 반경 안의 광물을 그곳에 하역합니다.',
   fisher: '보(堡) 승격 후 배치할 수 있습니다. 나루터에서 강고기를 잡아 식량을 보탭니다.',
   charcoalBurner: '진(鎭) 승격 후 창고에서 목재를 가져와 지정 숯가마에서 숯으로 굽습니다.',
   herder: '진(鎭) 승격 후 배치할 수 있습니다. 축사에서 가축을 돌보며 식량과 가죽을 보탭니다.',
@@ -97,6 +98,9 @@ export const JOB_DESC: Record<JobId, string> = {
   powderMaker: '부(府) 승격 후 배치할 수 있습니다. 염초장에서 장작과 돌을 써서 화약을 만듭니다.',
   clerk: '부(府) 승격 후 배치할 수 있습니다. 관청에서 행정을 맡아 자원 수집과 생산 효율을 높입니다.',
   undertaker: '묘지에 배정되어 시신을 수습하고 안장합니다. 장례를 치르면 마을이 위로를 얻습니다.',
+  teacher: '진(鎭) 승격 후 배치할 수 있습니다. 서당에서 아이들에게 글을 가르쳐 고을의 기대를 채웁니다.',
+  shaman: '당집에 상주하는 무당입니다. 마을에 들어온 무당만 맡을 수 있습니다.',
+  monk: '암자에 상주하는 승려입니다. 마을에 의탁한 노승만 맡을 수 있습니다.',
   watchman: '방어 시설 사이를 순찰합니다. 방어도가 오르고 위협도 증가가 줄어듭니다.',
   militia: '군영(없으면 마을 중심)에서 조련하는 상비 수비병입니다. 방어도가 크게 오릅니다.',
 };
@@ -113,6 +117,7 @@ export const JOB_COLORS: Record<JobId, string> = {
   weaver: '#8f9fbd',
   powderMaker: '#b47cc7', clerk: '#d0b36a',
   undertaker: '#6f6a7d',
+  teacher: '#e0cf8f', shaman: '#d97fb0', monk: '#a3a08a',
   watchman: '#7f8fd9', militia: '#e05f5f',
 };
 

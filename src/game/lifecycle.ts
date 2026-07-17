@@ -5,6 +5,7 @@
 import { BUILDING_DEFS, countBuilt } from './buildings';
 import { CONFIG } from './config';
 import { addLog } from './events';
+import { hasResidentMonk } from './morale';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
 import { killResident, livingResidents, rollResidentName } from './residents';
 import { getDayOfYear, getSeason } from './seasons';
@@ -340,8 +341,11 @@ export function buryCorpse(state: GameState, corpseId: number, cemetery: Buildin
   if ((cemetery.graves ?? 0) >= CONFIG.funeral.plotsPerCemetery) return false;
   const [corpse] = corpses.splice(index, 1);
   cemetery.graves = (cemetery.graves ?? 0) + 1;
+  // 노승이 재(齋)를 올려 주면 위로가 깊어진다
+  const relief = CONFIG.funeral.burialMoraleRelief
+    + (hasResidentMonk(state) ? CONFIG.satisfaction.monkBurialBonus : 0);
   for (const r of livingResidents(state)) {
-    r.morale = Math.min(100, r.morale + CONFIG.funeral.burialMoraleRelief);
+    r.morale = Math.min(100, r.morale + relief);
   }
   addLog(state, `${corpse.name}을(를) 양지바른 묘지에 안장했습니다. 마을이 위로를 얻습니다.`, 'info', true);
   return true;

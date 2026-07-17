@@ -1,7 +1,7 @@
 // 습격 시스템 — 위협도 누적, 지도 위 습격 무리 접근, 위기 선택지와 결과 판정
 import { CONFIG } from './config';
 import { FACTIONS, RESOURCE_NAMES, type Faction } from './constants';
-import { buildingFootprintTiles, computeDefense, countBuilt } from './buildings';
+import { computeDefense, countBuilt, footprintTilesOf } from './buildings';
 import { addLog } from './events';
 import {
   applyBattleDefenseMultipliers, cannonBattleMult, consumeBattlePowder, levyDefenseBonus, startBattle,
@@ -155,7 +155,7 @@ function raiderPassable(state: GameState, x: number, y: number): boolean {
 }
 
 function raiderBuildingApproachGoal(state: GameState, building: Building): (tile: { x: number; y: number }) => boolean {
-  const footprint = buildingFootprintTiles(state, building.type, building.x, building.y) ?? [];
+  const footprint = footprintTilesOf(state, building) ?? [];
   return tile =>
     raiderPassable(state, tile.x, tile.y) &&
     footprint.some(footprintTile =>

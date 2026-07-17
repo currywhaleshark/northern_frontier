@@ -151,13 +151,9 @@ function addStable(
 
 {
   const state = simulation.newGame(2026071715);
-  assert.equal(livestock.cattleFarmWorkMultiplier(state), 1);
+  assert.equal(livestock.plowOxenPool(state), 0, 'no cattle means no plow oxen to lend');
   for (let index = 0; index < 6; index++) addStable(state, 1, 'cattle');
-  assert.equal(
-    livestock.cattleFarmWorkMultiplier(state),
-    1 + CONFIG.livestock.cattleFarmWorkMaxBonus,
-    'the cattle draft-work bonus is capped',
-  );
+  assert.equal(livestock.plowOxenPool(state), 6, 'every stabled head can be lent as a plow ox');
   assert.equal(
     livestock.hayFromHarvestProgress(100),
     100 * CONFIG.livestock.hayPerHarvestProgress,

@@ -5,7 +5,7 @@ import {
   assignNearestWorkerToBuilding, assignResidentToBuilding,
   advanceDay, advanceTick, autoAssignWorkersToBuildingTypes, cancelBuildingConstruction, continueAfterVictory, demolishBuilding, newGame, reassignJob, resolveChoice, setResidentJob,
   setBuildingCrop, setDryingProduct, setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
-  setLivestockSpecies, slaughterLivestock,
+  assignPlotPlowOxen, setLivestockSpecies, slaughterLivestock,
   convertFieldToPaddy, toggleResidentCart,
   unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
@@ -14,7 +14,7 @@ import { addLog, negotiateTrade, requestTrade, tradeNegotiationOf } from './game
 import { initAudio, isMuted, playSfx, setMuted, setWeatherAmbient } from './sound/sfx';
 import { AlertsPanel } from './components/AlertsPanel';
 import { BuildDrawer } from './components/BuildDrawer';
-import { DockFrame } from './components/dock/DockFrame';
+import { DockFrame, type DockOverlayItem } from './components/dock/DockFrame';
 import { CourtWindow } from './components/dock/CourtWindow';
 import { FactionsWindow } from './components/dock/FactionsWindow';
 import { ResidentsWindow } from './components/dock/ResidentsWindow';
@@ -67,8 +67,16 @@ import type {
   BuildingTypeId, CombatWeaponId, CropId, Difficulty, DryingProductId, JobId, LivestockId, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
   PreparationActionId, PredatorKind, SpecialItemId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
-import { loadUiPrefs, saveUiPrefs, togglePinnedDockWindow, type UiPrefs } from './ui/uiPrefs';
-import type { DockWindowId } from './ui/dockPresentation';
+import {
+  loadUiPrefs,
+  resetDockWindowLayout,
+  saveUiPrefs,
+  setDockWindowLayout,
+  togglePinnedDockWindow,
+  type UiPrefs,
+} from './ui/uiPrefs';
+import { bringDockWindowToFront } from './ui/dockLayout';
+import type { DockWindowId, FloatingWindowId } from './ui/dockPresentation';
 import type { AutoAssignBuildingType } from './game/workerSlots';
 
 export default function App() {
@@ -93,6 +101,9 @@ export default function App() {
   const [openDockWindowIds, setOpenDockWindowIds] = useState<readonly DockWindowId[]>(
     () => [...uiPrefs.pinnedDockWindows],
   );
+  const [floatingWindowOrder, setFloatingWindowOrder] = useState<readonly FloatingWindowId[]>(
+    () => ['minimap', ...uiPrefs.pinnedDockWindows],
+  );
   const [weaponDialogOpen, setWeaponDialogOpen] = useState(false);
   const [expeditionMusterRequest, setExpeditionMusterRequest] = useState<ExpeditionMusterRequest | null>(null);
   // 이동 보간용: 마지막 서브틱 처리 시각과 서브틱 간격
@@ -115,7 +126,18 @@ export default function App() {
       const added = uiPrefs.pinnedDockWindows.filter(id => !current.includes(id));
       return added.length > 0 ? [...current, ...added] : current;
     });
+    setFloatingWindowOrder(current => {
+      const added = uiPrefs.pinnedDockWindows.filter(id => !current.includes(id));
+      return added.length > 0 ? [...current, ...added] : current;
+    });
   }, [uiPrefs.pinnedDockWindows]);
+
+  const selectionContextVisible = selectedEntity !== null;
+  useEffect(() => {
+    setFloatingWindowOrder(current => selectionContextVisible
+      ? bringDockWindowToFront(current, 'selection')
+      : current.filter(id => id !== 'selection'));
+  }, [selectionContextVisible]);
 
   // 브라우저 자동재생 정책: 첫 입력 때 오디오 시작
   useEffect(() => {
@@ -242,9 +264,16 @@ export default function App() {
       if (n > 0) {
         acc -= n * msPerTick;
         const s = stateRef.current;
+        const perf = window.__renderPerf;
+        const tickStart = perf ? performance.now() : 0;
         while (n-- > 0) {
           if (s.pendingChoice || s.tacticalBattle || s.tacticalBattleReport || s.gameOver) break; // 이벤트/전술전/장계/종료 시 자동 정지
           advanceTick(s);
+        }
+        if (perf) {
+          const bucket = perf['0-advanceTicks'] ?? (perf['0-advanceTicks'] = { total: 0, count: 0 });
+          bucket.total += performance.now() - tickStart;
+          bucket.count++;
         }
         animRef.current = { at: now, ms: msPerTick };
       }
@@ -256,11 +285,22 @@ export default function App() {
   // Esc로 건설 배치 취소
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPlacingType(null);
+      if (e.key === 'Escape' && !e.defaultPrevented) setPlacingType(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  const handlePlacePlot = (x: number, y: number, w: number, h: number) => {
+    if (!placingType) return;
+    const err = tryPlaceBuilding(stateRef.current, placingType, x, y, w, h);
+    if (err) addLog(stateRef.current, err, 'bad');
+    else {
+      playSfx('hammer');
+      setPlacingType(null);
+    }
+    bump();
+  };
 
   const handleTileClick = (x: number, y: number) => {
     if (placingType) {
@@ -389,6 +429,12 @@ export default function App() {
     const err = convertFieldToPaddy(stateRef.current, buildingId);
     if (err) addLog(stateRef.current, err, 'info');
     else playSfx('hammer');
+    bump();
+  };
+
+  const handleSetPlotPlowOxen = (buildingId: number, count: number) => {
+    const err = assignPlotPlowOxen(stateRef.current, buildingId, count);
+    if (err) addLog(stateRef.current, err, 'info');
     bump();
   };
 
@@ -742,13 +788,22 @@ export default function App() {
 
   const openDockWindow = useCallback((id: DockWindowId) => {
     setOpenDockWindowIds(current => current.includes(id) ? current : [...current, id]);
+    setFloatingWindowOrder(current => bringDockWindowToFront(current, id));
+  }, []);
+
+  const focusFloatingWindow = useCallback((id: FloatingWindowId) => {
+    setFloatingWindowOrder(current => bringDockWindowToFront(current, id));
   }, []);
 
   const toggleDockWindow = useCallback((id: DockWindowId) => {
-    setOpenDockWindowIds(current => current.includes(id)
+    const open = openDockWindowIds.includes(id);
+    setOpenDockWindowIds(current => open
       ? current.filter(openId => openId !== id)
       : [...current, id]);
-  }, []);
+    setFloatingWindowOrder(current => open
+      ? current.filter(openId => openId !== id)
+      : bringDockWindowToFront(current, id));
+  }, [openDockWindowIds]);
 
   const handleContextAction = (x: number, y: number) => {
     const tile = stateRef.current.map[y]?.[x];
@@ -821,6 +876,56 @@ export default function App() {
     );
   }
 
+  const overlayItems: DockOverlayItem[] = [
+    {
+      id: 'minimap',
+      label: '미니맵',
+      className: 'hud-minimap-window',
+      content: (
+        <div className="minimap-overlay">
+          <Minimap state={state} version={version} viewportRef={mapViewportRef} selected={selected} />
+        </div>
+      ),
+    },
+    ...(selectedEntity ? [{
+      id: 'selection' as const,
+      label: '선택 정보',
+      className: 'hud-selection-window',
+      content: (
+        <SelectionContextBar
+          state={state}
+          selected={selected}
+          selectedEntity={selectedEntity}
+          onClear={handleClearSelection}
+          onSetResidentJob={handleSetResidentJob}
+          onToggleResidentCart={handleToggleResidentCart}
+          onUpgradeHousing={handleUpgradeHousing}
+          onSetSmithyProduct={handleSetSmithyProduct}
+          onSetDryingProduct={handleSetDryingProduct}
+          onSetLivestockSpecies={handleSetLivestockSpecies}
+          onSlaughterLivestock={handleSlaughterLivestock}
+          onSetBuildingCrop={handleSetBuildingCrop}
+          onConvertFieldToPaddy={handleConvertFieldToPaddy}
+          onSetPlotPlowOxen={handleSetPlotPlowOxen}
+          onRequestTrade={handleRequestTrade}
+          onToggleNitre={handleToggleNitre}
+          onSilverVeinAction={handleSilverVeinAction}
+          onAssignNearestWorker={handleAssignNearestWorker}
+          onUnassignWorker={handleUnassignWorker}
+          onSelectResident={handleResidentClick}
+          onCancelBuildingConstruction={handleCancelBuildingConstruction}
+          onDemolishBuilding={handleDemolishBuilding}
+          onSendSiteGift={handleSendSiteGift}
+          onRequestSitePassage={handleRequestSitePassage}
+          onRequestSiteHunting={handleRequestSiteHunting}
+          onRequestSiteDefectors={handleRequestSiteDefectors}
+          onScoutBanditLair={handleScoutBanditLair}
+          onRaidBanditLair={handleRaidBanditLair}
+        />
+      ),
+    }] : []),
+  ];
+
   return (
     <div className="app">
       <TopBar
@@ -854,6 +959,7 @@ export default function App() {
               selectedResidentId={inspResidentId}
               anim={animRef.current}
               onTileClick={handleTileClick}
+              onPlacePlot={handlePlacePlot}
               onResidentClick={handleResidentClick}
               onContextAction={handleContextAction}
               onCancelPlace={() => setPlacingType(null)}
@@ -867,41 +973,8 @@ export default function App() {
             uiPrefs={uiPrefs}
             onUiPrefsChange={setUiPrefs}
           />
-          <div className="right-lower-stack">
-            <div className="minimap-overlay">
-              <Minimap state={state} version={version} viewportRef={mapViewportRef} selected={selected} />
-            </div>
-            <SelectionContextBar
-              state={state}
-              selected={selected}
-              selectedEntity={selectedEntity}
-              onClear={handleClearSelection}
-              onSetResidentJob={handleSetResidentJob}
-              onToggleResidentCart={handleToggleResidentCart}
-              onUpgradeHousing={handleUpgradeHousing}
-              onSetSmithyProduct={handleSetSmithyProduct}
-              onSetDryingProduct={handleSetDryingProduct}
-              onSetLivestockSpecies={handleSetLivestockSpecies}
-              onSlaughterLivestock={handleSlaughterLivestock}
-              onSetBuildingCrop={handleSetBuildingCrop}
-              onConvertFieldToPaddy={handleConvertFieldToPaddy}
-              onRequestTrade={handleRequestTrade}
-              onToggleNitre={handleToggleNitre}
-              onSilverVeinAction={handleSilverVeinAction}
-              onAssignNearestWorker={handleAssignNearestWorker}
-              onUnassignWorker={handleUnassignWorker}
-              onSelectResident={handleResidentClick}
-              onCancelBuildingConstruction={handleCancelBuildingConstruction}
-              onDemolishBuilding={handleDemolishBuilding}
-              onSendSiteGift={handleSendSiteGift}
-              onRequestSitePassage={handleRequestSitePassage}
-              onRequestSiteHunting={handleRequestSiteHunting}
-              onRequestSiteDefectors={handleRequestSiteDefectors}
-              onScoutBanditLair={handleScoutBanditLair}
-              onRaidBanditLair={handleRaidBanditLair}
-            />
-          </div>
           <DockFrame
+            overlayItems={overlayItems}
             items={[
               {
                 id: 'jobs',
@@ -973,9 +1046,14 @@ export default function App() {
               },
             ]}
             openWindowIds={openDockWindowIds}
+            windowOrder={floatingWindowOrder}
             pinnedWindowIds={uiPrefs.pinnedDockWindows}
+            layouts={uiPrefs.dockWindowLayouts}
             onToggleWindow={toggleDockWindow}
             onTogglePinned={id => setUiPrefs(current => togglePinnedDockWindow(current, id))}
+            onFocusWindow={focusFloatingWindow}
+            onCommitLayout={(id, layout) => setUiPrefs(current => setDockWindowLayout(current, id, layout))}
+            onResetLayout={id => setUiPrefs(current => resetDockWindowLayout(current, id))}
           />
         </div>
       </div>
