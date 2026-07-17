@@ -20,7 +20,7 @@ import { DRYING_PRODUCT_DEFS, dryingProductOf } from './preservation';
 import { jangdokdaeInputNeeds } from './fermentation';
 import { canGrowCropNow, canHarvestCropNow, canPlantCropNow, cropIdForBuilding, CROP_DEFS } from './crops';
 import { clothingCoverageTotal, foodTotal, fuelHeatTotal } from './consumption';
-import { isExplored, refreshExploration } from './exploration';
+import { isExplored } from './exploration';
 import { activePredatorScoutIds } from './expeditionIntel';
 import { FOOD_RESOURCES, FUEL_RESOURCES } from './resourceCatalog';
 import { isGateBuilding } from './walls';
@@ -30,6 +30,7 @@ import {
 import { performPhysicianTreatment } from './medicine';
 import { mineralDepositsInMineRange, servingMineForTile } from './miningSites';
 import { rankProductionEfficiency } from './productionEfficiency';
+import { buildGoalField, describeGoal, type DescribedGoal, type GoalField } from './pathGoals';
 import { reconcileResidentHomes } from './residents';
 import { canEnterForeignTerritory, canWorkForeignTerritory, noteTerritoryViolation } from './territory';
 import {
@@ -54,6 +55,8 @@ interface Ctx {
   rng: () => number;
   centerId: number;
   huntable: Map<string, number>; // 사냥 가능 타일 ("x,y") → 수확 배율 — 서식지 범위/크기와 연동
+  goalFields: Partial<Record<'forest' | 'huntable' | 'mineral', GoalField>>;
+  goalFieldUserCounts: Record<'forest' | 'huntable' | 'mineral', number>;
 }
 
 const PRODUCING_JOBS = [
@@ -158,7 +161,7 @@ function goalTiles(state: GameState, isGoal: (t: Tile) => boolean): { x: number;
   return goals;
 }
 
-function octileDistance(x: number, y: number, goals: { x: number; y: number }[]): number {
+function octileDistance(x: number, y: number, goals: readonly { x: number; y: number }[]): number {
   let best = Infinity;
   for (const goal of goals) {
     const dx = Math.abs(goal.x - x);
@@ -197,9 +200,15 @@ export function findPath(
   const basePass = passable ?? ((x: number, y: number) => isPassable(state, x, y));
   const h = state.map.length, w = state.map[0]?.length ?? 0;
   if (sx < 0 || sy < 0 || sx >= w || sy >= h || !state.map[sy]?.[sx]) return null;
-  const goals = goalTiles(state, isGoal);
+  const described = isGoal as DescribedGoal;
+  const describedFits = described.goalPoints &&
+    (described.goalWidth == null || described.goalWidth === w) &&
+    (described.goalHeight == null || described.goalHeight === h);
+  const goals = describedFits ? described.goalPoints! : goalTiles(state, isGoal);
   if (goals.length === 0) return null;
-  const estimate = goals.length <= 128
+  const estimate = describedFits && described.goalHeuristic?.length === w * h
+    ? (x: number, y: number) => described.goalHeuristic![y * w + x]
+    : goals.length <= 128
     ? (x: number, y: number) => octileDistance(x, y, goals)
     : () => 0;
 
@@ -389,7 +398,10 @@ function buildingInteractionGoal(state: GameState, buildingIds: readonly number[
       }
     }
   }
-  return t => goalSet.has(t.y * w + t.x);
+  const points = [...goalSet]
+    .sort((a, b) => a - b)
+    .map(index => ({ x: index % w, y: Math.floor(index / w) }));
+  return describeGoal(t => goalSet.has(t.y * w + t.x), points);
 }
 
 // 하역 거점: 중심지 + 창고 (+직업별 거점 건물)
@@ -709,12 +721,51 @@ interface GatherOpts {
   taskNone?: string;
   adjustHarvestAmount?: (tile: Tile, r: Resident, amount: number) => number;
   onHarvest?: (tile: Tile, r: Resident, amount: number) => void;
+  goalField?: () => GoalField;
+}
+
+type GatherGoalKind = 'forest' | 'huntable' | 'mineral';
+
+// 넓은 목표장 자체는 매 주민/매 서브틱이 아니라 state+일자 단위로 재사용한다.
+// 필드는 일부 아직 답사하지 못한/봉인된 후보도 포함하므로 heuristic으로만 쓰며,
+// 실제 도착 판정과 목표 목록은 아래에서 현재 답사·통행 가능한 칸으로 다시 좁힌다.
+const broadGoalFieldCache = new WeakMap<GameState, Map<GatherGoalKind, { day: number; field: GoalField }>>();
+
+function gatherGoalField(
+  state: GameState,
+  ctx: Ctx,
+  kind: GatherGoalKind,
+  goal: (tile: Tile) => boolean,
+): GoalField {
+  const cached = ctx.goalFields[kind];
+  if (cached) return cached;
+  let byKind = broadGoalFieldCache.get(state);
+  if (!byKind) {
+    byKind = new Map();
+    broadGoalFieldCache.set(state, byKind);
+  }
+  let broad = byKind.get(kind);
+  if (!broad || broad.day !== state.day) {
+    broad = { day: state.day, field: buildGoalField(state.map, goal) };
+    byKind.set(kind, broad);
+  }
+  const field: GoalField = {
+    ...broad.field,
+    goals: broad.field.goals.filter(point =>
+      isExplored(state, point.x, point.y) && canWorkForeignTerritory(state, point.x, point.y)),
+  };
+  ctx.goalFields[kind] = field;
+  return field;
 }
 
 function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void {
   const forced = r.manualOrder?.kind === 'work' ? r.manualOrder.unauthorizedSiteIds ?? [] : [];
-  const knownGoal = (tile: Tile): boolean => isExplored(state, tile.x, tile.y) && o.goal(tile) &&
+  let knownGoal: DescribedGoal = (tile: Tile): boolean => isExplored(state, tile.x, tile.y) && o.goal(tile) &&
     canWorkForeignTerritory(state, tile.x, tile.y, forced);
+  if (forced.length === 0 && o.goalField) {
+    const field = o.goalField();
+    knownGoal = describeGoal(knownGoal, field.goals, field);
+  }
   // 짐이 찼거나 하역 중이면 거점으로
   if (carryTotal(r) >= o.cap || (r.phase === 'toDeposit' && carryTotal(r) > 0)) {
     r.phase = 'toDeposit';
@@ -961,6 +1012,9 @@ function woodcutterTick(state: GameState, r: Resident, ctx: Ctx): void {
     yieldAmt: a.yields.wood * CONFIG.seasons.woodMult[ctx.season],
     cap: a.carryCap.wood,
     depositExtra: ['lumberCamp'],
+    goalField: ctx.goalFieldUserCounts.forest >= 3
+      ? () => gatherGoalField(state, ctx, 'forest', t => t.terrain === 'forest')
+      : undefined,
     taskWork: '벌목 중', taskMove: '숲으로 이동', taskHaul: '목재 운반',
     onHarvest: (tile, worker, woodAmount) => {
       addCarry(worker, 'brushwood', woodAmount * CONFIG.production.brushwoodPerWood);
@@ -982,6 +1036,9 @@ function hunterTick(state: GameState, r: Resident, ctx: Ctx): void {
       (ctx.huntable.get(`${t.x},${t.y}`) ?? 0) * CONFIG.production.meatPerGame,
     cap: a.carryCap.meat,
     depositExtra: ['huntLodge'],
+    goalField: ctx.goalFieldUserCounts.huntable >= 3
+      ? () => gatherGoalField(state, ctx, 'huntable', t => ctx.huntable.has(`${t.x},${t.y}`))
+      : undefined,
     taskWork: '사냥 중', taskMove: '서식지로 이동', taskHaul: '사냥감 운반',
     onHarvest: (_tile, res, meatAmount) => {
       addCarry(res, 'hide', (meatAmount / CONFIG.production.meatPerGame) * CONFIG.production.hidePerGame);
@@ -1012,6 +1069,9 @@ function herbalistTick(state: GameState, r: Resident, ctx: Ctx): void {
     yieldAmt: a.yields.herbs,
     cap: a.carryCap.herbs * (1 + forageRatio),
     depositExtra: ['herbHut'],
+    goalField: ctx.goalFieldUserCounts.forest >= 3
+      ? () => gatherGoalField(state, ctx, 'forest', t => t.terrain === 'forest')
+      : undefined,
     taskWork: '약초·산물 채집 중', taskMove: '산기슭으로 이동', taskHaul: '약초·산물 운반',
     onHarvest: (_tile, worker, herbAmount) => {
       addCarry(worker, 'vegetables', herbAmount * forageRatio);
@@ -1817,6 +1877,14 @@ function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
     yieldAmt: tile => tile.hasSilver ? a.yields.silver : tile.hasIron ? a.yields.iron : a.yields.stone,
     cap: miningSilver ? a.carryCap.silver : miningIron ? a.carryCap.iron : a.carryCap.stone,
     depositExtra: [],
+    goalField: ctx.goalFieldUserCounts.mineral >= 3
+      ? () => gatherGoalField(
+        state,
+        ctx,
+        'mineral',
+        t => t.terrain === 'rock' && mineralRemaining(t) > 0 && !isVeinSealedTile(state, t),
+      )
+      : undefined,
     depositTargets: (currentState, worker) => {
       const mine = worker.miningDepositBuildingId == null
         ? null
@@ -2206,6 +2274,12 @@ export function agentsTick(state: GameState): void {
   const tMod = producers <= 0 || t >= producers ? 1 : 0.6 + 0.4 * (t / producers);
   const mAvg = living.reduce((s, r) => s + r.morale, 0) / living.length;
   const center = state.buildings.find(b => b.type === 'center');
+  const goalFieldUserCounts = { forest: 0, huntable: 0, mineral: 0 };
+  for (const resident of living) {
+    if (resident.job === 'woodcutter' || resident.job === 'herbalist') goalFieldUserCounts.forest++;
+    else if (resident.job === 'hunter') goalFieldUserCounts.huntable++;
+    else if (resident.job === 'miner') goalFieldUserCounts.mineral++;
+  }
 
   const ctx: Ctx = {
     season,
@@ -2215,6 +2289,8 @@ export function agentsTick(state: GameState): void {
     rng,
     centerId: center ? center.id : -1,
     huntable: collectHuntableTiles(state.map, state.habitats, CONFIG.agents.hunting),
+    goalFields: {},
+    goalFieldUserCounts,
   };
 
   for (const r of living) {
@@ -2338,5 +2414,4 @@ export function agentsTick(state: GameState): void {
       bucket.count++;
     }
   }
-  refreshExploration(state);
 }

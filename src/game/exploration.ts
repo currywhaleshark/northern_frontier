@@ -44,12 +44,13 @@ export function ensureExploration(state: GameState): ExplorationState {
 }
 
 export function isExplored(state: GameState, x: number, y: number): boolean {
-  return ensureExploration(state).explored[y]?.[x] === true;
+  return state.exploration.explored[y]?.[x] === true;
 }
 
-export function revealAround(state: GameState, cx: number, cy: number, radius: number): void {
+export function revealAround(state: GameState, cx: number, cy: number, radius: number): number {
   const exploration = ensureExploration(state);
   const r2 = radius * radius;
+  let revealed = 0;
   for (let y = cy - radius; y <= cy + radius; y++) {
     const row = state.map[y];
     if (!row) continue;
@@ -57,26 +58,32 @@ export function revealAround(state: GameState, cx: number, cy: number, radius: n
       if (!row[x]) continue;
       const dx = x - cx;
       const dy = y - cy;
-      if (dx * dx + dy * dy <= r2) exploration.explored[y][x] = true;
+      if (dx * dx + dy * dy <= r2 && !exploration.explored[y][x]) {
+        exploration.explored[y][x] = true;
+        revealed++;
+      }
     }
   }
+  return revealed;
 }
 
-function revealBuilding(state: GameState, building: Building): void {
+function revealBuilding(state: GameState, building: Building): number {
   const { w, h } = buildingFootprintDims(building);
   const cx = building.x + Math.floor((w - 1) / 2);
   const cy = building.y + Math.floor((h - 1) / 2);
-  revealAround(state, cx, cy, buildingRevealRadius(state));
+  return revealAround(state, cx, cy, buildingRevealRadius(state));
 }
 
-export function refreshExploration(state: GameState): void {
+export function refreshExploration(state: GameState): number {
   ensureExploration(state);
-  for (const building of state.buildings) revealBuilding(state, building);
+  let revealed = 0;
+  for (const building of state.buildings) revealed += revealBuilding(state, building);
   const radius = residentRevealRadius(state);
   for (const resident of state.residents) {
     if (!resident.alive) continue;
-    revealAround(state, resident.x, resident.y, radius);
+    revealed += revealAround(state, resident.x, resident.y, radius);
   }
+  return revealed;
 }
 
 export function isBuildingFootprintExplored(
@@ -88,5 +95,6 @@ export function isBuildingFootprintExplored(
   h?: number,
 ): boolean {
   const tiles = buildingFootprintTiles(state, type, x, y, w, h);
-  return !!tiles && tiles.every(tile => isExplored(state, tile.x, tile.y));
+  const explored = state.exploration.explored;
+  return !!tiles && tiles.every(tile => explored[tile.y]?.[tile.x] === true);
 }

@@ -121,6 +121,7 @@ function onlyResident(state, job, x, y) {
   assert.equal(exploration.isExplored(state, 1, 1), false, 'manual reset starts hidden around moved scout');
 
   agents.agentsTick(state);
+  exploration.refreshExploration(state);
   assert.equal(exploration.isExplored(state, 1, 1), true, 'resident position reveals after agent tick');
 }
 

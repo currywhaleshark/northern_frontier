@@ -76,6 +76,7 @@ import {
   type UiPrefs,
 } from './ui/uiPrefs';
 import { bringDockWindowToFront } from './ui/dockLayout';
+import { advanceGameClock } from './ui/gameClock';
 import type { DockWindowId, FloatingWindowId } from './ui/dockPresentation';
 import type { AutoAssignBuildingType } from './game/workerSlots';
 
@@ -258,26 +259,30 @@ export default function App() {
         acc = 0;
         return;
       }
-      acc = Math.min(acc + (now - last), msPerTick * 24); // 탭 복귀 시 폭주 방지
+      const clock = advanceGameClock(acc, now - last, msPerTick, 24); // 탭 복귀 시 폭주 방지
+      acc = clock.accumulator;
       last = now;
-      let n = Math.floor(acc / msPerTick);
+      let n = clock.ticksToAdvance;
       if (n > 0) {
-        acc -= n * msPerTick;
         const s = stateRef.current;
         const perf = window.__renderPerf;
         const tickStart = perf ? performance.now() : 0;
+        let ticksProcessed = 0;
         while (n-- > 0) {
           if (s.pendingChoice || s.tacticalBattle || s.tacticalBattleReport || s.gameOver) break; // 이벤트/전술전/장계/종료 시 자동 정지
           advanceTick(s);
+          ticksProcessed++;
         }
         if (perf) {
           const bucket = perf['0-advanceTicks'] ?? (perf['0-advanceTicks'] = { total: 0, count: 0 });
           bucket.total += performance.now() - tickStart;
           bucket.count++;
         }
-        animRef.current = { at: now, ms: msPerTick };
+        if (ticksProcessed > 0) {
+          animRef.current = { at: now, ms: msPerTick };
+          bump();
+        }
       }
-      bump(); // 서브틱 사이에도 리렌더해 이동을 부드럽게 보간
     }, 33);
     return () => clearInterval(timer);
   }, [speed, screen, bump]);
@@ -953,11 +958,12 @@ export default function App() {
             <GameCanvas
               state={state}
               version={version}
+              animationActive={speed > 0 && !state.pendingChoice && !state.tacticalBattle && !state.tacticalBattleReport && !state.gameOver}
               placingType={placingType}
               selected={selected}
               selectedEntity={selectedEntity}
               selectedResidentId={inspResidentId}
-              anim={animRef.current}
+              anim={animRef}
               onTileClick={handleTileClick}
               onPlacePlot={handlePlacePlot}
               onResidentClick={handleResidentClick}
