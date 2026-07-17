@@ -2,7 +2,8 @@ import { findPath, isTerrainPassable, resetAgent } from './agents';
 import { CONFIG } from './config';
 import { addLog } from './events';
 import { createCombatRoster, isCombatReadyResident, type CombatantSnapshot } from './combatRoster';
-import { consumeMusketPowder, reconcileWeaponAssignments } from './weapons';
+import { deliverExpeditionCorpses, loseExpeditionCorpses } from './lifecycle';
+import { consumeMusketPowder, reconcileWeaponAssignments, resolvedMountAssignments } from './weapons';
 import type {
   Expedition, ExpeditionKind, GameState, PredatorKind, Resident, ResourceId,
 } from './types';
@@ -281,8 +282,25 @@ function weatherSpeedMultiplier(state: GameState): number {
   return 1;
 }
 
+export function expeditionMountedSpeedMultiplier(
+  state: GameState,
+  memberIds: readonly number[] = state.expedition?.memberIds ?? [],
+): number {
+  const memberSet = new Set(memberIds);
+  const livingMembers = state.residents.filter(resident => resident.alive && memberSet.has(resident.id));
+  if (livingMembers.length === 0) return 1;
+  const assignments = resolvedMountAssignments(state);
+  const mounted = livingMembers.filter(resident => assignments[resident.id] === 'horse').length;
+  const bonus = Math.min(
+    CONFIG.mounted.expeditionSpeedMaxBonus,
+    mounted / livingMembers.length * CONFIG.mounted.expeditionSpeedMaxBonus,
+  );
+  return 1 + bonus;
+}
+
 function movementSteps(state: GameState, expedition: Expedition): number {
-  const speed = expedition.speed * weatherSpeedMultiplier(state);
+  const speed = expedition.speed * weatherSpeedMultiplier(state) *
+    expeditionMountedSpeedMultiplier(state, expedition.memberIds);
   const whole = Math.floor(speed);
   const fraction = speed - whole;
   const deterministicRoll = ((expedition.ticks * 2654435761) >>> 0) / 0x100000000;
@@ -326,6 +344,7 @@ function completeReturn(state: GameState, expedition: Expedition): void {
     member.task = '대기';
   }
   addLog(state, `토벌대 ${members.length}명이 마을로 돌아왔습니다.`, 'info', true);
+  deliverExpeditionCorpses(state, expedition.musterX, expedition.musterY); // 전사자도 함께 돌아온다
 }
 
 export function beginExpeditionReturn(state: GameState, message?: string): string | null {
@@ -353,7 +372,8 @@ export function estimateExpeditionReturnTicks(state: GameState): number | null {
     ? expedition.path
     : routeTo(state, expedition.x, expedition.y, expedition.musterX, expedition.musterY);
   if (!path) return null;
-  const effectiveSpeed = Math.max(0.25, expedition.speed * weatherSpeedMultiplier(state));
+  const effectiveSpeed = Math.max(0.25, expedition.speed * weatherSpeedMultiplier(state) *
+    expeditionMountedSpeedMultiplier(state, expedition.memberIds));
   return Math.ceil(path.length / effectiveSpeed);
 }
 
@@ -365,6 +385,7 @@ export function expeditionTick(state: GameState): void {
     state.residents.some(resident => resident.id === id && resident.alive));
   if (expedition.memberIds.length === 0) {
     state.expedition = null;
+    loseExpeditionCorpses(state); // 전멸 — 시신을 수습할 사람이 돌아오지 못했다
     return;
   }
 

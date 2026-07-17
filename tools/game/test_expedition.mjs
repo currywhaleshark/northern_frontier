@@ -97,6 +97,30 @@ function addBuiltMarket(state) {
 }
 
 {
+  const { state, members } = prepareState(2026071350);
+  state.expedition.phase = 'return';
+  state.expedition.path = Array.from({ length: 13 }, (_, index) => ({ x: index, y: 0 }));
+  const unmountedEta = expedition.estimateExpeditionReturnTicks(state);
+  assert.equal(expedition.expeditionMountedSpeedMultiplier(state), 1);
+
+  const stable = {
+    id: state.nextBuildingId++, type: 'stable', x: 0, y: 0,
+    progress: 999, built: true, fieldGrowth: 0,
+    livestock: { species: 'horse', headcount: 1, ageDays: 30, feedDebt: 0, health: 100 },
+  };
+  state.buildings.push(stable);
+  state.mountAssignments = { [members[0].id]: 'horse' };
+  assert.equal(expedition.expeditionMountedSpeedMultiplier(state), 1.1,
+    'one mounted member in a three-person expedition adds ten percent speed');
+  assert.ok(expedition.estimateExpeditionReturnTicks(state) < unmountedEta);
+
+  stable.livestock.headcount = 3;
+  state.mountAssignments = Object.fromEntries(members.map(member => [member.id, 'horse']));
+  assert.equal(expedition.expeditionMountedSpeedMultiplier(state), 1.3,
+    'a fully mounted expedition reaches the thirty percent cap');
+}
+
+{
   const state = simulation.newGame(2026071351);
   for (const resident of state.residents) resident.job = 'idle';
   const members = state.residents.slice(0, 3);

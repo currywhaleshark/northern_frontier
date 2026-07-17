@@ -968,6 +968,14 @@ export const CONFIG = {
 
   mounted: {
     combatDeathHorseLossChance: 0.45,
+    maneuverPowerMultiplier: 0.82,
+    chargePowerBonus: 0.1,
+    routedLootRecoveryBase: 0.5,
+    routedLootRecoveryPerMounted: 0.04,
+    routedLootRecoveryMax: 0.75,
+    pursuitKillsPerMounted: 0.4,
+    pursuitKillsMax: 6,
+    expeditionSpeedMaxBonus: 0.3,
   },
 
   // 난이도별 보정 (메인 메뉴에서 선택)

@@ -287,17 +287,20 @@ export function stabilizeTacticalCasualtyCaptions(
   return stabilized;
 }
 
-function commandPowerMultiplier(
+export function commandPowerMultiplier(
   input: EngagementExchangeInput,
   defender: TacticalDefenderGroup,
 ): number {
   const { zone } = input;
   const command = defender.command ?? 'hold';
   if (command === 'hold') return 0.82;
-  if (command === 'charge') return 1.72;
-  if (command === 'redeploy') return 0.35;
-  if (command === 'fallback') return 0.22;
-  if (command === 'advance') return 0.45;
+  const mounted = tacticalGroupCapabilities(defender).has('mounted');
+  if (command === 'charge') {
+    return 1.72 + (mounted && zone.kind !== 'wall' ? CONFIG.mounted.chargePowerBonus : 0);
+  }
+  if (command === 'redeploy') return mounted ? CONFIG.mounted.maneuverPowerMultiplier : 0.35;
+  if (command === 'fallback') return mounted ? CONFIG.mounted.maneuverPowerMultiplier : 0.22;
+  if (command === 'advance') return mounted ? CONFIG.mounted.maneuverPowerMultiplier : 0.45;
   if (command === 'guardStorehouse') return zone.id === 'storehouse' ? 1.42 : 0.78;
   if (command === 'protectCivilians') return zone.id === 'center' || zone.id === 'storehouse' ? 1.05 : 0.72;
   if (command === 'ambush') {
@@ -350,8 +353,16 @@ function activeMeleeGuard(
 }
 
 function rearAssaultGuardStrength(defenders: TacticalDefenderGroup[]): number {
-  if (activeMeleeGuard(defenders, 'rear')) return 1;
-  if (activeMeleeGuard(defenders, 'middle')) {
+  const mobileRearGuard = (line: TacticalFormationLine) => defenders.some(group => {
+    const capabilities = tacticalGroupCapabilities(group);
+    return group.line === line &&
+      (capabilities.has('melee') || (capabilities.has('mounted') &&
+        (line === 'rear' || group.command === 'reinforceRear'))) &&
+      group.command !== 'fallback' && group.command !== 'advance' &&
+      activeDefenderCount(group) > 0;
+  });
+  if (mobileRearGuard('rear')) return 1;
+  if (mobileRearGuard('middle')) {
     return CONFIG.tacticalBattle.formationExposure.rearAssault.middleGuardStrength;
   }
   return 0;

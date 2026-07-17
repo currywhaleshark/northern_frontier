@@ -746,6 +746,7 @@ export interface TacticalDefenderGroup {
   kind: DefenderGroupKind;
   role: CombatRole;
   origin?: string;
+  mount?: MountId;
   weapon: CombatWeaponId | null;
   readyMuskets?: number;
   label: string;

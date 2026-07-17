@@ -113,6 +113,10 @@ assert.match(screenSource, /tacticalDefaultWeaponPose\(group\)/,
   'defender rendering must resolve role-specific default weapons from the live group');
 assert.match(screenSource, /TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET/,
   'defender rendering must use the dedicated default weapon pose sheet');
+assert.match(screenSource, /group\.mount === 'horse'/,
+  'mounted defender groups select the horse sprite');
+assert.match(screenSource, /TACTICAL_CHARACTER_SHEET/,
+  'mounted defenders reuse the mounted column from the folk character sheet');
 // 머리 크기 기준 정규화: 셀별 배율은 생성된 메트릭이 공급하고, CSS는 --unit-scale/--unit-dy를 반영해야 한다.
 assert.match(screenSource, /tacticalSpriteMetricVars\('court'/,
   'court sprites must apply generated head-size metrics');

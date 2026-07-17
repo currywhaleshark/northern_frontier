@@ -18,6 +18,7 @@ import type {
 } from '../../game/types';
 import { tacticalBackgroundAsset } from '../../render/tacticalBackgroundAssets';
 import {
+  TACTICAL_CHARACTER_SHEET,
   TACTICAL_COURT_POSE_SHEET,
   TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET,
   TACTICAL_DEFENDER_ROLE_POSE_SHEET,
@@ -119,6 +120,23 @@ function DefenderSprite({ group, gender, pose = 'idle', firing = false, faded = 
   faded?: boolean;
   falling?: boolean;
 }) {
+  if (group.mount === 'horse') {
+    const mountedX = TACTICAL_CHARACTER_SHEET.residentColumns * TACTICAL_CHARACTER_SHEET.residentWidth;
+    const mountedY = (gender === 'male' ? 0 : 1) * TACTICAL_CHARACTER_SHEET.spriteHeight;
+    const sheetWidth = mountedX + TACTICAL_CHARACTER_SHEET.mountedWidth;
+    const sheetHeight = TACTICAL_CHARACTER_SHEET.rows * TACTICAL_CHARACTER_SHEET.spriteHeight;
+    return (
+      <span
+        className={`tactical-sprite tactical-defender mounted role-${group.role} weapon-${group.weapon ?? 'unarmed'} pose-${falling ? 'hurt' : pose}${faded ? ' faded' : ''}${falling ? ' falling' : ''}`}
+        style={{
+          backgroundImage: `url(${TACTICAL_CHARACTER_SHEET.src})`,
+          backgroundPosition: `${-mountedX}px ${-mountedY}px`,
+          backgroundSize: `${sheetWidth}px ${sheetHeight}px`,
+        }}
+        aria-hidden="true"
+      />
+    );
+  }
   const descriptor = combatSpriteDescriptor(group.role, group.weapon);
   const resolvedPose = falling ? 'hurt' : pose;
   const defaultWeapon = tacticalDefaultWeaponPose(group);

@@ -51,6 +51,7 @@ function reset(state) {
   state.incidents.predatorThreats.tiger = undefined;
   state.weaponAllocationMode = 'manual';
   state.weaponAssignments = {};
+  state.mountAssignments = {};
   state.resources.muskets = 0;
   state.resources.hornBows = 0;
   state.resources.spears = 0;
@@ -83,6 +84,12 @@ function reset(state) {
   state.resources.hornBows = 1;
   state.resources.spears = 1;
   state.weaponAssignments = { [watchman.id]: 'hornBow', [hunter.id]: 'spear' };
+  state.buildings.push({
+    id: state.nextBuildingId++, type: 'stable', x: 0, y: 0,
+    progress: 999, built: true, fieldGrowth: 0,
+    livestock: { species: 'horse', headcount: 1, ageDays: 30, feedDebt: 0, health: 100 },
+  });
+  state.mountAssignments = { [watchman.id]: 'horse' };
 
   const snapshot = roster.createCombatRoster(state, { context: 'villageDefense' }).combatants;
   const watchmanSnapshot = snapshot.find(item => item.residentId === watchman.id);
@@ -90,6 +97,8 @@ function reset(state) {
   assert.equal(watchmanSnapshot.weapon, undefined, 'snapshot uses assignedWeapon/readyWeapon fields, not a legacy weapon field');
   assert.equal(watchmanSnapshot.assignedWeapon, 'hornBow');
   assert.equal(watchmanSnapshot.readyWeapon, 'hornBow');
+  assert.equal(watchmanSnapshot.mount, 'horse');
+  assert.ok(watchmanSnapshot.capabilities.includes('mounted'));
   assert.ok(watchmanSnapshot.capabilities.includes('guard'));
   assert.ok(watchmanSnapshot.capabilities.includes('volley'));
   assert.deepEqual(capabilities.combatSpriteDescriptor(watchmanSnapshot.role, watchmanSnapshot.assignedWeapon), {
@@ -113,7 +122,9 @@ function reset(state) {
   const watchmanGroup = groups.find(group => group.role === 'watchman');
   const hunterGroup = groups.find(group => group.role === 'hunter');
   assert.equal(watchmanGroup.weapon, 'hornBow');
+  assert.equal(watchmanGroup.mount, 'horse');
   assert.ok(capabilities.tacticalGroupCapabilities(watchmanGroup).has('volley'));
+  assert.ok(capabilities.tacticalGroupCapabilities(watchmanGroup).has('mounted'));
   assert.equal(hunterGroup.weapon, 'spear');
   assert.ok(capabilities.tacticalGroupCapabilities(hunterGroup).has('ambush'));
   assert.ok(capabilities.tacticalGroupCapabilities(hunterGroup).has('charge'));

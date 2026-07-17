@@ -105,7 +105,7 @@ function resetFighters(state) {
   assert.ok(nimachaSnapshot.capabilities.includes('ambush'));
   assert.ok(nimachaSnapshot.capabilities.includes('scout'));
   assert.ok(nimachaSnapshot.basePower > localSnapshot.basePower);
-  assert.ok(holaonSnapshot.capabilities.includes('mounted'));
+  assert.ok(!holaonSnapshot.capabilities.includes('mounted'), 'horse experience alone is not an active mount');
   assert.equal(combatCapabilities.isHorseExperiencedOrigin(HOLAON), true);
   assert.ok(
     deserterSnapshot.basePower + deserterSnapshot.weaponPower >

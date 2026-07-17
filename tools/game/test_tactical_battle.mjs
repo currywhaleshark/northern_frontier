@@ -832,9 +832,17 @@ function addBuiltMarker(state, type) {
   const woundedGroup = battle.defenderGroups.find(group => group.count > 0);
   assert.ok(woundedGroup);
   woundedGroup.wounded = 1;
+  woundedGroup.mount = 'horse';
   battle.pendingReport.wounded = 1;
   battle.pendingReport.loot = { grain: 5 };
   battle.pendingReport.buildingsDamaged = 1;
+  const mountedPursuers = Math.max(0, woundedGroup.count - woundedGroup.wounded - woundedGroup.killed);
+  const recoveryRate = tactical.routedLootRecoveryRate(mountedPursuers);
+  const expectedRecoveredGrain = Math.round(5 * recoveryRate * 100) / 100;
+  const committedRaiders = battle.raiderGroups.reduce((sum, group) => sum + group.count, 0);
+  const combatKills = Math.min(committedRaiders,
+    battle.raiderGroups.reduce((sum, group) => sum + group.killed, 0));
+  const expectedPursuitKills = tactical.mountedPursuitKills(mountedPursuers, committedRaiders - combatKills);
   const grainBeforeFinish = state.resources.grain;
 
   assert.equal(tactical.completeTacticalSimulation(state), null);
@@ -853,8 +861,12 @@ function addBuiltMarker(state, type) {
   assert.equal(state.battle, null);
   assert.ok(state.raidCooldown > 0);
   assert.ok(state.threat <= 40);
-  assert.equal(state.resources.grain, grainBeforeFinish - 2.5);
-  assert.equal(state.tacticalBattleReport.recoveredLoot.grain, 2.5);
+  assert.equal(state.resources.grain, grainBeforeFinish - (5 - expectedRecoveredGrain));
+  assert.equal(state.tacticalBattleReport.recoveredLoot.grain, expectedRecoveredGrain);
+  assert.equal(state.tacticalBattleReport.raidersKilled, combatKills + expectedPursuitKills);
+  if (expectedPursuitKills > 0) {
+    assert.ok(state.tacticalBattleReport.highlights.some(line => line.includes('기마 추격대')));
+  }
   assert.ok(state.buildings.some(building => building.repairing), 'deferred building damage should be applied on finish');
   assert.ok(state.residents.some(resident => resident.alive && resident.health < 100), 'deferred wounds should be applied on finish');
   assert.ok(state.log.some(entry => entry.text.startsWith('전투 장계:')));
@@ -2301,6 +2313,101 @@ for (const optionId of ['militia', 'levy']) {
   assert.equal(battle.pendingReport.treated, 1);
   assert.ok(battle.pendingReport.events.some(event => event.groupId === healer.id && event.float === '응급치료 +1'));
   assert.ok(battle.pendingReport.lines.some(line => line.includes('약초를 써 부상자 1명')));
+}
+
+{
+  const zone = {
+    id: 'center', name: '마을 중심', kind: 'center', order: 2,
+    pressure: 0, breached: false, defenseBonus: 0, ambushBonus: 0,
+    lootRisk: 0, civilianRisk: 0, description: '',
+  };
+  const mounted = {
+    id: 'mounted-reserve', kind: 'militia-bow', role: 'militia', weapon: 'hornBow', mount: 'horse',
+    label: '기마 각궁 수비병', residentIds: [1, 2], count: 2, zoneId: 'center', command: 'redeploy',
+    power: 20, wounded: 0, killed: 0, line: 'middle',
+  };
+  const unmounted = { ...mounted, id: 'foot-reserve', mount: undefined };
+  assert.equal(tacticalEngagement.commandPowerMultiplier({ zone }, unmounted), 0.35);
+  assert.equal(tacticalEngagement.commandPowerMultiplier({ zone }, mounted), CONFIG.mounted.maneuverPowerMultiplier,
+    'mounted reserves redeploy without the foot-unit combat penalty');
+
+  mounted.weapon = 'spear';
+  mounted.command = 'charge';
+  assert.equal(tacticalEngagement.commandPowerMultiplier({ zone }, mounted),
+    1.72 + CONFIG.mounted.chargePowerBonus);
+  assert.equal(tacticalEngagement.commandPowerMultiplier({ zone: { ...zone, kind: 'wall' } }, mounted), 1.72,
+    'palisades suppress the mounted charge bonus');
+
+  const rearBattle = {
+    orientation: 'defense',
+    defenderGroups: [{ ...mounted, weapon: 'hornBow', command: null }],
+    raiderGroups: [{
+      id: 'rear-raiders', kind: 'flankers', label: '후방 급습대', zoneId: 'center', line: 'front',
+      targetZoneId: 'center', power: 10, count: 2, killed: 0, morale: 60,
+      intent: 'flank', revealed: true, engagementsInZone: 1, rearAssault: true,
+    }],
+  };
+  assert.deepEqual(
+    tactical.tacticalRearResponseOptions(rearBattle, 'center').find(option => option.id === 'reinforceRear')?.groupIds,
+    ['mounted-reserve'],
+    'mounted ranged reserves can answer a rear assault from the middle line',
+  );
+  assert.equal(tactical.tacticalCommandUnavailableReason(rearBattle, rearBattle.defenderGroups[0], 'reinforceRear'), null);
+
+  assert.equal(tactical.routedLootRecoveryRate(0), 0.5);
+  assert.ok(tactical.routedLootRecoveryRate(3) > tactical.routedLootRecoveryRate(0));
+  assert.equal(tactical.routedLootRecoveryRate(100), CONFIG.mounted.routedLootRecoveryMax);
+  assert.equal(tactical.mountedPursuitKills(0, 12), 0);
+  assert.ok(tactical.mountedPursuitKills(4, 12) > 0);
+  assert.ok(tactical.mountedPursuitKills(100, 100) <= CONFIG.mounted.pursuitKillsMax);
+
+  function seededRng(seed) {
+    let value = seed >>> 0;
+    return () => {
+      value = (Math.imul(value, 1664525) + 1013904223) >>> 0;
+      return value / 0x100000000;
+    };
+  }
+  const attacker = {
+    id: 'measurement-raiders', kind: 'main', label: '실측 습격대', zoneId: zone.id, line: 'front',
+    targetZoneId: zone.id, power: 180, count: 12, killed: 0, morale: 75,
+    intent: 'advance', revealed: true, engagementsInZone: 0,
+  };
+  const movingDefender = {
+    ...mounted, id: 'measurement-defender', weapon: 'spear', command: 'fallback',
+    count: 12, residentIds: Array.from({ length: 12 }, (_, index) => index + 1), power: 120,
+  };
+  const measured = { footLosses: 0, mountedLosses: 0, footEnemyShare: 0, mountedEnemyShare: 0 };
+  for (let seed = 1; seed <= 32; seed += 1) {
+    for (const mountedFlag of [false, true]) {
+      const exchange = tacticalEngagement.resolveEngagementExchange({
+        zone,
+        defenders: [{ ...movingDefender, mount: mountedFlag ? 'horse' : undefined }],
+        attackers: [attacker],
+        direction: 'frontal', weather: 'clear', prepareVolleyApplied: false,
+        evacuateCiviliansApplied: false, roundStartingRaiderPower: attacker.power,
+        rng: seededRng(2026071700 + seed),
+      });
+      const losses = exchange.defenderLosses.reduce((sum, loss) => sum + loss.wounded + loss.killed, 0);
+      if (mountedFlag) {
+        measured.mountedLosses += losses;
+        measured.mountedEnemyShare += exchange.enemyShare;
+      } else {
+        measured.footLosses += losses;
+        measured.footEnemyShare += exchange.enemyShare;
+      }
+    }
+  }
+  assert.ok(measured.mountedEnemyShare < measured.footEnemyShare,
+    'fixed-seed mounted movement reduces enemy pressure while both groups still execute the same fallback');
+  assert.ok(measured.mountedLosses <= measured.footLosses,
+    'fixed-seed mounted movement controls casualties');
+  assert.equal(
+    tacticalEngagement.commandPowerMultiplier({ zone }, { ...movingDefender, command: 'hold', mount: undefined }),
+    tacticalEngagement.commandPowerMultiplier({ zone }, { ...movingDefender, command: 'hold', mount: 'horse' }),
+    'mounts do not strengthen a stationary defense line',
+  );
+  console.log('mounted fixed-seed measurement', JSON.stringify(measured));
 }
 
 console.log('tactical battle tests passed');

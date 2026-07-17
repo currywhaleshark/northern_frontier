@@ -2805,6 +2805,10 @@ html, body, #root {
   transform-origin: bottom center;
 }
 .tactical-defender:first-child { margin-left: 0; }
+.tactical-defender.mounted {
+  width: 168px;
+  margin-left: -84px;
+}
 .tactical-defender.faded { opacity: 0.42; }
 .tactical-raider {
   width: 168px;

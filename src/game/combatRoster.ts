@@ -1,8 +1,8 @@
 import { combatBasePower, combatCapabilities, combatWeaponTotalPower } from './combatCapabilities';
 import { activePredatorScoutIds } from './expeditionIntel';
-import { musketReadiness, resolvedWeaponAssignments } from './weapons';
+import { musketReadiness, resolvedMountAssignments, resolvedWeaponAssignments } from './weapons';
 import { CONFIG } from './config';
-import type { CombatWeaponId, GameState, Resident } from './types';
+import type { CombatWeaponId, GameState, MountId, Resident } from './types';
 
 export type CombatContext = 'villageDefense' | 'expedition';
 
@@ -23,6 +23,7 @@ export interface CombatantSnapshot {
   residentId: number;
   role: CombatRole;
   origin?: string;
+  mount?: MountId;
   assignedWeapon: CombatWeaponId | null;
   readyWeapon: CombatWeaponId | null;
   capabilities: CombatCapability[];
@@ -81,6 +82,7 @@ export function createCombatRoster(
     .sort((a, b) => a.id - b.id);
   const fighters = eligible.filter(resident => combatRoleForResident(resident) !== 'civilian');
   const assignments = resolvedWeaponAssignments(state);
+  const mountAssignments = resolvedMountAssignments(state);
   const musketIds = fighters
     .filter(resident => assignments[resident.id] === 'musket')
     .map(resident => resident.id);
@@ -96,13 +98,15 @@ export function createCombatRoster(
       ? null
       : assignedWeapon;
     const basePower = combatBasePower(role, resident.origin);
+    const mount = role === 'healer' ? null : mountAssignments[resident.id] ?? null;
     const snapshot: CombatantSnapshot = {
       residentId: resident.id,
       role,
       ...(resident.origin ? { origin: resident.origin } : {}),
+      ...(mount ? { mount } : {}),
       assignedWeapon,
       readyWeapon,
-      capabilities: [...combatCapabilities(role, readyWeapon, resident.origin)],
+      capabilities: [...combatCapabilities(role, readyWeapon, resident.origin, mount)],
       basePower,
       weaponPower: combatWeaponTotalPower(role, readyWeapon, resident.origin) - basePower,
     };

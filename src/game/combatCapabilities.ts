@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import { residentOriginProfile } from './defectors';
 import type { CombatCapability, CombatRole } from './combatRoster';
-import type { CombatWeaponId } from './types';
+import type { CombatWeaponId, MountId } from './types';
 
 // Hunters keep a weak hunting-bow volley even without an inventory weapon.
 // This is the single policy switch for that legacy gameplay rule.
@@ -11,6 +11,7 @@ export function combatCapabilities(
   role: CombatRole,
   weapon: CombatWeaponId | null,
   origin?: string,
+  mount?: MountId | null,
 ): ReadonlySet<CombatCapability> {
   const result = new Set<CombatCapability>(['hold']);
   if (role === 'militia') {
@@ -40,8 +41,8 @@ export function combatCapabilities(
     result.add('scout');
   } else if (originProfile === 'holaon') {
     result.add('scout');
-    result.add('mounted');
   }
+  if (mount === 'horse') result.add('mounted');
   return result;
 }
 
@@ -106,18 +107,20 @@ export function combatGroupLabel(role: CombatRole, weapon: CombatWeaponId | null
 export function tacticalGroupCapabilities(group: {
   role: CombatRole;
   origin?: string;
+  mount?: MountId;
   weapon: CombatWeaponId | null;
   readyMuskets?: number;
 }): ReadonlySet<CombatCapability> {
   const readyWeapon = group.weapon === 'musket' && (group.readyMuskets ?? 0) <= 0
     ? null
     : group.weapon;
-  return combatCapabilities(group.role, readyWeapon, group.origin);
+  return combatCapabilities(group.role, readyWeapon, group.origin, group.mount);
 }
 
 export function tacticalGroupPower(group: {
   role: CombatRole;
   origin?: string;
+  mount?: MountId;
   weapon: CombatWeaponId | null;
   readyMuskets?: number;
 }, active: number): number {

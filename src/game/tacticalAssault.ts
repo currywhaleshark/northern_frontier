@@ -53,18 +53,20 @@ function makePlayerGroup(
   const role = snapshots[0].role;
   const weapon = snapshots[0].assignedWeapon;
   const origin = snapshots[0].origin;
+  const mount = snapshots[0].mount;
   const kind: DefenderGroupKind = weapon === 'musket' ? 'militia-musket'
     : weapon === 'hornBow' ? 'militia-bow'
       : weapon === 'spear' ? 'militia-spear'
         : role === 'watchman' ? 'watchman' : role === 'hunter' ? 'hunter' : 'militia-unarmed';
   return {
-    id: `assault-${role}-${weapon ?? 'unarmed'}${origin ? `-${origin}` : ''}`,
+    id: `assault-${role}-${weapon ?? 'unarmed'}${origin ? `-${origin}` : ''}${mount ? `-${mount}` : ''}`,
     kind,
     role,
     ...(origin ? { origin } : {}),
+    ...(mount ? { mount } : {}),
     weapon,
     readyMuskets: snapshots.filter(snapshot => snapshot.readyWeapon === 'musket').length,
-    label: `${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
+    label: `${mount ? '기마 ' : ''}${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
     residentIds: snapshots.map(snapshot => snapshot.residentId),
     count: snapshots.length,
     zoneId: 'lairTrail',
@@ -89,7 +91,7 @@ export function createExpeditionTacticalGroups(state: GameState, memberIds: numb
   const snapshots = createCombatRoster(state, { context: 'expedition', memberIds }).combatants;
   const grouped = new Map<string, CombatantSnapshot[]>();
   for (const snapshot of snapshots) {
-    const key = `${snapshot.role}:${snapshot.assignedWeapon ?? 'unarmed'}:${snapshot.origin ?? 'local'}`;
+    const key = `${snapshot.role}:${snapshot.assignedWeapon ?? 'unarmed'}:${snapshot.origin ?? 'local'}:${snapshot.mount ?? 'foot'}`;
     const list = grouped.get(key) ?? [];
     list.push(snapshot);
     grouped.set(key, list);

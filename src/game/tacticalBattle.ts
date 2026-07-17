@@ -228,18 +228,20 @@ export function tacticalRearResponseOptions(
   if (!rearAssaultActive) return [];
   const defenders = battle.defenderGroups.filter(group =>
     group.zoneId === zoneId && group.commandable !== false && activeCount(group) > 0);
-  const middleMelee = defenders.filter(group =>
-    group.line === 'middle' && tacticalGroupCapabilities(group).has('melee'));
+  const middleReserve = defenders.filter(group => {
+    const capabilities = tacticalGroupCapabilities(group);
+    return group.line === 'middle' && (capabilities.has('melee') || capabilities.has('mounted'));
+  });
   const rearwardRedeploy = defenders.filter(group => group.line === 'front' || group.line === 'middle');
   const rearRanged = defenders.filter(group =>
     group.line === 'rear' && tacticalGroupCapabilities(group).has('volley'));
   const options: TacticalRearResponseOption[] = [];
-  if (middleMelee.length > 0) {
+  if (middleReserve.length > 0) {
     options.push({
       id: 'reinforceRear',
       label: '중열 예비대',
-      description: '중열 근접대에 후방 증원을 내려 이번 라운드 후방 교전에 투입합니다.',
-      groupIds: middleMelee.map(group => group.id),
+      description: '중열 근접대나 기마 예비대에 후방 증원을 내려 이번 라운드 후방 교전에 투입합니다.',
+      groupIds: middleReserve.map(group => group.id),
     });
   }
   if (rearwardRedeploy.length > 0) {
@@ -538,15 +540,18 @@ function snapshotGroup(
 ): TacticalDefenderGroup {
   const kind = kindForCombatant(role, weapon);
   const origin = snapshots[0]?.origin;
+  const mount = snapshots[0]?.mount;
   const originKey = origin ? `-${origin}` : '';
+  const mountKey = mount ? `-${mount}` : '';
   return {
-    id: `${role}-${weapon ?? 'unarmed'}${originKey}`,
+    id: `${role}-${weapon ?? 'unarmed'}${originKey}${mountKey}`,
     kind,
     role,
     ...(origin ? { origin } : {}),
+    ...(mount ? { mount } : {}),
     weapon,
     readyMuskets: snapshots.filter(snapshot => snapshot.readyWeapon === 'musket').length,
-    label: `${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
+    label: `${mount ? '기마 ' : ''}${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
     residentIds: snapshots.map(snapshot => snapshot.residentId),
     count: snapshots.length,
     zoneId,
@@ -563,7 +568,7 @@ function snapshotGroup(
 function groupsFromSnapshots(snapshots: CombatantSnapshot[], assault = false): TacticalDefenderGroup[] {
   const grouped = new Map<string, CombatantSnapshot[]>();
   for (const snapshot of snapshots) {
-    const key = `${snapshot.role}:${snapshot.assignedWeapon ?? 'unarmed'}:${snapshot.origin ?? 'local'}`;
+    const key = `${snapshot.role}:${snapshot.assignedWeapon ?? 'unarmed'}:${snapshot.origin ?? 'local'}:${snapshot.mount ?? 'foot'}`;
     const list = grouped.get(key) ?? [];
     list.push(snapshot);
     grouped.set(key, list);
@@ -1339,7 +1344,10 @@ export function tacticalCommandUnavailableReason(
   }
   if (command === 'reinforceRear') {
     if (defender.line !== 'middle') return '후방 증원은 중열 부대만 수행할 수 있습니다.';
-    if (!tacticalGroupCapabilities(defender).has('melee')) return '후방 증원은 근접 전투가 가능한 부대가 필요합니다.';
+    const capabilities = tacticalGroupCapabilities(defender);
+    if (!capabilities.has('melee') && !capabilities.has('mounted')) {
+      return '후방 증원은 근접 전투대나 기마 예비대가 필요합니다.';
+    }
     const rearAttackHere = battle.raiderGroups.some(group =>
       group.zoneId === defender.zoneId && tacticalRearAssaultIsEngaged(group) && activeRaider(group));
     return rearAttackHere ? null : '같은 구역에 대응할 후방 급습대가 없습니다.';
@@ -1397,7 +1405,9 @@ export function chooseDefaultTacticalCommands(battle: TacticalBattle): void {
       continue;
     }
     if (activeCount(defender) <= 0) continue;
-    const shouldReinforceRear = defender.line === 'middle' && tacticalGroupCapabilities(defender).has('melee') &&
+    const reserveCapabilities = tacticalGroupCapabilities(defender);
+    const shouldReinforceRear = defender.line === 'middle' &&
+      (reserveCapabilities.has('melee') || reserveCapabilities.has('mounted')) &&
       battle.raiderGroups.some(group =>
         group.zoneId === defender.zoneId && tacticalRearAssaultIsEngaged(group) && activeRaider(group));
     if (shouldReinforceRear && defender.commandSource !== 'player') {
@@ -1451,10 +1461,11 @@ export function tacticalRearManeuverFormationCounterForEngagement(
 
   const rearDefenderIds = new Set(rearDefenders.map(group => group.id));
   const guardPower = battle.defenderGroups.reduce((sum, group) => {
+    const capabilities = tacticalGroupCapabilities(group);
     if (!rearDefenderIds.has(group.id) || group.zoneId !== zoneId || group.commandable === false ||
         activeCount(group) <= 0 || group.command === 'redeploy' || group.command === 'fallback' ||
         group.command === 'advance' || group.command === 'openRetreat' ||
-        !tacticalGroupCapabilities(group).has('melee')) return sum;
+        (!capabilities.has('melee') && !capabilities.has('mounted'))) return sum;
     if (group.line === 'rear' || (group.line === 'middle' && group.command === 'reinforceRear')) {
       return sum + defenderSurvivingPower(group);
     }
@@ -1487,9 +1498,11 @@ export function tacticalRearManeuverEffectiveCounterStrengthForZone(
 
 export function tacticalFeintFormationCounter(battle: TacticalBattle): number {
   const reservePower = battle.defenderGroups.reduce((sum, group) => {
+    const capabilities = tacticalGroupCapabilities(group);
     if (group.line !== 'middle' || group.commandable === false || activeCount(group) <= 0 ||
         group.command === 'redeploy' || group.command === 'fallback' || group.command === 'advance' ||
-        group.command === 'openRetreat' || !tacticalGroupCapabilities(group).has('melee')) return sum;
+        group.command === 'openRetreat' ||
+        (!capabilities.has('melee') && !capabilities.has('mounted'))) return sum;
     return sum + defenderSurvivingPower(group);
   }, 0);
   const divertedPower = battle.raiderGroups.reduce((sum, group) =>
@@ -2177,16 +2190,38 @@ function hasLoot(loot: Partial<Record<ResourceId, number>>): boolean {
   return Object.values(loot).some(amount => (amount ?? 0) > 1e-9);
 }
 
+function activeMountedDefenderCount(battle: TacticalBattle): number {
+  return battle.defenderGroups.reduce((sum, group) =>
+    sum + (group.mount === 'horse' ? activeCount(group) : 0), 0);
+}
+
+export function routedLootRecoveryRate(mountedCount: number): number {
+  return Math.min(
+    CONFIG.mounted.routedLootRecoveryMax,
+    CONFIG.mounted.routedLootRecoveryBase +
+      Math.max(0, mountedCount) * CONFIG.mounted.routedLootRecoveryPerMounted,
+  );
+}
+
+export function mountedPursuitKills(mountedCount: number, escapedCount: number): number {
+  return Math.min(
+    Math.max(0, Math.floor(escapedCount)),
+    CONFIG.mounted.pursuitKillsMax,
+    Math.round(Math.max(0, mountedCount) * CONFIG.mounted.pursuitKillsPerMounted),
+  );
+}
+
 function recoverRoutedLoot(
   state: GameState,
   stolen: Partial<Record<ResourceId, number>>,
+  recoveryRate: number,
 ): { netLoss: Partial<Record<ResourceId, number>>; recovered: Partial<Record<ResourceId, number>> } {
   const netLoss: Partial<Record<ResourceId, number>> = {};
   const recovered: Partial<Record<ResourceId, number>> = {};
   for (const [resourceKey, rawAmount] of Object.entries(stolen)) {
     const resource = resourceKey as ResourceId;
     const amount = Math.max(0, rawAmount ?? 0);
-    const recoveredAmount = Math.round(amount * 0.5 * 100) / 100;
+    const recoveredAmount = Math.round(amount * recoveryRate * 100) / 100;
     if (recoveredAmount > 0) {
       state.resources[resource] += recoveredAmount;
       recovered[resource] = recoveredAmount;
@@ -2252,11 +2287,12 @@ export function finishTacticalBattle(state: GameState): void {
     remainingEnemyPower <= battle.initialEnemyPower * 0.35 ||
     battle.raiderGroups.every(group => group.intent === 'withdraw' || group.power <= 0)
   );
+  const mountedPursuers = activeMountedDefenderCount(battle);
   const grossLootLosses = applyLootLosses(state, mergeLoot(battle.reports));
   let lootLosses = grossLootLosses;
   let recoveredLoot: Partial<Record<ResourceId, number>> = {};
   if (battle.factionName !== '조정 토벌군' && enemyRouted && hasLoot(grossLootLosses)) {
-    const recovery = recoverRoutedLoot(state, grossLootLosses);
+    const recovery = recoverRoutedLoot(state, grossLootLosses, routedLootRecoveryRate(mountedPursuers));
     lootLosses = recovery.netLoss;
     recoveredLoot = recovery.recovered;
   }
@@ -2267,7 +2303,11 @@ export function finishTacticalBattle(state: GameState): void {
   moraleShock(state, -moraleDelta);
 
   const raidersCommitted = battle.raiderGroups.reduce((sum, group) => sum + group.count, 0);
-  const raidersKilled = Math.min(raidersCommitted, battle.raiderGroups.reduce((sum, group) => sum + group.killed, 0));
+  const combatKills = Math.min(raidersCommitted, battle.raiderGroups.reduce((sum, group) => sum + group.killed, 0));
+  const pursuitKills = battle.factionName !== '조정 토벌군' && enemyRouted
+    ? mountedPursuitKills(mountedPursuers, raidersCommitted - combatKills)
+    : 0;
+  const raidersKilled = Math.min(raidersCommitted, combatKills + pursuitKills);
   const raidersEscaped = Math.max(0, raidersCommitted - raidersKilled);
   const objective = raidDefenseObjectiveResult({
     factionName: battle.factionName,
@@ -2320,6 +2360,7 @@ export function finishTacticalBattle(state: GameState): void {
   const casualtyText = `전사 ${killedPeople.length}명${killedNames.length > 0 ? ` (${killedNames.join(', ')})` : ''}, 부상 ${woundedPeople.length}명`;
   const lootText = describeLootLosses(lootLosses);
   const highlights = [
+    ...(pursuitKills > 0 ? [`기마 추격대가 달아나는 적 ${pursuitKills}명을 추가로 쓰러뜨렸습니다.`] : []),
     ...(hasLoot(recoveredLoot) ? [`적의 궤주 과정에서 회수한 물자: ${describeLootLosses(recoveredLoot)}.`] : []),
     ...battle.reports.flatMap(report => report.lines),
   ].filter((line, index, all) => all.indexOf(line) === index).slice(0, 10);
