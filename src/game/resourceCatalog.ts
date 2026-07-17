@@ -7,6 +7,7 @@ export type ResourceCategory =
   | 'material'
   | 'military'
   | 'luxury'
+  | 'currency'
   | 'abstract';
 
 export interface ResourceDef {
@@ -21,7 +22,7 @@ export interface ResourceDef {
 }
 
 export const FOOD_RESOURCES = [
-  'grain', 'meat', 'eggs', 'fish', 'vegetables', 'kimchi', 'beans', 'jang', 'curedMeat', 'saltedFish', 'driedFish',
+  'grain', 'meat', 'eggs', 'milk', 'fish', 'vegetables', 'kimchi', 'beans', 'jang', 'curedMeat', 'saltedFish', 'driedFish',
 ] as const satisfies readonly ResourceId[];
 export const FUEL_RESOURCES = ['brushwood', 'firewood', 'charcoal'] as const satisfies readonly ResourceId[];
 export const CLOTHING_RESOURCES = ['hideClothes', 'cottonClothes'] as const satisfies readonly ResourceId[];
@@ -32,6 +33,7 @@ export const RESOURCE_DEFS: Record<ResourceId, ResourceDef> = {
   rice: { id: 'rice', name: '벼', icon: '🌾', category: 'material', tradeBaseValue: 0.8 },
   meat: { id: 'meat', name: '고기', icon: '🥩', category: 'food', foodWeight: 1, tradeBaseValue: 1.6 },
   eggs: { id: 'eggs', name: '달걀', icon: '🥚', category: 'food', foodWeight: 1, tradeBaseValue: 1.5 },
+  milk: { id: 'milk', name: '젖', icon: '🥛', category: 'food', foodWeight: 1, tradeBaseValue: 1.7 },
   fish: { id: 'fish', name: '생선', icon: '🐟', category: 'food', foodWeight: 1, tradeBaseValue: 1.3 },
   curedMeat: { id: 'curedMeat', name: '보존육', icon: '🍖', category: 'food', foodWeight: 1, tradeBaseValue: 2.4 },
   saltedFish: { id: 'saltedFish', name: '자반', icon: '🐟', category: 'food', foodWeight: 1, tradeBaseValue: 2.2 },
@@ -53,6 +55,8 @@ export const RESOURCE_DEFS: Record<ResourceId, ResourceDef> = {
   hide: { id: 'hide', name: '가죽', icon: '🦌', category: 'material', tradeBaseValue: 1.8 },
   hideClothes: { id: 'hideClothes', name: '가죽옷', icon: '🧥', category: 'clothing', clothingValue: 1.1, tradeBaseValue: 3.4 },
   cotton: { id: 'cotton', name: '목화', icon: '☁️', category: 'material', tradeBaseValue: 1.7 },
+  wool: { id: 'wool', name: '양털', icon: '🧶', category: 'material', tradeBaseValue: 2 },
+  hay: { id: 'hay', name: '건초', icon: '🌾', category: 'material', tradeBaseValue: 0.6 },
   cottonClothes: { id: 'cottonClothes', name: '무명옷', icon: '👕', category: 'clothing', clothingValue: 1, tradeBaseValue: 3 },
   herbs: { id: 'herbs', name: '약초', icon: '🌿', category: 'material', tradeBaseValue: 1.5 },
   gunpowder: { id: 'gunpowder', name: '화약', icon: '🧨', category: 'military', tradeBaseValue: 5 },
@@ -64,6 +68,8 @@ export const RESOURCE_DEFS: Record<ResourceId, ResourceDef> = {
   lacquerware: { id: 'lacquerware', name: '칠기', icon: '📦', category: 'luxury', tradeBaseValue: 5.5 },
   silk: { id: 'silk', name: '비단', icon: '🧶', category: 'luxury', tradeBaseValue: 7 },
   preciousMetal: { id: 'preciousMetal', name: '귀금속', icon: '💍', category: 'luxury', tradeBaseValue: 9 },
+  // 은은 사치 만족 집계(LUXURY_RESOURCES)에 넣지 않는다 — 쓰는 사치품이 아니라 쌓는 결제 수단.
+  silver: { id: 'silver', name: '은', icon: '🥈', category: 'currency', tradeBaseValue: 8 },
   reputation: { id: 'reputation', name: '명성', icon: '📜', category: 'abstract', tradeBaseValue: 0 },
   defense: { id: 'defense', name: '방어도', icon: '🛡️', category: 'abstract', tradeBaseValue: 0 },
 };
@@ -71,10 +77,10 @@ export const RESOURCE_DEFS: Record<ResourceId, ResourceDef> = {
 export const RESOURCE_IDS = Object.keys(RESOURCE_DEFS) as ResourceId[];
 
 export const RESOURCE_ORDER: ResourceId[] = [
-  'grain', 'rice', 'meat', 'eggs', 'fish', 'curedMeat', 'saltedFish', 'driedFish', 'vegetables', 'kimchi', 'beans', 'jang',
+  'grain', 'rice', 'meat', 'eggs', 'milk', 'fish', 'curedMeat', 'saltedFish', 'driedFish', 'vegetables', 'kimchi', 'beans', 'jang',
   'brushwood', 'firewood', 'charcoal',
-  'wood', 'stone', 'iron', 'tools', 'onggi', 'carts', 'hide', 'cotton', 'herbs', 'salt',
+  'wood', 'stone', 'iron', 'tools', 'onggi', 'carts', 'hide', 'cotton', 'wool', 'hay', 'herbs', 'salt',
   'hideClothes', 'cottonClothes',
-  'porcelain', 'brassware', 'lacquerware', 'silk', 'preciousMetal',
+  'porcelain', 'brassware', 'lacquerware', 'silk', 'preciousMetal', 'silver',
   'gunpowder', 'spears', 'hornBows', 'muskets', 'reputation', 'defense',
 ];

@@ -8,6 +8,7 @@ import { foreignSiteAt } from '../game/foreignSites';
 import { mineralRemaining } from '../game/minerals';
 import { livestockDailyFeedNeed, livestockCapacity, LIVESTOCK_DEFS, normalizeLivestockState } from '../game/livestock';
 import { residentHome } from '../game/residents';
+import { getSeason } from '../game/seasons';
 import { spoilagePreview } from '../game/spoilage';
 import type { SiteGiftType } from '../game/siteDiplomacy';
 import { isWallBuilding } from '../game/walls';
@@ -44,6 +45,7 @@ interface Props {
   onConvertFieldToPaddy: (buildingId: number) => void;
   onRequestTrade: (factionName: string) => void;
   onToggleNitre: () => void;
+  onSilverVeinAction: (action: 'break-seal' | 'reopen') => void;
   onAssignNearestWorker: (buildingId: number) => void;
   onUnassignWorker: (residentId: number) => void;
   onSelectResident: (residentId: number) => void;
@@ -162,6 +164,7 @@ export function SelectionContextBar({
   onConvertFieldToPaddy,
   onRequestTrade,
   onToggleNitre,
+  onSilverVeinAction,
   onAssignNearestWorker,
   onUnassignWorker,
   onSelectResident,
@@ -296,16 +299,18 @@ export function SelectionContextBar({
                             )}
                             {building.type === 'stable' && building.built && (() => {
                               const livestock = normalizeLivestockState(building.livestock);
-                              const feedNeed = livestockDailyFeedNeed(livestock);
+                              const season = getSeason(state.day);
+                              const herbivore = livestock.species !== 'chicken';
+                              const feedNeed = livestockDailyFeedNeed(livestock, herbivore ? 'winter' : season);
                               return (
                                 <>
-                                  <tr><td>축종</td><td>{LIVESTOCK_DEFS.chicken.icon} {LIVESTOCK_DEFS.chicken.name}</td></tr>
+                                  <tr><td>축종</td><td>{LIVESTOCK_DEFS[livestock.species].icon} {LIVESTOCK_DEFS[livestock.species].name}</td></tr>
                                   <tr><td>마릿수</td><td>{livestock.headcount}/{livestockCapacity(livestock.species)}마리</td></tr>
                                   <tr><td>번식</td><td><Bar value={livestock.growth * 100} color="#c99a4a" /></td></tr>
                                   <tr>
                                     <td>사료</td>
                                     <td>
-                                      곡물 {feedNeed.toFixed(2)}/일
+                                      {herbivore && season !== 'winter' ? '방목 · 겨울 ' : ''}{herbivore ? '건초' : '곡물'} {feedNeed.toFixed(2)}/일
                                       {livestock.feedShortageDays > 0 ? ` · ${livestock.feedShortageDays}일째 부족` : ''}
                                     </td>
                                   </tr>
@@ -388,6 +393,7 @@ export function SelectionContextBar({
                 onConvertFieldToPaddy={onConvertFieldToPaddy}
                 onRequestTrade={onRequestTrade}
                 onToggleNitre={onToggleNitre}
+                onSilverVeinAction={onSilverVeinAction}
                 onAssignNearestWorker={onAssignNearestWorker}
                 onUnassignWorker={onUnassignWorker}
                 onSelectResident={onSelectResident}

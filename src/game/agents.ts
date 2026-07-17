@@ -11,6 +11,7 @@ import { haulerCarryCapacity } from './equipment';
 import { collectHuntableTiles } from './habitats';
 import { makeRng } from './map';
 import { extractMineralDeposit, mineralRemaining } from './minerals';
+import { isVeinSealedTile, recordRockMining, recordSilverMined } from './silver';
 import { getSeason } from './seasons';
 import { outdoorMult } from './weather';
 import { processableAmount } from './processing';
@@ -22,7 +23,9 @@ import { isExplored, refreshExploration } from './exploration';
 import { activePredatorScoutIds } from './expeditionIntel';
 import { FOOD_RESOURCES, FUEL_RESOURCES } from './resourceCatalog';
 import { isGateBuilding } from './walls';
-import { ensureLivestockState } from './livestock';
+import {
+  cattleFarmWorkMultiplier, ensureLivestockState, hayFromHarvestProgress, livestockProductForHerder,
+} from './livestock';
 import { performPhysicianTreatment } from './medicine';
 import { reconcileResidentHomes } from './residents';
 import { canEnterForeignTerritory, canWorkForeignTerritory, noteTerritoryViolation } from './territory';
@@ -699,11 +702,11 @@ function manualGoTo(
   );
 }
 
-function logMineralDepletion(state: GameState, tile: Tile, resource: 'stone' | 'iron'): void {
+function logMineralDepletion(state: GameState, tile: Tile, resource: 'stone' | 'iron' | 'silver'): void {
   const mine = tile.buildingId == null
     ? undefined
     : state.buildings.find(building => building.id === tile.buildingId && building.type === 'mine');
-  const depositName = resource === 'iron' ? '철광맥' : '석재 노두';
+  const depositName = resource === 'silver' ? '은맥' : resource === 'iron' ? '철광맥' : '석재 노두';
   addLog(
     state,
     mine
@@ -1041,11 +1044,17 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
     const st = goTo(state, r, ctx, buildingGoal(state, target.id));
     if (st === 'arrived') {
       r.task = '수확 중';
-      const take = Math.min(target.fieldGrowth, a.work.harvestPerSubtick * ctx.outdoor * effOf(r));
+      const take = Math.min(
+        target.fieldGrowth,
+        a.work.harvestPerSubtick * ctx.outdoor * effOf(r) * cattleFarmWorkMultiplier(state),
+      );
       target.fieldGrowth -= take;
       const tile = state.map[target.y][target.x];
       const fertile = target.type === 'field' && tile.terrain === 'fertile' ? p.fertileBonus : 1;
       addBuildingStock(target, crop.output, (take / 100) * crop.yield * fertile * ctx.mMod);
+      if (ctx.season === 'autumn' && (crop.output === 'grain' || crop.output === 'rice')) {
+        addBuildingStock(target, 'hay', hayFromHarvestProgress(take));
+      }
       if (target.fieldGrowth <= 0.5 && target.queuedCropId) {
         target.cropId = target.queuedCropId;
         target.queuedCropId = null;
@@ -1073,7 +1082,10 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
   if (st === 'arrived') {
     r.task = `${crop.name} 재배 중`;
     const weatherGrow = state.weather === 'rain' ? 1.2 : state.weather === 'frost' ? 0.7 : 1;
-    target.fieldGrowth = Math.min(100, target.fieldGrowth + a.work.growPerSubtick * weatherGrow * effOf(r));
+    target.fieldGrowth = Math.min(
+      100,
+      target.fieldGrowth + a.work.growPerSubtick * weatherGrow * effOf(r) * cattleFarmWorkMultiplier(state),
+    );
     gainSkillTick(r);
   } else {
     r.task = st === 'stuck' ? '길이 막힘' : `${BUILDING_DEFS[farm.type].name}(으)로 이동`;
@@ -1120,11 +1132,11 @@ function builderTick(state: GameState, r: Resident, ctx: Ctx): void {
 }
 
 const HAUL_PRIORITY: ResourceId[] = [
-  'grain', 'rice', 'vegetables', 'kimchi', 'beans', 'meat', 'eggs', 'fish',
+  'grain', 'rice', 'vegetables', 'kimchi', 'beans', 'meat', 'eggs', 'milk', 'fish',
   'curedMeat', 'saltedFish', 'driedFish', 'jang',
   'firewood', 'brushwood', 'charcoal', 'wood',
   'hideClothes', 'cottonClothes', 'tools', 'onggi', 'carts', 'gunpowder', 'spears', 'hornBows', 'muskets',
-  'hide', 'cotton', 'herbs', 'stone', 'iron',
+  'hide', 'cotton', 'wool', 'hay', 'herbs', 'stone', 'iron',
 ];
 
 const FOOD_HAUL_RESOURCES = new Set<ResourceId>([...FOOD_RESOURCES, 'rice']);
@@ -1731,21 +1743,33 @@ function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
   const miningTile = state.map[r.y]?.[r.x];
   const miningIron = miningTile?.terrain === 'rock' && miningTile.hasIron;
+  const miningSilver = miningTile?.terrain === 'rock' && !!miningTile.hasSilver;
+  // 설점(보고 후 허가) 채굴은 산출의 큰 몫이 조정 몫으로 빠진다
+  const sanctionKeep = state.silverVein?.status === 'sanctioned'
+    && state.silverVein.x === miningTile?.x && state.silverVein.y === miningTile?.y
+    ? 1 - CONFIG.silver.sanctionTaxRatio
+    : 1;
   gatherJob(state, r, ctx, {
     goal: t => t.buildingId != null && state.buildings.some(b =>
-      b.id === t.buildingId && b.built && b.type === 'mine') && mineralRemaining(t) > 0,
+      b.id === t.buildingId && b.built && b.type === 'mine')
+      && mineralRemaining(t) > 0 && !isVeinSealedTile(state, t),
     workTicks: a.work.mine,
-    yieldRes: miningIron ? 'iron' : 'stone',
-    yieldAmt: tile => tile.hasIron ? a.yields.iron : a.yields.stone,
-    cap: miningIron ? a.carryCap.iron : a.carryCap.stone,
+    yieldRes: miningSilver ? 'silver' : miningIron ? 'iron' : 'stone',
+    yieldAmt: tile => tile.hasSilver ? a.yields.silver : tile.hasIron ? a.yields.iron : a.yields.stone,
+    cap: miningSilver ? a.carryCap.silver : miningIron ? a.carryCap.iron : a.carryCap.stone,
     depositExtra: ['mine'],
-    taskWork: '채광 중',
+    taskWork: miningSilver ? '은맥 채굴 중' : '채광 중',
     taskMove: '채광장으로 이동',
     taskHaul: '광물 운반',
     taskNone: '광맥 고갈',
     adjustHarvestAmount: (tile, _worker, amount) => {
       const extraction = extractMineralDeposit(tile, amount);
       if (extraction.depleted) logMineralDepletion(state, tile, extraction.resource);
+      if (extraction.resource === 'silver') {
+        recordSilverMined(state, extraction.amount);
+        return extraction.amount * sanctionKeep;
+      }
+      if (extraction.amount > 0) recordRockMining(state, tile);
       return extraction.amount;
     },
     onHarvest: (_tile, worker, amount) => {
@@ -1820,17 +1844,10 @@ function herderTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
 
-  const chicken = CONFIG.livestock.chicken;
-  const shortageMult = livestock.feedShortageDays > 0 ? 0.25 : 1;
-  const eggs = (chicken.eggPerHeadPerHerderDay / SUBTICKS)
-    * livestock.headcount
-    * chicken.eggSeasonMult[ctx.season]
-    * effOf(r)
-    * ctx.mMod
-    * shortageMult;
-  addBuildingStock(stable, 'eggs', eggs);
+  const product = livestockProductForHerder(livestock, ctx.season, (effOf(r) * ctx.mMod) / SUBTICKS);
+  if (product && product.amount > 0) addBuildingStock(stable, product.resource, product.amount);
   r.phase = 'working';
-  r.task = '달걀 거두기';
+  r.task = product?.task ?? '가축 돌보기';
   gainSkillTick(r);
 }
 
@@ -1938,26 +1955,29 @@ function weaverTick(state: GameState, r: Resident, ctx: Ctx): void {
   const weavingHouse = assignedWorkplace(state, r, ctx, 'weavingHouse', '베틀집 배정 없음');
   if (!weavingHouse) return;
   const target = (CONFIG.production.weaverCottonPerDay / 5) * effOf(r) * ctx.mMod;
-  if (supplyWorkplaceInputs(state, r, ctx, weavingHouse, { cotton: target })) return;
+  const cottonAvailable = buildingStock(weavingHouse, 'cotton') + (state.resources.cotton ?? 0);
+  const woolAvailable = buildingStock(weavingHouse, 'wool') + (state.resources.wool ?? 0);
+  const input: 'cotton' | 'wool' = cottonAvailable > 0.05 || woolAvailable <= 0.05 ? 'cotton' : 'wool';
+  if (supplyWorkplaceInputs(state, r, ctx, weavingHouse, { [input]: target })) return;
   const st = goTo(state, r, ctx, buildingGoal(state, weavingHouse.id));
   if (st !== 'arrived') {
     r.phase = st === 'stuck' ? 'rest' : 'toWork';
     r.task = st === 'stuck' ? '길이 막힘' : '베틀집으로 이동';
     return;
   }
-  const cotton = Math.min(
-    buildingStock(weavingHouse, 'cotton'),
+  const fiber = Math.min(
+    buildingStock(weavingHouse, input),
     target,
   );
-  if (cotton <= 0.05) {
+  if (fiber <= 0.05) {
     r.phase = 'rest';
-    r.task = '목화 대기';
+    r.task = '섬유 대기';
     return;
   }
-  takeBuildingStock(weavingHouse, 'cotton', cotton);
-  addBuildingStock(weavingHouse, 'cottonClothes', cotton * CONFIG.production.cottonClothesPerCotton);
+  takeBuildingStock(weavingHouse, input, fiber);
+  addBuildingStock(weavingHouse, 'cottonClothes', fiber * CONFIG.production.cottonClothesPerCotton);
   r.phase = 'working';
-  r.task = '베 짜기';
+  r.task = input === 'wool' ? '양털 짜기' : '베 짜기';
   gainSkillTick(r);
 }
 

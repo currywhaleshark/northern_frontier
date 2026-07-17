@@ -51,6 +51,7 @@ import { maybeOfferImmigration, resolveImmigration } from './immigration';
 import { createIncidentState, resolveSpecialEvent, updateSpecialEvents } from './specialEvents';
 import { dailyClaimTensionTick, noteBuildingClaimIntrusions } from './claimZones';
 import { applyDailySpoilage } from './spoilage';
+import { dailySilverTick, resolveSilverVeinChoice } from './silver';
 import { updateFermentation } from './fermentation';
 import { isKimjangChoice, maybeOpenKimjangEvent, resolveKimjangChoice } from './kimjang';
 import {
@@ -644,6 +645,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'incident' && isKimjangChoice(state.pendingChoice)) resolveKimjangChoice(state, optionId);
   else if (state.pendingChoice.kind === 'incident') resolveSpecialEvent(state, optionId, rng);
   else if (state.pendingChoice.kind === 'territory') resolveTerritoryWarning(state, optionId);
+  else if (state.pendingChoice.kind === 'silverVein') resolveSilverVeinChoice(state, optionId, rng);
   else resolveTrade(state, optionId);
   reconcileWeaponAssignments(state);
   state.resources.defense = computeDefense(state);
@@ -744,6 +746,7 @@ function endOfDay(state: GameState): void {
   maybeOfferImmigration(state, rng);
   maybeFlavorLog(state, rng);
   maybeCollectTribute(state); // 겨울: 조정의 사자가 세공을 거둔다 (모달 충돌 시 다음 날로)
+  dailySilverTick(state, rng); // 은맥 발견/재제안/잠채 발각 — 의심 갱신보다 먼저
   updateSuspicion(state, rng); // 모반 의심 누적과 감찰/견책/토벌 사건
   maybeOpenKimjangEvent(state); // 늦가을~입동의 연례 공동 김장. 다른 모달이 있으면 기간 안에 재시도
   updateSpecialEvents(state, rng); // 기존 제도권 사건과 모달이 겹치면 예정일을 넘겨 다음 날 재시도

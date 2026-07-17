@@ -99,8 +99,8 @@ function keepOnlyResident(state, index, job, tile) {
   assert.equal(buildings.smithyProductOf(smithy), 'tools');
   assert.deepEqual(buildings.availableSmithyProducts('settlement'), ['tools', 'carts']);
   assert.deepEqual(buildings.availableSmithyProducts('bo'), ['tools', 'carts', 'spears']);
-  assert.deepEqual(buildings.availableSmithyProducts('jin'), ['tools', 'carts', 'spears', 'hornBows']);
-  assert.deepEqual(buildings.availableSmithyProducts('bu'), ['tools', 'carts', 'spears', 'hornBows', 'muskets']);
+  assert.deepEqual(buildings.availableSmithyProducts('jin'), ['tools', 'carts', 'spears', 'hornBows', 'silverwork']);
+  assert.deepEqual(buildings.availableSmithyProducts('bu'), ['tools', 'carts', 'spears', 'hornBows', 'muskets', 'silverwork']);
 
   assert.ok(simulation.setSmithyProduct(state, smithy.id, 'spears')?.includes('승격'));
   state.rank = 'bo';

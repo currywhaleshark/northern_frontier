@@ -38,6 +38,7 @@ import {
   ExpeditionMusterDialog, type ExpeditionMusterRequest,
 } from './components/ExpeditionMusterDialog';
 import { requestPetition } from './game/petition';
+import { breakSilverSeal, reopenBuriedVein } from './game/silver';
 import { toggleNitreYards } from './game/suspicion';
 import { setProcessingReserve } from './game/processing';
 import { setTributeReserve } from './game/tributeReserve';
@@ -562,6 +563,16 @@ export default function App() {
     bump();
   };
 
+  // 은맥 — 봉인 어기기 / 묻어둔 은맥 다시 열기
+  const handleSilverVeinAction = (action: 'break-seal' | 'reopen') => {
+    const rng = makeRng(stateRef.current.seed + stateRef.current.day * 5417 + 13);
+    const err = action === 'break-seal'
+      ? breakSilverSeal(stateRef.current, rng)
+      : reopenBuriedVein(stateRef.current);
+    if (err) addLog(stateRef.current, err, 'info');
+    bump();
+  };
+
   const handleOrganizeHunt = (kind: WildlifeKind) => {
     if (kind !== 'boar') {
       if (!stateRef.current.incidents.predatorThreats[kind]) {
@@ -867,6 +878,7 @@ export default function App() {
               onConvertFieldToPaddy={handleConvertFieldToPaddy}
               onRequestTrade={handleRequestTrade}
               onToggleNitre={handleToggleNitre}
+              onSilverVeinAction={handleSilverVeinAction}
               onAssignNearestWorker={handleAssignNearestWorker}
               onUnassignWorker={handleUnassignWorker}
               onSelectResident={handleResidentClick}

@@ -2,7 +2,9 @@
 import { CONFIG } from '../game/config';
 import { foodTotal, fuelHeatTotal } from '../game/consumption';
 import { avg, livingResidents, residentHome } from '../game/residents';
-import { normalizeLivestockState, settlementLivestockDailyFeedNeed } from '../game/livestock';
+import {
+  normalizeLivestockState, settlementLivestockDailyFeedNeed, settlementLivestockWinterHayNeed,
+} from '../game/livestock';
 import { activePhysicianCount } from '../game/medicine';
 import { getDayOfSeason, getSeason } from '../game/seasons';
 import { firewoodWeatherMult } from '../game/weather';
@@ -44,20 +46,34 @@ export function computeAlerts(state: GameState): AlertItem[] {
   if (feedShortageDays > 0) {
     alerts.push({
       id: 'livestockFeedDanger',
-      text: `닭 사료가 ${feedShortageDays}일째 부족합니다. 곡물을 확보하거나 겨울 전에 일부를 도축하십시오.`,
+      text: `가축 사료가 ${feedShortageDays}일째 부족합니다. 곡물·건초를 확보하거나 일부를 도축하십시오.`,
       level: 'danger',
     });
   } else if ((season === 'autumn' || season === 'winter') && occupiedStables.length > 0) {
-    const feedPerDay = settlementLivestockDailyFeedNeed(state);
-    const feedDays = feedPerDay > 0 ? state.resources.grain / feedPerDay : 99;
-    const daysToCover = season === 'autumn'
+    const grainPerDay = settlementLivestockDailyFeedNeed(state);
+    const grainDaysToCover = season === 'autumn'
       ? (CONFIG.time.seasonDays - getDayOfSeason(state.day) + 1) + CONFIG.time.seasonDays
       : CONFIG.time.seasonDays - getDayOfSeason(state.day) + 1;
-    if (feedDays < daysToCover) {
+    const hayDaysToCover = season === 'autumn'
+      ? CONFIG.time.seasonDays
+      : CONFIG.time.seasonDays - getDayOfSeason(state.day) + 1;
+    const grainNeeded = grainPerDay * grainDaysToCover;
+    const hayNeeded = settlementLivestockWinterHayNeed(state, hayDaysToCover);
+    const grainShort = state.resources.grain + 1e-9 < grainNeeded;
+    const hayShort = state.resources.hay + 1e-9 < hayNeeded;
+    if (grainShort || hayShort) {
+      const needs = [
+        grainShort ? `곡물 약 ${grainNeeded.toFixed(1)}` : null,
+        hayShort ? `건초 약 ${hayNeeded.toFixed(1)}` : null,
+      ].filter(Boolean).join(' · ');
+      const coverage = Math.min(
+        grainNeeded > 0 ? state.resources.grain / grainNeeded : 1,
+        hayNeeded > 0 ? state.resources.hay / hayNeeded : 1,
+      );
       alerts.push({
         id: 'livestockFeedForecast',
-        text: `겨울 닭 사료가 부족합니다. 곡물 약 ${(feedPerDay * daysToCover).toFixed(1)}이 필요하니 비축하거나 일부를 도축하십시오.`,
-        level: feedDays < Math.min(4, daysToCover) ? 'danger' : 'warn',
+        text: `겨울 가축 사료가 부족합니다. ${needs}이 필요하니 비축하거나 일부를 도축하십시오.`,
+        level: coverage < 0.3 ? 'danger' : 'warn',
       });
     }
   }

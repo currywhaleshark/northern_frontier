@@ -35,7 +35,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 18, 'the tactical healer group ships with schema version 18');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 19, 'the silver economy ships with schema version 19');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -82,6 +82,12 @@ assert.equal(typeof saveLoad.migrateV17ToV18, 'function');
   const migrated = saveLoad.migrateV17ToV18({ schemaVersion: 17, resources: { herbs: 3 } });
   assert.equal(migrated.schemaVersion, 18);
   assert.equal(migrated.resources.herbs, 3);
+}
+
+{
+  const migrated = saveLoad.migrateV18ToV19({ schemaVersion: 18, resources: { herbs: 3 } });
+  assert.equal(migrated.schemaVersion, 19);
+  assert.equal(migrated.resources.herbs, 3, 'v19 (silver) is purely additive');
 }
 
 {
@@ -380,7 +386,7 @@ function prepareFormationTestCombatants(state) {
   muskets.line = 'rear';
   store.set('buksae-save-v3', JSON.stringify({ ...v7, schemaVersion: 7 }));
   const loaded = saveLoad.loadGame();
-  assert.equal(loaded?.schemaVersion, 18);
+  assert.equal(loaded?.schemaVersion, saveLoad.CURRENT_SCHEMA_VERSION);
   assert.equal(
     loaded?.tacticalBattle?.defenderGroups.find(group => group.id === muskets.id)?.line,
     'rear',
@@ -399,7 +405,7 @@ function prepareFormationTestCombatants(state) {
   assert.equal(muskets.line, 'middle');
   assert.equal(saveLoad.saveGame(v8), true);
   const loaded = saveLoad.loadGame();
-  assert.equal(loaded?.schemaVersion, 18);
+  assert.equal(loaded?.schemaVersion, saveLoad.CURRENT_SCHEMA_VERSION);
   assert.equal(loaded?.tacticalBattle?.defenderGroups.find(group => group.id === muskets.id)?.line, 'middle');
 }
 

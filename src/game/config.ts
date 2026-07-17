@@ -1,5 +1,5 @@
 // 시뮬레이션 밸런스 값 모음 — 숫자 튜닝은 전부 여기서 한다.
-import type { ProcessingInputId, Rank, ResourceId, Season } from './types';
+import type { LivestockId, ProcessingInputId, Rank, ResourceId, Season } from './types';
 
 export const CONFIG = {
   map: {
@@ -14,6 +14,8 @@ export const CONFIG = {
     ironMax: 140,
     legacyStone: 150,
     legacyIron: 120,
+    silverMin: 80,   // 잠채/설점으로 전환된 은맥의 매장량
+    silverMax: 130,
     nearbyStone: 36,
     nearbyIron: 16,
     nearbyMinDistance: 4,
@@ -46,11 +48,11 @@ export const CONFIG = {
   start: {
     residents: 12,
     resources: {
-      grain: 100, rice: 0, meat: 0, eggs: 0, fish: 0, curedMeat: 0, saltedFish: 0, driedFish: 0, vegetables: 0, kimchi: 0, beans: 0, jang: 0, salt: 0,
+      grain: 100, rice: 0, meat: 0, eggs: 0, milk: 0, fish: 0, curedMeat: 0, saltedFish: 0, driedFish: 0, vegetables: 0, kimchi: 0, beans: 0, jang: 0, salt: 0,
       brushwood: 12, firewood: 45, charcoal: 0,
       wood: 30, stone: 12, iron: 4, tools: 10, onggi: 0, carts: 0,
-      hide: 6, hideClothes: 12, cotton: 0, cottonClothes: 0, herbs: 5,
-      porcelain: 0, brassware: 0, lacquerware: 0, silk: 0, preciousMetal: 0,
+      hide: 6, hideClothes: 12, cotton: 0, wool: 0, hay: 0, cottonClothes: 0, herbs: 5,
+      porcelain: 0, brassware: 0, lacquerware: 0, silk: 0, preciousMetal: 0, silver: 0,
       gunpowder: 0, spears: 0, hornBows: 0, muskets: 0,
       reputation: 50, defense: 0,
     },
@@ -288,6 +290,9 @@ export const CONFIG = {
     musketIronPerUnit: 1.4,
     musketWoodPerUnit: 0.8,
     musketToolsPerUnit: 0.45,
+    silverworkPerDay: 0.5,       // 대장간 은세공 — 화폐(은)를 사치재(귀금속)로 바꾸는 싱크
+    silverworkSilverPerUnit: 2,
+    silverworkCharcoalPerUnit: 0.5,
     ironMinePerDay: 0.8,
     fishPerDay: 1.4,
     brushwoodPerWood: 0.35,
@@ -372,9 +377,9 @@ export const CONFIG = {
     moveSpeedSnow: 1,         // 폭설/눈보라
     shelterThreshold: 0.3,    // 실외작업 중단 기준 (날씨 효율이 이 밑이면 대피)
     carryCap: {
-      grain: 6, rice: 6, meat: 5, eggs: 5, fish: 5, curedMeat: 5, saltedFish: 5, driedFish: 5, vegetables: 5, kimchi: 5, beans: 5, jang: 5,
+      grain: 6, rice: 6, meat: 5, eggs: 5, milk: 5, fish: 5, curedMeat: 5, saltedFish: 5, driedFish: 5, vegetables: 5, kimchi: 5, beans: 5, jang: 5,
       brushwood: 4, firewood: 4, charcoal: 3, wood: 4,
-      stone: 3, iron: 3, hide: 2, cotton: 3, herbs: 1.5,
+      stone: 3, iron: 3, hide: 2, cotton: 3, wool: 3, hay: 5, herbs: 1.5, silver: 2,
     },
     haulerCarryCap: 10,       // 운반꾼 전용 적재량 (채석 귀환에도 사용)
     haulerBatchMin: 2,        // 평시 소량 왕복을 막는 작업장 최소 수거량
@@ -391,6 +396,7 @@ export const CONFIG = {
     },
     yields: {                 // 1회 채집으로 지는 짐
       wood: 1.1, game: 0.75, herbs: 0.55, iron: 1.2, mineStone: 0.4, stone: 1.1, fish: 1.2,
+      silver: 0.5,
     },
     forestDepleteChance: 0.12, // 벌목 1회당 숲이 평지가 될 확률
     forestRegrowChance: 0.003,  // 봄여름, 숲 인접 평지가 숲이 될 하루 확률
@@ -411,17 +417,99 @@ export const CONFIG = {
   },
 
   livestock: {
-    initialUnlocked: ['chicken'],
+    initialUnlocked: ['chicken'] as LivestockId[],
+    cattleFarmWorkBonusPerStable: 0.08,
+    cattleFarmWorkMaxBonus: 0.24,
+    hayPerHarvestProgress: 0.1,
     chicken: {
       capacity: 8,
       initialHeadcount: 4,
+      feedResource: 'grain' as ResourceId,
+      feedPerHeadPerDay: 0.06,
+      grazesOutsideWinter: false,
       grainPerHeadPerDay: 0.06,
       breedingPerHeadPerDay: 0.025,
+      productResource: 'eggs' as ResourceId,
+      productPerHeadPerHerderDay: 0.12,
+      productSeasonMult: { spring: 1, summer: 1, autumn: 0.9, winter: 0.65 } as Record<Season, number>,
       eggPerHeadPerHerderDay: 0.12,
       eggSeasonMult: { spring: 1, summer: 1, autumn: 0.9, winter: 0.65 } as Record<Season, number>,
       shortageGraceDays: 3,
       starvationLossIntervalDays: 2,
       slaughterMeatPerHead: 0.75,
+      slaughterHidePerHead: 0,
+    },
+    goat: {
+      capacity: 5,
+      initialHeadcount: 0,
+      feedResource: 'hay' as ResourceId,
+      feedPerHeadPerDay: 0.18,
+      grazesOutsideWinter: true,
+      grainPerHeadPerDay: 0,
+      breedingPerHeadPerDay: 0.012,
+      productResource: 'milk' as ResourceId,
+      productPerHeadPerHerderDay: 0.18,
+      productSeasonMult: { spring: 1, summer: 0.9, autumn: 0.75, winter: 0.55 } as Record<Season, number>,
+      eggPerHeadPerHerderDay: 0,
+      eggSeasonMult: { spring: 1, summer: 1, autumn: 1, winter: 1 } as Record<Season, number>,
+      shortageGraceDays: 2,
+      starvationLossIntervalDays: 2,
+      slaughterMeatPerHead: 3,
+      slaughterHidePerHead: 0.8,
+    },
+    sheep: {
+      capacity: 5,
+      initialHeadcount: 0,
+      feedResource: 'hay' as ResourceId,
+      feedPerHeadPerDay: 0.2,
+      grazesOutsideWinter: true,
+      grainPerHeadPerDay: 0,
+      breedingPerHeadPerDay: 0.01,
+      productResource: 'wool' as ResourceId,
+      productPerHeadPerHerderDay: 0.08,
+      productSeasonMult: { spring: 1, summer: 0.45, autumn: 0.85, winter: 0.15 } as Record<Season, number>,
+      eggPerHeadPerHerderDay: 0,
+      eggSeasonMult: { spring: 1, summer: 1, autumn: 1, winter: 1 } as Record<Season, number>,
+      shortageGraceDays: 2,
+      starvationLossIntervalDays: 2,
+      slaughterMeatPerHead: 3.5,
+      slaughterHidePerHead: 1.2,
+    },
+    cattle: {
+      capacity: 3,
+      initialHeadcount: 0,
+      feedResource: 'hay' as ResourceId,
+      feedPerHeadPerDay: 0.45,
+      grazesOutsideWinter: true,
+      grainPerHeadPerDay: 0,
+      breedingPerHeadPerDay: 0.005,
+      productResource: 'milk' as ResourceId,
+      productPerHeadPerHerderDay: 0.32,
+      productSeasonMult: { spring: 1, summer: 0.95, autumn: 0.8, winter: 0.6 } as Record<Season, number>,
+      eggPerHeadPerHerderDay: 0,
+      eggSeasonMult: { spring: 1, summer: 1, autumn: 1, winter: 1 } as Record<Season, number>,
+      shortageGraceDays: 2,
+      starvationLossIntervalDays: 2,
+      slaughterMeatPerHead: 8,
+      slaughterHidePerHead: 2.5,
+    },
+    horse: {
+      capacity: 3,
+      initialHeadcount: 0,
+      feedResource: 'hay' as ResourceId,
+      feedPerHeadPerDay: 0.35,
+      grazesOutsideWinter: true,
+      grainPerHeadPerDay: 0,
+      breedingPerHeadPerDay: 0.004,
+      productResource: null,
+      productPerHeadPerHerderDay: 0,
+      productSeasonMult: { spring: 0, summer: 0, autumn: 0, winter: 0 } as Record<Season, number>,
+      eggPerHeadPerHerderDay: 0,
+      eggSeasonMult: { spring: 1, summer: 1, autumn: 1, winter: 1 } as Record<Season, number>,
+      shortageGraceDays: 2,
+      starvationLossIntervalDays: 2,
+      slaughterMeatPerHead: 5,
+      slaughterHidePerHead: 1.5,
     },
   },
 
@@ -431,6 +519,7 @@ export const CONFIG = {
       fish: 0.06,
       meat: 0.04,
       eggs: 0.025,
+      milk: 0.05,
       vegetables: 0.015,
     },
     seasonMult: {
@@ -755,8 +844,12 @@ export const CONFIG = {
       hide: 14, hideClothes: 7, cotton: 12, cottonClothes: 7, herbs: 10, salt: 12,
       gunpowder: 4, spears: 6, hornBows: 4, muskets: 3,
       porcelain: 5, brassware: 5, lacquerware: 5, silk: 4, preciousMetal: 3,
+      silver: 12, // 상단이 한 철에 싣고 오는 은 — 은 수취(수출 흑자)의 상한
       reputation: 0, defense: 0,
     } as Record<ResourceId, number>,
+    // 은이 낀 거래는 관계 마진이 절반 이하로 줄어든다(1 + (마진-1)×이 값).
+    // 물물교환보다 은 결제가 항상 약간 이득이 되게 하는 장치다.
+    silverMarginKeep: 0.4,
     capacitySeasonMult: {
       spring: {
         grain: 0.65, rice: 0.55, fish: 1.25, vegetables: 0.85,
@@ -807,6 +900,26 @@ export const CONFIG = {
     partialSuspicionDecayMult: 0.5,
     rewardTools: 2,        // 격년 하사품 (도구 또는 옷, 결정적 롤)
     rewardCottonClothes: 3,
+    // 은 대납 — 요구 품목의 교역 가치 총합을 은 시세로 환산해 한 번에 치른다
+    silverPayMarkup: 1.1,           // 환산가에 얹는 웃돈 (조정 몫의 예우)
+    silverPayRepBonus: 2,           // 현물 납부 대비 추가 명성
+    silverPaySuspicionDecayMult: 1.5, // 은까지 바치는 성실함 — 의심을 더 깊이 씻는다
+  },
+
+  // 은맥 — 바위/철광을 캐는 동안 낮은 확률로 드러나는 게임당 1회 사건
+  silver: {
+    veinDailyChance: 0.015,   // 채광이 있었던 날의 발견 확률
+    pityMiningDays: 60,       // 누적 채광일이 이에 달하면 강제 발견 (게임당 최소 1회 보장)
+    reofferCooldownDays: 12,  // 묻어둔 은맥의 재제안 간격 (그 광상을 계속 캘 때)
+    sanctionChance: 0.25,     // 보고 시 설점 허가 확률 (나머지는 봉인 명령)
+    sanctionTaxRatio: 0.6,    // 설점 채굴 산출 중 조정 몫
+    reportReputation: 4,      // 보고 즉시 명성
+    reportSuspicionDecay: 6,  // 보고 즉시 의심 감소 (성실한 신고)
+    exposeBaseChance: 0.004,  // 잠채 발각 일일 기본 확률
+    exposePerMined: 0.0004,   // 캔 은 1당 추가 확률 (많이 캘수록 소문이 돈다)
+    exposeChanceMax: 0.05,
+    exposeSpike: 30,          // 발각 시 모반 의심 상승
+    exposeSpikeSealBroken: 40, // 봉인을 어긴 잠채가 발각되면 더 크게
   },
 
   // 세력별 우호도 증감
@@ -881,6 +994,8 @@ export const CONFIG = {
     tradeWindowDays: 12,
     cozyRelationAbove: 75,    // 이 관계 이상인 북방 세력마다 (적대 성향은 2배)
     perCozyFaction: 0.06,
+    perSecretSilver: 0.5,     // 잠채 은광 가동 중 — 조정 탭에는 익명 라벨로만 보인다
+    perSealBrokenSilver: 0.8, // 봉인을 어긴 잠채 — 조정이 위치를 아는 만큼 더 위험하다
     // ── 감소 ──
     baseDecay: 0.25,          // 하루 자연 감소
     tributeDecay: 6,          // 세공 납부 시 즉시

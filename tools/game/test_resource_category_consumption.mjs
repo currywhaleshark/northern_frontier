@@ -28,7 +28,7 @@ const constants = await import(pathToFileURL(join(compiledDir, 'constants.mjs'))
 
 {
   assert.deepEqual(catalog.FOOD_RESOURCES, [
-    'grain', 'meat', 'eggs', 'fish', 'vegetables', 'kimchi', 'beans', 'jang', 'curedMeat', 'saltedFish', 'driedFish',
+    'grain', 'meat', 'eggs', 'milk', 'fish', 'vegetables', 'kimchi', 'beans', 'jang', 'curedMeat', 'saltedFish', 'driedFish',
   ]);
   assert.deepEqual(catalog.FUEL_RESOURCES, ['brushwood', 'firewood', 'charcoal']);
   assert.deepEqual(catalog.CLOTHING_RESOURCES, ['hideClothes', 'cottonClothes']);
@@ -37,8 +37,8 @@ const constants = await import(pathToFileURL(join(compiledDir, 'constants.mjs'))
   assert.equal(constants.RESOURCE_NAMES.rice, '벼');
   assert.deepEqual(
     consumption.FOOD_VARIETY_GROUPS.find(group => group.id === 'meat')?.resources,
-    ['meat', 'eggs', 'curedMeat'],
-    'eggs contribute to the animal-protein group without creating a sixth variety group',
+    ['meat', 'eggs', 'milk', 'curedMeat'],
+    'eggs and milk contribute to the animal-protein group without creating a sixth variety group',
   );
   assert.deepEqual(
     consumption.FOOD_VARIETY_GROUPS.find(group => group.id === 'vegetables')?.resources,
@@ -50,6 +50,16 @@ const constants = await import(pathToFileURL(join(compiledDir, 'constants.mjs'))
     ['beans', 'jang'],
     'jang contributes to its source bean group instead of adding a new variety group',
   );
+}
+
+{
+  const state = simulation.newGame(2026071716);
+  for (const id of catalog.RESOURCE_IDS) state.resources[id] = 0;
+  state.resources.milk = 2;
+  const result = consumption.consumeFoodByDiet(state, 1);
+  assert.equal(result.totalConsumed, 1);
+  assert.equal(result.byResource.milk, 1);
+  assert.equal(result.varietyScore, 0.2, 'milk supplies the animal-protein variety group');
 }
 
 {

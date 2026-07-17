@@ -9,6 +9,7 @@ import {
 } from './tradeValues';
 import { SPECIAL_ITEM_DEFS } from './specialItems';
 import { hasActivePassageForFaction } from './passage';
+import { acquireFirstLivestockFromTrade } from './livestock';
 import type {
   GameState, LogEntry, PendingChoice, ResourceId, SpecialItemId, TradeNegotiation, TradeOffer, TradeQuote,
 } from './types';
@@ -310,6 +311,7 @@ function resolveInitiatedTrade(state: GameState, optionId: string): void {
     }
     changeRelation(state, faction, CONFIG.relations.tradeAccept);
     addLog(state, `장터에서 ${faction}과(와) ${RESOURCE_NAMES[quote.give]}을(를) ${RESOURCE_NAMES[quote.get]}(으)로 교환했습니다.`, 'trade');
+    acquireFirstLivestockFromTrade(state, faction);
   }
   state.pendingChoice = null;
 }
@@ -364,6 +366,7 @@ export function resolveTrade(state: GameState, optionId: string): void {
           `${RESOURCE_NAMES[negotiation.get]} ${negotiation.getAmt}(으)로 교환했습니다.`,
         'trade',
       );
+      acquireFirstLivestockFromTrade(state, negotiation.faction);
       state.pendingChoice = null;
       return;
     }
@@ -393,6 +396,7 @@ export function resolveTrade(state: GameState, optionId: string): void {
     state.resources.reputation = Math.min(100, state.resources.reputation + 2);
     changeRelation(state, d.faction, CONFIG.relations.tradeAccept);
     addLog(state, `장터에서 ${d.faction}과(와) ${RESOURCE_NAMES[d.give]}을(를) ${RESOURCE_NAMES[d.get]}(으)로 교환했습니다.`, 'trade');
+    acquireFirstLivestockFromTrade(state, d.faction);
   } else {
     state.resources.reputation = Math.max(0, state.resources.reputation - 1);
     state.tradeRefusedDays = 10;

@@ -28,6 +28,7 @@ interface Props {
   onConvertFieldToPaddy: (buildingId: number) => void;
   onRequestTrade: (factionName: string) => void;
   onToggleNitre: () => void;
+  onSilverVeinAction: (action: 'break-seal' | 'reopen') => void;
   onAssignNearestWorker: (buildingId: number) => void;
   onUnassignWorker: (residentId: number) => void;
   onSelectResident: (residentId: number) => void;
@@ -55,6 +56,7 @@ export function ActionPopup({
   onConvertFieldToPaddy,
   onRequestTrade,
   onToggleNitre,
+  onSilverVeinAction,
   onAssignNearestWorker,
   onUnassignWorker,
   onSelectResident,
@@ -275,7 +277,7 @@ export function ActionPopup({
           <div className="worker-slot-panel">
             <div className="worker-slot-summary">
               <span>축종</span>
-              <span className="muted small">{LIVESTOCK_DEFS.chicken.icon} {LIVESTOCK_DEFS.chicken.name} {livestock.headcount}마리</span>
+              <span className="muted small">{LIVESTOCK_DEFS[livestock.species].icon} {LIVESTOCK_DEFS[livestock.species].name} {livestock.headcount}마리</span>
             </div>
             <div className="action-grid">
               {IMPLEMENTED_LIVESTOCK_IDS.map(species => (
@@ -294,10 +296,10 @@ export function ActionPopup({
               className="action-command"
               type="button"
               disabled={livestock.headcount < 1}
-              title={`닭 1마리 → 고기 ${CONFIG.livestock.chicken.slaughterMeatPerHead}`}
+              title={`${LIVESTOCK_DEFS[livestock.species].name} 1마리 → 고기 ${CONFIG.livestock[livestock.species].slaughterMeatPerHead}`}
               onClick={() => onSlaughterLivestock(building.id, 1)}
             >
-              닭 1마리 도축
+              {LIVESTOCK_DEFS[livestock.species].name} 1마리 도축
             </button>
           </div>
         );
@@ -327,6 +329,32 @@ export function ActionPopup({
       {building.type === 'nitreYard' && (
         <button className="action-command" type="button" onClick={onToggleNitre}>
           {state.nitrePaused ? '염초장 가동 재개' : '염초장 가동 중지'}
+        </button>
+      )}
+
+      {building.type === 'mine' && state.silverVein
+        && state.map[state.silverVein.y]?.[state.silverVein.x]?.buildingId === building.id
+        && state.silverVein.status === 'sealed' && (
+        <button
+          className="action-command"
+          type="button"
+          title="조정의 봉인을 어기는 잠채입니다. 발각되면 모반 의심이 크게 치솟습니다."
+          onClick={() => onSilverVeinAction('break-seal')}
+        >
+          봉인을 어기고 은맥을 판다
+        </button>
+      )}
+
+      {building.type === 'mine' && state.silverVein
+        && state.map[state.silverVein.y]?.[state.silverVein.x]?.buildingId === building.id
+        && state.silverVein.status === 'buried' && (
+        <button
+          className="action-command"
+          type="button"
+          title="묻어둔 은맥의 처분을 다시 정합니다."
+          onClick={() => onSilverVeinAction('reopen')}
+        >
+          묻어둔 은맥을 다시 연다
         </button>
       )}
     </div>

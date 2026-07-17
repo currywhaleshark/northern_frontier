@@ -10,6 +10,7 @@ import { FACTIONS, RANK_NAMES, RANK_ORDER } from './constants';
 import { addLog } from './events';
 import { getRelation } from './relations';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
+import { silverSuspicionFactors } from './silver';
 import type { GameState, Rank } from './types';
 
 export interface SuspicionFactor {
@@ -54,6 +55,7 @@ export function suspicionBreakdown(state: GameState): SuspicionFactor[] {
   if (cozy > 0) {
     factors.push({ id: 'cozy', label: '북방 세력과의 유착 (관계 75 이상)', delta: cozy * s.perCozyFaction });
   }
+  factors.push(...silverSuspicionFactors(state)); // 잠채 — 익명 라벨로만 표시된다
   factors.push({ id: 'decay', label: '세월이 눈총을 씻는다', delta: -s.baseDecay });
   return factors;
 }

@@ -32,11 +32,13 @@ function rawFoodState(seed = 2026071601) {
   state.resources.fish = 20;
   state.resources.meat = 30;
   state.resources.eggs = 10;
+  state.resources.milk = 10;
   state.resources.vegetables = 40;
   return state;
 }
 
 assert.ok(CONFIG.spoilage.dailyRate.fish > CONFIG.spoilage.dailyRate.meat);
+assert.ok(CONFIG.spoilage.dailyRate.milk > CONFIG.spoilage.dailyRate.meat);
 assert.ok(CONFIG.spoilage.dailyRate.meat > CONFIG.spoilage.dailyRate.eggs);
 assert.ok(CONFIG.spoilage.dailyRate.eggs > CONFIG.spoilage.dailyRate.vegetables);
 assert.ok(CONFIG.spoilage.dailyRate.meat > CONFIG.spoilage.dailyRate.vegetables);
@@ -50,8 +52,9 @@ assert.ok(CONFIG.spoilage.seasonMult.winter < CONFIG.spoilage.seasonMult.autumn)
   assert.equal(report.season, 'summer');
   assert.equal(report.capacity, 0);
   assert.equal(report.protectedTotal, 0);
-  assert.equal(report.rawFoodTotal, 100);
+  assert.equal(report.rawFoodTotal, 110);
   assert.ok(report.items.fish.loss / report.items.fish.stock > report.items.meat.loss / report.items.meat.stock);
+  assert.ok(report.items.milk.loss / report.items.milk.stock > report.items.meat.loss / report.items.meat.stock);
   assert.ok(report.items.meat.loss / report.items.meat.stock > report.items.vegetables.loss / report.items.vegetables.stock);
   assert.ok(report.items.eggs.loss / report.items.eggs.stock > report.items.vegetables.loss / report.items.vegetables.stock);
 }
@@ -68,7 +71,8 @@ assert.ok(CONFIG.spoilage.seasonMult.winter < CONFIG.spoilage.seasonMult.autumn)
   assert.equal(protectedReport.capacity, CONFIG.spoilage.cellarCapacity);
   assert.equal(protectedReport.protectedTotal, CONFIG.spoilage.cellarCapacity);
   assert.equal(protectedReport.items.fish.protectedAmount, 20, 'fish receives protection first');
-  assert.equal(protectedReport.items.meat.protectedAmount, 16, 'remaining capacity protects meat second');
+  assert.equal(protectedReport.items.milk.protectedAmount, 10, 'fast-spoiling milk receives protection second');
+  assert.equal(protectedReport.items.meat.protectedAmount, 6, 'remaining capacity protects meat third');
   assert.equal(protectedReport.items.eggs.protectedAmount, 0, 'eggs wait behind faster-spoiling fish and meat');
   assert.equal(protectedReport.items.vegetables.protectedAmount, 0, 'vegetables receive the final remainder');
   assert.ok(protectedReport.totalLoss < exposed.totalLoss, 'a completed cellar reduces daily losses');
@@ -95,9 +99,10 @@ assert.ok(CONFIG.spoilage.seasonMult.winter < CONFIG.spoilage.seasonMult.autumn)
   state.resources.grain = 77;
   state.resources.rice = 33;
   state.resources.salt = 12;
-  const before = { fish: state.resources.fish, meat: state.resources.meat, eggs: state.resources.eggs, vegetables: state.resources.vegetables };
+  const before = { fish: state.resources.fish, milk: state.resources.milk, meat: state.resources.meat, eggs: state.resources.eggs, vegetables: state.resources.vegetables };
   const report = spoilage.applyDailySpoilage(state);
   assert.equal(state.resources.fish, before.fish - report.items.fish.loss);
+  assert.equal(state.resources.milk, before.milk - report.items.milk.loss);
   assert.equal(state.resources.meat, before.meat - report.items.meat.loss);
   assert.equal(state.resources.eggs, before.eggs - report.items.eggs.loss);
   assert.equal(state.resources.vegetables, before.vegetables - report.items.vegetables.loss);

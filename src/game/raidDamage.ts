@@ -2,6 +2,7 @@
 import { BUILDING_DEFS, countBuilt } from './buildings';
 import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
+import { lootLivestock } from './livestock';
 import { killResident, livingResidents, reconcileResidentHomes } from './residents';
 import type { BuildingTypeId, GameState, ResourceId } from './types';
 
@@ -10,13 +11,17 @@ export function applyLootLosses(
   requested: Partial<Record<ResourceId, number>>,
 ): Partial<Record<ResourceId, number>> {
   const applied: Partial<Record<ResourceId, number>> = {};
+  let largestLossRatio = 0;
   for (const [resource, rawAmount] of Object.entries(requested)) {
     const id = resource as ResourceId;
-    const amount = Math.min(state.resources[id] ?? 0, Math.max(0, Math.floor(rawAmount ?? 0)));
+    const before = state.resources[id] ?? 0;
+    const amount = Math.min(before, Math.max(0, Math.floor(rawAmount ?? 0)));
     if (amount <= 0) continue;
     state.resources[id] -= amount;
     applied[id] = amount;
+    largestLossRatio = Math.max(largestLossRatio, amount / Math.max(1, before));
   }
+  if (largestLossRatio > 0) lootLivestock(state, Math.min(0.35, largestLossRatio));
   return applied;
 }
 
@@ -43,6 +48,8 @@ export function loot(state: GameState, ratio: number): string {
       parts.push(`${RESOURCE_NAMES[res]} ${taken}`);
     }
   }
+  const livestockLoss = lootLivestock(state, r);
+  if (livestockLoss.lost > 0) parts.push(`가축 ${livestockLoss.lost}마리`);
   return parts.length > 0 ? `${parts.join(', ')} 약탈당함` : '약탈 피해 없음';
 }
 

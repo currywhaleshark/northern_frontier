@@ -71,6 +71,7 @@ export type ResourceId =
   | 'rice'       // 논에서 수확한 도정 전 벼
   | 'meat'       // 고기
   | 'eggs'       // 달걀
+  | 'milk'       // 젖
   | 'fish'       // 생선
   | 'curedMeat'  // 보존육
   | 'saltedFish' // 자반
@@ -92,6 +93,8 @@ export type ResourceId =
   | 'hide'       // 가죽
   | 'hideClothes' // 가죽옷
   | 'cotton'     // 목화
+  | 'wool'       // 양털
+  | 'hay'        // 건초 (초식 가축의 겨울 사료)
   | 'cottonClothes' // 무명옷
   | 'herbs'      // 약초
   | 'gunpowder'  // 화약 (조정 지급 — 조총·포대가 전투마다 소모)
@@ -103,10 +106,11 @@ export type ResourceId =
   | 'lacquerware' // 칠기
   | 'silk'       // 비단
   | 'preciousMetal' // 귀금속
+  | 'silver'     // 은 (조선 상단 결제 수단 — 부패하지 않는 가치 저장 자원)
   | 'reputation' // 명성
   | 'defense';   // 방어도
 
-export type SmithyProductId = 'tools' | 'carts' | 'spears' | 'hornBows' | 'muskets';
+export type SmithyProductId = 'tools' | 'carts' | 'spears' | 'hornBows' | 'muskets' | 'silverwork';
 
 export type DryingProductId = 'saltedFish' | 'driedFish';
 
@@ -159,6 +163,7 @@ export interface Tile {
   y: number;
   terrain: Terrain;
   hasIron: boolean;       // rock 타일 중 철광 여부
+  hasSilver?: boolean;    // 잠채/설점으로 은광이 된 광상. 구버전 저장은 없음
   mineralRemaining?: number; // 바위/철광의 남은 주 광물량. 구버전 저장은 없음
   buildingId: number | null;
 }
@@ -417,6 +422,20 @@ export interface LogEntry {
   important?: boolean; // 통합 로그 축약 상태의 주요 소식에 노출
 }
 
+// 은맥의 생애: offered(선택 대기) → secret(잠채) / sanctioned(설점) / sealed(봉인) / buried(묻어둠)
+export type SilverVeinStatus = 'offered' | 'secret' | 'sanctioned' | 'sealed' | 'buried';
+
+export interface SilverVeinState {
+  status: SilverVeinStatus;
+  x: number;
+  y: number;
+  discoveredDay: number;
+  minedTotal: number;      // 잠채/설점으로 캔 은 누계 (발각 확률에 비례)
+  exposed?: boolean;       // 잠채가 조정에 알려졌는지 (스파이크는 1회)
+  sealBroken?: boolean;    // 봉인 명령을 어기고 캐는 중인지 (발각 시 더 아프다)
+  lastOfferDay?: number;   // 묻어둔 은맥의 재제안 쿨다운 기준일
+}
+
 export interface ChoiceOption {
   id: string;
   label: string;
@@ -426,7 +445,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein';
   title: string;
   body: string;
   illustration?: {
@@ -1053,6 +1072,11 @@ export interface GameState {
   specialItems: Record<SpecialItemId, number>; // 산삼·호피 등 일반 자원과 분리한 기물함
   discoveredSpecialItems: SpecialItemId[];     // 소모해도 남는 기물 도감
   tributeWaivers: number;      // 산삼 진상으로 얻은 세공 면제 횟수
+  // ── 은맥 (게임당 1회 — 채광 중 발견 사건으로만 등장) ──
+  silverVein?: SilverVeinState | null; // 구버전 저장에는 없음
+  silverPityDays?: number;     // 발견 전 누적 채광일 (보장 발동용)
+  lastRockMiningDay?: number;  // 마지막으로 바위/철광을 캔 날 (은맥 판정 트리거)
+  lastRockMiningTile?: { x: number; y: number }; // 그날 캐던 광상 위치
   pendingChoice: PendingChoice | null;
   courtTribute: CourtTribute | null;  // 올해 세공 (봄 공지 때 설정)
   tributeReserve: Partial<Record<ResourceId, number>>; // 올해 세공용으로 잠근 중심지 재고

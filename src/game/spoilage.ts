@@ -2,7 +2,7 @@ import { CONFIG } from './config';
 import { getSeason } from './seasons';
 import type { GameState, ResourceId, Season } from './types';
 
-export const SPOILABLE_RESOURCE_IDS = ['fish', 'meat', 'eggs', 'vegetables'] as const satisfies readonly ResourceId[];
+export const SPOILABLE_RESOURCE_IDS = ['fish', 'milk', 'meat', 'eggs', 'vegetables'] as const satisfies readonly ResourceId[];
 export type SpoilableResourceId = typeof SPOILABLE_RESOURCE_IDS[number];
 
 export interface SpoilageItem {

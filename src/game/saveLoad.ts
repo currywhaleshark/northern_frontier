@@ -238,6 +238,11 @@ export function migrateV17ToV18(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 18 };
 }
 
+// v19: 은 자원과 은맥 상태 추가 — 가산적이라 필드 기본값 채움으로 충분하다
+export function migrateV18ToV19(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 19 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   let version = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -260,6 +265,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 15) migrated = migrateV15ToV16(migrated);
     else if (version === 16) migrated = migrateV16ToV17(migrated);
     else if (version === 17) migrated = migrateV17ToV18(migrated);
+    else if (version === 18) migrated = migrateV18ToV19(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -1048,6 +1054,9 @@ export function loadGame(): GameState | null {
     if (parsed.inspectionCooldownUntil == null) parsed.inspectionCooldownUntil = 0;
     if (parsed.censured == null) parsed.censured = false;
     if (parsed.crackdownDeadline == null) parsed.crackdownDeadline = 0;
+    // 은맥 없는 구버전
+    if (!Object.prototype.hasOwnProperty.call(parsed, 'silverVein')) parsed.silverVein = null;
+    if (parsed.silverPityDays == null) parsed.silverPityDays = 0;
     // 세공 없는 구버전: 시드로 올해분을 재생성. 이미 겨울이면 올해분은 면제 (다음 봄부터 정상 진행)
     if (!Object.prototype.hasOwnProperty.call(parsed, 'courtTribute')) {
       const pop = parsed.residents.filter(r => r.alive).length;

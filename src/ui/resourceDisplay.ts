@@ -25,6 +25,7 @@ export const RESOURCE_DISPLAY_GROUP_BY_RESOURCE = {
   rice: 'food',
   meat: 'food',
   eggs: 'food',
+  milk: 'food',
   fish: 'food',
   curedMeat: 'food',
   saltedFish: 'food',
@@ -46,6 +47,8 @@ export const RESOURCE_DISPLAY_GROUP_BY_RESOURCE = {
   carts: 'materials',
   hide: 'materials',
   cotton: 'materials',
+  wool: 'materials',
+  hay: 'materials',
   herbs: 'materials',
   salt: 'materials',
   gunpowder: 'military',
@@ -57,6 +60,7 @@ export const RESOURCE_DISPLAY_GROUP_BY_RESOURCE = {
   lacquerware: 'luxury',
   silk: 'luxury',
   preciousMetal: 'valuables',
+  silver: 'valuables',
 } as const satisfies Record<StockResourceId, ResourceDisplayGroupId>;
 
 export function isStockResourceId(value: unknown): value is StockResourceId {

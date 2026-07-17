@@ -429,7 +429,7 @@ export interface SmithyProductDef {
   task: string;
 }
 
-export const SMITHY_PRODUCT_ORDER: SmithyProductId[] = ['tools', 'carts', 'spears', 'hornBows', 'muskets'];
+export const SMITHY_PRODUCT_ORDER: SmithyProductId[] = ['tools', 'carts', 'spears', 'hornBows', 'muskets', 'silverwork'];
 
 export const SMITHY_PRODUCT_DEFS: Record<SmithyProductId, SmithyProductDef> = {
   tools: {
@@ -482,6 +482,19 @@ export const SMITHY_PRODUCT_DEFS: Record<SmithyProductId, SmithyProductDef> = {
     },
     ratePerDay: CONFIG.production.musketsPerDay,
     task: '조총 제작 중',
+  },
+  // 은세공 — 화폐(은)를 사치재(귀금속)로 바꾸는 비가역 싱크. 은 보유 자체는 만족을 주지 않는다.
+  silverwork: {
+    id: 'silverwork',
+    name: '은세공',
+    minRank: 'jin',
+    output: 'preciousMetal',
+    inputPerUnit: {
+      silver: CONFIG.production.silverworkSilverPerUnit,
+      charcoal: CONFIG.production.silverworkCharcoalPerUnit,
+    },
+    ratePerDay: CONFIG.production.silverworkPerDay,
+    task: '은세공 중',
   },
 };
 

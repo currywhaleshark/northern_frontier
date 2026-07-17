@@ -273,6 +273,17 @@ export function getPointerAction(
 
 export function getBuildingActions(state: GameState, building: Building): BuildingActionItem[] {
   if (!building.built) return [];
+  if (building.type === 'mine') {
+    const vein = state.silverVein;
+    const veinInMine = !!vein && state.map[vein.y]?.[vein.x]?.buildingId === building.id;
+    if (veinInMine && vein.status === 'sealed') {
+      return [{ id: 'silver-break-seal', label: '봉인을 어기고 은맥을 판다' }];
+    }
+    if (veinInMine && vein.status === 'buried') {
+      return [{ id: 'silver-reopen', label: '묻어둔 은맥을 다시 연다' }];
+    }
+    return [];
+  }
   if (building.type === 'hut' && isBuildingUnlocked(state.rank, 'ondol')) {
     return [{ id: 'upgrade:ondol', label: '온돌집으로 개량' }];
   }

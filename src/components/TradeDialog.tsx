@@ -24,7 +24,7 @@ interface Props {
 
 type TradeCategory = Exclude<ResourceCategory, 'abstract'>;
 
-const TRADE_CATEGORY_ORDER: TradeCategory[] = ['food', 'fuel', 'material', 'clothing', 'military', 'luxury'];
+const TRADE_CATEGORY_ORDER: TradeCategory[] = ['food', 'fuel', 'material', 'clothing', 'military', 'luxury', 'currency'];
 const TRADE_CATEGORY_LABELS: Record<TradeCategory, string> = {
   food: '식량',
   fuel: '연료',
@@ -32,6 +32,7 @@ const TRADE_CATEGORY_LABELS: Record<TradeCategory, string> = {
   clothing: '의복',
   military: '군수',
   luxury: '사치',
+  currency: '은',
 };
 
 function tradeCategoryOf(resource: ResourceId): TradeCategory {

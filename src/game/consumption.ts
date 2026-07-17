@@ -11,14 +11,14 @@ export interface ConsumptionResult {
 
 export const FOOD_VARIETY_GROUPS = [
   { id: 'grain', resources: ['grain'] as const, weight: 2 },
-  { id: 'meat', resources: ['meat', 'eggs', 'curedMeat'] as const, weight: 1 },
+  { id: 'meat', resources: ['meat', 'eggs', 'milk', 'curedMeat'] as const, weight: 1 },
   { id: 'fish', resources: ['fish', 'saltedFish', 'driedFish'] as const, weight: 1 },
   { id: 'vegetables', resources: ['vegetables', 'kimchi'] as const, weight: 1 },
   { id: 'beans', resources: ['beans', 'jang'] as const, weight: 0.5 },
 ] as const;
 
 const FOOD_CONSUMPTION_ORDER: readonly ResourceId[] = [
-  'grain', 'meat', 'eggs', 'fish', 'vegetables', 'kimchi', 'beans', 'jang', 'curedMeat', 'saltedFish', 'driedFish',
+  'grain', 'meat', 'eggs', 'milk', 'fish', 'vegetables', 'kimchi', 'beans', 'jang', 'curedMeat', 'saltedFish', 'driedFish',
 ];
 
 function finitePositive(value: number): number {

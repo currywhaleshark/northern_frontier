@@ -36,7 +36,7 @@ const EVENT_COOLDOWNS: Record<SpecialEventId, number> = {
   gyrfalcon: CONFIG.specialEvents.gyrfalconCooldownDays,
 };
 
-const FOOD_RESOURCES: ResourceId[] = ['grain', 'rice', 'meat', 'eggs', 'fish', 'vegetables', 'beans'];
+const FOOD_RESOURCES: ResourceId[] = ['grain', 'rice', 'meat', 'eggs', 'milk', 'fish', 'vegetables', 'beans'];
 
 function incidentSchedule(seed: number, year: number): number[] {
   const rng = makeRng(seed + year * 15485863 + 41);

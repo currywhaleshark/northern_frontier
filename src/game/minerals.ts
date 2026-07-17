@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import type { Tile } from './types';
 
-export type MineralResource = 'stone' | 'iron';
+export type MineralResource = 'stone' | 'iron' | 'silver';
 
 export interface MineralExtraction {
   resource: MineralResource;
@@ -23,7 +23,23 @@ export function mineralRemaining(tile: Tile): number {
 export function setMineralDeposit(tile: Tile, hasIron: boolean, amount: number): void {
   tile.terrain = 'rock';
   tile.hasIron = hasIron;
+  tile.hasSilver = false;
   tile.mineralRemaining = Math.max(0, amount);
+}
+
+// 잠채/설점 — 광상을 은맥으로 전환한다. 남은 원광과 무관하게 은 매장량을 새로 굴린다.
+export function convertToSilverDeposit(tile: Tile, rng: () => number): number {
+  const amount = CONFIG.minerals.silverMin
+    + Math.floor(rng() * (CONFIG.minerals.silverMax - CONFIG.minerals.silverMin + 1));
+  tile.terrain = 'rock';
+  tile.hasIron = false;
+  tile.hasSilver = true;
+  tile.mineralRemaining = amount;
+  return amount;
+}
+
+export function tileMineralResource(tile: Pick<Tile, 'hasIron' | 'hasSilver'>): MineralResource {
+  return tile.hasSilver ? 'silver' : tile.hasIron ? 'iron' : 'stone';
 }
 
 export function rollMineralDepositAmount(hasIron: boolean, rng: () => number): number {
@@ -33,7 +49,7 @@ export function rollMineralDepositAmount(hasIron: boolean, rng: () => number): n
 }
 
 export function extractMineralDeposit(tile: Tile, requested: number): MineralExtraction {
-  const resource: MineralResource = tile.hasIron ? 'iron' : 'stone';
+  const resource = tileMineralResource(tile);
   const available = mineralRemaining(tile);
   const amount = Math.min(available, Number.isFinite(requested) ? Math.max(0, requested) : 0);
   const remaining = Math.max(0, available - amount);
@@ -42,6 +58,7 @@ export function extractMineralDeposit(tile: Tile, requested: number): MineralExt
   if (depleted) {
     tile.terrain = 'plain';
     tile.hasIron = false;
+    tile.hasSilver = false;
   }
   return { resource, amount, remaining, depleted };
 }
