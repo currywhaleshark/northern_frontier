@@ -64,6 +64,7 @@ export type JobId =
   | 'militia';   // 수비병 (내부 id는 저장 호환을 위해 유지)
 
 export type CombatWeaponId = 'musket' | 'hornBow' | 'spear';
+export type MountId = 'horse';
 export type WeaponAllocationMode = 'auto' | 'manual';
 
 export type ResourceId =
@@ -289,6 +290,7 @@ export interface Resident {
   age: number;
   gender: Gender;
   job: JobId;
+  origin?: string; // 귀순·이주 전의 소속. 없으면 일반 개척지 주민
   hunger: number;   // 0(굶주림) ~ 100(포만)
   warmth: number;   // 0(동사 직전) ~ 100
   health: number;   // 0 사망
@@ -474,7 +476,7 @@ export type PredatorKind = 'wolf' | 'tiger';
 export type TigerTier = 'tiger' | 'greatTiger' | 'mountainLord';
 export type WildlifeKind = PredatorKind | 'boar';
 export type SpecialEventId = WildlifeKind | 'wildGinseng' | 'plagueSuspicion' | 'grainRequisition' |
-  'shipwreck' | 'earlyFrost' | 'gyrfalcon';
+  'shipwreck' | 'earlyFrost' | 'gyrfalcon' | 'horseDefectors';
 
 export interface PredatorThreat {
   kind: WildlifeKind;
@@ -743,6 +745,7 @@ export interface TacticalDefenderGroup {
   id: string;
   kind: DefenderGroupKind;
   role: CombatRole;
+  origin?: string;
   weapon: CombatWeaponId | null;
   readyMuskets?: number;
   label: string;
@@ -1049,6 +1052,7 @@ export interface GameState {
   resources: Record<ResourceId, number>;
   unlockedLivestock: LivestockId[];
   weaponAssignments: Partial<Record<number, CombatWeaponId>>; // 주민별 전투 무기. 없으면 비무장
+  mountAssignments: Partial<Record<number, MountId>>; // 무기와 별도인 주민별 탑승 군마
   weaponAllocationMode: WeaponAllocationMode; // 자동 배분을 유지할지 플레이어 배정을 고정할지
   processingReserves: Record<ProcessingInputId, number>; // 자동 가공/소비 전에 남길 원자재 수량
   threat: number;         // 습격 위협도 0~100

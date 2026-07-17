@@ -1,4 +1,5 @@
 import { CONFIG } from './config';
+import { residentOriginProfile } from './defectors';
 import type { CombatCapability, CombatRole } from './combatRoster';
 import type { CombatWeaponId } from './types';
 
@@ -9,6 +10,7 @@ export const HUNTER_DEFAULT_RANGED = true;
 export function combatCapabilities(
   role: CombatRole,
   weapon: CombatWeaponId | null,
+  origin?: string,
 ): ReadonlySet<CombatCapability> {
   const result = new Set<CombatCapability>(['hold']);
   if (role === 'militia') {
@@ -32,23 +34,42 @@ export function combatCapabilities(
   } else if (weapon === 'hornBow' || weapon === 'musket') {
     result.add('volley');
   }
+  const originProfile = residentOriginProfile(origin);
+  if (originProfile === 'nimacha') {
+    result.add('ambush');
+    result.add('scout');
+  } else if (originProfile === 'holaon') {
+    result.add('scout');
+    result.add('mounted');
+  }
   return result;
 }
 
-export function combatBasePower(role: CombatRole): number {
-  if (role === 'militia') return CONFIG.raid.militiaDefense;
-  if (role === 'watchman') return CONFIG.raid.watchmanDefense;
-  if (role === 'hunter') return CONFIG.tacticalBattle.groupPower.hunter;
-  if (role === 'healer') return CONFIG.tacticalBattle.groupPower.healer;
-  return CONFIG.raid.levyDefensePerResident;
+export function combatBasePower(role: CombatRole, origin?: string): number {
+  const rolePower = role === 'militia' ? CONFIG.raid.militiaDefense
+    : role === 'watchman' ? CONFIG.raid.watchmanDefense
+      : role === 'hunter' ? CONFIG.tacticalBattle.groupPower.hunter
+        : role === 'healer' ? CONFIG.tacticalBattle.groupPower.healer
+          : CONFIG.raid.levyDefensePerResident;
+  const originProfile = residentOriginProfile(origin);
+  const originBonus = originProfile === 'nimacha' ? CONFIG.defectors.nimachaBasePowerBonus
+    : originProfile === 'holaon' ? CONFIG.defectors.holaonBasePowerBonus
+      : 0;
+  return rolePower + originBonus;
 }
 
 export function combatWeaponTotalPower(
   role: CombatRole,
   readyWeapon: CombatWeaponId | null,
+  origin?: string,
 ): number {
-  const base = combatBasePower(role);
-  if (readyWeapon === 'musket') return Math.max(base, CONFIG.raid.musketDefense);
+  const base = combatBasePower(role, origin);
+  if (readyWeapon === 'musket') {
+    const musketPower = Math.max(base, CONFIG.raid.musketDefense);
+    return residentOriginProfile(origin) === 'courtDeserter'
+      ? musketPower + CONFIG.defectors.courtMusketPowerBonus
+      : musketPower;
+  }
   if (readyWeapon === 'hornBow') return Math.max(base, CONFIG.raid.hornBowDefense);
   if (readyWeapon === 'spear') return Math.max(base, CONFIG.raid.spearDefense);
   return base;
@@ -84,25 +105,31 @@ export function combatGroupLabel(role: CombatRole, weapon: CombatWeaponId | null
 
 export function tacticalGroupCapabilities(group: {
   role: CombatRole;
+  origin?: string;
   weapon: CombatWeaponId | null;
   readyMuskets?: number;
 }): ReadonlySet<CombatCapability> {
   const readyWeapon = group.weapon === 'musket' && (group.readyMuskets ?? 0) <= 0
     ? null
     : group.weapon;
-  return combatCapabilities(group.role, readyWeapon);
+  return combatCapabilities(group.role, readyWeapon, group.origin);
 }
 
 export function tacticalGroupPower(group: {
   role: CombatRole;
+  origin?: string;
   weapon: CombatWeaponId | null;
   readyMuskets?: number;
 }, active: number): number {
   const count = Math.max(0, active);
-  const base = combatBasePower(group.role);
+  const base = combatBasePower(group.role, group.origin);
   if (group.weapon === 'musket') {
     const ready = Math.min(count, Math.max(0, group.readyMuskets ?? 0));
-    return count * base + ready * (combatWeaponTotalPower(group.role, 'musket') - base);
+    return count * base + ready * (combatWeaponTotalPower(group.role, 'musket', group.origin) - base);
   }
-  return count * combatWeaponTotalPower(group.role, group.weapon);
+  return count * combatWeaponTotalPower(group.role, group.weapon, group.origin);
+}
+
+export function isHorseExperiencedOrigin(origin?: string): boolean {
+  return residentOriginProfile(origin) === 'holaon';
 }

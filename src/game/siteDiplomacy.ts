@@ -6,6 +6,7 @@ import { changeRelation, getRelation } from './relations';
 import { revealPassageRoute } from './passage';
 import { livingResidents } from './residents';
 import { createCombatRoster } from './combatRoster';
+import { openDefectorImmigrationChoice } from './immigration';
 import {
   banditLairDoctrineDefinition, ensureBanditLairDefensePlan, refreshBanditLairDoctrine,
 } from './enemyPlan';
@@ -119,6 +120,34 @@ export function requestHuntingRights(state: GameState, siteId: number): string |
   site.lastInteractionDay = state.day;
   addForeignSiteMemory(state, site.id, `${until}일까지 사냥터와 숲을 함께 쓰기로 약조했습니다.`, 'good');
   addLog(state, `${site.name}에 사냥터 사용을 청했습니다. 곡물 ${cost}을 답례하고 ${CONFIG.foreignSites.huntingRightsDays}일 동안 이용을 묵인받았습니다.`, 'good', true);
+  return null;
+}
+
+export function requestSiteDefectors(state: GameState, siteId: number): string | null {
+  const site = getSite(state, siteId);
+  if (!site) return '거점을 찾을 수 없습니다.';
+  const blocked = canAddressSite(site);
+  if (blocked) return blocked;
+  if (state.pendingChoice || state.battle || state.gameOver) return '다른 결정을 먼저 마쳐야 합니다.';
+  if (!site.factionName) return '소속을 확인할 수 없는 주민들에게 공식 귀순을 청할 수 없습니다.';
+  if (site.status !== 'hungry' && site.status !== 'sick') {
+    return '굶주리거나 병든 거점의 주민들만 삶터를 옮길 뜻을 보입니다.';
+  }
+  const config = CONFIG.defectors;
+  if (site.goodwill < config.siteMinGoodwill || site.trust < config.siteMinTrust) {
+    return `호의 ${config.siteMinGoodwill}, 신용 ${config.siteMinTrust} 이상이어야 주민 이주를 의논할 수 있습니다.`;
+  }
+  if (site.favors < config.siteFavorCost) return `이 부탁에는 거점의 은혜 ${config.siteFavorCost}가 필요합니다.`;
+  if (site.population < config.siteGroupMin) return '옮겨 올 수 있는 주민이 남아 있지 않습니다.';
+  const count = Math.min(
+    config.siteGroupMax,
+    site.population,
+    Math.max(config.siteGroupMin, Math.floor(site.population * 0.12)),
+  );
+  if (!openDefectorImmigrationChoice(state, site.factionName, count, site.id, config.siteFavorCost)) {
+    return '지금은 귀순 청원을 열 수 없습니다.';
+  }
+  addForeignSiteMemory(state, site.id, `주민 ${count}명이 개척지로 옮길 수 있도록 묵인을 청했습니다.`, 'neutral');
   return null;
 }
 

@@ -946,6 +946,30 @@ export const CONFIG = {
     rejectReputation: 2,
   },
 
+  defectors: {
+    immigrationDailyChance: 0.025,
+    groupMin: 2,
+    groupMax: 4,
+    rejectRelation: 3,
+    suspicionPerNorthernResident: 0.04,
+    nimachaBasePowerBonus: 0.75,
+    holaonBasePowerBonus: 0.4,
+    courtMusketPowerBonus: 2,
+    siteMinGoodwill: 45,
+    siteMinTrust: 35,
+    siteFavorCost: 2,
+    siteGroupMin: 2,
+    siteGroupMax: 4,
+    horseOfferChance: 0.035,
+    horseOfferCooldownDays: 24,
+    horseGroupSize: 2,
+    horseCount: 2,
+  },
+
+  mounted: {
+    combatDeathHorseLossChance: 0.45,
+  },
+
   // 난이도별 보정 (메인 메뉴에서 선택)
   // habitatChance: 숲 덩어리마다 짐승 서식지가 자리 잡을 확률 — 어려울수록 사냥감이 귀하다
   difficulty: {

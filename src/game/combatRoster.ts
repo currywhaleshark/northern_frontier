@@ -16,11 +16,13 @@ export type CombatCapability =
   | 'ambush'
   | 'scout'
   | 'guard'
-  | 'protect';
+  | 'protect'
+  | 'mounted';
 
 export interface CombatantSnapshot {
   residentId: number;
   role: CombatRole;
+  origin?: string;
   assignedWeapon: CombatWeaponId | null;
   readyWeapon: CombatWeaponId | null;
   capabilities: CombatCapability[];
@@ -93,16 +95,18 @@ export function createCombatRoster(
     const readyWeapon = assignedWeapon === 'musket' && !readyMusketIds.has(resident.id)
       ? null
       : assignedWeapon;
-    const basePower = combatBasePower(role);
-    return {
+    const basePower = combatBasePower(role, resident.origin);
+    const snapshot: CombatantSnapshot = {
       residentId: resident.id,
       role,
+      ...(resident.origin ? { origin: resident.origin } : {}),
       assignedWeapon,
       readyWeapon,
-      capabilities: [...combatCapabilities(role, readyWeapon)],
+      capabilities: [...combatCapabilities(role, readyWeapon, resident.origin)],
       basePower,
-      weaponPower: combatWeaponTotalPower(role, readyWeapon) - basePower,
-    } satisfies CombatantSnapshot;
+      weaponPower: combatWeaponTotalPower(role, readyWeapon, resident.origin) - basePower,
+    };
+    return snapshot;
   });
 
   return {

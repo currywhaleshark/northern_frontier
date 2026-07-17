@@ -2,10 +2,11 @@ import { CONFIG } from './config';
 import { addLog } from './events';
 import { addBuildingStock } from './inventory';
 import { getSeason } from './seasons';
+import { reconcileMountAssignments } from './weapons';
 import type { Building, GameState, LivestockId, LivestockState, ResourceId, Season } from './types';
 
 export const LIVESTOCK_IDS = ['chicken', 'goat', 'sheep', 'cattle', 'horse'] as const satisfies readonly LivestockId[];
-export const IMPLEMENTED_LIVESTOCK_IDS = ['chicken', 'goat', 'sheep', 'cattle'] as const satisfies readonly LivestockId[];
+export const IMPLEMENTED_LIVESTOCK_IDS = ['chicken', 'goat', 'sheep', 'cattle', 'horse'] as const satisfies readonly LivestockId[];
 
 export const LIVESTOCK_DEFS = {
   chicken: { name: '닭', icon: '🐔' },
@@ -175,6 +176,7 @@ export function updateLivestock(state: GameState): LivestockDailyReport {
 
   if (report.births > 0) addLog(state, `축사에서 새끼 가축 ${report.births}마리가 태어났습니다.`, 'good');
   if (report.deaths > 0) addLog(state, `먹이가 모자라 가축 ${report.deaths}마리를 잃었습니다.`, 'bad', true);
+  reconcileMountAssignments(state);
   return report;
 }
 
@@ -243,6 +245,7 @@ export function lootLivestock(state: GameState, ratio: number): LivestockLootRep
       .join(', ');
     addLog(state, `습격대가 축사를 털어 ${details}를 끌고 갔습니다.`, 'bad', true);
   }
+  reconcileMountAssignments(state);
   return report;
 }
 
@@ -255,6 +258,7 @@ export function setStableLivestock(state: GameState, buildingId: number, species
   if (livestock.species === species) return null;
   if (livestock.headcount > 0) return '축사에 가축이 남아 있어 축종을 바꿀 수 없습니다.';
   stable.livestock = createLivestockState(species, 0);
+  reconcileMountAssignments(state);
   return null;
 }
 
@@ -324,6 +328,7 @@ export function slaughterStableLivestock(state: GameState, buildingId: number, a
   if (livestock.headcount < requested) return '도축할 가축이 부족합니다.';
 
   livestock.headcount -= requested;
+  reconcileMountAssignments(state);
   livestock.growth = Math.min(livestock.growth, livestock.headcount > 0 ? 0.999999 : 0);
   const config = speciesConfig(livestock.species);
   const meat = requested * config.slaughterMeatPerHead;

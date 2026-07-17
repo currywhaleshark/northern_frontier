@@ -41,6 +41,7 @@ interface Props {
   onSendGift: (siteId: number, gift: SiteGiftType) => void;
   onRequestPassage: (siteId: number) => void;
   onRequestHunting: (siteId: number) => void;
+  onRequestDefectors: (siteId: number) => void;
   onScoutLair: (siteId: number) => void;
   onRaidLair: (siteId: number) => void;
 }
@@ -57,7 +58,7 @@ function estimatePower(state: GameState, site: ForeignSite): string {
 }
 
 export function ForeignSitePanel({
-  state, site, onSendGift, onRequestPassage, onRequestHunting, onScoutLair, onRaidLair,
+  state, site, onSendGift, onRequestPassage, onRequestHunting, onRequestDefectors, onScoutLair, onRaidLair,
 }: Props) {
   const faction = FACTIONS.find(candidate => candidate.name === site.factionName);
   const zones = state.claimZones.filter(zone => zone.siteId === site.id && zone.discovered);
@@ -139,6 +140,11 @@ export function ForeignSitePanel({
           <div className="foreign-site-requests">
             {hasPassage && <button className="btn small" type="button" disabled={inactive} onClick={() => onRequestPassage(site.id)}>통행 허락 청하기</button>}
             {hasHunting && <button className="btn small" type="button" disabled={inactive} onClick={() => onRequestHunting(site.id)}>사냥터 사용 청하기</button>}
+            {(site.status === 'hungry' || site.status === 'sick') && (
+              <button className="btn small" type="button" disabled={inactive} onClick={() => onRequestDefectors(site.id)}>
+                귀순 의향 묻기
+              </button>
+            )}
           </div>
         </div>
       )}

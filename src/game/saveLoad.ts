@@ -19,7 +19,9 @@ import { reconcileTributeReserve } from './tributeReserve';
 import { reconcileResidentHomes } from './residents';
 import { ensureIncidentState } from './specialEvents';
 import { ensureForeignSiteState, revealForeignSitesFromExploration } from './foreignSites';
-import { allocateMusketReadiness, reconcileWeaponAssignments, resolvedWeaponAssignments } from './weapons';
+import {
+  allocateMusketReadiness, reconcileMountAssignments, reconcileWeaponAssignments, resolvedWeaponAssignments,
+} from './weapons';
 import { beginExpeditionReturn } from './expedition';
 import { CURRENT_SCHEMA_VERSION } from './saveSchema';
 import { defaultRaiderFormationLine } from './tacticalTargeting';
@@ -814,6 +816,14 @@ function migrateWeaponAssignments(state: GameState): void {
   reconcileWeaponAssignments(state);
 }
 
+function migrateMountAssignments(state: GameState): void {
+  const legacy = state as GameState & { mountAssignments?: unknown };
+  if (!legacy.mountAssignments || typeof legacy.mountAssignments !== 'object') {
+    state.mountAssignments = {};
+  }
+  reconcileMountAssignments(state);
+}
+
 function migrateExpeditionState(state: GameState): void {
   const legacy = state as GameState & { expedition?: unknown; raidHold?: unknown };
   const raw = legacy.expedition;
@@ -879,6 +889,10 @@ export function loadGame(): GameState | null {
     // 최소한의 유효성 검사 (구버전 저장은 무시)
     if (!parsed.map || !parsed.residents || !parsed.resources || !parsed.buildings) return null;
     if (parsed.subTick == null || parsed.residents.some(r => r.x == null || r.px == null)) return null;
+    for (const resident of parsed.residents) {
+      if (typeof resident.origin !== 'string' || resident.origin.trim().length === 0) delete resident.origin;
+      else resident.origin = resident.origin.trim();
+    }
     if (!('raiders' in parsed)) return null;
     if (!Object.prototype.hasOwnProperty.call(parsed, 'battle')) parsed.battle = null;
     if (!Array.isArray(parsed.battleScars)) parsed.battleScars = [];
@@ -1077,6 +1091,7 @@ export function loadGame(): GameState | null {
     migrateResidentHaulTasks(parsed);
     migrateExpeditionState(parsed);
     migrateWeaponAssignments(parsed);
+    migrateMountAssignments(parsed);
     if (parsed.tacticalBattle) {
       const assignments = resolvedWeaponAssignments(parsed);
       for (const group of parsed.tacticalBattle.defenderGroups) {

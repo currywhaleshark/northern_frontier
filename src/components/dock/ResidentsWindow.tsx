@@ -18,7 +18,7 @@ export function ResidentsWindow({
   return (
     <div>
       <button type="button" className="btn small weapon-allocation-open" onClick={onOpenWeaponAllocation}>
-        ⚔ 병기고 무기 배분
+        ⚔ 병기고 무기·군마 배분
       </button>
       <div className="dock-resident-list">
         {state.residents.map(resident => (
@@ -33,7 +33,7 @@ export function ResidentsWindow({
             <span className="muted">{resident.alive
               ? `${resident.cartEquipped ? '🛒 ' : ''}${JOB_NAMES[resident.job]}${state.weaponAssignments[resident.id]
                 ? ` · ${COMBAT_WEAPON_NAMES[state.weaponAssignments[resident.id]!]}`
-                : ''}`
+                : ''}${state.mountAssignments[resident.id] ? ' · 🐎 기마' : ''}`
               : '사망'}</span>
           </button>
         ))}

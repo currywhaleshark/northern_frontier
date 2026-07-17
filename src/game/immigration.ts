@@ -2,8 +2,11 @@ import { housingCapacity } from './buildings';
 import { CONFIG } from './config';
 import { foodTotal } from './consumption';
 import { addLog } from './events';
+import { RESIDENT_ORIGINS, residentOriginLabel } from './defectors';
+import { addForeignSiteMemory } from './foreignSites';
 import { makeRng } from './map';
 import { rankEffects } from './promotion';
+import { changeRelation } from './relations';
 import { createResident, livingResidents, reconcileResidentHomes } from './residents';
 import { getSeason } from './seasons';
 import type { GameState } from './types';
@@ -32,6 +35,86 @@ function foodDays(food: number, population: number): number {
   return dailyNeed > 0 ? food / dailyNeed : 0;
 }
 
+function arrivalForecast(state: GameState, count: number) {
+  const living = livingResidents(state);
+  const housing = housingCapacity(state);
+  const currentFood = foodTotal(state);
+  const afterPopulation = living.length + count;
+  const freeBeds = Math.max(0, housing.total - living.length);
+  const afterHomeless = Math.max(0, afterPopulation - housing.total);
+  return {
+    living,
+    housing,
+    currentFood,
+    afterPopulation,
+    freeBeds,
+    afterHomeless,
+    currentFoodDays: foodDays(currentFood, living.length),
+    afterFoodDays: foodDays(currentFood, afterPopulation),
+  };
+}
+
+export function openDefectorImmigrationChoice(
+  state: GameState,
+  origin: string,
+  count: number,
+  sourceSiteId?: number,
+  favorCost = 0,
+): boolean {
+  if (state.pendingChoice || state.battle || state.gameOver || livingResidents(state).length === 0) return false;
+  const boundedCount = Math.max(1, Math.min(CONFIG.immigration.groupMax, Math.floor(count)));
+  const forecast = arrivalForecast(state, boundedCount);
+  const originLabel = residentOriginLabel(origin);
+  state.pendingChoice = {
+    kind: 'immigration',
+    title: `${originLabel}의 귀순 청원`,
+    illustration: {
+      src: '/assets/events/immigration-arrival-v2.png',
+      alt: '성책 앞에서 무기를 내려놓고 귀순을 청하는 사람들',
+    },
+    body:
+      `${originLabel} ${boundedCount}명이 가족과 짐을 이끌고 개척지에 귀순을 청합니다. ` +
+      '받아들이면 평소에는 다른 주민처럼 일하고, 필요할 때 출신지에서 익힌 전투 경험을 보탭니다.\n\n' +
+      `일행: ${boundedCount}명\n` +
+      `현재 주거: ${forecast.living.length}명 / ${forecast.housing.total}명 수용 (빈자리 ${forecast.freeBeds}명)\n` +
+      `수용 후: ${forecast.afterPopulation}명 / ${forecast.housing.total}명 수용` +
+      (forecast.afterHomeless > 0 ? ` · 노숙 ${forecast.afterHomeless}명 예상\n` : ' · 전원 입주 가능\n') +
+      `수용 후 식량 여유: 약 ${forecast.afterFoodDays.toFixed(1)}일분\n` +
+      '북방 출신 주민은 조정 감찰의 의심을 조금씩 높일 수 있습니다.',
+    options: [
+      {
+        id: 'accept', label: '받아들인다',
+        desc: `인구 +${boundedCount}. 출신 전투 경험을 얻지만 조정의 눈총이 늘 수 있습니다.`,
+      },
+      {
+        id: 'reject', label: '돌려보낸다',
+        desc: `인구 변화 없음. ${origin}과의 관계 -${CONFIG.defectors.rejectRelation}.`,
+      },
+    ],
+    data: {
+      count: boundedCount,
+      origin,
+      ...(sourceSiteId != null ? { sourceSiteId, favorCost } : {}),
+    },
+  };
+  state.lastImmigrationDay = state.day;
+  return true;
+}
+
+export function maybeOfferDefectorImmigration(state: GameState, rng: () => number): boolean {
+  if (state.pendingChoice || state.battle || state.gameOver) return false;
+  const season = getSeason(state.day);
+  if (season !== 'spring' && season !== 'summer') return false;
+  const lastDay = state.lastImmigrationDay ?? -999;
+  if (state.day - lastDay < CONFIG.immigration.cooldownDays) return false;
+  if (rng() >= Math.min(1, CONFIG.defectors.immigrationDailyChance * rankEffects(state.rank).immigration)) return false;
+  const origins = [RESIDENT_ORIGINS.nimacha, RESIDENT_ORIGINS.holaon] as const;
+  const origin = origins[Math.floor(rng() * origins.length)];
+  const count = CONFIG.defectors.groupMin +
+    Math.floor(rng() * (CONFIG.defectors.groupMax - CONFIG.defectors.groupMin + 1));
+  return openDefectorImmigrationChoice(state, origin, count);
+}
+
 export function maybeOfferImmigration(state: GameState, rng: () => number): boolean {
   if (state.pendingChoice || state.battle || state.gameOver) return false;
   const season = getSeason(state.day);
@@ -46,13 +129,7 @@ export function maybeOfferImmigration(state: GameState, rng: () => number): bool
   if (living.length === 0) return false;
   const count = im.groupMin + Math.floor(rng() * (im.groupMax - im.groupMin + 1));
   const story = IMMIGRATION_STORIES[Math.floor(rng() * IMMIGRATION_STORIES.length)];
-  const housing = housingCapacity(state);
-  const currentFood = foodTotal(state);
-  const afterPopulation = living.length + count;
-  const freeBeds = Math.max(0, housing.total - living.length);
-  const afterHomeless = Math.max(0, afterPopulation - housing.total);
-  const currentFoodDays = foodDays(currentFood, living.length);
-  const afterFoodDays = foodDays(currentFood, afterPopulation);
+  const forecast = arrivalForecast(state, count);
 
   state.pendingChoice = {
     kind: 'immigration',
@@ -64,16 +141,16 @@ export function maybeOfferImmigration(state: GameState, rng: () => number): bool
     body:
       `${story.body}\n\n` +
       `일행: ${count}명\n` +
-      `현재 주거: ${living.length}명 / ${housing.total}명 수용 (빈자리 ${freeBeds}명)\n` +
-      `수용 후: ${afterPopulation}명 / ${housing.total}명 수용` +
-      (afterHomeless > 0 ? ` · 노숙 ${afterHomeless}명 예상\n` : ' · 전원 입주 가능\n') +
-      `현재 식량: ${Math.floor(currentFood)} · 현재 인구 기준 약 ${currentFoodDays.toFixed(1)}일분\n` +
-      `수용 후 식량 여유: 약 ${afterFoodDays.toFixed(1)}일분`,
+      `현재 주거: ${living.length}명 / ${forecast.housing.total}명 수용 (빈자리 ${forecast.freeBeds}명)\n` +
+      `수용 후: ${forecast.afterPopulation}명 / ${forecast.housing.total}명 수용` +
+      (forecast.afterHomeless > 0 ? ` · 노숙 ${forecast.afterHomeless}명 예상\n` : ' · 전원 입주 가능\n') +
+      `현재 식량: ${Math.floor(forecast.currentFood)} · 현재 인구 기준 약 ${forecast.currentFoodDays.toFixed(1)}일분\n` +
+      `수용 후 식량 여유: 약 ${forecast.afterFoodDays.toFixed(1)}일분`,
     options: [
       {
         id: 'accept',
         label: '받아들인다',
-        desc: `인구 +${count}. ${afterHomeless > 0 ? `노숙 ${afterHomeless}명 발생.` : '전원 입주 가능.'} 식량은 약 ${afterFoodDays.toFixed(1)}일분이 됩니다.`,
+        desc: `인구 +${count}. ${forecast.afterHomeless > 0 ? `노숙 ${forecast.afterHomeless}명 발생.` : '전원 입주 가능.'} 식량은 약 ${forecast.afterFoodDays.toFixed(1)}일분이 됩니다.`,
       },
       {
         id: 'reject',
@@ -94,17 +171,47 @@ export function resolveImmigration(state: GameState, optionId: string): void {
   const count = Number.isFinite(rawCount)
     ? Math.max(1, Math.min(CONFIG.immigration.groupMax, Math.floor(rawCount)))
     : CONFIG.immigration.groupMin;
+  const origin = typeof choice.data.origin === 'string' && choice.data.origin.trim().length > 0
+    ? choice.data.origin.trim()
+    : undefined;
+  const sourceSiteId = Number(choice.data.sourceSiteId);
+  const sourceSite = Number.isFinite(sourceSiteId)
+    ? state.foreignSites.find(site => site.id === sourceSiteId)
+    : undefined;
+  const favorCost = Math.max(0, Math.floor(Number(choice.data.favorCost) || 0));
   state.pendingChoice = null;
 
   if (optionId === 'accept') {
     const rng = makeRng(state.seed + state.day * 15485863 + count * 17);
-    for (let i = 0; i < count; i++) state.residents.push(createResident(state, rng, 'idle'));
+    for (let i = 0; i < count; i++) state.residents.push(createResident(state, rng, 'idle', origin));
     reconcileResidentHomes(state, rng);
-    addLog(state, `떠돌던 백성 ${count}명을 받아들였습니다. 새 주민들에게 일자리를 마련해야 합니다.`, 'good', true);
+    if (sourceSite) {
+      sourceSite.favors = Math.max(0, sourceSite.favors - favorCost);
+      sourceSite.population = Math.max(0, sourceSite.population - count);
+      sourceSite.militaryPower = Math.max(0, sourceSite.militaryPower - count);
+      sourceSite.lastInteractionDay = state.day;
+      addForeignSiteMemory(state, sourceSite.id, `주민 ${count}명이 개척지로 옮겨 가는 것을 묵인했습니다.`, 'neutral');
+    }
+    addLog(
+      state,
+      origin
+        ? `${residentOriginLabel(origin)} ${count}명을 받아들였습니다. 평소에는 다른 주민처럼 일하며 출신지의 전투 경험을 간직합니다.`
+        : `떠돌던 백성 ${count}명을 받아들였습니다. 새 주민들에게 일자리를 마련해야 합니다.`,
+      'good', true,
+    );
     return;
   }
 
   if (optionId === 'reject') {
+    if (origin) {
+      changeRelation(state, origin, -CONFIG.defectors.rejectRelation);
+      if (sourceSite) {
+        sourceSite.lastInteractionDay = state.day;
+        addForeignSiteMemory(state, sourceSite.id, '개척지가 귀순 청원을 거절해 사람들이 돌아왔습니다.', 'bad');
+      }
+      addLog(state, `${residentOriginLabel(origin)}의 귀순 청원을 거절했습니다. ${origin}과의 관계가 나빠졌습니다.`, 'bad', true);
+      return;
+    }
     state.resources.reputation = Math.max(0, state.resources.reputation - CONFIG.immigration.rejectReputation);
     addLog(state, '머물 곳을 청하던 이들을 돌려보냈습니다. 야박하다는 소문이 퍼져 명성이 조금 떨어졌습니다.', 'bad', true);
   }

@@ -6,6 +6,8 @@ const contextSource = readFileSync(new URL('../../src/components/SelectionContex
 const drawerSource = readFileSync(new URL('../../src/components/BuildDrawer.tsx', import.meta.url), 'utf8');
 const canvasSource = readFileSync(new URL('../../src/components/GameCanvas.tsx', import.meta.url), 'utf8');
 const inspectorSource = readFileSync(new URL('../../src/components/InspectorPanel.tsx', import.meta.url), 'utf8');
+const weaponDialogSource = readFileSync(new URL('../../src/components/WeaponAllocationDialog.tsx', import.meta.url), 'utf8');
+const residentsWindowSource = readFileSync(new URL('../../src/components/dock/ResidentsWindow.tsx', import.meta.url), 'utf8');
 const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
 
 assert.match(appSource, /<SelectionContextBar\b[\s\S]*selectedEntity=\{selectedEntity\}/,
@@ -22,6 +24,12 @@ assert.match(contextSource, /building\.type === 'cellar'[\s\S]*저장 보호[\s\
   'completed cellars must show the protected raw-food amount in the selection context');
 assert.match(contextSource, /building\.type === 'stable'[\s\S]*마릿수[\s\S]*번식[\s\S]*곡물/,
   'completed stables must show flock size, breeding progress, and daily feed use');
+assert.match(contextSource, /<td>탑승<\/td>[\s\S]*mountAssignments/,
+  'combat resident details must show their current mount');
+assert.match(weaponDialogSource, /onAssignMount[\s\S]*horseStock[\s\S]*className="mount-select"/,
+  'the weapon allocation dialog must expose a separate horse assignment column');
+assert.match(residentsWindowSource, /무기·군마 배분[\s\S]*🐎 기마/,
+  'the resident dock must advertise and summarize horse assignment');
 assert.match(appSource, /onSlaughterLivestock=\{handleSlaughterLivestock\}/,
   'the stable slaughter action must be wired to the simulation from App');
 assert.doesNotMatch(canvasSource, /ActionPopup/,

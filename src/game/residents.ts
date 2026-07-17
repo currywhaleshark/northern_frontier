@@ -12,6 +12,7 @@ import { addLog } from './events';
 import { returnResidentCart } from './equipment';
 import { getSeason } from './seasons';
 import { warmthLossWeatherMult } from './weather';
+import { releaseResidentMount } from './weapons';
 import type { Building, GameState, Gender, JobId, Resident, Tile } from './types';
 
 export function rollResidentGender(rng: () => number): Gender {
@@ -123,7 +124,12 @@ function residentSpawnPoint(
   return { x: Math.floor(state.map[0].length / 2), y: Math.floor(state.map.length / 2) };
 }
 
-export function createResident(state: GameState, rng: () => number, job: JobId = 'idle'): Resident {
+export function createResident(
+  state: GameState,
+  rng: () => number,
+  job: JobId = 'idle',
+  origin?: string,
+): Resident {
   const gender = rollResidentGender(rng);
   const name = rollResidentName(state, rng, gender);
   // 마을 중심지 주변에서 출발한다. 중심지 자체는 solid footprint라 주민을 올려두지 않는다.
@@ -131,7 +137,7 @@ export function createResident(state: GameState, rng: () => number, job: JobId =
   const cx = center ? center.x : Math.floor(state.map[0].length / 2);
   const cy = center ? center.y : Math.floor(state.map.length / 2);
   const spawn = residentSpawnPoint(state, rng, cx, cy);
-  return {
+  const resident: Resident = {
     id: state.nextResidentId++,
     name,
     age: 16 + Math.floor(rng() * 34),
@@ -160,6 +166,8 @@ export function createResident(state: GameState, rng: () => number, job: JobId =
     haulTask: null,
     manualOrder: null,
   };
+  if (origin) resident.origin = origin;
+  return resident;
 }
 
 export function livingResidents(state: GameState): Resident[] {
@@ -260,6 +268,7 @@ export function killResident(
 ): void {
   if (!r.alive) return;
   returnResidentCart(state, r);
+  const horseLost = releaseResidentMount(state, r.id, combatDeath);
   r.alive = false;
   r.health = 0;
   r.homeBuildingId = null;
@@ -278,6 +287,7 @@ export function killResident(
           : 'other';
   if (combatDeath) {
     addLog(state, `${r.name}이(가) 전투 중 전사했습니다. (${cause})`, 'raid', true);
+    if (horseLost) addLog(state, '기수가 쓰러지는 과정에서 군마 한 필도 잃었습니다.', 'bad', true);
   } else if (cause === '호환') {
     addLog(state, `${r.name}이(가) 호환을 당해 목숨을 잃었습니다.`, 'bad', true);
   } else if (cause === '늑대 습격') {

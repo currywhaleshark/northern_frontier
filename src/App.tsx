@@ -51,10 +51,10 @@ import { createExpedition, predatorExpeditionTarget } from './game/expedition';
 import { purchasePredatorIntel } from './game/predatorIntelTrade';
 import { isForeignSiteOperational } from './game/foreignSites';
 import {
-  clearWeaponAssignments, setAutomaticWeaponAllocation, setResidentWeapon,
+  clearMountAssignments, clearWeaponAssignments, setAutomaticWeaponAllocation, setResidentMount, setResidentWeapon,
 } from './game/weapons';
 import {
-  requestHuntingRights, requestPassagePermission, scoutBanditLair, sendGiftToSite,
+  requestHuntingRights, requestPassagePermission, requestSiteDefectors, scoutBanditLair, sendGiftToSite,
   type SiteGiftType,
 } from './game/siteDiplomacy';
 import {
@@ -64,7 +64,7 @@ import {
 } from './game/tacticalBattle';
 import { mergeHuntGroups, setHuntPreparationZone, splitHuntGroup } from './game/tacticalHunt';
 import type {
-  BuildingTypeId, CombatWeaponId, CropId, Difficulty, DryingProductId, JobId, LivestockId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
+  BuildingTypeId, CombatWeaponId, CropId, Difficulty, DryingProductId, JobId, LivestockId, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
   PreparationActionId, PredatorKind, SpecialItemId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
 import { loadUiPrefs, saveUiPrefs, togglePinnedDockWindow, type UiPrefs } from './ui/uiPrefs';
@@ -333,6 +333,12 @@ export default function App() {
     refreshWeaponDefense();
   };
 
+  const handleSetResidentMount = (id: number, mount: MountId | null) => {
+    const error = setResidentMount(stateRef.current, id, mount);
+    if (error) addLog(stateRef.current, error, 'info');
+    bump();
+  };
+
   const handleAutoAssignWeapons = () => {
     setAutomaticWeaponAllocation(stateRef.current);
     refreshWeaponDefense();
@@ -340,6 +346,7 @@ export default function App() {
 
   const handleClearWeaponAssignments = () => {
     clearWeaponAssignments(stateRef.current);
+    clearMountAssignments(stateRef.current);
     refreshWeaponDefense();
   };
 
@@ -613,6 +620,8 @@ export default function App() {
     handleSiteAction(() => requestPassagePermission(stateRef.current, siteId));
   const handleRequestSiteHunting = (siteId: number) =>
     handleSiteAction(() => requestHuntingRights(stateRef.current, siteId));
+  const handleRequestSiteDefectors = (siteId: number) =>
+    handleSiteAction(() => requestSiteDefectors(stateRef.current, siteId));
   const handleScoutBanditLair = (siteId: number) =>
     handleSiteAction(() => scoutBanditLair(stateRef.current, siteId, siteActionRng(siteId)));
   const handleRaidBanditLair = (siteId: number) => {
@@ -887,6 +896,7 @@ export default function App() {
               onSendSiteGift={handleSendSiteGift}
               onRequestSitePassage={handleRequestSitePassage}
               onRequestSiteHunting={handleRequestSiteHunting}
+              onRequestSiteDefectors={handleRequestSiteDefectors}
               onScoutBanditLair={handleScoutBanditLair}
               onRaidBanditLair={handleRaidBanditLair}
             />
@@ -982,6 +992,7 @@ export default function App() {
         <WeaponAllocationDialog
           state={state}
           onAssign={handleSetResidentWeapon}
+          onAssignMount={handleSetResidentMount}
           onAutoAssign={handleAutoAssignWeapons}
           onClear={handleClearWeaponAssignments}
           onClose={() => setWeaponDialogOpen(false)}

@@ -40,14 +40,14 @@ import { createExploration, isBuildingFootprintExplored, refreshExploration } fr
 import { LUXURY_RESOURCES } from './resourceCatalog';
 import { DRYING_PRODUCT_DEFS } from './preservation';
 import { returnResidentCart, setResidentCartEquipped } from './equipment';
-import { reconcileWeaponAssignments, setAutomaticWeaponAllocation } from './weapons';
+import { reconcileMountAssignments, reconcileWeaponAssignments, setAutomaticWeaponAllocation } from './weapons';
 import { CURRENT_SCHEMA_VERSION } from './saveSchema';
 import { expeditionTick } from './expedition';
 import {
   maybeOpenExpeditionEngagementChoice, resolveExpeditionEngagementChoice,
 } from './expeditionEngagement';
 import { isHaulSourceBuilding } from './inventory';
-import { maybeOfferImmigration, resolveImmigration } from './immigration';
+import { maybeOfferDefectorImmigration, maybeOfferImmigration, resolveImmigration } from './immigration';
 import { createIncidentState, resolveSpecialEvent, updateSpecialEvents } from './specialEvents';
 import { dailyClaimTensionTick, noteBuildingClaimIntrusions } from './claimZones';
 import { applyDailySpoilage } from './spoilage';
@@ -113,6 +113,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     resources: startRes,
     unlockedLivestock: [...CONFIG.livestock.initialUnlocked],
     weaponAssignments: {},
+    mountAssignments: {},
     weaponAllocationMode: 'auto',
     processingReserves: defaultProcessingReserves(),
     threat: 25,
@@ -308,6 +309,7 @@ export function demolishBuilding(state: GameState, x: number, y: number): string
   clearBuildingTiles(state, building.id);
   clearAssignmentsForBuilding(state, building.id);
   state.buildings = state.buildings.filter(b => b.id !== building.id);
+  reconcileMountAssignments(state);
   state.resources.defense = computeDefense(state);
   addLog(state, `${def.name}을(를) 철거했습니다.`, 'info');
   return null;
@@ -330,6 +332,7 @@ export function cancelBuildingConstruction(state: GameState, buildingId: number)
   clearBuildingTiles(state, building.id);
   clearAssignmentsForBuilding(state, building.id);
   state.buildings = state.buildings.filter(candidate => candidate.id !== building.id);
+  reconcileMountAssignments(state);
   for (const resident of state.residents) {
     if (!resident.alive || resident.job !== 'builder') continue;
     resetAgent(state, resident);
@@ -351,6 +354,7 @@ export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
   clearIncompatibleAssignment(state, r);
   resetAgent(state, r);
   reconcileWeaponAssignments(state);
+  reconcileMountAssignments(state);
   state.resources.defense = computeDefense(state);
   return true;
 }
@@ -364,6 +368,7 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
     clearIncompatibleAssignment(state, r);
     resetAgent(state, r);
     reconcileWeaponAssignments(state);
+    reconcileMountAssignments(state);
     state.resources.defense = computeDefense(state);
   }
 }
@@ -648,6 +653,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'silverVein') resolveSilverVeinChoice(state, optionId, rng);
   else resolveTrade(state, optionId);
   reconcileWeaponAssignments(state);
+  reconcileMountAssignments(state);
   state.resources.defense = computeDefense(state);
 }
 
@@ -685,6 +691,7 @@ export function advanceTick(state: GameState): void {
   if (state.gameOver || state.pendingChoice || state.tacticalBattle || state.tacticalBattleReport) return;
   agentsTick(state);
   reconcileWeaponAssignments(state);
+  reconcileMountAssignments(state);
   state.resources.defense = computeDefense(state);
   expeditionTick(state);
   maybeOpenExpeditionEngagementChoice(state);
@@ -743,7 +750,7 @@ function endOfDay(state: GameState): void {
   if (maybeOfferTrade(state, rng, state.day - state.lastTradeDay)) {
     state.lastTradeDay = state.day;
   }
-  maybeOfferImmigration(state, rng);
+  if (!maybeOfferDefectorImmigration(state, rng)) maybeOfferImmigration(state, rng);
   maybeFlavorLog(state, rng);
   maybeCollectTribute(state); // 겨울: 조정의 사자가 세공을 거둔다 (모달 충돌 시 다음 날로)
   dailySilverTick(state, rng); // 은맥 발견/재제안/잠채 발각 — 의심 갱신보다 먼저

@@ -1634,7 +1634,7 @@ html, body, #root {
   margin-bottom: 12px;
 }
 .modal .body { white-space: pre-line; margin-bottom: 12px; line-height: 1.5; }
-.modal.weapon-allocation-dialog { max-width: 680px; }
+.modal.weapon-allocation-dialog { max-width: 820px; }
 .weapon-allocation-heading {
   display: flex;
   align-items: flex-start;
@@ -1645,7 +1645,7 @@ html, body, #root {
 .weapon-allocation-heading h2 { margin: 0 0 3px; }
 .weapon-stock-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
   margin-bottom: 10px;
 }
@@ -1676,7 +1676,7 @@ html, body, #root {
 }
 .weapon-allocation-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 170px;
+  grid-template-columns: minmax(0, 1fr) 170px 110px;
   align-items: center;
   gap: 10px;
   padding: 7px 4px;
@@ -1699,6 +1699,7 @@ html, body, #root {
 @media (max-width: 560px) {
   .weapon-stock-grid { grid-template-columns: 1fr; }
   .weapon-allocation-row { grid-template-columns: minmax(0, 1fr) 130px; }
+  .weapon-allocation-row .mount-select { grid-column: 2; }
   .weapon-allocation-actions > span { width: 100%; margin-left: 0; }
 }
 .modal.expedition-muster-dialog { max-width: 780px; padding: 0; overflow: hidden; }

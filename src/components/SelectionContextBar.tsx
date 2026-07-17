@@ -13,7 +13,7 @@ import { spoilagePreview } from '../game/spoilage';
 import type { SiteGiftType } from '../game/siteDiplomacy';
 import { isWallBuilding } from '../game/walls';
 import { combatDefaultWeaponName } from '../game/combatCapabilities';
-import { COMBAT_WEAPON_NAMES } from '../game/weapons';
+import { COMBAT_WEAPON_NAMES, MOUNT_NAMES } from '../game/weapons';
 import type {
   BuildingTypeId,
   CropId,
@@ -54,6 +54,7 @@ interface Props {
   onSendSiteGift: (siteId: number, gift: SiteGiftType) => void;
   onRequestSitePassage: (siteId: number) => void;
   onRequestSiteHunting: (siteId: number) => void;
+  onRequestSiteDefectors: (siteId: number) => void;
   onScoutBanditLair: (siteId: number) => void;
   onRaidBanditLair: (siteId: number) => void;
 }
@@ -77,6 +78,7 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart }: {
     <table className="insp-table">
       <tbody>
         <tr><td>이름</td><td>{resident.name} ({resident.age}세){resident.sick ? ' 🤒' : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</td></tr>
+        {resident.origin && <tr><td>출신</td><td>{resident.origin}</td></tr>}
         <tr>
           <td>직업</td>
           <td>
@@ -111,12 +113,15 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart }: {
           </tr>
         )}
         {resident.alive && (resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter') && (
-          <tr>
-            <td>전투 무기</td>
-            <td>{state.weaponAssignments[resident.id]
-              ? COMBAT_WEAPON_NAMES[state.weaponAssignments[resident.id]!]
-              : `${combatDefaultWeaponName(resident.job)} (기본 무장)`}</td>
-          </tr>
+          <>
+            <tr>
+              <td>전투 무기</td>
+              <td>{state.weaponAssignments[resident.id]
+                ? COMBAT_WEAPON_NAMES[state.weaponAssignments[resident.id]!]
+                : `${combatDefaultWeaponName(resident.job)} (기본 무장)`}</td>
+            </tr>
+            <tr><td>탑승</td><td>{state.mountAssignments[resident.id] ? MOUNT_NAMES[state.mountAssignments[resident.id]!] : '도보'}</td></tr>
+          </>
         )}
         <tr><td>현재 작업</td><td>{resident.task}</td></tr>
         {resident.alive && (
@@ -173,6 +178,7 @@ export function SelectionContextBar({
   onSendSiteGift,
   onRequestSitePassage,
   onRequestSiteHunting,
+  onRequestSiteDefectors,
   onScoutBanditLair,
   onRaidBanditLair,
 }: Props) {
@@ -232,6 +238,7 @@ export function SelectionContextBar({
             onSendGift={onSendSiteGift}
             onRequestPassage={onRequestSitePassage}
             onRequestHunting={onRequestSiteHunting}
+            onRequestDefectors={onRequestSiteDefectors}
             onScoutLair={onScoutBanditLair}
             onRaidLair={onRaidBanditLair}
           />

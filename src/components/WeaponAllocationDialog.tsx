@@ -1,22 +1,26 @@
 import { JOB_NAMES } from '../game/constants';
 import {
-  COMBAT_WEAPON_IDS, COMBAT_WEAPON_NAMES, musketReadiness, residentDefenseContribution,
-  resolvedWeaponAssignments, weaponStock,
+  COMBAT_WEAPON_IDS, COMBAT_WEAPON_NAMES, horseStock, MOUNT_NAMES, musketReadiness,
+  residentDefenseContribution, resolvedMountAssignments, resolvedWeaponAssignments, weaponStock,
 } from '../game/weapons';
 import { createCombatRoster } from '../game/combatRoster';
 import { CONFIG } from '../game/config';
-import type { CombatWeaponId, GameState } from '../game/types';
+import type { CombatWeaponId, GameState, MountId } from '../game/types';
 
 interface Props {
   state: GameState;
   onAssign: (residentId: number, weapon: CombatWeaponId | null) => void;
+  onAssignMount: (residentId: number, mount: MountId | null) => void;
   onAutoAssign: () => void;
   onClear: () => void;
   onClose: () => void;
 }
 
-export function WeaponAllocationDialog({ state, onAssign, onAutoAssign, onClear, onClose }: Props) {
+export function WeaponAllocationDialog({
+  state, onAssign, onAssignMount, onAutoAssign, onClear, onClose,
+}: Props) {
   const assignments = resolvedWeaponAssignments(state);
+  const mountAssignments = resolvedMountAssignments(state);
   const snapshots = new Map(createCombatRoster(state, { context: 'villageDefense' }).combatants
     .map(snapshot => [snapshot.residentId, snapshot]));
   const residents = state.residents
@@ -31,6 +35,7 @@ export function WeaponAllocationDialog({ state, onAssign, onAutoAssign, onClear,
     const weapon = assignments[resident.id];
     if (weapon) used[weapon] += 1;
   }
+  const mounted = residents.filter(resident => mountAssignments[resident.id] === 'horse').length;
 
   return (
     <div className="modal-overlay" role="presentation" onMouseDown={event => {
@@ -39,7 +44,7 @@ export function WeaponAllocationDialog({ state, onAssign, onAutoAssign, onClear,
       <div className="modal weapon-allocation-dialog" role="dialog" aria-modal="true" aria-labelledby="weapon-allocation-title">
         <div className="weapon-allocation-heading">
           <div>
-            <h2 id="weapon-allocation-title">병기고 무기 배분</h2>
+            <h2 id="weapon-allocation-title">병기고 무기·군마 배분</h2>
             <div className="muted small">
               {state.weaponAllocationMode === 'auto' ? '자동 배분 중' : '수동 배분 중'} · 현재 방어도 {state.resources.defense}
             </div>
@@ -62,6 +67,11 @@ export function WeaponAllocationDialog({ state, onAssign, onAutoAssign, onClear,
               })()}
             </div>
           ))}
+          <div className="weapon-stock-card mount-stock-card">
+            <strong>{MOUNT_NAMES.horse}</strong>
+            <span>{mounted} / {horseStock(state)} 배정</span>
+            <em>무기와 별도 배정</em>
+          </div>
         </div>
 
         <div className="weapon-allocation-actions">
@@ -75,6 +85,7 @@ export function WeaponAllocationDialog({ state, onAssign, onAutoAssign, onClear,
             <div className="muted small">무기를 배정할 수 있는 수비병·파수꾼·사냥꾼이 없습니다.</div>
           ) : residents.map(resident => {
             const current = assignments[resident.id] ?? '';
+            const currentMount = mountAssignments[resident.id] ?? '';
             const snapshot = snapshots.get(resident.id);
             return (
               <label key={resident.id} className="weapon-allocation-row">
@@ -86,6 +97,7 @@ export function WeaponAllocationDialog({ state, onAssign, onAutoAssign, onClear,
                   </small>
                 </span>
                 <select
+                  className="weapon-select"
                   value={current}
                   aria-label={`${resident.name} 무기`}
                   onChange={event => onAssign(
@@ -105,6 +117,21 @@ export function WeaponAllocationDialog({ state, onAssign, onAutoAssign, onClear,
                       {` · 방어 +${residentDefenseContribution(state, resident, weapon)}`}
                     </option>
                   ))}
+                </select>
+                <select
+                  className="mount-select"
+                  value={currentMount}
+                  aria-label={`${resident.name} 탑승`}
+                  onChange={event => onAssignMount(
+                    resident.id,
+                    event.target.value ? event.target.value as MountId : null,
+                  )}
+                >
+                  <option value="">도보</option>
+                  <option
+                    value="horse"
+                    disabled={currentMount !== 'horse' && mounted >= horseStock(state)}
+                  >🐎 군마</option>
                 </select>
               </label>
             );

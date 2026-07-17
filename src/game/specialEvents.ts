@@ -8,9 +8,11 @@ import {
 } from './expeditionIntel';
 import { makeRng } from './map';
 import { hasActivePhysician } from './medicine';
-import { killResident, livingResidents } from './residents';
+import { createResident, killResident, livingResidents, reconcileResidentHomes } from './residents';
 import { getSeason, getYear } from './seasons';
 import { createCombatRoster } from './combatRoster';
+import { RESIDENT_ORIGINS } from './defectors';
+import { acquireLivestock, ensureLivestockState, livestockCapacity } from './livestock';
 import type {
   Building,
   EpidemicState,
@@ -34,6 +36,7 @@ const EVENT_COOLDOWNS: Record<SpecialEventId, number> = {
   shipwreck: CONFIG.specialEvents.shipwreckCooldownDays,
   earlyFrost: CONFIG.specialEvents.earlyFrostCooldownDays,
   gyrfalcon: CONFIG.specialEvents.gyrfalconCooldownDays,
+  horseDefectors: CONFIG.defectors.horseOfferCooldownDays,
 };
 
 const FOOD_RESOURCES: ResourceId[] = ['grain', 'rice', 'meat', 'eggs', 'milk', 'fish', 'vegetables', 'beans'];
@@ -396,6 +399,50 @@ function openGyrfalconEvent(state: GameState): void {
   };
 }
 
+function horseCapacityAvailable(state: GameState): number {
+  return state.buildings
+    .filter(building => building.type === 'stable' && building.built)
+    .reduce((total, stable) => {
+      const livestock = ensureLivestockState(stable);
+      if (livestock.species !== 'horse' && livestock.headcount > 0) return total;
+      const occupied = livestock.species === 'horse' ? livestock.headcount : 0;
+      return total + livestockCapacity('horse') - occupied;
+    }, 0);
+}
+
+export function maybeOpenHorseDefectorEvent(state: GameState, rng: () => number): boolean {
+  ensureIncidentState(state);
+  if (state.pendingChoice || state.battle || state.gameOver) return false;
+  if (state.unlockedLivestock.includes('horse')) return false;
+  if ((state.incidents.cooldownUntil.horseDefectors ?? 0) > state.day) return false;
+  if (horseCapacityAvailable(state) < CONFIG.defectors.horseCount) return false;
+  if (rng() >= CONFIG.defectors.horseOfferChance) return false;
+  state.incidents.cooldownUntil.horseDefectors = state.day + CONFIG.defectors.horseOfferCooldownDays;
+  state.pendingChoice = {
+    kind: 'incident',
+    title: '말을 몰고 온 홀라온 귀순자',
+    body:
+      `홀라온 야인 ${CONFIG.defectors.horseGroupSize}명이 군마 ${CONFIG.defectors.horseCount}필을 몰고 성책 앞에 나타났습니다. ` +
+      '옛 무리를 떠나 개척지의 주민이 되겠다고 합니다. 받아들이면 군마 사육이 열리지만 귀순 야인은 조정 감찰의 눈에 띕니다.',
+    illustration: {
+      src: '/assets/events/immigration-arrival-v2.png',
+      alt: '군마를 몰고 성책 앞에서 귀순을 청하는 홀라온 사람들',
+    },
+    options: [
+      {
+        id: 'accept', label: '사람과 말을 받아들인다',
+        desc: `홀라온 출신 주민 +${CONFIG.defectors.horseGroupSize}, 군마 +${CONFIG.defectors.horseCount}, 군마 사육 해금.`,
+      },
+      {
+        id: 'reject', label: '돌려보낸다',
+        desc: '관계와 의심은 변하지 않습니다. 군마 사육도 열리지 않습니다.',
+      },
+    ],
+    data: { eventId: 'horseDefectors' },
+  };
+  return true;
+}
+
 export function maybeOpenSpecialEvent(state: GameState, rng: () => number): boolean {
   ensureIncidentState(state);
   if (state.pendingChoice || state.battle) return false;
@@ -406,7 +453,7 @@ export function maybeOpenSpecialEvent(state: GameState, rng: () => number): bool
   const riverExists = state.map.some(row => row.some(tile => tile.terrain === 'river'));
   const farms = standingFarms(state);
   const season = getSeason(state.day);
-  const candidates: Array<{ value: SpecialEventId; weight: number }> = [];
+  const candidates: Array<{ value: Exclude<SpecialEventId, 'horseDefectors'>; weight: number }> = [];
   const ready = (event: SpecialEventId) => (state.incidents.cooldownUntil[event] ?? 0) <= state.day;
   if (forestExists && !state.incidents.predatorThreats.wolf && ready('wolf')) candidates.push({ value: 'wolf', weight: CONFIG.specialEvents.wolfWeight });
   if (forestExists && !state.incidents.predatorThreats.tiger && ready('tiger')) candidates.push({ value: 'tiger', weight: CONFIG.specialEvents.tigerWeight });
@@ -853,6 +900,27 @@ function resolveGyrfalcon(state: GameState, optionId: string): void {
   }
 }
 
+function resolveHorseDefectors(state: GameState, optionId: string, rng: () => number): void {
+  if (optionId !== 'accept') {
+    addLog(state, '홀라온 귀순자들을 돌려보냈습니다. 서로 칼을 뽑지 않고 각자의 길로 물러났습니다.', 'info', true);
+    return;
+  }
+  const error = acquireLivestock(state, 'horse', CONFIG.defectors.horseCount);
+  if (error) {
+    addLog(state, `군마를 들일 수 없었습니다. ${error}`, 'bad', true);
+    return;
+  }
+  for (let index = 0; index < CONFIG.defectors.horseGroupSize; index++) {
+    state.residents.push(createResident(state, rng, 'idle', RESIDENT_ORIGINS.holaon));
+  }
+  reconcileResidentHomes(state, rng);
+  addLog(
+    state,
+    `홀라온 귀순자 ${CONFIG.defectors.horseGroupSize}명과 군마 ${CONFIG.defectors.horseCount}필을 받아들였습니다. 군마 사육이 열렸습니다.`,
+    'good', true,
+  );
+}
+
 export function resolveSpecialEvent(state: GameState, optionId: string, rng: () => number): void {
   const choice = state.pendingChoice;
   if (!choice || choice.kind !== 'incident') return;
@@ -867,6 +935,7 @@ export function resolveSpecialEvent(state: GameState, optionId: string, rng: () 
   if (eventId === 'shipwreck') return resolveShipwreck(state, optionId);
   if (eventId === 'earlyFrost') return resolveEarlyFrost(state, optionId, choice.data.targetBuildingId as number, rng);
   if (eventId === 'gyrfalcon') return resolveGyrfalcon(state, optionId);
+  if (eventId === 'horseDefectors') return resolveHorseDefectors(state, optionId, rng);
   if (!wildlife) return;
   if (eventId === 'predator-scout-select') {
     if ((wildlife === 'wolf' || wildlife === 'tiger') && optionId.startsWith('scout:')) {
@@ -1110,5 +1179,6 @@ export function updateSpecialEvents(state: GameState, rng: () => number): void {
 
   updatePlagueCase(state, rng);
   updateEpidemic(state, rng);
+  if (!state.pendingChoice) maybeOpenHorseDefectorEvent(state, rng);
   if (!state.pendingChoice) maybeOpenSpecialEvent(state, rng);
 }

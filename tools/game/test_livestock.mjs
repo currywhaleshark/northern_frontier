@@ -47,7 +47,7 @@ function addStable(
   assert.equal(state.resources.milk, 0, 'milk is initialized as a first-class food resource');
   assert.equal(state.resources.wool, 0, 'wool is initialized as a first-class material resource');
   assert.equal(state.resources.hay, 0, 'hay is initialized as a first-class winter-feed resource');
-  assert.deepEqual(livestock.IMPLEMENTED_LIVESTOCK_IDS, ['chicken', 'goat', 'sheep', 'cattle']);
+  assert.deepEqual(livestock.IMPLEMENTED_LIVESTOCK_IDS, ['chicken', 'goat', 'sheep', 'cattle', 'horse']);
   assert.deepEqual(livestock.createDefaultLivestockState(), {
     species: 'chicken', headcount: 4, growth: 0, feedShortageDays: 0,
   });

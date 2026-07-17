@@ -537,13 +537,16 @@ function snapshotGroup(
   zoneId: string,
 ): TacticalDefenderGroup {
   const kind = kindForCombatant(role, weapon);
+  const origin = snapshots[0]?.origin;
+  const originKey = origin ? `-${origin}` : '';
   return {
-    id: `${role}-${weapon ?? 'unarmed'}`,
+    id: `${role}-${weapon ?? 'unarmed'}${originKey}`,
     kind,
     role,
+    ...(origin ? { origin } : {}),
     weapon,
     readyMuskets: snapshots.filter(snapshot => snapshot.readyWeapon === 'musket').length,
-    label: combatGroupLabel(role, weapon),
+    label: `${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
     residentIds: snapshots.map(snapshot => snapshot.residentId),
     count: snapshots.length,
     zoneId,
@@ -560,7 +563,7 @@ function snapshotGroup(
 function groupsFromSnapshots(snapshots: CombatantSnapshot[], assault = false): TacticalDefenderGroup[] {
   const grouped = new Map<string, CombatantSnapshot[]>();
   for (const snapshot of snapshots) {
-    const key = `${snapshot.role}:${snapshot.assignedWeapon ?? 'unarmed'}`;
+    const key = `${snapshot.role}:${snapshot.assignedWeapon ?? 'unarmed'}:${snapshot.origin ?? 'local'}`;
     const list = grouped.get(key) ?? [];
     list.push(snapshot);
     grouped.set(key, list);

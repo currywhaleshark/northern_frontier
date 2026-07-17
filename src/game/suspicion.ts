@@ -11,6 +11,7 @@ import { addLog } from './events';
 import { getRelation } from './relations';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
 import { silverSuspicionFactors } from './silver';
+import { isNorthernDefectorOrigin } from './defectors';
 import type { GameState, Rank } from './types';
 
 export interface SuspicionFactor {
@@ -55,6 +56,15 @@ export function suspicionBreakdown(state: GameState): SuspicionFactor[] {
   if (cozy > 0) {
     factors.push({ id: 'cozy', label: '북방 세력과의 유착 (관계 75 이상)', delta: cozy * s.perCozyFaction });
   }
+  const northernDefectors = state.residents.filter(resident =>
+    resident.alive && isNorthernDefectorOrigin(resident.origin)).length;
+  if (northernDefectors > 0) {
+    factors.push({
+      id: 'defectors',
+      label: `귀순 야인 보유 (${northernDefectors}명)`,
+      delta: northernDefectors * CONFIG.defectors.suspicionPerNorthernResident,
+    });
+  }
   factors.push(...silverSuspicionFactors(state)); // 잠채 — 익명 라벨로만 표시된다
   factors.push({ id: 'decay', label: '세월이 눈총을 씻는다', delta: -s.baseDecay });
   return factors;
@@ -89,12 +99,15 @@ export function openInspection(state: GameState): void {
   const s = CONFIG.suspicion;
   const canBribe = edibleFoodTotal(state) >= s.bribeCost.food && state.resources.hide >= s.bribeCost.hide;
   const hasYards = countBuilt(state, 'nitreYard') > 0;
+  const northernDefectors = state.residents.filter(resident =>
+    resident.alive && isNorthernDefectorOrigin(resident.origin)).length;
   state.pendingChoice = {
     kind: 'inspection',
     title: '감찰 어사 — 조정의 눈',
     body:
       '한양에서 감찰 어사가 내려왔습니다. 변방 수령이 화약을 만들고 오랑캐와 내통한다는\n' +
-      `소문의 진위를 캐러 온 것입니다. (현재 모반 의심: ${Math.round(state.suspicion)})`,
+      `소문의 진위를 캐러 온 것입니다. (현재 모반 의심: ${Math.round(state.suspicion)})` +
+      (northernDefectors > 0 ? `\n귀순 야인 ${northernDefectors}명도 신원과 행적을 조사받습니다.` : ''),
     illustration: {
       src: '/assets/events/royal-inspection-v1.png',
       alt: '개척지 창고와 장부를 조사하는 감찰 어사와 서리',

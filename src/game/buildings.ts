@@ -145,7 +145,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   stable: {
     id: 'stable', name: '축사', emoji: '🐂',
-    desc: '진(鎭) 승격 후 건설. 목동이 닭을 돌보며 달걀을 거두고 필요하면 도축한다.',
+    desc: '진(鎭) 승격 후 건설. 목동이 가축을 돌보고 산물을 거두며 필요하면 도축한다.',
     cost: { wood: 16, stone: 6, grain: 8, tools: 1 }, buildDays: 9, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
   },

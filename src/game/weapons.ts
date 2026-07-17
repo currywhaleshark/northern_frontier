@@ -1,6 +1,6 @@
 import { CONFIG } from './config';
 import type {
-  CombatWeaponId, GameState, JobId, Resident, ResourceId, WeaponAllocationMode,
+  CombatWeaponId, GameState, JobId, MountId, Resident, ResourceId, WeaponAllocationMode,
 } from './types';
 
 export const COMBAT_WEAPON_IDS: readonly CombatWeaponId[] = ['musket', 'hornBow', 'spear'];
@@ -14,6 +14,7 @@ export const COMBAT_WEAPON_RESOURCES: Record<CombatWeaponId, ResourceId> = {
   hornBow: 'hornBows',
   spear: 'spears',
 };
+export const MOUNT_NAMES: Record<MountId, string> = { horse: '군마' };
 
 const COMBAT_JOBS = new Set<JobId>(['militia', 'watchman', 'hunter']);
 
@@ -40,6 +41,10 @@ export interface MusketGroupReadiness {
 
 export function isCombatWeaponId(value: unknown): value is CombatWeaponId {
   return value === 'musket' || value === 'hornBow' || value === 'spear';
+}
+
+export function isMountId(value: unknown): value is MountId {
+  return value === 'horse';
 }
 
 export function isCombatResident(resident: Pick<Resident, 'alive' | 'job'>): boolean {
@@ -72,6 +77,101 @@ function eligibleResidents(state: GameState): Resident[] {
   return state.residents
     .filter(isCombatResident)
     .sort((a, b) => a.id - b.id);
+}
+
+export function horseStock(state: GameState): number {
+  return state.buildings
+    .filter(building => building.type === 'stable' && building.built && building.livestock?.species === 'horse')
+    .reduce((sum, building) => {
+      const count = Number(building.livestock?.headcount);
+      return sum + (Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0);
+    }, 0);
+}
+
+function reconciledMountAssignments(state: GameState): Partial<Record<number, MountId>> {
+  const source = state.mountAssignments && typeof state.mountAssignments === 'object'
+    ? state.mountAssignments
+    : {};
+  const residents = new Set(eligibleResidents(state).map(resident => resident.id));
+  const capacity = horseStock(state);
+  const next: Partial<Record<number, MountId>> = {};
+  const entries = Object.entries(source)
+    .map(([residentId, mount]) => [Number(residentId), mount] as const)
+    .sort(([left], [right]) => left - right);
+  let used = 0;
+  for (const [residentId, mount] of entries) {
+    if (used >= capacity) break;
+    if (!Number.isInteger(residentId) || !residents.has(residentId) || !isMountId(mount)) continue;
+    next[residentId] = mount;
+    used += 1;
+  }
+  return next;
+}
+
+export function resolvedMountAssignments(state: GameState): Readonly<Partial<Record<number, MountId>>> {
+  return reconciledMountAssignments(state);
+}
+
+export function reconcileMountAssignments(state: GameState): void {
+  state.mountAssignments = reconciledMountAssignments(state);
+}
+
+export function clearMountAssignments(state: GameState): void {
+  state.mountAssignments = {};
+}
+
+export function setResidentMount(
+  state: GameState,
+  residentId: number,
+  mount: MountId | null,
+): string | null {
+  reconcileMountAssignments(state);
+  const resident = state.residents.find(candidate => candidate.id === residentId);
+  if (!resident) return '주민을 찾을 수 없습니다.';
+  if (!isCombatResident(resident)) return '수비병·파수꾼·사냥꾼에게만 군마를 배정할 수 있습니다.';
+  if (mount != null && !isMountId(mount)) return '알 수 없는 탈것입니다.';
+  const current = state.mountAssignments[residentId] ?? null;
+  if (current === mount) return null;
+  if (mount === 'horse') {
+    const used = Object.keys(state.mountAssignments)
+      .filter(id => Number(id) !== residentId)
+      .length;
+    if (used >= horseStock(state)) return '군마가 모두 배정되어 있습니다.';
+    state.mountAssignments[residentId] = mount;
+  } else {
+    delete state.mountAssignments[residentId];
+  }
+  return null;
+}
+
+export function assignedMount(state: GameState, residentId: number): MountId | null {
+  return resolvedMountAssignments(state)[residentId] ?? null;
+}
+
+export function combatMountLossRoll(state: Pick<GameState, 'seed' | 'day'>, residentId: number): number {
+  let value = (state.seed ^ Math.imul(state.day, 0x9e3779b1) ^ Math.imul(residentId, 0x85ebca6b)) >>> 0;
+  value ^= value >>> 16;
+  value = Math.imul(value, 0x7feb352d) >>> 0;
+  value ^= value >>> 15;
+  value = Math.imul(value, 0x846ca68b) >>> 0;
+  value ^= value >>> 16;
+  return value / 0x100000000;
+}
+
+export function releaseResidentMount(state: GameState, residentId: number, combatDeath = false): boolean {
+  if (state.mountAssignments?.[residentId] !== 'horse') return false;
+  delete state.mountAssignments[residentId];
+  if (!combatDeath || combatMountLossRoll(state, residentId) >= CONFIG.mounted.combatDeathHorseLossChance) {
+    return false;
+  }
+  const stable = state.buildings
+    .filter(building => building.type === 'stable' && building.built &&
+      building.livestock?.species === 'horse' && (building.livestock.headcount ?? 0) > 0)
+    .sort((left, right) => left.id - right.id)[0];
+  if (!stable?.livestock) return false;
+  stable.livestock.headcount = Math.max(0, stable.livestock.headcount - 1);
+  reconcileMountAssignments(state);
+  return true;
 }
 
 function assignFirstAvailable(
