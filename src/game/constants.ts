@@ -46,13 +46,14 @@ export const JOB_NAMES: Record<JobId, string> = {
   tanner: '무두장이',
   weaver: '직조공',
   powderMaker: '염초장이', clerk: '아전',
+  undertaker: '장의사',
   watchman: '파수꾼', militia: '수비병',
 };
 
 export const JOB_ORDER: JobId[] = [
   'idle', 'woodcutter', 'woodSplitter', 'hunter', 'farmer', 'miller', 'builder',
   'hauler', 'herbalist', 'physician', 'curer', 'potter', 'smith', 'miner', 'fisher', 'charcoalBurner', 'herder',
-  'tanner', 'weaver', 'powderMaker', 'clerk',
+  'tanner', 'weaver', 'powderMaker', 'clerk', 'undertaker',
   'watchman', 'militia',
 ];
 
@@ -95,6 +96,7 @@ export const JOB_DESC: Record<JobId, string> = {
   weaver: '베틀집에서 목화를 무명옷으로 짭니다.',
   powderMaker: '부(府) 승격 후 배치할 수 있습니다. 염초장에서 장작과 돌을 써서 화약을 만듭니다.',
   clerk: '부(府) 승격 후 배치할 수 있습니다. 관청에서 행정을 맡아 자원 수집과 생산 효율을 높입니다.',
+  undertaker: '묘지에 배정되어 시신을 수습하고 안장합니다. 장례를 치르면 마을이 위로를 얻습니다.',
   watchman: '방어 시설 사이를 순찰합니다. 방어도가 오르고 위협도 증가가 줄어듭니다.',
   militia: '군영(없으면 마을 중심)에서 조련하는 상비 수비병입니다. 방어도가 크게 오릅니다.',
 };
@@ -110,6 +112,7 @@ export const JOB_COLORS: Record<JobId, string> = {
   tanner: '#b9825a',
   weaver: '#8f9fbd',
   powderMaker: '#b47cc7', clerk: '#d0b36a',
+  undertaker: '#6f6a7d',
   watchman: '#7f8fd9', militia: '#e05f5f',
 };
 

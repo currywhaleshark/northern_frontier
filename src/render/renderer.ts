@@ -849,8 +849,17 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       });
     }
   }
+  // 매장을 기다리는 시신 — 장의사가 운구 중이면 표시하지 않는다
+  for (const corpse of state.corpses ?? []) {
+    if (corpse.carried || corpse.withExpedition) continue;
+    ctx.font = `${Math.round(TILE * 0.55)}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⚰️', corpse.x * TILE + TILE / 2, corpse.y * TILE + TILE / 2);
+  }
   for (const r of state.residents) {
     if (!r.alive || predatorScoutIds.has(r.id)) continue;
+    if (r.stage === 'infant') continue; // 아기는 집 안에서 자란다
     const p = residentPixelPos(r, o.alpha);
     sprites.drawResident(ctx, {
       job: r.job,
@@ -863,6 +872,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       moving: r.px !== r.x || r.py !== r.y,
       facing: r.x < r.px ? -1 : 1,
       militiaWeapon: militiaWeaponForResident(state, r),
+      sizeScale: r.stage === 'child' ? 0.62 : r.stage === 'youth' ? 0.8 : 1,
     });
   }
 

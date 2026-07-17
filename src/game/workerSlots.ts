@@ -29,10 +29,11 @@ export const SLOTTED_BUILDING_CONFIG: Partial<Record<BuildingTypeId, WorkerSlotC
   smokehouse: { job: 'curer', slots: 2 },
   dryingRack: { job: 'curer', slots: 2 },
   onggiKiln: { job: 'potter', slots: 2 },
+  cemetery: { job: 'undertaker', slots: 1 },
 };
 
 function isWorkableResident(state: GameState, resident: Resident | undefined): resident is Resident {
-  return resident != null && resident.alive && !resident.sick &&
+  return resident != null && resident.alive && !resident.sick && !resident.stage &&
     state.day >= (resident.quarantinedUntil ?? 0) && resident.health >= 20;
 }
 

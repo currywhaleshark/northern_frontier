@@ -51,6 +51,7 @@ import { maybeOfferDefectorImmigration, maybeOfferImmigration, resolveImmigratio
 import { createIncidentState, resolveSpecialEvent, updateSpecialEvents } from './specialEvents';
 import { dailyClaimTensionTick, noteBuildingClaimIntrusions } from './claimZones';
 import { applyDailySpoilage } from './spoilage';
+import { consumptionWeight, lifecycleDailyTick, resolveWeddingChoice } from './lifecycle';
 import { dailySilverTick, resolveSilverVeinChoice } from './silver';
 import { updateFermentation } from './fermentation';
 import { isKimjangChoice, maybeOpenKimjangEvent, resolveKimjangChoice } from './kimjang';
@@ -362,6 +363,10 @@ export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
 export function setResidentJob(state: GameState, id: number, job: JobId): void {
   if (!isJobUnlocked(state.rank, job)) return;
   const r = state.residents.find(res => res.id === id);
+  if (r?.stage) {
+    addLog(state, `${r.name}은(는) 아직 아이라 일을 맡길 수 없습니다.`, 'info');
+    return;
+  }
   if (r && r.alive) {
     if (job !== 'hauler') returnResidentCart(state, r);
     r.job = job;
@@ -651,6 +656,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'incident') resolveSpecialEvent(state, optionId, rng);
   else if (state.pendingChoice.kind === 'territory') resolveTerritoryWarning(state, optionId);
   else if (state.pendingChoice.kind === 'silverVein') resolveSilverVeinChoice(state, optionId, rng);
+  else if (state.pendingChoice.kind === 'wedding') resolveWeddingChoice(state, optionId);
   else resolveTrade(state, optionId);
   reconcileWeaponAssignments(state);
   reconcileMountAssignments(state);
@@ -740,6 +746,7 @@ function endOfDay(state: GameState): void {
   updateHabitats(state);
   runToolWear(state);
   runConsumptionAndNeeds(state, rng);
+  lifecycleDailyTick(state, rng); // 성장·노화·혼인·출산·장례 (소비/체온 갱신 뒤)
   updateLivestock(state);
   applyDailySpoilage(state);
   updateFermentation(state);
@@ -870,21 +877,24 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
   const pop = living.length;
   if (pop === 0) return;
 
+  // 나이 단계별 소비 몫 — 아이는 성인보다 적게 먹고 적게 입는다
+  const weight = consumptionWeight(state);
+
   // 식량
-  const foodNeed = pop * cfg.foodPerDay;
+  const foodNeed = weight * cfg.foodPerDay;
   const foodResult = consumeFoodByDiet(state, foodNeed);
   const fedRatio = foodResult.shortageRatio;
 
   // 장작
-  const fwNeed = pop * cfg.firewoodPerPerson *
+  const fwNeed = weight * cfg.firewoodPerPerson *
     CONFIG.seasons.firewoodMult[season] * firewoodWeatherMult(state.weather);
   const heatProvided = consumeFuelHeat(state, fwNeed);
   const firewoodRatio = fwNeed > 0 ? Math.min(1, heatProvided / fwNeed) : 1;
 
   // 옷
-  const clothesCoverage = Math.min(1, clothingCoverageTotal(state) / pop);
+  const clothesCoverage = Math.min(1, clothingCoverageTotal(state) / Math.max(1, weight));
   if (season === 'winter') {
-    consumeClothingWear(state, pop * cfg.clothesWearWinter);
+    consumeClothingWear(state, weight * cfg.clothesWearWinter);
   }
 
   const rng2 = makeRng(state.seed + state.day * 104729);
@@ -894,7 +904,7 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
     new Set(state.expedition?.memberIds ?? []),
   );
 
-  const foodOk = foodTotal(state) > pop * cfg.foodPerDay * 6;
+  const foodOk = foodTotal(state) > weight * cfg.foodPerDay * 6;
   updateMorale(
     state, foodOk, avg(state, 'warmth'), countBuilt(state, 'market') > 0,
     foodResult.varietyScore,

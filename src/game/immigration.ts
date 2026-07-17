@@ -4,6 +4,7 @@ import { foodTotal } from './consumption';
 import { addLog } from './events';
 import { RESIDENT_ORIGINS, residentOriginLabel } from './defectors';
 import { addForeignSiteMemory } from './foreignSites';
+import { applyLifeStage } from './lifecycle';
 import { makeRng } from './map';
 import { rankEffects } from './promotion';
 import { changeRelation } from './relations';
@@ -128,6 +129,13 @@ export function maybeOfferImmigration(state: GameState, rng: () => number): bool
   const living = livingResidents(state);
   if (living.length === 0) return false;
   const count = im.groupMin + Math.floor(rng() * (im.groupMax - im.groupMin + 1));
+  // 가족 구성 — 홀몸만 오지 않는다. 아이·노부모가 섞이면 즉시 전력은 줄지만 뿌리가 내린다.
+  const l = CONFIG.lifecycle;
+  const children = count >= 3 && rng() < l.immigrantChildChance ? 1 : 0;
+  const elders = count - children >= 2 && rng() < l.immigrantElderChance ? 1 : 0;
+  const compositionLabel = children + elders > 0
+    ? ` (장정 ${count - children - elders}, ${[children > 0 ? `아이 ${children}` : '', elders > 0 ? `노부모 ${elders}` : ''].filter(Boolean).join(', ')})`
+    : '';
   const story = IMMIGRATION_STORIES[Math.floor(rng() * IMMIGRATION_STORIES.length)];
   const forecast = arrivalForecast(state, count);
 
@@ -140,7 +148,7 @@ export function maybeOfferImmigration(state: GameState, rng: () => number): bool
     },
     body:
       `${story.body}\n\n` +
-      `일행: ${count}명\n` +
+      `일행: ${count}명${compositionLabel}\n` +
       `현재 주거: ${living.length}명 / ${forecast.housing.total}명 수용 (빈자리 ${forecast.freeBeds}명)\n` +
       `수용 후: ${forecast.afterPopulation}명 / ${forecast.housing.total}명 수용` +
       (forecast.afterHomeless > 0 ? ` · 노숙 ${forecast.afterHomeless}명 예상\n` : ' · 전원 입주 가능\n') +
@@ -158,7 +166,7 @@ export function maybeOfferImmigration(state: GameState, rng: () => number): bool
         desc: `인구 변화 없음. 명성 -${im.rejectReputation}.`,
       },
     ],
-    data: { count },
+    data: { count, children, elders },
   };
   state.lastImmigrationDay = state.day;
   return true;
@@ -183,7 +191,17 @@ export function resolveImmigration(state: GameState, optionId: string): void {
 
   if (optionId === 'accept') {
     const rng = makeRng(state.seed + state.day * 15485863 + count * 17);
-    for (let i = 0; i < count; i++) state.residents.push(createResident(state, rng, 'idle', origin));
+    const children = Math.max(0, Math.min(count - 1, Math.floor(Number(choice.data.children) || 0)));
+    const elders = Math.max(0, Math.min(count - children - 1, Math.floor(Number(choice.data.elders) || 0)));
+    for (let i = 0; i < count; i++) {
+      const resident = createResident(state, rng, 'idle', origin);
+      if (i < children) {
+        applyLifeStage(resident, rng() < 0.5 ? 'child' : 'youth');
+      } else if (i < children + elders) {
+        resident.age = 55 + Math.floor(rng() * 10); // 노부모 — 자연사 시계가 곧 돈다
+      }
+      state.residents.push(resident);
+    }
     reconcileResidentHomes(state, rng);
     if (sourceSite) {
       sourceSite.favors = Math.max(0, sourceSite.favors - favorCost);

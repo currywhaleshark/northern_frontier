@@ -31,6 +31,7 @@ const RESIDENT_COLUMNS: Record<JobId, number> = {
   weaver: 5,
   powderMaker: 7,
   clerk: 5,
+  undertaker: 5,
   watchman: 8,
   militia: 9,
 };

@@ -10,6 +10,7 @@ import { addLog } from './events';
 import { haulerCarryCapacity } from './equipment';
 import { collectHuntableTiles } from './habitats';
 import { makeRng } from './map';
+import { buryCorpse, cemeteryFreePlots, corpsesOf, elderLaborMult, nextCorpseToCollect } from './lifecycle';
 import { extractMineralDeposit, mineralRemaining } from './minerals';
 import { isVeinSealedTile, recordRockMining, recordSilverMined } from './silver';
 import { getSeason } from './seasons';
@@ -65,7 +66,7 @@ const OUTDOOR_JOBS = [
 // ─────────────────────────── 공통 헬퍼 ───────────────────────────
 
 function effOf(r: Resident): number {
-  return 1 + (r.skills[r.job] ?? 0) * CONFIG.production.skillEffect;
+  return (1 + (r.skills[r.job] ?? 0) * CONFIG.production.skillEffect) * elderLaborMult(r);
 }
 
 function gainSkillTick(r: Resident): void {
@@ -2047,6 +2048,53 @@ function idleTick(state: GameState, r: Resident, ctx: Ctx): void {
   loiterNearCenter(state, r, ctx, '대기');
 }
 
+// 장의사 — 시신을 수습해 묘지에 안장한다. 시신이 없으면 묘지를 돌본다.
+function undertakerTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const cemetery = assignedWorkplace(state, r, ctx, 'cemetery', '묘지 배정 없음');
+  if (!cemetery) return;
+  const f = CONFIG.funeral;
+
+  // 운구 중 — 묘지로 모신다
+  if (r.corpseCarryId != null) {
+    const corpse = corpsesOf(state).find(candidate => candidate.id === r.corpseCarryId);
+    if (!corpse) { r.corpseCarryId = null; return; }
+    const st = goTo(state, r, ctx, buildingGoal(state, cemetery.id));
+    if (st === 'stuck') { r.task = '길이 막힘'; return; }
+    if (st !== 'arrived') { r.task = '상여 운구'; return; }
+    if ((cemetery.graves ?? 0) >= f.plotsPerCemetery) {
+      r.task = '묘 자리 부족';
+      corpse.carried = false;
+      corpse.x = r.x;
+      corpse.y = r.y;
+      r.corpseCarryId = null;
+      return;
+    }
+    buryCorpse(state, corpse.id, cemetery);
+    r.corpseCarryId = null;
+    return;
+  }
+
+  const corpse = nextCorpseToCollect(state);
+  if (!corpse) {
+    loiterNearBuilding(state, r, ctx, cemetery, 2, '묘지 돌봄');
+    return;
+  }
+  if (cemeteryFreePlots(state) <= 0) {
+    loiterNearBuilding(state, r, ctx, cemetery, 2, '묘 자리 부족');
+    return;
+  }
+  const st = goTo(state, r, ctx, t => Math.abs(t.x - corpse.x) + Math.abs(t.y - corpse.y) <= 1);
+  if (st === 'stuck') {
+    corpse.skipUntilDay = state.day + f.corpseRetryDays;
+    r.task = '시신에 접근 불가';
+    return;
+  }
+  if (st !== 'arrived') { r.task = '시신 수습하러 이동'; return; }
+  corpse.carried = true;
+  r.corpseCarryId = corpse.id;
+  r.task = '상여 운구';
+}
+
 function nearestBuilding<T extends { x: number; y: number }>(r: Resident, list: T[]): T | null {
   let best: T | null = null;
   let bestD = Infinity;
@@ -2115,6 +2163,26 @@ export function agentsTick(state: GameState): void {
       goToCenter(state, r, ctx);
       continue;
     }
+    // 아이는 일하지 않는다 — 아기는 집에서 자라고, 어린이·소년은 마을 안에서 뛰논다
+    if (r.stage) {
+      clearHaulTask(r);
+      if (r.stage === 'infant') {
+        r.task = '집에서 자람';
+        r.phase = 'rest';
+        r.path = [];
+      } else {
+        loiterNearCenter(state, r, ctx, '뛰노는 중');
+      }
+      continue;
+    }
+    // 산모는 집에서 몸을 추스른다
+    if (state.day < (r.birthRecoveryUntil ?? 0)) {
+      r.task = '산후 조리';
+      clearHaulTask(r);
+      if (carryTotal(r) > 0) depositAll(state, r);
+      goToCenter(state, r, ctx);
+      continue;
+    }
     // 병자/격리자/중상자는 마을 중심에서 쉬며 배정은 유지한다
     if (r.sick || state.day < (r.quarantinedUntil ?? 0) || r.health < 20) {
       r.task = state.day < (r.quarantinedUntil ?? 0) ? '격리 중' : '앓아누움';
@@ -2165,6 +2233,7 @@ export function agentsTick(state: GameState): void {
       case 'tanner': tannerTick(state, r, ctx); break;
       case 'weaver': weaverTick(state, r, ctx); break;
       case 'clerk': clerkTick(state, r, ctx); break;
+      case 'undertaker': undertakerTick(state, r, ctx); break;
       case 'watchman': watchmanTick(state, r, ctx); break;
       case 'militia': militiaTick(state, r, ctx); break;
       default: idleTick(state, r, ctx); break;

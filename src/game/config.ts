@@ -906,6 +906,50 @@ export const CONFIG = {
     silverPaySuspicionDecayMult: 1.5, // 은까지 바치는 성실함 — 의심을 더 깊이 씻는다
   },
 
+  // 생애 주기 — 압축 성장(총 2.5게임년) + 나이별 소비 몫 + 노년·자연사.
+  // 계획: docs/superpowers/plans/2026-07-17-marriage-birth-growth.md
+  lifecycle: {
+    stageDays: { infant: 24, child: 48, youth: 48 },  // 합계 120일 = 2.5게임년
+    consumptionShare: { infant: 0.3, child: 0.5, youth: 0.7 }, // 성인 1.0 기준
+    growthPauseHungerBelow: 25,  // 굶주리면 성장이 멈춘다
+    growthPauseWarmthBelow: 25,  // 혹한에 떨어도 멈춘다
+    adultAge: 16,
+    childBedShare: 0.5,          // 아이는 침상 정원의 절반만 차지
+    // 혼인 — 조건 충족 시 자연 성사 (강제 중매 없음)
+    marriageDailyChance: 0.03,   // 자격 있는 짝이 있을 때의 일일 성사 확률
+    maxMarriageAge: 50,
+    weddingFeastFood: 8,         // 잔치 비용 (식용 식량)
+    weddingFeastMorale: 6,       // 잔치 시 전 주민 사기
+    weddingQuietMorale: 2,       // 조용히 치러도 당사자들 주변의 잔잔한 기쁨
+    // 출산 — 같은 집에 사는 부부. 굶는 마을엔 아기가 안 생긴다.
+    birthDailyChance: 0.025,     // 부부당, 식량·온기 여유 시
+    birthFoodDaysRequired: 6,    // 이 일수분의 식량 여유가 없으면 확률 0
+    birthWarmthRequired: 40,     // 평균 체온이 이보다 낮으면 확률 0
+    birthHousingFullMult: 0.15,  // 집이 꽉 차면 확률이 크게 떨어진다
+    maxMotherAge: 45,
+    maxChildrenPerCouple: 3,
+    birthRecoveryDays: 4,        // 산모 노동 이탈
+    birthWinterExtraRecovery: 3, // 겨울 출산은 회복이 느리다
+    // 노년 — 나이는 새해마다 +1세(압축 없음). 60부터 자연사 위험이 오른다.
+    elderDeathCheckAge: 60,
+    elderDeathAnnualBase: 0.1,   // 60세 연간 사망 확률
+    elderDeathAnnualPerYear: 0.05, // 이후 1세당 가산
+    elderLaborAge: 60,
+    elderLaborMult: 0.85,        // 노년 노동 효율 (완만 — 늙은 사냥꾼도 일한다)
+    // 이주 가족 구성 — 홀몸만 오지 않는다
+    immigrantChildChance: 0.4,   // 일행에 아이(어린이/소년) 1명이 섞일 확률
+    immigrantElderChance: 0.15,  // 노부모(55~64세) 1명이 섞일 확률
+  },
+
+  // 장례 — 모든 죽음은 시신을 남기고, 시신은 묘지에 묻힌다
+  funeral: {
+    plotsPerCemetery: 12,        // 묘지 1곳의 묘 자리
+    unburiedGraceDays: 3,        // 이 일수를 넘긴 시신부터 방치 페널티
+    unburiedMoralePerDay: 1.5,   // 방치 시신이 있는 날의 전 주민 사기 하락
+    burialMoraleRelief: 3,       // 안장 시 전 주민 사기 회복 (장례의 위로)
+    corpseRetryDays: 2,          // 접근 불가 시신의 재시도 간격
+  },
+
   // 은맥 — 바위/철광을 캐는 동안 낮은 확률로 드러나는 게임당 1회 사건
   silver: {
     veinDailyChance: 0.015,   // 채광이 있었던 날의 발견 확률

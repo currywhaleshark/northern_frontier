@@ -10,6 +10,7 @@ import {
 import { BUILDING_DEFS } from './buildings';
 import { addLog } from './events';
 import { returnResidentCart } from './equipment';
+import { addCorpse } from './lifecycle';
 import { getSeason } from './seasons';
 import { warmthLossWeatherMult } from './weather';
 import { releaseResidentMount } from './weapons';
@@ -274,6 +275,12 @@ export function killResident(
   r.homeBuildingId = null;
   r.task = '사망';
   state.totalDeaths++;
+  addCorpse(state, r, cause); // 모든 죽음은 시신을 남기고, 시신은 장례를 기다린다
+  // 사별 — 남은 배우자는 홀몸이 된다 (재혼 가능)
+  if (r.spouseId != null) {
+    const spouse = state.residents.find(other => other.id === r.spouseId);
+    if (spouse) spouse.spouseId = null;
+  }
   if (getSeason(state.day) === 'winter') state.winterDeaths++;
   if (starvation) state.starvationDeathsThisYear++;
   state.lastDeathCause = combatDeath

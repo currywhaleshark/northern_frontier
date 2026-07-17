@@ -77,6 +77,7 @@ export interface ResidentDrawParams {
   facing?: 1 | -1;    // 1 오른쪽, -1 왼쪽
   militiaWeapon?: MilitiaWeaponSpriteId;
   foreignFaction?: string;
+  sizeScale?: number; // 아이 축소 표시 (전용 시트가 나오기 전 폴백)
 }
 
 export interface ForeignStructureDrawParams {

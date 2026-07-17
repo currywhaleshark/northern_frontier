@@ -245,6 +245,11 @@ export function migrateV18ToV19(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 19 };
 }
 
+// v20: 생애 주기(단계·혼인·출산·노년)와 장례(시신·묘지) — 가산적
+export function migrateV19ToV20(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 20 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   let version = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -268,6 +273,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 16) migrated = migrateV16ToV17(migrated);
     else if (version === 17) migrated = migrateV17ToV18(migrated);
     else if (version === 18) migrated = migrateV18ToV19(migrated);
+    else if (version === 19) migrated = migrateV19ToV20(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -1071,6 +1077,9 @@ export function loadGame(): GameState | null {
     // 은맥 없는 구버전
     if (!Object.prototype.hasOwnProperty.call(parsed, 'silverVein')) parsed.silverVein = null;
     if (parsed.silverPityDays == null) parsed.silverPityDays = 0;
+    // 생애 주기·장례 없는 구버전
+    if (!Array.isArray(parsed.corpses)) parsed.corpses = [];
+    if (parsed.nextCorpseId == null) parsed.nextCorpseId = 1;
     // 세공 없는 구버전: 시드로 올해분을 재생성. 이미 겨울이면 올해분은 면제 (다음 봄부터 정상 진행)
     if (!Object.prototype.hasOwnProperty.call(parsed, 'courtTribute')) {
       const pop = parsed.residents.filter(r => r.alive).length;

@@ -351,8 +351,9 @@ function drawGeneratedCharacterRect(
   y: number,
   facing: 1 | -1 | undefined,
   bob: number,
+  sizeScale = 1,
 ): void {
-  const scale = CHAR / GENERATED_CHARACTER_SHEET.residentWidth;
+  const scale = (CHAR / GENERATED_CHARACTER_SHEET.residentWidth) * sizeScale;
   const dw = rect.sw * scale;
   const dh = rect.sh * scale;
   ctx.save();
@@ -368,7 +369,9 @@ function drawGeneratedResident(
   p: ResidentDrawParams,
   bob: number,
 ): void {
-  drawGeneratedCharacterRect(ctx, img, generatedResidentSourceRect(p.job, p.gender), p.x, p.y, p.facing, bob);
+  drawGeneratedCharacterRect(
+    ctx, img, generatedResidentSourceRect(p.job, p.gender), p.x, p.y, p.facing, bob, p.sizeScale ?? 1,
+  );
 }
 
 function drawForeignStructureSprite(
@@ -500,6 +503,7 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   garrison:   { base: TENT_GREEN, glyph: BANNER_RED },
   office:     { roof: ROOF_DARK, base: FACE_SHOP, glyph: BANNER_RED },
   market:     { roof: AWNING, base: COUNTER, roofLift: 12 },
+  cemetery:   { base: FACE_STONE }, // 봉분·비석 (전용 그림 나오기 전 임시)
   cannonEmplacement: { base: FACE_STONE, glyph: BANNER_RED }, // 돌 포대 (전용 그림 나오기 전 임시)
 };
 
@@ -526,6 +530,7 @@ const CHAR_BY_JOB: Record<JobId, CR> = {
   weaver:     [1, 7],
   powderMaker: [1, 9],
   clerk:      [1, 7],
+  undertaker: [1, 7],
   watchman:   [0, 11],
   militia:    [0, 9],
 };

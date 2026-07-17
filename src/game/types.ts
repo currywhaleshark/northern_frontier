@@ -61,6 +61,7 @@ export type JobId =
   | 'powderMaker' // 염초장이
   | 'clerk'      // 아전
   | 'watchman'   // 파수꾼
+  | 'undertaker' // 장의사 (묘지 배정 — 시신 수습과 안장)
   | 'militia';   // 수비병 (내부 id는 저장 호환을 위해 유지)
 
 export type CombatWeaponId = 'musket' | 'hornBow' | 'spear';
@@ -157,6 +158,7 @@ export type BuildingTypeId =
   | 'garrison'   // 군영
   | 'office'     // 관청
   | 'market'     // 장터
+  | 'cemetery'   // 묘지 (시신 안장 — 묘 자리가 차오른다)
   | 'cannonEmplacement'; // 불랑기포대 (부 승격 후 조정 청원으로만 배치)
 
 export interface Tile {
@@ -284,6 +286,22 @@ export interface HaulTask {
   targetBuildingId?: number; // supply일 때 재료를 내려놓을 생산시설
 }
 
+// 생애 단계 — 성장 게이지 모델(가축 growth 선례). 나이가 아니라 단계로 자란다.
+export type LifeStage = 'infant' | 'child' | 'youth';
+
+// 매장을 기다리는 시신. 방치가 길어지면 마을 사기가 상한다.
+export interface Corpse {
+  id: number;
+  name: string;
+  x: number;
+  y: number;
+  deathDay: number;
+  cause: string;
+  carried?: boolean;      // 장의사가 운구 중
+  skipUntilDay?: number;  // 접근 불가 시신의 재시도 유예
+  withExpedition?: boolean; // 원정대가 수습해 지니고 귀환 중 (귀환 시 마을에 내려놓는다)
+}
+
 export interface Resident {
   id: number;
   name: string;
@@ -291,6 +309,14 @@ export interface Resident {
   gender: Gender;
   job: JobId;
   origin?: string; // 귀순·이주 전의 소속. 없으면 일반 개척지 주민
+  // ── 생애 주기 (없으면 성인) ──
+  stage?: LifeStage | null;    // 아기/어린이/소년 — 성인이 되면 지워진다
+  stageProgress?: number;      // 현 단계에서 자란 일수 (굶주림·혹한이면 멈춤)
+  spouseId?: number | null;    // 배우자 주민 id
+  motherId?: number;           // "○○의 아이" 표기용
+  fatherId?: number;
+  birthRecoveryUntil?: number; // 산모 회복 — 이 날까지 노동 이탈
+  corpseCarryId?: number | null; // 장의사가 운구 중인 시신 id
   hunger: number;   // 0(굶주림) ~ 100(포만)
   warmth: number;   // 0(동사 직전) ~ 100
   health: number;   // 0 사망
@@ -340,6 +366,7 @@ export interface Building {
   dryingProduct?: DryingProductId; // 건조대 전용: 현재 생산품
   fermentBatches?: FermentBatch[]; // 장독대 전용: 절대일 기준 숙성 배치
   livestock?: LivestockState; // 축사 전용: 축종·마릿수·번식·사료 부족 상태
+  graves?: number; // 묘지 전용: 안장된 묘 수 (자리가 차면 증설이 필요하다)
   inventory?: Partial<Record<ResourceId, number>>; // 운반 전 생산지 현장 재고
   repairing?: boolean; // 습격으로 파손되어 건설담당의 수리가 필요한 상태
 }
@@ -447,7 +474,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding';
   title: string;
   body: string;
   illustration?: {
@@ -1077,6 +1104,9 @@ export interface GameState {
   specialItems: Record<SpecialItemId, number>; // 산삼·호피 등 일반 자원과 분리한 기물함
   discoveredSpecialItems: SpecialItemId[];     // 소모해도 남는 기물 도감
   tributeWaivers: number;      // 산삼 진상으로 얻은 세공 면제 횟수
+  // ── 생애 주기·장례 (구버전 저장에는 없음) ──
+  corpses?: Corpse[];          // 매장 대기 시신
+  nextCorpseId?: number;
   // ── 은맥 (게임당 1회 — 채광 중 발견 사건으로만 등장) ──
   silverVein?: SilverVeinState | null; // 구버전 저장에는 없음
   silverPityDays?: number;     // 발견 전 누적 채광일 (보장 발동용)
