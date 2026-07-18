@@ -4,6 +4,7 @@ import { cropIdForBuilding, CROP_DEFS } from '../game/crops';
 import { CONFIG } from '../game/config';
 import { haulerCarryCapacity } from '../game/equipment';
 import { isExplored } from '../game/exploration';
+import { familyReferenceName } from '../game/family';
 import { foreignSiteAt } from '../game/foreignSites';
 import { mineralRemaining } from '../game/minerals';
 import { mineMineralSummary } from '../game/miningSites';
@@ -90,6 +91,15 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
       <tbody>
         <tr><td>이름</td><td>{resident.name} ({resident.age}세){resident.literate ? <span title="문해자 — 의원·아전·훈장을 맡을 수 있고 숙련이 빨리 오릅니다"> 📖</span> : ''}{resident.sick ? ' 🤒' : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</td></tr>
         {resident.origin && <tr><td>출신</td><td>{resident.origin}</td></tr>}
+        {resident.spouseId != null && (
+          <tr><td>배우자</td><td>{familyReferenceName(state, resident.spouseId, undefined)}</td></tr>
+        )}
+        {(resident.stage || resident.motherId != null || resident.motherName) && (
+          <tr><td>어머니</td><td>{familyReferenceName(state, resident.motherId, resident.motherName)}</td></tr>
+        )}
+        {(resident.stage || resident.fatherId != null || resident.fatherName) && (
+          <tr><td>아버지</td><td>{familyReferenceName(state, resident.fatherId, resident.fatherName)}</td></tr>
+        )}
         {resident.stage === 'youth' && (
           <tr>
             <td>소년기 활동</td>

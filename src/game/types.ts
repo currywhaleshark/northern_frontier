@@ -358,7 +358,9 @@ export interface Resident {
   literate?: boolean;          // 문해자 — 의원·아전·훈장 자격, 숙련 성장 가속
   spouseId?: number | null;    // 배우자 주민 id
   motherId?: number;           // "○○의 아이" 표기용
+  motherName?: string;         // 부모가 이탈해도 남기는 역사적 이름
   fatherId?: number;
+  fatherName?: string;
   special?: SpecialResidentId; // 네임드 특수 주민 — 직업 고정, 게임당 1회
   birthRecoveryUntil?: number; // 산모 회복 — 이 날까지 노동 이탈
   corpseCarryId?: number | null; // 장의사가 운구 중인 시신 id

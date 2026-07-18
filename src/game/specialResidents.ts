@@ -8,6 +8,7 @@ import { addLog } from './events';
 import { makeRng } from './map';
 import { changeRelation, getRelation } from './relations';
 import { createResident, reconcileResidentHomes } from './residents';
+import { detachDepartingResidentFromFamily } from './family';
 import { weaponStock } from './weapons';
 import type {
   GameState,
@@ -731,6 +732,7 @@ function departSpecialResident(state: GameState, id: SpecialResidentId): void {
   if (resident) {
     delete state.weaponAssignments[resident.id];
     delete state.mountAssignments[resident.id];
+    detachDepartingResidentFromFamily(state, resident);
     state.residents = state.residents.filter(candidate => candidate.id !== resident.id);
   }
   specialResidentRecordsOf(state)[id] = { status: 'departed' };

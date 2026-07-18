@@ -29,6 +29,7 @@ import { defaultRaiderFormationLine } from './tacticalTargeting';
 import { isImplementedLivestockId, normalizeLivestockState } from './livestock';
 import { normalizeTacticalGroupTargets } from './tacticalBattle';
 import { isYouthWorkJob } from './youth';
+import { normalizeResidentFamilyReferences } from './family';
 import {
   gradeTacticalBattle, raidDefenseObjectiveResult, tacticalClosingSummary, tacticalOutcomeResult,
 } from './tacticalCore';
@@ -307,6 +308,9 @@ export function migrateV23ToV24(raw: RawSave, sourceVersion = 23): RawSave {
     if (migrated.expectationTransitionNotified !== true) {
       migrated.expectationTransitionNotified = false;
     }
+  }
+  if (Array.isArray(migrated.residents)) {
+    normalizeResidentFamilyReferences({ residents: migrated.residents as Resident[] });
   }
   migrated.schemaVersion = 24;
   return migrated;
@@ -982,6 +986,7 @@ export function loadGame(slot = 1): GameState | null {
         delete resident.youthActivity;
       }
     }
+    normalizeResidentFamilyReferences(parsed);
     if (!('raiders' in parsed)) return null;
     if (!Object.prototype.hasOwnProperty.call(parsed, 'battle')) parsed.battle = null;
     if (!Array.isArray(parsed.battleScars)) parsed.battleScars = [];

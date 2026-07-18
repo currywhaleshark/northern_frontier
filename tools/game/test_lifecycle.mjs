@@ -144,6 +144,9 @@ function healthyState(seed) {
   const baby = state.residents[state.residents.length - 1];
   assert.equal(baby.stage, 'infant');
   assert.equal(baby.motherId, mother.id);
+  assert.equal(baby.motherName, mother.name);
+  assert.equal(baby.fatherId, father.id);
+  assert.equal(baby.fatherName, father.name);
   assert.ok((mother.birthRecoveryUntil ?? 0) > state.day, 'the mother recovers after birth');
 
   // 굶는 마을엔 아기가 안 생긴다
