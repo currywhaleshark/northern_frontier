@@ -9,7 +9,8 @@ import {
   convertFieldToPaddy, toggleResidentCart,
   unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
-import { clearSave, hasSave, loadGame, saveGame } from './game/saveLoad';
+import { hasAnySave, loadGame, saveGame } from './game/saveLoad';
+import { SaveSlotDialog } from './components/SaveSlotDialog';
 import { addLog, negotiateTrade, requestTrade, tradeNegotiationOf } from './game/events';
 import { initAudio, isMuted, playSfx, setMuted, setWeatherAmbient } from './sound/sfx';
 import { AlertsPanel } from './components/AlertsPanel';
@@ -18,6 +19,7 @@ import { DockFrame, type DockOverlayItem } from './components/dock/DockFrame';
 import { CourtWindow } from './components/dock/CourtWindow';
 import { FactionsWindow } from './components/dock/FactionsWindow';
 import { ResidentsWindow } from './components/dock/ResidentsWindow';
+import { SpecialResidentsWindow } from './components/dock/SpecialResidentsWindow';
 import { EventModal } from './components/EventModal';
 import { TradeDialog } from './components/TradeDialog';
 import { GameCanvas } from './components/GameCanvas';
@@ -65,7 +67,7 @@ import {
 import { mergeHuntGroups, setHuntPreparationZone, splitHuntGroup } from './game/tacticalHunt';
 import type {
   BuildingTypeId, CombatWeaponId, CropId, Difficulty, DryingProductId, JobId, LivestockId, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
-  PreparationActionId, PredatorKind, SpecialItemId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
+  PreparationActionId, PredatorKind, SpecialItemId, SpecialResidentId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
 import {
   loadUiPrefs,
@@ -77,6 +79,7 @@ import {
 } from './ui/uiPrefs';
 import { bringDockWindowToFront } from './ui/dockLayout';
 import { advanceGameClock } from './ui/gameClock';
+import { appointConfinedSpecialResident } from './game/specialResidents';
 import type { DockWindowId, FloatingWindowId } from './ui/dockPresentation';
 import type { AutoAssignBuildingType } from './game/workerSlots';
 
@@ -95,7 +98,9 @@ export default function App() {
   const [placingType, setPlacingType] = useState<BuildingTypeId | null>(null);
   const [selected, setSelected] = useState<{ x: number; y: number } | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
-  const [canLoad, setCanLoad] = useState(hasSave());
+  const [canLoad, setCanLoad] = useState(hasAnySave());
+  // 저장 슬롯 다이얼로그: null이면 닫힘, 아니면 저장/불러오기 모드
+  const [slotDialogMode, setSlotDialogMode] = useState<'save' | 'load' | null>(null);
   const [inspResidentId, setInspResidentId] = useState<number | null>(null);
   const [soundOn, setSoundOn] = useState(!isMuted());
   const [uiPrefs, setUiPrefs] = useState<UiPrefs>(() => loadUiPrefs());
@@ -358,6 +363,11 @@ export default function App() {
 
   const handleSetResidentJob = (id: number, job: JobId) => {
     setResidentJob(stateRef.current, id, job);
+    bump();
+  };
+
+  const handleAppointConfinedSpecialResident = (id: SpecialResidentId) => {
+    appointConfinedSpecialResident(stateRef.current, id);
     bump();
   };
 
@@ -744,31 +754,35 @@ export default function App() {
     return error;
   };
 
-  const handleSave = () => {
-    if (saveGame(stateRef.current)) {
-      addLog(stateRef.current, '진행 상황을 저장했습니다.', 'info');
+  const handleSaveToSlot = (slot: number) => {
+    if (saveGame(stateRef.current, slot)) {
+      addLog(stateRef.current, `${slot}번 슬롯에 진행 상황을 저장했습니다.`, 'info');
       setCanLoad(true);
     } else {
       addLog(stateRef.current, '저장에 실패했습니다.', 'bad');
     }
+    setSlotDialogMode(null);
     bump();
   };
 
-  const handleLoad = () => {
-    const loaded = loadGame();
-    if (loaded) {
-      setSimMode(false);
-      stateRef.current = loaded;
-      addLog(stateRef.current, '저장된 진행 상황을 불러왔습니다.', 'info');
-      setSelected(null);
-      setSelectedEntity(null);
-      setPlacingType(null);
-      setInspResidentId(null);
-      setWeaponDialogOpen(false);
-      setExpeditionMusterRequest(null);
-      setScreen('game');
-      bump();
+  const handleLoadFromSlot = (slot: number) => {
+    const loaded = loadGame(slot);
+    if (!loaded) {
+      window.alert(`${slot}번 슬롯의 저장 데이터를 불러오지 못했습니다.`);
+      return;
     }
+    setSimMode(false);
+    stateRef.current = loaded;
+    addLog(stateRef.current, `${slot}번 슬롯의 진행 상황을 불러왔습니다.`, 'info');
+    setSelected(null);
+    setSelectedEntity(null);
+    setPlacingType(null);
+    setInspResidentId(null);
+    setWeaponDialogOpen(false);
+    setExpeditionMusterRequest(null);
+    setSlotDialogMode(null);
+    setScreen('game');
+    bump();
   };
 
   const handleResidentClick = (id: number) => {
@@ -856,11 +870,14 @@ export default function App() {
     setScreen('menu');
   };
 
-  const handleClearSave = () => {
-    if (!window.confirm('저장 데이터를 삭제할까요?')) return;
-    clearSave();
-    setCanLoad(false);
-  };
+  const slotDialog = slotDialogMode && (
+    <SaveSlotDialog
+      mode={slotDialogMode}
+      onSelect={slotDialogMode === 'save' ? handleSaveToSlot : handleLoadFromSlot}
+      onClose={() => setSlotDialogMode(null)}
+      onChanged={() => setCanLoad(hasAnySave())}
+    />
+  );
 
   if (screen === 'menu') {
     if (menuView === 'battleSim') {
@@ -872,12 +889,15 @@ export default function App() {
       );
     }
     return (
-      <MainMenu
-        canContinue={canLoad}
-        onStart={startNewGame}
-        onContinue={handleLoad}
-        onOpenBattleSim={() => setMenuView('battleSim')}
-      />
+      <>
+        <MainMenu
+          canContinue={canLoad}
+          onStart={startNewGame}
+          onContinue={() => setSlotDialogMode('load')}
+          onOpenBattleSim={() => setMenuView('battleSim')}
+        />
+        {slotDialog}
+      </>
     );
   }
 
@@ -937,10 +957,9 @@ export default function App() {
         state={state}
         speed={speed}
         setSpeed={setSpeed}
-        onSave={handleSave}
-        onLoad={handleLoad}
+        onSave={() => setSlotDialogMode('save')}
+        onLoad={() => setSlotDialogMode('load')}
         onNewGame={handleNewGame}
-        onClearSave={handleClearSave}
         canLoad={canLoad}
         soundOn={soundOn}
         onToggleSound={handleToggleSound}
@@ -1019,6 +1038,19 @@ export default function App() {
                 ),
               },
               {
+                id: 'specialResidents',
+                label: '특수 주민',
+                icon: '★',
+                content: (
+                  <SpecialResidentsWindow
+                    state={state}
+                    selectedResidentId={inspResidentId}
+                    onSelectResident={handleSelectResidentFromDock}
+                    onAppointConfined={handleAppointConfinedSpecialResident}
+                  />
+                ),
+              },
+              {
                 id: 'factions',
                 label: '세력',
                 icon: '交',
@@ -1091,6 +1123,8 @@ export default function App() {
       ) : state.pendingChoice ? (
         <EventModal choice={state.pendingChoice} onChoose={handleChoose} />
       ) : null}
+
+      {slotDialog}
 
       {state.gameOver && (
         <div className="modal-overlay">

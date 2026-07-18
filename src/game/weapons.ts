@@ -55,6 +55,12 @@ export function weaponStock(state: GameState, weapon: CombatWeaponId): number {
   return Math.max(0, Math.floor(state.resources[COMBAT_WEAPON_RESOURCES[weapon]] ?? 0));
 }
 
+// 항왜 사야카 '화약 아끼는 손' — 마을 전체 사수의 1인당 화약 소요를 줄인다
+export function effectivePowderPerShooter(state: GameState, powderPerShooter: number): number {
+  const thrifty = state.residents.some(resident => resident.alive && resident.special === 'hangwae');
+  return Math.max(0, powderPerShooter) * (thrifty ? CONFIG.specialResidents.hangwaePowderMult : 1);
+}
+
 export function residentDefenseContribution(
   state: GameState,
   resident: Pick<Resident, 'job'>,
@@ -65,7 +71,8 @@ export function residentDefenseContribution(
     : resident.job === 'watchman'
       ? CONFIG.raid.watchmanDefense
       : 0;
-  if (weapon === 'musket' && state.resources.gunpowder + 1e-9 >= CONFIG.raid.powderPerMusket) {
+  if (weapon === 'musket' &&
+      state.resources.gunpowder + 1e-9 >= effectivePowderPerShooter(state, CONFIG.raid.powderPerMusket)) {
     return Math.max(base, CONFIG.raid.musketDefense);
   }
   if (weapon === 'hornBow') return Math.max(base, CONFIG.raid.hornBowDefense);
@@ -309,7 +316,7 @@ export function musketReadiness(
   availableGunpowder = state.resources.gunpowder,
 ): MusketReadiness {
   const assigned = new Set(musketUsers).size;
-  const perShooter = Math.max(0, powderPerShooter);
+  const perShooter = effectivePowderPerShooter(state, powderPerShooter);
   const ready = perShooter === 0
     ? assigned
     : Math.min(assigned, Math.floor((Math.max(0, availableGunpowder) + 1e-9) / perShooter));

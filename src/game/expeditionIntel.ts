@@ -1,3 +1,4 @@
+import { CONFIG } from './config';
 import type { GameState, PredatorKind, PredatorThreat, TigerTier, WildlifeKind } from './types';
 
 export type EnemyIntelPrecision = 'exact' | 'rough' | 'unknown';
@@ -139,9 +140,15 @@ export function availablePredatorScouts(state: GameState) {
     .sort((a, b) => (b.skills.hunter ?? 0) - (a.skills.hunter ?? 0) || a.id - b.id);
 }
 
-export function predatorScoutDuration(hunterSkill: number, usedGyrfalcon: boolean): number {
+export function predatorScoutDuration(
+  hunterSkill: number,
+  usedGyrfalcon: boolean,
+  expertTracker = false, // 착호 포수 박돌개 '범 발자국 읽기'
+): number {
   const base = hunterSkill >= 0.75 ? 2 : hunterSkill >= 0.35 ? 3 : 4;
-  return Math.max(2, base - (usedGyrfalcon ? 1 : 0));
+  const reduction = (usedGyrfalcon ? 1 : 0)
+    + (expertTracker ? CONFIG.specialResidents.tigerHunterScoutDaysReduction : 0);
+  return Math.max(1, base - reduction);
 }
 
 function roundedThreatRange(value: number): { low: number; high: number } {

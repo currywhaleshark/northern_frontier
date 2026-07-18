@@ -2,7 +2,7 @@ import { combatBasePower, combatCapabilities, combatWeaponTotalPower } from './c
 import { activePredatorScoutIds } from './expeditionIntel';
 import { musketReadiness, resolvedMountAssignments, resolvedWeaponAssignments } from './weapons';
 import { CONFIG } from './config';
-import type { CombatWeaponId, GameState, MountId, Resident } from './types';
+import type { CombatWeaponId, GameState, MountId, Resident, SpecialResidentId } from './types';
 
 export type CombatContext = 'villageDefense' | 'expedition';
 
@@ -22,6 +22,7 @@ export type CombatCapability =
 export interface CombatantSnapshot {
   residentId: number;
   role: CombatRole;
+  special?: SpecialResidentId;
   origin?: string;
   mount?: MountId;
   assignedWeapon: CombatWeaponId | null;
@@ -93,22 +94,27 @@ export function createCombatRoster(
 
   const combatants = fighters.map(resident => {
     const role = combatRoleForResident(resident);
-    const assignedWeapon = role === 'healer' ? null : assignments[resident.id] ?? null;
+    const assignedWeapon = role === 'healer'
+      ? null
+      : assignments[resident.id] ?? (resident.special === 'jurchenWarrior'
+        ? 'spear'
+        : resident.special === 'hangwae' ? 'musket' : null);
     const readyWeapon = assignedWeapon === 'musket' && !readyMusketIds.has(resident.id)
       ? null
       : assignedWeapon;
-    const basePower = combatBasePower(role, resident.origin);
+    const basePower = combatBasePower(role, resident.origin, resident.special);
     const mount = role === 'healer' ? null : mountAssignments[resident.id] ?? null;
     const snapshot: CombatantSnapshot = {
       residentId: resident.id,
       role,
+      ...(resident.special ? { special: resident.special } : {}),
       ...(resident.origin ? { origin: resident.origin } : {}),
       ...(mount ? { mount } : {}),
       assignedWeapon,
       readyWeapon,
-      capabilities: [...combatCapabilities(role, readyWeapon, resident.origin, mount)],
+      capabilities: [...combatCapabilities(role, readyWeapon, resident.origin, mount, resident.special)],
       basePower,
-      weaponPower: combatWeaponTotalPower(role, readyWeapon, resident.origin) - basePower,
+      weaponPower: combatWeaponTotalPower(role, readyWeapon, resident.origin, resident.special) - basePower,
     };
     return snapshot;
   });

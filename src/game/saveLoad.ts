@@ -39,6 +39,13 @@ import type {
 export { CURRENT_SCHEMA_VERSION } from './saveSchema';
 
 const SAVE_KEY = 'buksae-save-v3'; // v3: 이동 보간(px/py)과 지도 위 습격 무리 추가
+// 저장 슬롯: 1번은 기존 단일 저장 키를 그대로 사용해 예전 저장과 호환된다
+export const SAVE_SLOT_COUNT = 4;
+
+function slotKey(slot: number): string {
+  return slot <= 1 ? SAVE_KEY : `${SAVE_KEY}-slot${slot}`;
+}
+
 const RESOURCE_ID_SET = new Set<string>(RESOURCE_IDS);
 
 type RawSave = Record<string, unknown>;
@@ -888,18 +895,22 @@ function migrateExpeditionState(state: GameState): void {
   }
 }
 
-export function saveGame(state: GameState): boolean {
+export function saveGame(state: GameState, slot = 1): boolean {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...state, schemaVersion: CURRENT_SCHEMA_VERSION }));
+    localStorage.setItem(slotKey(slot), JSON.stringify({
+      ...state,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      savedAt: Date.now(),
+    }));
     return true;
   } catch {
     return false;
   }
 }
 
-export function loadGame(): GameState | null {
+export function loadGame(slot = 1): GameState | null {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = localStorage.getItem(slotKey(slot));
     if (!raw) return null;
     const decoded = JSON.parse(raw) as RawSave;
     const parsed = migrateToCurrent(decoded) as unknown as GameState;
@@ -1109,6 +1120,8 @@ export function loadGame(): GameState | null {
     // 만족도·종교 없는 구버전
     if (!Array.isArray(parsed.unlockedReligions)) parsed.unlockedReligions = [];
     if (!Array.isArray(parsed.spentSpecialIds)) parsed.spentSpecialIds = [];
+    if (!parsed.specialResidentRecords || typeof parsed.specialResidentRecords !== 'object'
+      || Array.isArray(parsed.specialResidentRecords)) parsed.specialResidentRecords = {};
     if (parsed.religionOfferCooldownUntil == null) parsed.religionOfferCooldownUntil = 0;
     if (parsed.promotionCheerUntil == null) parsed.promotionCheerUntil = 0;
     // 세공 없는 구버전: 시드로 올해분을 재생성. 이미 겨울이면 올해분은 면제 (다음 봄부터 정상 진행)
@@ -1199,10 +1212,59 @@ export function loadGame(): GameState | null {
   }
 }
 
-export function hasSave(): boolean {
-  return localStorage.getItem(SAVE_KEY) != null;
+export function hasSave(slot = 1): boolean {
+  return localStorage.getItem(slotKey(slot)) != null;
 }
 
-export function clearSave(): void {
-  localStorage.removeItem(SAVE_KEY);
+export function hasAnySave(): boolean {
+  for (let slot = 1; slot <= SAVE_SLOT_COUNT; slot++) {
+    if (hasSave(slot)) return true;
+  }
+  return false;
+}
+
+export function clearSave(slot = 1): void {
+  localStorage.removeItem(slotKey(slot));
+}
+
+export interface SaveSlotSummary {
+  slot: number;
+  exists: boolean;
+  savedAt: number | null;
+  day: number | null;
+  population: number | null;
+  rank: string | null;
+  difficulty: string | null;
+}
+
+function emptySlotSummary(slot: number): SaveSlotSummary {
+  return { slot, exists: false, savedAt: null, day: null, population: null, rank: null, difficulty: null };
+}
+
+// 슬롯 목록 UI용 요약 — 전체 마이그레이션 없이 원본 JSON의 표시 필드만 읽는다
+export function readSaveSlotSummary(slot: number): SaveSlotSummary {
+  const raw = localStorage.getItem(slotKey(slot));
+  if (!raw) return emptySlotSummary(slot);
+  try {
+    const decoded = JSON.parse(raw) as RawSave;
+    const day = Number(decoded.day);
+    const savedAt = Number(decoded.savedAt);
+    const residents = Array.isArray(decoded.residents) ? decoded.residents : [];
+    return {
+      slot,
+      exists: true,
+      savedAt: Number.isFinite(savedAt) ? savedAt : null,
+      day: Number.isFinite(day) ? Math.max(1, Math.floor(day)) : null,
+      population: residents.filter(entry => entry && typeof entry === 'object' &&
+        (entry as RawSave).alive === true).length,
+      rank: typeof decoded.rank === 'string' ? decoded.rank : null,
+      difficulty: typeof decoded.difficulty === 'string' ? decoded.difficulty : null,
+    };
+  } catch {
+    return { ...emptySlotSummary(slot), exists: true };
+  }
+}
+
+export function readSaveSlotSummaries(): SaveSlotSummary[] {
+  return Array.from({ length: SAVE_SLOT_COUNT }, (_, index) => readSaveSlotSummary(index + 1));
 }

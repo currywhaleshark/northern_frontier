@@ -30,6 +30,7 @@ export const DEFAULT_DOCK_WINDOW_SIZES: Record<FloatingWindowId, Readonly<{ widt
   jobs: { width: 340, height: 520 },
   processing: { width: 340, height: 420 },
   residents: { width: 440, height: 540 },
+  specialResidents: { width: 420, height: 560 },
   factions: { width: 440, height: 520 },
   court: { width: 420, height: 560 },
   incidents: { width: 380, height: 420 },

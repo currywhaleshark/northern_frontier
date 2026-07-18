@@ -113,6 +113,10 @@ import {
   foreignResidentSourceRect,
   foreignStructureSourceRect,
 } from './foreignSiteAssets';
+import {
+  SPECIAL_RESIDENT_SHEET,
+  specialResidentSourceRect,
+} from './specialResidentAssets';
 
 const PITCH = 17;
 const T = 16;
@@ -147,6 +151,7 @@ let buildingDamageSheet: HTMLImageElement | null = null;
 let foreignResidentSheet: HTMLImageElement | null = null;
 let foreignSiteCoreSheet: HTMLImageElement | null = null;
 let foreignSitePropSheet: HTMLImageElement | null = null;
+let specialResidentSheet: HTMLImageElement | null = null;
 let loaded = 0;
 let started = false;
 
@@ -231,6 +236,9 @@ function ensureLoaded(): void {
   foreignSitePropSheet = new Image();
   foreignSitePropSheet.onload = () => { loaded++; };
   foreignSitePropSheet.src = FOREIGN_SITE_PROP_SHEET.src;
+  specialResidentSheet = new Image();
+  specialResidentSheet.onload = () => { loaded++; };
+  specialResidentSheet.src = SPECIAL_RESIDENT_SHEET.src;
   const characterSheet = new Image();
   characterSheet.onload = () => {
     generatedCharacterSheet = characterSheet;
@@ -849,7 +857,7 @@ function drawWallFamilyBuilding(ctx: CanvasRenderingContext2D, p: BuildingDrawPa
 }
 
 export const atlasSprites: SpriteAPI = {
-  id: 'kenney-atlas-river-mask-historical-ground-generated-objects-buildings-promotion-specialized-v1',
+  id: 'kenney-atlas-river-mask-historical-ground-generated-objects-buildings-promotion-specialized-special-residents-v1',
 
   drawTerrain(ctx, p) {
     if (!sheet) return;
@@ -1052,13 +1060,16 @@ export const atlasSprites: SpriteAPI = {
     const specializedSheet = specializedCharacterSheet;
     const foreignRect = foreignResidentSourceRect(p.foreignFaction, p.gender);
     const newContentRect = newContentResidentSourceRect(p.job, p.gender, p.stage);
-    if (!characterSheet && !specializedSheet && !militiaSheet && !kenneyChars &&
+    if (!characterSheet && !specializedSheet && !militiaSheet && !kenneyChars && !specialResidentSheet &&
         (!newContentResidentSheet || !newContentRect) && (!foreignResidentSheet || !foreignRect)) return;
     ctx.imageSmoothingEnabled = false;
     const half = CHALF;
     const bob = (p.moving ? Math.floor(performance.now() / 130) % 2 : 0) * CF;
 
-    if (foreignResidentSheet && foreignRect) {
+    const specialRect = p.special ? specialResidentSourceRect(p.special) : null;
+    if (specialResidentSheet && specialRect) {
+      drawGeneratedCharacterRect(ctx, specialResidentSheet, specialRect, p.x, p.y, p.facing, bob);
+    } else if (foreignResidentSheet && foreignRect) {
       drawGeneratedCharacterRect(ctx, foreignResidentSheet, foreignRect, p.x, p.y, p.facing, bob);
     } else if (newContentResidentSheet && newContentRect) {
       drawGeneratedCharacterRect(ctx, newContentResidentSheet, newContentRect, p.x, p.y, p.facing, bob);
@@ -1148,6 +1159,7 @@ export const atlasSprites: SpriteAPI = {
         moving: p.moving,
         facing: p.facing,
         militiaWeapon: member.militiaWeapon,
+        special: member.special,
       });
     }
     ctx.save();

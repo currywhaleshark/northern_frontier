@@ -56,6 +56,7 @@ import { dailyClaimTensionTick, noteBuildingClaimIntrusions } from './claimZones
 import { applyDailySpoilage } from './spoilage';
 import { consumptionWeight, lifecycleDailyTick, resolveWeddingChoice } from './lifecycle';
 import { dailyReligionTick, resolveReligionChoice } from './religion';
+import { dailySpecialResidentTick, resolveSpecialResidentChoice } from './specialResidents';
 import { dailySilverTick, resolveSilverVeinChoice } from './silver';
 import { updateFermentation } from './fermentation';
 import { isKimjangChoice, maybeOpenKimjangEvent, resolveKimjangChoice } from './kimjang';
@@ -382,8 +383,9 @@ export function cancelBuildingConstruction(state: GameState, buildingId: number)
 // 직업 재배정: from 직업의 산 주민 1명을 to 직업으로
 export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
   if (!isJobUnlocked(state.rank, to)) return false;
-  const r = state.residents.find(res => res.alive && res.job === from && res.assignedBuildingId == null)
-    ?? state.residents.find(res => res.alive && res.job === from);
+  const r = state.residents.find(res =>
+    res.alive && !res.special && res.job === from && res.assignedBuildingId == null)
+    ?? state.residents.find(res => res.alive && !res.special && res.job === from);
   if (!r) return false;
   if (to !== 'hauler') returnResidentCart(state, r);
   r.job = to;
@@ -711,6 +713,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'silverVein') resolveSilverVeinChoice(state, optionId, rng);
   else if (state.pendingChoice.kind === 'wedding') resolveWeddingChoice(state, optionId);
   else if (state.pendingChoice.kind === 'religion') resolveReligionChoice(state, optionId);
+  else if (state.pendingChoice.kind === 'specialResident') resolveSpecialResidentChoice(state, optionId, rng);
   else resolveTrade(state, optionId);
   reconcileWeaponAssignments(state);
   reconcileMountAssignments(state);
@@ -833,6 +836,7 @@ function endOfDay(state: GameState): void {
   maybeFlavorLog(state, rng);
   maybeCollectTribute(state); // 겨울: 조정의 사자가 세공을 거둔다 (모달 충돌 시 다음 날로)
   dailyReligionTick(state, rng); // 떠돌이 무당/노승이 문을 두드린다 (진 이상)
+  dailySpecialResidentTick(state, rng); // 귀양 선비 등 이름 있는 특수 주민
   dailySilverTick(state, rng); // 은맥 발견/재제안/잠채 발각 — 의심 갱신보다 먼저
   updateSuspicion(state, rng); // 모반 의심 누적과 감찰/견책/토벌 사건
   maybeOpenKimjangEvent(state); // 늦가을~입동의 연례 공동 김장. 다른 모달이 있으면 기간 안에 재시도

@@ -35,7 +35,6 @@ interface Props {
   onSave: () => void;
   onLoad: () => void;
   onNewGame: () => void;
-  onClearSave: () => void;
   canLoad: boolean;
   soundOn: boolean;
   onToggleSound: () => void;
@@ -45,7 +44,7 @@ interface Props {
 }
 
 export function TopBar({
-  state, speed, setSpeed, onSave, onLoad, onNewGame, onClearSave, canLoad,
+  state, speed, setSpeed, onSave, onLoad, onNewGame, canLoad,
   soundOn, onToggleSound, onOpenCourt, uiPrefs, onUiPrefsChange,
 }: Props) {
   const living = livingResidents(state);
@@ -219,7 +218,6 @@ export function TopBar({
           <button className="btn" onClick={onSave}>저장</button>
           <button className="btn" onClick={onLoad} disabled={!canLoad}>불러오기</button>
           <button className="btn" onClick={onNewGame}>새 게임</button>
-          <button className="btn" onClick={onClearSave}>저장 초기화</button>
         </span>
       </div>
     </div>

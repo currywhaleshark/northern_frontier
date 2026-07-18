@@ -7,6 +7,7 @@ import { rankAtLeast } from './constants';
 import { addLog } from './events';
 import { createResident, reconcileResidentHomes } from './residents';
 import { makeRng } from './map';
+import { specialResidentDefinition } from './specialResidents';
 import type { GameState, ReligionId, SpecialResidentId } from './types';
 
 interface ReligionPerson {
@@ -70,10 +71,12 @@ export function isReligionUnlocked(state: GameState, religion: ReligionId): bool
 }
 
 function openReligionChoice(state: GameState, person: ReligionPerson): void {
+  const definition = specialResidentDefinition(person.special);
   state.pendingChoice = {
     kind: 'religion',
     title: person.title,
     body: person.body,
+    illustration: definition.illustration,
     options: [
       {
         id: 'accept',

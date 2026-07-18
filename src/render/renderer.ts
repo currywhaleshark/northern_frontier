@@ -997,6 +997,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       moving: r.px !== r.x || r.py !== r.y,
       facing: r.x < r.px ? -1 : 1,
       militiaWeapon: militiaWeaponForResident(state, r),
+      special: r.special,
       stage: r.stage,
       sizeScale: r.stage === 'infant' ? 0.42 : r.stage === 'child' ? 0.62 : r.stage === 'youth' ? 0.8 : 1,
     });
@@ -1017,6 +1018,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
           job: member.job,
           gender: member.gender,
           militiaWeapon: militiaWeaponForResident(state, member),
+          special: member.special,
         })),
         total: members.length,
         moving: expedition.px !== expedition.x || expedition.py !== expedition.y,

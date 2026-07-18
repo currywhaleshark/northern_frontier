@@ -1682,7 +1682,9 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
   if (!smithy) return;
   const product = smithyProductOf(smithy);
   const def = SMITHY_PRODUCT_DEFS[product];
-  const target = (def.ratePerDay / 5) * effOf(r) * ctx.mMod;
+  // 도망 야장 막쇠 '천출의 망치' — 본인의 산출이 오른다
+  const specialMult = r.special === 'runawaySmith' ? CONFIG.specialResidents.runawaySmithSmithyMult : 1;
+  const target = (def.ratePerDay / 5) * effOf(r) * ctx.mMod * specialMult;
   const requirements = smithInputRequirements(product, target);
 
   if (carryTotal(r) > 0) {
@@ -1870,11 +1872,15 @@ function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
     && state.silverVein.x === miningTile?.x && state.silverVein.y === miningTile?.y
     ? 1 - CONFIG.silver.sanctionTaxRatio
     : 1;
+  // 맹인 지관 허생 '산세 읽기' — 마을 전체 채광 산출이 오른다
+  const geomancerMult = state.residents.some(resident => resident.alive && resident.special === 'geomancer')
+    ? 1 + CONFIG.specialResidents.geomancerMiningYieldBonus
+    : 1;
   gatherJob(state, r, ctx, {
     goal: t => t.terrain === 'rock' && mineralRemaining(t) > 0 && !isVeinSealedTile(state, t),
     workTicks: a.work.mine,
     yieldRes: miningSilver ? 'silver' : miningIron ? 'iron' : 'stone',
-    yieldAmt: tile => tile.hasSilver ? a.yields.silver : tile.hasIron ? a.yields.iron : a.yields.stone,
+    yieldAmt: tile => (tile.hasSilver ? a.yields.silver : tile.hasIron ? a.yields.iron : a.yields.stone) * geomancerMult,
     cap: miningSilver ? a.carryCap.silver : miningIron ? a.carryCap.iron : a.carryCap.stone,
     depositExtra: [],
     goalField: ctx.goalFieldUserCounts.mineral >= 3

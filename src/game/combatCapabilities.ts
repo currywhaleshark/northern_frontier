@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import { residentOriginProfile } from './defectors';
 import type { CombatCapability, CombatRole } from './combatRoster';
-import type { CombatWeaponId, MountId } from './types';
+import type { CombatWeaponId, MountId, SpecialResidentId } from './types';
 
 // Hunters keep a weak hunting-bow volley even without an inventory weapon.
 // This is the single policy switch for that legacy gameplay rule.
@@ -12,6 +12,7 @@ export function combatCapabilities(
   weapon: CombatWeaponId | null,
   origin?: string,
   mount?: MountId | null,
+  special?: SpecialResidentId,
 ): ReadonlySet<CombatCapability> {
   const result = new Set<CombatCapability>(['hold']);
   if (role === 'militia') {
@@ -43,10 +44,11 @@ export function combatCapabilities(
     result.add('scout');
   }
   if (mount === 'horse') result.add('mounted');
+  if (special === 'jurchenWarrior') result.add('ambush');
   return result;
 }
 
-export function combatBasePower(role: CombatRole, origin?: string): number {
+export function combatBasePower(role: CombatRole, origin?: string, special?: SpecialResidentId): number {
   const rolePower = role === 'militia' ? CONFIG.raid.militiaDefense
     : role === 'watchman' ? CONFIG.raid.watchmanDefense
       : role === 'hunter' ? CONFIG.tacticalBattle.groupPower.hunter
@@ -56,17 +58,24 @@ export function combatBasePower(role: CombatRole, origin?: string): number {
   const originBonus = originProfile === 'nimacha' ? CONFIG.defectors.nimachaBasePowerBonus
     : originProfile === 'holaon' ? CONFIG.defectors.holaonBasePowerBonus
       : 0;
-  return rolePower + originBonus;
+  const specialBonus = special === 'jurchenWarrior'
+    ? CONFIG.specialResidents.jurchenWarriorBasePowerBonus
+    : special === 'tigerHunter'
+      ? CONFIG.specialResidents.tigerHunterBasePowerBonus
+      : 0;
+  return rolePower + originBonus + specialBonus;
 }
 
 export function combatWeaponTotalPower(
   role: CombatRole,
   readyWeapon: CombatWeaponId | null,
   origin?: string,
+  special?: SpecialResidentId,
 ): number {
-  const base = combatBasePower(role, origin);
+  const base = combatBasePower(role, origin, special);
   if (readyWeapon === 'musket') {
-    const musketPower = Math.max(base, CONFIG.raid.musketDefense);
+    const musketPower = Math.max(base, CONFIG.raid.musketDefense)
+      + (special === 'hangwae' ? CONFIG.specialResidents.hangwaeMusketPowerBonus : 0);
     return residentOriginProfile(origin) === 'courtDeserter'
       ? musketPower + CONFIG.defectors.courtMusketPowerBonus
       : musketPower;
@@ -106,6 +115,7 @@ export function combatGroupLabel(role: CombatRole, weapon: CombatWeaponId | null
 
 export function tacticalGroupCapabilities(group: {
   role: CombatRole;
+  special?: SpecialResidentId;
   origin?: string;
   mount?: MountId;
   weapon: CombatWeaponId | null;
@@ -114,23 +124,26 @@ export function tacticalGroupCapabilities(group: {
   const readyWeapon = group.weapon === 'musket' && (group.readyMuskets ?? 0) <= 0
     ? null
     : group.weapon;
-  return combatCapabilities(group.role, readyWeapon, group.origin, group.mount);
+  return combatCapabilities(group.role, readyWeapon, group.origin, group.mount, group.special);
 }
 
 export function tacticalGroupPower(group: {
   role: CombatRole;
+  special?: SpecialResidentId;
   origin?: string;
   mount?: MountId;
   weapon: CombatWeaponId | null;
   readyMuskets?: number;
 }, active: number): number {
   const count = Math.max(0, active);
-  const base = combatBasePower(group.role, group.origin);
+  const base = combatBasePower(group.role, group.origin, group.special);
   if (group.weapon === 'musket') {
     const ready = Math.min(count, Math.max(0, group.readyMuskets ?? 0));
-    return count * base + ready * (combatWeaponTotalPower(group.role, 'musket', group.origin) - base);
+    return count * base + ready * (
+      combatWeaponTotalPower(group.role, 'musket', group.origin, group.special) - base
+    );
   }
-  return count * combatWeaponTotalPower(group.role, group.weapon, group.origin);
+  return count * combatWeaponTotalPower(group.role, group.weapon, group.origin, group.special);
 }
 
 export function isHorseExperiencedOrigin(origin?: string): boolean {

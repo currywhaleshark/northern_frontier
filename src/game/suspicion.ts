@@ -65,6 +65,41 @@ export function suspicionBreakdown(state: GameState): SuspicionFactor[] {
       delta: northernDefectors * CONFIG.defectors.suspicionPerNorthernResident,
     });
   }
+  if (state.residents.some(resident => resident.alive && resident.special === 'exiledScholar')) {
+    factors.push({
+      id: 'exiledScholar',
+      label: '유배 죄인을 관아에 등용',
+      delta: CONFIG.specialResidents.exiledScholarSuspicionPerDay,
+    });
+  }
+  if (state.residents.some(resident => resident.alive && resident.special === 'jurchenWarrior')) {
+    factors.push({
+      id: 'jurchenWarrior',
+      label: '이름난 향화 무사를 곁에 둠',
+      delta: CONFIG.specialResidents.jurchenWarriorSuspicionPerDay,
+    });
+  }
+  if (state.residents.some(resident => resident.alive && resident.special === 'uinyeo')) {
+    factors.push({
+      id: 'uinyeo',
+      label: '죄인 의녀를 의원에 둠',
+      delta: CONFIG.specialResidents.uinyeoSuspicionPerDay,
+    });
+  }
+  if (state.residents.some(resident => resident.alive && resident.special === 'interpreter')) {
+    factors.push({
+      id: 'interpreter',
+      label: '양쪽 말을 다 하는 역관을 둠',
+      delta: CONFIG.specialResidents.interpreterSuspicionPerDay,
+    });
+  }
+  if (state.residents.some(resident => resident.alive && resident.special === 'hangwae')) {
+    factors.push({
+      id: 'hangwae',
+      label: '왜인을 성책에 들임',
+      delta: CONFIG.specialResidents.hangwaeSuspicionPerDay,
+    });
+  }
   factors.push(...silverSuspicionFactors(state)); // 잠채 — 익명 라벨로만 표시된다
   factors.push({ id: 'decay', label: '세월이 눈총을 씻는다', delta: -s.baseDecay });
   return factors;

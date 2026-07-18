@@ -2,6 +2,7 @@
 // 습격 대상 선정, 협상 성공률, 위협도 증가에 반영된다.
 import { CONFIG } from './config';
 import { FACTIONS } from './constants';
+import { isJurchenFactionName } from './defectors';
 import type { GameState } from './types';
 
 export function initRelations(): Record<string, number> {
@@ -17,7 +18,17 @@ export function getRelation(state: GameState, name: string): number {
 export function changeRelation(state: GameState, name: string, delta: number): void {
   if (!state.relations) state.relations = initRelations();
   const cur = state.relations[name] ?? 50;
-  state.relations[name] = Math.max(0, Math.min(100, cur + delta));
+  let adjustedDelta = delta;
+  if (delta > 0 && isJurchenFactionName(name)) {
+    // 아라개(배신자 비호)는 상승을 둔화, 역관 배수겸(여진말 능통)은 상승을 가속 — 곱으로 중첩
+    if (state.residents.some(resident => resident.alive && resident.special === 'jurchenWarrior')) {
+      adjustedDelta *= CONFIG.specialResidents.jurchenWarriorRelationGainMult;
+    }
+    if (state.residents.some(resident => resident.alive && resident.special === 'interpreter')) {
+      adjustedDelta *= CONFIG.specialResidents.interpreterRelationGainMult;
+    }
+  }
+  state.relations[name] = Math.max(0, Math.min(100, cur + adjustedDelta));
 }
 
 // 하루: 각 세력의 기본 성향(initialRelation)을 향해 천천히 되돌아간다

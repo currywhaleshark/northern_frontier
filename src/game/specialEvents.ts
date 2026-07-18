@@ -697,7 +697,8 @@ export function startPredatorScout(state: GameState, kind: PredatorKind, residen
 
   const hunterSkill = hunter.skills.hunter ?? 0;
   const usedGyrfalcon = (state.specialItems?.gyrfalcon ?? 0) > 0;
-  const duration = predatorScoutDuration(hunterSkill, usedGyrfalcon);
+  const expertTracker = state.residents.some(resident => resident.alive && resident.special === 'tigerHunter');
+  const duration = predatorScoutDuration(hunterSkill, usedGyrfalcon, expertTracker);
   const completesOnDay = state.day + duration;
   if (completesOnDay > threat.untilDay) return '흔적이 사라지기 전에 정찰을 마칠 시간이 부족합니다.';
 
@@ -723,6 +724,7 @@ export function startPredatorScout(state: GameState, kind: PredatorKind, residen
 
 function openPredatorScoutSelection(state: GameState, kind: PredatorKind): void {
   const usedGyrfalcon = (state.specialItems?.gyrfalcon ?? 0) > 0;
+  const expertTracker = state.residents.some(resident => resident.alive && resident.special === 'tigerHunter');
   const scouts = availablePredatorScouts(state);
   state.pendingChoice = {
     kind: 'incident',
@@ -732,7 +734,7 @@ function openPredatorScoutSelection(state: GameState, kind: PredatorKind): void 
     options: [
       ...scouts.map(scout => {
         const skill = scout.skills.hunter ?? 0;
-        const duration = predatorScoutDuration(skill, usedGyrfalcon);
+        const duration = predatorScoutDuration(skill, usedGyrfalcon, expertTracker);
         return {
           id: `scout:${scout.id}`,
           label: `${scout.name}을(를) 보낸다`,
@@ -1088,8 +1090,11 @@ function updateEpidemic(state: GameState, rng: () => number): void {
     return;
   }
   const physicianActive = hasActivePhysician(state);
+  // 의녀 단심 '방역' — 역병이 번질 확률 자체를 줄인다
+  const uinyeoActive = state.residents.some(resident => resident.alive && resident.special === 'uinyeo');
   const spreadChance = CONFIG.specialEvents.epidemicSpreadChance *
-    (physicianActive ? CONFIG.medicine.epidemicSpreadMult : 1);
+    (physicianActive ? CONFIG.medicine.epidemicSpreadMult : 1) *
+    (uinyeoActive ? CONFIG.specialResidents.uinyeoEpidemicSpreadMult : 1);
   if (epidemic.mode === 'uncontained' && rng() < spreadChance) {
     const candidates = livingResidents(state).filter(resident => !epidemic.infectedIds.includes(resident.id));
     const infected = candidates[Math.floor(rng() * candidates.length)];

@@ -152,13 +152,17 @@ export function silverSuspicionFactors(state: GameState): SuspicionFactor[] {
   const tile = veinTile(state);
   if (!tile || mineralRemaining(tile) <= 0) return [];
   const s = CONFIG.suspicion;
+  // 지관 허생이 있으면 은 소문이 더 빨리 퍼진다 — 산세를 읽는 자가 있다는 소문 자체가 증거가 된다
+  const rumorMult = state.residents.some(resident => resident.alive && resident.special === 'geomancer')
+    ? CONFIG.specialResidents.geomancerSilverSuspicionMult
+    : 1;
   if (v.exposed) {
-    return [{ id: 'silverExposed', label: '은광 잠채가 조정에 알려짐', delta: v.sealBroken ? s.perSealBrokenSilver * 2 : s.perSecretSilver * 2 }];
+    return [{ id: 'silverExposed', label: '은광 잠채가 조정에 알려짐', delta: (v.sealBroken ? s.perSealBrokenSilver * 2 : s.perSecretSilver * 2) * rumorMult }];
   }
   return [{
     id: 'silverRumor',
     label: '변방에 도는 흉흉한 소문',
-    delta: v.sealBroken ? s.perSealBrokenSilver : s.perSecretSilver,
+    delta: (v.sealBroken ? s.perSealBrokenSilver : s.perSecretSilver) * rumorMult,
   }];
 }
 
@@ -172,7 +176,12 @@ export function dailySilverTick(state: GameState, rng: () => number): void {
     if (!minedRockRecently(state) || !state.lastRockMiningTile) return;
     const pity = (state.silverPityDays ?? 0) + 1;
     state.silverPityDays = pity;
-    if (rng() < s.veinDailyChance || pity >= s.pityMiningDays) {
+    // 지관 허생 '산세 읽기' — 은맥을 알아볼 확률이 오른다
+    const veinChance = s.veinDailyChance *
+      (state.residents.some(resident => resident.alive && resident.special === 'geomancer')
+        ? CONFIG.specialResidents.geomancerVeinChanceMult
+        : 1);
+    if (rng() < veinChance || pity >= s.pityMiningDays) {
       if (state.pendingChoice || state.battle) return; // 내일 다시 시도 (판정은 성립)
       const { x, y } = state.lastRockMiningTile;
       state.silverVein = { status: 'offered', x, y, discoveredDay: state.day, minedTotal: 0 };

@@ -14,6 +14,7 @@ import { spoilagePreview } from '../game/spoilage';
 import type { SiteGiftType } from '../game/siteDiplomacy';
 import { isWallBuilding } from '../game/walls';
 import { combatDefaultWeaponName } from '../game/combatCapabilities';
+import { specialResidentSkills } from '../game/specialResidents';
 import { COMBAT_WEAPON_NAMES, MOUNT_NAMES } from '../game/weapons';
 import type {
   BuildingTypeId,
@@ -81,6 +82,18 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart }: {
       <tbody>
         <tr><td>이름</td><td>{resident.name} ({resident.age}세){resident.sick ? ' 🤒' : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</td></tr>
         {resident.origin && <tr><td>출신</td><td>{resident.origin}</td></tr>}
+        {resident.special && specialResidentSkills(resident.special).length > 0 && (
+          <tr>
+            <td>특기</td>
+            <td className="special-skill-cell">
+              {specialResidentSkills(resident.special).map(skill => (
+                <span key={skill.id} className="special-skill-chip" title={skill.effect}>
+                  <span aria-hidden="true">{skill.icon}</span> {skill.name}
+                </span>
+              ))}
+            </td>
+          </tr>
+        )}
         <tr>
           <td>직업</td>
           <td>

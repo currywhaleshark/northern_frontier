@@ -8,6 +8,7 @@ import {
   SURNAME_WEIGHTS,
 } from './constants';
 import { BUILDING_DEFS } from './buildings';
+import { isNorthernDefectorOrigin, NORTHERN_DEFECTOR_NAMES } from './defectors';
 import { addLog } from './events';
 import { returnResidentCart } from './equipment';
 import { addCorpse } from './lifecycle';
@@ -31,7 +32,23 @@ function weightedSurnameIndex(rng: () => number): number {
   return SURNAME_WEIGHTS.length - 1;
 }
 
-export function rollResidentName(state: GameState, rng: () => number, gender: Gender): string {
+function rollNorthernDefectorName(state: GameState, rng: () => number): string {
+  const nameStart = Math.floor(rng() * NORTHERN_DEFECTOR_NAMES.length);
+  const usedNames = new Set(state.residents.map(resident => resident.name));
+  for (let offset = 0; offset < NORTHERN_DEFECTOR_NAMES.length; offset++) {
+    const name = NORTHERN_DEFECTOR_NAMES[(nameStart + offset) % NORTHERN_DEFECTOR_NAMES.length];
+    if (!usedNames.has(name)) return name;
+  }
+  return NORTHERN_DEFECTOR_NAMES[nameStart];
+}
+
+export function rollResidentName(
+  state: GameState,
+  rng: () => number,
+  gender: Gender,
+  origin?: string,
+): string {
+  if (isNorthernDefectorOrigin(origin)) return rollNorthernDefectorName(state, rng);
   const givenNames = gender === 'female' ? FEMALE_GIVEN_NAMES : MALE_GIVEN_NAMES;
   const surnameStart = weightedSurnameIndex(rng);
   const givenStart = Math.floor(rng() * givenNames.length);
@@ -133,7 +150,7 @@ export function createResident(
   origin?: string,
 ): Resident {
   const gender = rollResidentGender(rng);
-  const name = rollResidentName(state, rng, gender);
+  const name = rollResidentName(state, rng, gender, origin);
   // 마을 중심지 주변에서 출발한다. 중심지 자체는 solid footprint라 주민을 올려두지 않는다.
   const center = state.buildings.find(b => b.type === 'center');
   const cx = center ? center.x : Math.floor(state.map[0].length / 2);

@@ -46,6 +46,8 @@ export function performPhysicianTreatment(
 ): PhysicianTreatmentResult {
   const patient = physicianPatient(state, physician.id);
   if (!patient) return { status: 'no-patient', patient: null, herbsUsed: 0, healthRestored: 0 };
+  // 의녀 단심 '금침' — 본인의 치료 효율이 오른다
+  if (physician.special === 'uinyeo') efficiency *= CONFIG.specialResidents.uinyeoTreatmentMult;
 
   const herbs = CONFIG.medicine.herbsPerPhysicianPerDay / CONFIG.agents.subticksPerDay;
   if (state.resources.herbs + 1e-9 < herbs) {

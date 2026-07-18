@@ -79,7 +79,11 @@ export function InspectorPanel({ state, onOrganizeHunt, onScoutPredator }: Props
                         <option value="">{scouts.length > 0 ? '사냥꾼 선택…' : '파견 가능 사냥꾼 없음'}</option>
                         {scouts.map(scout => {
                           const skill = scout.skills.hunter ?? 0;
-                          const days = predatorScoutDuration(skill, (state.specialItems.gyrfalcon ?? 0) > 0);
+                          const days = predatorScoutDuration(
+                            skill,
+                            (state.specialItems.gyrfalcon ?? 0) > 0,
+                            state.residents.some(resident => resident.alive && resident.special === 'tigerHunter'),
+                          );
                           return <option key={scout.id} value={scout.id}>{scout.name} · 숙련 {Math.round(skill * 100)}% · {days}일</option>;
                         })}
                       </select>

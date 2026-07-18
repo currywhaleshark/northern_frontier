@@ -445,7 +445,10 @@ export function officeEfficiencyMultiplier(state: GameState): number {
   const clerks = state.residents.filter(r =>
     r.alive && !r.sick && r.health >= 20 && r.job === 'clerk').length;
   const bonus = Math.min(CONFIG.production.officeMaxBonus, clerks * CONFIG.production.officeBonusPerClerk);
-  return 1 + bonus;
+  const specialBonus = state.residents.some(resident => resident.alive && resident.special === 'exiledScholar')
+    ? CONFIG.specialResidents.exiledScholarOfficeBonus
+    : 0;
+  return 1 + bonus + specialBonus;
 }
 
 export function isBuildingUnlocked(rank: GameState['rank'] | undefined, type: BuildingTypeId): boolean {

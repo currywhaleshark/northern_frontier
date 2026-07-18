@@ -539,19 +539,24 @@ function snapshotGroup(
   zoneId: string,
 ): TacticalDefenderGroup {
   const kind = kindForCombatant(role, weapon);
+  const special = snapshots[0]?.special;
   const origin = snapshots[0]?.origin;
   const mount = snapshots[0]?.mount;
   const originKey = origin ? `-${origin}` : '';
   const mountKey = mount ? `-${mount}` : '';
+  const specialKey = special ? `-${special}` : '';
   return {
-    id: `${role}-${weapon ?? 'unarmed'}${originKey}${mountKey}`,
+    id: `${role}-${weapon ?? 'unarmed'}${originKey}${mountKey}${specialKey}`,
     kind,
     role,
+    ...(special ? { special } : {}),
     ...(origin ? { origin } : {}),
     ...(mount ? { mount } : {}),
     weapon,
     readyMuskets: snapshots.filter(snapshot => snapshot.readyWeapon === 'musket').length,
-    label: `${mount ? '기마 ' : ''}${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
+    label: special === 'jurchenWarrior'
+      ? `귀순 무사 ${combatGroupLabel(role, weapon)}`
+      : `${mount ? '기마 ' : ''}${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
     residentIds: snapshots.map(snapshot => snapshot.residentId),
     count: snapshots.length,
     zoneId,
@@ -568,7 +573,7 @@ function snapshotGroup(
 function groupsFromSnapshots(snapshots: CombatantSnapshot[], assault = false): TacticalDefenderGroup[] {
   const grouped = new Map<string, CombatantSnapshot[]>();
   for (const snapshot of snapshots) {
-    const key = `${snapshot.role}:${snapshot.assignedWeapon ?? 'unarmed'}:${snapshot.origin ?? 'local'}:${snapshot.mount ?? 'foot'}`;
+    const key = `${snapshot.role}:${snapshot.assignedWeapon ?? 'unarmed'}:${snapshot.origin ?? 'local'}:${snapshot.mount ?? 'foot'}:${snapshot.special ?? 'common'}`;
     const list = grouped.get(key) ?? [];
     list.push(snapshot);
     grouped.set(key, list);

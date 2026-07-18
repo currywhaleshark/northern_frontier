@@ -296,7 +296,27 @@ export interface HaulTask {
 export type LifeStage = 'infant' | 'child' | 'youth';
 
 // 네임드 특수 주민 — 게임당 한 번만 오는 인물 (2026-07-17-special-residents.md의 첫 조각)
-export type SpecialResidentId = 'mudang' | 'nosung';
+export type SpecialResidentId =
+  | 'mudang' | 'nosung' | 'exiledScholar' | 'jurchenWarrior'
+  | 'tigerHunter'   // 착호 포수 박돌개
+  | 'geomancer'     // 맹인 지관 허생
+  | 'uinyeo'        // 내의원 의녀 단심
+  | 'runawaySmith'  // 도망 야장 막쇠
+  | 'interpreter'   // 퇴역 역관 배수겸
+  | 'hangwae';      // 항왜 철포수 사야카
+
+export type SpecialResidentStatus = 'confined' | 'active' | 'departed' | 'declined' | 'dead';
+
+export interface SpecialResidentRecord {
+  status: SpecialResidentStatus;
+  residentId?: number;
+  availableUntilDay?: number;
+  originFaction?: string;
+  joinedDay?: number;
+  courtDemandResolved?: boolean;
+  pardonResolved?: boolean;
+  nextDemandDay?: number;
+}
 
 export type ReligionId = 'shamanism' | 'buddhism';
 
@@ -499,7 +519,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident';
   title: string;
   body: string;
   illustration?: {
@@ -797,6 +817,7 @@ export interface TacticalDefenderGroup {
   id: string;
   kind: DefenderGroupKind;
   role: CombatRole;
+  special?: SpecialResidentId;
   origin?: string;
   mount?: MountId;
   weapon: CombatWeaponId | null;
@@ -1139,6 +1160,7 @@ export interface GameState {
   unlockedReligions?: ReligionId[]; // 네임드가 와서 해금된 신앙 갈래
   religionOfferCooldownUntil?: number; // 다음 종교인 등장 가능일
   spentSpecialIds?: SpecialResidentId[]; // 이미 등장한 네임드 (게임당 1회)
+  specialResidentRecords?: Partial<Record<SpecialResidentId, SpecialResidentRecord>>; // 안치·합류·이탈 상태
   // ── 은맥 (게임당 1회 — 채광 중 발견 사건으로만 등장) ──
   silverVein?: SilverVeinState | null; // 구버전 저장에는 없음
   silverPityDays?: number;     // 발견 전 누적 채광일 (보장 발동용)

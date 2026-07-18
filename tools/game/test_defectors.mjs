@@ -38,6 +38,8 @@ const specialEvents = await import(pathToFileURL(join(compiledDir, 'specialEvent
 const livestock = await import(pathToFileURL(join(compiledDir, 'livestock.mjs')).href);
 const suspicion = await import(pathToFileURL(join(compiledDir, 'suspicion.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
+const residents = await import(pathToFileURL(join(compiledDir, 'residents.mjs')).href);
+const defectors = await import(pathToFileURL(join(compiledDir, 'defectors.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 const NIMACHA = '니마차 우디캐';
@@ -63,6 +65,24 @@ function resetFighters(state) {
   state.weaponAssignments = {};
   state.resources.muskets = 0;
   state.resources.gunpowder = 0;
+}
+
+// 북방 귀순 주민은 조선 성명이 아닌 여진 음차 이름풀을 쓴다.
+// 조정 이탈병은 같은 origin 필드를 쓰지만 조선식 이름을 유지한다.
+{
+  const state = simulation.newGame(2026071700);
+  const populationBefore = state.residents.length;
+  const first = residents.createResident(state, () => 0, 'idle', NIMACHA);
+  state.residents.push(first);
+  const second = residents.createResident(state, () => 0, 'idle', HOLAON);
+  const courtDeserter = residents.createResident(state, () => 0, 'idle', COURT_DESERTER);
+  const pool = new Set(defectors.NORTHERN_DEFECTOR_NAMES);
+
+  assert.ok(pool.has(first.name));
+  assert.ok(pool.has(second.name));
+  assert.notEqual(first.name, second.name, '이름풀이 남아 있으면 동명이인을 피한다');
+  assert.ok(!pool.has(courtDeserter.name));
+  assert.equal(state.residents.length, populationBefore + 1);
 }
 
 // 출신은 직업과 별개로 저장되고, 북방 귀순민은 일일 의심과 감찰 문구에 반영된다.

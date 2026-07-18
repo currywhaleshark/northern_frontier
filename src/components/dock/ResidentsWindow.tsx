@@ -48,7 +48,7 @@ export function ResidentsWindow({
             disabled={!resident.alive}
             onClick={() => onSelectResident(resident.id)}
           >
-            <span>{resident.name}{resident.sick ? ' 🤒' : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</span>
+            <span>{resident.special ? '★ ' : ''}{resident.name}{resident.sick ? ' 🤒' : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</span>
             <span className="muted">{resident.alive
               ? `${resident.cartEquipped ? '🛒 ' : ''}${residentRoleLabel(state, resident)}${state.weaponAssignments[resident.id]
                 ? ` · ${COMBAT_WEAPON_NAMES[state.weaponAssignments[resident.id]!]}`
