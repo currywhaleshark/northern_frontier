@@ -2,7 +2,7 @@
 // 하루는 SUBTICKS개의 서브틱으로 나뉜다. 서브틱마다 주민 에이전트가 이동/작업/운반하고,
 // 하루가 넘어갈 때 소비/생존/위협/이벤트 등 일일 처리를 한다.
 import { CONFIG } from './config';
-import { isJobUnlocked, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } from './constants';
+import { isJobUnlocked, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } from './constants';
 import {
   BUILDING_DEFS, buildingCostFor, buildingFootprintTiles, canAfford, canAffordCost,
   cannonPlacementsUsed, canPlaceBuildingAt, canPlaceOn, clampPlotSide,
@@ -56,6 +56,7 @@ import { createIncidentState, resolveSpecialEvent, updateSpecialEvents } from '.
 import { dailyClaimTensionTick, noteBuildingClaimIntrusions } from './claimZones';
 import { applyDailySpoilage } from './spoilage';
 import { consumptionWeight, lifecycleDailyTick, resolveWeddingChoice } from './lifecycle';
+import { applyJobChangeCarryover, dailyEducationTick, isLiterateJob } from './education';
 import { dailyReligionTick, resolveReligionChoice } from './religion';
 import { dailySpecialResidentTick, resolveSpecialResidentChoice } from './specialResidents';
 import { dailySilverTick, resolveSilverVeinChoice } from './silver';
@@ -182,6 +183,10 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     for (let i = 0; i < count; i++) {
       state.residents.push(createResident(state, rng, job as JobId));
     }
+  }
+  // 개척민 중 글을 아는 이 — 의원·아전·훈장의 콜드 스타트를 막는다
+  for (const resident of state.residents.slice(0, CONFIG.education.startLiterateAdults)) {
+    resident.literate = true;
   }
   setAutomaticWeaponAllocation(state);
   reconcileResidentHomes(state, rng);
@@ -384,11 +389,19 @@ export function cancelBuildingConstruction(state: GameState, buildingId: number)
 // 직업 재배정: from 직업의 산 주민 1명을 to 직업으로
 export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
   if (!isJobUnlocked(state.rank, to)) return false;
+  // 문해자 전용 관직 — 글을 아는 주민만 후보가 된다
+  const eligible = (res: Resident) => !isLiterateJob(to) || res.literate === true;
   const r = state.residents.find(res =>
-    res.alive && !res.special && res.job === from && res.assignedBuildingId == null)
-    ?? state.residents.find(res => res.alive && !res.special && res.job === from);
-  if (!r) return false;
+    res.alive && !res.special && res.job === from && res.assignedBuildingId == null && eligible(res))
+    ?? state.residents.find(res => res.alive && !res.special && res.job === from && eligible(res));
+  if (!r) {
+    if (isLiterateJob(to) && state.residents.some(res => res.alive && !res.special && res.job === from)) {
+      addLog(state, `${JOB_NAMES[to]}은(는) 글을 아는 주민만 맡을 수 있습니다. 서당에서 아이를 가르치거나 문해자 유민을 기다리십시오.`, 'info');
+    }
+    return false;
+  }
   if (to !== 'hauler') returnResidentCart(state, r);
+  applyJobChangeCarryover(r, to);
   r.job = to;
   clearIncompatibleAssignment(state, r);
   resetAgent(state, r);
@@ -413,8 +426,13 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
     addLog(state, '무당과 승려는 마을에 들어온 그 사람만 맡을 수 있습니다.', 'info');
     return;
   }
+  if (r && isLiterateJob(job) && r.literate !== true) {
+    addLog(state, `${r.name}은(는) 글을 몰라 ${JOB_NAMES[job]}을(를) 맡을 수 없습니다. 서당에서 배운 아이나 문해자 유민이 필요합니다.`, 'info');
+    return;
+  }
   if (r && r.alive) {
     if (job !== 'hauler') returnResidentCart(state, r);
+    applyJobChangeCarryover(r, job);
     r.job = job;
     clearIncompatibleAssignment(state, r);
     resetAgent(state, r);
@@ -823,6 +841,7 @@ function endOfDay(state: GameState): void {
   updateHabitats(state);
   runToolWear(state);
   runConsumptionAndNeeds(state, rng);
+  dailyEducationTick(state); // 취학 아동의 글공부 누적 (성인 전환 판정보다 먼저)
   lifecycleDailyTick(state, rng); // 성장·노화·혼인·출산·장례 (소비/체온 갱신 뒤)
   updateLivestock(state);
   applyDailySpoilage(state);

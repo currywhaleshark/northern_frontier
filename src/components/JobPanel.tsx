@@ -1,6 +1,7 @@
 // 직업 배정 패널: 무직 풀에서 직업으로 +/-
 import { BUILDING_DEFS } from '../game/buildings';
 import { isJobUnlocked, JOB_DESC, JOB_NAMES, JOB_ORDER } from '../game/constants';
+import { isLiterateJob } from '../game/education';
 import { countJob } from '../game/residents';
 import {
   AUTO_ASSIGN_BUILDING_TYPES,
@@ -28,6 +29,9 @@ interface Props {
 
 export function JobPanel({ state, onReassign, uiPrefs, onUiPrefsChange, onAutoAssign }: Props) {
   const idle = countJob(state, 'idle');
+  // 문해자 전용 관직(의원·아전·훈장)은 무직 문해 성인이 있어야 늘릴 수 있다
+  const literateIdle = state.residents.filter(resident =>
+    resident.alive && !resident.stage && resident.job === 'idle' && resident.literate === true).length;
   const selectedAutoAssignTypes = uiPrefs.autoAssignBuildingTypes;
   const allAutoAssignTypesSelected = selectedAutoAssignTypes.length === AUTO_ASSIGN_BUILDING_TYPES.length;
   return (
@@ -74,17 +78,24 @@ export function JobPanel({ state, onReassign, uiPrefs, onUiPrefsChange, onAutoAs
       </div>
       {JOB_ORDER.filter(j => j !== 'idle' && isJobUnlocked(state.rank, j)).map(job => {
         const count = countJob(state, job);
+        const gated = isLiterateJob(job);
         const unassigned = BUILDING_SLOT_JOBS.has(job)
           ? state.residents.filter(resident =>
             resident.alive && resident.job === job && resident.assignedBuildingId == null).length
           : null;
         return (
-          <div className="job-row" key={job} title={JOB_DESC[job]}>
-            <span>{JOB_NAMES[job]} {unassigned != null && <small>(미배정 {unassigned})</small>}</span>
+          <div className="job-row" key={job} title={`${JOB_DESC[job]}${gated ? '\n📖 문해자 전용 — 글을 아는 주민만 맡습니다' : ''}`}>
+            <span>{JOB_NAMES[job]}{gated && <span aria-label="문해자 전용" title="문해자 전용"> 📖</span>} {unassigned != null && <small>(미배정 {unassigned})</small>}</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <button className="job-btn" disabled={count === 0} onClick={() => onReassign(job, 'idle')}>−</button>
               <span className="count">{count}</span>
-              <button className="job-btn" data-tut={`job-plus-${job}`} disabled={idle === 0} onClick={() => onReassign('idle', job)}>＋</button>
+              <button
+                className="job-btn"
+                data-tut={`job-plus-${job}`}
+                disabled={idle === 0 || (gated && literateIdle === 0)}
+                title={gated && literateIdle === 0 ? '무직 문해자가 없습니다' : undefined}
+                onClick={() => onReassign('idle', job)}
+              >＋</button>
             </span>
           </div>
         );

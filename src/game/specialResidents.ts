@@ -348,6 +348,7 @@ function recruitSpecialResident(
   resident.gender = definition.gender;
   resident.age = definition.age;
   resident.special = id;
+  resident.literate = true; // 이름 있는 인물은 모두 글을 안다
   if (originFaction) resident.origin = originFaction;
   state.residents.push(resident);
   reconcileResidentHomes(state, rng);

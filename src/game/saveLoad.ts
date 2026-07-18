@@ -268,6 +268,23 @@ export function migrateV21ToV22(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 22 };
 }
 
+// v23: 교육·문해 — 구버전 저장의 현직 의원·아전·훈장과 특수 주민은 문해자로 인정한다
+export function migrateV22ToV23(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  if (Array.isArray(migrated.residents)) {
+    for (const entry of migrated.residents) {
+      if (!entry || typeof entry !== 'object') continue;
+      const resident = entry as RawSave;
+      if (resident.literate == null &&
+          (['physician', 'clerk', 'teacher'].includes(String(resident.job)) || resident.special != null)) {
+        resident.literate = true;
+      }
+    }
+  }
+  migrated.schemaVersion = 23;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   let version = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -294,6 +311,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 19) migrated = migrateV19ToV20(migrated);
     else if (version === 20) migrated = migrateV20ToV21(migrated);
     else if (version === 21) migrated = migrateV21ToV22(migrated);
+    else if (version === 22) migrated = migrateV22ToV23(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }

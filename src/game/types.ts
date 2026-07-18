@@ -351,6 +351,9 @@ export interface Resident {
   // ── 생애 주기 (없으면 성인) ──
   stage?: LifeStage | null;    // 아기/어린이/소년 — 성인이 되면 지워진다
   stageProgress?: number;      // 현 단계에서 자란 일수 (굶주림·혹한이면 멈춤)
+  // ── 교육 (서당) ──
+  education?: number;          // 아이의 취학 누적 일수 — schoolingDays 채우면 문해
+  literate?: boolean;          // 문해자 — 의원·아전·훈장 자격, 숙련 성장 가속
   spouseId?: number | null;    // 배우자 주민 id
   motherId?: number;           // "○○의 아이" 표기용
   fatherId?: number;

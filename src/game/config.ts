@@ -956,6 +956,18 @@ export const CONFIG = {
     immigrantElderChance: 0.15,  // 노부모(55~64세) 1명이 섞일 확률
   },
 
+  // 교육 — 서당 취학은 아이의 반몫 노동을 포기하는 대신 문해자를 길러낸다.
+  // 문해자만 의원·아전·훈장을 맡을 수 있고, 무엇을 배워도 빠르다.
+  education: {
+    seatsPerTeacher: 5,          // 훈장 1명당 취학 정원
+    schoolingDays: 30,           // 취학 이 일수면 문해 (어린이+소년 성장 96일 중)
+    literateSkillGainMult: 1.5,  // 문해자의 숙련 성장 배율
+    literateCarryover: 0.5,      // 전직 시 최고 숙련의 이 비율을 새 직업에 이월
+    childLaborMult: 0.5,         // 미취학 아이 심부름의 적재 배율 (반몫)
+    immigrantLiterateChance: 0.1, // 성인 유민이 문해자일 확률
+    startLiterateAdults: 2,      // 시작 개척민 중 문해자 수 (관직 콜드 스타트 방지)
+  },
+
   // 만족도 — 티어가 오를수록 기대 항목이 늘어난다 (성분 기반, 잠긴 항목은 계산 제외)
   // 계획: docs/superpowers/plans/2026-07-17-satisfaction-religion.md
   satisfaction: {

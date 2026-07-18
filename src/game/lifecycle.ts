@@ -5,6 +5,7 @@
 import { BUILDING_DEFS, countBuilt } from './buildings';
 import { CONFIG } from './config';
 import { addLog } from './events';
+import { settleEducationOnAdulthood } from './education';
 import { hasResidentMonk } from './morale';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
 import { killResident, livingResidents, rollResidentName } from './residents';
@@ -66,13 +67,20 @@ function growStages(state: GameState): void {
       applyLifeStage(r, LIFE_STAGE_ORDER[nextIndex]);
       continue;
     }
-    // 성인이 되었다
+    // 성인이 되었다 — 취학 일수를 채웠으면 문해자로
     r.stage = null;
     r.stageProgress = 0;
     r.age = l.adultAge;
     r.job = 'idle';
     r.task = '무직';
-    addLog(state, `${r.name}이(가) 어엿한 한 사람 몫의 일손으로 자랐습니다.`, 'good', true);
+    settleEducationOnAdulthood(r);
+    addLog(
+      state,
+      r.literate
+        ? `${r.name}이(가) 글을 깨친 어른으로 자랐습니다. 의원·아전·훈장을 맡을 수 있습니다.`
+        : `${r.name}이(가) 어엿한 한 사람 몫의 일손으로 자랐습니다.`,
+      'good', true,
+    );
   }
 }
 

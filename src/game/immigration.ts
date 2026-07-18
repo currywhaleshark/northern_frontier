@@ -4,6 +4,7 @@ import { foodTotal } from './consumption';
 import { addLog } from './events';
 import { RESIDENT_ORIGINS, residentOriginLabel } from './defectors';
 import { addForeignSiteMemory } from './foreignSites';
+import { literateAdults } from './education';
 import { applyLifeStage } from './lifecycle';
 import { makeRng } from './map';
 import { rankEffects } from './promotion';
@@ -193,14 +194,28 @@ export function resolveImmigration(state: GameState, optionId: string): void {
     const rng = makeRng(state.seed + state.day * 15485863 + count * 17);
     const children = Math.max(0, Math.min(count - 1, Math.floor(Number(choice.data.children) || 0)));
     const elders = Math.max(0, Math.min(count - children - 1, Math.floor(Number(choice.data.elders) || 0)));
+    // 문해자 공급 — 성인 유민 일부는 글을 안다. 마을에 문해 성인이 하나도 없으면
+    // 첫 성인은 문해자로 보장한다 (관직 데드락 방지).
+    let literateGuaranteeLeft = literateAdults(state).length === 0 ? 1 : 0;
+    let literateArrived = 0;
     for (let i = 0; i < count; i++) {
       const resident = createResident(state, rng, 'idle', origin);
       if (i < children) {
         applyLifeStage(resident, rng() < 0.5 ? 'child' : 'youth');
-      } else if (i < children + elders) {
-        resident.age = 55 + Math.floor(rng() * 10); // 노부모 — 자연사 시계가 곧 돈다
+      } else {
+        if (i < children + elders) {
+          resident.age = 55 + Math.floor(rng() * 10); // 노부모 — 자연사 시계가 곧 돈다
+        }
+        if (literateGuaranteeLeft > 0 || rng() < CONFIG.education.immigrantLiterateChance) {
+          resident.literate = true;
+          literateGuaranteeLeft = 0;
+          literateArrived += 1;
+        }
       }
       state.residents.push(resident);
+    }
+    if (literateArrived > 0) {
+      addLog(state, `새 유민 가운데 글을 아는 이가 ${literateArrived}명 있습니다. 의원·아전·훈장을 맡길 수 있습니다.`, 'good');
     }
     reconcileResidentHomes(state, rng);
     if (sourceSite) {

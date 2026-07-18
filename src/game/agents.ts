@@ -7,6 +7,7 @@ import {
 } from './buildings';
 import { JOB_NAMES, RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
+import { enrolledStudentIds, skillGainMult } from './education';
 import { haulerCarryCapacity } from './equipment';
 import { collectHuntableTiles } from './habitats';
 import { makeRng } from './map';
@@ -76,7 +77,8 @@ function effOf(r: Resident): number {
 
 function gainSkillTick(r: Resident): void {
   const cur = r.skills[r.job] ?? 0;
-  r.skills[r.job] = Math.min(1, cur + CONFIG.production.skillGainPerDay / 5);
+  // 문해자는 무엇을 배워도 빠르다 (서당 교육의 평생 보상)
+  r.skills[r.job] = Math.min(1, cur + (CONFIG.production.skillGainPerDay / 5) * skillGainMult(r));
 }
 
 function carryTotal(r: Resident): number {
@@ -2272,6 +2274,7 @@ export function agentsTick(state: GameState): void {
   const season = getSeason(state.day);
   const living = state.residents.filter(r => r.alive);
   const predatorScouts = activePredatorScoutIds(state);
+  const enrolledStudents = enrolledStudentIds(state); // 서당 정원 안의 취학 아동
   if (living.length === 0) return;
 
   const producers = living.filter(r =>
@@ -2331,18 +2334,25 @@ export function agentsTick(state: GameState): void {
       goToCenter(state, r, ctx);
       continue;
     }
-    // 아이는 일하지 않는다 — 아기는 집에서, 어린이·소년은 서당이 있으면 글공부, 없으면 뛰논다
+    // 아이 — 아기는 집에서 자라고, 어린이·소년은 서당 정원에 들면 글공부,
+    // 자리가 없으면 반몫 심부름(창고 운반 보조)을 한다.
     if (r.stage) {
-      clearHaulTask(r);
       if (r.stage === 'infant') {
+        clearHaulTask(r);
         r.task = '집에서 자람';
         r.phase = 'rest';
         r.path = [];
-      } else {
+        continue;
+      }
+      if (enrolledStudents.has(r.id)) {
+        clearHaulTask(r);
         const school = state.buildings.find(building => building.type === 'school' && building.built);
         if (school) loiterNearBuilding(state, r, ctx, school, 3, '글공부');
         else loiterNearCenter(state, r, ctx, '뛰노는 중');
+        continue;
       }
+      haulerTick(state, r, ctx);
+      if (r.task === '대기') r.task = '심부름거리 찾는 중';
       continue;
     }
     // 산모는 집에서 몸을 추스른다

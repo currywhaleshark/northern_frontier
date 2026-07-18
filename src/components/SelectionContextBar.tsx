@@ -14,6 +14,7 @@ import { spoilagePreview } from '../game/spoilage';
 import type { SiteGiftType } from '../game/siteDiplomacy';
 import { isWallBuilding } from '../game/walls';
 import { combatDefaultWeaponName } from '../game/combatCapabilities';
+import { enrolledStudentIds, isSchoolAge } from '../game/education';
 import { specialResidentSkills } from '../game/specialResidents';
 import { COMBAT_WEAPON_NAMES, MOUNT_NAMES } from '../game/weapons';
 import type {
@@ -80,8 +81,18 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart }: {
   return (
     <table className="insp-table">
       <tbody>
-        <tr><td>이름</td><td>{resident.name} ({resident.age}세){resident.sick ? ' 🤒' : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</td></tr>
+        <tr><td>이름</td><td>{resident.name} ({resident.age}세){resident.literate ? <span title="문해자 — 의원·아전·훈장을 맡을 수 있고 숙련이 빨리 오릅니다"> 📖</span> : ''}{resident.sick ? ' 🤒' : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</td></tr>
         {resident.origin && <tr><td>출신</td><td>{resident.origin}</td></tr>}
+        {isSchoolAge(resident) && (
+          <tr>
+            <td>글공부</td>
+            <td>{enrolledStudentIds(state).has(resident.id)
+              ? `취학 중 · ${Math.floor(resident.education ?? 0)}/${CONFIG.education.schoolingDays}일`
+              : (resident.education ?? 0) > 0
+                ? `미취학 (서당 자리 없음) · 배운 날 ${Math.floor(resident.education ?? 0)}/${CONFIG.education.schoolingDays}일`
+                : '미취학 — 반몫 심부름 중'}</td>
+          </tr>
+        )}
         {resident.special && specialResidentSkills(resident.special).length > 0 && (
           <tr>
             <td>특기</td>

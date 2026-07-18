@@ -6,11 +6,13 @@ function carriedAmount(resident: Resident): number {
 }
 
 export function haulerCarryCapacity(
-  resident: Pick<Resident, 'job' | 'cartEquipped'>,
+  resident: Pick<Resident, 'job' | 'cartEquipped' | 'stage'>,
 ): number {
-  return resident.job === 'hauler' && resident.cartEquipped
+  const base = resident.job === 'hauler' && resident.cartEquipped
     ? CONFIG.agents.haulerCartCarryCap
     : CONFIG.agents.haulerCarryCap;
+  // 미취학 아이의 심부름은 반몫이다
+  return resident.stage ? base * CONFIG.education.childLaborMult : base;
 }
 
 export function returnResidentCart(state: GameState, resident: Resident): boolean {
