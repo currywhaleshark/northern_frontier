@@ -1,5 +1,8 @@
 # 전술전 확장 계획: 3열 진형·표적 지정·후방 교전선·적 사전 계책
 
+> 역사 계획 (2026-07-18): 체크박스와 후속 항목은 작성 시점 기록이다. 현재 상태는
+> [UI 재구성 릴리스 후보](../../release-candidates/2026-07-ui-reorganization.md)를 기준으로 한다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. 해당 스킬이 세션에 없으면 일반 TDD 방식(각 Task마다 테스트 선행 → 구현 → 회귀 확인)으로 진행한다. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 현재 전술전은 전장 구역(접근로→방어선→창고→중심지)과 부대별 명령까지만 지휘할 수 있다. 이를 다음 네 축으로 확장한다: (1) 각 구역 내부를 **전열/중열/후열** 3열로 나누고, (2) 후방 급습을 **별도의 두 번째 교전선**으로 승격해 예비대 대응을 만들고, (3) **표적 지정**을 총 피해량 재분배 방식으로 추가하고, (4) 적도 전투 생성 시 잠기는 **목적·계책(계책점수)**을 갖게 해 정찰-대비의 정보전을 만든다. 실시간 RTS화·개별 유닛 판정은 하지 않는다.

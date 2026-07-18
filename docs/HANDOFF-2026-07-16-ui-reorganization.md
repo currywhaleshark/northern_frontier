@@ -1,5 +1,8 @@
 # UI 재구성 핸드오프 — 2026-07-16
 
+> 역사 문서 상태 (2026-07-18): 이 핸드오프는 작성 시점 기록이다. 현재 구현·검증·미완성
+> 상태는 [UI 재구성 릴리스 후보](release-candidates/2026-07-ui-reorganization.md)를 기준으로 한다.
+
 ## 저장소 상태
 
 - 저장소: `https://github.com/currywhaleshark/northern_frontier`

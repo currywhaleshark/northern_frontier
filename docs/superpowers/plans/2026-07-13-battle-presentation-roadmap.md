@@ -1,5 +1,8 @@
 # Battle Presentation Roadmap (전투 연출 보강 계획)
 
+> 역사 계획 (2026-07-18): 체크박스와 후속 항목은 작성 시점 기록이다. 현재 상태는
+> [UI 재구성 릴리스 후보](../../release-candidates/2026-07-ui-reorganization.md)를 기준으로 한다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 전술 전투 화면과 지도 위 실시간 전투의 연출을 단계적으로 보강해 전투의 긴장감과 피해의 체감을 높인다. 밸런스·판정 로직은 건드리지 않고 연출 계층만 확장한다.

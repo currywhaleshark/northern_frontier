@@ -1,5 +1,8 @@
 # 만족도·종교 계획: 티어가 오를수록 늘어나는 기대 — 서당과 두 갈래 신앙
 
+> 역사 계획 (2026-07-18): 체크박스와 후속 항목은 작성 시점 기록이다. 구저장 완충과 소년
+> 서당 연동의 현재 상태는 [UI 재구성 릴리스 후보](../../release-candidates/2026-07-ui-reorganization.md)를 기준으로 한다.
+
 > **For agentic workers:** 프레임(티어별 기대 스케일)과 구성 요소 목록은 확정, 종교의 택1 방식과
 > 선비 훈장 전환(§7)은 구현 전 사용자 확인이 필요하다. 구현은
 > superpowers:subagent-driven-development 또는 superpowers:executing-plans로 Phase 단위 진행한다.

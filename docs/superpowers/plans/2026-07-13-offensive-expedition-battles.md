@@ -1,5 +1,8 @@
 # 공격전 계획: 토벌대 소집·원정·산채 토벌·맹수 사냥 (토벌 원정 시스템)
 
+> 역사 계획 (2026-07-18): 체크박스와 후속 항목은 작성 시점 기록이다. 현재 상태는
+> [UI 재구성 릴리스 후보](../../release-candidates/2026-07-ui-reorganization.md)를 기준으로 한다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 지금까지의 전술 전투는 전부 방어전이다. 마적 산채 토벌과 호랑이·늑대 사냥을 **공격전**으로 승격한다: 메인 화면에서 주민을 개별로 움직이는 대신 **토벌대 소집**으로 수비병·사냥꾼 등을 몇 명 데려갈지 정해 하나의 부대로 묶고, 지도 위에서 목표 지점까지 이동한 뒤 공격전을 개시한다. 방어전과 마찬가지로 **자동 전투와 직접 지휘 둘 다** 지원한다. 산채 토벌(공성 양상)과 맹수 사냥(몰이 양상)은 서로 다른 구조로 만든다.

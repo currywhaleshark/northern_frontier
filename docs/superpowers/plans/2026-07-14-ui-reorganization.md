@@ -1,5 +1,8 @@
 # UI 개편 계획: 자원바 정책·하단 건설 드로어·도킹 핀 창·인스펙터 절단·로그 통합
 
+> 역사 계획 (2026-07-18): 체크박스와 “다음 작업”은 작성 시점 기록이다. 현재 구현·검증·
+> 미완성 상태는 [UI 재구성 릴리스 후보](../../release-candidates/2026-07-ui-reorganization.md)를 기준으로 한다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. 해당 스킬이 세션에 없으면 일반 TDD 방식으로 진행한다. Steps use checkbox (`- [ ]`) 구문으로 추적한다.
 
 **Goal:** 좌우 고정 사이드바를 해체해 게임 캔버스를 넓히고, 품목이 계속 늘어나는 자원바에 영구적인 표시 정책을 세운다. 배치 원칙: **선택 문맥 정보는 하단, 전역 관리는 우측 도킹 핀 창, 건설은 하단 아이콘→드로어, 로그는 좌상단 통합, 지속 목표는 상단바 목표 행.**

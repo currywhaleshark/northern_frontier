@@ -1,5 +1,8 @@
 # 전술 전투 검토 후속 수정 계획 (적 행동 위협 구조 + 연출 흐름)
 
+> 역사 계획 (2026-07-18): 체크박스와 후속 항목은 작성 시점 기록이다. 현재 상태는
+> [UI 재구성 릴리스 후보](../../release-candidates/2026-07-ui-reorganization.md)를 기준으로 한다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 전술 전투(`src/game/tacticalBattle.ts`)의 승패 구조가 "우회조 하나"에 좌우되는 문제를 바로잡아 주력·약탈조·우회조가 각각 제 역할의 위협을 내게 하고, 실측에서 드러난 연출 어색함(빈 구역 백병전, 밋밋한 중심지 돌파, 매복 후 고립 등)을 정리한다. 연출 재생 파이프라인(`TacticalBattleScreen.tsx`)의 골격은 건드리지 않는다.

@@ -1,5 +1,8 @@
 # 몰이사냥 재작업 계획: 부채꼴 포위망·호랑이 결정 테이블·반격 창구
 
+> 역사 계획 (2026-07-18): 체크박스와 후속 항목은 작성 시점 기록이다. 현재 상태는
+> [UI 재구성 릴리스 후보](../../release-candidates/2026-07-ui-reorganization.md)를 기준으로 한다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. 해당 스킬이 세션에 없으면 일반 TDD 방식으로 진행한다. Steps use checkbox (`- [ ]`) syntax로 추적한다.
 
 **Goal:** 맹수 사냥(특히 호랑이)의 의도된 그림은 "여럿이 흩어져 몰이를 하고, 호랑이는 숨어 있다가 약한 쪽부터 한 번씩 급습하고, 플레이어는 포위망을 좁혀 몰아넣거나 급습을 반격해 정리한다"이다. 현재 구현은 선형 3단계 복도 + 매 라운드 무조건 공격이라 이 긴장이 전혀 살지 않는다. 전투를 **부채꼴 3개 + 심처의 포위망 모델**로 재작업한다: 배치가 곧 전술이 되고(흩으면 몰이가 되지만 조가 얇아지고, 뭉치면 안전하지만 구멍으로 몰이가 정체·도주), 호랑이는 결정 테이블로 은신·급습·돌파를 선택하며, 아군의 주 대미지 창구는 호랑이가 모습을 드러내는 순간의 반격이다.

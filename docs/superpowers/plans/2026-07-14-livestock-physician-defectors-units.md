@@ -1,5 +1,8 @@
 # 병종·민생 확장 계획: 가축 5종·의원·귀순병·팽배수·기마병
 
+> 역사 계획 (2026-07-18): 체크박스와 후속 항목은 작성 시점 기록이다. 팽배수를 포함한
+> 현재 완료·보류 상태는 [UI 재구성 릴리스 후보](../../release-candidates/2026-07-ui-reorganization.md)를 기준으로 한다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. 해당 스킬이 세션에 없으면 일반 TDD 방식으로 진행한다. Steps use checkbox (`- [ ]`) 구문으로 추적한다.
 
 **Goal:** 생존 게임의 정체성을 유지하면서 전투와 민생 양쪽에 걸치는 확장을 추가한다: (1) 축사를 **축종 선택형 가축 시스템**(닭→소·염소·양→군마, 거래·사건으로 점진 해금)으로 승격하고, (2) **의원**을 티어 2~3 건물·직업으로 추가해 역병 사건과 연계하며, (3) **귀순/투항 주민**을 외교·이주·포로 경로로 받아들이되 조정 의심(suspicion)과 연동하고, (4) 전투 병종으로 **팽배수**(대장간 방패)와 **기마병**(군마 기반)을 추가한다.

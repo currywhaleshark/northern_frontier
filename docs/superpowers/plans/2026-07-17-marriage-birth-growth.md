@@ -1,5 +1,8 @@
 # 혼인·출산·성장·노년·장례 계획: 뿌리내리는 정착지 — 생애 주기 전체
 
+> 역사 계획 (2026-07-18): 체크박스와 후속 항목은 작성 시점 기록이다. 현재 상태는
+> [UI 재구성 릴리스 후보](../../release-candidates/2026-07-ui-reorganization.md)를 기준으로 한다.
+
 > **For agentic workers:** 핵심 방향(3중 완충으로 아이를 순수 리스크에서 구한다)은 확정,
 > 수치와 일부 분기(§8)는 구현 전/중 사용자 확인. 구현은 superpowers:subagent-driven-development
 > 또는 superpowers:executing-plans로 Phase 단위 진행한다.

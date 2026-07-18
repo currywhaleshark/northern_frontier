@@ -1,5 +1,8 @@
 # 발효·보존 계획: 부패(채소·고기·생선)·움 저장고·훈제·염장·건조·장독대·김장
 
+> 역사 계획 (2026-07-18): 체크박스와 후속 항목은 작성 시점 기록이다. 현재 상태는
+> [UI 재구성 릴리스 후보](../../release-candidates/2026-07-ui-reorganization.md)를 기준으로 한다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. 해당 스킬이 세션에 없으면 일반 TDD 방식으로 진행한다. Steps use checkbox (`- [ ]`) 구문으로 추적한다.
 
 **Goal:** 현재 가공 사슬은 전부 1차에서 끝나고, 부패가 없어 모든 식량이 무한 보존된다. **채소·고기·생선 3종에 부패를 도입**하고, 그 대응 수단을 계층으로 쌓는다: **움 저장고**(완화 — 부패를 늦춤) → **훈제·염장·건조**(보존 가공 — 부패하지 않는 보존식) → **장독대·김장**(발효 — 시간이 만드는 2·3차 가공). 겨울이 "버티는 계절"에서 "가을에 갈무리한 것을 꺼내 먹는 계절"로 바뀐다.

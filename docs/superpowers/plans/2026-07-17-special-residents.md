@@ -1,5 +1,8 @@
 # 특수 주민 계획: 사연 있는 주민 — 이벤트 획득·고정 직업·보너스와 리스크의 거래
 
+> 역사 계획 (2026-07-18): 체크박스와 후속 항목은 작성 시점 기록이다. 가족 참조 무결성과
+> 추가 후보 보류 상태는 [UI 재구성 릴리스 후보](../../release-candidates/2026-07-ui-reorganization.md)를 기준으로 한다.
+
 > **For agentic workers:** 이 문서는 프레임워크와 사례 2종이 확정된 설계 계획이다. 후보 사례(§4의
 > 후보군)와 미해결 질문(§7)은 구현 중 사용자에게 확인한다. 구현은
 > superpowers:subagent-driven-development 또는 superpowers:executing-plans로 Phase 단위 진행한다.

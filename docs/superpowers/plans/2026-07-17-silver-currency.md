@@ -1,5 +1,8 @@
 # 화폐 계획: 은(銀) — 대외 결제 통일·은광 딜레마·상평통보 보류
 
+> 역사 계획 (2026-07-18): 체크박스와 후속 항목은 작성 시점 기록이다. 현재 상태는
+> [UI 재구성 릴리스 후보](../../release-candidates/2026-07-ui-reorganization.md)를 기준으로 한다.
+
 > **For agentic workers:** 핵심 결정은 확정됐다(아래 "확정된 설계 결정"). 남은 미해결 질문(§6)은
 > 구현 중 사용자에게 확인한다. 구현은 superpowers:subagent-driven-development 또는
 > superpowers:executing-plans로 Phase 단위 진행한다.
