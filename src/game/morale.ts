@@ -98,6 +98,14 @@ export function moraleBreakdown(state: GameState, inputs: MoraleInputs): MoraleF
   if (state.day < (state.promotionCheerUntil ?? 0)) {
     factors.push({ id: 'promotion', label: '승격의 경사', unlocked: true, delta: s.promotionCheer });
   }
+  if (state.day < (state.expectationTransitionUntil ?? 0)) {
+    factors.push({
+      id: 'legacy-expectation-transition',
+      label: '새 기대에 적응 중',
+      unlocked: true,
+      delta: s.legacyTransitionCheer,
+    });
+  }
 
   return factors;
 }

@@ -35,7 +35,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 23, 'the education/literacy update ships with schema version 23');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 24, 'release-candidate save migrations ship with schema version 24');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -47,6 +47,7 @@ assert.equal(typeof saveLoad.migrateV14ToV15, 'function');
 assert.equal(typeof saveLoad.migrateV15ToV16, 'function');
 assert.equal(typeof saveLoad.migrateV16ToV17, 'function');
 assert.equal(typeof saveLoad.migrateV17ToV18, 'function');
+assert.equal(typeof saveLoad.migrateV23ToV24, 'function');
 
 {
   const migrated = saveLoad.migrateV8ToV9({

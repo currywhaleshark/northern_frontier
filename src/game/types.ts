@@ -1172,6 +1172,8 @@ export interface GameState {
   moraleFactors?: MoraleFactor[];   // 어제 계산된 민심 내역 (UI 표시용 스냅숏)
   lastFermentMealDay?: number;      // 마지막으로 밥상에 장·김치가 오른 날
   promotionCheerUntil?: number;     // 승격 직후 완충 버프 종료일
+  expectationTransitionUntil?: number; // 만족도 도입 이전 고티어 저장의 새 기대 적응 종료일
+  expectationTransitionNotified?: boolean; // 적응 안내 중요 로그를 이미 남겼는지
   unlockedReligions?: ReligionId[]; // 네임드가 와서 해금된 신앙 갈래
   religionOfferCooldownUntil?: number; // 다음 종교인 등장 가능일
   spentSpecialIds?: SpecialResidentId[]; // 이미 등장한 네임드 (게임당 1회)

@@ -285,9 +285,36 @@ export function migrateV22ToV23(raw: RawSave): RawSave {
   return migrated;
 }
 
+// v24: 만족도 도입 전(v21 이하) 고티어 저장의 새 기대 적응 기간.
+// sourceVersion은 연속 마이그레이션 전의 실제 저장 버전이어야 현재 v22/v23 저장을 건드리지 않는다.
+export function migrateV23ToV24(raw: RawSave, sourceVersion = 23): RawSave {
+  const migrated = clonedRecord(raw);
+  const legacyGameOver = migrated.gameOver;
+  const legacyWon = legacyGameOver != null && typeof legacyGameOver === 'object'
+    && (legacyGameOver as RawSave).won === true;
+  const rank = String(migrated.rank ?? (legacyWon ? 'bo' : 'settlement'));
+  if (sourceVersion <= 21 && rank !== 'settlement') {
+    const day = typeof migrated.day === 'number' && Number.isFinite(migrated.day) ? migrated.day : 1;
+    const existing = typeof migrated.expectationTransitionUntil === 'number'
+      && Number.isFinite(migrated.expectationTransitionUntil)
+      ? migrated.expectationTransitionUntil
+      : 0;
+    migrated.expectationTransitionUntil = Math.max(
+      existing,
+      day + CONFIG.satisfaction.legacyTransitionDays,
+    );
+    if (migrated.expectationTransitionNotified !== true) {
+      migrated.expectationTransitionNotified = false;
+    }
+  }
+  migrated.schemaVersion = 24;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
-  let version = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
+  const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
+  let version = sourceVersion;
   if (version > CURRENT_SCHEMA_VERSION) {
     throw new Error(`Unsupported future schema version: ${version}`);
   }
@@ -312,6 +339,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 20) migrated = migrateV20ToV21(migrated);
     else if (version === 21) migrated = migrateV21ToV22(migrated);
     else if (version === 22) migrated = migrateV22ToV23(migrated);
+    else if (version === 23) migrated = migrateV23ToV24(migrated, sourceVersion);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -1143,6 +1171,20 @@ export function loadGame(slot = 1): GameState | null {
       || Array.isArray(parsed.specialResidentRecords)) parsed.specialResidentRecords = {};
     if (parsed.religionOfferCooldownUntil == null) parsed.religionOfferCooldownUntil = 0;
     if (parsed.promotionCheerUntil == null) parsed.promotionCheerUntil = 0;
+    if (parsed.expectationTransitionUntil != null &&
+        (!Number.isFinite(parsed.expectationTransitionUntil) || parsed.expectationTransitionUntil <= 0)) {
+      delete parsed.expectationTransitionUntil;
+    }
+    if (parsed.expectationTransitionUntil != null && parsed.expectationTransitionNotified !== true) {
+      if (!Array.isArray(parsed.log)) parsed.log = [];
+      parsed.log.push({
+        day: parsed.day,
+        text: '마을의 규모가 커지며 주민들이 바라는 살림의 기준도 달라졌습니다. 새 기대에 적응하는 동안 승격의 여운이 민심을 받쳐 줍니다.',
+        kind: 'info',
+        important: true,
+      });
+      parsed.expectationTransitionNotified = true;
+    }
     // 세공 없는 구버전: 시드로 올해분을 재생성. 이미 겨울이면 올해분은 면제 (다음 봄부터 정상 진행)
     if (!Object.prototype.hasOwnProperty.call(parsed, 'courtTribute')) {
       const pop = parsed.residents.filter(r => r.alive).length;

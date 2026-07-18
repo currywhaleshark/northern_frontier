@@ -986,6 +986,8 @@ export const CONFIG = {
     shamanCheer: 2,                        // 당집에 무당 상주 (부가)
     promotionCheer: 8,                     // 승격 직후 완충 버프
     promotionCheerDays: 12,
+    legacyTransitionCheer: 8,              // 구저장 고티어가 새 기대에 적응하는 동안의 별도 완충
+    legacyTransitionDays: 12,
     monkGriefRelief: 3,                    // 노승 상주 시 사망 사기 하락 6 → 3
     monkBurialBonus: 2,                    // 노승 상주 시 안장 위로 +2
   },
