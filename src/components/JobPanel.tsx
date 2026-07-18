@@ -84,7 +84,7 @@ export function JobPanel({ state, onReassign, uiPrefs, onUiPrefsChange, onAutoAs
             <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <button className="job-btn" disabled={count === 0} onClick={() => onReassign(job, 'idle')}>−</button>
               <span className="count">{count}</span>
-              <button className="job-btn" disabled={idle === 0} onClick={() => onReassign('idle', job)}>＋</button>
+              <button className="job-btn" data-tut={`job-plus-${job}`} disabled={idle === 0} onClick={() => onReassign('idle', job)}>＋</button>
             </span>
           </div>
         );

@@ -86,7 +86,7 @@ export function CourtWindow({
                     <span style={{ color: ready ? '#6fbf73' : '#e06c5c' }}>
                       세공고 {reserved.toFixed(0)} / {required} · 사용 {usable}
                     </span>
-                    <div className="tribute-reserve-controls">
+                    <div className="tribute-reserve-controls" data-tut="tribute-reserve">
                       <button type="button" title="5 줄이기" onClick={() => onSetTributeReserve(resource, reserved - 5)}>-5</button>
                       <button type="button" title="1 줄이기" onClick={() => onSetTributeReserve(resource, reserved - 1)}>−</button>
                       <input

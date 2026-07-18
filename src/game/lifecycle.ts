@@ -185,7 +185,8 @@ function tryMarriage(state: GameState, rng: () => number): void {
   bride.spouseId = groom.id;
   cohouseCouple(state, groom, bride);
   addLog(state, `${groom.name}와(과) ${bride.name}이(가) 혼인했습니다.`, 'good', true);
-  if (!state.pendingChoice && !state.battle) openWeddingChoice(state, groom, bride);
+  // 시나리오(튜토리얼) 중에는 혼인 잔치 모달을 생략한다 — 혼인 자체는 그대로 진행
+  if (!state.pendingChoice && !state.battle && !state.scenario) openWeddingChoice(state, groom, bride);
 }
 
 // ── 출산 ────────────────────────────────────────────────

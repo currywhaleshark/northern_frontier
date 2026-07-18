@@ -519,7 +519,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario';
   title: string;
   body: string;
   illustration?: {
@@ -529,6 +529,18 @@ export interface PendingChoice {
   options: ChoiceOption[];
   // raid: { power, faction, warned } / trade: { give, giveAmt, get, getAmt, faction } / immigration: { count }
   data: Record<string, unknown>;
+}
+
+// ── 시나리오(튜토리얼) — 일반 게임 위에 얹는 스크립트 레이어 ──
+// 내용(문구·조건)은 코드(scenario.ts)에 있고, 저장에는 진행 위치만 남긴다.
+// version이 코드와 다르면 로드 시 시나리오를 해제하고 일반 모드로 전환한다.
+export interface ScenarioState {
+  id: 'tutorial';
+  version: number;
+  stepIndex: number;                // 진행 중 스텝 (0-based). steps.length면 완료 대기
+  introShown: boolean;              // 현재 스텝의 안내 모달을 이미 띄웠는지
+  completed?: boolean;
+  flags: Record<string, number>;    // 스텝 목표 수치와 UI 훅 플래그 (예: residentSelected)
 }
 
 export interface TerritoryViolation {
@@ -1161,6 +1173,7 @@ export interface GameState {
   religionOfferCooldownUntil?: number; // 다음 종교인 등장 가능일
   spentSpecialIds?: SpecialResidentId[]; // 이미 등장한 네임드 (게임당 1회)
   specialResidentRecords?: Partial<Record<SpecialResidentId, SpecialResidentRecord>>; // 안치·합류·이탈 상태
+  scenario?: ScenarioState | null;  // 튜토리얼 등 스크립트 시나리오 (없으면 일반 모드)
   // ── 은맥 (게임당 1회 — 채광 중 발견 사건으로만 등장) ──
   silverVein?: SilverVeinState | null; // 구버전 저장에는 없음
   silverPityDays?: number;     // 발견 전 누적 채광일 (보장 발동용)

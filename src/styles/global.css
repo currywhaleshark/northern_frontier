@@ -100,6 +100,64 @@ html, body, #root {
   flex: 1 1 280px;
   max-width: 520px;
 }
+.ongoing-objective.scenario {
+  flex: 1 1 280px;
+  max-width: 560px;
+  border-color: #7ab3d9;
+  cursor: default;
+}
+.ongoing-objective.scenario .objective-title { color: #7ab3d9; }
+
+/* 튜토리얼 코치 — 다음에 누를 곳을 가리키는 링과 말풍선 (모달 z-index 100 아래) */
+.tutorial-coach-ring {
+  position: fixed;
+  z-index: 90;
+  border: 2px solid #7ab3d9;
+  border-radius: 8px;
+  pointer-events: none;
+  animation: coach-pulse 1.4s ease-in-out infinite;
+}
+@keyframes coach-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(122, 179, 217, 0.55); }
+  50% { box-shadow: 0 0 0 7px rgba(122, 179, 217, 0); }
+}
+.tutorial-coach-bubble {
+  position: fixed;
+  z-index: 91;
+  transform: translateX(-50%);
+  max-width: 280px;
+  padding: 8px 11px;
+  background: #17222b;
+  border: 1px solid #7ab3d9;
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+.tutorial-coach-bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 7px solid transparent;
+}
+.tutorial-coach-bubble.above::after {
+  top: 100%;
+  border-top-color: #7ab3d9;
+}
+.tutorial-coach-bubble.below::after {
+  bottom: 100%;
+  border-bottom-color: #7ab3d9;
+}
+.tutorial-coach-label {
+  display: block;
+  margin-bottom: 2px;
+  color: #7ab3d9;
+  font-weight: 700;
+  font-size: 11px;
+}
 .objective-summary {
   min-width: 0;
   overflow: hidden;

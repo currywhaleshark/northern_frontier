@@ -18,6 +18,7 @@ import { RESOURCE_IDS } from './resourceCatalog';
 import { reconcileTributeReserve } from './tributeReserve';
 import { reconcileResidentHomes } from './residents';
 import { ensureIncidentState } from './specialEvents';
+import { TUTORIAL_SCENARIO_VERSION, TUTORIAL_STEPS } from './scenario';
 import { ensureForeignSiteState, revealForeignSitesFromExploration } from './foreignSites';
 import {
   allocateMusketReadiness, reconcileMountAssignments, reconcileWeaponAssignments, resolvedWeaponAssignments,
@@ -1199,6 +1200,27 @@ export function loadGame(slot = 1): GameState | null {
         kind: 'info',
         important: true,
       });
+    }
+    // 시나리오 저장: 코드의 튜토리얼 버전과 다르면 해제하고 일반 모드로 잇는다 (짧으니 재시작이 정답)
+    if (parsed.scenario) {
+      const scenario = parsed.scenario;
+      const valid = scenario.id === 'tutorial'
+        && scenario.version === TUTORIAL_SCENARIO_VERSION
+        && Number.isInteger(scenario.stepIndex)
+        && scenario.stepIndex >= 0 && scenario.stepIndex <= TUTORIAL_STEPS.length
+        && scenario.flags != null && typeof scenario.flags === 'object';
+      if (!valid) {
+        parsed.scenario = null;
+        parsed.log ??= [];
+        parsed.log.push({
+          day: parsed.day,
+          text: '길잡이 시나리오가 갱신되어 이 저장은 일반 모드로 이어집니다. 새 길잡이는 메인 메뉴에서 시작할 수 있습니다.',
+          kind: 'info',
+          important: true,
+        });
+      }
+    } else {
+      parsed.scenario = null;
     }
     rebuildBuildingFootprints(parsed);
     reconcileResidentHomes(parsed, makeRng((parsed.seed ?? 1) + parsed.day * 32452843));

@@ -206,6 +206,7 @@ export function BuildDrawer({
                   key={type}
                   type="button"
                   className="build-drawer-item"
+                  data-tut={`build-item-${type}`}
                   aria-disabled={reason != null}
                   aria-describedby={tooltipType === type ? 'build-drawer-tooltip' : undefined}
                   aria-label={def.name}
@@ -234,6 +235,7 @@ export function BuildDrawer({
               key={category.id}
               type="button"
               className={`${open ? 'active' : ''}${placing ? ' placing' : ''}`}
+              data-tut={`build-cat-${category.id}`}
               title={`${category.label} 건설 목록${placing ? ' · 현재 배치 중' : ''}`}
               aria-controls="build-drawer-panel"
               aria-expanded={open}

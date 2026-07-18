@@ -124,6 +124,7 @@ export function DockFrame({
               key={item.id}
               type="button"
               className={`${open ? 'active' : ''}${pinned ? ' pinned' : ''}`}
+              data-tut={`dock-${item.id}`}
               aria-label={`${item.label} 창 ${open ? '닫기' : '열기'}`}
               aria-pressed={open}
               title={`${item.label}${pinned ? ' · 고정됨' : ''}`}

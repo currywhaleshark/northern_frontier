@@ -23,6 +23,7 @@ import {
   toggleStarredResource,
   type UiPrefs,
 } from '../ui/uiPrefs';
+import { currentScenarioStep } from '../game/scenario';
 import { TimeControls } from './TimeControls';
 import { ResourceBreakdownPopover } from './ResourceBreakdownPopover';
 import { ResourceIcon } from './TradeResourceIcon';
@@ -64,6 +65,7 @@ export function TopBar({
     ? Math.max(0, state.crackdownDeadline - state.day)
     : 0;
   const promotionTarget = state.victoryProgressNote ? nextRank(state.rank) : null;
+  const scenarioStep = currentScenarioStep(state);
   const spoilage = spoilagePreview(state);
   return (
     <div className="topbar">
@@ -145,12 +147,20 @@ export function TopBar({
           </div>
         )}
       </div>
-      {(tribute || state.crackdownDeadline > 0 || promotionTarget) && (
+      {(scenarioStep || tribute || state.crackdownDeadline > 0 || promotionTarget) && (
         <div className="topbar-objectives" aria-label="지속 관리 항목">
+          {scenarioStep && (
+            <div className="ongoing-objective scenario" title="길잡이 시나리오의 현재 목표">
+              <span className="objective-title">길잡이</span>
+              <span className="objective-deadline">{scenarioStep.title}</span>
+              <span className="objective-summary">{scenarioStep.goal(state)}</span>
+            </div>
+          )}
           {tribute && (
             <button
               type="button"
               className={`ongoing-objective tribute ${tributeRatio >= 1 ? 'ready' : tributeDays <= 10 ? 'urgent' : ''}`}
+              data-tut="tribute-chip"
               title="조정 창에서 세공고 비축량 관리"
               onClick={onOpenCourt}
             >

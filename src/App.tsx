@@ -66,9 +66,12 @@ import {
 } from './game/tacticalBattle';
 import { mergeHuntGroups, setHuntPreparationZone, splitHuntGroup } from './game/tacticalHunt';
 import type {
-  BuildingTypeId, CombatWeaponId, CropId, Difficulty, DryingProductId, JobId, LivestockId, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
+  BuildingTypeId, CombatWeaponId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
   PreparationActionId, PredatorKind, SpecialItemId, SpecialResidentId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
+import { markScenarioFlag } from './game/scenario';
+import { createTutorialGame } from './game/tutorialStart';
+import { TutorialCoach } from './components/TutorialCoach';
 import {
   loadUiPrefs,
   resetDockWindowLayout,
@@ -789,6 +792,8 @@ export default function App() {
     setSelected(null);
     setSelectedEntity({ kind: 'resident', id });
     setInspResidentId(id);
+    // 튜토리얼 1스텝(주민 선택) 달성 플래그
+    if (stateRef.current.scenario) markScenarioFlag(stateRef.current, 'residentSelected');
   };
 
   const handleClearSelection = useCallback(() => {
@@ -850,9 +855,9 @@ export default function App() {
   };
 
   // 선택 상태를 비우고 새 판을 시작
-  const startNewGame = (difficulty: Difficulty) => {
+  const enterGameWith = (state: GameState) => {
     setSimMode(false);
-    stateRef.current = newGame(undefined, difficulty);
+    stateRef.current = state;
     setSelected(null);
     setSelectedEntity(null);
     setPlacingType(null);
@@ -862,6 +867,14 @@ export default function App() {
     setSpeed(1);
     setScreen('game');
     bump();
+  };
+
+  const startNewGame = (difficulty: Difficulty) => {
+    enterGameWith(newGame(undefined, difficulty));
+  };
+
+  const startTutorial = () => {
+    enterGameWith(createTutorialGame());
   };
 
   // 상단 바의 "새 게임" → 메인 메뉴로
@@ -893,6 +906,7 @@ export default function App() {
         <MainMenu
           canContinue={canLoad}
           onStart={startNewGame}
+          onStartTutorial={startTutorial}
           onContinue={() => setSlotDialogMode('load')}
           onOpenBattleSim={() => setMenuView('battleSim')}
         />
@@ -1125,6 +1139,8 @@ export default function App() {
       ) : null}
 
       {slotDialog}
+
+      {state.scenario && <TutorialCoach state={state} />}
 
       {state.gameOver && (
         <div className="modal-overlay">
