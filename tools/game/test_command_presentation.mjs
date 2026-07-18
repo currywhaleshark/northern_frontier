@@ -38,6 +38,9 @@ const {
   tacticalQuickCommands,
 } = await import(pathToFileURL(join(componentDir, 'commandPresentation.mjs')).href);
 
+assert.equal(TACTICAL_QUICK_COMMAND_LIMIT, 3,
+  'the battlefield popover must reserve its fourth fixed slot for the full command board');
+
 const zones = [
   { id: 'approach', order: 0 },
   { id: 'wall', order: 1 },
@@ -93,7 +96,7 @@ function defenseBattle(groups, raiders = []) {
 function assertPartition(battle, group) {
   const available = tacticalAvailableCommands(battle, group);
   const { quick, more } = tacticalCommandPresentation(battle, group);
-  assert.ok(quick.length <= TACTICAL_QUICK_COMMAND_LIMIT, 'quick commands must never exceed four');
+  assert.ok(quick.length <= TACTICAL_QUICK_COMMAND_LIMIT, 'quick commands must never exceed three');
   assert.equal(new Set(quick).size, quick.length, 'quick commands must not contain duplicates');
   assert.equal(new Set(more).size, more.length, 'more commands must not contain duplicates');
   assert.equal(quick.some(command => more.includes(command)), false,

@@ -31,6 +31,7 @@ interface Props {
   onCommand: (command: TacticalCommandId) => void;
   onSetLine: (line: TacticalFormationLine) => void;
   onMoveZone: (zoneId: string) => void;
+  onOpenCommandBoard: () => void;
   onClose: (restoreFocus: boolean) => void;
 }
 
@@ -59,10 +60,26 @@ function TacticalPlacementSegment({
   onSetLine,
   onMoveZone,
 }: TacticalPlacementSegmentProps) {
-  if (hunt) {
-    return (
-      <div className="tactical-command-popover-segment" role="group" aria-label="길목 이동">
-        {battle.zones.filter(zone => zone.id !== 'huntDen').map(zone => {
+  const [expanded, setExpanded] = useState(false);
+  const huntZones = hunt ? battle.zones.filter(zone => zone.id !== 'huntDen') : [];
+  const canMove = hunt
+    ? huntZones.some(zone => zone.id !== group.zoneId)
+    : FORMATION_LINES.some(line =>
+      line !== displayedLine && tacticalFormationLineUnavailableReason(battle, group, line) == null);
+  if (!canMove) return null;
+
+  return (
+    <div className="tactical-command-placement">
+      <button
+        type="button"
+        className="tactical-command-placement-toggle"
+        aria-expanded={expanded}
+        title={expanded ? '배치 선택 접기' : '배치 선택 펼치기'}
+        onClick={() => setExpanded(value => !value)}
+      >배치 {expanded ? '▴' : '▾'}</button>
+      {expanded && (hunt ? (
+        <div className="tactical-command-popover-segment" role="group" aria-label="길목 이동">
+          {huntZones.map(zone => {
           const current = zone.id === group.zoneId;
           return (
             <button
@@ -76,28 +93,27 @@ function TacticalPlacementSegment({
               key={zone.id}
             >{zone.name}{!current && <small> ½</small>}</button>
           );
-        })}
-      </div>
-    );
-  }
-
-  return (
-    <div className="tactical-command-popover-segment" role="group" aria-label="전열 선택">
-      {FORMATION_LINES.map(line => {
-        const unavailableReason = tacticalFormationLineUnavailableReason(battle, group, line);
-        const active = displayedLine === line;
-        return (
-          <button
-            type="button"
-            className={active ? 'active' : ''}
-            aria-pressed={active}
-            disabled={unavailableReason != null}
-            title={unavailableReason ?? (line === group.line ? '현재 전열' : '다음 라운드 목표 전열')}
-            onClick={() => onSetLine(line)}
-            key={line}
-          >{lineLabel(line)}{group.pendingLine === line && line !== group.line && <small> 예약</small>}</button>
-        );
-      })}
+          })}
+        </div>
+      ) : (
+        <div className="tactical-command-popover-segment" role="group" aria-label="전열 선택">
+          {FORMATION_LINES.map(line => {
+            const unavailableReason = tacticalFormationLineUnavailableReason(battle, group, line);
+            const active = displayedLine === line;
+            return (
+              <button
+                type="button"
+                className={active ? 'active' : ''}
+                aria-pressed={active}
+                disabled={unavailableReason != null}
+                title={unavailableReason ?? (line === group.line ? '현재 전열' : '다음 라운드 목표 전열')}
+                onClick={() => onSetLine(line)}
+                key={line}
+              >{lineLabel(line)}{group.pendingLine === line && line !== group.line && <small> 예약</small>}</button>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -112,50 +128,47 @@ export function TacticalCommandPopover({
   onCommand,
   onSetLine,
   onMoveZone,
+  onOpenCommandBoard,
   onClose,
 }: Props) {
   const headerId = useId();
-  const descriptionId = useId();
-  const moreCommandsId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [hoveredCommand, setHoveredCommand] = useState<TacticalCommandId | null>(null);
   const active = tacticalActiveDefenderCount(group);
   const canCommand = tacticalGroupCanReceiveCommand(group);
   const displayedLine = group.pendingLine ?? group.line;
-  const { quick: quickCommands, more: moreCommands } = tacticalCommandPresentation(battle, group);
+  const { quick: quickCommands } = tacticalCommandPresentation(battle, group);
   const locationLabel = hunt
     ? battle.zones.find(zone => zone.id === group.zoneId)?.name ?? '길목 미정'
     : lineLabel(displayedLine);
-  const targetLabel = group.targetSource === 'player'
-    ? battle.raiderGroups.find(target => target.id === group.targetGroupId)?.label ?? '자동'
-    : '자동';
-  const commandSummary = !canCommand
-    ? '전투 명령 없음'
-    : group.command
-      ? `${group.commandSource === 'player' ? '지정' : '자동'}: ${commandLabel(group.command, group, hunt)}`
-      : '자동: 추천 대기';
-  const describedCommand = hoveredCommand ?? group.command;
-  const description = describedCommand
-    ? commandDescription(describedCommand, group, hunt)
-    : '명령을 선택하십시오';
+  const manualTargetLabel = !hunt && group.targetSource === 'player' && group.targetGroupId
+    ? battle.raiderGroups.find(target => target.id === group.targetGroupId)?.label ?? '지정 표적'
+    : null;
 
   useEffect(() => {
-    setExpanded(false);
-    setHoveredCommand(null);
     const root = rootRef.current;
     const current = root?.querySelector<HTMLButtonElement>('[data-current="true"]');
     (current ?? root?.querySelector<HTMLButtonElement>('button'))?.focus();
   }, [group.id]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Escape') return;
+    if (event.key !== 'Escape') {
+      const arrowKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+      if (!arrowKeys.includes(event.key)) return;
+      const buttons = Array.from(rootRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []);
+      const currentIndex = buttons.indexOf(event.target as HTMLButtonElement);
+      if (currentIndex < 0 || buttons.length < 2) return;
+      event.preventDefault();
+      const backwards = event.key === 'ArrowLeft' || event.key === 'ArrowUp';
+      const nextIndex = (currentIndex + (backwards ? -1 : 1) + buttons.length) % buttons.length;
+      buttons[nextIndex]?.focus();
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     onClose(true);
   };
   const stopStageClick = (event: MouseEvent<HTMLDivElement>) => event.stopPropagation();
-  const renderCommandButton = (command: TacticalCommandId, kind: 'quick' | 'more') => {
+  const renderCommandButton = (command: TacticalCommandId, kind: 'quick') => {
     const current = group.command === command;
     const label = commandLabel(command, group, hunt);
     const commandHelp = commandDescription(command, group, hunt);
@@ -168,10 +181,6 @@ export function TacticalCommandPopover({
         data-command-id={command}
         data-current={current}
         title={`${label} — ${commandHelp}`}
-        onMouseEnter={() => setHoveredCommand(command)}
-        onMouseLeave={() => setHoveredCommand(value => (value === command ? null : value))}
-        onFocus={() => setHoveredCommand(command)}
-        onBlur={() => setHoveredCommand(value => (value === command ? null : value))}
         onClick={() => onCommand(command)}
         key={command}
       >{label}</button>
@@ -193,20 +202,25 @@ export function TacticalCommandPopover({
           <strong id={headerId}>{group.label} {active}명</strong>
           <span aria-hidden="true">·</span>
           <span>{locationLabel}</span>
+          {manualTargetLabel && (
+            <em className="tactical-command-target-badge" title={`수동 표적: ${manualTargetLabel}`}>
+              🎯 {manualTargetLabel}
+            </em>
+          )}
           {group.ambushed && <em className="tactical-state-badge ambushed">매복중</em>}
         </div>
-        <small title={`${commandSummary}${!hunt && canCommand ? ` · 표적: ${targetLabel}` : ''}`}>
-          {commandSummary}{!hunt && canCommand && <> · 표적: {targetLabel}</>}
-        </small>
       </div>
 
       {!canCommand ? (
         <p className="tactical-command-popover-message">{group.commandable === false
-          ? '피난 주민은 보호 대상이며 전투 명령을 받지 않습니다.'
+          ? group.kind === 'healer'
+            ? '전술 치료반은 후열 보호 대상이며 같은 구역의 부상자를 자동 치료합니다.'
+            : '피난 주민은 보호 대상이며 전투 명령을 받지 않습니다.'
           : '이 부대는 전투 불능이어서 명령을 내릴 수 없습니다.'}</p>
       ) : (
         <div className="tactical-command-popover-body">
           <TacticalPlacementSegment
+            key={group.id}
             battle={battle}
             group={group}
             hunt={hunt}
@@ -217,38 +231,18 @@ export function TacticalCommandPopover({
 
           <div className="tactical-command-quick-grid" role="group" aria-label="빠른 명령">
             {quickCommands.map(command => renderCommandButton(command, 'quick'))}
-            {moreCommands.length > 0 && (
-              <button
-                type="button"
-                className={`tactical-command-more-toggle${quickCommands.length % 2 === 0 ? ' wide' : ''}`}
-                aria-controls={moreCommandsId}
-                aria-expanded={expanded}
-                aria-label={expanded ? '빠른 명령만 보기' : '나머지 명령 더보기'}
-                title={expanded ? '빠른 명령만 보기' : '나머지 유효 명령 보기'}
-                onClick={() => setExpanded(value => !value)}
-              >{expanded ? '간략히' : '···'}</button>
-            )}
+            <button
+              type="button"
+              className="tactical-command-more-toggle"
+              aria-label="전체 명령판 열기"
+              title="하단 전체 명령판 열기"
+              onClick={onOpenCommandBoard}
+            >···</button>
           </div>
 
-          {expanded && moreCommands.length > 0 && (
-            <div
-              className="tactical-command-more-list"
-              id={moreCommandsId}
-              role="group"
-              aria-label="나머지 명령"
-            >
-              {moreCommands.map(command => renderCommandButton(command, 'more'))}
-            </div>
-          )}
-
-          {quickCommands.length === 0 && moreCommands.length === 0 && (
+          {quickCommands.length === 0 && (
             <p className="tactical-command-popover-message">지금 내릴 수 있는 명령이 없습니다.</p>
           )}
-          <p
-            className="tactical-command-popover-description"
-            id={descriptionId}
-            aria-live="polite"
-          >{description}</p>
         </div>
       )}
     </div>

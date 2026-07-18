@@ -112,28 +112,37 @@ assert.match(popoverSource, /tacticalCommandPresentation\(battle, group\)/,
 assert.doesNotMatch(popoverSource, /COMMAND_LABELS|const\s+commandDescription/,
   'the popover must not duplicate command strings');
 assert.match(popoverSource, /quickCommands\.map\(command => renderCommandButton\(command, 'quick'\)\)/,
-  'the collapsed popover must render only the prioritized quick commands');
-assert.match(popoverSource, /expanded && moreCommands\.length > 0[\s\S]*moreCommands\.map\(command => renderCommandButton\(command, 'more'\)\)/,
-  'More must expand the remaining command list inside the same popover');
-assert.doesNotMatch(popoverSource, /<small>\{commandDescription|tactical-command-popover-footer/,
-  'the popover must not repeat a persistent description under every command or keep the legacy footer');
+  'the quick-action strip must render only the prioritized quick commands');
+assert.match(popoverSource,
+  /quickCommands\.map\(command => renderCommandButton\(command, 'quick'\)\)[\s\S]*className="tactical-command-more-toggle"[\s\S]*onClick=\{onOpenCommandBoard\}/,
+  'the fixed final More slot must open the lower command board after the quick commands');
+assert.doesNotMatch(popoverSource, /moreCommands|tactical-command-more-list/,
+  'the quick-action strip must not nest the remaining command list');
+assert.doesNotMatch(popoverSource,
+  /commandSummary|표적:\s*자동|자동:\s*추천 대기|tactical-command-popover-description/,
+  'the popover must omit automatic summaries, automatic target text, and persistent descriptions');
 assert.doesNotMatch(popoverSource, /적 부대를 클릭하면 집중 표적|전체 명령은 아래 명령판에서/,
   'the compact popover must remove repetitive targeting and lower-panel instructions');
-assert.match(popoverSource, /className="tactical-command-popover-description"[\s\S]*aria-live="polite"/,
-  'one live description region must serve hovered and focused commands');
 assert.match(popoverSource, /aria-label=\{`\$\{label\}: \$\{commandHelp\}`\}[\s\S]*title=\{`\$\{label\} — \$\{commandHelp\}`\}/,
   'command buttons must retain explicit accessible labels and tooltip descriptions');
 assert.match(popoverSource, /function TacticalPlacementSegment\([\s\S]*<TacticalPlacementSegment/,
   'formation and hunt-route selection must remain an independently replaceable placement component');
 assert.match(popoverSource,
-  /setExpanded\(false\);\s*setHoveredCommand\(null\);[\s\S]*\}, \[group\.id\]\);/,
-  'changing groups must reset expanded and preview state');
+  /function TacticalPlacementSegment\([\s\S]*useState\(false\)[\s\S]*aria-expanded=\{expanded\}[\s\S]*배치/,
+  'placement controls must start collapsed behind an explicit toggle');
+assert.match(popoverSource, /if \(!canMove\) return null;/,
+  'placement controls must disappear when the group cannot move anywhere');
+assert.match(popoverSource,
+  /manualTargetLabel[\s\S]*targetSource === 'player'[\s\S]*targetGroupId[\s\S]*tactical-command-target-badge/,
+  'only a persisted manual target may add a compact header badge');
 assert.match(popoverSource, /event\.key !== 'Escape'[\s\S]*onClose\(true\)/,
   'Escape must continue closing the popover with focus restoration requested');
+assert.match(popoverSource, /ArrowLeft[\s\S]*ArrowRight[\s\S]*ArrowUp[\s\S]*ArrowDown[\s\S]*\.focus\(\)/,
+  'arrow keys must move focus between quick-action controls');
 assert.match(popoverSource, /피난 주민은 보호 대상이며 전투 명령을 받지 않습니다/,
   'civilian groups must retain the description-only protection mode');
-assert.match(screenSource, /tactical-command-hint\$\{commandPopover \? ' popover-open' : ''\}/,
-  'the lower-panel hint must visually recede while the popover owns command explanation');
+assert.match(popoverSource, /전술 치료반은 후열 보호 대상이며[\s\S]*자동 치료/,
+  'healer groups must retain their distinct non-command explanation');
 assert.match(screenSource, /<div className="tactical-stage-shell" ref=\{stageShellRef\}/,
   'the stage shell must own the popover positioning reference');
 assert.ok(screenSource.indexOf('<TacticalCommandPopover') > screenSource.indexOf('<div className="tactical-battlefield"'),
@@ -144,6 +153,13 @@ assert.match(screenSource, /assignCommandTo\(popoverGroup\.id, command\)/,
   'popover commands must target their explicit group instead of a selected-group closure');
 assert.match(screenSource, /popoverAnchorRef\.current\?\.focus\(\)/,
   'Escape closing must restore focus to the battlefield unit anchor');
+assert.match(screenSource,
+  /const openCommandBoard = \(\)[\s\S]*setCommandPopover\(null\)[\s\S]*commandBoardRef\.current\?\.querySelector<HTMLButtonElement>\('button:not\(:disabled\)'\)\?\.focus\(\)/,
+  'More must close the popover while preserving selection and focus the first enabled full command');
+assert.match(screenSource, /onOpenCommandBoard=\{openCommandBoard\}/,
+  'the popover More slot must route to the lower full command board');
+assert.match(screenSource, /ref=\{commandBoardRef\}[\s\S]*command-board-emphasis/,
+  'opening the full board must visibly emphasize the lower command path');
 assert.match(zoneSource, /onSelectGroup\(group\.id, event\.currentTarget\)/,
   'battlefield selection must pass its unit element as the popover anchor');
 assert.match(zoneSource, /\.\.\.formationStackStyle\(stackIndex, lineGroups\.length\)[\s\S]*zIndex:\s*80/,

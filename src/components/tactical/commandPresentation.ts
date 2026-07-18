@@ -9,7 +9,7 @@ import type {
   TacticalDefenderGroup,
 } from '../../game/types';
 
-export const TACTICAL_QUICK_COMMAND_LIMIT = 4;
+export const TACTICAL_QUICK_COMMAND_LIMIT = 3;
 
 const CONTEXT_COMMANDS: readonly TacticalCommandId[] = [
   'reinforceRear',

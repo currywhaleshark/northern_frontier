@@ -221,6 +221,8 @@ export function TacticalBattleScreen({
   const viewportRef = useRef<HTMLDivElement>(null);
   const stageShellRef = useRef<HTMLDivElement>(null);
   const popoverAnchorRef = useRef<HTMLElement | null>(null);
+  const commandBoardRef = useRef<HTMLDivElement>(null);
+  const commandBoardAttentionTimerRef = useRef<number | null>(null);
   const nextPendingTimerRef = useRef<number | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(() => battle
     ? nextActiveTacticalGroupId(battle.defenderGroups, null) ?? battle.defenderGroups[0]?.id ?? null
@@ -231,6 +233,7 @@ export function TacticalBattleScreen({
   const [stingerRound, setStingerRound] = useState<number | null>(null);
   const [fast, setFast] = useState(false);
   const [commandPopover, setCommandPopover] = useState<CommandPopoverState | null>(null);
+  const [commandBoardEmphasis, setCommandBoardEmphasis] = useState(false);
   const [nextPendingGroupId, setNextPendingGroupId] = useState<string | null>(null);
   const fastRef = useRef(false);
   const preparationPlayback = battle?.phase === 'preparationExecution';
@@ -246,6 +249,22 @@ export function TacticalBattleScreen({
     if (options?.restoreFocus) popoverAnchorRef.current?.focus();
   };
 
+  const openCommandBoard = () => {
+    setCommandPopover(null);
+    setCommandBoardEmphasis(false);
+    window.requestAnimationFrame(() => {
+      setCommandBoardEmphasis(true);
+      commandBoardRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+      if (commandBoardAttentionTimerRef.current != null) {
+        window.clearTimeout(commandBoardAttentionTimerRef.current);
+      }
+      commandBoardAttentionTimerRef.current = window.setTimeout(() => {
+        setCommandBoardEmphasis(false);
+        commandBoardAttentionTimerRef.current = null;
+      }, 1200);
+    });
+  };
+
   const pulseNextPending = (groupId: string) => {
     if (nextPendingTimerRef.current != null) window.clearTimeout(nextPendingTimerRef.current);
     setNextPendingGroupId(groupId);
@@ -257,6 +276,9 @@ export function TacticalBattleScreen({
 
   useEffect(() => () => {
     if (nextPendingTimerRef.current != null) window.clearTimeout(nextPendingTimerRef.current);
+    if (commandBoardAttentionTimerRef.current != null) {
+      window.clearTimeout(commandBoardAttentionTimerRef.current);
+    }
   }, []);
 
   useEffect(() => {
@@ -715,6 +737,7 @@ export function TacticalBattleScreen({
                 setViewedZoneId(zoneId);
                 closePopover();
               }}
+              onOpenCommandBoard={openCommandBoard}
               onClose={restoreFocus => closePopover({ restoreFocus })}
             />
           )}
@@ -1004,13 +1027,19 @@ export function TacticalBattleScreen({
                         })}
                       </div>
                     )}
-                    <div className="tactical-command-bar" role="group" aria-label={`${selectedGroup.label} 명령 선택`}>
+                    <div
+                      ref={commandBoardRef}
+                      className={`tactical-command-bar${commandBoardEmphasis ? ' command-board-emphasis' : ''}`}
+                      role="group"
+                      aria-label={`${selectedGroup.label} 명령 선택`}
+                    >
                       {tacticalSupportedCommands(battle).map(command => {
                         const unavailableReason = tacticalCommandUnavailableReason(battle, selectedGroup, command);
                         return (
                           <button
                             key={command}
                             className={selectedGroup.command === command ? 'active' : ''}
+                            aria-pressed={selectedGroup.command === command}
                             disabled={unavailableReason != null}
                             title={unavailableReason ?? commandDescription(command, selectedGroup, hunt)}
                             onMouseEnter={() => setHoveredCommand(command)}
@@ -1031,7 +1060,7 @@ export function TacticalBattleScreen({
                       >자동 표적</button>
                     )}
                   </div>
-                  <div className={`tactical-command-hint${commandPopover ? ' popover-open' : ''}`}>
+                  <div className="tactical-command-hint">
                     {commandHint}
                   </div>
                 </>
