@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import ts from 'typescript';
 
 function compileGameModules() {
@@ -338,8 +338,7 @@ function recordTrade(metrics, negotiation) {
   metrics.given[negotiation.give] = (metrics.given[negotiation.give] ?? 0) + negotiation.giveAmt;
 }
 
-function tryProactiveTrade(state, metrics) {
-  const target = chooseTradeTarget(state);
+function tryTradeForTarget(state, metrics, target) {
   if (!target) return false;
   let best = null;
   for (const faction of ordinaryFactions) {
@@ -364,6 +363,10 @@ function tryProactiveTrade(state, metrics) {
   recordTrade(metrics, negotiation);
   simulation.resolveChoice(state, 'confirm');
   return true;
+}
+
+function tryProactiveTrade(state, metrics) {
+  return tryTradeForTarget(state, metrics, chooseTradeTarget(state));
 }
 
 function handleIncomingTrade(state, metrics) {
@@ -669,34 +672,71 @@ function summarize(mode, results) {
   };
 }
 
-const modes = requestedModes?.length ? requestedModes : ['passive', 'active'];
-const allResults = {};
-for (const mode of modes) {
-  const results = [];
-  for (let i = 0; i < runs; i++) results.push(runOne(seedBase + i, mode));
-  allResults[mode] = results;
-  console.log(JSON.stringify(summarize(mode, results), null, 2));
-}
+export const releaseAutoplayContext = {
+  simulation,
+  buildings,
+  events,
+  tradeValues,
+  consumption,
+  residents,
+  workerSlots,
+  tributeReserve,
+  relations,
+  CONFIG,
+  FACTIONS,
+};
 
-const interesting = (allResults.active ?? [])
-  .filter(result => !result.censored)
-  .sort((a, b) => a.survivedDays - b.survivedDays)
-  .slice(0, 5)
-  .map(result => ({
-    seed: result.seed,
-    years: result.years,
-    reason: result.reason,
-    population: result.population,
-    deaths: result.deaths,
-    trades: result.trades,
-    raids: result.raids,
-    minFoodDays: result.minFoodDays,
-    minFuelDays: result.minFuelDays,
-  }));
-console.log(JSON.stringify({ activeEarlyFailures: interesting }, null, 2));
-if (trace) {
-  console.log(JSON.stringify({
-    passiveTrace: allResults.passive?.[0],
-    activeTrace: allResults.active?.[0],
-  }, null, 2));
+export { load as loadCompiledGameModule };
+export {
+  placementCandidates,
+  tryQueueBuilding,
+  manageConstruction,
+  rebalanceJobs,
+  handleChoice,
+  emptyMetrics,
+  reserveForTribute,
+  tryProactiveTrade,
+  tryTradeForTarget,
+  firstEnabledOption,
+  living,
+  housingCapacity,
+  foodDays,
+  fuelDays,
+  clothingTotal,
+  builtCount,
+  plannedCount,
+};
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const modes = requestedModes?.length ? requestedModes : ['passive', 'active'];
+  const allResults = {};
+  for (const mode of modes) {
+    const results = [];
+    for (let i = 0; i < runs; i++) results.push(runOne(seedBase + i, mode));
+    allResults[mode] = results;
+    console.log(JSON.stringify(summarize(mode, results), null, 2));
+  }
+
+  const interesting = (allResults.active ?? [])
+    .filter(result => !result.censored)
+    .sort((a, b) => a.survivedDays - b.survivedDays)
+    .slice(0, 5)
+    .map(result => ({
+      seed: result.seed,
+      years: result.years,
+      reason: result.reason,
+      population: result.population,
+      deaths: result.deaths,
+      trades: result.trades,
+      raids: result.raids,
+      minFoodDays: result.minFoodDays,
+      minFuelDays: result.minFuelDays,
+    }));
+  console.log(JSON.stringify({ activeEarlyFailures: interesting }, null, 2));
+  if (trace) {
+    console.log(JSON.stringify({
+      passiveTrace: allResults.passive?.[0],
+      activeTrace: allResults.active?.[0],
+    }, null, 2));
+  }
 }
