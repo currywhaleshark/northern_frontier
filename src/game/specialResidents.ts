@@ -40,8 +40,7 @@ export interface SpecialResidentDefinition {
   benefit: string;
   risk: string;
   skills?: readonly SpecialResidentSkill[];
-  // 전용 삽화가 있는 인물만. 없으면 사건 모달은 글로만 나온다.
-  illustration?: { src: string; alt: string };
+  illustration: { src: string; alt: string };
 }
 
 export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
@@ -161,6 +160,10 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
         effect: `백전의 사냥 솜씨. 전술 기본 전력 +${CONFIG.specialResidents.tigerHunterBasePowerBonus}.`,
       },
     ],
+    illustration: {
+      src: '/assets/events/special-tiger-hunter-bak-v1.png',
+      alt: '눈 쌓인 산길에서 외눈으로 범 발자국을 살피는 착호 포수 박돌개',
+    },
   },
   {
     id: 'geomancer',
@@ -182,6 +185,10 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
         effect: `그가 마을에 있으면 모든 채광 산출 +${Math.round(CONFIG.specialResidents.geomancerMiningYieldBonus * 100)}%, 은맥을 알아볼 확률이 크게 오른다.`,
       },
     ],
+    illustration: {
+      src: '/assets/events/special-geomancer-heo-v1.png',
+      alt: '북방 광산 어귀에서 지팡이로 바위의 맥을 짚는 맹인 지관 허생',
+    },
   },
   {
     id: 'uinyeo',
@@ -209,6 +216,10 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
         effect: `그가 살아 있으면 역병이 번질 확률이 ${Math.round((1 - CONFIG.specialResidents.uinyeoEpidemicSpreadMult) * 100)}% 줄어든다.`,
       },
     ],
+    illustration: {
+      src: '/assets/events/special-uinyeo-dansim-v1.png',
+      alt: '눈 덮인 개척지 의원에서 병자를 치료하는 내의원 의녀 단심',
+    },
   },
   {
     id: 'runawaySmith',
@@ -230,6 +241,10 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
         effect: `병장기를 만들던 손. 자신의 대장간 작업 산출 +${Math.round((CONFIG.specialResidents.runawaySmithSmithyMult - 1) * 100)}%.`,
       },
     ],
+    illustration: {
+      src: '/assets/events/special-runaway-smith-maksoe-v1.png',
+      alt: '밤의 대장간에서 추노꾼을 경계하며 쇠를 두드리는 도망 야장 막쇠',
+    },
   },
   {
     id: 'interpreter',
@@ -251,6 +266,10 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
         effect: `여진 세력과의 관계 상승량 +${Math.round((CONFIG.specialResidents.interpreterRelationGainMult - 1) * 100)}%.`,
       },
     ],
+    illustration: {
+      src: '/assets/events/special-interpreter-bae-v1.png',
+      alt: '북방 관아에서 여진 사절과 조선 관리 사이의 말을 옮기는 퇴역 역관 배수겸',
+    },
   },
   {
     id: 'hangwae',
@@ -278,6 +297,10 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
         effect: `그가 마을에 있으면 모든 조총 사수의 화약 소모가 ${Math.round((1 - CONFIG.specialResidents.hangwaePowderMult) * 100)}% 줄어든다.`,
       },
     ],
+    illustration: {
+      src: '/assets/events/special-hangwae-sayaka-v1.png',
+      alt: '조선식 군복과 전립을 갖추고 철포를 든 백발의 항왜 철포수 사야카',
+    },
   },
 ] as const;
 
@@ -535,7 +558,7 @@ function maybeOfferSimpleArrival(state: GameState, rng: () => number, spec: Simp
     kind: 'specialResident',
     title: spec.title,
     body: spec.body,
-    ...(definition.illustration ? { illustration: definition.illustration } : {}),
+    illustration: definition.illustration,
     options: [
       {
         id: 'accept',
@@ -903,6 +926,7 @@ export function maybeOpenTigerHunterFollowup(state: GameState, rng: () => number
     body:
       '이웃 고을에 범이 내려와 사람이 상했다는 장계가 돌았습니다.\n' +
       '조정은 이름난 포수 박돌개를 착호에 보내라 명합니다. 보내면 공은 크지만, 늙은 포수가 성할 리 없습니다.',
+    illustration: specialResidentDefinition('tigerHunter').illustration,
     options: [
       {
         id: 'comply',
@@ -933,6 +957,7 @@ export function maybeOpenRunawaySmithFollowup(state: GameState, rng: () => numbe
     body:
       '몽둥이를 든 사내들이 막쇠의 얼굴이 그려진 방을 들이밀며 대장간을 에워쌌습니다.\n' +
       '남쪽 대갓집이 보낸 추노꾼입니다. 몸값을 치르거나, 내어주거나, 내쫓아야 합니다.',
+    illustration: specialResidentDefinition('runawaySmith').illustration,
     options: [
       {
         id: 'pay',
@@ -965,6 +990,7 @@ export function maybeOpenHangwaeFollowup(state: GameState, rng: () => number): b
     body:
       '변방 성책에 왜인이 숨어 산다는 상소가 조정에 올라갔습니다.\n' +
       '사야카를 한양으로 압송하라는 공문이 내려왔습니다. 내어주면 의심은 덜지만 철포의 명수를 잃습니다.',
+    illustration: specialResidentDefinition('hangwae').illustration,
     options: [
       {
         id: 'surrender',
@@ -1002,6 +1028,7 @@ export function maybeOpenUinyeoFollowup(state: GameState, rng: () => number): bo
     body:
       '궁중 독살 사건의 진범이 잡혔다는 소식이 북방까지 닿았습니다.\n' +
       '단심의 죄가 씻겼으니 원하면 반가로 돌아갈 수 있습니다. 돌려보내면 의원의 손은 잃지만 조정은 이 개척지의 후의를 기억할 것입니다.',
+    illustration: specialResidentDefinition('uinyeo').illustration,
     options: [
       {
         id: 'return',

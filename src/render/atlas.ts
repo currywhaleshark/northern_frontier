@@ -857,7 +857,7 @@ function drawWallFamilyBuilding(ctx: CanvasRenderingContext2D, p: BuildingDrawPa
 }
 
 export const atlasSprites: SpriteAPI = {
-  id: 'kenney-atlas-river-mask-historical-ground-generated-objects-buildings-promotion-specialized-special-residents-v1',
+  id: 'kenney-atlas-river-mask-historical-ground-generated-objects-buildings-promotion-specialized-special-residents-v2',
 
   drawTerrain(ctx, p) {
     if (!sheet) return;

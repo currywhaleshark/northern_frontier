@@ -3,9 +3,9 @@ import type { SpecialResidentId } from '../game/types';
 export const SPECIAL_RESIDENT_SHEET = {
   residentWidth: 28,
   spriteHeight: 40,
-  columns: 4,
+  columns: 10,
   rows: 1,
-  src: '/assets/special-residents-v1.png',
+  src: '/assets/special-residents-v2.png',
 } as const;
 
 // 전용 스프라이트가 있는 인물만 등록한다. 없는 특수 주민은 직업 스프라이트로 폴백.
@@ -14,6 +14,12 @@ const COLUMNS: Partial<Record<SpecialResidentId, number>> = {
   nosung: 1,
   exiledScholar: 2,
   jurchenWarrior: 3,
+  tigerHunter: 4,
+  geomancer: 5,
+  uinyeo: 6,
+  runawaySmith: 7,
+  interpreter: 8,
+  hangwae: 9,
 };
 
 export function specialResidentSourceRect(id: SpecialResidentId) {

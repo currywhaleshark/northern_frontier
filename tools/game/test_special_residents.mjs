@@ -69,8 +69,7 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
     'mudang', 'nosung', 'exiledScholar', 'jurchenWarrior',
     'tigerHunter', 'geomancer', 'uinyeo', 'runawaySmith', 'interpreter', 'hangwae',
   ]);
-  assert.ok(roster.every(resident =>
-    !resident.illustration || resident.illustration.src.startsWith('/assets/events/special-')));
+  assert.ok(roster.every(resident => resident.illustration.src.startsWith('/assets/events/special-')));
 
   // 종교인은 존재 자체가 능력이라 스킬이 없고, 나머지 특수 주민은 패시브 스킬을 최소 하나 가진다
   for (const definition of roster) {
@@ -289,10 +288,9 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
 
 {
   const root = fileURLToPath(new URL('../../', import.meta.url));
-  const sheet = pngSize(join(root, 'public/assets/special-residents-v1.png'));
-  assert.deepEqual(sheet, { width: 28 * 4, height: 40 });
+  const sheet = pngSize(join(root, 'public/assets/special-residents-v2.png'));
+  assert.deepEqual(sheet, { width: 28 * 10, height: 40 });
   for (const definition of specialResidents.SPECIAL_RESIDENT_ROSTER) {
-    if (!definition.illustration) continue; // 신규 인물은 아직 전용 삽화가 없다
     const art = pngSize(join(root, 'public', definition.illustration.src));
     assert.ok(Math.abs(art.width / art.height - 3) < 0.01, `${definition.id} event art remains 3:1`);
   }
