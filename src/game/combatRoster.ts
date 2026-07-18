@@ -41,7 +41,7 @@ export function combatRoleForResident(resident: Pick<Resident, 'job'>): CombatRo
 }
 
 function physicallyReady(state: GameState, resident: Resident): boolean {
-  return resident.alive && !resident.sick && resident.health >= 20 &&
+  return resident.alive && !resident.stage && !resident.sick && resident.health >= 20 &&
     state.day >= (resident.quarantinedUntil ?? 0);
 }
 

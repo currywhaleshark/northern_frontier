@@ -11,7 +11,8 @@ export function haulerCarryCapacity(
   const base = resident.job === 'hauler' && resident.cartEquipped
     ? CONFIG.agents.haulerCartCarryCap
     : CONFIG.agents.haulerCarryCap;
-  // 미취학 아이의 심부름은 반몫이다
+  // 어린이 심부름과 소년 운반 노동은 각각 명시된 반몫만 적용한다.
+  if (resident.stage === 'youth') return base * CONFIG.lifecycle.youthWorkEfficiency;
   return resident.stage ? base * CONFIG.education.childLaborMult : base;
 }
 

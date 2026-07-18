@@ -5,6 +5,7 @@
 import { CONFIG } from './config';
 import { assignedWorkers } from './workerSlots';
 import type { GameState, JobId, Resident } from './types';
+import { youthActivityOf } from './youth';
 
 // 문해자 전용 관직 — 글을 모르면 맡을 수 없다
 export const LITERATE_JOBS: readonly JobId[] = ['physician', 'clerk', 'teacher'];
@@ -38,7 +39,8 @@ export function enrolledStudentIds(state: GameState): Set<number> {
   const seats = schoolSeatCount(state);
   if (seats <= 0) return new Set();
   const students = state.residents
-    .filter(isSchoolAge)
+    .filter(resident => isSchoolAge(resident)
+      && (resident.stage === 'child' || youthActivityOf(resident) === 'school'))
     .sort((a, b) => {
       const stageRank = (resident: Resident) => resident.stage === 'youth' ? 0 : 1;
       return stageRank(a) - stageRank(b) || a.id - b.id;
@@ -53,14 +55,34 @@ export function dailyEducationTick(state: GameState): void {
   if (enrolled.size === 0) return;
   for (const resident of state.residents) {
     if (!enrolled.has(resident.id)) continue;
-    resident.education = Math.min(CONFIG.education.schoolingDays, (resident.education ?? 0) + 1);
+    resident.education = Math.min(
+      CONFIG.education.schoolDaysForAdultBonus,
+      (resident.education ?? 0) + CONFIG.education.schoolProgressPerDay,
+    );
   }
 }
 
 // 성인 전환 시 — 취학 일수를 채웠으면 문해자가 된다 (lifecycle에서 호출)
-export function settleEducationOnAdulthood(resident: Resident): void {
-  resident.literate = (resident.education ?? 0) >= CONFIG.education.schoolingDays;
+export function settleEducationOnAdulthood(resident: Resident): boolean {
+  if (resident.education == null) {
+    delete resident.youthActivity;
+    return false;
+  }
+  const completed = resident.education >= CONFIG.education.schoolDaysForAdultBonus;
+  resident.literate = completed;
+  if (completed) {
+    resident.skills.clerk = Math.max(
+      resident.skills.clerk ?? 0,
+      CONFIG.education.schoolAdultSkillBonus,
+    );
+    resident.skills.teacher = Math.max(
+      resident.skills.teacher ?? 0,
+      CONFIG.education.schoolAdultSkillBonus,
+    );
+  }
   resident.education = undefined;
+  delete resident.youthActivity;
+  return completed;
 }
 
 // 문해자의 숙련 성장 배율

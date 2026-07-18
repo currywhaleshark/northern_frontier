@@ -81,11 +81,11 @@ function healthyState(seed) {
   assert.equal(kid.age, L.adultAge);
 }
 
-// ── 아이는 일을 맡길 수 없다 ──
+// ── 어린이는 일을 맡길 수 없다 (소년은 별도 제한 직무 정책) ──
 {
   const state = healthyState(2026071722);
   const kid = state.residents[0];
-  lifecycle.applyLifeStage(kid, 'youth');
+  lifecycle.applyLifeStage(kid, 'child');
   simulation.setResidentJob(state, kid.id, 'farmer');
   assert.equal(kid.job, 'idle', 'children cannot take jobs');
 }

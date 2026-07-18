@@ -6,7 +6,7 @@ import {
   advanceDay, advanceTick, autoAssignWorkersToBuildingTypes, cancelBuildingConstruction, continueAfterVictory, demolishBuilding, newGame, reassignJob, resolveChoice, setResidentJob,
   setBuildingCrop, setDryingProduct, setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
   assignPlotPlowOxen, setLivestockSpecies, slaughterLivestock,
-  convertFieldToPaddy, toggleResidentCart,
+  convertFieldToPaddy, setYouthActivity, toggleResidentCart,
   unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
 import { hasAnySave, loadGame, saveGame } from './game/saveLoad';
@@ -66,7 +66,7 @@ import {
 } from './game/tacticalBattle';
 import { mergeHuntGroups, setHuntPreparationZone, splitHuntGroup } from './game/tacticalHunt';
 import type {
-  BuildingTypeId, CombatWeaponId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId,
+  BuildingTypeId, CombatWeaponId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId, YouthActivity,
   PreparationActionId, PredatorKind, SpecialItemId, SpecialResidentId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
 import { markScenarioFlag } from './game/scenario';
@@ -366,6 +366,12 @@ export default function App() {
 
   const handleSetResidentJob = (id: number, job: JobId) => {
     setResidentJob(stateRef.current, id, job);
+    bump();
+  };
+
+  const handleSetYouthActivity = (id: number, activity: YouthActivity) => {
+    const error = setYouthActivity(stateRef.current, id, activity);
+    if (error) addLog(stateRef.current, error, 'info');
     bump();
   };
 
@@ -937,6 +943,7 @@ export default function App() {
           selectedEntity={selectedEntity}
           onClear={handleClearSelection}
           onSetResidentJob={handleSetResidentJob}
+          onSetYouthActivity={handleSetYouthActivity}
           onToggleResidentCart={handleToggleResidentCart}
           onUpgradeHousing={handleUpgradeHousing}
           onSetSmithyProduct={handleSetSmithyProduct}

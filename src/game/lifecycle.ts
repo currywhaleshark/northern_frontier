@@ -10,6 +10,7 @@ import { hasResidentMonk } from './morale';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
 import { killResident, livingResidents, rollResidentName } from './residents';
 import { getDayOfYear, getSeason } from './seasons';
+import { youthLaborMult } from './youth';
 import type { Building, Corpse, GameState, LifeStage, Resident } from './types';
 
 export const LIFE_STAGE_ORDER: LifeStage[] = ['infant', 'child', 'youth'];
@@ -51,6 +52,12 @@ export function applyLifeStage(resident: Resident, stage: LifeStage): void {
   resident.assignedBuildingId = null;
   resident.skills = {};
   resident.task = LIFE_STAGE_NAMES[stage];
+  if (stage === 'youth') {
+    resident.youthActivity = 'work';
+    resident.education ??= 0;
+  } else {
+    delete resident.youthActivity;
+  }
 }
 
 // ── 성장 (일일) ──────────────────────────────────────────
@@ -73,11 +80,11 @@ function growStages(state: GameState): void {
     r.age = l.adultAge;
     r.job = 'idle';
     r.task = '무직';
-    settleEducationOnAdulthood(r);
+    const educationResult = settleEducationOnAdulthood(r);
     addLog(
       state,
-      r.literate
-        ? `${r.name}이(가) 글을 깨친 어른으로 자랐습니다. 의원·아전·훈장을 맡을 수 있습니다.`
+      educationResult
+        ? `${r.name}이(가) 글을 깨친 어른으로 자랐습니다. 의원·아전·훈장을 맡을 수 있고, 아전·훈장 일을 시작할 밑천도 닦았습니다.`
         : `${r.name}이(가) 어엿한 한 사람 몫의 일손으로 자랐습니다.`,
       'good', true,
     );
@@ -107,6 +114,14 @@ function ageResidents(state: GameState, rng: () => number): void {
 export function elderLaborMult(resident: Pick<Resident, 'age' | 'stage'>): number {
   if (resident.stage) return 1;
   return resident.age >= CONFIG.lifecycle.elderLaborAge ? CONFIG.lifecycle.elderLaborMult : 1;
+}
+
+// 연령 단계 노동 효율의 단일 진입점. 소년과 노년 보정을 별도 위치에서 중복 곱하지 않는다.
+export function laborEfficiencyMult(
+  resident: Pick<Resident, 'age' | 'stage' | 'youthActivity'>,
+): number {
+  if (resident.stage) return youthLaborMult(resident);
+  return elderLaborMult(resident);
 }
 
 // ── 혼인 ────────────────────────────────────────────────

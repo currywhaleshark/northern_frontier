@@ -1,6 +1,7 @@
 import { isJobUnlocked } from './constants';
 import { CONFIG } from './config';
 import { isBuildingUnlocked, isPlotBuildingType, plotArea } from './buildings';
+import { canResidentTakeJob } from './youth';
 import type { Building, BuildingTypeId, GameState, JobId, Resident } from './types';
 
 export interface WorkerSlotConfig {
@@ -37,7 +38,7 @@ export const SLOTTED_BUILDING_CONFIG: Partial<Record<BuildingTypeId, WorkerSlotC
 };
 
 function isWorkableResident(state: GameState, resident: Resident | undefined): resident is Resident {
-  return resident != null && resident.alive && !resident.sick && !resident.stage &&
+  return resident != null && resident.alive && !resident.sick && canResidentTakeJob(resident, resident.job) &&
     state.day >= (resident.quarantinedUntil ?? 0) && resident.health >= 20;
 }
 
@@ -199,6 +200,11 @@ export function canAssignResidentToBuilding(
   const config = workerSlotConfig(building.type);
   if (!config) return 'building has no worker slots';
   if (!isJobUnlocked(state.rank, config.job)) return 'job is locked by rank';
+  if (!canResidentTakeJob(resident, config.job)) {
+    return resident.stage === 'youth'
+      ? '이 일은 소년에게 맡길 수 없습니다'
+      : '아직 일을 맡길 수 없는 나이입니다';
+  }
 
   const assigned = assignedWorkers(state, building);
   if (

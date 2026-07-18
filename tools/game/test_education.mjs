@@ -78,6 +78,7 @@ function addChild(state, stage) {
   state.rank = 'jin'; // 서당·훈장 해금
   addSchoolWithTeacher(state);
   const child = addChild(state, 'youth');
+  child.youthActivity = 'school';
   assert.ok(education.enrolledStudentIds(state).has(child.id), 'child takes a school seat');
   for (let day = 0; day < CONFIG.education.schoolingDays; day++) education.dailyEducationTick(state);
   assert.equal(child.education, CONFIG.education.schoolingDays);
@@ -109,6 +110,7 @@ function addChild(state, stage) {
   state.rank = 'jin'; // 서당·훈장 해금
   addSchoolWithTeacher(state);
   const youths = [addChild(state, 'youth'), addChild(state, 'youth')];
+  youths.forEach(youth => { youth.youthActivity = 'school'; });
   const children = [];
   for (let i = 0; i < CONFIG.education.seatsPerTeacher; i++) children.push(addChild(state, 'child'));
   const enrolled = education.enrolledStudentIds(state);

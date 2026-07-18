@@ -57,6 +57,7 @@ import { dailyClaimTensionTick, noteBuildingClaimIntrusions } from './claimZones
 import { applyDailySpoilage } from './spoilage';
 import { consumptionWeight, lifecycleDailyTick, resolveWeddingChoice } from './lifecycle';
 import { applyJobChangeCarryover, dailyEducationTick, isLiterateJob } from './education';
+import { canResidentTakeJob, isYouthWorkJob, youthActivityOf } from './youth';
 import { dailyReligionTick, resolveReligionChoice } from './religion';
 import { dailySpecialResidentTick, resolveSpecialResidentChoice } from './specialResidents';
 import { dailySilverTick, resolveSilverVeinChoice } from './silver';
@@ -80,7 +81,7 @@ import {
 } from './workerSlots';
 import type { AutoAssignBuildingType } from './workerSlots';
 import type {
-  Building, BuildingTypeId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId, PointerAction, Resident, ResourceId, Season, SmithyProductId,
+  Building, BuildingTypeId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId, PointerAction, Resident, ResourceId, Season, SmithyProductId, YouthActivity,
 } from './types';
 
 // ─────────────────────────── 새 게임 ───────────────────────────
@@ -390,7 +391,8 @@ export function cancelBuildingConstruction(state: GameState, buildingId: number)
 export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
   if (!isJobUnlocked(state.rank, to)) return false;
   // 문해자 전용 관직 — 글을 아는 주민만 후보가 된다
-  const eligible = (res: Resident) => !isLiterateJob(to) || res.literate === true;
+  const eligible = (res: Resident) => canResidentTakeJob(res, to)
+    && (!isLiterateJob(to) || res.literate === true);
   const r = state.residents.find(res =>
     res.alive && !res.special && res.job === from && res.assignedBuildingId == null && eligible(res))
     ?? state.residents.find(res => res.alive && !res.special && res.job === from && eligible(res));
@@ -414,8 +416,16 @@ export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
 export function setResidentJob(state: GameState, id: number, job: JobId): void {
   if (!isJobUnlocked(state.rank, job)) return;
   const r = state.residents.find(res => res.id === id);
-  if (r?.stage) {
+  if (r?.stage && r.stage !== 'youth') {
     addLog(state, `${r.name}은(는) 아직 아이라 일을 맡길 수 없습니다.`, 'info');
+    return;
+  }
+  if (r?.stage === 'youth' && youthActivityOf(r) !== 'work') {
+    addLog(state, `${r.name}은(는) 서당에 다니는 소년이라 생산 일을 맡길 수 없습니다. 먼저 일 돕기를 선택하십시오.`, 'info');
+    return;
+  }
+  if (r?.stage === 'youth' && !isYouthWorkJob(job)) {
+    addLog(state, `${r.name}은(는) 소년이라 안전한 일 돕기 직무만 맡을 수 있습니다.`, 'info');
     return;
   }
   if (r?.special) {
@@ -440,6 +450,40 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
     reconcileMountAssignments(state);
     state.resources.defense = computeDefense(state);
   }
+}
+
+export function setYouthActivity(
+  state: GameState,
+  id: number,
+  activity: YouthActivity,
+): string | null {
+  const resident = state.residents.find(candidate => candidate.id === id);
+  if (!resident?.alive) return '소년 주민을 찾을 수 없습니다.';
+  if (resident.stage !== 'youth') return '소년에게만 활동을 정할 수 있습니다.';
+  if (youthActivityOf(resident) === activity) return null;
+
+  if (activity === 'school') {
+    returnResidentCart(state, resident);
+    resident.job = 'idle';
+    resident.assignedBuildingId = null;
+  } else if (!isYouthWorkJob(resident.job)) {
+    resident.job = 'idle';
+    resident.assignedBuildingId = null;
+  }
+  resident.youthActivity = activity;
+  resident.education ??= 0;
+  resetAgent(state, resident);
+  reconcileWeaponAssignments(state);
+  reconcileMountAssignments(state);
+  state.resources.defense = computeDefense(state);
+  addLog(
+    state,
+    activity === 'school'
+      ? `${resident.name}이(가) 일손을 놓고 서당에 다니기 시작했습니다.`
+      : `${resident.name}이(가) 서당 공부를 멈추고 반몫으로 일을 돕습니다.`,
+    'info',
+  );
+  return null;
 }
 
 export function toggleResidentCart(state: GameState, id: number): string | null {

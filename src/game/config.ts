@@ -1,5 +1,5 @@
 // 시뮬레이션 밸런스 값 모음 — 숫자 튜닝은 전부 여기서 한다.
-import type { LivestockId, ProcessingInputId, Rank, ResourceId, Season } from './types';
+import type { JobId, LivestockId, ProcessingInputId, Rank, ResourceId, Season } from './types';
 
 export const CONFIG = {
   map: {
@@ -951,6 +951,8 @@ export const CONFIG = {
     elderDeathAnnualPerYear: 0.05, // 이후 1세당 가산
     elderLaborAge: 60,
     elderLaborMult: 0.85,        // 노년 노동 효율 (완만 — 늙은 사냥꾼도 일한다)
+    youthWorkEfficiency: 0.5,    // 소년의 안전 직무 생산은 성인의 반몫
+    youthAllowedJobs: ['idle', 'hauler', 'farmer', 'woodSplitter', 'herder'] as JobId[],
     // 이주 가족 구성 — 홀몸만 오지 않는다
     immigrantChildChance: 0.4,   // 일행에 아이(어린이/소년) 1명이 섞일 확률
     immigrantElderChance: 0.15,  // 노부모(55~64세) 1명이 섞일 확률
@@ -961,6 +963,9 @@ export const CONFIG = {
   education: {
     seatsPerTeacher: 5,          // 훈장 1명당 취학 정원
     schoolingDays: 30,           // 취학 이 일수면 문해 (어린이+소년 성장 96일 중)
+    schoolProgressPerDay: 1,
+    schoolDaysForAdultBonus: 30,
+    schoolAdultSkillBonus: 0.2,  // 성인 전환 시 아전·훈장 초기 숙련
     literateSkillGainMult: 1.5,  // 문해자의 숙련 성장 배율
     literateCarryover: 0.5,      // 전직 시 최고 숙련의 이 비율을 새 직업에 이월
     childLaborMult: 0.5,         // 미취학 아이 심부름의 적재 배율 (반몫)

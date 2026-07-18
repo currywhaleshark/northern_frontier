@@ -294,6 +294,7 @@ export interface HaulTask {
 
 // 생애 단계 — 성장 게이지 모델(가축 growth 선례). 나이가 아니라 단계로 자란다.
 export type LifeStage = 'infant' | 'child' | 'youth';
+export type YouthActivity = 'work' | 'school';
 
 // 네임드 특수 주민 — 게임당 한 번만 오는 인물 (2026-07-17-special-residents.md의 첫 조각)
 export type SpecialResidentId =
@@ -352,6 +353,7 @@ export interface Resident {
   stage?: LifeStage | null;    // 아기/어린이/소년 — 성인이 되면 지워진다
   stageProgress?: number;      // 현 단계에서 자란 일수 (굶주림·혹한이면 멈춤)
   // ── 교육 (서당) ──
+  youthActivity?: YouthActivity; // 소년기 선택 — 반몫 노동 또는 서당 취학
   education?: number;          // 아이의 취학 누적 일수 — schoolingDays 채우면 문해
   literate?: boolean;          // 문해자 — 의원·아전·훈장 자격, 숙련 성장 가속
   spouseId?: number | null;    // 배우자 주민 id

@@ -14,8 +14,9 @@ import { spoilagePreview } from '../game/spoilage';
 import type { SiteGiftType } from '../game/siteDiplomacy';
 import { isWallBuilding } from '../game/walls';
 import { combatDefaultWeaponName } from '../game/combatCapabilities';
-import { enrolledStudentIds, isSchoolAge } from '../game/education';
+import { enrolledStudentIds, isSchoolAge, schoolSeatCount } from '../game/education';
 import { specialResidentSkills } from '../game/specialResidents';
+import { isYouthWorkJob } from '../game/youth';
 import { COMBAT_WEAPON_NAMES, MOUNT_NAMES } from '../game/weapons';
 import type {
   BuildingTypeId,
@@ -28,6 +29,7 @@ import type {
   ResourceId,
   SelectedEntity,
   SmithyProductId,
+  YouthActivity,
 } from '../game/types';
 import { ActionPopup } from './ActionPopup';
 import { ForeignSitePanel } from './ForeignSitePanel';
@@ -38,6 +40,7 @@ interface Props {
   selectedEntity: SelectedEntity | null;
   onClear: () => void;
   onSetResidentJob: (id: number, job: JobId) => void;
+  onSetYouthActivity: (id: number, activity: YouthActivity) => void;
   onToggleResidentCart: (id: number) => void;
   onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
@@ -71,26 +74,63 @@ function Bar({ value, color }: { value: number; color: string }) {
   );
 }
 
-function ResidentContext({ state, resident, onSetJob, onToggleCart }: {
+function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthActivity }: {
   state: GameState;
   resident: Resident;
   onSetJob: (job: JobId) => void;
   onToggleCart: () => void;
+  onSetYouthActivity: (activity: YouthActivity) => void;
 }) {
   const home = resident.alive ? residentHome(state, resident) : null;
+  const enrolled = isSchoolAge(resident) && enrolledStudentIds(state).has(resident.id);
+  const youthActivity = resident.youthActivity === 'school' ? 'school' : 'work';
+  const activeSchoolSeats = schoolSeatCount(state);
   return (
     <table className="insp-table">
       <tbody>
         <tr><td>이름</td><td>{resident.name} ({resident.age}세){resident.literate ? <span title="문해자 — 의원·아전·훈장을 맡을 수 있고 숙련이 빨리 오릅니다"> 📖</span> : ''}{resident.sick ? ' 🤒' : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</td></tr>
         {resident.origin && <tr><td>출신</td><td>{resident.origin}</td></tr>}
+        {resident.stage === 'youth' && (
+          <tr>
+            <td>소년기 활동</td>
+            <td>
+              <div role="group" aria-label="소년기 활동 선택">
+                <button
+                  type="button"
+                  className="btn small"
+                  aria-pressed={youthActivity === 'work'}
+                  onClick={() => onSetYouthActivity('work')}
+                >일 돕기</button>{' '}
+                <button
+                  type="button"
+                  className="btn small"
+                  aria-pressed={youthActivity === 'school'}
+                  onClick={() => onSetYouthActivity('school')}
+                >서당 다니기</button>
+              </div>
+              <small className="muted">
+                {youthActivity === 'work'
+                  ? '성인 노동력의 50% · 운반꾼·농부·장작패기·목동만 가능'
+                  : enrolled
+                    ? '서당 가동 · 교육 진행 중'
+                    : activeSchoolSeats <= 0
+                      ? '진행 정지 — 완공된 서당과 건강한 훈장이 필요합니다.'
+                      : '진행 정지 — 서당 정원이 찼습니다.'}
+              </small>
+            </td>
+          </tr>
+        )}
         {isSchoolAge(resident) && (
           <tr>
             <td>글공부</td>
-            <td>{enrolledStudentIds(state).has(resident.id)
-              ? `취학 중 · ${Math.floor(resident.education ?? 0)}/${CONFIG.education.schoolingDays}일`
-              : (resident.education ?? 0) > 0
-                ? `미취학 (서당 자리 없음) · 배운 날 ${Math.floor(resident.education ?? 0)}/${CONFIG.education.schoolingDays}일`
-                : '미취학 — 반몫 심부름 중'}</td>
+            <td>
+              {enrolled
+                ? `취학 중 · ${Math.floor(resident.education ?? 0)}/${CONFIG.education.schoolDaysForAdultBonus}일`
+                : `배운 날 ${Math.floor(resident.education ?? 0)}/${CONFIG.education.schoolDaysForAdultBonus}일`}
+              {resident.stage === 'youth' && (
+                <small className="muted"> · 성인 시 아전·훈장 초기 숙련 {Math.round(CONFIG.education.schoolAdultSkillBonus * 100)}%</small>
+              )}
+            </td>
           </tr>
         )}
         {resident.special && specialResidentSkills(resident.special).length > 0 && (
@@ -110,10 +150,14 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart }: {
           <td>
             <select
               value={resident.job}
-              disabled={!resident.alive}
+              disabled={!resident.alive || (!!resident.stage && (resident.stage !== 'youth' || youthActivity !== 'work'))}
+              title={resident.stage === 'youth' && youthActivity === 'school'
+                ? '서당에 다니는 동안 생산 직무를 맡을 수 없습니다'
+                : resident.stage && resident.stage !== 'youth' ? '아직 직업을 맡을 수 없는 나이입니다' : undefined}
               onChange={event => onSetJob(event.target.value as JobId)}
             >
-              {JOB_ORDER.filter(job => job === resident.job || isJobUnlocked(state.rank, job)).map(job => (
+              {JOB_ORDER.filter(job => job === resident.job || (isJobUnlocked(state.rank, job)
+                && (resident.stage !== 'youth' || isYouthWorkJob(job)))).map(job => (
                 <option key={job} value={job}>{JOB_NAMES[job]}</option>
               ))}
             </select>
@@ -185,6 +229,7 @@ export function SelectionContextBar({
   selectedEntity,
   onClear,
   onSetResidentJob,
+  onSetYouthActivity,
   onToggleResidentCart,
   onUpgradeHousing,
   onSetSmithyProduct,
@@ -237,6 +282,7 @@ export function SelectionContextBar({
             state={state}
             resident={resident}
             onSetJob={job => onSetResidentJob(resident.id, job)}
+            onSetYouthActivity={activity => onSetYouthActivity(resident.id, activity)}
             onToggleCart={() => onToggleResidentCart(resident.id)}
           />
         </div>

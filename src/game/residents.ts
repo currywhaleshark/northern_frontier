@@ -16,6 +16,7 @@ import { hasResidentMonk, moraleBreakdown, moraleTarget, type MoraleInputs } fro
 import { getSeason } from './seasons';
 import { warmthLossWeatherMult } from './weather';
 import { releaseResidentMount } from './weapons';
+import { canResidentTakeJob } from './youth';
 import type { Building, GameState, Gender, JobId, Resident, Tile } from './types';
 
 export function rollResidentGender(rng: () => number): Gender {
@@ -260,7 +261,7 @@ export function reconcileResidentHomes(state: GameState, rng: () => number): voi
 }
 
 export function countJob(state: GameState, job: JobId): number {
-  return state.residents.filter(r => r.alive && r.job === job).length;
+  return state.residents.filter(r => r.alive && r.job === job && canResidentTakeJob(r, job)).length;
 }
 
 export function skillOf(r: Resident): number {

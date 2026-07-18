@@ -3,6 +3,7 @@ import { BUILDING_DEFS } from '../game/buildings';
 import { isJobUnlocked, JOB_DESC, JOB_NAMES, JOB_ORDER } from '../game/constants';
 import { isLiterateJob } from '../game/education';
 import { countJob } from '../game/residents';
+import { canResidentTakeJob } from '../game/youth';
 import {
   AUTO_ASSIGN_BUILDING_TYPES,
   SLOTTED_BUILDING_CONFIG,
@@ -29,9 +30,6 @@ interface Props {
 
 export function JobPanel({ state, onReassign, uiPrefs, onUiPrefsChange, onAutoAssign }: Props) {
   const idle = countJob(state, 'idle');
-  // 문해자 전용 관직(의원·아전·훈장)은 무직 문해 성인이 있어야 늘릴 수 있다
-  const literateIdle = state.residents.filter(resident =>
-    resident.alive && !resident.stage && resident.job === 'idle' && resident.literate === true).length;
   const selectedAutoAssignTypes = uiPrefs.autoAssignBuildingTypes;
   const allAutoAssignTypesSelected = selectedAutoAssignTypes.length === AUTO_ASSIGN_BUILDING_TYPES.length;
   return (
@@ -79,6 +77,9 @@ export function JobPanel({ state, onReassign, uiPrefs, onUiPrefsChange, onAutoAs
       {JOB_ORDER.filter(j => j !== 'idle' && isJobUnlocked(state.rank, j)).map(job => {
         const count = countJob(state, job);
         const gated = isLiterateJob(job);
+        const assignableIdle = state.residents.filter(resident =>
+          resident.alive && resident.job === 'idle' && canResidentTakeJob(resident, job)
+          && (!gated || resident.literate === true)).length;
         const unassigned = BUILDING_SLOT_JOBS.has(job)
           ? state.residents.filter(resident =>
             resident.alive && resident.job === job && resident.assignedBuildingId == null).length
@@ -92,8 +93,10 @@ export function JobPanel({ state, onReassign, uiPrefs, onUiPrefsChange, onAutoAs
               <button
                 className="job-btn"
                 data-tut={`job-plus-${job}`}
-                disabled={idle === 0 || (gated && literateIdle === 0)}
-                title={gated && literateIdle === 0 ? '무직 문해자가 없습니다' : undefined}
+                disabled={assignableIdle === 0}
+                title={assignableIdle === 0
+                  ? gated ? '무직 문해자가 없습니다' : '이 직업을 맡을 수 있는 무직 주민이 없습니다'
+                  : undefined}
                 onClick={() => onReassign('idle', job)}
               >＋</button>
             </span>

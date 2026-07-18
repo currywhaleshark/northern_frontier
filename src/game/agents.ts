@@ -11,7 +11,7 @@ import { enrolledStudentIds, skillGainMult } from './education';
 import { haulerCarryCapacity } from './equipment';
 import { collectHuntableTiles } from './habitats';
 import { makeRng } from './map';
-import { buryCorpse, cemeteryFreePlots, corpsesOf, elderLaborMult, nextCorpseToCollect } from './lifecycle';
+import { buryCorpse, cemeteryFreePlots, corpsesOf, laborEfficiencyMult, nextCorpseToCollect } from './lifecycle';
 import { extractMineralDeposit, mineralRemaining } from './minerals';
 import { isVeinSealedTile, recordRockMining, recordSilverMined } from './silver';
 import { getSeason } from './seasons';
@@ -72,7 +72,7 @@ const OUTDOOR_JOBS = [
 // ─────────────────────────── 공통 헬퍼 ───────────────────────────
 
 function effOf(r: Resident): number {
-  return (1 + (r.skills[r.job] ?? 0) * CONFIG.production.skillEffect) * elderLaborMult(r);
+  return (1 + (r.skills[r.job] ?? 0) * CONFIG.production.skillEffect) * laborEfficiencyMult(r);
 }
 
 function gainSkillTick(r: Resident): void {
@@ -2334,8 +2334,7 @@ export function agentsTick(state: GameState): void {
       goToCenter(state, r, ctx);
       continue;
     }
-    // 아이 — 아기는 집에서 자라고, 어린이·소년은 서당 정원에 들면 글공부,
-    // 자리가 없으면 반몫 심부름(창고 운반 보조)을 한다.
+    // 아기·어린이와 취학 소년. 일 돕기를 고른 소년만 아래 일반 직업 흐름으로 내려간다.
     if (r.stage) {
       if (r.stage === 'infant') {
         clearHaulTask(r);
@@ -2344,16 +2343,25 @@ export function agentsTick(state: GameState): void {
         r.path = [];
         continue;
       }
-      if (enrolledStudents.has(r.id)) {
+      if (r.stage === 'youth' && r.youthActivity !== 'school') {
+        // 안전 직무 배정과 0.5 효율은 배정 경계/laborEfficiencyMult에서 단 한 번 적용한다.
+      } else if (enrolledStudents.has(r.id)) {
         clearHaulTask(r);
+        if (carryTotal(r) > 0) depositAll(state, r);
         const school = state.buildings.find(building => building.type === 'school' && building.built);
         if (school) loiterNearBuilding(state, r, ctx, school, 3, '글공부');
         else loiterNearCenter(state, r, ctx, '뛰노는 중');
         continue;
+      } else if (r.stage === 'youth') {
+        clearHaulTask(r);
+        if (carryTotal(r) > 0) depositAll(state, r);
+        loiterNearCenter(state, r, ctx, '서당 수업 중단');
+        continue;
+      } else {
+        haulerTick(state, r, ctx);
+        if (r.task === '대기') r.task = '심부름거리 찾는 중';
+        continue;
       }
-      haulerTick(state, r, ctx);
-      if (r.task === '대기') r.task = '심부름거리 찾는 중';
-      continue;
     }
     // 산모는 집에서 몸을 추스른다
     if (state.day < (r.birthRecoveryUntil ?? 0)) {

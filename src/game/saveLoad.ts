@@ -28,6 +28,7 @@ import { CURRENT_SCHEMA_VERSION } from './saveSchema';
 import { defaultRaiderFormationLine } from './tacticalTargeting';
 import { isImplementedLivestockId, normalizeLivestockState } from './livestock';
 import { normalizeTacticalGroupTargets } from './tacticalBattle';
+import { isYouthWorkJob } from './youth';
 import {
   gradeTacticalBattle, raidDefenseObjectiveResult, tacticalClosingSummary, tacticalOutcomeResult,
 } from './tacticalCore';
@@ -968,6 +969,18 @@ export function loadGame(slot = 1): GameState | null {
     for (const resident of parsed.residents) {
       if (typeof resident.origin !== 'string' || resident.origin.trim().length === 0) delete resident.origin;
       else resident.origin = resident.origin.trim();
+      if (resident.stage === 'youth') {
+        resident.youthActivity = resident.youthActivity === 'school' ? 'school' : 'work';
+        resident.education = typeof resident.education === 'number' && Number.isFinite(resident.education)
+          ? Math.max(0, resident.education)
+          : 0;
+        if (resident.youthActivity === 'school' || !isYouthWorkJob(resident.job)) {
+          resident.job = 'idle';
+          resident.assignedBuildingId = null;
+        }
+      } else {
+        delete resident.youthActivity;
+      }
     }
     if (!('raiders' in parsed)) return null;
     if (!Object.prototype.hasOwnProperty.call(parsed, 'battle')) parsed.battle = null;
