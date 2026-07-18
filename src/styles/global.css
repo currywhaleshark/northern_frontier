@@ -595,22 +595,21 @@ html, body, #root {
   background: #090b0d;
 }
 .minimap-canvas-wrap canvas {
+  display: block;
   width: 188px;
   height: auto;
+}
+.minimap-base-canvas {
+  position: relative;
+  pointer-events: none;
+}
+.minimap-overlay-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   cursor: crosshair;
   touch-action: none;
-}
-.minimap-raid-ping {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border: 2px solid #ff6e59;
-  border-radius: 50%;
-  background: rgba(206, 44, 32, 0.75);
-  transform: translate(-50%, -50%);
-  box-shadow: 0 0 0 3px rgba(255, 83, 62, 0.2);
-  pointer-events: none;
-  animation: minimap-raid-pulse 0.9s ease-out infinite;
 }
 .minimap-tooltip {
   position: absolute;
@@ -638,10 +637,6 @@ html, body, #root {
 .minimap-legend i.hostile { background: #d45e52; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 .minimap-legend i.target { background: #e29937; transform: rotate(45deg); }
 
-@keyframes minimap-raid-pulse {
-  0% { transform: translate(-50%, -50%) scale(0.7); opacity: 1; }
-  100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0.28; }
-}
 @keyframes minimap-alert-text {
   50% { color: #ffd1c8; }
 }

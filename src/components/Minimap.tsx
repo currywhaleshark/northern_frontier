@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type RefObject } from 'react';
 import { CONFIG } from '../game/config';
 import { buildingFootprintSize } from '../game/buildings';
 import { FACTIONS } from '../game/constants';
 import { visibleMinimapRaid, visibleMinimapSites } from '../game/minimap';
 import { activeExpeditionTargetMarkers } from '../game/expeditionTargets';
 import type { ForeignSite, GameState, Terrain } from '../game/types';
+import { terrainVisualSignature } from '../render/renderer';
+import {
+  minimapBaseInvalidationKey,
+  minimapOverlayInvalidationKey,
+} from './minimapRenderModel';
 
 const TILE = CONFIG.ui.tileSize;
 const MAP_SIZE = 188;
@@ -53,6 +58,7 @@ interface ViewportRect {
 interface Props {
   state: GameState;
   version: number;
+  animationActive: boolean;
   viewportRef: RefObject<HTMLDivElement>;
   selected: { x: number; y: number } | null;
 }
@@ -97,8 +103,17 @@ function drawSite(ctx: CanvasRenderingContext2D, site: ForeignSite, sx: number, 
   }
 }
 
-export function Minimap({ state, version, viewportRef, selected }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+function recordMinimapRedraw(name: 'minimap-base-redraw' | 'minimap-overlay-redraw', startedAt: number): void {
+  const perf = window.__renderPerf;
+  if (!perf) return;
+  const bucket = perf[name] ?? (perf[name] = { total: 0, count: 0 });
+  bucket.total += performance.now() - startedAt;
+  bucket.count++;
+}
+
+export function Minimap({ state, version, animationActive, viewportRef, selected }: Props) {
+  const baseCanvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const dragging = useRef(false);
   const [viewport, setViewport] = useState<ViewportRect>({ left: 0, top: 0, width: 1, height: 1 });
   const [hoverLabel, setHoverLabel] = useState<string | null>(null);
@@ -108,6 +123,21 @@ export function Minimap({ state, version, viewportRef, selected }: Props) {
   const visibleRaid = visibleMinimapRaid(state);
   const visibleSites = visibleMinimapSites(state);
   const targetMarkers = activeExpeditionTargetMarkers(state);
+  const baseInvalidationKey = useMemo(() => minimapBaseInvalidationKey({
+    terrainSignature: terrainVisualSignature(state),
+    explored: state.exploration.explored,
+    buildings: state.buildings,
+    claimZones: state.claimZones,
+    sites: visibleMinimapSites(state),
+  }), [state, version]);
+  const overlayInvalidationKey = minimapOverlayInvalidationKey({
+    mapWidth,
+    mapHeight,
+    viewport,
+    selected,
+    raid: visibleRaid,
+    targets: targetMarkers,
+  });
 
   const readViewport = useCallback(() => {
     const box = viewportRef.current;
@@ -135,10 +165,12 @@ export function Minimap({ state, version, viewportRef, selected }: Props) {
     };
   }, [readViewport, viewportRef]);
 
+  // Base layer redraw: only durable map visuals belong in this effect.
   useEffect(() => {
-    const canvas = canvasRef.current;
+    const canvas = baseCanvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
+    const startedAt = window.__renderPerf ? performance.now() : 0;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#090b0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -177,50 +209,94 @@ export function Minimap({ state, version, viewportRef, selected }: Props) {
     for (const site of visibleSites) {
       drawSite(ctx, site, (site.x + site.width / 2) * scaleX, (site.y + site.height / 2) * scaleY);
     }
+    recordMinimapRedraw('minimap-base-redraw', startedAt);
+  }, [baseInvalidationKey, mapHeight, mapWidth, minimapHeight]);
 
-    for (const marker of targetMarkers) {
-      const x = (marker.x + 0.5) * scaleX;
-      const y = (marker.y + 0.5) * scaleY;
-      const color = marker.kind === 'tiger' ? '#e05f52' : marker.kind === 'wolf' ? '#e29937' : '#c84f45';
+  // Overlay layer redraw: transient camera, selection, threat, and target state only.
+  useEffect(() => {
+    const canvas = overlayCanvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    const scaleX = canvas.width / mapWidth;
+    const scaleY = canvas.height / mapHeight;
+    const pulseActive = visibleRaid != null || targetMarkers.length > 0;
+    let animationFrame: number | null = null;
+
+    const drawOverlay = () => {
+      const startedAt = window.__renderPerf ? performance.now() : 0;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 260);
-      ctx.beginPath();
-      ctx.arc(x, y, Math.max(5, marker.radius * (scaleX + scaleY) * 0.5), 0, Math.PI * 2);
-      ctx.fillStyle = marker.kind === 'wolf' ? 'rgba(226,153,55,0.16)' : 'rgba(224,95,82,0.16)';
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1 + pulse;
-      ctx.fill();
-      ctx.stroke();
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(Math.PI / 4);
-      ctx.fillStyle = color;
-      ctx.strokeStyle = '#111518';
-      ctx.lineWidth = 1;
-      ctx.fillRect(-3, -3, 6, 6);
-      ctx.strokeRect(-3.5, -3.5, 7, 7);
-      ctx.restore();
-    }
 
-    if (selected) {
-      ctx.strokeStyle = '#eff7fb';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(selected.x * scaleX - 1, selected.y * scaleY - 1, Math.max(4, scaleX + 2), Math.max(4, scaleY + 2));
-    }
+      for (const marker of targetMarkers) {
+        const x = (marker.x + 0.5) * scaleX;
+        const y = (marker.y + 0.5) * scaleY;
+        const color = marker.kind === 'tiger' ? '#e05f52' : marker.kind === 'wolf' ? '#e29937' : '#c84f45';
+        ctx.beginPath();
+        ctx.arc(x, y, Math.max(5, marker.radius * (scaleX + scaleY) * 0.5), 0, Math.PI * 2);
+        ctx.fillStyle = marker.kind === 'wolf' ? 'rgba(226,153,55,0.16)' : 'rgba(224,95,82,0.16)';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1 + pulse;
+        ctx.fill();
+        ctx.stroke();
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(Math.PI / 4);
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#111518';
+        ctx.lineWidth = 1;
+        ctx.fillRect(-3, -3, 6, 6);
+        ctx.strokeRect(-3.5, -3.5, 7, 7);
+        ctx.restore();
+      }
 
-    ctx.fillStyle = 'rgba(229, 239, 243, 0.08)';
-    ctx.strokeStyle = 'rgba(239, 247, 250, 0.9)';
-    ctx.lineWidth = 1;
-    ctx.fillRect(viewport.left * canvas.width, viewport.top * canvas.height, viewport.width * canvas.width, viewport.height * canvas.height);
-    ctx.strokeRect(
-      Math.round(viewport.left * canvas.width) + 0.5,
-      Math.round(viewport.top * canvas.height) + 0.5,
-      Math.max(2, Math.round(viewport.width * canvas.width) - 1),
-      Math.max(2, Math.round(viewport.height * canvas.height) - 1),
-    );
-  }, [mapHeight, mapWidth, selected, state, targetMarkers, version, viewport, visibleSites]);
+      if (visibleRaid) {
+        const x = (visibleRaid.x + 0.5) * scaleX;
+        const y = (visibleRaid.y + 0.5) * scaleY;
+        ctx.beginPath();
+        ctx.arc(x, y, 4 + pulse * 2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(206,44,32,0.75)';
+        ctx.strokeStyle = '#ff6e59';
+        ctx.lineWidth = 1 + pulse;
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      if (selected) {
+        ctx.strokeStyle = '#eff7fb';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(selected.x * scaleX - 1, selected.y * scaleY - 1, Math.max(4, scaleX + 2), Math.max(4, scaleY + 2));
+      }
+
+      ctx.fillStyle = 'rgba(229, 239, 243, 0.08)';
+      ctx.strokeStyle = 'rgba(239, 247, 250, 0.9)';
+      ctx.lineWidth = 1;
+      ctx.fillRect(viewport.left * canvas.width, viewport.top * canvas.height, viewport.width * canvas.width, viewport.height * canvas.height);
+      ctx.strokeRect(
+        Math.round(viewport.left * canvas.width) + 0.5,
+        Math.round(viewport.top * canvas.height) + 0.5,
+        Math.max(2, Math.round(viewport.width * canvas.width) - 1),
+        Math.max(2, Math.round(viewport.height * canvas.height) - 1),
+      );
+      recordMinimapRedraw('minimap-overlay-redraw', startedAt);
+      const animatePulse = animationActive && !document.hidden && pulseActive;
+      if (animatePulse) animationFrame = requestAnimationFrame(drawOverlay);
+    };
+
+    const handleVisibilityChange = () => {
+      if (animationFrame != null) cancelAnimationFrame(animationFrame);
+      animationFrame = null;
+      if (!document.hidden) drawOverlay();
+    };
+    drawOverlay();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (animationFrame != null) cancelAnimationFrame(animationFrame);
+    };
+  }, [animationActive, mapHeight, mapWidth, minimapHeight, overlayInvalidationKey]);
 
   const navigate = (clientX: number, clientY: number) => {
-    const canvas = canvasRef.current;
+    const canvas = overlayCanvasRef.current;
     const box = viewportRef.current;
     if (!canvas || !box) return;
     const rect = canvas.getBoundingClientRect();
@@ -238,7 +314,7 @@ export function Minimap({ state, version, viewportRef, selected }: Props) {
   };
 
   const markerLabelAt = (clientX: number, clientY: number): string | null => {
-    const canvas = canvasRef.current;
+    const canvas = overlayCanvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
     const px = (clientX - rect.left) * canvas.width / rect.width;
@@ -276,7 +352,15 @@ export function Minimap({ state, version, viewportRef, selected }: Props) {
       </div>
       <div className="minimap-canvas-wrap">
         <canvas
-          ref={canvasRef}
+          ref={baseCanvasRef}
+          className="minimap-base-canvas"
+          width={MAP_SIZE}
+          height={minimapHeight}
+          aria-hidden="true"
+        />
+        <canvas
+          ref={overlayCanvasRef}
+          className="minimap-overlay-canvas"
           width={MAP_SIZE}
           height={minimapHeight}
           aria-label="개척지 미니맵"
@@ -295,15 +379,6 @@ export function Minimap({ state, version, viewportRef, selected }: Props) {
             setHoverLabel(null);
           }}
         />
-        {visibleRaid && (
-          <span
-            className="minimap-raid-ping"
-            style={{
-              left: `${((visibleRaid.x + 0.5) / mapWidth) * 100}%`,
-              top: `${((visibleRaid.y + 0.5) / mapHeight) * 100}%`,
-            }}
-          />
-        )}
         {hoverLabel && <div className="minimap-tooltip">{hoverLabel}</div>}
       </div>
       <div className="minimap-legend" aria-label="미니맵 범례">

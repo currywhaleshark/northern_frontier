@@ -928,7 +928,13 @@ export default function App() {
       className: 'hud-minimap-window',
       content: (
         <div className="minimap-overlay">
-          <Minimap state={state} version={version} viewportRef={mapViewportRef} selected={selected} />
+          <Minimap
+            state={state}
+            version={version}
+            animationActive={speed > 0 && !state.pendingChoice && !state.tacticalBattle && !state.tacticalBattleReport && !state.gameOver}
+            viewportRef={mapViewportRef}
+            selected={selected}
+          />
         </div>
       ),
     },
