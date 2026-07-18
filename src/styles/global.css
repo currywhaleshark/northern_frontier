@@ -1586,6 +1586,31 @@ html, body, #root {
 }
 .sim-exit-button:hover { background: rgba(84, 34, 29, 0.95); }
 
+.lazy-ui-fallback,
+.lazy-ui-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 96px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.lazy-ui-fallback.overlay,
+.lazy-ui-error.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  min-height: 100vh;
+  color: var(--text);
+  background: rgba(7, 11, 15, 0.88);
+}
+
+.lazy-ui-error.overlay {
+  flex-direction: column;
+}
+
 @media (max-width: 900px) {
   .sim-grid { grid-template-columns: 1fr; }
 }

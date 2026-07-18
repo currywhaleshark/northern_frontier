@@ -1,5 +1,5 @@
 // 최상위 컴포넌트: 게임 상태 보관, 게임 루프, 플레이어 입력 연결
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { CONFIG } from './game/config';
 import {
   assignNearestWorkerToBuilding, assignResidentToBuilding,
@@ -10,7 +10,6 @@ import {
   unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
 import { hasAnySave, loadGame, saveGame } from './game/saveLoad';
-import { SaveSlotDialog } from './components/SaveSlotDialog';
 import { addLog, negotiateTrade, requestTrade, tradeNegotiationOf } from './game/events';
 import { initAudio, isMuted, playSfx, setMuted, stopWeatherAmbient, setWeatherAmbient } from './sound/sfx';
 import { AlertsPanel } from './components/AlertsPanel';
@@ -19,26 +18,20 @@ import { DockFrame, type DockOverlayItem } from './components/dock/DockFrame';
 import { CourtWindow } from './components/dock/CourtWindow';
 import { FactionsWindow } from './components/dock/FactionsWindow';
 import { ResidentsWindow } from './components/dock/ResidentsWindow';
-import { SpecialResidentsWindow } from './components/dock/SpecialResidentsWindow';
 import { EventModal } from './components/EventModal';
 import { TradeDialog } from './components/TradeDialog';
 import { GameCanvas } from './components/GameCanvas';
 import { InspectorPanel } from './components/InspectorPanel';
 import { JobPanel } from './components/JobPanel';
 import { MainMenu } from './components/MainMenu';
-import { BattleSimulationSetup } from './components/BattleSimulationSetup';
 import { createBattleSimulation, type BattleSimulationOptions } from './game/battleSimulation';
 import { centerViewportOnSettlement, centerViewportOnTile, Minimap } from './components/Minimap';
 import { ProcessingPanel } from './components/ProcessingPanel';
 import { SelectionContextBar } from './components/SelectionContextBar';
 import { TopBar } from './components/TopBar';
 import { UnifiedLog } from './components/UnifiedLog';
-import { TacticalBattleScreen } from './components/TacticalBattleScreen';
-import { TacticalBattleReportModal } from './components/TacticalBattleReportModal';
-import { WeaponAllocationDialog } from './components/WeaponAllocationDialog';
-import {
-  ExpeditionMusterDialog, type ExpeditionMusterRequest,
-} from './components/ExpeditionMusterDialog';
+import type { ExpeditionMusterRequest } from './components/ExpeditionMusterDialog';
+import { LazyUiBoundary } from './components/LazyUiBoundary';
 import { requestPetition } from './game/petition';
 import { breakSilverSeal, reopenBuriedVein } from './game/silver';
 import { toggleNitreYards } from './game/suspicion';
@@ -85,6 +78,21 @@ import { advanceGameClock } from './ui/gameClock';
 import { appointConfinedSpecialResident } from './game/specialResidents';
 import type { DockWindowId, FloatingWindowId } from './ui/dockPresentation';
 import type { AutoAssignBuildingType } from './game/workerSlots';
+
+const SaveSlotDialog = lazy(() => import('./components/SaveSlotDialog')
+  .then(module => ({ default: module.SaveSlotDialog })));
+const BattleSimulationSetup = lazy(() => import('./components/BattleSimulationSetup')
+  .then(module => ({ default: module.BattleSimulationSetup })));
+const TacticalBattleScreen = lazy(() => import('./components/TacticalBattleScreen')
+  .then(module => ({ default: module.TacticalBattleScreen })));
+const TacticalBattleReportModal = lazy(() => import('./components/TacticalBattleReportModal')
+  .then(module => ({ default: module.TacticalBattleReportModal })));
+const WeaponAllocationDialog = lazy(() => import('./components/WeaponAllocationDialog')
+  .then(module => ({ default: module.WeaponAllocationDialog })));
+const ExpeditionMusterDialog = lazy(() => import('./components/ExpeditionMusterDialog')
+  .then(module => ({ default: module.ExpeditionMusterDialog })));
+const SpecialResidentsWindow = lazy(() => import('./components/dock/SpecialResidentsWindow')
+  .then(module => ({ default: module.SpecialResidentsWindow })));
 
 export default function App() {
   // 게임 상태는 ref에 두고, version 증가로 리렌더를 트리거한다
@@ -895,21 +903,25 @@ export default function App() {
   };
 
   const slotDialog = slotDialogMode && (
-    <SaveSlotDialog
-      mode={slotDialogMode}
-      onSelect={slotDialogMode === 'save' ? handleSaveToSlot : handleLoadFromSlot}
-      onClose={() => setSlotDialogMode(null)}
-      onChanged={() => setCanLoad(hasAnySave())}
-    />
+    <LazyUiBoundary label="저장 슬롯" mode="overlay">
+      <SaveSlotDialog
+        mode={slotDialogMode}
+        onSelect={slotDialogMode === 'save' ? handleSaveToSlot : handleLoadFromSlot}
+        onClose={() => setSlotDialogMode(null)}
+        onChanged={() => setCanLoad(hasAnySave())}
+      />
+    </LazyUiBoundary>
   );
 
   if (screen === 'menu') {
     if (menuView === 'battleSim') {
       return (
-        <BattleSimulationSetup
-          onStart={startBattleSimulation}
-          onBack={() => setMenuView('main')}
-        />
+        <LazyUiBoundary label="전투 시뮬레이션" mode="overlay">
+          <BattleSimulationSetup
+            onStart={startBattleSimulation}
+            onBack={() => setMenuView('main')}
+          />
+        </LazyUiBoundary>
       );
     }
     return (
@@ -1074,12 +1086,14 @@ export default function App() {
                 label: '특수 주민',
                 icon: '★',
                 content: (
-                  <SpecialResidentsWindow
-                    state={state}
-                    selectedResidentId={inspResidentId}
-                    onSelectResident={handleSelectResidentFromDock}
-                    onAppointConfined={handleAppointConfinedSpecialResident}
-                  />
+                  <LazyUiBoundary label="특수 주민">
+                    <SpecialResidentsWindow
+                      state={state}
+                      selectedResidentId={inspResidentId}
+                      onSelectResident={handleSelectResidentFromDock}
+                      onAppointConfined={handleAppointConfinedSpecialResident}
+                    />
+                  </LazyUiBoundary>
                 ),
               },
               {
@@ -1129,22 +1143,26 @@ export default function App() {
       </div>
 
       {expeditionMusterRequest ? (
-        <ExpeditionMusterDialog
-          state={state}
-          request={expeditionMusterRequest}
-          onAssignWeapon={handleSetResidentWeapon}
-          onConfirm={handleConfirmExpedition}
-          onClose={() => setExpeditionMusterRequest(null)}
-        />
+        <LazyUiBoundary label="원정대 편성" mode="overlay">
+          <ExpeditionMusterDialog
+            state={state}
+            request={expeditionMusterRequest}
+            onAssignWeapon={handleSetResidentWeapon}
+            onConfirm={handleConfirmExpedition}
+            onClose={() => setExpeditionMusterRequest(null)}
+          />
+        </LazyUiBoundary>
       ) : weaponDialogOpen ? (
-        <WeaponAllocationDialog
-          state={state}
-          onAssign={handleSetResidentWeapon}
-          onAssignMount={handleSetResidentMount}
-          onAutoAssign={handleAutoAssignWeapons}
-          onClear={handleClearWeaponAssignments}
-          onClose={() => setWeaponDialogOpen(false)}
-        />
+        <LazyUiBoundary label="무기 배정" mode="overlay">
+          <WeaponAllocationDialog
+            state={state}
+            onAssign={handleSetResidentWeapon}
+            onAssignMount={handleSetResidentMount}
+            onAutoAssign={handleAutoAssignWeapons}
+            onClear={handleClearWeaponAssignments}
+            onClose={() => setWeaponDialogOpen(false)}
+          />
+        </LazyUiBoundary>
       ) : tradeNegotiationOf(state.pendingChoice) ? (
         <TradeDialog
           state={state}
@@ -1180,25 +1198,29 @@ export default function App() {
       )}
 
       {state.tacticalBattle && (
-        <TacticalBattleScreen
-          state={state}
-          onSpendPreparation={handleSpendPreparation}
-          onAdvancePhase={handleAdvanceTacticalPhase}
-          onAssignGroup={handleAssignTacticalGroup}
-          onSplitHuntGroup={handleSplitHuntGroup}
-          onMergeHuntGroups={handleMergeHuntGroups}
-          onSetHuntPreparationZone={handleSetHuntPreparationZone}
-          onSetFormationLine={handleSetTacticalFormationLine}
-          onSetCommand={handleSetTacticalCommand}
-          onSetGroupTarget={handleSetTacticalGroupTarget}
-          onResolveRound={handleResolveTacticalRound}
-          onCompleteSimulation={handleCompleteTacticalSimulation}
-          onAcknowledgeReport={handleAcknowledgeTacticalReport}
-          onFinishBattle={handleFinishTacticalBattle}
-        />
+        <LazyUiBoundary label="전술전" mode="overlay">
+          <TacticalBattleScreen
+            state={state}
+            onSpendPreparation={handleSpendPreparation}
+            onAdvancePhase={handleAdvanceTacticalPhase}
+            onAssignGroup={handleAssignTacticalGroup}
+            onSplitHuntGroup={handleSplitHuntGroup}
+            onMergeHuntGroups={handleMergeHuntGroups}
+            onSetHuntPreparationZone={handleSetHuntPreparationZone}
+            onSetFormationLine={handleSetTacticalFormationLine}
+            onSetCommand={handleSetTacticalCommand}
+            onSetGroupTarget={handleSetTacticalGroupTarget}
+            onResolveRound={handleResolveTacticalRound}
+            onCompleteSimulation={handleCompleteTacticalSimulation}
+            onAcknowledgeReport={handleAcknowledgeTacticalReport}
+            onFinishBattle={handleFinishTacticalBattle}
+          />
+        </LazyUiBoundary>
       )}
       {state.tacticalBattleReport && (
-        <TacticalBattleReportModal report={state.tacticalBattleReport} onClose={handleDismissTacticalBattleReport} />
+        <LazyUiBoundary label="전투 장계" mode="overlay">
+          <TacticalBattleReportModal report={state.tacticalBattleReport} onClose={handleDismissTacticalBattleReport} />
+        </LazyUiBoundary>
       )}
       {simMode && (
         <button className="sim-exit-button" onClick={exitBattleSimulation}>
