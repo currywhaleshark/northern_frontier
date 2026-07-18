@@ -22,6 +22,8 @@ const SHEETS = {
   defenderRoles: { src: 'public/assets/tactical/defender-roles-poses-v2.png', cellWidth: 84, cellHeight: 120, columns: 8, rows: 4 },
   defenderWeapons: { src: 'public/assets/tactical/defender-weapons-poses-v2.png', cellWidth: 84, cellHeight: 120, columns: 6, rows: 4 },
   defenderDefaultWeapons: { src: 'public/assets/tactical/defender-default-weapons-poses-v1.png', cellWidth: 84, cellHeight: 120, columns: 6, rows: 4 },
+  healers: { src: 'public/assets/tactical/defender-healers-poses-v1.png', cellWidth: 84, cellHeight: 120, columns: 2, rows: 4 },
+  specialResidents: { src: 'public/assets/tactical/special-resident-combat-poses-v1.png', cellWidth: 84, cellHeight: 120, columns: 4, rows: 4 },
   raiders: { src: 'public/assets/tactical/faction-raiders-poses-v2.png', cellWidth: 168, cellHeight: 120, columns: 6, rows: 4 },
   court: { src: 'public/assets/tactical/court-army-poses-v2.png', cellWidth: 168, cellHeight: 120, columns: 5, rows: 4 },
 };

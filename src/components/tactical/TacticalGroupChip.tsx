@@ -4,8 +4,10 @@ import type { TacticalDefenderGroup } from '../../game/types';
 import { tacticalSpriteMetricVars } from '../../render/tacticalSpriteMetrics';
 import {
   TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET,
+  TACTICAL_HEALER_POSE_SHEET,
   TACTICAL_DEFENDER_ROLE_POSE_SHEET,
   TACTICAL_DEFENDER_WEAPON_POSE_SHEET,
+  TACTICAL_SPECIAL_RESIDENT_POSE_SHEET,
   tacticalDefaultWeaponPose,
   tacticalDefenderPoseCell,
 } from '../../render/tacticalCharacterAssets';
@@ -35,17 +37,26 @@ function DockDefenderSprite({ group, gender }: {
     gender,
     'idle',
     defaultWeapon,
+    group.special,
   );
   const sheet = cell.sheet === 'weapons'
     ? TACTICAL_DEFENDER_WEAPON_POSE_SHEET
     : cell.sheet === 'defaultWeapons'
       ? TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET
-      : TACTICAL_DEFENDER_ROLE_POSE_SHEET;
+      : cell.sheet === 'healers'
+        ? TACTICAL_HEALER_POSE_SHEET
+        : cell.sheet === 'specialResidents'
+          ? TACTICAL_SPECIAL_RESIDENT_POSE_SHEET
+          : TACTICAL_DEFENDER_ROLE_POSE_SHEET;
   const metricSheet = cell.sheet === 'weapons'
     ? 'defenderWeapons' as const
     : cell.sheet === 'defaultWeapons'
       ? 'defenderDefaultWeapons' as const
-      : 'defenderRoles' as const;
+      : cell.sheet === 'healers'
+        ? 'healers' as const
+        : cell.sheet === 'specialResidents'
+          ? 'specialResidents' as const
+          : 'defenderRoles' as const;
   return (
     <span
       className={`tactical-sprite tactical-defender role-${group.role} weapon-${group.weapon ?? 'unarmed'} default-weapon-${defaultWeapon ?? 'none'} pose-idle`}

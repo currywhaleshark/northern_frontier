@@ -33,6 +33,18 @@ const SHEETS = [
     columnGroups: { 1: 'f', 3: 'f', 5: 'f' },
   },
   {
+    key: 'healers',
+    src: 'public/assets/tactical/defender-healers-poses-v1.png',
+    cellWidth: 84, cellHeight: 120, columns: 2, rows: 4,
+    columnGroups: { 1: 'f' },
+  },
+  {
+    key: 'specialResidents',
+    src: 'public/assets/tactical/special-resident-combat-poses-v1.png',
+    cellWidth: 84, cellHeight: 120, columns: 4, rows: 4,
+    columnGroups: { 2: 'f' },
+  },
+  {
     key: 'defenderDefaultWeapons',
     src: 'public/assets/tactical/defender-default-weapons-poses-v1.png',
     cellWidth: 84, cellHeight: 120, columns: 6, rows: 4,
@@ -72,7 +84,8 @@ const HEAD_BOXES_DIR = 'tools/game/head-boxes';
 // 아군 3개 시트는 같은 화풍이라 공통 기준으로 정규화한다. 적 시트(마적·관군)는
 // 화풍(신체 비례)이 달라 아군 머리 크기에 맞추면 전체가 거대해지므로,
 // 각 시트 자신의 중앙값을 기준으로 포즈·캐릭터 간 편차만 고르게 잡는다.
-const DEFENDER_SHEET_KEYS = ['defenderRoles', 'defenderWeapons', 'defenderDefaultWeapons'];
+const DEFENDER_REFERENCE_SHEET_KEYS = ['defenderRoles', 'defenderWeapons', 'defenderDefaultWeapons'];
+const DEFENDER_SHEET_KEYS = [...DEFENDER_REFERENCE_SHEET_KEYS, 'healers', 'specialResidents'];
 
 // ---------------------------------------------------------------- PNG 디코딩
 
@@ -432,11 +445,11 @@ function main() {
   // 기준 머리 크기: 아군 3개 시트는 공통 기준(전부 같은 소스일 때), 적 시트는 자기 시트 중앙값.
   // 아군 공통 기준은 체형 그룹(columnGroups)별 중앙값으로 나눠 잡는다.
   const groupOf = (sheet, column) => sheet.columnGroups?.[column] ?? 'm';
-  const defenderSources = new Set(DEFENDER_SHEET_KEYS.map(key => headSources.get(key)));
+  const defenderSources = new Set(DEFENDER_REFERENCE_SHEET_KEYS.map(key => headSources.get(key)));
   const sharedDefenderGroupReference = new Map();
   if (defenderSources.size === 1) {
     const groupSizes = new Map();
-    for (const key of DEFENDER_SHEET_KEYS) {
+    for (const key of DEFENDER_REFERENCE_SHEET_KEYS) {
       const { sheet } = analyses.get(key);
       headSizes.get(key).forEach(rowSizes => rowSizes.forEach((size, column) => {
         if (size == null) return;
@@ -447,11 +460,11 @@ function main() {
     }
     for (const [group, sizes] of groupSizes) sharedDefenderGroupReference.set(group, median(sizes));
   } else {
-    console.warn('경고: 아군 시트의 머리 박스가 일부만 있어 시트별 기준으로 정규화합니다. 아군 3개 시트를 모두 제공하는 것이 좋습니다.');
+    console.warn('경고: 기존 아군 기준 시트의 머리 박스가 일부만 있어 시트별 기준으로 정규화합니다.');
   }
   const sheetReference = new Map(SHEETS.map(sheet => [sheet.key, median(sheetSizes(sheet.key))]));
   const referenceFor = (key, column) => {
-    if (DEFENDER_SHEET_KEYS.includes(key) && sharedDefenderGroupReference.size > 0) {
+    if (DEFENDER_REFERENCE_SHEET_KEYS.includes(key) && sharedDefenderGroupReference.size > 0) {
       const { sheet } = analyses.get(key);
       return sharedDefenderGroupReference.get(groupOf(sheet, column)) ?? sheetReference.get(key);
     }
@@ -544,7 +557,7 @@ function main() {
     '  readonly dy: number;',
     '}',
     '',
-    "export type TacticalMetricSheetKey = 'defenderRoles' | 'defenderWeapons' | 'defenderDefaultWeapons' | 'raiders' | 'court';",
+    "export type TacticalMetricSheetKey = 'defenderRoles' | 'defenderWeapons' | 'defenderDefaultWeapons' | 'healers' | 'specialResidents' | 'raiders' | 'court';",
     '',
     'export const TACTICAL_SPRITE_METRICS: Readonly<Record<',
     '  TacticalMetricSheetKey,',

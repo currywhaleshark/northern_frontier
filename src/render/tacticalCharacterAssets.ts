@@ -60,6 +60,22 @@ export const TACTICAL_DEFENDER_WEAPON_POSE_SHEET = {
   src: '/assets/tactical/defender-weapons-poses-v2.png',
 } as const;
 
+export const TACTICAL_HEALER_POSE_SHEET = {
+  spriteWidth: 84,
+  spriteHeight: 120,
+  columns: 2,
+  rows: 4,
+  src: '/assets/tactical/defender-healers-poses-v1.png',
+} as const;
+
+export const TACTICAL_SPECIAL_RESIDENT_POSE_SHEET = {
+  spriteWidth: 84,
+  spriteHeight: 120,
+  columns: 4,
+  rows: 4,
+  src: '/assets/tactical/special-resident-combat-poses-v1.png',
+} as const;
+
 export const TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET = {
   spriteWidth: 84,
   spriteHeight: 120,
@@ -98,6 +114,28 @@ const WEAPON_COLUMNS = {
   musket: 4,
 } as const;
 
+const SPECIAL_RESIDENT_COLUMNS: Partial<Record<SpecialResidentId, number>> = {
+  jurchenWarrior: 0,
+  tigerHunter: 1,
+  uinyeo: 2,
+  hangwae: 3,
+};
+
+function tacticalSpecialResidentColumn(
+  role: import('../game/combatRoster').CombatRole,
+  weapon: import('../game/types').CombatWeaponId | null,
+  special?: SpecialResidentId,
+): number | null {
+  if (!special) return null;
+  const column = SPECIAL_RESIDENT_COLUMNS[special];
+  if (column == null) return null;
+  if (special === 'jurchenWarrior') return role === 'militia' && weapon === 'spear' ? column : null;
+  if (special === 'tigerHunter') return role === 'hunter' && weapon == null ? column : null;
+  if (special === 'uinyeo') return role === 'healer' ? column : null;
+  if (special === 'hangwae') return role === 'militia' && weapon === 'musket' ? column : null;
+  return null;
+}
+
 export type TacticalDefaultWeaponPose = 'bambooSpear' | 'farmTools' | 'watchmanBaton';
 
 const DEFAULT_WEAPON_COLUMNS: Readonly<Record<TacticalDefaultWeaponPose, number>> = {
@@ -122,8 +160,17 @@ export function tacticalDefenderPoseCell(
   gender: 'male' | 'female',
   pose: TacticalSpritePose,
   defaultWeapon: TacticalDefaultWeaponPose | null = null,
-): { sheet: 'roles' | 'weapons' | 'defaultWeapons'; column: number; row: number } {
+  special?: SpecialResidentId,
+): {
+  sheet: 'roles' | 'weapons' | 'defaultWeapons' | 'healers' | 'specialResidents';
+  column: number;
+  row: number;
+} {
   const genderOffset = gender === 'female' ? 1 : 0;
+  const specialColumn = tacticalSpecialResidentColumn(role, weapon, special);
+  if (specialColumn != null) {
+    return { sheet: 'specialResidents', column: specialColumn, row: TACTICAL_POSE_ROWS[pose] };
+  }
   if (weapon) {
     return { sheet: 'weapons', column: WEAPON_COLUMNS[weapon] + genderOffset, row: TACTICAL_POSE_ROWS[pose] };
   }
@@ -134,14 +181,19 @@ export function tacticalDefenderPoseCell(
       row: TACTICAL_POSE_ROWS[pose],
     };
   }
+  if (role === 'healer') {
+    return { sheet: 'healers', column: genderOffset, row: TACTICAL_POSE_ROWS[pose] };
+  }
   return { sheet: 'roles', column: ROLE_COLUMNS[role] + genderOffset, row: TACTICAL_POSE_ROWS[pose] };
 }
 
 export function tacticalDefenderMuzzleAnchor(
   weapon: import('../game/types').CombatWeaponId | null,
   gender: 'male' | 'female',
+  special?: SpecialResidentId,
 ): TacticalMuzzleAnchor | null {
   if (weapon !== 'musket') return null;
+  if (special === 'hangwae') return { x: 4, y: 60, size: 'musket' };
   return { x: gender === 'female' ? 19 : 17, y: 47, size: 'musket' };
 }
 
@@ -200,4 +252,4 @@ export function tacticalCourtMuzzleAnchor(
   return null;
 }
 
-import type { PredatorKind, TigerTier } from '../game/types';
+import type { PredatorKind, SpecialResidentId, TigerTier } from '../game/types';

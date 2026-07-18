@@ -5,7 +5,7 @@ export interface TacticalSpriteMetric {
   readonly dy: number;
 }
 
-export type TacticalMetricSheetKey = 'defenderRoles' | 'defenderWeapons' | 'defenderDefaultWeapons' | 'raiders' | 'court';
+export type TacticalMetricSheetKey = 'defenderRoles' | 'defenderWeapons' | 'defenderDefaultWeapons' | 'healers' | 'specialResidents' | 'raiders' | 'court';
 
 export const TACTICAL_SPRITE_METRICS: Readonly<Record<
   TacticalMetricSheetKey,
@@ -252,6 +252,122 @@ export const TACTICAL_SPRITE_METRICS: Readonly<Record<
       {
         scale: 1.094,
         dy: 38.3
+      }
+    ]
+  ],
+  healers: [
+    [
+      {
+        scale: 1.043,
+        dy: 2.1
+      },
+      {
+        scale: 1,
+        dy: 2
+      }
+    ],
+    [
+      {
+        scale: 1.043,
+        dy: 2.1
+      },
+      {
+        scale: 1,
+        dy: 2
+      }
+    ],
+    [
+      {
+        scale: 1.091,
+        dy: 2.2
+      },
+      {
+        scale: 0.82,
+        dy: 1.6
+      }
+    ],
+    [
+      {
+        scale: 0.857,
+        dy: 1.7
+      },
+      {
+        scale: 0.82,
+        dy: 1.6
+      }
+    ]
+  ],
+  specialResidents: [
+    [
+      {
+        scale: 1.15,
+        dy: 2.3
+      },
+      {
+        scale: 0.82,
+        dy: 1.6
+      },
+      {
+        scale: 1.136,
+        dy: 2.3
+      },
+      {
+        scale: 1.15,
+        dy: 2.3
+      }
+    ],
+    [
+      {
+        scale: 0.926,
+        dy: 1.9
+      },
+      {
+        scale: 0.82,
+        dy: 1.6
+      },
+      {
+        scale: 1.15,
+        dy: 2.3
+      },
+      {
+        scale: 1.042,
+        dy: 2.1
+      }
+    ],
+    [
+      {
+        scale: 1.15,
+        dy: 2.3
+      },
+      {
+        scale: 1,
+        dy: 2
+      },
+      {
+        scale: 1,
+        dy: 2
+      },
+      {
+        scale: 1.15,
+        dy: 2.3
+      }
+    ],
+    [
+      {
+        scale: 0.926,
+        dy: 1.9
+      },
+      {
+        scale: 0.82,
+        dy: 1.6
+      },
+      {
+        scale: 0.893,
+        dy: 1.8
+      },
+      {
+        scale: 0.82,
+        dy: 1.6
       }
     ]
   ],

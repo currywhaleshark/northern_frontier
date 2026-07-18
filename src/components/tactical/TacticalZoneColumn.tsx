@@ -21,8 +21,10 @@ import {
   TACTICAL_CHARACTER_SHEET,
   TACTICAL_COURT_POSE_SHEET,
   TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET,
+  TACTICAL_HEALER_POSE_SHEET,
   TACTICAL_DEFENDER_ROLE_POSE_SHEET,
   TACTICAL_DEFENDER_WEAPON_POSE_SHEET,
+  TACTICAL_SPECIAL_RESIDENT_POSE_SHEET,
   TACTICAL_RAIDER_POSE_SHEET,
   tacticalBeastSheet,
   tacticalCourtMuzzleAnchor,
@@ -146,20 +148,29 @@ function DefenderSprite({ group, gender, pose = 'idle', firing = false, faded = 
     gender,
     resolvedPose,
     defaultWeapon,
+    group.special,
   );
   const muzzleAnchor = firing && resolvedPose === 'attack'
-    ? tacticalDefenderMuzzleAnchor(group.weapon, gender)
+    ? tacticalDefenderMuzzleAnchor(group.weapon, gender, group.special)
     : null;
   const sheet = cell.sheet === 'weapons'
     ? TACTICAL_DEFENDER_WEAPON_POSE_SHEET
     : cell.sheet === 'defaultWeapons'
       ? TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET
-      : TACTICAL_DEFENDER_ROLE_POSE_SHEET;
+      : cell.sheet === 'healers'
+        ? TACTICAL_HEALER_POSE_SHEET
+        : cell.sheet === 'specialResidents'
+          ? TACTICAL_SPECIAL_RESIDENT_POSE_SHEET
+          : TACTICAL_DEFENDER_ROLE_POSE_SHEET;
   const metricSheet = cell.sheet === 'weapons'
     ? 'defenderWeapons' as const
     : cell.sheet === 'defaultWeapons'
       ? 'defenderDefaultWeapons' as const
-      : 'defenderRoles' as const;
+      : cell.sheet === 'healers'
+        ? 'healers' as const
+        : cell.sheet === 'specialResidents'
+          ? 'specialResidents' as const
+          : 'defenderRoles' as const;
   return (
     <span
       className={`tactical-sprite tactical-defender role-${group.role} weapon-${group.weapon ?? 'unarmed'} default-weapon-${defaultWeapon ?? 'none'} pose-${resolvedPose}${faded ? ' faded' : ''}${falling ? ' falling' : ''}`}
@@ -515,6 +526,7 @@ function defenderPoseForEvent(
   if (event.kind === 'casualty' && event.groupId === group.id) return 'hurt';
   if ((event.kind === 'wallHit' || event.kind === 'zoneFall' || event.kind === 'artilleryHit' ||
       event.kind === 'beastAmbush') && event.side === 'defender') return 'hurt';
+  if (event.kind === 'report' && event.groupId === group.id && group.kind === 'healer') return 'attack';
   const capabilities = tacticalGroupCapabilities(group);
   if (defenderFiringForEvent(event, group)) return 'attack';
   if (event.kind === 'ambush' && event.side !== 'raider' && capabilities.has('ambush')) return 'attack';

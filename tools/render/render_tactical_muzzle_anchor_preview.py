@@ -46,6 +46,7 @@ def main() -> None:
         (attack_cell("defender-weapons-poses-v2.png", 6, 5), (19, 47), 20),
         (attack_cell("court-army-poses-v2.png", 5, 0), (50, 57), 24),
         (attack_cell("court-army-poses-v2.png", 5, 4), (58, 72), 38),
+        (attack_cell("special-resident-combat-poses-v1.png", 4, 3), (4, 60), 20),
     ]
     gap = 16
     width = sum(item[0].width * SCALE for item in entries) + gap * (len(entries) - 1)

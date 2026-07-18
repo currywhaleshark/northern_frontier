@@ -12,11 +12,14 @@
 | defender-roles-poses-v2.png | defenderRoles.json | 8칸 × 4줄, 셀 84×120px (전체 672×480) |
 | defender-weapons-poses-v2.png | defenderWeapons.json | 6칸 × 4줄, 셀 84×120px (전체 504×480) |
 | defender-default-weapons-poses-v1.png | defenderDefaultWeapons.json | 6칸 × 4줄, 셀 84×120px (전체 504×480) |
+| defender-healers-poses-v1.png | healers.json | 2칸 × 4줄, 셀 84×120px (전체 168×480) |
+| special-resident-combat-poses-v1.png | specialResidents.json | 4칸 × 4줄, 셀 84×120px (전체 336×480) |
 | faction-raiders-poses-v2.png | raiders.json | 6칸 × 4줄, 셀 168×120px (전체 1008×480) |
 | court-army-poses-v2.png | court.json | 5칸 × 4줄, 셀 168×120px (전체 840×480) |
 
-주의: 아군 3개 시트(defender*)는 공통 기준으로 정규화되므로 **셋 다 제공하는 것이
-가장 좋다.** 적 시트(raiders/court)는 각자 자기 시트 기준이라 개별 제공해도 된다.
+주의: 기존 아군 기준 3개 시트(defenderRoles/Weapons/DefaultWeapons)는 공통 기준으로
+정규화되므로 **셋 다 제공하는 것이 가장 좋다.** 치료반과 특수주민 시트는 머리 박스가
+없으면 각 시트 자체 휴리스틱 기준을 사용한다. 적 시트는 각자 자기 시트 기준이다.
 
 ---
 

@@ -23,6 +23,10 @@ assert.deepEqual(assets.TACTICAL_POSE_ROWS, {
 
 assert.equal(assets.TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET.src,
   '/assets/tactical/defender-default-weapons-poses-v1.png');
+assert.equal(assets.TACTICAL_HEALER_POSE_SHEET.src,
+  '/assets/tactical/defender-healers-poses-v1.png');
+assert.equal(assets.TACTICAL_SPECIAL_RESIDENT_POSE_SHEET.src,
+  '/assets/tactical/special-resident-combat-poses-v1.png');
 assert.equal(assets.tacticalDefaultWeaponPose({ id: 'militia-unarmed', role: 'militia', weapon: null }),
   'bambooSpear');
 assert.equal(assets.tacticalDefaultWeaponPose({ id: 'militia-unarmed-levy', role: 'militia', weapon: null }),
@@ -52,6 +56,27 @@ assert.deepEqual(assets.tacticalDefenderPoseCell('militia', 'hornBow', 'female',
 assert.deepEqual(assets.tacticalDefenderPoseCell('hunter', 'spear', 'male', 'attack'), {
   sheet: 'weapons', column: 0, row: 1,
 });
+assert.deepEqual(assets.tacticalDefenderPoseCell('healer', null, 'male', 'attack'), {
+  sheet: 'healers', column: 0, row: 1,
+});
+assert.deepEqual(assets.tacticalDefenderPoseCell('healer', null, 'female', 'idle'), {
+  sheet: 'healers', column: 1, row: 0,
+});
+assert.deepEqual(assets.tacticalDefenderPoseCell('militia', 'spear', 'male', 'attack', null, 'jurchenWarrior'), {
+  sheet: 'specialResidents', column: 0, row: 1,
+});
+assert.deepEqual(assets.tacticalDefenderPoseCell('hunter', null, 'male', 'idle', null, 'tigerHunter'), {
+  sheet: 'specialResidents', column: 1, row: 0,
+});
+assert.deepEqual(assets.tacticalDefenderPoseCell('healer', null, 'female', 'wounded', null, 'uinyeo'), {
+  sheet: 'specialResidents', column: 2, row: 3,
+});
+assert.deepEqual(assets.tacticalDefenderPoseCell('militia', 'musket', 'male', 'hurt', null, 'hangwae'), {
+  sheet: 'specialResidents', column: 3, row: 2,
+});
+assert.deepEqual(assets.tacticalDefenderPoseCell('militia', 'hornBow', 'male', 'idle', null, 'jurchenWarrior'), {
+  sheet: 'weapons', column: 2, row: 0,
+});
 assert.equal(assets.tacticalRaiderPoseCell('변경 마적', 'attack')?.row, 1);
 assert.equal(assets.tacticalCourtPoseCell('court-artillery', 'hurt').column, 4);
 assert.equal(assets.tacticalCourtPoseCell('court-artillery', 'hurt').row, 2);
@@ -60,6 +85,9 @@ assert.deepEqual(assets.tacticalDefenderMuzzleAnchor('musket', 'male'), {
 });
 assert.deepEqual(assets.tacticalDefenderMuzzleAnchor('musket', 'female'), {
   x: 19, y: 47, size: 'musket',
+});
+assert.deepEqual(assets.tacticalDefenderMuzzleAnchor('musket', 'male', 'hangwae'), {
+  x: 4, y: 60, size: 'musket',
 });
 assert.equal(assets.tacticalDefenderMuzzleAnchor('hornBow', 'male'), null);
 assert.deepEqual(assets.tacticalCourtMuzzleAnchor('court-gunner'), {
@@ -79,6 +107,8 @@ assert.doesNotMatch(screenSource, /className="fx-muzzle-flash"/, 'zone-fixed mus
 assert.match(screenSource, /tactical-unit-muzzle-flash/, 'muzzle flash must be anchored inside each firing sprite');
 assert.match(screenSource, /muzzleAnchor = firing && resolvedPose === 'attack'/,
   'attack poses must only show muzzle flash during a firing event');
+assert.match(screenSource, /tacticalDefenderMuzzleAnchor\(group\.weapon, gender, group\.special\)/,
+  'special resident muskets need their own verified muzzle anchor');
 assert.match(screenSource, /firing=\{recoiling\}/,
   'defender muzzle flash must follow the verified volley/recoil condition');
 assert.match(screenSource, /function arrowProjectileCountForZone/,
@@ -111,6 +141,8 @@ assert.match(screenSource, /role-\$\{group\.role\}/,
   'defender sprites must expose their role to visual sizing rules');
 assert.match(screenSource, /tacticalDefaultWeaponPose\(group\)/,
   'defender rendering must resolve role-specific default weapons from the live group');
+assert.match(screenSource, /event\.kind === 'report'[\s\S]*group\.kind === 'healer'[\s\S]*return 'attack'/,
+  'a healer treatment report must use the dedicated treatment action pose');
 assert.match(screenSource, /TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET/,
   'defender rendering must use the dedicated default weapon pose sheet');
 assert.match(screenSource, /group\.mount === 'horse'/,
@@ -141,6 +173,8 @@ const expectedMetricShapes = {
   defenderRoles: { rows: 4, columns: 8 },
   defenderWeapons: { rows: 4, columns: 6 },
   defenderDefaultWeapons: { rows: 4, columns: 6 },
+  healers: { rows: 4, columns: 2 },
+  specialResidents: { rows: 4, columns: 4 },
   raiders: { rows: 4, columns: 6 },
   court: { rows: 4, columns: 5 },
 };
