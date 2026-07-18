@@ -472,7 +472,16 @@ function startWindLoop(): void {
   lfo.start();
 }
 
-// 날씨에 맞춰 바람 세기를 조절 (매 프레임 불러도 안전)
+// 메뉴 전환은 기존 날씨가 다음 세션과 섞이지 않도록 같은 노드를 즉시 무음으로 만든다.
+export function stopWeatherAmbient(): void {
+  windTarget = 0;
+  if (!ctx || !windGain) return;
+  const now = ctx.currentTime;
+  windGain.gain.cancelScheduledValues(now);
+  windGain.gain.setValueAtTime(0, now);
+}
+
+// 날씨에 맞춰 바람 세기를 조절 (동일 목표를 반복 호출해도 안전)
 export function setWeatherAmbient(weather: WeatherId): void {
   if (!ctx || !windGain) return;
   const target =

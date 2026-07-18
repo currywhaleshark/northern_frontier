@@ -12,7 +12,7 @@ import {
 import { hasAnySave, loadGame, saveGame } from './game/saveLoad';
 import { SaveSlotDialog } from './components/SaveSlotDialog';
 import { addLog, negotiateTrade, requestTrade, tradeNegotiationOf } from './game/events';
-import { initAudio, isMuted, playSfx, setMuted, setWeatherAmbient } from './sound/sfx';
+import { initAudio, isMuted, playSfx, setMuted, stopWeatherAmbient, setWeatherAmbient } from './sound/sfx';
 import { AlertsPanel } from './components/AlertsPanel';
 import { BuildDrawer } from './components/BuildDrawer';
 import { DockFrame, type DockOverlayItem } from './components/dock/DockFrame';
@@ -159,7 +159,7 @@ export default function App() {
     };
   }, []);
 
-  // 게임 상태 변화 → 효과음/앰비언트 (렌더마다 증가분만 검사)
+  // 게임 상태 변화 → 효과음 (렌더마다 증가분만 검사)
   useEffect(() => {
     const s = stateRef.current;
     const m = sndRef.current;
@@ -196,10 +196,15 @@ export default function App() {
     }
     m.battleActive = !!s.battle;
     m.battleOutcome = s.battle?.outcome ?? (s.battle ? m.battleOutcome : null);
-    setWeatherAmbient(s.weather);
   });
 
   const state = stateRef.current;
+
+  // 화면 수명주기 → 날씨 앰비언트. 메뉴는 이전 게임의 날씨를 즉시 끊는다.
+  useEffect(() => {
+    if (screen === 'game') setWeatherAmbient(state.weather);
+    else stopWeatherAmbient();
+  }, [screen, state.weather]);
 
   // 직접 지휘를 시작하면 기존 배속을 버린다. 전투 종료 뒤 10배속이
   // 갑자기 재개되어 장작 고갈이나 동사 판정이 연달아 진행되는 일을 막는다.
