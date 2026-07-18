@@ -43,7 +43,7 @@ import { getPointerAction } from './selectionActions';
 import { createExploration, isBuildingFootprintExplored, refreshExploration } from './exploration';
 import { LUXURY_RESOURCES } from './resourceCatalog';
 import { DRYING_PRODUCT_DEFS } from './preservation';
-import { returnResidentCart, setResidentCartEquipped } from './equipment';
+import { haulerCarryCapacity, returnResidentCart, setResidentCartEquipped } from './equipment';
 import { reconcileMountAssignments, reconcileWeaponAssignments, setAutomaticWeaponAllocation } from './weapons';
 import { CURRENT_SCHEMA_VERSION } from './saveSchema';
 import { expeditionTick } from './expedition';
@@ -496,7 +496,7 @@ export function toggleResidentCart(state: GameState, id: number): string | null 
   addLog(
     state,
     equipping
-      ? `${resident.name}에게 수레를 장비했습니다. 적재량이 ${CONFIG.agents.haulerCartCarryCap}(으)로 늘어납니다.`
+      ? `${resident.name}에게 수레를 장비했습니다. 적재량이 ${haulerCarryCapacity(resident)}(으)로 늘어납니다.`
       : `${resident.name}의 수레를 마을 비축으로 돌려보냈습니다.`,
     'good',
   );

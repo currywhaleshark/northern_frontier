@@ -99,7 +99,8 @@ function addChild(state, stage) {
   assert.equal(child.literate, false);
   assert.equal(
     equipment.haulerCarryCapacity({ job: 'idle', cartEquipped: false, stage: 'child' }),
-    CONFIG.agents.haulerCarryCap * CONFIG.education.childLaborMult,
+    CONFIG.agents.haulerCarryCap * CONFIG.agents.carryCapacityMultiplier
+      * CONFIG.education.childLaborMult,
     'unschooled children haul at half share',
   );
 }

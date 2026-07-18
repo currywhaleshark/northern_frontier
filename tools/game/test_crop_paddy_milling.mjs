@@ -221,7 +221,8 @@ function makePaddyEligibleTile(state, x, y) {
   runTicks(state, 1);
 
   const milled = (CONFIG.production.millerRicePerDay / 5)
-    * CONFIG.production.rankLaborEfficiency[state.rank];
+    * CONFIG.production.rankLaborEfficiency[state.rank]
+    * CONFIG.production.resourceOutputMultiplier;
   assert.equal(miller.task, '방아 찧기');
   assert.ok(Math.abs(mill.inventory.rice - (10 - milled)) < 0.001, 'miller consumes rice delivered to the mill');
   assert.ok(Math.abs((mill.inventory.grain ?? 0) - (milled * CONFIG.production.grainPerRice)) < 0.001, 'miller stores edible grain at the mill');

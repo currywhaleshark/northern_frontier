@@ -269,7 +269,8 @@ function runTicks(state, ticks, sustainWorkers = []) {
   runTicks(state, 1);
   const take = 100 - plot.fieldGrowth;
   assert.ok(take > 0, 'harvest removes growth');
-  const expected = (take / 100) * CROP_DEFS.millet.yield * 4;
+  const expected = (take / 100) * CROP_DEFS.millet.yield * 4
+    * CONFIG.production.resourceOutputMultiplier;
   const got = plot.inventory?.grain ?? 0;
   assert.ok(Math.abs(got - expected) < 0.005, `yield scales with sown tiles (expected ${expected}, got ${got})`);
 }

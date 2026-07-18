@@ -5,15 +5,24 @@ function carriedAmount(resident: Resident): number {
   return Object.values(resident.carrying).reduce((sum, amount) => sum + (amount ?? 0), 0);
 }
 
+export function scaledCarryCapacity(base: number): number {
+  return base * CONFIG.agents.carryCapacityMultiplier;
+}
+
+export function haulingMoveSpeedMultiplier(resident: Pick<Resident, 'job'>): number {
+  return resident.job === 'hauler' ? CONFIG.agents.haulerMoveSpeedMultiplier : 1;
+}
+
 export function haulerCarryCapacity(
   resident: Pick<Resident, 'job' | 'cartEquipped' | 'stage'>,
 ): number {
   const base = resident.job === 'hauler' && resident.cartEquipped
     ? CONFIG.agents.haulerCartCarryCap
     : CONFIG.agents.haulerCarryCap;
+  const adjustedBase = scaledCarryCapacity(base);
   // 어린이 심부름과 소년 운반 노동은 각각 명시된 반몫만 적용한다.
-  if (resident.stage === 'youth') return base * CONFIG.lifecycle.youthWorkEfficiency;
-  return resident.stage ? base * CONFIG.education.childLaborMult : base;
+  if (resident.stage === 'youth') return adjustedBase * CONFIG.lifecycle.youthWorkEfficiency;
+  return resident.stage ? adjustedBase * CONFIG.education.childLaborMult : adjustedBase;
 }
 
 export function returnResidentCart(state: GameState, resident: Resident): boolean {
@@ -39,8 +48,9 @@ export function setResidentCartEquipped(
     return null;
   }
 
-  if (carriedAmount(resident) > CONFIG.agents.haulerCarryCap + 0.0001) {
-    return `짐을 ${CONFIG.agents.haulerCarryCap} 이하로 내린 뒤 수레를 반납할 수 있습니다.`;
+  const uncartedCapacity = scaledCarryCapacity(CONFIG.agents.haulerCarryCap);
+  if (carriedAmount(resident) > uncartedCapacity + 0.0001) {
+    return `짐을 ${uncartedCapacity} 이하로 내린 뒤 수레를 반납할 수 있습니다.`;
   }
   returnResidentCart(state, resident);
   return null;

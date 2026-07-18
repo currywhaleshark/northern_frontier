@@ -110,7 +110,8 @@ const jinHarvest = prepareAutumnFarmer(2026071711, 'jin');
 assert.ok(settlementHarvest > 0, 'control farmer harvests grain');
 assert.ok(Math.abs(jinHarvest / settlementHarvest - CONFIG.production.rankLaborEfficiency.jin) < 0.000001,
   'the actual farmer output path receives the configured jin efficiency multiplier');
-assert.ok(jinHarvest < (CONFIG.agents.work.harvestPerSubtick * CONFIG.farming.tilesPerFarmer / 100) * CROP_DEFS.millet.yield * 1.2,
+assert.ok(jinHarvest < (CONFIG.agents.work.harvestPerSubtick * CONFIG.farming.tilesPerFarmer / 100)
+  * CROP_DEFS.millet.yield * CONFIG.production.resourceOutputMultiplier * 1.2,
   'the rank bonus remains a moderate adjustment rather than a production spike');
 
 const courtWindowSource = readFileSync(new URL('../../src/components/dock/CourtWindow.tsx', import.meta.url), 'utf8');

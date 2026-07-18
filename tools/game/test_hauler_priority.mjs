@@ -83,11 +83,13 @@ function setupSingleHauler(seed = 9001) {
   site.inventory.stone = 9;
   simulation.advanceTick(state);
 
+  const expectedCapacity = CONFIG.agents.haulerCarryCap * CONFIG.agents.carryCapacityMultiplier;
   assert.equal(hauler.carrying.meat, 2, 'food inventory is collected before stone');
-  assert.equal(hauler.carrying.stone, 8, 'remaining capacity is filled from the same site');
-  assert.equal(Object.values(hauler.carrying).reduce((sum, amount) => sum + amount, 0), 10);
+  assert.equal(hauler.carrying.stone, expectedCapacity - 2,
+    'remaining capacity includes the release carrying adjustment and is filled from the same site');
+  assert.equal(Object.values(hauler.carrying).reduce((sum, amount) => sum + amount, 0), expectedCapacity);
   assert.equal(site.inventory.meat, 0);
-  assert.equal(site.inventory.stone, 1);
+  assert.equal(site.inventory.stone, 0);
 }
 
 {
@@ -160,7 +162,8 @@ function setupSingleHauler(seed = 9001) {
   assert.equal(state.resources.carts, 0);
   simulation.advanceTick(state);
 
-  assert.equal(hauler.carrying.grain, CONFIG.agents.haulerCartCarryCap);
+  assert.equal(hauler.carrying.grain,
+    CONFIG.agents.haulerCartCarryCap * CONFIG.agents.carryCapacityMultiplier);
   assert.ok(simulation.toggleResidentCart(state, hauler.id)?.includes('짐을'));
 
   hauler.carrying = {};

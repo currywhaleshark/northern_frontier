@@ -8,7 +8,7 @@ import {
 import { JOB_NAMES, RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
 import { enrolledStudentIds, skillGainMult } from './education';
-import { haulerCarryCapacity } from './equipment';
+import { haulerCarryCapacity, haulingMoveSpeedMultiplier, scaledCarryCapacity } from './equipment';
 import { collectHuntableTiles } from './habitats';
 import { makeRng } from './map';
 import { buryCorpse, cemeteryFreePlots, corpsesOf, laborEfficiencyMult, nextCorpseToCollect } from './lifecycle';
@@ -52,7 +52,8 @@ interface Ctx {
   season: Season;
   outdoor: number;
   tMod: number;   // 도구 보정
-  mMod: number;   // 사기 보정
+  mMod: number;   // 사기·관청·등급 노동 보정
+  outputMod: number; // mMod에 RC 자원 산출 보정을 한 번만 합성
   rng: () => number;
   centerId: number;
   huntable: Map<string, number>; // 사냥 가능 타일 ("x,y") → 수확 배율 — 서식지 범위/크기와 연동
@@ -299,12 +300,13 @@ export function findPath(
 
 const bfs = findPath;
 
-function moveSteps(state: GameState, ctx: Ctx): number {
+function moveSteps(state: GameState, r: Resident, ctx: Ctx): number {
   let sp: number = CONFIG.agents.moveSpeed;
   if (ctx.season === 'winter') sp = CONFIG.agents.moveSpeedWinter;
   if (state.weather === 'blizzard' || state.weather === 'heavySnow') {
     sp = Math.min(sp, CONFIG.agents.moveSpeedSnow);
   }
+  sp *= haulingMoveSpeedMultiplier(r);
   const n = Math.floor(sp);
   return n + (ctx.rng() < sp - n ? 1 : 0);
 }
@@ -342,7 +344,7 @@ function goTo(
     pathFailUntil.delete(r.id);
     r.path = p;
   }
-  const steps = moveSteps(state, ctx);
+  const steps = moveSteps(state, r, ctx);
   for (let i = 0; i < steps && r.path.length > 0; i++) {
     const next = r.path[0];
     if (!canPass(next.x, next.y)) { r.path = []; return 'moving'; } // 다음 틱에 재탐색
@@ -598,7 +600,7 @@ function isWorkplaceInputStock(building: Building, resource: ResourceId): boolea
 
 function processorCarryCapacity(resource: ResourceId): number {
   const capacities = CONFIG.agents.carryCap as Partial<Record<ResourceId, number>>;
-  return capacities[resource] ?? CONFIG.agents.haulerCarryCap;
+  return scaledCarryCapacity(capacities[resource] ?? CONFIG.agents.haulerCarryCap);
 }
 
 function unloadWorkplaceInputs(building: Building, resident: Resident, inputs: Set<ResourceId>): void {
@@ -769,7 +771,8 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
     knownGoal = describeGoal(knownGoal, field.goals, field);
   }
   // 짐이 찼거나 하역 중이면 거점으로
-  if (carryTotal(r) >= o.cap || (r.phase === 'toDeposit' && carryTotal(r) > 0)) {
+  if (carryTotal(r) >= scaledCarryCapacity(o.cap) ||
+    (r.phase === 'toDeposit' && carryTotal(r) > 0)) {
     r.phase = 'toDeposit';
     r.task = o.taskHaul;
     const targets = o.depositTargets?.(state, r) ?? depositBuildings(state, o.depositExtra);
@@ -796,7 +799,7 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
     gainSkillTick(r);
     if (r.workTimer <= 0) {
       const base = typeof o.yieldAmt === 'function' ? o.yieldAmt(state.map[r.y][r.x]) : o.yieldAmt;
-      const requested = base * ctx.tMod * ctx.mMod * effOf(r);
+      const requested = base * ctx.tMod * ctx.outputMod * effOf(r);
       const amt = Math.max(0, o.adjustHarvestAmount?.(state.map[r.y][r.x], r, requested) ?? requested);
       if (amt > 0) addCarry(r, o.yieldRes, amt);
       o.onHarvest?.(state.map[r.y][r.x], r, amt);
@@ -1158,7 +1161,7 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
         : 0;
       const fertile = target.type === 'field' ? 1 + fertileFraction * (p.fertileBonus - 1) : 1;
       // 소출은 파종을 마친 칸수에 비례한다 — 1×1 만작이면 기존과 동일
-      addBuildingStock(target, crop.output, (take / 100) * crop.yield * sown * fertile * ctx.mMod);
+      addBuildingStock(target, crop.output, (take / 100) * crop.yield * sown * fertile * ctx.outputMod);
       if (ctx.season === 'autumn' && (crop.output === 'grain' || crop.output === 'rice')) {
         addBuildingStock(target, 'hay', hayFromHarvestProgress(take * sown));
       }
@@ -1597,7 +1600,7 @@ function millerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const mill = assignedWorkplace(state, r, ctx, 'watermill', '방앗간 배정 없음');
   if (!mill) return;
 
-  const target = (p.millerRicePerDay / 5) * effOf(r) * ctx.mMod;
+  const target = (p.millerRicePerDay / 5) * effOf(r) * ctx.outputMod;
   if (supplyWorkplaceInputs(state, r, ctx, mill, { rice: target })) return;
 
   const st = goTo(state, r, ctx, buildingGoal(state, mill.id));
@@ -1624,7 +1627,7 @@ function millerTick(state: GameState, r: Resident, ctx: Ctx): void {
 function woodSplitterTick(state: GameState, r: Resident, ctx: Ctx): void {
   const shed = assignedWorkplace(state, r, ctx, 'woodShed', '장작마당 배정 없음');
   if (!shed) return;
-  const target = (CONFIG.production.firewoodWoodPerDay / 5) * effOf(r) * ctx.mMod;
+  const target = (CONFIG.production.firewoodWoodPerDay / 5) * effOf(r) * ctx.outputMod;
   if (supplyWorkplaceInputs(state, r, ctx, shed, { wood: target })) return;
   const st = goTo(state, r, ctx, buildingGoal(state, shed.id));
   if (st !== 'arrived') {
@@ -1686,7 +1689,7 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
   const def = SMITHY_PRODUCT_DEFS[product];
   // 도망 야장 막쇠 '천출의 망치' — 본인의 산출이 오른다
   const specialMult = r.special === 'runawaySmith' ? CONFIG.specialResidents.runawaySmithSmithyMult : 1;
-  const target = (def.ratePerDay / 5) * effOf(r) * ctx.mMod * specialMult;
+  const target = (def.ratePerDay / 5) * effOf(r) * ctx.outputMod * specialMult;
   const requirements = smithInputRequirements(product, target);
 
   if (carryTotal(r) > 0) {
@@ -1781,13 +1784,13 @@ function curerTick(state: GameState, r: Resident, ctx: Ctx): void {
         ? CONFIG.production.charcoalPerCuredMeat
         : CONFIG.production.firewoodPerCuredMeat,
     };
-    target = (CONFIG.production.curedMeatPerDay / 5) * effOf(r) * ctx.mMod;
+    target = (CONFIG.production.curedMeatPerDay / 5) * effOf(r) * ctx.outputMod;
     task = '고기 훈연 중';
   } else {
     const def = DRYING_PRODUCT_DEFS[dryingProductOf(workplace)];
     output = def.output;
     inputs = def.inputPerUnit;
-    target = (def.ratePerDay / 5) * effOf(r) * ctx.mMod;
+    target = (def.ratePerDay / 5) * effOf(r) * ctx.outputMod;
     task = def.task;
     rainBlocked = def.stopsInRain && state.weather === 'rain';
   }
@@ -1834,7 +1837,7 @@ function potterTick(state: GameState, r: Resident, ctx: Ctx): void {
       ? CONFIG.production.charcoalPerOnggi
       : CONFIG.production.firewoodPerOnggi,
   };
-  const target = (CONFIG.production.onggiPerDay / 5) * effOf(r) * ctx.mMod;
+  const target = (CONFIG.production.onggiPerDay / 5) * effOf(r) * ctx.outputMod;
   const requirements = scaledRequirements(inputs, target);
 
   if (carryTotal(r) > 0) {
@@ -1945,7 +1948,7 @@ function charcoalBurnerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const kiln = assignedWorkplace(state, r, ctx, 'charcoalKiln', '숯가마 배정 없음');
   if (!kiln) return;
 
-  const target = (p.charcoalWoodPerDay / 5) * effOf(r) * ctx.mMod;
+  const target = (p.charcoalWoodPerDay / 5) * effOf(r) * ctx.outputMod;
   if (supplyWorkplaceInputs(state, r, ctx, kiln, { wood: target })) return;
 
   const st = goTo(state, r, ctx, buildingGoal(state, kiln.id));
@@ -1988,7 +1991,7 @@ function herderTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
 
-  const product = livestockProductForHerder(livestock, ctx.season, (effOf(r) * ctx.mMod) / SUBTICKS);
+  const product = livestockProductForHerder(livestock, ctx.season, (effOf(r) * ctx.outputMod) / SUBTICKS);
   if (product && product.amount > 0) addBuildingStock(stable, product.resource, product.amount);
   r.phase = 'working';
   r.task = product?.task ?? '가축 돌보기';
@@ -2032,7 +2035,7 @@ function powderMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const yard = assignedWorkplace(state, r, ctx, 'nitreYard', '질초장 배정 없음');
   if (!yard) return;
 
-  const target = (p.gunpowderPerDay / 5) * effOf(r) * ctx.mMod;
+  const target = (p.gunpowderPerDay / 5) * effOf(r) * ctx.outputMod;
   const requirements = {
     firewood: target * p.gunpowderFirewoodPerPowder,
     stone: target * p.gunpowderStonePerPowder,
@@ -2068,7 +2071,7 @@ function tannerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const tannery = assignedWorkplace(state, r, ctx, 'tannery', '무두장 배정 없음');
   if (!tannery) return;
 
-  const target = (p.tanneryHidePerDay / 5) * effOf(r) * ctx.mMod;
+  const target = (p.tanneryHidePerDay / 5) * effOf(r) * ctx.outputMod;
   if (supplyWorkplaceInputs(state, r, ctx, tannery, { hide: target })) return;
 
   const st = goTo(state, r, ctx, buildingGoal(state, tannery.id));
@@ -2098,7 +2101,7 @@ function tannerTick(state: GameState, r: Resident, ctx: Ctx): void {
 function weaverTick(state: GameState, r: Resident, ctx: Ctx): void {
   const weavingHouse = assignedWorkplace(state, r, ctx, 'weavingHouse', '베틀집 배정 없음');
   if (!weavingHouse) return;
-  const target = (CONFIG.production.weaverCottonPerDay / 5) * effOf(r) * ctx.mMod;
+  const target = (CONFIG.production.weaverCottonPerDay / 5) * effOf(r) * ctx.outputMod;
   const cottonAvailable = buildingStock(weavingHouse, 'cotton') + (state.resources.cotton ?? 0);
   const woolAvailable = buildingStock(weavingHouse, 'wool') + (state.resources.wool ?? 0);
   const input: 'cotton' | 'wool' = cottonAvailable > 0.05 || woolAvailable <= 0.05 ? 'cotton' : 'wool';
@@ -2290,11 +2293,14 @@ export function agentsTick(state: GameState): void {
     else if (resident.job === 'miner') goalFieldUserCounts.mineral++;
   }
 
+  const laborOutputMod = (0.8 + (mAvg / 100) * 0.4) * officeEfficiencyMultiplier(state) *
+    rankProductionEfficiency(state.rank);
   const ctx: Ctx = {
     season,
     outdoor: outdoorMult(state.weather),
     tMod,
-    mMod: (0.8 + (mAvg / 100) * 0.4) * officeEfficiencyMultiplier(state) * rankProductionEfficiency(state.rank),
+    mMod: laborOutputMod,
+    outputMod: laborOutputMod * CONFIG.production.resourceOutputMultiplier,
     rng,
     centerId: center ? center.id : -1,
     huntable: collectHuntableTiles(state.map, state.habitats, CONFIG.agents.hunting),

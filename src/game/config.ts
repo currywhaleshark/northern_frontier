@@ -272,6 +272,8 @@ export const CONFIG = {
   },
 
   production: {
+    // RC 장기 측정의 초반 아사·냉사 완화: 변환비는 그대로 두고 노동 산출만 소폭 높인다.
+    resourceOutputMultiplier: 1.08,
     // 승격으로 전문직이 늘어나는 만큼 작업 조직·도구 운용이 정비된다.
     // 개척지 초반 난이도는 유지하고 보 이후의 기초·가공 생산만 보완한다.
     rankLaborEfficiency: {
@@ -394,7 +396,9 @@ export const CONFIG = {
     moveSpeed: 2,             // 서브틱당 이동 타일 수
     moveSpeedWinter: 1.5,     // 겨울 눈길
     moveSpeedSnow: 1,         // 폭설/눈보라
+    haulerMoveSpeedMultiplier: 1.1, // 운반꾼 왕복 이동만 소폭 보완
     shelterThreshold: 0.3,    // 실외작업 중단 기준 (날씨 효율이 이 밑이면 대피)
+    carryCapacityMultiplier: 1.1, // 채집·가공 원료·운반꾼 적재량 공용 보정
     carryCap: {
       grain: 6, rice: 6, meat: 5, eggs: 5, milk: 5, fish: 5, curedMeat: 5, saltedFish: 5, driedFish: 5, vegetables: 5, kimchi: 5, beans: 5, jang: 5,
       brushwood: 4, firewood: 4, charcoal: 3, wood: 4,

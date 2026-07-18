@@ -27,6 +27,7 @@ const fermentation = await import(pathToFileURL(join(compiledDir, 'fermentation.
 const kimjang = await import(pathToFileURL(join(compiledDir, 'kimjang.mjs')).href);
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const spoilage = await import(pathToFileURL(join(compiledDir, 'spoilage.mjs')).href);
+const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 function prepare(seed) {
   const state = simulation.newGame(seed);
@@ -247,9 +248,11 @@ function runUntil(state, predicate, maxTicks = 100) {
   const yard = addBuilt(state, 'jangdokdae', 10, 2, { kimchi: 12 });
   worker(state, 0, 'hauler', 9, 2);
 
-  runUntil(state, () => (yard.inventory.kimchi ?? 0) <= 0.05, 200);
+  runUntil(state, () => state.resources.kimchi > 0, 200);
 
-  assert.equal(yard.inventory.kimchi, 0);
+  assert.ok(yard.inventory.kimchi < 12, 'the first adjusted hauler load leaves the yard');
+  assert.ok(yard.inventory.kimchi < CONFIG.agents.haulerBatchMin,
+    'a sub-batch remainder may wait for the next finished batch');
   assert.ok(state.resources.kimchi > 0, 'transported kimchi reaches settlement meals');
 }
 
