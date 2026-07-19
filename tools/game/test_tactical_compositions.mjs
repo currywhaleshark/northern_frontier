@@ -49,6 +49,11 @@ assert.equal(units.tacticalUnitProfile('court-cavalry').label, '기창 기병');
 for (const deferredId of ['court-mortar', 'court-mounted-flail', 'scout', 'banner-crew']) {
   assert.equal(profiles.some(profile => profile.id === deferredId), false, `${deferredId} remains outside the MVP type set`);
 }
+assert.deepEqual(
+  profiles.filter(profile => profile.implementationPhase === 2 && profile.enabled).map(profile => profile.id),
+  ['shield-infantry', 'deserter-musketeer', 'wall-breaker', 'court-shield', 'court-horse-archer'],
+  'phase 2 activates exactly the agreed matchup profiles',
+);
 
 const templates = compositions.tacticalCompositionTemplates();
 assert.equal(new Set(templates.map(template => template.id)).size, templates.length, 'composition IDs are unique');
@@ -92,6 +97,15 @@ assert.equal(
   undefined,
   'an invalid cross-faction simulator override is rejected',
 );
+const phase2State = simulation.newGame(2026072055);
+phase2State.relations['조정 토벌군'] = 0;
+const phase2Battle = tacticalBattle.createTacticalBattle(phase2State, {
+  factionName: '조정 토벌군', power: 160, warned: true, siege: true, mode: 'garrison',
+  forcedDoctrine: 'shieldedAdvance', forcedCompositionTemplateId: 'court-shielded-advance',
+  maximumCompositionPhase: 2,
+});
+assert.equal(phase2Battle.enemyPlan?.compositionTemplateId, 'court-shielded-advance');
+assert.ok(phase2Battle.raiderGroups.some(group => group.unitType === 'court-shield'));
 const compositionOnlyOverride = enemyPlan.createEnemyPlan({
   factionName: '조정 토벌군', power: 160, relation: 0, revealed: false,
   flankRoll: 0.1, objectiveRoll: 0.2, stratagemRoll: 0.3,
@@ -219,6 +233,10 @@ assert.deepEqual(summary.composition.groups.map(group => ({
   { label: '궁기병', exact: false, count: undefined, unitType: undefined },
 ]);
 assert.equal(summary.hiddenStratagemCount, 1);
+assert.equal(summary.intentSignals.doctrineId, 'shockBreakthrough');
+assert.deepEqual(summary.intentSignals.groups.map(group => group.groupId), ['lancers']);
+assert.ok(summary.intentSignals.groups[0].signal.length > 0,
+  'the backend selector owns visible per-group action signal copy');
 
 const hiddenSummary = enemyPlan.enemyPlanSummaryView({
   ...intelBattle,
@@ -230,10 +248,12 @@ const hiddenSummary = enemyPlan.enemyPlanSummaryView({
 assert.equal(hiddenSummary.objective.label, '미확인');
 assert.equal(hiddenSummary.doctrine.label, '미확인');
 assert.equal(hiddenSummary.composition.templateLabel, '미확인 편제');
+assert.equal(hiddenSummary.intentSignals.doctrineLabel, '미확인 교리');
 assert.deepEqual(hiddenSummary.composition.groups.map(group => group.label), ['창기병'],
   'without composition intel only already sighted groups appear, and only by category');
 
 assert.equal(events.isKnownTacticalAnimationEventKind('rearAssault'), true);
+assert.equal(events.isKnownTacticalAnimationEventKind('doctrineShift'), true);
 assert.equal(events.isKnownTacticalAnimationEventKind('futureRouteArrival'), false,
   'frontends can safely skip an unknown future animation event kind');
 

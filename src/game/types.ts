@@ -792,6 +792,15 @@ export type TacticalUnitArchetype =
   | 'directArtillery'
   | 'indirectArtillery'
   | 'medic';
+export type TacticalAiState =
+  | 'forming'
+  | 'probing'
+  | 'engaging'
+  | 'withdrawing'
+  | 'committingReserve'
+  | 'routeTransit'
+  | 'routeEngagement'
+  | 'exiting';
 
 export interface EnemyCounterBreakdown {
   intelligence: number;
@@ -850,6 +859,14 @@ export interface TacticalUnitProfile {
   factions: readonly TacticalEnemyFactionId[];
   intelCategory: string;
   defaultLine: TacticalFormationLine;
+  rangedMultiplier: number;
+  meleeMultiplier: number;
+  chargeMultiplier: number;
+  protectionMultiplier: number;
+  mobility: 1 | 2 | 3;
+  wallPressure: number;
+  routeSpeed: 1 | 2;
+  targetPriorities: readonly TacticalUnitTag[];
   implementationPhase: 1 | 2 | 8;
   enabled: boolean;
 }
@@ -974,6 +991,9 @@ export interface TacticalRaiderGroup {
   killed: number;
   morale: number;
   intent: 'advance' | 'loot' | 'flank' | 'breakWall' | 'defend' | 'escape' | 'withdraw';
+  aiState?: TacticalAiState;
+  aiStateChangedRound?: number;
+  intentLockedUntilRound?: number;
   revealed: boolean;
   confused?: boolean;
   combatMultiplier?: number;
@@ -1024,6 +1044,7 @@ export type TacticalAnimationEventKind =
     | 'beastRout'
     | 'casualty'
     | 'moraleBreak'
+    | 'doctrineShift'
     | 'report';
 
 export interface TacticalAnimationEvent {

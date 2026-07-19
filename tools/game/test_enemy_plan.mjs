@@ -215,14 +215,23 @@ function wallBreakerBattle(seed, countered) {
   wallBattle.prepPoints = 5;
   if (countered) assert.equal(tactical.spendPreparationAction(wallState, 'repairWall'), null);
   assert.equal(tactical.advanceTacticalPhase(wallState), null);
-  return wallBattle.raiderGroups.find(group => group.kind === 'main');
+  return {
+    group: wallBattle.raiderGroups.find(group => group.unitType === 'wall-breaker'),
+    effectScale: enemyPlan.enemyPlanStratagemScale(wallBattle.enemyPlan, 'wallBreakers'),
+  };
 }
 const fullBreakers = wallBreakerBattle(2026071502, false);
 const counteredBreakers = wallBreakerBattle(2026071502, true);
-assert.ok(fullBreakers.wallPressureBonus > counteredBreakers.wallPressureBonus,
-  'wall repair attenuates the wall-breaker pressure bonus');
-assert.ok(fullBreakers.lossResistance > counteredBreakers.lossResistance,
-  'countered wall breakers lose most of their extra casualty vulnerability');
+assert.ok(fullBreakers.group && counteredBreakers.group,
+  'the wall-breaker stratagem materializes as an actual targetable group');
+assert.ok(
+  engagement.tacticalUnitWallPressure(
+    fullBreakers.group, 'breachAndStorm', fullBreakers.effectScale,
+  ) > engagement.tacticalUnitWallPressure(
+    counteredBreakers.group, 'breachAndStorm', counteredBreakers.effectScale,
+  ),
+  'wall repair attenuates the actual wall-breaker group pressure',
+);
 
 const consequenceInput = {
   zone: {

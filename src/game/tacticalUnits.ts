@@ -1,8 +1,82 @@
 import type {
-  RaiderUnitType, TacticalEnemyFactionId, TacticalUnitProfile,
+  RaiderUnitType, TacticalEnemyFactionId, TacticalUnitArchetype, TacticalUnitProfile,
 } from './types';
 
-const PROFILES: Record<RaiderUnitType, TacticalUnitProfile> = {
+type TacticalUnitIdentity = Omit<TacticalUnitProfile,
+  'rangedMultiplier' | 'meleeMultiplier' | 'chargeMultiplier' | 'protectionMultiplier' |
+  'mobility' | 'wallPressure' | 'routeSpeed' | 'targetPriorities'>;
+
+const ARCHETYPE_COMBAT: Record<TacticalUnitArchetype, Pick<TacticalUnitProfile,
+  'rangedMultiplier' | 'meleeMultiplier' | 'chargeMultiplier' | 'protectionMultiplier' |
+  'mobility' | 'wallPressure' | 'routeSpeed' | 'targetPriorities'>> = {
+  lightCavalry: {
+    rangedMultiplier: 1.02, meleeMultiplier: 0.86, chargeMultiplier: 1.08,
+    protectionMultiplier: 0.92, mobility: 3, wallPressure: 0, routeSpeed: 2,
+    targetPriorities: ['ranged', 'support'],
+  },
+  horseArcher: {
+    rangedMultiplier: 1.16, meleeMultiplier: 0.7, chargeMultiplier: 0.82,
+    protectionMultiplier: 0.9, mobility: 3, wallPressure: 0, routeSpeed: 2,
+    targetPriorities: ['ranged', 'support'],
+  },
+  lancerCavalry: {
+    rangedMultiplier: 0.62, meleeMultiplier: 1.08, chargeMultiplier: 1.35,
+    protectionMultiplier: 0.92, mobility: 3, wallPressure: 0, routeSpeed: 2,
+    targetPriorities: ['infantry', 'ranged'],
+  },
+  spearInfantry: {
+    rangedMultiplier: 0.55, meleeMultiplier: 1.05, chargeMultiplier: 0.85,
+    protectionMultiplier: 1.05, mobility: 1, wallPressure: 1, routeSpeed: 1,
+    targetPriorities: ['mounted'],
+  },
+  shieldInfantry: {
+    rangedMultiplier: 0.45, meleeMultiplier: 0.82, chargeMultiplier: 0.75,
+    protectionMultiplier: 1.28, mobility: 1, wallPressure: 1, routeSpeed: 1,
+    targetPriorities: ['ranged'],
+  },
+  footArcher: {
+    rangedMultiplier: 1.12, meleeMultiplier: 0.65, chargeMultiplier: 0.65,
+    protectionMultiplier: 0.88, mobility: 1, wallPressure: 0, routeSpeed: 1,
+    targetPriorities: ['mounted', 'infantry'],
+  },
+  musketeer: {
+    rangedMultiplier: 1.22, meleeMultiplier: 0.62, chargeMultiplier: 0.6,
+    protectionMultiplier: 0.86, mobility: 1, wallPressure: 0, routeSpeed: 1,
+    targetPriorities: ['shielded', 'artillery'],
+  },
+  meleeInfantry: {
+    rangedMultiplier: 0.55, meleeMultiplier: 1.12, chargeMultiplier: 1.08,
+    protectionMultiplier: 1, mobility: 1, wallPressure: 2, routeSpeed: 1,
+    targetPriorities: ['infantry', 'siege'],
+  },
+  looterInfantry: {
+    rangedMultiplier: 0.5, meleeMultiplier: 0.85, chargeMultiplier: 0.9,
+    protectionMultiplier: 0.84, mobility: 2, wallPressure: 1, routeSpeed: 2,
+    targetPriorities: ['support'],
+  },
+  wallBreaker: {
+    rangedMultiplier: 0.35, meleeMultiplier: 0.72, chargeMultiplier: 0.6,
+    protectionMultiplier: 0.68, mobility: 1, wallPressure: 10, routeSpeed: 1,
+    targetPriorities: ['siege'],
+  },
+  directArtillery: {
+    rangedMultiplier: 1.15, meleeMultiplier: 0.3, chargeMultiplier: 0.3,
+    protectionMultiplier: 0.72, mobility: 1, wallPressure: 8, routeSpeed: 1,
+    targetPriorities: ['siege', 'shielded'],
+  },
+  indirectArtillery: {
+    rangedMultiplier: 1.2, meleeMultiplier: 0.25, chargeMultiplier: 0.25,
+    protectionMultiplier: 0.68, mobility: 1, wallPressure: 2, routeSpeed: 1,
+    targetPriorities: ['ranged', 'mounted', 'support'],
+  },
+  medic: {
+    rangedMultiplier: 0.2, meleeMultiplier: 0.25, chargeMultiplier: 0.2,
+    protectionMultiplier: 0.7, mobility: 1, wallPressure: 0, routeSpeed: 1,
+    targetPriorities: [],
+  },
+};
+
+const PROFILES: Record<RaiderUnitType, TacticalUnitIdentity> = {
   'nimacha-hunter': {
     id: 'nimacha-hunter', label: '숲 사냥꾼', archetype: 'footArcher',
     tags: ['infantry', 'ranged', 'scout'], factions: ['nimacha'], intelCategory: '보병 궁수',
@@ -76,27 +150,27 @@ const PROFILES: Record<RaiderUnitType, TacticalUnitProfile> = {
   'shield-infantry': {
     id: 'shield-infantry', label: '방패꾼', archetype: 'shieldInfantry',
     tags: ['infantry', 'shielded'], factions: ['nimacha', 'bandit'], intelCategory: '방패보병',
-    defaultLine: 'front', implementationPhase: 2, enabled: false,
+    defaultLine: 'front', implementationPhase: 2, enabled: true,
   },
   'deserter-musketeer': {
     id: 'deserter-musketeer', label: '탈영 총포수', archetype: 'musketeer',
     tags: ['infantry', 'ranged', 'firearm'], factions: ['bandit'], intelCategory: '총포수',
-    defaultLine: 'middle', implementationPhase: 2, enabled: false,
+    defaultLine: 'middle', implementationPhase: 2, enabled: true,
   },
   'wall-breaker': {
     id: 'wall-breaker', label: '파책조', archetype: 'wallBreaker',
-    tags: ['infantry', 'siege'], factions: ['nimacha', 'bandit'], intelCategory: '파책 도구',
-    defaultLine: 'front', implementationPhase: 2, enabled: false,
+    tags: ['infantry', 'siege'], factions: ['nimacha', 'bandit', 'court'], intelCategory: '파책 도구',
+    defaultLine: 'front', implementationPhase: 2, enabled: true,
   },
   'court-shield': {
     id: 'court-shield', label: '방패수', archetype: 'shieldInfantry',
     tags: ['infantry', 'shielded'], factions: ['court'], intelCategory: '방패보병',
-    defaultLine: 'front', implementationPhase: 2, enabled: false,
+    defaultLine: 'front', implementationPhase: 2, enabled: true,
   },
   'court-horse-archer': {
     id: 'court-horse-archer', label: '관군 궁기병', archetype: 'horseArcher',
     tags: ['mounted', 'ranged'], factions: ['court'], intelCategory: '궁기병',
-    defaultLine: 'middle', implementationPhase: 2, enabled: false,
+    defaultLine: 'middle', implementationPhase: 2, enabled: true,
   },
   'court-medic': {
     id: 'court-medic', label: '의원대', archetype: 'medic',
@@ -113,11 +187,20 @@ const PROFILES: Record<RaiderUnitType, TacticalUnitProfile> = {
 export const TACTICAL_UNIT_PROFILE_IDS = Object.freeze(Object.keys(PROFILES) as RaiderUnitType[]);
 
 export function tacticalUnitProfile(id: RaiderUnitType): TacticalUnitProfile {
-  return PROFILES[id];
+  const identity = PROFILES[id];
+  return { ...identity, ...ARCHETYPE_COMBAT[identity.archetype] };
+}
+
+export function tacticalUnitProfileOrUndefined(
+  id: RaiderUnitType | string | undefined,
+): TacticalUnitProfile | undefined {
+  return id && Object.prototype.hasOwnProperty.call(PROFILES, id)
+    ? tacticalUnitProfile(id as RaiderUnitType)
+    : undefined;
 }
 
 export function tacticalUnitProfiles(): readonly TacticalUnitProfile[] {
-  return TACTICAL_UNIT_PROFILE_IDS.map(id => PROFILES[id]);
+  return TACTICAL_UNIT_PROFILE_IDS.map(tacticalUnitProfile);
 }
 
 export function tacticalUnitProfilesForFaction(

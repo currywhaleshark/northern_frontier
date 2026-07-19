@@ -5,6 +5,7 @@ export const TACTICAL_ANIMATION_EVENT_KINDS = Object.freeze([
   'conceal', 'zoneFall', 'artilleryHit', 'rearAssault', 'advance', 'ambush', 'volley', 'melee',
   'wallAssault', 'wallHit', 'loot', 'retreat', 'fire', 'leaderEscape', 'escapeBlocked',
   'beastReveal', 'beastAmbush', 'beastRout', 'casualty', 'moraleBreak', 'report',
+  'doctrineShift',
 ] satisfies readonly TacticalAnimationEventKind[]);
 
 const TACTICAL_ANIMATION_EVENT_KIND_SET = new Set<string>(TACTICAL_ANIMATION_EVENT_KINDS);

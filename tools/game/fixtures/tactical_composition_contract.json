@@ -16,7 +16,18 @@
       "intelCategory": "보병 궁수",
       "defaultLine": "middle",
       "implementationPhase": 1,
-      "enabled": true
+      "enabled": true,
+      "rangedMultiplier": 1.12,
+      "meleeMultiplier": 0.65,
+      "chargeMultiplier": 0.65,
+      "protectionMultiplier": 0.88,
+      "mobility": 1,
+      "wallPressure": 0,
+      "routeSpeed": 1,
+      "targetPriorities": [
+        "mounted",
+        "infantry"
+      ]
     },
     {
       "id": "nimacha-spearman",
@@ -32,7 +43,17 @@
       "intelCategory": "창보병",
       "defaultLine": "front",
       "implementationPhase": 1,
-      "enabled": true
+      "enabled": true,
+      "rangedMultiplier": 0.55,
+      "meleeMultiplier": 1.05,
+      "chargeMultiplier": 0.85,
+      "protectionMultiplier": 1.05,
+      "mobility": 1,
+      "wallPressure": 1,
+      "routeSpeed": 1,
+      "targetPriorities": [
+        "mounted"
+      ]
     },
     {
       "id": "nimacha-looter",
@@ -47,7 +68,17 @@
       "intelCategory": "약탈 보병",
       "defaultLine": "front",
       "implementationPhase": 1,
-      "enabled": true
+      "enabled": true,
+      "rangedMultiplier": 0.5,
+      "meleeMultiplier": 0.85,
+      "chargeMultiplier": 0.9,
+      "protectionMultiplier": 0.84,
+      "mobility": 2,
+      "wallPressure": 1,
+      "routeSpeed": 2,
+      "targetPriorities": [
+        "support"
+      ]
     },
     {
       "id": "holaon-lancer",
@@ -63,7 +94,18 @@
       "intelCategory": "창기병",
       "defaultLine": "front",
       "implementationPhase": 1,
-      "enabled": true
+      "enabled": true,
+      "rangedMultiplier": 0.62,
+      "meleeMultiplier": 1.08,
+      "chargeMultiplier": 1.35,
+      "protectionMultiplier": 0.92,
+      "mobility": 3,
+      "wallPressure": 0,
+      "routeSpeed": 2,
+      "targetPriorities": [
+        "infantry",
+        "ranged"
+      ]
     },
     {
       "id": "holaon-horse-archer",
@@ -79,7 +121,18 @@
       "intelCategory": "궁기병",
       "defaultLine": "middle",
       "implementationPhase": 1,
-      "enabled": true
+      "enabled": true,
+      "rangedMultiplier": 1.16,
+      "meleeMultiplier": 0.7,
+      "chargeMultiplier": 0.82,
+      "protectionMultiplier": 0.9,
+      "mobility": 3,
+      "wallPressure": 0,
+      "routeSpeed": 2,
+      "targetPriorities": [
+        "ranged",
+        "support"
+      ]
     },
     {
       "id": "holaon-raider",
@@ -95,7 +148,18 @@
       "intelCategory": "경기병",
       "defaultLine": "front",
       "implementationPhase": 1,
-      "enabled": true
+      "enabled": true,
+      "rangedMultiplier": 1.02,
+      "meleeMultiplier": 0.86,
+      "chargeMultiplier": 1.08,
+      "protectionMultiplier": 0.92,
+      "mobility": 3,
+      "wallPressure": 0,
+      "routeSpeed": 2,
+      "targetPriorities": [
+        "ranged",
+        "support"
+      ]
     },
     {
       "id": "bandit-vanguard",
@@ -111,7 +175,18 @@
       "intelCategory": "근접 보병",
       "defaultLine": "front",
       "implementationPhase": 1,
-      "enabled": true
+      "enabled": true,
+      "rangedMultiplier": 0.55,
+      "meleeMultiplier": 1.12,
+      "chargeMultiplier": 1.08,
+      "protectionMultiplier": 1,
+      "mobility": 1,
+      "wallPressure": 2,
+      "routeSpeed": 1,
+      "targetPriorities": [
+        "infantry",
+        "siege"
+      ]
     },
     {
       "id": "bandit-rider",
@@ -128,7 +203,18 @@
       "intelCategory": "경기병",
       "defaultLine": "middle",
       "implementationPhase": 1,
-      "enabled": true
+      "enabled": true,
+      "rangedMultiplier": 1.02,
+      "meleeMultiplier": 0.86,
+      "chargeMultiplier": 1.08,
+      "protectionMultiplier": 0.92,
+      "mobility": 3,
+      "wallPressure": 0,
+      "routeSpeed": 2,
+      "targetPriorities": [
+        "ranged",
+        "support"
+      ]
     },
     {
       "id": "bandit-looter",
@@ -143,7 +229,17 @@
       "intelCategory": "약탈 보병",
       "defaultLine": "front",
       "implementationPhase": 1,
-      "enabled": true
+      "enabled": true,
+      "rangedMultiplier": 0.5,
+      "meleeMultiplier": 0.85,
+      "chargeMultiplier": 0.9,
+      "protectionMultiplier": 0.84,
+      "mobility": 2,
+      "wallPressure": 1,
+      "routeSpeed": 2,
+      "targetPriorities": [
+        "support"
+      ]
     },
     {
       "id": "court-gunner",
@@ -160,7 +256,18 @@
       "intelCategory": "총포수",
       "defaultLine": "middle",
       "implementationPhase": 1,
-      "enabled": true
+      "enabled": true,
+      "rangedMultiplier": 1.22,
+      "meleeMultiplier": 0.62,
+      "chargeMultiplier": 0.6,
+      "protectionMultiplier": 0.86,
+      "mobility": 1,
+      "wallPressure": 0,
+      "routeSpeed": 1,
+      "targetPriorities": [
+        "shielded",
+        "artillery"
+      ]
     },
     {
       "id": "court-archer",
@@ -176,7 +283,18 @@
       "intelCategory": "궁병",
       "defaultLine": "middle",
       "implementationPhase": 1,
-      "enabled": true
+      "enabled": true,
+      "rangedMultiplier": 1.12,
+      "meleeMultiplier": 0.65,
+      "chargeMultiplier": 0.65,
+      "protectionMultiplier": 0.88,
+      "mobility": 1,
+      "wallPressure": 0,
+      "routeSpeed": 1,
+      "targetPriorities": [
+        "mounted",
+        "infantry"
+      ]
     },
     {
       "id": "court-melee",
@@ -192,7 +310,18 @@
       "intelCategory": "근접 보병",
       "defaultLine": "front",
       "implementationPhase": 1,
-      "enabled": true
+      "enabled": true,
+      "rangedMultiplier": 0.55,
+      "meleeMultiplier": 1.12,
+      "chargeMultiplier": 1.08,
+      "protectionMultiplier": 1,
+      "mobility": 1,
+      "wallPressure": 2,
+      "routeSpeed": 1,
+      "targetPriorities": [
+        "infantry",
+        "siege"
+      ]
     },
     {
       "id": "court-cavalry",
@@ -208,7 +337,18 @@
       "intelCategory": "창기병",
       "defaultLine": "front",
       "implementationPhase": 1,
-      "enabled": true
+      "enabled": true,
+      "rangedMultiplier": 0.62,
+      "meleeMultiplier": 1.08,
+      "chargeMultiplier": 1.35,
+      "protectionMultiplier": 0.92,
+      "mobility": 3,
+      "wallPressure": 0,
+      "routeSpeed": 2,
+      "targetPriorities": [
+        "infantry",
+        "ranged"
+      ]
     },
     {
       "id": "court-artillery",
@@ -225,7 +365,18 @@
       "intelCategory": "직사 화포",
       "defaultLine": "rear",
       "implementationPhase": 1,
-      "enabled": true
+      "enabled": true,
+      "rangedMultiplier": 1.15,
+      "meleeMultiplier": 0.3,
+      "chargeMultiplier": 0.3,
+      "protectionMultiplier": 0.72,
+      "mobility": 1,
+      "wallPressure": 8,
+      "routeSpeed": 1,
+      "targetPriorities": [
+        "siege",
+        "shielded"
+      ]
     },
     {
       "id": "shield-infantry",
@@ -242,7 +393,17 @@
       "intelCategory": "방패보병",
       "defaultLine": "front",
       "implementationPhase": 2,
-      "enabled": false
+      "enabled": true,
+      "rangedMultiplier": 0.45,
+      "meleeMultiplier": 0.82,
+      "chargeMultiplier": 0.75,
+      "protectionMultiplier": 1.28,
+      "mobility": 1,
+      "wallPressure": 1,
+      "routeSpeed": 1,
+      "targetPriorities": [
+        "ranged"
+      ]
     },
     {
       "id": "deserter-musketeer",
@@ -259,7 +420,18 @@
       "intelCategory": "총포수",
       "defaultLine": "middle",
       "implementationPhase": 2,
-      "enabled": false
+      "enabled": true,
+      "rangedMultiplier": 1.22,
+      "meleeMultiplier": 0.62,
+      "chargeMultiplier": 0.6,
+      "protectionMultiplier": 0.86,
+      "mobility": 1,
+      "wallPressure": 0,
+      "routeSpeed": 1,
+      "targetPriorities": [
+        "shielded",
+        "artillery"
+      ]
     },
     {
       "id": "wall-breaker",
@@ -271,12 +443,23 @@
       ],
       "factions": [
         "nimacha",
-        "bandit"
+        "bandit",
+        "court"
       ],
       "intelCategory": "파책 도구",
       "defaultLine": "front",
       "implementationPhase": 2,
-      "enabled": false
+      "enabled": true,
+      "rangedMultiplier": 0.35,
+      "meleeMultiplier": 0.72,
+      "chargeMultiplier": 0.6,
+      "protectionMultiplier": 0.68,
+      "mobility": 1,
+      "wallPressure": 10,
+      "routeSpeed": 1,
+      "targetPriorities": [
+        "siege"
+      ]
     },
     {
       "id": "court-shield",
@@ -292,7 +475,17 @@
       "intelCategory": "방패보병",
       "defaultLine": "front",
       "implementationPhase": 2,
-      "enabled": false
+      "enabled": true,
+      "rangedMultiplier": 0.45,
+      "meleeMultiplier": 0.82,
+      "chargeMultiplier": 0.75,
+      "protectionMultiplier": 1.28,
+      "mobility": 1,
+      "wallPressure": 1,
+      "routeSpeed": 1,
+      "targetPriorities": [
+        "ranged"
+      ]
     },
     {
       "id": "court-horse-archer",
@@ -308,7 +501,18 @@
       "intelCategory": "궁기병",
       "defaultLine": "middle",
       "implementationPhase": 2,
-      "enabled": false
+      "enabled": true,
+      "rangedMultiplier": 1.16,
+      "meleeMultiplier": 0.7,
+      "chargeMultiplier": 0.82,
+      "protectionMultiplier": 0.9,
+      "mobility": 3,
+      "wallPressure": 0,
+      "routeSpeed": 2,
+      "targetPriorities": [
+        "ranged",
+        "support"
+      ]
     },
     {
       "id": "court-medic",
@@ -324,7 +528,15 @@
       "intelCategory": "의료 지원",
       "defaultLine": "rear",
       "implementationPhase": 8,
-      "enabled": false
+      "enabled": false,
+      "rangedMultiplier": 0.2,
+      "meleeMultiplier": 0.25,
+      "chargeMultiplier": 0.2,
+      "protectionMultiplier": 0.7,
+      "mobility": 1,
+      "wallPressure": 0,
+      "routeSpeed": 1,
+      "targetPriorities": []
     },
     {
       "id": "court-hwacha",
@@ -343,7 +555,19 @@
       "intelCategory": "중화기 징후",
       "defaultLine": "rear",
       "implementationPhase": 8,
-      "enabled": false
+      "enabled": false,
+      "rangedMultiplier": 1.2,
+      "meleeMultiplier": 0.25,
+      "chargeMultiplier": 0.25,
+      "protectionMultiplier": 0.68,
+      "mobility": 1,
+      "wallPressure": 2,
+      "routeSpeed": 1,
+      "targetPriorities": [
+        "ranged",
+        "mounted",
+        "support"
+      ]
     }
   ],
   "doctrines": [
@@ -739,7 +963,7 @@
           "required": true
         },
         {
-          "role": "flankers",
+          "role": "main",
           "candidates": [
             {
               "unitType": "wall-breaker",
@@ -2099,6 +2323,19 @@
         ],
         "hiddenGroupCount": 2
       },
+      "intentSignals": {
+        "doctrineRevealed": false,
+        "doctrineLabel": "미확인 교리",
+        "groups": [
+          {
+            "groupId": "fixture-lancers",
+            "label": "기마 선봉",
+            "state": "engaging",
+            "intent": "advance",
+            "signal": "한 구역에 전력을 모아 전진합니다."
+          }
+        ]
+      },
       "revealedStratagems": [],
       "hiddenStratagemCount": 2
     },
@@ -2147,6 +2384,20 @@
         ],
         "hiddenGroupCount": 0
       },
+      "intentSignals": {
+        "doctrineRevealed": true,
+        "doctrineId": "mountedSkirmish",
+        "doctrineLabel": "기마 견제",
+        "groups": [
+          {
+            "groupId": "fixture-lancers",
+            "label": "기마 선봉",
+            "state": "engaging",
+            "intent": "advance",
+            "signal": "한 구역에 전력을 모아 전진합니다."
+          }
+        ]
+      },
       "revealedStratagems": [
         {
           "id": "rearManeuver",
@@ -2189,7 +2440,8 @@
     "beastRout",
     "casualty",
     "moraleBreak",
-    "report"
+    "report",
+    "doctrineShift"
   ],
   "simulationOverrides": {
     "enemyDoctrine": "mountedSkirmish",

@@ -30,6 +30,7 @@ import {
 import {
   applyDefenseZoneConsequences, resolveEngagementExchange, splitTacticalEngagementDefenders,
 } from './tacticalEngagement';
+import { applyTacticalDoctrineAi } from './tacticalDoctrine';
 import {
   acknowledgeAssaultReport, advanceAssaultPhase, applyAssaultReportPositions, assaultCommandUnavailableReason,
   assaultPreparationUnavailableReason, assignAssaultGroup, chooseDefaultAssaultCommands,
@@ -726,9 +727,7 @@ function raiderGroups(
         case 'court-archer': return { morale: 90, combatMultiplier: 1.07, lossResistance: 0.84 };
         case 'court-melee': return { morale: 93, combatMultiplier: 1.12, lossResistance: 0.78 };
         case 'court-cavalry': return { morale: 95, combatMultiplier: 1.2, lossResistance: 0.72 };
-        case 'court-artillery': return {
-          morale: 88, combatMultiplier: 1.24, lossResistance: 0.8, wallPressureBonus: 12,
-        };
+        case 'court-artillery': return { morale: 88, combatMultiplier: 1.24, lossResistance: 0.8 };
         default: return { morale: factionName === '조정 토벌군' ? 90 : 74 };
       }
     };
@@ -776,7 +775,7 @@ function raiderGroups(
       { id: 'court-archers', kind: 'main', unitType: 'court-archer', label: '훈련도감 사수', weight: 0.14, morale: 90, intent: 'advance', visibility: 'open', combatMultiplier: 1.07, lossResistance: 0.84 },
       { id: 'court-melee', kind: 'main', unitType: 'court-melee', label: '훈련도감 살수', weight: 0.24, morale: 93, intent: 'advance', visibility: 'open', combatMultiplier: 1.12, lossResistance: 0.78 },
       { id: 'court-cavalry', kind: 'flankers', unitType: 'court-cavalry', label: '관군 기병', weight: 0.19, morale: 95, intent: 'flank', visibility: 'open', combatMultiplier: 1.2, lossResistance: 0.72 },
-      { id: 'court-artillery', kind: 'main', unitType: 'court-artillery', label: '화포대', weight: 0.15, morale: 88, intent: 'breakWall', visibility: 'open', combatMultiplier: 1.24, lossResistance: 0.8, wallPressureBonus: 12 },
+      { id: 'court-artillery', kind: 'main', unitType: 'court-artillery', label: '화포대', weight: 0.15, morale: 88, intent: 'breakWall', visibility: 'open', combatMultiplier: 1.24, lossResistance: 0.8 },
     ];
   } else {
     composition = [
@@ -902,7 +901,7 @@ export function createTacticalBattle(
     forcedDoctrine: params.forcedDoctrine,
     forcedCompositionTemplateId: params.forcedCompositionTemplateId,
     forcedFlankRoute: params.forcedFlankRoute,
-    maximumCompositionPhase: params.maximumCompositionPhase,
+    maximumCompositionPhase: params.maximumCompositionPhase ?? 2,
     revealed: false,
   });
   const enemies = raiderGroups(params.factionName, originalPower, { scoutsReady, deepScouted }, enemyPlan);
@@ -1056,11 +1055,36 @@ function preparationEvent(
 function applyEnemyPlanPreparationEffects(battle: TacticalBattle): void {
   const scale = enemyPlanStratagemScale(battle.enemyPlan, 'wallBreakers');
   if (scale <= 0) return;
-  const main = battle.raiderGroups.find(group => group.kind === 'main');
+  if (battle.raiderGroups.some(group => group.unitType === 'wall-breaker')) return;
+  const main = battle.raiderGroups
+    .filter(group => group.kind === 'main' && group.unitType !== 'court-artillery' && group.count > 1)
+    .sort((left, right) => right.power - left.power || left.id.localeCompare(right.id))[0];
   if (!main) return;
   const effect = CONFIG.tacticalBattle.enemyPlan.effects.wallBreakers;
-  main.wallPressureBonus = (main.wallPressureBonus ?? 0) + effect.wallPressureBonus * scale;
-  main.lossResistance = (main.lossResistance ?? 1) * (1 + effect.lossResistancePenalty * scale);
+  const movedCount = Math.max(1, Math.min(main.count - 1, Math.round(main.count * effect.powerShare)));
+  const movedPower = main.power * effect.powerShare;
+  main.count -= movedCount;
+  main.power -= movedPower;
+  const stratagem = battle.enemyPlan?.stratagems.find(candidate => candidate.id === 'wallBreakers');
+  battle.raiderGroups.push({
+    id: `${main.id}-wall-breakers`,
+    kind: 'main',
+    unitType: 'wall-breaker',
+    label: battle.factionName === '조정 토벌군' ? '파책 살수조' : '방책 파괴조',
+    zoneId: main.zoneId,
+    line: 'front',
+    targetZoneId: 'wall',
+    power: movedPower,
+    count: movedCount,
+    killed: 0,
+    morale: main.morale,
+    intent: 'breakWall',
+    revealed: stratagem?.revealed === true,
+    combatMultiplier: 0.82,
+    lossResistance: 1,
+    engagementsInZone: 0,
+    rearAssault: false,
+  });
 }
 
 function applySelectedPreparationActions(state: GameState, battle: TacticalBattle): TacticalAnimationEvent[] {
@@ -1748,6 +1772,7 @@ function shouldRaiderAdvance(
   defenderReadiness: number,
 ): boolean {
   if (!zone) return false;
+  if (attacker.intent === 'defend') return false;
   const defendersBroken = defenderReadiness <= 0.55;
   const undefended = defenderReadiness <= 0;
   if (attacker.kind === 'main') {
@@ -1838,6 +1863,7 @@ export function resolveTacticalRound(state: GameState): string | null {
   const rng = makeRng(state.seed + battle.id * 8191 + battle.round * 131071);
   const events: TacticalAnimationEvent[] = [];
   const lines: string[] = [];
+  const doctrineTransitions = applyTacticalDoctrineAi(battle);
   const rangedEfficiency = enemyPlanRangedEfficiency(battle.enemyPlan);
   if (battle.round === 1) {
     const moraleBonus = enemyPlanFirstRoundMoraleBonus(battle.enemyPlan);
@@ -1865,6 +1891,15 @@ export function resolveTacticalRound(state: GameState): string | null {
 
   const focusZoneName = battle.zones.find(zone => zone.id === focusZoneId)?.name ?? '전선';
   event(events, focusZoneId, 'camera', `${withJosa(focusZoneName, '으로/로')} 시선을 옮깁니다.`, 450);
+  for (const transition of doctrineTransitions) {
+    const group = battle.raiderGroups.find(candidate => candidate.id === transition.groupId);
+    const zoneId = group?.zoneId ?? focusZoneId;
+    event(events, zoneId, 'doctrineShift', `${transition.groupLabel}: ${transition.signal}`, 560, {
+      side: 'raider', groupId: transition.groupId, actorGroupIds: [transition.groupId],
+      float: transition.toState === 'committingReserve' ? '예비대 투입!' : '행동 전환',
+    });
+    lines.push(`${transition.groupLabel}: ${transition.signal}`);
+  }
   for (const defender of battle.defenderGroups.filter(group => group.command === 'ambush' && !group.ambushed)) {
     event(events, defender.zoneId, 'camera', `${withJosa(defender.label, '이/가')} 숨을 죽이고 매복 자리를 잡습니다.`, 420);
     lines.push(`${withJosa(defender.label, '이/가')} 다음 교전을 위해 매복합니다.`);
@@ -2012,6 +2047,10 @@ export function resolveTacticalRound(state: GameState): string | null {
               hide: pendingLootAvailable(state, battle, 'hide'),
             },
             fireArrowEffectScale: enemyPlanStratagemScale(battle.enemyPlan, 'fireArrows'),
+            doctrine: battle.enemyPlan?.doctrine,
+            wallBreakerEffectScale: battle.enemyPlan?.stratagems.some(stratagem => stratagem.id === 'wallBreakers')
+              ? enemyPlanStratagemScale(battle.enemyPlan, 'wallBreakers')
+              : undefined,
             rng,
           })
           : {
@@ -2100,6 +2139,9 @@ export function resolveTacticalRound(state: GameState): string | null {
     } else if (!attacker.confused && index >= 0 && index < route.length - 1 &&
       shouldRaiderAdvance(attacker, battle, zone, share, defenderReadiness.get(attacker.zoneId) ?? 0)) {
       const fromZoneId = attacker.zoneId;
+      if (attacker.kind === 'main' && !attacker.rearAssault && zone && zone.id !== 'wall') {
+        zone.breached = true;
+      }
       attacker.pendingZoneId = route[index + 1];
       attacker.targetZoneId = route[Math.min(route.length - 1, index + 2)];
       const destinationName = battle.zones.find(candidate => candidate.id === attacker.pendingZoneId)?.name;

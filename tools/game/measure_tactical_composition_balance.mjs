@@ -150,7 +150,7 @@ function runBattle(tactical, battleSimulation, configuration, seed) {
   return {
     seed,
     outcome,
-    rounds: battle.round,
+    rounds: battle.reports.length,
     initialEnemyPower,
     initialEnemyCount,
     friendlyWounded: battle.defenderGroups.reduce((sum, group) => sum + group.wounded, 0),
@@ -161,6 +161,10 @@ function runBattle(tactical, battleSimulation, configuration, seed) {
     wallBreachRound,
     centerBreached: centerBreachRound != null,
     centerBreachRound,
+    approachBreached: zone(battle, 'approach').breached,
+    storehouseBreached: zone(battle, 'storehouse').breached,
+    anyZoneBreached: battle.zones.some(candidate => candidate.breached),
+    breachedZoneIds: battle.zones.filter(candidate => candidate.breached).map(candidate => candidate.id),
     buildingsDamaged,
     lootUnits,
   };
@@ -184,6 +188,9 @@ function summarize(results) {
     partialLossRate: rate(results, result => result.outcome === 'partialLoss'),
     wallBreachRate: rate(results, result => result.wallBreached),
     centerBreachRate: rate(results, result => result.centerBreached),
+    approachBreachRate: rate(results, result => result.approachBreached),
+    storehouseBreachRate: rate(results, result => result.storehouseBreached),
+    anyZoneBreachRate: rate(results, result => result.anyZoneBreached),
     averageRounds: average(results, result => result.rounds),
     averageInitialEnemyPower: average(results, result => result.initialEnemyPower),
     averageInitialEnemyCount: average(results, result => result.initialEnemyCount),
@@ -224,6 +231,8 @@ function compare(candidateResults, referenceResults) {
     defenseSuccessRateDelta: candidateSummary.defenseSuccessRate - referenceSummary.defenseSuccessRate,
     wallBreachRateDelta: candidateSummary.wallBreachRate - referenceSummary.wallBreachRate,
     centerBreachRateDelta: candidateSummary.centerBreachRate - referenceSummary.centerBreachRate,
+    approachBreachRateDelta: candidateSummary.approachBreachRate - referenceSummary.approachBreachRate,
+    anyZoneBreachRateDelta: candidateSummary.anyZoneBreachRate - referenceSummary.anyZoneBreachRate,
     averagePeakWallPressureDelta:
       candidateSummary.averagePeakWallPressure - referenceSummary.averagePeakWallPressure,
     averageFriendlyCasualtiesDelta:
@@ -289,4 +298,10 @@ const output = {
   },
 };
 
-console.log(JSON.stringify(output, null, 2));
+if (process.argv.includes('--update')) {
+  const fixtureUrl = new URL('./fixtures/tactical_composition_balance_phase2.json', import.meta.url);
+  writeFileSync(fixtureUrl, `${JSON.stringify(output, null, 2)}\n`, 'utf8');
+  console.log('phase 2 tactical composition balance fixture updated');
+} else {
+  console.log(JSON.stringify(output, null, 2));
+}

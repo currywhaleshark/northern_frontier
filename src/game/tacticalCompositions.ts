@@ -44,7 +44,7 @@ const TEMPLATES: readonly TacticalCompositionTemplate[] = [
     id: 'nimacha-breach-party', label: '니마차 산림 침투대', faction: 'nimacha',
     doctrines: ['breachAndStorm', 'shieldedAdvance'], objectives: ['breakthrough', 'arson'], weight: 1,
     implementationPhase: 2,
-    slots: [slot('main', 'shield-infantry', [0.28, 0.38]), slot('main', 'nimacha-hunter', [0.24, 0.34]), slot('flankers', 'wall-breaker', [0.24, 0.34])],
+    slots: [slot('main', 'shield-infantry', [0.28, 0.38]), slot('main', 'nimacha-hunter', [0.24, 0.34]), slot('main', 'wall-breaker', [0.24, 0.34])],
   },
 
   {
