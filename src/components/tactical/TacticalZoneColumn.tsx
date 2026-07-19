@@ -832,13 +832,15 @@ export function TacticalZoneColumn({
           const meleeAttacker = meleeActorForEvent(activeEvent, 'raider', raider.id);
           const advancing = activeEvent?.kind === 'advance' && activeEvent.side === 'raider' &&
             (activeEvent.actorGroupIds?.includes(raider.id) ?? false);
+          const doctrineShifting = activeEvent?.kind === 'doctrineShift' &&
+            (activeEvent.actorGroupIds?.includes(raider.id) ?? false);
           const casualtyHit = activeEvent?.kind === 'casualty' && activeEvent.side === 'raider' &&
             activeEvent.groupId === raider.id;
           const withdrawing = activeEvent?.groupId === raider.id &&
             (activeEvent.kind === 'retreat' || activeEvent.kind === 'moraleBreak');
           return (
             <div
-              className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${advancing ? ' advancing' : ''}${casualtyHit ? ' casualty-hit' : ''}${withdrawing ? ' withdrawing' : ''}${leaderMotion}`}
+              className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${advancing ? ' advancing' : ''}${doctrineShifting ? ' doctrine-shifting' : ''}${casualtyHit ? ' casualty-hit' : ''}${withdrawing ? ' withdrawing' : ''}${leaderMotion}`}
               style={formationStackStyle(stackIndex, lineGroups.length)}
               data-stack-depth={lineGroups.length - 1 - stackIndex}
               key={leaderMotion ? `${raider.id}-${activeEvent?.kind}-${eventIndex}` : raider.id}
@@ -919,13 +921,15 @@ export function TacticalZoneColumn({
           const meleeAttacker = meleeActorForEvent(activeEvent, 'raider', raider.id);
           const advancing = activeEvent?.kind === 'advance' && activeEvent.side === 'raider' &&
             (activeEvent.actorGroupIds?.includes(raider.id) ?? false);
+          const doctrineShifting = activeEvent?.kind === 'doctrineShift' &&
+            (activeEvent.actorGroupIds?.includes(raider.id) ?? false);
           const casualtyHit = activeEvent?.kind === 'casualty' && activeEvent.side === 'raider' &&
             activeEvent.groupId === raider.id;
           const rearWithdrawing = activeEvent?.groupId === raider.id &&
             (activeEvent.kind === 'retreat' || activeEvent.kind === 'moraleBreak');
           return (
             <div
-              className={`tactical-raider-group rear-assault${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${advancing ? ' advancing' : ''}${casualtyHit ? ' casualty-hit' : ''}${rearWithdrawing ? ' rear-withdrawing' : ''}`}
+              className={`tactical-raider-group rear-assault${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${advancing ? ' advancing' : ''}${doctrineShifting ? ' doctrine-shifting' : ''}${casualtyHit ? ' casualty-hit' : ''}${rearWithdrawing ? ' rear-withdrawing' : ''}`}
               key={raider.id}
               onClick={targetable ? event => {
                 event.stopPropagation();

@@ -101,6 +101,7 @@ const EVENT_SFX: Partial<Record<TacticalAnimationEvent['kind'], SfxName>> = {
   loot: 'lootCrash',
   advance: 'raidDrum',
   retreat: 'raidDrum',
+  doctrineShift: 'raidDrum',
   leaderEscape: 'raidHorn',
   escapeBlocked: 'ambush',
   beastReveal: 'hunt',

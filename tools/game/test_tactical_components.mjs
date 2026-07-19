@@ -91,6 +91,22 @@ assert.match(simSetupSource, /enemyCompositionTemplateId:/,
   'the simulator must pass the forced composition template into the simulation options');
 assert.match(simSetupSource, /template\.doctrines\.includes/,
   'forcing a doctrine must filter the template list to compatible compositions');
+assert.match(simSetupSource, /template\.implementationPhase <= 2/,
+  'the simulator must not expose composition templates beyond the active battle phase cap');
+
+// ── Phase 2: 교리 행동 징후와 doctrineShift 재생 ──
+assert.match(planSource, /intentSignals/,
+  'enemy plan panel must render intent signals from the backend summary, not recompute them');
+assert.match(planSource, /tactical-enemy-intent-signals/,
+  'intent signals must render as their own list block');
+assert.doesNotMatch(planSource, /aiState|TacticalAiState/,
+  'the panel must not read raw AI state fields directly — signals come pre-translated');
+assert.match(screenSource, /doctrineShift: 'raidDrum'/,
+  'doctrineShift playback must have a sound cue');
+assert.match(zoneSource, /doctrine-shifting/,
+  'the acting raider group must get a doctrine-shift motion class');
+assert.match(cssSource, /\.tactical-zone\.event-doctrineShift \.tactical-raider-group\.doctrine-shifting\s*\{\s*animation:\s*tactical-doctrine-shift calc\(560ms \* var\(--tactical-playback-scale\)\)/,
+  'doctrine-shift motion must follow shared playback pacing');
 
 // ── 무대 포인터 드래그 인프라 (P1.5 스파이크 → Phase 3/4 공유 경로) ──
 const dragSource = readFileSync(new URL('../../src/components/tactical/stagePointerDrag.ts', import.meta.url), 'utf8');

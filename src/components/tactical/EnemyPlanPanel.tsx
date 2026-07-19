@@ -28,7 +28,7 @@ export function EnemyPlanPanel({
 }: Props) {
   const revealed = plan.stratagems.filter(stratagem => stratagem.revealed);
   const hiddenCount = plan.stratagems.length - revealed.length;
-  const { objective, doctrine, composition } = summary;
+  const { objective, doctrine, composition, intentSignals } = summary;
   const objectiveRevealed = objective.revealed;
   return (
     <aside className="tactical-enemy-plan" aria-label="적 목적·교리·편제·계책 정보">
@@ -52,6 +52,15 @@ export function EnemyPlanPanel({
             {doctrine.strength && <li className="doctrine-strength">강점 — {doctrine.strength}</li>}
             {doctrine.weakness && <li className="doctrine-weakness">약점 — {doctrine.weakness}</li>}
             {doctrine.counter && <li className="doctrine-counter">권장 대응 — {doctrine.counter}</li>}
+          </ul>
+        )}
+        {intentSignals.groups.length > 0 && (
+          <ul className="tactical-enemy-intent-signals" aria-label="공개된 적 부대의 행동 징후">
+            {intentSignals.groups.map(group => (
+              <li key={group.groupId} data-ai-state={group.state}>
+                {group.label} — {group.signal}
+              </li>
+            ))}
           </ul>
         )}
       </div>
