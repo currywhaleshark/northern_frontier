@@ -134,8 +134,27 @@ export function tacticalGroupPower(group: {
   mount?: MountId;
   weapon: CombatWeaponId | null;
   readyMuskets?: number;
+  featuredResidents?: ReadonlyArray<{ special: SpecialResidentId; origin?: string }>;
 }, active: number): number {
   const count = Math.max(0, active);
+  const featuredResidents = group.featuredResidents?.slice(0, count) ?? [];
+  if (featuredResidents.length > 0) {
+    const ready = group.weapon === 'musket'
+      ? Math.min(count, Math.max(0, group.readyMuskets ?? 0))
+      : 0;
+    let power = group.weapon === 'musket'
+      ? count * combatBasePower(group.role, group.origin) + ready * (
+        combatWeaponTotalPower(group.role, 'musket', group.origin) - combatBasePower(group.role, group.origin)
+      )
+      : count * combatWeaponTotalPower(group.role, group.weapon, group.origin);
+    featuredResidents.forEach((featured, index) => {
+      const readyWeapon = group.weapon === 'musket' ? (index < ready ? 'musket' : null) : group.weapon;
+      const featuredOrigin = featured.origin ?? group.origin;
+      power += combatWeaponTotalPower(group.role, readyWeapon, featuredOrigin, featured.special) -
+        combatWeaponTotalPower(group.role, readyWeapon, group.origin);
+    });
+    return power;
+  }
   const base = combatBasePower(group.role, group.origin, group.special);
   if (group.weapon === 'musket') {
     const ready = Math.min(count, Math.max(0, group.readyMuskets ?? 0));

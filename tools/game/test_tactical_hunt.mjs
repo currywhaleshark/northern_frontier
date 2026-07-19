@@ -32,7 +32,22 @@ const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs'
 const agents = await import(pathToFileURL(join(compiledDir, 'agents.mjs')).href);
 const expedition = await import(pathToFileURL(join(compiledDir, 'expedition.mjs')).href);
 const engagement = await import(pathToFileURL(join(compiledDir, 'expeditionEngagement.mjs')).href);
-const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
+const tacticalModule = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
+const tactical = {
+  ...tacticalModule,
+  advanceTacticalPhase(state) {
+    const battle = state.tacticalBattle;
+    if (battle?.phase === 'deployment') {
+      const defaults = tacticalModule.autoDeployTacticalGroups(battle);
+      for (const group of battle.defenderGroups) {
+        const placement = battle.deploymentPlacements?.[group.id];
+        const fallback = defaults[group.id];
+        if (placement == null && fallback) tacticalModule.placeTacticalDeploymentGroup(state, group.id, fallback);
+      }
+    }
+    return tacticalModule.advanceTacticalPhase(state);
+  },
+};
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
 const weapons = await import(pathToFileURL(join(compiledDir, 'weapons.mjs')).href);
 const intel = await import(pathToFileURL(join(compiledDir, 'expeditionIntel.mjs')).href);
@@ -280,6 +295,8 @@ function finishBattle(state) {
   assert.equal(battle.huntBaitPlaced, true);
   assert.equal(battle.huntTrapSet, true);
   assert.equal(battle.huntPredatorState, 'hidden', 'placing bait does not reveal every hidden beast at deployment');
+  assert.match(tacticalHunt.huntDeploymentUnavailableReason(state), /모두 배치/);
+  tactical.applyAutoDeployTacticalGroups(battle);
   assert.equal(tacticalHunt.huntDeploymentUnavailableReason(state), null);
   battle.prepActions.push({ id: 'splitDrivers', label: 'legacy split', cost: 2, selected: true, applied: false });
   battle.huntDriversSplit = true;
@@ -330,12 +347,13 @@ function finishBattle(state) {
   assert.equal(battle.huntDetachmentSerial, 0);
   const originalPower = original.power;
   const originalIds = [...original.residentIds].sort((a, b) => a - b);
+  const baseLabel = original.baseLabel ?? original.label;
   enterDeployment(state);
 
   assert.equal(tacticalHunt.splitHuntGroup(state, original.id, 1), null);
   assert.equal(tacticalHunt.splitHuntGroup(state, original.id, 1), null);
   assert.equal(battle.defenderGroups.length, 3);
-  assert.equal(battle.huntDetachmentSerial, 2);
+  assert.equal(battle.deploymentSerial, 2);
   assert.deepEqual(battle.defenderGroups.map(group => group.count).sort(), [1, 1, 1]);
   assert.deepEqual(
     battle.defenderGroups.flatMap(group => group.residentIds).sort((a, b) => a - b),
@@ -346,9 +364,9 @@ function finishBattle(state) {
   assert.ok(Math.abs(battle.defenderGroups.reduce((sum, group) => sum + group.power, 0) - originalPower) < 1e-9);
   assert.ok(battle.defenderGroups.every(group => group.huntOriginGroupId === original.id));
   assert.deepEqual(battle.defenderGroups.map(group => group.label).sort(), [
-    `${original.label.replace(/ [A-Z]조$/, '')} A조`,
-    `${original.label.replace(/ [A-Z]조$/, '')} B조`,
-    `${original.label.replace(/ [A-Z]조$/, '')} C조`,
+    `${baseLabel} 1조`,
+    `${baseLabel} 2조`,
+    `${baseLabel} 3조`,
   ]);
   const splitGroups = [...battle.defenderGroups].sort((left, right) => left.id.localeCompare(right.id));
   for (const [index, sectorId] of ['huntSectorRidge', 'huntSectorRavine', 'huntSectorBrook'].entries()) {
@@ -361,7 +379,7 @@ function finishBattle(state) {
 
   assert.equal(saveLoad.saveGame(state), true);
   const loaded = saveLoad.loadGame();
-  assert.equal(loaded?.tacticalBattle?.huntDetachmentSerial, 2);
+  assert.equal(loaded?.tacticalBattle?.deploymentSerial, 2);
   assert.deepEqual(
     loaded?.tacticalBattle?.defenderGroups.map(group => group.huntOriginGroupId),
     battle.defenderGroups.map(group => group.huntOriginGroupId),
@@ -377,9 +395,11 @@ function finishBattle(state) {
 
   const unrelated = battle.defenderGroups.find(group => group.id !== original.id);
   assert.ok(unrelated);
-  unrelated.huntOriginGroupId = 'different-origin';
-  assert.match(tacticalHunt.mergeHuntGroups(state, original.id, unrelated.id), /같은 원래 조/);
-  unrelated.huntOriginGroupId = original.id;
+  assert.equal(tactical.assignDefenderGroup(state, unrelated.id, original.zoneId), null);
+  const originalCohortId = unrelated.deploymentCohortId;
+  unrelated.deploymentCohortId = 'different-origin';
+  assert.match(tacticalHunt.mergeHuntGroups(state, original.id, unrelated.id), /같은 병종과 원래 조/);
+  unrelated.deploymentCohortId = originalCohortId;
 
   battle.assaultKind = 'banditLair';
   assert.match(tacticalHunt.splitHuntGroup(state, original.id, 1), /맹수 사냥/);
@@ -635,7 +655,7 @@ function finishBattle(state) {
   enterDeployment(state);
   assert.equal(tacticalHunt.splitHuntGroup(state, group.id, 1), null);
   assert.equal(battle.defenderGroups.length, 2);
-  assert.match(tacticalHunt.splitHuntGroup(state, group.id, 1), /최소 2명/);
+  assert.match(tacticalHunt.splitHuntGroup(state, group.id, 1), /1명 이상/);
 }
 
 {

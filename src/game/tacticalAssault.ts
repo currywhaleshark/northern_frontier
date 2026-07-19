@@ -10,6 +10,15 @@ import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
 import { resolveEngagementExchange } from './tacticalEngagement';
 import { tacticalTargetingRole } from './tacticalTargeting';
 import {
+  attachFeaturedResidentsToTacticalGroups,
+  initializeTacticalDeployment,
+  mergeTacticalGroups,
+  placeTacticalDeploymentGroup,
+  splitTacticalGroup,
+  tacticalDeploymentUnavailableReason,
+  tacticalFeaturedResidentsFromSnapshots,
+} from './tacticalDeployment';
+import {
   banditLairDoctrineDefinition, ensureBanditLairDefensePlan, refreshBanditLairDoctrine,
 } from './enemyPlan';
 import {
@@ -28,6 +37,7 @@ const ASSAULT_MAX_ROUNDS = 7;
 const LAIR_POSITION_POWER_MULTIPLIER = 3.2;
 const ASSAULT_PREPARATIONS: Array<{ id: PreparationActionId; label: string; cost: number }> = [
   { id: 'nightAssault', label: '야습 대기', cost: 2 },
+  { id: 'preInfiltration', label: '선행 침투', cost: CONFIG.tacticalBattle.deployment.preInfiltrationCost },
   { id: 'prepareFireArrows', label: '불화살 준비', cost: 2 },
   { id: 'blockLeaderEscape', label: '퇴로 매복', cost: 2 },
   { id: 'lureGuards', label: '초병 유인', cost: 1 },
@@ -54,6 +64,8 @@ function makePlayerGroup(
   const weapon = snapshots[0].assignedWeapon;
   const origin = snapshots[0].origin;
   const mount = snapshots[0].mount;
+  const featuredResidents = tacticalFeaturedResidentsFromSnapshots(state, snapshots);
+  const special = featuredResidents[0]?.special;
   const kind: DefenderGroupKind = weapon === 'musket' ? 'militia-musket'
     : weapon === 'hornBow' ? 'militia-bow'
       : weapon === 'spear' ? 'militia-spear'
@@ -62,11 +74,14 @@ function makePlayerGroup(
     id: `assault-${role}-${weapon ?? 'unarmed'}${origin ? `-${origin}` : ''}${mount ? `-${mount}` : ''}`,
     kind,
     role,
+    ...(special ? { special } : {}),
     ...(origin ? { origin } : {}),
     ...(mount ? { mount } : {}),
     weapon,
     readyMuskets: snapshots.filter(snapshot => snapshot.readyWeapon === 'musket').length,
     label: `${mount ? '기마 ' : ''}${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
+    baseLabel: `${mount ? '기마 ' : ''}${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
+    ...(featuredResidents.length > 0 ? { featuredResidents } : {}),
     residentIds: snapshots.map(snapshot => snapshot.residentId),
     count: snapshots.length,
     zoneId: 'lairTrail',
@@ -96,9 +111,9 @@ export function createExpeditionTacticalGroups(state: GameState, memberIds: numb
     list.push(snapshot);
     grouped.set(key, list);
   }
-  return [...grouped.values()]
+  return attachFeaturedResidentsToTacticalGroups([...grouped.values()]
     .map(group => makePlayerGroup(state, group))
-    .filter((group): group is TacticalDefenderGroup => group != null);
+    .filter((group): group is TacticalDefenderGroup => group != null));
 }
 
 function doctrineEffectScale(plan: BanditLairDefensePlan): number {
@@ -300,6 +315,7 @@ export function createBanditLairTacticalAssault(state: GameState): TacticalBattl
     assaultFireDamage: 0,
     resourceSnapshot: captureTacticalResources(state),
   };
+  initializeTacticalDeployment(battle);
   state.tacticalBattle = battle;
   state.pendingChoice = null;
   addLog(state, `${site.name} 앞에서 토벌대 직접 지휘를 시작합니다.`, 'raid', true);
@@ -313,6 +329,15 @@ export function assaultPreparationUnavailableReason(
   const battle = state.tacticalBattle;
   if (!battle || battle.orientation !== 'assault') return '진행 중인 산채 공격전이 없습니다.';
   if (!ASSAULT_PREPARATIONS.some(action => action.id === actionId)) return '이 준비는 산채 공격에서 사용할 수 없습니다.';
+  const selected = (id: PreparationActionId) => battle.prepActions.some(action => action.id === id && action.selected);
+  if (actionId === 'preInfiltration' && (selected('nightAssault') || selected('lureGuards'))) {
+    return '선행 침투는 야습 대기·초병 유인과 함께 준비할 수 없습니다.';
+  }
+  if ((actionId === 'nightAssault' || actionId === 'lureGuards') && selected('preInfiltration')) {
+    return '야습 대기·초병 유인은 선행 침투와 함께 준비할 수 없습니다.';
+  }
+  if (actionId === 'preInfiltration' && !battle.defenderGroups.some(group =>
+    group.kind === 'hunter' && activeCount(group) > 0)) return '선행 침투시킬 사냥꾼이 없습니다.';
   if (actionId === 'prepareFireArrows' && !battle.defenderGroups.some(group =>
     (group.kind === 'militia-bow' || group.kind === 'militia-musket') && activeCount(group) > 0)) {
     return '불화살이나 화공 사격을 맡을 원거리 부대가 없습니다.';
@@ -359,6 +384,8 @@ export function advanceAssaultPhase(state: GameState): string | null {
         battle.zones[0].pressure = clamp(battle.zones[0].pressure + 18, 0, 100);
         battle.raiderMorale = clamp(battle.raiderMorale - 6, 0, 100);
         prepEvent(events, 'lairTrail', 'ambush', '밤이 깊기를 기다렸다가 초병의 시야 밖으로 접근합니다.');
+      } else if (action.id === 'preInfiltration') {
+        prepEvent(events, 'lairWall', 'prepareAmbush', '사냥꾼이 본대보다 먼저 숲길을 돌아 목책 앞에 은닉합니다.');
       } else if (action.id === 'prepareFireArrows') {
         prepEvent(events, 'lairWall', 'readyVolley', '기름 먹인 화살과 불씨를 원거리 부대에 나눠 줍니다.');
       } else if (action.id === 'blockLeaderEscape') {
@@ -386,6 +413,8 @@ export function advanceAssaultPhase(state: GameState): string | null {
     return null;
   }
   if (battle.phase === 'deployment') {
+    const unavailableReason = tacticalDeploymentUnavailableReason(battle);
+    if (unavailableReason) return unavailableReason;
     chooseDefaultAssaultCommands(battle);
     battle.phase = 'command';
     return null;
@@ -398,13 +427,21 @@ export function assignAssaultGroup(state: GameState, groupId: string, zoneId: st
   if (!battle || battle.orientation !== 'assault') return '진행 중인 산채 공격전이 없습니다.';
   if (battle.phase !== 'deployment') return '배치 단계에서만 병력을 옮길 수 있습니다.';
   const group = battle.defenderGroups.find(candidate => candidate.id === groupId);
-  const zone = battle.zones.find(candidate => candidate.id === zoneId);
-  const currentOrder = battle.zones.find(candidate => candidate.id === battle.currentZoneId)?.order ?? 0;
   if (!group) return '토벌대 그룹을 찾을 수 없습니다.';
-  if (!zone) return '공격 구역을 찾을 수 없습니다.';
-  if (zone.order > currentOrder) return '아직 돌파하지 못한 산채 안쪽에는 배치할 수 없습니다.';
-  group.zoneId = zoneId;
-  return null;
+  const line = battle.deploymentPlacements?.[group.id]?.line ?? group.line;
+  return placeTacticalDeploymentGroup(state, groupId, { zoneId, line });
+}
+
+export function splitAssaultGroup(state: GameState, groupId: string, detachCount: number): string | null {
+  return splitTacticalGroup(state, groupId, detachCount);
+}
+
+export function mergeAssaultGroups(
+  state: GameState,
+  destinationGroupId: string,
+  sourceGroupId: string,
+): string | null {
+  return mergeTacticalGroups(state, destinationGroupId, sourceGroupId);
 }
 
 export function assaultCommandUnavailableReason(
