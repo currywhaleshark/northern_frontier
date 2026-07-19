@@ -921,6 +921,7 @@ export type PreparationActionId =
   | 'preliminaryBombardment'
   | 'musterMilitia'
   | 'nightAssault'
+  | 'preInfiltration'
   | 'prepareFireArrows'
   | 'blockLeaderEscape'
   | 'lureGuards'
@@ -945,6 +946,23 @@ export interface TacticalBattleZone {
   focusTargetSource?: 'auto' | 'player';
 }
 
+export interface TacticalFeaturedResident {
+  residentId: number;
+  special: SpecialResidentId;
+  name: string;
+  shortName: string;
+  traitLabel: string;
+  spriteScale: number;
+  origin?: string;
+}
+
+export interface TacticalDeploymentPlacement {
+  zoneId: string;
+  line: TacticalFormationLine;
+  hidden?: boolean;
+  fixed?: boolean;
+}
+
 export interface TacticalDefenderGroup {
   id: string;
   kind: DefenderGroupKind;
@@ -955,6 +973,10 @@ export interface TacticalDefenderGroup {
   weapon: CombatWeaponId | null;
   readyMuskets?: number;
   label: string;
+  baseLabel?: string;
+  featuredResidents?: TacticalFeaturedResident[];
+  featuredDetachment?: boolean;
+  deploymentCohortId?: string;
   residentIds: number[];
   count: number;
   zoneId: string;
@@ -1175,6 +1197,10 @@ export interface TacticalBattle {
   preparationEvents: TacticalAnimationEvent[];
   zones: TacticalBattleZone[];
   defenderGroups: TacticalDefenderGroup[];
+  deploymentPlacements?: Record<string, TacticalDeploymentPlacement | null>;
+  deploymentSerial?: number;
+  deploymentGroupAliases?: Record<string, string>;
+  deploymentForced?: 'nightAmbush';
   raiderGroups: TacticalRaiderGroup[];
   enemyPlan?: EnemyPlan;
   enemyPlanDeploymentApplied?: boolean;

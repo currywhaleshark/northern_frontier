@@ -72,6 +72,7 @@ const PREP_DESCRIPTIONS: Record<PreparationActionId, string> = {
   setHuntTraps: '준비를 예약한 뒤 배치 단계에서 길목 하나를 골라 첫 돌파나 도주를 막습니다.',
   placeBait: '고기 3을 예약하고 배치 단계에서 길목 하나를 골라 첫 급습을 그쪽으로 유도합니다.',
   splitDrivers: '구 형식 저장 호환용 행동이며 새 사냥에서는 실제 분견대 편성을 사용합니다.',
+  preInfiltration: '사냥꾼을 토벌대보다 앞서 보내 적 소굴 전방에 은닉 배치할 수 있게 합니다.',
 };
 
 interface CommandPopoverState {

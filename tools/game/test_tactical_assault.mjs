@@ -38,7 +38,22 @@ const battleSimulation = await import(pathToFileURL(join(compiledDir, 'battleSim
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
 const siteDiplomacy = await import(pathToFileURL(join(compiledDir, 'siteDiplomacy.mjs')).href);
 const enemyPlan = await import(pathToFileURL(join(compiledDir, 'enemyPlan.mjs')).href);
-const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
+const tacticalModule = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
+const tactical = {
+  ...tacticalModule,
+  advanceTacticalPhase(state) {
+    const battle = state.tacticalBattle;
+    if (battle?.phase === 'deployment') {
+      const defaults = tacticalModule.autoDeployTacticalGroups(battle);
+      for (const group of battle.defenderGroups) {
+        const placement = battle.deploymentPlacements?.[group.id];
+        const fallback = defaults[group.id];
+        if (placement == null && fallback) tacticalModule.placeTacticalDeploymentGroup(state, group.id, fallback);
+      }
+    }
+    return tacticalModule.advanceTacticalPhase(state);
+  },
+};
 const weapons = await import(pathToFileURL(join(compiledDir, 'weapons.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
@@ -170,7 +185,7 @@ function finishPendingBattle(state) {
   assert.ok(hunter.power < hunterPower);
   assert.equal(battle.preparationEvents.length, 3);
   assert.equal(tactical.advanceTacticalPhase(state), null);
-  assert.match(tactical.assignDefenderGroup(state, hunter.id, 'lairWall'), /돌파하지 못한/);
+  assert.match(tactical.assignDefenderGroup(state, hunter.id, 'lairWall'), /진입로/);
   assert.equal(tactical.advanceTacticalPhase(state), null);
   assert.match(tactical.setTacticalCommand(state, hunter.id, 'arson'), /목책이나 두목 움막/);
   assert.equal(tactical.setTacticalCommand(state, hunter.id, 'blockEscape'), null);

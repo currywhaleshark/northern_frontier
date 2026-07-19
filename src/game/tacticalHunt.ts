@@ -11,6 +11,13 @@ import { createExpeditionTacticalGroups } from './tacticalAssault';
 import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
 import { defaultRaiderFormationLine } from './tacticalTargeting';
 import {
+  initializeTacticalDeployment,
+  mergeTacticalGroups,
+  placeTacticalDeploymentGroup,
+  splitTacticalGroup,
+  tacticalDeploymentUnavailableReason,
+} from './tacticalDeployment';
+import {
   captureTacticalResources, gradeTacticalBattle, tacticalClosingSummary, tacticalDateLabel,
   tacticalDefenderShotCounts, tacticalOutcomeResult, tacticalPeopleReport, tacticalResourceDelta,
 } from './tacticalCore';
@@ -185,6 +192,7 @@ export function createPredatorTacticalHunt(state: GameState): TacticalBattle | s
     huntCounterattackCount: 0,
     resourceSnapshot: captureTacticalResources(state),
   };
+  initializeTacticalDeployment(battle);
   state.tacticalBattle = battle;
   state.pendingChoice = null;
   addLog(state, `${battle.factionName}의 흔적 앞에서 몰이사냥 직접 지휘를 시작합니다.`, 'raid', true);
@@ -261,6 +269,10 @@ export function assignHuntGroup(state: GameState, groupId: string, zoneId: strin
   if (!group) return '사냥대 그룹을 찾을 수 없습니다.';
   if (!zone) return '사냥 구역을 찾을 수 없습니다.';
   if (group.commandable === false || activeCount(group) <= 0) return '전투 가능한 사냥대 조만 옮길 수 있습니다.';
+  if (battle.phase === 'deployment') {
+    const line = battle.deploymentPlacements?.[group.id]?.line ?? group.line;
+    return placeTacticalDeploymentGroup(state, groupId, { zoneId, line });
+  }
   if (zone.id === 'huntDen') return '결착 전에는 덤불 심처에 사냥대를 배치할 수 없습니다.';
   if (group.zoneId === zoneId) return null;
   group.zoneId = zoneId;
@@ -275,7 +287,7 @@ export function huntDeploymentUnavailableReason(state: GameState): string | null
   if (bait && (!bait.applied || !battle.huntBaitZoneId)) return '미끼를 놓을 길목을 먼저 지정해야 합니다.';
   const trap = battle.prepActions.find(action => action.id === 'setHuntTraps' && action.selected);
   if (trap && (!trap.applied || !battle.huntTrapZoneId)) return '함정을 설치할 길목을 먼저 지정해야 합니다.';
-  return null;
+  return tacticalDeploymentUnavailableReason(battle);
 }
 
 export function setHuntPreparationZone(
@@ -307,79 +319,11 @@ export function setHuntPreparationZone(
   return null;
 }
 
-function huntGroupBaseLabel(group: TacticalDefenderGroup): string {
-  return group.label.replace(/ [A-Z]조$/u, '');
-}
-
-function relabelHuntOriginGroups(battle: TacticalBattle, originGroupId: string): void {
-  const siblings = battle.defenderGroups
-    .filter(group => group.huntOriginGroupId === originGroupId)
-    .sort((left, right) => left.id.localeCompare(right.id));
-  if (siblings.length === 0) return;
-  const baseLabel = huntGroupBaseLabel(siblings[0]);
-  siblings.forEach((group, index) => {
-    const suffix = index < 26 ? String.fromCharCode(65 + index) : String(index + 1);
-    group.label = siblings.length === 1 ? baseLabel : `${baseLabel} ${suffix}조`;
-  });
-}
-
-function reallocateHuntMusketReadiness(state: GameState, battle: TacticalBattle): void {
-  const musketGroups = battle.defenderGroups.filter(group => group.weapon === 'musket' && activeCount(group) > 0);
-  const readiness = allocateMusketReadiness(
-    state,
-    musketGroups.map(group => ({ id: group.id, residentIds: group.residentIds })),
-    CONFIG.raid.powderPerMusket,
-  );
-  for (const group of battle.defenderGroups) {
-    if (group.weapon === 'musket') group.readyMuskets = readiness.byGroup[group.id] ?? 0;
-  }
-}
-
 export function splitHuntGroup(state: GameState, groupId: string, detachCount: number): string | null {
-  const battle = state.tacticalBattle;
-  if (!battle || battle.assaultKind !== 'predatorHunt') return '맹수 사냥 전투에서만 분견대를 나눌 수 있습니다.';
-  if (battle.phase !== 'deployment' || battle.round !== 1 || battle.reports.length > 0) {
-    return '첫 교전 전 배치 단계에서만 분견대를 나눌 수 있습니다.';
+  if (!state.tacticalBattle || state.tacticalBattle.assaultKind !== 'predatorHunt') {
+    return '진행 중인 맹수 사냥이 없습니다.';
   }
-  const group = battle.defenderGroups.find(candidate => candidate.id === groupId);
-  if (!group) return '나눌 사냥대 조를 찾을 수 없습니다.';
-  if (group.commandable === false || activeCount(group) <= 0) return '전투 가능한 사냥대 조만 나눌 수 있습니다.';
-  if (group.wounded > 0 || group.killed > 0) return '사상자가 생긴 조는 분견대로 나눌 수 없습니다.';
-  if (!Number.isInteger(detachCount) || detachCount < 1) return '분리할 인원은 1명 이상이어야 합니다.';
-  if (group.count < 2 || detachCount >= group.count) return '최소 2명인 조에서 원대에 1명 이상 남도록 나누어야 합니다.';
-
-  const orderedIds = [...group.residentIds].sort((left, right) => left - right);
-  const retainedIds = orderedIds.slice(0, orderedIds.length - detachCount);
-  const detachedIds = orderedIds.slice(orderedIds.length - detachCount);
-  const originalCount = group.count;
-  const detachedPower = group.power * detachCount / originalCount;
-  const originGroupId = group.huntOriginGroupId ?? group.id;
-  group.huntOriginGroupId = originGroupId;
-  group.residentIds = retainedIds;
-  group.count = retainedIds.length;
-  group.power -= detachedPower;
-
-  const serial = (battle.huntDetachmentSerial ?? 0) + 1;
-  battle.huntDetachmentSerial = serial;
-  battle.defenderGroups.push({
-    ...group,
-    id: `${originGroupId}-detachment-${serial}`,
-    label: huntGroupBaseLabel(group),
-    residentIds: detachedIds,
-    count: detachedIds.length,
-    power: detachedPower,
-    readyMuskets: 0,
-    wounded: 0,
-    killed: 0,
-    command: null,
-    commandSource: undefined,
-    targetGroupId: undefined,
-    targetSource: 'auto',
-    huntOriginGroupId: originGroupId,
-  });
-  relabelHuntOriginGroups(battle, originGroupId);
-  reallocateHuntMusketReadiness(state, battle);
-  return null;
+  return splitTacticalGroup(state, groupId, detachCount);
 }
 
 export function mergeHuntGroups(
@@ -387,39 +331,10 @@ export function mergeHuntGroups(
   destinationGroupId: string,
   sourceGroupId: string,
 ): string | null {
-  const battle = state.tacticalBattle;
-  if (!battle || battle.assaultKind !== 'predatorHunt') return '맹수 사냥 전투에서만 분견대를 합칠 수 있습니다.';
-  if (battle.phase !== 'deployment' || battle.round !== 1 || battle.reports.length > 0) {
-    return '첫 교전 전 배치 단계에서만 분견대를 합칠 수 있습니다.';
+  if (!state.tacticalBattle || state.tacticalBattle.assaultKind !== 'predatorHunt') {
+    return '진행 중인 맹수 사냥이 없습니다.';
   }
-  if (destinationGroupId === sourceGroupId) return '서로 다른 분견대 두 조를 선택해야 합니다.';
-  const destination = battle.defenderGroups.find(group => group.id === destinationGroupId);
-  const source = battle.defenderGroups.find(group => group.id === sourceGroupId);
-  if (!destination || !source) return '합칠 사냥대 분견대를 찾을 수 없습니다.';
-  const destinationOrigin = destination.huntOriginGroupId ?? destination.id;
-  const sourceOrigin = source.huntOriginGroupId ?? source.id;
-  if (destinationOrigin !== sourceOrigin) return '같은 원래 조에서 나뉜 분견대끼리만 합칠 수 있습니다.';
-  if (destination.role !== source.role || destination.weapon !== source.weapon) {
-    return '역할과 무기가 같은 분견대끼리만 합칠 수 있습니다.';
-  }
-  if (destination.zoneId !== source.zoneId) return '같은 사냥 구역에 있는 분견대끼리만 합칠 수 있습니다.';
-  if (destination.wounded > 0 || destination.killed > 0 || source.wounded > 0 || source.killed > 0) {
-    return '사상자가 생긴 분견대는 합칠 수 없습니다.';
-  }
-  const mergedIds = [...new Set([...destination.residentIds, ...source.residentIds])].sort((left, right) => left - right);
-  if (mergedIds.length !== destination.count + source.count) return '주민이 중복된 분견대는 합칠 수 없습니다.';
-  destination.residentIds = mergedIds;
-  destination.count += source.count;
-  destination.power += source.power;
-  destination.huntOriginGroupId = destinationOrigin;
-  destination.command = null;
-  destination.commandSource = undefined;
-  destination.targetGroupId = undefined;
-  destination.targetSource = 'auto';
-  battle.defenderGroups = battle.defenderGroups.filter(group => group.id !== source.id);
-  relabelHuntOriginGroups(battle, destinationOrigin);
-  reallocateHuntMusketReadiness(state, battle);
-  return null;
+  return mergeTacticalGroups(state, destinationGroupId, sourceGroupId);
 }
 
 export function huntCommandUnavailableReason(

@@ -1,6 +1,7 @@
 // localStorage 저장/불러오기
 import { CONFIG } from './config';
 import { clampPlotSide, computeDefense, rebuildBuildingFootprints } from './buildings';
+import { combatGroupLabel } from './combatCapabilities';
 import { defaultCropForBuildingType } from './crops';
 import { rollCourtTribute } from './courtTribute';
 import {
@@ -18,6 +19,7 @@ import { RESOURCE_IDS } from './resourceCatalog';
 import { reconcileTributeReserve } from './tributeReserve';
 import { reconcileResidentHomes } from './residents';
 import { ensureIncidentState } from './specialEvents';
+import { specialResidentDefinition } from './specialResidents';
 import { TUTORIAL_SCENARIO_VERSION, TUTORIAL_STEPS } from './scenario';
 import { ensureForeignSiteState, revealForeignSitesFromExploration } from './foreignSites';
 import {
@@ -37,7 +39,8 @@ import {
 import type {
   CombatWeaponId, CourtTribute, DefenderGroupKind, FermentBatch, GameState, Gender, Resident, ResourceId,
   PreparationActionId, RaiderUnitType, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
-  TacticalAiState, TacticalFormationLine, TacticalPreparationEffect, TacticalRaiderGroup, TacticalRoundReport,
+  SpecialResidentId, TacticalAiState, TacticalDeploymentPlacement, TacticalFeaturedResident, TacticalFormationLine,
+  TacticalPreparationEffect, TacticalRaiderGroup, TacticalRoundReport,
 } from './types';
 
 export { CURRENT_SCHEMA_VERSION } from './saveSchema';
@@ -321,6 +324,12 @@ export function migrateV23ToV24(raw: RawSave, sourceVersion = 23): RawSave {
   return migrated;
 }
 
+// v25: 직접 지휘 전투의 빈 무대 배치·공통 분할·네임드 조 계약. 실제 전투 필드 정규화는
+// migrateTacticalBattle에서 수행하고, 구버전 전투는 저장되어 있던 위치를 배치로 합성한다.
+export function migrateV24ToV25(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 25 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -350,6 +359,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 21) migrated = migrateV21ToV22(migrated);
     else if (version === 22) migrated = migrateV22ToV23(migrated);
     else if (version === 23) migrated = migrateV23ToV24(migrated, sourceVersion);
+    else if (version === 24) migrated = migrateV24ToV25(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -361,6 +371,10 @@ const TACTICAL_PHASES = new Set(['preparation', 'preparationExecution', 'deploym
 const DEFENDER_KINDS = new Set<DefenderGroupKind>([
   'militia-spear', 'militia-bow', 'militia-musket', 'militia-unarmed', 'watchman', 'hunter', 'healer', 'civilian',
 ]);
+const SPECIAL_RESIDENT_IDS = new Set<SpecialResidentId>([
+  'mudang', 'nosung', 'exiledScholar', 'jurchenWarrior', 'tigerHunter',
+  'geomancer', 'uinyeo', 'runawaySmith', 'interpreter', 'hangwae',
+]);
 const TACTICAL_COMMANDS = new Set<TacticalCommandId>([
   'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'reinforceRear',
   'fallback', 'advance', 'charge',
@@ -370,7 +384,7 @@ const PREPARATION_ACTION_IDS = new Set<PreparationActionId>([
   'evacuateCivilians', 'hideSupplies', 'repairWall', 'setAmbush', 'prepareVolley',
   'firePrevention', 'torchWatch',
   'preliminaryBombardment', 'musterMilitia', 'nightAssault', 'prepareFireArrows',
-  'blockLeaderEscape', 'lureGuards', 'setHuntTraps', 'placeBait', 'splitDrivers',
+  'blockLeaderEscape', 'lureGuards', 'setHuntTraps', 'placeBait', 'splitDrivers', 'preInfiltration',
 ]);
 
 function migratePreparationAction(raw: unknown): TacticalPreparationEffect | null {
@@ -448,6 +462,26 @@ function isTacticalFormationLine(value: unknown): value is TacticalFormationLine
   return value === 'front' || value === 'middle' || value === 'rear';
 }
 
+function migratedFeaturedResidents(
+  ids: readonly number[],
+  state: GameState,
+): TacticalFeaturedResident[] {
+  return ids.flatMap(residentId => {
+    const resident = state.residents.find(candidate => candidate.id === residentId);
+    if (!resident?.special || !SPECIAL_RESIDENT_IDS.has(resident.special)) return [];
+    const definition = specialResidentDefinition(resident.special);
+    return [{
+      residentId,
+      special: resident.special,
+      name: resident.name,
+      shortName: definition.shortName,
+      traitLabel: (definition.skills ?? []).map(skill => skill.name).join(' · ') || definition.epithet,
+      spriteScale: CONFIG.tacticalBattle.deployment.featuredSpriteScale,
+      ...(resident.origin ? { origin: resident.origin } : {}),
+    }];
+  });
+}
+
 function migratedFormationLinesAdjacent(from: TacticalFormationLine, to: TacticalFormationLine): boolean {
   const lines: readonly TacticalFormationLine[] = ['front', 'middle', 'rear'];
   return Math.abs(lines.indexOf(from) - lines.indexOf(to)) === 1;
@@ -521,12 +555,30 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       ? group.pendingLine
       : undefined;
     const command = storedCommand === 'redeploy' && pendingLine == null ? null : storedCommand;
+    const id = typeof group.id === 'string' ? group.id : `migrated-defender-${index}`;
+    const featuredResidents = migratedFeaturedResidents(ids, state);
+    const baseLabel = typeof group.baseLabel === 'string' && group.baseLabel.trim().length > 0
+      ? group.baseLabel
+      : combatGroupLabel(role, weapon);
+    const featuredDetachment = featuredResidents.length > 0 && group.featuredDetachment === true;
+    const label = featuredResidents[0]
+      ? featuredDetachment
+        ? `${featuredResidents[0].shortName}의 조 분리`
+        : `${featuredResidents[0].shortName}의 ${baseLabel}`
+      : typeof group.label === 'string' ? group.label : id;
     return [{
       ...group,
-      id: typeof group.id === 'string' ? group.id : `migrated-defender-${index}`,
+      id,
       kind, role, weapon,
       readyMuskets: weapon === 'musket' ? Math.min(count, Math.max(0, Math.floor(Number(group.readyMuskets) || count))) : 0,
-      label: typeof group.label === 'string' ? group.label : String(group.id ?? kind),
+      label,
+      baseLabel,
+      featuredResidents: featuredResidents.length > 0 ? featuredResidents : undefined,
+      featuredDetachment,
+      special: featuredResidents[0]?.special,
+      deploymentCohortId: typeof group.deploymentCohortId === 'string' && group.deploymentCohortId.length > 0
+        ? group.deploymentCohortId
+        : id,
       residentIds: ids, count, killed, wounded,
       zoneId: protectedCivilian
         ? civilianZoneId
@@ -546,7 +598,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       huntOriginGroupId: encounterKind === 'predatorHunt'
         ? (typeof group.huntOriginGroupId === 'string'
           ? group.huntOriginGroupId
-          : String(group.id ?? `migrated-defender-${index}`))
+          : id)
         : undefined,
     }];
   });
@@ -622,6 +674,12 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     : group) as unknown as TacticalRaiderGroup[];
   if (!defenderGroups.some(group => group.count > 0) || !raiderGroups.some(group => group.count > 0)) return null;
 
+  const prepActions = (Array.isArray(source.prepActions) ? source.prepActions : [])
+    .flatMap(action => {
+      const migratedAction = migratePreparationAction(action);
+      return migratedAction ? [migratedAction] : [];
+    });
+
   const reports = (Array.isArray(source.reports) ? source.reports : [])
     .filter(report => report && typeof report === 'object')
     .map(report => {
@@ -642,20 +700,110 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
   if (pendingForbidden && source.pendingReport != null) return null;
   if (pendingReport && !reports.some(report => report.round === pendingReport.round &&
     report.focusZoneId === pendingReport.focusZoneId)) reports.push(pendingReport);
+  const rawPlacementRecord = source.deploymentPlacements && typeof source.deploymentPlacements === 'object' &&
+      !Array.isArray(source.deploymentPlacements)
+    ? source.deploymentPlacements as Record<string, unknown>
+    : null;
+  const prepApplied = (id: PreparationActionId) => prepActions.some(action => action.id === id && action.applied);
+  const canRemainWaiting = phase === 'preparation' || phase === 'preparationExecution' || phase === 'deployment';
+  const defaultPlacement = (group: typeof defenderGroups[number]): TacticalDeploymentPlacement => {
+    if (group.kind === 'civilian') {
+      return { zoneId: zoneIds.has('center') ? 'center' : defaultZoneId, line: 'rear', fixed: true };
+    }
+    if (encounterKind === 'predatorHunt') {
+      const huntZone = zoneIds.has('huntSectorRidge')
+        ? 'huntSectorRidge'
+        : [...zoneIds].find(zoneId => zoneId !== 'huntDen') ?? defaultZoneId;
+      return { zoneId: huntZone, line: group.kind === 'healer' ? 'rear' : group.line };
+    }
+    if (encounterKind === 'banditLair') {
+      return {
+        zoneId: zoneIds.has('lairTrail') ? 'lairTrail' : defaultZoneId,
+        line: group.kind === 'healer' ? 'rear' : group.line,
+      };
+    }
+    const preferred = group.kind === 'hunter' ? 'approach' : group.id.includes('-levy') ? 'storehouse' : 'wall';
+    return {
+      zoneId: zoneIds.has(preferred) ? preferred : defaultZoneId,
+      line: group.kind === 'healer' ? 'rear' : group.line,
+      ...(group.kind === 'hunter' && prepApplied('setAmbush') ? { hidden: true } : {}),
+    };
+  };
+  const deploymentPlacements: Record<string, TacticalDeploymentPlacement | null> = {};
+  for (const group of defenderGroups) {
+    const fallback = defaultPlacement(group);
+    if (group.kind === 'civilian') {
+      deploymentPlacements[group.id] = fallback;
+      group.zoneId = fallback.zoneId;
+      group.line = fallback.line;
+      group.ambushed = false;
+      continue;
+    }
+    if (!rawPlacementRecord) {
+      const legacyPlacement: TacticalDeploymentPlacement = {
+        zoneId: zoneIds.has(group.zoneId) ? group.zoneId : fallback.zoneId,
+        line: group.kind === 'healer' ? 'rear' : group.line,
+        ...(group.kind === 'hunter' && encounterKind === 'raidDefense' && group.zoneId === 'approach' && prepApplied('setAmbush')
+          ? { hidden: true }
+          : {}),
+      };
+      deploymentPlacements[group.id] = legacyPlacement;
+      group.zoneId = legacyPlacement.zoneId;
+      group.line = legacyPlacement.line;
+      group.ambushed = legacyPlacement.hidden === true;
+      continue;
+    }
+    const rawPlacement = rawPlacementRecord[group.id];
+    const required = group.commandable !== false && group.count - group.wounded - group.killed > 0;
+    let placement: TacticalDeploymentPlacement | null = rawPlacement == null
+      ? required && canRemainWaiting ? null : fallback
+      : null;
+    if (rawPlacement && typeof rawPlacement === 'object') {
+      const candidate = rawPlacement as Record<string, unknown>;
+      const zoneId = typeof candidate.zoneId === 'string' ? candidate.zoneId : '';
+      const line = isTacticalFormationLine(candidate.line)
+        ? (group.kind === 'healer' ? 'rear' : candidate.line)
+        : null;
+      const assaultZoneAllowed = encounterKind !== 'banditLair' || zoneId === 'lairTrail' ||
+        (group.kind === 'hunter' && zoneId === 'lairWall' && prepApplied('preInfiltration'));
+      const huntZoneAllowed = encounterKind !== 'predatorHunt' || zoneId !== 'huntDen';
+      if (zoneIds.has(zoneId) && line && assaultZoneAllowed && huntZoneAllowed) {
+        const hidden = (encounterKind === 'banditLair' && group.kind === 'hunter' && zoneId === 'lairWall' &&
+            prepApplied('preInfiltration')) ||
+          (encounterKind === 'raidDefense' && group.kind === 'hunter' && zoneId === 'approach' && prepApplied('setAmbush'));
+        placement = { zoneId, line, ...(hidden ? { hidden: true } : {}) };
+      } else if (!required || !canRemainWaiting) {
+        placement = fallback;
+      }
+    }
+    deploymentPlacements[group.id] = placement;
+    group.zoneId = placement?.zoneId ?? '';
+    if (placement) group.line = placement.line;
+    if (canRemainWaiting) group.pendingLine = undefined;
+    group.ambushed = placement?.hidden === true;
+  }
+  const defenderGroupIds = new Set(defenderGroups.map(group => group.id));
+  const deploymentGroupAliases = source.deploymentGroupAliases && typeof source.deploymentGroupAliases === 'object' &&
+      !Array.isArray(source.deploymentGroupAliases)
+    ? Object.fromEntries(Object.entries(source.deploymentGroupAliases as Record<string, unknown>)
+      .filter(([alias, target]) => alias.length > 0 && typeof target === 'string' && defenderGroupIds.has(target)))
+    : {};
   const migrated = {
     ...source,
     encounterKind,
     orientation: encounterKind === 'raidDefense' ? 'defense' : 'assault',
     assaultKind: encounterKind === 'raidDefense' ? undefined : encounterKind,
     phase,
-    prepActions: (Array.isArray(source.prepActions) ? source.prepActions : [])
-      .flatMap(action => {
-        const migratedAction = migratePreparationAction(action);
-        return migratedAction ? [migratedAction] : [];
-      }),
+    prepActions,
     preparationEvents: Array.isArray(source.preparationEvents) ? source.preparationEvents : [],
     zones,
     defenderGroups,
+    deploymentPlacements,
+    deploymentSerial: Number.isInteger(source.deploymentSerial) && Number(source.deploymentSerial) >= 0
+      ? Number(source.deploymentSerial)
+      : 0,
+    deploymentGroupAliases,
+    deploymentForced: source.deploymentForced === 'nightAmbush' ? 'nightAmbush' : undefined,
     raiderGroups,
     enemyPlan,
     lairDefensePlan: encounterKind === 'banditLair'

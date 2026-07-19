@@ -28,7 +28,22 @@ function compileGameModules() {
 
 const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
-const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
+const tacticalModule = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
+const tactical = {
+  ...tacticalModule,
+  advanceTacticalPhase(state) {
+    const battle = state.tacticalBattle;
+    if (battle?.phase === 'deployment') {
+      const defaults = tacticalModule.autoDeployTacticalGroups(battle);
+      for (const group of battle.defenderGroups) {
+        const placement = battle.deploymentPlacements?.[group.id];
+        const fallback = defaults[group.id];
+        if (placement == null && fallback) tacticalModule.placeTacticalDeploymentGroup(state, group.id, fallback);
+      }
+    }
+    return tacticalModule.advanceTacticalPhase(state);
+  },
+};
 const tacticalCore = await import(pathToFileURL(join(compiledDir, 'tacticalCore.mjs')).href);
 const tacticalEngagement = await import(pathToFileURL(join(compiledDir, 'tacticalEngagement.mjs')).href);
 const enemyPlan = await import(pathToFileURL(join(compiledDir, 'enemyPlan.mjs')).href);
@@ -125,6 +140,12 @@ function addBuiltMarker(state, type) {
     built: true,
     fieldGrowth: 0,
   });
+}
+
+function deployCommandableToZone(state, zoneId) {
+  for (const group of state.tacticalBattle.defenderGroups.filter(candidate => candidate.commandable !== false)) {
+    assert.equal(tactical.assignDefenderGroup(state, group.id, zoneId), null);
+  }
 }
 
 {
@@ -516,7 +537,9 @@ function addBuiltMarker(state, type) {
     factionName: 'rear-only pressure test', power: 84, warned: true, siege: true, mode: 'garrison',
   });
   assert.equal(tactical.advanceTacticalPhase(state), null);
-  battle.defenderGroups.forEach(group => { group.zoneId = 'center'; });
+  for (const group of battle.defenderGroups.filter(group => group.commandable !== false)) {
+    assert.equal(tactical.assignDefenderGroup(state, group.id, 'center'), null);
+  }
   const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
   assert.ok(flanker);
   battle.raiderGroups.filter(group => group.id !== flanker.id).forEach(group => { group.intent = 'withdraw'; });
@@ -1147,11 +1170,12 @@ function addBuiltMarker(state, type) {
   assert.equal(hunters.ambushed, false, 'selecting a preparation does not apply it yet');
   battle.zones.find(zone => zone.id === 'approach').ambushBonus = 100;
   tactical.advanceTacticalPhase(state);
-  assert.equal(hunters.ambushed, true, 'confirming preparations puts approach hunters in ambush');
+  assert.equal(hunters.ambushed, false, 'confirming preparations keeps the still-waiting hunter card off stage');
   assert.equal(battle.phase, 'preparationExecution');
   assert.ok(battle.preparationEvents.some(event => event.kind === 'prepareAmbush' && event.groupId === hunters.id));
   tactical.advanceTacticalPhase(state);
   tactical.advanceTacticalPhase(state);
+  assert.equal(hunters.ambushed, true, 'placing hunters on the approach activates the prepared ambush');
   assert.equal(hunters.command, 'ambush', 'an ambushed hunter defaults to the surprise attack command');
   const raiderZones = new Map(battle.raiderGroups.map(group => [group.id, group.zoneId]));
   assert.equal(tactical.resolveTacticalRound(state), null);
@@ -1226,10 +1250,11 @@ function addBuiltMarker(state, type) {
   assert.equal(battle.phase, 'preparationExecution');
   const mustered = battle.defenderGroups.find(group => group.id === 'militia-unarmed-mustered');
   assert.ok(mustered);
-  assert.equal(mustered.zoneId, 'wall', 'newly mustered militia joins the defensive front');
+  assert.equal(mustered.zoneId, '', 'newly mustered militia waits as a deployment card');
+  assert.equal(battle.deploymentPlacements[mustered.id], null);
   assert.equal(civilians.count + mustered.count, civiliansBefore);
   assert.ok(battle.preparationEvents.some(event =>
-    event.kind === 'muster' && event.zoneId === 'wall' && event.groupId === mustered.id));
+    event.kind === 'muster' && event.zoneId === 'wall' && event.groupId == null));
 }
 
 {
@@ -1323,7 +1348,9 @@ function addBuiltMarker(state, type) {
     factionName: 'main-force-breakthrough-test', power: 80, warned: true, siege: false, mode: 'garrison',
   });
   tactical.advanceTacticalPhase(state);
-  for (const defender of battle.defenderGroups) defender.zoneId = 'center';
+  for (const defender of battle.defenderGroups.filter(group => group.commandable !== false)) {
+    assert.equal(tactical.assignDefenderGroup(state, defender.id, 'center'), null);
+  }
   tactical.advanceTacticalPhase(state);
   const main = battle.raiderGroups.find(group => group.kind === 'main');
   assert.ok(main);
@@ -1408,7 +1435,7 @@ function addBuiltMarker(state, type) {
     forcedDoctrine: 'shockBreakthrough', forcedCompositionTemplateId: 'court-siege-battery',
   });
   tactical.advanceTacticalPhase(state);
-  battle.defenderGroups.forEach(group => { group.zoneId = 'center'; });
+  deployCommandableToZone(state, 'center');
   tactical.advanceTacticalPhase(state);
   const mainGroups = battle.raiderGroups.filter(group => group.kind === 'main');
   assert.ok(mainGroups.length >= 3);
@@ -1437,7 +1464,7 @@ function addBuiltMarker(state, type) {
     factionName: 'sequential-advance-playback-test', power: 90, warned: true, siege: false, mode: 'garrison',
   });
   tactical.advanceTacticalPhase(state);
-  battle.defenderGroups.forEach(group => { group.zoneId = 'center'; });
+  deployCommandableToZone(state, 'center');
   tactical.advanceTacticalPhase(state);
   battle.raiderGroups.forEach(group => {
     group.zoneId = 'approach';
@@ -1932,7 +1959,7 @@ function addBuiltMarker(state, type) {
     factionName: 'guarded-flanker-delay-test', power: 90, warned: true, siege: false, mode: 'garrison',
   });
   tactical.advanceTacticalPhase(state);
-  battle.defenderGroups.forEach(group => { group.zoneId = 'storehouse'; });
+  deployCommandableToZone(state, 'storehouse');
   tactical.advanceTacticalPhase(state);
   const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
   assert.ok(flanker);
@@ -1991,7 +2018,7 @@ function addBuiltMarker(state, type) {
     factionName: 'empty-zone-event-test', power: 70, warned: true, siege: false, mode: 'garrison',
   });
   tactical.advanceTacticalPhase(state);
-  battle.defenderGroups.forEach(group => { group.zoneId = 'center'; });
+  deployCommandableToZone(state, 'center');
   tactical.advanceTacticalPhase(state);
   const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
   assert.ok(flanker);
@@ -2343,7 +2370,7 @@ for (const optionId of ['militia', 'levy']) {
     factionName: 'rear assault ambush order test', power: 90, warned: true, siege: false, mode: 'garrison',
   });
   tactical.advanceTacticalPhase(state);
-  battle.defenderGroups.forEach(group => { group.zoneId = 'center'; });
+  deployCommandableToZone(state, 'center');
   tactical.advanceTacticalPhase(state);
   const hunter = battle.defenderGroups.find(group => group.kind === 'hunter');
   const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');

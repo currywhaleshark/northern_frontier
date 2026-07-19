@@ -30,12 +30,27 @@ globalThis.localStorage = {
 const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
-const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
+const tacticalModule = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
+const tactical = {
+  ...tacticalModule,
+  advanceTacticalPhase(state) {
+    const battle = state.tacticalBattle;
+    if (battle?.phase === 'deployment') {
+      const defaults = tacticalModule.autoDeployTacticalGroups(battle);
+      for (const group of battle.defenderGroups) {
+        const placement = battle.deploymentPlacements?.[group.id];
+        const fallback = defaults[group.id];
+        if (placement == null && fallback) tacticalModule.placeTacticalDeploymentGroup(state, group.id, fallback);
+      }
+    }
+    return tacticalModule.advanceTacticalPhase(state);
+  },
+};
 const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'expeditionEngagement.mjs')).href);
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 24, 'release-candidate save migrations ship with schema version 24');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 25, 'deployment save migrations ship with schema version 25');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -48,6 +63,13 @@ assert.equal(typeof saveLoad.migrateV15ToV16, 'function');
 assert.equal(typeof saveLoad.migrateV16ToV17, 'function');
 assert.equal(typeof saveLoad.migrateV17ToV18, 'function');
 assert.equal(typeof saveLoad.migrateV23ToV24, 'function');
+assert.equal(typeof saveLoad.migrateV24ToV25, 'function');
+
+{
+  const migrated = saveLoad.migrateV24ToV25({ schemaVersion: 24, tacticalBattle: { phase: 'deployment' } });
+  assert.equal(migrated.schemaVersion, 25);
+  assert.deepEqual(migrated.tacticalBattle, { phase: 'deployment' }, 'v25 remains additive at the root schema layer');
+}
 
 {
   const migrated = saveLoad.migrateV8ToV9({
@@ -113,6 +135,7 @@ assert.equal(typeof saveLoad.migrateV23ToV24, 'function');
   rawHealer.weapon = 'spear';
   rawHealer.command = 'hold';
   rawHealer.commandable = true;
+  delete raw.deploymentPlacements;
   const migratedBattle = saveLoad.migrateTacticalBattle(raw, state);
   const healer = migratedBattle?.defenderGroups.find(group => group.kind === 'healer');
   assert.ok(healer, 'v18 tactical saves preserve healer defender groups');

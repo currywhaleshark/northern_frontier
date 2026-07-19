@@ -727,6 +727,12 @@ export const CONFIG = {
       rehideEncirclementMax: 70,
     },
     raiderPowerPerFighter: 4,
+    deployment: {
+      maxCohortGroups: 3,
+      maxCommandableGroups: 10,
+      featuredSpriteScale: 1.15,
+      preInfiltrationCost: 2,
+    },
     unitMatchups: {
       spearVsMountedDefense: 1.15,
       bowVsShieldedDefense: 0.9,
@@ -859,7 +865,12 @@ export const CONFIG = {
         wallBreakers: { wallPressureBonus: 10, lossResistancePenalty: 0.2, powerShare: 0.18 },
         fireArrows: { pressureBonus: 8, buildingDamageChance: 0.35 },
         feint: { powerShift: 0.14, estimatedMainMultiplier: 1.25 },
-        nightApproach: { prepPointPenalty: 1, rangedEfficiencyPenalty: 0.3, firstRoundMoraleBonus: 8 },
+        nightApproach: {
+          prepPointPenalty: 1,
+          rangedEfficiencyPenalty: 0.3,
+          firstRoundMoraleBonus: 8,
+          forcedAutoDeployThreshold: 0.5,
+        },
       },
     },
     morale: { village: 70, warnedBonus: 8, siegeBonus: 4, raiders: 72 },
