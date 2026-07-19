@@ -8,6 +8,7 @@ import {
   placeholderSprites,
   type BuildingDamageDrawParams,
   type BuildingDrawParams,
+  type ExpeditionDrawParams,
   type ForeignStructureDrawParams,
   type RaiderDrawParams,
   type ResidentDrawParams,
@@ -90,6 +91,14 @@ import {
   specializedResidentSourceRect,
 } from './specializedCharacterAssets';
 import {
+  NEW_CONTENT_BUILDING_SHEET,
+  NEW_CONTENT_LARGE_BUILDING_SHEET,
+  NEW_CONTENT_RESIDENT_SHEET,
+  isNewContentBuildingType,
+  newContentBuildingSourceRect,
+  newContentResidentSourceRect,
+} from './newContentAssets';
+import {
   FACTION_RAIDER_SHEET,
   factionRaiderSourceRect,
 } from './factionRaiderAssets';
@@ -104,6 +113,10 @@ import {
   foreignResidentSourceRect,
   foreignStructureSourceRect,
 } from './foreignSiteAssets';
+import {
+  SPECIAL_RESIDENT_SHEET,
+  specialResidentSourceRect,
+} from './specialResidentAssets';
 
 const PITCH = 17;
 const T = 16;
@@ -130,11 +143,15 @@ let wallGateSheet: HTMLImageElement | null = null;
 let specializedBuildingSheet: HTMLImageElement | null = null;
 let specializedLargeBuildingSheet: HTMLImageElement | null = null;
 let specializedCharacterSheet: HTMLImageElement | null = null;
+let newContentBuildingSheet: HTMLImageElement | null = null;
+let newContentLargeBuildingSheet: HTMLImageElement | null = null;
+let newContentResidentSheet: HTMLImageElement | null = null;
 let factionRaiderSheet: HTMLImageElement | null = null;
 let buildingDamageSheet: HTMLImageElement | null = null;
 let foreignResidentSheet: HTMLImageElement | null = null;
 let foreignSiteCoreSheet: HTMLImageElement | null = null;
 let foreignSitePropSheet: HTMLImageElement | null = null;
+let specialResidentSheet: HTMLImageElement | null = null;
 let loaded = 0;
 let started = false;
 
@@ -195,6 +212,15 @@ function ensureLoaded(): void {
   specializedCharacterSheet = new Image();
   specializedCharacterSheet.onload = () => { loaded++; };
   specializedCharacterSheet.src = SPECIALIZED_CHARACTER_SHEET.src;
+  newContentBuildingSheet = new Image();
+  newContentBuildingSheet.onload = () => { loaded++; };
+  newContentBuildingSheet.src = NEW_CONTENT_BUILDING_SHEET.src;
+  newContentLargeBuildingSheet = new Image();
+  newContentLargeBuildingSheet.onload = () => { loaded++; };
+  newContentLargeBuildingSheet.src = NEW_CONTENT_LARGE_BUILDING_SHEET.src;
+  newContentResidentSheet = new Image();
+  newContentResidentSheet.onload = () => { loaded++; };
+  newContentResidentSheet.src = NEW_CONTENT_RESIDENT_SHEET.src;
   factionRaiderSheet = new Image();
   factionRaiderSheet.onload = () => { loaded++; };
   factionRaiderSheet.src = FACTION_RAIDER_SHEET.src;
@@ -210,6 +236,9 @@ function ensureLoaded(): void {
   foreignSitePropSheet = new Image();
   foreignSitePropSheet.onload = () => { loaded++; };
   foreignSitePropSheet.src = FOREIGN_SITE_PROP_SHEET.src;
+  specialResidentSheet = new Image();
+  specialResidentSheet.onload = () => { loaded++; };
+  specialResidentSheet.src = SPECIAL_RESIDENT_SHEET.src;
   const characterSheet = new Image();
   characterSheet.onload = () => {
     generatedCharacterSheet = characterSheet;
@@ -220,7 +249,7 @@ function ensureLoaded(): void {
 
 export function atlasReady(): boolean {
   ensureLoaded();
-  return loaded >= 22;
+  return loaded >= 25;
 }
 
 // 아틀라스가 준비되면 아틀라스, 아니면 임시 그래픽
@@ -288,6 +317,19 @@ function blitSpecializedBuilding(
   ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
 }
 
+function blitNewContentBuilding(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  p: BuildingDrawParams,
+  large: boolean,
+): void {
+  const rect = newContentBuildingSourceRect(p.type, p.season, large);
+  if (!rect) return;
+  const sheetMeta = large ? NEW_CONTENT_LARGE_BUILDING_SHEET : NEW_CONTENT_BUILDING_SHEET;
+  const destHeight = sheetMeta.spriteHeight * (p.size / sheetMeta.tileSize);
+  ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
+}
+
 function blitPromotionBuilding(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
@@ -350,8 +392,9 @@ function drawGeneratedCharacterRect(
   y: number,
   facing: 1 | -1 | undefined,
   bob: number,
+  sizeScale = 1,
 ): void {
-  const scale = CHAR / GENERATED_CHARACTER_SHEET.residentWidth;
+  const scale = (CHAR / GENERATED_CHARACTER_SHEET.residentWidth) * sizeScale;
   const dw = rect.sw * scale;
   const dh = rect.sh * scale;
   ctx.save();
@@ -367,7 +410,9 @@ function drawGeneratedResident(
   p: ResidentDrawParams,
   bob: number,
 ): void {
-  drawGeneratedCharacterRect(ctx, img, generatedResidentSourceRect(p.job, p.gender), p.x, p.y, p.facing, bob);
+  drawGeneratedCharacterRect(
+    ctx, img, generatedResidentSourceRect(p.job, p.gender), p.x, p.y, p.facing, bob, p.sizeScale ?? 1,
+  );
 }
 
 function drawForeignStructureSprite(
@@ -467,11 +512,17 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   ondol:      { roof: ROOF_BROWN_DARK, base: FACE_DOOR, glyph: CAMPFIRE },
   tileHouse:  { roof: ROOF_DARK, base: FACE_STONE, glyph: CAMPFIRE },
   storehouse: { roof: ROOF_BROWN, base: FACE_SHOP },
+  cellar:     { roof: ROOF_BROWN_DARK, base: FACE_STONE },
+  smokehouse: { roof: ROOF_DARK, base: FACE_STONE, glyph: CAMPFIRE },
+  dryingRack: { base: FENCE, glyph: WATER },
+  onggiKiln:  { roof: ROOF_DARK, base: FACE_STONE, glyph: CAMPFIRE },
+  jangdokdae: { base: FACE_STONE, glyph: HIDE },
   bridge:     { base: FENCE },
   lumberCamp: { base: LOGS },
   woodShed:   { base: LOGS, glyph: CAMPFIRE },
   huntLodge:  { base: TENT_TAN },
   herbHut:    { roof: ROOF_BROWN, base: FACE_DOOR, glyph: HERB },
+  clinic:     { roof: ROOF_DARK, base: FACE_DOOR, glyph: HERB },
   field:      { base: DIRT }, // 성장 단계는 drawBuilding에서 덧그림
   smithy:     { roof: ROOF_DARK, base: FACE_DOOR, glyph: ANVIL },
   mine:       { base: ROCK_GRAY2, glyph: ANVIL },
@@ -493,6 +544,10 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   garrison:   { base: TENT_GREEN, glyph: BANNER_RED },
   office:     { roof: ROOF_DARK, base: FACE_SHOP, glyph: BANNER_RED },
   market:     { roof: AWNING, base: COUNTER, roofLift: 12 },
+  cemetery:   { base: FACE_STONE }, // 봉분·비석 (전용 그림 나오기 전 임시)
+  school:     { roof: ROOF_WHITE, base: FACE_SHOP }, // 전용 그림 나오기 전 임시
+  shrine:     { roof: ROOF_DARK, base: TENT_GREEN }, // 전용 그림 나오기 전 임시
+  hermitage:  { roof: ROOF_DARK, base: FACE_STONE }, // 전용 그림 나오기 전 임시
   cannonEmplacement: { base: FACE_STONE, glyph: BANNER_RED }, // 돌 포대 (전용 그림 나오기 전 임시)
 };
 
@@ -507,6 +562,9 @@ const CHAR_BY_JOB: Record<JobId, CR> = {
   builder:    [0, 8],
   hauler:     [1, 7],
   herbalist:  [1, 5],
+  physician:  [1, 5],
+  curer:      [1, 7],
+  potter:     [1, 9],
   smith:      [1, 9],
   miner:      [1, 9],
   fisher:     [1, 10],
@@ -516,6 +574,10 @@ const CHAR_BY_JOB: Record<JobId, CR> = {
   weaver:     [1, 7],
   powderMaker: [1, 9],
   clerk:      [1, 7],
+  undertaker: [1, 7],
+  teacher:    [1, 7],
+  shaman:     [1, 8],
+  monk:       [1, 8],
   watchman:   [0, 11],
   militia:    [0, 9],
 };
@@ -795,7 +857,7 @@ function drawWallFamilyBuilding(ctx: CanvasRenderingContext2D, p: BuildingDrawPa
 }
 
 export const atlasSprites: SpriteAPI = {
-  id: 'kenney-atlas-river-mask-historical-ground-generated-objects-buildings-promotion-specialized-v1',
+  id: 'kenney-atlas-river-mask-historical-ground-generated-objects-buildings-promotion-specialized-special-residents-v2',
 
   drawTerrain(ctx, p) {
     if (!sheet) return;
@@ -870,6 +932,17 @@ export const atlasSprites: SpriteAPI = {
       ctx.globalAlpha = 1;
       drawProgressBar(ctx, p);
       return;
+    }
+
+    if (isNewContentBuildingType(p.type)) {
+      const useLarge = p.size > NEW_CONTENT_BUILDING_SHEET.tileSize && newContentLargeBuildingSheet;
+      const image = useLarge ? newContentLargeBuildingSheet : newContentBuildingSheet;
+      if (image) {
+        blitNewContentBuilding(ctx, image, p, Boolean(useLarge));
+        ctx.globalAlpha = 1;
+        drawProgressBar(ctx, p);
+        return;
+      }
     }
 
     if (isSpecializedBuildingType(p.type)) {
@@ -986,14 +1059,20 @@ export const atlasSprites: SpriteAPI = {
     const kenneyChars = chars;
     const specializedSheet = specializedCharacterSheet;
     const foreignRect = foreignResidentSourceRect(p.foreignFaction, p.gender);
-    if (!characterSheet && !specializedSheet && !militiaSheet && !kenneyChars &&
-        (!foreignResidentSheet || !foreignRect)) return;
+    const newContentRect = newContentResidentSourceRect(p.job, p.gender, p.stage);
+    if (!characterSheet && !specializedSheet && !militiaSheet && !kenneyChars && !specialResidentSheet &&
+        (!newContentResidentSheet || !newContentRect) && (!foreignResidentSheet || !foreignRect)) return;
     ctx.imageSmoothingEnabled = false;
     const half = CHALF;
     const bob = (p.moving ? Math.floor(performance.now() / 130) % 2 : 0) * CF;
 
-    if (foreignResidentSheet && foreignRect) {
+    const specialRect = p.special ? specialResidentSourceRect(p.special) : null;
+    if (specialResidentSheet && specialRect) {
+      drawGeneratedCharacterRect(ctx, specialResidentSheet, specialRect, p.x, p.y, p.facing, bob);
+    } else if (foreignResidentSheet && foreignRect) {
       drawGeneratedCharacterRect(ctx, foreignResidentSheet, foreignRect, p.x, p.y, p.facing, bob);
+    } else if (newContentResidentSheet && newContentRect) {
+      drawGeneratedCharacterRect(ctx, newContentResidentSheet, newContentRect, p.x, p.y, p.facing, bob);
     } else if (militiaSheet && p.job === 'militia' && p.militiaWeapon) {
       drawGeneratedCharacterRect(
         ctx,
@@ -1061,6 +1140,55 @@ export const atlasSprites: SpriteAPI = {
       ctx.stroke();
       ctx.lineWidth = 1;
     }
+  },
+
+  drawExpedition(ctx, p: ExpeditionDrawParams) {
+    const visible = Math.min(p.members.length, 4);
+    for (let i = 0; i < visible; i++) {
+      const member = p.members[i];
+      const ox = ((i * 17) % 15 - 7) * 0.8 * CF;
+      const oy = ((i * 29) % 11 - 5) * 0.75 * CF;
+      atlasSprites.drawResident(ctx, {
+        job: member.job,
+        gender: member.gender,
+        x: p.x + ox,
+        y: p.y + oy,
+        sick: false,
+        carrying: false,
+        selected: false,
+        moving: p.moving,
+        facing: p.facing,
+        militiaWeapon: member.militiaWeapon,
+        special: member.special,
+      });
+    }
+    ctx.save();
+    ctx.strokeStyle = '#263d50';
+    ctx.lineWidth = Math.max(1.5, 1.5 * CF);
+    ctx.beginPath();
+    ctx.moveTo(p.x + 9 * CF, p.y + 7 * CF);
+    ctx.lineTo(p.x + 9 * CF, p.y - 15 * CF);
+    ctx.stroke();
+    ctx.fillStyle = '#4f83a8';
+    ctx.strokeStyle = '#d7e5ee';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(p.x + 10 * CF, p.y - 15 * CF);
+    ctx.lineTo(p.x + 22 * CF, p.y - 12 * CF);
+    ctx.lineTo(p.x + 10 * CF, p.y - 7 * CF);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    if (p.total > visible) {
+      ctx.fillStyle = '#edf4f7';
+      ctx.strokeStyle = '#263d50';
+      ctx.font = `bold ${Math.round(8 * CF)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.strokeText(String(p.total), p.x, p.y - 13 * CF);
+      ctx.fillText(String(p.total), p.x, p.y - 13 * CF);
+    }
+    ctx.restore();
   },
 
   drawRaiders(ctx, p) {

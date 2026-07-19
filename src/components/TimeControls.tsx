@@ -19,6 +19,7 @@ export function TimeControls({ speed, setSpeed, paused }: Props) {
         <button
           key={s.value}
           className={`time-btn${speed === s.value ? ' active' : ''}`}
+          data-tut={s.value === 1 ? 'time-play' : undefined}
           onClick={() => setSpeed(s.value)}
         >
           {s.label}

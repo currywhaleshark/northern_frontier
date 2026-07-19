@@ -6,20 +6,29 @@
 // 그리기 자체는 SpriteAPI(sprites.ts)에 위임하므로, 진짜 그래픽을 붙일 때는
 // SpriteAPI 구현체만 교체하면 된다.
 import { CONFIG } from '../game/config';
-import { BUILDING_DEFS, buildingFootprintSize, canAfford, canPlaceBuildingAt } from '../game/buildings';
+import {
+  armedMusketeers, BUILDING_DEFS, buildingCostFor, buildingFootprintDims, buildingFootprintSize,
+  canAfford, canAffordCost, canPlaceBuildingAt, canPlaceOn, isPlotBuildingType,
+} from '../game/buildings';
+import { COLLAPSE_RATIO } from '../game/battles';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
 import { getSeason } from '../game/seasons';
 import { findHabitatIconAtTile } from '../game/habitats';
 import { isBuildingFootprintExplored, isExplored } from '../game/exploration';
 import { builtWallTileSet, isWallBuilding, wallConnectionsFromSet } from '../game/walls';
-import { assignedWorkers, workerSlotConfig } from '../game/workerSlots';
+import { assignedWorkers, workerSlotConfig, workerSlotCount } from '../game/workerSlots';
 import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
 import { militiaWeaponForResident } from './militiaWeaponAssignment';
 import { claimZonesAt } from '../game/claimZones';
 import { foreignSiteAt } from '../game/foreignSites';
 import { foreignSiteActors, foreignSiteProps, type ForeignSiteProp } from '../game/foreignSiteActivity';
 import { activePassageRoutes } from '../game/passage';
-import type { AnimalHabitat, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, Resident, Terrain } from '../game/types';
+import { weaponCountsForResidents } from '../game/weapons';
+import { activePredatorScoutIds } from '../game/expeditionIntel';
+import { isBuriedSilverVeinTile } from '../game/silver';
+import { activeExpeditionTargetMarkers, type ExpeditionTargetMarker } from '../game/expeditionTargets';
+import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, Resident, Terrain } from '../game/types';
+import { pixelRectIntersectsViewport, tileRectIntersectsViewport, type SceneViewport } from './sceneViewport';
 
 const TILE = CONFIG.ui.tileSize;
 
@@ -38,10 +47,34 @@ export interface SceneOptions {
   alpha: number; // 서브틱 사이 이동 보간 계수 0~1
   hover: { x: number; y: number } | null;
   placingType: BuildingTypeId | null;
+  placingRect?: { x: number; y: number; w: number; h: number } | null; // 경작지 드래그 크기 지정 미리보기
   selected: { x: number; y: number } | null;
   selectedResidentId: number | null;
   selectedBuildingId?: number | null;
+  viewport?: SceneViewport;
+  terrainVisualSignature?: number;
   sprites?: SpriteAPI;
+}
+
+const TERRAIN_VISUAL_CODE: Record<Terrain, number> = {
+  forest: 1,
+  plain: 2,
+  river: 3,
+  mountain: 4,
+  fertile: 5,
+  rock: 6,
+  center: 7,
+};
+
+export function terrainVisualSignature(state: Pick<GameState, 'map'>): number {
+  let hash = 0x811c9dc5;
+  for (const row of state.map) {
+    for (const tile of row) {
+      const visualCode = TERRAIN_VISUAL_CODE[tile.terrain] * 2 + (tile.hasIron ? 1 : 0);
+      hash = Math.imul(hash ^ visualCode, 0x01000193);
+    }
+  }
+  return hash >>> 0;
 }
 
 // 주민의 화면 픽셀 위치 (보간 + 지터). 렌더링과 마우스 히트 판정이 공유한다.
@@ -57,8 +90,12 @@ export function residentPixelPos(r: Resident, alpha: number): { x: number; y: nu
 export function findResidentAt(state: GameState, mx: number, my: number, alpha: number, radius = 10): Resident | null {
   let best: Resident | null = null;
   let bestD = radius;
+  const expeditionUnitIds = state.expedition && state.expedition.phase !== 'muster'
+    ? new Set(state.expedition.memberIds)
+    : new Set<number>();
   for (const r of state.residents) {
     if (!r.alive) continue;
+    if (expeditionUnitIds.has(r.id)) continue;
     const p = residentPixelPos(r, alpha);
     const d = Math.hypot(p.x - mx, p.y - my);
     if (d <= bestD) { bestD = d; best = r; }
@@ -70,12 +107,18 @@ export function findResidentAt(state: GameState, mx: number, my: number, alpha: 
 let terrainLayer: HTMLCanvasElement | null = null;
 let terrainKey = '';
 
-function drawTerrainLayer(state: GameState, width: number, height: number, sprites: SpriteAPI): HTMLCanvasElement {
+function drawTerrainLayer(
+  state: GameState,
+  width: number,
+  height: number,
+  sprites: SpriteAPI,
+  visualSignature: number,
+): HTMLCanvasElement {
   const season = getSeason(state.day);
   const winter = season === 'winter';
   const frozenRiver = winter && state.weather !== 'thawFlood';
-  // 하루/날씨/건물 수/스프라이트 세트가 바뀔 때만 다시 그린다
-  const key = `${state.day}|${state.weather}|${state.buildings.length}|${width}|${sprites.id}`;
+  // 계절·결빙·실제 타일 시각 속성이 바뀔 때만 다시 그린다.
+  const key = `${season}|${frozenRiver ? 1 : 0}|${visualSignature}|${width}|${height}|${sprites.id}`;
   if (terrainLayer && terrainKey === key) return terrainLayer;
 
   if (!terrainLayer || terrainLayer.width !== width || terrainLayer.height !== height) {
@@ -160,7 +203,7 @@ function drawFootprints(ctx: CanvasRenderingContext2D, trail: { x: number; y: nu
 }
 
 
-function drawBattleClash(ctx: CanvasRenderingContext2D, frontX: number, frontY: number): void {
+function drawBattleClash(ctx: CanvasRenderingContext2D, frontX: number, frontY: number, muskets: boolean): void {
   const t = performance.now() / 140;
   const cx = frontX * TILE + TILE / 2;
   const cy = frontY * TILE + TILE / 2;
@@ -184,6 +227,122 @@ function drawBattleClash(ctx: CanvasRenderingContext2D, frontX: number, frontY: 
   ctx.beginPath();
   ctx.ellipse(cx, cy, TILE * 1.45, TILE * 0.9, 0, 0, Math.PI * 2);
   ctx.stroke();
+  if (muskets) {
+    // 조총 무장 + 화약 보유: 먼지구름 사이 총구 섬광 점멸 + 흰 초연이 피어오른다
+    for (let i = 0; i < 4; i++) {
+      const flick = fract(t * 0.23 + i * 0.334);
+      if (flick < 0.09) {
+        const angle = i * 1.71 + Math.floor(t * 0.23 + i * 0.334) * 2.4;
+        const fx = cx + Math.cos(angle) * TILE * 1.05;
+        const fy = cy + Math.sin(angle) * TILE * 0.62;
+        const a = 0.9 * (1 - flick / 0.09);
+        ctx.strokeStyle = `rgba(255,244,196,${a.toFixed(2)})`;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(fx - 4, fy);
+        ctx.lineTo(fx + 4, fy);
+        ctx.moveTo(fx, fy - 4);
+        ctx.lineTo(fx, fy + 4);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(255,252,232,${(a * 0.8).toFixed(2)})`;
+        ctx.beginPath();
+        ctx.arc(fx, fy, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    for (let i = 0; i < 5; i++) {
+      const phase = fract(t * 0.05 + i * 0.21);
+      const sx = cx + Math.sin(i * 2.1) * TILE * 0.9 + Math.sin(phase * 5 + i) * 3;
+      const sy = cy - TILE * 0.3 - phase * TILE * 1.1;
+      ctx.fillStyle = `rgba(235,235,228,${(0.4 * (1 - phase)).toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2 + phase * 4.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+// 집결 단계: 전선 지점에 펄럭이는 깃발과 집결 링을 그린다
+function drawMusterFlag(ctx: CanvasRenderingContext2D, frontX: number, frontY: number): void {
+  const t = performance.now() / 1000;
+  const cx = frontX * TILE + TILE / 2;
+  const cy = frontY * TILE + TILE / 2;
+  ctx.save();
+  // 집결 지점 링 — 천천히 맥동
+  const pulse = 0.5 + 0.5 * Math.sin(t * 2.4);
+  ctx.strokeStyle = `rgba(233,163,74,${(0.3 + pulse * 0.35).toFixed(2)})`;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 5]);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, TILE * (1.15 + pulse * 0.12), TILE * (0.72 + pulse * 0.08), 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // 장대
+  ctx.strokeStyle = '#6b5232';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + 5);
+  ctx.lineTo(cx, cy - 26);
+  ctx.stroke();
+  // 펄럭이는 깃발 — 끝단이 바람에 흔들린다
+  const wave = Math.sin(t * 6) * 3;
+  ctx.fillStyle = '#b6412f';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 26);
+  ctx.quadraticCurveTo(cx + 9, cy - 25 + wave * 0.4, cx + 17, cy - 23 + wave);
+  ctx.lineTo(cx + 15, cy - 16 + wave * 0.6);
+  ctx.quadraticCurveTo(cx + 8, cy - 18, cx, cy - 15);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// 승기가 기운 습격 무리: 도주 방향으로 흘러나가는 작은 인영 입자
+function drawRoutStream(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  dirX: number,
+  dirY: number,
+): void {
+  const t = performance.now() / 900;
+  ctx.save();
+  for (let i = 0; i < 10; i++) {
+    const phase = fract(t + i * 0.137);
+    const spread = ((i % 5) - 2) * 4;
+    const x = cx + dirX * phase * TILE * 2.7 - dirY * spread;
+    const y = cy + dirY * phase * TILE * 2.7 * 0.62 + dirX * spread;
+    const alpha = 0.55 * (1 - phase);
+    ctx.fillStyle = `rgba(72,58,48,${alpha.toFixed(2)})`;
+    ctx.fillRect(x - 1, y - 2, 2, 4);
+  }
+  ctx.restore();
+}
+
+// 전투가 끝난 자리의 교란 자국 — 겨울엔 짓밟힌 눈, 그 외 계절엔 파헤쳐진 땅.
+// 남은 날수에 따라 옅어진다.
+function drawBattleScarDecal(ctx: CanvasRenderingContext2D, scar: BattleScar, day: number, winter: boolean): void {
+  const cx = scar.x * TILE + TILE / 2;
+  const cy = scar.y * TILE + TILE / 2;
+  const fade = Math.max(0.25, Math.min(1, (scar.until - day) / 4));
+  const col = winter ? '88,98,114' : '66,54,40';
+  ctx.save();
+  ctx.fillStyle = `rgba(${col},${(0.16 * fade).toFixed(2)})`;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, TILE * 1.3, TILE * 0.8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // 흩어진 짧은 긁힘 자국 (자리 좌표로 결정적 배치)
+  for (let i = 0; i < 14; i++) {
+    const s = (scar.x * 31 + scar.y * 57 + i * 97) % 113;
+    const ox = ((s * 13) % 60 - 30) / 30;
+    const oy = ((s * 29) % 60 - 30) / 30;
+    const px = cx + ox * TILE * 1.1;
+    const py = cy + oy * TILE * 0.65;
+    ctx.fillStyle = `rgba(${col},${((0.22 + (s % 3) * 0.06) * fade).toFixed(2)})`;
+    if (s % 2 === 0) ctx.fillRect(px - 1, py - 1, 2, 3);
+    else ctx.fillRect(px - 2, py - 1, 4, 2);
+  }
   ctx.restore();
 }
 
@@ -197,6 +356,40 @@ function drawHabitatRange(ctx: CanvasRenderingContext2D, habitat: AnimalHabitat)
   ctx.setLineDash([7, 5]);
   ctx.beginPath();
   ctx.arc(cx, cy, habitat.radius * TILE, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawBuriedSilverVeinMarker(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  const cx = x * TILE + TILE / 2;
+  const cy = y * TILE + TILE / 2;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(235, 205, 116, 0.95)';
+  ctx.fillStyle = 'rgba(55, 43, 29, 0.78)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3, 2]);
+  ctx.beginPath();
+  ctx.arc(cx, cy, Math.max(5, TILE * 0.28), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#e6c970';
+  ctx.fillRect(cx - 1, cy - 4, 2, 8);
+  ctx.fillRect(cx - 4, cy - 1, 8, 2);
+  ctx.restore();
+}
+
+function drawMineWorkRange(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  const cx = (x + 0.5) * TILE;
+  const cy = (y + 0.5) * TILE;
+  ctx.save();
+  ctx.fillStyle = 'rgba(122,179,217,0.10)';
+  ctx.strokeStyle = 'rgba(122,179,217,0.9)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([7, 5]);
+  ctx.beginPath();
+  ctx.arc(cx, cy, CONFIG.minerals.mineWorkRadius * TILE, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
   ctx.restore();
@@ -224,6 +417,52 @@ function drawHabitatIcon(ctx: CanvasRenderingContext2D, habitat: AnimalHabitat):
   ctx.beginPath();
   ctx.ellipse(cx, cy + 5 * s, 5.2 * s, 3.7 * s, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+function drawExpeditionTargetMarker(ctx: CanvasRenderingContext2D, marker: ExpeditionTargetMarker): void {
+  const cx = (marker.x + 0.5) * TILE;
+  const cy = (marker.y + 0.5) * TILE;
+  const color = marker.kind === 'tiger' ? '224,95,82' : marker.kind === 'wolf' ? '226,153,55' : '194,76,66';
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 260);
+  const radius = marker.radius * TILE * (1 + pulse * 0.045);
+  ctx.save();
+  ctx.fillStyle = `rgba(${color},${(0.08 + pulse * 0.05).toFixed(3)})`;
+  ctx.strokeStyle = `rgba(${color},${(0.72 + pulse * 0.24).toFixed(3)})`;
+  ctx.lineWidth = marker.expeditionTarget ? 3 : 2;
+  ctx.setLineDash([10, 6]);
+  ctx.lineDashOffset = -(performance.now() / 45) % 16;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = `rgb(${color})`;
+  ctx.strokeStyle = 'rgba(18,20,22,0.95)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 11);
+  ctx.lineTo(cx + 9, cy);
+  ctx.lineTo(cx, cy + 11);
+  ctx.lineTo(cx - 9, cy);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.font = '700 11px sans-serif';
+  const width = ctx.measureText(marker.label).width + 14;
+  const labelX = cx - width / 2;
+  const labelY = cy - radius - 25;
+  ctx.fillStyle = 'rgba(22,24,26,0.92)';
+  ctx.strokeStyle = `rgba(${color},0.9)`;
+  ctx.lineWidth = 1;
+  ctx.fillRect(labelX, labelY, width, 19);
+  ctx.strokeRect(labelX + 0.5, labelY + 0.5, width - 1, 18);
+  ctx.fillStyle = '#f4ead4';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(marker.label, cx, labelY + 10);
   ctx.restore();
 }
 
@@ -255,11 +494,12 @@ function drawWorkerSlotOverlay(
   if (!building.built) return;
   const config = workerSlotConfig(building.type);
   if (!config) return;
-  if (!isBuildingFootprintExplored(state, building.type, building.x, building.y)) return;
+  if (!isBuildingFootprintExplored(state, building.type, building.x, building.y, building.w, building.h)) return;
 
+  const slotCount = workerSlotCount(building);
   const workers = assignedWorkers(state, building);
-  const footprint = buildingFootprintSize(building.type);
-  const cx = (building.x + footprint / 2) * TILE;
+  const dims = buildingFootprintDims(building);
+  const cx = (building.x + dims.w / 2) * TILE;
   const top = building.y * TILE;
   const emptyFill = 'rgba(30,36,43,0.78)';
   const emptyStroke = 'rgba(216,222,229,0.48)';
@@ -269,7 +509,7 @@ function drawWorkerSlotOverlay(
     const radius = 4.4;
     const gap = 3;
     const pad = 4;
-    const width = config.slots * radius * 2 + Math.max(0, config.slots - 1) * gap + pad * 2;
+    const width = slotCount * radius * 2 + Math.max(0, slotCount - 1) * gap + pad * 2;
     const height = radius * 2 + pad * 2;
     const left = cx - width / 2;
     const y = top - height - 3;
@@ -278,7 +518,7 @@ function drawWorkerSlotOverlay(
     ctx.lineWidth = 1;
     ctx.fillRect(left, y, width, height);
     ctx.strokeRect(left + 0.5, y + 0.5, width - 1, height - 1);
-    for (let i = 0; i < config.slots; i++) {
+    for (let i = 0; i < slotCount; i++) {
       const worker = workers[i];
       const dotX = left + pad + radius + i * (radius * 2 + gap);
       const dotY = y + height / 2;
@@ -298,9 +538,9 @@ function drawWorkerSlotOverlay(
 
   const radius = 2.4;
   const gap = 5.5;
-  const startX = cx - ((config.slots - 1) * gap) / 2;
+  const startX = cx - ((slotCount - 1) * gap) / 2;
   const y = top - 4;
-  for (let i = 0; i < config.slots; i++) {
+  for (let i = 0; i < slotCount; i++) {
     const worker = workers[i];
     drawSlotDot(
       ctx,
@@ -325,11 +565,12 @@ function drawWorkerSlotOverlays(
   }
 }
 
-function drawFogOverlay(ctx: CanvasRenderingContext2D, state: GameState): void {
+function drawFogOverlay(ctx: CanvasRenderingContext2D, state: GameState, viewport: SceneViewport): void {
   ctx.save();
-  for (let y = 0; y < state.map.length; y++) {
+  for (let y = viewport.tileMinY; y <= viewport.tileMaxY; y++) {
     const row = state.map[y];
-    for (let x = 0; x < row.length; x++) {
+    if (!row) continue;
+    for (let x = viewport.tileMinX; x <= Math.min(viewport.tileMaxX, row.length - 1); x++) {
       if (isExplored(state, x, y)) continue;
       ctx.fillStyle = 'rgba(2,5,8,0.94)';
       ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
@@ -562,22 +803,66 @@ function drawForeignSiteProp(
   ctx.restore();
 }
 
+// 프레임 병목 계측 (옵트인) — 콘솔에서 `window.__renderPerf = {}`를 넣으면 구간별 누적 ms가 쌓인다
+type RenderPerfBucket = { total: number; count: number };
+declare global {
+  interface Window { __renderPerf?: Record<string, RenderPerfBucket> }
+}
+
 export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: SceneOptions): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
+  const viewport = o.viewport ?? {
+    pixelX: 0,
+    pixelY: 0,
+    pixelWidth: canvas.width,
+    pixelHeight: canvas.height,
+    tileMinX: 0,
+    tileMinY: 0,
+    tileMaxX: Math.max(0, Math.ceil(canvas.width / TILE) - 1),
+    tileMaxY: Math.max(0, Math.ceil(canvas.height / TILE) - 1),
+  };
+  if (viewport.pixelWidth <= 0 || viewport.pixelHeight <= 0) return;
+  const perf = typeof window !== 'undefined' ? window.__renderPerf : undefined;
+  let perfLast = perf ? performance.now() : 0;
+  const lap = (name: string): void => {
+    if (!perf) return;
+    const now = performance.now();
+    const bucket = perf[name] ?? (perf[name] = { total: 0, count: 0 });
+    bucket.total += now - perfLast;
+    bucket.count++;
+    perfLast = now;
+  };
   const sprites = o.sprites ?? placeholderSprites;
+  const predatorScoutIds = activePredatorScoutIds(state);
   const lerp = (a: number, b: number) => a + (b - a) * o.alpha;
   ctx.imageSmoothingEnabled = false;
 
   // 1) 지형
-  const layer = drawTerrainLayer(state, canvas.width, canvas.height, sprites);
+  const layer = drawTerrainLayer(
+    state,
+    canvas.width,
+    canvas.height,
+    sprites,
+    o.terrainVisualSignature ?? terrainVisualSignature(state),
+  );
   // 짐승이 떠난(비활성) 서식지는 지도에서도 숨긴다
   const habitats = state.habitats.filter(h => h.active && isExplored(state, h.x, h.y));
   const hoveredHabitat = o.hover ? findHabitatIconAtTile(habitats, o.hover.x, o.hover.y) : null;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(layer, 0, 0);
+  ctx.clearRect(viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight);
+  ctx.drawImage(
+    layer,
+    viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight,
+    viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight,
+  );
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight);
+  ctx.clip();
   if (hoveredHabitat) drawHabitatRange(ctx, hoveredHabitat);
-  for (const habitat of habitats) drawHabitatIcon(ctx, habitat);
+  for (const habitat of habitats) {
+    if (tileRectIntersectsViewport(viewport, habitat.x, habitat.y)) drawHabitatIcon(ctx, habitat);
+  }
 
   const activeClaimZones = new Map<number, ClaimZone>();
   for (const point of [o.hover, o.selected]) {
@@ -591,23 +876,63 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     drawClaimZone(ctx, zone, owner ? siteColor(owner) : '#aab1b8');
   }
   for (const route of activePassageRoutes(state)) drawPassageRoute(ctx, route);
+  const buriedVein = state.silverVein;
+  if (buriedVein?.status === 'buried') {
+    const buriedTile = state.map[buriedVein.y]?.[buriedVein.x];
+    if (buriedTile && isExplored(state, buriedVein.x, buriedVein.y)
+      && isBuriedSilverVeinTile(state, buriedTile)
+      && tileRectIntersectsViewport(viewport, buriedVein.x, buriedVein.y)) {
+      drawBuriedSilverVeinMarker(ctx, buriedVein.x, buriedVein.y);
+    }
+  }
+  lap('1-terrain');
 
   // 2) 건물 — 지붕이 위 타일에 겹치므로 y 순서로 그린다
   const season = getSeason(state.day);
   const heating = (season === 'autumn' || season === 'winter') && state.resources.firewood > 0;
+  // 끝난 전투 자리의 교란 자국 — 건물·주민 아래 바닥 데칼로 깔린다
+  for (const scar of state.battleScars ?? []) {
+    if (scar.until < state.day) continue;
+    if (!isExplored(state, scar.x, scar.y)) continue;
+    if (!tileRectIntersectsViewport(viewport, scar.x - 2, scar.y - 2, 5, 5)) continue;
+    drawBattleScarDecal(ctx, scar, state.day, season === 'winter');
+  }
   const wallTiles = builtWallTileSet(state);
   const sorted = [...state.buildings].sort((a, b) =>
-    (a.y + buildingFootprintSize(a.type)) - (b.y + buildingFootprintSize(b.type)) || a.x - b.x);
+    (a.y + buildingFootprintDims(a).h) - (b.y + buildingFootprintDims(b).h) || a.x - b.x);
+  const visibleBuildings: Building[] = [];
   for (const b of sorted) {
-    if (!isBuildingFootprintExplored(state, b.type, b.x, b.y)) continue;
+    if (!isBuildingFootprintExplored(state, b.type, b.x, b.y, b.w, b.h)) continue;
     const def = BUILDING_DEFS[b.type];
-    const footprint = buildingFootprintSize(b.type);
-    const size = TILE * footprint;
+    const dims = buildingFootprintDims(b);
+    if (!tileRectIntersectsViewport(viewport, b.x - 1, b.y - 1, dims.w + 2, dims.h + 2)) continue;
+    visibleBuildings.push(b);
+    const size = TILE * dims.w;
+    if (isPlotBuildingType(b.type)) {
+      // 경작지는 발자국 칸마다 스프라이트를 타일링 — 파종을 마친 칸만 작물이 자라 보인다
+      const area = dims.w * dims.h;
+      const sown = b.built ? Math.min(area, Math.max(0, Math.floor(b.sownArea ?? area))) : 0;
+      for (let i = 0; i < area; i++) {
+        const cellX = b.x + (i % dims.w);
+        const cellY = b.y + Math.floor(i / dims.w);
+        sprites.drawBuilding(ctx, {
+          type: b.type, built: b.built, ghost: false,
+          season,
+          progress01: def.buildDays > 0 ? b.progress / def.buildDays : 1,
+          growth01: i < sown ? b.fieldGrowth / 100 : 0,
+          x: cellX * TILE, y: cellY * TILE, size: TILE,
+        });
+      }
+      if (b.repairing) {
+        sprites.drawBuildingDamage(ctx, { season, x: b.x * TILE, y: b.y * TILE, size });
+        drawDamageSmoke(ctx, b.x * TILE, b.y * TILE, b.id, dims.w);
+      }
+      continue;
+    }
     sprites.drawBuilding(ctx, {
       type: b.type, built: b.built, ghost: false,
       season,
       progress01: def.buildDays > 0 ? b.progress / def.buildDays : 1,
-      growth01: b.type === 'field' || b.type === 'paddy' ? b.fieldGrowth / 100 : undefined,
       connections: b.built && isWallBuilding(b.type)
         ? wallConnectionsFromSet(wallTiles, b.x, b.y)
         : undefined,
@@ -615,24 +940,28 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     });
     if (b.repairing) {
       sprites.drawBuildingDamage(ctx, { season, x: b.x * TILE, y: b.y * TILE, size });
-      drawDamageSmoke(ctx, b.x * TILE, b.y * TILE, b.id, footprint);
+      drawDamageSmoke(ctx, b.x * TILE, b.y * TILE, b.id, dims.w);
     }
     // 아궁이에 불을 땔 때 온돌집/중심지 굴뚝에서 연기가 오른다
     if (b.built && heating && (b.type === 'ondol' || b.type === 'center')) {
-      drawChimneySmoke(ctx, b.x * TILE, b.y * TILE, b.id, footprint);
+      drawChimneySmoke(ctx, b.x * TILE, b.y * TILE, b.id, dims.w);
     }
   }
 
   const discoveredSites = state.foreignSites.filter(candidate => candidate.discovered);
-  for (const site of discoveredSites) {
+  const visibleSites = discoveredSites.filter(site =>
+    tileRectIntersectsViewport(viewport, site.x - 1, site.y - 1, site.width + 2, site.height + 2));
+  for (const site of visibleSites) {
     for (const prop of foreignSiteProps(state, site)) drawForeignSiteProp(ctx, sprites, prop, site, season, state.day);
   }
-  for (const site of discoveredSites) {
+  for (const site of visibleSites) {
     const selected = !!o.selected && foreignSiteAt(state, o.selected.x, o.selected.y)?.id === site.id;
     drawForeignSite(ctx, sprites, site, selected, season);
   }
 
-  drawWorkerSlotOverlays(ctx, state, sorted, o.selectedBuildingId);
+  lap('2-buildings');
+  drawWorkerSlotOverlays(ctx, state, visibleBuildings, o.selectedBuildingId);
+  lap('2b-slotOverlays');
 
   // 3) 선택 주민의 예정 경로 — 행군하는 점선(개미행렬) 애니메이션
   if (o.selectedResidentId != null) {
@@ -656,8 +985,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
 
   // 4) 외부 거점 생활 인구와 개척지 주민
   const activityTime = (state.day - 1) * CONFIG.agents.subticksPerDay + state.subTick + o.alpha;
-  for (const site of discoveredSites) {
+  for (const site of visibleSites) {
     for (const actor of foreignSiteActors(state, site, activityTime)) {
+      if (!pixelRectIntersectsViewport(viewport, actor.x * TILE - TILE, actor.y * TILE - TILE, TILE * 2, TILE * 2)) continue;
       sprites.drawResident(ctx, {
         job: actor.job,
         gender: actor.gender,
@@ -672,9 +1002,19 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       });
     }
   }
+  // 매장을 기다리는 시신 — 장의사가 운구 중이면 표시하지 않는다
+  for (const corpse of state.corpses ?? []) {
+    if (corpse.carried || corpse.withExpedition) continue;
+    if (!tileRectIntersectsViewport(viewport, corpse.x, corpse.y)) continue;
+    ctx.font = `${Math.round(TILE * 0.55)}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⚰️', corpse.x * TILE + TILE / 2, corpse.y * TILE + TILE / 2);
+  }
   for (const r of state.residents) {
-    if (!r.alive) continue;
+    if (!r.alive || predatorScoutIds.has(r.id)) continue;
     const p = residentPixelPos(r, o.alpha);
+    if (!pixelRectIntersectsViewport(viewport, p.x - TILE, p.y - TILE, TILE * 2, TILE * 2)) continue;
     sprites.drawResident(ctx, {
       job: r.job,
       gender: r.gender,
@@ -686,10 +1026,41 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       moving: r.px !== r.x || r.py !== r.y,
       facing: r.x < r.px ? -1 : 1,
       militiaWeapon: militiaWeaponForResident(state, r),
+      special: r.special,
+      stage: r.stage,
+      sizeScale: r.stage === 'infant' ? 0.42 : r.stage === 'child' ? 0.62 : r.stage === 'youth' ? 0.8 : 1,
     });
   }
 
-  // 5) 습격 무리 (+겨울 눈밭 발자국)
+  // 5) 아군 원정부대 — 집결 중에는 개별 주민, 출발 후에는 단일 부대로 표시한다.
+  if (state.expedition) {
+    const expedition = state.expedition;
+    if (expedition.phase === 'muster') {
+      drawMusterFlag(ctx, expedition.musterX, expedition.musterY);
+    } else {
+      if (season === 'winter' && expedition.trail.length > 0) drawFootprints(ctx, expedition.trail);
+      const members = state.residents.filter(resident => resident.alive && expedition.memberIds.includes(resident.id));
+      sprites.drawExpedition(ctx, {
+        x: lerp(expedition.px, expedition.x) * TILE + TILE / 2,
+        y: lerp(expedition.py, expedition.y) * TILE + TILE / 2,
+        members: members.map(member => ({
+          job: member.job,
+          gender: member.gender,
+          militiaWeapon: militiaWeaponForResident(state, member),
+          special: member.special,
+        })),
+        total: members.length,
+        moving: expedition.px !== expedition.x || expedition.py !== expedition.y,
+        facing: expedition.x < expedition.px ? -1 : 1,
+      });
+      if (expedition.phase === 'engage') {
+        const muskets = weaponCountsForResidents(state, members).readyMuskets > 0;
+        drawBattleClash(ctx, expedition.targetX, expedition.targetY, muskets);
+      }
+    }
+  }
+
+  // 6) 습격 무리 (+겨울 눈밭 발자국)
   if (state.raiders) {
     const b = state.raiders;
     if (getSeason(state.day) === 'winter' && b.trail && b.trail.length > 0) {
@@ -704,13 +1075,30 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       facing: b.x < b.px ? -1 : 1,
       faction: b.faction,
     });
-    if (state.battle?.phase === 'clash') drawBattleClash(ctx, state.battle.frontX, state.battle.frontY);
+    const battle = state.battle;
+    if (battle?.phase === 'muster') drawMusterFlag(ctx, battle.frontX, battle.frontY);
+    if (battle?.phase === 'clash') {
+      const muskets = armedMusketeers(state) > 0 && state.resources.gunpowder > 0;
+      drawBattleClash(ctx, battle.frontX, battle.frontY, muskets);
+      // 무리 전력이 붕괴선에 가까워지면 습격자 입자가 도주 방향(마을 반대편)으로 흘러나간다
+      const ratio = battle.initialPower > 0 ? b.power / battle.initialPower : 1;
+      if (battle.outcome === 'victory' && ratio <= COLLAPSE_RATIO + 0.18) {
+        const center = state.buildings.find(candidate => candidate.type === 'center' && candidate.built);
+        const dx = battle.frontX - (center?.x ?? battle.frontX);
+        const dy = battle.frontY - (center?.y ?? battle.frontY + 2);
+        const len = Math.hypot(dx, dy) || 1;
+        drawRoutStream(ctx, battle.frontX * TILE + TILE / 2, battle.frontY * TILE + TILE / 2, dx / len, dy / len);
+      }
+    }
   }
 
-  // 6) 밤낮 색조 — 하루 진행도(subTick+보간)로 계산. 세계를 물들이고 창에는 불이 켜진다.
+  lap('3-6-actors');
+
+  // 7) 밤낮 색조 — 하루 진행도(subTick+보간)로 계산. 세계를 물들이고 창에는 불이 켜진다.
   const SUB = CONFIG.agents.subticksPerDay;
   const dayFrac = ((state.subTick + o.alpha) % SUB) / SUB;
-  drawDayNight(ctx, state, dayFrac, canvas.width, canvas.height);
+  drawDayNight(ctx, state, dayFrac, viewport);
+  lap('7-daynight');
 
   // 7) 선택 타일 표시 (밤에도 잘 보이게 색조 위에)
   if (o.selected) {
@@ -721,10 +1109,20 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   }
 
   // 8) 날씨 오버레이 (비/눈/눈보라/서리/혹한/해빙 홍수)
-  drawWeather(ctx, state.weather, canvas.width, canvas.height);
+  drawWeather(ctx, state.weather, canvas.width, canvas.height, viewport);
+  lap('8-weather');
 
   // 9) 미답사 안개 — 지형/자원/건물/서식지를 탐색 전까지 가린다
-  drawFogOverlay(ctx, state);
+  drawFogOverlay(ctx, state, viewport);
+  lap('9-fog');
+
+  // 활성 토벌 목표는 미답사 안개 위에도 표시해 위치를 잃지 않게 한다.
+  for (const marker of activeExpeditionTargetMarkers(state)) drawExpeditionTargetMarker(ctx, marker);
+
+  const selectedMine = o.selectedBuildingId == null
+    ? undefined
+    : state.buildings.find(building => building.id === o.selectedBuildingId && building.type === 'mine');
+  if (selectedMine) drawMineWorkRange(ctx, selectedMine.x, selectedMine.y);
 
   // 10) 배치 모드: 관련 자원 하이라이트 (사냥막→서식지 범위, 밭→비옥한 땅)
   if (o.placingType) {
@@ -732,14 +1130,16 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     if (o.placingType === 'huntLodge') {
       for (const habitat of habitats) drawHabitatRange(ctx, habitat);
     }
+    if (o.placingType === 'mine' && o.hover) drawMineWorkRange(ctx, o.hover.x, o.hover.y);
     const want = PLACEMENT_HINT[o.placingType];
     if (want) {
       const pulse = 0.22 + 0.14 * Math.sin(performance.now() / 280);
       ctx.fillStyle = `rgba(255,214,90,${pulse.toFixed(3)})`;
       ctx.strokeStyle = 'rgba(255,214,90,0.8)';
-      for (let y = 0; y < state.map.length; y++) {
+      for (let y = viewport.tileMinY; y <= viewport.tileMaxY; y++) {
         const row = state.map[y];
-        for (let x = 0; x < row.length; x++) {
+        if (!row) continue;
+        for (let x = viewport.tileMinX; x <= Math.min(viewport.tileMaxX, row.length - 1); x++) {
           if (row[x].terrain !== want || !isExplored(state, x, y)) continue;
           ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
           ctx.strokeRect(x * TILE + 0.5, y * TILE + 0.5, TILE - 1, TILE - 1);
@@ -749,7 +1149,32 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   }
 
   // 11) 건설 배치 미리보기 — 날씨 위에 얹어 잘 보이게
-  if (o.placingType && o.hover) {
+  if (o.placingType && isPlotBuildingType(o.placingType) && o.placingRect) {
+    // 경작지: 드래그 사각형을 칸별 유효/무효로 칠한다
+    const def = BUILDING_DEFS[o.placingType];
+    const rect = o.placingRect;
+    const affordable = canAffordCost(state, buildingCostFor(o.placingType, rect.w, rect.h));
+    for (let dy = 0; dy < rect.h; dy++) {
+      for (let dx = 0; dx < rect.w; dx++) {
+        const tx = rect.x + dx;
+        const ty = rect.y + dy;
+        const tile = state.map[ty]?.[tx];
+        const ok = affordable && !!tile && isExplored(state, tx, ty) &&
+          canPlaceOn(def, tile, state) && !foreignSiteAt(state, tx, ty);
+        ctx.fillStyle = ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
+        ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE);
+        sprites.drawBuilding(ctx, {
+          type: o.placingType, built: true, ghost: true, progress01: 1,
+          season,
+          x: tx * TILE, y: ty * TILE, size: TILE,
+        });
+      }
+    }
+    ctx.strokeStyle = 'rgba(255,214,90,0.9)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(rect.x * TILE + 0.75, rect.y * TILE + 0.75, rect.w * TILE - 1.5, rect.h * TILE - 1.5);
+    ctx.lineWidth = 1;
+  } else if (o.placingType && o.hover) {
     const def = BUILDING_DEFS[o.placingType];
     const footprint = buildingFootprintSize(o.placingType);
     const size = TILE * footprint;
@@ -768,18 +1193,20 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       x: o.hover.x * TILE, y: o.hover.y * TILE, size,
     });
   }
+  lap('10-11-overlay');
+  ctx.restore();
 }
 
 // ── 밤낮 사이클 ──
 // dayFrac 0=새벽, 0.25=한낮, 0.5=해질녘, 0.75=한밤중. 시간 흐름은 config.time.msPerDay가 정한다.
-function drawDayNight(ctx: CanvasRenderingContext2D, state: GameState, dayFrac: number, W: number, H: number): void {
+function drawDayNight(ctx: CanvasRenderingContext2D, state: GameState, dayFrac: number, viewport: SceneViewport): void {
   const sun = Math.sin(dayFrac * Math.PI * 2); // +1 한낮, -1 한밤중
   const night = Math.max(0, -sun);             // 낮엔 0, 자정에 1
 
   // 밤의 푸른 어둠
   if (night > 0.002) {
     ctx.fillStyle = `rgba(16,24,56,${(night * 0.5).toFixed(3)})`;
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight);
   }
   // 여명/황혼의 따뜻한 빛 (해가 지평선 근처일 때만)
   const twilight = Math.max(0, 1 - Math.abs(sun) * 3.5);
@@ -787,7 +1214,7 @@ function drawDayNight(ctx: CanvasRenderingContext2D, state: GameState, dayFrac: 
     const dusk = dayFrac > 0.25 && dayFrac < 0.75; // 해질녘은 붉게, 새벽은 노랗게
     const col = dusk ? '255,110,70' : '255,175,95';
     ctx.fillStyle = `rgba(${col},${(twilight * 0.17).toFixed(3)})`;
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight);
   }
   // 밤이 깊어지면 집·군영·중심지 창에 불이 켜진다
   if (night > 0.28) {
@@ -795,6 +1222,7 @@ function drawDayNight(ctx: CanvasRenderingContext2D, state: GameState, dayFrac: 
     for (const b of state.buildings) {
       if (!b.built) continue;
       if (b.type === 'hut' || b.type === 'ondol' || b.type === 'center' || b.type === 'garrison') {
+        if (!tileRectIntersectsViewport(viewport, b.x, b.y, buildingFootprintSize(b.type), buildingFootprintSize(b.type))) continue;
         const size = TILE * buildingFootprintSize(b.type);
         ctx.fillStyle = `rgba(255,205,95,${(0.85 * a).toFixed(2)})`;
         ctx.fillRect(b.x * TILE + size * 0.5 - 1.5, b.y * TILE + size * 0.42, 3, 3);
@@ -810,13 +1238,20 @@ function fract(n: number): number {
   return n - Math.floor(n);
 }
 
-function drawWeather(ctx: CanvasRenderingContext2D, weather: GameState['weather'], W: number, H: number): void {
+function drawWeather(
+  ctx: CanvasRenderingContext2D,
+  weather: GameState['weather'],
+  W: number,
+  H: number,
+  viewport: SceneViewport,
+): void {
   const t = performance.now();
+  const fillViewport = () => ctx.fillRect(viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight);
 
   switch (weather) {
     case 'rain': {
       ctx.fillStyle = 'rgba(60,90,130,0.10)'; // 흐린 하늘 색조
-      ctx.fillRect(0, 0, W, H);
+      fillViewport();
       ctx.strokeStyle = 'rgba(190,205,230,0.4)';
       ctx.lineWidth = 1;
       const n = 150, fall = 0.9, slant = 3, len = 9;
@@ -832,7 +1267,7 @@ function drawWeather(ctx: CanvasRenderingContext2D, weather: GameState['weather'
     }
     case 'thawFlood': {
       ctx.fillStyle = 'rgba(80,120,150,0.12)'; // 해빙 — 푸르고 축축하게
-      ctx.fillRect(0, 0, W, H);
+      fillViewport();
       ctx.strokeStyle = 'rgba(200,215,235,0.32)';
       ctx.lineWidth = 1;
       const n = 90, fall = 0.7, slant = 2, len = 7;
@@ -848,20 +1283,20 @@ function drawWeather(ctx: CanvasRenderingContext2D, weather: GameState['weather'
     }
     case 'heavySnow': {
       ctx.fillStyle = 'rgba(235,240,248,0.10)';
-      ctx.fillRect(0, 0, W, H);
+      fillViewport();
       drawSnow(ctx, t, W, H, 130, 0.13, 0.9, 1.6);
       break;
     }
     case 'blizzard': {
       ctx.fillStyle = 'rgba(228,235,245,0.24)'; // 앞이 잘 안 보이는 흰 안개
-      ctx.fillRect(0, 0, W, H);
+      fillViewport();
       // 세차게 옆으로 몰아치는 눈
       drawSnow(ctx, t, W, H, 240, 0.34, 1.5, 1.7, 0.5);
       break;
     }
     case 'frost': {
       ctx.fillStyle = 'rgba(210,225,240,0.10)'; // 서리 — 옅은 냉기
-      ctx.fillRect(0, 0, W, H);
+      fillViewport();
       // 드문드문 반짝이는 서리 결정 (거의 정지)
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
       for (let i = 0; i < 40; i++) {
@@ -875,12 +1310,12 @@ function drawWeather(ctx: CanvasRenderingContext2D, weather: GameState['weather'
     case 'coldSnap': {
       // 혹한 — 강한 푸른 색조 + 비네트, 공기는 정지, 미세한 성에가 떠다닌다
       ctx.fillStyle = 'rgba(90,130,175,0.16)';
-      ctx.fillRect(0, 0, W, H);
+      fillViewport();
       const grd = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.75);
       grd.addColorStop(0, 'rgba(30,50,80,0)');
       grd.addColorStop(1, 'rgba(30,50,80,0.28)');
       ctx.fillStyle = grd;
-      ctx.fillRect(0, 0, W, H);
+      fillViewport();
       ctx.fillStyle = 'rgba(215,230,245,0.55)';
       for (let i = 0; i < 60; i++) {
         const x = fract((i * 0.083) + (t * 0.02) / W) * W;

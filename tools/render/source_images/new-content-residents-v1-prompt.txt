@@ -1,0 +1,19 @@
+Create one exact 2 columns by 3 rows character sprite contact sheet for a Joseon-frontier survival game. Match the attached reference sheet: compact crisp 16-bit pixel art, three-quarter top-down RPG game view, warm muted earthy palette, hard pixel clusters, consistent upper-left lighting, complete full bodies, and the same camera angle, proportions, baseline, and visual density as the reference characters. Each cell contains exactly one isolated character facing slightly toward screen-right in a neutral standing or subtle walking pose. Keep generous space around every character. Do not draw grid lines, borders, labels, text, UI, props on the ground, scenery, shadows extending into another cell, or anything crossing a cell boundary.
+
+The entire background must be perfectly uniform solid chroma-key magenta #FF00FF (RGB 255,0,255), with no gradient, texture, noise, shadow, antialiasing haze, vignette, or other magenta tones.
+
+EXACT CELL ORDER, left to right:
+
+Row 1 — young toddlers, visibly smaller than row 2 and much smaller than adults:
+1. Boy toddler: about three years old, short Joseon frontier hemp jacket and trousers in muted tan and blue-gray, one clearly visible long braided daenggi-meori tied with a muted ribbon, practical cloth shoes, empty hands. He must not have a topknot, adult bun, cropped hair, or headband.
+2. Girl toddler: about three years old, short Joseon frontier hemp jacket and skirt-trousers in muted tan and dusty red, one clearly visible long braided daenggi-meori tied with a muted ribbon, practical cloth shoes, empty hands. She must not have an adult bun or topknot.
+
+Row 2 — children, visibly larger than row 1 but smaller than the adult row:
+1. Boy child: about eight years old, plain practical Joseon hemp clothes in muted brown and blue-gray, one clearly visible long braided daenggi-meori tied with a muted ribbon, cloth shoes, empty hands. He must not have a topknot, adult bun, cropped hair, or headband.
+2. Girl child: about eight years old, plain practical Joseon hemp jacket and skirt in muted brown and dusty red, one clearly visible long braided daenggi-meori tied with a muted ribbon, cloth shoes, empty hands. She must not have an adult bun or topknot.
+
+Row 3 — adult undertakers at normal reference-character scale:
+1. Male undertaker: sober dark charcoal hemp robes, muted off-white mourning sash and headband, straw shoes, carrying a small short-handled burial spade held close to the body.
+2. Female undertaker: sober dark charcoal hemp jacket and skirt-trousers, muted off-white mourning sash and headband, straw shoes, carrying a small wrapped burial-tool bundle held close to the body.
+
+The four children in rows 1 and 2 are unmarried and all four must use long braided daenggi-meori hair; no child may wear a sangtu topknot or adult bun. The boy/girl pair in each age row must have equal scale and baseline. The two undertakers must read as the same profession and have equal scale and baseline. Preserve a respectful historical frontier tone. Do not include corpses, coffins, bones, skulls, ghosts, gore, religious symbols, modern objects, lettering, or detached particles. All six sprites must be fully visible and safely inset from their cells.

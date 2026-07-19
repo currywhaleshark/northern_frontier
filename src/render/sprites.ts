@@ -6,7 +6,7 @@
 // 현재 구현(placeholderSprites)은 단색 사각형 + 이모지 임시 그래픽이다.
 import { BUILDING_DEFS } from '../game/buildings';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
-import type { BuildingTypeId, ForeignSiteStatus, ForeignSiteType, Gender, JobId, Season, Terrain } from '../game/types';
+import type { BuildingTypeId, ForeignSiteStatus, ForeignSiteType, Gender, JobId, LifeStage, Season, SpecialResidentId, Terrain } from '../game/types';
 import type { MilitiaWeaponSpriteId } from './militiaWeaponAssets';
 
 // 계절별 지형 팔레트 (임시 그래픽용)
@@ -77,6 +77,9 @@ export interface ResidentDrawParams {
   facing?: 1 | -1;    // 1 오른쪽, -1 왼쪽
   militiaWeapon?: MilitiaWeaponSpriteId;
   foreignFaction?: string;
+  stage?: LifeStage | null;
+  sizeScale?: number; // 아이 축소 표시 (전용 시트가 나오기 전 폴백)
+  special?: SpecialResidentId;
 }
 
 export interface ForeignStructureDrawParams {
@@ -100,6 +103,20 @@ export interface RaiderDrawParams {
   faction?: string;
 }
 
+export interface ExpeditionDrawParams {
+  x: number;
+  y: number;
+  members: Array<{
+    job: JobId;
+    gender: Gender;
+    militiaWeapon?: MilitiaWeaponSpriteId;
+    special?: SpecialResidentId;
+  }>;
+  total: number;
+  moving?: boolean;
+  facing?: 1 | -1;
+}
+
 export interface BuildingDamageDrawParams {
   season: Season;
   x: number;
@@ -114,6 +131,7 @@ export interface SpriteAPI {
   drawBuildingDamage(ctx: CanvasRenderingContext2D, p: BuildingDamageDrawParams): void;
   drawForeignStructure(ctx: CanvasRenderingContext2D, p: ForeignStructureDrawParams): boolean;
   drawResident(ctx: CanvasRenderingContext2D, p: ResidentDrawParams): void;
+  drawExpedition(ctx: CanvasRenderingContext2D, p: ExpeditionDrawParams): void;
   drawRaiders(ctx: CanvasRenderingContext2D, p: RaiderDrawParams): void;
 }
 
@@ -219,6 +237,35 @@ export const placeholderSprites: SpriteAPI = {
       ctx.arc(p.x, p.y, 5.5, 0, Math.PI * 2);
       ctx.stroke();
       ctx.lineWidth = 1;
+    }
+  },
+
+  drawExpedition(ctx, p) {
+    const visible = Math.min(p.members.length, 5);
+    for (let i = 0; i < visible; i++) {
+      const member = p.members[i];
+      const ox = ((i * 17) % 11 - 5) * 1.25;
+      const oy = ((i * 29) % 9 - 4) * 1.1;
+      ctx.fillStyle = JOB_COLORS[member.job];
+      ctx.beginPath();
+      ctx.arc(p.x + ox, p.y + oy, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#1f3f5d';
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#324c62';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(p.x + 7, p.y + 4);
+    ctx.lineTo(p.x + 7, p.y - 13);
+    ctx.stroke();
+    ctx.fillStyle = '#4f83a8';
+    ctx.fillRect(p.x + 8, p.y - 13, 9, 6);
+    if (p.total > visible) {
+      ctx.fillStyle = '#dfeaf2';
+      ctx.font = 'bold 8px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(String(p.total), p.x, p.y - 11);
     }
   },
 

@@ -22,11 +22,17 @@ const BUILDING_COLUMNS: Record<BuildingTypeId, number> = {
   ondol: 2,
   tileHouse: 2,
   storehouse: 3,
+  cellar: 3,
+  smokehouse: 10,
+  dryingRack: 5,
+  onggiKiln: 10,
+  jangdokdae: 9,
   bridge: 11,
   lumberCamp: 4,
   woodShed: 4,
   huntLodge: 5,
   herbHut: 6,
+  clinic: 6,
   mine: 10,
   ferry: 5,
   charcoalKiln: 10,
@@ -48,6 +54,10 @@ const BUILDING_COLUMNS: Record<BuildingTypeId, number> = {
   garrison: 13,
   office: 14,
   market: 14,
+  cemetery: 3, // 전용 그림 나오기 전 임시 (움 저장고 봉분 재사용)
+  school: 14,    // 전용 그림 나오기 전 임시 (관청 재사용)
+  shrine: 9,     // 전용 그림 나오기 전 임시
+  hermitage: 6,  // 전용 그림 나오기 전 임시
   cannonEmplacement: 12, // 전용 그림이 나오기 전까지 망루 그림을 빌려 쓴다
 };
 

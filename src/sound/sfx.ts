@@ -2,9 +2,53 @@
 // 브라우저 자동재생 정책 때문에 첫 사용자 입력 후 initAudio()를 불러야 소리가 난다.
 import type { WeatherId } from '../game/types';
 
+export const BATTLE_SAMPLE_PATHS = {
+  cannon: '/assets/audio/battle/cannon.mp3',
+  musket: '/assets/audio/battle/musket.mp3',
+  arrow: '/assets/audio/battle/arrow.mp3',
+  drum: '/assets/audio/battle/drum.mp3',
+  horn: '/assets/audio/battle/horn.mp3',
+  ready: '/assets/audio/battle/ready.mp3',
+  muster: '/assets/audio/battle/muster.mp3',
+  melee1: '/assets/audio/battle/melee-1.mp3',
+  melee2: '/assets/audio/battle/melee-2.mp3',
+} as const;
+
+export const WEAPON_SHOT_STAGGER_MS = { arrow: 45, musket: 70, cannon: 110 } as const;
+
+const WEAPON_FAMILY_OFFSET_MS = { arrow: 0, musket: 55, cannon: 90 } as const;
+const WEAPON_BASE_VOLUME = { arrow: 0.78, musket: 0.9, cannon: 0.84 } as const;
+
+type BattleSampleName = keyof typeof BATTLE_SAMPLE_PATHS;
+export type WeaponShotKind = 'arrow' | 'musket' | 'cannon';
+export interface WeaponSalvoShots {
+  arrows?: number;
+  muskets?: number;
+  cannons?: number;
+}
+
+export interface WeaponShotSchedule {
+  kind: WeaponShotKind;
+  delaySeconds: number;
+  volume: number;
+  playbackRate: number;
+  pan: number;
+}
+
+export interface MeleeStrikeSchedule {
+  kind: 'melee1' | 'melee2';
+  delaySeconds: number;
+  volume: number;
+  playbackRate: number;
+  pan: number;
+}
+
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+let battleLimiter: DynamicsCompressorNode | null = null;
 let noiseBuf: AudioBuffer | null = null;
+const battleSamples = new Map<BattleSampleName, AudioBuffer>();
+let battleSamplesPromise: Promise<void> | null = null;
 let muted = typeof localStorage !== 'undefined' && localStorage.getItem('buksae-muted') === '1';
 
 // 바람 앰비언트 루프 상태
@@ -17,6 +61,7 @@ const lastPlay: Record<string, number> = {};
 export function initAudio(): void {
   if (ctx) {
     if (ctx.state === 'suspended') void ctx.resume();
+    void ensureBattleSamples();
     return;
   }
   try {
@@ -24,14 +69,170 @@ export function initAudio(): void {
     master = ctx.createGain();
     master.gain.value = muted ? 0 : MASTER_VOL;
     master.connect(ctx.destination);
+    battleLimiter = ctx.createDynamicsCompressor();
+    battleLimiter.threshold.value = -16;
+    battleLimiter.knee.value = 12;
+    battleLimiter.ratio.value = 8;
+    battleLimiter.attack.value = 0.003;
+    battleLimiter.release.value = 0.18;
+    battleLimiter.connect(master);
     // 화이트노이즈 버퍼 (돌풍/북/망치의 재료)
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const data = noiseBuf.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    void ensureBattleSamples();
     startWindLoop();
   } catch {
     ctx = null;
   }
+}
+
+export function ensureBattleSamples(): Promise<void> {
+  if (battleSamplesPromise) return battleSamplesPromise;
+  if (!ctx) return Promise.resolve();
+  const audioContext = ctx;
+  const missingSamples = Object.entries(BATTLE_SAMPLE_PATHS)
+    .filter(([name]) => !battleSamples.has(name as BattleSampleName));
+  if (missingSamples.length === 0) return Promise.resolve();
+
+  battleSamplesPromise = Promise.all(missingSamples.map(async ([name, path]) => {
+    try {
+      const response = await fetch(path);
+      if (!response.ok) throw new Error(`전투 음원 로드 실패: ${path}`);
+      const data = await response.arrayBuffer();
+      battleSamples.set(name as BattleSampleName, await audioContext.decodeAudioData(data));
+    } catch (error) {
+      console.warn(error);
+    }
+  })).then(() => undefined).finally(() => {
+    battleSamplesPromise = null;
+  });
+  return battleSamplesPromise;
+}
+
+function playLoadedBattleSample(
+  name: BattleSampleName,
+  startTime: number,
+  volume: number,
+  playbackRate = 1,
+  pan = 0,
+): void {
+  if (!ctx || !master || muted) return;
+  const buffer = battleSamples.get(name);
+  if (!buffer) return;
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.playbackRate.value = playbackRate;
+  const gain = ctx.createGain();
+  gain.gain.value = volume;
+  const panner = ctx.createStereoPanner();
+  panner.pan.value = pan;
+  source.connect(gain).connect(panner).connect(battleLimiter ?? master);
+  source.start(Math.max(ctx.currentTime, startTime));
+}
+
+function playBattleSample(name: BattleSampleName, delaySeconds = 0, volume = 0.7): void {
+  if (!ctx || !master || muted) return;
+  const schedule = () => {
+    if (!ctx || muted || !battleSamples.has(name)) return;
+    playLoadedBattleSample(name, ctx.currentTime + Math.max(0, delaySeconds), volume);
+  };
+  if (battleSamples.has(name)) schedule();
+  else void ensureBattleSamples().then(schedule);
+}
+
+export function buildWeaponVolleySchedule(shots: WeaponSalvoShots): WeaponShotSchedule[] {
+  const result: WeaponShotSchedule[] = [];
+  const entries: Array<[WeaponShotKind, number]> = [
+    ['arrow', shots.arrows ?? 0],
+    ['musket', shots.muskets ?? 0],
+    ['cannon', shots.cannons ?? 0],
+  ];
+  for (const [kind, requested] of entries) {
+    const shotCount = Math.max(0, Math.floor(requested));
+    const volume = WEAPON_BASE_VOLUME[kind] / Math.pow(Math.max(1, shotCount), 0.18);
+    for (let index = 0; index < shotCount; index++) {
+      result.push({
+        kind,
+        delaySeconds: (WEAPON_FAMILY_OFFSET_MS[kind] + index * WEAPON_SHOT_STAGGER_MS[kind]) / 1000,
+        volume,
+        playbackRate: 1 + ((index % 5) - 2) * 0.012,
+        pan: ((index % 3) - 1) * 0.16,
+      });
+    }
+  }
+  return result;
+}
+
+export function playWeaponSalvo(shots: WeaponSalvoShots): void {
+  if (!ctx || !master || muted) return;
+  const schedule = buildWeaponVolleySchedule(shots);
+  if (schedule.length === 0) return;
+  const play = () => {
+    if (!ctx || muted) return;
+    const baseTime = ctx.currentTime + 0.012;
+    for (const shot of schedule) {
+      playLoadedBattleSample(
+        shot.kind,
+        baseTime + shot.delaySeconds,
+        shot.volume,
+        shot.playbackRate,
+        shot.pan,
+      );
+    }
+  };
+  const samplesReady = schedule.every(shot => battleSamples.has(shot.kind));
+  if (samplesReady) play();
+  else void ensureBattleSamples().then(play);
+}
+
+export function playWeaponVolley(kind: WeaponShotKind, shooters: number): void {
+  playWeaponSalvo(kind === 'arrow'
+    ? { arrows: shooters }
+    : kind === 'musket'
+      ? { muskets: shooters }
+      : { cannons: shooters });
+}
+
+export function meleeStrikeCount(participants: number): number {
+  const count = Math.max(0, Math.floor(participants));
+  if (count === 0) return 0;
+  return Math.min(24, Math.max(1, Math.ceil(Math.sqrt(count) * 1.5 - 0.5)));
+}
+
+export function buildMeleeStrikeSchedule(participants: number): MeleeStrikeSchedule[] {
+  const strikeCount = meleeStrikeCount(participants);
+  const volume = 0.76 / Math.pow(Math.max(1, strikeCount), 0.14);
+  const firstVariant = Math.floor(participants) % 2;
+  return Array.from({ length: strikeCount }, (_, index) => ({
+    kind: ((index + firstVariant) % 2 === 0 ? 'melee1' : 'melee2') as 'melee1' | 'melee2',
+    delaySeconds: index * 0.09,
+    volume,
+    playbackRate: 1 + ((index % 5) - 2) * 0.018,
+    pan: ((index % 4) - 1.5) * 0.13,
+  }));
+}
+
+export function playMeleeClash(participants: number): void {
+  if (!ctx || !master || muted) return;
+  const schedule = buildMeleeStrikeSchedule(participants);
+  if (schedule.length === 0) return;
+  const play = () => {
+    if (!ctx || muted) return;
+    const baseTime = ctx.currentTime + 0.012;
+    for (const strike of schedule) {
+      playLoadedBattleSample(
+        strike.kind,
+        baseTime + strike.delaySeconds,
+        strike.volume,
+        strike.playbackRate,
+        strike.pan,
+      );
+    }
+  };
+  const samplesReady = battleSamples.has('melee1') && battleSamples.has('melee2');
+  if (samplesReady) play();
+  else void ensureBattleSamples().then(play);
 }
 
 export function isMuted(): boolean {
@@ -107,8 +308,9 @@ function noiseBurst(dur: number, o: NoiseOpts = {}): void {
 
 export type SfxName =
   | 'good' | 'hunt' | 'heal' | 'welcome' | 'warn'
-  | 'bad' | 'death' | 'raidDrum' | 'raidHorn'
-  | 'tradeBell' | 'gust' | 'hammer' | 'win' | 'lose';
+  | 'bad' | 'death' | 'raidDrum' | 'raidHorn' | 'battleReady' | 'militiaMuster'
+  | 'tradeBell' | 'gust' | 'hammer' | 'win' | 'lose'
+  | 'volley' | 'melee' | 'ambush' | 'casualty' | 'moraleBreak' | 'lootCrash' | 'wallHit';
 
 export function playSfx(name: SfxName): void {
   if (!ctx || !master || muted) return;
@@ -145,15 +347,17 @@ export function playSfx(name: SfxName): void {
       tone(196, 0.6, { vol: 0.3, slide: -40 });
       tone(131, 0.8, { vol: 0.22, delay: 0.15, slide: -20 });
       break;
-    case 'raidDrum': // 북소리
-      noiseBurst(0.12, { filter: 220, q: 0.7, vol: 0.5 });
-      tone(82, 0.28, { vol: 0.55, slide: -28 });
+    case 'raidDrum': // 제공된 북소리
+      playBattleSample('drum', 0, 0.62);
       break;
-    case 'raidHorn': // 뿔나팔 + 북 — 습격 경보
-      tone(147, 1.0, { type: 'sawtooth', vol: 0.22, attack: 0.22 });
-      tone(220, 0.85, { type: 'sawtooth', vol: 0.12, attack: 0.28, delay: 0.05 });
-      noiseBurst(0.12, { filter: 220, vol: 0.45, delay: 0.5 });
-      tone(82, 0.3, { vol: 0.5, slide: -28, delay: 0.5 });
+    case 'raidHorn': // 제공된 뿔나팔 — 개전 및 전황 경보
+      playBattleSample('horn', 0, 0.78);
+      break;
+    case 'battleReady':
+      playBattleSample('ready', 0, 0.76);
+      break;
+    case 'militiaMuster':
+      playBattleSample('muster', 0, 0.8);
       break;
     case 'tradeBell': // 방울/엽전 짤랑
       tone(1319, 0.12, { type: 'triangle', vol: 0.16 });
@@ -178,7 +382,65 @@ export function playSfx(name: SfxName): void {
       notes.forEach((f, i) => tone(f, 0.55, { type: 'sawtooth', vol: 0.14, delay: i * 0.3, slide: -12 }));
       break;
     }
+    case 'volley': // 구버전 이벤트 폴백 — 제공된 조총음
+      playWeaponVolley('musket', 1);
+      break;
+    case 'melee': // 백병전 — 금속 부딪힘 두어 번 + 함성 스웰
+      noiseBurst(0.05, { filter: 3400, q: 2.2, vol: 0.26 });
+      noiseBurst(0.05, { filter: 2800, q: 2.2, vol: 0.2, delay: 0.13 });
+      tone(1240, 0.06, { type: 'triangle', vol: 0.1, delay: 0.13, humanize: 30 });
+      noiseBurst(0.55, { filter: 320, q: 0.6, vol: 0.16, attack: 0.16 });
+      break;
+    case 'ambush': // 매복 — 수풀 휘익 + 기습 함성 북
+      noiseBurst(0.22, { filter: 750, q: 1.4, vol: 0.24, attack: 0.02 });
+      tone(110, 0.2, { vol: 0.32, slide: -30, delay: 0.14 });
+      noiseBurst(0.06, { filter: 1900, q: 1.2, vol: 0.18, delay: 0.16 });
+      break;
+    case 'casualty': // 인명 피해 — 짧고 둔한 낙하음
+      tone(150, 0.12, { vol: 0.2, slide: -60 });
+      noiseBurst(0.08, { filter: 420, q: 0.8, vol: 0.18, delay: 0.02 });
+      break;
+    case 'moraleBreak': // 대열 붕괴 — 내려가는 뿔나팔
+      tone(196, 0.7, { type: 'sawtooth', vol: 0.16, slide: -62, attack: 0.09 });
+      tone(147, 0.6, { type: 'sawtooth', vol: 0.1, delay: 0.24, slide: -40, attack: 0.1 });
+      break;
+    case 'lootCrash': // 약탈 — 창고 문 부서지는 소리 + 곡물 쏟아짐
+      noiseBurst(0.07, { filter: 1500, q: 1, vol: 0.28 });
+      tone(120, 0.16, { vol: 0.2, slide: -44, delay: 0.02 });
+      noiseBurst(0.32, { filter: 900, q: 0.5, vol: 0.12, delay: 0.14, attack: 0.06 });
+      break;
+    case 'wallHit': // 방어선 붕괴 — 무겁게 무너지는 충격음
+      tone(64, 0.42, { vol: 0.4, slide: -20 });
+      noiseBurst(0.28, { filter: 240, q: 0.6, vol: 0.34 });
+      noiseBurst(0.4, { filter: 1100, q: 0.5, vol: 0.14, delay: 0.08, attack: 0.05 });
+      break;
   }
+}
+
+// ── 전투 북 루프: 전술 전투 연출(simulating) 동안 낮게 깔리는 군고(軍鼓) ──
+
+let battleDrumTimer: number | null = null;
+let battleDrumBeat = 0;
+
+function battleDrumHit(accent: boolean): void {
+  playBattleSample('drum', 0, accent ? 0.5 : 0.32);
+}
+
+export function setBattleDrums(active: boolean): void {
+  if (!active) {
+    if (battleDrumTimer != null) {
+      clearInterval(battleDrumTimer);
+      battleDrumTimer = null;
+    }
+    return;
+  }
+  if (battleDrumTimer != null || !ctx || !master) return;
+  battleDrumBeat = 0;
+  battleDrumHit(true);
+  battleDrumTimer = window.setInterval(() => {
+    battleDrumBeat = (battleDrumBeat + 1) % 4;
+    battleDrumHit(battleDrumBeat === 0);
+  }, 640);
 }
 
 // ── 바람 앰비언트: 악천후 동안 낮게 깔리는 루프 ──
@@ -210,7 +472,16 @@ function startWindLoop(): void {
   lfo.start();
 }
 
-// 날씨에 맞춰 바람 세기를 조절 (매 프레임 불러도 안전)
+// 메뉴 전환은 기존 날씨가 다음 세션과 섞이지 않도록 같은 노드를 즉시 무음으로 만든다.
+export function stopWeatherAmbient(): void {
+  windTarget = 0;
+  if (!ctx || !windGain) return;
+  const now = ctx.currentTime;
+  windGain.gain.cancelScheduledValues(now);
+  windGain.gain.setValueAtTime(0, now);
+}
+
+// 날씨에 맞춰 바람 세기를 조절 (동일 목표를 반복 호출해도 안전)
 export function setWeatherAmbient(weather: WeatherId): void {
   if (!ctx || !windGain) return;
   const target =

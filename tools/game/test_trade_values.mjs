@@ -51,6 +51,36 @@ for (const relation of [35, 50, 65, 80]) {
 }
 
 {
+  const saltSuppliers = FACTIONS.filter(candidate => candidate.exports.includes('salt'));
+  assert.deepEqual(
+    saltSuppliers.map(candidate => candidate.name).sort(),
+    ['골간 우디캐', '만상', '송상'].sort(),
+    'salt has one coastal and two merchant suppliers',
+  );
+  assert.equal('salt' in CONFIG.tribute.baseAmounts, false, 'trade-only salt is never a tribute demand');
+
+  const state = simulation.newGame(2026071602);
+  state.resources.wood = 20;
+  state.relations['골간 우디캐'] = 80;
+  const quote = tradeValues.quoteTrade(state, '골간 우디캐', { give: 'wood', giveAmt: 8, get: 'salt' });
+  assert.equal(quote.ok, true, 'the coastal faction can sell salt through player-initiated trade');
+  assert.ok(quote.getAmt > 0);
+}
+
+{
+  const jangBuyers = FACTIONS.filter(candidate => candidate.imports.includes('jang'));
+  assert.ok(jangBuyers.length >= 4, 'regional traders buy high-value fermented jang');
+  const buyer = jangBuyers.find(candidate => candidate.exports.includes('grain'));
+  assert.ok(buyer);
+  const state = simulation.newGame(2026071618);
+  state.resources.jang = 10;
+  state.relations[buyer.name] = 80;
+  const quote = tradeValues.quoteTrade(state, buyer.name, { give: 'jang', giveAmt: 2, get: 'grain' });
+  assert.equal(quote.ok, true);
+  assert.ok(quote.getAmt > 0);
+}
+
+{
   const state = simulation.newGame(2026071001);
   const odoori = FACTIONS.find(candidate => candidate.name === '오도리 씨족');
   const golgan = FACTIONS.find(candidate => candidate.name === '골간 우디캐');

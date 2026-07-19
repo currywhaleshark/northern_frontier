@@ -16,6 +16,13 @@ export function relationMargin(relation: number): number {
   return 1.5;
 }
 
+// 은이 낀 거래는 마진이 크게 줄어든다 — 누구나 반기는 결제 수단이라 흥정이 짧다.
+// 물물교환(마진 1회)보다 은 왕복(축소 마진 2회)이 근소하게 이득이 되는 수준으로 유지한다.
+export function silverAdjustedMargin(margin: number, give: ResourceId, get: ResourceId): number {
+  if (give !== 'silver' && get !== 'silver') return margin;
+  return 1 + (margin - 1) * CONFIG.trade.silverMarginKeep;
+}
+
 export function factionValue(factionName: string, resource: ResourceId): number {
   const faction = FACTIONS.find(candidate => candidate.name === factionName);
   return faction?.tradeValues[resource] ?? RESOURCE_DEFS[resource].tradeBaseValue;
@@ -127,7 +134,9 @@ export function quoteTrade(state: GameState, factionName: string, request: Trade
     return rejected(factionName, request, `${RESOURCE_NAMES[request.give]}이(가) 부족합니다.`);
   }
 
-  const margin = relationMargin(getRelation(state, factionName));
+  const margin = silverAdjustedMargin(
+    relationMargin(getRelation(state, factionName)), request.give, request.get,
+  );
   const giveUnitValue = factionValue(factionName, request.give);
   const getUnitValue = factionValue(factionName, request.get);
   if (!(giveUnitValue > 0) || !(getUnitValue > 0)) {
@@ -177,7 +186,8 @@ export function quoteFactionDemand(
     .filter(resource => !ABSTRACT_RESOURCES.has(resource) && resource !== get)
     .map(resource => {
       const unitValue = factionValue(factionName, resource);
-      const amount = unitValue > 0 ? Math.ceil((getAmt * getUnitValue * margin) / unitValue) : 0;
+      const effMargin = silverAdjustedMargin(margin, resource, get);
+      const amount = unitValue > 0 ? Math.ceil((getAmt * getUnitValue * effMargin) / unitValue) : 0;
       const stock = state.resources[resource] ?? 0;
       return {
         resource,

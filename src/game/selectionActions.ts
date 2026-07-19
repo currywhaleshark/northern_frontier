@@ -1,11 +1,13 @@
-import { BUILDING_DEFS, buildingFootprintTiles, getBuilding, isBuildingUnlocked } from './buildings';
+import { BUILDING_DEFS, footprintTilesOf, getBuilding, isBuildingUnlocked } from './buildings';
 import { CONFIG } from './config';
-import { JOB_NAMES } from './constants';
 import { collectHuntableTiles } from './habitats';
 import { isPassable, isTerrainPassable } from './agents';
 import { getSeason } from './seasons';
 import { isExplored } from './exploration';
+import { foreignSiteAt } from './foreignSites';
 import { isHaulSourceBuilding } from './inventory';
+import { isMineralDeposit, servingMineForTile } from './miningSites';
+import { isVeinSealedTile } from './silver';
 import { canAssignResidentToBuilding, workerSlotConfig } from './workerSlots';
 import { unauthorizedTerritorySiteIds } from './territory';
 import type { Building, GameState, JobId, PointerAction, SelectedEntity, Tile } from './types';
@@ -47,7 +49,7 @@ function tileBuilding(state: GameState, tile: Tile): Building | undefined {
 }
 
 export function tileBelongsToBuilding(state: GameState, tile: Tile, building: Building): boolean {
-  const footprint = buildingFootprintTiles(state, building.type, building.x, building.y);
+  const footprint = footprintTilesOf(state, building);
   return !!footprint?.some(part => part.x === tile.x && part.y === tile.y);
 }
 
@@ -57,12 +59,6 @@ function activeHuntableTiles(state: GameState): Map<string, number> {
 
 function buildingMatches(tile: Tile, building: Building | undefined, types: readonly Building['type'][]): boolean {
   return !!building && building.built && tile.buildingId === building.id && types.includes(building.type);
-}
-
-function workLabel(job: JobId, tile: Tile, building?: Building): string {
-  if (job === 'hauler' && tile.terrain === 'rock') return tile.hasIron ? '철광 채석' : '채석';
-  if (building) return `${BUILDING_DEFS[building.type].name} 작업`;
-  return `${JOB_NAMES[job]} 작업`;
 }
 
 function isMoveTargetTile(tile: Tile): boolean {
@@ -122,9 +118,12 @@ export function canResidentWorkTarget(
         ? { ok: true, label: '약초·산물 채집' }
         : { ok: false, label: '약초꾼이 일할 수 없는 대상입니다' };
     case 'miner':
+      if (isMineralDeposit(tile) && !isVeinSealedTile(state, tile)) {
+        return { ok: true, label: tile.hasSilver ? '은맥 채굴' : tile.hasIron ? '철광 채굴' : '채석' };
+      }
       return buildingMatches(tile, building, ['mine'])
-        ? { ok: true, label: '채광', buildingId: building?.id }
-        : { ok: false, label: '채광장이 아닙니다' };
+        ? { ok: true, label: '주변 광상 채광', buildingId: building?.id }
+        : { ok: false, label: '채광장 작업 반경의 광상이 아닙니다' };
     case 'fisher':
       return buildingMatches(tile, building, ['ferry'])
         ? { ok: true, label: '고기잡이', buildingId: building?.id }
@@ -133,8 +132,15 @@ export function canResidentWorkTarget(
       return buildingMatches(tile, building, ['smithy'])
         ? { ok: true, label: '대장간 작업', buildingId: building?.id }
         : { ok: false, label: '대장간이 아닙니다' };
+    case 'curer':
+      return buildingMatches(tile, building, ['smokehouse', 'dryingRack'])
+        ? { ok: true, label: '갈무리 작업', buildingId: building?.id }
+        : { ok: false, label: '훈연소나 건조대가 아닙니다' };
+    case 'potter':
+      return buildingMatches(tile, building, ['onggiKiln'])
+        ? { ok: true, label: '옹기 굽기', buildingId: building?.id }
+        : { ok: false, label: '옹기가마가 아닙니다' };
     case 'hauler':
-      if (tile.terrain === 'rock') return { ok: true, label: workLabel(job, tile) };
       if (building && tile.buildingId === building.id && isHaulSourceBuilding(building)) {
         return {
           ok: true,
@@ -177,6 +183,32 @@ export function canResidentWorkTarget(
 export function selectedEntityFromTile(state: GameState, tile: Tile): SelectedEntity {
   const building = tileBuilding(state, tile);
   return building ? { kind: 'building', id: building.id } : { kind: 'tile', x: tile.x, y: tile.y };
+}
+
+export function selectedEntityAfterTileClick(
+  state: GameState,
+  current: SelectedEntity | null,
+  tile: Tile,
+): SelectedEntity | null {
+  const explored = isExplored(state, tile.x, tile.y);
+  const next = explored
+    ? selectedEntityFromTile(state, tile)
+    : { kind: 'tile' as const, x: tile.x, y: tile.y };
+
+  if (current?.kind === 'tile'
+    && next.kind === 'tile'
+    && current.x === tile.x
+    && current.y === tile.y) {
+    return null;
+  }
+
+  if ((current?.kind === 'resident' || current?.kind === 'building')
+    && next.kind === 'tile'
+    && (!explored || !foreignSiteAt(state, tile.x, tile.y))) {
+    return null;
+  }
+
+  return next;
 }
 
 export function getPointerAction(
@@ -238,6 +270,18 @@ export function getPointerAction(
 
 export function getBuildingActions(state: GameState, building: Building): BuildingActionItem[] {
   if (!building.built) return [];
+  if (building.type === 'mine') {
+    const vein = state.silverVein;
+    const veinTile = vein ? state.map[vein.y]?.[vein.x] : undefined;
+    const veinInMine = !!veinTile && servingMineForTile(state, veinTile)?.id === building.id;
+    if (veinInMine && vein?.status === 'sealed') {
+      return [{ id: 'silver-break-seal', label: '봉인을 어기고 은맥을 판다' }];
+    }
+    if (veinInMine && vein?.status === 'buried') {
+      return [{ id: 'silver-reopen', label: '묻어둔 은맥을 다시 연다' }];
+    }
+    return [];
+  }
   if (building.type === 'hut' && isBuildingUnlocked(state.rank, 'ondol')) {
     return [{ id: 'upgrade:ondol', label: '온돌집으로 개량' }];
   }

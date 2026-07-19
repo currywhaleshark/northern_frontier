@@ -4,6 +4,8 @@ const HAUL_SOURCE_BUILDING_TYPES: ReadonlySet<BuildingTypeId> = new Set([
   'field', 'paddy', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut',
   'smithy', 'mine', 'ferry', 'watermill', 'charcoalKiln', 'stable',
   'nitreYard', 'tannery', 'weavingHouse',
+  'smokehouse', 'dryingRack',
+  'onggiKiln', 'jangdokdae',
 ]);
 
 export function ensureBuildingInventory(building: Building): Partial<Record<ResourceId, number>> {
@@ -36,6 +38,11 @@ export function isStorageBuilding(building: Building): boolean {
 
 export function isHaulSourceBuilding(building: Building): boolean {
   return building.built && HAUL_SOURCE_BUILDING_TYPES.has(building.type);
+}
+
+// 전술 약탈은 현재 전역 재고만 건드리지만, 향후 건물별 약탈이 생겨도 장독은 무거운 고정 재고로 남긴다.
+export function isRaidProtectedBuildingInventory(building: Building): boolean {
+  return building.type === 'jangdokdae';
 }
 
 export function addSettlementStock(state: GameState, resource: ResourceId, amount: number): void {

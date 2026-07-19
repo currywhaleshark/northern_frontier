@@ -2,8 +2,35 @@
 import { BUILDING_DEFS, countBuilt } from './buildings';
 import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
+import { lootLivestock } from './livestock';
 import { killResident, livingResidents, reconcileResidentHomes } from './residents';
 import type { BuildingTypeId, GameState, ResourceId } from './types';
+
+export function applyLootLosses(
+  state: GameState,
+  requested: Partial<Record<ResourceId, number>>,
+): Partial<Record<ResourceId, number>> {
+  const applied: Partial<Record<ResourceId, number>> = {};
+  let largestLossRatio = 0;
+  for (const [resource, rawAmount] of Object.entries(requested)) {
+    const id = resource as ResourceId;
+    const before = state.resources[id] ?? 0;
+    const amount = Math.min(before, Math.max(0, Math.floor(rawAmount ?? 0)));
+    if (amount <= 0) continue;
+    state.resources[id] -= amount;
+    applied[id] = amount;
+    largestLossRatio = Math.max(largestLossRatio, amount / Math.max(1, before));
+  }
+  if (largestLossRatio > 0) lootLivestock(state, Math.min(0.35, largestLossRatio));
+  return applied;
+}
+
+export function describeLootLosses(losses: Partial<Record<ResourceId, number>>): string {
+  const parts = Object.entries(losses)
+    .filter(([, amount]) => (amount ?? 0) > 0)
+    .map(([resource, amount]) => `${RESOURCE_NAMES[resource as ResourceId]} ${amount}`);
+  return parts.length > 0 ? parts.join(', ') : '없음';
+}
 
 // 창고 자원 약탈 처리
 export function loot(state: GameState, ratio: number): string {
@@ -21,6 +48,8 @@ export function loot(state: GameState, ratio: number): string {
       parts.push(`${RESOURCE_NAMES[res]} ${taken}`);
     }
   }
+  const livestockLoss = lootLivestock(state, r);
+  if (livestockLoss.lost > 0) parts.push(`가축 ${livestockLoss.lost}마리`);
   return parts.length > 0 ? `${parts.join(', ')} 약탈당함` : '약탈 피해 없음';
 }
 
@@ -32,16 +61,18 @@ export function injure(
   count: number,
   severity: number,
   preferredIds: number[] = [],
+  restrictToPreferred = false,
 ): number {
   const preferred = new Set(preferredIds);
-  const living = livingResidents(state)
-    .sort((a, b) => Number(preferred.has(b.id)) - Number(preferred.has(a.id)));
+  const candidates = livingResidents(state).filter(resident => !restrictToPreferred || preferred.has(resident.id));
   let injured = 0;
-  for (let i = 0; i < count && living.length > 0; i++) {
-    const pool = living.slice(0, Math.max(1, preferredIds.length || living.length));
+  for (let i = 0; i < count && candidates.length > 0; i++) {
+    const preferredPool = candidates.filter(resident => preferred.has(resident.id));
+    const pool = preferredPool.length > 0 ? preferredPool : candidates;
     const r = pool[Math.floor(rng() * pool.length)];
     r.health = Math.max(5, r.health - (severity + rng() * severity));
     r.task = '부상 회복 중';
+    candidates.splice(candidates.indexOf(r), 1);
     injured++;
   }
   return injured;

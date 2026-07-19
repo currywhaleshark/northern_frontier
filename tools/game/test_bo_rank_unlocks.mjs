@@ -35,8 +35,8 @@ const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mj
 const selectionActions = await import(pathToFileURL(join(compiledDir, 'selectionActions.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-const BO_BUILDINGS = ['ondol', 'mine', 'ferry', 'paddy', 'watermill'];
-const BO_JOBS = ['miner', 'fisher', 'miller'];
+const BO_BUILDINGS = ['ondol', 'mine', 'ferry', 'paddy', 'watermill', 'onggiKiln', 'jangdokdae'];
+const BO_JOBS = ['fisher', 'miller', 'potter'];
 
 function boostResources(state) {
   for (const key of Object.keys(state.resources)) state.resources[key] = 1000;
@@ -158,13 +158,13 @@ function runTicks(state, ticks) {
   for (const job of BO_JOBS) {
     assert.equal(constants.isJobUnlocked(state.rank, job), false, `${job} is locked before bo`);
   }
+  assert.equal(constants.isJobUnlocked(state.rank, 'miner'), true, 'miner is a settlement-tier job');
 
   const resident = state.residents.find(r => r.alive);
-  const oldJob = resident.job;
-  assert.equal(simulation.reassignJob(state, oldJob, 'miner'), false);
-  assert.equal(resident.job, oldJob);
+  simulation.setResidentJob(state, resident.id, 'miner');
+  assert.equal(resident.job, 'miner');
   simulation.setResidentJob(state, resident.id, 'fisher');
-  assert.equal(resident.job, oldJob);
+  assert.equal(resident.job, 'miner');
 }
 
 {
@@ -180,14 +180,23 @@ function runTicks(state, ticks) {
         ? prepareTile(state, 'rock')
         : building === 'ferry'
           ? prepareRiverEdge(state).river
+          : building === 'onggiKiln'
+            ? prepareRiverEdge(state).river
           : building === 'paddy'
             ? preparePaddyTile(state)
             : building === 'watermill'
               ? prepareWatermillEdge(state)
               : prepareTile(state, 'plain');
-    if (building === 'mine') tile.hasIron = true;
-    if (building === 'ondol') {
-      const size = buildings.buildingFootprintSize(building);
+    if (building === 'mine') {
+      tile.terrain = 'plain';
+      const deposit = state.map[tile.y][tile.x + 2];
+      deposit.terrain = 'rock';
+      deposit.hasIron = true;
+      deposit.mineralRemaining = 20;
+      deposit.buildingId = null;
+    }
+    const size = buildings.buildingFootprintSize(building);
+    if (building === 'ondol' || building === 'jangdokdae') {
       for (let dy = 0; dy < size; dy++) {
         for (let dx = 0; dx < size; dx++) {
           const footprintTile = state.map[tile.y + dy][tile.x + dx];
@@ -221,7 +230,33 @@ function runTicks(state, ticks) {
   boostResources(state);
   state.rank = 'bo';
   const inland = prepareTile(state, 'plain');
-  assert.ok(simulation.tryPlaceBuilding(state, 'mine', inland.x, inland.y), 'mine rejects plain land');
+  for (let y = inland.y - CONFIG.minerals.mineWorkRadius; y <= inland.y + CONFIG.minerals.mineWorkRadius; y++) {
+    for (let x = inland.x - CONFIG.minerals.mineWorkRadius; x <= inland.x + CONFIG.minerals.mineWorkRadius; x++) {
+      const tile = state.map[y]?.[x];
+      if (!tile || tile.buildingId != null) continue;
+      tile.terrain = 'plain';
+      tile.hasIron = false;
+      tile.hasSilver = false;
+      tile.mineralRemaining = 0;
+    }
+  }
+  assert.ok(
+    simulation.tryPlaceBuilding(state, 'mine', inland.x, inland.y),
+    'mine requires a known mineral deposit in its work radius',
+  );
+  const deposit = state.map[inland.y][inland.x + 2];
+  deposit.terrain = 'rock';
+  deposit.hasIron = true;
+  deposit.mineralRemaining = 20;
+  assert.ok(
+    simulation.tryPlaceBuilding(state, 'mine', deposit.x, deposit.y),
+    'mine rejects direct placement on a mineral deposit',
+  );
+  assert.equal(
+    simulation.tryPlaceBuilding(state, 'mine', inland.x, inland.y),
+    null,
+    'mine can be placed on open land near a known mineral deposit',
+  );
 
   const ferryState = simulation.newGame(44);
   boostResources(ferryState);
@@ -263,15 +298,18 @@ function runTicks(state, ticks) {
 
 {
   const state = simulation.newGame(46);
-  const mineTile = prepareTile(state, 'rock');
+  const mineSite = prepareTile(state, 'plain');
+  const mineTile = state.map[mineSite.y][mineSite.x + 2];
+  mineTile.terrain = 'rock';
   mineTile.hasIron = true;
   mineTile.mineralRemaining = 1;
-  placeBuilt(state, 'mine', mineTile);
+  mineTile.buildingId = null;
+  placeBuilt(state, 'mine', mineSite);
   const miner = onlyWorkerAt(state, 'miner', mineTile);
   runTicks(state, 6);
 
-  assert.ok((miner.carrying.iron ?? 0) > 0, 'miner carries iron from an iron mine');
-  assert.ok((miner.carrying.stone ?? 0) > 0, 'miner also brings stone from an iron mine');
+  assert.ok((miner.carrying.iron ?? 0) > 0, 'miner carries iron from a deposit near the mine worksite');
+  assert.ok((miner.carrying.stone ?? 0) > 0, 'miner also brings stone from a nearby iron deposit');
   assert.equal(mineTile.terrain, 'plain', 'the mine deposit disappears when exhausted');
   assert.equal(mineTile.mineralRemaining, 0);
   assert.ok(state.log.some(entry => entry.text.includes('철광맥') && entry.text.includes('고갈')));

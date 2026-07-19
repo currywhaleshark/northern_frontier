@@ -87,6 +87,18 @@ export const CROP_DEFS: Record<CropId, CropDef> = {
     yield: CONFIG.production.fieldGrainYield * 0.45,
     survivesWinter: false,
   },
+  beans: {
+    id: 'beans',
+    name: '콩',
+    desc: '봄에 심어 가을에 거두는 건조 두류. 그대로 먹을 수 있고 훗날 장을 담그는 원료가 됩니다.',
+    buildingTypes: ['field'],
+    plantSeasons: ['spring'],
+    growSeasons: ['spring', 'summer'],
+    harvestSeasons: ['autumn'],
+    output: 'beans',
+    yield: CONFIG.production.fieldGrainYield * 0.5,
+    survivesWinter: false,
+  },
   cotton: {
     id: 'cotton',
     name: '목화',
@@ -101,7 +113,7 @@ export const CROP_DEFS: Record<CropId, CropDef> = {
   },
 };
 
-export const CROP_ORDER: CropId[] = ['millet', 'sorghum', 'buckwheat', 'barley', 'rice', 'vegetables', 'cotton'];
+export const CROP_ORDER: CropId[] = ['millet', 'sorghum', 'buckwheat', 'barley', 'rice', 'vegetables', 'beans', 'cotton'];
 
 export function defaultCropForBuildingType(type: BuildingTypeId): CropId | null {
   if (type === 'field') return 'millet';

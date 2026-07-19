@@ -1,14 +1,21 @@
 import {
-  BUILDING_DEFS, buildingFootprintTiles, getBuilding, isBuildingUnlocked, isSmithyProductUnlocked, SMITHY_PRODUCT_DEFS,
-  SMITHY_PRODUCT_ORDER, smithyProductOf,
+  BUILDING_DEFS, buildingCostFor, buildingFootprintDims, footprintTilesOf, getBuilding, isBuildingUnlocked,
+  isSmithyProductUnlocked, SMITHY_PRODUCT_DEFS, SMITHY_PRODUCT_ORDER, smithyProductOf,
 } from '../game/buildings';
 import { CONFIG } from '../game/config';
 import { FACTIONS, JOB_COLORS, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES } from '../game/constants';
 import { allowedCropsForBuilding, cropIdForBuilding, CROP_DEFS } from '../game/crops';
 import { canRequestTrade, factionTradeUnlockReason } from '../game/events';
+import { DRYING_PRODUCT_DEFS, DRYING_PRODUCT_ORDER, dryingProductOf } from '../game/preservation';
+import {
+  IMPLEMENTED_LIVESTOCK_IDS, LIVESTOCK_DEFS, normalizeLivestockState,
+  plotPlowOxenMax, plowOxenAssigned, plowOxenOf, plowOxenPool,
+} from '../game/livestock';
 import { getBuildingActions } from '../game/selectionActions';
-import { assignedWorkers, availableWorkerSlots, workerSlotConfig } from '../game/workerSlots';
-import type { BuildingTypeId, CropId, GameState, ResourceId, SmithyProductId } from '../game/types';
+import {
+  assignedSlotResidents, availableWorkerSlots, isResidentAvailableForWorkerSlot, workerSlotConfig, workerSlotCount,
+} from '../game/workerSlots';
+import type { BuildingTypeId, CropId, DryingProductId, GameState, LivestockId, ResourceId, SmithyProductId } from '../game/types';
 import { FactionName } from './FactionName';
 
 const TILE = CONFIG.ui.tileSize;
@@ -16,20 +23,26 @@ const TILE = CONFIG.ui.tileSize;
 interface Props {
   state: GameState;
   buildingId: number;
+  embedded?: boolean;
   onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
+  onSetDryingProduct: (buildingId: number, product: DryingProductId) => void;
+  onSetLivestockSpecies: (buildingId: number, species: LivestockId) => void;
+  onSlaughterLivestock: (buildingId: number, amount: number) => void;
   onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
   onConvertFieldToPaddy: (buildingId: number) => void;
+  onSetPlotPlowOxen: (buildingId: number, count: number) => void;
   onRequestTrade: (factionName: string) => void;
   onToggleNitre: () => void;
+  onSilverVeinAction: (action: 'break-seal' | 'reopen') => void;
   onAssignNearestWorker: (buildingId: number) => void;
   onUnassignWorker: (residentId: number) => void;
   onSelectResident: (residentId: number) => void;
   onClose: () => void;
 }
 
-function CostLine({ type }: { type: BuildingTypeId }) {
-  const cost = Object.entries(BUILDING_DEFS[type].cost)
+function CostLine({ type, w = 1, h = 1 }: { type: BuildingTypeId; w?: number; h?: number }) {
+  const cost = Object.entries(buildingCostFor(type, w, h))
     .filter(([, amount]) => (amount ?? 0) > 0)
     .map(([res, amount]) => `${RESOURCE_NAMES[res as ResourceId]} ${amount}`)
     .join(' · ');
@@ -39,12 +52,18 @@ function CostLine({ type }: { type: BuildingTypeId }) {
 export function ActionPopup({
   state,
   buildingId,
+  embedded = false,
   onUpgradeHousing,
   onSetSmithyProduct,
+  onSetDryingProduct,
+  onSetLivestockSpecies,
+  onSlaughterLivestock,
   onSetBuildingCrop,
   onConvertFieldToPaddy,
+  onSetPlotPlowOxen,
   onRequestTrade,
   onToggleNitre,
+  onSilverVeinAction,
   onAssignNearestWorker,
   onUnassignWorker,
   onSelectResident,
@@ -57,39 +76,63 @@ export function ActionPopup({
   if (actions.length === 0 && !slotConfig) return null;
 
   const def = BUILDING_DEFS[building.type];
-  const footprint = buildingFootprintTiles(state, building.type, building.x, building.y) ?? [];
+  const footprint = footprintTilesOf(state, building) ?? [];
   const maxX = Math.max(building.x, ...footprint.map(tile => tile.x));
   const minY = Math.min(building.y, ...footprint.map(tile => tile.y));
   const style = {
     left: (maxX + 1) * TILE + 8,
     top: minY * TILE,
   };
-  const slotWorkers = slotConfig ? assignedWorkers(state, building) : [];
+  const slotCount = slotConfig ? workerSlotCount(building) : 0;
+  const slotWorkers = slotConfig ? assignedSlotResidents(state, building) : [];
   const openSlots = slotConfig ? availableWorkerSlots(state, building) : 0;
   const isCropBuilding = building.built && (building.type === 'field' || building.type === 'paddy');
   const currentCrop = isCropBuilding ? cropIdForBuilding(building) : null;
   const queuedCrop = isCropBuilding ? building.queuedCropId ?? null : null;
   const hasStandingCrop = isCropBuilding && currentCrop != null && building.fieldGrowth > 0.5;
+  const plotDims = isCropBuilding ? buildingFootprintDims(building) : null;
+  const plotAreaTiles = plotDims ? plotDims.w * plotDims.h : 0;
+  const plotSown = isCropBuilding ? Math.min(plotAreaTiles, Math.max(0, Math.floor(building.sownArea ?? 0))) : 0;
 
   return (
-    <div className="action-popup" style={style}>
-      <div className="action-popup-head">
-        <span>{def.emoji} {def.name}</span>
-        <button className="icon-btn" type="button" onClick={onClose} aria-label="닫기">x</button>
-      </div>
+    <div className={embedded ? 'selection-building-actions' : 'action-popup'} style={embedded ? undefined : style}>
+      {!embedded && (
+        <div className="action-popup-head">
+          <span>{def.emoji} {def.name}</span>
+          <button className="icon-btn" type="button" onClick={onClose} aria-label="닫기">x</button>
+        </div>
+      )}
+
+      {plotDims && (
+        <div className="muted small">
+          {plotDims.w}×{plotDims.h} 경작지 · 파종 {plotSown}/{plotAreaTiles}칸 · 성장 {Math.round(building.fieldGrowth)}%
+        </div>
+      )}
 
       {slotConfig && (
         <div className="worker-slot-panel">
           <div className="worker-slot-summary">
             <span>작업 슬롯</span>
-            <span className="muted small">{JOB_NAMES[slotConfig.job]} {slotWorkers.length}/{slotConfig.slots}</span>
+            <span className="muted small">{JOB_NAMES[slotConfig.job]} {slotWorkers.length}/{slotCount}</span>
           </div>
-          {Array.from({ length: slotConfig.slots }, (_value, index) => {
+          {Array.from({ length: slotCount }, (_value, index) => {
             const worker = slotWorkers[index];
+            const workerInactive = worker != null && !isResidentAvailableForWorkerSlot(state, worker);
+            const workerStatus = !worker
+              ? JOB_NAMES[slotConfig.job]
+              : worker.sick
+                ? '와병 중 · 생산 중단'
+                : state.day < (worker.quarantinedUntil ?? 0)
+                  ? '격리 중 · 생산 중단'
+                  : worker.health < 20
+                    ? '중상 · 생산 중단'
+                    : workerInactive
+                      ? '근무 불가 · 생산 중단'
+                      : JOB_NAMES[worker.job];
             const disabled = !worker && openSlots <= 0;
             return (
               <div
-                className={`worker-slot-row${worker ? '' : ' empty'}${disabled ? ' disabled' : ''}`}
+                className={`worker-slot-row${workerInactive ? ' inactive' : ''}${worker ? '' : ' empty'}${disabled ? ' disabled' : ''}`}
                 key={worker?.id ?? `empty-${index}`}
               >
                 <button
@@ -108,7 +151,7 @@ export function ActionPopup({
                   />
                   <span className="worker-slot-text">
                     <span className="worker-slot-name">{worker ? worker.name : '빈 슬롯 배정'}</span>
-                    <span className="muted small">{worker ? JOB_NAMES[worker.job] : JOB_NAMES[slotConfig.job]}</span>
+                    <span className="muted small">{workerStatus}</span>
                   </span>
                 </button>
                 {worker && (
@@ -188,10 +231,44 @@ export function ActionPopup({
         </div>
       )}
 
+      {isCropBuilding && (() => {
+        const oxenMax = plotPlowOxenMax(building);
+        const assigned = plowOxenOf(building);
+        const pool = plowOxenPool(state);
+        const freeOxen = Math.max(0, pool - plowOxenAssigned(state));
+        if (oxenMax <= 0 || (pool <= 0 && assigned <= 0)) return null;
+        return (
+          <div className="worker-slot-panel">
+            <div className="worker-slot-summary">
+              <span>농우</span>
+              <span className="muted small">
+                내준 소 {assigned}/{oxenMax}마리 · 남은 소 {freeOxen}마리
+              </span>
+            </div>
+            <div className="action-grid">
+              {Array.from({ length: oxenMax + 1 }, (_value, count) => (
+                <button
+                  key={count}
+                  className={`action-chip${assigned === count ? ' active' : ''}`}
+                  type="button"
+                  disabled={count > assigned + freeOxen}
+                  title={count === 0
+                    ? '농우를 축사로 돌려보냅니다'
+                    : `소 ${count}마리가 쟁기를 끌어 파종·재배·수확이 빨라집니다 (+${Math.round(count * (CONFIG.farming.plowOxWorkMultiplier - 1) * 100)}%)`}
+                  onClick={() => onSetPlotPlowOxen(building.id, count)}
+                >
+                  {count === 0 ? '없음' : `${count}마리`}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {building.type === 'field' && building.built && (
         <button className="action-command" type="button" onClick={() => onConvertFieldToPaddy(building.id)}>
           <span>논으로 전환</span>
-          <CostLine type="paddy" />
+          <CostLine type="paddy" w={building.w ?? 1} h={building.h ?? 1} />
         </button>
       )}
 
@@ -234,6 +311,63 @@ export function ActionPopup({
         </div>
       )}
 
+      {building.type === 'dryingRack' && (
+        <div className="action-grid">
+          {DRYING_PRODUCT_ORDER.map(product => {
+            const productDef = DRYING_PRODUCT_DEFS[product];
+            const active = dryingProductOf(building) === product;
+            const recipe = Object.entries(productDef.inputPerUnit)
+              .map(([res, amt]) => `${RESOURCE_NAMES[res as ResourceId]} ${amt}`)
+              .join(' + ');
+            return (
+              <button
+                key={product}
+                className={`action-chip${active ? ' active' : ''}`}
+                type="button"
+                title={`${recipe}${productDef.stopsInRain ? ' · 비가 오면 생산 중단' : ''}`}
+                onClick={() => onSetDryingProduct(building.id, product)}
+              >
+                {productDef.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {building.type === 'stable' && building.built && (() => {
+        const livestock = normalizeLivestockState(building.livestock);
+        return (
+          <div className="worker-slot-panel">
+            <div className="worker-slot-summary">
+              <span>축종</span>
+              <span className="muted small">{LIVESTOCK_DEFS[livestock.species].icon} {LIVESTOCK_DEFS[livestock.species].name} {livestock.headcount}마리</span>
+            </div>
+            <div className="action-grid">
+              {IMPLEMENTED_LIVESTOCK_IDS.map(species => (
+                <button
+                  key={species}
+                  className={`action-chip${livestock.species === species ? ' active' : ''}`}
+                  type="button"
+                  disabled={!state.unlockedLivestock.includes(species)}
+                  onClick={() => onSetLivestockSpecies(building.id, species)}
+                >
+                  {LIVESTOCK_DEFS[species].icon} {LIVESTOCK_DEFS[species].name}
+                </button>
+              ))}
+            </div>
+            <button
+              className="action-command"
+              type="button"
+              disabled={livestock.headcount < 1}
+              title={`${LIVESTOCK_DEFS[livestock.species].name} 1마리 → 고기 ${CONFIG.livestock[livestock.species].slaughterMeatPerHead}`}
+              onClick={() => onSlaughterLivestock(building.id, 1)}
+            >
+              {LIVESTOCK_DEFS[livestock.species].name} 1마리 도축
+            </button>
+          </div>
+        );
+      })()}
+
       {(building.type === 'market' || building.type === 'dock') && (
         <div className="action-grid">
           {FACTIONS.filter(faction =>
@@ -258,6 +392,28 @@ export function ActionPopup({
       {building.type === 'nitreYard' && (
         <button className="action-command" type="button" onClick={onToggleNitre}>
           {state.nitrePaused ? '염초장 가동 재개' : '염초장 가동 중지'}
+        </button>
+      )}
+
+      {building.type === 'mine' && actions.some(action => action.id === 'silver-break-seal') && (
+        <button
+          className="action-command"
+          type="button"
+          title="조정의 봉인을 어기는 잠채입니다. 발각되면 모반 의심이 크게 치솟습니다."
+          onClick={() => onSilverVeinAction('break-seal')}
+        >
+          봉인을 어기고 은맥을 판다
+        </button>
+      )}
+
+      {building.type === 'mine' && actions.some(action => action.id === 'silver-reopen') && (
+        <button
+          className="action-command"
+          type="button"
+          title="묻어둔 은맥의 처분을 다시 정합니다."
+          onClick={() => onSilverVeinAction('reopen')}
+        >
+          묻어둔 은맥을 다시 연다
         </button>
       )}
     </div>

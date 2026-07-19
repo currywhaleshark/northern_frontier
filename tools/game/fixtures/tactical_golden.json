@@ -1,0 +1,4998 @@
+[
+  {
+    "id": "nimacha-unwarned-front",
+    "factionName": "니마차 우디캐",
+    "power": 68,
+    "warned": false,
+    "rearAssault": false,
+    "seed": 2026071401,
+    "rounds": [
+      {
+        "round": 1,
+        "focusZoneId": "approach",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "nimacha-hunters",
+            "killed": 1,
+            "power": 36.11164798591338,
+            "morale": 74,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-looters",
+            "killed": 0,
+            "power": 16.59183826379804,
+            "morale": 66,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-spears",
+            "killed": 0,
+            "power": 13.663866805480737,
+            "morale": 71,
+            "zoneId": "approach",
+            "pendingZoneId": "storehouse",
+            "intent": "flank",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 25.794767358171818,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 7,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 0,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 67,
+        "raiderMorale": 69,
+        "villageMoraleDelta": -7,
+        "raiderMoraleDelta": -3,
+        "wounded": 0,
+        "killed": 0,
+        "raidersKilled": 1,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제1차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "창잡이 우회대가 방책을 우회해 창고 주변으로 접근합니다.",
+          "이번 교전 적 피해: 1명 처치.",
+          "마을 기세 -7, 적 기세 -3."
+        ],
+        "events": [
+          {
+            "zoneId": "approach",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "casualty",
+            "groupId": "nimacha-hunters"
+          },
+          {
+            "zoneId": "approach",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "melee",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 2,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "nimacha-hunters",
+            "killed": 2,
+            "power": 31.78127908572869,
+            "morale": 67,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-looters",
+            "killed": 1,
+            "power": 14.602209309659127,
+            "morale": 59,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-spears",
+            "killed": 0,
+            "power": 13.52722813742593,
+            "morale": 64,
+            "zoneId": "storehouse",
+            "pendingZoneId": "center",
+            "intent": "flank",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 20.794767358171818,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 13,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 34,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 59,
+        "raiderMorale": 62,
+        "villageMoraleDelta": -8,
+        "raiderMoraleDelta": -7,
+        "wounded": 0,
+        "killed": 0,
+        "raidersKilled": 2,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제2차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "창잡이 우회대가 방책을 우회해 마을 중심지로 접근합니다.",
+          "이번 교전 적 피해: 2명 처치.",
+          "마을 기세 -8, 적 기세 -7."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "nimacha-hunters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "nimacha-looters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "nimacha-looters"
+          },
+          {
+            "zoneId": "storehouse",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 3,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 1,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "nimacha-hunters",
+            "killed": 3,
+            "power": 27.886759348327516,
+            "morale": 60,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-looters",
+            "killed": 2,
+            "power": 12.812835376258587,
+            "morale": 52,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-spears",
+            "killed": 0,
+            "power": 13.39195585605167,
+            "morale": 57,
+            "zoneId": "center",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 15.794767358171818,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 19,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 29,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 32,
+            "breached": false
+          }
+        ],
+        "villageMorale": 51,
+        "raiderMorale": 55,
+        "villageMoraleDelta": -8,
+        "raiderMoraleDelta": -7,
+        "wounded": 1,
+        "killed": 0,
+        "raidersKilled": 2,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제3차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "이번 교전 수비 피해: 전사 0명, 부상 1명.",
+          "이번 교전 적 피해: 2명 처치.",
+          "마을 기세 -8, 적 기세 -7."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "nimacha-hunters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "nimacha-looters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "nimacha-looters"
+          },
+          {
+            "zoneId": "center",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "casualty",
+            "groupId": "civilian-unarmed"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 4,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "center",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 2,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "nimacha-hunters",
+            "killed": 4,
+            "power": 24.32960558826076,
+            "morale": 53,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-looters",
+            "killed": 2,
+            "power": 11.178467432444132,
+            "morale": 45,
+            "zoneId": "wall",
+            "pendingZoneId": "storehouse",
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-spears",
+            "killed": 0,
+            "power": 13.258036297491152,
+            "morale": 50,
+            "zoneId": "center",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 10.794767358171818,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 25,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 24,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 64,
+            "breached": false
+          }
+        ],
+        "villageMorale": 43,
+        "raiderMorale": 48,
+        "villageMoraleDelta": -8,
+        "raiderMoraleDelta": -7,
+        "wounded": 1,
+        "killed": 0,
+        "raidersKilled": 1,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제4차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "니마차 노획조가 방책의 틈으로 새어 나가 창고 주변으로 침투합니다.",
+          "이번 교전 수비 피해: 전사 0명, 부상 1명.",
+          "이번 교전 적 피해: 1명 처치.",
+          "마을 기세 -8, 적 기세 -7."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "nimacha-hunters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "nimacha-looters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "casualty",
+            "groupId": "civilian-unarmed"
+          },
+          {
+            "zoneId": "center",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 5,
+        "focusZoneId": "center",
+        "nextFocusZoneId": "center",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 2,
+            "killed": 1
+          }
+        ],
+        "raiders": [
+          {
+            "id": "nimacha-hunters",
+            "killed": 5,
+            "power": 21.119961013976827,
+            "morale": 48,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-looters",
+            "killed": 2,
+            "power": 11.06668275811969,
+            "morale": 40,
+            "zoneId": "storehouse",
+            "pendingZoneId": null,
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-spears",
+            "killed": 0,
+            "power": 13.125455934516241,
+            "morale": 45,
+            "zoneId": "center",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 5.794767358171818,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 31,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 58,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 96,
+            "breached": false
+          }
+        ],
+        "villageMorale": 26,
+        "raiderMorale": 43,
+        "villageMoraleDelta": -17,
+        "raiderMoraleDelta": -5,
+        "wounded": 0,
+        "killed": 1,
+        "raidersKilled": 1,
+        "buildingsDamaged": 0,
+        "loot": {
+          "grain": 6,
+          "firewood": 4,
+          "hide": 2
+        },
+        "summary": "마을은 버텼지만 일부 방어선과 비축을 잃었습니다.",
+        "lines": [
+          "이번 교전 수비 피해: 전사 1명, 부상 0명.",
+          "이번 교전 적 피해: 1명 처치.",
+          "창고 피해 예상: 곡물 6, 장작 4, 가죽 2.",
+          "마을 기세 -17, 적 기세 -5."
+        ],
+        "events": [
+          {
+            "zoneId": "center",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "nimacha-hunters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "storehouse",
+            "kind": "loot",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "casualty",
+            "groupId": "civilian-unarmed"
+          },
+          {
+            "zoneId": "center",
+            "kind": "report",
+            "groupId": null
+          }
+        ],
+        "ended": true,
+        "outcome": "partialLoss"
+      }
+    ],
+    "outcome": "partialLoss"
+  },
+  {
+    "id": "nimacha-warned-rear",
+    "factionName": "니마차 우디캐",
+    "power": 74,
+    "warned": true,
+    "rearAssault": true,
+    "seed": 2026071402,
+    "rounds": [
+      {
+        "round": 1,
+        "focusZoneId": "approach",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "nimacha-hunters",
+            "killed": 0,
+            "power": 39.21270985352355,
+            "morale": 75,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-looters",
+            "killed": 0,
+            "power": 18.626037180423683,
+            "morale": 67,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-spears",
+            "killed": 0,
+            "power": 14.704766195071329,
+            "morale": 72,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "flank",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 28.17476048594876,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 7,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 0,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 75,
+        "raiderMorale": 70,
+        "villageMoraleDelta": -7,
+        "raiderMoraleDelta": -2,
+        "wounded": 1,
+        "killed": 0,
+        "raidersKilled": 0,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제1차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "창잡이 우회대가 주 방어선의 뒤편을 노리며 마을 방어선으로 우회합니다.",
+          "이번 교전 수비 피해: 전사 0명, 부상 1명.",
+          "마을 기세 -7, 적 기세 -2."
+        ],
+        "events": [
+          {
+            "zoneId": "approach",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "melee",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "casualty",
+            "groupId": "hunter-unarmed"
+          },
+          {
+            "zoneId": "approach",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 2,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "nimacha-hunters",
+            "killed": 1,
+            "power": 35.00360576616112,
+            "morale": 66,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-looters",
+            "killed": 1,
+            "power": 16.62671273892653,
+            "morale": 58,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-spears",
+            "killed": 0,
+            "power": 13.704959400430344,
+            "morale": 63,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": true
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 23.17476048594876,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 14.664476759166092,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 0,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 77,
+        "raiderMorale": 61,
+        "villageMoraleDelta": 2,
+        "raiderMoraleDelta": -9,
+        "wounded": 0,
+        "killed": 0,
+        "raidersKilled": 2,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제2차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "창잡이 우회대가 마을 방어선 후열을 급습했습니다.",
+          "이번 교전 적 피해: 2명 처치.",
+          "마을 기세 +2, 적 기세 -9."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "nimacha-hunters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "nimacha-looters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "nimacha-looters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "rearAssault",
+            "groupId": "nimacha-spears"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "melee",
+            "groupId": "nimacha-spears"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 3,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "nimacha-hunters",
+            "killed": 2,
+            "power": 31.071691978460468,
+            "morale": 57,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-looters",
+            "killed": 1,
+            "power": 14.759053689768718,
+            "morale": 49,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-spears",
+            "killed": 0,
+            "power": 12.733996627384172,
+            "morale": 54,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": true
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 18.17476048594876,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 20.664476759166092,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 0,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 79,
+        "raiderMorale": 52,
+        "villageMoraleDelta": 2,
+        "raiderMoraleDelta": -9,
+        "wounded": 1,
+        "killed": 0,
+        "raidersKilled": 1,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제3차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "이번 교전 수비 피해: 전사 0명, 부상 1명.",
+          "이번 교전 적 피해: 1명 처치.",
+          "마을 기세 +2, 적 기세 -9."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "nimacha-hunters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "nimacha-looters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "militia-musket"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "melee",
+            "groupId": "nimacha-spears"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 4,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 2,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "nimacha-hunters",
+            "killed": 3,
+            "power": 27.495405555913223,
+            "morale": 48,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-looters",
+            "killed": 1,
+            "power": 13.060317639058777,
+            "morale": 40,
+            "zoneId": "wall",
+            "pendingZoneId": "storehouse",
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-spears",
+            "killed": 1,
+            "power": 11.825543540126512,
+            "morale": 45,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": true
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 13.17476048594876,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 26.664476759166092,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 0,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 78,
+        "raiderMorale": 43,
+        "villageMoraleDelta": -1,
+        "raiderMoraleDelta": -9,
+        "wounded": 2,
+        "killed": 0,
+        "raidersKilled": 2,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제4차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "후방 급습으로 후열에서 1명의 사상자가 발생해 마을 기세가 흔들렸습니다.",
+          "니마차 노획조가 방책의 틈으로 새어 나가 창고 주변으로 침투합니다.",
+          "이번 교전 수비 피해: 전사 0명, 부상 2명.",
+          "이번 교전 적 피해: 2명 처치.",
+          "마을 기세 -1, 적 기세 -9."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "nimacha-hunters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "nimacha-looters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "militia-musket"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "nimacha-spears"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "melee",
+            "groupId": "nimacha-spears"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "militia-hornBow"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 5,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 2,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "nimacha-hunters",
+            "killed": 4,
+            "power": 24.08954626592291,
+            "morale": 41,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-looters",
+            "killed": 1,
+            "power": 12.929714462668189,
+            "morale": 33,
+            "zoneId": "storehouse",
+            "pendingZoneId": null,
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "nimacha-spears",
+            "killed": 1,
+            "power": 10.99247708561465,
+            "morale": 38,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": true
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 8.17476048594876,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 32.66447675916609,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 34,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 71,
+        "raiderMorale": 36,
+        "villageMoraleDelta": -7,
+        "raiderMoraleDelta": -7,
+        "wounded": 0,
+        "killed": 0,
+        "raidersKilled": 1,
+        "buildingsDamaged": 0,
+        "loot": {
+          "grain": 5,
+          "firewood": 4,
+          "hide": 1
+        },
+        "summary": "마을은 버텼지만 일부 방어선과 비축을 잃었습니다.",
+        "lines": [
+          "이번 교전 적 피해: 1명 처치.",
+          "창고 피해 예상: 곡물 5, 장작 4, 가죽 1.",
+          "마을 기세 -7, 적 기세 -7."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "nimacha-hunters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "melee",
+            "groupId": "nimacha-spears"
+          },
+          {
+            "zoneId": "storehouse",
+            "kind": "loot",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "report",
+            "groupId": null
+          }
+        ],
+        "ended": true,
+        "outcome": "partialLoss"
+      }
+    ],
+    "outcome": "partialLoss"
+  },
+  {
+    "id": "holaon-unwarned-rear",
+    "factionName": "홀라온 야인",
+    "power": 78,
+    "warned": false,
+    "rearAssault": true,
+    "seed": 2026071403,
+    "rounds": [
+      {
+        "round": 1,
+        "focusZoneId": "approach",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "holaon-lancers",
+            "killed": 0,
+            "power": 41.286664874899586,
+            "morale": 80,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-raiders",
+            "killed": 0,
+            "power": 19.63863468839898,
+            "morale": 72,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-archers",
+            "killed": 0,
+            "power": 15.734035130661649,
+            "morale": 78,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "flank",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 29.06245393097194,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 7,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 0,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 67,
+        "raiderMorale": 70,
+        "villageMoraleDelta": -7,
+        "raiderMoraleDelta": -2,
+        "wounded": 0,
+        "killed": 0,
+        "raidersKilled": 0,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제1차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "기마 궁수가 주 방어선의 뒤편을 노리며 마을 방어선으로 우회합니다.",
+          "마을 기세 -7, 적 기세 -2."
+        ],
+        "events": [
+          {
+            "zoneId": "approach",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "melee",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 2,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "holaon-lancers",
+            "killed": 1,
+            "power": 37.247242405815186,
+            "morale": 71,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-raiders",
+            "killed": 0,
+            "power": 17.59457810945817,
+            "morale": 63,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-archers",
+            "killed": 0,
+            "power": 14.746477914294445,
+            "morale": 69,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": true
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 24.06245393097194,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 15.688062935845661,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 0,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 66,
+        "raiderMorale": 61,
+        "villageMoraleDelta": -1,
+        "raiderMoraleDelta": -9,
+        "wounded": 1,
+        "killed": 0,
+        "raidersKilled": 1,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제2차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "기마 궁수가 마을 방어선 후열을 급습했습니다.",
+          "후방 급습으로 후열에서 1명의 사상자가 발생해 마을 기세가 흔들렸습니다.",
+          "이번 교전 수비 피해: 전사 0명, 부상 1명.",
+          "이번 교전 적 피해: 1명 처치.",
+          "마을 기세 -1, 적 기세 -9."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "rearAssault",
+            "groupId": "holaon-archers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "melee",
+            "groupId": "holaon-archers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "militia-hornBow"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 3,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "holaon-lancers",
+            "killed": 2,
+            "power": 33.32555359259435,
+            "morale": 62,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-raiders",
+            "killed": 0,
+            "power": 15.623835039795079,
+            "morale": 54,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-archers",
+            "killed": 0,
+            "power": 13.8540594183549,
+            "morale": 60,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": true
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 19.06245393097194,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 21.885377797875073,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 0,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 68,
+        "raiderMorale": 52,
+        "villageMoraleDelta": 2,
+        "raiderMoraleDelta": -9,
+        "wounded": 0,
+        "killed": 0,
+        "raidersKilled": 1,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제3차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "이번 교전 적 피해: 1명 처치.",
+          "마을 기세 +2, 적 기세 -9."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "melee",
+            "groupId": "holaon-archers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 4,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "holaon-lancers",
+            "killed": 3,
+            "power": 29.77949627734964,
+            "morale": 53,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-raiders",
+            "killed": 0,
+            "power": 13.855240948741903,
+            "morale": 45,
+            "zoneId": "wall",
+            "pendingZoneId": "storehouse",
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-archers",
+            "killed": 0,
+            "power": 12.986508027837681,
+            "morale": 51,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": true
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 14.062453930971941,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 27.885377797875073,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 0,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 70,
+        "raiderMorale": 43,
+        "villageMoraleDelta": 2,
+        "raiderMoraleDelta": -9,
+        "wounded": 0,
+        "killed": 0,
+        "raidersKilled": 1,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제4차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "약탈 기병이 방책의 틈으로 새어 나가 창고 주변으로 침투합니다.",
+          "이번 교전 적 피해: 1명 처치.",
+          "마을 기세 +2, 적 기세 -9."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "melee",
+            "groupId": "holaon-archers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 5,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "holaon-lancers",
+            "killed": 4,
+            "power": 26.241449315282043,
+            "morale": 46,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-raiders",
+            "killed": 0,
+            "power": 13.716688539254484,
+            "morale": 38,
+            "zoneId": "storehouse",
+            "pendingZoneId": null,
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-archers",
+            "killed": 1,
+            "power": 12.157698449175669,
+            "morale": 44,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": true
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 9.062453930971941,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 33.88537779787507,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 34,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 63,
+        "raiderMorale": 36,
+        "villageMoraleDelta": -7,
+        "raiderMoraleDelta": -7,
+        "wounded": 0,
+        "killed": 0,
+        "raidersKilled": 2,
+        "buildingsDamaged": 1,
+        "loot": {
+          "grain": 5,
+          "firewood": 4,
+          "hide": 2
+        },
+        "summary": "마을은 버텼지만 일부 방어선과 비축을 잃었습니다.",
+        "lines": [
+          "이번 교전 적 피해: 2명 처치.",
+          "창고 피해 예상: 곡물 5, 장작 4, 가죽 2.",
+          "방어 시설과 건물 1곳이 파손될 위험에 놓였습니다.",
+          "마을 기세 -7, 적 기세 -7."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "holaon-archers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "melee",
+            "groupId": "holaon-archers"
+          },
+          {
+            "zoneId": "storehouse",
+            "kind": "loot",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "report",
+            "groupId": null
+          }
+        ],
+        "ended": true,
+        "outcome": "partialLoss"
+      }
+    ],
+    "outcome": "partialLoss"
+  },
+  {
+    "id": "holaon-warned-front",
+    "factionName": "홀라온 야인",
+    "power": 84,
+    "warned": true,
+    "rearAssault": false,
+    "seed": 2026071404,
+    "rounds": [
+      {
+        "round": 1,
+        "focusZoneId": "approach",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 0,
+            "killed": 1
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "holaon-lancers",
+            "killed": 1,
+            "power": 45.319407088994815,
+            "morale": 80,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-raiders",
+            "killed": 0,
+            "power": 20.6694622772639,
+            "morale": 72,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-archers",
+            "killed": 0,
+            "power": 16.7538280960194,
+            "morale": 78,
+            "zoneId": "approach",
+            "pendingZoneId": "storehouse",
+            "intent": "flank",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 30.34305964262598,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 7,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 0,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 74,
+        "raiderMorale": 70,
+        "villageMoraleDelta": -8,
+        "raiderMoraleDelta": -2,
+        "wounded": 0,
+        "killed": 1,
+        "raidersKilled": 1,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제1차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "기마 궁수가 방책을 우회해 창고 주변으로 접근합니다.",
+          "이번 교전 수비 피해: 전사 1명, 부상 0명.",
+          "이번 교전 적 피해: 1명 처치.",
+          "마을 기세 -8, 적 기세 -2."
+        ],
+        "events": [
+          {
+            "zoneId": "approach",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "casualty",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "approach",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "melee",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "casualty",
+            "groupId": "hunter-unarmed"
+          },
+          {
+            "zoneId": "approach",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 2,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 0,
+            "killed": 1
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "holaon-lancers",
+            "killed": 2,
+            "power": 40.494262256286284,
+            "morale": 73,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-raiders",
+            "killed": 1,
+            "power": 18.328321878383207,
+            "morale": 65,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-archers",
+            "killed": 0,
+            "power": 16.59969287753602,
+            "morale": 71,
+            "zoneId": "storehouse",
+            "pendingZoneId": "center",
+            "intent": "flank",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 25.34305964262598,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 14.09452712910867,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 34,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 66,
+        "raiderMorale": 63,
+        "villageMoraleDelta": -8,
+        "raiderMoraleDelta": -7,
+        "wounded": 0,
+        "killed": 0,
+        "raidersKilled": 2,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제2차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "기마 궁수가 방책을 우회해 마을 중심지로 접근합니다.",
+          "이번 교전 적 피해: 2명 처치.",
+          "마을 기세 -8, 적 기세 -7."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "holaon-raiders"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "storehouse",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 3,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 0,
+            "killed": 1
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 1,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "holaon-lancers",
+            "killed": 3,
+            "power": 36.10913529771449,
+            "morale": 66,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-raiders",
+            "killed": 2,
+            "power": 16.21685861315464,
+            "morale": 58,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-archers",
+            "killed": 0,
+            "power": 16.44697570306269,
+            "morale": 64,
+            "zoneId": "center",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 20.34305964262598,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 20.580424605373963,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 29,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 32,
+            "breached": false
+          }
+        ],
+        "villageMorale": 58,
+        "raiderMorale": 56,
+        "villageMoraleDelta": -8,
+        "raiderMoraleDelta": -7,
+        "wounded": 1,
+        "killed": 0,
+        "raidersKilled": 2,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제3차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "이번 교전 수비 피해: 전사 0명, 부상 1명.",
+          "이번 교전 적 피해: 2명 처치.",
+          "마을 기세 -8, 적 기세 -7."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "holaon-raiders"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "center",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "casualty",
+            "groupId": "civilian-unarmed"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 4,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "center",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 0,
+            "killed": 1
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 2,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "holaon-lancers",
+            "killed": 4,
+            "power": 31.980745572039698,
+            "morale": 59,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-raiders",
+            "killed": 2,
+            "power": 14.244424628481552,
+            "morale": 51,
+            "zoneId": "wall",
+            "pendingZoneId": "storehouse",
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-archers",
+            "killed": 0,
+            "power": 16.295663526594513,
+            "morale": 57,
+            "zoneId": "center",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 15.343059642625981,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 26.580424605373963,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 24,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 64,
+            "breached": false
+          }
+        ],
+        "villageMorale": 50,
+        "raiderMorale": 49,
+        "villageMoraleDelta": -8,
+        "raiderMoraleDelta": -7,
+        "wounded": 1,
+        "killed": 0,
+        "raidersKilled": 1,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제4차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "약탈 기병이 방책의 틈으로 새어 나가 창고 주변으로 침투합니다.",
+          "이번 교전 수비 피해: 전사 0명, 부상 1명.",
+          "이번 교전 적 피해: 1명 처치.",
+          "마을 기세 -8, 적 기세 -7."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "casualty",
+            "groupId": "civilian-unarmed"
+          },
+          {
+            "zoneId": "center",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 5,
+        "focusZoneId": "center",
+        "nextFocusZoneId": "center",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 0,
+            "killed": 1
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 3,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "holaon-lancers",
+            "killed": 5,
+            "power": 28.137771466281784,
+            "morale": 54,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-raiders",
+            "killed": 2,
+            "power": 14.101980382196736,
+            "morale": 46,
+            "zoneId": "storehouse",
+            "pendingZoneId": null,
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "holaon-archers",
+            "killed": 0,
+            "power": 16.145743422149845,
+            "morale": 52,
+            "zoneId": "center",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 10.343059642625981,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 32.58042460537396,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 58,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 96,
+            "breached": false
+          }
+        ],
+        "villageMorale": 33,
+        "raiderMorale": 44,
+        "villageMoraleDelta": -17,
+        "raiderMoraleDelta": -5,
+        "wounded": 1,
+        "killed": 0,
+        "raidersKilled": 1,
+        "buildingsDamaged": 0,
+        "loot": {
+          "grain": 7,
+          "firewood": 5,
+          "hide": 2
+        },
+        "summary": "마을은 버텼지만 일부 방어선과 비축을 잃었습니다.",
+        "lines": [
+          "이번 교전 수비 피해: 전사 0명, 부상 1명.",
+          "이번 교전 적 피해: 1명 처치.",
+          "창고 피해 예상: 곡물 7, 장작 5, 가죽 2.",
+          "마을 기세 -17, 적 기세 -5."
+        ],
+        "events": [
+          {
+            "zoneId": "center",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "storehouse",
+            "kind": "loot",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "casualty",
+            "groupId": "civilian-unarmed"
+          },
+          {
+            "zoneId": "center",
+            "kind": "report",
+            "groupId": null
+          }
+        ],
+        "ended": true,
+        "outcome": "partialLoss"
+      }
+    ],
+    "outcome": "partialLoss"
+  },
+  {
+    "id": "bandit-unwarned-rear",
+    "factionName": "변경 마적",
+    "power": 82,
+    "warned": false,
+    "rearAssault": true,
+    "seed": 2026071405,
+    "rounds": [
+      {
+        "round": 1,
+        "focusZoneId": "approach",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "bandit-vanguard",
+            "killed": 0,
+            "power": 43.145593848338216,
+            "morale": 74,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "bandit-looters",
+            "killed": 0,
+            "power": 20.592215245797785,
+            "morale": 65,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "bandit-riders",
+            "killed": 0,
+            "power": 16.66988853231249,
+            "morale": 70,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "flank",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 28.319923104227712,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 7,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 0,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 67,
+        "raiderMorale": 70,
+        "villageMoraleDelta": -7,
+        "raiderMoraleDelta": -2,
+        "wounded": 1,
+        "killed": 0,
+        "raidersKilled": 0,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제1차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "기마 마적이 주 방어선의 뒤편을 노리며 마을 방어선으로 우회합니다.",
+          "이번 교전 수비 피해: 전사 0명, 부상 1명.",
+          "마을 기세 -7, 적 기세 -2."
+        ],
+        "events": [
+          {
+            "zoneId": "approach",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "melee",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "casualty",
+            "groupId": "hunter-unarmed"
+          },
+          {
+            "zoneId": "approach",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 2,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "bandit-vanguard",
+            "killed": 1,
+            "power": 38.60841050328552,
+            "morale": 65,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "bandit-looters",
+            "killed": 1,
+            "power": 18.42674137656809,
+            "morale": 56,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "bandit-riders",
+            "killed": 0,
+            "power": 15.57195594514024,
+            "morale": 61,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": true
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 23.319923104227712,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 15.349767490567183,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 0,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 66,
+        "raiderMorale": 61,
+        "villageMoraleDelta": -1,
+        "raiderMoraleDelta": -9,
+        "wounded": 1,
+        "killed": 0,
+        "raidersKilled": 2,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제2차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "기마 마적이 마을 방어선 후열을 급습했습니다.",
+          "후방 급습으로 후열에서 1명의 사상자가 발생해 마을 기세가 흔들렸습니다.",
+          "이번 교전 수비 피해: 전사 0명, 부상 1명.",
+          "이번 교전 적 피해: 2명 처치.",
+          "마을 기세 -1, 적 기세 -9."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "bandit-vanguard"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "bandit-looters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "bandit-vanguard"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "rearAssault",
+            "groupId": "bandit-riders"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "melee",
+            "groupId": "bandit-riders"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "militia-hornBow"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 3,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "bandit-vanguard",
+            "killed": 2,
+            "power": 34.171418715004975,
+            "morale": 56,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "bandit-looters",
+            "killed": 2,
+            "power": 16.30908620488874,
+            "morale": 47,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "bandit-riders",
+            "killed": 1,
+            "power": 14.569690032204683,
+            "morale": 52,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": true
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 18.319923104227712,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 21.34976749056718,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 0,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 68,
+        "raiderMorale": 52,
+        "villageMoraleDelta": 2,
+        "raiderMoraleDelta": -9,
+        "wounded": 0,
+        "killed": 0,
+        "raidersKilled": 3,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제3차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "이번 교전 적 피해: 3명 처치.",
+          "마을 기세 +2, 적 기세 -9."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "bandit-vanguard"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "bandit-looters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "bandit-vanguard"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "bandit-riders"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "melee",
+            "groupId": "bandit-riders"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 4,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "bandit-vanguard",
+            "killed": 3,
+            "power": 30.125409613873366,
+            "morale": 47,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "bandit-looters",
+            "killed": 2,
+            "power": 14.37803640662138,
+            "morale": 38,
+            "zoneId": "wall",
+            "pendingZoneId": "storehouse",
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "bandit-riders",
+            "killed": 1,
+            "power": 13.622473994969955,
+            "morale": 43,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": true
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 13.319923104227712,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 27.34976749056718,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 0,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 70,
+        "raiderMorale": 43,
+        "villageMoraleDelta": 2,
+        "raiderMoraleDelta": -9,
+        "wounded": 0,
+        "killed": 0,
+        "raidersKilled": 1,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제4차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "약탈패가 방책의 틈으로 새어 나가 창고 주변으로 침투합니다.",
+          "이번 교전 적 피해: 1명 처치.",
+          "마을 기세 +2, 적 기세 -9."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "bandit-vanguard"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "bandit-vanguard"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "melee",
+            "groupId": "bandit-riders"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 5,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "bandit-vanguard",
+            "killed": 4,
+            "power": 26.30301749186262,
+            "morale": 40,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "bandit-looters",
+            "killed": 2,
+            "power": 14.234256042555167,
+            "morale": 31,
+            "zoneId": "storehouse",
+            "pendingZoneId": null,
+            "intent": "loot",
+            "rearAssault": false
+          },
+          {
+            "id": "bandit-riders",
+            "killed": 1,
+            "power": 12.694795081529419,
+            "morale": 36,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": true
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 8.319923104227712,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 33.34976749056718,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 34,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 63,
+        "raiderMorale": 36,
+        "villageMoraleDelta": -7,
+        "raiderMoraleDelta": -7,
+        "wounded": 1,
+        "killed": 0,
+        "raidersKilled": 1,
+        "buildingsDamaged": 1,
+        "loot": {
+          "grain": 5,
+          "firewood": 4,
+          "hide": 2
+        },
+        "summary": "마을은 버텼지만 일부 방어선과 비축을 잃었습니다.",
+        "lines": [
+          "이번 교전 수비 피해: 전사 0명, 부상 1명.",
+          "이번 교전 적 피해: 1명 처치.",
+          "창고 피해 예상: 곡물 5, 장작 4, 가죽 2.",
+          "방어 시설과 건물 1곳이 파손될 위험에 놓였습니다.",
+          "마을 기세 -7, 적 기세 -7."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "bandit-vanguard"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "bandit-vanguard"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "militia-unarmed"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "melee",
+            "groupId": "bandit-riders"
+          },
+          {
+            "zoneId": "storehouse",
+            "kind": "loot",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "report",
+            "groupId": null
+          }
+        ],
+        "ended": true,
+        "outcome": "partialLoss"
+      }
+    ],
+    "outcome": "partialLoss"
+  },
+  {
+    "id": "court-warned-front",
+    "factionName": "조정 토벌군",
+    "power": 154,
+    "warned": true,
+    "rearAssault": false,
+    "seed": 2026071406,
+    "rounds": [
+      {
+        "round": 1,
+        "focusZoneId": "approach",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "court-gunners",
+            "killed": 1,
+            "power": 42.6732,
+            "morale": 93,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "court-archers",
+            "killed": 0,
+            "power": 21.8152,
+            "morale": 89,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "court-melee",
+            "killed": 0,
+            "power": 36.7114,
+            "morale": 92,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "court-cavalry",
+            "killed": 0,
+            "power": 28.7912,
+            "morale": 94,
+            "zoneId": "approach",
+            "pendingZoneId": "storehouse",
+            "intent": "flank",
+            "rearAssault": false
+          },
+          {
+            "id": "court-artillery",
+            "killed": 0,
+            "power": 22.816,
+            "morale": 87,
+            "zoneId": "approach",
+            "pendingZoneId": "wall",
+            "intent": "breakWall",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 34.10264497249475,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 7,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 0,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 74,
+        "raiderMorale": 91,
+        "villageMoraleDelta": -8,
+        "raiderMoraleDelta": -1,
+        "wounded": 1,
+        "killed": 0,
+        "raidersKilled": 1,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제1차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "관군 기병이 방책을 우회해 창고 주변으로 접근합니다.",
+          "이번 교전 수비 피해: 전사 0명, 부상 1명.",
+          "이번 교전 적 피해: 1명 처치.",
+          "마을 기세 -8, 적 기세 -1."
+        ],
+        "events": [
+          {
+            "zoneId": "approach",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "casualty",
+            "groupId": "court-gunners"
+          },
+          {
+            "zoneId": "approach",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "melee",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "casualty",
+            "groupId": "hunter-unarmed"
+          },
+          {
+            "zoneId": "approach",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 2,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 0,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "court-gunners",
+            "killed": 2,
+            "power": 39.895158284694716,
+            "morale": 87,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "court-archers",
+            "killed": 0,
+            "power": 20.245529687778546,
+            "morale": 83,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "court-melee",
+            "killed": 1,
+            "power": 34.25858095934051,
+            "morale": 86,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "court-cavalry",
+            "killed": 0,
+            "power": 28.58390336,
+            "morale": 88,
+            "zoneId": "storehouse",
+            "pendingZoneId": "center",
+            "intent": "flank",
+            "rearAssault": false
+          },
+          {
+            "id": "court-artillery",
+            "killed": 0,
+            "power": 21.252494351529265,
+            "morale": 81,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "breakWall",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 29.10264497249475,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 34.412121819517694,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 34,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 0,
+            "breached": false
+          }
+        ],
+        "villageMorale": 66,
+        "raiderMorale": 85,
+        "villageMoraleDelta": -8,
+        "raiderMoraleDelta": -6,
+        "wounded": 1,
+        "killed": 0,
+        "raidersKilled": 2,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제2차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "관군 기병이 방책을 우회해 마을 중심지로 접근합니다.",
+          "이번 교전 수비 피해: 전사 0명, 부상 1명.",
+          "이번 교전 적 피해: 2명 처치.",
+          "마을 기세 -8, 적 기세 -6."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "court-gunners"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "court-melee"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "court-melee"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "artilleryHit",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "militia-musket"
+          },
+          {
+            "zoneId": "storehouse",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 3,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 2,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 1,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "court-gunners",
+            "killed": 3,
+            "power": 37.265620678525124,
+            "morale": 81,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "court-archers",
+            "killed": 0,
+            "power": 18.770658704675526,
+            "morale": 77,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "court-melee",
+            "killed": 2,
+            "power": 31.94113522172546,
+            "morale": 80,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "court-cavalry",
+            "killed": 0,
+            "power": 28.378099255808,
+            "morale": 82,
+            "zoneId": "center",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": false
+          },
+          {
+            "id": "court-artillery",
+            "killed": 0,
+            "power": 19.7779919036393,
+            "morale": 75,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "breakWall",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 24.10264497249475,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 61.064703011092455,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 29,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 32,
+            "breached": false
+          }
+        ],
+        "villageMorale": 58,
+        "raiderMorale": 79,
+        "villageMoraleDelta": -8,
+        "raiderMoraleDelta": -6,
+        "wounded": 2,
+        "killed": 0,
+        "raidersKilled": 2,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제3차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "이번 교전 수비 피해: 전사 0명, 부상 2명.",
+          "이번 교전 적 피해: 2명 처치.",
+          "마을 기세 -8, 적 기세 -6."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "court-gunners"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "court-melee"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "court-melee"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "artilleryHit",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "militia-musket"
+          },
+          {
+            "zoneId": "center",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "casualty",
+            "groupId": "civilian-unarmed"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 4,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 2,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 2,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "court-gunners",
+            "killed": 4,
+            "power": 34.75563249754025,
+            "morale": 75,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "court-archers",
+            "killed": 0,
+            "power": 17.373298005649364,
+            "morale": 71,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "court-melee",
+            "killed": 3,
+            "power": 29.733157560329513,
+            "morale": 74,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "court-cavalry",
+            "killed": 0,
+            "power": 28.17377694116618,
+            "morale": 76,
+            "zoneId": "center",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": false
+          },
+          {
+            "id": "court-artillery",
+            "killed": 0,
+            "power": 18.37575333917982,
+            "morale": 69,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "breakWall",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 19.10264497249475,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 87.12064084369297,
+            "breached": false
+          },
+          {
+            "id": "storehouse",
+            "pressure": 24,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 64,
+            "breached": false
+          }
+        ],
+        "villageMorale": 50,
+        "raiderMorale": 73,
+        "villageMoraleDelta": -8,
+        "raiderMoraleDelta": -6,
+        "wounded": 1,
+        "killed": 0,
+        "raidersKilled": 2,
+        "buildingsDamaged": 0,
+        "loot": {},
+        "summary": "제4차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
+        "lines": [
+          "이번 교전 수비 피해: 전사 0명, 부상 1명.",
+          "이번 교전 적 피해: 2명 처치.",
+          "마을 기세 -8, 적 기세 -6."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "court-gunners"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "court-melee"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "court-melee"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "artilleryHit",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "casualty",
+            "groupId": "civilian-unarmed"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          }
+        ],
+        "ended": false,
+        "outcome": null
+      },
+      {
+        "round": 5,
+        "focusZoneId": "wall",
+        "nextFocusZoneId": "wall",
+        "defenders": [
+          {
+            "id": "militia-musket",
+            "wounded": 3,
+            "killed": 0
+          },
+          {
+            "id": "militia-hornBow",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-spear",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "militia-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "watchman-unarmed",
+            "wounded": 0,
+            "killed": 0
+          },
+          {
+            "id": "hunter-unarmed",
+            "wounded": 1,
+            "killed": 0
+          },
+          {
+            "id": "civilian-unarmed",
+            "wounded": 3,
+            "killed": 0
+          }
+        ],
+        "raiders": [
+          {
+            "id": "court-gunners",
+            "killed": 5,
+            "power": 32.28602461527875,
+            "morale": 69,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "court-archers",
+            "killed": 0,
+            "power": 16.00886954680893,
+            "morale": 65,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "court-melee",
+            "killed": 3,
+            "power": 27.56483020478076,
+            "morale": 68,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "advance",
+            "rearAssault": false
+          },
+          {
+            "id": "court-cavalry",
+            "killed": 0,
+            "power": 27.970925747189785,
+            "morale": 70,
+            "zoneId": "center",
+            "pendingZoneId": null,
+            "intent": "flank",
+            "rearAssault": false
+          },
+          {
+            "id": "court-artillery",
+            "killed": 0,
+            "power": 17.001317872015477,
+            "morale": 63,
+            "zoneId": "wall",
+            "pendingZoneId": null,
+            "intent": "breakWall",
+            "rearAssault": false
+          }
+        ],
+        "zones": [
+          {
+            "id": "approach",
+            "pressure": 14.102644972494751,
+            "breached": false
+          },
+          {
+            "id": "wall",
+            "pressure": 100,
+            "breached": true
+          },
+          {
+            "id": "storehouse",
+            "pressure": 19,
+            "breached": false
+          },
+          {
+            "id": "center",
+            "pressure": 96,
+            "breached": false
+          }
+        ],
+        "villageMorale": 42,
+        "raiderMorale": 67,
+        "villageMoraleDelta": -8,
+        "raiderMoraleDelta": -6,
+        "wounded": 2,
+        "killed": 0,
+        "raidersKilled": 1,
+        "buildingsDamaged": 1,
+        "loot": {},
+        "summary": "마을은 버텼지만 일부 방어선과 비축을 잃었습니다.",
+        "lines": [
+          "마을 방어선의 방책이 파괴되어 적 주력의 진입로가 열렸습니다.",
+          "이번 교전 수비 피해: 전사 0명, 부상 2명.",
+          "이번 교전 적 피해: 1명 처치.",
+          "방어 시설과 건물 1곳이 파손될 위험에 놓였습니다.",
+          "마을 기세 -8, 적 기세 -6."
+        ],
+        "events": [
+          {
+            "zoneId": "wall",
+            "kind": "camera",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "court-gunners"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "volley",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallAssault",
+            "groupId": "court-melee"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "artilleryHit",
+            "groupId": null
+          },
+          {
+            "zoneId": "wall",
+            "kind": "casualty",
+            "groupId": "militia-musket"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "wallHit",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "advance",
+            "groupId": null
+          },
+          {
+            "zoneId": "center",
+            "kind": "casualty",
+            "groupId": "civilian-unarmed"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "report",
+            "groupId": null
+          }
+        ],
+        "ended": true,
+        "outcome": "partialLoss"
+      }
+    ],
+    "outcome": "partialLoss"
+  }
+]

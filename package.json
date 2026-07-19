@@ -6,7 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:game": "node tools/run-game-tests.mjs",
+    "measure:runtime": "node tools/game/measure_runtime_performance.mjs",
+    "test:combat": "node tools/game/test_tactical_battle.mjs",
+    "gen:sprite-metrics": "node tools/game/generate_tactical_sprite_metrics.mjs",
+    "edit:head-boxes": "node tools/game/head_box_editor.mjs",
+    "check": "npm run test:game && npm run build"
   },
   "dependencies": {
     "react": "^18.3.1",

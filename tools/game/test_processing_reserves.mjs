@@ -95,6 +95,8 @@ function runTicks(state, ticks) {
     rice: 0,
     hide: 0,
     iron: 0,
+    meat: 8,
+    fish: 8,
   });
 }
 
@@ -138,6 +140,8 @@ function runTicks(state, ticks) {
     rice: 0,
     hide: 0,
     iron: 0,
+    meat: 8,
+    fish: 8,
   });
 }
 

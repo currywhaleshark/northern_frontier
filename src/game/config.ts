@@ -1,5 +1,5 @@
 // 시뮬레이션 밸런스 값 모음 — 숫자 튜닝은 전부 여기서 한다.
-import type { ProcessingInputId, Rank, ResourceId, Season } from './types';
+import type { JobId, LivestockId, ProcessingInputId, Rank, ResourceId, Season } from './types';
 
 export const CONFIG = {
   map: {
@@ -14,10 +14,13 @@ export const CONFIG = {
     ironMax: 140,
     legacyStone: 150,
     legacyIron: 120,
+    silverMin: 80,   // 잠채/설점으로 전환된 은맥의 매장량
+    silverMax: 130,
     nearbyStone: 36,
     nearbyIron: 16,
     nearbyMinDistance: 4,
     nearbyMaxDistance: 7,
+    mineWorkRadius: 6, // 채광장 거점에서 주변 광상을 찾아 왕복하는 반경
   },
 
   time: {
@@ -46,11 +49,11 @@ export const CONFIG = {
   start: {
     residents: 12,
     resources: {
-      grain: 100, rice: 0, meat: 0, fish: 0, vegetables: 0,
+      grain: 100, rice: 0, meat: 0, eggs: 0, milk: 0, fish: 0, curedMeat: 0, saltedFish: 0, driedFish: 0, vegetables: 0, kimchi: 0, beans: 0, jang: 0, salt: 0,
       brushwood: 12, firewood: 45, charcoal: 0,
-      wood: 30, stone: 12, iron: 4, tools: 10, carts: 0,
-      hide: 6, hideClothes: 12, cotton: 0, cottonClothes: 0, herbs: 5,
-      porcelain: 0, brassware: 0, lacquerware: 0, silk: 0, preciousMetal: 0,
+      wood: 30, stone: 12, iron: 4, tools: 10, onggi: 0, carts: 0,
+      hide: 6, hideClothes: 12, cotton: 0, wool: 0, hay: 0, cottonClothes: 0, herbs: 5,
+      porcelain: 0, brassware: 0, lacquerware: 0, silk: 0, preciousMetal: 0, silver: 0,
       gunpowder: 0, spears: 0, hornBows: 0, muskets: 0,
       reputation: 50, defense: 0,
     },
@@ -96,6 +99,22 @@ export const CONFIG = {
     poorDietDamage: 1,
   },
 
+  medicine: {
+    patientHealthThreshold: 75,
+    treatmentHealthPerDay: 6,
+    herbsPerPhysicianPerDay: 0.6,
+    normalSickRecoveryBonusPerDay: 0.18,
+    diagnosisDays: 1,
+    isolationDaysReduction: 3,
+    epidemicSpreadMult: 0.5,
+    epidemicDeathMult: 0.4,
+    epidemicDamageMult: 0.6,
+    tacticalReturnsPerPhysicianPerRound: 1,
+    tacticalReturnChance: 0.2,
+    tacticalHerbsPerReturn: 1,
+    tacticalInjurySeverityMult: 0.75,
+  },
+
   foreignSites: {
     minCenterDistance: 16,
     minSiteSpacing: 11,
@@ -119,6 +138,86 @@ export const CONFIG = {
     violationIgnoreRelation: -8,
     banditScoutWarningBonus: 0.25,
     lairSuppressionDays: 18,
+    banditLairScouting: {
+      baseChance: 0.28,
+      hunterBonus: 0.09,
+      watchmanBonus: 0.07,
+      militiaBonus: 0.06,
+      maxHunters: 4,
+      maxWatchmen: 3,
+      maxMilitia: 3,
+      alarmPenaltyPerPoint: 0.003,
+      repeatAttemptPenalty: 0.06,
+      blizzardPenalty: 0.24,
+      coldSnapPenalty: 0.12,
+      minChance: 0.12,
+      maxChance: 0.92,
+      successAlarm: 4,
+      failureAlarm: 12,
+      repeatedFailureAlarm: 4,
+      intelDays: 48,
+    },
+    banditLairDefense: {
+      doctrineReviewIntervalDays: 24,
+      doctrineChangeChance: 0.65,
+      baseStratagemPoints: 1,
+      alarmPerPoint: 25,
+      maxAlarmPoints: 4,
+      scoutFailurePoints: 1,
+      maxScoutFailurePoints: 2,
+      assaultDefeatPoints: 1,
+      maxAssaultDefeatPoints: 2,
+      militaryPowerPerPoint: 40,
+      maxMilitaryPowerPoints: 2,
+      maxStratagemPoints: 8,
+      pointEffectStep: 0.06,
+      maxPointEffectBonus: 0.3,
+      groupPowerShares: {
+        base: {
+          sentries: 0.10,
+          trailArchers: 0.06,
+          wallSpears: 0.11,
+          wallArchers: 0.16,
+          yardVanguard: 0.20,
+          yardSkirmishers: 0.11,
+          leaderGuard: 0.14,
+          keepArchers: 0.07,
+          leaderEscapeGroup: 0.05,
+        },
+        doctrineShift: {
+          trailAttrition: {
+            sentries: 0.02, trailArchers: 0.01, wallSpears: 0, wallArchers: 0,
+            yardVanguard: -0.02, yardSkirmishers: 0, leaderGuard: -0.01,
+            keepArchers: 0, leaderEscapeGroup: 0,
+          },
+          wallHold: {
+            sentries: 0, trailArchers: 0, wallSpears: 0.015, wallArchers: 0.02,
+            yardVanguard: -0.015, yardSkirmishers: 0, leaderGuard: -0.01,
+            keepArchers: -0.01, leaderEscapeGroup: 0,
+          },
+          leaderEscape: {
+            sentries: -0.01, trailArchers: 0, wallSpears: -0.01, wallArchers: -0.01,
+            yardVanguard: -0.005, yardSkirmishers: 0, leaderGuard: 0.015,
+            keepArchers: 0, leaderEscapeGroup: 0.02,
+          },
+        },
+      },
+      trailAttrition: {
+        trailDefenseBonus: 2,
+        sentryCombatBonus: 0.02,
+      },
+      wallHold: {
+        wallDefenseBonus: 2,
+        wallCombatBonus: 0.02,
+        innerDefensePenalty: 4,
+      },
+      leaderEscape: {
+        keepEscapeChance: 0.62,
+        moraleEscapeChance: 0.43,
+        preparedBlockEffectiveness: 0.95,
+        preRemovedLootDamage: 1,
+      },
+    },
   },
 
   specialEvents: {
@@ -173,6 +272,16 @@ export const CONFIG = {
   },
 
   production: {
+    // RC 장기 측정의 초반 아사·냉사 완화: 변환비는 그대로 두고 노동 산출만 소폭 높인다.
+    resourceOutputMultiplier: 1.08,
+    // 승격으로 전문직이 늘어나는 만큼 작업 조직·도구 운용이 정비된다.
+    // 개척지 초반 난이도는 유지하고 보 이후의 기초·가공 생산만 보완한다.
+    rankLaborEfficiency: {
+      settlement: 1,
+      bo: 1.1,
+      jin: 1.15,
+      bu: 1.18,
+    } as Record<Rank, number>,
     woodPerDay: 1.3,
     gamePerDay: 0.9,
     herbsPerDay: 0.5,
@@ -192,6 +301,9 @@ export const CONFIG = {
     musketIronPerUnit: 1.4,
     musketWoodPerUnit: 0.8,
     musketToolsPerUnit: 0.45,
+    silverworkPerDay: 0.5,       // 대장간 은세공 — 화폐(은)를 사치재(귀금속)로 바꾸는 싱크
+    silverworkSilverPerUnit: 2,
+    silverworkCharcoalPerUnit: 0.5,
     ironMinePerDay: 0.8,
     fishPerDay: 1.4,
     brushwoodPerWood: 0.35,
@@ -208,15 +320,27 @@ export const CONFIG = {
     hidePerGame: 1,
     millerRicePerDay: 4,       // 방아꾼 1인 하루 벼 도정량
     grainPerRice: 1.5,         // 벼 1 → 먹을 수 있는 곡물 1.5
-    haulerStonePerDay: 0.4,    // 돌이 부족할 때 채석
-    stoneReserveTarget: 40,
     woodReserve: 25,           // 건축용으로 남겨둘 목재 (이 이상만 장작으로 팬다)
     processingReserves: {
       wood: 25,
       rice: 0,
       hide: 0,
       iron: 0,
+      meat: 8,
+      fish: 8,
     } as Record<ProcessingInputId, number>,
+    curedMeatPerDay: 1.8,
+    meatPerCuredMeat: 1.15,
+    firewoodPerCuredMeat: 0.35,
+    charcoalPerCuredMeat: 0.22,
+    saltedFishPerDay: 2,
+    fishPerSaltedFish: 1,
+    saltPerSaltedFish: 0.25,
+    driedFishPerDay: 1.3,
+    fishPerDriedFish: 1.25,
+    onggiPerDay: 0.75,
+    firewoodPerOnggi: 1,
+    charcoalPerOnggi: 0.65,
     tanneryHidePerDay: 2,      // 가죽공방 하루 가죽 소비 (가죽 2 → 옷 1)
     weaverCottonPerDay: 2,
     cottonClothesPerCotton: 0.5,
@@ -230,26 +354,62 @@ export const CONFIG = {
     skillEffect: 0.5,          // 숙련 1.0일 때 생산 +50%
   },
 
+  // 경작지 (드래그 크기 지정 논밭)
+  farming: {
+    maxPlotSide: 3,       // 경작지 한 변 최대 칸수 (3×3 = 9칸 상한)
+    tilesPerFarmer: 3,    // 농부 1명이 감당하는 칸수 — 슬롯 수 = ceil(면적/이 값)
+    // 칸 1개 파종에 드는 농부 서브틱. 봄 96서브틱 기준: 혼자 3×3(9칸)은 5칸 남짓에서 봄이 끝나고
+    // (의도된 실패), 적정 인원 3명이면 7일째쯤 다 심고 생육으로 넘어간다.
+    sowWorkPerTile: 18,
+    plowOxWorkMultiplier: 1.4, // 농우 배정 시 파종·생육·수확 작업 배수
+    plowOxenPerPlotMax: 1,     // 경작지당 농우 상한 (9칸 대형은 +1)
+    largePlotOxThreshold: 7,   // 이 칸수 이상이면 농우 상한 +1
+  },
+
+  fermentation: {
+    jangdokdaeOnggiCapacity: 4,
+    jangBeansPerOnggi: 4,
+    jangSaltPerOnggi: 1,
+    jangOutputPerOnggi: 4,
+    jangMaturationDays: 24,
+    onggiRecoveryRate: 0.9,
+    jangAutumnStartDay: 7,
+    jangWinterEndDay: 4,
+    kimchiVegetablesPerOnggi: 6,
+    kimchiSaltPerOnggi: 1,
+    kimchiOutputPerOnggi: 6,
+    kimchiMaturationDays: 4,
+    kimjangMoralePerOnggi: 1.5,
+    kimjangReservedOnggiPerYard: 2,
+    kimjangAutumnStartDay: 10,
+    kimjangWinterEndDay: 2,
+    kimjangSizes: {
+      small: 1,
+      medium: 2,
+      large: 4,
+    },
+  },
+
   // 주민 에이전트 (이동/작업/운반)
   agents: {
     subticksPerDay: 8,        // 하루를 나누는 서브틱 수
     moveSpeed: 2,             // 서브틱당 이동 타일 수
     moveSpeedWinter: 1.5,     // 겨울 눈길
     moveSpeedSnow: 1,         // 폭설/눈보라
+    haulerMoveSpeedMultiplier: 1.1, // 운반꾼 왕복 이동만 소폭 보완
     shelterThreshold: 0.3,    // 실외작업 중단 기준 (날씨 효율이 이 밑이면 대피)
+    carryCapacityMultiplier: 1.1, // 채집·가공 원료·운반꾼 적재량 공용 보정
     carryCap: {
-      grain: 6, rice: 6, meat: 5, fish: 5, vegetables: 5,
+      grain: 6, rice: 6, meat: 5, eggs: 5, milk: 5, fish: 5, curedMeat: 5, saltedFish: 5, driedFish: 5, vegetables: 5, kimchi: 5, beans: 5, jang: 5,
       brushwood: 4, firewood: 4, charcoal: 3, wood: 4,
-      stone: 3, iron: 3, hide: 2, cotton: 3, herbs: 1.5,
+      stone: 3, iron: 3, hide: 2, cotton: 3, wool: 3, hay: 5, herbs: 1.5, silver: 2,
     },
-    haulerCarryCap: 10,       // 운반꾼 전용 적재량 (채석 귀환에도 사용)
+    haulerCarryCap: 10,       // 운반꾼 전용 적재량
     haulerBatchMin: 2,        // 평시 소량 왕복을 막는 작업장 최소 수거량
-    haulerQuarryBatchMin: 6,  // 돌 비축 부족 시 이만큼 모인 짐만 채석을 중단하고 수거
     haulerCartCarryCap: 24,   // 수레 장비 운반꾼 적재량
     haulerCartBatchMin: 8,
-    haulerCartQuarryBatchMin: 14,
     work: {                   // 작업지에서 1회 채집에 드는 서브틱
-      chop: 3, hunt: 5, herb: 3, mine: 4, quarry: 3, fish: 4,
+      chop: 3, hunt: 5, herb: 3, mine: 4, fish: 4,
       herd: 5,
       harvestPerSubtick: 8,   // 가을 수확: 서브틱당 깎는 성장도
       growPerSubtick: 1.4,    // 봄여름 농사: 서브틱당 올리는 성장도
@@ -257,7 +417,7 @@ export const CONFIG = {
     },
     yields: {                 // 1회 채집으로 지는 짐
       wood: 1.1, game: 0.75, herbs: 0.55, iron: 1.2, mineStone: 0.4, stone: 1.1, fish: 1.2,
-      herdFood: 1, herdHide: 0.25,
+      silver: 0.5,
     },
     forestDepleteChance: 0.12, // 벌목 1회당 숲이 평지가 될 확률
     forestRegrowChance: 0.003,  // 봄여름, 숲 인접 평지가 숲이 될 하루 확률
@@ -275,6 +435,120 @@ export const CONFIG = {
     woodMult:     { spring: 1, summer: 1.3, autumn: 1.1, winter: 0.7 },
     gameMult:     { spring: 1.25, summer: 1, autumn: 1.1, winter: 0.5 },
     fishMult:     { spring: 1.2, summer: 1.15, autumn: 0.9, winter: 0.45 },
+  },
+
+  livestock: {
+    initialUnlocked: ['chicken'] as LivestockId[],
+    hayPerHarvestProgress: 0.1,
+    chicken: {
+      capacity: 8,
+      initialHeadcount: 4,
+      feedResource: 'grain' as ResourceId,
+      feedPerHeadPerDay: 0.06,
+      grazesOutsideWinter: false,
+      grainPerHeadPerDay: 0.06,
+      breedingPerHeadPerDay: 0.025,
+      productResource: 'eggs' as ResourceId,
+      productPerHeadPerHerderDay: 0.12,
+      productSeasonMult: { spring: 1, summer: 1, autumn: 0.9, winter: 0.65 } as Record<Season, number>,
+      eggPerHeadPerHerderDay: 0.12,
+      eggSeasonMult: { spring: 1, summer: 1, autumn: 0.9, winter: 0.65 } as Record<Season, number>,
+      shortageGraceDays: 3,
+      starvationLossIntervalDays: 2,
+      slaughterMeatPerHead: 0.75,
+      slaughterHidePerHead: 0,
+    },
+    goat: {
+      capacity: 5,
+      initialHeadcount: 0,
+      feedResource: 'hay' as ResourceId,
+      feedPerHeadPerDay: 0.18,
+      grazesOutsideWinter: true,
+      grainPerHeadPerDay: 0,
+      breedingPerHeadPerDay: 0.012,
+      productResource: 'milk' as ResourceId,
+      productPerHeadPerHerderDay: 0.18,
+      productSeasonMult: { spring: 1, summer: 0.9, autumn: 0.75, winter: 0.55 } as Record<Season, number>,
+      eggPerHeadPerHerderDay: 0,
+      eggSeasonMult: { spring: 1, summer: 1, autumn: 1, winter: 1 } as Record<Season, number>,
+      shortageGraceDays: 2,
+      starvationLossIntervalDays: 2,
+      slaughterMeatPerHead: 3,
+      slaughterHidePerHead: 0.8,
+    },
+    sheep: {
+      capacity: 5,
+      initialHeadcount: 0,
+      feedResource: 'hay' as ResourceId,
+      feedPerHeadPerDay: 0.2,
+      grazesOutsideWinter: true,
+      grainPerHeadPerDay: 0,
+      breedingPerHeadPerDay: 0.01,
+      productResource: 'wool' as ResourceId,
+      productPerHeadPerHerderDay: 0.08,
+      productSeasonMult: { spring: 1, summer: 0.45, autumn: 0.85, winter: 0.15 } as Record<Season, number>,
+      eggPerHeadPerHerderDay: 0,
+      eggSeasonMult: { spring: 1, summer: 1, autumn: 1, winter: 1 } as Record<Season, number>,
+      shortageGraceDays: 2,
+      starvationLossIntervalDays: 2,
+      slaughterMeatPerHead: 3.5,
+      slaughterHidePerHead: 1.2,
+    },
+    cattle: {
+      capacity: 3,
+      initialHeadcount: 0,
+      feedResource: 'hay' as ResourceId,
+      feedPerHeadPerDay: 0.45,
+      grazesOutsideWinter: true,
+      grainPerHeadPerDay: 0,
+      breedingPerHeadPerDay: 0.005,
+      productResource: 'milk' as ResourceId,
+      productPerHeadPerHerderDay: 0.32,
+      productSeasonMult: { spring: 1, summer: 0.95, autumn: 0.8, winter: 0.6 } as Record<Season, number>,
+      eggPerHeadPerHerderDay: 0,
+      eggSeasonMult: { spring: 1, summer: 1, autumn: 1, winter: 1 } as Record<Season, number>,
+      shortageGraceDays: 2,
+      starvationLossIntervalDays: 2,
+      slaughterMeatPerHead: 8,
+      slaughterHidePerHead: 2.5,
+    },
+    horse: {
+      capacity: 3,
+      initialHeadcount: 0,
+      feedResource: 'hay' as ResourceId,
+      feedPerHeadPerDay: 0.35,
+      grazesOutsideWinter: true,
+      grainPerHeadPerDay: 0,
+      breedingPerHeadPerDay: 0.004,
+      productResource: null,
+      productPerHeadPerHerderDay: 0,
+      productSeasonMult: { spring: 0, summer: 0, autumn: 0, winter: 0 } as Record<Season, number>,
+      eggPerHeadPerHerderDay: 0,
+      eggSeasonMult: { spring: 1, summer: 1, autumn: 1, winter: 1 } as Record<Season, number>,
+      shortageGraceDays: 2,
+      starvationLossIntervalDays: 2,
+      slaughterMeatPerHead: 5,
+      slaughterHidePerHead: 1.5,
+    },
+  },
+
+  // K2 보존 경제. 생선·고기는 빠르게 상하므로 훈연·염장·건조로 손실을 피해야 한다.
+  spoilage: {
+    dailyRate: {
+      fish: 0.06,
+      meat: 0.04,
+      eggs: 0.025,
+      milk: 0.05,
+      vegetables: 0.015,
+    },
+    seasonMult: {
+      spring: 0.9,
+      summer: 1.4,
+      autumn: 1,
+      winter: 0.25,
+    } as Record<Season, number>,
+    cellarCapacity: 36,
+    cellarRateMult: 0.3,
   },
 
   weather: {
@@ -342,6 +616,235 @@ export const CONFIG = {
     repairProgressMax: 0.6,   // 파손 직후 남는 공정률 상한
   },
 
+  tacticalBattle: {
+    maxRounds: 5,
+    hunt: {
+      maxEngagements: 8,
+      baitMeatCost: 3,
+      ambush: {
+        tigerHitChance: { base: 0.68, min: 0.46, max: 0.92 },
+        wolfHitChance: {
+          base: 0.31,
+          packThreshold: 3,
+          perExtraBeast: 0.035,
+          min: 0.28,
+          max: 0.64,
+        },
+        spearWallMultiplier: { tiger: 0.38, wolf: 0.55 },
+        splitDriversHitMultiplier: 1.35,
+        multipleLossChance: {
+          tiger: 0.12,
+          greatTiger: 0.30,
+          mountainLord: 0.54,
+          wolfMediumPackThreshold: 7,
+          wolfMediumPack: 0.12,
+          wolfLargePackThreshold: 9,
+          wolfLargePack: 0.28,
+        },
+        deathChance: {
+          tigerBase: 0.15,
+          tigerMin: 0.10,
+          tigerMax: 0.28,
+          wolfBase: 0.045,
+          wolfPerBeast: 0.006,
+          wolfMin: 0.06,
+          wolfMax: 0.12,
+        },
+      },
+      encirclement: {
+        baseGain: 9,
+        perDriver: 2.2,
+        hunterSkillMultiplier: 12,
+        wolfBaseMultiplier: 1.16,
+        wolfPackThreshold: 3,
+        wolfPenaltyPerExtraBeast: 0.038,
+        wolfMinMultiplier: 0.82,
+        wolfMaxMultiplier: 1.16,
+        splitDriversMultiplier: 1.42,
+        fallbackMultiplier: 0.55,
+        movedDriveMultiplier: 0.5,
+        minimumGain: 2,
+      },
+      beastAI: {
+        corneredEncirclement: 100,
+        breakoutEncirclement: {
+          wolf: 60,
+          tiger: 70,
+          greatTiger: 62,
+          mountainLord: 55,
+        },
+        breakoutBlockadeMax: {
+          wolf: 24,
+          tiger: 20,
+          greatTiger: 25,
+          mountainLord: 30,
+        },
+        woundedPowerShare: 0.45,
+        ambushDecisionChance: 0.72,
+        ambushExposureThreshold: {
+          wolf: 34,
+          tiger: 38,
+          greatTiger: 32,
+          mountainLord: 26,
+        },
+        exposure: {
+          perMember: 2,
+          meleeBonus: 10,
+          spearWallBonus: 18,
+          baitPenalty: 12,
+          trapBonus: 15,
+        },
+      },
+      sectors: {
+        blockadeThreshold: 4,
+        holeGainMultiplier: 0.5,
+        openEscapeRounds: 2,
+        openEscapeEncirclementMin: 10,
+        openEscapeChance: 0.45,
+      },
+      search: {
+        baseChance: 0.16,
+        perDriveGroup: 0.08,
+        perHunterGroup: 0.12,
+        hunterSkillMultiplier: 0.24,
+        minChance: 0.08,
+        maxChance: 0.92,
+      },
+      breakout: {
+        baseSuccessChance: 0.68,
+        blockadePenaltyPerPower: 0.018,
+        minSuccessChance: 0.08,
+        maxSuccessChance: 0.90,
+      },
+      counterAttack: {
+        sameSectorMultiplier: 1.45,
+        adjacentSectorMultiplier: 0.72,
+        specialistMultiplier: 1.15,
+        searchRevealMultiplier: 0.9,
+      },
+      wolfMultiAmbushHitMultiplier: 0.72,
+      rehideChance: { tiger: 0.46, greatTiger: 0.38, mountainLord: 0.30 },
+      rehideEncirclementMax: 70,
+    },
+    raiderPowerPerFighter: 4,
+    formationExposure: {
+      ambushed: 0.55,
+      frontal: {
+        chargingRanged: 1.7,
+        meleeScreenedRanged: 0.42,
+        lineScreened: 0.72,
+        exposedRanged: 1.45,
+        screeningMelee: 1.25,
+        exposed: 1,
+      },
+      rearAssault: {
+        adjacentProtected: 0.85,
+        deepProtected: 0.5,
+        guardedMelee: 1.65,
+        guardedRanged: 0.48,
+        exposedRanged: 2.2,
+        exposedCivilian: 1.8,
+        exposedOther: 1.45,
+        middleGuardStrength: 0.55,
+        unguardedAttackerLossMultiplier: 0.55,
+      },
+    },
+    targeting: {
+      musketLineEfficiency: { front: 1, middle: 1, rear: 0 },
+      musketScreenedEfficiency: 0.65,
+      musketPreparedScreenedEfficiency: 0.8,
+      bowLineEfficiency: { front: 1, middle: 0.9, rear: 0.75 },
+      concentration: { melee: 0.85, musket: 0.8, bow: 0.65 },
+      maxFocusedLossShare: 0.7,
+    },
+    prep: {
+      surpriseBase: 1,
+      warned: 3,
+      beacon: 1,
+      watchtowerMax: 2,
+      watchmenPerPoint: 2,
+      watchmenMax: 2,
+      severeWeatherPenalty: 1,
+      max: 8,
+    },
+    groupPower: {
+      militiaMusket: 18,
+      militiaBow: 16,
+      militiaSpear: 14,
+      militiaUnarmed: 9,
+      watchman: 6,
+      hunter: 8,
+      healer: 0.5,
+      civilian: 1,
+    },
+    raiderSplit: { main: 0.55, looters: 0.25, flankers: 0.2 },
+    enemyPlan: {
+      objectiveActivationRelation: { default: 50, nimacha: 45, holaon: 35, bandit: 25, court: 50 },
+      objectiveWeights: {
+        default: { breakthrough: 0.45, plunder: 0.35, arson: 0.2 },
+        nimacha: { breakthrough: 0.35, plunder: 0.45, arson: 0.2 },
+        holaon: { breakthrough: 0.45, plunder: 0.35, arson: 0.2 },
+        bandit: { breakthrough: 0.25, plunder: 0.55, arson: 0.2 },
+        court: { breakthrough: 0.7, plunder: 0.1, arson: 0.2 },
+      },
+      objectivePowerBreakthroughBonus: 0.65,
+      objectiveLowPowerPlunderBonus: 0.25,
+      objectiveHostilityArsonBonus: 0.8,
+      objectiveProfiles: {
+        breakthrough: {
+          raiderSplit: { main: 0.55, looters: 0.25, flankers: 0.2 },
+          lootRoundsToExit: 2,
+          damageToExit: Number.POSITIVE_INFINITY,
+        },
+        plunder: {
+          raiderSplit: { main: 0.4, looters: 0.4, flankers: 0.2 },
+          lootRoundsToExit: 1,
+          damageToExit: Number.POSITIVE_INFINITY,
+        },
+        arson: {
+          raiderSplit: { main: 0.45, looters: 0.2, flankers: 0.35 },
+          lootRoundsToExit: 2,
+          damageToExit: 2,
+        },
+      },
+      stratagemPoints: {
+        factionBase: { default: 2, nimacha: 2, holaon: 2, bandit: 2, court: 3 },
+        powerPerPoint: 70,
+        maxPowerBonus: 2,
+        hostilityBonusAt: 10,
+        grudgeBonusAt: 20,
+        max: 7,
+      },
+      stratagemCosts: {
+        rearManeuver: 2,
+        wallBreakers: 2,
+        fireArrows: 3,
+        feint: 2,
+        nightApproach: 2,
+      },
+      objectiveCandidates: {
+        breakthrough: ['wallBreakers', 'feint', 'nightApproach', 'fireArrows'],
+        plunder: ['feint', 'nightApproach', 'wallBreakers', 'fireArrows'],
+        arson: ['fireArrows', 'nightApproach', 'feint', 'wallBreakers'],
+      },
+      maxStratagems: 3,
+      counteredEffectScale: 0.4,
+      counterStrength: {
+        preparation: 0.6,
+        intelFull: 1,
+        formationCurveExponent: 1,
+      },
+      effects: {
+        rearManeuver: { counteredCombatPenalty: 0.25 },
+        wallBreakers: { wallPressureBonus: 10, lossResistancePenalty: 0.2 },
+        fireArrows: { pressureBonus: 8, buildingDamageChance: 0.35 },
+        feint: { powerShift: 0.14, estimatedMainMultiplier: 1.25 },
+        nightApproach: { prepPointPenalty: 1, rangedEfficiencyPenalty: 0.3, firstRoundMoraleBonus: 8 },
+      },
+    },
+    morale: { village: 70, warnedBonus: 8, siegeBonus: 4, raiders: 72 },
+  },
+
   trade: {
     minIntervalDays: 14,
     dailyChance: 0.07,
@@ -354,14 +857,18 @@ export const CONFIG = {
     maxHaggleRounds: 2,
     counterTolerance: 1.45,
     capacityBase: {
-      grain: 28, rice: 24, meat: 16, fish: 18, vegetables: 14,
+      grain: 28, rice: 24, meat: 16, eggs: 14, fish: 18, curedMeat: 12, saltedFish: 12, driedFish: 12, vegetables: 14, beans: 14, jang: 8,
       brushwood: 24, firewood: 20, charcoal: 12,
-      wood: 24, stone: 20, iron: 9, tools: 6, carts: 2,
-      hide: 14, hideClothes: 7, cotton: 12, cottonClothes: 7, herbs: 10,
+      wood: 24, stone: 20, iron: 9, tools: 6, onggi: 4, carts: 2,
+      hide: 14, hideClothes: 7, cotton: 12, cottonClothes: 7, herbs: 10, salt: 12,
       gunpowder: 4, spears: 6, hornBows: 4, muskets: 3,
       porcelain: 5, brassware: 5, lacquerware: 5, silk: 4, preciousMetal: 3,
+      silver: 12, // 상단이 한 철에 싣고 오는 은 — 은 수취(수출 흑자)의 상한
       reputation: 0, defense: 0,
     } as Record<ResourceId, number>,
+    // 은이 낀 거래는 관계 마진이 절반 이하로 줄어든다(1 + (마진-1)×이 값).
+    // 물물교환보다 은 결제가 항상 약간 이득이 되게 하는 장치다.
+    silverMarginKeep: 0.4,
     capacitySeasonMult: {
       spring: {
         grain: 0.65, rice: 0.55, fish: 1.25, vegetables: 0.85,
@@ -412,6 +919,210 @@ export const CONFIG = {
     partialSuspicionDecayMult: 0.5,
     rewardTools: 2,        // 격년 하사품 (도구 또는 옷, 결정적 롤)
     rewardCottonClothes: 3,
+    // 은 대납 — 요구 품목의 교역 가치 총합을 은 시세로 환산해 한 번에 치른다
+    silverPayMarkup: 1.1,           // 환산가에 얹는 웃돈 (조정 몫의 예우)
+    silverPayRepBonus: 2,           // 현물 납부 대비 추가 명성
+    silverPaySuspicionDecayMult: 1.5, // 은까지 바치는 성실함 — 의심을 더 깊이 씻는다
+  },
+
+  // 생애 주기 — 압축 성장(총 2.5게임년) + 나이별 소비 몫 + 노년·자연사.
+  // 계획: docs/superpowers/plans/2026-07-17-marriage-birth-growth.md
+  lifecycle: {
+    stageDays: { infant: 24, child: 48, youth: 48 },  // 합계 120일 = 2.5게임년
+    consumptionShare: { infant: 0.3, child: 0.5, youth: 0.7 }, // 성인 1.0 기준
+    growthPauseHungerBelow: 25,  // 굶주리면 성장이 멈춘다
+    growthPauseWarmthBelow: 25,  // 혹한에 떨어도 멈춘다
+    adultAge: 16,
+    childBedShare: 0.5,          // 아이는 침상 정원의 절반만 차지
+    // 혼인 — 조건 충족 시 자연 성사 (강제 중매 없음)
+    marriageDailyChance: 0.03,   // 자격 있는 짝이 있을 때의 일일 성사 확률
+    maxMarriageAge: 50,
+    weddingFeastFood: 8,         // 잔치 비용 (식용 식량)
+    weddingFeastMorale: 6,       // 잔치 시 전 주민 사기
+    weddingQuietMorale: 2,       // 조용히 치러도 당사자들 주변의 잔잔한 기쁨
+    // 출산 — 같은 집에 사는 부부. 굶는 마을엔 아기가 안 생긴다.
+    birthDailyChance: 0.025,     // 부부당, 식량·온기 여유 시
+    birthFoodDaysRequired: 6,    // 이 일수분의 식량 여유가 없으면 확률 0
+    birthWarmthRequired: 40,     // 평균 체온이 이보다 낮으면 확률 0
+    birthHousingFullMult: 0.15,  // 집이 꽉 차면 확률이 크게 떨어진다
+    maxMotherAge: 45,
+    maxChildrenPerCouple: 3,
+    birthRecoveryDays: 4,        // 산모 노동 이탈
+    birthWinterExtraRecovery: 3, // 겨울 출산은 회복이 느리다
+    // 노년 — 나이는 새해마다 +1세(압축 없음). 60부터 자연사 위험이 오른다.
+    elderDeathCheckAge: 60,
+    elderDeathAnnualBase: 0.1,   // 60세 연간 사망 확률
+    elderDeathAnnualPerYear: 0.05, // 이후 1세당 가산
+    elderLaborAge: 60,
+    elderLaborMult: 0.85,        // 노년 노동 효율 (완만 — 늙은 사냥꾼도 일한다)
+    youthWorkEfficiency: 0.5,    // 소년의 안전 직무 생산은 성인의 반몫
+    youthAllowedJobs: ['idle', 'hauler', 'farmer', 'woodSplitter', 'herder'] as JobId[],
+    // 이주 가족 구성 — 홀몸만 오지 않는다
+    immigrantChildChance: 0.4,   // 일행에 아이(어린이/소년) 1명이 섞일 확률
+    immigrantElderChance: 0.15,  // 노부모(55~64세) 1명이 섞일 확률
+  },
+
+  // 교육 — 서당 취학은 아이의 반몫 노동을 포기하는 대신 문해자를 길러낸다.
+  // 문해자만 의원·아전·훈장을 맡을 수 있고, 무엇을 배워도 빠르다.
+  education: {
+    seatsPerTeacher: 5,          // 훈장 1명당 취학 정원
+    schoolingDays: 30,           // 취학 이 일수면 문해 (어린이+소년 성장 96일 중)
+    schoolProgressPerDay: 1,
+    schoolDaysForAdultBonus: 30,
+    schoolAdultSkillBonus: 0.2,  // 성인 전환 시 아전·훈장 초기 숙련
+    literateSkillGainMult: 1.5,  // 문해자의 숙련 성장 배율
+    literateCarryover: 0.5,      // 전직 시 최고 숙련의 이 비율을 새 직업에 이월
+    childLaborMult: 0.5,         // 미취학 아이 심부름의 적재 배율 (반몫)
+    immigrantLiterateChance: 0.1, // 성인 유민이 문해자일 확률
+    startLiterateAdults: 2,      // 시작 개척민 중 문해자 수 (관직 콜드 스타트 방지)
+  },
+
+  // 만족도 — 티어가 오를수록 기대 항목이 늘어난다 (성분 기반, 잠긴 항목은 계산 제외)
+  // 계획: docs/superpowers/plans/2026-07-17-satisfaction-religion.md
+  satisfaction: {
+    base: 50,
+    mealOk: 10, mealShort: -18,            // 정착지: 끼니
+    warmthGood: 8, warmthBad: -12,         // 정착지: 온기 (60 이상 / 35 미만)
+    varietyPenalty: -8,                    // 정착지: 식단 단조 (다양성 0.5 미만)
+    clothingGood: 5, clothingBad: -6,      // 보: 입성 (보급률 0.8 이상 / 0.4 미만)
+    marketGood: 4, marketMissing: -3,      // 보: 장터
+    fermentGood: 6, fermentMissing: -6,    // 진: 밥상의 격 (최근 장·김치)
+    fermentWindowDays: 4,
+    educationGood: 6, educationMissing: -6, // 진: 서당 (훈장 배정)
+    luxuryGood: 6, luxuryMissing: -6,      // 부: 사치품 (인구당 재고)
+    luxuryPerCapita: 0.4,
+    religionGood: 6, religionMissing: -6,  // 부: 종교 시설
+    shamanCheer: 2,                        // 당집에 무당 상주 (부가)
+    promotionCheer: 8,                     // 승격 직후 완충 버프
+    promotionCheerDays: 12,
+    legacyTransitionCheer: 8,              // 구저장 고티어가 새 기대에 적응하는 동안의 별도 완충
+    legacyTransitionDays: 12,
+    monkGriefRelief: 3,                    // 노승 상주 시 사망 사기 하락 6 → 3
+    monkBurialBonus: 2,                    // 노승 상주 시 안장 위로 +2
+  },
+
+  // 종교인 등장 — 사람이 먼저 온다. 네임드가 합류해야 그 갈래의 시설이 열린다.
+  religion: {
+    minRank: 'jin' as Rank,
+    dailyChance: 0.02,
+    declineRetryDays: 36,   // 거절해도 훗날 다시 문을 두드린다
+    mudangAge: 44,
+    nosungAge: 62,          // 노승은 자연사 시계도 함께 돈다
+  },
+
+  // 이름 있는 특수 주민 — 크게 돕는 만큼 지속 위험을 가져온다.
+  specialResidents: {
+    exiledScholarMinRank: 'bu' as Rank,
+    exiledScholarDailyChance: 0.012,
+    exiledScholarConfinedDays: 48,
+    exiledScholarAge: 51,
+    exiledScholarOfficeBonus: 0.2,
+    exiledScholarSuspicionPerDay: 0.2,
+    exiledScholarCourtDemandChance: 0.04,
+    exiledScholarCourtDemandSuspicion: 70,
+    exiledScholarHideSuspicionRise: 15,
+    exiledScholarSurrenderSuspicionRelief: 12,
+    exiledScholarPardonServiceDays: 180,
+    exiledScholarPardonChance: 0.006,
+    exiledScholarPardonMaxSuspicion: 20,
+    exiledScholarPardonReputation: 18,
+    exiledScholarPardonSuspicionRelief: 10,
+    jurchenWarriorMinRank: 'jin' as Rank,
+    jurchenWarriorDailyChance: 0.008,
+    jurchenWarriorMinRelation: 65,
+    jurchenWarriorAge: 37,
+    jurchenWarriorBasePowerBonus: 6,
+    jurchenWarriorSuspicionPerDay: 0.12,
+    jurchenWarriorRecruitRelationLoss: 8,
+    jurchenWarriorRelationGainMult: 0.65,
+    jurchenWarriorDemandChance: 0.012,
+    jurchenWarriorDemandCooldownDays: 90,
+    jurchenWarriorSurrenderRelationGain: 12,
+    jurchenWarriorRefuseRelationLoss: 15,
+    jurchenWarriorRefuseThreatRise: 8,
+    jurchenWarriorDesertRelationBelow: 10,
+    jurchenWarriorDesertChance: 0.003,
+    // 착호 포수 박돌개 — 맹수 추적·사냥 특화, 조정의 착호 징발이 부담
+    tigerHunterMinRank: 'bo' as Rank,
+    tigerHunterDailyChance: 0.010,
+    tigerHunterAge: 61,
+    tigerHunterBasePowerBonus: 5,
+    tigerHunterScoutDaysReduction: 1,
+    tigerHunterDemandChance: 0.010,
+    tigerHunterDemandCooldownDays: 120,
+    tigerHunterLevyReputation: 8,
+    tigerHunterLevyHealthLoss: 25,
+    tigerHunterRefuseReputationLoss: 6,
+    // 맹인 지관 허생 — 채광·은맥 특화, 은 소문이 더 빨리 퍼지는 게 부담
+    geomancerMinRank: 'bo' as Rank,
+    geomancerDailyChance: 0.010,
+    geomancerAge: 58,
+    geomancerMiningYieldBonus: 0.15,
+    geomancerVeinChanceMult: 3,
+    geomancerSilverSuspicionMult: 1.5,
+    // 내의원 의녀 단심 — 치료·방역 특화, 죄인 은닉 의심과 누명 벗김 후속
+    uinyeoMinRank: 'jin' as Rank,
+    uinyeoDailyChance: 0.010,
+    uinyeoAge: 34,
+    uinyeoTreatmentMult: 1.5,
+    uinyeoEpidemicSpreadMult: 0.6,
+    uinyeoSuspicionPerDay: 0.08,
+    uinyeoExonerationServiceDays: 150,
+    uinyeoExonerationChance: 0.006,
+    uinyeoExonerationReputation: 14,
+    uinyeoExonerationSuspicionRelief: 6,
+    // 도망 야장 막쇠 — 대장간 특화, 추노꾼 방문이 부담
+    runawaySmithMinRank: 'jin' as Rank,
+    runawaySmithDailyChance: 0.010,
+    runawaySmithAge: 29,
+    runawaySmithSmithyMult: 1.6,
+    runawaySmithDemandChance: 0.012,
+    runawaySmithDemandCooldownDays: 100,
+    runawaySmithRansomSilver: 15,
+    runawaySmithRefuseReputationLoss: 6,
+    // 퇴역 역관 배수겸 — 여진 외교 특화, 양다리 의심이 부담
+    interpreterMinRank: 'bu' as Rank,
+    interpreterDailyChance: 0.008,
+    interpreterAge: 66,
+    interpreterMinRelation: 55,
+    interpreterRelationGainMult: 1.5,
+    interpreterSuspicionPerDay: 0.10,
+    // 항왜 철포수 사야카 — 조총 특화, 왜인 은닉 의심과 조정 압송 요구가 부담
+    hangwaeMinRank: 'bu' as Rank,
+    hangwaeDailyChance: 0.008,
+    hangwaeAge: 68,
+    hangwaeMusketPowerBonus: 6,
+    hangwaePowderMult: 0.8,
+    hangwaeSuspicionPerDay: 0.15,
+    hangwaeDemandChance: 0.010,
+    hangwaeDemandCooldownDays: 110,
+    hangwaeSurrenderSuspicionRelief: 10,
+    hangwaeRefuseSuspicionRise: 8,
+  },
+
+  // 장례 — 모든 죽음은 시신을 남기고, 시신은 묘지에 묻힌다
+  funeral: {
+    plotsPerCemetery: 12,        // 묘지 1곳의 묘 자리
+    unburiedGraceDays: 3,        // 이 일수를 넘긴 시신부터 방치 페널티
+    unburiedMoralePerDay: 1.5,   // 방치 시신이 있는 날의 전 주민 사기 하락
+    burialMoraleRelief: 3,       // 안장 시 전 주민 사기 회복 (장례의 위로)
+    corpseRetryDays: 2,          // 접근 불가 시신의 재시도 간격
+  },
+
+  // 은맥 — 바위/철광을 캐는 동안 낮은 확률로 드러나는 게임당 1회 사건
+  silver: {
+    veinDailyChance: 0.015,   // 채광이 있었던 날의 발견 확률
+    pityMiningDays: 60,       // 누적 채광일이 이에 달하면 강제 발견 (게임당 최소 1회 보장)
+    reofferCooldownDays: 12,  // 묻어둔 은맥의 재제안 간격 (그 광상을 계속 캘 때)
+    sanctionChance: 0.25,     // 보고 시 설점 허가 확률 (나머지는 봉인 명령)
+    sanctionTaxRatio: 0.6,    // 설점 채굴 산출 중 조정 몫
+    reportReputation: 4,      // 보고 즉시 명성
+    reportSuspicionDecay: 6,  // 보고 즉시 의심 감소 (성실한 신고)
+    exposeBaseChance: 0.004,  // 잠채 발각 일일 기본 확률
+    exposePerMined: 0.0004,   // 캔 은 1당 추가 확률 (많이 캘수록 소문이 돈다)
+    exposeChanceMax: 0.05,
+    exposeSpike: 30,          // 발각 시 모반 의심 상승
+    exposeSpikeSealBroken: 40, // 봉인을 어긴 잠채가 발각되면 더 크게
   },
 
   // 세력별 우호도 증감
@@ -436,6 +1147,38 @@ export const CONFIG = {
     groupMin: 2,
     groupMax: 5,
     rejectReputation: 2,
+  },
+
+  defectors: {
+    immigrationDailyChance: 0.025,
+    groupMin: 2,
+    groupMax: 4,
+    rejectRelation: 3,
+    suspicionPerNorthernResident: 0.04,
+    nimachaBasePowerBonus: 0.75,
+    holaonBasePowerBonus: 0.4,
+    courtMusketPowerBonus: 2,
+    siteMinGoodwill: 45,
+    siteMinTrust: 35,
+    siteFavorCost: 2,
+    siteGroupMin: 2,
+    siteGroupMax: 4,
+    horseOfferChance: 0.035,
+    horseOfferCooldownDays: 24,
+    horseGroupSize: 2,
+    horseCount: 2,
+  },
+
+  mounted: {
+    combatDeathHorseLossChance: 0.45,
+    maneuverPowerMultiplier: 0.82,
+    chargePowerBonus: 0.1,
+    routedLootRecoveryBase: 0.5,
+    routedLootRecoveryPerMounted: 0.04,
+    routedLootRecoveryMax: 0.75,
+    pursuitKillsPerMounted: 0.4,
+    pursuitKillsMax: 6,
+    expeditionSpeedMaxBonus: 0.3,
   },
 
   // 난이도별 보정 (메인 메뉴에서 선택)
@@ -486,6 +1229,8 @@ export const CONFIG = {
     tradeWindowDays: 12,
     cozyRelationAbove: 75,    // 이 관계 이상인 북방 세력마다 (적대 성향은 2배)
     perCozyFaction: 0.06,
+    perSecretSilver: 0.5,     // 잠채 은광 가동 중 — 조정 탭에는 익명 라벨로만 보인다
+    perSealBrokenSilver: 0.8, // 봉인을 어긴 잠채 — 조정이 위치를 아는 만큼 더 위험하다
     // ── 감소 ──
     baseDecay: 0.25,          // 하루 자연 감소
     tributeDecay: 6,          // 세공 납부 시 즉시

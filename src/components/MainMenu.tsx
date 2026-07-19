@@ -6,12 +6,14 @@ import type { Difficulty } from '../game/types';
 interface Props {
   canContinue: boolean;
   onStart: (difficulty: Difficulty) => void;
+  onStartTutorial: () => void;
   onContinue: () => void;
+  onOpenBattleSim: () => void;
 }
 
 const DIFF_ORDER: Difficulty[] = ['easy', 'normal', 'hard'];
 
-export function MainMenu({ canContinue, onStart, onContinue }: Props) {
+export function MainMenu({ canContinue, onStart, onStartTutorial, onContinue, onOpenBattleSim }: Props) {
   const [diff, setDiff] = useState<Difficulty>('normal');
 
   return (
@@ -44,9 +46,13 @@ export function MainMenu({ canContinue, onStart, onContinue }: Props) {
 
         <div className="menu-actions">
           <button className="btn primary menu-btn" onClick={() => onStart(diff)}>개척 시작</button>
+          <button className="btn menu-btn" onClick={onStartTutorial} title="고정된 마을에서 첫 겨울까지 기본 살림을 안내합니다">
+            길잡이 (튜토리얼)
+          </button>
           {canContinue && (
             <button className="btn menu-btn" onClick={onContinue}>이어하기</button>
           )}
+          <button className="btn menu-btn" onClick={onOpenBattleSim}>전투 시뮬레이션</button>
         </div>
 
         <div className="menu-footer muted small">

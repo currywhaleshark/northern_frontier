@@ -101,8 +101,15 @@ function prepareResident(resident, job, x, y) {
   const hauler = onlyResident(state, 'hauler', 9, 10);
   assert.equal(
     selectionActions.getPointerAction(state, { kind: 'resident', id: hauler.id }, rockTile).kind,
+    'invalid',
+    'hauler cannot manually quarry rock',
+  );
+
+  hauler.job = 'miner';
+  assert.equal(
+    selectionActions.getPointerAction(state, { kind: 'resident', id: hauler.id }, rockTile).kind,
     'work',
-    'hauler can manually quarry rock',
+    'settlement-tier miner can work rock without a mine',
   );
 
   hauler.job = 'farmer';
@@ -215,6 +222,50 @@ function prepareResident(resident, job, x, y) {
 
   assert.equal(resident.assignedBuildingId, null, 'successful unassign clears building assignment');
   assert.deepEqual(resident.path, [], 'successful unassign resets resident path');
+}
+
+{
+  const state = simulation.newGame(2026070808);
+  clearMapToPlain(state);
+  const emptyTile = state.map[10][10];
+  const otherTile = state.map[10][11];
+  const resident = onlyResident(state, 'idle', 14, 15);
+  const smithy = addBuilt(state, 'smithy', 15, 15);
+  const smithyTile = state.map[15][15];
+
+  assert.equal(
+    selectionActions.selectedEntityAfterTileClick(state, { kind: 'resident', id: resident.id }, emptyTile),
+    null,
+    'an empty-tile left click clears a resident selection',
+  );
+  assert.equal(
+    selectionActions.selectedEntityAfterTileClick(state, { kind: 'building', id: smithy.id }, emptyTile),
+    null,
+    'an empty-tile left click clears a building selection',
+  );
+  assert.equal(
+    selectionActions.selectedEntityAfterTileClick(
+      state,
+      { kind: 'tile', x: emptyTile.x, y: emptyTile.y },
+      emptyTile,
+    ),
+    null,
+    'clicking the selected terrain tile again clears it',
+  );
+  assert.deepEqual(
+    selectionActions.selectedEntityAfterTileClick(
+      state,
+      { kind: 'tile', x: emptyTile.x, y: emptyTile.y },
+      otherTile,
+    ),
+    { kind: 'tile', x: otherTile.x, y: otherTile.y },
+    'clicking different terrain moves the terrain selection',
+  );
+  assert.deepEqual(
+    selectionActions.selectedEntityAfterTileClick(state, { kind: 'resident', id: resident.id }, smithyTile),
+    { kind: 'building', id: smithy.id },
+    'clicking a building replaces the current resident selection',
+  );
 }
 
 console.log('selection action tests passed');

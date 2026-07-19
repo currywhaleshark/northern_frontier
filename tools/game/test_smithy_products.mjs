@@ -38,6 +38,7 @@ const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs'))
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
 const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
+const weapons = await import(pathToFileURL(join(compiledDir, 'weapons.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 function openTile(state) {
@@ -98,8 +99,8 @@ function keepOnlyResident(state, index, job, tile) {
   assert.equal(buildings.smithyProductOf(smithy), 'tools');
   assert.deepEqual(buildings.availableSmithyProducts('settlement'), ['tools', 'carts']);
   assert.deepEqual(buildings.availableSmithyProducts('bo'), ['tools', 'carts', 'spears']);
-  assert.deepEqual(buildings.availableSmithyProducts('jin'), ['tools', 'carts', 'spears', 'hornBows']);
-  assert.deepEqual(buildings.availableSmithyProducts('bu'), ['tools', 'carts', 'spears', 'hornBows', 'muskets']);
+  assert.deepEqual(buildings.availableSmithyProducts('jin'), ['tools', 'carts', 'spears', 'hornBows', 'silverwork']);
+  assert.deepEqual(buildings.availableSmithyProducts('bu'), ['tools', 'carts', 'spears', 'hornBows', 'muskets', 'silverwork']);
 
   assert.ok(simulation.setSmithyProduct(state, smithy.id, 'spears')?.includes('승격'));
   state.rank = 'bo';
@@ -190,6 +191,7 @@ function keepOnlyResident(state, index, job, tile) {
   state.resources.gunpowder = 5;
   state.resources.hornBows = 3;
   state.resources.spears = 10;
+  weapons.reconcileWeaponAssignments(state);
 
   assert.deepEqual(buildings.militiaWeaponAllocation(state), {
     muskets: 2,
@@ -209,9 +211,14 @@ function keepOnlyResident(state, index, job, tile) {
   assert.deepEqual(buildings.militiaWeaponAllocation(state), {
     muskets: 0,
     hornBows: 3,
-    spears: 5,
-    unarmed: 0,
+    spears: 3,
+    unarmed: 2,
   });
+  assert.equal(
+    Object.values(state.weaponAssignments).filter(weapon => weapon === 'musket').length,
+    2,
+    'assigned muskets remain with their residents when powder runs out',
+  );
 }
 
 {

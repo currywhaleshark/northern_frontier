@@ -1,21 +1,25 @@
 // 습격 시스템 — 위협도 누적, 지도 위 습격 무리 접근, 위기 선택지와 결과 판정
 import { CONFIG } from './config';
 import { FACTIONS, RESOURCE_NAMES, type Faction } from './constants';
-import { buildingFootprintTiles, countBuilt } from './buildings';
+import { computeDefense, countBuilt, footprintTilesOf } from './buildings';
 import { addLog } from './events';
 import {
   applyBattleDefenseMultipliers, cannonBattleMult, consumeBattlePowder, levyDefenseBonus, startBattle,
 } from './battles';
-import { findPath } from './agents';
+import { findPath, SUBTICKS } from './agents';
+import { estimateExpeditionReturnTicks, orderExpeditionReturn } from './expedition';
 import { damageBuildings, injure, killResidents, loot, moraleShock } from './raidDamage';
 import { rankEffects } from './promotion';
 import { changeRelation, getRelation, hostileRelationsAvg } from './relations';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
-import { countJob } from './residents';
 import { getSeason, getYear } from './seasons';
-import type { BattleMode, Building, GameState, PendingChoice, TradeNegotiation } from './types';
+import type {
+  BattleMode, Building, ExpeditionRaidOrder, GameState, PendingChoice, TradeNegotiation,
+} from './types';
 import { isWallBuilding } from './walls';
 import { findRaidOriginSite } from './foreignSites';
+import { createTacticalBattle } from './tacticalBattle';
+import { activePredatorScoutIds } from './expeditionIntel';
 
 // 위협도 일일 갱신
 export function updateThreat(state: GameState): void {
@@ -26,7 +30,10 @@ export function updateThreat(state: GameState): void {
   if (edibleFoodTotal(state) + state.resources.hide > t.wealthThreshold) delta += t.wealthExtra;
   if (state.resources.reputation < 35) delta += t.lowRepExtra;
   if (state.tradeRefusedDays > 0) delta += t.tradeRefusedExtra;
-  delta -= countJob(state, 'watchman') * t.perWatchman;
+  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
+  const villageWatchmen = state.residents.filter(resident =>
+    resident.alive && resident.job === 'watchman' && !away.has(resident.id)).length;
+  delta -= villageWatchmen * t.perWatchman;
   delta -= Math.min(state.resources.defense / t.defenseFactor, t.maxDefenseThreatReduction);
   // 적대 세력들과의 관계가 나쁠수록 국경이 험악해진다
   const avgRel = hostileRelationsAvg(state);
@@ -148,7 +155,7 @@ function raiderPassable(state: GameState, x: number, y: number): boolean {
 }
 
 function raiderBuildingApproachGoal(state: GameState, building: Building): (tile: { x: number; y: number }) => boolean {
-  const footprint = buildingFootprintTiles(state, building.type, building.x, building.y) ?? [];
+  const footprint = footprintTilesOf(state, building) ?? [];
   return tile =>
     raiderPassable(state, tile.x, tile.y) &&
     footprint.some(footprintTile =>
@@ -158,7 +165,7 @@ function raiderBuildingApproachGoal(state: GameState, building: Building): (tile
 // 습격 발생 판정: 성사되면 지도 가장자리에 습격 무리가 나타나 마을로 접근한다
 export function checkRaidTrigger(state: GameState, rng: () => number): void {
   const t = CONFIG.threat;
-  if (state.pendingChoice || state.raidCooldown > 0 || state.raiders || state.battle) return;
+  if (state.pendingChoice || state.raidHold || state.raidCooldown > 0 || state.raiders || state.battle || state.tacticalBattle) return;
   if (state.threat < t.raidThreshold) return;
   let chance = (state.threat - t.raidThreshold) / t.raidChanceDiv;
   const season = getSeason(state.day);
@@ -304,6 +311,7 @@ export function raidersTick(state: GameState, rng: () => number): void {
   // 렌더러가 직전 타일에서 미끄러져 들어오는 이동을 반복 재생하지 않는다
   band.px = band.x;
   band.py = band.y;
+  if (state.raidHold) return;
   if (state.battle) return; // 전투 중엔 무리가 전선에 묶인다
   let steps = Math.floor(band.speed) + (rng() < band.speed % 1 ? 1 : 0);
   while (steps-- > 0 && band.path.length > 0) {
@@ -333,8 +341,9 @@ export function raidersTick(state: GameState, rng: () => number): void {
 function resolveFightFallback(
   state: GameState, rng: () => number, faction: string, successP: number, side: string, mode: BattleMode,
 ): void {
+  const away = new Set(state.expedition?.memberIds ?? []);
   const defenderIds = state.residents
-    .filter(resident => resident.alive && !resident.sick && resident.health >= 20 &&
+    .filter(resident => resident.alive && !away.has(resident.id) && !resident.sick && resident.health >= 20 &&
       (mode === 'levy' || resident.job === 'militia' || resident.job === 'watchman'))
     .map(resident => resident.id);
   if (rng() < successP) {
@@ -362,7 +371,7 @@ function resolveFightFallback(
       CONFIG.raid.defeatDeathRate[mode],
       defenderIds,
     );
-    const injured = injure(state, rng, 2 + Math.floor(rng() * 3), 30);
+    const injured = injure(state, rng, 2 + Math.floor(rng() * 3), 30, defenderIds);
     const lootMsg = loot(state, 0.2 + rng() * 0.1);
     const damageCount = mode === 'levy'
       ? CONFIG.raid.buildingDamage.villageDefeat
@@ -415,13 +424,92 @@ export function resolveExtortion(state: GameState, optionId: string, rng: () => 
   }
 }
 
+const EXPEDITION_RAID_HOLD_TICKS = SUBTICKS;
+
+interface RaidChoiceContext {
+  expeditionOrder?: ExpeditionRaidOrder;
+  forcedDefense?: boolean;
+  fortifiedWait?: boolean;
+  suppressStartLog?: boolean;
+}
+
+function villageResidentIds(state: GameState): number[] {
+  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
+  return state.residents.filter(resident => resident.alive && !away.has(resident.id)).map(resident => resident.id);
+}
+
+function openExpeditionRaidOrderChoice(
+  state: GameState,
+  power: number,
+  faction: string,
+  warned: boolean,
+  siege: boolean,
+): void {
+  const eta = estimateExpeditionReturnTicks(state);
+  const currentDefense = computeDefense(state);
+  const joinedDefense = computeDefense(state, { includeExpedition: true });
+  state.pendingChoice = {
+    kind: 'expeditionRaidOrder',
+    title: `원정 중 습격 — ${faction}`,
+    illustration: {
+      src: '/assets/events/raid-charge-v2.png',
+      alt: '원정대가 자리를 비운 사이 마을로 접근하는 무장 세력',
+    },
+    body:
+      `${faction}이(가) 마을 외곽에 도달했습니다. 먼저 토벌대에 내릴 명령을 정해야 합니다.` +
+      `\n현재 잔류 방어도 ${currentDefense} / 원정대 합류 시 ${joinedDefense}` +
+      `\n예상 귀환 ${eta == null ? '불명' : `${eta}틱`} / 적 공격 유예 ${EXPEDITION_RAID_HOLD_TICKS}틱`,
+    options: [
+      {
+        id: 'return',
+        label: '즉시 회군을 명한다',
+        desc: '현재 원정을 중단하고 마을로 돌아옵니다. 도착 전까지는 방어전에 참가하지 못합니다.',
+      },
+      {
+        id: 'continue',
+        label: '원정을 계속한다',
+        desc: '기존 목표와 일정을 유지합니다. 마을은 남은 인원과 무기로 대응해야 합니다.',
+      },
+    ],
+    data: { power, faction, warned, siege },
+  };
+  addLog(state, `${faction}의 습격이 시작되었습니다. 원정대에 보낼 명령을 정해야 합니다!`, 'raid', true);
+}
+
+export function resolveExpeditionRaidOrder(state: GameState, optionId: string): void {
+  const choice = state.pendingChoice;
+  if (!choice || choice.kind !== 'expeditionRaidOrder') return;
+  let order: ExpeditionRaidOrder = optionId === 'return' ? 'return' : 'continue';
+  if (order === 'return') {
+    const error = orderExpeditionReturn(state);
+    if (error) {
+      addLog(state, `${error} 원정대는 기존 명령을 계속 수행합니다.`, 'bad', true);
+      order = 'continue';
+    }
+  }
+  const power = Number(choice.data.power ?? 0);
+  const faction = String(choice.data.faction ?? '무장 세력');
+  const warned = Boolean(choice.data.warned);
+  const siege = Boolean(choice.data.siege);
+  state.pendingChoice = null;
+  openRaidChoice(state, () => 0.5, warned, power, faction, siege, {
+    expeditionOrder: order,
+    suppressStartLog: true,
+  });
+}
+
 // 습격 선택지 모달 생성
 export function openRaidChoice(
   state: GameState, rng: () => number, warned: boolean,
-  powerIn?: number, factionName?: string, siege = false,
+  powerIn?: number, factionName?: string, siege = false, context: RaidChoiceContext = {},
 ): void {
   const faction = FACTIONS.find(f => f.name === factionName) ?? pickFaction(state, rng);
   const power = powerIn ?? raidPower(state, rng);
+  if (state.expedition && !context.expeditionOrder && state.expedition.phase !== 'return') {
+    openExpeditionRaidOrderChoice(state, power, faction.name, warned, siege);
+    return;
+  }
+  const expeditionOrder = context.expeditionOrder ?? (state.expedition ? 'return' : undefined);
   const hasBeacon = countBuilt(state, 'beacon') > 0;
   const hasMarket = countBuilt(state, 'market') > 0;
   const tributeCost = { food: 20, hide: 8, tools: 2 };
@@ -440,7 +528,11 @@ export function openRaidChoice(
       (siege ? '\n방책이 무리를 가로막고 있어 방어에 유리합니다.' : '') +
       (getRelation(state, faction.name) >= 60 ? '\n낯익은 얼굴들입니다. 말이 통할지도 모릅니다.'
         : getRelation(state, faction.name) <= 35 ? '\n그들의 눈빛에 해묵은 원한이 서려 있습니다.' : '') +
-      `\n추정 규모: ${power < 30 ? '소규모' : power < 50 ? '중간 규모' : '대규모'} / 현재 방어도: ${state.resources.defense}`,
+      `\n추정 규모: ${power < 30 ? '소규모' : power < 50 ? '중간 규모' : '대규모'} / 현재 방어도: ${computeDefense(state)}` +
+      (expeditionOrder
+        ? `\n원정대 명령: ${expeditionOrder === 'return' ? '즉시 회군' : '원정 계속'} / 귀환 예상: ${estimateExpeditionReturnTicks(state) ?? '불명'}틱`
+        : '') +
+      (context.fortifiedWait ? '\n마을은 완전 수성 태세이며 방책 방어 보너스를 받습니다.' : ''),
     options: [
       {
         id: 'shelter', label: '목책 안으로 피난한다',
@@ -453,6 +545,14 @@ export function openRaidChoice(
       {
         id: 'levy', label: '민병을 징집한다',
         desc: '성한 주민 모두가 마을 안에서 방어전을 벌입니다. 방어도는 오르지만 승리해도 부상과 건물 파손이 생깁니다.',
+      },
+      {
+        id: 'manual-garrison', label: '직접 지휘한다 — 수비병 요격',
+        desc: '전투 두루마리에서 수비병·파수꾼·사냥꾼을 배치하고 교전별 전략을 선택합니다.',
+      },
+      {
+        id: 'manual-levy', label: '직접 지휘한다 — 민병 방어',
+        desc: '성한 주민을 소집해 마을 안에서 방어전을 지휘합니다. 병력을 보존하거나 물자를 지킬 방향을 정할 수 있습니다.',
       },
       {
         id: 'tribute', label: '공물을 내어보낸다',
@@ -473,10 +573,53 @@ export function openRaidChoice(
         disabledReason: '봉수대가 필요합니다',
       },
     ],
-    data: { power, faction: faction.name, warned, siege },
+    data: {
+      power,
+      faction: faction.name,
+      warned,
+      siege: siege || Boolean(context.fortifiedWait),
+      expeditionOrder,
+      fortifiedWait: Boolean(context.fortifiedWait),
+    },
   };
+  if (context.forcedDefense) {
+    choice.title = `수성 교전 임박! — ${faction.name}`;
+    choice.options = choice.options.filter(option => option.id === 'levy' || option.id === 'manual-levy');
+  } else if (expeditionOrder) {
+    choice.options.splice(1, 0, {
+      id: 'fortify-wait',
+      label: '완전 수성으로 굳히고 기다린다',
+      desc: `일반 작업을 멈추고 ${EXPEDITION_RAID_HOLD_TICKS}틱 동안 방책 안에서 원정대를 기다립니다. 먼저 닥치는 쪽에 따라 참전 인원이 결정됩니다.`,
+    });
+  }
   state.pendingChoice = choice;
-  addLog(state, `${faction.name}의 습격이 시작되었습니다!`, 'raid');
+  if (!context.suppressStartLog) addLog(state, `${faction.name}의 습격이 시작되었습니다!`, 'raid');
+}
+
+export function raidHoldTick(state: GameState, rng: () => number): void {
+  const hold = state.raidHold;
+  if (!hold || state.pendingChoice || state.battle || state.tacticalBattle || state.gameOver) return;
+  hold.ticksRemaining = Math.max(0, hold.ticksRemaining - 1);
+  const expeditionArrived = state.expedition == null;
+  if (!expeditionArrived && hold.ticksRemaining > 0) return;
+
+  state.raidHold = null;
+  if (state.raiders) state.raiders.siege = true;
+  state.resources.defense = computeDefense(state);
+  addLog(
+    state,
+    expeditionArrived
+      ? '회군한 원정대가 방책 안의 잔류군과 합류했습니다. 적의 총공세가 시작됩니다!'
+      : '원정대가 돌아오기 전에 적의 공격 시한이 끝났습니다. 잔류군만으로 총공세를 막아야 합니다!',
+    'raid',
+    true,
+  );
+  openRaidChoice(state, rng, hold.warned, hold.power, hold.faction, true, {
+    expeditionOrder: hold.expeditionOrder,
+    forcedDefense: true,
+    fortifiedWait: true,
+    suppressStartLog: true,
+  });
 }
 
 // 선택지 결과 판정
@@ -486,14 +629,39 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
   const power = c.data.power as number;
   const faction = c.data.faction as string;
   const warned = c.data.warned as boolean;
+  const expeditionOrder = c.data.expeditionOrder as ExpeditionRaidOrder | undefined;
 
   // 경보/공성/궂은 날씨 보정 — 지도 전투와 같은 배율 (눈보라·혹한은 침입자에게 더 가혹하다)
   const battleMods = { warned, siege: Boolean(c.data.siege) };
 
   switch (optionId) {
+    case 'fortify-wait': {
+      if (!expeditionOrder) return;
+      state.raidHold = {
+        power,
+        faction,
+        warned,
+        siege: true,
+        expeditionOrder,
+        ticksRemaining: EXPEDITION_RAID_HOLD_TICKS,
+      };
+      if (state.raiders) {
+        state.raiders.siege = true;
+        state.raiders.speed = 0;
+        state.raiders.path = [];
+      }
+      state.pendingChoice = null;
+      addLog(
+        state,
+        `마을이 모든 문을 걸어 잠그고 완전 수성에 들어갔습니다. ${EXPEDITION_RAID_HOLD_TICKS}틱 안에 원정대가 돌아오지 못하면 잔류군만으로 맞섭니다.`,
+        'raid',
+        true,
+      );
+      return;
+    }
     case 'shelter': {
       const lootMsg = loot(state, 0.22 + rng() * 0.1);
-      const injured = rng() < 0.25 ? injure(state, rng, 1, 15) : 0;
+      const injured = rng() < 0.25 ? injure(state, rng, 1, 15, villageResidentIds(state)) : 0;
       const damaged = damageBuildings(state, rng, CONFIG.raid.buildingDamage.shelter);
       moraleShock(state, 8);
       changeRelation(state, faction, CONFIG.relations.shelter);
@@ -519,6 +687,26 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
       resolveFightFallback(state, rng, faction, levyDefense / (levyDefense + power), '징집된 주민들', 'levy');
       break;
     }
+    case 'manual-garrison': {
+      createTacticalBattle(state, {
+        factionName: faction,
+        power,
+        warned,
+        siege: battleMods.siege,
+        mode: 'garrison',
+      });
+      return;
+    }
+    case 'manual-levy': {
+      createTacticalBattle(state, {
+        factionName: faction,
+        power,
+        warned,
+        siege: battleMods.siege,
+        mode: 'levy',
+      });
+      return;
+    }
     case 'tribute': {
       consumeEdibleFood(state, 20);
       state.resources.hide = Math.max(0, state.resources.hide - 8);
@@ -543,6 +731,16 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
         changeRelation(state, faction, CONFIG.relations.negotiateSuccess);
         addLog(state, `장터에서의 협상이 통했습니다. ${faction}이(가) 식량 ${give}을(를) 받고 가죽 4를 남기고 물러갑니다. 명성이 올랐습니다.`, 'good', true);
       } else {
+        if (expeditionOrder) {
+          addLog(state, `협상이 결렬되었습니다. 격분한 ${faction}이(가) 방책을 공격하기 시작합니다!`, 'raid', true);
+          openRaidChoice(state, rng, warned, power, faction, true, {
+            expeditionOrder,
+            forcedDefense: true,
+            fortifiedWait: true,
+            suppressStartLog: true,
+          });
+          return;
+        }
         const injured = injure(state, rng, 2, 25);
         const lootMsg = loot(state, 0.3 + rng() * 0.1);
         const damaged = damageBuildings(state, rng, CONFIG.raid.buildingDamage.shelter + 1);
@@ -568,5 +766,6 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
   }
   state.raidCooldown = CONFIG.threat.raidCooldownDays;
   state.raiders = null; // 무리는 물러간다
+  state.raidHold = null;
   state.pendingChoice = null;
 }

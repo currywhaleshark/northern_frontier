@@ -1,6 +1,8 @@
 // 건물 정의와 배치/방어 관련 헬퍼
 import { CONFIG } from './config';
 import { rankAtLeast } from './constants';
+import { createCombatRoster } from './combatRoster';
+import { hasKnownMineralDepositNear } from './miningSites';
 import type { Building, BuildingDef, BuildingTypeId, GameState, Rank, ResourceId, SmithyProductId, Tile } from './types';
 
 export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
@@ -34,6 +36,36 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     cost: { wood: 9, stone: 2 }, buildDays: 6, slots: 0, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
+  cellar: {
+    id: 'cellar', name: '움 저장고', emoji: '🕳️',
+    desc: `땅의 냉기를 이용해 생선·고기·채소 ${CONFIG.spoilage.cellarCapacity}만큼의 부패를 늦춘다. 여러 동의 보호 용량은 합산된다.`,
+    cost: { wood: 5, stone: 3 }, buildDays: 4, slots: 0, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false,
+  },
+  smokehouse: {
+    id: 'smokehouse', name: '훈연소', emoji: '♨️',
+    desc: '갈무리꾼이 고기와 장작 또는 숯을 써서 오래 두는 보존육을 만든다.',
+    cost: { wood: 8, stone: 4, tools: 1 }, buildDays: 6, slots: 2, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false,
+  },
+  dryingRack: {
+    id: 'dryingRack', name: '건조대', emoji: '🎏',
+    desc: '강가에서 생선을 자반이나 건어물로 갈무리한다. 건어물은 소금이 들지 않지만 비가 오면 작업이 멈춘다.',
+    cost: { wood: 8, stone: 2, tools: 1 }, buildDays: 5, slots: 2, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'riverbank', unique: false,
+  },
+  onggiKiln: {
+    id: 'onggiKiln', name: '옹기가마', emoji: '🏺',
+    desc: '보(堡) 승격 후 강가에 짓는다. 옹기장이가 현지 점토를 빚어 장작이나 숯으로 옹기를 굽는다.',
+    cost: { wood: 12, stone: 6, tools: 2 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'riverbank', unique: false, minRank: 'bo',
+  },
+  jangdokdae: {
+    id: 'jangdokdae', name: '장독대', emoji: '🫙',
+    desc: '보(堡) 승격 후 마당에 짓는다. 늦가을부터 초겨울까지 콩과 소금을 옹기에 담그면 시간이 장을 익힌다.',
+    cost: { wood: 6, stone: 3, tools: 1 }, buildDays: 5, slots: 0, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false, minRank: 'bo',
+  },
   bridge: {
     id: 'bridge', name: '다리', emoji: '🌉',
     desc: '강 위에 놓아 사계절 주민 통행을 가능하게 한다.',
@@ -64,9 +96,15 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     cost: { wood: 5 }, buildDays: 3, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
+  clinic: {
+    id: 'clinic', name: '의원', emoji: '⚕️',
+    desc: '진(鎭) 승격 후 건설. 의원이 약초로 병자와 중상자를 치료하고 역병의 진단과 방역을 돕는다.',
+    cost: { wood: 14, stone: 10, herbs: 4, tools: 2 }, buildDays: 9, slots: 2, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
+  },
   field: {
     id: 'field', name: '밭', emoji: '🌾',
-    desc: '조·수수·메밀·보리 중 작물을 골라 기른다. 비옥한 땅이면 소출 +30%.',
+    desc: '곡물·채소·콩·목화 중 작물을 골라 기른다. 비옥한 땅이면 소출 +30%.',
     cost: { wood: 2, tools: 1 }, buildDays: 3, slots: 1, capacity: 0, defense: 0,
     winterBonus: false, placement: 'field', unique: false,
   },
@@ -90,9 +128,9 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   mine: {
     id: 'mine', name: '채광장', emoji: '⛏️',
-    desc: '보(堡) 승격 후 건설. 채광꾼이 돌과 철을 캐는 거점.',
+    desc: `보(堡) 승격 후 건설. 광상 위가 아닌 주변 빈 땅에 세우면 채광꾼이 반경 ${CONFIG.minerals.mineWorkRadius}칸의 돌·철·은을 캐 와 하역한다.`,
     cost: { wood: 10, stone: 8, tools: 2 }, buildDays: 8, slots: 4, capacity: 0, defense: 0,
-    winterBonus: false, placement: 'rock', unique: false, minRank: 'bo',
+    winterBonus: false, placement: 'land', unique: false, minRank: 'bo',
   },
   ferry: {
     id: 'ferry', name: '나루터', emoji: '⛵',
@@ -108,7 +146,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   stable: {
     id: 'stable', name: '축사', emoji: '🐂',
-    desc: '진(鎭) 승격 후 건설. 목동이 가축을 돌보며 식량과 가죽을 꾸준히 보탠다.',
+    desc: '진(鎭) 승격 후 건설. 목동이 가축을 돌보고 산물을 거두며 필요하면 도축한다.',
     cost: { wood: 16, stone: 6, grain: 8, tools: 1 }, buildDays: 9, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
   },
@@ -190,6 +228,30 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     cost: { wood: 11, stone: 4 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: true,
   },
+  cemetery: {
+    id: 'cemetery', name: '묘지', emoji: '🪦',
+    desc: '세상을 떠난 이들을 안장한다. 장의사가 시신을 수습해 묻으면 마을이 위로를 얻고, 시신을 방치하면 민심이 상한다.',
+    cost: { wood: 4, stone: 6 }, buildDays: 4, slots: 1, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false,
+  },
+  school: {
+    id: 'school', name: '서당', emoji: '📖',
+    desc: '훈장이 아이들에게 글을 가르친다. 진(鎭)쯤 되는 고을의 주민들은 글 배울 곳을 바란다.',
+    cost: { wood: 10, stone: 4, tools: 1 }, buildDays: 8, slots: 1, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: true, minRank: 'jin',
+  },
+  shrine: {
+    id: 'shrine', name: '당집', emoji: '🎐',
+    desc: '마을의 안녕을 비는 무속의 당. 떠돌이 무당이 마을에 들어와야 지을 수 있다.',
+    cost: { wood: 8, stone: 2, hide: 2 }, buildDays: 6, slots: 1, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: true, minRank: 'jin',
+  },
+  hermitage: {
+    id: 'hermitage', name: '암자', emoji: '🕯️',
+    desc: '명복을 빌고 상례를 돕는 작은 절. 노승이 마을에 의탁해야 지을 수 있다.',
+    cost: { wood: 10, stone: 6 }, buildDays: 8, slots: 1, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: true, minRank: 'jin',
+  },
   cannonEmplacement: {
     id: 'cannonEmplacement', name: '불랑기포대', emoji: '💥',
     desc: '조정이 하사한 불랑기포를 얹은 포대. 방어도 +40, 화약이 있으면 전투 방어가 크게 오른다 (교전마다 화약 소모). 부(府) 승격 후 조정 청원으로만 받을 수 있다.',
@@ -199,8 +261,8 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
 };
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
-  'hut', 'ondol', 'tileHouse', 'storehouse', 'bridge', 'field', 'paddy', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut',
-  'smithy', 'mine', 'ferry', 'watermill', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office',
+  'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'field', 'paddy', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'clinic',
+  'smokehouse', 'dryingRack', 'smithy', 'mine', 'ferry', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office', 'cemetery', 'school', 'shrine', 'hermitage',
   'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement',
 ];
@@ -214,6 +276,8 @@ export const SINGLE_TILE_BUILDINGS = [
   'field',
   'paddy',
   'ferry',
+  'dryingRack',
+  'onggiKiln',
   'dock',
   'palisade',
   'earthFort',
@@ -228,16 +292,54 @@ export function buildingFootprintSize(type: BuildingTypeId): 1 | 2 {
   return SINGLE_TILE_BUILDING_SET.has(type) ? 1 : 2;
 }
 
+// 밭·논은 드래그로 크기를 정하는 경작지 — 발자국이 타입이 아니라 인스턴스(w/h)에 달려 있다
+export function isPlotBuildingType(type: BuildingTypeId): type is 'field' | 'paddy' {
+  return type === 'field' || type === 'paddy';
+}
+
+export function clampPlotSide(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 1;
+  return Math.min(CONFIG.farming.maxPlotSide, Math.max(1, Math.floor(value)));
+}
+
+export interface FootprintDims { w: number; h: number }
+
+export function buildingFootprintDims(building: Pick<Building, 'type' | 'w' | 'h'>): FootprintDims {
+  if (isPlotBuildingType(building.type)) {
+    return { w: clampPlotSide(building.w ?? 1), h: clampPlotSide(building.h ?? 1) };
+  }
+  const size = buildingFootprintSize(building.type);
+  return { w: size, h: size };
+}
+
+export function plotArea(building: Pick<Building, 'type' | 'w' | 'h'>): number {
+  const { w, h } = buildingFootprintDims(building);
+  return w * h;
+}
+
+// 경작지의 파종 칸 수 — 구버전 세이브(sownArea 없음)는 자라던 밭이면 전체 파종으로 본다
+export function sownAreaOf(farm: Pick<Building, 'type' | 'w' | 'h' | 'sownArea' | 'fieldGrowth'>): number {
+  const area = plotArea(farm);
+  const raw = typeof farm.sownArea === 'number' && Number.isFinite(farm.sownArea)
+    ? farm.sownArea
+    : (farm.fieldGrowth > 0 ? area : 0);
+  return Math.min(area, Math.max(0, raw));
+}
+
 export function buildingFootprintTiles(
   state: Pick<GameState, 'map'>,
   type: BuildingTypeId,
   x: number,
   y: number,
+  w?: number,
+  h?: number,
 ): Tile[] | null {
   const size = buildingFootprintSize(type);
+  const width = w ?? size;
+  const height = h ?? size;
   const tiles: Tile[] = [];
-  for (let dy = 0; dy < size; dy++) {
-    for (let dx = 0; dx < size; dx++) {
+  for (let dy = 0; dy < height; dy++) {
+    for (let dx = 0; dx < width; dx++) {
       const tile = state.map[y + dy]?.[x + dx];
       if (!tile) return null;
       tiles.push(tile);
@@ -246,19 +348,59 @@ export function buildingFootprintTiles(
   return tiles;
 }
 
-export function canPlaceBuildingAt(state: GameState, type: BuildingTypeId, x: number, y: number): boolean {
-  const tiles = buildingFootprintTiles(state, type, x, y);
+// 기존 건물 인스턴스의 발자국 — 경작지는 저장된 w/h를 쓴다
+export function footprintTilesOf(
+  state: Pick<GameState, 'map'>,
+  building: Pick<Building, 'type' | 'x' | 'y' | 'w' | 'h'>,
+): Tile[] | null {
+  const { w, h } = buildingFootprintDims(building);
+  return buildingFootprintTiles(state, building.type, building.x, building.y, w, h);
+}
+
+export function canPlaceBuildingAt(
+  state: GameState,
+  type: BuildingTypeId,
+  x: number,
+  y: number,
+  w?: number,
+  h?: number,
+): boolean {
+  const tiles = buildingFootprintTiles(state, type, x, y, w, h);
   if (!tiles) return false;
   if (type === 'watermill') return canPlaceWatermillAt(state, x, y);
   const def = BUILDING_DEFS[type];
-  return tiles.every(tile => canPlaceOn(def, tile, state));
+  if (!tiles.every(tile => canPlaceOn(def, tile, state))) return false;
+  if (type === 'mine') return hasKnownMineralDepositNear(state, x, y);
+  return true;
+}
+
+// 경작지 건설비는 칸수 비례 (1×1이면 기본 비용 그대로)
+export function buildingCostFor(
+  type: BuildingTypeId,
+  w = 1,
+  h = 1,
+): Partial<Record<ResourceId, number>> {
+  const def = BUILDING_DEFS[type];
+  if (!isPlotBuildingType(type)) return def.cost;
+  const area = clampPlotSide(w) * clampPlotSide(h);
+  if (area === 1) return def.cost;
+  const scaled: Partial<Record<ResourceId, number>> = {};
+  for (const [res, amt] of Object.entries(def.cost)) {
+    scaled[res as ResourceId] = (amt ?? 0) * area;
+  }
+  return scaled;
+}
+
+export function canAffordCost(state: GameState, cost: Partial<Record<ResourceId, number>>): boolean {
+  return Object.entries(cost).every(([res, amt]) =>
+    state.resources[res as keyof typeof state.resources] >= (amt ?? 0));
 }
 
 export function occupyBuildingTiles(
   state: GameState,
-  building: Pick<Building, 'id' | 'type' | 'x' | 'y'>,
+  building: Pick<Building, 'id' | 'type' | 'x' | 'y' | 'w' | 'h'>,
 ): void {
-  const tiles = buildingFootprintTiles(state, building.type, building.x, building.y);
+  const tiles = footprintTilesOf(state, building);
   if (!tiles) return;
   for (const tile of tiles) tile.buildingId = building.id;
 }
@@ -276,7 +418,7 @@ export function rebuildBuildingFootprints(state: GameState): void {
     for (const tile of row) tile.buildingId = null;
   }
   for (const building of state.buildings) {
-    const tiles = buildingFootprintTiles(state, building.type, building.x, building.y);
+    const tiles = footprintTilesOf(state, building);
     if (!tiles) continue;
     for (const tile of tiles) {
       if (tile.buildingId == null) tile.buildingId = building.id;
@@ -303,7 +445,10 @@ export function officeEfficiencyMultiplier(state: GameState): number {
   const clerks = state.residents.filter(r =>
     r.alive && !r.sick && r.health >= 20 && r.job === 'clerk').length;
   const bonus = Math.min(CONFIG.production.officeMaxBonus, clerks * CONFIG.production.officeBonusPerClerk);
-  return 1 + bonus;
+  const specialBonus = state.residents.some(resident => resident.alive && resident.special === 'exiledScholar')
+    ? CONFIG.specialResidents.exiledScholarOfficeBonus
+    : 0;
+  return 1 + bonus + specialBonus;
 }
 
 export function isBuildingUnlocked(rank: GameState['rank'] | undefined, type: BuildingTypeId): boolean {
@@ -376,8 +521,7 @@ export function canPlaceOn(def: BuildingDef, tile: Tile, state?: GameState): boo
 }
 
 export function canAfford(state: GameState, def: BuildingDef): boolean {
-  return Object.entries(def.cost).every(([res, amt]) =>
-    state.resources[res as keyof typeof state.resources] >= (amt ?? 0));
+  return canAffordCost(state, def.cost);
 }
 
 export interface SmithyProductDef {
@@ -390,7 +534,7 @@ export interface SmithyProductDef {
   task: string;
 }
 
-export const SMITHY_PRODUCT_ORDER: SmithyProductId[] = ['tools', 'carts', 'spears', 'hornBows', 'muskets'];
+export const SMITHY_PRODUCT_ORDER: SmithyProductId[] = ['tools', 'carts', 'spears', 'hornBows', 'muskets', 'silverwork'];
 
 export const SMITHY_PRODUCT_DEFS: Record<SmithyProductId, SmithyProductDef> = {
   tools: {
@@ -444,6 +588,19 @@ export const SMITHY_PRODUCT_DEFS: Record<SmithyProductId, SmithyProductDef> = {
     ratePerDay: CONFIG.production.musketsPerDay,
     task: '조총 제작 중',
   },
+  // 은세공 — 화폐(은)를 사치재(귀금속)로 바꾸는 비가역 싱크. 은 보유 자체는 만족을 주지 않는다.
+  silverwork: {
+    id: 'silverwork',
+    name: '은세공',
+    minRank: 'jin',
+    output: 'preciousMetal',
+    inputPerUnit: {
+      silver: CONFIG.production.silverworkSilverPerUnit,
+      charcoal: CONFIG.production.silverworkCharcoalPerUnit,
+    },
+    ratePerDay: CONFIG.production.silverworkPerDay,
+    task: '은세공 중',
+  },
 };
 
 export function smithyProductOf(building: Pick<Building, 'smithyProduct'> | undefined): SmithyProductId {
@@ -471,9 +628,10 @@ export function housingCapacity(state: GameState): { total: number; ondol: numbe
   return { total, ondol };
 }
 
-// 조총으로 무장 가능한 수비병 수 — 화약이 없으면 냉병기로 환원된다
+// 실제로 조총을 배정받아 사격 가능한 전투원 수.
 export function armedMusketeers(state: GameState): number {
-  return militiaWeaponAllocation(state).muskets;
+  return createCombatRoster(state, { context: 'villageDefense' }).combatants
+    .filter(combatant => combatant.readyWeapon === 'musket').length;
 }
 
 export interface MilitiaWeaponAllocation {
@@ -484,33 +642,44 @@ export interface MilitiaWeaponAllocation {
 }
 
 export function militiaWeaponAllocation(state: GameState): MilitiaWeaponAllocation {
-  const militia = state.residents.filter(r => r.alive && r.job === 'militia').length;
-  const muskets = state.resources.gunpowder > 0
-    ? Math.min(militia, Math.floor(state.resources.muskets))
-    : 0;
-  let remaining = militia - muskets;
-  const hornBows = Math.min(remaining, Math.floor(state.resources.hornBows));
-  remaining -= hornBows;
-  const spears = Math.min(remaining, Math.floor(state.resources.spears));
-  remaining -= spears;
-  return { muskets, hornBows, spears, unarmed: remaining };
+  const militia = createCombatRoster(state, { context: 'villageDefense' }).combatants
+    .filter(combatant => combatant.role === 'militia');
+  // 탄약 없는 조총수는 배정을 유지하지만 현재 전투 계산에서는 비무장 수비병으로 취급한다.
+  return {
+    muskets: militia.filter(combatant => combatant.readyWeapon === 'musket').length,
+    hornBows: militia.filter(combatant => combatant.readyWeapon === 'hornBow').length,
+    spears: militia.filter(combatant => combatant.readyWeapon === 'spear').length,
+    unarmed: militia.filter(combatant => combatant.readyWeapon == null).length,
+  };
 }
 
-// 방어도 = 건물 + 파수꾼 + 수비병 (조총 무장 수비병은 기여가 크다)
-export function computeDefense(state: GameState): number {
+// 방어도 = 건물 + 마을에 남은 전투원의 직업·실제 배정 무기.
+export function computeDefense(
+  state: GameState,
+  options: {
+    includeExpedition?: boolean;
+    excludedResidentIds?: Iterable<number>;
+    gunpowderAvailable?: number;
+  } = {},
+): number {
+  const excludedResidentIds = [...(options.excludedResidentIds ?? [])];
+  const combatants = [...createCombatRoster(state, {
+    context: 'villageDefense', excludedResidentIds, gunpowderAvailable: options.gunpowderAvailable,
+  }).combatants];
+  if (options.includeExpedition && state.expedition) {
+    combatants.push(...createCombatRoster(state, {
+      context: 'expedition', memberIds: state.expedition.memberIds, excludedResidentIds,
+      gunpowderAvailable: options.gunpowderAvailable,
+    }).combatants);
+  }
   let d = 0;
   for (const b of state.buildings) {
     if (b.built) d += BUILDING_DEFS[b.type].defense;
   }
-  const watchmen = state.residents.filter(r => r.alive && r.job === 'watchman').length;
-  d += watchmen * CONFIG.raid.watchmanDefense;
   const garrisonMult = countBuilt(state, 'garrison') > 0 ? 1.3 : 1;
-  const armed = militiaWeaponAllocation(state);
-  d += Math.round(
-    (armed.muskets * CONFIG.raid.musketDefense +
-      armed.hornBows * CONFIG.raid.hornBowDefense +
-      armed.spears * CONFIG.raid.spearDefense +
-      armed.unarmed * CONFIG.raid.militiaDefense) * garrisonMult,
-  );
+  const unique = new Map(combatants.map(combatant => [combatant.residentId, combatant]));
+  const peopleDefense = [...unique.values()].reduce((sum, combatant) =>
+    sum + combatant.basePower + combatant.weaponPower, 0);
+  d += Math.round(peopleDefense * garrisonMult);
   return Math.round(d);
 }

@@ -56,6 +56,14 @@ function withDock(state) {
   return state;
 }
 
+function withEmptyStable(state) {
+  state.buildings.push({
+    id: 9003, type: 'stable', x: 3, y: 3, progress: 9, built: true, fieldGrowth: 0,
+    livestock: { species: 'chicken', headcount: 0, growth: 0, feedShortageDays: 0 },
+  });
+  return state;
+}
+
 // ── canRequestTrade 거부 사유들 ──
 {
   const state = simulation.newGame(11);
@@ -156,6 +164,20 @@ function withDock(state) {
   assert.ok(state.relations[TRADER] > before.rel);
   assert.equal(state.lastTradeByFaction[TRADER], state.day);
   assert.ok(state.initiatedTradeDays.includes(state.day));
+}
+
+// ── 첫 가축은 해당 세력과의 실제 거래 성사로 획득·해금된다 ──
+{
+  const faction = FACTIONS.find(candidate => candidate.name === '니마차 우디캐');
+  const state = withEmptyStable(withMarket(simulation.newGame(2026071718)));
+  state.relations[faction.name] = 60;
+  for (const resource of faction.imports) state.resources[resource] = 100;
+  assert.equal(events.requestTrade(state, faction.name), null);
+  assert.equal(events.negotiateTrade(state, faction.exports[0], 1), null);
+  simulation.resolveChoice(state, 'confirm');
+  assert.ok(state.unlockedLivestock.includes('goat'), 'the first successful Nimacha trade unlocks goats');
+  const goatStable = state.buildings.find(building => building.livestock?.species === 'goat');
+  assert.equal(goatStable?.livestock?.headcount, 2, 'the unlock includes a breeding pair of goats');
 }
 
 // ── 같은 조건을 다시 흥정하면 요구량이 줄거나 최종 조건을 고수한다 ──

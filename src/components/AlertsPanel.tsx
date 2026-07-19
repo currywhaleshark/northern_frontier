@@ -2,7 +2,11 @@
 import { CONFIG } from '../game/config';
 import { foodTotal, fuelHeatTotal } from '../game/consumption';
 import { avg, livingResidents, residentHome } from '../game/residents';
-import { getSeason } from '../game/seasons';
+import {
+  normalizeLivestockState, settlementLivestockDailyFeedNeed, settlementLivestockWinterHayNeed,
+} from '../game/livestock';
+import { activePhysicianCount } from '../game/medicine';
+import { getDayOfSeason, getSeason } from '../game/seasons';
 import { firewoodWeatherMult } from '../game/weather';
 import type { AlertItem, GameState } from '../game/types';
 
@@ -34,12 +38,61 @@ export function computeAlerts(state: GameState): AlertItem[] {
     else if (fwDays < 10) alerts.push({ id: 'fw1', text: `장작이 빠르게 줄고 있습니다. (약 ${Math.floor(fwDays)}일치)`, level: 'warn' });
   }
 
+  const occupiedStables = state.buildings
+    .filter(building => building.type === 'stable' && building.built)
+    .map(building => normalizeLivestockState(building.livestock))
+    .filter(livestock => livestock.headcount > 0);
+  const feedShortageDays = occupiedStables.reduce((max, livestock) => Math.max(max, livestock.feedShortageDays), 0);
+  if (feedShortageDays > 0) {
+    alerts.push({
+      id: 'livestockFeedDanger',
+      text: `가축 사료가 ${feedShortageDays}일째 부족합니다. 곡물·건초를 확보하거나 일부를 도축하십시오.`,
+      level: 'danger',
+    });
+  } else if ((season === 'autumn' || season === 'winter') && occupiedStables.length > 0) {
+    const grainPerDay = settlementLivestockDailyFeedNeed(state);
+    const grainDaysToCover = season === 'autumn'
+      ? (CONFIG.time.seasonDays - getDayOfSeason(state.day) + 1) + CONFIG.time.seasonDays
+      : CONFIG.time.seasonDays - getDayOfSeason(state.day) + 1;
+    const hayDaysToCover = season === 'autumn'
+      ? CONFIG.time.seasonDays
+      : CONFIG.time.seasonDays - getDayOfSeason(state.day) + 1;
+    const grainNeeded = grainPerDay * grainDaysToCover;
+    const hayNeeded = settlementLivestockWinterHayNeed(state, hayDaysToCover);
+    const grainShort = state.resources.grain + 1e-9 < grainNeeded;
+    const hayShort = state.resources.hay + 1e-9 < hayNeeded;
+    if (grainShort || hayShort) {
+      const needs = [
+        grainShort ? `곡물 약 ${grainNeeded.toFixed(1)}` : null,
+        hayShort ? `건초 약 ${hayNeeded.toFixed(1)}` : null,
+      ].filter(Boolean).join(' · ');
+      const coverage = Math.min(
+        grainNeeded > 0 ? state.resources.grain / grainNeeded : 1,
+        hayNeeded > 0 ? state.resources.hay / hayNeeded : 1,
+      );
+      alerts.push({
+        id: 'livestockFeedForecast',
+        text: `겨울 가축 사료가 부족합니다. ${needs}이 필요하니 비축하거나 일부를 도축하십시오.`,
+        level: coverage < 0.3 ? 'danger' : 'warn',
+      });
+    }
+  }
+
   const warmth = avg(state, 'warmth');
   if (warmth < 30) alerts.push({ id: 'cold2', text: '주민들이 얼어붙고 있습니다! 장작과 옷, 온돌집이 필요합니다.', level: 'danger' });
   else if (warmth < 45) alerts.push({ id: 'cold1', text: '추위 위험: 주민 평균 체온이 낮습니다.', level: 'warn' });
 
   const sick = living.filter(r => r.sick).length;
-  if (sick > 0) alerts.push({ id: 'sick', text: `질병 발생: ${sick}명이 앓고 있습니다. 약초가 회복을 돕습니다.`, level: sick >= pop * 0.25 ? 'danger' : 'warn' });
+  if (sick > 0) {
+    const physicians = activePhysicianCount(state);
+    alerts.push({
+      id: 'sick',
+      text: physicians > 0
+        ? `질병 발생: ${sick}명이 앓고 있으며 의원 ${physicians}명이 치료 중입니다.`
+        : `질병 발생: ${sick}명이 앓고 있습니다. 약초와 의원이 필요합니다.`,
+      level: sick >= pop * 0.25 ? 'danger' : 'warn',
+    });
+  }
 
   const damagedBuildings = state.buildings.filter(building => building.repairing).length;
   if (damagedBuildings > 0) {
@@ -126,8 +179,7 @@ export function AlertsPanel({ state }: { state: GameState }) {
   const alerts = computeAlerts(state);
   if (alerts.length === 0) return null;
   return (
-    <div className="section">
-      <div className="panel-title">경보</div>
+    <div className="alert-stack" aria-label="경보" aria-live="polite">
       {alerts.map(a => (
         <div key={a.id} className={`alert ${a.level}`}>{a.text}</div>
       ))}

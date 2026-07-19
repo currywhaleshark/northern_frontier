@@ -8,10 +8,15 @@ import {
   SURNAME_WEIGHTS,
 } from './constants';
 import { BUILDING_DEFS } from './buildings';
+import { isNorthernDefectorOrigin, NORTHERN_DEFECTOR_NAMES } from './defectors';
 import { addLog } from './events';
 import { returnResidentCart } from './equipment';
+import { addCorpse } from './lifecycle';
+import { hasResidentMonk, moraleBreakdown, moraleTarget, type MoraleInputs } from './morale';
 import { getSeason } from './seasons';
 import { warmthLossWeatherMult } from './weather';
+import { releaseResidentMount } from './weapons';
+import { canResidentTakeJob } from './youth';
 import type { Building, GameState, Gender, JobId, Resident, Tile } from './types';
 
 export function rollResidentGender(rng: () => number): Gender {
@@ -28,7 +33,23 @@ function weightedSurnameIndex(rng: () => number): number {
   return SURNAME_WEIGHTS.length - 1;
 }
 
-export function rollResidentName(state: GameState, rng: () => number, gender: Gender): string {
+function rollNorthernDefectorName(state: GameState, rng: () => number): string {
+  const nameStart = Math.floor(rng() * NORTHERN_DEFECTOR_NAMES.length);
+  const usedNames = new Set(state.residents.map(resident => resident.name));
+  for (let offset = 0; offset < NORTHERN_DEFECTOR_NAMES.length; offset++) {
+    const name = NORTHERN_DEFECTOR_NAMES[(nameStart + offset) % NORTHERN_DEFECTOR_NAMES.length];
+    if (!usedNames.has(name)) return name;
+  }
+  return NORTHERN_DEFECTOR_NAMES[nameStart];
+}
+
+export function rollResidentName(
+  state: GameState,
+  rng: () => number,
+  gender: Gender,
+  origin?: string,
+): string {
+  if (isNorthernDefectorOrigin(origin)) return rollNorthernDefectorName(state, rng);
   const givenNames = gender === 'female' ? FEMALE_GIVEN_NAMES : MALE_GIVEN_NAMES;
   const surnameStart = weightedSurnameIndex(rng);
   const givenStart = Math.floor(rng() * givenNames.length);
@@ -123,15 +144,20 @@ function residentSpawnPoint(
   return { x: Math.floor(state.map[0].length / 2), y: Math.floor(state.map.length / 2) };
 }
 
-export function createResident(state: GameState, rng: () => number, job: JobId = 'idle'): Resident {
+export function createResident(
+  state: GameState,
+  rng: () => number,
+  job: JobId = 'idle',
+  origin?: string,
+): Resident {
   const gender = rollResidentGender(rng);
-  const name = rollResidentName(state, rng, gender);
+  const name = rollResidentName(state, rng, gender, origin);
   // 마을 중심지 주변에서 출발한다. 중심지 자체는 solid footprint라 주민을 올려두지 않는다.
   const center = state.buildings.find(b => b.type === 'center');
   const cx = center ? center.x : Math.floor(state.map[0].length / 2);
   const cy = center ? center.y : Math.floor(state.map.length / 2);
   const spawn = residentSpawnPoint(state, rng, cx, cy);
-  return {
+  const resident: Resident = {
     id: state.nextResidentId++,
     name,
     age: 16 + Math.floor(rng() * 34),
@@ -160,6 +186,8 @@ export function createResident(state: GameState, rng: () => number, job: JobId =
     haulTask: null,
     manualOrder: null,
   };
+  if (origin) resident.origin = origin;
+  return resident;
 }
 
 export function livingResidents(state: GameState): Resident[] {
@@ -233,7 +261,7 @@ export function reconcileResidentHomes(state: GameState, rng: () => number): voi
 }
 
 export function countJob(state: GameState, job: JobId): number {
-  return state.residents.filter(r => r.alive && r.job === job).length;
+  return state.residents.filter(r => r.alive && r.job === job && canResidentTakeJob(r, job)).length;
 }
 
 export function skillOf(r: Resident): number {
@@ -260,11 +288,18 @@ export function killResident(
 ): void {
   if (!r.alive) return;
   returnResidentCart(state, r);
+  const horseLost = releaseResidentMount(state, r.id, combatDeath);
   r.alive = false;
   r.health = 0;
   r.homeBuildingId = null;
   r.task = '사망';
   state.totalDeaths++;
+  addCorpse(state, r, cause); // 모든 죽음은 시신을 남기고, 시신은 장례를 기다린다
+  // 사별 — 남은 배우자는 홀몸이 된다 (재혼 가능)
+  if (r.spouseId != null) {
+    const spouse = state.residents.find(other => other.id === r.spouseId);
+    if (spouse) spouse.spouseId = null;
+  }
   if (getSeason(state.day) === 'winter') state.winterDeaths++;
   if (starvation) state.starvationDeathsThisYear++;
   state.lastDeathCause = combatDeath
@@ -278,6 +313,7 @@ export function killResident(
           : 'other';
   if (combatDeath) {
     addLog(state, `${r.name}이(가) 전투 중 전사했습니다. (${cause})`, 'raid', true);
+    if (horseLost) addLog(state, '기수가 쓰러지는 과정에서 군마 한 필도 잃었습니다.', 'bad', true);
   } else if (cause === '호환') {
     addLog(state, `${r.name}이(가) 호환을 당해 목숨을 잃었습니다.`, 'bad', true);
   } else if (cause === '늑대 습격') {
@@ -285,9 +321,10 @@ export function killResident(
   } else {
     addLog(state, `${r.name}이(가) ${cause}(으)로 세상을 떠났습니다.`, 'bad', true);
   }
-  // 이웃의 죽음은 마을 전체의 사기를 깎는다
+  // 이웃의 죽음은 마을 전체의 사기를 깎는다 — 노승의 재(齋)가 있으면 슬픔이 덜하다
+  const griefLoss = hasResidentMonk(state) ? CONFIG.satisfaction.monkGriefRelief : 6;
   for (const other of state.residents) {
-    if (other.alive) other.morale = Math.max(0, other.morale - 6);
+    if (other.alive) other.morale = Math.max(0, other.morale - griefLoss);
   }
 }
 
@@ -300,11 +337,12 @@ export function updateResidentNeeds(
   clothesCoverage: number, // 0~1, 옷 보급률
   dietVarietyScore: number, // 0~1, 그날 먹은 식품군 다양성
   vegetableRatio: number,   // 0~1, 권장 채소 몫 충족률
+  excludedResidentIds: ReadonlySet<number> = new Set(),
 ): void {
   const cfg = CONFIG.needs;
   const hcfg = CONFIG.health;
   const season = getSeason(state.day);
-  const living = livingResidents(state);
+  const living = livingResidents(state).filter(resident => !excludedResidentIds.has(resident.id));
   reconcileResidentHomes(state, rng);
 
   for (const r of living) {
@@ -388,19 +426,10 @@ export function updateResidentNeeds(
   reconcileResidentHomes(state, rng);
 }
 
-// 사기: 식량/추위/장터 상태에 따라 목표치로 수렴
-export function updateMorale(
-  state: GameState,
-  foodOk: boolean,
-  warmthAvg: number,
-  hasMarket: boolean,
-  dietVarietyScore = 1,
-): void {
-  let target = 50;
-  target += foodOk ? 10 : -18;
-  target += warmthAvg > 60 ? 8 : warmthAvg < 35 ? -12 : 0;
-  target += hasMarket ? 5 : 0;
-  if (dietVarietyScore < 0.5) target -= CONFIG.needs.monotonyMoralePenalty;
+// 사기: 성분 기반 목표치로 수렴 — 티어가 오를수록 기대 항목이 늘어난다 (morale.ts)
+export function updateMorale(state: GameState, inputs: MoraleInputs): void {
+  state.moraleFactors = moraleBreakdown(state, inputs); // UI(민심 내역) 스냅숏
+  const target = moraleTarget(state, inputs);
   for (const r of livingResidents(state)) {
     const diff = target - r.morale;
     r.morale = Math.max(0, Math.min(100, r.morale + Math.sign(diff) * Math.min(4, Math.abs(diff))));

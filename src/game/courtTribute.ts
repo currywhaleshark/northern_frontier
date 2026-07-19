@@ -6,6 +6,7 @@ import { RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
 import { makeRng } from './map';
 import { rankEffects } from './promotion';
+import { RESOURCE_DEFS } from './resourceCatalog';
 import { lowerSuspicion } from './suspicion';
 import { getSeason, getYear } from './seasons';
 import {
@@ -45,6 +46,15 @@ export function tributeItemsLabel(items: CourtTribute['items']): string {
 
 export function canPayTribute(state: GameState, tribute: CourtTribute): boolean {
   return tributeReserveRatio(state, tribute) >= 1;
+}
+
+// 은 대납 비용 — 요구 품목의 교역 가치 총합을 은 시세로 환산하고 웃돈을 얹는다
+export function tributeSilverCost(tribute: CourtTribute): number {
+  const totalValue = Object.entries(tribute.items).reduce(
+    (sum, [res, amt]) => sum + (amt ?? 0) * RESOURCE_DEFS[res as ResourceId].tradeBaseValue,
+    0,
+  );
+  return Math.max(1, Math.ceil(totalValue * CONFIG.tribute.silverPayMarkup / RESOURCE_DEFS.silver.tradeBaseValue));
 }
 
 // 봄 첫날: 올해 세공 공지
@@ -98,6 +108,14 @@ export function openCourtTributeChoice(state: GameState): void {
           : preparedRatio >= 1 ? '전량 납부가 준비되었습니다' : undefined,
       },
       {
+        id: 'pay-silver',
+        label: '은으로 대납한다',
+        desc: `은 ${tributeSilverCost(tribute)}을 한 번에 치릅니다. 명성 +${t.repPaid + t.silverPayRepBonus}, ` +
+          '은까지 바치는 성실함에 조정의 의심이 깊이 씻깁니다.',
+        disabled: (state.resources.silver ?? 0) < tributeSilverCost(tribute),
+        disabledReason: (state.resources.silver ?? 0) < tributeSilverCost(tribute) ? '은이 부족합니다' : undefined,
+      },
+      {
         id: 'refuse',
         label: '올해는 바치지 못한다',
         desc: `명성 -${repLoss}, 위협 +${t.threatFail}. 조정의 눈 밖에 나고 국경이 험악해집니다.`,
@@ -130,6 +148,19 @@ export function resolveCourtTribute(state: GameState, optionId: string): void {
   const t = CONFIG.tribute;
   if (optionId === 'pay') optionId = 'pay-full';
   tribute.resolved = true;
+
+  if (optionId === 'pay-silver' && (state.resources.silver ?? 0) >= tributeSilverCost(tribute)) {
+    state.resources.silver -= tributeSilverCost(tribute);
+    releaseTributeReserve(state);
+    tribute.paid = true;
+    state.tributeFailStreak = 0;
+    state.tributePaidStreak += 1;
+    state.resources.reputation = Math.min(100, state.resources.reputation + t.repPaid + t.silverPayRepBonus);
+    lowerSuspicion(state, CONFIG.suspicion.tributeDecay * t.silverPaySuspicionDecayMult);
+    addLog(state, '세공을 은으로 대납했습니다. 사자는 은궤의 무게를 달아 보고는 흡족히 돌아갔습니다.', 'good', true);
+    grantFullTributeReward(state, tribute);
+    return;
+  }
 
   if (optionId === 'pay-full' && canPayTribute(state, tribute)) {
     consumeTributeReserve(state, tribute);
