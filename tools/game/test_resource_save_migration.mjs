@@ -495,12 +495,20 @@ function prepareFormationTestCombatants(state) {
   flanker.zoneId = 'wall';
   flanker.rearAssault = true;
   flanker.engagementsInZone = 1;
+  flanker.aiState = 'committingReserve';
+  flanker.aiStateChangedRound = 3;
+  flanker.intentLockedUntilRound = 5;
   assert.equal(tactical.setTacticalCommand(rearReserveSave, spear.id, 'reinforceRear'), null);
   assert.equal(saveLoad.saveGame(rearReserveSave), true);
   const loaded = saveLoad.loadGame();
   const loadedSpear = loaded?.tacticalBattle?.defenderGroups.find(group => group.id === spear.id);
   assert.equal(loadedSpear?.command, 'reinforceRear');
   assert.equal(loadedSpear?.commandSource, 'player');
+  const loadedFlanker = loaded?.tacticalBattle?.raiderGroups.find(group => group.id === flanker.id);
+  assert.equal(loadedFlanker?.aiState, 'committingReserve');
+  assert.equal(loadedFlanker?.aiStateChangedRound, 3);
+  assert.equal(loadedFlanker?.intentLockedUntilRound, 5,
+    'doctrine intent locks survive a tactical save round-trip');
 }
 
 {

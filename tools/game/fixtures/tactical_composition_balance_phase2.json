@@ -1,0 +1,199 @@
+{
+  "conditions": {
+    "samplesPerComposition": 200,
+    "seedBase": 2026071900,
+    "factionName": "조정 토벌군",
+    "power": 154,
+    "warned": true,
+    "siege": true,
+    "season": "winter",
+    "weather": "clear",
+    "prepPoints": "auto",
+    "cannonEmplacements": 0,
+    "enemyFlankRoute": "none",
+    "defenders": {
+      "muskets": 3,
+      "bows": 3,
+      "spears": 4,
+      "unarmedMilitia": 1,
+      "watchmen": 2,
+      "hunters": 3,
+      "civilians": 6
+    }
+  },
+  "summaries": {
+    "cavalryWing": {
+      "label": "관군 기병익대",
+      "doctrine": "shockBreakthrough",
+      "composition": "court-cavalry-wing",
+      "artillery": false,
+      "battles": 200,
+      "outcomes": {
+        "partialLoss": 200
+      },
+      "defenseSuccessRate": 0,
+      "partialLossRate": 1,
+      "wallBreachRate": 0,
+      "centerBreachRate": 0,
+      "approachBreachRate": 1,
+      "storehouseBreachRate": 0,
+      "anyZoneBreachRate": 1,
+      "averageRounds": 5,
+      "averageInitialEnemyPower": 154,
+      "averageInitialEnemyCount": 39,
+      "averageFriendlyWounded": 5.12,
+      "averageFriendlyKilled": 0.205,
+      "averageFriendlyCasualties": 5.325,
+      "averageEnemyKilled": 7.805,
+      "averagePeakWallPressure": 60.430893715253525,
+      "averageBuildingsDamaged": 0,
+      "averageLootUnits": 0
+    },
+    "siegeBattery": {
+      "label": "정규 공성대",
+      "doctrine": "shockBreakthrough",
+      "composition": "court-siege-battery",
+      "artillery": true,
+      "battles": 200,
+      "outcomes": {
+        "partialLoss": 200
+      },
+      "defenseSuccessRate": 0,
+      "partialLossRate": 1,
+      "wallBreachRate": 1,
+      "centerBreachRate": 0,
+      "approachBreachRate": 1,
+      "storehouseBreachRate": 0,
+      "anyZoneBreachRate": 1,
+      "averageRounds": 5,
+      "averageInitialEnemyPower": 154,
+      "averageInitialEnemyCount": 39,
+      "averageFriendlyWounded": 2.86,
+      "averageFriendlyKilled": 0.005,
+      "averageFriendlyCasualties": 2.865,
+      "averageEnemyKilled": 9.88,
+      "averagePeakWallPressure": 100,
+      "averageBuildingsDamaged": 1,
+      "averageLootUnits": 0
+    },
+    "legacyPunitiveForce": {
+      "label": "기존 조정 토벌군",
+      "doctrine": "missileSuppression",
+      "composition": "court-legacy-punitive-force",
+      "artillery": true,
+      "battles": 200,
+      "outcomes": {
+        "partialLoss": 200
+      },
+      "defenseSuccessRate": 0,
+      "partialLossRate": 1,
+      "wallBreachRate": 0,
+      "centerBreachRate": 0,
+      "approachBreachRate": 1,
+      "storehouseBreachRate": 0,
+      "anyZoneBreachRate": 1,
+      "averageRounds": 5,
+      "averageInitialEnemyPower": 154,
+      "averageInitialEnemyCount": 39,
+      "averageFriendlyWounded": 3.155,
+      "averageFriendlyKilled": 0.13,
+      "averageFriendlyCasualties": 3.285,
+      "averageEnemyKilled": 5.185,
+      "averagePeakWallPressure": 48.22590319152889,
+      "averageBuildingsDamaged": 0,
+      "averageLootUnits": 0
+    },
+    "threeArmies": {
+      "label": "삼수진",
+      "doctrine": "missileSuppression",
+      "composition": "court-three-armies",
+      "artillery": false,
+      "battles": 200,
+      "outcomes": {
+        "partialLoss": 200
+      },
+      "defenseSuccessRate": 0,
+      "partialLossRate": 1,
+      "wallBreachRate": 0,
+      "centerBreachRate": 0,
+      "approachBreachRate": 1,
+      "storehouseBreachRate": 0,
+      "anyZoneBreachRate": 1,
+      "averageRounds": 5,
+      "averageInitialEnemyPower": 154,
+      "averageInitialEnemyCount": 39,
+      "averageFriendlyWounded": 2.205,
+      "averageFriendlyKilled": 0.075,
+      "averageFriendlyCasualties": 2.28,
+      "averageEnemyKilled": 5.375,
+      "averagePeakWallPressure": 39.79196518239017,
+      "averageBuildingsDamaged": 0,
+      "averageLootUnits": 0
+    },
+    "firearmColumn": {
+      "label": "포수 전진대",
+      "doctrine": "missileSuppression",
+      "composition": "court-firearm-column",
+      "artillery": false,
+      "battles": 200,
+      "outcomes": {
+        "partialLoss": 200
+      },
+      "defenseSuccessRate": 0,
+      "partialLossRate": 1,
+      "wallBreachRate": 0,
+      "centerBreachRate": 0,
+      "approachBreachRate": 1,
+      "storehouseBreachRate": 0,
+      "anyZoneBreachRate": 1,
+      "averageRounds": 5,
+      "averageInitialEnemyPower": 154,
+      "averageInitialEnemyCount": 39,
+      "averageFriendlyWounded": 3.15,
+      "averageFriendlyKilled": 0.13,
+      "averageFriendlyCasualties": 3.28,
+      "averageEnemyKilled": 4.61,
+      "averagePeakWallPressure": 36.614616101389394,
+      "averageBuildingsDamaged": 0,
+      "averageLootUnits": 0
+    }
+  },
+  "comparisons": {
+    "cavalryWingVsSiegeBatteryMatchedDoctrine": {
+      "pairedOutcomes": {
+        "candidateBetter": 0,
+        "equal": 200,
+        "candidateWorse": 0
+      },
+      "defenseSuccessRateDelta": 0,
+      "wallBreachRateDelta": -1,
+      "centerBreachRateDelta": 0,
+      "approachBreachRateDelta": 0,
+      "anyZoneBreachRateDelta": 0,
+      "averagePeakWallPressureDelta": -39.569106284746475,
+      "averageFriendlyCasualtiesDelta": 2.46,
+      "averageEnemyKilledDelta": -2.075000000000001,
+      "averageRoundsDelta": 0
+    },
+    "cavalryWingVsLegacyPunitiveForce": {
+      "pairedOutcomes": {
+        "candidateBetter": 0,
+        "equal": 200,
+        "candidateWorse": 0
+      },
+      "defenseSuccessRateDelta": 0,
+      "wallBreachRateDelta": 0,
+      "centerBreachRateDelta": 0,
+      "approachBreachRateDelta": 0,
+      "anyZoneBreachRateDelta": 0,
+      "averagePeakWallPressureDelta": 12.204990523724632,
+      "averageFriendlyCasualtiesDelta": 2.04,
+      "averageEnemyKilledDelta": 2.62,
+      "averageRoundsDelta": 0
+    }
+  },
+  "gates": {
+    "compositionDefenseSuccessSpread": 0,
+    "finalDraftWithinThirtyPercentagePoints": true
+  }
+}

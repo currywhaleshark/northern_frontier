@@ -2,6 +2,7 @@ import { tacticalGroupCapabilities, tacticalGroupPower } from './combatCapabilit
 import { CONFIG } from './config';
 import { withJosa } from './josa';
 import { tacticalDefenderShotCounts, tacticalRaiderShotCounts } from './tacticalCore';
+import { tacticalUnitProfileOrUndefined } from './tacticalUnits';
 import {
   canTargetLine,
   tacticalContactLine,
@@ -11,6 +12,7 @@ import {
 } from './tacticalTargeting';
 import type {
   ResourceId,
+  EnemyDoctrineId,
   TacticalAnimationEvent,
   TacticalBattleZone,
   TacticalCommandId,
@@ -33,6 +35,133 @@ function activeDefenderCount(group: TacticalDefenderGroup): number {
 
 function activeRaiderCount(group: TacticalRaiderGroup): number {
   return Math.max(0, group.count - group.killed);
+}
+
+function defenderWeaponShare(
+  defenders: ReadonlyArray<TacticalDefenderGroup>,
+  weapon: TacticalDefenderGroup['weapon'],
+): number {
+  const total = defenders.reduce((sum, defender) => sum + activeDefenderCount(defender), 0);
+  if (total <= 0) return 0;
+  return defenders.reduce((sum, defender) =>
+    sum + (defender.weapon === weapon ? activeDefenderCount(defender) : 0), 0) / total;
+}
+
+export function tacticalAttackerMatchupMultiplier(
+  attacker: TacticalRaiderGroup,
+  defenders: ReadonlyArray<TacticalDefenderGroup>,
+  zone: TacticalBattleZone,
+  direction: 'frontal' | 'rear',
+): number {
+  const profile = tacticalUnitProfileOrUndefined(attacker.unitType);
+  if (!profile) return 1;
+  const ranged = tacticalTargetingRole(attacker) !== 'melee';
+  let multiplier = ranged ? profile.rangedMultiplier : profile.meleeMultiplier;
+  const firstContactShock = profile.tags.includes('shock') && attacker.engagementsInZone <= 0 &&
+    direction === 'frontal';
+  if (firstContactShock) multiplier *= profile.chargeMultiplier * CONFIG.tacticalBattle.unitMatchups.firstContactShock;
+  if (profile.tags.includes('mounted') && profile.tags.includes('shock')) {
+    if (zone.kind === 'wall') multiplier *= CONFIG.tacticalBattle.unitMatchups.mountedShockVsWall;
+    if (defenderWeaponShare(defenders, 'spear') > 0) {
+      multiplier *= CONFIG.tacticalBattle.unitMatchups.mountedShockVsSpear;
+    }
+  }
+  if (attacker.aiState === 'forming') multiplier *= CONFIG.tacticalBattle.unitMatchups.formingPower;
+  else if (attacker.aiState === 'probing' && ranged) {
+    multiplier *= CONFIG.tacticalBattle.unitMatchups.probingRangedPower;
+  } else if (attacker.aiState === 'withdrawing') {
+    multiplier *= CONFIG.tacticalBattle.unitMatchups.withdrawingPower;
+  } else if (attacker.aiState === 'committingReserve') {
+    multiplier *= CONFIG.tacticalBattle.unitMatchups.reserveCommitPower;
+  }
+  return multiplier;
+}
+
+export function tacticalRaiderWeatherMultiplier(
+  attacker: TacticalRaiderGroup,
+  weather: WeatherId,
+): number {
+  const profile = tacticalUnitProfileOrUndefined(attacker.unitType);
+  if (!profile || (!profile.tags.includes('ranged') && !profile.tags.includes('firearm') &&
+      !profile.tags.includes('artillery'))) return 1;
+  if (profile.tags.includes('firearm')) {
+    if (weather === 'rain') return CONFIG.tacticalBattle.unitMatchups.firearmWeather.rain;
+    if (weather === 'heavySnow') return CONFIG.tacticalBattle.unitMatchups.firearmWeather.heavySnow;
+    if (weather === 'blizzard') return CONFIG.tacticalBattle.unitMatchups.firearmWeather.blizzard;
+    return 1;
+  }
+  if (weather === 'heavySnow') return CONFIG.tacticalBattle.unitMatchups.rangedWeather.heavySnow;
+  if (weather === 'blizzard') return CONFIG.tacticalBattle.unitMatchups.rangedWeather.blizzard;
+  return 1;
+}
+
+export function tacticalDefenderMatchupMultiplier(
+  defender: TacticalDefenderGroup,
+  attackers: ReadonlyArray<TacticalRaiderGroup>,
+  direction: 'frontal' | 'rear',
+): number {
+  const profiles = attackers
+    .filter(attacker => !attacker.confused && activeRaiderCount(attacker) > 0)
+    .map(attacker => tacticalUnitProfileOrUndefined(attacker.unitType))
+    .filter((profile): profile is NonNullable<typeof profile> => profile != null);
+  if (profiles.length === 0) return 1;
+  let multiplier = 1;
+  if (direction === 'frontal' && defender.weapon === 'spear' &&
+      profiles.some(profile => profile.tags.includes('mounted'))) {
+    multiplier *= CONFIG.tacticalBattle.unitMatchups.spearVsMountedDefense;
+  }
+  if (profiles.some(profile => profile.tags.includes('shielded'))) {
+    if (defender.weapon === 'hornBow') multiplier *= CONFIG.tacticalBattle.unitMatchups.bowVsShieldedDefense;
+    if (defender.weapon === 'musket') multiplier *= CONFIG.tacticalBattle.unitMatchups.firearmVsShieldedDefense;
+  }
+  return multiplier;
+}
+
+export function tacticalRaiderLossMatchupMultiplier(
+  attacker: TacticalRaiderGroup,
+  defenders: ReadonlyArray<TacticalDefenderGroup>,
+  direction: 'frontal' | 'rear',
+): number {
+  const profile = tacticalUnitProfileOrUndefined(attacker.unitType);
+  if (!profile) return 1;
+  let multiplier = 1 / Math.max(0.1, profile.protectionMultiplier);
+  const bowShare = defenderWeaponShare(defenders, 'hornBow');
+  const musketShare = defenderWeaponShare(defenders, 'musket');
+  const spearShare = defenderWeaponShare(defenders, 'spear');
+  if (profile.tags.includes('shielded')) {
+    multiplier *= 1 + bowShare * (CONFIG.tacticalBattle.unitMatchups.bowVsShieldedDefense - 1) +
+      musketShare * (CONFIG.tacticalBattle.unitMatchups.firearmVsShieldedDefense - 1);
+  }
+  if (profile.tags.includes('mounted')) {
+    multiplier *= 1 + spearShare * (CONFIG.tacticalBattle.unitMatchups.spearVsMountedDefense - 1);
+  }
+  if (profile.archetype === 'wallBreaker') {
+    multiplier *= CONFIG.tacticalBattle.unitMatchups.wallBreakerLossScale;
+  }
+  if (direction === 'rear' && (profile.tags.includes('ranged') || profile.tags.includes('artillery'))) {
+    multiplier *= CONFIG.tacticalBattle.unitMatchups.rearRangedLossScale;
+  }
+  if (attacker.aiState === 'withdrawing') {
+    multiplier *= CONFIG.tacticalBattle.unitMatchups.withdrawingLossScale;
+  }
+  return Math.max(0.35, multiplier);
+}
+
+export function tacticalUnitWallPressure(
+  attacker: TacticalRaiderGroup,
+  doctrine?: EnemyDoctrineId,
+  wallBreakerEffectScale?: number,
+): number {
+  if (attacker.confused || activeRaiderCount(attacker) <= 0) return 0;
+  const profile = tacticalUnitProfileOrUndefined(attacker.unitType);
+  if (!profile) return Math.max(0, attacker.wallPressureBonus ?? 0);
+  const activeShare = attacker.count > 0 ? activeRaiderCount(attacker) / attacker.count : 0;
+  let pressure = profile.wallPressure * activeShare * clamp(attacker.morale / 100, 0, 1);
+  if (profile.archetype === 'wallBreaker' && wallBreakerEffectScale != null) {
+    pressure *= clamp(wallBreakerEffectScale, 0, 1);
+  }
+  if (doctrine === 'breachAndStorm' && profile.tags.includes('siege')) pressure *= 1.2;
+  return pressure;
 }
 
 function defenderVolleyCaption(shots: { arrows?: number; muskets?: number }): string {
@@ -535,6 +664,8 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     (sum, group) => sum + (group.confused
       ? 0
       : group.power * (group.morale / 100) * (group.combatMultiplier ?? 1) *
+        tacticalAttackerMatchupMultiplier(group, defenders, zone, input.direction) *
+        tacticalRaiderWeatherMultiplier(group, input.weather) *
         (tacticalTargetingRole(group) === 'melee' ? 1 : input.rangedEfficiency ?? 1)),
     0,
   );
@@ -545,7 +676,8 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     const readyPower = defender.weapon === 'musket'
       ? tacticalGroupPower(defender, active)
       : defender.power * survivingShare;
-    const powerMultiplier = input.defenderPowerMultiplier?.(defender) ?? commandPowerMultiplier(input, defender);
+    const powerMultiplier = (input.defenderPowerMultiplier?.(defender) ?? commandPowerMultiplier(input, defender)) *
+      tacticalDefenderMatchupMultiplier(defender, attackers, input.direction);
     return sum + readyPower * powerMultiplier;
   }, 0);
   defensePower *= 1 + zone.defenseBonus / 100;
@@ -694,6 +826,8 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     const targeting = canTargetLine(attacker, defenderRiskEntries[targetIndex].defender.line, enemyTargetingContext);
     if (!targeting.allowed) continue;
     const effectivePower = attacker.power * (attacker.morale / 100) * (attacker.combatMultiplier ?? 1) *
+      tacticalAttackerMatchupMultiplier(attacker, defenders, zone, input.direction) *
+      tacticalRaiderWeatherMultiplier(attacker, input.weather) *
       (tacticalTargetingRole(attacker) === 'melee' ? 1 : input.rangedEfficiency ?? 1);
     enemyTargetDemands[targetIndex] += rawEnemyPower > 0
       ? effectivePower * targeting.efficiency * tacticalTargetingConcentration(attacker) / rawEnemyPower
@@ -760,7 +894,8 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
         (1 - rearExposure.unguardedAttackerLossMultiplier) * rearGuardStrength
       : 1;
     const groupLossRate = clamp(
-      raiderLossRate * (attacker.lossResistance ?? 1) * rearAssaultResistance,
+      raiderLossRate * (attacker.lossResistance ?? 1) * rearAssaultResistance *
+        tacticalRaiderLossMatchupMultiplier(attacker, defenders, input.direction),
       0.005,
       0.24,
     );
@@ -782,7 +917,8 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     const readyPower = defender.weapon === 'musket'
       ? tacticalGroupPower(defender, active)
       : defender.power * survivingShare;
-    return readyPower * (input.defenderPowerMultiplier?.(defender) ?? commandPowerMultiplier(input, defender));
+    return readyPower * (input.defenderPowerMultiplier?.(defender) ?? commandPowerMultiplier(input, defender)) *
+      tacticalDefenderMatchupMultiplier(defender, attackers, input.direction);
   });
   const totalFriendlyPower = defenderEffectivePowers.reduce((sum, power) => sum + power, 0);
   for (let defenderIndex = 0; defenderIndex < combatDefenders.length; defenderIndex += 1) {
@@ -876,6 +1012,8 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     (sum, group) => sum + (group.confused || activeRaiderCount(group) <= 0
       ? 0
       : group.power * (group.morale / 100) * (group.combatMultiplier ?? 1) *
+        tacticalAttackerMatchupMultiplier(group, defenders, zone, input.direction) *
+        tacticalRaiderWeatherMultiplier(group, input.weather) *
         (tacticalTargetingRole(group) === 'melee' ? 1 : input.rangedEfficiency ?? 1)),
     0,
   );
@@ -883,6 +1021,8 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     (sum, group) => sum + (group.confused || retreatingAttackerIdSet.has(group.id) || activeRaiderCount(group) <= 0
       ? 0
       : group.power * (group.morale / 100) * (group.combatMultiplier ?? 1) *
+        tacticalAttackerMatchupMultiplier(group, defenders, zone, input.direction) *
+        tacticalRaiderWeatherMultiplier(group, input.weather) *
         (tacticalTargetingRole(group) === 'melee' ? 1 : input.rangedEfficiency ?? 1)),
     0,
   );
@@ -1041,6 +1181,8 @@ export interface DefenseZoneConsequencesInput {
   originalPower: number;
   availableLoot: Partial<Record<ResourceId, number>>;
   fireArrowEffectScale?: number;
+  doctrine?: EnemyDoctrineId;
+  wallBreakerEffectScale?: number;
   rng: () => number;
 }
 
@@ -1077,7 +1219,7 @@ export function applyDefenseZoneConsequences(
   let pressureDelta = 15 + pressureEnemyShare * 32 - pressureDefenseShare * 12;
   if (zone.id === 'wall') {
     pressureDelta += attackers.reduce((sum, attacker) =>
-      sum + (attacker.confused ? 0 : attacker.wallPressureBonus ?? 0), 0);
+      sum + tacticalUnitWallPressure(attacker, input.doctrine, input.wallBreakerEffectScale), 0);
   }
   pressureDelta -= commandShare('hold') * 8;
   pressureDelta -= commandShare('charge') * 6;

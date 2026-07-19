@@ -2,7 +2,8 @@ import { CONFIG } from './config';
 import {
   chooseTacticalCompositionTemplate, tacticalCompositionTemplate, tacticalEnemyFactionId,
 } from './tacticalCompositions';
-import { tacticalUnitProfile } from './tacticalUnits';
+import { tacticalDoctrineStateSignal } from './tacticalDoctrine';
+import { tacticalUnitProfileOrUndefined } from './tacticalUnits';
 import type {
   BanditLairDefensePlan, BanditLairDoctrineId, EnemyDoctrineId, EnemyObjectiveId, EnemyPlan, EnemyStratagemId,
   EnemyCounterBreakdown, EnemyStratagemState, ForeignSite, GameState, PreparationActionId, TacticalFlankPlan,
@@ -602,7 +603,7 @@ export function enemyCompositionIntelView(
   const template = tacticalCompositionTemplate(plan?.compositionTemplateId);
   const visibleGroups = battle.raiderGroups.filter(group => compositionRevealed || group.revealed);
   const groups = visibleGroups.map(group => {
-    const profile = group.unitType ? tacticalUnitProfile(group.unitType) : undefined;
+    const profile = tacticalUnitProfileOrUndefined(group.unitType);
     const exact = compositionRevealed && group.revealed && profile != null;
     return {
       groupId: group.id,
@@ -634,8 +635,49 @@ export interface EnemyPlanSummaryView {
     counter?: string;
   };
   composition: EnemyCompositionIntelView;
+  intentSignals: EnemyDoctrineIntentView;
   revealedStratagems: ReturnType<typeof enemyStratagemDefinition>[];
   hiddenStratagemCount: number;
+}
+
+export interface EnemyDoctrineIntentGroupView {
+  groupId: string;
+  label: string;
+  state: import('./types').TacticalAiState;
+  intent: TacticalBattle['raiderGroups'][number]['intent'];
+  signal: string;
+}
+
+export interface EnemyDoctrineIntentView {
+  doctrineRevealed: boolean;
+  doctrineId?: EnemyDoctrineId;
+  doctrineLabel: string;
+  groups: EnemyDoctrineIntentGroupView[];
+}
+
+export function enemyDoctrineIntentView(
+  battle: Pick<TacticalBattle, 'enemyPlan' | 'raiderGroups'>,
+): EnemyDoctrineIntentView {
+  const doctrineRevealed = battle.enemyPlan?.doctrineRevealed === true && battle.enemyPlan.doctrine != null;
+  const groups = battle.raiderGroups.filter(group => group.revealed).map(group => {
+    const state = group.aiState ?? 'engaging';
+    const intent = group.intent ?? 'advance';
+    return {
+      groupId: group.id,
+      label: group.label,
+      state,
+      intent,
+      signal: tacticalDoctrineStateSignal(state, intent),
+    };
+  });
+  return {
+    doctrineRevealed,
+    ...(doctrineRevealed ? { doctrineId: battle.enemyPlan!.doctrine } : {}),
+    doctrineLabel: doctrineRevealed
+      ? DOCTRINE_DETAILS[battle.enemyPlan!.doctrine!].label
+      : '미확인 교리',
+    groups,
+  };
 }
 
 export function enemyPlanSummaryView(
@@ -665,6 +707,7 @@ export function enemyPlanSummaryView(
       } : { label: '미확인' }),
     },
     composition: enemyCompositionIntelView(battle),
+    intentSignals: enemyDoctrineIntentView(battle),
     revealedStratagems,
     hiddenStratagemCount: Math.max(0, (plan?.stratagems.length ?? 0) - revealedStratagems.length),
   };

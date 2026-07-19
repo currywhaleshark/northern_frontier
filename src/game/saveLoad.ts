@@ -37,7 +37,7 @@ import {
 import type {
   CombatWeaponId, CourtTribute, DefenderGroupKind, FermentBatch, GameState, Gender, Resident, ResourceId,
   PreparationActionId, RaiderUnitType, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
-  TacticalFormationLine, TacticalPreparationEffect, TacticalRaiderGroup, TacticalRoundReport,
+  TacticalAiState, TacticalFormationLine, TacticalPreparationEffect, TacticalRaiderGroup, TacticalRoundReport,
 } from './types';
 
 export { CURRENT_SCHEMA_VERSION } from './saveSchema';
@@ -51,6 +51,10 @@ function slotKey(slot: number): string {
 }
 
 const RESOURCE_ID_SET = new Set<string>(RESOURCE_IDS);
+const TACTICAL_AI_STATES = new Set<TacticalAiState>([
+  'forming', 'probing', 'engaging', 'withdrawing', 'committingReserve',
+  'routeTransit', 'routeEngagement', 'exiting',
+]);
 
 type RawSave = Record<string, unknown>;
 
@@ -573,6 +577,15 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
         ? Number(group.estimatedPower)
         : undefined,
       morale: Math.max(0, Math.min(100, Number(group.morale) || 0)),
+      aiState: TACTICAL_AI_STATES.has(group.aiState as TacticalAiState)
+        ? group.aiState as TacticalAiState
+        : undefined,
+      aiStateChangedRound: Number.isFinite(group.aiStateChangedRound)
+        ? Math.max(1, Math.floor(Number(group.aiStateChangedRound)))
+        : undefined,
+      intentLockedUntilRound: Number.isFinite(group.intentLockedUntilRound)
+        ? Math.max(1, Math.floor(Number(group.intentLockedUntilRound)))
+        : undefined,
       engagementsInZone: Math.max(0, Math.floor(Number(group.engagementsInZone) || 0)),
       flankPlan: group.flankPlan === 'rearAssault' || group.flankPlan === 'breakthrough' ? group.flankPlan : undefined,
       flankPlanRevealed: group.flankPlanRevealed === true,

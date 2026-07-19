@@ -727,6 +727,26 @@ export const CONFIG = {
       rehideEncirclementMax: 70,
     },
     raiderPowerPerFighter: 4,
+    unitMatchups: {
+      spearVsMountedDefense: 1.15,
+      bowVsShieldedDefense: 0.9,
+      firearmVsShieldedDefense: 1.05,
+      mountedShockVsSpear: 0.86,
+      mountedShockVsWall: 0.76,
+      firstContactShock: 1.16,
+      wallBreakerLossScale: 1.24,
+      rearRangedLossScale: 1.18,
+      probingRangedPower: 1.08,
+      formingPower: 0.72,
+      withdrawingPower: 0.82,
+      withdrawingLossScale: 0.78,
+      reserveCommitPower: 1.15,
+      rangedWeather: { heavySnow: 0.82, blizzard: 0.62 },
+      firearmWeather: { rain: 0.82, heavySnow: 0.72, blizzard: 0.55 },
+    },
+    doctrineAi: {
+      minIntentRounds: 2,
+    },
     formationExposure: {
       ambushed: 0.55,
       frontal: {
@@ -836,7 +856,7 @@ export const CONFIG = {
       },
       effects: {
         rearManeuver: { counteredCombatPenalty: 0.25 },
-        wallBreakers: { wallPressureBonus: 10, lossResistancePenalty: 0.2 },
+        wallBreakers: { wallPressureBonus: 10, lossResistancePenalty: 0.2, powerShare: 0.18 },
         fireArrows: { pressureBonus: 8, buildingDamageChance: 0.35 },
         feint: { powerShift: 0.14, estimatedMainMultiplier: 1.25 },
         nightApproach: { prepPointPenalty: 1, rangedEfficiencyPenalty: 0.3, firstRoundMoraleBonus: 8 },

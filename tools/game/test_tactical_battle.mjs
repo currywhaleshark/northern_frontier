@@ -1077,7 +1077,10 @@ function addBuiltMarker(state, type) {
   assert.equal(battle.enemyPlan.doctrine, 'shockBreakthrough');
   assert.equal(battle.enemyPlan.compositionTemplateId, 'court-siege-battery');
   assert.ok(battle.raiderGroups.every(group => group.revealed && group.morale >= 88));
-  assert.ok(battle.raiderGroups.find(group => group.unitType === 'court-artillery').wallPressureBonus >= 10);
+  assert.ok(tacticalEngagement.tacticalUnitWallPressure(
+    battle.raiderGroups.find(group => group.unitType === 'court-artillery'),
+    battle.enemyPlan.doctrine,
+  ) > 0, 'artillery wall pressure is derived from its static unit profile');
 }
 
 {
@@ -1115,9 +1118,9 @@ function addBuiltMarker(state, type) {
 
 {
   const expectedTypes = new Map([
-    ['니마차 우디캐', ['nimacha-hunter', 'nimacha-looter', 'nimacha-spearman']],
+    ['니마차 우디캐', ['shield-infantry', 'nimacha-hunter', 'wall-breaker']],
     ['홀라온 야인', ['holaon-lancer', 'holaon-raider', 'holaon-horse-archer']],
-    ['변경 마적', ['bandit-vanguard', 'bandit-looter', 'bandit-rider']],
+    ['변경 마적', ['shield-infantry', 'wall-breaker', 'bandit-rider']],
   ]);
   for (const [factionName, unitTypes] of expectedTypes) {
     const state = simulation.newGame(2026071311);
