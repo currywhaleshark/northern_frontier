@@ -1,10 +1,12 @@
 import { CONFIG } from './config';
-import { tacticalCompositionTemplate, tacticalEnemyFactionId } from './tacticalCompositions';
+import {
+  chooseTacticalCompositionTemplate, tacticalCompositionTemplate, tacticalEnemyFactionId,
+} from './tacticalCompositions';
 import { tacticalUnitProfile } from './tacticalUnits';
 import type {
   BanditLairDefensePlan, BanditLairDoctrineId, EnemyDoctrineId, EnemyObjectiveId, EnemyPlan, EnemyStratagemId,
   EnemyCounterBreakdown, EnemyStratagemState, ForeignSite, GameState, PreparationActionId, TacticalFlankPlan,
-  TacticalBattle, TacticalEnemyFactionId,
+  TacticalBattle, TacticalEnemyFactionId, TacticalRouteSide,
 } from './types';
 
 type EnemyPlanCreationInput = {
@@ -16,6 +18,12 @@ type EnemyPlanCreationInput = {
   stratagemRoll?: number;
   intelLevel?: number;
   intelRoll?: number;
+  doctrineRoll?: number;
+  compositionRoll?: number;
+  forcedDoctrine?: EnemyDoctrineId;
+  forcedCompositionTemplateId?: string;
+  forcedFlankRoute?: TacticalRouteSide | 'none';
+  maximumCompositionPhase?: 1 | 2 | 8;
   revealed: boolean;
 };
 
@@ -549,20 +557,22 @@ export function enemyPlanWarningLines(plan: EnemyPlan | undefined): string[] {
     ? 2
     : 0);
   if (intelLevel <= 0) return ['적의 접근 방식은 알 수 없습니다.'];
-  const revealed = plan.stratagems.filter(stratagem => stratagem.revealed);
+  const lines: string[] = [];
   if (intelLevel === 1) {
-    const sign = plan.stratagems[0];
-    return sign ? [STRATAGEM_DETAILS[sign.id].warning] : ['적의 움직임에서 뚜렷한 의도를 읽기 어렵습니다.'];
+    return plan.objectiveRevealed
+      ? [`확인된 적의 주된 목적: ${OBJECTIVE_DETAILS[plan.objective].label}`]
+      : ['적의 움직임에서 뚜렷한 의도를 읽기 어렵습니다.'];
   }
-  if (intelLevel === 2) {
-    const lines = revealed.slice(0, 1).map(stratagem => STRATAGEM_DETAILS[stratagem.id].warning);
-    if (lines.length === 0 && plan.objectiveRevealed) lines.push('적의 주된 목적이 정찰로 확인되었습니다.');
-    if (plan.stratagems.length > revealed.length) lines.push('이와 다른 움직임도 감지됩니다.');
-    return lines;
+  if (plan.compositionRevealed) {
+    const composition = tacticalCompositionTemplate(plan.compositionTemplateId);
+    lines.push(composition ? `적 편제는 ${composition.label}입니다.` : '적 편제의 윤곽이 확인되었습니다.');
   }
-  const visible = intelLevel === 3 ? revealed : plan.stratagems;
-  const lines = visible.map(stratagem => STRATAGEM_DETAILS[stratagem.id].warning);
-  if (intelLevel === 3 && plan.stratagems.length > visible.length) lines.push('아직 확인되지 않은 다른 움직임도 있습니다.');
+  if (plan.doctrineRevealed && plan.doctrine) {
+    lines.push(`적은 ${DOCTRINE_DETAILS[plan.doctrine].label} 교리로 움직입니다.`);
+  }
+  const revealed = plan.stratagems.filter(stratagem => stratagem.revealed);
+  lines.push(...revealed.map(stratagem => STRATAGEM_DETAILS[stratagem.id].warning));
+  if (plan.stratagems.length > revealed.length) lines.push('아직 확인되지 않은 다른 움직임도 있습니다.');
   return lines.length > 0 ? lines : ['적의 대열에서 별도의 계책 징후는 보이지 않습니다.'];
 }
 
@@ -670,26 +680,34 @@ export function enemyIntelLevel(input: {
   return clamp(score, 0, 4) as 0 | 1 | 2 | 3 | 4;
 }
 
+export interface InitialEnemyPlanReveals {
+  objective: boolean;
+  composition: boolean;
+  doctrine: boolean;
+  stratagemCount: number;
+}
+
+export function initialEnemyPlanReveals(level: number): InitialEnemyPlanReveals {
+  const intelLevel = clamp(Math.floor(level), 0, 4);
+  return {
+    objective: intelLevel >= 1,
+    composition: intelLevel >= 2,
+    doctrine: intelLevel >= 3,
+    stratagemCount: intelLevel >= 4 ? 1 : 0,
+  };
+}
+
 function applyEnemyPlanIntel(plan: EnemyPlan, level: number, roll: number): EnemyPlan {
   const intelLevel = clamp(Math.floor(level), 0, 4);
+  const reveals = initialEnemyPlanReveals(intelLevel);
   plan.intelLevel = intelLevel as 0 | 1 | 2 | 3 | 4;
-  plan.objectiveRevealed = false;
+  plan.objectiveRevealed = reveals.objective;
+  plan.compositionRevealed = reveals.composition;
+  plan.doctrineRevealed = reveals.doctrine;
   plan.stratagems.forEach(stratagem => { stratagem.revealed = false; });
-  if (intelLevel <= 1) return plan;
-  if (intelLevel === 2) {
-    const options = ['objective', ...plan.stratagems.map((_stratagem, index) => index)] as Array<'objective' | number>;
-    const selected = options[Math.floor(clamp(roll, 0, 0.999999999) * options.length)];
-    if (selected === 'objective') plan.objectiveRevealed = true;
-    else if (selected != null) plan.stratagems[selected].revealed = true;
-    return plan;
-  }
-  plan.objectiveRevealed = true;
-  const revealCount = intelLevel === 3
-    ? Math.max(1, Math.ceil(plan.stratagems.length * 0.67))
-    : plan.stratagems.length;
-  plan.stratagems.slice(0, revealCount).forEach(stratagem => { stratagem.revealed = true; });
-  if (intelLevel === 4 && plan.stratagems.length > 0) {
+  if (reveals.stratagemCount > 0 && plan.stratagems.length > 0) {
     const counterIndex = Math.floor(clamp(roll, 0, 0.999999999) * plan.stratagems.length);
+    plan.stratagems[counterIndex].revealed = true;
     plan.stratagems[counterIndex].counter = {
       ...plan.stratagems[counterIndex].counter,
       intelligence: CONFIG.tacticalBattle.enemyPlan.counterStrength.intelFull,
@@ -750,14 +768,58 @@ function planFromLegacyFlank({ flankPlan = 'breakthrough', revealed = false }: L
   };
 }
 
+function lockEnemyFlankRoute(
+  plan: EnemyPlan,
+  forcedRoute: TacticalRouteSide | 'none' | undefined,
+  roll: number,
+  revealed: boolean,
+): void {
+  if (forcedRoute === 'none') {
+    plan.stratagems = plan.stratagems.filter(stratagem => stratagem.id !== 'rearManeuver');
+    plan.flankRouteSide = undefined;
+    return;
+  }
+  if (forcedRoute && !plan.stratagems.some(stratagem => stratagem.id === 'rearManeuver')) {
+    plan.stratagems.unshift({ id: 'rearManeuver', revealed, counterLevel: 0 });
+    plan.stratagems = plan.stratagems.slice(0, CONFIG.tacticalBattle.enemyPlan.maxStratagems);
+  }
+  plan.flankRouteSide = plan.stratagems.some(stratagem => stratagem.id === 'rearManeuver')
+    ? forcedRoute ?? (clamp(roll, 0, 0.999999999) < 0.5 ? 'left' : 'right')
+    : undefined;
+}
+
 export function createEnemyPlan(input: EnemyPlanCreationInput): EnemyPlan {
   const power = Math.max(0, input.power ?? 0);
   const relation = clamp(input.relation ?? 50, 0, 100);
   const legacyFlankPlan = input.flankRoll < rearManeuverChance(input.factionName)
     ? 'rearAssault'
     : 'breakthrough';
+  const maximumPhase = input.maximumCompositionPhase ?? 1;
+  const eligibleDoctrines = eligibleEnemyDoctrines(input.factionName, maximumPhase);
+  const forcedTemplate = tacticalCompositionTemplate(input.forcedCompositionTemplateId);
+  const forcedTemplateDoctrine = forcedTemplate?.faction === tacticalEnemyFactionId(input.factionName)
+    ? forcedTemplate.doctrines.find(candidate => eligibleDoctrines.includes(candidate))
+    : undefined;
+  const doctrine = input.forcedDoctrine && eligibleDoctrines.includes(input.forcedDoctrine)
+    ? input.forcedDoctrine
+    : forcedTemplateDoctrine ??
+      chooseEnemyDoctrine(input.factionName, input.doctrineRoll ?? input.stratagemRoll ?? 0, maximumPhase);
   if (relation >= CONFIG.tacticalBattle.enemyPlan.objectiveActivationRelation[factionKey(input.factionName)]) {
     const plan = planFromLegacyFlank({ flankPlan: legacyFlankPlan, revealed: input.revealed });
+    const composition = chooseTacticalCompositionTemplate({
+      faction: tacticalEnemyFactionId(input.factionName), doctrine, objective: plan.objective, power,
+      roll: input.compositionRoll ?? input.objectiveRoll ?? 0, maximumPhase,
+      forcedTemplateId: input.forcedCompositionTemplateId,
+      requiresFlankers: input.forcedFlankRoute === 'left' || input.forcedFlankRoute === 'right',
+    });
+    plan.doctrine = doctrine;
+    plan.doctrineRevealed = input.revealed;
+    plan.compositionTemplateId = composition?.id;
+    plan.compositionRevealed = input.revealed;
+    if (composition && !composition.slots.some(slot => slot.role === 'flankers')) {
+      plan.stratagems = plan.stratagems.filter(stratagem => stratagem.id !== 'rearManeuver');
+    }
+    lockEnemyFlankRoute(plan, input.forcedFlankRoute, input.compositionRoll ?? input.flankRoll, input.revealed);
     return input.intelLevel == null ? plan : applyEnemyPlanIntel(plan, input.intelLevel, input.intelRoll ?? 0);
   }
   const objective = chooseEnemyObjective(
@@ -767,18 +829,30 @@ export function createEnemyPlan(input: EnemyPlanCreationInput): EnemyPlan {
     input.objectiveRoll ?? 0,
   );
   const stratagemPoints = enemyStratagemPoints(input.factionName, power, relation);
+  const composition = chooseTacticalCompositionTemplate({
+    faction: tacticalEnemyFactionId(input.factionName), doctrine, objective, power,
+    roll: input.compositionRoll ?? input.objectiveRoll ?? 0, maximumPhase,
+    forcedTemplateId: input.forcedCompositionTemplateId,
+    requiresFlankers: input.forcedFlankRoute === 'left' || input.forcedFlankRoute === 'right',
+  });
   const plan: EnemyPlan = {
     objective,
     objectiveRevealed: input.revealed,
+    doctrine,
+    doctrineRevealed: input.revealed,
+    compositionTemplateId: composition?.id,
+    compositionRevealed: input.revealed,
     stratagemPoints,
     stratagems: purchaseStratagems(
       objective,
       stratagemPoints,
-      legacyFlankPlan === 'rearAssault',
+      legacyFlankPlan === 'rearAssault' &&
+        (!composition || composition.slots.some(slot => slot.role === 'flankers')),
       input.stratagemRoll ?? 0,
       input.revealed,
     ),
   };
+  lockEnemyFlankRoute(plan, input.forcedFlankRoute, input.compositionRoll ?? input.flankRoll, input.revealed);
   return input.intelLevel == null ? plan : applyEnemyPlanIntel(plan, input.intelLevel, input.intelRoll ?? 0);
 }
 
@@ -822,6 +896,15 @@ export function migrateEnemyPlan(raw: unknown, legacy: LegacyFlankPlan = {}): En
   }
 
   if (source.stratagems.length > 0 && stratagems.length === 0) return planFromLegacyFlank(legacy);
+  const doctrine = ENEMY_DOCTRINES.includes(source.doctrine as EnemyDoctrineId)
+    ? source.doctrine as EnemyDoctrineId
+    : undefined;
+  const composition = typeof source.compositionTemplateId === 'string'
+    ? tacticalCompositionTemplate(source.compositionTemplateId)
+    : undefined;
+  const flankRouteSide = source.flankRouteSide === 'left' || source.flankRouteSide === 'right'
+    ? source.flankRouteSide
+    : undefined;
   return {
     objective: OBJECTIVES.includes(source.objective as EnemyObjectiveId)
       ? source.objective as EnemyObjectiveId
@@ -833,6 +916,17 @@ export function migrateEnemyPlan(raw: unknown, legacy: LegacyFlankPlan = {}): En
     ...(Number.isFinite(source.intelLevel) ? {
       intelLevel: clamp(Math.floor(Number(source.intelLevel)), 0, 4) as 0 | 1 | 2 | 3 | 4,
     } : {}),
+    ...(doctrine ? {
+      doctrine,
+      doctrineRevealed: source.doctrineRevealed === true,
+    } : {}),
+    ...(composition ? {
+      compositionTemplateId: composition.id,
+      compositionRevealed: source.compositionRevealed === true,
+    } : {}),
+    ...(flankRouteSide && stratagems.some(stratagem => stratagem.id === 'rearManeuver')
+      ? { flankRouteSide }
+      : {}),
     stratagems,
   };
 }

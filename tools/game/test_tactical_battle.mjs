@@ -1061,6 +1061,8 @@ function addBuiltMarker(state, type) {
     season: 'winter', weather: 'clear', prepPoints: 'auto', seed: 2026071310,
     defenders: { muskets: 2, bows: 2, spears: 2, unarmedMilitia: 0, watchmen: 2, hunters: 2, civilians: 6 },
     cannonEmplacements: 3,
+    enemyDoctrine: 'shockBreakthrough',
+    enemyCompositionTemplateId: 'court-siege-battery',
   });
   const battle = state.tacticalBattle;
   assert.ok(battle);
@@ -1070,8 +1072,10 @@ function addBuiltMarker(state, type) {
   assert.ok(state.resources.gunpowder >= 3 * 2, 'simulator supplies powder for its cannon emplacements');
   assert.deepEqual(
     new Set(battle.raiderGroups.map(group => group.unitType)),
-    new Set(['court-gunner', 'court-archer', 'court-melee', 'court-cavalry', 'court-artillery']),
+    new Set(['court-gunner', 'court-melee', 'court-artillery']),
   );
+  assert.equal(battle.enemyPlan.doctrine, 'shockBreakthrough');
+  assert.equal(battle.enemyPlan.compositionTemplateId, 'court-siege-battery');
   assert.ok(battle.raiderGroups.every(group => group.revealed && group.morale >= 88));
   assert.ok(battle.raiderGroups.find(group => group.unitType === 'court-artillery').wallPressureBonus >= 10);
 }
@@ -1121,7 +1125,9 @@ function addBuiltMarker(state, type) {
     const battle = tactical.createTacticalBattle(state, {
       factionName, power: 48, warned: true, siege: false, mode: 'garrison',
     });
-    assert.deepEqual(battle.raiderGroups.map(group => group.unitType), unitTypes);
+    assert.deepEqual(new Set(battle.raiderGroups.map(group => group.unitType)), new Set(unitTypes));
+    assert.ok(battle.enemyPlan.compositionTemplateId,
+      `${factionName} stores the deterministic composition template used to create its groups`);
   }
 }
 
@@ -1396,6 +1402,7 @@ function addBuiltMarker(state, type) {
   prepareDefenders(state);
   const battle = tactical.createTacticalBattle(state, {
     factionName: '조정 토벌군', power: 160, warned: true, siege: true, mode: 'garrison',
+    forcedDoctrine: 'shockBreakthrough', forcedCompositionTemplateId: 'court-siege-battery',
   });
   tactical.advanceTacticalPhase(state);
   battle.defenderGroups.forEach(group => { group.zoneId = 'center'; });

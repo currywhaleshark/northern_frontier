@@ -28,6 +28,8 @@ const compositions = await import(pathToFileURL(join(compiledDir, 'tacticalCompo
 const enemyPlan = await import(pathToFileURL(join(compiledDir, 'enemyPlan.mjs')).href);
 const events = await import(pathToFileURL(join(compiledDir, 'tacticalEvents.mjs')).href);
 const targeting = await import(pathToFileURL(join(compiledDir, 'tacticalTargeting.mjs')).href);
+const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
+const tacticalBattle = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
 
 const profiles = units.tacticalUnitProfiles();
 assert.equal(profiles.length, 21, 'all 14 legacy and 7 new tactical unit profile IDs have one definition');
@@ -90,6 +92,29 @@ assert.equal(
   undefined,
   'an invalid cross-faction simulator override is rejected',
 );
+const compositionOnlyOverride = enemyPlan.createEnemyPlan({
+  factionName: '조정 토벌군', power: 160, relation: 0, revealed: false,
+  flankRoll: 0.1, objectiveRoll: 0.2, stratagemRoll: 0.3,
+  forcedCompositionTemplateId: 'court-siege-battery',
+});
+assert.equal(compositionOnlyOverride.compositionTemplateId, 'court-siege-battery');
+assert.ok(['shockBreakthrough', 'missileSuppression'].includes(compositionOnlyOverride.doctrine),
+  'forcing only a simulator composition derives one compatible doctrine');
+const forcedLeftRoute = enemyPlan.createEnemyPlan({
+  factionName: '홀라온 야인', power: 100, relation: 0, revealed: false,
+  flankRoll: 0.99, objectiveRoll: 0.2, stratagemRoll: 0.3,
+  forcedFlankRoute: 'left',
+});
+assert.equal(forcedLeftRoute.flankRouteSide, 'left');
+assert.ok(forcedLeftRoute.stratagems.some(entry => entry.id === 'rearManeuver'),
+  'forcing a simulator flank route also locks the rear maneuver needed to use it');
+const forcedNoRoute = enemyPlan.createEnemyPlan({
+  factionName: '홀라온 야인', power: 100, relation: 0, revealed: false,
+  flankRoll: 0, objectiveRoll: 0.2, stratagemRoll: 0.3,
+  forcedFlankRoute: 'none',
+});
+assert.equal(forcedNoRoute.flankRouteSide, undefined);
+assert.equal(forcedNoRoute.stratagems.some(entry => entry.id === 'rearManeuver'), false);
 
 const doctrineDefinitions = enemyPlan.enemyDoctrineDefinitions();
 assert.equal(doctrineDefinitions.length, 8, 'all persisted doctrine IDs have definitions');
@@ -101,6 +126,73 @@ assert.equal(enemyPlan.enemyDoctrineDefinition('fireSupport').enabled, false, 'f
 assert.equal(enemyPlan.enemyDoctrineDefinition('feignedRetreat').enabled, false, 'feigned retreat remains deferred');
 assert.equal(new Set(doctrineDefinitions.filter(entry => entry.enabled).map(entry => entry.id)).size, 6,
   'the MVP activates exactly six doctrines');
+
+for (const factionName of ['니마차 우디캐', '홀라온 야인', '변경 마적', '조정 토벌군']) {
+  const counts = new Map();
+  for (let index = 0; index < 200; index += 1) {
+    const plan = enemyPlan.createEnemyPlan({
+      factionName, power: 120, relation: 0, revealed: false,
+      flankRoll: (index * 0.173) % 1,
+      objectiveRoll: (index * 0.347) % 1,
+      stratagemRoll: (index * 0.523) % 1,
+      doctrineRoll: (index * 0.619) % 1,
+      compositionRoll: (index * 0.757) % 1,
+    });
+    assert.ok(plan.doctrine && plan.compositionTemplateId, `${factionName} locks doctrine and composition metadata`);
+    const template = compositions.tacticalCompositionTemplate(plan.compositionTemplateId);
+    if (plan.stratagems.some(entry => entry.id === 'rearManeuver')) {
+      assert.ok(template.slots.some(entry => entry.role === 'flankers'),
+        `${factionName} never buys rear maneuver for a composition without a flanking group`);
+      assert.ok(plan.flankRouteSide === 'left' || plan.flankRouteSide === 'right');
+    } else {
+      assert.equal(plan.flankRouteSide, undefined);
+    }
+    counts.set(plan.compositionTemplateId, (counts.get(plan.compositionTemplateId) ?? 0) + 1);
+  }
+  assert.ok(counts.size >= 4, `${factionName} produces at least four composition IDs across 200 fixed inputs`);
+  assert.ok(Math.max(...counts.values()) / 200 <= 0.45,
+    `${factionName}'s most common composition stays at or below the 45% diversity gate`);
+  for (let index = 0; index < 10; index += 1) {
+    const state = simulation.newGame(2026072000 + index);
+    state.relations[factionName] = 0;
+    const battle = tacticalBattle.createTacticalBattle(state, {
+      factionName, power: factionName === '조정 토벌군' ? 160 : 90,
+      warned: true, siege: true, mode: 'garrison',
+    });
+    assert.equal(battle.raiderGroups.reduce((sum, group) => sum + group.power, 0), battle.originalPower,
+      `${factionName} composition allocation preserves the locked power budget exactly`);
+    assert.ok(battle.raiderGroups.length >= 3 && battle.raiderGroups.length <= 6);
+  }
+}
+
+assert.deepEqual(enemyPlan.migrateEnemyPlan({
+  objective: 'breakthrough', objectiveRevealed: true,
+  doctrine: 'mountedSkirmish', doctrineRevealed: true,
+  compositionTemplateId: 'holaon-mounted-skirmish', compositionRevealed: true,
+  stratagemPoints: 2, stratagems: [],
+}), {
+  objective: 'breakthrough', objectiveRevealed: true, stratagemPoints: 2,
+  doctrine: 'mountedSkirmish', doctrineRevealed: true,
+  compositionTemplateId: 'holaon-mounted-skirmish', compositionRevealed: true,
+  stratagems: [],
+}, 'migration preserves known doctrine, composition, and their stored reveal truth');
+const migratedUnknownMetadata = enemyPlan.migrateEnemyPlan({
+  objective: 'breakthrough', objectiveRevealed: false,
+  doctrine: 'futureDoctrine', doctrineRevealed: true,
+  compositionTemplateId: 'future-template', compositionRevealed: true,
+  stratagemPoints: 0, stratagems: [],
+});
+assert.equal(migratedUnknownMetadata.doctrine, undefined);
+assert.equal(migratedUnknownMetadata.compositionTemplateId, undefined);
+assert.equal(enemyPlan.migrateEnemyPlan({
+  objective: 'breakthrough', objectiveRevealed: false, stratagemPoints: 2,
+  flankRouteSide: 'right',
+  stratagems: [{ id: 'rearManeuver', revealed: false, counterLevel: 0 }],
+}).flankRouteSide, 'right', 'a locked flank side survives migration when rear maneuver exists');
+assert.equal(enemyPlan.migrateEnemyPlan({
+  objective: 'breakthrough', objectiveRevealed: false, stratagemPoints: 0,
+  flankRouteSide: 'right', stratagems: [],
+}).flankRouteSide, undefined, 'an orphaned flank side is discarded without rear maneuver');
 
 const intelBattle = {
   enemyPlan: {
@@ -146,4 +238,3 @@ assert.equal(events.isKnownTacticalAnimationEventKind('futureRouteArrival'), fal
   'frontends can safely skip an unknown future animation event kind');
 
 console.log('tactical composition contract tests passed');
-

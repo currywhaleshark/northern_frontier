@@ -12,7 +12,8 @@ import { createTacticalBattle } from './tacticalBattle';
 import { createPredatorTacticalHunt } from './tacticalHunt';
 import { clearWeaponAssignments, setResidentWeapon } from './weapons';
 import type {
-  BattleMode, Expedition, GameState, JobId, PredatorKind, Season, TigerTier, WeatherId,
+  BattleMode, EnemyDoctrineId, Expedition, GameState, JobId, PredatorKind, Season, TacticalRouteSide,
+  TigerTier, WeatherId,
 } from './types';
 
 // 각 항목은 구체값 또는 'random' (시작할 때마다 새로 굴린다)
@@ -43,6 +44,9 @@ export interface BattleSimulationOptions {
   cannonEmplacements: SimSetting<number>; // 완성된 불랑기포대 수
   tigerTier?: SimSetting<TigerTier>;
   wolfCount?: SimSetting<number>;
+  enemyDoctrine?: EnemyDoctrineId | 'auto';
+  enemyCompositionTemplateId?: string | 'auto';
+  enemyFlankRoute?: TacticalRouteSide | 'none' | 'auto';
   seed?: number;
 }
 
@@ -303,7 +307,18 @@ export function createBattleSimulation(options: BattleSimulationOptions): GameSt
     const power = factionName === '조정 토벌군'
       ? Math.max(120, Math.round(rolledPower))
       : Math.round(rolledPower);
-    createTacticalBattle(state, { factionName, power, warned, siege, mode });
+    createTacticalBattle(state, {
+      factionName, power, warned, siege, mode,
+      forcedDoctrine: options.enemyDoctrine && options.enemyDoctrine !== 'auto'
+        ? options.enemyDoctrine
+        : undefined,
+      forcedCompositionTemplateId: options.enemyCompositionTemplateId && options.enemyCompositionTemplateId !== 'auto'
+        ? options.enemyCompositionTemplateId
+        : undefined,
+      forcedFlankRoute: options.enemyFlankRoute && options.enemyFlankRoute !== 'auto'
+        ? options.enemyFlankRoute
+        : undefined,
+    });
   } else {
     createOffensiveSimulation(state, scenario, options, combatantIds, rng);
   }

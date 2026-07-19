@@ -27,12 +27,12 @@ function compileGameModules() {
 }
 
 const SCENARIOS = [
-  { id: 'nimacha-unwarned-front', factionName: '니마차 우디캐', power: 68, warned: false, rearAssault: false, seed: 2026071401 },
-  { id: 'nimacha-warned-rear', factionName: '니마차 우디캐', power: 74, warned: true, rearAssault: true, seed: 2026071402 },
-  { id: 'holaon-unwarned-rear', factionName: '홀라온 야인', power: 78, warned: false, rearAssault: true, seed: 2026071403 },
-  { id: 'holaon-warned-front', factionName: '홀라온 야인', power: 84, warned: true, rearAssault: false, seed: 2026071404 },
-  { id: 'bandit-unwarned-rear', factionName: '변경 마적', power: 82, warned: false, rearAssault: true, seed: 2026071405 },
-  { id: 'court-warned-front', factionName: '조정 토벌군', power: 154, warned: true, rearAssault: false, seed: 2026071406 },
+  { id: 'nimacha-unwarned-front', factionName: '니마차 우디캐', power: 68, warned: false, rearAssault: false, seed: 2026071401, doctrine: 'missileSuppression', composition: 'nimacha-forest-screen' },
+  { id: 'nimacha-warned-rear', factionName: '니마차 우디캐', power: 74, warned: true, rearAssault: true, seed: 2026071402, doctrine: 'missileSuppression', composition: 'nimacha-forest-screen' },
+  { id: 'holaon-unwarned-rear', factionName: '홀라온 야인', power: 78, warned: false, rearAssault: true, seed: 2026071403, doctrine: 'mountedSkirmish', composition: 'holaon-mounted-skirmish' },
+  { id: 'holaon-warned-front', factionName: '홀라온 야인', power: 84, warned: true, rearAssault: false, seed: 2026071404, doctrine: 'mountedSkirmish', composition: 'holaon-mounted-skirmish' },
+  { id: 'bandit-unwarned-rear', factionName: '변경 마적', power: 82, warned: false, rearAssault: true, seed: 2026071405, doctrine: 'mountedSkirmish', composition: 'bandit-hit-and-run' },
+  { id: 'court-warned-front', factionName: '조정 토벌군', power: 154, warned: true, rearAssault: false, seed: 2026071406, doctrine: 'shockBreakthrough', composition: 'court-cavalry-wing' },
 ];
 
 const DEFENDERS = {
@@ -132,6 +132,8 @@ function runScenario(tactical, battleSimulation, scenario) {
     prepPoints: 'auto',
     defenders: DEFENDERS,
     cannonEmplacements: 0,
+    enemyDoctrine: scenario.doctrine,
+    enemyCompositionTemplateId: scenario.composition,
     seed: scenario.seed,
   });
   const battle = state.tacticalBattle;

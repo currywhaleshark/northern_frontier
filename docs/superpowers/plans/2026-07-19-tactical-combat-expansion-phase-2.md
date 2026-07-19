@@ -940,18 +940,22 @@ Codex는 공개 계약을 바꿀 때 자료형·fixture·게임 테스트를 같
 - Create: `tools/game/test_tactical_compositions.mjs`
 
 **작업:**
-- [ ] 병과 태그·프로필 정의.
-- [ ] 기존 unitType을 새 프로필에 매핑해 결과 무변경 확인.
-- [ ] 교리·편제 템플릿 자료형과 결정적 선택기 추가.
-- [ ] `enemyPlanSummaryView(battle)`와 `enemyCompositionIntelView(battle)` selector 추가.
-- [ ] label·강점·약점·권장 대응을 판정 정의와 공유하는 교리 정의 조회 API 추가.
-- [ ] 프론트가 모르는 `TacticalAnimationEvent.kind`를 안전하게 건너뛰는 전방 호환 규칙과 테스트 추가.
-- [ ] 세력별 최소 4개 템플릿 추가.
-- [ ] 개발용 전투 시뮬레이터에 교리·편제 템플릿·우회로 강제 옵션 추가.
-- [ ] 편제 다양성·전력 보존·금지 조합 테스트.
-- [ ] 구버전 저장은 기존 unitType과 enemyPlan에서 기본 교리/편제를 합성.
+- [x] 병과 태그·프로필 정의.
+- [x] 기존 unitType을 새 프로필에 매핑해 결과 무변경 확인.
+- [x] 교리·편제 템플릿 자료형과 결정적 선택기 추가.
+- [x] `enemyPlanSummaryView(battle)`와 `enemyCompositionIntelView(battle)` selector 추가.
+- [x] label·강점·약점·권장 대응을 판정 정의와 공유하는 교리 정의 조회 API 추가.
+- [x] 프론트가 모르는 `TacticalAnimationEvent.kind`를 안전하게 건너뛰는 전방 호환 규칙과 테스트 추가.
+- [x] 세력별 최소 4개 템플릿 추가.
+- [x] 개발용 전투 시뮬레이터에 교리·편제 템플릿·우회로 강제 옵션 추가.
+- [x] 편제 다양성·전력 보존·금지 조합 테스트.
+- [x] 구버전 저장은 기존 unitType과 enemyPlan에서 기본 교리/편제를 합성.
 
 **완료 조건:** 편제는 달라지지만 병과별 새 상성은 아직 적용하지 않아 총 전투 결과가 기준선 ±5% 이내.
+
+**2026-07-19 백엔드 검증:** 고정 6시나리오 기준 라운드 수·아군 전사·적 사상은 기준선과 동일하고
+아군 부상은 -5%다. 다만 관군 기병익대 1건이 `partialLoss → defenseSuccess` 임계값을 넘어 최종
+밸런스 완료 판정은 보류한다. Phase 2 상성 수치를 넣기 전에 관군 무화포 편제의 목책 압박을 측정한다.
 
 ### Phase 2 — 병과별 교전 특성과 교리 AI
 

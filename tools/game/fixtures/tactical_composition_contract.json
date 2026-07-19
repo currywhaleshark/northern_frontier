@@ -1,0 +1,2199 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "nimacha-hunter",
+      "label": "숲 사냥꾼",
+      "archetype": "footArcher",
+      "tags": [
+        "infantry",
+        "ranged",
+        "scout"
+      ],
+      "factions": [
+        "nimacha"
+      ],
+      "intelCategory": "보병 궁수",
+      "defaultLine": "middle",
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "nimacha-spearman",
+      "label": "창잡이",
+      "archetype": "spearInfantry",
+      "tags": [
+        "infantry",
+        "antiMounted"
+      ],
+      "factions": [
+        "nimacha"
+      ],
+      "intelCategory": "창보병",
+      "defaultLine": "front",
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "nimacha-looter",
+      "label": "니마차 노획조",
+      "archetype": "looterInfantry",
+      "tags": [
+        "infantry"
+      ],
+      "factions": [
+        "nimacha"
+      ],
+      "intelCategory": "약탈 보병",
+      "defaultLine": "front",
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "holaon-lancer",
+      "label": "기마 선봉",
+      "archetype": "lancerCavalry",
+      "tags": [
+        "mounted",
+        "shock"
+      ],
+      "factions": [
+        "holaon"
+      ],
+      "intelCategory": "창기병",
+      "defaultLine": "front",
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "holaon-horse-archer",
+      "label": "기마 궁수",
+      "archetype": "horseArcher",
+      "tags": [
+        "mounted",
+        "ranged"
+      ],
+      "factions": [
+        "holaon"
+      ],
+      "intelCategory": "궁기병",
+      "defaultLine": "middle",
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "holaon-raider",
+      "label": "약탈 기병",
+      "archetype": "lightCavalry",
+      "tags": [
+        "mounted",
+        "scout"
+      ],
+      "factions": [
+        "holaon"
+      ],
+      "intelCategory": "경기병",
+      "defaultLine": "front",
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "bandit-vanguard",
+      "label": "두목 친위대",
+      "archetype": "meleeInfantry",
+      "tags": [
+        "infantry",
+        "shock"
+      ],
+      "factions": [
+        "bandit"
+      ],
+      "intelCategory": "근접 보병",
+      "defaultLine": "front",
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "bandit-rider",
+      "label": "기마 마적",
+      "archetype": "lightCavalry",
+      "tags": [
+        "mounted",
+        "ranged",
+        "scout"
+      ],
+      "factions": [
+        "bandit"
+      ],
+      "intelCategory": "경기병",
+      "defaultLine": "middle",
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "bandit-looter",
+      "label": "약탈패",
+      "archetype": "looterInfantry",
+      "tags": [
+        "infantry"
+      ],
+      "factions": [
+        "bandit"
+      ],
+      "intelCategory": "약탈 보병",
+      "defaultLine": "front",
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "court-gunner",
+      "label": "훈련도감 포수",
+      "archetype": "musketeer",
+      "tags": [
+        "infantry",
+        "ranged",
+        "firearm"
+      ],
+      "factions": [
+        "court"
+      ],
+      "intelCategory": "총포수",
+      "defaultLine": "middle",
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "court-archer",
+      "label": "훈련도감 사수",
+      "archetype": "footArcher",
+      "tags": [
+        "infantry",
+        "ranged"
+      ],
+      "factions": [
+        "court"
+      ],
+      "intelCategory": "궁병",
+      "defaultLine": "middle",
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "court-melee",
+      "label": "훈련도감 살수",
+      "archetype": "meleeInfantry",
+      "tags": [
+        "infantry",
+        "shock"
+      ],
+      "factions": [
+        "court"
+      ],
+      "intelCategory": "근접 보병",
+      "defaultLine": "front",
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "court-cavalry",
+      "label": "기창 기병",
+      "archetype": "lancerCavalry",
+      "tags": [
+        "mounted",
+        "shock"
+      ],
+      "factions": [
+        "court"
+      ],
+      "intelCategory": "창기병",
+      "defaultLine": "front",
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "court-artillery",
+      "label": "불랑기 화포",
+      "archetype": "directArtillery",
+      "tags": [
+        "artillery",
+        "firearm",
+        "siege"
+      ],
+      "factions": [
+        "court"
+      ],
+      "intelCategory": "직사 화포",
+      "defaultLine": "rear",
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "shield-infantry",
+      "label": "방패꾼",
+      "archetype": "shieldInfantry",
+      "tags": [
+        "infantry",
+        "shielded"
+      ],
+      "factions": [
+        "nimacha",
+        "bandit"
+      ],
+      "intelCategory": "방패보병",
+      "defaultLine": "front",
+      "implementationPhase": 2,
+      "enabled": false
+    },
+    {
+      "id": "deserter-musketeer",
+      "label": "탈영 총포수",
+      "archetype": "musketeer",
+      "tags": [
+        "infantry",
+        "ranged",
+        "firearm"
+      ],
+      "factions": [
+        "bandit"
+      ],
+      "intelCategory": "총포수",
+      "defaultLine": "middle",
+      "implementationPhase": 2,
+      "enabled": false
+    },
+    {
+      "id": "wall-breaker",
+      "label": "파책조",
+      "archetype": "wallBreaker",
+      "tags": [
+        "infantry",
+        "siege"
+      ],
+      "factions": [
+        "nimacha",
+        "bandit"
+      ],
+      "intelCategory": "파책 도구",
+      "defaultLine": "front",
+      "implementationPhase": 2,
+      "enabled": false
+    },
+    {
+      "id": "court-shield",
+      "label": "방패수",
+      "archetype": "shieldInfantry",
+      "tags": [
+        "infantry",
+        "shielded"
+      ],
+      "factions": [
+        "court"
+      ],
+      "intelCategory": "방패보병",
+      "defaultLine": "front",
+      "implementationPhase": 2,
+      "enabled": false
+    },
+    {
+      "id": "court-horse-archer",
+      "label": "관군 궁기병",
+      "archetype": "horseArcher",
+      "tags": [
+        "mounted",
+        "ranged"
+      ],
+      "factions": [
+        "court"
+      ],
+      "intelCategory": "궁기병",
+      "defaultLine": "middle",
+      "implementationPhase": 2,
+      "enabled": false
+    },
+    {
+      "id": "court-medic",
+      "label": "의원대",
+      "archetype": "medic",
+      "tags": [
+        "infantry",
+        "support"
+      ],
+      "factions": [
+        "court"
+      ],
+      "intelCategory": "의료 지원",
+      "defaultLine": "rear",
+      "implementationPhase": 8,
+      "enabled": false
+    },
+    {
+      "id": "court-hwacha",
+      "label": "화차",
+      "archetype": "indirectArtillery",
+      "tags": [
+        "artillery",
+        "ranged",
+        "firearm",
+        "indirectFire",
+        "support"
+      ],
+      "factions": [
+        "court"
+      ],
+      "intelCategory": "중화기 징후",
+      "defaultLine": "rear",
+      "implementationPhase": 8,
+      "enabled": false
+    }
+  ],
+  "doctrines": [
+    {
+      "id": "mountedSkirmish",
+      "label": "기마 견제",
+      "strength": "이동 사격과 후퇴를 반복해 느린 전열을 접근 전에 소모시킵니다.",
+      "weakness": "접촉이 고정되면 전투력이 떨어지고 창벽과 집중 사격에 취약합니다.",
+      "counter": "진형을 유지하고 궁·총포를 한 표적에 집중하십시오.",
+      "factions": [
+        "holaon",
+        "bandit",
+        "court"
+      ],
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "shockBreakthrough",
+      "label": "충격 돌파",
+      "strength": "한 구역과 한 열에 충격 전력을 집중해 얇은 전열을 무너뜨립니다.",
+      "weakness": "준비된 창벽과 목책에 돌격이 멈추면 손실이 커집니다.",
+      "counter": "창보병을 전열에 두고 목책과 준비 사격을 유지하십시오.",
+      "factions": [
+        "nimacha",
+        "holaon",
+        "bandit",
+        "court"
+      ],
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "shieldedAdvance",
+      "label": "방패 전진",
+      "strength": "방패 전열이 뒤따르는 사격대와 파책조의 화살 피해를 줄입니다.",
+      "weakness": "총포·화포와 측후방 공격에는 차폐 효과가 크게 줄어듭니다.",
+      "counter": "총포·화포를 집중하거나 우회해 방패 뒤 지원대를 치십시오.",
+      "factions": [
+        "nimacha",
+        "bandit",
+        "court"
+      ],
+      "implementationPhase": 2,
+      "enabled": true
+    },
+    {
+      "id": "breachAndStorm",
+      "label": "파책 돌입",
+      "strength": "파책조를 호위해 목책 압박을 빠르게 쌓습니다.",
+      "weakness": "파책조 자체는 사격과 근접전 모두 약하고 잃으면 교리가 무너집니다.",
+      "counter": "파책조를 우선 표적으로 삼고 방책을 응급 수리하십시오.",
+      "factions": [
+        "nimacha",
+        "bandit"
+      ],
+      "implementationPhase": 2,
+      "enabled": true
+    },
+    {
+      "id": "missileSuppression",
+      "label": "원거리 제압",
+      "strength": "궁·총포가 노출된 열을 집중 사격해 접근 전에 전력을 깎습니다.",
+      "weakness": "우회 급습과 악천후, 방패 전열에 효율이 떨어집니다.",
+      "counter": "방패로 접근하거나 우회대를 보내 원거리 대열을 압박하십시오.",
+      "factions": [
+        "nimacha",
+        "bandit",
+        "court"
+      ],
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "fireSupport",
+      "label": "화력 지원",
+      "strength": "화차 사격 뒤 보병이 전진해 후열과 밀집대를 함께 위협합니다.",
+      "weakness": "재장전 중 기동 급습에 취약하고 산개한 대열에는 효율이 낮습니다.",
+      "counter": "대열을 산개하고 재장전 시점에 기동 부대로 급습하십시오.",
+      "factions": [
+        "court"
+      ],
+      "implementationPhase": 8,
+      "enabled": false
+    },
+    {
+      "id": "reserveCounterattack",
+      "label": "예비대 역습",
+      "strength": "주력이 전선을 고정한 뒤 정예 예비대를 투입해 재배치를 처벌합니다.",
+      "weakness": "예비대 위치가 드러나거나 주력이 먼저 무너지면 투입 효과가 사라집니다.",
+      "counter": "아군 예비대를 남기고 정찰로 적의 투입 징후를 확인하십시오.",
+      "factions": [
+        "nimacha",
+        "holaon",
+        "bandit",
+        "court"
+      ],
+      "implementationPhase": 1,
+      "enabled": true
+    },
+    {
+      "id": "feignedRetreat",
+      "label": "거짓 후퇴",
+      "strength": "일부 부대가 물러나 추격을 유도한 뒤 측후방에서 역습합니다.",
+      "weakness": "추격하지 않고 위치를 지키면 실제 정면 전력만 얇아집니다.",
+      "counter": "퇴각을 즉시 추격하지 말고 정찰과 진형 유지를 우선하십시오.",
+      "factions": [
+        "holaon",
+        "bandit"
+      ],
+      "implementationPhase": 8,
+      "enabled": false
+    }
+  ],
+  "templates": [
+    {
+      "id": "nimacha-forest-screen",
+      "label": "산림 견제대",
+      "faction": "nimacha",
+      "doctrines": [
+        "missileSuppression",
+        "reserveCounterattack"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "nimacha-hunter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.36,
+            0.5
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "nimacha-spearman",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.25,
+            0.36
+          ],
+          "required": true
+        },
+        {
+          "role": "looters",
+          "candidates": [
+            {
+              "unitType": "nimacha-looter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.18,
+            0.3
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "nimacha-spear-ambush",
+      "label": "창잡이 매복대",
+      "faction": "nimacha",
+      "doctrines": [
+        "reserveCounterattack",
+        "shockBreakthrough"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "nimacha-spearman",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.42,
+            0.58
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "nimacha-hunter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.22,
+            0.34
+          ],
+          "required": true
+        },
+        {
+          "role": "looters",
+          "candidates": [
+            {
+              "unitType": "nimacha-looter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.14,
+            0.26
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "nimacha-plunder-column",
+      "label": "산림 노획대",
+      "faction": "nimacha",
+      "doctrines": [
+        "missileSuppression",
+        "reserveCounterattack"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "nimacha-hunter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.28,
+            0.4
+          ],
+          "required": true
+        },
+        {
+          "role": "looters",
+          "candidates": [
+            {
+              "unitType": "nimacha-looter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.34,
+            0.48
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "nimacha-spearman",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.18,
+            0.3
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "nimacha-balanced-warband",
+      "label": "니마차 혼성대",
+      "faction": "nimacha",
+      "doctrines": [
+        "missileSuppression",
+        "reserveCounterattack",
+        "shockBreakthrough"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "nimacha-spearman",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.32,
+            0.44
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "nimacha-hunter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.26,
+            0.38
+          ],
+          "required": true
+        },
+        {
+          "role": "looters",
+          "candidates": [
+            {
+              "unitType": "nimacha-looter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.18,
+            0.28
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "nimacha-breach-party",
+      "label": "니마차 산림 침투대",
+      "faction": "nimacha",
+      "doctrines": [
+        "breachAndStorm",
+        "shieldedAdvance"
+      ],
+      "objectives": [
+        "breakthrough",
+        "arson"
+      ],
+      "implementationPhase": 2,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "shield-infantry",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.28,
+            0.38
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "nimacha-hunter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.24,
+            0.34
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "wall-breaker",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.24,
+            0.34
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "holaon-mounted-skirmish",
+      "label": "기마 견제대",
+      "faction": "holaon",
+      "doctrines": [
+        "mountedSkirmish"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "holaon-horse-archer",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.42,
+            0.56
+          ],
+          "required": true
+        },
+        {
+          "role": "looters",
+          "candidates": [
+            {
+              "unitType": "holaon-raider",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.24,
+            0.36
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "holaon-lancer",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.14,
+            0.26
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "holaon-shock-column",
+      "label": "홀라온 충격 돌파대",
+      "faction": "holaon",
+      "doctrines": [
+        "shockBreakthrough"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "holaon-lancer",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.48,
+            0.62
+          ],
+          "required": true
+        },
+        {
+          "role": "looters",
+          "candidates": [
+            {
+              "unitType": "holaon-raider",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.2,
+            0.3
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "holaon-horse-archer",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.14,
+            0.24
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "holaon-raiding-wings",
+      "label": "약탈 우회대",
+      "faction": "holaon",
+      "doctrines": [
+        "mountedSkirmish",
+        "reserveCounterattack"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "holaon-raider",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.36,
+            0.5
+          ],
+          "required": true
+        },
+        {
+          "role": "looters",
+          "candidates": [
+            {
+              "unitType": "holaon-raider",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.22,
+            0.34
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "holaon-horse-archer",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.2,
+            0.32
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "holaon-balanced-host",
+      "label": "홀라온 혼성 기병대",
+      "faction": "holaon",
+      "doctrines": [
+        "mountedSkirmish",
+        "shockBreakthrough",
+        "reserveCounterattack"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "holaon-lancer",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.3,
+            0.42
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "holaon-horse-archer",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.28,
+            0.4
+          ],
+          "required": true
+        },
+        {
+          "role": "looters",
+          "candidates": [
+            {
+              "unitType": "holaon-raider",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.2,
+            0.3
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "bandit-hit-and-run",
+      "label": "치고 빠지는 약탈대",
+      "faction": "bandit",
+      "doctrines": [
+        "mountedSkirmish",
+        "reserveCounterattack"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "bandit-rider",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.34,
+            0.48
+          ],
+          "required": true
+        },
+        {
+          "role": "looters",
+          "candidates": [
+            {
+              "unitType": "bandit-looter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.28,
+            0.42
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "bandit-vanguard",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.18,
+            0.3
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "bandit-chief-column",
+      "label": "두목 돌격대",
+      "faction": "bandit",
+      "doctrines": [
+        "shockBreakthrough",
+        "reserveCounterattack"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "bandit-vanguard",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.46,
+            0.6
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "bandit-rider",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.22,
+            0.34
+          ],
+          "required": true
+        },
+        {
+          "role": "looters",
+          "candidates": [
+            {
+              "unitType": "bandit-looter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.14,
+            0.26
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "bandit-looting-column",
+      "label": "마적 약탈 종대",
+      "faction": "bandit",
+      "doctrines": [
+        "mountedSkirmish",
+        "missileSuppression"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "looters",
+          "candidates": [
+            {
+              "unitType": "bandit-looter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.4,
+            0.54
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "bandit-vanguard",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.22,
+            0.34
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "bandit-rider",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.18,
+            0.3
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "bandit-balanced-warband",
+      "label": "마적 혼성대",
+      "faction": "bandit",
+      "doctrines": [
+        "mountedSkirmish",
+        "shockBreakthrough",
+        "reserveCounterattack",
+        "missileSuppression"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "bandit-vanguard",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.3,
+            0.42
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "bandit-rider",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.26,
+            0.38
+          ],
+          "required": true
+        },
+        {
+          "role": "looters",
+          "candidates": [
+            {
+              "unitType": "bandit-looter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.2,
+            0.3
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "bandit-deserter-mixed",
+      "label": "혼성 탈영병대",
+      "faction": "bandit",
+      "doctrines": [
+        "missileSuppression",
+        "reserveCounterattack"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 2,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "bandit-vanguard",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.3,
+            0.42
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "deserter-musketeer",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.24,
+            0.34
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "bandit-rider",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.18,
+            0.28
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "bandit-night-breach",
+      "label": "야간 파책대",
+      "faction": "bandit",
+      "doctrines": [
+        "breachAndStorm",
+        "shieldedAdvance"
+      ],
+      "objectives": [
+        "breakthrough",
+        "arson"
+      ],
+      "implementationPhase": 2,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "shield-infantry",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.3,
+            0.42
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "wall-breaker",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.28,
+            0.4
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "bandit-rider",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.16,
+            0.26
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "court-three-armies",
+      "label": "삼수진",
+      "faction": "court",
+      "doctrines": [
+        "missileSuppression",
+        "reserveCounterattack"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-gunner",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.28,
+            0.38
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-archer",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.22,
+            0.32
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-melee",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.3,
+            0.42
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "court-cavalry-wing",
+      "label": "관군 기병익대",
+      "faction": "court",
+      "doctrines": [
+        "mountedSkirmish",
+        "shockBreakthrough",
+        "reserveCounterattack"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-melee",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.3,
+            0.42
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "court-cavalry",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.32,
+            0.46
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-archer",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.18,
+            0.28
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "court-firearm-column",
+      "label": "포수 전진대",
+      "faction": "court",
+      "doctrines": [
+        "missileSuppression",
+        "reserveCounterattack"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-gunner",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.4,
+            0.54
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-melee",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.26,
+            0.38
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "court-cavalry",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.14,
+            0.24
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "court-siege-battery",
+      "label": "정규 공성대",
+      "faction": "court",
+      "doctrines": [
+        "shockBreakthrough",
+        "missileSuppression"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-artillery",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.16,
+            0.24
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-melee",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.32,
+            0.44
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-gunner",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.24,
+            0.36
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "court-shielded-advance",
+      "label": "방패 전진대",
+      "faction": "court",
+      "doctrines": [
+        "shieldedAdvance"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 2,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-shield",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.3,
+            0.42
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-gunner",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.26,
+            0.38
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-melee",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.2,
+            0.32
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "court-mobile-wing",
+      "label": "관군 기동익대",
+      "faction": "court",
+      "doctrines": [
+        "mountedSkirmish",
+        "reserveCounterattack"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 2,
+      "slots": [
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "court-horse-archer",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.3,
+            0.44
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-cavalry",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.26,
+            0.38
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-archer",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.18,
+            0.28
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "court-fire-support",
+      "label": "화력 압박대",
+      "faction": "court",
+      "doctrines": [
+        "fireSupport"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 8,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-hwacha",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.14,
+            0.2
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-gunner",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.3,
+            0.42
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-melee",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.3,
+            0.42
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "court-long-campaign",
+      "label": "장기 토벌대",
+      "faction": "court",
+      "doctrines": [
+        "reserveCounterattack"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 8,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-gunner",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.28,
+            0.38
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-melee",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.3,
+            0.42
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-medic",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.08,
+            0.14
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "nimacha-legacy-warband",
+      "label": "기존 니마차 혼성대",
+      "faction": "nimacha",
+      "doctrines": [
+        "missileSuppression"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "nimacha-hunter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.34,
+            0.46
+          ],
+          "required": true
+        },
+        {
+          "role": "looters",
+          "candidates": [
+            {
+              "unitType": "nimacha-looter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.2,
+            0.32
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "nimacha-spearman",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.22,
+            0.34
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "holaon-legacy-host",
+      "label": "기존 홀라온 기병대",
+      "faction": "holaon",
+      "doctrines": [
+        "mountedSkirmish"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "holaon-lancer",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.34,
+            0.46
+          ],
+          "required": true
+        },
+        {
+          "role": "looters",
+          "candidates": [
+            {
+              "unitType": "holaon-raider",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.2,
+            0.32
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "holaon-horse-archer",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.22,
+            0.34
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "bandit-legacy-warband",
+      "label": "기존 마적 혼성대",
+      "faction": "bandit",
+      "doctrines": [
+        "reserveCounterattack"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "bandit-vanguard",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.34,
+            0.46
+          ],
+          "required": true
+        },
+        {
+          "role": "looters",
+          "candidates": [
+            {
+              "unitType": "bandit-looter",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.2,
+            0.32
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "bandit-rider",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.22,
+            0.34
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "court-legacy-punitive-force",
+      "label": "기존 조정 토벌군",
+      "faction": "court",
+      "doctrines": [
+        "missileSuppression"
+      ],
+      "objectives": [
+        "breakthrough",
+        "plunder",
+        "arson"
+      ],
+      "implementationPhase": 1,
+      "slots": [
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-gunner",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.25,
+            0.31
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-archer",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.11,
+            0.17
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-melee",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.21,
+            0.27
+          ],
+          "required": true
+        },
+        {
+          "role": "flankers",
+          "candidates": [
+            {
+              "unitType": "court-cavalry",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.16,
+            0.22
+          ],
+          "required": true
+        },
+        {
+          "role": "main",
+          "candidates": [
+            {
+              "unitType": "court-artillery",
+              "weight": 1
+            }
+          ],
+          "powerShare": [
+            0.12,
+            0.18
+          ],
+          "required": true
+        }
+      ]
+    }
+  ],
+  "views": {
+    "hidden": {
+      "objective": {
+        "revealed": false,
+        "label": "미확인"
+      },
+      "doctrine": {
+        "revealed": false,
+        "label": "미확인"
+      },
+      "composition": {
+        "revealed": false,
+        "templateLabel": "미확인 편제",
+        "groups": [
+          {
+            "groupId": "fixture-lancers",
+            "label": "창기병",
+            "category": "창기병",
+            "exact": false,
+            "support": false
+          }
+        ],
+        "hiddenGroupCount": 2
+      },
+      "revealedStratagems": [],
+      "hiddenStratagemCount": 2
+    },
+    "revealed": {
+      "objective": {
+        "revealed": true,
+        "id": "breakthrough",
+        "label": "방어선 돌파"
+      },
+      "doctrine": {
+        "revealed": true,
+        "id": "mountedSkirmish",
+        "label": "기마 견제",
+        "strength": "이동 사격과 후퇴를 반복해 느린 전열을 접근 전에 소모시킵니다.",
+        "weakness": "접촉이 고정되면 전투력이 떨어지고 창벽과 집중 사격에 취약합니다.",
+        "counter": "진형을 유지하고 궁·총포를 한 표적에 집중하십시오."
+      },
+      "composition": {
+        "revealed": true,
+        "templateId": "holaon-mounted-skirmish",
+        "templateLabel": "기마 견제대",
+        "groups": [
+          {
+            "groupId": "fixture-lancers",
+            "unitType": "holaon-lancer",
+            "label": "기마 선봉",
+            "category": "창기병",
+            "count": 6,
+            "exact": true,
+            "support": false
+          },
+          {
+            "groupId": "fixture-archers",
+            "label": "궁기병",
+            "category": "궁기병",
+            "exact": false,
+            "support": false
+          },
+          {
+            "groupId": "fixture-raiders",
+            "label": "경기병",
+            "category": "경기병",
+            "exact": false,
+            "support": false
+          }
+        ],
+        "hiddenGroupCount": 0
+      },
+      "revealedStratagems": [
+        {
+          "id": "rearManeuver",
+          "cost": 2,
+          "label": "후방 우회",
+          "effect": "우회대가 방어선 후열에 별도 교전선을 엽니다.",
+          "warning": "주력과 떨어진 말발굽과 발자국이 방책 뒤편으로 갈라집니다.",
+          "counter": "후열 근접 경비 또는 중열 예비대의 후방 증원",
+          "drawback": "우회대는 본대 지원에서 떨어져 후열 경비에 막히면 전투력이 낮아집니다."
+        }
+      ],
+      "hiddenStratagemCount": 1
+    }
+  },
+  "animationEventKinds": [
+    "camera",
+    "bombardment",
+    "fortify",
+    "prepareAmbush",
+    "readyVolley",
+    "muster",
+    "evacuate",
+    "conceal",
+    "zoneFall",
+    "artilleryHit",
+    "rearAssault",
+    "advance",
+    "ambush",
+    "volley",
+    "melee",
+    "wallAssault",
+    "wallHit",
+    "loot",
+    "retreat",
+    "fire",
+    "leaderEscape",
+    "escapeBlocked",
+    "beastReveal",
+    "beastAmbush",
+    "beastRout",
+    "casualty",
+    "moraleBreak",
+    "report"
+  ],
+  "simulationOverrides": {
+    "enemyDoctrine": "mountedSkirmish",
+    "enemyCompositionTemplateId": "holaon-mounted-skirmish",
+    "enemyFlankRoute": "right"
+  }
+}

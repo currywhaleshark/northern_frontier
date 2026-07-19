@@ -764,6 +764,7 @@ export type EnemyDoctrineId =
   | 'reserveCounterattack'
   | 'feignedRetreat';
 export type TacticalEnemyFactionId = 'default' | 'nimacha' | 'holaon' | 'bandit' | 'court';
+export type TacticalRouteSide = 'left' | 'right';
 export type TacticalUnitTag =
   | 'infantry'
   | 'mounted'
@@ -812,6 +813,7 @@ export interface EnemyPlan {
   doctrineRevealed?: boolean;
   compositionTemplateId?: string;
   compositionRevealed?: boolean;
+  flankRouteSide?: TacticalRouteSide;
   stratagemPoints: number;
   intelLevel?: 0 | 1 | 2 | 3 | 4;
   stratagems: EnemyStratagemState[];

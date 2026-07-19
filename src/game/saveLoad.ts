@@ -26,6 +26,7 @@ import {
 import { beginExpeditionReturn } from './expedition';
 import { CURRENT_SCHEMA_VERSION } from './saveSchema';
 import { defaultRaiderFormationLine } from './tacticalTargeting';
+import { legacyTacticalPlanMetadata } from './tacticalCompositions';
 import { isImplementedLivestockId, normalizeLivestockState } from './livestock';
 import { normalizeTacticalGroupTargets } from './tacticalBattle';
 import { isYouthWorkJob } from './youth';
@@ -587,6 +588,15 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       revealed: legacyFlankers?.flankPlanRevealed === true,
     })
     : undefined;
+  const legacyPlanMetadata = typeof source.factionName === 'string'
+    ? legacyTacticalPlanMetadata(source.factionName)
+    : undefined;
+  if (enemyPlan && legacyPlanMetadata) {
+    enemyPlan.doctrine ??= legacyPlanMetadata.doctrine;
+    enemyPlan.doctrineRevealed ??= false;
+    enemyPlan.compositionTemplateId ??= legacyPlanMetadata.compositionTemplateId;
+    enemyPlan.compositionRevealed ??= false;
+  }
   const derivedFlankPlan = enemyPlan ? flankPlanFromEnemyPlan(enemyPlan) : undefined;
   const derivedFlankPlanRevealed = enemyPlan ? flankPlanRevealedFromEnemyPlan(enemyPlan) : undefined;
   const raiderGroups = migratedRaiderGroups.map(group => encounterKind === 'raidDefense' && group.kind === 'flankers'

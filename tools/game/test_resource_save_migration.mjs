@@ -126,6 +126,27 @@ assert.equal(typeof saveLoad.migrateV23ToV24, 'function');
 }
 
 {
+  const state = simulation.newGame(2026071911);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: '홀라온 야인', power: 70, warned: true, siege: false, mode: 'garrison',
+  });
+  const raw = JSON.parse(JSON.stringify(battle));
+  delete raw.enemyPlan.doctrine;
+  delete raw.enemyPlan.doctrineRevealed;
+  delete raw.enemyPlan.compositionTemplateId;
+  delete raw.enemyPlan.compositionRevealed;
+  const legacyGroupIds = raw.raiderGroups.map(group => group.id);
+  const migrated = saveLoad.migrateTacticalBattle(raw, state);
+  assert.ok(migrated);
+  assert.equal(migrated.enemyPlan.doctrine, 'mountedSkirmish');
+  assert.equal(migrated.enemyPlan.doctrineRevealed, false);
+  assert.equal(migrated.enemyPlan.compositionTemplateId, 'holaon-legacy-host');
+  assert.equal(migrated.enemyPlan.compositionRevealed, false);
+  assert.deepEqual(migrated.raiderGroups.map(group => group.id), legacyGroupIds,
+    'legacy metadata synthesis never regenerates or rewrites an in-progress enemy formation');
+}
+
+{
   const migrated = saveLoad.migrateV15ToV16({
     schemaVersion: 15,
     resources: { grain: 20 },

@@ -38,7 +38,7 @@ const TEMPLATES: readonly TacticalCompositionTemplate[] = [
     id: 'nimacha-balanced-warband', label: '니마차 혼성대', faction: 'nimacha',
     doctrines: ['missileSuppression', 'reserveCounterattack', 'shockBreakthrough'], objectives: ALL_OBJECTIVES, weight: 1,
     implementationPhase: 1,
-    slots: [slot('main', 'nimacha-spearman', [0.32, 0.44]), slot('main', 'nimacha-hunter', [0.26, 0.38]), slot('looters', 'nimacha-looter', [0.18, 0.28])],
+    slots: [slot('main', 'nimacha-spearman', [0.32, 0.44]), slot('flankers', 'nimacha-hunter', [0.26, 0.38]), slot('looters', 'nimacha-looter', [0.18, 0.28])],
   },
   {
     id: 'nimacha-breach-party', label: '니마차 산림 침투대', faction: 'nimacha',
@@ -51,13 +51,13 @@ const TEMPLATES: readonly TacticalCompositionTemplate[] = [
     id: 'holaon-mounted-skirmish', label: '기마 견제대', faction: 'holaon',
     doctrines: ['mountedSkirmish'], objectives: ALL_OBJECTIVES, weight: 1,
     implementationPhase: 1,
-    slots: [slot('main', 'holaon-horse-archer', [0.42, 0.56]), slot('flankers', 'holaon-raider', [0.24, 0.36]), slot('main', 'holaon-lancer', [0.14, 0.26])],
+    slots: [slot('main', 'holaon-horse-archer', [0.42, 0.56]), slot('looters', 'holaon-raider', [0.24, 0.36]), slot('flankers', 'holaon-lancer', [0.14, 0.26])],
   },
   {
     id: 'holaon-shock-column', label: '홀라온 충격 돌파대', faction: 'holaon',
     doctrines: ['shockBreakthrough'], objectives: ALL_OBJECTIVES, weight: 1,
     implementationPhase: 1,
-    slots: [slot('main', 'holaon-lancer', [0.48, 0.62]), slot('flankers', 'holaon-raider', [0.2, 0.3]), slot('main', 'holaon-horse-archer', [0.14, 0.24])],
+    slots: [slot('main', 'holaon-lancer', [0.48, 0.62]), slot('looters', 'holaon-raider', [0.2, 0.3]), slot('flankers', 'holaon-horse-archer', [0.14, 0.24])],
   },
   {
     id: 'holaon-raiding-wings', label: '약탈 우회대', faction: 'holaon',
@@ -69,7 +69,7 @@ const TEMPLATES: readonly TacticalCompositionTemplate[] = [
     id: 'holaon-balanced-host', label: '홀라온 혼성 기병대', faction: 'holaon',
     doctrines: ['mountedSkirmish', 'shockBreakthrough', 'reserveCounterattack'], objectives: ALL_OBJECTIVES, weight: 1,
     implementationPhase: 1,
-    slots: [slot('main', 'holaon-lancer', [0.3, 0.42]), slot('main', 'holaon-horse-archer', [0.28, 0.4]), slot('flankers', 'holaon-raider', [0.2, 0.3])],
+    slots: [slot('main', 'holaon-lancer', [0.3, 0.42]), slot('flankers', 'holaon-horse-archer', [0.28, 0.4]), slot('looters', 'holaon-raider', [0.2, 0.3])],
   },
 
   {
@@ -117,7 +117,7 @@ const TEMPLATES: readonly TacticalCompositionTemplate[] = [
   },
   {
     id: 'court-cavalry-wing', label: '관군 기병익대', faction: 'court',
-    doctrines: ['shockBreakthrough', 'reserveCounterattack'], objectives: ALL_OBJECTIVES, weight: 1,
+    doctrines: ['mountedSkirmish', 'shockBreakthrough', 'reserveCounterattack'], objectives: ALL_OBJECTIVES, weight: 1,
     implementationPhase: 1,
     slots: [slot('main', 'court-melee', [0.3, 0.42]), slot('flankers', 'court-cavalry', [0.32, 0.46]), slot('main', 'court-archer', [0.18, 0.28])],
   },
@@ -157,6 +157,36 @@ const TEMPLATES: readonly TacticalCompositionTemplate[] = [
     implementationPhase: 8,
     slots: [slot('main', 'court-gunner', [0.28, 0.38]), slot('main', 'court-melee', [0.3, 0.42]), slot('main', 'court-medic', [0.08, 0.14])],
   },
+  // Weight-zero templates describe already-started battles from saves created before
+  // composition IDs existed. They are valid metadata targets but never random picks.
+  {
+    id: 'nimacha-legacy-warband', label: '기존 니마차 혼성대', faction: 'nimacha',
+    doctrines: ['missileSuppression'], objectives: ALL_OBJECTIVES, weight: 0,
+    implementationPhase: 1,
+    slots: [slot('main', 'nimacha-hunter', [0.34, 0.46]), slot('looters', 'nimacha-looter', [0.2, 0.32]), slot('flankers', 'nimacha-spearman', [0.22, 0.34])],
+  },
+  {
+    id: 'holaon-legacy-host', label: '기존 홀라온 기병대', faction: 'holaon',
+    doctrines: ['mountedSkirmish'], objectives: ALL_OBJECTIVES, weight: 0,
+    implementationPhase: 1,
+    slots: [slot('main', 'holaon-lancer', [0.34, 0.46]), slot('looters', 'holaon-raider', [0.2, 0.32]), slot('flankers', 'holaon-horse-archer', [0.22, 0.34])],
+  },
+  {
+    id: 'bandit-legacy-warband', label: '기존 마적 혼성대', faction: 'bandit',
+    doctrines: ['reserveCounterattack'], objectives: ALL_OBJECTIVES, weight: 0,
+    implementationPhase: 1,
+    slots: [slot('main', 'bandit-vanguard', [0.34, 0.46]), slot('looters', 'bandit-looter', [0.2, 0.32]), slot('flankers', 'bandit-rider', [0.22, 0.34])],
+  },
+  {
+    id: 'court-legacy-punitive-force', label: '기존 조정 토벌군', faction: 'court',
+    doctrines: ['missileSuppression'], objectives: ALL_OBJECTIVES, weight: 0,
+    implementationPhase: 1,
+    slots: [
+      slot('main', 'court-gunner', [0.25, 0.31]), slot('main', 'court-archer', [0.11, 0.17]),
+      slot('main', 'court-melee', [0.21, 0.27]), slot('flankers', 'court-cavalry', [0.16, 0.22]),
+      slot('main', 'court-artillery', [0.12, 0.18]),
+    ],
+  },
 ];
 
 export function tacticalEnemyFactionId(factionName: string): TacticalEnemyFactionId {
@@ -165,6 +195,20 @@ export function tacticalEnemyFactionId(factionName: string): TacticalEnemyFactio
   if (factionName === '변경 마적') return 'bandit';
   if (factionName === '조정 토벌군') return 'court';
   return 'default';
+}
+
+const LEGACY_PLAN_METADATA: Partial<Record<TacticalEnemyFactionId, {
+  doctrine: EnemyDoctrineId;
+  compositionTemplateId: string;
+}>> = {
+  nimacha: { doctrine: 'missileSuppression', compositionTemplateId: 'nimacha-legacy-warband' },
+  holaon: { doctrine: 'mountedSkirmish', compositionTemplateId: 'holaon-legacy-host' },
+  bandit: { doctrine: 'reserveCounterattack', compositionTemplateId: 'bandit-legacy-warband' },
+  court: { doctrine: 'missileSuppression', compositionTemplateId: 'court-legacy-punitive-force' },
+};
+
+export function legacyTacticalPlanMetadata(factionName: string) {
+  return LEGACY_PLAN_METADATA[tacticalEnemyFactionId(factionName)];
 }
 
 export function tacticalCompositionTemplates(): readonly TacticalCompositionTemplate[] {
@@ -181,6 +225,7 @@ export function eligibleTacticalCompositionTemplates(input: {
   objective: EnemyObjectiveId;
   power: number;
   maximumPhase?: 1 | 2 | 8;
+  requiresFlankers?: boolean;
 }): readonly TacticalCompositionTemplate[] {
   const maximumPhase = input.maximumPhase ?? 8;
   return TEMPLATES.filter(template =>
@@ -188,6 +233,7 @@ export function eligibleTacticalCompositionTemplates(input: {
     template.implementationPhase <= maximumPhase &&
     template.doctrines.includes(input.doctrine) &&
     template.objectives.includes(input.objective) &&
+    (!input.requiresFlankers || template.slots.some(slot => slot.role === 'flankers')) &&
     template.slots.every(candidate => !candidate.minThreat || input.power >= candidate.minThreat));
 }
 
@@ -199,6 +245,7 @@ export function chooseTacticalCompositionTemplate(input: {
   roll: number;
   maximumPhase?: 1 | 2 | 8;
   forcedTemplateId?: string;
+  requiresFlankers?: boolean;
 }): TacticalCompositionTemplate | undefined {
   const eligible = eligibleTacticalCompositionTemplates(input);
   if (input.forcedTemplateId) {

@@ -485,12 +485,20 @@ const intelPlans = Array.from({ length: 5 }, (_unused, intelLevel) => enemyPlan.
 const revealedCount = plan => Number(plan.objectiveRevealed) +
   plan.stratagems.filter(stratagem => stratagem.revealed).length;
 assert.equal(revealedCount(intelPlans[0]), 0);
-assert.equal(revealedCount(intelPlans[1]), 0, 'intel level 1 exposes warning signs but no exact plan IDs');
-assert.equal(revealedCount(intelPlans[2]), 1, 'intel level 2 identifies the objective or one stratagem');
-assert.ok(revealedCount(intelPlans[3]) >= 2, 'intel level 3 reveals most of the plan');
-assert.ok(intelPlans[4].objectiveRevealed && intelPlans[4].stratagems.every(stratagem => stratagem.revealed));
+assert.equal(revealedCount(intelPlans[1]), 1, 'intel level 1 identifies the enemy objective');
+assert.equal(intelPlans[1].compositionRevealed, false);
+assert.equal(intelPlans[2].compositionRevealed, true, 'intel level 2 identifies the composition category');
+assert.equal(intelPlans[2].doctrineRevealed, false);
+assert.equal(intelPlans[3].doctrineRevealed, true, 'intel level 3 identifies the enemy doctrine');
+assert.equal(intelPlans[3].stratagems.some(stratagem => stratagem.revealed), false);
+assert.equal(revealedCount(intelPlans[4]), 2, 'intel level 4 identifies one exact stratagem in addition to the objective');
 assert.equal(intelPlans[4].stratagems.filter(stratagem => stratagem.counterLevel === 2).length, 1,
-  'intel level 4 fully counters exactly one first activation');
+  'intel level 4 fully counters exactly one revealed first activation');
+for (let level = 1; level < intelPlans.length; level += 1) {
+  assert.ok(Number(intelPlans[level].objectiveRevealed) >= Number(intelPlans[level - 1].objectiveRevealed));
+  assert.ok(Number(intelPlans[level].compositionRevealed) >= Number(intelPlans[level - 1].compositionRevealed));
+  assert.ok(Number(intelPlans[level].doctrineRevealed) >= Number(intelPlans[level - 1].doctrineRevealed));
+}
 assert.equal(enemyPlan.enemyIntelLevel({ watchtowers: 0, watchmen: 0, hunters: 0 }), 0);
 assert.equal(enemyPlan.enemyIntelLevel({ watchtowers: 1, watchmen: 2, hunters: 2 }), 4);
 const unwarnedState = simulation.newGame(2026071505);

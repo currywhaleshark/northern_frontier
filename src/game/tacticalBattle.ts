@@ -44,8 +44,11 @@ import {
 import {
   canTargetLine, defaultRaiderFormationLine, tacticalContactLine, tacticalTargetingRole,
 } from './tacticalTargeting';
+import { tacticalCompositionTemplate } from './tacticalCompositions';
+import { tacticalUnitProfile } from './tacticalUnits';
 import type {
   DefenderGroupKind,
+  EnemyDoctrineId,
   EnemyPlan,
   GameState,
   PreparationActionId,
@@ -58,6 +61,7 @@ import type {
   TacticalFormationLine,
   TacticalRaiderGroup,
   RaiderUnitType,
+  TacticalRouteSide,
   TacticalRoundReport,
 } from './types';
 
@@ -705,7 +709,50 @@ function raiderGroups(
   };
   const split = enemyObjectiveProfile(enemyPlan.objective).raiderSplit;
   let composition: Composition[];
-  if (factionName === '니마차 우디캐') {
+  const template = tacticalCompositionTemplate(enemyPlan.compositionTemplateId);
+  if (template) {
+    const traits = (unitType: RaiderUnitType) => {
+      switch (unitType) {
+        case 'nimacha-hunter': return { morale: 77 };
+        case 'nimacha-spearman': return { morale: 74, combatMultiplier: 1.05 };
+        case 'nimacha-looter': return { morale: 69 };
+        case 'holaon-lancer': return { morale: 82, combatMultiplier: 1.08, lossResistance: 0.94 };
+        case 'holaon-horse-archer': return { morale: 80, combatMultiplier: 1.1, lossResistance: 0.92 };
+        case 'holaon-raider': return { morale: 74, combatMultiplier: 1.05 };
+        case 'bandit-vanguard': return { morale: 76 };
+        case 'bandit-rider': return { morale: 72, combatMultiplier: 1.04 };
+        case 'bandit-looter': return { morale: 67 };
+        case 'court-gunner': return { morale: 94, combatMultiplier: 1.18, lossResistance: 0.76 };
+        case 'court-archer': return { morale: 90, combatMultiplier: 1.07, lossResistance: 0.84 };
+        case 'court-melee': return { morale: 93, combatMultiplier: 1.12, lossResistance: 0.78 };
+        case 'court-cavalry': return { morale: 95, combatMultiplier: 1.2, lossResistance: 0.72 };
+        case 'court-artillery': return {
+          morale: 88, combatMultiplier: 1.24, lossResistance: 0.8, wallPressureBonus: 12,
+        };
+        default: return { morale: factionName === '조정 토벌군' ? 90 : 74 };
+      }
+    };
+    composition = template.slots.map((templateSlot, index) => {
+      const unitType = templateSlot.candidates[0].unitType;
+      const profile = tacticalUnitProfile(unitType);
+      const intent: TacticalRaiderGroup['intent'] = profile.tags.includes('siege')
+        ? 'breakWall'
+        : templateSlot.role === 'looters' ? 'loot' : templateSlot.role === 'flankers' ? 'flank' : 'advance';
+      const visibility: Visibility = factionName === '조정 토벌군' || templateSlot.role === 'main'
+        ? 'open'
+        : templateSlot.role === 'looters' ? 'scouts' : 'deep';
+      return {
+        id: `${template.id}-${index + 1}`,
+        kind: templateSlot.role,
+        unitType,
+        label: profile.label,
+        weight: (templateSlot.powerShare[0] + templateSlot.powerShare[1]) / 2,
+        intent,
+        visibility,
+        ...traits(unitType),
+      };
+    });
+  } else if (factionName === '니마차 우디캐') {
     composition = [
       { id: 'nimacha-hunters', kind: 'main', unitType: 'nimacha-hunter', label: '숲 사냥꾼 선봉', weight: split.main, morale: 77, intent: 'advance', visibility: 'open' },
       { id: 'nimacha-looters', kind: 'looters', unitType: 'nimacha-looter', label: '니마차 노획조', weight: split.looters, morale: 69, intent: 'loot', visibility: 'scouts' },
@@ -739,7 +786,9 @@ function raiderGroups(
     ];
   }
 
-  if (enemyPlan.objective !== 'breakthrough') {
+  const preserveNorthernMissionBudget = factionName === '니마차 우디캐' ||
+    factionName === '홀라온 야인' || factionName === '변경 마적';
+  if (preserveNorthernMissionBudget || enemyPlan.objective !== 'breakthrough') {
     const kinds: readonly TacticalRaiderGroup['kind'][] = ['main', 'looters', 'flankers'];
     const baseTotals = Object.fromEntries(kinds.map(kind => [
       kind,
@@ -816,6 +865,10 @@ export function createTacticalBattle(
     warned: boolean;
     siege: boolean;
     mode: 'garrison' | 'levy';
+    forcedDoctrine?: EnemyDoctrineId;
+    forcedCompositionTemplateId?: string;
+    forcedFlankRoute?: TacticalRouteSide | 'none';
+    maximumCompositionPhase?: 1 | 2 | 8;
   },
 ): TacticalBattle {
   const groups = defenderGroups(state, params.mode);
@@ -829,15 +882,27 @@ export function createTacticalBattle(
   const scoutsReady = intelLevel >= 2;
   const deepScouted = intelLevel >= 3;
   const planRng = makeRng(state.seed + state.day * 4099 + state.subTick * 131 + originalPower);
+  const flankRoll = planRng();
+  const objectiveRoll = planRng();
+  const stratagemRoll = planRng();
+  const intelRoll = planRng();
+  const doctrineRoll = planRng();
+  const compositionRoll = planRng();
   const enemyPlan = createEnemyPlan({
     factionName: params.factionName,
     power: originalPower,
     relation: state.relations[params.factionName] ?? 50,
-    flankRoll: planRng(),
-    objectiveRoll: planRng(),
-    stratagemRoll: planRng(),
+    flankRoll,
+    objectiveRoll,
+    stratagemRoll,
     intelLevel,
-    intelRoll: planRng(),
+    intelRoll,
+    doctrineRoll,
+    compositionRoll,
+    forcedDoctrine: params.forcedDoctrine,
+    forcedCompositionTemplateId: params.forcedCompositionTemplateId,
+    forcedFlankRoute: params.forcedFlankRoute,
+    maximumCompositionPhase: params.maximumCompositionPhase,
     revealed: false,
   });
   const enemies = raiderGroups(params.factionName, originalPower, { scoutsReady, deepScouted }, enemyPlan);
