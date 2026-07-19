@@ -25,6 +25,7 @@ import type {
   TacticalFormationLine,
 } from '../game/types';
 import { playMeleeClash, playSfx, playWeaponSalvo, playWeaponVolley, setBattleDrums, type SfxName } from '../sound/sfx';
+import { StageDragSpike } from './tactical/StageDragSpike';
 import { TacticalGroupChip } from './tactical/TacticalGroupChip';
 import { TacticalCommandPopover } from './tactical/TacticalCommandPopover';
 import { TacticalMiniMap } from './tactical/TacticalMiniMap';
@@ -32,6 +33,10 @@ import { EnemyPlanPanel } from './tactical/EnemyPlanPanel';
 import { TacticalZoneColumn } from './tactical/TacticalZoneColumn';
 import { commandDescription, commandLabel } from './tactical/commandText';
 import { computeCommandPopoverPlacement } from './tactical/popoverPlacement';
+
+// P1.5 스파이크 전용 플래그 — `?dragSpike` URL로만 켜지는 개발용 드래그 검증 하네스
+const DRAG_SPIKE_ENABLED = typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).has('dragSpike');
 
 interface Props {
   state: GameState;
@@ -676,6 +681,9 @@ export function TacticalBattleScreen({
               onViewZone={setViewedZoneId}
               onSelectGroup={selectGroup}
             />
+          )}
+          {DRAG_SPIKE_ENABLED && (
+            <StageDragSpike battle={battle} shellRef={stageShellRef} disabled={playbackActive} />
           )}
           {snowfall && (
             <div className={`tactical-weather-layer weather-${state.weather}`} aria-hidden="true">

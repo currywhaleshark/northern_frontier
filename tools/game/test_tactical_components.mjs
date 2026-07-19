@@ -91,6 +91,24 @@ assert.match(simSetupSource, /enemyCompositionTemplateId:/,
   'the simulator must pass the forced composition template into the simulation options');
 assert.match(simSetupSource, /template\.doctrines\.includes/,
   'forcing a doctrine must filter the template list to compatible compositions');
+
+// ── 무대 포인터 드래그 인프라 (P1.5 스파이크 → Phase 3/4 공유 경로) ──
+const dragSource = readFileSync(new URL('../../src/components/tactical/stagePointerDrag.ts', import.meta.url), 'utf8');
+assert.match(dragSource, /STAGE_DRAG_THRESHOLD_PX = 6/,
+  'stage drag must keep a movement threshold so clicks stay clicks');
+assert.match(dragSource, /setPointerCapture/, 'crossing the threshold must capture the pointer');
+assert.match(dragSource, /try\s*\{\s*session\.element\.setPointerCapture/,
+  'pointer capture must tolerate synthetic pointers without throwing');
+assert.match(dragSource, /elementsFromPoint/,
+  'anchor hit-testing must be coordinate based because capture pins the event target');
+assert.match(dragSource, /key === 'Escape'/, 'Escape must cancel an active drag');
+assert.match(dragSource, /contextmenu/, 'right-click must cancel an active drag');
+assert.match(dragSource, /pointercancel|handlePointerCancel/,
+  'native pointercancel (e.g. touch scroll takeover) must cancel the drag');
+assert.match(cssSource, /\.stage-drag-handle\s*\{[\s\S]*?touch-action:\s*none;/,
+  'drag handles must opt out of native touch scrolling so the stage strip keeps its own');
+assert.match(screenSource, /dragSpike/,
+  'the drag spike harness must stay behind its dev-only URL flag');
 assert.match(planSource, /enemyStratagemCounterStrength/,
   'enemy plan panel must derive a continuous combined counter percentage');
 assert.match(planSource, /완전 대응/, 'enemy plan panel must label only 100% counters as complete');
