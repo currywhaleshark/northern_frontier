@@ -1,7 +1,10 @@
 import { CONFIG } from './config';
+import { tacticalCompositionTemplate, tacticalEnemyFactionId } from './tacticalCompositions';
+import { tacticalUnitProfile } from './tacticalUnits';
 import type {
-  BanditLairDefensePlan, BanditLairDoctrineId, EnemyObjectiveId, EnemyPlan, EnemyStratagemId,
+  BanditLairDefensePlan, BanditLairDoctrineId, EnemyDoctrineId, EnemyObjectiveId, EnemyPlan, EnemyStratagemId,
   EnemyCounterBreakdown, EnemyStratagemState, ForeignSite, GameState, PreparationActionId, TacticalFlankPlan,
+  TacticalBattle, TacticalEnemyFactionId,
 } from './types';
 
 type EnemyPlanCreationInput = {
@@ -28,6 +31,84 @@ const STRATAGEMS: readonly EnemyStratagemId[] = [
 const BANDIT_LAIR_DOCTRINES: readonly BanditLairDoctrineId[] = [
   'trailAttrition', 'wallHold', 'leaderEscape',
 ];
+
+const ENEMY_DOCTRINES: readonly EnemyDoctrineId[] = [
+  'mountedSkirmish', 'shockBreakthrough', 'shieldedAdvance', 'breachAndStorm',
+  'missileSuppression', 'fireSupport', 'reserveCounterattack', 'feignedRetreat',
+];
+
+const OBJECTIVE_DETAILS: Record<EnemyObjectiveId, { label: string }> = {
+  breakthrough: { label: '방어선 돌파' },
+  plunder: { label: '비축 약탈' },
+  arson: { label: '방책·창고 방화' },
+};
+
+const DOCTRINE_DETAILS: Record<EnemyDoctrineId, {
+  label: string;
+  strength: string;
+  weakness: string;
+  counter: string;
+  factions: readonly TacticalEnemyFactionId[];
+  implementationPhase: 1 | 2 | 8;
+  enabled: boolean;
+}> = {
+  mountedSkirmish: {
+    label: '기마 견제',
+    strength: '이동 사격과 후퇴를 반복해 느린 전열을 접근 전에 소모시킵니다.',
+    weakness: '접촉이 고정되면 전투력이 떨어지고 창벽과 집중 사격에 취약합니다.',
+    counter: '진형을 유지하고 궁·총포를 한 표적에 집중하십시오.',
+    factions: ['holaon', 'bandit', 'court'], implementationPhase: 1, enabled: true,
+  },
+  shockBreakthrough: {
+    label: '충격 돌파',
+    strength: '한 구역과 한 열에 충격 전력을 집중해 얇은 전열을 무너뜨립니다.',
+    weakness: '준비된 창벽과 목책에 돌격이 멈추면 손실이 커집니다.',
+    counter: '창보병을 전열에 두고 목책과 준비 사격을 유지하십시오.',
+    factions: ['nimacha', 'holaon', 'bandit', 'court'], implementationPhase: 1, enabled: true,
+  },
+  shieldedAdvance: {
+    label: '방패 전진',
+    strength: '방패 전열이 뒤따르는 사격대와 파책조의 화살 피해를 줄입니다.',
+    weakness: '총포·화포와 측후방 공격에는 차폐 효과가 크게 줄어듭니다.',
+    counter: '총포·화포를 집중하거나 우회해 방패 뒤 지원대를 치십시오.',
+    factions: ['nimacha', 'bandit', 'court'], implementationPhase: 2, enabled: true,
+  },
+  breachAndStorm: {
+    label: '파책 돌입',
+    strength: '파책조를 호위해 목책 압박을 빠르게 쌓습니다.',
+    weakness: '파책조 자체는 사격과 근접전 모두 약하고 잃으면 교리가 무너집니다.',
+    counter: '파책조를 우선 표적으로 삼고 방책을 응급 수리하십시오.',
+    factions: ['nimacha', 'bandit'], implementationPhase: 2, enabled: true,
+  },
+  missileSuppression: {
+    label: '원거리 제압',
+    strength: '궁·총포가 노출된 열을 집중 사격해 접근 전에 전력을 깎습니다.',
+    weakness: '우회 급습과 악천후, 방패 전열에 효율이 떨어집니다.',
+    counter: '방패로 접근하거나 우회대를 보내 원거리 대열을 압박하십시오.',
+    factions: ['nimacha', 'bandit', 'court'], implementationPhase: 1, enabled: true,
+  },
+  fireSupport: {
+    label: '화력 지원',
+    strength: '화차 사격 뒤 보병이 전진해 후열과 밀집대를 함께 위협합니다.',
+    weakness: '재장전 중 기동 급습에 취약하고 산개한 대열에는 효율이 낮습니다.',
+    counter: '대열을 산개하고 재장전 시점에 기동 부대로 급습하십시오.',
+    factions: ['court'], implementationPhase: 8, enabled: false,
+  },
+  reserveCounterattack: {
+    label: '예비대 역습',
+    strength: '주력이 전선을 고정한 뒤 정예 예비대를 투입해 재배치를 처벌합니다.',
+    weakness: '예비대 위치가 드러나거나 주력이 먼저 무너지면 투입 효과가 사라집니다.',
+    counter: '아군 예비대를 남기고 정찰로 적의 투입 징후를 확인하십시오.',
+    factions: ['nimacha', 'holaon', 'bandit', 'court'], implementationPhase: 1, enabled: true,
+  },
+  feignedRetreat: {
+    label: '거짓 후퇴',
+    strength: '일부 부대가 물러나 추격을 유도한 뒤 측후방에서 역습합니다.',
+    weakness: '추격하지 않고 위치를 지키면 실제 정면 전력만 얇아집니다.',
+    counter: '퇴각을 즉시 추격하지 말고 정찰과 진형 유지를 우선하십시오.',
+    factions: ['holaon', 'bandit'], implementationPhase: 8, enabled: false,
+  },
+};
 
 const BANDIT_LAIR_DOCTRINE_DETAILS: Record<BanditLairDoctrineId, { label: string; effect: string }> = {
   trailAttrition: {
@@ -265,12 +346,43 @@ export function migrateBanditLairDefensePlan(raw: unknown): BanditLairDefensePla
   };
 }
 
-function factionKey(factionName: string): 'nimacha' | 'holaon' | 'bandit' | 'court' | 'default' {
-  if (factionName === '니마차 우디캐') return 'nimacha';
-  if (factionName === '홀라온 야인') return 'holaon';
-  if (factionName === '변경 마적') return 'bandit';
-  if (factionName === '조정 토벌군') return 'court';
-  return 'default';
+export function enemyObjectiveDefinition(objective: EnemyObjectiveId) {
+  return { id: objective, ...OBJECTIVE_DETAILS[objective], ...enemyObjectiveProfile(objective) };
+}
+
+export function enemyDoctrineDefinition(doctrine: EnemyDoctrineId) {
+  return { id: doctrine, ...DOCTRINE_DETAILS[doctrine] };
+}
+
+export function enemyDoctrineDefinitions(): readonly ReturnType<typeof enemyDoctrineDefinition>[] {
+  return ENEMY_DOCTRINES.map(enemyDoctrineDefinition);
+}
+
+export function eligibleEnemyDoctrines(
+  factionName: string,
+  maximumPhase: 1 | 2 | 8 = 2,
+): readonly EnemyDoctrineId[] {
+  const faction = tacticalEnemyFactionId(factionName);
+  return ENEMY_DOCTRINES.filter(doctrine => {
+    const definition = DOCTRINE_DETAILS[doctrine];
+    return definition.enabled && definition.implementationPhase <= maximumPhase &&
+      definition.factions.includes(faction);
+  });
+}
+
+export function chooseEnemyDoctrine(
+  factionName: string,
+  roll: number,
+  maximumPhase: 1 | 2 | 8 = 2,
+): EnemyDoctrineId {
+  const candidates = eligibleEnemyDoctrines(factionName, maximumPhase);
+  if (candidates.length === 0) return 'reserveCounterattack';
+  const index = Math.floor(clamp(roll, 0, 0.999999999) * candidates.length);
+  return candidates[index];
+}
+
+function factionKey(factionName: string): TacticalEnemyFactionId {
+  return tacticalEnemyFactionId(factionName);
 }
 
 function rearManeuverChance(factionName: string): number {
@@ -452,6 +564,100 @@ export function enemyPlanWarningLines(plan: EnemyPlan | undefined): string[] {
   const lines = visible.map(stratagem => STRATAGEM_DETAILS[stratagem.id].warning);
   if (intelLevel === 3 && plan.stratagems.length > visible.length) lines.push('아직 확인되지 않은 다른 움직임도 있습니다.');
   return lines.length > 0 ? lines : ['적의 대열에서 별도의 계책 징후는 보이지 않습니다.'];
+}
+
+export interface EnemyCompositionIntelGroupView {
+  groupId: string;
+  unitType?: import('./types').RaiderUnitType;
+  label: string;
+  category: string;
+  count?: number;
+  exact: boolean;
+  support: boolean;
+}
+
+export interface EnemyCompositionIntelView {
+  revealed: boolean;
+  templateId?: string;
+  templateLabel: string;
+  groups: EnemyCompositionIntelGroupView[];
+  hiddenGroupCount: number;
+}
+
+export function enemyCompositionIntelView(
+  battle: Pick<TacticalBattle, 'enemyPlan' | 'raiderGroups'>,
+): EnemyCompositionIntelView {
+  const plan = battle.enemyPlan;
+  const compositionRevealed = plan?.compositionRevealed === true;
+  const template = tacticalCompositionTemplate(plan?.compositionTemplateId);
+  const visibleGroups = battle.raiderGroups.filter(group => compositionRevealed || group.revealed);
+  const groups = visibleGroups.map(group => {
+    const profile = group.unitType ? tacticalUnitProfile(group.unitType) : undefined;
+    const exact = compositionRevealed && group.revealed && profile != null;
+    return {
+      groupId: group.id,
+      ...(exact && group.unitType ? { unitType: group.unitType } : {}),
+      label: exact ? profile!.label : (profile?.intelCategory ?? '미확인 부대'),
+      category: profile?.intelCategory ?? '미확인 부대',
+      ...(exact ? { count: Math.max(0, group.count - group.killed) } : {}),
+      exact,
+      support: profile?.tags.includes('support') === true || profile?.tags.includes('artillery') === true,
+    };
+  });
+  return {
+    revealed: compositionRevealed,
+    ...(compositionRevealed && template ? { templateId: template.id } : {}),
+    templateLabel: compositionRevealed ? (template?.label ?? '확인된 혼성 편제') : '미확인 편제',
+    groups,
+    hiddenGroupCount: Math.max(0, battle.raiderGroups.length - visibleGroups.length),
+  };
+}
+
+export interface EnemyPlanSummaryView {
+  objective: { revealed: boolean; id?: EnemyObjectiveId; label: string };
+  doctrine: {
+    revealed: boolean;
+    id?: EnemyDoctrineId;
+    label: string;
+    strength?: string;
+    weakness?: string;
+    counter?: string;
+  };
+  composition: EnemyCompositionIntelView;
+  revealedStratagems: ReturnType<typeof enemyStratagemDefinition>[];
+  hiddenStratagemCount: number;
+}
+
+export function enemyPlanSummaryView(
+  battle: Pick<TacticalBattle, 'enemyPlan' | 'raiderGroups'>,
+): EnemyPlanSummaryView {
+  const plan = battle.enemyPlan;
+  const objectiveRevealed = plan?.objectiveRevealed === true;
+  const doctrineRevealed = plan?.doctrineRevealed === true && plan.doctrine != null;
+  const doctrine = doctrineRevealed ? enemyDoctrineDefinition(plan!.doctrine!) : undefined;
+  const revealedStratagems = plan?.stratagems
+    .filter(stratagem => stratagem.revealed)
+    .map(stratagem => enemyStratagemDefinition(stratagem.id)) ?? [];
+  return {
+    objective: {
+      revealed: objectiveRevealed,
+      ...(objectiveRevealed && plan ? { id: plan.objective } : {}),
+      label: objectiveRevealed && plan ? OBJECTIVE_DETAILS[plan.objective].label : '미확인',
+    },
+    doctrine: {
+      revealed: doctrineRevealed,
+      ...(doctrine ? {
+        id: doctrine.id,
+        label: doctrine.label,
+        strength: doctrine.strength,
+        weakness: doctrine.weakness,
+        counter: doctrine.counter,
+      } : { label: '미확인' }),
+    },
+    composition: enemyCompositionIntelView(battle),
+    revealedStratagems,
+    hiddenStratagemCount: Math.max(0, (plan?.stratagems.length ?? 0) - revealedStratagems.length),
+  };
 }
 
 export function enemyIntelLevel(input: {

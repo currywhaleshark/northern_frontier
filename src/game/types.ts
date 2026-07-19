@@ -754,6 +754,43 @@ export type TacticalFlankPlan = 'breakthrough' | 'rearAssault';
 export type TacticalTargetSource = 'auto' | 'player' | 'ai';
 export type EnemyObjectiveId = 'breakthrough' | 'plunder' | 'arson';
 export type EnemyStratagemId = 'rearManeuver' | 'wallBreakers' | 'fireArrows' | 'feint' | 'nightApproach';
+export type EnemyDoctrineId =
+  | 'mountedSkirmish'
+  | 'shockBreakthrough'
+  | 'shieldedAdvance'
+  | 'breachAndStorm'
+  | 'missileSuppression'
+  | 'fireSupport'
+  | 'reserveCounterattack'
+  | 'feignedRetreat';
+export type TacticalEnemyFactionId = 'default' | 'nimacha' | 'holaon' | 'bandit' | 'court';
+export type TacticalUnitTag =
+  | 'infantry'
+  | 'mounted'
+  | 'ranged'
+  | 'firearm'
+  | 'shock'
+  | 'antiMounted'
+  | 'shielded'
+  | 'siege'
+  | 'artillery'
+  | 'indirectFire'
+  | 'support'
+  | 'scout';
+export type TacticalUnitArchetype =
+  | 'lightCavalry'
+  | 'horseArcher'
+  | 'lancerCavalry'
+  | 'spearInfantry'
+  | 'shieldInfantry'
+  | 'footArcher'
+  | 'musketeer'
+  | 'meleeInfantry'
+  | 'looterInfantry'
+  | 'wallBreaker'
+  | 'directArtillery'
+  | 'indirectArtillery'
+  | 'medic';
 
 export interface EnemyCounterBreakdown {
   intelligence: number;
@@ -771,6 +808,10 @@ export interface EnemyStratagemState {
 export interface EnemyPlan {
   objective: EnemyObjectiveId;
   objectiveRevealed: boolean;
+  doctrine?: EnemyDoctrineId;
+  doctrineRevealed?: boolean;
+  compositionTemplateId?: string;
+  compositionRevealed?: boolean;
   stratagemPoints: number;
   intelLevel?: 0 | 1 | 2 | 3 | 4;
   stratagems: EnemyStratagemState[];
@@ -790,7 +831,50 @@ export type RaiderUnitType =
   | 'court-archer'
   | 'court-melee'
   | 'court-cavalry'
-  | 'court-artillery';
+  | 'court-artillery'
+  | 'shield-infantry'
+  | 'deserter-musketeer'
+  | 'wall-breaker'
+  | 'court-shield'
+  | 'court-horse-archer'
+  | 'court-medic'
+  | 'court-hwacha';
+
+export interface TacticalUnitProfile {
+  id: RaiderUnitType;
+  label: string;
+  archetype: TacticalUnitArchetype;
+  tags: readonly TacticalUnitTag[];
+  factions: readonly TacticalEnemyFactionId[];
+  intelCategory: string;
+  defaultLine: TacticalFormationLine;
+  implementationPhase: 1 | 2 | 8;
+  enabled: boolean;
+}
+
+export interface TacticalCompositionCandidate {
+  unitType: RaiderUnitType;
+  weight: number;
+}
+
+export interface TacticalCompositionSlot {
+  role: RaiderGroupKind;
+  candidates: readonly TacticalCompositionCandidate[];
+  powerShare: readonly [min: number, max: number];
+  required?: boolean;
+  minThreat?: number;
+}
+
+export interface TacticalCompositionTemplate {
+  id: string;
+  label: string;
+  faction: TacticalEnemyFactionId;
+  doctrines: readonly EnemyDoctrineId[];
+  objectives: readonly EnemyObjectiveId[];
+  weight: number;
+  slots: readonly TacticalCompositionSlot[];
+  implementationPhase: 1 | 2 | 8;
+}
 
 export type TacticalCommandId =
   | 'hold'
@@ -910,9 +994,7 @@ export interface TacticalPreparationEffect {
   applied: boolean;
 }
 
-export interface TacticalAnimationEvent {
-  zoneId: string;
-  kind:
+export type TacticalAnimationEventKind =
     | 'camera'
     | 'bombardment'
     | 'fortify'
@@ -941,6 +1023,10 @@ export interface TacticalAnimationEvent {
     | 'casualty'
     | 'moraleBreak'
     | 'report';
+
+export interface TacticalAnimationEvent {
+  zoneId: string;
+  kind: TacticalAnimationEventKind;
   text?: string;
   durationMs: number;
   // 연출 보강용 부가 정보 (구버전 저장에는 없을 수 있어 전부 선택)

@@ -1,4 +1,5 @@
 import { CONFIG } from './config';
+import { tacticalUnitProfile } from './tacticalUnits';
 import type {
   CombatWeaponId, RaiderUnitType, TacticalDefenderGroup, TacticalFormationLine, TacticalRaiderGroup,
 } from './types';
@@ -25,16 +26,12 @@ export type TacticalTargetingAttacker = Pick<TacticalDefenderGroup, 'weapon' | '
 
 export type TacticalTargetingRole = 'melee' | 'musket' | 'bow';
 
-const RANGED_RAIDER_TYPES = new Set<RaiderUnitType>([
-  'nimacha-hunter', 'holaon-horse-archer', 'bandit-rider', 'court-gunner', 'court-archer',
-]);
-
 export function defaultRaiderFormationLine(
   unitType?: RaiderUnitType,
   leader = false,
 ): TacticalFormationLine {
-  if (leader || unitType === 'court-artillery') return 'rear';
-  return unitType && RANGED_RAIDER_TYPES.has(unitType) ? 'middle' : 'front';
+  if (leader) return 'rear';
+  return unitType ? tacticalUnitProfile(unitType).defaultLine : 'front';
 }
 
 export function tacticalTargetingRole(attacker: TacticalTargetingAttacker): TacticalTargetingRole {
@@ -44,8 +41,10 @@ export function tacticalTargetingRole(attacker: TacticalTargetingAttacker): Tact
     if (weapon === 'hornBow' || (weapon == null && attacker.role === 'hunter')) return 'bow';
     return 'melee';
   }
-  if (attacker.unitType === 'court-gunner' || attacker.unitType === 'court-artillery') return 'musket';
-  return attacker.unitType && RANGED_RAIDER_TYPES.has(attacker.unitType) ? 'bow' : 'melee';
+  if (!attacker.unitType) return 'melee';
+  const profile = tacticalUnitProfile(attacker.unitType);
+  if (profile.tags.includes('firearm') || profile.tags.includes('artillery')) return 'musket';
+  return profile.tags.includes('ranged') ? 'bow' : 'melee';
 }
 
 export function tacticalTargetingConcentration(attacker: TacticalTargetingAttacker): number {
