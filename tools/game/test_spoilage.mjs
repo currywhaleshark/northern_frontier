@@ -34,6 +34,7 @@ function rawFoodState(seed = 2026071601) {
   state.resources.eggs = 10;
   state.resources.milk = 10;
   state.resources.vegetables = 40;
+  state.spoilageStockAtDayStart = spoilage.spoilageStockSnapshot(state);
   return state;
 }
 
@@ -109,6 +110,19 @@ assert.ok(CONFIG.spoilage.seasonMult.winter < CONFIG.spoilage.seasonMult.autumn)
   assert.equal(state.resources.grain, 77, 'dry grain does not spoil');
   assert.equal(state.resources.rice, 33, 'unmilled rice does not spoil');
   assert.equal(state.resources.salt, 12, 'salt does not spoil');
+}
+
+{
+  const state = rawFoodState();
+  const oldFish = state.resources.fish;
+  state.resources.fish += 8;
+  const preview = spoilage.spoilagePreview(state);
+  assert.equal(preview.items.fish.eligibleStock, oldFish, 'only stock present at day start can spoil');
+  assert.equal(preview.items.fish.freshAmount, 8, 'same-day inbound food receives a one-day grace period');
+  const report = spoilage.applyDailySpoilage(state);
+  assert.equal(report.items.fish.loss, oldFish * CONFIG.spoilage.dailyRate.fish * CONFIG.spoilage.seasonMult.spring);
+  assert.equal(state.spoilageStockAtDayStart.fish, state.resources.fish,
+    'remaining fresh stock becomes eligible on the next day');
 }
 
 {

@@ -38,6 +38,8 @@ const scenario = await import(pathToFileURL(join(compiledDir, 'scenario.mjs')).h
 const tutorialStart = await import(pathToFileURL(join(compiledDir, 'tutorialStart.mjs')).href);
 const crops = await import(pathToFileURL(join(compiledDir, 'crops.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
+const seasons = await import(pathToFileURL(join(compiledDir, 'seasons.mjs')).href);
+const coachSource = readFileSync(new URL('../../src/components/TutorialCoach.tsx', import.meta.url), 'utf8');
 
 // 시나리오 중 허용되는 모달 — scenario(길잡이), tribute(결정론적 세공 수거)
 const ALLOWED_MODAL_KINDS = new Set(['scenario', 'tribute']);
@@ -84,8 +86,44 @@ function pushBuilt(state, type, extra = {}) {
   );
   // 시작 불변식: 사냥 스텝에 필요한 활성 서식지
   assert.ok(a.habitats.some(habitat => habitat.active), 'tutorial map has an active habitat');
+  assert.equal(a.buildings.some(building => building.type === 'woodShed'), false, 'tutorial starts before the wood yard lesson');
+  assert.equal(a.scenario.flags.woodShedGoal, 1, 'firewood lesson requires one newly completed wood yard');
   // 첫 안내가 게임 시작과 동시에 열려 있다
   assert.equal(a.pendingChoice?.kind, 'scenario');
+}
+
+{
+  // 파종은 장작·주거보다 먼저 열려 정상 진행에서 봄 파종창을 놓치지 않는다.
+  assert.deepEqual(
+    scenario.TUTORIAL_STEPS.slice(0, 4).map(step => step.id),
+    ['wake', 'sowing', 'firewood', 'housing'],
+  );
+  const state = tutorialStart.createTutorialGame();
+  closeModals(state);
+  scenario.markScenarioFlag(state, 'residentSelected');
+  keepAlive(state);
+  simulation.advanceDay(state);
+  assert.equal(scenario.currentScenarioStep(state)?.id, 'sowing');
+  assert.equal(seasons.getSeason(state.day), 'spring', 'the natural second tutorial step opens during planting season');
+}
+
+{
+  // 장작 재고만 미리 쌓아도 장작마당과 장작꾼 안내를 건너뛸 수 없다.
+  const state = tutorialStart.createTutorialGame();
+  const firewoodStep = scenario.TUTORIAL_STEPS.find(step => step.id === 'firewood');
+  assert.ok(firewoodStep);
+  state.resources.firewood = (state.scenario.flags.firewoodGoal ?? 0) + 5;
+  assert.equal(firewoodStep.isDone(state), false, 'stockpile alone does not skip the wood yard lesson');
+  pushBuilt(state, 'woodShed');
+  assert.equal(firewoodStep.isDone(state), false, 'a completed yard still needs an assigned wood splitter');
+  const worker = state.residents.find(resident => resident.alive && !resident.special);
+  assert.ok(worker);
+  worker.job = 'woodSplitter';
+  assert.equal(firewoodStep.isDone(state), true, 'yard, worker, and stockpile complete the lesson together');
+
+  const buildHint = coachSource.indexOf("{ tut: 'build-item-woodShed'");
+  const workerHint = coachSource.indexOf("{ tut: 'job-plus-woodSplitter'");
+  assert.ok(buildHint >= 0 && workerHint > buildHint, 'coach points to wood yard construction before staffing');
 }
 
 {
@@ -93,7 +131,12 @@ function pushBuilt(state, type, extra = {}) {
   const state = tutorialStart.createTutorialGame();
   const solvers = {
     wake: s => scenario.markScenarioFlag(s, 'residentSelected'),
-    firewood: s => { s.resources.firewood = (s.scenario.flags.firewoodGoal ?? 0) + 5; },
+    firewood: s => {
+      pushBuilt(s, 'woodShed');
+      const worker = s.residents.find(resident => resident.alive && !resident.special && resident.job !== 'woodSplitter');
+      if (worker) worker.job = 'woodSplitter';
+      s.resources.firewood = (s.scenario.flags.firewoodGoal ?? 0) + 5;
+    },
     housing: s => pushBuilt(s, 'hut'),
     sowing: s => pushBuilt(s, 'field', {
       w: 2, h: 2, sownArea: 4, cropId: crops.defaultCropForBuildingType('field'), queuedCropId: null,

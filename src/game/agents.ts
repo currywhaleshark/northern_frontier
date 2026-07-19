@@ -193,7 +193,45 @@ function reconstructPath(prev: Int32Array, width: number, start: number, end: nu
 // passable을 넘기면 주민과 다른 통행 규칙을 적용할 수 있다.
 // 성능: (1) 통행 판정은 탐색 한 번 안에서 칸당 1회로 메모한다 — 세력권·건물 검사가 비싸다.
 //       (2) open 리스트는 이진 힙 (push 시점 점수 고정 + closed 스킵의 lazy deletion).
+function runtimePathStartTime(): number | null {
+  if (typeof window === 'undefined') return null;
+  return (window as unknown as { __runtimePerfStartTime?: () => number | null })
+    .__runtimePerfStartTime?.() ?? null;
+}
+
+function recordRuntimePathfinding(
+  startedAt: number | null,
+  detail: Record<string, string | number | boolean | null>,
+): void {
+  if (typeof window === 'undefined') return;
+  (window as unknown as {
+    __recordRuntimePerfSince?: (
+      name: string,
+      start: number | null,
+      detail?: Record<string, string | number | boolean | null>,
+    ) => void;
+  }).__recordRuntimePerfSince?.('pathfinding', startedAt, detail);
+}
+
 export function findPath(
+  state: GameState,
+  sx: number,
+  sy: number,
+  isGoal: (t: Tile) => boolean,
+  passable?: (x: number, y: number) => boolean,
+): { x: number; y: number }[] | null {
+  const startedAt = runtimePathStartTime();
+  const result = findPathCore(state, sx, sy, isGoal, passable);
+  recordRuntimePathfinding(startedAt, {
+    fromX: sx,
+    fromY: sy,
+    pathLength: result?.length ?? 0,
+    found: result !== null,
+  });
+  return result;
+}
+
+function findPathCore(
   state: GameState,
   sx: number,
   sy: number,

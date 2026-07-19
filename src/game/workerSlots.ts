@@ -37,7 +37,10 @@ export const SLOTTED_BUILDING_CONFIG: Partial<Record<BuildingTypeId, WorkerSlotC
   hermitage: { job: 'monk', slots: 1 },
 };
 
-function isWorkableResident(state: GameState, resident: Resident | undefined): resident is Resident {
+export function isResidentAvailableForWorkerSlot(
+  state: GameState,
+  resident: Resident | undefined,
+): resident is Resident {
   return resident != null && resident.alive && !resident.sick && canResidentTakeJob(resident, resident.job) &&
     state.day >= (resident.quarantinedUntil ?? 0) && resident.health >= 20;
 }
@@ -79,26 +82,31 @@ export function isAutoAssignBuildingType(value: unknown): value is AutoAssignBui
   return typeof value === 'string' && (AUTO_ASSIGN_BUILDING_TYPES as readonly string[]).includes(value);
 }
 
-export function assignedWorkers(state: GameState, building: Building): Resident[] {
+export function assignedSlotResidents(state: GameState, building: Building): Resident[] {
   const config = slottedConfigForBuilding(state, building);
   if (!config) return [];
   return state.residents
     .filter(resident =>
       resident.assignedBuildingId === building.id &&
-      isWorkableResident(state, resident) &&
+      resident.alive &&
       resident.job === config.job)
     .sort((a, b) => a.id - b.id)
     .slice(0, workerSlotCount(building));
 }
 
+export function assignedWorkers(state: GameState, building: Building): Resident[] {
+  return assignedSlotResidents(state, building)
+    .filter(resident => isResidentAvailableForWorkerSlot(state, resident));
+}
+
 export function isResidentInAssignedSlot(state: GameState, resident: Resident, building: Building): boolean {
-  return assignedWorkers(state, building).some(worker => worker.id === resident.id);
+  return assignedSlotResidents(state, building).some(worker => worker.id === resident.id);
 }
 
 export function availableWorkerSlots(state: GameState, building: Building): number {
   const config = slottedConfigForBuilding(state, building);
   if (!config) return 0;
-  return Math.max(0, workerSlotCount(building) - assignedWorkers(state, building).length);
+  return Math.max(0, workerSlotCount(building) - assignedSlotResidents(state, building).length);
 }
 
 export function autoAssignWorkersToBuilding(state: GameState, buildingId: number): Resident[] {
@@ -106,11 +114,7 @@ export function autoAssignWorkersToBuilding(state: GameState, buildingId: number
   const config = slottedConfigForBuilding(state, building);
   if (!building || !config) return [];
 
-  // 병자처럼 잠시 일을 못 하는 기존 배정자도 자리는 유지한다.
-  const reservedSlots = state.residents.filter(resident =>
-    resident.alive &&
-    resident.job === config.job &&
-    resident.assignedBuildingId === building.id).length;
+  const reservedSlots = assignedSlotResidents(state, building).length;
   const vacancies = Math.max(0, workerSlotCount(building) - reservedSlots);
   if (vacancies === 0) return [];
 
@@ -118,7 +122,7 @@ export function autoAssignWorkersToBuilding(state: GameState, buildingId: number
     .filter(resident =>
       resident.assignedBuildingId == null &&
       resident.job === config.job &&
-      isWorkableResident(state, resident))
+      isResidentAvailableForWorkerSlot(state, resident))
     .sort((a, b) => distance(a, building) - distance(b, building) || a.id - b.id)
     .slice(0, vacancies);
 
@@ -141,9 +145,7 @@ export function autoAssignWorkersToSelectedBuildingTypes(
     .flatMap(building => {
       const config = slottedConfigForBuilding(state, building);
       if (!config) return [];
-      // 병자 등 일시적으로 일하지 못하는 기존 배정자도 자리를 차지한다.
-      const reservedSlots = state.residents.filter(resident =>
-        resident.alive && resident.job === config.job && resident.assignedBuildingId === building.id).length;
+      const reservedSlots = assignedSlotResidents(state, building).length;
       const vacancies = Math.max(0, workerSlotCount(building) - reservedSlots);
       return vacancies > 0 ? [{ building, config, vacancies }] : [];
     });
@@ -156,7 +158,8 @@ export function autoAssignWorkersToSelectedBuildingTypes(
     for (const target of targets) {
       if (target.vacancies <= 0) continue;
       for (const resident of state.residents) {
-        if (resident.job !== target.config.job || resident.assignedBuildingId != null || !isWorkableResident(state, resident)) continue;
+        if (resident.job !== target.config.job || resident.assignedBuildingId != null ||
+          !isResidentAvailableForWorkerSlot(state, resident)) continue;
         const candidate = { target, resident, distance: distance(resident, target.building) };
         if (!best || candidate.distance < best.distance
           || (candidate.distance === best.distance && candidate.target.building.id < best.target.building.id)
@@ -206,7 +209,7 @@ export function canAssignResidentToBuilding(
       : '아직 일을 맡길 수 없는 나이입니다';
   }
 
-  const assigned = assignedWorkers(state, building);
+  const assigned = assignedSlotResidents(state, building);
   if (
     assigned.length >= workerSlotCount(building) &&
     !assigned.some(worker => worker.id === resident.id)
@@ -266,7 +269,7 @@ export function assignNearestWorkerToBuilding(state: GameState, buildingId: numb
   const candidate = state.residents
     .filter(resident =>
       resident.assignedBuildingId == null &&
-      isWorkableResident(state, resident))
+      isResidentAvailableForWorkerSlot(state, resident))
     .sort((a, b) => {
       const jobPreference = Number(b.job === config.job) - Number(a.job === config.job);
       if (jobPreference !== 0) return jobPreference;

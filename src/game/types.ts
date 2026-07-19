@@ -342,6 +342,15 @@ export interface Corpse {
   withExpedition?: boolean; // 원정대가 수습해 지니고 귀환 중 (귀환 시 마을에 내려놓는다)
 }
 
+// 묘지에 안치된 뒤에도 남는 최소 기록. 구버전 묘는 일부 값이 없을 수 있다.
+export interface BurialRecord {
+  corpseId?: number;
+  name?: string;
+  cause?: string;
+  deathDay?: number;
+  burialDay?: number;
+}
+
 export interface Resident {
   id: number;
   name: string;
@@ -419,6 +428,7 @@ export interface Building {
   fermentBatches?: FermentBatch[]; // 장독대 전용: 절대일 기준 숙성 배치
   livestock?: LivestockState; // 축사 전용: 축종·마릿수·번식·사료 부족 상태
   graves?: number; // 묘지 전용: 안장된 묘 수 (자리가 차면 증설이 필요하다)
+  burialRecords?: BurialRecord[]; // 묘지 전용: 이름·사인·사망일을 보존하는 안치 기록
   inventory?: Partial<Record<ResourceId, number>>; // 운반 전 생산지 현장 재고
   repairing?: boolean; // 습격으로 파손되어 건설담당의 수리가 필요한 상태
 }
@@ -1143,6 +1153,7 @@ export interface GameState {
   nextBuildingId: number;
   nextResidentId: number;
   resources: Record<ResourceId, number>;
+  spoilageStockAtDayStart?: Partial<Record<ResourceId, number>>; // 당일 입고분 부패 유예용 하루 시작 재고
   unlockedLivestock: LivestockId[];
   weaponAssignments: Partial<Record<number, CombatWeaponId>>; // 주민별 전투 무기. 없으면 비무장
   mountAssignments: Partial<Record<number, MountId>>; // 무기와 별도인 주민별 탑승 군마

@@ -13,8 +13,10 @@ export function createTutorialGame(): GameState {
   ensureTutorialInvariants(state);
   const builtHouses = state.buildings.filter(building =>
     building.built && (building.type === 'hut' || building.type === 'ondol' || building.type === 'tileHouse')).length;
+  const builtWoodSheds = state.buildings.filter(building => building.built && building.type === 'woodShed').length;
   state.scenario = createTutorialScenarioState({
     firewoodGoal: Math.ceil(state.resources.firewood) + 25,
+    woodShedGoal: builtWoodSheds + 1,
     houseGoal: builtHouses + 1,
     meatGoal: 6,
   });

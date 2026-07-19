@@ -12,7 +12,9 @@ import {
   plotPlowOxenMax, plowOxenAssigned, plowOxenOf, plowOxenPool,
 } from '../game/livestock';
 import { getBuildingActions } from '../game/selectionActions';
-import { assignedWorkers, availableWorkerSlots, workerSlotConfig, workerSlotCount } from '../game/workerSlots';
+import {
+  assignedSlotResidents, availableWorkerSlots, isResidentAvailableForWorkerSlot, workerSlotConfig, workerSlotCount,
+} from '../game/workerSlots';
 import type { BuildingTypeId, CropId, DryingProductId, GameState, LivestockId, ResourceId, SmithyProductId } from '../game/types';
 import { FactionName } from './FactionName';
 
@@ -82,7 +84,7 @@ export function ActionPopup({
     top: minY * TILE,
   };
   const slotCount = slotConfig ? workerSlotCount(building) : 0;
-  const slotWorkers = slotConfig ? assignedWorkers(state, building) : [];
+  const slotWorkers = slotConfig ? assignedSlotResidents(state, building) : [];
   const openSlots = slotConfig ? availableWorkerSlots(state, building) : 0;
   const isCropBuilding = building.built && (building.type === 'field' || building.type === 'paddy');
   const currentCrop = isCropBuilding ? cropIdForBuilding(building) : null;
@@ -115,10 +117,22 @@ export function ActionPopup({
           </div>
           {Array.from({ length: slotCount }, (_value, index) => {
             const worker = slotWorkers[index];
+            const workerInactive = worker != null && !isResidentAvailableForWorkerSlot(state, worker);
+            const workerStatus = !worker
+              ? JOB_NAMES[slotConfig.job]
+              : worker.sick
+                ? '와병 중 · 생산 중단'
+                : state.day < (worker.quarantinedUntil ?? 0)
+                  ? '격리 중 · 생산 중단'
+                  : worker.health < 20
+                    ? '중상 · 생산 중단'
+                    : workerInactive
+                      ? '근무 불가 · 생산 중단'
+                      : JOB_NAMES[worker.job];
             const disabled = !worker && openSlots <= 0;
             return (
               <div
-                className={`worker-slot-row${worker ? '' : ' empty'}${disabled ? ' disabled' : ''}`}
+                className={`worker-slot-row${workerInactive ? ' inactive' : ''}${worker ? '' : ' empty'}${disabled ? ' disabled' : ''}`}
                 key={worker?.id ?? `empty-${index}`}
               >
                 <button
@@ -137,7 +151,7 @@ export function ActionPopup({
                   />
                   <span className="worker-slot-text">
                     <span className="worker-slot-name">{worker ? worker.name : '빈 슬롯 배정'}</span>
-                    <span className="muted small">{worker ? JOB_NAMES[worker.job] : JOB_NAMES[slotConfig.job]}</span>
+                    <span className="muted small">{workerStatus}</span>
                   </span>
                 </button>
                 {worker && (

@@ -11,7 +11,9 @@ assert.ok(loopStart >= 0 && loopEnd > loopStart, 'App game loop source is discov
 const loopSource = appSource.slice(loopStart, loopEnd);
 
 assert.match(loopSource, /advanceGameClock\(acc, now - last, msPerTick, 24\)/, 'App delegates accumulator math to the pure game clock');
-assert.match(loopSource, /if \(ticksProcessed > 0\) \{[\s\S]*?bump\(\);[\s\S]*?\}/, 'App bumps once only after processing simulation ticks');
+assert.match(loopSource, /if \(ticksProcessed > 0\) \{[\s\S]*?runtimeVersionStore\.publish\(\);[\s\S]*?requestUiRefresh\(/, 'processed ticks publish the canvas version and request a throttled management snapshot refresh');
+assert.doesNotMatch(loopSource, /if \(ticksProcessed > 0\) \{[\s\S]*?\bbump\(\)/, 'ordinary simulation ticks no longer bump the whole App tree');
+assert.match(loopSource, /uiVersionStore\.publish\(\);\s*if \(commitApp\) setVersion/, 'scheduled management refreshes do not commit App');
 assert.doesNotMatch(loopSource, /\}\s*bump\(\);\s*\/\/ 서브틱 사이에도/, 'the 33ms loop no longer unconditionally bumps React');
 
 assert.match(canvasSource, /animationActive: boolean/, 'GameCanvas receives an explicit animation state');

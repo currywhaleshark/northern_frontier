@@ -104,6 +104,10 @@ export function BuildDrawer({
   const placingCategory = placingType && isBuildableBuildingType(placingType)
     ? buildCategoryFor(placingType)
     : null;
+  // BUILD_MENU_ORDER에서 온 카테고리 내 순서는 그대로 두고, 현재 가능한 건물만 앞에 모은다.
+  const buildItems = activeCategory?.types.map(type => ({ type, reason: unavailableReason(state, type) })) ?? [];
+  const availableBuildItems = buildItems.filter(item => item.reason == null);
+  const unavailableBuildItems = buildItems.filter(item => item.reason != null);
 
   const rememberCategory = (category: BuildCategoryId) => {
     onUiPrefsChange(current => current.buildDrawerLastCategory === category
@@ -163,6 +167,31 @@ export function BuildDrawer({
     setPlacingType(type);
   };
 
+  const renderBuildItem = ({ type, reason }: { type: BuildableBuildingTypeId; reason: string | null }) => {
+    const def = BUILDING_DEFS[type];
+    return (
+      <button
+        key={type}
+        type="button"
+        className="build-drawer-item"
+        data-tut={`build-item-${type}`}
+        aria-disabled={reason != null}
+        aria-describedby={tooltipType === type ? 'build-drawer-tooltip' : undefined}
+        aria-label={def.name}
+        title={reason ? `사용 불가: ${reason}` : def.name}
+        onMouseEnter={() => setHoveredTooltipType(type)}
+        onMouseLeave={() => setHoveredTooltipType(current => current === type ? null : current)}
+        onFocus={() => setFocusedTooltipType(type)}
+        onBlur={() => setFocusedTooltipType(current => current === type ? null : current)}
+        onClick={() => { if (!reason) startPlacement(type); }}
+      >
+        <BuildingThumb type={type} state={state} />
+        <strong className="build-drawer-item-name">{def.name}</strong>
+        {reason && <span className="build-drawer-item-lock" aria-hidden="true">🔒</span>}
+      </button>
+    );
+  };
+
   return (
     <div className="build-drawer-shell" aria-label="건설 도구">
       {placingType && isBuildableBuildingType(placingType) && (
@@ -197,30 +226,17 @@ export function BuildDrawer({
               onClick={() => setDrawerState(current => ({ ...current, openCategory: null }))}
             >×</button>
           </header>
-          <div className="build-drawer-grid">
-            {activeCategory.types.map(type => {
-              const def = BUILDING_DEFS[type];
-              const reason = unavailableReason(state, type);
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  className="build-drawer-item"
-                  data-tut={`build-item-${type}`}
-                  aria-disabled={reason != null}
-                  aria-describedby={tooltipType === type ? 'build-drawer-tooltip' : undefined}
-                  aria-label={def.name}
-                  onMouseEnter={() => setHoveredTooltipType(type)}
-                  onMouseLeave={() => setHoveredTooltipType(current => current === type ? null : current)}
-                  onFocus={() => setFocusedTooltipType(type)}
-                  onBlur={() => setFocusedTooltipType(current => current === type ? null : current)}
-                  onClick={() => { if (!reason) startPlacement(type); }}
-                >
-                  <BuildingThumb type={type} state={state} />
-                  <strong className="build-drawer-item-name">{def.name}</strong>
-                </button>
-              );
-            })}
+          <div className="build-drawer-list">
+            <div className="build-drawer-group-label" role="heading" aria-level={2}>
+              <span>지금 건설 가능</span><small>{availableBuildItems.length}종</small>
+            </div>
+            {availableBuildItems.map(renderBuildItem)}
+            {unavailableBuildItems.length > 0 && (
+              <div className="build-drawer-group-label unavailable" role="heading" aria-level={2}>
+                <span>현재 불가</span><small>{unavailableBuildItems.length}종 · 이유는 항목에 올려 보십시오</small>
+              </div>
+            )}
+            {unavailableBuildItems.map(renderBuildItem)}
           </div>
         </section>
       )}

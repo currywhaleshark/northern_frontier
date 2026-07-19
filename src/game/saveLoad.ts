@@ -1137,6 +1137,14 @@ export function loadGame(slot = 1): GameState | null {
     if (!parsed.unlockedLivestock.includes('chicken')) parsed.unlockedLivestock.push('chicken');
     for (const building of parsed.buildings) {
       if (building.built) building.repairing = false;
+      if (building.type === 'cemetery') {
+        const graveCount = Math.max(0, Math.floor(building.graves ?? 0));
+        building.graves = graveCount;
+        building.burialRecords = Array.isArray(building.burialRecords)
+          ? building.burialRecords.slice(0, graveCount)
+          : [];
+        while (building.burialRecords.length < graveCount) building.burialRecords.push({});
+      }
       if (building.type === 'smithy' && !building.smithyProduct) building.smithyProduct = 'tools';
       if (building.type === 'dryingRack' && building.dryingProduct !== 'driedFish') {
         building.dryingProduct = 'saltedFish';
@@ -1179,6 +1187,15 @@ export function loadGame(slot = 1): GameState | null {
     // 은맥 없는 구버전
     if (!Object.prototype.hasOwnProperty.call(parsed, 'silverVein')) parsed.silverVein = null;
     if (parsed.silverPityDays == null) parsed.silverPityDays = 0;
+    if (!parsed.spoilageStockAtDayStart || typeof parsed.spoilageStockAtDayStart !== 'object') {
+      parsed.spoilageStockAtDayStart = {
+        fish: parsed.resources.fish ?? 0,
+        milk: parsed.resources.milk ?? 0,
+        meat: parsed.resources.meat ?? 0,
+        eggs: parsed.resources.eggs ?? 0,
+        vegetables: parsed.resources.vegetables ?? 0,
+      };
+    }
     // 생애 주기·장례 없는 구버전
     if (!Array.isArray(parsed.corpses)) parsed.corpses = [];
     if (parsed.nextCorpseId == null) parsed.nextCorpseId = 1;

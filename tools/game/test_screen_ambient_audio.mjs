@@ -9,21 +9,23 @@ assert.match(appSource,
   'App must import an explicit weather stop operation alongside weather updates');
 
 const generalSoundEffect = appSource.slice(
-  appSource.indexOf('// 게임 상태 변화 → 효과음'),
-  appSource.indexOf('const state = stateRef.current;'),
+  appSource.indexOf('// 관리 UI snapshot과 같은 cadence로 게임 상태 효과를 동기화한다.'),
+  appSource.indexOf('  useEffect(() => {\n    setWeatherAmbient(state.weather);'),
 );
 assert.doesNotMatch(generalSoundEffect, /setWeatherAmbient|stopWeatherAmbient/,
-  'log and battle SFX inspection must not update weather ambient on every render');
+  'log and battle SFX inspection must not update weather ambient on every snapshot');
 
 const ambientEffect = appSource.slice(
-  appSource.indexOf('// 화면 수명주기 → 날씨 앰비언트'),
-  appSource.indexOf('// 직접 지휘를 시작하면'),
+  appSource.indexOf('  useEffect(() => {\n    setWeatherAmbient(state.weather);'),
+  appSource.indexOf('  return null;\n}', appSource.indexOf('function RuntimeGameEffects')),
 );
 assert.match(ambientEffect,
-  /if \(screen === 'game'\) setWeatherAmbient\(state\.weather\);[\s\S]*else stopWeatherAmbient\(\);/,
-  'only the game screen may own the current weather ambient');
-assert.match(ambientEffect, /\}, \[screen, state\.weather\]\);/,
-  'weather ambient updates must be driven only by screen or actual weather changes');
+  /setWeatherAmbient\(state\.weather\);[\s\S]*\}, \[state\.weather\]\);/,
+  'the mounted game runtime boundary owns weather updates');
+assert.match(ambientEffect, /useEffect\(\(\) => \(\) => stopWeatherAmbient\(\), \[\]\);/,
+  'leaving the game screen must stop ambient when the runtime boundary unmounts');
+assert.ok(appSource.indexOf("if (screen === 'menu')") < appSource.indexOf('<RuntimeGameEffects'),
+  'the runtime effects boundary must only mount after the menu early return');
 
 assert.match(sfxSource, /export function stopWeatherAmbient\(\): void \{/,
   'the sound layer must expose an explicit menu-transition stop');

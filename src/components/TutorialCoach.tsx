@@ -26,11 +26,22 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
   ],
   firewood: [
     {
+      done: state => state.buildings.filter(building => building.built && building.type === 'woodShed').length
+        >= (state.scenario?.flags.woodShedGoal ?? Infinity),
+      path: [
+        { tut: 'build-cat-production', text: '생산 건설 목록을 여십시오.' },
+        { tut: 'build-item-woodShed', text: '장작마당을 골라 빈 땅에 배치하고 완공하십시오. 장작꾼은 이 작업장이 있어야 일합니다.' },
+      ],
+    },
+    {
       done: state => countJob(state, 'woodSplitter') >= 1,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
         { tut: 'job-plus-woodSplitter', text: '장작꾼 ＋를 누르십시오. 원목을 장작으로 팹니다. 무직이 없으면 다른 직업의 −를 먼저 누르십시오.' },
       ],
+    },
+    {
+      path: [{ tut: 'time-play', text: '시간을 흘려 장작마당의 장작꾼이 목표량까지 장작을 패게 하십시오.' }],
     },
   ],
   housing: [

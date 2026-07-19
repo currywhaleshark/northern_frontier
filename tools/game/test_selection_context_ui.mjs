@@ -6,6 +6,8 @@ const contextSource = readFileSync(new URL('../../src/components/SelectionContex
 const drawerSource = readFileSync(new URL('../../src/components/BuildDrawer.tsx', import.meta.url), 'utf8');
 const canvasSource = readFileSync(new URL('../../src/components/GameCanvas.tsx', import.meta.url), 'utf8');
 const inspectorSource = readFileSync(new URL('../../src/components/InspectorPanel.tsx', import.meta.url), 'utf8');
+const actionPopupSource = readFileSync(new URL('../../src/components/ActionPopup.tsx', import.meta.url), 'utf8');
+const jobPanelSource = readFileSync(new URL('../../src/components/JobPanel.tsx', import.meta.url), 'utf8');
 const weaponDialogSource = readFileSync(new URL('../../src/components/WeaponAllocationDialog.tsx', import.meta.url), 'utf8');
 const residentsWindowSource = readFileSync(new URL('../../src/components/dock/ResidentsWindow.tsx', import.meta.url), 'utf8');
 const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
@@ -23,6 +25,8 @@ assert.match(contextSource, /<ActionPopup[\s\S]*embedded/,
   'building actions must reuse the established action controls inside the context bar');
 assert.match(contextSource, /building\.type === 'cellar'[\s\S]*저장 보호[\s\S]*spoilage\.protectedTotal/,
   'completed cellars must show the protected raw-food amount in the selection context');
+assert.match(contextSource, /building\.type === 'cemetery'[\s\S]*안치 기록[\s\S]*record\.name[\s\S]*record\.cause[\s\S]*record\.deathDay/,
+  'cemeteries must show the buried name, cause of death, and death day');
 assert.match(contextSource, /building\.type === 'stable'[\s\S]*마릿수[\s\S]*번식[\s\S]*곡물/,
   'completed stables must show flock size, breeding progress, and daily feed use');
 assert.match(contextSource, /<td>탑승<\/td>[\s\S]*mountAssignments/,
@@ -37,6 +41,16 @@ assert.doesNotMatch(canvasSource, /ActionPopup/,
   'the map canvas must not keep a duplicate building action popup');
 assert.doesNotMatch(inspectorSource, /tab === 'tile'|ResidentDetail/,
   'the right inspector must no longer duplicate tile or resident selection details');
+assert.match(actionPopupSource, /assignedSlotResidents\(state, building\)/,
+  'worker slot rows must render preserved assignments rather than active production workers only');
+assert.match(actionPopupSource, /worker\.sick[\s\S]*와병 중 · 생산 중단/,
+  'a sick assignee must remain named in the slot with an inactive status');
+assert.match(actionPopupSource, /worker-slot-row\$\{workerInactive \? ' inactive' : ''\}/,
+  'temporarily unavailable assignees must receive a distinct inactive slot style');
+assert.match(jobPanelSource, /isResidentAvailableForWorkerSlot\(state, resident\)[\s\S]*배치 가능/,
+  'the job panel must count only residents who automatic assignment can actually place');
+assert.match(cssSource, /\.worker-slot-row\.inactive[\s\S]*\.worker-slot-main/,
+  'inactive preserved slots must have a visible disabled-work treatment');
 
 assert.doesNotMatch(drawerSource, /selectionActive/,
   'selection state must not close or disable the independently positioned build drawer');

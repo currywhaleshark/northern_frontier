@@ -17,6 +17,14 @@ function veinTile(state: GameState): Tile | null {
   return v ? state.map[v.y]?.[v.x] ?? null : null;
 }
 
+export function isBuriedSilverVeinTile(
+  state: GameState,
+  tile: Pick<Tile, 'x' | 'y'>,
+): boolean {
+  const v = vein(state);
+  return !!v && v.status === 'buried' && v.x === tile.x && v.y === tile.y;
+}
+
 // 봉인 명령이 떨어진 광상은 은맥만이 아니라 남은 돌·철도 캘 수 없다 (보고의 대가).
 export function isVeinSealedTile(state: GameState, tile: Pick<Tile, 'x' | 'y'>): boolean {
   const v = vein(state);

@@ -25,6 +25,7 @@ import { foreignSiteActors, foreignSiteProps, type ForeignSiteProp } from '../ga
 import { activePassageRoutes } from '../game/passage';
 import { weaponCountsForResidents } from '../game/weapons';
 import { activePredatorScoutIds } from '../game/expeditionIntel';
+import { isBuriedSilverVeinTile } from '../game/silver';
 import { activeExpeditionTargetMarkers, type ExpeditionTargetMarker } from '../game/expeditionTargets';
 import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, Resident, Terrain } from '../game/types';
 import { pixelRectIntersectsViewport, tileRectIntersectsViewport, type SceneViewport } from './sceneViewport';
@@ -357,6 +358,25 @@ function drawHabitatRange(ctx: CanvasRenderingContext2D, habitat: AnimalHabitat)
   ctx.arc(cx, cy, habitat.radius * TILE, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+  ctx.restore();
+}
+
+function drawBuriedSilverVeinMarker(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  const cx = x * TILE + TILE / 2;
+  const cy = y * TILE + TILE / 2;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(235, 205, 116, 0.95)';
+  ctx.fillStyle = 'rgba(55, 43, 29, 0.78)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3, 2]);
+  ctx.beginPath();
+  ctx.arc(cx, cy, Math.max(5, TILE * 0.28), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#e6c970';
+  ctx.fillRect(cx - 1, cy - 4, 2, 8);
+  ctx.fillRect(cx - 4, cy - 1, 8, 2);
   ctx.restore();
 }
 
@@ -856,6 +876,15 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     drawClaimZone(ctx, zone, owner ? siteColor(owner) : '#aab1b8');
   }
   for (const route of activePassageRoutes(state)) drawPassageRoute(ctx, route);
+  const buriedVein = state.silverVein;
+  if (buriedVein?.status === 'buried') {
+    const buriedTile = state.map[buriedVein.y]?.[buriedVein.x];
+    if (buriedTile && isExplored(state, buriedVein.x, buriedVein.y)
+      && isBuriedSilverVeinTile(state, buriedTile)
+      && tileRectIntersectsViewport(viewport, buriedVein.x, buriedVein.y)) {
+      drawBuriedSilverVeinMarker(ctx, buriedVein.x, buriedVein.y);
+    }
+  }
   lap('1-terrain');
 
   // 2) 건물 — 지붕이 위 타일에 겹치므로 y 순서로 그린다

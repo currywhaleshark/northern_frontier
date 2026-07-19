@@ -12,6 +12,7 @@ import { livestockDailyFeedNeed, livestockCapacity, LIVESTOCK_DEFS, normalizeLiv
 import { residentHome } from '../game/residents';
 import { getSeason } from '../game/seasons';
 import { spoilagePreview } from '../game/spoilage';
+import { isBuriedSilverVeinTile } from '../game/silver';
 import type { SiteGiftType } from '../game/siteDiplomacy';
 import { isWallBuilding } from '../game/walls';
 import { combatDefaultWeaponName } from '../game/combatCapabilities';
@@ -277,6 +278,7 @@ export function SelectionContextBar({
     : null;
   const spoilage = spoilagePreview(state);
   const mineSummary = building?.type === 'mine' ? mineMineralSummary(state, building) : null;
+  const buriedSilverVeinHere = isBuriedSilverVeinTile(state, tile ?? { x: -1, y: -1 });
 
   if (resident) {
     const jobName = JOB_NAMES[resident.job];
@@ -340,6 +342,12 @@ export function SelectionContextBar({
                   ) : (
                     <>
                       <tr><td>지형</td><td>{TERRAIN_NAMES[tile.terrain]}{tile.terrain === 'rock' && tile.hasIron ? ' (철맥)' : ''}</td></tr>
+                      {buriedSilverVeinHere && (
+                        <tr>
+                          <td>은맥</td>
+                          <td>묻어 둠 · {mineralRemaining(tile) > 0 ? `원광 ${mineralRemaining(tile).toFixed(1)} 남음` : '원광 고갈'} · 다시 열 수 있음</td>
+                        </tr>
+                      )}
                       {tile.terrain === 'rock' && building?.type !== 'mine' && (
                         <tr>
                           <td>광상</td>
@@ -393,6 +401,26 @@ export function SelectionContextBar({
                                 </td>
                               </tr>
                             )}
+                            {building.type === 'cemetery' && building.built && (() => {
+                              const graveCount = Math.max(0, building.graves ?? 0);
+                              const records = Array.from({ length: graveCount }, (_, index) => building.burialRecords?.[index] ?? {});
+                              return (
+                                <>
+                                  <tr><td>묘 자리</td><td>{graveCount}/{CONFIG.funeral.plotsPerCemetery}기</td></tr>
+                                  <tr>
+                                    <td>안치 기록</td>
+                                    <td>{records.length > 0
+                                      ? records.map((record, index) => (
+                                        <div key={`${record.corpseId ?? 'unknown'}-${index}`} className="burial-record">
+                                          <strong>{typeof record.name === 'string' && record.name.trim() ? record.name : '미상'}</strong>
+                                          <span>사인 {typeof record.cause === 'string' && record.cause.trim() ? record.cause : '미상'} · 사망 {Number.isFinite(record.deathDay) ? `${record.deathDay}일` : '미상'}</span>
+                                        </div>
+                                      ))
+                                      : <span className="muted">안치 기록 없음</span>}</td>
+                                  </tr>
+                                </>
+                              );
+                            })()}
                             {(building.type === 'field' || building.type === 'paddy') && building.built && (
                               <>
                                 <tr>

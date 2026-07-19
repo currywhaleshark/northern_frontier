@@ -367,6 +367,13 @@ export function buryCorpse(state: GameState, corpseId: number, cemetery: Buildin
   if ((cemetery.graves ?? 0) >= CONFIG.funeral.plotsPerCemetery) return false;
   const [corpse] = corpses.splice(index, 1);
   cemetery.graves = (cemetery.graves ?? 0) + 1;
+  (cemetery.burialRecords ??= []).push({
+    corpseId: corpse.id,
+    name: corpse.name,
+    cause: corpse.cause,
+    deathDay: corpse.deathDay,
+    burialDay: state.day,
+  });
   // 노승이 재(齋)를 올려 주면 위로가 깊어진다
   const relief = CONFIG.funeral.burialMoraleRelief
     + (hasResidentMonk(state) ? CONFIG.satisfaction.monkBurialBonus : 0);

@@ -5,8 +5,8 @@ const appSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'u
 const logSource = readFileSync(new URL('../../src/components/UnifiedLog.tsx', import.meta.url), 'utf8');
 const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
 
-assert.match(appSource, /<UnifiedLog state=\{state\}/,
-  'App must render one unified log over the canvas');
+assert.match(appSource, /<Profiler id="log-boundary"[\s\S]*?<RuntimeVersionBoundary store=\{uiVersionStore\}>[\s\S]*?<UnifiedLog state=\{stateRef\.current\}/,
+  'App must render one unified log over the canvas through its management snapshot boundary');
 assert.doesNotMatch(appSource, /ImportantLogOverlay|<EventLog/,
   'App must not retain either legacy log surface');
 assert.equal(existsSync(new URL('../../src/components/ImportantLogOverlay.tsx', import.meta.url)), false,

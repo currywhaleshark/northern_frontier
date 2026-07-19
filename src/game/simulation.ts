@@ -54,7 +54,7 @@ import { isHaulSourceBuilding } from './inventory';
 import { maybeOfferDefectorImmigration, maybeOfferImmigration, resolveImmigration } from './immigration';
 import { createIncidentState, resolveSpecialEvent, updateSpecialEvents } from './specialEvents';
 import { dailyClaimTensionTick, noteBuildingClaimIntrusions } from './claimZones';
-import { applyDailySpoilage } from './spoilage';
+import { applyDailySpoilage, spoilageStockSnapshot } from './spoilage';
 import { consumptionWeight, lifecycleDailyTick, resolveWeddingChoice } from './lifecycle';
 import { applyJobChangeCarryover, dailyEducationTick, isLiterateJob } from './education';
 import { canResidentTakeJob, isYouthWorkJob, youthActivityOf } from './youth';
@@ -172,6 +172,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     lastDeathCause: 'other',
     victoryProgressNote: '',
   };
+  state.spoilageStockAtDayStart = spoilageStockSnapshot(state);
 
   // 마을 중심지 + 초가집 2채는 지어진 상태로 시작
   placePrebuilt(state, 'center', centerX, centerY);

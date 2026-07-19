@@ -11,6 +11,7 @@ import { getPointerAction } from '../game/selectionActions';
 import { foreignSiteAt } from '../game/foreignSites';
 import type { BuildingTypeId, GameState, SelectedEntity } from '../game/types';
 import { FactionName } from './FactionName';
+import { recordRuntimePerf, recordRuntimePerfSince, runtimePerfStartTime } from '../perf/runtimePerf';
 
 const TILE = CONFIG.ui.tileSize;
 const CLICK_RADIUS = Math.round(TILE * 0.65); // 주민 클릭 판정 반경(픽셀)
@@ -45,6 +46,7 @@ export function GameCanvas({
   const animationFrameRef = useRef<number | null>(null);
   const continuousRenderRef = useRef(false);
   const lastCanvasDrawRef = useRef(0);
+  const lastMeasuredCanvasDrawRef = useRef(0);
   const viewportRef = useRef<SceneViewport | null>(null);
   const pointerPositionRef = useRef<{ mx: number; my: number } | null>(null);
   const hoverSemanticKeyRef = useRef('outside');
@@ -64,6 +66,13 @@ export function GameCanvas({
     const frame = (now: number) => {
       animationFrameRef.current = null;
       if (!continuousRenderRef.current || now - lastCanvasDrawRef.current >= ANIMATION_FRAME_MS) {
+        const runtimeProbe = window.__runtimePerf;
+        if (runtimeProbe?.active && lastMeasuredCanvasDrawRef.current >= runtimeProbe.startedAt) {
+          recordRuntimePerf('frame-interval', lastMeasuredCanvasDrawRef.current, now - lastMeasuredCanvasDrawRef.current, {
+            targetMs: ANIMATION_FRAME_MS,
+          });
+        }
+        lastMeasuredCanvasDrawRef.current = runtimeProbe?.active ? now : 0;
         lastCanvasDrawRef.current = now;
         drawRef.current();
       }
@@ -141,6 +150,7 @@ export function GameCanvas({
     const frameAlpha = Math.max(0, Math.min(1, (performance.now() - anim.current.at) / anim.current.ms));
     const perf = window.__renderPerf;
     const start = perf ? performance.now() : 0;
+    const runtimeDrawStart = runtimePerfStartTime();
     renderScene(canvas, state, {
       alpha: frameAlpha, hover: hoverTile, placingType, placingRect, selected, selectedResidentId,
       selectedBuildingId, viewport: viewportRef.current ?? undefined, terrainVisualSignature: terrainSignature,
@@ -151,6 +161,10 @@ export function GameCanvas({
       bucket.total += performance.now() - start;
       bucket.count++;
     }
+    recordRuntimePerfSince('canvas-draw', runtimeDrawStart, {
+      residents: state.residents.length,
+      buildings: state.buildings.length,
+    });
   };
 
   // 보간은 App 전체 React 렌더와 분리한다. 정지 중에는 상호작용/상태 변경마다 한 프레임만 그린다.

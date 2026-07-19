@@ -174,6 +174,13 @@ function healthyState(seed) {
   const moraleBefore = state.residents.filter(r => r.alive).map(r => r.morale);
   assert.equal(lifecycle.buryCorpse(state, corpse.id, cemetery), true);
   assert.equal(cemetery.graves, 1);
+  assert.deepEqual(cemetery.burialRecords, [{
+    corpseId: corpse.id,
+    name: corpse.name,
+    cause: corpse.cause,
+    deathDay: corpse.deathDay,
+    burialDay: state.day,
+  }], 'burial preserves the identity, cause, and date after the corpse is removed');
   assert.equal((state.corpses ?? []).length, 0);
   assert.ok(state.residents.filter(r => r.alive)
     .every((r, i) => r.morale >= moraleBefore[i]), 'burial comforts the village');

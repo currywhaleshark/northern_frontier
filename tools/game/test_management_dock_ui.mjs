@@ -41,6 +41,14 @@ assert.doesNotMatch(topBarSource, /조정 탭에서/,
   'TopBar guidance must refer to the docked court window rather than a removed tab');
 assert.match(residentSource, /onSelectResident\(resident\.id\)/,
   'resident rows must retain direct resident selection');
+assert.match(residentSource, /filteredResidents\(state, \{[\s\S]*query,[\s\S]*job: jobFilter,[\s\S]*status: statusFilter,[\s\S]*sort,/,
+  'resident window must apply name, job, status, and sort controls to its visible rows');
+assert.match(residentSource, /aria-label="주민 이름 찾기"[\s\S]*aria-label="주민 직업 필터"[\s\S]*aria-label="주민 상태 필터"[\s\S]*aria-label="주민 정렬 기준"/,
+  'resident list controls must be keyboard-accessible and explicitly named');
+assert.match(residentSource, /selectedHidden[\s\S]*선택한 주민은 현재 필터에 숨겨져 있습니다/,
+  'filtering must preserve a hidden selection instead of clearing it');
+assert.doesNotMatch(residentSource, /scrollTop\s*=/,
+  'resident filtering and sorting must not reset the list scroll position');
 assert.match(appSource, /handleSelectResidentFromDock[\s\S]*centerViewportOnTile/,
   'dock resident selection must center the map on that resident');
 assert.match(minimapSource, /export function centerViewportOnTile/,

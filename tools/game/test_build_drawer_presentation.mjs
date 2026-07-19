@@ -28,6 +28,8 @@ transpileDirectory(new URL('../../src/game/', import.meta.url), join(rootDir, 'g
 transpileDirectory(new URL('../../src/ui/', import.meta.url), join(rootDir, 'ui'));
 
 const { BUILD_MENU_ORDER } = await import(pathToFileURL(join(rootDir, 'game', 'buildings.mjs')).href);
+const drawerSource = readFileSync(new URL('../../src/components/BuildDrawer.tsx', import.meta.url), 'utf8');
+const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
 const {
   BUILD_CATEGORIES,
   BUILD_CATEGORY_BY_TYPE,
@@ -62,5 +64,18 @@ assert.deepEqual(drawer, { openCategory: 'farming', restoreCategory: null },
   'finishing or cancelling placement must restore the originating category');
 drawer = toggleBuildDrawerCategory(drawer, 'farming');
 assert.equal(drawer.openCategory, null, 'pressing the active category again must close the drawer');
+
+assert.match(drawerSource, /const availableBuildItems = buildItems\.filter\(item => item\.reason == null\)/,
+  'the drawer must partition available buildings before unavailable ones');
+assert.match(drawerSource, /const unavailableBuildItems = buildItems\.filter\(item => item\.reason != null\)/,
+  'unavailable buildings must retain their own stable group');
+assert.match(drawerSource, /지금 건설 가능[\s\S]*?availableBuildItems\.map\(renderBuildItem\)[\s\S]*?현재 불가[\s\S]*?unavailableBuildItems\.map\(renderBuildItem\)/,
+  'the available group must render before the unavailable group');
+assert.match(drawerSource, /title=\{reason \? `사용 불가: \$\{reason\}` : def\.name\}/,
+  'unavailable items must preserve an explicit lock reason');
+assert.match(cssSource, /\.build-drawer-list\s*\{[\s\S]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)[\s\S]*overflow-y:\s*auto;/,
+  'drawer cards must use a four-column vertical scroll grid');
+assert.doesNotMatch(cssSource, /\.build-drawer-grid\s*\{[\s\S]*grid-auto-flow:\s*column/,
+  'the old horizontal auto-column drawer must be removed');
 
 console.log('build drawer presentation tests passed');

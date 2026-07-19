@@ -115,6 +115,18 @@ function resident(state, index, job, x, y) {
   assert.equal(sickAssigned.assignedBuildingId, smithy.id);
   assert.equal(healthy.assignedBuildingId, smithy.id);
   assert.equal(extra.assignedBuildingId, null);
+  assert.deepEqual(workerSlots.assignedSlotResidents(state, smithy).map(worker => worker.id),
+    [sickAssigned.id, healthy.id],
+    'the slot roster keeps a temporarily sick assignee visible beside the active replacement');
+  assert.deepEqual(workerSlots.assignedWorkers(state, smithy).map(worker => worker.id), [healthy.id],
+    'temporarily sick assignees do not contribute production while their slot remains reserved');
+  assert.equal(workerSlots.availableWorkerSlots(state, smithy), 0,
+    'the displayed roster and automatic assignment agree that no unexplained vacancy remains');
+
+  sickAssigned.sick = false;
+  assert.deepEqual(workerSlots.assignedWorkers(state, smithy).map(worker => worker.id),
+    [sickAssigned.id, healthy.id],
+    'a recovered assignee automatically resumes work in the preserved slot');
 }
 
 // 대량 자동 배정은 선택한 건물 종류의 빈자리만 채우며, 기존 배정·다른 종류·직업은 보존한다.

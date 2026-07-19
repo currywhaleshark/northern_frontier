@@ -1072,11 +1072,6 @@
           },
           {
             "zoneId": "wall",
-            "kind": "rearAssault",
-            "groupId": "nimacha-spears"
-          },
-          {
-            "zoneId": "wall",
             "kind": "volley",
             "groupId": null
           },
@@ -1099,6 +1094,11 @@
             "zoneId": "wall",
             "kind": "wallAssault",
             "groupId": "nimacha-looters"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "rearAssault",
+            "groupId": "nimacha-spears"
           },
           {
             "zoneId": "wall",
@@ -1885,11 +1885,6 @@
           },
           {
             "zoneId": "wall",
-            "kind": "rearAssault",
-            "groupId": "holaon-archers"
-          },
-          {
-            "zoneId": "wall",
             "kind": "volley",
             "groupId": null
           },
@@ -1902,6 +1897,11 @@
             "zoneId": "wall",
             "kind": "wallAssault",
             "groupId": "holaon-lancers"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "rearAssault",
+            "groupId": "holaon-archers"
           },
           {
             "zoneId": "wall",
@@ -3500,11 +3500,6 @@
           },
           {
             "zoneId": "wall",
-            "kind": "rearAssault",
-            "groupId": "bandit-riders"
-          },
-          {
-            "zoneId": "wall",
             "kind": "volley",
             "groupId": null
           },
@@ -3522,6 +3517,11 @@
             "zoneId": "wall",
             "kind": "wallAssault",
             "groupId": "bandit-vanguard"
+          },
+          {
+            "zoneId": "wall",
+            "kind": "rearAssault",
+            "groupId": "bandit-riders"
           },
           {
             "zoneId": "wall",

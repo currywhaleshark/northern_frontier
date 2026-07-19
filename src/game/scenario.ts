@@ -12,7 +12,7 @@ import { getDayOfSeason, getSeason } from './seasons';
 import { isWallBuilding } from './walls';
 import type { GameState, ScenarioState } from './types';
 
-export const TUTORIAL_SCENARIO_VERSION = 1;
+export const TUTORIAL_SCENARIO_VERSION = 2;
 
 export interface ScenarioStepDefinition {
   id: string;
@@ -50,15 +50,30 @@ export const TUTORIAL_STEPS: readonly ScenarioStepDefinition[] = [
     isDone: state => (flags(state).residentSelected ?? 0) > 0 && state.day >= 2,
   },
   {
+    id: 'sowing',
+    title: '봄 파종',
+    goal: () => '밭을 일구고 4칸 이상 파종하기',
+    body:
+      '봄은 짧습니다. 파종철이 지나면 그 칸은 한 해 내내 놉니다.\n\n' +
+      '· 건설 목록(농사)에서 밭을 끌어 크기를 정해 배치하십시오.\n' +
+      '· 농부가 밭을 갈고 씨를 뿌립니다. 가을에 거둔 곡식이 겨울 식량이 됩니다.\n' +
+      '· 밭을 선택하면 작물을 고르고 농우를 붙일 수 있습니다.',
+    isDone: state => totalSownArea(state) >= 4,
+  },
+  {
     id: 'firewood',
     title: '장작이 곧 목숨',
-    goal: state => `장작 ${flags(state).firewoodGoal ?? 0} 확보`,
+    goal: state => `장작마당 1채 + 장작꾼 1명 + 장작 ${flags(state).firewoodGoal ?? 0} 확보`,
     body:
       '북방의 겨울은 장작이 떨어지는 순간부터 사람을 잡아갑니다.\n\n' +
-      '· 벌목꾼이 나무를 베어 원목을 나르고, 장작꾼이 원목을 장작으로 팹니다.\n' +
-      '· 하단 독의 직업 배정 창에서 인원을 조절할 수 있습니다.\n' +
+      '· 먼저 건설 목록(생산)에서 장작마당을 골라 완공하십시오. 장작꾼은 장작마당이 있어야 일합니다.\n' +
+      '· 벌목꾼이 나무를 베어 원목을 나르고, 장작꾼이 장작마당에서 원목을 장작으로 팹니다.\n' +
+      '· 하단 독의 직업 배정 창에서 장작꾼을 1명 이상 두십시오.\n' +
       '· 인구가 늘수록 하루 장작 소모도 늘어난다는 것을 기억하십시오.',
-    isDone: state => state.resources.firewood >= (flags(state).firewoodGoal ?? Infinity),
+    isDone: state =>
+      builtCount(state, type => type === 'woodShed') >= (flags(state).woodShedGoal ?? Infinity) &&
+      state.residents.some(resident => resident.alive && resident.job === 'woodSplitter') &&
+      state.resources.firewood >= (flags(state).firewoodGoal ?? Infinity),
   },
   {
     id: 'housing',
@@ -71,17 +86,6 @@ export const TUTORIAL_STEPS: readonly ScenarioStepDefinition[] = [
       '· 완공된 집은 주민이 알아서 입주합니다.',
     isDone: state => builtCount(state, type => type === 'hut' || type === 'ondol' || type === 'tileHouse')
       >= (flags(state).houseGoal ?? Infinity),
-  },
-  {
-    id: 'sowing',
-    title: '봄 파종',
-    goal: () => '밭을 일구고 4칸 이상 파종하기',
-    body:
-      '봄은 짧습니다. 파종철이 지나면 그 칸은 한 해 내내 놉니다.\n\n' +
-      '· 건설 목록(농사)에서 밭을 끌어 크기를 정해 배치하십시오.\n' +
-      '· 농부가 밭을 갈고 씨를 뿌립니다. 가을에 거둔 곡식이 겨울 식량이 됩니다.\n' +
-      '· 밭을 선택하면 작물을 고르고 농우를 붙일 수 있습니다.',
-    isDone: state => totalSownArea(state) >= 4,
   },
   {
     id: 'hunting',

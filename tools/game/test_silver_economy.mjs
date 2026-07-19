@@ -35,6 +35,9 @@ const silver = await load('silver');
 const suspicion = await load('suspicion');
 const courtTribute = await load('courtTribute');
 const buildings = await load('buildings');
+const selectionActions = await load('selectionActions');
+const rendererSource = readFileSync(new URL('../../src/render/renderer.ts', import.meta.url), 'utf8');
+const selectionContextSource = readFileSync(new URL('../../src/components/SelectionContextBar.tsx', import.meta.url), 'utf8');
 
 const MANSANG = '만상';
 const SONGSANG = '송상';
@@ -199,11 +202,25 @@ function recordMiningToday(state, tile) {
   assert.equal(state.silverVein.status, 'buried');
   assert.ok(!tile.hasSilver, 'buried vein keeps the original deposit');
 
+  tile.mineralRemaining = 1;
+  const depletion = minerals.extractMineralDeposit(tile, 1);
+  assert.equal(depletion.depleted, true);
+  assert.equal(tile.terrain, 'plain', 'the original outcrop may be exhausted');
+  assert.equal(silver.isBuriedSilverVeinTile(state, tile), true,
+    'the buried vein remains discoverable independently of the depleted outcrop');
+  assert.ok(selectionActions.getBuildingActions(state, state.buildings.find(building => building.type === 'mine'))
+    .some(action => action.id === 'silver-reopen'), 'the serving mine can still reopen a buried vein after depletion');
+
   state.day += CONFIG.silver.reofferCooldownDays;
   recordMiningToday(state, tile);
   silver.dailySilverTick(state, () => 0.99);
   assert.equal(state.pendingChoice?.kind, 'silverVein', 'mining the deposit re-offers the dilemma');
 }
+
+assert.match(rendererSource, /status === 'buried'[\s\S]*drawBuriedSilverVeinMarker/,
+  'the explored map keeps a marker for a buried vein');
+assert.match(selectionContextSource, /buriedSilverVeinHere[\s\S]*묻어 둠[\s\S]*원광 고갈/,
+  'tile details explain that a buried vein survives outcrop depletion');
 
 // ── G2: 보장 — 자연 확률이 없어도 누적 채광일이 차면 반드시 등장 ──
 {

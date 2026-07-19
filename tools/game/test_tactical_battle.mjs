@@ -453,6 +453,17 @@ function addBuiltMarker(state, type) {
   flanker.engagementsInZone = 0;
   assert.equal(tactical.tacticalRaiderVisibleDuringPlayback(battle, flanker, 0), false,
     'the shared battlefield visibility contract hides a rear assault before first contact');
+  battle.phase = 'simulating';
+  battle.pendingReport = { events: [] };
+  assert.equal(tactical.tacticalRaiderVisibleDuringPlayback(battle, flanker, 0), false,
+    'a rear assaulter moving into position stays hidden when the current playback has no reveal event');
+  battle.pendingReport.events.push({ kind: 'rearAssault', groupId: flanker.id });
+  assert.equal(tactical.tacticalRaiderVisibleDuringPlayback(battle, flanker, -1), false,
+    'the next rear assaulter stays hidden before its reveal beat');
+  assert.equal(tactical.tacticalRaiderVisibleDuringPlayback(battle, flanker, 0), true,
+    'the current rear assaulter becomes visible on its reveal beat');
+  battle.phase = 'command';
+  battle.pendingReport = null;
   assert.ok(tactical.tacticalCommandUnavailableReason(battle, spear, 'reinforceRear'),
     'a planned but not-yet-revealed rear assault must not unlock the rear response command');
   spear.command = 'hold';
@@ -2313,6 +2324,42 @@ for (const optionId of ['militia', 'levy']) {
   assert.equal(battle.pendingReport.treated, 1);
   assert.ok(battle.pendingReport.events.some(event => event.groupId === healer.id && event.float === '응급치료 +1'));
   assert.ok(battle.pendingReport.lines.some(line => line.includes('약초를 써 부상자 1명')));
+}
+
+{
+  const state = simulation.newGame(2026071908);
+  prepareDefenders(state);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'rear assault ambush order test', power: 90, warned: true, siege: false, mode: 'garrison',
+  });
+  tactical.advanceTacticalPhase(state);
+  battle.defenderGroups.forEach(group => { group.zoneId = 'center'; });
+  tactical.advanceTacticalPhase(state);
+  const hunter = battle.defenderGroups.find(group => group.kind === 'hunter');
+  const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
+  assert.ok(hunter && flanker);
+  hunter.zoneId = 'wall';
+  hunter.line = 'rear';
+  hunter.ambushed = true;
+  hunter.command = 'ambush';
+  hunter.commandSource = 'player';
+  battle.raiderGroups.forEach(group => {
+    group.intent = 'withdraw';
+    group.power = 0;
+  });
+  Object.assign(flanker, {
+    zoneId: 'wall', targetZoneId: 'wall', flankPlan: 'rearAssault', rearAssault: true,
+    intent: 'flank', revealed: false, power: 90, morale: 100, engagementsInZone: 0,
+  });
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  const hunterAmbushIndex = battle.pendingReport.events.findIndex(event =>
+    event.kind === 'ambush' && event.text.includes('매복중이던 사냥꾼'));
+  const rearAssaultIndex = battle.pendingReport.events.findIndex(event =>
+    event.kind === 'rearAssault' && event.groupId === flanker.id);
+  assert.ok(hunterAmbushIndex >= 0, 'an ambushed hunter receives a distinct preemptive attack beat');
+  assert.ok(rearAssaultIndex >= 0, 'the rear assaulter receives a distinct reveal beat');
+  assert.ok(hunterAmbushIndex < rearAssaultIndex,
+    'the ambushed hunter attacks before the rear assault reveal changes the formation direction');
 }
 
 {

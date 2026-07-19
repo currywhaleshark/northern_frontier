@@ -6,6 +6,7 @@ import { visibleMinimapRaid, visibleMinimapSites } from '../game/minimap';
 import { activeExpeditionTargetMarkers } from '../game/expeditionTargets';
 import type { ForeignSite, GameState, Terrain } from '../game/types';
 import { terrainVisualSignature } from '../render/renderer';
+import { recordRuntimePerfSince, runtimePerfStartTime } from '../perf/runtimePerf';
 import {
   minimapBaseInvalidationKey,
   minimapOverlayInvalidationKey,
@@ -171,6 +172,7 @@ export function Minimap({ state, version, animationActive, viewportRef, selected
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
     const startedAt = window.__renderPerf ? performance.now() : 0;
+    const runtimeStartedAt = runtimePerfStartTime();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#090b0d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -210,6 +212,10 @@ export function Minimap({ state, version, animationActive, viewportRef, selected
       drawSite(ctx, site, (site.x + site.width / 2) * scaleX, (site.y + site.height / 2) * scaleY);
     }
     recordMinimapRedraw('minimap-base-redraw', startedAt);
+    recordRuntimePerfSince('minimap-base-draw', runtimeStartedAt, {
+      buildings: state.buildings.length,
+      exploredRows: state.exploration.explored.length,
+    });
   }, [baseInvalidationKey, mapHeight, mapWidth, minimapHeight]);
 
   // Overlay layer redraw: transient camera, selection, threat, and target state only.
@@ -224,6 +230,7 @@ export function Minimap({ state, version, animationActive, viewportRef, selected
 
     const drawOverlay = () => {
       const startedAt = window.__renderPerf ? performance.now() : 0;
+      const runtimeStartedAt = runtimePerfStartTime();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 260);
 
@@ -278,6 +285,10 @@ export function Minimap({ state, version, animationActive, viewportRef, selected
         Math.max(2, Math.round(viewport.height * canvas.height) - 1),
       );
       recordMinimapRedraw('minimap-overlay-redraw', startedAt);
+      recordRuntimePerfSince('minimap-overlay-draw', runtimeStartedAt, {
+        targets: targetMarkers.length,
+        raidVisible: visibleRaid !== null,
+      });
       const animatePulse = animationActive && !document.hidden && pulseActive;
       if (animatePulse) animationFrame = requestAnimationFrame(drawOverlay);
     };

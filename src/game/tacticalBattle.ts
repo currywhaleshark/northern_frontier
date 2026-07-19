@@ -467,7 +467,9 @@ export function tacticalRaiderVisibleDuringPlayback(
     } else {
       const revealIndex = battle.pendingReport?.events.findIndex(playbackEvent =>
         playbackEvent.kind === 'rearAssault' && playbackEvent.groupId === attacker.id) ?? -1;
-      if (revealIndex >= 0 && eventIndex < revealIndex) return false;
+      if (revealIndex >= 0) {
+        if (eventIndex < revealIndex) return false;
+      } else if (attacker.engagementsInZone <= 0) return false;
     }
   }
   if (attacker.intent !== 'withdraw') return true;
@@ -1820,11 +1822,10 @@ export function resolveTacticalRound(state: GameState): string | null {
     const defenders = assignedDefenders.filter(group => activeCount(group) > 0);
     const rearAttackers = attackers.filter(attacker => attacker.rearAssault);
     const frontalAttackers = attackers.filter(attacker => !attacker.rearAssault);
+    const newlyRevealedRearAttackerIds = new Set<string>();
     for (const attacker of rearAttackers.filter(group => group.engagementsInZone === 0)) {
       attacker.revealed = true;
-      event(events, zone.id, 'rearAssault', `${withJosa(attacker.label, '이/가')} 수비대 후열에 갑자기 모습을 드러냅니다.`, 760, {
-        side: 'defender', groupId: attacker.id, float: '후방 급습!',
-      });
+      newlyRevealedRearAttackerIds.add(attacker.id);
       lines.push(`${withJosa(attacker.label, '이/가')} ${zone.name} 후열을 급습했습니다.`);
     }
     const assignedEngagements = splitTacticalEngagementDefenders(assignedDefenders, rearAttackers.length > 0);
@@ -1905,7 +1906,20 @@ export function resolveTacticalRound(state: GameState): string | null {
         attacker.pendingZoneId = undefined;
         moraleBrokenAttackerIds.add(attacker.id);
       }
-      events.push(...exchange.preDefenseEvents);
+      if (engagement.direction === 'rear' && newlyRevealedRearAttackerIds.size > 0) {
+        const revealEvents: TacticalAnimationEvent[] = [];
+        for (const attacker of engagement.attackers.filter(group => newlyRevealedRearAttackerIds.has(group.id))) {
+          event(revealEvents, zone.id, 'rearAssault', `${withJosa(attacker.label, '이/가')} 수비대 후열에 갑자기 모습을 드러냅니다.`, 760, {
+            side: 'defender', groupId: attacker.id, float: '후방 급습!',
+          });
+        }
+        const preemptiveEventCount = exchange.surpriseAttack ? 1 : 0;
+        events.push(
+          ...exchange.preDefenseEvents.slice(0, preemptiveEventCount),
+          ...revealEvents,
+          ...exchange.preDefenseEvents.slice(preemptiveEventCount),
+        );
+      } else events.push(...exchange.preDefenseEvents);
       lines.push(...exchange.preDefenseLines);
       for (const loss of exchange.defenderLosses) {
         const defender = engagement.defenders.find(group => group.id === loss.groupId);

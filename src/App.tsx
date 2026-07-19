@@ -1,5 +1,5 @@
 // 최상위 컴포넌트: 게임 상태 보관, 게임 루프, 플레이어 입력 연결
-import { lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Profiler, useCallback, useEffect, useLayoutEffect, useRef, useState, type ProfilerOnRenderCallback } from 'react';
 import { CONFIG } from './game/config';
 import {
   assignNearestWorkerToBuilding, assignResidentToBuilding,
@@ -78,6 +78,23 @@ import { advanceGameClock } from './ui/gameClock';
 import { appointConfinedSpecialResident } from './game/specialResidents';
 import type { DockWindowId, FloatingWindowId } from './ui/dockPresentation';
 import type { AutoAssignBuildingType } from './game/workerSlots';
+import { RuntimeVersionBoundary } from './components/RuntimeVersionBoundary';
+import { createRuntimeVersionStore, uiRefreshIntervalMs } from './ui/runtimeVersionStore';
+import {
+  recordRuntimePerf, recordRuntimePerfSince, runtimePerfSnapshot, runtimePerfStartTime,
+  startRuntimePerf, stopRuntimePerf, summarizeRuntimePerf,
+} from './perf/runtimePerf';
+
+let lastAppCommitTime = 0;
+const runtimePerfParams = new URLSearchParams(window.location.search);
+
+const recordAppRender: ProfilerOnRenderCallback = (
+  id, phase, actualDuration, _baseDuration, startTime, commitTime,
+) => {
+  lastAppCommitTime = commitTime;
+  recordRuntimePerf('react-render', startTime, actualDuration, { id, phase });
+  recordRuntimePerf('react-commit', commitTime, Math.max(0, performance.now() - commitTime), { id, phase });
+};
 
 const SaveSlotDialog = lazy(() => import('./components/SaveSlotDialog')
   .then(module => ({ default: module.SaveSlotDialog })));
@@ -94,12 +111,79 @@ const ExpeditionMusterDialog = lazy(() => import('./components/ExpeditionMusterD
 const SpecialResidentsWindow = lazy(() => import('./components/dock/SpecialResidentsWindow')
   .then(module => ({ default: module.SpecialResidentsWindow })));
 
+function RuntimeGameEffects({ state, setSpeed }: { state: GameState; setSpeed: (speed: number) => void }) {
+  const sndRef = useRef({
+    logLen: 0,
+    pending: null as string | null,
+    over: false,
+    battleActive: false,
+    battleOutcome: null as 'victory' | 'defeat' | null,
+  });
+
+  // 관리 UI snapshot과 같은 cadence로 게임 상태 효과를 동기화한다.
+  useEffect(() => {
+    const m = sndRef.current;
+    if (state.log.length < m.logLen) m.logLen = state.log.length;
+    if (state.log.length > m.logLen) {
+      for (const e of state.log.slice(m.logLen).slice(-3)) {
+        if (e.kind === 'good') {
+          if (e.text.includes('노루')) playSfx('hunt');
+          else if (e.text.includes('회복')) playSfx('heal');
+          else if (e.text.includes('이주민')) playSfx('welcome');
+          else playSfx('good');
+        } else if (e.kind === 'bad') {
+          if (e.text.includes('세상을 떠났')) playSfx('death');
+          else if (e.text.includes('부족') || e.text.includes('굶')) playSfx('warn');
+          else playSfx('bad');
+        } else if (e.kind === 'raid') playSfx('raidDrum');
+        else if (e.kind === 'trade') playSfx('tradeBell');
+        else if (e.kind === 'weather' && (e.text.includes('눈보라') || e.text.includes('혹한'))) playSfx('gust');
+      }
+      m.logLen = state.log.length;
+    }
+    const pendingKind = state.pendingChoice?.kind ?? null;
+    if (pendingKind && pendingKind !== m.pending) {
+      playSfx(pendingKind === 'raid' || pendingKind === 'crackdown'
+        ? 'raidHorn'
+        : pendingKind === 'immigration' ? 'welcome' : 'tradeBell');
+    }
+    m.pending = pendingKind;
+    if (state.gameOver && !m.over) playSfx(state.gameOver.won ? 'win' : 'lose');
+    m.over = Boolean(state.gameOver);
+    if (state.battle && !m.battleActive) playSfx('raidDrum');
+    if (!state.battle && m.battleActive && m.battleOutcome) {
+      playSfx(m.battleOutcome === 'victory' ? 'raidHorn' : 'death');
+    }
+    m.battleActive = Boolean(state.battle);
+    m.battleOutcome = state.battle?.outcome ?? (state.battle ? m.battleOutcome : null);
+  });
+
+  useEffect(() => {
+    setWeatherAmbient(state.weather);
+  }, [state.weather]);
+
+  useEffect(() => () => stopWeatherAmbient(), []);
+
+  useEffect(() => {
+    if (state.tacticalBattle) setSpeed(0);
+  }, [state.tacticalBattle?.id, setSpeed]);
+
+  return null;
+}
+
 export default function App() {
-  // 게임 상태는 ref에 두고, version 증가로 리렌더를 트리거한다
+  const appRenderStartedAt = runtimePerfStartTime();
+  // 게임 상태는 ref에 두고, 입력/차단 상태만 App version으로 즉시 반영한다.
   const stateRef = useRef(newGame());
   const mapViewportRef = useRef<HTMLDivElement>(null);
-  const [version, setVersion] = useState(0);
-  const bump = useCallback(() => setVersion(v => v + 1), []);
+  const [runtimeVersionStore] = useState(createRuntimeVersionStore);
+  const [uiVersionStore] = useState(createRuntimeVersionStore);
+  const [, setVersion] = useState(0);
+  const bump = useCallback(() => {
+    runtimeVersionStore.publish();
+    uiVersionStore.publish();
+    setVersion(v => v + 1);
+  }, [runtimeVersionStore, uiVersionStore]);
 
   const [screen, setScreen] = useState<'menu' | 'game'>('menu');
   const [menuView, setMenuView] = useState<'main' | 'battleSim'>('main');
@@ -123,17 +207,13 @@ export default function App() {
   );
   const [weaponDialogOpen, setWeaponDialogOpen] = useState(false);
   const [expeditionMusterRequest, setExpeditionMusterRequest] = useState<ExpeditionMusterRequest | null>(null);
+  const [runtimePerfReport, setRuntimePerfReport] = useState<string | null>(null);
+  const [runtimePerfCapturing, setRuntimePerfCapturing] = useState(false);
+  const runtimePerfEnabled = runtimePerfParams.get('perf') === '1';
+  const runtimePerfDurationMs = Number(runtimePerfParams.get('perfMs') ?? 0);
+  const appLayoutCompletedAtRef = useRef(0);
   // 이동 보간용: 마지막 서브틱 처리 시각과 서브틱 간격
   const animRef = useRef({ at: performance.now(), ms: 175 });
-  // 사운드 트리거 추적 (로그 증가분/모달 전환/게임 종료/지도 전투)
-  const sndRef = useRef({
-    logLen: 0,
-    pending: null as string | null,
-    over: false,
-    battleActive: false,
-    battleOutcome: null as 'victory' | 'defeat' | null,
-  });
-
   useEffect(() => {
     saveUiPrefs(uiPrefs);
   }, [uiPrefs]);
@@ -149,12 +229,39 @@ export default function App() {
     });
   }, [uiPrefs.pinnedDockWindows]);
 
+  useLayoutEffect(() => {
+    const probe = window.__runtimePerf;
+    if (!probe?.active || appRenderStartedAt == null) {
+      appLayoutCompletedAtRef.current = 0;
+      return;
+    }
+    const completedAt = performance.now();
+    recordRuntimePerf('react-tree-render-commit', appRenderStartedAt, completedAt - appRenderStartedAt, { screen });
+    appLayoutCompletedAtRef.current = completedAt;
+  });
+
+  useEffect(() => {
+    const layoutCompletedAt = appLayoutCompletedAtRef.current;
+    const probe = window.__runtimePerf;
+    if (probe?.active && layoutCompletedAt >= probe.startedAt) {
+      recordRuntimePerf('react-tree-passive-effects', layoutCompletedAt, performance.now() - layoutCompletedAt, { screen });
+    }
+  });
+
   const selectionContextVisible = selectedEntity !== null;
   useEffect(() => {
     setFloatingWindowOrder(current => selectionContextVisible
       ? bringDockWindowToFront(current, 'selection')
       : current.filter(id => id !== 'selection'));
   }, [selectionContextVisible]);
+
+  useEffect(() => {
+    if (lastAppCommitTime > 0) {
+      recordRuntimePerf('react-post-commit', lastAppCommitTime, Math.max(0, performance.now() - lastAppCommitTime), {
+        screen,
+      });
+    }
+  });
 
   // 브라우저 자동재생 정책: 첫 입력 때 오디오 시작
   useEffect(() => {
@@ -167,58 +274,7 @@ export default function App() {
     };
   }, []);
 
-  // 게임 상태 변화 → 효과음 (렌더마다 증가분만 검사)
-  useEffect(() => {
-    const s = stateRef.current;
-    const m = sndRef.current;
-    if (s.log.length < m.logLen) m.logLen = s.log.length; // 새 게임/로그 절삭
-    if (s.log.length > m.logLen) {
-      for (const e of s.log.slice(m.logLen).slice(-3)) {
-        if (e.kind === 'good') {
-          // 가장 잦은 good 로그들을 소리로 구분한다
-          if (e.text.includes('노루')) playSfx('hunt');
-          else if (e.text.includes('회복')) playSfx('heal');
-          else if (e.text.includes('이주민')) playSfx('welcome');
-          else playSfx('good');
-        } else if (e.kind === 'bad') {
-          if (e.text.includes('세상을 떠났')) playSfx('death');
-          else if (e.text.includes('부족') || e.text.includes('굶')) playSfx('warn');
-          else playSfx('bad');
-        } else if (e.kind === 'raid') playSfx('raidDrum');
-        else if (e.kind === 'trade') playSfx('tradeBell');
-        else if (e.kind === 'weather' && (e.text.includes('눈보라') || e.text.includes('혹한'))) playSfx('gust');
-      }
-      m.logLen = s.log.length;
-    }
-    const pk = s.pendingChoice?.kind ?? null;
-    if (pk && pk !== m.pending) {
-      playSfx(pk === 'raid' || pk === 'crackdown' ? 'raidHorn' : pk === 'immigration' ? 'welcome' : 'tradeBell');
-    }
-    m.pending = pk;
-    if (s.gameOver && !m.over) playSfx(s.gameOver.won ? 'win' : 'lose');
-    m.over = !!s.gameOver;
-    // 지도 위 습격 전투: 집결 개시에 북, 종료 시 승리면 뿔나팔·패배면 저음 조종
-    if (s.battle && !m.battleActive) playSfx('raidDrum');
-    if (!s.battle && m.battleActive && m.battleOutcome) {
-      playSfx(m.battleOutcome === 'victory' ? 'raidHorn' : 'death');
-    }
-    m.battleActive = !!s.battle;
-    m.battleOutcome = s.battle?.outcome ?? (s.battle ? m.battleOutcome : null);
-  });
-
   const state = stateRef.current;
-
-  // 화면 수명주기 → 날씨 앰비언트. 메뉴는 이전 게임의 날씨를 즉시 끊는다.
-  useEffect(() => {
-    if (screen === 'game') setWeatherAmbient(state.weather);
-    else stopWeatherAmbient();
-  }, [screen, state.weather]);
-
-  // 직접 지휘를 시작하면 기존 배속을 버린다. 전투 종료 뒤 10배속이
-  // 갑자기 재개되어 장작 고갈이나 동사 판정이 연달아 진행되는 일을 막는다.
-  useEffect(() => {
-    if (state.tacticalBattle) setSpeed(0);
-  }, [state.tacticalBattle?.id]);
 
   useEffect(() => {
     if (screen !== 'game') return;
@@ -262,6 +318,11 @@ export default function App() {
       crop: (id: number, crop: CropId, mode: 'queue' | 'uproot' = 'uproot') => setBuildingCrop(stateRef.current, id, crop, mode),
       paddy: (id: number) => convertFieldToPaddy(stateRef.current, id),
       assign: (residentId: number, buildingId: number) => assignResidentToBuilding(stateRef.current, residentId, buildingId),
+      perf: {
+        start: startRuntimePerf,
+        stop: stopRuntimePerf,
+        snapshot: runtimePerfSnapshot,
+      },
       reset: () => { stateRef.current = newGame(); bump(); },
     };
   }, [bump]);
@@ -271,28 +332,63 @@ export default function App() {
     if (speed === 0 || screen !== 'game') return;
     const msPerDay = CONFIG.time.msPerDay[speed] ?? 1400;
     const msPerTick = msPerDay / SUBTICKS;
+    const uiRefreshMs = uiRefreshIntervalMs(speed);
     let last = performance.now();
+    let lastUiRefresh = last;
     let acc = 0;
+    let uiRefreshTimer: number | null = null;
+    const flushUi = (commitApp = false) => {
+      if (uiRefreshTimer !== null) window.clearTimeout(uiRefreshTimer);
+      uiRefreshTimer = null;
+      lastUiRefresh = performance.now();
+      uiVersionStore.publish();
+      if (commitApp) setVersion(v => v + 1);
+    };
+    const requestUiRefresh = (immediate: boolean) => {
+      if (immediate) {
+        flushUi(true);
+        return;
+      }
+      if (performance.now() - lastUiRefresh >= uiRefreshMs) {
+        flushUi();
+        return;
+      }
+      if (uiRefreshTimer === null) {
+        uiRefreshTimer = window.setTimeout(flushUi, uiRefreshMs - (performance.now() - lastUiRefresh));
+      }
+    };
     const timer = setInterval(() => {
+      const runtimeLoopStart = runtimePerfStartTime();
       const now = performance.now();
       if (stateRef.current.tacticalBattle || stateRef.current.tacticalBattleReport) {
         last = now;
         acc = 0;
+        recordRuntimePerfSince('game-loop', runtimeLoopStart, { ticksProcessed: 0, battlePaused: true });
         return;
       }
       const clock = advanceGameClock(acc, now - last, msPerTick, 24); // 탭 복귀 시 폭주 방지
       acc = clock.accumulator;
       last = now;
       let n = clock.ticksToAdvance;
+      let runtimeTicksProcessed = 0;
       if (n > 0) {
         const s = stateRef.current;
+        const logLengthBefore = s.log.length;
         const perf = window.__renderPerf;
         const tickStart = perf ? performance.now() : 0;
         let ticksProcessed = 0;
         while (n-- > 0) {
           if (s.pendingChoice || s.tacticalBattle || s.tacticalBattleReport || s.gameOver) break; // 이벤트/전술전/장계/종료 시 자동 정지
+          const runtimeTickStart = runtimePerfStartTime();
           advanceTick(s);
+          recordRuntimePerfSince('simulation-tick', runtimeTickStart, {
+            day: s.day,
+            subTick: s.subTick,
+            residents: s.residents.length,
+            buildings: s.buildings.length,
+          });
           ticksProcessed++;
+          runtimeTicksProcessed++;
         }
         if (perf) {
           const bucket = perf['0-advanceTicks'] ?? (perf['0-advanceTicks'] = { total: 0, count: 0 });
@@ -301,12 +397,23 @@ export default function App() {
         }
         if (ticksProcessed > 0) {
           animRef.current = { at: now, ms: msPerTick };
-          bump();
+          runtimeVersionStore.publish();
+          const urgentLogAdded = s.log.slice(logLengthBefore).some(entry =>
+            entry.important || entry.kind === 'bad' || entry.kind === 'raid',
+          );
+          requestUiRefresh(
+            urgentLogAdded ||
+            Boolean(s.pendingChoice || s.tacticalBattle || s.tacticalBattleReport || s.gameOver),
+          );
         }
       }
+      recordRuntimePerfSince('game-loop', runtimeLoopStart, { ticksProcessed: runtimeTicksProcessed, battlePaused: false });
     }, 33);
-    return () => clearInterval(timer);
-  }, [speed, screen, bump]);
+    return () => {
+      clearInterval(timer);
+      if (uiRefreshTimer !== null) window.clearTimeout(uiRefreshTimer);
+    };
+  }, [speed, screen, runtimeVersionStore, uiVersionStore]);
 
   // Esc로 건설 배치 취소
   useEffect(() => {
@@ -380,6 +487,33 @@ export default function App() {
   const handleSetResidentJob = (id: number, job: JobId) => {
     setResidentJob(stateRef.current, id, job);
     bump();
+  };
+
+  const handleStopRuntimePerf = () => {
+    const summary = summarizeRuntimePerf(stopRuntimePerf());
+    const s = stateRef.current;
+    setRuntimePerfReport(JSON.stringify({
+      ...summary,
+      state: {
+        day: s.day,
+        subTick: s.subTick,
+        residents: s.residents.length,
+        buildings: s.buildings.length,
+        pendingChoice: Boolean(s.pendingChoice),
+      },
+    }, null, 2));
+    setRuntimePerfCapturing(false);
+  };
+
+  const handleStartRuntimePerf = () => {
+    setRuntimePerfReport(null);
+    setRuntimePerfCapturing(true);
+    requestAnimationFrame(() => {
+      startRuntimePerf();
+      if (Number.isFinite(runtimePerfDurationMs) && runtimePerfDurationMs >= 250) {
+        window.setTimeout(handleStopRuntimePerf, runtimePerfDurationMs);
+      }
+    });
   };
 
   const handleSetYouthActivity = (id: number, activity: YouthActivity) => {
@@ -945,13 +1079,22 @@ export default function App() {
       className: 'hud-minimap-window',
       content: (
         <div className="minimap-overlay">
-          <Minimap
-            state={state}
-            version={version}
-            animationActive={speed > 0 && !state.pendingChoice && !state.tacticalBattle && !state.tacticalBattleReport && !state.gameOver}
-            viewportRef={mapViewportRef}
-            selected={selected}
-          />
+          <Profiler id="minimap-boundary" onRender={recordAppRender}>
+            <RuntimeVersionBoundary store={runtimeVersionStore}>
+              {runtimeVersion => {
+                const runtimeState = stateRef.current;
+                return (
+                  <Minimap
+                    state={runtimeState}
+                    version={runtimeVersion}
+                    animationActive={speed > 0 && !runtimeState.pendingChoice && !runtimeState.tacticalBattle && !runtimeState.tacticalBattleReport && !runtimeState.gameOver}
+                    viewportRef={mapViewportRef}
+                    selected={selected}
+                  />
+                );
+              }}
+            </RuntimeVersionBoundary>
+          </Profiler>
         </div>
       ),
     },
@@ -960,89 +1103,123 @@ export default function App() {
       label: '선택 정보',
       className: 'hud-selection-window',
       content: (
-        <SelectionContextBar
-          state={state}
-          selected={selected}
-          selectedEntity={selectedEntity}
-          onClear={handleClearSelection}
-          onSetResidentJob={handleSetResidentJob}
-          onSetYouthActivity={handleSetYouthActivity}
-          onToggleResidentCart={handleToggleResidentCart}
-          onUpgradeHousing={handleUpgradeHousing}
-          onSetSmithyProduct={handleSetSmithyProduct}
-          onSetDryingProduct={handleSetDryingProduct}
-          onSetLivestockSpecies={handleSetLivestockSpecies}
-          onSlaughterLivestock={handleSlaughterLivestock}
-          onSetBuildingCrop={handleSetBuildingCrop}
-          onConvertFieldToPaddy={handleConvertFieldToPaddy}
-          onSetPlotPlowOxen={handleSetPlotPlowOxen}
-          onRequestTrade={handleRequestTrade}
-          onToggleNitre={handleToggleNitre}
-          onSilverVeinAction={handleSilverVeinAction}
-          onAssignNearestWorker={handleAssignNearestWorker}
-          onUnassignWorker={handleUnassignWorker}
-          onSelectResident={handleResidentClick}
-          onCancelBuildingConstruction={handleCancelBuildingConstruction}
-          onDemolishBuilding={handleDemolishBuilding}
-          onSendSiteGift={handleSendSiteGift}
-          onRequestSitePassage={handleRequestSitePassage}
-          onRequestSiteHunting={handleRequestSiteHunting}
-          onRequestSiteDefectors={handleRequestSiteDefectors}
-          onScoutBanditLair={handleScoutBanditLair}
-          onRaidBanditLair={handleRaidBanditLair}
-        />
+        <RuntimeVersionBoundary store={uiVersionStore}>
+          {() => (
+            <SelectionContextBar
+              state={stateRef.current}
+              selected={selected}
+              selectedEntity={selectedEntity}
+              onClear={handleClearSelection}
+              onSetResidentJob={handleSetResidentJob}
+              onSetYouthActivity={handleSetYouthActivity}
+              onToggleResidentCart={handleToggleResidentCart}
+              onUpgradeHousing={handleUpgradeHousing}
+              onSetSmithyProduct={handleSetSmithyProduct}
+              onSetDryingProduct={handleSetDryingProduct}
+              onSetLivestockSpecies={handleSetLivestockSpecies}
+              onSlaughterLivestock={handleSlaughterLivestock}
+              onSetBuildingCrop={handleSetBuildingCrop}
+              onConvertFieldToPaddy={handleConvertFieldToPaddy}
+              onSetPlotPlowOxen={handleSetPlotPlowOxen}
+              onRequestTrade={handleRequestTrade}
+              onToggleNitre={handleToggleNitre}
+              onSilverVeinAction={handleSilverVeinAction}
+              onAssignNearestWorker={handleAssignNearestWorker}
+              onUnassignWorker={handleUnassignWorker}
+              onSelectResident={handleResidentClick}
+              onCancelBuildingConstruction={handleCancelBuildingConstruction}
+              onDemolishBuilding={handleDemolishBuilding}
+              onSendSiteGift={handleSendSiteGift}
+              onRequestSitePassage={handleRequestSitePassage}
+              onRequestSiteHunting={handleRequestSiteHunting}
+              onRequestSiteDefectors={handleRequestSiteDefectors}
+              onScoutBanditLair={handleScoutBanditLair}
+              onRaidBanditLair={handleRaidBanditLair}
+            />
+          )}
+        </RuntimeVersionBoundary>
       ),
     }] : []),
   ];
 
   return (
+    <Profiler id="game-app" onRender={recordAppRender}>
     <div className="app">
-      <TopBar
-        state={state}
-        speed={speed}
-        setSpeed={setSpeed}
-        onSave={() => setSlotDialogMode('save')}
-        onLoad={() => setSlotDialogMode('load')}
-        onNewGame={handleNewGame}
-        canLoad={canLoad}
-        soundOn={soundOn}
-        onToggleSound={handleToggleSound}
-        uiPrefs={uiPrefs}
-        onUiPrefsChange={setUiPrefs}
-        onOpenCourt={() => openDockWindow('court')}
-      />
+      <RuntimeVersionBoundary store={uiVersionStore}>
+        {() => <RuntimeGameEffects state={stateRef.current} setSpeed={setSpeed} />}
+      </RuntimeVersionBoundary>
+      <Profiler id="topbar-boundary" onRender={recordAppRender}>
+        <RuntimeVersionBoundary store={uiVersionStore}>
+          {() => (
+            <TopBar
+              state={stateRef.current}
+              speed={speed}
+              setSpeed={setSpeed}
+              onSave={() => setSlotDialogMode('save')}
+              onLoad={() => setSlotDialogMode('load')}
+              onNewGame={handleNewGame}
+              canLoad={canLoad}
+              soundOn={soundOn}
+              onToggleSound={handleToggleSound}
+              uiPrefs={uiPrefs}
+              onUiPrefsChange={setUiPrefs}
+              onOpenCourt={() => openDockWindow('court')}
+            />
+          )}
+        </RuntimeVersionBoundary>
+      </Profiler>
       <div className="main">
         <div className="canvas-stage">
-          <div className="right-overlay-stack">
-            <AlertsPanel state={state} />
-          </div>
-          <UnifiedLog state={state} />
+          <RuntimeVersionBoundary store={uiVersionStore}>
+            {() => (
+              <div className="right-overlay-stack">
+                <AlertsPanel state={stateRef.current} />
+              </div>
+            )}
+          </RuntimeVersionBoundary>
+          <Profiler id="log-boundary" onRender={recordAppRender}>
+            <RuntimeVersionBoundary store={uiVersionStore}>
+              {() => <UnifiedLog state={stateRef.current} />}
+            </RuntimeVersionBoundary>
+          </Profiler>
           <div className="canvas-wrap" ref={mapViewportRef}>
-            <GameCanvas
-              state={state}
-              version={version}
-              animationActive={speed > 0 && !state.pendingChoice && !state.tacticalBattle && !state.tacticalBattleReport && !state.gameOver}
-              placingType={placingType}
-              selected={selected}
-              selectedEntity={selectedEntity}
-              selectedResidentId={inspResidentId}
-              anim={animRef}
-              onTileClick={handleTileClick}
-              onPlacePlot={handlePlacePlot}
-              onResidentClick={handleResidentClick}
-              onContextAction={handleContextAction}
-              onCancelPlace={() => setPlacingType(null)}
-            />
+            <RuntimeVersionBoundary store={runtimeVersionStore}>
+              {runtimeVersion => {
+                const runtimeState = stateRef.current;
+                return (
+                  <GameCanvas
+                    state={runtimeState}
+                    version={runtimeVersion}
+                    animationActive={speed > 0 && !runtimeState.pendingChoice && !runtimeState.tacticalBattle && !runtimeState.tacticalBattleReport && !runtimeState.gameOver}
+                    placingType={placingType}
+                    selected={selected}
+                    selectedEntity={selectedEntity}
+                    selectedResidentId={inspResidentId}
+                    anim={animRef}
+                    onTileClick={handleTileClick}
+                    onPlacePlot={handlePlacePlot}
+                    onResidentClick={handleResidentClick}
+                    onContextAction={handleContextAction}
+                    onCancelPlace={() => setPlacingType(null)}
+                  />
+                );
+              }}
+            </RuntimeVersionBoundary>
           </div>
-          <BuildDrawer
-            state={state}
-            placingType={placingType}
-            setPlacingType={setPlacingType}
-            onClearSelection={handleClearSelection}
-            uiPrefs={uiPrefs}
-            onUiPrefsChange={setUiPrefs}
-          />
-          <DockFrame
+          <RuntimeVersionBoundary store={uiVersionStore}>
+            {() => (
+              <BuildDrawer
+                state={stateRef.current}
+                placingType={placingType}
+                setPlacingType={setPlacingType}
+                onClearSelection={handleClearSelection}
+                uiPrefs={uiPrefs}
+                onUiPrefsChange={setUiPrefs}
+              />
+            )}
+          </RuntimeVersionBoundary>
+          <Profiler id="dock-boundary" onRender={recordAppRender}>
+            <DockFrame
             overlayItems={overlayItems}
             items={[
               {
@@ -1050,35 +1227,47 @@ export default function App() {
                 label: '직업 배정',
                 icon: '人',
                 content: (
-                  <JobPanel
-                    state={state}
-                    onReassign={handleReassign}
-                    uiPrefs={uiPrefs}
-                    onUiPrefsChange={setUiPrefs}
-                    onAutoAssign={handleAutoAssignBuildings}
-                  />
+                  <RuntimeVersionBoundary store={uiVersionStore}>
+                    {() => (
+                      <JobPanel
+                        state={stateRef.current}
+                        onReassign={handleReassign}
+                        uiPrefs={uiPrefs}
+                        onUiPrefsChange={setUiPrefs}
+                        onAutoAssign={handleAutoAssignBuildings}
+                      />
+                    )}
+                  </RuntimeVersionBoundary>
                 ),
               },
               {
                 id: 'processing',
                 label: '가공·비축',
                 icon: '⚙',
-                content: <ProcessingPanel state={state} onSetReserve={handleSetProcessingReserve} />,
+                content: (
+                  <RuntimeVersionBoundary store={uiVersionStore}>
+                    {() => <ProcessingPanel state={stateRef.current} onSetReserve={handleSetProcessingReserve} />}
+                  </RuntimeVersionBoundary>
+                ),
               },
               {
                 id: 'residents',
                 label: '주민',
                 icon: '民',
                 content: (
-                  <ResidentsWindow
-                    state={state}
-                    selectedResidentId={inspResidentId}
-                    onSelectResident={handleSelectResidentFromDock}
-                    onOpenWeaponAllocation={() => {
-                      setSpeed(0);
-                      setWeaponDialogOpen(true);
-                    }}
-                  />
+                  <RuntimeVersionBoundary store={uiVersionStore}>
+                    {() => (
+                      <ResidentsWindow
+                        state={stateRef.current}
+                        selectedResidentId={inspResidentId}
+                        onSelectResident={handleSelectResidentFromDock}
+                        onOpenWeaponAllocation={() => {
+                          setSpeed(0);
+                          setWeaponDialogOpen(true);
+                        }}
+                      />
+                    )}
+                  </RuntimeVersionBoundary>
                 ),
               },
               {
@@ -1086,34 +1275,46 @@ export default function App() {
                 label: '특수 주민',
                 icon: '★',
                 content: (
-                  <LazyUiBoundary label="특수 주민">
-                    <SpecialResidentsWindow
-                      state={state}
-                      selectedResidentId={inspResidentId}
-                      onSelectResident={handleSelectResidentFromDock}
-                      onAppointConfined={handleAppointConfinedSpecialResident}
-                    />
-                  </LazyUiBoundary>
+                  <RuntimeVersionBoundary store={uiVersionStore}>
+                    {() => (
+                      <LazyUiBoundary label="특수 주민">
+                        <SpecialResidentsWindow
+                          state={stateRef.current}
+                          selectedResidentId={inspResidentId}
+                          onSelectResident={handleSelectResidentFromDock}
+                          onAppointConfined={handleAppointConfinedSpecialResident}
+                        />
+                      </LazyUiBoundary>
+                    )}
+                  </RuntimeVersionBoundary>
                 ),
               },
               {
                 id: 'factions',
                 label: '세력',
                 icon: '交',
-                content: <FactionsWindow state={state} onRequestTrade={handleRequestTrade} />,
+                content: (
+                  <RuntimeVersionBoundary store={uiVersionStore}>
+                    {() => <FactionsWindow state={stateRef.current} onRequestTrade={handleRequestTrade} />}
+                  </RuntimeVersionBoundary>
+                ),
               },
               {
                 id: 'court',
                 label: '조정',
                 icon: '廷',
                 content: (
-                  <CourtWindow
-                    state={state}
-                    onPetition={handlePetition}
-                    onToggleNitre={handleToggleNitre}
-                    onSetTributeReserve={handleSetTributeReserve}
-                    onUseLuxuryGood={handleUseLuxuryGood}
-                  />
+                  <RuntimeVersionBoundary store={uiVersionStore}>
+                    {() => (
+                      <CourtWindow
+                        state={stateRef.current}
+                        onPetition={handlePetition}
+                        onToggleNitre={handleToggleNitre}
+                        onSetTributeReserve={handleSetTributeReserve}
+                        onUseLuxuryGood={handleUseLuxuryGood}
+                      />
+                    )}
+                  </RuntimeVersionBoundary>
                 ),
               },
               {
@@ -1121,11 +1322,15 @@ export default function App() {
                 label: '사건 · 기물함',
                 icon: '警',
                 content: (
-                  <InspectorPanel
-                    state={state}
-                    onOrganizeHunt={handleOrganizeHunt}
-                    onScoutPredator={handleScoutPredator}
-                  />
+                  <RuntimeVersionBoundary store={uiVersionStore}>
+                    {() => (
+                      <InspectorPanel
+                        state={stateRef.current}
+                        onOrganizeHunt={handleOrganizeHunt}
+                        onScoutPredator={handleScoutPredator}
+                      />
+                    )}
+                  </RuntimeVersionBoundary>
                 ),
               },
             ]}
@@ -1138,7 +1343,8 @@ export default function App() {
             onFocusWindow={focusFloatingWindow}
             onCommitLayout={(id, layout) => setUiPrefs(current => setDockWindowLayout(current, id, layout))}
             onResetLayout={id => setUiPrefs(current => resetDockWindowLayout(current, id))}
-          />
+            />
+          </Profiler>
         </div>
       </div>
 
@@ -1227,6 +1433,19 @@ export default function App() {
           시뮬레이션 종료
         </button>
       )}
+      {runtimePerfEnabled && (
+        <aside style={{ position: 'fixed', left: 8, bottom: 8, zIndex: 10000, maxWidth: 'min(720px, 90vw)' }}>
+          {runtimePerfCapturing
+            ? <button className="btn" onClick={handleStopRuntimePerf}>성능 측정 종료</button>
+            : <button className="btn" onClick={handleStartRuntimePerf}>성능 측정 시작</button>}
+          {runtimePerfReport && (
+            <pre data-testid="runtime-perf-report" style={{ maxHeight: '70vh', overflow: 'auto', background: '#111', color: '#eee', padding: 8 }}>
+              {runtimePerfReport}
+            </pre>
+          )}
+        </aside>
+      )}
     </div>
+    </Profiler>
   );
 }

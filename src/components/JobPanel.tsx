@@ -6,6 +6,7 @@ import { countJob } from '../game/residents';
 import { canResidentTakeJob } from '../game/youth';
 import {
   AUTO_ASSIGN_BUILDING_TYPES,
+  isResidentAvailableForWorkerSlot,
   SLOTTED_BUILDING_CONFIG,
   type AutoAssignBuildingType,
 } from '../game/workerSlots';
@@ -82,11 +83,12 @@ export function JobPanel({ state, onReassign, uiPrefs, onUiPrefsChange, onAutoAs
           && (!gated || resident.literate === true)).length;
         const unassigned = BUILDING_SLOT_JOBS.has(job)
           ? state.residents.filter(resident =>
-            resident.alive && resident.job === job && resident.assignedBuildingId == null).length
+            resident.job === job && resident.assignedBuildingId == null &&
+            isResidentAvailableForWorkerSlot(state, resident)).length
           : null;
         return (
           <div className="job-row" key={job} title={`${JOB_DESC[job]}${gated ? '\n📖 문해자 전용 — 글을 아는 주민만 맡습니다' : ''}`}>
-            <span>{JOB_NAMES[job]}{gated && <span aria-label="문해자 전용" title="문해자 전용"> 📖</span>} {unassigned != null && <small>(미배정 {unassigned})</small>}</span>
+            <span>{JOB_NAMES[job]}{gated && <span aria-label="문해자 전용" title="문해자 전용"> 📖</span>} {unassigned != null && <small>(배치 가능 {unassigned})</small>}</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <button className="job-btn" disabled={count === 0} onClick={() => onReassign(job, 'idle')}>−</button>
               <span className="count">{count}</span>

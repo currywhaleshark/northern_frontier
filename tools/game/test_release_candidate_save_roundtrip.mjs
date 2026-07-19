@@ -290,6 +290,12 @@ for (const [index, rank] of ['bo', 'jin'].entries()) {
   }
   delete state.corpses;
   delete state.nextCorpseId;
+  delete state.spoilageStockAtDayStart;
+  const cemetery = {
+    id: state.nextBuildingId++, type: 'cemetery', x: 5, y: 5,
+    progress: 9, built: true, fieldGrowth: 0, graves: 2,
+  };
+  state.buildings.push(cemetery);
   const population = state.residents.length;
   await roundTripScenario({
     name: 'pre-lifecycle-v19', state, schemaVersion: 19,
@@ -297,6 +303,10 @@ for (const [index, rank] of ['bo', 'jin'].entries()) {
       assert.equal(loaded.residents.length, population);
       assert.deepEqual(loaded.corpses, []);
       assert.equal(loaded.nextCorpseId, 1);
+      assert.deepEqual(loaded.buildings.find(building => building.id === cemetery.id)?.burialRecords, [{}, {}],
+        'legacy graves become explicit unknown records');
+      assert.equal(loaded.spoilageStockAtDayStart.fish, loaded.resources.fish,
+        'legacy saves conservatively treat current food as day-start stock');
     },
   });
   results.push('pre-lifecycle-v19');
