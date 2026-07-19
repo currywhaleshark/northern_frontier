@@ -41,10 +41,10 @@ def test_resources() -> None:
 
 def test_buildings(filename: str, cell_width: int, cell_height: int) -> None:
     image = Image.open(ASSET_DIR / filename).convert("RGBA")
-    assert image.size == (7 * cell_width, 2 * cell_height)
-    for column in range(7):
-        normal = alpha_cell(image, 7, 2, column, 0)
-        winter = alpha_cell(image, 7, 2, column, 1)
+    assert image.size == (8 * cell_width, 2 * cell_height)
+    for column in range(8):
+        normal = alpha_cell(image, 8, 2, column, 0)
+        winter = alpha_cell(image, 8, 2, column, 1)
         assert_occupied_with_margin(normal, f"{filename} normal {column}")
         assert_occupied_with_margin(winter, f"{filename} winter {column}")
         assert ImageChops.difference(normal, winter).getbbox() is not None, (
@@ -53,14 +53,14 @@ def test_buildings(filename: str, cell_width: int, cell_height: int) -> None:
 
 
 def test_residents() -> None:
-    image = Image.open(ASSET_DIR / "new-content-residents-v1.png").convert("RGBA")
-    assert image.size == (56, 120)
+    image = Image.open(ASSET_DIR / "new-content-residents-v2.png").convert("RGBA")
+    assert image.size == (56, 360)
     heights: list[list[int]] = []
-    for row in range(3):
+    for row in range(9):
         row_heights = []
         for column in range(2):
             bbox = assert_occupied_with_margin(
-                alpha_cell(image, 2, 3, column, row),
+                alpha_cell(image, 2, 9, column, row),
                 f"resident row {row} column {column}",
             )
             row_heights.append(bbox[3] - bbox[1])
@@ -68,12 +68,17 @@ def test_residents() -> None:
     assert sum(heights[0]) < sum(heights[1]) < sum(heights[2]), (
         f"resident height progression must be infant < child < adult, got {heights}"
     )
+    teacher_height = sum(heights[3])
+    for row in range(4, 9):
+        assert sum(heights[row]) < teacher_height, (
+            f"youth row {row} must remain shorter than the teacher row, got {heights}"
+        )
 
 
 def main() -> None:
     test_resources()
-    test_buildings("new-content-buildings-v1.png", 28, 40)
-    test_buildings("new-content-buildings-large-v1.png", 56, 80)
+    test_buildings("new-content-buildings-v2.png", 28, 40)
+    test_buildings("new-content-buildings-large-v2.png", 56, 80)
     test_residents()
     print("new content asset pixel tests passed")
 

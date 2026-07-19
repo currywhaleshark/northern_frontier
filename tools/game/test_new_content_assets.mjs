@@ -48,7 +48,7 @@ for (const resource of expectedResources) {
 assert.equal(occupiedResourceCells.size, expectedResources.length,
   'new resources must not share atlas cells');
 
-const buildingTypes = ['cellar', 'smokehouse', 'dryingRack', 'onggiKiln', 'jangdokdae', 'clinic', 'cemetery'];
+const buildingTypes = ['cellar', 'smokehouse', 'dryingRack', 'onggiKiln', 'jangdokdae', 'clinic', 'cemetery', 'school'];
 for (const [column, type] of buildingTypes.entries()) {
   assert.equal(assets.isNewContentBuildingType(type), true, `${type} must use the new building sheet`);
   assert.deepEqual(assets.newContentBuildingSourceRect(type, 'summer'), {
@@ -78,13 +78,28 @@ assert.deepEqual(assets.newContentResidentSourceRect('undertaker', 'male'), {
 assert.deepEqual(assets.newContentResidentSourceRect('undertaker', 'female'), {
   sx: 28, sy: 80, sw: 28, sh: 40,
 });
-assert.equal(assets.newContentResidentSourceRect('idle', 'male', 'youth'), null);
+assert.deepEqual(assets.newContentResidentSourceRect('teacher', 'male'), {
+  sx: 0, sy: 120, sw: 28, sh: 40,
+});
+assert.deepEqual(assets.newContentResidentSourceRect('teacher', 'female'), {
+  sx: 28, sy: 120, sw: 28, sh: 40,
+});
+for (const [index, job] of ['idle', 'hauler', 'farmer', 'woodSplitter', 'herder'].entries()) {
+  assert.deepEqual(assets.newContentResidentSourceRect(job, 'male', 'youth'), {
+    sx: 0, sy: (index + 4) * 40, sw: 28, sh: 40,
+  });
+  assert.deepEqual(assets.newContentResidentSourceRect(job, 'female', 'youth'), {
+    sx: 28, sy: (index + 4) * 40, sw: 28, sh: 40,
+  });
+}
+assert.equal(assets.newContentResidentSourceRect('teacher', 'male', 'youth'), null,
+  'unsupported youth jobs must not fall back to an adult sprite');
 assert.equal(assets.newContentResidentSourceRect('undertaker', 'male', 'child').sy, 40,
   'life stage must take priority over an accidental child job assignment');
 
-assert.deepEqual(pngDimensions(new URL('../../public/assets/new-content-buildings-v1.png', import.meta.url)), [196, 80]);
-assert.deepEqual(pngDimensions(new URL('../../public/assets/new-content-buildings-large-v1.png', import.meta.url)), [392, 160]);
-assert.deepEqual(pngDimensions(new URL('../../public/assets/new-content-residents-v1.png', import.meta.url)), [56, 120]);
+assert.deepEqual(pngDimensions(new URL('../../public/assets/new-content-buildings-v2.png', import.meta.url)), [224, 80]);
+assert.deepEqual(pngDimensions(new URL('../../public/assets/new-content-buildings-large-v2.png', import.meta.url)), [448, 160]);
+assert.deepEqual(pngDimensions(new URL('../../public/assets/new-content-residents-v2.png', import.meta.url)), [56, 360]);
 assert.deepEqual(pngDimensions(new URL('../../public/assets/resources/new-content-resource-atlas-v1.png', import.meta.url)), [1024, 1024]);
 
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');

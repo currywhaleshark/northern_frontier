@@ -3,25 +3,25 @@ import type { BuildingTypeId, Gender, JobId, LifeStage, Season } from '../game/t
 export const NEW_CONTENT_BUILDING_SHEET = {
   tileSize: 28,
   spriteHeight: 40,
-  columns: 7,
+  columns: 8,
   rows: 2,
-  src: '/assets/new-content-buildings-v1.png',
+  src: '/assets/new-content-buildings-v2.png',
 } as const;
 
 export const NEW_CONTENT_LARGE_BUILDING_SHEET = {
   tileSize: 56,
   spriteHeight: 80,
-  columns: 7,
+  columns: 8,
   rows: 2,
-  src: '/assets/new-content-buildings-large-v1.png',
+  src: '/assets/new-content-buildings-large-v2.png',
 } as const;
 
 export const NEW_CONTENT_RESIDENT_SHEET = {
   residentWidth: 28,
   spriteHeight: 40,
   columns: 2,
-  rows: 3,
-  src: '/assets/new-content-residents-v1.png',
+  rows: 9,
+  src: '/assets/new-content-residents-v2.png',
 } as const;
 
 const BUILDING_COLUMNS: Partial<Record<BuildingTypeId, number>> = {
@@ -32,6 +32,15 @@ const BUILDING_COLUMNS: Partial<Record<BuildingTypeId, number>> = {
   jangdokdae: 4,
   clinic: 5,
   cemetery: 6,
+  school: 7,
+};
+
+const YOUTH_JOB_ROWS: Partial<Record<JobId, number>> = {
+  idle: 4,
+  hauler: 5,
+  farmer: 6,
+  woodSplitter: 7,
+  herder: 8,
 };
 
 export function isNewContentBuildingType(type: BuildingTypeId): boolean {
@@ -55,9 +64,13 @@ export function newContentResidentSourceRect(job: JobId, gender: Gender, stage?:
     ? 0
     : stage === 'child'
       ? 1
-      : job === 'undertaker'
-        ? 2
-        : null;
+      : stage === 'youth'
+        ? YOUTH_JOB_ROWS[job] ?? null
+        : job === 'undertaker'
+          ? 2
+          : job === 'teacher'
+            ? 3
+            : null;
   if (row == null) return null;
   return {
     sx: (gender === 'female' ? 1 : 0) * NEW_CONTENT_RESIDENT_SHEET.residentWidth,
