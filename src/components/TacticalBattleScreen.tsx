@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { RESOURCE_NAMES, WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
 import { countBuilt } from '../game/buildings';
 import { getSeason } from '../game/seasons';
-import { banditLairDoctrineDefinition, enemyPlanCounterLabelsForAction } from '../game/enemyPlan';
+import { banditLairDoctrineDefinition, enemyPlanCounterLabelsForAction, enemyPlanSummaryView } from '../game/enemyPlan';
 import { withJosa } from '../game/josa';
 import {
   applyTacticalPlaybackEvent,
@@ -500,6 +500,8 @@ export function TacticalBattleScreen({
   const effectiveRearCounterZoneName = rearResponseZoneId
     ? battle.zones.find(zone => zone.id === rearResponseZoneId)?.name
     : undefined;
+  // 적 계획 요약은 백엔드 selector가 단일 소스다 — 프론트에서 공개 여부를 재판정하지 않는다.
+  const enemyPlanSummary = battle.enemyPlan ? enemyPlanSummaryView(battle) : null;
   const hintCommand = hoveredCommand ?? selectedGroup?.command ?? null;
   const commandHint = selectedGroup && hintCommand
     ? `${commandLabel(hintCommand, selectedGroup, hunt)} — ${tacticalCommandUnavailableReason(battle, selectedGroup, hintCommand) ?? commandDescription(hintCommand, selectedGroup, hunt)}`
@@ -744,9 +746,10 @@ export function TacticalBattleScreen({
         </div>
 
         <div className="tactical-controls">
-          {battle.enemyPlan && !assault && !hunt && battle.phase === 'command' && (
+          {battle.enemyPlan && enemyPlanSummary && !assault && !hunt && battle.phase === 'command' && (
             <EnemyPlanPanel
               plan={battle.enemyPlan}
+              summary={enemyPlanSummary}
               effectiveCounterStrengths={effectiveCounterStrengths}
               effectiveRearCounterZoneName={effectiveRearCounterZoneName}
             />
@@ -767,9 +770,10 @@ export function TacticalBattleScreen({
           )}
           {battle.phase === 'preparation' && (
             <>
-              {battle.enemyPlan && !assault && !hunt && (
+              {battle.enemyPlan && enemyPlanSummary && !assault && !hunt && (
                 <EnemyPlanPanel
                   plan={battle.enemyPlan}
+                  summary={enemyPlanSummary}
                   effectiveCounterStrengths={effectiveCounterStrengths}
                   effectiveRearCounterZoneName={effectiveRearCounterZoneName}
                 />

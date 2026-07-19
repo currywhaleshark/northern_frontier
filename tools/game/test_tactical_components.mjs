@@ -69,6 +69,28 @@ assert.match(cssSource,
 
 assert.match(planSource, /objectiveRevealed/, 'enemy plan panel must hide an unrevealed objective');
 assert.match(planSource, /미확인 계책/, 'enemy plan panel must show the hidden stratagem count');
+assert.match(planSource, /EnemyPlanSummaryView/,
+  'enemy plan panel must consume the backend summary selector instead of re-deriving reveal state');
+assert.match(planSource, /tactical-enemy-summary-line/,
+  'enemy plan panel must render the one-line objective/doctrine/composition summary');
+assert.match(planSource, /doctrine\.(strength|weakness)/,
+  'a revealed doctrine must show its strength and weakness in the same terms as the resolver');
+assert.match(planSource, /권장 대응/, 'a revealed doctrine must surface the recommended counter');
+assert.match(planSource, /범주 추정/,
+  'unidentified composition groups must show only their intel category, not exact names');
+assert.match(screenSource, /enemyPlanSummaryView\(battle\)/,
+  'the battle screen must compute the enemy summary through the backend selector');
+const simSetupSource = readFileSync(new URL('../../src/components/BattleSimulationSetup.tsx', import.meta.url), 'utf8');
+assert.match(simSetupSource, /eligibleEnemyDoctrines\(/,
+  'the simulator must list forceable doctrines from the backend eligibility rule');
+assert.match(simSetupSource, /tacticalCompositionTemplates\(\)/,
+  'the simulator must list forceable composition templates from the backend registry');
+assert.match(simSetupSource, /enemyFlankRoute/,
+  'the simulator must expose the forced flank route option');
+assert.match(simSetupSource, /enemyCompositionTemplateId:/,
+  'the simulator must pass the forced composition template into the simulation options');
+assert.match(simSetupSource, /template\.doctrines\.includes/,
+  'forcing a doctrine must filter the template list to compatible compositions');
 assert.match(planSource, /enemyStratagemCounterStrength/,
   'enemy plan panel must derive a continuous combined counter percentage');
 assert.match(planSource, /완전 대응/, 'enemy plan panel must label only 100% counters as complete');

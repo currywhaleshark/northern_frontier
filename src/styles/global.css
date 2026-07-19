@@ -3430,21 +3430,59 @@ html, body, #root {
 .tactical-panel-heading span { color: var(--muted); font-size: 11px; }
 .tactical-enemy-plan {
   display: grid;
-  grid-template-columns: 130px 150px minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: 110px 120px minmax(140px, 190px) minmax(140px, 200px) minmax(0, 1fr);
+  gap: 6px 8px;
   margin-bottom: 9px;
   padding: 8px;
   border: 1px solid #594c3d;
   border-radius: 5px;
   background: #28282a;
 }
+.tactical-enemy-summary-line {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #3d3a33;
+  color: #d8c9a0;
+  font-size: 11px;
+  line-height: 1.35;
+}
 .tactical-enemy-plan-heading,
-.tactical-enemy-objective { display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+.tactical-enemy-objective,
+.tactical-enemy-doctrine,
+.tactical-enemy-composition { display: flex; flex-direction: column; justify-content: flex-start; gap: 3px; min-width: 0; }
+.tactical-enemy-plan-heading { justify-content: center; }
+.tactical-enemy-objective { justify-content: center; }
 .tactical-enemy-plan-heading strong,
-.tactical-enemy-objective strong { color: #ead8ac; font-size: 12px; }
+.tactical-enemy-objective strong,
+.tactical-enemy-doctrine strong,
+.tactical-enemy-composition strong { color: #ead8ac; font-size: 12px; }
 .tactical-enemy-plan-heading span,
-.tactical-enemy-objective span { color: var(--muted); font-size: 10px; }
-.tactical-enemy-objective.hidden strong { color: #8d9498; }
+.tactical-enemy-objective span,
+.tactical-enemy-doctrine span,
+.tactical-enemy-composition span { color: var(--muted); font-size: 10px; }
+.tactical-enemy-objective.hidden strong,
+.tactical-enemy-doctrine.hidden strong,
+.tactical-enemy-composition.hidden strong { color: #8d9498; }
+.tactical-enemy-doctrine-notes,
+.tactical-enemy-composition-groups {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 9px;
+  line-height: 1.3;
+  color: #adb4b8;
+}
+.tactical-enemy-doctrine-notes .doctrine-strength { color: #c9a25e; }
+.tactical-enemy-doctrine-notes .doctrine-weakness { color: #87c995; }
+.tactical-enemy-doctrine-notes .doctrine-counter { color: #9fc4d8; }
+.tactical-enemy-composition-groups li.exact { color: #cfc4a4; }
+.tactical-enemy-composition-groups li.category { color: #9da5a9; font-style: italic; }
+.tactical-enemy-composition-groups li.hidden-groups { color: #8d9498; }
+.tactical-enemy-composition-groups .support-tag { color: #d8a05e; font-style: normal; }
 .tactical-enemy-stratagems { display: flex; gap: 5px; overflow-x: auto; }
 .tactical-enemy-stratagem {
   position: relative;

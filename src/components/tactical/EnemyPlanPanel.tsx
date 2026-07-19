@@ -2,14 +2,9 @@ import {
   enemyStratagemCounterStrength,
   enemyStratagemCounterStrengthForEngagement,
   enemyStratagemDefinition,
+  type EnemyPlanSummaryView,
 } from '../../game/enemyPlan';
-import type { EnemyObjectiveId, EnemyPlan, EnemyStratagemId } from '../../game/types';
-
-const OBJECTIVE_LABELS: Record<EnemyObjectiveId, string> = {
-  breakthrough: '방어선 돌파',
-  plunder: '비축 약탈',
-  arson: '방책·창고 방화',
-};
+import type { EnemyPlan, EnemyStratagemId } from '../../game/types';
 
 function counterLabel(strength: number): string {
   const percent = Math.round(Math.max(0, Math.min(1, strength)) * 100);
@@ -20,26 +15,64 @@ function counterLabel(strength: number): string {
 
 interface Props {
   plan: EnemyPlan;
+  summary: EnemyPlanSummaryView;
   effectiveCounterStrengths?: Partial<Record<EnemyStratagemId, number>>;
   effectiveRearCounterZoneName?: string;
 }
 
 export function EnemyPlanPanel({
   plan,
+  summary,
   effectiveCounterStrengths,
   effectiveRearCounterZoneName,
 }: Props) {
   const revealed = plan.stratagems.filter(stratagem => stratagem.revealed);
   const hiddenCount = plan.stratagems.length - revealed.length;
+  const { objective, doctrine, composition } = summary;
+  const objectiveRevealed = objective.revealed;
   return (
-    <aside className="tactical-enemy-plan" aria-label="적 목적과 계책 정보">
+    <aside className="tactical-enemy-plan" aria-label="적 목적·교리·편제·계책 정보">
       <div className="tactical-enemy-plan-heading">
         <strong>적 정보</strong>
         <span>계책점수 {plan.stratagemPoints}</span>
       </div>
-      <div className={`tactical-enemy-objective${plan.objectiveRevealed ? ' revealed' : ' hidden'}`}>
+      <p className="tactical-enemy-summary-line">
+        {`목적: ${objective.label} · 교리: ${doctrine.label} · 편제: ${composition.templateLabel}`}
+        {summary.hiddenStratagemCount > 0 && ` · 미확인 계책 ${summary.hiddenStratagemCount}개`}
+      </p>
+      <div className={`tactical-enemy-objective${objectiveRevealed ? ' revealed' : ' hidden'}`}>
         <span>예상 목적</span>
-        <strong>{plan.objectiveRevealed ? OBJECTIVE_LABELS[plan.objective] : '미확인'}</strong>
+        <strong>{objective.label}</strong>
+      </div>
+      <div className={`tactical-enemy-doctrine${doctrine.revealed ? ' revealed' : ' hidden'}`}>
+        <span>교리</span>
+        <strong>{doctrine.label}</strong>
+        {doctrine.revealed && (
+          <ul className="tactical-enemy-doctrine-notes">
+            {doctrine.strength && <li className="doctrine-strength">강점 — {doctrine.strength}</li>}
+            {doctrine.weakness && <li className="doctrine-weakness">약점 — {doctrine.weakness}</li>}
+            {doctrine.counter && <li className="doctrine-counter">권장 대응 — {doctrine.counter}</li>}
+          </ul>
+        )}
+      </div>
+      <div className={`tactical-enemy-composition${composition.revealed ? ' revealed' : ' hidden'}`}>
+        <span>편제</span>
+        <strong>{composition.templateLabel}</strong>
+        {(composition.groups.length > 0 || composition.hiddenGroupCount > 0) && (
+          <ul className="tactical-enemy-composition-groups">
+            {composition.groups.map(group => (
+              <li key={group.groupId} className={group.exact ? 'exact' : 'category'}>
+                {group.exact && group.count != null
+                  ? `${group.label} ${group.count}명`
+                  : `${group.category} (범주 추정)`}
+                {group.support && <em className="support-tag"> 지원</em>}
+              </li>
+            ))}
+            {composition.hiddenGroupCount > 0 && (
+              <li className="hidden-groups">미확인 부대 {composition.hiddenGroupCount}개</li>
+            )}
+          </ul>
+        )}
       </div>
       <div className="tactical-enemy-stratagems">
         {revealed.map(stratagem => {

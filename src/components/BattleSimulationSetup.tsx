@@ -6,7 +6,9 @@ import {
   BATTLE_SIMULATION_ENEMIES,
   type BattleSimDefenderCounts, type BattleSimulationOptions, type BattleSimulationScenario, type SimSetting,
 } from '../game/battleSimulation';
-import type { BattleMode, Season, TigerTier, WeatherId } from '../game/types';
+import { enemyDoctrineDefinition, eligibleEnemyDoctrines } from '../game/enemyPlan';
+import { tacticalCompositionTemplates, tacticalEnemyFactionId } from '../game/tacticalCompositions';
+import type { BattleMode, EnemyDoctrineId, Season, TacticalRouteSide, TigerTier, WeatherId } from '../game/types';
 
 interface Props {
   onStart: (options: BattleSimulationOptions) => void;
@@ -58,11 +60,22 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
   const [tigerTier, setTigerTier] = useState<SimSetting<TigerTier>>(RANDOM);
   const [wolfCountRandom, setWolfCountRandom] = useState(true);
   const [wolfCount, setWolfCount] = useState(6);
+  const [enemyDoctrine, setEnemyDoctrine] = useState<EnemyDoctrineId | 'auto'>('auto');
+  const [enemyTemplateId, setEnemyTemplateId] = useState<string>('auto');
+  const [enemyFlankRoute, setEnemyFlankRoute] = useState<TacticalRouteSide | 'none' | 'auto'>('auto');
   const offensive = scenario !== 'defense';
   const selectedEnemy = factionName === RANDOM
     ? null
     : BATTLE_SIMULATION_ENEMIES.find(enemy => enemy.name === factionName);
   const courtArmy = factionName === '조정 토벌군';
+  // 강제 옵션 후보는 백엔드 정의에서만 가져온다 — 교리·편제의 단일 소스는 게임 도메인이다.
+  const enemyFactionKnown = !offensive && factionName !== RANDOM;
+  const doctrineOptions = enemyFactionKnown ? eligibleEnemyDoctrines(factionName, 2) : [];
+  const templateOptions = enemyFactionKnown
+    ? tacticalCompositionTemplates().filter(template =>
+      template.faction === tacticalEnemyFactionId(factionName) &&
+      (enemyDoctrine === 'auto' || template.doctrines.includes(enemyDoctrine)))
+    : [];
   const combatantTotal = defenders.muskets + defenders.bows + defenders.spears +
     defenders.unarmedMilitia + defenders.watchmen + defenders.hunters;
 
@@ -83,6 +96,9 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
     cannonEmplacements: cannonMode === 'random' ? RANDOM : cannonMode === 'fixed' ? cannonCount : 0,
     tigerTier,
     wolfCount: wolfCountRandom ? RANDOM : wolfCount,
+    enemyDoctrine: enemyFactionKnown ? enemyDoctrine : 'auto',
+    enemyCompositionTemplateId: enemyFactionKnown ? enemyTemplateId : 'auto',
+    enemyFlankRoute: offensive ? 'auto' : enemyFlankRoute,
   });
 
   // boolean 항목용 3택(랜덤/예/아니오) 버튼 열
@@ -148,6 +164,8 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
               <select value={factionName} onChange={event => {
                 const next = event.target.value;
                 setFactionName(next);
+                setEnemyDoctrine('auto');
+                setEnemyTemplateId('auto');
                 if (next === '조정 토벌군') setPower(current => Math.max(140, current));
               }}>
                 <option value={RANDOM}>랜덤</option>
@@ -158,6 +176,56 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
               <small className={`sim-enemy-note${courtArmy ? ' danger' : ''}`}>
                 {selectedEnemy?.description ?? '니마차·홀라온·변경 마적·조정 토벌군 가운데 하나가 출현합니다.'}
               </small>
+            </label>
+            <label className="sim-field">
+              <span>적 교리 강제</span>
+              <select
+                value={enemyFactionKnown ? enemyDoctrine : 'auto'}
+                disabled={!enemyFactionKnown}
+                onChange={event => {
+                  const next = event.target.value as EnemyDoctrineId | 'auto';
+                  setEnemyDoctrine(next);
+                  if (next !== 'auto' && enemyTemplateId !== 'auto') {
+                    const current = tacticalCompositionTemplates().find(template => template.id === enemyTemplateId);
+                    if (current && !current.doctrines.includes(next)) setEnemyTemplateId('auto');
+                  }
+                }}
+              >
+                <option value="auto">자동 (규칙대로 선택)</option>
+                {doctrineOptions.map(id => {
+                  const definition = enemyDoctrineDefinition(id);
+                  return <option key={id} value={id}>{definition.label}</option>;
+                })}
+              </select>
+              {!enemyFactionKnown && <small className="sim-enemy-note">습격 세력을 지정하면 교리·편제를 강제할 수 있습니다.</small>}
+            </label>
+            <label className="sim-field">
+              <span>적 편제 강제</span>
+              <select
+                value={enemyFactionKnown ? enemyTemplateId : 'auto'}
+                disabled={!enemyFactionKnown}
+                onChange={event => setEnemyTemplateId(event.target.value)}
+              >
+                <option value="auto">자동 (교리 호환 편제 중 선택)</option>
+                {templateOptions.map(template => (
+                  <option key={template.id} value={template.id}>
+                    {template.label}{template.implementationPhase > 1 ? ` (${template.implementationPhase}단계)` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="sim-field">
+              <span>후방 우회 경로 강제</span>
+              <div className="sim-choice-row">
+                {([['auto', '자동'], ['left', '좌측'], ['right', '우측'], ['none', '없음']] as const).map(([option, label]) => (
+                  <button
+                    key={option}
+                    className={`sim-choice${enemyFlankRoute === option ? ' active' : ''}`}
+                    onClick={() => setEnemyFlankRoute(option)}
+                  >{label}</button>
+                ))}
+              </div>
+              <small className="sim-enemy-note">적이 후방 우회 계책을 쓸 때 사용할 경로를 고정합니다. '없음'은 우회 계책을 봉쇄합니다.</small>
             </label>
             </>)}
             {(scenario === 'defense' || scenario === 'banditLair') && (
