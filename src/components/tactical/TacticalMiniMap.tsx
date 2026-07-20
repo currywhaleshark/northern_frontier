@@ -1,12 +1,14 @@
 import { useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { tacticalRaiderVisibleDuringPlayback } from '../../game/tacticalBattle';
+import { tacticalGroupIsInRouteTransit, tacticalRaiderVisibleDuringPlayback } from '../../game/tacticalBattle';
 import { tacticalActiveDefenderCount } from '../../game/tacticalCommandState';
+import type { TacticalFlankRouteView } from '../../game/tacticalRoutes';
 import type {
   GameState,
   TacticalBattleZone,
   TacticalDefenderGroup,
   TacticalFormationLine,
   TacticalRaiderGroup,
+  TacticalRouteSide,
 } from '../../game/types';
 import { commandLabel } from './commandText';
 import {
@@ -30,6 +32,8 @@ interface Props {
   selectedGroupId: string | null;
   eventIndex: number;
   playback: boolean;
+  /** P6 우회로 표시 — 백엔드 tacticalFlankRouteView 결과만 받는다. hidden은 렌더하지 않는다. */
+  routeViews: TacticalFlankRouteView[];
   onViewZone: (zoneId: string) => void;
   onSelectGroup: (groupId: string) => void;
 }
@@ -160,6 +164,49 @@ function AggregateHtmlMarker({ side, count }: { side: 'friendly' | 'enemy'; coun
   );
 }
 
+function MinimapRouteBranch({
+  view,
+  playback,
+  onViewZone,
+}: {
+  view: TacticalFlankRouteView | undefined;
+  playback: boolean;
+  onViewZone: (zoneId: string) => void;
+}) {
+  if (!view || view.display === 'hidden') return null;
+  const suspected = view.display === 'suspected';
+  const label = suspected
+    ? `${view.route.label} — 우회 징후 · 도착 예상 ${view.expectedArrivalRounds?.[0]}~${view.expectedArrivalRounds?.[1]}교전`
+    : `${view.route.label} 보기 · 이동 중 ${view.transits.length}개 조`;
+  return (
+    <button
+      type="button"
+      tabIndex={playback ? -1 : 0}
+      className={`tactical-minimap-route side-${view.route.side} display-${view.display} control-${view.route.control}`}
+      aria-label={label}
+      title={label}
+      onClick={() => {
+        if (!playback) onViewZone('approach');
+      }}
+    >
+      <i className="tactical-minimap-route-line" aria-hidden="true" />
+      {suspected ? (
+        <span className="tactical-minimap-route-suspect">?</span>
+      ) : (
+        <span className="tactical-minimap-route-steps" aria-hidden="true">
+          {([0, 1, 2] as const).map(step => (
+            <span className="tactical-minimap-route-step" key={step}>
+              {view.transits.filter(transit => transit.step === step).map(transit => (
+                <i className={`tactical-minimap-dot ${transit.side === 'raider' ? 'enemy' : 'friendly'} small`} key={transit.groupId} />
+              ))}
+            </span>
+          ))}
+        </span>
+      )}
+    </button>
+  );
+}
+
 function StripMiniMap({
   battle,
   assault,
@@ -168,6 +215,7 @@ function StripMiniMap({
   selectedGroupId,
   eventIndex,
   playback,
+  routeViews,
   onViewZone,
   onSelectGroup,
   hoveredZoneId,
@@ -178,14 +226,19 @@ function StripMiniMap({
 }) {
   const labelZoneId = hoveredZoneId ?? viewedZoneId;
   const labelIndex = Math.max(0, battle.zones.findIndex(zone => zone.id === labelZoneId));
+  const routeBySide = (side: TacticalRouteSide) => routeViews.find(view => view.route.side === side);
   return (
     <div className={`tactical-minimap-strip${assault ? ' assault' : ''}`}>
+      <MinimapRouteBranch view={routeBySide('left')} playback={playback} onViewZone={onViewZone} />
       <div className="tactical-minimap-strip-map">
         {battle.zones.map(zone => {
+          // 우회 이동 중인 조는 구역 점이 아니라 경로 가지에서만 보인다 (계획서 8.6)
           const defenders = battle.defenderGroups.filter(group =>
-            group.zoneId === zone.id && defenderVisualActive(battle, group, eventIndex) > 0);
+            group.zoneId === zone.id && !tacticalGroupIsInRouteTransit(group) &&
+            defenderVisualActive(battle, group, eventIndex) > 0);
           const raiders = battle.raiderGroups.filter(group =>
             group.zoneId === zone.id &&
+            !tacticalGroupIsInRouteTransit(group) &&
             raiderVisualActive(battle, group, eventIndex) > 0 &&
             tacticalRaiderVisibleDuringPlayback(battle, group, eventIndex));
           const frontalRaiders = raiders.filter(group => !group.rearAssault);
@@ -271,6 +324,7 @@ function StripMiniMap({
           );
         })}
       </div>
+      <MinimapRouteBranch view={routeBySide('right')} playback={playback} onViewZone={onViewZone} />
       <div className="tactical-minimap-name">
         {battle.zones[labelIndex]?.name} {labelIndex + 1}/{battle.zones.length}
       </div>

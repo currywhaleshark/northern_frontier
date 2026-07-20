@@ -2,7 +2,8 @@ import type { CSSProperties } from 'react';
 import { combatSpriteDescriptor, tacticalGroupCapabilities } from '../../game/combatCapabilities';
 import { CONFIG } from '../../game/config';
 import {
-  tacticalDeploymentPlacementUnavailableReason, tacticalGroupTargetUnavailableReason,
+  tacticalDeploymentPlacementUnavailableReason, tacticalGroupIsInRouteTransit,
+  tacticalGroupTargetUnavailableReason,
   tacticalRaiderVisibleDuringPlayback,
   tacticalStageOrderPreview, tacticalStageOrderUnavailableReason,
 } from '../../game/tacticalBattle';
@@ -697,10 +698,12 @@ export function TacticalZoneColumn({
 }: Props) {
   const focused = zone.id === activeZoneId;
   const showFormationGuides = battle.phase === 'deployment';
+  // 우회 이동 중인 조는 정면 랭크에서 빠진다 — 공개 경로면 리본·미니맵 가지에서만 보인다 (계획서 8.6)
   const defenders = battle.defenderGroups
-    .filter(group => group.zoneId === zone.id)
+    .filter(group => group.zoneId === zone.id && !tacticalGroupIsInRouteTransit(group))
     .sort((a, b) => defenderFormationOrder(a) - defenderFormationOrder(b));
   const zoneRaiders = battle.raiderGroups.filter(group => group.zoneId === zone.id &&
+    !tacticalGroupIsInRouteTransit(group) &&
     tacticalRaiderVisibleDuringPlayback(battle, group, eventIndex));
   const raiders = zoneRaiders.filter(group => !group.rearAssault);
   const rearAssaulters = zoneRaiders.filter(group => group.rearAssault);

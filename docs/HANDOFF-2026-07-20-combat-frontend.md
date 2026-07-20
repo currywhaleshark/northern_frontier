@@ -247,3 +247,42 @@ Codex의 P5 방향 계약(`0c0f4c2`, 백엔드 핸드오프 9절) 위에 방향 
   확정 시 towardRear+당회 페널티, 이미 후방이면 페널티 없음)과 mutation 경로 검증으로 갈음 —
   **집에서 후방 급습 시나리오로 두 경로 비교 QA할 것**.
 - 나머지 미완(스크린샷·인접 구역 드롭 실입력·터치·특수주민)은 8절과 동일.
+
+## 10. 2026-07-20 회사 세션 기록 4 — P6 프론트 구현 완료 (이 커밋)
+
+Codex의 P6 우회로 계약(`fd491ce`, 백엔드 핸드오프 10절) 위에 경로 표시 UI를 구현했다.
+
+### 구현 내역
+
+- **준비 좌/우 개방 토글**: 준비 그리드의 `우회로 개방` 카드를 방향별 버튼으로 교체
+  (`tacticalFlankRoutePreparationView` + `toggleTacticalFlankRoutePreparation`). 점수 소비·환불·즉시
+  공개는 전부 백엔드. flankRoutes 없는 전투(토벌·사냥)에서는 카드 자체를 숨긴다.
+- **`TacticalRouteRibbon.tsx` (신규)**: 무대 좌상단 리본. `hidden` 미표시, `suspected`는 `? 징후 —
+  도착 예상 1~3교전`(백엔드 범위값), `revealed`는 입구/중간/후방 출구 3단 step 표시 + control 색.
+  재생 중에는 `pendingReport.routeAdvances`의 `visibleToDefender` 항목만 `중간 진입`/`후방 출구
+  도달!` 칩으로 표시.
+- **미니맵 가지**: 스트립 위(좌)/아래(우)에 경로 가지. 미개방 미표시, 징후 점선+`?`, 공개 실선+부대
+  점, control 색(중립/아군/적/교전). 클릭 시 접근로로 카메라 이동.
+- **정면 랭크·미니맵 점에서 이동 중 부대 제외**: `tacticalGroupIsInRouteTransit` 필터 — 비공개 경로
+  누출 방지의 핵심(무대·미니맵 모두).
+- **정보 패널 우회 징후 줄**: EnemyPlanPanel에 `routeViews` prop — `우회 징후: …` / `우회 확인: …`.
+- 컴포넌트 계약 테스트 ~20건 추가(비누출·재파생 금지·reduced-motion 등). 화면은 `defenderIntel`·raw
+  `routeTransit.step`을 직접 읽지 않는다(테스트로 강제).
+
+### 검증
+
+- tsc·컴포넌트·`test_tactical_routes`·test:combat·빌드 통과.
+- 브라우저(방어전, 우회 좌측 강제): suspected 상태에서 패널 징후 줄·미니맵 점선 `?` 가지·리본 징후
+  행이 모두 표시되고 hidden 우측 경로는 어디에도 없음. 좌측 개방 → 2점 소비·`revealed` 전환,
+  재토글 → 2점 환불·suspected 복귀, 잔여 0점에서 우측 버튼이 백엔드 사유("남은 준비점수가
+  부족합니다.")로 비활성. 기마 마적 우회대가 기병×능선길 규칙대로 2라운드에 걸쳐 입구→중간→후방
+  출구로 이동하는 것을 리본 step·재생 칩(`중간 진입`, `후방 출구 도달!`)·`routeAdvances` 계약으로
+  확인. 이동 중 정면 랭크·미니맵 구역 점에는 끝까지 나타나지 않고, step 2 도달 후에도 transit이
+  유지된다(P7 경계).
+
+### 남은 것
+
+- **경로 control 색(아군/교전)과 차단 배치 UI는 Phase 7** — P6에서는 아군이 경로에 들어갈 수 없어
+  중립/적 색만 실검증됨.
+- suspected 강등(nightApproach) 화면 확인은 계책 조합이 확률적이라 미실행 — selector 계약 테스트로
+  갈음. 나머지 미완 항목은 8·9절과 동일.

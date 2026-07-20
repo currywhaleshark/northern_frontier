@@ -4,6 +4,7 @@ import {
   enemyStratagemDefinition,
   type EnemyPlanSummaryView,
 } from '../../game/enemyPlan';
+import type { TacticalFlankRouteView } from '../../game/tacticalRoutes';
 import type { EnemyPlan, EnemyStratagemId } from '../../game/types';
 
 function counterLabel(strength: number): string {
@@ -18,6 +19,8 @@ interface Props {
   summary: EnemyPlanSummaryView;
   effectiveCounterStrengths?: Partial<Record<EnemyStratagemId, number>>;
   effectiveRearCounterZoneName?: string;
+  /** P6 우회 징후 — 백엔드 tacticalFlankRouteView 결과. hidden 경로는 여기서도 표시하지 않는다. */
+  routeViews?: TacticalFlankRouteView[];
 }
 
 export function EnemyPlanPanel({
@@ -25,6 +28,7 @@ export function EnemyPlanPanel({
   summary,
   effectiveCounterStrengths,
   effectiveRearCounterZoneName,
+  routeViews,
 }: Props) {
   const revealed = plan.stratagems.filter(stratagem => stratagem.revealed);
   const hiddenCount = plan.stratagems.length - revealed.length;
@@ -40,6 +44,15 @@ export function EnemyPlanPanel({
         {`목적: ${objective.label} · 교리: ${doctrine.label} · 편제: ${composition.templateLabel}`}
         {summary.hiddenStratagemCount > 0 && ` · 미확인 계책 ${summary.hiddenStratagemCount}개`}
       </p>
+      {(routeViews ?? []).filter(view => view.display !== 'hidden').map(view => (
+        <p className={`tactical-enemy-route-intel display-${view.display}`} key={view.route.id}>
+          {view.display === 'suspected'
+            ? `우회 징후: ${view.route.label} — 적 우회대 의심 · 도착 예상 ${view.expectedArrivalRounds?.[0]}~${view.expectedArrivalRounds?.[1]}교전`
+            : `우회 확인: ${view.route.label} — ${view.transits.some(transit => transit.side === 'raider')
+              ? '적 우회대 이동 중'
+              : '통행 없음'}`}
+        </p>
+      ))}
       <div className={`tactical-enemy-objective${objectiveRevealed ? ' revealed' : ' hidden'}`}>
         <span>예상 목적</span>
         <strong>{objective.label}</strong>

@@ -14,7 +14,9 @@ import {
   tacticalRearAssaultIsEngaged, tacticalRearManeuverEffectiveCounterStrengthForZone,
   setTacticalGroupFacing,
   tacticalFacingPreview, tacticalFacingUnavailableReason,
+  tacticalFlankRoutePreparationView, tacticalFlankRouteView,
   tacticalStageOrderPreview, tacticalStageOrderUnavailableReason, tacticalSupportedCommands,
+  toggleTacticalFlankRoutePreparation,
   type TacticalFacingPreview, type TacticalStageOrderPreview,
 } from '../game/tacticalBattle';
 import { assaultMaxRounds } from '../game/tacticalAssault';
@@ -40,6 +42,7 @@ import {
 } from './tactical/TacticalDeploymentDock';
 import { TacticalGroupChip } from './tactical/TacticalGroupChip';
 import { TacticalOrderConfirm } from './tactical/TacticalOrderConfirm';
+import { TacticalRouteRibbon } from './tactical/TacticalRouteRibbon';
 import { useStagePointerDrag, type StageDragPoint } from './tactical/stagePointerDrag';
 import { TacticalCommandPopover } from './tactical/TacticalCommandPopover';
 import { TacticalMiniMap } from './tactical/TacticalMiniMap';
@@ -588,6 +591,9 @@ export function TacticalBattleScreen({
   // P3 배치 계약 — 카드 독·버튼이 같은 selector/mutation을 쓴다. 규칙 수치는 재계산하지 않는다.
   const deploymentView = battle.phase === 'deployment' ? tacticalDeploymentView(battle) : null;
   const deploymentStartReason = hunt ? huntDeploymentReason : deploymentView?.unavailableReason ?? null;
+  // P6 우회로 — 표시 상태·step·도착 범위는 백엔드 selector가 단일 소스다
+  const flankRouteViews = battle.flankRoutes?.length ? tacticalFlankRouteView(battle) : [];
+  const flankRouteOptions = battle.phase === 'preparation' ? tacticalFlankRoutePreparationView(state) : [];
   const runDeploymentAction = (action: (current: GameState) => string | null): string | null => {
     const error = onDeploymentAction(action);
     if (error) showDeployNotice(error);
@@ -981,8 +987,18 @@ export function TacticalBattleScreen({
               selectedGroupId={selectedGroupId}
               eventIndex={eventIndex}
               playback={playbackActive}
+              routeViews={flankRouteViews}
               onViewZone={setViewedZoneId}
               onSelectGroup={selectGroup}
+            />
+          )}
+          {showTacticalMiniMap && flankRouteViews.length > 0 && (
+            <TacticalRouteRibbon
+              battle={battle}
+              views={flankRouteViews}
+              routeAdvances={combatPlayback ? battle.pendingReport?.routeAdvances ?? null : null}
+              playback={playbackActive}
+              onFocusRoute={setViewedZoneId}
             />
           )}
           {DRAG_SPIKE_ENABLED && (
@@ -1093,6 +1109,7 @@ export function TacticalBattleScreen({
               summary={enemyPlanSummary}
               effectiveCounterStrengths={effectiveCounterStrengths}
               effectiveRearCounterZoneName={effectiveRearCounterZoneName}
+              routeViews={flankRouteViews}
             />
           )}
           {assault && !hunt && battle.lairDefensePlan &&
@@ -1117,6 +1134,7 @@ export function TacticalBattleScreen({
                   summary={enemyPlanSummary}
                   effectiveCounterStrengths={effectiveCounterStrengths}
                   effectiveRearCounterZoneName={effectiveRearCounterZoneName}
+                  routeViews={flankRouteViews}
                 />
               )}
               <div className="tactical-panel-heading">
@@ -1129,12 +1147,41 @@ export function TacticalBattleScreen({
               <div className="tactical-action-grid">
                 {battle.prepActions
                   .filter(action => action.id !== 'preliminaryBombardment' || countBuilt(state, 'cannonEmplacement') > 0)
+                  .filter(action => action.id !== 'openFlankRoute' || flankRouteOptions.length > 0)
                   .map(action => {
                     const unavailableReason = tacticalPreparationUnavailableReason(state, action.id);
                     const disabled = action.applied || (!action.selected && (
                       battle.prepPoints < action.cost || unavailableReason != null
                     ));
                     const counterLabels = enemyPlanCounterLabelsForAction(battle.enemyPlan, action.id);
+                    if (action.id === 'openFlankRoute') {
+                      // 좌·우 경로별 개방 토글 — 점수 소비·환불·공개 전환은 전부 백엔드 toggle이 처리한다
+                      return (
+                        <div
+                          key={action.id}
+                          className={`tactical-action tactical-flank-route-action${action.selected ? ' selected' : ''}`}
+                        >
+                          <span>{action.cost}점/경로</span>
+                          <strong>{action.label}</strong>
+                          <small>{PREP_DESCRIPTIONS.openFlankRoute}</small>
+                          <div className="tactical-flank-route-sides" role="group" aria-label="열 우회로 방향 선택">
+                            {flankRouteOptions.map(option => (
+                              <button
+                                type="button"
+                                key={option.side}
+                                className={option.selected ? 'active' : ''}
+                                disabled={!option.selected && option.unavailableReason != null}
+                                title={option.unavailableReason ?? (option.selected
+                                  ? `개방 취소 — ${option.cost}점을 돌려받습니다.`
+                                  : `${withJosa(option.label, '을/를')} ${option.cost}점으로 엽니다. 연 경로는 즉시 공개됩니다.`)}
+                                onClick={() => runDeploymentAction(current =>
+                                  toggleTacticalFlankRoutePreparation(current, option.side))}
+                              >{option.side === 'left' ? '좌' : '우'} · {option.label}</button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
                     return (
                       <button
                         key={action.id}

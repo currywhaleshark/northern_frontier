@@ -629,4 +629,55 @@ assert.match(chipSource, /facing === 'towardRear' \? ' · 후방 경계' : ''/,
 assert.match(cssSource, /\.tactical-facing-arrow\.left/,
   'facing arrows must sit on both sides of the selected unit');
 
+// ── Phase 6: 우회로 준비·미니맵 가지·무대 리본·징후 ──
+const routeRibbonSource = readFileSync(
+  new URL('../../src/components/tactical/TacticalRouteRibbon.tsx', import.meta.url),
+  'utf8',
+);
+
+assert.match(screenSource, /toggleTacticalFlankRoutePreparation\(current, option\.side\)/,
+  'route preparation must toggle per side through the backend mutation');
+assert.match(screenSource, /action\.id !== 'openFlankRoute' \|\| flankRouteOptions\.length > 0/,
+  'the flank route action card must hide in battles without flank routes');
+assert.match(screenSource, /tacticalFlankRoutePreparationView\(state\)/,
+  'route side options and refund state must come from the backend preparation view');
+assert.match(screenSource, /tacticalFlankRouteView\(battle\)/,
+  'route display state must come from the backend visibility selector');
+assert.match(screenSource, /<TacticalRouteRibbon\b/,
+  'the stage must delegate visible routes to the route ribbon');
+assert.match(screenSource, /battle\.pendingReport\?\.routeAdvances/,
+  'route movement replay must come from the round report contract');
+assert.doesNotMatch(screenSource, /defenderIntel ===|routeTransit\.step/,
+  'the screen must not re-derive route visibility or read raw transit steps');
+
+assert.match(routeRibbonSource, /view\.display !== 'hidden'/,
+  'hidden routes must never render in the ribbon');
+assert.match(routeRibbonSource, /advance\.visibleToDefender/,
+  'only visible route advances may replay in the ribbon');
+assert.match(routeRibbonSource, /expectedArrivalRounds/,
+  'suspected routes must show the backend arrival range only');
+assert.doesNotMatch(routeRibbonSource, /routeTransit|defenderIntel/,
+  'the ribbon must read the view contract, not raw route state');
+
+assert.match(minimapSource, /MinimapRouteBranch/,
+  'the strip minimap must render flank route branches');
+assert.match(minimapSource, /!view \|\| view\.display === 'hidden'\) return null;/,
+  'unopened routes must not appear on the minimap');
+assert.match(minimapSource, /display-\$\{view\.display\}/,
+  'suspected routes must render with the display-state styling class');
+assert.match(minimapSource, /tactical-minimap-route-suspect">\?/,
+  'suspected routes must show a question mark');
+assert.match(minimapSource, /!tacticalGroupIsInRouteTransit\(group\)/,
+  'transit groups must leave the zone dot lists');
+assert.match(zoneSource, /!tacticalGroupIsInRouteTransit\(group\)/,
+  'transit groups must leave the stage ranks');
+assert.match(planSource, /routeViews/,
+  'the enemy plan panel must surface route intel lines');
+assert.match(cssSource, /\.tactical-minimap-route\.display-suspected \.tactical-minimap-route-line\s*\{\s*border-top-style:\s*dashed;/,
+  'suspected minimap branches must be dashed');
+assert.match(cssSource, /\.tactical-route-ribbon\s*\{[\s\S]*position:\s*absolute;/,
+  'the route ribbon must overlay the stage edge');
+assert.match(cssSource, /prefers-reduced-motion[\s\S]*\.tactical-route-advance\s*\{\s*animation:\s*none;/,
+  'route advance pulses must respect reduced motion');
+
 console.log('tactical component extraction tests passed');

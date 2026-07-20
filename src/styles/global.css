@@ -3695,6 +3695,126 @@ html, body, #root {
 .tactical-facing-arrow:disabled { opacity: 0.4; cursor: default; }
 .tactical-state-badge.facing-turning { border-color: #a3703a; color: #e8b45f; }
 .tactical-facing-toggle { flex: 0 0 auto; }
+/* ── Phase 6 우회로 — 준비 선택·미니맵 가지·무대 리본·징후 ── */
+.tactical-flank-route-action { cursor: default; }
+.tactical-flank-route-sides {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.tactical-flank-route-sides button {
+  flex: 1 1 0;
+  padding: 3px 6px;
+  border: 1px solid #445057;
+  border-radius: 4px;
+  background: #292f33;
+  color: var(--text);
+  font-size: 10px;
+  cursor: pointer;
+}
+.tactical-flank-route-sides button.active { border-color: #d0a651; background: #3a372d; }
+.tactical-flank-route-sides button:disabled { opacity: 0.5; cursor: default; }
+.tactical-minimap-route {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 1px 4px;
+  border: 0;
+  background: none;
+  color: #9fa9ad;
+  font-size: 9px;
+  cursor: pointer;
+}
+.tactical-minimap-route-line {
+  flex: 1 1 auto;
+  height: 0;
+  border-top: 2px solid #7a8a92;
+}
+.tactical-minimap-route.display-suspected .tactical-minimap-route-line { border-top-style: dashed; }
+.tactical-minimap-route.control-defender .tactical-minimap-route-line { border-top-color: #7aa071; }
+.tactical-minimap-route.control-raider .tactical-minimap-route-line { border-top-color: #c4694f; }
+.tactical-minimap-route.control-contested .tactical-minimap-route-line { border-top-color: #e8b45f; }
+.tactical-minimap-route-suspect { color: #e8b45f; font-weight: 700; }
+.tactical-minimap-route-steps { display: flex; gap: 8px; }
+.tactical-minimap-route-step {
+  display: flex;
+  gap: 2px;
+  min-width: 10px;
+  min-height: 8px;
+  align-items: center;
+  border-bottom: 1px solid #55606675;
+}
+.tactical-route-ribbon {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  z-index: 26;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 340px;
+}
+.tactical-route-ribbon-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid #59626a;
+  border-radius: 4px;
+  background: rgba(30, 34, 37, 0.88);
+  color: var(--text);
+  font-size: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+.tactical-route-ribbon-row.display-suspected { border-style: dashed; }
+.tactical-route-ribbon-row.control-contested { border-color: #e8b45f; }
+.tactical-route-ribbon-row.control-raider { border-color: #c4694f; }
+.tactical-route-ribbon-row.control-defender { border-color: #7aa071; }
+.tactical-route-ribbon-row strong { color: #ead8ac; font-size: 10px; }
+.tactical-route-suspect { color: #e8b45f; }
+.tactical-route-steps { display: flex; align-items: center; gap: 4px; }
+.tactical-route-step {
+  display: flex;
+  gap: 2px;
+  min-width: 16px;
+  min-height: 10px;
+  align-items: center;
+  padding: 1px 2px;
+  border-bottom: 2px solid #7a8a92;
+}
+.tactical-route-step + .tactical-route-step { border-left: 1px dotted #59626a; }
+.tactical-route-unit {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.tactical-route-unit.raider { background: #c4694f; }
+.tactical-route-unit.defender { background: #7aa071; border-radius: 1px; }
+.tactical-route-control.contested { color: #e8b45f; font-style: normal; }
+.tactical-route-control.raider { color: #c4694f; font-style: normal; }
+.tactical-route-control.defender { color: #9fc487; font-style: normal; }
+.tactical-route-advance {
+  color: #e8b45f;
+  font-style: normal;
+  animation: tactical-route-advance-pulse 900ms ease 2;
+}
+@keyframes tactical-route-advance-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.tactical-enemy-plan .tactical-enemy-route-intel {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 10px;
+  color: #d8c9a0;
+}
+.tactical-enemy-plan .tactical-enemy-route-intel.display-suspected { color: #e8b45f; }
+@media (prefers-reduced-motion: reduce) {
+  .tactical-route-advance { animation: none; }
+}
 .tactical-order-confirm {
   position: absolute;
   z-index: 70;
