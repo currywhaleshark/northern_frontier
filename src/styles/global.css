@@ -3805,6 +3805,32 @@ html, body, #root {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
 }
+/* ── Phase 7 경로 차단·교전·급습 ── */
+.tactical-route-ribbon-row.deploy-anchor-valid {
+  outline: 2px dashed rgba(216, 180, 94, 0.55);
+  outline-offset: 1px;
+}
+.tactical-route-ribbon-row.deploy-anchor-hover {
+  outline: 2px solid #d8b45e;
+  outline-offset: 1px;
+  background: rgba(216, 180, 94, 0.16);
+}
+.tactical-route-ribbon-row.deploy-anchor-blocked { opacity: 0.55; }
+.tactical-route-engagement {
+  font-style: normal;
+  animation: tactical-route-advance-pulse 900ms ease 2;
+}
+.tactical-route-engagement.outcome-defenderHeld { color: #9fc487; }
+.tactical-route-engagement.outcome-raiderBreakthrough { color: #e08b72; }
+.tactical-route-engagement.outcome-contested { color: #e8b45f; }
+.tactical-route-arrival {
+  font-style: normal;
+  font-weight: 700;
+  animation: tactical-route-advance-pulse 900ms ease 2;
+}
+.tactical-route-arrival.side-raider { color: #e08b72; }
+.tactical-route-arrival.side-defender { color: #9fc487; }
+.tactical-state-badge.rear-raid { border-color: #55a79a; color: #79c7ba; }
 .tactical-enemy-plan .tactical-enemy-route-intel {
   grid-column: 1 / -1;
   margin: 0;

@@ -20,6 +20,8 @@ interface Props {
   mode: 'deployment' | 'command';
   selected: boolean;
   pending: boolean;
+  /** P7 — 이번 라운드에 우회로 출구로 후열 급습에 도달한 부대 */
+  rearRaid: boolean;
   commandText: string | null;
   targetText: string;
   onSelect: () => void;
@@ -73,7 +75,7 @@ export function DockDefenderSprite({ group, gender }: {
 }
 
 export function TacticalGroupChip({
-  group, gender, active, zoneName, mode, selected, pending, commandText, targetText, onSelect,
+  group, gender, active, zoneName, mode, selected, pending, rearRaid, commandText, targetText, onSelect,
 }: Props) {
   return (
     <button
@@ -91,7 +93,7 @@ export function TacticalGroupChip({
           {group.label}
           <em>{active === 0 ? '전투 불능' : `${active}명`}</em>
         </strong>
-        <span>{zoneName} · {group.line === 'front' ? '전열' : group.line === 'middle' ? '중열' : '후열'}{group.facing === 'towardRear' ? ' · 후방 경계' : ''}{group.pendingFacing ? ' · 회전 중' : ''}{group.ambushed ? ' · 매복중' : ''}</span>
+        <span>{zoneName} · {group.line === 'front' ? '전열' : group.line === 'middle' ? '중열' : '후열'}{group.routeTransit ? ` · ${group.routeTransit.purpose === 'block' ? '경로 차단' : '우회 이동'} 중` : ''}{group.facing === 'towardRear' ? ' · 후방 경계' : ''}{group.pendingFacing ? ' · 회전 중' : ''}{rearRaid ? ' · 후열 급습' : ''}{group.ambushed ? ' · 매복중' : ''}</span>
         {mode === 'command' && (
           <>
             <span className={`tactical-dock-command${pending ? ' waiting' : ''}`}>

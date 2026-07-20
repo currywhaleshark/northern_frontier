@@ -1184,6 +1184,12 @@ export function TacticalZoneColumn({
                     title="방향전환 직후라 이번 교전에는 전투력이 줄어듭니다."
                   >회전 중</em>
                 )}
+                {group.rearRaidRound === (battle.pendingReport?.round ?? battle.round) && (
+                  <em
+                    className="tactical-state-badge rear-raid"
+                    title="우회로를 지나 적 후열에 도달했습니다 — 이번 교전에 급습 보너스가 적용됩니다."
+                  >후열 급습</em>
+                )}
                 {hunt && group.huntMovedRound === battle.round && (
                   <em className="tactical-state-badge tactical-hunt-moved" title="이번 라운드 이동으로 몰이 기여가 절반입니다.">
                     이동 · 몰이 ½

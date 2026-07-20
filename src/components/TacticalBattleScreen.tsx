@@ -6,7 +6,8 @@ import { banditLairDoctrineDefinition, enemyPlanCounterLabelsForAction, enemyPla
 import { withJosa } from '../game/josa';
 import {
   applyAutoDeployTacticalGroups, applyTacticalPlaybackEvent, applyTacticalStageOrder,
-  mergeTacticalGroups, placeTacticalDeploymentGroup, removeTacticalDeploymentGroup,
+  mergeTacticalGroups, placeTacticalDeploymentGroup, placeTacticalRouteBlocker,
+  removeTacticalDeploymentGroup,
   resetTacticalDeployment, splitFeaturedTacticalGroup, splitTacticalGroup,
   tacticalCommandUnavailableReason, tacticalDeploymentPlacementUnavailableReason, tacticalDeploymentView,
   tacticalLootText,
@@ -15,6 +16,7 @@ import {
   setTacticalGroupFacing,
   tacticalFacingPreview, tacticalFacingUnavailableReason,
   tacticalFlankRoutePreparationView, tacticalFlankRouteView,
+  tacticalRoutePlacementUnavailableReason,
   tacticalStageOrderPreview, tacticalStageOrderUnavailableReason, tacticalSupportedCommands,
   toggleTacticalFlankRoutePreparation,
   type TacticalFacingPreview, type TacticalStageOrderPreview,
@@ -42,7 +44,7 @@ import {
 } from './tactical/TacticalDeploymentDock';
 import { TacticalGroupChip } from './tactical/TacticalGroupChip';
 import { TacticalOrderConfirm } from './tactical/TacticalOrderConfirm';
-import { TacticalRouteRibbon } from './tactical/TacticalRouteRibbon';
+import { TacticalRouteRibbon, parseRouteAnchorId } from './tactical/TacticalRouteRibbon';
 import { useStagePointerDrag, type StageDragPoint } from './tactical/stagePointerDrag';
 import { TacticalCommandPopover } from './tactical/TacticalCommandPopover';
 import { TacticalMiniMap } from './tactical/TacticalMiniMap';
@@ -190,6 +192,7 @@ function UnitDock({ state, battle, hunt, mode, selectedGroupId, onSelect }: {
             mode={mode}
             selected={selectedGroupId === group.id}
             pending={pending}
+            rearRaid={group.rearRaidRound === (battle.pendingReport?.round ?? battle.round)}
             commandText={group.command ? commandLabel(group.command, group, hunt) : null}
             targetText={targetText}
             onSelect={() => onSelect(group.id)}
@@ -651,6 +654,21 @@ export function TacticalBattleScreen({
         if (!error) showDeployNotice(`${groupLabel} — 배치 대기로 되돌렸습니다.`, 'ok');
         return;
       }
+      const routeSide = anchorId ? parseRouteAnchorId(anchorId) : null;
+      if (routeSide) {
+        const routeReason = tacticalRoutePlacementUnavailableReason(battle, groupId, routeSide);
+        if (routeReason) {
+          showDeployNotice(routeReason);
+          return;
+        }
+        const error = runDeploymentAction(current => placeTacticalRouteBlocker(current, groupId, routeSide));
+        if (error) return;
+        playSfx('hammer');
+        const routeLabel = battle.flankRoutes?.find(route => route.side === routeSide)?.label ?? '우회로';
+        showDeployNotice(`${groupLabel} — ${routeLabel} 중간 차단 배치.`, 'ok');
+        selectGroup(groupId);
+        return;
+      }
       const target = anchorId ? parseDeployAnchorId(anchorId) : null;
       if (!target) {
         showDeployNotice('유효한 배치 위치가 아닙니다. 아군 전열 위나 배치 대기 영역에 놓으십시오.');
@@ -997,7 +1015,13 @@ export function TacticalBattleScreen({
               battle={battle}
               views={flankRouteViews}
               routeAdvances={combatPlayback ? battle.pendingReport?.routeAdvances ?? null : null}
+              routeEngagements={combatPlayback ? battle.pendingReport?.routeEngagements ?? null : null}
+              routeArrivals={combatPlayback ? battle.pendingReport?.routeArrivals ?? null : null}
               playback={playbackActive}
+              deploymentPhase={battle.phase === 'deployment'}
+              blockerDrag={battle.phase === 'deployment' && zoneStageDrag
+                ? { groupId: zoneStageDrag.groupId, hoverAnchorId: zoneStageDrag.hoverAnchorId }
+                : null}
               onFocusRoute={setViewedZoneId}
             />
           )}

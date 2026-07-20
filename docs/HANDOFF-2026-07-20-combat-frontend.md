@@ -283,6 +283,44 @@ Codex의 P6 우회로 계약(`fd491ce`, 백엔드 핸드오프 10절) 위에 경
 ### 남은 것
 
 - **경로 control 색(아군/교전)과 차단 배치 UI는 Phase 7** — P6에서는 아군이 경로에 들어갈 수 없어
-  중립/적 색만 실검증됨.
+  중립/적 색만 실검증됨. → **11절에서 해소.**
 - suspected 강등(nightApproach) 화면 확인은 계책 조합이 확률적이라 미실행 — selector 계약 테스트로
   갈음. 나머지 미완 항목은 8·9절과 동일.
+
+## 11. 2026-07-20 회사 세션 기록 5 — P7 프론트 구현 완료 (이 커밋)
+
+Codex의 P7 경로 교전 계약(`3606369`, 백엔드 핸드오프 11절) 위에 차단 배치·우회 기동·재생 UI를 구현했다.
+
+### 구현 내역
+
+- **경로 차단 배치**: 배치 단계에 플레이어가 연 경로의 리본 행이 드롭 앵커(`route|left/right`,
+  `parseRouteAnchorId` 공용 헬퍼)가 된다. 카드·무대 부대 드래그 모두 지원 — 유효성은
+  `tacticalRoutePlacementUnavailableReason`, 적용은 `placeTacticalRouteBlocker`. 호버 시 리본 행
+  하이라이트 + 고스트 `…중간 차단 배치`. 차단 카드는 배치 완료 영역에 `<경로> · 경로 차단`으로 남고
+  무대 랭크에는 없다(기존 transit 필터). 역드래그·일반 레인 재배치 시 route 해제는 백엔드가 처리.
+- **우회 기동**: 기존 명령 dispatch 그대로 — `tacticalSupportedCommands`에 `flankRoute`가 오면 명령
+  바에 자동 노출되고 검증은 범용 `tacticalCommandUnavailableReason`(내부 route order reason). 칩은
+  `경로 차단 중`/`우회 이동 중`을 구분 표시.
+- **재생**: 리본이 `routeAdvances → routeEngagements → routeArrivals` 순으로 보고 배열을 그대로
+  재생한다. 교전 칩은 outcome별 색(차단 성공/차단 붕괴/경로 대치) + 양측 피해 + 패퇴/철수 표기,
+  서사는 백엔드 `lines`를 title로. 도달 칩은 적 `후방 진입!`/아군 `후열 급습 도달!`. control
+  아군/교전 색이 이번에 실검증됨.
+- **후열 급습 배지**: `rearRaidRound`가 **표시 라운드**(`pendingReport?.round ?? battle.round`)와
+  같을 때만 무대·칩 배지. 처음에 `battle.round` 비교로 넣었다가 재생 중 round가 이미 +1인 것을
+  브라우저에서 발견해 수정 — 이 관례는 헤더 roundLabel과 동일하다.
+- 배율 수치(급습·노출)는 UI 어디에도 없음(테스트 강제). 컴포넌트 계약 테스트 ~18건 추가.
+
+### 검증
+
+- tsc·컴포넌트·routes·test:combat·빌드 통과.
+- 브라우저(우회 좌측 강제 + 좌측 개방): 창 수비병 카드→리본 드롭(호버 하이라이트·고스트) →
+  `routeId` placement·purpose=block·step1·contested. 지휘에서 차단 유지 라운드에 경로 교전 재생
+  칩 `차단 성공 — 아군 피해 1 · 적 피해 0` + `아군 통제` 전환 + 적 step0 밀림. `우회 기동` 클릭 →
+  purpose=raid·step0 재출발, 2라운드 이동 후 `창 수비병 — 마을 방어선 후열 급습 도달!` 칩과
+  `rearRaidRound` 기록, transit 제거·목적 구역 합류까지 확인.
+
+### 남은 것
+
+- 아군 차단대 패퇴(적 승리) 재생과 적 후방 진입 칩은 시드 사정상 실화면 미확인(계약 배열·칩 코드는
+  동일 경로, 백엔드 테스트 고정). 집 QA 후보.
+- 기존 미완 항목(스크린샷·터치·특수주민·인접 구역 드롭 실입력)은 8~10절과 동일.

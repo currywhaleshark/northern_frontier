@@ -6,9 +6,12 @@ import { useEffect, useRef, useState } from 'react';
 import { combatDefaultWeaponName } from '../../game/combatCapabilities';
 import {
   placeTacticalDeploymentGroup,
+  placeTacticalRouteBlocker,
   removeTacticalDeploymentGroup,
   tacticalDeploymentPlacementUnavailableReason,
+  tacticalRoutePlacementUnavailableReason,
 } from '../../game/tacticalBattle';
+import { parseRouteAnchorId } from './TacticalRouteRibbon';
 import {
   defaultTacticalDeploymentPlacement,
   type TacticalDeploymentGroupView,
@@ -110,7 +113,14 @@ function DeploymentCard({
   const featured = view.featuredResidents[0];
 
   const hoverAnchor = dragState.dragging ? dragState.hoverAnchorId : null;
-  const hoverPlacement = hoverAnchor && hoverAnchor !== DEPLOY_DOCK_ANCHOR_ID
+  const hoverRouteSide = hoverAnchor ? parseRouteAnchorId(hoverAnchor) : null;
+  const hoverRoute = hoverRouteSide
+    ? battle.flankRoutes?.find(route => route.side === hoverRouteSide)
+    : undefined;
+  const hoverRouteReason = hoverRouteSide
+    ? tacticalRoutePlacementUnavailableReason(battle, view.groupId, hoverRouteSide)
+    : null;
+  const hoverPlacement = hoverAnchor && hoverAnchor !== DEPLOY_DOCK_ANCHOR_ID && !hoverRouteSide
     ? parseDeployAnchorId(hoverAnchor)
     : null;
   const hoverReason = hoverPlacement
@@ -118,9 +128,11 @@ function DeploymentCard({
     : null;
   const ghostText = hoverAnchor === DEPLOY_DOCK_ANCHOR_ID
     ? placement ? '배치 대기로 되돌리기' : '이미 배치 대기 중입니다'
-    : hoverPlacement
-      ? hoverReason ?? `${battle.zones.find(zone => zone.id === hoverPlacement.zoneId)?.name ?? ''} ${deploymentLineLabel(hoverPlacement.line)}${battle.orientation === 'assault' && hoverPlacement.zoneId === 'lairWall' ? ' · 전방 은닉' : ''} 배치`
-      : '무대의 아군 전열 위로 끌어 배치';
+    : hoverRouteSide
+      ? hoverRouteReason ?? `${hoverRoute?.label ?? '우회로'} 중간 차단 배치`
+      : hoverPlacement
+        ? hoverReason ?? `${battle.zones.find(zone => zone.id === hoverPlacement.zoneId)?.name ?? ''} ${deploymentLineLabel(hoverPlacement.line)}${battle.orientation === 'assault' && hoverPlacement.zoneId === 'lairWall' ? ' · 전방 은닉' : ''} 배치`
+        : '무대의 아군 전열 위로 끌어 배치';
 
   return (
     <>
@@ -152,9 +164,11 @@ function DeploymentCard({
           <span className={`tactical-deploy-card-placement${placement ? '' : ' pending'}`}>
             {locked
               ? `${placementZoneName ?? ''} 최후열 고정`
-              : placement
-                ? `${placementZoneName} · ${deploymentLineLabel(placement.line)}${placement.hidden ? ' · 은닉' : ''}${group.facing === 'towardRear' ? ' · 후방 경계' : ''}`
-                : `추천: ${recommendedZoneName} · ${deploymentLineLabel(recommended.line)}`}
+              : placement?.routeId
+                ? `${battle.flankRoutes?.find(route => route.id === placement.routeId)?.label ?? '우회로'} · 경로 차단`
+                : placement
+                  ? `${placementZoneName} · ${deploymentLineLabel(placement.line)}${placement.hidden ? ' · 은닉' : ''}${group.facing === 'towardRear' ? ' · 후방 경계' : ''}`
+                  : `추천: ${recommendedZoneName} · ${deploymentLineLabel(recommended.line)}`}
           </span>
           {mustered && <em className="tactical-deploy-card-badge">긴급 소집</em>}
         </span>
@@ -166,7 +180,7 @@ function DeploymentCard({
           style={{ left: dragState.position.x, top: dragState.position.y }}
         >
           <strong>{view.label} {view.count}명</strong>
-          <span className={hoverPlacement && hoverReason ? 'blocked' : ''}>{ghostText}</span>
+          <span className={(hoverRouteSide && hoverRouteReason) || (hoverPlacement && hoverReason) ? 'blocked' : ''}>{ghostText}</span>
         </div>
       )}
     </>
@@ -199,6 +213,21 @@ export function TacticalDeploymentDock({
       if (!card.placement) return;
       onAction(current => removeTacticalDeploymentGroup(current, card.groupId));
       showFeedback(`${card.label} — 배치 대기로 되돌렸습니다.`, 'ok');
+      return;
+    }
+    const routeSide = anchorId ? parseRouteAnchorId(anchorId) : null;
+    if (routeSide) {
+      // P7 경로 차단 배치 — 유효성·적용은 전부 백엔드 route placement 계약이 처리한다
+      const routeReason = tacticalRoutePlacementUnavailableReason(battle, card.groupId, routeSide);
+      if (routeReason) {
+        showFeedback(routeReason, 'warn');
+        return;
+      }
+      onAction(current => placeTacticalRouteBlocker(current, card.groupId, routeSide));
+      playSfx('hammer');
+      const routeLabel = battle.flankRoutes?.find(route => route.side === routeSide)?.label ?? '우회로';
+      showFeedback(`${card.label} — ${routeLabel} 중간 차단 배치.`, 'ok');
+      onSelect(card.groupId);
       return;
     }
     const target = anchorId ? parseDeployAnchorId(anchorId) : null;

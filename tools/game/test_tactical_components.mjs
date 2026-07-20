@@ -680,4 +680,54 @@ assert.match(cssSource, /\.tactical-route-ribbon\s*\{[\s\S]*position:\s*absolute
 assert.match(cssSource, /prefers-reduced-motion[\s\S]*\.tactical-route-advance\s*\{\s*animation:\s*none;/,
   'route advance pulses must respect reduced motion');
 
+// ── Phase 7: 경로 차단 배치·우회 기동·교전/급습 재생 ──
+const dockSourceP7 = deployDockSource === undefined ? '' : readFileSync(
+  new URL('../../src/components/tactical/TacticalDeploymentDock.tsx', import.meta.url),
+  'utf8',
+);
+const ribbonSourceP7 = readFileSync(
+  new URL('../../src/components/tactical/TacticalRouteRibbon.tsx', import.meta.url),
+  'utf8',
+);
+
+assert.match(ribbonSourceP7, /parseRouteAnchorId/,
+  'route entrances must resolve through the shared route anchor helper');
+assert.match(ribbonSourceP7, /deploymentPhase && view\.route\.openedByDefender/,
+  'only player-opened routes may become blocker drop anchors during deployment');
+assert.match(ribbonSourceP7, /tacticalRoutePlacementUnavailableReason\(battle, blockerDrag\.groupId, view\.route\.side\)/,
+  'route anchor validity must come from the backend placement reason');
+assert.match(ribbonSourceP7, /routeEngagements/,
+  'route engagements must replay from the round report contract');
+assert.match(ribbonSourceP7, /engagement\.lines\.join/,
+  'engagement narration must come from backend lines, not be invented');
+assert.match(ribbonSourceP7, /outcome-\$\{engagement\.outcome\}/,
+  'engagement chips must style by the backend outcome');
+assert.match(ribbonSourceP7, /routeArrivals/,
+  'route exit arrivals must replay from the round report contract');
+assert.doesNotMatch(ribbonSourceP7, /rearRaidPowerMultiplier|0\.75|1\.5/,
+  'the ribbon must not hardcode raid or exposure multipliers');
+
+assert.match(dockSourceP7, /placeTacticalRouteBlocker\(current, card\.groupId, routeSide\)/,
+  'card drops on route anchors must call the backend blocker mutation');
+assert.match(dockSourceP7, /tacticalRoutePlacementUnavailableReason\(battle, card\.groupId, routeSide\)/,
+  'card route drops must pre-validate through the backend reason');
+assert.match(dockSourceP7, /경로 차단/,
+  'blocker cards must label their route placement');
+assert.match(screenSource, /placeTacticalRouteBlocker\(current, groupId, routeSide\)/,
+  'stage unit drops on route anchors must call the backend blocker mutation');
+assert.match(screenSource, /routeEngagements={combatPlayback \? battle\.pendingReport\?\.routeEngagements \?\? null : null}/,
+  'engagement replay must be limited to the combat playback window');
+assert.match(screenSource, /rearRaid={group\.rearRaidRound === \(battle\.pendingReport\?\.round \?\? battle\.round\)}/,
+  'dock chips must badge rear raids only on the displayed arrival round');
+assert.match(zoneSource, /group\.rearRaidRound === \(battle\.pendingReport\?\.round \?\? battle\.round\)/,
+  'stage units must badge rear raids only on the displayed arrival round');
+assert.match(chipSource, /경로 차단.*우회 이동/,
+  'transit chips must distinguish blocking from raiding');
+assert.match(commandTextSource, /flankRoute: '우회 기동'/,
+  'the flankRoute command must keep its label in the shared command text');
+assert.match(cssSource, /\.tactical-route-ribbon-row\.deploy-anchor-hover/,
+  'hovered route anchors must highlight during blocker drags');
+assert.match(cssSource, /\.tactical-state-badge\.rear-raid/,
+  'the rear raid badge must have dedicated styling');
+
 console.log('tactical component extraction tests passed');
