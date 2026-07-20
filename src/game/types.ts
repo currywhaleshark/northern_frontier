@@ -1232,6 +1232,39 @@ export type TacticalBattleGrade =
   | 'defeat'
   | 'crushingDefeat';
 
+export type TacticalBattleFlankOutcome =
+  | 'unused'
+  | 'defenderHeld'
+  | 'raiderReachedRear'
+  | 'defenderReachedRear'
+  | 'contested';
+
+export interface TacticalBattleFlankRouteReport {
+  routeId: string;
+  side: TacticalRouteSide;
+  label: string;
+  finalControl: TacticalRouteControl;
+  outcome: TacticalBattleFlankOutcome;
+  engagements: number;
+  defenderHolds: number;
+  raiderBreakthroughs: number;
+  contestedEngagements: number;
+  defenderArrivals: number;
+  raiderArrivals: number;
+  summary: string;
+}
+
+export interface TacticalBattleTacticsReport {
+  objectiveId?: EnemyObjectiveId;
+  objectiveLabel: string;
+  objectiveAchieved?: boolean;
+  doctrineId?: EnemyDoctrineId;
+  doctrineLabel: string;
+  compositionTemplateId?: string;
+  compositionLabel: string;
+  flankRoutes: TacticalBattleFlankRouteReport[];
+}
+
 export interface TacticalBattleReport {
   encounterKind: 'raidDefense' | 'banditLair' | 'predatorHunt';
   title: string;
@@ -1269,6 +1302,7 @@ export interface TacticalBattleReport {
   threatAfter: number;
   highlights: string[];
   resourceDelta: Partial<Record<ResourceId, number>>;
+  tactics?: TacticalBattleTacticsReport;
   siteOutcome?: 'burned' | 'abandoned' | 'fortified' | 'unchanged';
   predatorOutcome?: 'killed' | 'repelled' | 'escaped' | 'huntersDefeated' | 'withdrawn';
 }

@@ -1122,6 +1122,31 @@ function deployCommandableToZone(state, zoneId) {
     factionName: '변경 마적', outcome: 'defenseSuccess', enemyRouted: true, looted: true,
     defendersCommitted: 20, defendersKilled: 0, defendersWounded: 2,
   }), { result: 'victory' });
+
+  assert.deepEqual(tacticalCore.raidDefenseObjectiveResult({
+    factionName: '변경 마적', objective: 'breakthrough', outcome: 'partialLoss',
+    enemyRouted: false, looted: true, defendersCommitted: 20, defendersKilled: 0, defendersWounded: 2,
+  }), { result: 'victory' }, 'incidental loot does not complete a breakthrough objective');
+  assert.deepEqual(tacticalCore.raidDefenseObjectiveResult({
+    factionName: '변경 마적', objective: 'plunder', outcome: 'raidersLooted',
+    enemyRouted: false, looted: true, defendersCommitted: 20, defendersKilled: 0, defendersWounded: 2,
+  }), { result: 'defeat' }, 'completed plunder objective is a defeat');
+  assert.deepEqual(tacticalCore.raidDefenseObjectiveResult({
+    factionName: '변경 마적', objective: 'arson', outcome: 'partialLoss', buildingsDamaged: 2,
+    enemyRouted: false, looted: false, defendersCommitted: 20, defendersKilled: 0, defendersWounded: 2,
+  }), { result: 'defeat' }, 'arson damage threshold completes the arson objective');
+  assert.deepEqual(tacticalCore.raidDefenseObjectiveResult({
+    factionName: '변경 마적', objective: 'arson', outcome: 'partialLoss', buildingsDamaged: 1,
+    enemyRouted: false, looted: true, defendersCommitted: 20, defendersKilled: 0, defendersWounded: 2,
+  }), { result: 'victory' }, 'sub-threshold arson damage and incidental loot do not complete the objective');
+  assert.deepEqual(tacticalCore.raidDefenseObjectiveResult({
+    factionName: '조정 토벌군', objective: 'breakthrough', outcome: 'partialLoss',
+    enemyRouted: false, looted: true, defendersCommitted: 20, defendersKilled: 0, defendersWounded: 2,
+  }), { result: 'victory' }, 'objective contract applies consistently to court forces');
+  assert.deepEqual(tacticalCore.raidDefenseObjectiveResult({
+    factionName: '변경 마적', objective: 'breakthrough', outcome: 'partialLoss',
+    enemyRouted: false, looted: false, defendersCommitted: 20, defendersKilled: 7, defendersWounded: 6,
+  }), { result: 'defeat', forcedGrade: 'narrowDefeat' });
 }
 
 {
@@ -1132,6 +1157,7 @@ function deployCommandableToZone(state, zoneId) {
     const battle = tactical.createTacticalBattle(state, {
       factionName, power: 60, warned: true, siege: false, mode: 'garrison',
     });
+    if (options.objective != null) battle.enemyPlan.objective = options.objective;
     if (options.raiderMorale != null) battle.raiderMorale = options.raiderMorale;
     battle.reports.push({
       round: 5,
@@ -1144,7 +1170,7 @@ function deployCommandableToZone(state, zoneId) {
       killed: 0,
       raidersKilled: 1,
       loot: options.loot ?? (outcome === 'defenseSuccess' ? {} : { grain: 3 }),
-      buildingsDamaged: 0,
+      buildingsDamaged: options.buildingsDamaged ?? 0,
       villageMoraleDelta: 0,
       raiderMoraleDelta: 0,
       ended: true,
@@ -1156,24 +1182,34 @@ function deployCommandableToZone(state, zoneId) {
     return { report: state.tacticalBattleReport, state, grainBefore };
   }
 
-  const { report: raidLoss } = finishDefenseReport('변경 마적', 'partialLoss', 2026071411);
+  const { report: raidLoss } = finishDefenseReport('변경 마적', 'raidersLooted', 2026071411, {
+    objective: 'plunder',
+  });
   assert.equal(raidLoss.result, 'defeat');
-  assert.equal(raidLoss.closingSummary, '습격대가 약탈을 마치고 물러납니다.');
+  assert.equal(raidLoss.closingSummary, '습격대가 목표한 비축을 챙겨 물러납니다.');
+  assert.equal(raidLoss.tactics.objectiveId, 'plunder');
+  assert.equal(raidLoss.tactics.objectiveAchieved, true);
 
-  const { report: courtLoss } = finishDefenseReport('조정 토벌군', 'partialLoss', 2026071412);
-  assert.equal(courtLoss.result, 'defeat');
-  assert.equal(courtLoss.closingSummary, '토벌대가 공격을 마치고 물러납니다.');
+  const { report: courtHold } = finishDefenseReport('조정 토벌군', 'partialLoss', 2026071412, {
+    objective: 'breakthrough',
+  });
+  assert.equal(courtHold.result, 'victory');
+  assert.equal(courtHold.closingSummary, '습격대의 돌파를 저지해 마을 방어선을 지켰습니다.');
 
-  const { report: victory } = finishDefenseReport('변경 마적', 'defenseSuccess', 2026071413);
+  const { report: victory } = finishDefenseReport('변경 마적', 'defenseSuccess', 2026071413, {
+    objective: 'breakthrough',
+  });
   assert.equal(victory.result, 'victory');
-  assert.equal(victory.closingSummary, '습격대가 약탈을 포기하고 물러납니다.');
+  assert.equal(victory.closingSummary, '습격대의 돌파를 저지해 마을 방어선을 지켰습니다.');
 
-  const noLoot = finishDefenseReport('변경 마적', 'partialLoss', 2026071414, { loot: {} }).report;
+  const noLoot = finishDefenseReport('변경 마적', 'partialLoss', 2026071414, {
+    loot: {}, objective: 'plunder',
+  }).report;
   assert.equal(noLoot.result, 'victory', 'preventing all loot fulfills the village defense objective');
-  assert.equal(noLoot.closingSummary, '습격대가 약탈을 포기하고 물러납니다.');
+  assert.equal(noLoot.closingSummary, '습격대의 비축 약탈 목표를 좌절시켰습니다.');
 
   const routed = finishDefenseReport('변경 마적', 'defenseSuccess', 2026071415, {
-    loot: { grain: 10 }, raiderMorale: 0,
+    loot: { grain: 10 }, raiderMorale: 0, objective: 'plunder',
   });
   assert.equal(routed.report.result, 'victory');
   assert.equal(routed.report.closingSummary, '적의 기세가 꺾여 대열이 무너지고 도주합니다.');

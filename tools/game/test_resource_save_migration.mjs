@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 29, 'support-unit save migrations ship with schema version 29');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 30, 'completed tactical reports ship with schema version 30');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -60,6 +60,7 @@ assert.equal(typeof saveLoad.migrateV12ToV13, 'function');
 assert.equal(typeof saveLoad.migrateV13ToV14, 'function');
 assert.equal(typeof saveLoad.migrateV14ToV15, 'function');
 assert.equal(typeof saveLoad.migrateV28ToV29, 'function');
+assert.equal(typeof saveLoad.migrateV29ToV30, 'function');
 assert.equal(typeof saveLoad.migrateV15ToV16, 'function');
 assert.equal(typeof saveLoad.migrateV16ToV17, 'function');
 assert.equal(typeof saveLoad.migrateV17ToV18, 'function');
@@ -85,6 +86,12 @@ assert.equal(typeof saveLoad.migrateV27ToV28, 'function');
   const migrated = saveLoad.migrateV27ToV28({ schemaVersion: 27, tacticalBattle: { phase: 'command' } });
   assert.equal(migrated.schemaVersion, 28);
   assert.deepEqual(migrated.tacticalBattle, { phase: 'command' }, 'v28 root migration remains additive');
+}
+
+{
+  const migrated = saveLoad.migrateV29ToV30({ schemaVersion: 29, tacticalBattleReport: { battleId: 7 } });
+  assert.equal(migrated.schemaVersion, 30);
+  assert.deepEqual(migrated.tacticalBattleReport, { battleId: 7 }, 'v30 root migration remains additive');
 }
 
 {
@@ -927,6 +934,35 @@ for (const [field, seed] of [['events', 2026071451], ['lines', 2026071452]]) {
   assert.ok(Number.isFinite(loaded?.tacticalBattleReport?.gradeScore));
   assert.equal(loaded?.tacticalBattleReport?.closingSummary, '습격대가 약탈을 포기하고 물러납니다.');
   assert.deepEqual(loaded?.tacticalBattleReport?.recoveredLoot, {});
+}
+
+{
+  const state = simulation.newGame(2026071444);
+  state.tacticalBattleReport = {
+    battleId: 78,
+    outcome: 'defenseSuccess',
+    factionName: '변경 마적',
+    tactics: {
+      objectiveId: 'breakthrough', objectiveLabel: '방어선 돌파', objectiveAchieved: false,
+      doctrineId: 'mountedSkirmish', doctrineLabel: '기마 견제',
+      compositionTemplateId: 'bandit-hit-and-run', compositionLabel: '치고 빠지는 약탈대',
+      flankRoutes: [{
+        routeId: 'flank-left', side: 'left', label: '숲 능선길', finalControl: 'defender',
+        outcome: 'defenderHeld', engagements: 2, defenderHolds: 1, raiderBreakthroughs: 0,
+        contestedEngagements: 1, defenderArrivals: 0, raiderArrivals: 0,
+        summary: '숲 능선길의 차단대가 적 우회 시도를 저지했습니다.',
+      }],
+    },
+  };
+  assert.equal(saveLoad.saveGame(state), true);
+  const loaded = saveLoad.loadGame();
+  assert.equal(loaded?.tacticalBattleReport?.tactics?.objectiveId, 'breakthrough');
+  assert.equal(loaded?.tacticalBattleReport?.tactics?.objectiveAchieved, false);
+  assert.equal(loaded?.tacticalBattleReport?.tactics?.doctrineId, 'mountedSkirmish');
+  assert.equal(loaded?.tacticalBattleReport?.tactics?.compositionTemplateId, 'bandit-hit-and-run');
+  assert.deepEqual(loaded?.tacticalBattleReport?.tactics?.flankRoutes.map(route => ({
+    side: route.side, outcome: route.outcome, engagements: route.engagements,
+  })), [{ side: 'left', outcome: 'defenderHeld', engagements: 2 }]);
 }
 
 console.log('resource save migration tests passed');

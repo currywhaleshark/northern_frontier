@@ -10,6 +10,7 @@ import {
   enemyIntelLevel,
   enemyPlanFirstRoundMoraleBonus, enemyPlanPreparationPenalty, enemyPlanRangedEfficiency,
   enemyPlanStratagemScale, enemyPlanStratagemScaleForEngagement, enemyPlanWarningLines,
+  enemyDoctrineDefinition, enemyObjectiveDefinition,
   flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
 } from './enemyPlan';
 import { addLog } from './events';
@@ -25,7 +26,8 @@ import { activePredatorScoutIds } from './expeditionIntel';
 import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
 import {
   captureTacticalResources, gradeTacticalBattle, TACTICAL_BATTLE_GRADE_LABELS,
-  raidDefenseObjectiveResult, tacticalClosingSummary, tacticalPeopleReport, tacticalResourceDelta,
+  raidDefenseObjectiveAchieved, raidDefenseObjectiveResult, tacticalClosingSummary,
+  tacticalPeopleReport, tacticalResourceDelta,
 } from './tacticalCore';
 import {
   applyDefenseZoneConsequences, resolveEngagementExchange, splitTacticalEngagementDefenders,
@@ -79,6 +81,7 @@ import {
 import type {
   DefenderGroupKind,
   EnemyDoctrineId,
+  EnemyObjectiveId,
   EnemyPlan,
   GameState,
   PreparationActionId,
@@ -91,6 +94,8 @@ import type {
   TacticalFacing,
   TacticalFormationLine,
   TacticalRaiderGroup,
+  TacticalBattleFlankOutcome,
+  TacticalBattleTacticsReport,
   RaiderUnitType,
   TacticalRouteSide,
   TacticalRoundReport,
@@ -2749,8 +2754,22 @@ function outcomeLabel(
   result: 'victory' | 'defeat',
   looted: boolean,
   enemyRouted: boolean,
+  objective?: EnemyObjectiveId,
+  objectiveAchieved = false,
 ): string {
   if (enemyRouted) return '적을 궤주시켰습니다';
+  if (objective) {
+    if (outcome === 'villageRouted') return '마을 방어선이 무너졌습니다';
+    if (result === 'victory') {
+      if (objective === 'breakthrough') return '적의 방어선 돌파를 저지했습니다';
+      if (objective === 'plunder') return '적의 비축 약탈 목표를 막았습니다';
+      return '적의 방책·창고 방화 목표를 막았습니다';
+    }
+    if (!objectiveAchieved) return '적의 작전 목표는 막았지만 아군 피해가 극심합니다';
+    if (objective === 'plunder') return '적이 목표한 비축을 약탈했습니다';
+    if (objective === 'arson') return '적이 목표한 방책·창고 피해를 냈습니다';
+    return '적이 마을 방어선을 돌파했습니다';
+  }
   if (factionName === '조정 토벌군') {
     if (outcome === 'defenseSuccess') return '토벌대의 공격을 막아냈습니다';
     if (outcome === 'villageRouted') return '마을 방어선이 무너졌습니다';
@@ -2761,6 +2780,76 @@ function outcomeLabel(
     : '약탈은 막았지만 아군 피해가 극심합니다';
   if (outcome === 'villageRouted') return '마을 방어선이 무너졌습니다';
   return '습격대의 약탈을 막지 못했습니다';
+}
+
+function tacticalFlankOutcomeSummary(
+  label: string,
+  outcome: TacticalBattleFlankOutcome,
+  defenderArrivals: number,
+  raiderArrivals: number,
+): string {
+  if (outcome === 'raiderReachedRear') return `${label}에서 적 우회대 ${raiderArrivals}개 조가 아군 후열에 도달했습니다.`;
+  if (outcome === 'defenderReachedRear') return `${label}에서 아군 우회대 ${defenderArrivals}개 조가 적 후열에 도달했습니다.`;
+  if (outcome === 'defenderHeld') return `${label}의 차단대가 적 우회 시도를 저지했습니다.`;
+  if (outcome === 'contested') return `${label}의 통제권을 두고 교전했으나 출구 돌파는 없었습니다.`;
+  return `${label}이 열렸지만 경로 교전이나 후열 도달은 없었습니다.`;
+}
+
+export function tacticalBattleTacticsReport(battle: TacticalBattle): TacticalBattleTacticsReport {
+  const objectiveId = battle.enemyPlan?.objective;
+  const finalOutcome = [...battle.reports].reverse().find(report => report.ended)?.outcome ??
+    battle.reports[battle.reports.length - 1]?.outcome ?? 'partialLoss';
+  const buildingsDamaged = battle.reports.reduce((sum, report) => sum + report.buildingsDamaged, 0);
+  const doctrineId = battle.enemyPlan?.doctrine;
+  const compositionTemplateId = battle.enemyPlan?.compositionTemplateId;
+  const composition = tacticalCompositionTemplate(compositionTemplateId);
+  const routeEngagements = battle.reports.flatMap(report => report.routeEngagements ?? []);
+  const routeArrivals = battle.reports.flatMap(report => report.routeArrivals ?? []);
+  const flankRoutes = (battle.flankRoutes ?? []).flatMap(route => {
+    const engagements = routeEngagements.filter(entry => entry.routeId === route.id);
+    const arrivals = routeArrivals.filter(entry => entry.routeId === route.id);
+    if (!route.openedByDefender && !route.openedByRaider && engagements.length === 0 && arrivals.length === 0) return [];
+    const defenderHolds = engagements.filter(entry => entry.outcome === 'defenderHeld').length;
+    const raiderBreakthroughs = engagements.filter(entry => entry.outcome === 'raiderBreakthrough').length;
+    const contestedEngagements = engagements.filter(entry => entry.outcome === 'contested').length;
+    const defenderArrivals = arrivals.filter(entry => entry.side === 'defender').length;
+    const raiderArrivals = arrivals.filter(entry => entry.side === 'raider').length;
+    const outcome: TacticalBattleFlankOutcome = raiderArrivals > 0
+      ? 'raiderReachedRear'
+      : defenderArrivals > 0
+        ? 'defenderReachedRear'
+        : engagements.length === 0
+          ? 'unused'
+          : route.control === 'defender' && defenderHolds > 0
+            ? 'defenderHeld'
+            : 'contested';
+    return [{
+      routeId: route.id,
+      side: route.side,
+      label: route.label,
+      finalControl: route.control,
+      outcome,
+      engagements: engagements.length,
+      defenderHolds,
+      raiderBreakthroughs,
+      contestedEngagements,
+      defenderArrivals,
+      raiderArrivals,
+      summary: tacticalFlankOutcomeSummary(route.label, outcome, defenderArrivals, raiderArrivals),
+    }];
+  });
+  return {
+    objectiveId,
+    objectiveLabel: objectiveId ? enemyObjectiveDefinition(objectiveId).label : '미확인 목표',
+    objectiveAchieved: objectiveId
+      ? raidDefenseObjectiveAchieved(objectiveId, finalOutcome, buildingsDamaged)
+      : undefined,
+    doctrineId,
+    doctrineLabel: doctrineId ? enemyDoctrineDefinition(doctrineId).label : '미확인 교리',
+    compositionTemplateId,
+    compositionLabel: composition?.label ?? '미확인 편제',
+    flankRoutes,
+  };
 }
 
 export function finishTacticalBattle(state: GameState): void {
@@ -2823,6 +2912,8 @@ export function finishTacticalBattle(state: GameState): void {
   const objective = raidDefenseObjectiveResult({
     factionName: battle.factionName,
     outcome,
+    objective: battle.enemyPlan?.objective,
+    buildingsDamaged: damageCount,
     enemyRouted,
     looted,
     defendersCommitted: participantIds.size,
@@ -2830,7 +2921,13 @@ export function finishTacticalBattle(state: GameState): void {
     defendersWounded: woundedPeople.length,
   });
   const result = objective.result;
-  const closingSummary = tacticalClosingSummary('raidDefense', outcome, battle.factionName, { looted, enemyRouted });
+  const objectiveId = battle.enemyPlan?.objective;
+  const objectiveAchieved = objectiveId
+    ? raidDefenseObjectiveAchieved(objectiveId, outcome, damageCount)
+    : false;
+  const closingSummary = tacticalClosingSummary('raidDefense', outcome, battle.factionName, {
+    looted, enemyRouted, objective: objectiveId, objectiveAchieved, result,
+  });
   const gradeEvaluation = gradeTacticalBattle({
     encounterKind: 'raidDefense',
     result,
@@ -2886,7 +2983,9 @@ export function finishTacticalBattle(state: GameState): void {
     mode: battle.mode,
     warned: battle.warned,
     outcome,
-    outcomeLabel: outcomeLabel(outcome, battle.factionName, result, looted, enemyRouted),
+    outcomeLabel: outcomeLabel(
+      outcome, battle.factionName, result, looted, enemyRouted, objectiveId, objectiveAchieved,
+    ),
     result,
     grade: battleGrade,
     gradeScore: gradeEvaluation.score,
@@ -2912,10 +3011,11 @@ export function finishTacticalBattle(state: GameState): void {
     threatAfter: state.threat,
     highlights,
     resourceDelta: tacticalResourceDelta(state, battle),
+    tactics: tacticalBattleTacticsReport(battle),
   };
   addLog(
     state,
-    `전투 장계: ${date}, ${battle.factionName} 습격 방어전. ${TACTICAL_BATTLE_GRADE_LABELS[battleGrade]} — ${outcomeLabel(outcome, battle.factionName, result, looted, enemyRouted)}. ${closingSummary} ${casualtyText}, 적 ${raidersKilled}명 처치·${raidersEscaped}명 ${enemyRouted ? '도주' : '물러남'}, 건물 ${damaged.length}곳 파손, 자원 피해 ${lootText}.`,
+    `전투 장계: ${date}, ${battle.factionName} 습격 방어전. ${TACTICAL_BATTLE_GRADE_LABELS[battleGrade]} — ${outcomeLabel(outcome, battle.factionName, result, looted, enemyRouted, objectiveId, objectiveAchieved)}. ${closingSummary} ${casualtyText}, 적 ${raidersKilled}명 처치·${raidersEscaped}명 ${enemyRouted ? '도주' : '물러남'}, 건물 ${damaged.length}곳 파손, 자원 피해 ${lootText}.`,
     result === 'victory' ? 'good' : 'raid',
     true,
   );

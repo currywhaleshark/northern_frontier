@@ -1,6 +1,6 @@
 # 핸드오프 — 전투확장 2단계 백엔드 (집에서 이어갈 Codex에게)
 
-> 최초 작성: 2026-07-20 새벽. 최종 갱신: 2026-07-20, Phase 8 백엔드 `4b52501` 이후.
+> 최초 작성: 2026-07-20 새벽. 최종 갱신: 2026-07-20, Phase 9 목표별 승패 계약 전환 완료.
 > 집 환경에서는 Hermes kanban 보드 `northern-combat`을 다시 사용할 수 있다. 다만 **보드는 흐름,
 > Git은 진실**이라는 규약은 그대로다. 계약·타입·fixture의 정본은 Git과 이 문서다. 전체 설계 원전은
 > [전술전 확장 2단계 계획서](superpowers/plans/2026-07-19-tactical-combat-expansion-phase-2.md)이며,
@@ -11,9 +11,10 @@
 - 역할 분담: **Codex = `src/game/**` 백엔드 + `src/render/tactical*` 스프라이트 / Fable =
   `src/components/**` 전술 프론트 + 전술 CSS·효과음**. 계약 때문에 필요한 최소 연결 외에는 상대 소유 파일을 건드리지 않는다.
 - 통합 브랜치: `codex/combat-expansion-phase-2`. P8 백엔드 기준점은 **`4b52501 feat: add phase 8 tactical support units`**다.
-- P3~P7은 백엔드·프론트 통합 완료다. P8 백엔드와 의원대/화차 스프라이트도 `4b52501`에서 완료됐다.
-- **P8 프론트는 Fable이 작업 중**이다. 완료 커밋을 받기 전에는 해당 파일을 대신 구현하거나 통합 브랜치에서 수정하지 않는다.
-- 집에 도착하면 먼저 kanban을 확인해 P8 프론트의 최신 커밋·질문·블로커를 동기화한다. 이후 Git 상태와 비교한다.
+- P3~P8 백엔드·프론트 통합 완료다. P8 프론트 완료 기준점은 **`4b19a29 Build Phase 8 support unit display and effects frontend`**다.
+- Phase 9 백엔드 첫 단위인 장계 데이터 계약·세력별 200시드 측정기·스프라이트 QC는
+  **`9e87cd6 Start Phase 9 tactical balance reporting`**으로 통합 브랜치에 push했다.
+- 사용자 결정에 따라 목표×종료상태 교차표를 추가하고 목표별 승패 계약으로 전환했다. 전투 배율과 golden fixture는 바꾸지 않았다.
 
 ## 1. 집에서 다시 시작하는 순서
 
@@ -543,3 +544,121 @@ P8 프론트 통합과 실화면 QA가 끝나면 계획서의 **Phase 9 — 시�
 바로 구현하기 전에 kanban에 P9 backend/frontend 태스크가 이미 있는지 확인한다. Codex의 첫 범위는 스프라이트 QC,
 교리·편제·우회 결과의 장계 데이터 계약, 세력별 200시드 측정이며, Fable 범위는 정보 밀도·접근성·화면 QA다.
 golden fixture는 측정 결과와 의도된 변화가 검토되기 전에는 갱신하지 않는다.
+
+## 14. 2026-07-20 Phase 9 백엔드 첫 단위 — 장계·200시드·스프라이트 QC
+
+### 장계 데이터 계약과 저장 v30
+
+- 방어전 종료 장계의 선택 필드 `tactics`에 실제 `doctrineId`/표시명, `compositionTemplateId`/표시명,
+  전투 중 열린 우회로별 결과를 기록한다.
+- 우회 결과는 최종 통제, 교전 수, 수비 유지/적 돌파/대치 횟수, 양측 출구 도달 수와 백엔드 요약 문장을 담는다.
+  최종 outcome은 `unused | defenderHeld | raiderReachedRear | defenderReachedRear | contested`다.
+- `tacticalBattleTacticsReport(battle)`가 라운드 보고 배열을 한 번만 집계한다. 장계 UI는 raw route report를
+  다시 계산하지 않고 이 계약을 소비한다.
+- 저장 스키마는 v30이다. v29→v30 루트 마이그레이션은 additive이며, 구 장계에는 존재하지 않은 전술 기록을
+  임의로 합성하지 않는다. 현재 장계의 ID·라벨·우회 집계는 필드 단위로 검증해 round-trip한다.
+- 집중 테스트는 `tools/game/test_tactical_report_tactics.mjs`와
+  `tools/game/test_resource_save_migration.mjs`다.
+
+### 세력별 200시드 측정
+
+신규 `tools/game/measure_tactical_faction_balance.mjs`는 세력당 200전, 총 800전을 실행한다. 네 세력 모두
+적 전력 120, 적대 관계 0, 같은 수비대, 경보 true/false 짝, 맑음/눈보라/해빙기 순환, 자동 교리·편제·우회로를 사용한다.
+같은 세력의 첫 3시드를 다시 실행해 결정성도 확인한다.
+
+`BattleSimulationOptions.enemyRelation` 선택 입력을 추가했다. 기본 시뮬레이터 동작은 바꾸지 않으며, 측정기는
+관계 기본값에서 모든 세력이 legacy `breakthrough` 목표로 고정되는 것을 피하려고 0을 지정한다.
+
+최초 기준 결과:
+
+| 세력 | 장계 승률 | 아군 평균 피해 | 적 평균 전사 | 적 후열 도달 | 최빈 편제 점유율 | 편제별 승률 편차 |
+|---|---:|---:|---:|---:|---:|---:|
+| 니마차 | 64.5% | 2.75 | 9.39 | 23.5% | 25.0% | 90.9%p |
+| 홀라온 | 4.5% | 3.04 | 7.89 | 56.0% | 43.5% | 16.1%p |
+| 변경 마적 | 53.5% | 2.51 | 8.54 | 56.0% | 27.5% | 100%p |
+| 조정 토벌군 | 0.0% | 2.67 | 7.02 | 24.0% | 20.5% | 0%p |
+
+- 편제 다양성 45% 상한은 네 세력 모두 통과했다.
+- 적대 관계 0에서 Phase 8 교리까지 열면 니마차 11.5%, 마적 14.5%가 목표와 맞는 편제를 찾지 못하는
+  공백도 최초 측정에서 드러났다. 자동 선택에 한해 같은 세력·목표의 다음 호환 교리로 결정적 fallback하고,
+  강제 교리/편제는 기존 의미를 유지하도록 고쳤다. 수정 뒤 800전에서 미할당 편제는 0%다.
+- 같은 세력의 편제 승률 30%p 상한은 실패했다. 니마차는 90.9%p, 변경 마적은 100%p다.
+  홀라온 16.1%p와 관군 0%p는 통과한다.
+- 결과 outcome은 대부분 `partialLoss`인데 장계 승패만 갈린다. 비관군 방어전의
+  `raidDefenseObjectiveResult`가 약탈량이 조금이라도 있으면 패배, 없으면 피해 상한 이내에서 승리로 판정하고,
+  편제 선택과 약탈 역할이 결합되기 때문이다. 수치 배율을 먼저 건드리지 말고 **목표·약탈량·편제별 장계 승패
+  교차표**를 추가해 결과 계약 문제와 실제 교전 밸런스를 분리한다.
+- 관군 중화기 발사 라운드는 31.5%의 전투에서 발생했다. 해당 라운드 전체 피해를 중화기 피해로 간주한 보수적
+  상한은 총 아군 피해의 10.9%, 단일 라운드 최대 1명이었다. 의원 회복은 전투당 평균 전력 0.141이었다.
+- golden fixture는 갱신하지 않았다.
+
+### 사용자 결정과 목표별 승패 계약 전환
+
+kanban `t_d5a6d1e7`에 **교차표 먼저 → 목표별 승패 계약 전환**으로 결정됐다. 교차표 검토 전 배율은
+불변이며 golden은 의도 검토 뒤에만 갱신한다. 이 결정으로 첫 단위 커밋 보류가 풀렸고 `9e87cd6`을 먼저 push했다.
+
+`measure_tactical_faction_balance.mjs`의 `objectiveOutcomeCrossTable`은 목표×최종 outcome마다 전투 수,
+승/패, 약탈 발생, 목표 달성 수를 기록한다. 그 뒤 신규 장계부터 아래 계약을 적용한다.
+
+- `villageRouted`는 목표와 관계없이 패배다.
+- 돌파 목표는 마을 방어선 붕괴, 약탈 목표는 `raidersLooted`, 방화 목표는 기존 설정의 건물 피해 임계치
+  `damageToExit` 도달만 목표 달성으로 본다.
+- 부수적 약탈이나 임계 미만 파손은 다른 목표의 승패를 뒤집지 않는다.
+- 적 궤주는 승리, 목표를 막았더라도 전사율 35% 또는 총 피해율 65% 이상이면 기존처럼 `narrowDefeat`다.
+- 목표 정보가 없는 v30 이전/첫 단위 장계는 종전 faction/loot 기반 판정을 유지한다.
+
+`TacticalBattleTacticsReport`에 `objectiveId`, 표시명, `objectiveAchieved`를 추가했다.
+`tacticalBattleTacticsReport`가 교리·편제·우회 결과와 함께 이를 확정하며, 저장 로드는 필드를 검증한 뒤 같은
+목표 계약으로 result를 복구한다. 장계의 `outcomeLabel`과 `closingSummary`도 목표 판정과 모순되지 않게 맞췄다.
+
+같은 800전 재측정의 교차표 핵심:
+
+| 세력 | 돌파 미달성 승리 | 약탈 달성 패배 | 방화 달성 패배 | 마을 붕괴 패배 | 전체 승률 |
+|---|---:|---:|---:|---:|---:|
+| 니마차 | 73/73 | 22/22 | 0/0 | 0/0 | 89.0% |
+| 홀라온 | 81/81 | 53/53 | 1/1 | 12/12 | 67.0% |
+| 변경 마적 | 52/52 | 51/51 | 1/1 | 0/0 | 74.0% |
+| 조정 토벌군 | 131/131 | 0/0 | 5/5 | 8/8 | 93.5% |
+
+목표 달성과 result의 불일치는 없었다. 다만 편제별 **총** 승률 편차는 목표 구성비까지 섞이므로 니마차
+36.4%p, 마적 52.6%p로 30%p 진단 게이트를 계속 실패한다. 홀라온 25.7%p, 관군 22.7%p는 통과한다.
+이 수치는 숨기거나 수치 조정으로 덮지 않았고, 다음 밸런스 검토에서는 목표별로 층화한 편제 성능과 실제 교전
+outcome을 함께 봐야 한다.
+
+### 스프라이트 QC
+
+- `test_tactical_sprite_poses.mjs`의 마지막 실패는 렌더 회귀가 아니라 오래된 문자열 검사였다.
+- 현재 혼성 조 렌더는 `group.special`을 전 슬롯에 적용하지 않고 슬롯별 `special`을
+  `tacticalDefenderMuzzleAnchor`에 전달한다. 한괘 본인만 전용 총구 앵커를 쓰는 현재 계약으로 검사를 갱신했다.
+- 전술 pose·시트·메트릭·총구 앵커 전체 테스트가 통과한다. PNG나 atlas 좌표는 이번 단위에서 바꾸지 않았다.
+
+### 현재 검증과 다음 작업
+
+통과:
+
+```bash
+npx tsc --noEmit
+node tools/game/test_tactical_report_tactics.mjs
+node tools/game/test_resource_save_migration.mjs
+node tools/game/test_tactical_compositions.mjs
+node tools/game/test_tactical_routes.mjs
+node tools/game/test_tactical_support_units.mjs
+node tools/game/test_tactical_battle.mjs
+node tools/game/test_tactical_sprite_poses.mjs
+npm run test:combat
+npm run build
+git diff --check
+```
+
+`npm run test:game`도 전체 실행했다. Phase 9 변경으로 생긴 v30 고정 기대값은 모두 갱신했고, 최종 실패는
+기존 기준선 두 건만 남는다: `test_screen_ambient_audio.mjs`, `test_tactical_assault.mjs`의 자동 0.589 / 직접 0.281
+승률 게이트. 과거 세 번째 기준선이던 `test_tactical_sprite_poses.mjs`는 슬롯별 특수주민 앵커 계약으로 바로잡아 통과한다.
+
+다음 순서:
+
+1. 목표별 계약 단위 커밋을 통합 브랜치에 push하면 Fable은 P9 frontend를 시작한다. UI는
+   `tacticalBattleTacticsReport` 계약을 그대로 소비하고 raw route report를 재계산하지 않는다.
+2. Fable 범위는 장계 교리·편제·우회 표기와 정보 밀도·접근성 QA다. `objectiveId`와
+   `objectiveAchieved`도 같은 계약 안에서 읽을 수 있다.
+3. 후속 밸런스 수치 검토는 목표별 층화 교차표를 먼저 보고 진행한다. 편제/교리 배율과 golden fixture는
+   별도 의도 검토·사용자 결정 전까지 유지한다.
