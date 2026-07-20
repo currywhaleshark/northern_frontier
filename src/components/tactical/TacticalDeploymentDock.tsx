@@ -147,7 +147,14 @@ function DeploymentCard({
           : placement
             ? '무대의 다른 전열로 끌어 재배치하거나, 배치 대기 영역으로 끌어 되돌립니다.'
             : '무대의 아군 전열로 끌어 배치합니다. 아래 구역·전열 단추로도 배치할 수 있습니다.'}
-        {...(locked ? { onClick: onSelect } : handleProps)}
+        {...(locked ? { onClick: onSelect } : {
+          ...handleProps,
+          // 포인터 클릭 선택은 훅의 onClick(pointerup) 경로가 처리한다 — 여기서는 키보드
+          // Enter/Space가 만드는 detail 0 클릭만 받아 카드 선택의 키보드 경로를 살린다.
+          onClick: (event: React.MouseEvent<HTMLButtonElement>) => {
+            if (event.detail === 0) onSelect();
+          },
+        })}
       >
         <span className="tactical-dock-thumb" aria-hidden="true">
           <DockDefenderSprite group={group} gender={gender} />
