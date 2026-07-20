@@ -1,8 +1,9 @@
 import { RESOURCE_IDS } from './resourceCatalog';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { tacticalGroupCapabilities } from './combatCapabilities';
+import { enemyObjectiveProfile } from './enemyPlan';
 import type {
-  GameState, ResourceId, TacticalBattle, TacticalBattlePersonReport, TacticalBattleReport,
+  EnemyObjectiveId, GameState, ResourceId, TacticalBattle, TacticalBattlePersonReport, TacticalBattleReport,
   TacticalBattleGrade, TacticalDefenderGroup, TacticalRaiderGroup, TacticalRoundReport,
 } from './types';
 
@@ -120,6 +121,9 @@ export function tacticalOutcomeResult(outcome: TacticalOutcome): TacticalBattleR
 interface RaidDefenseObjectiveInput {
   factionName: string;
   outcome: TacticalOutcome;
+  objective?: EnemyObjectiveId;
+  objectiveAchieved?: boolean;
+  buildingsDamaged?: number;
   enemyRouted: boolean;
   looted: boolean;
   defendersCommitted: number;
@@ -127,34 +131,80 @@ interface RaidDefenseObjectiveInput {
   defendersWounded: number;
 }
 
+export function raidDefenseObjectiveAchieved(
+  objective: EnemyObjectiveId,
+  outcome: TacticalOutcome,
+  buildingsDamaged = 0,
+): boolean {
+  if (objective === 'breakthrough') return outcome === 'villageRouted';
+  if (objective === 'plunder') return outcome === 'raidersLooted';
+  return buildingsDamaged >= enemyObjectiveProfile(objective).damageToExit;
+}
+
 export function raidDefenseObjectiveResult(
   input: RaidDefenseObjectiveInput,
 ): { result: TacticalBattleReport['result']; forcedGrade?: TacticalBattleGrade } {
-  if (input.factionName === '조정 토벌군') return { result: tacticalOutcomeResult(input.outcome) };
+  if (!input.objective) {
+    if (input.factionName === '조정 토벌군') return { result: tacticalOutcomeResult(input.outcome) };
+    if (input.outcome === 'villageRouted') return { result: 'defeat' };
+    const committed = Math.max(1, input.defendersCommitted);
+    const deathRate = input.defendersKilled / committed;
+    const casualtyRate = (input.defendersKilled + input.defendersWounded) / committed;
+    if (!input.looted) {
+      if (deathRate >= 0.35 || casualtyRate >= 0.65) {
+        return { result: 'defeat', forcedGrade: 'narrowDefeat' };
+      }
+      return { result: 'victory' };
+    }
+    if (input.enemyRouted) return { result: 'victory' };
+    return { result: 'defeat' };
+  }
+
+  if (input.enemyRouted) return { result: 'victory' };
   if (input.outcome === 'villageRouted') return { result: 'defeat' };
+  const objectiveAchieved = input.objectiveAchieved ?? raidDefenseObjectiveAchieved(
+    input.objective,
+    input.outcome,
+    input.buildingsDamaged,
+  );
+  if (objectiveAchieved) return { result: 'defeat' };
   const committed = Math.max(1, input.defendersCommitted);
   const deathRate = input.defendersKilled / committed;
   const casualtyRate = (input.defendersKilled + input.defendersWounded) / committed;
-  if (!input.looted) {
-    if (deathRate >= 0.35 || casualtyRate >= 0.65) {
-      return { result: 'defeat', forcedGrade: 'narrowDefeat' };
-    }
-    return { result: 'victory' };
+  if (deathRate >= 0.35 || casualtyRate >= 0.65) {
+    return { result: 'defeat', forcedGrade: 'narrowDefeat' };
   }
-  if (input.enemyRouted) return { result: 'victory' };
-  return { result: 'defeat' };
+  return { result: 'victory' };
 }
 
 export function tacticalClosingSummary(
   encounterKind: TacticalBattleReport['encounterKind'],
   outcome: TacticalOutcome,
   factionName: string,
-  details: { looted?: boolean; enemyRouted?: boolean } = {},
+  details: {
+    looted?: boolean;
+    enemyRouted?: boolean;
+    objective?: EnemyObjectiveId;
+    objectiveAchieved?: boolean;
+    result?: TacticalBattleReport['result'];
+  } = {},
 ): string {
   if (encounterKind === 'raidDefense') {
     if (details.enemyRouted) return factionName === '조정 토벌군'
       ? '토벌대의 기세가 꺾여 대열이 무너지고 도주합니다.'
       : '적의 기세가 꺾여 대열이 무너지고 도주합니다.';
+    if (details.objective) {
+      if (outcome === 'villageRouted') return '습격대가 마을 방어선을 무너뜨렸습니다.';
+      if (details.result === 'victory') {
+        if (details.objective === 'breakthrough') return '습격대의 돌파를 저지해 마을 방어선을 지켰습니다.';
+        if (details.objective === 'plunder') return '습격대의 비축 약탈 목표를 좌절시켰습니다.';
+        return '습격대의 방책·창고 방화 목표를 좌절시켰습니다.';
+      }
+      if (!details.objectiveAchieved) return '적의 작전 목표는 막았지만 수비대 피해가 극심합니다.';
+      if (details.objective === 'plunder') return '습격대가 목표한 비축을 챙겨 물러납니다.';
+      if (details.objective === 'arson') return '습격대가 방책과 창고에 목표한 피해를 남기고 물러납니다.';
+      return '습격대가 마을 방어선을 돌파했습니다.';
+    }
     if (factionName === '조정 토벌군') return '토벌대가 공격을 마치고 물러납니다.';
     return details.looted
       ? '습격대가 약탈을 마치고 물러납니다.'

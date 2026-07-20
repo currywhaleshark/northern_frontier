@@ -943,6 +943,7 @@ for (const [field, seed] of [['events', 2026071451], ['lines', 2026071452]]) {
     outcome: 'defenseSuccess',
     factionName: '변경 마적',
     tactics: {
+      objectiveId: 'breakthrough', objectiveLabel: '방어선 돌파', objectiveAchieved: false,
       doctrineId: 'mountedSkirmish', doctrineLabel: '기마 견제',
       compositionTemplateId: 'bandit-hit-and-run', compositionLabel: '치고 빠지는 약탈대',
       flankRoutes: [{
@@ -955,6 +956,8 @@ for (const [field, seed] of [['events', 2026071451], ['lines', 2026071452]]) {
   };
   assert.equal(saveLoad.saveGame(state), true);
   const loaded = saveLoad.loadGame();
+  assert.equal(loaded?.tacticalBattleReport?.tactics?.objectiveId, 'breakthrough');
+  assert.equal(loaded?.tacticalBattleReport?.tactics?.objectiveAchieved, false);
   assert.equal(loaded?.tacticalBattleReport?.tactics?.doctrineId, 'mountedSkirmish');
   assert.equal(loaded?.tacticalBattleReport?.tactics?.compositionTemplateId, 'bandit-hit-and-run');
   assert.deepEqual(loaded?.tacticalBattleReport?.tactics?.flankRoutes.map(route => ({

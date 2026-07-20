@@ -1255,6 +1255,9 @@ export interface TacticalBattleFlankRouteReport {
 }
 
 export interface TacticalBattleTacticsReport {
+  objectiveId?: EnemyObjectiveId;
+  objectiveLabel: string;
+  objectiveAchieved?: boolean;
   doctrineId?: EnemyDoctrineId;
   doctrineLabel: string;
   compositionTemplateId?: string;

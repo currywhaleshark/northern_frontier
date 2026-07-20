@@ -5,7 +5,7 @@ import { combatGroupLabel } from './combatCapabilities';
 import { defaultCropForBuildingType } from './crops';
 import { rollCourtTribute } from './courtTribute';
 import {
-  enemyDoctrineDefinitions, flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
+  enemyDoctrineDefinitions, enemyObjectiveDefinition, flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
   migrateBanditLairDefensePlan, migrateEnemyPlan,
 } from './enemyPlan';
 import { spawnAnimalHabitats } from './habitats';
@@ -45,7 +45,7 @@ import {
   gradeTacticalBattle, raidDefenseObjectiveResult, tacticalClosingSummary, tacticalOutcomeResult,
 } from './tacticalCore';
 import type {
-  CombatWeaponId, CourtTribute, DefenderGroupKind, FermentBatch, GameState, Gender, Resident, ResourceId,
+  CombatWeaponId, CourtTribute, DefenderGroupKind, EnemyObjectiveId, FermentBatch, GameState, Gender, Resident, ResourceId,
   PreparationActionId, RaiderUnitType, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
   SpecialResidentId, TacticalAiState, TacticalDeploymentPlacement, TacticalFeaturedResident, TacticalFormationLine,
   TacticalBattleFlankOutcome, TacticalBattleTacticsReport, TacticalFacing, TacticalPreparationEffect,
@@ -1047,6 +1047,10 @@ const TACTICAL_FLANK_OUTCOMES = new Set<TacticalBattleFlankOutcome>([
 function migrateTacticalBattleTacticsReport(raw: unknown): TacticalBattleTacticsReport | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const source = clonedRecord(raw);
+  const objectiveId = source.objectiveId === 'breakthrough' || source.objectiveId === 'plunder' ||
+    source.objectiveId === 'arson'
+    ? source.objectiveId as EnemyObjectiveId
+    : undefined;
   const doctrine = enemyDoctrineDefinitions().find(entry => entry.id === source.doctrineId);
   const compositionTemplateId = typeof source.compositionTemplateId === 'string'
     ? source.compositionTemplateId
@@ -1086,8 +1090,13 @@ function migrateTacticalBattleTacticsReport(raw: unknown): TacticalBattleTactics
         : `${label} 우회 결과`,
     });
   }
-  if (!doctrine && !composition && flankRoutes.length === 0) return undefined;
+  if (!objectiveId && !doctrine && !composition && flankRoutes.length === 0) return undefined;
   return {
+    objectiveId,
+    objectiveLabel: typeof source.objectiveLabel === 'string' && source.objectiveLabel.trim().length > 0
+      ? source.objectiveLabel.trim()
+      : objectiveId ? enemyObjectiveDefinition(objectiveId).label : '미확인 목표',
+    objectiveAchieved: typeof source.objectiveAchieved === 'boolean' ? source.objectiveAchieved : undefined,
     doctrineId: doctrine?.id,
     doctrineLabel: typeof source.doctrineLabel === 'string' && source.doctrineLabel.trim().length > 0
       ? source.doctrineLabel.trim()
@@ -1117,16 +1126,20 @@ function migrateTacticalBattleReport(raw: unknown): TacticalBattleReport | null 
   report.highlights = Array.isArray(report.highlights) ? report.highlights : [];
   report.loot = report.loot && typeof report.loot === 'object' ? report.loot : {};
   report.recoveredLoot = report.recoveredLoot && typeof report.recoveredLoot === 'object' ? report.recoveredLoot : {};
+  report.tactics = migrateTacticalBattleTacticsReport(report.tactics);
   const looted = Object.values(report.loot).some(amount => (amount ?? 0) > 1e-9);
   report.enemyRouted = report.enemyRouted === true || (
     report.encounterKind === 'raidDefense' && report.outcome === 'defenseSuccess' &&
     (Number(report.raiderMorale) <= 20 ||
       Number(report.raidersKilled) / Math.max(1, Number(report.raidersCommitted) || 0) >= 0.65)
   );
-  const objective = report.encounterKind === 'raidDefense'
+  const objectiveResult = report.encounterKind === 'raidDefense'
     ? raidDefenseObjectiveResult({
       factionName: report.factionName ?? report.enemyLabel,
       outcome: report.outcome,
+      objective: report.tactics?.objectiveId,
+      objectiveAchieved: report.tactics?.objectiveAchieved,
+      buildingsDamaged: report.damagedBuildings.length,
       enemyRouted: report.enemyRouted,
       looted,
       defendersCommitted: Number(report.defendersCommitted) || 0,
@@ -1134,12 +1147,15 @@ function migrateTacticalBattleReport(raw: unknown): TacticalBattleReport | null 
       defendersWounded: report.wounded.length,
     })
     : null;
-  if (objective) report.result = objective.result;
+  if (objectiveResult) report.result = objectiveResult.result;
   report.closingSummary = typeof report.closingSummary === 'string' && report.closingSummary.length > 0
     ? report.closingSummary
     : tacticalClosingSummary(report.encounterKind, report.outcome, report.factionName ?? report.enemyLabel, {
       looted,
       enemyRouted: report.enemyRouted,
+      objective: report.tactics?.objectiveId,
+      objectiveAchieved: report.tactics?.objectiveAchieved,
+      result: report.result,
     });
   report.initialFriendlyPower = Math.max(1, Number(report.initialFriendlyPower) || Number(report.defendersCommitted) || 1);
   report.initialEnemyPower = Math.max(1, Number(report.initialEnemyPower) || Number(report.raidersCommitted) || 1);
@@ -1155,13 +1171,12 @@ function migrateTacticalBattleReport(raw: unknown): TacticalBattleReport | null 
     enemiesKilled: Number(report.raidersKilled) || 0,
     loot: report.loot,
   });
-  report.grade = objective?.forcedGrade ?? migratedGrade.grade;
+  report.grade = objectiveResult?.forcedGrade ?? migratedGrade.grade;
   report.gradeScore = migratedGrade.score;
   report.resourceDelta = report.resourceDelta && typeof report.resourceDelta === 'object'
     ? report.resourceDelta
     : Object.fromEntries(Object.entries(report.loot).map(([id, amount]) =>
       [id, report.encounterKind === 'raidDefense' ? -Number(amount) : Number(amount)]));
-  report.tactics = migrateTacticalBattleTacticsReport(report.tactics);
   return report;
 }
 

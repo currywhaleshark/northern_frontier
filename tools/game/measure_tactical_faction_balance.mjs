@@ -122,6 +122,7 @@ function runBattle(tactical, battleSimulation, faction, index) {
     .reduce((lootSum, amount) => lootSum + Number(amount ?? 0), 0), 0);
   tactical.finishTacticalBattle(state);
   assert.ok(state.tacticalBattleReport);
+  assert.equal(state.tacticalBattleReport.tactics?.objectiveId, battle.enemyPlan.objective);
   return {
     seed,
     warned: battle.warned,
@@ -133,6 +134,7 @@ function runBattle(tactical, battleSimulation, faction, index) {
     raiderReachedRear: routeArrivals.some(arrival => arrival.side === 'raider'),
     outcome,
     result: state.tacticalBattleReport.result,
+    objectiveAchieved: state.tacticalBattleReport.tactics?.objectiveAchieved === true,
     rounds: battle.reports.length,
     friendlyCasualties,
     enemyCasualties: battle.raiderGroups.reduce((sum, group) => sum + group.killed, 0),
@@ -171,6 +173,22 @@ function summarize(results) {
         compositions: distribution(entries, result => result.composition),
       }];
     }));
+  const objectiveOutcomeCrossTable = Object.fromEntries(
+    [...new Set(results.map(result => result.objective))].sort().map(objective => {
+      const objectiveEntries = results.filter(result => result.objective === objective);
+      const outcomes = [...new Set(objectiveEntries.map(result => result.outcome))].sort();
+      return [objective, Object.fromEntries(outcomes.map(outcome => {
+        const entries = objectiveEntries.filter(result => result.outcome === outcome);
+        return [outcome, {
+          battles: entries.length,
+          victories: entries.filter(result => result.result === 'victory').length,
+          defeats: entries.filter(result => result.result === 'defeat').length,
+          lootedBattles: entries.filter(result => result.lootUnits > 0).length,
+          objectiveAchievedBattles: entries.filter(result => result.objectiveAchieved).length,
+        }];
+      }))];
+    }),
+  );
   const compositionVictoryRates = Object.values(compositionResults).map(summary => summary.victoryRate);
   const mostCommonComposition = Math.max(...Object.values(compositions)) / results.length;
   const friendlyCasualtyTotal = results.reduce((sum, result) => sum + result.friendlyCasualties, 0);
@@ -182,6 +200,7 @@ function summarize(results) {
     compositions,
     compositionResults,
     objectiveResults,
+    objectiveOutcomeCrossTable,
     compositionVictoryRateSpread: Math.max(...compositionVictoryRates) - Math.min(...compositionVictoryRates),
     victoryRate: rate(results, result => result.result === 'victory'),
     defenseSuccessRate: rate(results, result => result.outcome === 'defenseSuccess'),

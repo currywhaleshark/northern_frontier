@@ -30,6 +30,7 @@ const state = battleSimulation.createBattleSimulation({
   defenders: { muskets: 2, bows: 2, spears: 4, unarmedMilitia: 1, watchmen: 0, hunters: 0, civilians: 6 },
   cannonEmplacements: 0, enemyDoctrine: 'mountedSkirmish',
   enemyCompositionTemplateId: 'bandit-hit-and-run', enemyFlankRoute: 'left', seed: 2026072401,
+  enemyRelation: 100,
 });
 const battle = state.tacticalBattle;
 const left = battle.flankRoutes.find(route => route.side === 'left');
@@ -73,11 +74,17 @@ battle.reports = [{
 
 const tactics = tactical.tacticalBattleTacticsReport(battle);
 assert.deepEqual({
+  objectiveId: tactics.objectiveId,
+  objectiveLabel: tactics.objectiveLabel,
+  objectiveAchieved: tactics.objectiveAchieved,
   doctrineId: tactics.doctrineId,
   doctrineLabel: tactics.doctrineLabel,
   compositionTemplateId: tactics.compositionTemplateId,
   compositionLabel: tactics.compositionLabel,
 }, {
+  objectiveId: 'breakthrough',
+  objectiveLabel: '방어선 돌파',
+  objectiveAchieved: false,
   doctrineId: 'mountedSkirmish',
   doctrineLabel: '기마 견제',
   compositionTemplateId: 'bandit-hit-and-run',
@@ -98,6 +105,8 @@ assert.match(tactics.flankRoutes[1].summary, /아군 우회대 1개 조가 적 �
 
 tactical.finishTacticalBattle(state);
 assert.equal(state.tacticalBattle, null);
+assert.equal(state.tacticalBattleReport.tactics.objectiveId, 'breakthrough');
+assert.equal(state.tacticalBattleReport.tactics.objectiveAchieved, false);
 assert.equal(state.tacticalBattleReport.tactics.doctrineId, 'mountedSkirmish');
 assert.equal(state.tacticalBattleReport.tactics.compositionTemplateId, 'bandit-hit-and-run');
 assert.deepEqual(state.tacticalBattleReport.tactics.flankRoutes.map(route => route.outcome), [
