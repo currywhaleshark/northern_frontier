@@ -12,8 +12,10 @@ import {
   tacticalLootText,
   tacticalFormationLineUnavailableReason, tacticalPreparationUnavailableReason, tacticalRearResponseOptions,
   tacticalRearAssaultIsEngaged, tacticalRearManeuverEffectiveCounterStrengthForZone,
+  setTacticalGroupFacing,
+  tacticalFacingPreview, tacticalFacingUnavailableReason,
   tacticalStageOrderPreview, tacticalStageOrderUnavailableReason, tacticalSupportedCommands,
-  type TacticalStageOrderPreview,
+  type TacticalFacingPreview, type TacticalStageOrderPreview,
 } from '../game/tacticalBattle';
 import { assaultMaxRounds } from '../game/tacticalAssault';
 import { huntDeploymentUnavailableReason, huntMaxRounds } from '../game/tacticalHunt';
@@ -26,6 +28,8 @@ import type {
   PreparationActionId,
   TacticalAnimationEvent,
   TacticalCommandId,
+  TacticalDefenderGroup,
+  TacticalFacing,
   TacticalFormationLine,
 } from '../game/types';
 import { playMeleeClash, playSfx, playWeaponSalvo, playWeaponVolley, setBattleDrums, type SfxName } from '../sound/sfx';
@@ -43,6 +47,10 @@ import { EnemyPlanPanel } from './tactical/EnemyPlanPanel';
 import { TacticalZoneColumn } from './tactical/TacticalZoneColumn';
 import { commandDescription, commandLabel } from './tactical/commandText';
 import { computeCommandPopoverPlacement } from './tactical/popoverPlacement';
+import {
+  facingLabel, facingPenaltyText, facingTransitionText,
+  stageOrderCommandLabel, stageOrderPenaltyText, stageOrderTransitionText,
+} from './tactical/stageOrderPreview';
 
 // P1.5 스파이크 전용 플래그 — `?dragSpike` URL로만 켜지는 개발용 드래그 검증 하네스
 const DRAG_SPIKE_ENABLED = typeof window !== 'undefined' &&
@@ -261,12 +269,12 @@ export function TacticalBattleScreen({
   const [featuredSplit, setFeaturedSplit] = useState<{ groupId: string; companions: number[] } | null>(null);
   const [deployNotice, setDeployNotice] = useState<{ text: string; tone: 'ok' | 'warn' } | null>(null);
   const deployNoticeTimerRef = useRef<number | null>(null);
-  // P4 지휘 단계 확인 카드 — 확인 전에는 게임 상태를 바꾸지 않는다 (계획서 7.9)
-  const [stageOrderConfirm, setStageOrderConfirm] = useState<{
-    preview: TacticalStageOrderPreview;
-    left: number;
-    top: number;
-  } | null>(null);
+  // P4·P5 지휘 단계 확인 카드 — 확인 전에는 게임 상태를 바꾸지 않는다 (계획서 7.9)
+  const [stageOrderConfirm, setStageOrderConfirm] = useState<
+    | { kind: 'order'; preview: TacticalStageOrderPreview; left: number; top: number }
+    | { kind: 'facing'; preview: TacticalFacingPreview; left: number; top: number }
+    | null
+  >(null);
   // 무대 부대 드래그 — 화면 단일 훅. 어떤 부대를 집었는지는 pointerdown에서 ref로 기록한다.
   const stageDragSourceRef = useRef<string | null>(null);
   // 드롭 직후 이어지는 click이 팝오버를 열지 않게 잠깐 막는다
@@ -673,17 +681,83 @@ export function TacticalBattleScreen({
     const top = shellRect
       ? Math.max(8, Math.min(point.y - shellRect.top - cardHeight - 12, shellRect.height - cardHeight - 8))
       : 8;
-    setStageOrderConfirm({ preview, left, top });
+    setStageOrderConfirm({ kind: 'order', preview, left, top });
   };
   const confirmStageOrder = () => {
     if (!stageOrderConfirm) return;
-    const { preview } = stageOrderConfirm;
+    const pending = stageOrderConfirm;
     setStageOrderConfirm(null);
-    // applyTacticalStageOrder가 확정 시점에 재검증하므로 낡은 preview는 오류 문구로 떨어진다
+    // 두 mutation 모두 확정 시점에 재검증하므로 낡은 preview는 오류 문구로 떨어진다
+    if (pending.kind === 'order') {
+      const preview = pending.preview;
+      const error = runDeploymentAction(current =>
+        applyTacticalStageOrder(current, preview.groupId, preview.destination));
+      if (!error) playSfx('raidDrum');
+      return;
+    }
+    const preview = pending.preview;
     const error = runDeploymentAction(current =>
-      applyTacticalStageOrder(current, preview.groupId, preview.destination));
+      setTacticalGroupFacing(current, preview.groupId, preview.destination));
     if (!error) playSfx('raidDrum');
   };
+  // P5 방향전환 — 배치 단계는 무료·즉시 적용, 지휘 단계는 preview 확인 카드를 거친다 (계획서 7.10)
+  const requestFacingChange = (groupId: string, facing: TacticalFacing, anchorElement?: HTMLElement | null) => {
+    const group = battle.defenderGroups.find(candidate => candidate.id === groupId);
+    const reason = tacticalFacingUnavailableReason(battle, groupId, facing);
+    if (reason) {
+      showDeployNotice(reason);
+      return;
+    }
+    if (battle.phase === 'deployment') {
+      const error = runDeploymentAction(current => setTacticalGroupFacing(current, groupId, facing));
+      if (!error) showDeployNotice(`${group?.label ?? ''} — ${facingLabel(facing)} 전환.`, 'ok');
+      return;
+    }
+    if (battle.phase !== 'command') return;
+    const preview = tacticalFacingPreview(battle, groupId, facing);
+    if (!preview) return;
+    selectGroup(groupId);
+    const shellRect = stageShellRef.current?.getBoundingClientRect();
+    const cardWidth = 240;
+    const cardHeight = 110;
+    const target = anchorElement?.getBoundingClientRect();
+    const left = shellRect
+      ? Math.max(8, Math.min(
+        (target ? target.left + target.width / 2 - shellRect.left : shellRect.width / 2) - cardWidth / 2,
+        shellRect.width - cardWidth - 8,
+      ))
+      : 8;
+    const top = shellRect
+      ? Math.max(8, Math.min(
+        (target ? target.top - shellRect.top : shellRect.height / 2) - cardHeight - 10,
+        shellRect.height - cardHeight - 8,
+      ))
+      : 8;
+    setStageOrderConfirm({ kind: 'facing', preview, left, top });
+  };
+  // 키보드 동등 경로 — 무대 화살표와 같은 검증·확인 흐름을 쓰는 전방/후방 토글
+  const renderFacingToggle = (group: TacticalDefenderGroup) => (
+    <div className="tactical-line-toggle tactical-facing-toggle" role="group" aria-label={`${group.label} 방향 선택`}>
+      {(['towardEnemy', 'towardRear'] as const).map(facing => {
+        const facingReason = tacticalFacingUnavailableReason(battle, group.id, facing);
+        const current = group.facing === facing;
+        return (
+          <button
+            type="button"
+            key={facing}
+            className={current ? 'active' : ''}
+            disabled={facingReason != null}
+            title={current
+              ? '현재 방향'
+              : facingReason ?? (battle.phase === 'command'
+                ? '확인 후 방향을 바꿉니다. 이번 교전 전투력에만 페널티가 붙습니다.'
+                : '배치 단계 방향전환은 즉시 적용됩니다.')}
+            onClick={event => requestFacingChange(group.id, facing, event.currentTarget)}
+          >{facing === 'towardEnemy' ? '전방' : '후방'}</button>
+        );
+      })}
+    </div>
+  );
   const stageUnitDragSourceId = stageDrag.state.dragging ? stageDragSourceRef.current : null;
   const zoneStageDrag = stageUnitDragSourceId && (battle.phase === 'command' || battle.phase === 'deployment')
     ? {
@@ -868,6 +942,7 @@ export function TacticalBattleScreen({
                   nextPendingGroupId={nextPendingGroupId}
                   stageDrag={zoneStageDrag}
                   stageDragHandlePropsFor={stageDragHandlePropsFor}
+                  onTurnGroup={requestFacingChange}
                   onSelectGroup={openCommandPopover}
                   onSelectTarget={(defenderGroupId, enemyGroupId) => {
                     const defender = battle.defenderGroups.find(group => group.id === defenderGroupId);
@@ -978,16 +1053,36 @@ export function TacticalBattleScreen({
               onClose={restoreFocus => closePopover({ restoreFocus })}
             />
           )}
-          {stageOrderConfirm && battle.phase === 'command' && (
-            <TacticalOrderConfirm
-              battle={battle}
-              preview={stageOrderConfirm.preview}
-              groupLabel={battle.defenderGroups.find(group => group.id === stageOrderConfirm.preview.groupId)?.label ?? ''}
-              style={{ left: stageOrderConfirm.left, top: stageOrderConfirm.top }}
-              onConfirm={confirmStageOrder}
-              onCancel={() => setStageOrderConfirm(null)}
-            />
-          )}
+          {stageOrderConfirm && battle.phase === 'command' && (() => {
+            const confirmGroup = battle.defenderGroups.find(group => group.id === stageOrderConfirm.preview.groupId);
+            const confirmGroupLabel = confirmGroup?.label ?? '';
+            const presentation = stageOrderConfirm.kind === 'order'
+              ? {
+                title: `${confirmGroupLabel} · ${stageOrderTransitionText(battle, stageOrderConfirm.preview)}`,
+                penaltyText: stageOrderPenaltyText(stageOrderConfirm.preview),
+                warning: stageOrderConfirm.preview.warning ?? null,
+                confirmLabel: `${stageOrderCommandLabel(stageOrderConfirm.preview.command)} 확정`,
+              }
+              : {
+                title: `${confirmGroupLabel} · ${facingTransitionText(stageOrderConfirm.preview)}`,
+                penaltyText: facingPenaltyText(stageOrderConfirm.preview),
+                warning: stageOrderConfirm.preview.command && confirmGroup
+                  ? `기존 명령(${commandLabel(stageOrderConfirm.preview.command, confirmGroup, hunt)})은 유지됩니다.`
+                  : null,
+                confirmLabel: '방향전환 확정',
+              };
+            return (
+              <TacticalOrderConfirm
+                title={presentation.title}
+                penaltyText={presentation.penaltyText}
+                warning={presentation.warning}
+                confirmLabel={presentation.confirmLabel}
+                style={{ left: stageOrderConfirm.left, top: stageOrderConfirm.top }}
+                onConfirm={confirmStageOrder}
+                onCancel={() => setStageOrderConfirm(null)}
+              />
+            );
+          })()}
         </div>
 
         <div className="tactical-controls">
@@ -1252,6 +1347,7 @@ export function TacticalBattleScreen({
                     })}
                   </div>
                 )}
+                {!hunt && renderFacingToggle(selectedGroup)}
               </div>
             </>
           )}
@@ -1354,6 +1450,7 @@ export function TacticalBattleScreen({
                         })}
                       </div>
                     )}
+                    {!hunt && renderFacingToggle(selectedGroup)}
                     <div
                       ref={commandBoardRef}
                       className={`tactical-command-bar${commandBoardEmphasis ? ' command-board-emphasis' : ''}`}

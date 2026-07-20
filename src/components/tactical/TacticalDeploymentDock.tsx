@@ -153,7 +153,7 @@ function DeploymentCard({
             {locked
               ? `${placementZoneName ?? ''} 최후열 고정`
               : placement
-                ? `${placementZoneName} · ${deploymentLineLabel(placement.line)}${placement.hidden ? ' · 은닉' : ''}`
+                ? `${placementZoneName} · ${deploymentLineLabel(placement.line)}${placement.hidden ? ' · 은닉' : ''}${group.facing === 'towardRear' ? ' · 후방 경계' : ''}`
                 : `추천: ${recommendedZoneName} · ${deploymentLineLabel(recommended.line)}`}
           </span>
           {mustered && <em className="tactical-deploy-card-badge">긴급 소집</em>}

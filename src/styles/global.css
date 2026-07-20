@@ -3673,6 +3673,28 @@ html, body, #root {
 .tactical-panel-heading .tactical-forced-deploy-note { color: #e0a072; font-size: 10px; font-weight: 700; }
 /* ── Phase 4 무대 명령 드래그 — 부대 핸들·확인 카드 ── */
 .tactical-field-group.stage-dragging { opacity: 0.5; }
+/* ── Phase 5 명시적 방향 — 선택 부대 양옆 화살표·회전 페널티 배지 ── */
+.tactical-facing-arrow {
+  position: absolute;
+  top: 34%;
+  z-index: 40;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #d0a651;
+  border-radius: 50%;
+  background: rgba(32, 30, 24, 0.92);
+  color: #ead8ac;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.tactical-facing-arrow.left { left: -14px; }
+.tactical-facing-arrow.right { right: -14px; }
+.tactical-facing-arrow:hover:not(:disabled) { background: #3a372d; }
+.tactical-facing-arrow:disabled { opacity: 0.4; cursor: default; }
+.tactical-state-badge.facing-turning { border-color: #a3703a; color: #e8b45f; }
+.tactical-facing-toggle { flex: 0 0 auto; }
 .tactical-order-confirm {
   position: absolute;
   z-index: 70;

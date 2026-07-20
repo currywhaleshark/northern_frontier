@@ -6,7 +6,7 @@ import {
   tacticalRaiderVisibleDuringPlayback,
   tacticalStageOrderPreview, tacticalStageOrderUnavailableReason,
 } from '../../game/tacticalBattle';
-import { stageOrderCommandLabel } from './stageOrderPreview';
+import { facingLabel, stageOrderCommandLabel } from './stageOrderPreview';
 import type {
   GameState,
   PredatorKind,
@@ -16,6 +16,7 @@ import type {
   TacticalAnimationEvent,
   TacticalBattleZone,
   TacticalDefenderGroup,
+  TacticalFacing,
   TacticalFormationLine,
   TacticalRaiderGroup,
   TigerTier,
@@ -76,6 +77,8 @@ interface Props {
   stageDragHandlePropsFor: ((groupId: string) => React.DOMAttributes<HTMLElement>) | null;
   onSelectGroup: (groupId: string, element: HTMLElement) => void;
   onSelectTarget: (defenderGroupId: string, enemyGroupId: string) => void;
+  /** P5 방향전환 — 선택 부대 양옆 화살표가 호출한다. 배치=즉시, 지휘=확인 카드(화면이 처리) */
+  onTurnGroup: (groupId: string, facing: TacticalFacing, element: HTMLElement) => void;
 }
 
 function defenderFormationRole(group: TacticalDefenderGroup): 'melee' | 'ranged' | 'civilian' {
@@ -690,6 +693,7 @@ export function TacticalZoneColumn({
   stageDragHandlePropsFor,
   onSelectGroup,
   onSelectTarget,
+  onTurnGroup,
 }: Props) {
   const focused = zone.id === activeZoneId;
   const showFormationGuides = battle.phase === 'deployment';
@@ -1083,8 +1087,8 @@ export function TacticalZoneColumn({
             )}
             {defenders.filter(group => group.line === line).map((group, stackIndex, lineGroups) => {
           const recoiling = zoneVolley && defenderFiringForEvent(activeEvent, group);
-          const rearFacing = rearAssaulters.length > 0 &&
-            (group.line === 'rear' || (group.line === 'middle' && group.command === 'reinforceRear'));
+          // P5: 표시 방향은 명시적 facing이 단일 소스다 — 열·명령에서 파생하지 않는다.
+          const rearFacing = group.facing === 'towardRear';
           const blockingEscape = activeEvent?.kind === 'escapeBlocked' &&
             activeEvent.zoneId === zone.id && group.kind === 'hunter';
           const prepMotion = activeEvent?.kind === 'readyVolley' && activeEvent.zoneId === zone.id && tacticalGroupCapabilities(group).has('volley')
@@ -1133,6 +1137,29 @@ export function TacticalZoneColumn({
               } : undefined}
               {...(unitDragProps ?? {})}
             >
+              {commandable && !hunt && selectedGroupId === group.id && group.commandable !== false &&
+                (['left', 'right'] as const).map(side => {
+                  // 화면 좌우는 저장하지 않는다 — 전투 orientation에서 표시 방향만 파생 (계약 문서 9절)
+                  const facing: TacticalFacing = side === 'left'
+                    ? assault ? 'towardRear' : 'towardEnemy'
+                    : assault ? 'towardEnemy' : 'towardRear';
+                  const current = group.facing === facing;
+                  return (
+                    <button
+                      type="button"
+                      key={side}
+                      className={`tactical-facing-arrow ${side}`}
+                      disabled={current}
+                      title={current ? '현재 방향입니다.' : `${facingLabel(facing)}으로 방향전환`}
+                      aria-label={`${group.label} ${facingLabel(facing)} 방향전환`}
+                      onClick={event => {
+                        event.stopPropagation();
+                        onTurnGroup(group.id, facing, event.currentTarget);
+                      }}
+                      onPointerDown={event => event.stopPropagation()}
+                    >{side === 'left' ? '◀' : '▶'}</button>
+                  );
+                })}
               <GroupSprites
                 state={state}
                 group={group}
@@ -1148,6 +1175,12 @@ export function TacticalZoneColumn({
               <span>
                 {group.label}
                 {group.ambushed && <em className="tactical-state-badge ambushed">매복중</em>}
+                {group.pendingFacing && (
+                  <em
+                    className="tactical-state-badge facing-turning"
+                    title="방향전환 직후라 이번 교전에는 전투력이 줄어듭니다."
+                  >회전 중</em>
+                )}
                 {hunt && group.huntMovedRound === battle.round && (
                   <em className="tactical-state-badge tactical-hunt-moved" title="이번 라운드 이동으로 몰이 기여가 절반입니다.">
                     이동 · 몰이 ½

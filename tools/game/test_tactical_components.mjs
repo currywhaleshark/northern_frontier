@@ -560,10 +560,13 @@ assert.match(orderConfirmSource, /contextmenu/, 'right-click must cancel the pen
 assert.match(orderConfirmSource, /stopPropagation/,
   'clicks inside the confirm card must not bubble into the stage-shell cancel handler');
 assert.match(orderConfirmSource, /취소/, 'the confirm card must offer an explicit cancel button');
-assert.match(orderConfirmSource, /\{commandLabel\} 확정/,
+assert.match(orderConfirmSource, /\{confirmLabel\}/,
   'the confirm button must name the command being confirmed');
-assert.doesNotMatch(orderConfirmSource, /applyTacticalStageOrder|setTacticalCommand|setDefenderFormationLine/,
+assert.doesNotMatch(orderConfirmSource,
+  /applyTacticalStageOrder|setTacticalCommand|setDefenderFormationLine|setTacticalGroupFacing/,
   'the confirm card must delegate mutations to its callbacks');
+assert.match(screenSource, /confirmLabel: `\$\{stageOrderCommandLabel\(stageOrderConfirm\.preview\.command\)\} 확정`/,
+  'stage-order confirms must name the previewed command on the confirm button');
 
 assert.match(orderPreviewSource, /Math\.round\(preview\.powerPenalty \* 100\)/,
   'penalty text must come straight from the backend preview ratio');
@@ -590,5 +593,40 @@ assert.match(cssSource, /\.tactical-order-confirm\s*\{[\s\S]*position:\s*absolut
   'the confirm card must overlay the stage near the drop point');
 assert.match(cssSource, /\.tactical-field-group\.stage-dragging\s*\{\s*opacity/,
   'the dragged unit must dim while its ghost previews the destination');
+
+// ── Phase 5: 명시적 방향 ──
+assert.match(zoneSource, /const rearFacing = group\.facing === 'towardRear';/,
+  'stage flip direction must come from the explicit facing state, not line/command inference');
+assert.match(zoneSource, /tactical-facing-arrow/,
+  'the selected unit must show facing arrows on both sides');
+assert.match(zoneSource, /assault \? 'towardRear' : 'towardEnemy'/,
+  'screen left/right must derive from battle orientation instead of being stored');
+assert.match(zoneSource, /facing-turning/,
+  'a pending facing change must show a current-round penalty badge on the stage unit');
+assert.doesNotMatch(zoneSource, /0\.75|25%/,
+  'the stage must not hardcode the facing penalty ratio');
+assert.match(screenSource, /setTacticalGroupFacing\(current, groupId, facing\)/,
+  'deployment facing changes must apply immediately through the backend mutation');
+assert.match(screenSource, /setTacticalGroupFacing\(current, preview\.groupId, preview\.destination\)/,
+  'command facing confirms must apply exactly the previewed backend mutation');
+assert.match(screenSource, /tacticalFacingPreview\(battle, groupId, facing\)/,
+  'command facing changes must preview through the backend before confirming');
+assert.match(screenSource, /facingPenaltyText\(stageOrderConfirm\.preview\)/,
+  'the facing confirm card must show the backend-provided penalty');
+assert.equal(
+  [...screenSource.matchAll(/renderFacingToggle\(selectedGroup\)/g)].length,
+  2,
+  'deployment and command controls must both expose the keyboard facing toggle',
+);
+assert.match(screenSource, /기존 명령\(/,
+  'the facing confirm card must state that the current command is preserved');
+assert.doesNotMatch(orderPreviewSource, /0\.75/,
+  'facing presentation must not hardcode the turn multiplier');
+assert.match(chipSource, /pendingFacing \? ' · 회전 중' : ''/,
+  'command dock chips must surface the current-round facing penalty');
+assert.match(chipSource, /facing === 'towardRear' \? ' · 후방 경계' : ''/,
+  'command dock chips must surface a rear-facing state');
+assert.match(cssSource, /\.tactical-facing-arrow\.left/,
+  'facing arrows must sit on both sides of the selected unit');
 
 console.log('tactical component extraction tests passed');

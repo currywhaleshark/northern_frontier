@@ -1,7 +1,9 @@
-// Phase 4 무대 명령 표시 문구 — 명령 종류·전력 페널티·이동 문구는 전부 백엔드
-// tacticalStageOrderPreview 계약 값을 그대로 보여주며 여기서 재계산하지 않는다.
-import type { TacticalStageAnchor, TacticalStageOrderPreview } from '../../game/tacticalBattle';
-import type { TacticalBattle } from '../../game/types';
+// Phase 4·5 무대 명령/방향 표시 문구 — 명령 종류·전력 페널티·이동 문구는 전부 백엔드
+// preview 계약 값을 그대로 보여주며 여기서 재계산하지 않는다.
+import type {
+  TacticalFacingPreview, TacticalStageAnchor, TacticalStageOrderPreview,
+} from '../../game/tacticalBattle';
+import type { TacticalBattle, TacticalFacing } from '../../game/types';
 import { deploymentLineLabel } from './TacticalDeploymentDock';
 
 export function stageOrderCommandLabel(command: TacticalStageOrderPreview['command']): string {
@@ -30,4 +32,21 @@ export function stageOrderPenaltyText(preview: TacticalStageOrderPreview): strin
   const percent = Math.round(preview.powerPenalty * 100);
   if (percent <= 0) return null;
   return `${stageOrderCommandLabel(preview.command)} 중 전투력 ${percent}% 감소`;
+}
+
+// ── Phase 5 방향전환 ──
+
+export function facingLabel(facing: TacticalFacing): string {
+  return facing === 'towardEnemy' ? '적 방향' : '후방';
+}
+
+export function facingTransitionText(preview: TacticalFacingPreview): string {
+  return `${facingLabel(preview.origin)} → ${facingLabel(preview.destination)}`;
+}
+
+/** 지휘 단계 회전 페널티는 백엔드 preview의 powerPenalty·currentRoundOnly에서만 읽는다. 배치 단계는 0 → null */
+export function facingPenaltyText(preview: TacticalFacingPreview): string | null {
+  const percent = Math.round(preview.powerPenalty * 100);
+  if (percent <= 0) return null;
+  return `방향전환으로 전투력 ${percent}% 감소${preview.currentRoundOnly ? ' — 이번 교전만' : ''}`;
 }
