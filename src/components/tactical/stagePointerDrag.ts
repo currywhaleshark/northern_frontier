@@ -28,6 +28,11 @@ export interface StagePointerDragOptions {
   /** 앵커 판정에 쓸 data 속성 이름 (기본 data-stage-anchor) */
   anchorAttribute?: string;
   disabled?: boolean;
+  /**
+   * false면 커서 좌표를 상태에 싣지 않고 dragging/hoverAnchorId가 바뀔 때만 재렌더한다.
+   * 커서 추종 고스트 없이 레인 고스트만 쓰는 화면 단위 훅(Phase 4 무대 드래그)용.
+   */
+  trackPosition?: boolean;
   onDrop: (anchorId: string | null, point: StageDragPoint, pointerType: string) => void;
   /** 임계값을 넘지 못하고 놓았을 때 — 기존 클릭 동작 위임 */
   onClick?: () => void;
@@ -53,7 +58,9 @@ export function findStageDragAnchorId(
 const IDLE_STATE: StageDragState = { dragging: false, pointerType: null, position: null, hoverAnchorId: null };
 
 export function useStagePointerDrag(options: StagePointerDragOptions) {
-  const { anchorAttribute = 'data-stage-anchor', disabled = false, onDrop, onClick, onCancel } = options;
+  const {
+    anchorAttribute = 'data-stage-anchor', disabled = false, trackPosition = true, onDrop, onClick, onCancel,
+  } = options;
   const [state, setState] = useState<StageDragState>(IDLE_STATE);
   const sessionRef = useRef<{
     pointerId: number;
@@ -110,13 +117,17 @@ export function useStagePointerDrag(options: StagePointerDragOptions) {
         // 합성 포인터(테스트)나 이미 사라진 포인터 — 좌표 추적만으로 진행
       }
     }
-    setState({
-      dragging: true,
-      pointerType: session.pointerType,
-      position: { x: event.clientX, y: event.clientY },
-      hoverAnchorId: findStageDragAnchorId(event.clientX, event.clientY, anchorAttribute),
+    const hoverAnchorId = findStageDragAnchorId(event.clientX, event.clientY, anchorAttribute);
+    setState(previous => {
+      if (!trackPosition && previous.dragging && previous.hoverAnchorId === hoverAnchorId) return previous;
+      return {
+        dragging: true,
+        pointerType: session.pointerType,
+        position: trackPosition ? { x: event.clientX, y: event.clientY } : null,
+        hoverAnchorId,
+      };
     });
-  }, [anchorAttribute]);
+  }, [anchorAttribute, trackPosition]);
 
   const handlePointerUp = useCallback((event: React.PointerEvent<HTMLElement>) => {
     const session = sessionRef.current;

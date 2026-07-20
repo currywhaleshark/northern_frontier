@@ -165,3 +165,51 @@ P3 mutation 7종을 개별 핸들러로 늘리지 않기 위한 단일 dispatch�
 - **페인 한정 관찰**: 무대 가로 스크롤(`scrollTo`)이 이 브라우저 페인에서 고정된다 — **stash로 기준선
   재현 결과 P3 이전에도 동일**하므로 앱 회귀 아님(실 브라우저·playwright에서는 정상으로 추정).
   16그룹 1280×720 겹침 QA도 스크린샷과 함께 집에서.
+
+## 8. 2026-07-20 회사 세션 기록 2 — P4 프론트 구현 완료 (이 커밋)
+
+Codex의 P4 계약(`e20b56c`) 위에 무대 드래그·고스트·확인 카드를 구현했다.
+
+### 구현 내역
+
+- **`stagePointerDrag.ts`** — `trackPosition: false` 옵션 추가: 커서 좌표를 상태에 싣지 않고
+  dragging/hoverAnchorId 변화 때만 재렌더(화면 단일 훅용). 기존 카드 훅 동작은 그대로.
+- **`stageOrderPreview.ts` (신규)** — preview 표시 문구 헬퍼. 명령 라벨·`전열 → 중열` 전환 표기·
+  `powerPenalty` 감소 문구. 수치는 전부 백엔드 preview 값 그대로.
+- **`TacticalOrderConfirm.tsx` (신규)** — 7.9 확인 카드. role=dialog, Escape·우클릭 취소,
+  카드 내부 클릭 stopPropagation, `[취소] [<명령> 확정]`. mutation은 콜백 위임(직접 호출 없음).
+- **`TacticalBattleScreen.tsx`** — 화면 단일 무대 드래그 훅(`data-deploy-anchor` 공유):
+  - 배치 단계 무대 부대 드롭 = 카드 드롭과 같은 검증·즉시 적용, 독 영역 드롭 = 예비 복귀.
+  - 지휘 단계 드롭 = `tacticalStageOrderUnavailableReason`/`Preview` → 확인 카드(드롭 지점 근처,
+    셸 안 클램프) → 확정 시 `applyTacticalStageOrder` 정확히 1회. 같은 위치 드롭은 선택만 유지.
+  - 취소 경로: Escape·우클릭·무대 빈 곳 클릭·연출 진입(playback 효과에서 드래그+카드 자동 취소).
+    확인 전 상태 불변. 확인 후 선택 유지(7.9).
+  - 드롭 직후 따라오는 click이 팝오버를 다시 열지 않게 가드. 드래그 시작 시 열린 팝오버 닫음.
+  - 오류·안내는 `tactical-deploy-feedback` 공용 notice(ok/warn tone)로 지휘 단계에도 표시.
+- **`TacticalZoneColumn.tsx`** — `deployDrag` prop을 `stageDrag { groupId, hoverAnchorId, mode }`로
+  일반화: mode 'deployment'는 배치 검증, 'command'는 무대 명령 계약. 지휘 모드에서 원위치 레인은
+  앵커 제외(no-op), 호버 레인 고스트는 `<라벨> <명령> 예약`. 부대 div에 드래그 핸들 부여
+  (배치 = 피난 주민 제외, 지휘 = 지휘 가능만) + `stage-dragging` 시각 상태. 레인 앵커는 지휘
+  단계에도 유지.
+- **키보드 동등 경로**: 기존 전열 토글(재배치 예약)·명령 바(전진/후퇴)가 같은 백엔드 검증을 쓰는
+  동등 경로로 유지된다. 별도 목적지 순회 키는 만들지 않았다(범위 판단 — 필요하면 후속).
+- 컴포넌트 계약 테스트 ~25건 추가(확인 전 상태 불변 경로·즉시/확인 분기·취소 경로·재계산 금지 등).
+
+### 검증
+
+- tsc·컴포넌트·stage_orders·test:combat·빌드 통과.
+- 브라우저(방어전, 지휘 단계): 후열→중열 드래그 중 앵커 상태가 정확함(호버=hover, 인접 열=valid,
+  비인접 열/대각/원거리 구역=blocked, 원위치=중립, 인접 구역 같은 열=valid) + 레인 고스트
+  `재배치 예약` + 드래그 부대 dim. 드롭 → 확인 카드 `사냥활 사냥꾼 · 후열 → 중열 / 재배치 중 전투력
+  65% 감소 / …` (백엔드 값). Escape 취소 시 상태 불변, 확정 시 redeploy+pendingLine만 기록(순간이동
+  없음), 선택 유지. 같은 위치 드롭 = 선택만. 불가 레인 드롭 = 백엔드 사유 notice.
+  배치 단계: 무대 부대 레인 이동 즉시 적용 + 독으로 역드래그 예비 복귀.
+
+### 남은 것
+
+- **인접 구역 드롭(전진/후퇴 확인 카드)의 실입력 재현 미완** — 이 페인은 무대 가로 스크롤이 고정되어
+  옆 구역 레인에 포인터를 놓을 수 없다. 경로는 재배치와 동일 코드이고 명령 매핑·페널티는
+  `test_tactical_stage_orders.mjs`가 검증하지만, **집에서 playwright로 전진/후퇴 확인 카드까지 실입력
+  QA할 것**. 레인 유효성 클래스(인접 구역 valid)는 이 세션에서 확인됨.
+- 실기기 터치 경로(기존 Phase 4 QA 항목)와 특수주민·적 6개 조 실화면(시뮬레이터 옵션 보강 대기)은
+  그대로 남아 있다.

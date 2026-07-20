@@ -492,7 +492,7 @@ assert.doesNotMatch(deployDockSource, /window\.confirm|TacticalOrderConfirm/,
 
 assert.match(zoneSource, /'data-deploy-anchor': deployAnchorId/,
   'defender formation lanes must expose deploy anchors during deployment');
-assert.match(zoneSource, /tacticalDeploymentPlacementUnavailableReason\(battle, deployDrag\.groupId/,
+assert.match(zoneSource, /tacticalDeploymentPlacementUnavailableReason\(battle, stageDrag\.groupId/,
   'lane anchor validity must come from the backend placement validator');
 assert.match(zoneSource, /deploy-anchor-hover/,
   'the hovered valid lane must get a stronger highlight while dragging');
@@ -519,5 +519,76 @@ assert.match(cssSource, /\.tactical-field-group:hover \.tactical-featured-name/,
   'the featured name tag must appear on hover');
 assert.match(cssSource, /prefers-reduced-motion[\s\S]*tactical-deploy-card\.just-mustered\s*\{\s*animation:\s*none;/,
   'the muster pulse must respect reduced-motion preferences');
+
+// ── Phase 4: 무대 드래그·고스트·확인 카드 ──
+const orderConfirmSource = readFileSync(
+  new URL('../../src/components/tactical/TacticalOrderConfirm.tsx', import.meta.url),
+  'utf8',
+);
+const orderPreviewSource = readFileSync(
+  new URL('../../src/components/tactical/stageOrderPreview.ts', import.meta.url),
+  'utf8',
+);
+const dragHookSource = readFileSync(
+  new URL('../../src/components/tactical/stagePointerDrag.ts', import.meta.url),
+  'utf8',
+);
+
+assert.match(screenSource, /<TacticalOrderConfirm\b/,
+  'command-phase drops must confirm through the dedicated order confirm card');
+assert.match(screenSource, /applyTacticalStageOrder\(current, preview\.groupId, preview\.destination\)/,
+  'confirming a stage order must apply exactly the previewed backend mutation');
+assert.match(screenSource, /tacticalStageOrderUnavailableReason\(battle, groupId, target\)/,
+  'stage drops must gate through the backend stage-order validator');
+assert.match(screenSource, /if \(preview\.command == null\) return; \/\/ 같은 위치 드롭 = 선택만 유지/,
+  'same-position drops must only keep the selection without a confirm card');
+assert.match(screenSource, /setStageOrderConfirm\(null\);\s*cancelStageDrag\(\);/,
+  'entering playback must cancel unconfirmed drags and pending confirm cards');
+assert.match(screenSource, /setStageOrderConfirm\(null\); \/\/ 무대 빈 곳 클릭 = 미확정 명령 취소/,
+  'clicking empty stage space must cancel the pending confirm card');
+assert.match(screenSource, /stageDropGuardRef/,
+  'the click that follows a drop must not reopen the command popover');
+assert.match(screenSource, /trackPosition: false/,
+  'the screen-level stage drag hook must not re-render on every pointer move');
+assert.doesNotMatch(screenSource, /powerPenalty\s*[*+\-/]/,
+  'the screen must not recompute stage-order power penalties');
+
+assert.match(orderConfirmSource, /role="dialog"/,
+  'the order confirm card must be an accessible dialog');
+assert.match(orderConfirmSource, /Escape/, 'Escape must cancel the pending order');
+assert.match(orderConfirmSource, /contextmenu/, 'right-click must cancel the pending order');
+assert.match(orderConfirmSource, /stopPropagation/,
+  'clicks inside the confirm card must not bubble into the stage-shell cancel handler');
+assert.match(orderConfirmSource, /취소/, 'the confirm card must offer an explicit cancel button');
+assert.match(orderConfirmSource, /\{commandLabel\} 확정/,
+  'the confirm button must name the command being confirmed');
+assert.doesNotMatch(orderConfirmSource, /applyTacticalStageOrder|setTacticalCommand|setDefenderFormationLine/,
+  'the confirm card must delegate mutations to its callbacks');
+
+assert.match(orderPreviewSource, /Math\.round\(preview\.powerPenalty \* 100\)/,
+  'penalty text must come straight from the backend preview ratio');
+assert.doesNotMatch(orderPreviewSource, /CONFIG|Multiplier/,
+  'stage order presentation must not reach into config or multiplier math');
+
+assert.match(zoneSource, /tacticalStageOrderUnavailableReason\(battle, stageDrag\.groupId/,
+  'command-mode lane validity must come from the backend stage-order validator');
+assert.match(zoneSource, /tacticalStageOrderPreview\(battle, ghostGroup\.id/,
+  'the command-mode lane ghost must describe the previewed order');
+assert.match(zoneSource, /stage-dragging/,
+  'the dragged stage unit must show a dragging visual state');
+assert.match(zoneSource, /showFormationGuides \? group\.kind !== 'civilian' : group\.commandable !== false/,
+  'stage drag handles must exclude civilians in deployment and non-commandables in command');
+assert.match(zoneSource, /showFormationGuides \|\| battle\.phase === 'command' \? \{ 'data-deploy-anchor': deployAnchorId \}/,
+  'lanes must stay anchor targets during the command phase');
+
+assert.match(dragHookSource, /trackPosition/,
+  'the shared drag hook must support hover-only tracking for screen-level use');
+assert.match(dragHookSource, /previous\.hoverAnchorId === hoverAnchorId\) return previous;/,
+  'hover-only tracking must skip re-renders while the anchor is unchanged');
+
+assert.match(cssSource, /\.tactical-order-confirm\s*\{[\s\S]*position:\s*absolute;/,
+  'the confirm card must overlay the stage near the drop point');
+assert.match(cssSource, /\.tactical-field-group\.stage-dragging\s*\{\s*opacity/,
+  'the dragged unit must dim while its ghost previews the destination');
 
 console.log('tactical component extraction tests passed');

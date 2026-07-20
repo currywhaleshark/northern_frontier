@@ -5,13 +5,15 @@ import { getSeason } from '../game/seasons';
 import { banditLairDoctrineDefinition, enemyPlanCounterLabelsForAction, enemyPlanSummaryView } from '../game/enemyPlan';
 import { withJosa } from '../game/josa';
 import {
-  applyAutoDeployTacticalGroups, applyTacticalPlaybackEvent,
-  mergeTacticalGroups, resetTacticalDeployment, splitFeaturedTacticalGroup, splitTacticalGroup,
+  applyAutoDeployTacticalGroups, applyTacticalPlaybackEvent, applyTacticalStageOrder,
+  mergeTacticalGroups, placeTacticalDeploymentGroup, removeTacticalDeploymentGroup,
+  resetTacticalDeployment, splitFeaturedTacticalGroup, splitTacticalGroup,
   tacticalCommandUnavailableReason, tacticalDeploymentPlacementUnavailableReason, tacticalDeploymentView,
   tacticalLootText,
   tacticalFormationLineUnavailableReason, tacticalPreparationUnavailableReason, tacticalRearResponseOptions,
   tacticalRearAssaultIsEngaged, tacticalRearManeuverEffectiveCounterStrengthForZone,
-  tacticalSupportedCommands,
+  tacticalStageOrderPreview, tacticalStageOrderUnavailableReason, tacticalSupportedCommands,
+  type TacticalStageOrderPreview,
 } from '../game/tacticalBattle';
 import { assaultMaxRounds } from '../game/tacticalAssault';
 import { huntDeploymentUnavailableReason, huntMaxRounds } from '../game/tacticalHunt';
@@ -28,8 +30,13 @@ import type {
 } from '../game/types';
 import { playMeleeClash, playSfx, playWeaponSalvo, playWeaponVolley, setBattleDrums, type SfxName } from '../sound/sfx';
 import { StageDragSpike } from './tactical/StageDragSpike';
-import { TacticalDeploymentDock, type DeploymentDragSnapshot } from './tactical/TacticalDeploymentDock';
+import {
+  DEPLOY_DOCK_ANCHOR_ID, TacticalDeploymentDock, parseDeployAnchorId,
+  type DeploymentDragSnapshot,
+} from './tactical/TacticalDeploymentDock';
 import { TacticalGroupChip } from './tactical/TacticalGroupChip';
+import { TacticalOrderConfirm } from './tactical/TacticalOrderConfirm';
+import { useStagePointerDrag, type StageDragPoint } from './tactical/stagePointerDrag';
 import { TacticalCommandPopover } from './tactical/TacticalCommandPopover';
 import { TacticalMiniMap } from './tactical/TacticalMiniMap';
 import { EnemyPlanPanel } from './tactical/EnemyPlanPanel';
@@ -252,8 +259,19 @@ export function TacticalBattleScreen({
   const [deployDrag, setDeployDrag] = useState<DeploymentDragSnapshot | null>(null);
   // <이름>의 조 분리 — 동행 주민 선택 중인 카드
   const [featuredSplit, setFeaturedSplit] = useState<{ groupId: string; companions: number[] } | null>(null);
-  const [deployNotice, setDeployNotice] = useState<string | null>(null);
+  const [deployNotice, setDeployNotice] = useState<{ text: string; tone: 'ok' | 'warn' } | null>(null);
   const deployNoticeTimerRef = useRef<number | null>(null);
+  // P4 지휘 단계 확인 카드 — 확인 전에는 게임 상태를 바꾸지 않는다 (계획서 7.9)
+  const [stageOrderConfirm, setStageOrderConfirm] = useState<{
+    preview: TacticalStageOrderPreview;
+    left: number;
+    top: number;
+  } | null>(null);
+  // 무대 부대 드래그 — 화면 단일 훅. 어떤 부대를 집었는지는 pointerdown에서 ref로 기록한다.
+  const stageDragSourceRef = useRef<string | null>(null);
+  // 드롭 직후 이어지는 click이 팝오버를 열지 않게 잠깐 막는다
+  const stageDropGuardRef = useRef(false);
+  const stageDropHandlerRef = useRef<(groupId: string, anchorId: string | null, point: StageDragPoint) => void>(() => {});
   const fastRef = useRef(false);
   const preparationPlayback = battle?.phase === 'preparationExecution';
   const combatPlayback = battle?.phase === 'simulating';
@@ -304,20 +322,57 @@ export function TacticalBattleScreen({
   useEffect(() => {
     setDeployDrag(null);
     setFeaturedSplit(null);
+    setStageOrderConfirm(null);
   }, [battle?.phase, battle?.id]);
 
   useEffect(() => {
     setFeaturedSplit(null);
   }, [selectedGroupId]);
 
-  const showDeployNotice = (text: string) => {
+  const showDeployNotice = (text: string, tone: 'ok' | 'warn' = 'warn') => {
     if (deployNoticeTimerRef.current != null) window.clearTimeout(deployNoticeTimerRef.current);
-    setDeployNotice(text);
+    setDeployNotice({ text, tone });
     deployNoticeTimerRef.current = window.setTimeout(() => {
       setDeployNotice(null);
       deployNoticeTimerRef.current = null;
     }, 2600);
   };
+
+  // 무대 부대 드래그 훅 — 커서 고스트 없이 레인 하이라이트·고스트만 쓰므로 좌표 추적을 끈다.
+  const stageDrag = useStagePointerDrag({
+    anchorAttribute: 'data-deploy-anchor',
+    trackPosition: false,
+    disabled: playbackActive,
+    onDrop: (anchorId, point) => {
+      const sourceGroupId = stageDragSourceRef.current;
+      stageDragSourceRef.current = null;
+      stageDropGuardRef.current = true;
+      window.setTimeout(() => {
+        stageDropGuardRef.current = false;
+      }, 300);
+      if (sourceGroupId) stageDropHandlerRef.current(sourceGroupId, anchorId, point);
+    },
+    onClick: () => {
+      // 임계값 미달 = 클릭. 선택·팝오버는 부대 div의 기존 onClick이 처리한다.
+      stageDragSourceRef.current = null;
+    },
+    onCancel: () => {
+      stageDragSourceRef.current = null;
+    },
+  });
+  const { cancelDrag: cancelStageDrag } = stageDrag;
+
+  // 드래그가 임계값을 넘으면 열려 있던 명령 팝오버를 닫는다
+  useEffect(() => {
+    if (stageDrag.state.dragging) setCommandPopover(null);
+  }, [stageDrag.state.dragging]);
+
+  // 연출 단계로 넘어가면 미확정 드래그·확인 카드를 자동 취소한다 (계획서 7.9)
+  useEffect(() => {
+    if (!playbackActive) return;
+    setStageOrderConfirm(null);
+    cancelStageDrag();
+  }, [playbackActive, cancelStageDrag]);
 
   useEffect(() => {
     if (commandPopover && selectedGroupId !== commandPopover.groupId) setCommandPopover(null);
@@ -469,6 +524,8 @@ export function TacticalBattleScreen({
   };
 
   const openCommandPopover = (groupId: string, element: HTMLElement) => {
+    // 드롭 직후 따라오는 click은 새 팝오버를 열지 않는다
+    if (stageDropGuardRef.current) return;
     const shell = stageShellRef.current;
     if (!shell || battle?.phase !== 'command') {
       selectGroup(groupId);
@@ -568,6 +625,84 @@ export function TacticalBattleScreen({
   const handleDeployDragChange = (groupId: string, drag: DeploymentDragSnapshot | null) => {
     setDeployDrag(current => drag ?? (current?.groupId === groupId ? null : current));
   };
+
+  // ── P4 무대 부대 드래그: 드롭 처리·앵커 상태·확인 카드 ──
+  // 배치 단계 무대 드롭은 카드 드롭과 같은 규칙으로 즉시 적용, 지휘 단계 드롭은 preview 후 확인 카드.
+  stageDropHandlerRef.current = (groupId, anchorId, point) => {
+    const groupLabel = battle.defenderGroups.find(candidate => candidate.id === groupId)?.label ?? '';
+    if (battle.phase === 'deployment') {
+      if (anchorId === DEPLOY_DOCK_ANCHOR_ID) {
+        const error = runDeploymentAction(current => removeTacticalDeploymentGroup(current, groupId));
+        if (!error) showDeployNotice(`${groupLabel} — 배치 대기로 되돌렸습니다.`, 'ok');
+        return;
+      }
+      const target = anchorId ? parseDeployAnchorId(anchorId) : null;
+      if (!target) {
+        showDeployNotice('유효한 배치 위치가 아닙니다. 아군 전열 위나 배치 대기 영역에 놓으십시오.');
+        return;
+      }
+      const reason = tacticalDeploymentPlacementUnavailableReason(battle, groupId, target);
+      if (reason) {
+        showDeployNotice(reason);
+        return;
+      }
+      const error = runDeploymentAction(current => placeTacticalDeploymentGroup(current, groupId, target));
+      if (error) return;
+      playSfx('hammer');
+      selectGroup(groupId);
+      return;
+    }
+    if (battle.phase !== 'command') return;
+    const target = anchorId ? parseDeployAnchorId(anchorId) : null;
+    if (!target) return; // 앵커 밖 드롭 = 취소, 상태 불변
+    const reason = tacticalStageOrderUnavailableReason(battle, groupId, target);
+    if (reason) {
+      showDeployNotice(reason);
+      return;
+    }
+    const preview = tacticalStageOrderPreview(battle, groupId, target);
+    if (!preview) return;
+    selectGroup(preview.groupId);
+    if (preview.command == null) return; // 같은 위치 드롭 = 선택만 유지
+    const shellRect = stageShellRef.current?.getBoundingClientRect();
+    const cardWidth = 240;
+    const cardHeight = 120;
+    const left = shellRect
+      ? Math.max(8, Math.min(point.x - shellRect.left - cardWidth / 2, shellRect.width - cardWidth - 8))
+      : 8;
+    const top = shellRect
+      ? Math.max(8, Math.min(point.y - shellRect.top - cardHeight - 12, shellRect.height - cardHeight - 8))
+      : 8;
+    setStageOrderConfirm({ preview, left, top });
+  };
+  const confirmStageOrder = () => {
+    if (!stageOrderConfirm) return;
+    const { preview } = stageOrderConfirm;
+    setStageOrderConfirm(null);
+    // applyTacticalStageOrder가 확정 시점에 재검증하므로 낡은 preview는 오류 문구로 떨어진다
+    const error = runDeploymentAction(current =>
+      applyTacticalStageOrder(current, preview.groupId, preview.destination));
+    if (!error) playSfx('raidDrum');
+  };
+  const stageUnitDragSourceId = stageDrag.state.dragging ? stageDragSourceRef.current : null;
+  const zoneStageDrag = stageUnitDragSourceId && (battle.phase === 'command' || battle.phase === 'deployment')
+    ? {
+      groupId: stageUnitDragSourceId,
+      hoverAnchorId: stageDrag.state.hoverAnchorId,
+      mode: battle.phase === 'command' ? 'command' as const : 'deployment' as const,
+    }
+    : battle.phase === 'deployment' && deployDrag
+      ? { ...deployDrag, mode: 'deployment' as const }
+      : null;
+  const stageDragHandlePropsFor = (battle.phase === 'deployment' || battle.phase === 'command') && !playbackActive
+    ? (groupId: string) => ({
+      ...stageDrag.handleProps,
+      onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
+        stageDragSourceRef.current = groupId;
+        stageDrag.handleProps.onPointerDown(event);
+      },
+    })
+    : null;
   const roundLimit = hunt ? huntMaxRounds() : assault ? assaultMaxRounds() : 5;
   const commandable = battle.phase === 'command' || battle.phase === 'deployment';
   const showTacticalMiniMap = battle.phase === 'preparation' || battle.phase === 'preparationExecution' ||
@@ -708,6 +843,7 @@ export function TacticalBattleScreen({
 
         <div className="tactical-stage-shell" ref={stageShellRef} onClick={() => {
           setCommandPopover(null);
+          setStageOrderConfirm(null); // 무대 빈 곳 클릭 = 미확정 명령 취소 (계획서 7.9)
           enableFastForward();
         }}>
           <div className="tactical-battlefield" ref={viewportRef}>
@@ -730,7 +866,8 @@ export function TacticalBattleScreen({
                   commandable={commandable}
                   selectedGroupId={selectedGroup?.id ?? null}
                   nextPendingGroupId={nextPendingGroupId}
-                  deployDrag={battle.phase === 'deployment' ? deployDrag : null}
+                  stageDrag={zoneStageDrag}
+                  stageDragHandlePropsFor={stageDragHandlePropsFor}
                   onSelectGroup={openCommandPopover}
                   onSelectTarget={(defenderGroupId, enemyGroupId) => {
                     const defender = battle.defenderGroups.find(group => group.id === defenderGroupId);
@@ -839,6 +976,16 @@ export function TacticalBattleScreen({
               }}
               onOpenCommandBoard={openCommandBoard}
               onClose={restoreFocus => closePopover({ restoreFocus })}
+            />
+          )}
+          {stageOrderConfirm && battle.phase === 'command' && (
+            <TacticalOrderConfirm
+              battle={battle}
+              preview={stageOrderConfirm.preview}
+              groupLabel={battle.defenderGroups.find(group => group.id === stageOrderConfirm.preview.groupId)?.label ?? ''}
+              style={{ left: stageOrderConfirm.left, top: stageOrderConfirm.top }}
+              onConfirm={confirmStageOrder}
+              onCancel={() => setStageOrderConfirm(null)}
             />
           )}
         </div>
@@ -957,7 +1104,7 @@ export function TacticalBattleScreen({
                 onDragChange={handleDeployDragChange}
               />
               {deployNotice && (
-                <p className="tactical-deploy-feedback warn" role="status">{deployNotice}</p>
+                <p className={`tactical-deploy-feedback ${deployNotice.tone}`} role="status">{deployNotice.text}</p>
               )}
               {hunt && battle.prepActions.filter(action =>
                 action.selected && (action.id === 'placeBait' || action.id === 'setHuntTraps')).map(action => {
@@ -1138,6 +1285,9 @@ export function TacticalBattleScreen({
                   selectGroup(groupId);
                 }}
               />
+              {deployNotice && (
+                <p className={`tactical-deploy-feedback ${deployNotice.tone}`} role="status">{deployNotice.text}</p>
+              )}
               {rearResponseZoneId && rearResponseOptions.length > 0 && (
                 <div className="tactical-rear-response-guide" role="status">
                   <strong>{battle.zones.find(zone => zone.id === rearResponseZoneId)?.name} 후방 급습 대응</strong>

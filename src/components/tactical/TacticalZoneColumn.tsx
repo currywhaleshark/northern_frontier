@@ -4,7 +4,9 @@ import { CONFIG } from '../../game/config';
 import {
   tacticalDeploymentPlacementUnavailableReason, tacticalGroupTargetUnavailableReason,
   tacticalRaiderVisibleDuringPlayback,
+  tacticalStageOrderPreview, tacticalStageOrderUnavailableReason,
 } from '../../game/tacticalBattle';
+import { stageOrderCommandLabel } from './stageOrderPreview';
 import type {
   GameState,
   PredatorKind,
@@ -65,8 +67,13 @@ interface Props {
   commandable: boolean;
   selectedGroupId: string | null;
   nextPendingGroupId: string | null;
-  /** 배치 카드 드래그 중일 때만 채워진다 — 아군 전열 레인을 배치 앵커·고스트로 바꾼다 */
-  deployDrag: { groupId: string; hoverAnchorId: string | null } | null;
+  /**
+   * 카드·부대 드래그 중일 때만 채워진다 — 아군 전열 레인을 앵커·고스트로 바꾼다.
+   * mode 'deployment'는 배치 검증, 'command'는 무대 명령 preview 계약을 쓴다.
+   */
+  stageDrag: { groupId: string; hoverAnchorId: string | null; mode: 'deployment' | 'command' } | null;
+  /** 무대 위 부대를 드래그 핸들로 만드는 포인터 props — 배치·지휘 단계에서만 전달된다 */
+  stageDragHandlePropsFor: ((groupId: string) => React.DOMAttributes<HTMLElement>) | null;
   onSelectGroup: (groupId: string, element: HTMLElement) => void;
   onSelectTarget: (defenderGroupId: string, enemyGroupId: string) => void;
 }
@@ -679,7 +686,8 @@ export function TacticalZoneColumn({
   commandable,
   selectedGroupId,
   nextPendingGroupId,
-  deployDrag,
+  stageDrag,
+  stageDragHandlePropsFor,
   onSelectGroup,
   onSelectTarget,
 }: Props) {
@@ -1027,24 +1035,42 @@ export function TacticalZoneColumn({
       </div>
       <div className="tactical-defender-rank">
         {DEFENDER_FORMATION_LINES.map(line => {
-          // 배치 카드 드래그 앵커 — 유효성 판정은 백엔드 unavailable-reason이 단일 소스다.
+          // 드래그 앵커 — 유효성 판정은 배치는 배치 검증, 지휘는 무대 명령 preview 계약이 단일 소스다.
           const deployAnchorId = `${zone.id}|${line}`;
-          const deployReason = deployDrag
-            ? tacticalDeploymentPlacementUnavailableReason(battle, deployDrag.groupId, { zoneId: zone.id, line })
+          const dragGroup = stageDrag
+            ? battle.defenderGroups.find(group => group.id === stageDrag.groupId)
+            : undefined;
+          // 지휘 모드에서 현재 위치 레인은 앵커 후보에서 제외한다(같은 위치 드롭 = 선택 유지 no-op)
+          const dragOriginLane = stageDrag?.mode === 'command' && dragGroup
+            ? dragGroup.zoneId === zone.id && dragGroup.line === line
+            : false;
+          const dragReason = stageDrag && !dragOriginLane
+            ? stageDrag.mode === 'deployment'
+              ? tacticalDeploymentPlacementUnavailableReason(battle, stageDrag.groupId, { zoneId: zone.id, line })
+              : tacticalStageOrderUnavailableReason(battle, stageDrag.groupId, { zoneId: zone.id, line })
             : null;
-          const deployAnchorClass = deployDrag
-            ? deployReason == null
-              ? deployDrag.hoverAnchorId === deployAnchorId ? ' deploy-anchor-hover' : ' deploy-anchor-valid'
+          const deployAnchorClass = stageDrag && !dragOriginLane
+            ? dragReason == null
+              ? stageDrag.hoverAnchorId === deployAnchorId ? ' deploy-anchor-hover' : ' deploy-anchor-valid'
               : ' deploy-anchor-blocked'
             : '';
-          const ghostGroup = deployDrag && deployReason == null && deployDrag.hoverAnchorId === deployAnchorId
-            ? battle.defenderGroups.find(group => group.id === deployDrag.groupId)
+          const ghostGroup = stageDrag && !dragOriginLane && dragReason == null &&
+              stageDrag.hoverAnchorId === deployAnchorId
+            ? dragGroup
             : undefined;
+          const ghostOrderPreview = ghostGroup && stageDrag?.mode === 'command'
+            ? tacticalStageOrderPreview(battle, ghostGroup.id, { zoneId: zone.id, line })
+            : null;
+          const ghostText = ghostGroup
+            ? stageDrag?.mode === 'command'
+              ? `${ghostGroup.label} ${stageOrderCommandLabel(ghostOrderPreview?.command ?? null)} 예약`
+              : `${ghostGroup.label} 배치 예정`
+            : '';
           return (
           <div
             className={`tactical-formation-lane line-${line}${deployAnchorClass}`}
             data-formation-line={line}
-            {...(showFormationGuides ? { 'data-deploy-anchor': deployAnchorId } : {})}
+            {...(showFormationGuides || battle.phase === 'command' ? { 'data-deploy-anchor': deployAnchorId } : {})}
             aria-label={`아군 ${formationLineLabel(line)}`}
             key={line}
           >
@@ -1052,7 +1078,7 @@ export function TacticalZoneColumn({
             {ghostGroup && (
               <div className="tactical-field-group tactical-deploy-lane-ghost" aria-hidden="true">
                 <GroupSprites state={state} group={ghostGroup} maxVisible={3} />
-                <span>{ghostGroup.label} 배치 예정</span>
+                <span>{ghostText}</span>
               </div>
             )}
             {defenders.filter(group => group.line === line).map((group, stackIndex, lineGroups) => {
@@ -1078,9 +1104,14 @@ export function TacticalZoneColumn({
           );
           const casualtyHit = activeEvent?.kind === 'casualty' && activeEvent.side === 'defender' &&
             activeEvent.groupId === group.id;
+          // 무대 부대 드래그 핸들 — 배치 단계는 피난 주민 제외 전원, 지휘 단계는 지휘 가능 부대만
+          const unitDragProps = stageDragHandlePropsFor &&
+              (showFormationGuides ? group.kind !== 'civilian' : group.commandable !== false)
+            ? stageDragHandlePropsFor(group.id)
+            : null;
           return (
             <div
-              className={`tactical-field-group formation-${defenderFormationRole(group)} line-${group.line}${rearFacing ? ' rear-facing' : ''}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${meleeAttacker ? ' melee-attacker' : ''}${casualtyHit ? ' casualty-hit' : ''}${prepMotion}${commandable ? ' selectable' : ''}${commandable && selectedGroupId === group.id ? ' selected' : ''}${nextPendingGroupId === group.id ? ' next-pending' : ''}`}
+              className={`tactical-field-group formation-${defenderFormationRole(group)} line-${group.line}${rearFacing ? ' rear-facing' : ''}${recoiling ? ' recoil' : ''}${blockingEscape ? ' leader-blocking' : ''}${meleeAttacker ? ' melee-attacker' : ''}${casualtyHit ? ' casualty-hit' : ''}${prepMotion}${commandable ? ' selectable' : ''}${commandable && selectedGroupId === group.id ? ' selected' : ''}${nextPendingGroupId === group.id ? ' next-pending' : ''}${unitDragProps ? ' stage-drag-handle' : ''}${stageDrag?.groupId === group.id ? ' stage-dragging' : ''}`}
               style={{
                 ...formationStackStyle(stackIndex, lineGroups.length),
                 ...(commandable && selectedGroupId === group.id ? { zIndex: 80 } : {}),
@@ -1100,6 +1131,7 @@ export function TacticalZoneColumn({
                 event.preventDefault();
                 onSelectGroup(group.id, event.currentTarget);
               } : undefined}
+              {...(unitDragProps ?? {})}
             >
               <GroupSprites
                 state={state}
