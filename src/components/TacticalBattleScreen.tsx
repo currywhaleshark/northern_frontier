@@ -85,6 +85,7 @@ const PREP_DESCRIPTIONS: Record<PreparationActionId, string> = {
   torchWatch: '접근로를 밝혀 야간 접근의 첫 교전 기세와 사격 교란을 줄입니다.',
   preliminaryBombardment: '보유한 불랑기포대로 접전 전에 포격합니다. 포대 1문당 화약 2를 소모합니다.',
   musterMilitia: '피난 주민 일부를 민병으로 소집합니다. 마을 기세가 조금 낮아집니다.',
+  openFlankRoute: '준비점수 2를 쓰고 좌·우 중 한 우회로를 열어 경로 징후와 이동을 확인합니다.',
   nightAssault: '밤이 깊기를 기다려 숲길 초기 돌파와 기습 효과를 얻습니다.',
   prepareFireArrows: '목책·움막에 화공 명령을 쓸 수 있게 하지만 노획물이 불탈 수 있습니다.',
   blockLeaderEscape: '사냥꾼 일부를 본대에서 빼 두목의 산길 퇴로에 미리 매복시킵니다.',

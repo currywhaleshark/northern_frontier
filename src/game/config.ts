@@ -796,6 +796,14 @@ export const CONFIG = {
       severeWeatherPenalty: 1,
       max: 8,
     },
+    flankRoutes: {
+      preparationCost: 2,
+      weatherDelayRounds: 1,
+      sides: {
+        left: { label: '숲 능선길', terrain: 'woodedRidge' as const },
+        right: { label: '하천 둥길', terrain: 'riverBank' as const },
+      },
+    },
     groupPower: {
       militiaMusket: 18,
       militiaBow: 16,

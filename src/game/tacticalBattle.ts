@@ -50,6 +50,14 @@ import {
 import { tacticalCompositionTemplate } from './tacticalCompositions';
 import { tacticalUnitProfile } from './tacticalUnits';
 import {
+  advanceTacticalRouteTransits,
+  createTacticalFlankRoutes,
+  initializeEnemyTacticalRouteTransit,
+  syncTacticalRouteVisibility,
+  tacticalFlankRoutePreparationUnavailableReason,
+  toggleTacticalFlankRoutePreparation,
+} from './tacticalRoutes';
+import {
   applyAutoDeployTacticalGroups,
   attachFeaturedResidentsToTacticalGroups,
   initializeTacticalDeployment,
@@ -104,7 +112,19 @@ const PREPARATION_ACTIONS: Array<{ id: PreparationActionId; label: string; cost:
   { id: 'torchWatch', label: '횃불 경계', cost: 1 },
   { id: 'preliminaryBombardment', label: '사전포격', cost: 3 },
   { id: 'musterMilitia', label: '민병 소집', cost: 1 },
+  { id: 'openFlankRoute', label: '우회로 개방', cost: CONFIG.tacticalBattle.flankRoutes.preparationCost },
 ];
+
+export {
+  TACTICAL_FLANK_ROUTE_IDS,
+  tacticalFlankRoutePreparationView,
+  tacticalFlankRoutePreparationUnavailableReason,
+  tacticalFlankRouteView,
+  tacticalGroupIsInRouteTransit,
+  tacticalRouteBySide,
+  tacticalRouteRoundsRequired,
+  toggleTacticalFlankRoutePreparation,
+} from './tacticalRoutes';
 
 const DEFENSE_SUPPORTED_COMMANDS: readonly TacticalCommandId[] = [
   'hold', 'charge', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians',
@@ -943,6 +963,7 @@ export function createTacticalBattle(
     revealed: false,
   });
   const enemies = raiderGroups(params.factionName, originalPower, { scoutsReady, deepScouted }, enemyPlan);
+  const flankRoutes = createTacticalFlankRoutes(enemyPlan);
   const battle: TacticalBattle = {
     encounterKind: 'raidDefense',
     id: state.day * 1000 + state.subTick * 10 + (params.mode === 'levy' ? 2 : 1),
@@ -958,6 +979,7 @@ export function createTacticalBattle(
     prepActions: PREPARATION_ACTIONS.map(action => ({ ...action, selected: false, applied: false })),
     preparationEvents: [],
     zones: createZones(state, params.siege, groups),
+    flankRoutes,
     defenderGroups: groups,
     raiderGroups: enemies,
     enemyPlan,
@@ -977,6 +999,8 @@ export function createTacticalBattle(
     mode: params.mode,
     resourceSnapshot: captureTacticalResources(state),
   };
+  initializeEnemyTacticalRouteTransit(battle, state.weather);
+  syncTacticalRouteVisibility(battle);
   initializeTacticalDeployment(battle);
   state.tacticalBattle = battle;
   state.battle = null;
@@ -992,6 +1016,7 @@ export function spendPreparationAction(state: GameState, actionId: PreparationAc
   if (battle.assaultKind === 'predatorHunt') return spendHuntPreparationAction(state, actionId);
   if (battle.orientation === 'assault') return spendAssaultPreparationAction(state, actionId);
   if (battle.phase !== 'preparation') return '준비 단계가 이미 끝났습니다.';
+  if (actionId === 'openFlankRoute') return '열 우회로의 좌·우 방향을 먼저 선택하십시오.';
   const action = battle.prepActions.find(candidate => candidate.id === actionId);
   if (!action) return '알 수 없는 준비 행동입니다.';
   if (action.applied) return '이미 마친 준비입니다.';
@@ -1032,6 +1057,7 @@ export function tacticalPreparationUnavailableReason(
     if (countBuilt(state, 'cannonEmplacement') <= 0) return '완성된 불랑기포대가 없습니다.';
     if (state.resources.gunpowder < CONFIG.raid.powderPerCannon) return '포격에 쓸 화약이 부족합니다.';
   }
+  if (actionId === 'openFlankRoute') return '열 우회로의 좌·우 방향을 먼저 선택하십시오.';
   return null;
 }
 
@@ -1242,6 +1268,10 @@ function applySelectedPreparationActions(state: GameState, battle: TacticalBattl
         `주민 ${musterCount}명이 급히 무기를 들어 긴급 소집 민병 카드로 합류합니다.`, 1200,
         { side: 'defender', float: `${musterCount}명 소집` },
       );
+    } else if (actionId === 'openFlankRoute') {
+      // 경로는 방향별 토글 시 즉시 열려 배치 UI에 노출된다.
+      // 준비 확정은 선택을 잠그고 일반 준비 대응만 적용한다.
+      syncTacticalRouteVisibility(battle);
     }
 
     applyEnemyPlanPreparationCounter(battle.enemyPlan, actionId);
@@ -2135,11 +2165,13 @@ export function resolveTacticalRound(state: GameState): string | null {
     return resolveAssaultRound(state);
   }
   if (battle.phase !== 'command') return '교전을 진행할 지휘 단계가 아닙니다.';
+  const routeAdvances = advanceTacticalRouteTransits(battle);
   chooseDefaultTacticalCommands(battle);
   normalizeTacticalGroupTargets(battle);
   const firingMusketGroups = battle.defenderGroups.filter(group =>
     group.weapon === 'musket' && group.command === 'volley' && activeCount(group) > 0 &&
-    battle.raiderGroups.some(enemy => enemy.zoneId === group.zoneId && enemy.intent !== 'withdraw' && enemy.power > 0));
+    battle.raiderGroups.some(enemy => !enemy.routeTransit && enemy.zoneId === group.zoneId &&
+      enemy.intent !== 'withdraw' && enemy.power > 0));
   const musketAllocation = consumeMusketVolleys(
     state,
     firingMusketGroups.map(group => ({
@@ -2154,6 +2186,16 @@ export function resolveTacticalRound(state: GameState): string | null {
   const rng = makeRng(state.seed + battle.id * 8191 + battle.round * 131071);
   const events: TacticalAnimationEvent[] = [];
   const lines: string[] = [];
+  for (const advance of routeAdvances) {
+    const route = battle.flankRoutes?.find(candidate => candidate.id === advance.routeId);
+    const group = battle.raiderGroups.find(candidate => candidate.id === advance.groupId);
+    if (!route || !group) continue;
+    if (advance.visibleToDefender) {
+      lines.push(`${group.label}: ${route.label} ${advance.toStep === 2 ? '후방 출구에 도달' : '중간 구간으로 이동'}.`);
+    } else if (route.defenderIntel === 'suspected') {
+      lines.push(`${route.label} 방면에서 우회 징후가 감지됩니다.`);
+    }
+  }
   const doctrineTransitions = applyTacticalDoctrineAi(battle);
   const rangedEfficiency = enemyPlanRangedEfficiency(battle.enemyPlan);
   if (battle.round === 1) {
@@ -2178,7 +2220,7 @@ export function resolveTacticalRound(state: GameState): string | null {
   let raiderMoraleDelta = 0;
   const focusZoneId = battle.currentZoneId;
   const roundStartingRaiderPower = Math.max(1, battle.raiderGroups.reduce((sum, group) =>
-    sum + (group.intent === 'withdraw' ? 0 : group.power), 0));
+    sum + (group.intent === 'withdraw' || group.routeTransit ? 0 : group.power), 0));
 
   const focusZoneName = battle.zones.find(zone => zone.id === focusZoneId)?.name ?? '전선';
   event(events, focusZoneId, 'camera', `${withJosa(focusZoneName, '으로/로')} 시선을 옮깁니다.`, 450);
@@ -2197,14 +2239,15 @@ export function resolveTacticalRound(state: GameState): string | null {
   }
   for (const defender of battle.defenderGroups.filter(group => group.command === 'advance')) {
     const enemyHere = battle.raiderGroups.some(attacker =>
-      attacker.zoneId === defender.zoneId && attacker.intent !== 'withdraw' && attacker.power > 0);
+      !attacker.routeTransit && attacker.zoneId === defender.zoneId && attacker.intent !== 'withdraw' && attacker.power > 0);
     if (!enemyHere) event(events, defender.zoneId, 'advance', `${withJosa(defender.label, '이/가')} 앞선 방어선으로 전진할 채비를 합니다.`, 520, {
       side: 'defender', float: '전진 준비',
     });
   }
 
   for (const zone of battle.zones) {
-    const attackers = battle.raiderGroups.filter(group => group.zoneId === zone.id && group.intent !== 'withdraw' && group.power > 0);
+    const attackers = battle.raiderGroups.filter(group => !group.routeTransit && group.zoneId === zone.id &&
+      group.intent !== 'withdraw' && group.power > 0);
     if (attackers.length === 0) {
       zone.pressure = Math.max(0, zone.pressure - 5);
       continue;
@@ -2414,6 +2457,10 @@ export function resolveTacticalRound(state: GameState): string | null {
   }>();
   for (const attacker of battle.raiderGroups) {
     attacker.morale = clamp(attacker.morale + raiderMoraleDelta, 0, 100);
+    if (attacker.routeTransit) {
+      attacker.confused = false;
+      continue;
+    }
     const route = routeForRaider(attacker);
     const index = route.indexOf(attacker.zoneId);
     const zone = battle.zones.find(candidate => candidate.id === attacker.zoneId);
@@ -2539,6 +2586,7 @@ export function resolveTacticalRound(state: GameState): string | null {
     summary: outcome ? summaryForOutcome(outcome) : `제${battle.round}차 교전이 끝났습니다. 다음 전선을 지휘하십시오.`,
     lines,
     events,
+    routeAdvances,
     wounded: roundWounded,
     treated: treatment.treated,
     killed: roundKilled,

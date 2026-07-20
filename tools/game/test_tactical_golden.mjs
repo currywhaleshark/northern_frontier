@@ -113,14 +113,6 @@ function advanceToCommand(tactical, state) {
   assert.equal(battle.phase, 'command');
 }
 
-function forceFlankPlan(battle, rearAssault) {
-  const flankers = battle.raiderGroups.find(group => group.kind === 'flankers');
-  assert.ok(flankers, 'golden scenarios require a flanker group');
-  flankers.flankPlan = rearAssault ? 'rearAssault' : 'breakthrough';
-  flankers.targetZoneId = rearAssault ? 'wall' : 'center';
-  flankers.rearAssault = false;
-}
-
 function runScenario(tactical, battleSimulation, scenario) {
   const state = battleSimulation.createBattleSimulation({
     mode: 'garrison',
@@ -135,11 +127,12 @@ function runScenario(tactical, battleSimulation, scenario) {
     cannonEmplacements: 0,
     enemyDoctrine: scenario.doctrine,
     enemyCompositionTemplateId: scenario.composition,
+    enemyFlankRoute: scenario.rearAssault ? 'left' : 'none',
     seed: scenario.seed,
   });
   const battle = state.tacticalBattle;
   assert.ok(battle);
-  forceFlankPlan(battle, scenario.rearAssault);
+  assert.ok(battle.raiderGroups.some(group => group.kind === 'flankers'), 'golden scenarios require a flanker group');
   advanceToCommand(tactical, state);
 
   const rounds = [];

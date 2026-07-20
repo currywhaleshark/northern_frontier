@@ -852,8 +852,8 @@
           {
             "id": "nimacha-forest-screen-1",
             "killed": 0,
-            "power": 39.08708270761244,
-            "morale": 75,
+            "power": 38.96022843466537,
+            "morale": 74,
             "zoneId": "approach",
             "pendingZoneId": null,
             "intent": "defend",
@@ -862,8 +862,8 @@
           {
             "id": "nimacha-forest-screen-2",
             "killed": 0,
-            "power": 14.713083136678195,
-            "morale": 72,
+            "power": 15,
+            "morale": 71,
             "zoneId": "approach",
             "pendingZoneId": null,
             "intent": "defend",
@@ -872,8 +872,8 @@
           {
             "id": "nimacha-forest-screen-3",
             "killed": 0,
-            "power": 18.545714966407143,
-            "morale": 67,
+            "power": 18.482589863916814,
+            "morale": 66,
             "zoneId": "approach",
             "pendingZoneId": null,
             "intent": "defend",
@@ -883,7 +883,7 @@
         "zones": [
           {
             "id": "approach",
-            "pressure": 27.953700762110522,
+            "pressure": 26.418764059450922,
             "breached": false
           },
           {
@@ -903,9 +903,9 @@
           }
         ],
         "villageMorale": 75,
-        "raiderMorale": 70,
+        "raiderMorale": 69,
         "villageMoraleDelta": -7,
-        "raiderMoraleDelta": -2,
+        "raiderMoraleDelta": -3,
         "wounded": 1,
         "killed": 0,
         "raidersKilled": 0,
@@ -913,11 +913,12 @@
         "loot": {},
         "summary": "제1차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
         "lines": [
+          "숲 능선길 방면에서 우회 징후가 감지됩니다.",
           "숲 사냥꾼: 거리를 유지하며 견제 사격을 준비합니다.",
           "창잡이: 전열을 고정하고 예비 전력을 숨깁니다.",
           "니마차 노획조: 전열을 고정하고 예비 전력을 숨깁니다.",
           "이번 교전 수비 피해: 전사 0명, 부상 1명.",
-          "마을 기세 -7, 적 기세 -2."
+          "마을 기세 -7, 적 기세 -3."
         ],
         "events": [
           {
@@ -1009,8 +1010,8 @@
           {
             "id": "nimacha-forest-screen-1",
             "killed": 1,
-            "power": 38.402773543646084,
-            "morale": 73,
+            "power": 38.16406249831398,
+            "morale": 72,
             "zoneId": "approach",
             "pendingZoneId": null,
             "intent": "defend",
@@ -1019,8 +1020,8 @@
           {
             "id": "nimacha-forest-screen-2",
             "killed": 0,
-            "power": 14.497201272209187,
-            "morale": 70,
+            "power": 15,
+            "morale": 69,
             "zoneId": "approach",
             "pendingZoneId": null,
             "intent": "defend",
@@ -1029,8 +1030,8 @@
           {
             "id": "nimacha-forest-screen-3",
             "killed": 0,
-            "power": 18.20556842067075,
-            "morale": 65,
+            "power": 18.086906026906348,
+            "morale": 64,
             "zoneId": "approach",
             "pendingZoneId": null,
             "intent": "defend",
@@ -1040,7 +1041,7 @@
         "zones": [
           {
             "id": "approach",
-            "pressure": 58.4801690371345,
+            "pressure": 55.52805425932035,
             "breached": false
           },
           {
@@ -1059,9 +1060,9 @@
             "breached": false
           }
         ],
-        "villageMorale": 67,
-        "raiderMorale": 68,
-        "villageMoraleDelta": -8,
+        "villageMorale": 68,
+        "raiderMorale": 67,
+        "villageMoraleDelta": -7,
         "raiderMoraleDelta": -2,
         "wounded": 0,
         "killed": 0,
@@ -1070,8 +1071,9 @@
         "loot": {},
         "summary": "제2차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
         "lines": [
+          "숲 능선길 방면에서 우회 징후가 감지됩니다.",
           "이번 교전 적 피해: 1명 처치.",
-          "마을 기세 -8, 적 기세 -2."
+          "마을 기세 -7, 적 기세 -2."
         ],
         "events": [
           {
@@ -1111,7 +1113,7 @@
       {
         "round": 3,
         "focusZoneId": "approach",
-        "nextFocusZoneId": "wall",
+        "nextFocusZoneId": "approach",
         "defenders": [
           {
             "id": "militia-musket",
@@ -1153,8 +1155,8 @@
           {
             "id": "nimacha-forest-screen-1",
             "killed": 1,
-            "power": 37.761147170623346,
-            "morale": 71,
+            "power": 37.38022579949706,
+            "morale": 70,
             "zoneId": "approach",
             "pendingZoneId": "wall",
             "intent": "advance",
@@ -1163,18 +1165,18 @@
           {
             "id": "nimacha-forest-screen-2",
             "killed": 0,
-            "power": 14.29420074918427,
-            "morale": 68,
+            "power": 15,
+            "morale": 67,
             "zoneId": "approach",
-            "pendingZoneId": "wall",
+            "pendingZoneId": null,
             "intent": "flank",
             "rearAssault": false
           },
           {
             "id": "nimacha-forest-screen-3",
             "killed": 0,
-            "power": 17.886908646107337,
-            "morale": 63,
+            "power": 17.69773664652332,
+            "morale": 62,
             "zoneId": "approach",
             "pendingZoneId": "wall",
             "intent": "loot",
@@ -1184,7 +1186,7 @@
         "zones": [
           {
             "id": "approach",
-            "pressure": 89.39358736901471,
+            "pressure": 84.58736824760055,
             "breached": true
           },
           {
@@ -1203,9 +1205,9 @@
             "breached": false
           }
         ],
-        "villageMorale": 59,
-        "raiderMorale": 66,
-        "villageMoraleDelta": -8,
+        "villageMorale": 61,
+        "raiderMorale": 65,
+        "villageMoraleDelta": -7,
         "raiderMoraleDelta": -2,
         "wounded": 1,
         "killed": 0,
@@ -1217,9 +1219,8 @@
           "숲 사냥꾼: 한 구역에 전력을 모아 전진합니다.",
           "창잡이: 주 방어선을 비껴 측후방을 압박합니다.",
           "니마차 노획조: 주력이 묶어 둔 틈으로 약탈조가 침투합니다.",
-          "창잡이가 주 방어선의 뒤편을 노리며 마을 방어선으로 우회합니다.",
           "이번 교전 수비 피해: 전사 0명, 부상 1명.",
-          "마을 기세 -8, 적 기세 -2."
+          "마을 기세 -7, 적 기세 -2."
         ],
         "events": [
           {
@@ -1268,7 +1269,7 @@
             "groupId": null
           },
           {
-            "zoneId": "wall",
+            "zoneId": "approach",
             "kind": "camera",
             "groupId": null
           }
@@ -1278,8 +1279,8 @@
       },
       {
         "round": 4,
-        "focusZoneId": "wall",
-        "nextFocusZoneId": "wall",
+        "focusZoneId": "approach",
+        "nextFocusZoneId": "approach",
         "defenders": [
           {
             "id": "militia-musket",
@@ -1321,8 +1322,8 @@
           {
             "id": "nimacha-forest-screen-1",
             "killed": 2,
-            "power": 32.720985773779475,
-            "morale": 64,
+            "power": 32.37108727176047,
+            "morale": 61,
             "zoneId": "wall",
             "pendingZoneId": null,
             "intent": "advance",
@@ -1331,18 +1332,18 @@
           {
             "id": "nimacha-forest-screen-2",
             "killed": 0,
-            "power": 14.219326364307591,
-            "morale": 61,
-            "zoneId": "wall",
+            "power": 15,
+            "morale": 58,
+            "zoneId": "approach",
             "pendingZoneId": null,
             "intent": "flank",
-            "rearAssault": true
+            "rearAssault": false
           },
           {
             "id": "nimacha-forest-screen-3",
             "killed": 1,
-            "power": 15.385769006830039,
-            "morale": 56,
+            "power": 15.213218139411332,
+            "morale": 53,
             "zoneId": "wall",
             "pendingZoneId": null,
             "intent": "loot",
@@ -1352,12 +1353,12 @@
         "zones": [
           {
             "id": "approach",
-            "pressure": 84.39358736901471,
+            "pressure": 79.58736824760055,
             "breached": true
           },
           {
             "id": "wall",
-            "pressure": 6.0480184606929255,
+            "pressure": 6,
             "breached": false
           },
           {
@@ -1371,10 +1372,10 @@
             "breached": false
           }
         ],
-        "villageMorale": 51,
-        "raiderMorale": 59,
-        "villageMoraleDelta": -8,
-        "raiderMoraleDelta": -7,
+        "villageMorale": 62,
+        "raiderMorale": 56,
+        "villageMoraleDelta": 1,
+        "raiderMoraleDelta": -9,
         "wounded": 1,
         "killed": 0,
         "raidersKilled": 2,
@@ -1382,14 +1383,13 @@
         "loot": {},
         "summary": "제4차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
         "lines": [
-          "창잡이가 마을 방어선 후열을 급습했습니다.",
           "이번 교전 수비 피해: 전사 0명, 부상 1명.",
           "이번 교전 적 피해: 2명 처치.",
-          "마을 기세 -8, 적 기세 -7."
+          "마을 기세 +1, 적 기세 -9."
         ],
         "events": [
           {
-            "zoneId": "wall",
+            "zoneId": "approach",
             "kind": "camera",
             "groupId": null
           },
@@ -1424,12 +1424,7 @@
             "groupId": "militia-musket"
           },
           {
-            "zoneId": "wall",
-            "kind": "rearAssault",
-            "groupId": "nimacha-forest-screen-2"
-          },
-          {
-            "zoneId": "wall",
+            "zoneId": "approach",
             "kind": "camera",
             "groupId": null
           }
@@ -1439,8 +1434,8 @@
       },
       {
         "round": 5,
-        "focusZoneId": "wall",
-        "nextFocusZoneId": "wall",
+        "focusZoneId": "approach",
+        "nextFocusZoneId": "approach",
         "defenders": [
           {
             "id": "militia-musket",
@@ -1482,8 +1477,8 @@
           {
             "id": "nimacha-forest-screen-1",
             "killed": 3,
-            "power": 28.19947987742257,
-            "morale": 57,
+            "power": 27.86312026843324,
+            "morale": 52,
             "zoneId": "wall",
             "pendingZoneId": null,
             "intent": "advance",
@@ -1492,18 +1487,18 @@
           {
             "id": "nimacha-forest-screen-2",
             "killed": 0,
-            "power": 14.14484417858979,
-            "morale": 54,
-            "zoneId": "wall",
+            "power": 15,
+            "morale": 49,
+            "zoneId": "approach",
             "pendingZoneId": null,
-            "intent": "withdraw",
-            "rearAssault": true
+            "intent": "flank",
+            "rearAssault": false
           },
           {
             "id": "nimacha-forest-screen-3",
             "killed": 2,
-            "power": 13.158465932694916,
-            "morale": 49,
+            "power": 12.993755082551106,
+            "morale": 44,
             "zoneId": "wall",
             "pendingZoneId": null,
             "intent": "loot",
@@ -1513,12 +1508,12 @@
         "zones": [
           {
             "id": "approach",
-            "pressure": 79.39358736901471,
+            "pressure": 74.58736824760055,
             "breached": true
           },
           {
             "id": "wall",
-            "pressure": 12.048018460692926,
+            "pressure": 12,
             "breached": false
           },
           {
@@ -1532,10 +1527,10 @@
             "breached": false
           }
         ],
-        "villageMorale": 43,
-        "raiderMorale": 52,
-        "villageMoraleDelta": -8,
-        "raiderMoraleDelta": -7,
+        "villageMorale": 63,
+        "raiderMorale": 47,
+        "villageMoraleDelta": 1,
+        "raiderMoraleDelta": -9,
         "wounded": 0,
         "killed": 0,
         "raidersKilled": 2,
@@ -1543,13 +1538,12 @@
         "loot": {},
         "summary": "마을은 버텼지만 일부 방어선과 비축을 잃었습니다.",
         "lines": [
-          "창잡이가 후방 급습 목표를 달성하고 전장에서 이탈했습니다.",
           "이번 교전 적 피해: 2명 처치.",
-          "마을 기세 -8, 적 기세 -7."
+          "마을 기세 +1, 적 기세 -9."
         ],
         "events": [
           {
-            "zoneId": "wall",
+            "zoneId": "approach",
             "kind": "camera",
             "groupId": null
           },
@@ -1579,12 +1573,7 @@
             "groupId": "nimacha-forest-screen-3"
           },
           {
-            "zoneId": "wall",
-            "kind": "retreat",
-            "groupId": "nimacha-forest-screen-2"
-          },
-          {
-            "zoneId": "wall",
+            "zoneId": "approach",
             "kind": "report",
             "groupId": null
           }
@@ -1648,7 +1637,7 @@
           {
             "id": "holaon-mounted-skirmish-1",
             "killed": 0,
-            "power": 41.3507732120179,
+            "power": 41.15422960429239,
             "morale": 78,
             "zoneId": "approach",
             "pendingZoneId": null,
@@ -1658,7 +1647,7 @@
           {
             "id": "holaon-mounted-skirmish-2",
             "killed": 0,
-            "power": 19.671266479215113,
+            "power": 19.571747369173167,
             "morale": 72,
             "zoneId": "approach",
             "pendingZoneId": "wall",
@@ -1668,10 +1657,10 @@
           {
             "id": "holaon-mounted-skirmish-3",
             "killed": 0,
-            "power": 15.752792392369765,
+            "power": 16,
             "morale": 80,
             "zoneId": "approach",
-            "pendingZoneId": "wall",
+            "pendingZoneId": null,
             "intent": "flank",
             "rearAssault": false
           }
@@ -1679,7 +1668,7 @@
         "zones": [
           {
             "id": "approach",
-            "pressure": 30.68304192414233,
+            "pressure": 28.165208440081116,
             "breached": false
           },
           {
@@ -1698,9 +1687,9 @@
             "breached": false
           }
         ],
-        "villageMorale": 66,
+        "villageMorale": 67,
         "raiderMorale": 70,
-        "villageMoraleDelta": -8,
+        "villageMoraleDelta": -7,
         "raiderMoraleDelta": -2,
         "wounded": 0,
         "killed": 0,
@@ -1709,11 +1698,11 @@
         "loot": {},
         "summary": "제1차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
         "lines": [
+          "숲 능선길 방면에서 우회 징후가 감지됩니다.",
           "기마 궁수: 거리를 유지하며 견제 사격을 준비합니다.",
           "약탈 기병: 주력이 묶어 둔 틈으로 약탈조가 침투합니다.",
           "기마 선봉: 주 방어선을 비껴 측후방을 압박합니다.",
-          "기마 선봉이 주 방어선의 뒤편을 노리며 마을 방어선으로 우회합니다.",
-          "마을 기세 -8, 적 기세 -2."
+          "마을 기세 -7, 적 기세 -2."
         ],
         "events": [
           {
@@ -1805,8 +1794,8 @@
           {
             "id": "holaon-mounted-skirmish-1",
             "killed": 0,
-            "power": 40.31657653828841,
-            "morale": 74,
+            "power": 40.12154126593947,
+            "morale": 73,
             "zoneId": "approach",
             "pendingZoneId": null,
             "intent": "defend",
@@ -1815,8 +1804,8 @@
           {
             "id": "holaon-mounted-skirmish-2",
             "killed": 1,
-            "power": 16.690128972021824,
-            "morale": 68,
+            "power": 16.60497056429964,
+            "morale": 67,
             "zoneId": "wall",
             "pendingZoneId": null,
             "intent": "loot",
@@ -1825,23 +1814,23 @@
           {
             "id": "holaon-mounted-skirmish-3",
             "killed": 0,
-            "power": 15.664268548164817,
-            "morale": 76,
-            "zoneId": "wall",
+            "power": 16,
+            "morale": 75,
+            "zoneId": "approach",
             "pendingZoneId": null,
             "intent": "flank",
-            "rearAssault": true
+            "rearAssault": false
           }
         ],
         "zones": [
           {
             "id": "approach",
-            "pressure": 56.22639450702668,
+            "pressure": 53.66401473850131,
             "breached": false
           },
           {
             "id": "wall",
-            "pressure": 8.114220793170041,
+            "pressure": 8.104036192367259,
             "breached": false
           },
           {
@@ -1855,10 +1844,10 @@
             "breached": false
           }
         ],
-        "villageMorale": 51,
-        "raiderMorale": 66,
-        "villageMoraleDelta": -15,
-        "raiderMoraleDelta": -4,
+        "villageMorale": 61,
+        "raiderMorale": 65,
+        "villageMoraleDelta": -6,
+        "raiderMoraleDelta": -5,
         "wounded": 1,
         "killed": 0,
         "raidersKilled": 1,
@@ -1866,10 +1855,10 @@
         "loot": {},
         "summary": "제2차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
         "lines": [
-          "기마 선봉이 마을 방어선 후열을 급습했습니다.",
+          "숲 능선길 방면에서 우회 징후가 감지됩니다.",
           "이번 교전 수비 피해: 전사 0명, 부상 1명.",
           "이번 교전 적 피해: 1명 처치.",
-          "마을 기세 -15, 적 기세 -4."
+          "마을 기세 -6, 적 기세 -5."
         ],
         "events": [
           {
@@ -1901,11 +1890,6 @@
             "zoneId": "wall",
             "kind": "casualty",
             "groupId": "militia-unarmed"
-          },
-          {
-            "zoneId": "wall",
-            "kind": "rearAssault",
-            "groupId": "holaon-mounted-skirmish-3"
           },
           {
             "zoneId": "approach",
@@ -1961,8 +1945,8 @@
           {
             "id": "holaon-mounted-skirmish-1",
             "killed": 0,
-            "power": 39.267240539700246,
-            "morale": 70,
+            "power": 39.06585429530825,
+            "morale": 67,
             "zoneId": "approach",
             "pendingZoneId": null,
             "intent": "defend",
@@ -1971,8 +1955,8 @@
           {
             "id": "holaon-mounted-skirmish-2",
             "killed": 2,
-            "power": 14.138687404721281,
-            "morale": 64,
+            "power": 14.064378754493898,
+            "morale": 61,
             "zoneId": "wall",
             "pendingZoneId": null,
             "intent": "loot",
@@ -1981,23 +1965,23 @@
           {
             "id": "holaon-mounted-skirmish-3",
             "killed": 0,
-            "power": 15.576242169475673,
-            "morale": 72,
-            "zoneId": "wall",
+            "power": 16,
+            "morale": 69,
+            "zoneId": "approach",
             "pendingZoneId": null,
-            "intent": "withdraw",
-            "rearAssault": true
+            "intent": "flank",
+            "rearAssault": false
           }
         ],
         "zones": [
           {
             "id": "approach",
-            "pressure": 77.27270567529497,
+            "pressure": 74.5138604019706,
             "breached": true
           },
           {
             "id": "wall",
-            "pressure": 9.017418954190301,
+            "pressure": 8.971271996914453,
             "breached": false
           },
           {
@@ -2011,10 +1995,10 @@
             "breached": false
           }
         ],
-        "villageMorale": 37,
-        "raiderMorale": 62,
-        "villageMoraleDelta": -14,
-        "raiderMoraleDelta": -4,
+        "villageMorale": 56,
+        "raiderMorale": 59,
+        "villageMoraleDelta": -5,
+        "raiderMoraleDelta": -6,
         "wounded": 0,
         "killed": 0,
         "raidersKilled": 1,
@@ -2023,9 +2007,9 @@
         "summary": "제3차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
         "lines": [
           "기마 궁수: 사격 뒤 접촉을 끊고 거리를 벌립니다.",
-          "기마 선봉이 후방 급습 목표를 달성하고 전장에서 이탈했습니다.",
+          "기마 선봉: 주 방어선을 비껴 측후방을 압박합니다.",
           "이번 교전 적 피해: 1명 처치.",
-          "마을 기세 -14, 적 기세 -4."
+          "마을 기세 -5, 적 기세 -6."
         ],
         "events": [
           {
@@ -2037,6 +2021,11 @@
             "zoneId": "approach",
             "kind": "doctrineShift",
             "groupId": "holaon-mounted-skirmish-1"
+          },
+          {
+            "zoneId": "approach",
+            "kind": "doctrineShift",
+            "groupId": "holaon-mounted-skirmish-3"
           },
           {
             "zoneId": "approach",
@@ -2062,11 +2051,6 @@
             "zoneId": "wall",
             "kind": "wallAssault",
             "groupId": "holaon-mounted-skirmish-2"
-          },
-          {
-            "zoneId": "wall",
-            "kind": "retreat",
-            "groupId": "holaon-mounted-skirmish-3"
           },
           {
             "zoneId": "approach",
@@ -2122,8 +2106,8 @@
           {
             "id": "holaon-mounted-skirmish-1",
             "killed": 0,
-            "power": 38.31596453631912,
-            "morale": 65,
+            "power": 38.09056423233008,
+            "morale": 62,
             "zoneId": "approach",
             "pendingZoneId": null,
             "intent": "defend",
@@ -2132,8 +2116,8 @@
           {
             "id": "holaon-mounted-skirmish-2",
             "killed": 3,
-            "power": 11.953754741796766,
-            "morale": 59,
+            "power": 11.887220098387392,
+            "morale": 56,
             "zoneId": "wall",
             "pendingZoneId": "storehouse",
             "intent": "loot",
@@ -2142,23 +2126,23 @@
           {
             "id": "holaon-mounted-skirmish-3",
             "killed": 0,
-            "power": 15.576242169475673,
-            "morale": 67,
-            "zoneId": "wall",
+            "power": 16,
+            "morale": 64,
+            "zoneId": "approach",
             "pendingZoneId": null,
-            "intent": "withdraw",
-            "rearAssault": true
+            "intent": "flank",
+            "rearAssault": false
           }
         ],
         "zones": [
           {
             "id": "approach",
-            "pressure": 99.56184079636732,
+            "pressure": 96.29282568482625,
             "breached": true
           },
           {
             "id": "wall",
-            "pressure": 9.462268189913157,
+            "pressure": 9.34349411455499,
             "breached": false
           },
           {
@@ -2172,8 +2156,8 @@
             "breached": false
           }
         ],
-        "villageMorale": 32,
-        "raiderMorale": 57,
+        "villageMorale": 51,
+        "raiderMorale": 54,
         "villageMoraleDelta": -5,
         "raiderMoraleDelta": -5,
         "wounded": 0,
@@ -2183,7 +2167,6 @@
         "loot": {},
         "summary": "제4차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
         "lines": [
-          "기마 선봉: 대열이 무너져 전장에서 이탈합니다.",
           "약탈 기병이 방책의 틈으로 새어 나가 창고 주변으로 침투합니다.",
           "이번 교전 적 피해: 1명 처치.",
           "마을 기세 -5, 적 기세 -5."
@@ -2193,11 +2176,6 @@
             "zoneId": "approach",
             "kind": "camera",
             "groupId": null
-          },
-          {
-            "zoneId": "wall",
-            "kind": "doctrineShift",
-            "groupId": "holaon-mounted-skirmish-3"
           },
           {
             "zoneId": "approach",
@@ -2278,8 +2256,8 @@
           {
             "id": "holaon-mounted-skirmish-1",
             "killed": 0,
-            "power": 37.120330671829976,
-            "morale": 62,
+            "power": 36.862655296289326,
+            "morale": 59,
             "zoneId": "approach",
             "pendingZoneId": null,
             "intent": "defend",
@@ -2288,8 +2266,8 @@
           {
             "id": "holaon-mounted-skirmish-2",
             "killed": 3,
-            "power": 11.823822625038106,
-            "morale": 56,
+            "power": 11.758011184274485,
+            "morale": 53,
             "zoneId": "storehouse",
             "pendingZoneId": null,
             "intent": "loot",
@@ -2298,12 +2276,12 @@
           {
             "id": "holaon-mounted-skirmish-3",
             "killed": 0,
-            "power": 15.576242169475673,
-            "morale": 64,
-            "zoneId": "wall",
+            "power": 16,
+            "morale": 61,
+            "zoneId": "approach",
             "pendingZoneId": null,
-            "intent": "withdraw",
-            "rearAssault": true
+            "intent": "flank",
+            "rearAssault": false
           }
         ],
         "zones": [
@@ -2314,7 +2292,7 @@
           },
           {
             "id": "wall",
-            "pressure": 4.462268189913157,
+            "pressure": 4.343494114554989,
             "breached": false
           },
           {
@@ -2328,8 +2306,8 @@
             "breached": false
           }
         ],
-        "villageMorale": 17,
-        "raiderMorale": 54,
+        "villageMorale": 36,
+        "raiderMorale": 51,
         "villageMoraleDelta": -15,
         "raiderMoraleDelta": -3,
         "wounded": 0,
@@ -3273,18 +3251,18 @@
           {
             "id": "bandit-hit-and-run-1",
             "killed": 0,
-            "power": 16.63422675509053,
-            "morale": 70,
+            "power": 17,
+            "morale": 69,
             "zoneId": "approach",
-            "pendingZoneId": "wall",
+            "pendingZoneId": null,
             "intent": "flank",
             "rearAssault": false
           },
           {
             "id": "bandit-hit-and-run-2",
             "killed": 0,
-            "power": 20.50513031571072,
-            "morale": 65,
+            "power": 20.406354535569424,
+            "morale": 64,
             "zoneId": "approach",
             "pendingZoneId": "wall",
             "intent": "loot",
@@ -3293,8 +3271,8 @@
           {
             "id": "bandit-hit-and-run-3",
             "killed": 0,
-            "power": 43.129029355650864,
-            "morale": 74,
+            "power": 42.955183982602186,
+            "morale": 73,
             "zoneId": "approach",
             "pendingZoneId": null,
             "intent": "defend",
@@ -3304,7 +3282,7 @@
         "zones": [
           {
             "id": "approach",
-            "pressure": 28.1128669456358,
+            "pressure": 25.939799782527288,
             "breached": false
           },
           {
@@ -3324,9 +3302,9 @@
           }
         ],
         "villageMorale": 67,
-        "raiderMorale": 70,
+        "raiderMorale": 69,
         "villageMoraleDelta": -7,
-        "raiderMoraleDelta": -2,
+        "raiderMoraleDelta": -3,
         "wounded": 1,
         "killed": 0,
         "raidersKilled": 0,
@@ -3334,12 +3312,12 @@
         "loot": {},
         "summary": "제1차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
         "lines": [
+          "숲 능선길 방면에서 우회 징후가 감지됩니다.",
           "기마 마적: 주 방어선을 비껴 측후방을 압박합니다.",
           "약탈패: 주력이 묶어 둔 틈으로 약탈조가 침투합니다.",
           "두목 친위대: 전열을 고정하고 예비 전력을 숨깁니다.",
-          "기마 마적이 주 방어선의 뒤편을 노리며 마을 방어선으로 우회합니다.",
           "이번 교전 수비 피해: 전사 0명, 부상 1명.",
-          "마을 기세 -7, 적 기세 -2."
+          "마을 기세 -7, 적 기세 -3."
         ],
         "events": [
           {
@@ -3361,11 +3339,6 @@
             "zoneId": "approach",
             "kind": "doctrineShift",
             "groupId": "bandit-hit-and-run-3"
-          },
-          {
-            "zoneId": "approach",
-            "kind": "volley",
-            "groupId": null
           },
           {
             "zoneId": "approach",
@@ -3436,18 +3409,18 @@
           {
             "id": "bandit-hit-and-run-1",
             "killed": 0,
-            "power": 16.51688313374212,
-            "morale": 66,
-            "zoneId": "wall",
+            "power": 17,
+            "morale": 64,
+            "zoneId": "approach",
             "pendingZoneId": null,
             "intent": "flank",
-            "rearAssault": true
+            "rearAssault": false
           },
           {
             "id": "bandit-hit-and-run-2",
             "killed": 1,
-            "power": 17.252420077778144,
-            "morale": 61,
+            "power": 17.166167878170064,
+            "morale": 59,
             "zoneId": "wall",
             "pendingZoneId": null,
             "intent": "loot",
@@ -3456,8 +3429,8 @@
           {
             "id": "bandit-hit-and-run-3",
             "killed": 0,
-            "power": 42.01966281307155,
-            "morale": 70,
+            "power": 41.837020492245586,
+            "morale": 68,
             "zoneId": "approach",
             "pendingZoneId": null,
             "intent": "defend",
@@ -3467,12 +3440,12 @@
         "zones": [
           {
             "id": "approach",
-            "pressure": 52.9657459105856,
+            "pressure": 50.62278696411597,
             "breached": false
           },
           {
             "id": "wall",
-            "pressure": 8.464226958713681,
+            "pressure": 8.413537925644857,
             "breached": false
           },
           {
@@ -3486,10 +3459,10 @@
             "breached": false
           }
         ],
-        "villageMorale": 52,
-        "raiderMorale": 66,
-        "villageMoraleDelta": -15,
-        "raiderMoraleDelta": -4,
+        "villageMorale": 61,
+        "raiderMorale": 64,
+        "villageMoraleDelta": -6,
+        "raiderMoraleDelta": -5,
         "wounded": 0,
         "killed": 0,
         "raidersKilled": 1,
@@ -3497,9 +3470,9 @@
         "loot": {},
         "summary": "제2차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
         "lines": [
-          "기마 마적이 마을 방어선 후열을 급습했습니다.",
+          "숲 능선길 방면에서 우회 징후가 감지됩니다.",
           "이번 교전 적 피해: 1명 처치.",
-          "마을 기세 -15, 적 기세 -4."
+          "마을 기세 -6, 적 기세 -5."
         ],
         "events": [
           {
@@ -3526,11 +3499,6 @@
             "zoneId": "wall",
             "kind": "wallAssault",
             "groupId": "bandit-hit-and-run-2"
-          },
-          {
-            "zoneId": "wall",
-            "kind": "rearAssault",
-            "groupId": "bandit-hit-and-run-1"
           },
           {
             "zoneId": "approach",
@@ -3544,7 +3512,7 @@
       {
         "round": 3,
         "focusZoneId": "approach",
-        "nextFocusZoneId": "wall",
+        "nextFocusZoneId": "approach",
         "defenders": [
           {
             "id": "militia-musket",
@@ -3586,18 +3554,18 @@
           {
             "id": "bandit-hit-and-run-1",
             "killed": 0,
-            "power": 16.400367295113874,
-            "morale": 62,
-            "zoneId": "wall",
+            "power": 17,
+            "morale": 59,
+            "zoneId": "approach",
             "pendingZoneId": null,
-            "intent": "withdraw",
-            "rearAssault": true
+            "intent": "flank",
+            "rearAssault": false
           },
           {
             "id": "bandit-hit-and-run-2",
             "killed": 2,
-            "power": 14.482398487507659,
-            "morale": 57,
+            "power": 14.406189243994511,
+            "morale": 54,
             "zoneId": "wall",
             "pendingZoneId": null,
             "intent": "loot",
@@ -3606,8 +3574,8 @@
           {
             "id": "bandit-hit-and-run-3",
             "killed": 0,
-            "power": 40.9936098873468,
-            "morale": 66,
+            "power": 40.791608555661114,
+            "morale": 63,
             "zoneId": "approach",
             "pendingZoneId": "wall",
             "intent": "advance",
@@ -3617,12 +3585,12 @@
         "zones": [
           {
             "id": "approach",
-            "pressure": 78.53562602459122,
+            "pressure": 75.87953855979828,
             "breached": true
           },
           {
             "id": "wall",
-            "pressure": 9.257107464887905,
+            "pressure": 9.13189235724034,
             "breached": false
           },
           {
@@ -3636,10 +3604,10 @@
             "breached": false
           }
         ],
-        "villageMorale": 37,
-        "raiderMorale": 62,
-        "villageMoraleDelta": -15,
-        "raiderMoraleDelta": -4,
+        "villageMorale": 55,
+        "raiderMorale": 59,
+        "villageMoraleDelta": -6,
+        "raiderMoraleDelta": -5,
         "wounded": 0,
         "killed": 0,
         "raidersKilled": 1,
@@ -3647,16 +3615,21 @@
         "loot": {},
         "summary": "제3차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
         "lines": [
+          "기마 마적: 주 방어선을 비껴 측후방을 압박합니다.",
           "두목 친위대: 한 구역에 전력을 모아 전진합니다.",
-          "기마 마적이 후방 급습 목표를 달성하고 전장에서 이탈했습니다.",
           "이번 교전 적 피해: 1명 처치.",
-          "마을 기세 -15, 적 기세 -4."
+          "마을 기세 -6, 적 기세 -5."
         ],
         "events": [
           {
             "zoneId": "approach",
             "kind": "camera",
             "groupId": null
+          },
+          {
+            "zoneId": "approach",
+            "kind": "doctrineShift",
+            "groupId": "bandit-hit-and-run-1"
           },
           {
             "zoneId": "approach",
@@ -3694,12 +3667,7 @@
             "groupId": "bandit-hit-and-run-2"
           },
           {
-            "zoneId": "wall",
-            "kind": "retreat",
-            "groupId": "bandit-hit-and-run-1"
-          },
-          {
-            "zoneId": "wall",
+            "zoneId": "approach",
             "kind": "camera",
             "groupId": null
           }
@@ -3709,8 +3677,8 @@
       },
       {
         "round": 4,
-        "focusZoneId": "wall",
-        "nextFocusZoneId": "wall",
+        "focusZoneId": "approach",
+        "nextFocusZoneId": "approach",
         "defenders": [
           {
             "id": "militia-musket",
@@ -3752,18 +3720,18 @@
           {
             "id": "bandit-hit-and-run-1",
             "killed": 0,
-            "power": 16.400367295113874,
-            "morale": 53,
-            "zoneId": "wall",
+            "power": 17,
+            "morale": 50,
+            "zoneId": "approach",
             "pendingZoneId": null,
-            "intent": "withdraw",
-            "rearAssault": true
+            "intent": "flank",
+            "rearAssault": false
           },
           {
             "id": "bandit-hit-and-run-2",
             "killed": 2,
-            "power": 12.484033932281358,
-            "morale": 48,
+            "power": 12.400627911474599,
+            "morale": 45,
             "zoneId": "wall",
             "pendingZoneId": "storehouse",
             "intent": "loot",
@@ -3772,8 +3740,8 @@
           {
             "id": "bandit-hit-and-run-3",
             "killed": 2,
-            "power": 36.24212146982661,
-            "morale": 57,
+            "power": 36.02140458312298,
+            "morale": 54,
             "zoneId": "wall",
             "pendingZoneId": null,
             "intent": "advance",
@@ -3783,12 +3751,12 @@
         "zones": [
           {
             "id": "approach",
-            "pressure": 73.53562602459122,
+            "pressure": 70.87953855979828,
             "breached": true
           },
           {
             "id": "wall",
-            "pressure": 17.183178285049213,
+            "pressure": 16.65537230185094,
             "breached": false
           },
           {
@@ -3802,8 +3770,8 @@
             "breached": false
           }
         ],
-        "villageMorale": 38,
-        "raiderMorale": 53,
+        "villageMorale": 56,
+        "raiderMorale": 50,
         "villageMoraleDelta": 1,
         "raiderMoraleDelta": -9,
         "wounded": 0,
@@ -3813,21 +3781,15 @@
         "loot": {},
         "summary": "제4차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
         "lines": [
-          "기마 마적: 대열이 무너져 전장에서 이탈합니다.",
           "약탈패가 방책의 틈으로 새어 나가 창고 주변으로 침투합니다.",
           "이번 교전 적 피해: 2명 처치.",
           "마을 기세 +1, 적 기세 -9."
         ],
         "events": [
           {
-            "zoneId": "wall",
+            "zoneId": "approach",
             "kind": "camera",
             "groupId": null
-          },
-          {
-            "zoneId": "wall",
-            "kind": "doctrineShift",
-            "groupId": "bandit-hit-and-run-1"
           },
           {
             "zoneId": "wall",
@@ -3850,7 +3812,7 @@
             "groupId": null
           },
           {
-            "zoneId": "wall",
+            "zoneId": "approach",
             "kind": "camera",
             "groupId": null
           }
@@ -3860,8 +3822,8 @@
       },
       {
         "round": 5,
-        "focusZoneId": "wall",
-        "nextFocusZoneId": "wall",
+        "focusZoneId": "approach",
+        "nextFocusZoneId": "approach",
         "defenders": [
           {
             "id": "militia-musket",
@@ -3903,18 +3865,18 @@
           {
             "id": "bandit-hit-and-run-1",
             "killed": 0,
-            "power": 16.400367295113874,
-            "morale": 46,
-            "zoneId": "wall",
+            "power": 17,
+            "morale": 43,
+            "zoneId": "approach",
             "pendingZoneId": null,
-            "intent": "withdraw",
-            "rearAssault": true
+            "intent": "flank",
+            "rearAssault": false
           },
           {
             "id": "bandit-hit-and-run-2",
             "killed": 2,
-            "power": 12.33541448070658,
-            "morale": 41,
+            "power": 12.25300138871895,
+            "morale": 38,
             "zoneId": "storehouse",
             "pendingZoneId": null,
             "intent": "loot",
@@ -3923,8 +3885,8 @@
           {
             "id": "bandit-hit-and-run-3",
             "killed": 3,
-            "power": 31.6903492199623,
-            "morale": 50,
+            "power": 31.47000028740527,
+            "morale": 47,
             "zoneId": "wall",
             "pendingZoneId": null,
             "intent": "advance",
@@ -3934,12 +3896,12 @@
         "zones": [
           {
             "id": "approach",
-            "pressure": 68.53562602459122,
+            "pressure": 65.87953855979828,
             "breached": true
           },
           {
             "id": "wall",
-            "pressure": 23.183178285049213,
+            "pressure": 22.65537230185094,
             "breached": false
           },
           {
@@ -3953,8 +3915,8 @@
             "breached": false
           }
         ],
-        "villageMorale": 30,
-        "raiderMorale": 46,
+        "villageMorale": 48,
+        "raiderMorale": 43,
         "villageMoraleDelta": -8,
         "raiderMoraleDelta": -7,
         "wounded": 1,
@@ -3976,7 +3938,7 @@
         ],
         "events": [
           {
-            "zoneId": "wall",
+            "zoneId": "approach",
             "kind": "camera",
             "groupId": null
           },
@@ -4006,7 +3968,7 @@
             "groupId": null
           },
           {
-            "zoneId": "wall",
+            "zoneId": "approach",
             "kind": "report",
             "groupId": null
           }

@@ -765,6 +765,39 @@ export type EnemyDoctrineId =
   | 'feignedRetreat';
 export type TacticalEnemyFactionId = 'default' | 'nimacha' | 'holaon' | 'bandit' | 'court';
 export type TacticalRouteSide = 'left' | 'right';
+export type TacticalRouteIntel = 'unknown' | 'suspected' | 'revealed';
+export type TacticalRouteControl = 'neutral' | 'defender' | 'raider' | 'contested';
+export type TacticalRouteTerrain = 'woodedRidge' | 'riverBank';
+
+export interface TacticalFlankRoute {
+  id: string;
+  side: TacticalRouteSide;
+  label: string;
+  terrain: TacticalRouteTerrain;
+  openedByDefender: boolean;
+  openedByRaider: boolean;
+  defenderIntel: TacticalRouteIntel;
+  control: TacticalRouteControl;
+}
+
+export interface TacticalRouteTransit {
+  routeId: string;
+  step: 0 | 1 | 2;
+  destinationZoneId: string;
+  visibleToDefender: boolean;
+  startedRound: number;
+  elapsedRounds: number;
+  roundsRequired: number;
+}
+
+export interface TacticalRouteAdvance {
+  groupId: string;
+  routeId: string;
+  fromStep: 0 | 1 | 2;
+  toStep: 0 | 1 | 2;
+  visibleToDefender: boolean;
+  arrivedAtExit: boolean;
+}
 export type TacticalUnitTag =
   | 'infantry'
   | 'mounted'
@@ -922,6 +955,7 @@ export type PreparationActionId =
   | 'torchWatch'
   | 'preliminaryBombardment'
   | 'musterMilitia'
+  | 'openFlankRoute'
   | 'nightAssault'
   | 'preInfiltration'
   | 'prepareFireArrows'
@@ -1000,6 +1034,7 @@ export interface TacticalDefenderGroup {
   lockedZoneId?: string;
   huntOriginGroupId?: string;
   huntMovedRound?: number;
+  routeTransit?: TacticalRouteTransit;
 }
 
 export interface TacticalRaiderGroup {
@@ -1034,6 +1069,7 @@ export interface TacticalRaiderGroup {
   beastKind?: PredatorKind;
   tigerTier?: TigerTier;
   leader?: boolean;
+  routeTransit?: TacticalRouteTransit;
 }
 
 export interface TacticalPreparationEffect {
@@ -1104,6 +1140,7 @@ export interface TacticalRoundReport {
   summary: string;
   lines: string[];
   events: TacticalAnimationEvent[];
+  routeAdvances?: TacticalRouteAdvance[];
   wounded: number;
   treated?: number;
   killed: number;
@@ -1202,6 +1239,7 @@ export interface TacticalBattle {
   prepActions: TacticalPreparationEffect[];
   preparationEvents: TacticalAnimationEvent[];
   zones: TacticalBattleZone[];
+  flankRoutes?: TacticalFlankRoute[];
   defenderGroups: TacticalDefenderGroup[];
   deploymentPlacements?: Record<string, TacticalDeploymentPlacement | null>;
   deploymentSerial?: number;

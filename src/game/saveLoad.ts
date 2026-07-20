@@ -31,6 +31,12 @@ import { defaultRaiderFormationLine } from './tacticalTargeting';
 import { legacyTacticalPlanMetadata } from './tacticalCompositions';
 import { isImplementedLivestockId, normalizeLivestockState } from './livestock';
 import { normalizeTacticalGroupTargets } from './tacticalBattle';
+import {
+  initializeEnemyTacticalRouteTransit,
+  migrateTacticalFlankRoutes,
+  migrateTacticalRouteTransit,
+  syncTacticalRouteVisibility,
+} from './tacticalRoutes';
 import { isYouthWorkJob } from './youth';
 import { normalizeResidentFamilyReferences } from './family';
 import {
@@ -336,6 +342,12 @@ export function migrateV25ToV26(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 26 };
 }
 
+// v27: 직접 지휘 방어전의 좌·우 우회로, 가시성, 실제 이동 단계.
+// 전투 내부 필드는 migrateTacticalBattle에서 필드 단위로 정규화한다.
+export function migrateV26ToV27(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 27 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -367,6 +379,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 23) migrated = migrateV23ToV24(migrated, sourceVersion);
     else if (version === 24) migrated = migrateV24ToV25(migrated);
     else if (version === 25) migrated = migrateV25ToV26(migrated);
+    else if (version === 26) migrated = migrateV26ToV27(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -391,6 +404,7 @@ const PREPARATION_ACTION_IDS = new Set<PreparationActionId>([
   'evacuateCivilians', 'hideSupplies', 'repairWall', 'setAmbush', 'prepareVolley',
   'firePrevention', 'torchWatch',
   'preliminaryBombardment', 'musterMilitia', 'nightAssault', 'prepareFireArrows',
+  'openFlankRoute',
   'blockLeaderEscape', 'lureGuards', 'setHuntTraps', 'placeBait', 'splitDrivers', 'preInfiltration',
 ]);
 
@@ -410,7 +424,31 @@ function migratePreparationAction(raw: unknown): TacticalPreparationEffect | nul
   } as TacticalPreparationEffect;
 }
 
-function migratePendingReport(raw: unknown, zoneIds: ReadonlySet<string>): TacticalRoundReport | null {
+function migrateRouteAdvances(raw: unknown, routeIds: ReadonlySet<string>): TacticalRoundReport['routeAdvances'] {
+  if (!Array.isArray(raw)) return undefined;
+  const advances = raw.flatMap(entry => {
+    if (!entry || typeof entry !== 'object') return [];
+    const source = entry as Record<string, unknown>;
+    if (typeof source.groupId !== 'string' || !routeIds.has(String(source.routeId))) return [];
+    if ((source.fromStep !== 0 && source.fromStep !== 1 && source.fromStep !== 2) ||
+        (source.toStep !== 0 && source.toStep !== 1 && source.toStep !== 2)) return [];
+    return [{
+      groupId: source.groupId,
+      routeId: String(source.routeId),
+      fromStep: source.fromStep as 0 | 1 | 2,
+      toStep: source.toStep as 0 | 1 | 2,
+      visibleToDefender: source.visibleToDefender === true,
+      arrivedAtExit: source.toStep === 2,
+    }];
+  });
+  return advances.length > 0 ? advances : undefined;
+}
+
+function migratePendingReport(
+  raw: unknown,
+  zoneIds: ReadonlySet<string>,
+  routeIds: ReadonlySet<string>,
+): TacticalRoundReport | null {
   if (!raw || typeof raw !== 'object') return null;
   const report = raw as Record<string, unknown>;
   if (!Number.isInteger(report.round) || Number(report.round) < 1) return null;
@@ -429,6 +467,7 @@ function migratePendingReport(raw: unknown, zoneIds: ReadonlySet<string>): Tacti
     events: report.events.map(event => ({
       ...(event as Record<string, unknown>),
     })) as unknown as TacticalAnimationEvent[],
+    routeAdvances: migrateRouteAdvances(report.routeAdvances, routeIds),
     wounded: Math.max(0, Number(report.wounded) || 0),
     treated: Math.max(0, Number(report.treated) || 0),
     killed: Math.max(0, Number(report.killed) || 0),
@@ -691,6 +730,11 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     enemyPlan.compositionTemplateId ??= legacyPlanMetadata.compositionTemplateId;
     enemyPlan.compositionRevealed ??= false;
   }
+  if (enemyPlan && !enemyPlan.flankRouteSide &&
+      enemyPlan.stratagems.some(stratagem => stratagem.id === 'rearManeuver')) {
+    // v26 이전 저장은 계책만 있고 경로 선택이 없을 수 있다. 임의 RNG를 새로 쓰지 않고 좌측으로 고정한다.
+    enemyPlan.flankRouteSide = 'left';
+  }
   const derivedFlankPlan = enemyPlan ? flankPlanFromEnemyPlan(enemyPlan) : undefined;
   const derivedFlankPlanRevealed = enemyPlan ? flankPlanRevealedFromEnemyPlan(enemyPlan) : undefined;
   const raiderGroups = migratedRaiderGroups.map(group => encounterKind === 'raidDefense' && group.kind === 'flankers'
@@ -703,11 +747,30 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     : group) as unknown as TacticalRaiderGroup[];
   if (!defenderGroups.some(group => group.count > 0) || !raiderGroups.some(group => group.count > 0)) return null;
 
+  const flankRoutes = encounterKind === 'raidDefense'
+    ? migrateTacticalFlankRoutes(source.flankRoutes, enemyPlan)
+    : undefined;
+  const flankRouteIds = new Set((flankRoutes ?? []).map(route => route.id));
+
   const prepActions = (Array.isArray(source.prepActions) ? source.prepActions : [])
     .flatMap(action => {
       const migratedAction = migratePreparationAction(action);
       return migratedAction ? [migratedAction] : [];
     });
+  if (encounterKind === 'raidDefense' && !prepActions.some(action => action.id === 'openFlankRoute')) {
+    prepActions.push({
+      id: 'openFlankRoute',
+      label: '우회로 개방',
+      cost: CONFIG.tacticalBattle.flankRoutes.preparationCost,
+      selected: flankRoutes?.some(route => route.openedByDefender) === true,
+      applied: String(source.phase) !== 'preparation' && flankRoutes?.some(route => route.openedByDefender) === true,
+    });
+  }
+  const flankRouteAction = prepActions.find(action => action.id === 'openFlankRoute');
+  if (flankRouteAction) {
+    flankRouteAction.selected = flankRoutes?.some(route => route.openedByDefender) === true;
+    if (String(source.phase) === 'preparation') flankRouteAction.applied = false;
+  }
 
   const reports = (Array.isArray(source.reports) ? source.reports : [])
     .filter(report => report && typeof report === 'object')
@@ -717,6 +780,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
         ...item,
         lines: Array.isArray(item.lines) ? item.lines.filter(line => typeof line === 'string') : [],
         events: Array.isArray(item.events) ? item.events : [],
+        routeAdvances: migrateRouteAdvances(item.routeAdvances, flankRouteIds),
         raidersKilled: Math.max(0, Number(item.raidersKilled) || 0),
       } as unknown as TacticalRoundReport;
     });
@@ -724,7 +788,9 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
   const pendingRequired = phase === 'simulating' || phase === 'report' || phase === 'finished';
   const pendingForbidden = phase === 'preparation' || phase === 'preparationExecution' ||
     phase === 'deployment' || phase === 'command';
-  const pendingReport = source.pendingReport == null ? null : migratePendingReport(source.pendingReport, zoneIds);
+  const pendingReport = source.pendingReport == null
+    ? null
+    : migratePendingReport(source.pendingReport, zoneIds, flankRouteIds);
   if (pendingRequired && !pendingReport) return null;
   if (pendingForbidden && source.pendingReport != null) return null;
   if (pendingReport && !reports.some(report => report.round === pendingReport.round &&
@@ -826,6 +892,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     prepActions,
     preparationEvents: Array.isArray(source.preparationEvents) ? source.preparationEvents : [],
     zones,
+    flankRoutes,
     defenderGroups,
     deploymentPlacements,
     deploymentSerial: Number.isInteger(source.deploymentSerial) && Number(source.deploymentSerial) >= 0
@@ -854,6 +921,17 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     currentZoneId: defaultZoneId,
     enemyPlanDeploymentApplied: source.enemyPlanDeploymentApplied === true,
   } as unknown as TacticalBattle;
+  if (migrated.flankRoutes) {
+    const routeIds = new Set(migrated.flankRoutes.map(route => route.id));
+    const fallbackRound = Math.max(1, Math.floor(Number(source.round) || 1));
+    for (const group of [...migrated.defenderGroups, ...migrated.raiderGroups]) {
+      const transit = migrateTacticalRouteTransit(group.routeTransit, routeIds, fallbackRound);
+      if (transit && zoneIds.has(transit.destinationZoneId)) group.routeTransit = transit;
+      else group.routeTransit = undefined;
+    }
+    initializeEnemyTacticalRouteTransit(migrated, state.weather);
+    syncTacticalRouteVisibility(migrated);
+  }
   for (const zone of zones) {
     if (zone.focusTargetSource !== 'player' || !zone.focusTargetGroupId) continue;
     for (const defender of migrated.defenderGroups.filter(group =>

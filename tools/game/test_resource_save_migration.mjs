@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 26, 'facing save migrations ship with schema version 26');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 27, 'route save migrations ship with schema version 27');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -65,11 +65,18 @@ assert.equal(typeof saveLoad.migrateV17ToV18, 'function');
 assert.equal(typeof saveLoad.migrateV23ToV24, 'function');
 assert.equal(typeof saveLoad.migrateV24ToV25, 'function');
 assert.equal(typeof saveLoad.migrateV25ToV26, 'function');
+assert.equal(typeof saveLoad.migrateV26ToV27, 'function');
 
 {
   const migrated = saveLoad.migrateV24ToV25({ schemaVersion: 24, tacticalBattle: { phase: 'deployment' } });
   assert.equal(migrated.schemaVersion, 25);
   assert.deepEqual(migrated.tacticalBattle, { phase: 'deployment' }, 'v25 remains additive at the root schema layer');
+}
+
+{
+  const migrated = saveLoad.migrateV26ToV27({ schemaVersion: 26, tacticalBattle: { phase: 'command' } });
+  assert.equal(migrated.schemaVersion, 27);
+  assert.deepEqual(migrated.tacticalBattle, { phase: 'command' }, 'v27 root migration remains additive');
 }
 
 {
@@ -578,6 +585,36 @@ function prepareFormationTestCombatants(state) {
 }
 
 {
+  const routeState = simulation.newGame(2026072202);
+  prepareFormationTestCombatants(routeState);
+  const battle = tactical.createTacticalBattle(routeState, {
+    factionName: '우회로 저장 복원', power: 70, warned: true, siege: false, mode: 'garrison',
+    forcedFlankRoute: 'left',
+  });
+  assert.equal(tactical.toggleTacticalFlankRoutePreparation(routeState, 'right'), null);
+  const transit = battle.raiderGroups.find(group => group.routeTransit)?.routeTransit;
+  assert.ok(transit);
+  transit.step = 1;
+  transit.elapsedRounds = 1;
+  assert.equal(saveLoad.saveGame(routeState), true);
+  const loaded = saveLoad.loadGame();
+  assert.deepEqual(loaded?.tacticalBattle?.flankRoutes?.map(route => ({
+    side: route.side,
+    openedByDefender: route.openedByDefender,
+    openedByRaider: route.openedByRaider,
+    intel: route.defenderIntel,
+  })), [
+    { side: 'left', openedByDefender: false, openedByRaider: true, intel: 'unknown' },
+    { side: 'right', openedByDefender: true, openedByRaider: false, intel: 'revealed' },
+  ]);
+  const loadedTransit = loaded?.tacticalBattle?.raiderGroups.find(group => group.routeTransit)?.routeTransit;
+  assert.equal(loadedTransit?.step, 1);
+  assert.equal(loadedTransit?.elapsedRounds, 1);
+  assert.equal(loadedTransit?.visibleToDefender, false,
+    'hidden route transit keeps its real step in the save without exposing it to the defender');
+}
+
+{
   const rearPenaltySave = simulation.newGame(2026071591);
   prepareFormationTestCombatants(rearPenaltySave);
   const battle = tactical.createTacticalBattle(rearPenaltySave, {
@@ -731,7 +768,8 @@ for (const [field, seed] of [['events', 2026071451], ['lines', 2026071452]]) {
   ];
   assert.equal(saveLoad.saveGame(state), true);
   const loaded = saveLoad.loadGame();
-  assert.deepEqual(loaded?.tacticalBattle?.prepActions.map(action => action.id), ['preliminaryBombardment']);
+  assert.deepEqual(loaded?.tacticalBattle?.prepActions.map(action => action.id),
+    ['preliminaryBombardment', 'openFlankRoute']);
 }
 
 {
@@ -783,6 +821,7 @@ for (const [field, seed] of [['events', 2026071451], ['lines', 2026071452]]) {
   assert.deepEqual(loaded?.tacticalBattle?.enemyPlan, {
     objective: 'breakthrough',
     objectiveRevealed: true,
+    flankRouteSide: 'left',
     stratagemPoints: 0,
     stratagems: [{ id: 'rearManeuver', revealed: true, counterLevel: 0 }],
   }, 'legacy flank fields synthesize the equivalent enemy plan');
@@ -806,6 +845,7 @@ for (const [field, seed] of [['events', 2026071451], ['lines', 2026071452]]) {
   assert.deepEqual(loaded.tacticalBattle.enemyPlan, {
     objective: 'breakthrough',
     objectiveRevealed: false,
+    flankRouteSide: 'left',
     stratagemPoints: 0,
     stratagems: [{ id: 'rearManeuver', revealed: false, counterLevel: 0 }],
   });

@@ -248,3 +248,88 @@ UI는 이 수치를 재계산하지 않는다. 배치 단계는 즉시 mutation�
 
 전체 게임 러너에서 P5·저장·골든·교리 테스트는 통과했다. 남은 기존 실패는 토벌 자동/직접 승률 게이트,
 `test_screen_ambient_audio.mjs`, `test_tactical_sprite_poses.mjs` 세 개이며 P5 변경 범위 밖이다.
+
+## 10. 2026-07-20 통합 세션 — P5 프론트 통합과 Phase 6 우회로 백엔드 계약
+
+### P5 통합 확인
+
+- Fable의 P5 프론트 커밋 `891226e`를 통합 브랜치에 fast-forward했다.
+- 배치 방향전환은 즉시 mutation, 지휘 방향전환은 preview → 확인 카드 → mutation 1회를 지켰다.
+- 무대·배지·지휘 독은 `group.facing`/`pendingFacing`만 사용하고 페널티 수치를 UI에 하드코딩하지 않는다.
+
+### Phase 6 상태 계약
+
+`TacticalBattle.flankRoutes`에 방어전마다 좌·우 두 경로가 생긴다. 일반 `zones` 배열에는 넣지 않는다.
+
+- `flank-left`: 숲 능선길 / `woodedRidge`
+- `flank-right`: 하천 둥길 / `riverBank`
+- 각 경로는 `openedByDefender`, `openedByRaider`, `defenderIntel`, `control`을 가진다.
+- `rearManeuver`가 있으면 `enemyPlan.flankRouteSide`가 생성 시 좌/우 한 곳으로 잠기고 해당 경로만 `openedByRaider=true`가 된다.
+
+`TacticalDefenderGroup`/`TacticalRaiderGroup`의 선택 필드 `routeTransit`은 `routeId`,
+`step: 0 | 1 | 2`, `destinationZoneId`, `visibleToDefender`, `startedRound`, `elapsedRounds`,
+`roundsRequired`를 가진다. step은 입구 0 → 중간 1 → 후방 출구 2이다.
+
+적 우회대는 생성 시 step 0에 실제로 배치되며, 비공개 경로에서도 매 라운드 동일한 실제 step을 진행한다.
+이동 중에는 정면 교전·일제사격 대상·구역 압박에 참여하지 않는다.
+
+### 준비 행동 API
+
+`src/game/tacticalBattle.ts`에서 다음을 재노출한다.
+
+- `tacticalFlankRoutePreparationView(state)`
+- `tacticalFlankRoutePreparationUnavailableReason(state, side)`
+- `toggleTacticalFlankRoutePreparation(state, side)`
+
+`openFlankRoute`는 **경로당** 준비점수 2를 쓴다. 좌·우를 모두 열면 4점이다. 범용
+`spendPreparationAction(state, 'openFlankRoute')`는 방향 선택 안내 오류를 돌려주므로 UI는 반드시 방향별 mutation을 쓴다.
+준비 단계에서 다시 끄면 2점이 정확히 환불되고, 플레이어가 연 경로는 즉시 `revealed`로 된다.
+
+### 가시성과 프론트 selector
+
+- `tacticalFlankRouteView(battle)`
+- `tacticalRouteBySide(battle, side)`
+- `tacticalGroupIsInRouteTransit(group)`
+- `TACTICAL_FLANK_ROUTE_IDS`
+
+`tacticalFlankRouteView` 결과의 `display`는 `hidden | suspected | revealed`이다.
+
+- `hidden`: `transits=[]`. 실제 step을 UI에 누출하지 않는다.
+- `suspected`: `transits=[]`, `expectedArrivalRounds=[1,3]`. 미니맵의 `?`와 예상 도착 범위만 표시한다.
+- `revealed`: 경로의 실제 transit step을 `transits`로 제공한다.
+
+`nightApproach`는 적의 공개 경로를 `suspected`로 한 단계 낮출 수 있지만, 플레이어가 직접 연 경로는 항상
+`revealed`다. AI·판정·저장은 가시성과 무관하게 실제 step을 유지한다.
+
+`pendingReport.routeAdvances`에는 이번 라운드의 `fromStep`, `toStep`, `visibleToDefender`,
+`arrivedAtExit`가 들어 있다. Fable은 공개 이동 재생에 이 배열을 쓰고 비공개 항목은 렌더하지 않는다.
+
+### 이동 시간
+
+- 보병: 기본 2라운드.
+- 기병/고기동 병과: 기본 1라운드.
+- 숲 능선길의 기병: 2라운드.
+- 눈보라, 또는 해빙기 하천 둥길: 1라운드 추가.
+
+수치는 `tacticalRouteRoundsRequired(group, route, weather)`에서만 계산한다.
+
+### Phase 7 경계
+
+Phase 6에서 step 2는 “후방 출구에 도달”이며 `routeTransit`을 아직 제거하지 않는다. 후방 구역 진입,
+차단대와의 중간 교전, 우회 성공/패퇴, 플레이어 후열 급습은 Phase 7 판정 계약이다. Fable은 step 2를
+기존 `rearAssault` 교전으로 추측해 변환하지 않는다.
+
+### 저장과 검증
+
+- 저장 스키마는 v27이다.
+- v26 이하에서 `rearManeuver`만 있고 경로 선택이 없으면 새 RNG를 쓰지 않고 좌측 경로로 합성한다.
+- 경로, 개방 선택, control, transit step/소요 라운드, report movement가 필드 단위로 검증·복원된다.
+- `tools/game/test_tactical_routes.mjs`가 경로 잠금, 2점 소비/환불, 병종·지형·날씨 속도, 비공개 내부 이동,
+  selector 비누출, 라운드 보고 계약을 고정한다.
+
+Fable의 Phase 6 프론트는 준비 행동에 좌/우 선택을 붙이고,
+`tacticalFlankRouteView`만으로 무대 가장자 경로·미니맵 `?`·공개 이동을 표시한다.
+
+`tsc`, `test:combat`, 경로·무대 명령·배치·적 계획·교리·골든·저장·사냥 테스트와
+프로덕션 빌드가 통과했다. 전체 `test:game`의 실패는 기존에도 남아 있던 주변음 구조 검사,
+산채 자동/직접 밸런스 게이트, 특수주민 총구 앵커 검사 3건만 동일하게 남았다.

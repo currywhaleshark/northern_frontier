@@ -195,6 +195,7 @@ function deployCommandableToZone(state, zoneId) {
       torchWatch: 1,
       preliminaryBombardment: 3,
       musterMilitia: 1,
+      openFlankRoute: 2,
     },
   );
 }
@@ -469,6 +470,7 @@ function deployCommandableToZone(state, zoneId) {
   bow.zoneId = 'wall';
   bow.line = 'middle';
   flanker.zoneId = 'wall';
+  flanker.routeTransit = undefined;
   flanker.rearAssault = true;
   flanker.intent = 'flank';
   flanker.engagementsInZone = 0;
@@ -645,6 +647,7 @@ function deployCommandableToZone(state, zoneId) {
   assert.ok(flanker);
   battle.raiderGroups.filter(group => group.id !== flanker.id).forEach(group => { group.intent = 'withdraw'; });
   flanker.zoneId = 'wall';
+  flanker.routeTransit = undefined;
   flanker.rearAssault = true;
   flanker.intent = 'flank';
   flanker.engagementsInZone = 1;
@@ -1298,7 +1301,10 @@ function deployCommandableToZone(state, zoneId) {
   assert.equal(tactical.resolveTacticalRound(state), null);
   assert.equal(hunters.ambushed, false, 'a surprise attack consumes the ambushed state');
   assert.equal(hunters.command, 'fallback', 'hunters disengage automatically after a surprise attack');
-  assert.ok(battle.raiderGroups.every(group => group.confused), 'guaranteed test chance confuses every raider group');
+  assert.ok(battle.raiderGroups.filter(group => !group.routeTransit).every(group => group.confused),
+    'guaranteed test chance confuses every raider group on the frontal battlefield');
+  assert.ok(battle.raiderGroups.filter(group => group.routeTransit).every(group => !group.confused),
+    'route transit groups do not receive frontal ambush effects');
   assert.ok(battle.pendingReport.events.some(event => event.kind === 'ambush' && event.float === '혼란!'));
   assert.ok(
     battle.raiderGroups.every(group => group.zoneId === raiderZones.get(group.id)),
@@ -1585,6 +1591,7 @@ function deployCommandableToZone(state, zoneId) {
   tactical.advanceTacticalPhase(state);
   battle.raiderGroups.forEach(group => {
     group.zoneId = 'approach';
+    group.routeTransit = undefined;
     group.morale = 100;
     group.rearAssault = false;
     if (group.kind === 'flankers') group.flankPlan = 'breakthrough';
@@ -1738,6 +1745,7 @@ function deployCommandableToZone(state, zoneId) {
   flanker.power = 90;
   flanker.morale = 100;
   flanker.rearAssault = true;
+  flanker.routeTransit = undefined;
   flanker.revealed = true;
   flanker.engagementsInZone = 1;
   battle.raiderGroups.filter(group => group !== flanker).forEach(group => { group.intent = 'withdraw'; });
@@ -2081,6 +2089,7 @@ function deployCommandableToZone(state, zoneId) {
   const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
   assert.ok(flanker);
   flanker.zoneId = 'storehouse';
+  flanker.routeTransit = undefined;
   flanker.power = 180;
   flanker.morale = 100;
   flanker.engagementsInZone = 0;
@@ -2140,6 +2149,7 @@ function deployCommandableToZone(state, zoneId) {
   const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
   assert.ok(flanker);
   flanker.zoneId = 'storehouse';
+  flanker.routeTransit = undefined;
   flanker.flankPlan = 'breakthrough';
   flanker.rearAssault = false;
   battle.raiderGroups.filter(group => group !== flanker).forEach(group => { group.intent = 'withdraw'; });
@@ -2274,6 +2284,7 @@ function deployCommandableToZone(state, zoneId) {
     });
     Object.assign(flankers, {
       zoneId: 'wall', targetZoneId: rearAssault ? 'wall' : 'center',
+      routeTransit: undefined,
       flankPlan: rearAssault ? 'rearAssault' : 'breakthrough', rearAssault,
       revealed: true, count: 200, killed: 0, power: 800, morale: 100, engagementsInZone: 0,
     });
@@ -2508,6 +2519,7 @@ for (const optionId of ['militia', 'levy']) {
   });
   Object.assign(flanker, {
     zoneId: 'wall', targetZoneId: 'wall', flankPlan: 'rearAssault', rearAssault: true,
+    routeTransit: undefined,
     intent: 'flank', revealed: false, power: 90, morale: 100, engagementsInZone: 0,
   });
   assert.equal(tactical.resolveTacticalRound(state), null);
