@@ -12,6 +12,7 @@ import {
 import { hasAnySave, loadGame, saveGame } from './game/saveLoad';
 import { addLog, negotiateTrade, requestTrade, tradeNegotiationOf } from './game/events';
 import { initAudio, isMuted, playSfx, setMuted, stopWeatherAmbient, setWeatherAmbient } from './sound/sfx';
+import { initMusic, setMusicMuted, setMusicScene, type MusicScene } from './sound/music';
 import { AlertsPanel } from './components/AlertsPanel';
 import { BuildDrawer } from './components/BuildDrawer';
 import { DockFrame, type DockOverlayItem } from './components/dock/DockFrame';
@@ -263,9 +264,12 @@ export default function App() {
     }
   });
 
-  // 브라우저 자동재생 정책: 첫 입력 때 오디오 시작
+  // 브라우저 자동재생 정책: 첫 입력 때 효과음과 BGM 시작
   useEffect(() => {
-    const boot = () => initAudio();
+    const boot = () => {
+      initAudio();
+      initMusic();
+    };
     window.addEventListener('pointerdown', boot, { once: true });
     window.addEventListener('keydown', boot, { once: true });
     return () => {
@@ -275,6 +279,15 @@ export default function App() {
   }, []);
 
   const state = stateRef.current;
+  const musicScene: MusicScene = screen === 'menu'
+    ? 'title'
+    : state.tacticalBattle || state.tacticalBattleReport || state.battle
+      ? 'battle'
+      : 'simulation';
+
+  useEffect(() => {
+    setMusicScene(musicScene);
+  }, [musicScene]);
 
   useEffect(() => {
     if (screen !== 'game') return;
@@ -465,6 +478,7 @@ export default function App() {
     const next = !soundOn;
     setSoundOn(next);
     setMuted(!next);
+    setMusicMuted(!next);
   };
 
   const handleReassign = (from: JobId, to: JobId) => {
@@ -1071,6 +1085,8 @@ export default function App() {
           onStartTutorial={startTutorial}
           onContinue={() => setSlotDialogMode('load')}
           onOpenBattleSim={() => setMenuView('battleSim')}
+          soundOn={soundOn}
+          onToggleSound={handleToggleSound}
         />
         {slotDialog}
       </>
