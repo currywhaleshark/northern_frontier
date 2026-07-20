@@ -1,7 +1,16 @@
 import { BUILDING_DEFS } from '../game/buildings';
 import { RESOURCE_NAMES } from '../game/constants';
 import { TACTICAL_BATTLE_GRADE_LABELS } from '../game/tacticalCore';
-import type { ResourceId, TacticalBattleReport } from '../game/types';
+import type { ResourceId, TacticalBattleFlankOutcome, TacticalBattleReport } from '../game/types';
+
+// 표시 전용 라벨 — 판정은 백엔드 tactics 계약(outcome·summary)이 원전이다.
+const FLANK_OUTCOME_LABELS: Record<TacticalBattleFlankOutcome, string> = {
+  unused: '사용 없음',
+  defenderHeld: '차단 유지',
+  raiderReachedRear: '적 후방 진입',
+  defenderReachedRear: '아군 후방 급습',
+  contested: '대치',
+};
 
 interface Props {
   report: TacticalBattleReport;
@@ -144,6 +153,50 @@ export function TacticalBattleReportModal({ report, onClose }: Props) {
               <ol>{report.highlights.map((line, index) => <li key={`${line}-${index}`}>{line}</li>)}</ol>
             ) : <p>별도로 기록할 전황 없음</p>}
           </section>
+
+          {report.tactics && (
+            <section className="battle-report-section tactics">
+              <h3>적 전술</h3>
+              <div className="battle-report-tactics-facts">
+                <div>
+                  <span>적 목표</span>
+                  <strong>{report.tactics.objectiveLabel}</strong>
+                  {report.tactics.objectiveAchieved != null && (
+                    <em className={`battle-report-objective ${report.tactics.objectiveAchieved ? 'achieved' : 'denied'}`}>
+                      {report.tactics.objectiveAchieved ? '목표 달성' : '목표 저지'}
+                    </em>
+                  )}
+                </div>
+                <div>
+                  <span>교리</span>
+                  <strong>{report.tactics.doctrineLabel}</strong>
+                </div>
+                <div>
+                  <span>편제</span>
+                  <strong>{report.tactics.compositionLabel}</strong>
+                </div>
+              </div>
+              <div className="battle-report-subsection">
+                <strong>우회로 전황</strong>
+                {report.tactics.flankRoutes.length > 0 ? (
+                  <ul className="battle-report-route-list">
+                    {report.tactics.flankRoutes.map(route => (
+                      <li key={route.routeId}>
+                        <div className="battle-report-route-head">
+                          <b>{route.label}</b>
+                          <span className={`battle-report-route-outcome ${route.outcome}`}>
+                            {FLANK_OUTCOME_LABELS[route.outcome]}
+                            {route.engagements > 0 ? ` · 교전 ${route.engagements}회` : ''}
+                          </span>
+                        </div>
+                        <p>{route.summary}</p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p>양측 모두 우회로를 쓰지 않았습니다.</p>}
+              </div>
+            </section>
+          )}
         </div>
 
         <footer className="battle-report-footer">

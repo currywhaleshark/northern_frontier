@@ -768,4 +768,30 @@ assert.match(cssSource, /\.fx-rocket/,
 assert.match(cssSource, /prefers-reduced-motion[\s\S]*\.tactical-raider-group\.treating \{ animation: none; \}/,
   'the treatment pulse must respect reduced motion');
 
+// ── Phase 9: 장계 적 전술 표기 (tactics 계약 소비 전용) ──
+const reportModalSource = readFileSync(
+  new URL('../../src/components/TacticalBattleReportModal.tsx', import.meta.url),
+  'utf8',
+);
+assert.match(reportModalSource, /report\.tactics && \(/,
+  'the tactics section must render only when the backend attached a tactics report');
+assert.match(reportModalSource, /report\.tactics\.objectiveLabel/,
+  'the enemy objective must display the backend-provided label');
+assert.match(reportModalSource, /objectiveAchieved != null/,
+  'the objective badge must distinguish unknown from achieved/denied');
+assert.match(reportModalSource, /'목표 달성' : '목표 저지'/,
+  'objective achievement must be labeled in text, not color alone');
+assert.match(reportModalSource, /report\.tactics\.doctrineLabel/,
+  'the doctrine must display the backend-provided label');
+assert.match(reportModalSource, /report\.tactics\.compositionLabel/,
+  'the composition must display the backend-provided label');
+assert.match(reportModalSource, /FLANK_OUTCOME_LABELS\[route\.outcome\]/,
+  'flank route outcomes must be labeled in text via the display-only map');
+assert.match(reportModalSource, /\{route\.summary\}/,
+  'route summaries must come from the backend sentence, not be rebuilt');
+assert.doesNotMatch(reportModalSource, /routeEngagements|routeArrivals|tacticalBattleTacticsReport|flankRouteView/,
+  'the report modal must not recompute tactics from raw route reports');
+assert.match(cssSource, /\.battle-report-route-outcome\.raiderReachedRear/,
+  'route outcome chips must have tone styling on top of their text labels');
+
 console.log('tactical component extraction tests passed');

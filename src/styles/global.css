@@ -5201,6 +5201,49 @@ html, body, #root {
 .battle-report-force-line strong { color: #e3d0c8; font-size: 13px; }
 .battle-report-force-bar { height: 10px; margin: 13px 0 8px; overflow: hidden; background: #121719; }
 .battle-report-force-bar i { display: block; height: 100%; background: #a95145; }
+/* 적 전술 요약 — 목표 달성 여부와 우회로 outcome은 색과 함께 항상 문자 라벨로 구분한다(접근성). */
+.battle-report-section.tactics { grid-column: 1 / -1; min-height: 0; border-right: 0; }
+.battle-report-tactics-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.battle-report-tactics-facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #343c3f;
+}
+.battle-report-tactics-facts span { color: #98a1a4; font-size: 10px; }
+.battle-report-tactics-facts strong { color: #e3d5b3; font-size: 12px; }
+.battle-report-objective {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 1px 6px;
+  border: 1px solid;
+  border-radius: 2px;
+  font-size: 9px;
+  font-style: normal;
+}
+.battle-report-objective.achieved { color: #e29b91; border-color: #7c4a43; }
+.battle-report-objective.denied { color: #9ed09f; border-color: #4a6b4c; }
+.battle-report-route-list li {
+  min-height: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 6px 0;
+}
+.battle-report-route-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.battle-report-route-head b { color: #cbd7e0; }
+.battle-report-route-outcome { font-size: 9px; color: #969fa2; }
+.battle-report-route-outcome.defenderHeld,
+.battle-report-route-outcome.defenderReachedRear { color: #9ed09f; }
+.battle-report-route-outcome.raiderReachedRear { color: #e29b91; }
+.battle-report-route-outcome.contested { color: #d9b96a; }
+.battle-report-route-list p { margin: 0; }
 .battle-report-section.chronicle ol { counter-reset: battle-line; }
 .battle-report-section.chronicle li {
   justify-content: flex-start;
