@@ -7,13 +7,14 @@ import { materializePredatorThreat } from './expeditionIntel';
 import { makeRng } from './map';
 import { createResident } from './residents';
 import { newGame } from './simulation';
+import { specialResidentDefinition } from './specialResidents';
 import { createBanditLairTacticalAssault } from './tacticalAssault';
 import { createTacticalBattle } from './tacticalBattle';
 import { createPredatorTacticalHunt } from './tacticalHunt';
 import { clearWeaponAssignments, setResidentWeapon } from './weapons';
 import type {
-  BattleMode, EnemyDoctrineId, Expedition, GameState, JobId, PredatorKind, Season, TacticalRouteSide,
-  TigerTier, WeatherId,
+  BattleMode, EnemyDoctrineId, EnemyStratagemId, Expedition, GameState, JobId, PredatorKind, Season,
+  SpecialResidentId, TacticalRouteSide, TigerTier, WeatherId,
 } from './types';
 
 // 각 항목은 구체값 또는 'random' (시작할 때마다 새로 굴린다)
@@ -46,7 +47,9 @@ export interface BattleSimulationOptions {
   wolfCount?: SimSetting<number>;
   enemyDoctrine?: EnemyDoctrineId | 'auto';
   enemyCompositionTemplateId?: string | 'auto';
+  enemyStratagem?: EnemyStratagemId | 'none' | 'auto';
   enemyFlankRoute?: TacticalRouteSide | 'none' | 'auto';
+  includeCombatSpecialResidents?: boolean;
   /** 개발 측정용 적대 관계. 생략하면 새 게임의 기본 관계를 유지한다. */
   enemyRelation?: number;
   seed?: number;
@@ -54,6 +57,9 @@ export interface BattleSimulationOptions {
 
 const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter'];
 const WEATHERS: WeatherId[] = ['clear', 'rain', 'frost', 'heavySnow', 'blizzard', 'coldSnap', 'thawFlood'];
+const COMBAT_SPECIAL_RESIDENTS: readonly SpecialResidentId[] = [
+  'jurchenWarrior', 'tigerHunter', 'uinyeo', 'hangwae',
+];
 
 export const BATTLE_SIMULATION_ENEMIES = [
   {
@@ -259,6 +265,20 @@ export function createBattleSimulation(options: BattleSimulationOptions): GameSt
   add('watchman', counts.watchmen);
   add('hunter', counts.hunters);
   add('idle', counts.civilians);
+  if (options.includeCombatSpecialResidents) {
+    for (const id of COMBAT_SPECIAL_RESIDENTS) {
+      const definition = specialResidentDefinition(id);
+      const resident = createResident(state, rng, definition.job);
+      resident.name = definition.name;
+      resident.gender = definition.gender;
+      resident.age = definition.age;
+      resident.special = definition.id;
+      state.residents.push(resident);
+      if (definition.job === 'militia' || definition.job === 'watchman' || definition.job === 'hunter') {
+        combatantIds.push(resident.id);
+      }
+    }
+  }
 
   // 무기 배분(militiaWeaponAllocation)이 지정한 수와 정확히 일치하게 비축을 맞춘다
   state.resources.muskets = counts.muskets;
@@ -319,6 +339,9 @@ export function createBattleSimulation(options: BattleSimulationOptions): GameSt
         : undefined,
       forcedCompositionTemplateId: options.enemyCompositionTemplateId && options.enemyCompositionTemplateId !== 'auto'
         ? options.enemyCompositionTemplateId
+        : undefined,
+      forcedStratagem: options.enemyStratagem && options.enemyStratagem !== 'auto'
+        ? options.enemyStratagem
         : undefined,
       forcedFlankRoute: options.enemyFlankRoute && options.enemyFlankRoute !== 'auto'
         ? options.enemyFlankRoute

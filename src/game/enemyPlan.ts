@@ -23,6 +23,7 @@ type EnemyPlanCreationInput = {
   compositionRoll?: number;
   forcedDoctrine?: EnemyDoctrineId;
   forcedCompositionTemplateId?: string;
+  forcedStratagem?: EnemyStratagemId | 'none';
   forcedFlankRoute?: TacticalRouteSide | 'none';
   maximumCompositionPhase?: 1 | 2 | 8;
   revealed: boolean;
@@ -448,6 +449,10 @@ export function enemyStratagemDefinition(stratagem: EnemyStratagemId) {
   return { id: stratagem, cost: enemyStratagemCost(stratagem), ...STRATAGEM_DETAILS[stratagem] };
 }
 
+export function enemyStratagemDefinitions() {
+  return STRATAGEMS.map(enemyStratagemDefinition);
+}
+
 export function enemyCombinedCounterStrength(counter: Partial<EnemyCounterBreakdown> = {}): number {
   const intelligence = clamp(counter.intelligence ?? 0, 0, 1);
   const preparation = clamp(counter.preparation ?? 0, 0, 1);
@@ -831,6 +836,28 @@ function lockEnemyFlankRoute(
     : undefined;
 }
 
+function lockEnemyPlanOverrides(
+  plan: EnemyPlan,
+  forcedStratagem: EnemyStratagemId | 'none' | undefined,
+  forcedRoute: TacticalRouteSide | 'none' | undefined,
+  roll: number,
+  revealed: boolean,
+): void {
+  if (forcedStratagem === 'none') {
+    plan.stratagems = [];
+    plan.flankRouteSide = undefined;
+    return;
+  }
+  if (forcedStratagem) {
+    const forcedState: EnemyStratagemState = { id: forcedStratagem, revealed, counterLevel: 0 };
+    plan.stratagems = [
+      forcedState,
+      ...plan.stratagems.filter(stratagem => stratagem.id !== forcedStratagem),
+    ].slice(0, CONFIG.tacticalBattle.enemyPlan.maxStratagems);
+  }
+  lockEnemyFlankRoute(plan, forcedRoute, roll, revealed);
+}
+
 export function createEnemyPlan(input: EnemyPlanCreationInput): EnemyPlan {
   const power = Math.max(0, input.power ?? 0);
   const relation = clamp(input.relation ?? 50, 0, 100);
@@ -876,7 +903,13 @@ export function createEnemyPlan(input: EnemyPlanCreationInput): EnemyPlan {
     if (composition && !composition.slots.some(slot => slot.role === 'flankers')) {
       plan.stratagems = plan.stratagems.filter(stratagem => stratagem.id !== 'rearManeuver');
     }
-    lockEnemyFlankRoute(plan, input.forcedFlankRoute, input.compositionRoll ?? input.flankRoll, input.revealed);
+    lockEnemyPlanOverrides(
+      plan,
+      input.forcedStratagem,
+      input.forcedFlankRoute,
+      input.compositionRoll ?? input.flankRoll,
+      input.revealed,
+    );
     return input.intelLevel == null ? plan : applyEnemyPlanIntel(plan, input.intelLevel, input.intelRoll ?? 0);
   }
   const objective = chooseEnemyObjective(
@@ -904,7 +937,13 @@ export function createEnemyPlan(input: EnemyPlanCreationInput): EnemyPlan {
       input.revealed,
     ),
   };
-  lockEnemyFlankRoute(plan, input.forcedFlankRoute, input.compositionRoll ?? input.flankRoll, input.revealed);
+  lockEnemyPlanOverrides(
+    plan,
+    input.forcedStratagem,
+    input.forcedFlankRoute,
+    input.compositionRoll ?? input.flankRoll,
+    input.revealed,
+  );
   return input.intelLevel == null ? plan : applyEnemyPlanIntel(plan, input.intelLevel, input.intelRoll ?? 0);
 }
 

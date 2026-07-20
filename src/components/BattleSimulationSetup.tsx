@@ -6,9 +6,13 @@ import {
   BATTLE_SIMULATION_ENEMIES,
   type BattleSimDefenderCounts, type BattleSimulationOptions, type BattleSimulationScenario, type SimSetting,
 } from '../game/battleSimulation';
-import { enemyDoctrineDefinition, eligibleEnemyDoctrines } from '../game/enemyPlan';
+import {
+  enemyDoctrineDefinition, enemyStratagemDefinitions, eligibleEnemyDoctrines,
+} from '../game/enemyPlan';
 import { tacticalCompositionTemplates, tacticalEnemyFactionId } from '../game/tacticalCompositions';
-import type { BattleMode, EnemyDoctrineId, Season, TacticalRouteSide, TigerTier, WeatherId } from '../game/types';
+import type {
+  BattleMode, EnemyDoctrineId, EnemyStratagemId, Season, TacticalRouteSide, TigerTier, WeatherId,
+} from '../game/types';
 
 interface Props {
   onStart: (options: BattleSimulationOptions) => void;
@@ -62,7 +66,9 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
   const [wolfCount, setWolfCount] = useState(6);
   const [enemyDoctrine, setEnemyDoctrine] = useState<EnemyDoctrineId | 'auto'>('auto');
   const [enemyTemplateId, setEnemyTemplateId] = useState<string>('auto');
+  const [enemyStratagem, setEnemyStratagem] = useState<EnemyStratagemId | 'none' | 'auto'>('auto');
   const [enemyFlankRoute, setEnemyFlankRoute] = useState<TacticalRouteSide | 'none' | 'auto'>('auto');
+  const [includeCombatSpecialResidents, setIncludeCombatSpecialResidents] = useState(false);
   const offensive = scenario !== 'defense';
   const selectedEnemy = factionName === RANDOM
     ? null
@@ -100,7 +106,9 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
     wolfCount: wolfCountRandom ? RANDOM : wolfCount,
     enemyDoctrine: enemyFactionKnown ? enemyDoctrine : 'auto',
     enemyCompositionTemplateId: enemyFactionKnown ? enemyTemplateId : 'auto',
+    enemyStratagem: enemyFactionKnown ? enemyStratagem : 'auto',
     enemyFlankRoute: offensive ? 'auto' : enemyFlankRoute,
+    includeCombatSpecialResidents: !offensive && includeCombatSpecialResidents,
   });
 
   // boolean 항목용 3택(랜덤/예/아니오) 버튼 열
@@ -168,6 +176,8 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
                 setFactionName(next);
                 setEnemyDoctrine('auto');
                 setEnemyTemplateId('auto');
+                setEnemyStratagem('auto');
+                setEnemyFlankRoute('auto');
                 if (next === '조정 토벌군') setPower(current => Math.max(140, current));
               }}>
                 <option value={RANDOM}>랜덤</option>
@@ -217,13 +227,39 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
               </select>
             </label>
             <label className="sim-field">
+              <span>적 계책 강제</span>
+              <select
+                value={enemyFactionKnown ? enemyStratagem : 'auto'}
+                disabled={!enemyFactionKnown}
+                onChange={event => {
+                  const next = event.target.value as EnemyStratagemId | 'none' | 'auto';
+                  setEnemyStratagem(next);
+                  if (next === 'none') setEnemyFlankRoute('none');
+                  else if (next === 'rearManeuver' && enemyFlankRoute === 'none') setEnemyFlankRoute('auto');
+                }}
+              >
+                <option value="auto">자동 (계책점수 규칙대로)</option>
+                <option value="none">없음 (모든 계책 봉쇄)</option>
+                {enemyStratagemDefinitions().map(stratagem => (
+                  <option key={stratagem.id} value={stratagem.id}>
+                    {stratagem.label} (비용 {stratagem.cost})
+                  </option>
+                ))}
+              </select>
+              <small className="sim-enemy-note">선택한 계책은 자동 구매 결과보다 우선하며 반드시 포함됩니다.</small>
+            </label>
+            <label className="sim-field">
               <span>후방 우회 경로 강제</span>
               <div className="sim-choice-row">
                 {([['auto', '자동'], ['left', '좌측'], ['right', '우측'], ['none', '없음']] as const).map(([option, label]) => (
                   <button
                     key={option}
                     className={`sim-choice${enemyFlankRoute === option ? ' active' : ''}`}
-                    onClick={() => setEnemyFlankRoute(option)}
+                    onClick={() => {
+                      setEnemyFlankRoute(option);
+                      if (option !== 'none' && enemyStratagem === 'none') setEnemyStratagem('auto');
+                      if (option === 'none' && enemyStratagem === 'rearManeuver') setEnemyStratagem('auto');
+                    }}
                   >{label}</button>
                 ))}
               </div>
@@ -282,6 +318,22 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
               <span>{offensive ? '사전 정찰 정보' : '경보 여부'}</span>
               {triState(warned, setWarned, offensive ? '정확히 앎' : '경보됨', offensive ? '정보 없음' : '기습')}
             </label>
+            {!offensive && (
+            <label className="sim-field">
+              <span>전투 특수주민</span>
+              <div className="sim-choice-row">
+                <button
+                  className={`sim-choice${!includeCombatSpecialResidents ? ' active' : ''}`}
+                  onClick={() => setIncludeCombatSpecialResidents(false)}
+                >기본</button>
+                <button
+                  className={`sim-choice${includeCombatSpecialResidents ? ' active' : ''}`}
+                  onClick={() => setIncludeCombatSpecialResidents(true)}
+                >4명 포함</button>
+              </div>
+              <small className="sim-enemy-note">아라개·박돌개·단심·사야카를 추가해 이름 있는 조와 치료반 밀도를 시험합니다.</small>
+            </label>
+            )}
             {!offensive && (
             <label className="sim-field">
               <span>방책 공성</span>
