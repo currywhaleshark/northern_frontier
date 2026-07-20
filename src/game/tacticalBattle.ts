@@ -29,10 +29,12 @@ import {
 } from './tacticalCore';
 import {
   applyDefenseZoneConsequences, resolveEngagementExchange, splitTacticalEngagementDefenders,
+  tacticalMovementCommandPowerMultiplier,
 } from './tacticalEngagement';
 import { applyTacticalDoctrineAi } from './tacticalDoctrine';
 import {
-  acknowledgeAssaultReport, advanceAssaultPhase, applyAssaultReportPositions, assaultCommandUnavailableReason,
+  acknowledgeAssaultReport, advanceAssaultPhase, applyAssaultReportPositions, assaultCommandPowerMultiplier,
+  assaultCommandUnavailableReason,
   assaultPreparationUnavailableReason, assignAssaultGroup, chooseDefaultAssaultCommands,
   finishBanditLairTacticalAssault, resolveAssaultRound, setAssaultCommand,
   spendAssaultPreparationAction,
@@ -53,6 +55,7 @@ import {
   initializeTacticalDeployment,
   placeTacticalDeploymentGroup,
   registerTacticalDeploymentGroup,
+  resolveTacticalDeploymentGroupId,
   tacticalDeploymentUnavailableReason,
   tacticalFeaturedResidentsFromSnapshots,
 } from './tacticalDeployment';
@@ -1273,8 +1276,7 @@ export function tacticalFormationLineUnavailableReason(
   }
   if (defender.kind === 'healer') return line === 'rear' ? null : '전술 치료반은 후열에만 배치할 수 있습니다.';
   if (defender.commandable === false) return '피난 주민은 전열을 바꿀 수 없습니다.';
-  const deferredRedeploy = battle.phase === 'command' && battle.orientation !== 'assault' &&
-    battle.assaultKind !== 'predatorHunt';
+  const deferredRedeploy = battle.phase === 'command' && battle.assaultKind !== 'predatorHunt';
   if (deferredRedeploy && line !== defender.line &&
       !tacticalFormationLinesAdjacent(defender.line, line)) {
     return '한 라운드에는 인접한 전열로만 재배치할 수 있습니다.';
@@ -1305,8 +1307,7 @@ export function setDefenderFormationLine(
     }
     return placeTacticalDeploymentGroup(state, groupId, { zoneId: placement.zoneId, line });
   }
-  const deferredRedeploy = battle.phase === 'command' && battle.orientation !== 'assault' &&
-    battle.assaultKind !== 'predatorHunt';
+  const deferredRedeploy = battle.phase === 'command' && battle.assaultKind !== 'predatorHunt';
   if (!deferredRedeploy) {
     defender.line = line;
     defender.pendingLine = undefined;
@@ -1324,6 +1325,142 @@ export function setDefenderFormationLine(
   defender.command = 'redeploy';
   defender.commandSource = 'player';
   return null;
+}
+
+export interface TacticalStageAnchor {
+  zoneId: string;
+  line: TacticalFormationLine;
+}
+
+export interface TacticalStageOrderPreview {
+  groupId: string;
+  origin: TacticalStageAnchor;
+  destination: TacticalStageAnchor;
+  command: Extract<TacticalCommandId, 'redeploy' | 'fallback' | 'advance'> | null;
+  /** 현재 교전 전력에서 빠지는 비율. 0.65면 현재 교전에는 전력 35%만 기여한다. */
+  powerPenalty: number;
+  /** 명령 확정 뒤 목적지가 실제 위치가 되기까지 필요한 교전 수. */
+  travelRounds: 0 | 1;
+  warning?: string;
+}
+
+interface TacticalStageOrderResolution {
+  group: TacticalDefenderGroup;
+  origin: TacticalStageAnchor;
+  command: TacticalStageOrderPreview['command'];
+  reason: string | null;
+}
+
+function tacticalStageOrderResolution(
+  battle: TacticalBattle,
+  groupId: string,
+  destination: TacticalStageAnchor,
+): TacticalStageOrderResolution | null {
+  const resolvedGroupId = resolveTacticalDeploymentGroupId(battle, groupId);
+  const group = battle.defenderGroups.find(candidate => candidate.id === resolvedGroupId);
+  if (!group) return null;
+  const origin = { zoneId: group.zoneId, line: group.line };
+  if (battle.phase !== 'command') {
+    return { group, origin, command: null, reason: '지휘 단계에서만 무대 명령을 내릴 수 있습니다.' };
+  }
+  if (battle.assaultKind === 'predatorHunt') {
+    return { group, origin, command: null, reason: '몰이사냥 길목 이동은 기존 길목 이동 명령을 사용하십시오.' };
+  }
+  if (group.commandable === false) {
+    return { group, origin, command: null, reason: group.kind === 'healer'
+      ? '전술 치료반은 무대 명령 대상이 아닙니다.'
+      : '피난 주민은 무대 명령 대상이 아닙니다.' };
+  }
+  if (activeCount(group) <= 0) {
+    return { group, origin, command: null, reason: '전투 가능한 부대만 무대에서 이동할 수 있습니다.' };
+  }
+  if (!battle.zones.some(zone => zone.id === destination.zoneId)) {
+    return { group, origin, command: null, reason: '알 수 없는 전투 구역입니다.' };
+  }
+  if (!FORMATION_LINE_ORDER.includes(destination.line)) {
+    return { group, origin, command: null, reason: '알 수 없는 전열입니다.' };
+  }
+  const zoneChanged = origin.zoneId !== destination.zoneId;
+  const lineChanged = origin.line !== destination.line;
+  if (!zoneChanged && !lineChanged) return { group, origin, command: null, reason: null };
+  if (zoneChanged && lineChanged) {
+    return { group, origin, command: null, reason: '한 번의 무대 명령으로 구역과 전열을 함께 바꿀 수 없습니다.' };
+  }
+  if (lineChanged) {
+    const reason = tacticalFormationLineUnavailableReason(battle, group, destination.line);
+    return { group, origin, command: 'redeploy', reason };
+  }
+
+  const orderedZones = [...battle.zones].sort((left, right) => left.order - right.order);
+  const originIndex = orderedZones.findIndex(zone => zone.id === origin.zoneId);
+  const destinationIndex = orderedZones.findIndex(zone => zone.id === destination.zoneId);
+  if (originIndex < 0 || Math.abs(originIndex - destinationIndex) !== 1) {
+    return { group, origin, command: null, reason: '한 라운드에는 인접한 전투 구역으로만 이동할 수 있습니다.' };
+  }
+  const towardHigherOrder = destinationIndex > originIndex;
+  const command = battle.orientation === 'assault'
+    ? towardHigherOrder ? 'advance' : 'fallback'
+    : towardHigherOrder ? 'fallback' : 'advance';
+  return { group, origin, command, reason: tacticalCommandUnavailableReason(battle, group, command) };
+}
+
+export function tacticalStageOrderUnavailableReason(
+  battle: TacticalBattle,
+  groupId: string,
+  destination: TacticalStageAnchor,
+): string | null {
+  const resolution = tacticalStageOrderResolution(battle, groupId, destination);
+  return resolution?.reason ?? (resolution ? null : '전술 부대를 찾을 수 없습니다.');
+}
+
+export function tacticalStageOrderPreview(
+  battle: TacticalBattle,
+  groupId: string,
+  destination: TacticalStageAnchor,
+): TacticalStageOrderPreview | null {
+  const resolution = tacticalStageOrderResolution(battle, groupId, destination);
+  if (!resolution || resolution.reason) return null;
+  const { group, origin, command } = resolution;
+  const powerMultiplier = command == null
+    ? 1
+    : battle.orientation === 'assault'
+      ? assaultCommandPowerMultiplier({ ...group, command })
+      : tacticalMovementCommandPowerMultiplier(group, command);
+  const destinationName = battle.zones.find(zone => zone.id === destination.zoneId)?.name ?? destination.zoneId;
+  const warning = command === 'advance' && battle.orientation === 'assault'
+    ? `${destinationName} 돌파에 성공하면 이동합니다.`
+    : command === 'fallback'
+      ? `${withJosa(destinationName, '으로/로')} 물러납니다.`
+      : command === 'advance'
+        ? `${withJosa(destinationName, '으로/로')} 전진합니다.`
+        : command === 'redeploy'
+          ? '이번 교전이 끝난 뒤 새 전열을 적용합니다.'
+          : undefined;
+  return {
+    groupId: group.id,
+    origin,
+    destination: { ...destination },
+    command,
+    powerPenalty: Math.max(0, Math.min(1, 1 - powerMultiplier)),
+    travelRounds: command == null ? 0 : 1,
+    ...(warning ? { warning } : {}),
+  };
+}
+
+export function applyTacticalStageOrder(
+  state: GameState,
+  groupId: string,
+  destination: TacticalStageAnchor,
+): string | null {
+  const battle = state.tacticalBattle;
+  if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  const preview = tacticalStageOrderPreview(battle, groupId, destination);
+  if (!preview) return tacticalStageOrderUnavailableReason(battle, groupId, destination);
+  if (preview.command == null) return null;
+  if (preview.command === 'redeploy') {
+    return setDefenderFormationLine(state, preview.groupId, destination.line);
+  }
+  return setTacticalCommand(state, preview.groupId, preview.command);
 }
 
 export function setTacticalCommand(

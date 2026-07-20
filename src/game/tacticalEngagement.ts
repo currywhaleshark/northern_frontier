@@ -427,9 +427,9 @@ export function commandPowerMultiplier(
   if (command === 'charge') {
     return 1.72 + (mounted && zone.kind !== 'wall' ? CONFIG.mounted.chargePowerBonus : 0);
   }
-  if (command === 'redeploy') return mounted ? CONFIG.mounted.maneuverPowerMultiplier : 0.35;
-  if (command === 'fallback') return mounted ? CONFIG.mounted.maneuverPowerMultiplier : 0.22;
-  if (command === 'advance') return mounted ? CONFIG.mounted.maneuverPowerMultiplier : 0.45;
+  if (command === 'redeploy' || command === 'fallback' || command === 'advance') {
+    return tacticalMovementCommandPowerMultiplier(defender, command);
+  }
   if (command === 'guardStorehouse') return zone.id === 'storehouse' ? 1.42 : 0.78;
   if (command === 'protectCivilians') return zone.id === 'center' || zone.id === 'storehouse' ? 1.05 : 0.72;
   if (command === 'ambush') {
@@ -446,6 +446,15 @@ export function commandPowerMultiplier(
     return mult;
   }
   return 1;
+}
+
+export function tacticalMovementCommandPowerMultiplier(
+  defender: TacticalDefenderGroup,
+  command: Extract<TacticalCommandId, 'redeploy' | 'fallback' | 'advance'>,
+): number {
+  if (tacticalGroupCapabilities(defender).has('mounted')) return CONFIG.mounted.maneuverPowerMultiplier;
+  if (command === 'redeploy') return 0.35;
+  return command === 'fallback' ? 0.22 : 0.45;
 }
 
 function casualtyMultiplier(

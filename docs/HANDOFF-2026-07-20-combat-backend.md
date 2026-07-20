@@ -139,3 +139,42 @@ git diff --check
 - 선행 침투의 산채 경계도·날씨 기반 발각 판정은 P3 완료 조건에는 포함하지 않았고 아직 구현하지 않았다.
   후속으로 넣을 때는 결정적 RNG 입력과 저장 필드를 먼저 설계한다.
 - 방향전환·실제 우회로·지휘 단계 드래그 확인은 각각 후속 Phase 4~7 범위다.
+
+## 8. 2026-07-20 통합 세션 — P3 프론트 통합과 Phase 4 백엔드 계약
+
+### P3 통합 확인
+
+- Fable의 P3 프론트 커밋 `ec6d9e0`을 통합 브랜치에 fast-forward했다.
+- `src/App.tsx` 변경은 기존 `handleTacticalAction`의 오류 문자열 반환을 보존하고
+  `onDeploymentAction` 범용 dispatch 하나만 추가한 최소 통합 경계로 승인했다.
+- 타입 검사, 컴포넌트·배치·전투·사냥·저장 마이그레이션 테스트와 프로덕션 빌드가 통과했다.
+- `test_tactical_assault.mjs` 마지막 밸런스 게이트는 기존과 같은 자동 0.589 / 직접 0.281로만 실패한다.
+- 1280×720 브라우저에서 지휘 가능 아군을 상한 10개 조까지 분할한 뒤 자동배치해 카드 독, 무대 스택,
+  키보드 선택 경로를 확인했다. 현재 시뮬레이터는 적 3개 조까지만 생성하므로 고정 피난 주민 포함 총
+  14개 조까지 재현했다. 특수주민과 적 6개 조 실화면은 시뮬레이터 옵션 보강 뒤 다시 확인한다.
+
+### Phase 4 공개 계약
+
+`src/game/tacticalBattle.ts`가 다음 API와 자료형을 제공한다.
+
+- `TacticalStageAnchor`
+- `TacticalStageOrderPreview`
+- `tacticalStageOrderUnavailableReason(battle, groupId, destination)`
+- `tacticalStageOrderPreview(battle, groupId, destination)`
+- `applyTacticalStageOrder(state, groupId, destination)`
+
+규칙은 다음과 같다.
+
+- 같은 위치 드롭은 `command: null`, `powerPenalty: 0`, `travelRounds: 0`의 선택 전용 no-op이다.
+- 같은 구역의 인접 열은 `redeploy`, 인접 구역의 같은 열은 전투 orientation에 따라
+  `advance` 또는 `fallback`이다.
+- 한 드래그에서 구역과 열을 동시에 바꾸거나 비인접 구역·열로 옮기는 요청은 거부한다.
+- preview는 상태를 바꾸지 않는 순수 함수다. 확정 mutation은 정확히 한 명령만 기록하며 즉시 순간이동하지
+  않는다. 토벌전 열 재배치도 이제 다음 교전 위치 적용 때 반영한다.
+- `powerPenalty`는 현재 교전 전력에서 빠지는 비율이다. 예를 들어 보병 `redeploy`의 0.65는 전력 35% 기여를
+  뜻한다. 기마 여부와 전투별 기존 명령 배율은 백엔드가 계산한다.
+- 분할·합류로 사라진 groupId도 `deploymentGroupAliases`를 통해 현재 조로 복구한다.
+- 맹수 사냥은 Phase 4에서 기존 길목 이동 계약을 유지하며 공용 직선 전선 드래그 대상에서 제외한다.
+
+계약 테스트는 `tools/game/test_tactical_stage_orders.mjs`다. Fable은 Phase 4 무대 고스트·확인 카드·키보드
+경로에서 목적지별 preview/unavailable-reason을 그대로 사용하고 전력 페널티나 명령 종류를 재계산하지 않는다.

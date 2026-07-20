@@ -7,7 +7,7 @@ import { makeRng } from './map';
 import { injure, killResidents } from './raidDamage';
 import { applyBanditLairOutcome, type BanditLairOutcome } from './siteDiplomacy';
 import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
-import { resolveEngagementExchange } from './tacticalEngagement';
+import { resolveEngagementExchange, tacticalMovementCommandPowerMultiplier } from './tacticalEngagement';
 import { tacticalTargetingRole } from './tacticalTargeting';
 import {
   attachFeaturedResidentsToTacticalGroups,
@@ -29,7 +29,7 @@ import {
 import type {
   BanditLairDefensePlan, DefenderGroupKind, GameState, PreparationActionId, ResourceId,
   TacticalAnimationEvent, TacticalBattle, TacticalBattleZone, TacticalCommandId, TacticalDefenderGroup,
-  TacticalRaiderGroup, TacticalRoundReport,
+  TacticalFormationLine, TacticalRaiderGroup, TacticalRoundReport,
 } from './types';
 
 const ASSAULT_MAX_ROUNDS = 7;
@@ -492,13 +492,14 @@ export function chooseDefaultAssaultCommands(battle: TacticalBattle): void {
   }
 }
 
-function commandPower(group: TacticalDefenderGroup): number {
+export function assaultCommandPowerMultiplier(group: TacticalDefenderGroup): number {
   if (group.command === 'charge') return 1.5;
   if (group.command === 'volley') return 1.32;
   if (group.command === 'ambush') return 1.48;
   if (group.command === 'advance') return 1.14;
   if (group.command === 'hold') return 0.92;
   if (group.command === 'fallback') return 0.45;
+  if (group.command === 'redeploy') return tacticalMovementCommandPowerMultiplier(group, 'redeploy');
   if (group.command === 'arson') return 0.9;
   if (group.command === 'blockEscape') return 0.32;
   if (group.command === 'openRetreat') return 0;
@@ -619,7 +620,7 @@ export function resolveAssaultRound(state: GameState): string | null {
     prepareVolleyApplied: false,
     evacuateCiviliansApplied: false,
     roundStartingRaiderPower: Math.max(1, enemies.reduce((sum, group) => sum + group.power, 0)),
-    defenderPowerMultiplier: commandPower,
+    defenderPowerMultiplier: assaultCommandPowerMultiplier,
     defenderCasualtyMultiplier: assaultCommandCasualtyMultiplier,
     raiderLossRateScale: 2,
     rng,
@@ -792,6 +793,14 @@ export function resolveAssaultRound(state: GameState): string | null {
 export function applyAssaultReportPositions(battle: TacticalBattle): void {
   const report = battle.pendingReport;
   if (!report || report.positionsApplied) return;
+  const lineOrder: readonly TacticalFormationLine[] = ['front', 'middle', 'rear'];
+  for (const group of battle.defenderGroups) {
+    if (group.command !== 'redeploy' || !group.pendingLine) continue;
+    if (Math.abs(lineOrder.indexOf(group.line) - lineOrder.indexOf(group.pendingLine)) !== 1) continue;
+    group.line = group.pendingLine;
+    group.pendingLine = undefined;
+    group.command = 'hold';
+  }
   const nextZoneId = report.nextFocusZoneId;
   if (nextZoneId !== battle.currentZoneId) {
     for (const group of battle.defenderGroups) {
