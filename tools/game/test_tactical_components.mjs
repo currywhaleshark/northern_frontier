@@ -815,6 +815,10 @@ assert.match(cssSource, /\.tactical-deploy-card\.stage-drag-handle\s*\{\s*touch-
   'deploy cards must keep native horizontal panning so the dock can slide on touch');
 assert.match(dockSource, /addEventListener\('wheel', onWheel, \{ passive: false \}\)/,
   'the card row must attach a non-passive wheel listener because React root wheel handlers are passive');
+assert.match(dragSource, /window\.addEventListener\('touchmove', touchScrollBlockerRef\.current!, \{ passive: false \}\)/,
+  'touch drags must arm a non-passive touchmove blocker so native panning cannot cancel a claimed drag mid-gesture');
+assert.match(dragSource, /sessionRef\.current\?\.dragging && event\.cancelable\) event\.preventDefault\(\)/,
+  'the blocker must prevent scrolling only after the drag is claimed, keeping the pan-x dock slide alive');
 assert.match(dockSource, /row\.scrollLeft \+= event\.deltaY/,
   'vertical wheel over the card row must scroll it horizontally');
 

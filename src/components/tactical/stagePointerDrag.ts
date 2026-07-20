@@ -76,6 +76,15 @@ export function useStagePointerDrag(options: StagePointerDragOptions) {
     dragging: boolean;
     element: HTMLElement;
   } | null>(null);
+  // pan-x 핸들(배치 카드)에서는 touch-action만으로 부족하다 — 세로 드래그로 확정된 뒤에도
+  // 이동 중 가로 성분이 쌓이거나(iOS는 세로에도) 브라우저가 네이티브 팬을 가로채며 pointercancel을
+  // 던진다. 드래그가 잡은 제스처의 touchmove를 non-passive로 preventDefault해 인수를 막는다.
+  const touchScrollBlockerRef = useRef<(event: TouchEvent) => void>();
+  if (!touchScrollBlockerRef.current) {
+    touchScrollBlockerRef.current = event => {
+      if (sessionRef.current?.dragging && event.cancelable) event.preventDefault();
+    };
+  }
 
   const endSession = useCallback((element?: HTMLElement, pointerId?: number) => {
     if (element != null && pointerId != null) {
@@ -85,6 +94,7 @@ export function useStagePointerDrag(options: StagePointerDragOptions) {
         // 이미 해제되었거나 합성 이벤트라 캡처가 없던 경우 — 무시
       }
     }
+    window.removeEventListener('touchmove', touchScrollBlockerRef.current!);
     sessionRef.current = null;
     setState(IDLE_STATE);
   }, []);
@@ -108,6 +118,10 @@ export function useStagePointerDrag(options: StagePointerDragOptions) {
       dragging: false,
       element: event.currentTarget,
     };
+    if (event.pointerType === 'touch') {
+      // 드래그 확정 전에는 preventDefault하지 않으므로 pan-x 독 슬라이드는 그대로 산다.
+      window.addEventListener('touchmove', touchScrollBlockerRef.current!, { passive: false });
+    }
   }, [disabled]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLElement>) => {
@@ -164,6 +178,11 @@ export function useStagePointerDrag(options: StagePointerDragOptions) {
   const handlePointerCancel = useCallback(() => {
     cancelDrag();
   }, [cancelDrag]);
+
+  // 언마운트가 세션 도중이면 touchmove 차단 리스너를 반드시 회수한다.
+  useEffect(() => () => {
+    window.removeEventListener('touchmove', touchScrollBlockerRef.current!);
+  }, []);
 
   // Escape·우클릭은 드래그 중 언제든 취소한다.
   useEffect(() => {
