@@ -6,6 +6,7 @@ import {
   tacticalGroupTargetUnavailableReason,
   tacticalRaiderVisibleDuringPlayback,
   tacticalStageOrderPreview, tacticalStageOrderUnavailableReason,
+  tacticalSupportUnitView,
 } from '../../game/tacticalBattle';
 import { facingLabel, stageOrderCommandLabel } from './stageOrderPreview';
 import type {
@@ -26,6 +27,7 @@ import { tacticalBackgroundAsset } from '../../render/tacticalBackgroundAssets';
 import {
   TACTICAL_CHARACTER_SHEET,
   TACTICAL_COURT_POSE_SHEET,
+  TACTICAL_COURT_SUPPORT_POSE_SHEET,
   TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET,
   TACTICAL_HEALER_POSE_SHEET,
   TACTICAL_DEFENDER_ROLE_POSE_SHEET,
@@ -35,6 +37,7 @@ import {
   tacticalBeastSheet,
   tacticalCourtMuzzleAnchor,
   tacticalCourtPoseCell,
+  tacticalCourtSupportPoseCell,
   tacticalDefaultWeaponPose,
   tacticalDefenderMuzzleAnchor,
   tacticalDefenderPoseCell,
@@ -211,6 +214,25 @@ function CourtRaiderSprite({ unitType, pose, firing, falling }: {
   falling: boolean;
 }) {
   const resolvedPose = falling ? 'hurt' : pose;
+  // P8 지원병(의원대·화차)은 전용 시트를 쓴다 — 셀·앵커·메트릭은 전부 렌더 계약에서 온다
+  const supportCell = tacticalCourtSupportPoseCell(unitType, resolvedPose);
+  if (supportCell) {
+    const supportMuzzle = firing && resolvedPose === 'attack' ? tacticalCourtMuzzleAnchor(unitType) : null;
+    return (
+      <span
+        className={`tactical-sprite tactical-court-raider court-support unit-${unitType} pose-${resolvedPose}${falling ? ' falling' : ''}`}
+        style={{
+          backgroundImage: `url(${TACTICAL_COURT_SUPPORT_POSE_SHEET.src})`,
+          backgroundPosition: `${-supportCell.column * TACTICAL_COURT_SUPPORT_POSE_SHEET.spriteWidth}px ${-supportCell.row * TACTICAL_COURT_SUPPORT_POSE_SHEET.spriteHeight}px`,
+          backgroundSize: `${TACTICAL_COURT_SUPPORT_POSE_SHEET.columns * TACTICAL_COURT_SUPPORT_POSE_SHEET.spriteWidth}px ${TACTICAL_COURT_SUPPORT_POSE_SHEET.rows * TACTICAL_COURT_SUPPORT_POSE_SHEET.spriteHeight}px`,
+          ...tacticalSpriteMetricVars('courtSupport', supportCell.column, supportCell.row),
+        } as CSSProperties}
+        aria-hidden="true"
+      >
+        {supportMuzzle && <UnitMuzzleFlash anchor={supportMuzzle} />}
+      </span>
+    );
+  }
   const cell = tacticalCourtPoseCell(unitType, resolvedPose);
   const muzzleAnchor = firing && resolvedPose === 'attack' ? tacticalCourtMuzzleAnchor(unitType) : null;
   return (
@@ -625,6 +647,7 @@ function raiderPoseForEvent(
       (event.groupId == null || event.groupId === group.id)) return 'hurt';
   if (event.kind === 'rearAssault' && event.groupId === group.id) return 'attack';
   if (event.kind === 'wallAssault' && event.groupId === group.id) return 'attack';
+  if (event.kind === 'enemyTreatment' && event.groupId === group.id) return 'attack';
   if (raiderFiringForEvent(event, group)) return 'attack';
   if (meleeActorForEvent(event, 'raider', group.id)) return 'attack';
   if (event.kind === 'advance' && event.side !== 'defender') return 'attack';
@@ -638,6 +661,10 @@ function raiderFiringForEvent(
 ): boolean {
   if (!event || event.zoneId !== group.zoneId) return false;
   const shotKind = raiderShotKind(group);
+  if (event.kind === 'hwachaVolley') {
+    return group.unitType === 'court-hwacha' && (!event.shots || (event.shots.rockets ?? 0) > 0) &&
+      (event.groupId == null || event.groupId === group.id);
+  }
   if (event.kind === 'artilleryHit') {
     return shotKind === 'cannon' && (!event.shots || (event.shots.cannons ?? 0) > 0);
   }
@@ -711,6 +738,9 @@ export function TacticalZoneColumn({
   const zoneVolley = activeEvent?.kind === 'volley' && activeEvent.zoneId === zone.id;
   const zoneArson = activeEvent?.kind === 'fire' && activeEvent.zoneId === zone.id;
   const zoneBombardment = activeEvent?.kind === 'bombardment' && activeEvent.zoneId === zone.id;
+  // P8 화차 — 로켓 수는 이벤트 shots.rockets에서만 읽는다 (표시 상한만 UI 몫)
+  const zoneHwacha = activeEvent?.kind === 'hwachaVolley' && activeEvent.zoneId === zone.id;
+  const hwachaRocketCount = zoneHwacha ? Math.min(12, Math.max(1, activeEvent?.shots?.rockets ?? 1)) : 0;
   const arrowProjectileCount = arrowProjectileCountForZone(activeEvent, defenders, zoneRaiders);
   const frontalProjectileMovesRight = assault
     ? activeEvent?.side !== 'raider'
@@ -822,6 +852,17 @@ export function TacticalZoneColumn({
           ))}
         </div>
       )}
+      {zoneHwacha && hwachaRocketCount > 0 && (
+        <div className="tactical-fx-layer hwacha" key={`hwacha-${eventIndex}`} aria-hidden="true">
+          {Array.from({ length: hwachaRocketCount }, (_, index) => (
+            <span
+              key={index}
+              className={`fx-arrow fx-rocket moves-${projectileMovesRight ? 'right' : 'left'}`}
+              style={{ animationDelay: `${index * 45}ms`, bottom: `${150 + (index * 17) % 80}px` }}
+            />
+          ))}
+        </div>
+      )}
       {zoneBombardment && (
         <div className="tactical-fx-layer bombardment" key={`bombardment-${eventIndex}`} aria-hidden="true">
           {Array.from({ length: Math.max(1, battle.preliminaryBombardmentCannons ?? 1) }, (_, index) => (
@@ -899,9 +940,11 @@ export function TacticalZoneColumn({
             activeEvent.groupId === raider.id;
           const withdrawing = activeEvent?.groupId === raider.id &&
             (activeEvent.kind === 'retreat' || activeEvent.kind === 'moraleBreak');
+          const treating = activeEvent?.kind === 'enemyTreatment' && activeEvent.groupId === raider.id;
+          const supportView = raider.revealed ? tacticalSupportUnitView(battle, raider) : null;
           return (
             <div
-              className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${advancing ? ' advancing' : ''}${doctrineShifting ? ' doctrine-shifting' : ''}${casualtyHit ? ' casualty-hit' : ''}${withdrawing ? ' withdrawing' : ''}${leaderMotion}`}
+              className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${advancing ? ' advancing' : ''}${doctrineShifting ? ' doctrine-shifting' : ''}${casualtyHit ? ' casualty-hit' : ''}${withdrawing ? ' withdrawing' : ''}${treating ? ' treating' : ''}${leaderMotion}`}
               style={formationStackStyle(stackIndex, lineGroups.length)}
               data-stack-depth={lineGroups.length - 1 - stackIndex}
               key={leaderMotion ? `${raider.id}-${activeEvent?.kind}-${eventIndex}` : raider.id}
@@ -947,6 +990,14 @@ export function TacticalZoneColumn({
               </div>
               <span>
                 {raider.revealed ? `${raider.label} ${activeRaiders}${raider.beastKind ? '마리' : '명'}${raider.beastKind ? '' : ` · 전력 ${Math.round(raider.estimatedPower ?? raider.power)}`} · ${tacticalRaiderIntentLabel(battle, raider)}` : raider.beastKind ? '덤불 속 흔적' : '정체불명'}
+                {supportView && (
+                  <em
+                    className={`tactical-state-badge support-${supportView.status}`}
+                    title={supportView.kind === 'medic'
+                      ? supportView.statusLabel
+                      : `${supportView.statusLabel} · 남은 탄약 ${supportView.shotsRemaining}발`}
+                  >{supportView.statusLabel}</em>
+                )}
                 {raider.confused && <em className="tactical-state-badge confused">혼란</em>}
                 {focusTarget && <em className="tactical-state-badge focus-target">집중 표적</em>}
               </span>

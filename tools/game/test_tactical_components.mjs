@@ -91,8 +91,8 @@ assert.match(simSetupSource, /enemyCompositionTemplateId:/,
   'the simulator must pass the forced composition template into the simulation options');
 assert.match(simSetupSource, /template\.doctrines\.includes/,
   'forcing a doctrine must filter the template list to compatible compositions');
-assert.match(simSetupSource, /template\.implementationPhase <= 2/,
-  'the simulator must not expose composition templates beyond the active battle phase cap');
+assert.match(simSetupSource, /template\.implementationPhase <= 8/,
+  'the simulator must expose composition templates up to the active battle phase cap');
 
 // ── Phase 2: 교리 행동 징후와 doctrineShift 재생 ──
 assert.match(planSource, /intentSignals/,
@@ -729,5 +729,41 @@ assert.match(cssSource, /\.tactical-route-ribbon-row\.deploy-anchor-hover/,
   'hovered route anchors must highlight during blocker drags');
 assert.match(cssSource, /\.tactical-state-badge\.rear-raid/,
   'the rear raid badge must have dedicated styling');
+
+// ── Phase 8: 지원·화포 병과 표시와 연출 ──
+assert.match(zoneSource, /tacticalCourtSupportPoseCell\(unitType, resolvedPose\)/,
+  'court support units must render from the dedicated support sheet cell');
+assert.match(zoneSource, /TACTICAL_COURT_SUPPORT_POSE_SHEET/,
+  'court support sprites must use the new support pose sheet');
+assert.match(zoneSource, /tacticalSpriteMetricVars\('courtSupport', supportCell\.column, supportCell\.row\)/,
+  'court support sprites must use the courtSupport metric contract');
+assert.match(zoneSource, /supportView\.statusLabel/,
+  'support unit status must come from the backend support view label');
+assert.doesNotMatch(zoneSource, /supportState\./,
+  'the stage must not read raw support state fields');
+assert.match(zoneSource, /event\.kind === 'hwachaVolley'/,
+  'hwacha volleys must drive a distinct firing pose');
+assert.match(zoneSource, /shots\?\.rockets/,
+  'rocket counts must come from the event contract');
+assert.match(zoneSource, /event\.kind === 'enemyTreatment' && event\.groupId === group\.id/,
+  'enemy treatment must animate only the acting medic group');
+assert.match(screenSource, /supportReload: 'hammer'/,
+  'support reload playback must have its own sound cue');
+assert.match(screenSource, /enemyTreatment: 'heal'/,
+  'enemy treatment playback must have a healing sound cue');
+assert.match(screenSource, /event\.kind === 'hwachaVolley'/,
+  'hwacha volleys must have a distinct salvo sound path');
+assert.match(screenSource, /report\.raiderPowerRestored/,
+  'the round report must surface enemy power restored as a report figure');
+assert.doesNotMatch(screenSource, /전사자.*복귀|부활/,
+  'enemy treatment must never be described as reviving the dead');
+assert.match(minimapSource, /tacticalSupportUnitView\(battle, group\)/,
+  'minimap tooltips must read support status from the backend view');
+assert.match(cssSource, /\.tactical-zone\.event-enemyTreatment \.tactical-raider-group\.treating/,
+  'enemy treatment must pulse only the treating group');
+assert.match(cssSource, /\.fx-rocket/,
+  'hwacha rockets must have dedicated projectile styling');
+assert.match(cssSource, /prefers-reduced-motion[\s\S]*\.tactical-raider-group\.treating \{ animation: none; \}/,
+  'the treatment pulse must respect reduced motion');
 
 console.log('tactical component extraction tests passed');

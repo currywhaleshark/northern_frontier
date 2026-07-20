@@ -134,10 +134,17 @@ const EVENT_SFX: Partial<Record<TacticalAnimationEvent['kind'], SfxName>> = {
   beastReveal: 'hunt',
   beastAmbush: 'ambush',
   beastRout: 'moraleBreak',
+  supportReload: 'hammer',
+  enemyTreatment: 'heal',
 };
 
 function playTacticalEventSfx(event: TacticalAnimationEvent): void {
   const shots = event.shots;
+  // P8 화차 — 로켓 수는 이벤트 계약에서 읽고 재생 횟수만 상한을 둔다
+  if (event.kind === 'hwachaVolley') {
+    playWeaponVolley('cannon', Math.min(4, Math.max(1, shots?.rockets ?? 1)));
+    return;
+  }
   if (shots && (shots.arrows ?? 0) + (shots.muskets ?? 0) + (shots.cannons ?? 0) > 0) {
     playWeaponSalvo(shots);
     return;
@@ -1588,6 +1595,11 @@ export function TacticalBattleScreen({
                 <span className="tactical-report-label">제{report.round}차 교전 보고</span>
                 <h2>{report.summary}</h2>
                 {report.lines.map((line, index) => <p key={`${line}-${index}`}>{line}</p>)}
+                {(report.raiderPowerRestored ?? 0) > 0 && (
+                  <p className="tactical-report-treatment">
+                    적 의원대가 부상 병력을 추슬러 전투력 {Math.round(report.raiderPowerRestored ?? 0)}을 회복했습니다.
+                  </p>
+                )}
               </div>
               <div className="tactical-report-numbers">
                 <div><span>전사</span><strong>{report.killed}</strong></div>

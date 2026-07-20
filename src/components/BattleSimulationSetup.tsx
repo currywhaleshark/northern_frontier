@@ -70,12 +70,12 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
   const courtArmy = factionName === '조정 토벌군';
   // 강제 옵션 후보는 백엔드 정의에서만 가져온다 — 교리·편제의 단일 소스는 게임 도메인이다.
   const enemyFactionKnown = !offensive && factionName !== RANDOM;
-  const doctrineOptions = enemyFactionKnown ? eligibleEnemyDoctrines(factionName, 2) : [];
-  // 실전 편제 선택기와 같은 상한(Phase 2)만 노출한다 — Phase 8 지원·화포 편제는 아직 판정이 없다.
+  const doctrineOptions = enemyFactionKnown ? eligibleEnemyDoctrines(factionName, 8) : [];
+  // P8에서 지원·화포 병과 판정이 활성화되어 실전과 같은 8단계까지 노출한다.
   const templateOptions = enemyFactionKnown
     ? tacticalCompositionTemplates().filter(template =>
       template.faction === tacticalEnemyFactionId(factionName) &&
-      template.implementationPhase <= 2 &&
+      template.implementationPhase <= 8 &&
       (enemyDoctrine === 'auto' || template.doctrines.includes(enemyDoctrine)))
     : [];
   const combatantTotal = defenders.muskets + defenders.bows + defenders.spears +

@@ -1,5 +1,7 @@
 import { useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { tacticalGroupIsInRouteTransit, tacticalRaiderVisibleDuringPlayback } from '../../game/tacticalBattle';
+import {
+  tacticalGroupIsInRouteTransit, tacticalRaiderVisibleDuringPlayback, tacticalSupportUnitView,
+} from '../../game/tacticalBattle';
 import { tacticalActiveDefenderCount } from '../../game/tacticalCommandState';
 import type { TacticalFlankRouteView } from '../../game/tacticalRoutes';
 import type {
@@ -85,7 +87,9 @@ function raiderTooltip(
   const unit = group.beastKind ? '마리' : '명';
   const power = group.beastKind ? '' : ` · 전력 ${Math.round(group.power)}`;
   const rear = group.rearAssault ? ' · 후방 급습' : '';
-  return `${group.label} ${active}${unit}${power} · ${tacticalRaiderIntentLabel(battle, group)}${rear}`;
+  const support = tacticalSupportUnitView(battle, group);
+  const supportText = support ? ` · ${support.statusLabel}` : '';
+  return `${group.label} ${active}${unit}${power} · ${tacticalRaiderIntentLabel(battle, group)}${rear}${supportText}`;
 }
 
 function markerSize(active: number): 'small' | 'large' {

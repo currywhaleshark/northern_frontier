@@ -3831,6 +3831,28 @@ html, body, #root {
 .tactical-route-arrival.side-raider { color: #e08b72; }
 .tactical-route-arrival.side-defender { color: #9fc487; }
 .tactical-state-badge.rear-raid { border-color: #55a79a; color: #79c7ba; }
+/* ── Phase 8 지원·화포 병과 — 화차 로켓·의원 치료·상태 배지 ── */
+.fx-rocket {
+  height: 3px;
+  background: linear-gradient(90deg, rgba(255, 214, 140, 0), #ffd68c 55%, #ff9a4d);
+  box-shadow: 0 0 6px rgba(255, 170, 80, 0.8);
+}
+.tactical-zone.event-enemyTreatment .tactical-raider-group.treating {
+  animation: tactical-enemy-treatment calc(640ms * var(--tactical-playback-scale)) ease 1;
+}
+@keyframes tactical-enemy-treatment {
+  0%, 100% { filter: none; }
+  50% { filter: drop-shadow(0 0 8px rgba(121, 199, 186, 0.9)); }
+}
+.tactical-state-badge.support-ready { border-color: #7aa071; color: #9fc487; }
+.tactical-state-badge.support-firing { border-color: #c4694f; color: #e08b72; }
+.tactical-state-badge.support-reloading,
+.tactical-state-badge.support-spent { border-color: #59626a; color: #9fa9ad; }
+.tactical-state-badge.support-treating { border-color: #55a79a; color: #79c7ba; }
+.tactical-report-treatment { color: #79c7ba; font-size: 11px; }
+@media (prefers-reduced-motion: reduce) {
+  .tactical-zone.event-enemyTreatment .tactical-raider-group.treating { animation: none; }
+}
 .tactical-enemy-plan .tactical-enemy-route-intel {
   grid-column: 1 / -1;
   margin: 0;
