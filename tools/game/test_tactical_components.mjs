@@ -793,5 +793,7 @@ assert.doesNotMatch(reportModalSource, /routeEngagements|routeArrivals|tacticalB
   'the report modal must not recompute tactics from raw route reports');
 assert.match(cssSource, /\.battle-report-route-outcome\.raiderReachedRear/,
   'route outcome chips must have tone styling on top of their text labels');
+assert.match(minimapSource, /routeControlLabel\(view\.route\.control\)/,
+  'minimap route branches must state route control in text, not color alone');
 
 console.log('tactical component extraction tests passed');

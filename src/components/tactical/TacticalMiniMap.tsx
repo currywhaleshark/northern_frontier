@@ -13,6 +13,7 @@ import type {
   TacticalRouteSide,
 } from '../../game/types';
 import { commandLabel } from './commandText';
+import { routeControlLabel } from './TacticalRouteRibbon';
 import {
   tacticalPlaybackCasualties,
   tacticalRaiderIntentLabel,
@@ -179,9 +180,10 @@ function MinimapRouteBranch({
 }) {
   if (!view || view.display === 'hidden') return null;
   const suspected = view.display === 'suspected';
+  const control = routeControlLabel(view.route.control);
   const label = suspected
     ? `${view.route.label} — 우회 징후 · 도착 예상 ${view.expectedArrivalRounds?.[0]}~${view.expectedArrivalRounds?.[1]}교전`
-    : `${view.route.label} 보기 · 이동 중 ${view.transits.length}개 조`;
+    : `${view.route.label} 보기 · 이동 중 ${view.transits.length}개 조${control ? ` · ${control}` : ''}`;
   return (
     <button
       type="button"

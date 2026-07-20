@@ -23,7 +23,8 @@ export function parseRouteAnchorId(anchorId: string): TacticalRouteSide | null {
   return side === 'left' || side === 'right' ? side : null;
 }
 
-function controlLabel(control: TacticalFlankRouteView['route']['control']): string {
+// 미니맵도 같은 문구를 쓴다 — 통제 상태는 색 class와 함께 항상 문자로 전달한다(접근성).
+export function routeControlLabel(control: TacticalFlankRouteView['route']['control']): string {
   if (control === 'defender') return '아군 통제';
   if (control === 'raider') return '적 통제';
   if (control === 'contested') return '교전 중';
@@ -90,7 +91,7 @@ export function TacticalRouteRibbon({
               ? `${view.route.label} — 적 우회 징후. 정확한 위치는 알 수 없습니다.`
               : anchorActive
                 ? `${view.route.label} — 카드나 부대를 끌어 놓으면 경로 중간을 차단합니다.`
-                : `${view.route.label} — ${controlLabel(view.route.control) || '통행 없음'}`}
+                : `${view.route.label} — ${routeControlLabel(view.route.control) || '통행 없음'}`}
             disabled={playback}
             onClick={() => onFocusRoute('approach')}
           >
@@ -115,7 +116,7 @@ export function TacticalRouteRibbon({
               </span>
             )}
             {view.display === 'revealed' && view.route.control !== 'neutral' && (
-              <em className={`tactical-route-control ${view.route.control}`}>{controlLabel(view.route.control)}</em>
+              <em className={`tactical-route-control ${view.route.control}`}>{routeControlLabel(view.route.control)}</em>
             )}
             {advances.map(advance => (
               <em className="tactical-route-advance" key={`advance-${advance.groupId}-${advance.toStep}`}>
