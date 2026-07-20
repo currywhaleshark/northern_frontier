@@ -100,6 +100,14 @@ export const TACTICAL_COURT_POSE_SHEET = {
   src: '/assets/tactical/court-army-poses-v2.png',
 } as const;
 
+export const TACTICAL_COURT_SUPPORT_POSE_SHEET = {
+  spriteWidth: 168,
+  spriteHeight: 120,
+  columns: 2,
+  rows: 4,
+  src: '/assets/tactical/court-support-poses-v1.png',
+} as const;
+
 const ROLE_COLUMNS = {
   civilian: 0,
   militia: 2,
@@ -244,11 +252,25 @@ export function tacticalCourtPoseCell(
   return { column: COURT_COLUMNS[unitType] ?? 0, row: TACTICAL_POSE_ROWS[pose] };
 }
 
+const COURT_SUPPORT_COLUMNS: Partial<Record<import('../game/types').RaiderUnitType, number>> = {
+  'court-medic': 0,
+  'court-hwacha': 1,
+};
+
+export function tacticalCourtSupportPoseCell(
+  unitType: import('../game/types').RaiderUnitType,
+  pose: TacticalSpritePose,
+): { column: number; row: number } | null {
+  const column = COURT_SUPPORT_COLUMNS[unitType];
+  return column == null ? null : { column, row: TACTICAL_POSE_ROWS[pose] };
+}
+
 export function tacticalCourtMuzzleAnchor(
   unitType: import('../game/types').RaiderUnitType,
 ): TacticalMuzzleAnchor | null {
   if (unitType === 'court-gunner') return { x: 50, y: 57, size: 'musket' };
   if (unitType === 'court-artillery') return { x: 58, y: 72, size: 'cannon' };
+  if (unitType === 'court-hwacha') return { x: 34, y: 64, size: 'cannon' };
   return null;
 }
 

@@ -5,7 +5,7 @@ export interface TacticalSpriteMetric {
   readonly dy: number;
 }
 
-export type TacticalMetricSheetKey = 'defenderRoles' | 'defenderWeapons' | 'defenderDefaultWeapons' | 'healers' | 'specialResidents' | 'raiders' | 'court';
+export type TacticalMetricSheetKey = 'defenderRoles' | 'defenderWeapons' | 'defenderDefaultWeapons' | 'healers' | 'specialResidents' | 'raiders' | 'court' | 'courtSupport';
 
 export const TACTICAL_SPRITE_METRICS: Readonly<Record<
   TacticalMetricSheetKey,
@@ -670,6 +670,48 @@ export const TACTICAL_SPRITE_METRICS: Readonly<Record<
       {
         scale: 1.011,
         dy: 18.2
+      }
+    ]
+  ],
+  courtSupport: [
+    [
+      {
+        scale: 0.955,
+        dy: 0
+      },
+      {
+        scale: 0.991,
+        dy: 2
+      }
+    ],
+    [
+      {
+        scale: 1.05,
+        dy: 2.1
+      },
+      {
+        scale: 0.972,
+        dy: 2.9
+      }
+    ],
+    [
+      {
+        scale: 1.05,
+        dy: 10.5
+      },
+      {
+        scale: 0.972,
+        dy: 5.8
+      }
+    ],
+    [
+      {
+        scale: 1.05,
+        dy: 18.9
+      },
+      {
+        scale: 1.01,
+        dy: 21.2
       }
     ]
   ]

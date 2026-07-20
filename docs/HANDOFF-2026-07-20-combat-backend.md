@@ -418,3 +418,59 @@ raw `routeTransit.step`에서 추론하지 않는다. 비공개 이동은 기존
 `tsc`, P7 경로 계약, 배치, 무대 명령, 병과 상성, 저장 마이그레이션, 갱신한 전술 골든 fixture와
 프로덕션 빌드가 통과했다. 전체 `test:game`은 P7 테스트와 골든을 포함해 통과했고, 최종 실패 목록은 통합 전과
 동일한 `test_screen_ambient_audio.mjs`, 토벌 자동/직접 승률 게이트, `test_tactical_sprite_poses.mjs` 3건이다.
+
+## 12. 2026-07-20 통합 세션 — P7 프론트 통합과 Phase 8 지원·화포 백엔드 계약
+
+### P7 통합 확인
+
+- Fable의 P7 프론트 커밋 `1e34522`를 통합 브랜치에 fast-forward했다.
+- 경로 차단 배치, 우회 기동, `routeAdvances → routeEngagements → routeArrivals` 재생과 후열 급습 배지가
+  P7 selector/report 계약만 사용한다.
+
+### 지원 부대 상태와 selector
+
+`TacticalRaiderGroup`에 저장되는 `maximumPower`와 `supportState`가 추가됐다. supportState는
+`kind`, `shotsRemaining`, `readyOnRound`, `facingZoneId`, `lastFiredRound`, `totalRestored`를 가진다.
+프론트는 raw 필드 대신 `tacticalSupportUnitView(battle, group)`을 사용한다. 결과 status는
+`ready | firing | reloading | spent | treating`이고, 탄약·준비 라운드·방향 구역과 백엔드 상태 문구를 함께 준다.
+
+### 화포·화차 판정
+
+- 직접 화포는 3발, 발사 뒤 1교전 재장전이다. 화차는 2발, 발사 뒤 2교전 재장전이다.
+- 이동해 `zoneId`가 `facingZoneId`와 달라지면 그 교전은 포구 방향 조정에 쓰며 발사하지 않는다.
+- 발사 교전에만 본 전투력과 방책 압력을 낸다. 재장전·탄약 소진 중에는 취약한 운용 인원 방어력만 남는다.
+- 화차는 활성 수비 인원 8명 이상 밀집대에 강하고 산개한 소수 대상에는 배율이 크게 낮다.
+- 직접 화포는 기존 `artilleryHit`, 화차는 `hwachaVolley`, 방향 조정/재장전은 `supportReload` 이벤트를 낸다.
+  화차 발사 수는 `event.shots.rockets`에 기록된다. UI는 수치·배율을 하드코딩하지 않는다.
+- 후방에서 맞은 지원 부대는 기존 원거리 후방 취약 배율에 지원대 추가 배율이 겹친다. P7 자동 표적 우선순위의
+  화포→지원/의원 순서는 그대로 사용한다.
+
+### 의원대 판정
+
+- 의원대는 같은 구역의 생존 부대가 잃은 `power`만 회복한다. `killed`는 절대 줄지 않고,
+  `maximumPower × 생존 인원 비율`을 넘지 않는다.
+- 모든 의원대의 전투 누적 회복 상한은 `initialEnemyPower`의 10%다.
+- 회복량은 `pendingReport.raiderPowerRestored`, 연출은 `enemyTreatment` 이벤트에 기록된다.
+
+### 활성화·저장
+
+- `court-medic`, `court-hwacha`, `fireSupport`를 Phase 8에서 활성화했고 신규 방어전의 기본 최대 편제 단계는 8이다.
+- 저장 스키마는 v29다. 구 저장은 병종과 현재 구역에서 지원 상태·초기 전력 상한을 결정적으로 합성한다.
+- `tools/game/test_tactical_support_units.mjs`가 탄약, 재장전, 이동 뒤 방향 조정, 화차 밀집/산개,
+  비치명 회복 상한, 후방 취약, v29 마이그레이션을 고정한다.
+
+### 스프라이트 계약
+
+- 신규 시트: `/assets/tactical/court-support-poses-v1.png`, 336×480, 168×120 셀, 2열×4행.
+- 열은 의원대/화차, 행은 idle/attack/hurt/wounded다. 기존 관군 시트와 같은 화면 왼쪽 방향이다.
+- `TACTICAL_COURT_SUPPORT_POSE_SHEET`, `tacticalCourtSupportPoseCell`, 화차 발사 앵커를 추가했다.
+- 실제 화차 복원 사진을 기준으로 큰 바퀴·긴 들보·낮은 신기전 랙을 사용했다. 기존 화포대와 나란히 놓고
+  머리 크기·신장·발 기준선·수레 점유폭을 비교했으며 `courtSupport` 수동 head-box와 생성 메트릭을 추가했다.
+
+### Fable의 Phase 8 프론트 착수점
+
+1. `court-medic`/`court-hwacha`는 `TACTICAL_COURT_SUPPORT_POSE_SHEET`와 support pose cell을 사용한다.
+2. 지원 카드의 탄약·재장전·치료 상태는 `tacticalSupportUnitView`만 표시한다.
+3. `artilleryHit`, `hwachaVolley`, `supportReload`, `enemyTreatment`을 서로 다른 동작/효과음/칩으로 재생한다.
+4. `raiderPowerRestored`는 보고 수치이며 전사자 복귀로 표현하지 않는다.
+5. 전투 시뮬레이터의 교리/편제 선택 상한을 8로 올려 `court-fire-support`, `court-long-campaign`을 실화면 QA한다.

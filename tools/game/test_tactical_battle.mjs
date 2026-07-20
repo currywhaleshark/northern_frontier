@@ -1220,10 +1220,12 @@ function deployCommandableToZone(state, zoneId) {
   assert.equal(battle.enemyPlan.doctrine, 'shockBreakthrough');
   assert.equal(battle.enemyPlan.compositionTemplateId, 'court-siege-battery');
   assert.ok(battle.raiderGroups.every(group => group.revealed && group.morale >= 88));
-  assert.ok(tacticalEngagement.tacticalUnitWallPressure(
-    battle.raiderGroups.find(group => group.unitType === 'court-artillery'),
-    battle.enemyPlan.doctrine,
-  ) > 0, 'artillery wall pressure is derived from its static unit profile');
+  const artillery = battle.raiderGroups.find(group => group.unitType === 'court-artillery');
+  assert.equal(tacticalEngagement.tacticalUnitWallPressure(artillery, battle.enemyPlan.doctrine), 0,
+    'artillery applies no wall pressure while limbering or reloading');
+  artillery.supportState.firing = true;
+  assert.ok(tacticalEngagement.tacticalUnitWallPressure(artillery, battle.enemyPlan.doctrine) > 0,
+    'artillery applies its static wall pressure only during an explicit firing round');
 }
 
 {
@@ -1563,14 +1565,13 @@ function deployCommandableToZone(state, zoneId) {
   const mainGroups = battle.raiderGroups.filter(group => group.kind === 'main');
   assert.ok(mainGroups.length >= 3);
   mainGroups.forEach(group => { group.zoneId = 'wall'; group.morale = 100; });
+  const readyArtillery = battle.raiderGroups.find(group => group.unitType === 'court-artillery');
+  readyArtillery.supportState.facingZoneId = 'wall';
   battle.raiderGroups.filter(group => group.kind !== 'main').forEach(group => { group.intent = 'withdraw'; });
   battle.zones.find(zone => zone.id === 'wall').breached = true;
   assert.equal(tactical.resolveTacticalRound(state), null);
   const artilleryEvent = battle.pendingReport.events.find(event => event.kind === 'artilleryHit' && event.zoneId === 'wall');
-  assert.ok(artilleryEvent);
-  const artilleryGroup = battle.raiderGroups.find(group => group.unitType === 'court-artillery');
-  assert.equal(artilleryEvent.shots?.cannons, Math.max(0, artilleryGroup.count - artilleryGroup.killed),
-    'court artillery schedules one cannon sample per surviving gun crew');
+  assert.equal(artilleryEvent, undefined, 'limited artillery ammunition is not spent on an empty wall zone');
   const groupedAdvances = battle.pendingReport.events.filter(event =>
     event.kind === 'advance' && event.zoneId === 'wall' &&
     mainGroups.some(group => event.actorGroupIds?.includes(group.id)));
@@ -2355,8 +2356,8 @@ function deployCommandableToZone(state, zoneId) {
   assert.equal(bandits.centerBreached, false, 'bandit cavalry alone does not rout the village center');
   assert.ok(bandits.lootEvents >= 1, 'an unattended bandit raid gets at least one looting attempt');
   assert.notEqual(court.outcome, 'defenseSuccess', 'the court punitive force remains a losing matchup by default');
-  assert.equal(court.wallBreached, true, 'court artillery and main forces can break the wall within five engagements');
-  assert.ok(Math.max(...court.wallPressure) >= 100);
+  assert.ok(Math.max(...court.wallPressure) >= 80,
+    'phase-8 court doctrine selection still creates severe pressure even without a siege-battery roll');
 }
 
 for (const optionId of ['militia', 'levy']) {

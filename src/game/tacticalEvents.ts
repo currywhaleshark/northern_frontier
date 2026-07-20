@@ -2,7 +2,8 @@ import type { TacticalAnimationEventKind } from './types';
 
 export const TACTICAL_ANIMATION_EVENT_KINDS = Object.freeze([
   'camera', 'bombardment', 'fortify', 'prepareAmbush', 'readyVolley', 'muster', 'evacuate',
-  'conceal', 'zoneFall', 'artilleryHit', 'rearAssault', 'advance', 'ambush', 'volley', 'melee',
+  'conceal', 'zoneFall', 'artilleryHit', 'hwachaVolley', 'supportReload', 'enemyTreatment',
+  'rearAssault', 'advance', 'ambush', 'volley', 'melee',
   'wallAssault', 'wallHit', 'loot', 'retreat', 'fire', 'leaderEscape', 'escapeBlocked',
   'beastReveal', 'beastAmbush', 'beastRout', 'casualty', 'moraleBreak', 'report',
   'doctrineShift',

@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 28, 'route engagement save migrations ship with schema version 28');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 29, 'support-unit save migrations ship with schema version 29');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -59,6 +59,7 @@ assert.equal(typeof saveLoad.migrateV11ToV12, 'function');
 assert.equal(typeof saveLoad.migrateV12ToV13, 'function');
 assert.equal(typeof saveLoad.migrateV13ToV14, 'function');
 assert.equal(typeof saveLoad.migrateV14ToV15, 'function');
+assert.equal(typeof saveLoad.migrateV28ToV29, 'function');
 assert.equal(typeof saveLoad.migrateV15ToV16, 'function');
 assert.equal(typeof saveLoad.migrateV16ToV17, 'function');
 assert.equal(typeof saveLoad.migrateV17ToV18, 'function');

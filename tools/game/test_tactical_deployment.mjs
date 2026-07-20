@@ -268,7 +268,7 @@ function totals(groups) {
 }
 
 {
-  assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 28);
+  assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 29);
   assert.equal(saveLoad.migrateV24ToV25({ schemaVersion: 24, marker: 'kept' }).marker, 'kept');
   const state = battleSimulation.createBattleSimulation(simulationOptions({ seed: 2026072010 }));
   clearEnemyStratagems(state);

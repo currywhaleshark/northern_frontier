@@ -136,10 +136,10 @@ for (const definition of doctrineDefinitions) {
   assert.ok(definition.label && definition.strength && definition.weakness && definition.counter,
     `${definition.id} shares label, strength, weakness, and counter copy with the UI`);
 }
-assert.equal(enemyPlan.enemyDoctrineDefinition('fireSupport').enabled, false, 'fire support waits for phase 8');
+assert.equal(enemyPlan.enemyDoctrineDefinition('fireSupport').enabled, true, 'phase 8 activates fire support');
 assert.equal(enemyPlan.enemyDoctrineDefinition('feignedRetreat').enabled, false, 'feigned retreat remains deferred');
-assert.equal(new Set(doctrineDefinitions.filter(entry => entry.enabled).map(entry => entry.id)).size, 6,
-  'the MVP activates exactly six doctrines');
+assert.equal(new Set(doctrineDefinitions.filter(entry => entry.enabled).map(entry => entry.id)).size, 7,
+  'phase 8 activates fire support while feigned retreat remains deferred');
 
 for (const factionName of ['니마차 우디캐', '홀라온 야인', '변경 마적', '조정 토벌군']) {
   const counts = new Map();

@@ -175,12 +175,12 @@ const PROFILES: Record<RaiderUnitType, TacticalUnitIdentity> = {
   'court-medic': {
     id: 'court-medic', label: '의원대', archetype: 'medic',
     tags: ['infantry', 'support'], factions: ['court'], intelCategory: '의료 지원',
-    defaultLine: 'rear', implementationPhase: 8, enabled: false,
+    defaultLine: 'rear', implementationPhase: 8, enabled: true,
   },
   'court-hwacha': {
     id: 'court-hwacha', label: '화차', archetype: 'indirectArtillery',
     tags: ['artillery', 'ranged', 'firearm', 'indirectFire', 'support'], factions: ['court'],
-    intelCategory: '중화기 징후', defaultLine: 'rear', implementationPhase: 8, enabled: false,
+    intelCategory: '중화기 징후', defaultLine: 'rear', implementationPhase: 8, enabled: true,
   },
 };
 

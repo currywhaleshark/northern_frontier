@@ -1076,6 +1076,8 @@ export interface TacticalRaiderGroup {
   targetSource?: 'ai';
   targetZoneId: string;
   power: number;
+  /** Power at deployment, used as the hard ceiling for non-fatal support recovery. */
+  maximumPower?: number;
   estimatedPower?: number;
   count: number;
   killed: number;
@@ -1097,6 +1099,19 @@ export interface TacticalRaiderGroup {
   tigerTier?: TigerTier;
   leader?: boolean;
   routeTransit?: TacticalRouteTransit;
+  supportState?: TacticalRaiderSupportState;
+}
+
+export type TacticalRaiderSupportKind = 'directArtillery' | 'hwacha' | 'medic';
+
+export interface TacticalRaiderSupportState {
+  kind: TacticalRaiderSupportKind;
+  shotsRemaining: number;
+  readyOnRound: number;
+  facingZoneId: string;
+  firing?: boolean;
+  lastFiredRound?: number;
+  totalRestored?: number;
 }
 
 export interface TacticalPreparationEffect {
@@ -1118,6 +1133,9 @@ export type TacticalAnimationEventKind =
     | 'conceal'
     | 'zoneFall'
     | 'artilleryHit'
+    | 'hwachaVolley'
+    | 'supportReload'
+    | 'enemyTreatment'
     | 'rearAssault'
     | 'advance'
     | 'ambush'
@@ -1157,6 +1175,7 @@ export interface TacticalAnimationEvent {
     arrows?: number;
     muskets?: number;
     cannons?: number;
+    rockets?: number;
   };
 }
 
@@ -1172,6 +1191,7 @@ export interface TacticalRoundReport {
   routeArrivals?: TacticalRouteArrival[];
   wounded: number;
   treated?: number;
+  raiderPowerRestored?: number;
   killed: number;
   raidersKilled: number;
   loot: Partial<Record<ResourceId, number>>;

@@ -80,6 +80,22 @@ export function tacticalAttackerMatchupMultiplier(
 ): number {
   const profile = tacticalUnitProfileOrUndefined(attacker.unitType);
   if (!profile) return 1;
+  if (attacker.supportState?.kind === 'medic') {
+    return CONFIG.tacticalBattle.supportUnits.medic.combatPowerMultiplier;
+  }
+  if (attacker.supportState?.kind === 'directArtillery') {
+    return attacker.supportState.firing
+      ? CONFIG.tacticalBattle.supportUnits.directArtillery.firingPowerMultiplier
+      : CONFIG.tacticalBattle.supportUnits.directArtillery.inactivePowerMultiplier;
+  }
+  if (attacker.supportState?.kind === 'hwacha') {
+    if (!attacker.supportState.firing) return CONFIG.tacticalBattle.supportUnits.hwacha.inactivePowerMultiplier;
+    const activeTargets = defenders.reduce((sum, defender) => sum + activeDefenderCount(defender), 0);
+    const density = activeTargets >= CONFIG.tacticalBattle.supportUnits.hwacha.denseTargetCount
+      ? CONFIG.tacticalBattle.supportUnits.hwacha.denseTargetMultiplier
+      : CONFIG.tacticalBattle.supportUnits.hwacha.sparseTargetMultiplier;
+    return CONFIG.tacticalBattle.supportUnits.hwacha.firingPowerMultiplier * density;
+  }
   const ranged = tacticalTargetingRole(attacker) !== 'melee';
   let multiplier = ranged ? profile.rangedMultiplier : profile.meleeMultiplier;
   const firstContactShock = profile.tags.includes('shock') && attacker.engagementsInZone <= 0 &&
@@ -166,6 +182,9 @@ export function tacticalRaiderLossMatchupMultiplier(
   if (direction === 'rear' && (profile.tags.includes('ranged') || profile.tags.includes('artillery'))) {
     multiplier *= CONFIG.tacticalBattle.unitMatchups.rearRangedLossScale;
   }
+  if (direction === 'rear' && attacker.supportState) {
+    multiplier *= CONFIG.tacticalBattle.supportUnits.rearLossMultiplier;
+  }
   if (attacker.aiState === 'withdrawing') {
     multiplier *= CONFIG.tacticalBattle.unitMatchups.withdrawingLossScale;
   }
@@ -178,12 +197,18 @@ export function tacticalUnitWallPressure(
   wallBreakerEffectScale?: number,
 ): number {
   if (attacker.confused || activeRaiderCount(attacker) <= 0) return 0;
+  if (attacker.supportState?.kind === 'medic') return 0;
+  if ((attacker.supportState?.kind === 'directArtillery' || attacker.supportState?.kind === 'hwacha') &&
+      !attacker.supportState.firing) return 0;
   const profile = tacticalUnitProfileOrUndefined(attacker.unitType);
   if (!profile) return Math.max(0, attacker.wallPressureBonus ?? 0);
   const activeShare = attacker.count > 0 ? activeRaiderCount(attacker) / attacker.count : 0;
   let pressure = profile.wallPressure * activeShare * clamp(attacker.morale / 100, 0, 1);
   if (profile.archetype === 'wallBreaker' && wallBreakerEffectScale != null) {
     pressure *= clamp(wallBreakerEffectScale, 0, 1);
+  }
+  if (attacker.supportState?.kind === 'directArtillery' && attacker.supportState.firing) {
+    pressure *= CONFIG.tacticalBattle.supportUnits.directArtillery.wallPressureMultiplier;
   }
   if (doctrine === 'breachAndStorm' && profile.tags.includes('siege')) pressure *= 1.2;
   return pressure;
@@ -773,7 +798,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
   if (zone.id === 'wall' && !zone.breached) {
     const rangedWallUnits = new Set([
       'nimacha-hunter', 'holaon-horse-archer', 'bandit-rider',
-      'court-gunner', 'court-archer', 'court-artillery',
+      'court-gunner', 'court-archer', 'court-artillery', 'court-hwacha', 'court-medic',
     ]);
     const wallStriker = attackers
       .filter(attacker => !attacker.confused && !attacker.rearAssault &&
@@ -820,11 +845,22 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
       }));
     }
   }
-  if (zone.id === 'wall' && attackers.some(attacker =>
-    attacker.unitType === 'court-artillery' && !attacker.confused)) {
+  const directArtillery = attackers.find(attacker =>
+    attacker.supportState?.kind === 'directArtillery' && attacker.supportState.firing && !attacker.confused);
+  if (directArtillery) {
     enemyActionEvents.push(animationEvent(zone.id, 'artilleryHit', '토벌군 화포대의 포탄이 방책을 뒤흔듭니다.', 720, {
-      side: 'raider', float: '적 화포 사격!', shots: { cannons: raiderShots.cannons ?? 1 },
+      side: 'raider', groupId: directArtillery.id, actorGroupIds: [directArtillery.id],
+      float: '적 화포 사격!', shots: { cannons: Math.max(1, activeRaiderCount(directArtillery)) },
     }));
+  }
+  const hwacha = attackers.find(attacker =>
+    attacker.supportState?.kind === 'hwacha' && attacker.supportState.firing && !attacker.confused);
+  if (hwacha) {
+    enemyActionEvents.push(animationEvent(zone.id, 'hwachaVolley',
+      '토벌군 화차에서 신기전이 빗발칩니다.', 720, {
+        side: 'raider', groupId: hwacha.id, actorGroupIds: [hwacha.id],
+        float: '화차 일제사!', shots: { rockets: Math.max(1, activeRaiderCount(hwacha) * 5) },
+      }));
   }
 
   let rearAssaultCasualties = 0;

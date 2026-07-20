@@ -750,6 +750,30 @@ export const CONFIG = {
       rangedWeather: { heavySnow: 0.82, blizzard: 0.62 },
       firearmWeather: { rain: 0.82, heavySnow: 0.72, blizzard: 0.55 },
     },
+    supportUnits: {
+      directArtillery: {
+        maxShots: 3,
+        reloadRounds: 1,
+        firingPowerMultiplier: 1.18,
+        wallPressureMultiplier: 4,
+      inactivePowerMultiplier: 0.12,
+      },
+      hwacha: {
+        maxShots: 2,
+        reloadRounds: 2,
+        firingPowerMultiplier: 1.08,
+        denseTargetMultiplier: 1.22,
+        sparseTargetMultiplier: 0.62,
+        denseTargetCount: 8,
+        inactivePowerMultiplier: 0.1,
+      },
+      medic: {
+        recoveryPerActiveMedic: 0.65,
+        maximumBattleRecoveryShare: 0.1,
+        combatPowerMultiplier: 0.06,
+      },
+      rearLossMultiplier: 1.35,
+    },
     doctrineAi: {
       minIntentRounds: 2,
     },

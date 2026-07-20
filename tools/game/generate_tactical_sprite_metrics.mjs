@@ -60,6 +60,11 @@ const SHEETS = [
     src: 'public/assets/tactical/court-army-poses-v2.png',
     cellWidth: 168, cellHeight: 120, columns: 5, rows: 4,
   },
+  {
+    key: 'courtSupport',
+    src: 'public/assets/tactical/court-support-poses-v1.png',
+    cellWidth: 168, cellHeight: 120, columns: 2, rows: 4,
+  },
 ];
 
 const ALPHA_THRESHOLD = 50;
@@ -557,7 +562,7 @@ function main() {
     '  readonly dy: number;',
     '}',
     '',
-    "export type TacticalMetricSheetKey = 'defenderRoles' | 'defenderWeapons' | 'defenderDefaultWeapons' | 'healers' | 'specialResidents' | 'raiders' | 'court';",
+    "export type TacticalMetricSheetKey = 'defenderRoles' | 'defenderWeapons' | 'defenderDefaultWeapons' | 'healers' | 'specialResidents' | 'raiders' | 'court' | 'courtSupport';",
     '',
     'export const TACTICAL_SPRITE_METRICS: Readonly<Record<',
     '  TacticalMetricSheetKey,',

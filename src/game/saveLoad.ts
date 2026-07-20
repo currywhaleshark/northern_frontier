@@ -29,6 +29,7 @@ import { beginExpeditionReturn } from './expedition';
 import { CURRENT_SCHEMA_VERSION } from './saveSchema';
 import { defaultRaiderFormationLine } from './tacticalTargeting';
 import { legacyTacticalPlanMetadata } from './tacticalCompositions';
+import { createTacticalRaiderSupportState, tacticalSupportKindForUnitType } from './tacticalSupport';
 import { isImplementedLivestockId, normalizeLivestockState } from './livestock';
 import { normalizeTacticalGroupTargets } from './tacticalBattle';
 import {
@@ -353,6 +354,11 @@ export function migrateV27ToV28(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 28 };
 }
 
+// v29: explicit ammunition, reload, facing, and non-fatal recovery state for enemy support units.
+export function migrateV28ToV29(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 29 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -386,6 +392,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 25) migrated = migrateV25ToV26(migrated);
     else if (version === 26) migrated = migrateV26ToV27(migrated);
     else if (version === 27) migrated = migrateV27ToV28(migrated);
+    else if (version === 28) migrated = migrateV28ToV29(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -518,6 +525,7 @@ function migratePendingReport(
     routeArrivals: migrateRouteArrivals(report.routeArrivals, routeIds),
     wounded: Math.max(0, Number(report.wounded) || 0),
     treated: Math.max(0, Number(report.treated) || 0),
+    raiderPowerRestored: Math.max(0, Number(report.raiderPowerRestored) || 0),
     killed: Math.max(0, Number(report.killed) || 0),
     raidersKilled: Math.max(0, Number(report.raidersKilled) || 0),
     loot: report.loot && typeof report.loot === 'object' ? report.loot : {},
@@ -729,6 +737,26 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     const count = Number.isFinite(group.count)
       ? Math.max(0, Math.floor(Number(group.count)))
       : Math.max(1, Math.round(estimatedRaiders * (rawRaiderPower > 0 ? (Number(group.power) || 0) / rawRaiderPower : 1 / 3)));
+    const unitType = group.unitType as RaiderUnitType | undefined;
+    const expectedSupportKind = tacticalSupportKindForUnitType(unitType);
+    const rawSupport = group.supportState && typeof group.supportState === 'object'
+      ? group.supportState as Record<string, unknown>
+      : null;
+    const defaultSupport = createTacticalRaiderSupportState(unitType,
+      zoneIds.has(String(group.zoneId)) ? String(group.zoneId) : defaultZoneId);
+    const supportState = expectedSupportKind && defaultSupport ? {
+      ...defaultSupport,
+      shotsRemaining: Number.isFinite(rawSupport?.shotsRemaining)
+        ? Math.max(0, Math.floor(Number(rawSupport?.shotsRemaining))) : defaultSupport.shotsRemaining,
+      readyOnRound: Number.isFinite(rawSupport?.readyOnRound)
+        ? Math.max(1, Math.floor(Number(rawSupport?.readyOnRound))) : defaultSupport.readyOnRound,
+      facingZoneId: zoneIds.has(String(rawSupport?.facingZoneId))
+        ? String(rawSupport?.facingZoneId) : defaultSupport.facingZoneId,
+      firing: rawSupport?.firing === true,
+      lastFiredRound: Number.isFinite(rawSupport?.lastFiredRound)
+        ? Math.max(1, Math.floor(Number(rawSupport?.lastFiredRound))) : undefined,
+      totalRestored: Math.max(0, Number(rawSupport?.totalRestored) || 0),
+    } : undefined;
     return [{
       ...group,
       id: typeof group.id === 'string' ? group.id : `migrated-raider-${index}`,
@@ -741,6 +769,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       count,
       killed: Math.min(count, Math.max(0, Math.floor(Number(group.killed) || 0))),
       power,
+      maximumPower: Math.max(power, Number(group.maximumPower) || power),
       estimatedPower: Number.isFinite(group.estimatedPower) && Number(group.estimatedPower) >= 0
         ? Number(group.estimatedPower)
         : undefined,
@@ -760,6 +789,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       rearAssault: group.rearAssault === true,
       targetGroupId: typeof group.targetGroupId === 'string' ? group.targetGroupId : undefined,
       targetSource: 'ai',
+      supportState,
     }];
   });
   const legacyFlankers = migratedRaiderGroups.find(group => group.kind === 'flankers');
@@ -832,6 +862,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
         routeEngagements: migrateRouteEngagements(item.routeEngagements, flankRouteIds),
         routeArrivals: migrateRouteArrivals(item.routeArrivals, flankRouteIds),
         raidersKilled: Math.max(0, Number(item.raidersKilled) || 0),
+        raiderPowerRestored: Math.max(0, Number(item.raiderPowerRestored) || 0),
       } as unknown as TacticalRoundReport;
     });
   const phase = String(source.phase);

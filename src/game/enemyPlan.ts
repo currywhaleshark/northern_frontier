@@ -101,7 +101,7 @@ const DOCTRINE_DETAILS: Record<EnemyDoctrineId, {
     strength: '화차 사격 뒤 보병이 전진해 후열과 밀집대를 함께 위협합니다.',
     weakness: '재장전 중 기동 급습에 취약하고 산개한 대열에는 효율이 낮습니다.',
     counter: '대열을 산개하고 재장전 시점에 기동 부대로 급습하십시오.',
-    factions: ['court'], implementationPhase: 8, enabled: false,
+    factions: ['court'], implementationPhase: 8, enabled: true,
   },
   reserveCounterattack: {
     label: '예비대 역습',

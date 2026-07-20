@@ -80,6 +80,9 @@ assert.deepEqual(assets.tacticalDefenderPoseCell('militia', 'hornBow', 'male', '
 assert.equal(assets.tacticalRaiderPoseCell('변경 마적', 'attack')?.row, 1);
 assert.equal(assets.tacticalCourtPoseCell('court-artillery', 'hurt').column, 4);
 assert.equal(assets.tacticalCourtPoseCell('court-artillery', 'hurt').row, 2);
+assert.deepEqual(assets.tacticalCourtSupportPoseCell('court-medic', 'idle'), { column: 0, row: 0 });
+assert.deepEqual(assets.tacticalCourtSupportPoseCell('court-hwacha', 'attack'), { column: 1, row: 1 });
+assert.equal(assets.tacticalCourtSupportPoseCell('court-gunner', 'idle'), null);
 assert.deepEqual(assets.tacticalDefenderMuzzleAnchor('musket', 'male'), {
   x: 17, y: 47, size: 'musket',
 });
@@ -95,6 +98,9 @@ assert.deepEqual(assets.tacticalCourtMuzzleAnchor('court-gunner'), {
 });
 assert.deepEqual(assets.tacticalCourtMuzzleAnchor('court-artillery'), {
   x: 58, y: 72, size: 'cannon',
+});
+assert.deepEqual(assets.tacticalCourtMuzzleAnchor('court-hwacha'), {
+  x: 34, y: 64, size: 'cannon',
 });
 
 const screenSource = [

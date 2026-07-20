@@ -528,7 +528,7 @@
       "intelCategory": "의료 지원",
       "defaultLine": "rear",
       "implementationPhase": 8,
-      "enabled": false,
+      "enabled": true,
       "rangedMultiplier": 0.2,
       "meleeMultiplier": 0.25,
       "chargeMultiplier": 0.2,
@@ -555,7 +555,7 @@
       "intelCategory": "중화기 징후",
       "defaultLine": "rear",
       "implementationPhase": 8,
-      "enabled": false,
+      "enabled": true,
       "rangedMultiplier": 1.2,
       "meleeMultiplier": 0.25,
       "chargeMultiplier": 0.25,
@@ -651,7 +651,7 @@
         "court"
       ],
       "implementationPhase": 8,
-      "enabled": false
+      "enabled": true
     },
     {
       "id": "reserveCounterattack",
@@ -2423,6 +2423,9 @@
     "conceal",
     "zoneFall",
     "artilleryHit",
+    "hwachaVolley",
+    "supportReload",
+    "enemyTreatment",
     "rearAssault",
     "advance",
     "ambush",

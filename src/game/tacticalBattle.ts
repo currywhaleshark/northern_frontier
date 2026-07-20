@@ -50,6 +50,12 @@ import {
 import { tacticalCompositionTemplate } from './tacticalCompositions';
 import { tacticalUnitProfile } from './tacticalUnits';
 import {
+  applyTacticalRaiderSupportTreatment,
+  createTacticalRaiderSupportState,
+  prepareTacticalRaiderSupportRound,
+} from './tacticalSupport';
+export { tacticalSupportUnitView } from './tacticalSupport';
+import {
   advanceTacticalRouteTransits,
   createTacticalFlankRoutes,
   initializeEnemyTacticalRouteTransit,
@@ -793,6 +799,8 @@ function raiderGroups(
         case 'court-melee': return { morale: 93, combatMultiplier: 1.12, lossResistance: 0.78 };
         case 'court-cavalry': return { morale: 95, combatMultiplier: 1.2, lossResistance: 0.72 };
         case 'court-artillery': return { morale: 88, combatMultiplier: 1.24, lossResistance: 0.8 };
+        case 'court-hwacha': return { morale: 89, combatMultiplier: 1.1, lossResistance: 0.82 };
+        case 'court-medic': return { morale: 91, combatMultiplier: 1, lossResistance: 0.88 };
         default: return { morale: factionName === '조정 토벌군' ? 90 : 74 };
       }
     };
@@ -903,6 +911,7 @@ function raiderGroups(
       ? 'storehouse'
       : entry.kind === 'flankers' ? (flankPlan === 'rearAssault' ? 'wall' : 'center') : 'wall',
     power: powers[index],
+    maximumPower: powers[index],
     estimatedPower: enemyPlanStratagemScale(enemyPlan, 'feint') > 0 && entry.kind === 'main'
       ? powers[index] * CONFIG.tacticalBattle.enemyPlan.effects.feint.estimatedMainMultiplier
       : undefined,
@@ -918,6 +927,7 @@ function raiderGroups(
     flankPlan: entry.kind === 'flankers' ? flankPlan : undefined,
     flankPlanRevealed: entry.kind === 'flankers' ? flankPlanRevealed : undefined,
     rearAssault: false,
+    supportState: createTacticalRaiderSupportState(entry.unitType, 'approach'),
   }));
 }
 
@@ -966,7 +976,7 @@ export function createTacticalBattle(
     forcedDoctrine: params.forcedDoctrine,
     forcedCompositionTemplateId: params.forcedCompositionTemplateId,
     forcedFlankRoute: params.forcedFlankRoute,
-    maximumCompositionPhase: params.maximumCompositionPhase ?? 2,
+    maximumCompositionPhase: params.maximumCompositionPhase ?? 8,
     revealed: false,
   });
   const enemies = raiderGroups(params.factionName, originalPower, { scoutsReady, deepScouted }, enemyPlan);
@@ -2202,6 +2212,7 @@ export function resolveTacticalRound(state: GameState): string | null {
   }
   const events: TacticalAnimationEvent[] = [...routeResolution.events];
   const lines: string[] = [...routeResolution.lines];
+  prepareTacticalRaiderSupportRound(battle, events, lines);
   for (const advance of routeAdvances) {
     const route = battle.flankRoutes?.find(candidate => candidate.id === advance.routeId);
     const group = battle.raiderGroups.find(candidate => candidate.id === advance.groupId) ??
@@ -2465,6 +2476,7 @@ export function resolveTacticalRound(state: GameState): string | null {
   }
 
   const treatment = applyTacticalFieldTreatment(state, battle, events, lines, rng);
+  const raiderPowerRestored = applyTacticalRaiderSupportTreatment(battle, events, lines);
   villageMoraleDelta = Math.round(clamp(villageMoraleDelta, -18, 5));
   raiderMoraleDelta = Math.round(clamp(raiderMoraleDelta, -22, 0));
   battle.villageMorale = clamp(battle.villageMorale + villageMoraleDelta, 0, 100);
@@ -2613,6 +2625,7 @@ export function resolveTacticalRound(state: GameState): string | null {
     routeArrivals: routeResolution.arrivals,
     wounded: roundWounded,
     treated: treatment.treated,
+    raiderPowerRestored,
     killed: roundKilled,
     raidersKilled: roundRaidersKilled,
     loot: lootBag,
