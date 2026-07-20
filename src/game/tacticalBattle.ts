@@ -83,6 +83,7 @@ import type {
   EnemyDoctrineId,
   EnemyObjectiveId,
   EnemyPlan,
+  EnemyStratagemId,
   GameState,
   PreparationActionId,
   ResourceId,
@@ -946,6 +947,7 @@ export function createTacticalBattle(
     mode: 'garrison' | 'levy';
     forcedDoctrine?: EnemyDoctrineId;
     forcedCompositionTemplateId?: string;
+    forcedStratagem?: EnemyStratagemId | 'none';
     forcedFlankRoute?: TacticalRouteSide | 'none';
     maximumCompositionPhase?: 1 | 2 | 8;
   },
@@ -980,6 +982,7 @@ export function createTacticalBattle(
     compositionRoll,
     forcedDoctrine: params.forcedDoctrine,
     forcedCompositionTemplateId: params.forcedCompositionTemplateId,
+    forcedStratagem: params.forcedStratagem,
     forcedFlankRoute: params.forcedFlankRoute,
     maximumCompositionPhase: params.maximumCompositionPhase ?? 8,
     revealed: false,

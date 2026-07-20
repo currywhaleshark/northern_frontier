@@ -89,6 +89,12 @@ assert.match(simSetupSource, /enemyFlankRoute/,
   'the simulator must expose the forced flank route option');
 assert.match(simSetupSource, /enemyCompositionTemplateId:/,
   'the simulator must pass the forced composition template into the simulation options');
+assert.match(simSetupSource, /enemyStratagem:/,
+  'the simulator must pass the forced enemy stratagem into the simulation options');
+assert.match(simSetupSource, /includeCombatSpecialResidents:/,
+  'the simulator must pass the combat-special-resident crowd preset into the simulation options');
+assert.match(simSetupSource, /enemyStratagemDefinitions\(\)/,
+  'the simulator must list forceable stratagems from the backend registry');
 assert.match(simSetupSource, /template\.doctrines\.includes/,
   'forcing a doctrine must filter the template list to compatible compositions');
 assert.match(simSetupSource, /template\.implementationPhase <= 8/,

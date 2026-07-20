@@ -29,6 +29,7 @@ const enemyPlan = await import(pathToFileURL(join(compiledDir, 'enemyPlan.mjs'))
 const events = await import(pathToFileURL(join(compiledDir, 'tacticalEvents.mjs')).href);
 const targeting = await import(pathToFileURL(join(compiledDir, 'tacticalTargeting.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
+const battleSimulation = await import(pathToFileURL(join(compiledDir, 'battleSimulation.mjs')).href);
 const tacticalBattle = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
 
 const profiles = units.tacticalUnitProfiles();
@@ -129,6 +130,69 @@ const forcedNoRoute = enemyPlan.createEnemyPlan({
 });
 assert.equal(forcedNoRoute.flankRouteSide, undefined);
 assert.equal(forcedNoRoute.stratagems.some(entry => entry.id === 'rearManeuver'), false);
+
+const forcedWallBreakers = enemyPlan.createEnemyPlan({
+  factionName: '조정 토벌군', power: 160, relation: 100, revealed: true,
+  flankRoll: 0.99, objectiveRoll: 0.2, stratagemRoll: 0.99,
+  forcedCompositionTemplateId: 'court-legacy-punitive-force',
+  forcedStratagem: 'wallBreakers',
+  maximumCompositionPhase: 8,
+});
+assert.ok(forcedWallBreakers.stratagems.some(entry => entry.id === 'wallBreakers'),
+  'the simulator can force one enemy stratagem into the generated plan');
+const forcedNoStratagem = enemyPlan.createEnemyPlan({
+  factionName: '조정 토벌군', power: 160, relation: 0, revealed: true,
+  flankRoll: 0, objectiveRoll: 0.2, stratagemRoll: 0,
+  forcedStratagem: 'none',
+  maximumCompositionPhase: 8,
+});
+assert.deepEqual(forcedNoStratagem.stratagems, [],
+  'the simulator can explicitly suppress every enemy stratagem');
+
+const crowdedSimulation = battleSimulation.createBattleSimulation({
+  scenario: 'defense', mode: 'garrison', factionName: '조정 토벌군', power: 160,
+  warned: true, siege: true, season: 'winter', weather: 'clear', prepPoints: 0,
+  defenders: { muskets: 1, bows: 2, spears: 1, unarmedMilitia: 1, watchmen: 1, hunters: 1, civilians: 4 },
+  cannonEmplacements: 0, includeCombatSpecialResidents: true,
+  enemyDoctrine: 'missileSuppression',
+  enemyCompositionTemplateId: 'court-legacy-punitive-force',
+  enemyStratagem: 'wallBreakers', enemyFlankRoute: 'auto', seed: 20260720,
+});
+assert.deepEqual(
+  crowdedSimulation.residents.filter(resident => resident.special).map(resident => resident.special).sort(),
+  ['hangwae', 'jurchenWarrior', 'tigerHunter', 'uinyeo'].sort(),
+  'the crowd-QA preset includes exactly the four combat-visible special residents',
+);
+assert.equal(crowdedSimulation.tacticalBattle.raiderGroups.length, 5,
+  'the legacy court composition starts with five targetable enemy groups');
+assert.equal(tacticalBattle.advanceTacticalPhase(crowdedSimulation), null);
+assert.equal(crowdedSimulation.tacticalBattle.phase, 'deployment');
+for (const special of ['jurchenWarrior', 'tigerHunter', 'hangwae']) {
+  const group = crowdedSimulation.tacticalBattle.defenderGroups.find(candidate =>
+    candidate.featuredResidents?.some(featured => featured.special === special));
+  const featured = group?.featuredResidents?.find(candidate => candidate.special === special);
+  assert.ok(group && featured, `${special} is attached to a deployment group`);
+  assert.equal(tacticalBattle.splitFeaturedTacticalGroup(crowdedSimulation, group.id, featured.residentId), null);
+}
+const splitCandidate = crowdedSimulation.tacticalBattle.defenderGroups.find(group =>
+  group.commandable !== false && group.count >= 2 && !(group.featuredResidents?.length));
+assert.ok(splitCandidate, 'the crowd-QA roster leaves one regular group available for the tenth detachment');
+assert.equal(tacticalBattle.splitTacticalGroup(crowdedSimulation, splitCandidate.id, 1), null);
+assert.equal(
+  crowdedSimulation.tacticalBattle.defenderGroups.filter(group => group.commandable !== false).length,
+  10,
+  'the special-resident preset can reach the ten-commandable-group cap during deployment',
+);
+tacticalBattle.applyAutoDeployTacticalGroups(crowdedSimulation.tacticalBattle);
+assert.equal(tacticalBattle.advanceTacticalPhase(crowdedSimulation), null);
+assert.equal(crowdedSimulation.tacticalBattle.raiderGroups.length, 6,
+  'forced wall breakers materialize the sixth targetable enemy group at deployment');
+assert.equal(
+  crowdedSimulation.tacticalBattle.defenderGroups.filter(group => group.commandable !== false).length +
+    crowdedSimulation.tacticalBattle.raiderGroups.length,
+  16,
+  'the simulator reproduces the 10-friendly plus 6-enemy overlap QA contract',
+);
 
 const doctrineDefinitions = enemyPlan.enemyDoctrineDefinitions();
 assert.equal(doctrineDefinitions.length, 8, 'all persisted doctrine IDs have definitions');
