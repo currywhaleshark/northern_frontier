@@ -843,18 +843,32 @@ export function createEnemyPlan(input: EnemyPlanCreationInput): EnemyPlan {
   const forcedTemplateDoctrine = forcedTemplate?.faction === tacticalEnemyFactionId(input.factionName)
     ? forcedTemplate.doctrines.find(candidate => eligibleDoctrines.includes(candidate))
     : undefined;
-  const doctrine = input.forcedDoctrine && eligibleDoctrines.includes(input.forcedDoctrine)
+  let doctrine = input.forcedDoctrine && eligibleDoctrines.includes(input.forcedDoctrine)
     ? input.forcedDoctrine
     : forcedTemplateDoctrine ??
       chooseEnemyDoctrine(input.factionName, input.doctrineRoll ?? input.stratagemRoll ?? 0, maximumPhase);
-  if (relation >= CONFIG.tacticalBattle.enemyPlan.objectiveActivationRelation[factionKey(input.factionName)]) {
-    const plan = planFromLegacyFlank({ flankPlan: legacyFlankPlan, revealed: input.revealed });
-    const composition = chooseTacticalCompositionTemplate({
-      faction: tacticalEnemyFactionId(input.factionName), doctrine, objective: plan.objective, power,
+  const chooseComposition = (objective: EnemyObjectiveId) => {
+    const selectionInput = (candidateDoctrine: EnemyDoctrineId) => ({
+      faction: tacticalEnemyFactionId(input.factionName), doctrine: candidateDoctrine, objective, power,
       roll: input.compositionRoll ?? input.objectiveRoll ?? 0, maximumPhase,
       forcedTemplateId: input.forcedCompositionTemplateId,
       requiresFlankers: input.forcedFlankRoute === 'left' || input.forcedFlankRoute === 'right',
     });
+    let composition = chooseTacticalCompositionTemplate(selectionInput(doctrine));
+    if (composition || input.forcedDoctrine || input.forcedCompositionTemplateId) return composition;
+    const start = Math.max(0, eligibleDoctrines.indexOf(doctrine));
+    for (let offset = 1; offset < eligibleDoctrines.length; offset += 1) {
+      const fallbackDoctrine = eligibleDoctrines[(start + offset) % eligibleDoctrines.length];
+      composition = chooseTacticalCompositionTemplate(selectionInput(fallbackDoctrine));
+      if (!composition) continue;
+      doctrine = fallbackDoctrine;
+      return composition;
+    }
+    return undefined;
+  };
+  if (relation >= CONFIG.tacticalBattle.enemyPlan.objectiveActivationRelation[factionKey(input.factionName)]) {
+    const plan = planFromLegacyFlank({ flankPlan: legacyFlankPlan, revealed: input.revealed });
+    const composition = chooseComposition(plan.objective);
     plan.doctrine = doctrine;
     plan.doctrineRevealed = input.revealed;
     plan.compositionTemplateId = composition?.id;
@@ -872,12 +886,7 @@ export function createEnemyPlan(input: EnemyPlanCreationInput): EnemyPlan {
     input.objectiveRoll ?? 0,
   );
   const stratagemPoints = enemyStratagemPoints(input.factionName, power, relation);
-  const composition = chooseTacticalCompositionTemplate({
-    faction: tacticalEnemyFactionId(input.factionName), doctrine, objective, power,
-    roll: input.compositionRoll ?? input.objectiveRoll ?? 0, maximumPhase,
-    forcedTemplateId: input.forcedCompositionTemplateId,
-    requiresFlankers: input.forcedFlankRoute === 'left' || input.forcedFlankRoute === 'right',
-  });
+  const composition = chooseComposition(objective);
   const plan: EnemyPlan = {
     objective,
     objectiveRevealed: input.revealed,

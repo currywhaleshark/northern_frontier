@@ -47,6 +47,8 @@ export interface BattleSimulationOptions {
   enemyDoctrine?: EnemyDoctrineId | 'auto';
   enemyCompositionTemplateId?: string | 'auto';
   enemyFlankRoute?: TacticalRouteSide | 'none' | 'auto';
+  /** 개발 측정용 적대 관계. 생략하면 새 게임의 기본 관계를 유지한다. */
+  enemyRelation?: number;
   seed?: number;
 }
 
@@ -307,6 +309,9 @@ export function createBattleSimulation(options: BattleSimulationOptions): GameSt
     const power = factionName === '조정 토벌군'
       ? Math.max(120, Math.round(rolledPower))
       : Math.round(rolledPower);
+    if (Number.isFinite(options.enemyRelation)) {
+      state.relations[factionName] = Math.max(0, Math.min(100, Number(options.enemyRelation)));
+    }
     createTacticalBattle(state, {
       factionName, power, warned, siege, mode,
       forcedDoctrine: options.enemyDoctrine && options.enemyDoctrine !== 'auto'

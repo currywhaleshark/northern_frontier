@@ -10,6 +10,7 @@ import {
   enemyIntelLevel,
   enemyPlanFirstRoundMoraleBonus, enemyPlanPreparationPenalty, enemyPlanRangedEfficiency,
   enemyPlanStratagemScale, enemyPlanStratagemScaleForEngagement, enemyPlanWarningLines,
+  enemyDoctrineDefinition,
   flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
 } from './enemyPlan';
 import { addLog } from './events';
@@ -91,6 +92,8 @@ import type {
   TacticalFacing,
   TacticalFormationLine,
   TacticalRaiderGroup,
+  TacticalBattleFlankOutcome,
+  TacticalBattleTacticsReport,
   RaiderUnitType,
   TacticalRouteSide,
   TacticalRoundReport,
@@ -2763,6 +2766,67 @@ function outcomeLabel(
   return '습격대의 약탈을 막지 못했습니다';
 }
 
+function tacticalFlankOutcomeSummary(
+  label: string,
+  outcome: TacticalBattleFlankOutcome,
+  defenderArrivals: number,
+  raiderArrivals: number,
+): string {
+  if (outcome === 'raiderReachedRear') return `${label}에서 적 우회대 ${raiderArrivals}개 조가 아군 후열에 도달했습니다.`;
+  if (outcome === 'defenderReachedRear') return `${label}에서 아군 우회대 ${defenderArrivals}개 조가 적 후열에 도달했습니다.`;
+  if (outcome === 'defenderHeld') return `${label}의 차단대가 적 우회 시도를 저지했습니다.`;
+  if (outcome === 'contested') return `${label}의 통제권을 두고 교전했으나 출구 돌파는 없었습니다.`;
+  return `${label}이 열렸지만 경로 교전이나 후열 도달은 없었습니다.`;
+}
+
+export function tacticalBattleTacticsReport(battle: TacticalBattle): TacticalBattleTacticsReport {
+  const doctrineId = battle.enemyPlan?.doctrine;
+  const compositionTemplateId = battle.enemyPlan?.compositionTemplateId;
+  const composition = tacticalCompositionTemplate(compositionTemplateId);
+  const routeEngagements = battle.reports.flatMap(report => report.routeEngagements ?? []);
+  const routeArrivals = battle.reports.flatMap(report => report.routeArrivals ?? []);
+  const flankRoutes = (battle.flankRoutes ?? []).flatMap(route => {
+    const engagements = routeEngagements.filter(entry => entry.routeId === route.id);
+    const arrivals = routeArrivals.filter(entry => entry.routeId === route.id);
+    if (!route.openedByDefender && !route.openedByRaider && engagements.length === 0 && arrivals.length === 0) return [];
+    const defenderHolds = engagements.filter(entry => entry.outcome === 'defenderHeld').length;
+    const raiderBreakthroughs = engagements.filter(entry => entry.outcome === 'raiderBreakthrough').length;
+    const contestedEngagements = engagements.filter(entry => entry.outcome === 'contested').length;
+    const defenderArrivals = arrivals.filter(entry => entry.side === 'defender').length;
+    const raiderArrivals = arrivals.filter(entry => entry.side === 'raider').length;
+    const outcome: TacticalBattleFlankOutcome = raiderArrivals > 0
+      ? 'raiderReachedRear'
+      : defenderArrivals > 0
+        ? 'defenderReachedRear'
+        : engagements.length === 0
+          ? 'unused'
+          : route.control === 'defender' && defenderHolds > 0
+            ? 'defenderHeld'
+            : 'contested';
+    return [{
+      routeId: route.id,
+      side: route.side,
+      label: route.label,
+      finalControl: route.control,
+      outcome,
+      engagements: engagements.length,
+      defenderHolds,
+      raiderBreakthroughs,
+      contestedEngagements,
+      defenderArrivals,
+      raiderArrivals,
+      summary: tacticalFlankOutcomeSummary(route.label, outcome, defenderArrivals, raiderArrivals),
+    }];
+  });
+  return {
+    doctrineId,
+    doctrineLabel: doctrineId ? enemyDoctrineDefinition(doctrineId).label : '미확인 교리',
+    compositionTemplateId,
+    compositionLabel: composition?.label ?? '미확인 편제',
+    flankRoutes,
+  };
+}
+
 export function finishTacticalBattle(state: GameState): void {
   const battle = state.tacticalBattle;
   if (!battle) return;
@@ -2912,6 +2976,7 @@ export function finishTacticalBattle(state: GameState): void {
     threatAfter: state.threat,
     highlights,
     resourceDelta: tacticalResourceDelta(state, battle),
+    tactics: tacticalBattleTacticsReport(battle),
   };
   addLog(
     state,

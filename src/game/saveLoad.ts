@@ -5,7 +5,8 @@ import { combatGroupLabel } from './combatCapabilities';
 import { defaultCropForBuildingType } from './crops';
 import { rollCourtTribute } from './courtTribute';
 import {
-  flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan, migrateBanditLairDefensePlan, migrateEnemyPlan,
+  enemyDoctrineDefinitions, flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
+  migrateBanditLairDefensePlan, migrateEnemyPlan,
 } from './enemyPlan';
 import { spawnAnimalHabitats } from './habitats';
 import { makeRng } from './map';
@@ -28,7 +29,7 @@ import {
 import { beginExpeditionReturn } from './expedition';
 import { CURRENT_SCHEMA_VERSION } from './saveSchema';
 import { defaultRaiderFormationLine } from './tacticalTargeting';
-import { legacyTacticalPlanMetadata } from './tacticalCompositions';
+import { legacyTacticalPlanMetadata, tacticalCompositionTemplate } from './tacticalCompositions';
 import { createTacticalRaiderSupportState, tacticalSupportKindForUnitType } from './tacticalSupport';
 import { isImplementedLivestockId, normalizeLivestockState } from './livestock';
 import { normalizeTacticalGroupTargets } from './tacticalBattle';
@@ -47,7 +48,8 @@ import type {
   CombatWeaponId, CourtTribute, DefenderGroupKind, FermentBatch, GameState, Gender, Resident, ResourceId,
   PreparationActionId, RaiderUnitType, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
   SpecialResidentId, TacticalAiState, TacticalDeploymentPlacement, TacticalFeaturedResident, TacticalFormationLine,
-  TacticalFacing, TacticalPreparationEffect, TacticalRaiderGroup, TacticalRoundReport,
+  TacticalBattleFlankOutcome, TacticalBattleTacticsReport, TacticalFacing, TacticalPreparationEffect,
+  TacticalRaiderGroup, TacticalRoundReport,
 } from './types';
 
 export { CURRENT_SCHEMA_VERSION } from './saveSchema';
@@ -359,6 +361,12 @@ export function migrateV28ToV29(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 29 };
 }
 
+// v30: completed-battle doctrine, composition, and flank-route result records.
+// Report fields remain optional so older completed battles load without inventing history.
+export function migrateV29ToV30(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 30 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -393,6 +401,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 26) migrated = migrateV26ToV27(migrated);
     else if (version === 27) migrated = migrateV27ToV28(migrated);
     else if (version === 28) migrated = migrateV28ToV29(migrated);
+    else if (version === 29) migrated = migrateV29ToV30(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -1031,6 +1040,66 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
   return migrated;
 }
 
+const TACTICAL_FLANK_OUTCOMES = new Set<TacticalBattleFlankOutcome>([
+  'unused', 'defenderHeld', 'raiderReachedRear', 'defenderReachedRear', 'contested',
+]);
+
+function migrateTacticalBattleTacticsReport(raw: unknown): TacticalBattleTacticsReport | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const source = clonedRecord(raw);
+  const doctrine = enemyDoctrineDefinitions().find(entry => entry.id === source.doctrineId);
+  const compositionTemplateId = typeof source.compositionTemplateId === 'string'
+    ? source.compositionTemplateId
+    : undefined;
+  const composition = tacticalCompositionTemplate(compositionTemplateId);
+  const flankRoutes: TacticalBattleTacticsReport['flankRoutes'] = [];
+  for (const rawRoute of Array.isArray(source.flankRoutes) ? source.flankRoutes : []) {
+    const route = clonedRecord(rawRoute);
+    const routeId = typeof route.routeId === 'string' ? route.routeId.trim() : '';
+    const side = route.side === 'left' || route.side === 'right' ? route.side : null;
+    const finalControl = route.finalControl === 'defender' || route.finalControl === 'raider' ||
+      route.finalControl === 'contested' || route.finalControl === 'neutral'
+      ? route.finalControl
+      : null;
+    const outcome = TACTICAL_FLANK_OUTCOMES.has(route.outcome as TacticalBattleFlankOutcome)
+      ? route.outcome as TacticalBattleFlankOutcome
+      : null;
+    if (!routeId || !side || !finalControl || !outcome) continue;
+    const count = (value: unknown) => Math.max(0, Math.floor(Number(value) || 0));
+    const label = typeof route.label === 'string' && route.label.trim().length > 0
+      ? route.label.trim()
+      : side === 'left' ? '숲 능선길' : '하천 둥길';
+    flankRoutes.push({
+      routeId,
+      side,
+      label,
+      finalControl,
+      outcome,
+      engagements: count(route.engagements),
+      defenderHolds: count(route.defenderHolds),
+      raiderBreakthroughs: count(route.raiderBreakthroughs),
+      contestedEngagements: count(route.contestedEngagements),
+      defenderArrivals: count(route.defenderArrivals),
+      raiderArrivals: count(route.raiderArrivals),
+      summary: typeof route.summary === 'string' && route.summary.trim().length > 0
+        ? route.summary.trim()
+        : `${label} 우회 결과`,
+    });
+  }
+  if (!doctrine && !composition && flankRoutes.length === 0) return undefined;
+  return {
+    doctrineId: doctrine?.id,
+    doctrineLabel: typeof source.doctrineLabel === 'string' && source.doctrineLabel.trim().length > 0
+      ? source.doctrineLabel.trim()
+      : doctrine?.label ?? '미확인 교리',
+    compositionTemplateId: composition?.id,
+    compositionLabel: typeof source.compositionLabel === 'string' && source.compositionLabel.trim().length > 0
+      ? source.compositionLabel.trim()
+      : composition?.label ?? '미확인 편제',
+    flankRoutes,
+  };
+}
+
 function migrateTacticalBattleReport(raw: unknown): TacticalBattleReport | null {
   if (!raw || typeof raw !== 'object') return null;
   const report = clonedRecord(raw) as unknown as TacticalBattleReport;
@@ -1092,6 +1161,7 @@ function migrateTacticalBattleReport(raw: unknown): TacticalBattleReport | null 
     ? report.resourceDelta
     : Object.fromEntries(Object.entries(report.loot).map(([id, amount]) =>
       [id, report.encounterKind === 'raidDefense' ? -Number(amount) : Number(amount)]));
+  report.tactics = migrateTacticalBattleTacticsReport(report.tactics);
   return report;
 }
 

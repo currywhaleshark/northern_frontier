@@ -151,9 +151,12 @@ for (const factionName of ['니마차 우디캐', '홀라온 야인', '변경 �
       stratagemRoll: (index * 0.523) % 1,
       doctrineRoll: (index * 0.619) % 1,
       compositionRoll: (index * 0.757) % 1,
+      maximumCompositionPhase: 8,
     });
     assert.ok(plan.doctrine && plan.compositionTemplateId, `${factionName} locks doctrine and composition metadata`);
     const template = compositions.tacticalCompositionTemplate(plan.compositionTemplateId);
+    assert.ok(template.doctrines.includes(plan.doctrine), `${factionName} locks a composition-compatible doctrine`);
+    assert.ok(template.objectives.includes(plan.objective), `${factionName} locks an objective-compatible composition`);
     if (plan.stratagems.some(entry => entry.id === 'rearManeuver')) {
       assert.ok(template.slots.some(entry => entry.role === 'flankers'),
         `${factionName} never buys rear maneuver for a composition without a flanking group`);

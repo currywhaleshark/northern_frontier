@@ -113,8 +113,8 @@ assert.doesNotMatch(screenSource, /className="fx-muzzle-flash"/, 'zone-fixed mus
 assert.match(screenSource, /tactical-unit-muzzle-flash/, 'muzzle flash must be anchored inside each firing sprite');
 assert.match(screenSource, /muzzleAnchor = firing && resolvedPose === 'attack'/,
   'attack poses must only show muzzle flash during a firing event');
-assert.match(screenSource, /tacticalDefenderMuzzleAnchor\(group\.weapon, gender, group\.special\)/,
-  'special resident muskets need their own verified muzzle anchor');
+assert.match(screenSource, /tacticalDefenderMuzzleAnchor\(group\.weapon, gender, special\)/,
+  'each special-resident slot needs its own verified muzzle anchor without affecting mixed-group peers');
 assert.match(screenSource, /firing=\{recoiling\}/,
   'defender muzzle flash must follow the verified volley/recoil condition');
 assert.match(screenSource, /function arrowProjectileCountForZone/,
