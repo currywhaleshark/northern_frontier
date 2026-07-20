@@ -55,12 +55,14 @@ function applyFeaturedLabel(group: TacticalDefenderGroup): void {
   const featured = group.featuredResidents?.[0];
   const baseLabel = baseGroupLabel(group);
   group.baseLabel = baseLabel;
-  group.label = featured
-    ? group.featuredDetachment
-      ? `${featured.shortName}의 조 분리`
-      : `${featured.shortName}의 ${baseLabel}`
-    : baseLabel;
+  group.label = featured ? `${featured.shortName}의 ${baseLabel}` : baseLabel;
   group.special = featured?.special;
+}
+
+const COHORT_GROUP_ORDINALS = ['갑조', '을조', '병조'] as const;
+
+function cohortGroupOrdinal(index: number): string {
+  return COHORT_GROUP_ORDINALS[index] ?? `${index + 1}조`;
 }
 
 export function tacticalFeaturedResidentsFromSnapshots(
@@ -371,7 +373,7 @@ function relabelCohort(battle: TacticalBattle, cohortId: string): void {
   for (const group of groups) applyFeaturedLabel(group);
   common.forEach((group, index) => {
     const base = baseGroupLabel(group);
-    group.label = common.length > 1 || groups.length > 1 ? `${base} ${index + 1}조` : base;
+    group.label = common.length > 1 || groups.length > 1 ? `${base} ${cohortGroupOrdinal(index)}` : base;
   });
 }
 

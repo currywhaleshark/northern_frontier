@@ -121,15 +121,26 @@ function totals(groups) {
   const battle = enterDeployment(state);
   const original = battle.defenderGroups.find(group => group.commandable !== false && group.count >= 4 && !group.featuredResidents?.length);
   assert.ok(original);
+  const baseLabel = original.baseLabel ?? original.label;
   const cohortId = original.deploymentCohortId;
   const before = totals([original]);
   assert.equal(tactical.splitTacticalGroup(state, original.id, 1), null);
   const cohort = battle.defenderGroups.filter(group => group.deploymentCohortId === cohortId);
   assert.equal(cohort.length, 2);
+  assert.deepEqual(
+    [...cohort].sort((left, right) => left.id.localeCompare(right.id)).map(group => group.label),
+    [`${baseLabel} 갑조`, `${baseLabel} 을조`],
+    'ordinary detachments use period-appropriate cohort ordinals',
+  );
   assert.deepEqual(totals(cohort), before, 'ordinary split preserves residents, power, and musket readiness');
   assert.equal(tactical.splitTacticalGroup(state, original.id, 1), null);
   const cappedCohort = battle.defenderGroups.filter(group => group.deploymentCohortId === cohortId);
   assert.equal(cappedCohort.length, 3);
+  assert.deepEqual(
+    [...cappedCohort].sort((left, right) => left.id.localeCompare(right.id)).map(group => group.label),
+    [`${baseLabel} 갑조`, `${baseLabel} 을조`, `${baseLabel} 병조`],
+    'the third detachment is labeled 병조 at the per-cohort cap',
+  );
   assert.deepEqual(totals(cappedCohort), before);
   assert.match(tactical.splitTacticalGroup(state, original.id, 1), /최대 3개 조/);
   const detached = cappedCohort.filter(group => group.id !== original.id);
@@ -177,7 +188,9 @@ function totals(groups) {
   assert.equal(tactical.splitFeaturedTacticalGroup(state, named.id, fighters[0].id, [companionId]), null);
   const detachment = battle.defenderGroups.find(group => group.featuredDetachment === true);
   assert.ok(detachment);
-  assert.equal(detachment.label, '아라개의 조 분리');
+  assert.equal(detachment.label, '아라개의 창 수비병',
+    'a named detachment keeps its battlefield unit label instead of the split action label');
+  assert.equal(named.label, '창 수비병 갑조');
   assert.deepEqual(detachment.residentIds, [fighters[0].id, companionId]);
   assert.equal(detachment.special, 'jurchenWarrior');
   assert.equal(combatCapabilities.tacticalGroupCapabilities(detachment).has('ambush'), true);

@@ -364,10 +364,10 @@ function finishBattle(state) {
   assert.ok(Math.abs(battle.defenderGroups.reduce((sum, group) => sum + group.power, 0) - originalPower) < 1e-9);
   assert.ok(battle.defenderGroups.every(group => group.huntOriginGroupId === original.id));
   assert.deepEqual(battle.defenderGroups.map(group => group.label).sort(), [
-    `${baseLabel} 1조`,
-    `${baseLabel} 2조`,
-    `${baseLabel} 3조`,
-  ]);
+    `${baseLabel} 갑조`,
+    `${baseLabel} 을조`,
+    `${baseLabel} 병조`,
+  ].sort());
   const splitGroups = [...battle.defenderGroups].sort((left, right) => left.id.localeCompare(right.id));
   for (const [index, sectorId] of ['huntSectorRidge', 'huntSectorRavine', 'huntSectorBrook'].entries()) {
     assert.equal(tactical.assignDefenderGroup(state, splitGroups[index].id, sectorId), null);
