@@ -1,0 +1,15 @@
+Create one exact 4-column by 4-row historical pixel-art sprite sheet on a flat solid #FF00FF magenta background. Each cell contains exactly one complete named special resident mounted on a compact brown Korean warhorse, viewed from the side. Match the supplied mounted resident sheet's horse proportions, scale, pose timing, crisp dark outlines, and restrained Joseon palette. Preserve the supplied special-resident sheet's recognizable faces, hats, clothing colors, and signature equipment. No text, labels, grid lines, scenery, shadows, effects, particles, extra figures, duplicates, or omissions. Make every complete horse, rider, weapon, and tool small enough to leave a wide uninterrupted magenta margin on all four sides of its own cell; nothing may touch or cross a cell boundary.
+
+Columns left to right, same identity through all rows:
+1. Araggae / Jurchen warrior: rugged male frontier warrior in brown lamellar and fur-trimmed gear, long spear.
+2. Parkdolgae / tiger hunter: stocky male hunter in straw hat and brown hunting clothes, simple hunting bow and quiver; he shoots straight forward in the horse's screen-left direction.
+3. Dansim / tactical healer: female uinyeo in white head covering, teal jacket and burgundy skirt, compact field medicine satchel and bandages; mounted treatment gesture instead of an attack.
+4. Sayaka / matchlock defender: elderly male gunner with a weathered grandfather's face, gray brows and short gray facial hair, dark navy clothes and black gat-like hat, Joseon matchlock musket.
+
+Rows top to bottom:
+1. idle mounted ready stance.
+2. action: spear thrust, simple-bow shot straight forward toward screen-left, mounted treatment/bandaging gesture, clean matchlock aim without painted flash or smoke respectively.
+3. hurt recoil while staying mounted, signature equipment retained.
+4. wounded exhausted slump over the saddle, signature equipment retained.
+
+All 16 cells must be filled and ordered exactly as specified. Restore complete weapon tips, horse hooves, tails, hands, and tools inside each cell.

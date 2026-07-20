@@ -51,6 +51,13 @@ const SHEETS = [
     columnGroups: { 1: 'f', 3: 'f', 5: 'f' },
   },
   {
+    key: 'mountedDefenders',
+    src: 'public/assets/tactical/defender-mounted-poses-v1.png',
+    cellWidth: 168, cellHeight: 120, columns: 16, rows: 4,
+    columnGroups: { 1: 'f', 3: 'f', 5: 'f', 7: 'f', 9: 'f', 11: 'f', 14: 'f' },
+    normalized: true,
+  },
+  {
     key: 'raiders',
     src: 'public/assets/tactical/faction-raiders-poses-v2.png',
     cellWidth: 168, cellHeight: 120, columns: 6, rows: 4,
@@ -64,6 +71,30 @@ const SHEETS = [
     key: 'courtSupport',
     src: 'public/assets/tactical/court-support-poses-v1.png',
     cellWidth: 168, cellHeight: 120, columns: 2, rows: 4,
+  },
+  {
+    key: 'nimachaUnits',
+    src: 'public/assets/tactical/nimacha-unit-poses-v1.png',
+    cellWidth: 168, cellHeight: 120, columns: 5, rows: 4,
+    normalized: true,
+  },
+  {
+    key: 'holaonUnits',
+    src: 'public/assets/tactical/holaon-unit-poses-v1.png',
+    cellWidth: 168, cellHeight: 120, columns: 3, rows: 4,
+    normalized: true,
+  },
+  {
+    key: 'banditUnits',
+    src: 'public/assets/tactical/bandit-unit-poses-v1.png',
+    cellWidth: 168, cellHeight: 120, columns: 6, rows: 4,
+    normalized: true,
+  },
+  {
+    key: 'courtExpanded',
+    src: 'public/assets/tactical/court-expanded-poses-v1.png',
+    cellWidth: 168, cellHeight: 120, columns: 3, rows: 4,
+    normalized: true,
   },
 ];
 
@@ -90,7 +121,7 @@ const HEAD_BOXES_DIR = 'tools/game/head-boxes';
 // 화풍(신체 비례)이 달라 아군 머리 크기에 맞추면 전체가 거대해지므로,
 // 각 시트 자신의 중앙값을 기준으로 포즈·캐릭터 간 편차만 고르게 잡는다.
 const DEFENDER_REFERENCE_SHEET_KEYS = ['defenderRoles', 'defenderWeapons', 'defenderDefaultWeapons'];
-const DEFENDER_SHEET_KEYS = [...DEFENDER_REFERENCE_SHEET_KEYS, 'healers', 'specialResidents'];
+const DEFENDER_SHEET_KEYS = [...DEFENDER_REFERENCE_SHEET_KEYS, 'healers', 'specialResidents', 'mountedDefenders'];
 
 // ---------------------------------------------------------------- PNG 디코딩
 
@@ -482,6 +513,16 @@ function main() {
     const clamp = headSources.get(sheet.key) === 'boxes' ? SCALE_CLAMP : HEURISTIC_SCALE_CLAMP;
     metrics[sheet.key] = cells.map((rowCells, row) => rowCells.map((cell, column) => {
       if (!cell) return { scale: 1, dy: 0 };
+      if (sheet.normalized) {
+        reportLines.push([
+          sheet.key.padEnd(24),
+          `c${column} r${row}`.padEnd(7),
+          'pre-normalized'.padEnd(14),
+          'scale=1.000',
+          'dy=0.0',
+        ].join(' '));
+        return { scale: 1, dy: 0 };
+      }
       const reference = referenceFor(sheet.key, column);
       const headSize = headSizes.get(sheet.key)[row][column] ?? reference;
       const scale = Math.min(clamp.max, Math.max(clamp.min, reference / headSize));
@@ -562,7 +603,7 @@ function main() {
     '  readonly dy: number;',
     '}',
     '',
-    "export type TacticalMetricSheetKey = 'defenderRoles' | 'defenderWeapons' | 'defenderDefaultWeapons' | 'healers' | 'specialResidents' | 'raiders' | 'court' | 'courtSupport';",
+    "export type TacticalMetricSheetKey = 'defenderRoles' | 'defenderWeapons' | 'defenderDefaultWeapons' | 'healers' | 'specialResidents' | 'mountedDefenders' | 'raiders' | 'court' | 'courtSupport' | 'nimachaUnits' | 'holaonUnits' | 'banditUnits' | 'courtExpanded';",
     '',
     'export const TACTICAL_SPRITE_METRICS: Readonly<Record<',
     '  TacticalMetricSheetKey,',

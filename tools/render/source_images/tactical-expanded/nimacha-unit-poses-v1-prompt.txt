@@ -1,0 +1,5 @@
+Create a production-ready 2D pixel-art tactical combat pose sheet matching the existing Joseon northern-frontier raider sprites: crisp dark pixel outlines, warm muted hide/fur/wood colors, grounded historical equipment, strong readable silhouettes, transparent-ready edges.
+
+Exactly 5 equal columns and 4 equal rows, with no grid lines. Columns left to right: foot forest hunter with short composite hunting bow, foot spearman with long spear, foot looter with rope/loot sack/small hatchet, foot shield infantry with broad hide-covered wooden shield and short spear, foot wall-breaker with heavy hooked axe or timber-breaking maul. Rows top to bottom: idle, attack, hurt recoil, badly wounded crouched or kneeling but alive. All units face left in 3/4 side view.
+
+Every subject fits fully inside its cell with margin on all sides. Identity, costume, scale, and bounding box remain consistent through all poses. No horses, detached effects, arrows in flight, blood, muzzle flashes, labels, UI, borders, or watermarks. Background is 100% solid flat #FF00FF magenta.

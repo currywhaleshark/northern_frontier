@@ -27,6 +27,16 @@ assert.equal(assets.TACTICAL_HEALER_POSE_SHEET.src,
   '/assets/tactical/defender-healers-poses-v1.png');
 assert.equal(assets.TACTICAL_SPECIAL_RESIDENT_POSE_SHEET.src,
   '/assets/tactical/special-resident-combat-poses-v1.png');
+assert.equal(assets.TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.src,
+  '/assets/tactical/defender-mounted-poses-v1.png');
+assert.equal(assets.TACTICAL_NIMACHA_UNIT_POSE_SHEET.src,
+  '/assets/tactical/nimacha-unit-poses-v1.png');
+assert.equal(assets.TACTICAL_HOLAON_UNIT_POSE_SHEET.src,
+  '/assets/tactical/holaon-unit-poses-v1.png');
+assert.equal(assets.TACTICAL_BANDIT_UNIT_POSE_SHEET.src,
+  '/assets/tactical/bandit-unit-poses-v1.png');
+assert.equal(assets.TACTICAL_COURT_EXPANDED_POSE_SHEET.src,
+  '/assets/tactical/court-expanded-poses-v1.png');
 assert.equal(assets.tacticalDefaultWeaponPose({ id: 'militia-unarmed', role: 'militia', weapon: null }),
   'bambooSpear');
 assert.equal(assets.tacticalDefaultWeaponPose({ id: 'militia-unarmed-levy', role: 'militia', weapon: null }),
@@ -76,6 +86,60 @@ assert.deepEqual(assets.tacticalDefenderPoseCell('militia', 'musket', 'male', 'h
 });
 assert.deepEqual(assets.tacticalDefenderPoseCell('militia', 'hornBow', 'male', 'idle', null, 'jurchenWarrior'), {
   sheet: 'weapons', column: 2, row: 0,
+});
+assert.deepEqual(assets.tacticalMountedDefenderPoseCell('militia', null, 'male', 'idle', 'bambooSpear'), {
+  column: 0, row: 0,
+});
+assert.deepEqual(assets.tacticalMountedDefenderPoseCell('watchman', null, 'female', 'attack', 'watchmanBaton'), {
+  column: 3, row: 1,
+});
+assert.deepEqual(assets.tacticalMountedDefenderPoseCell('hunter', null, 'male', 'hurt'), {
+  column: 4, row: 2,
+});
+assert.deepEqual(assets.tacticalMountedDefenderPoseCell('militia', 'spear', 'female', 'wounded'), {
+  column: 7, row: 3,
+});
+assert.deepEqual(assets.tacticalMountedDefenderPoseCell('hunter', 'hornBow', 'male', 'attack'), {
+  column: 8, row: 1,
+});
+assert.deepEqual(assets.tacticalMountedDefenderPoseCell('militia', 'musket', 'female', 'idle'), {
+  column: 11, row: 0,
+});
+assert.deepEqual(assets.tacticalMountedDefenderPoseCell('militia', 'spear', 'male', 'attack', null, 'jurchenWarrior'), {
+  column: 12, row: 1,
+});
+assert.deepEqual(assets.tacticalMountedDefenderPoseCell('hunter', null, 'male', 'attack', null, 'tigerHunter'), {
+  column: 13, row: 1,
+});
+assert.deepEqual(assets.tacticalMountedDefenderPoseCell('healer', null, 'female', 'attack', null, 'uinyeo'), {
+  column: 14, row: 1,
+});
+assert.deepEqual(assets.tacticalMountedDefenderPoseCell('militia', 'musket', 'male', 'wounded', null, 'hangwae'), {
+  column: 15, row: 3,
+});
+assert.deepEqual(assets.tacticalExpandedRaiderPoseCell('니마차 우디캐', 'nimacha-spearman', 'attack'), {
+  sheet: 'nimachaUnits', column: 1, row: 1,
+});
+assert.deepEqual(assets.tacticalExpandedRaiderPoseCell('니마차 우디캐', 'shield-infantry', 'hurt'), {
+  sheet: 'nimachaUnits', column: 3, row: 2,
+});
+assert.deepEqual(assets.tacticalExpandedRaiderPoseCell('홀라온 야인', 'holaon-horse-archer', 'idle'), {
+  sheet: 'holaonUnits', column: 1, row: 0,
+});
+assert.deepEqual(assets.tacticalExpandedRaiderPoseCell('변경 마적', 'deserter-musketeer', 'attack'), {
+  sheet: 'banditUnits', column: 4, row: 1,
+});
+assert.deepEqual(assets.tacticalExpandedRaiderPoseCell('변경 마적', 'wall-breaker', 'wounded'), {
+  sheet: 'banditUnits', column: 5, row: 3,
+});
+assert.deepEqual(assets.tacticalExpandedRaiderPoseCell('조정 토벌군', 'court-shield', 'idle'), {
+  sheet: 'courtExpanded', column: 0, row: 0,
+});
+assert.deepEqual(assets.tacticalExpandedRaiderPoseCell('조정 토벌군', 'court-horse-archer', 'attack'), {
+  sheet: 'courtExpanded', column: 1, row: 1,
+});
+assert.deepEqual(assets.tacticalExpandedRaiderPoseCell('조정 토벌군', 'wall-breaker', 'hurt'), {
+  sheet: 'courtExpanded', column: 2, row: 2,
 });
 assert.equal(assets.tacticalRaiderPoseCell('변경 마적', 'attack')?.row, 1);
 assert.equal(assets.tacticalCourtPoseCell('court-artillery', 'hurt').column, 4);
@@ -153,8 +217,12 @@ assert.match(screenSource, /TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET/,
   'defender rendering must use the dedicated default weapon pose sheet');
 assert.match(screenSource, /group\.mount === 'horse'/,
   'mounted defender groups select the horse sprite');
-assert.match(screenSource, /TACTICAL_CHARACTER_SHEET/,
-  'mounted defenders reuse the mounted column from the folk character sheet');
+assert.match(screenSource, /tacticalMountedDefenderPoseCell/,
+  'mounted defenders select a live weapon and pose cell instead of the legacy static horse portrait');
+assert.match(screenSource, /TACTICAL_MOUNTED_DEFENDER_POSE_SHEET/,
+  'mounted defenders use the dedicated combat pose sheet in both stage and dock rendering');
+assert.match(screenSource, /tacticalExpandedRaiderPoseCell/,
+  'expanded enemy unit types use faction-specific silhouettes instead of one faction portrait');
 // 머리 크기 기준 정규화: 셀별 배율은 생성된 메트릭이 공급하고, CSS는 --unit-scale/--unit-dy를 반영해야 한다.
 assert.match(screenSource, /tacticalSpriteMetricVars\('court'/,
   'court sprites must apply generated head-size metrics');
@@ -181,8 +249,13 @@ const expectedMetricShapes = {
   defenderDefaultWeapons: { rows: 4, columns: 6 },
   healers: { rows: 4, columns: 2 },
   specialResidents: { rows: 4, columns: 4 },
+  mountedDefenders: { rows: 4, columns: 16 },
   raiders: { rows: 4, columns: 6 },
   court: { rows: 4, columns: 5 },
+  nimachaUnits: { rows: 4, columns: 5 },
+  holaonUnits: { rows: 4, columns: 3 },
+  banditUnits: { rows: 4, columns: 6 },
+  courtExpanded: { rows: 4, columns: 3 },
 };
 for (const [sheetKey, shape] of Object.entries(expectedMetricShapes)) {
   const sheetMetrics = metrics.TACTICAL_SPRITE_METRICS[sheetKey];

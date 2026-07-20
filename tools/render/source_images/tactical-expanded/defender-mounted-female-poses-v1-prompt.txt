@@ -1,0 +1,17 @@
+Create one exact 6-column by 4-row pixel-art sprite sheet on a perfectly flat solid #FF00FF magenta background. Every cell contains exactly one complete mounted female Joseon villager defender, viewed from the side and facing right, riding the same compact brown Korean warhorse. Match the supplied male mounted sheet's crisp historical pixel-art scale, dark outlines, restrained Joseon palette, horse proportions, spacing, and pose timing, while matching the supplied resident references for practical female Joseon village clothing, headbands, braided or tied hair, and clearly feminine faces. No text, labels, grid lines, shadows, scenery, borders, transparency, gradients, glow, smoke, particles, or loose objects. Keep every rider, horse, weapon, and muzzle fully inside its own cell with generous clear magenta padding; never let a weapon cross a cell boundary.
+
+Columns, left to right, keep the same female rider identity through all four rows:
+1. bamboo spear: simple bamboo-shaft spear, pale work clothes and headband.
+2. watchman baton: short slim dark hardwood six-faceted yukmo-bangmangi (육모방망이), dark blue vest; never a paddle, mallet, plank, or mace.
+3. hunter default: plain one-piece wooden hunting bow (사냥활) with a shallow curve and minimal decoration, quiver, olive work clothes.
+4. assigned spear: long military spear, pale work clothes.
+5. assigned horn bow: compact strongly reflexed Korean horn bow (각궁) with wrapped grip and curled-back limb tips, quiver, dark blue clothes; clearly distinct from the simple hunting bow.
+6. assigned musket: Joseon matchlock musket, pale work clothes.
+
+Rows, top to bottom, keep the exact same four pose semantics in every column:
+1. idle mounted ready stance.
+2. attack: thrust spear, swing baton, loose arrow, thrust long spear, loose arrow, fire/aim matchlock respectively.
+3. hurt recoil while staying mounted, weapon retained.
+4. wounded exhausted slump over the saddle, weapon retained and safely inside the cell.
+
+All 24 cells must be filled, ordered exactly as specified, with no duplicates, omissions, extra figures, cropped anatomy, or weapon spillover.

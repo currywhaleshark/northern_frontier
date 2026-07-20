@@ -25,7 +25,8 @@ import type {
 } from '../../game/types';
 import { tacticalBackgroundAsset } from '../../render/tacticalBackgroundAssets';
 import {
-  TACTICAL_CHARACTER_SHEET,
+  TACTICAL_BANDIT_UNIT_POSE_SHEET,
+  TACTICAL_COURT_EXPANDED_POSE_SHEET,
   TACTICAL_COURT_POSE_SHEET,
   TACTICAL_COURT_SUPPORT_POSE_SHEET,
   TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET,
@@ -33,6 +34,9 @@ import {
   TACTICAL_DEFENDER_ROLE_POSE_SHEET,
   TACTICAL_DEFENDER_WEAPON_POSE_SHEET,
   TACTICAL_SPECIAL_RESIDENT_POSE_SHEET,
+  TACTICAL_HOLAON_UNIT_POSE_SHEET,
+  TACTICAL_MOUNTED_DEFENDER_POSE_SHEET,
+  TACTICAL_NIMACHA_UNIT_POSE_SHEET,
   TACTICAL_RAIDER_POSE_SHEET,
   tacticalBeastSheet,
   tacticalCourtMuzzleAnchor,
@@ -41,6 +45,10 @@ import {
   tacticalDefaultWeaponPose,
   tacticalDefenderMuzzleAnchor,
   tacticalDefenderPoseCell,
+  tacticalExpandedRaiderMuzzleAnchor,
+  tacticalExpandedRaiderPoseCell,
+  tacticalMountedDefenderMuzzleAnchor,
+  tacticalMountedDefenderPoseCell,
   tacticalRaiderPoseCell,
   type TacticalMuzzleAnchor,
   type TacticalSpritePose,
@@ -142,26 +150,36 @@ function DefenderSprite({ group, gender, pose = 'idle', firing = false, faded = 
   /** 슬롯 단위 특수주민 시트 지정 — 특수주민이 섞인 조에서 본인 슬롯에만 전용 시트를 쓴다 */
   special?: SpecialResidentId;
 }) {
-  if (group.mount === 'horse') {
-    const mountedX = TACTICAL_CHARACTER_SHEET.residentColumns * TACTICAL_CHARACTER_SHEET.residentWidth;
-    const mountedY = (gender === 'male' ? 0 : 1) * TACTICAL_CHARACTER_SHEET.spriteHeight;
-    const sheetWidth = mountedX + TACTICAL_CHARACTER_SHEET.mountedWidth;
-    const sheetHeight = TACTICAL_CHARACTER_SHEET.rows * TACTICAL_CHARACTER_SHEET.spriteHeight;
-    return (
-      <span
-        className={`tactical-sprite tactical-defender mounted role-${group.role} weapon-${group.weapon ?? 'unarmed'} pose-${falling ? 'hurt' : pose}${faded ? ' faded' : ''}${falling ? ' falling' : ''}`}
-        style={{
-          backgroundImage: `url(${TACTICAL_CHARACTER_SHEET.src})`,
-          backgroundPosition: `${-mountedX}px ${-mountedY}px`,
-          backgroundSize: `${sheetWidth}px ${sheetHeight}px`,
-        }}
-        aria-hidden="true"
-      />
-    );
-  }
   const descriptor = combatSpriteDescriptor(group.role, group.weapon);
   const resolvedPose = falling ? 'hurt' : pose;
   const defaultWeapon = tacticalDefaultWeaponPose(group);
+  if (group.mount === 'horse') {
+    const cell = tacticalMountedDefenderPoseCell(
+      group.role,
+      descriptor.source === 'weapon' ? descriptor.id : null,
+      gender,
+      resolvedPose,
+      defaultWeapon,
+      special,
+    );
+    const muzzleAnchor = firing && resolvedPose === 'attack'
+      ? tacticalMountedDefenderMuzzleAnchor(group.weapon, gender, special)
+      : null;
+    return (
+      <span
+        className={`tactical-sprite tactical-defender mounted role-${group.role} weapon-${group.weapon ?? 'unarmed'} default-weapon-${defaultWeapon ?? 'none'} pose-${resolvedPose}${faded ? ' faded' : ''}${falling ? ' falling' : ''}`}
+        style={{
+          backgroundImage: `url(${TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.src})`,
+          backgroundPosition: `${-cell.column * TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.spriteWidth}px ${-cell.row * TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.spriteHeight}px`,
+          backgroundSize: `${TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.columns * TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.spriteWidth}px ${TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.rows * TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.spriteHeight}px`,
+          ...tacticalSpriteMetricVars('mountedDefenders', cell.column, cell.row),
+        } as CSSProperties}
+        aria-hidden="true"
+      >
+        {muzzleAnchor && <UnitMuzzleFlash anchor={muzzleAnchor} />}
+      </span>
+    );
+  }
   const cell = tacticalDefenderPoseCell(
     group.role,
     descriptor.source === 'weapon' ? descriptor.id : null,
@@ -234,6 +252,7 @@ function CourtRaiderSprite({ unitType, pose, firing, falling }: {
     );
   }
   const cell = tacticalCourtPoseCell(unitType, resolvedPose);
+  if (!cell) return <span className="tactical-raider-unknown" aria-hidden="true">?</span>;
   const muzzleAnchor = firing && resolvedPose === 'attack' ? tacticalCourtMuzzleAnchor(unitType) : null;
   return (
     <span
@@ -243,6 +262,45 @@ function CourtRaiderSprite({ unitType, pose, firing, falling }: {
         backgroundPosition: `${-cell.column * TACTICAL_COURT_POSE_SHEET.spriteWidth}px ${-cell.row * TACTICAL_COURT_POSE_SHEET.spriteHeight}px`,
         backgroundSize: `${TACTICAL_COURT_POSE_SHEET.columns * TACTICAL_COURT_POSE_SHEET.spriteWidth}px ${TACTICAL_COURT_POSE_SHEET.rows * TACTICAL_COURT_POSE_SHEET.spriteHeight}px`,
         ...tacticalSpriteMetricVars('court', cell.column, cell.row),
+      } as CSSProperties}
+      aria-hidden="true"
+    >
+      {muzzleAnchor && <UnitMuzzleFlash anchor={muzzleAnchor} />}
+    </span>
+  );
+}
+
+function ExpandedRaiderSprite({ faction, unitType, pose, firing, falling, offset }: {
+  faction: string;
+  unitType: RaiderUnitType;
+  pose: TacticalSpritePose;
+  firing: boolean;
+  falling: boolean;
+  offset: number;
+}) {
+  const resolvedPose = falling ? 'hurt' : pose;
+  const cell = tacticalExpandedRaiderPoseCell(faction, unitType, resolvedPose);
+  if (!cell) return null;
+  const sheet = cell.sheet === 'nimachaUnits'
+    ? TACTICAL_NIMACHA_UNIT_POSE_SHEET
+    : cell.sheet === 'holaonUnits'
+      ? TACTICAL_HOLAON_UNIT_POSE_SHEET
+      : cell.sheet === 'banditUnits'
+        ? TACTICAL_BANDIT_UNIT_POSE_SHEET
+        : TACTICAL_COURT_EXPANDED_POSE_SHEET;
+  const muzzleAnchor = firing && resolvedPose === 'attack'
+    ? tacticalExpandedRaiderMuzzleAnchor(faction, unitType)
+    : null;
+  return (
+    <span
+      className={`tactical-sprite tactical-raider expanded-raider unit-${unitType} pose-${resolvedPose}${falling ? ' falling' : ''}`}
+      style={{
+        backgroundImage: `url(${sheet.src})`,
+        backgroundPosition: `${-cell.column * sheet.spriteWidth}px ${-cell.row * sheet.spriteHeight}px`,
+        backgroundSize: `${sheet.columns * sheet.spriteWidth}px ${sheet.rows * sheet.spriteHeight}px`,
+        marginLeft: offset > 0 ? -140 : 0,
+        marginBottom: (offset % 3) * 4,
+        ...tacticalSpriteMetricVars(cell.sheet, cell.column, cell.row),
       } as CSSProperties}
       aria-hidden="true"
     >
@@ -300,6 +358,9 @@ function RaiderSprite({
   if (beastKind) return (
     <BeastSprite kind={beastKind} tigerTier={tigerTier} hidden={hidden} pose={pose} falling={falling} />
   );
+  if (!hidden && unitType && tacticalExpandedRaiderPoseCell(faction, unitType, falling ? 'hurt' : pose)) {
+    return <ExpandedRaiderSprite faction={faction} unitType={unitType} pose={pose} firing={firing} falling={falling} offset={offset} />;
+  }
   if (!hidden && faction === '조정 토벌군' && unitType?.startsWith('court-')) {
     return <CourtRaiderSprite unitType={unitType} pose={pose} firing={firing} falling={falling} />;
   }
@@ -630,10 +691,11 @@ function defenderFiringForEvent(
 }
 
 function raiderShotKind(group: TacticalRaiderGroup): 'arrow' | 'musket' | 'cannon' | null {
-  if (group.unitType === 'court-gunner') return 'musket';
+  if (group.unitType === 'court-gunner' || group.unitType === 'deserter-musketeer') return 'musket';
   if (group.unitType === 'court-artillery') return 'cannon';
   if (group.unitType === 'nimacha-hunter' || group.unitType === 'holaon-horse-archer' ||
-      group.unitType === 'bandit-rider' || group.unitType === 'court-archer') return 'arrow';
+      group.unitType === 'bandit-rider' || group.unitType === 'court-archer' ||
+      group.unitType === 'court-horse-archer') return 'arrow';
   return null;
 }
 

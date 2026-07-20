@@ -108,6 +108,46 @@ export const TACTICAL_COURT_SUPPORT_POSE_SHEET = {
   src: '/assets/tactical/court-support-poses-v1.png',
 } as const;
 
+export const TACTICAL_MOUNTED_DEFENDER_POSE_SHEET = {
+  spriteWidth: 168,
+  spriteHeight: 120,
+  columns: 16,
+  rows: 4,
+  src: '/assets/tactical/defender-mounted-poses-v1.png',
+} as const;
+
+export const TACTICAL_NIMACHA_UNIT_POSE_SHEET = {
+  spriteWidth: 168,
+  spriteHeight: 120,
+  columns: 5,
+  rows: 4,
+  src: '/assets/tactical/nimacha-unit-poses-v1.png',
+} as const;
+
+export const TACTICAL_HOLAON_UNIT_POSE_SHEET = {
+  spriteWidth: 168,
+  spriteHeight: 120,
+  columns: 3,
+  rows: 4,
+  src: '/assets/tactical/holaon-unit-poses-v1.png',
+} as const;
+
+export const TACTICAL_BANDIT_UNIT_POSE_SHEET = {
+  spriteWidth: 168,
+  spriteHeight: 120,
+  columns: 6,
+  rows: 4,
+  src: '/assets/tactical/bandit-unit-poses-v1.png',
+} as const;
+
+export const TACTICAL_COURT_EXPANDED_POSE_SHEET = {
+  spriteWidth: 168,
+  spriteHeight: 120,
+  columns: 3,
+  rows: 4,
+  src: '/assets/tactical/court-expanded-poses-v1.png',
+} as const;
+
 const ROLE_COLUMNS = {
   civilian: 0,
   militia: 2,
@@ -195,6 +235,43 @@ export function tacticalDefenderPoseCell(
   return { sheet: 'roles', column: ROLE_COLUMNS[role] + genderOffset, row: TACTICAL_POSE_ROWS[pose] };
 }
 
+export function tacticalMountedDefenderPoseCell(
+  role: import('../game/combatRoster').CombatRole,
+  weapon: import('../game/types').CombatWeaponId | null,
+  gender: 'male' | 'female',
+  pose: TacticalSpritePose,
+  defaultWeapon: TacticalDefaultWeaponPose | null = null,
+  special?: SpecialResidentId,
+): { column: number; row: number } {
+  const specialColumn = special == null ? null : SPECIAL_MOUNTED_COLUMNS[special];
+  if (specialColumn != null) {
+    return { column: specialColumn, row: TACTICAL_POSE_ROWS[pose] };
+  }
+  const genderOffset = gender === 'female' ? 1 : 0;
+  const loadoutColumn = weapon === 'spear'
+    ? 6
+    : weapon === 'hornBow'
+      ? 8
+      : weapon === 'musket'
+        ? 10
+        : defaultWeapon === 'watchmanBaton' || role === 'watchman'
+          ? 2
+          : role === 'hunter'
+            ? 4
+            : 0;
+  return { column: loadoutColumn + genderOffset, row: TACTICAL_POSE_ROWS[pose] };
+}
+
+export function tacticalMountedDefenderMuzzleAnchor(
+  weapon: import('../game/types').CombatWeaponId | null,
+  gender: 'male' | 'female',
+  special?: SpecialResidentId,
+): TacticalMuzzleAnchor | null {
+  if (weapon !== 'musket') return null;
+  if (special === 'hangwae') return { x: 8, y: 46, size: 'musket' };
+  return { x: gender === 'female' ? 15 : 13, y: 47, size: 'musket' };
+}
+
 export function tacticalDefenderMuzzleAnchor(
   weapon: import('../game/types').CombatWeaponId | null,
   gender: 'male' | 'female',
@@ -237,6 +314,87 @@ export function tacticalRaiderPoseCell(
   return column == null ? null : { column, row: TACTICAL_POSE_ROWS[pose] };
 }
 
+type TacticalExpandedRaiderSheet = 'nimachaUnits' | 'holaonUnits' | 'banditUnits' | 'courtExpanded';
+
+const EXPANDED_RAIDER_COLUMNS: Readonly<Record<string, {
+  sheet: TacticalExpandedRaiderSheet;
+  faction: string;
+  columns: Partial<Record<import('../game/types').RaiderUnitType, number>>;
+}>> = {
+  nimacha: {
+    sheet: 'nimachaUnits',
+    faction: '니마차 우디캐',
+    columns: {
+      'nimacha-hunter': 0,
+      'nimacha-spearman': 1,
+      'nimacha-looter': 2,
+      'shield-infantry': 3,
+      'wall-breaker': 4,
+    },
+  },
+  holaon: {
+    sheet: 'holaonUnits',
+    faction: '홀라온 야인',
+    columns: {
+      'holaon-lancer': 0,
+      'holaon-horse-archer': 1,
+      'holaon-raider': 2,
+    },
+  },
+  bandit: {
+    sheet: 'banditUnits',
+    faction: '변경 마적',
+    columns: {
+      'bandit-vanguard': 0,
+      'bandit-rider': 1,
+      'bandit-looter': 2,
+      'shield-infantry': 3,
+      'deserter-musketeer': 4,
+      'wall-breaker': 5,
+    },
+  },
+  court: {
+    sheet: 'courtExpanded',
+    faction: '조정 토벌군',
+    columns: {
+      'court-shield': 0,
+      'court-horse-archer': 1,
+      'wall-breaker': 2,
+    },
+  },
+};
+
+const SPECIAL_MOUNTED_COLUMNS: Readonly<Partial<Record<SpecialResidentId, number>>> = {
+  jurchenWarrior: 12,
+  tigerHunter: 13,
+  uinyeo: 14,
+  hangwae: 15,
+};
+
+export function tacticalExpandedRaiderPoseCell(
+  faction: string,
+  unitType: import('../game/types').RaiderUnitType,
+  pose: TacticalSpritePose,
+): { sheet: TacticalExpandedRaiderSheet; column: number; row: number } | null {
+  for (const definition of Object.values(EXPANDED_RAIDER_COLUMNS)) {
+    if (definition.faction !== faction) continue;
+    const column = definition.columns[unitType];
+    if (column == null) return null;
+    return { sheet: definition.sheet, column, row: TACTICAL_POSE_ROWS[pose] };
+  }
+  return null;
+}
+
+export function tacticalExpandedRaiderMuzzleAnchor(
+  faction: string,
+  unitType: import('../game/types').RaiderUnitType,
+): TacticalMuzzleAnchor | null {
+  if (faction === '변경 마적' && unitType === 'deserter-musketeer') {
+    return { x: 14, y: 48, size: 'musket' };
+  }
+  return null;
+}
+
 const COURT_COLUMNS: Partial<Record<import('../game/types').RaiderUnitType, number>> = {
   'court-gunner': 0,
   'court-archer': 1,
@@ -248,8 +406,9 @@ const COURT_COLUMNS: Partial<Record<import('../game/types').RaiderUnitType, numb
 export function tacticalCourtPoseCell(
   unitType: import('../game/types').RaiderUnitType,
   pose: TacticalSpritePose,
-): { column: number; row: number } {
-  return { column: COURT_COLUMNS[unitType] ?? 0, row: TACTICAL_POSE_ROWS[pose] };
+): { column: number; row: number } | null {
+  const column = COURT_COLUMNS[unitType];
+  return column == null ? null : { column, row: TACTICAL_POSE_ROWS[pose] };
 }
 
 const COURT_SUPPORT_COLUMNS: Partial<Record<import('../game/types').RaiderUnitType, number>> = {

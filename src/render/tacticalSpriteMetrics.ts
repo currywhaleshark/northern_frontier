@@ -5,7 +5,7 @@ export interface TacticalSpriteMetric {
   readonly dy: number;
 }
 
-export type TacticalMetricSheetKey = 'defenderRoles' | 'defenderWeapons' | 'defenderDefaultWeapons' | 'healers' | 'specialResidents' | 'raiders' | 'court' | 'courtSupport';
+export type TacticalMetricSheetKey = 'defenderRoles' | 'defenderWeapons' | 'defenderDefaultWeapons' | 'healers' | 'specialResidents' | 'mountedDefenders' | 'raiders' | 'court' | 'courtSupport' | 'nimachaUnits' | 'holaonUnits' | 'banditUnits' | 'courtExpanded';
 
 export const TACTICAL_SPRITE_METRICS: Readonly<Record<
   TacticalMetricSheetKey,
@@ -477,6 +477,272 @@ export const TACTICAL_SPRITE_METRICS: Readonly<Record<
       }
     ]
   ],
+  mountedDefenders: [
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ]
+  ],
   raiders: [
     [
       {
@@ -712,6 +978,318 @@ export const TACTICAL_SPRITE_METRICS: Readonly<Record<
       {
         scale: 1.01,
         dy: 21.2
+      }
+    ]
+  ],
+  nimachaUnits: [
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ]
+  ],
+  holaonUnits: [
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ]
+  ],
+  banditUnits: [
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ]
+  ],
+  courtExpanded: [
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      }
+    ],
+    [
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
+      },
+      {
+        scale: 1,
+        dy: 0
       }
     ]
   ]

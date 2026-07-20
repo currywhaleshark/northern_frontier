@@ -1,0 +1,5 @@
+Create a production-ready 2D pixel-art tactical combat pose sheet matching the existing Joseon northern-frontier raider sprites: crisp dark pixel outlines, warm muted leather/fur colors, historically grounded Jurchen frontier equipment, and strong readable silhouettes.
+
+Exactly 3 equal columns and 4 equal rows, with no grid lines. Columns left to right: armored lancer cavalry with long lance, horse archer with recurved composite bow and quiver, light raider cavalry with saber and a short javelin at the saddle. Rows top to bottom: idle, mounted attack, hurt recoil, badly wounded exhausted rider still mounted. All units face left in 3/4 side view.
+
+Every horse-and-rider silhouette fits fully inside its cell, including weapons, tail, hooves, and tack. Identity, horse, costume, scale, and bounding box remain consistent through all poses. No detached effects, arrows in flight, blood, labels, UI, borders, or watermarks. Background is 100% solid flat #FF00FF magenta.

@@ -5,11 +5,13 @@ import { tacticalSpriteMetricVars } from '../../render/tacticalSpriteMetrics';
 import {
   TACTICAL_DEFENDER_DEFAULT_WEAPON_POSE_SHEET,
   TACTICAL_HEALER_POSE_SHEET,
+  TACTICAL_MOUNTED_DEFENDER_POSE_SHEET,
   TACTICAL_DEFENDER_ROLE_POSE_SHEET,
   TACTICAL_DEFENDER_WEAPON_POSE_SHEET,
   TACTICAL_SPECIAL_RESIDENT_POSE_SHEET,
   tacticalDefaultWeaponPose,
   tacticalDefenderPoseCell,
+  tacticalMountedDefenderPoseCell,
 } from '../../render/tacticalCharacterAssets';
 
 interface Props {
@@ -34,6 +36,28 @@ export function DockDefenderSprite({ group, gender }: {
 }) {
   const descriptor = combatSpriteDescriptor(group.role, group.weapon);
   const defaultWeapon = tacticalDefaultWeaponPose(group);
+  if (group.mount === 'horse') {
+    const cell = tacticalMountedDefenderPoseCell(
+      group.role,
+      descriptor.source === 'weapon' ? descriptor.id : null,
+      gender,
+      'idle',
+      defaultWeapon,
+      group.special,
+    );
+    return (
+      <span
+        className={`tactical-sprite tactical-defender mounted role-${group.role} weapon-${group.weapon ?? 'unarmed'} default-weapon-${defaultWeapon ?? 'none'} pose-idle`}
+        style={{
+          backgroundImage: `url(${TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.src})`,
+          backgroundPosition: `${-cell.column * TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.spriteWidth}px ${-cell.row * TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.spriteHeight}px`,
+          backgroundSize: `${TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.columns * TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.spriteWidth}px ${TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.rows * TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.spriteHeight}px`,
+          ...tacticalSpriteMetricVars('mountedDefenders', cell.column, cell.row),
+        } as CSSProperties}
+        aria-hidden="true"
+      />
+    );
+  }
   const cell = tacticalDefenderPoseCell(
     group.role,
     descriptor.source === 'weapon' ? descriptor.id : null,

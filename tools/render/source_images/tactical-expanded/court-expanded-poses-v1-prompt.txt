@@ -1,0 +1,5 @@
+Create a production-ready 2D pixel-art Joseon court-army tactical combat pose sheet matching the existing court sprites: crisp dark pixel outlines, dark navy and muted red military uniforms, black hats or helmets, historically grounded equipment, and strong readable silhouettes.
+
+Exactly 3 equal columns and 4 equal rows, with no grid lines. Columns left to right: foot shield soldier with broad wooden shield and short spear, Joseon horse archer with recurved bow and quiver, foot military wall-breaking sapper with demolition axe or maul and timber wedges. Rows top to bottom: idle, attack, hurt recoil, badly wounded but alive. All face left in 3/4 side view.
+
+Every subject fits fully inside its cell including horse, bow, shield, spear, tool, tail, hooves, and tack. Identity, costume, scale, and bounding box remain consistent through all poses. No detached effects, arrows in flight, blood, smoke, labels, UI, borders, or watermarks. Background is 100% solid flat #FF00FF magenta.
