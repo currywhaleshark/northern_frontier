@@ -156,4 +156,116 @@ function route(battle, side) {
   assert.equal(routes.migrateTacticalRouteTransit({ routeId: 'missing', step: 1 }, new Set(['flank-left']), 2), undefined);
 }
 
+{
+  const state = battleSimulation.createBattleSimulation(options({
+    defenders: { muskets: 0, bows: 0, spears: 12, unarmedMilitia: 0, watchmen: 0, hunters: 0, civilians: 0 },
+  }));
+  const battle = state.tacticalBattle;
+  assert.equal(tactical.toggleTacticalFlankRoutePreparation(state, 'left'), null);
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  if (battle.phase === 'preparationExecution') assert.equal(tactical.advanceTacticalPhase(state), null);
+  tactical.applyAutoDeployTacticalGroups(battle);
+  const spears = battle.defenderGroups.find(group => group.weapon === 'spear');
+  assert.ok(spears);
+  assert.equal(tactical.placeTacticalRouteBlocker(state, spears.id, 'left'), null);
+  assert.equal(spears.routeTransit.purpose, 'block');
+  assert.equal(spears.routeTransit.step, 1, 'a deployed blocker occupies the route middle without travel time');
+  assert.equal(battle.deploymentPlacements[spears.id].routeId, route(battle, 'left').id);
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  battle.raiderGroups.filter(group => !group.routeTransit).forEach(group => { group.intent = 'withdraw'; });
+  const pressureBefore = battle.zones.map(zone => zone.pressure);
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.equal(battle.pendingReport.routeEngagements.length, 1,
+    'a crossing raider and prepared blocker produce a dedicated route engagement');
+  assert.equal(battle.pendingReport.routeEngagements[0].routeId, route(battle, 'left').id);
+  assert.deepEqual(battle.zones.map(zone => zone.pressure), pressureBefore,
+    'route-only combat never creates frontal zone pressure');
+  assert.deepEqual(battle.pendingReport.loot, {}, 'route-only combat cannot loot before an exit arrival');
+}
+
+{
+  const state = battleSimulation.createBattleSimulation(options({ enemyFlankRoute: 'none' }));
+  const battle = state.tacticalBattle;
+  assert.equal(tactical.toggleTacticalFlankRoutePreparation(state, 'right'), null);
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  if (battle.phase === 'preparationExecution') assert.equal(tactical.advanceTacticalPhase(state), null);
+  tactical.applyAutoDeployTacticalGroups(battle);
+  const spears = battle.defenderGroups.find(group => group.weapon === 'spear');
+  assert.ok(spears);
+  assert.equal(tactical.placeTacticalRouteBlocker(state, spears.id, 'right'), null);
+  assert.equal(tactical.advanceTacticalPhase(state), null);
+  assert.equal(tactical.setTacticalCommand(state, spears.id, 'flankRoute'), null);
+  assert.equal(spears.routeTransit.purpose, 'raid');
+  assert.equal(spears.routeTransit.step, 0);
+  const targetZoneId = spears.routeTransit.destinationZoneId;
+  const candidates = battle.raiderGroups.slice(0, 2);
+  assert.equal(candidates.length, 2);
+  candidates[0].zoneId = targetZoneId;
+  candidates[0].unitType = 'nimacha-spearman';
+  candidates[0].routeTransit = undefined;
+  candidates[1].zoneId = targetZoneId;
+  candidates[1].unitType = 'court-archer';
+  candidates[1].line = 'rear';
+  candidates[1].routeTransit = undefined;
+  const first = routes.advanceTacticalRouteTransits(battle);
+  const firstResolution = routes.resolveTacticalRouteRound(battle, first, state.weather, () => 0.5);
+  assert.equal(firstResolution.arrivals.length, 0);
+  assert.ok(spears.routeTransit, 'foot raiders stay absent from frontal combat during route travel');
+  const second = routes.advanceTacticalRouteTransits(battle);
+  const secondResolution = routes.resolveTacticalRouteRound(battle, second, state.weather, () => 0.5);
+  assert.deepEqual(secondResolution.arrivals.map(arrival => [arrival.groupId, arrival.side, arrival.rearAssault]), [
+    [spears.id, 'defender', true],
+  ]);
+  assert.equal(spears.routeTransit, undefined);
+  assert.equal(spears.rearRaidRound, battle.round);
+  assert.equal(spears.targetGroupId, candidates[1].id,
+    'player rear raids prioritize exposed ranged units over ordinary melee targets');
+}
+
+{
+  const state = battleSimulation.createBattleSimulation(options({
+    power: 180,
+    defenders: { muskets: 1, bows: 0, spears: 0, unarmedMilitia: 0, watchmen: 0, hunters: 0, civilians: 0 },
+  }));
+  const battle = state.tacticalBattle;
+  tactical.toggleTacticalFlankRoutePreparation(state, 'left');
+  tactical.advanceTacticalPhase(state);
+  if (battle.phase === 'preparationExecution') tactical.advanceTacticalPhase(state);
+  tactical.applyAutoDeployTacticalGroups(battle);
+  const blocker = battle.defenderGroups.find(group => group.weapon === 'musket');
+  const flanker = battle.raiderGroups.find(group => group.routeTransit);
+  assert.ok(blocker && flanker);
+  flanker.power = 220;
+  flanker.count = Math.max(flanker.count, 20);
+  flanker.unitType = 'bandit-rider';
+  const originZoneId = battle.deploymentPlacements[blocker.id].zoneId;
+  assert.equal(tactical.placeTacticalRouteBlocker(state, blocker.id, 'left'), null);
+  tactical.advanceTacticalPhase(state);
+  const advances = routes.advanceTacticalRouteTransits(battle);
+  const resolution = routes.resolveTacticalRouteRound(battle, advances, state.weather, () => 0.5);
+  assert.equal(resolution.engagements[0].outcome, 'raiderBreakthrough');
+  assert.equal(blocker.routeTransit, undefined);
+  assert.equal(blocker.zoneId, originZoneId, 'a broken blocker returns to its pre-route deployment zone');
+  assert.equal(flanker.routeTransit.step, 1, 'a route winner enters the rear only on the following step');
+  const nextAdvances = routes.advanceTacticalRouteTransits(battle);
+  const arrival = routes.resolveTacticalRouteRound(battle, nextAdvances, state.weather, () => 0.5);
+  assert.equal(arrival.arrivals[0].groupId, flanker.id);
+  assert.equal(flanker.rearAssault, true);
+}
+
+{
+  const state = battleSimulation.createBattleSimulation(options({ factionName: '니마차 우디캐' }));
+  const battle = state.tacticalBattle;
+  const flanker = battle.raiderGroups.find(group => group.routeTransit);
+  assert.ok(flanker);
+  const first = routes.advanceTacticalRouteTransits(battle);
+  routes.resolveTacticalRouteRound(battle, first, state.weather, () => 0.5);
+  const second = routes.advanceTacticalRouteTransits(battle);
+  const arrival = routes.resolveTacticalRouteRound(battle, second, state.weather, () => 0.5);
+  assert.equal(arrival.arrivals[0].groupId, flanker.id);
+  assert.equal(flanker.routeTransit, undefined);
+  assert.equal(flanker.rearAssault, true, 'enemy exit arrival feeds the existing rear-engagement path');
+  assert.equal(flanker.engagementsInZone, 0, 'rear reveal and first contact remain pending until the zone exchange');
+}
+
 console.log('tactical route contract tests passed');

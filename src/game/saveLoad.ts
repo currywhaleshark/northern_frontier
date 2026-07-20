@@ -348,6 +348,11 @@ export function migrateV26ToV27(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 27 };
 }
 
+// v28: route blockers, route-only engagement reports, and player rear raids.
+export function migrateV27ToV28(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 28 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -380,6 +385,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 24) migrated = migrateV24ToV25(migrated);
     else if (version === 25) migrated = migrateV25ToV26(migrated);
     else if (version === 26) migrated = migrateV26ToV27(migrated);
+    else if (version === 27) migrated = migrateV27ToV28(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -398,7 +404,7 @@ const SPECIAL_RESIDENT_IDS = new Set<SpecialResidentId>([
 const TACTICAL_COMMANDS = new Set<TacticalCommandId>([
   'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'reinforceRear',
   'fallback', 'advance', 'charge',
-  'arson', 'blockEscape', 'openRetreat',
+  'arson', 'blockEscape', 'openRetreat', 'flankRoute',
 ]);
 const PREPARATION_ACTION_IDS = new Set<PreparationActionId>([
   'evacuateCivilians', 'hideSupplies', 'repairWall', 'setAmbush', 'prepareVolley',
@@ -444,6 +450,46 @@ function migrateRouteAdvances(raw: unknown, routeIds: ReadonlySet<string>): Tact
   return advances.length > 0 ? advances : undefined;
 }
 
+function migrateRouteEngagements(raw: unknown, routeIds: ReadonlySet<string>): TacticalRoundReport['routeEngagements'] {
+  if (!Array.isArray(raw)) return undefined;
+  const engagements = raw.flatMap(entry => {
+    if (!entry || typeof entry !== 'object') return [];
+    const source = entry as Record<string, unknown>;
+    if (!routeIds.has(String(source.routeId))) return [];
+    if (source.outcome !== 'defenderHeld' && source.outcome !== 'raiderBreakthrough' && source.outcome !== 'contested') {
+      return [];
+    }
+    return [{
+      routeId: String(source.routeId),
+      defenderGroupIds: Array.isArray(source.defenderGroupIds)
+        ? source.defenderGroupIds.filter(id => typeof id === 'string') as string[] : [],
+      raiderGroupIds: Array.isArray(source.raiderGroupIds)
+        ? source.raiderGroupIds.filter(id => typeof id === 'string') as string[] : [],
+      outcome: source.outcome as 'defenderHeld' | 'raiderBreakthrough' | 'contested',
+      defenderLosses: Math.max(0, Math.floor(Number(source.defenderLosses) || 0)),
+      raiderLosses: Math.max(0, Math.floor(Number(source.raiderLosses) || 0)),
+      defenderRetreated: source.defenderRetreated === true,
+      raiderRetreated: source.raiderRetreated === true,
+      lines: Array.isArray(source.lines) ? source.lines.filter(line => typeof line === 'string') as string[] : [],
+    }];
+  });
+  return engagements.length > 0 ? engagements : undefined;
+}
+
+function migrateRouteArrivals(raw: unknown, routeIds: ReadonlySet<string>): TacticalRoundReport['routeArrivals'] {
+  if (!Array.isArray(raw)) return undefined;
+  const arrivals = raw.flatMap(entry => {
+    if (!entry || typeof entry !== 'object') return [];
+    const source = entry as Record<string, unknown>;
+    if (!routeIds.has(String(source.routeId)) || typeof source.groupId !== 'string' ||
+        typeof source.destinationZoneId !== 'string' || (source.side !== 'defender' && source.side !== 'raider')) return [];
+    return [{ routeId: String(source.routeId), groupId: source.groupId,
+      side: source.side as 'defender' | 'raider',
+      destinationZoneId: source.destinationZoneId, rearAssault: source.rearAssault === true }];
+  });
+  return arrivals.length > 0 ? arrivals : undefined;
+}
+
 function migratePendingReport(
   raw: unknown,
   zoneIds: ReadonlySet<string>,
@@ -468,6 +514,8 @@ function migratePendingReport(
       ...(event as Record<string, unknown>),
     })) as unknown as TacticalAnimationEvent[],
     routeAdvances: migrateRouteAdvances(report.routeAdvances, routeIds),
+    routeEngagements: migrateRouteEngagements(report.routeEngagements, routeIds),
+    routeArrivals: migrateRouteArrivals(report.routeArrivals, routeIds),
     wounded: Math.max(0, Number(report.wounded) || 0),
     treated: Math.max(0, Number(report.treated) || 0),
     killed: Math.max(0, Number(report.killed) || 0),
@@ -781,6 +829,8 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
         lines: Array.isArray(item.lines) ? item.lines.filter(line => typeof line === 'string') : [],
         events: Array.isArray(item.events) ? item.events : [],
         routeAdvances: migrateRouteAdvances(item.routeAdvances, flankRouteIds),
+        routeEngagements: migrateRouteEngagements(item.routeEngagements, flankRouteIds),
+        routeArrivals: migrateRouteArrivals(item.routeArrivals, flankRouteIds),
         raidersKilled: Math.max(0, Number(item.raidersKilled) || 0),
       } as unknown as TacticalRoundReport;
     });
@@ -866,7 +916,9 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
         const hidden = (encounterKind === 'banditLair' && group.kind === 'hunter' && zoneId === 'lairWall' &&
             prepApplied('preInfiltration')) ||
           (encounterKind === 'raidDefense' && group.kind === 'hunter' && zoneId === 'approach' && prepApplied('setAmbush'));
-        placement = { zoneId, line, ...(hidden ? { hidden: true } : {}) };
+        const routeId = typeof candidate.routeId === 'string' && flankRouteIds.has(candidate.routeId)
+          ? candidate.routeId : undefined;
+        placement = { zoneId, line, ...(hidden ? { hidden: true } : {}), ...(routeId ? { routeId } : {}) };
       } else if (!required || !canRemainWaiting) {
         placement = fallback;
       }

@@ -15,6 +15,7 @@ const COMMAND_LABELS: Record<TacticalCommandId, string> = {
   arson: '방화',
   blockEscape: '퇴로 차단',
   openRetreat: '자진 철수',
+  flankRoute: '우회 기동',
 };
 
 export function commandLabel(

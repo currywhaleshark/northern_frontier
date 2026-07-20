@@ -333,3 +333,88 @@ Fable의 Phase 6 프론트는 준비 행동에 좌/우 선택을 붙이고,
 `tsc`, `test:combat`, 경로·무대 명령·배치·적 계획·교리·골든·저장·사냥 테스트와
 프로덕션 빌드가 통과했다. 전체 `test:game`의 실패는 기존에도 남아 있던 주변음 구조 검사,
 산채 자동/직접 밸런스 게이트, 특수주민 총구 앵커 검사 3건만 동일하게 남았다.
+
+## 11. 2026-07-20 통합 세션 — P6 프론트 통합과 Phase 7 경로 교전 백엔드 계약
+
+### P6 통합 확인
+
+- Fable의 P6 프론트 커밋 `e96b639`를 통합 브랜치에 fast-forward했다.
+- 화면은 `tacticalFlankRouteView`와 `tacticalGroupIsInRouteTransit`만 사용해 비공개 route step을 누출하지 않는다.
+- App 통합 경계와 기존 무대/미니맵 스크롤 동작에는 별도 변경이 없다.
+
+### 차단 배치 API
+
+`src/game/tacticalBattle.ts`가 다음 계약을 재노출한다.
+
+- `tacticalRoutePlacementUnavailableReason(battle, groupId, side)`
+- `placeTacticalRouteBlocker(state, groupId, side)`
+
+방어전 배치 단계에서 플레이어가 개방한 경로에 전투 가능한 지휘 부대만 놓을 수 있다. 피난 주민과 치료반은
+거부된다. 성공하면 `deploymentPlacements[groupId].routeId`가 생기고, 부대는
+`routeTransit.purpose='block'`, `step=1`로 경로 중간을 즉시 점유한다. 일반 레인이나 대기 카드로 다시
+배치하면 route 상태와 routeId가 함께 제거되며 control도 즉시 다시 계산된다.
+
+### 우회 기동 명령
+
+- 방어전 지원 명령에 `flankRoute`(`우회 기동`)가 추가됐다.
+- `tacticalRouteOrderUnavailableReason(battle, groupId)`는 열린 경로의 차단대인지 검증한다.
+- 범용 `setTacticalCommand(state, groupId, 'flankRoute')`를 쓰면 `orderTacticalRouteRaid`와 같은 mutation을
+  실행한다. 별도 프론트 전용 상태는 필요 없다.
+- 명령이 확정되면 `purpose='raid'`, `step=0`으로 출발하며 이동 내내 정면 전력에서 제외된다.
+
+`TacticalRouteTransit`에는 P7부터 `purpose: 'block' | 'raid'`, `originZoneId`, `engagements`가 추가됐다.
+패퇴 시 origin으로 정확히 되돌리고, 경로에서 반복 접촉하더라도 최초 충격 보너스를 반복하지 않기 위한 필드다.
+
+### 경로 교전과 통제
+
+`resolveTacticalRouteRound`는 이동 판정 직후, 일반 구역 교전 전에 호출된다.
+
+- 차단대와 우회대는 중간(step 1)에서 `resolveEngagementExchange`로 싸운다.
+- 경로 교전은 일반 `TacticalBattleZone`에 합쳐지지 않고 방책 pressure, breach, 건물 피해, 약탈을 만들지 않는다.
+- 창은 기존 창 대 기마 상성을 그대로 받고, 홀로 선 활/조총 차단대는 경로 근접전 피격 배율이 높다.
+- 수비 승리: 적을 입구 step 0으로 밀어내며, 낮은 사기나 전력 붕괴면 완전히 철수시킨다.
+- 적 승리: 차단대는 원래 배치 구역으로 패퇴하고 적은 step 1에 남는다. 후방 진입은 다음 이동 step에서만 일어난다.
+- 대치: 양측 모두 step 1에 남아 다음 라운드에 다시 교전한다.
+- 승리한 측이 route `control`을 얻으며, 점유 부대가 출구로 나간 뒤에도 해당 교전 결과를 보존한다.
+
+### 후방 출구와 플레이어 급습
+
+- 적이 출구에 도달하면 routeTransit을 제거하고 목적 구역에 `rearAssault=true`,
+  `engagementsInZone=0`으로 들어간다. 같은 라운드의 기존 후방 교전·공개·대응 방향 판정을 그대로 탄다.
+- 플레이어가 출구에 도달하면 목적 구역에 합류하고 `rearRaidRound`가 이번 라운드로 찍힌다. 그 라운드만
+  `rearRaidPowerMultiplier`를 받고 이후에는 일반 부대로 남는다.
+- 자동 표적은 화포 → 지원/의원 → 조총 → 활 → 일반 후열 순이다. 실제 피해는 기존 그룹별 표적 판정을 사용한다.
+- 이동 시간과 정면 이탈 비용이 있으므로 후방 급습은 공짜 추가 화력이 아니다.
+
+### 재생용 보고 계약
+
+`pendingReport`에 다음 배열이 추가됐다.
+
+- `routeEngagements`: routeId, 양측 groupIds, `defenderHeld | raiderBreakthrough | contested`, 양측 피해,
+  실제 철수 여부, 재생 문장.
+- `routeArrivals`: routeId, groupId, side, destinationZoneId, rearAssault.
+
+P7 프론트는 `routeAdvances` 이동 뒤 `routeEngagements`, 그 뒤 `routeArrivals` 순으로 재생한다. 승패나 후방 진입을
+raw `routeTransit.step`에서 추론하지 않는다. 비공개 이동은 기존처럼 `visibleToDefender=false`면 숨기되, 출구 급습은
+기존 rearAssault 공개 이벤트와 함께 표시한다.
+
+### 저장·밸런스·검증
+
+- 저장 스키마는 v28이다. v27 transit은 `purpose='raid'`, `originZoneId='approach'`, `engagements=0`으로 복원된다.
+- route 배치, 교전 보고, 출구 도달 보고를 필드 단위로 검증한다.
+- `tools/game/test_tactical_routes.mjs`는 차단 배치, 전용 교전, pressure/loot 비발생, 차단대 패퇴,
+  다음-step 후방 진입, 플레이어 급습과 원거리 우선 표적을 고정한다.
+- `tools/game/measure_tactical_route_balance.mjs`는 40개 고정 시드에서 창/활/조총 차단을 비교한다. 현재 창은
+  기마 우회대에 더 많은 피해를 주고 평균 아군 피해가 더 낮지만 hold 97.5%라 일부 대치 위험이 남는다.
+
+### Fable의 Phase 7 프론트 착수점
+
+1. 배치 카드/무대 부대를 열린 route 입구에 드롭할 때 placement reason을 표시하고 mutation을 호출한다.
+2. routeId가 있는 배치 카드는 완료 영역에 남기되 일반 무대 랭크에는 그리지 않는다. 리본 step 1의 차단대 점으로 표시한다.
+3. 지휘 독의 `우회 기동`은 기존 범용 명령 dispatch를 그대로 사용한다. 차단 유지(`hold`)와 우회 기동을 구분한다.
+4. route control의 defender/raider/contested 색과 경로 교전 피해·패퇴·출구 도달 칩을 보고 배열에서 재생한다.
+5. 플레이어 출구 도달 시 우선 표적 표시와 후열 급습 배지를 보여 주되 배율 수치를 UI에 하드코딩하지 않는다.
+
+`tsc`, P7 경로 계약, 배치, 무대 명령, 병과 상성, 저장 마이그레이션, 갱신한 전술 골든 fixture와
+프로덕션 빌드가 통과했다. 전체 `test:game`은 P7 테스트와 골든을 포함해 통과했고, 최종 실패 목록은 통합 전과
+동일한 `test_screen_ambient_audio.mjs`, 토벌 자동/직접 승률 게이트, `test_tactical_sprite_poses.mjs` 3건이다.

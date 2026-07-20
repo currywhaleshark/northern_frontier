@@ -1,6 +1,7 @@
 import { combatGroupLabel } from './combatCapabilities';
 import { CONFIG } from './config';
 import { specialResidentDefinition } from './specialResidents';
+import { syncTacticalRouteControl } from './tacticalRoutes';
 import type { CombatantSnapshot } from './combatRoster';
 import type {
   GameState,
@@ -154,6 +155,7 @@ function syncGroupPlacement(
   group: TacticalDefenderGroup,
   placement: TacticalDeploymentPlacement | null,
 ): void {
+  group.routeTransit = undefined;
   if (!placement) {
     group.zoneId = '';
     group.pendingLine = undefined;
@@ -178,6 +180,7 @@ export function initializeTacticalDeployment(battle: TacticalBattle): void {
   battle.deploymentPlacements = placements;
   battle.deploymentSerial ??= 0;
   battle.deploymentGroupAliases ??= {};
+  syncTacticalRouteControl(battle);
 }
 
 export function registerTacticalDeploymentGroup(battle: TacticalBattle, group: TacticalDefenderGroup): void {
@@ -206,6 +209,7 @@ export function applyAutoDeployTacticalGroups(
   battle.deploymentPlacements = placements;
   battle.deploymentForced = forced;
   for (const group of battle.defenderGroups) syncGroupPlacement(group, placements[group.id] ?? null);
+  syncTacticalRouteControl(battle);
 }
 
 export function resetTacticalDeployment(battle: TacticalBattle): void {
@@ -219,7 +223,7 @@ function samePlacement(
 ): boolean {
   if (!left || !right) return left == null && right == null;
   return left.zoneId === right.zoneId && left.line === right.line &&
-    left.hidden === right.hidden && left.fixed === right.fixed;
+    left.hidden === right.hidden && left.fixed === right.fixed && left.routeId === right.routeId;
 }
 
 export function tacticalDeploymentPlacementUnavailableReason(
@@ -281,6 +285,7 @@ export function placeTacticalDeploymentGroup(
   battle.deploymentPlacements ??= {};
   battle.deploymentPlacements[group.id] = next;
   syncGroupPlacement(group, next);
+  syncTacticalRouteControl(battle);
   return null;
 }
 
@@ -294,6 +299,7 @@ export function removeTacticalDeploymentGroup(state: GameState, groupId: string)
   battle.deploymentPlacements ??= {};
   battle.deploymentPlacements[group.id] = null;
   syncGroupPlacement(group, null);
+  syncTacticalRouteControl(battle);
   return null;
 }
 

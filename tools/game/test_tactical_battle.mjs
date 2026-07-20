@@ -102,7 +102,7 @@ const reportModalSource = readFileSync(new URL('../../src/components/TacticalBat
 {
   assert.deepEqual(tactical.tacticalSupportedCommands({ orientation: 'defense' }), [
     'hold', 'charge', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians',
-    'reinforceRear', 'fallback', 'advance',
+    'reinforceRear', 'fallback', 'advance', 'flankRoute',
   ], 'raid defense must expose only commands supported by the defensive battle system');
   assert.deepEqual(tactical.tacticalSupportedCommands({ orientation: 'assault', assaultKind: 'banditLair' }), [
     'hold', 'charge', 'volley', 'ambush', 'fallback', 'advance', 'arson', 'blockEscape', 'openRetreat',

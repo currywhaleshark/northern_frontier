@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 27, 'route save migrations ship with schema version 27');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 28, 'route engagement save migrations ship with schema version 28');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -66,6 +66,7 @@ assert.equal(typeof saveLoad.migrateV23ToV24, 'function');
 assert.equal(typeof saveLoad.migrateV24ToV25, 'function');
 assert.equal(typeof saveLoad.migrateV25ToV26, 'function');
 assert.equal(typeof saveLoad.migrateV26ToV27, 'function');
+assert.equal(typeof saveLoad.migrateV27ToV28, 'function');
 
 {
   const migrated = saveLoad.migrateV24ToV25({ schemaVersion: 24, tacticalBattle: { phase: 'deployment' } });
@@ -77,6 +78,12 @@ assert.equal(typeof saveLoad.migrateV26ToV27, 'function');
   const migrated = saveLoad.migrateV26ToV27({ schemaVersion: 26, tacticalBattle: { phase: 'command' } });
   assert.equal(migrated.schemaVersion, 27);
   assert.deepEqual(migrated.tacticalBattle, { phase: 'command' }, 'v27 root migration remains additive');
+}
+
+{
+  const migrated = saveLoad.migrateV27ToV28({ schemaVersion: 27, tacticalBattle: { phase: 'command' } });
+  assert.equal(migrated.schemaVersion, 28);
+  assert.deepEqual(migrated.tacticalBattle, { phase: 'command' }, 'v28 root migration remains additive');
 }
 
 {

@@ -782,12 +782,15 @@ export interface TacticalFlankRoute {
 
 export interface TacticalRouteTransit {
   routeId: string;
+  purpose: 'block' | 'raid';
   step: 0 | 1 | 2;
   destinationZoneId: string;
+  originZoneId: string;
   visibleToDefender: boolean;
   startedRound: number;
   elapsedRounds: number;
   roundsRequired: number;
+  engagements: number;
 }
 
 export interface TacticalRouteAdvance {
@@ -797,6 +800,26 @@ export interface TacticalRouteAdvance {
   toStep: 0 | 1 | 2;
   visibleToDefender: boolean;
   arrivedAtExit: boolean;
+}
+
+export interface TacticalRouteEngagement {
+  routeId: string;
+  defenderGroupIds: string[];
+  raiderGroupIds: string[];
+  outcome: 'defenderHeld' | 'raiderBreakthrough' | 'contested';
+  defenderLosses: number;
+  raiderLosses: number;
+  defenderRetreated: boolean;
+  raiderRetreated: boolean;
+  lines: string[];
+}
+
+export interface TacticalRouteArrival {
+  routeId: string;
+  groupId: string;
+  side: 'defender' | 'raider';
+  destinationZoneId: string;
+  rearAssault: boolean;
 }
 export type TacticalUnitTag =
   | 'infantry'
@@ -941,7 +964,8 @@ export type TacticalCommandId =
   | 'charge'
   | 'arson'
   | 'blockEscape'
-  | 'openRetreat';
+  | 'openRetreat'
+  | 'flankRoute';
 
 export type TacticalFacing = 'towardEnemy' | 'towardRear';
 
@@ -995,6 +1019,7 @@ export interface TacticalFeaturedResident {
 export interface TacticalDeploymentPlacement {
   zoneId: string;
   line: TacticalFormationLine;
+  routeId?: string;
   hidden?: boolean;
   fixed?: boolean;
 }
@@ -1034,6 +1059,8 @@ export interface TacticalDefenderGroup {
   lockedZoneId?: string;
   huntOriginGroupId?: string;
   huntMovedRound?: number;
+  /** This group emerged behind the enemy through a flank route in this round. */
+  rearRaidRound?: number;
   routeTransit?: TacticalRouteTransit;
 }
 
@@ -1141,6 +1168,8 @@ export interface TacticalRoundReport {
   lines: string[];
   events: TacticalAnimationEvent[];
   routeAdvances?: TacticalRouteAdvance[];
+  routeEngagements?: TacticalRouteEngagement[];
+  routeArrivals?: TacticalRouteArrival[];
   wounded: number;
   treated?: number;
   killed: number;

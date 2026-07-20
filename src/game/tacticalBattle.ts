@@ -53,8 +53,11 @@ import {
   advanceTacticalRouteTransits,
   createTacticalFlankRoutes,
   initializeEnemyTacticalRouteTransit,
+  orderTacticalRouteRaid,
+  resolveTacticalRouteRound,
   syncTacticalRouteVisibility,
   tacticalFlankRoutePreparationUnavailableReason,
+  tacticalRouteOrderUnavailableReason,
   toggleTacticalFlankRoutePreparation,
 } from './tacticalRoutes';
 import {
@@ -123,12 +126,16 @@ export {
   tacticalGroupIsInRouteTransit,
   tacticalRouteBySide,
   tacticalRouteRoundsRequired,
+  tacticalRouteOrderUnavailableReason,
+  tacticalRoutePlacementUnavailableReason,
+  placeTacticalRouteBlocker,
+  orderTacticalRouteRaid,
   toggleTacticalFlankRoutePreparation,
 } from './tacticalRoutes';
 
 const DEFENSE_SUPPORTED_COMMANDS: readonly TacticalCommandId[] = [
   'hold', 'charge', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians',
-  'reinforceRear', 'fallback', 'advance',
+  'reinforceRear', 'fallback', 'advance', 'flankRoute',
 ];
 const ASSAULT_SUPPORTED_COMMANDS: readonly TacticalCommandId[] = [
   'hold', 'charge', 'volley', 'ambush', 'fallback', 'advance', 'arson', 'blockEscape', 'openRetreat',
@@ -1603,6 +1610,11 @@ export function setTacticalCommand(
   if (!IMPLEMENTED_COMMANDS.has(command)) return '이 명령은 아직 사용할 수 없습니다.';
   const unavailableReason = tacticalCommandUnavailableReason(battle, defender, command);
   if (unavailableReason) return unavailableReason;
+  if (command === 'flankRoute') {
+    const result = orderTacticalRouteRaid(state, groupId);
+    if (!result) normalizeTacticalGroupTargets(battle);
+    return result;
+  }
   defender.command = command;
   if (command === 'reinforceRear') applyTacticalFacingChange(battle, defender, 'towardRear');
   if (command !== 'redeploy') defender.pendingLine = undefined;
@@ -1729,6 +1741,7 @@ export function tacticalCommandUnavailableReason(
   if (battle.assaultKind === 'predatorHunt') return huntCommandUnavailableReason(battle, defender, command);
   if (battle.orientation === 'assault') return assaultCommandUnavailableReason(battle, defender, command);
   if (!IMPLEMENTED_COMMANDS.has(command)) return '이 명령은 아직 사용할 수 없습니다.';
+  if (command === 'flankRoute') return tacticalRouteOrderUnavailableReason(battle, defender.id);
   if (command === 'redeploy') {
     if (!defender.pendingLine) return '먼저 인접한 목표 전열을 선택하십시오.';
     return tacticalFormationLinesAdjacent(defender.line, defender.pendingLine)
@@ -2165,13 +2178,17 @@ export function resolveTacticalRound(state: GameState): string | null {
     return resolveAssaultRound(state);
   }
   if (battle.phase !== 'command') return '교전을 진행할 지휘 단계가 아닙니다.';
+  const rng = makeRng(state.seed + battle.id * 8191 + battle.round * 131071);
   const routeAdvances = advanceTacticalRouteTransits(battle);
+  const routeResolution = resolveTacticalRouteRound(battle, routeAdvances, state.weather, rng);
   chooseDefaultTacticalCommands(battle);
   normalizeTacticalGroupTargets(battle);
+  const routeEngagedDefenderIds = new Set(routeResolution.engagements.flatMap(engagement =>
+    engagement.defenderGroupIds));
   const firingMusketGroups = battle.defenderGroups.filter(group =>
     group.weapon === 'musket' && group.command === 'volley' && activeCount(group) > 0 &&
-    battle.raiderGroups.some(enemy => !enemy.routeTransit && enemy.zoneId === group.zoneId &&
-      enemy.intent !== 'withdraw' && enemy.power > 0));
+    (routeEngagedDefenderIds.has(group.id) || battle.raiderGroups.some(enemy =>
+      !enemy.routeTransit && enemy.zoneId === group.zoneId && enemy.intent !== 'withdraw' && enemy.power > 0)));
   const musketAllocation = consumeMusketVolleys(
     state,
     firingMusketGroups.map(group => ({
@@ -2183,12 +2200,12 @@ export function resolveTacticalRound(state: GameState): string | null {
   for (const group of battle.defenderGroups.filter(group => group.weapon === 'musket')) {
     group.readyMuskets = musketAllocation.byGroup[group.id] ?? 0;
   }
-  const rng = makeRng(state.seed + battle.id * 8191 + battle.round * 131071);
-  const events: TacticalAnimationEvent[] = [];
-  const lines: string[] = [];
+  const events: TacticalAnimationEvent[] = [...routeResolution.events];
+  const lines: string[] = [...routeResolution.lines];
   for (const advance of routeAdvances) {
     const route = battle.flankRoutes?.find(candidate => candidate.id === advance.routeId);
-    const group = battle.raiderGroups.find(candidate => candidate.id === advance.groupId);
+    const group = battle.raiderGroups.find(candidate => candidate.id === advance.groupId) ??
+      battle.defenderGroups.find(candidate => candidate.id === advance.groupId);
     if (!route || !group) continue;
     if (advance.visibleToDefender) {
       lines.push(`${group.label}: ${route.label} ${advance.toStep === 2 ? '후방 출구에 도달' : '중간 구간으로 이동'}.`);
@@ -2212,12 +2229,12 @@ export function resolveTacticalRound(state: GameState): string | null {
   const defenderReadiness = new Map<string, number>();
   const undefendedFrontalZones = new Set<string>();
   const moraleBrokenAttackerIds = new Set<string>();
-  let roundWounded = 0;
-  let roundKilled = 0;
-  let roundRaidersKilled = 0;
+  let roundWounded = routeResolution.wounded;
+  let roundKilled = routeResolution.killed;
+  let roundRaidersKilled = routeResolution.raidersKilled;
   let buildingsDamaged = 0;
-  let villageMoraleDelta = 0;
-  let raiderMoraleDelta = 0;
+  let villageMoraleDelta = routeResolution.villageMoraleDelta;
+  let raiderMoraleDelta = routeResolution.raiderMoraleDelta;
   const focusZoneId = battle.currentZoneId;
   const roundStartingRaiderPower = Math.max(1, battle.raiderGroups.reduce((sum, group) =>
     sum + (group.intent === 'withdraw' || group.routeTransit ? 0 : group.power), 0));
@@ -2333,6 +2350,11 @@ export function resolveTacticalRound(state: GameState): string | null {
         evacuateCiviliansApplied: applied(battle, 'evacuateCivilians'),
         roundStartingRaiderPower,
         rangedEfficiency,
+        defenderPowerMultiplier: defender => (
+          defender.command === 'redeploy' || defender.command === 'fallback' || defender.command === 'advance'
+            ? tacticalMovementCommandPowerMultiplier(defender, defender.command) : 1
+        ) * (defender.rearRaidRound === battle.round
+          ? CONFIG.tacticalBattle.flankRoutes.engagement.rearRaidPowerMultiplier : 1),
         priorRaiderMoraleDelta: raiderMoraleDelta,
         retreatPowerThreshold: battle.originalPower * 0.035,
         rng,
@@ -2587,6 +2609,8 @@ export function resolveTacticalRound(state: GameState): string | null {
     lines,
     events,
     routeAdvances,
+    routeEngagements: routeResolution.engagements,
+    routeArrivals: routeResolution.arrivals,
     wounded: roundWounded,
     treated: treatment.treated,
     killed: roundKilled,
@@ -2906,6 +2930,7 @@ export function tacticalCommandDescription(command: TacticalCommandId, ambushed 
     arson: '준비한 불화살로 목책과 움막의 돌파를 앞당기지만 노획 일부가 불탑니다.',
     blockEscape: '사냥꾼을 본대에서 빼 두목의 산길 퇴로를 감시합니다.',
     openRetreat: '현재 성과를 포기하거나 챙긴 뒤 토벌대 전체가 질서 있게 철수합니다.',
+    flankRoute: '열어 둔 우회로를 통과해 적 후열의 원거리·화포·지원 부대를 우선 급습합니다.',
   };
   return descriptions[command];
 }

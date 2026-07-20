@@ -799,6 +799,14 @@ export const CONFIG = {
     flankRoutes: {
       preparationCost: 2,
       weatherDelayRounds: 1,
+      engagement: {
+        preparedBlockPowerMultiplier: 1.15,
+        isolatedRangedCasualtyMultiplier: 1.35,
+        defenderWinShare: 0.56,
+        raiderWinShare: 0.56,
+        withdrawMoraleThreshold: 24,
+        rearRaidPowerMultiplier: 1.12,
+      },
       sides: {
         left: { label: '숲 능선길', terrain: 'woodedRidge' as const },
         right: { label: '하천 둥길', terrain: 'riverBank' as const },
