@@ -9,11 +9,15 @@ interface Props {
   onStartTutorial: () => void;
   onContinue: () => void;
   onOpenBattleSim: () => void;
+  soundOn: boolean;
+  onToggleSound: () => void;
 }
 
 const DIFF_ORDER: Difficulty[] = ['easy', 'normal', 'hard'];
 
-export function MainMenu({ canContinue, onStart, onStartTutorial, onContinue, onOpenBattleSim }: Props) {
+export function MainMenu({
+  canContinue, onStart, onStartTutorial, onContinue, onOpenBattleSim, soundOn, onToggleSound,
+}: Props) {
   const [diff, setDiff] = useState<Difficulty>('normal');
 
   return (
@@ -53,6 +57,9 @@ export function MainMenu({ canContinue, onStart, onStartTutorial, onContinue, on
             <button className="btn menu-btn" onClick={onContinue}>이어하기</button>
           )}
           <button className="btn menu-btn" onClick={onOpenBattleSim}>전투 시뮬레이션</button>
+          <button className="btn menu-btn" onClick={onToggleSound} title={soundOn ? '배경음과 효과음 끄기' : '배경음과 효과음 켜기'}>
+            {soundOn ? '🔊 소리 끄기' : '🔇 소리 켜기'}
+          </button>
         </div>
 
         <div className="menu-footer muted small">
