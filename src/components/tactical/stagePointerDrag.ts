@@ -106,6 +106,13 @@ export function useStagePointerDrag(options: StagePointerDragOptions) {
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLElement>) => {
     const session = sessionRef.current;
     if (!session || event.pointerId !== session.pointerId) return;
+    // 임계값 전에 포인터가 핸들 밖으로 튀면(빠른 플릭) pointerup을 캡처 없이 놓쳐 세션이 남는다.
+    // 마우스는 pointerId가 고정이라 이후 버튼 없는 호버가 죽은 세션을 되살려 유령 드래그가 된다 —
+    // 버튼이 떨어진 포인터는 드래그가 아니라 정리 신호다.
+    if (event.buttons === 0) {
+      cancelDrag();
+      return;
+    }
     const dx = event.clientX - session.origin.x;
     const dy = event.clientY - session.origin.y;
     if (!session.dragging) {
@@ -127,7 +134,7 @@ export function useStagePointerDrag(options: StagePointerDragOptions) {
         hoverAnchorId,
       };
     });
-  }, [anchorAttribute, trackPosition]);
+  }, [anchorAttribute, cancelDrag, trackPosition]);
 
   const handlePointerUp = useCallback((event: React.PointerEvent<HTMLElement>) => {
     const session = sessionRef.current;

@@ -121,6 +121,8 @@ assert.match(dragSource, /key === 'Escape'/, 'Escape must cancel an active drag'
 assert.match(dragSource, /contextmenu/, 'right-click must cancel an active drag');
 assert.match(dragSource, /pointercancel|handlePointerCancel/,
   'native pointercancel (e.g. touch scroll takeover) must cancel the drag');
+assert.match(dragSource, /event\.buttons === 0[\s\S]{0,120}cancelDrag\(\)/,
+  'a buttons-up pointer move must clear a stale session so a fast flick cannot leave a hover-activated ghost drag');
 assert.match(cssSource, /\.stage-drag-handle\s*\{[\s\S]*?touch-action:\s*none;/,
   'drag handles must opt out of native touch scrolling so the stage strip keeps its own');
 assert.match(screenSource, /dragSpike/,
