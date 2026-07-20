@@ -438,4 +438,86 @@ assert.match(cssSource,
   /\.tactical-screen\.assault \.tactical-zone\.formation-view \.tactical-defender-rank \.line-rear[\s\S]*grid-column:\s*1;/,
   'assault zones must put the player rear line at the outer left edge');
 
+// ── Phase 3: 빈 전장 배치 카드 독 ──
+const deployDockSource = readFileSync(
+  new URL('../../src/components/tactical/TacticalDeploymentDock.tsx', import.meta.url),
+  'utf8',
+);
+
+assert.match(screenSource, /battle\.phase === 'deployment'[\s\S]*?<TacticalDeploymentDock\b/,
+  'the deployment phase must delegate reserve cards to the deployment dock');
+assert.match(screenSource, /applyAutoDeployTacticalGroups\(activeBattle\)/,
+  'the auto-deploy button must reuse the backend auto deployment mutation');
+assert.match(screenSource, /resetTacticalDeployment\(activeBattle\)/,
+  'the deployment reset button must reuse the backend reset mutation');
+assert.match(screenSource, /배치 초기화/, 'the deployment screen must offer a reset-to-cards action');
+assert.match(screenSource, /배치 완료/, 'deployment must complete through an explicit completion button');
+assert.match(screenSource, /deploymentStartReason = hunt \? huntDeploymentReason : deploymentView\?\.unavailableReason/,
+  'the completion gate must come from backend unavailable reasons, not recomputed counts');
+assert.match(screenSource, /splitFeaturedTacticalGroup\(current, selectedGroup\.id, selectedFeatured\.residentId, featuredSplit\.companions\)/,
+  'the named-resident split must call the featured split mutation with chosen companions');
+assert.match(screenSource, /\{selectedFeatured\.shortName\}의 조 분리/,
+  'the featured split action must be labeled <resident>의 조 분리, not a generic label');
+assert.match(screenSource, /featuredSplit\.companions\.length >= 2/,
+  'the companion picker must cap featured split companions at two');
+assert.match(screenSource, /tacticalDeploymentPlacementUnavailableReason\(battle, selectedGroup\.id/,
+  'deployment zone buttons must gate through the same placement validator as dragging');
+assert.match(screenSource, /deploymentForced === 'nightAmbush' && battle\.round === 1/,
+  'a successful night ambush must surface a forced-deployment notice in round one');
+assert.match(screenSource, /splitSelectedGroup|onSplitHuntGroup/,
+  'group splitting must remain reachable from the deployment controls');
+assert.match(screenSource, /mergeTacticalGroups\(current, selectedGroup\.id, sourceGroupId\)/,
+  'non-hunt merges must route through the shared merge mutation');
+
+assert.match(deployDockSource, /useStagePointerDrag\(\{/,
+  'deployment cards must reuse the shared stage pointer drag hook');
+assert.match(deployDockSource, /data-deploy-anchor/,
+  'deployment drags must resolve their targets through the deploy anchor attribute');
+assert.match(deployDockSource, /tacticalDeploymentPlacementUnavailableReason\(battle, card\.groupId, target\)/,
+  'card drops must validate through the backend placement reason before mutating');
+assert.match(deployDockSource, /placeTacticalDeploymentGroup\(current, card\.groupId, target\)/,
+  'valid card drops must apply immediately through the backend place mutation');
+assert.match(deployDockSource, /removeTacticalDeploymentGroup\(current, card\.groupId\)/,
+  'dragging a placed card back to the waiting area must return it to reserve');
+assert.match(deployDockSource, /배치 대기/, 'the dock must render a waiting-card area');
+assert.match(deployDockSource, /배치 완료/, 'the dock must render a placed-card area');
+assert.match(deployDockSource, /militia-unarmed-mustered/,
+  'the emergency militia card must be highlighted when deployment opens');
+assert.match(deployDockSource, /피난 주민은 마을 중심지 최후열에 고정/,
+  'civilian cards must be locked with an explanation instead of being draggable');
+assert.match(deployDockSource, /defaultTacticalDeploymentPlacement\(battle, group\)/,
+  'waiting cards must read the recommended line from the backend default placement');
+assert.doesNotMatch(deployDockSource, /window\.confirm|TacticalOrderConfirm/,
+  'deployment drops must apply immediately without a confirmation card (13.8)');
+
+assert.match(zoneSource, /'data-deploy-anchor': deployAnchorId/,
+  'defender formation lanes must expose deploy anchors during deployment');
+assert.match(zoneSource, /tacticalDeploymentPlacementUnavailableReason\(battle, deployDrag\.groupId/,
+  'lane anchor validity must come from the backend placement validator');
+assert.match(zoneSource, /deploy-anchor-hover/,
+  'the hovered valid lane must get a stronger highlight while dragging');
+assert.match(zoneSource, /tactical-deploy-lane-ghost/,
+  'hovering a valid lane must show a deployment ghost instead of the real unit');
+assert.match(zoneSource, /'--featured-scale': featured\.spriteScale/,
+  'featured resident scale must come from the backend spriteScale contract');
+assert.match(zoneSource, /special=\{slotSpecial\(index\)\}/,
+  'only the featured resident slot may use the special resident sprite sheet');
+assert.match(zoneSource, /tactical-featured-mark/,
+  'featured residents must carry an always-on small marker');
+assert.match(zoneSource, /tactical-featured-name/,
+  'featured residents must expose a hover/selection name tag');
+
+assert.match(cssSource, /\.tactical-deploy-dock\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1fr\);/,
+  'the deployment dock must split into waiting and placed areas');
+assert.match(cssSource, /\.tactical-formation-lane\.deploy-anchor-hover/,
+  'the hovered deploy anchor lane must have dedicated styling');
+assert.match(cssSource, /\.tactical-formation-slot\.featured\s*\{[\s\S]*scale\(var\(--featured-scale/,
+  'featured slots must scale by the backend-provided ratio');
+assert.doesNotMatch(cssSource, /\.tactical-formation-slot\.featured\s*\{[^}]*border/,
+  'featured residents must not get an always-on border (plan 7.5)');
+assert.match(cssSource, /\.tactical-field-group:hover \.tactical-featured-name/,
+  'the featured name tag must appear on hover');
+assert.match(cssSource, /prefers-reduced-motion[\s\S]*tactical-deploy-card\.just-mustered\s*\{\s*animation:\s*none;/,
+  'the muster pulse must respect reduced-motion preferences');
+
 console.log('tactical component extraction tests passed');

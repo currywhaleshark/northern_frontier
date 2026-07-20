@@ -2,13 +2,15 @@ import type { CSSProperties } from 'react';
 import { combatSpriteDescriptor, tacticalGroupCapabilities } from '../../game/combatCapabilities';
 import { CONFIG } from '../../game/config';
 import {
-  tacticalGroupTargetUnavailableReason, tacticalRaiderVisibleDuringPlayback,
+  tacticalDeploymentPlacementUnavailableReason, tacticalGroupTargetUnavailableReason,
+  tacticalRaiderVisibleDuringPlayback,
 } from '../../game/tacticalBattle';
 import type {
   GameState,
   PredatorKind,
   RaiderUnitType,
   Season,
+  SpecialResidentId,
   TacticalAnimationEvent,
   TacticalBattleZone,
   TacticalDefenderGroup,
@@ -63,6 +65,8 @@ interface Props {
   commandable: boolean;
   selectedGroupId: string | null;
   nextPendingGroupId: string | null;
+  /** 배치 카드 드래그 중일 때만 채워진다 — 아군 전열 레인을 배치 앵커·고스트로 바꾼다 */
+  deployDrag: { groupId: string; hoverAnchorId: string | null } | null;
   onSelectGroup: (groupId: string, element: HTMLElement) => void;
   onSelectTarget: (defenderGroupId: string, enemyGroupId: string) => void;
 }
@@ -114,13 +118,15 @@ function UnitMuzzleFlash({ anchor }: { anchor: TacticalMuzzleAnchor }) {
   );
 }
 
-function DefenderSprite({ group, gender, pose = 'idle', firing = false, faded = false, falling = false }: {
+function DefenderSprite({ group, gender, pose = 'idle', firing = false, faded = false, falling = false, special }: {
   group: TacticalDefenderGroup;
   gender: 'male' | 'female';
   pose?: TacticalSpritePose;
   firing?: boolean;
   faded?: boolean;
   falling?: boolean;
+  /** 슬롯 단위 특수주민 시트 지정 — 특수주민이 섞인 조에서 본인 슬롯에만 전용 시트를 쓴다 */
+  special?: SpecialResidentId;
 }) {
   if (group.mount === 'horse') {
     const mountedX = TACTICAL_CHARACTER_SHEET.residentColumns * TACTICAL_CHARACTER_SHEET.residentWidth;
@@ -148,10 +154,10 @@ function DefenderSprite({ group, gender, pose = 'idle', firing = false, faded = 
     gender,
     resolvedPose,
     defaultWeapon,
-    group.special,
+    special,
   );
   const muzzleAnchor = firing && resolvedPose === 'attack'
-    ? tacticalDefenderMuzzleAnchor(group.weapon, gender, group.special)
+    ? tacticalDefenderMuzzleAnchor(group.weapon, gender, special)
     : null;
   const sheet = cell.sheet === 'weapons'
     ? TACTICAL_DEFENDER_WEAPON_POSE_SHEET
@@ -396,10 +402,20 @@ function GroupSprites({
   const shown = showAll ? active : Math.min(maxVisible, active);
   const woundedShown = showAll ? Math.min(3, wounded) : Math.min(1, wounded);
   const fallingShown = showAll ? falling : Math.min(2, falling);
+  // 특수주민을 표시 순서 맨 앞(대형 최전방)에 두고, 본인 슬롯에만 전용 시트·배율·표식을 적용한다.
+  const featuredList = group.featuredResidents ?? [];
+  const featuredIds = featuredList.map(item => item.residentId)
+    .filter(residentId => group.residentIds.includes(residentId));
+  const displayIds = [...featuredIds, ...group.residentIds.filter(id => !featuredIds.includes(id))];
   const gender = (index: number) => {
-    const residentId = group.residentIds[index];
+    const residentId = displayIds[index];
     return state.residents.find(resident => resident.id === residentId)?.gender ?? (index % 2 ? 'female' : 'male');
   };
+  const slotFeatured = (index: number) =>
+    featuredList.find(item => item.residentId === displayIds[index]);
+  // 특수주민이 없는 구버전 저장 그룹은 기존처럼 group.special을 전 슬롯에 쓴다.
+  const slotSpecial = (index: number): SpecialResidentId | undefined =>
+    slotFeatured(index)?.special ?? (featuredList.length > 0 ? undefined : group.special);
   if (showAll && shown + woundedShown + fallingShown > 0) {
     const total = shown + woundedShown + fallingShown;
     const denseFormation = compactFormation || formationGroupCount >= 3
@@ -416,17 +432,25 @@ function GroupSprites({
         style={{ width: formation.width, height: formation.height }}
         aria-label={`${group.label} ${active}명 전투 가능`}
       >
-        {Array.from({ length: shown }, (_, index) => (
-          <span
-            className="tactical-formation-slot defender-slot"
-            style={formationSlotStyle(
-              index, total, denseFormation.spriteWidth, 120, denseFormation.xStep, 13, denseFormation.maxColumns,
-            )}
-            key={`${group.id}-${index}`}
-          >
-            <DefenderSprite group={group} gender={gender(index)} pose={pose} firing={firing} />
-          </span>
-        ))}
+        {Array.from({ length: shown }, (_, index) => {
+          const featured = slotFeatured(index);
+          return (
+            <span
+              className={`tactical-formation-slot defender-slot${featured ? ' featured' : ''}`}
+              style={{
+                ...formationSlotStyle(
+                  index, total, denseFormation.spriteWidth, 120, denseFormation.xStep, 13, denseFormation.maxColumns,
+                ),
+                ...(featured ? { '--featured-scale': featured.spriteScale, zIndex: 55 } : {}),
+              } as CSSProperties}
+              key={`${group.id}-${index}`}
+            >
+              <DefenderSprite group={group} gender={gender(index)} pose={pose} firing={firing} special={slotSpecial(index)} />
+              {featured && <i className="tactical-featured-mark" aria-hidden="true" />}
+              {featured && <em className="tactical-featured-name">{featured.name}</em>}
+            </span>
+          );
+        })}
         {Array.from({ length: woundedShown }, (_, index) => (
           <span
             className="tactical-formation-slot defender-slot"
@@ -436,7 +460,7 @@ function GroupSprites({
             )}
             key={`${group.id}-wounded-${index}`}
           >
-            <DefenderSprite group={group} gender={gender(shown + index)} pose="wounded" faded />
+            <DefenderSprite group={group} gender={gender(shown + index)} pose="wounded" faded special={slotSpecial(shown + index)} />
           </span>
         ))}
         {Array.from({ length: fallingShown }, (_, index) => (
@@ -448,7 +472,7 @@ function GroupSprites({
             )}
             key={`${group.id}-fall-${index}`}
           >
-            <DefenderSprite group={group} gender={gender(shown + woundedShown + index)} pose="hurt" falling />
+            <DefenderSprite group={group} gender={gender(shown + woundedShown + index)} pose="hurt" falling special={slotSpecial(shown + woundedShown + index)} />
           </span>
         ))}
       </div>
@@ -456,9 +480,28 @@ function GroupSprites({
   }
   return (
     <div className={`tactical-unit-line${showAll ? ' full-formation' : ''}`} aria-label={`${group.label} ${active}명 전투 가능`}>
-      {Array.from({ length: shown }, (_, index) => (
-        <DefenderSprite key={`${group.id}-${index}`} group={group} gender={gender(index)} pose={pose} firing={firing} />
-      ))}
+      {Array.from({ length: shown }, (_, index) => {
+        const featured = slotFeatured(index);
+        return featured ? (
+          <span
+            className="tactical-featured-inline"
+            style={{ '--featured-scale': featured.spriteScale } as CSSProperties}
+            key={`${group.id}-${index}`}
+          >
+            <DefenderSprite group={group} gender={gender(index)} pose={pose} firing={firing} special={slotSpecial(index)} />
+            <i className="tactical-featured-mark" aria-hidden="true" />
+          </span>
+        ) : (
+          <DefenderSprite
+            key={`${group.id}-${index}`}
+            group={group}
+            gender={gender(index)}
+            pose={pose}
+            firing={firing}
+            special={slotSpecial(index)}
+          />
+        );
+      })}
       {Array.from({ length: woundedShown }, (_, index) => (
         <DefenderSprite
           key={`${group.id}-wounded-${index}`}
@@ -466,6 +509,7 @@ function GroupSprites({
           gender={gender(shown + index)}
           pose="wounded"
           faded
+          special={slotSpecial(shown + index)}
         />
       ))}
       {Array.from({ length: fallingShown }, (_, index) => (
@@ -475,6 +519,7 @@ function GroupSprites({
           gender={gender(shown + woundedShown + index)}
           pose="hurt"
           falling
+          special={slotSpecial(shown + woundedShown + index)}
         />
       ))}
       {active > shown && <span className="tactical-unit-more">+{active - shown}</span>}
@@ -634,6 +679,7 @@ export function TacticalZoneColumn({
   commandable,
   selectedGroupId,
   nextPendingGroupId,
+  deployDrag,
   onSelectGroup,
   onSelectTarget,
 }: Props) {
@@ -980,14 +1026,35 @@ export function TacticalZoneColumn({
         })}
       </div>
       <div className="tactical-defender-rank">
-        {DEFENDER_FORMATION_LINES.map(line => (
+        {DEFENDER_FORMATION_LINES.map(line => {
+          // 배치 카드 드래그 앵커 — 유효성 판정은 백엔드 unavailable-reason이 단일 소스다.
+          const deployAnchorId = `${zone.id}|${line}`;
+          const deployReason = deployDrag
+            ? tacticalDeploymentPlacementUnavailableReason(battle, deployDrag.groupId, { zoneId: zone.id, line })
+            : null;
+          const deployAnchorClass = deployDrag
+            ? deployReason == null
+              ? deployDrag.hoverAnchorId === deployAnchorId ? ' deploy-anchor-hover' : ' deploy-anchor-valid'
+              : ' deploy-anchor-blocked'
+            : '';
+          const ghostGroup = deployDrag && deployReason == null && deployDrag.hoverAnchorId === deployAnchorId
+            ? battle.defenderGroups.find(group => group.id === deployDrag.groupId)
+            : undefined;
+          return (
           <div
-            className={`tactical-formation-lane line-${line}`}
+            className={`tactical-formation-lane line-${line}${deployAnchorClass}`}
             data-formation-line={line}
+            {...(showFormationGuides ? { 'data-deploy-anchor': deployAnchorId } : {})}
             aria-label={`아군 ${formationLineLabel(line)}`}
             key={line}
           >
             {showFormationGuides && <span className="tactical-formation-line-label">아군 {formationLineLabel(line)}</span>}
+            {ghostGroup && (
+              <div className="tactical-field-group tactical-deploy-lane-ghost" aria-hidden="true">
+                <GroupSprites state={state} group={ghostGroup} maxVisible={3} />
+                <span>{ghostGroup.label} 배치 예정</span>
+              </div>
+            )}
             {defenders.filter(group => group.line === line).map((group, stackIndex, lineGroups) => {
           const recoiling = zoneVolley && defenderFiringForEvent(activeEvent, group);
           const rearFacing = rearAssaulters.length > 0 &&
@@ -1059,7 +1126,8 @@ export function TacticalZoneColumn({
           );
             })}
           </div>
-        ))}
+          );
+        })}
       </div>
       {activeEvent?.float && activeEvent.zoneId === zone.id && (
         <span key={`float-${eventIndex}`} className={`tactical-float ${activeEvent.side ?? 'defender'}`}>

@@ -25,7 +25,8 @@ interface Props {
   onSelect: () => void;
 }
 
-function DockDefenderSprite({ group, gender }: {
+// 하단 독·배치 카드가 공유하는 소형 부대 초상 — 특수주민이 든 조는 group.special로 전용 시트를 쓴다
+export function DockDefenderSprite({ group, gender }: {
   group: TacticalDefenderGroup;
   gender: 'male' | 'female';
 }) {

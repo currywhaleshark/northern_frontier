@@ -5,8 +5,10 @@ import { getSeason } from '../game/seasons';
 import { banditLairDoctrineDefinition, enemyPlanCounterLabelsForAction, enemyPlanSummaryView } from '../game/enemyPlan';
 import { withJosa } from '../game/josa';
 import {
-  applyTacticalPlaybackEvent,
-  tacticalCommandUnavailableReason, tacticalLootText,
+  applyAutoDeployTacticalGroups, applyTacticalPlaybackEvent,
+  mergeTacticalGroups, resetTacticalDeployment, splitFeaturedTacticalGroup, splitTacticalGroup,
+  tacticalCommandUnavailableReason, tacticalDeploymentPlacementUnavailableReason, tacticalDeploymentView,
+  tacticalLootText,
   tacticalFormationLineUnavailableReason, tacticalPreparationUnavailableReason, tacticalRearResponseOptions,
   tacticalRearAssaultIsEngaged, tacticalRearManeuverEffectiveCounterStrengthForZone,
   tacticalSupportedCommands,
@@ -26,6 +28,7 @@ import type {
 } from '../game/types';
 import { playMeleeClash, playSfx, playWeaponSalvo, playWeaponVolley, setBattleDrums, type SfxName } from '../sound/sfx';
 import { StageDragSpike } from './tactical/StageDragSpike';
+import { TacticalDeploymentDock, type DeploymentDragSnapshot } from './tactical/TacticalDeploymentDock';
 import { TacticalGroupChip } from './tactical/TacticalGroupChip';
 import { TacticalCommandPopover } from './tactical/TacticalCommandPopover';
 import { TacticalMiniMap } from './tactical/TacticalMiniMap';
@@ -47,6 +50,8 @@ interface Props {
   onMergeHuntGroups: (destinationGroupId: string, sourceGroupId: string) => void;
   onSetHuntPreparationZone: (actionId: 'placeBait' | 'setHuntTraps', zoneId: string) => void;
   onSetFormationLine: (groupId: string, line: TacticalFormationLine) => void;
+  /** P3 배치 계약 dispatch — 배치·분할·합류 mutation을 App 상태 갱신 경로로 실행하고 오류 문구를 돌려준다 */
+  onDeploymentAction: (action: (state: GameState) => string | null) => string | null;
   onSetCommand: (groupId: string, command: TacticalCommandId) => void;
   onSetGroupTarget: (defenderGroupId: string, enemyGroupId: string | null) => void;
   onResolveRound: () => void;
@@ -217,6 +222,7 @@ export function TacticalBattleScreen({
   onMergeHuntGroups,
   onSetHuntPreparationZone,
   onSetFormationLine,
+  onDeploymentAction,
   onSetCommand,
   onSetGroupTarget,
   onResolveRound,
@@ -242,6 +248,12 @@ export function TacticalBattleScreen({
   const [commandPopover, setCommandPopover] = useState<CommandPopoverState | null>(null);
   const [commandBoardEmphasis, setCommandBoardEmphasis] = useState(false);
   const [nextPendingGroupId, setNextPendingGroupId] = useState<string | null>(null);
+  // P3 배치 카드 드래그 상태 — 무대 레인 앵커 하이라이트·고스트 전용, 저장하지 않는다
+  const [deployDrag, setDeployDrag] = useState<DeploymentDragSnapshot | null>(null);
+  // <이름>의 조 분리 — 동행 주민 선택 중인 카드
+  const [featuredSplit, setFeaturedSplit] = useState<{ groupId: string; companions: number[] } | null>(null);
+  const [deployNotice, setDeployNotice] = useState<string | null>(null);
+  const deployNoticeTimerRef = useRef<number | null>(null);
   const fastRef = useRef(false);
   const preparationPlayback = battle?.phase === 'preparationExecution';
   const combatPlayback = battle?.phase === 'simulating';
@@ -286,7 +298,26 @@ export function TacticalBattleScreen({
     if (commandBoardAttentionTimerRef.current != null) {
       window.clearTimeout(commandBoardAttentionTimerRef.current);
     }
+    if (deployNoticeTimerRef.current != null) window.clearTimeout(deployNoticeTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    setDeployDrag(null);
+    setFeaturedSplit(null);
+  }, [battle?.phase, battle?.id]);
+
+  useEffect(() => {
+    setFeaturedSplit(null);
+  }, [selectedGroupId]);
+
+  const showDeployNotice = (text: string) => {
+    if (deployNoticeTimerRef.current != null) window.clearTimeout(deployNoticeTimerRef.current);
+    setDeployNotice(text);
+    deployNoticeTimerRef.current = window.setTimeout(() => {
+      setDeployNotice(null);
+      deployNoticeTimerRef.current = null;
+    }, 2600);
+  };
 
   useEffect(() => {
     if (commandPopover && selectedGroupId !== commandPopover.groupId) setCommandPopover(null);
@@ -467,13 +498,20 @@ export function TacticalBattleScreen({
   const assault = battle.orientation === 'assault';
   const hunt = battle.assaultKind === 'predatorHunt';
   const lairAssault = assault && !hunt;
-  const mergeableHuntGroups = hunt && selectedGroup
+  // 합류 후보는 같은 원래 조(cohort)와 같은 배치 상태만 나열한다 — 최종 판정은 백엔드 merge가 한다.
+  const samePlacementForMerge = (leftId: string, rightId: string) => {
+    const left = battle.deploymentPlacements?.[leftId] ?? null;
+    const right = battle.deploymentPlacements?.[rightId] ?? null;
+    if (!left || !right) return left == null && right == null;
+    return left.zoneId === right.zoneId && left.line === right.line &&
+      left.hidden === right.hidden && left.fixed === right.fixed;
+  };
+  const mergeableGroups = battle.phase === 'deployment' && selectedGroup
     ? battle.defenderGroups.filter(group =>
       group.id !== selectedGroup.id &&
-      group.huntOriginGroupId === selectedGroup.huntOriginGroupId &&
-      group.role === selectedGroup.role &&
-      group.weapon === selectedGroup.weapon &&
-      group.zoneId === selectedGroup.zoneId &&
+      (group.deploymentCohortId ?? group.id) === (selectedGroup.deploymentCohortId ?? selectedGroup.id) &&
+      !((group.featuredResidents?.length ?? 0) > 0 && (selectedGroup.featuredResidents?.length ?? 0) > 0) &&
+      samePlacementForMerge(group.id, selectedGroup.id) &&
       group.wounded === 0 && group.killed === 0)
     : [];
   const huntNeedsMoreGroups = hunt && battle.defenderGroups.reduce(
@@ -481,6 +519,55 @@ export function TacticalBattleScreen({
     0,
   ) >= 3 && battle.defenderGroups.filter(group => tacticalActiveDefenderCount(group) > 0).length < 3;
   const huntDeploymentReason = hunt ? huntDeploymentUnavailableReason(state) : null;
+  // P3 배치 계약 — 카드 독·버튼이 같은 selector/mutation을 쓴다. 규칙 수치는 재계산하지 않는다.
+  const deploymentView = battle.phase === 'deployment' ? tacticalDeploymentView(battle) : null;
+  const deploymentStartReason = hunt ? huntDeploymentReason : deploymentView?.unavailableReason ?? null;
+  const runDeploymentAction = (action: (current: GameState) => string | null): string | null => {
+    const error = onDeploymentAction(action);
+    if (error) showDeployNotice(error);
+    return error;
+  };
+  const autoDeployAll = () => {
+    const error = runDeploymentAction(current => {
+      const activeBattle = current.tacticalBattle;
+      if (!activeBattle) return '진행 중인 직접 지휘 전투가 없습니다.';
+      applyAutoDeployTacticalGroups(activeBattle);
+      return null;
+    });
+    if (!error) playSfx('raidDrum');
+  };
+  const resetDeployment = () => runDeploymentAction(current => {
+    const activeBattle = current.tacticalBattle;
+    if (!activeBattle) return '진행 중인 직접 지휘 전투가 없습니다.';
+    resetTacticalDeployment(activeBattle);
+    return null;
+  });
+  const splitSelectedGroup = (detachCount: number) => {
+    if (!selectedGroup) return;
+    if (hunt) {
+      onSplitHuntGroup(selectedGroup.id, detachCount);
+      return;
+    }
+    runDeploymentAction(current => splitTacticalGroup(current, selectedGroup.id, detachCount));
+  };
+  const mergeIntoSelectedGroup = (sourceGroupId: string) => {
+    if (!selectedGroup) return;
+    if (hunt) {
+      onMergeHuntGroups(selectedGroup.id, sourceGroupId);
+      return;
+    }
+    runDeploymentAction(current => mergeTacticalGroups(current, selectedGroup.id, sourceGroupId));
+  };
+  const selectedFeatured = selectedGroup?.featuredResidents?.[0] ?? null;
+  const confirmFeaturedSplit = () => {
+    if (!selectedGroup || !selectedFeatured || !featuredSplit) return;
+    const error = runDeploymentAction(current =>
+      splitFeaturedTacticalGroup(current, selectedGroup.id, selectedFeatured.residentId, featuredSplit.companions));
+    if (!error) setFeaturedSplit(null);
+  };
+  const handleDeployDragChange = (groupId: string, drag: DeploymentDragSnapshot | null) => {
+    setDeployDrag(current => drag ?? (current?.groupId === groupId ? null : current));
+  };
   const roundLimit = hunt ? huntMaxRounds() : assault ? assaultMaxRounds() : 5;
   const commandable = battle.phase === 'command' || battle.phase === 'deployment';
   const showTacticalMiniMap = battle.phase === 'preparation' || battle.phase === 'preparationExecution' ||
@@ -643,6 +730,7 @@ export function TacticalBattleScreen({
                   commandable={commandable}
                   selectedGroupId={selectedGroup?.id ?? null}
                   nextPendingGroupId={nextPendingGroupId}
+                  deployDrag={battle.phase === 'deployment' ? deployDrag : null}
                   onSelectGroup={openCommandPopover}
                   onSelectTarget={(defenderGroupId, enemyGroupId) => {
                     const defender = battle.defenderGroups.find(group => group.id === defenderGroupId);
@@ -831,30 +919,46 @@ export function TacticalBattleScreen({
             </div>
           )}
 
-          {battle.phase === 'deployment' && selectedGroup && (
+          {battle.phase === 'deployment' && selectedGroup && deploymentView && (
             <>
               <div className="tactical-panel-heading">
                 <div>
                   <strong>{hunt ? '사냥대 배치' : assault ? '토벌대 배치' : '수비대 배치'}</strong>
                   <span>{battle.preliminaryBombardmentCannons
                     ? `사전포격 ${battle.preliminaryBombardmentCannons}문 · 적 ${battle.preliminaryBombardmentCasualties ?? 0}명 전투불능`
-                    : '부대를 고른 뒤 지킬 구역과 전열을 지정합니다.'}</span>
+                    : deploymentView.unavailableReason ?? '카드를 무대 전열로 끌거나 구역·전열 단추로 배치합니다.'}</span>
                 </div>
-                <button
-                  className="btn primary"
-                  disabled={huntDeploymentReason != null}
-                  title={huntDeploymentReason ?? undefined}
-                  onClick={onAdvancePhase}
-                >전투 시작</button>
+                <div className="tactical-deploy-heading-actions">
+                  <button
+                    className="btn"
+                    onClick={autoDeployAll}
+                    title="모든 지휘 가능 부대를 기존 기본 진형으로 배치합니다."
+                  >자동배치</button>
+                  <button
+                    className="btn"
+                    onClick={resetDeployment}
+                    title="지휘 가능 부대를 모두 배치 대기 카드로 되돌립니다. 피난 주민 고정 배치는 유지됩니다."
+                  >배치 초기화</button>
+                  <button
+                    className="btn primary"
+                    disabled={deploymentStartReason != null}
+                    title={deploymentStartReason ?? '배치를 확정하고 첫 교전 지휘로 넘어갑니다.'}
+                    onClick={onAdvancePhase}
+                  >배치 완료</button>
+                </div>
               </div>
-              <UnitDock
+              <TacticalDeploymentDock
                 state={state}
                 battle={battle}
-                hunt={hunt}
-                mode="deployment"
+                view={deploymentView}
                 selectedGroupId={selectedGroup.id}
                 onSelect={selectGroup}
+                onAction={runDeploymentAction}
+                onDragChange={handleDeployDragChange}
               />
+              {deployNotice && (
+                <p className="tactical-deploy-feedback warn" role="status">{deployNotice}</p>
+              )}
               {hunt && battle.prepActions.filter(action =>
                 action.selected && (action.id === 'placeBait' || action.id === 'setHuntTraps')).map(action => {
                 const selectedZoneId = action.id === 'placeBait' ? battle.huntBaitZoneId : battle.huntTrapZoneId;
@@ -885,49 +989,103 @@ export function TacticalBattleScreen({
                   길목을 모두 막으려면 조를 나누십시오. 얇은 분견대는 급습에 더 취약합니다.
                 </div>
               )}
-              {hunt && (
-                <div className="tactical-hunt-detachment-controls" role="group" aria-label="사냥대 분견대 편성">
-                  <strong>분견대 편성</strong>
+              <div className="tactical-hunt-detachment-controls" role="group" aria-label="분견대 편성">
+                <strong>분견대 편성</strong>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={selectedGroup.commandable === false ||
+                    selectedGroup.count < 2 || selectedGroup.wounded > 0 || selectedGroup.killed > 0}
+                  title={selectedGroup.count < 2 ? '최소 2명인 조만 나눌 수 있습니다.' : '선택한 조에서 1명을 분리합니다.'}
+                  onClick={() => splitSelectedGroup(1)}
+                >1명 분리</button>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={selectedGroup.commandable === false ||
+                    selectedGroup.count < 2 || selectedGroup.wounded > 0 || selectedGroup.killed > 0}
+                  title={selectedGroup.count < 2 ? '최소 2명인 조만 나눌 수 있습니다.' : '선택한 조를 가능한 한 반으로 나눕니다.'}
+                  onClick={() => splitSelectedGroup(Math.floor(selectedGroup.count / 2))}
+                >반으로 나누기</button>
+                {selectedFeatured && (
                   <button
                     type="button"
                     className="btn"
-                    disabled={selectedGroup.count < 2 || selectedGroup.wounded > 0 || selectedGroup.killed > 0}
-                    title={selectedGroup.count < 2 ? '최소 2명인 조만 나눌 수 있습니다.' : '선택한 조에서 1명을 분리합니다.'}
-                    onClick={() => onSplitHuntGroup(selectedGroup.id, 1)}
-                  >1명 분리</button>
+                    disabled={selectedGroup.commandable === false ||
+                      selectedGroup.count < 2 || selectedGroup.wounded > 0 || selectedGroup.killed > 0}
+                    title={`${selectedFeatured.name} 본인과 동료 0~2명을 새 조로 분리합니다. 특기와 조 이름도 함께 옮겨집니다.`}
+                    onClick={() => setFeaturedSplit(current =>
+                      current?.groupId === selectedGroup.id ? null : { groupId: selectedGroup.id, companions: [] })}
+                  >{selectedFeatured.shortName}의 조 분리</button>
+                )}
+                {mergeableGroups.map(group => (
                   <button
                     type="button"
                     className="btn"
-                    disabled={selectedGroup.count < 2 || selectedGroup.wounded > 0 || selectedGroup.killed > 0}
-                    title={selectedGroup.count < 2 ? '최소 2명인 조만 나눌 수 있습니다.' : '선택한 조를 가능한 한 반으로 나눕니다.'}
-                    onClick={() => onSplitHuntGroup(selectedGroup.id, Math.floor(selectedGroup.count / 2))}
-                  >반으로 나누기</button>
-                  {mergeableHuntGroups.map(group => (
-                    <button
-                      type="button"
-                      className="btn"
-                      key={group.id}
-                      title={`${withJosa(group.label, '을/를')} 선택한 조에 합칩니다.`}
-                      onClick={() => onMergeHuntGroups(selectedGroup.id, group.id)}
-                    >같은 조 합류 · {group.label}</button>
-                  ))}
+                    key={group.id}
+                    title={`${withJosa(group.label, '을/를')} 선택한 조에 합칩니다.`}
+                    onClick={() => mergeIntoSelectedGroup(group.id)}
+                  >같은 조 합류 · {group.label}</button>
+                ))}
+              </div>
+              {selectedFeatured && featuredSplit?.groupId === selectedGroup.id && (
+                <div className="tactical-featured-split" role="group" aria-label={`${selectedFeatured.name}의 조 분리`}>
+                  <strong>{selectedFeatured.shortName}의 조 분리 — 함께 옮길 동료를 고르십시오 (0~2명)</strong>
+                  <div className="tactical-featured-split-companions">
+                    {selectedGroup.residentIds
+                      .filter(residentId => residentId !== selectedFeatured.residentId)
+                      .map(residentId => {
+                        const resident = state.residents.find(candidate => candidate.id === residentId);
+                        const checked = featuredSplit.companions.includes(residentId);
+                        return (
+                          <button
+                            type="button"
+                            key={residentId}
+                            className={checked ? 'active' : ''}
+                            aria-pressed={checked}
+                            disabled={!checked && featuredSplit.companions.length >= 2}
+                            onClick={() => setFeaturedSplit(current => current && ({
+                              ...current,
+                              companions: checked
+                                ? current.companions.filter(id => id !== residentId)
+                                : [...current.companions, residentId],
+                            }))}
+                          >{resident?.name ?? `주민 ${residentId}`}</button>
+                        );
+                      })}
+                  </div>
+                  <div className="tactical-featured-split-actions">
+                    <button type="button" className="btn" onClick={() => setFeaturedSplit(null)}>취소</button>
+                    <button type="button" className="btn primary" onClick={confirmFeaturedSplit}>
+                      {selectedFeatured.shortName} 포함 {featuredSplit.companions.length + 1}명 분리
+                    </button>
+                  </div>
                 </div>
               )}
               <div className="tactical-deploy-row">
                 <strong>{selectedGroup.label}{selectedGroup.ambushed && <em className="tactical-state-badge ambushed">매복중</em>}</strong>
                 <div className="tactical-zone-buttons" aria-label={`${selectedGroup.label} 배치 구역 선택`}>
-                  {battle.zones.filter(zone => !hunt || zone.id !== 'huntDen').map(zone => (
-                    <button
-                      key={zone.id}
-                      className={selectedGroup.zoneId === zone.id ? 'active' : ''}
-                      disabled={(selectedGroup.commandable === false && selectedGroup.kind !== 'healer') ||
-                        tacticalActiveDefenderCount(selectedGroup) <= 0}
-                      onClick={() => {
-                        onAssignGroup(selectedGroup.id, zone.id);
-                        setViewedZoneId(zone.id);
-                      }}
-                    >{zone.name}</button>
-                  ))}
+                  {battle.zones.filter(zone => !hunt || zone.id !== 'huntDen').map(zone => {
+                    // 드래그와 같은 검증 함수를 쓰는 키보드 대체 경로 — 열은 현재 배치 열 또는 추천 열을 따른다
+                    const zoneReason = tacticalDeploymentPlacementUnavailableReason(battle, selectedGroup.id, {
+                      zoneId: zone.id,
+                      line: battle.deploymentPlacements?.[selectedGroup.id]?.line ?? selectedGroup.line,
+                    });
+                    return (
+                      <button
+                        key={zone.id}
+                        className={selectedGroup.zoneId === zone.id ? 'active' : ''}
+                        disabled={zoneReason != null || tacticalActiveDefenderCount(selectedGroup) <= 0}
+                        title={zoneReason ?? (selectedGroup.zoneId === zone.id
+                          ? '현재 배치 구역'
+                          : `${zone.name}에 배치합니다.`)}
+                        onClick={() => {
+                          onAssignGroup(selectedGroup.id, zone.id);
+                          setViewedZoneId(zone.id);
+                        }}
+                      >{zone.name}</button>
+                    );
+                  })}
                 </div>
                 {!hunt && (
                   <div className="tactical-line-toggle" aria-label={`${selectedGroup.label} 전열 선택`}>
@@ -958,6 +1116,11 @@ export function TacticalBattleScreen({
                   <strong>제{battle.round}차 교전 지휘</strong>
                   <span>현재 초점: {battle.zones.find(zone => zone.id === battle.currentZoneId)?.name}
                     {pendingCommandCount > 0 ? ` · 자동 명령 ${pendingCommandCount}개 부대` : ' · 모든 부대 직접 명령 완료'}</span>
+                  {battle.deploymentForced === 'nightAmbush' && battle.round === 1 && (
+                    <span className="tactical-forced-deploy-note" role="status">
+                      야습! 대열을 갖출 틈 없이 기존 진형으로 맞섭니다.
+                    </span>
+                  )}
                 </div>
                 <button className="btn primary" onClick={() => {
                   closePopover();

@@ -669,11 +669,16 @@ export default function App() {
     bump();
   };
 
-  const handleTacticalAction = (action: () => string | null) => {
+  const handleTacticalAction = (action: () => string | null): string | null => {
     const error = action();
     if (error) addLog(stateRef.current, error, 'info');
     bump();
+    return error;
   };
+
+  // P3 배치 계약 dispatch — 전술 화면이 배치·분할·합류 mutation을 직접 조합해 실행한다.
+  const handleTacticalDeploymentAction = (action: (current: GameState) => string | null) =>
+    handleTacticalAction(() => action(stateRef.current));
 
   const handleSpendPreparation = (actionId: PreparationActionId) =>
     handleTacticalAction(() => spendPreparationAction(stateRef.current, actionId));
@@ -1414,6 +1419,7 @@ export default function App() {
             onMergeHuntGroups={handleMergeHuntGroups}
             onSetHuntPreparationZone={handleSetHuntPreparationZone}
             onSetFormationLine={handleSetTacticalFormationLine}
+            onDeploymentAction={handleTacticalDeploymentAction}
             onSetCommand={handleSetTacticalCommand}
             onSetGroupTarget={handleSetTacticalGroupTarget}
             onResolveRound={handleResolveTacticalRound}

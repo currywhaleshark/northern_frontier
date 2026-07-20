@@ -3489,6 +3489,193 @@ html, body, #root {
   font-size: 10px;
 }
 
+/* ── Phase 3 배치 카드 독 — 배치 대기/배치 완료 두 영역과 드래그 배치 ── */
+.tactical-deploy-heading-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+.tactical-deploy-dock {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+}
+.tactical-deploy-area {
+  min-width: 0;
+  padding: 4px 6px 6px;
+  border: 1px dashed #445057;
+  border-radius: 5px;
+  background: rgba(30, 34, 37, 0.75);
+}
+.tactical-deploy-area.waiting { border-color: #7a6a45; }
+.tactical-deploy-area header {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+.tactical-deploy-area header strong { color: #ead8ac; font-size: 11px; }
+.tactical-deploy-area header em { color: #9fa9ad; font-size: 10px; font-style: normal; }
+.tactical-deploy-cards {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+  scrollbar-width: thin;
+}
+.tactical-deploy-empty {
+  align-self: center;
+  padding: 8px 6px;
+  color: #8d9498;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.tactical-deploy-card {
+  flex: 0 0 auto;
+  min-width: 150px;
+  max-width: 200px;
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 4px;
+  border: 1px solid #7a6a45;
+  border-radius: 4px;
+  background: #292f33;
+  color: var(--text);
+  text-align: left;
+}
+.tactical-deploy-card:hover { border-color: #b9944f; }
+.tactical-deploy-card.placed { border-color: rgba(122, 160, 113, 0.7); border-style: solid; }
+.tactical-deploy-card.waiting { border-style: dashed; }
+.tactical-deploy-card.active { border-color: #d0a651; background: #3a372d; border-style: solid; }
+.tactical-deploy-card.dragging { opacity: 0.55; }
+.tactical-deploy-card.locked { opacity: 0.75; cursor: default; }
+.tactical-deploy-card .tactical-deploy-card-featured {
+  overflow: hidden;
+  color: #d8b45e;
+  font-size: 9px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tactical-deploy-card .tactical-deploy-card-placement { color: #b7c885; font-size: 9px; font-weight: 700; }
+.tactical-deploy-card .tactical-deploy-card-placement.pending { color: #9fa9ad; font-weight: 400; }
+.tactical-deploy-card .tactical-deploy-card-badge { color: #e8b45f; font-size: 9px; font-style: normal; }
+.tactical-deploy-card.just-mustered { animation: tactical-deploy-card-muster 1.3s ease 2; }
+@keyframes tactical-deploy-card-muster {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 0 2px rgba(232, 180, 95, 0.75); }
+}
+.tactical-deploy-feedback { margin: 2px 0 0; font-size: 10px; }
+.tactical-deploy-feedback.ok { color: #b7c885; }
+.tactical-deploy-feedback.warn { color: #e0a072; }
+.tactical-deploy-ghost {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 8px;
+  border: 1px solid #d8b45e;
+  border-radius: 4px;
+  background: rgba(44, 42, 36, 0.94);
+}
+.tactical-deploy-ghost strong { color: #ead8ac; font-size: 10px; }
+.tactical-deploy-ghost span { color: #9fc4d8; font-size: 9px; }
+.tactical-deploy-ghost span.blocked { color: #e0a072; }
+/* 드래그 중 무대 아군 레인 앵커 — 유효/호버/불가 */
+.tactical-zone.formation-view .tactical-formation-lane.deploy-anchor-valid {
+  outline: 2px dashed rgba(216, 180, 94, 0.55);
+  outline-offset: -4px;
+  border-radius: 6px;
+  background: rgba(216, 180, 94, 0.07);
+}
+.tactical-zone.formation-view .tactical-formation-lane.deploy-anchor-hover {
+  outline: 2px solid #d8b45e;
+  outline-offset: -4px;
+  border-radius: 6px;
+  background: rgba(216, 180, 94, 0.16);
+  box-shadow: inset 0 0 22px rgba(216, 180, 94, 0.2);
+}
+.tactical-zone.formation-view .tactical-formation-lane.deploy-anchor-blocked { opacity: 0.6; }
+.tactical-zone.formation-view .tactical-formation-lane > .tactical-deploy-lane-ghost {
+  opacity: 0.6;
+  filter: saturate(0.7);
+  pointer-events: none;
+}
+/* 특수주민 강조 — 본인 슬롯만 1.12~1.18배(백엔드 spriteScale) + 상시 소형 표식 + 호버/선택 이름표.
+   상시 테두리는 계획서 7.5에 따라 쓰지 않는다. */
+.tactical-formation-slot.featured {
+  transform: scale(var(--featured-scale, 1.15));
+  transform-origin: bottom center;
+}
+.tactical-featured-inline {
+  position: relative;
+  display: inline-block;
+  transform: scale(var(--featured-scale, 1.15));
+  transform-origin: bottom center;
+}
+.tactical-featured-mark {
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  width: 7px;
+  height: 7px;
+  transform: translateX(-50%) rotate(45deg);
+  border: 1px solid #6b5426;
+  background: #e8c46a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+.tactical-featured-name {
+  position: absolute;
+  left: 50%;
+  top: -20px;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border: 1px solid #7a6a45;
+  border-radius: 3px;
+  background: rgba(32, 30, 24, 0.92);
+  color: #ead8ac;
+  font-size: 9px;
+  font-style: normal;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.tactical-field-group:hover .tactical-featured-name,
+.tactical-field-group.selected .tactical-featured-name { opacity: 1; }
+/* <이름>의 조 분리 — 동행 주민 선택 */
+.tactical-featured-split {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 8px;
+  border: 1px solid #7a6a45;
+  border-radius: 5px;
+  background: #2c2a24;
+}
+.tactical-featured-split strong { color: #ead8ac; font-size: 11px; }
+.tactical-featured-split-companions { display: flex; flex-wrap: wrap; gap: 4px; }
+.tactical-featured-split-companions button {
+  padding: 3px 8px;
+  border: 1px solid #445057;
+  border-radius: 4px;
+  background: #292f33;
+  color: var(--text);
+  font-size: 10px;
+  cursor: pointer;
+}
+.tactical-featured-split-companions button.active { border-color: #d0a651; background: #3a372d; }
+.tactical-featured-split-companions button:disabled { opacity: 0.5; cursor: default; }
+.tactical-featured-split-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.tactical-panel-heading .tactical-forced-deploy-note { color: #e0a072; font-size: 10px; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) {
+  .tactical-deploy-card.just-mustered { animation: none; }
+  .tactical-featured-name { transition: none; }
+}
+
 .tactical-enemy-summary-line {
   grid-column: 1 / -1;
   margin: 0;

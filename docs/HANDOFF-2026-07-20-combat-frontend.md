@@ -101,3 +101,67 @@ P3-backend 태스크 본문 요지(집 밖에서 못 보니 여기 옮김): 빈 
   `resize_window 1280×720`부터. (회사 환경이면 무관)
 - 커밋 서명 관례: 본문 끝 `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`.
 - 회사에서 한 결정·계약 요청은 **이 문서나 계획서에 기록**해 두면, 집에 돌아온 페이블이 kanban에 동기화한다.
+
+## 7. 2026-07-20 회사 세션 기록 — P3 프론트 구현 완료 (이 커밋)
+
+Codex의 P3 백엔드(`dca02c9`, 통합 `d729f4f`)를 확인하고 P3 프론트를 구현했다. xhigh 합의는 지켜졌다.
+
+### 구현 내역
+
+- **`src/components/tactical/TacticalDeploymentDock.tsx` (신규)** — 배치 대기/배치 완료 카드 독.
+  카드에 병과 라벨·인원·무기·기마·특수주민(★ 이름·특기)·추천 구역·열(`defaultTacticalDeploymentPlacement`)
+  표시. 카드별 `useStagePointerDrag` — 드롭 즉시 적용(13.8), 대기 영역 역드래그로 예비 복귀,
+  드롭 전 `tacticalDeploymentPlacementUnavailableReason` 선검증 + 피드백 줄(role=status).
+  피난 주민은 잠긴 카드. `militia-unarmed-mustered` cohort는 배치 단계 진입 시 `긴급 소집` 배지+펄스.
+- **`TacticalZoneColumn.tsx`** — 아군 전열 레인에 `data-deploy-anchor="{zoneId}|{line}"`(배치 단계만),
+  드래그 중 유효/호버/불가 클래스(판정은 전부 백엔드 validator), 호버 유효 레인에 부대 고스트.
+  특수주민: 본인 슬롯만 전용 시트(`slotSpecial`)·`--featured-scale`(백엔드 `spriteScale`)·상시 소형
+  표식·호버/선택 이름표. 상시 테두리 없음. 구버전 저장(featuredResidents 없는 group.special)은 기존 동작 유지.
+- **`TacticalBattleScreen.tsx`** — 배치 단계 개편: 헤딩에 자동배치/배치 초기화/배치 완료(게이트 =
+  hunt ? `huntDeploymentUnavailableReason` : `view.unavailableReason`). UnitDock 대신 카드 독.
+  분견대 편성 블록을 전 전투 공통화(1명 분리/반으로 나누기/같은 조 합류 — hunt는 기존 prop,
+  그 외는 dispatch). `<이름>의 조 분리` + 동행 0~2명 선택 UI(`splitFeaturedTacticalGroup`).
+  구역 버튼은 드래그와 같은 validator로 비활성+사유 title. 지휘 1라운드에
+  `deploymentForced === 'nightAmbush'` 야습 강제배치 노트.
+- **`TacticalGroupChip.tsx`** — `DockDefenderSprite` export만 추가.
+- **`global.css`** — 독/카드/앵커/고스트/특수주민/동행 선택 스타일 + `prefers-reduced-motion` 처리.
+- **`tools/game/test_tactical_components.mjs`** — P3 프론트 계약 검사 ~35건 추가(즉시 적용·validator
+  단일 사용·특수주민 배율 계약·상시 테두리 금지·reduced-motion 등).
+
+### ⚠ 통합 경계 변경 — kanban 동기화 필요
+
+`src/App.tsx`(통합 전용)에 최소 연결을 추가했다: `handleTacticalAction`이 오류 문자열을 반환하도록
+변경(기존 호출부 영향 없음) + 범용 `handleTacticalDeploymentAction` + `onDeploymentAction` prop 1개.
+P3 mutation 7종을 개별 핸들러로 늘리지 않기 위한 단일 dispatch이며 Phase 4~5도 재사용 예정.
+**집에서 Codex/통합 담당에게 이 경계 변경을 알리고 승인 받을 것.**
+
+### 계약 요청 후보 (비차단)
+
+- `battleSimulation.ts`: 시뮬레이터 아군 구성에 **특수주민 포함 옵션**이 없어 명명 조·특기 UI를
+  시뮬레이터에서 QA할 수 없다. 특수주민 스냅샷 생성 옵션 추가를 Codex에 요청 검토.
+
+### 검증
+
+- `npx tsc --noEmit`, `test_tactical_components.mjs`, `test_tactical_deployment.mjs`,
+  `npm run test:combat`, `npm run build` 전부 통과 (500kB chunk 경고는 기존).
+- 브라우저(전투 시뮬레이션): 방어전(홀라온·경보됨·민병 소집) — 빈 무대 시작, 카드 7장+잠긴 피난 주민,
+  긴급 소집 배지, 자동배치 결과가 기준선 규칙과 정확 일치(사냥꾼 approach/rear, 조총 wall/middle,
+  각궁 wall/rear, 나머지 wall/front, 소집 민병 wall/front), 배치 초기화, 1명 분리/합류(전력·인원 보존,
+  alias 기록), 카드→레인 드래그(유효 앵커 12곳 하이라이트+레인 고스트+커서 고스트, 즉시 적용),
+  역드래그 예비 복귀, 무효 위치 거부 피드백, 배치 완료→지휘 1라운드 진입.
+  토벌전(선행 침투) — 4명 조는 목책 거부(3명 제한 사유), 분할 후 2명 조는 목책 은닉 배치
+  (`hidden`+매복중+카드 은닉 표시), 2번째 사냥꾼 조는 "1개 조만" 사유로 거부, 마당/움막 진입로 제한,
+  자동배치 시 전원 lairTrail 복귀. `?dragSpike` 하네스 생존.
+
+### 남은 것 / 관찰
+
+- **특수주민 화면 확인 미완** — 시뮬레이터에 특수주민이 없어 소스 검사·계약 테스트로만 검증. 본편
+  저장(특수주민 보유)으로 확인하거나 위 계약 요청 후 QA.
+- **야습 강제배치 실화면 재생 미확인** — 계책 발생이 확률적이라 시뮬레이터에서 강제 불가(백엔드
+  fixture 테스트는 통과, UI는 기존 preparationEvents 재생 + 지휘 노트라 위험 낮음). 시뮬레이터 계책
+  강제 옵션이 생기면 재확인.
+- **스크린샷 QA 미완** — 이 세션의 브라우저 페인은 전투 화면 스크린샷 캡처가 타임아웃된다(DOM·상태
+  검증으로 대체). 기준선 비교 스크린샷은 집에서 playwright 스크립트로 찍을 것.
+- **페인 한정 관찰**: 무대 가로 스크롤(`scrollTo`)이 이 브라우저 페인에서 고정된다 — **stash로 기준선
+  재현 결과 P3 이전에도 동일**하므로 앱 회귀 아님(실 브라우저·playwright에서는 정상으로 추정).
+  16그룹 1280×720 겹침 QA도 스크린샷과 함께 집에서.
