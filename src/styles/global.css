@@ -3446,6 +3446,9 @@ html, body, #root {
   cursor: grab;
 }
 .stage-drag-handle.dragging { cursor: grabbing; }
+/* 배치 카드는 세로 스와이프만 드래그다 — 가로 팬은 남겨 좁은 화면에서 독을 손가락으로 넘긴다.
+   무대 부대 핸들은 인접 구역 드래그가 좌우라 touch-action: none을 유지한다. */
+.tactical-deploy-card.stage-drag-handle { touch-action: pan-x; }
 .stage-drag-ghost {
   position: fixed;
   transform: translate(-50%, -120%);

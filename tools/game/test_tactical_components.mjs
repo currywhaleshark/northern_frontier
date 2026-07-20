@@ -796,4 +796,20 @@ assert.match(cssSource, /\.battle-report-route-outcome\.raiderReachedRear/,
 assert.match(minimapSource, /routeControlLabel\(view\.route\.control\)/,
   'minimap route branches must state route control in text, not color alone');
 
+// ── P9 실기기 후속: 카드 독 터치 축 분리·휠 가로 스크롤 ──
+const dockSource = readFileSync(
+  new URL('../../src/components/tactical/TacticalDeploymentDock.tsx', import.meta.url),
+  'utf8',
+);
+assert.match(dragSource, /touchAxis === 'vertical' && event\.pointerType === 'touch' && Math\.abs\(dx\) > Math\.abs\(dy\)/,
+  'vertical-axis handles must yield horizontally-dominant touches to native pan instead of dragging');
+assert.match(dockSource, /touchAxis: 'vertical'/,
+  'deploy cards must promote only vertical touch moves to a placement drag');
+assert.match(cssSource, /\.tactical-deploy-card\.stage-drag-handle\s*\{\s*touch-action:\s*pan-x/,
+  'deploy cards must keep native horizontal panning so the dock can slide on touch');
+assert.match(dockSource, /addEventListener\('wheel', onWheel, \{ passive: false \}\)/,
+  'the card row must attach a non-passive wheel listener because React root wheel handlers are passive');
+assert.match(dockSource, /row\.scrollLeft \+= event\.deltaY/,
+  'vertical wheel over the card row must scroll it horizontally');
+
 console.log('tactical component extraction tests passed');

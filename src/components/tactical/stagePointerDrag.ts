@@ -33,6 +33,12 @@ export interface StagePointerDragOptions {
    * 커서 추종 고스트 없이 레인 고스트만 쓰는 화면 단위 훅(Phase 4 무대 드래그)용.
    */
   trackPosition?: boolean;
+  /**
+   * 'vertical'이면 터치 포인터는 세로 우세 이동만 드래그로 승격한다. 가로 우세면 세션을 조용히
+   * 끝내 핸들의 `touch-action: pan-x` 네이티브 가로 스크롤(배치 카드 독 슬라이드)에 양보한다.
+   * 마우스·펜과 무대 부대 드래그(인접 구역이 좌우라 가로 드래그가 유효)는 기본값 'any'를 쓴다.
+   */
+  touchAxis?: 'any' | 'vertical';
   onDrop: (anchorId: string | null, point: StageDragPoint, pointerType: string) => void;
   /** 임계값을 넘지 못하고 놓았을 때 — 기존 클릭 동작 위임 */
   onClick?: () => void;
@@ -59,7 +65,8 @@ const IDLE_STATE: StageDragState = { dragging: false, pointerType: null, positio
 
 export function useStagePointerDrag(options: StagePointerDragOptions) {
   const {
-    anchorAttribute = 'data-stage-anchor', disabled = false, trackPosition = true, onDrop, onClick, onCancel,
+    anchorAttribute = 'data-stage-anchor', disabled = false, trackPosition = true, touchAxis = 'any',
+    onDrop, onClick, onCancel,
   } = options;
   const [state, setState] = useState<StageDragState>(IDLE_STATE);
   const sessionRef = useRef<{
@@ -117,6 +124,11 @@ export function useStagePointerDrag(options: StagePointerDragOptions) {
     const dy = event.clientY - session.origin.y;
     if (!session.dragging) {
       if (Math.hypot(dx, dy) < STAGE_DRAG_THRESHOLD_PX) return;
+      // 세로 전용 핸들의 가로 우세 터치는 드래그가 아니라 독 슬라이드다 — 네이티브 pan-x에 양보.
+      if (touchAxis === 'vertical' && event.pointerType === 'touch' && Math.abs(dx) > Math.abs(dy)) {
+        endSession(session.element, session.pointerId);
+        return;
+      }
       session.dragging = true;
       try {
         session.element.setPointerCapture(session.pointerId);
@@ -134,7 +146,7 @@ export function useStagePointerDrag(options: StagePointerDragOptions) {
         hoverAnchorId,
       };
     });
-  }, [anchorAttribute, cancelDrag, trackPosition]);
+  }, [anchorAttribute, cancelDrag, endSession, touchAxis, trackPosition]);
 
   const handlePointerUp = useCallback((event: React.PointerEvent<HTMLElement>) => {
     const session = sessionRef.current;

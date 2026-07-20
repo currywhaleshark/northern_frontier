@@ -2,7 +2,7 @@
 // 카드를 무대 전열 앵커로 끌어 즉시 배치한다(확인 카드 없음, 13.8 확정).
 // 배치 규칙 판정은 전부 백엔드 unavailable-reason/mutation이 담당하고, 이 컴포넌트는
 // 카드 표시·드래그 좌표·피드백 문구만 책임진다.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { combatDefaultWeaponName } from '../../game/combatCapabilities';
 import {
   placeTacticalDeploymentGroup,
@@ -89,6 +89,8 @@ function DeploymentCard({
   const { state: dragState, handleProps } = useStagePointerDrag({
     anchorAttribute: DEPLOY_ANCHOR_ATTRIBUTE,
     disabled: disabled || locked,
+    // 카드 touch-action은 pan-x — 가로 스와이프는 독 슬라이드, 세로 스와이프만 배치 드래그다.
+    touchAxis: 'vertical',
     onDrop: anchorId => {
       onDragChange(null);
       onDrop(anchorId);
@@ -187,6 +189,25 @@ function DeploymentCard({
   );
 }
 
+function DeployCardRow({ children }: { children: ReactNode }) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const row = rowRef.current;
+    if (!row) return;
+    // React 루트의 wheel 리스너는 passive라 onWheel로는 페이지 스크롤을 못 막는다 —
+    // 행에 직접 non-passive로 달아 세로 휠을 카드열 가로 스크롤로 옮긴다.
+    const onWheel = (event: WheelEvent) => {
+      if (row.scrollWidth <= row.clientWidth) return;
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      row.scrollLeft += event.deltaY;
+      event.preventDefault();
+    };
+    row.addEventListener('wheel', onWheel, { passive: false });
+    return () => row.removeEventListener('wheel', onWheel);
+  }, []);
+  return <div className="tactical-deploy-cards" ref={rowRef}>{children}</div>;
+}
+
 export function TacticalDeploymentDock({
   state, battle, view, selectedGroupId, onSelect, onAction, onDragChange,
 }: Props) {
@@ -279,25 +300,25 @@ export function TacticalDeploymentDock({
           <strong>배치 대기</strong>
           <em>{view.waiting.length}</em>
         </header>
-        <div className="tactical-deploy-cards">
+        <DeployCardRow>
           {view.waiting.map(card => renderCard(card, false))}
           {view.waiting.length === 0 && (
             <span className="tactical-deploy-empty">모든 부대가 배치되었습니다.</span>
           )}
-        </div>
+        </DeployCardRow>
       </section>
       <section className="tactical-deploy-area placed" aria-label={`배치 완료 ${view.placed.length}개 조`}>
         <header>
           <strong>배치 완료</strong>
           <em>{view.placed.length}</em>
         </header>
-        <div className="tactical-deploy-cards">
+        <DeployCardRow>
           {view.placed.map(card => renderCard(card, false))}
           {view.fixed.map(card => renderCard(card, true))}
           {view.placed.length === 0 && view.fixed.length === 0 && (
             <span className="tactical-deploy-empty">카드를 무대로 끌어 배치하십시오.</span>
           )}
-        </div>
+        </DeployCardRow>
       </section>
       {feedback && (
         <p className={`tactical-deploy-feedback ${feedback.tone}`} role="status">{feedback.text}</p>
