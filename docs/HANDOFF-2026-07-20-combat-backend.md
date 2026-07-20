@@ -1,40 +1,43 @@
-# 핸드오프 — 전투확장 2단계 백엔드 (내일의 Codex에게)
+# 핸드오프 — 전투확장 2단계 백엔드 (집에서 이어갈 Codex에게)
 
-> 작성: 2026-07-20 새벽, 집 환경의 Codex.
-> 전제: **이 문서를 읽는 환경에는 Hermes도 kanban 보드도 없다.** 찾거나 복구하려 하지 말고,
-> Git과 이 문서만 진실로 삼아 바로 이어간다. 전체 설계 원전은
+> 최초 작성: 2026-07-20 새벽. 최종 갱신: 2026-07-20, Phase 8 백엔드 `4b52501` 이후.
+> 집 환경에서는 Hermes kanban 보드 `northern-combat`을 다시 사용할 수 있다. 다만 **보드는 흐름,
+> Git은 진실**이라는 규약은 그대로다. 계약·타입·fixture의 정본은 Git과 이 문서다. 전체 설계 원전은
 > [전술전 확장 2단계 계획서](superpowers/plans/2026-07-19-tactical-combat-expansion-phase-2.md)이며,
 > 특히 7.3~7.6절, 9.4절, Phase 3, 13.8절의 사용자 확정을 먼저 읽는다.
 
 ## 0. 30초 요약
 
 - 역할 분담: **Codex = `src/game/**` 백엔드 + `src/render/tactical*` 스프라이트 / Fable =
-  `src/components/**` 전술 프론트 + 전술 CSS**. 계약 때문에 필요한 최소 1줄 외에는 상대 소유 파일을 건드리지 않는다.
-- 통합 브랜치: `codex/combat-expansion-phase-2`. Codex P3 작업 브랜치:
-  `codex/combat-expansion-phase-3-backend`.
-- **P3 백엔드는 `dca02c9`에서 완료**됐다. 빈 무대 배치, 자동배치, 공통 분할·합류, 명명 조,
-  민병 카드, 토벌 선행 침투, 야습 강제 자동배치, 저장 스키마 v25와 결정성 테스트가 들어 있다.
-- P3 프론트는 아직 Fable 몫이다. 상세 착수 지침은
-  [프론트엔드 핸드오프](HANDOFF-2026-07-20-combat-frontend.md)를 따른다.
-- 회사 환경에서는 조율 보드가 없으므로 상태 변경·계약 요청·결정은 이 문서 또는 계획서에 기록하고 커밋한다.
+  `src/components/**` 전술 프론트 + 전술 CSS·효과음**. 계약 때문에 필요한 최소 연결 외에는 상대 소유 파일을 건드리지 않는다.
+- 통합 브랜치: `codex/combat-expansion-phase-2`. P8 백엔드 기준점은 **`4b52501 feat: add phase 8 tactical support units`**다.
+- P3~P7은 백엔드·프론트 통합 완료다. P8 백엔드와 의원대/화차 스프라이트도 `4b52501`에서 완료됐다.
+- **P8 프론트는 Fable이 작업 중**이다. 완료 커밋을 받기 전에는 해당 파일을 대신 구현하거나 통합 브랜치에서 수정하지 않는다.
+- 집에 도착하면 먼저 kanban을 확인해 P8 프론트의 최신 커밋·질문·블로커를 동기화한다. 이후 Git 상태와 비교한다.
 
-## 1. 회사에서 시작하는 순서
+## 1. 집에서 다시 시작하는 순서
 
 ```bash
+hermes kanban boards switch northern-combat
+hermes kanban list
 git fetch origin
 git switch codex/combat-expansion-phase-2
 git pull --ff-only
 git log --oneline -8
 ```
 
-그다음 아래 존재 여부로 P3 통합을 판별한다.
+kanban에서 `P8-backend 지원·화포 병과`와 `P8-frontend 지원 카드·치료·화포 연출` 태스크를 `show`해
+최신 코멘트를 읽는다. 정확한 태스크 ID는 `list` 결과를 사용하며 추측해 새 카드를 중복 생성하지 않는다.
 
-- `src/game/tacticalDeployment.ts`
-- `tools/game/test_tactical_deployment.mjs`
-- `git log`에 `dca02c9 feat: add empty tactical deployment backend` 또는 이를 포함한 통합 커밋
+그다음 아래 존재 여부로 P8 백엔드를 판별한다.
 
-세 항목이 있으면 kanban 확인 없이 현재 상태에서 계속한다. 없으면 임의로 재구현하지 말고
-`origin/codex/combat-expansion-phase-3-backend`가 push됐는지 확인해 통합 브랜치와 비교한다.
+- `src/game/tacticalSupport.ts`
+- `tools/game/test_tactical_support_units.mjs`
+- `public/assets/tactical/court-support-poses-v1.png`
+- `git log`에 `4b52501 feat: add phase 8 tactical support units`
+
+네 항목이 있으면 12·13절을 기준으로 계속한다. 없으면 임의로 재구현하지 말고
+`origin/codex/combat-expansion-phase-2`와 현재 브랜치를 비교한다.
 
 ## 2. P3 백엔드에서 완료한 계약
 
@@ -474,3 +477,69 @@ raw `routeTransit.step`에서 추론하지 않는다. 비공개 이동은 기존
 3. `artilleryHit`, `hwachaVolley`, `supportReload`, `enemyTreatment`을 서로 다른 동작/효과음/칩으로 재생한다.
 4. `raiderPowerRestored`는 보고 수치이며 전사자 복귀로 표현하지 않는다.
 5. 전투 시뮬레이터의 교리/편제 선택 상한을 8로 올려 `court-fire-support`, `court-long-campaign`을 실화면 QA한다.
+
+## 13. 집 환경 재개용 P8 백엔드 인계
+
+### 현재 Git 기준과 작업 경계
+
+- 백엔드·스프라이트 완료 커밋: **`4b52501`**, 원격 `origin/codex/combat-expansion-phase-2`에 push 완료.
+- P8 프론트 작업 브랜치: `fable/combat-expansion-phase-2-frontend`(사용자 전달 기준 작업 중).
+- 이 문서 갱신 커밋은 `4b52501` 위에 추가되므로, P8 프론트가 `4b52501`에서 갈라졌다면 양 브랜치는 문서 1건만큼
+  갈라진다. 프론트 완료 뒤 무조건 `--ff-only`를 쓰지 말고 먼저 `git log --graph --oneline --all -12`로 확인한다.
+- Fable 소유 파일은 `src/components/**`, 전술 CSS, `src/sound/sfx.ts`다. Codex는 프론트 작업 중 이 경계를
+  건드리지 않는다. `src/App.tsx` 연결 변경이 필요하면 Fable 커밋의 의도를 읽고 최소 연결만 검토한다.
+
+### kanban 동기화
+
+집에서 첫 세션에 `northern-combat` 보드로 전환한 뒤 다음 상태를 맞춘다.
+
+1. P8 백엔드 태스크가 있으면 `4b52501`과 이 문서 12·13절 경로를 코멘트하고 완료 상태로 둔다.
+2. P8 프론트 태스크가 있으면 백엔드 태스크의 자식/의존 태스크인지 확인하고 진행 중 상태를 유지한다.
+3. P8 프론트 태스크에 아래 “완료 게이트”를 코멘트한다. 이미 같은 내용이 있으면 중복 코멘트하지 않는다.
+4. 완료 커밋을 받으면 태스크 코멘트의 해시와 `origin/fable/combat-expansion-phase-2-frontend`의 tip이 같은지 확인한다.
+5. 보드에 태스크가 없을 때만 계획서 규약의 이름 `P8-backend 지원·화포 병과`,
+   `P8-frontend 지원 카드·치료·화포 연출`로 만들고 backend를 부모로 연결한다.
+
+이 인계 작성 환경에서는 `hermes` 실행 파일이 PATH에 없어 보드를 직접 갱신하지 못했다. 따라서 집에서의 첫 행동은
+`hermes kanban list`와 해당 두 태스크 `show`다. 보드 내용보다 Git 해시가 우선한다.
+
+### P8 프론트 완료 게이트
+
+- `court-medic`과 `court-hwacha`가 일반 관군 시트가 아니라 `TACTICAL_COURT_SUPPORT_POSE_SHEET`를 사용한다.
+- 두 병과는 최종 시트에 이미 화면 왼쪽을 보도록 반전돼 있다. 렌더러에서 별도 재반전하지 않는다.
+- 의원대 idle 발이 아래 pose 셀로 침범하지 않고, wounded에 팔이 두 개만 보이는지 실제 화면에서 확인한다.
+- 화차 수레는 pose별 같은 점유 크기를 유지하고, attack/wounded 포수만 기존 관군 인체 비율과 비슷하게 보이는지 확인한다.
+- 지원 상태 문구는 `tacticalSupportUnitView`만 사용한다. raw `supportState.readyOnRound`나 배율을 UI에서 재계산하지 않는다.
+- `event.shots.rockets`가 0보다 크면 화차 사격 효과음을 낸다. 기존 화살·조총·대포 합계만 검사하면 화차가 무음이 된다.
+- `hwachaVolley`, `supportReload`, `enemyTreatment`을 서로 구별해 재생하고, 의원 회복은 `raiderPowerRestored`의
+  전력 회복으로만 표시한다. 전사자 수가 줄거나 부활하는 표현은 금지한다.
+- `BattleSimulationSetup`의 교리·편제 단계 제한을 8로 올려 `court-fire-support`와 `court-long-campaign`을 선택할 수 있게 한다.
+- 빈 같은 구역 표적일 때 화포가 탄약을 소비하지 않는지, 이동 직후 방향 조정, 화차 2발/2교전 재장전,
+  의원 누적 10% 상한을 브라우저에서 각각 한 번 확인한다.
+
+### 통합 뒤 검증
+
+P8 프론트 커밋을 통합한 뒤 다음을 실행한다.
+
+```bash
+npx tsc --noEmit
+node tools/game/test_tactical_support_units.mjs
+node tools/game/test_tactical_compositions.mjs
+node tools/game/test_tactical_battle.mjs
+node tools/game/test_resource_save_migration.mjs
+node tools/game/test_tactical_components.mjs
+npm run test:combat
+npm run build
+git diff --check
+```
+
+`test_tactical_sprite_poses.mjs`는 P8 지원 시트 검사까지 지나간 뒤 기존 특수주민 조총 muzzle-anchor 문자열 검사에서
+실패한다. P8 회귀로 오인하지 않는다. 전체 `test:game`의 기존 실패 기준선은 `test_screen_ambient_audio.mjs`,
+토벌 자동/직접 승률 게이트, 위 sprite pose 검사 세 종류다. 다른 실패가 생기면 P8 통합 회귀로 취급한다.
+
+### P8 종료 후 다음 차례
+
+P8 프론트 통합과 실화면 QA가 끝나면 계획서의 **Phase 9 — 시각 자산·장계·최종 밸런스**로 이동한다.
+바로 구현하기 전에 kanban에 P9 backend/frontend 태스크가 이미 있는지 확인한다. Codex의 첫 범위는 스프라이트 QC,
+교리·편제·우회 결과의 장계 데이터 계약, 세력별 200시드 측정이며, Fable 범위는 정보 밀도·접근성·화면 QA다.
+golden fixture는 측정 결과와 의도된 변화가 검토되기 전에는 갱신하지 않는다.
