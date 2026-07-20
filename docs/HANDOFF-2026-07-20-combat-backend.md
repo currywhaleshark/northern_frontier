@@ -178,3 +178,73 @@ git diff --check
 
 계약 테스트는 `tools/game/test_tactical_stage_orders.mjs`다. Fable은 Phase 4 무대 고스트·확인 카드·키보드
 경로에서 목적지별 preview/unavailable-reason을 그대로 사용하고 전력 페널티나 명령 종류를 재계산하지 않는다.
+
+## 9. 2026-07-20 통합 세션 — P4 프론트 통합과 Phase 5 백엔드 계약
+
+### P4 통합 확인
+
+- Fable의 P4 프론트 커밋 `43f28b8`을 통합 브랜치에 fast-forward했다.
+- 무대 드래그는 배치 단계에서 즉시 적용하고, 지휘 단계에서만 `tacticalStageOrderPreview` 뒤 확인 카드를
+  띄운다. 확인 전 상태 불변·확정 시 단일 mutation 경계와 App 통합 경계를 검토했다.
+- `tsc`, 컴포넌트 계약, 무대 명령 계약이 통합 직후 통과했다.
+- 통합 브라우저 스모크에서 방어전 생성 → 빈 무대 → 자동배치 → 지휘 단계까지 확인했다. 이 환경의 브라우저
+  입력 API는 drag를 제공하지 않아 확인 카드의 실제 재입력은 Fable `43f28b8`의 실검증 기록을 따른다.
+
+### Phase 5 상태 의미와 공개 API
+
+`TacticalDefenderGroup`에 다음 상태가 추가됐다.
+
+- `facing: 'towardEnemy' | 'towardRear'`: 명령 확정 즉시 적용된 현재 판정 방향.
+- `pendingFacing?: TacticalFacing`: `facing`과 같은 새 방향을 담는 이번 라운드 방향전환 페널티 표식.
+  다음 라운드 목표를 뜻하지 않는다. 값이 있으면 현재 판정에만 ×0.75를 적용하고, 전투 연출 완료 때 지운다.
+
+`src/game/tacticalBattle.ts`의 프론트 공개 계약:
+
+- `TacticalFacingPreview`
+- `tacticalFacingUnavailableReason(battle, groupId, facing)`
+- `tacticalFacingPreview(battle, groupId, facing)`
+- `setTacticalGroupFacing(state, groupId, facing)`
+
+preview는 `origin`, `destination`, 보존되는 `command`, `powerMultiplier`, `powerPenalty`,
+`currentRoundOnly`를 제공한다. 배치 단계는 `1 / 0 / false`, 지휘 단계는 `0.75 / 0.25 / true`다.
+UI는 이 수치를 재계산하지 않는다. 배치 단계는 즉시 mutation하고, 지휘 단계는 preview 확인 뒤 mutation한다.
+같은 방향·미배치 카드·피난 주민·치료반·전투 불능 부대·연출/보고 단계는 unavailable-reason으로 거부한다.
+
+### 판정 규칙
+
+- 방향전환은 주 명령을 소비하거나 바꾸지 않는다. 한 라운드에 왕복 전환해도 `pendingFacing` 하나만 남아
+  ×0.75가 중첩되지 않는다.
+- `splitTacticalEngagementDefenders`는 정면과 후방 공격이 동시에 있을 때 열이나 `reinforceRear`가 아니라
+  `facing`으로 부대를 나눈다. 정면 공격만 또는 후방 공격만 있으면 전투 가능 부대가 그 교전에 남고,
+  공격 반대 방향을 향한 부대는 측후방 노출 페널티를 받는다.
+- 잘못된 방향의 피격 노출은 기존 진형 노출값에
+  `CONFIG.tacticalBattle.formationExposure.facing.wrongDirectionExposureMultiplier`(현재 1.5)를 곱한다.
+- 후방 기동 카운터와 후방 근접 엄호도 명시적 방향을 사용한다. 열만 후열인 부대는 자동으로 후방을 막지 않는다.
+- `reinforceRear`는 중열 근접/기마 예비대의 편의 명령으로 유지되며, 확정 시 `towardRear`로 돌리고 해당
+  라운드 ×0.75를 적용한다. 이미 후방을 향하고 있으면 새 페널티를 만들지 않는다.
+- 신규 부대와 피난 주민은 `towardEnemy`로 시작한다. 화면의 좌우는 저장하지 않고 전투 orientation에서
+  프론트가 표시 방향만 파생한다.
+
+### 저장과 검증
+
+- 저장 스키마는 v26이다. v25→v26 루트 마이그레이션은 additive이며 실제 전투 필드 정규화는
+  `migrateTacticalBattle`에서 한다.
+- 구버전 저장은 실제 후방 교전이 이미 활성화된 구역에서만 기존 규칙을 합성한다: 후열 또는
+  `reinforceRear` 중열은 `towardRear`, 나머지와 피난 주민은 `towardEnemy`. 구버전 저장에 일회성
+  `pendingFacing` 페널티를 새로 만들지 않는다.
+- 현재 저장의 facing과 pendingFacing은 전투 중 round-trip에서 보존된다.
+- 방향 계약·결정성·골든 fixture·저장 round-trip을 갱신했다. `test_tactical_battle.mjs`,
+  `test_resource_save_migration.mjs`, `test_enemy_plan.mjs`, `test_tactical_golden.mjs`가 핵심 계약 테스트다.
+
+### Fable의 Phase 5 프론트 착수점
+
+1. 선택 부대 양옆 방향 화살표와 방향 고스트를 붙인다. 배치 단계는 바로
+   `setTacticalGroupFacing`, 지휘 단계는 `tacticalFacingPreview` 확인 카드를 거친다.
+2. 확인 카드의 25%·현재 라운드 한정 문구는 preview 값에서 표시한다. `pendingFacing`이 있으면 무대와 카드에
+   현재 판정 페널티를 표시하되, 이것을 아직 적용되지 않은 미래 방향으로 렌더링하지 않는다.
+3. 기존 `onDeploymentAction` dispatch로 mutation을 연결할 수 있다. App 통합 경계에 별도 방향 callback을
+   추가한다면 최소 변경으로 기록한다.
+4. `reinforceRear` 버튼 경로와 방향 화살표 경로가 같은 facing/페널티 결과를 내는지 브라우저에서 함께 확인한다.
+
+전체 게임 러너에서 P5·저장·골든·교리 테스트는 통과했다. 남은 기존 실패는 토벌 자동/직접 승률 게이트,
+`test_screen_ambient_audio.mjs`, `test_tactical_sprite_poses.mjs` 세 개이며 P5 변경 범위 밖이다.

@@ -442,10 +442,10 @@ function deployCommandableToZone(state, zoneId) {
   const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
   assert.ok(spear && bow && civilians && flanker);
 
-  const front = { ...spear, id: 'front', line: 'front', command: 'hold' };
-  const middleFront = { ...spear, id: 'middle-front', line: 'middle', command: 'hold' };
-  const middleRear = { ...spear, id: 'middle-rear', line: 'middle', command: 'reinforceRear' };
-  const rear = { ...bow, id: 'rear', line: 'rear', command: 'volley' };
+  const front = { ...spear, id: 'front', line: 'front', facing: 'towardEnemy', command: 'hold' };
+  const middleFront = { ...spear, id: 'middle-front', line: 'middle', facing: 'towardEnemy', command: 'hold' };
+  const middleRear = { ...spear, id: 'middle-rear', line: 'middle', facing: 'towardRear', command: 'reinforceRear' };
+  const rear = { ...bow, id: 'rear', line: 'rear', facing: 'towardRear', command: 'volley' };
   const protectedCivilians = { ...civilians, id: 'protected-civilians', line: 'rear', command: null };
   const split = tacticalEngagement.splitTacticalEngagementDefenders(
     [front, middleFront, middleRear, rear, protectedCivilians],
@@ -531,6 +531,107 @@ function deployCommandableToZone(state, zoneId) {
 }
 
 {
+  const state = simulation.newGame(2026072051);
+  prepareDefenders(state);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'explicit facing contract', power: 60, warned: true, siege: true, mode: 'garrison',
+  });
+  assert.ok(battle.defenderGroups.every(group => group.facing === 'towardEnemy'),
+    'new tactical groups start with a meaning-based enemy-facing direction');
+  assert.equal(tacticalModule.advanceTacticalPhase(state), null);
+  assert.equal(battle.phase, 'deployment');
+  const group = battle.defenderGroups.find(candidate => candidate.commandable !== false);
+  const civilians = battle.defenderGroups.find(candidate => candidate.kind === 'civilian');
+  assert.ok(group && civilians);
+  assert.match(tactical.tacticalFacingUnavailableReason(battle, group.id, 'towardRear'), /배치/,
+    'an undeployed card cannot be turned on the stage');
+  tactical.applyAutoDeployTacticalGroups(battle);
+
+  const deploymentPreview = tactical.tacticalFacingPreview(battle, group.id, 'towardRear');
+  assert.deepEqual(deploymentPreview, {
+    groupId: group.id,
+    origin: 'towardEnemy',
+    destination: 'towardRear',
+    command: null,
+    powerMultiplier: 1,
+    powerPenalty: 0,
+    currentRoundOnly: false,
+  });
+  assert.equal(tactical.setTacticalGroupFacing(state, group.id, 'towardRear'), null);
+  assert.equal(group.facing, 'towardRear');
+  assert.equal(group.pendingFacing, undefined, 'deployment facing changes are free');
+  assert.match(tactical.setTacticalGroupFacing(state, civilians.id, 'towardRear'), /고정 방향/);
+  assert.equal(civilians.facing, 'towardEnemy');
+  assert.equal(tactical.setTacticalGroupFacing(state, group.id, 'towardEnemy'), null);
+
+  assert.equal(tacticalModule.advanceTacticalPhase(state), null);
+  assert.equal(battle.phase, 'command');
+  assert.equal(tactical.setTacticalCommand(state, group.id, 'hold'), null);
+  const beforePreview = JSON.stringify(group);
+  const commandPreview = tactical.tacticalFacingPreview(battle, group.id, 'towardRear');
+  assert.equal(JSON.stringify(group), beforePreview, 'facing preview leaves battle state unchanged');
+  assert.equal(commandPreview?.powerMultiplier, 0.75);
+  assert.equal(commandPreview?.powerPenalty, 0.25);
+  assert.equal(commandPreview?.command, 'hold');
+  assert.equal(commandPreview?.currentRoundOnly, true);
+
+  assert.equal(tactical.setTacticalGroupFacing(state, group.id, 'towardRear'), null);
+  assert.equal(group.facing, 'towardRear', 'confirmed facing applies immediately');
+  assert.equal(group.pendingFacing, 'towardRear');
+  assert.equal(group.command, 'hold', 'turning preserves the main action command');
+  assert.equal(tactical.setTacticalGroupFacing(state, group.id, 'towardEnemy'), null);
+  assert.equal(group.pendingFacing, 'towardEnemy', 'turning twice keeps one current-round penalty marker');
+  assert.equal(tacticalEngagement.tacticalFacingTurnPowerMultiplier(group), 0.75,
+    'the facing penalty never stacks within one round');
+
+  const zone = { ...battle.zones.find(candidate => candidate.id === group.zoneId), defenseBonus: 0 };
+  const attacker = {
+    ...battle.raiderGroups[0], zoneId: group.zoneId, line: 'front', power: 80, count: 10, killed: 0,
+    morale: 100, intent: 'advance', rearAssault: false, revealed: true,
+  };
+  const baseGroup = {
+    ...group, residentIds: [...group.residentIds], count: Math.max(1, group.count), wounded: 0, killed: 0,
+    power: 100, command: 'hold', facing: 'towardEnemy', pendingFacing: undefined,
+  };
+  const exchangeInput = {
+    zone,
+    attackers: [attacker],
+    direction: 'frontal',
+    weather: 'clear',
+    prepareVolleyApplied: false,
+    evacuateCiviliansApplied: false,
+    roundStartingRaiderPower: attacker.power,
+    rng: () => 0.5,
+  };
+  const steady = tacticalEngagement.resolveEngagementExchange({ ...exchangeInput, defenders: [baseGroup] });
+  const turning = tacticalEngagement.resolveEngagementExchange({
+    ...exchangeInput, defenders: [{ ...baseGroup, pendingFacing: 'towardEnemy' }],
+  });
+  assert.ok(Math.abs(turning.defensePower - steady.defensePower * 0.75) < 1e-9,
+    'the current-round turn penalty multiplies effective combat power exactly once');
+  const correctExposure = tacticalEngagement.formationExposureMultiplier(baseGroup, [baseGroup]);
+  const wrongFacingGroup = { ...baseGroup, facing: 'towardRear' };
+  const wrongExposure = tacticalEngagement.formationExposureMultiplier(wrongFacingGroup, [wrongFacingGroup]);
+  assert.equal(wrongExposure, correctExposure *
+    CONFIG.tacticalBattle.formationExposure.facing.wrongDirectionExposureMultiplier,
+  'a group facing away from the attack takes the configured flank/rear exposure penalty');
+  const directionSplit = tacticalEngagement.splitTacticalEngagementDefenders(
+    [baseGroup, { ...baseGroup, id: `${baseGroup.id}-rear`, facing: 'towardRear' }],
+    true,
+    true,
+  );
+  assert.deepEqual(directionSplit.frontal.map(candidate => candidate.id), [baseGroup.id]);
+  assert.deepEqual(directionSplit.rear.map(candidate => candidate.id), [`${baseGroup.id}-rear`],
+    'a turned group contributes to the actual rear engagement regardless of its formation line');
+
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.equal(group.pendingFacing, 'towardEnemy', 'the turn marker survives through its resolution');
+  assert.equal(tactical.completeTacticalSimulation(state), null);
+  assert.equal(group.pendingFacing, undefined, 'the turn penalty clears before the next command round');
+  assert.equal(group.facing, 'towardEnemy', 'the confirmed direction persists after its penalty clears');
+}
+
+{
   const state = simulation.newGame(2026071464);
   prepareDefenders(state);
   const battle = tactical.createTacticalBattle(state, {
@@ -570,7 +671,9 @@ function deployCommandableToZone(state, zoneId) {
   const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
   assert.ok(spear && bow && watchman && flanker);
   Object.assign(spear, { zoneId: 'wall', line: 'middle', command: 'hold', commandSource: 'recommended' });
-  Object.assign(bow, { zoneId: 'wall', line: 'rear', command: 'volley', commandSource: 'recommended' });
+  Object.assign(bow, {
+    zoneId: 'wall', line: 'rear', facing: 'towardRear', command: 'volley', commandSource: 'recommended',
+  });
   Object.assign(watchman, { zoneId: 'wall', line: 'front', command: 'hold', commandSource: 'recommended' });
   Object.assign(flanker, {
     zoneId: 'wall', rearAssault: true, intent: 'flank', power: 30, engagementsInZone: 0,
@@ -672,10 +775,16 @@ function deployCommandableToZone(state, zoneId) {
 
   rear.engagementsInZone = 1;
   tactical.normalizeTacticalGroupTargets(battle);
+  assert.equal(tactical.tacticalGroupTargetUnavailableReason(battle, bow.id, front.id), null,
+    'a rear-line defender keeps facing the enemy until the explicit facing changes');
+  assert.equal(tactical.setTacticalGroupFacing(state, bow.id, 'towardRear'), null);
   assert.ok(tactical.tacticalGroupTargetUnavailableReason(battle, bow.id, front.id),
-    'after the rear assault occurs, a rear-line defender no longer attacks the frontal engagement');
+    'a defender explicitly turned rearward leaves the frontal engagement');
+  assert.equal(tactical.tacticalGroupTargetUnavailableReason(battle, bow.id, rear.id), null);
   assert.match(tactical.tacticalGroupTargetUnavailableReason(battle, spear.id, rear.id), /정면 교전/);
-  Object.assign(spear, { line: 'middle', command: 'reinforceRear' });
+  spear.line = 'middle';
+  assert.equal(tactical.setTacticalCommand(state, spear.id, 'reinforceRear'), null);
+  assert.equal(spear.facing, 'towardRear', 'reinforceRear remains a rear-facing convenience command');
   assert.equal(tactical.tacticalGroupTargetUnavailableReason(battle, spear.id, rear.id), null,
     'a middle melee reserve ordered to reinforce the rear may target the rear assault');
   assert.equal(tactical.setTacticalGroupTarget(state, bow.id, null), null);
@@ -700,6 +809,7 @@ function deployCommandableToZone(state, zoneId) {
     wounded: 0,
     killed: 0,
     line,
+    facing: 'towardEnemy',
     ambushed: false,
     ...overrides,
   });
@@ -746,18 +856,25 @@ function deployCommandableToZone(state, zoneId) {
   assert.ok(rearWithoutGuard > middleWithoutGuard && middleWithoutGuard > frontWithoutGuard,
     'rear assaults expose rear, middle, then front in that order');
 
-  const middleGuard = defender('middle-guard', 'middle', 'spear');
+  const middleGuard = defender('middle-guard', 'middle', 'spear', { facing: 'towardRear' });
   const rearGuard = defender('rear-guard', 'rear', 'spear');
-  const partiallyGuardedRear = tacticalEngagement.rearAssaultExposureMultiplier(
+  const middleFacingGuardedRear = tacticalEngagement.rearAssaultExposureMultiplier(
     rearBows,
     [frontGuard, middleGuard, rearBows],
   );
-  const fullyGuardedRear = tacticalEngagement.rearAssaultExposureMultiplier(
+  const rearLineWrongFacing = tacticalEngagement.rearAssaultExposureMultiplier(
     rearBows,
     [frontGuard, middleMuskets, rearBows, rearGuard],
   );
-  assert.ok(fullyGuardedRear < partiallyGuardedRear && partiallyGuardedRear < rearWithoutGuard,
-    'middle melee guards give partial protection while rear melee guards give full protection');
+  const rearFacingGuardedRear = tacticalEngagement.rearAssaultExposureMultiplier(
+    rearBows,
+    [frontGuard, middleMuskets, rearBows, { ...rearGuard, facing: 'towardRear' }],
+  );
+  assert.equal(rearLineWrongFacing, rearWithoutGuard,
+    'a rear-line melee group no longer guards the rear while it still faces the enemy');
+  assert.equal(middleFacingGuardedRear, rearFacingGuardedRear,
+    'rear guard strength follows explicit facing instead of being derived from the formation line');
+  assert.ok(rearFacingGuardedRear < rearLineWrongFacing);
 }
 
 {
@@ -1829,11 +1946,11 @@ function deployCommandableToZone(state, zoneId) {
     pressure: 30, breached: false, defenseBonus: 10, ambushBonus: 0,
     lootRisk: 0, civilianRisk: 10, description: 'target allocation test',
   };
-  const defender = (id, weapon, line, command, power) => ({
+  const defender = (id, weapon, line, command, power, facing = 'towardEnemy') => ({
     id, kind: weapon === 'spear' ? 'militia-spear' : weapon === 'musket' ? 'militia-musket' : 'militia-bow',
     role: 'militia', weapon, readyMuskets: weapon === 'musket' ? 20 : 0,
     label: id, residentIds: Array.from({ length: 20 }, (_, index) => index + 1), count: 20,
-    zoneId: zone.id, command, commandSource: 'player', power, wounded: 0, killed: 0, line,
+    zoneId: zone.id, command, commandSource: 'player', power, wounded: 0, killed: 0, line, facing,
   });
   const raider = (id, line, unitType, intent = 'advance', overrides = {}) => ({
     id, kind: intent === 'loot' ? 'looters' : 'main', unitType, label: id, zoneId: zone.id, line,
@@ -1843,7 +1960,7 @@ function deployCommandableToZone(state, zoneId) {
   const defenders = [
     defender('front-spear', 'spear', 'front', 'hold', 80),
     defender('middle-musket', 'musket', 'middle', 'volley', 160),
-    defender('rear-bow', 'hornBow', 'rear', 'volley', 120),
+    defender('rear-bow', 'hornBow', 'rear', 'volley', 120, 'towardRear'),
   ];
   const attackers = [
     raider('front-main', 'front', 'bandit-vanguard'),
@@ -2146,6 +2263,8 @@ function deployCommandableToZone(state, zoneId) {
     });
     bow.line = 'rear';
     spear.line = rearGuard ? 'rear' : 'front';
+    bow.facing = rearAssault ? 'towardRear' : 'towardEnemy';
+    spear.facing = rearAssault && rearGuard ? 'towardRear' : 'towardEnemy';
     tactical.advanceTacticalPhase(state);
     const flankers = battle.raiderGroups.find(group => group.kind === 'flankers');
     assert.ok(flankers);
@@ -2176,12 +2295,13 @@ function deployCommandableToZone(state, zoneId) {
   const exposedRear = runFlankAssault({ rearAssault: true, rearGuard: false });
   const guardedRear = runFlankAssault({ rearAssault: true, rearGuard: true });
   assert.ok(exposedRear.events.some(event => event.kind === 'rearAssault' && event.float === '후방 급습!'));
-  assert.ok(exposedRear.bowCasualties > exposedRear.spearCasualties,
-    'an unguarded rear assault concentrates casualties on rear ranged troops');
-  assert.ok(guardedRear.bowCasualties < exposedRear.bowCasualties,
-    'rear-line melee troops shield ranged troops from a rear assault');
+  assert.ok(exposedRear.bowCasualties > 0 && exposedRear.spearCasualties > 0,
+    'an unguarded rear assault reaches both rear ranged troops and wrong-facing frontal troops');
+  assert.ok(guardedRear.bowCasualties + guardedRear.spearCasualties <=
+      exposedRear.bowCasualties + exposedRear.spearCasualties,
+  'a rear-facing guard does not increase the fixed-seed friendly casualty budget');
   assert.ok(guardedRear.flankersKilled > exposedRear.flankersKilled,
-    'rear-line melee troops remove the flankers’ loss-resistance advantage');
+    'rear-facing melee troops remove the flankers’ loss-resistance advantage');
   assert.ok(exposedRear.wallPressure <= breakthrough.wallPressure / 2,
     'rear assault flankers contribute no more than half normal wall pressure');
   assert.ok(exposedRear.lines.some(line => line.includes('후방 급습')));
@@ -2322,9 +2442,11 @@ for (const optionId of ['militia', 'levy']) {
     'rear attackers value the exposed treatment team as a target');
 
   const exposed = tacticalEngagement.rearAssaultExposureMultiplier(healer, [healer]);
-  const rearGuard = { ...fighters, line: 'rear', commandable: undefined, command: 'hold' };
+  const rearGuard = {
+    ...fighters, line: 'rear', facing: 'towardRear', commandable: undefined, command: 'hold',
+  };
   const guarded = tacticalEngagement.rearAssaultExposureMultiplier(healer, [healer, rearGuard]);
-  assert.ok(guarded < exposed, 'a rear-line melee guard protects the high-exposure healer group');
+  assert.ok(guarded < exposed, 'a rear-facing melee guard protects the high-exposure healer group');
 
   state.resources.herbs = 0;
   const untreated = tactical.applyTacticalFieldTreatment(state, battle);

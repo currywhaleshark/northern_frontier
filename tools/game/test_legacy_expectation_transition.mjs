@@ -51,8 +51,8 @@ function transitionLogs(state) {
   return state.log.filter(entry => entry.text.includes(TRANSITION_LOG));
 }
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 24,
-  'legacy expectation transition and family integrity ship with schema v24');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 26,
+  'legacy expectation transition remains compatible through the facing schema migration');
 assert.ok(CONFIG.satisfaction.legacyTransitionDays > 0);
 assert.ok(CONFIG.satisfaction.legacyTransitionCheer > 0);
 

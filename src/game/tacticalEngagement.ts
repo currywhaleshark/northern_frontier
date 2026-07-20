@@ -37,6 +37,31 @@ function activeRaiderCount(group: TacticalRaiderGroup): number {
   return Math.max(0, group.count - group.killed);
 }
 
+export function tacticalFacingMatchesDirection(
+  defender: Pick<TacticalDefenderGroup, 'facing'>,
+  direction: 'frontal' | 'rear',
+): boolean {
+  const facing = defender.facing ?? 'towardEnemy';
+  return direction === 'rear' ? facing === 'towardRear' : facing === 'towardEnemy';
+}
+
+export function tacticalFacingTurnPowerMultiplier(
+  defender: Pick<TacticalDefenderGroup, 'pendingFacing'>,
+): number {
+  return defender.pendingFacing == null
+    ? 1
+    : CONFIG.tacticalBattle.formationExposure.facing.turnPowerMultiplier;
+}
+
+export function tacticalFacingExposureMultiplier(
+  defender: Pick<TacticalDefenderGroup, 'facing'>,
+  direction: 'frontal' | 'rear',
+): number {
+  return tacticalFacingMatchesDirection(defender, direction)
+    ? 1
+    : CONFIG.tacticalBattle.formationExposure.facing.wrongDirectionExposureMultiplier;
+}
+
 function defenderWeaponShare(
   defenders: ReadonlyArray<TacticalDefenderGroup>,
   weapon: TacticalDefenderGroup['weapon'],
@@ -491,19 +516,14 @@ function activeMeleeGuard(
 }
 
 function rearAssaultGuardStrength(defenders: TacticalDefenderGroup[]): number {
-  const mobileRearGuard = (line: TacticalFormationLine) => defenders.some(group => {
+  const mobileRearGuard = defenders.some(group => {
     const capabilities = tacticalGroupCapabilities(group);
-    return group.line === line &&
-      (capabilities.has('melee') || (capabilities.has('mounted') &&
-        (line === 'rear' || group.command === 'reinforceRear'))) &&
+    return tacticalFacingMatchesDirection(group, 'rear') &&
+      (capabilities.has('melee') || capabilities.has('mounted')) &&
       group.command !== 'fallback' && group.command !== 'advance' &&
       activeDefenderCount(group) > 0;
   });
-  if (mobileRearGuard('rear')) return 1;
-  if (mobileRearGuard('middle')) {
-    return CONFIG.tacticalBattle.formationExposure.rearAssault.middleGuardStrength;
-  }
-  return 0;
+  return mobileRearGuard ? 1 : 0;
 }
 
 export function formationExposureMultiplier(
@@ -511,7 +531,10 @@ export function formationExposureMultiplier(
   defenders: TacticalDefenderGroup[],
 ): number {
   const exposure = CONFIG.tacticalBattle.formationExposure;
-  if (tacticalGroupCapabilities(defender).has('ambush') && defender.ambushed) return exposure.ambushed;
+  const facingExposure = tacticalFacingExposureMultiplier(defender, 'frontal');
+  if (tacticalGroupCapabilities(defender).has('ambush') && defender.ambushed) {
+    return exposure.ambushed * facingExposure;
+  }
   const contactLine = activeContactLine(defenders, FRONTAL_LINE_ORDER);
   const contactIndex = contactLine == null ? -1 : FRONTAL_LINE_ORDER.indexOf(contactLine);
   const defenderIndex = FRONTAL_LINE_ORDER.indexOf(defender.line);
@@ -524,15 +547,15 @@ export function formationExposureMultiplier(
     group.command !== 'charge' && group.command !== 'fallback' && group.command !== 'advance' &&
     activeDefenderCount(group) > 0);
   if (tacticalGroupCapabilities(defender).has('volley')) {
-    if (chargingMelee) return exposure.frontal.chargingRanged;
-    if (screeningMelee) return exposure.frontal.meleeScreenedRanged;
-    return screenedByEarlierLine ? exposure.frontal.lineScreened : exposure.frontal.exposedRanged;
+    if (chargingMelee) return exposure.frontal.chargingRanged * facingExposure;
+    if (screeningMelee) return exposure.frontal.meleeScreenedRanged * facingExposure;
+    return (screenedByEarlierLine ? exposure.frontal.lineScreened : exposure.frontal.exposedRanged) * facingExposure;
   }
-  if (screenedByEarlierLine) return exposure.frontal.lineScreened;
+  if (screenedByEarlierLine) return exposure.frontal.lineScreened * facingExposure;
   if (tacticalGroupCapabilities(defender).has('melee') && screeningMelee) {
-    return exposure.frontal.screeningMelee;
+    return exposure.frontal.screeningMelee * facingExposure;
   }
-  return exposure.frontal.exposed;
+  return exposure.frontal.exposed * facingExposure;
 }
 
 export function rearAssaultExposureMultiplier(
@@ -540,12 +563,13 @@ export function rearAssaultExposureMultiplier(
   defenders: TacticalDefenderGroup[],
 ): number {
   const rearExposure = CONFIG.tacticalBattle.formationExposure.rearAssault;
+  const facingExposure = tacticalFacingExposureMultiplier(defender, 'rear');
   const contactLine = activeContactLine(defenders, REAR_ASSAULT_LINE_ORDER);
   const contactIndex = contactLine == null ? -1 : REAR_ASSAULT_LINE_ORDER.indexOf(contactLine);
   const defenderIndex = REAR_ASSAULT_LINE_ORDER.indexOf(defender.line);
   const distanceBehindContact = contactIndex < 0 ? 0 : defenderIndex - contactIndex;
   if (distanceBehindContact > 0) {
-    return distanceBehindContact === 1 ? rearExposure.adjacentProtected : rearExposure.deepProtected;
+    return (distanceBehindContact === 1 ? rearExposure.adjacentProtected : rearExposure.deepProtected) * facingExposure;
   }
 
   const capabilities = tacticalGroupCapabilities(defender);
@@ -554,7 +578,7 @@ export function rearAssaultExposureMultiplier(
       : rearExposure.exposedOther;
   const guarded = capabilities.has('melee') ? rearExposure.guardedMelee : rearExposure.guardedRanged;
   const guardStrength = rearAssaultGuardStrength(defenders);
-  return exposed + (guarded - exposed) * guardStrength;
+  return (exposed + (guarded - exposed) * guardStrength) * facingExposure;
 }
 
 function surpriseConfusionChance(zone: TacticalBattleZone, defenders: TacticalDefenderGroup[]): number {
@@ -616,6 +640,7 @@ export interface EngagementExchangeResult {
 export function splitTacticalEngagementDefenders(
   defenders: ReadonlyArray<TacticalDefenderGroup>,
   rearAssaultActive: boolean,
+  frontalAssaultActive = true,
 ): {
   frontal: TacticalDefenderGroup[];
   rear: TacticalDefenderGroup[];
@@ -624,11 +649,10 @@ export function splitTacticalEngagementDefenders(
   const combatants = defenders.filter(defender => defender.commandable !== false);
   const protectedTargets = defenders.filter(defender => defender.commandable === false);
   if (!rearAssaultActive) return { frontal: combatants, rear: [], protectedTargets };
+  if (!frontalAssaultActive) return { frontal: [], rear: combatants, protectedTargets };
   return {
-    frontal: combatants.filter(defender =>
-      (defender.line === 'front' || (defender.line === 'middle' && defender.command !== 'reinforceRear'))),
-    rear: combatants.filter(defender => defender.line === 'rear' ||
-      (defender.line === 'middle' && defender.command === 'reinforceRear')),
+    frontal: combatants.filter(defender => tacticalFacingMatchesDirection(defender, 'frontal')),
+    rear: combatants.filter(defender => tacticalFacingMatchesDirection(defender, 'rear')),
     protectedTargets,
   };
 }
@@ -686,6 +710,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
       ? tacticalGroupPower(defender, active)
       : defender.power * survivingShare;
     const powerMultiplier = (input.defenderPowerMultiplier?.(defender) ?? commandPowerMultiplier(input, defender)) *
+      tacticalFacingTurnPowerMultiplier(defender) *
       tacticalDefenderMatchupMultiplier(defender, attackers, input.direction);
     return sum + readyPower * powerMultiplier;
   }, 0);
@@ -927,6 +952,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
       ? tacticalGroupPower(defender, active)
       : defender.power * survivingShare;
     return readyPower * (input.defenderPowerMultiplier?.(defender) ?? commandPowerMultiplier(input, defender)) *
+      tacticalFacingTurnPowerMultiplier(defender) *
       tacticalDefenderMatchupMultiplier(defender, attackers, input.direction);
   });
   const totalFriendlyPower = defenderEffectivePowers.reduce((sum, power) => sum + power, 0);

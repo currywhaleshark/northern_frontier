@@ -910,6 +910,8 @@ export type TacticalCommandId =
   | 'blockEscape'
   | 'openRetreat';
 
+export type TacticalFacing = 'towardEnemy' | 'towardRear';
+
 export type PreparationActionId =
   | 'evacuateCivilians'
   | 'hideSupplies'
@@ -987,6 +989,10 @@ export interface TacticalDefenderGroup {
   killed: number;
   line: TacticalFormationLine;
   pendingLine?: TacticalFormationLine;
+  /** 의미 기반 현재 방향. 화면의 좌우는 전투 orientation에서 파생한다. */
+  facing: TacticalFacing;
+  /** 값이 있으면 이번 라운드에 방향을 바꿨으며, facing과 같은 새 방향을 가리킨다. */
+  pendingFacing?: TacticalFacing;
   targetGroupId?: string;
   targetSource?: 'auto' | 'player';
   ambushed?: boolean;

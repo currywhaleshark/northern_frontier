@@ -359,6 +359,7 @@ for (const [index, rank] of ['bo', 'jin'].entries()) {
   });
   assert.ok(battle);
   assert.equal(tactical.advanceTacticalPhase(state), null);
+  if (battle.phase === 'deployment') tactical.applyAutoDeployTacticalGroups(battle);
   assert.equal(tactical.advanceTacticalPhase(state), null);
   assert.equal(state.tacticalBattle.phase, 'command');
   await roundTripScenario({

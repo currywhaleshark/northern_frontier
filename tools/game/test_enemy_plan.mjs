@@ -274,6 +274,7 @@ feintBattle.enemyPlan = {
 assert.equal(tactical.advanceTacticalPhase(feintState), null);
 const mainPowerBeforeFeint = feintBattle.raiderGroups.filter(group => group.kind === 'main')
   .reduce((sum, group) => sum + group.power, 0);
+if (feintBattle.phase === 'deployment') tactical.applyAutoDeployTacticalGroups(feintBattle);
 assert.equal(tactical.advanceTacticalPhase(feintState), null);
 const mainPowerAfterFeint = feintBattle.raiderGroups.filter(group => group.kind === 'main')
   .reduce((sum, group) => sum + group.power, 0);
@@ -304,6 +305,7 @@ function formationCounterBattle(seed, stratagemId, reservePower, divertedPower) 
   reserve.killed = 0;
   reserve.power = reservePower;
   reserve.line = stratagemId === 'rearManeuver' ? 'rear' : 'middle';
+  reserve.facing = stratagemId === 'rearManeuver' ? 'towardRear' : 'towardEnemy';
   reserve.command = 'hold';
   const diverted = formationBattle.raiderGroups.find(group => group.kind === 'flankers');
   diverted.power = divertedPower;
@@ -325,7 +327,7 @@ const counterFormation = result => result.stratagem.counter?.formation ?? 0;
 const rearDefender = (id, zoneId, power, overrides = {}) => ({
   id, kind: 'militia-spear', role: 'militia', weapon: 'spear', label: id,
   residentIds: Array.from({ length: 10 }, (_unused, index) => `${id}-${index}`),
-  zoneId, line: 'rear', command: 'hold', commandSource: 'player', power,
+  zoneId, line: 'rear', facing: 'towardRear', command: 'hold', commandSource: 'player', power,
   count: 10, wounded: 0, killed: 0, ...overrides,
 });
 const rearAttacker = (id, zoneId, power, overrides = {}) => ({
@@ -373,15 +375,19 @@ for (const [guardPower, expected, description] of [
 }
 
 const firstGuard = rearDefender('first-guard', 'wall', 50);
-const middleReserve = rearDefender('middle-reserve', 'wall', 100, { line: 'middle' });
+const middleReserve = rearDefender('middle-reserve', 'wall', 100, {
+  line: 'middle', facing: 'towardEnemy',
+});
 const firstAssault = rearAttacker('first-assault', 'wall', 100, { engagementsInZone: 0 });
 const firstAssaultBattle = rearBattle([firstGuard, middleReserve], [firstAssault]);
 const firstCounter = rearCounter(firstAssaultBattle, 'wall', [firstAssault], [firstGuard, middleReserve]);
 closeTo(firstCounter, 1 / 3, 'the first ambush includes a predeployed rear melee guard');
 middleReserve.command = 'reinforceRear';
+middleReserve.facing = 'towardRear';
 const reinforcedCounter = rearCounter(firstAssaultBattle, 'wall', [firstAssault], [firstGuard, middleReserve]);
 closeTo(reinforcedCounter, 0.6, 'a middle melee reserve joins the next rear engagement after reinforceRear');
 middleReserve.command = 'hold';
+middleReserve.facing = 'towardEnemy';
 closeTo(rearCounter(firstAssaultBattle, 'wall', [firstAssault], [firstGuard, middleReserve]), firstCounter,
   'removing reinforceRear immediately removes the middle reserve from the counter');
 firstAssaultBattle.enemyPlan = {
@@ -397,10 +403,12 @@ closeTo(tactical.tacticalRearManeuverEffectiveCounterStrengthForZone(firstAssaul
   1 - (1 - 0.6) * (1 - firstCounter),
   'the UI counter combines fixed preparation with the currently engaged zone guard');
 middleReserve.command = 'reinforceRear';
+middleReserve.facing = 'towardRear';
 assert.ok(tactical.tacticalRearManeuverEffectiveCounterStrengthForZone(firstAssaultBattle, 'wall') >
   1 - (1 - 0.6) * (1 - firstCounter),
   'the UI counter rises after a live middle reserve receives reinforceRear');
 middleReserve.command = 'hold';
+middleReserve.facing = 'towardEnemy';
 
 const attritionGuard = rearDefender('attrition-guard', 'wall', 100);
 const attritionAssault = rearAttacker('attrition-assault', 'wall', 100);

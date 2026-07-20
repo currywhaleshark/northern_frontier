@@ -98,6 +98,7 @@ function makePlayerGroup(
     line: weapon === 'musket'
       ? 'middle'
       : weapon === 'spear' || (weapon == null && (role === 'militia' || role === 'watchman')) ? 'front' : 'rear',
+    facing: 'towardEnemy',
     ambushed: false,
   };
 }

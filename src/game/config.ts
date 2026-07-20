@@ -754,6 +754,10 @@ export const CONFIG = {
       minIntentRounds: 2,
     },
     formationExposure: {
+      facing: {
+        turnPowerMultiplier: 0.75,
+        wrongDirectionExposureMultiplier: 1.5,
+      },
       ambushed: 0.55,
       frontal: {
         chargingRanged: 1.7,
@@ -771,7 +775,6 @@ export const CONFIG = {
         exposedRanged: 2.2,
         exposedCivilian: 1.8,
         exposedOther: 1.45,
-        middleGuardStrength: 0.55,
         unguardedAttackerLossMultiplier: 0.55,
       },
     },

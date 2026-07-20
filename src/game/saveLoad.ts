@@ -40,7 +40,7 @@ import type {
   CombatWeaponId, CourtTribute, DefenderGroupKind, FermentBatch, GameState, Gender, Resident, ResourceId,
   PreparationActionId, RaiderUnitType, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
   SpecialResidentId, TacticalAiState, TacticalDeploymentPlacement, TacticalFeaturedResident, TacticalFormationLine,
-  TacticalPreparationEffect, TacticalRaiderGroup, TacticalRoundReport,
+  TacticalFacing, TacticalPreparationEffect, TacticalRaiderGroup, TacticalRoundReport,
 } from './types';
 
 export { CURRENT_SCHEMA_VERSION } from './saveSchema';
@@ -330,6 +330,12 @@ export function migrateV24ToV25(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 25 };
 }
 
+// v26: 직접 지휘 부대의 의미 기반 방향과 현재 라운드 방향전환 페널티 표식.
+// 실제 구버전 방향 합성은 전투의 적 상태까지 함께 보는 migrateTacticalBattle에서 수행한다.
+export function migrateV25ToV26(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 26 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -360,6 +366,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 22) migrated = migrateV22ToV23(migrated);
     else if (version === 23) migrated = migrateV23ToV24(migrated, sourceVersion);
     else if (version === 24) migrated = migrateV24ToV25(migrated);
+    else if (version === 25) migrated = migrateV25ToV26(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -462,6 +469,10 @@ function isTacticalFormationLine(value: unknown): value is TacticalFormationLine
   return value === 'front' || value === 'middle' || value === 'rear';
 }
 
+function isTacticalFacing(value: unknown): value is TacticalFacing {
+  return value === 'towardEnemy' || value === 'towardRear';
+}
+
 function migratedFeaturedResidents(
   ids: readonly number[],
   state: GameState,
@@ -505,6 +516,14 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     : source.encounterKind === 'predatorHunt' || source.assaultKind === 'predatorHunt'
       ? 'predatorHunt'
       : 'raidDefense';
+  const legacyRearEngagedZoneIds = new Set((source.raiderGroups as unknown[]).flatMap(entry => {
+    if (!entry || typeof entry !== 'object') return [];
+    const group = entry as Record<string, unknown>;
+    const active = Number(group.power) > 0 && Number(group.count) - Number(group.killed ?? 0) > 0;
+    return group.rearAssault === true && Number(group.engagementsInZone) > 0 && active
+      ? [String(group.zoneId ?? '')]
+      : [];
+  }).filter(Boolean));
   const zones = rawZones.filter(zone => zoneIds.has(String(zone.id))).map((zone, index) => ({
     ...zone,
     id: String(zone.id),
@@ -555,6 +574,14 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       ? group.pendingLine
       : undefined;
     const command = storedCommand === 'redeploy' && pendingLine == null ? null : storedCommand;
+    const legacyRearFacing = legacyRearEngagedZoneIds.has(String(group.zoneId)) &&
+      (line === 'rear' || (line === 'middle' && command === 'reinforceRear'));
+    const facing: TacticalFacing = protectedCivilian
+      ? 'towardEnemy'
+      : isTacticalFacing(group.facing) ? group.facing : legacyRearFacing ? 'towardRear' : 'towardEnemy';
+    const pendingFacing = isTacticalFacing(group.pendingFacing) && group.pendingFacing === facing
+      ? group.pendingFacing
+      : undefined;
     const id = typeof group.id === 'string' ? group.id : `migrated-defender-${index}`;
     const featuredResidents = migratedFeaturedResidents(ids, state);
     const baseLabel = typeof group.baseLabel === 'string' && group.baseLabel.trim().length > 0
@@ -592,6 +619,8 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       power: protectedCivilian ? 0 : Math.max(0, Number(group.power) || 0),
       line,
       pendingLine,
+      facing,
+      pendingFacing,
       ambushed: group.ambushed === true,
       targetGroupId: typeof group.targetGroupId === 'string' ? group.targetGroupId : undefined,
       targetSource: group.targetSource === 'player' ? 'player' : 'auto',

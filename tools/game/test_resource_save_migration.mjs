@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 25, 'deployment save migrations ship with schema version 25');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 26, 'facing save migrations ship with schema version 26');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -64,11 +64,18 @@ assert.equal(typeof saveLoad.migrateV16ToV17, 'function');
 assert.equal(typeof saveLoad.migrateV17ToV18, 'function');
 assert.equal(typeof saveLoad.migrateV23ToV24, 'function');
 assert.equal(typeof saveLoad.migrateV24ToV25, 'function');
+assert.equal(typeof saveLoad.migrateV25ToV26, 'function');
 
 {
   const migrated = saveLoad.migrateV24ToV25({ schemaVersion: 24, tacticalBattle: { phase: 'deployment' } });
   assert.equal(migrated.schemaVersion, 25);
   assert.deepEqual(migrated.tacticalBattle, { phase: 'deployment' }, 'v25 remains additive at the root schema layer');
+}
+
+{
+  const migrated = saveLoad.migrateV25ToV26({ schemaVersion: 25, marker: 'kept' });
+  assert.equal(migrated.schemaVersion, 26);
+  assert.equal(migrated.marker, 'kept', 'v26 remains additive at the root schema layer');
 }
 
 {
@@ -527,11 +534,47 @@ function prepareFormationTestCombatants(state) {
   const loadedSpear = loaded?.tacticalBattle?.defenderGroups.find(group => group.id === spear.id);
   assert.equal(loadedSpear?.command, 'reinforceRear');
   assert.equal(loadedSpear?.commandSource, 'player');
+  assert.equal(loadedSpear?.facing, 'towardRear');
+  assert.equal(loadedSpear?.pendingFacing, 'towardRear',
+    'the immediate direction and its current-round penalty marker survive a save round-trip');
   const loadedFlanker = loaded?.tacticalBattle?.raiderGroups.find(group => group.id === flanker.id);
   assert.equal(loadedFlanker?.aiState, 'committingReserve');
   assert.equal(loadedFlanker?.aiStateChangedRound, 3);
   assert.equal(loadedFlanker?.intentLockedUntilRound, 5,
     'doctrine intent locks survive a tactical save round-trip');
+}
+
+{
+  const legacyFacingState = simulation.newGame(2026072052);
+  prepareFormationTestCombatants(legacyFacingState);
+  const battle = tactical.createTacticalBattle(legacyFacingState, {
+    factionName: 'legacy facing synthesis', power: 40, warned: true, siege: false, mode: 'garrison',
+  });
+  const spear = battle.defenderGroups.find(group => group.kind === 'militia-spear');
+  const bow = battle.defenderGroups.find(group => group.kind === 'militia-bow');
+  const civilians = battle.defenderGroups.find(group => group.kind === 'civilian');
+  const flanker = battle.raiderGroups.find(group => group.kind === 'flankers');
+  assert.ok(spear && bow && civilians && flanker);
+  Object.assign(spear, { zoneId: 'wall', line: 'middle', command: 'reinforceRear' });
+  Object.assign(bow, { zoneId: 'wall', line: 'rear', command: 'volley' });
+  Object.assign(flanker, {
+    zoneId: 'wall', rearAssault: true, engagementsInZone: 1, intent: 'flank', power: 40,
+  });
+  const legacyBattle = JSON.parse(JSON.stringify(battle));
+  legacyBattle.defenderGroups.forEach(group => {
+    delete group.facing;
+    delete group.pendingFacing;
+  });
+  const migrated = saveLoad.migrateTacticalBattle(legacyBattle, legacyFacingState);
+  const migratedSpear = migrated?.defenderGroups.find(group => group.id === spear.id);
+  const migratedBow = migrated?.defenderGroups.find(group => group.id === bow.id);
+  const migratedCivilians = migrated?.defenderGroups.find(group => group.id === civilians.id);
+  assert.equal(migratedSpear?.facing, 'towardRear',
+    'an engaged legacy reinforceRear reserve is synthesized as rear-facing');
+  assert.equal(migratedBow?.facing, 'towardRear',
+    'an engaged legacy rear-line group preserves its former rear assignment');
+  assert.equal(migratedCivilians?.facing, 'towardEnemy', 'legacy civilians keep their fixed enemy-facing default');
+  assert.equal(migratedSpear?.pendingFacing, undefined, 'legacy saves do not invent a turn penalty');
 }
 
 {

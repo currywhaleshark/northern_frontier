@@ -107,6 +107,9 @@ const state = battleSimulation.createBattleSimulation({
   enemyCompositionTemplateId: 'court-cavalry-wing', enemyFlankRoute: 'none', seed: 2026071952,
 });
 for (let guard = 0; guard < 4 && state.tacticalBattle.phase !== 'command'; guard += 1) {
+  if (state.tacticalBattle.phase === 'deployment') {
+    tactical.applyAutoDeployTacticalGroups(state.tacticalBattle);
+  }
   assert.equal(tactical.advanceTacticalPhase(state), null);
 }
 assert.equal(tactical.resolveTacticalRound(state), null);

@@ -106,6 +106,7 @@ function snapshotRound(battle, report) {
 function advanceToCommand(tactical, state) {
   const battle = state.tacticalBattle;
   for (let guard = 0; guard < 4 && battle.phase !== 'command'; guard += 1) {
+    if (battle.phase === 'deployment') tactical.applyAutoDeployTacticalGroups(battle);
     const error = tactical.advanceTacticalPhase(state);
     assert.equal(error, null);
   }
