@@ -32,6 +32,7 @@ let outgoingAudio: HTMLAudioElement | null = null;
 let fadeFrame: number | null = null;
 let initialized = false;
 let muted = typeof localStorage !== 'undefined' && localStorage.getItem('buksae-muted') === '1';
+let volume = 0.7;
 
 const shuffleBags: Partial<Record<MusicScene, string[]>> = {};
 const lastTrack: Partial<Record<MusicScene, string>> = {};
@@ -87,9 +88,9 @@ function crossfade(previous: HTMLAudioElement | null, next: HTMLAudioElement): v
   const startedAt = performance.now();
 
   const step = (now: number) => {
-    const progress = Math.min(1, (now - startedAt) / CROSSFADE_MS);
+    const progress = Math.max(0, Math.min(1, (now - startedAt) / CROSSFADE_MS));
     if (previous) previous.volume = muted ? 0 : previousVolume * (1 - progress);
-    next.volume = muted ? 0 : MUSIC_VOLUME * progress;
+    next.volume = muted ? 0 : MUSIC_VOLUME * volume * progress;
     if (progress < 1) {
       fadeFrame = requestAnimationFrame(step);
       return;
@@ -137,7 +138,7 @@ export function initMusic(): void {
       startScene(desiredScene);
       return;
     }
-    currentAudio.volume = muted ? 0 : MUSIC_VOLUME;
+    currentAudio.volume = muted ? 0 : MUSIC_VOLUME * volume;
     void currentAudio.play().catch(() => undefined);
     return;
   }
@@ -152,8 +153,18 @@ export function setMusicScene(scene: MusicScene): void {
 export function setMusicMuted(nextMuted: boolean): void {
   muted = nextMuted;
   if (currentAudio) {
-    currentAudio.volume = muted ? 0 : MUSIC_VOLUME;
+    currentAudio.volume = muted ? 0 : MUSIC_VOLUME * volume;
     if (!muted) void currentAudio.play().catch(() => undefined);
   }
   if (outgoingAudio && muted) outgoingAudio.volume = 0;
+}
+
+export function setMusicSettings(settings: { enabled: boolean; volume: number }): void {
+  muted = !settings.enabled;
+  volume = Math.min(1, Math.max(0, Number.isFinite(settings.volume) ? settings.volume : 0.7));
+  if (currentAudio) {
+    currentAudio.volume = muted ? 0 : MUSIC_VOLUME * volume;
+    if (!muted) void currentAudio.play().catch(() => undefined);
+  }
+  if (outgoingAudio) outgoingAudio.volume = muted ? 0 : MUSIC_VOLUME * volume;
 }

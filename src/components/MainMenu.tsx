@@ -9,14 +9,13 @@ interface Props {
   onStartTutorial: () => void;
   onContinue: () => void;
   onOpenBattleSim: () => void;
-  soundOn: boolean;
-  onToggleSound: () => void;
+  onOpenSettings: () => void;
 }
 
 const DIFF_ORDER: Difficulty[] = ['easy', 'normal', 'hard'];
 
 export function MainMenu({
-  canContinue, onStart, onStartTutorial, onContinue, onOpenBattleSim, soundOn, onToggleSound,
+  canContinue, onStart, onStartTutorial, onContinue, onOpenBattleSim, onOpenSettings,
 }: Props) {
   const [diff, setDiff] = useState<Difficulty>('normal');
 
@@ -27,8 +26,8 @@ export function MainMenu({
         <div className="menu-subtitle">육진 너머 — 혹한의 개척지</div>
         <p className="menu-desc">
           조정의 명을 받아 두만강 이북의 변경에 개척지를 세우십시오.
-          짧은 봄과 여름 동안 식량과 장작을 모으고, 목책을 두르고,
-          북방 세력과 거래하거나 맞서며 다섯 해의 겨울을 버텨야 합니다.
+          계절을 대비해 마을의 살림과 방비를 갖추고, 북방 세력과 교역하거나 맞서며
+          작은 개척지를 보(堡)와 진(鎭)을 거쳐 부(府)로 성장시키십시오.
         </p>
 
         <div className="diff-row">
@@ -57,9 +56,7 @@ export function MainMenu({
             <button className="btn menu-btn" onClick={onContinue}>이어하기</button>
           )}
           <button className="btn menu-btn" onClick={onOpenBattleSim}>전투 시뮬레이션</button>
-          <button className="btn menu-btn" onClick={onToggleSound} title={soundOn ? '배경음과 효과음 끄기' : '배경음과 효과음 켜기'}>
-            {soundOn ? '🔊 소리 끄기' : '🔇 소리 켜기'}
-          </button>
+          <button className="btn menu-btn" onClick={onOpenSettings}>설정</button>
         </div>
 
         <div className="menu-footer muted small">

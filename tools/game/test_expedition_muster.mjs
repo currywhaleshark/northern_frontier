@@ -68,11 +68,12 @@ function prepareCombatants(seed) {
   assert.ok(center);
   state.incidents.predatorThreats.wolf = { kind: 'wolf', untilDay: state.day + 5 };
   state.habitats = [
-    { id: 20, x: Math.max(0, center.x - 7), y: center.y, radius: 5, active: true },
+    { id: 20, x: Math.max(0, center.x - 15), y: center.y, radius: 5, active: true },
     { id: 10, x: Math.min(state.map[0].length - 1, center.x + 3), y: center.y, radius: 5, active: true },
     { id: 1, x: center.x, y: center.y, radius: 5, active: false },
   ];
-  assert.equal(expedition.predatorExpeditionTarget(state, 'wolf')?.habitatId, 10);
+  assert.equal(expedition.predatorExpeditionTarget(state, 'wolf')?.habitatId, 20,
+    'predator hunts must prefer a habitat outside the village safety distance');
   delete state.incidents.predatorThreats.wolf;
   assert.equal(expedition.predatorExpeditionTarget(state, 'wolf'), null, 'inactive threat cannot open a hunt target');
 }

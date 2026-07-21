@@ -4,6 +4,7 @@ import { addLog } from './events';
 import { createCombatRoster, isCombatReadyResident, type CombatantSnapshot } from './combatRoster';
 import { deliverExpeditionCorpses, loseExpeditionCorpses } from './lifecycle';
 import { consumeMusketPowder, reconcileWeaponAssignments, resolvedMountAssignments } from './weapons';
+import { habitatForestTiles } from './habitats';
 import type {
   Expedition, ExpeditionKind, GameState, PredatorKind, Resident, ResourceId,
 } from './types';
@@ -134,12 +135,28 @@ export function predatorExpeditionTarget(
     x: Math.floor((state.map[0]?.length ?? 1) / 2),
     y: Math.floor(state.map.length / 2),
   };
-  const habitat = state.habitats
+  const candidates = state.habitats
     .filter(candidate => candidate.active)
+    .map(candidate => ({
+      ...candidate,
+      distance: Math.abs(candidate.x - center.x) + Math.abs(candidate.y - center.y),
+      forestTiles: habitatForestTiles(state.map, candidate),
+    }));
+  const distantLargeForests = candidates.filter(candidate =>
+    candidate.distance >= CONFIG.specialEvents.predatorMinSettlementDistance &&
+    candidate.forestTiles >= CONFIG.specialEvents.predatorPreferredForestTiles);
+  const distantForests = candidates.filter(candidate =>
+    candidate.distance >= CONFIG.specialEvents.predatorMinSettlementDistance);
+  const pool = distantLargeForests.length > 0
+    ? distantLargeForests
+    : distantForests.length > 0
+      ? distantForests
+      : candidates;
+  const habitat = pool
     .sort((a, b) => {
-      const aDistance = Math.abs(a.x - center.x) + Math.abs(a.y - center.y);
-      const bDistance = Math.abs(b.x - center.x) + Math.abs(b.y - center.y);
-      return aDistance - bDistance || a.id - b.id;
+      if (a.forestTiles !== b.forestTiles) return b.forestTiles - a.forestTiles;
+      if (distantForests.length === 0 && a.distance !== b.distance) return b.distance - a.distance;
+      return a.distance - b.distance || a.id - b.id;
     })[0];
   return habitat ? { x: habitat.x, y: habitat.y, habitatId: habitat.id } : null;
 }

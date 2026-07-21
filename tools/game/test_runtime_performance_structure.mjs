@@ -5,8 +5,9 @@ const appSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'u
 const canvasSource = readFileSync(new URL('../../src/components/GameCanvas.tsx', import.meta.url), 'utf8');
 const rendererSource = readFileSync(new URL('../../src/render/renderer.ts', import.meta.url), 'utf8');
 
-const loopStart = appSource.indexOf('// ── 게임 루프:');
-const loopEnd = appSource.indexOf('// Esc로 건설 배치 취소');
+const loopAnchor = appSource.indexOf('const msPerDay = CONFIG.time.msPerDay[speed]');
+const loopStart = appSource.lastIndexOf('useEffect(() => {', loopAnchor);
+const loopEnd = appSource.indexOf('const openGameMenu = useCallback', loopAnchor);
 assert.ok(loopStart >= 0 && loopEnd > loopStart, 'App game loop source is discoverable');
 const loopSource = appSource.slice(loopStart, loopEnd);
 

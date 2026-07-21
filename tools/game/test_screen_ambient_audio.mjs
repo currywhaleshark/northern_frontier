@@ -10,13 +10,13 @@ assert.match(appSource,
 
 const generalSoundEffect = appSource.slice(
   appSource.indexOf('// 관리 UI snapshot과 같은 cadence로 게임 상태 효과를 동기화한다.'),
-  appSource.indexOf('  useEffect(() => {\n    setWeatherAmbient(state.weather);'),
+  appSource.indexOf('setWeatherAmbient(state.weather);'),
 );
 assert.doesNotMatch(generalSoundEffect, /setWeatherAmbient|stopWeatherAmbient/,
   'log and battle SFX inspection must not update weather ambient on every snapshot');
 
 const ambientEffect = appSource.slice(
-  appSource.indexOf('  useEffect(() => {\n    setWeatherAmbient(state.weather);'),
+  Math.max(0, appSource.indexOf('setWeatherAmbient(state.weather);') - 40),
   appSource.indexOf('  return null;\n}', appSource.indexOf('function RuntimeGameEffects')),
 );
 assert.match(ambientEffect,

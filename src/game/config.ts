@@ -249,6 +249,8 @@ export const CONFIG = {
     tigerEncounterDeathChance: 0.025,
     wolfHuntDeathChance: 0.02,
     tigerHuntDeathChance: 0.08,
+    predatorMinSettlementDistance: 12,
+    predatorPreferredForestTiles: 18,
     wolfBaitMeat: 6,
     boarThreatDays: [12, 18] as const,
     boarInitialCropLoss: 0.12,

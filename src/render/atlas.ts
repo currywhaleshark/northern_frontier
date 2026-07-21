@@ -1068,7 +1068,7 @@ export const atlasSprites: SpriteAPI = {
 
     const specialRect = p.special ? specialResidentSourceRect(p.special) : null;
     if (specialResidentSheet && specialRect) {
-      drawGeneratedCharacterRect(ctx, specialResidentSheet, specialRect, p.x, p.y, p.facing, bob);
+      drawGeneratedCharacterRect(ctx, specialResidentSheet, specialRect, p.x, p.y, p.facing, bob, 1.16);
     } else if (foreignResidentSheet && foreignRect) {
       drawGeneratedCharacterRect(ctx, foreignResidentSheet, foreignRect, p.x, p.y, p.facing, bob);
     } else if (newContentResidentSheet && newContentRect) {

@@ -16,7 +16,8 @@ import { DockWindow } from './DockWindow';
 export interface DockFrameItem {
   id: DockWindowId;
   label: string;
-  icon: string;
+  icon: ReactNode;
+  shortcut?: string;
   content: ReactNode;
 }
 
@@ -127,10 +128,11 @@ export function DockFrame({
               data-tut={`dock-${item.id}`}
               aria-label={`${item.label} 창 ${open ? '닫기' : '열기'}`}
               aria-pressed={open}
-              title={`${item.label}${pinned ? ' · 고정됨' : ''}`}
+              title={`${item.label}${item.shortcut ? ` (${item.shortcut})` : ''}${pinned ? ' · 고정됨' : ''}`}
               onClick={() => onToggleWindow(item.id)}
             >
               <span aria-hidden="true">{item.icon}</span>
+              {item.shortcut && <kbd className="dock-shortcut" aria-hidden="true">{item.shortcut}</kbd>}
             </button>
           );
         })}

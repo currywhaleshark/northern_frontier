@@ -282,7 +282,7 @@ html, body, #root {
 .canvas-wrap {
   position: absolute;
   inset: 0;
-  overflow: auto;
+  overflow: hidden;
   background: #0d1013;
   padding: 8px;
   /* 지도가 뷰포트보다 크면 드래그로 이동한다. flex 중앙정렬은 오버플로 시 좌측 끝
@@ -320,6 +320,34 @@ html, body, #root {
   cursor: pointer;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
 }
+.dock-strip button > span {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+}
+.management-dock-icon {
+  display: block;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7));
+}
+.dock-shortcut {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border: 1px solid rgba(217, 164, 65, 0.78);
+  border-radius: 4px;
+  background: #11161a;
+  color: #f1d78f;
+  font: 700 9px/13px ui-monospace, monospace;
+  text-align: center;
+}
 .dock-strip button:hover,
 .dock-strip button:focus-visible,
 .dock-strip button.active { border-color: var(--accent); color: var(--text); outline: none; }
@@ -333,6 +361,19 @@ html, body, #root {
   height: 5px;
   border-radius: 50%;
   background: var(--accent);
+}
+.time-btn kbd {
+  margin-left: 4px;
+  padding: 0 3px;
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 3px;
+  color: var(--muted);
+  font-size: 9px;
+}
+.topbar-menu-button kbd {
+  margin-left: 3px;
+  color: var(--muted);
+  font-size: 9px;
 }
 .dock-window-layer {
   position: absolute;
@@ -1551,6 +1592,74 @@ html, body, #root {
 .menu-actions { display: flex; gap: 10px; justify-content: center; margin-bottom: 14px; }
 .menu-btn { padding: 9px 26px; font-size: 15px; }
 .menu-footer { border-top: 1px solid var(--border); padding-top: 10px; }
+
+/* ── ESC 게임 메뉴·설정·리포트 ── */
+.game-menu-overlay { z-index: 250; background: rgba(5, 7, 9, 0.82); backdrop-filter: blur(3px); }
+.save-slot-overlay { z-index: 270; }
+.game-menu-modal { width: min(430px, 92vw); padding: 20px; }
+.game-menu-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.game-menu-heading h2 { margin: 2px 0 0; color: var(--accent); }
+.game-menu-actions { display: grid; gap: 8px; }
+.game-menu-actions.horizontal { grid-template-columns: 1fr 1fr; }
+.game-menu-actions .btn,
+.game-menu-wide { min-height: 40px; }
+.game-menu-hint { margin: 14px 0 0; text-align: center; }
+.game-menu-hint kbd { padding: 1px 5px; border: 1px solid var(--border); border-radius: 3px; }
+.settings-dialog { width: min(560px, 92vw); }
+.settings-audio-row {
+  display: grid;
+  grid-template-columns: minmax(145px, auto) minmax(120px, 1fr) 44px;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel2);
+}
+.settings-toggle { display: flex; align-items: center; gap: 8px; }
+.settings-audio-row input[type='range'] { width: 100%; accent-color: var(--accent); }
+.settings-audio-row > span { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.settings-note { margin: 12px 0; }
+.feedback-dialog { width: min(650px, 94vw); overflow-y: auto; }
+.feedback-dialog > label { display: grid; gap: 5px; margin: 10px 0; color: var(--muted); font-size: 12px; }
+.feedback-dialog input[type='text'],
+.feedback-dialog > label > input:not([type]),
+.feedback-dialog textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #13191d;
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+.feedback-kind { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.feedback-kind button {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel2);
+  color: var(--muted);
+  cursor: pointer;
+}
+.feedback-kind button.active { border-color: var(--accent); color: var(--text); background: #383323; }
+.feedback-diagnostics-toggle { display: flex !important; grid-template-columns: none !important; align-items: center; color: var(--text) !important; }
+
+@media (max-width: 620px) {
+  .settings-audio-row { grid-template-columns: 1fr 44px; }
+  .settings-toggle { grid-column: 1 / -1; }
+}
 
 /* ── 전투 시뮬레이션 설정 화면 ── */
 .sim-panel {

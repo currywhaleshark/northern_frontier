@@ -89,7 +89,9 @@ assert.deepEqual(normalized.autoAssignBuildingTypes, ['field', 'smithy'],
 assert.deepEqual(normalized.pinnedDockWindows, ['jobs', 'processing', 'residents', 'factions', 'court'],
   'dock preferences must remove duplicate and unknown window pins');
 assert.deepEqual(normalized.dockWindowLayouts, {}, 'v4 prefs must start without saved window layouts');
-assert.equal(normalized.version, 5, 'v4 prefs must migrate to the current schema without resetting');
+assert.equal(normalized.version, 6, 'v4 prefs must migrate to the current schema without resetting');
+assert.deepEqual(normalized.audio, { sfxEnabled: true, sfxVolume: 0.7, musicEnabled: true, musicVolume: 0.7 });
+assert.equal(normalized.mapZoom, 1);
 
 const legacyStorage = memoryStorage({
   [UI_PREFS_KEY]: JSON.stringify({
@@ -100,7 +102,7 @@ const legacyStorage = memoryStorage({
   [LEGACY_BUILD_MENU_OPEN_KEY]: JSON.stringify({ 생산: true }),
 });
 const migrated = loadUiPrefs(legacyStorage);
-assert.equal(migrated.version, 5, 'v1 prefs must migrate to the current schema');
+assert.equal(migrated.version, 6, 'v1 prefs must migrate to the current schema');
 assert.deepEqual(migrated.starredResources, ['tools'], 'v1 stars must survive migration');
 assert.deepEqual(migrated.pinnedResourceGroups, ['materials'], 'v1 group pins must survive migration');
 assert.equal(migrated.buildDrawerLastCategory, 'production',
@@ -110,6 +112,13 @@ assert.equal(legacyStorage.has(LEGACY_BUILD_MENU_OPEN_KEY), false,
 assert.deepEqual(migrated.autoAssignBuildingTypes, AUTO_ASSIGN_BUILDING_TYPES,
   'pre-auto-assignment UI prefs must default to every supported building type');
 assert.deepEqual(migrated.pinnedDockWindows, [], 'older prefs must start with every dock window closed');
+
+const legacyMuted = loadUiPrefs(memoryStorage({
+  [UI_PREFS_KEY]: JSON.stringify({ version: 5 }),
+  'buksae-muted': '1',
+}));
+assert.equal(legacyMuted.audio.sfxEnabled, false, 'legacy global mute must migrate to the SE channel');
+assert.equal(legacyMuted.audio.musicEnabled, false, 'legacy global mute must migrate to the BGM channel');
 
 const v2Migrated = normalizeUiPrefs({
   version: 2,
@@ -154,6 +163,20 @@ assert.deepEqual(v5Layouts.dockWindowLayouts, {
 assert.deepEqual(v5Layouts.starredResources, ['tools']);
 assert.deepEqual(v5Layouts.pinnedDockWindows, ['jobs']);
 
+const v6Settings = normalizeUiPrefs({
+  ...defaultUiPrefs(),
+  version: 6,
+  audio: { sfxEnabled: false, sfxVolume: 2, musicEnabled: true, musicVolume: -1 },
+  mapZoom: 9,
+});
+assert.deepEqual(v6Settings.audio, {
+  sfxEnabled: false,
+  sfxVolume: 1,
+  musicEnabled: true,
+  musicVolume: 0,
+});
+assert.equal(v6Settings.mapZoom, 2, 'zoom preferences must clamp to the supported range');
+
 let prefs = defaultUiPrefs();
 for (const resource of DISPLAY_RESOURCE_ORDER.slice(0, MAX_STARRED_RESOURCES)) {
   prefs = toggleStarredResource(prefs, resource);
@@ -196,6 +219,6 @@ assert.deepEqual(prefs.dockWindowLayouts, {});
 const storage = memoryStorage();
 saveUiPrefs(normalized, storage);
 assert.deepEqual(loadUiPrefs(storage), normalized, 'saved prefs must round-trip independently');
-assert.equal(JSON.parse(storage.value()).version, 5, 'saved prefs must retain their own schema version');
+assert.equal(JSON.parse(storage.value()).version, 6, 'saved prefs must retain their own schema version');
 
 console.log('ui prefs tests passed');

@@ -25,6 +25,7 @@ interface Props {
   onClearSelection: () => void;
   uiPrefs: UiPrefs;
   onUiPrefsChange: (update: (current: UiPrefs) => UiPrefs) => void;
+  shortcutsEnabled?: boolean;
 }
 
 function costText(type: BuildableBuildingTypeId): string {
@@ -92,7 +93,7 @@ function BuildingThumb({ type, state }: { type: BuildableBuildingTypeId; state: 
 }
 
 export function BuildDrawer({
-  state, placingType, setPlacingType, onClearSelection, uiPrefs, onUiPrefsChange,
+  state, placingType, setPlacingType, onClearSelection, uiPrefs, onUiPrefsChange, shortcutsEnabled = true,
 }: Props) {
   const [drawerState, setDrawerState] = useState(closedBuildDrawerState);
   const [hoveredTooltipType, setHoveredTooltipType] = useState<BuildableBuildingTypeId | null>(null);
@@ -135,7 +136,7 @@ export function BuildDrawer({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== 'b' || event.altKey || event.ctrlKey || event.metaKey || isTextInput(event.target)) {
+      if (!shortcutsEnabled || event.key.toLowerCase() !== 'b' || event.altKey || event.ctrlKey || event.metaKey || isTextInput(event.target)) {
         return;
       }
       event.preventDefault();
@@ -147,7 +148,7 @@ export function BuildDrawer({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [placingType, setPlacingType, uiPrefs.buildDrawerLastCategory]);
+  }, [placingType, setPlacingType, shortcutsEnabled, uiPrefs.buildDrawerLastCategory]);
 
   const toggleCategory = (category: BuildCategoryId) => {
     rememberCategory(category);

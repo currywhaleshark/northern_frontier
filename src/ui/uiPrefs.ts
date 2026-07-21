@@ -28,8 +28,16 @@ import {
 
 export const UI_PREFS_KEY = 'buksae-ui-prefs';
 export const LEGACY_BUILD_MENU_OPEN_KEY = 'buksae-buildmenu-open';
-export const UI_PREFS_VERSION = 5;
+export const UI_PREFS_VERSION = 6;
 export const MAX_STARRED_RESOURCES = 8;
+export const DEFAULT_MAP_ZOOM = 1;
+
+export interface AudioPrefs {
+  sfxEnabled: boolean;
+  sfxVolume: number;
+  musicEnabled: boolean;
+  musicVolume: number;
+}
 
 export interface UiPrefs {
   version: typeof UI_PREFS_VERSION;
@@ -39,6 +47,8 @@ export interface UiPrefs {
   autoAssignBuildingTypes: AutoAssignBuildingType[];
   pinnedDockWindows: DockWindowId[];
   dockWindowLayouts: DockWindowLayouts;
+  audio: AudioPrefs;
+  mapZoom: number;
 }
 
 export interface UiPrefsStorage {
@@ -56,7 +66,37 @@ export function defaultUiPrefs(buildDrawerLastCategory = DEFAULT_BUILD_CATEGORY)
     autoAssignBuildingTypes: [...AUTO_ASSIGN_BUILDING_TYPES],
     pinnedDockWindows: [],
     dockWindowLayouts: {},
+    audio: {
+      sfxEnabled: true,
+      sfxVolume: 0.7,
+      musicEnabled: true,
+      musicVolume: 0.7,
+    },
+    mapZoom: DEFAULT_MAP_ZOOM,
   };
+}
+
+function clampUnit(value: unknown, fallback: number): number {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.min(1, Math.max(0, number)) : fallback;
+}
+
+function normalizeAudioPrefs(value: unknown): AudioPrefs {
+  const defaults = defaultUiPrefs().audio;
+  if (!value || typeof value !== 'object') return defaults;
+  const candidate = value as Partial<AudioPrefs>;
+  return {
+    sfxEnabled: typeof candidate.sfxEnabled === 'boolean' ? candidate.sfxEnabled : defaults.sfxEnabled,
+    sfxVolume: clampUnit(candidate.sfxVolume, defaults.sfxVolume),
+    musicEnabled: typeof candidate.musicEnabled === 'boolean' ? candidate.musicEnabled : defaults.musicEnabled,
+    musicVolume: clampUnit(candidate.musicVolume, defaults.musicVolume),
+  };
+}
+
+export function normalizeMapZoom(value: unknown): number {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return DEFAULT_MAP_ZOOM;
+  return Math.min(2, Math.max(0.5, Math.round(number * 100) / 100));
 }
 
 function uniqueValidValues<T>(
@@ -86,10 +126,12 @@ export function normalizeUiPrefs(value: unknown, migratedBuildCategory = DEFAULT
     autoAssignBuildingTypes?: unknown;
     pinnedDockWindows?: unknown;
     dockWindowLayouts?: unknown;
+    audio?: unknown;
+    mapZoom?: unknown;
   };
   if (candidate.version !== 1 && candidate.version !== 2
     && candidate.version !== 3 && candidate.version !== 4
-    && candidate.version !== UI_PREFS_VERSION) {
+    && candidate.version !== 5 && candidate.version !== UI_PREFS_VERSION) {
     return defaultUiPrefs();
   }
   return {
@@ -109,6 +151,12 @@ export function normalizeUiPrefs(value: unknown, migratedBuildCategory = DEFAULT
     dockWindowLayouts: candidate.version >= 5
       ? normalizeDockWindowLayouts(candidate.dockWindowLayouts)
       : {},
+    audio: candidate.version >= 6
+      ? normalizeAudioPrefs(candidate.audio)
+      : defaultUiPrefs().audio,
+    mapZoom: candidate.version >= 6
+      ? normalizeMapZoom(candidate.mapZoom)
+      : DEFAULT_MAP_ZOOM,
   };
 }
 
@@ -139,9 +187,14 @@ export function loadUiPrefs(storage: UiPrefsStorage | null = browserStorage()): 
   const migratedBuildCategory = legacyBuildCategory(storage);
   try {
     const raw = storage.getItem(UI_PREFS_KEY);
-    return raw
-      ? normalizeUiPrefs(JSON.parse(raw), migratedBuildCategory)
+    const parsed = raw ? JSON.parse(raw) as { version?: unknown } : null;
+    const prefs = parsed
+      ? normalizeUiPrefs(parsed, migratedBuildCategory)
       : defaultUiPrefs(migratedBuildCategory);
+    if ((!parsed || Number(parsed.version) < 6) && storage.getItem('buksae-muted') === '1') {
+      return setAudioPrefs(prefs, { sfxEnabled: false, musicEnabled: false });
+    }
+    return prefs;
   } catch {
     return defaultUiPrefs(migratedBuildCategory);
   } finally {
@@ -234,4 +287,16 @@ export function resetDockWindowLayout(prefs: UiPrefs, id: FloatingWindowId): UiP
   const dockWindowLayouts = { ...prefs.dockWindowLayouts };
   delete dockWindowLayouts[id];
   return { ...prefs, dockWindowLayouts };
+}
+
+export function setAudioPrefs(prefs: UiPrefs, audio: Partial<AudioPrefs>): UiPrefs {
+  return {
+    ...prefs,
+    audio: normalizeAudioPrefs({ ...prefs.audio, ...audio }),
+  };
+}
+
+export function setMapZoom(prefs: UiPrefs, mapZoom: number): UiPrefs {
+  const normalized = normalizeMapZoom(mapZoom);
+  return normalized === prefs.mapZoom ? prefs : { ...prefs, mapZoom: normalized };
 }

@@ -54,7 +54,7 @@ export function SaveSlotDialog({ mode, onSelect, onClose, onChanged }: Props) {
   };
 
   return (
-    <div className="modal-overlay" role="presentation" onMouseDown={event => {
+    <div className="modal-overlay save-slot-overlay" role="presentation" onMouseDown={event => {
       if (event.target === event.currentTarget) onClose();
     }}>
       <div className="modal save-slot-dialog" role="dialog" aria-modal="true" aria-labelledby="save-slot-title">

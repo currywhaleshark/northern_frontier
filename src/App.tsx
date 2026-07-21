@@ -11,8 +11,8 @@ import {
 } from './game/simulation';
 import { hasAnySave, loadGame, saveGame } from './game/saveLoad';
 import { addLog, negotiateTrade, requestTrade, tradeNegotiationOf } from './game/events';
-import { initAudio, isMuted, playSfx, setMuted, stopWeatherAmbient, setWeatherAmbient } from './sound/sfx';
-import { initMusic, setMusicMuted, setMusicScene, type MusicScene } from './sound/music';
+import { initAudio, playSfx, setSfxSettings, stopWeatherAmbient, setWeatherAmbient } from './sound/sfx';
+import { initMusic, setMusicScene, setMusicSettings, type MusicScene } from './sound/music';
 import { AlertsPanel } from './components/AlertsPanel';
 import { BuildDrawer } from './components/BuildDrawer';
 import { DockFrame, type DockOverlayItem } from './components/dock/DockFrame';
@@ -25,6 +25,10 @@ import { GameCanvas } from './components/GameCanvas';
 import { InspectorPanel } from './components/InspectorPanel';
 import { JobPanel } from './components/JobPanel';
 import { MainMenu } from './components/MainMenu';
+import { GameMenu } from './components/GameMenu';
+import { SettingsDialog } from './components/SettingsDialog';
+import { FeedbackDialog } from './components/FeedbackDialog';
+import { ManagementDockIcon } from './components/ManagementDockIcon';
 import { createBattleSimulation, type BattleSimulationOptions } from './game/battleSimulation';
 import { centerViewportOnSettlement, centerViewportOnTile, Minimap } from './components/Minimap';
 import { ProcessingPanel } from './components/ProcessingPanel';
@@ -70,7 +74,9 @@ import {
   loadUiPrefs,
   resetDockWindowLayout,
   saveUiPrefs,
+  setAudioPrefs,
   setDockWindowLayout,
+  setMapZoom,
   togglePinnedDockWindow,
   type UiPrefs,
 } from './ui/uiPrefs';
@@ -85,6 +91,7 @@ import {
   recordRuntimePerf, recordRuntimePerfSince, runtimePerfSnapshot, runtimePerfStartTime,
   startRuntimePerf, stopRuntimePerf, summarizeRuntimePerf,
 } from './perf/runtimePerf';
+import { dockWindowForHotkey, isEditableTarget, speedForHotkey } from './ui/gameHotkeys';
 
 let lastAppCommitTime = 0;
 const runtimePerfParams = new URLSearchParams(window.location.search);
@@ -198,8 +205,11 @@ export default function App() {
   // 저장 슬롯 다이얼로그: null이면 닫힘, 아니면 저장/불러오기 모드
   const [slotDialogMode, setSlotDialogMode] = useState<'save' | 'load' | null>(null);
   const [inspResidentId, setInspResidentId] = useState<number | null>(null);
-  const [soundOn, setSoundOn] = useState(!isMuted());
   const [uiPrefs, setUiPrefs] = useState<UiPrefs>(() => loadUiPrefs());
+  const [gameMenuView, setGameMenuView] = useState<'main' | 'settings' | 'feedback' | null>(null);
+  const [titleSettingsOpen, setTitleSettingsOpen] = useState(false);
+  const lastPlayingSpeedRef = useRef(1);
+  const menuRestoreSpeedRef = useRef(1);
   const [openDockWindowIds, setOpenDockWindowIds] = useState<readonly DockWindowId[]>(
     () => [...uiPrefs.pinnedDockWindows],
   );
@@ -218,6 +228,15 @@ export default function App() {
   useEffect(() => {
     saveUiPrefs(uiPrefs);
   }, [uiPrefs]);
+
+  useEffect(() => {
+    setSfxSettings({ enabled: uiPrefs.audio.sfxEnabled, volume: uiPrefs.audio.sfxVolume });
+    setMusicSettings({ enabled: uiPrefs.audio.musicEnabled, volume: uiPrefs.audio.musicVolume });
+  }, [uiPrefs.audio]);
+
+  useEffect(() => {
+    if (speed > 0) lastPlayingSpeedRef.current = speed;
+  }, [speed]);
 
   useEffect(() => {
     setOpenDockWindowIds(current => {
@@ -428,14 +447,18 @@ export default function App() {
     };
   }, [speed, screen, runtimeVersionStore, uiVersionStore]);
 
-  // Esc로 건설 배치 취소
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !e.defaultPrevented) setPlacingType(null);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  const openGameMenu = useCallback(() => {
+    if (screen !== 'game') return;
+    if (speed > 0) lastPlayingSpeedRef.current = speed;
+    menuRestoreSpeedRef.current = speed;
+    setSpeed(0);
+    setGameMenuView('main');
+  }, [screen, speed]);
+
+  const closeGameMenu = useCallback(() => {
+    setGameMenuView(null);
+    if (screen === 'game') setSpeed(menuRestoreSpeedRef.current);
+  }, [screen]);
 
   const handlePlacePlot = (x: number, y: number, w: number, h: number) => {
     if (!placingType) return;
@@ -471,14 +494,6 @@ export default function App() {
     setSelected({ x, y });
     setSelectedEntity(nextSelection);
     setInspResidentId(null);
-  };
-
-  const handleToggleSound = () => {
-    initAudio();
-    const next = !soundOn;
-    setSoundOn(next);
-    setMuted(!next);
-    setMusicMuted(!next);
   };
 
   const handleReassign = (from: JobId, to: JobId) => {
@@ -956,6 +971,10 @@ export default function App() {
     setWeaponDialogOpen(false);
     setExpeditionMusterRequest(null);
     setSlotDialogMode(null);
+    setGameMenuView(null);
+    setSpeed(1);
+    lastPlayingSpeedRef.current = 1;
+    menuRestoreSpeedRef.current = 1;
     setScreen('game');
     bump();
   };
@@ -1001,6 +1020,61 @@ export default function App() {
       : bringDockWindowToFront(current, id));
   }, [openDockWindowIds]);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (titleSettingsOpen) {
+          setTitleSettingsOpen(false);
+        } else if (slotDialogMode) {
+          setSlotDialogMode(null);
+        } else if (gameMenuView === 'settings' || gameMenuView === 'feedback') {
+          setGameMenuView('main');
+        } else if (gameMenuView === 'main') {
+          closeGameMenu();
+        } else if (placingType) {
+          setPlacingType(null);
+        } else if (weaponDialogOpen) {
+          setWeaponDialogOpen(false);
+        } else if (expeditionMusterRequest) {
+          setExpeditionMusterRequest(null);
+        } else {
+          openGameMenu();
+        }
+        return;
+      }
+
+      if (screen !== 'game' || isEditableTarget(event.target) || slotDialogMode || gameMenuView ||
+          weaponDialogOpen || expeditionMusterRequest) return;
+      const runtimeState = stateRef.current;
+      if (runtimeState.pendingChoice || runtimeState.tacticalBattle || runtimeState.tacticalBattleReport || runtimeState.gameOver) return;
+
+      if (event.code === 'Space') {
+        event.preventDefault();
+        setSpeed(current => current === 0 ? lastPlayingSpeedRef.current || 1 : 0);
+        return;
+      }
+      const shortcutSpeed = speedForHotkey(event.code);
+      if (shortcutSpeed != null) {
+        event.preventDefault();
+        setSpeed(shortcutSpeed);
+        return;
+      }
+      const dockId = dockWindowForHotkey(event.key);
+      if (dockId) {
+        event.preventDefault();
+        toggleDockWindow(dockId);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [
+    closeGameMenu, expeditionMusterRequest, gameMenuView, openGameMenu, placingType, screen,
+    slotDialogMode, titleSettingsOpen, toggleDockWindow, weaponDialogOpen,
+  ]);
+
   const handleContextAction = (x: number, y: number) => {
     const tile = stateRef.current.map[y]?.[x];
     if (!tile) return;
@@ -1036,7 +1110,11 @@ export default function App() {
     setInspResidentId(null);
     setWeaponDialogOpen(false);
     setExpeditionMusterRequest(null);
+    setGameMenuView(null);
+    setTitleSettingsOpen(false);
     setSpeed(1);
+    lastPlayingSpeedRef.current = 1;
+    menuRestoreSpeedRef.current = 1;
     setScreen('game');
     bump();
   };
@@ -1049,9 +1127,12 @@ export default function App() {
     enterGameWith(createTutorialGame());
   };
 
-  // 상단 바의 "새 게임" → 메인 메뉴로
+  // ESC 게임 메뉴의 "새 게임" → 타이틀의 난이도 선택으로
   const handleNewGame = () => {
     if (!window.confirm('메인 메뉴로 돌아갈까요? 저장하지 않은 진행은 사라집니다.')) return;
+    setGameMenuView(null);
+    setSlotDialogMode(null);
+    setMenuView('main');
     setScreen('menu');
   };
 
@@ -1085,10 +1166,17 @@ export default function App() {
           onStartTutorial={startTutorial}
           onContinue={() => setSlotDialogMode('load')}
           onOpenBattleSim={() => setMenuView('battleSim')}
-          soundOn={soundOn}
-          onToggleSound={handleToggleSound}
+          onOpenSettings={() => setTitleSettingsOpen(true)}
         />
         {slotDialog}
+        {titleSettingsOpen && (
+          <SettingsDialog
+            audio={uiPrefs.audio}
+            onChange={update => setUiPrefs(current => setAudioPrefs(current, update))}
+            onClose={() => setTitleSettingsOpen(false)}
+            backLabel="메인 메뉴로"
+          />
+        )}
       </>
     );
   }
@@ -1176,12 +1264,7 @@ export default function App() {
               state={stateRef.current}
               speed={speed}
               setSpeed={setSpeed}
-              onSave={() => setSlotDialogMode('save')}
-              onLoad={() => setSlotDialogMode('load')}
-              onNewGame={handleNewGame}
-              canLoad={canLoad}
-              soundOn={soundOn}
-              onToggleSound={handleToggleSound}
+              onOpenMenu={openGameMenu}
               uiPrefs={uiPrefs}
               onUiPrefsChange={setUiPrefs}
               onOpenCourt={() => openDockWindow('court')}
@@ -1212,6 +1295,7 @@ export default function App() {
                     state={runtimeState}
                     version={runtimeVersion}
                     animationActive={speed > 0 && !runtimeState.pendingChoice && !runtimeState.tacticalBattle && !runtimeState.tacticalBattleReport && !runtimeState.gameOver}
+                    zoom={uiPrefs.mapZoom}
                     placingType={placingType}
                     selected={selected}
                     selectedEntity={selectedEntity}
@@ -1222,6 +1306,7 @@ export default function App() {
                     onResidentClick={handleResidentClick}
                     onContextAction={handleContextAction}
                     onCancelPlace={() => setPlacingType(null)}
+                    onZoomChange={zoom => setUiPrefs(current => setMapZoom(current, zoom))}
                   />
                 );
               }}
@@ -1236,6 +1321,8 @@ export default function App() {
                 onClearSelection={handleClearSelection}
                 uiPrefs={uiPrefs}
                 onUiPrefsChange={setUiPrefs}
+                shortcutsEnabled={!gameMenuView && !slotDialogMode && !weaponDialogOpen && !expeditionMusterRequest &&
+                  !stateRef.current.pendingChoice && !stateRef.current.tacticalBattle && !stateRef.current.tacticalBattleReport}
               />
             )}
           </RuntimeVersionBoundary>
@@ -1246,7 +1333,8 @@ export default function App() {
               {
                 id: 'jobs',
                 label: '직업 배정',
-                icon: '人',
+                icon: <ManagementDockIcon id="jobs" />,
+                shortcut: 'Q',
                 content: (
                   <RuntimeVersionBoundary store={uiVersionStore}>
                     {() => (
@@ -1264,7 +1352,8 @@ export default function App() {
               {
                 id: 'processing',
                 label: '가공·비축',
-                icon: '⚙',
+                icon: <ManagementDockIcon id="processing" />,
+                shortcut: 'W',
                 content: (
                   <RuntimeVersionBoundary store={uiVersionStore}>
                     {() => <ProcessingPanel state={stateRef.current} onSetReserve={handleSetProcessingReserve} />}
@@ -1274,7 +1363,8 @@ export default function App() {
               {
                 id: 'residents',
                 label: '주민',
-                icon: '民',
+                icon: <ManagementDockIcon id="residents" />,
+                shortcut: 'E',
                 content: (
                   <RuntimeVersionBoundary store={uiVersionStore}>
                     {() => (
@@ -1294,7 +1384,8 @@ export default function App() {
               {
                 id: 'specialResidents',
                 label: '특수 주민',
-                icon: '★',
+                icon: <ManagementDockIcon id="specialResidents" />,
+                shortcut: 'R',
                 content: (
                   <RuntimeVersionBoundary store={uiVersionStore}>
                     {() => (
@@ -1312,8 +1403,9 @@ export default function App() {
               },
               {
                 id: 'factions',
-                label: '세력',
-                icon: '交',
+                label: '세력·거래',
+                icon: <ManagementDockIcon id="factions" />,
+                shortcut: 'T',
                 content: (
                   <RuntimeVersionBoundary store={uiVersionStore}>
                     {() => <FactionsWindow state={stateRef.current} onRequestTrade={handleRequestTrade} />}
@@ -1323,7 +1415,8 @@ export default function App() {
               {
                 id: 'court',
                 label: '조정',
-                icon: '廷',
+                icon: <ManagementDockIcon id="court" />,
+                shortcut: 'Y',
                 content: (
                   <RuntimeVersionBoundary store={uiVersionStore}>
                     {() => (
@@ -1341,7 +1434,8 @@ export default function App() {
               {
                 id: 'incidents',
                 label: '사건 · 기물함',
-                icon: '警',
+                icon: <ManagementDockIcon id="incidents" />,
+                shortcut: 'U',
                 content: (
                   <RuntimeVersionBoundary store={uiVersionStore}>
                     {() => (
@@ -1402,6 +1496,33 @@ export default function App() {
       ) : null}
 
       {slotDialog}
+
+      {gameMenuView === 'main' && (
+        <GameMenu
+          canLoad={canLoad}
+          onResume={closeGameMenu}
+          onSave={() => setSlotDialogMode('save')}
+          onLoad={() => setSlotDialogMode('load')}
+          onNewGame={handleNewGame}
+          onSettings={() => setGameMenuView('settings')}
+          onFeedback={() => setGameMenuView('feedback')}
+        />
+      )}
+      {gameMenuView === 'settings' && (
+        <SettingsDialog
+          audio={uiPrefs.audio}
+          onChange={update => setUiPrefs(current => setAudioPrefs(current, update))}
+          onClose={() => setGameMenuView('main')}
+        />
+      )}
+      {gameMenuView === 'feedback' && (
+        <FeedbackDialog
+          state={stateRef.current}
+          speed={menuRestoreSpeedRef.current}
+          zoom={uiPrefs.mapZoom}
+          onClose={() => setGameMenuView('main')}
+        />
+      )}
 
       {state.scenario && <TutorialCoach state={state} />}
 

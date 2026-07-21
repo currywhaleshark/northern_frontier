@@ -33,20 +33,14 @@ interface Props {
   state: GameState;
   speed: number;
   setSpeed: (s: number) => void;
-  onSave: () => void;
-  onLoad: () => void;
-  onNewGame: () => void;
-  canLoad: boolean;
-  soundOn: boolean;
-  onToggleSound: () => void;
+  onOpenMenu: () => void;
   onOpenCourt: () => void;
   uiPrefs: UiPrefs;
   onUiPrefsChange: (update: (current: UiPrefs) => UiPrefs) => void;
 }
 
 export function TopBar({
-  state, speed, setSpeed, onSave, onLoad, onNewGame, canLoad,
-  soundOn, onToggleSound, onOpenCourt, uiPrefs, onUiPrefsChange,
+  state, speed, setSpeed, onOpenMenu, onOpenCourt, uiPrefs, onUiPrefsChange,
 }: Props) {
   const living = livingResidents(state);
   const pop = living.length;
@@ -222,12 +216,9 @@ export function TopBar({
         </span>
           <TimeControls speed={speed} setSpeed={setSpeed} paused={state.pendingChoice != null || state.tacticalBattle != null || state.tacticalBattleReport != null || state.gameOver != null} />
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-          <button className="btn" onClick={onToggleSound} title={soundOn ? '소리 끄기' : '소리 켜기'}>
-            {soundOn ? '🔊' : '🔇'}
+          <button className="btn topbar-menu-button" onClick={onOpenMenu} title="게임 메뉴 (Esc)" aria-label="게임 메뉴 열기">
+            ☰ <kbd>Esc</kbd>
           </button>
-          <button className="btn" onClick={onSave}>저장</button>
-          <button className="btn" onClick={onLoad} disabled={!canLoad}>불러오기</button>
-          <button className="btn" onClick={onNewGame}>새 게임</button>
         </span>
       </div>
     </div>

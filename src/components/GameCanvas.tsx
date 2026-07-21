@@ -1,6 +1,6 @@
 // 지도 뷰 — 렌더링은 render/renderer.ts에 위임하고,
 // 여기서는 마우스 입력(클릭/호버 툴팁)과 캔버스 수명만 다룬다.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type WheelEvent as ReactWheelEvent } from 'react';
 import { CONFIG } from '../game/config';
 import { JOB_NAMES, RESOURCE_NAMES } from '../game/constants';
 import { buildingCostFor } from '../game/buildings';
@@ -12,6 +12,7 @@ import { foreignSiteAt } from '../game/foreignSites';
 import type { BuildingTypeId, GameState, SelectedEntity } from '../game/types';
 import { FactionName } from './FactionName';
 import { recordRuntimePerf, recordRuntimePerfSince, runtimePerfStartTime } from '../perf/runtimePerf';
+import { steppedMapZoom } from '../ui/mapZoom';
 
 const TILE = CONFIG.ui.tileSize;
 const CLICK_RADIUS = Math.round(TILE * 0.65); // 주민 클릭 판정 반경(픽셀)
@@ -22,6 +23,7 @@ interface Props {
   state: GameState;
   version: number;
   animationActive: boolean;
+  zoom: number;
   placingType: BuildingTypeId | null;
   selected: { x: number; y: number } | null;
   selectedEntity: SelectedEntity | null;
@@ -35,11 +37,12 @@ interface Props {
   onResidentClick: (id: number) => void;
   onContextAction: (x: number, y: number) => void;
   onCancelPlace: () => void;
+  onZoomChange: (zoom: number) => void;
 }
 
 export function GameCanvas({
-  state, version, animationActive, placingType, selected, selectedEntity, selectedResidentId, anim,
-  onTileClick, onPlacePlot, onResidentClick, onContextAction, onCancelPlace,
+  state, version, animationActive, zoom, placingType, selected, selectedEntity, selectedResidentId, anim,
+  onTileClick, onPlacePlot, onResidentClick, onContextAction, onCancelPlace, onZoomChange,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawRef = useRef<() => void>(() => undefined);
@@ -54,12 +57,41 @@ export function GameCanvas({
   const [mouse, setMouse] = useState<{ mx: number; my: number } | null>(null);
   const [panning, setPanning] = useState(false);
   // 드래그 패닝 상태 (리렌더 없이 추적)
-  const drag = useRef({ active: false, sx: 0, sy: 0, scrollL: 0, scrollT: 0, moved: false });
+  const drag = useRef({ active: false, button: 0, sx: 0, sy: 0, scrollL: 0, scrollT: 0, moved: false });
+  const zoomAnchorRef = useRef<{ worldX: number; worldY: number; boxX: number; boxY: number } | null>(null);
   // 경작지(밭/논) 배치 중 드래그 크기 지정 — 기준 칸(anchor)에서 현재 칸까지의 사각형
   const isPlotPlacing = placingType === 'field' || placingType === 'paddy';
   const [plotDrag, setPlotDrag] = useState<{ ax: number; ay: number; cx: number; cy: number } | null>(null);
 
   const scrollBox = () => canvasRef.current?.closest('.canvas-wrap') as HTMLElement | null;
+
+  const requestZoom = (nextZoom: number, clientX?: number, clientY?: number) => {
+    if (Math.abs(nextZoom - zoom) < 0.001) return;
+    const canvas = canvasRef.current;
+    const box = scrollBox();
+    if (!canvas || !box) return;
+    const boxRect = box.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    const anchorClientX = clientX ?? boxRect.left + box.clientWidth / 2;
+    const anchorClientY = clientY ?? boxRect.top + box.clientHeight / 2;
+    zoomAnchorRef.current = {
+      worldX: (anchorClientX - canvasRect.left) * (canvas.width / Math.max(1, canvasRect.width)),
+      worldY: (anchorClientY - canvasRect.top) * (canvas.height / Math.max(1, canvasRect.height)),
+      boxX: anchorClientX - boxRect.left,
+      boxY: anchorClientY - boxRect.top,
+    };
+    onZoomChange(nextZoom);
+  };
+
+  useLayoutEffect(() => {
+    const anchor = zoomAnchorRef.current;
+    const canvas = canvasRef.current;
+    const box = scrollBox();
+    if (!anchor || !canvas || !box) return;
+    zoomAnchorRef.current = null;
+    box.scrollLeft = canvas.offsetLeft + anchor.worldX * zoom - anchor.boxX;
+    box.scrollTop = canvas.offsetTop + anchor.worldY * zoom - anchor.boxY;
+  }, [zoom]);
 
   const requestCanvasRender = useCallback(() => {
     if (animationFrameRef.current !== null) return;
@@ -86,8 +118,8 @@ export function GameCanvas({
   const positionTooltip = useCallback((point: { mx: number; my: number } | null) => {
     const tooltip = tooltipRef.current;
     if (!tooltip || !point) return;
-    tooltip.style.transform = `translate3d(${point.mx + 14}px, ${point.my + 8}px, 0)`;
-  }, []);
+      tooltip.style.transform = `translate3d(${point.mx * zoom + 14}px, ${point.my * zoom + 8}px, 0)`;
+  }, [zoom]);
 
   const h = state.map.length, w = state.map[0]?.length ?? 0;
   const alpha = Math.max(0, Math.min(1, (performance.now() - anim.current.at) / anim.current.ms));
@@ -193,12 +225,12 @@ export function GameCanvas({
     if (!canvas || !box) return;
     const updateViewport = () => {
       viewportRef.current = sceneViewportFromScroll({
-        scrollLeft: box.scrollLeft,
-        scrollTop: box.scrollTop,
-        clientWidth: box.clientWidth,
-        clientHeight: box.clientHeight,
-        canvasLeft: canvas.offsetLeft,
-        canvasTop: canvas.offsetTop,
+        scrollLeft: box.scrollLeft / zoom,
+        scrollTop: box.scrollTop / zoom,
+        clientWidth: box.clientWidth / zoom,
+        clientHeight: box.clientHeight / zoom,
+        canvasLeft: canvas.offsetLeft / zoom,
+        canvasTop: canvas.offsetTop / zoom,
         canvasWidth: canvas.width,
         canvasHeight: canvas.height,
         tileSize: TILE,
@@ -214,7 +246,7 @@ export function GameCanvas({
       box.removeEventListener('scroll', updateViewport);
       resizeObserver.disconnect();
     };
-  }, [requestCanvasRender]);
+  }, [requestCanvasRender, zoom]);
 
   useEffect(() => {
     positionTooltip(pointerPositionRef.current);
@@ -222,7 +254,15 @@ export function GameCanvas({
 
   const toMouse = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect();
-    return { mx: e.clientX - rect.left, my: e.clientY - rect.top };
+    return {
+      mx: (e.clientX - rect.left) * (canvasRef.current!.width / Math.max(1, rect.width)),
+      my: (e.clientY - rect.top) * (canvasRef.current!.height / Math.max(1, rect.height)),
+    };
+  };
+
+  const handleWheel = (event: ReactWheelEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
+    requestZoom(steppedMapZoom(zoom, event.deltaY), event.clientX, event.clientY);
   };
 
   // 툴팁 대상: 주민 우선, 그다음 (발견된) 습격 무리
@@ -253,13 +293,14 @@ export function GameCanvas({
           : 'grab';
 
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
+    <div style={{ position: 'relative', display: 'inline-block', width: w * TILE * zoom, height: h * TILE * zoom }}>
       <canvas
         ref={canvasRef}
         width={w * TILE}
         height={h * TILE}
         data-version={version}
-        style={{ cursor: canvasCursor }}
+        style={{ cursor: canvasCursor, width: '100%', height: '100%' }}
+        onWheel={handleWheel}
         onPointerDown={e => {
           // 경작지 배치 중에는 좌클릭 드래그가 화면 이동이 아니라 크기 지정이다
           if (isPlotPlacing && e.button === 0) {
@@ -276,7 +317,7 @@ export function GameCanvas({
           const box = scrollBox();
           if (!box) return;
           drag.current = {
-            active: true, moved: false,
+            active: true, moved: false, button: e.button,
             sx: e.clientX, sy: e.clientY,
             scrollL: box.scrollLeft, scrollT: box.scrollTop,
           };
@@ -322,10 +363,13 @@ export function GameCanvas({
             onPlacePlot(rect.x, rect.y, rect.w, rect.h);
             return;
           }
+          const resetZoom = drag.current.button === 1 && !drag.current.moved;
           drag.current.active = false;
           setPanning(false);
           try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+          if (resetZoom) requestZoom(1);
         }}
+        onAuxClick={e => e.preventDefault()}
         onPointerLeave={() => {
           pointerPositionRef.current = null;
           hoverSemanticKeyRef.current = 'outside';

@@ -50,6 +50,7 @@ let noiseBuf: AudioBuffer | null = null;
 const battleSamples = new Map<BattleSampleName, AudioBuffer>();
 let battleSamplesPromise: Promise<void> | null = null;
 let muted = typeof localStorage !== 'undefined' && localStorage.getItem('buksae-muted') === '1';
+let volume = 0.7;
 
 // 바람 앰비언트 루프 상태
 let windGain: GainNode | null = null;
@@ -67,7 +68,7 @@ export function initAudio(): void {
   try {
     ctx = new AudioContext();
     master = ctx.createGain();
-    master.gain.value = muted ? 0 : MASTER_VOL;
+    master.gain.value = muted ? 0 : MASTER_VOL * volume;
     master.connect(ctx.destination);
     battleLimiter = ctx.createDynamicsCompressor();
     battleLimiter.threshold.value = -16;
@@ -243,7 +244,17 @@ export function setMuted(m: boolean): void {
   muted = m;
   try { localStorage.setItem('buksae-muted', m ? '1' : '0'); } catch { /* ignore */ }
   if (ctx && master) {
-    master.gain.linearRampToValueAtTime(m ? 0 : MASTER_VOL, ctx.currentTime + 0.1);
+    master.gain.linearRampToValueAtTime(m ? 0 : MASTER_VOL * volume, ctx.currentTime + 0.1);
+  }
+}
+
+export function setSfxSettings(settings: { enabled: boolean; volume: number }): void {
+  muted = !settings.enabled;
+  volume = Math.min(1, Math.max(0, Number.isFinite(settings.volume) ? settings.volume : 0.7));
+  try { localStorage.setItem('buksae-muted', muted ? '1' : '0'); } catch { /* ignore */ }
+  if (ctx && master) {
+    master.gain.cancelScheduledValues(ctx.currentTime);
+    master.gain.linearRampToValueAtTime(muted ? 0 : MASTER_VOL * volume, ctx.currentTime + 0.1);
   }
 }
 

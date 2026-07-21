@@ -6,10 +6,10 @@ interface Props {
 }
 
 const SPEEDS = [
-  { value: 0, label: '⏸ 정지' },
-  { value: 1, label: '▶ 1배' },
-  { value: 3, label: '▶▶ 3배' },
-  { value: 10, label: '▶▶▶ 10배' },
+  { value: 0, label: '⏸ 정지', shortcut: 'Space' },
+  { value: 1, label: '▶ 1배', shortcut: '1' },
+  { value: 3, label: '▶▶ 3배', shortcut: '2' },
+  { value: 10, label: '▶▶▶ 10배', shortcut: null },
 ];
 
 export function TimeControls({ speed, setSpeed, paused }: Props) {
@@ -20,9 +20,11 @@ export function TimeControls({ speed, setSpeed, paused }: Props) {
           key={s.value}
           className={`time-btn${speed === s.value ? ' active' : ''}`}
           data-tut={s.value === 1 ? 'time-play' : undefined}
+          title={s.shortcut ? `${s.label} (${s.shortcut})` : s.label}
           onClick={() => setSpeed(s.value)}
         >
           {s.label}
+          {s.shortcut && <kbd>{s.shortcut}</kbd>}
         </button>
       ))}
       {paused && <span className="muted small" style={{ alignSelf: 'center' }}>(이벤트 대기 중)</span>}

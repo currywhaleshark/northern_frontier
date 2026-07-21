@@ -16,10 +16,18 @@ const TILE = CONFIG.ui.tileSize;
 const MAP_SIZE = 188;
 const MAP_PADDING = 8;
 
+export function mapViewportScale(box: HTMLDivElement): number {
+  const canvas = box.querySelector('canvas[data-version]');
+  if (!(canvas instanceof HTMLCanvasElement) || canvas.width <= 0) return 1;
+  const scale = canvas.getBoundingClientRect().width / canvas.width;
+  return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
+
 export function centerViewportOnTile(box: HTMLDivElement, x: number, y: number): void {
+  const scale = mapViewportScale(box);
   box.scrollTo({
-    left: MAP_PADDING + (x + 0.5) * TILE - box.clientWidth / 2,
-    top: MAP_PADDING + (y + 0.5) * TILE - box.clientHeight / 2,
+    left: MAP_PADDING + (x + 0.5) * TILE * scale - box.clientWidth / 2,
+    top: MAP_PADDING + (y + 0.5) * TILE * scale - box.clientHeight / 2,
   });
 }
 
@@ -143,8 +151,9 @@ export function Minimap({ state, version, animationActive, viewportRef, selected
   const readViewport = useCallback(() => {
     const box = viewportRef.current;
     if (!box) return;
-    const worldWidth = mapWidth * TILE;
-    const worldHeight = mapHeight * TILE;
+    const scale = mapViewportScale(box);
+    const worldWidth = mapWidth * TILE * scale;
+    const worldHeight = mapHeight * TILE * scale;
     setViewport({
       left: Math.max(0, box.scrollLeft - MAP_PADDING) / worldWidth,
       top: Math.max(0, box.scrollTop - MAP_PADDING) / worldHeight,
@@ -313,9 +322,10 @@ export function Minimap({ state, version, animationActive, viewportRef, selected
     const rect = canvas.getBoundingClientRect();
     const nx = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     const ny = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+    const scale = mapViewportScale(box);
     box.scrollTo({
-      left: MAP_PADDING + nx * mapWidth * TILE - box.clientWidth / 2,
-      top: MAP_PADDING + ny * mapHeight * TILE - box.clientHeight / 2,
+      left: MAP_PADDING + nx * mapWidth * TILE * scale - box.clientWidth / 2,
+      top: MAP_PADDING + ny * mapHeight * TILE * scale - box.clientHeight / 2,
     });
   };
 
