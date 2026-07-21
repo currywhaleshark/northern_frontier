@@ -2,7 +2,7 @@
 // 원리: 각 소목표는 얕은 곳→깊은 곳 순서의 앵커 경로(data-tut)를 갖고,
 // 화면에 실제로 보이는 가장 깊은 앵커를 가리킨다. 창을 열고 닫아도 스스로 따라가고,
 // 앵커가 사라진 UI 개편에도 조용히 물러날 뿐 게임을 막지 않는다.
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { currentScenarioStep } from '../game/scenario';
 import { countJob } from '../game/residents';
 import { isWallBuilding } from '../game/walls';
@@ -108,6 +108,22 @@ function visibleAnchor(tut: string): HTMLElement | null {
   return rect.width > 0 && rect.height > 0 ? el : null;
 }
 
+const COACH_BUBBLE_WIDTH = 280;
+const COACH_VIEWPORT_MARGIN = 10;
+const COACH_ARROW_INSET = 10;
+
+export function coachHorizontalPlacement(targetCenterX: number, viewportWidth: number) {
+  const bubbleWidth = Math.max(1, Math.min(COACH_BUBBLE_WIDTH, viewportWidth - COACH_VIEWPORT_MARGIN * 2));
+  const halfWidth = bubbleWidth / 2;
+  const centerX = Math.min(
+    viewportWidth - COACH_VIEWPORT_MARGIN - halfWidth,
+    Math.max(COACH_VIEWPORT_MARGIN + halfWidth, targetCenterX),
+  );
+  const maxArrowOffset = Math.max(0, halfWidth - COACH_ARROW_INSET);
+  const arrowOffset = Math.min(maxArrowOffset, Math.max(-maxArrowOffset, targetCenterX - centerX));
+  return { centerX, arrowOffset };
+}
+
 export function TutorialCoach({ state }: { state: GameState }) {
   // 앵커 위치는 DOM에서 읽으므로 주기적으로 다시 잰다 (창 열림/스크롤/리사이즈 추적)
   const [, setTick] = useState(0);
@@ -130,7 +146,14 @@ export function TutorialCoach({ state }: { state: GameState }) {
 
   const rect = target.el.getBoundingClientRect();
   const above = rect.top > 110;
-  const centerX = Math.min(window.innerWidth - 150, Math.max(150, rect.left + rect.width / 2));
+  const { centerX, arrowOffset } = coachHorizontalPlacement(rect.left + rect.width / 2, window.innerWidth);
+  const bubbleStyle: CSSProperties & { '--coach-arrow-offset': string } = {
+    left: centerX,
+    '--coach-arrow-offset': `${arrowOffset}px`,
+    ...(above
+      ? { bottom: window.innerHeight - rect.top + 10 }
+      : { top: rect.bottom + 10 }),
+  };
   return (
     <>
       <div
@@ -145,12 +168,7 @@ export function TutorialCoach({ state }: { state: GameState }) {
       <div
         className={`tutorial-coach-bubble ${above ? 'above' : 'below'}`}
         role="status"
-        style={{
-          left: centerX,
-          ...(above
-            ? { bottom: window.innerHeight - rect.top + 10 }
-            : { top: rect.bottom + 10 }),
-        }}
+        style={bubbleStyle}
       >
         <span className="tutorial-coach-label">길잡이</span>
         {target.text}

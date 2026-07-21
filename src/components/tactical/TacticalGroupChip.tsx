@@ -19,7 +19,7 @@ interface Props {
   gender: 'male' | 'female';
   active: number;
   zoneName: string;
-  mode: 'deployment' | 'command';
+  mode: 'preparation' | 'deployment' | 'command';
   selected: boolean;
   pending: boolean;
   /** P7 — 이번 라운드에 우회로 출구로 후열 급습에 도달한 부대 */

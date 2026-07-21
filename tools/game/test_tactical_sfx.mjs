@@ -28,6 +28,7 @@ const samples = {
   muster: 'public/assets/audio/battle/muster.mp3',
   melee1: 'public/assets/audio/battle/melee-1.mp3',
   melee2: 'public/assets/audio/battle/melee-2.mp3',
+  nightAmbushAlarm: 'public/assets/audio/battle/night-ambush-alarm.mp3',
 };
 for (const [name, relativePath] of Object.entries(samples)) {
   const path = `${root}${relativePath}`;
@@ -41,6 +42,14 @@ assert.match(sfxSource, /export function playWeaponSalvo/,
   'mixed weapon fire needs one shared salvo scheduler');
 assert.match(sfxSource, /export function playMeleeClash/,
   'melee needs a participant-aware sample scheduler');
+assert.match(sfxSource, /export function setNightAmbushAlarm/,
+  'night ambush needs a stoppable looping alarm');
+assert.match(sfxSource, /setInterval\(playNightAmbushAlarmStrike, 650\)/,
+  'the alarm must overlap individual strikes instead of repeating the sample silence');
+assert.match(screenSource, /<strong>야습!!<\/strong>/,
+  'night ambush must warn the player before the original forced-deployment message');
+assert.match(screenSource, /battle\.phase !== 'preparationExecution' \|\| nightAmbushIntro/,
+  'the original preparation playback must wait for the night ambush warning');
 assert.match(sfxSource, /arrow:\s*\d+[,\s]*musket:\s*\d+[,\s]*cannon:\s*\d+/,
   'each weapon needs a short, explicit shot stagger');
 assert.match(sfxSource, /for \(let index = 0; index < shotCount; index\+\+\)/,
@@ -172,7 +181,8 @@ try {
     if (name !== 'musket') assert.equal(fetchCounts.get(path), 1, `${name} must not be downloaded again`);
   }
   await sfx.ensureBattleSamples();
-  assert.equal([...fetchCounts.values()].reduce((sum, count) => sum + count, 0), 10,
+  assert.equal([...fetchCounts.values()].reduce((sum, count) => sum + count, 0),
+    Object.keys(sfx.BATTLE_SAMPLE_PATHS).length + 1,
     'once every sample is loaded, later initialization performs no downloads');
 } finally {
   console.warn = originalWarn;

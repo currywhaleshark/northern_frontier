@@ -10,6 +10,18 @@ const ICON_PATHS: Record<DockWindowId, string> = {
   incidents: '/assets/ui/dock-incidents-v1.png',
 };
 
-export function ManagementDockIcon({ id }: { id: DockWindowId }) {
-  return <img className="management-dock-icon" src={ICON_PATHS[id]} alt="" draggable={false} />;
+interface Props {
+  id: DockWindowId;
+  notification?: string;
+}
+
+export function ManagementDockIcon({ id, notification }: Props) {
+  return (
+    <span className={`management-dock-icon-wrap${notification ? ' has-notification' : ''}`}>
+      <img className="management-dock-icon" src={ICON_PATHS[id]} alt="" draggable={false} />
+      {notification && (
+        <span className="dock-notification" role="status" aria-live="polite">{notification}</span>
+      )}
+    </span>
+  );
 }

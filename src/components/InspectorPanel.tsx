@@ -118,7 +118,7 @@ export function InspectorPanel({ state, onOrganizeHunt, onScoutPredator }: Props
             <span className="special-item-icon" aria-hidden="true">{def.icon}</span>
             <div>
               <strong>{def.name}</strong>
-              <span className="muted small">{def.tradeValue > 0 ? `교역 가치 ${def.tradeValue}` : '보유 중 습격 조기발견 보너스'}</span>
+              <span className="muted small">{def.inventoryNote}</span>
             </div>
             <b>{state.specialItems[item]}</b>
           </div>

@@ -35,6 +35,7 @@ export function tacticalBackgroundAsset(
   assaultKind?: OffensiveBackgroundKind,
   zoneOrder = 0,
   zoneId?: string,
+  night = false,
 ): TacticalBackgroundAsset {
   const huntSectorFamily = assaultKind === 'predatorHunt' && zoneId
     ? HUNT_SECTOR_BACKGROUND_FAMILY[zoneId]
@@ -54,5 +55,7 @@ export function tacticalBackgroundAsset(
     };
   }
   const backgroundKind = BACKGROUND_KIND_BY_ZONE[kind];
-  return { src: `/assets/tactical/${backgroundKind}-${season}-v1.webp` };
+  return {
+    src: `/assets/tactical/${backgroundKind}${night ? '-night' : ''}-${season}-v1.webp`,
+  };
 }

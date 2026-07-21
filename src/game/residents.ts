@@ -261,7 +261,24 @@ export function reconcileResidentHomes(state: GameState, rng: () => number): voi
 }
 
 export function countJob(state: GameState, job: JobId): number {
-  return state.residents.filter(r => r.alive && r.job === job && canResidentTakeJob(r, job)).length;
+  return jobWorkforceCounts(state, job).total;
+}
+
+export interface JobWorkforceCounts {
+  adult: number;
+  youth: number;
+  total: number;
+}
+
+export function jobWorkforceCounts(state: GameState, job: JobId): JobWorkforceCounts {
+  let adult = 0;
+  let youth = 0;
+  for (const resident of state.residents) {
+    if (!resident.alive || resident.job !== job || !canResidentTakeJob(resident, job)) continue;
+    if (resident.stage === 'youth') youth++;
+    else if (!resident.stage) adult++;
+  }
+  return { adult, youth, total: adult + youth };
 }
 
 export function skillOf(r: Resident): number {

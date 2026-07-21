@@ -12,6 +12,7 @@ import {
   plotPlowOxenMax, plowOxenAssigned, plowOxenOf, plowOxenPool,
 } from '../game/livestock';
 import { getBuildingActions } from '../game/selectionActions';
+import { centerPromotionUpgradeReason, nextRank } from '../game/promotion';
 import {
   assignedSlotResidents, availableWorkerSlots, isResidentAvailableForWorkerSlot, workerSlotConfig, workerSlotCount,
 } from '../game/workerSlots';
@@ -25,6 +26,7 @@ interface Props {
   buildingId: number;
   embedded?: boolean;
   onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
+  onUpgradeCenter: (buildingId: number) => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
   onSetDryingProduct: (buildingId: number, product: DryingProductId) => void;
   onSetLivestockSpecies: (buildingId: number, species: LivestockId) => void;
@@ -54,6 +56,7 @@ export function ActionPopup({
   buildingId,
   embedded = false,
   onUpgradeHousing,
+  onUpgradeCenter,
   onSetSmithyProduct,
   onSetDryingProduct,
   onSetLivestockSpecies,
@@ -73,7 +76,9 @@ export function ActionPopup({
   if (!building) return null;
   const actions = getBuildingActions(state, building);
   const slotConfig = building.built ? workerSlotConfig(building.type) : null;
-  if (actions.length === 0 && !slotConfig) return null;
+  const centerTarget = building.type === 'center' ? nextRank(state.rank) : null;
+  const centerReason = centerTarget ? centerPromotionUpgradeReason(state, building.id) : null;
+  if (actions.length === 0 && !slotConfig && !centerTarget) return null;
 
   const def = BUILDING_DEFS[building.type];
   const footprint = footprintTilesOf(state, building) ?? [];
@@ -100,6 +105,28 @@ export function ActionPopup({
         <div className="action-popup-head">
           <span>{def.emoji} {def.name}</span>
           <button className="icon-btn" type="button" onClick={onClose} aria-label="닫기">x</button>
+        </div>
+      )}
+
+      {centerTarget && (
+        <div className="worker-slot-panel center-promotion-panel">
+          <div className="worker-slot-summary">
+            <span>{RANK_NAMES[centerTarget]} 승격</span>
+            <span className="muted small">교지 확인</span>
+          </div>
+          <p className="muted small">
+            교지를 받은 뒤 중심지를 업그레이드하면 승격합니다. 교지는 기물함에 영구 보관됩니다.
+          </p>
+          <button
+            className="btn"
+            type="button"
+            disabled={centerReason != null}
+            title={centerReason ?? `${RANK_NAMES[centerTarget]}로 승격합니다`}
+            onClick={() => onUpgradeCenter(building.id)}
+          >
+            중심지 업그레이드
+          </button>
+          {centerReason && <div className="muted small">{centerReason}</div>}
         </div>
       )}
 

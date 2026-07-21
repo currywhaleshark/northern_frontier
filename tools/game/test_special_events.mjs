@@ -132,7 +132,10 @@ const tribute = await import(pathToFileURL(join(compiledDir, 'courtTribute.mjs')
   delete state.tributeWaivers;
   specialEvents.ensureIncidentState(state);
   assert.ok(state.incidents.scheduledDays.length >= 1);
-  assert.deepEqual(state.specialItems, { wildGinseng: 0, tigerPelt: 0, gyrfalcon: 0 });
+  assert.deepEqual(state.specialItems, {
+    wildGinseng: 0, tigerPelt: 0, gyrfalcon: 0,
+    boDecree: 0, jinDecree: 0, buDecree: 0,
+  });
   assert.deepEqual(state.discoveredSpecialItems, []);
   assert.equal(state.tributeWaivers, 0);
 }

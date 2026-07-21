@@ -16,7 +16,7 @@ import {
   setTacticalGroupFacing,
   tacticalFacingPreview, tacticalFacingUnavailableReason,
   tacticalFlankRoutePreparationView, tacticalFlankRouteView,
-  tacticalRoutePlacementUnavailableReason,
+  tacticalRouteOrderUnavailableReason, tacticalRoutePlacementUnavailableReason,
   tacticalStageOrderPreview, tacticalStageOrderUnavailableReason, tacticalSupportedCommands,
   toggleTacticalFlankRoutePreparation,
   type TacticalFacingPreview, type TacticalStageOrderPreview,
@@ -36,7 +36,10 @@ import type {
   TacticalFacing,
   TacticalFormationLine,
 } from '../game/types';
-import { playMeleeClash, playSfx, playWeaponSalvo, playWeaponVolley, setBattleDrums, type SfxName } from '../sound/sfx';
+import {
+  playMeleeClash, playSfx, playWeaponSalvo, playWeaponVolley, setBattleDrums,
+  setNightAmbushAlarm, type SfxName,
+} from '../sound/sfx';
 import { StageDragSpike } from './tactical/StageDragSpike';
 import {
   DEPLOY_DOCK_ANCHOR_ID, TacticalDeploymentDock, parseDeployAnchorId,
@@ -90,7 +93,7 @@ const PREP_DESCRIPTIONS: Record<PreparationActionId, string> = {
   torchWatch: '접근로를 밝혀 야간 접근의 첫 교전 기세와 사격 교란을 줄입니다.',
   preliminaryBombardment: '보유한 불랑기포대로 접전 전에 포격합니다. 포대 1문당 화약 2를 소모합니다.',
   musterMilitia: '피난 주민 일부를 민병으로 소집합니다. 마을 기세가 조금 낮아집니다.',
-  openFlankRoute: '준비점수 2를 쓰고 좌·우 중 한 우회로를 열어 경로 징후와 이동을 확인합니다.',
+  openFlankRoute: '경로를 열면 배치 단계에서 아군을 차단대로 보낼 수 있고, 교전 지휘에서 그 차단대에 우회 기동을 명령할 수 있습니다.',
   nightAssault: '밤이 깊기를 기다려 숲길 초기 돌파와 기습 효과를 얻습니다.',
   prepareFireArrows: '목책·움막에 화공 명령을 쓸 수 있게 하지만 노획물이 불탈 수 있습니다.',
   blockLeaderEscape: '사냥꾼 일부를 본대에서 빼 두목의 산길 퇴로에 미리 매복시킵니다.',
@@ -175,7 +178,7 @@ function UnitDock({ state, battle, hunt, mode, selectedGroupId, onSelect }: {
   state: GameState;
   battle: NonNullable<GameState['tacticalBattle']>;
   hunt: boolean;
-  mode: 'deployment' | 'command';
+  mode: 'preparation' | 'deployment' | 'command';
   selectedGroupId: string | null;
   onSelect: (groupId: string) => void;
 }) {
@@ -277,6 +280,9 @@ export function TacticalBattleScreen({
   const [commandPopover, setCommandPopover] = useState<CommandPopoverState | null>(null);
   const [commandBoardEmphasis, setCommandBoardEmphasis] = useState(false);
   const [nextPendingGroupId, setNextPendingGroupId] = useState<string | null>(null);
+  const [nightAmbushIntroDoneId, setNightAmbushIntroDoneId] = useState<number | null>(null);
+  // 적 정보 상세는 헤더 칩으로 여닫는다 — 하단바 스크롤을 강제하지 않기 위해 기본은 접힘
+  const [enemyIntelOpen, setEnemyIntelOpen] = useState(false);
   // P3 배치 카드 드래그 상태 — 무대 레인 앵커 하이라이트·고스트 전용, 저장하지 않는다
   const [deployDrag, setDeployDrag] = useState<DeploymentDragSnapshot | null>(null);
   // <이름>의 조 분리 — 동행 주민 선택 중인 카드
@@ -298,6 +304,8 @@ export function TacticalBattleScreen({
   const preparationPlayback = battle?.phase === 'preparationExecution';
   const combatPlayback = battle?.phase === 'simulating';
   const playbackActive = preparationPlayback || combatPlayback;
+  const nightAmbushIntro = battle?.phase === 'preparationExecution' &&
+    battle.deploymentForced === 'nightAmbush' && nightAmbushIntroDoneId !== battle.id;
   const activeEvent = preparationPlayback
     ? battle.preparationEvents[eventIndex] ?? null
     : combatPlayback ? battle.pendingReport?.events[eventIndex] ?? null : null;
@@ -405,6 +413,10 @@ export function TacticalBattleScreen({
   }, [battle?.phase, viewedZoneId]);
 
   useEffect(() => {
+    setEnemyIntelOpen(false);
+  }, [battle?.phase, battle?.id]);
+
+  useEffect(() => {
     const viewport = viewportRef.current;
     const close = () => setCommandPopover(null);
     window.addEventListener('resize', close);
@@ -421,7 +433,23 @@ export function TacticalBattleScreen({
   }, [battle?.id]);
 
   useEffect(() => {
-    if (!battle || battle.phase !== 'preparationExecution') return;
+    if (!battle || !nightAmbushIntro) {
+      setNightAmbushAlarm(false);
+      return;
+    }
+    setNightAmbushAlarm(true);
+    const timer = window.setTimeout(() => {
+      setNightAmbushAlarm(false);
+      setNightAmbushIntroDoneId(battle.id);
+    }, 4200);
+    return () => {
+      window.clearTimeout(timer);
+      setNightAmbushAlarm(false);
+    };
+  }, [battle?.id, nightAmbushIntro]);
+
+  useEffect(() => {
+    if (!battle || battle.phase !== 'preparationExecution' || nightAmbushIntro) return;
     let cancelled = false;
     let timer = 0;
     const events = battle.preparationEvents;
@@ -446,7 +474,7 @@ export function TacticalBattleScreen({
     };
     // Phase and battle id uniquely identify a preparation playback.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [battle?.id, battle?.phase]);
+  }, [battle?.id, battle?.phase, nightAmbushIntro]);
 
   useEffect(() => {
     if (!battle || battle.phase !== 'simulating' || !battle.pendingReport) return;
@@ -604,6 +632,8 @@ export function TacticalBattleScreen({
   // P6 우회로 — 표시 상태·step·도착 범위는 백엔드 selector가 단일 소스다
   const flankRouteViews = battle.flankRoutes?.length ? tacticalFlankRouteView(battle) : [];
   const flankRouteOptions = battle.phase === 'preparation' ? tacticalFlankRoutePreparationView(state) : [];
+  const defenderOpenedRoutes = flankRouteViews.filter(view => view.route.openedByDefender);
+  const routeBlockers = battle.defenderGroups.filter(group => group.routeTransit?.purpose === 'block');
   const runDeploymentAction = (action: (current: GameState) => string | null): string | null => {
     const error = onDeploymentAction(action);
     if (error) showDeployNotice(error);
@@ -837,6 +867,16 @@ export function TacticalBattleScreen({
     : undefined;
   // 적 계획 요약은 백엔드 selector가 단일 소스다 — 프론트에서 공개 여부를 재판정하지 않는다.
   const enemyPlanSummary = battle.enemyPlan ? enemyPlanSummaryView(battle) : null;
+  const raidIntel = !assault && !hunt && battle.enemyPlan && enemyPlanSummary ? enemyPlanSummary : null;
+  const lairIntelPlan = lairAssault ? battle.lairDefensePlan ?? null : null;
+  const enemyIntelSummaryText = raidIntel
+    ? `목적 ${raidIntel.objective.label} · 교리 ${raidIntel.doctrine.label}${
+      raidIntel.hiddenStratagemCount > 0 ? ` · 미확인 계책 ${raidIntel.hiddenStratagemCount}` : ''}`
+    : lairIntelPlan
+      ? lairIntelPlan.doctrineRevealed
+        ? `산채 교리 ${banditLairDoctrineDefinition(lairIntelPlan.doctrine).label} · 계책점수 ${lairIntelPlan.stratagemPoints}`
+        : '산채 교리 미확인'
+      : null;
   const hintCommand = hoveredCommand ?? selectedGroup?.command ?? null;
   const commandHint = selectedGroup && hintCommand
     ? `${commandLabel(hintCommand, selectedGroup, hunt)} — ${tacticalCommandUnavailableReason(battle, selectedGroup, hintCommand) ?? commandDescription(hintCommand, selectedGroup, hunt)}`
@@ -915,11 +955,25 @@ export function TacticalBattleScreen({
 
   return (
     <div className="tactical-overlay" role="dialog" aria-modal="true" aria-label={`${displayedFactionName} ${hunt ? '사냥' : assault ? '토벌' : '습격'} 직접 지휘`}>
-      <div className={`tactical-screen${assault ? ' assault' : ' defense'}${hunt ? ' hunt' : ''}${fast ? ' fast-playback' : ''}${activeEvent?.kind === 'wallAssault' || activeEvent?.kind === 'wallHit' || activeEvent?.kind === 'bombardment' || activeEvent?.kind === 'zoneFall' || activeEvent?.kind === 'artilleryHit' || activeEvent?.kind === 'beastAmbush' ? ' shaking' : ''}`}>
+      <div className={`tactical-screen${assault ? ' assault' : ' defense'}${hunt ? ' hunt' : ''}${battle.deploymentForced === 'nightAmbush' ? ' night-battle' : ''}${nightAmbushIntro ? ' night-ambush-intro' : ''}${fast ? ' fast-playback' : ''}${activeEvent?.kind === 'wallAssault' || activeEvent?.kind === 'wallHit' || activeEvent?.kind === 'bombardment' || activeEvent?.kind === 'zoneFall' || activeEvent?.kind === 'artilleryHit' || activeEvent?.kind === 'beastAmbush' ? ' shaking' : ''}`}>
         <header className="tactical-header">
-          <div>
-            <div className="tactical-kicker">{hunt ? '맹수 몰이사냥 지휘' : assault ? '산채 토벌 지휘' : '습격 방어 지휘'}</div>
-            <h1>{displayedFactionName}</h1>
+          <div className="tactical-header-title">
+            <div>
+              <div className="tactical-kicker">{hunt ? '맹수 몰이사냥 지휘' : assault ? '산채 토벌 지휘' : '습격 방어 지휘'}</div>
+              <h1>{displayedFactionName}</h1>
+            </div>
+            {enemyIntelSummaryText && (
+              <button
+                type="button"
+                className={`tactical-enemy-intel-toggle${enemyIntelOpen ? ' open' : ''}`}
+                aria-expanded={enemyIntelOpen}
+                title={enemyIntelOpen ? '적 정보 상세를 접습니다.' : '적 정보 상세를 펼칩니다.'}
+                onClick={() => setEnemyIntelOpen(open => !open)}
+              >
+                <span>{enemyIntelSummaryText}</span>
+                <i aria-hidden="true">{enemyIntelOpen ? '▲' : '▼'}</i>
+              </button>
+            )}
           </div>
           <div className="tactical-status-row">
             <div><span>교전</span><strong>{Math.min(roundLabel, roundLimit)} / {roundLimit}</strong></div>
@@ -945,6 +999,31 @@ export function TacticalBattleScreen({
               : assault ? (battle.warned ? '정찰 완료' : '정보 부족') : battle.warned ? '경보됨' : '기습'}</strong></div>
             <div><span>날씨</span><strong>{WEATHER_ICONS[state.weather]} {WEATHER_NAMES[state.weather]}</strong></div>
           </div>
+          {enemyIntelOpen && (raidIntel || lairIntelPlan) && (
+            <div className="tactical-enemy-intel-dropdown" role="region" aria-label="적 정보 상세">
+              {raidIntel && battle.enemyPlan ? (
+                <EnemyPlanPanel
+                  plan={battle.enemyPlan}
+                  summary={raidIntel}
+                  effectiveCounterStrengths={effectiveCounterStrengths}
+                  effectiveRearCounterZoneName={effectiveRearCounterZoneName}
+                  routeViews={flankRouteViews}
+                />
+              ) : lairIntelPlan && (
+                <aside className="tactical-enemy-plan tactical-lair-intel" aria-label="산채 방어 정보">
+                  <div className="tactical-enemy-plan-heading">
+                    <strong>{lairIntelPlan.doctrineRevealed
+                      ? `산채 교리: ${banditLairDoctrineDefinition(lairIntelPlan.doctrine).label}`
+                      : '산채 교리: 미확인'}</strong>
+                    {lairIntelPlan.doctrineRevealed &&
+                      <span>계책점수 {lairIntelPlan.stratagemPoints}</span>}
+                  </div>
+                  {!lairIntelPlan.doctrineRevealed &&
+                    <span className="muted small">이전 정찰 정보가 오래되었습니다.</span>}
+                </aside>
+              )}
+            </div>
+          )}
         </header>
 
         <div className="tactical-stage-shell" ref={stageShellRef} onClick={() => {
@@ -1054,6 +1133,15 @@ export function TacticalBattleScreen({
             </div>
           )}
           {state.weather === 'blizzard' && <div className="tactical-visibility-veil" aria-hidden="true" />}
+          {nightAmbushIntro && (
+            <div className="tactical-night-ambush-alert" role="alert" aria-live="assertive">
+              <div>
+                <span>긴급 경보</span>
+                <strong>야습!!</strong>
+                <p>적이 어둠을 타고 들이닥쳤습니다. 병력이 기존 방어 진형으로 급히 집결합니다.</p>
+              </div>
+            </div>
+          )}
           {(activeEvent?.kind === 'wallHit' || activeEvent?.kind === 'bombardment' || activeEvent?.kind === 'zoneFall' || activeEvent?.kind === 'rearAssault' || activeEvent?.kind === 'leaderEscape' || activeEvent?.kind === 'escapeBlocked' || activeEvent?.kind === 'fire') && (
             <div
               className={`tactical-vignette${activeEvent.kind === 'bombardment' ? ' bombardment' : ''}${activeEvent.kind === 'rearAssault' ? ' rear-assault' : ''}${activeEvent.kind === 'fire' ? ' arson' : ''}${activeEvent.kind === 'leaderEscape' ? ' leader-escape' : ''}${activeEvent.kind === 'escapeBlocked' ? ' escape-blocked' : ''}`}
@@ -1134,46 +1222,25 @@ export function TacticalBattleScreen({
         </div>
 
         <div className="tactical-controls">
-          {battle.enemyPlan && enemyPlanSummary && !assault && !hunt && battle.phase === 'command' && (
-            <EnemyPlanPanel
-              plan={battle.enemyPlan}
-              summary={enemyPlanSummary}
-              effectiveCounterStrengths={effectiveCounterStrengths}
-              effectiveRearCounterZoneName={effectiveRearCounterZoneName}
-              routeViews={flankRouteViews}
-            />
-          )}
-          {assault && !hunt && battle.lairDefensePlan &&
-            (battle.phase === 'preparation' || battle.phase === 'deployment' || battle.phase === 'command') && (
-            <aside className="tactical-enemy-plan tactical-lair-intel" aria-label="산채 방어 정보">
-              <div className="tactical-enemy-plan-heading">
-                <strong>{battle.lairDefensePlan.doctrineRevealed
-                  ? `산채 교리: ${banditLairDoctrineDefinition(battle.lairDefensePlan.doctrine).label}`
-                  : '산채 교리: 미확인'}</strong>
-                {battle.lairDefensePlan.doctrineRevealed &&
-                  <span>계책점수 {battle.lairDefensePlan.stratagemPoints}</span>}
-              </div>
-              {!battle.lairDefensePlan.doctrineRevealed &&
-                <span className="muted small">이전 정찰 정보가 오래되었습니다.</span>}
-            </aside>
-          )}
           {battle.phase === 'preparation' && (
             <>
-              {battle.enemyPlan && enemyPlanSummary && !assault && !hunt && (
-                <EnemyPlanPanel
-                  plan={battle.enemyPlan}
-                  summary={enemyPlanSummary}
-                  effectiveCounterStrengths={effectiveCounterStrengths}
-                  effectiveRearCounterZoneName={effectiveRearCounterZoneName}
-                  routeViews={flankRouteViews}
-                />
-              )}
               <div className="tactical-panel-heading">
                 <div>
                   <strong>준비태세 선택</strong>
                   <span>남은 준비점수 {battle.prepPoints} · 선택한 태세는 실행 전까지 취소할 수 있습니다.</span>
                 </div>
                 <button className="btn primary" onClick={onAdvancePhase}>선택한 준비 실행</button>
+              </div>
+              <div className="tactical-preparation-roster">
+                <strong>참전 아군</strong>
+                <UnitDock
+                  state={state}
+                  battle={battle}
+                  hunt={hunt}
+                  mode="preparation"
+                  selectedGroupId={selectedGroupId}
+                  onSelect={selectGroup}
+                />
               </div>
               <div className="tactical-action-grid">
                 {battle.prepActions
@@ -1185,16 +1252,20 @@ export function TacticalBattleScreen({
                       battle.prepPoints < action.cost || unavailableReason != null
                     ));
                     const counterLabels = enemyPlanCounterLabelsForAction(battle.enemyPlan, action.id);
+                    const detailId = `tactical-prep-${action.id}-detail`;
                     if (action.id === 'openFlankRoute') {
                       // 좌·우 경로별 개방 토글 — 점수 소비·환불·공개 전환은 전부 백엔드 toggle이 처리한다
                       return (
                         <div
                           key={action.id}
                           className={`tactical-action tactical-flank-route-action${action.selected ? ' selected' : ''}`}
+                          title={PREP_DESCRIPTIONS.openFlankRoute}
                         >
                           <span>{action.cost}점/경로</span>
                           <strong>{action.label}</strong>
-                          <small>{PREP_DESCRIPTIONS.openFlankRoute}</small>
+                          <div className="tactical-action-detail" id={detailId} role="tooltip">
+                            <small>{PREP_DESCRIPTIONS.openFlankRoute}</small>
+                          </div>
                           <div className="tactical-flank-route-sides" role="group" aria-label="열 우회로 방향 선택">
                             {flankRouteOptions.map(option => (
                               <button
@@ -1202,6 +1273,7 @@ export function TacticalBattleScreen({
                                 key={option.side}
                                 className={option.selected ? 'active' : ''}
                                 disabled={!option.selected && option.unavailableReason != null}
+                                aria-describedby={detailId}
                                 title={option.unavailableReason ?? (option.selected
                                   ? `개방 취소 — ${option.cost}점을 돌려받습니다.`
                                   : `${withJosa(option.label, '을/를')} ${option.cost}점으로 엽니다. 연 경로는 즉시 공개됩니다.`)}
@@ -1218,12 +1290,16 @@ export function TacticalBattleScreen({
                         key={action.id}
                         className={`tactical-action${action.selected ? ' selected' : ''}${action.applied ? ' applied' : ''}${counterLabels.length > 0 ? ' counters-plan' : ''}`}
                         disabled={disabled}
+                        title={unavailableReason ?? PREP_DESCRIPTIONS[action.id]}
+                        aria-describedby={detailId}
                         onClick={() => onSpendPreparation(action.id)}
                       >
                         <span>{action.applied ? '완료' : action.selected ? '취소' : `${action.cost}점`}</span>
                         <strong>{action.label}</strong>
-                        <small>{unavailableReason ?? PREP_DESCRIPTIONS[action.id]}</small>
-                        {counterLabels.length > 0 && <em>대응: {counterLabels.join(' · ')}</em>}
+                        <div className="tactical-action-detail" id={detailId} role="tooltip">
+                          <small>{unavailableReason ?? PREP_DESCRIPTIONS[action.id]}</small>
+                          {counterLabels.length > 0 && <em>대응: {counterLabels.join(' · ')}</em>}
+                        </div>
                       </button>
                     );
                   })}
@@ -1277,6 +1353,41 @@ export function TacticalBattleScreen({
                 onAction={runDeploymentAction}
                 onDragChange={handleDeployDragChange}
               />
+              {defenderOpenedRoutes.length > 0 && (
+                <div className="tactical-route-order-panel deployment" role="group" aria-label="우회로 차단 배치">
+                  <div>
+                    <strong>우회로 차단 배치</strong>
+                    <span>먼저 일반 전장에 배치한 부대를 선택하고 우회로 버튼을 누르십시오. 카드 드래그도 그대로 사용할 수 있습니다.</span>
+                  </div>
+                  <div className="tactical-route-order-actions">
+                    {defenderOpenedRoutes.map(view => {
+                      const active = selectedGroup.routeTransit?.purpose === 'block' &&
+                        selectedGroup.routeTransit.routeId === view.route.id;
+                      const unavailableReason = active
+                        ? null
+                        : tacticalRoutePlacementUnavailableReason(battle, selectedGroup.id, view.route.side);
+                      return (
+                        <button
+                          type="button"
+                          key={view.route.id}
+                          className={active ? 'active' : ''}
+                          disabled={active || unavailableReason != null}
+                          title={active
+                            ? `${view.route.label}에 차단 배치되어 있습니다.`
+                            : unavailableReason ?? `${view.route.label} 중간에 차단대로 배치합니다.`}
+                          onClick={() => {
+                            const error = runDeploymentAction(current =>
+                              placeTacticalRouteBlocker(current, selectedGroup.id, view.route.side));
+                            if (error) return;
+                            playSfx('hammer');
+                            showDeployNotice(`${selectedGroup.label} — ${view.route.label} 차단 배치 완료.`, 'ok');
+                          }}
+                        >{view.route.side === 'left' ? '좌측' : '우측'} · {view.route.label}{active ? ' 배치됨' : ' 차단배치'}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {deployNotice && (
                 <p className={`tactical-deploy-feedback ${deployNotice.tone}`} role="status">{deployNotice.text}</p>
               )}
@@ -1460,6 +1571,36 @@ export function TacticalBattleScreen({
                   selectGroup(groupId);
                 }}
               />
+              {defenderOpenedRoutes.length > 0 && (
+                <div className="tactical-route-order-panel command" role="group" aria-label="우회로 부대 운용">
+                  <div>
+                    <strong>우회로 부대 운용</strong>
+                    <span>{routeBlockers.length > 0
+                      ? '차단대를 선택해 진지를 지키거나, 우회 기동으로 전환해 적 후열을 급습할 수 있습니다.'
+                      : '배치 단계에서 우회로에 보낸 차단대가 없습니다.'}</span>
+                  </div>
+                  <div className="tactical-route-order-actions">
+                    {routeBlockers.map(group => (
+                      <button
+                        type="button"
+                        key={group.id}
+                        className={selectedGroup.id === group.id ? 'active' : ''}
+                        onClick={() => selectGroup(group.id)}
+                      >{group.label} · 차단 중</button>
+                    ))}
+                    {selectedGroup.routeTransit && (
+                      <button
+                        type="button"
+                        className="primary-route-order"
+                        disabled={tacticalRouteOrderUnavailableReason(battle, selectedGroup.id) != null}
+                        title={tacticalRouteOrderUnavailableReason(battle, selectedGroup.id) ??
+                          '차단 진지를 떠나 우회로를 통과한 뒤 적 후열을 급습합니다.'}
+                        onClick={() => onSetCommand(selectedGroup.id, 'flankRoute')}
+                      >{selectedGroup.command === 'flankRoute' ? '우회 기동 중' : '선택 부대 우회 기동'}</button>
+                    )}
+                  </div>
+                </div>
+              )}
               {deployNotice && (
                 <p className={`tactical-deploy-feedback ${deployNotice.tone}`} role="status">{deployNotice.text}</p>
               )}

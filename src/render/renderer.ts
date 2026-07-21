@@ -32,6 +32,13 @@ import { pixelRectIntersectsViewport, tileRectIntersectsViewport, type SceneView
 
 const TILE = CONFIG.ui.tileSize;
 
+const CENTER_VISUAL_SCALE: Record<GameState['rank'], number> = {
+  settlement: 0.78,
+  bo: 0.86,
+  jin: 0.93,
+  bu: 1,
+};
+
 // 배치 모드에서 금색으로 짚어 주는 자원 지형 (건물 → 찾아야 할 지형)
 const PLACEMENT_HINT: Partial<Record<BuildingTypeId, Terrain>> = {
   field: 'fertile',
@@ -905,9 +912,20 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     if (!isBuildingFootprintExplored(state, b.type, b.x, b.y, b.w, b.h)) continue;
     const def = BUILDING_DEFS[b.type];
     const dims = buildingFootprintDims(b);
-    if (!tileRectIntersectsViewport(viewport, b.x - 1, b.y - 1, dims.w + 2, dims.h + 2)) continue;
+    const topMargin = b.type === 'center' ? 3 : 1;
+    if (!tileRectIntersectsViewport(viewport, b.x - 1, b.y - topMargin, dims.w + 2, dims.h + topMargin + 1)) continue;
     visibleBuildings.push(b);
-    const size = TILE * dims.w;
+    const footprintWidth = TILE * dims.w;
+    const footprintHeight = TILE * dims.h;
+    const size = b.type === 'center'
+      ? Math.round(footprintWidth * CENTER_VISUAL_SCALE[state.rank])
+      : footprintWidth;
+    const drawX = b.type === 'center'
+      ? b.x * TILE + Math.round((footprintWidth - size) / 2)
+      : b.x * TILE;
+    const drawY = b.type === 'center'
+      ? b.y * TILE + footprintHeight - size
+      : b.y * TILE;
     if (isPlotBuildingType(b.type)) {
       // 경작지는 발자국 칸마다 스프라이트를 타일링 — 파종을 마친 칸만 작물이 자라 보인다
       const area = dims.w * dims.h;
@@ -931,20 +949,21 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     }
     sprites.drawBuilding(ctx, {
       type: b.type, built: b.built, ghost: false,
+      rank: b.type === 'center' ? state.rank : undefined,
       season,
       progress01: def.buildDays > 0 ? b.progress / def.buildDays : 1,
       connections: b.built && isWallBuilding(b.type)
         ? wallConnectionsFromSet(wallTiles, b.x, b.y)
         : undefined,
-      x: b.x * TILE, y: b.y * TILE, size,
+      x: drawX, y: drawY, size,
     });
     if (b.repairing) {
-      sprites.drawBuildingDamage(ctx, { season, x: b.x * TILE, y: b.y * TILE, size });
-      drawDamageSmoke(ctx, b.x * TILE, b.y * TILE, b.id, dims.w);
+      sprites.drawBuildingDamage(ctx, { season, x: drawX, y: drawY, size });
+      drawDamageSmoke(ctx, drawX, drawY, b.id, size / TILE);
     }
     // 아궁이에 불을 땔 때 온돌집/중심지 굴뚝에서 연기가 오른다
     if (b.built && heating && (b.type === 'ondol' || b.type === 'center')) {
-      drawChimneySmoke(ctx, b.x * TILE, b.y * TILE, b.id, dims.w);
+      drawChimneySmoke(ctx, drawX, drawY, b.id, size / TILE);
     }
   }
 
@@ -1222,8 +1241,9 @@ function drawDayNight(ctx: CanvasRenderingContext2D, state: GameState, dayFrac: 
     for (const b of state.buildings) {
       if (!b.built) continue;
       if (b.type === 'hut' || b.type === 'ondol' || b.type === 'center' || b.type === 'garrison') {
-        if (!tileRectIntersectsViewport(viewport, b.x, b.y, buildingFootprintSize(b.type), buildingFootprintSize(b.type))) continue;
-        const size = TILE * buildingFootprintSize(b.type);
+        const dims = buildingFootprintDims(b);
+        if (!tileRectIntersectsViewport(viewport, b.x, b.y, dims.w, dims.h)) continue;
+        const size = TILE * dims.w;
         ctx.fillStyle = `rgba(255,205,95,${(0.85 * a).toFixed(2)})`;
         ctx.fillRect(b.x * TILE + size * 0.5 - 1.5, b.y * TILE + size * 0.42, 3, 3);
       }

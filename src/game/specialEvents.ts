@@ -85,10 +85,13 @@ export function ensureIncidentState(state: GameState): void {
       epidemic: state.incidents.epidemic ?? null,
     };
   }
-  state.specialItems ??= { wildGinseng: 0, tigerPelt: 0, gyrfalcon: 0 };
+  state.specialItems ??= { wildGinseng: 0, tigerPelt: 0, gyrfalcon: 0, boDecree: 0, jinDecree: 0, buDecree: 0 };
   state.specialItems.wildGinseng ??= 0;
   state.specialItems.tigerPelt ??= 0;
   state.specialItems.gyrfalcon ??= 0;
+  state.specialItems.boDecree ??= 0;
+  state.specialItems.jinDecree ??= 0;
+  state.specialItems.buDecree ??= 0;
   state.discoveredSpecialItems ??= [];
   state.tributeWaivers ??= 0;
   for (const kind of ['wolf', 'tiger', 'boar'] as const) {

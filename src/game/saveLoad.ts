@@ -47,7 +47,7 @@ import {
 import type {
   CombatWeaponId, CourtTribute, DefenderGroupKind, EnemyObjectiveId, FermentBatch, GameState, Gender, Resident, ResourceId,
   PreparationActionId, RaiderUnitType, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
-  SpecialResidentId, TacticalAiState, TacticalDeploymentPlacement, TacticalFeaturedResident, TacticalFormationLine,
+  SpecialItemId, SpecialResidentId, TacticalAiState, TacticalDeploymentPlacement, TacticalFeaturedResident, TacticalFormationLine,
   TacticalBattleFlankOutcome, TacticalBattleTacticsReport, TacticalFacing, TacticalPreparationEffect,
   TacticalRaiderGroup, TacticalRoundReport,
 } from './types';
@@ -367,6 +367,87 @@ export function migrateV29ToV30(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 30 };
 }
 
+// v31: 승격 교지를 기물함에 영구 보관하고 중심지 업그레이드로 승격을 확정한다.
+// 이미 승격한 구 저장은 지나온 단계의 교지를 소급 보관해 진행을 잃지 않는다.
+export function migrateV30ToV31(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const specialItems = migrated.specialItems && typeof migrated.specialItems === 'object'
+    ? { ...migrated.specialItems as RawSave }
+    : {};
+  const discovered = new Set(Array.isArray(migrated.discoveredSpecialItems)
+    ? migrated.discoveredSpecialItems.map(String)
+    : []);
+  const rank = String(migrated.rank ?? 'settlement');
+  const achieved = rank === 'bu'
+    ? ['boDecree', 'jinDecree', 'buDecree']
+    : rank === 'jin'
+      ? ['boDecree', 'jinDecree']
+      : rank === 'bo' ? ['boDecree'] : [];
+  for (const item of achieved) {
+    specialItems[item] = Math.max(1, Number(specialItems[item]) || 0);
+    discovered.add(item);
+  }
+  for (const item of ['boDecree', 'jinDecree', 'buDecree']) {
+    specialItems[item] = Math.max(0, Number(specialItems[item]) || 0);
+  }
+  migrated.specialItems = specialItems;
+  migrated.discoveredSpecialItems = [...discovered];
+  migrated.pendingPromotionNotice = null;
+  migrated.schemaVersion = 31;
+  return migrated;
+}
+
+// v32: 신규 중심지는 3×2로 시작한다. 이미 배치가 끝난 구 저장은 인접 건물과
+// 겹치지 않도록 기존 2×2 발자국을 명시적으로 보존한다.
+export function migrateV31ToV32(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  if (Array.isArray(migrated.buildings)) {
+    migrated.buildings = migrated.buildings.map(value => {
+      if (!value || typeof value !== 'object') return value;
+      const building = { ...value as RawSave };
+      if (building.type === 'center') {
+        building.w = Number.isFinite(Number(building.w)) ? Number(building.w) : 2;
+        building.h = 2;
+      }
+      return building;
+    });
+  }
+  migrated.schemaVersion = 32;
+  return migrated;
+}
+
+function deterministicSilverAmount(raw: RawSave, vein: RawSave): number {
+  const span = CONFIG.minerals.silverMax - CONFIG.minerals.silverMin + 1;
+  const seed = Number(raw.seed) || 0;
+  const x = Number(vein.x) || 0;
+  const y = Number(vein.y) || 0;
+  const day = Number(vein.discoveredDay) || 0;
+  const hash = ((seed * 73856093) ^ (x * 19349663) ^ (y * 83492791) ^ (day * 2654435761)) >>> 0;
+  return CONFIG.minerals.silverMin + (hash % span);
+}
+
+// v33: 은맥 매장량은 최초 발견 순간 한 번만 확정하며, 묻은 뒤 자동 재제안하지 않는다.
+export function migrateV32ToV33(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  if (migrated.silverVein && typeof migrated.silverVein === 'object') {
+    const silverVein = { ...migrated.silverVein as RawSave };
+    if (!Number.isFinite(Number(silverVein.discoveredAmount))) {
+      const x = Math.floor(Number(silverVein.x));
+      const y = Math.floor(Number(silverVein.y));
+      const row = Array.isArray(migrated.map) ? migrated.map[y] : null;
+      const tile = Array.isArray(row) ? row[x] : null;
+      const remaining = tile && typeof tile === 'object' ? Number((tile as RawSave).mineralRemaining) : NaN;
+      const mined = Math.max(0, Number(silverVein.minedTotal) || 0);
+      silverVein.discoveredAmount = (silverVein.status === 'secret' || silverVein.status === 'sanctioned') && Number.isFinite(remaining)
+        ? Math.max(0, remaining + mined)
+        : deterministicSilverAmount(migrated, silverVein);
+    }
+    migrated.silverVein = silverVein;
+  }
+  migrated.schemaVersion = 33;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -402,6 +483,9 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 27) migrated = migrateV27ToV28(migrated);
     else if (version === 28) migrated = migrateV28ToV29(migrated);
     else if (version === 29) migrated = migrateV29ToV30(migrated);
+    else if (version === 30) migrated = migrateV30ToV31(migrated);
+    else if (version === 31) migrated = migrateV31ToV32(migrated);
+    else if (version === 32) migrated = migrateV32ToV33(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -1575,6 +1659,22 @@ export function loadGame(slot = 1): GameState | null {
     // 승격 없는 구버전: 옛 승리(진보 승격)를 이뤘다면 보에서 이어간다
     if (!Object.prototype.hasOwnProperty.call(parsed, 'rank')) {
       parsed.rank = parsed.gameOver?.won ? 'bo' : 'settlement';
+    }
+    const specialItemIds: SpecialItemId[] = [
+      'wildGinseng', 'tigerPelt', 'gyrfalcon', 'boDecree', 'jinDecree', 'buDecree',
+    ];
+    if (!parsed.specialItems || typeof parsed.specialItems !== 'object') {
+      parsed.specialItems = {} as Record<SpecialItemId, number>;
+    }
+    for (const item of specialItemIds) {
+      const amount = Number(parsed.specialItems[item]);
+      parsed.specialItems[item] = Number.isFinite(amount) ? Math.max(0, amount) : 0;
+    }
+    parsed.discoveredSpecialItems = Array.isArray(parsed.discoveredSpecialItems)
+      ? parsed.discoveredSpecialItems.filter((item): item is SpecialItemId => specialItemIds.includes(item))
+      : [];
+    if (parsed.pendingPromotionNotice !== 'bo' && parsed.pendingPromotionNotice !== 'jin' && parsed.pendingPromotionNotice !== 'bu') {
+      parsed.pendingPromotionNotice = null;
     }
     if (parsed.tributePaidStreak == null) parsed.tributePaidStreak = 0;
     parsed.unlockedLivestock = Array.isArray(parsed.unlockedLivestock)

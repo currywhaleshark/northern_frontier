@@ -189,6 +189,22 @@ assert.match(screenSource, /hasArrowShooter/,
   'an arrow projectile needs a visible firing group in the event zone');
 assert.match(screenSource, /group\.count - group\.killed > 0/,
   'an arrow projectile needs at least one surviving visible shooter');
+assert.match(screenSource, /arrowProjectileAssignmentsForZone[\s\S]*shooter\.targetGroupId/,
+  'each arrow must preserve the firing group\'s actual assigned target');
+assert.match(screenSource, /data-tactical-group-id=\{(?:raider|group)\.id\}/,
+  'rendered formations must expose stable group anchors for projectile measurement');
+assert.match(screenSource, /measureArrowProjectilePaths[\s\S]*getBoundingClientRect\(\)/,
+  'arrow paths must be measured from the rendered shooter and target positions');
+assert.match(screenSource, /data-projectile-shooter=\{path\.shooterGroupId\}[\s\S]*data-projectile-target=\{path\.targetGroupId\}/,
+  'each rendered arrow must identify the shooter-target pair it connects');
+assert.match(screenSource, /--projectile-dx[\s\S]*path\.endX - path\.startX/,
+  'the flight distance must end at the measured target instead of a viewport-relative endpoint');
+assert.match(screenSource, /offsetPath: `path\(\"M \$\{path\.startX\} \$\{path\.startY\} Q \$\{path\.controlX\} \$\{path\.controlY\} \$\{path\.endX\} \$\{path\.endY\}\"\)`/,
+  'targeted arrows must follow one continuous quadratic Bezier arc from shooter to target');
+assert.match(screenSource, /offsetRotate: 'auto'/,
+  'an arrow must rotate along the tangent of its live flight path');
+assert.match(tacticalCss, /@keyframes fx-targeted-arrow-flight[\s\S]*offset-distance:\s*100%/,
+  'targeted arrow animation must traverse the measured motion path through its landing point');
 assert.doesNotMatch(screenSource, /Array\.from\(\{ length: 5 \}/,
   'volley visuals must not create five unconditional arrows');
 assert.doesNotMatch(tacticalCss, /\.tactical-zone\.event-volley \.tactical-raider-rank::after/,

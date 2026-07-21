@@ -6,7 +6,7 @@
 // 현재 구현(placeholderSprites)은 단색 사각형 + 이모지 임시 그래픽이다.
 import { BUILDING_DEFS } from '../game/buildings';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
-import type { BuildingTypeId, ForeignSiteStatus, ForeignSiteType, Gender, JobId, LifeStage, Season, SpecialResidentId, Terrain } from '../game/types';
+import type { BuildingTypeId, ForeignSiteStatus, ForeignSiteType, Gender, JobId, LifeStage, Rank, Season, SpecialResidentId, Terrain } from '../game/types';
 import type { MilitiaWeaponSpriteId } from './militiaWeaponAssets';
 
 // 계절별 지형 팔레트 (임시 그래픽용)
@@ -54,6 +54,7 @@ export interface TerrainDrawParams {
 
 export interface BuildingDrawParams {
   type: BuildingTypeId;
+  rank?: Rank;
   built: boolean;
   progress01: number; // 0~1 공정률
   ghost: boolean;     // 배치 미리보기

@@ -125,7 +125,8 @@ html, body, #root {
   position: fixed;
   z-index: 91;
   transform: translateX(-50%);
-  max-width: 280px;
+  width: min(280px, calc(100vw - 20px));
+  box-sizing: border-box;
   padding: 8px 11px;
   background: #17222b;
   border: 1px solid #7ab3d9;
@@ -139,7 +140,7 @@ html, body, #root {
 .tutorial-coach-bubble::after {
   content: '';
   position: absolute;
-  left: 50%;
+  left: calc(50% + var(--coach-arrow-offset, 0px));
   transform: translateX(-50%);
   border: 7px solid transparent;
 }
@@ -333,6 +334,58 @@ html, body, #root {
   object-fit: contain;
   image-rendering: pixelated;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7));
+}
+.management-dock-icon-wrap {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+}
+.management-dock-icon-wrap.has-notification .management-dock-icon {
+  filter:
+    drop-shadow(0 0 3px rgba(244, 190, 78, 0.95))
+    drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7));
+}
+.dock-strip button:has(.management-dock-icon-wrap.has-notification) {
+  border-color: #e3ae43;
+  background: #3a3020;
+  box-shadow: 0 0 0 2px rgba(227, 174, 67, 0.18), 0 3px 10px rgba(0, 0, 0, 0.35);
+  animation: dock-notification-pulse 1.5s ease-in-out infinite;
+}
+.dock-notification {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 10px);
+  min-width: max-content;
+  padding: 5px 8px;
+  border: 1px solid #e3ae43;
+  border-radius: 6px;
+  background: rgba(45, 35, 20, 0.97);
+  color: #ffe6a4;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-shadow: 0 1px 1px #000;
+  transform: translateY(-50%);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.dock-notification::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  border: 5px solid transparent;
+  border-left-color: #e3ae43;
+  transform: translateY(-50%);
+}
+@keyframes dock-notification-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dock-strip button:has(.management-dock-icon-wrap.has-notification) { animation: none; }
 }
 .dock-shortcut {
   position: absolute;
@@ -616,7 +669,6 @@ html, body, #root {
   gap: 7px;
   margin-bottom: 5px;
 }
-.minimap-heading strong { font-size: 12px; }
 .minimap-alert-label {
   color: #f08b78;
   font-size: 11px;
@@ -1049,6 +1101,27 @@ html, body, #root {
   color: #9ca5ae;
   cursor: not-allowed;
 }
+.build-drawer-item.resource-shortage[aria-disabled="true"] {
+  border-color: #725a31;
+  background: #2b2923;
+  color: #d8c69e;
+}
+.build-drawer-item.rank-locked[aria-disabled="true"] {
+  filter: grayscale(0.65);
+  opacity: 0.72;
+}
+.build-drawer-item-status {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  padding: 1px 3px;
+  border: 1px solid #876b38;
+  border-radius: 3px;
+  background: rgba(45, 37, 24, 0.94);
+  color: #e2c982;
+  font-size: 8px;
+  line-height: 1.2;
+}
 .build-drawer-thumb { width: 38px; height: 44px; flex: 0 0 auto; image-rendering: pixelated; }
 .build-drawer-item-name {
   display: -webkit-box;
@@ -1188,6 +1261,17 @@ html, body, #root {
 .job-row:last-child { border-bottom: none; }
 .job-row small { color: var(--muted); font-size: 10px; font-weight: 400; }
 .job-row .count { min-width: 24px; text-align: center; font-weight: bold; }
+.job-controls { display: flex; align-items: center; gap: 3px; }
+.job-count-breakdown {
+  display: grid;
+  min-width: 62px;
+  color: var(--text);
+  font-size: 10px;
+  line-height: 1.15;
+  text-align: center;
+}
+.job-count-breakdown strong { color: var(--accent); font-size: 12px; }
+.job-count-breakdown small { color: var(--muted); }
 .job-btn {
   width: 22px; height: 22px;
   background: var(--panel);
@@ -1535,6 +1619,8 @@ html, body, #root {
 
 /* ── 메인 메뉴 ── */
 .main-menu {
+  position: relative;
+  overflow: hidden;
   height: 100vh;
   display: flex;
   align-items: center;
@@ -1547,7 +1633,30 @@ html, body, #root {
   background-position: 42% center;
   background-repeat: no-repeat;
 }
+/* 메인 메뉴 눈발 — 전투 화면 눈 연출과 같은 결. 패널 뒤 배경에서만 흩날린다. */
+.menu-snow-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.menu-snowflake {
+  position: absolute;
+  top: -2%;
+  border-radius: 50%;
+  background: rgba(248, 251, 255, 0.85);
+  box-shadow: 0 0 6px rgba(240, 246, 255, 0.3);
+  animation: menu-snow-fall linear infinite;
+}
+@keyframes menu-snow-fall {
+  from { top: -2%; transform: translateX(0); }
+  to { top: 102%; transform: translateX(-52px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-snow-layer { display: none; }
+}
 .menu-panel {
+  position: relative; /* 눈발 레이어보다 위에 그린다 */
   max-width: 640px;
   width: 92%;
   background: rgba(22, 27, 32, 0.86);
@@ -1776,6 +1885,34 @@ html, body, #root {
   text-align: center;
 }
 .build-drawer-item-lock { position: absolute; top: 3px; right: 3px; font-size: 10px; filter: grayscale(0.35); }
+
+.promotion-modal {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  text-align: center;
+  border-color: #9f7740;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.7), inset 0 0 36px rgba(159, 119, 64, 0.1);
+}
+.promotion-modal-seal { margin: 0 auto 4px; color: #b54d42; font-size: 34px; }
+.promotion-unlock-section { margin: 16px 0; text-align: left; }
+.promotion-unlock-section h3 { margin: 0 0 8px; color: var(--accent); font-size: 14px; }
+.promotion-unlock-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.promotion-unlock-grid.compact { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.promotion-unlock-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel2);
+  font-size: 11px;
+}
+.promotion-new-duty { padding: 10px; border-left: 3px solid #9f7740; background: rgba(159, 119, 64, 0.08); text-align: left; }
+.promotion-new-duty strong { display: block; margin-bottom: 3px; color: var(--accent); }
+.center-promotion-panel { border-color: #80633b; background: rgba(128, 99, 59, 0.08); }
 
 .lazy-ui-fallback.overlay,
 .lazy-ui-error.overlay {
@@ -2302,6 +2439,7 @@ html, body, #root {
 }
 .tactical-screen.fast-playback { --tactical-playback-scale: 1; }
 .tactical-header {
+  position: relative;
   min-height: 72px;
   display: flex;
   align-items: center;
@@ -2311,6 +2449,54 @@ html, body, #root {
   border-bottom: 1px solid #4e493d;
   background: #202326;
 }
+.tactical-header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+/* 세력 이름은 줄바꿈 없이 유지하고, 축약 칩 쪽이 말줄임으로 줄어든다 */
+.tactical-header-title > div:first-child { flex: 0 0 auto; }
+/* 적 정보 축약 칩 — 상세는 헤더 아래 드롭다운으로 펼친다 (하단바 스크롤 방지) */
+.tactical-enemy-intel-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 360px;
+  padding: 5px 9px;
+  border: 1px solid #68604e;
+  border-radius: 4px;
+  background: #292d30;
+  color: #d8c9a0;
+  font-size: 11px;
+  cursor: pointer;
+}
+.tactical-enemy-intel-toggle span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tactical-enemy-intel-toggle i { font-style: normal; color: #c8a85f; font-size: 9px; }
+.tactical-enemy-intel-toggle:hover,
+.tactical-enemy-intel-toggle.open { border-color: #c8a85f; color: #ead8ac; }
+.tactical-enemy-intel-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 10px;
+  z-index: 90;
+  width: min(860px, calc(100% - 20px));
+  max-height: min(340px, 52vh);
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid #594c3d;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  background: #202428;
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.55);
+}
+.tactical-enemy-intel-dropdown .tactical-enemy-plan { margin-bottom: 0; }
 .tactical-kicker {
   color: #c8a85f;
   font-size: 11px;
@@ -2378,6 +2564,70 @@ html, body, #root {
   min-height: 0;
   overflow: hidden;
   background: #121619;
+}
+.tactical-night-ambush-alert {
+  position: absolute;
+  z-index: 82;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(68, 13, 9, 0.12), rgba(2, 6, 16, 0.34));
+  animation: tactical-night-alert-flash 700ms steps(2, end) 3;
+}
+.tactical-night-ambush-alert > div {
+  width: min(460px, calc(100% - 48px));
+  padding: 22px 28px;
+  border: 2px solid #c64a3b;
+  border-radius: 5px;
+  background: rgba(28, 9, 10, 0.93);
+  box-shadow: 0 0 0 4px rgba(198, 74, 59, 0.16), 0 18px 60px rgba(0, 0, 0, 0.72);
+  text-align: center;
+}
+.tactical-night-ambush-alert span {
+  display: block;
+  color: #e3a08d;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+}
+.tactical-night-ambush-alert strong {
+  display: block;
+  margin: 5px 0 7px;
+  color: #fff0d1;
+  font-size: clamp(34px, 6vw, 62px);
+  line-height: 1;
+  text-shadow: 0 2px 0 #741d1a, 0 0 24px rgba(225, 69, 48, 0.58);
+}
+.tactical-night-ambush-alert p {
+  margin: 0;
+  color: #e4d4c0;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.tactical-screen.night-ambush-intro .tactical-controls {
+  pointer-events: none;
+  filter: brightness(0.45) saturate(0.5);
+}
+.tactical-screen.night-ambush-intro .tactical-defender-rank .tactical-field-group {
+  animation: tactical-night-scramble 850ms cubic-bezier(0.16, 0.78, 0.28, 1.08) both;
+}
+.tactical-screen.night-ambush-intro .tactical-defender-rank .tactical-field-group:nth-of-type(2) { animation-delay: 420ms; }
+.tactical-screen.night-ambush-intro .tactical-defender-rank .tactical-field-group:nth-of-type(3) { animation-delay: 840ms; }
+.tactical-screen.night-ambush-intro .tactical-defender-rank .tactical-field-group:nth-of-type(4) { animation-delay: 1260ms; }
+@keyframes tactical-night-scramble {
+  0% { opacity: 0; transform: translate(88px, 24px) scale(0.88); filter: blur(2px); }
+  58% { opacity: 1; transform: translate(-7px, -2px) scale(1.03); filter: blur(0); }
+  78% { transform: translate(5px, 1px) scale(0.99); }
+  100% { opacity: 1; transform: translate(0, 0) scale(1); filter: blur(0); }
+}
+@keyframes tactical-night-alert-flash {
+  0%, 100% { box-shadow: inset 0 0 90px rgba(145, 24, 18, 0.08); }
+  50% { box-shadow: inset 0 0 140px rgba(194, 38, 25, 0.28); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tactical-night-ambush-alert,
+  .tactical-screen.night-ambush-intro .tactical-defender-rank .tactical-field-group { animation: none; }
 }
 .tactical-battlefield {
   width: 100%;
@@ -2728,6 +2978,11 @@ html, body, #root {
   background: rgba(61, 58, 42, 0.88);
 }
 .tactical-raider-group.targetable {
+  pointer-events: none;
+  cursor: default;
+}
+.tactical-raider-group.targetable > .tactical-raider-sprites,
+.tactical-raider-group.targetable > span {
   pointer-events: auto;
   cursor: crosshair;
 }
@@ -2981,8 +3236,19 @@ html, body, #root {
 .tactical-field-group.formation-ranged { margin: 0 0 16px 4px; }
 .tactical-field-group.formation-civilian { margin: 0 0 26px 8px; opacity: 0.88; }
 .tactical-field-group.line-rear { margin-left: 3px; filter: saturate(0.92); }
-/* 배치·지휘 단계에는 무대 위 부대를 직접 클릭해 선택할 수 있다 */
-.tactical-field-group.selectable { cursor: pointer; }
+/* 배치·지휘 단계의 포인터 판정은 빈 그룹 래퍼가 아니라 실제 스프라이트와 라벨만 쓴다. */
+.tactical-field-group.selectable {
+  pointer-events: none;
+  cursor: default;
+}
+.tactical-field-group.selectable > .tactical-unit-line,
+.tactical-field-group.selectable > span,
+.tactical-field-group.selectable > .tactical-facing-arrow {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.tactical-field-group.selectable.stage-drag-handle > .tactical-unit-line,
+.tactical-field-group.selectable.stage-drag-handle > span { cursor: grab; }
 .tactical-field-group.selectable:hover > span { box-shadow: 0 0 0 1px #b9944f; }
 .tactical-field-group.selected > span {
   background: rgba(64, 51, 24, 0.92);
@@ -3808,20 +4074,29 @@ html, body, #root {
 .tactical-state-badge.facing-turning { border-color: #a3703a; color: #e8b45f; }
 .tactical-facing-toggle { flex: 0 0 auto; }
 /* ── Phase 6 우회로 — 준비 선택·미니맵 가지·무대 리본·징후 ── */
-.tactical-flank-route-action { cursor: default; }
+.tactical-flank-route-action {
+  grid-template-columns: 70px minmax(0, 1fr);
+  cursor: default;
+}
 .tactical-flank-route-sides {
+  grid-column: 2;
   display: flex;
   gap: 4px;
-  margin-top: 4px;
+  min-width: 0;
+  margin: 0;
 }
 .tactical-flank-route-sides button {
   flex: 1 1 0;
+  min-width: 0;
   padding: 3px 6px;
   border: 1px solid #445057;
   border-radius: 4px;
   background: #292f33;
   color: var(--text);
   font-size: 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   cursor: pointer;
 }
 .tactical-flank-route-sides button.active { border-color: #d0a651; background: #3a372d; }
@@ -4096,17 +4371,18 @@ html, body, #root {
 .tactical-enemy-stratagem.none { min-width: 180px; color: #9da5a9; font-size: 10px; }
 .tactical-action-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
   gap: 6px;
 }
 .tactical-action {
-  min-height: 72px;
+  min-height: 42px;
   position: relative;
   display: grid;
-  grid-template-columns: 44px 1fr;
-  grid-template-rows: auto 1fr;
-  gap: 2px 8px;
-  padding: 8px;
+  grid-template-columns: 62px minmax(0, 1fr);
+  grid-template-rows: minmax(28px, auto);
+  align-items: center;
+  gap: 6px;
+  padding: 5px 7px;
   border: 1px solid #454f54;
   border-radius: 5px;
   background: #2a3034;
@@ -4119,27 +4395,91 @@ html, body, #root {
 .tactical-action.selected { border-color: #d0a651; background: #353a34; box-shadow: inset 0 0 0 1px #8f7439; }
 .tactical-action.applied { border-color: #55835f; opacity: 0.78; }
 .tactical-action > span {
-  grid-row: 1 / 3;
+  grid-row: 1;
   display: grid;
   place-items: center;
-  min-height: 42px;
+  min-height: 28px;
   border-right: 1px solid #4b565a;
   color: #d6b66b;
   font-size: 11px;
   font-weight: 700;
+  white-space: nowrap;
 }
 .tactical-action.applied > span { color: #91c699; }
 .tactical-action.selected > span { color: #f0cf78; }
-.tactical-action strong { font-size: 12px; }
+.tactical-action strong { overflow: hidden; font-size: 12px; white-space: nowrap; text-overflow: ellipsis; }
 .tactical-action small { color: #aeb6ba; font-size: 10px; line-height: 1.35; }
-.tactical-action > em {
-  grid-column: 2;
+.tactical-action-detail {
+  position: absolute;
+  z-index: 35;
+  top: calc(100% + 4px);
+  left: 62px;
+  right: 4px;
+  display: none;
+  min-width: 210px;
+  padding: 7px 8px;
+  border: 1px solid #69747a;
+  border-radius: 4px;
+  background: rgba(25, 29, 32, 0.98);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.tactical-action:hover,
+.tactical-action:focus-within { z-index: 34; }
+.tactical-action:hover .tactical-action-detail,
+.tactical-action:focus-visible .tactical-action-detail,
+.tactical-action:focus-within .tactical-action-detail { display: grid; gap: 3px; }
+.tactical-action-detail > em {
   color: #aeb6ba;
   font-size: 9px;
   font-style: normal;
 }
 .tactical-action.counters-plan { border-color: #8b773f; }
-.tactical-action.counters-plan > em { color: #e1c268; }
+.tactical-action.counters-plan .tactical-action-detail > em { color: #e1c268; }
+
+.tactical-preparation-roster {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+.tactical-preparation-roster > strong {
+  color: #d8c9a0;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.tactical-route-order-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 6px 0;
+  padding: 6px 8px;
+  border: 1px solid #58644d;
+  border-radius: 5px;
+  background: #282f2a;
+}
+.tactical-route-order-panel > div:first-child { display: grid; gap: 2px; min-width: 0; }
+.tactical-route-order-panel strong { color: #d9c987; font-size: 11px; }
+.tactical-route-order-panel span { color: #aeb6ba; font-size: 9px; }
+.tactical-route-order-actions { display: flex; flex: 0 0 auto; gap: 5px; }
+.tactical-route-order-actions button {
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid #5b6960;
+  border-radius: 4px;
+  background: #303833;
+  color: #d9ddda;
+  font-size: 10px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tactical-route-order-actions button:hover:not(:disabled) { border-color: #d0a651; }
+.tactical-route-order-actions button.active,
+.tactical-route-order-actions button.primary-route-order { border-color: #b9944f; background: #3a372d; color: #f0dca8; }
+.tactical-route-order-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── 하단 부대 독 — 배치·지휘 공용 가로 칩 목록 ── */
 .tactical-unit-dock {
@@ -4709,6 +5049,35 @@ html, body, #root {
   overflow: hidden;
   pointer-events: none;
 }
+/* 지휘 단계 명령 화살표 — 녹색=진형이동 예약, 붉은=집중 표적. 포물선은 SVG Q 곡선으로 그린다. */
+.tactical-order-arrow-layer {
+  position: absolute;
+  z-index: 40;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+.tactical-order-arrow {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-opacity: 0.92;
+  stroke-dasharray: 8 6;
+  animation: tactical-order-arrow-flow 850ms linear infinite;
+}
+.tactical-order-arrow.move { stroke: #7fd98a; }
+.tactical-order-arrow.target { stroke: #ef6a4e; }
+.tactical-order-arrow-head.move { fill: #7fd98a; }
+.tactical-order-arrow-head.target { fill: #ef6a4e; }
+@keyframes tactical-order-arrow-flow {
+  to { stroke-dashoffset: -14; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tactical-order-arrow { animation: none; }
+}
 /* 화살: 수비 랭크(우측)에서 적 랭크(좌측)로 호를 그리며 날아간다 */
 .fx-arrow {
   position: absolute;
@@ -4724,6 +5093,14 @@ html, body, #root {
   left: 42%;
   background: linear-gradient(270deg, #f7efd2, #e8d9a8 55%, transparent);
   animation-name: fx-assault-arrow-flight;
+}
+.fx-arrow.positioned,
+.fx-arrow.positioned.moves-right {
+  bottom: auto;
+  margin: 0;
+  offset-distance: 0%;
+  offset-rotate: auto;
+  animation-name: fx-targeted-arrow-flight;
 }
 .fx-fire-arrow {
   height: 3px;
@@ -4759,6 +5136,11 @@ html, body, #root {
   animation: fx-fire-impact calc(820ms * var(--tactical-playback-scale)) calc(380ms * var(--tactical-playback-scale)) ease-out forwards;
 }
 .fx-fire-impact.moves-right { left: auto; right: 18%; }
+.fx-fire-impact.positioned {
+  right: auto;
+  bottom: auto;
+  translate: -50% -50%;
+}
 @keyframes fx-fire-flicker { to { transform: scale(1.35) translateX(2px); opacity: 0.7; } }
 @keyframes fx-fire-impact {
   0% { transform: scale(0.2); opacity: 0; }
@@ -4777,6 +5159,12 @@ html, body, #root {
   12% { opacity: 1; }
   48% { transform: translate(max(24vw, 180px), -52px) rotate(-4deg); opacity: 1; }
   100% { transform: translate(max(46vw, 350px), 30px) rotate(22deg); opacity: 0.9; }
+}
+@keyframes fx-targeted-arrow-flight {
+  0% { opacity: 0; offset-distance: 0%; }
+  10% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { opacity: 0.82; offset-distance: 100%; }
 }
 /* 사격 유닛의 실제 총구 좌표에 붙는 섬광과 초연 */
 .tactical-unit-muzzle-flash {
@@ -5132,6 +5520,9 @@ html, body, #root {
   .tactical-zone.has-rear-assault .tactical-defender-rank { right: 23%; gap: 3px; }
   .tactical-controls { padding: 8px; }
   .tactical-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tactical-route-order-panel { align-items: stretch; flex-direction: column; }
+  .tactical-route-order-actions { flex-wrap: wrap; }
+  .tactical-route-order-actions button { flex: 1 1 150px; }
   .tactical-deploy-row { grid-template-columns: 1fr; gap: 6px; }
   .tactical-zone-buttons { grid-template-columns: repeat(4, minmax(72px, 1fr)); }
   .tactical-rear-response-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -5172,6 +5563,7 @@ html, body, #root {
   .tactical-status-row { justify-content: flex-start; margin-top: 6px; }
   .tactical-status-row > div { min-width: 64px; }
   .tactical-action-grid { grid-template-columns: 1fr; }
+  .tactical-preparation-roster { grid-template-columns: 1fr; }
   .tactical-zone-buttons { grid-template-columns: repeat(2, 1fr); }
   .tactical-command-bar-row { flex-direction: column; gap: 6px; }
   .tactical-command-bar-row .tactical-line-toggle { grid-template-columns: repeat(3, 1fr); }

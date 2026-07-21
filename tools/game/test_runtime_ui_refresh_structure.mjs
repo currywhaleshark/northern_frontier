@@ -20,7 +20,7 @@ assert.match(loopSource, /uiVersionStore\.publish\(\);\s*if \(commitApp\) setVer
 assert.match(loopSource, /if \(immediate\) \{\s*flushUi\(true\)/, 'urgent states retain an immediate full App commit path');
 assert.match(loopSource, /entry\.important \|\| entry\.kind === 'bad' \|\| entry\.kind === 'raid'/, 'urgent logs bypass the management UI throttle');
 assert.doesNotMatch(loopSource, /requestUiRefresh\(\s*s\.log\.length !== logLengthBefore/, 'ordinary logs follow the management UI cadence');
-assert.match(loopSource, /Boolean\(s\.pendingChoice \|\| s\.tacticalBattle \|\| s\.tacticalBattleReport \|\| s\.gameOver\)/, 'blocking overlays bypass the management UI throttle');
+assert.match(loopSource, /Boolean\(s\.pendingChoice \|\| s\.pendingPromotionNotice \|\| s\.tacticalBattle \|\| s\.tacticalBattleReport \|\| s\.gameOver\)/, 'blocking overlays bypass the management UI throttle');
 assert.doesNotMatch(loopSource, /animRef\.current = \{ at: now, ms: msPerTick \};\s*bump\(\)/, 'ordinary ticks no longer rerender the whole App tree');
 assert.match(appSource, /<RuntimeVersionBoundary store=\{runtimeVersionStore\}>[\s\S]*?<GameCanvas/, 'GameCanvas consumes the tick-local version boundary');
 assert.match(appSource, /<RuntimeVersionBoundary store=\{uiVersionStore\}>[\s\S]*?<TopBar/, 'TopBar consumes a management snapshot boundary');

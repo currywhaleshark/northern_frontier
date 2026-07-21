@@ -13,6 +13,7 @@ import { tacticalCompositionTemplates, tacticalEnemyFactionId } from '../game/ta
 import type {
   BattleMode, EnemyDoctrineId, EnemyStratagemId, Season, TacticalRouteSide, TigerTier, WeatherId,
 } from '../game/types';
+import { MenuSnowLayer } from './MenuSnowLayer';
 
 interface Props {
   onStart: (options: BattleSimulationOptions) => void;
@@ -131,6 +132,7 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
 
   return (
     <div className="main-menu">
+      <MenuSnowLayer />
       <div className="menu-panel sim-panel">
         <h1 className="menu-title">전투 시뮬레이션</h1>
         <div className="menu-subtitle">본 게임 진행과 무관하게 전술 전투만 시험합니다 — 결과는 저장되지 않습니다.</div>

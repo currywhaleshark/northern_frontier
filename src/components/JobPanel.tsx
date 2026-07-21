@@ -2,7 +2,7 @@
 import { BUILDING_DEFS } from '../game/buildings';
 import { isJobUnlocked, JOB_DESC, JOB_NAMES, JOB_ORDER } from '../game/constants';
 import { isLiterateJob } from '../game/education';
-import { countJob } from '../game/residents';
+import { jobWorkforceCounts } from '../game/residents';
 import { canResidentTakeJob } from '../game/youth';
 import {
   AUTO_ASSIGN_BUILDING_TYPES,
@@ -30,12 +30,14 @@ interface Props {
 }
 
 export function JobPanel({ state, onReassign, uiPrefs, onUiPrefsChange, onAutoAssign }: Props) {
-  const idle = countJob(state, 'idle');
+  const idle = jobWorkforceCounts(state, 'idle');
   const selectedAutoAssignTypes = uiPrefs.autoAssignBuildingTypes;
   const allAutoAssignTypesSelected = selectedAutoAssignTypes.length === AUTO_ASSIGN_BUILDING_TYPES.length;
   return (
     <div className="dock-panel-content job-panel-content">
-      <div className="dock-panel-summary">무직 {idle}명</div>
+      <div className="dock-panel-summary">
+        무직 <strong>성인 {idle.adult}명</strong> · 소년 {idle.youth}명
+      </div>
       <div className="auto-assign-panel">
         <div className="auto-assign-head">
           <span>건물 자동 배정 <small>선택 {selectedAutoAssignTypes.length}/{AUTO_ASSIGN_BUILDING_TYPES.length}</small></span>
@@ -76,7 +78,7 @@ export function JobPanel({ state, onReassign, uiPrefs, onUiPrefsChange, onAutoAs
         </details>
       </div>
       {JOB_ORDER.filter(j => j !== 'idle' && isJobUnlocked(state.rank, j)).map(job => {
-        const count = countJob(state, job);
+        const count = jobWorkforceCounts(state, job);
         const gated = isLiterateJob(job);
         const assignableIdle = state.residents.filter(resident =>
           resident.alive && resident.job === 'idle' && canResidentTakeJob(resident, job)
@@ -89,9 +91,12 @@ export function JobPanel({ state, onReassign, uiPrefs, onUiPrefsChange, onAutoAs
         return (
           <div className="job-row" key={job} title={`${JOB_DESC[job]}${gated ? '\n📖 문해자 전용 — 글을 아는 주민만 맡습니다' : ''}`}>
             <span>{JOB_NAMES[job]}{gated && <span aria-label="문해자 전용" title="문해자 전용"> 📖</span>} {unassigned != null && <small>(배치 가능 {unassigned})</small>}</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <button className="job-btn" disabled={count === 0} onClick={() => onReassign(job, 'idle')}>−</button>
-              <span className="count">{count}</span>
+            <span className="job-controls">
+              <button className="job-btn" disabled={count.total === 0} onClick={() => onReassign(job, 'idle')}>−</button>
+              <span className="job-count-breakdown" aria-label={`성인 ${count.adult}명, 소년 ${count.youth}명`}>
+                <span>성인 <strong>{count.adult}</strong></span>
+                <small>소년 {count.youth}</small>
+              </span>
               <button
                 className="job-btn"
                 data-tut={`job-plus-${job}`}

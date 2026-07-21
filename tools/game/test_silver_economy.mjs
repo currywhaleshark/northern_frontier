@@ -193,11 +193,13 @@ function recordMiningToday(state, tile) {
   assert.ok(!factors.some(factor => factor.id === 'silverRumor'), 'sanctioned mining is legal — no rumor');
 }
 
-// ── G2: 묻어둔다 → 같은 광상을 계속 캐면 재제안 ──
+// ── G2: 묻어둔다 → 자동 재제안 없이 고정 매장량으로 직접 다시 열기 ──
 {
   const { state, tile } = stateWithMine(2026071716);
   recordMiningToday(state, tile);
   silver.dailySilverTick(state, () => 0);
+  const discoveredAmount = state.silverVein.discoveredAmount;
+  assert.ok(discoveredAmount >= CONFIG.minerals.silverMin && discoveredAmount <= CONFIG.minerals.silverMax);
   silver.resolveSilverVeinChoice(state, 'bury', () => 0.5);
   assert.equal(state.silverVein.status, 'buried');
   assert.ok(!tile.hasSilver, 'buried vein keeps the original deposit');
@@ -211,16 +213,23 @@ function recordMiningToday(state, tile) {
   assert.ok(selectionActions.getBuildingActions(state, state.buildings.find(building => building.type === 'mine'))
     .some(action => action.id === 'silver-reopen'), 'the serving mine can still reopen a buried vein after depletion');
 
-  state.day += CONFIG.silver.reofferCooldownDays;
+  state.day += 30;
   recordMiningToday(state, tile);
   silver.dailySilverTick(state, () => 0.99);
-  assert.equal(state.pendingChoice?.kind, 'silverVein', 'mining the deposit re-offers the dilemma');
+  assert.equal(state.pendingChoice, null, 'continued mining never re-opens the buried-vein event');
+  assert.equal(state.silverVein.discoveredAmount, discoveredAmount, 'the hidden silver reserve remains fixed');
+
+  assert.equal(silver.reopenBuriedVein(state), null);
+  assert.equal(state.pendingChoice?.kind, 'silverVein', 'the player can explicitly reopen it from the mine');
+  silver.resolveSilverVeinChoice(state, 'secret', () => 0.99);
+  assert.equal(minerals.mineralRemaining(tile), discoveredAmount,
+    'opening the vein uses the amount fixed at first discovery instead of rerolling');
 }
 
 assert.match(rendererSource, /status === 'buried'[\s\S]*drawBuriedSilverVeinMarker/,
   'the explored map keeps a marker for a buried vein');
-assert.match(selectionContextSource, /buriedSilverVeinHere[\s\S]*묻어 둠[\s\S]*원광 고갈/,
-  'tile details explain that a buried vein survives outcrop depletion');
+assert.match(selectionContextSource, /buriedSilverVeinHere[\s\S]*은 매장량[\s\S]*고정[\s\S]*원광 고갈/,
+  'tile details distinguish the fixed hidden reserve from changing original ore');
 
 // ── G2: 보장 — 자연 확률이 없어도 누적 채광일이 차면 반드시 등장 ──
 {

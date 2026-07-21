@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 30, 'completed tactical reports ship with schema version 30');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 33, 'fixed silver discoveries ship with schema version 33');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -92,6 +92,35 @@ assert.equal(typeof saveLoad.migrateV27ToV28, 'function');
   const migrated = saveLoad.migrateV29ToV30({ schemaVersion: 29, tacticalBattleReport: { battleId: 7 } });
   assert.equal(migrated.schemaVersion, 30);
   assert.deepEqual(migrated.tacticalBattleReport, { battleId: 7 }, 'v30 root migration remains additive');
+}
+
+{
+  const migrated = saveLoad.migrateV30ToV31({ schemaVersion: 30, rank: 'jin', specialItems: {} });
+  assert.equal(migrated.schemaVersion, 31);
+  assert.equal(migrated.specialItems.boDecree, 1);
+  assert.equal(migrated.specialItems.jinDecree, 1);
+  assert.equal(migrated.specialItems.buDecree, 0);
+}
+
+{
+  const migrated = saveLoad.migrateV31ToV32({
+    schemaVersion: 31,
+    buildings: [{ id: 1, type: 'center', x: 10, y: 10 }, { id: 2, type: 'hut', x: 12, y: 10 }],
+  });
+  assert.equal(migrated.schemaVersion, 32);
+  assert.deepEqual(migrated.buildings[0], { id: 1, type: 'center', x: 10, y: 10, w: 2, h: 2 });
+}
+
+{
+  const migrated = saveLoad.migrateV32ToV33({
+    schemaVersion: 32,
+    seed: 77,
+    map: [[{ terrain: 'rock', hasSilver: true, mineralRemaining: 64 }]],
+    silverVein: { status: 'secret', x: 0, y: 0, discoveredDay: 12, minedTotal: 9 },
+  });
+  assert.equal(migrated.schemaVersion, 33);
+  assert.equal(migrated.silverVein.discoveredAmount, 73,
+    'active legacy veins reconstruct their original reserve from remaining plus mined');
 }
 
 {

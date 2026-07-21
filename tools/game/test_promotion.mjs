@@ -42,7 +42,10 @@ const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-const { checkPromotion, nextRank, promotionConditions, rankEffects, RANK_ORDER } = promotion;
+const {
+  acknowledgePromotionNotice, checkPromotion, nextRank, promotionConditions, rankEffects,
+  upgradeSettlementCenter, RANK_ORDER,
+} = promotion;
 
 // ── 사다리 순서 ──
 assert.deepEqual(RANK_ORDER, ['settlement', 'bo', 'jin', 'bu']);
@@ -99,10 +102,19 @@ function addBuilt(state, type, n = 1) {
   const rep0 = state.resources.reputation;
 
   checkPromotion(state);
+  assert.equal(state.rank, 'settlement');
+  assert.equal(state.pendingChoice?.kind, 'promotionDecree');
+  simulation.resolveChoice(state, 'receive-decree');
+  assert.equal(state.specialItems.boDecree, 1);
+  const centerId = state.buildings.find(building => building.type === 'center').id;
+  assert.equal(upgradeSettlementCenter(state, centerId), null);
   assert.equal(state.rank, 'bo');
+  assert.equal(state.pendingPromotionNotice, 'bo');
   assert.equal(state.gameOver, null, '보 승격은 게임을 끝내지 않는다');
   assert.equal(state.resources.reputation, Math.min(100, rep0 + CONFIG.ranks.promotionReputation));
   assert.ok(state.log.some(e => e.text.includes('보(堡)로 승격')));
+  acknowledgePromotionNotice(state);
+  assert.equal(state.pendingPromotionNotice, null);
 
   // 다음 점검에선 진 승격 조건이 목록에 뜬다
   checkPromotion(state);
@@ -116,9 +128,16 @@ function addBuilt(state, type, n = 1) {
   state.tributePaidStreak = jin.tributeYears;
   addBuilt(state, 'watchtower', 2);
   checkPromotion(state);
+  assert.equal(state.rank, 'bo');
+  assert.equal(state.pendingChoice?.kind, 'promotionDecree');
+  simulation.resolveChoice(state, 'receive-decree');
+  assert.equal(state.specialItems.jinDecree, 1);
+  assert.equal(upgradeSettlementCenter(state, centerId), null);
   assert.equal(state.rank, 'jin');
+  assert.equal(state.pendingPromotionNotice, 'jin');
   assert.equal(state.gameOver, null);
   assert.ok(state.log.some(e => e.text.includes('진(鎭)으로 승격')));
+  acknowledgePromotionNotice(state);
 
   // ── 부 승격 = 최종 승리 ──
   const bu = CONFIG.ranks.bu;
@@ -128,7 +147,14 @@ function addBuilt(state, type, n = 1) {
   addBuilt(state, 'watchtower', 1); // 총 3개
   addBuilt(state, 'market');
   checkPromotion(state);
+  assert.equal(state.rank, 'jin');
+  assert.equal(state.pendingChoice?.kind, 'promotionDecree');
+  simulation.resolveChoice(state, 'receive-decree');
+  assert.equal(state.specialItems.buDecree, 1);
+  assert.equal(upgradeSettlementCenter(state, centerId), null);
   assert.equal(state.rank, 'bu');
+  assert.equal(state.gameOver, null, '승격 안내를 확인하기 전에는 최종 승리가 확정되지 않는다');
+  acknowledgePromotionNotice(state);
   assert.ok(state.gameOver?.won, '부 승격이 최종 승리');
   assert.ok(state.gameOver.reason.includes('부(府)'));
 }

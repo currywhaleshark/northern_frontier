@@ -3,7 +3,7 @@
 // 모반 의심(suspicion)이 그림자처럼 따라붙는다. 계획: docs/superpowers/plans/2026-07-17-silver-currency.md
 import { CONFIG } from './config';
 import { addLog } from './events';
-import { convertToSilverDeposit, mineralRemaining } from './minerals';
+import { convertToSilverDeposit, mineralRemaining, rollSilverDepositAmount } from './minerals';
 import { lowerSuspicion } from './suspicion';
 import type { SuspicionFactor } from './suspicion';
 import type { GameState, SilverVeinState, Tile } from './types';
@@ -15,6 +15,11 @@ function vein(state: GameState): SilverVeinState | null {
 function veinTile(state: GameState): Tile | null {
   const v = vein(state);
   return v ? state.map[v.y]?.[v.x] ?? null : null;
+}
+
+function activateSilverDeposit(v: SilverVeinState, tile: Tile, rng: () => number): void {
+  v.discoveredAmount ??= rollSilverDepositAmount(rng);
+  convertToSilverDeposit(tile, rng, v.discoveredAmount);
 }
 
 export function isBuriedSilverVeinTile(
@@ -77,7 +82,7 @@ export function openSilverVeinChoice(state: GameState): void {
         id: 'bury',
         label: '도로 묻어둔다',
         desc: '아무 일도 없었던 것으로 합니다. 광상은 원래대로 캐고, 은맥은 그 자리에 남습니다. ' +
-          '나중에 이 광상을 캐다 보면 다시 생각할 기회가 옵니다.',
+          '채광장에서 직접 다시 열기 전에는 이 결정이 다시 나타나지 않습니다.',
       },
     ],
     data: { x: v.x, y: v.y },
@@ -96,7 +101,7 @@ export function resolveSilverVeinChoice(state: GameState, optionId: string, rng:
 
   if (optionId === 'secret') {
     v.status = 'secret';
-    convertToSilverDeposit(tile, rng);
+    activateSilverDeposit(v, tile, rng);
     addLog(state, '은맥을 숨기기로 했습니다. 채광꾼들이 입을 닫고 은을 캐기 시작합니다.', 'info', true);
     return;
   }
@@ -106,7 +111,7 @@ export function resolveSilverVeinChoice(state: GameState, optionId: string, rng:
     lowerSuspicion(state, s.reportSuspicionDecay);
     if (rng() < s.sanctionChance) {
       v.status = 'sanctioned';
-      convertToSilverDeposit(tile, rng);
+      activateSilverDeposit(v, tile, rng);
       addLog(
         state,
         `조정이 설점(設店)을 허가했습니다. 은을 캘 수 있으나 산출의 ${Math.round(s.sanctionTaxRatio * 100)}%는 조정 몫입니다.`,
@@ -125,7 +130,7 @@ export function resolveSilverVeinChoice(state: GameState, optionId: string, rng:
     return;
   }
 
-  // 묻어둔다 — 광상은 원래 광물로 계속 캔다. 캐다 보면 재제안이 온다.
+  // 묻어둔다 — 광상은 원래 광물로 계속 캐지만, 플레이어가 직접 다시 열기 전에는 재제안하지 않는다.
   v.status = 'buried';
   v.lastOfferDay = state.day;
   addLog(state, '은맥을 도로 묻었습니다. 돌 틈의 은빛은 우리끼리의 비밀로 남습니다.', 'info');
@@ -139,7 +144,7 @@ export function breakSilverSeal(state: GameState, rng: () => number): string | n
   v.status = 'secret';
   v.sealBroken = true;
   v.exposed = false;
-  convertToSilverDeposit(tile, rng);
+  activateSilverDeposit(v, tile, rng);
   addLog(state, '조정의 봉인을 어기고 은맥을 다시 팠습니다. 이제 돌이킬 수 없습니다.', 'bad', true);
   return null;
 }
@@ -174,7 +179,7 @@ export function silverSuspicionFactors(state: GameState): SuspicionFactor[] {
   }];
 }
 
-// 일일 갱신 — 발견 판정(보장 포함), 묻어둔 은맥 재제안, 잠채 발각.
+// 일일 갱신 — 최초 발견 판정(보장 포함)과 잠채 발각. 묻은 은맥은 자동으로 다시 열지 않는다.
 export function dailySilverTick(state: GameState, rng: () => number): void {
   const s = CONFIG.silver;
   const v = vein(state);
@@ -192,7 +197,14 @@ export function dailySilverTick(state: GameState, rng: () => number): void {
     if (rng() < veinChance || pity >= s.pityMiningDays) {
       if (state.pendingChoice || state.battle) return; // 내일 다시 시도 (판정은 성립)
       const { x, y } = state.lastRockMiningTile;
-      state.silverVein = { status: 'offered', x, y, discoveredDay: state.day, minedTotal: 0 };
+      state.silverVein = {
+        status: 'offered',
+        x,
+        y,
+        discoveredDay: state.day,
+        discoveredAmount: rollSilverDepositAmount(rng),
+        minedTotal: 0,
+      };
       openSilverVeinChoice(state);
     }
     return;
@@ -200,16 +212,6 @@ export function dailySilverTick(state: GameState, rng: () => number): void {
 
   // 선택 모달이 사라진 offered 상태(저장/불러오기 등) — 다시 연다.
   if (v.status === 'offered' && !state.pendingChoice && !state.battle) {
-    openSilverVeinChoice(state);
-    return;
-  }
-
-  // 묻어둔 은맥: 그 광상을 계속 캐고 있으면 이따금 다시 떠오른다.
-  if (v.status === 'buried') {
-    if (!minedRockRecently(state)) return;
-    const t = state.lastRockMiningTile;
-    if (!t || t.x !== v.x || t.y !== v.y) return;
-    if (state.day - (v.lastOfferDay ?? 0) < s.reofferCooldownDays) return;
     openSilverVeinChoice(state);
     return;
   }

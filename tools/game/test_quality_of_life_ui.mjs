@@ -26,7 +26,7 @@ assert.equal(zoom.steppedMapZoom(0.5, 100), 0.5);
 
 const feedback = await importTypeScript('../../src/ui/feedbackReport.ts');
 const feedbackState = {
-  schemaVersion: 30, day: 44, subTick: 2, difficulty: 'normal', seed: 123, rank: 'bo',
+  schemaVersion: 33, day: 44, subTick: 2, difficulty: 'normal', seed: 123, rank: 'bo',
   residents: [{ alive: true }, { alive: false }], buildings: [{ id: 1 }], pendingChoice: null,
   tacticalBattle: null, gameOver: null,
   log: [{ day: 44, kind: 'bad', important: true, text: '재현용 기록' }],

@@ -191,9 +191,9 @@ export function generateMap(seed: number): { tiles: Tile[][]; centerX: number; c
       }
     }
   }
-  // 중심지 주변 3x3을 평지로 정리
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
+  // 3×2 중심지와 둘레 한 칸을 평지로 정리한다. centerX/centerY는 북서쪽 기준점이다.
+  for (let dy = -1; dy <= 2; dy++) {
+    for (let dx = -1; dx <= 3; dx++) {
       const t = tiles[centerY + dy]?.[centerX + dx];
       if (t && t.terrain !== 'river') {
         t.terrain = 'plain';

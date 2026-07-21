@@ -1,4 +1,4 @@
-import { buildingFootprintSize } from './buildings';
+import { buildingFootprintDims } from './buildings';
 import { CONFIG } from './config';
 import { revealAround } from './exploration';
 import type { ForeignSite, GameState } from './types';
@@ -39,10 +39,10 @@ function lineTiles(from: { x: number; y: number }, to: { x: number; y: number })
 export function passageRouteToSite(state: GameState, site: ForeignSite): { x: number; y: number }[] {
   const center = state.buildings.find(building => building.type === 'center');
   if (!center) return [];
-  const centerSize = buildingFootprintSize(center.type);
+  const centerDims = buildingFootprintDims(center);
   const from = {
-    x: Math.round(center.x + (centerSize - 1) / 2),
-    y: Math.round(center.y + (centerSize - 1) / 2),
+    x: Math.round(center.x + (centerDims.w - 1) / 2),
+    y: Math.round(center.y + (centerDims.h - 1) / 2),
   };
   const to = {
     x: Math.round(site.x + (site.width - 1) / 2),

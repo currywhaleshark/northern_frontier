@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { combatSpriteDescriptor, tacticalGroupCapabilities } from '../../game/combatCapabilities';
 import { CONFIG } from '../../game/config';
 import {
@@ -754,6 +754,163 @@ function arrowProjectileCountForZone(
   return hasArrowShooter ? Math.min(12, requestedArrows) : 0;
 }
 
+interface ArrowProjectileAssignment {
+  shooterGroupId: string;
+  targetGroupId: string;
+}
+
+interface ArrowProjectilePath extends ArrowProjectileAssignment {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  controlX: number;
+  controlY: number;
+}
+
+type ArrowProjectileStyle = CSSProperties & {
+  '--projectile-dx': string;
+  '--projectile-dy': string;
+};
+
+export function arrowProjectileAssignmentsForZone(
+  event: TacticalAnimationEvent | null,
+  defenders: TacticalDefenderGroup[],
+  raiders: TacticalRaiderGroup[],
+): ArrowProjectileAssignment[] {
+  const projectileCount = arrowProjectileCountForZone(event, defenders, raiders);
+  if (!event || projectileCount === 0) return [];
+
+  const defenderShot = event.side !== 'raider';
+  const shooters = defenderShot
+    ? defenders.filter(group => group.count - group.wounded - group.killed > 0 &&
+      group.weapon !== 'musket' && defenderFiringForEvent(event, group))
+    : raiders.filter(group => group.count - group.killed > 0 && group.revealed &&
+      raiderShotKind(group) === 'arrow' && raiderFiringForEvent(event, group));
+  const targets = defenderShot
+    ? raiders.filter(group => group.count - group.killed > 0 && group.revealed)
+    : defenders.filter(group => group.count - group.wounded - group.killed > 0);
+  if (shooters.length === 0 || targets.length === 0) return [];
+
+  return Array.from({ length: projectileCount }, (_, index) => {
+    const shooter = shooters[index % shooters.length];
+    const preferredTarget = targets.find(group => group.id === shooter.targetGroupId);
+    const target = preferredTarget ?? targets[index % targets.length];
+    return { shooterGroupId: shooter.id, targetGroupId: target.id };
+  });
+}
+
+function projectileSpriteRect(groupElement: HTMLElement, index: number): DOMRect {
+  const sprites = Array.from(groupElement.querySelectorAll<HTMLElement>(
+    '.tactical-sprite:not(.faded):not(.falling), .tactical-raider-unknown',
+  ));
+  return (sprites[index % Math.max(1, sprites.length)] ?? groupElement).getBoundingClientRect();
+}
+
+function measureArrowProjectilePaths(
+  root: HTMLElement,
+  assignments: ArrowProjectileAssignment[],
+): ArrowProjectilePath[] {
+  const rootRect = root.getBoundingClientRect();
+  const groups = Array.from(root.querySelectorAll<HTMLElement>('[data-tactical-group-id]'));
+  const groupElement = (groupId: string) =>
+    groups.find(element => element.dataset.tacticalGroupId === groupId) ?? null;
+
+  return assignments.flatMap((assignment, index) => {
+    const shooterElement = groupElement(assignment.shooterGroupId);
+    const targetElement = groupElement(assignment.targetGroupId);
+    if (!shooterElement || !targetElement) return [];
+    const shooterRect = projectileSpriteRect(shooterElement, index);
+    const targetRect = projectileSpriteRect(targetElement, index * 3 + 1);
+    const shooterCenterX = shooterRect.left + shooterRect.width / 2;
+    const targetCenterX = targetRect.left + targetRect.width / 2;
+    const direction = targetCenterX >= shooterCenterX ? 1 : -1;
+    const scatter = ((index * 17) % 13) - 6;
+    const startX = shooterCenterX - rootRect.left + direction * Math.min(26, shooterRect.width * 0.18);
+    const startY = shooterRect.top - rootRect.top + shooterRect.height * 0.5 + scatter * 0.35;
+    const endX = targetCenterX - rootRect.left - direction * Math.min(22, targetRect.width * 0.14);
+    const endY = targetRect.top - rootRect.top + targetRect.height * 0.56 + scatter;
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const arcHeight = Math.min(58, Math.max(20, Math.abs(dx) * 0.13));
+    return [{
+      ...assignment,
+      startX,
+      startY,
+      endX,
+      endY,
+      controlX: startX + dx * 0.5,
+      controlY: startY + dy * 0.5 - arcHeight * 2,
+    }];
+  });
+}
+
+interface OrderArrowPath {
+  key: string;
+  kind: 'move' | 'target';
+  d: string;
+}
+
+// 지휘 단계 명령 화살표 — 진형이동 예약(녹색)·집중 표적(붉은)을 무대 위 포물선으로 보여준다.
+// 실제 예약 상태는 defenderGroups가 단일 소스고, 여기서는 DOM 위치만 측정한다.
+function measureOrderArrowPaths(
+  root: HTMLElement,
+  defenders: TacticalDefenderGroup[],
+  assault: boolean,
+): OrderArrowPath[] {
+  const rootRect = root.getBoundingClientRect();
+  const groups = Array.from(root.querySelectorAll<HTMLElement>('[data-tactical-group-id]'));
+  const elementFor = (groupId: string) =>
+    groups.find(element => element.dataset.tacticalGroupId === groupId) ?? null;
+  const paths: OrderArrowPath[] = [];
+  for (const group of defenders) {
+    const sourceElement = elementFor(group.id);
+    if (!sourceElement) continue;
+    const sourceRect = sourceElement.getBoundingClientRect();
+    const startX = sourceRect.left - rootRect.left + sourceRect.width / 2;
+    const startY = sourceRect.top - rootRect.top + sourceRect.height * 0.3;
+    const pushArc = (kind: OrderArrowPath['kind'], endX: number, endY: number) => {
+      const dx = endX - startX;
+      const arc = Math.max(26, Math.min(72, Math.abs(dx) * 0.22 + 18));
+      paths.push({
+        key: `${group.id}-${kind}`,
+        kind,
+        d: `M ${startX} ${startY} Q ${startX + dx / 2} ${Math.min(startY, endY) - arc} ${endX} ${endY}`,
+      });
+    };
+    if (group.command === 'redeploy' && group.pendingLine) {
+      const laneElement = root.querySelector<HTMLElement>(
+        `.tactical-defender-rank [data-formation-line="${group.pendingLine}"]`,
+      );
+      if (laneElement) {
+        const laneRect = laneElement.getBoundingClientRect();
+        pushArc(
+          'move',
+          laneRect.left - rootRect.left + laneRect.width / 2,
+          laneRect.top - rootRect.top + laneRect.height * 0.42,
+        );
+      }
+    } else if (group.command === 'advance' || group.command === 'fallback') {
+      // 구역 이동 예약 — 목적지 구역은 화면 밖이므로 무대 가장자리를 향해 그린다
+      const towardEnemy = group.command === 'advance';
+      const movesLeft = assault ? !towardEnemy : towardEnemy;
+      pushArc('move', movesLeft ? 20 : rootRect.width - 20, Math.max(28, startY - 24));
+    }
+    if (group.targetSource === 'player' && group.targetGroupId) {
+      const targetElement = elementFor(group.targetGroupId);
+      if (targetElement) {
+        const targetRect = targetElement.getBoundingClientRect();
+        pushArc(
+          'target',
+          targetRect.left - rootRect.left + targetRect.width / 2,
+          targetRect.top - rootRect.top + targetRect.height * 0.25,
+        );
+      }
+    }
+  }
+  return paths;
+}
+
 function scarStyle(zoneId: string, index: number): CSSProperties {
   const seed = (zoneId.charCodeAt(0) + zoneId.length * 7) * 31 + index * 53;
   return {
@@ -785,6 +942,9 @@ export function TacticalZoneColumn({
   onSelectTarget,
   onTurnGroup,
 }: Props) {
+  const zoneRef = useRef<HTMLElement>(null);
+  const [arrowProjectilePaths, setArrowProjectilePaths] = useState<ArrowProjectilePath[]>([]);
+  const [orderArrowPaths, setOrderArrowPaths] = useState<OrderArrowPath[]>([]);
   const focused = zone.id === activeZoneId;
   const showFormationGuides = battle.phase === 'deployment';
   // 우회 이동 중인 조는 정면 랭크에서 빠진다 — 공개 경로면 리본·미니맵 가지에서만 보인다 (계획서 8.6)
@@ -803,14 +963,21 @@ export function TacticalZoneColumn({
   // P8 화차 — 로켓 수는 이벤트 shots.rockets에서만 읽는다 (표시 상한만 UI 몫)
   const zoneHwacha = activeEvent?.kind === 'hwachaVolley' && activeEvent.zoneId === zone.id;
   const hwachaRocketCount = zoneHwacha ? Math.min(12, Math.max(1, activeEvent?.shots?.rockets ?? 1)) : 0;
-  const arrowProjectileCount = arrowProjectileCountForZone(activeEvent, defenders, zoneRaiders);
+  const arrowAssignments = arrowProjectileAssignmentsForZone(activeEvent, defenders, zoneRaiders);
   const frontalProjectileMovesRight = assault
     ? activeEvent?.side !== 'raider'
     : activeEvent?.side === 'raider';
   const projectileMovesRight = activeEvent?.direction === 'rear'
     ? !frontalProjectileMovesRight
     : frontalProjectileMovesRight;
-  const background = tacticalBackgroundAsset(zone.kind, season, battle.assaultKind, zone.order, zone.id);
+  const background = tacticalBackgroundAsset(
+    zone.kind,
+    season,
+    battle.assaultKind,
+    zone.order,
+    zone.id,
+    battle.deploymentForced === 'nightAmbush',
+  );
   const scars = Math.min(9, scarCount);
   const liveBreachEventIndex = battle.phase === 'simulating'
     ? battle.pendingReport?.events.findIndex(item =>
@@ -834,8 +1001,52 @@ export function TacticalZoneColumn({
   const blockadePercent = Math.min(100, currentBlockade / Math.max(0.01, blockadeThreshold) * 100);
   const openRounds = huntSector ? battle.huntOpenSectorRounds?.[zone.id] ?? 0 : 0;
 
+  // 명령 화살표는 지휘 단계에서만 그린다 — 사냥은 이동이 즉시 적용이고 표적 지정이 없다
+  const orderArrowSignature = battle.phase === 'command' && !hunt
+    ? defenders.map(group =>
+      `${group.id}:${group.command ?? ''}:${group.pendingLine ?? ''}:${
+        group.targetSource === 'player' ? group.targetGroupId ?? '' : ''}`).join('|')
+    : '';
+
+  useLayoutEffect(() => {
+    const root = zoneRef.current;
+    if (!root || orderArrowSignature === '') {
+      setOrderArrowPaths([]);
+      return;
+    }
+    const measure = () => setOrderArrowPaths(measureOrderArrowPaths(root, defenders, assault));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+    // 시그니처가 예약 명령·표적 변화를 대표한다. 선택 강조는 배율만 바꾸므로 재측정에 포함한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderArrowSignature, selectedGroupId, assault, zone.id]);
+
+  useLayoutEffect(() => {
+    const root = zoneRef.current;
+    if (!root || arrowAssignments.length === 0) {
+      setArrowProjectilePaths([]);
+      return;
+    }
+    const measure = () => setArrowProjectilePaths(measureArrowProjectilePaths(root, arrowAssignments));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [activeEvent, eventIndex, zone.id]);
+
   return (
     <section
+      ref={zoneRef}
       data-zone-id={zone.id}
       className={`tactical-zone formation-view zone-${zone.kind}${hunt ? ` hunt-zone${zone.id === 'huntDen' ? ' hunt-den' : ' hunt-sector'}` : assault ? ' assault-zone' : ' defense-zone'}${focused ? ' focused' : ''}${visibleBreached ? ' breached' : ''}${burning ? ' burning' : ''}${raidersAdvancing ? ' moving-raiders' : ''}${rearAssaulters.length > 0 ? ' has-rear-assault' : ''}${activeEvent?.groupId ? ' targeted-group-event' : ''}${eventClass(activeEvent, zone.id)}`}
       style={{
@@ -891,25 +1102,58 @@ export function TacticalZoneColumn({
           )}
         </div>
       )}
-      {zoneArson && arrowProjectileCount > 0 && (
+      {zoneArson && arrowProjectilePaths.length > 0 && (
         <div className="tactical-fx-layer arson" key={`arson-${eventIndex}`} aria-hidden="true">
-          {Array.from({ length: arrowProjectileCount }, (_, index) => (
+          {arrowProjectilePaths.map((path, index) => (
             <span
-              key={index}
-              className={`fx-arrow fx-fire-arrow moves-${projectileMovesRight ? 'right' : 'left'}`}
-              style={{ animationDelay: `${index * 55}ms`, bottom: `${164 + (index * 19) % 68}px` }}
+              key={`${path.shooterGroupId}-${path.targetGroupId}-${index}`}
+              className={`fx-arrow fx-fire-arrow positioned moves-${path.endX >= path.startX ? 'right' : 'left'}`}
+              data-projectile-shooter={path.shooterGroupId}
+              data-projectile-target={path.targetGroupId}
+              data-projectile-start-x={path.startX}
+              data-projectile-start-y={path.startY}
+              data-projectile-end-x={path.endX}
+              data-projectile-end-y={path.endY}
+              style={{
+                left: 0,
+                top: 0,
+                animationDelay: `${index * 55}ms`,
+                offsetPath: `path("M ${path.startX} ${path.startY} Q ${path.controlX} ${path.controlY} ${path.endX} ${path.endY}")`,
+                offsetAnchor: 'center',
+                offsetRotate: 'auto',
+                '--projectile-dx': `${path.endX - path.startX}px`,
+                '--projectile-dy': `${path.endY - path.startY}px`,
+              } as ArrowProjectileStyle}
             />
           ))}
-          <span className={`fx-fire-impact moves-${projectileMovesRight ? 'right' : 'left'}`} />
+          <span
+            className="fx-fire-impact positioned"
+            style={{ left: arrowProjectilePaths[0].endX, top: arrowProjectilePaths[0].endY }}
+          />
         </div>
       )}
-      {zoneVolley && arrowProjectileCount > 0 && (
+      {zoneVolley && arrowProjectilePaths.length > 0 && (
         <div className="tactical-fx-layer" key={`fx-${eventIndex}`} aria-hidden="true">
-          {Array.from({ length: arrowProjectileCount }, (_, index) => (
+          {arrowProjectilePaths.map((path, index) => (
             <span
-              key={index}
-              className={`fx-arrow moves-${projectileMovesRight ? 'right' : 'left'}`}
-              style={{ animationDelay: `${index * 60}ms`, bottom: `${168 + (index * 23) % 60}px` }}
+              key={`${path.shooterGroupId}-${path.targetGroupId}-${index}`}
+              className={`fx-arrow positioned moves-${path.endX >= path.startX ? 'right' : 'left'}`}
+              data-projectile-shooter={path.shooterGroupId}
+              data-projectile-target={path.targetGroupId}
+              data-projectile-start-x={path.startX}
+              data-projectile-start-y={path.startY}
+              data-projectile-end-x={path.endX}
+              data-projectile-end-y={path.endY}
+              style={{
+                left: 0,
+                top: 0,
+                animationDelay: `${index * 60}ms`,
+                offsetPath: `path("M ${path.startX} ${path.startY} Q ${path.controlX} ${path.controlY} ${path.endX} ${path.endY}")`,
+                offsetAnchor: 'center',
+                offsetRotate: 'auto',
+                '--projectile-dx': `${path.endX - path.startX}px`,
+                '--projectile-dy': `${path.endY - path.startY}px`,
+              } as ArrowProjectileStyle}
             />
           ))}
         </div>
@@ -1009,6 +1253,7 @@ export function TacticalZoneColumn({
               className={`tactical-raider-group${raider.beastKind ? ' beast-group' : ''}${raider.tigerTier ? ` tier-${raider.tigerTier}` : ''}${raider.unitType ? ` unit-${raider.unitType}` : ''}${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${advancing ? ' advancing' : ''}${doctrineShifting ? ' doctrine-shifting' : ''}${casualtyHit ? ' casualty-hit' : ''}${withdrawing ? ' withdrawing' : ''}${treating ? ' treating' : ''}${leaderMotion}`}
               style={formationStackStyle(stackIndex, lineGroups.length)}
               data-stack-depth={lineGroups.length - 1 - stackIndex}
+              data-tactical-group-id={raider.id}
               key={leaderMotion ? `${raider.id}-${activeEvent?.kind}-${eventIndex}` : raider.id}
               onClick={targetable ? event => {
                 event.stopPropagation();
@@ -1104,6 +1349,7 @@ export function TacticalZoneColumn({
           return (
             <div
               className={`tactical-raider-group rear-assault${raider.confused ? ' confused' : ''}${targetable ? ' targetable' : targetingActive ? ' target-unavailable' : ''}${focusTarget ? ' focus-target' : ''}${meleeAttacker ? ' melee-attacker' : ''}${advancing ? ' advancing' : ''}${doctrineShifting ? ' doctrine-shifting' : ''}${casualtyHit ? ' casualty-hit' : ''}${rearWithdrawing ? ' rear-withdrawing' : ''}`}
+              data-tactical-group-id={raider.id}
               key={raider.id}
               onClick={targetable ? event => {
                 event.stopPropagation();
@@ -1239,6 +1485,7 @@ export function TacticalZoneColumn({
               data-stack-index={stackIndex}
               data-stack-count={lineGroups.length}
               data-stack-depth={lineGroups.length - 1 - stackIndex}
+              data-tactical-group-id={group.id}
               key={recoiling || blockingEscape || prepMotion ? `${group.id}-motion-${eventIndex}` : group.id}
               onClick={commandable ? event => {
                 event.stopPropagation();
@@ -1316,6 +1563,34 @@ export function TacticalZoneColumn({
           );
         })}
       </div>
+      {orderArrowPaths.length > 0 && (
+        <svg className="tactical-order-arrow-layer" aria-hidden="true">
+          <defs>
+            {(['move', 'target'] as const).map(kind => (
+              <marker
+                key={kind}
+                id={`tactical-order-arrow-${kind}-${zone.id}`}
+                viewBox="0 0 10 10"
+                refX="8"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" className={`tactical-order-arrow-head ${kind}`} />
+              </marker>
+            ))}
+          </defs>
+          {orderArrowPaths.map(path => (
+            <path
+              key={path.key}
+              className={`tactical-order-arrow ${path.kind}`}
+              d={path.d}
+              markerEnd={`url(#tactical-order-arrow-${path.kind}-${zone.id})`}
+            />
+          ))}
+        </svg>
+      )}
       {activeEvent?.float && activeEvent.zoneId === zone.id && (
         <span key={`float-${eventIndex}`} className={`tactical-float ${activeEvent.side ?? 'defender'}`}>
           {activeEvent.float}

@@ -214,7 +214,7 @@ export function TopBar({
         <span className={`threat-box${state.threat > 60 ? ' threat-high' : ''}`}>
           위협도 {state.threat.toFixed(0)}
         </span>
-          <TimeControls speed={speed} setSpeed={setSpeed} paused={state.pendingChoice != null || state.tacticalBattle != null || state.tacticalBattleReport != null || state.gameOver != null} />
+          <TimeControls speed={speed} setSpeed={setSpeed} paused={state.pendingChoice != null || state.pendingPromotionNotice != null || state.tacticalBattle != null || state.tacticalBattleReport != null || state.gameOver != null} />
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
           <button className="btn topbar-menu-button" onClick={onOpenMenu} title="게임 메뉴 (Esc)" aria-label="게임 메뉴 열기">
             ☰ <kbd>Esc</kbd>

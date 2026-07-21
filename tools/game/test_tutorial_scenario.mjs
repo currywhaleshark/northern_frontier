@@ -124,6 +124,10 @@ function pushBuilt(state, type, extra = {}) {
   const buildHint = coachSource.indexOf("{ tut: 'build-item-woodShed'");
   const workerHint = coachSource.indexOf("{ tut: 'job-plus-woodSplitter'");
   assert.ok(buildHint >= 0 && workerHint > buildHint, 'coach points to wood yard construction before staffing');
+  assert.match(coachSource, /coachHorizontalPlacement\(rect\.left \+ rect\.width \/ 2, window\.innerWidth\)/,
+    'coach bubble placement follows the actual center of its target');
+  assert.match(coachSource, /'--coach-arrow-offset': `\$\{arrowOffset\}px`/,
+    'coach bubble exposes an independent arrow offset when its body is clamped to the viewport');
 }
 
 {

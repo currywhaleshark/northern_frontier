@@ -131,7 +131,7 @@ export function DockFrame({
               title={`${item.label}${item.shortcut ? ` (${item.shortcut})` : ''}${pinned ? ' · 고정됨' : ''}`}
               onClick={() => onToggleWindow(item.id)}
             >
-              <span aria-hidden="true">{item.icon}</span>
+              <span>{item.icon}</span>
               {item.shortcut && <kbd className="dock-shortcut" aria-hidden="true">{item.shortcut}</kbd>}
             </button>
           );

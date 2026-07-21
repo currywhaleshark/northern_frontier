@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -20,6 +20,15 @@ const sectors = [
   ['huntSectorRavine', 'ravine'],
 ];
 const seasons = ['spring', 'summer', 'autumn', 'winter'];
+const defenseKinds = ['approach', 'wall', 'storehouse', 'center'];
+
+for (const season of seasons) {
+  for (const kind of defenseKinds) {
+    const assetUrl = new URL(`../../public/assets/tactical/${kind}-night-${season}-v1.webp`, import.meta.url);
+    assert.equal(existsSync(assetUrl), true, `${kind} ${season} night background must exist`);
+    assert.ok(statSync(assetUrl).size > 100_000, `${kind} ${season} night background must not be empty`);
+  }
+}
 
 for (const season of seasons) {
   const paths = sectors.map(([zoneId, family], order) => {
@@ -43,6 +52,9 @@ assert.deepEqual(assets.tacticalBackgroundAsset('wall', 'summer', 'banditLair', 
   src: '/assets/tactical/offensive-backgrounds/bandit-panorama-summer-v1.webp',
   size: '200% 100%',
   position: 'right center',
+});
+assert.deepEqual(assets.tacticalBackgroundAsset('wall', 'autumn', undefined, 1, 'villageWall', true), {
+  src: '/assets/tactical/wall-night-autumn-v1.webp',
 });
 
 console.log('tactical background asset tests passed');

@@ -11,6 +11,7 @@ import {
 } from './game/simulation';
 import { hasAnySave, loadGame, saveGame } from './game/saveLoad';
 import { addLog, negotiateTrade, requestTrade, tradeNegotiationOf } from './game/events';
+import { jobWorkforceCounts } from './game/residents';
 import { initAudio, playSfx, setSfxSettings, stopWeatherAmbient, setWeatherAmbient } from './sound/sfx';
 import { initMusic, setMusicScene, setMusicSettings, type MusicScene } from './sound/music';
 import { AlertsPanel } from './components/AlertsPanel';
@@ -20,6 +21,7 @@ import { CourtWindow } from './components/dock/CourtWindow';
 import { FactionsWindow } from './components/dock/FactionsWindow';
 import { ResidentsWindow } from './components/dock/ResidentsWindow';
 import { EventModal } from './components/EventModal';
+import { PromotionModal } from './components/PromotionModal';
 import { TradeDialog } from './components/TradeDialog';
 import { GameCanvas } from './components/GameCanvas';
 import { InspectorPanel } from './components/InspectorPanel';
@@ -68,6 +70,7 @@ import type {
   PreparationActionId, PredatorKind, SpecialItemId, SpecialResidentId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
 import { markScenarioFlag } from './game/scenario';
+import { acknowledgePromotionNotice, upgradeSettlementCenter } from './game/promotion';
 import { createTutorialGame } from './game/tutorialStart';
 import { TutorialCoach } from './components/TutorialCoach';
 import {
@@ -331,7 +334,7 @@ export default function App() {
         for (let i = 0; i < days; i++) {
           const s = stateRef.current;
           if (s.gameOver) break;
-          if (s.pendingChoice || s.tacticalBattle || s.tacticalBattleReport) break;
+          if (s.pendingChoice || s.pendingPromotionNotice || s.tacticalBattle || s.tacticalBattleReport) break;
           advanceDay(s);
         }
         bump();
@@ -410,7 +413,7 @@ export default function App() {
         const tickStart = perf ? performance.now() : 0;
         let ticksProcessed = 0;
         while (n-- > 0) {
-          if (s.pendingChoice || s.tacticalBattle || s.tacticalBattleReport || s.gameOver) break; // 이벤트/전술전/장계/종료 시 자동 정지
+          if (s.pendingChoice || s.pendingPromotionNotice || s.tacticalBattle || s.tacticalBattleReport || s.gameOver) break; // 이벤트/승격/전술전/장계/종료 시 자동 정지
           const runtimeTickStart = runtimePerfStartTime();
           advanceTick(s);
           recordRuntimePerfSince('simulation-tick', runtimeTickStart, {
@@ -435,7 +438,7 @@ export default function App() {
           );
           requestUiRefresh(
             urgentLogAdded ||
-            Boolean(s.pendingChoice || s.tacticalBattle || s.tacticalBattleReport || s.gameOver),
+            Boolean(s.pendingChoice || s.pendingPromotionNotice || s.tacticalBattle || s.tacticalBattleReport || s.gameOver),
           );
         }
       }
@@ -641,6 +644,23 @@ export default function App() {
   const handleUpgradeHousing = (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => {
     const err = upgradeHousingBuilding(stateRef.current, buildingId, targetType);
     if (err) addLog(stateRef.current, err, 'info');
+    bump();
+  };
+
+  const handleUpgradeCenter = (buildingId: number) => {
+    const err = upgradeSettlementCenter(stateRef.current, buildingId);
+    if (err) addLog(stateRef.current, err, 'info');
+    else {
+      setSpeed(0);
+      playSfx('good');
+    }
+    bump();
+  };
+
+  const handleAcknowledgePromotion = () => {
+    const completesCampaign = stateRef.current.pendingPromotionNotice === 'bu';
+    acknowledgePromotionNotice(stateRef.current);
+    if (!completesCampaign) playSfx('good');
     bump();
   };
 
@@ -1049,7 +1069,7 @@ export default function App() {
       if (screen !== 'game' || isEditableTarget(event.target) || slotDialogMode || gameMenuView ||
           weaponDialogOpen || expeditionMusterRequest) return;
       const runtimeState = stateRef.current;
-      if (runtimeState.pendingChoice || runtimeState.tacticalBattle || runtimeState.tacticalBattleReport || runtimeState.gameOver) return;
+      if (runtimeState.pendingChoice || runtimeState.pendingPromotionNotice || runtimeState.tacticalBattle || runtimeState.tacticalBattleReport || runtimeState.gameOver) return;
 
       if (event.code === 'Space') {
         event.preventDefault();
@@ -1196,7 +1216,7 @@ export default function App() {
                   <Minimap
                     state={runtimeState}
                     version={runtimeVersion}
-                    animationActive={speed > 0 && !runtimeState.pendingChoice && !runtimeState.tacticalBattle && !runtimeState.tacticalBattleReport && !runtimeState.gameOver}
+                    animationActive={speed > 0 && !runtimeState.pendingChoice && !runtimeState.pendingPromotionNotice && !runtimeState.tacticalBattle && !runtimeState.tacticalBattleReport && !runtimeState.gameOver}
                     viewportRef={mapViewportRef}
                     selected={selected}
                   />
@@ -1223,6 +1243,7 @@ export default function App() {
               onSetYouthActivity={handleSetYouthActivity}
               onToggleResidentCart={handleToggleResidentCart}
               onUpgradeHousing={handleUpgradeHousing}
+              onUpgradeCenter={handleUpgradeCenter}
               onSetSmithyProduct={handleSetSmithyProduct}
               onSetDryingProduct={handleSetDryingProduct}
               onSetLivestockSpecies={handleSetLivestockSpecies}
@@ -1294,7 +1315,7 @@ export default function App() {
                   <GameCanvas
                     state={runtimeState}
                     version={runtimeVersion}
-                    animationActive={speed > 0 && !runtimeState.pendingChoice && !runtimeState.tacticalBattle && !runtimeState.tacticalBattleReport && !runtimeState.gameOver}
+                    animationActive={speed > 0 && !runtimeState.pendingChoice && !runtimeState.pendingPromotionNotice && !runtimeState.tacticalBattle && !runtimeState.tacticalBattleReport && !runtimeState.gameOver}
                     zoom={uiPrefs.mapZoom}
                     placingType={placingType}
                     selected={selected}
@@ -1322,7 +1343,7 @@ export default function App() {
                 uiPrefs={uiPrefs}
                 onUiPrefsChange={setUiPrefs}
                 shortcutsEnabled={!gameMenuView && !slotDialogMode && !weaponDialogOpen && !expeditionMusterRequest &&
-                  !stateRef.current.pendingChoice && !stateRef.current.tacticalBattle && !stateRef.current.tacticalBattleReport}
+                  !stateRef.current.pendingChoice && !stateRef.current.pendingPromotionNotice && !stateRef.current.tacticalBattle && !stateRef.current.tacticalBattleReport}
               />
             )}
           </RuntimeVersionBoundary>
@@ -1333,7 +1354,19 @@ export default function App() {
               {
                 id: 'jobs',
                 label: '직업 배정',
-                icon: <ManagementDockIcon id="jobs" />,
+                icon: (
+                  <RuntimeVersionBoundary store={uiVersionStore}>
+                    {() => {
+                      const adultIdle = jobWorkforceCounts(stateRef.current, 'idle').adult;
+                      return (
+                        <ManagementDockIcon
+                          id="jobs"
+                          notification={adultIdle > 0 ? `무직 ${adultIdle}명` : undefined}
+                        />
+                      );
+                    }}
+                  </RuntimeVersionBoundary>
+                ),
                 shortcut: 'Q',
                 content: (
                   <RuntimeVersionBoundary store={uiVersionStore}>
@@ -1525,6 +1558,10 @@ export default function App() {
       )}
 
       {state.scenario && <TutorialCoach state={state} />}
+
+      {state.pendingPromotionNotice && state.pendingPromotionNotice !== 'settlement' && (
+        <PromotionModal rank={state.pendingPromotionNotice} onAcknowledge={handleAcknowledgePromotion} />
+      )}
 
       {state.gameOver && (
         <div className="modal-overlay">

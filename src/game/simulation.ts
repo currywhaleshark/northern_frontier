@@ -15,7 +15,7 @@ import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events'
 import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
 import { dailyScenarioTick, resolveScenarioChoice, scenarioSuppressesRandomEvents } from './scenario';
 import { grantYearlyPowder, resolvePetition } from './petition';
-import { checkPromotion } from './promotion';
+import { checkPromotion, resolvePromotionDecreeChoice } from './promotion';
 import { resolveCrackdown, resolveInspection, updateSuspicion } from './suspicion';
 import { generateMap, makeRng } from './map';
 import { isHabitatActive, spawnAnimalHabitats } from './habitats';
@@ -143,7 +143,10 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     lastImmigrationDay: -999,
     lastKimjangYear: 0,
     incidents: createIncidentState(s),
-    specialItems: { wildGinseng: 0, tigerPelt: 0, gyrfalcon: 0 },
+    specialItems: {
+      wildGinseng: 0, tigerPelt: 0, gyrfalcon: 0,
+      boDecree: 0, jinDecree: 0, buDecree: 0,
+    },
     discoveredSpecialItems: [],
     tributeWaivers: 0,
     pendingChoice: null,
@@ -152,6 +155,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     tributeFailStreak: 0,
     tributePaidStreak: 0,
     rank: 'settlement',
+    pendingPromotionNotice: null,
     lastPetitionDay: 0,
     cannonsGranted: 0,
     suspicion: 0,
@@ -217,10 +221,14 @@ function placePrebuilt(state: GameState, type: BuildingTypeId, x: number, y: num
     b.sownArea = 0;
     b.plowOxen = 0;
   }
+  if (type === 'center') {
+    b.w = 3;
+    b.h = 2;
+  }
   if (type === 'jangdokdae') b.fermentBatches = [];
   if (type === 'stable') b.livestock = createDefaultLivestockState();
   state.buildings.push(b);
-  const tiles = buildingFootprintTiles(state, type, x, y) ?? [];
+  const tiles = footprintTilesOf(state, b) ?? [];
   occupyBuildingTiles(state, b);
   for (const tile of tiles) {
     if (tile.terrain === 'forest') tile.terrain = 'plain';
@@ -779,6 +787,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'religion') resolveReligionChoice(state, optionId);
   else if (state.pendingChoice.kind === 'specialResident') resolveSpecialResidentChoice(state, optionId, rng);
   else if (state.pendingChoice.kind === 'scenario') resolveScenarioChoice(state, optionId);
+  else if (state.pendingChoice.kind === 'promotionDecree') resolvePromotionDecreeChoice(state, optionId);
   else resolveTrade(state, optionId);
   reconcileWeaponAssignments(state);
   reconcileMountAssignments(state);
@@ -908,7 +917,7 @@ function endOfDay(state: GameState): void {
   if (!scenarioSuppressesRandomEvents(state)) {
     dailyReligionTick(state, rng); // 떠돌이 무당/노승이 문을 두드린다 (진 이상)
     dailySpecialResidentTick(state, rng); // 귀양 선비 등 이름 있는 특수 주민
-    dailySilverTick(state, rng); // 은맥 발견/재제안/잠채 발각 — 의심 갱신보다 먼저
+    dailySilverTick(state, rng); // 은맥 최초 발견/잠채 발각 — 의심 갱신보다 먼저
     updateSuspicion(state, rng); // 모반 의심 누적과 감찰/견책/토벌 사건
     maybeOpenKimjangEvent(state); // 늦가을~입동의 연례 공동 김장. 다른 모달이 있으면 기간 안에 재시도
     updateSpecialEvents(state, rng); // 기존 제도권 사건과 모달이 겹치면 예정일을 넘겨 다음 날 재시도

@@ -10,9 +10,12 @@ SOURCE_DIR = ROOT / "tools" / "render" / "source_images"
 BUILDING_NORMAL_SOURCE = SOURCE_DIR / "promotion-buildings-topdown-normal-v1.png"
 BUILDING_WINTER_SOURCE = SOURCE_DIR / "promotion-buildings-topdown-winter-v1.png"
 CHARACTER_SOURCE = SOURCE_DIR / "promotion-characters-draft-v1.png"
+CENTER_NORMAL_SOURCE = SOURCE_DIR / "center-promotions-topdown-normal-v1.png"
+CENTER_WINTER_SOURCE = SOURCE_DIR / "center-promotions-topdown-winter-v1.png"
 BUILDING_OUTPUT = ROOT / "public" / "assets" / "promotion-buildings-generated-v1.png"
 LARGE_BUILDING_OUTPUT = ROOT / "public" / "assets" / "promotion-buildings-generated-large-v1.png"
 CHARACTER_OUTPUT = ROOT / "public" / "assets" / "promotion-characters-generated-v1.png"
+CENTER_OUTPUT = ROOT / "public" / "assets" / "center-promotions-generated-v1.png"
 
 TILE_SIZE = 28
 SPRITE_HEIGHT = 40
@@ -24,6 +27,9 @@ SOURCE_BUILDING_COLUMNS = 4
 SOURCE_BUILDING_ROWS = 3
 CHARACTER_COLUMNS = 6
 CHARACTER_ROWS = 2
+CENTER_COLUMNS = 3
+CENTER_ROWS = 2
+CENTER_SOURCE_SPLITS = (0.0, 0.29, 0.64, 1.0)
 
 
 def is_key_pixel(r: int, g: int, b: int) -> bool:
@@ -156,9 +162,35 @@ def compose_characters() -> None:
     print(f"wrote {CHARACTER_OUTPUT}")
 
 
+def compose_center_promotions() -> None:
+    output = Image.new(
+        "RGBA",
+        (CENTER_COLUMNS * LARGE_TILE_SIZE, CENTER_ROWS * LARGE_SPRITE_HEIGHT),
+        (0, 0, 0, 0),
+    )
+    for output_row, source in enumerate((CENTER_NORMAL_SOURCE, CENTER_WINTER_SOURCE)):
+        image = Image.open(source).convert("RGB")
+        for col in range(CENTER_COLUMNS):
+            left = round(image.width * CENTER_SOURCE_SPLITS[col])
+            right = round(image.width * CENTER_SOURCE_SPLITS[col + 1])
+            crop = remove_key(image.crop((left, 0, right, image.height)))
+            sprite = fit_to_cell(
+                crop,
+                max_width=LARGE_TILE_SIZE - 2,
+                max_height=LARGE_SPRITE_HEIGHT - 4,
+                tile_size=LARGE_TILE_SIZE,
+                sprite_height=LARGE_SPRITE_HEIGHT,
+            )
+            output.alpha_composite(sprite, (col * LARGE_TILE_SIZE, output_row * LARGE_SPRITE_HEIGHT))
+    CENTER_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    output.save(CENTER_OUTPUT)
+    print(f"wrote {CENTER_OUTPUT}")
+
+
 def main() -> None:
     compose_buildings()
     compose_characters()
+    compose_center_promotions()
 
 
 if __name__ == "__main__":

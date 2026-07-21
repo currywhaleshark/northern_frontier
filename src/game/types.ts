@@ -521,10 +521,11 @@ export interface SilverVeinState {
   x: number;
   y: number;
   discoveredDay: number;
+  discoveredAmount?: number; // 최초 발견 순간 확정된 은 매장량. 다시 열어도 변하지 않는다
   minedTotal: number;      // 잠채/설점으로 캔 은 누계 (발각 확률에 비례)
   exposed?: boolean;       // 잠채가 조정에 알려졌는지 (스파이크는 1회)
   sealBroken?: boolean;    // 봉인 명령을 어기고 캐는 중인지 (발각 시 더 아프다)
-  lastOfferDay?: number;   // 묻어둔 은맥의 재제안 쿨다운 기준일
+  lastOfferDay?: number;   // 마지막으로 은맥 선택지를 연 날(기록·구 저장 호환)
 }
 
 export interface ChoiceOption {
@@ -536,7 +537,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'promotionDecree';
   title: string;
   body: string;
   illustration?: {
@@ -572,7 +573,9 @@ export interface TerritoryViolation {
   lastWorkDay?: number;
 }
 
-export type SpecialItemId = 'wildGinseng' | 'tigerPelt' | 'gyrfalcon';
+export type SpecialItemId =
+  | 'wildGinseng' | 'tigerPelt' | 'gyrfalcon'
+  | 'boDecree' | 'jinDecree' | 'buDecree';
 export type PredatorKind = 'wolf' | 'tiger';
 export type TigerTier = 'tiger' | 'greatTiger' | 'mountainLord';
 export type WildlifeKind = PredatorKind | 'boar';
@@ -1467,6 +1470,7 @@ export interface GameState {
   tributeFailStreak: number;          // 연속 미납 횟수 (2년 연속이면 명성 하락 가중)
   tributePaidStreak: number;          // 연속 납부 년수 (승격 조건의 "공물 성실도")
   rank: Rank;                         // 현재 승격 단계
+  pendingPromotionNotice: Rank | null; // 중심지 업그레이드 뒤 표시할 승격·해금 안내
   lastPetitionDay: number;            // 마지막 청원 승인일 (계절당 1회 쿨다운)
   cannonsGranted: number;             // 조정이 하사한 불랑기포 수 (배치 가능 상한)
   // ── 모반 의심 (화약 자급/월경 교역/북방 유착이 조정의 눈총을 산다) ──

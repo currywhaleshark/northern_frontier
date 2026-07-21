@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { CONFIG } from '../game/config';
 import type { Difficulty } from '../game/types';
+import { MenuSnowLayer } from './MenuSnowLayer';
 
 interface Props {
   canContinue: boolean;
@@ -21,6 +22,7 @@ export function MainMenu({
 
   return (
     <div className="main-menu">
+      <MenuSnowLayer />
       <div className="menu-panel">
         <h1 className="menu-title">북새 <span className="hanja">北塞</span></h1>
         <div className="menu-subtitle">육진 너머 — 혹한의 개척지</div>

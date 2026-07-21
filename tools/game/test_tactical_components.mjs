@@ -21,6 +21,20 @@ assert.match(screenSource, /<EnemyPlanPanel\b/, 'the preparation screen must del
 assert.doesNotMatch(screenSource, /flankerIntel/, 'the legacy one-line flanker intel must be removed');
 assert.match(screenSource, /enemyPlanCounterLabelsForAction/,
   'preparation cards must derive counter tags from revealed stratagems');
+assert.match(screenSource, /className="tactical-preparation-roster"[\s\S]*mode="preparation"/,
+  'the preparation phase must show the friendly unit cards before deployment begins');
+assert.match(screenSource, /className="tactical-action-detail"[\s\S]{0,80}role="tooltip"/,
+  'compact preparation cards must move their explanation into a hover/focus detail');
+assert.match(cssSource, /\.tactical-action\s*\{[\s\S]*min-height:\s*42px;/,
+  'preparation choices must stay compact enough to avoid a long vertical control scroll');
+assert.match(cssSource, /\.tactical-flank-route-sides button\s*\{[\s\S]*white-space:\s*nowrap;/,
+  'flank-route direction buttons must keep their labels horizontal');
+assert.match(screenSource, /aria-label="우회로 차단 배치"[\s\S]*placeTacticalRouteBlocker\(current, selectedGroup\.id, view\.route\.side\)/,
+  'deployment must offer a visible click path for placing the selected group as a route blocker');
+assert.match(screenSource, /aria-label="우회로 부대 운용"[\s\S]*onSetCommand\(selectedGroup\.id, 'flankRoute'\)/,
+  'command phase must expose a visible route-raid action for the selected blocker');
+assert.match(commandPresentationSource, /CONTEXT_COMMANDS[\s\S]*'flankRoute'/,
+  'route raid must also remain a contextual quick command for blocker groups');
 assert.match(screenSource, /const TACTICAL_PLAYBACK_NORMAL_SCALE = 1\.6;/,
   'normal tactical playback must run slower than the authored event timing');
 assert.equal(
@@ -162,6 +176,12 @@ for (const className of [
 }
 assert.match(zoneSource, /data-zone-id=\{zone\.id\}/, 'zone identity must remain on the extracted section');
 assert.match(zoneSource, /onSelectGroup\(group\.id,/, 'battlefield groups must remain selectable');
+assert.match(cssSource, /\.tactical-field-group\.selectable\s*\{[\s\S]*?pointer-events:\s*none;/,
+  'empty battlefield group layout must not capture selection clicks');
+assert.match(cssSource, /\.tactical-field-group\.selectable > \.tactical-unit-line,[\s\S]*?\.tactical-field-group\.selectable > span[\s\S]*?pointer-events:\s*auto;/,
+  'friendly sprite bounds and their label must remain selectable');
+assert.match(cssSource, /\.tactical-raider-group\.targetable > \.tactical-raider-sprites,[\s\S]*?\.tactical-raider-group\.targetable > span[\s\S]*?pointer-events:\s*auto;/,
+  'enemy sprite bounds and their label must remain targetable');
 assert.match(zoneSource, /onSelectTarget/,
   'revealed enemy groups must expose the selected friendly group target callback');
 assert.match(popoverSource, /from ['"]\.\/commandText['"]/,

@@ -11,6 +11,8 @@ const inspectorSource = readFileSync(new URL('../../src/components/InspectorPane
 const dockPresentationSource = readFileSync(new URL('../../src/ui/dockPresentation.ts', import.meta.url), 'utf8');
 const minimapSource = readFileSync(new URL('../../src/components/Minimap.tsx', import.meta.url), 'utf8');
 const topBarSource = readFileSync(new URL('../../src/components/TopBar.tsx', import.meta.url), 'utf8');
+const jobPanelSource = readFileSync(new URL('../../src/components/JobPanel.tsx', import.meta.url), 'utf8');
+const dockIconSource = readFileSync(new URL('../../src/components/ManagementDockIcon.tsx', import.meta.url), 'utf8');
 
 for (const id of ['residents', 'factions', 'court', 'incidents']) {
   assert.match(dockPresentationSource, new RegExp(`['"]${id}['"]`), `${id} must be a supported dock window`);
@@ -53,6 +55,16 @@ assert.match(appSource, /handleSelectResidentFromDock[\s\S]*centerViewportOnTile
   'dock resident selection must center the map on that resident');
 assert.match(minimapSource, /export function centerViewportOnTile/,
   'map centering must be reusable outside the minimap control');
+assert.doesNotMatch(minimapSource, /<strong>지도<\/strong>/,
+  'the minimap must not repeat a second title inside its titled dock window');
+assert.match(appSource, /jobWorkforceCounts\(stateRef\.current, ['"]idle['"]\)\.adult[\s\S]*notification=\{adultIdle > 0 \? `무직 \$\{adultIdle\}명`/,
+  'the jobs icon must show a live adult-unemployment notice even while its window is closed');
+assert.match(dockIconSource, /has-notification[\s\S]*dock-notification[\s\S]*role="status"/,
+  'management dock notifications must highlight their icon and expose a status bubble');
+assert.match(jobPanelSource, /무직 <strong>성인 \{idle\.adult\}명<\/strong> · 소년 \{idle\.youth\}명/,
+  'unemployed residents must be split into adult and youth counts');
+assert.match(jobPanelSource, /성인[\s\S]*\{count\.adult\}[\s\S]*소년 \{count\.youth\}/,
+  'each job count must split adult workers from youth workers');
 assert.match(factionSource, /onRequestTrade\(faction\.name\)/,
   'faction trading must remain available in its dock window');
 assert.match(courtSource, /onSetTributeReserve[\s\S]*onPetition[\s\S]*onUseLuxuryGood/,

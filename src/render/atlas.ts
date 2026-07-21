@@ -117,6 +117,10 @@ import {
   SPECIAL_RESIDENT_SHEET,
   specialResidentSourceRect,
 } from './specialResidentAssets';
+import {
+  CENTER_PROMOTION_SHEET,
+  centerPromotionSourceRect,
+} from './centerPromotionAssets';
 
 const PITCH = 17;
 const T = 16;
@@ -152,6 +156,7 @@ let foreignResidentSheet: HTMLImageElement | null = null;
 let foreignSiteCoreSheet: HTMLImageElement | null = null;
 let foreignSitePropSheet: HTMLImageElement | null = null;
 let specialResidentSheet: HTMLImageElement | null = null;
+let centerPromotionSheet: HTMLImageElement | null = null;
 let loaded = 0;
 let started = false;
 
@@ -239,6 +244,9 @@ function ensureLoaded(): void {
   specialResidentSheet = new Image();
   specialResidentSheet.onload = () => { loaded++; };
   specialResidentSheet.src = SPECIAL_RESIDENT_SHEET.src;
+  centerPromotionSheet = new Image();
+  centerPromotionSheet.onload = () => { loaded++; };
+  centerPromotionSheet.src = CENTER_PROMOTION_SHEET.src;
   const characterSheet = new Image();
   characterSheet.onload = () => {
     generatedCharacterSheet = characterSheet;
@@ -249,7 +257,7 @@ function ensureLoaded(): void {
 
 export function atlasReady(): boolean {
   ensureLoaded();
-  return loaded >= 25;
+  return loaded >= 26;
 }
 
 // 아틀라스가 준비되면 아틀라스, 아니면 임시 그래픽
@@ -351,6 +359,19 @@ function blitLargePromotionBuilding(
   if (!rect) return;
   const scale = p.size / PROMOTION_LARGE_BUILDING_SHEET.tileSize;
   const destHeight = PROMOTION_LARGE_BUILDING_SHEET.spriteHeight * scale;
+  ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
+}
+
+function blitCenterPromotion(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  p: BuildingDrawParams,
+): void {
+  if (!p.rank) return;
+  const rect = centerPromotionSourceRect(p.rank, p.season);
+  if (!rect) return;
+  const scale = p.size / CENTER_PROMOTION_SHEET.tileSize;
+  const destHeight = CENTER_PROMOTION_SHEET.spriteHeight * scale;
   ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
 }
 
@@ -857,7 +878,7 @@ function drawWallFamilyBuilding(ctx: CanvasRenderingContext2D, p: BuildingDrawPa
 }
 
 export const atlasSprites: SpriteAPI = {
-  id: 'kenney-atlas-river-mask-historical-ground-generated-objects-buildings-promotion-specialized-special-residents-v2',
+  id: 'kenney-atlas-river-mask-historical-ground-generated-objects-buildings-promotion-centers-specialized-special-residents-v3',
 
   drawTerrain(ctx, p) {
     if (!sheet) return;
@@ -927,6 +948,13 @@ export const atlasSprites: SpriteAPI = {
     const spr = BUILDING_SPRITES[p.type];
     const alpha = p.ghost ? 0.75 : p.built ? 1 : 0.55;
     ctx.globalAlpha = alpha;
+
+    if (p.type === 'center' && p.rank && p.rank !== 'settlement' && centerPromotionSheet) {
+      blitCenterPromotion(ctx, centerPromotionSheet, p);
+      ctx.globalAlpha = 1;
+      drawProgressBar(ctx, p);
+      return;
+    }
 
     if (drawWallFamilyBuilding(ctx, p)) {
       ctx.globalAlpha = 1;

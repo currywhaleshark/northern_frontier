@@ -1189,7 +1189,6 @@ export const CONFIG = {
   silver: {
     veinDailyChance: 0.015,   // 채광이 있었던 날의 발견 확률
     pityMiningDays: 60,       // 누적 채광일이 이에 달하면 강제 발견 (게임당 최소 1회 보장)
-    reofferCooldownDays: 12,  // 묻어둔 은맥의 재제안 간격 (그 광상을 계속 캘 때)
     sanctionChance: 0.25,     // 보고 시 설점 허가 확률 (나머지는 봉인 명령)
     sanctionTaxRatio: 0.6,    // 설점 채굴 산출 중 조정 몫
     reportReputation: 4,      // 보고 즉시 명성

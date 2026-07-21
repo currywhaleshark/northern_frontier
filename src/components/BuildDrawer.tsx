@@ -106,9 +106,14 @@ export function BuildDrawer({
     ? buildCategoryFor(placingType)
     : null;
   // BUILD_MENU_ORDER에서 온 카테고리 내 순서는 그대로 두고, 현재 가능한 건물만 앞에 모은다.
-  const buildItems = activeCategory?.types.map(type => ({ type, reason: unavailableReason(state, type) })) ?? [];
-  const availableBuildItems = buildItems.filter(item => item.reason == null);
-  const unavailableBuildItems = buildItems.filter(item => item.reason != null);
+  const buildItems = activeCategory?.types.map(type => ({
+    type,
+    reason: unavailableReason(state, type),
+    rankLocked: !isBuildingUnlocked(state.rank, type),
+    resourceShortage: isBuildingUnlocked(state.rank, type) && !canAfford(state, BUILDING_DEFS[type]),
+  })) ?? [];
+  const currentRankBuildItems = buildItems.filter(item => !item.rankLocked);
+  const rankLockedBuildItems = buildItems.filter(item => item.rankLocked);
 
   const rememberCategory = (category: BuildCategoryId) => {
     onUiPrefsChange(current => current.buildDrawerLastCategory === category
@@ -168,13 +173,18 @@ export function BuildDrawer({
     setPlacingType(type);
   };
 
-  const renderBuildItem = ({ type, reason }: { type: BuildableBuildingTypeId; reason: string | null }) => {
+  const renderBuildItem = ({ type, reason, rankLocked, resourceShortage }: {
+    type: BuildableBuildingTypeId;
+    reason: string | null;
+    rankLocked: boolean;
+    resourceShortage: boolean;
+  }) => {
     const def = BUILDING_DEFS[type];
     return (
       <button
         key={type}
         type="button"
-        className="build-drawer-item"
+        className={`build-drawer-item${reason ? ' disabled' : ''}${rankLocked ? ' rank-locked' : ''}${resourceShortage ? ' resource-shortage' : ''}`}
         data-tut={`build-item-${type}`}
         aria-disabled={reason != null}
         aria-describedby={tooltipType === type ? 'build-drawer-tooltip' : undefined}
@@ -188,7 +198,8 @@ export function BuildDrawer({
       >
         <BuildingThumb type={type} state={state} />
         <strong className="build-drawer-item-name">{def.name}</strong>
-        {reason && <span className="build-drawer-item-lock" aria-hidden="true">🔒</span>}
+        {rankLocked && <span className="build-drawer-item-lock" aria-hidden="true">🔒</span>}
+        {resourceShortage && <span className="build-drawer-item-status">자원 부족</span>}
       </button>
     );
   };
@@ -229,15 +240,15 @@ export function BuildDrawer({
           </header>
           <div className="build-drawer-list">
             <div className="build-drawer-group-label" role="heading" aria-level={2}>
-              <span>지금 건설 가능</span><small>{availableBuildItems.length}종</small>
+              <span>현재 단계</span><small>{currentRankBuildItems.length}종 · 자원 부족 항목도 여기에 표시</small>
             </div>
-            {availableBuildItems.map(renderBuildItem)}
-            {unavailableBuildItems.length > 0 && (
+            {currentRankBuildItems.map(renderBuildItem)}
+            {rankLockedBuildItems.length > 0 && (
               <div className="build-drawer-group-label unavailable" role="heading" aria-level={2}>
-                <span>현재 불가</span><small>{unavailableBuildItems.length}종 · 이유는 항목에 올려 보십시오</small>
+                <span>승격 후 해금</span><small>{rankLockedBuildItems.length}종</small>
               </div>
             )}
-            {unavailableBuildItems.map(renderBuildItem)}
+            {rankLockedBuildItems.map(renderBuildItem)}
           </div>
         </section>
       )}

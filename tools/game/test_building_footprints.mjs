@@ -51,7 +51,7 @@ const SINGLE_TILE = [
   'watchtower',
 ];
 
-const TWO_TILE = Object.keys(buildings.BUILDING_DEFS).filter(type => !SINGLE_TILE.includes(type));
+const TWO_TILE = Object.keys(buildings.BUILDING_DEFS).filter(type => type !== 'center' && !SINGLE_TILE.includes(type));
 
 function boostResources(state) {
   for (const key of Object.keys(state.resources)) state.resources[key] = 1000;
@@ -84,16 +84,22 @@ function footprintIds(state, type, x, y) {
   for (const type of TWO_TILE) {
     assert.equal(buildings.buildingFootprintSize(type), 2, `${type} becomes 2x2`);
   }
+  assert.deepEqual(buildings.buildingFootprintDims({ type: 'center' }), { w: 3, h: 2 },
+    'new centers reserve a fixed 3x2 footprint');
+  assert.deepEqual(buildings.buildingFootprintDims({ type: 'center', w: 2, h: 2 }), { w: 2, h: 2 },
+    'migrated centers can preserve a collision-safe 2x2 footprint');
 }
 
 {
   const state = simulation.newGame(2026070701);
   for (const building of state.buildings) {
-    const size = buildings.buildingFootprintSize(building.type);
+    const dims = buildings.buildingFootprintDims(building);
     const ids = footprintIds(state, building.type, building.x, building.y);
-    assert.equal(ids.length, size * size, `${building.type} footprint has ${size * size} tiles`);
+    assert.equal(ids.length, dims.w * dims.h, `${building.type} footprint has ${dims.w * dims.h} tiles`);
     assert.ok(ids.every(id => id === building.id), `${building.type} prebuilt footprint is occupied by its id`);
   }
+  const center = state.buildings.find(building => building.type === 'center');
+  assert.deepEqual({ w: center.w, h: center.h }, { w: 3, h: 2 });
 }
 
 {

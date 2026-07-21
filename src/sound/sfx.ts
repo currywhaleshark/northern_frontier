@@ -12,6 +12,7 @@ export const BATTLE_SAMPLE_PATHS = {
   muster: '/assets/audio/battle/muster.mp3',
   melee1: '/assets/audio/battle/melee-1.mp3',
   melee2: '/assets/audio/battle/melee-2.mp3',
+  nightAmbushAlarm: '/assets/audio/battle/night-ambush-alarm.mp3',
 } as const;
 
 export const WEAPON_SHOT_STAGGER_MS = { arrow: 45, musket: 70, cannon: 110 } as const;
@@ -452,6 +453,60 @@ export function setBattleDrums(active: boolean): void {
     battleDrumBeat = (battleDrumBeat + 1) % 4;
     battleDrumHit(battleDrumBeat === 0);
   }, 640);
+}
+
+// ── 야습 경보 루프: 강제 자동배치 연출 동안만 제공 음원을 반복한다 ──
+
+let nightAmbushAlarmRequested = false;
+let nightAmbushAlarmTimer: number | null = null;
+let nightAmbushAlarmBeat = 0;
+const nightAmbushAlarmSources = new Set<AudioBufferSourceNode>();
+
+function stopNightAmbushAlarmSources(): void {
+  if (nightAmbushAlarmTimer != null) {
+    window.clearInterval(nightAmbushAlarmTimer);
+    nightAmbushAlarmTimer = null;
+  }
+  for (const source of nightAmbushAlarmSources) {
+    source.onended = null;
+    try { source.stop(); } catch { /* already stopped */ }
+  }
+  nightAmbushAlarmSources.clear();
+}
+
+function playNightAmbushAlarmStrike(): void {
+  if (!ctx || !master || !nightAmbushAlarmRequested) return;
+  const buffer = battleSamples.get('nightAmbushAlarm');
+  if (!buffer) return;
+  const source = ctx.createBufferSource();
+  const gain = ctx.createGain();
+  source.buffer = buffer;
+  source.playbackRate.value = 0.98 + (nightAmbushAlarmBeat % 3) * 0.018;
+  gain.gain.value = nightAmbushAlarmBeat % 4 === 0 ? 0.58 : 0.46;
+  source.connect(gain).connect(battleLimiter ?? master);
+  source.onended = () => nightAmbushAlarmSources.delete(source);
+  nightAmbushAlarmSources.add(source);
+  nightAmbushAlarmBeat += 1;
+  source.start();
+}
+
+export function setNightAmbushAlarm(active: boolean): void {
+  nightAmbushAlarmRequested = active;
+  if (!active) {
+    stopNightAmbushAlarmSources();
+    return;
+  }
+
+  const start = () => {
+    if (!nightAmbushAlarmRequested || nightAmbushAlarmTimer != null || !ctx || !master) return;
+    nightAmbushAlarmBeat = 0;
+    playNightAmbushAlarmStrike();
+    // 원본의 뒤쪽 무음이 시작되기 전에 다음 타격을 겹쳐 긴급한 연타로 들리게 한다.
+    nightAmbushAlarmTimer = window.setInterval(playNightAmbushAlarmStrike, 650);
+  };
+
+  if (battleSamples.has('nightAmbushAlarm')) start();
+  else void ensureBattleSamples().then(start);
 }
 
 // ── 바람 앰비언트: 악천후 동안 낮게 깔리는 루프 ──

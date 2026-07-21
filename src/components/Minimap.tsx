@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type RefObject } from 'react';
 import { CONFIG } from '../game/config';
-import { buildingFootprintSize } from '../game/buildings';
+import { buildingFootprintDims } from '../game/buildings';
 import { FACTIONS } from '../game/constants';
 import { visibleMinimapRaid, visibleMinimapSites } from '../game/minimap';
 import { activeExpeditionTargetMarkers } from '../game/expeditionTargets';
@@ -34,8 +34,8 @@ export function centerViewportOnTile(box: HTMLDivElement, x: number, y: number):
 export function centerViewportOnSettlement(state: GameState, box: HTMLDivElement): void {
   const center = state.buildings.find(building => building.type === 'center');
   if (!center) return;
-  const size = buildingFootprintSize(center.type);
-  centerViewportOnTile(box, center.x + (size - 1) / 2, center.y + (size - 1) / 2);
+  const dims = buildingFootprintDims(center);
+  centerViewportOnTile(box, center.x + (dims.w - 1) / 2, center.y + (dims.h - 1) / 2);
 }
 
 const TERRAIN_COLORS: Record<Terrain, string> = {
@@ -366,7 +366,6 @@ export function Minimap({ state, version, animationActive, viewportRef, selected
   return (
     <div className={`minimap-panel${visibleRaid ? ' raid-alert' : targetMarkers.length > 0 ? ' hunt-alert' : ''}`}>
       <div className="minimap-heading">
-        <strong>지도</strong>
         {visibleRaid && <span className="minimap-alert-label">습격 경보</span>}
         {!visibleRaid && targetMarkers.length > 0 && <span className="minimap-target-label">토벌 목표</span>}
         <button type="button" className="minimap-center-btn" title="마을 중심으로 이동" aria-label="마을 중심으로 이동" onClick={navigateToCenter}>◎</button>

@@ -45,6 +45,7 @@ interface Props {
   onSetYouthActivity: (id: number, activity: YouthActivity) => void;
   onToggleResidentCart: (id: number) => void;
   onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
+  onUpgradeCenter: (buildingId: number) => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
   onSetDryingProduct: (buildingId: number, product: DryingProductId) => void;
   onSetLivestockSpecies: (buildingId: number, species: LivestockId) => void;
@@ -243,6 +244,7 @@ export function SelectionContextBar({
   onSetYouthActivity,
   onToggleResidentCart,
   onUpgradeHousing,
+  onUpgradeCenter,
   onSetSmithyProduct,
   onSetDryingProduct,
   onSetLivestockSpecies,
@@ -345,7 +347,10 @@ export function SelectionContextBar({
                       {buriedSilverVeinHere && (
                         <tr>
                           <td>은맥</td>
-                          <td>묻어 둠 · {mineralRemaining(tile) > 0 ? `원광 ${mineralRemaining(tile).toFixed(1)} 남음` : '원광 고갈'} · 다시 열 수 있음</td>
+                          <td>
+                            묻어 둠 · 은 매장량 {Math.round(state.silverVein?.discoveredAmount ?? 0)} 고정 ·{' '}
+                            {mineralRemaining(tile) > 0 ? `원광 ${mineralRemaining(tile).toFixed(1)} 남음` : '원광 고갈'} · 채광장에서 다시 열 수 있음
+                          </td>
                         </tr>
                       )}
                       {tile.terrain === 'rock' && building?.type !== 'mine' && (
@@ -520,6 +525,7 @@ export function SelectionContextBar({
                 state={state}
                 buildingId={building.id}
                 onUpgradeHousing={onUpgradeHousing}
+                onUpgradeCenter={onUpgradeCenter}
                 onSetSmithyProduct={onSetSmithyProduct}
                 onSetDryingProduct={onSetDryingProduct}
                 onSetLivestockSpecies={onSetLivestockSpecies}

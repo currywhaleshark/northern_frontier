@@ -27,10 +27,16 @@ export function setMineralDeposit(tile: Tile, hasIron: boolean, amount: number):
   tile.mineralRemaining = Math.max(0, amount);
 }
 
-// 잠채/설점 — 광상을 은맥으로 전환한다. 남은 원광과 무관하게 은 매장량을 새로 굴린다.
-export function convertToSilverDeposit(tile: Tile, rng: () => number): number {
-  const amount = CONFIG.minerals.silverMin
+export function rollSilverDepositAmount(rng: () => number): number {
+  return CONFIG.minerals.silverMin
     + Math.floor(rng() * (CONFIG.minerals.silverMax - CONFIG.minerals.silverMin + 1));
+}
+
+// 잠채/설점 — 광상을 은맥으로 전환한다. 발견 당시 확정한 매장량이 있으면 재추첨하지 않는다.
+export function convertToSilverDeposit(tile: Tile, rng: () => number, discoveredAmount?: number): number {
+  const amount = Number.isFinite(discoveredAmount)
+    ? Math.max(0, discoveredAmount ?? 0)
+    : rollSilverDepositAmount(rng);
   tile.terrain = 'rock';
   tile.hasIron = false;
   tile.hasSilver = true;

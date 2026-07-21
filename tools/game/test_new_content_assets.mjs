@@ -30,6 +30,10 @@ const assets = await transpileModule(
   new URL('../../src/render/newContentAssets.ts', import.meta.url),
   'newContentAssets.mjs',
 );
+const centerAssets = await transpileModule(
+  new URL('../../src/render/centerPromotionAssets.ts', import.meta.url),
+  'centerPromotionAssets.mjs',
+);
 
 const expectedResources = [
   'eggs', 'milk', 'curedMeat', 'saltedFish',
@@ -101,10 +105,15 @@ assert.deepEqual(pngDimensions(new URL('../../public/assets/new-content-building
 assert.deepEqual(pngDimensions(new URL('../../public/assets/new-content-buildings-large-v2.png', import.meta.url)), [448, 160]);
 assert.deepEqual(pngDimensions(new URL('../../public/assets/new-content-residents-v2.png', import.meta.url)), [56, 360]);
 assert.deepEqual(pngDimensions(new URL('../../public/assets/resources/new-content-resource-atlas-v1.png', import.meta.url)), [1024, 1024]);
+assert.deepEqual(pngDimensions(new URL('../../public/assets/center-promotions-generated-v1.png', import.meta.url)), [168, 160]);
+assert.equal(centerAssets.centerPromotionSourceRect('settlement', 'summer'), null);
+assert.deepEqual(centerAssets.centerPromotionSourceRect('bo', 'summer'), { sx: 0, sy: 0, sw: 56, sh: 80 });
+assert.deepEqual(centerAssets.centerPromotionSourceRect('jin', 'winter'), { sx: 56, sy: 80, sw: 56, sh: 80 });
+assert.deepEqual(centerAssets.centerPromotionSourceRect('bu', 'winter'), { sx: 112, sy: 80, sw: 56, sh: 80 });
 
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
 const rendererSource = readFileSync(new URL('../../src/render/renderer.ts', import.meta.url), 'utf8');
-assert.match(atlasSource, /return loaded >= 25;/, 'atlas readiness must include the three new sheets');
+assert.match(atlasSource, /return loaded >= 26;/, 'atlas readiness must include the promoted-center sheet');
 assert.match(atlasSource, /newContentResidentSourceRect\(p\.job, p\.gender, p\.stage\)/,
   'resident dispatch must choose the new sheet by life stage');
 assert.doesNotMatch(rendererSource, /r\.stage === 'infant'\) continue/,

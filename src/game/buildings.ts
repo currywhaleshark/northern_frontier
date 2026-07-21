@@ -308,6 +308,12 @@ export function buildingFootprintDims(building: Pick<Building, 'type' | 'w' | 'h
   if (isPlotBuildingType(building.type)) {
     return { w: clampPlotSide(building.w ?? 1), h: clampPlotSide(building.h ?? 1) };
   }
+  if (building.type === 'center') {
+    return {
+      w: Math.max(2, Math.min(3, Math.floor(building.w ?? 3))),
+      h: 2,
+    };
+  }
   const size = buildingFootprintSize(building.type);
   return { w: size, h: size };
 }
@@ -334,9 +340,9 @@ export function buildingFootprintTiles(
   w?: number,
   h?: number,
 ): Tile[] | null {
-  const size = buildingFootprintSize(type);
-  const width = w ?? size;
-  const height = h ?? size;
+  const dims = buildingFootprintDims({ type, w, h });
+  const width = dims.w;
+  const height = dims.h;
   const tiles: Tile[] = [];
   for (let dy = 0; dy < height; dy++) {
     for (let dx = 0; dx < width; dx++) {
