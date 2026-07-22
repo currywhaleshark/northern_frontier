@@ -165,6 +165,12 @@ import {
   minerLocomotionSourceRect,
   minerWorkSourceRect,
 } from './residentMinerAssets';
+import {
+  RESIDENT_HERBALIST_GATHER_SHEET,
+  RESIDENT_HERBALIST_LOCOMOTION_SHEET,
+  herbalistGatherSourceRect,
+  herbalistLocomotionSourceRect,
+} from './residentHerbalistAssets';
 
 const PITCH = 17;
 const T = 16;
@@ -217,6 +223,8 @@ let residentBuilderWorkSheet: HTMLImageElement | null = null;
 let residentMinerLocomotionSheet: HTMLImageElement | null = null;
 let residentMinerWorkSheet: HTMLImageElement | null = null;
 let residentMinerLoadSheet: HTMLImageElement | null = null;
+let residentHerbalistLocomotionSheet: HTMLImageElement | null = null;
+let residentHerbalistGatherSheet: HTMLImageElement | null = null;
 let loaded = 0;
 let started = false;
 
@@ -355,6 +363,12 @@ function ensureLoaded(): void {
   residentMinerLoadSheet = new Image();
   residentMinerLoadSheet.onload = () => { loaded++; };
   residentMinerLoadSheet.src = RESIDENT_MINER_LOAD_SHEET.src;
+  residentHerbalistLocomotionSheet = new Image();
+  residentHerbalistLocomotionSheet.onload = () => { loaded++; };
+  residentHerbalistLocomotionSheet.src = RESIDENT_HERBALIST_LOCOMOTION_SHEET.src;
+  residentHerbalistGatherSheet = new Image();
+  residentHerbalistGatherSheet.onload = () => { loaded++; };
+  residentHerbalistGatherSheet.src = RESIDENT_HERBALIST_GATHER_SHEET.src;
   const characterSheet = new Image();
   characterSheet.onload = () => {
     generatedCharacterSheet = characterSheet;
@@ -365,7 +379,7 @@ function ensureLoaded(): void {
 
 export function atlasReady(): boolean {
   ensureLoaded();
-  return loaded >= 42;
+  return loaded >= 44;
 }
 
 // 아틀라스가 준비되면 아틀라스, 아니면 임시 그래픽
@@ -1335,6 +1349,28 @@ export const atlasSprites: SpriteAPI = {
         ctx,
         residentBuilderLocomotionSheet,
         builderLocomotionSourceRect(p.gender, Boolean(p.moving), performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentHerbalistGatherSheet && p.job === 'herbalist' && p.working && !p.moving) {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentHerbalistGatherSheet,
+        herbalistGatherSourceRect(p.gender, performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentHerbalistLocomotionSheet && p.job === 'herbalist') {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentHerbalistLocomotionSheet,
+        herbalistLocomotionSourceRect(p.gender, Boolean(p.moving), performance.now()),
         p.x,
         p.y,
         p.facing,

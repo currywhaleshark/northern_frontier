@@ -20,6 +20,7 @@ import { assignedWorkers, workerSlotConfig, workerSlotCount } from '../game/work
 import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
 import { militiaWeaponForResident } from './militiaWeaponAssignment';
 import { farmerSpriteActionFor, selectOxPlowFarmerIds } from './residentFarmerAssets';
+import { residentWorkStances, type ResidentWorkStance } from './residentWorkLayout';
 import { claimZonesAt } from '../game/claimZones';
 import { foreignSiteAt } from '../game/foreignSites';
 import { foreignSiteActors, foreignSiteProps, type ForeignSiteProp } from '../game/foreignSiteActivity';
@@ -28,6 +29,9 @@ import { weaponCountsForResidents } from '../game/weapons';
 import { activePredatorScoutIds } from '../game/expeditionIntel';
 import { isBuriedSilverVeinTile } from '../game/silver';
 import { activeExpeditionTargetMarkers, type ExpeditionTargetMarker } from '../game/expeditionTargets';
+import {
+  activeInteriorWorkers, workplaceActivityStyle, type WorkplaceActivityStyle,
+} from '../game/workplacePresentation';
 import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, Resident, Terrain } from '../game/types';
 import { pixelRectIntersectsViewport, tileRectIntersectsViewport, type SceneViewport } from './sceneViewport';
 
@@ -86,11 +90,15 @@ export function terrainVisualSignature(state: Pick<GameState, 'map'>): number {
 }
 
 // 주민의 화면 픽셀 위치 (보간 + 지터). 렌더링과 마우스 히트 판정이 공유한다.
-export function residentPixelPos(r: Resident, alpha: number): { x: number; y: number } {
+export function residentPixelPos(
+  r: Resident,
+  alpha: number,
+  workStance?: ResidentWorkStance,
+): { x: number; y: number } {
   const [jx, jy] = jitterOf(r.id);
   return {
-    x: (r.px + (r.x - r.px) * alpha) * TILE + TILE / 2 + jx,
-    y: (r.py + (r.y - r.py) * alpha) * TILE + TILE / 2 + jy,
+    x: (r.px + (r.x - r.px) * alpha) * TILE + TILE / 2 + jx + (workStance?.offsetX ?? 0),
+    y: (r.py + (r.y - r.py) * alpha) * TILE + TILE / 2 + jy + (workStance?.offsetY ?? 0),
   };
 }
 
@@ -98,13 +106,14 @@ export function residentPixelPos(r: Resident, alpha: number): { x: number; y: nu
 export function findResidentAt(state: GameState, mx: number, my: number, alpha: number, radius = 10): Resident | null {
   let best: Resident | null = null;
   let bestD = radius;
+  const workStances = residentWorkStances(state.residents, TILE);
   const expeditionUnitIds = state.expedition && state.expedition.phase !== 'muster'
     ? new Set(state.expedition.memberIds)
     : new Set<number>();
   for (const r of state.residents) {
     if (!r.alive) continue;
     if (expeditionUnitIds.has(r.id)) continue;
-    const p = residentPixelPos(r, alpha);
+    const p = residentPixelPos(r, alpha, workStances.get(r.id));
     const d = Math.hypot(p.x - mx, p.y - my);
     if (d <= bestD) { bestD = d; best = r; }
   }
@@ -176,6 +185,53 @@ function drawChimneySmoke(ctx: CanvasRenderingContext2D, bx: number, by: number,
     ctx.arc(sx, sy, 1.6 + ph * 2.4, 0, Math.PI * 2);
     ctx.fill();
   }
+}
+
+function drawWorkplaceActivity(
+  ctx: CanvasRenderingContext2D,
+  bx: number,
+  by: number,
+  id: number,
+  size: number,
+  workers: number,
+  style: WorkplaceActivityStyle,
+): void {
+  const t = performance.now();
+  ctx.save();
+  if (style === 'fire') {
+    drawChimneySmoke(ctx, bx, by, id, size / TILE);
+    const count = Math.min(5, 2 + workers);
+    for (let i = 0; i < count; i++) {
+      const phase = ((t / 180 + i * 1.7 + id * 0.61) % 7) / 7;
+      const x = bx + size * 0.7 + Math.sin(i * 2.3 + id) * 3 + phase * 2;
+      const y = by + size * 0.68 - phase * 12;
+      ctx.fillStyle = `rgba(255,${Math.round(150 + phase * 70)},70,${(0.9 * (1 - phase)).toFixed(2)})`;
+      ctx.fillRect(Math.round(x), Math.round(y), phase < 0.45 ? 2 : 1, phase < 0.45 ? 2 : 1);
+    }
+  } else if (style === 'craft') {
+    const pulse = (Math.sin(t / 150 + id) + 1) / 2;
+    ctx.strokeStyle = `rgba(238,213,158,${(0.35 + pulse * 0.45).toFixed(2)})`;
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < Math.min(3, workers + 1); i++) {
+      const x = bx + size * (0.35 + i * 0.14);
+      const y = by + size * 0.72 - ((i + Math.floor(t / 220)) % 2) * 2;
+      ctx.beginPath();
+      ctx.moveTo(x - 2, y + 2);
+      ctx.lineTo(x + 2, y - 2);
+      ctx.stroke();
+    }
+  } else {
+    const pulse = (Math.sin(t / 420 + id * 0.7) + 1) / 2;
+    const x = bx + size * 0.5;
+    const y = by + size * 0.55;
+    ctx.fillStyle = `rgba(255,205,104,${(0.13 + pulse * 0.11).toFixed(2)})`;
+    ctx.beginPath();
+    ctx.arc(x, y, 7 + pulse * 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = `rgba(255,221,139,${(0.72 + pulse * 0.2).toFixed(2)})`;
+    ctx.fillRect(Math.round(x - 2), Math.round(y - 1.5), 4, 3);
+  }
+  ctx.restore();
 }
 
 function drawDamageSmoke(ctx: CanvasRenderingContext2D, bx: number, by: number, id: number, footprint: number): void {
@@ -493,11 +549,27 @@ function drawSlotDot(
   ctx.lineWidth = 1;
 }
 
+function drawActiveWorkerPulse(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  residentId: number,
+): void {
+  const pulse = (Math.sin(performance.now() / 190 + residentId * 0.8) + 1) / 2;
+  ctx.strokeStyle = `rgba(255,205,104,${(0.48 + pulse * 0.42).toFixed(2)})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(x, y, radius + 1.2 + pulse * 0.8, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
 function drawWorkerSlotOverlay(
   ctx: CanvasRenderingContext2D,
   state: GameState,
   building: Building,
   expanded: boolean,
+  activeResidentIds: ReadonlySet<number>,
 ): void {
   if (!building.built) return;
   const config = workerSlotConfig(building.type);
@@ -506,6 +578,7 @@ function drawWorkerSlotOverlay(
 
   const slotCount = workerSlotCount(building);
   const workers = assignedWorkers(state, building);
+  const activeCount = workers.filter(worker => activeResidentIds.has(worker.id)).length;
   const dims = buildingFootprintDims(building);
   const cx = (building.x + dims.w / 2) * TILE;
   const top = building.y * TILE;
@@ -518,7 +591,8 @@ function drawWorkerSlotOverlay(
     const gap = 3;
     const pad = 4;
     const width = slotCount * radius * 2 + Math.max(0, slotCount - 1) * gap + pad * 2;
-    const height = radius * 2 + pad * 2;
+    const statusHeight = 12;
+    const height = radius * 2 + pad * 2 + statusHeight;
     const left = cx - width / 2;
     const y = top - height - 3;
     ctx.fillStyle = 'rgba(20,24,28,0.88)';
@@ -529,7 +603,7 @@ function drawWorkerSlotOverlay(
     for (let i = 0; i < slotCount; i++) {
       const worker = workers[i];
       const dotX = left + pad + radius + i * (radius * 2 + gap);
-      const dotY = y + height / 2;
+      const dotY = y + pad + radius;
       drawSlotDot(
         ctx,
         dotX,
@@ -539,7 +613,15 @@ function drawWorkerSlotOverlay(
         worker ? 'rgba(246,225,178,0.9)' : emptyStroke,
         worker ? 1.2 : 1,
       );
+      if (worker && activeResidentIds.has(worker.id)) {
+        drawActiveWorkerPulse(ctx, dotX, dotY, radius, worker.id);
+      }
     }
+    ctx.fillStyle = activeCount > 0 ? '#f1cf7a' : 'rgba(216,222,229,0.68)';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`작업 ${activeCount}/${slotCount}`, cx, y + height - statusHeight / 2);
     ctx.restore();
     return;
   }
@@ -558,6 +640,9 @@ function drawWorkerSlotOverlay(
       worker ? JOB_COLORS[worker.job] : emptyFill,
       worker ? 'rgba(20,24,28,0.82)' : emptyStroke,
     );
+    if (worker && activeResidentIds.has(worker.id)) {
+      drawActiveWorkerPulse(ctx, startX + i * gap, y, radius, worker.id);
+    }
   }
   ctx.restore();
 }
@@ -567,9 +652,10 @@ function drawWorkerSlotOverlays(
   state: GameState,
   buildings: Building[],
   selectedBuildingId?: number | null,
+  activeResidentIds: ReadonlySet<number> = new Set<number>(),
 ): void {
   for (const building of buildings) {
-    drawWorkerSlotOverlay(ctx, state, building, selectedBuildingId === building.id);
+    drawWorkerSlotOverlay(ctx, state, building, selectedBuildingId === building.id, activeResidentIds);
   }
 }
 
@@ -843,6 +929,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   };
   const sprites = o.sprites ?? placeholderSprites;
   const predatorScoutIds = activePredatorScoutIds(state);
+  const indoorWorkers = activeInteriorWorkers(state);
   const lerp = (a: number, b: number) => a + (b - a) * o.alpha;
   ctx.imageSmoothingEnabled = false;
 
@@ -966,6 +1053,11 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     if (b.built && heating && (b.type === 'ondol' || b.type === 'center')) {
       drawChimneySmoke(ctx, drawX, drawY, b.id, size / TILE);
     }
+    const activeWorkerCount = indoorWorkers.countByBuilding.get(b.id) ?? 0;
+    const activityStyle = workplaceActivityStyle(b.type);
+    if (b.built && activeWorkerCount > 0 && activityStyle) {
+      drawWorkplaceActivity(ctx, drawX, drawY, b.id, size, activeWorkerCount, activityStyle);
+    }
   }
 
   const discoveredSites = state.foreignSites.filter(candidate => candidate.discovered);
@@ -980,7 +1072,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   }
 
   lap('2-buildings');
-  drawWorkerSlotOverlays(ctx, state, visibleBuildings, o.selectedBuildingId);
+  drawWorkerSlotOverlays(ctx, state, visibleBuildings, o.selectedBuildingId, indoorWorkers.residentIds);
   lap('2b-slotOverlays');
 
   // 3) 선택 주민의 예정 경로 — 행군하는 점선(개미행렬) 애니메이션
@@ -1032,9 +1124,11 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     ctx.fillText('⚰️', corpse.x * TILE + TILE / 2, corpse.y * TILE + TILE / 2);
   }
   const oxPlowFarmerIds = selectOxPlowFarmerIds(state.buildings, state.residents);
+  const workStances = residentWorkStances(state.residents, TILE);
   for (const r of state.residents) {
-    if (!r.alive || predatorScoutIds.has(r.id)) continue;
-    const p = residentPixelPos(r, o.alpha);
+    if (!r.alive || predatorScoutIds.has(r.id) || indoorWorkers.residentIds.has(r.id)) continue;
+    const workStance = workStances.get(r.id);
+    const p = residentPixelPos(r, o.alpha, workStance);
     if (!pixelRectIntersectsViewport(viewport, p.x - TILE, p.y - TILE, TILE * 2, TILE * 2)) continue;
     sprites.drawResident(ctx, {
       job: r.job,
@@ -1052,7 +1146,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       selected: r.id === o.selectedResidentId,
       moving: r.px !== r.x || r.py !== r.y,
       working: r.phase === 'working' && r.px === r.x && r.py === r.y,
-      facing: r.x < r.px ? -1 : 1,
+      facing: workStance?.facing ?? (r.x < r.px ? -1 : 1),
       militiaWeapon: militiaWeaponForResident(state, r),
       special: r.special,
       stage: r.stage,

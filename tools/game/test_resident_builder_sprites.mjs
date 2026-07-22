@@ -71,7 +71,7 @@ assert.match(atlasSource, /residentBuilderLocomotionSheet\s*&&\s*p\.job\s*===\s*
   'builders otherwise use the hammer-carrying locomotion sheet');
 assert.match(atlasSource, /builderLocomotionSourceRect\(p\.gender,\s*Boolean\(p\.moving\),\s*performance\.now\(\)\)/,
   'builder locomotion advances only while moving');
-assert.match(atlasSource, /return loaded >= 42;/, 'atlas readiness includes both builder sheets');
+assert.match(atlasSource, /return loaded >= 44;/, 'atlas readiness includes builder and later resident sheets');
 
 const youthBranch = atlasSource.indexOf('newContentResidentSheet && newContentRect');
 const builderBranch = atlasSource.indexOf("p.job === 'builder'");
