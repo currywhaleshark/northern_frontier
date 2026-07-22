@@ -281,15 +281,6 @@ export function jobWorkforceCounts(state: GameState, job: JobId): JobWorkforceCo
   return { adult, youth, total: adult + youth };
 }
 
-export function skillOf(r: Resident): number {
-  return r.skills[r.job] ?? 0;
-}
-
-export function gainSkill(r: Resident): void {
-  const cur = r.skills[r.job] ?? 0;
-  r.skills[r.job] = Math.min(1, cur + CONFIG.production.skillGainPerDay);
-}
-
 const COMBAT_TASKS = new Set(['출전 준비', '출전 중', '전선 대기', '전투 중', '전투 부상']);
 
 function isCombatDeathContext(state: GameState, resident: Resident): boolean {

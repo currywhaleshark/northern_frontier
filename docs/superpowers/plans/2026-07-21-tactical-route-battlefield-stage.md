@@ -250,7 +250,10 @@ applyTacticalStageMove(state, groupId, destination)
 - 정면 레인 이동과 경로 이동이 같은 목적지 타입·preview 흐름을 사용한다.
 - mutation은 확정 시점에 다시 검증한다.
 - 경로 진입은 연결된 진입로 또는 창고지대에서만 가능하다.
-- route middle의 `hold`는 차단, 출구 방향 드롭은 flank/return/transfer로 명확히 변환한다.
+- `routeNode` 드롭은 물리 위치만 이동하고 도착 목적을 암묵적으로 정하지 않는다.
+- 경로 안에서는 `진입로 합류`, `방책 후열 급습`, `창고지대 합류`를 별도 목적 버튼으로 선택한다.
+- 방책에 생존해 교전 가능한 적이 없으면 `방책 후열 급습`은 비활성화하고 확정 시점에도 같은 조건을 재검증한다.
+- 세 목적은 같은 `zoneLane` preview·확정·재검증 흐름으로 flank/return/transfer에 변환한다.
 - 경로 안의 부대는 직접 선택·명령 가능하며, 기존 `routeTransit이면 정면 무대에서 숨김` 규칙은 유지한다.
 - 후퇴나 차단 붕괴 시 마지막 정상 출입구 또는 명시된 origin으로 돌아간다.
 
@@ -265,8 +268,9 @@ applyTacticalStageMove(state, groupId, destination)
 ### 4.6 적 AI
 
 - 적 후방 우회는 `진입로 측 입구 → 중간 → 창고지대 측 입구`를 기본 방향으로 삼는다.
-- 목적지 기본값을 기존 성문 후방이 아니라 `storehouse`로 변경한다.
-- 창고지대 도달 후에는 후방 진입 표식을 가진 채 기존 표적·약탈 AI에 합류한다.
+- 적의 출구 목적은 작전 목표로 결정한다. 돌파는 방책 후열 급습, 약탈은 창고지대 침투를 선택한다.
+- 방화는 방책이 건재하면 방책 후열을 급습하고, 이미 돌파된 뒤에는 창고지대로 침투한다.
+- 방책 급습만 후방 진입 표식을 가지며, 창고지대 침투는 일반 약탈·방화 AI에 합류한다.
 - 아군이 경로 중간을 막으면 기존 전용 교전을 먼저 해결한다.
 - 아군이 창고지대 쪽에서 경로에 들어가 역으로 접근하는 경우 중간에서 정상적으로 조우한다.
 
@@ -431,9 +435,9 @@ public/assets/tactical/route-gates/storehouse-{season}-{day|night}-v1.webp
 
 **담당:** Codex
 
-- [ ] 현재 route/deployment/stage order/golden 테스트 결과 기록.
-- [ ] 좌·우 우회, 차단 승리·패배, 숨은 적, 저장 중 이동 fixture 고정.
-- [ ] 정면 zone pressure·loot 결과를 변경 금지 기준선으로 저장.
+- [x] 현재 route/deployment/stage order/golden 테스트 결과 기록.
+- [x] 좌·우 우회, 차단 승리·패배, 숨은 적, 저장 중 이동 fixture 고정.
+- [x] 정면 zone pressure·loot 결과를 변경 금지 기준선으로 저장.
 
 **게이트:** UI 변경 없이 현재 `npm run check`와 경로 밸런스 측정이 재현된다.
 
@@ -441,11 +445,11 @@ public/assets/tactical/route-gates/storehouse-{season}-{day|night}-v1.webp
 
 **담당:** Codex
 
-- [ ] approach/storehouse endpoint와 물리 node 자료형 추가.
-- [ ] `tacticalStageTopology`·`tacticalRouteStageView` selector 추가.
-- [ ] 숫자 step·기존 wall 목적지 저장 마이그레이션.
-- [ ] hidden/suspected/revealed 누설 방지 테스트.
-- [ ] Fable용 정적 fixture와 타입 인계.
+- [x] approach/storehouse endpoint와 물리 node 자료형 추가.
+- [x] `tacticalStageTopology`·`tacticalRouteStageView` selector 추가.
+- [x] 숫자 step·기존 wall 목적지 저장 마이그레이션.
+- [x] hidden/suspected/revealed 누설 방지 테스트.
+- [x] Fable용 정적 fixture와 타입 인계.
 
 **게이트:** Fable이 raw battle 상태를 조합하지 않고 정면·좌·우 무대와 링크를 그릴 수 있다.
 
@@ -453,10 +457,10 @@ public/assets/tactical/route-gates/storehouse-{season}-{day|night}-v1.webp
 
 **담당:** Codex
 
-- [ ] 미배치 카드 → route middle 직접 배치 허용.
-- [ ] route placement와 zone placement 상호 배타성 보장.
-- [ ] 카드 독 복귀, 초기화, 분할·합류, 배치 완료 판정 연결.
-- [ ] 자동배치 기존 결과 보존.
+- [x] 미배치 카드 → route middle 직접 배치 허용.
+- [x] route placement와 zone placement 상호 배타성 보장.
+- [x] 카드 독 복귀, 초기화, 분할·합류, 배치 완료 판정 연결.
+- [x] 자동배치 기존 결과 보존.
 
 **게이트:** 일반 전장 선배치 없이 차단대를 놓고 저장·복원·배치 취소할 수 있다.
 
@@ -464,11 +468,11 @@ public/assets/tactical/route-gates/storehouse-{season}-{day|night}-v1.webp
 
 **담당:** Fable, Phase 1 fixture 수령 후 시작
 
-- [ ] `viewedStageId` 탐색 전환.
-- [ ] `TacticalRouteStage`와 세 노드 렌더.
-- [ ] 공용 부대 배우/스프라이트 표시 추출.
-- [ ] 선택 부대가 경로에 있을 때 자동 무대 이동.
-- [ ] 미니맵·출입구·경로 알림 탐색 연결.
+- [x] `viewedStageId` 탐색 전환.
+- [x] `TacticalRouteStage`와 세 노드 렌더.
+- [x] 공용 부대 배우/스프라이트 표시 추출.
+- [x] 선택 부대가 경로에 있을 때 자동 무대 이동.
+- [x] 미니맵·출입구·경로 알림 탐색 연결.
 
 **게이트:** fixture만으로 실제 경로 무대에서 아군·공개 적·통제 상태를 볼 수 있다.
 
@@ -476,11 +480,11 @@ public/assets/tactical/route-gates/storehouse-{season}-{day|night}-v1.webp
 
 **담당:** Codex
 
-- [ ] zone lane ↔ route node 목적지 검증·preview·mutation.
-- [ ] block/flank/return/transfer와 목적 출구·열 기록.
-- [ ] 반대 방향 이동과 중간 조우.
-- [ ] 접근로→창고 AI 목적지 전환.
-- [ ] 이동 시간·날씨·후퇴·차단 붕괴 테스트.
+- [x] zone lane ↔ route node 목적지 검증·preview·mutation.
+- [x] block/flank/return/transfer와 목적 출구·열 기록.
+- [x] 반대 방향 이동과 중간 조우.
+- [x] 접근로→창고 AI 목적지 전환.
+- [x] 이동 시간·날씨·후퇴·차단 붕괴 테스트.
 
 **게이트:** 버튼 없이 mutation만으로 양쪽 출입구 진입, 차단, 복귀, 급습이 모두 재현된다.
 
@@ -488,7 +492,7 @@ public/assets/tactical/route-gates/storehouse-{season}-{day|night}-v1.webp
 
 **담당:** Codex
 
-- [ ] 두 경로의 계절·주야 배경 제작.
+- [x] 두 경로의 계절·주야 배경 제작.
 - [ ] 진입로·창고지대 양측 출입구 레이어 제작.
 - [ ] `tacticalBackgroundAsset` 공개 API와 fallback 추가.
 - [ ] 크기·경로·누락·fallback 자동 테스트.
@@ -549,7 +553,10 @@ public/assets/tactical/route-gates/storehouse-{season}-{day|night}-v1.webp
 - 양방향: approach→storehouse와 storehouse→approach가 같은 거리·날씨 규칙을 쓴다.
 - 중간 차단: 반대 방향 병력이 중간에서 만나면 한 번만 교전한다.
 - 후퇴: 패한 차단대가 올바른 origin 출입구로 돌아가고 두 무대에 중복 표시되지 않는다.
-- 도착: 적은 storehouse 후열, 아군은 명령한 목적 zone/line에 정확히 한 번 합류한다.
+- 도착: 양측 모두 선택한 목적에 따라 방책 후열 급습 또는 approach/storehouse zone/line에 정확히 한 번 합류한다.
+- 목적 분리: 물리 출구 이동만으로 급습이 자동 발동하지 않고, 아군 UI에 세 목적이 모두 노출된다.
+- 빈 방책: 방책에 생존·전투 가능·비퇴각 적이 없으면 급습 버튼·드롭·확정이 모두 같은 사유로 거부된다.
+- 적 목적: 돌파·약탈·방화와 방책 돌파 상태가 각각 규정된 급습/침투 목적을 선택한다.
 - 정보 은닉: unknown/suspected에서 실제 groupId, 병과, node, 피해, 정확한 도착 라운드를 노출하지 않는다.
 - 저장 복원: 이동 전·중간 교전·출구 도달 직전 각각 round, node, direction, 피해가 보존된다.
 - 이벤트 순서: advance → engagement → retreat/arrival 순서를 지킨다.
@@ -562,11 +569,12 @@ public/assets/tactical/route-gates/storehouse-{season}-{day|night}-v1.webp
 3. 진입로 아군을 좌측 입구로 드래그하고 이동 예상 라운드·정면 이탈 경고를 확인한다.
 4. 창고지대 아군을 같은 경로 반대편에서 진입시켜 중간 조우를 만든다.
 5. 차단 성공, 대치, 차단 붕괴를 각각 재생한다.
-6. 적이 창고지대 측 출구로 돌파하고 다음 정상 교전에서 후열을 공격하는지 확인한다.
-7. 경로 부대를 진입로 측 출구로 복귀시키고 지정한 열에 합류시키는지 확인한다.
-8. 이동 중 저장·재실행 뒤 같은 무대·같은 위치·같은 예상 도착 시간을 확인한다.
-9. 야간·눈보라에서 출입구와 유닛·고스트가 구분되는지 확인한다.
-10. 키보드만으로 경로 선택, 목적지 선택, 확인, 취소를 수행한다.
+6. 경로 부대가 진입로 합류·방책 후열 급습·창고지대 합류를 각각 선택해 그대로 도착하는지 확인한다.
+7. 방책의 마지막 적이 죽거나 퇴각하면 방책 후열 급습이 비활성화되고 사유가 표시되는지 확인한다.
+8. 적 돌파·약탈·방화 목표가 방책 상태에 따라 방책 급습 또는 창고 침투를 선택하는지 확인한다.
+9. 이동 중 저장·재실행 뒤 같은 무대·같은 위치·같은 예상 도착 시간을 확인한다.
+10. 야간·눈보라에서 출입구와 유닛·고스트가 구분되는지 확인한다.
+11. 키보드만으로 경로 선택, 목적지 선택, 확인, 취소를 수행한다.
 
 ### 9.3 기능 완료 정의
 

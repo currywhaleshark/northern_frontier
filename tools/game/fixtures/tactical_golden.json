@@ -541,7 +541,7 @@
           {
             "id": "nimacha-forest-screen-2",
             "killed": 0,
-            "power": 12.886521099432686,
+            "power": 13.010429956158001,
             "morale": 59,
             "zoneId": "storehouse",
             "pendingZoneId": "center",
@@ -696,7 +696,7 @@
           {
             "id": "nimacha-forest-screen-2",
             "killed": 0,
-            "power": 12.763792327057137,
+            "power": 13.010429956158001,
             "morale": 52,
             "zoneId": "center",
             "pendingZoneId": null,
@@ -1024,7 +1024,7 @@
             "morale": 67,
             "zoneId": "wall",
             "pendingZoneId": null,
-            "intent": "defend",
+            "intent": "flank",
             "rearAssault": true
           },
           {
@@ -1071,7 +1071,7 @@
         "loot": {},
         "summary": "제2차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
         "lines": [
-          "창잡이이 숲 능선길 후방 출구에 도달했습니다.",
+          "창잡이가 숲 능선길을 통과해 방책 후열을 급습합니다.",
           "숲 능선길 방면에서 우회 징후가 감지됩니다.",
           "창잡이가 마을 방어선 후열을 급습했습니다.",
           "이번 교전 적 피해: 1명 처치.",
@@ -1186,7 +1186,7 @@
             "morale": 63,
             "zoneId": "wall",
             "pendingZoneId": null,
-            "intent": "defend",
+            "intent": "flank",
             "rearAssault": true
           },
           {
@@ -1353,7 +1353,7 @@
           {
             "id": "nimacha-forest-screen-2",
             "killed": 0,
-            "power": 12.924320433448257,
+            "power": 12.99237573491687,
             "morale": 56,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -1514,7 +1514,7 @@
           {
             "id": "nimacha-forest-screen-2",
             "killed": 0,
-            "power": 12.924320433448257,
+            "power": 12.99237573491687,
             "morale": 47,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -1847,7 +1847,7 @@
           {
             "id": "holaon-mounted-skirmish-3",
             "killed": 0,
-            "power": 15.91008695652174,
+            "power": 16,
             "morale": 75,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -1888,7 +1888,7 @@
         "loot": {},
         "summary": "제2차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
         "lines": [
-          "기마 선봉이 숲 능선길 후방 출구에 도달했습니다.",
+          "기마 선봉이 숲 능선길을 통과해 방책 후열을 급습합니다.",
           "숲 능선길 방면에서 우회 징후가 감지됩니다.",
           "기마 선봉이 마을 방어선 후열을 급습했습니다.",
           "이번 교전 수비 피해: 전사 0명, 부상 1명.",
@@ -2005,7 +2005,7 @@
           {
             "id": "holaon-mounted-skirmish-3",
             "killed": 0,
-            "power": 15.8206791852552,
+            "power": 16,
             "morale": 70,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -2166,7 +2166,7 @@
           {
             "id": "holaon-mounted-skirmish-3",
             "killed": 0,
-            "power": 15.8206791852552,
+            "power": 16,
             "morale": 64,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -2312,7 +2312,7 @@
           {
             "id": "holaon-mounted-skirmish-2",
             "killed": 3,
-            "power": 11.750402287575964,
+            "power": 11.879527587439437,
             "morale": 53,
             "zoneId": "storehouse",
             "pendingZoneId": null,
@@ -2322,7 +2322,7 @@
           {
             "id": "holaon-mounted-skirmish-3",
             "killed": 0,
-            "power": 15.8206791852552,
+            "power": 16,
             "morale": 61,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -2657,7 +2657,7 @@
           {
             "id": "holaon-mounted-skirmish-3",
             "killed": 0,
-            "power": 16.561481509938247,
+            "power": 16.73244343196045,
             "morale": 76,
             "zoneId": "storehouse",
             "pendingZoneId": "center",
@@ -2813,7 +2813,7 @@
           {
             "id": "holaon-mounted-skirmish-3",
             "killed": 0,
-            "power": 16.392266372771488,
+            "power": 16.73244343196045,
             "morale": 72,
             "zoneId": "center",
             "pendingZoneId": null,
@@ -2979,7 +2979,7 @@
           {
             "id": "holaon-mounted-skirmish-3",
             "killed": 0,
-            "power": 16.22478017287578,
+            "power": 16.73244343196045,
             "morale": 68,
             "zoneId": "center",
             "pendingZoneId": null,
@@ -3130,7 +3130,7 @@
           {
             "id": "holaon-mounted-skirmish-2",
             "killed": 3,
-            "power": 12.492319340226935,
+            "power": 12.629597574734923,
             "morale": 58,
             "zoneId": "storehouse",
             "pendingZoneId": null,
@@ -3140,7 +3140,7 @@
           {
             "id": "holaon-mounted-skirmish-3",
             "killed": 0,
-            "power": 16.059005245022483,
+            "power": 16.73244343196045,
             "morale": 66,
             "zoneId": "center",
             "pendingZoneId": null,
@@ -3455,7 +3455,7 @@
           {
             "id": "bandit-hit-and-run-1",
             "killed": 0,
-            "power": 16.88007608695652,
+            "power": 17,
             "morale": 65,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -3516,7 +3516,7 @@
         "loot": {},
         "summary": "제2차 교전이 끝났습니다. 다음 전선을 지휘하십시오.",
         "lines": [
-          "기마 마적이 숲 능선길 후방 출구에 도달했습니다.",
+          "기마 마적이 숲 능선길을 통과해 방책 후열을 급습합니다.",
           "숲 능선길 방면에서 우회 징후가 감지됩니다.",
           "기마 마적이 마을 방어선 후열을 급습했습니다.",
           "이번 교전 적 피해: 1명 처치.",
@@ -3607,7 +3607,7 @@
           {
             "id": "bandit-hit-and-run-1",
             "killed": 0,
-            "power": 16.76099815890832,
+            "power": 17,
             "morale": 61,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -3773,7 +3773,7 @@
           {
             "id": "bandit-hit-and-run-1",
             "killed": 0,
-            "power": 16.76099815890832,
+            "power": 17,
             "morale": 52,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -3924,7 +3924,7 @@
           {
             "id": "bandit-hit-and-run-1",
             "killed": 0,
-            "power": 16.76099815890832,
+            "power": 17,
             "morale": 45,
             "zoneId": "wall",
             "pendingZoneId": null,
@@ -3934,7 +3934,7 @@
           {
             "id": "bandit-hit-and-run-2",
             "killed": 2,
-            "power": 12.278325682566097,
+            "power": 12.426257317295809,
             "morale": 40,
             "zoneId": "storehouse",
             "pendingZoneId": null,
@@ -4280,7 +4280,7 @@
           {
             "id": "court-cavalry-wing-2",
             "killed": 1,
-            "power": 60.04895349716446,
+            "power": 60.522608695652174,
             "morale": 90,
             "zoneId": "storehouse",
             "pendingZoneId": "center",
@@ -4441,7 +4441,7 @@
           {
             "id": "court-cavalry-wing-2",
             "killed": 1,
-            "power": 59.57900516544752,
+            "power": 60.522608695652174,
             "morale": 85,
             "zoneId": "center",
             "pendingZoneId": null,
@@ -4606,7 +4606,7 @@
           {
             "id": "court-cavalry-wing-2",
             "killed": 1,
-            "power": 59.11273469023967,
+            "power": 60.522608695652174,
             "morale": 80,
             "zoneId": "center",
             "pendingZoneId": null,
@@ -4766,7 +4766,7 @@
           {
             "id": "court-cavalry-wing-2",
             "killed": 1,
-            "power": 58.65011328831606,
+            "power": 60.522608695652174,
             "morale": 75,
             "zoneId": "center",
             "pendingZoneId": null,

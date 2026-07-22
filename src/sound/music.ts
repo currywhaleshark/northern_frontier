@@ -150,15 +150,6 @@ export function setMusicScene(scene: MusicScene): void {
   if (initialized) startScene(scene);
 }
 
-export function setMusicMuted(nextMuted: boolean): void {
-  muted = nextMuted;
-  if (currentAudio) {
-    currentAudio.volume = muted ? 0 : MUSIC_VOLUME * volume;
-    if (!muted) void currentAudio.play().catch(() => undefined);
-  }
-  if (outgoingAudio && muted) outgoingAudio.volume = 0;
-}
-
 export function setMusicSettings(settings: { enabled: boolean; volume: number }): void {
   muted = !settings.enabled;
   volume = Math.min(1, Math.max(0, Number.isFinite(settings.volume) ? settings.volume : 0.7));

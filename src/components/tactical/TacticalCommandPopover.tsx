@@ -14,24 +14,29 @@ import {
 } from '../../game/tacticalCommandState';
 import type {
   GameState,
+  TacticalAmbushAftermath,
   TacticalCommandId,
   TacticalDefenderGroup,
   TacticalFormationLine,
+  TacticalRaiderGroup,
 } from '../../game/types';
-import { tacticalCommandPresentation } from './commandPresentation';
+import { tacticalAvailableCommands } from './commandPresentation';
 import { commandDescription, commandLabel } from './commandText';
 
 interface Props {
   battle: NonNullable<GameState['tacticalBattle']>;
   group: TacticalDefenderGroup;
   hunt: boolean;
+  mode: 'self' | 'attack' | 'ambushAftermath';
+  target?: TacticalRaiderGroup | null;
   placement: 'above' | 'below';
   style: CSSProperties;
   maxHeight: number;
   onCommand: (command: TacticalCommandId) => void;
+  onAmbushAftermath: (aftermath: TacticalAmbushAftermath) => void;
   onSetLine: (line: TacticalFormationLine) => void;
   onMoveZone: (zoneId: string) => void;
-  onOpenCommandBoard: () => void;
+  onReturnRoute: () => void;
   onClose: (restoreFocus: boolean) => void;
 }
 
@@ -48,6 +53,13 @@ const FORMATION_LINES: readonly TacticalFormationLine[] = ['front', 'middle', 'r
 
 function lineLabel(line: TacticalFormationLine): string {
   return line === 'front' ? '전열' : line === 'middle' ? '중열' : '후열';
+}
+
+function routeNodeLabel(group: TacticalDefenderGroup): string | null {
+  if (!group.routeTransit) return null;
+  if (group.routeTransit.node === 'approachGate') return '진입로 측 입구';
+  if (group.routeTransit.node === 'middle') return '중간 차단 지점';
+  return '창고지대 측 입구';
 }
 
 // Kept separate from action commands so future stage dragging can replace this
@@ -122,13 +134,16 @@ export function TacticalCommandPopover({
   battle,
   group,
   hunt,
+  mode,
+  target,
   placement,
   style,
   maxHeight,
   onCommand,
+  onAmbushAftermath,
   onSetLine,
   onMoveZone,
-  onOpenCommandBoard,
+  onReturnRoute,
   onClose,
 }: Props) {
   const headerId = useId();
@@ -136,19 +151,30 @@ export function TacticalCommandPopover({
   const active = tacticalActiveDefenderCount(group);
   const canCommand = tacticalGroupCanReceiveCommand(group);
   const displayedLine = group.pendingLine ?? group.line;
-  const { quick: quickCommands } = tacticalCommandPresentation(battle, group);
-  const locationLabel = hunt
-    ? battle.zones.find(zone => zone.id === group.zoneId)?.name ?? '길목 미정'
-    : lineLabel(displayedLine);
-  const manualTargetLabel = !hunt && group.targetSource === 'player' && group.targetGroupId
-    ? battle.raiderGroups.find(target => target.id === group.targetGroupId)?.label ?? '지정 표적'
+  const availableCommands = tacticalAvailableCommands(battle, group);
+  const quickCommands = mode === 'ambushAftermath'
+    ? []
+    : hunt
+    ? availableCommands
+    : mode === 'attack'
+      ? (['attack', 'volley', 'charge', 'ambush'] as const).filter(command => availableCommands.includes(command))
+      : (['hold', 'ambush', 'guardStorehouse', 'protectCivilians', 'reinforceRear', 'arson', 'blockEscape', 'openRetreat'] as const)
+        .filter(command => availableCommands.includes(command));
+  const routeLocation = group.routeTransit
+    ? `${battle.flankRoutes?.find(route => route.id === group.routeTransit?.routeId)?.label ?? '우회로'} · ${routeNodeLabel(group)}`
     : null;
+  const locationLabel = routeLocation ?? (hunt
+    ? battle.zones.find(zone => zone.id === group.zoneId)?.name ?? '길목 미정'
+    : lineLabel(displayedLine));
+  const manualTargetLabel = target?.label ?? (!hunt && group.targetSource === 'player' && group.targetGroupId
+    ? battle.raiderGroups.find(target => target.id === group.targetGroupId)?.label ?? '지정 표적'
+    : null);
 
   useEffect(() => {
     const root = rootRef.current;
     const current = root?.querySelector<HTMLButtonElement>('[data-current="true"]');
     (current ?? root?.querySelector<HTMLButtonElement>('button'))?.focus();
-  }, [group.id]);
+  }, [group.id, mode, target?.id]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Escape') {
@@ -202,9 +228,9 @@ export function TacticalCommandPopover({
           <strong id={headerId}>{group.label} {active}명</strong>
           <span aria-hidden="true">·</span>
           <span>{locationLabel}</span>
-          {manualTargetLabel && (
+          {mode !== 'self' && manualTargetLabel && (
             <em className="tactical-command-target-badge" title={`수동 표적: ${manualTargetLabel}`}>
-              🎯 {manualTargetLabel}
+              → {manualTargetLabel}
             </em>
           )}
           {group.ambushed && <em className="tactical-state-badge ambushed">매복중</em>}
@@ -219,30 +245,57 @@ export function TacticalCommandPopover({
           : '이 부대는 전투 불능이어서 명령을 내릴 수 없습니다.'}</p>
       ) : (
         <div className="tactical-command-popover-body">
-          <TacticalPlacementSegment
-            key={group.id}
-            battle={battle}
-            group={group}
-            hunt={hunt}
-            displayedLine={displayedLine}
-            onSetLine={onSetLine}
-            onMoveZone={onMoveZone}
-          />
+          {mode === 'ambushAftermath' ? (
+            <>
+              <p className="tactical-command-popover-message">급습 뒤 추격을 피해 이탈할지, 현재 방어선을 지킬지 선택하십시오.</p>
+              <div className="tactical-command-quick-grid" role="group" aria-label="급습 후 행동">
+                <button
+                  type="button"
+                  className="tactical-command-option quick"
+                  title="급습 공격 뒤 다음 방어선으로 물러납니다."
+                  onClick={() => onAmbushAftermath('fallback')}
+                >공격 후 이탈</button>
+                <button
+                  type="button"
+                  className="tactical-command-option quick"
+                  title="급습 공격 뒤 현재 구역과 전열에 남습니다."
+                  onClick={() => onAmbushAftermath('hold')}
+                >위치 유지</button>
+              </div>
+            </>
+          ) : (<>
+          {mode === 'self' && hunt && (
+            <TacticalPlacementSegment
+              key={group.id}
+              battle={battle}
+              group={group}
+              hunt={hunt}
+              displayedLine={displayedLine}
+              onSetLine={onSetLine}
+              onMoveZone={onMoveZone}
+            />
+          )}
+
+          {mode === 'self' && group.routeTransit && (
+            <div className="tactical-route-return-control">
+              <button
+                type="button"
+                className="tactical-command-option quick"
+                title="현재 우회로에서 출발했던 입구 방향으로 한 단계 되돌아갑니다."
+                onClick={onReturnRoute}
+              >↩ 출발지로 복귀</button>
+              <small>우회로에서 한 지점씩 되돌아가 출발 전장으로 합류합니다.</small>
+            </div>
+          )}
 
           <div className="tactical-command-quick-grid" role="group" aria-label="빠른 명령">
             {quickCommands.map(command => renderCommandButton(command, 'quick'))}
-            <button
-              type="button"
-              className="tactical-command-more-toggle"
-              aria-label="전체 명령판 열기"
-              title="하단 전체 명령판 열기"
-              onClick={onOpenCommandBoard}
-            >···</button>
           </div>
 
           {quickCommands.length === 0 && (
             <p className="tactical-command-popover-message">지금 내릴 수 있는 명령이 없습니다.</p>
           )}
+          </>)}
         </div>
       )}
     </div>

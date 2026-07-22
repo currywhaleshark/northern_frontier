@@ -163,6 +163,65 @@ assert.deepEqual(
   ['hangwae', 'jurchenWarrior', 'tigerHunter', 'uinyeo'].sort(),
   'the crowd-QA preset includes exactly the four combat-visible special residents',
 );
+
+const configuredAllies = battleSimulation.createBattleSimulation({
+  scenario: 'defense', mode: 'garrison', factionName: '니마차 우디캐', power: 70,
+  warned: true, siege: false, season: 'autumn', weather: 'clear', prepPoints: 0,
+  defenders: {
+    muskets: 0, bows: 0, spears: 2, unarmedMilitia: 1,
+    watchmen: 0, hunters: 2, physicians: 2, civilians: 0,
+  },
+  mountedDefenders: { spears: 1, hunters: 1 },
+  combatSpecialResidents: ['jurchenWarrior', 'uinyeo'],
+  mountedSpecialResidents: ['jurchenWarrior', 'uinyeo'],
+  cannonEmplacements: 0, seed: 20260722,
+});
+assert.deepEqual(
+  configuredAllies.residents.filter(resident => resident.special).map(resident => resident.special).sort(),
+  ['jurchenWarrior', 'uinyeo'].sort(),
+  'designated allied composition includes only the selected special residents',
+);
+assert.equal(
+  configuredAllies.residents.filter(resident => resident.job === 'physician').length,
+  3,
+  'ordinary physicians and the selected royal physician both join as healers',
+);
+assert.equal(
+  configuredAllies.tacticalBattle.defenderGroups
+    .filter(group => group.kind === 'healer')
+    .reduce((sum, group) => sum + group.count, 0),
+  3,
+  'physicians materialize as a rear healer group in the tactical battle',
+);
+const configuredMountedIds = Object.keys(configuredAllies.mountAssignments).map(Number);
+assert.equal(configuredMountedIds.length, 3,
+  'designated spear, hunter, and eligible special resident receive horses');
+const uinyeoResident = configuredAllies.residents.find(resident => resident.special === 'uinyeo');
+assert.ok(uinyeoResident && !configuredMountedIds.includes(uinyeoResident.id),
+  'the physician remains unmounted even if an invalid mounted-special option reaches the backend');
+assert.equal(
+  configuredAllies.tacticalBattle.defenderGroups
+    .filter(group => group.mount === 'horse')
+    .reduce((sum, group) => sum + group.count, 0),
+  3,
+  'mounted assignments remain visible in the generated tactical groups',
+);
+
+const randomizedAllies = Array.from({ length: 12 }, (_, index) =>
+  battleSimulation.createBattleSimulation({
+    scenario: 'defense', mode: 'garrison', factionName: '니마차 우디캐', power: 60,
+    warned: true, siege: false, season: 'summer', weather: 'clear', prepPoints: 0,
+    defenders: 'random', combatSpecialResidents: 'random',
+    mountedDefenders: 'random', mountedSpecialResidents: 'random',
+    cannonEmplacements: 0, seed: 20260800 + index,
+  }));
+assert.ok(randomizedAllies.some(simulation =>
+  simulation.residents.some(resident => resident.job === 'physician' && resident.special !== 'uinyeo')),
+  'random allied composition can generate ordinary physicians');
+assert.ok(randomizedAllies.some(simulation => simulation.residents.some(resident => resident.special)),
+  'random allied composition can generate combat special residents');
+assert.ok(randomizedAllies.some(simulation => Object.keys(simulation.mountAssignments).length > 0),
+  'random allied composition can generate mounted defenders');
 assert.equal(crowdedSimulation.tacticalBattle.raiderGroups.length, 5,
   'the legacy court composition starts with five targetable enemy groups');
 assert.equal(tacticalBattle.advanceTacticalPhase(crowdedSimulation), null);

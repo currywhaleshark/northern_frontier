@@ -21,12 +21,34 @@ const sectors = [
 ];
 const seasons = ['spring', 'summer', 'autumn', 'winter'];
 const defenseKinds = ['approach', 'wall', 'storehouse', 'center'];
+const routeFamilies = [
+  ['woodedRidge', 'wooded-ridge'],
+  ['riverBank', 'river-bank'],
+];
 
 for (const season of seasons) {
   for (const kind of defenseKinds) {
     const assetUrl = new URL(`../../public/assets/tactical/${kind}-night-${season}-v1.webp`, import.meta.url);
     assert.equal(existsSync(assetUrl), true, `${kind} ${season} night background must exist`);
     assert.ok(statSync(assetUrl).size > 100_000, `${kind} ${season} night background must not be empty`);
+  }
+}
+
+for (const season of seasons) {
+  for (const [terrain, family] of routeFamilies) {
+    for (const [night, period] of [[false, 'day'], [true, 'night']]) {
+      const assetUrl = new URL(
+        `../../public/assets/tactical/routes/${family}-${season}-${period}-v1.webp`,
+        import.meta.url,
+      );
+      assert.equal(existsSync(assetUrl), true, `${terrain} ${season} ${period} route background must exist`);
+      assert.ok(statSync(assetUrl).size > 200_000, `${terrain} ${season} ${period} route background must not be empty`);
+      assert.deepEqual(assets.tacticalRouteBackgroundAsset(terrain, season, night), {
+        src: `/assets/tactical/routes/${family}-${season}-${period}-v1.webp`,
+        size: 'cover',
+        position: 'center center',
+      });
+    }
   }
 }
 

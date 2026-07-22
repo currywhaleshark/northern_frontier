@@ -347,6 +347,8 @@ export function huntCommandUnavailableReason(
   if (command === 'fallback') return '포위 유지 명령은 새 몰이사냥에서 사용할 수 없습니다.';
   if (command === 'hold') return tacticalGroupCapabilities(group).has('melee')
     ? null : '창벽은 근접 무장을 갖춘 조만 세울 수 있습니다.';
+  if (command === 'attack') return tacticalGroupCapabilities(group).has('melee')
+    ? null : '일반 공격은 근접 무장을 갖춘 조만 수행할 수 있습니다.';
   if (command === 'volley') return tacticalGroupCapabilities(group).has('volley') ? null : '각궁 또는 화약이 준비된 조총이 필요합니다.';
   if (command === 'ambush') return activeCount(group) > 0 ? null : '전투 가능한 조만 반격을 준비할 수 있습니다.';
   if (command === 'charge') {
@@ -476,7 +478,6 @@ function applyWolfDamage(
   battle: TacticalBattle,
   damage: number,
   events: TacticalAnimationEvent[],
-  zoneId: string,
 ): number {
   const leader = battle.raiderGroups.find(group => group.leader);
   const pack = battle.raiderGroups.find(group => !group.leader);
@@ -493,8 +494,11 @@ function applyWolfDamage(
       killed += 1;
       battle.huntLeaderKilled = true;
       battle.raiderMorale = clamp(battle.raiderMorale - 55, 0, 100);
-      addEvent(events, zoneId, 'beastRout', '우두머리가 쓰러지자 남은 늑대들이 싸울 뜻을 잃고 흩어집니다.', {
-        side: 'raider', groupId: leader.id, float: '우두머리 처치!',
+      addEvent(events, leader.zoneId, 'casualty', '늑대 우두머리가 치명상을 입고 쓰러집니다.', {
+        side: 'raider', groupId: leader.id, casualties: 1, killed: 1, float: '우두머리 처치!',
+      });
+      addEvent(events, pack.zoneId, 'beastRout', '우두머리가 쓰러지자 남은 늑대들이 싸울 뜻을 잃고 흩어집니다.', {
+        side: 'raider', groupId: pack.id, float: '도주!',
       });
     }
   }
@@ -505,7 +509,7 @@ function applyWolfDamage(
     const packKilled = activeBeasts(pack) - aliveAfter;
     pack.killed += packKilled;
     killed += packKilled;
-    if (packKilled > 0) addEvent(events, zoneId, 'casualty', `늑대 ${packKilled}마리가 쓰러집니다.`, {
+    if (packKilled > 0) addEvent(events, pack.zoneId, 'casualty', `늑대 ${packKilled}마리가 쓰러집니다.`, {
       side: 'raider', groupId: pack.id, casualties: packKilled, killed: packKilled, float: `-${packKilled}`,
     });
   }
@@ -529,12 +533,15 @@ function triggerHuntTrap(
     tiger.power = Math.max(0, tiger.power - damage);
     if (tiger.power <= 0.8) {
       tiger.killed = Math.max(tiger.killed, 1);
+      addEvent(events, zone.id, 'casualty', `${tiger.label}이 함정의 치명상을 입고 쓰러집니다.`, {
+        side: 'raider', groupId: tiger.id, casualties: 1, killed: 1, float: '사살!',
+      });
       return 1;
     }
     if (tiger.power < battle.originalPower * 0.55) battle.huntPredatorState = 'wounded';
     return 0;
   }
-  return applyWolfDamage(battle, damage, events, zone.id);
+  return applyWolfDamage(battle, damage, events);
 }
 
 function huntEscapeText(battle: TacticalBattle): string {
@@ -855,6 +862,8 @@ export function resolveHuntRound(state: GameState): string | null {
               : actionSectorIds.has(group.zoneId) || group.zoneId === actionZone.id
                 ? HUNT_CONFIG.counterAttack.sameSectorMultiplier
                 : HUNT_CONFIG.counterAttack.adjacentSectorMultiplier
+            : group.command === 'attack'
+              ? 1
             : group.command === 'advance'
               ? 0.72
               : 0.28;
@@ -898,9 +907,12 @@ export function resolveHuntRound(state: GameState): string | null {
       if (tiger.power <= 0.8) {
         tiger.killed = 1;
         beastsKilled = 1;
+        addEvent(events, tiger.zoneId, 'casualty', `${tiger.label}이 치명상을 입고 쓰러집니다.`, {
+          side: 'raider', groupId: tiger.id, casualties: 1, killed: 1, float: '사살!',
+        });
       } else if (tiger.power < battle.originalPower * 0.55) battle.huntPredatorState = 'wounded';
     } else {
-      beastsKilled = applyWolfDamage(battle, damage, events, actionZone.id);
+      beastsKilled = applyWolfDamage(battle, damage, events);
     }
   }
 
@@ -932,8 +944,17 @@ export function resolveHuntRound(state: GameState): string | null {
   const nextZoneId = actionZone.id;
   if (wounded + killed > 0) lines.push(`사냥대 피해: 전사 ${killed}명, 부상 ${wounded}명.`);
   lines.push(`포위망 ${Math.round(battle.huntEncirclement ?? 0)}% · 사냥대 기세 ${villageMoraleDelta >= 0 ? '+' : ''}${villageMoraleDelta}.`);
-  if (outcome && !events.some(event => event.kind === 'retreat' && event.zoneId === actionZone.id)) {
-    addEvent(events, actionZone.id, outcome === 'huntRepelled' ? 'beastRout' : outcome === 'huntEscaped' ? 'retreat' : outcome === 'huntKill' ? 'moraleBreak' : 'report', outcomeText(battle, outcome));
+  const outcomeAlreadyAnimated = outcome === 'huntRepelled'
+    ? events.some(event => event.kind === 'beastRout')
+    : outcome === 'huntEscaped'
+      ? events.some(event => event.kind === 'retreat')
+      : outcome === 'huntKill'
+        ? events.some(event => event.kind === 'casualty' && event.side === 'raider')
+        : false;
+  if (outcome && !outcomeAlreadyAnimated) {
+    const visibleBeastZoneId = battle.raiderGroups.find(group =>
+      group.revealed && activeBeasts(group) > 0)?.zoneId;
+    addEvent(events, visibleBeastZoneId ?? actionZone.id, outcome === 'huntRepelled' ? 'beastRout' : outcome === 'huntEscaped' ? 'retreat' : outcome === 'huntKill' ? 'moraleBreak' : 'report', outcomeText(battle, outcome));
   }
 
   const report: TacticalRoundReport = {

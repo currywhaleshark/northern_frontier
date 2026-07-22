@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const appSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+const appSource = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
 const contextSource = readFileSync(new URL('../../src/components/SelectionContextBar.tsx', import.meta.url), 'utf8');
 const drawerSource = readFileSync(new URL('../../src/components/BuildDrawer.tsx', import.meta.url), 'utf8');
 const canvasSource = readFileSync(new URL('../../src/components/GameCanvas.tsx', import.meta.url), 'utf8');

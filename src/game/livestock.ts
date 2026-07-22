@@ -54,10 +54,6 @@ function finiteNonNegative(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
-export function isLivestockId(value: unknown): value is LivestockId {
-  return typeof value === 'string' && (LIVESTOCK_IDS as readonly string[]).includes(value);
-}
-
 export function isImplementedLivestockId(value: unknown): value is typeof IMPLEMENTED_LIVESTOCK_IDS[number] {
   return typeof value === 'string' && (IMPLEMENTED_LIVESTOCK_IDS as readonly string[]).includes(value);
 }

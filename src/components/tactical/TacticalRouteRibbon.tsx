@@ -50,7 +50,7 @@ interface Props {
   deploymentPhase: boolean;
   /** 배치 카드·무대 부대 드래그 중일 때의 대상 부대와 호버 앵커 */
   blockerDrag: { groupId: string; hoverAnchorId: string | null } | null;
-  onFocusRoute: (zoneId: string) => void;
+  onFocusRoute: (routeId: string) => void;
 }
 
 export function TacticalRouteRibbon({
@@ -93,7 +93,7 @@ export function TacticalRouteRibbon({
                 ? `${view.route.label} — 카드나 부대를 끌어 놓으면 경로 중간을 차단합니다.`
                 : `${view.route.label} — ${routeControlLabel(view.route.control) || '통행 없음'}`}
             disabled={playback}
-            onClick={() => onFocusRoute('approach')}
+            onClick={() => onFocusRoute(view.route.id)}
           >
             <strong>{view.route.side === 'left' ? '좌' : '우'} · {view.route.label}</strong>
             {view.display === 'suspected' ? (

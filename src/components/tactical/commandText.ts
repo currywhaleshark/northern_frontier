@@ -3,6 +3,7 @@ import type { TacticalCommandId, TacticalDefenderGroup } from '../../game/types'
 
 const COMMAND_LABELS: Record<TacticalCommandId, string> = {
   hold: '고수',
+  attack: '공격',
   charge: '돌격',
   volley: '일제 사격',
   ambush: '매복',

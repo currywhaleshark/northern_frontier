@@ -314,6 +314,14 @@ export function tacticalRaiderPoseCell(
   return column == null ? null : { column, row: TACTICAL_POSE_ROWS[pose] };
 }
 
+export function tacticalRaiderSpriteFaction(
+  battle: Pick<import('../game/types').TacticalBattle, 'encounterKind' | 'factionName'>,
+): string {
+  // 산채 전투는 factionName에 세력명이 아니라 산채 고유 이름을 보존한다.
+  // 렌더링할 때만 변경 마적 시트 키로 정규화한다.
+  return battle.encounterKind === 'banditLair' ? '변경 마적' : battle.factionName;
+}
+
 type TacticalExpandedRaiderSheet = 'nimachaUnits' | 'holaonUnits' | 'banditUnits' | 'courtExpanded';
 
 const EXPANDED_RAIDER_COLUMNS: Readonly<Record<string, {

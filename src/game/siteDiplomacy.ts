@@ -367,7 +367,18 @@ export function banditLairRaidChance(
   const readyMuskets = combatants.filter(resident => resident.readyWeapon === 'musket').length;
   const bowsAndSpears = combatants.filter(resident =>
     resident.readyWeapon === 'hornBow' || resident.readyWeapon === 'spear').length;
-  return Math.max(0.1, Math.min(0.9,
+  const openFieldChance = Math.max(0.1, Math.min(0.9,
     0.18 + power / 240 + militia * 0.07 + watchmen * 0.045 + hunters * 0.04 +
     readyMuskets * 0.08 + bowsAndSpears * 0.018 - site.militaryPower / 180));
+  const defensePlan = ensureBanditLairDefensePlan(site);
+  const defenseConfig = CONFIG.foreignSites.banditLairDefense;
+  const stratagemScale = 1 + Math.min(
+    defenseConfig.maxPointEffectBonus,
+    Math.max(0, defensePlan.stratagemPoints - defenseConfig.baseStratagemPoints) * defenseConfig.pointEffectStep,
+  );
+  // 직접 전투가 사용하는 산채 진지 배율을 승산(odds)에 동일하게 적용한다.
+  // 확률 자체를 단순 나누면 강한 토벌대까지 과도하게 눌리므로 odds 공간에서 보정한다.
+  const openFieldOdds = openFieldChance / (1 - openFieldChance);
+  const fortifiedOdds = openFieldOdds / (defenseConfig.positionPowerMultiplier * stratagemScale);
+  return Math.max(0.1, Math.min(0.9, fortifiedOdds / (1 + fortifiedOdds)));
 }

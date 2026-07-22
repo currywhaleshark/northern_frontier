@@ -101,14 +101,14 @@ const reportModalSource = readFileSync(new URL('../../src/components/TacticalBat
 
 {
   assert.deepEqual(tactical.tacticalSupportedCommands({ orientation: 'defense' }), [
-    'hold', 'charge', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians',
-    'reinforceRear', 'fallback', 'advance', 'flankRoute',
-  ], 'raid defense must expose only commands supported by the defensive battle system');
+    'hold', 'attack', 'charge', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians',
+    'reinforceRear', 'fallback', 'advance',
+  ], 'raid defense uses the route-stage purpose selector instead of a fixed flank command');
   assert.deepEqual(tactical.tacticalSupportedCommands({ orientation: 'assault', assaultKind: 'banditLair' }), [
-    'hold', 'charge', 'volley', 'ambush', 'fallback', 'advance', 'arson', 'blockEscape', 'openRetreat',
+    'hold', 'attack', 'charge', 'volley', 'ambush', 'fallback', 'advance', 'arson', 'blockEscape', 'openRetreat',
   ], 'bandit-lair assaults must expose only assault commands');
   assert.deepEqual(tactical.tacticalSupportedCommands({ orientation: 'assault', assaultKind: 'predatorHunt' }), [
-    'hold', 'charge', 'volley', 'ambush', 'advance', 'openRetreat',
+    'hold', 'attack', 'charge', 'volley', 'ambush', 'advance', 'openRetreat',
   ], 'predator hunts must expose only hunt commands');
 }
 
@@ -743,9 +743,10 @@ function deployCommandableToZone(state, zoneId) {
   Object.assign(musket, { zoneId: zone.id, line: 'middle', command: 'volley' });
   Object.assign(bow, { zoneId: zone.id, line: 'rear', command: 'volley' });
   const [front, middle, rear] = battle.raiderGroups;
-  Object.assign(front, { zoneId: zone.id, line: 'front', revealed: true, intent: 'advance', power: 90, count: 30, killed: 0, rearAssault: false });
-  Object.assign(middle, { zoneId: zone.id, line: 'middle', revealed: true, intent: 'advance', power: 90, count: 30, killed: 0, rearAssault: false });
-  Object.assign(rear, { zoneId: zone.id, line: 'rear', revealed: true, intent: 'advance', power: 90, count: 30, killed: 0, rearAssault: false });
+  assert.ok(front && middle && rear, 'target selection fixture needs three enemy groups');
+  Object.assign(front, { zoneId: zone.id, line: 'front', revealed: true, intent: 'advance', power: 90, count: 30, killed: 0, rearAssault: false, routeTransit: undefined });
+  Object.assign(middle, { zoneId: zone.id, line: 'middle', revealed: true, intent: 'advance', power: 90, count: 30, killed: 0, rearAssault: false, routeTransit: undefined });
+  Object.assign(rear, { zoneId: zone.id, line: 'rear', revealed: true, intent: 'advance', power: 90, count: 30, killed: 0, rearAssault: false, routeTransit: undefined });
 
   assert.match(tactical.tacticalGroupTargetUnavailableReason(battle, spear.id, rear.id), /접촉 열/);
   assert.match(tactical.tacticalGroupTargetUnavailableReason(battle, musket.id, rear.id), /후열/);
@@ -934,6 +935,26 @@ function deployCommandableToZone(state, zoneId) {
   assert.deepEqual(zone, zoneBefore, 'engagement exchange must not mutate zone input');
   assert.ok(Number.isFinite(exchange.enemyShare));
   assert.equal(exchange.raiderLosses.length, attackers.length);
+
+  const undefendedAttacker = structuredClone(attackers[0]);
+  const undefendedExchange = tacticalEngagement.resolveEngagementExchange({
+    zone,
+    defenders: [],
+    attackers: [undefendedAttacker],
+    direction: 'frontal',
+    weather: state.weather,
+    prepareVolleyApplied: false,
+    evacuateCiviliansApplied: false,
+    roundStartingRaiderPower: undefendedAttacker.power,
+    rng: () => 0,
+  });
+  assert.equal(undefendedExchange.defensePower, 0);
+  assert.deepEqual(undefendedExchange.raiderLosses.map(loss => [loss.killed, loss.powerAfter]), [
+    [0, undefendedAttacker.power],
+  ], 'an undefended zone cannot inflict random minimum attrition even on the lowest RNG roll');
+  assert.equal(undefendedExchange.postDefenseEvents.some(event =>
+    event.kind === 'casualty' && event.side === 'raider'), false,
+  'an undefended zone cannot emit an enemy casualty event');
 
   const consequenceDefenders = structuredClone(defenders);
   for (const loss of exchange.defenderLosses) {
@@ -1356,6 +1377,41 @@ function deployCommandableToZone(state, zoneId) {
 }
 
 {
+  const state = simulation.newGame(2026072217);
+  prepareDefenders(state);
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: 'ambush-hold-position-test', power: 60, warned: true, siege: false, mode: 'garrison',
+  });
+  const hunter = battle.defenderGroups.find(group => group.kind === 'hunter');
+  const target = battle.raiderGroups.find(group => !group.routeTransit);
+  assert.ok(hunter && target);
+  battle.phase = 'command';
+  Object.assign(hunter, {
+    zoneId: 'wall', line: 'rear', ambushed: true, command: 'hold', commandSource: 'recommended',
+  });
+  battle.raiderGroups.forEach(group => {
+    group.intent = 'withdraw';
+    group.power = 0;
+    group.routeTransit = undefined;
+  });
+  Object.assign(target, {
+    zoneId: 'wall', targetZoneId: 'wall', line: 'front', intent: 'advance', revealed: true,
+    power: 60, morale: 70, rearAssault: false,
+  });
+  assert.equal(tactical.setTacticalAmbushAftermath(state, hunter.id, target.id, 'hold'), null);
+  assert.equal(hunter.command, 'ambush');
+  assert.equal(hunter.targetGroupId, target.id);
+  assert.equal(hunter.ambushAftermath, 'hold');
+  assert.equal(tactical.resolveTacticalRound(state), null);
+  assert.equal(hunter.ambushed, false, 'holding still consumes the prepared surprise attack');
+  assert.equal(hunter.command, 'hold', 'the selected hold aftermath keeps the ambusher in the battle');
+  assert.equal(hunter.zoneId, 'wall', 'a holding ambusher does not skip the next palisade engagement');
+  assert.equal(hunter.ambushAftermath, undefined, 'the one-shot aftermath choice is cleared after combat');
+  assert.ok(!battle.pendingReport.events.some(event => event.kind === 'retreat' && event.float === '이탈!'),
+    'a holding ambusher does not play the automatic disengage beat');
+}
+
+{
   const state = simulation.newGame(2026071311);
   prepareDefenders(state);
   const battle = tactical.createTacticalBattle(state, {
@@ -1580,7 +1636,9 @@ function deployCommandableToZone(state, zoneId) {
   assert.equal(tactical.tacticalCommandUnavailableReason(battle, spear, 'advance'), null);
   assert.ok(tactical.tacticalCommandUnavailableReason(battle, spear, 'charge'));
   spear.zoneId = 'approach';
+  assert.equal(tactical.tacticalCommandUnavailableReason(battle, spear, 'attack'), null);
   assert.equal(tactical.tacticalCommandUnavailableReason(battle, spear, 'charge'), null);
+  assert.ok(tactical.tacticalCommandUnavailableReason(battle, bow, 'attack'));
   assert.ok(tactical.tacticalCommandUnavailableReason(battle, bow, 'charge'));
   assert.ok(tactical.tacticalCommandUnavailableReason(battle, civilians, 'advance'));
   assert.ok(tactical.tacticalCommandUnavailableReason(battle, hunter, 'ambush'));
@@ -2190,10 +2248,16 @@ function deployCommandableToZone(state, zoneId) {
   flanker.flankPlan = 'breakthrough';
   flanker.rearAssault = false;
   battle.raiderGroups.filter(group => group !== flanker).forEach(group => { group.intent = 'withdraw'; });
+  const flankerKilledBefore = flanker.killed;
+  const flankerPowerBefore = flanker.power;
   assert.equal(tactical.resolveTacticalRound(state), null);
   const storehouseEvents = battle.pendingReport.events.filter(event => event.zoneId === 'storehouse');
   assert.ok(storehouseEvents.some(event => event.kind === 'advance' && event.text.includes('저항 없이')));
   assert.ok(!storehouseEvents.some(event => event.kind === 'melee'), 'empty zones do not play melee captions or sounds');
+  assert.deepEqual([flanker.killed, flanker.power], [flankerKilledBefore, flankerPowerBefore],
+    'advancing through an empty zone cannot cause unexplained enemy losses');
+  assert.ok(!storehouseEvents.some(event => event.kind === 'casualty' && event.side === 'raider'),
+    'empty zones do not play enemy casualty events');
 }
 
 {

@@ -132,6 +132,25 @@ assert.deepEqual(assets.tacticalExpandedRaiderPoseCell('변경 마적', 'deserte
 assert.deepEqual(assets.tacticalExpandedRaiderPoseCell('변경 마적', 'wall-breaker', 'wounded'), {
   sheet: 'banditUnits', column: 5, row: 3,
 });
+const lairSpriteFaction = assets.tacticalRaiderSpriteFaction({
+  encounterKind: 'banditLair',
+  factionName: '검은 까마귀 산채',
+});
+assert.equal(lairSpriteFaction, '변경 마적',
+  'bandit lairs must normalize their unique site name to the bandit sprite sheet key');
+assert.deepEqual(assets.tacticalExpandedRaiderPoseCell(lairSpriteFaction, 'bandit-vanguard', 'idle'), {
+  sheet: 'banditUnits', column: 0, row: 0,
+});
+assert.deepEqual(assets.tacticalExpandedRaiderPoseCell(lairSpriteFaction, 'bandit-rider', 'attack'), {
+  sheet: 'banditUnits', column: 1, row: 1,
+});
+assert.deepEqual(assets.tacticalExpandedRaiderPoseCell(lairSpriteFaction, 'bandit-looter', 'hurt'), {
+  sheet: 'banditUnits', column: 2, row: 2,
+});
+assert.equal(assets.tacticalRaiderSpriteFaction({
+  encounterKind: 'raidDefense',
+  factionName: '니마차 우디캐',
+}), '니마차 우디캐', 'ordinary raids must preserve their actual faction sprite key');
 assert.deepEqual(assets.tacticalExpandedRaiderPoseCell('조정 토벌군', 'court-shield', 'idle'), {
   sheet: 'courtExpanded', column: 0, row: 0,
 });

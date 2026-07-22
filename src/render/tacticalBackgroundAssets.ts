@@ -1,4 +1,4 @@
-import type { Season, TacticalZoneKind } from '../game/types';
+import type { Season, TacticalRouteTerrain, TacticalZoneKind } from '../game/types';
 
 type TacticalBackgroundKind = 'approach' | 'wall' | 'storehouse' | 'center';
 type OffensiveBackgroundKind = 'banditLair' | 'predatorHunt';
@@ -21,6 +21,23 @@ const BACKGROUND_KIND_BY_ZONE: Record<TacticalZoneKind, TacticalBackgroundKind> 
 function offensivePanorama(kind: OffensiveBackgroundKind, season: Season): string {
   const family = kind === 'banditLair' ? 'bandit' : 'hunt';
   return `/assets/tactical/offensive-backgrounds/${family}-panorama-${season}-v1.webp`;
+}
+
+const ROUTE_BACKGROUND_FAMILY: Readonly<Record<TacticalRouteTerrain, 'wooded-ridge' | 'river-bank'>> = {
+  woodedRidge: 'wooded-ridge',
+  riverBank: 'river-bank',
+};
+
+export function tacticalRouteBackgroundAsset(
+  terrain: TacticalRouteTerrain,
+  season: Season,
+  night = false,
+): TacticalBackgroundAsset {
+  return {
+    src: `/assets/tactical/routes/${ROUTE_BACKGROUND_FAMILY[terrain]}-${season}-${night ? 'night' : 'day'}-v1.webp`,
+    size: 'cover',
+    position: 'center center',
+  };
 }
 
 const HUNT_SECTOR_BACKGROUND_FAMILY: Readonly<Record<string, 'ridge' | 'brook' | 'ravine'>> = {

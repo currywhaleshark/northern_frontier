@@ -116,6 +116,51 @@ function totals(groups) {
 }
 
 {
+  const state = battleSimulation.createBattleSimulation(simulationOptions({ seed: 2026072302 }));
+  clearEnemyStratagems(state);
+  assert.equal(tactical.toggleTacticalFlankRoutePreparation(state, 'left'), null);
+  const battle = enterDeployment(state);
+  const route = battle.flankRoutes.find(candidate => candidate.side === 'left');
+  const group = battle.defenderGroups.find(candidate =>
+    candidate.commandable !== false && candidate.kind === 'militia-spear' && candidate.count >= 4);
+  assert.ok(route && group);
+  assert.equal(battle.deploymentPlacements[group.id], null);
+
+  assert.equal(tactical.placeTacticalRouteBlocker(state, group.id, 'left'), null,
+    'a waiting deployment card can go directly to the route middle');
+  assert.deepEqual(battle.deploymentPlacements[group.id], {
+    zoneId: '', line: group.line, routeId: route.id,
+  });
+  assert.equal(group.zoneId, '');
+  assert.equal(group.routeTransit.node, 'middle');
+  assert.equal(tactical.tacticalDeploymentView(battle).placed.some(view => view.groupId === group.id), true);
+
+  assert.equal(tactical.splitTacticalGroup(state, group.id, 1), null);
+  const detached = battle.defenderGroups.find(candidate =>
+    candidate.deploymentCohortId === group.deploymentCohortId && candidate.id !== group.id);
+  assert.ok(detached);
+  assert.equal(detached.routeTransit, undefined, 'a route split never duplicates physical route occupancy');
+  assert.equal(battle.deploymentPlacements[detached.id], null);
+
+  tactical.applyAutoDeployTacticalGroups(battle);
+  assert.equal(battle.deploymentPlacements[group.id].routeId, route.id,
+    'auto deploy preserves an intentional route placement');
+  assert.equal(group.routeTransit.node, 'middle');
+  assert.ok(battle.deploymentPlacements[detached.id]?.zoneId,
+    'auto deploy still places waiting non-route groups in their normal frontal zones');
+
+  assert.equal(tactical.removeTacticalDeploymentGroup(state, group.id), null);
+  assert.equal(battle.deploymentPlacements[group.id], null);
+  assert.equal(group.routeTransit, undefined, 'returning a route group to the dock removes route occupancy');
+
+  assert.equal(tactical.placeTacticalRouteBlocker(state, group.id, 'left'), null);
+  tactical.resetTacticalDeployment(battle);
+  assert.equal(group.routeTransit, undefined);
+  assert.equal(battle.deploymentPlacements[group.id], null,
+    'deployment reset returns commandable route groups to waiting cards');
+}
+
+{
   const state = battleSimulation.createBattleSimulation(simulationOptions({ seed: 2026072003 }));
   clearEnemyStratagems(state);
   const battle = enterDeployment(state);
@@ -281,7 +326,7 @@ function totals(groups) {
 }
 
 {
-  assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 33);
+  assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 34);
   assert.equal(saveLoad.migrateV24ToV25({ schemaVersion: 24, marker: 'kept' }).marker, 'kept');
   const state = battleSimulation.createBattleSimulation(simulationOptions({ seed: 2026072010 }));
   clearEnemyStratagems(state);

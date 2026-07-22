@@ -12,7 +12,6 @@ import type {
 export const TACTICAL_QUICK_COMMAND_LIMIT = 3;
 
 const CONTEXT_COMMANDS: readonly TacticalCommandId[] = [
-  'flankRoute',
   'reinforceRear',
   'guardStorehouse',
   'protectCivilians',

@@ -33,8 +33,6 @@ import type {
 } from './types';
 
 const ASSAULT_MAX_ROUNDS = 7;
-// 산채 병력은 구역별로 나뉘어 원정대 전원에게 각개격파되므로, 직접 지휘에서만 진지 방어 전투력을 보정한다.
-const LAIR_POSITION_POWER_MULTIPLIER = 3.2;
 const ASSAULT_PREPARATIONS: Array<{ id: PreparationActionId; label: string; cost: number }> = [
   { id: 'nightAssault', label: '야습 대기', cost: 2 },
   { id: 'preInfiltration', label: '선행 침투', cost: CONFIG.tacticalBattle.deployment.preInfiltrationCost },
@@ -280,7 +278,11 @@ export function createBanditLairTacticalAssault(state: GameState): TacticalBattl
     ...storedLairDefensePlan,
     doctrineRevealed: scouted && storedLairDefensePlan.doctrineRevealed,
   };
-  const enemies = banditDefenders(site.militaryPower * LAIR_POSITION_POWER_MULTIPLIER, scouted, lairDefensePlan);
+  const enemies = banditDefenders(
+    site.militaryPower * CONFIG.foreignSites.banditLairDefense.positionPowerMultiplier,
+    scouted,
+    lairDefensePlan,
+  );
   const battle: TacticalBattle = {
     encounterKind: 'banditLair',
     id: state.day * 1000 + state.subTick * 10 + 7,
@@ -452,6 +454,8 @@ export function assaultCommandUnavailableReason(
 ): string | null {
   if (battle.orientation !== 'assault') return '산채 공격전 명령이 아닙니다.';
   if (command === 'hold' || command === 'fallback' || command === 'advance' || command === 'openRetreat') return null;
+  if (command === 'attack') return tacticalGroupCapabilities(group).has('melee')
+    ? null : '일반 공격은 근접 무장을 갖춘 부대만 수행할 수 있습니다.';
   if (command === 'charge') return tacticalGroupCapabilities(group).has('charge') ? null : '돌격은 창을 갖춘 부대만 수행할 수 있습니다.';
   if (command === 'volley') return tacticalGroupCapabilities(group).has('volley') ? null : '원거리 부대가 필요합니다. 각궁 또는 화약이 준비된 조총이 필요합니다.';
   if (command === 'ambush') {
@@ -494,6 +498,7 @@ export function chooseDefaultAssaultCommands(battle: TacticalBattle): void {
 }
 
 export function assaultCommandPowerMultiplier(group: TacticalDefenderGroup): number {
+  if (group.command === 'attack') return 1;
   if (group.command === 'charge') return 1.5;
   if (group.command === 'volley') return 1.32;
   if (group.command === 'ambush') return 1.48;
@@ -585,9 +590,9 @@ export function resolveAssaultRound(state: GameState): string | null {
       side: 'raider', shots: { arrows: enemyShots.arrows, muskets: enemyShots.muskets },
     });
   }
-  if (commands.has('charge') || commands.has('advance')) {
+  if (commands.has('attack') || commands.has('charge') || commands.has('advance')) {
     const meleeActors = players
-      .filter(group => (group.command === 'charge' || group.command === 'advance') &&
+      .filter(group => (group.command === 'attack' || group.command === 'charge' || group.command === 'advance') &&
         tacticalGroupCapabilities(group).has('melee'));
     const meleeParticipants = meleeActors
       .reduce((sum, group) => sum + activeCount(group), 0) +

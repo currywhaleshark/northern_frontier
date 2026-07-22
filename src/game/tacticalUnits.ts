@@ -1,6 +1,4 @@
-import type {
-  RaiderUnitType, TacticalEnemyFactionId, TacticalUnitArchetype, TacticalUnitProfile,
-} from './types';
+import type { RaiderUnitType, TacticalUnitArchetype, TacticalUnitProfile } from './types';
 
 type TacticalUnitIdentity = Omit<TacticalUnitProfile,
   'rangedMultiplier' | 'meleeMultiplier' | 'chargeMultiplier' | 'protectionMultiplier' |
@@ -201,13 +199,5 @@ export function tacticalUnitProfileOrUndefined(
 
 export function tacticalUnitProfiles(): readonly TacticalUnitProfile[] {
   return TACTICAL_UNIT_PROFILE_IDS.map(tacticalUnitProfile);
-}
-
-export function tacticalUnitProfilesForFaction(
-  faction: TacticalEnemyFactionId,
-  maximumPhase: 1 | 2 | 8 = 8,
-): readonly TacticalUnitProfile[] {
-  return tacticalUnitProfiles().filter(profile =>
-    profile.factions.includes(faction) && profile.implementationPhase <= maximumPhase);
 }
 

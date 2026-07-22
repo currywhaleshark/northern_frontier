@@ -78,10 +78,6 @@ function pickFaction(state: GameState, rng: () => number): Faction {
   return cands[cands.length - 1].f;
 }
 
-export function isExtortionFaction(factionName: string): boolean {
-  return Boolean(FACTIONS.find(faction => faction.name === factionName)?.extortionDemands?.length);
-}
-
 export function openExtortionDemand(
   state: GameState,
   rng: () => number,

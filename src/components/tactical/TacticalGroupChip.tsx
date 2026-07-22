@@ -9,6 +9,7 @@ import {
   TACTICAL_DEFENDER_ROLE_POSE_SHEET,
   TACTICAL_DEFENDER_WEAPON_POSE_SHEET,
   TACTICAL_SPECIAL_RESIDENT_POSE_SHEET,
+  type TacticalSpritePose,
   tacticalDefaultWeaponPose,
   tacticalDefenderPoseCell,
   tacticalMountedDefenderPoseCell,
@@ -30,9 +31,11 @@ interface Props {
 }
 
 // 하단 독·배치 카드가 공유하는 소형 부대 초상 — 특수주민이 든 조는 group.special로 전용 시트를 쓴다
-export function DockDefenderSprite({ group, gender }: {
-  group: TacticalDefenderGroup;
+export function DockDefenderSprite({ group, gender, pose = 'idle', falling = false }: {
+  group: Pick<TacticalDefenderGroup, 'id' | 'role' | 'weapon' | 'mount' | 'special'>;
   gender: 'male' | 'female';
+  pose?: TacticalSpritePose;
+  falling?: boolean;
 }) {
   const descriptor = combatSpriteDescriptor(group.role, group.weapon);
   const defaultWeapon = tacticalDefaultWeaponPose(group);
@@ -41,13 +44,13 @@ export function DockDefenderSprite({ group, gender }: {
       group.role,
       descriptor.source === 'weapon' ? descriptor.id : null,
       gender,
-      'idle',
+      pose,
       defaultWeapon,
       group.special,
     );
     return (
       <span
-        className={`tactical-sprite tactical-defender mounted role-${group.role} weapon-${group.weapon ?? 'unarmed'} default-weapon-${defaultWeapon ?? 'none'} pose-idle`}
+        className={`tactical-sprite tactical-defender mounted role-${group.role} weapon-${group.weapon ?? 'unarmed'} default-weapon-${defaultWeapon ?? 'none'} pose-${pose}${falling ? ' falling' : ''}`}
         style={{
           backgroundImage: `url(${TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.src})`,
           backgroundPosition: `${-cell.column * TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.spriteWidth}px ${-cell.row * TACTICAL_MOUNTED_DEFENDER_POSE_SHEET.spriteHeight}px`,
@@ -62,7 +65,7 @@ export function DockDefenderSprite({ group, gender }: {
     group.role,
     descriptor.source === 'weapon' ? descriptor.id : null,
     gender,
-    'idle',
+    pose,
     defaultWeapon,
     group.special,
   );
@@ -86,7 +89,7 @@ export function DockDefenderSprite({ group, gender }: {
           : 'defenderRoles' as const;
   return (
     <span
-      className={`tactical-sprite tactical-defender role-${group.role} weapon-${group.weapon ?? 'unarmed'} default-weapon-${defaultWeapon ?? 'none'} pose-idle`}
+      className={`tactical-sprite tactical-defender role-${group.role} weapon-${group.weapon ?? 'unarmed'} default-weapon-${defaultWeapon ?? 'none'} pose-${pose}${falling ? ' falling' : ''}`}
       style={{
         backgroundImage: `url(${sheet.src})`,
         backgroundPosition: `${-cell.column * sheet.spriteWidth}px ${-cell.row * sheet.spriteHeight}px`,

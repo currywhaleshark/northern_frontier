@@ -9,7 +9,3 @@ export type FloatingWindowId = typeof FLOATING_WINDOW_IDS[number];
 export function isDockWindowId(value: unknown): value is DockWindowId {
   return typeof value === 'string' && (DOCK_WINDOW_IDS as readonly string[]).includes(value);
 }
-
-export function isFloatingWindowId(value: unknown): value is FloatingWindowId {
-  return typeof value === 'string' && (FLOATING_WINDOW_IDS as readonly string[]).includes(value);
-}

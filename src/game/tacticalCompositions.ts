@@ -1,6 +1,6 @@
 import type {
   EnemyDoctrineId, EnemyObjectiveId, RaiderGroupKind, RaiderUnitType,
-  TacticalCompositionCandidate, TacticalCompositionSlot, TacticalCompositionTemplate,
+  TacticalCompositionSlot, TacticalCompositionTemplate,
   TacticalEnemyFactionId,
 } from './types';
 
@@ -259,18 +259,4 @@ export function chooseTacticalCompositionTemplate(input: {
     if (cursor < 0) return template;
   }
   return eligible[eligible.length - 1];
-}
-
-export function chooseTacticalCompositionCandidate(
-  candidates: readonly TacticalCompositionCandidate[],
-  roll: number,
-): RaiderUnitType | undefined {
-  const total = candidates.reduce((sum, candidate) => sum + Math.max(0, candidate.weight), 0);
-  if (total <= 0) return undefined;
-  let cursor = Math.max(0, Math.min(0.999999999, roll)) * total;
-  for (const candidate of candidates) {
-    cursor -= Math.max(0, candidate.weight);
-    if (cursor < 0) return candidate.unitType;
-  }
-  return candidates[candidates.length - 1]?.unitType;
 }

@@ -1,22 +1,25 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { RESOURCE_NAMES, WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
 import { countBuilt } from '../game/buildings';
 import { getSeason } from '../game/seasons';
 import { banditLairDoctrineDefinition, enemyPlanCounterLabelsForAction, enemyPlanSummaryView } from '../game/enemyPlan';
 import { withJosa } from '../game/josa';
 import {
-  applyAutoDeployTacticalGroups, applyTacticalPlaybackEvent, applyTacticalStageOrder,
+  applyAutoDeployTacticalGroups, applyTacticalPlaybackEvent, applyTacticalStageMove, applyTacticalStageOrder,
   mergeTacticalGroups, placeTacticalDeploymentGroup, placeTacticalRouteBlocker,
   removeTacticalDeploymentGroup,
   resetTacticalDeployment, splitFeaturedTacticalGroup, splitTacticalGroup,
   tacticalCommandUnavailableReason, tacticalDeploymentPlacementUnavailableReason, tacticalDeploymentView,
+  tacticalGroupTargetUnavailableReason,
+  setTacticalAmbushAftermath,
   tacticalLootText,
   tacticalFormationLineUnavailableReason, tacticalPreparationUnavailableReason, tacticalRearResponseOptions,
   tacticalRearAssaultIsEngaged, tacticalRearManeuverEffectiveCounterStrengthForZone,
   setTacticalGroupFacing,
   tacticalFacingPreview, tacticalFacingUnavailableReason,
   tacticalFlankRoutePreparationView, tacticalFlankRouteView,
-  tacticalRouteOrderUnavailableReason, tacticalRoutePlacementUnavailableReason,
+  tacticalRoutePlacementUnavailableReason,
+  tacticalStageMovePreview, tacticalStageMoveUnavailableReason,
   tacticalStageOrderPreview, tacticalStageOrderUnavailableReason, tacticalSupportedCommands,
   toggleTacticalFlankRoutePreparation,
   type TacticalFacingPreview, type TacticalStageOrderPreview,
@@ -31,10 +34,12 @@ import type {
   GameState,
   PreparationActionId,
   TacticalAnimationEvent,
+  TacticalAmbushAftermath,
   TacticalCommandId,
   TacticalDefenderGroup,
   TacticalFacing,
   TacticalFormationLine,
+  TacticalStageMovePreview,
 } from '../game/types';
 import {
   playMeleeClash, playSfx, playWeaponSalvo, playWeaponVolley, setBattleDrums,
@@ -47,18 +52,27 @@ import {
 } from './tactical/TacticalDeploymentDock';
 import { TacticalGroupChip } from './tactical/TacticalGroupChip';
 import { TacticalOrderConfirm } from './tactical/TacticalOrderConfirm';
-import { TacticalRouteRibbon, parseRouteAnchorId } from './tactical/TacticalRouteRibbon';
+import { parseRouteAnchorId } from './tactical/TacticalRouteRibbon';
 import { useStagePointerDrag, type StageDragPoint } from './tactical/stagePointerDrag';
 import { TacticalCommandPopover } from './tactical/TacticalCommandPopover';
 import { TacticalMiniMap } from './tactical/TacticalMiniMap';
 import { EnemyPlanPanel } from './tactical/EnemyPlanPanel';
 import { TacticalZoneColumn } from './tactical/TacticalZoneColumn';
+import { TacticalRouteStage } from './tactical/TacticalRouteStage';
+import { parseRouteExitAnchorId, parseRouteGateAnchorId } from './tactical/TacticalRouteGate';
+import {
+  tacticalRouteExitDestination,
+  tacticalRouteGateDestination,
+  tacticalRouteReturnDestination,
+  tacticalRouteStageView,
+} from '../game/tacticalRoutes';
 import { commandDescription, commandLabel } from './tactical/commandText';
 import { computeCommandPopoverPlacement } from './tactical/popoverPlacement';
 import {
   facingLabel, facingPenaltyText, facingTransitionText,
   stageOrderCommandLabel, stageOrderPenaltyText, stageOrderTransitionText,
 } from './tactical/stageOrderPreview';
+import { tacticalRaiderSpriteFaction } from '../render/tacticalCharacterAssets';
 
 // P1.5 스파이크 전용 플래그 — `?dragSpike` URL로만 켜지는 개발용 드래그 검증 하네스
 const DRAG_SPIKE_ENABLED = typeof window !== 'undefined' &&
@@ -106,6 +120,8 @@ const PREP_DESCRIPTIONS: Record<PreparationActionId, string> = {
 
 interface CommandPopoverState {
   groupId: string;
+  mode: 'self' | 'attack' | 'ambushAftermath';
+  targetGroupId?: string;
   x: number;
   y: number;
   placement: 'above' | 'below';
@@ -202,7 +218,7 @@ function UnitDock({ state, battle, hunt, mode, selectedGroupId, onSelect }: {
             mode={mode}
             selected={selectedGroupId === group.id}
             pending={pending}
-            rearRaid={group.rearRaidRound === (battle.pendingReport?.round ?? battle.round)}
+            rearRaid={group.rearRaidRound != null}
             commandText={group.command ? commandLabel(group.command, group, hunt) : null}
             targetText={targetText}
             onSelect={() => onSelect(group.id)}
@@ -266,8 +282,6 @@ export function TacticalBattleScreen({
   const viewportRef = useRef<HTMLDivElement>(null);
   const stageShellRef = useRef<HTMLDivElement>(null);
   const popoverAnchorRef = useRef<HTMLElement | null>(null);
-  const commandBoardRef = useRef<HTMLDivElement>(null);
-  const commandBoardAttentionTimerRef = useRef<number | null>(null);
   const nextPendingTimerRef = useRef<number | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(() => battle
     ? nextActiveTacticalGroupId(battle.defenderGroups, null) ?? battle.defenderGroups[0]?.id ?? null
@@ -275,10 +289,13 @@ export function TacticalBattleScreen({
   const [hoveredCommand, setHoveredCommand] = useState<TacticalCommandId | null>(null);
   const [eventIndex, setEventIndex] = useState(0);
   const [viewedZoneId, setViewedZoneId] = useState(battle?.currentZoneId ?? 'approach');
+  const [viewedRouteId, setViewedRouteId] = useState<string | null>(null);
+  const [stageTransition, setStageTransition] = useState<
+    'route-from-top' | 'route-from-bottom' | 'zone-from-top' | 'zone-from-bottom' | null
+  >(null);
   const [stingerRound, setStingerRound] = useState<number | null>(null);
   const [fast, setFast] = useState(false);
   const [commandPopover, setCommandPopover] = useState<CommandPopoverState | null>(null);
-  const [commandBoardEmphasis, setCommandBoardEmphasis] = useState(false);
   const [nextPendingGroupId, setNextPendingGroupId] = useState<string | null>(null);
   const [nightAmbushIntroDoneId, setNightAmbushIntroDoneId] = useState<number | null>(null);
   // 적 정보 상세는 헤더 칩으로 여닫는다 — 하단바 스크롤을 강제하지 않기 위해 기본은 접힘
@@ -292,6 +309,7 @@ export function TacticalBattleScreen({
   // P4·P5 지휘 단계 확인 카드 — 확인 전에는 게임 상태를 바꾸지 않는다 (계획서 7.9)
   const [stageOrderConfirm, setStageOrderConfirm] = useState<
     | { kind: 'order'; preview: TacticalStageOrderPreview; left: number; top: number }
+    | { kind: 'move'; preview: TacticalStageMovePreview; left: number; top: number }
     | { kind: 'facing'; preview: TacticalFacingPreview; left: number; top: number }
     | null
   >(null);
@@ -300,6 +318,7 @@ export function TacticalBattleScreen({
   // 드롭 직후 이어지는 click이 팝오버를 열지 않게 잠깐 막는다
   const stageDropGuardRef = useRef(false);
   const stageDropHandlerRef = useRef<(groupId: string, anchorId: string | null, point: StageDragPoint) => void>(() => {});
+  const previousFocusedRouteIdRef = useRef<string | null>(null);
   const fastRef = useRef(false);
   const preparationPlayback = battle?.phase === 'preparationExecution';
   const combatPlayback = battle?.phase === 'simulating';
@@ -310,26 +329,21 @@ export function TacticalBattleScreen({
     ? battle.preparationEvents[eventIndex] ?? null
     : combatPlayback ? battle.pendingReport?.events[eventIndex] ?? null : null;
   const activeZoneId = activeEvent?.zoneId ?? viewedZoneId;
+  const transitionRouteId = activeEvent?.routeId ?? (!activeEvent ? viewedRouteId : null);
+
+  useLayoutEffect(() => {
+    const previousRouteId = previousFocusedRouteIdRef.current;
+    if (previousRouteId === transitionRouteId) return;
+    const routeId = transitionRouteId ?? previousRouteId;
+    const side = battle?.flankRoutes?.find(route => route.id === routeId)?.side;
+    if (transitionRouteId) setStageTransition(side === 'right' ? 'route-from-bottom' : 'route-from-top');
+    else if (previousRouteId) setStageTransition(side === 'right' ? 'zone-from-top' : 'zone-from-bottom');
+    previousFocusedRouteIdRef.current = transitionRouteId;
+  }, [transitionRouteId, battle?.flankRoutes]);
 
   const closePopover = (options?: { restoreFocus?: boolean }) => {
     setCommandPopover(null);
     if (options?.restoreFocus) popoverAnchorRef.current?.focus();
-  };
-
-  const openCommandBoard = () => {
-    setCommandPopover(null);
-    setCommandBoardEmphasis(false);
-    window.requestAnimationFrame(() => {
-      setCommandBoardEmphasis(true);
-      commandBoardRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
-      if (commandBoardAttentionTimerRef.current != null) {
-        window.clearTimeout(commandBoardAttentionTimerRef.current);
-      }
-      commandBoardAttentionTimerRef.current = window.setTimeout(() => {
-        setCommandBoardEmphasis(false);
-        commandBoardAttentionTimerRef.current = null;
-      }, 1200);
-    });
   };
 
   const pulseNextPending = (groupId: string) => {
@@ -343,9 +357,6 @@ export function TacticalBattleScreen({
 
   useEffect(() => () => {
     if (nextPendingTimerRef.current != null) window.clearTimeout(nextPendingTimerRef.current);
-    if (commandBoardAttentionTimerRef.current != null) {
-      window.clearTimeout(commandBoardAttentionTimerRef.current);
-    }
     if (deployNoticeTimerRef.current != null) window.clearTimeout(deployNoticeTimerRef.current);
   }, []);
 
@@ -544,7 +555,7 @@ export function TacticalBattleScreen({
       left: Math.max(0, zone.offsetLeft - (viewport.clientWidth - zone.clientWidth) / 2),
       behavior: battle?.assaultKind === 'predatorHunt' ? 'auto' : 'smooth',
     });
-  }, [activeZoneId, battle?.assaultKind]);
+  }, [activeZoneId, battle?.assaultKind, transitionRouteId]);
 
   const selectedGroup = useMemo(
     () => battle?.defenderGroups.find(group => group.id === selectedGroupId) ??
@@ -553,6 +564,9 @@ export function TacticalBattleScreen({
   );
   const popoverGroup = commandPopover
     ? battle?.defenderGroups.find(group => group.id === commandPopover.groupId) ?? null
+    : null;
+  const popoverTarget = commandPopover?.targetGroupId
+    ? battle?.raiderGroups.find(group => group.id === commandPopover.targetGroupId) ?? null
     : null;
 
   useEffect(() => {
@@ -569,8 +583,12 @@ export function TacticalBattleScreen({
   // 부대 선택 시 무대도 해당 부대의 구역으로 따라간다 (독 칩·무대 클릭 공용)
   const selectGroup = (groupId: string) => {
     setSelectedGroupId(groupId);
-    const zoneId = battle?.defenderGroups.find(group => group.id === groupId)?.zoneId;
-    if (zoneId) setViewedZoneId(zoneId);
+    const group = battle?.defenderGroups.find(candidate => candidate.id === groupId);
+    if (group?.routeTransit) setViewedRouteId(group.routeTransit.routeId);
+    else if (group?.zoneId) {
+      setViewedRouteId(null);
+      setViewedZoneId(group.zoneId);
+    }
   };
 
   const openCommandPopover = (groupId: string, element: HTMLElement) => {
@@ -581,7 +599,12 @@ export function TacticalBattleScreen({
       selectGroup(groupId);
       return;
     }
-    if (commandPopover?.groupId === groupId) {
+    if (selectedGroupId !== groupId) {
+      closePopover();
+      selectGroup(groupId);
+      return;
+    }
+    if (commandPopover?.groupId === groupId && commandPopover.mode === 'self') {
       closePopover();
       return;
     }
@@ -598,13 +621,14 @@ export function TacticalBattleScreen({
     });
     popoverAnchorRef.current = element;
     selectGroup(groupId);
-    setCommandPopover({ groupId, ...placement });
+    setCommandPopover({ groupId, mode: 'self', ...placement });
   };
 
   if (!battle) return null;
   const assault = battle.orientation === 'assault';
   const hunt = battle.assaultKind === 'predatorHunt';
   const lairAssault = assault && !hunt;
+  const raiderSpriteFaction = tacticalRaiderSpriteFaction(battle);
   // 합류 후보는 같은 원래 조(cohort)와 같은 배치 상태만 나열한다 — 최종 판정은 백엔드 merge가 한다.
   const samePlacementForMerge = (leftId: string, rightId: string) => {
     const left = battle.deploymentPlacements?.[leftId] ?? null;
@@ -631,6 +655,43 @@ export function TacticalBattleScreen({
   const deploymentStartReason = hunt ? huntDeploymentReason : deploymentView?.unavailableReason ?? null;
   // P6 우회로 — 표시 상태·step·도착 범위는 백엔드 selector가 단일 소스다
   const flankRouteViews = battle.flankRoutes?.length ? tacticalFlankRouteView(battle) : [];
+  const routeStageViews = battle.flankRoutes?.length ? tacticalRouteStageView(battle) : [];
+  const focusedRouteId = activeEvent?.routeId ?? (!activeEvent ? viewedRouteId : null);
+  const activeRouteStage = focusedRouteId
+    ? routeStageViews.find(view => view.routeId === focusedRouteId && view.accessible) ?? null
+    : null;
+  const selectedRouteDefender = activeRouteStage && selectedGroup?.routeTransit?.routeId === activeRouteStage.routeId
+    ? selectedGroup
+    : null;
+  const targetableRouteEnemyIds = new Set((battle.phase === 'command' ? activeRouteStage?.groups ?? [] : [])
+    .filter(group => group.side === 'raider' && selectedRouteDefender &&
+      tacticalGroupTargetUnavailableReason(battle, selectedRouteDefender.id, group.groupId) == null)
+    .map(group => group.groupId) ?? []);
+  const openAttackCommandPopover = (groupId: string, targetGroupId: string, element: HTMLElement) => {
+    const shell = stageShellRef.current;
+    if (!shell || battle.phase !== 'command' || selectedGroupId !== groupId) return;
+    const unit = element.getBoundingClientRect();
+    const shellRect = shell.getBoundingClientRect();
+    const placement = computeCommandPopoverPlacement({
+      left: unit.left - shellRect.left,
+      top: unit.top - shellRect.top,
+      width: unit.width,
+      height: unit.height,
+    }, { width: shellRect.width, height: shellRect.height });
+    popoverAnchorRef.current = element;
+    setCommandPopover({ groupId, mode: 'attack', targetGroupId, ...placement });
+  };
+  const viewRoute = (routeId: string) => {
+    const side = battle.flankRoutes?.find(route => route.id === routeId)?.side;
+    setStageTransition(side === 'right' ? 'route-from-bottom' : 'route-from-top');
+    setViewedRouteId(routeId);
+  };
+  const viewZone = (zoneId: string) => {
+    const side = battle.flankRoutes?.find(route => route.id === viewedRouteId)?.side;
+    if (viewedRouteId) setStageTransition(side === 'right' ? 'zone-from-top' : 'zone-from-bottom');
+    setViewedRouteId(null);
+    setViewedZoneId(zoneId);
+  };
   const flankRouteOptions = battle.phase === 'preparation' ? tacticalFlankRoutePreparationView(state) : [];
   const defenderOpenedRoutes = flankRouteViews.filter(view => view.route.openedByDefender);
   const routeBlockers = battle.defenderGroups.filter(group => group.routeTransit?.purpose === 'block');
@@ -681,6 +742,32 @@ export function TacticalBattleScreen({
     setDeployDrag(current => drag ?? (current?.groupId === groupId ? null : current));
   };
 
+  const openStageMoveConfirm = (
+    groupId: string,
+    destination: TacticalStageMovePreview['destination'],
+    point: StageDragPoint,
+  ) => {
+    const reason = tacticalStageMoveUnavailableReason(state, groupId, destination);
+    if (reason) {
+      showDeployNotice(reason);
+      return;
+    }
+    const preview = tacticalStageMovePreview(state, groupId, destination);
+    if (!preview) return;
+    selectGroup(preview.groupId);
+    if (preview.effect === 'none') return;
+    const shellRect = stageShellRef.current?.getBoundingClientRect();
+    const cardWidth = 240;
+    const cardHeight = 120;
+    const left = shellRect
+      ? Math.max(8, Math.min(point.x - shellRect.left - cardWidth / 2, shellRect.width - cardWidth - 8))
+      : 8;
+    const top = shellRect
+      ? Math.max(8, Math.min(point.y - shellRect.top - cardHeight - 12, shellRect.height - cardHeight - 8))
+      : 8;
+    setStageOrderConfirm({ kind: 'move', preview, left, top });
+  };
+
   // ── P4 무대 부대 드래그: 드롭 처리·앵커 상태·확인 카드 ──
   // 배치 단계 무대 드롭은 카드 드롭과 같은 규칙으로 즉시 적용, 지휘 단계 드롭은 preview 후 확인 카드.
   stageDropHandlerRef.current = (groupId, anchorId, point) => {
@@ -723,6 +810,30 @@ export function TacticalBattleScreen({
       return;
     }
     if (battle.phase !== 'command') return;
+    const routeExit = anchorId ? parseRouteExitAnchorId(anchorId) : null;
+    if (routeExit) {
+      const destination = tacticalRouteExitDestination(
+        battle, groupId, routeExit.routeId, routeExit.target,
+      );
+      if (!destination) {
+        showDeployNotice('선택한 부대가 이 우회로 출구 목적을 수행할 수 없습니다.');
+        return;
+      }
+      openStageMoveConfirm(groupId, destination, point);
+      return;
+    }
+    const routeGate = anchorId ? parseRouteGateAnchorId(anchorId) : null;
+    if (routeGate) {
+      const destination = routeGate.node === 'middle'
+        ? { kind: 'routeNode' as const, ...routeGate }
+        : tacticalRouteGateDestination(battle, groupId, routeGate.routeId, routeGate.node);
+      if (!destination) {
+        showDeployNotice('이 출입구에 연결된 이동 경로를 찾을 수 없습니다.');
+        return;
+      }
+      openStageMoveConfirm(groupId, destination, point);
+      return;
+    }
     const target = anchorId ? parseDeployAnchorId(anchorId) : null;
     if (!target) return; // 앵커 밖 드롭 = 취소, 상태 불변
     const reason = tacticalStageOrderUnavailableReason(battle, groupId, target);
@@ -755,6 +866,16 @@ export function TacticalBattleScreen({
       const error = runDeploymentAction(current =>
         applyTacticalStageOrder(current, preview.groupId, preview.destination));
       if (!error) playSfx('raidDrum');
+      return;
+    }
+    if (pending.kind === 'move') {
+      const preview = pending.preview;
+      const error = runDeploymentAction(current =>
+        applyTacticalStageMove(current, preview.groupId, preview.destination));
+      if (!error) {
+        playSfx('raidDrum');
+        if (preview.destination.kind === 'routeNode') viewRoute(preview.destination.routeId);
+      }
       return;
     }
     const preview = pending.preview;
@@ -888,6 +1009,23 @@ export function TacticalBattleScreen({
     const firstAssignment = group.commandSource !== 'player';
     onSetCommand(group.id, command);
     if (!firstAssignment) return;
+    const nextId = nextPendingTacticalGroupId(battle.defenderGroups, group.id);
+    if (nextId) {
+      selectGroup(nextId);
+      pulseNextPending(nextId);
+    }
+  };
+  const assignAmbushAftermathTo = (
+    groupId: string,
+    targetGroupId: string,
+    aftermath: TacticalAmbushAftermath,
+  ) => {
+    const group = battle.defenderGroups.find(candidate => candidate.id === groupId);
+    if (!group || !tacticalGroupCanReceiveCommand(group)) return;
+    const firstAssignment = group.commandSource !== 'player';
+    const error = runDeploymentAction(current =>
+      setTacticalAmbushAftermath(current, group.id, targetGroupId, aftermath));
+    if (error || !firstAssignment) return;
     const nextId = nextPendingTacticalGroupId(battle.defenderGroups, group.id);
     if (nextId) {
       selectGroup(nextId);
@@ -1032,7 +1170,47 @@ export function TacticalBattleScreen({
           enableFastForward();
         }}>
           <div className="tactical-battlefield" ref={viewportRef}>
-            <div className="tactical-strip" style={{ width: `${battle.zones.length * 100}%` }}>
+            <div
+              key={activeRouteStage ? `route-${activeRouteStage.routeId}` : 'zone-strip'}
+              className={`tactical-stage-camera ${activeRouteStage ? 'route' : 'zone'}${stageTransition ? ` transition-${stageTransition}` : ''}`}
+            >
+            {activeRouteStage ? (
+              <TacticalRouteStage
+                state={state}
+                view={activeRouteStage}
+                selectedGroupId={selectedGroupId}
+                playback={playbackActive}
+                deploymentPhase={battle.phase === 'deployment'}
+                commandPhase={battle.phase === 'command'}
+                fieldLayout={battle.phase === 'command' || battle.phase === 'simulating' || battle.phase === 'report'}
+                season={season}
+                night={battle.deploymentForced === 'nightAmbush'}
+                activeEvent={activeEvent}
+                eventIndex={eventIndex}
+                raiderFaction={raiderSpriteFaction}
+                targetingActive={battle.phase === 'command' && selectedRouteDefender != null}
+                targetableEnemyIds={targetableRouteEnemyIds}
+                selectedTargetGroupId={selectedRouteDefender?.targetSource === 'player'
+                  ? selectedRouteDefender.targetGroupId ?? null
+                  : null}
+                stageDrag={zoneStageDrag}
+                stageDragHandlePropsFor={stageDragHandlePropsFor}
+                onSelectGroup={openCommandPopover}
+                onSelectTarget={openAttackCommandPopover}
+                onViewZone={zoneId => {
+                  // 드롭 직후 브라우저가 합성하는 click은 출구 보기 전환이 아니라 이동 명령의 일부다.
+                  if (stageDropGuardRef.current) return;
+                  viewZone(zoneId);
+                }}
+                onRequestMove={(groupId, destination, element) => {
+                  const bounds = element.getBoundingClientRect();
+                  openStageMoveConfirm(groupId, destination, {
+                    x: bounds.left + bounds.width / 2,
+                    y: bounds.top + bounds.height / 2,
+                  });
+                }}
+              />
+            ) : <div className="tactical-strip" style={{ width: `${battle.zones.length * 100}%` }}>
               {battle.zones.map(zone => (
                 <TacticalZoneColumn
                   key={zone.id}
@@ -1051,25 +1229,29 @@ export function TacticalBattleScreen({
                   commandable={commandable}
                   selectedGroupId={selectedGroup?.id ?? null}
                   nextPendingGroupId={nextPendingGroupId}
+                  routeStageViews={routeStageViews}
+                  onViewRoute={viewRoute}
+                  onRequestRouteEntry={(groupId, routeId, node, element) => {
+                    const rect = element.getBoundingClientRect();
+                    openStageMoveConfirm(groupId, { kind: 'routeNode', routeId, node }, {
+                      x: rect.left + rect.width / 2,
+                      y: rect.top + rect.height / 2,
+                    });
+                  }}
                   stageDrag={zoneStageDrag}
                   stageDragHandlePropsFor={stageDragHandlePropsFor}
                   onTurnGroup={requestFacingChange}
                   onSelectGroup={openCommandPopover}
-                  onSelectTarget={(defenderGroupId, enemyGroupId) => {
-                    const defender = battle.defenderGroups.find(group => group.id === defenderGroupId);
-                    onSetGroupTarget(defenderGroupId,
-                      defender?.targetSource === 'player' && defender.targetGroupId === enemyGroupId
-                        ? null
-                        : enemyGroupId);
-                  }}
+                  onSelectTarget={openAttackCommandPopover}
                 />
               ))}
+            </div>}
             </div>
           </div>
           <button
             type="button"
             className="tactical-stage-nav previous"
-            disabled={activeZoneIndex <= 0 || playbackActive}
+            disabled={activeRouteStage != null || activeZoneIndex <= 0 || playbackActive}
             onClick={() => showZone(activeZoneIndex - 1)}
             title={assault ? '이전 공략 구역' : '이전 방어선'}
             aria-label={assault ? '이전 공략 구역' : '이전 방어선'}
@@ -1077,7 +1259,7 @@ export function TacticalBattleScreen({
           <button
             type="button"
             className="tactical-stage-nav next"
-            disabled={activeZoneIndex >= battle.zones.length - 1 || playbackActive}
+            disabled={activeRouteStage != null || activeZoneIndex >= battle.zones.length - 1 || playbackActive}
             onClick={() => showZone(activeZoneIndex + 1)}
             title={assault ? '다음 공략 구역' : '다음 방어선'}
             aria-label={assault ? '다음 공략 구역' : '다음 방어선'}
@@ -1092,23 +1274,10 @@ export function TacticalBattleScreen({
               eventIndex={eventIndex}
               playback={playbackActive}
               routeViews={flankRouteViews}
-              onViewZone={setViewedZoneId}
+              viewedRouteId={activeRouteStage?.routeId ?? null}
+              onViewZone={viewZone}
+              onViewRoute={viewRoute}
               onSelectGroup={selectGroup}
-            />
-          )}
-          {showTacticalMiniMap && flankRouteViews.length > 0 && (
-            <TacticalRouteRibbon
-              battle={battle}
-              views={flankRouteViews}
-              routeAdvances={combatPlayback ? battle.pendingReport?.routeAdvances ?? null : null}
-              routeEngagements={combatPlayback ? battle.pendingReport?.routeEngagements ?? null : null}
-              routeArrivals={combatPlayback ? battle.pendingReport?.routeArrivals ?? null : null}
-              playback={playbackActive}
-              deploymentPhase={battle.phase === 'deployment'}
-              blockerDrag={battle.phase === 'deployment' && zoneStageDrag
-                ? { groupId: zoneStageDrag.groupId, hoverAnchorId: zoneStageDrag.hoverAnchorId }
-                : null}
-              onFocusRoute={setViewedZoneId}
             />
           )}
           {DRAG_SPIKE_ENABLED && (
@@ -1163,6 +1332,8 @@ export function TacticalBattleScreen({
               battle={battle}
               group={popoverGroup}
               hunt={hunt}
+              mode={commandPopover.mode}
+              target={popoverTarget}
               placement={commandPopover.placement}
               style={{
                 left: commandPopover.x,
@@ -1171,6 +1342,14 @@ export function TacticalBattleScreen({
               } as CSSProperties}
               maxHeight={commandPopover.maxHeight}
               onCommand={command => {
+                if (commandPopover.mode === 'attack' && command === 'ambush' &&
+                    popoverGroup.ambushed && popoverTarget) {
+                  setCommandPopover({ ...commandPopover, mode: 'ambushAftermath' });
+                  return;
+                }
+                if (commandPopover.mode === 'attack' && popoverTarget) {
+                  onSetGroupTarget(popoverGroup.id, popoverTarget.id);
+                }
                 assignCommandTo(popoverGroup.id, command);
                 closePopover();
               }}
@@ -1185,13 +1364,44 @@ export function TacticalBattleScreen({
                 setViewedZoneId(zoneId);
                 closePopover();
               }}
-              onOpenCommandBoard={openCommandBoard}
+              onAmbushAftermath={aftermath => {
+                if (!popoverTarget) {
+                  showDeployNotice('급습할 적 표적을 다시 선택하십시오.');
+                  closePopover();
+                  return;
+                }
+                assignAmbushAftermathTo(popoverGroup.id, popoverTarget.id, aftermath);
+                closePopover();
+              }}
+              onReturnRoute={() => {
+                const destination = tacticalRouteReturnDestination(battle, popoverGroup.id);
+                if (!destination) {
+                  showDeployNotice('이 부대의 우회로 복귀 경로를 찾을 수 없습니다.');
+                  return;
+                }
+                openStageMoveConfirm(popoverGroup.id, destination, {
+                  x: commandPopover.x,
+                  y: commandPopover.y,
+                });
+                closePopover();
+              }}
               onClose={restoreFocus => closePopover({ restoreFocus })}
             />
           )}
           {stageOrderConfirm && battle.phase === 'command' && (() => {
             const confirmGroup = battle.defenderGroups.find(group => group.id === stageOrderConfirm.preview.groupId);
             const confirmGroupLabel = confirmGroup?.label ?? '';
+            const moveDestinationLabel = (destination: TacticalStageMovePreview['destination']) => {
+              if (destination.kind === 'zoneLane') {
+                const zone = battle.zones.find(candidate => candidate.id === destination.zoneId)?.name ?? destination.zoneId;
+                const line = destination.line === 'front' ? '전열' : destination.line === 'middle' ? '중열' : '후열';
+                return `${zone} ${line}`;
+              }
+              const route = battle.flankRoutes?.find(candidate => candidate.id === destination.routeId)?.label ?? '우회로';
+              const node = destination.node === 'approachGate' ? '진입로 측 입구'
+                : destination.node === 'middle' ? '중간 차단 지점' : '창고지대 측 입구';
+              return `${route} · ${node}`;
+            };
             const presentation = stageOrderConfirm.kind === 'order'
               ? {
                 title: `${confirmGroupLabel} · ${stageOrderTransitionText(battle, stageOrderConfirm.preview)}`,
@@ -1199,6 +1409,20 @@ export function TacticalBattleScreen({
                 warning: stageOrderConfirm.preview.warning ?? null,
                 confirmLabel: `${stageOrderCommandLabel(stageOrderConfirm.preview.command)} 확정`,
               }
+              : stageOrderConfirm.kind === 'move'
+                ? {
+                  title: `${confirmGroupLabel} · ${moveDestinationLabel(stageOrderConfirm.preview.origin)} → ${moveDestinationLabel(stageOrderConfirm.preview.destination)}`,
+                  penaltyText: stageOrderConfirm.preview.travelRounds > 0
+                    ? `이동 ${stageOrderConfirm.preview.travelRounds}교전`
+                    : stageOrderConfirm.preview.leavesFrontalBattle ? '정면 전투 이탈' : null,
+                  warning: stageOrderConfirm.preview.warning ?? null,
+                  confirmLabel: stageOrderConfirm.preview.effect === 'routeEntry' ? '우회로 진입 확정'
+                    : stageOrderConfirm.preview.effect === 'rearRaid' ? '후방 급습 확정'
+                      : stageOrderConfirm.preview.effect === 'return' ? '전장 복귀 확정'
+                        : stageOrderConfirm.preview.effect === 'zoneTransfer' ? '전장 합류 확정'
+                          : stageOrderConfirm.preview.effect === 'block' ? '차단 지점 이동 확정'
+                            : '우회로 이동 확정',
+                }
               : {
                 title: `${confirmGroupLabel} · ${facingTransitionText(stageOrderConfirm.preview)}`,
                 penaltyText: facingPenaltyText(stageOrderConfirm.preview),
@@ -1576,7 +1800,7 @@ export function TacticalBattleScreen({
                   <div>
                     <strong>우회로 부대 운용</strong>
                     <span>{routeBlockers.length > 0
-                      ? '차단대를 선택해 진지를 지키거나, 우회 기동으로 전환해 적 후열을 급습할 수 있습니다.'
+                      ? '차단대를 선택한 뒤 우회로 무대에서 진입로 합류·방책 급습·창고지대 합류 목적을 정하십시오.'
                       : '배치 단계에서 우회로에 보낸 차단대가 없습니다.'}</span>
                   </div>
                   <div className="tactical-route-order-actions">
@@ -1592,11 +1816,9 @@ export function TacticalBattleScreen({
                       <button
                         type="button"
                         className="primary-route-order"
-                        disabled={tacticalRouteOrderUnavailableReason(battle, selectedGroup.id) != null}
-                        title={tacticalRouteOrderUnavailableReason(battle, selectedGroup.id) ??
-                          '차단 진지를 떠나 우회로를 통과한 뒤 적 후열을 급습합니다.'}
-                        onClick={() => onSetCommand(selectedGroup.id, 'flankRoute')}
-                      >{selectedGroup.command === 'flankRoute' ? '우회 기동 중' : '선택 부대 우회 기동'}</button>
+                        title="우회로 무대를 열어 이동 지점과 최종 목적을 선택합니다."
+                        onClick={() => viewRoute(selectedGroup.routeTransit!.routeId)}
+                      >우회로 목적 선택</button>
                     )}
                   </div>
                 </div>
@@ -1672,8 +1894,7 @@ export function TacticalBattleScreen({
                     )}
                     {!hunt && renderFacingToggle(selectedGroup)}
                     <div
-                      ref={commandBoardRef}
-                      className={`tactical-command-bar${commandBoardEmphasis ? ' command-board-emphasis' : ''}`}
+                      className="tactical-command-bar"
                       role="group"
                       aria-label={`${selectedGroup.label} 명령 선택`}
                     >

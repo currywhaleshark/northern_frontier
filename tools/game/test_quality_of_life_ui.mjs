@@ -45,7 +45,7 @@ for (const name of ['jobs', 'processing', 'residents', 'special-residents', 'fac
   assert.equal(png.toString('ascii', 1, 4), 'PNG', `${name} dock icon must be a PNG`);
 }
 
-const appSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+const appSource = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
 const mainMenuSource = readFileSync(new URL('../../src/components/MainMenu.tsx', import.meta.url), 'utf8');
 const readmeSource = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
 const topBarSource = readFileSync(new URL('../../src/components/TopBar.tsx', import.meta.url), 'utf8');

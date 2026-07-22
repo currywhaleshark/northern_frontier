@@ -696,7 +696,14 @@ function finishBattle(state) {
   assert.equal(tactical.setTacticalCommand(state, hunter.id, 'ambush'), null);
   assert.equal(tactical.resolveTacticalRound(state), null);
   assert.equal(battle.pendingReport.outcome, 'huntRepelled');
-  assert.ok(battle.pendingReport.events.some(event => event.kind === 'beastRout'));
+  const leaderDeathIndex = battle.pendingReport.events.findIndex(event =>
+    event.kind === 'casualty' && event.side === 'raider' && event.groupId === leader.id);
+  const packRoutIndex = battle.pendingReport.events.findIndex(event =>
+    event.kind === 'beastRout' && event.groupId === pack.id);
+  assert.ok(leaderDeathIndex >= 0, 'the wolf leader must remain visible through an explicit death event');
+  assert.ok(packRoutIndex > leaderDeathIndex, 'the surviving pack must rout visibly after the leader falls');
+  assert.equal(battle.pendingReport.events[leaderDeathIndex].zoneId, leader.zoneId);
+  assert.equal(battle.pendingReport.events[packRoutIndex].zoneId, pack.zoneId);
   finishBattle(state);
   assert.equal(state.incidents.predatorThreats.wolf, undefined);
   assert.equal(state.expedition?.phase, 'return');
@@ -712,6 +719,10 @@ function finishBattle(state) {
   battle.raiderGroups.forEach(group => { group.revealed = true; group.power = 0.01; });
   assert.equal(tactical.resolveTacticalRound(state), null);
   assert.equal(battle.pendingReport.outcome, 'huntKill');
+  const tiger = battle.raiderGroups[0];
+  assert.ok(battle.pendingReport.events.some(event =>
+    event.kind === 'casualty' && event.side === 'raider' && event.groupId === tiger.id),
+  'a killed tiger must play a falling sprite before disappearing');
   finishBattle(state);
   assert.equal(state.incidents.predatorThreats.tiger, undefined);
   assert.ok(state.discoveredSpecialItems.includes('tigerPelt'));

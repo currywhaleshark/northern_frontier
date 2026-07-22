@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 
-const appSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+const appSource = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
 const logSource = readFileSync(new URL('../../src/components/UnifiedLog.tsx', import.meta.url), 'utf8');
 const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
 

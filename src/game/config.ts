@@ -158,6 +158,8 @@ export const CONFIG = {
       intelDays: 48,
     },
     banditLairDefense: {
+      // 직접 지휘와 자동판정이 공유하는 산채 진지 전력 배율이다.
+      positionPowerMultiplier: 3.2,
       doctrineReviewIntervalDays: 24,
       doctrineChangeChance: 0.65,
       baseStratagemPoints: 1,

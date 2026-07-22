@@ -4,7 +4,7 @@ import { FACTIONS, FLAVOR_LOGS_CALM, FLAVOR_LOGS_TENSE, RESOURCE_NAMES } from '.
 import { countBuilt } from './buildings';
 import { changeRelation, getRelation } from './relations';
 import {
-  applyQuotedTrade, evaluateFactionProposal, factionTradeCapacity, factionValue, quoteFactionDemand, quoteTrade,
+  applyQuotedTrade, evaluateFactionProposal, factionTradeCapacity, factionValue, quoteFactionDemand,
   relationMargin, useFactionTradeCapacity, visitorTradeMultiplier,
 } from './tradeValues';
 import { SPECIAL_ITEM_DEFS } from './specialItems';

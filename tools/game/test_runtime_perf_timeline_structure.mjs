@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const perfSource = readFileSync(new URL('../../src/perf/runtimePerf.ts', import.meta.url), 'utf8');
-const appSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+const appSource = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
 const canvasSource = readFileSync(new URL('../../src/components/GameCanvas.tsx', import.meta.url), 'utf8');
 const minimapSource = readFileSync(new URL('../../src/components/Minimap.tsx', import.meta.url), 'utf8');
 const agentsSource = readFileSync(new URL('../../src/game/agents.ts', import.meta.url), 'utf8');

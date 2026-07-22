@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 33, 'fixed silver discoveries ship with schema version 33');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 34, 'route stage nodes ship with schema version 34');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -69,6 +69,7 @@ assert.equal(typeof saveLoad.migrateV24ToV25, 'function');
 assert.equal(typeof saveLoad.migrateV25ToV26, 'function');
 assert.equal(typeof saveLoad.migrateV26ToV27, 'function');
 assert.equal(typeof saveLoad.migrateV27ToV28, 'function');
+assert.equal(typeof saveLoad.migrateV33ToV34, 'function');
 
 {
   const migrated = saveLoad.migrateV24ToV25({ schemaVersion: 24, tacticalBattle: { phase: 'deployment' } });
@@ -121,6 +122,32 @@ assert.equal(typeof saveLoad.migrateV27ToV28, 'function');
   assert.equal(migrated.schemaVersion, 33);
   assert.equal(migrated.silverVein.discoveredAmount, 73,
     'active legacy veins reconstruct their original reserve from remaining plus mined');
+}
+
+{
+  const migrated = saveLoad.migrateV33ToV34({
+    schemaVersion: 33,
+    tacticalBattle: {
+      flankRoutes: [{ id: 'flank-left', side: 'left' }],
+      defenderGroups: [],
+      raiderGroups: [{
+        id: 'legacy-flanker', line: 'rear',
+        routeTransit: {
+          routeId: 'flank-left', purpose: 'raid', step: 1,
+          originZoneId: 'approach', destinationZoneId: 'wall',
+        },
+      }],
+    },
+  });
+  assert.equal(migrated.schemaVersion, 34);
+  assert.deepEqual(migrated.tacticalBattle.flankRoutes[0], {
+    id: 'flank-left', side: 'left', approachZoneId: 'approach', interiorZoneId: 'storehouse',
+  });
+  assert.deepEqual(migrated.tacticalBattle.raiderGroups[0].routeTransit, {
+    routeId: 'flank-left', purpose: 'flank', step: 1,
+    node: 'middle', destinationNode: 'storehouseGate', originZoneId: 'approach',
+    destinationZoneId: 'wall', destinationLine: 'rear',
+  });
 }
 
 {
@@ -639,6 +666,7 @@ function prepareFormationTestCombatants(state) {
   const transit = battle.raiderGroups.find(group => group.routeTransit)?.routeTransit;
   assert.ok(transit);
   transit.step = 1;
+  transit.node = 'middle';
   transit.elapsedRounds = 1;
   assert.equal(saveLoad.saveGame(routeState), true);
   const loaded = saveLoad.loadGame();
@@ -653,9 +681,49 @@ function prepareFormationTestCombatants(state) {
   ]);
   const loadedTransit = loaded?.tacticalBattle?.raiderGroups.find(group => group.routeTransit)?.routeTransit;
   assert.equal(loadedTransit?.step, 1);
+  assert.equal(loadedTransit?.node, 'middle');
   assert.equal(loadedTransit?.elapsedRounds, 1);
   assert.equal(loadedTransit?.visibleToDefender, false,
     'hidden route transit keeps its real step in the save without exposing it to the defender');
+}
+
+{
+  const routeDeploymentState = simulation.newGame(2026072303);
+  prepareFormationTestCombatants(routeDeploymentState);
+  const battle = tactical.createTacticalBattle(routeDeploymentState, {
+    factionName: '우회로 직접 배치 저장', power: 70, warned: true, siege: false, mode: 'garrison',
+  });
+  battle.enemyPlan.stratagems = [];
+  assert.equal(tactical.toggleTacticalFlankRoutePreparation(routeDeploymentState, 'left'), null);
+  assert.equal(tactical.advanceTacticalPhase(routeDeploymentState), null);
+  if (battle.phase === 'preparationExecution') {
+    assert.equal(tactical.advanceTacticalPhase(routeDeploymentState), null);
+  }
+  assert.equal(battle.phase, 'deployment');
+  const group = battle.defenderGroups.find(candidate =>
+    candidate.commandable !== false && candidate.kind === 'militia-spear');
+  assert.ok(group);
+  battle.deploymentPlacements[group.id] = { zoneId: 'approach', line: group.line };
+  group.zoneId = 'approach';
+  assert.equal(tactical.placeTacticalRouteBlocker(routeDeploymentState, group.id, 'left'), null);
+  const routeId = group.routeTransit.routeId;
+  Object.assign(group.routeTransit, {
+    purpose: 'flank', destinationNode: 'approachGate', destinationZoneId: 'wall', destinationLine: 'rear',
+  });
+  assert.equal(saveLoad.saveGame(routeDeploymentState), true);
+  const loaded = saveLoad.loadGame();
+  const loadedGroup = loaded?.tacticalBattle?.defenderGroups.find(candidate => candidate.id === group.id);
+  assert.equal(loaded?.tacticalBattle?.deploymentPlacements?.[group.id]?.routeId, routeId);
+  assert.equal(loaded?.tacticalBattle?.deploymentPlacements?.[group.id]?.zoneId, '');
+  assert.equal(loadedGroup?.routeTransit?.routeId, routeId);
+  assert.equal(loadedGroup?.routeTransit?.node, 'middle',
+    'route placement and physical occupancy survive a deployment-phase save round trip together');
+  assert.equal(loadedGroup?.routeTransit?.originZoneId, 'approach');
+  assert.equal(loadedGroup?.routeTransit?.returnZoneId, 'storehouse',
+    'friendly return-gate identity survives separately from the forced-retreat origin');
+  assert.equal(loadedGroup?.routeTransit?.destinationZoneId, 'wall',
+    'a saved defender rear raid must still emerge behind the enemy instead of being rewritten to approach or storehouse');
+  assert.equal(loadedGroup?.zoneId, '', 'a restored route group does not also occupy a frontal zone');
 }
 
 {

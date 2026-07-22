@@ -473,6 +473,7 @@ export function commandPowerMultiplier(
   const { zone } = input;
   const command = defender.command ?? 'hold';
   if (command === 'hold') return 0.82;
+  if (command === 'attack') return 1;
   const mounted = tacticalGroupCapabilities(defender).has('mounted');
   if (command === 'charge') {
     return 1.72 + (mounted && zone.kind !== 'wall' ? CONFIG.mounted.chargePowerBonus : 0);
@@ -528,16 +529,6 @@ function activeContactLine(
 ): TacticalFormationLine | null {
   return lineOrder.find(line => defenders.some(group =>
     group.line === line && activeDefenderCount(group) > 0)) ?? null;
-}
-
-function activeMeleeGuard(
-  defenders: TacticalDefenderGroup[],
-  line: TacticalFormationLine,
-): boolean {
-  return defenders.some(group =>
-    group.line === line && tacticalGroupCapabilities(group).has('melee') &&
-    group.command !== 'fallback' && group.command !== 'advance' &&
-    activeDefenderCount(group) > 0);
 }
 
 function rearAssaultGuardStrength(defenders: TacticalDefenderGroup[]): number {
@@ -690,6 +681,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
   const rearAttackers = rearEngagement ? attackers : [];
   const combatDefenders = defenders.filter(defender => defender.commandable !== false);
   const surpriseDefenders = defenders.filter(defender => defender.command === 'ambush' && defender.ambushed);
+  const disengagingSurpriseDefenders = surpriseDefenders.filter(defender => defender.ambushAftermath !== 'hold');
   const surpriseAttack = surpriseDefenders.length > 0;
   const friendlyActionEvents: TacticalAnimationEvent[] = [];
   const enemyActionEvents: TacticalAnimationEvent[] = [];
@@ -825,6 +817,15 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
       float: '돌격!', meleeParticipants: chargingMeleeCount + activeAttackerCount,
     }));
   }
+  if (commands.includes('attack')) {
+    const attackingDefenders = combatDefenders.filter(defender =>
+      defender.command === 'attack' && tacticalGroupCapabilities(defender).has('melee'));
+    const attackingCount = attackingDefenders.reduce((sum, defender) => sum + activeDefenderCount(defender), 0);
+    friendlyActionEvents.push(animationEvent(zone.id, 'melee', '근접 수비대가 대열을 유지하며 적과 맞붙습니다.', 620, {
+      side: 'defender', actorGroupIds: attackingDefenders.map(group => group.id),
+      float: '공격!', meleeParticipants: attackingCount + activeAttackerCount,
+    }));
+  }
   if (chargeOpensFlank) {
     enemyActionEvents.push(animationEvent(zone.id, 'melee', '돌격대가 비운 전열의 틈으로 적이 파고들어 후열 원거리 병종을 우회 타격합니다.', 580, {
       side: 'raider', actorGroupIds: attackingMelee.map(group => group.id),
@@ -832,7 +833,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     }));
     preDefenseLines.push(`${zone.name}에서 근접대의 돌격으로 후열 원거리 병종이 우회 타격에 노출됐습니다.`);
   }
-  if (!commands.includes('volley') && !surpriseAttack && !commands.includes('charge')) {
+  if (!commands.includes('volley') && !surpriseAttack && !commands.includes('charge') && !commands.includes('attack')) {
     // Undefended lines get their sole presentation from the scheduled route movement below.
     if (defenders.length > 0 && defenders.every(defender => defender.kind === 'civilian')) {
       enemyActionEvents.push(animationEvent(zone.id, 'advance', '무장하지 못한 주민들이 비명을 지르며 전선 뒤로 흩어집니다.', 620, {
@@ -949,11 +950,15 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
     commands.includes('volley') ? 0.06 : 0,
     commands.includes('charge') ? 0.12 : 0,
   );
-  const raiderLossRate = clamp(
-    defenseShare * (0.08 + commandEdge) * (input.raiderLossRateScale ?? 1),
-    0.01,
-    0.24,
-  );
+  // 수비 전력이 전혀 없는 구역은 교전 손실을 만들 수 없다. 기존 최소 1% 하한을
+  // 그대로 적용하면 확률 반올림 때문에 무방비 진격 중인 적이 간헐적으로 1명씩 죽었다.
+  const raiderLossRate = defensePower <= 0
+    ? 0
+    : clamp(
+      defenseShare * (0.08 + commandEdge) * (input.raiderLossRateScale ?? 1),
+      0.01,
+      0.24,
+    );
   const rearGuardStrength = rearAssaultGuardStrength(defenders);
   const rearExposure = CONFIG.tacticalBattle.formationExposure.rearAssault;
   const raiderLosses: TacticalRaiderLoss[] = [];
@@ -963,12 +968,14 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
       ? rearExposure.unguardedAttackerLossMultiplier +
         (1 - rearExposure.unguardedAttackerLossMultiplier) * rearGuardStrength
       : 1;
-    const groupLossRate = clamp(
-      raiderLossRate * (attacker.lossResistance ?? 1) * rearAssaultResistance *
-        tacticalRaiderLossMatchupMultiplier(attacker, defenders, input.direction),
-      0.005,
-      0.24,
-    );
+    const groupLossRate = raiderLossRate <= 0
+      ? 0
+      : clamp(
+        raiderLossRate * (attacker.lossResistance ?? 1) * rearAssaultResistance *
+          tacticalRaiderLossMatchupMultiplier(attacker, defenders, input.direction),
+        0.005,
+        0.24,
+      );
     const expectedKilled = activeRaiders * groupLossRate * (0.55 + defenseShare * 0.7);
     return {
       attacker,
@@ -1206,7 +1213,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
   const villageMoraleDelta = (resolvedEnemyShare > 0.5 ? -(2 + resolvedEnemyShare * 7) : 1) -
     (rearAssaultCasualties > 0 ? 3 : 0);
 
-  if (surpriseAttack) {
+  if (disengagingSurpriseDefenders.length > 0) {
     afterConsequencesEvents.push(animationEvent(zone.id, 'retreat', '급습을 마친 사냥꾼들이 추격을 피해 다음 방어선으로 빠집니다.', 620, {
       side: 'defender', float: '이탈!',
     }));

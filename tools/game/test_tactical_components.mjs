@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const screenSource = readFileSync(new URL('../../src/components/TacticalBattleScreen.tsx', import.meta.url), 'utf8');
-const appSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+const appSource = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
 const zoneSource = readFileSync(new URL('../../src/components/tactical/TacticalZoneColumn.tsx', import.meta.url), 'utf8');
 const chipSource = readFileSync(new URL('../../src/components/tactical/TacticalGroupChip.tsx', import.meta.url), 'utf8');
 const planSource = readFileSync(new URL('../../src/components/tactical/EnemyPlanPanel.tsx', import.meta.url), 'utf8');
 const popoverSource = readFileSync(new URL('../../src/components/tactical/TacticalCommandPopover.tsx', import.meta.url), 'utf8');
 const minimapSource = readFileSync(new URL('../../src/components/tactical/TacticalMiniMap.tsx', import.meta.url), 'utf8');
+const routeStageSource = readFileSync(new URL('../../src/components/tactical/TacticalRouteStage.tsx', import.meta.url), 'utf8');
+const routeGateSource = readFileSync(new URL('../../src/components/tactical/TacticalRouteGate.tsx', import.meta.url), 'utf8');
 const commandTextSource = readFileSync(new URL('../../src/components/tactical/commandText.ts', import.meta.url), 'utf8');
 const commandPresentationSource = readFileSync(
   new URL('../../src/components/tactical/commandPresentation.ts', import.meta.url),
@@ -16,6 +18,91 @@ const commandPresentationSource = readFileSync(
 const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
 
 assert.match(screenSource, /<TacticalZoneColumn\b/, 'the battle screen must delegate each battlefield zone');
+assert.match(screenSource, /tacticalRouteStageView\(battle\)/,
+  'the route battlefield must render only the redacted backend stage selector');
+assert.match(screenSource, /<TacticalRouteStage\b/,
+  'the battle screen must render a first-class route stage instead of only a ribbon');
+assert.match(routeStageSource, /view\.nodes\.map/,
+  'the route stage must render approach, middle, and storehouse nodes from the backend view');
+assert.match(routeStageSource, /view\.groups\.filter\(group => group\.node === node\.node\)/,
+  'route group occupancy must come from physical node values rather than legacy step inference');
+assert.doesNotMatch(routeStageSource, /routeTransit|defenderIntel|\.step/,
+  'the route stage must not read raw transit or hidden-intel state');
+assert.match(routeStageSource, /'data-deploy-anchor': `route\|\$\{view\.side\}`/,
+  'the physical middle node must reuse the existing route deployment anchor contract');
+assert.match(routeStageSource, /<DockDefenderSprite/, 'route defenders must reuse the established defender sprite renderer');
+assert.match(routeStageSource, /<RaiderSprite/, 'route enemies must reuse the established raider pose renderer');
+assert.match(routeStageSource, /Array\.from\(\{ length: shown \}/,
+  'route groups must place a visible multi-sprite formation on the physical battlefield');
+assert.match(routeStageSource, /Math\.min\(6, group\.count\)/,
+  'large route groups must use the same readable abbreviated-formation approach as the main stage');
+assert.match(screenSource, /const focusedRouteId = activeEvent\?\.routeId/,
+  'route combat events must move camera focus onto their first-class route battlefield');
+assert.match(routeStageSource, /fieldLayout \? ' field-layout'/,
+  'command phase must remove the route-node card layout without changing physical occupancy');
+assert.match(routeStageSource, /event-\$\{routeEvent\.kind\}/,
+  'route combat must expose the same event class contract as the normal battlefield');
+assert.match(routeStageSource, /onSelectGroup\(group\.groupId, event\.currentTarget\)/,
+  'route defenders must open the same anchored command popover as normal battlefield units');
+assert.match(routeStageSource, /onSelectTarget\(selectedGroupId, group\.groupId, event\.currentTarget\)/,
+  'route enemies must anchor the same attack-command popover as normal battlefield enemies');
+assert.doesNotMatch(routeStageSource, />진입로로<|>창고지대로</,
+  'route stage header must not duplicate navigation already provided by endpoint arrows');
+assert.match(cssSource, /\.tactical-route-stage\.field-layout \.tactical-route-stage-node\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/,
+  'route command mode must render units directly over the battlefield background');
+assert.match(minimapSource, /onViewRoute\(view\.route\.id\)/,
+  'clicking a minimap route branch must navigate to the route stage itself');
+assert.match(zoneSource, /<TacticalRouteGate/, 'approach and storehouse zones must delegate route entrances');
+assert.match(routeGateSource, /zoneId !== 'approach' && zoneId !== 'storehouse'/,
+  'route gates must appear only at the two physical route endpoints');
+assert.match(routeGateSource, /view\.display === 'suspected' \? '징후 · 위치 미확인' : '폐쇄'/,
+  'route entrances must label suspected and hidden states without leaking occupancy');
+assert.match(routeGateSource, /ArrowFatUp[\s\S]*ArrowFatDown/,
+  'route entrances must use real up/down icon assets for the left and right route boundaries');
+assert.match(routeGateSource, /const isUpperGate = view\.side === 'left'/,
+  'both approach and storehouse battlefield gates must keep upper-left/lower-right route placement');
+assert.match(routeGateSource, /isUpperGate \? ArrowFatUp : ArrowFatDown/,
+  'each endpoint must point its upper marker upward and lower marker downward');
+assert.match(routeGateSource, /'data-deploy-anchor': anchorId/,
+  'opened approach and storehouse gates must become command-stage route entry drop anchors');
+assert.match(routeGateSource, /tacticalStageMoveUnavailableReason\(state, stageDrag\.groupId/,
+  'route gate drag validity must use the unified backend movement contract');
+assert.match(routeGateSource, /selectedAtEndpoint[\s\S]*onRequestEntry\(selectedGroupId, view\.routeId, node, event\.currentTarget\)/,
+  'a selected endpoint unit must also be able to enter by clicking the physical route gate');
+assert.match(screenSource, /parseRouteGateAnchorId\(anchorId\)/,
+  'the battle screen must parse physical route gate drops before normal zone-lane drops');
+assert.match(screenSource, /applyTacticalStageMove\(current, preview\.groupId, preview\.destination\)/,
+  'confirmed route gate drops must apply through the unified stage movement mutation');
+assert.match(routeStageSource, /stageDragHandlePropsFor\(group\.groupId\)/,
+  'commandable defender groups on the route stage must use the shared battlefield drag handle');
+assert.match(routeStageSource,
+  /group\.side === 'defender' \? 'tactical-field-group' : 'tactical-raider-group'/,
+  'route groups must reuse the frontal battlefield friendly and enemy presentation classes');
+assert.match(routeStageSource,
+  /className="tactical-unit-label"[\s\S]*tactical-state-badge \$\{routeStatusBadgeClass\(group\.statusLabel\)\}/,
+  'route labels must use the same single-line label and state-badge language as frontal groups');
+assert.doesNotMatch(routeStageSource, /tactical-route-stage-unit-label/,
+  'the route stage must not keep its separate bordered two-line unit label');
+assert.match(routeStageSource, /routeGateAnchorId\(view\.routeId, node\)/,
+  'the route middle and both exit arrows must use physical route-node drop anchors');
+assert.match(routeStageSource, /onClick=\{event => \{\s*event\.stopPropagation\(\);\s*onViewZone\(exitZoneId\);/,
+  'the exit arrow click must not bubble into the stage-shell confirm-card cancel handler');
+assert.match(screenSource, /tacticalRouteGateDestination\(battle, groupId, routeGate\.routeId, routeGate\.node\)/,
+  'route exit-arrow drops must resolve to either a rear raid or a return through the backend selector');
+assert.match(screenSource, /onViewZone=\{zoneId => \{[\s\S]*?stageDropGuardRef\.current[\s\S]*?viewZone\(zoneId\);/,
+  'the synthetic click after an exit-arrow drop must not navigate to the connected frontal zone');
+assert.match(cssSource, /\.tactical-route-gate\.position-upper\s*\{[^}]*top:\s*63%;[^}]*translate\(-50%,\s*-50%\)/,
+  'the upper route entrance or exit must sit on the upper battlefield boundary');
+assert.match(cssSource, /\.tactical-route-gate\.position-lower\s*\{[^}]*bottom:\s*8px;[^}]*translateX\(-50%\)/,
+  'the lower route entrance or exit must sit on the lower battlefield boundary');
+assert.match(routeStageSource, /view\.side === 'right' \? ArrowFatUp : ArrowFatDown/,
+  'right-route battlefield exits must point upward while left-route exits point downward');
+assert.match(routeStageSource, /node\.node === 'approachGate'[\s\S]*node\.node === 'storehouseGate'/,
+  'the route battlefield must place exit arrows at both physical endpoints');
+assert.match(cssSource, /\.tactical-route-stage-exit\.position-upper\s*\{[^}]*top:\s*-38px/,
+  'right-route exits must sit above both endpoint nodes');
+assert.match(cssSource, /\.tactical-route-stage-exit\.position-lower\s*\{[^}]*bottom:\s*-38px/,
+  'left-route exits must sit below both endpoint nodes');
 assert.match(screenSource, /<TacticalGroupChip\b/, 'the unit dock must delegate each group chip');
 assert.match(screenSource, /<EnemyPlanPanel\b/, 'the preparation screen must delegate enemy plan intel');
 assert.doesNotMatch(screenSource, /flankerIntel/, 'the legacy one-line flanker intel must be removed');
@@ -31,10 +118,12 @@ assert.match(cssSource, /\.tactical-flank-route-sides button\s*\{[\s\S]*white-sp
   'flank-route direction buttons must keep their labels horizontal');
 assert.match(screenSource, /aria-label="우회로 차단 배치"[\s\S]*placeTacticalRouteBlocker\(current, selectedGroup\.id, view\.route\.side\)/,
   'deployment must offer a visible click path for placing the selected group as a route blocker');
-assert.match(screenSource, /aria-label="우회로 부대 운용"[\s\S]*onSetCommand\(selectedGroup\.id, 'flankRoute'\)/,
-  'command phase must expose a visible route-raid action for the selected blocker');
-assert.match(commandPresentationSource, /CONTEXT_COMMANDS[\s\S]*'flankRoute'/,
-  'route raid must also remain a contextual quick command for blocker groups');
+assert.match(screenSource, /aria-label="우회로 부대 운용"[\s\S]*우회로 목적 선택/,
+  'command phase must open the route stage instead of forcing a fixed rear raid');
+assert.match(routeStageSource, /진입로 합류[\s\S]*방책 후열 급습[\s\S]*창고지대 합류/,
+  'the route stage must expose all three explicit exit purposes');
+assert.doesNotMatch(commandPresentationSource, /CONTEXT_COMMANDS[\s\S]*'flankRoute'/,
+  'a fixed rear-raid quick command must not bypass the explicit route purpose choice');
 assert.match(screenSource, /const TACTICAL_PLAYBACK_NORMAL_SCALE = 1\.6;/,
   'normal tactical playback must run slower than the authored event timing');
 assert.equal(
@@ -105,8 +194,22 @@ assert.match(simSetupSource, /enemyCompositionTemplateId:/,
   'the simulator must pass the forced composition template into the simulation options');
 assert.match(simSetupSource, /enemyStratagem:/,
   'the simulator must pass the forced enemy stratagem into the simulation options');
-assert.match(simSetupSource, /includeCombatSpecialResidents:/,
-  'the simulator must pass the combat-special-resident crowd preset into the simulation options');
+assert.match(simSetupSource, /combatSpecialResidents:/,
+  'the simulator must pass individually selected combat special residents into the simulation options');
+assert.match(simSetupSource, /mountedDefenders:/,
+  'the simulator must pass role-specific mounted defender counts into the simulation options');
+assert.match(simSetupSource, /mountedSpecialResidents:/,
+  'the simulator must pass mounted special-resident selections into the simulation options');
+assert.match(simSetupSource, /key: 'physicians'/,
+  'the simulator must expose physicians in the allied composition');
+assert.match(simSetupSource, /기본 장비 수비대/,
+  'the simulator must use the current default-equipment wording instead of the old unarmed label');
+assert.doesNotMatch(simSetupSource, /맨손 수비병/,
+  'the obsolete unarmed-defender wording must not remain in the simulator');
+assert.ok(
+  simSetupSource.indexOf('전투 특수주민') > simSetupSource.indexOf("'아군 구성'"),
+  'special-resident controls belong under allied composition, not engagement conditions',
+);
 assert.match(simSetupSource, /enemyStratagemDefinitions\(\)/,
   'the simulator must list forceable stratagems from the backend registry');
 assert.match(simSetupSource, /template\.doctrines\.includes/,
@@ -191,15 +294,14 @@ assert.match(commandTextSource, /export function commandLabel[\s\S]*export funct
 assert.match(commandPresentationSource,
   /tacticalSupportedCommands\(battle\)\.filter\(command =>[\s\S]*tacticalCommandUnavailableReason\(battle, group, command\) == null/,
   'the presentation helper must show only supported commands that are currently available');
-assert.match(popoverSource, /tacticalCommandPresentation\(battle, group\)/,
-  'the popover must consume the isolated quick-command presentation helper');
+assert.match(popoverSource, /tacticalAvailableCommands\(battle, group\)/,
+  'the popover must consume the shared available-command selector');
 assert.doesNotMatch(popoverSource, /COMMAND_LABELS|const\s+commandDescription/,
   'the popover must not duplicate command strings');
 assert.match(popoverSource, /quickCommands\.map\(command => renderCommandButton\(command, 'quick'\)\)/,
   'the quick-action strip must render only the prioritized quick commands');
-assert.match(popoverSource,
-  /quickCommands\.map\(command => renderCommandButton\(command, 'quick'\)\)[\s\S]*className="tactical-command-more-toggle"[\s\S]*onClick=\{onOpenCommandBoard\}/,
-  'the fixed final More slot must open the lower command board after the quick commands');
+assert.doesNotMatch(popoverSource, /tactical-command-more-toggle|onOpenCommandBoard/,
+  'the contextual popover must not mix in the legacy full-command-board escape hatch');
 assert.doesNotMatch(popoverSource, /moreCommands|tactical-command-more-list/,
   'the quick-action strip must not nest the remaining command list');
 assert.doesNotMatch(popoverSource,
@@ -237,15 +339,30 @@ assert.match(screenSource, /assignCommandTo\(popoverGroup\.id, command\)/,
   'popover commands must target their explicit group instead of a selected-group closure');
 assert.match(screenSource, /popoverAnchorRef\.current\?\.focus\(\)/,
   'Escape closing must restore focus to the battlefield unit anchor');
-assert.match(screenSource,
-  /const openCommandBoard = \(\)[\s\S]*setCommandPopover\(null\)[\s\S]*commandBoardRef\.current\?\.querySelector<HTMLButtonElement>\('button:not\(:disabled\)'\)\?\.focus\(\)/,
-  'More must close the popover while preserving selection and focus the first enabled full command');
-assert.match(screenSource, /onOpenCommandBoard=\{openCommandBoard\}/,
-  'the popover More slot must route to the lower full command board');
-assert.match(screenSource, /ref=\{commandBoardRef\}[\s\S]*command-board-emphasis/,
-  'opening the full board must visibly emphasize the lower command path');
+assert.match(screenSource, /selectedGroupId !== groupId[\s\S]*selectGroup\(groupId\)[\s\S]*return;/,
+  'the first friendly click must only select the group');
+assert.match(screenSource, /mode: 'self'/,
+  'clicking the already selected friendly group must open the stationary-command popover');
+assert.match(screenSource, /mode: 'attack', targetGroupId/,
+  'clicking an enemy must open a target-bound attack-command popover');
+assert.match(popoverSource, /\['attack', 'volley', 'charge', 'ambush'\]/,
+  'the enemy popover must contain only attack, volley, charge, and ambush actions');
+assert.match(screenSource, /command === 'ambush'[\s\S]*mode: 'ambushAftermath'/,
+  'choosing a surprise attack must open a second aftermath popover before committing the order');
+assert.match(popoverSource, /공격 후 이탈[\s\S]*위치 유지/,
+  'the surprise-attack aftermath popover must offer disengage and hold choices');
+assert.match(popoverSource, /\['hold', 'ambush', 'guardStorehouse', 'protectCivilians'/,
+  'the friendly re-click popover must prioritize stationary commands');
+assert.match(zoneSource, /tactical-zone-move-edge[\s\S]*data-deploy-anchor=\{anchorId\}/,
+  'cross-zone advance and fallback must use explicit left and right battlefield-edge drop targets');
 assert.match(zoneSource, /onSelectGroup\(group\.id, event\.currentTarget\)/,
   'battlefield selection must pass its unit element as the popover anchor');
+assert.match(zoneSource,
+  /const raiderSpriteFaction = tacticalRaiderSpriteFaction\(battle\)[\s\S]*<RaiderSprite faction=\{raiderSpriteFaction\}/,
+  'frontal bandit-lair enemies must use the normalized bandit sprite sheet key');
+assert.match(screenSource,
+  /const raiderSpriteFaction = tacticalRaiderSpriteFaction\(battle\)[\s\S]*raiderFaction=\{raiderSpriteFaction\}/,
+  'route-stage bandit-lair enemies must use the same normalized sprite sheet key');
 assert.match(zoneSource, /\.\.\.formationStackStyle\(stackIndex, lineGroups\.length\)[\s\S]*zIndex:\s*80/,
   'the selected battlefield group must paint above ordinary inline formation depths');
 assert.match(cssSource, /\.tactical-command-popover[\s\S]*z-index:\s*90;/,
@@ -262,6 +379,14 @@ assert.match(minimapSource, /from ['"]\.\/commandText['"]/,
   'the tactical minimap must reuse shared command labels');
 assert.match(minimapSource, /tacticalRaiderIntentLabel/,
   'the tactical minimap must reuse the battlefield raider intent label');
+assert.match(minimapSource, /battle\.zones\.map\(zone =>/,
+  'strip minimaps must render the canonical battlefield zone order');
+assert.doesNotMatch(cssSource,
+  /\.tactical-minimap-strip\.assault \.tactical-minimap-strip-map\s*\{[^}]*flex-direction:\s*row-reverse/,
+  'assault minimaps must keep the battlefield zone order instead of reversing the entire strip');
+assert.match(cssSource,
+  /\.tactical-minimap-strip\.assault \.tactical-minimap-segment-body\s*\{[^}]*grid-template-areas:\s*'friendly enemy'/,
+  'assault minimaps must still reverse the formations inside each zone toward the contact side');
 assert.match(screenSource, /<TacticalMiniMap\b/,
   'the battle stage must render the tactical minimap');
 assert.match(screenSource, /battle\.phase === 'preparation'[\s\S]*battle\.phase === 'deployment'/,
@@ -609,8 +734,8 @@ assert.match(zoneSource, /stage-dragging/,
   'the dragged stage unit must show a dragging visual state');
 assert.match(zoneSource, /showFormationGuides \? group\.kind !== 'civilian' : group\.commandable !== false/,
   'stage drag handles must exclude civilians in deployment and non-commandables in command');
-assert.match(zoneSource, /showFormationGuides \|\| battle\.phase === 'command' \? \{ 'data-deploy-anchor': deployAnchorId \}/,
-  'lanes must stay anchor targets during the command phase');
+assert.match(zoneSource, /showFormationGuides \|\| \(stageDrag\?\.mode === 'command' && dragGroup\?\.zoneId === zone\.id\)/,
+  'same-zone lanes must stay anchor targets for formation changes during command dragging');
 
 assert.match(dragHookSource, /trackPosition/,
   'the shared drag hook must support hover-only tracking for screen-level use');
@@ -621,6 +746,12 @@ assert.match(cssSource, /\.tactical-order-confirm\s*\{[\s\S]*position:\s*absolut
   'the confirm card must overlay the stage near the drop point');
 assert.match(cssSource, /\.tactical-field-group\.stage-dragging\s*\{\s*opacity/,
   'the dragged unit must dim while its ghost previews the destination');
+assert.match(routeStageSource, /measureRouteOrderArrowPaths/,
+  'the route stage must measure confirmed movement reservations with the same SVG arrow language');
+assert.match(routeStageSource, /className="tactical-order-arrow move"/,
+  'route movement reservations must reuse the normal battlefield movement-arrow styling');
+assert.match(cssSource, /\.tactical-route-stage-exit\.deploy-anchor-hover/,
+  'hovering a valid route exit arrow must visibly highlight the drop target');
 
 // ── Phase 5: 명시적 방향 ──
 assert.match(zoneSource, /const rearFacing = group\.facing === 'towardRear';/,
@@ -671,10 +802,8 @@ assert.match(screenSource, /tacticalFlankRoutePreparationView\(state\)/,
   'route side options and refund state must come from the backend preparation view');
 assert.match(screenSource, /tacticalFlankRouteView\(battle\)/,
   'route display state must come from the backend visibility selector');
-assert.match(screenSource, /<TacticalRouteRibbon\b/,
-  'the stage must delegate visible routes to the route ribbon');
-assert.match(screenSource, /battle\.pendingReport\?\.routeAdvances/,
-  'route movement replay must come from the round report contract');
+assert.doesNotMatch(screenSource, /<TacticalRouteRibbon\b/,
+  'the redundant upper-left route ribbon must not render beside the minimap');
 assert.doesNotMatch(screenSource, /defenderIntel ===|routeTransit\.step/,
   'the screen must not re-derive route visibility or read raw transit steps');
 
@@ -695,8 +824,30 @@ assert.match(minimapSource, /display-\$\{view\.display\}/,
   'suspected routes must render with the display-state styling class');
 assert.match(minimapSource, /tactical-minimap-route-suspect">\?/,
   'suspected routes must show a question mark');
-assert.match(minimapSource, /!tacticalGroupIsInRouteTransit\(group\)/,
-  'transit groups must leave the zone dot lists');
+assert.match(minimapSource, /view\.transits\.filter\(transit => transit\.step === step\)/,
+  'route units must render only at their physical nodes inside the route region');
+assert.doesNotMatch(minimapSource, /routeProjectionByGroupId/,
+  'route units must not be projected into frontal minimap cells');
+assert.match(minimapSource, /!tacticalGroupIsInRouteTransit\(group\) && group\.zoneId === zone\.id/,
+  'frontal minimap cells must exclude every group currently in route transit');
+assert.match(minimapSource, /const opened = view\.route\.openedByDefender/,
+  'only preparation-opened routes may expand into full minimap stage regions');
+assert.match(minimapSource, /tactical-minimap-route-zone/,
+  'opened routes must render as compact rectangular minimap regions above or below the frontal strip');
+assert.match(cssSource, /\.tactical-minimap-route-row\s*\{[^}]*grid-template-columns:\s*repeat\(4,/,
+  'the route row must align to the four frontal minimap cells');
+assert.match(cssSource, /\.tactical-minimap-route\.opened\s*\{[^}]*grid-column:\s*1\s*\/\s*span 3;/,
+  'the physical route region must stop after approach, wall, and storehouse');
+assert.match(minimapSource, /tactical-minimap-route-control-text/,
+  'the village-center remainder must show route control as plain text');
+assert.doesNotMatch(minimapSource, /<strong>\{view\.route\.side/,
+  'the route rectangle must not duplicate a label in its upper-left corner');
+assert.match(minimapSource, /viewedRouteId == null && viewedZoneId === zone\.id/,
+  'the viewed border must move from frontal cells to the active route region');
+assert.match(cssSource, /\.tactical-minimap-route\.opened\.viewed\s*\{[^}]*border-color:\s*#d0a651;/,
+  'the active route minimap region must reuse the established viewed border color');
+assert.match(cssSource, /tactical-stage-enter-from-top[\s\S]*tactical-stage-enter-from-bottom/,
+  'route camera changes must animate vertically from the matching upper or lower boundary');
 assert.match(zoneSource, /!tacticalGroupIsInRouteTransit\(group\)/,
   'transit groups must leave the stage ranks');
 assert.match(planSource, /routeViews/,
@@ -743,16 +894,28 @@ assert.match(dockSourceP7, /경로 차단/,
   'blocker cards must label their route placement');
 assert.match(screenSource, /placeTacticalRouteBlocker\(current, groupId, routeSide\)/,
   'stage unit drops on route anchors must call the backend blocker mutation');
-assert.match(screenSource, /routeEngagements={combatPlayback \? battle\.pendingReport\?\.routeEngagements \?\? null : null}/,
-  'engagement replay must be limited to the combat playback window');
-assert.match(screenSource, /rearRaid={group\.rearRaidRound === \(battle\.pendingReport\?\.round \?\? battle\.round\)}/,
-  'dock chips must badge rear raids only on the displayed arrival round');
-assert.match(zoneSource, /group\.rearRaidRound === \(battle\.pendingReport\?\.round \?\? battle\.round\)/,
-  'stage units must badge rear raids only on the displayed arrival round');
+assert.match(screenSource, /rearRaid={group\.rearRaidRound != null}/,
+  'dock chips must keep identifying a defender that remains behind the enemy');
+assert.match(zoneSource, /defenderRearRaiders = defenders\.filter\(group => group\.rearRaidRound != null\)/,
+  'defender rear raiders must remain in the enemy-rear layer after their arrival round');
+assert.match(zoneSource, /frontalDefenders = defenders\.filter\(group => group\.rearRaidRound == null\)/,
+  'persistent defender rear raiders must not teleport back into the friendly formation');
+assert.match(zoneSource, /tactical-defender-rear-raid-rank/,
+  'arriving defender raiders must render in a dedicated enemy-rear battlefield layer');
+assert.match(zoneSource, /frontalDefenders\.filter\(group => group\.line === line\)/,
+  'defender raiders must leave the ordinary friendly formation while the raid arrival is displayed');
+assert.match(cssSource, /\.tactical-defender-rear-raid-rank\s*\{[^}]*left:\s*-2%;[^}]*right:\s*84%;/,
+  'the defender rear-raid layer must sit behind the enemy formation on the defense stage');
+assert.match(cssSource, /\.tactical-defender-rear-raid-rank \.tactical-defender\s*\{[^}]*scaleX\(-1\)/,
+  'defender raiders behind the enemy must turn to face the enemy formation');
 assert.match(chipSource, /경로 차단.*우회 이동/,
   'transit chips must distinguish blocking from raiding');
 assert.match(commandTextSource, /flankRoute: '우회 기동'/,
   'the flankRoute command must keep its label in the shared command text');
+assert.match(popoverSource, /출발지로 복귀/,
+  'a route unit popover must expose an explicit return choice alongside flank advance');
+assert.match(screenSource, /tacticalRouteReturnDestination\(battle, popoverGroup\.id\)/,
+  'the popover return action must use the backend route-return destination selector');
 assert.match(cssSource, /\.tactical-route-ribbon-row\.deploy-anchor-hover/,
   'hovered route anchors must highlight during blocker drags');
 assert.match(cssSource, /\.tactical-state-badge\.rear-raid/,

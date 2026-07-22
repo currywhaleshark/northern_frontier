@@ -1,7 +1,7 @@
 // 절차적 지도 생성 + 시드 난수
 import { CONFIG } from './config';
 import {
-  mineralRemaining, rollMineralDepositAmount, setMineralDeposit,
+  rollMineralDepositAmount, setMineralDeposit,
 } from './minerals';
 import type { Tile, Terrain } from './types';
 
@@ -206,13 +206,4 @@ export function generateMap(seed: number): { tiles: Tile[][]; centerX: number; c
   placeNearbyMineralDeposits(tiles, centerX, centerY, rng);
 
   return { tiles, centerX, centerY };
-}
-
-// 지도에 철광 타일이 있는지 (대장장이 채광 가능 여부)
-export function hasIronTiles(tiles: Tile[][]): boolean {
-  return tiles.some(row => row.some(t => t.terrain === 'rock' && t.hasIron && mineralRemaining(t) > 0));
-}
-
-export function hasRockTiles(tiles: Tile[][]): boolean {
-  return tiles.some(row => row.some(t => t.terrain === 'rock' && mineralRemaining(t) > 0));
 }

@@ -485,18 +485,7 @@ const GRASS_FERTILE: CR = [9, 1];       // 싹이 돋은 풀 (비옥지)
 const DIRT: CR = [6, 0];
 const WATER: CR = [1, 0];
 const WATER_SPARKLE: CR = [0, 0];
-const ICE: CR = [3, 4];
-const ROCK_GRAY: CR = [55, 21];
 const ROCK_GRAY2: CR = [54, 21];
-const ROCK_BROWN: CR = [55, 20];
-const ORE_GOLD: CR = [41, 11];
-
-// 나무 변형 (계절별)
-const TREES_GREEN: CR[] = [[13, 9], [15, 9], [16, 9], [18, 9], [13, 10], [16, 10]];
-const TREES_AUTUMN: CR[] = [[14, 9], [17, 9], [14, 10], [17, 10]];
-const TREES_WINTER: CR[] = [[16, 9], [18, 9], [16, 10], [18, 10]];
-const BUSHES: CR[] = [[19, 9], [25, 9], [24, 9]];
-const BUSHES_AUTUMN: CR[] = [[20, 9], [21, 9]];
 
 // ── 건물 매핑: 지붕(위) + 몸체(아래) + 부속 표식 ──
 const ROOF_BROWN: CR = [34, 21];

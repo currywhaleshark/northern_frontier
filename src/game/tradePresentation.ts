@@ -113,5 +113,3 @@ export const RESOURCE_SPRITES: Partial<Record<ResourceIconId, TradeResourceSprit
   hay: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 3, row: 2 },
   silver: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 0, row: 3 },
 };
-
-export const TRADE_RESOURCE_SPRITES = RESOURCE_SPRITES;

@@ -7,7 +7,6 @@ import type {
   ClaimKind,
   ForeignSite,
   ForeignSiteMemory,
-  ForeignSiteStatus,
   ForeignSiteType,
   GameState,
   Season,
@@ -253,10 +252,6 @@ export function foreignSiteAt(state: GameState, x: number, y: number): ForeignSi
     x >= site.x && x < site.x + site.width && y >= site.y && y < site.y + site.height) ?? null;
 }
 
-export function discoveredForeignSites(state: GameState): ForeignSite[] {
-  return state.foreignSites.filter(site => site.discovered);
-}
-
 export function addForeignSiteMemory(
   state: GameState,
   siteId: number,
@@ -335,8 +330,4 @@ export function findRaidOriginSite(state: GameState, factionName: string): Forei
 export function isForeignSiteOperational(site: ForeignSite): boolean {
   if (site.status === 'burned' || site.status === 'abandoned') return false;
   return site.type !== 'seasonalCamp' || site.seasonalActive !== false;
-}
-
-export function setForeignSiteStatus(site: ForeignSite, status: ForeignSiteStatus): void {
-  site.status = status;
 }

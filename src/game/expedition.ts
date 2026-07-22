@@ -28,10 +28,6 @@ export function expeditionMemberIds(state: GameState): Set<number> {
   return new Set(state.expedition?.memberIds ?? []);
 }
 
-export function isExpeditionMember(state: GameState, residentId: number): boolean {
-  return state.expedition?.memberIds.includes(residentId) ?? false;
-}
-
 function expeditionEligible(state: GameState, resident: Resident): boolean {
   return isCombatReadyResident(state, resident, 'expedition', new Set([resident.id])) &&
     (resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter');

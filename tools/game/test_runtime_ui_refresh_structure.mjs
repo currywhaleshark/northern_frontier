@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const appSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+const appSource = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
 const storeSource = readFileSync(new URL('../../src/ui/runtimeVersionStore.ts', import.meta.url), 'utf8');
 const boundarySource = readFileSync(new URL('../../src/components/RuntimeVersionBoundary.tsx', import.meta.url), 'utf8');
 

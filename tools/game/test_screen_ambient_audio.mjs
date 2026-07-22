@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const appSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+const shellSource = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+const appSource = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
 const sfxSource = readFileSync(new URL('../../src/sound/sfx.ts', import.meta.url), 'utf8');
 
 assert.match(appSource,
@@ -24,8 +25,10 @@ assert.match(ambientEffect,
   'the mounted game runtime boundary owns weather updates');
 assert.match(ambientEffect, /useEffect\(\(\) => \(\) => stopWeatherAmbient\(\), \[\]\);/,
   'leaving the game screen must stop ambient when the runtime boundary unmounts');
-assert.ok(appSource.indexOf("if (screen === 'menu')") < appSource.indexOf('<RuntimeGameEffects'),
-  'the runtime effects boundary must only mount after the menu early return');
+assert.match(shellSource, /lazy\(\(\) => import\('\.\/GameSession'\)\)/,
+  'the runtime effects boundary must only load after leaving the menu shell');
+assert.doesNotMatch(shellSource, /<RuntimeGameEffects/,
+  'the menu shell must never mount game weather effects');
 
 assert.match(sfxSource, /export function stopWeatherAmbient\(\): void \{/,
   'the sound layer must expose an explicit menu-transition stop');
@@ -40,10 +43,10 @@ assert.doesNotMatch(stopSource, /initAudio|new AudioContext|startWindLoop|create
   'stopping ambient must reuse the existing context and nodes');
 
 assert.match(appSource,
-  /const enterGameWith = \(state: GameState\)[\s\S]*stateRef\.current = state;[\s\S]*setScreen\('game'\);/,
-  'new games must install their state before the game screen requests ambient');
+  /const \[initialState\] = useState\(\(\) => initialSessionState\(launch\)\);[\s\S]*const stateRef = useRef\(initialState\);/,
+  'new sessions must install their state before the game screen requests ambient');
 assert.match(appSource,
-  /const handleLoadFromSlot[\s\S]*stateRef\.current = loaded;[\s\S]*setScreen\('game'\);/,
+  /const handleLoadFromSlot[\s\S]*stateRef\.current = loaded;[\s\S]*bump\(\);/,
   'loaded games must install their weather before the game screen requests ambient');
 assert.match(sfxSource, /export function setMuted[\s\S]*localStorage\.setItem\('buksae-muted'/,
   'screen transitions must leave the persisted mute policy intact');

@@ -21,7 +21,3 @@ export function firewoodWeatherMult(weather: WeatherId): number {
 export function warmthLossWeatherMult(weather: WeatherId): number {
   return CONFIG.weather.warmthLossMult[weather];
 }
-
-export function isSevereWeather(weather: WeatherId): boolean {
-  return weather === 'blizzard' || weather === 'coldSnap' || weather === 'heavySnow';
-}

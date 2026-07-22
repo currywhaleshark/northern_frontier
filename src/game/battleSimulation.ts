@@ -11,7 +11,7 @@ import { specialResidentDefinition } from './specialResidents';
 import { createBanditLairTacticalAssault } from './tacticalAssault';
 import { createTacticalBattle } from './tacticalBattle';
 import { createPredatorTacticalHunt } from './tacticalHunt';
-import { clearWeaponAssignments, setResidentWeapon } from './weapons';
+import { clearWeaponAssignments, setResidentMount, setResidentWeapon } from './weapons';
 import type {
   BattleMode, EnemyDoctrineId, EnemyStratagemId, Expedition, GameState, JobId, PredatorKind, Season,
   SpecialResidentId, TacticalRouteSide, TigerTier, WeatherId,
@@ -25,11 +25,18 @@ export interface BattleSimDefenderCounts {
   muskets: number;        // 조총 수비대
   bows: number;           // 각궁 수비대
   spears: number;         // 창 수비대
-  unarmedMilitia: number; // 맨손 수비병
+  unarmedMilitia: number; // 기본 장비 수비병
   watchmen: number;       // 파수꾼
   hunters: number;        // 사냥꾼
+  physicians: number;     // 전술 치료반
   civilians: number;      // 피난 주민
 }
+
+export type BattleSimMountableDefenderKey = Exclude<
+  keyof BattleSimDefenderCounts,
+  'physicians' | 'civilians'
+>;
+export type BattleSimDefenderMountCounts = Record<BattleSimMountableDefenderKey, number>;
 
 export interface BattleSimulationOptions {
   scenario?: BattleSimulationScenario;
@@ -49,6 +56,10 @@ export interface BattleSimulationOptions {
   enemyCompositionTemplateId?: string | 'auto';
   enemyStratagem?: EnemyStratagemId | 'none' | 'auto';
   enemyFlankRoute?: TacticalRouteSide | 'none' | 'auto';
+  combatSpecialResidents?: SimSetting<SpecialResidentId[]>;
+  mountedDefenders?: SimSetting<Partial<BattleSimDefenderMountCounts>>;
+  mountedSpecialResidents?: SimSetting<SpecialResidentId[]>;
+  /** 이전 시뮬레이터 프리셋과 테스트 저장값을 위한 호환 옵션. */
   includeCombatSpecialResidents?: boolean;
   /** 개발 측정용 적대 관계. 생략하면 새 게임의 기본 관계를 유지한다. */
   enemyRelation?: number;
@@ -57,8 +68,11 @@ export interface BattleSimulationOptions {
 
 const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter'];
 const WEATHERS: WeatherId[] = ['clear', 'rain', 'frost', 'heavySnow', 'blizzard', 'coldSnap', 'thawFlood'];
-const COMBAT_SPECIAL_RESIDENTS: readonly SpecialResidentId[] = [
+export const BATTLE_SIMULATION_COMBAT_SPECIAL_RESIDENTS: readonly SpecialResidentId[] = [
   'jurchenWarrior', 'tigerHunter', 'uinyeo', 'hangwae',
+];
+const MOUNTABLE_DEFENDER_KEYS: readonly BattleSimMountableDefenderKey[] = [
+  'muskets', 'bows', 'spears', 'unarmedMilitia', 'watchmen', 'hunters',
 ];
 
 export const BATTLE_SIMULATION_ENEMIES = [
@@ -98,6 +112,7 @@ export function randomDefenderCounts(rng: () => number): BattleSimDefenderCounts
     unarmedMilitia: Math.floor(rng() * 4),
     watchmen: Math.floor(rng() * 4),
     hunters: Math.floor(rng() * 5),
+    physicians: Math.floor(rng() * 3),
     civilians: 4 + Math.floor(rng() * 7),
   };
   // 전투원이 하나도 없으면 최소한의 수비대는 세운다
@@ -110,6 +125,28 @@ export function randomDefenderCounts(rng: () => number): BattleSimDefenderCounts
 
 function combatantCount(counts: BattleSimDefenderCounts): number {
   return counts.muskets + counts.bows + counts.spears + counts.unarmedMilitia + counts.watchmen + counts.hunters;
+}
+
+function randomMountedDefenderCounts(
+  counts: BattleSimDefenderCounts,
+  rng: () => number,
+): BattleSimDefenderMountCounts {
+  return Object.fromEntries(MOUNTABLE_DEFENDER_KEYS.map(key => {
+    let mounted = 0;
+    for (let index = 0; index < counts[key]; index++) {
+      if (rng() < 0.32) mounted += 1;
+    }
+    return [key, mounted];
+  })) as BattleSimDefenderMountCounts;
+}
+
+function selectedSpecialResidents(options: BattleSimulationOptions, rng: () => number): SpecialResidentId[] {
+  const requested = options.combatSpecialResidents === 'random'
+    ? BATTLE_SIMULATION_COMBAT_SPECIAL_RESIDENTS.filter(() => rng() < 0.38)
+    : options.combatSpecialResidents ?? (options.includeCombatSpecialResidents
+      ? [...BATTLE_SIMULATION_COMBAT_SPECIAL_RESIDENTS]
+      : []);
+  return [...new Set(requested)].filter(id => BATTLE_SIMULATION_COMBAT_SPECIAL_RESIDENTS.includes(id));
 }
 
 function expeditionCounts(counts: BattleSimDefenderCounts): BattleSimDefenderCounts {
@@ -254,19 +291,27 @@ export function createBattleSimulation(options: BattleSimulationOptions): GameSt
   state.residents = [];
   state.nextResidentId = 1;
   const combatantIds: number[] = [];
-  const add = (job: JobId, amount: number) => {
+  const add = (job: JobId, amount: number): number[] => {
+    const ids: number[] = [];
     for (let i = 0; i < amount; i++) {
       const resident = createResident(state, rng, job);
       state.residents.push(resident);
-      if (job === 'militia' || job === 'watchman' || job === 'hunter') combatantIds.push(resident.id);
+      ids.push(resident.id);
+      if (job === 'militia' || job === 'watchman' || job === 'hunter' || job === 'physician') {
+        combatantIds.push(resident.id);
+      }
     }
+    return ids;
   };
-  add('militia', counts.muskets + counts.bows + counts.spears + counts.unarmedMilitia);
-  add('watchman', counts.watchmen);
-  add('hunter', counts.hunters);
+  const militiaIds = add('militia', counts.muskets + counts.bows + counts.spears + counts.unarmedMilitia);
+  const watchmanIds = add('watchman', counts.watchmen);
+  const hunterIds = add('hunter', counts.hunters);
+  add('physician', counts.physicians);
   add('idle', counts.civilians);
-  if (options.includeCombatSpecialResidents) {
-    for (const id of COMBAT_SPECIAL_RESIDENTS) {
+  const specialResidentIds = new Map<SpecialResidentId, number>();
+  const selectedSpecialIds = selectedSpecialResidents(options, rng);
+  if (selectedSpecialIds.length > 0) {
+    for (const id of selectedSpecialIds) {
       const definition = specialResidentDefinition(id);
       const resident = createResident(state, rng, definition.job);
       resident.name = definition.name;
@@ -274,7 +319,9 @@ export function createBattleSimulation(options: BattleSimulationOptions): GameSt
       resident.age = definition.age;
       resident.special = definition.id;
       state.residents.push(resident);
-      if (definition.job === 'militia' || definition.job === 'watchman' || definition.job === 'hunter') {
+      specialResidentIds.set(definition.id, resident.id);
+      if (definition.job === 'militia' || definition.job === 'watchman' ||
+          definition.job === 'hunter' || definition.job === 'physician') {
         combatantIds.push(resident.id);
       }
     }
@@ -296,6 +343,51 @@ export function createBattleSimulation(options: BattleSimulationOptions): GameSt
   assign('musket', counts.muskets);
   assign('hornBow', counts.bows);
   assign('spear', counts.spears);
+
+  // 지정/랜덤 군마 편성을 실제 주민 배정으로 변환한다. 치료반과 민간인은 승마 대상이 아니다.
+  const regularIds: Record<BattleSimMountableDefenderKey, number[]> = {
+    muskets: militiaIds.slice(0, counts.muskets),
+    bows: militiaIds.slice(counts.muskets, counts.muskets + counts.bows),
+    spears: militiaIds.slice(counts.muskets + counts.bows, counts.muskets + counts.bows + counts.spears),
+    unarmedMilitia: militiaIds.slice(counts.muskets + counts.bows + counts.spears),
+    watchmen: watchmanIds,
+    hunters: hunterIds,
+  };
+  const requestedMounted = options.mountedDefenders === 'random' ||
+      (options.defenders === 'random' && options.mountedDefenders == null)
+    ? randomMountedDefenderCounts(counts, rng)
+    : options.mountedDefenders ?? {};
+  const mountedResidentIds: number[] = [];
+  for (const key of MOUNTABLE_DEFENDER_KEYS) {
+    const amount = Math.max(0, Math.min(
+      regularIds[key].length,
+      Math.round(Number(requestedMounted[key] ?? 0)) || 0,
+    ));
+    mountedResidentIds.push(...regularIds[key].slice(0, amount));
+  }
+  const requestedMountedSpecials = options.mountedSpecialResidents === 'random'
+    ? selectedSpecialIds.filter(id => specialResidentDefinition(id).job !== 'physician' && rng() < 0.45)
+    : options.mountedSpecialResidents ?? [];
+  for (const id of [...new Set(requestedMountedSpecials)]) {
+    if (!selectedSpecialIds.includes(id) || specialResidentDefinition(id).job === 'physician') continue;
+    const residentId = specialResidentIds.get(id);
+    if (residentId != null) mountedResidentIds.push(residentId);
+  }
+  if (mountedResidentIds.length > 0) {
+    state.buildings.push({
+      id: state.nextBuildingId++,
+      type: 'stable',
+      x: 0,
+      y: 0,
+      progress: 999,
+      built: true,
+      fieldGrowth: 0,
+      livestock: {
+        species: 'horse', headcount: mountedResidentIds.length, growth: 0, feedShortageDays: 0,
+      },
+    });
+    for (const residentId of mountedResidentIds) setResidentMount(state, residentId, 'horse');
+  }
 
   const cannonSetting = scenario === 'defense' ? options.cannonEmplacements ?? 0 : 0;
   const cannonCount = Math.max(0, Math.min(8, Math.round(

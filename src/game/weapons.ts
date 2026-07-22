@@ -1,6 +1,6 @@
 import { CONFIG } from './config';
 import type {
-  CombatWeaponId, GameState, JobId, MountId, Resident, ResourceId, WeaponAllocationMode,
+  CombatWeaponId, GameState, JobId, MountId, Resident, ResourceId,
 } from './types';
 
 export const COMBAT_WEAPON_IDS: readonly CombatWeaponId[] = ['musket', 'hornBow', 'spear'];
@@ -327,7 +327,6 @@ export function musketReadiness(
     powderRequired: ready * perShooter,
   };
 }
-
 export function consumeMusketPowder(
   state: GameState,
   musketUsers: Iterable<number>,
@@ -404,8 +403,4 @@ export function weaponCountsForResidents(
     unarmed: Math.max(0, total - muskets - hornBows - spears),
     readyMuskets: musketReadiness(state, musketUsers, CONFIG.raid.powderPerMusket).ready,
   };
-}
-
-export function weaponAssignmentMode(state: GameState): WeaponAllocationMode {
-  return state.weaponAllocationMode === 'manual' ? 'manual' : 'auto';
 }

@@ -51,16 +51,10 @@ import type {
   TacticalBattleFlankOutcome, TacticalBattleTacticsReport, TacticalFacing, TacticalPreparationEffect,
   TacticalRaiderGroup, TacticalRoundReport,
 } from './types';
+import { SAVE_SLOT_COUNT, saveSlotStorageKey } from './saveStorage';
 
 export { CURRENT_SCHEMA_VERSION } from './saveSchema';
-
-const SAVE_KEY = 'buksae-save-v3'; // v3: 이동 보간(px/py)과 지도 위 습격 무리 추가
-// 저장 슬롯: 1번은 기존 단일 저장 키를 그대로 사용해 예전 저장과 호환된다
-export const SAVE_SLOT_COUNT = 4;
-
-function slotKey(slot: number): string {
-  return slot <= 1 ? SAVE_KEY : `${SAVE_KEY}-slot${slot}`;
-}
+export { SAVE_SLOT_COUNT } from './saveStorage';
 
 const RESOURCE_ID_SET = new Set<string>(RESOURCE_IDS);
 const TACTICAL_AI_STATES = new Set<TacticalAiState>([
@@ -448,6 +442,82 @@ export function migrateV32ToV33(raw: RawSave): RawSave {
   return migrated;
 }
 
+function migrateRawTacticalRouteTransit(
+  value: unknown,
+  fallbackLine: unknown,
+  side: 'defender' | 'raider',
+): unknown {
+  if (!value || typeof value !== 'object') return value;
+  const transit = { ...value as RawSave };
+  const originZoneId = typeof transit.originZoneId === 'string' ? transit.originZoneId : 'approach';
+  const reverse = originZoneId === 'storehouse';
+  if (transit.node !== 'approachGate' && transit.node !== 'middle' && transit.node !== 'storehouseGate') {
+    transit.node = transit.step === 1
+      ? 'middle'
+      : transit.step === 2
+        ? (reverse ? 'approachGate' : 'storehouseGate')
+        : (reverse ? 'storehouseGate' : 'approachGate');
+  }
+  if (transit.purpose === 'raid' ||
+      (transit.purpose !== 'block' && transit.purpose !== 'move' && transit.purpose !== 'return' &&
+        transit.purpose !== 'transfer')) {
+    transit.purpose = 'flank';
+  }
+  if (side === 'defender' && typeof transit.returnZoneId !== 'string' &&
+      originZoneId === 'approach' && transit.destinationZoneId === 'wall') {
+    transit.destinationZoneId = 'storehouse';
+  }
+  if (transit.destinationLine !== 'front' && transit.destinationLine !== 'middle' && transit.destinationLine !== 'rear') {
+    transit.destinationLine = fallbackLine === 'front' || fallbackLine === 'middle' || fallbackLine === 'rear'
+      ? fallbackLine
+      : 'rear';
+  }
+  if (transit.destinationNode !== 'approachGate' && transit.destinationNode !== 'middle' &&
+      transit.destinationNode !== 'storehouseGate') {
+    transit.destinationNode = transit.purpose === 'block'
+      ? transit.node
+      : transit.destinationZoneId === 'approach' ? 'approachGate' : 'storehouseGate';
+  }
+  return transit;
+}
+
+// v34: 우회로를 정식 전투 무대로 표시하기 위한 양측 endpoint, 물리 node, 목적 열을 저장한다.
+// 구형 step은 라운드 판정 호환용으로 보존하되 새 UI와 저장 복원은 node를 기준으로 삼는다.
+export function migrateV33ToV34(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  if (migrated.tacticalBattle && typeof migrated.tacticalBattle === 'object') {
+    const battle = { ...migrated.tacticalBattle as RawSave };
+    if (Array.isArray(battle.flankRoutes)) {
+      battle.flankRoutes = battle.flankRoutes.map(value => {
+        if (!value || typeof value !== 'object') return value;
+        return {
+          ...value as RawSave,
+          approachZoneId: 'approach',
+          interiorZoneId: 'storehouse',
+        };
+      });
+    }
+    for (const key of ['defenderGroups', 'raiderGroups']) {
+      if (!Array.isArray(battle[key])) continue;
+      battle[key] = (battle[key] as unknown[]).map(value => {
+        if (!value || typeof value !== 'object') return value;
+        const group = { ...value as RawSave };
+        if (group.routeTransit) {
+          group.routeTransit = migrateRawTacticalRouteTransit(
+            group.routeTransit,
+            group.line,
+            key === 'defenderGroups' ? 'defender' : 'raider',
+          );
+        }
+        return group;
+      });
+    }
+    migrated.tacticalBattle = battle;
+  }
+  migrated.schemaVersion = 34;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -486,6 +556,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 30) migrated = migrateV30ToV31(migrated);
     else if (version === 31) migrated = migrateV31ToV32(migrated);
     else if (version === 32) migrated = migrateV32ToV33(migrated);
+    else if (version === 33) migrated = migrateV33ToV34(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -502,7 +573,7 @@ const SPECIAL_RESIDENT_IDS = new Set<SpecialResidentId>([
   'geomancer', 'uinyeo', 'runawaySmith', 'interpreter', 'hangwae',
 ]);
 const TACTICAL_COMMANDS = new Set<TacticalCommandId>([
-  'hold', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'reinforceRear',
+  'hold', 'attack', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians', 'redeploy', 'reinforceRear',
   'fallback', 'advance', 'charge',
   'arson', 'blockEscape', 'openRetreat', 'flankRoute',
 ]);
@@ -810,8 +881,15 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       facing,
       pendingFacing,
       ambushed: group.ambushed === true,
+      ambushAftermath: group.ambushAftermath === 'hold' || group.ambushAftermath === 'fallback'
+        ? group.ambushAftermath
+        : undefined,
       targetGroupId: typeof group.targetGroupId === 'string' ? group.targetGroupId : undefined,
       targetSource: group.targetSource === 'player' ? 'player' : 'auto',
+      rearRaidRound: Number.isFinite(group.rearRaidRound)
+        ? Math.max(1, Math.floor(Number(group.rearRaidRound)))
+        : undefined,
+      routeTransit: group.routeTransit,
       huntOriginGroupId: encounterKind === 'predatorHunt'
         ? (typeof group.huntOriginGroupId === 'string'
           ? group.huntOriginGroupId
@@ -1036,13 +1114,21 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       const assaultZoneAllowed = encounterKind !== 'banditLair' || zoneId === 'lairTrail' ||
         (group.kind === 'hunter' && zoneId === 'lairWall' && prepApplied('preInfiltration'));
       const huntZoneAllowed = encounterKind !== 'predatorHunt' || zoneId !== 'huntDen';
-      if (zoneIds.has(zoneId) && line && assaultZoneAllowed && huntZoneAllowed) {
+      const routeId = typeof candidate.routeId === 'string' && flankRouteIds.has(candidate.routeId)
+        ? candidate.routeId : undefined;
+      const rawGroup = group as unknown as Record<string, unknown>;
+      const rawTransit = rawGroup.routeTransit && typeof rawGroup.routeTransit === 'object'
+        ? rawGroup.routeTransit as Record<string, unknown>
+        : undefined;
+      const routePlacementAllowed = encounterKind === 'raidDefense' && line && routeId != null &&
+        rawTransit?.routeId === routeId;
+      if (routePlacementAllowed) {
+        placement = { zoneId: '', line, routeId };
+      } else if (zoneIds.has(zoneId) && line && assaultZoneAllowed && huntZoneAllowed) {
         const hidden = (encounterKind === 'banditLair' && group.kind === 'hunter' && zoneId === 'lairWall' &&
             prepApplied('preInfiltration')) ||
           (encounterKind === 'raidDefense' && group.kind === 'hunter' && zoneId === 'approach' && prepApplied('setAmbush'));
-        const routeId = typeof candidate.routeId === 'string' && flankRouteIds.has(candidate.routeId)
-          ? candidate.routeId : undefined;
-        placement = { zoneId, line, ...(hidden ? { hidden: true } : {}), ...(routeId ? { routeId } : {}) };
+        placement = { zoneId, line, ...(hidden ? { hidden: true } : {}) };
       } else if (!required || !canRemainWaiting) {
         placement = fallback;
       }
@@ -1100,8 +1186,13 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
   if (migrated.flankRoutes) {
     const routeIds = new Set(migrated.flankRoutes.map(route => route.id));
     const fallbackRound = Math.max(1, Math.floor(Number(source.round) || 1));
-    for (const group of [...migrated.defenderGroups, ...migrated.raiderGroups]) {
-      const transit = migrateTacticalRouteTransit(group.routeTransit, routeIds, fallbackRound);
+    for (const group of migrated.defenderGroups) {
+      const transit = migrateTacticalRouteTransit(group.routeTransit, routeIds, fallbackRound, 'defender');
+      if (transit && zoneIds.has(transit.destinationZoneId)) group.routeTransit = transit;
+      else group.routeTransit = undefined;
+    }
+    for (const group of migrated.raiderGroups) {
+      const transit = migrateTacticalRouteTransit(group.routeTransit, routeIds, fallbackRound, 'raider');
       if (transit && zoneIds.has(transit.destinationZoneId)) group.routeTransit = transit;
       else group.routeTransit = undefined;
     }
@@ -1479,7 +1570,7 @@ function migrateExpeditionState(state: GameState): void {
 
 export function saveGame(state: GameState, slot = 1): boolean {
   try {
-    localStorage.setItem(slotKey(slot), JSON.stringify({
+    localStorage.setItem(saveSlotStorageKey(slot), JSON.stringify({
       ...state,
       schemaVersion: CURRENT_SCHEMA_VERSION,
       savedAt: Date.now(),
@@ -1492,7 +1583,7 @@ export function saveGame(state: GameState, slot = 1): boolean {
 
 export function loadGame(slot = 1): GameState | null {
   try {
-    const raw = localStorage.getItem(slotKey(slot));
+    const raw = localStorage.getItem(saveSlotStorageKey(slot));
     if (!raw) return null;
     const decoded = JSON.parse(raw) as RawSave;
     const parsed = migrateToCurrent(decoded) as unknown as GameState;
@@ -1876,7 +1967,7 @@ export function loadGame(slot = 1): GameState | null {
 }
 
 export function hasSave(slot = 1): boolean {
-  return localStorage.getItem(slotKey(slot)) != null;
+  return localStorage.getItem(saveSlotStorageKey(slot)) != null;
 }
 
 export function hasAnySave(): boolean {
@@ -1887,7 +1978,7 @@ export function hasAnySave(): boolean {
 }
 
 export function clearSave(slot = 1): void {
-  localStorage.removeItem(slotKey(slot));
+  localStorage.removeItem(saveSlotStorageKey(slot));
 }
 
 export interface SaveSlotSummary {
@@ -1906,7 +1997,7 @@ function emptySlotSummary(slot: number): SaveSlotSummary {
 
 // 슬롯 목록 UI용 요약 — 전체 마이그레이션 없이 원본 JSON의 표시 필드만 읽는다
 export function readSaveSlotSummary(slot: number): SaveSlotSummary {
-  const raw = localStorage.getItem(slotKey(slot));
+  const raw = localStorage.getItem(saveSlotStorageKey(slot));
   if (!raw) return emptySlotSummary(slot);
   try {
     const decoded = JSON.parse(raw) as RawSave;

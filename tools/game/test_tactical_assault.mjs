@@ -229,7 +229,7 @@ function finishPendingBattle(state) {
 }
 
 {
-  const { state, battle, lair } = prepareState(2026071393, false);
+  const { state, battle, lair } = prepareState(2026071394, false);
   assert.equal(battle.raiderGroups.filter(group => group.revealed).length, 1, 'unscouted assault only reveals sentries');
   enterCommandPhase(state);
   const group = battle.defenderGroups[0];
@@ -573,10 +573,10 @@ assert.match(
       `zone rounds ${JSON.stringify(roundsByZone)}`,
   );
   const baseline = {
-    directRate: 0.5625,
+    directRate: 0.28125,
     averageRounds: 7,
-    averageCasualties: 1.3125,
-    roundsByZone: { lairTrail: 32, lairWall: 65, lairYard: 69, lairKeep: 58 },
+    averageCasualties: 1.5625,
+    roundsByZone: { lairTrail: 32, lairWall: 79, lairYard: 73, lairKeep: 40 },
   };
   const withinFifteenPercent = (actual, expected) =>
     Math.abs(actual - expected) <= Math.max(0.0001, Math.abs(expected) * 0.15);

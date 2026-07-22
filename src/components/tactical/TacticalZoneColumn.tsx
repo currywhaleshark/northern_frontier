@@ -21,6 +21,7 @@ import type {
   TacticalFacing,
   TacticalFormationLine,
   TacticalRaiderGroup,
+  TacticalRouteNode,
   TigerTier,
 } from '../../game/types';
 import { tacticalBackgroundAsset } from '../../render/tacticalBackgroundAssets';
@@ -50,10 +51,13 @@ import {
   tacticalMountedDefenderMuzzleAnchor,
   tacticalMountedDefenderPoseCell,
   tacticalRaiderPoseCell,
+  tacticalRaiderSpriteFaction,
   type TacticalMuzzleAnchor,
   type TacticalSpritePose,
 } from '../../render/tacticalCharacterAssets';
 import { tacticalSpriteMetricVars } from '../../render/tacticalSpriteMetrics';
+import type { TacticalRouteStageView } from '../../game/tacticalRoutes';
+import { TacticalRouteGate } from './TacticalRouteGate';
 
 const BARRICADE_SPRITES = {
   normal: '/assets/tactical/barricade-normal-v1.png',
@@ -80,6 +84,9 @@ interface Props {
   commandable: boolean;
   selectedGroupId: string | null;
   nextPendingGroupId: string | null;
+  routeStageViews: TacticalRouteStageView[];
+  onViewRoute: (routeId: string) => void;
+  onRequestRouteEntry: (groupId: string, routeId: string, node: TacticalRouteNode, element: HTMLElement) => void;
   /**
    * 카드·부대 드래그 중일 때만 채워진다 — 아군 전열 레인을 앵커·고스트로 바꾼다.
    * mode 'deployment'는 배치 검증, 'command'는 무대 명령 preview 계약을 쓴다.
@@ -88,7 +95,7 @@ interface Props {
   /** 무대 위 부대를 드래그 핸들로 만드는 포인터 props — 배치·지휘 단계에서만 전달된다 */
   stageDragHandlePropsFor: ((groupId: string) => React.DOMAttributes<HTMLElement>) | null;
   onSelectGroup: (groupId: string, element: HTMLElement) => void;
-  onSelectTarget: (defenderGroupId: string, enemyGroupId: string) => void;
+  onSelectTarget: (defenderGroupId: string, enemyGroupId: string, element: HTMLElement) => void;
   /** P5 방향전환 — 선택 부대 양옆 화살표가 호출한다. 배치=즉시, 지휘=확인 카드(화면이 처리) */
   onTurnGroup: (groupId: string, facing: TacticalFacing, element: HTMLElement) => void;
 }
@@ -342,7 +349,7 @@ function BeastSprite({ kind, tigerTier, hidden, pose, falling }: {
   );
 }
 
-function RaiderSprite({
+export function RaiderSprite({
   faction, unitType, beastKind, tigerTier, hidden, offset, pose = 'idle', firing = false, falling = false,
 }: {
   faction: string;
@@ -936,21 +943,39 @@ export function TacticalZoneColumn({
   commandable,
   selectedGroupId,
   nextPendingGroupId,
+  routeStageViews,
   stageDrag,
   stageDragHandlePropsFor,
   onSelectGroup,
   onSelectTarget,
   onTurnGroup,
+  onViewRoute,
+  onRequestRouteEntry,
 }: Props) {
   const zoneRef = useRef<HTMLElement>(null);
   const [arrowProjectilePaths, setArrowProjectilePaths] = useState<ArrowProjectilePath[]>([]);
   const [orderArrowPaths, setOrderArrowPaths] = useState<OrderArrowPath[]>([]);
   const focused = zone.id === activeZoneId;
+  const raiderSpriteFaction = tacticalRaiderSpriteFaction(battle);
   const showFormationGuides = battle.phase === 'deployment';
+  const commandDragGroup = stageDrag?.mode === 'command'
+    ? battle.defenderGroups.find(group => group.id === stageDrag.groupId)
+    : undefined;
+  const orderedZones = [...battle.zones].sort((left, right) => left.order - right.order);
+  const orderedZoneIndex = orderedZones.findIndex(candidate => candidate.id === zone.id);
+  const commandMoveEdges = commandDragGroup?.zoneId === zone.id
+    ? ([
+      { side: 'left' as const, destinationZone: orderedZones[orderedZoneIndex - 1] },
+      { side: 'right' as const, destinationZone: orderedZones[orderedZoneIndex + 1] },
+    ]).filter(edge => edge.destinationZone != null)
+    : [];
   // 우회 이동 중인 조는 정면 랭크에서 빠진다 — 공개 경로면 리본·미니맵 가지에서만 보인다 (계획서 8.6)
   const defenders = battle.defenderGroups
     .filter(group => group.zoneId === zone.id && !tacticalGroupIsInRouteTransit(group))
     .sort((a, b) => defenderFormationOrder(a) - defenderFormationOrder(b));
+  const displayedRound = battle.pendingReport?.round ?? battle.round;
+  const defenderRearRaiders = defenders.filter(group => group.rearRaidRound != null);
+  const frontalDefenders = defenders.filter(group => group.rearRaidRound == null);
   const zoneRaiders = battle.raiderGroups.filter(group => group.zoneId === zone.id &&
     !tacticalGroupIsInRouteTransit(group) &&
     tacticalRaiderVisibleDuringPlayback(battle, group, eventIndex));
@@ -1080,6 +1105,38 @@ export function TacticalZoneColumn({
       <div className="tactical-prep-tags">
         {effects.map(label => <span key={label}>{label}</span>)}
       </div>
+      <TacticalRouteGate
+        state={state}
+        zoneId={zone.id}
+        views={routeStageViews}
+        playback={battle.phase === 'simulating' || battle.phase === 'preparationExecution'}
+        selectedGroupId={selectedGroupId}
+        stageDrag={stageDrag}
+        onViewRoute={onViewRoute}
+        onRequestEntry={onRequestRouteEntry}
+      />
+      {commandMoveEdges.map(edge => {
+        const destination = { zoneId: edge.destinationZone.id, line: commandDragGroup!.line };
+        const anchorId = `${destination.zoneId}|${destination.line}`;
+        const reason = tacticalStageOrderUnavailableReason(battle, commandDragGroup!.id, destination);
+        const preview = reason == null
+          ? tacticalStageOrderPreview(battle, commandDragGroup!.id, destination)
+          : null;
+        const hovered = stageDrag?.hoverAnchorId === anchorId;
+        return (
+          <div
+            key={edge.side}
+            className={`tactical-zone-move-edge ${edge.side}${reason ? ' deploy-anchor-blocked' : hovered ? ' deploy-anchor-hover' : ' deploy-anchor-valid'}`}
+            data-deploy-anchor={anchorId}
+            title={reason ?? `${edge.destinationZone.name}(으)로 ${stageOrderCommandLabel(preview?.command ?? null)}`}
+            aria-label={reason ?? `${stageOrderCommandLabel(preview?.command ?? null)} · ${edge.destinationZone.name}`}
+          >
+            <b>{edge.side === 'left' ? '◀' : '▶'}</b>
+            <span>{stageOrderCommandLabel(preview?.command ?? null)}</span>
+            <small>{edge.destinationZone.name}</small>
+          </div>
+        );
+      })}
       {scars > 0 && (
         <div className="tactical-scar-layer" aria-hidden="true">
           {Array.from({ length: scars }, (_, index) => (
@@ -1257,7 +1314,7 @@ export function TacticalZoneColumn({
               key={leaderMotion ? `${raider.id}-${activeEvent?.kind}-${eventIndex}` : raider.id}
               onClick={targetable ? event => {
                 event.stopPropagation();
-                onSelectTarget(selectedGroupId!, raider.id);
+                onSelectTarget(selectedGroupId!, raider.id, event.currentTarget);
               } : undefined}
               role={targetable ? 'button' : undefined}
               tabIndex={targetable ? 0 : undefined}
@@ -1268,7 +1325,7 @@ export function TacticalZoneColumn({
               onKeyDown={targetable ? event => {
                 if (event.key !== 'Enter' && event.key !== ' ') return;
                 event.preventDefault();
-                onSelectTarget(selectedGroupId!, raider.id);
+                onSelectTarget(selectedGroupId!, raider.id, event.currentTarget);
               } : undefined}
             >
               <div
@@ -1282,7 +1339,7 @@ export function TacticalZoneColumn({
                     style={formationSlotStyle(spriteIndex, totalRaiders, 168, 120, 22, 14, 5)}
                     key={`${raider.id}-${spriteIndex}`}
                   >
-                    <RaiderSprite faction={battle.factionName} unitType={raider.unitType} beastKind={raider.beastKind} tigerTier={raider.tigerTier} hidden={!raider.revealed} offset={0} pose={raiderPose} firing={raiderFiringForEvent(activeEvent, raider)} />
+                    <RaiderSprite faction={raiderSpriteFaction} unitType={raider.unitType} beastKind={raider.beastKind} tigerTier={raider.tigerTier} hidden={!raider.revealed} offset={0} pose={raiderPose} firing={raiderFiringForEvent(activeEvent, raider)} />
                   </span>
                 ))}
                 {Array.from({ length: fallingRaiders }, (_, casualtyIndex) => (
@@ -1291,11 +1348,11 @@ export function TacticalZoneColumn({
                     style={formationSlotStyle(activeRaiders + casualtyIndex, totalRaiders, 168, 120, 22, 14, 5)}
                     key={`${raider.id}-fall-${eventIndex}-${casualtyIndex}`}
                   >
-                    <RaiderSprite faction={battle.factionName} unitType={raider.unitType} beastKind={raider.beastKind} tigerTier={raider.tigerTier} hidden={false} offset={0} pose="hurt" falling />
+                    <RaiderSprite faction={raiderSpriteFaction} unitType={raider.unitType} beastKind={raider.beastKind} tigerTier={raider.tigerTier} hidden={false} offset={0} pose="hurt" falling />
                   </span>
                 ))}
               </div>
-              <span>
+              <span className="tactical-unit-label">
                 {raider.revealed ? `${raider.label} ${activeRaiders}${raider.beastKind ? '마리' : '명'}${raider.beastKind ? '' : ` · 전력 ${Math.round(raider.estimatedPower ?? raider.power)}`} · ${tacticalRaiderIntentLabel(battle, raider)}` : raider.beastKind ? '덤불 속 흔적' : '정체불명'}
                 {supportView && (
                   <em
@@ -1353,7 +1410,7 @@ export function TacticalZoneColumn({
               key={raider.id}
               onClick={targetable ? event => {
                 event.stopPropagation();
-                onSelectTarget(selectedGroupId!, raider.id);
+                onSelectTarget(selectedGroupId!, raider.id, event.currentTarget);
               } : undefined}
               role={targetable ? 'button' : undefined}
               tabIndex={targetable ? 0 : undefined}
@@ -1364,7 +1421,7 @@ export function TacticalZoneColumn({
               onKeyDown={targetable ? event => {
                 if (event.key !== 'Enter' && event.key !== ' ') return;
                 event.preventDefault();
-                onSelectTarget(selectedGroupId!, raider.id);
+                onSelectTarget(selectedGroupId!, raider.id, event.currentTarget);
               } : undefined}
             >
               <div
@@ -1378,7 +1435,7 @@ export function TacticalZoneColumn({
                     style={formationSlotStyle(spriteIndex, totalRaiders, 132, 100, 20, 13, 5)}
                     key={`${raider.id}-rear-${spriteIndex}`}
                   >
-                    <RaiderSprite faction={battle.factionName} unitType={raider.unitType} hidden={false} offset={0} pose={raiderPoseForEvent(activeEvent, raider)} />
+                    <RaiderSprite faction={raiderSpriteFaction} unitType={raider.unitType} hidden={false} offset={0} pose={raiderPoseForEvent(activeEvent, raider)} />
                   </span>
                 ))}
                 {Array.from({ length: fallingRaiders }, (_, casualtyIndex) => (
@@ -1387,13 +1444,70 @@ export function TacticalZoneColumn({
                     style={formationSlotStyle(activeRaiders + casualtyIndex, totalRaiders, 132, 100, 20, 13, 5)}
                     key={`${raider.id}-rear-fall-${eventIndex}-${casualtyIndex}`}
                   >
-                    <RaiderSprite faction={battle.factionName} unitType={raider.unitType} hidden={false} offset={0} pose="hurt" falling />
+                    <RaiderSprite faction={raiderSpriteFaction} unitType={raider.unitType} hidden={false} offset={0} pose="hurt" falling />
                   </span>
                 ))}
               </div>
-              <span>
+              <span className="tactical-unit-label">
                 {raider.label} {activeRaiders}명 · 후방 급습
                 {focusTarget && <em className="tactical-state-badge focus-target">집중 표적</em>}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="tactical-defender-rear-raid-rank" aria-label="아군 적 후방 급습대">
+        {defenderRearRaiders.map(group => {
+          const playbackLoss = tacticalPlaybackCasualties(battle, eventIndex, 'defender', group.id);
+          const visualActive = Math.min(
+            group.count,
+            Math.max(0, group.count - group.wounded - group.killed) + playbackLoss.futureTotal,
+          );
+          const visualWounded = Math.max(
+            0,
+            group.wounded - playbackLoss.futureWounded - playbackLoss.currentWounded,
+          );
+          const arrivedThisRound = group.rearRaidRound === displayedRound;
+          const unitDragProps = stageDragHandlePropsFor && group.commandable !== false
+            ? stageDragHandlePropsFor(group.id)
+            : null;
+          return (
+            <div
+              className={`tactical-field-group defender-rear-raid${commandable ? ' selectable' : ''}${commandable && selectedGroupId === group.id ? ' selected' : ''}${unitDragProps ? ' stage-drag-handle' : ''}${stageDrag?.groupId === group.id ? ' stage-dragging' : ''}`}
+              data-tactical-group-id={group.id}
+              key={`${group.id}-rear-raid`}
+              onClick={commandable ? event => {
+                event.stopPropagation();
+                onSelectGroup(group.id, event.currentTarget);
+              } : undefined}
+              role={commandable ? 'button' : undefined}
+              tabIndex={commandable ? 0 : undefined}
+              onKeyDown={commandable ? event => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                onSelectGroup(group.id, event.currentTarget);
+              } : undefined}
+              {...(unitDragProps ?? {})}
+            >
+              <GroupSprites
+                state={state}
+                group={group}
+                pose={defenderPoseForEvent(activeEvent, group)}
+                showAll
+                compactFormation
+                activeOverride={visualActive}
+                woundedOverride={visualWounded}
+                falling={activeEvent?.kind === 'casualty' && activeEvent.groupId === group.id
+                  ? activeEvent.casualties ?? 0 : 0}
+              />
+              <span className="tactical-unit-label">
+                {group.label}
+                <em
+                  className="tactical-state-badge rear-raid"
+                  title={arrivedThisRound
+                    ? '우회로를 지나 적 후방에 도달했습니다 — 이번 교전에 급습 보너스가 적용됩니다.'
+                    : '우회대가 적 후방 위치를 유지하며 교전하고 있습니다.'}
+                >{arrivedThisRound ? '후열 급습' : '적 후방 교전'}</em>
               </span>
             </div>
           );
@@ -1436,7 +1550,9 @@ export function TacticalZoneColumn({
           <div
             className={`tactical-formation-lane line-${line}${deployAnchorClass}`}
             data-formation-line={line}
-            {...(showFormationGuides || battle.phase === 'command' ? { 'data-deploy-anchor': deployAnchorId } : {})}
+            {...(showFormationGuides || (stageDrag?.mode === 'command' && dragGroup?.zoneId === zone.id)
+              ? { 'data-deploy-anchor': deployAnchorId }
+              : {})}
             aria-label={`아군 ${formationLineLabel(line)}`}
             key={line}
           >
@@ -1447,7 +1563,7 @@ export function TacticalZoneColumn({
                 <span>{ghostText}</span>
               </div>
             )}
-            {defenders.filter(group => group.line === line).map((group, stackIndex, lineGroups) => {
+            {frontalDefenders.filter(group => group.line === line).map((group, stackIndex, lineGroups) => {
           const recoiling = zoneVolley && defenderFiringForEvent(activeEvent, group);
           // P5: 표시 방향은 명시적 facing이 단일 소스다 — 열·명령에서 파생하지 않는다.
           const rearFacing = group.facing === 'towardRear';
@@ -1535,7 +1651,7 @@ export function TacticalZoneColumn({
                 woundedOverride={visualWounded}
                 falling={activeEvent?.kind === 'casualty' && activeEvent.groupId === group.id ? activeEvent.casualties ?? 0 : 0}
               />
-              <span>
+              <span className="tactical-unit-label">
                 {group.label}
                 {group.ambushed && <em className="tactical-state-badge ambushed">매복중</em>}
                 {group.pendingFacing && (
@@ -1544,7 +1660,7 @@ export function TacticalZoneColumn({
                     title="방향전환 직후라 이번 교전에는 전투력이 줄어듭니다."
                   >회전 중</em>
                 )}
-                {group.rearRaidRound === (battle.pendingReport?.round ?? battle.round) && (
+                {group.rearRaidRound != null && (
                   <em
                     className="tactical-state-badge rear-raid"
                     title="우회로를 지나 적 후열에 도달했습니다 — 이번 교전에 급습 보너스가 적용됩니다."

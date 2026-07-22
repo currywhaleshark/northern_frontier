@@ -19,8 +19,3 @@ export function getSeason(day: number): Season {
 export function getDayOfSeason(day: number): number {
   return ((getDayOfYear(day) - 1) % CONFIG.time.seasonDays) + 1;
 }
-
-export function isColdSeason(day: number): boolean {
-  const s = getSeason(day);
-  return s === 'autumn' || s === 'winter';
-}

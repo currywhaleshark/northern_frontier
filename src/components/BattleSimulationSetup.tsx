@@ -3,15 +3,17 @@ import { useState } from 'react';
 import { CONFIG } from '../game/config';
 import { WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
 import {
-  BATTLE_SIMULATION_ENEMIES,
-  type BattleSimDefenderCounts, type BattleSimulationOptions, type BattleSimulationScenario, type SimSetting,
+  BATTLE_SIMULATION_COMBAT_SPECIAL_RESIDENTS, BATTLE_SIMULATION_ENEMIES,
+  type BattleSimDefenderCounts, type BattleSimDefenderMountCounts, type BattleSimMountableDefenderKey,
+  type BattleSimulationOptions, type BattleSimulationScenario, type SimSetting,
 } from '../game/battleSimulation';
 import {
   enemyDoctrineDefinition, enemyStratagemDefinitions, eligibleEnemyDoctrines,
 } from '../game/enemyPlan';
 import { tacticalCompositionTemplates, tacticalEnemyFactionId } from '../game/tacticalCompositions';
+import { specialResidentDefinition } from '../game/specialResidents';
 import type {
-  BattleMode, EnemyDoctrineId, EnemyStratagemId, Season, TacticalRouteSide, TigerTier, WeatherId,
+  BattleMode, EnemyDoctrineId, EnemyStratagemId, Season, SpecialResidentId, TacticalRouteSide, TigerTier, WeatherId,
 } from '../game/types';
 import { MenuSnowLayer } from './MenuSnowLayer';
 
@@ -36,15 +38,27 @@ const DEFENDER_FIELDS: Array<{
   { key: 'muskets', label: '조총 수비대', offensiveLabel: '조총 토벌대', max: 8 },
   { key: 'bows', label: '각궁 수비대', offensiveLabel: '각궁 토벌대', max: 8 },
   { key: 'spears', label: '창 수비대', offensiveLabel: '창 토벌대', max: 8 },
-  { key: 'unarmedMilitia', label: '맨손 수비병', offensiveLabel: '경무장 토벌대', max: 8 },
+  { key: 'unarmedMilitia', label: '기본 장비 수비대', offensiveLabel: '기본 장비 토벌대', max: 8 },
   { key: 'watchmen', label: '파수꾼', max: 6 },
   { key: 'hunters', label: '사냥꾼', max: 8 },
+  { key: 'physicians', label: '의원', offensiveLabel: '원정 의원', max: 4 },
   { key: 'civilians', label: '피난 주민', max: 16 },
 ];
 
 const DEFAULT_DEFENDERS: BattleSimDefenderCounts = {
-  muskets: 1, bows: 2, spears: 2, unarmedMilitia: 1, watchmen: 2, hunters: 2, civilians: 6,
+  muskets: 1, bows: 2, spears: 2, unarmedMilitia: 1, watchmen: 2, hunters: 2, physicians: 1, civilians: 6,
 };
+const DEFAULT_MOUNTED_DEFENDERS: BattleSimDefenderMountCounts = {
+  muskets: 0, bows: 0, spears: 0, unarmedMilitia: 0, watchmen: 0, hunters: 0,
+};
+const MOUNTABLE_DEFENDER_KEYS = new Set<keyof BattleSimDefenderCounts>(
+  Object.keys(DEFAULT_MOUNTED_DEFENDERS) as BattleSimMountableDefenderKey[],
+);
+const COMBAT_SPECIAL_OPTIONS = BATTLE_SIMULATION_COMBAT_SPECIAL_RESIDENTS.map(id => specialResidentDefinition(id));
+
+function isMountableDefenderKey(key: keyof BattleSimDefenderCounts): key is BattleSimMountableDefenderKey {
+  return MOUNTABLE_DEFENDER_KEYS.has(key);
+}
 
 export function BattleSimulationSetup({ onStart, onBack }: Props) {
   const [scenario, setScenario] = useState<BattleSimulationScenario>('defense');
@@ -60,6 +74,9 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
   const [prepPoints, setPrepPoints] = useState(4);
   const [defendersRandom, setDefendersRandom] = useState(true);
   const [defenders, setDefenders] = useState<BattleSimDefenderCounts>(DEFAULT_DEFENDERS);
+  const [mountedDefenders, setMountedDefenders] = useState<BattleSimDefenderMountCounts>(DEFAULT_MOUNTED_DEFENDERS);
+  const [combatSpecialResidents, setCombatSpecialResidents] = useState<SpecialResidentId[]>([]);
+  const [mountedSpecialResidents, setMountedSpecialResidents] = useState<SpecialResidentId[]>([]);
   const [cannonMode, setCannonMode] = useState<'none' | 'fixed' | 'random'>('none');
   const [cannonCount, setCannonCount] = useState(1);
   const [tigerTier, setTigerTier] = useState<SimSetting<TigerTier>>(RANDOM);
@@ -69,7 +86,6 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
   const [enemyTemplateId, setEnemyTemplateId] = useState<string>('auto');
   const [enemyStratagem, setEnemyStratagem] = useState<EnemyStratagemId | 'none' | 'auto'>('auto');
   const [enemyFlankRoute, setEnemyFlankRoute] = useState<TacticalRouteSide | 'none' | 'auto'>('auto');
-  const [includeCombatSpecialResidents, setIncludeCombatSpecialResidents] = useState(false);
   const offensive = scenario !== 'defense';
   const selectedEnemy = factionName === RANDOM
     ? null
@@ -88,8 +104,26 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
   const combatantTotal = defenders.muskets + defenders.bows + defenders.spears +
     defenders.unarmedMilitia + defenders.watchmen + defenders.hunters;
 
-  const setCount = (key: keyof BattleSimDefenderCounts, value: number) =>
-    setDefenders(prev => ({ ...prev, [key]: Math.max(0, Math.min(20, Math.round(value) || 0)) }));
+  const setCount = (key: keyof BattleSimDefenderCounts, value: number) => {
+    const next = Math.max(0, Math.min(20, Math.round(value) || 0));
+    setDefenders(prev => ({ ...prev, [key]: next }));
+    if (isMountableDefenderKey(key)) {
+      setMountedDefenders(prev => ({ ...prev, [key]: Math.min(prev[key], next) }));
+    }
+  };
+  const setMountedCount = (key: BattleSimMountableDefenderKey, value: number) =>
+    setMountedDefenders(prev => ({
+      ...prev,
+      [key]: Math.max(0, Math.min(defenders[key], Math.round(value) || 0)),
+    }));
+  const toggleSpecialResident = (id: SpecialResidentId) => {
+    setCombatSpecialResidents(prev => prev.includes(id)
+      ? prev.filter(candidate => candidate !== id)
+      : [...prev, id]);
+    if (combatSpecialResidents.includes(id)) {
+      setMountedSpecialResidents(prev => prev.filter(candidate => candidate !== id));
+    }
+  };
 
   const start = () => onStart({
     scenario,
@@ -109,7 +143,9 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
     enemyCompositionTemplateId: enemyFactionKnown ? enemyTemplateId : 'auto',
     enemyStratagem: enemyFactionKnown ? enemyStratagem : 'auto',
     enemyFlankRoute: offensive ? 'auto' : enemyFlankRoute,
-    includeCombatSpecialResidents: !offensive && includeCombatSpecialResidents,
+    combatSpecialResidents: defendersRandom ? RANDOM : combatSpecialResidents,
+    mountedDefenders: defendersRandom ? RANDOM : mountedDefenders,
+    mountedSpecialResidents: defendersRandom ? RANDOM : mountedSpecialResidents,
   });
 
   // boolean 항목용 3택(랜덤/예/아니오) 버튼 열
@@ -322,22 +358,6 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
             </label>
             {!offensive && (
             <label className="sim-field">
-              <span>전투 특수주민</span>
-              <div className="sim-choice-row">
-                <button
-                  className={`sim-choice${!includeCombatSpecialResidents ? ' active' : ''}`}
-                  onClick={() => setIncludeCombatSpecialResidents(false)}
-                >기본</button>
-                <button
-                  className={`sim-choice${includeCombatSpecialResidents ? ' active' : ''}`}
-                  onClick={() => setIncludeCombatSpecialResidents(true)}
-                >4명 포함</button>
-              </div>
-              <small className="sim-enemy-note">아라개·박돌개·단심·사야카를 추가해 이름 있는 조와 치료반 밀도를 시험합니다.</small>
-            </label>
-            )}
-            {!offensive && (
-            <label className="sim-field">
               <span>방책 공성</span>
               {triState(siege, setSiege, '공성', '없음')}
             </label>
@@ -398,17 +418,69 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
             </div>
             {!defendersRandom && (
               <div className="sim-count-grid">
-                {DEFENDER_FIELDS.filter(field => !offensive || field.key !== 'civilians').map(field => (
-                  <label className="sim-count" key={field.key}>
-                    <span>{offensive ? field.offensiveLabel ?? field.label : field.label}</span>
-                    <input
-                      type="number" min={0} max={field.max} value={defenders[field.key]}
-                      onChange={event => setCount(field.key, Number(event.target.value))}
-                    />
-                  </label>
-                ))}
+                {DEFENDER_FIELDS.filter(field => !offensive || field.key !== 'civilians').map(field => {
+                  const mountableKey = isMountableDefenderKey(field.key) ? field.key : null;
+                  return (
+                    <div className="sim-count" key={field.key} role="group" aria-label={`${field.label} 구성`}>
+                      <span>{offensive ? field.offensiveLabel ?? field.label : field.label}</span>
+                      <div className="sim-count-inputs">
+                        <label>
+                          <small>인원</small>
+                          <input
+                            aria-label={`${offensive ? field.offensiveLabel ?? field.label : field.label} 인원`}
+                            type="number" min={0} max={field.max} value={defenders[field.key]}
+                            onChange={event => setCount(field.key, Number(event.target.value))}
+                          />
+                        </label>
+                        {mountableKey && (
+                          <label>
+                            <small>기마</small>
+                            <input
+                              aria-label={`${offensive ? field.offensiveLabel ?? field.label : field.label} 기마 인원`}
+                              type="number" min={0} max={defenders[mountableKey]} value={mountedDefenders[mountableKey]}
+                              disabled={defenders[mountableKey] === 0}
+                              onChange={event => setMountedCount(mountableKey, Number(event.target.value))}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
+            <div className="sim-field sim-special-field">
+              <span>전투 특수주민 {defendersRandom ? '(개별 랜덤)' : ''}</span>
+              {defendersRandom ? (
+                <small className="sim-enemy-note">아라개·박돌개·단심·사야카의 참가와 전투 가능 인물의 기마 상태를 각각 추첨합니다.</small>
+              ) : (
+                <div className="sim-special-grid">
+                  {COMBAT_SPECIAL_OPTIONS.map(definition => {
+                    const selected = combatSpecialResidents.includes(definition.id);
+                    const mountable = definition.job === 'militia' || definition.job === 'watchman' || definition.job === 'hunter';
+                    const mounted = mountedSpecialResidents.includes(definition.id);
+                    return (
+                      <div className="sim-special-option" key={definition.id}>
+                        <button
+                          className={`sim-choice${selected ? ' active' : ''}`}
+                          title={definition.name}
+                          onClick={() => toggleSpecialResident(definition.id)}
+                        >{definition.badge} {definition.shortName}</button>
+                        {mountable && (
+                          <button
+                            className={`sim-choice sim-mount-choice${mounted ? ' active' : ''}`}
+                            disabled={!selected}
+                            onClick={() => setMountedSpecialResidents(prev => mounted
+                              ? prev.filter(candidate => candidate !== definition.id)
+                              : [...prev, definition.id])}
+                          >🐎 기마</button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             {!defendersRandom && offensive && combatantTotal < 2 && (
               <p className="sim-note danger">토벌대는 최소 2명이어야 합니다.</p>
             )}
@@ -434,8 +506,10 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
             )}
             <p className="sim-note">
               {offensive
-                ? '직업과 무기별 인원을 직접 편성합니다. 사냥꾼 수와 숙련은 맹수 추적·함정·준비점수에 반영됩니다.'
-                : '조총 수비대나 불랑기포대를 넣으면 화약이 자동으로 지급됩니다. 민병 방어를 고르면 피난 주민 일부가 소집 민병으로 합류합니다.'}
+                ? '직업과 무기별 인원을 직접 편성합니다. 의원은 후열에서 부상자를 치료합니다. 기마는 기동·돌격·추격에 유리합니다.'
+                : defendersRandom
+                  ? '인원뿐 아니라 의원·특수주민·군마 편성도 함께 무작위로 생성됩니다.'
+                  : '의원은 후열에서 부상자를 치료합니다. 기마는 상시 전력 증가가 아니라 돌격·기동·후퇴·추격과 우회로 이동에 이점을 줍니다.'}
             </p>
           </section>
         </div>

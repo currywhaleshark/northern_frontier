@@ -771,12 +771,48 @@ export type TacticalRouteSide = 'left' | 'right';
 export type TacticalRouteIntel = 'unknown' | 'suspected' | 'revealed';
 export type TacticalRouteControl = 'neutral' | 'defender' | 'raider' | 'contested';
 export type TacticalRouteTerrain = 'woodedRidge' | 'riverBank';
+export type TacticalRouteNode = 'approachGate' | 'middle' | 'storehouseGate';
+export type TacticalRoutePurpose = 'block' | 'move' | 'flank' | 'return' | 'transfer';
+
+export type TacticalStageId =
+  | { kind: 'zone'; zoneId: string }
+  | { kind: 'route'; routeId: string };
+
+export type TacticalStageDestination =
+  | { kind: 'zoneLane'; zoneId: string; line: TacticalFormationLine }
+  | { kind: 'routeNode'; routeId: string; node: TacticalRouteNode };
+
+export type TacticalStageMoveEffect =
+  | 'none'
+  | 'redeploy'
+  | 'advance'
+  | 'fallback'
+  | 'routeEntry'
+  | 'block'
+  | 'rearRaid'
+  | 'return'
+  | 'zoneTransfer';
+
+export interface TacticalStageMovePreview {
+  groupId: string;
+  origin: TacticalStageDestination;
+  destination: TacticalStageDestination;
+  command: TacticalCommandId | null;
+  purpose: TacticalRoutePurpose | null;
+  effect: TacticalStageMoveEffect;
+  powerPenalty: number;
+  travelRounds: number;
+  leavesFrontalBattle: boolean;
+  warning?: string;
+}
 
 export interface TacticalFlankRoute {
   id: string;
   side: TacticalRouteSide;
   label: string;
   terrain: TacticalRouteTerrain;
+  approachZoneId: 'approach';
+  interiorZoneId: 'storehouse';
   openedByDefender: boolean;
   openedByRaider: boolean;
   defenderIntel: TacticalRouteIntel;
@@ -785,10 +821,18 @@ export interface TacticalFlankRoute {
 
 export interface TacticalRouteTransit {
   routeId: string;
-  purpose: 'block' | 'raid';
+  purpose: TacticalRoutePurpose;
+  /** 물리 위치의 단일 표시 계약. step은 구버전 저장·라운드 판정 호환용이다. */
+  node: TacticalRouteNode;
+  /** 현재 명령이 끝나는 물리 노드. node와 같아도 출구 합류 명령이면 1라운드를 소비한다. */
+  destinationNode: TacticalRouteNode;
+  /** @deprecated TacticalRouteNode로 이관 중인 구형 진행도. */
   step: 0 | 1 | 2;
   destinationZoneId: string;
+  destinationLine: TacticalFormationLine;
   originZoneId: string;
+  /** 정상 명령으로 되돌아갈 출입구 구역. originZoneId는 경로 교전 패배 시 강제 퇴각 원점을 보존한다. */
+  returnZoneId?: string;
   visibleToDefender: boolean;
   startedRound: number;
   elapsedRounds: number;
@@ -956,6 +1000,7 @@ export interface TacticalCompositionTemplate {
 
 export type TacticalCommandId =
   | 'hold'
+  | 'attack'
   | 'volley'
   | 'ambush'
   | 'guardStorehouse'
@@ -969,6 +1014,8 @@ export type TacticalCommandId =
   | 'blockEscape'
   | 'openRetreat'
   | 'flankRoute';
+
+export type TacticalAmbushAftermath = 'fallback' | 'hold';
 
 export type TacticalFacing = 'towardEnemy' | 'towardRear';
 
@@ -1058,11 +1105,13 @@ export interface TacticalDefenderGroup {
   targetGroupId?: string;
   targetSource?: 'auto' | 'player';
   ambushed?: boolean;
+  /** 급습 공격 뒤 자동 이탈할지 현재 위치를 지킬지 정한다. 미지정 시 기존처럼 자동 이탈한다. */
+  ambushAftermath?: TacticalAmbushAftermath;
   commandable?: boolean;
   lockedZoneId?: string;
   huntOriginGroupId?: string;
   huntMovedRound?: number;
-  /** This group emerged behind the enemy through a flank route in this round. */
+  /** 이 교전에 적 후방에 도착했으며, 다른 구역으로 이동할 때까지 적 후방 위치를 유지한다. */
   rearRaidRound?: number;
   routeTransit?: TacticalRouteTransit;
 }
@@ -1161,6 +1210,10 @@ export type TacticalAnimationEventKind =
 
 export interface TacticalAnimationEvent {
   zoneId: string;
+  /** 우회로 전용 교전이면 재생 카메라가 포커스할 실제 경로 */
+  routeId?: string;
+  /** 우회로 전용 교전의 물리 노드 — 구버전 저장에는 없을 수 있다 */
+  routeNode?: TacticalRouteNode;
   kind: TacticalAnimationEventKind;
   text?: string;
   durationMs: number;

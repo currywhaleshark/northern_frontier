@@ -6,7 +6,7 @@ import { isJobUnlocked, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } fr
 import {
   BUILDING_DEFS, buildingCostFor, buildingFootprintTiles, canAfford, canAffordCost,
   cannonPlacementsUsed, canPlaceBuildingAt, canPlaceOn, clampPlotSide,
-  clearBuildingTiles, computeDefense, countBuilt, getBuilding, isBuildingUnlocked,
+  clearBuildingTiles, computeDefense, getBuilding, isBuildingUnlocked,
   footprintTilesOf, isPaddyEligibleTile, isPlotBuildingType, isSmithyProductUnlocked,
   occupyBuildingTiles, plotArea, SMITHY_PRODUCT_DEFS,
 } from './buildings';

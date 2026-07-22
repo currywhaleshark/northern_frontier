@@ -21,7 +21,7 @@ export interface BuildingActionItem {
 
 const NONE_ACTION: PointerAction = { kind: 'none', cursor: 'default', label: '' };
 
-function actionBuilding(state: GameState, building: Building): PointerAction {
+function actionBuilding(building: Building): PointerAction {
   const def = BUILDING_DEFS[building.type];
   return { kind: 'building', cursor: 'pointer', label: `${def.name} 작업`, buildingId: building.id };
 }
@@ -223,13 +223,13 @@ export function getPointerAction(
   if (selected?.kind === 'building') {
     const building = getBuilding(state, selected.id);
     if (!building) return actionInvalid('건물을 찾을 수 없습니다');
-    return tileBelongsToBuilding(state, tile, building) ? actionBuilding(state, building) : NONE_ACTION;
+    return tileBelongsToBuilding(state, tile, building) ? actionBuilding(building) : NONE_ACTION;
   }
 
   if (selected?.kind !== 'resident') {
     if (!explored) return NONE_ACTION;
     const building = tileBuilding(state, tile);
-    return building ? actionBuilding(state, building) : NONE_ACTION;
+    return building ? actionBuilding(building) : NONE_ACTION;
   }
 
   const resident = state.residents.find(r => r.id === selected.id);

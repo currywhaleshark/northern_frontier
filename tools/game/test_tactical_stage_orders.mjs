@@ -157,6 +157,22 @@ function closeTo(actual, expected, message) {
 }
 
 {
+  const state = battleSimulation.createBattleSimulation(simulationOptions({ seed: 2026072105 }));
+  const battle = enterCommand(state);
+  const group = battle.defenderGroups.find(candidate =>
+    candidate.commandable !== false && candidate.zoneId === 'wall' && candidate.line === 'front');
+  assert.ok(group);
+  const destination = { kind: 'zoneLane', zoneId: 'storehouse', line: 'front' };
+  const preview = tactical.tacticalStageMovePreview(state, group.id, destination);
+  assert.deepEqual([preview.effect, preview.command, preview.purpose, preview.leavesFrontalBattle], [
+    'fallback', 'fallback', null, false,
+  ], 'the unified Phase 4 API keeps frontal lane orders in the same preview contract');
+  assert.equal(tactical.applyTacticalStageMove(state, group.id, destination), null);
+  assert.equal(group.command, 'fallback');
+  assert.equal(group.zoneId, 'wall', 'unified frontal movement still waits for round resolution');
+}
+
+{
   const state = battleSimulation.createBattleSimulation(simulationOptions({
     scenario: 'banditLair',
     seed: 2026072103,

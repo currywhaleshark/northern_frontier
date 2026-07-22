@@ -20,7 +20,6 @@ import {
   applyLootLosses, damageBuildings, describeLootLosses, injure, killResidents, moraleShock,
 } from './raidDamage';
 import { changeRelation } from './relations';
-import { livingResidents } from './residents';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { activePredatorScoutIds } from './expeditionIntel';
 import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
@@ -37,7 +36,7 @@ import { applyTacticalDoctrineAi } from './tacticalDoctrine';
 import {
   acknowledgeAssaultReport, advanceAssaultPhase, applyAssaultReportPositions, assaultCommandPowerMultiplier,
   assaultCommandUnavailableReason,
-  assaultPreparationUnavailableReason, assignAssaultGroup, chooseDefaultAssaultCommands,
+  assaultPreparationUnavailableReason, chooseDefaultAssaultCommands,
   finishBanditLairTacticalAssault, resolveAssaultRound, setAssaultCommand,
   spendAssaultPreparationAction,
 } from './tacticalAssault';
@@ -58,15 +57,16 @@ import {
 } from './tacticalSupport';
 export { tacticalSupportUnitView } from './tacticalSupport';
 import {
+  applyTacticalRouteStageMove,
   advanceTacticalRouteTransits,
   createTacticalFlankRoutes,
   initializeEnemyTacticalRouteTransit,
   orderTacticalRouteRaid,
   resolveTacticalRouteRound,
   syncTacticalRouteVisibility,
-  tacticalFlankRoutePreparationUnavailableReason,
   tacticalRouteOrderUnavailableReason,
-  toggleTacticalFlankRoutePreparation,
+  tacticalRouteStageMovePreview,
+  tacticalRouteStageMoveUnavailableReason,
 } from './tacticalRoutes';
 import {
   applyAutoDeployTacticalGroups,
@@ -88,6 +88,7 @@ import type {
   PreparationActionId,
   ResourceId,
   TacticalAnimationEvent,
+  TacticalAmbushAftermath,
   TacticalBattle,
   TacticalBattleZone,
   TacticalCommandId,
@@ -100,6 +101,8 @@ import type {
   RaiderUnitType,
   TacticalRouteSide,
   TacticalRoundReport,
+  TacticalStageDestination,
+  TacticalStageMovePreview,
 } from './types';
 
 export {
@@ -146,14 +149,14 @@ export {
 } from './tacticalRoutes';
 
 const DEFENSE_SUPPORTED_COMMANDS: readonly TacticalCommandId[] = [
-  'hold', 'charge', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians',
-  'reinforceRear', 'fallback', 'advance', 'flankRoute',
+  'hold', 'attack', 'charge', 'volley', 'ambush', 'guardStorehouse', 'protectCivilians',
+  'reinforceRear', 'fallback', 'advance',
 ];
 const ASSAULT_SUPPORTED_COMMANDS: readonly TacticalCommandId[] = [
-  'hold', 'charge', 'volley', 'ambush', 'fallback', 'advance', 'arson', 'blockEscape', 'openRetreat',
+  'hold', 'attack', 'charge', 'volley', 'ambush', 'fallback', 'advance', 'arson', 'blockEscape', 'openRetreat',
 ];
 const HUNT_SUPPORTED_COMMANDS: readonly TacticalCommandId[] = [
-  'hold', 'charge', 'volley', 'ambush', 'advance', 'openRetreat',
+  'hold', 'attack', 'charge', 'volley', 'ambush', 'advance', 'openRetreat',
 ];
 const IMPLEMENTED_COMMANDS = new Set<TacticalCommandId>([...DEFENSE_SUPPORTED_COMMANDS, 'redeploy']);
 
@@ -226,11 +229,13 @@ function applyNextEngagementStates(battle: TacticalBattle): void {
     } else if (defender.command === 'fallback') {
       const rearZoneId = nextRearZoneId(battle, defender.zoneId);
       if (rearZoneId) defender.zoneId = rearZoneId;
+      defender.rearRaidRound = undefined;
       defender.pendingLine = undefined;
       defender.command = 'hold';
     } else if (defender.command === 'advance') {
       const forwardZoneId = nextForwardZoneId(battle, defender.zoneId);
       if (forwardZoneId) defender.zoneId = forwardZoneId;
+      defender.rearRaidRound = undefined;
       defender.pendingLine = undefined;
       defender.command = 'hold';
     } else if (defender.command === 'ambush' && !defender.ambushed) {
@@ -424,10 +429,24 @@ export function tacticalGroupTargetUnavailableReason(
     return '퇴각 중인 부대는 표적을 지정할 수 없습니다.';
   }
   const target = battle.raiderGroups.find(group => group.id === enemyGroupId);
-  if (!target || target.zoneId !== defender.zoneId || !activeRaider(target)) {
+  if (!target || !activeRaider(target)) {
     return '같은 전장 구역에 생존한 적 표적이 없습니다.';
   }
+  const defenderRoute = defender.routeTransit;
+  const targetRoute = target.routeTransit;
+  if (defenderRoute || targetRoute) {
+    if (!defenderRoute || !targetRoute || defenderRoute.routeId !== targetRoute.routeId) {
+      return '같은 우회로에 있는 적만 공격 대상으로 지정할 수 있습니다.';
+    }
+    const route = battle.flankRoutes?.find(candidate => candidate.id === defenderRoute.routeId);
+    return route?.defenderIntel === 'revealed'
+      ? null
+      : '아직 드러나지 않은 우회로 적은 공격 대상으로 지정할 수 없습니다.';
+  }
   if (!target.revealed) return '아직 드러나지 않은 적은 표적으로 지정할 수 없습니다.';
+  if (target.zoneId !== defender.zoneId) {
+    return '같은 전장 구역에 생존한 적 표적이 없습니다.';
+  }
   if (target.rearAssault && !tacticalRearAssaultIsEngaged(target)) {
     return '아직 실제 후방 교전이 시작되지 않은 급습대는 표적으로 지정할 수 없습니다.';
   }
@@ -1606,6 +1625,84 @@ export function applyTacticalStageOrder(
   return setTacticalCommand(state, preview.groupId, preview.command);
 }
 
+function resolvedTacticalStageMoveGroupId(battle: TacticalBattle, groupId: string): string {
+  return resolveTacticalDeploymentGroupId(battle, groupId) ?? groupId;
+}
+
+/**
+ * Unified Phase 4 movement contract for frontal lanes and physical route nodes.
+ * The legacy zone-only APIs remain available while the frontend migrates.
+ */
+export function tacticalStageMoveUnavailableReason(
+  state: Pick<GameState, 'tacticalBattle' | 'weather'>,
+  groupId: string,
+  destination: TacticalStageDestination,
+): string | null {
+  const battle = state.tacticalBattle;
+  if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  const resolvedGroupId = resolvedTacticalStageMoveGroupId(battle, groupId);
+  const group = battle.defenderGroups.find(candidate => candidate.id === resolvedGroupId);
+  if (!group) return '전술 부대를 찾을 수 없습니다.';
+  if (group.routeTransit || destination.kind === 'routeNode') {
+    return tacticalRouteStageMoveUnavailableReason(state, resolvedGroupId, destination);
+  }
+  return tacticalStageOrderUnavailableReason(battle, resolvedGroupId, {
+    zoneId: destination.zoneId,
+    line: destination.line,
+  });
+}
+
+export function tacticalStageMovePreview(
+  state: Pick<GameState, 'tacticalBattle' | 'weather'>,
+  groupId: string,
+  destination: TacticalStageDestination,
+): TacticalStageMovePreview | null {
+  const battle = state.tacticalBattle;
+  if (!battle) return null;
+  const resolvedGroupId = resolvedTacticalStageMoveGroupId(battle, groupId);
+  const group = battle.defenderGroups.find(candidate => candidate.id === resolvedGroupId);
+  if (!group) return null;
+  if (group.routeTransit || destination.kind === 'routeNode') {
+    return tacticalRouteStageMovePreview(state, resolvedGroupId, destination);
+  }
+  const preview = tacticalStageOrderPreview(battle, resolvedGroupId, {
+    zoneId: destination.zoneId,
+    line: destination.line,
+  });
+  if (!preview) return null;
+  return {
+    groupId: preview.groupId,
+    origin: { kind: 'zoneLane', ...preview.origin },
+    destination: { kind: 'zoneLane', ...preview.destination },
+    command: preview.command,
+    purpose: null,
+    effect: preview.command ?? 'none',
+    powerPenalty: preview.powerPenalty,
+    travelRounds: preview.travelRounds,
+    leavesFrontalBattle: false,
+    ...(preview.warning ? { warning: preview.warning } : {}),
+  };
+}
+
+export function applyTacticalStageMove(
+  state: GameState,
+  groupId: string,
+  destination: TacticalStageDestination,
+): string | null {
+  const battle = state.tacticalBattle;
+  if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  const resolvedGroupId = resolvedTacticalStageMoveGroupId(battle, groupId);
+  const group = battle.defenderGroups.find(candidate => candidate.id === resolvedGroupId);
+  if (!group) return '전술 부대를 찾을 수 없습니다.';
+  if (group.routeTransit || destination.kind === 'routeNode') {
+    return applyTacticalRouteStageMove(state, resolvedGroupId, destination);
+  }
+  return applyTacticalStageOrder(state, resolvedGroupId, {
+    zoneId: destination.zoneId,
+    line: destination.line,
+  });
+}
+
 export function setTacticalCommand(
   state: GameState,
   groupId: string,
@@ -1634,9 +1731,41 @@ export function setTacticalCommand(
     return result;
   }
   defender.command = command;
+  defender.ambushAftermath = undefined;
   if (command === 'reinforceRear') applyTacticalFacingChange(battle, defender, 'towardRear');
   if (command !== 'redeploy') defender.pendingLine = undefined;
   defender.commandSource = 'player';
+  normalizeTacticalGroupTargets(battle);
+  return null;
+}
+
+export function setTacticalAmbushAftermath(
+  state: GameState,
+  groupId: string,
+  targetGroupId: string,
+  aftermath: TacticalAmbushAftermath,
+): string | null {
+  const battle = state.tacticalBattle;
+  if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
+  if (battle.phase !== 'command' || battle.orientation === 'assault' || battle.assaultKind === 'predatorHunt') {
+    return '습격 방어 지휘 단계에서만 급습 후 행동을 정할 수 있습니다.';
+  }
+  if (aftermath !== 'fallback' && aftermath !== 'hold') return '알 수 없는 급습 후 행동입니다.';
+  const defender = battle.defenderGroups.find(candidate => candidate.id === groupId);
+  if (!defender) return '수비 그룹을 찾을 수 없습니다.';
+  const commandReason = tacticalCommandUnavailableReason(battle, defender, 'ambush');
+  if (commandReason) return commandReason;
+  const targetReason = tacticalGroupTargetUnavailableReason(battle, groupId, targetGroupId);
+  if (targetReason) return targetReason;
+  if (aftermath === 'fallback' && !nextRearZoneId(battle, defender.zoneId)) {
+    return '최후 방어선에서는 급습 후 더 물러날 수 없습니다.';
+  }
+  defender.targetGroupId = targetGroupId;
+  defender.targetSource = 'player';
+  defender.command = 'ambush';
+  defender.commandSource = 'player';
+  defender.pendingLine = undefined;
+  defender.ambushAftermath = aftermath;
   normalizeTacticalGroupTargets(battle);
   return null;
 }
@@ -1777,6 +1906,12 @@ export function tacticalCommandUnavailableReason(
     return rearAttackHere ? null : '같은 구역에 대응할 후방 급습대가 없습니다.';
   }
   if (command === 'hold') return null;
+  if (command === 'attack') {
+    if (!tacticalGroupCapabilities(defender).has('melee')) return '일반 공격은 근접 무장을 갖춘 부대만 수행할 수 있습니다.';
+    const enemyHere = battle.raiderGroups.some(group =>
+      group.zoneId === defender.zoneId && group.intent !== 'withdraw' && group.power > 0);
+    return enemyHere ? null : '공격할 적이 같은 구역에 없습니다.';
+  }
   if (command === 'volley') {
     return tacticalGroupCapabilities(defender).has('volley')
       ? null : '각궁 또는 화약이 준비된 조총이 필요합니다.';
@@ -2476,7 +2611,8 @@ export function resolveTacticalRound(state: GameState): string | null {
           const defender = engagement.defenders.find(group => group.id === defenderId);
           if (!defender) continue;
           defender.ambushed = false;
-          defender.command = 'fallback';
+          defender.command = defender.ambushAftermath === 'hold' ? 'hold' : 'fallback';
+          defender.ambushAftermath = undefined;
         }
         events.push(...exchange.afterConsequencesEvents);
       }
@@ -3032,6 +3168,7 @@ export function dismissTacticalBattleReport(state: GameState): void {
 export function tacticalCommandDescription(command: TacticalCommandId, ambushed = false): string {
   const descriptions: Record<TacticalCommandId, string> = {
     hold: '대열을 고수해 적게 피해를 주고받으며 전선을 안정시킵니다.',
+    attack: '근접대가 대열을 유지하며 정면으로 교전합니다. 피해와 위험은 표준입니다.',
     charge: '근접대가 강하게 돌격해 큰 피해를 주지만 자신과 후열 원거리 병종이 위험해집니다.',
     volley: '활과 조총 사격으로 적 기세를 꺾습니다. 악천후에는 약해집니다.',
     ambush: ambushed

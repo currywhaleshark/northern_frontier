@@ -9,7 +9,6 @@ import type {
   TacticalDefenderGroup,
   TacticalDeploymentPlacement,
   TacticalFeaturedResident,
-  TacticalFormationLine,
 } from './types';
 
 export interface TacticalDeploymentGroupView {
@@ -207,10 +206,19 @@ export function applyAutoDeployTacticalGroups(
   battle: TacticalBattle,
   forced?: TacticalBattle['deploymentForced'],
 ): void {
-  const placements = autoDeployTacticalGroups(battle);
+  const defaults = autoDeployTacticalGroups(battle);
+  const placements = Object.fromEntries(battle.defenderGroups.map(group => {
+    const current = battle.deploymentPlacements?.[group.id];
+    const keepRoutePlacement = current?.routeId != null && group.routeTransit?.routeId === current.routeId;
+    return [group.id, keepRoutePlacement ? current : defaults[group.id] ?? null];
+  })) as Record<string, TacticalDeploymentPlacement | null>;
   battle.deploymentPlacements = placements;
   battle.deploymentForced = forced;
-  for (const group of battle.defenderGroups) syncGroupPlacement(group, placements[group.id] ?? null);
+  for (const group of battle.defenderGroups) {
+    const placement = placements[group.id] ?? null;
+    if (placement?.routeId && group.routeTransit?.routeId === placement.routeId) continue;
+    syncGroupPlacement(group, placement);
+  }
   syncTacticalRouteControl(battle);
 }
 
@@ -433,6 +441,7 @@ export function splitTacticalGroup(state: GameState, groupId: string, detachCoun
     targetSource: 'auto',
     pendingLine: undefined,
     ambushed: false,
+    routeTransit: undefined,
   };
   battle.defenderGroups.push(detached);
   battle.deploymentPlacements ??= {};
@@ -494,6 +503,7 @@ export function splitFeaturedTacticalGroup(
     targetSource: 'auto',
     pendingLine: undefined,
     ambushed: false,
+    routeTransit: undefined,
   };
   battle.defenderGroups.push(detached);
   battle.deploymentPlacements ??= {};

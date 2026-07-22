@@ -1391,15 +1391,6 @@ html, body, #root {
 .insp-table { width: 100%; font-size: 12px; border-collapse: collapse; }
 .insp-table td { padding: 2px 4px; border-bottom: 1px dotted var(--border); }
 .insp-table td:first-child { color: var(--muted); width: 40%; }
-.trade-controls {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 58px auto minmax(0, 1fr);
-  gap: 4px;
-  align-items: center;
-  margin-top: 4px;
-}
-.trade-controls select,
-.trade-controls input,
 .tribute-reserve-controls input {
   min-width: 0;
   height: 26px;
@@ -1409,7 +1400,6 @@ html, body, #root {
   color: var(--text);
   font: inherit;
 }
-.trade-controls button { grid-column: 1 / -1; }
 .faction-entry {
   display: grid;
   grid-template-columns: 74px minmax(0, 1fr);
@@ -1851,6 +1841,28 @@ html, body, #root {
   gap: 3px;
 }
 .sim-count > span { color: #aeb6ba; font-size: 10px; }
+.sim-count-inputs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+.sim-count-inputs > label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.sim-count-inputs small {
+  color: #747e82;
+  font-size: 9px;
+}
+.sim-count-inputs input { min-width: 0; width: 100%; box-sizing: border-box; }
+.sim-special-field { margin-top: 10px; }
+.sim-special-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.sim-special-option { display: flex; min-width: 0; gap: 4px; }
+.sim-special-option > .sim-choice:first-child { flex: 1; }
+.sim-mount-choice { padding-inline: 7px; white-space: nowrap; }
+.sim-choice:disabled { cursor: not-allowed; opacity: 0.4; }
 .sim-note {
   margin: 10px 0 0;
   color: #8f979b;
@@ -2641,6 +2653,29 @@ html, body, #root {
 }
 .tactical-battlefield::-webkit-scrollbar { display: none; }
 .tactical-screen.hunt .tactical-battlefield { scroll-behavior: auto; }
+.tactical-stage-camera {
+  width: 100%;
+  height: 100%;
+}
+.tactical-stage-camera.transition-route-from-top,
+.tactical-stage-camera.transition-zone-from-top {
+  animation: tactical-stage-enter-from-top 380ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
+}
+.tactical-stage-camera.transition-route-from-bottom,
+.tactical-stage-camera.transition-zone-from-bottom {
+  animation: tactical-stage-enter-from-bottom 380ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
+}
+@keyframes tactical-stage-enter-from-top {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+@keyframes tactical-stage-enter-from-bottom {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tactical-stage-camera { animation: none !important; }
+}
 .tactical-strip {
   height: 100%;
   min-height: 390px;
@@ -2923,7 +2958,36 @@ html, body, #root {
   transform: translateY(var(--unit-dy, 0px)) scaleX(1) scale(calc(var(--raider-scale) * var(--unit-scale, 1)));
 }
 .tactical-rear-assault-rank.entering { animation: tactical-rear-assault-enter 820ms cubic-bezier(0.18, 0.75, 0.25, 1); }
-.tactical-rear-assault-rank.attacking { animation: tactical-rear-assault-strike 620ms ease-in-out; }
+.tactical-defender-rear-raid-rank {
+  position: absolute;
+  z-index: 8;
+  left: -2%;
+  right: 84%;
+  bottom: 30px;
+  min-height: 154px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding-right: 10px;
+  pointer-events: none;
+}
+.tactical-defender-rear-raid-rank:empty { display: none; }
+.tactical-defender-rear-raid-rank .tactical-field-group {
+  width: 132px;
+  flex: 0 0 132px;
+  scale: 0.78;
+  transform-origin: right bottom;
+  animation: tactical-defender-rear-raid-enter 820ms cubic-bezier(0.18, 0.75, 0.25, 1);
+  pointer-events: auto;
+}
+.tactical-defender-rear-raid-rank .tactical-defender {
+  transform: translateY(var(--unit-dy, 0px)) scaleX(-1) scale(calc(var(--defender-scale) * var(--unit-scale, 1)));
+}
+@keyframes tactical-defender-rear-raid-enter {
+  from { opacity: 0; transform: translate(-130px, -22px); }
+  55% { opacity: 1; }
+  to { opacity: 1; transform: translate(0, 0); }
+}
 .tactical-formation-lane { display: contents; }
 .tactical-formation-line-label,
 .tactical-contact-line { display: none; }
@@ -2931,11 +2995,6 @@ html, body, #root {
   from { opacity: 0; transform: translate(130px, -22px); }
   55% { opacity: 1; }
   to { opacity: 1; transform: translate(0, 0); }
-}
-@keyframes tactical-rear-assault-strike {
-  0%, 100% { transform: translateX(0); }
-  38% { transform: translateX(-34px); }
-  64% { transform: translateX(-24px); }
 }
 .tactical-raider-group {
   min-width: 0;
@@ -2951,6 +3010,7 @@ html, body, #root {
 }
 /* 적은 오른쪽을 향하므로 flex 열의 왼쪽 끝이 후열이다. 화포대는 항상 그 후열에 둔다. */
 .tactical-raider-group.unit-court-artillery { order: -1; }
+.tactical-unit-label,
 .tactical-raider-group > span,
 .tactical-field-group > span {
   padding: 3px 7px;
@@ -3407,8 +3467,20 @@ html, body, #root {
   gap: 4px;
   padding: 6px 8px 5px;
 }
-.tactical-command-option,
-.tactical-command-more-toggle {
+.tactical-route-return-control {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 0;
+  border-top: 1px solid rgba(122, 132, 136, 0.22);
+}
+.tactical-route-return-control small {
+  color: #899397;
+  font-size: 9px;
+  line-height: 1.25;
+}
+.tactical-command-option {
   min-width: 0;
   border: 1px solid #454c4f;
   border-radius: 4px;
@@ -3428,9 +3500,7 @@ html, body, #root {
 }
 .tactical-command-option.quick { min-height: 29px; color: #ead8ac; font-size: 11px; }
 .tactical-command-option:hover,
-.tactical-command-option:focus-visible,
-.tactical-command-more-toggle:hover,
-.tactical-command-more-toggle:focus-visible {
+.tactical-command-option:focus-visible {
   border-color: #a57e3e;
   background: rgba(210, 169, 88, 0.12);
   outline: none;
@@ -3441,7 +3511,6 @@ html, body, #root {
   color: #f4dfa8;
   box-shadow: inset 2px 0 #d2a958;
 }
-.tactical-command-more-toggle { min-height: 29px; padding: 3px 7px; color: #aeb6b7; }
 .tactical-command-popover-message { margin: 0; padding: 10px; color: #aeb6b7; }
 .tactical-unit-line {
   min-height: 120px;
@@ -3594,7 +3663,6 @@ html, body, #root {
   display: flex;
   overflow: visible;
 }
-.tactical-minimap-strip.assault .tactical-minimap-strip-map { flex-direction: row-reverse; }
 .tactical-minimap-segment {
   position: relative;
   min-width: 0;
@@ -3605,8 +3673,6 @@ html, body, #root {
   cursor: pointer;
 }
 .tactical-minimap-segment:first-child { border-left-width: 1px; }
-.tactical-minimap-strip.assault .tactical-minimap-segment:first-child { border-left-width: 0; }
-.tactical-minimap-strip.assault .tactical-minimap-segment:last-child { border-left-width: 1px; }
 .tactical-minimap-segment:hover,
 .tactical-minimap-segment:focus-visible { background: rgba(55, 51, 40, 0.9); outline: none; }
 .tactical-minimap-segment.viewed { z-index: 1; border-color: #d0a651; box-shadow: inset 0 0 0 1px #d0a651; }
@@ -3757,8 +3823,6 @@ html, body, #root {
 .tactical-minimap-prep.bait { fill: #e0a33f; stroke: #f1c16e; }
 .tactical-minimap-prep.trap { fill: #7f9bb3; stroke: #b5cbdb; }
 .tactical-minimap-tracks { fill: #8f979b; }
-.tactical-caption {
-}
 .tactical-caption {
   position: absolute;
   z-index: 12;
@@ -3976,6 +4040,35 @@ html, body, #root {
   box-shadow: inset 0 0 22px rgba(216, 180, 94, 0.2);
 }
 .tactical-zone.formation-view .tactical-formation-lane.deploy-anchor-blocked { opacity: 0.6; }
+
+.tactical-zone-move-edge {
+  position: absolute;
+  top: 24%;
+  bottom: 18%;
+  z-index: 86;
+  width: 54px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: #ead38e;
+  background: rgba(23, 28, 30, 0.78);
+  border: 1px dashed rgba(234, 211, 142, 0.7);
+  pointer-events: auto;
+}
+.tactical-zone-move-edge.left { left: 8px; }
+.tactical-zone-move-edge.right { right: 8px; }
+.tactical-zone-move-edge b { font-size: 22px; }
+.tactical-zone-move-edge span { font-size: 11px; font-weight: 800; }
+.tactical-zone-move-edge small { font-size: 9px; color: #c9c4b4; writing-mode: vertical-rl; }
+.tactical-zone-move-edge.deploy-anchor-hover {
+  border-style: solid;
+  color: #9be6a4;
+  background: rgba(45, 80, 50, 0.94);
+  box-shadow: 0 0 16px rgba(127, 217, 138, 0.42);
+}
+.tactical-zone-move-edge.deploy-anchor-blocked { opacity: 0.38; }
 .tactical-zone.formation-view .tactical-formation-lane > .tactical-deploy-lane-ghost {
   opacity: 0.6;
   filter: saturate(0.7);
@@ -4123,15 +4216,65 @@ html, body, #root {
 .tactical-minimap-route.control-raider .tactical-minimap-route-line { border-top-color: #c4694f; }
 .tactical-minimap-route.control-contested .tactical-minimap-route-line { border-top-color: #e8b45f; }
 .tactical-minimap-route-suspect { color: #e8b45f; font-weight: 700; }
-.tactical-minimap-route-steps { display: flex; gap: 8px; }
-.tactical-minimap-route-step {
-  display: flex;
-  gap: 2px;
-  min-width: 10px;
-  min-height: 8px;
-  align-items: center;
-  border-bottom: 1px solid #55606675;
+.tactical-minimap-route-row {
+  width: 224px;
+  min-height: 22px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
+.tactical-minimap-route.opened {
+  position: relative;
+  grid-column: 1 / span 3;
+  width: auto;
+  min-height: 22px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(143, 151, 155, 0.38);
+  background: rgba(28, 33, 36, 0.88);
+}
+.tactical-minimap-route.opened:hover,
+.tactical-minimap-route.opened:focus-visible {
+  background: rgba(55, 51, 40, 0.92);
+  outline: none;
+}
+.tactical-minimap-route.opened.viewed {
+  border-color: #d0a651;
+  box-shadow: inset 0 0 0 1px #d0a651;
+}
+.tactical-minimap-route.opened .tactical-minimap-route-line { display: none; }
+.tactical-minimap-route-zone {
+  position: relative;
+  width: 100%;
+  height: 20px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.tactical-minimap-route-node {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-left: 1px solid rgba(143, 151, 155, 0.22);
+}
+.tactical-minimap-route-node:first-child { border-left: 0; }
+.tactical-minimap-route-control-text {
+  grid-column: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2px;
+  color: #9fa9ad;
+  font-size: 8px;
+  line-height: 1.1;
+  text-align: center;
+}
+.tactical-minimap-route-control-text.control-defender { color: #9fbd97; }
+.tactical-minimap-route-control-text.control-raider { color: #df927e; }
+.tactical-minimap-route-control-text.control-contested { color: #e8c477; }
+.tactical-minimap-route.opened.control-defender { background: rgba(49, 70, 48, 0.68); }
+.tactical-minimap-route.opened.control-raider { background: rgba(83, 40, 35, 0.68); }
+.tactical-minimap-route.opened.control-contested { background: rgba(78, 62, 34, 0.72); }
 .tactical-route-ribbon {
   position: absolute;
   top: 8px;
@@ -4203,6 +4346,183 @@ html, body, #root {
   background: rgba(216, 180, 94, 0.16);
 }
 .tactical-route-ribbon-row.deploy-anchor-blocked { opacity: 0.55; }
+.tactical-route-stage {
+  width: 100%; min-width: 100%; height: 100%; position: relative; overflow: hidden;
+  display: grid; grid-template-rows: auto 1fr; color: #e9dfc4;
+  isolation: isolate;
+  background-repeat: no-repeat;
+  background: linear-gradient(180deg, rgba(19, 28, 27, 0.2), rgba(12, 16, 16, 0.82)),
+    radial-gradient(ellipse at center, #465448 0%, #252f2b 62%, #151b19 100%);
+}
+.tactical-route-stage.terrain-riverBank {
+  background: linear-gradient(180deg, rgba(19, 28, 32, 0.18), rgba(12, 16, 19, 0.84)),
+    radial-gradient(ellipse at center, #4b5d61 0%, #2d3b3d 58%, #182124 100%);
+}
+.tactical-route-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(13, 18, 18, 0.08) 0%, rgba(12, 16, 16, 0.18) 62%, rgba(8, 11, 11, 0.42) 100%);
+}
+.tactical-route-stage > header { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr; align-items: center; padding: 12px 46px; background: rgba(13, 17, 16, 0.72); border-bottom: 1px solid #667060; }
+.tactical-route-stage > header div { display: grid; text-align: center; }
+.tactical-route-stage > header strong { color: #f0dca8; font-size: 15px; }
+.tactical-route-stage > header span { color: #b6bba9; font-size: 10px; }
+.tactical-route-stage > header button { border: 1px solid #6f765f; background: #262d28; color: #ddd3b7; padding: 6px 9px; cursor: pointer; }
+.tactical-route-exit-orders { position: relative; z-index: 5; display: flex; justify-content: center; gap: 6px; padding: 5px 10px; background: rgba(13, 17, 16, 0.58); }
+.tactical-route-exit-order { display: grid; min-width: 118px; padding: 4px 7px; border: 1px solid #687064; border-radius: 3px; background: rgba(33, 39, 35, 0.9); color: #e3d8b8; cursor: pointer; text-align: center; }
+.tactical-route-exit-order strong { font-size: 10px; }
+.tactical-route-exit-order small { color: #aeb5a7; font-size: 8px; }
+.tactical-route-exit-order.target-wall { border-color: #9e7057; color: #f0c18e; }
+.tactical-route-exit-order.deploy-anchor-valid { outline: 2px dashed rgba(127, 217, 138, 0.78); outline-offset: 1px; }
+.tactical-route-exit-order.deploy-anchor-hover { outline-style: solid; background: rgba(45, 80, 50, 0.96); box-shadow: 0 0 14px rgba(127, 217, 138, 0.4); }
+.tactical-route-exit-order.deploy-anchor-blocked,
+.tactical-route-exit-order:disabled { cursor: default; opacity: 0.4; }
+.tactical-route-stage-track { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; align-items: end; padding: 0 6% 42px; position: relative; z-index: 1; }
+.tactical-route-stage-track::before { content: ''; position: absolute; left: 12%; right: 12%; bottom: 117px; border-top: 5px double rgba(193, 174, 121, 0.42); }
+.tactical-route-stage-node { position: relative; z-index: 1; height: 154px; box-sizing: border-box; display: grid; grid-template-rows: auto 1fr; gap: 5px; min-width: 0; padding: 7px; border: 1px solid rgba(188, 174, 132, 0.44); background: rgba(17, 22, 20, 0.58); }
+.tactical-route-stage-node[data-deploy-anchor] { outline: 1px dashed rgba(224, 189, 98, 0.65); outline-offset: -5px; }
+.tactical-route-stage-node[data-deploy-anchor]::after { content: '부대를 끌어 차단 배치'; align-self: end; text-align: center; color: #d8bd78; font-size: 9px; }
+.tactical-route-stage-node[data-route-command-anchor]::after { content: '이동 목적지'; color: #8fd39a; }
+.tactical-route-stage-node.deploy-anchor-valid { outline: 2px dashed rgba(127, 217, 138, 0.72); outline-offset: -5px; }
+.tactical-route-stage-node.deploy-anchor-hover { outline-style: solid; background: rgba(55, 92, 61, 0.44); box-shadow: inset 0 0 18px rgba(127, 217, 138, 0.25); }
+.tactical-route-stage-node.deploy-anchor-blocked { opacity: 0.48; }
+.tactical-route-stage-node-label { text-align: center; color: #d9c987; font-size: 11px; font-weight: 700; }
+.tactical-route-stage-groups { min-width: 0; display: flex; align-items: flex-end; justify-content: center; gap: 3px; }
+.tactical-route-stage-group { position: relative; flex: 0 1 148px; width: min(100%, 148px); min-width: 0; min-height: 126px; border: 0; background: transparent; color: #e5dcc2; padding: 0; cursor: pointer; overflow: visible; }
+.tactical-route-stage-group.raider { order: 1; }
+.tactical-route-stage-group.defender { order: 2; }
+.tactical-route-stage-formation { position: absolute; inset: 0 0 27px; }
+.tactical-route-stage-formation.tactical-unit-line,
+.tactical-route-stage-formation.tactical-raider-sprites { min-height: 0; height: auto; display: block; }
+.tactical-route-stage-unit-slot { position: absolute; left: 50%; bottom: calc(8px + var(--route-unit-y)); width: 84px; height: 120px; transform: translateX(calc(-50% + var(--route-unit-x))) scale(0.66); transform-origin: center bottom; }
+.tactical-route-stage-unit-slot .tactical-sprite { position: absolute; left: 50%; bottom: 0; }
+.tactical-route-stage-unit-slot .tactical-defender {
+  transform: translateX(-50%) translateY(var(--unit-dy, 0px)) scale(calc(var(--defender-scale) * var(--unit-scale, 1)));
+}
+.tactical-route-stage-unit-slot .tactical-raider {
+  transform: translateX(-50%) translateY(var(--unit-dy, 0px)) scaleX(-1) scale(var(--unit-scale, 1));
+}
+.tactical-route-stage-unit-slot .tactical-court-raider {
+  transform: translateX(-50%) translateY(var(--unit-dy, 0px)) scaleX(-1) scale(calc(var(--raider-scale) * var(--unit-scale, 1)));
+}
+.tactical-route-stage-group > .tactical-unit-label { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); box-sizing: border-box; max-width: 146px; font-size: 9px; text-align: center; white-space: nowrap; }
+.tactical-route-stage-group.defender:not(:disabled):hover > .tactical-unit-label { box-shadow: 0 0 0 1px #b9944f; }
+.tactical-route-stage-group.raider.targetable { cursor: crosshair; }
+.tactical-route-stage-group.raider.targetable:hover > .tactical-unit-label,
+.tactical-route-stage-group.raider.targetable:focus-visible > .tactical-unit-label { box-shadow: 0 0 0 1px #d46d59; }
+.tactical-state-badge.route-blocking { color: #79c7ba; background: rgba(34, 72, 67, 0.82); }
+.tactical-state-badge.route-moving { color: #d7caa3; background: rgba(61, 58, 42, 0.88); }
+.tactical-state-badge.route-engaged { color: #e8b45f; background: rgba(83, 54, 25, 0.82); }
+.tactical-route-stage-group:disabled { cursor: default; }
+.tactical-route-stage-group.stage-dragging { opacity: 0.5; }
+.tactical-route-stage-empty { align-self: center; text-align: center; color: #818a7e; font-size: 10px; }
+.tactical-route-stage.field-layout .tactical-route-stage-track::before { display: none; }
+.tactical-route-stage.field-layout .tactical-route-stage-node { border: 0; background: transparent; }
+.tactical-route-stage.field-layout .tactical-route-stage-node.deploy-anchor-hover { background: rgba(55, 92, 61, 0.36); }
+.tactical-route-stage.field-layout .tactical-route-stage-node-label,
+.tactical-route-stage.field-layout .tactical-route-stage-empty { display: none; }
+/* 우회로는 적이 왼쪽, 아군이 오른쪽에서 서로 마주본다. 공격전의 전역 반전 규칙보다 우선한다. */
+.tactical-screen.assault .tactical-route-stage .tactical-defender {
+  transform: translateX(-50%) translateY(var(--unit-dy, 0px)) scale(calc(var(--defender-scale) * var(--unit-scale, 1)));
+}
+.tactical-screen.assault .tactical-route-stage .tactical-raider {
+  transform: translateX(-50%) translateY(var(--unit-dy, 0px)) scaleX(-1) scale(var(--unit-scale, 1));
+}
+.tactical-screen.assault .tactical-route-stage .tactical-court-raider {
+  transform: translateX(-50%) translateY(var(--unit-dy, 0px)) scaleX(-1) scale(calc(var(--raider-scale) * var(--unit-scale, 1)));
+}
+.tactical-route-stage.event-melee .tactical-route-stage-group.raider.melee-attacker { animation: tactical-charge-right calc(520ms * var(--tactical-playback-scale)) ease 1; }
+.tactical-route-stage.event-melee .tactical-route-stage-group.defender.melee-attacker { animation: tactical-charge-left calc(520ms * var(--tactical-playback-scale)) ease 1; }
+.tactical-route-stage.event-casualty .tactical-route-stage-group.casualty-hit { animation: tactical-casualty calc(520ms * var(--tactical-playback-scale)) ease; }
+.tactical-route-stage.event-ambush .tactical-route-stage-group.raider { animation: tactical-hit calc(420ms * var(--tactical-playback-scale)) ease 2; }
+.tactical-route-stage .tactical-route-stage-group.firing { animation: tactical-recoil calc(320ms * var(--tactical-playback-scale)) ease; }
+.tactical-route-stage .tactical-route-stage-group.raider.firing { animation-name: tactical-assault-recoil; }
+.tactical-route-stage .tactical-route-stage-group.withdrawing { animation: tactical-break calc(650ms * var(--tactical-playback-scale)) ease forwards; }
+.tactical-route-stage-unit-slot .tactical-defender.falling { animation-name: tactical-route-defender-fall; }
+.tactical-route-stage-unit-slot .tactical-raider.falling,
+.tactical-route-stage-unit-slot .tactical-court-raider.falling { animation-name: tactical-route-raider-fall; }
+@keyframes tactical-route-defender-fall {
+  0% { transform: translateX(-50%) translateY(var(--unit-dy, 0px)) scale(calc(var(--defender-scale, 1) * var(--unit-scale, 1))) rotate(0); opacity: 1; }
+  38% { transform: translateX(-50%) translateY(var(--unit-dy, 0px)) scale(calc(var(--defender-scale, 1) * var(--unit-scale, 1))) rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(var(--unit-dy, 0px)) scale(calc(var(--defender-scale, 1) * var(--unit-scale, 1))) rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
+}
+@keyframes tactical-route-raider-fall {
+  0% { transform: translateX(-50%) translateY(var(--unit-dy, 0px)) scaleX(-1) scale(calc(var(--raider-scale, 1) * var(--unit-scale, 1))) rotate(0); opacity: 1; }
+  38% { transform: translateX(-50%) translateY(var(--unit-dy, 0px)) scaleX(-1) scale(calc(var(--raider-scale, 1) * var(--unit-scale, 1))) rotate(14deg) translateY(3px); filter: sepia(1) saturate(3.4); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(var(--unit-dy, 0px)) scaleX(-1) scale(calc(var(--raider-scale, 1) * var(--unit-scale, 1))) rotate(76deg) translateY(16px); filter: sepia(1) saturate(2); opacity: 0; }
+}
+.tactical-route-stage-exit {
+  position: absolute;
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 5px 1px 2px;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(24, 29, 27, 0.78);
+  color: #d9bd6d;
+  filter: drop-shadow(0 2px 2px rgba(9, 12, 12, 0.82));
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tactical-route-stage-exit.position-upper { top: -38px; transform: translateX(-50%); }
+.tactical-route-stage-exit.position-lower { bottom: -38px; transform: translateX(-50%); }
+.tactical-route-stage-node.node-storehouseGate .tactical-route-stage-exit { left: 36%; }
+.tactical-route-stage-exit span { color: #efe2bd; font-size: 9px; font-weight: 700; }
+.tactical-route-stage-exit:hover:not(:disabled),
+.tactical-route-stage-exit:focus-visible { background: rgba(49, 49, 36, 0.94); color: #f0cf73; }
+.tactical-route-stage-exit.deploy-anchor-valid { outline: 2px dashed rgba(127, 217, 138, 0.78); outline-offset: 2px; }
+.tactical-route-stage-exit.deploy-anchor-hover { outline-style: solid; color: #9be6a4; background: rgba(45, 80, 50, 0.96); box-shadow: 0 0 14px rgba(127, 217, 138, 0.4); }
+.tactical-route-stage-exit.deploy-anchor-blocked { opacity: 0.38; }
+.tactical-route-stage-exit:focus-visible { outline: 2px solid #e0bd62; outline-offset: 2px; }
+.tactical-route-stage-exit:disabled { cursor: default; opacity: 0.48; }
+.tactical-route-order-arrow-layer { z-index: 35; }
+.tactical-route-gates { position: absolute; inset: 0; z-index: 12; pointer-events: none; }
+.tactical-route-gate {
+  position: absolute;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 5px 2px 2px;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(24, 29, 27, 0.72);
+  color: #d9bd6d;
+  filter: drop-shadow(0 2px 2px rgba(9, 12, 12, 0.82));
+  pointer-events: auto;
+  cursor: pointer;
+}
+.tactical-route-gate.position-upper { top: 63%; transform: translate(-50%, -50%); }
+.tactical-route-gate.position-lower { bottom: 8px; transform: translateX(-50%); }
+.tactical-route-gate.deploy-anchor-valid {
+  outline: 2px dashed rgba(216, 180, 94, 0.72);
+  outline-offset: 2px;
+}
+.tactical-route-gate.deploy-anchor-hover {
+  outline: 2px solid #f0c967;
+  outline-offset: 3px;
+  background: rgba(86, 73, 39, 0.94);
+  box-shadow: 0 0 14px rgba(216, 180, 94, 0.38);
+}
+.tactical-route-gate.deploy-anchor-blocked { opacity: 0.42; }
+.tactical-route-gate-arrow { display: grid; place-items: center; width: 36px; height: 36px; color: currentColor; }
+.tactical-route-gate-copy { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.05; white-space: nowrap; }
+.tactical-route-gate-copy strong { color: #efe2bd; font-size: 9px; }
+.tactical-route-gate-copy small { margin-top: 2px; color: #b8b9a8; font-size: 8px; }
+.tactical-route-gate:hover:not(:disabled),
+.tactical-route-gate:focus-visible { background: rgba(49, 49, 36, 0.9); color: #f0cf73; }
+.tactical-route-gate:focus-visible { outline: 2px solid #e0bd62; outline-offset: 2px; }
+.tactical-route-gate.display-suspected { opacity: 0.72; }
+.tactical-route-gate.display-suspected .tactical-route-gate-arrow { filter: grayscale(0.45); }
+.tactical-route-gate:disabled { cursor: default; opacity: 0.48; }
+.tactical-route-gate.control-raider { color: #c67964; }
+.tactical-route-gate.control-contested { color: #e0b458; }
 .tactical-route-engagement {
   font-style: normal;
   animation: tactical-route-advance-pulse 900ms ease 2;
@@ -4568,14 +4888,6 @@ html, body, #root {
   background: #292f33;
   color: var(--text);
   cursor: pointer;
-}
-@keyframes tactical-command-board-emphasis {
-  0% { box-shadow: 0 0 0 0 rgba(208, 166, 81, 0.76); }
-  100% { box-shadow: 0 0 0 7px rgba(208, 166, 81, 0); }
-}
-.tactical-command-bar.command-board-emphasis {
-  border-radius: 4px;
-  animation: tactical-command-board-emphasis 600ms ease-out 2;
 }
 .tactical-zone-buttons button { min-height: 32px; padding: 4px; font-size: 10px; }
 .tactical-line-toggle { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
@@ -5545,8 +5857,7 @@ html, body, #root {
   .tactical-command-popover::before,
   .tactical-command-popover::after { display: none; }
   .tactical-command-popover-segment button { min-height: 32px; }
-  .tactical-command-option.quick,
-  .tactical-command-more-toggle { min-height: 38px; }
+  .tactical-command-option.quick { min-height: 38px; }
 }
 
 @media (max-height: 650px) {
@@ -5626,7 +5937,6 @@ html, body, #root {
   border-bottom: 1px solid #3f4649;
 }
 .battle-report-outcome.victory { background: #263b2d; }
-.battle-report-outcome.costly { background: #3a3527; }
 .battle-report-outcome.defeat { background: #402a28; }
 .battle-report-outcome-copy {
   display: grid;
@@ -6106,7 +6416,6 @@ html, body, #root {
 
 .muted { color: var(--muted); }
 .small { font-size: 11px; }
-.victory-note { font-size: 11px; color: var(--muted); line-height: 1.5; }
 
 /* ── 돌발 사건·기물함 ── */
 .incident-panel .panel-title { font-size: 12px; }

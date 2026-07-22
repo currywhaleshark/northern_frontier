@@ -6,7 +6,7 @@ import { COMBAT_WEAPON_NAMES } from '../../game/weapons';
 import { filteredResidents, type ResidentSort, type ResidentStatusFilter } from '../../ui/residentListPresentation';
 import type { GameState, JobId, Resident } from '../../game/types';
 
-function residentRoleLabel(state: GameState, resident: Resident): string {
+function residentRoleLabel(resident: Resident): string {
   if (resident.stage) return LIFE_STAGE_NAMES[resident.stage];
   return JOB_NAMES[resident.job];
 }
@@ -128,7 +128,7 @@ export function ResidentsWindow({
           >
             <span>{resident.special ? '★ ' : ''}{resident.name}{resident.sick ? ' 🤒' : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</span>
             <span className="muted">{resident.alive
-              ? `${resident.cartEquipped ? '🛒 ' : ''}${residentRoleLabel(state, resident)} · ${workplaceLabel(state, resident)}${state.weaponAssignments[resident.id]
+              ? `${resident.cartEquipped ? '🛒 ' : ''}${residentRoleLabel(resident)} · ${workplaceLabel(state, resident)}${state.weaponAssignments[resident.id]
                 ? ` · ${COMBAT_WEAPON_NAMES[state.weaponAssignments[resident.id]!]}`
                 : ''}${state.mountAssignments[resident.id] ? ' · 🐎 기마' : ''}`
               : '사망'}</span>
