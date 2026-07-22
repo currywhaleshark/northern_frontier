@@ -1,0 +1,70 @@
+import assert from 'node:assert/strict';
+import { Buffer } from 'node:buffer';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+
+const assetSource = readFileSync(new URL('../../src/render/residentHaulerAssets.ts', import.meta.url), 'utf8');
+const assetOutput = ts.transpileModule(assetSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ES2022,
+    target: ts.ScriptTarget.ES2022,
+  },
+}).outputText;
+const assetModuleUrl = `data:text/javascript;base64,${Buffer.from(assetOutput).toString('base64')}`;
+const {
+  RESIDENT_HAULER_CART_LOCOMOTION_SHEET,
+  RESIDENT_HAULER_LOCOMOTION_SHEET,
+  haulerCartLocomotionSourceRect,
+  haulerLocomotionFrameIndex,
+  haulerLocomotionSourceRect,
+} = await import(assetModuleUrl);
+
+assert.deepEqual(RESIDENT_HAULER_LOCOMOTION_SHEET, {
+  frameSize: 40,
+  columns: 3,
+  rows: 2,
+  frameDurationMs: 140,
+  src: '/assets/resident-hauler-locomotion-v1.png',
+});
+assert.deepEqual(RESIDENT_HAULER_CART_LOCOMOTION_SHEET, {
+  frameSize: 64,
+  columns: 3,
+  rows: 2,
+  frameDurationMs: 140,
+  src: '/assets/resident-hauler-cart-locomotion-v1.png',
+});
+
+assert.equal(haulerLocomotionFrameIndex(false, 420), 0);
+assert.deepEqual(
+  [0, 140, 280, 420, 560].map(elapsed => haulerLocomotionFrameIndex(true, elapsed)),
+  [0, 1, 0, 2, 0],
+);
+assert.deepEqual(haulerLocomotionSourceRect('female', true, 420), { sx: 80, sy: 40, sw: 40, sh: 40 });
+assert.deepEqual(haulerCartLocomotionSourceRect('male', true, 140), { sx: 64, sy: 0, sw: 64, sh: 64 });
+
+const dimensions = [
+  ['resident-hauler-locomotion-v1.png', 120, 80],
+  ['resident-hauler-cart-locomotion-v1.png', 192, 128],
+];
+for (const [filename, width, height] of dimensions) {
+  const png = readFileSync(new URL(`../../public/assets/${filename}`, import.meta.url));
+  assert.equal(png.readUInt32BE(16), width, `${filename} width`);
+  assert.equal(png.readUInt32BE(20), height, `${filename} height`);
+}
+
+const rendererSource = readFileSync(new URL('../../src/render/renderer.ts', import.meta.url), 'utf8');
+assert.match(rendererSource, /cartEquipped:\s*r\.cartEquipped/,
+  'renderer passes the equipped-cart state to resident sprites');
+
+const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
+assert.match(atlasSource, /p\.job\s*===\s*['"]hauler['"]\s*&&\s*p\.cartEquipped/,
+  'equipped haulers use the cart sheet');
+assert.match(atlasSource, /residentHaulerLocomotionSheet\s*&&\s*p\.job\s*===\s*['"]hauler['"]/,
+  'cartless adult haulers use the jige sheet');
+
+const youthBranch = atlasSource.indexOf('newContentResidentSheet && newContentRect');
+const haulerBranch = atlasSource.indexOf("p.job === 'hauler'");
+assert.ok(youthBranch >= 0 && haulerBranch > youthBranch,
+  'youth and child resident rendering remains ahead of adult hauler rendering');
+
+console.log('resident hauler sprite tests passed');

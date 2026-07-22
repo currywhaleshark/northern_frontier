@@ -121,6 +121,50 @@ import {
   CENTER_PROMOTION_SHEET,
   centerPromotionSourceRect,
 } from './centerPromotionAssets';
+import {
+  RESIDENT_WOODCUTTER_LOAD_SHEET,
+  RESIDENT_WOODCUTTER_LOCOMOTION_SHEET,
+  RESIDENT_WOODCUTTER_WORK_SHEET,
+  woodcutterLoadSourceRect,
+  woodcutterLocomotionSourceRect,
+  woodcutterWorkSourceRect,
+} from './residentWorkAssets';
+import {
+  RESIDENT_HUNTER_HUNT_SHEET,
+  RESIDENT_HUNTER_LOAD_SHEET,
+  RESIDENT_HUNTER_LOCOMOTION_SHEET,
+  hunterHuntSourceRect,
+  hunterLoadSourceRect,
+  hunterLocomotionSourceRect,
+} from './residentHunterAssets';
+import {
+  RESIDENT_HAULER_CART_LOCOMOTION_SHEET,
+  RESIDENT_HAULER_LOCOMOTION_SHEET,
+  haulerCartLocomotionSourceRect,
+  haulerLocomotionSourceRect,
+} from './residentHaulerAssets';
+import {
+  RESIDENT_FARMER_HARVEST_SHEET,
+  RESIDENT_FARMER_OX_PLOW_SHEET,
+  RESIDENT_FARMER_TILL_SHEET,
+  farmerHarvestSourceRect,
+  farmerOxPlowSourceRect,
+  farmerTillSourceRect,
+} from './residentFarmerAssets';
+import {
+  RESIDENT_BUILDER_LOCOMOTION_SHEET,
+  RESIDENT_BUILDER_WORK_SHEET,
+  builderLocomotionSourceRect,
+  builderWorkSourceRect,
+} from './residentBuilderAssets';
+import {
+  RESIDENT_MINER_LOAD_SHEET,
+  RESIDENT_MINER_LOCOMOTION_SHEET,
+  RESIDENT_MINER_WORK_SHEET,
+  minerLoadSourceRect,
+  minerLocomotionSourceRect,
+  minerWorkSourceRect,
+} from './residentMinerAssets';
 
 const PITCH = 17;
 const T = 16;
@@ -157,6 +201,22 @@ let foreignSiteCoreSheet: HTMLImageElement | null = null;
 let foreignSitePropSheet: HTMLImageElement | null = null;
 let specialResidentSheet: HTMLImageElement | null = null;
 let centerPromotionSheet: HTMLImageElement | null = null;
+let residentWoodcutterWorkSheet: HTMLImageElement | null = null;
+let residentWoodcutterLocomotionSheet: HTMLImageElement | null = null;
+let residentWoodcutterLoadSheet: HTMLImageElement | null = null;
+let residentHunterHuntSheet: HTMLImageElement | null = null;
+let residentHunterLocomotionSheet: HTMLImageElement | null = null;
+let residentHunterLoadSheet: HTMLImageElement | null = null;
+let residentHaulerLocomotionSheet: HTMLImageElement | null = null;
+let residentHaulerCartLocomotionSheet: HTMLImageElement | null = null;
+let residentFarmerTillSheet: HTMLImageElement | null = null;
+let residentFarmerHarvestSheet: HTMLImageElement | null = null;
+let residentFarmerOxPlowSheet: HTMLImageElement | null = null;
+let residentBuilderLocomotionSheet: HTMLImageElement | null = null;
+let residentBuilderWorkSheet: HTMLImageElement | null = null;
+let residentMinerLocomotionSheet: HTMLImageElement | null = null;
+let residentMinerWorkSheet: HTMLImageElement | null = null;
+let residentMinerLoadSheet: HTMLImageElement | null = null;
 let loaded = 0;
 let started = false;
 
@@ -247,6 +307,54 @@ function ensureLoaded(): void {
   centerPromotionSheet = new Image();
   centerPromotionSheet.onload = () => { loaded++; };
   centerPromotionSheet.src = CENTER_PROMOTION_SHEET.src;
+  residentWoodcutterWorkSheet = new Image();
+  residentWoodcutterWorkSheet.onload = () => { loaded++; };
+  residentWoodcutterWorkSheet.src = RESIDENT_WOODCUTTER_WORK_SHEET.src;
+  residentWoodcutterLocomotionSheet = new Image();
+  residentWoodcutterLocomotionSheet.onload = () => { loaded++; };
+  residentWoodcutterLocomotionSheet.src = RESIDENT_WOODCUTTER_LOCOMOTION_SHEET.src;
+  residentWoodcutterLoadSheet = new Image();
+  residentWoodcutterLoadSheet.onload = () => { loaded++; };
+  residentWoodcutterLoadSheet.src = RESIDENT_WOODCUTTER_LOAD_SHEET.src;
+  residentHunterHuntSheet = new Image();
+  residentHunterHuntSheet.onload = () => { loaded++; };
+  residentHunterHuntSheet.src = RESIDENT_HUNTER_HUNT_SHEET.src;
+  residentHunterLocomotionSheet = new Image();
+  residentHunterLocomotionSheet.onload = () => { loaded++; };
+  residentHunterLocomotionSheet.src = RESIDENT_HUNTER_LOCOMOTION_SHEET.src;
+  residentHunterLoadSheet = new Image();
+  residentHunterLoadSheet.onload = () => { loaded++; };
+  residentHunterLoadSheet.src = RESIDENT_HUNTER_LOAD_SHEET.src;
+  residentHaulerLocomotionSheet = new Image();
+  residentHaulerLocomotionSheet.onload = () => { loaded++; };
+  residentHaulerLocomotionSheet.src = RESIDENT_HAULER_LOCOMOTION_SHEET.src;
+  residentHaulerCartLocomotionSheet = new Image();
+  residentHaulerCartLocomotionSheet.onload = () => { loaded++; };
+  residentHaulerCartLocomotionSheet.src = RESIDENT_HAULER_CART_LOCOMOTION_SHEET.src;
+  residentFarmerTillSheet = new Image();
+  residentFarmerTillSheet.onload = () => { loaded++; };
+  residentFarmerTillSheet.src = RESIDENT_FARMER_TILL_SHEET.src;
+  residentFarmerHarvestSheet = new Image();
+  residentFarmerHarvestSheet.onload = () => { loaded++; };
+  residentFarmerHarvestSheet.src = RESIDENT_FARMER_HARVEST_SHEET.src;
+  residentFarmerOxPlowSheet = new Image();
+  residentFarmerOxPlowSheet.onload = () => { loaded++; };
+  residentFarmerOxPlowSheet.src = RESIDENT_FARMER_OX_PLOW_SHEET.src;
+  residentBuilderLocomotionSheet = new Image();
+  residentBuilderLocomotionSheet.onload = () => { loaded++; };
+  residentBuilderLocomotionSheet.src = RESIDENT_BUILDER_LOCOMOTION_SHEET.src;
+  residentBuilderWorkSheet = new Image();
+  residentBuilderWorkSheet.onload = () => { loaded++; };
+  residentBuilderWorkSheet.src = RESIDENT_BUILDER_WORK_SHEET.src;
+  residentMinerLocomotionSheet = new Image();
+  residentMinerLocomotionSheet.onload = () => { loaded++; };
+  residentMinerLocomotionSheet.src = RESIDENT_MINER_LOCOMOTION_SHEET.src;
+  residentMinerWorkSheet = new Image();
+  residentMinerWorkSheet.onload = () => { loaded++; };
+  residentMinerWorkSheet.src = RESIDENT_MINER_WORK_SHEET.src;
+  residentMinerLoadSheet = new Image();
+  residentMinerLoadSheet.onload = () => { loaded++; };
+  residentMinerLoadSheet.src = RESIDENT_MINER_LOAD_SHEET.src;
   const characterSheet = new Image();
   characterSheet.onload = () => {
     generatedCharacterSheet = characterSheet;
@@ -257,7 +365,7 @@ function ensureLoaded(): void {
 
 export function atlasReady(): boolean {
   ensureLoaded();
-  return loaded >= 26;
+  return loaded >= 42;
 }
 
 // 아틀라스가 준비되면 아틀라스, 아니면 임시 그래픽
@@ -1090,6 +1198,182 @@ export const atlasSprites: SpriteAPI = {
       drawGeneratedCharacterRect(ctx, foreignResidentSheet, foreignRect, p.x, p.y, p.facing, bob);
     } else if (newContentResidentSheet && newContentRect) {
       drawGeneratedCharacterRect(ctx, newContentResidentSheet, newContentRect, p.x, p.y, p.facing, bob);
+    } else if (residentWoodcutterWorkSheet && p.job === 'woodcutter' && p.working && !p.moving) {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentWoodcutterWorkSheet,
+        woodcutterWorkSourceRect(p.gender, performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentWoodcutterLoadSheet && p.job === 'woodcutter' && p.carryingWood) {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentWoodcutterLoadSheet,
+        woodcutterLoadSourceRect(p.gender, Boolean(p.moving), performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentWoodcutterLocomotionSheet && p.job === 'woodcutter') {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentWoodcutterLocomotionSheet,
+        woodcutterLocomotionSourceRect(p.gender, Boolean(p.moving), performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentHunterHuntSheet && p.job === 'hunter' && p.working && !p.moving) {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentHunterHuntSheet,
+        hunterHuntSourceRect(p.gender, performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentHunterLoadSheet && p.job === 'hunter' && p.carryingGame) {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentHunterLoadSheet,
+        hunterLoadSourceRect(p.gender, Boolean(p.moving), performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentHunterLocomotionSheet && p.job === 'hunter') {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentHunterLocomotionSheet,
+        hunterLocomotionSourceRect(p.gender, Boolean(p.moving), performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentHaulerCartLocomotionSheet && p.job === 'hauler' && p.cartEquipped) {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentHaulerCartLocomotionSheet,
+        haulerCartLocomotionSourceRect(p.gender, Boolean(p.moving), performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentHaulerLocomotionSheet && p.job === 'hauler') {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentHaulerLocomotionSheet,
+        haulerLocomotionSourceRect(p.gender, Boolean(p.moving), performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentFarmerOxPlowSheet && p.job === 'farmer' && p.farmerAction === 'oxPlow') {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentFarmerOxPlowSheet,
+        farmerOxPlowSourceRect(p.gender, performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentFarmerHarvestSheet && p.job === 'farmer' && p.farmerAction === 'harvest') {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentFarmerHarvestSheet,
+        farmerHarvestSourceRect(p.gender, performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentFarmerTillSheet && p.job === 'farmer' && p.farmerAction === 'till') {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentFarmerTillSheet,
+        farmerTillSourceRect(p.gender, performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentBuilderWorkSheet && p.job === 'builder' && p.working && !p.moving) {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentBuilderWorkSheet,
+        builderWorkSourceRect(p.gender, performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentBuilderLocomotionSheet && p.job === 'builder') {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentBuilderLocomotionSheet,
+        builderLocomotionSourceRect(p.gender, Boolean(p.moving), performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentMinerWorkSheet && p.job === 'miner' && p.working && !p.moving) {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentMinerWorkSheet,
+        minerWorkSourceRect(p.gender, performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentMinerLoadSheet && p.job === 'miner' && p.carryingMinerals) {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentMinerLoadSheet,
+        minerLoadSourceRect(p.gender, Boolean(p.moving), performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
+    } else if (residentMinerLocomotionSheet && p.job === 'miner') {
+      drawGeneratedCharacterRect(
+        ctx,
+        residentMinerLocomotionSheet,
+        minerLocomotionSourceRect(p.gender, Boolean(p.moving), performance.now()),
+        p.x,
+        p.y,
+        p.facing,
+        0,
+        p.sizeScale ?? 1,
+      );
     } else if (militiaSheet && p.job === 'militia' && p.militiaWeapon) {
       drawGeneratedCharacterRect(
         ctx,

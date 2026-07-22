@@ -19,6 +19,7 @@ import { builtWallTileSet, isWallBuilding, wallConnectionsFromSet } from '../gam
 import { assignedWorkers, workerSlotConfig, workerSlotCount } from '../game/workerSlots';
 import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
 import { militiaWeaponForResident } from './militiaWeaponAssignment';
+import { farmerSpriteActionFor, selectOxPlowFarmerIds } from './residentFarmerAssets';
 import { claimZonesAt } from '../game/claimZones';
 import { foreignSiteAt } from '../game/foreignSites';
 import { foreignSiteActors, foreignSiteProps, type ForeignSiteProp } from '../game/foreignSiteActivity';
@@ -1030,6 +1031,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     ctx.textBaseline = 'middle';
     ctx.fillText('⚰️', corpse.x * TILE + TILE / 2, corpse.y * TILE + TILE / 2);
   }
+  const oxPlowFarmerIds = selectOxPlowFarmerIds(state.buildings, state.residents);
   for (const r of state.residents) {
     if (!r.alive || predatorScoutIds.has(r.id)) continue;
     const p = residentPixelPos(r, o.alpha);
@@ -1041,8 +1043,15 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       y: p.y,
       sick: r.sick,
       carrying: Object.keys(r.carrying).length > 0,
+      carryingWood: (r.carrying.wood ?? 0) > 0 || (r.carrying.brushwood ?? 0) > 0,
+      carryingGame: (r.carrying.meat ?? 0) > 0 || (r.carrying.hide ?? 0) > 0,
+      carryingMinerals: (r.carrying.stone ?? 0) > 0 || (r.carrying.iron ?? 0) > 0 ||
+        (r.carrying.silver ?? 0) > 0,
+      cartEquipped: r.cartEquipped,
+      farmerAction: farmerSpriteActionFor(r, oxPlowFarmerIds),
       selected: r.id === o.selectedResidentId,
       moving: r.px !== r.x || r.py !== r.y,
+      working: r.phase === 'working' && r.px === r.x && r.py === r.y,
       facing: r.x < r.px ? -1 : 1,
       militiaWeapon: militiaWeaponForResident(state, r),
       special: r.special,

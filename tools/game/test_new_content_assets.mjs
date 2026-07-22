@@ -113,7 +113,7 @@ assert.deepEqual(centerAssets.centerPromotionSourceRect('bu', 'winter'), { sx: 1
 
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
 const rendererSource = readFileSync(new URL('../../src/render/renderer.ts', import.meta.url), 'utf8');
-assert.match(atlasSource, /return loaded >= 26;/, 'atlas readiness must include the promoted-center sheet');
+assert.match(atlasSource, /return loaded >= 42;/, 'atlas readiness must include all resident work sheets');
 assert.match(atlasSource, /newContentResidentSourceRect\(p\.job, p\.gender, p\.stage\)/,
   'resident dispatch must choose the new sheet by life stage');
 assert.doesNotMatch(rendererSource, /r\.stage === 'infant'\) continue/,
