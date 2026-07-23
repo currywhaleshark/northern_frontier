@@ -1,4 +1,5 @@
 import { CONFIG } from '../game/config';
+import { isIndoors } from '../game/dayCycle';
 import {
   residentActiveWorkplace,
   workplacePresentation,
@@ -22,6 +23,11 @@ export function buildResidentPresentationSnapshot(state: GameState): ResidentPre
   const indoorResidentIds = new Set<number>();
   const workplaceActiveCountByBuilding = new Map<number, number>();
   for (const resident of state.residents) {
+    // 취침(집 도착 후)·실내 여가(당집·암자) 재실자는 그리지 않는다 — M0 계약 isIndoors
+    if (isIndoors(state, resident)) {
+      indoorResidentIds.add(resident.id);
+      continue;
+    }
     const building = residentActiveWorkplace(resident, buildingById);
     if (!building) continue;
     const presentation = workplacePresentation(building.type);

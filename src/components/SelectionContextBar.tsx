@@ -19,6 +19,7 @@ import { combatDefaultWeaponName } from '../game/combatCapabilities';
 import { enrolledStudentIds, isSchoolAge, schoolSeatCount } from '../game/education';
 import { specialResidentSkills } from '../game/specialResidents';
 import { isYouthWorkJob } from '../game/youth';
+import { DAY_BAND_NAMES, uiDayBand } from '../ui/dayBand';
 import { COMBAT_WEAPON_NAMES, MOUNT_NAMES } from '../game/weapons';
 import type {
   BuildingTypeId,
@@ -205,7 +206,7 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
             <tr><td>탑승</td><td>{state.mountAssignments[resident.id] ? MOUNT_NAMES[state.mountAssignments[resident.id]!] : '도보'}</td></tr>
           </>
         )}
-        <tr><td>현재 작업</td><td>{resident.task}</td></tr>
+        <tr><td>현재 작업</td><td>{DAY_BAND_NAMES[uiDayBand(state.subTick)]} · {resident.task}</td></tr>
         {resident.alive && (
           <tr>
             <td>주거</td>
