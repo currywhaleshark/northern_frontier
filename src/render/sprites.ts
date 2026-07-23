@@ -73,14 +73,21 @@ export interface ResidentDrawParams {
   y: number;
   sick: boolean;
   carrying: boolean;
+  carryingWood?: boolean;
+  carryingGame?: boolean;
+  carryingMinerals?: boolean;
+  cartEquipped?: boolean;
+  farmerAction?: 'till' | 'harvest' | 'oxPlow';
   selected: boolean;
   moving?: boolean;   // 이번 서브틱에 이동 중 (걷기 연출)
+  working?: boolean;  // 작업 타이머가 진행 중인 제자리 작업 연출
   facing?: 1 | -1;    // 1 오른쪽, -1 왼쪽
   militiaWeapon?: MilitiaWeaponSpriteId;
   foreignFaction?: string;
   stage?: LifeStage | null;
   sizeScale?: number; // 아이 축소 표시 (전용 시트가 나오기 전 폴백)
   special?: SpecialResidentId;
+  animationTimeMs?: number; // 한 캔버스 프레임에서 공유하는 애니메이션 시간
 }
 
 export interface ForeignStructureDrawParams {

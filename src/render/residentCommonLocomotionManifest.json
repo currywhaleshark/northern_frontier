@@ -1,0 +1,1576 @@
+{
+  "version": 1,
+  "kind": "resident-common-locomotion-manifest",
+  "game_input": "/assets/resident-common-locomotion-v1.png",
+  "degraded_static_fallback": false,
+  "cell": {
+    "width": 64,
+    "height": 64
+  },
+  "sheet": {
+    "width": 192,
+    "height": 2560
+  },
+  "runtime_mirror": {
+    "left": "side"
+  },
+  "source_facing": "left",
+  "generation_facing": "right",
+  "baked_flip_x": true,
+  "animation": {
+    "rows": {
+      "idle-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "idle-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "farmer-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "farmer-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "wood-splitter-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "wood-splitter-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "miller-curer-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "miller-curer-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "physician-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "physician-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "potter-smith-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "potter-smith-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "fisher-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "fisher-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "charcoal-burner-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "charcoal-burner-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "herder-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "herder-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "tanner-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "tanner-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "weaver-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "weaver-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "powder-maker-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "powder-maker-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "clerk-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "clerk-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "undertaker-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "undertaker-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "teacher-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "teacher-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "watchman-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "watchman-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "militia-unarmed-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "militia-unarmed-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "militia-spears-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "militia-spears-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "militia-horn-bows-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "militia-horn-bows-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "militia-muskets-male": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "militia-muskets-female": {
+        "frames": 4,
+        "fps": 5,
+        "loop": true,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ]
+      }
+    }
+  },
+  "frame_layout": {
+    "rows": {
+      "idle-male": [
+        {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "idle-female": [
+        {
+          "x": 0,
+          "y": 64,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 64,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 64,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 64,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "farmer-male": [
+        {
+          "x": 0,
+          "y": 128,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 128,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 128,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 128,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "farmer-female": [
+        {
+          "x": 0,
+          "y": 192,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 192,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 192,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 192,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "wood-splitter-male": [
+        {
+          "x": 0,
+          "y": 256,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 256,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 256,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 256,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "wood-splitter-female": [
+        {
+          "x": 0,
+          "y": 320,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 320,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 320,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 320,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "miller-curer-male": [
+        {
+          "x": 0,
+          "y": 384,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 384,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 384,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 384,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "miller-curer-female": [
+        {
+          "x": 0,
+          "y": 448,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 448,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 448,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 448,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "physician-male": [
+        {
+          "x": 0,
+          "y": 512,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 512,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 512,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 512,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "physician-female": [
+        {
+          "x": 0,
+          "y": 576,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 576,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 576,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 576,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "potter-smith-male": [
+        {
+          "x": 0,
+          "y": 640,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 640,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 640,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 640,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "potter-smith-female": [
+        {
+          "x": 0,
+          "y": 704,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 704,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 704,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 704,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "fisher-male": [
+        {
+          "x": 0,
+          "y": 768,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 768,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 768,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 768,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "fisher-female": [
+        {
+          "x": 0,
+          "y": 832,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 832,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 832,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 832,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "charcoal-burner-male": [
+        {
+          "x": 0,
+          "y": 896,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 896,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 896,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 896,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "charcoal-burner-female": [
+        {
+          "x": 0,
+          "y": 960,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 960,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 960,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 960,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "herder-male": [
+        {
+          "x": 0,
+          "y": 1024,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1024,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1024,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1024,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "herder-female": [
+        {
+          "x": 0,
+          "y": 1088,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1088,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1088,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1088,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "tanner-male": [
+        {
+          "x": 0,
+          "y": 1152,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1152,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1152,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1152,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "tanner-female": [
+        {
+          "x": 0,
+          "y": 1216,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1216,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1216,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1216,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "weaver-male": [
+        {
+          "x": 0,
+          "y": 1280,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1280,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1280,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1280,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "weaver-female": [
+        {
+          "x": 0,
+          "y": 1344,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1344,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1344,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1344,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "powder-maker-male": [
+        {
+          "x": 0,
+          "y": 1408,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1408,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1408,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1408,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "powder-maker-female": [
+        {
+          "x": 0,
+          "y": 1472,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1472,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1472,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1472,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "clerk-male": [
+        {
+          "x": 0,
+          "y": 1536,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1536,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1536,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1536,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "clerk-female": [
+        {
+          "x": 0,
+          "y": 1600,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1600,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1600,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1600,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "undertaker-male": [
+        {
+          "x": 0,
+          "y": 1664,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1664,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1664,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1664,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "undertaker-female": [
+        {
+          "x": 0,
+          "y": 1728,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1728,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1728,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1728,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "teacher-male": [
+        {
+          "x": 0,
+          "y": 1792,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1792,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1792,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1792,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "teacher-female": [
+        {
+          "x": 0,
+          "y": 1856,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1856,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1856,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1856,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "watchman-male": [
+        {
+          "x": 0,
+          "y": 1920,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1920,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1920,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1920,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "watchman-female": [
+        {
+          "x": 0,
+          "y": 1984,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 1984,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 1984,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 1984,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "militia-unarmed-male": [
+        {
+          "x": 0,
+          "y": 2048,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 2048,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 2048,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 2048,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "militia-unarmed-female": [
+        {
+          "x": 0,
+          "y": 2112,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 2112,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 2112,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 2112,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "militia-spears-male": [
+        {
+          "x": 0,
+          "y": 2176,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 2176,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 2176,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 2176,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "militia-spears-female": [
+        {
+          "x": 0,
+          "y": 2240,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 2240,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 2240,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 2240,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "militia-horn-bows-male": [
+        {
+          "x": 0,
+          "y": 2304,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 2304,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 2304,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 2304,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "militia-horn-bows-female": [
+        {
+          "x": 0,
+          "y": 2368,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 2368,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 2368,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 2368,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "militia-muskets-male": [
+        {
+          "x": 0,
+          "y": 2432,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 2432,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 2432,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 2432,
+          "w": 64,
+          "h": 64
+        }
+      ],
+      "militia-muskets-female": [
+        {
+          "x": 0,
+          "y": 2496,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 64,
+          "y": 2496,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 0,
+          "y": 2496,
+          "w": 64,
+          "h": 64
+        },
+        {
+          "x": 128,
+          "y": 2496,
+          "w": 64,
+          "h": 64
+        }
+      ]
+    }
+  },
+  "job_identities": {
+    "idle": "idle",
+    "farmer": "farmer",
+    "woodSplitter": "wood-splitter",
+    "miller": "miller-curer",
+    "physician": "physician",
+    "curer": "miller-curer",
+    "potter": "potter-smith",
+    "smith": "potter-smith",
+    "fisher": "fisher",
+    "charcoalBurner": "charcoal-burner",
+    "herder": "herder",
+    "tanner": "tanner",
+    "weaver": "weaver",
+    "powderMaker": "powder-maker",
+    "clerk": "clerk",
+    "undertaker": "undertaker",
+    "teacher": "teacher",
+    "watchman": "watchman"
+  },
+  "militia_identities": {
+    "unarmed": "militia-unarmed",
+    "spears": "militia-spears",
+    "hornBows": "militia-horn-bows",
+    "muskets": "militia-muskets"
+  },
+  "source_runs": {
+    "idle-male": "tools/render/generated/resident-common-locomotion-v1/idle-male",
+    "idle-female": "tools/render/generated/resident-common-locomotion-v1/idle-female",
+    "farmer-male": "tools/render/generated/resident-common-locomotion-v1/farmer-male",
+    "farmer-female": "tools/render/generated/resident-common-locomotion-v1/farmer-female",
+    "wood-splitter-male": "tools/render/generated/resident-common-locomotion-v1/wood-splitter-male",
+    "wood-splitter-female": "tools/render/generated/resident-common-locomotion-v1/wood-splitter-female",
+    "miller-curer-male": "tools/render/generated/resident-common-locomotion-v1/miller-curer-male",
+    "miller-curer-female": "tools/render/generated/resident-common-locomotion-v1/miller-curer-female",
+    "physician-male": "tools/render/generated/resident-common-locomotion-v1/physician-male",
+    "physician-female": "tools/render/generated/resident-common-locomotion-v1/physician-female",
+    "potter-smith-male": "tools/render/generated/resident-common-locomotion-v1/potter-smith-male",
+    "potter-smith-female": "tools/render/generated/resident-common-locomotion-v1/potter-smith-female",
+    "fisher-male": "tools/render/generated/resident-common-locomotion-v1/fisher-male",
+    "fisher-female": "tools/render/generated/resident-common-locomotion-v1/fisher-female",
+    "charcoal-burner-male": "tools/render/generated/resident-common-locomotion-v1/charcoal-burner-male",
+    "charcoal-burner-female": "tools/render/generated/resident-common-locomotion-v1/charcoal-burner-female",
+    "herder-male": "tools/render/generated/resident-common-locomotion-v1/herder-male",
+    "herder-female": "tools/render/generated/resident-common-locomotion-v1/herder-female",
+    "tanner-male": "tools/render/generated/resident-common-locomotion-v1/tanner-male",
+    "tanner-female": "tools/render/generated/resident-common-locomotion-v1/tanner-female",
+    "weaver-male": "tools/render/generated/resident-common-locomotion-v1/weaver-male",
+    "weaver-female": "tools/render/generated/resident-common-locomotion-v1/weaver-female",
+    "powder-maker-male": "tools/render/generated/resident-common-locomotion-v1/powder-maker-male",
+    "powder-maker-female": "tools/render/generated/resident-common-locomotion-v1/powder-maker-female",
+    "clerk-male": "tools/render/generated/resident-common-locomotion-v1/clerk-male",
+    "clerk-female": "tools/render/generated/resident-common-locomotion-v1/clerk-female",
+    "undertaker-male": "tools/render/generated/resident-common-locomotion-v1/undertaker-male",
+    "undertaker-female": "tools/render/generated/resident-common-locomotion-v1/undertaker-female",
+    "teacher-male": "tools/render/generated/resident-common-locomotion-v1/teacher-male",
+    "teacher-female": "tools/render/generated/resident-common-locomotion-v1/teacher-female",
+    "watchman-male": "tools/render/generated/resident-common-locomotion-v1/watchman-male",
+    "watchman-female": "tools/render/generated/resident-common-locomotion-v1/watchman-female",
+    "militia-unarmed-male": "tools/render/generated/resident-common-locomotion-v1/militia-unarmed-male",
+    "militia-unarmed-female": "tools/render/generated/resident-common-locomotion-v1/militia-unarmed-female",
+    "militia-spears-male": "tools/render/generated/resident-common-locomotion-v1/militia-spears-male",
+    "militia-spears-female": "tools/render/generated/resident-common-locomotion-v1/militia-spears-female",
+    "militia-horn-bows-male": "tools/render/generated/resident-common-locomotion-v1/militia-horn-bows-male",
+    "militia-horn-bows-female": "tools/render/generated/resident-common-locomotion-v1/militia-horn-bows-female",
+    "militia-muskets-male": "tools/render/generated/resident-common-locomotion-v1/militia-muskets-male",
+    "militia-muskets-female": "tools/render/generated/resident-common-locomotion-v1/militia-muskets-female"
+  }
+}

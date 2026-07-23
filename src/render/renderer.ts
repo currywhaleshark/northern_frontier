@@ -19,6 +19,13 @@ import { builtWallTileSet, isWallBuilding, wallConnectionsFromSet } from '../gam
 import { assignedWorkers, workerSlotConfig, workerSlotCount } from '../game/workerSlots';
 import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
 import { militiaWeaponForResident } from './militiaWeaponAssignment';
+import { farmerSpriteActionFor } from './residentFarmerAssets';
+import type { ResidentWorkStance } from './residentWorkLayout';
+import {
+  buildResidentPresentationSnapshot,
+  type ResidentPresentationSnapshot,
+} from './residentPresentation';
+import { stableResidentAnimationOffset } from './residentAnimation';
 import { claimZonesAt } from '../game/claimZones';
 import { foreignSiteAt } from '../game/foreignSites';
 import { foreignSiteActors, foreignSiteProps, type ForeignSiteProp } from '../game/foreignSiteActivity';
@@ -27,6 +34,7 @@ import { weaponCountsForResidents } from '../game/weapons';
 import { activePredatorScoutIds } from '../game/expeditionIntel';
 import { isBuriedSilverVeinTile } from '../game/silver';
 import { activeExpeditionTargetMarkers, type ExpeditionTargetMarker } from '../game/expeditionTargets';
+import { workplaceActivityStyle, type WorkplaceActivityStyle } from '../game/workplacePresentation';
 import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, Resident, Terrain } from '../game/types';
 import { pixelRectIntersectsViewport, tileRectIntersectsViewport, type SceneViewport } from './sceneViewport';
 
@@ -52,6 +60,7 @@ const PLACEMENT_HINT: Partial<Record<BuildingTypeId, Terrain>> = {
 
 export interface SceneOptions {
   alpha: number; // 서브틱 사이 이동 보간 계수 0~1
+  animationTimeMs: number; // 이 장면의 모든 주민 source rect가 공유하는 RAF 시간
   hover: { x: number; y: number } | null;
   placingType: BuildingTypeId | null;
   placingRect?: { x: number; y: number; w: number; h: number } | null; // 경작지 드래그 크기 지정 미리보기
@@ -61,6 +70,8 @@ export interface SceneOptions {
   viewport?: SceneViewport;
   terrainVisualSignature?: number;
   sprites?: SpriteAPI;
+  residentPresentation?: ResidentPresentationSnapshot;
+  renderScale?: 1 | 2;
 }
 
 const TERRAIN_VISUAL_CODE: Record<Terrain, number> = {
@@ -85,16 +96,27 @@ export function terrainVisualSignature(state: Pick<GameState, 'map'>): number {
 }
 
 // 주민의 화면 픽셀 위치 (보간 + 지터). 렌더링과 마우스 히트 판정이 공유한다.
-export function residentPixelPos(r: Resident, alpha: number): { x: number; y: number } {
+export function residentPixelPos(
+  r: Resident,
+  alpha: number,
+  workStance?: ResidentWorkStance,
+): { x: number; y: number } {
   const [jx, jy] = jitterOf(r.id);
   return {
-    x: (r.px + (r.x - r.px) * alpha) * TILE + TILE / 2 + jx,
-    y: (r.py + (r.y - r.py) * alpha) * TILE + TILE / 2 + jy,
+    x: (r.px + (r.x - r.px) * alpha) * TILE + TILE / 2 + jx + (workStance?.offsetX ?? 0),
+    y: (r.py + (r.y - r.py) * alpha) * TILE + TILE / 2 + jy + (workStance?.offsetY ?? 0),
   };
 }
 
 // 픽셀 좌표에서 가장 가까운 주민 찾기 (radius 픽셀 이내)
-export function findResidentAt(state: GameState, mx: number, my: number, alpha: number, radius = 10): Resident | null {
+export function findResidentAt(
+  state: GameState,
+  mx: number,
+  my: number,
+  alpha: number,
+  radius = 10,
+  presentation: ResidentPresentationSnapshot = buildResidentPresentationSnapshot(state),
+): Resident | null {
   let best: Resident | null = null;
   let bestD = radius;
   const expeditionUnitIds = state.expedition && state.expedition.phase !== 'muster'
@@ -103,7 +125,8 @@ export function findResidentAt(state: GameState, mx: number, my: number, alpha: 
   for (const r of state.residents) {
     if (!r.alive) continue;
     if (expeditionUnitIds.has(r.id)) continue;
-    const p = residentPixelPos(r, alpha);
+    if (presentation.indoorResidentIds.has(r.id)) continue;
+    const p = residentPixelPos(r, alpha, presentation.workStances.get(r.id));
     const d = Math.hypot(p.x - mx, p.y - my);
     if (d <= bestD) { bestD = d; best = r; }
   }
@@ -175,6 +198,53 @@ function drawChimneySmoke(ctx: CanvasRenderingContext2D, bx: number, by: number,
     ctx.arc(sx, sy, 1.6 + ph * 2.4, 0, Math.PI * 2);
     ctx.fill();
   }
+}
+
+function drawWorkplaceActivity(
+  ctx: CanvasRenderingContext2D,
+  bx: number,
+  by: number,
+  id: number,
+  size: number,
+  workers: number,
+  style: WorkplaceActivityStyle,
+): void {
+  const t = performance.now();
+  ctx.save();
+  if (style === 'fire') {
+    drawChimneySmoke(ctx, bx, by, id, size / TILE);
+    const count = Math.min(5, 2 + workers);
+    for (let i = 0; i < count; i++) {
+      const phase = ((t / 180 + i * 1.7 + id * 0.61) % 7) / 7;
+      const x = bx + size * 0.7 + Math.sin(i * 2.3 + id) * 3 + phase * 2;
+      const y = by + size * 0.68 - phase * 12;
+      ctx.fillStyle = `rgba(255,${Math.round(150 + phase * 70)},70,${(0.9 * (1 - phase)).toFixed(2)})`;
+      ctx.fillRect(Math.round(x), Math.round(y), phase < 0.45 ? 2 : 1, phase < 0.45 ? 2 : 1);
+    }
+  } else if (style === 'craft') {
+    const pulse = (Math.sin(t / 150 + id) + 1) / 2;
+    ctx.strokeStyle = `rgba(238,213,158,${(0.35 + pulse * 0.45).toFixed(2)})`;
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < Math.min(3, workers + 1); i++) {
+      const x = bx + size * (0.35 + i * 0.14);
+      const y = by + size * 0.72 - ((i + Math.floor(t / 220)) % 2) * 2;
+      ctx.beginPath();
+      ctx.moveTo(x - 2, y + 2);
+      ctx.lineTo(x + 2, y - 2);
+      ctx.stroke();
+    }
+  } else {
+    const pulse = (Math.sin(t / 420 + id * 0.7) + 1) / 2;
+    const x = bx + size * 0.5;
+    const y = by + size * 0.55;
+    ctx.fillStyle = `rgba(255,205,104,${(0.13 + pulse * 0.11).toFixed(2)})`;
+    ctx.beginPath();
+    ctx.arc(x, y, 7 + pulse * 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = `rgba(255,221,139,${(0.72 + pulse * 0.2).toFixed(2)})`;
+    ctx.fillRect(Math.round(x - 2), Math.round(y - 1.5), 4, 3);
+  }
+  ctx.restore();
 }
 
 function drawDamageSmoke(ctx: CanvasRenderingContext2D, bx: number, by: number, id: number, footprint: number): void {
@@ -492,11 +562,27 @@ function drawSlotDot(
   ctx.lineWidth = 1;
 }
 
+function drawActiveWorkerPulse(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  residentId: number,
+): void {
+  const pulse = (Math.sin(performance.now() / 190 + residentId * 0.8) + 1) / 2;
+  ctx.strokeStyle = `rgba(255,205,104,${(0.48 + pulse * 0.42).toFixed(2)})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(x, y, radius + 1.2 + pulse * 0.8, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
 function drawWorkerSlotOverlay(
   ctx: CanvasRenderingContext2D,
   state: GameState,
   building: Building,
   expanded: boolean,
+  activeResidentIds: ReadonlySet<number>,
 ): void {
   if (!building.built) return;
   const config = workerSlotConfig(building.type);
@@ -505,6 +591,7 @@ function drawWorkerSlotOverlay(
 
   const slotCount = workerSlotCount(building);
   const workers = assignedWorkers(state, building);
+  const activeCount = workers.filter(worker => activeResidentIds.has(worker.id)).length;
   const dims = buildingFootprintDims(building);
   const cx = (building.x + dims.w / 2) * TILE;
   const top = building.y * TILE;
@@ -517,7 +604,8 @@ function drawWorkerSlotOverlay(
     const gap = 3;
     const pad = 4;
     const width = slotCount * radius * 2 + Math.max(0, slotCount - 1) * gap + pad * 2;
-    const height = radius * 2 + pad * 2;
+    const statusHeight = 12;
+    const height = radius * 2 + pad * 2 + statusHeight;
     const left = cx - width / 2;
     const y = top - height - 3;
     ctx.fillStyle = 'rgba(20,24,28,0.88)';
@@ -528,7 +616,7 @@ function drawWorkerSlotOverlay(
     for (let i = 0; i < slotCount; i++) {
       const worker = workers[i];
       const dotX = left + pad + radius + i * (radius * 2 + gap);
-      const dotY = y + height / 2;
+      const dotY = y + pad + radius;
       drawSlotDot(
         ctx,
         dotX,
@@ -538,7 +626,15 @@ function drawWorkerSlotOverlay(
         worker ? 'rgba(246,225,178,0.9)' : emptyStroke,
         worker ? 1.2 : 1,
       );
+      if (worker && activeResidentIds.has(worker.id)) {
+        drawActiveWorkerPulse(ctx, dotX, dotY, radius, worker.id);
+      }
     }
+    ctx.fillStyle = activeCount > 0 ? '#f1cf7a' : 'rgba(216,222,229,0.68)';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`작업 ${activeCount}/${slotCount}`, cx, y + height - statusHeight / 2);
     ctx.restore();
     return;
   }
@@ -557,6 +653,9 @@ function drawWorkerSlotOverlay(
       worker ? JOB_COLORS[worker.job] : emptyFill,
       worker ? 'rgba(20,24,28,0.82)' : emptyStroke,
     );
+    if (worker && activeResidentIds.has(worker.id)) {
+      drawActiveWorkerPulse(ctx, startX + i * gap, y, radius, worker.id);
+    }
   }
   ctx.restore();
 }
@@ -566,9 +665,10 @@ function drawWorkerSlotOverlays(
   state: GameState,
   buildings: Building[],
   selectedBuildingId?: number | null,
+  activeResidentIds: ReadonlySet<number> = new Set<number>(),
 ): void {
   for (const building of buildings) {
-    drawWorkerSlotOverlay(ctx, state, building, selectedBuildingId === building.id);
+    drawWorkerSlotOverlay(ctx, state, building, selectedBuildingId === building.id, activeResidentIds);
   }
 }
 
@@ -819,15 +919,19 @@ declare global {
 export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: SceneOptions): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
+  const renderScale = o.renderScale === 2 ? 2 : 1;
+  const logicalWidth = canvas.width / renderScale;
+  const logicalHeight = canvas.height / renderScale;
+  if (typeof ctx.setTransform === 'function') ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
   const viewport = o.viewport ?? {
     pixelX: 0,
     pixelY: 0,
-    pixelWidth: canvas.width,
-    pixelHeight: canvas.height,
+    pixelWidth: logicalWidth,
+    pixelHeight: logicalHeight,
     tileMinX: 0,
     tileMinY: 0,
-    tileMaxX: Math.max(0, Math.ceil(canvas.width / TILE) - 1),
-    tileMaxY: Math.max(0, Math.ceil(canvas.height / TILE) - 1),
+    tileMaxX: Math.max(0, Math.ceil(logicalWidth / TILE) - 1),
+    tileMaxY: Math.max(0, Math.ceil(logicalHeight / TILE) - 1),
   };
   if (viewport.pixelWidth <= 0 || viewport.pixelHeight <= 0) return;
   const perf = typeof window !== 'undefined' ? window.__renderPerf : undefined;
@@ -842,14 +946,15 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   };
   const sprites = o.sprites ?? placeholderSprites;
   const predatorScoutIds = activePredatorScoutIds(state);
+  const presentation = o.residentPresentation ?? buildResidentPresentationSnapshot(state);
   const lerp = (a: number, b: number) => a + (b - a) * o.alpha;
   ctx.imageSmoothingEnabled = false;
 
   // 1) 지형
   const layer = drawTerrainLayer(
     state,
-    canvas.width,
-    canvas.height,
+    logicalWidth,
+    logicalHeight,
     sprites,
     o.terrainVisualSignature ?? terrainVisualSignature(state),
   );
@@ -965,6 +1070,11 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     if (b.built && heating && (b.type === 'ondol' || b.type === 'center')) {
       drawChimneySmoke(ctx, drawX, drawY, b.id, size / TILE);
     }
+    const activeWorkerCount = presentation.workplaceActiveCountByBuilding.get(b.id) ?? 0;
+    const activityStyle = workplaceActivityStyle(b.type);
+    if (b.built && activeWorkerCount > 0 && activityStyle) {
+      drawWorkplaceActivity(ctx, drawX, drawY, b.id, size, activeWorkerCount, activityStyle);
+    }
   }
 
   const discoveredSites = state.foreignSites.filter(candidate => candidate.discovered);
@@ -979,7 +1089,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   }
 
   lap('2-buildings');
-  drawWorkerSlotOverlays(ctx, state, visibleBuildings, o.selectedBuildingId);
+  drawWorkerSlotOverlays(ctx, state, visibleBuildings, o.selectedBuildingId, presentation.indoorResidentIds);
   lap('2b-slotOverlays');
 
   // 3) 선택 주민의 예정 경로 — 행군하는 점선(개미행렬) 애니메이션
@@ -1031,8 +1141,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     ctx.fillText('⚰️', corpse.x * TILE + TILE / 2, corpse.y * TILE + TILE / 2);
   }
   for (const r of state.residents) {
-    if (!r.alive || predatorScoutIds.has(r.id)) continue;
-    const p = residentPixelPos(r, o.alpha);
+    if (!r.alive || predatorScoutIds.has(r.id) || presentation.indoorResidentIds.has(r.id)) continue;
+    const workStance = presentation.workStances.get(r.id);
+    const p = residentPixelPos(r, o.alpha, workStance);
     if (!pixelRectIntersectsViewport(viewport, p.x - TILE, p.y - TILE, TILE * 2, TILE * 2)) continue;
     sprites.drawResident(ctx, {
       job: r.job,
@@ -1041,13 +1152,21 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       y: p.y,
       sick: r.sick,
       carrying: Object.keys(r.carrying).length > 0,
+      carryingWood: (r.carrying.wood ?? 0) > 0 || (r.carrying.brushwood ?? 0) > 0,
+      carryingGame: (r.carrying.meat ?? 0) > 0 || (r.carrying.hide ?? 0) > 0,
+      carryingMinerals: (r.carrying.stone ?? 0) > 0 || (r.carrying.iron ?? 0) > 0 ||
+        (r.carrying.silver ?? 0) > 0,
+      cartEquipped: r.cartEquipped,
+      farmerAction: farmerSpriteActionFor(r, presentation.oxPlowFarmerIds),
       selected: r.id === o.selectedResidentId,
       moving: r.px !== r.x || r.py !== r.y,
-      facing: r.x < r.px ? -1 : 1,
+      working: r.phase === 'working' && r.px === r.x && r.py === r.y,
+      facing: workStance?.facing ?? (r.x < r.px ? -1 : 1),
       militiaWeapon: militiaWeaponForResident(state, r),
       special: r.special,
       stage: r.stage,
       sizeScale: r.stage === 'infant' ? 0.42 : r.stage === 'child' ? 0.62 : r.stage === 'youth' ? 0.8 : 1,
+      animationTimeMs: o.animationTimeMs + stableResidentAnimationOffset(r.id),
     });
   }
 
@@ -1128,7 +1247,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   }
 
   // 8) 날씨 오버레이 (비/눈/눈보라/서리/혹한/해빙 홍수)
-  drawWeather(ctx, state.weather, canvas.width, canvas.height, viewport);
+  drawWeather(ctx, state.weather, logicalWidth, logicalHeight, viewport);
   lap('8-weather');
 
   // 9) 미답사 안개 — 지형/자원/건물/서식지를 탐색 전까지 가린다

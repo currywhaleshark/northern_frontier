@@ -131,6 +131,53 @@ function setupSingleHauler(seed = 9001) {
 
 {
   const { state, hauler, site } = setupSingleHauler();
+  const center = state.buildings.find(building => building.type === 'center');
+  assert.ok(center, 'center exists for final-approach timing');
+  state.map[site.y][site.x].buildingId = null;
+  for (const row of state.map) {
+    for (const tile of row) {
+      if (tile.buildingId == null) tile.terrain = 'plain';
+    }
+  }
+  const siteTile = state.map.flat().find(tile =>
+    tile.buildingId == null && Math.abs(tile.x - center.x) + Math.abs(tile.y - center.y) === 4);
+  assert.ok(siteTile, 'a deterministic final-approach path exists');
+  site.x = siteTile.x;
+  site.y = siteTile.y;
+  siteTile.buildingId = site.id;
+  hauler.x = site.x;
+  hauler.y = site.y;
+  hauler.px = site.x;
+  hauler.py = site.y;
+  site.inventory.carts = 1;
+  state.resources.carts = 0;
+
+  simulation.advanceTick(state);
+  assert.equal(hauler.carrying.carts, 1, 'the hauler starts the delivery with cargo visible');
+
+  let finalApproach = null;
+  for (let tick = 0; tick < 80 && state.resources.carts === 0; tick++) {
+    const before = {
+      x: hauler.x, y: hauler.y, px: hauler.px, py: hauler.py,
+      cargo: hauler.carrying.carts ?? 0,
+    };
+    simulation.advanceTick(state);
+    if (state.resources.carts > 0) finalApproach = before;
+  }
+
+  assert.ok(finalApproach, 'the cargo reaches settlement storage');
+  assert.ok(finalApproach.px !== finalApproach.x || finalApproach.py !== finalApproach.y,
+    'the previous tick is still visually interpolating the final approach');
+  assert.equal(finalApproach.cargo, 1,
+    'cargo remains visible throughout the final approach');
+  assert.equal(hauler.px, hauler.x, 'unloading waits until horizontal interpolation is complete');
+  assert.equal(hauler.py, hauler.y, 'unloading waits until vertical interpolation is complete');
+  assert.equal(hauler.carrying.carts ?? 0, 0, 'cargo is removed only after arrival');
+  assert.equal(hauler.phase, 'rest', 'the hauler pauses at the destination after unloading');
+}
+
+{
+  const { state, hauler, site } = setupSingleHauler();
   site.inventory.grain = 1;
   const rock = state.map.flat().find(tile =>
     tile.buildingId == null && Math.abs(tile.x - hauler.x) + Math.abs(tile.y - hauler.y) === 1);

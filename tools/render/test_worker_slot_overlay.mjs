@@ -61,6 +61,7 @@ class FakeContext {
   }
 
   beginPath() {}
+  clip() {}
   clearRect() {}
   closePath() {}
   drawImage() {}
@@ -70,9 +71,13 @@ class FakeContext {
   fillText() {}
   lineTo() {}
   moveTo() {}
+  rect() {}
   restore() {}
   save() {}
   setLineDash() {}
+  setTransform(a, b, c, d, e, f) {
+    this.ops.push({ kind: 'setTransform', a, b, c, d, e, f });
+  }
   stroke() {}
   strokeRect() {}
   createRadialGradient() { return new FakeGradient(); }
@@ -133,6 +138,7 @@ globalThis.document = {
 const compiledDir = compileModules();
 const { renderScene } = await import(pathToFileURL(join(compiledDir, 'render', 'renderer.mjs')).href);
 const { JOB_COLORS } = await import(pathToFileURL(join(compiledDir, 'game', 'constants.mjs')).href);
+const { newGame } = await import(pathToFileURL(join(compiledDir, 'game', 'simulation.mjs')).href);
 
 const map = makeMap(8, 8);
 const field = { id: 101, type: 'field', x: 2, y: 2, progress: 3, built: true, fieldGrowth: 60 };
@@ -142,7 +148,8 @@ for (let y = smithy.y; y < smithy.y + 2; y++) {
   for (let x = smithy.x; x < smithy.x + 2; x++) map[y][x].buildingId = smithy.id;
 }
 
-const state = {
+const state = newGame(12345);
+Object.assign(state, {
   day: 1,
   subTick: 4,
   weather: 'clear',
@@ -164,7 +171,7 @@ const state = {
   rank: 'bu',
   raiders: null,
   battle: null,
-};
+});
 
 const ops = [];
 const sprites = {
@@ -203,6 +210,34 @@ assert.ok(
 assert.ok(
   slotArcs.some(op => op.radius > 1.5 && op.radius < 4),
   'unselected slotted building draws compact dots',
+);
+
+const hdOps = [];
+renderScene(makeCanvas(hdOps, 360, 360), state, {
+  alpha: 0,
+  animationTimeMs: 0,
+  hover: null,
+  placingType: null,
+  selected: null,
+  selectedResidentId: null,
+  selectedBuildingId: field.id,
+  renderScale: 2,
+  viewport: {
+    pixelX: 0,
+    pixelY: 0,
+    pixelWidth: 180,
+    pixelHeight: 180,
+    tileMinX: 0,
+    tileMinY: 0,
+    tileMaxX: 7,
+    tileMaxY: 7,
+  },
+  sprites,
+});
+assert.deepEqual(
+  hdOps.find(op => op.kind === 'setTransform'),
+  { kind: 'setTransform', a: 2, b: 0, c: 0, d: 2, e: 0, f: 0 },
+  '2x zoom renders logical scene coordinates into a doubled backing canvas',
 );
 
 console.log('worker slot overlay tests passed');

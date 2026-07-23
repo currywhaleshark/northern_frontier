@@ -32,10 +32,11 @@ import { performPhysicianTreatment } from './medicine';
 import { mineralDepositsInMineRange, servingMineForTile } from './miningSites';
 import { rankProductionEfficiency } from './productionEfficiency';
 import { buildGoalField, describeGoal, type DescribedGoal, type GoalField } from './pathGoals';
+import { farmWorkTileForTick } from './farmWorkTiles';
 import { reconcileResidentHomes } from './residents';
 import { canEnterForeignTerritory, canWorkForeignTerritory, noteTerritoryViolation } from './territory';
 import {
-  assignedBuildingForResident, autoAssignWorkersToBuilding, isResidentInAssignedSlot,
+  assignedBuildingForResident, assignedWorkers, autoAssignWorkersToBuilding, isResidentInAssignedSlot,
 } from './workerSlots';
 import {
   addBuildingStock, buildingStock, depositResidentToBuilding, depositResidentToSettlement,
@@ -59,6 +60,7 @@ interface Ctx {
   huntable: Map<string, number>; // 사냥 가능 타일 ("x,y") → 수확 배율 — 서식지 범위/크기와 연동
   goalFields: Partial<Record<'forest' | 'huntable' | 'mineral', GoalField>>;
   goalFieldUserCounts: Record<'forest' | 'huntable' | 'mineral', number>;
+  farmerWorkIdsByPlot: Map<number, number[]>;
 }
 
 const PRODUCING_JOBS = [
@@ -351,6 +353,12 @@ function moveSteps(state: GameState, r: Resident, ctx: Ctx): number {
 
 type GoResult = 'arrived' | 'moving' | 'stuck';
 
+// 논리 좌표가 목표에 닿은 틱에도 화면은 px/py에서 x/y로 이동을 보간한다.
+// 짐 내리기는 그 보간이 끝난 다음 틱에 실행해야 한다.
+function isSettledAtGoal(resident: Resident, result: GoResult): boolean {
+  return result === 'arrived' && resident.px === resident.x && resident.py === resident.y;
+}
+
 // 실패한 경로 탐색은 몇 서브틱 쉬어 간다 — 막힌 주민이 매 틱 지도 전체를 다시 뒤지는 것을 막는다.
 // (저장되지 않는 순수 성능 캐시. 지형은 서브틱 사이에 거의 변하지 않는다.)
 const PATH_FAIL_COOLDOWN_TICKS = 3;
@@ -568,7 +576,7 @@ function depositCarriedResources(
   r.phase = 'toDeposit';
   r.task = task;
   const st = goTo(state, r, ctx, depositGoal(state, extra));
-  if (st === 'arrived') {
+  if (isSettledAtGoal(r, st)) {
     unloadAtDepositGoal(state, r, extra);
     r.phase = 'rest';
   } else if (st === 'stuck') {
@@ -667,7 +675,7 @@ function supplyWorkplaceInputs(
     resident.phase = 'toDeposit';
     resident.task = '작업장에 원료 운반';
     const st = goTo(state, resident, ctx, buildingGoal(state, workplace.id));
-    if (st === 'arrived') {
+    if (isSettledAtGoal(resident, st)) {
       unloadWorkplaceInputs(workplace, resident, inputSet);
       resident.phase = 'rest';
       resident.path = [];
@@ -815,7 +823,7 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
     r.task = o.taskHaul;
     const targets = o.depositTargets?.(state, r) ?? depositBuildings(state, o.depositExtra);
     const st = goTo(state, r, ctx, buildingInteractionGoal(state, targets.map(building => building.id)));
-    if (st === 'arrived') {
+    if (isSettledAtGoal(r, st)) {
       const productionSite = targets.find(building => !isStorageBuilding(building) &&
         isResidentAtBuildingInteraction(state, r, building.id));
       if (productionSite) depositResidentToBuilding(productionSite, r);
@@ -872,7 +880,7 @@ function clearManualOrder(r: Resident): void {
 }
 
 function exactTileGoal(x: number, y: number): (t: Tile) => boolean {
-  return t => t.x === x && t.y === y;
+  return describeGoal(t => t.x === x && t.y === y, [{ x, y }]);
 }
 
 function manualGoTo(
@@ -970,7 +978,7 @@ function handleManualHaulerTransport(
     resident.phase = 'toDeposit';
     resident.task = `${BUILDING_DEFS[source.type].name} 강제 운송`;
     const st = manualGoTo(state, resident, ctx, order, depositGoal(state, []));
-    if (st === 'arrived' || st === 'stuck') {
+    if (isSettledAtGoal(resident, st) || st === 'stuck') {
       depositResidentToSettlement(state, resident);
       clearHaulTask(resident);
       resident.phase = 'rest';
@@ -1133,6 +1141,26 @@ function maybeApplyQueuedCrop(farm: Building, season: Season): void {
   farm.sownArea = 0;
 }
 
+function goToFarmerWorkTile(state: GameState, resident: Resident, ctx: Ctx, farm: Building): GoResult {
+  let workerIds = ctx.farmerWorkIdsByPlot.get(farm.id);
+  if (!workerIds) {
+    workerIds = assignedWorkers(state, farm).map(worker => worker.id);
+    ctx.farmerWorkIdsByPlot.set(farm.id, workerIds);
+  }
+  const currentTile = state.map[resident.y]?.[resident.x];
+  if (currentTile?.buildingId !== farm.id) {
+    const entry = farmWorkTileForTick(farm, workerIds, resident.id, 0);
+    const status = goTo(state, resident, ctx, exactTileGoal(entry.x, entry.y));
+    resident.phase = status === 'arrived' ? 'working' : 'toWork';
+    return status;
+  }
+
+  const target = farmWorkTileForTick(farm, workerIds, resident.id, absoluteTick(state));
+  const status = goTo(state, resident, ctx, exactTileGoal(target.x, target.y));
+  resident.phase = status === 'arrived' ? 'working' : 'toWork';
+  return status;
+}
+
 function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
   const p = CONFIG.production;
@@ -1184,7 +1212,7 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
       loiterNearBuilding(state, r, ctx, farm, 3, '수확 마무리');
       return;
     }
-    const st = goTo(state, r, ctx, buildingGoal(state, target.id));
+    const st = goToFarmerWorkTile(state, r, ctx, target);
     if (st === 'arrived') {
       r.task = '수확 중';
       const take = Math.min(
@@ -1221,7 +1249,7 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
 
   // 파종철: 아직 씨를 넣지 못한 칸부터 채운다
   if (canPlantCropNow(cropId, farm.type, ctx.season) && sown < area) {
-    const st = goTo(state, r, ctx, buildingGoal(state, farm.id));
+    const st = goToFarmerWorkTile(state, r, ctx, farm);
     if (st === 'arrived') {
       r.task = `${crop.name} 파종 중`;
       const sowRate = ctx.outdoor * effOf(r) * plotWorkMultiplier(state, farm) / f.sowWorkPerTile;
@@ -1244,7 +1272,7 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
     loiterNearBuilding(state, r, ctx, farm, 3, `${BUILDING_DEFS[farm.type].name} 관리`);
     return;
   }
-  const st = goTo(state, r, ctx, buildingGoal(state, target.id));
+  const st = goToFarmerWorkTile(state, r, ctx, target);
   if (st === 'arrived') {
     r.task = `${crop.name} 재배 중`;
     const weatherGrow = state.weather === 'rain' ? 1.2 : state.weather === 'frost' ? 0.7 : 1;
@@ -1262,9 +1290,14 @@ function builderTick(state: GameState, r: Resident, ctx: Ctx): void {
   const sites = state.buildings.filter(b => !b.built);
   const repairs = sites.filter(b => b.repairing);
   const target = nearestBuilding(r, repairs.length > 0 ? repairs : sites);
-  if (!target) { loiterNearCenter(state, r, ctx, '지을 것 없음'); return; }
+  if (!target) {
+    r.phase = 'rest';
+    loiterNearCenter(state, r, ctx, '지을 것 없음');
+    return;
+  }
   const st = goTo(state, r, ctx, buildingGoal(state, target.id));
   if (st === 'arrived') {
+    r.phase = 'working';
     r.task = target.repairing ? '건물 수리 중' : '건설 중';
     const def = BUILDING_DEFS[target.type];
     target.progress += CONFIG.agents.work.buildPerSubtick * effOf(r) * ctx.tMod * Math.max(0.5, ctx.outdoor);
@@ -1293,6 +1326,7 @@ function builderTick(state: GameState, r: Resident, ctx: Ctx): void {
       }
     }
   } else {
+    r.phase = 'toWork';
     r.task = st === 'stuck' ? '길이 막힘' : '공사장으로 이동';
   }
 }
@@ -1538,7 +1572,7 @@ function handleSupplyHaulTask(state: GameState, resident: Resident, ctx: Ctx): v
     resident.phase = 'toDeposit';
     resident.task = `${BUILDING_DEFS[target.type].name} 재료 운반`;
     const status = goTo(state, resident, ctx, buildingGoal(state, target.id));
-    if (status === 'arrived') {
+    if (isSettledAtGoal(resident, status)) {
       depositResidentToBuilding(target, resident);
       clearHaulTask(resident);
       resident.phase = 'rest';
@@ -1589,7 +1623,7 @@ function haulerTick(state: GameState, r: Resident, ctx: Ctx): void {
     r.phase = 'toDeposit';
     r.task = '창고로 운반';
     const st = goTo(state, r, ctx, depositGoal(state, []));
-    if (st === 'arrived' || st === 'stuck') {
+    if (isSettledAtGoal(r, st) || st === 'stuck') {
       depositResidentToSettlement(state, r);
       clearHaulTask(r);
       r.phase = 'rest';
@@ -2232,23 +2266,40 @@ function idleTick(state: GameState, r: Resident, ctx: Ctx): void {
   loiterNearCenter(state, r, ctx, '대기');
 }
 
+function stationedIndoorWorkerTick(
+  state: GameState,
+  resident: Resident,
+  ctx: Ctx,
+  building: Building,
+  task: string,
+): void {
+  const status = goTo(state, resident, ctx, buildingGoal(state, building.id));
+  if (status === 'arrived') {
+    resident.phase = 'working';
+    resident.task = task;
+  } else {
+    resident.phase = status === 'stuck' ? 'rest' : 'toWork';
+    resident.task = status === 'stuck' ? '길이 막힘' : `${BUILDING_DEFS[building.type].name} 이동 중`;
+  }
+}
+
 // 훈장·무당·승려 — 제 일터에 상주한다 (효과는 배정 여부로 판정된다)
 function teacherTick(state: GameState, r: Resident, ctx: Ctx): void {
   const school = assignedWorkplace(state, r, ctx, 'school', '서당 배정 없음');
   if (!school) return;
-  loiterNearBuilding(state, r, ctx, school, 2, '글 가르치는 중');
+  stationedIndoorWorkerTick(state, r, ctx, school, '글 가르치는 중');
 }
 
 function shamanTick(state: GameState, r: Resident, ctx: Ctx): void {
   const shrine = assignedWorkplace(state, r, ctx, 'shrine', '당집 배정 없음');
   if (!shrine) return;
-  loiterNearBuilding(state, r, ctx, shrine, 2, '치성 드리는 중');
+  stationedIndoorWorkerTick(state, r, ctx, shrine, '치성 드리는 중');
 }
 
 function monkTick(state: GameState, r: Resident, ctx: Ctx): void {
   const hermitage = assignedWorkplace(state, r, ctx, 'hermitage', '암자 배정 없음');
   if (!hermitage) return;
-  loiterNearBuilding(state, r, ctx, hermitage, 2, '독경 중');
+  stationedIndoorWorkerTick(state, r, ctx, hermitage, '독경 중');
 }
 
 // 장의사 — 시신을 수습해 묘지에 안장한다. 시신이 없으면 묘지를 돌본다.
@@ -2344,6 +2395,7 @@ export function agentsTick(state: GameState): void {
     huntable: collectHuntableTiles(state.map, state.habitats, CONFIG.agents.hunting),
     goalFields: {},
     goalFieldUserCounts,
+    farmerWorkIdsByPlot: new Map(),
   };
 
   for (const r of living) {

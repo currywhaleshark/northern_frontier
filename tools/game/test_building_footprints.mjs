@@ -213,6 +213,11 @@ function footprintIds(state, type, x, y) {
   assert.equal(storehouse.built, true, 'a builder repairs the damaged building');
   assert.equal(storehouse.repairing, false);
   assert.ok(state.log.some(entry => entry.text.includes('수리가 끝나')));
+  assert.equal(builder.phase, 'working', 'the builder finishes the final repair action');
+
+  agents.agentsTick(state);
+  assert.equal(builder.phase, 'rest', 'a builder with no remaining site leaves the hammering state');
+  assert.equal(builder.task, '지을 것 없음');
 }
 
 console.log('building footprint tests passed');

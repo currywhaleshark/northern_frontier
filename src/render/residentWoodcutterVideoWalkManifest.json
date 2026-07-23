@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-runtime-variant-manifest",
+  "characterId": "resident-woodcutter-video-walk-v2",
+  "engine": "component-row",
+  "game_input": "/assets/resident-woodcutter-video-walk-v2.png",
+  "high_definition_game_input": "/assets/resident-woodcutter-video-walk-hd-v2.png",
+  "degraded_static_fallback": false,
+  "display": {
+    "width": 28,
+    "height": 40
+  },
+  "animation": {
+    "rows": {
+      "male_axe_walk": {
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [200, 200, 200, 200],
+        "loop": true
+      },
+      "female_axe_walk": {
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [200, 200, 200, 200],
+        "loop": true
+      },
+      "male_jige_walk": {
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [200, 200, 200, 200],
+        "loop": true
+      },
+      "female_jige_walk": {
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [200, 200, 200, 200],
+        "loop": true
+      }
+    }
+  },
+  "frame_layout": {
+    "sheetWidth": 84,
+    "sheetHeight": 160,
+    "cellWidth": 28,
+    "cellHeight": 40,
+    "rows": {
+      "male_axe_walk": [
+        { "x": 0, "y": 0, "w": 28, "h": 40 },
+        { "x": 28, "y": 0, "w": 28, "h": 40 },
+        { "x": 0, "y": 0, "w": 28, "h": 40 },
+        { "x": 56, "y": 0, "w": 28, "h": 40 }
+      ],
+      "female_axe_walk": [
+        { "x": 0, "y": 40, "w": 28, "h": 40 },
+        { "x": 28, "y": 40, "w": 28, "h": 40 },
+        { "x": 0, "y": 40, "w": 28, "h": 40 },
+        { "x": 56, "y": 40, "w": 28, "h": 40 }
+      ],
+      "male_jige_walk": [
+        { "x": 0, "y": 80, "w": 28, "h": 40 },
+        { "x": 28, "y": 80, "w": 28, "h": 40 },
+        { "x": 0, "y": 80, "w": 28, "h": 40 },
+        { "x": 56, "y": 80, "w": 28, "h": 40 }
+      ],
+      "female_jige_walk": [
+        { "x": 0, "y": 120, "w": 28, "h": 40 },
+        { "x": 28, "y": 120, "w": 28, "h": 40 },
+        { "x": 0, "y": 120, "w": 28, "h": 40 },
+        { "x": 56, "y": 120, "w": 28, "h": 40 }
+      ]
+    }
+  },
+  "high_definition_frame_layout": {
+    "sheetWidth": 168,
+    "sheetHeight": 320,
+    "cellWidth": 56,
+    "cellHeight": 80,
+    "rows": {
+      "male_axe_walk": [
+        { "x": 0, "y": 0, "w": 56, "h": 80 },
+        { "x": 56, "y": 0, "w": 56, "h": 80 },
+        { "x": 0, "y": 0, "w": 56, "h": 80 },
+        { "x": 112, "y": 0, "w": 56, "h": 80 }
+      ],
+      "female_axe_walk": [
+        { "x": 0, "y": 80, "w": 56, "h": 80 },
+        { "x": 56, "y": 80, "w": 56, "h": 80 },
+        { "x": 0, "y": 80, "w": 56, "h": 80 },
+        { "x": 112, "y": 80, "w": 56, "h": 80 }
+      ],
+      "male_jige_walk": [
+        { "x": 0, "y": 160, "w": 56, "h": 80 },
+        { "x": 56, "y": 160, "w": 56, "h": 80 },
+        { "x": 0, "y": 160, "w": 56, "h": 80 },
+        { "x": 112, "y": 160, "w": 56, "h": 80 }
+      ],
+      "female_jige_walk": [
+        { "x": 0, "y": 240, "w": 56, "h": 80 },
+        { "x": 56, "y": 240, "w": 56, "h": 80 },
+        { "x": 0, "y": 240, "w": 56, "h": 80 },
+        { "x": 112, "y": 240, "w": 56, "h": 80 }
+      ]
+    }
+  }
+}

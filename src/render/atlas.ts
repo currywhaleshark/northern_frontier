@@ -121,6 +121,73 @@ import {
   CENTER_PROMOTION_SHEET,
   centerPromotionSourceRect,
 } from './centerPromotionAssets';
+import {
+  RESIDENT_WOODCUTTER_LOAD_SHEET,
+  RESIDENT_WOODCUTTER_LOCOMOTION_SHEET,
+  RESIDENT_WOODCUTTER_WORK_SHEET,
+  woodcutterLoadSourceRect,
+  woodcutterLocomotionSourceRect,
+  woodcutterWorkSourceRect,
+} from './residentWoodcutterAssets';
+import {
+  RESIDENT_HUNTER_HUNT_SHEET,
+  RESIDENT_HUNTER_LOAD_SHEET,
+  RESIDENT_HUNTER_LOCOMOTION_SHEET,
+  hunterHuntSourceRect,
+  hunterLoadSourceRect,
+  hunterLocomotionSourceRect,
+} from './residentHunterAssets';
+import {
+  RESIDENT_HAULER_CART_LOCOMOTION_SHEET,
+  RESIDENT_HAULER_LOCOMOTION_SHEET,
+  haulerCartLocomotionSourceRect,
+  haulerLocomotionSourceRect,
+} from './residentHaulerAssets';
+import {
+  RESIDENT_FARMER_HARVEST_SHEET,
+  RESIDENT_FARMER_OX_PLOW_SHEET,
+  RESIDENT_FARMER_TILL_SHEET,
+  farmerHarvestSourceRect,
+  farmerOxPlowSourceRect,
+  farmerTillSourceRect,
+} from './residentFarmerAssets';
+import {
+  RESIDENT_BUILDER_LOCOMOTION_SHEET,
+  RESIDENT_BUILDER_WORK_SHEET,
+  builderLocomotionSourceRect,
+  builderWorkSourceRect,
+} from './residentBuilderAssets';
+import {
+  RESIDENT_MINER_LOAD_SHEET,
+  RESIDENT_MINER_LOCOMOTION_SHEET,
+  RESIDENT_MINER_WORK_SHEET,
+  minerLoadSourceRect,
+  minerLocomotionSourceRect,
+  minerWorkSourceRect,
+} from './residentMinerAssets';
+import {
+  RESIDENT_HERBALIST_GATHER_SHEET,
+  RESIDENT_HERBALIST_LOCOMOTION_SHEET,
+  herbalistGatherSourceRect,
+  herbalistLocomotionSourceRect,
+} from './residentHerbalistAssets';
+import {
+  RESIDENT_COMMON_LOCOMOTION_SHEET,
+  commonLocomotionSourceRect,
+} from './residentCommonLocomotionAssets';
+import {
+  RESIDENT_IDLE_VIDEO_WALK_SHEETS,
+  idleVideoWalkSourceRect,
+} from './residentIdleVideoWalkAssets';
+import {
+  RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS,
+  woodcutterVideoWalkSourceRect,
+  type WoodcutterVideoWalkKind,
+} from './residentWoodcutterVideoWalkAssets';
+import {
+  RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS,
+  woodcutterVideoWorkSourceRect,
+} from './residentWoodcutterVideoWorkAssets';
 
 const PITCH = 17;
 const T = 16;
@@ -157,107 +224,144 @@ let foreignSiteCoreSheet: HTMLImageElement | null = null;
 let foreignSitePropSheet: HTMLImageElement | null = null;
 let specialResidentSheet: HTMLImageElement | null = null;
 let centerPromotionSheet: HTMLImageElement | null = null;
-let loaded = 0;
+let residentWoodcutterWorkSheet: HTMLImageElement | null = null;
+let residentWoodcutterLocomotionSheet: HTMLImageElement | null = null;
+let residentWoodcutterLoadSheet: HTMLImageElement | null = null;
+let residentHunterHuntSheet: HTMLImageElement | null = null;
+let residentHunterLocomotionSheet: HTMLImageElement | null = null;
+let residentHunterLoadSheet: HTMLImageElement | null = null;
+let residentHaulerLocomotionSheet: HTMLImageElement | null = null;
+let residentHaulerCartLocomotionSheet: HTMLImageElement | null = null;
+let residentFarmerTillSheet: HTMLImageElement | null = null;
+let residentFarmerHarvestSheet: HTMLImageElement | null = null;
+let residentFarmerOxPlowSheet: HTMLImageElement | null = null;
+let residentBuilderLocomotionSheet: HTMLImageElement | null = null;
+let residentBuilderWorkSheet: HTMLImageElement | null = null;
+let residentMinerLocomotionSheet: HTMLImageElement | null = null;
+let residentMinerWorkSheet: HTMLImageElement | null = null;
+let residentMinerLoadSheet: HTMLImageElement | null = null;
+let residentHerbalistLocomotionSheet: HTMLImageElement | null = null;
+let residentHerbalistGatherSheet: HTMLImageElement | null = null;
+let residentCommonLocomotionSheet: HTMLImageElement | null = null;
+let residentIdleVideoWalkSheet: HTMLImageElement | null = null;
+let residentIdleVideoWalkHdSheet: HTMLImageElement | null = null;
+let residentWoodcutterVideoWalkSheet: HTMLImageElement | null = null;
+let residentWoodcutterVideoWalkHdSheet: HTMLImageElement | null = null;
+let residentWoodcutterVideoWorkSheet: HTMLImageElement | null = null;
+let residentWoodcutterVideoWorkHdSheet: HTMLImageElement | null = null;
 let started = false;
+
+export interface AtlasAssetState {
+  src: string;
+  status: 'idle' | 'loading' | 'loaded' | 'failed';
+  required: boolean;
+}
+
+const atlasAssetStates: AtlasAssetState[] = [];
+const atlasAssetSettledListeners = new Set<() => void>();
+const warnedAssetFailures = new Set<string>();
+
+function loadAtlasAsset(
+  src: string,
+  required: boolean,
+  assign: (image: HTMLImageElement | null) => void,
+): void {
+  const state: AtlasAssetState = { src, required, status: 'loading' };
+  atlasAssetStates.push(state);
+  const image = new Image();
+  const settle = (status: 'loaded' | 'failed') => {
+    if (state.status !== 'loading') return;
+    state.status = status;
+    assign(status === 'loaded' ? image : null);
+    if (status === 'failed' && !warnedAssetFailures.has(src)) {
+      warnedAssetFailures.add(src);
+      const kind = required ? 'core' : 'optional resident presentation';
+      console.warn(`[atlas] Failed to load ${kind} asset: ${src}`);
+    }
+    for (const listener of atlasAssetSettledListeners) listener();
+  };
+  image.onload = () => { settle('loaded'); };
+  image.onerror = () => { settle('failed'); };
+  image.src = src;
+}
 
 function ensureLoaded(): void {
   if (started || typeof Image === 'undefined') return;
   started = true;
-  sheet = new Image();
-  sheet.onload = () => { loaded++; };
-  sheet.src = '/assets/roguelikeSheet_transparent.png';
-  chars = new Image();
-  chars.onload = () => { loaded++; };
-  chars.src = '/assets/roguelikeChar_transparent.png';
-  riverSheet = new Image();
-  riverSheet.onload = () => { loaded++; };
-  riverSheet.src = '/assets/river-mask-autotile-28px-sheet.png';
-  historicalTerrainSheet = new Image();
-  historicalTerrainSheet.onload = () => { loaded++; };
-  historicalTerrainSheet.src = '/assets/folk-warm-terrain-v3-28px-sheet.png';
-  terrainObjectSheet = new Image();
-  terrainObjectSheet.onload = () => { loaded++; };
-  terrainObjectSheet.src = GENERATED_TERRAIN_OBJECT_SHEET.src;
-  buildingSheet = new Image();
-  buildingSheet.onload = () => { loaded++; };
-  buildingSheet.src = GENERATED_BUILDING_SHEET.src;
-  largeBuildingSheet = new Image();
-  largeBuildingSheet.onload = () => { loaded++; };
-  largeBuildingSheet.src = GENERATED_LARGE_BUILDING_SHEET.src;
-  promotionBuildingSheet = new Image();
-  promotionBuildingSheet.onload = () => { loaded++; };
-  promotionBuildingSheet.src = PROMOTION_BUILDING_SHEET.src;
-  promotionLargeBuildingSheet = new Image();
-  promotionLargeBuildingSheet.onload = () => { loaded++; };
-  promotionLargeBuildingSheet.src = PROMOTION_LARGE_BUILDING_SHEET.src;
-  const promotionChars = new Image();
-  promotionChars.onload = () => {
-    promotionCharacterSheet = promotionChars;
-    loaded++;
-  };
-  promotionChars.src = PROMOTION_CHARACTER_SHEET.src;
-  const militiaWeapons = new Image();
-  militiaWeapons.onload = () => {
-    militiaWeaponSheet = militiaWeapons;
-    loaded++;
-  };
-  militiaWeapons.src = MILITIA_WEAPON_SHEET.src;
-  wallFamilySheet = new Image();
-  wallFamilySheet.onload = () => { loaded++; };
-  wallFamilySheet.src = WALL_FAMILY_SHEET.src;
-  wallGateSheet = new Image();
-  wallGateSheet.onload = () => { loaded++; };
-  wallGateSheet.src = WALL_GATE_SHEET.src;
-  specializedBuildingSheet = new Image();
-  specializedBuildingSheet.onload = () => { loaded++; };
-  specializedBuildingSheet.src = SPECIALIZED_BUILDING_SHEET.src;
-  specializedLargeBuildingSheet = new Image();
-  specializedLargeBuildingSheet.onload = () => { loaded++; };
-  specializedLargeBuildingSheet.src = SPECIALIZED_LARGE_BUILDING_SHEET.src;
-  specializedCharacterSheet = new Image();
-  specializedCharacterSheet.onload = () => { loaded++; };
-  specializedCharacterSheet.src = SPECIALIZED_CHARACTER_SHEET.src;
-  newContentBuildingSheet = new Image();
-  newContentBuildingSheet.onload = () => { loaded++; };
-  newContentBuildingSheet.src = NEW_CONTENT_BUILDING_SHEET.src;
-  newContentLargeBuildingSheet = new Image();
-  newContentLargeBuildingSheet.onload = () => { loaded++; };
-  newContentLargeBuildingSheet.src = NEW_CONTENT_LARGE_BUILDING_SHEET.src;
-  newContentResidentSheet = new Image();
-  newContentResidentSheet.onload = () => { loaded++; };
-  newContentResidentSheet.src = NEW_CONTENT_RESIDENT_SHEET.src;
-  factionRaiderSheet = new Image();
-  factionRaiderSheet.onload = () => { loaded++; };
-  factionRaiderSheet.src = FACTION_RAIDER_SHEET.src;
-  buildingDamageSheet = new Image();
-  buildingDamageSheet.onload = () => { loaded++; };
-  buildingDamageSheet.src = BUILDING_DAMAGE_SHEET.src;
-  foreignResidentSheet = new Image();
-  foreignResidentSheet.onload = () => { loaded++; };
-  foreignResidentSheet.src = FOREIGN_RESIDENT_SHEET.src;
-  foreignSiteCoreSheet = new Image();
-  foreignSiteCoreSheet.onload = () => { loaded++; };
-  foreignSiteCoreSheet.src = FOREIGN_SITE_CORE_SHEET.src;
-  foreignSitePropSheet = new Image();
-  foreignSitePropSheet.onload = () => { loaded++; };
-  foreignSitePropSheet.src = FOREIGN_SITE_PROP_SHEET.src;
-  specialResidentSheet = new Image();
-  specialResidentSheet.onload = () => { loaded++; };
-  specialResidentSheet.src = SPECIAL_RESIDENT_SHEET.src;
-  centerPromotionSheet = new Image();
-  centerPromotionSheet.onload = () => { loaded++; };
-  centerPromotionSheet.src = CENTER_PROMOTION_SHEET.src;
-  const characterSheet = new Image();
-  characterSheet.onload = () => {
-    generatedCharacterSheet = characterSheet;
-    loaded++;
-  };
-  characterSheet.src = GENERATED_CHARACTER_SHEET.src;
+  loadAtlasAsset('/assets/roguelikeSheet_transparent.png', true, image => { sheet = image; });
+  loadAtlasAsset('/assets/roguelikeChar_transparent.png', true, image => { chars = image; });
+  loadAtlasAsset('/assets/river-mask-autotile-28px-sheet.png', true, image => { riverSheet = image; });
+  loadAtlasAsset('/assets/folk-warm-terrain-v3-28px-sheet.png', true, image => { historicalTerrainSheet = image; });
+  loadAtlasAsset(GENERATED_TERRAIN_OBJECT_SHEET.src, true, image => { terrainObjectSheet = image; });
+  loadAtlasAsset(GENERATED_BUILDING_SHEET.src, true, image => { buildingSheet = image; });
+  loadAtlasAsset(GENERATED_LARGE_BUILDING_SHEET.src, true, image => { largeBuildingSheet = image; });
+  loadAtlasAsset(PROMOTION_BUILDING_SHEET.src, true, image => { promotionBuildingSheet = image; });
+  loadAtlasAsset(PROMOTION_LARGE_BUILDING_SHEET.src, true, image => { promotionLargeBuildingSheet = image; });
+  loadAtlasAsset(PROMOTION_CHARACTER_SHEET.src, true, image => { promotionCharacterSheet = image; });
+  loadAtlasAsset(MILITIA_WEAPON_SHEET.src, true, image => { militiaWeaponSheet = image; });
+  loadAtlasAsset(WALL_FAMILY_SHEET.src, true, image => { wallFamilySheet = image; });
+  loadAtlasAsset(WALL_GATE_SHEET.src, true, image => { wallGateSheet = image; });
+  loadAtlasAsset(SPECIALIZED_BUILDING_SHEET.src, true, image => { specializedBuildingSheet = image; });
+  loadAtlasAsset(SPECIALIZED_LARGE_BUILDING_SHEET.src, true, image => { specializedLargeBuildingSheet = image; });
+  loadAtlasAsset(SPECIALIZED_CHARACTER_SHEET.src, true, image => { specializedCharacterSheet = image; });
+  loadAtlasAsset(NEW_CONTENT_BUILDING_SHEET.src, true, image => { newContentBuildingSheet = image; });
+  loadAtlasAsset(NEW_CONTENT_LARGE_BUILDING_SHEET.src, true, image => { newContentLargeBuildingSheet = image; });
+  loadAtlasAsset(NEW_CONTENT_RESIDENT_SHEET.src, true, image => { newContentResidentSheet = image; });
+  loadAtlasAsset(FACTION_RAIDER_SHEET.src, true, image => { factionRaiderSheet = image; });
+  loadAtlasAsset(BUILDING_DAMAGE_SHEET.src, true, image => { buildingDamageSheet = image; });
+  loadAtlasAsset(FOREIGN_RESIDENT_SHEET.src, true, image => { foreignResidentSheet = image; });
+  loadAtlasAsset(FOREIGN_SITE_CORE_SHEET.src, true, image => { foreignSiteCoreSheet = image; });
+  loadAtlasAsset(FOREIGN_SITE_PROP_SHEET.src, true, image => { foreignSitePropSheet = image; });
+  loadAtlasAsset(SPECIAL_RESIDENT_SHEET.src, true, image => { specialResidentSheet = image; });
+  loadAtlasAsset(CENTER_PROMOTION_SHEET.src, true, image => { centerPromotionSheet = image; });
+  loadAtlasAsset(GENERATED_CHARACTER_SHEET.src, true, image => { generatedCharacterSheet = image; });
+
+  loadAtlasAsset(RESIDENT_WOODCUTTER_WORK_SHEET.src, false, image => { residentWoodcutterWorkSheet = image; });
+  loadAtlasAsset(RESIDENT_WOODCUTTER_LOCOMOTION_SHEET.src, false, image => { residentWoodcutterLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_WOODCUTTER_LOAD_SHEET.src, false, image => { residentWoodcutterLoadSheet = image; });
+  loadAtlasAsset(RESIDENT_HUNTER_HUNT_SHEET.src, false, image => { residentHunterHuntSheet = image; });
+  loadAtlasAsset(RESIDENT_HUNTER_LOCOMOTION_SHEET.src, false, image => { residentHunterLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_HUNTER_LOAD_SHEET.src, false, image => { residentHunterLoadSheet = image; });
+  loadAtlasAsset(RESIDENT_HAULER_LOCOMOTION_SHEET.src, false, image => { residentHaulerLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_HAULER_CART_LOCOMOTION_SHEET.src, false, image => { residentHaulerCartLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_FARMER_TILL_SHEET.src, false, image => { residentFarmerTillSheet = image; });
+  loadAtlasAsset(RESIDENT_FARMER_HARVEST_SHEET.src, false, image => { residentFarmerHarvestSheet = image; });
+  loadAtlasAsset(RESIDENT_FARMER_OX_PLOW_SHEET.src, false, image => { residentFarmerOxPlowSheet = image; });
+  loadAtlasAsset(RESIDENT_BUILDER_LOCOMOTION_SHEET.src, false, image => { residentBuilderLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_BUILDER_WORK_SHEET.src, false, image => { residentBuilderWorkSheet = image; });
+  loadAtlasAsset(RESIDENT_MINER_LOCOMOTION_SHEET.src, false, image => { residentMinerLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_MINER_WORK_SHEET.src, false, image => { residentMinerWorkSheet = image; });
+  loadAtlasAsset(RESIDENT_MINER_LOAD_SHEET.src, false, image => { residentMinerLoadSheet = image; });
+  loadAtlasAsset(RESIDENT_HERBALIST_LOCOMOTION_SHEET.src, false, image => { residentHerbalistLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_HERBALIST_GATHER_SHEET.src, false, image => { residentHerbalistGatherSheet = image; });
+  loadAtlasAsset(RESIDENT_COMMON_LOCOMOTION_SHEET.src, false, image => { residentCommonLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_IDLE_VIDEO_WALK_SHEETS.standard.src, false, image => { residentIdleVideoWalkSheet = image; });
+  loadAtlasAsset(RESIDENT_IDLE_VIDEO_WALK_SHEETS.highDefinition.src, false,
+    image => { residentIdleVideoWalkHdSheet = image; });
+  loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.standard.src, false,
+    image => { residentWoodcutterVideoWalkSheet = image; });
+  loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.highDefinition.src, false,
+    image => { residentWoodcutterVideoWalkHdSheet = image; });
+  loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.standard.src, false,
+    image => { residentWoodcutterVideoWorkSheet = image; });
+  loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.highDefinition.src, false,
+    image => { residentWoodcutterVideoWorkHdSheet = image; });
 }
 
 export function atlasReady(): boolean {
   ensureLoaded();
-  return loaded >= 26;
+  const requiredAssets = atlasAssetStates.filter(asset => asset.required);
+  return started && requiredAssets.length > 0 && requiredAssets.every(asset => asset.status === 'loaded');
+}
+
+export function atlasAssetStateSnapshot(): readonly Readonly<AtlasAssetState>[] {
+  ensureLoaded();
+  return atlasAssetStates.map(asset => ({ ...asset }));
+}
+
+export function onAtlasAssetSettled(listener: () => void): () => void {
+  atlasAssetSettledListeners.add(listener);
+  return () => { atlasAssetSettledListeners.delete(listener); };
 }
 
 // 아틀라스가 준비되면 아틀라스, 아니면 임시 그래픽
@@ -434,6 +538,226 @@ function drawGeneratedResident(
   drawGeneratedCharacterRect(
     ctx, img, generatedResidentSourceRect(p.job, p.gender), p.x, p.y, p.facing, bob, p.sizeScale ?? 1,
   );
+}
+
+function drawResidentCellRect(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  rect: SourceRect,
+  p: ResidentDrawParams,
+): void {
+  const displaySize = RESIDENT_COMMON_LOCOMOTION_SHEET.displaySize * (p.sizeScale ?? 1);
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.scale(generatedCharacterFacingScale(p.facing), 1);
+  ctx.drawImage(
+    img,
+    rect.sx,
+    rect.sy,
+    rect.sw,
+    rect.sh,
+    -displaySize / 2,
+    CHALF - displaySize,
+    displaySize,
+    displaySize,
+  );
+  ctx.restore();
+}
+
+function canvasBackingScale(ctx: CanvasRenderingContext2D): number {
+  if (typeof ctx.getTransform !== 'function') return 1;
+  const transform = ctx.getTransform();
+  return Math.hypot(transform.a, transform.b);
+}
+
+function drawIdleVideoWalk(
+  ctx: CanvasRenderingContext2D,
+  p: ResidentDrawParams,
+  animationTimeMs: number,
+): boolean {
+  const wantsHighDefinition = canvasBackingScale(ctx) >= 1.5;
+  const highDefinition = wantsHighDefinition && residentIdleVideoWalkHdSheet != null;
+  const image = highDefinition ? residentIdleVideoWalkHdSheet : residentIdleVideoWalkSheet;
+  if (!image) return false;
+  const rect = idleVideoWalkSourceRect(p.gender, animationTimeMs, highDefinition);
+  const sizeScale = p.sizeScale ?? 1;
+  const displayWidth = RESIDENT_IDLE_VIDEO_WALK_SHEETS.displayWidth * sizeScale;
+  const displayHeight = RESIDENT_IDLE_VIDEO_WALK_SHEETS.displayHeight * sizeScale;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.scale(generatedCharacterFacingScale(p.facing), 1);
+  ctx.drawImage(
+    image,
+    rect.sx,
+    rect.sy,
+    rect.sw,
+    rect.sh,
+    -displayWidth / 2,
+    CHALF - displayHeight,
+    displayWidth,
+    displayHeight,
+  );
+  ctx.restore();
+  return true;
+}
+
+function drawWoodcutterVideoWalk(
+  ctx: CanvasRenderingContext2D,
+  p: ResidentDrawParams,
+  animationTimeMs: number,
+  kind: WoodcutterVideoWalkKind,
+): boolean {
+  const wantsHighDefinition = canvasBackingScale(ctx) >= 1.5;
+  const highDefinition = wantsHighDefinition && residentWoodcutterVideoWalkHdSheet != null;
+  const image = highDefinition ? residentWoodcutterVideoWalkHdSheet : residentWoodcutterVideoWalkSheet;
+  if (!image) return false;
+  const rect = woodcutterVideoWalkSourceRect(p.gender, kind, animationTimeMs, highDefinition);
+  const sizeScale = p.sizeScale ?? 1;
+  const displayWidth = RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.displayWidth * sizeScale;
+  const displayHeight = RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.displayHeight * sizeScale;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.scale(generatedCharacterFacingScale(p.facing), 1);
+  ctx.drawImage(
+    image,
+    rect.sx,
+    rect.sy,
+    rect.sw,
+    rect.sh,
+    -displayWidth / 2,
+    CHALF - displayHeight,
+    displayWidth,
+    displayHeight,
+  );
+  ctx.restore();
+  return true;
+}
+
+function drawWoodcutterVideoWork(
+  ctx: CanvasRenderingContext2D,
+  p: ResidentDrawParams,
+  animationTimeMs: number,
+): boolean {
+  const wantsHighDefinition = canvasBackingScale(ctx) >= 1.5;
+  const highDefinition = wantsHighDefinition && residentWoodcutterVideoWorkHdSheet != null;
+  const image = highDefinition ? residentWoodcutterVideoWorkHdSheet : residentWoodcutterVideoWorkSheet;
+  if (!image) return false;
+  const rect = woodcutterVideoWorkSourceRect(p.gender, animationTimeMs, highDefinition);
+  const sizeScale = p.sizeScale ?? 1;
+  const displayWidth = RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.displayWidth * sizeScale;
+  const displayHeight = RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.displayHeight * sizeScale;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.scale(generatedCharacterFacingScale(p.facing), 1);
+  ctx.drawImage(
+    image,
+    rect.sx,
+    rect.sy,
+    rect.sw,
+    rect.sh,
+    -displayWidth / 2,
+    CHALF - displayHeight,
+    displayWidth,
+    displayHeight,
+  );
+  ctx.restore();
+  return true;
+}
+
+function drawOptionalResidentPresentation(
+  ctx: CanvasRenderingContext2D,
+  p: ResidentDrawParams,
+  animationTimeMs: number,
+): boolean {
+  const draw = (image: HTMLImageElement | null, rect: SourceRect): boolean => {
+    if (!image) return false;
+    drawGeneratedCharacterRect(ctx, image, rect, p.x, p.y, p.facing, 0, p.sizeScale ?? 1);
+    return true;
+  };
+  const drawCommon = (rect: SourceRect | null): boolean => {
+    if (!residentCommonLocomotionSheet || !rect) return false;
+    drawResidentCellRect(ctx, residentCommonLocomotionSheet, rect, p);
+    return true;
+  };
+
+  switch (p.job) {
+    case 'idle':
+      if (!p.stage && drawIdleVideoWalk(ctx, p, p.moving ? animationTimeMs : 0)) return true;
+      break;
+    case 'woodcutter':
+      if (p.working && !p.moving) {
+        if (!p.stage && drawWoodcutterVideoWork(ctx, p, animationTimeMs)) return true;
+        return draw(residentWoodcutterWorkSheet, woodcutterWorkSourceRect(p.gender, animationTimeMs));
+      }
+      if (!p.stage) {
+        const kind: WoodcutterVideoWalkKind = p.carryingWood ? 'jige' : 'axe';
+        if (drawWoodcutterVideoWalk(ctx, p, p.moving ? animationTimeMs : 0, kind)) return true;
+      }
+      if (p.carryingWood) {
+        return draw(residentWoodcutterLoadSheet, woodcutterLoadSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+      }
+      return draw(residentWoodcutterLocomotionSheet,
+        woodcutterLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+    case 'hunter':
+      if (p.working && !p.moving) {
+        return draw(residentHunterHuntSheet, hunterHuntSourceRect(p.gender, animationTimeMs));
+      }
+      if (p.carryingGame) {
+        return draw(residentHunterLoadSheet, hunterLoadSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+      }
+      return draw(residentHunterLocomotionSheet,
+        hunterLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+    case 'hauler':
+      if (p.cartEquipped) {
+        return draw(residentHaulerCartLocomotionSheet,
+          haulerCartLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+      }
+      return draw(residentHaulerLocomotionSheet,
+        haulerLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+    case 'farmer':
+      if (p.moving) break;
+      if (p.farmerAction === 'oxPlow') {
+        return draw(residentFarmerOxPlowSheet, farmerOxPlowSourceRect(p.gender, animationTimeMs));
+      }
+      if (p.farmerAction === 'harvest') {
+        return draw(residentFarmerHarvestSheet, farmerHarvestSourceRect(p.gender, animationTimeMs));
+      }
+      if (p.farmerAction === 'till') {
+        return draw(residentFarmerTillSheet, farmerTillSourceRect(p.gender, animationTimeMs));
+      }
+      return false;
+    case 'builder':
+      if (p.working && !p.moving) {
+        return draw(residentBuilderWorkSheet, builderWorkSourceRect(p.gender, animationTimeMs));
+      }
+      return draw(residentBuilderLocomotionSheet,
+        builderLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+    case 'herbalist':
+      if (p.working && !p.moving) {
+        return draw(residentHerbalistGatherSheet, herbalistGatherSourceRect(p.gender, animationTimeMs));
+      }
+      return draw(residentHerbalistLocomotionSheet,
+        herbalistLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+    case 'miner':
+      if (p.working && !p.moving) {
+        return draw(residentMinerWorkSheet, minerWorkSourceRect(p.gender, animationTimeMs));
+      }
+      if (p.carryingMinerals) {
+        return draw(residentMinerLoadSheet, minerLoadSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+      }
+      return draw(residentMinerLocomotionSheet,
+        minerLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+    default:
+      break;
+  }
+  if (!p.moving || p.stage) return false;
+  return drawCommon(commonLocomotionSourceRect(
+    p.job,
+    p.gender,
+    p.militiaWeapon,
+    true,
+    animationTimeMs,
+  ));
 }
 
 function drawForeignStructureSprite(
@@ -1081,13 +1405,20 @@ export const atlasSprites: SpriteAPI = {
         (!newContentResidentSheet || !newContentRect) && (!foreignResidentSheet || !foreignRect)) return;
     ctx.imageSmoothingEnabled = false;
     const half = CHALF;
-    const bob = (p.moving ? Math.floor(performance.now() / 130) % 2 : 0) * CF;
+    const animationTime = p.animationTimeMs ?? performance.now();
+    const bob = (p.moving ? Math.floor(animationTime / 130) % 2 : 0) * CF;
+    let drewOptionalResidentPresentation = false;
 
     const specialRect = p.special ? specialResidentSourceRect(p.special) : null;
     if (specialResidentSheet && specialRect) {
       drawGeneratedCharacterRect(ctx, specialResidentSheet, specialRect, p.x, p.y, p.facing, bob, 1.16);
     } else if (foreignResidentSheet && foreignRect) {
       drawGeneratedCharacterRect(ctx, foreignResidentSheet, foreignRect, p.x, p.y, p.facing, bob);
+    } else if (newContentResidentSheet && newContentRect && p.stage) {
+      drawGeneratedCharacterRect(ctx, newContentResidentSheet, newContentRect, p.x, p.y, p.facing, bob);
+    } else if ((drewOptionalResidentPresentation = drawOptionalResidentPresentation(ctx, p, animationTime))) {
+      // Optional sheets are selected by the requested presentation state. If that exact
+      // sheet is unavailable, the chain continues to the generated resident fallback.
     } else if (newContentResidentSheet && newContentRect) {
       drawGeneratedCharacterRect(ctx, newContentResidentSheet, newContentRect, p.x, p.y, p.facing, bob);
     } else if (militiaSheet && p.job === 'militia' && p.militiaWeapon) {
@@ -1142,7 +1473,10 @@ export const atlasSprites: SpriteAPI = {
       ctx.textBaseline = 'middle';
       ctx.fillText('+', p.x + half - 2 * CF, p.y - half + 2 * CF);
     }
-    if (p.carrying) {
+    const integratedCargo = drewOptionalResidentPresentation && (
+      p.job === 'hauler' || Boolean(p.carryingWood || p.carryingGame || p.carryingMinerals)
+    );
+    if (p.carrying && !integratedCargo) {
       const b = Math.round(4 * CF);
       ctx.fillStyle = '#f0e6c8';
       ctx.strokeStyle = 'rgba(0,0,0,0.5)';

@@ -1693,8 +1693,8 @@ html, body, #root {
 .menu-footer { border-top: 1px solid var(--border); padding-top: 10px; }
 
 /* ── ESC 게임 메뉴·설정·리포트 ── */
-.game-menu-overlay { z-index: 250; background: rgba(5, 7, 9, 0.82); backdrop-filter: blur(3px); }
-.save-slot-overlay { z-index: 270; }
+.game-menu-overlay { --modal-layer: 250; background: rgba(5, 7, 9, 0.82); backdrop-filter: blur(3px); }
+.save-slot-overlay { --modal-layer: 270; }
 .game-menu-modal { width: min(430px, 92vw); padding: 20px; }
 .game-menu-heading {
   display: flex;
@@ -2117,7 +2117,7 @@ html, body, #root {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.65);
   display: flex; align-items: center; justify-content: center;
-  z-index: 100;
+  z-index: var(--modal-layer, 100);
 }
 .modal {
   background: var(--panel);
