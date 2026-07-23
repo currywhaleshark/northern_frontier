@@ -24,6 +24,13 @@ function compileModules() {
       writeFileSync(target, output, 'utf8');
     }
   }
+  const renderSrc = new URL('render/', srcRoot);
+  for (const file of readdirSync(renderSrc).filter(name => name.endsWith('.json'))) {
+    const source = readFileSync(new URL(file, renderSrc), 'utf8');
+    const target = join(outDir, 'render', `${file}.mjs`);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, `export default ${source.trim()};\n`, 'utf8');
+  }
   return outDir;
 }
 
@@ -45,10 +52,12 @@ class FakeImage {
   fail() { this.onerror?.(new Error(`failed: ${this._src}`)); }
 }
 
-function drawContext() {
+function drawContext(backingScale = 1) {
   const images = [];
+  const drawCalls = [];
   return {
     images,
+    drawCalls,
     imageSmoothingEnabled: false,
     fillStyle: '',
     strokeStyle: '',
@@ -57,8 +66,12 @@ function drawContext() {
     textAlign: '',
     textBaseline: '',
     globalAlpha: 1,
+    getTransform() { return { a: backingScale, b: 0, c: 0, d: backingScale, e: 0, f: 0 }; },
     beginPath() {},
-    drawImage(image) { images.push(image); },
+    drawImage(image, ...args) {
+      images.push(image);
+      drawCalls.push({ image, args });
+    },
     ellipse() {},
     fillRect() {},
     fillText() {},
@@ -97,6 +110,26 @@ try {
   assert.ok(initialStates.some(asset => !asset.required), 'the manifest marks resident work sheets as optional');
   assert.ok(!initialStates.some(asset => /resident-.*-v1\.png/.test(asset.src) && asset.required),
     'resident presentation sheets are never core requirements');
+  assert.equal(
+    initialStates.find(asset => asset.src === '/assets/resident-woodcutter-video-walk-v2.png')?.required,
+    false,
+    'the video-derived woodcutter walk is optional presentation',
+  );
+  assert.equal(
+    initialStates.find(asset => asset.src === '/assets/resident-woodcutter-video-walk-hd-v2.png')?.required,
+    false,
+    'the HD woodcutter walk is optional presentation',
+  );
+  assert.equal(
+    initialStates.find(asset => asset.src === '/assets/resident-woodcutter-video-work-v2.png')?.required,
+    false,
+    'the video-derived woodcutter work is optional presentation',
+  );
+  assert.equal(
+    initialStates.find(asset => asset.src === '/assets/resident-woodcutter-video-work-hd-v2.png')?.required,
+    false,
+    'the HD woodcutter work is optional presentation',
+  );
 
   const failedWorkSrc = '/assets/resident-woodcutter-work-v1.png';
   const lateHunterSrc = '/assets/resident-hunter-hunt-v1.png';
@@ -115,8 +148,36 @@ try {
 
   const fallbackContext = drawContext();
   atlas.atlasSprites.drawResident(fallbackContext, residentParams());
-  assert.equal(fallbackContext.images[0], FakeImage.bySrc.get('/assets/folk-characters-generated-v1.png'),
-    'a missing woodcutter work sheet falls back to the generated resident, not another work sheet');
+  assert.equal(fallbackContext.images[0], FakeImage.bySrc.get('/assets/resident-woodcutter-video-work-v2.png'),
+    'the new video-derived work presentation replaces a missing legacy work sheet');
+  assert.deepEqual(
+    fallbackContext.drawCalls[0].args.slice(0, 4),
+    [28, 0, 28, 40],
+    'a working woodcutter uses the second chop frame at 260 ms',
+  );
+
+  const highDefinitionWorkContext = drawContext(2);
+  atlas.atlasSprites.drawResident(highDefinitionWorkContext, residentParams());
+  assert.equal(
+    highDefinitionWorkContext.images[0],
+    FakeImage.bySrc.get('/assets/resident-woodcutter-video-work-hd-v2.png'),
+    'a working woodcutter uses the HD work source on the 2x backing canvas',
+  );
+  assert.deepEqual(
+    highDefinitionWorkContext.drawCalls[0].args.slice(0, 4),
+    [56, 0, 56, 80],
+    'the HD work presentation samples the matching second frame',
+  );
+
+  const femaleFollowThroughContext = drawContext();
+  atlas.atlasSprites.drawResident(femaleFollowThroughContext, residentParams({
+    gender: 'female', animationTimeMs: 280,
+  }));
+  assert.deepEqual(
+    femaleFollowThroughContext.drawCalls[0].args.slice(0, 4),
+    [56, 40, 28, 40],
+    'a working female woodcutter reaches the low follow-through frame',
+  );
 
   let settledInvalidations = 0;
   const unsubscribe = atlas.onAtlasAssetSettled(() => { settledInvalidations++; });
@@ -128,6 +189,126 @@ try {
   atlas.atlasSprites.drawResident(hunterContext, residentParams({ job: 'hunter' }));
   assert.equal(hunterContext.images[0], FakeImage.bySrc.get(lateHunterSrc),
     'another loaded profession still uses its optional work sheet');
+
+  const woodcutterWalkingContext = drawContext();
+  atlas.atlasSprites.drawResident(woodcutterWalkingContext, residentParams({
+    moving: true, working: false, animationTimeMs: 260,
+  }));
+  assert.equal(
+    woodcutterWalkingContext.images[0],
+    FakeImage.bySrc.get('/assets/resident-woodcutter-video-walk-v2.png'),
+    'a moving adult woodcutter uses the standard video-derived axe walk',
+  );
+  assert.deepEqual(
+    woodcutterWalkingContext.drawCalls[0].args.slice(0, 4),
+    [28, 0, 28, 40],
+    'the axe walk advances to its second frame at 260 ms',
+  );
+
+  const standingFemaleWoodcutterContext = drawContext();
+  atlas.atlasSprites.drawResident(standingFemaleWoodcutterContext, residentParams({
+    gender: 'female', moving: false, working: false, animationTimeMs: 600,
+  }));
+  assert.deepEqual(
+    standingFemaleWoodcutterContext.drawCalls[0].args.slice(0, 4),
+    [0, 40, 28, 40],
+    'a standing female woodcutter holds the first axe frame',
+  );
+
+  const loadedFemaleWoodcutterContext = drawContext();
+  atlas.atlasSprites.drawResident(loadedFemaleWoodcutterContext, residentParams({
+    gender: 'female', moving: true, working: false, carryingWood: true, animationTimeMs: 600,
+  }));
+  assert.deepEqual(
+    loadedFemaleWoodcutterContext.drawCalls[0].args.slice(0, 4),
+    [56, 120, 28, 40],
+    'a loaded female woodcutter uses the fourth jige frame at 600 ms',
+  );
+
+  const highDefinitionWoodcutterContext = drawContext(2);
+  atlas.atlasSprites.drawResident(highDefinitionWoodcutterContext, residentParams({
+    moving: true, working: false, animationTimeMs: 260,
+  }));
+  assert.equal(
+    highDefinitionWoodcutterContext.images[0],
+    FakeImage.bySrc.get('/assets/resident-woodcutter-video-walk-hd-v2.png'),
+    'a moving woodcutter uses the 56x80 source on the 2x backing canvas',
+  );
+  assert.deepEqual(
+    highDefinitionWoodcutterContext.drawCalls[0].args.slice(0, 4),
+    [56, 0, 56, 80],
+    'the HD axe walk uses the matching second frame',
+  );
+
+  const commonWalkingContext = drawContext();
+  atlas.atlasSprites.drawResident(commonWalkingContext, residentParams({
+    job: 'idle', moving: true, working: false,
+  }));
+  assert.equal(
+    commonWalkingContext.images[0],
+    FakeImage.bySrc.get('/assets/resident-idle-video-walk-v1.png'),
+    'a moving unemployed adult uses the standard video-derived walk at normal zoom',
+  );
+
+  const highDefinitionIdleContext = drawContext(2);
+  atlas.atlasSprites.drawResident(highDefinitionIdleContext, residentParams({
+    job: 'idle', moving: true, working: false,
+  }));
+  assert.equal(
+    highDefinitionIdleContext.images[0],
+    FakeImage.bySrc.get('/assets/resident-idle-video-walk-hd-v1.png'),
+    'a moving unemployed adult uses the 56x80 source on the 2x backing canvas',
+  );
+
+  const standingIdleContext = drawContext();
+  atlas.atlasSprites.drawResident(standingIdleContext, residentParams({
+    job: 'idle', gender: 'female', moving: false, working: false, animationTimeMs: 600,
+  }));
+  assert.equal(
+    standingIdleContext.images[0],
+    FakeImage.bySrc.get('/assets/resident-idle-video-walk-v1.png'),
+    'a standing unemployed adult keeps the new standard-resolution presentation',
+  );
+  assert.deepEqual(
+    standingIdleContext.drawCalls[0].args.slice(0, 4),
+    [0, 40, 28, 40],
+    'a standing unemployed woman holds the first atlas frame instead of animating',
+  );
+
+  const highDefinitionStandingIdleContext = drawContext(2);
+  atlas.atlasSprites.drawResident(highDefinitionStandingIdleContext, residentParams({
+    job: 'idle', gender: 'female', moving: false, working: false, animationTimeMs: 600,
+  }));
+  assert.equal(
+    highDefinitionStandingIdleContext.images[0],
+    FakeImage.bySrc.get('/assets/resident-idle-video-walk-hd-v1.png'),
+    'a standing unemployed adult keeps the HD presentation on the 2x backing canvas',
+  );
+  assert.deepEqual(
+    highDefinitionStandingIdleContext.drawCalls[0].args.slice(0, 4),
+    [0, 80, 56, 80],
+    'a standing unemployed woman holds the first HD atlas frame',
+  );
+
+  const youthWalkingContext = drawContext();
+  atlas.atlasSprites.drawResident(youthWalkingContext, residentParams({
+    job: 'idle', moving: true, working: false, stage: 'youth',
+  }));
+  assert.equal(
+    youthWalkingContext.images[0],
+    FakeImage.bySrc.get('/assets/new-content-residents-v2.png'),
+    'common adult walking never replaces the youth presentation',
+  );
+
+  const undertakerWalkingContext = drawContext();
+  atlas.atlasSprites.drawResident(undertakerWalkingContext, residentParams({
+    job: 'undertaker', moving: true, working: false,
+  }));
+  assert.equal(
+    undertakerWalkingContext.images[0],
+    FakeImage.bySrc.get('/assets/resident-common-locomotion-v1.png'),
+    'adult new-content jobs can walk instead of remaining on their static portrait',
+  );
 
   FakeImage.bySrc = new Map();
   const coreFailureAtlas = await import(`${atlasUrl}?core-failure`);

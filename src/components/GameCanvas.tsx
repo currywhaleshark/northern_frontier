@@ -13,7 +13,7 @@ import { foreignSiteAt } from '../game/foreignSites';
 import type { BuildingTypeId, GameState, SelectedEntity } from '../game/types';
 import { FactionName } from './FactionName';
 import { recordRuntimePerf, recordRuntimePerfSince, runtimePerfStartTime } from '../perf/runtimePerf';
-import { steppedMapZoom } from '../ui/mapZoom';
+import { mapBackingScaleForZoom, steppedMapZoom } from '../ui/mapZoom';
 
 const TILE = CONFIG.ui.tileSize;
 const CLICK_RADIUS = Math.round(TILE * 0.65); // 주민 클릭 판정 반경(픽셀)
@@ -80,8 +80,8 @@ export function GameCanvas({
     const anchorClientX = clientX ?? boxRect.left + box.clientWidth / 2;
     const anchorClientY = clientY ?? boxRect.top + box.clientHeight / 2;
     zoomAnchorRef.current = {
-      worldX: (anchorClientX - canvasRect.left) * (canvas.width / Math.max(1, canvasRect.width)),
-      worldY: (anchorClientY - canvasRect.top) * (canvas.height / Math.max(1, canvasRect.height)),
+      worldX: (anchorClientX - canvasRect.left) * (logicalWidth / Math.max(1, canvasRect.width)),
+      worldY: (anchorClientY - canvasRect.top) * (logicalHeight / Math.max(1, canvasRect.height)),
       boxX: anchorClientX - boxRect.left,
       boxY: anchorClientY - boxRect.top,
     };
@@ -127,6 +127,9 @@ export function GameCanvas({
   }, [zoom]);
 
   const h = state.map.length, w = state.map[0]?.length ?? 0;
+  const logicalWidth = w * TILE;
+  const logicalHeight = h * TILE;
+  const renderScale = mapBackingScaleForZoom(zoom);
   const alpha = Math.max(0, Math.min(1, (performance.now() - anim.current.at) / anim.current.ms));
   const hoverTile = mouse
     ? { x: Math.floor(mouse.mx / TILE), y: Math.floor(mouse.my / TILE) }
@@ -193,6 +196,7 @@ export function GameCanvas({
       alpha: frameAlpha, animationTimeMs, hover: hoverTile, placingType, placingRect, selected, selectedResidentId,
       selectedBuildingId, viewport: viewportRef.current ?? undefined, terrainVisualSignature: terrainSignature,
       sprites: getActiveSprites(), residentPresentation,
+      renderScale,
     });
     if (perf) {
       const bucket = perf['renderScene-total'] ?? (perf['renderScene-total'] = { total: 0, count: 0 });
@@ -239,8 +243,8 @@ export function GameCanvas({
         clientHeight: box.clientHeight / zoom,
         canvasLeft: canvas.offsetLeft / zoom,
         canvasTop: canvas.offsetTop / zoom,
-        canvasWidth: canvas.width,
-        canvasHeight: canvas.height,
+        canvasWidth: logicalWidth,
+        canvasHeight: logicalHeight,
         tileSize: TILE,
         overscanTiles: 1,
       });
@@ -254,7 +258,7 @@ export function GameCanvas({
       box.removeEventListener('scroll', updateViewport);
       resizeObserver.disconnect();
     };
-  }, [requestCanvasRender, zoom]);
+  }, [requestCanvasRender, zoom, logicalWidth, logicalHeight]);
 
   useEffect(() => {
     positionTooltip(pointerPositionRef.current);
@@ -263,8 +267,8 @@ export function GameCanvas({
   const toMouse = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect();
     return {
-      mx: (e.clientX - rect.left) * (canvasRef.current!.width / Math.max(1, rect.width)),
-      my: (e.clientY - rect.top) * (canvasRef.current!.height / Math.max(1, rect.height)),
+      mx: (e.clientX - rect.left) * (logicalWidth / Math.max(1, rect.width)),
+      my: (e.clientY - rect.top) * (logicalHeight / Math.max(1, rect.height)),
     };
   };
 
@@ -301,11 +305,12 @@ export function GameCanvas({
           : 'grab';
 
   return (
-    <div style={{ position: 'relative', display: 'inline-block', width: w * TILE * zoom, height: h * TILE * zoom }}>
+    <div style={{ position: 'relative', display: 'inline-block', width: logicalWidth * zoom, height: logicalHeight * zoom }}>
       <canvas
         ref={canvasRef}
-        width={w * TILE}
-        height={h * TILE}
+        width={logicalWidth * renderScale}
+        height={logicalHeight * renderScale}
+        data-render-scale={renderScale}
         data-version={version}
         style={{ cursor: canvasCursor, width: '100%', height: '100%' }}
         onWheel={handleWheel}

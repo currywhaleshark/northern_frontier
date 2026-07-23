@@ -171,6 +171,23 @@ import {
   herbalistGatherSourceRect,
   herbalistLocomotionSourceRect,
 } from './residentHerbalistAssets';
+import {
+  RESIDENT_COMMON_LOCOMOTION_SHEET,
+  commonLocomotionSourceRect,
+} from './residentCommonLocomotionAssets';
+import {
+  RESIDENT_IDLE_VIDEO_WALK_SHEETS,
+  idleVideoWalkSourceRect,
+} from './residentIdleVideoWalkAssets';
+import {
+  RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS,
+  woodcutterVideoWalkSourceRect,
+  type WoodcutterVideoWalkKind,
+} from './residentWoodcutterVideoWalkAssets';
+import {
+  RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS,
+  woodcutterVideoWorkSourceRect,
+} from './residentWoodcutterVideoWorkAssets';
 
 const PITCH = 17;
 const T = 16;
@@ -225,6 +242,13 @@ let residentMinerWorkSheet: HTMLImageElement | null = null;
 let residentMinerLoadSheet: HTMLImageElement | null = null;
 let residentHerbalistLocomotionSheet: HTMLImageElement | null = null;
 let residentHerbalistGatherSheet: HTMLImageElement | null = null;
+let residentCommonLocomotionSheet: HTMLImageElement | null = null;
+let residentIdleVideoWalkSheet: HTMLImageElement | null = null;
+let residentIdleVideoWalkHdSheet: HTMLImageElement | null = null;
+let residentWoodcutterVideoWalkSheet: HTMLImageElement | null = null;
+let residentWoodcutterVideoWalkHdSheet: HTMLImageElement | null = null;
+let residentWoodcutterVideoWorkSheet: HTMLImageElement | null = null;
+let residentWoodcutterVideoWorkHdSheet: HTMLImageElement | null = null;
 let started = false;
 
 export interface AtlasAssetState {
@@ -310,6 +334,18 @@ function ensureLoaded(): void {
   loadAtlasAsset(RESIDENT_MINER_LOAD_SHEET.src, false, image => { residentMinerLoadSheet = image; });
   loadAtlasAsset(RESIDENT_HERBALIST_LOCOMOTION_SHEET.src, false, image => { residentHerbalistLocomotionSheet = image; });
   loadAtlasAsset(RESIDENT_HERBALIST_GATHER_SHEET.src, false, image => { residentHerbalistGatherSheet = image; });
+  loadAtlasAsset(RESIDENT_COMMON_LOCOMOTION_SHEET.src, false, image => { residentCommonLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_IDLE_VIDEO_WALK_SHEETS.standard.src, false, image => { residentIdleVideoWalkSheet = image; });
+  loadAtlasAsset(RESIDENT_IDLE_VIDEO_WALK_SHEETS.highDefinition.src, false,
+    image => { residentIdleVideoWalkHdSheet = image; });
+  loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.standard.src, false,
+    image => { residentWoodcutterVideoWalkSheet = image; });
+  loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.highDefinition.src, false,
+    image => { residentWoodcutterVideoWalkHdSheet = image; });
+  loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.standard.src, false,
+    image => { residentWoodcutterVideoWorkSheet = image; });
+  loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.highDefinition.src, false,
+    image => { residentWoodcutterVideoWorkHdSheet = image; });
 }
 
 export function atlasReady(): boolean {
@@ -504,6 +540,130 @@ function drawGeneratedResident(
   );
 }
 
+function drawResidentCellRect(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  rect: SourceRect,
+  p: ResidentDrawParams,
+): void {
+  const displaySize = RESIDENT_COMMON_LOCOMOTION_SHEET.displaySize * (p.sizeScale ?? 1);
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.scale(generatedCharacterFacingScale(p.facing), 1);
+  ctx.drawImage(
+    img,
+    rect.sx,
+    rect.sy,
+    rect.sw,
+    rect.sh,
+    -displaySize / 2,
+    CHALF - displaySize,
+    displaySize,
+    displaySize,
+  );
+  ctx.restore();
+}
+
+function canvasBackingScale(ctx: CanvasRenderingContext2D): number {
+  if (typeof ctx.getTransform !== 'function') return 1;
+  const transform = ctx.getTransform();
+  return Math.hypot(transform.a, transform.b);
+}
+
+function drawIdleVideoWalk(
+  ctx: CanvasRenderingContext2D,
+  p: ResidentDrawParams,
+  animationTimeMs: number,
+): boolean {
+  const wantsHighDefinition = canvasBackingScale(ctx) >= 1.5;
+  const highDefinition = wantsHighDefinition && residentIdleVideoWalkHdSheet != null;
+  const image = highDefinition ? residentIdleVideoWalkHdSheet : residentIdleVideoWalkSheet;
+  if (!image) return false;
+  const rect = idleVideoWalkSourceRect(p.gender, animationTimeMs, highDefinition);
+  const sizeScale = p.sizeScale ?? 1;
+  const displayWidth = RESIDENT_IDLE_VIDEO_WALK_SHEETS.displayWidth * sizeScale;
+  const displayHeight = RESIDENT_IDLE_VIDEO_WALK_SHEETS.displayHeight * sizeScale;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.scale(generatedCharacterFacingScale(p.facing), 1);
+  ctx.drawImage(
+    image,
+    rect.sx,
+    rect.sy,
+    rect.sw,
+    rect.sh,
+    -displayWidth / 2,
+    CHALF - displayHeight,
+    displayWidth,
+    displayHeight,
+  );
+  ctx.restore();
+  return true;
+}
+
+function drawWoodcutterVideoWalk(
+  ctx: CanvasRenderingContext2D,
+  p: ResidentDrawParams,
+  animationTimeMs: number,
+  kind: WoodcutterVideoWalkKind,
+): boolean {
+  const wantsHighDefinition = canvasBackingScale(ctx) >= 1.5;
+  const highDefinition = wantsHighDefinition && residentWoodcutterVideoWalkHdSheet != null;
+  const image = highDefinition ? residentWoodcutterVideoWalkHdSheet : residentWoodcutterVideoWalkSheet;
+  if (!image) return false;
+  const rect = woodcutterVideoWalkSourceRect(p.gender, kind, animationTimeMs, highDefinition);
+  const sizeScale = p.sizeScale ?? 1;
+  const displayWidth = RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.displayWidth * sizeScale;
+  const displayHeight = RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.displayHeight * sizeScale;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.scale(generatedCharacterFacingScale(p.facing), 1);
+  ctx.drawImage(
+    image,
+    rect.sx,
+    rect.sy,
+    rect.sw,
+    rect.sh,
+    -displayWidth / 2,
+    CHALF - displayHeight,
+    displayWidth,
+    displayHeight,
+  );
+  ctx.restore();
+  return true;
+}
+
+function drawWoodcutterVideoWork(
+  ctx: CanvasRenderingContext2D,
+  p: ResidentDrawParams,
+  animationTimeMs: number,
+): boolean {
+  const wantsHighDefinition = canvasBackingScale(ctx) >= 1.5;
+  const highDefinition = wantsHighDefinition && residentWoodcutterVideoWorkHdSheet != null;
+  const image = highDefinition ? residentWoodcutterVideoWorkHdSheet : residentWoodcutterVideoWorkSheet;
+  if (!image) return false;
+  const rect = woodcutterVideoWorkSourceRect(p.gender, animationTimeMs, highDefinition);
+  const sizeScale = p.sizeScale ?? 1;
+  const displayWidth = RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.displayWidth * sizeScale;
+  const displayHeight = RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.displayHeight * sizeScale;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.scale(generatedCharacterFacingScale(p.facing), 1);
+  ctx.drawImage(
+    image,
+    rect.sx,
+    rect.sy,
+    rect.sw,
+    rect.sh,
+    -displayWidth / 2,
+    CHALF - displayHeight,
+    displayWidth,
+    displayHeight,
+  );
+  ctx.restore();
+  return true;
+}
+
 function drawOptionalResidentPresentation(
   ctx: CanvasRenderingContext2D,
   p: ResidentDrawParams,
@@ -514,11 +674,24 @@ function drawOptionalResidentPresentation(
     drawGeneratedCharacterRect(ctx, image, rect, p.x, p.y, p.facing, 0, p.sizeScale ?? 1);
     return true;
   };
+  const drawCommon = (rect: SourceRect | null): boolean => {
+    if (!residentCommonLocomotionSheet || !rect) return false;
+    drawResidentCellRect(ctx, residentCommonLocomotionSheet, rect, p);
+    return true;
+  };
 
   switch (p.job) {
+    case 'idle':
+      if (!p.stage && drawIdleVideoWalk(ctx, p, p.moving ? animationTimeMs : 0)) return true;
+      break;
     case 'woodcutter':
       if (p.working && !p.moving) {
+        if (!p.stage && drawWoodcutterVideoWork(ctx, p, animationTimeMs)) return true;
         return draw(residentWoodcutterWorkSheet, woodcutterWorkSourceRect(p.gender, animationTimeMs));
+      }
+      if (!p.stage) {
+        const kind: WoodcutterVideoWalkKind = p.carryingWood ? 'jige' : 'axe';
+        if (drawWoodcutterVideoWalk(ctx, p, p.moving ? animationTimeMs : 0, kind)) return true;
       }
       if (p.carryingWood) {
         return draw(residentWoodcutterLoadSheet, woodcutterLoadSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
@@ -542,6 +715,7 @@ function drawOptionalResidentPresentation(
       return draw(residentHaulerLocomotionSheet,
         haulerLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
     case 'farmer':
+      if (p.moving) break;
       if (p.farmerAction === 'oxPlow') {
         return draw(residentFarmerOxPlowSheet, farmerOxPlowSourceRect(p.gender, animationTimeMs));
       }
@@ -574,8 +748,16 @@ function drawOptionalResidentPresentation(
       return draw(residentMinerLocomotionSheet,
         minerLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
     default:
-      return false;
+      break;
   }
+  if (!p.moving || p.stage) return false;
+  return drawCommon(commonLocomotionSourceRect(
+    p.job,
+    p.gender,
+    p.militiaWeapon,
+    true,
+    animationTimeMs,
+  ));
 }
 
 function drawForeignStructureSprite(
@@ -1232,11 +1414,11 @@ export const atlasSprites: SpriteAPI = {
       drawGeneratedCharacterRect(ctx, specialResidentSheet, specialRect, p.x, p.y, p.facing, bob, 1.16);
     } else if (foreignResidentSheet && foreignRect) {
       drawGeneratedCharacterRect(ctx, foreignResidentSheet, foreignRect, p.x, p.y, p.facing, bob);
-    } else if (newContentResidentSheet && newContentRect) {
-      drawGeneratedCharacterRect(ctx, newContentResidentSheet, newContentRect, p.x, p.y, p.facing, bob);
     } else if ((drewOptionalResidentPresentation = drawOptionalResidentPresentation(ctx, p, animationTime))) {
       // Optional sheets are selected by the requested presentation state. If that exact
       // sheet is unavailable, the chain continues to the generated resident fallback.
+    } else if (newContentResidentSheet && newContentRect) {
+      drawGeneratedCharacterRect(ctx, newContentResidentSheet, newContentRect, p.x, p.y, p.facing, bob);
     } else if (militiaSheet && p.job === 'militia' && p.militiaWeapon) {
       drawGeneratedCharacterRect(
         ctx,

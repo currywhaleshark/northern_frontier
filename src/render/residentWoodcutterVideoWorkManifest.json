@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-runtime-variant-manifest",
+  "characterId": "resident-woodcutter-video-work-v2",
+  "engine": "component-row",
+  "game_input": "/assets/resident-woodcutter-video-work-v2.png",
+  "high_definition_game_input": "/assets/resident-woodcutter-video-work-hd-v2.png",
+  "degraded_static_fallback": false,
+  "display": {
+    "width": 28,
+    "height": 40
+  },
+  "animation": {
+    "rows": {
+      "male_chop": {
+        "frames": 3,
+        "fps": 7,
+        "durations_ms": [140, 140, 140],
+        "loop": true
+      },
+      "female_chop": {
+        "frames": 3,
+        "fps": 7,
+        "durations_ms": [140, 140, 140],
+        "loop": true
+      }
+    }
+  },
+  "frame_layout": {
+    "sheetWidth": 84,
+    "sheetHeight": 80,
+    "cellWidth": 28,
+    "cellHeight": 40,
+    "rows": {
+      "male_chop": [
+        { "x": 0, "y": 0, "w": 28, "h": 40 },
+        { "x": 28, "y": 0, "w": 28, "h": 40 },
+        { "x": 56, "y": 0, "w": 28, "h": 40 }
+      ],
+      "female_chop": [
+        { "x": 0, "y": 40, "w": 28, "h": 40 },
+        { "x": 28, "y": 40, "w": 28, "h": 40 },
+        { "x": 56, "y": 40, "w": 28, "h": 40 }
+      ]
+    }
+  },
+  "high_definition_frame_layout": {
+    "sheetWidth": 168,
+    "sheetHeight": 160,
+    "cellWidth": 56,
+    "cellHeight": 80,
+    "rows": {
+      "male_chop": [
+        { "x": 0, "y": 0, "w": 56, "h": 80 },
+        { "x": 56, "y": 0, "w": 56, "h": 80 },
+        { "x": 112, "y": 0, "w": 56, "h": 80 }
+      ],
+      "female_chop": [
+        { "x": 0, "y": 80, "w": 56, "h": 80 },
+        { "x": 56, "y": 80, "w": 56, "h": 80 },
+        { "x": 112, "y": 80, "w": 56, "h": 80 }
+      ]
+    }
+  }
+}

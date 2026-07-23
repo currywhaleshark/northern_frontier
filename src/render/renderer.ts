@@ -71,6 +71,7 @@ export interface SceneOptions {
   terrainVisualSignature?: number;
   sprites?: SpriteAPI;
   residentPresentation?: ResidentPresentationSnapshot;
+  renderScale?: 1 | 2;
 }
 
 const TERRAIN_VISUAL_CODE: Record<Terrain, number> = {
@@ -918,15 +919,19 @@ declare global {
 export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: SceneOptions): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
+  const renderScale = o.renderScale === 2 ? 2 : 1;
+  const logicalWidth = canvas.width / renderScale;
+  const logicalHeight = canvas.height / renderScale;
+  if (typeof ctx.setTransform === 'function') ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
   const viewport = o.viewport ?? {
     pixelX: 0,
     pixelY: 0,
-    pixelWidth: canvas.width,
-    pixelHeight: canvas.height,
+    pixelWidth: logicalWidth,
+    pixelHeight: logicalHeight,
     tileMinX: 0,
     tileMinY: 0,
-    tileMaxX: Math.max(0, Math.ceil(canvas.width / TILE) - 1),
-    tileMaxY: Math.max(0, Math.ceil(canvas.height / TILE) - 1),
+    tileMaxX: Math.max(0, Math.ceil(logicalWidth / TILE) - 1),
+    tileMaxY: Math.max(0, Math.ceil(logicalHeight / TILE) - 1),
   };
   if (viewport.pixelWidth <= 0 || viewport.pixelHeight <= 0) return;
   const perf = typeof window !== 'undefined' ? window.__renderPerf : undefined;
@@ -948,8 +953,8 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   // 1) 지형
   const layer = drawTerrainLayer(
     state,
-    canvas.width,
-    canvas.height,
+    logicalWidth,
+    logicalHeight,
     sprites,
     o.terrainVisualSignature ?? terrainVisualSignature(state),
   );
@@ -1242,7 +1247,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   }
 
   // 8) 날씨 오버레이 (비/눈/눈보라/서리/혹한/해빙 홍수)
-  drawWeather(ctx, state.weather, canvas.width, canvas.height, viewport);
+  drawWeather(ctx, state.weather, logicalWidth, logicalHeight, viewport);
   lap('8-weather');
 
   // 9) 미답사 안개 — 지형/자원/건물/서식지를 탐색 전까지 가린다
