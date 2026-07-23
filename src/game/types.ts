@@ -282,7 +282,17 @@ export type ManualOrder =
   | { kind: 'move'; x: number; y: number; unauthorizedSiteIds?: number[] }
   | { kind: 'work'; x: number; y: number; buildingId?: number; repeat?: boolean; unauthorizedSiteIds?: number[]; started?: boolean };
 
-export type AgentPhase = 'rest' | 'toWork' | 'working' | 'toDeposit';
+export type DayBand = 'dawn' | 'work' | 'evening' | 'night';
+
+export type AgentPhase =
+  | 'rest'
+  | 'toWork'
+  | 'working'
+  | 'toDeposit'
+  | 'toLeisure'
+  | 'leisure'
+  | 'toHome'
+  | 'sleeping';
 
 export interface HaulTask {
   sourceBuildingId: number;
