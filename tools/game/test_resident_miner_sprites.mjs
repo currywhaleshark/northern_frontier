@@ -65,16 +65,16 @@ assert.match(rendererSource, /\(r\.carrying\.silver\s*\?\?\s*0\)\s*>\s*0/,
   'renderer identifies a silver load');
 
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
-assert.match(atlasSource, /p\.job\s*===\s*['"]miner['"]\s*&&\s*p\.working\s*&&\s*!p\.moving/,
+assert.match(atlasSource, /case ['"]miner['"]:\s*if \(p\.working && !p\.moving\)/,
   'stationary working miners use the pickaxe work sheet');
-assert.match(atlasSource, /p\.job\s*===\s*['"]miner['"]\s*&&\s*p\.carryingMinerals/,
+assert.match(atlasSource, /if \(p\.carryingMinerals\)/,
   'ore-carrying miners use the loaded jige sheet');
-assert.match(atlasSource, /residentMinerLocomotionSheet\s*&&\s*p\.job\s*===\s*['"]miner['"]/,
+assert.match(atlasSource, /return draw\(residentMinerLocomotionSheet/,
   'unladen adult miners use the pickaxe locomotion sheet');
 assert.match(atlasSource, /if\s*\(p\.carrying\)/, 'the existing cargo marker remains enabled');
 
 const youthBranch = atlasSource.indexOf('newContentResidentSheet && newContentRect');
-const minerBranch = atlasSource.indexOf("p.job === 'miner'");
+const minerBranch = atlasSource.indexOf('drawOptionalResidentPresentation(ctx, p');
 assert.ok(youthBranch >= 0 && minerBranch > youthBranch,
   'special/youth resident rendering remains ahead of adult miner rendering');
 

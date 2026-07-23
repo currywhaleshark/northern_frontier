@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { CONFIG } from '../game/config';
 import { JOB_NAMES, RESOURCE_NAMES } from '../game/constants';
 import { buildingCostFor } from '../game/buildings';
-import { getActiveSprites } from '../render/atlas';
+import { getActiveSprites, onAtlasAssetSettled } from '../render/atlas';
 import { findResidentAt, renderScene, terrainVisualSignature } from '../render/renderer';
 import { sceneViewportFromScroll, type SceneViewport } from '../render/sceneViewport';
 import { getPointerAction } from '../game/selectionActions';
@@ -218,6 +218,8 @@ export function GameCanvas({
   useEffect(() => {
     requestCanvasRender();
   });
+
+  useEffect(() => onAtlasAssetSettled(requestCanvasRender), [requestCanvasRender]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

@@ -77,13 +77,13 @@ assert.match(rendererSource, /carryingWood:\s*\(r\.carrying\.wood\s*\?\?\s*0\)\s
   'renderer distinguishes timber loads from other cargo');
 
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
-assert.match(atlasSource, /p\.job\s*===\s*['"]woodcutter['"]\s*&&\s*p\.working\s*&&\s*!p\.moving/,
+assert.match(atlasSource, /case ['"]woodcutter['"]:\s*if \(p\.working && !p\.moving\)/,
   'atlas uses the work sheet only for a stationary working woodcutter');
-assert.match(atlasSource, /woodcutterWorkSourceRect\(p\.gender,\s*performance\.now\(\)\)/,
+assert.match(atlasSource, /woodcutterWorkSourceRect\(p\.gender, animationTimeMs\)/,
   'atlas advances the gender-specific woodcutting frames');
-assert.match(atlasSource, /p\.job\s*===\s*['"]woodcutter['"]\s*&&\s*p\.carryingWood/,
+assert.match(atlasSource, /if \(p\.carryingWood\)/,
   'timber-carrying woodcutters use the jige sheet');
-assert.match(atlasSource, /woodcutterLocomotionSourceRect\(p\.gender,\s*Boolean\(p\.moving\),\s*performance\.now\(\)\)/,
+assert.match(atlasSource, /woodcutterLocomotionSourceRect\(p\.gender, Boolean\(p\.moving\), animationTimeMs\)/,
   'unladen woodcutters use idle or axe-carrying walk frames');
 assert.match(atlasSource, /if\s*\(p\.carrying\)/, 'the existing cargo marker remains enabled');
 

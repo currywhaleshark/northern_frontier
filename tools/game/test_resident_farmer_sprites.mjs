@@ -90,12 +90,13 @@ assert.match(rendererSource, /farmerAction:\s*farmerSpriteActionFor\(r, oxPlowFa
   'renderer passes the derived farmer work action');
 
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
+assert.match(atlasSource, /case 'farmer':/);
 for (const action of ['oxPlow', 'harvest', 'till']) {
-  assert.match(atlasSource, new RegExp(`p\\.job === 'farmer' && p\\.farmerAction === '${action}'`),
+  assert.match(atlasSource, new RegExp(`p\\.farmerAction === '${action}'`),
     `${action} farmer sheet is connected to the atlas`);
 }
 const youthBranch = atlasSource.indexOf('newContentResidentSheet && newContentRect');
-const farmerBranch = atlasSource.indexOf("p.job === 'farmer'");
+const farmerBranch = atlasSource.indexOf('drawOptionalResidentPresentation(ctx, p');
 assert.ok(youthBranch >= 0 && farmerBranch > youthBranch,
   'special/youth resident rendering remains ahead of adult farmer work rendering');
 

@@ -65,16 +65,17 @@ assert.equal(workPng.readUInt32BE(16), 160, 'work sheet has four 40px columns');
 assert.equal(workPng.readUInt32BE(20), 80, 'work sheet has two gender rows');
 
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
-assert.match(atlasSource, /p\.job\s*===\s*['"]builder['"]\s*&&\s*p\.working\s*&&\s*!p\.moving/,
+assert.match(atlasSource, /case ['"]builder['"]:\s*if \(p\.working && !p\.moving\)/,
   'stationary working builders use the hammering sheet');
-assert.match(atlasSource, /residentBuilderLocomotionSheet\s*&&\s*p\.job\s*===\s*['"]builder['"]/,
+assert.match(atlasSource, /return draw\(residentBuilderLocomotionSheet/,
   'builders otherwise use the hammer-carrying locomotion sheet');
-assert.match(atlasSource, /builderLocomotionSourceRect\(p\.gender,\s*Boolean\(p\.moving\),\s*performance\.now\(\)\)/,
+assert.match(atlasSource, /builderLocomotionSourceRect\(p\.gender, Boolean\(p\.moving\), animationTimeMs\)/,
   'builder locomotion advances only while moving');
-assert.match(atlasSource, /return loaded >= 44;/, 'atlas readiness includes builder and later resident sheets');
+assert.match(atlasSource, /RESIDENT_BUILDER_WORK_SHEET\.src, false/,
+  'builder sheets are optional resident presentation assets');
 
 const youthBranch = atlasSource.indexOf('newContentResidentSheet && newContentRect');
-const builderBranch = atlasSource.indexOf("p.job === 'builder'");
+const builderBranch = atlasSource.indexOf('drawOptionalResidentPresentation(ctx, p');
 assert.ok(youthBranch >= 0 && builderBranch > youthBranch,
   'special and youth rendering remains ahead of adult builder rendering');
 

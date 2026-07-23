@@ -72,23 +72,24 @@ assert.equal(gatherPng.readUInt32BE(20), 80, 'gather sheet has two gender rows')
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
 assert.match(
   atlasSource,
-  /p\.job\s*===\s*['"]herbalist['"]\s*&&\s*p\.working\s*&&\s*!p\.moving/,
+  /case ['"]herbalist['"]:\s*if \(p\.working && !p\.moving\)/,
   'stationary working herbalists use the crouched gathering sheet',
 );
 assert.match(
   atlasSource,
-  /residentHerbalistLocomotionSheet\s*&&\s*p\.job\s*===\s*['"]herbalist['"]/,
+  /return draw\(residentHerbalistLocomotionSheet/,
   'herbalists otherwise use the herb-carrying locomotion sheet',
 );
 assert.match(
   atlasSource,
-  /herbalistLocomotionSourceRect\(p\.gender,\s*Boolean\(p\.moving\),\s*performance\.now\(\)\)/,
+  /herbalistLocomotionSourceRect\(p\.gender, Boolean\(p\.moving\), animationTimeMs\)/,
   'herbalist locomotion advances only while moving',
 );
-assert.match(atlasSource, /return loaded >= 44;/, 'atlas readiness includes both herbalist sheets');
+assert.match(atlasSource, /RESIDENT_HERBALIST_GATHER_SHEET\.src, false/,
+  'herbalist sheets are optional resident presentation assets');
 
 const youthBranch = atlasSource.indexOf('newContentResidentSheet && newContentRect');
-const herbalistBranch = atlasSource.indexOf("p.job === 'herbalist'");
+const herbalistBranch = atlasSource.indexOf('drawOptionalResidentPresentation(ctx, p');
 assert.ok(
   youthBranch >= 0 && herbalistBranch > youthBranch,
   'special and youth rendering remains ahead of adult herbalist rendering',

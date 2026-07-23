@@ -71,15 +71,15 @@ assert.match(rendererSource, /carryingGame:\s*\(r\.carrying\.meat\s*\?\?\s*0\)\s
   'renderer distinguishes game loads from other cargo');
 
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
-assert.match(atlasSource, /p\.job\s*===\s*['"]hunter['"]\s*&&\s*p\.working\s*&&\s*!p\.moving/,
+assert.match(atlasSource, /case ['"]hunter['"]:\s*if \(p\.working && !p\.moving\)/,
   'only stationary working hunters draw the bow');
-assert.match(atlasSource, /p\.job\s*===\s*['"]hunter['"]\s*&&\s*p\.carryingGame/,
+assert.match(atlasSource, /if \(p\.carryingGame\)/,
   'hunters carrying meat or hide use the prey sheet');
-assert.match(atlasSource, /hunterLocomotionSourceRect\(p\.gender,\s*Boolean\(p\.moving\),\s*performance\.now\(\)\)/,
+assert.match(atlasSource, /hunterLocomotionSourceRect\(p\.gender, Boolean\(p\.moving\), animationTimeMs\)/,
   'ordinary hunters use bow-carrying idle and walking frames');
 
 const specialBranch = atlasSource.indexOf('if (specialResidentSheet && specialRect)');
-const hunterBranch = atlasSource.indexOf("p.job === 'hunter'");
+const hunterBranch = atlasSource.indexOf('drawOptionalResidentPresentation(ctx, p');
 assert.ok(specialBranch >= 0 && hunterBranch > specialBranch,
   'special resident rendering remains ahead of ordinary hunter rendering');
 

@@ -225,161 +225,107 @@ let residentMinerWorkSheet: HTMLImageElement | null = null;
 let residentMinerLoadSheet: HTMLImageElement | null = null;
 let residentHerbalistLocomotionSheet: HTMLImageElement | null = null;
 let residentHerbalistGatherSheet: HTMLImageElement | null = null;
-let loaded = 0;
 let started = false;
+
+export interface AtlasAssetState {
+  src: string;
+  status: 'idle' | 'loading' | 'loaded' | 'failed';
+  required: boolean;
+}
+
+const atlasAssetStates: AtlasAssetState[] = [];
+const atlasAssetSettledListeners = new Set<() => void>();
+const warnedAssetFailures = new Set<string>();
+
+function loadAtlasAsset(
+  src: string,
+  required: boolean,
+  assign: (image: HTMLImageElement | null) => void,
+): void {
+  const state: AtlasAssetState = { src, required, status: 'loading' };
+  atlasAssetStates.push(state);
+  const image = new Image();
+  const settle = (status: 'loaded' | 'failed') => {
+    if (state.status !== 'loading') return;
+    state.status = status;
+    assign(status === 'loaded' ? image : null);
+    if (status === 'failed' && !warnedAssetFailures.has(src)) {
+      warnedAssetFailures.add(src);
+      const kind = required ? 'core' : 'optional resident presentation';
+      console.warn(`[atlas] Failed to load ${kind} asset: ${src}`);
+    }
+    for (const listener of atlasAssetSettledListeners) listener();
+  };
+  image.onload = () => { settle('loaded'); };
+  image.onerror = () => { settle('failed'); };
+  image.src = src;
+}
 
 function ensureLoaded(): void {
   if (started || typeof Image === 'undefined') return;
   started = true;
-  sheet = new Image();
-  sheet.onload = () => { loaded++; };
-  sheet.src = '/assets/roguelikeSheet_transparent.png';
-  chars = new Image();
-  chars.onload = () => { loaded++; };
-  chars.src = '/assets/roguelikeChar_transparent.png';
-  riverSheet = new Image();
-  riverSheet.onload = () => { loaded++; };
-  riverSheet.src = '/assets/river-mask-autotile-28px-sheet.png';
-  historicalTerrainSheet = new Image();
-  historicalTerrainSheet.onload = () => { loaded++; };
-  historicalTerrainSheet.src = '/assets/folk-warm-terrain-v3-28px-sheet.png';
-  terrainObjectSheet = new Image();
-  terrainObjectSheet.onload = () => { loaded++; };
-  terrainObjectSheet.src = GENERATED_TERRAIN_OBJECT_SHEET.src;
-  buildingSheet = new Image();
-  buildingSheet.onload = () => { loaded++; };
-  buildingSheet.src = GENERATED_BUILDING_SHEET.src;
-  largeBuildingSheet = new Image();
-  largeBuildingSheet.onload = () => { loaded++; };
-  largeBuildingSheet.src = GENERATED_LARGE_BUILDING_SHEET.src;
-  promotionBuildingSheet = new Image();
-  promotionBuildingSheet.onload = () => { loaded++; };
-  promotionBuildingSheet.src = PROMOTION_BUILDING_SHEET.src;
-  promotionLargeBuildingSheet = new Image();
-  promotionLargeBuildingSheet.onload = () => { loaded++; };
-  promotionLargeBuildingSheet.src = PROMOTION_LARGE_BUILDING_SHEET.src;
-  const promotionChars = new Image();
-  promotionChars.onload = () => {
-    promotionCharacterSheet = promotionChars;
-    loaded++;
-  };
-  promotionChars.src = PROMOTION_CHARACTER_SHEET.src;
-  const militiaWeapons = new Image();
-  militiaWeapons.onload = () => {
-    militiaWeaponSheet = militiaWeapons;
-    loaded++;
-  };
-  militiaWeapons.src = MILITIA_WEAPON_SHEET.src;
-  wallFamilySheet = new Image();
-  wallFamilySheet.onload = () => { loaded++; };
-  wallFamilySheet.src = WALL_FAMILY_SHEET.src;
-  wallGateSheet = new Image();
-  wallGateSheet.onload = () => { loaded++; };
-  wallGateSheet.src = WALL_GATE_SHEET.src;
-  specializedBuildingSheet = new Image();
-  specializedBuildingSheet.onload = () => { loaded++; };
-  specializedBuildingSheet.src = SPECIALIZED_BUILDING_SHEET.src;
-  specializedLargeBuildingSheet = new Image();
-  specializedLargeBuildingSheet.onload = () => { loaded++; };
-  specializedLargeBuildingSheet.src = SPECIALIZED_LARGE_BUILDING_SHEET.src;
-  specializedCharacterSheet = new Image();
-  specializedCharacterSheet.onload = () => { loaded++; };
-  specializedCharacterSheet.src = SPECIALIZED_CHARACTER_SHEET.src;
-  newContentBuildingSheet = new Image();
-  newContentBuildingSheet.onload = () => { loaded++; };
-  newContentBuildingSheet.src = NEW_CONTENT_BUILDING_SHEET.src;
-  newContentLargeBuildingSheet = new Image();
-  newContentLargeBuildingSheet.onload = () => { loaded++; };
-  newContentLargeBuildingSheet.src = NEW_CONTENT_LARGE_BUILDING_SHEET.src;
-  newContentResidentSheet = new Image();
-  newContentResidentSheet.onload = () => { loaded++; };
-  newContentResidentSheet.src = NEW_CONTENT_RESIDENT_SHEET.src;
-  factionRaiderSheet = new Image();
-  factionRaiderSheet.onload = () => { loaded++; };
-  factionRaiderSheet.src = FACTION_RAIDER_SHEET.src;
-  buildingDamageSheet = new Image();
-  buildingDamageSheet.onload = () => { loaded++; };
-  buildingDamageSheet.src = BUILDING_DAMAGE_SHEET.src;
-  foreignResidentSheet = new Image();
-  foreignResidentSheet.onload = () => { loaded++; };
-  foreignResidentSheet.src = FOREIGN_RESIDENT_SHEET.src;
-  foreignSiteCoreSheet = new Image();
-  foreignSiteCoreSheet.onload = () => { loaded++; };
-  foreignSiteCoreSheet.src = FOREIGN_SITE_CORE_SHEET.src;
-  foreignSitePropSheet = new Image();
-  foreignSitePropSheet.onload = () => { loaded++; };
-  foreignSitePropSheet.src = FOREIGN_SITE_PROP_SHEET.src;
-  specialResidentSheet = new Image();
-  specialResidentSheet.onload = () => { loaded++; };
-  specialResidentSheet.src = SPECIAL_RESIDENT_SHEET.src;
-  centerPromotionSheet = new Image();
-  centerPromotionSheet.onload = () => { loaded++; };
-  centerPromotionSheet.src = CENTER_PROMOTION_SHEET.src;
-  residentWoodcutterWorkSheet = new Image();
-  residentWoodcutterWorkSheet.onload = () => { loaded++; };
-  residentWoodcutterWorkSheet.src = RESIDENT_WOODCUTTER_WORK_SHEET.src;
-  residentWoodcutterLocomotionSheet = new Image();
-  residentWoodcutterLocomotionSheet.onload = () => { loaded++; };
-  residentWoodcutterLocomotionSheet.src = RESIDENT_WOODCUTTER_LOCOMOTION_SHEET.src;
-  residentWoodcutterLoadSheet = new Image();
-  residentWoodcutterLoadSheet.onload = () => { loaded++; };
-  residentWoodcutterLoadSheet.src = RESIDENT_WOODCUTTER_LOAD_SHEET.src;
-  residentHunterHuntSheet = new Image();
-  residentHunterHuntSheet.onload = () => { loaded++; };
-  residentHunterHuntSheet.src = RESIDENT_HUNTER_HUNT_SHEET.src;
-  residentHunterLocomotionSheet = new Image();
-  residentHunterLocomotionSheet.onload = () => { loaded++; };
-  residentHunterLocomotionSheet.src = RESIDENT_HUNTER_LOCOMOTION_SHEET.src;
-  residentHunterLoadSheet = new Image();
-  residentHunterLoadSheet.onload = () => { loaded++; };
-  residentHunterLoadSheet.src = RESIDENT_HUNTER_LOAD_SHEET.src;
-  residentHaulerLocomotionSheet = new Image();
-  residentHaulerLocomotionSheet.onload = () => { loaded++; };
-  residentHaulerLocomotionSheet.src = RESIDENT_HAULER_LOCOMOTION_SHEET.src;
-  residentHaulerCartLocomotionSheet = new Image();
-  residentHaulerCartLocomotionSheet.onload = () => { loaded++; };
-  residentHaulerCartLocomotionSheet.src = RESIDENT_HAULER_CART_LOCOMOTION_SHEET.src;
-  residentFarmerTillSheet = new Image();
-  residentFarmerTillSheet.onload = () => { loaded++; };
-  residentFarmerTillSheet.src = RESIDENT_FARMER_TILL_SHEET.src;
-  residentFarmerHarvestSheet = new Image();
-  residentFarmerHarvestSheet.onload = () => { loaded++; };
-  residentFarmerHarvestSheet.src = RESIDENT_FARMER_HARVEST_SHEET.src;
-  residentFarmerOxPlowSheet = new Image();
-  residentFarmerOxPlowSheet.onload = () => { loaded++; };
-  residentFarmerOxPlowSheet.src = RESIDENT_FARMER_OX_PLOW_SHEET.src;
-  residentBuilderLocomotionSheet = new Image();
-  residentBuilderLocomotionSheet.onload = () => { loaded++; };
-  residentBuilderLocomotionSheet.src = RESIDENT_BUILDER_LOCOMOTION_SHEET.src;
-  residentBuilderWorkSheet = new Image();
-  residentBuilderWorkSheet.onload = () => { loaded++; };
-  residentBuilderWorkSheet.src = RESIDENT_BUILDER_WORK_SHEET.src;
-  residentMinerLocomotionSheet = new Image();
-  residentMinerLocomotionSheet.onload = () => { loaded++; };
-  residentMinerLocomotionSheet.src = RESIDENT_MINER_LOCOMOTION_SHEET.src;
-  residentMinerWorkSheet = new Image();
-  residentMinerWorkSheet.onload = () => { loaded++; };
-  residentMinerWorkSheet.src = RESIDENT_MINER_WORK_SHEET.src;
-  residentMinerLoadSheet = new Image();
-  residentMinerLoadSheet.onload = () => { loaded++; };
-  residentMinerLoadSheet.src = RESIDENT_MINER_LOAD_SHEET.src;
-  residentHerbalistLocomotionSheet = new Image();
-  residentHerbalistLocomotionSheet.onload = () => { loaded++; };
-  residentHerbalistLocomotionSheet.src = RESIDENT_HERBALIST_LOCOMOTION_SHEET.src;
-  residentHerbalistGatherSheet = new Image();
-  residentHerbalistGatherSheet.onload = () => { loaded++; };
-  residentHerbalistGatherSheet.src = RESIDENT_HERBALIST_GATHER_SHEET.src;
-  const characterSheet = new Image();
-  characterSheet.onload = () => {
-    generatedCharacterSheet = characterSheet;
-    loaded++;
-  };
-  characterSheet.src = GENERATED_CHARACTER_SHEET.src;
+  loadAtlasAsset('/assets/roguelikeSheet_transparent.png', true, image => { sheet = image; });
+  loadAtlasAsset('/assets/roguelikeChar_transparent.png', true, image => { chars = image; });
+  loadAtlasAsset('/assets/river-mask-autotile-28px-sheet.png', true, image => { riverSheet = image; });
+  loadAtlasAsset('/assets/folk-warm-terrain-v3-28px-sheet.png', true, image => { historicalTerrainSheet = image; });
+  loadAtlasAsset(GENERATED_TERRAIN_OBJECT_SHEET.src, true, image => { terrainObjectSheet = image; });
+  loadAtlasAsset(GENERATED_BUILDING_SHEET.src, true, image => { buildingSheet = image; });
+  loadAtlasAsset(GENERATED_LARGE_BUILDING_SHEET.src, true, image => { largeBuildingSheet = image; });
+  loadAtlasAsset(PROMOTION_BUILDING_SHEET.src, true, image => { promotionBuildingSheet = image; });
+  loadAtlasAsset(PROMOTION_LARGE_BUILDING_SHEET.src, true, image => { promotionLargeBuildingSheet = image; });
+  loadAtlasAsset(PROMOTION_CHARACTER_SHEET.src, true, image => { promotionCharacterSheet = image; });
+  loadAtlasAsset(MILITIA_WEAPON_SHEET.src, true, image => { militiaWeaponSheet = image; });
+  loadAtlasAsset(WALL_FAMILY_SHEET.src, true, image => { wallFamilySheet = image; });
+  loadAtlasAsset(WALL_GATE_SHEET.src, true, image => { wallGateSheet = image; });
+  loadAtlasAsset(SPECIALIZED_BUILDING_SHEET.src, true, image => { specializedBuildingSheet = image; });
+  loadAtlasAsset(SPECIALIZED_LARGE_BUILDING_SHEET.src, true, image => { specializedLargeBuildingSheet = image; });
+  loadAtlasAsset(SPECIALIZED_CHARACTER_SHEET.src, true, image => { specializedCharacterSheet = image; });
+  loadAtlasAsset(NEW_CONTENT_BUILDING_SHEET.src, true, image => { newContentBuildingSheet = image; });
+  loadAtlasAsset(NEW_CONTENT_LARGE_BUILDING_SHEET.src, true, image => { newContentLargeBuildingSheet = image; });
+  loadAtlasAsset(NEW_CONTENT_RESIDENT_SHEET.src, true, image => { newContentResidentSheet = image; });
+  loadAtlasAsset(FACTION_RAIDER_SHEET.src, true, image => { factionRaiderSheet = image; });
+  loadAtlasAsset(BUILDING_DAMAGE_SHEET.src, true, image => { buildingDamageSheet = image; });
+  loadAtlasAsset(FOREIGN_RESIDENT_SHEET.src, true, image => { foreignResidentSheet = image; });
+  loadAtlasAsset(FOREIGN_SITE_CORE_SHEET.src, true, image => { foreignSiteCoreSheet = image; });
+  loadAtlasAsset(FOREIGN_SITE_PROP_SHEET.src, true, image => { foreignSitePropSheet = image; });
+  loadAtlasAsset(SPECIAL_RESIDENT_SHEET.src, true, image => { specialResidentSheet = image; });
+  loadAtlasAsset(CENTER_PROMOTION_SHEET.src, true, image => { centerPromotionSheet = image; });
+  loadAtlasAsset(GENERATED_CHARACTER_SHEET.src, true, image => { generatedCharacterSheet = image; });
+
+  loadAtlasAsset(RESIDENT_WOODCUTTER_WORK_SHEET.src, false, image => { residentWoodcutterWorkSheet = image; });
+  loadAtlasAsset(RESIDENT_WOODCUTTER_LOCOMOTION_SHEET.src, false, image => { residentWoodcutterLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_WOODCUTTER_LOAD_SHEET.src, false, image => { residentWoodcutterLoadSheet = image; });
+  loadAtlasAsset(RESIDENT_HUNTER_HUNT_SHEET.src, false, image => { residentHunterHuntSheet = image; });
+  loadAtlasAsset(RESIDENT_HUNTER_LOCOMOTION_SHEET.src, false, image => { residentHunterLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_HUNTER_LOAD_SHEET.src, false, image => { residentHunterLoadSheet = image; });
+  loadAtlasAsset(RESIDENT_HAULER_LOCOMOTION_SHEET.src, false, image => { residentHaulerLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_HAULER_CART_LOCOMOTION_SHEET.src, false, image => { residentHaulerCartLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_FARMER_TILL_SHEET.src, false, image => { residentFarmerTillSheet = image; });
+  loadAtlasAsset(RESIDENT_FARMER_HARVEST_SHEET.src, false, image => { residentFarmerHarvestSheet = image; });
+  loadAtlasAsset(RESIDENT_FARMER_OX_PLOW_SHEET.src, false, image => { residentFarmerOxPlowSheet = image; });
+  loadAtlasAsset(RESIDENT_BUILDER_LOCOMOTION_SHEET.src, false, image => { residentBuilderLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_BUILDER_WORK_SHEET.src, false, image => { residentBuilderWorkSheet = image; });
+  loadAtlasAsset(RESIDENT_MINER_LOCOMOTION_SHEET.src, false, image => { residentMinerLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_MINER_WORK_SHEET.src, false, image => { residentMinerWorkSheet = image; });
+  loadAtlasAsset(RESIDENT_MINER_LOAD_SHEET.src, false, image => { residentMinerLoadSheet = image; });
+  loadAtlasAsset(RESIDENT_HERBALIST_LOCOMOTION_SHEET.src, false, image => { residentHerbalistLocomotionSheet = image; });
+  loadAtlasAsset(RESIDENT_HERBALIST_GATHER_SHEET.src, false, image => { residentHerbalistGatherSheet = image; });
 }
 
 export function atlasReady(): boolean {
   ensureLoaded();
-  return loaded >= 44;
+  const requiredAssets = atlasAssetStates.filter(asset => asset.required);
+  return started && requiredAssets.length > 0 && requiredAssets.every(asset => asset.status === 'loaded');
+}
+
+export function atlasAssetStateSnapshot(): readonly Readonly<AtlasAssetState>[] {
+  ensureLoaded();
+  return atlasAssetStates.map(asset => ({ ...asset }));
+}
+
+export function onAtlasAssetSettled(listener: () => void): () => void {
+  atlasAssetSettledListeners.add(listener);
+  return () => { atlasAssetSettledListeners.delete(listener); };
 }
 
 // 아틀라스가 준비되면 아틀라스, 아니면 임시 그래픽
@@ -556,6 +502,80 @@ function drawGeneratedResident(
   drawGeneratedCharacterRect(
     ctx, img, generatedResidentSourceRect(p.job, p.gender), p.x, p.y, p.facing, bob, p.sizeScale ?? 1,
   );
+}
+
+function drawOptionalResidentPresentation(
+  ctx: CanvasRenderingContext2D,
+  p: ResidentDrawParams,
+  animationTimeMs: number,
+): boolean {
+  const draw = (image: HTMLImageElement | null, rect: SourceRect): boolean => {
+    if (!image) return false;
+    drawGeneratedCharacterRect(ctx, image, rect, p.x, p.y, p.facing, 0, p.sizeScale ?? 1);
+    return true;
+  };
+
+  switch (p.job) {
+    case 'woodcutter':
+      if (p.working && !p.moving) {
+        return draw(residentWoodcutterWorkSheet, woodcutterWorkSourceRect(p.gender, animationTimeMs));
+      }
+      if (p.carryingWood) {
+        return draw(residentWoodcutterLoadSheet, woodcutterLoadSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+      }
+      return draw(residentWoodcutterLocomotionSheet,
+        woodcutterLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+    case 'hunter':
+      if (p.working && !p.moving) {
+        return draw(residentHunterHuntSheet, hunterHuntSourceRect(p.gender, animationTimeMs));
+      }
+      if (p.carryingGame) {
+        return draw(residentHunterLoadSheet, hunterLoadSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+      }
+      return draw(residentHunterLocomotionSheet,
+        hunterLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+    case 'hauler':
+      if (p.cartEquipped) {
+        return draw(residentHaulerCartLocomotionSheet,
+          haulerCartLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+      }
+      return draw(residentHaulerLocomotionSheet,
+        haulerLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+    case 'farmer':
+      if (p.farmerAction === 'oxPlow') {
+        return draw(residentFarmerOxPlowSheet, farmerOxPlowSourceRect(p.gender, animationTimeMs));
+      }
+      if (p.farmerAction === 'harvest') {
+        return draw(residentFarmerHarvestSheet, farmerHarvestSourceRect(p.gender, animationTimeMs));
+      }
+      if (p.farmerAction === 'till') {
+        return draw(residentFarmerTillSheet, farmerTillSourceRect(p.gender, animationTimeMs));
+      }
+      return false;
+    case 'builder':
+      if (p.working && !p.moving) {
+        return draw(residentBuilderWorkSheet, builderWorkSourceRect(p.gender, animationTimeMs));
+      }
+      return draw(residentBuilderLocomotionSheet,
+        builderLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+    case 'herbalist':
+      if (p.working && !p.moving) {
+        return draw(residentHerbalistGatherSheet, herbalistGatherSourceRect(p.gender, animationTimeMs));
+      }
+      return draw(residentHerbalistLocomotionSheet,
+        herbalistLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+    case 'miner':
+      if (p.working && !p.moving) {
+        return draw(residentMinerWorkSheet, minerWorkSourceRect(p.gender, animationTimeMs));
+      }
+      if (p.carryingMinerals) {
+        return draw(residentMinerLoadSheet, minerLoadSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+      }
+      return draw(residentMinerLocomotionSheet,
+        minerLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+    default:
+      return false;
+  }
 }
 
 function drawForeignStructureSprite(
@@ -1212,204 +1232,9 @@ export const atlasSprites: SpriteAPI = {
       drawGeneratedCharacterRect(ctx, foreignResidentSheet, foreignRect, p.x, p.y, p.facing, bob);
     } else if (newContentResidentSheet && newContentRect) {
       drawGeneratedCharacterRect(ctx, newContentResidentSheet, newContentRect, p.x, p.y, p.facing, bob);
-    } else if (residentWoodcutterWorkSheet && p.job === 'woodcutter' && p.working && !p.moving) {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentWoodcutterWorkSheet,
-        woodcutterWorkSourceRect(p.gender, performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentWoodcutterLoadSheet && p.job === 'woodcutter' && p.carryingWood) {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentWoodcutterLoadSheet,
-        woodcutterLoadSourceRect(p.gender, Boolean(p.moving), performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentWoodcutterLocomotionSheet && p.job === 'woodcutter') {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentWoodcutterLocomotionSheet,
-        woodcutterLocomotionSourceRect(p.gender, Boolean(p.moving), performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentHunterHuntSheet && p.job === 'hunter' && p.working && !p.moving) {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentHunterHuntSheet,
-        hunterHuntSourceRect(p.gender, performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentHunterLoadSheet && p.job === 'hunter' && p.carryingGame) {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentHunterLoadSheet,
-        hunterLoadSourceRect(p.gender, Boolean(p.moving), performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentHunterLocomotionSheet && p.job === 'hunter') {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentHunterLocomotionSheet,
-        hunterLocomotionSourceRect(p.gender, Boolean(p.moving), performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentHaulerCartLocomotionSheet && p.job === 'hauler' && p.cartEquipped) {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentHaulerCartLocomotionSheet,
-        haulerCartLocomotionSourceRect(p.gender, Boolean(p.moving), performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentHaulerLocomotionSheet && p.job === 'hauler') {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentHaulerLocomotionSheet,
-        haulerLocomotionSourceRect(p.gender, Boolean(p.moving), performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentFarmerOxPlowSheet && p.job === 'farmer' && p.farmerAction === 'oxPlow') {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentFarmerOxPlowSheet,
-        farmerOxPlowSourceRect(p.gender, performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentFarmerHarvestSheet && p.job === 'farmer' && p.farmerAction === 'harvest') {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentFarmerHarvestSheet,
-        farmerHarvestSourceRect(p.gender, performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentFarmerTillSheet && p.job === 'farmer' && p.farmerAction === 'till') {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentFarmerTillSheet,
-        farmerTillSourceRect(p.gender, performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentBuilderWorkSheet && p.job === 'builder' && p.working && !p.moving) {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentBuilderWorkSheet,
-        builderWorkSourceRect(p.gender, performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentBuilderLocomotionSheet && p.job === 'builder') {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentBuilderLocomotionSheet,
-        builderLocomotionSourceRect(p.gender, Boolean(p.moving), performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentHerbalistGatherSheet && p.job === 'herbalist' && p.working && !p.moving) {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentHerbalistGatherSheet,
-        herbalistGatherSourceRect(p.gender, performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentHerbalistLocomotionSheet && p.job === 'herbalist') {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentHerbalistLocomotionSheet,
-        herbalistLocomotionSourceRect(p.gender, Boolean(p.moving), performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentMinerWorkSheet && p.job === 'miner' && p.working && !p.moving) {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentMinerWorkSheet,
-        minerWorkSourceRect(p.gender, performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentMinerLoadSheet && p.job === 'miner' && p.carryingMinerals) {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentMinerLoadSheet,
-        minerLoadSourceRect(p.gender, Boolean(p.moving), performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
-    } else if (residentMinerLocomotionSheet && p.job === 'miner') {
-      drawGeneratedCharacterRect(
-        ctx,
-        residentMinerLocomotionSheet,
-        minerLocomotionSourceRect(p.gender, Boolean(p.moving), performance.now()),
-        p.x,
-        p.y,
-        p.facing,
-        0,
-        p.sizeScale ?? 1,
-      );
+    } else if (drawOptionalResidentPresentation(ctx, p, p.animationTimeMs ?? performance.now())) {
+      // Optional sheets are selected by the requested presentation state. If that exact
+      // sheet is unavailable, the chain continues to the generated resident fallback.
     } else if (militiaSheet && p.job === 'militia' && p.militiaWeapon) {
       drawGeneratedCharacterRect(
         ctx,

@@ -87,6 +87,7 @@ export interface ResidentDrawParams {
   stage?: LifeStage | null;
   sizeScale?: number; // 아이 축소 표시 (전용 시트가 나오기 전 폴백)
   special?: SpecialResidentId;
+  animationTimeMs?: number; // 한 캔버스 프레임에서 공유하는 애니메이션 시간
 }
 
 export interface ForeignStructureDrawParams {

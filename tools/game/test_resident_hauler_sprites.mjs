@@ -57,13 +57,13 @@ assert.match(rendererSource, /cartEquipped:\s*r\.cartEquipped/,
   'renderer passes the equipped-cart state to resident sprites');
 
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
-assert.match(atlasSource, /p\.job\s*===\s*['"]hauler['"]\s*&&\s*p\.cartEquipped/,
+assert.match(atlasSource, /case ['"]hauler['"]:\s*if \(p\.cartEquipped\)/,
   'equipped haulers use the cart sheet');
-assert.match(atlasSource, /residentHaulerLocomotionSheet\s*&&\s*p\.job\s*===\s*['"]hauler['"]/,
+assert.match(atlasSource, /return draw\(residentHaulerLocomotionSheet/,
   'cartless adult haulers use the jige sheet');
 
 const youthBranch = atlasSource.indexOf('newContentResidentSheet && newContentRect');
-const haulerBranch = atlasSource.indexOf("p.job === 'hauler'");
+const haulerBranch = atlasSource.indexOf('drawOptionalResidentPresentation(ctx, p');
 assert.ok(youthBranch >= 0 && haulerBranch > youthBranch,
   'youth and child resident rendering remains ahead of adult hauler rendering');
 
