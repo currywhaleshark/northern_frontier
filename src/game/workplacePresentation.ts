@@ -1,53 +1,61 @@
-import type { Building, BuildingTypeId, GameState, Resident } from './types';
+import type { Building, BuildingTypeId, Resident } from './types';
 
 export type WorkplaceActivityStyle = 'fire' | 'craft' | 'service';
+export type WorkplacePresentationMode = 'interior' | 'yard' | 'visible';
 
-const INTERIOR_WORKPLACE_STYLES: Partial<Record<BuildingTypeId, WorkplaceActivityStyle>> = {
-  watermill: 'craft',
-  woodShed: 'craft',
-  charcoalKiln: 'fire',
-  smithy: 'fire',
-  stable: 'service',
-  clinic: 'service',
-  nitreYard: 'craft',
-  tannery: 'craft',
-  weavingHouse: 'craft',
-  smokehouse: 'fire',
-  dryingRack: 'craft',
-  onggiKiln: 'fire',
-  school: 'service',
-  shrine: 'service',
-  hermitage: 'service',
+export interface WorkplacePresentation {
+  mode: WorkplacePresentationMode;
+  activity: WorkplaceActivityStyle | null;
+}
+
+const VISIBLE_WORKPLACE: WorkplacePresentation = { mode: 'visible', activity: null };
+
+const WORKPLACE_PRESENTATIONS: Partial<Record<BuildingTypeId, WorkplacePresentation>> = {
+  watermill: { mode: 'interior', activity: 'craft' },
+  smithy: { mode: 'interior', activity: 'fire' },
+  clinic: { mode: 'interior', activity: 'service' },
+  tannery: { mode: 'interior', activity: 'craft' },
+  weavingHouse: { mode: 'interior', activity: 'craft' },
+  smokehouse: { mode: 'interior', activity: 'fire' },
+  school: { mode: 'interior', activity: 'service' },
+  shrine: { mode: 'interior', activity: 'service' },
+  hermitage: { mode: 'interior', activity: 'service' },
+
+  woodShed: { mode: 'yard', activity: 'craft' },
+  charcoalKiln: { mode: 'yard', activity: 'fire' },
+  stable: { mode: 'yard', activity: 'service' },
+  nitreYard: { mode: 'yard', activity: 'craft' },
+  dryingRack: { mode: 'yard', activity: 'craft' },
+  onggiKiln: { mode: 'yard', activity: 'fire' },
 };
 
+export function workplacePresentation(type: BuildingTypeId): WorkplacePresentation {
+  return WORKPLACE_PRESENTATIONS[type] ?? VISIBLE_WORKPLACE;
+}
+
 export function workplaceActivityStyle(type: BuildingTypeId): WorkplaceActivityStyle | null {
-  return INTERIOR_WORKPLACE_STYLES[type] ?? null;
+  return workplacePresentation(type).activity;
 }
 
 export function isInteriorWorkplace(type: BuildingTypeId): boolean {
-  return workplaceActivityStyle(type) != null;
+  return workplacePresentation(type).mode === 'interior';
 }
 
-/** 화면 보간까지 끝내고 배정 작업장에서 실제 생산·업무 중인 주민만 실내로 표시한다. */
-export function residentInteriorWorkplace(state: GameState, resident: Resident): Building | null {
+/** 화면 보간까지 끝내고 배정 작업장에서 실제 생산·업무 중인 주민을 찾는다. */
+export function residentActiveWorkplace(
+  resident: Resident,
+  buildingById: ReadonlyMap<number, Building>,
+): Building | null {
   if (!resident.alive || resident.phase !== 'working' || resident.px !== resident.x || resident.py !== resident.y ||
       resident.assignedBuildingId == null) return null;
-  const building = state.buildings.find(candidate =>
-    candidate.id === resident.assignedBuildingId && candidate.built && isInteriorWorkplace(candidate.type));
-  return building ?? null;
+  const building = buildingById.get(resident.assignedBuildingId);
+  return building?.built ? building : null;
 }
 
-export function activeInteriorWorkers(state: GameState): {
-  residentIds: Set<number>;
-  countByBuilding: Map<number, number>;
-} {
-  const residentIds = new Set<number>();
-  const countByBuilding = new Map<number, number>();
-  for (const resident of state.residents) {
-    const building = residentInteriorWorkplace(state, resident);
-    if (!building) continue;
-    residentIds.add(resident.id);
-    countByBuilding.set(building.id, (countByBuilding.get(building.id) ?? 0) + 1);
-  }
-  return { residentIds, countByBuilding };
+export function residentInteriorWorkplace(
+  resident: Resident,
+  buildingById: ReadonlyMap<number, Building>,
+): Building | null {
+  const building = residentActiveWorkplace(resident, buildingById);
+  return building && isInteriorWorkplace(building.type) ? building : null;
 }

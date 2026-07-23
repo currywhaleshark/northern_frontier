@@ -9,54 +9,59 @@ const output = ts.transpileModule(source, {
 }).outputText;
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(output).toString('base64')}`;
 const {
-  activeInteriorWorkers,
   isInteriorWorkplace,
+  residentActiveWorkplace,
   residentInteriorWorkplace,
   workplaceActivityStyle,
+  workplacePresentation,
 } = await import(moduleUrl);
 
+const expectedInterior = [
+  'watermill', 'smithy', 'clinic', 'tannery', 'weavingHouse', 'smokehouse',
+  'school', 'shrine', 'hermitage',
+];
+const expectedYard = ['woodShed', 'charcoalKiln', 'stable', 'nitreYard', 'dryingRack', 'onggiKiln'];
+const expectedVisible = ['field', 'paddy', 'ferry', 'cemetery', 'mine', 'lumberCamp', 'huntLodge', 'herbHut'];
+
+for (const type of expectedInterior) {
+  assert.equal(workplacePresentation(type).mode, 'interior', `${type} workers are represented indoors`);
+  assert.equal(isInteriorWorkplace(type), true);
+}
+for (const type of expectedYard) {
+  assert.equal(workplacePresentation(type).mode, 'yard', `${type} workers remain visible in the yard`);
+  assert.ok(workplaceActivityStyle(type), `${type} keeps a building activity effect`);
+}
+for (const type of expectedVisible) {
+  assert.equal(workplacePresentation(type).mode, 'visible', `${type} workers remain fully visible`);
+  assert.equal(isInteriorWorkplace(type), false);
+}
 assert.equal(workplaceActivityStyle('smithy'), 'fire');
 assert.equal(workplaceActivityStyle('woodShed'), 'craft');
 assert.equal(workplaceActivityStyle('clinic'), 'service');
-assert.equal(isInteriorWorkplace('tannery'), true);
-assert.equal(isInteriorWorkplace('field'), false, 'farmers remain visible on their field tiles');
-assert.equal(isInteriorWorkplace('ferry'), false, 'fishers remain visible at the waterfront');
-assert.equal(isInteriorWorkplace('cemetery'), false, 'undertakers remain visible in the cemetery grounds');
 
 const smithy = { id: 10, type: 'smithy', built: true, x: 5, y: 5 };
-const field = { id: 20, type: 'field', built: true, x: 8, y: 8 };
+const charcoal = { id: 20, type: 'charcoalKiln', built: true, x: 8, y: 8 };
+const buildingById = new Map([[smithy.id, smithy], [charcoal.id, charcoal]]);
 const resident = (id, overrides = {}) => ({
   id, alive: true, phase: 'working', assignedBuildingId: smithy.id,
   x: 4, y: 5, px: 4, py: 5, ...overrides,
 });
-const state = {
-  buildings: [smithy, field],
-  residents: [
-    resident(1),
-    resident(2, { px: 3 }),
-    resident(3, { phase: 'rest' }),
-    resident(4, { assignedBuildingId: field.id, x: 8, y: 8, px: 8, py: 8 }),
-  ],
-};
 
-assert.equal(residentInteriorWorkplace(state, state.residents[0]), smithy,
+assert.equal(residentActiveWorkplace(resident(1), buildingById), smithy);
+assert.equal(residentInteriorWorkplace(resident(1), buildingById), smithy,
   'a stationary working smith is represented inside the smithy');
-assert.equal(residentInteriorWorkplace(state, state.residents[1]), null,
-  'a worker remains visible while the final movement interpolation is running');
-assert.equal(residentInteriorWorkplace(state, state.residents[2]), null,
-  'an idle assigned worker remains visible outside');
-assert.equal(residentInteriorWorkplace(state, state.residents[3]), null,
-  'field workers are never hidden by the interior presentation');
-
-const active = activeInteriorWorkers(state);
-assert.deepEqual([...active.residentIds], [1]);
-assert.equal(active.countByBuilding.get(smithy.id), 1);
+assert.equal(residentInteriorWorkplace(resident(2, { px: 3 }), buildingById), null,
+  'a worker remains visible while movement interpolation is running');
+assert.equal(residentInteriorWorkplace(resident(3, { phase: 'rest' }), buildingById), null,
+  'an idle assigned worker remains visible');
+assert.equal(residentInteriorWorkplace(resident(4, { assignedBuildingId: charcoal.id }), buildingById), null,
+  'yard workers are active but never hidden');
 
 const rendererSource = readFileSync(new URL('../../src/render/renderer.ts', import.meta.url), 'utf8');
-assert.match(rendererSource, /indoorWorkers\.residentIds\.has\(r\.id\)/,
-  'the resident pass hides active interior workers');
-assert.match(rendererSource, /drawWorkplaceActivity\([^)]*activeWorkerCount/s,
-  'active interior workers drive the building activity effect');
+assert.match(rendererSource, /presentation\.indoorResidentIds\.has\(r\.id\)/,
+  'the resident pass hides only snapshot-classified interior workers');
+assert.match(rendererSource, /workplaceActiveCountByBuilding\.get\(b\.id\)/,
+  'interior and yard activity effects use the snapshot active count');
 assert.match(rendererSource, /작업 \$\{activeCount\}\/\$\{slotCount\}/,
   'expanded worker slots show the active worker count');
 

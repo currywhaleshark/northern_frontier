@@ -84,9 +84,10 @@ for (const [filename, width, height] of dimensions) {
 }
 
 const rendererSource = readFileSync(new URL('../../src/render/renderer.ts', import.meta.url), 'utf8');
-assert.match(rendererSource, /selectOxPlowFarmerIds\(state\.buildings, state\.residents\)/,
-  'renderer caps ox-plow units to plot assignments');
-assert.match(rendererSource, /farmerAction:\s*farmerSpriteActionFor\(r, oxPlowFarmerIds\)/,
+const presentationSource = readFileSync(new URL('../../src/render/residentPresentation.ts', import.meta.url), 'utf8');
+assert.match(presentationSource, /selectOxPlowFarmerIds\(state\.buildings, state\.residents\)/,
+  'the shared presentation snapshot caps ox-plow units to plot assignments');
+assert.match(rendererSource, /farmerAction:\s*farmerSpriteActionFor\(r, presentation\.oxPlowFarmerIds\)/,
   'renderer passes the derived farmer work action');
 
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');

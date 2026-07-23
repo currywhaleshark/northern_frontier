@@ -19,8 +19,12 @@ import { builtWallTileSet, isWallBuilding, wallConnectionsFromSet } from '../gam
 import { assignedWorkers, workerSlotConfig, workerSlotCount } from '../game/workerSlots';
 import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
 import { militiaWeaponForResident } from './militiaWeaponAssignment';
-import { farmerSpriteActionFor, selectOxPlowFarmerIds } from './residentFarmerAssets';
-import { residentWorkStances, type ResidentWorkStance } from './residentWorkLayout';
+import { farmerSpriteActionFor } from './residentFarmerAssets';
+import type { ResidentWorkStance } from './residentWorkLayout';
+import {
+  buildResidentPresentationSnapshot,
+  type ResidentPresentationSnapshot,
+} from './residentPresentation';
 import { claimZonesAt } from '../game/claimZones';
 import { foreignSiteAt } from '../game/foreignSites';
 import { foreignSiteActors, foreignSiteProps, type ForeignSiteProp } from '../game/foreignSiteActivity';
@@ -29,9 +33,7 @@ import { weaponCountsForResidents } from '../game/weapons';
 import { activePredatorScoutIds } from '../game/expeditionIntel';
 import { isBuriedSilverVeinTile } from '../game/silver';
 import { activeExpeditionTargetMarkers, type ExpeditionTargetMarker } from '../game/expeditionTargets';
-import {
-  activeInteriorWorkers, workplaceActivityStyle, type WorkplaceActivityStyle,
-} from '../game/workplacePresentation';
+import { workplaceActivityStyle, type WorkplaceActivityStyle } from '../game/workplacePresentation';
 import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, Resident, Terrain } from '../game/types';
 import { pixelRectIntersectsViewport, tileRectIntersectsViewport, type SceneViewport } from './sceneViewport';
 
@@ -66,6 +68,7 @@ export interface SceneOptions {
   viewport?: SceneViewport;
   terrainVisualSignature?: number;
   sprites?: SpriteAPI;
+  residentPresentation?: ResidentPresentationSnapshot;
 }
 
 const TERRAIN_VISUAL_CODE: Record<Terrain, number> = {
@@ -103,17 +106,24 @@ export function residentPixelPos(
 }
 
 // 픽셀 좌표에서 가장 가까운 주민 찾기 (radius 픽셀 이내)
-export function findResidentAt(state: GameState, mx: number, my: number, alpha: number, radius = 10): Resident | null {
+export function findResidentAt(
+  state: GameState,
+  mx: number,
+  my: number,
+  alpha: number,
+  radius = 10,
+  presentation: ResidentPresentationSnapshot = buildResidentPresentationSnapshot(state),
+): Resident | null {
   let best: Resident | null = null;
   let bestD = radius;
-  const workStances = residentWorkStances(state.residents, TILE);
   const expeditionUnitIds = state.expedition && state.expedition.phase !== 'muster'
     ? new Set(state.expedition.memberIds)
     : new Set<number>();
   for (const r of state.residents) {
     if (!r.alive) continue;
     if (expeditionUnitIds.has(r.id)) continue;
-    const p = residentPixelPos(r, alpha, workStances.get(r.id));
+    if (presentation.indoorResidentIds.has(r.id)) continue;
+    const p = residentPixelPos(r, alpha, presentation.workStances.get(r.id));
     const d = Math.hypot(p.x - mx, p.y - my);
     if (d <= bestD) { bestD = d; best = r; }
   }
@@ -929,7 +939,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   };
   const sprites = o.sprites ?? placeholderSprites;
   const predatorScoutIds = activePredatorScoutIds(state);
-  const indoorWorkers = activeInteriorWorkers(state);
+  const presentation = o.residentPresentation ?? buildResidentPresentationSnapshot(state);
   const lerp = (a: number, b: number) => a + (b - a) * o.alpha;
   ctx.imageSmoothingEnabled = false;
 
@@ -1053,7 +1063,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     if (b.built && heating && (b.type === 'ondol' || b.type === 'center')) {
       drawChimneySmoke(ctx, drawX, drawY, b.id, size / TILE);
     }
-    const activeWorkerCount = indoorWorkers.countByBuilding.get(b.id) ?? 0;
+    const activeWorkerCount = presentation.workplaceActiveCountByBuilding.get(b.id) ?? 0;
     const activityStyle = workplaceActivityStyle(b.type);
     if (b.built && activeWorkerCount > 0 && activityStyle) {
       drawWorkplaceActivity(ctx, drawX, drawY, b.id, size, activeWorkerCount, activityStyle);
@@ -1072,7 +1082,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   }
 
   lap('2-buildings');
-  drawWorkerSlotOverlays(ctx, state, visibleBuildings, o.selectedBuildingId, indoorWorkers.residentIds);
+  drawWorkerSlotOverlays(ctx, state, visibleBuildings, o.selectedBuildingId, presentation.indoorResidentIds);
   lap('2b-slotOverlays');
 
   // 3) 선택 주민의 예정 경로 — 행군하는 점선(개미행렬) 애니메이션
@@ -1123,11 +1133,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     ctx.textBaseline = 'middle';
     ctx.fillText('⚰️', corpse.x * TILE + TILE / 2, corpse.y * TILE + TILE / 2);
   }
-  const oxPlowFarmerIds = selectOxPlowFarmerIds(state.buildings, state.residents);
-  const workStances = residentWorkStances(state.residents, TILE);
   for (const r of state.residents) {
-    if (!r.alive || predatorScoutIds.has(r.id) || indoorWorkers.residentIds.has(r.id)) continue;
-    const workStance = workStances.get(r.id);
+    if (!r.alive || predatorScoutIds.has(r.id) || presentation.indoorResidentIds.has(r.id)) continue;
+    const workStance = presentation.workStances.get(r.id);
     const p = residentPixelPos(r, o.alpha, workStance);
     if (!pixelRectIntersectsViewport(viewport, p.x - TILE, p.y - TILE, TILE * 2, TILE * 2)) continue;
     sprites.drawResident(ctx, {
@@ -1142,7 +1150,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       carryingMinerals: (r.carrying.stone ?? 0) > 0 || (r.carrying.iron ?? 0) > 0 ||
         (r.carrying.silver ?? 0) > 0,
       cartEquipped: r.cartEquipped,
-      farmerAction: farmerSpriteActionFor(r, oxPlowFarmerIds),
+      farmerAction: farmerSpriteActionFor(r, presentation.oxPlowFarmerIds),
       selected: r.id === o.selectedResidentId,
       moving: r.px !== r.x || r.py !== r.y,
       working: r.phase === 'working' && r.px === r.x && r.py === r.y,

@@ -6,6 +6,7 @@ import { JOB_NAMES, RESOURCE_NAMES } from '../game/constants';
 import { buildingCostFor } from '../game/buildings';
 import { getActiveSprites, onAtlasAssetSettled } from '../render/atlas';
 import { findResidentAt, renderScene, terrainVisualSignature } from '../render/renderer';
+import { createResidentPresentationSnapshotCache } from '../render/residentPresentation';
 import { sceneViewportFromScroll, type SceneViewport } from '../render/sceneViewport';
 import { getPointerAction } from '../game/selectionActions';
 import { foreignSiteAt } from '../game/foreignSites';
@@ -53,6 +54,10 @@ export function GameCanvas({
   const viewportRef = useRef<SceneViewport | null>(null);
   const pointerPositionRef = useRef<{ mx: number; my: number } | null>(null);
   const hoverSemanticKeyRef = useRef('outside');
+  const residentPresentationCacheRef = useRef<ReturnType<typeof createResidentPresentationSnapshotCache> | null>(null);
+  if (!residentPresentationCacheRef.current) {
+    residentPresentationCacheRef.current = createResidentPresentationSnapshotCache();
+  }
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [mouse, setMouse] = useState<{ mx: number; my: number } | null>(null);
   const [panning, setPanning] = useState(false);
@@ -130,6 +135,7 @@ export function GameCanvas({
   const pointerAction = placingType ? null : getPointerAction(state, selectedEntity, hoveredTile);
   const selectedBuildingId = selectedEntity?.kind === 'building' ? selectedEntity.id : null;
   const terrainSignature = useMemo(() => terrainVisualSignature(state), [state, version]);
+  const residentPresentation = residentPresentationCacheRef.current.get(state, version);
 
   const hoverSemanticKey = (point: { mx: number; my: number }): string => {
     const x = Math.floor(point.mx / TILE), y = Math.floor(point.my / TILE);
@@ -137,7 +143,7 @@ export function GameCanvas({
     if (!tile) return 'outside';
     if (placingType) return `placing:${x},${y}`;
     const frameAlpha = Math.max(0, Math.min(1, (performance.now() - anim.current.at) / anim.current.ms));
-    const resident = findResidentAt(state, point.mx, point.my, frameAlpha, CLICK_RADIUS);
+    const resident = findResidentAt(state, point.mx, point.my, frameAlpha, CLICK_RADIUS, residentPresentation);
     if (resident) return `resident:${resident.id}`;
     const raid = state.raiders;
     if (raid?.spotted) {
@@ -186,7 +192,7 @@ export function GameCanvas({
     renderScene(canvas, state, {
       alpha: frameAlpha, hover: hoverTile, placingType, placingRect, selected, selectedResidentId,
       selectedBuildingId, viewport: viewportRef.current ?? undefined, terrainVisualSignature: terrainSignature,
-      sprites: getActiveSprites(),
+      sprites: getActiveSprites(), residentPresentation,
     });
     if (perf) {
       const bucket = perf['renderScene-total'] ?? (perf['renderScene-total'] = { total: 0, count: 0 });
@@ -269,7 +275,7 @@ export function GameCanvas({
 
   // 툴팁 대상: 주민 우선, 그다음 (발견된) 습격 무리
   const hoveredResident = mouse && !placingType
-    ? findResidentAt(state, mouse.mx, mouse.my, alpha, CLICK_RADIUS)
+    ? findResidentAt(state, mouse.mx, mouse.my, alpha, CLICK_RADIUS, residentPresentation)
     : null;
   let raiderHovered = false;
   if (!hoveredResident && mouse && state.raiders && state.raiders.spotted) {
@@ -387,7 +393,7 @@ export function GameCanvas({
           if (tx < 0 || ty < 0 || tx >= w || ty >= h) return;
           if (!placingType) {
             // 반경 내 가장 가까운 주민을 우선 선택
-            const resident = findResidentAt(state, m.mx, m.my, alpha, CLICK_RADIUS);
+            const resident = findResidentAt(state, m.mx, m.my, alpha, CLICK_RADIUS, residentPresentation);
             if (resident) {
               onResidentClick(resident.id);
               return;
