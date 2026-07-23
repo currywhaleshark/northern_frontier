@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import ts from 'typescript';
 
@@ -9,12 +9,17 @@ const SEED = 20260717;
 const COLD_TICKS = 24;
 const STRESS_TICKS = 8;
 const PATH_SAMPLES = 30;
+const DEFAULT_GAME_SOURCE_ROOT = fileURLToPath(new URL('../../src/game/', import.meta.url));
+const SOURCE_ARG_INDEX = process.argv.indexOf('--source-root');
+const GAME_SOURCE_ROOT = resolve(
+  SOURCE_ARG_INDEX >= 0 ? process.argv[SOURCE_ARG_INDEX + 1] : DEFAULT_GAME_SOURCE_ROOT,
+);
 
 function compileGameModules(label) {
-  const srcDir = new URL('../../src/game/', import.meta.url);
+  const srcDir = GAME_SOURCE_ROOT;
   const outDir = mkdtempSync(join(tmpdir(), `northern-runtime-${label}-`));
   for (const file of readdirSync(srcDir).filter(candidate => candidate.endsWith('.ts'))) {
-    const source = readFileSync(new URL(file, srcDir), 'utf8');
+    const source = readFileSync(join(srcDir, file), 'utf8');
     let output = ts.transpileModule(source, {
       compilerOptions: {
         module: ts.ModuleKind.ES2022,
