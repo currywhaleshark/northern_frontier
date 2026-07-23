@@ -36,7 +36,7 @@ import { activePredatorScoutIds } from '../game/expeditionIntel';
 import { isBuriedSilverVeinTile } from '../game/silver';
 import { activeExpeditionTargetMarkers, type ExpeditionTargetMarker } from '../game/expeditionTargets';
 import { workplaceActivityStyle, type WorkplaceActivityStyle } from '../game/workplacePresentation';
-import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, Resident, Terrain } from '../game/types';
+import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, Resident, Season, Terrain } from '../game/types';
 import { pixelRectIntersectsViewport, tileRectIntersectsViewport, type SceneViewport } from './sceneViewport';
 
 const TILE = CONFIG.ui.tileSize;
@@ -1346,8 +1346,20 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
 
 // ── 밤낮 사이클 ──
 // dayFrac 0=새벽, 0.25=한낮, 0.5=해질녘, 0.75=한밤중. 시간 흐름은 config.time.msPerDay가 정한다.
+// 계절별 낮 길이 — 순수 시각 계층. 에이전트 대역·생산 수치에는 영향을 주지 않는다
+// (겨울 생산 페널티는 날씨 시스템 소관 — 이중 페널티 금지). 낮은 0.25, 자정은 0.75에 고정되고
+// 여명·황혼 시각만 계절에 따라 이동한다.
+const SEASON_DAYLIGHT_FRAC: Readonly<Record<Season, number>> = {
+  spring: 0.5, summer: 0.58, autumn: 0.5, winter: 0.42,
+};
+
 function drawDayNight(ctx: CanvasRenderingContext2D, state: GameState, dayFrac: number, viewport: SceneViewport): void {
-  const sun = Math.sin(dayFrac * Math.PI * 2); // +1 한낮, -1 한밤중
+  const daylight = SEASON_DAYLIGHT_FRAC[getSeason(state.day)];
+  const dawnT = 0.25 - daylight / 2;
+  const duskT = 0.25 + daylight / 2;
+  const sun = dayFrac >= dawnT && dayFrac < duskT
+    ? Math.sin(Math.PI * ((dayFrac - dawnT) / daylight))          // 낮 구간: 0→1→0
+    : -Math.sin(Math.PI * ((dayFrac - duskT + 1) % 1) / (1 - daylight)); // 밤 구간: 0→-1→0
   const night = Math.max(0, -sun);             // 낮엔 0, 자정에 1
 
   // 밤의 푸른 어둠
