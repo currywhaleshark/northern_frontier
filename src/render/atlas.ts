@@ -1414,6 +1414,8 @@ export const atlasSprites: SpriteAPI = {
       drawGeneratedCharacterRect(ctx, specialResidentSheet, specialRect, p.x, p.y, p.facing, bob, 1.16);
     } else if (foreignResidentSheet && foreignRect) {
       drawGeneratedCharacterRect(ctx, foreignResidentSheet, foreignRect, p.x, p.y, p.facing, bob);
+    } else if (newContentResidentSheet && newContentRect && p.stage) {
+      drawGeneratedCharacterRect(ctx, newContentResidentSheet, newContentRect, p.x, p.y, p.facing, bob);
     } else if ((drewOptionalResidentPresentation = drawOptionalResidentPresentation(ctx, p, animationTime))) {
       // Optional sheets are selected by the requested presentation state. If that exact
       // sheet is unavailable, the chain continues to the generated resident fallback.
