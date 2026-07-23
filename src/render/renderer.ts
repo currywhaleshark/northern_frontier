@@ -13,6 +13,7 @@ import {
 import { COLLAPSE_RATIO } from '../game/battles';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
 import { getSeason } from '../game/seasons';
+import { DAY_BANDS, DAY_CYCLE_SUBTICKS } from '../game/dayCycle';
 import { findHabitatIconAtTile } from '../game/habitats';
 import { isBuildingFootprintExplored, isExplored } from '../game/exploration';
 import { builtWallTileSet, isWallBuilding, wallConnectionsFromSet } from '../game/walls';
@@ -1233,8 +1234,16 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   lap('3-6-actors');
 
   // 7) 밤낮 색조 — 하루 진행도(subTick+보간)로 계산. 세계를 물들이고 창에는 불이 켜진다.
-  const SUB = CONFIG.agents.subticksPerDay;
-  const dayFrac = ((state.subTick + o.alpha) % SUB) / SUB;
+  // 12서브틱 체제에서는 한낮 = 노동 대역 중앙, 자정 = 밤 대역 중앙으로 정렬한다 (M0 계약).
+  // 두 중앙이 정확히 반나절(SUB/2) 떨어져 있어 균등 선형 이동만으로 두 앵커가 동시에 성립한다.
+  // 런타임이 아직 8서브틱이면(M1-BE 전환 전) 종전 선형 매핑을 유지한다.
+  // SUB를 number로 넓힌다 — config 리터럴(8)과 target spec(12)의 비교가 M1-BE 전환 전까지 상수 불일치라서
+  const SUB: number = CONFIG.agents.subticksPerDay;
+  const subU = (state.subTick + o.alpha) % SUB;
+  const workCenter = (DAY_BANDS.work.start + DAY_BANDS.work.end + 1) / 2;
+  const dayFrac = SUB === DAY_CYCLE_SUBTICKS
+    ? ((subU - workCenter + 0.25 * SUB + SUB) % SUB) / SUB
+    : subU / SUB;
   drawDayNight(ctx, state, dayFrac, viewport);
   lap('7-daynight');
 
