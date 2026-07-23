@@ -1223,7 +1223,8 @@ export const atlasSprites: SpriteAPI = {
         (!newContentResidentSheet || !newContentRect) && (!foreignResidentSheet || !foreignRect)) return;
     ctx.imageSmoothingEnabled = false;
     const half = CHALF;
-    const bob = (p.moving ? Math.floor(performance.now() / 130) % 2 : 0) * CF;
+    const animationTime = p.animationTimeMs ?? performance.now();
+    const bob = (p.moving ? Math.floor(animationTime / 130) % 2 : 0) * CF;
 
     const specialRect = p.special ? specialResidentSourceRect(p.special) : null;
     if (specialResidentSheet && specialRect) {
@@ -1232,7 +1233,7 @@ export const atlasSprites: SpriteAPI = {
       drawGeneratedCharacterRect(ctx, foreignResidentSheet, foreignRect, p.x, p.y, p.facing, bob);
     } else if (newContentResidentSheet && newContentRect) {
       drawGeneratedCharacterRect(ctx, newContentResidentSheet, newContentRect, p.x, p.y, p.facing, bob);
-    } else if (drawOptionalResidentPresentation(ctx, p, p.animationTimeMs ?? performance.now())) {
+    } else if (drawOptionalResidentPresentation(ctx, p, animationTime)) {
       // Optional sheets are selected by the requested presentation state. If that exact
       // sheet is unavailable, the chain continues to the generated resident fallback.
     } else if (militiaSheet && p.job === 'militia' && p.militiaWeapon) {

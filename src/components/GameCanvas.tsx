@@ -46,7 +46,7 @@ export function GameCanvas({
   onTileClick, onPlacePlot, onResidentClick, onContextAction, onCancelPlace, onZoomChange,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawRef = useRef<() => void>(() => undefined);
+  const drawRef = useRef<(animationTimeMs: number) => void>(() => undefined);
   const animationFrameRef = useRef<number | null>(null);
   const continuousRenderRef = useRef(false);
   const lastCanvasDrawRef = useRef(0);
@@ -111,7 +111,7 @@ export function GameCanvas({
         }
         lastMeasuredCanvasDrawRef.current = runtimeProbe?.active ? now : 0;
         lastCanvasDrawRef.current = now;
-        drawRef.current();
+        drawRef.current(now);
       }
       if (continuousRenderRef.current) {
         animationFrameRef.current = requestAnimationFrame(frame);
@@ -182,15 +182,15 @@ export function GameCanvas({
         : null))
     : null;
 
-  drawRef.current = () => {
+  drawRef.current = (animationTimeMs) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const frameAlpha = Math.max(0, Math.min(1, (performance.now() - anim.current.at) / anim.current.ms));
+    const frameAlpha = Math.max(0, Math.min(1, (animationTimeMs - anim.current.at) / anim.current.ms));
     const perf = window.__renderPerf;
     const start = perf ? performance.now() : 0;
     const runtimeDrawStart = runtimePerfStartTime();
     renderScene(canvas, state, {
-      alpha: frameAlpha, hover: hoverTile, placingType, placingRect, selected, selectedResidentId,
+      alpha: frameAlpha, animationTimeMs, hover: hoverTile, placingType, placingRect, selected, selectedResidentId,
       selectedBuildingId, viewport: viewportRef.current ?? undefined, terrainVisualSignature: terrainSignature,
       sprites: getActiveSprites(), residentPresentation,
     });

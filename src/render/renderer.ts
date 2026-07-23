@@ -25,6 +25,7 @@ import {
   buildResidentPresentationSnapshot,
   type ResidentPresentationSnapshot,
 } from './residentPresentation';
+import { stableResidentAnimationOffset } from './residentAnimation';
 import { claimZonesAt } from '../game/claimZones';
 import { foreignSiteAt } from '../game/foreignSites';
 import { foreignSiteActors, foreignSiteProps, type ForeignSiteProp } from '../game/foreignSiteActivity';
@@ -59,6 +60,7 @@ const PLACEMENT_HINT: Partial<Record<BuildingTypeId, Terrain>> = {
 
 export interface SceneOptions {
   alpha: number; // 서브틱 사이 이동 보간 계수 0~1
+  animationTimeMs: number; // 이 장면의 모든 주민 source rect가 공유하는 RAF 시간
   hover: { x: number; y: number } | null;
   placingType: BuildingTypeId | null;
   placingRect?: { x: number; y: number; w: number; h: number } | null; // 경작지 드래그 크기 지정 미리보기
@@ -1159,6 +1161,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       special: r.special,
       stage: r.stage,
       sizeScale: r.stage === 'infant' ? 0.42 : r.stage === 'child' ? 0.62 : r.stage === 'youth' ? 0.8 : 1,
+      animationTimeMs: o.animationTimeMs + stableResidentAnimationOffset(r.id),
     });
   }
 
