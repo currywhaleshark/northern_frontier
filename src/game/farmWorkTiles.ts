@@ -6,7 +6,7 @@ export interface FarmWorkTile {
   y: number;
 }
 
-export const FARM_WORK_TILE_DWELL_SUBTICKS = 3;
+export const FARM_WORK_TILE_DWELL_SUBTICKS = 6;
 
 type FarmPlot = Pick<Building, 'type' | 'x' | 'y' | 'w' | 'h'>;
 
