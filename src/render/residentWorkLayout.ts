@@ -15,11 +15,13 @@ type WorkLayoutResident = Pick<Resident, 'id' | 'alive' | 'phase' | 'x' | 'y' | 
 export function residentWorkStances(
   residents: readonly WorkLayoutResident[],
   tileSize: number,
+  excludedResidentIds?: ReadonlySet<number>,
 ): Map<number, ResidentWorkStance> {
   const groups = new Map<string, WorkLayoutResident[]>();
   for (const resident of residents) {
     if (!resident.alive || resident.phase !== 'working' ||
-        resident.x !== resident.px || resident.y !== resident.py) continue;
+        resident.x !== resident.px || resident.y !== resident.py ||
+        excludedResidentIds?.has(resident.id)) continue;
     const key = `${resident.x},${resident.y}`;
     const group = groups.get(key) ?? [];
     group.push(resident);
@@ -29,17 +31,33 @@ export function residentWorkStances(
   const stances = new Map<number, ResidentWorkStance>();
   for (const group of groups.values()) {
     group.sort((a, b) => a.id - b.id);
+    if (group.length === 1) {
+      const resident = group[0];
+      const side = resident.id % 2 === 0 ? -1 : 1;
+      stances.set(resident.id, {
+        offsetX: side * tileSize * 0.12,
+        offsetY: 0,
+        facing: side < 0 ? 1 : -1,
+      });
+      continue;
+    }
+
+    const columns = group.length <= 4 ? 2 : group.length <= 6 ? 3 : 4;
+    const rows = Math.ceil(group.length / columns);
+    const xSpacing = columns === 2 ? 0.36 : columns === 3 ? 0.24 : 0.18;
+    const ySpacing = 0.11;
     for (let index = 0; index < group.length; index++) {
       const resident = group[index];
-      const pair = Math.floor(index / 2);
-      const side = group.length === 1
-        ? (resident.id % 2 === 0 ? -1 : 1)
-        : (index % 2 === 0 ? -1 : 1);
-      const distance = tileSize * (0.16 + Math.min(2, pair) * 0.07);
+      const row = Math.floor(index / columns);
+      const rowStart = row * columns;
+      const rowCount = Math.min(columns, group.length - rowStart);
+      const column = index - rowStart;
+      const offsetX = (column - (rowCount - 1) / 2) * xSpacing * tileSize;
+      const offsetY = (row - (rows - 1) / 2) * ySpacing * tileSize;
       stances.set(resident.id, {
-        offsetX: side * distance,
-        offsetY: pair === 0 ? 0 : -tileSize * 0.09 * Math.min(2, pair),
-        facing: side < 0 ? 1 : -1,
+        offsetX,
+        offsetY,
+        facing: offsetX < 0 ? 1 : offsetX > 0 ? -1 : (resident.id % 2 === 0 ? 1 : -1),
       });
     }
   }

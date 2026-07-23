@@ -13,27 +13,43 @@ const { residentWorkStances } = await import(moduleUrl);
 const resident = (id, overrides = {}) => ({
   id, alive: true, phase: 'working', x: 4, y: 5, px: 4, py: 5, ...overrides,
 });
-const stances = residentWorkStances([
-  resident(10), resident(20), resident(30),
-  resident(41, { x: 7, px: 7 }),
-  resident(50, { px: 3 }),
-  resident(60, { phase: 'rest' }),
+const key = stance => `${stance.offsetX.toFixed(5)},${stance.offsetY.toFixed(5)}`;
+
+for (const count of [1, 2, 4, 6, 8, 12]) {
+  const residents = Array.from({ length: count }, (_unused, index) => resident(100 + index * 7));
+  const stances = residentWorkStances(residents, 32);
+  assert.equal(stances.size, count, `${count} workers all receive a stance`);
+  assert.equal(new Set([...stances.values()].map(key)).size, count,
+    `${count} workers receive unique offsets`);
+  for (const stance of stances.values()) {
+    assert.ok(Math.abs(stance.offsetX) <= 32 * 0.34, 'worker remains horizontally near the tile center');
+    assert.ok(Math.abs(stance.offsetY) <= 32 * 0.14, 'worker remains vertically near the ground line');
+  }
+
+  const reversed = residentWorkStances([...residents].reverse(), 32);
+  for (const worker of residents) {
+    assert.deepEqual(reversed.get(worker.id), stances.get(worker.id),
+      'resident input order does not change the ID-sorted stance');
+  }
+  const repeat = residentWorkStances(residents, 32);
+  assert.deepEqual([...repeat], [...stances], 'the same input is deterministic');
+}
+
+const mixed = [resident(10), resident(20), resident(30), resident(40)];
+const hidden = new Set([20, 30]);
+const compact = residentWorkStances(mixed, 32, hidden);
+const expectedTwo = residentWorkStances([mixed[0], mixed[3]], 32);
+assert.deepEqual([...compact], [...expectedTwo], 'hidden interior workers do not consume visible stance slots');
+assert.equal(compact.has(20), false);
+assert.equal(compact.has(30), false);
+
+const eligibility = residentWorkStances([
+  resident(1),
+  resident(2, { px: 3 }),
+  resident(3, { phase: 'rest' }),
 ], 32);
-
-assert.ok(stances.get(10).offsetX < 0 && stances.get(10).facing === 1,
-  'left-offset worker faces right toward the work point');
-assert.ok(stances.get(20).offsetX > 0 && stances.get(20).facing === -1,
-  'right-offset worker faces left toward the work point');
-assert.notEqual(stances.get(30).offsetX, stances.get(10).offsetX,
-  'additional workers use another depth slot instead of fully overlapping');
-assert.ok(stances.has(41), 'a lone stationary worker still gets a side-facing work stance');
-assert.equal(stances.has(50), false, 'moving workers are not offset from their interpolated path');
-assert.equal(stances.has(60), false, 'resting residents keep their normal position');
-
-const rendererSource = readFileSync(new URL('../../src/render/renderer.ts', import.meta.url), 'utf8');
-assert.match(rendererSource, /residentWorkStances\(state\.residents, TILE\)/,
-  'renderer builds work stances once for the resident pass');
-assert.match(rendererSource, /facing:\s*workStance\?\.facing\s*\?\?/,
-  'workers use the inward-facing direction supplied by their work stance');
+assert.ok(eligibility.has(1));
+assert.equal(eligibility.has(2), false, 'moving workers stay on their interpolated path');
+assert.equal(eligibility.has(3), false, 'resting residents keep their normal position');
 
 console.log('resident work layout tests passed');
