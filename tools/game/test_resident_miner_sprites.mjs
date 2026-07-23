@@ -71,7 +71,8 @@ assert.match(atlasSource, /if \(p\.carryingMinerals\)/,
   'ore-carrying miners use the loaded jige sheet');
 assert.match(atlasSource, /return draw\(residentMinerLocomotionSheet/,
   'unladen adult miners use the pickaxe locomotion sheet');
-assert.match(atlasSource, /if\s*\(p\.carrying\)/, 'the existing cargo marker remains enabled');
+assert.match(atlasSource, /if \(p\.carrying && !integratedCargo\)/,
+  'generic cargo remains for fallbacks but does not overlap an integrated ore jige');
 
 const youthBranch = atlasSource.indexOf('newContentResidentSheet && newContentRect');
 const minerBranch = atlasSource.indexOf('drawOptionalResidentPresentation(ctx, p');

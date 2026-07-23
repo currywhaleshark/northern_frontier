@@ -3,7 +3,7 @@ import { Buffer } from 'node:buffer';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 
-const assetSource = readFileSync(new URL('../../src/render/residentWorkAssets.ts', import.meta.url), 'utf8');
+const assetSource = readFileSync(new URL('../../src/render/residentWoodcutterAssets.ts', import.meta.url), 'utf8');
 const assetOutput = ts.transpileModule(assetSource, {
   compilerOptions: {
     module: ts.ModuleKind.ES2022,
@@ -85,6 +85,7 @@ assert.match(atlasSource, /if \(p\.carryingWood\)/,
   'timber-carrying woodcutters use the jige sheet');
 assert.match(atlasSource, /woodcutterLocomotionSourceRect\(p\.gender, Boolean\(p\.moving\), animationTimeMs\)/,
   'unladen woodcutters use idle or axe-carrying walk frames');
-assert.match(atlasSource, /if\s*\(p\.carrying\)/, 'the existing cargo marker remains enabled');
+assert.match(atlasSource, /if \(p\.carrying && !integratedCargo\)/,
+  'generic cargo remains for fallbacks but does not overlap an integrated jige load');
 
 console.log('resident work sprite tests passed');

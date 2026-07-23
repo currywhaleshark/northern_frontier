@@ -19,7 +19,7 @@ for (const id of [0, 1, 17, 999, -3]) {
   assert.ok(offset >= 0 && offset < 1000, 'phase offsets remain inside the one-second cycle');
 }
 
-const assetSource = readFileSync(new URL('../../src/render/residentWorkAssets.ts', import.meta.url), 'utf8');
+const assetSource = readFileSync(new URL('../../src/render/residentWoodcutterAssets.ts', import.meta.url), 'utf8');
 const assetOutput = ts.transpileModule(assetSource, {
   compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
 }).outputText;

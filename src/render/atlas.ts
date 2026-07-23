@@ -128,7 +128,7 @@ import {
   woodcutterLoadSourceRect,
   woodcutterLocomotionSourceRect,
   woodcutterWorkSourceRect,
-} from './residentWorkAssets';
+} from './residentWoodcutterAssets';
 import {
   RESIDENT_HUNTER_HUNT_SHEET,
   RESIDENT_HUNTER_LOAD_SHEET,
@@ -1225,6 +1225,7 @@ export const atlasSprites: SpriteAPI = {
     const half = CHALF;
     const animationTime = p.animationTimeMs ?? performance.now();
     const bob = (p.moving ? Math.floor(animationTime / 130) % 2 : 0) * CF;
+    let drewOptionalResidentPresentation = false;
 
     const specialRect = p.special ? specialResidentSourceRect(p.special) : null;
     if (specialResidentSheet && specialRect) {
@@ -1233,7 +1234,7 @@ export const atlasSprites: SpriteAPI = {
       drawGeneratedCharacterRect(ctx, foreignResidentSheet, foreignRect, p.x, p.y, p.facing, bob);
     } else if (newContentResidentSheet && newContentRect) {
       drawGeneratedCharacterRect(ctx, newContentResidentSheet, newContentRect, p.x, p.y, p.facing, bob);
-    } else if (drawOptionalResidentPresentation(ctx, p, animationTime)) {
+    } else if ((drewOptionalResidentPresentation = drawOptionalResidentPresentation(ctx, p, animationTime))) {
       // Optional sheets are selected by the requested presentation state. If that exact
       // sheet is unavailable, the chain continues to the generated resident fallback.
     } else if (militiaSheet && p.job === 'militia' && p.militiaWeapon) {
@@ -1288,7 +1289,10 @@ export const atlasSprites: SpriteAPI = {
       ctx.textBaseline = 'middle';
       ctx.fillText('+', p.x + half - 2 * CF, p.y - half + 2 * CF);
     }
-    if (p.carrying) {
+    const integratedCargo = drewOptionalResidentPresentation && (
+      p.job === 'hauler' || Boolean(p.carryingWood || p.carryingGame || p.carryingMinerals)
+    );
+    if (p.carrying && !integratedCargo) {
       const b = Math.round(4 * CF);
       ctx.fillStyle = '#f0e6c8';
       ctx.strokeStyle = 'rgba(0,0,0,0.5)';
