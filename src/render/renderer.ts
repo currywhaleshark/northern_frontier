@@ -14,6 +14,7 @@ import { COLLAPSE_RATIO } from '../game/battles';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
 import { getSeason } from '../game/seasons';
 import { DAY_BANDS, DAY_CYCLE_SUBTICKS } from '../game/dayCycle';
+import { LEISURE_CLUSTER_CAPACITY } from '../game/agents';
 import { findHabitatIconAtTile } from '../game/habitats';
 import { isBuildingFootprintExplored, isExplored } from '../game/exploration';
 import { builtWallTileSet, isWallBuilding, wallConnectionsFromSet } from '../game/walls';
@@ -1145,6 +1146,15 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     if (!r.alive || predatorScoutIds.has(r.id) || presentation.indoorResidentIds.has(r.id)) continue;
     const workStance = presentation.workStances.get(r.id);
     const p = residentPixelPos(r, o.alpha, workStance);
+    // 저녁 마실 — 같은 타일에 모인 소그룹(최대 4인)이 겹치지 않게 둘러서고, 마실 지점을 바라본다.
+    let leisureFacing: -1 | 1 | undefined;
+    if (r.phase === 'leisure' && r.px === r.x && r.py === r.y) {
+      const angle = (r.id % LEISURE_CLUSTER_CAPACITY) * (Math.PI * 2 / LEISURE_CLUSTER_CAPACITY) + Math.PI / 4;
+      p.x += Math.cos(angle) * 5;
+      p.y += Math.sin(angle) * 3;
+      const dest = r.targetId != null ? presentation.buildingById.get(r.targetId) : undefined;
+      if (dest) leisureFacing = dest.x * TILE + TILE / 2 >= p.x ? 1 : -1;
+    }
     if (!pixelRectIntersectsViewport(viewport, p.x - TILE, p.y - TILE, TILE * 2, TILE * 2)) continue;
     sprites.drawResident(ctx, {
       job: r.job,
@@ -1162,7 +1172,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       selected: r.id === o.selectedResidentId,
       moving: r.px !== r.x || r.py !== r.y,
       working: r.phase === 'working' && r.px === r.x && r.py === r.y,
-      facing: workStance?.facing ?? (r.x < r.px ? -1 : 1),
+      facing: workStance?.facing ?? leisureFacing ?? (r.x < r.px ? -1 : 1),
       militiaWeapon: militiaWeaponForResident(state, r),
       special: r.special,
       stage: r.stage,
