@@ -2427,11 +2427,32 @@ export function morningDepartureSubTick(
   tilesPerTick: number = CONFIG.agents.moveSpeed,
 ): number {
   const travelTicks = Math.max(1, Math.ceil(Math.max(0, distanceTiles) / Math.max(0.1, tilesPerTick)));
-  const tieBreak = leisureOrderKey(residentId, day) & 1;
+  const orderKey = leisureOrderKey(residentId, day);
+  const idealDeparture = DAY_BANDS.work.start - travelTicks;
+  // 새벽 전체를 써도 제시간에 못 가는 원거리 주민은 첫 3틱에 나눠 출발한다.
+  if (idealDeparture <= DAY_BANDS.dawn.start) {
+    return DAY_BANDS.dawn.start + (orderKey % 3);
+  }
+  const tieBreak = orderKey & 1;
   return Math.max(
     DAY_BANDS.dawn.start,
-    Math.min(DAY_BANDS.dawn.end, DAY_BANDS.work.start - travelTicks - tieBreak),
+    Math.min(DAY_BANDS.dawn.end, idealDeparture - tieBreak),
   );
+}
+
+export function morningWakeSubTick(
+  departureSubTick: number | null,
+  residentId: number,
+  day: number,
+): number {
+  const orderKey = leisureOrderKey(residentId, day);
+  if (departureSubTick == null) {
+    return DAY_BANDS.dawn.start + 1 + (orderKey % Math.max(1, DAY_BANDS.dawn.end - 2));
+  }
+  // 이른 통근자는 나타나는 순간 바로 출발해 첫 3틱의 실루엣도 분산한다.
+  if (departureSubTick <= DAY_BANDS.dawn.start + 2) return departureSubTick;
+  const preparationTicks = 1 + ((orderKey >>> 2) & 1);
+  return Math.max(DAY_BANDS.dawn.start, departureSubTick - preparationTicks);
 }
 
 export function leisureAssignments(
@@ -2618,11 +2639,19 @@ function morningPreparationAgentTick(state: GameState, r: Resident, ctx: Ctx): v
   }
 }
 
+function waitForMorningWake(state: GameState, r: Resident, wakeSubTick: number): boolean {
+  if (r.phase !== 'sleeping' || state.subTick >= wakeSubTick) return false;
+  r.path = [];
+  r.task = '잠자는 중';
+  return true;
+}
+
 function dawnAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
   r.task = '아침 채비';
   const unavailable = r.stage != null || r.sick || state.day < (r.quarantinedUntil ?? 0) ||
     r.health < 20 || state.day < (r.birthRecoveryUntil ?? 0);
   if (unavailable) {
+    if (waitForMorningWake(state, r, morningWakeSubTick(null, r.id, state.day))) return;
     r.phase = 'rest';
     r.path = [];
     r.targetId = null;
@@ -2631,21 +2660,28 @@ function dawnAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
 
   const plan = dawnCommutePlan(state, r);
   if (!plan) {
+    if (waitForMorningWake(state, r, morningWakeSubTick(null, r.id, state.day))) return;
     morningPreparationAgentTick(state, r, ctx);
     return;
   }
+  let departureSubTick = DAY_BANDS.dawn.start + (leisureOrderKey(r.id, state.day) & 1);
   if (plan.staggerByDistance) {
     const distance = morningCommuteDistance(state, r, ctx, plan.goal);
-    const departureSubTick = morningDepartureSubTick(
+    departureSubTick = morningDepartureSubTick(
       distance,
       r.id,
       state.day,
       morningMoveTilesPerTick(state, r, ctx),
     );
-    if (state.subTick < departureSubTick) {
-      morningPreparationAgentTick(state, r, ctx);
-      return;
-    }
+  }
+  if (waitForMorningWake(
+    state,
+    r,
+    morningWakeSubTick(departureSubTick, r.id, state.day),
+  )) return;
+  if (state.subTick < departureSubTick) {
+    morningPreparationAgentTick(state, r, ctx);
+    return;
   }
 
   const startCommute = (
@@ -2770,15 +2806,10 @@ function waitForEveningDeparture(r: Resident): void {
   r.task = '일 마무리';
 }
 
-function finishCurrentEveningWork(state: GameState, r: Resident, ctx: Ctx): boolean {
-  if (r.job === 'hauler' && (r.haulTask != null || carryTotal(r) > 0)) {
-    haulerTick(state, r, ctx);
-    return true;
-  }
+function finishCurrentBoundedWork(state: GameState, r: Resident, ctx: Ctx): boolean {
   if (!GATHERING_JOBS.includes(r.job)) return false;
   const finishingWork = r.phase === 'working' && r.workTimer > 0;
-  const finishingDelivery = r.phase === 'toDeposit' && carryTotal(r) > 0;
-  if (!finishingWork && !finishingDelivery) return false;
+  if (!finishingWork) return false;
   switch (r.job) {
     case 'woodcutter': woodcutterTick(state, r, ctx); break;
     case 'hunter': hunterTick(state, r, ctx); break;
@@ -2788,6 +2819,80 @@ function finishCurrentEveningWork(state: GameState, r: Resident, ctx: Ctx): bool
     default: return false;
   }
   return true;
+}
+
+const END_OF_DAY_DEPOSIT_TASK = '짐을 부리러 가는 중';
+
+function endOfDayDepositExtra(r: Resident): BuildingTypeId[] {
+  switch (r.job) {
+    case 'woodcutter': return ['lumberCamp'];
+    case 'hunter': return ['huntLodge'];
+    case 'herbalist': return ['herbHut'];
+    case 'fisher': return ['ferry'];
+    default: return [];
+  }
+}
+
+function endOfDayDirectDeposit(state: GameState, r: Resident): Building | null {
+  if (r.job === 'hauler' && r.haulTask?.kind === 'supply' && r.haulTask.targetBuildingId != null) {
+    return state.buildings.find(building =>
+      building.id === r.haulTask?.targetBuildingId && building.built) ?? null;
+  }
+  if (r.job === 'miner' && r.miningDepositBuildingId != null) {
+    return state.buildings.find(building =>
+      building.id === r.miningDepositBuildingId && building.built && building.type === 'mine') ?? null;
+  }
+  return null;
+}
+
+function depositEndOfDayLoad(state: GameState, r: Resident, ctx: Ctx): boolean {
+  if (carryTotal(r) <= 0) return false;
+  const directTarget = endOfDayDirectDeposit(state, r);
+  const extra = endOfDayDepositExtra(r);
+  const targetId = directTarget?.id ?? null;
+  if (r.phase !== 'toDeposit' || r.task !== END_OF_DAY_DEPOSIT_TASK || r.targetId !== targetId) {
+    r.phase = 'toDeposit';
+    r.path = [];
+    r.targetId = targetId;
+  }
+  r.task = END_OF_DAY_DEPOSIT_TASK;
+  const result = goTo(
+    state,
+    r,
+    ctx,
+    directTarget ? buildingGoal(state, directTarget.id) : depositGoal(state, extra),
+  );
+  if (isSettledAtGoal(r, result)) {
+    if (directTarget) depositResidentToBuilding(directTarget, r);
+    else unloadAtDepositGoal(state, r, extra);
+    if (r.job === 'hauler') clearHaulTask(r);
+    if (r.job === 'miner') r.miningDepositBuildingId = null;
+    r.phase = 'rest';
+    r.path = [];
+    r.targetId = null;
+    r.task = '짐을 부리고 일 마침';
+  } else if (result === 'stuck') {
+    depositResidentToSettlement(state, r);
+    if (r.job === 'hauler') clearHaulTask(r);
+    if (r.job === 'miner') r.miningDepositBuildingId = null;
+    r.phase = 'rest';
+    r.path = [];
+    r.targetId = null;
+    r.task = '짐을 맡기고 일 마침';
+  }
+  return true;
+}
+
+function closeOutWorkday(state: GameState, r: Resident, ctx: Ctx): boolean {
+  if (finishCurrentBoundedWork(state, r, ctx)) return true;
+  if (depositEndOfDayLoad(state, r, ctx)) return true;
+  if (r.job === 'hauler' && r.haulTask != null) clearHaulTask(r);
+  r.workTimer = 0;
+  if (r.phase !== 'toLeisure' && r.phase !== 'leisure' &&
+      r.phase !== 'toHome' && r.phase !== 'sleeping') {
+    waitForEveningDeparture(r);
+  }
+  return false;
 }
 
 // ─────────────────────────── 틱 진입점 ───────────────────────────
@@ -2884,8 +2989,12 @@ export function agentsTick(state: GameState): void {
       dawnAgentTick(state, r, ctx);
       continue;
     }
+    if (dayBand === 'work' && state.subTick === DAY_BANDS.work.end) {
+      closeOutWorkday(state, r, ctx);
+      continue;
+    }
     if (dayBand === 'evening') {
-      if (finishCurrentEveningWork(state, r, ctx)) continue;
+      if (closeOutWorkday(state, r, ctx)) continue;
       const departureSubTick = DAY_BANDS.evening.start + eveningDepartureDelay(r.id, state.day);
       if (state.subTick < departureSubTick) {
         waitForEveningDeparture(r);
@@ -2895,6 +3004,9 @@ export function agentsTick(state: GameState): void {
       continue;
     }
     if (dayBand === 'night') {
+      r.workTimer = 0;
+      if (depositEndOfDayLoad(state, r, ctx)) continue;
+      if (r.job === 'hauler' && r.haulTask != null) clearHaulTask(r);
       returnHomeAgentTick(state, r, ctx);
       continue;
     }
