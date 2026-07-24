@@ -260,6 +260,14 @@ html, body, #root {
   color: var(--accent);
   white-space: nowrap;
 }
+.day-arc {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel2);
+  line-height: 0;
+}
 .pop-box { color: var(--muted); white-space: nowrap; }
 .pop-box b { color: var(--text); }
 .pop-box .housing-shortage { color: var(--bad); }
