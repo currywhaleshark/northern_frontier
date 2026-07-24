@@ -1,5 +1,6 @@
 // 하늘 시계 — 포물선 궤적 위를 낮에는 해가, 밤에는 달이 좌→우로 흐르는 HUD 시간 표시.
 // 대역 정의(DAY_BANDS)에서 위치를 파생하므로 서브틱 수가 바뀌어도 자동 적응한다.
+import { useRef } from 'react';
 import { DAY_BANDS } from '../game/dayCycle';
 import { CONFIG } from '../game/config';
 import { DAY_BAND_NAMES, uiDayBand } from '../ui/dayBand';
@@ -30,7 +31,11 @@ export function DayArcWidget({ subTick, speed }: { subTick: number; speed: numbe
   const t = (subTick - spanStart + 0.5) / (spanEnd - spanStart + 1);
   const p = arcPoint(t);
   const tickMs = CONFIG.time.msPerDay[speed] / CONFIG.agents.subticksPerDay;
-  const transitionMs = Number.isFinite(tickMs) ? Math.min(600, tickMs * 0.9) : 0;
+  // 뒤로 가는 이동(세이브 로드·날짜 점프)은 전환 없이 순간이동 — 해·달은 앞으로만 흐른다
+  const lastRef = useRef({ night, t });
+  const movedBackward = lastRef.current.night === night && t < lastRef.current.t;
+  lastRef.current = { night, t };
+  const transitionMs = !movedBackward && Number.isFinite(tickMs) ? Math.min(600, tickMs * 0.9) : 0;
 
   return (
     <span className="day-arc" title={`${DAY_BAND_NAMES[band]} — ${night ? '달' : '해'}가 하늘을 지납니다`}>
@@ -49,8 +54,9 @@ export function DayArcWidget({ subTick, speed }: { subTick: number; speed: numbe
             <circle cx={W * 0.78} cy={12} r="0.8" />
           </g>
         )}
-        {/* 해 / 달 — 서브틱 사이를 CSS 전환으로 미끄러진다 */}
-        <g style={{
+        {/* 해 / 달 — 서브틱 사이를 CSS 전환으로 미끄러진다.
+            key로 천체 교대 시 리마운트해 우측 끝→좌측 시작의 복귀 이동이 보이지 않게 한다 */}
+        <g key={night ? 'moon' : 'sun'} style={{
           transform: `translate(${p.x}px, ${p.y}px)`,
           transition: `transform ${transitionMs}ms linear`,
         }}>
