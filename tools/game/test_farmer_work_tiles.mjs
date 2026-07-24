@@ -205,8 +205,8 @@ function runHeavySnowSpring() {
 }
 
 const heavySnowSown = runHeavySnowSpring();
-assert.ok(heavySnowSown > 0,
-  `3x3 heavy-snow sowing must keep making progress before balance tuning (got ${heavySnowSown})`);
+assert.equal(heavySnowSown, 0,
+  'outdoor farmers must stop sowing and shelter throughout heavy snow');
 assert.equal(runHeavySnowSpring(), heavySnowSown, 'heavy-snow farm production is deterministic');
 
 console.log('farmer work tile tests passed');
