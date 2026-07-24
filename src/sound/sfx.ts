@@ -548,6 +548,22 @@ export function stopWeatherAmbient(): void {
   windGain.gain.setValueAtTime(0, now);
 }
 
+// 날씨에 맞춰 바람 세기를 조절 (동일 목표를 반복 호출해도 안전)
+export function setWeatherAmbient(weather: WeatherId): void {
+  if (!ctx || !windGain) return;
+  const target =
+    weather === 'blizzard' ? 0.4 :
+    weather === 'coldSnap' ? 0.22 :
+    weather === 'heavySnow' ? 0.14 : 0;
+  if (target === windTarget) return;
+  windTarget = target;
+  const now = ctx.currentTime;
+  // 현재 값에서 목표로 부드럽게 램프 (엔벨로프에는 LFO가 섞이지 않으므로 0까지 확실히 내려간다)
+  windGain.gain.cancelScheduledValues(now);
+  windGain.gain.setValueAtTime(windGain.gain.value, now);
+  windGain.gain.linearRampToValueAtTime(target, now + 2.5);
+}
+
 // ── 풀벌레 앰비언트: 저녁·밤 대역에 낮게 깔리는 귀뚜라미 (겨울엔 울지 않는다) ──
 
 let cricketGain: GainNode | null = null;
@@ -584,6 +600,7 @@ function startCricketLoop(): void {
   cricketGain = ctx.createGain();
   cricketGain.gain.value = 0; // 대역 엔벨로프 (0이면 완전 무음)
   cricketGain.connect(master);
+  if (typeof window === 'undefined') return;
   window.setInterval(() => {
     if (cricketTarget <= 0.001) return; // 무음이면 스케줄 자체를 생략
     scheduleCricketChirp();
@@ -610,20 +627,4 @@ export function setDayBandAmbient(band: DayBand, winter: boolean): void {
   cricketGain.gain.cancelScheduledValues(now);
   cricketGain.gain.setValueAtTime(cricketGain.gain.value, now);
   cricketGain.gain.linearRampToValueAtTime(target, now + 2.5);
-}
-
-// 날씨에 맞춰 바람 세기를 조절 (동일 목표를 반복 호출해도 안전)
-export function setWeatherAmbient(weather: WeatherId): void {
-  if (!ctx || !windGain) return;
-  const target =
-    weather === 'blizzard' ? 0.4 :
-    weather === 'coldSnap' ? 0.22 :
-    weather === 'heavySnow' ? 0.14 : 0;
-  if (target === windTarget) return;
-  windTarget = target;
-  const now = ctx.currentTime;
-  // 현재 값에서 목표로 부드럽게 램프 (엔벨로프에는 LFO가 섞이지 않으므로 0까지 확실히 내려간다)
-  windGain.gain.cancelScheduledValues(now);
-  windGain.gain.setValueAtTime(windGain.gain.value, now);
-  windGain.gain.linearRampToValueAtTime(target, now + 2.5);
 }
