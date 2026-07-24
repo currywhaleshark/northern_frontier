@@ -2715,11 +2715,24 @@ function dawnAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 }
 
-function returnHomeAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
+type HomeEntryReason = 'sleep' | 'snowShelter';
+
+function returnHomeAgentTick(
+  state: GameState,
+  r: Resident,
+  ctx: Ctx,
+  reason: HomeEntryReason = 'sleep',
+): void {
   const home = residentHome(state, r);
   const center = state.buildings.find(building => building.id === ctx.centerId && building.built) ?? null;
   const destination = home ?? center;
-  const sleepingTask = home ? '잠자리에 듦' : '처마 밑에서 잠듦';
+  const sheltering = reason === 'snowShelter';
+  const sleepingTask = sheltering
+    ? home ? '집 안에서 폭설 대피' : '처마 밑에서 폭설 대피'
+    : home ? '잠자리에 듦' : '처마 밑에서 잠듦';
+  const movingTask = sheltering
+    ? home ? '폭설을 피해 귀가 중' : '폭설을 피해 처마로 이동 중'
+    : home ? '집으로 돌아가는 중' : '처마를 찾아가는 중';
 
   if (!destination) {
     r.phase = 'sleeping';
@@ -2740,7 +2753,7 @@ function returnHomeAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
     r.path = [];
     r.targetId = destination.id;
   }
-  r.task = home ? '집으로 돌아가는 중' : '처마를 찾아가는 중';
+  r.task = movingTask;
   const result = goTo(state, r, ctx, buildingGoal(state, destination.id));
   if (result === 'arrived') {
     r.phase = 'sleeping';
@@ -2985,6 +2998,13 @@ export function agentsTick(state: GameState): void {
       battleAgentTick(state, r, ctx);
       continue;
     }
+    // 폭설·눈보라에는 실외 작업자가 일과/여가보다 귀가와 입실을 우선한다.
+    const sheltersFromSnow = OUTDOOR_JOBS.includes(r.job) &&
+      (state.weather === 'heavySnow' || ctx.outdoor < CONFIG.agents.shelterThreshold);
+    if (sheltersFromSnow && dayBand !== 'night') {
+      returnHomeAgentTick(state, r, ctx, 'snowShelter');
+      continue;
+    }
     if (dayBand === 'dawn') {
       dawnAgentTick(state, r, ctx);
       continue;
@@ -3053,12 +3073,6 @@ export function agentsTick(state: GameState): void {
       r.task = state.day < (r.quarantinedUntil ?? 0) ? '격리 중' : '앓아누움';
       clearHaulTask(r);
       if (carryTotal(r) > 0) depositAll(state, r); // 짐은 이웃이 거둬 간다
-      goToCenter(state, r, ctx);
-      continue;
-    }
-    // 심한 악천후엔 실외 작업자는 대피한다
-    if (OUTDOOR_JOBS.includes(r.job) && ctx.outdoor < CONFIG.agents.shelterThreshold) {
-      r.task = '악천후 대피';
       goToCenter(state, r, ctx);
       continue;
     }

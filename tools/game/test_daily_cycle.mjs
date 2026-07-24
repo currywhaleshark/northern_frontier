@@ -243,6 +243,55 @@ try {
   assert.equal(active.task, '아침 채비',
     'a nearby worker wakes later and prepares around the home before departure');
 
+  state.weather = 'heavySnow';
+  Object.assign(active, {
+    job: 'woodcutter',
+    assignedBuildingId: null,
+    x: 10,
+    y: 10,
+    px: 10,
+    py: 10,
+    phase: 'sleeping',
+    path: [],
+    workTimer: 0,
+    targetId: home.id,
+    carrying: {},
+  });
+  state.subTick = compiledDayCycle.DAY_BANDS.dawn.start;
+  agents.agentsTick(state);
+  assert.equal(active.phase, 'sleeping',
+    'an outdoor worker stays inside instead of joining the dawn commute during heavy snow');
+  assert.equal(active.task, '집 안에서 폭설 대피');
+  assert.equal(compiledDayCycle.isIndoors(state, active), true);
+
+  Object.assign(active, {
+    x: 8,
+    y: 10,
+    px: 8,
+    py: 10,
+    phase: 'working',
+    path: [],
+    workTimer: 0,
+    targetId: null,
+  });
+  state.subTick = compiledDayCycle.DAY_BANDS.work.start;
+  agents.agentsTick(state);
+  assert.equal(active.phase, 'toHome');
+  assert.equal(active.targetId, home.id);
+  assert.equal(active.task, '폭설을 피해 귀가 중',
+    'heavy-snow sheltering reuses the visible homeward movement');
+  for (let subTick = state.subTick + 1;
+    subTick <= compiledDayCycle.DAY_BANDS.work.end && active.phase !== 'sleeping';
+    subTick++) {
+    state.subTick = subTick;
+    agents.agentsTick(state);
+  }
+  assert.equal(active.phase, 'sleeping');
+  assert.equal(active.task, '집 안에서 폭설 대피');
+  assert.equal(compiledDayCycle.isIndoors(state, active), true,
+    'the worker disappears indoors after reaching home');
+  state.weather = 'clear';
+
   Object.assign(active, {
     job: 'idle',
     assignedBuildingId: null,
