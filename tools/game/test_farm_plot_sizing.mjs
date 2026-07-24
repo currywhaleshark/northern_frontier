@@ -166,6 +166,7 @@ function runTicks(state, ticks, sustainWorkers = []) {
   const farmer = onlyWorkerAt(state, 'farmer', spot.x, spot.y);
   assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, plot.id), null);
 
+  state.subTick = 1;
   runTicks(state, 1, [farmer]);
   assert.ok((plot.sownArea ?? 0) > 0, 'the farmer starts sowing in spring');
   assert.ok(farmer.task.includes('파종'), 'the farmer reports sowing work');
@@ -266,6 +267,7 @@ function runTicks(state, ticks, sustainWorkers = []) {
   state.day = CONFIG.time.seasonDays * 2 + 1; // 가을
   const farmer = onlyWorkerAt(state, 'farmer', spot.x, spot.y);
   assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, plot.id), null);
+  state.subTick = 1;
   runTicks(state, 1);
   const take = 100 - plot.fieldGrowth;
   assert.ok(take > 0, 'harvest removes growth');

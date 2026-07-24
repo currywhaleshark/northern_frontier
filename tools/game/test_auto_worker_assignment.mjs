@@ -87,6 +87,7 @@ function resident(state, index, job, x, y) {
   const idleCloser = resident(state, 5, 'idle', 11, 10);
   assert.equal(workerSlots.assignResidentToBuilding(state, assignedElsewhere.id, other.id), null);
 
+  state.subTick = 1;
   agents.agentsTick(state);
 
   assert.equal(target.built, true);

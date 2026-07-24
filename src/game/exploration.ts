@@ -1,10 +1,10 @@
 import { buildingFootprintDims, buildingFootprintTiles } from './buildings';
 import { CONFIG } from './config';
+import { dayBandOf } from './dayCycle';
 import type { Building, BuildingTypeId, ExplorationState, GameState } from './types';
 
 function isNight(state: Pick<GameState, 'subTick'>): boolean {
-  const dayFraction = state.subTick / CONFIG.agents.subticksPerDay;
-  return dayFraction > 0.5;
+  return dayBandOf(state.subTick) === 'night';
 }
 
 function sightMultiplier(state: Pick<GameState, 'subTick' | 'weather'>): number {

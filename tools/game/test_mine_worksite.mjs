@@ -122,7 +122,7 @@ function addBuiltMine(state, x, y) {
     targetId: null, carrying: {}, assignedBuildingId: null,
   });
 
-  for (let tick = 0; tick < 56; tick++) simulation.advanceTick(state);
+  for (let tick = 0; tick < CONFIG.agents.subticksPerDay * 7; tick++) simulation.advanceTick(state);
   assert.ok(deposit.mineralRemaining < 12, 'the miner walks to and extracts from a nearby deposit');
   assert.equal(outside.mineralRemaining, 30, 'the miner never extracts from outside the work radius');
   assert.ok(inventory.buildingStock(mine, 'stone') > 0, 'the miner unloads extracted stone at the mine');

@@ -1,4 +1,5 @@
 import { CONFIG } from './config';
+import { WORK_SUBTICKS } from './dayCycle';
 import type { GameState, Resident } from './types';
 
 export type PhysicianTreatmentStatus = 'treated' | 'recovered' | 'no-patient' | 'no-herbs';
@@ -49,20 +50,20 @@ export function performPhysicianTreatment(
   // 의녀 단심 '금침' — 본인의 치료 효율이 오른다
   if (physician.special === 'uinyeo') efficiency *= CONFIG.specialResidents.uinyeoTreatmentMult;
 
-  const herbs = CONFIG.medicine.herbsPerPhysicianPerDay / CONFIG.agents.subticksPerDay;
+  const herbs = CONFIG.medicine.herbsPerPhysicianPerDay / WORK_SUBTICKS;
   if (state.resources.herbs + 1e-9 < herbs) {
     return { status: 'no-herbs', patient, herbsUsed: 0, healthRestored: 0 };
   }
   state.resources.herbs = Math.max(0, state.resources.herbs - herbs);
 
   const beforeHealth = patient.health;
-  const healing = (CONFIG.medicine.treatmentHealthPerDay / CONFIG.agents.subticksPerDay) * Math.max(0, efficiency);
+  const healing = (CONFIG.medicine.treatmentHealthPerDay / WORK_SUBTICKS) * Math.max(0, efficiency);
   patient.health = Math.min(100, patient.health + healing);
   let status: PhysicianTreatmentStatus = 'treated';
   if (patient.sick && !isIncidentPatient(state, patient.id)) {
     const recoveryChance = Math.min(
       0.95,
-      (CONFIG.medicine.normalSickRecoveryBonusPerDay / CONFIG.agents.subticksPerDay) * Math.max(0, efficiency),
+      (CONFIG.medicine.normalSickRecoveryBonusPerDay / WORK_SUBTICKS) * Math.max(0, efficiency),
     );
     if (rng() < recoveryChance) {
       patient.sick = false;

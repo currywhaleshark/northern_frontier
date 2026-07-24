@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 
 const source = readFileSync(new URL('../../src/game/dayCycle.ts', import.meta.url), 'utf8');
@@ -8,7 +11,14 @@ const output = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(output).toString('base64')}`;
-const { DAY_CYCLE_SUBTICKS, DAY_BANDS, dayBandOf, isIndoors } = await import(moduleUrl);
+const {
+  DAY_CYCLE_SUBTICKS,
+  DAY_BANDS,
+  WORK_SUBTICKS,
+  dayBandOf,
+  isIndoors,
+  normalizeDayCycleSubTick,
+} = await import(moduleUrl);
 
 assert.equal(DAY_CYCLE_SUBTICKS, 12);
 assert.deepEqual(DAY_BANDS, {
@@ -19,6 +29,7 @@ assert.deepEqual(DAY_BANDS, {
 });
 assert.equal(DAY_BANDS.work.end - DAY_BANDS.work.start + 1, 8,
   'the target day cycle preserves exactly eight work subticks');
+assert.equal(WORK_SUBTICKS, 8);
 
 const expectedBands = [
   'dawn',
@@ -33,6 +44,10 @@ assert.deepEqual(
 for (const invalid of [-1, 12, 0.5, Number.NaN, Number.POSITIVE_INFINITY]) {
   assert.throws(() => dayBandOf(invalid), RangeError);
 }
+assert.equal(normalizeDayCycleSubTick(-1), 0);
+assert.equal(normalizeDayCycleSubTick(7.8), 7);
+assert.equal(normalizeDayCycleSubTick(99), 11);
+assert.equal(normalizeDayCycleSubTick('invalid'), 0);
 
 const state = {
   buildings: [
@@ -61,7 +76,148 @@ assert.equal(isIndoors(state, resident({ phase: 'leisure', targetId: 4 })), fals
 assert.equal(isIndoors(state, resident({ phase: 'leisure', targetId: null })), false);
 
 const configSource = readFileSync(new URL('../../src/game/config.ts', import.meta.url), 'utf8');
-assert.match(configSource, /subticksPerDay:\s*8\b/,
-  'M0 exposes the target contract without changing the runtime day length');
+assert.match(configSource, /subticksPerDay:\s*DAY_CYCLE_SUBTICKS\b/,
+  'M1 runs the simulation on the shared twelve-subtick contract');
+
+function compileGameModules() {
+  const srcDir = new URL('../../src/game/', import.meta.url);
+  const outDir = mkdtempSync(join(tmpdir(), 'northern-daily-cycle-'));
+  for (const file of readdirSync(srcDir).filter(candidate => candidate.endsWith('.ts'))) {
+    const moduleSource = readFileSync(new URL(file, srcDir), 'utf8');
+    let moduleOutput = ts.transpileModule(moduleSource, {
+      compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    moduleOutput = moduleOutput.replace(
+      /(from\s+['"])(\.{1,2}\/[^'"]+)(['"])/g,
+      (_match, start, specifier, end) =>
+        /\.[cm]?js$/.test(specifier) ? `${start}${specifier}${end}` : `${start}${specifier}.mjs${end}`,
+    );
+    writeFileSync(join(outDir, file.replace(/\.ts$/, '.mjs')), moduleOutput, 'utf8');
+  }
+  return outDir;
+}
+
+function clearMapToPlain(state) {
+  for (const row of state.map) {
+    for (const tile of row) {
+      tile.terrain = 'plain';
+      tile.hasIron = false;
+      tile.buildingId = null;
+    }
+  }
+  state.buildings = [];
+}
+
+const compiledDir = compileGameModules();
+try {
+  const load = name => import(pathToFileURL(join(compiledDir, `${name}.mjs`)).href);
+  const simulation = await load('simulation');
+  const agents = await load('agents');
+  const buildings = await load('buildings');
+  const compiledDayCycle = await load('dayCycle');
+  const { CONFIG } = await load('config');
+
+  const state = simulation.newGame(2026072401);
+  clearMapToPlain(state);
+  const addBuilt = (type, x, y) => {
+    const building = {
+      id: state.nextBuildingId++,
+      type,
+      x,
+      y,
+      progress: buildings.BUILDING_DEFS[type].buildDays,
+      built: true,
+      fieldGrowth: 0,
+    };
+    state.buildings.push(building);
+    buildings.occupyBuildingTiles(state, building);
+    return building;
+  };
+  addBuilt('center', 4, 4);
+  const home = addBuilt('hut', 12, 10);
+  const active = state.residents[0];
+  for (const candidate of state.residents) candidate.alive = candidate.id === active.id;
+  Object.assign(active, {
+    alive: true,
+    job: 'idle',
+    stage: null,
+    sick: false,
+    health: 100,
+    x: 8,
+    y: 10,
+    px: 8,
+    py: 10,
+    phase: 'rest',
+    path: [],
+    workTimer: 0,
+    targetId: null,
+    homeBuildingId: home.id,
+    assignedBuildingId: null,
+    carrying: {},
+    haulTask: null,
+    manualOrder: null,
+  });
+
+  globalThis.window = { __renderPerf: {} };
+  state.subTick = 0;
+  agents.agentsTick(state);
+  assert.equal(active.phase, 'rest');
+  assert.equal(active.task, '아침 채비');
+
+  for (let subTick = 1; subTick <= 8; subTick++) {
+    state.subTick = subTick;
+    agents.agentsTick(state);
+  }
+  assert.equal(globalThis.window.__renderPerf['job-idle'].count, 8,
+    'the existing job loop runs exactly eight times per twelve-subtick day');
+
+  Object.assign(active, { x: 8, y: 10, px: 8, py: 10, phase: 'rest', path: [], targetId: null });
+  state.subTick = 9;
+  agents.agentsTick(state);
+  assert.equal(active.phase, 'toHome');
+  assert.match(active.task, /집으로/);
+
+  state.subTick = 10;
+  agents.agentsTick(state);
+  assert.equal(active.phase, 'sleeping');
+  assert.equal(active.task, '잠자리에 듦');
+  assert.equal(compiledDayCycle.isIndoors(state, active), true);
+
+  const sleepingPosition = { x: active.x, y: active.y };
+  state.subTick = 11;
+  agents.agentsTick(state);
+  assert.deepEqual({ x: active.x, y: active.y }, sleepingPosition,
+    'sleeping residents skip movement and work calculations');
+
+  const fullDay = simulation.newGame(2026072402);
+  const startingDay = fullDay.day;
+  for (let tick = 0; tick < agents.SUBTICKS; tick++) simulation.advanceTick(fullDay);
+  assert.equal(fullDay.day, startingDay + 1);
+  assert.equal(fullDay.subTick, 0);
+
+  const warmthState = simulation.newGame(2026072403);
+  const warmthResident = warmthState.residents[0];
+  for (const candidate of warmthState.residents) candidate.alive = candidate.id === warmthResident.id;
+  Object.assign(warmthResident, {
+    alive: true,
+    stage: null,
+    sick: false,
+    health: 100,
+    hunger: 100,
+    warmth: 40,
+  });
+  warmthState.weather = 'clear';
+  warmthState.resources.grain = 1000;
+  warmthState.resources.firewood = 1000;
+  for (let tick = 0; tick < agents.SUBTICKS; tick++) simulation.advanceTick(warmthState);
+  assert.equal(
+    warmthResident.warmth,
+    40 + CONFIG.needs.warmthRegenWarmSeason,
+    'the unchanged daily warmth recovery is applied once after the sleeping band',
+  );
+} finally {
+  delete globalThis.window;
+  rmSync(compiledDir, { recursive: true, force: true });
+}
 
 console.log('daily cycle contract tests passed');

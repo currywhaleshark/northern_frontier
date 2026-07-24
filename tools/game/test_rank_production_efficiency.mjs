@@ -101,6 +101,7 @@ function prepareAutumnFarmer(seed, rank) {
     phase: 'rest', path: [], workTimer: 0, targetId: null, carrying: {},
   });
   assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, field.id), null);
+  state.subTick = 1;
   agents.agentsTick(state);
   return field.inventory.grain ?? 0;
 }

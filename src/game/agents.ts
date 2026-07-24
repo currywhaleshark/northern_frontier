@@ -1,6 +1,7 @@
 // 주민 에이전트 시뮬레이션 — 서브틱 단위의 이동, 작업, 운반
 // 자원은 창고/거점에 짐을 부려야 마을 비축량에 더해진다.
 import { CONFIG } from './config';
+import { DAY_CYCLE_SUBTICKS, WORK_SUBTICKS, dayBandOf } from './dayCycle';
 import {
   BUILDING_DEFS, footprintTilesOf, isSmithyProductUnlocked, officeEfficiencyMultiplier,
   plotArea, SMITHY_PRODUCT_DEFS, smithyProductOf, sownAreaOf,
@@ -33,7 +34,7 @@ import { mineralDepositsInMineRange, servingMineForTile } from './miningSites';
 import { rankProductionEfficiency } from './productionEfficiency';
 import { buildGoalField, describeGoal, type DescribedGoal, type GoalField } from './pathGoals';
 import { farmWorkTileForTick } from './farmWorkTiles';
-import { reconcileResidentHomes } from './residents';
+import { reconcileResidentHomes, residentHome } from './residents';
 import { canEnterForeignTerritory, canWorkForeignTerritory, noteTerritoryViolation } from './territory';
 import {
   assignedBuildingForResident, assignedWorkers, autoAssignWorkersToBuilding, isResidentInAssignedSlot,
@@ -47,7 +48,7 @@ import type {
   SmithyProductId, Tile,
 } from './types';
 
-export const SUBTICKS = CONFIG.agents.subticksPerDay;
+export const SUBTICKS = DAY_CYCLE_SUBTICKS;
 
 interface Ctx {
   season: Season;
@@ -2063,7 +2064,7 @@ function herderTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
 
-  const product = livestockProductForHerder(livestock, ctx.season, (effOf(r) * ctx.outputMod) / SUBTICKS);
+  const product = livestockProductForHerder(livestock, ctx.season, (effOf(r) * ctx.outputMod) / WORK_SUBTICKS);
   if (product && product.amount > 0) addBuildingStock(stable, product.resource, product.amount);
   r.phase = 'working';
   r.task = product?.task ?? '가축 돌보기';
@@ -2359,10 +2360,168 @@ function nearestBuilding<T extends { x: number; y: number }>(r: Resident, list: 
   return best;
 }
 
+function resumeCriticalActivity(r: Resident): void {
+  if (r.phase !== 'toHome' && r.phase !== 'sleeping' &&
+      r.phase !== 'toLeisure' && r.phase !== 'leisure') return;
+  r.phase = 'rest';
+  r.path = [];
+  r.targetId = null;
+}
+
+function goToWithinRemainingBand(
+  state: GameState,
+  r: Resident,
+  ctx: Ctx,
+  goal: (tile: Tile) => boolean,
+  remainingBandTicks: number,
+): GoResult {
+  let result = goTo(state, r, ctx, goal);
+  if (result !== 'moving') return result;
+
+  // 하루 대역은 지도 이동 거리보다 훨씬 거친 시간 단위다. 남은 경로를 남은
+  // 출퇴근 대역에 고르게 나눠, 통근이 다음 노동 대역의 8틱을 잠식하지 않게 한다.
+  const extraMoves = Math.max(0, Math.ceil((r.path.length + 1) / remainingBandTicks) - 1);
+  for (let move = 0; move < extraMoves && result === 'moving'; move++) {
+    result = goTo(state, r, ctx, goal);
+  }
+  return result;
+}
+
+function dawnAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
+  r.phase = 'rest';
+  r.path = [];
+  r.targetId = null;
+  r.task = '아침 채비';
+
+  const unavailable = r.stage != null || r.sick || state.day < (r.quarantinedUntil ?? 0) ||
+    r.health < 20 || state.day < (r.birthRecoveryUntil ?? 0);
+  if (unavailable) return;
+
+  if (r.manualOrder) {
+    const order = r.manualOrder;
+    const buildingId = order.kind === 'work' ? order.buildingId : undefined;
+    const goal = buildingId != null
+      ? buildingGoal(state, buildingId)
+      : exactTileGoal(order.x, order.y);
+    r.phase = 'toWork';
+    r.targetId = buildingId ?? null;
+    goToWithinRemainingBand(state, r, ctx, goal, 1);
+    r.task = '명령 작업지로 이동';
+    return;
+  }
+
+  if (r.haulTask) {
+    const carrying = carryTotal(r) > 0;
+    const destinationId = carrying && r.haulTask.kind === 'supply'
+      ? r.haulTask.targetBuildingId
+      : carrying
+        ? null
+        : r.haulTask.sourceBuildingId;
+    const goal = destinationId == null
+      ? depositGoal(state, [])
+      : buildingGoal(state, destinationId);
+    r.phase = carrying ? 'toDeposit' : 'toWork';
+    r.targetId = destinationId ?? null;
+    goToWithinRemainingBand(state, r, ctx, goal, 1);
+    r.task = carrying ? '운반 재개 준비' : '수거 재개 준비';
+    return;
+  }
+
+  if (carryTotal(r) > 0) {
+    const miningDeposit = r.job === 'miner' && r.miningDepositBuildingId != null
+      ? state.buildings.find(building =>
+        building.id === r.miningDepositBuildingId && building.built && building.type === 'mine')
+      : null;
+    const goal = miningDeposit
+      ? buildingGoal(state, miningDeposit.id)
+      : depositGoal(state, []);
+    r.phase = 'toDeposit';
+    r.targetId = miningDeposit?.id ?? null;
+    goToWithinRemainingBand(state, r, ctx, goal, 1);
+    r.task = '짐 정리 준비';
+    return;
+  }
+
+  const workplace = assignedBuildingForResident(state, r);
+  if (!workplace) return;
+  r.phase = 'toWork';
+  r.targetId = workplace.id;
+  let workplaceGoal = buildingGoal(state, workplace.id);
+  if (r.job === 'farmer' && (workplace.type === 'field' || workplace.type === 'paddy')) {
+    const workerIds = assignedWorkers(state, workplace).map(worker => worker.id);
+    const tile = farmWorkTileForTick(workplace, workerIds, r.id, absoluteTick(state) + 1);
+    workplaceGoal = exactTileGoal(tile.x, tile.y);
+  }
+  const result = goToWithinRemainingBand(state, r, ctx, workplaceGoal, 1);
+  if (result === 'stuck') {
+    r.phase = 'rest';
+    r.targetId = null;
+    r.task = '아침 채비';
+    return;
+  }
+  r.task = result === 'arrived' ? '일터에서 채비' : '일터로 이동';
+}
+
+function returnHomeAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const home = residentHome(state, r);
+  const center = state.buildings.find(building => building.id === ctx.centerId && building.built) ?? null;
+  const destination = home ?? center;
+  const sleepingTask = home ? '잠자리에 듦' : '처마 밑에서 잠듦';
+
+  if (!destination) {
+    r.phase = 'sleeping';
+    r.path = [];
+    r.targetId = null;
+    r.task = sleepingTask;
+    return;
+  }
+
+  if (r.phase === 'sleeping' && r.targetId === destination.id) {
+    r.path = [];
+    r.task = sleepingTask;
+    return;
+  }
+
+  if (r.phase !== 'toHome' || r.targetId !== destination.id) {
+    r.phase = 'toHome';
+    r.path = [];
+    r.targetId = destination.id;
+  }
+  r.task = home ? '집으로 돌아가는 중' : '처마를 찾아가는 중';
+  const remainingReturnTicks = DAY_CYCLE_SUBTICKS - state.subTick;
+  const result = goToWithinRemainingBand(
+    state,
+    r,
+    ctx,
+    buildingGoal(state, destination.id),
+    remainingReturnTicks,
+  );
+  if (result === 'arrived') {
+    r.phase = 'sleeping';
+    r.path = [];
+    r.task = sleepingTask;
+  } else if (result === 'stuck') {
+    r.path = [];
+    r.task = '귀갓길을 찾지 못함';
+  }
+}
+
+function prepareWorkBandAgent(r: Resident): void {
+  if (r.phase !== 'toHome' && r.phase !== 'sleeping' &&
+      r.phase !== 'toLeisure' && r.phase !== 'leisure') return;
+  r.phase = 'rest';
+  r.path = [];
+  r.targetId = null;
+  r.task = '아침 채비';
+}
+
 // ─────────────────────────── 틱 진입점 ───────────────────────────
 
 export function agentsTick(state: GameState): void {
-  const rng = makeRng(state.seed + state.day * 7919 + state.subTick * 101 + 7);
+  const dayBand = dayBandOf(state.subTick);
+  // 노동 1~8은 구버전 노동 0~7과 같은 결정적 난수열을 쓴다.
+  const rngSubTick = dayBand === 'work' ? state.subTick - 1 : state.subTick;
+  const rng = makeRng(state.seed + state.day * 7919 + rngSubTick * 101 + 7);
   const season = getSeason(state.day);
   const living = state.residents.filter(r => r.alive);
   const predatorScouts = activePredatorScoutIds(state);
@@ -2404,6 +2563,7 @@ export function agentsTick(state: GameState): void {
     r.px = r.x;
     r.py = r.y;
     if (predatorScouts.has(r.id)) {
+      resumeCriticalActivity(r);
       r.task = '맹수 흔적 추적 중';
       clearHaulTask(r);
       r.path = [];
@@ -2413,6 +2573,7 @@ export function agentsTick(state: GameState): void {
     }
     // 원정 참여자는 expeditionTick이 집결·행군·귀환을 전담한다.
     if (state.expedition?.memberIds.includes(r.id)) {
+      resumeCriticalActivity(r);
       r.task = state.expedition.phase === 'muster'
         ? '토벌 집결 중'
         : state.expedition.phase === 'return'
@@ -2424,12 +2585,28 @@ export function agentsTick(state: GameState): void {
       continue;
     }
     if (state.raidHold) {
+      resumeCriticalActivity(r);
       r.task = '완전 수성 중';
       clearHaulTask(r);
       if (carryTotal(r) > 0) depositAll(state, r);
       goToCenter(state, r, ctx);
       continue;
     }
+    // 전투에 징집된 주민은 생활 대역보다 전선 행동을 우선한다.
+    if (state.battle?.defenderIds.includes(r.id)) {
+      resumeCriticalActivity(r);
+      battleAgentTick(state, r, ctx);
+      continue;
+    }
+    if (dayBand === 'dawn') {
+      dawnAgentTick(state, r, ctx);
+      continue;
+    }
+    if (dayBand === 'evening' || dayBand === 'night') {
+      returnHomeAgentTick(state, r, ctx);
+      continue;
+    }
+    prepareWorkBandAgent(r);
     // 아기·어린이와 취학 소년. 일 돕기를 고른 소년만 아래 일반 직업 흐름으로 내려간다.
     if (r.stage) {
       if (r.stage === 'infant') {
@@ -2473,11 +2650,6 @@ export function agentsTick(state: GameState): void {
       clearHaulTask(r);
       if (carryTotal(r) > 0) depositAll(state, r); // 짐은 이웃이 거둬 간다
       goToCenter(state, r, ctx);
-      continue;
-    }
-    // 전투에 징집된 주민은 직업 행동보다 전선 행동을 우선한다.
-    if (state.battle?.defenderIds.includes(r.id)) {
-      battleAgentTick(state, r, ctx);
       continue;
     }
     // 심한 악천후엔 실외 작업자는 대피한다

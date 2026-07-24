@@ -138,6 +138,7 @@ function assertValidHomes(state, expectedHomeless = 0) {
   for (const resident of living(state)) resident.job = 'idle';
   builder.job = 'builder';
   target.progress = buildings.BUILDING_DEFS.hut.buildDays - 0.001;
+  state.subTick = 1;
   for (let tick = 0; tick < 80 && !target.built; tick++) agents.agentsTick(state);
 
   assert.equal(target.built, true, 'the builder should finish the repair');

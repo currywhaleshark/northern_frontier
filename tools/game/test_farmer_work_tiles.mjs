@@ -54,7 +54,7 @@ for (const row of state.map) {
 state.buildings = [];
 state.exploration = { explored: state.map.map(row => row.map(() => true)) };
 state.day = 13;
-state.subTick = 0;
+state.subTick = 1;
 state.weather = 'clear';
 state.resources.tools = 100;
 
@@ -90,7 +90,7 @@ for (let index = 0; index < farmers.length; index++) {
 }
 
 const visited = new Map(farmers.map(farmer => [farmer.id, new Set()]));
-for (let tick = 0; tick < 6; tick++) {
+for (let tick = 0; tick < 7; tick++) {
   const growthBefore = farm.fieldGrowth;
   agents.agentsTick(state);
   assert.ok(farm.fieldGrowth > growthBefore, `farm production continues on visual work tick ${tick}`);

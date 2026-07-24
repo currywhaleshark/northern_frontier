@@ -1,5 +1,6 @@
 // localStorage 저장/불러오기
 import { CONFIG } from './config';
+import { normalizeDayCycleSubTick } from './dayCycle';
 import { clampPlotSide, computeDefense, rebuildBuildingFootprints } from './buildings';
 import { combatGroupLabel } from './combatCapabilities';
 import { defaultCropForBuildingType } from './crops';
@@ -518,6 +519,19 @@ export function migrateV33ToV34(raw: RawSave): RawSave {
   return migrated;
 }
 
+// v35: 하루를 8 노동 서브틱에서 새벽1·노동8·저녁1·밤2의 12서브틱으로 확장한다.
+// 구버전의 0~7은 생산 대역 1~8로 그대로 옮겨 진행 중이던 phase/path/carry를 보존한다.
+export function migrateV34ToV35(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const numeric = Number(migrated.subTick);
+  const legacySubTick = Number.isFinite(numeric)
+    ? Math.min(7, Math.max(0, Math.floor(numeric)))
+    : 0;
+  migrated.subTick = legacySubTick + 1;
+  migrated.schemaVersion = 35;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -557,9 +571,11 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 31) migrated = migrateV31ToV32(migrated);
     else if (version === 32) migrated = migrateV32ToV33(migrated);
     else if (version === 33) migrated = migrateV33ToV34(migrated);
+    else if (version === 34) migrated = migrateV34ToV35(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
+  migrated.subTick = normalizeDayCycleSubTick(migrated.subTick);
   migrated.schemaVersion = CURRENT_SCHEMA_VERSION;
   return migrated;
 }

@@ -148,7 +148,7 @@ function onlyResident(state, job, x, y) {
   assert.equal(exploration.isExplored(state, scout.x + 7, scout.y), true);
   assert.equal(exploration.isExplored(state, scout.x + 8, scout.y), false);
 
-  state.subTick = 6;
+  state.subTick = 10;
   state.exploration = exploration.createExploration(state);
   exploration.refreshExploration(state);
   assert.equal(exploration.residentRevealRadius(state), 5, 'night should reduce sight');

@@ -1,4 +1,5 @@
 // 시뮬레이션 밸런스 값 모음 — 숫자 튜닝은 전부 여기서 한다.
+import { DAY_CYCLE_SUBTICKS } from './dayCycle';
 import type { JobId, LivestockId, ProcessingInputId, Rank, ResourceId, Season } from './types';
 
 export const CONFIG = {
@@ -396,7 +397,7 @@ export const CONFIG = {
 
   // 주민 에이전트 (이동/작업/운반)
   agents: {
-    subticksPerDay: 8,        // 하루를 나누는 서브틱 수
+    subticksPerDay: DAY_CYCLE_SUBTICKS, // 새벽1 + 노동8 + 저녁1 + 밤2
     moveSpeed: 2,             // 서브틱당 이동 타일 수
     moveSpeedWinter: 1.5,     // 겨울 눈길
     moveSpeedSnow: 1,         // 폭설/눈보라

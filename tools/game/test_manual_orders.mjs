@@ -33,6 +33,16 @@ const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs'))
 const selectionActions = await import(pathToFileURL(join(compiledDir, 'selectionActions.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
+function agentsWorkTick(state) {
+  if (state.subTick >= 8) {
+    state.day++;
+    state.subTick = 1;
+  } else {
+    state.subTick = state.subTick >= 1 ? state.subTick + 1 : 1;
+  }
+  agents.agentsTick(state);
+}
+
 function clearMapToPlain(state) {
   for (const row of state.map) {
     for (const tile of row) {
@@ -126,8 +136,7 @@ function onlyResident(state, job, x, y) {
   assert.equal(farmer.manualOrder.kind, 'move');
 
   for (let i = 0; i < 20 && farmer.manualOrder; i++) {
-    agents.agentsTick(state);
-    state.subTick++;
+    agentsWorkTick(state);
   }
 
   assert.equal(farmer.x, 8);
@@ -156,8 +165,7 @@ function onlyResident(state, job, x, y) {
 
   let sawCarry = false;
   for (let i = 0; i < 180 && state.resources.stone <= 0; i++) {
-    agents.agentsTick(state);
-    state.subTick++;
+    agentsWorkTick(state);
     sawCarry ||= (miner.carrying.stone ?? 0) > 0;
   }
 
@@ -185,8 +193,7 @@ function onlyResident(state, job, x, y) {
   assert.equal(simulation.issueResidentWorkOrder(state, miner.id, action), null);
 
   for (let i = 0; i < 180 && state.resources.iron <= 0; i++) {
-    agents.agentsTick(state);
-    state.subTick++;
+    agentsWorkTick(state);
   }
 
   assert.ok(state.resources.iron > 0, 'manual iron orders deliver iron instead of stone');
@@ -212,8 +219,7 @@ function onlyResident(state, job, x, y) {
   assert.equal(simulation.issueResidentWorkOrder(state, herbalist.id, action), null);
 
   for (let i = 0; i < 80 && (herbalist.carrying.herbs ?? 0) <= 0; i++) {
-    agents.agentsTick(state);
-    state.subTick++;
+    agentsWorkTick(state);
   }
 
   assert.ok((herbalist.carrying.herbs ?? 0) > 0, 'herbalist gathers herbs');
@@ -249,8 +255,7 @@ function onlyResident(state, job, x, y) {
   assert.equal(hauler.manualOrder?.repeat, true);
 
   for (let i = 0; i < 80 && state.resources.wood < 8; i++) {
-    agents.agentsTick(state);
-    state.subTick++;
+    agentsWorkTick(state);
   }
 
   assert.equal(state.resources.wood, 8, 'the selected production building is hauled');
@@ -260,8 +265,7 @@ function onlyResident(state, job, x, y) {
 
   camp.inventory.wood = 4;
   for (let i = 0; i < 80 && state.resources.wood < 12; i++) {
-    agents.agentsTick(state);
-    state.subTick++;
+    agentsWorkTick(state);
   }
   assert.equal(state.resources.wood, 12, 'new stock at the forced source is hauled again');
 }

@@ -43,6 +43,7 @@ function prepare(seed) {
   for (const resource of catalog.RESOURCE_IDS) state.resources[resource] = 0;
   for (const resident of state.residents) resident.alive = false;
   state.weather = 'clear';
+  state.subTick = 1;
   state.pendingChoice = null;
   state.gameOver = null;
   addBuilt(state, 'center', 2, 2);

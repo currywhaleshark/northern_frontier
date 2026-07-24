@@ -228,6 +228,7 @@ function runTicks(state, ticks) {
   state.resources.firewood = 10;
   state.resources.stone = 10;
   state.resources.gunpowder = 0;
+  state.subTick = 1;
   runTicks(state, 8);
 
   assert.ok((yard.inventory?.gunpowder ?? 0) > 0, 'powder maker stores gunpowder at a nitre yard');

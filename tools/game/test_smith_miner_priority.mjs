@@ -134,6 +134,7 @@ function setupSmithScenario(seed, withMiner) {
 
   state.rank = 'bo';
   state.weather = 'clear';
+  state.subTick = 1;
   state.resources.iron = 0;
   state.resources.wood = 100;
   state.resources.tools = 0;

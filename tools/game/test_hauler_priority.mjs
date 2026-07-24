@@ -72,6 +72,7 @@ function setupSingleHauler(seed = 9001) {
   hauler.py = site.y;
 
   state.weather = 'clear';
+  state.subTick = 1;
   state.resources.stone = 0;
   state.resources.tools = 10;
   return { state, hauler, site };

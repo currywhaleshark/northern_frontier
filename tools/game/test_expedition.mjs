@@ -187,7 +187,7 @@ function addBuiltMarket(state) {
   agents.agentsTick(state);
   assert.equal(state.residents[3].task, '완전 수성 중');
 
-  for (let i = 0; i < 8 && !state.pendingChoice; i++) raids.raidHoldTick(state, () => 0.5);
+  for (let i = 0; i < agents.SUBTICKS && !state.pendingChoice; i++) raids.raidHoldTick(state, () => 0.5);
   assert.ok(state.expedition, 'continuing expedition remains away when the deadline expires');
   assert.equal(state.pendingChoice?.kind, 'raid');
   assert.deepEqual(state.pendingChoice.options.map(option => option.id), ['levy', 'manual-levy']);

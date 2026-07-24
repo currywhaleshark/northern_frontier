@@ -26,6 +26,7 @@ const simulation = await load('simulation');
 const buildings = await load('buildings');
 const agents = await load('agents');
 const medicine = await load('medicine');
+const dayCycle = await load('dayCycle');
 const specialEvents = await load('specialEvents');
 const constants = await load('constants');
 const workerSlots = await load('workerSlots');
@@ -99,7 +100,7 @@ function onlyEvent(state, eventId) {
   assert.equal(result.status, 'recovered');
   assert.equal(patient.sick, false);
   assert.ok(patient.health > 50);
-  assert.equal(state.resources.herbs, herbsBefore - CONFIG.medicine.herbsPerPhysicianPerDay / CONFIG.agents.subticksPerDay);
+  assert.equal(state.resources.herbs, herbsBefore - CONFIG.medicine.herbsPerPhysicianPerDay / dayCycle.WORK_SUBTICKS);
 }
 
 {
@@ -109,6 +110,7 @@ function onlyEvent(state, eventId) {
   for (const resident of state.residents) resident.alive = resident === physician || resident === patient;
   Object.assign(patient, { alive: true, sick: true, health: 45, quarantinedUntil: 0 });
   state.resources.herbs = 2;
+  state.subTick = 1;
   const healthBefore = patient.health;
   const herbsBefore = state.resources.herbs;
   agents.agentsTick(state);

@@ -112,6 +112,7 @@ function runTicks(state, ticks) {
   const field = placeBuilt(state, 'field', fieldTile, { fieldGrowth: 100 });
   const farmer = onlyWorkerAt(state, 'farmer', fieldTile);
   assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, field.id), null);
+  state.subTick = 1;
 
   runTicks(state, 1);
 
@@ -133,6 +134,7 @@ function runTicks(state, ticks) {
   state.resources.rice = 0;
   state.resources.grain = 0;
   state.processingReserves.rice = 0;
+  state.subTick = 1;
 
   runTicks(state, 1);
 

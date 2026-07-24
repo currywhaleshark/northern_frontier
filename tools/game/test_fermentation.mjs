@@ -39,6 +39,8 @@ function prepare(seed) {
     }
   }
   state.buildings = [];
+  state.foreignSites = [];
+  state.claimZones = [];
   state.exploration = { explored: state.map.map(row => row.map(() => true)) };
   for (const resource of catalog.RESOURCE_IDS) state.resources[resource] = 0;
   for (const resident of state.residents) resident.alive = false;
@@ -73,9 +75,32 @@ function worker(state, index, job, x, y) {
   return resident;
 }
 
-function runUntil(state, predicate, maxTicks = 100) {
-  for (let tick = 0; tick < maxTicks && !predicate(); tick++) simulation.advanceTick(state);
-  assert.ok(predicate(), `condition was not reached within ${maxTicks} ticks`);
+function runUntil(
+  state,
+  predicate,
+  maxTicks = Math.ceil(100 * CONFIG.agents.subticksPerDay / 8),
+) {
+  for (let tick = 0; tick < maxTicks && !predicate(); tick++) {
+    simulation.advanceTick(state);
+  }
+  const workerState = state.residents.find(resident => resident.alive);
+  assert.ok(predicate(), `condition was not reached within ${maxTicks} ticks: ${JSON.stringify({
+    day: state.day,
+    subTick: state.subTick,
+    pendingChoice: state.pendingChoice?.kind ?? null,
+    gameOver: state.gameOver,
+    jang: state.resources.jang,
+    onggi: state.resources.onggi,
+    yard: state.buildings.find(building => building.type === 'jangdokdae')?.inventory,
+    worker: workerState && {
+      x: workerState.x,
+      y: workerState.y,
+      phase: workerState.phase,
+      task: workerState.task,
+      carrying: workerState.carrying,
+      haulTask: workerState.haulTask,
+    },
+  })}`);
 }
 
 {
@@ -232,7 +257,7 @@ function runUntil(state, predicate, maxTicks = 100) {
   state.day = 55;
   Object.assign(state.resources, { grain: 100, stone: 40 });
   const yard = addBuilt(state, 'jangdokdae', 10, 2, { jang: 8, onggi: 1.8 });
-  worker(state, 0, 'hauler', 9, 2);
+  worker(state, 0, 'hauler', 9, 1);
 
   runUntil(state, () => state.resources.jang > 0 && state.resources.onggi > 0);
 
@@ -246,7 +271,7 @@ function runUntil(state, predicate, maxTicks = 100) {
   state.day = 39;
   Object.assign(state.resources, { grain: 100, stone: 40 });
   const yard = addBuilt(state, 'jangdokdae', 10, 2, { kimchi: 12 });
-  worker(state, 0, 'hauler', 9, 2);
+  worker(state, 0, 'hauler', 9, 1);
 
   runUntil(state, () => state.resources.kimchi > 0, 200);
 

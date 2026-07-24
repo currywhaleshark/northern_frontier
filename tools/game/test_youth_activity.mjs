@@ -122,6 +122,7 @@ function makeOnlyWorker(state, stage = null) {
 function oneTickHarvest(seed, stage) {
   const state = simulation.newGame(seed);
   state.day = 25;
+  state.subTick = 1;
   state.weather = 'clear';
   state.resources.tools = 100;
   const tile = openTile(state);

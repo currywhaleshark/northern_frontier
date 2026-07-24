@@ -41,6 +41,7 @@ function prepare(seed) {
   for (const resident of state.residents) resident.alive = false;
   state.rank = 'bu';
   state.weather = 'clear';
+  state.subTick = 1;
   state.pendingChoice = null;
   state.gameOver = null;
   state.processingReserves.wood = 0;

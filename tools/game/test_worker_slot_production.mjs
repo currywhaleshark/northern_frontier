@@ -108,6 +108,7 @@ function prepareState(seed) {
   addBuilt(state, 'center', 2, 2);
   state.rank = 'bu';
   state.day = 1;
+  state.subTick = 1;
   state.weather = 'clear';
   state.resources.tools = 100;
   state.processingReserves.iron = 0;

@@ -209,6 +209,7 @@ function footprintIds(state, type, x, y) {
   builder.px = 1;
   builder.py = 2;
   builder.path = [];
+  state.subTick = 1;
   for (let tick = 0; tick < 40 && !storehouse.built; tick++) agents.agentsTick(state);
   assert.equal(storehouse.built, true, 'a builder repairs the damaged building');
   assert.equal(storehouse.repairing, false);

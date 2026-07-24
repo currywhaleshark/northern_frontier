@@ -135,6 +135,7 @@ function makePaddyEligibleTile(state, x, y) {
 {
   const state = prepareState(2026071608);
   state.day = 25; // autumn
+  state.subTick = 1;
   const field = addBuilt(state, 'field', 9, 9, { cropId: 'beans', fieldGrowth: 100, inventory: {} });
   const farmer = workableResident(state, 0, 'farmer', 9, 9);
   assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, field.id), null);
@@ -193,6 +194,7 @@ function makePaddyEligibleTile(state, x, y) {
 {
   const state = prepareState();
   state.day = 25; // autumn
+  state.subTick = 1;
   const paddy = addBuilt(state, 'paddy', 9, 9, { cropId: 'rice', fieldGrowth: 100, inventory: {} });
   const farmer = workableResident(state, 0, 'farmer', 9, 9);
   assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, paddy.id), null);
@@ -211,6 +213,7 @@ function makePaddyEligibleTile(state, x, y) {
 {
   const state = prepareState();
   state.day = 3;
+  state.subTick = 1;
   const mill = addBuilt(state, 'watermill', 12, 12, { inventory: { rice: 10 } });
   const miller = workableResident(state, 0, 'miller', 11, 12);
   state.resources.rice = 0;

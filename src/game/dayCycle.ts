@@ -9,6 +9,8 @@ export const DAY_BANDS = {
   night: { start: 10, end: 11 },
 } as const satisfies Readonly<Record<DayBand, { start: number; end: number }>>;
 
+export const WORK_SUBTICKS = DAY_BANDS.work.end - DAY_BANDS.work.start + 1;
+
 const DAY_BAND_ORDER: readonly DayBand[] = ['dawn', 'work', 'evening', 'night'];
 const INDOOR_LEISURE_BUILDING_TYPES: ReadonlySet<BuildingTypeId> = new Set([
   'shrine',
@@ -26,6 +28,12 @@ export function dayBandOf(subTick: number): DayBand {
   }
 
   throw new RangeError(`subTick ${subTick} is not covered by DAY_BANDS`);
+}
+
+export function normalizeDayCycleSubTick(value: unknown): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.min(DAY_CYCLE_SUBTICKS - 1, Math.max(0, Math.floor(numeric)));
 }
 
 export function isIndoors(state: GameState, resident: Resident): boolean {

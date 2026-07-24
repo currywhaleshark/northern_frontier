@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 34, 'route stage nodes ship with schema version 34');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 35, 'daily cycle migration ships with schema version 35');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -70,6 +70,7 @@ assert.equal(typeof saveLoad.migrateV25ToV26, 'function');
 assert.equal(typeof saveLoad.migrateV26ToV27, 'function');
 assert.equal(typeof saveLoad.migrateV27ToV28, 'function');
 assert.equal(typeof saveLoad.migrateV33ToV34, 'function');
+assert.equal(typeof saveLoad.migrateV34ToV35, 'function');
 
 {
   const migrated = saveLoad.migrateV24ToV25({ schemaVersion: 24, tacticalBattle: { phase: 'deployment' } });
@@ -148,6 +149,25 @@ assert.equal(typeof saveLoad.migrateV33ToV34, 'function');
     node: 'middle', destinationNode: 'storehouseGate', originZoneId: 'approach',
     destinationZoneId: 'wall', destinationLine: 'rear',
   });
+}
+
+{
+  const resident = {
+    id: 7,
+    phase: 'toDeposit',
+    path: [{ x: 4, y: 5 }],
+    carrying: { wood: 3 },
+  };
+  const migrated = saveLoad.migrateV34ToV35({
+    schemaVersion: 34,
+    subTick: 6.9,
+    residents: [resident],
+  });
+  assert.equal(migrated.schemaVersion, 35);
+  assert.equal(migrated.subTick, 7, 'legacy subticks move into the equivalent work-band slot');
+  assert.deepEqual(migrated.residents[0], resident, 'phase, path, and carried resources survive the time migration');
+  assert.equal(saveLoad.migrateV34ToV35({ schemaVersion: 34, subTick: -4 }).subTick, 1);
+  assert.equal(saveLoad.migrateV34ToV35({ schemaVersion: 34, subTick: 99 }).subTick, 8);
 }
 
 {
@@ -483,6 +503,11 @@ assert.equal(typeof saveLoad.migrateV33ToV34, 'function');
   const migrated = saveLoad.migrateToCurrent(source);
   assert.equal(source.schemaVersion, 3, 'schema migration must not mutate its input');
   assert.equal(migrated.schemaVersion, saveLoad.CURRENT_SCHEMA_VERSION);
+  assert.equal(migrated.subTick, 1);
+  assert.equal(saveLoad.migrateToCurrent({
+    schemaVersion: saveLoad.CURRENT_SCHEMA_VERSION,
+    subTick: 99,
+  }).subTick, 11, 'current saves normalize corrupt subticks without weakening dayBandOf');
 }
 
 {

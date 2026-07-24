@@ -7,7 +7,6 @@ import ts from 'typescript';
 
 const SEED = 20260717;
 const COLD_TICKS = 24;
-const STRESS_TICKS = 8;
 const PATH_SAMPLES = 30;
 const DEFAULT_GAME_SOURCE_ROOT = fileURLToPath(new URL('../../src/game/', import.meta.url));
 const SOURCE_ARG_INDEX = process.argv.indexOf('--source-root');
@@ -170,7 +169,7 @@ async function measureStress() {
   const modules = await loadGameModules('stress-120x96');
   try {
     const state = createStressState(modules.simulation.newGame(SEED), modules.buildings);
-    const result = runTicks(state, modules.simulation.advanceTick, STRESS_TICKS);
+    const result = runTicks(state, modules.simulation.advanceTick, modules.agents.SUBTICKS);
     return {
       scenario: 'stress-120-residents-96-buildings',
       seed: SEED,

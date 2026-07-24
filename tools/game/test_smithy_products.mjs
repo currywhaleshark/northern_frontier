@@ -69,6 +69,7 @@ function addBuilt(state, type, tile = openTile(state)) {
 }
 
 function keepOnlyResident(state, index, job, tile) {
+  state.subTick = 1;
   for (const resident of state.residents) resident.alive = false;
   const resident = state.residents[index];
   Object.assign(resident, {
