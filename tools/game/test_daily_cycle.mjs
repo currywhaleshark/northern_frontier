@@ -172,12 +172,27 @@ try {
     'the existing job loop runs exactly eight times per twelve-subtick day');
 
   Object.assign(active, { x: 8, y: 10, px: 8, py: 10, phase: 'rest', path: [], targetId: null });
+  const resourcesBeforeLeisure = structuredClone(state.resources);
+  const inventoriesBeforeLeisure = state.buildings.map(building => structuredClone(building.inventory ?? {}));
   state.subTick = 9;
   agents.agentsTick(state);
-  assert.equal(active.phase, 'toHome');
-  assert.match(active.task, /집으로/);
+  assert.equal(active.phase, 'leisure');
+  assert.equal(active.targetId, state.buildings.find(building => building.type === 'center').id);
+  assert.equal(active.task, '마실 중');
+  assert.deepEqual(state.resources, resourcesBeforeLeisure,
+    'evening leisure does not consume or produce settlement resources');
+  assert.deepEqual(
+    state.buildings.map(building => building.inventory ?? {}),
+    inventoriesBeforeLeisure,
+    'evening leisure does not change building inventories',
+  );
 
   state.subTick = 10;
+  agents.agentsTick(state);
+  assert.ok(active.phase === 'toHome' || active.phase === 'sleeping');
+  assert.match(active.task, /집으로|잠자리/);
+
+  state.subTick = 11;
   agents.agentsTick(state);
   assert.equal(active.phase, 'sleeping');
   assert.equal(active.task, '잠자리에 듦');
@@ -188,6 +203,52 @@ try {
   agents.agentsTick(state);
   assert.deepEqual({ x: active.x, y: active.y }, sleepingPosition,
     'sleeping residents skip movement and work calculations');
+
+  const leisureState = {
+    day: 23,
+    buildings: [
+      { id: 1, type: 'center', built: true },
+      { id: 2, type: 'market', built: true },
+      { id: 3, type: 'shrine', built: true },
+      { id: 4, type: 'hermitage', built: true },
+      { id: 5, type: 'market', built: false },
+    ],
+  };
+  const leisureResidents = Array.from({ length: 16 }, (_, index) => ({
+    id: index + 1,
+    alive: true,
+    stage: null,
+    sick: false,
+    health: 100,
+  }));
+  leisureResidents[0].sick = true;
+  leisureResidents[1].quarantinedUntil = leisureState.day + 1;
+  leisureResidents[2].stage = 'infant';
+  const destinations = agents.leisureDestinations(leisureState);
+  assert.deepEqual(destinations.map(building => building.id), [3, 4, 2, 1],
+    'leisure destinations prefer shrine/hermitage, then market, then center');
+
+  const assignments = agents.leisureAssignments(leisureState, leisureResidents);
+  assert.equal(assignments.has(1), false, 'sick residents skip evening leisure');
+  assert.equal(assignments.has(2), false, 'quarantined residents skip evening leisure');
+  assert.equal(assignments.has(3), false, 'infants skip evening leisure');
+  const assignedCounts = new Map();
+  for (const destinationId of assignments.values()) {
+    assignedCounts.set(destinationId, (assignedCounts.get(destinationId) ?? 0) + 1);
+  }
+  assert.deepEqual([...assignedCounts.entries()], [[3, 4], [4, 4], [2, 4], [1, 1]],
+    'four-person clusters spill into the next destination priority');
+  assert.ok([...assignedCounts.values()].every(count => count <= agents.LEISURE_CLUSTER_CAPACITY));
+  assert.deepEqual(
+    [...agents.leisureAssignments(leisureState, leisureResidents)],
+    [...assignments],
+    'resident id and day produce stable leisure assignments',
+  );
+  assert.notDeepEqual(
+    [...agents.leisureAssignments({ ...leisureState, day: leisureState.day + 1 }, leisureResidents)],
+    [...assignments],
+    'the deterministic dispersal rotates when the day changes',
+  );
 
   const fullDay = simulation.newGame(2026072402);
   const startingDay = fullDay.day;

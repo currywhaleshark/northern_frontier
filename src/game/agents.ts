@@ -73,6 +73,16 @@ const OUTDOOR_JOBS = [
   'charcoalBurner', 'herder',
 ];
 
+export const LEISURE_CLUSTER_CAPACITY = 4;
+
+// 새 여가 시설(예: 주막)은 이 우선순위 표에 타입을 추가하는 것으로 연결한다.
+// 같은 우선순위 안에서는 건물 id 순으로 슬롯을 열어 저장/불러오기에도 흔들리지 않게 한다.
+const LEISURE_DESTINATION_TIERS: readonly (readonly BuildingTypeId[])[] = [
+  ['shrine', 'hermitage'],
+  ['market'],
+  ['center'],
+];
+
 // ─────────────────────────── 공통 헬퍼 ───────────────────────────
 
 function effOf(r: Resident): number {
@@ -2360,6 +2370,53 @@ function nearestBuilding<T extends { x: number; y: number }>(r: Resident, list: 
   return best;
 }
 
+export function leisureDestinations(state: GameState): Building[] {
+  const built = state.buildings.filter(building => building.built);
+  return LEISURE_DESTINATION_TIERS.flatMap(types =>
+    built
+      .filter(building => types.includes(building.type))
+      .sort((a, b) => a.id - b.id),
+  );
+}
+
+function isLeisureEligible(state: GameState, resident: Resident): boolean {
+  return resident.alive &&
+    resident.stage !== 'infant' &&
+    !resident.sick &&
+    state.day >= (resident.quarantinedUntil ?? 0) &&
+    resident.health >= 20 &&
+    state.day >= (resident.birthRecoveryUntil ?? 0);
+}
+
+function leisureOrderKey(residentId: number, day: number): number {
+  let value = (residentId ^ Math.imul(day + 1, 0x9e3779b1)) >>> 0;
+  value = Math.imul(value ^ (value >>> 16), 0x85ebca6b) >>> 0;
+  value = Math.imul(value ^ (value >>> 13), 0xc2b2ae35) >>> 0;
+  return (value ^ (value >>> 16)) >>> 0;
+}
+
+export function leisureAssignments(
+  state: GameState,
+  residents: readonly Resident[] = state.residents,
+): Map<number, number> {
+  const destinations = leisureDestinations(state);
+  if (destinations.length === 0) return new Map();
+
+  const orderedResidents = residents
+    .filter(resident => isLeisureEligible(state, resident))
+    .sort((a, b) => {
+      const keyDelta = leisureOrderKey(a.id, state.day) - leisureOrderKey(b.id, state.day);
+      return keyDelta || a.id - b.id;
+    });
+  const assignments = new Map<number, number>();
+  for (let index = 0; index < orderedResidents.length; index++) {
+    const destination = destinations[Math.floor(index / LEISURE_CLUSTER_CAPACITY)];
+    if (!destination) break;
+    assignments.set(orderedResidents[index].id, destination.id);
+  }
+  return assignments;
+}
+
 function resumeCriticalActivity(r: Resident): void {
   if (r.phase !== 'toHome' && r.phase !== 'sleeping' &&
       r.phase !== 'toLeisure' && r.phase !== 'leisure') return;
@@ -2506,6 +2563,45 @@ function returnHomeAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 }
 
+function eveningLeisureAgentTick(
+  state: GameState,
+  r: Resident,
+  ctx: Ctx,
+  destinationId: number | undefined,
+): void {
+  if (destinationId == null) {
+    returnHomeAgentTick(state, r, ctx);
+    return;
+  }
+
+  if (r.phase === 'leisure' && r.targetId === destinationId) {
+    r.path = [];
+    r.task = '마실 중';
+    return;
+  }
+
+  if (r.phase !== 'toLeisure' || r.targetId !== destinationId) {
+    r.phase = 'toLeisure';
+    r.path = [];
+    r.targetId = destinationId;
+  }
+  r.task = '마실 나감';
+  const result = goToWithinRemainingBand(
+    state,
+    r,
+    ctx,
+    buildingGoal(state, destinationId),
+    1,
+  );
+  if (result === 'arrived') {
+    r.phase = 'leisure';
+    r.path = [];
+    r.task = '마실 중';
+  } else if (result === 'stuck') {
+    returnHomeAgentTick(state, r, ctx);
+  }
+}
+
 function prepareWorkBandAgent(r: Resident): void {
   if (r.phase !== 'toHome' && r.phase !== 'sleeping' &&
       r.phase !== 'toLeisure' && r.phase !== 'leisure') return;
@@ -2527,6 +2623,14 @@ export function agentsTick(state: GameState): void {
   const predatorScouts = activePredatorScoutIds(state);
   const enrolledStudents = enrolledStudentIds(state); // 서당 정원 안의 취학 아동
   if (living.length === 0) return;
+  const leisureResidents = living.filter(resident =>
+    !predatorScouts.has(resident.id) &&
+    !state.expedition?.memberIds.includes(resident.id) &&
+    !state.battle?.defenderIds.includes(resident.id) &&
+    !state.raidHold);
+  const eveningAssignments = dayBand === 'evening'
+    ? leisureAssignments(state, leisureResidents)
+    : new Map<number, number>();
 
   const producers = living.filter(r =>
     PRODUCING_JOBS.includes(r.job) && !r.sick && state.day >= (r.quarantinedUntil ?? 0) && r.health >= 20).length;
@@ -2602,7 +2706,11 @@ export function agentsTick(state: GameState): void {
       dawnAgentTick(state, r, ctx);
       continue;
     }
-    if (dayBand === 'evening' || dayBand === 'night') {
+    if (dayBand === 'evening') {
+      eveningLeisureAgentTick(state, r, ctx, eveningAssignments.get(r.id));
+      continue;
+    }
+    if (dayBand === 'night') {
       returnHomeAgentTick(state, r, ctx);
       continue;
     }
