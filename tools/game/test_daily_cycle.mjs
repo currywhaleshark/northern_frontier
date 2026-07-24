@@ -122,6 +122,17 @@ try {
   const compiledDayCycle = await load('dayCycle');
   const { CONFIG } = await load('config');
 
+  const nearDeparture = agents.morningDepartureSubTick(2, 1, 20, 2);
+  const farDeparture = agents.morningDepartureSubTick(12, 1, 20, 2);
+  assert.ok(farDeparture < nearDeparture,
+    'residents with a longer commute leave earlier during dawn');
+  const nearDepartures = new Set(
+    Array.from({ length: 16 }, (_, index) =>
+      agents.morningDepartureSubTick(2, index + 1, 20, 2)),
+  );
+  assert.deepEqual(nearDepartures, new Set([7, 8]),
+    'resident id and day spread equal-distance morning departures over one tick');
+
   const state = simulation.newGame(2026072401);
   clearMapToPlain(state);
   const addBuilt = (type, x, y) => {
@@ -164,13 +175,63 @@ try {
   });
 
   globalThis.window = { __renderPerf: {} };
+  const nearWorkplace = addBuilt('woodShed', 17, 10);
+  const farWorkplace = addBuilt('woodShed', 55, 10);
+  Object.assign(active, {
+    job: 'woodSplitter',
+    assignedBuildingId: farWorkplace.id,
+    x: 10,
+    y: 10,
+    px: 10,
+    py: 10,
+    phase: 'sleeping',
+    path: [],
+    targetId: home.id,
+  });
+  state.subTick = compiledDayCycle.DAY_BANDS.dawn.start;
+  agents.agentsTick(state);
+  assert.equal(active.phase, 'toWork');
+  assert.equal(active.task, '일터로 이동',
+    'a distant worker leaves at the beginning of dawn');
+
+  Object.assign(active, {
+    assignedBuildingId: nearWorkplace.id,
+    x: 10,
+    y: 10,
+    px: 10,
+    py: 10,
+    phase: 'sleeping',
+    path: [],
+    targetId: home.id,
+  });
+  state.subTick = compiledDayCycle.DAY_BANDS.dawn.start;
+  agents.agentsTick(state);
+  assert.equal(active.phase, 'rest');
+  assert.equal(active.task, '아침 채비',
+    'a nearby worker prepares around the home before leaving later');
+
+  Object.assign(active, {
+    job: 'idle',
+    assignedBuildingId: null,
+    x: 8,
+    y: 10,
+    px: 8,
+    py: 10,
+    phase: 'rest',
+    path: [],
+    targetId: null,
+  });
+  const dawnPositions = new Set([`${active.x},${active.y}`]);
   for (let subTick = compiledDayCycle.DAY_BANDS.dawn.start;
     subTick <= compiledDayCycle.DAY_BANDS.dawn.end; subTick++) {
     state.subTick = subTick;
     agents.agentsTick(state);
+    dawnPositions.add(`${active.x},${active.y}`);
   }
   assert.equal(active.phase, 'rest');
   assert.equal(active.task, '아침 채비');
+  assert.ok(dawnPositions.size > 1,
+    'an unassigned resident visibly moves around the home while preparing in the morning');
 
   for (let subTick = compiledDayCycle.DAY_BANDS.work.start;
     subTick <= compiledDayCycle.DAY_BANDS.work.end; subTick++) {
@@ -180,7 +241,75 @@ try {
   assert.equal(globalThis.window.__renderPerf['job-idle'].count, 36,
     'the denser day exposes thirty-six work movement/action opportunities');
 
-  Object.assign(active, { x: 8, y: 10, px: 8, py: 10, phase: 'rest', path: [], targetId: null });
+  const workTile = state.map[20][20];
+  workTile.terrain = 'forest';
+  state.exploration.explored[20][20] = true;
+  Object.assign(active, {
+    job: 'woodcutter',
+    x: 20,
+    y: 20,
+    px: 20,
+    py: 20,
+    phase: 'working',
+    path: [],
+    workTimer: 2,
+    targetId: null,
+    carrying: {},
+  });
+  state.subTick = compiledDayCycle.DAY_BANDS.evening.start;
+  agents.agentsTick(state);
+  assert.equal(active.phase, 'working');
+  assert.ok(active.workTimer > 0 && active.workTimer < 2,
+    'a bounded gathering action continues after the work band closes');
+  while (active.phase === 'working' && state.subTick < compiledDayCycle.DAY_BANDS.evening.end) {
+    state.subTick++;
+    agents.agentsTick(state);
+  }
+  assert.equal(active.phase, 'rest');
+  assert.equal(active.workTimer, 0);
+  assert.ok((active.carrying.wood ?? 0) > 0,
+    'the already-started gathering action produces its result before departure');
+
+  const constructionSite = {
+    id: state.nextBuildingId++,
+    type: 'hut',
+    x: 24,
+    y: 20,
+    progress: 0,
+    built: false,
+    fieldGrowth: 0,
+  };
+  state.buildings.push(constructionSite);
+  Object.assign(active, {
+    job: 'builder',
+    x: 23,
+    y: 20,
+    px: 23,
+    py: 20,
+    phase: 'working',
+    path: [],
+    workTimer: 0,
+    targetId: constructionSite.id,
+    carrying: {},
+  });
+  state.subTick = compiledDayCycle.DAY_BANDS.evening.start;
+  agents.agentsTick(state);
+  assert.equal(constructionSite.progress, 0,
+    'construction stops immediately at evening and preserves partial progress');
+  assert.equal(active.task, '일 마무리');
+
+  Object.assign(active, {
+    job: 'idle',
+    x: 8,
+    y: 10,
+    px: 8,
+    py: 10,
+    phase: 'rest',
+    path: [],
+    workTimer: 0,
+    targetId: null,
+    carrying: {},
+  });
   const resourcesBeforeLeisure = structuredClone(state.resources);
   const inventoriesBeforeLeisure = state.buildings.map(building => structuredClone(building.inventory ?? {}));
   const departureDelay = agents.eveningDepartureDelay(active.id, state.day);

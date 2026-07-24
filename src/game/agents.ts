@@ -1308,10 +1308,14 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 }
 
-function builderTick(state: GameState, r: Resident, ctx: Ctx): void {
+function builderTarget(state: GameState, r: Resident): Building | null {
   const sites = state.buildings.filter(b => !b.built);
   const repairs = sites.filter(b => b.repairing);
-  const target = nearestBuilding(r, repairs.length > 0 ? repairs : sites);
+  return nearestBuilding(r, repairs.length > 0 ? repairs : sites);
+}
+
+function builderTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const target = builderTarget(state, r);
   if (!target) {
     r.phase = 'rest';
     loiterNearCenter(state, r, ctx, '지을 것 없음');
@@ -2416,6 +2420,20 @@ export function eveningDepartureDelay(residentId: number, day: number): 1 | 2 {
   return (1 + (leisureOrderKey(residentId, day) & 1)) as 1 | 2;
 }
 
+export function morningDepartureSubTick(
+  distanceTiles: number,
+  residentId: number,
+  day: number,
+  tilesPerTick: number = CONFIG.agents.moveSpeed,
+): number {
+  const travelTicks = Math.max(1, Math.ceil(Math.max(0, distanceTiles) / Math.max(0.1, tilesPerTick)));
+  const tieBreak = leisureOrderKey(residentId, day) & 1;
+  return Math.max(
+    DAY_BANDS.dawn.start,
+    Math.min(DAY_BANDS.dawn.end, DAY_BANDS.work.start - travelTicks - tieBreak),
+  );
+}
+
 export function leisureAssignments(
   state: GameState,
   residents: readonly Resident[] = state.residents,
@@ -2446,9 +2464,162 @@ function resumeCriticalActivity(r: Resident): void {
   r.targetId = null;
 }
 
+interface DawnCommutePlan {
+  phase: 'toWork' | 'toDeposit';
+  targetId: number | null;
+  goal: DescribedGoal;
+  movingTask: string;
+  arrivedTask: string;
+  staggerByDistance: boolean;
+}
+
+function dawnCommutePlan(state: GameState, r: Resident): DawnCommutePlan | null {
+  if (r.manualOrder) {
+    const order = r.manualOrder;
+    const buildingId = order.kind === 'work' ? order.buildingId : undefined;
+    return {
+      phase: 'toWork',
+      targetId: buildingId ?? null,
+      goal: buildingId != null
+        ? buildingGoal(state, buildingId) as DescribedGoal
+        : exactTileGoal(order.x, order.y) as DescribedGoal,
+      movingTask: '명령 작업지로 이동',
+      arrivedTask: '명령 작업지에서 채비',
+      staggerByDistance: false,
+    };
+  }
+
+  if (r.haulTask) {
+    const carrying = carryTotal(r) > 0;
+    const destinationId = carrying && r.haulTask.kind === 'supply'
+      ? r.haulTask.targetBuildingId
+      : carrying
+        ? null
+        : r.haulTask.sourceBuildingId;
+    return {
+      phase: carrying ? 'toDeposit' : 'toWork',
+      targetId: destinationId ?? null,
+      goal: (destinationId == null
+        ? depositGoal(state, [])
+        : buildingGoal(state, destinationId)) as DescribedGoal,
+      movingTask: carrying ? '운반 재개 준비' : '수거 재개 준비',
+      arrivedTask: carrying ? '운반 거점에서 채비' : '수거지에서 채비',
+      staggerByDistance: false,
+    };
+  }
+
+  if (carryTotal(r) > 0 && !GATHERING_JOBS.includes(r.job)) {
+    const miningDeposit = r.job === 'miner' && r.miningDepositBuildingId != null
+      ? state.buildings.find(building =>
+        building.id === r.miningDepositBuildingId && building.built && building.type === 'mine')
+      : null;
+    return {
+      phase: 'toDeposit',
+      targetId: miningDeposit?.id ?? null,
+      goal: (miningDeposit
+        ? buildingGoal(state, miningDeposit.id)
+        : depositGoal(state, [])) as DescribedGoal,
+      movingTask: '짐 정리 준비',
+      arrivedTask: '하역 거점에서 채비',
+      staggerByDistance: false,
+    };
+  }
+
+  if (r.job === 'builder') {
+    const target = builderTarget(state, r);
+    if (target) {
+      return {
+        phase: 'toWork',
+        targetId: target.id,
+        goal: buildingGoal(state, target.id) as DescribedGoal,
+        movingTask: '공사장으로 이동',
+        arrivedTask: '공사장에서 채비',
+        staggerByDistance: true,
+      };
+    }
+  }
+
+  const workplace = assignedBuildingForResident(state, r);
+  if (!workplace) return null;
+  let workplaceGoal = buildingGoal(state, workplace.id) as DescribedGoal;
+  if (r.job === 'farmer' && (workplace.type === 'field' || workplace.type === 'paddy')) {
+    const workerIds = assignedWorkers(state, workplace).map(worker => worker.id);
+    const workBandStartTick = state.day * SUBTICKS + DAY_BANDS.work.start;
+    const tile = farmWorkTileForTick(workplace, workerIds, r.id, workBandStartTick);
+    workplaceGoal = exactTileGoal(tile.x, tile.y) as DescribedGoal;
+  }
+  return {
+    phase: 'toWork',
+    targetId: workplace.id,
+    goal: workplaceGoal,
+    movingTask: '일터로 이동',
+    arrivedTask: '일터에서 채비',
+    staggerByDistance: true,
+  };
+}
+
+function minimumGoalDistance(
+  origins: readonly { x: number; y: number }[],
+  destinations: readonly { x: number; y: number }[],
+  fallback: Resident,
+): number {
+  const from = origins.length > 0 ? origins : [fallback];
+  const to = destinations.length > 0 ? destinations : [fallback];
+  let distance = Infinity;
+  for (const origin of from) {
+    for (const destination of to) {
+      distance = Math.min(
+        distance,
+        Math.max(Math.abs(origin.x - destination.x), Math.abs(origin.y - destination.y)),
+      );
+    }
+  }
+  return Number.isFinite(distance) ? distance : 0;
+}
+
+function morningCommuteDistance(state: GameState, r: Resident, ctx: Ctx, goal: DescribedGoal): number {
+  const home = residentHome(state, r);
+  const origin = home
+    ? buildingGoal(state, home.id) as DescribedGoal
+    : ctx.centerId >= 0
+      ? buildingGoal(state, ctx.centerId) as DescribedGoal
+      : null;
+  return minimumGoalDistance(origin?.goalPoints ?? [], goal.goalPoints ?? [], r);
+}
+
+function morningMoveTilesPerTick(state: GameState, r: Resident, ctx: Ctx): number {
+  let speed: number = CONFIG.agents.moveSpeed;
+  if (ctx.season === 'winter') speed = CONFIG.agents.moveSpeedWinter;
+  if (state.weather === 'blizzard' || state.weather === 'heavySnow') {
+    speed = Math.min(speed, CONFIG.agents.moveSpeedSnow);
+  }
+  return Math.max(1, Math.floor(speed * haulingMoveSpeedMultiplier(r)));
+}
+
+function morningPreparationAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const home = residentHome(state, r);
+  const center = ctx.centerId >= 0
+    ? state.buildings.find(building => building.id === ctx.centerId && building.built) ?? null
+    : null;
+  const anchorId = home?.id ?? center?.id ?? null;
+  if (r.phase !== 'rest' || r.targetId !== anchorId) {
+    r.phase = 'rest';
+    r.path = [];
+    r.targetId = anchorId;
+  }
+  if (home) {
+    loiterNearBuilding(state, r, ctx, home, 2, '아침 채비');
+  } else if (center) {
+    loiterNearBuilding(state, r, ctx, center, 2, '아침 채비');
+  } else {
+    r.task = '아침 채비';
+    r.path = [];
+    tryLoiterStep(state, r, ctx, r.x, r.y, 2);
+  }
+}
+
 function dawnAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
   r.task = '아침 채비';
-
   const unavailable = r.stage != null || r.sick || state.day < (r.quarantinedUntil ?? 0) ||
     r.health < 20 || state.day < (r.birthRecoveryUntil ?? 0);
   if (unavailable) {
@@ -2456,6 +2627,25 @@ function dawnAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
     r.path = [];
     r.targetId = null;
     return;
+  }
+
+  const plan = dawnCommutePlan(state, r);
+  if (!plan) {
+    morningPreparationAgentTick(state, r, ctx);
+    return;
+  }
+  if (plan.staggerByDistance) {
+    const distance = morningCommuteDistance(state, r, ctx, plan.goal);
+    const departureSubTick = morningDepartureSubTick(
+      distance,
+      r.id,
+      state.day,
+      morningMoveTilesPerTick(state, r, ctx),
+    );
+    if (state.subTick < departureSubTick) {
+      morningPreparationAgentTick(state, r, ctx);
+      return;
+    }
   }
 
   const startCommute = (
@@ -2475,74 +2665,12 @@ function dawnAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
     return result;
   };
 
-  if (r.manualOrder) {
-    const order = r.manualOrder;
-    const buildingId = order.kind === 'work' ? order.buildingId : undefined;
-    const goal = buildingId != null
-      ? buildingGoal(state, buildingId)
-      : exactTileGoal(order.x, order.y);
-    startCommute('toWork', buildingId ?? null, goal, '명령 작업지로 이동', '명령 작업지에서 채비');
-    return;
-  }
-
-  if (r.haulTask) {
-    const carrying = carryTotal(r) > 0;
-    const destinationId = carrying && r.haulTask.kind === 'supply'
-      ? r.haulTask.targetBuildingId
-      : carrying
-        ? null
-        : r.haulTask.sourceBuildingId;
-    const goal = destinationId == null
-      ? depositGoal(state, [])
-      : buildingGoal(state, destinationId);
-    startCommute(
-      carrying ? 'toDeposit' : 'toWork',
-      destinationId ?? null,
-      goal,
-      carrying ? '운반 재개 준비' : '수거 재개 준비',
-      carrying ? '운반 거점에서 채비' : '수거지에서 채비',
-    );
-    return;
-  }
-
-  if (carryTotal(r) > 0 && !GATHERING_JOBS.includes(r.job)) {
-    const miningDeposit = r.job === 'miner' && r.miningDepositBuildingId != null
-      ? state.buildings.find(building =>
-        building.id === r.miningDepositBuildingId && building.built && building.type === 'mine')
-      : null;
-    const goal = miningDeposit
-      ? buildingGoal(state, miningDeposit.id)
-      : depositGoal(state, []);
-    startCommute(
-      'toDeposit',
-      miningDeposit?.id ?? null,
-      goal,
-      '짐 정리 준비',
-      '하역 거점에서 채비',
-    );
-    return;
-  }
-
-  const workplace = assignedBuildingForResident(state, r);
-  if (!workplace) {
-    r.phase = 'rest';
-    r.path = [];
-    r.targetId = null;
-    return;
-  }
-  let workplaceGoal = buildingGoal(state, workplace.id);
-  if (r.job === 'farmer' && (workplace.type === 'field' || workplace.type === 'paddy')) {
-    const workerIds = assignedWorkers(state, workplace).map(worker => worker.id);
-    const workBandStartTick = state.day * SUBTICKS + DAY_BANDS.work.start;
-    const tile = farmWorkTileForTick(workplace, workerIds, r.id, workBandStartTick);
-    workplaceGoal = exactTileGoal(tile.x, tile.y);
-  }
   const result = startCommute(
-    'toWork',
-    workplace.id,
-    workplaceGoal,
-    '일터로 이동',
-    '일터에서 채비',
+    plan.phase,
+    plan.targetId,
+    plan.goal,
+    plan.movingTask,
+    plan.arrivedTask,
   );
   if (result === 'stuck') {
     r.phase = 'rest';
@@ -2622,6 +2750,11 @@ function eveningLeisureAgentTick(
 }
 
 function prepareWorkBandAgent(r: Resident): void {
+  if (r.phase === 'rest' && r.task === '아침 채비') {
+    r.path = [];
+    r.targetId = null;
+    return;
+  }
   if (r.phase !== 'toHome' && r.phase !== 'sleeping' &&
       r.phase !== 'toLeisure' && r.phase !== 'leisure') return;
   r.phase = 'rest';
@@ -2635,6 +2768,26 @@ function waitForEveningDeparture(r: Resident): void {
   r.path = [];
   r.targetId = null;
   r.task = '일 마무리';
+}
+
+function finishCurrentEveningWork(state: GameState, r: Resident, ctx: Ctx): boolean {
+  if (r.job === 'hauler' && (r.haulTask != null || carryTotal(r) > 0)) {
+    haulerTick(state, r, ctx);
+    return true;
+  }
+  if (!GATHERING_JOBS.includes(r.job)) return false;
+  const finishingWork = r.phase === 'working' && r.workTimer > 0;
+  const finishingDelivery = r.phase === 'toDeposit' && carryTotal(r) > 0;
+  if (!finishingWork && !finishingDelivery) return false;
+  switch (r.job) {
+    case 'woodcutter': woodcutterTick(state, r, ctx); break;
+    case 'hunter': hunterTick(state, r, ctx); break;
+    case 'herbalist': herbalistTick(state, r, ctx); break;
+    case 'miner': minerTick(state, r, ctx); break;
+    case 'fisher': fisherTick(state, r, ctx); break;
+    default: return false;
+  }
+  return true;
 }
 
 // ─────────────────────────── 틱 진입점 ───────────────────────────
@@ -2732,6 +2885,7 @@ export function agentsTick(state: GameState): void {
       continue;
     }
     if (dayBand === 'evening') {
+      if (finishCurrentEveningWork(state, r, ctx)) continue;
       const departureSubTick = DAY_BANDS.evening.start + eveningDepartureDelay(r.id, state.day);
       if (state.subTick < departureSubTick) {
         waitForEveningDeparture(r);
