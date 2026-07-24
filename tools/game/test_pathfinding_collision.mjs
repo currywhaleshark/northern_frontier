@@ -135,6 +135,7 @@ function onlyBuilderAt(state, x, y) {
   assert.equal(simulation.tryPlaceBuilding(state, 'smithy', 10, 10), null);
   const smithy = state.buildings.find(building => building.type === 'smithy');
   const builder = onlyBuilderAt(state, 8, 10);
+  state.subTick = 9;
 
   for (let i = 0; i < 6; i++) simulation.advanceTick(state);
 

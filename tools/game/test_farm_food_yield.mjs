@@ -31,6 +31,7 @@ const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs'
 const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 const { CROP_DEFS } = await import(pathToFileURL(join(compiledDir, 'crops.mjs')).href);
+const { WORK_RATE_SCALE } = await import(pathToFileURL(join(compiledDir, 'dayCycle.mjs')).href);
 
 function centerTile(state) {
   const center = state.buildings.find(b => b.type === 'center');
@@ -112,12 +113,12 @@ function runTicks(state, ticks) {
   const field = placeBuilt(state, 'field', fieldTile, { fieldGrowth: 100 });
   const farmer = onlyWorkerAt(state, 'farmer', fieldTile);
   assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, field.id), null);
-  state.subTick = 1;
+  state.subTick = 9;
 
   runTicks(state, 1);
 
   // 농부 1명이 tilesPerFarmer칸 몫을 감당한다 — 1×1 만작 밭은 기존보다 3배 빠르게 걷힌다
-  const take = CONFIG.agents.work.harvestPerSubtick * CONFIG.farming.tilesPerFarmer;
+  const take = CONFIG.agents.work.harvestPerSubtick * CONFIG.farming.tilesPerFarmer * WORK_RATE_SCALE;
   assert.equal(field.fieldGrowth, 100 - take, 'farmer harvests one subtick worth of field growth');
   const harvested = (take / 100) * CROP_DEFS.millet.yield * CONFIG.production.resourceOutputMultiplier;
   assert.ok(Math.abs((field.inventory?.grain ?? 0) - harvested) < 0.001, 'millet harvest stays in field inventory');
@@ -134,13 +135,14 @@ function runTicks(state, ticks) {
   state.resources.rice = 0;
   state.resources.grain = 0;
   state.processingReserves.rice = 0;
-  state.subTick = 1;
+  state.subTick = 9;
 
   runTicks(state, 1);
 
   const milled = (CONFIG.production.millerRicePerDay / 5)
     * CONFIG.production.rankLaborEfficiency[state.rank]
-    * CONFIG.production.resourceOutputMultiplier;
+    * CONFIG.production.resourceOutputMultiplier
+    * WORK_RATE_SCALE;
   assert.equal(miller.task, '방아 찧기');
   assert.ok(Math.abs(watermill.inventory.rice - (10 - milled)) < 0.001, 'miller mills the expected local rice amount');
   assert.ok(Math.abs((watermill.inventory?.grain ?? 0) - (milled * 1.5)) < 0.001, 'milled rice creates grain at the mill');

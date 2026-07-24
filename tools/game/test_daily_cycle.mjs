@@ -14,39 +14,42 @@ const moduleUrl = `data:text/javascript;base64,${Buffer.from(output).toString('b
 const {
   DAY_CYCLE_SUBTICKS,
   DAY_BANDS,
+  LEGACY_WORK_SUBTICKS,
+  WORK_RATE_SCALE,
   WORK_SUBTICKS,
   dayBandOf,
   isIndoors,
   normalizeDayCycleSubTick,
 } = await import(moduleUrl);
 
-assert.equal(DAY_CYCLE_SUBTICKS, 12);
+assert.equal(DAY_CYCLE_SUBTICKS, 72);
 assert.deepEqual(DAY_BANDS, {
-  dawn: { start: 0, end: 0 },
-  work: { start: 1, end: 8 },
-  evening: { start: 9, end: 9 },
-  night: { start: 10, end: 11 },
+  dawn: { start: 0, end: 8 },
+  work: { start: 9, end: 44 },
+  evening: { start: 45, end: 57 },
+  night: { start: 58, end: 71 },
 });
-assert.equal(DAY_BANDS.work.end - DAY_BANDS.work.start + 1, 8,
-  'the target day cycle preserves exactly eight work subticks');
-assert.equal(WORK_SUBTICKS, 8);
+assert.equal(WORK_SUBTICKS, 36);
+assert.equal(LEGACY_WORK_SUBTICKS, 8);
+assert.equal(WORK_RATE_SCALE, 2 / 9,
+  'economic work deltas normalize the denser work band against the legacy eight ticks');
 
 const expectedBands = [
-  'dawn',
-  'work', 'work', 'work', 'work', 'work', 'work', 'work', 'work',
-  'evening',
-  'night', 'night',
+  ...Array(9).fill('dawn'),
+  ...Array(36).fill('work'),
+  ...Array(13).fill('evening'),
+  ...Array(14).fill('night'),
 ];
 assert.deepEqual(
   Array.from({ length: DAY_CYCLE_SUBTICKS }, (_, subTick) => dayBandOf(subTick)),
   expectedBands,
 );
-for (const invalid of [-1, 12, 0.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+for (const invalid of [-1, 72, 0.5, Number.NaN, Number.POSITIVE_INFINITY]) {
   assert.throws(() => dayBandOf(invalid), RangeError);
 }
 assert.equal(normalizeDayCycleSubTick(-1), 0);
 assert.equal(normalizeDayCycleSubTick(7.8), 7);
-assert.equal(normalizeDayCycleSubTick(99), 11);
+assert.equal(normalizeDayCycleSubTick(99), 71);
 assert.equal(normalizeDayCycleSubTick('invalid'), 0);
 
 const state = {
@@ -77,7 +80,9 @@ assert.equal(isIndoors(state, resident({ phase: 'leisure', targetId: null })), f
 
 const configSource = readFileSync(new URL('../../src/game/config.ts', import.meta.url), 'utf8');
 assert.match(configSource, /subticksPerDay:\s*DAY_CYCLE_SUBTICKS\b/,
-  'M1 runs the simulation on the shared twelve-subtick contract');
+  'the simulation uses the shared seventy-two-subtick contract');
+assert.match(configSource, /msPerDay:\s*\{\s*1:\s*48000,\s*3:\s*16000,\s*10:\s*4800\s*\}/,
+  'all speeds keep the legacy real-time tick cadence over a forty-eight-second day');
 
 function compileGameModules() {
   const srcDir = new URL('../../src/game/', import.meta.url);
@@ -159,25 +164,44 @@ try {
   });
 
   globalThis.window = { __renderPerf: {} };
-  state.subTick = 0;
-  agents.agentsTick(state);
-  assert.equal(active.phase, 'rest');
-  assert.equal(active.task, '아침 채비');
-
-  for (let subTick = 1; subTick <= 8; subTick++) {
+  for (let subTick = compiledDayCycle.DAY_BANDS.dawn.start;
+    subTick <= compiledDayCycle.DAY_BANDS.dawn.end; subTick++) {
     state.subTick = subTick;
     agents.agentsTick(state);
   }
-  assert.equal(globalThis.window.__renderPerf['job-idle'].count, 8,
-    'the existing job loop runs exactly eight times per twelve-subtick day');
+  assert.equal(active.phase, 'rest');
+  assert.equal(active.task, '아침 채비');
+
+  for (let subTick = compiledDayCycle.DAY_BANDS.work.start;
+    subTick <= compiledDayCycle.DAY_BANDS.work.end; subTick++) {
+    state.subTick = subTick;
+    agents.agentsTick(state);
+  }
+  assert.equal(globalThis.window.__renderPerf['job-idle'].count, 36,
+    'the denser day exposes thirty-six work movement/action opportunities');
 
   Object.assign(active, { x: 8, y: 10, px: 8, py: 10, phase: 'rest', path: [], targetId: null });
   const resourcesBeforeLeisure = structuredClone(state.resources);
   const inventoriesBeforeLeisure = state.buildings.map(building => structuredClone(building.inventory ?? {}));
-  state.subTick = 9;
+  const departureDelay = agents.eveningDepartureDelay(active.id, state.day);
+  assert.ok(departureDelay === 1 || departureDelay === 2);
+  state.subTick = compiledDayCycle.DAY_BANDS.evening.start;
   agents.agentsTick(state);
-  assert.equal(active.phase, 'leisure');
+  assert.equal(active.phase, 'rest');
+  assert.equal(active.task, '일 마무리');
+
+  state.subTick = compiledDayCycle.DAY_BANDS.evening.start + departureDelay;
+  agents.agentsTick(state);
+  assert.equal(active.phase, 'toLeisure');
   assert.equal(active.targetId, state.buildings.find(building => building.type === 'center').id);
+  assert.equal(active.task, '마실 나감');
+
+  for (let subTick = state.subTick + 1;
+    subTick <= compiledDayCycle.DAY_BANDS.evening.end; subTick++) {
+    state.subTick = subTick;
+    agents.agentsTick(state);
+  }
+  assert.equal(active.phase, 'leisure');
   assert.equal(active.task, '마실 중');
   assert.deepEqual(state.resources, resourcesBeforeLeisure,
     'evening leisure does not consume or produce settlement resources');
@@ -187,19 +211,17 @@ try {
     'evening leisure does not change building inventories',
   );
 
-  state.subTick = 10;
-  agents.agentsTick(state);
-  assert.ok(active.phase === 'toHome' || active.phase === 'sleeping');
-  assert.match(active.task, /집으로|잠자리/);
-
-  state.subTick = 11;
-  agents.agentsTick(state);
+  for (let subTick = compiledDayCycle.DAY_BANDS.night.start;
+    subTick <= compiledDayCycle.DAY_BANDS.night.end; subTick++) {
+    state.subTick = subTick;
+    agents.agentsTick(state);
+  }
   assert.equal(active.phase, 'sleeping');
   assert.equal(active.task, '잠자리에 듦');
   assert.equal(compiledDayCycle.isIndoors(state, active), true);
 
   const sleepingPosition = { x: active.x, y: active.y };
-  state.subTick = 11;
+  state.subTick = compiledDayCycle.DAY_BANDS.night.end;
   agents.agentsTick(state);
   assert.deepEqual({ x: active.x, y: active.y }, sleepingPosition,
     'sleeping residents skip movement and work calculations');
@@ -249,6 +271,12 @@ try {
     [...assignments],
     'the deterministic dispersal rotates when the day changes',
   );
+  const departureDelays = Array.from(
+    { length: 16 },
+    (_, index) => agents.eveningDepartureDelay(index + 1, leisureState.day),
+  );
+  assert.deepEqual(new Set(departureDelays), new Set([1, 2]),
+    'resident id and day spread evening departures over one or two subticks');
 
   const fullDay = simulation.newGame(2026072402);
   const startingDay = fullDay.day;

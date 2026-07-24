@@ -108,7 +108,7 @@ function prepareState(seed) {
   addBuilt(state, 'center', 2, 2);
   state.rank = 'bu';
   state.day = 1;
-  state.subTick = 1;
+  state.subTick = 9;
   state.weather = 'clear';
   state.resources.tools = 100;
   state.processingReserves.iron = 0;
@@ -137,7 +137,7 @@ function prepareState(seed) {
 
   // 작기가 파종 단계부터 시작한다 — 씨를 다 넣은 뒤에야 성장이 오른다
   assert.ok((field.sownArea ?? 0) > 0, 'assigned farmer starts sowing the assigned field');
-  const ticksToSowAndGrow = CONFIG.farming.sowWorkPerTile * 2 + 8;
+  const ticksToSowAndGrow = CONFIG.agents.subticksPerDay * 3;
   for (let i = 0; i < ticksToSowAndGrow; i++) {
     state.pendingChoice = null; // 사건 선택지가 시뮬레이션을 멈추지 않게
     state.weather = 'clear';

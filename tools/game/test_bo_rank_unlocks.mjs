@@ -131,6 +131,7 @@ function onlyWorkerAt(state, job, tile) {
     carrying: {},
   });
   state.rank = 'bo';
+  state.subTick = 9;
   state.weather = 'clear';
   state.resources.tools = 100;
   return worker;
@@ -306,7 +307,7 @@ function runTicks(state, ticks) {
   mineTile.buildingId = null;
   placeBuilt(state, 'mine', mineSite);
   const miner = onlyWorkerAt(state, 'miner', mineTile);
-  runTicks(state, 6);
+  runTicks(state, 30);
 
   assert.ok((miner.carrying.iron ?? 0) > 0, 'miner carries iron from a deposit near the mine worksite');
   assert.ok((miner.carrying.stone ?? 0) > 0, 'miner also brings stone from a nearby iron deposit');

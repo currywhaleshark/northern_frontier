@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 35, 'daily cycle migration ships with schema version 35');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 36, 'dense daily cycle migration ships with schema version 36');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -71,6 +71,7 @@ assert.equal(typeof saveLoad.migrateV26ToV27, 'function');
 assert.equal(typeof saveLoad.migrateV27ToV28, 'function');
 assert.equal(typeof saveLoad.migrateV33ToV34, 'function');
 assert.equal(typeof saveLoad.migrateV34ToV35, 'function');
+assert.equal(typeof saveLoad.migrateV35ToV36, 'function');
 
 {
   const migrated = saveLoad.migrateV24ToV25({ schemaVersion: 24, tacticalBattle: { phase: 'deployment' } });
@@ -149,6 +150,37 @@ assert.equal(typeof saveLoad.migrateV34ToV35, 'function');
     node: 'middle', destinationNode: 'storehouseGate', originZoneId: 'approach',
     destinationZoneId: 'wall', destinationLine: 'rear',
   });
+}
+
+{
+  const resident = {
+    id: 9,
+    phase: 'toLeisure',
+    path: [{ x: 8, y: 6 }],
+    carrying: { fish: 2 },
+  };
+  const expectedSubTicks = new Map([
+    [0, 4],
+    [1, 11],
+    [4, 24],
+    [8, 42],
+    [9, 51],
+    [10, 61],
+    [11, 68],
+  ]);
+  for (const [subTick, expected] of expectedSubTicks) {
+    const migrated = saveLoad.migrateV35ToV36({
+      schemaVersion: 35,
+      subTick,
+      residents: [resident],
+    });
+    assert.equal(migrated.schemaVersion, 36);
+    assert.equal(migrated.subTick, expected, `subtick ${subTick} keeps its relative band position`);
+    assert.deepEqual(migrated.residents[0], resident,
+      'phase, path, and carried resources survive the dense time migration');
+  }
+  assert.equal(saveLoad.migrateV35ToV36({ schemaVersion: 35, subTick: -4 }).subTick, 4);
+  assert.equal(saveLoad.migrateV35ToV36({ schemaVersion: 35, subTick: 99 }).subTick, 68);
 }
 
 {
@@ -503,11 +535,11 @@ assert.equal(typeof saveLoad.migrateV34ToV35, 'function');
   const migrated = saveLoad.migrateToCurrent(source);
   assert.equal(source.schemaVersion, 3, 'schema migration must not mutate its input');
   assert.equal(migrated.schemaVersion, saveLoad.CURRENT_SCHEMA_VERSION);
-  assert.equal(migrated.subTick, 1);
+  assert.equal(migrated.subTick, 11);
   assert.equal(saveLoad.migrateToCurrent({
     schemaVersion: saveLoad.CURRENT_SCHEMA_VERSION,
     subTick: 99,
-  }).subTick, 11, 'current saves normalize corrupt subticks without weakening dayBandOf');
+  }).subTick, 71, 'current saves normalize corrupt subticks without weakening dayBandOf');
 }
 
 {

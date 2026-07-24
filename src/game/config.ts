@@ -27,9 +27,9 @@ export const CONFIG = {
   time: {
     seasonDays: 12,           // 한 계절 길이(일)
     yearDays: 48,             // 1년 = 4계절
-    // 하루당 실시간(ms). 밤낮 사이클을 느긋하게 볼 수 있도록 1배속을 8초/일로 늦췄다.
-    // (3배 ≈ 2.7초/일, 10배 ≈ 0.8초/일로 빨리감기)
-    msPerDay: { 1: 8000, 3: 2700, 10: 800 } as Record<number, number>,
+    // 하루당 실시간(ms). 72서브틱에서도 기존 틱 간격과 주민 체감 이동 속도를 유지한다.
+    // (1배 667ms/틱, 3배 222ms/틱, 10배 67ms/틱)
+    msPerDay: { 1: 48000, 3: 16000, 10: 4800 } as Record<number, number>,
   },
 
   exploration: {
@@ -397,7 +397,7 @@ export const CONFIG = {
 
   // 주민 에이전트 (이동/작업/운반)
   agents: {
-    subticksPerDay: DAY_CYCLE_SUBTICKS, // 새벽1 + 노동8 + 저녁1 + 밤2
+    subticksPerDay: DAY_CYCLE_SUBTICKS, // 새벽9 + 노동36 + 저녁13 + 밤14
     moveSpeed: 2,             // 서브틱당 이동 타일 수
     moveSpeedWinter: 1.5,     // 겨울 눈길
     moveSpeedSnow: 1,         // 폭설/눈보라

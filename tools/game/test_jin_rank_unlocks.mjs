@@ -97,6 +97,7 @@ function onlyWorkerAt(state, job, tile) {
     carrying: {},
   });
   state.rank = 'jin';
+  state.subTick = 9;
   state.weather = 'clear';
   state.resources.tools = 100;
   return worker;

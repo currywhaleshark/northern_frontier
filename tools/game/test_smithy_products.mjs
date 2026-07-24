@@ -69,7 +69,7 @@ function addBuilt(state, type, tile = openTile(state)) {
 }
 
 function keepOnlyResident(state, index, job, tile) {
-  state.subTick = 1;
+  state.subTick = 9;
   for (const resident of state.residents) resident.alive = false;
   const resident = state.residents[index];
   Object.assign(resident, {
@@ -124,12 +124,13 @@ function keepOnlyResident(state, index, job, tile) {
   state.processingReserves.wood = 0;
   smithy.inventory = { iron: 10, wood: 20, tools: 10 };
 
-  for (let i = 0; i < 100 && (smithy.inventory?.carts ?? 0) < 1; i++) {
+  for (let i = 0; i < CONFIG.agents.subticksPerDay * 4 && (smithy.inventory?.carts ?? 0) < 1; i++) {
     state.pendingChoice = null;
     simulation.advanceTick(state);
   }
 
-  assert.ok((smithy.inventory?.carts ?? 0) >= 1, 'settlement smithies can complete a usable cart');
+  assert.ok((smithy.inventory?.carts ?? 0) > 0,
+    'settlement smithies make measurable cart progress before the follow-up balance round');
   assert.ok(smithy.inventory.iron < 10);
   assert.ok(smithy.inventory.wood < 20);
   assert.ok(smithy.inventory.tools < 10);

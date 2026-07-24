@@ -140,7 +140,7 @@ function onlyResident(state, job, x, y) {
   state.buildings = [];
 
   state.weather = 'clear';
-  state.subTick = 2;
+  state.subTick = 9;
   state.exploration = exploration.createExploration(state);
   exploration.refreshExploration(state);
   assert.equal(exploration.residentRevealRadius(state), 7, 'clear daytime sight should be wider');
@@ -148,7 +148,7 @@ function onlyResident(state, job, x, y) {
   assert.equal(exploration.isExplored(state, scout.x + 7, scout.y), true);
   assert.equal(exploration.isExplored(state, scout.x + 8, scout.y), false);
 
-  state.subTick = 10;
+  state.subTick = 58;
   state.exploration = exploration.createExploration(state);
   exploration.refreshExploration(state);
   assert.equal(exploration.residentRevealRadius(state), 5, 'night should reduce sight');
@@ -157,7 +157,7 @@ function onlyResident(state, job, x, y) {
   assert.equal(exploration.isExplored(state, scout.x + 6, scout.y), false);
 
   state.weather = 'blizzard';
-  state.subTick = 2;
+  state.subTick = 9;
   state.exploration = exploration.createExploration(state);
   exploration.refreshExploration(state);
   assert.equal(exploration.residentRevealRadius(state), 3, 'blizzard should sharply reduce sight');

@@ -40,6 +40,7 @@ function prepare(seed) {
   for (const id of catalog.RESOURCE_IDS) state.resources[id] = 0;
   for (const resident of state.residents) resident.alive = false;
   state.rank = 'bu';
+  state.subTick = 9;
   state.weather = 'clear';
   state.pendingChoice = null;
   state.gameOver = null;
@@ -82,7 +83,7 @@ function runTicks(state, ticks) {
   const camp = addBuilt(state, 'lumberCamp', 9, 9);
   for (let y = 6; y <= 10; y++) for (let x = 5; x <= 8; x++) state.map[y][x].terrain = 'forest';
   worker(state, 'woodcutter', 8, 8);
-  runTicks(state, 24);
+  runTicks(state, CONFIG.agents.subticksPerDay * 4);
   assert.ok((camp.inventory.wood ?? 0) > 0);
   assert.ok((camp.inventory.brushwood ?? 0) > 0);
 }
@@ -94,7 +95,7 @@ function runTicks(state, ticks) {
   for (let y = 11; y <= 17; y++) for (let x = 11; x <= 17; x++) state.map[y][x].terrain = 'forest';
   state.habitats = [{ id: 1, x: 14, y: 14, radius: 4, active: true }];
   worker(state, 'hunter', 14, 14);
-  runTicks(state, 32);
+  runTicks(state, CONFIG.agents.subticksPerDay * 4);
   assert.ok((lodge.inventory.meat ?? 0) > 0);
   assert.ok((lodge.inventory.hide ?? 0) > 0);
 }
@@ -106,7 +107,7 @@ function runTicks(state, ticks) {
   const splitter = worker(state, 'woodSplitter', 8, 9);
   state.resources.wood = 20;
   assert.equal(workerSlots.assignResidentToBuilding(state, splitter.id, shed.id), null);
-  runTicks(state, 24);
+  runTicks(state, CONFIG.agents.subticksPerDay * 4);
   assert.ok((shed.inventory.firewood ?? 0) > 0);
   assert.equal(state.resources.firewood, 0, 'processed fuel waits for a hauler');
 }
@@ -118,7 +119,7 @@ function runTicks(state, ticks) {
   const burner = worker(state, 'charcoalBurner', 8, 9);
   assert.equal(workerSlots.assignResidentToBuilding(state, burner.id, kiln.id), null);
   state.resources.wood = 20;
-  runTicks(state, 24);
+  runTicks(state, CONFIG.agents.subticksPerDay * 4);
   assert.ok((kiln.inventory.charcoal ?? 0) > 0);
   assert.equal(state.resources.charcoal, 0);
 }
@@ -130,7 +131,7 @@ function runTicks(state, ticks) {
   const tanner = worker(state, 'tanner', 8, 9);
   state.resources.hide = 10;
   assert.equal(workerSlots.assignResidentToBuilding(state, tanner.id, tannery.id), null);
-  runTicks(state, 24);
+  runTicks(state, CONFIG.agents.subticksPerDay * 4);
   assert.ok((tannery.inventory.hideClothes ?? 0) > 0);
   assert.equal(state.resources.hideClothes, 0);
 }
@@ -142,7 +143,7 @@ function runTicks(state, ticks) {
   const weaver = worker(state, 'weaver', 8, 9);
   state.resources.cotton = 10;
   assert.equal(workerSlots.assignResidentToBuilding(state, weaver.id, weaving.id), null);
-  runTicks(state, 24);
+  runTicks(state, CONFIG.agents.subticksPerDay * 4);
   assert.ok((weaving.inventory.cottonClothes ?? 0) > 0);
   assert.equal(state.resources.cottonClothes, 0);
 }

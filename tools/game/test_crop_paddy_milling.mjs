@@ -35,6 +35,7 @@ const processing = await import(pathToFileURL(join(compiledDir, 'processing.mjs'
 const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
 const spoilage = await import(pathToFileURL(join(compiledDir, 'spoilage.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
+const { WORK_RATE_SCALE } = await import(pathToFileURL(join(compiledDir, 'dayCycle.mjs')).href);
 
 function clearMapToPlain(state) {
   for (const row of state.map) {
@@ -135,7 +136,7 @@ function makePaddyEligibleTile(state, x, y) {
 {
   const state = prepareState(2026071608);
   state.day = 25; // autumn
-  state.subTick = 1;
+  state.subTick = 9;
   const field = addBuilt(state, 'field', 9, 9, { cropId: 'beans', fieldGrowth: 100, inventory: {} });
   const farmer = workableResident(state, 0, 'farmer', 9, 9);
   assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, field.id), null);
@@ -194,7 +195,7 @@ function makePaddyEligibleTile(state, x, y) {
 {
   const state = prepareState();
   state.day = 25; // autumn
-  state.subTick = 1;
+  state.subTick = 9;
   const paddy = addBuilt(state, 'paddy', 9, 9, { cropId: 'rice', fieldGrowth: 100, inventory: {} });
   const farmer = workableResident(state, 0, 'farmer', 9, 9);
   assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, paddy.id), null);
@@ -203,7 +204,7 @@ function makePaddyEligibleTile(state, x, y) {
 
   assert.equal(
     paddy.fieldGrowth,
-    100 - CONFIG.agents.work.harvestPerSubtick * CONFIG.farming.tilesPerFarmer,
+    100 - CONFIG.agents.work.harvestPerSubtick * CONFIG.farming.tilesPerFarmer * WORK_RATE_SCALE,
     'rice harvest removes one harvest step (tilesPerFarmer-scaled)',
   );
   assert.ok((paddy.inventory.rice ?? 0) > 0, 'paddy stores unmilled rice locally');
@@ -213,7 +214,7 @@ function makePaddyEligibleTile(state, x, y) {
 {
   const state = prepareState();
   state.day = 3;
-  state.subTick = 1;
+  state.subTick = 9;
   const mill = addBuilt(state, 'watermill', 12, 12, { inventory: { rice: 10 } });
   const miller = workableResident(state, 0, 'miller', 11, 12);
   state.resources.rice = 0;
@@ -225,7 +226,8 @@ function makePaddyEligibleTile(state, x, y) {
 
   const milled = (CONFIG.production.millerRicePerDay / 5)
     * CONFIG.production.rankLaborEfficiency[state.rank]
-    * CONFIG.production.resourceOutputMultiplier;
+    * CONFIG.production.resourceOutputMultiplier
+    * WORK_RATE_SCALE;
   assert.equal(miller.task, '방아 찧기');
   assert.ok(Math.abs(mill.inventory.rice - (10 - milled)) < 0.001, 'miller consumes rice delivered to the mill');
   assert.ok(Math.abs((mill.inventory.grain ?? 0) - (milled * CONFIG.production.grainPerRice)) < 0.001, 'miller stores edible grain at the mill');

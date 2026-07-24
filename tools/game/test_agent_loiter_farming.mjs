@@ -126,8 +126,9 @@ function advance(state, ticks) {
   const farmer = onlyResidentAt(state, 'farmer', 6, 4);
   assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, field.id), null);
   state.day = 13; // summer
+  state.subTick = 9;
 
-  advance(state, 56);
+  advance(state, 30);
 
   assert.ok(
     manhattan(farmer, field) <= 3,

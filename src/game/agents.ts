@@ -1,7 +1,9 @@
 // 주민 에이전트 시뮬레이션 — 서브틱 단위의 이동, 작업, 운반
 // 자원은 창고/거점에 짐을 부려야 마을 비축량에 더해진다.
 import { CONFIG } from './config';
-import { DAY_CYCLE_SUBTICKS, WORK_SUBTICKS, dayBandOf } from './dayCycle';
+import {
+  DAY_BANDS, DAY_CYCLE_SUBTICKS, WORK_RATE_SCALE, WORK_SUBTICKS, dayBandOf,
+} from './dayCycle';
 import {
   BUILDING_DEFS, footprintTilesOf, isSmithyProductUnlocked, officeEfficiencyMultiplier,
   plotArea, SMITHY_PRODUCT_DEFS, smithyProductOf, sownAreaOf,
@@ -72,8 +74,11 @@ const OUTDOOR_JOBS = [
   'woodcutter', 'woodSplitter', 'hunter', 'herbalist', 'farmer', 'builder', 'miner', 'fisher',
   'charcoalBurner', 'herder',
 ];
+const GATHERING_JOBS = ['woodcutter', 'hunter', 'herbalist', 'miner', 'fisher'];
 
 export const LEISURE_CLUSTER_CAPACITY = 4;
+const WORK_STOCK_EPSILON = 0.05 * WORK_RATE_SCALE;
+const WORK_CRAFT_EPSILON = 0.02 * WORK_RATE_SCALE;
 
 // 새 여가 시설(예: 주막)은 이 우선순위 표에 타입을 추가하는 것으로 연결한다.
 // 같은 우선순위 안에서는 건물 id 순으로 슬롯을 열어 저장/불러오기에도 흔들리지 않게 한다.
@@ -92,7 +97,10 @@ function effOf(r: Resident): number {
 function gainSkillTick(r: Resident): void {
   const cur = r.skills[r.job] ?? 0;
   // 문해자는 무엇을 배워도 빠르다 (서당 교육의 평생 보상)
-  r.skills[r.job] = Math.min(1, cur + (CONFIG.production.skillGainPerDay / 5) * skillGainMult(r));
+  r.skills[r.job] = Math.min(
+    1,
+    cur + (CONFIG.production.skillGainPerDay / 5) * skillGainMult(r) * WORK_RATE_SCALE,
+  );
 }
 
 function carryTotal(r: Resident): number {
@@ -704,7 +712,7 @@ function supplyWorkplaceInputs(
   const resource = (Object.entries(requirements) as [ResourceId, number][]).find(([candidate, needed]) =>
     needed > 0 &&
     buildingStock(workplace, candidate) + 0.0001 < needed &&
-    settlementProcessingStock(state, candidate) > 0.05)?.[0];
+    settlementProcessingStock(state, candidate) > WORK_STOCK_EPSILON)?.[0];
   if (!resource) return false;
 
   const storage = nearestBuilding(resident, state.buildings.filter(isStorageBuilding));
@@ -722,7 +730,7 @@ function supplyWorkplaceInputs(
       ? Math.min(1, processorCarryCapacity(resource))
       : processorCarryCapacity(resource);
     const amount = Math.min(settlementProcessingStock(state, resource), pickupCap);
-    if (amount > 0.05) {
+    if (amount > WORK_STOCK_EPSILON) {
       state.resources[resource] = Math.max(0, state.resources[resource] - amount);
       addCarry(resident, resource, amount);
       resident.phase = 'toDeposit';
@@ -856,7 +864,7 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
     gainSkillTick(r);
     if (r.workTimer <= 0) {
       const base = typeof o.yieldAmt === 'function' ? o.yieldAmt(state.map[r.y][r.x]) : o.yieldAmt;
-      const requested = base * ctx.tMod * ctx.outputMod * effOf(r);
+      const requested = base * ctx.tMod * ctx.outputMod * effOf(r) * WORK_RATE_SCALE;
       const amt = Math.max(0, o.adjustHarvestAmount?.(state.map[r.y][r.x], r, requested) ?? requested);
       if (amt > 0) addCarry(r, o.yieldRes, amt);
       o.onHarvest?.(state.map[r.y][r.x], r, amt);
@@ -951,13 +959,14 @@ function handleManualMoveOrder(state: GameState, r: Resident, ctx: Ctx, order: M
 
 function reserveManualHaulTask(state: GameState, resident: Resident, source: Building): boolean {
   const current = resident.haulTask;
-  if (current?.sourceBuildingId === source.id && buildingStock(source, current.resource) > 0.05) {
+  if (current?.sourceBuildingId === source.id &&
+      buildingStock(source, current.resource) > WORK_STOCK_EPSILON) {
     return true;
   }
   clearHaulTask(resident);
   for (const resource of HAUL_PRIORITY) {
     const available = availableHaulAmount(state, source, resource, resident.id);
-    if (available <= 0.05) continue;
+    if (available <= WORK_STOCK_EPSILON) continue;
     resident.haulTask = {
       sourceBuildingId: source.id,
       resource,
@@ -1228,7 +1237,7 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
       r.task = '수확 중';
       const take = Math.min(
         target.fieldGrowth,
-        a.work.harvestPerSubtick * ctx.outdoor * effOf(r) * workBoost / perTileDivisor,
+        a.work.harvestPerSubtick * ctx.outdoor * effOf(r) * workBoost * WORK_RATE_SCALE / perTileDivisor,
       );
       target.fieldGrowth -= take;
       // 비옥지 보너스는 발자국 내 비옥 칸 비율만큼 (다칸 경작지의 혼합 지형 대응)
@@ -1263,7 +1272,8 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
     const st = goToFarmerWorkTile(state, r, ctx, farm);
     if (st === 'arrived') {
       r.task = `${crop.name} 파종 중`;
-      const sowRate = ctx.outdoor * effOf(r) * plotWorkMultiplier(state, farm) / f.sowWorkPerTile;
+      const sowRate = ctx.outdoor * effOf(r) * plotWorkMultiplier(state, farm) *
+        WORK_RATE_SCALE / f.sowWorkPerTile;
       farm.sownArea = Math.min(area, sown + sowRate);
       gainSkillTick(r);
     } else {
@@ -1289,7 +1299,8 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
     const weatherGrow = state.weather === 'rain' ? 1.2 : state.weather === 'frost' ? 0.7 : 1;
     target.fieldGrowth = Math.min(
       100,
-      target.fieldGrowth + a.work.growPerSubtick * weatherGrow * effOf(r) * workBoost / perTileDivisor,
+      target.fieldGrowth + a.work.growPerSubtick * weatherGrow * effOf(r) *
+        workBoost * WORK_RATE_SCALE / perTileDivisor,
     );
     gainSkillTick(r);
   } else {
@@ -1311,7 +1322,8 @@ function builderTick(state: GameState, r: Resident, ctx: Ctx): void {
     r.phase = 'working';
     r.task = target.repairing ? '건물 수리 중' : '건설 중';
     const def = BUILDING_DEFS[target.type];
-    target.progress += CONFIG.agents.work.buildPerSubtick * effOf(r) * ctx.tMod * Math.max(0.5, ctx.outdoor);
+    target.progress += CONFIG.agents.work.buildPerSubtick * effOf(r) * ctx.tMod *
+      Math.max(0.5, ctx.outdoor) * WORK_RATE_SCALE;
     gainSkillTick(r);
     if (target.progress >= def.buildDays) {
       const repaired = target.repairing === true;
@@ -1411,7 +1423,7 @@ function assignJangdokdaeSupplyTask(state: GameState, resident: Resident): boole
           - reservedSettlementSupplyAmount(state, resource, resident.id),
       );
       const amount = Math.min(haulerCarryCapacity(resident), missing, available);
-      if (amount <= 0.05) continue;
+      if (amount <= WORK_STOCK_EPSILON) continue;
       resident.haulTask = {
         kind: 'supply',
         sourceBuildingId: storage.id,
@@ -1523,7 +1535,7 @@ function assignHaulTask(state: GameState, resident: Resident): boolean {
     let best: { building: Building; available: number; distance: number } | null = null;
     for (const candidate of perBuilding) {
       const available = candidate.amounts[index];
-      if (available <= 0.05) continue;
+      if (available <= WORK_STOCK_EPSILON) continue;
       if (!isUrgent(resource, available) && candidate.load + 0.0001 < batchMin) continue;
       const distance = Math.abs(candidate.building.x - resident.x) + Math.abs(candidate.building.y - resident.y);
       if (!best || distance < best.distance ||
@@ -1561,7 +1573,7 @@ function collectHaulLoad(state: GameState, resident: Resident, source: Building)
       remaining,
       availableHaulAmount(state, source, resource, resident.id),
     );
-    if (amount <= 0.05) continue;
+    if (amount <= WORK_STOCK_EPSILON) continue;
     addCarry(resident, resource, takeBuildingStock(source, resource, amount));
   }
   return carryTotal(resident);
@@ -1597,7 +1609,7 @@ function handleSupplyHaulTask(state: GameState, resident: Resident, ctx: Ctx): v
 
   const source = state.buildings.find(building =>
     building.id === task.sourceBuildingId && isStorageBuilding(building));
-  if (!source || state.resources[task.resource] <= 0.05) {
+  if (!source || state.resources[task.resource] <= WORK_STOCK_EPSILON) {
     clearHaulTask(resident);
     resident.phase = 'rest';
     return;
@@ -1607,7 +1619,7 @@ function handleSupplyHaulTask(state: GameState, resident: Resident, ctx: Ctx): v
   const status = goTo(state, resident, ctx, buildingGoal(state, source.id));
   if (status === 'arrived') {
     const amount = Math.min(task.amount, haulerCarryCapacity(resident), state.resources[task.resource]);
-    if (amount > 0.05) {
+    if (amount > WORK_STOCK_EPSILON) {
       state.resources[task.resource] -= amount;
       addCarry(resident, task.resource, amount);
       resident.phase = 'toDeposit';
@@ -1652,7 +1664,7 @@ function haulerTick(state: GameState, r: Resident, ctx: Ctx): void {
   if (task) {
     const source = state.buildings.find(building =>
       building.id === task.sourceBuildingId && building.built && !isStorageBuilding(building));
-    if (!source || buildingStock(source, task.resource) <= 0.05) {
+    if (!source || buildingStock(source, task.resource) <= WORK_STOCK_EPSILON) {
       clearHaulTask(r);
       r.phase = 'rest';
       return;
@@ -1683,7 +1695,7 @@ function millerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const mill = assignedWorkplace(state, r, ctx, 'watermill', '방앗간 배정 없음');
   if (!mill) return;
 
-  const target = (p.millerRicePerDay / 5) * effOf(r) * ctx.outputMod;
+  const target = (p.millerRicePerDay / 5) * effOf(r) * ctx.outputMod * WORK_RATE_SCALE;
   if (supplyWorkplaceInputs(state, r, ctx, mill, { rice: target })) return;
 
   const st = goTo(state, r, ctx, buildingGoal(state, mill.id));
@@ -1694,7 +1706,7 @@ function millerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   const q = Math.min(buildingStock(mill, 'rice'), target);
-  if (q <= 0.05) {
+  if (q <= WORK_STOCK_EPSILON) {
     r.phase = 'rest';
     loiterNearBuilding(state, r, ctx, mill, 3, '도정할 곡물 없음');
     return;
@@ -1710,7 +1722,8 @@ function millerTick(state: GameState, r: Resident, ctx: Ctx): void {
 function woodSplitterTick(state: GameState, r: Resident, ctx: Ctx): void {
   const shed = assignedWorkplace(state, r, ctx, 'woodShed', '장작마당 배정 없음');
   if (!shed) return;
-  const target = (CONFIG.production.firewoodWoodPerDay / 5) * effOf(r) * ctx.outputMod;
+  const target = (CONFIG.production.firewoodWoodPerDay / 5) * effOf(r) *
+    ctx.outputMod * WORK_RATE_SCALE;
   if (supplyWorkplaceInputs(state, r, ctx, shed, { wood: target })) return;
   const st = goTo(state, r, ctx, buildingGoal(state, shed.id));
   if (st !== 'arrived') {
@@ -1722,7 +1735,7 @@ function woodSplitterTick(state: GameState, r: Resident, ctx: Ctx): void {
     buildingStock(shed, 'wood'),
     target,
   );
-  if (wood <= 0.05) {
+  if (wood <= WORK_STOCK_EPSILON) {
     r.phase = 'rest';
     r.task = '목재 대기';
     return;
@@ -1761,7 +1774,7 @@ function smithInputRequirements(product: SmithyProductId, target: number): Workp
 
 function smithInputWaitTask(smithy: Building, requirements: WorkplaceInputs): string {
   const missing = (Object.entries(requirements) as [ResourceId, number][])
-    .find(([resource]) => buildingStock(smithy, resource) <= 0.02)?.[0];
+    .find(([resource]) => buildingStock(smithy, resource) <= WORK_CRAFT_EPSILON)?.[0];
   return missing ? `${RESOURCE_NAMES[missing]} 대기` : '재료 대기';
 }
 
@@ -1772,7 +1785,7 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
   const def = SMITHY_PRODUCT_DEFS[product];
   // 도망 야장 막쇠 '천출의 망치' — 본인의 산출이 오른다
   const specialMult = r.special === 'runawaySmith' ? CONFIG.specialResidents.runawaySmithSmithyMult : 1;
-  const target = (def.ratePerDay / 5) * effOf(r) * ctx.outputMod * specialMult;
+  const target = (def.ratePerDay / 5) * effOf(r) * ctx.outputMod * specialMult * WORK_RATE_SCALE;
   const requirements = smithInputRequirements(product, target);
 
   if (carryTotal(r) > 0) {
@@ -1789,7 +1802,7 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
 
   if (supplyWorkplaceInputs(state, r, ctx, smithy, requirements)) return;
   const made = Math.min(target, smithMaxCraftable(smithy, product));
-  if (made <= 0.02) {
+  if (made <= WORK_CRAFT_EPSILON) {
     const st = goTo(state, r, ctx, buildingGoal(state, smithy.id));
     r.phase = st === 'moving' ? 'toWork' : 'rest';
     r.task = st === 'stuck' ? '길이 막힘' : st === 'arrived'
@@ -1835,14 +1848,14 @@ function consumeRecipeInputs(workplace: Building, inputs: WorkplaceInputs, made:
 
 function inputWaitTask(workplace: Building, requirements: WorkplaceInputs): string {
   const missing = (Object.entries(requirements) as [ResourceId, number][])
-    .find(([resource]) => buildingStock(workplace, resource) <= 0.02)?.[0];
+    .find(([resource]) => buildingStock(workplace, resource) <= WORK_CRAFT_EPSILON)?.[0];
   return missing ? `${RESOURCE_NAMES[missing]} 대기` : '재료 대기';
 }
 
 function preferredKilnFuel(state: GameState, workplace: Building): 'firewood' | 'charcoal' {
-  if (buildingStock(workplace, 'charcoal') > 0.02) return 'charcoal';
-  if (buildingStock(workplace, 'firewood') > 0.02) return 'firewood';
-  if (state.resources.charcoal > 0.05) return 'charcoal';
+  if (buildingStock(workplace, 'charcoal') > WORK_CRAFT_EPSILON) return 'charcoal';
+  if (buildingStock(workplace, 'firewood') > WORK_CRAFT_EPSILON) return 'firewood';
+  if (state.resources.charcoal > WORK_STOCK_EPSILON) return 'charcoal';
   return 'firewood';
 }
 
@@ -1867,13 +1880,14 @@ function curerTick(state: GameState, r: Resident, ctx: Ctx): void {
         ? CONFIG.production.charcoalPerCuredMeat
         : CONFIG.production.firewoodPerCuredMeat,
     };
-    target = (CONFIG.production.curedMeatPerDay / 5) * effOf(r) * ctx.outputMod;
+    target = (CONFIG.production.curedMeatPerDay / 5) * effOf(r) *
+      ctx.outputMod * WORK_RATE_SCALE;
     task = '고기 훈연 중';
   } else {
     const def = DRYING_PRODUCT_DEFS[dryingProductOf(workplace)];
     output = def.output;
     inputs = def.inputPerUnit;
-    target = (def.ratePerDay / 5) * effOf(r) * ctx.outputMod;
+    target = (def.ratePerDay / 5) * effOf(r) * ctx.outputMod * WORK_RATE_SCALE;
     task = def.task;
     rainBlocked = def.stopsInRain && state.weather === 'rain';
   }
@@ -1898,7 +1912,7 @@ function curerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   const made = Math.min(target, maxCraftableFrom(workplace, inputs));
-  if (made <= 0.02) {
+  if (made <= WORK_CRAFT_EPSILON) {
     r.phase = 'rest';
     r.task = inputWaitTask(workplace, requirements);
     return;
@@ -1920,7 +1934,8 @@ function potterTick(state: GameState, r: Resident, ctx: Ctx): void {
       ? CONFIG.production.charcoalPerOnggi
       : CONFIG.production.firewoodPerOnggi,
   };
-  const target = (CONFIG.production.onggiPerDay / 5) * effOf(r) * ctx.outputMod;
+  const target = (CONFIG.production.onggiPerDay / 5) * effOf(r) *
+    ctx.outputMod * WORK_RATE_SCALE;
   const requirements = scaledRequirements(inputs, target);
 
   if (carryTotal(r) > 0) {
@@ -1937,7 +1952,7 @@ function potterTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   const made = Math.min(target, maxCraftableFrom(kiln, inputs));
-  if (made <= 0.02) {
+  if (made <= WORK_CRAFT_EPSILON) {
     r.phase = 'rest';
     r.task = inputWaitTask(kiln, requirements);
     return;
@@ -2031,7 +2046,7 @@ function charcoalBurnerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const kiln = assignedWorkplace(state, r, ctx, 'charcoalKiln', '숯가마 배정 없음');
   if (!kiln) return;
 
-  const target = (p.charcoalWoodPerDay / 5) * effOf(r) * ctx.outputMod;
+  const target = (p.charcoalWoodPerDay / 5) * effOf(r) * ctx.outputMod * WORK_RATE_SCALE;
   if (supplyWorkplaceInputs(state, r, ctx, kiln, { wood: target })) return;
 
   const st = goTo(state, r, ctx, buildingGoal(state, kiln.id));
@@ -2045,7 +2060,7 @@ function charcoalBurnerTick(state: GameState, r: Resident, ctx: Ctx): void {
     buildingStock(kiln, 'wood'),
     target,
   );
-  if (wood <= 0.05) {
+  if (wood <= WORK_STOCK_EPSILON) {
     r.phase = 'rest';
     loiterNearBuilding(state, r, ctx, kiln, 3, '목재 대기');
     return;
@@ -2118,7 +2133,7 @@ function powderMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const yard = assignedWorkplace(state, r, ctx, 'nitreYard', '질초장 배정 없음');
   if (!yard) return;
 
-  const target = (p.gunpowderPerDay / 5) * effOf(r) * ctx.outputMod;
+  const target = (p.gunpowderPerDay / 5) * effOf(r) * ctx.outputMod * WORK_RATE_SCALE;
   const requirements = {
     firewood: target * p.gunpowderFirewoodPerPowder,
     stone: target * p.gunpowderStonePerPowder,
@@ -2135,7 +2150,7 @@ function powderMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const firewoodLimit = buildingStock(yard, 'firewood') / p.gunpowderFirewoodPerPowder;
   const stoneLimit = buildingStock(yard, 'stone') / p.gunpowderStonePerPowder;
   const made = Math.min(target, firewoodLimit, stoneLimit);
-  if (made <= 0.02) {
+  if (made <= WORK_CRAFT_EPSILON) {
     r.phase = 'rest';
     loiterNearBuilding(state, r, ctx, yard, 3, '화약 재료 대기');
     return;
@@ -2154,7 +2169,7 @@ function tannerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const tannery = assignedWorkplace(state, r, ctx, 'tannery', '무두장 배정 없음');
   if (!tannery) return;
 
-  const target = (p.tanneryHidePerDay / 5) * effOf(r) * ctx.outputMod;
+  const target = (p.tanneryHidePerDay / 5) * effOf(r) * ctx.outputMod * WORK_RATE_SCALE;
   if (supplyWorkplaceInputs(state, r, ctx, tannery, { hide: target })) return;
 
   const st = goTo(state, r, ctx, buildingGoal(state, tannery.id));
@@ -2168,7 +2183,7 @@ function tannerTick(state: GameState, r: Resident, ctx: Ctx): void {
     buildingStock(tannery, 'hide'),
     target,
   );
-  if (hideUsed <= 0.05) {
+  if (hideUsed <= WORK_STOCK_EPSILON) {
     r.phase = 'rest';
     loiterNearBuilding(state, r, ctx, tannery, 3, '가죽 대기');
     return;
@@ -2184,10 +2199,12 @@ function tannerTick(state: GameState, r: Resident, ctx: Ctx): void {
 function weaverTick(state: GameState, r: Resident, ctx: Ctx): void {
   const weavingHouse = assignedWorkplace(state, r, ctx, 'weavingHouse', '베틀집 배정 없음');
   if (!weavingHouse) return;
-  const target = (CONFIG.production.weaverCottonPerDay / 5) * effOf(r) * ctx.outputMod;
+  const target = (CONFIG.production.weaverCottonPerDay / 5) * effOf(r) *
+    ctx.outputMod * WORK_RATE_SCALE;
   const cottonAvailable = buildingStock(weavingHouse, 'cotton') + (state.resources.cotton ?? 0);
   const woolAvailable = buildingStock(weavingHouse, 'wool') + (state.resources.wool ?? 0);
-  const input: 'cotton' | 'wool' = cottonAvailable > 0.05 || woolAvailable <= 0.05 ? 'cotton' : 'wool';
+  const input: 'cotton' | 'wool' = cottonAvailable > WORK_STOCK_EPSILON ||
+    woolAvailable <= WORK_STOCK_EPSILON ? 'cotton' : 'wool';
   if (supplyWorkplaceInputs(state, r, ctx, weavingHouse, { [input]: target })) return;
   const st = goTo(state, r, ctx, buildingGoal(state, weavingHouse.id));
   if (st !== 'arrived') {
@@ -2199,7 +2216,7 @@ function weaverTick(state: GameState, r: Resident, ctx: Ctx): void {
     buildingStock(weavingHouse, input),
     target,
   );
-  if (fiber <= 0.05) {
+  if (fiber <= WORK_STOCK_EPSILON) {
     r.phase = 'rest';
     r.task = '섬유 대기';
     return;
@@ -2395,6 +2412,10 @@ function leisureOrderKey(residentId: number, day: number): number {
   return (value ^ (value >>> 16)) >>> 0;
 }
 
+export function eveningDepartureDelay(residentId: number, day: number): 1 | 2 {
+  return (1 + (leisureOrderKey(residentId, day) & 1)) as 1 | 2;
+}
+
 export function leisureAssignments(
   state: GameState,
   residents: readonly Resident[] = state.residents,
@@ -2425,34 +2446,34 @@ function resumeCriticalActivity(r: Resident): void {
   r.targetId = null;
 }
 
-function goToWithinRemainingBand(
-  state: GameState,
-  r: Resident,
-  ctx: Ctx,
-  goal: (tile: Tile) => boolean,
-  remainingBandTicks: number,
-): GoResult {
-  let result = goTo(state, r, ctx, goal);
-  if (result !== 'moving') return result;
-
-  // 하루 대역은 지도 이동 거리보다 훨씬 거친 시간 단위다. 남은 경로를 남은
-  // 출퇴근 대역에 고르게 나눠, 통근이 다음 노동 대역의 8틱을 잠식하지 않게 한다.
-  const extraMoves = Math.max(0, Math.ceil((r.path.length + 1) / remainingBandTicks) - 1);
-  for (let move = 0; move < extraMoves && result === 'moving'; move++) {
-    result = goTo(state, r, ctx, goal);
-  }
-  return result;
-}
-
 function dawnAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
-  r.phase = 'rest';
-  r.path = [];
-  r.targetId = null;
   r.task = '아침 채비';
 
   const unavailable = r.stage != null || r.sick || state.day < (r.quarantinedUntil ?? 0) ||
     r.health < 20 || state.day < (r.birthRecoveryUntil ?? 0);
-  if (unavailable) return;
+  if (unavailable) {
+    r.phase = 'rest';
+    r.path = [];
+    r.targetId = null;
+    return;
+  }
+
+  const startCommute = (
+    phase: 'toWork' | 'toDeposit',
+    targetId: number | null,
+    goal: (tile: Tile) => boolean,
+    movingTask: string,
+    arrivedTask: string,
+  ): GoResult => {
+    if (r.phase !== phase || r.targetId !== targetId) {
+      r.phase = phase;
+      r.path = [];
+      r.targetId = targetId;
+    }
+    const result = goTo(state, r, ctx, goal);
+    r.task = result === 'arrived' ? arrivedTask : movingTask;
+    return result;
+  };
 
   if (r.manualOrder) {
     const order = r.manualOrder;
@@ -2460,10 +2481,7 @@ function dawnAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
     const goal = buildingId != null
       ? buildingGoal(state, buildingId)
       : exactTileGoal(order.x, order.y);
-    r.phase = 'toWork';
-    r.targetId = buildingId ?? null;
-    goToWithinRemainingBand(state, r, ctx, goal, 1);
-    r.task = '명령 작업지로 이동';
+    startCommute('toWork', buildingId ?? null, goal, '명령 작업지로 이동', '명령 작업지에서 채비');
     return;
   }
 
@@ -2477,14 +2495,17 @@ function dawnAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
     const goal = destinationId == null
       ? depositGoal(state, [])
       : buildingGoal(state, destinationId);
-    r.phase = carrying ? 'toDeposit' : 'toWork';
-    r.targetId = destinationId ?? null;
-    goToWithinRemainingBand(state, r, ctx, goal, 1);
-    r.task = carrying ? '운반 재개 준비' : '수거 재개 준비';
+    startCommute(
+      carrying ? 'toDeposit' : 'toWork',
+      destinationId ?? null,
+      goal,
+      carrying ? '운반 재개 준비' : '수거 재개 준비',
+      carrying ? '운반 거점에서 채비' : '수거지에서 채비',
+    );
     return;
   }
 
-  if (carryTotal(r) > 0) {
+  if (carryTotal(r) > 0 && !GATHERING_JOBS.includes(r.job)) {
     const miningDeposit = r.job === 'miner' && r.miningDepositBuildingId != null
       ? state.buildings.find(building =>
         building.id === r.miningDepositBuildingId && building.built && building.type === 'mine')
@@ -2492,31 +2513,42 @@ function dawnAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
     const goal = miningDeposit
       ? buildingGoal(state, miningDeposit.id)
       : depositGoal(state, []);
-    r.phase = 'toDeposit';
-    r.targetId = miningDeposit?.id ?? null;
-    goToWithinRemainingBand(state, r, ctx, goal, 1);
-    r.task = '짐 정리 준비';
+    startCommute(
+      'toDeposit',
+      miningDeposit?.id ?? null,
+      goal,
+      '짐 정리 준비',
+      '하역 거점에서 채비',
+    );
     return;
   }
 
   const workplace = assignedBuildingForResident(state, r);
-  if (!workplace) return;
-  r.phase = 'toWork';
-  r.targetId = workplace.id;
+  if (!workplace) {
+    r.phase = 'rest';
+    r.path = [];
+    r.targetId = null;
+    return;
+  }
   let workplaceGoal = buildingGoal(state, workplace.id);
   if (r.job === 'farmer' && (workplace.type === 'field' || workplace.type === 'paddy')) {
     const workerIds = assignedWorkers(state, workplace).map(worker => worker.id);
-    const tile = farmWorkTileForTick(workplace, workerIds, r.id, absoluteTick(state) + 1);
+    const workBandStartTick = state.day * SUBTICKS + DAY_BANDS.work.start;
+    const tile = farmWorkTileForTick(workplace, workerIds, r.id, workBandStartTick);
     workplaceGoal = exactTileGoal(tile.x, tile.y);
   }
-  const result = goToWithinRemainingBand(state, r, ctx, workplaceGoal, 1);
+  const result = startCommute(
+    'toWork',
+    workplace.id,
+    workplaceGoal,
+    '일터로 이동',
+    '일터에서 채비',
+  );
   if (result === 'stuck') {
     r.phase = 'rest';
     r.targetId = null;
     r.task = '아침 채비';
-    return;
   }
-  r.task = result === 'arrived' ? '일터에서 채비' : '일터로 이동';
 }
 
 function returnHomeAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
@@ -2545,14 +2577,7 @@ function returnHomeAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
     r.targetId = destination.id;
   }
   r.task = home ? '집으로 돌아가는 중' : '처마를 찾아가는 중';
-  const remainingReturnTicks = DAY_CYCLE_SUBTICKS - state.subTick;
-  const result = goToWithinRemainingBand(
-    state,
-    r,
-    ctx,
-    buildingGoal(state, destination.id),
-    remainingReturnTicks,
-  );
+  const result = goTo(state, r, ctx, buildingGoal(state, destination.id));
   if (result === 'arrived') {
     r.phase = 'sleeping';
     r.path = [];
@@ -2586,13 +2611,7 @@ function eveningLeisureAgentTick(
     r.targetId = destinationId;
   }
   r.task = '마실 나감';
-  const result = goToWithinRemainingBand(
-    state,
-    r,
-    ctx,
-    buildingGoal(state, destinationId),
-    1,
-  );
+  const result = goTo(state, r, ctx, buildingGoal(state, destinationId));
   if (result === 'arrived') {
     r.phase = 'leisure';
     r.path = [];
@@ -2611,12 +2630,18 @@ function prepareWorkBandAgent(r: Resident): void {
   r.task = '아침 채비';
 }
 
+function waitForEveningDeparture(r: Resident): void {
+  r.phase = 'rest';
+  r.path = [];
+  r.targetId = null;
+  r.task = '일 마무리';
+}
+
 // ─────────────────────────── 틱 진입점 ───────────────────────────
 
 export function agentsTick(state: GameState): void {
   const dayBand = dayBandOf(state.subTick);
-  // 노동 1~8은 구버전 노동 0~7과 같은 결정적 난수열을 쓴다.
-  const rngSubTick = dayBand === 'work' ? state.subTick - 1 : state.subTick;
+  const rngSubTick = dayBand === 'work' ? state.subTick - DAY_BANDS.work.start : state.subTick;
   const rng = makeRng(state.seed + state.day * 7919 + rngSubTick * 101 + 7);
   const season = getSeason(state.day);
   const living = state.residents.filter(r => r.alive);
@@ -2707,6 +2732,11 @@ export function agentsTick(state: GameState): void {
       continue;
     }
     if (dayBand === 'evening') {
+      const departureSubTick = DAY_BANDS.evening.start + eveningDepartureDelay(r.id, state.day);
+      if (state.subTick < departureSubTick) {
+        waitForEveningDeparture(r);
+        continue;
+      }
       eveningLeisureAgentTick(state, r, ctx, eveningAssignments.get(r.id));
       continue;
     }

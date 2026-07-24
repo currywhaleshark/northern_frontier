@@ -110,7 +110,7 @@ function onlyEvent(state, eventId) {
   for (const resident of state.residents) resident.alive = resident === physician || resident === patient;
   Object.assign(patient, { alive: true, sick: true, health: 45, quarantinedUntil: 0 });
   state.resources.herbs = 2;
-  state.subTick = 1;
+  state.subTick = 9;
   const healthBefore = patient.health;
   const herbsBefore = state.resources.herbs;
   agents.agentsTick(state);

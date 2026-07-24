@@ -532,6 +532,32 @@ export function migrateV34ToV35(raw: RawSave): RawSave {
   return migrated;
 }
 
+// v36: 12서브틱 하루를 같은 실시간 틱 cadence의 72서브틱 하루로 확장한다.
+// 현재 대역 안에서의 상대 위치를 새 대역으로 옮기며 주민 phase/path/carry는 건드리지 않는다.
+export function migrateV35ToV36(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const numeric = Number(migrated.subTick);
+  const oldSubTick = Number.isFinite(numeric)
+    ? Math.min(11, Math.max(0, Math.floor(numeric)))
+    : 0;
+  const oldBands = [
+    { start: 0, end: 0, nextStart: 0, nextEnd: 8 },
+    { start: 1, end: 8, nextStart: 9, nextEnd: 44 },
+    { start: 9, end: 9, nextStart: 45, nextEnd: 57 },
+    { start: 10, end: 11, nextStart: 58, nextEnd: 71 },
+  ];
+  const band = oldBands.find(range => oldSubTick >= range.start && oldSubTick <= range.end)!;
+  const oldLength = band.end - band.start + 1;
+  const nextLength = band.nextEnd - band.nextStart + 1;
+  const relativeMidpoint = (oldSubTick - band.start + 0.5) / oldLength;
+  migrated.subTick = band.nextStart + Math.min(
+    nextLength - 1,
+    Math.floor(relativeMidpoint * nextLength),
+  );
+  migrated.schemaVersion = 36;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -572,6 +598,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 32) migrated = migrateV32ToV33(migrated);
     else if (version === 33) migrated = migrateV33ToV34(migrated);
     else if (version === 34) migrated = migrateV34ToV35(migrated);
+    else if (version === 35) migrated = migrateV35ToV36(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }

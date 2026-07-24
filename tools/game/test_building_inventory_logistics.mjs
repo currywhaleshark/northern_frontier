@@ -72,7 +72,7 @@ function worker(state, index, job, x, y) {
     fieldGrowth: 100, cropId: 'millet', queuedCropId: null,
   });
   state.day = 25;
-  state.subTick = 1;
+  state.subTick = 9;
   const farmer = worker(state, 0, 'farmer', 8, 8);
   assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, field.id), null);
 
@@ -88,7 +88,7 @@ function worker(state, index, job, x, y) {
   addBuilt(state, 'center', 2, 2);
   const field = addBuilt(state, 'field', 8, 8, { inventory: { grain: 6 } });
   worker(state, 0, 'hauler', 8, 8);
-  state.subTick = 1;
+  state.subTick = 9;
 
   for (let i = 0; i < 7; i++) simulation.advanceTick(state);
 
@@ -103,7 +103,7 @@ function worker(state, index, job, x, y) {
   const field = addBuilt(state, 'field', 8, 8, { inventory: { grain: 10 } });
   const first = worker(state, 0, 'hauler', 8, 8);
   const second = worker(state, 1, 'hauler', 8, 8);
-  state.subTick = 1;
+  state.subTick = 9;
 
   simulation.advanceTick(state);
 

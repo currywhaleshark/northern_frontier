@@ -1,15 +1,17 @@
 import type { BuildingTypeId, DayBand, GameState, Resident } from './types';
 
-export const DAY_CYCLE_SUBTICKS = 12;
+export const DAY_CYCLE_SUBTICKS = 72;
 
 export const DAY_BANDS = {
-  dawn: { start: 0, end: 0 },
-  work: { start: 1, end: 8 },
-  evening: { start: 9, end: 9 },
-  night: { start: 10, end: 11 },
+  dawn: { start: 0, end: 8 },
+  work: { start: 9, end: 44 },
+  evening: { start: 45, end: 57 },
+  night: { start: 58, end: 71 },
 } as const satisfies Readonly<Record<DayBand, { start: number; end: number }>>;
 
 export const WORK_SUBTICKS = DAY_BANDS.work.end - DAY_BANDS.work.start + 1;
+export const LEGACY_WORK_SUBTICKS = 8;
+export const WORK_RATE_SCALE = LEGACY_WORK_SUBTICKS / WORK_SUBTICKS;
 
 const DAY_BAND_ORDER: readonly DayBand[] = ['dawn', 'work', 'evening', 'night'];
 const INDOOR_LEISURE_BUILDING_TYPES: ReadonlySet<BuildingTypeId> = new Set([

@@ -36,7 +36,7 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
 function agentsWorkTick(state) {
   if (state.subTick >= 8) {
     state.day++;
-    state.subTick = 1;
+    state.subTick = 9;
   } else {
     state.subTick = state.subTick >= 1 ? state.subTick + 1 : 1;
   }

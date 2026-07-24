@@ -1244,10 +1244,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   lap('3-6-actors');
 
   // 7) 밤낮 색조 — 하루 진행도(subTick+보간)로 계산. 세계를 물들이고 창에는 불이 켜진다.
-  // 12서브틱 체제에서는 한낮 = 노동 대역 중앙, 자정 = 밤 대역 중앙으로 정렬한다 (M0 계약).
+  // 72서브틱 체제에서는 한낮 = 노동 대역 중앙, 자정 = 밤 대역 중앙으로 정렬한다 (M4 계약).
   // 두 중앙이 정확히 반나절(SUB/2) 떨어져 있어 균등 선형 이동만으로 두 앵커가 동시에 성립한다.
-  // 런타임이 아직 8서브틱이면(M1-BE 전환 전) 종전 선형 매핑을 유지한다.
-  // SUB를 number로 넓힌다 — config 리터럴(8)과 target spec(12)의 비교가 M1-BE 전환 전까지 상수 불일치라서
+  // 이전 설정을 읽는 개발 빌드에서는 종전 선형 매핑을 유지한다.
   const SUB: number = CONFIG.agents.subticksPerDay;
   const subU = (state.subTick + o.alpha) % SUB;
   const workCenter = (DAY_BANDS.work.start + DAY_BANDS.work.end + 1) / 2;

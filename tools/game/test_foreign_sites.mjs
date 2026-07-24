@@ -241,7 +241,7 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
   resident.py = tile.y;
   resident.phase = 'working';
   resident.workTimer = 10;
-  state.subTick = 1;
+  state.subTick = 9;
   agents.agentsTick(state);
   assert.equal(resident.task, '작업 허가 없음', 'passage permission does not let automatic work continue');
 
