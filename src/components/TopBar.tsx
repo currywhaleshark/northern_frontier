@@ -24,7 +24,7 @@ import {
   type UiPrefs,
 } from '../ui/uiPrefs';
 import { currentScenarioStep } from '../game/scenario';
-import { DAY_BAND_ICONS, DAY_BAND_NAMES, uiDayBand } from '../ui/dayBand';
+import { DayArcWidget } from './DayArcWidget';
 import { TimeControls } from './TimeControls';
 import { ResourceBreakdownPopover } from './ResourceBreakdownPopover';
 import { ResourceIcon } from './TradeResourceIcon';
@@ -203,8 +203,8 @@ export function TopBar({
         <span className="date-box">
           {getYear(state.day)}년차 {SEASON_NAMES[getSeason(state.day)]} {getDayOfSeason(state.day)}일
           {' '}{WEATHER_ICONS[state.weather]} {WEATHER_NAMES[state.weather]}
-          {' '}{DAY_BAND_ICONS[uiDayBand(state.subTick)]} {DAY_BAND_NAMES[uiDayBand(state.subTick)]}
         </span>
+        <DayArcWidget subTick={state.subTick} />
         <span className="pop-box">
           인구 <b>{pop}</b> · 주거 <b className={homeless > 0 ? 'housing-shortage' : undefined}
             title={`입주 ${housed}명 / 수용 ${housing.total}명`}>{housed}/{housing.total}</b>
