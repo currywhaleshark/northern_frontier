@@ -1,6 +1,6 @@
 // 절차 합성 사운드 — 외부 오디오 파일 없이 Web Audio API로 모든 소리를 만든다.
 // 브라우저 자동재생 정책 때문에 첫 사용자 입력 후 initAudio()를 불러야 소리가 난다.
-import type { WeatherId } from '../game/types';
+import type { DayBand, WeatherId } from '../game/types';
 
 export const BATTLE_SAMPLE_PATHS = {
   cannon: '/assets/audio/battle/cannon.mp3',
@@ -84,6 +84,7 @@ export function initAudio(): void {
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
     void ensureBattleSamples();
     startWindLoop();
+    startCricketLoop();
   } catch {
     ctx = null;
   }
@@ -545,6 +546,70 @@ export function stopWeatherAmbient(): void {
   const now = ctx.currentTime;
   windGain.gain.cancelScheduledValues(now);
   windGain.gain.setValueAtTime(0, now);
+}
+
+// ── 풀벌레 앰비언트: 저녁·밤 대역에 낮게 깔리는 귀뚜라미 (겨울엔 울지 않는다) ──
+
+let cricketGain: GainNode | null = null;
+let cricketTarget = 0;
+
+function scheduleCricketChirp(): void {
+  if (!ctx || !cricketGain) return;
+  const t = ctx.currentTime + Math.random() * 0.25;
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = 4100 + Math.random() * 500;
+  // 22~28Hz 트릴이 "찌르르" 결을 만든다
+  const trill = ctx.createGain();
+  trill.gain.value = 0.5;
+  const lfo = ctx.createOscillator();
+  lfo.frequency.value = 22 + Math.random() * 6;
+  const lfoAmp = ctx.createGain();
+  lfoAmp.gain.value = 0.5;
+  lfo.connect(lfoAmp).connect(trill.gain);
+  const env = ctx.createGain();
+  env.gain.setValueAtTime(0, t);
+  env.gain.linearRampToValueAtTime(1, t + 0.05);
+  env.gain.setValueAtTime(1, t + 0.28);
+  env.gain.linearRampToValueAtTime(0, t + 0.36);
+  osc.connect(trill).connect(env).connect(cricketGain);
+  osc.start(t);
+  lfo.start(t);
+  osc.stop(t + 0.45);
+  lfo.stop(t + 0.45);
+}
+
+function startCricketLoop(): void {
+  if (!ctx || !master) return;
+  cricketGain = ctx.createGain();
+  cricketGain.gain.value = 0; // 대역 엔벨로프 (0이면 완전 무음)
+  cricketGain.connect(master);
+  window.setInterval(() => {
+    if (cricketTarget <= 0.001) return; // 무음이면 스케줄 자체를 생략
+    scheduleCricketChirp();
+    if (Math.random() < 0.4) scheduleCricketChirp(); // 이따금 겹울음
+  }, 700);
+}
+
+// 메뉴 전환 시 즉시 무음 (stopWeatherAmbient와 같은 문법)
+export function stopDayBandAmbient(): void {
+  cricketTarget = 0;
+  if (!ctx || !cricketGain) return;
+  const now = ctx.currentTime;
+  cricketGain.gain.cancelScheduledValues(now);
+  cricketGain.gain.setValueAtTime(0, now);
+}
+
+// 하루 대역에 맞춰 풀벌레 소리를 켠다 (동일 목표 반복 호출 안전)
+export function setDayBandAmbient(band: DayBand, winter: boolean): void {
+  if (!ctx || !cricketGain) return;
+  const target = winter ? 0 : band === 'evening' ? 0.09 : band === 'night' ? 0.13 : 0;
+  if (target === cricketTarget) return;
+  cricketTarget = target;
+  const now = ctx.currentTime;
+  cricketGain.gain.cancelScheduledValues(now);
+  cricketGain.gain.setValueAtTime(cricketGain.gain.value, now);
+  cricketGain.gain.linearRampToValueAtTime(target, now + 2.5);
 }
 
 // 날씨에 맞춰 바람 세기를 조절 (동일 목표를 반복 호출해도 안전)

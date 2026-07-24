@@ -12,7 +12,9 @@ import {
 import { hasAnySave, loadGame, saveGame } from './game/saveLoad';
 import { addLog, negotiateTrade, requestTrade, tradeNegotiationOf } from './game/events';
 import { jobWorkforceCounts } from './game/residents';
-import { playSfx, setSfxSettings, stopWeatherAmbient, setWeatherAmbient } from './sound/sfx';
+import { playSfx, setSfxSettings, stopWeatherAmbient, setWeatherAmbient, setDayBandAmbient, stopDayBandAmbient } from './sound/sfx';
+import { getSeason } from './game/seasons';
+import { uiDayBand } from './ui/dayBand';
 import { setMusicScene, setMusicSettings } from './sound/music';
 import { AlertsPanel } from './components/AlertsPanel';
 import { BuildDrawer } from './components/BuildDrawer';
@@ -172,6 +174,15 @@ function RuntimeGameEffects({ state, setSpeed }: { state: GameState; setSpeed: (
   }, [state.weather]);
 
   useEffect(() => () => stopWeatherAmbient(), []);
+
+  // 저녁·밤 풀벌레 — 겨울엔 울지 않는다
+  const dayBand = uiDayBand(state.subTick);
+  const cricketWinter = getSeason(state.day) === 'winter';
+  useEffect(() => {
+    setDayBandAmbient(dayBand, cricketWinter);
+  }, [dayBand, cricketWinter]);
+
+  useEffect(() => () => stopDayBandAmbient(), []);
 
   useEffect(() => {
     if (state.tacticalBattle) setSpeed(0);
