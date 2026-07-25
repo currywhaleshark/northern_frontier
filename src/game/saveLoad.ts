@@ -4,6 +4,7 @@ import { normalizeDayCycleSubTick } from './dayCycle';
 import { clampPlotSide, computeDefense, rebuildBuildingFootprints } from './buildings';
 import { combatGroupLabel } from './combatCapabilities';
 import { defaultCropForBuildingType } from './crops';
+import { edictLevelDef, EDICT_ORDER } from './edicts';
 import { rollCourtTribute } from './courtTribute';
 import {
   enemyDoctrineDefinitions, enemyObjectiveDefinition, flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
@@ -12,6 +13,7 @@ import {
 import { spawnAnimalHabitats } from './habitats';
 import { makeRng } from './map';
 import { ensureMineralDeposits } from './minerals';
+import { ensureForestGrowth } from './forestGrowth';
 import { ensureProcessingReserves } from './processing';
 import { initRelations } from './relations';
 import { getSeason, getYear } from './seasons';
@@ -33,6 +35,7 @@ import { defaultRaiderFormationLine } from './tacticalTargeting';
 import { legacyTacticalPlanMetadata, tacticalCompositionTemplate } from './tacticalCompositions';
 import { createTacticalRaiderSupportState, tacticalSupportKindForUnitType } from './tacticalSupport';
 import { isImplementedLivestockId, normalizeLivestockState } from './livestock';
+import { normalizePastureArea } from './pastures';
 import { normalizeTacticalGroupTargets } from './tacticalBattle';
 import {
   initializeEnemyTacticalRouteTransit,
@@ -46,7 +49,8 @@ import {
   gradeTacticalBattle, raidDefenseObjectiveResult, tacticalClosingSummary, tacticalOutcomeResult,
 } from './tacticalCore';
 import type {
-  CombatWeaponId, CourtTribute, DefenderGroupKind, EnemyObjectiveId, FermentBatch, GameState, Gender, Resident, ResourceId,
+  CombatWeaponId, CourtTribute, DefenderGroupKind, EdictId, EdictLevel, EdictState,
+  EnemyObjectiveId, FermentBatch, GameState, Gender, Resident, ResourceId,
   PreparationActionId, RaiderUnitType, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
   SpecialItemId, SpecialResidentId, TacticalAiState, TacticalDeploymentPlacement, TacticalFeaturedResident, TacticalFormationLine,
   TacticalBattleFlankOutcome, TacticalBattleTacticsReport, TacticalFacing, TacticalPreparationEffect,
@@ -558,6 +562,39 @@ export function migrateV35ToV36(raw: RawSave): RawSave {
   return migrated;
 }
 
+// 절목 상태를 정규화한다. 모르는 령·단계는 버리고, 반포일이 없으면 오늘로 본다.
+export function normalizedEdicts(raw: unknown, day: number): Partial<Record<EdictId, EdictState>> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const result: Partial<Record<EdictId, EdictState>> = {};
+  for (const [id, entry] of Object.entries(raw as Record<string, unknown>)) {
+    if (!EDICT_ORDER.includes(id as EdictId)) continue;
+    const candidate = entry as { level?: unknown; sinceDay?: unknown } | null;
+    const level = candidate?.level as EdictLevel;
+    if (!edictLevelDef(id as EdictId, level)) continue;
+    const since = candidate?.sinceDay;
+    result[id as EdictId] = {
+      level,
+      sinceDay: typeof since === 'number' && Number.isFinite(since) ? since : day,
+    };
+  }
+  return result;
+}
+
+// v37: 절목(節目) 도입. 구버전 저장은 반포한 령이 없는 상태 = 전부 평시로 시작한다.
+export function migrateV36ToV37(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const day = Number.isFinite(migrated.day) ? Number(migrated.day) : 1;
+  migrated.edicts = normalizedEdicts(migrated.edicts, day);
+  migrated.edictWhiplashUntil = 0;
+  migrated.schemaVersion = 37;
+  return migrated;
+}
+
+// v38: 축사별 방목 영역. 구버전 축사는 기존 실내 수용량을 유지하고 새로 지정할 수 있다.
+export function migrateV37ToV38(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 38 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -599,6 +636,8 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 33) migrated = migrateV33ToV34(migrated);
     else if (version === 34) migrated = migrateV34ToV35(migrated);
     else if (version === 35) migrated = migrateV35ToV36(migrated);
+    else if (version === 36) migrated = migrateV36ToV37(migrated);
+    else if (version === 37) migrated = migrateV37ToV38(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -1754,6 +1793,7 @@ export function loadGame(slot = 1): GameState | null {
       }
     }
     ensureMineralDeposits(parsed.map);
+    ensureForestGrowth(parsed.map);
     if (parsed.battle && !parsed.battle.mode) parsed.battle.mode = 'garrison';
     if (parsed.battle && !parsed.battle.location) {
       parsed.battle.location = parsed.battle.mode === 'levy' ? 'village' : 'outskirts';
@@ -1818,6 +1858,9 @@ export function loadGame(slot = 1): GameState | null {
     for (const building of parsed.buildings) {
       if (building.built) building.repairing = false;
       if (building.type === 'cemetery') {
+        // v20 이전 묘지는 고정 2×2 건물이었으므로 저장된 발자국이 없으면 그대로 보존한다.
+        if (!Number.isFinite(building.w)) building.w = 2;
+        if (!Number.isFinite(building.h)) building.h = 2;
         const graveCount = Math.max(0, Math.floor(building.graves ?? 0));
         building.graves = graveCount;
         building.burialRecords = Array.isArray(building.burialRecords)
@@ -1851,11 +1894,21 @@ export function loadGame(slot = 1): GameState | null {
           : 0;
         building.plowOxen = Math.max(0, rawOxen);
       }
-      if (building.type === 'stable') building.livestock = normalizeLivestockState(building.livestock);
+      if (building.type === 'stable') {
+        building.livestock = normalizeLivestockState(building.livestock);
+        const pasture = normalizePastureArea(building.pasture);
+        if (pasture) building.pasture = pasture;
+        else delete building.pasture;
+      }
     }
     ensureProcessingReserves(parsed);
     if (parsed.lastPetitionDay == null) parsed.lastPetitionDay = 0;
     if (parsed.cannonsGranted == null) parsed.cannonsGranted = 0;
+    // 절목 — 저장에 없거나 깨진 항목은 평시로 본다 (지금까지와 같은 거동)
+    parsed.edicts = normalizedEdicts(parsed.edicts, parsed.day);
+    if (parsed.edictWhiplashUntil == null || !Number.isFinite(parsed.edictWhiplashUntil)) {
+      parsed.edictWhiplashUntil = 0;
+    }
     // 모반 의심 없는 구버전
     if (parsed.suspicion == null) parsed.suspicion = 0;
     if (parsed.nitrePaused == null) parsed.nitrePaused = false;

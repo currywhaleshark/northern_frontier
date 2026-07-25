@@ -5,7 +5,7 @@ import {
   assignNearestWorkerToBuilding, assignResidentToBuilding,
   advanceDay, advanceTick, autoAssignWorkersToBuildingTypes, cancelBuildingConstruction, continueAfterVictory, demolishBuilding, newGame, reassignJob, resolveChoice, setResidentJob,
   setBuildingCrop, setDryingProduct, setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
-  assignPlotPlowOxen, setLivestockSpecies, slaughterLivestock,
+  assignPlotPlowOxen, defineStablePasture, setLivestockSpecies, slaughterLivestock,
   convertFieldToPaddy, setYouthActivity, toggleResidentCart,
   unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
@@ -40,6 +40,8 @@ import { TopBar } from './components/TopBar';
 import { UnifiedLog } from './components/UnifiedLog';
 import type { ExpeditionMusterRequest } from './components/ExpeditionMusterDialog';
 import { LazyUiBoundary } from './components/LazyUiBoundary';
+import { EdictDialog } from './components/EdictDialog';
+import { setEdictLevel } from './game/edicts';
 import { requestPetition } from './game/petition';
 import { breakSilverSeal, reopenBuriedVein } from './game/silver';
 import { toggleNitreYards } from './game/suspicion';
@@ -67,7 +69,7 @@ import {
 } from './game/tacticalBattle';
 import { mergeHuntGroups, setHuntPreparationZone, splitHuntGroup } from './game/tacticalHunt';
 import type {
-  BuildingTypeId, CombatWeaponId, CropId, DryingProductId, GameState, JobId, LivestockId, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId, YouthActivity,
+  BuildingTypeId, CombatWeaponId, CropId, DryingProductId, EdictId, EdictLevel, GameState, JobId, LivestockId, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId, YouthActivity,
   PreparationActionId, PredatorKind, SpecialItemId, SpecialResidentId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
 import { markScenarioFlag } from './game/scenario';
@@ -222,6 +224,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   const [simMode, setSimMode] = useState(launch.kind === 'battleSimulation');
   const [speed, setSpeed] = useState(launch.kind === 'battleSimulation' ? 0 : 1);
   const [placingType, setPlacingType] = useState<BuildingTypeId | null>(null);
+  const [pastureStableId, setPastureStableId] = useState<number | null>(null);
   const [selected, setSelected] = useState<{ x: number; y: number } | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
   const [canLoad, setCanLoad] = useState(hasAnySave());
@@ -239,6 +242,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     () => ['minimap', ...uiPrefs.pinnedDockWindows],
   );
   const [weaponDialogOpen, setWeaponDialogOpen] = useState(false);
+  const [edictDialogOpen, setEdictDialogOpen] = useState(false);
   const [expeditionMusterRequest, setExpeditionMusterRequest] = useState<ExpeditionMusterRequest | null>(null);
   const [runtimePerfReport, setRuntimePerfReport] = useState<string | null>(null);
   const [runtimePerfCapturing, setRuntimePerfCapturing] = useState(false);
@@ -475,7 +479,16 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     bump();
   };
 
+  const handlePlacePasture = (x: number, y: number, w: number, h: number) => {
+    if (pastureStableId == null) return;
+    const err = defineStablePasture(stateRef.current, pastureStableId, x, y, w, h);
+    if (err) addLog(stateRef.current, err, 'bad');
+    else setPastureStableId(null);
+    bump();
+  };
+
   const handleTileClick = (x: number, y: number) => {
+    if (pastureStableId != null) return;
     if (placingType) {
       const err = tryPlaceBuilding(stateRef.current, placingType, x, y);
       if (err) addLog(stateRef.current, err, 'bad');
@@ -621,6 +634,18 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     const err = slaughterLivestock(stateRef.current, buildingId, amount);
     if (err) addLog(stateRef.current, err, 'info');
     bump();
+  };
+
+  const handleDefinePasture = (buildingId: number) => {
+    const stable = stateRef.current.buildings.find(building =>
+      building.id === buildingId && building.type === 'stable' && building.built);
+    if (!stable) {
+      addLog(stateRef.current, '완공된 축사를 선택해야 합니다.', 'info');
+      bump();
+      return;
+    }
+    setPlacingType(null);
+    setPastureStableId(buildingId);
   };
 
   const handleSetBuildingCrop = (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => {
@@ -820,6 +845,19 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     bump();
   };
 
+  // 절목 창 — 중심지에서 여는 관리 창. 다른 관리 모달과 같이 시간을 멈춘다.
+  const handleOpenEdicts = () => {
+    setSpeed(0);
+    setEdictDialogOpen(true);
+  };
+
+  // 절목 — 중심지에서 령을 반포·변경한다 (막힌 경우 이유를 로그로 알린다)
+  const handleSetEdictLevel = (id: EdictId, level: EdictLevel) => {
+    const err = setEdictLevel(stateRef.current, id, level);
+    if (err) addLog(stateRef.current, err, 'info');
+    bump();
+  };
+
   // 염초장 가동 토글 (모반 의심 관리)
   const handleToggleNitre = () => {
     toggleNitreYards(stateRef.current);
@@ -972,6 +1010,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     setSelected(null);
     setSelectedEntity(null);
     setPlacingType(null);
+    setPastureStableId(null);
     setInspResidentId(null);
     setWeaponDialogOpen(false);
     setExpeditionMusterRequest(null);
@@ -995,6 +1034,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     setSelected(null);
     setSelectedEntity(null);
     setInspResidentId(null);
+    setPastureStableId(null);
   }, []);
 
   const handleSelectResidentFromDock = (id: number) => {
@@ -1040,6 +1080,8 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
           setPlacingType(null);
         } else if (weaponDialogOpen) {
           setWeaponDialogOpen(false);
+        } else if (edictDialogOpen) {
+          setEdictDialogOpen(false);
         } else if (expeditionMusterRequest) {
           setExpeditionMusterRequest(null);
         } else {
@@ -1049,7 +1091,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       }
 
       if (isEditableTarget(event.target) || slotDialogMode || gameMenuView ||
-          weaponDialogOpen || expeditionMusterRequest) return;
+          weaponDialogOpen || edictDialogOpen || expeditionMusterRequest) return;
       const runtimeState = stateRef.current;
       if (runtimeState.pendingChoice || runtimeState.pendingPromotionNotice || runtimeState.tacticalBattle || runtimeState.tacticalBattleReport || runtimeState.gameOver) return;
 
@@ -1073,7 +1115,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [
-    closeGameMenu, expeditionMusterRequest, gameMenuView, openGameMenu, placingType,
+    closeGameMenu, edictDialogOpen, expeditionMusterRequest, gameMenuView, openGameMenu, placingType,
     slotDialogMode, toggleDockWindow, weaponDialogOpen,
   ]);
 
@@ -1168,10 +1210,12 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               onSetDryingProduct={handleSetDryingProduct}
               onSetLivestockSpecies={handleSetLivestockSpecies}
               onSlaughterLivestock={handleSlaughterLivestock}
+              onDefinePasture={handleDefinePasture}
               onSetBuildingCrop={handleSetBuildingCrop}
               onConvertFieldToPaddy={handleConvertFieldToPaddy}
               onSetPlotPlowOxen={handleSetPlotPlowOxen}
               onRequestTrade={handleRequestTrade}
+              onOpenEdicts={handleOpenEdicts}
               onToggleNitre={handleToggleNitre}
               onSilverVeinAction={handleSilverVeinAction}
               onAssignNearestWorker={handleAssignNearestWorker}
@@ -1238,15 +1282,20 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                     animationActive={speed > 0 && !runtimeState.pendingChoice && !runtimeState.pendingPromotionNotice && !runtimeState.tacticalBattle && !runtimeState.tacticalBattleReport && !runtimeState.gameOver}
                     zoom={uiPrefs.mapZoom}
                     placingType={placingType}
+                    pastureStableId={pastureStableId}
                     selected={selected}
                     selectedEntity={selectedEntity}
                     selectedResidentId={inspResidentId}
                     anim={animRef}
                     onTileClick={handleTileClick}
                     onPlacePlot={handlePlacePlot}
+                    onPlacePasture={handlePlacePasture}
                     onResidentClick={handleResidentClick}
                     onContextAction={handleContextAction}
-                    onCancelPlace={() => setPlacingType(null)}
+                    onCancelPlace={() => {
+                      setPlacingType(null);
+                      setPastureStableId(null);
+                    }}
                     onZoomChange={zoom => setUiPrefs(current => setMapZoom(current, zoom))}
                   />
                 );
@@ -1258,11 +1307,14 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               <BuildDrawer
                 state={stateRef.current}
                 placingType={placingType}
-                setPlacingType={setPlacingType}
+                setPlacingType={type => {
+                  setPastureStableId(null);
+                  setPlacingType(type);
+                }}
                 onClearSelection={handleClearSelection}
                 uiPrefs={uiPrefs}
                 onUiPrefsChange={setUiPrefs}
-                shortcutsEnabled={!gameMenuView && !slotDialogMode && !weaponDialogOpen && !expeditionMusterRequest &&
+                shortcutsEnabled={!gameMenuView && !slotDialogMode && !weaponDialogOpen && !edictDialogOpen && !expeditionMusterRequest &&
                   !stateRef.current.pendingChoice && !stateRef.current.pendingPromotionNotice && !stateRef.current.tacticalBattle && !stateRef.current.tacticalBattleReport}
               />
             )}
@@ -1437,6 +1489,12 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
             onClose={() => setWeaponDialogOpen(false)}
           />
         </LazyUiBoundary>
+      ) : edictDialogOpen ? (
+        <EdictDialog
+          state={state}
+          onSetEdictLevel={handleSetEdictLevel}
+          onClose={() => setEdictDialogOpen(false)}
+        />
       ) : tradeNegotiationOf(state.pendingChoice) ? (
         <TradeDialog
           state={state}

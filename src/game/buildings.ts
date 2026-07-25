@@ -146,7 +146,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   stable: {
     id: 'stable', name: '축사', emoji: '🐂',
-    desc: '진(鎭) 승격 후 건설. 목동이 가축을 돌보고 산물을 거두며 필요하면 도축한다.',
+    desc: '진(鎭) 승격 후 건설. 완공 뒤 인접 평지에 방목지를 지정하며, 넓을수록 더 많은 가축과 목동이 필요하다.',
     cost: { wood: 16, stone: 6, grain: 8, tools: 1 }, buildDays: 9, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
   },
@@ -292,9 +292,14 @@ export function buildingFootprintSize(type: BuildingTypeId): 1 | 2 {
   return SINGLE_TILE_BUILDING_SET.has(type) ? 1 : 2;
 }
 
-// 밭·논은 드래그로 크기를 정하는 경작지 — 발자국이 타입이 아니라 인스턴스(w/h)에 달려 있다
+// 밭·논은 드래그로 크기를 정하는 경작지다.
 export function isPlotBuildingType(type: BuildingTypeId): type is 'field' | 'paddy' {
   return type === 'field' || type === 'paddy';
+}
+
+// 묘역도 경작지와 같은 사각 드래그 배치를 쓰되 농사 로직에는 들어가지 않는다.
+export function isAreaBuildingType(type: BuildingTypeId): type is 'field' | 'paddy' | 'cemetery' {
+  return isPlotBuildingType(type) || type === 'cemetery';
 }
 
 export function clampPlotSide(value: number | undefined): number {
@@ -305,8 +310,13 @@ export function clampPlotSide(value: number | undefined): number {
 export interface FootprintDims { w: number; h: number }
 
 export function buildingFootprintDims(building: Pick<Building, 'type' | 'w' | 'h'>): FootprintDims {
-  if (isPlotBuildingType(building.type)) {
-    return { w: clampPlotSide(building.w ?? 1), h: clampPlotSide(building.h ?? 1) };
+  if (isAreaBuildingType(building.type)) {
+    // 크기 정보가 없던 구버전 묘지는 실제로 2×2를 차지했으므로 그 발자국을 보존한다.
+    const legacyDefault = building.type === 'cemetery' ? 2 : 1;
+    return {
+      w: clampPlotSide(building.w ?? legacyDefault),
+      h: clampPlotSide(building.h ?? legacyDefault),
+    };
   }
   if (building.type === 'center') {
     return {
@@ -321,6 +331,13 @@ export function buildingFootprintDims(building: Pick<Building, 'type' | 'w' | 'h
 export function plotArea(building: Pick<Building, 'type' | 'w' | 'h'>): number {
   const { w, h } = buildingFootprintDims(building);
   return w * h;
+}
+
+export function cemeteryPlotCapacity(
+  building: Pick<Building, 'type' | 'w' | 'h'>,
+): number {
+  if (building.type !== 'cemetery') return 0;
+  return plotArea(building) * CONFIG.funeral.plotsPerTile;
 }
 
 // 경작지의 파종 칸 수 — 구버전 세이브(sownArea 없음)는 자라던 밭이면 전체 파종으로 본다
@@ -373,6 +390,14 @@ export function canPlaceBuildingAt(
 ): boolean {
   const tiles = buildingFootprintTiles(state, type, x, y, w, h);
   if (!tiles) return false;
+  if (tiles.some(tile => state.buildings.some(building => {
+    const pasture = building.pasture;
+    return !!pasture &&
+      tile.x >= pasture.x &&
+      tile.y >= pasture.y &&
+      tile.x < pasture.x + pasture.w &&
+      tile.y < pasture.y + pasture.h;
+  }))) return false;
   if (type === 'watermill') return canPlaceWatermillAt(state, x, y);
   const def = BUILDING_DEFS[type];
   if (!tiles.every(tile => canPlaceOn(def, tile, state))) return false;
@@ -380,14 +405,14 @@ export function canPlaceBuildingAt(
   return true;
 }
 
-// 경작지 건설비는 칸수 비례 (1×1이면 기본 비용 그대로)
+// 드래그 영역 건설비는 칸수 비례 (1×1이면 기본 비용 그대로)
 export function buildingCostFor(
   type: BuildingTypeId,
   w = 1,
   h = 1,
 ): Partial<Record<ResourceId, number>> {
   const def = BUILDING_DEFS[type];
-  if (!isPlotBuildingType(type)) return def.cost;
+  if (!isAreaBuildingType(type)) return def.cost;
   const area = clampPlotSide(w) * clampPlotSide(h);
   if (area === 1) return def.cost;
   const scaled: Partial<Record<ResourceId, number>> = {};

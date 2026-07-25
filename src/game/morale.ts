@@ -6,6 +6,7 @@ import { countBuilt } from './buildings';
 import { CONFIG } from './config';
 import { rankAtLeast } from './constants';
 import { luxuryStockTotal } from './consumption';
+import { edictMoraleFactors } from './edicts';
 import { assignedWorkers } from './workerSlots';
 import type { GameState, MoraleFactor, Rank, Resident } from './types';
 
@@ -106,6 +107,9 @@ export function moraleBreakdown(state: GameState, inputs: MoraleInputs): MoraleF
       delta: s.legacyTransitionCheer,
     });
   }
+
+  // ── 절목 — 시행 중인 령과 조령모개의 대가 ──
+  factors.push(...edictMoraleFactors(state));
 
   return factors;
 }

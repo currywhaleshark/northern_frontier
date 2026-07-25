@@ -458,9 +458,9 @@ function createReachableExpedition(state) {
 // 10. Multiple species, plow oxen, and mounted residents preserve bounded assignments.
 {
   const state = makeStableState(2026071990);
-  state.unlockedLivestock = ['chicken', 'goat', 'sheep', 'cattle', 'horse'];
+  state.unlockedLivestock = ['chicken', 'goat', 'sheep', 'pig', 'cattle', 'horse'];
   const species = [
-    ['chicken', 4], ['goat', 3], ['sheep', 3], ['cattle', 3], ['horse', 3],
+    ['chicken', 4], ['goat', 3], ['sheep', 3], ['pig', 3], ['cattle', 3], ['horse', 3],
   ];
   for (const [index, [id, headcount]] of species.entries()) {
     state.buildings.push({
@@ -485,7 +485,8 @@ function createReachableExpedition(state) {
     const loadedField = loaded.buildings.find(building => building.id === field.id);
     assert.equal(loadedField?.plowOxen, 2);
     assert.equal(Object.keys(loaded.mountAssignments).length, 2);
-    assert.equal(loaded.buildings.filter(building => building.livestock?.headcount > 0).length, 5);
+    assert.equal(loaded.buildings.filter(building => building.livestock?.headcount > 0).length, 6);
+    assert.ok(loaded.buildings.some(building => building.livestock?.species === 'pig'));
   };
   await roundTripScenario({
     name: 'livestock-oxen-mounts', state, schemaVersion: saveLoad.CURRENT_SCHEMA_VERSION,

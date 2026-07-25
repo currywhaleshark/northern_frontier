@@ -7,7 +7,7 @@ import {
   BUILDING_DEFS, buildingCostFor, buildingFootprintTiles, canAfford, canAffordCost,
   cannonPlacementsUsed, canPlaceBuildingAt, canPlaceOn, clampPlotSide,
   clearBuildingTiles, computeDefense, getBuilding, isBuildingUnlocked,
-  footprintTilesOf, isPaddyEligibleTile, isPlotBuildingType, isSmithyProductUnlocked,
+  footprintTilesOf, isAreaBuildingType, isPaddyEligibleTile, isPlotBuildingType, isSmithyProductUnlocked,
   occupyBuildingTiles, plotArea, SMITHY_PRODUCT_DEFS,
 } from './buildings';
 import { isWallBuilding } from './walls';
@@ -18,6 +18,7 @@ import { grantYearlyPowder, resolvePetition } from './petition';
 import { checkPromotion, resolvePromotionDecreeChoice } from './promotion';
 import { resolveCrackdown, resolveInspection, updateSuspicion } from './suspicion';
 import { generateMap, makeRng } from './map';
+import { advanceForestGrowth, setTreeStage } from './forestGrowth';
 import { isHabitatActive, spawnAnimalHabitats } from './habitats';
 import { agentsTick, resetAgent, SUBTICKS } from './agents';
 import { battleTick } from './battles';
@@ -39,6 +40,7 @@ import {
 import {
   clothingCoverageTotal, consumeClothingWear, consumeFoodByDiet, consumeFuelHeat, foodTotal,
 } from './consumption';
+import { edictFoodRationMultiplier, edictFuelRationMultiplier } from './edicts';
 import { getPointerAction } from './selectionActions';
 import { createExploration, isBuildingFootprintExplored, refreshExploration } from './exploration';
 import { LUXURY_RESOURCES } from './resourceCatalog';
@@ -64,8 +66,10 @@ import { dailySilverTick, resolveSilverVeinChoice } from './silver';
 import { updateFermentation } from './fermentation';
 import { isKimjangChoice, maybeOpenKimjangEvent, resolveKimjangChoice } from './kimjang';
 import {
-  createDefaultLivestockState, setPlotPlowOxen, setStableLivestock, slaughterStableLivestock, updateLivestock,
+  createDefaultLivestockState, ensureLivestockState, livestockCapacityForStable, setPlotPlowOxen,
+  setStableLivestock, slaughterStableLivestock, updateLivestock,
 } from './livestock';
+import { pastureRequiredHerders, setStablePasture } from './pastures';
 import { resolveTerritoryWarning, updateTerritoryWarnings } from './territory';
 import {
   foreignSiteAt, generateForeignSites, revealForeignSitesFromExploration, updateSeasonalForeignSites,
@@ -159,6 +163,8 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     lastPetitionDay: 0,
     cannonsGranted: 0,
     suspicion: 0,
+    edicts: {},
+    edictWhiplashUntil: 0,
     nitrePaused: false,
     nitreHiddenUntil: 0,
     initiatedTradeDays: [],
@@ -215,9 +221,11 @@ function placePrebuilt(state: GameState, type: BuildingTypeId, x: number, y: num
     cropId: defaultCropForBuildingType(type),
     queuedCropId: null,
   };
-  if (isPlotBuildingType(type)) {
+  if (isAreaBuildingType(type)) {
     b.w = 1;
     b.h = 1;
+  }
+  if (isPlotBuildingType(type)) {
     b.sownArea = 0;
     b.plowOxen = 0;
   }
@@ -282,9 +290,9 @@ export function tryPlaceBuilding(
   const def = BUILDING_DEFS[type];
   const tile = state.map[y]?.[x];
   if (!tile) return '지도 밖입니다.';
-  // 경작지만 드래그 크기를 받는다 — 그 외 건물은 타입 고정 크기
-  const w = isPlotBuildingType(type) ? clampPlotSide(plotW ?? 1) : undefined;
-  const h = isPlotBuildingType(type) ? clampPlotSide(plotH ?? 1) : undefined;
+  // 경작지와 묘역은 드래그 크기를 받는다 — 그 외 건물은 타입 고정 크기
+  const w = isAreaBuildingType(type) ? clampPlotSide(plotW ?? 1) : undefined;
+  const h = isAreaBuildingType(type) ? clampPlotSide(plotH ?? 1) : undefined;
   if (!isBuildingUnlocked(state.rank, type)) {
     const rankName = def.minRank ? RANK_NAMES[def.minRank] : RANK_NAMES.bo;
     return `${rankName} 승격 후 지을 수 있습니다.`;
@@ -319,9 +327,11 @@ export function tryPlaceBuilding(
     cropId: defaultCropForBuildingType(type),
     queuedCropId: null,
   };
-  if (isPlotBuildingType(type)) {
+  if (isAreaBuildingType(type)) {
     b.w = w;
     b.h = h;
+  }
+  if (isPlotBuildingType(type)) {
     b.sownArea = 0;
     b.plowOxen = 0;
   }
@@ -730,6 +740,26 @@ export function setLivestockSpecies(state: GameState, buildingId: number, specie
   return setStableLivestock(state, buildingId, species);
 }
 
+export function defineStablePasture(
+  state: GameState,
+  buildingId: number,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): string | null {
+  const error = setStablePasture(state, buildingId, { x, y, w, h });
+  if (error) return error;
+  const stable = state.buildings.find(building => building.id === buildingId)!;
+  const livestock = ensureLivestockState(stable);
+  addLog(
+    state,
+    `축사 방목지를 ${w}×${h}칸으로 정했습니다. ${livestockCapacityForStable(stable, livestock.species)}마리 수용 · 목동 ${pastureRequiredHerders(stable)}명 필요.`,
+    'info',
+  );
+  return null;
+}
+
 export function slaughterLivestock(state: GameState, buildingId: number, amount = 1): string | null {
   return slaughterStableLivestock(state, buildingId, amount);
 }
@@ -994,7 +1024,7 @@ function onSeasonChange(state: GameState, prev: string, next: string): void {
 }
 
 // 봄/여름, 숲 인접 평지가 천천히 다시 숲이 된다
-function regrowForest(state: GameState, rng: () => number, season: string): void {
+function regrowForest(state: GameState, rng: () => number, season: Season): void {
   if (season !== 'spring' && season !== 'summer') return;
   const h = state.map.length;
   const forestBefore = new Set<string>();
@@ -1019,11 +1049,21 @@ function regrowForest(state: GameState, rng: () => number, season: string): void
     const row = state.map[y];
     for (let x = 0; x < row.length; x++) {
       const t = row[x];
+      if (t.terrain === 'forest') {
+        advanceForestGrowth(
+          t,
+          season,
+          rng,
+          CONFIG.agents.forestStumpSproutChance,
+          CONFIG.agents.forestYoungMatureChance,
+        );
+        continue;
+      }
       if (t.terrain !== 'plain' || t.buildingId != null) continue;
       const chance = hasForestNearby(x, y)
         ? CONFIG.agents.forestRegrowChance
         : CONFIG.agents.forestPioneerChance;
-      if (chance > 0 && rng() < chance) t.terrain = 'forest';
+      if (chance > 0 && rng() < chance) setTreeStage(t, 'young');
     }
   }
 }
@@ -1063,16 +1103,21 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
   // 나이 단계별 소비 몫 — 아이는 성인보다 적게 먹고 적게 입는다
   const weight = consumptionWeight(state);
 
-  // 식량
+  // 식량 — 절미령이 서면 창고에서 내주는 몫만 줄어든다. 배부름은 평시 몫을 기준으로 재므로
+  // 아껴 먹인 만큼 끼니를 거른 이가 생기고, 배고픔과 건강이 서서히 무너진다.
   const foodNeed = weight * cfg.foodPerDay;
-  const foodResult = consumeFoodByDiet(state, foodNeed);
-  const fedRatio = foodResult.shortageRatio;
+  const rationedFoodNeed = foodNeed * edictFoodRationMultiplier(state);
+  const foodResult = consumeFoodByDiet(state, rationedFoodNeed);
+  const fedRatio = foodNeed > 0 ? Math.min(1, foodResult.totalConsumed / foodNeed) : 1;
+  const foodShortage = foodResult.shortageRatio < 0.999; // 배급이 아니라 재고가 모자란 경우
 
-  // 장작
+  // 장작 — 절탄령도 같은 문법. 아궁이에 덜 넣은 만큼 체온 충족률이 떨어진다.
   const fwNeed = weight * cfg.firewoodPerPerson *
     CONFIG.seasons.firewoodMult[season] * firewoodWeatherMult(state.weather);
-  const heatProvided = consumeFuelHeat(state, fwNeed);
+  const rationedFwNeed = fwNeed * edictFuelRationMultiplier(state);
+  const heatProvided = consumeFuelHeat(state, rationedFwNeed);
   const firewoodRatio = fwNeed > 0 ? Math.min(1, heatProvided / fwNeed) : 1;
+  const fuelShortage = heatProvided < rationedFwNeed - 0.000001;
 
   // 옷
   const clothesCoverage = Math.min(1, clothingCoverageTotal(state) / Math.max(1, weight));
@@ -1100,8 +1145,8 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
     clothesCoverage,
   });
 
-  if (fedRatio < 1) addLog(state, '식량이 모자라 주민들이 배를 곯았습니다.', 'bad');
-  if (firewoodRatio < 1 && (season === 'winter' || season === 'autumn')) {
+  if (foodShortage) addLog(state, '식량이 모자라 주민들이 배를 곯았습니다.', 'bad');
+  if (fuelShortage && (season === 'winter' || season === 'autumn')) {
     addLog(state, '장작이 부족해 아궁이가 식었습니다. 주민들의 체온이 떨어집니다.', 'bad');
   }
   if ((state.weather === 'coldSnap' || state.weather === 'blizzard') && rng() < 0.2) {

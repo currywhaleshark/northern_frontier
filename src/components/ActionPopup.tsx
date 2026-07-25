@@ -5,12 +5,14 @@ import {
 import { CONFIG } from '../game/config';
 import { FACTIONS, JOB_COLORS, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES } from '../game/constants';
 import { allowedCropsForBuilding, cropIdForBuilding, CROP_DEFS } from '../game/crops';
+import { edictSlotCapacity, edictSlotsUsed } from '../game/edicts';
 import { canRequestTrade, factionTradeUnlockReason } from '../game/events';
 import { DRYING_PRODUCT_DEFS, DRYING_PRODUCT_ORDER, dryingProductOf } from '../game/preservation';
 import {
   IMPLEMENTED_LIVESTOCK_IDS, LIVESTOCK_DEFS, normalizeLivestockState,
   plotPlowOxenMax, plowOxenAssigned, plowOxenOf, plowOxenPool,
 } from '../game/livestock';
+import { pastureRequiredHerders, pastureTileCount, stableLivestockCapacity } from '../game/pastures';
 import { getBuildingActions } from '../game/selectionActions';
 import { centerPromotionUpgradeReason, nextRank } from '../game/promotion';
 import {
@@ -31,10 +33,12 @@ interface Props {
   onSetDryingProduct: (buildingId: number, product: DryingProductId) => void;
   onSetLivestockSpecies: (buildingId: number, species: LivestockId) => void;
   onSlaughterLivestock: (buildingId: number, amount: number) => void;
+  onDefinePasture: (buildingId: number) => void;
   onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
   onConvertFieldToPaddy: (buildingId: number) => void;
   onSetPlotPlowOxen: (buildingId: number, count: number) => void;
   onRequestTrade: (factionName: string) => void;
+  onOpenEdicts: () => void;
   onToggleNitre: () => void;
   onSilverVeinAction: (action: 'break-seal' | 'reopen') => void;
   onAssignNearestWorker: (buildingId: number) => void;
@@ -61,10 +65,12 @@ export function ActionPopup({
   onSetDryingProduct,
   onSetLivestockSpecies,
   onSlaughterLivestock,
+  onDefinePasture,
   onSetBuildingCrop,
   onConvertFieldToPaddy,
   onSetPlotPlowOxen,
   onRequestTrade,
+  onOpenEdicts,
   onToggleNitre,
   onSilverVeinAction,
   onAssignNearestWorker,
@@ -128,6 +134,18 @@ export function ActionPopup({
           </button>
           {centerReason && <div className="muted small">{centerReason}</div>}
         </div>
+      )}
+
+      {building.type === 'center' && building.built && (
+        <button
+          className="action-command"
+          type="button"
+          title="배급·난방 같은 시행 세칙을 반포합니다"
+          onClick={onOpenEdicts}
+        >
+          <span>📜 절목</span>
+          <div className="muted small">시행 중 {edictSlotsUsed(state)}/{edictSlotCapacity(state)}개</div>
+        </button>
       )}
 
       {plotDims && (
@@ -363,12 +381,22 @@ export function ActionPopup({
 
       {building.type === 'stable' && building.built && (() => {
         const livestock = normalizeLivestockState(building.livestock);
+        const pastureTiles = pastureTileCount(building);
+        const capacity = stableLivestockCapacity(building, livestock.species);
         return (
           <div className="worker-slot-panel">
             <div className="worker-slot-summary">
               <span>축종</span>
-              <span className="muted small">{LIVESTOCK_DEFS[livestock.species].icon} {LIVESTOCK_DEFS[livestock.species].name} {livestock.headcount}마리</span>
+              <span className="muted small">{LIVESTOCK_DEFS[livestock.species].icon} {LIVESTOCK_DEFS[livestock.species].name} {livestock.headcount}/{capacity}마리</span>
             </div>
+            <button
+              className="action-command"
+              type="button"
+              title={`최대 ${CONFIG.pasture.maxSide}×${CONFIG.pasture.maxSide} · 약 ${CONFIG.pasture.tilesPerHerder}칸마다 목동 1명`}
+              onClick={() => onDefinePasture(building.id)}
+            >
+              {pastureTiles > 0 ? `방목지 다시 지정 (${pastureTiles}칸 · 목동 ${pastureRequiredHerders(building)}명)` : '방목지 지정'}
+            </button>
             <div className="action-grid">
               {IMPLEMENTED_LIVESTOCK_IDS.map(species => (
                 <button

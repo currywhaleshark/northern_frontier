@@ -3,6 +3,7 @@ import { CONFIG } from './config';
 import {
   rollMineralDepositAmount, setMineralDeposit,
 } from './minerals';
+import { ensureForestGrowth } from './forestGrowth';
 import type { Tile, Terrain } from './types';
 
 // mulberry32 시드 난수 — 지도 생성과 시뮬레이션 전반에서 사용
@@ -204,6 +205,7 @@ export function generateMap(seed: number): { tiles: Tile[][]; centerX: number; c
   }
   tiles[centerY][centerX].terrain = 'center';
   placeNearbyMineralDeposits(tiles, centerX, centerY, rng);
+  ensureForestGrowth(tiles);
 
   return { tiles, centerX, centerY };
 }

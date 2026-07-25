@@ -2151,6 +2151,47 @@ html, body, #root {
 }
 .modal .body { white-space: pre-line; margin-bottom: 12px; line-height: 1.5; }
 .modal.weapon-allocation-dialog { max-width: 820px; }
+/* ── 절목 (중심지에서 반포하는 시행 세칙) ── */
+.modal.edict-dialog { max-width: 560px; }
+.edict-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.edict-heading h2 { margin: 0 0 3px; }
+.edict-rules {
+  border-left: 2px solid var(--border);
+  padding-left: 8px;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+.edict-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.edict-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(20, 24, 28, 0.5);
+}
+.edict-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.edict-card p { margin: 0; line-height: 1.45; }
+.edict-active-tag { color: var(--accent); }
+.edict-levels { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.edict-hold-note { color: #d9a441; }
+.edict-whiplash-note { color: #e06c5c; margin-top: 8px; }
 .modal.save-slot-dialog { max-width: 460px; }
 .save-slot-heading {
   display: flex;

@@ -165,10 +165,11 @@ function healthyState(seed) {
 
   const cemetery = {
     id: state.nextBuildingId++, type: 'cemetery', x: 6, y: 6,
-    progress: 9, built: true, fieldGrowth: 0,
+    progress: 9, built: true, fieldGrowth: 0, w: 1, h: 1,
   };
   state.buildings.push(cemetery);
-  assert.equal(lifecycle.cemeteryFreePlots(state), CONFIG.funeral.plotsPerCemetery);
+  assert.equal(lifecycle.cemeteryFreePlots(state), CONFIG.funeral.plotsPerTile,
+    'one cemetery tile has four quarter-tile grave plots');
 
   const corpse = lifecycle.nextCorpseToCollect(state);
   const moraleBefore = state.residents.filter(r => r.alive).map(r => r.morale);
@@ -182,6 +183,7 @@ function healthyState(seed) {
     burialDay: state.day,
   }], 'burial preserves the identity, cause, and date after the corpse is removed');
   assert.equal((state.corpses ?? []).length, 0);
+  assert.equal(lifecycle.cemeteryFreePlots(state), 3);
   assert.ok(state.residents.filter(r => r.alive)
     .every((r, i) => r.morale >= moraleBefore[i]), 'burial comforts the village');
 

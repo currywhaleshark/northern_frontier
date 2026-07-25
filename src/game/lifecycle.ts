@@ -2,7 +2,7 @@
 // 아이는 나이가 아니라 단계 게이지로 자라고(총 120일 ≈ 2.5게임년), 성인 나이는
 // 새해마다 1살씩만 먹는다(비대칭 — 압축 노화는 개국공신을 너무 일찍 데려간다).
 // 계획: docs/superpowers/plans/2026-07-17-marriage-birth-growth.md
-import { BUILDING_DEFS, countBuilt } from './buildings';
+import { BUILDING_DEFS, cemeteryPlotCapacity, countBuilt } from './buildings';
 import { CONFIG } from './config';
 import { addLog } from './events';
 import { settleEducationOnAdulthood } from './education';
@@ -351,7 +351,7 @@ export function loseExpeditionCorpses(state: GameState): void {
 export function cemeteryFreePlots(state: GameState): number {
   return state.buildings
     .filter(building => building.type === 'cemetery' && building.built)
-    .reduce((sum, building) => sum + Math.max(0, CONFIG.funeral.plotsPerCemetery - (building.graves ?? 0)), 0);
+    .reduce((sum, building) => sum + Math.max(0, cemeteryPlotCapacity(building) - (building.graves ?? 0)), 0);
 }
 
 // 다음으로 수습할 시신 — 접근 실패로 유예됐거나 원정대가 지닌 시신은 건너뛴다.
@@ -364,7 +364,7 @@ export function buryCorpse(state: GameState, corpseId: number, cemetery: Buildin
   const corpses = corpsesOf(state);
   const index = corpses.findIndex(corpse => corpse.id === corpseId);
   if (index < 0) return false;
-  if ((cemetery.graves ?? 0) >= CONFIG.funeral.plotsPerCemetery) return false;
+  if ((cemetery.graves ?? 0) >= cemeteryPlotCapacity(cemetery)) return false;
   const [corpse] = corpses.splice(index, 1);
   cemetery.graves = (cemetery.graves ?? 0) + 1;
   (cemetery.burialRecords ??= []).push({

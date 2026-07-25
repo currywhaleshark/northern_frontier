@@ -2,6 +2,7 @@ import { CONFIG } from './config';
 import type { Tile } from './types';
 
 export type MineralResource = 'stone' | 'iron' | 'silver';
+export type MineralVisualTier = 'trace' | 'small' | 'medium' | 'large' | 'huge';
 
 export interface MineralExtraction {
   resource: MineralResource;
@@ -18,6 +19,15 @@ export function mineralRemaining(tile: Tile): number {
   if (tile.terrain !== 'rock') return 0;
   const amount = tile.mineralRemaining;
   return Number.isFinite(amount) ? Math.max(0, amount ?? 0) : defaultDepositAmount(tile);
+}
+
+export function mineralVisualTier(remaining: number): MineralVisualTier {
+  const amount = Number.isFinite(remaining) ? Math.max(0, remaining) : 0;
+  if (amount < 20) return 'trace';
+  if (amount < 40) return 'small';
+  if (amount < 65) return 'medium';
+  if (amount < 90) return 'large';
+  return 'huge';
 }
 
 export function setMineralDeposit(tile: Tile, hasIron: boolean, amount: number): void {

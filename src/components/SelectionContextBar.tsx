@@ -1,4 +1,4 @@
-import { BUILDING_DEFS, getBuilding } from '../game/buildings';
+import { BUILDING_DEFS, cemeteryPlotCapacity, getBuilding } from '../game/buildings';
 import { isJobUnlocked, JOB_NAMES, JOB_ORDER, RESOURCE_NAMES, TERRAIN_NAMES } from '../game/constants';
 import { cropIdForBuilding, CROP_DEFS } from '../game/crops';
 import { CONFIG } from '../game/config';
@@ -8,7 +8,8 @@ import { familyReferenceName } from '../game/family';
 import { foreignSiteAt } from '../game/foreignSites';
 import { mineralRemaining } from '../game/minerals';
 import { mineMineralSummary } from '../game/miningSites';
-import { livestockDailyFeedNeed, livestockCapacity, LIVESTOCK_DEFS, normalizeLivestockState } from '../game/livestock';
+import { livestockCapacityForStable, livestockDailyFeedNeed, LIVESTOCK_DEFS, normalizeLivestockState } from '../game/livestock';
+import { pastureRequiredHerders, pastureTileCount } from '../game/pastures';
 import { residentHome } from '../game/residents';
 import { getSeason } from '../game/seasons';
 import { spoilagePreview } from '../game/spoilage';
@@ -51,10 +52,12 @@ interface Props {
   onSetDryingProduct: (buildingId: number, product: DryingProductId) => void;
   onSetLivestockSpecies: (buildingId: number, species: LivestockId) => void;
   onSlaughterLivestock: (buildingId: number, amount: number) => void;
+  onDefinePasture: (buildingId: number) => void;
   onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
   onConvertFieldToPaddy: (buildingId: number) => void;
   onSetPlotPlowOxen: (buildingId: number, count: number) => void;
   onRequestTrade: (factionName: string) => void;
+  onOpenEdicts: () => void;
   onToggleNitre: () => void;
   onSilverVeinAction: (action: 'break-seal' | 'reopen') => void;
   onAssignNearestWorker: (buildingId: number) => void;
@@ -250,10 +253,12 @@ export function SelectionContextBar({
   onSetDryingProduct,
   onSetLivestockSpecies,
   onSlaughterLivestock,
+  onDefinePasture,
   onSetBuildingCrop,
   onConvertFieldToPaddy,
   onSetPlotPlowOxen,
   onRequestTrade,
+  onOpenEdicts,
   onToggleNitre,
   onSilverVeinAction,
   onAssignNearestWorker,
@@ -409,10 +414,11 @@ export function SelectionContextBar({
                             )}
                             {building.type === 'cemetery' && building.built && (() => {
                               const graveCount = Math.max(0, building.graves ?? 0);
+                              const graveCapacity = cemeteryPlotCapacity(building);
                               const records = Array.from({ length: graveCount }, (_, index) => building.burialRecords?.[index] ?? {});
                               return (
                                 <>
-                                  <tr><td>묘 자리</td><td>{graveCount}/{CONFIG.funeral.plotsPerCemetery}기</td></tr>
+                                  <tr><td>묘 자리</td><td>{graveCount}/{graveCapacity}기 · {building.w ?? 2}×{building.h ?? 2}칸</td></tr>
                                   <tr>
                                     <td>안치 기록</td>
                                     <td>{records.length > 0
@@ -441,17 +447,25 @@ export function SelectionContextBar({
                             {building.type === 'stable' && building.built && (() => {
                               const livestock = normalizeLivestockState(building.livestock);
                               const season = getSeason(state.day);
-                              const herbivore = livestock.species !== 'chicken';
-                              const feedNeed = livestockDailyFeedNeed(livestock, herbivore ? 'winter' : season);
+                              const feedConfig = CONFIG.livestock[livestock.species];
+                              const seasonalGrazer = feedConfig.grazesOutsideWinter;
+                              const feedNeed = livestockDailyFeedNeed(livestock, seasonalGrazer ? 'winter' : season);
                               return (
                                 <>
                                   <tr><td>축종</td><td>{LIVESTOCK_DEFS[livestock.species].icon} {LIVESTOCK_DEFS[livestock.species].name}</td></tr>
-                                  <tr><td>마릿수</td><td>{livestock.headcount}/{livestockCapacity(livestock.species)}마리</td></tr>
+                                  <tr><td>마릿수</td><td>{livestock.headcount}/{livestockCapacityForStable(building, livestock.species)}마리</td></tr>
+                                  <tr>
+                                    <td>방목지</td>
+                                    <td>{building.pasture
+                                      ? `${building.pasture.w}×${building.pasture.h} · ${pastureTileCount(building)}칸 · 목동 ${pastureRequiredHerders(building)}명`
+                                      : '미지정 · 기존 축사 수용량'}</td>
+                                  </tr>
                                   <tr><td>번식</td><td><Bar value={livestock.growth * 100} color="#c99a4a" /></td></tr>
                                   <tr>
                                     <td>사료</td>
                                     <td>
-                                      {herbivore && season !== 'winter' ? '방목 · 겨울 ' : ''}{herbivore ? '건초' : '곡물'} {feedNeed.toFixed(2)}/일
+                                      {seasonalGrazer && season !== 'winter' ? '방목 · 겨울 ' : ''}
+                                      {feedConfig.feedResource === 'hay' ? '건초' : '곡물'} {feedNeed.toFixed(2)}/일
                                       {livestock.feedShortageDays > 0 ? ` · ${livestock.feedShortageDays}일째 부족` : ''}
                                     </td>
                                   </tr>
@@ -531,10 +545,12 @@ export function SelectionContextBar({
                 onSetDryingProduct={onSetDryingProduct}
                 onSetLivestockSpecies={onSetLivestockSpecies}
                 onSlaughterLivestock={onSlaughterLivestock}
+                onDefinePasture={onDefinePasture}
                 onSetBuildingCrop={onSetBuildingCrop}
                 onConvertFieldToPaddy={onConvertFieldToPaddy}
                 onSetPlotPlowOxen={onSetPlotPlowOxen}
                 onRequestTrade={onRequestTrade}
+                onOpenEdicts={onOpenEdicts}
                 onToggleNitre={onToggleNitre}
                 onSilverVeinAction={onSilverVeinAction}
                 onAssignNearestWorker={onAssignNearestWorker}

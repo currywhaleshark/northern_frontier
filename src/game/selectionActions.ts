@@ -270,6 +270,8 @@ export function getPointerAction(
 
 export function getBuildingActions(state: GameState, building: Building): BuildingActionItem[] {
   if (!building.built) return [];
+  // 중심지에서 절목(시행 세칙)을 반포한다
+  if (building.type === 'center') return [{ id: 'edicts', label: '절목' }];
   if (building.type === 'mine') {
     const vein = state.silverVein;
     const veinTile = vein ? state.map[vein.y]?.[vein.x] : undefined;

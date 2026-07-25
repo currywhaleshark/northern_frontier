@@ -1,6 +1,7 @@
 import { isJobUnlocked } from './constants';
 import { CONFIG } from './config';
 import { isBuildingUnlocked, isPlotBuildingType, plotArea } from './buildings';
+import { pastureRequiredHerders } from './pastures';
 import { canResidentTakeJob } from './youth';
 import type { Building, BuildingTypeId, GameState, JobId, Resident } from './types';
 
@@ -71,6 +72,7 @@ export function workerSlotCount(building: Pick<Building, 'type' | 'w' | 'h'>): n
   if (isPlotBuildingType(building.type)) {
     return Math.max(1, Math.ceil(plotArea(building) / CONFIG.farming.tilesPerFarmer));
   }
+  if (building.type === 'stable') return pastureRequiredHerders(building);
   return config.slots;
 }
 

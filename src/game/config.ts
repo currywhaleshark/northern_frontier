@@ -424,9 +424,11 @@ export const CONFIG = {
       wood: 1.1, game: 0.75, herbs: 0.55, iron: 1.2, mineStone: 0.4, stone: 1.1, fish: 1.2,
       silver: 0.5,
     },
-    forestDepleteChance: 0.12, // 벌목 1회당 숲이 평지가 될 확률
+    forestDepleteChance: 0.12, // 벌목 1회당 성목이 그루터기가 될 확률
     forestRegrowChance: 0.003,  // 봄여름, 숲 인접 평지가 숲이 될 하루 확률
     forestPioneerChance: 0.00018, // 봄여름, 고립된 평지에 새 숲 씨앗이 들 확률
+    forestStumpSproutChance: 0.012, // 봄여름, 그루터기가 어린나무로 회복될 하루 확률
+    forestYoungMatureChance: 0.006, // 봄여름, 어린나무가 성목이 될 하루 확률
     // 사냥 수확 배율 — 짐승 서식지(숲 덩어리)가 클수록 사냥감이 풍부하다
     hunting: {
       habitatYieldBase: 0.8,     // 서식지 기본
@@ -499,6 +501,24 @@ export const CONFIG = {
       slaughterMeatPerHead: 3.5,
       slaughterHidePerHead: 1.2,
     },
+    pig: {
+      capacity: 6,
+      initialHeadcount: 0,
+      feedResource: 'grain' as ResourceId,
+      feedPerHeadPerDay: 0.24,
+      grazesOutsideWinter: false,
+      grainPerHeadPerDay: 0.24,
+      breedingPerHeadPerDay: 0.02,
+      productResource: null,
+      productPerHeadPerHerderDay: 0,
+      productSeasonMult: { spring: 0, summer: 0, autumn: 0, winter: 0 } as Record<Season, number>,
+      eggPerHeadPerHerderDay: 0,
+      eggSeasonMult: { spring: 1, summer: 1, autumn: 1, winter: 1 } as Record<Season, number>,
+      shortageGraceDays: 2,
+      starvationLossIntervalDays: 2,
+      slaughterMeatPerHead: 12,
+      slaughterHidePerHead: 0.5,
+    },
     cattle: {
       capacity: 3,
       initialHeadcount: 0,
@@ -535,6 +555,20 @@ export const CONFIG = {
       slaughterMeatPerHead: 5,
       slaughterHidePerHead: 1.5,
     },
+  },
+
+  pasture: {
+    maxSide: 6,
+    tilesPerHerder: 8,
+    visibleAnimalLimit: 12,
+    capacityPerTile: {
+      chicken: 2,
+      goat: 1,
+      sheep: 1,
+      pig: 1,
+      cattle: 0.5,
+      horse: 0.5,
+    } as Record<LivestockId, number>,
   },
 
   // K2 보존 경제. 생선·고기는 빠르게 상하므로 훈연·염장·건조로 손실을 피해야 한다.
@@ -1080,6 +1114,26 @@ export const CONFIG = {
     monkBurialBonus: 2,                    // 노승 상주 시 안장 위로 +2
   },
 
+  // 절목 — 중심지에서 반포하는 시행 세칙. 평시(기본값)는 기존 거동과 완전히 같다.
+  // 모든 령은 "항상 켜두면 손해"여야 한다 (docs/DESIGN-2026-07-23-edict-system.md §7).
+  edicts: {
+    slotsByRank: { settlement: 1, bo: 2, jin: 3, bu: 4 } as Record<Rank, number>,
+    officeSlotBonus: 1,        // 관청 + 아전이 있으면 동시 시행 슬롯 +1
+    clerkHoldDaysMult: 0.5,    // 아전의 행정력이 최소 유지 기간을 줄인다
+    whiplashMoralePenalty: -10, // 조령모개 — 아침에 내린 영을 저녁에 바꾼 대가
+    whiplashDays: 6,
+    whiplashReputation: -2,
+    // 절미령(節米令) — 배급 조절. 절미의 본체는 민심이 아니라 누적 배고픔·건강 저하다.
+    ration: {
+      tight: { foodMult: 0.75, morale: -6 },
+      generous: { foodMult: 1.2, morale: 4 },
+    },
+    // 절탄령(節炭令) — 난방 제한. 혹한·눈보라에는 배급이 더 야박해진다.
+    fuelRation: {
+      tight: { fuelMult: 0.7, morale: -4, harshWeatherMult: 0.85 },
+    },
+  },
+
   // 종교인 등장 — 사람이 먼저 온다. 네임드가 합류해야 그 갈래의 시설이 열린다.
   religion: {
     minRank: 'jin' as Rank,
@@ -1181,7 +1235,7 @@ export const CONFIG = {
 
   // 장례 — 모든 죽음은 시신을 남기고, 시신은 묘지에 묻힌다
   funeral: {
-    plotsPerCemetery: 12,        // 묘지 1곳의 묘 자리
+    plotsPerTile: 4,             // 묘역 한 칸을 2×2로 나눠 네 사람을 안장
     unburiedGraceDays: 3,        // 이 일수를 넘긴 시신부터 방치 페널티
     unburiedMoralePerDay: 1.5,   // 방치 시신이 있는 날의 전 주민 사기 하락
     burialMoraleRelief: 3,       // 안장 시 전 주민 사기 회복 (장례의 위로)

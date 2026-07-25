@@ -16,16 +16,17 @@ const {
   historicalTerrainSeasonRow,
   historicalTerrainSampleOffsetFromHash,
   historicalTerrainSourceRect,
+  historicalTerrainVariantFor,
   historicalTerrainVariantFromHash,
 } = await import(moduleUrl);
 
 const columnCases = [
   ['plain', 0],
   ['center', 0],
-  ['forest', 0],
+  ['forest', 5],
   ['river', null],
-  ['mountain', 0],
-  ['rock', 0],
+  ['mountain', 3],
+  ['rock', 3],
   ['fertile', 0],
 ];
 
@@ -44,7 +45,7 @@ assert.deepEqual(historicalTerrainSourceRect('plain', 'spring'), {
   sh: 20,
 });
 assert.deepEqual(historicalTerrainSourceRect('forest', 'autumn'), {
-  sx: 3,
+  sx: 143,
   sy: 59,
   sw: 20,
   sh: 20,
@@ -55,15 +56,26 @@ assert.deepEqual(historicalTerrainSourceRect('fertile', 'summer'), {
   sw: 20,
   sh: 20,
 });
+assert.deepEqual(historicalTerrainSourceRect('plain', 'winter', 2), {
+  sx: 6,
+  sy: 174,
+  sw: 40,
+  sh: 40,
+});
 assert.equal(historicalTerrainSourceRect('river', 'summer'), null);
 assert.deepEqual(historicalTerrainSampleOffsetFromHash(0), { dx: 0, dy: 0 });
 assert.deepEqual(historicalTerrainSampleOffsetFromHash(4), { dx: 1, dy: 0 });
 assert.deepEqual(historicalTerrainSampleOffsetFromHash(8), { dx: 2, dy: 0 });
 assert.deepEqual(historicalTerrainSampleOffsetFromHash(16), { dx: 1, dy: 1 });
 assert.deepEqual(historicalTerrainSampleOffsetFromHash(32), { dx: 2, dy: 2 });
+assert.deepEqual(historicalTerrainSampleOffsetFromHash(32, 2), { dx: 4, dy: 4 });
 assert.deepEqual(historicalTerrainVariantFromHash(0), { flipX: false, flipY: false });
 assert.deepEqual(historicalTerrainVariantFromHash(1), { flipX: true, flipY: false });
 assert.deepEqual(historicalTerrainVariantFromHash(2), { flipX: false, flipY: true });
 assert.deepEqual(historicalTerrainVariantFromHash(3), { flipX: true, flipY: true });
+assert.deepEqual(historicalTerrainVariantFor('plain', 3), { flipX: true, flipY: true });
+assert.deepEqual(historicalTerrainVariantFor('forest', 3), { flipX: false, flipY: false });
+assert.deepEqual(historicalTerrainVariantFor('mountain', 3), { flipX: false, flipY: false });
+assert.deepEqual(historicalTerrainVariantFor('rock', 3), { flipX: false, flipY: false });
 
 console.log('historical terrain tests passed');

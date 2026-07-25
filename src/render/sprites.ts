@@ -6,8 +6,11 @@
 // 현재 구현(placeholderSprites)은 단색 사각형 + 이모지 임시 그래픽이다.
 import { BUILDING_DEFS } from '../game/buildings';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
-import type { BuildingTypeId, ForeignSiteStatus, ForeignSiteType, Gender, JobId, LifeStage, Rank, Season, SpecialResidentId, Terrain } from '../game/types';
+import type { BuildingTypeId, ForeignSiteStatus, ForeignSiteType, Gender, JobId, LifeStage, LivestockId, Rank, Season, SpecialResidentId, Terrain } from '../game/types';
+import type { TreeStage } from '../game/forestGrowth';
+import type { MineralResource, MineralVisualTier } from '../game/minerals';
 import type { MilitiaWeaponSpriteId } from './militiaWeaponAssets';
+import type { MountainProfile, TreeSpecies } from './terrainGrowthVisuals';
 
 // 계절별 지형 팔레트 (임시 그래픽용)
 const TERRAIN_PALETTES: Record<Season, Record<Terrain, string>> = {
@@ -40,6 +43,13 @@ export interface TerrainDrawParams {
   winter: boolean;
   frozenRiver: boolean; // 겨울 언 강 (해빙기 홍수면 false)
   hasIron: boolean;
+  hasSilver?: boolean;
+  treeStage?: TreeStage;
+  treeSpecies?: TreeSpecies;
+  mineralResource?: MineralResource;
+  mineralTier?: MineralVisualTier;
+  mountainProfile?: MountainProfile;
+  highDefinition?: boolean;
   tileX: number; // 타일 좌표 (변형 패턴용)
   tileY: number;
   x: number;     // 픽셀 좌표
@@ -60,6 +70,8 @@ export interface BuildingDrawParams {
   ghost: boolean;     // 배치 미리보기
   season: Season;
   growth01?: number;  // 밭 전용: 작물 성장 0~1
+  graveCount?: number; // 묘역 타일 전용: 이 칸의 2×2 소구획에 놓인 묘 수 0~4
+  highDefinition?: boolean; // 2배 backing canvas에서는 HD 원본을 선택
   connections?: { n: boolean; e: boolean; s: boolean; w: boolean }; // 성벽 계열 연결 렌더링
   x: number;
   y: number;
@@ -132,11 +144,22 @@ export interface BuildingDamageDrawParams {
   size: number;
 }
 
+export interface LivestockDrawParams {
+  species: LivestockId;
+  x: number;
+  y: number;
+  facing?: 1 | -1;
+  highDefinition?: boolean;
+}
+
 export interface SpriteAPI {
   id: string; // 지형 레이어 캐시 키에 들어간다 — 스프라이트 세트가 바뀌면 다시 그린다
   drawTerrain(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): void;
+  drawTerrainProp?(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): void;
+  drawTerrainOverlay?(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): void;
   drawBuilding(ctx: CanvasRenderingContext2D, p: BuildingDrawParams): void;
   drawBuildingDamage(ctx: CanvasRenderingContext2D, p: BuildingDamageDrawParams): void;
+  drawLivestock(ctx: CanvasRenderingContext2D, p: LivestockDrawParams): void;
   drawForeignStructure(ctx: CanvasRenderingContext2D, p: ForeignStructureDrawParams): boolean;
   drawResident(ctx: CanvasRenderingContext2D, p: ResidentDrawParams): void;
   drawExpedition(ctx: CanvasRenderingContext2D, p: ExpeditionDrawParams): void;
@@ -218,6 +241,21 @@ export const placeholderSprites: SpriteAPI = {
     ctx.lineTo(p.x + p.size * 0.73, p.y + p.size * 0.7);
     ctx.stroke();
     ctx.restore();
+  },
+
+  drawLivestock(ctx, p) {
+    const icons: Record<LivestockId, string> = {
+      chicken: '🐔',
+      goat: '🐐',
+      sheep: '🐑',
+      pig: '🐖',
+      cattle: '🐄',
+      horse: '🐎',
+    };
+    ctx.font = '16px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(icons[p.species], p.x, p.y);
   },
 
   drawForeignStructure() {

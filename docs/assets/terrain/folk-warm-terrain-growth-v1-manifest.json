@@ -1,0 +1,788 @@
+{
+  "cellHd": [
+    196,
+    224
+  ],
+  "cellStandard": [
+    98,
+    112
+  ],
+  "cols": 6,
+  "rows": 9,
+  "groups": {
+    "trees": {
+      "source": "terrain-growth-trees-v1.png",
+      "sourceSize": [
+        1536,
+        1024
+      ],
+      "atlasRow": 0,
+      "rows": 4,
+      "cols": 6,
+      "sharedScale": 0.8412698412698413,
+      "frames": [
+        {
+          "row": 0,
+          "col": 0,
+          "sourceBounds": [
+            88,
+            196,
+            185,
+            262
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            88,
+            62
+          ]
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "sourceBounds": [
+            310,
+            110,
+            414,
+            258
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            94,
+            131
+          ]
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "sourceBounds": [
+            507,
+            17,
+            697,
+            261
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            167,
+            212
+          ]
+        },
+        {
+          "row": 0,
+          "col": 3,
+          "sourceBounds": [
+            829,
+            196,
+            920,
+            262
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            83,
+            62
+          ]
+        },
+        {
+          "row": 0,
+          "col": 4,
+          "sourceBounds": [
+            1092,
+            114,
+            1171,
+            261
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            73,
+            130
+          ]
+        },
+        {
+          "row": 0,
+          "col": 5,
+          "sourceBounds": [
+            1316,
+            18,
+            1446,
+            261
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            116,
+            211
+          ]
+        },
+        {
+          "row": 1,
+          "col": 0,
+          "sourceBounds": [
+            88,
+            441,
+            184,
+            504
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            87,
+            60
+          ]
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "sourceBounds": [
+            310,
+            352,
+            418,
+            502
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            98,
+            133
+          ]
+        },
+        {
+          "row": 1,
+          "col": 2,
+          "sourceBounds": [
+            502,
+            268,
+            697,
+            505
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            171,
+            206
+          ]
+        },
+        {
+          "row": 1,
+          "col": 3,
+          "sourceBounds": [
+            826,
+            442,
+            920,
+            504
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            86,
+            59
+          ]
+        },
+        {
+          "row": 1,
+          "col": 4,
+          "sourceBounds": [
+            1089,
+            346,
+            1173,
+            504
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            77,
+            140
+          ]
+        },
+        {
+          "row": 1,
+          "col": 5,
+          "sourceBounds": [
+            1313,
+            268,
+            1446,
+            505
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            119,
+            206
+          ]
+        },
+        {
+          "row": 2,
+          "col": 0,
+          "sourceBounds": [
+            87,
+            680,
+            184,
+            744
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            88,
+            61
+          ]
+        },
+        {
+          "row": 2,
+          "col": 1,
+          "sourceBounds": [
+            310,
+            600,
+            414,
+            743
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            94,
+            127
+          ]
+        },
+        {
+          "row": 2,
+          "col": 2,
+          "sourceBounds": [
+            503,
+            510,
+            696,
+            745
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            169,
+            204
+          ]
+        },
+        {
+          "row": 2,
+          "col": 3,
+          "sourceBounds": [
+            826,
+            684,
+            922,
+            745
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            87,
+            58
+          ]
+        },
+        {
+          "row": 2,
+          "col": 4,
+          "sourceBounds": [
+            1091,
+            589,
+            1171,
+            744
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            74,
+            137
+          ]
+        },
+        {
+          "row": 2,
+          "col": 5,
+          "sourceBounds": [
+            1314,
+            510,
+            1446,
+            743
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            118,
+            203
+          ]
+        },
+        {
+          "row": 3,
+          "col": 0,
+          "sourceBounds": [
+            78,
+            922,
+            180,
+            995
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            93,
+            68
+          ]
+        },
+        {
+          "row": 3,
+          "col": 1,
+          "sourceBounds": [
+            309,
+            837,
+            409,
+            992
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            91,
+            137
+          ]
+        },
+        {
+          "row": 3,
+          "col": 2,
+          "sourceBounds": [
+            504,
+            758,
+            692,
+            995
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            165,
+            206
+          ]
+        },
+        {
+          "row": 3,
+          "col": 3,
+          "sourceBounds": [
+            821,
+            923,
+            920,
+            996
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            90,
+            68
+          ]
+        },
+        {
+          "row": 3,
+          "col": 4,
+          "sourceBounds": [
+            1088,
+            840,
+            1170,
+            995
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            76,
+            137
+          ]
+        },
+        {
+          "row": 3,
+          "col": 5,
+          "sourceBounds": [
+            1316,
+            754,
+            1444,
+            996
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            114,
+            210
+          ]
+        }
+      ]
+    },
+    "minerals": {
+      "source": "terrain-mineral-outcrops-v1.png",
+      "sourceSize": [
+        1619,
+        971
+      ],
+      "atlasRow": 4,
+      "rows": 3,
+      "cols": 5,
+      "sharedScale": 0.5822784810126582,
+      "frames": [
+        {
+          "row": 0,
+          "col": 0,
+          "sourceBounds": [
+            71,
+            234,
+            193,
+            300
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            76,
+            43
+          ]
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "sourceBounds": [
+            357,
+            195,
+            503,
+            303
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            90,
+            68
+          ]
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "sourceBounds": [
+            662,
+            158,
+            846,
+            305
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            112,
+            90
+          ]
+        },
+        {
+          "row": 0,
+          "col": 3,
+          "sourceBounds": [
+            977,
+            109,
+            1192,
+            304
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            130,
+            118
+          ]
+        },
+        {
+          "row": 0,
+          "col": 4,
+          "sourceBounds": [
+            1285,
+            30,
+            1561,
+            310
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            165,
+            168
+          ]
+        },
+        {
+          "row": 1,
+          "col": 0,
+          "sourceBounds": [
+            76,
+            531,
+            195,
+            597
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            74,
+            43
+          ]
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "sourceBounds": [
+            357,
+            485,
+            506,
+            600
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            91,
+            72
+          ]
+        },
+        {
+          "row": 1,
+          "col": 2,
+          "sourceBounds": [
+            651,
+            433,
+            851,
+            600
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            121,
+            102
+          ]
+        },
+        {
+          "row": 1,
+          "col": 3,
+          "sourceBounds": [
+            958,
+            379,
+            1195,
+            600
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            143,
+            133
+          ]
+        },
+        {
+          "row": 1,
+          "col": 4,
+          "sourceBounds": [
+            1271,
+            343,
+            1572,
+            607
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            180,
+            158
+          ]
+        },
+        {
+          "row": 2,
+          "col": 0,
+          "sourceBounds": [
+            72,
+            822,
+            187,
+            895
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            72,
+            47
+          ]
+        },
+        {
+          "row": 2,
+          "col": 1,
+          "sourceBounds": [
+            350,
+            783,
+            501,
+            897
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            93,
+            71
+          ]
+        },
+        {
+          "row": 2,
+          "col": 2,
+          "sourceBounds": [
+            655,
+            728,
+            856,
+            902
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            122,
+            106
+          ]
+        },
+        {
+          "row": 2,
+          "col": 3,
+          "sourceBounds": [
+            965,
+            680,
+            1206,
+            903
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            145,
+            135
+          ]
+        },
+        {
+          "row": 2,
+          "col": 4,
+          "sourceBounds": [
+            1272,
+            628,
+            1580,
+            908
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            184,
+            168
+          ]
+        }
+      ]
+    },
+    "mountains": {
+      "source": "terrain-mountain-ridges-v1.png",
+      "sourceSize": [
+        1983,
+        793
+      ],
+      "atlasRow": 7,
+      "rows": 2,
+      "cols": 5,
+      "sharedScale": 0.4623115577889447,
+      "frames": [
+        {
+          "row": 0,
+          "col": 0,
+          "sourceBounds": [
+            18,
+            250,
+            375,
+            389
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            169,
+            68
+          ]
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "sourceBounds": [
+            407,
+            198,
+            797,
+            389
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            184,
+            92
+          ]
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "sourceBounds": [
+            820,
+            130,
+            1180,
+            387
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            170,
+            123
+          ]
+        },
+        {
+          "row": 0,
+          "col": 3,
+          "sourceBounds": [
+            1231,
+            86,
+            1593,
+            390
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            171,
+            144
+          ]
+        },
+        {
+          "row": 0,
+          "col": 4,
+          "sourceBounds": [
+            1637,
+            210,
+            1962,
+            390
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            154,
+            87
+          ]
+        },
+        {
+          "row": 1,
+          "col": 0,
+          "sourceBounds": [
+            17,
+            572,
+            375,
+            711
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            169,
+            68
+          ]
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "sourceBounds": [
+            407,
+            520,
+            797,
+            712
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            184,
+            92
+          ]
+        },
+        {
+          "row": 1,
+          "col": 2,
+          "sourceBounds": [
+            820,
+            451,
+            1180,
+            709
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            170,
+            123
+          ]
+        },
+        {
+          "row": 1,
+          "col": 3,
+          "sourceBounds": [
+            1231,
+            419,
+            1593,
+            714
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            171,
+            140
+          ]
+        },
+        {
+          "row": 1,
+          "col": 4,
+          "sourceBounds": [
+            1637,
+            532,
+            1962,
+            711
+          ],
+          "sourceTouchesImageEdge": false,
+          "packedSizeHd": [
+            154,
+            86
+          ]
+        }
+      ]
+    }
+  }
+}

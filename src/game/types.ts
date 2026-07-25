@@ -171,6 +171,7 @@ export interface Tile {
   x: number;
   y: number;
   terrain: Terrain;
+  treeStage?: 'stump' | 'young' | 'mature'; // 숲 성장 상태. 구버전 저장의 숲은 성목으로 간주
   hasIron: boolean;       // rock 타일 중 철광 여부
   hasSilver?: boolean;    // 잠채/설점으로 은광이 된 광상. 구버전 저장은 없음
   mineralRemaining?: number; // 바위/철광의 남은 주 광물량. 구버전 저장은 없음
@@ -410,13 +411,20 @@ export interface Resident {
   manualOrder: ManualOrder | null;  // 플레이어가 우클릭으로 지정한 이동/작업 명령
 }
 
-export type LivestockId = 'chicken' | 'goat' | 'sheep' | 'cattle' | 'horse';
+export type LivestockId = 'chicken' | 'goat' | 'sheep' | 'pig' | 'cattle' | 'horse';
 
 export interface LivestockState {
   species: LivestockId;
   headcount: number;
   growth: number; // 다음 새끼가 태어나기까지의 진행도 0~1
   feedShortageDays: number;
+}
+
+export interface PastureArea {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 export interface Building {
@@ -427,8 +435,8 @@ export interface Building {
   progress: number;   // 투입된 건축가-일수
   built: boolean;
   fieldGrowth: number; // 밭 전용: 작물 성장도 0~100
-  w?: number; // 밭/논 전용: 가로 칸 수 (기본 1, 최대 CONFIG.farming.maxPlotSide)
-  h?: number; // 밭/논 전용: 세로 칸 수 (기본 1, 최대 CONFIG.farming.maxPlotSide)
+  w?: number; // 밭/논/묘역 전용: 가로 칸 수 (기본 1, 최대 CONFIG.farming.maxPlotSide)
+  h?: number; // 밭/논/묘역 전용: 세로 칸 수 (기본 1, 최대 CONFIG.farming.maxPlotSide)
   sownArea?: number; // 밭/논 전용: 이번 작기에 파종을 마친 칸 수 (0 ~ w*h)
   plowOxen?: number; // 밭/논 전용: 배정된 농우(소) 마릿수
   cropId?: CropId | null; // 밭/논 전용: 현재 선택/재배 작물
@@ -437,7 +445,8 @@ export interface Building {
   dryingProduct?: DryingProductId; // 건조대 전용: 현재 생산품
   fermentBatches?: FermentBatch[]; // 장독대 전용: 절대일 기준 숙성 배치
   livestock?: LivestockState; // 축사 전용: 축종·마릿수·번식·사료 부족 상태
-  graves?: number; // 묘지 전용: 안장된 묘 수 (자리가 차면 증설이 필요하다)
+  pasture?: PastureArea; // 축사 전용: 완공 후 지정하는 인접 방목 영역
+  graves?: number; // 묘역 전용: 안장된 묘 수 (한 타일의 2×2 소구획에 최대 4기)
   burialRecords?: BurialRecord[]; // 묘지 전용: 이름·사인·사망일을 보존하는 안치 기록
   inventory?: Partial<Record<ResourceId, number>>; // 운반 전 생산지 현장 재고
   repairing?: boolean; // 습격으로 파손되어 건설담당의 수리가 필요한 상태
@@ -1461,6 +1470,16 @@ export interface GameOverState {
 
 export type DeathCauseId = 'combat' | 'starvation' | 'cold' | 'disease' | 'other';
 
+// 절목(節目) — 중심지에서 반포하는 시행 세칙. 개별 항목은 「~령(令)」.
+// 계획: docs/DESIGN-2026-07-23-edict-system.md
+export type EdictId = 'ration' | 'fuelRation';
+export type EdictLevel = 'tight' | 'normal' | 'generous'; // 령마다 유효 단계가 다르다
+
+export interface EdictState {
+  level: EdictLevel;
+  sinceDay: number;   // 조령모개 판정·"n일째 시행" 표기
+}
+
 export interface GameState {
   schemaVersion: number;
   day: number;          // 경과 일수 (1부터)
@@ -1538,6 +1557,9 @@ export interface GameState {
   cannonsGranted: number;             // 조정이 하사한 불랑기포 수 (배치 가능 상한)
   // ── 모반 의심 (화약 자급/월경 교역/북방 유착이 조정의 눈총을 산다) ──
   suspicion: number;                  // 0~100
+  // ── 절목 (구버전 저장에는 없음 = 전부 평시) ──
+  edicts?: Partial<Record<EdictId, EdictState>>;
+  edictWhiplashUntil?: number;        // 조령모개 사기 페널티 종료일
   nitrePaused: boolean;               // 염초장 가동 중지 토글 (플레이어)
   nitreHiddenUntil: number;           // 감찰 은닉: 이 날까지 염초장이 멈춘다
   initiatedTradeDays: number[];       // 최근 플레이어 주도 교역 성사일 (월경 교역 혐의)

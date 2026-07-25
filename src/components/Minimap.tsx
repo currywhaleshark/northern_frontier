@@ -19,7 +19,11 @@ const MAP_PADDING = 8;
 export function mapViewportScale(box: HTMLDivElement): number {
   const canvas = box.querySelector('canvas[data-version]');
   if (!(canvas instanceof HTMLCanvasElement) || canvas.width <= 0) return 1;
-  const scale = canvas.getBoundingClientRect().width / canvas.width;
+  // 백킹 캔버스는 고배율 줌에서 2배로 커진다(data-render-scale). 여기서 필요한 값은
+  // "논리 픽셀당 화면 픽셀"이므로 백킹 배율을 나눠서 되돌려야 미니맵 뷰포트가 어긋나지 않는다.
+  const renderScale = Number(canvas.dataset.renderScale);
+  const backingScale = Number.isFinite(renderScale) && renderScale > 0 ? renderScale : 1;
+  const scale = canvas.getBoundingClientRect().width / (canvas.width / backingScale);
   return Number.isFinite(scale) && scale > 0 ? scale : 1;
 }
 
@@ -169,6 +173,10 @@ export function Minimap({ state, version, animationActive, viewportRef, selected
     box.addEventListener('scroll', readViewport, { passive: true });
     const resizeObserver = new ResizeObserver(readViewport);
     resizeObserver.observe(box);
+    // 줌은 스크롤 박스가 아니라 안쪽 지도 캔버스의 표시 크기를 바꾼다. 스크롤 위치가
+    // 그대로인 줌(가장자리에 붙어 있을 때)은 scroll 이벤트가 없으므로 캔버스도 관찰한다.
+    const mapCanvas = box.querySelector('canvas[data-version]');
+    if (mapCanvas instanceof HTMLCanvasElement) resizeObserver.observe(mapCanvas);
     return () => {
       box.removeEventListener('scroll', readViewport);
       resizeObserver.disconnect();

@@ -16,6 +16,11 @@ import {
   type TerrainDrawParams,
 } from './sprites';
 import {
+  LIVESTOCK_SHEETS,
+  livestockSourceRect,
+  type LivestockSheet,
+} from './livestockAssets';
+import {
   GENERATED_CHARACTER_SHEET,
   generatedCharacterFacingScale,
   generatedMountedRaiderSourceRect,
@@ -26,10 +31,9 @@ import { FACTIONS, JOB_COLORS } from '../game/constants';
 import { isGateBuilding, isWallBuilding } from '../game/walls';
 import type { BuildingTypeId, JobId, Season, Terrain } from '../game/types';
 import {
-  HISTORICAL_TERRAIN_SAMPLE_SIZE,
   historicalTerrainSampleOffsetFromHash,
   historicalTerrainSourceRect,
-  historicalTerrainVariantFromHash,
+  historicalTerrainVariantFor,
 } from './historicalTerrain';
 import {
   RIVER_AUTOTILE_SIZE,
@@ -106,6 +110,18 @@ import {
   BUILDING_DAMAGE_SHEET,
   buildingDamageSourceRect,
 } from './buildingDamageAssets';
+import {
+  CEMETERY_SHEETS,
+  cemeterySourceRect,
+  type CemeterySheet,
+} from './cemeteryAssets';
+import {
+  OBLIQUE_BUILDING_SHEETS,
+  obliqueBuildingFrame,
+  obliqueBuildingSourceRect,
+  type ObliqueBuildingGroup,
+  type ObliqueBuildingSheet,
+} from './obliqueBuildingAssets';
 import {
   FOREIGN_RESIDENT_SHEET,
   FOREIGN_SITE_CORE_SHEET,
@@ -188,6 +204,16 @@ import {
   RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS,
   woodcutterVideoWorkSourceRect,
 } from './residentWoodcutterVideoWorkAssets';
+import {
+  TERRAIN_GROWTH_DRAW_SIZE,
+  TERRAIN_GROWTH_SHEETS,
+  TERRAIN_GROWTH_TREE_DRAW_SCALE,
+  mineralGrowthSourceRect,
+  mountainGrowthSourceRect,
+  treeGrowthSourceRect,
+  type TerrainGrowthSheet,
+  type TerrainGrowthSourceRect,
+} from './terrainGrowthAssets';
 
 const PITCH = 17;
 const T = 16;
@@ -201,7 +227,10 @@ let sheet: HTMLImageElement | null = null;
 let chars: HTMLImageElement | null = null;
 let riverSheet: HTMLImageElement | null = null;
 let historicalTerrainSheet: HTMLImageElement | null = null;
+let historicalTerrainHdSheet: HTMLImageElement | null = null;
 let terrainObjectSheet: HTMLImageElement | null = null;
+let terrainGrowthSheet: HTMLImageElement | null = null;
+let terrainGrowthHdSheet: HTMLImageElement | null = null;
 let buildingSheet: HTMLImageElement | null = null;
 let largeBuildingSheet: HTMLImageElement | null = null;
 let generatedCharacterSheet: HTMLImageElement | null = null;
@@ -219,6 +248,16 @@ let newContentLargeBuildingSheet: HTMLImageElement | null = null;
 let newContentResidentSheet: HTMLImageElement | null = null;
 let factionRaiderSheet: HTMLImageElement | null = null;
 let buildingDamageSheet: HTMLImageElement | null = null;
+let cemeterySheet: HTMLImageElement | null = null;
+let cemeteryHdSheet: HTMLImageElement | null = null;
+let obliqueOneTileSheet: HTMLImageElement | null = null;
+let obliqueOneTileHdSheet: HTMLImageElement | null = null;
+let obliqueTwoTileSheet: HTMLImageElement | null = null;
+let obliqueTwoTileHdSheet: HTMLImageElement | null = null;
+let obliqueCenterSheet: HTMLImageElement | null = null;
+let obliqueCenterHdSheet: HTMLImageElement | null = null;
+let livestockSheet: HTMLImageElement | null = null;
+let livestockHdSheet: HTMLImageElement | null = null;
 let foreignResidentSheet: HTMLImageElement | null = null;
 let foreignSiteCoreSheet: HTMLImageElement | null = null;
 let foreignSitePropSheet: HTMLImageElement | null = null;
@@ -292,7 +331,10 @@ function ensureLoaded(): void {
   loadAtlasAsset('/assets/roguelikeChar_transparent.png', true, image => { chars = image; });
   loadAtlasAsset('/assets/river-mask-autotile-28px-sheet.png', true, image => { riverSheet = image; });
   loadAtlasAsset('/assets/folk-warm-terrain-v3-28px-sheet.png', true, image => { historicalTerrainSheet = image; });
+  loadAtlasAsset('/assets/folk-warm-terrain-v3-56px-sheet.png', true, image => { historicalTerrainHdSheet = image; });
   loadAtlasAsset(GENERATED_TERRAIN_OBJECT_SHEET.src, true, image => { terrainObjectSheet = image; });
+  loadAtlasAsset(TERRAIN_GROWTH_SHEETS.standard.src, true, image => { terrainGrowthSheet = image; });
+  loadAtlasAsset(TERRAIN_GROWTH_SHEETS.highDefinition.src, true, image => { terrainGrowthHdSheet = image; });
   loadAtlasAsset(GENERATED_BUILDING_SHEET.src, true, image => { buildingSheet = image; });
   loadAtlasAsset(GENERATED_LARGE_BUILDING_SHEET.src, true, image => { largeBuildingSheet = image; });
   loadAtlasAsset(PROMOTION_BUILDING_SHEET.src, true, image => { promotionBuildingSheet = image; });
@@ -309,6 +351,16 @@ function ensureLoaded(): void {
   loadAtlasAsset(NEW_CONTENT_RESIDENT_SHEET.src, true, image => { newContentResidentSheet = image; });
   loadAtlasAsset(FACTION_RAIDER_SHEET.src, true, image => { factionRaiderSheet = image; });
   loadAtlasAsset(BUILDING_DAMAGE_SHEET.src, true, image => { buildingDamageSheet = image; });
+  loadAtlasAsset(CEMETERY_SHEETS.standard.src, true, image => { cemeterySheet = image; });
+  loadAtlasAsset(CEMETERY_SHEETS.highDefinition.src, true, image => { cemeteryHdSheet = image; });
+  loadAtlasAsset(OBLIQUE_BUILDING_SHEETS.oneTile.standard.src, true, image => { obliqueOneTileSheet = image; });
+  loadAtlasAsset(OBLIQUE_BUILDING_SHEETS.oneTile.highDefinition.src, true, image => { obliqueOneTileHdSheet = image; });
+  loadAtlasAsset(OBLIQUE_BUILDING_SHEETS.twoTile.standard.src, true, image => { obliqueTwoTileSheet = image; });
+  loadAtlasAsset(OBLIQUE_BUILDING_SHEETS.twoTile.highDefinition.src, true, image => { obliqueTwoTileHdSheet = image; });
+  loadAtlasAsset(OBLIQUE_BUILDING_SHEETS.center.standard.src, true, image => { obliqueCenterSheet = image; });
+  loadAtlasAsset(OBLIQUE_BUILDING_SHEETS.center.highDefinition.src, true, image => { obliqueCenterHdSheet = image; });
+  loadAtlasAsset(LIVESTOCK_SHEETS.standard.src, true, image => { livestockSheet = image; });
+  loadAtlasAsset(LIVESTOCK_SHEETS.highDefinition.src, true, image => { livestockHdSheet = image; });
   loadAtlasAsset(FOREIGN_RESIDENT_SHEET.src, true, image => { foreignResidentSheet = image; });
   loadAtlasAsset(FOREIGN_SITE_CORE_SHEET.src, true, image => { foreignSiteCoreSheet = image; });
   loadAtlasAsset(FOREIGN_SITE_PROP_SHEET.src, true, image => { foreignSitePropSheet = image; });
@@ -409,6 +461,129 @@ function blitLargeGeneratedBuilding(
   const scale = p.size / GENERATED_LARGE_BUILDING_SHEET.tileSize;
   const destHeight = GENERATED_LARGE_BUILDING_SHEET.spriteHeight * scale;
   ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
+}
+
+function activeCemeterySheet(
+  highDefinition: boolean | undefined,
+): { image: HTMLImageElement; sheet: CemeterySheet } | null {
+  if (highDefinition && cemeteryHdSheet) {
+    return { image: cemeteryHdSheet, sheet: CEMETERY_SHEETS.highDefinition };
+  }
+  if (cemeterySheet) {
+    return { image: cemeterySheet, sheet: CEMETERY_SHEETS.standard };
+  }
+  if (cemeteryHdSheet) {
+    return { image: cemeteryHdSheet, sheet: CEMETERY_SHEETS.highDefinition };
+  }
+  return null;
+}
+
+function blitCemeteryPlot(ctx: CanvasRenderingContext2D, p: BuildingDrawParams): boolean {
+  const active = activeCemeterySheet(p.highDefinition);
+  if (!active) return false;
+  const rect = cemeterySourceRect(active.sheet, p.graveCount ?? 0, p.season === 'winter');
+  const destHeight = p.size * (CEMETERY_SHEETS.standard.cellHeight / CEMETERY_SHEETS.standard.cellWidth);
+  ctx.drawImage(
+    active.image,
+    rect.sx,
+    rect.sy,
+    rect.sw,
+    rect.sh,
+    p.x,
+    p.y + p.size - destHeight,
+    p.size,
+    destHeight,
+  );
+  return true;
+}
+
+function activeObliqueBuildingSheet(
+  group: ObliqueBuildingGroup,
+  highDefinition: boolean | undefined,
+): { image: HTMLImageElement; sheet: ObliqueBuildingSheet } | null {
+  const images = group === 'oneTile'
+    ? { standard: obliqueOneTileSheet, highDefinition: obliqueOneTileHdSheet }
+    : group === 'twoTile'
+      ? { standard: obliqueTwoTileSheet, highDefinition: obliqueTwoTileHdSheet }
+      : { standard: obliqueCenterSheet, highDefinition: obliqueCenterHdSheet };
+  const sheets = OBLIQUE_BUILDING_SHEETS[group];
+  if (highDefinition && images.highDefinition) {
+    return { image: images.highDefinition, sheet: sheets.highDefinition };
+  }
+  if (images.standard) {
+    return { image: images.standard, sheet: sheets.standard };
+  }
+  if (images.highDefinition) {
+    return { image: images.highDefinition, sheet: sheets.highDefinition };
+  }
+  return null;
+}
+
+function blitObliqueBuilding(ctx: CanvasRenderingContext2D, p: BuildingDrawParams): boolean {
+  const frame = obliqueBuildingFrame(p.type, p.rank);
+  if (!frame) return false;
+  const active = activeObliqueBuildingSheet(frame.group, p.highDefinition);
+  if (!active) return false;
+  const rect = obliqueBuildingSourceRect(active.sheet, frame.column, p.season);
+  const destHeight = p.size * (active.sheet.cellHeight / active.sheet.cellWidth);
+  ctx.drawImage(
+    active.image,
+    rect.sx,
+    rect.sy,
+    rect.sw,
+    rect.sh,
+    p.x,
+    p.y + p.size - destHeight,
+    p.size,
+    destHeight,
+  );
+  return true;
+}
+
+function activeLivestockSheet(
+  highDefinition: boolean | undefined,
+): { image: HTMLImageElement; sheet: LivestockSheet } | null {
+  if (highDefinition && livestockHdSheet) {
+    return { image: livestockHdSheet, sheet: LIVESTOCK_SHEETS.highDefinition };
+  }
+  if (livestockSheet) return { image: livestockSheet, sheet: LIVESTOCK_SHEETS.standard };
+  if (livestockHdSheet) return { image: livestockHdSheet, sheet: LIVESTOCK_SHEETS.highDefinition };
+  return null;
+}
+
+function drawCemeteryPlotFallback(ctx: CanvasRenderingContext2D, p: BuildingDrawParams): void {
+  const winter = p.season === 'winter';
+  const inset = Math.max(1, Math.round(p.size * 0.06));
+  ctx.save();
+  ctx.fillStyle = winter ? '#c7d0d2' : '#6d7047';
+  ctx.fillRect(p.x + inset, p.y + inset, p.size - inset * 2, p.size - inset * 2);
+  ctx.strokeStyle = winter ? '#89969a' : '#4c4932';
+  ctx.lineWidth = Math.max(1, Math.round(p.size / 28));
+  ctx.strokeRect(p.x + inset + 0.5, p.y + inset + 0.5, p.size - inset * 2 - 1, p.size - inset * 2 - 1);
+
+  const graves = Math.min(CONFIG.funeral.plotsPerTile, Math.max(0, Math.floor(p.graveCount ?? 0)));
+  const slots = [
+    [0.28, 0.31],
+    [0.71, 0.31],
+    [0.28, 0.72],
+    [0.71, 0.72],
+  ] as const;
+  const moundWidth = Math.max(5, Math.round(p.size * 0.25));
+  const moundHeight = Math.max(3, Math.round(p.size * 0.13));
+  const stoneWidth = Math.max(2, Math.round(p.size * 0.10));
+  const stoneHeight = Math.max(4, Math.round(p.size * 0.18));
+  for (let i = 0; i < graves; i++) {
+    const [fx, fy] = slots[i];
+    const cx = Math.round(p.x + p.size * fx);
+    const cy = Math.round(p.y + p.size * fy);
+    ctx.fillStyle = winter ? '#eef3f4' : '#75613e';
+    ctx.fillRect(cx - Math.floor(moundWidth / 2), cy, moundWidth, moundHeight);
+    ctx.fillStyle = winter ? '#8d989b' : '#6f716c';
+    ctx.fillRect(cx - Math.floor(stoneWidth / 2), cy - stoneHeight + 1, stoneWidth, stoneHeight);
+    ctx.fillStyle = winter ? '#d9e1e3' : '#a2a49d';
+    ctx.fillRect(cx - Math.floor(stoneWidth / 2), cy - stoneHeight + 1, stoneWidth, 1);
+  }
+  ctx.restore();
 }
 
 function blitSpecializedBuilding(
@@ -953,19 +1128,35 @@ function drawBanks(
 }
 
 // 역사 지형 시트에서 땅 텍스처를 그린다 (타일 좌표 해시로 뒤집기/표본 위치 변형)
+function activeHistoricalTerrain(
+  highDefinition: boolean | undefined,
+): { image: HTMLImageElement; sourceScale: 1 | 2 } | null {
+  if (highDefinition && historicalTerrainHdSheet) {
+    return { image: historicalTerrainHdSheet, sourceScale: 2 };
+  }
+  if (historicalTerrainSheet) {
+    return { image: historicalTerrainSheet, sourceScale: 1 };
+  }
+  if (historicalTerrainHdSheet) {
+    return { image: historicalTerrainHdSheet, sourceScale: 2 };
+  }
+  return null;
+}
+
 function drawHistoricalGround(
   ctx: CanvasRenderingContext2D, terrain: Terrain, p: TerrainDrawParams, h: number,
 ): boolean {
-  if (!historicalTerrainSheet) return false;
-  const rect = historicalTerrainSourceRect(terrain, p.season);
+  const active = activeHistoricalTerrain(p.highDefinition);
+  if (!active) return false;
+  const rect = historicalTerrainSourceRect(terrain, p.season, active.sourceScale);
   if (!rect) return false;
-  const variant = historicalTerrainVariantFromHash(h);
-  const sampleOffset = historicalTerrainSampleOffsetFromHash(h);
+  const variant = historicalTerrainVariantFor(terrain, h);
+  const sampleOffset = historicalTerrainSampleOffsetFromHash(h, active.sourceScale);
   ctx.save();
   ctx.translate(p.x + (variant.flipX ? p.size : 0), p.y + (variant.flipY ? p.size : 0));
   ctx.scale(variant.flipX ? -1 : 1, variant.flipY ? -1 : 1);
   ctx.drawImage(
-    historicalTerrainSheet,
+    active.image,
     rect.sx + sampleOffset.dx,
     rect.sy + sampleOffset.dy,
     rect.sw,
@@ -1024,18 +1215,21 @@ function drawRiverTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParams, h: n
   }
 
   // 5) 대각선만 뭍인 모서리는 뭍+둑으로 되메워 이웃 강 타일의 물가와 맞물린다
-  const groundRect = historicalTerrainSourceRect('plain', p.season);
-  const srcScale = HISTORICAL_TERRAIN_SAMPLE_SIZE / RIVER_AUTOTILE_SIZE;
+  const activeGround = activeHistoricalTerrain(p.highDefinition);
+  const groundRect = activeGround
+    ? historicalTerrainSourceRect('plain', p.season, activeGround.sourceScale)
+    : null;
+  const srcScale = groundRect ? groundRect.sw / RIVER_AUTOTILE_SIZE : 1;
   for (const corner of riverLandCorners(nb)) {
     const right = corner === 'ne' || corner === 'se';
     const bottom = corner === 'se' || corner === 'sw';
     const cx = p.x + (right ? p.size - inset : 0);
     const cy = p.y + (bottom ? p.size - inset : 0);
-    if (groundRect && historicalTerrainSheet) {
+    if (groundRect && activeGround) {
       ctx.drawImage(
-        historicalTerrainSheet,
-        groundRect.sx + (right ? HISTORICAL_TERRAIN_SAMPLE_SIZE - RIVER_BANK_INSET * srcScale : 0),
-        groundRect.sy + (bottom ? HISTORICAL_TERRAIN_SAMPLE_SIZE - RIVER_BANK_INSET * srcScale : 0),
+        activeGround.image,
+        groundRect.sx + (right ? groundRect.sw - RIVER_BANK_INSET * srcScale : 0),
+        groundRect.sy + (bottom ? groundRect.sh - RIVER_BANK_INSET * srcScale : 0),
         RIVER_BANK_INSET * srcScale, RIVER_BANK_INSET * srcScale,
         cx, cy, inset, inset,
       );
@@ -1190,8 +1384,37 @@ function drawWallFamilyBuilding(ctx: CanvasRenderingContext2D, p: BuildingDrawPa
   return true;
 }
 
+function activeTerrainGrowthSheet(
+  highDefinition: boolean | undefined,
+): { image: HTMLImageElement; sheet: TerrainGrowthSheet } | null {
+  if (highDefinition && terrainGrowthHdSheet) {
+    return { image: terrainGrowthHdSheet, sheet: TERRAIN_GROWTH_SHEETS.highDefinition };
+  }
+  if (terrainGrowthSheet) {
+    return { image: terrainGrowthSheet, sheet: TERRAIN_GROWTH_SHEETS.standard };
+  }
+  if (terrainGrowthHdSheet) {
+    return { image: terrainGrowthHdSheet, sheet: TERRAIN_GROWTH_SHEETS.highDefinition };
+  }
+  return null;
+}
+
+function blitTerrainGrowth(
+  ctx: CanvasRenderingContext2D,
+  p: TerrainDrawParams,
+  source: TerrainGrowthSourceRect,
+  image: HTMLImageElement,
+  drawScale = 1,
+): void {
+  const width = TERRAIN_GROWTH_DRAW_SIZE.width * drawScale;
+  const height = TERRAIN_GROWTH_DRAW_SIZE.height * drawScale;
+  const x = p.x + p.size / 2 - width / 2;
+  const y = p.y + p.size - height;
+  ctx.drawImage(image, source.sx, source.sy, source.sw, source.sh, x, y, width, height);
+}
+
 export const atlasSprites: SpriteAPI = {
-  id: 'kenney-atlas-river-mask-historical-ground-generated-objects-buildings-promotion-centers-specialized-special-residents-v3',
+  id: 'kenney-atlas-river-mask-historical-ground-terrain-growth-hd-v4',
 
   drawTerrain(ctx, p) {
     if (!sheet) return;
@@ -1240,18 +1463,60 @@ export const atlasSprites: SpriteAPI = {
       ctx.fillRect(p.x, p.y, p.size, p.size);
     }
 
-    // 지형 오브젝트 (숲은 활엽수/소나무를 타일 해시로 섞어 단조로움을 줄인다)
-    let terrainObject = terrainObjectFor(p.terrain, p.season, p.hasIron ?? false);
-    if (terrainObject === 'lowRock' && h % 2 === 1) terrainObject = 'fieldstone';
-    if (terrainObject === 'broadleaf' && h % 3 === 0) terrainObject = 'pine';
-    if (terrainObject === 'winterTree' && h % 3 === 0) terrainObject = 'snowPine';
-    if (terrainObject && terrainObjectSheet) {
-      blitTerrainObject(ctx, terrainObjectSheet, terrainObject, p.x, p.y, p.size);
+    // 새 자산이 준비되지 않은 동안에는 기존 한 칸 소품을 폴백으로 유지한다.
+    if (!activeTerrainGrowthSheet(p.highDefinition)) {
+      let terrainObject = terrainObjectFor(p.terrain, p.season, p.hasIron ?? false);
+      if (terrainObject === 'lowRock' && h % 2 === 1) terrainObject = 'fieldstone';
+      if (terrainObject === 'broadleaf' && h % 3 === 0) terrainObject = 'pine';
+      if (terrainObject === 'winterTree' && h % 3 === 0) terrainObject = 'snowPine';
+      if (terrainObject && terrainObjectSheet) {
+        blitTerrainObject(ctx, terrainObjectSheet, terrainObject, p.x, p.y, p.size);
+      }
     }
 
     // 계절 색조 (겨울 눈덮임 / 가을 마름)
     if (!drewHistoricalGround) {
       seasonWash(ctx, p.season, p.x, p.y, p.size);
+    }
+  },
+
+  drawTerrainProp(ctx, p) {
+    const growth = activeTerrainGrowthSheet(p.highDefinition);
+    if (!growth) return;
+    ctx.imageSmoothingEnabled = false;
+    if (p.terrain === 'forest' && p.treeStage === 'stump') {
+      const source = treeGrowthSourceRect(
+        growth.sheet,
+        p.season,
+        p.treeSpecies ?? 'broadleaf',
+        'stump',
+      );
+      blitTerrainGrowth(ctx, p, source, growth.image, TERRAIN_GROWTH_TREE_DRAW_SCALE);
+    } else if (p.terrain === 'rock' && p.mineralResource && p.mineralTier) {
+      const source = mineralGrowthSourceRect(growth.sheet, p.mineralResource, p.mineralTier);
+      blitTerrainGrowth(ctx, p, source, growth.image);
+    }
+  },
+
+  drawTerrainOverlay(ctx, p) {
+    const growth = activeTerrainGrowthSheet(p.highDefinition);
+    if (!growth) return;
+    ctx.imageSmoothingEnabled = false;
+    if (p.terrain === 'forest' && p.treeStage && p.treeStage !== 'stump') {
+      const source = treeGrowthSourceRect(
+        growth.sheet,
+        p.season,
+        p.treeSpecies ?? 'broadleaf',
+        p.treeStage,
+      );
+      blitTerrainGrowth(ctx, p, source, growth.image, TERRAIN_GROWTH_TREE_DRAW_SCALE);
+    } else if (p.terrain === 'mountain') {
+      const source = mountainGrowthSourceRect(
+        growth.sheet,
+        p.winter,
+        p.mountainProfile ?? 'shoulder',
+      );
+      blitTerrainGrowth(ctx, p, source, growth.image);
     }
   },
 
@@ -1261,6 +1526,19 @@ export const atlasSprites: SpriteAPI = {
     const spr = BUILDING_SPRITES[p.type];
     const alpha = p.ghost ? 0.75 : p.built ? 1 : 0.55;
     ctx.globalAlpha = alpha;
+
+    if (p.type === 'cemetery') {
+      if (!blitCemeteryPlot(ctx, p)) drawCemeteryPlotFallback(ctx, p);
+      ctx.globalAlpha = 1;
+      drawProgressBar(ctx, p);
+      return;
+    }
+
+    if (blitObliqueBuilding(ctx, p)) {
+      ctx.globalAlpha = 1;
+      drawProgressBar(ctx, p);
+      return;
+    }
 
     if (p.type === 'center' && p.rank && p.rank !== 'settlement' && centerPromotionSheet) {
       blitCenterPromotion(ctx, centerPromotionSheet, p);
@@ -1387,6 +1665,28 @@ export const atlasSprites: SpriteAPI = {
       p.size,
       destHeight,
     );
+  },
+
+  drawLivestock(ctx, p) {
+    const active = activeLivestockSheet(p.highDefinition);
+    if (!active) return;
+    const rect = livestockSourceRect(active.sheet, p.species);
+    const drawSize = CONFIG.ui.tileSize;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    if (p.facing === -1) ctx.scale(-1, 1);
+    ctx.drawImage(
+      active.image,
+      rect.sx,
+      rect.sy,
+      rect.sw,
+      rect.sh,
+      -drawSize / 2,
+      -drawSize / 2,
+      drawSize,
+      drawSize,
+    );
+    ctx.restore();
   },
 
   drawForeignStructure(ctx, p) {

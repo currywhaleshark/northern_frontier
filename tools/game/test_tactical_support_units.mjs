@@ -115,7 +115,7 @@ assert.equal(enemyPlan.enemyDoctrineDefinition('fireSupport').enabled, true);
   assert.ok(rear > front, 'rear raids punish exposed support units');
 }
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 36);
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 37);
 assert.equal(saveLoad.migrateV28ToV29({ schemaVersion: 28, marker: 'kept' }).marker, 'kept');
 assert.equal(saveLoad.migrateV29ToV30({ schemaVersion: 29, marker: 'kept' }).marker, 'kept');
 

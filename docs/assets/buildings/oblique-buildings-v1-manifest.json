@@ -1,0 +1,2203 @@
+{
+  "version": 2,
+  "projection": "inclined orthographic top-down",
+  "anchor": "bottom-center",
+  "groups": {
+    "twoTile": {
+      "group": "twoTile",
+      "frameOrder": [
+        "hut",
+        "ondol",
+        "tileHouse",
+        "storehouse",
+        "cellar",
+        "smokehouse",
+        "jangdokdae",
+        "woodShed",
+        "clinic",
+        "watermill",
+        "smithy",
+        "charcoalKiln",
+        "stable",
+        "nitreYard",
+        "tannery",
+        "weavingHouse",
+        "beacon",
+        "garrison",
+        "office",
+        "market",
+        "school",
+        "shrine",
+        "hermitage",
+        "cannonEmplacement"
+      ],
+      "seasons": [
+        "normal",
+        "winter"
+      ],
+      "cellHd": [
+        112,
+        160
+      ],
+      "cellStandard": [
+        56,
+        80
+      ],
+      "sheetHd": [
+        2688,
+        320
+      ],
+      "sheetStandard": [
+        1344,
+        160
+      ],
+      "outputHd": "public/assets/oblique-buildings-2x2-v1-hd.png",
+      "outputStandard": "public/assets/oblique-buildings-2x2-v1.png",
+      "frames": [
+        {
+          "id": "hut",
+          "season": "normal",
+          "column": 0,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/normal-processed/building-1.png",
+          "sourceBBox": [
+            57,
+            87,
+            454,
+            425
+          ],
+          "packedSizeHd": [
+            108,
+            92
+          ],
+          "pasteHd": [
+            2,
+            66
+          ],
+          "packedBBoxHd": [
+            2,
+            66,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "ondol",
+          "season": "normal",
+          "column": 1,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/normal-processed/building-2.png",
+          "sourceBBox": [
+            56,
+            84,
+            455,
+            428
+          ],
+          "packedSizeHd": [
+            108,
+            93
+          ],
+          "pasteHd": [
+            2,
+            65
+          ],
+          "packedBBoxHd": [
+            2,
+            65,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "tileHouse",
+          "season": "normal",
+          "column": 2,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/normal-processed/building-3.png",
+          "sourceBBox": [
+            58,
+            101,
+            455,
+            410
+          ],
+          "packedSizeHd": [
+            108,
+            84
+          ],
+          "pasteHd": [
+            2,
+            74
+          ],
+          "packedBBoxHd": [
+            2,
+            74,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "storehouse",
+          "season": "normal",
+          "column": 3,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/normal-processed/building-4.png",
+          "sourceBBox": [
+            56,
+            79,
+            453,
+            433
+          ],
+          "packedSizeHd": [
+            108,
+            96
+          ],
+          "pasteHd": [
+            2,
+            62
+          ],
+          "packedBBoxHd": [
+            2,
+            62,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "cellar",
+          "season": "normal",
+          "column": 4,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/normal-processed/building-5.png",
+          "sourceBBox": [
+            56,
+            147,
+            455,
+            365
+          ],
+          "packedSizeHd": [
+            108,
+            59
+          ],
+          "pasteHd": [
+            2,
+            99
+          ],
+          "packedBBoxHd": [
+            2,
+            99,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "smokehouse",
+          "season": "normal",
+          "column": 5,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/normal-processed/building-6.png",
+          "sourceBBox": [
+            56,
+            104,
+            454,
+            403
+          ],
+          "packedSizeHd": [
+            108,
+            81
+          ],
+          "pasteHd": [
+            2,
+            77
+          ],
+          "packedBBoxHd": [
+            2,
+            77,
+            99,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "jangdokdae",
+          "season": "normal",
+          "column": 6,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/normal-processed/building-7.png",
+          "sourceBBox": [
+            56,
+            120,
+            455,
+            391
+          ],
+          "packedSizeHd": [
+            108,
+            73
+          ],
+          "pasteHd": [
+            2,
+            85
+          ],
+          "packedBBoxHd": [
+            2,
+            85,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "woodShed",
+          "season": "normal",
+          "column": 7,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/normal-processed/building-8.png",
+          "sourceBBox": [
+            56,
+            116,
+            455,
+            396
+          ],
+          "packedSizeHd": [
+            108,
+            76
+          ],
+          "pasteHd": [
+            2,
+            82
+          ],
+          "packedBBoxHd": [
+            2,
+            82,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "clinic",
+          "season": "normal",
+          "column": 8,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/normal-processed/building-1.png",
+          "sourceBBox": [
+            56,
+            86,
+            455,
+            427
+          ],
+          "packedSizeHd": [
+            108,
+            92
+          ],
+          "pasteHd": [
+            2,
+            66
+          ],
+          "packedBBoxHd": [
+            2,
+            66,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "watermill",
+          "season": "normal",
+          "column": 9,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/normal-processed/building-2.png",
+          "sourceBBox": [
+            59,
+            93,
+            455,
+            418
+          ],
+          "packedSizeHd": [
+            108,
+            89
+          ],
+          "pasteHd": [
+            2,
+            69
+          ],
+          "packedBBoxHd": [
+            7,
+            69,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "smithy",
+          "season": "normal",
+          "column": 10,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/normal-processed/building-3.png",
+          "sourceBBox": [
+            58,
+            75,
+            455,
+            438
+          ],
+          "packedSizeHd": [
+            108,
+            99
+          ],
+          "pasteHd": [
+            2,
+            59
+          ],
+          "packedBBoxHd": [
+            2,
+            59,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "charcoalKiln",
+          "season": "normal",
+          "column": 11,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/normal-processed/building-4.png",
+          "sourceBBox": [
+            56,
+            128,
+            455,
+            383
+          ],
+          "packedSizeHd": [
+            108,
+            69
+          ],
+          "pasteHd": [
+            2,
+            89
+          ],
+          "packedBBoxHd": [
+            2,
+            89,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "stable",
+          "season": "normal",
+          "column": 12,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/normal-processed/building-5.png",
+          "sourceBBox": [
+            56,
+            98,
+            455,
+            414
+          ],
+          "packedSizeHd": [
+            108,
+            86
+          ],
+          "pasteHd": [
+            2,
+            72
+          ],
+          "packedBBoxHd": [
+            2,
+            72,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "nitreYard",
+          "season": "normal",
+          "column": 13,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/normal-processed/building-6.png",
+          "sourceBBox": [
+            56,
+            85,
+            455,
+            427
+          ],
+          "packedSizeHd": [
+            108,
+            93
+          ],
+          "pasteHd": [
+            2,
+            65
+          ],
+          "packedBBoxHd": [
+            2,
+            65,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "tannery",
+          "season": "normal",
+          "column": 14,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/normal-processed/building-7.png",
+          "sourceBBox": [
+            57,
+            100,
+            455,
+            411
+          ],
+          "packedSizeHd": [
+            108,
+            84
+          ],
+          "pasteHd": [
+            2,
+            74
+          ],
+          "packedBBoxHd": [
+            2,
+            74,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "weavingHouse",
+          "season": "normal",
+          "column": 15,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/normal-processed/building-8.png",
+          "sourceBBox": [
+            56,
+            76,
+            455,
+            435
+          ],
+          "packedSizeHd": [
+            108,
+            97
+          ],
+          "pasteHd": [
+            2,
+            61
+          ],
+          "packedBBoxHd": [
+            2,
+            61,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "beacon",
+          "season": "normal",
+          "column": 16,
+          "row": 0,
+          "source": "tools/render/generated/building-redesign-v2/beacon/normal-processed.png",
+          "sourceBBox": [
+            147,
+            197,
+            1107,
+            1094
+          ],
+          "packedSizeHd": [
+            108,
+            101
+          ],
+          "pasteHd": [
+            2,
+            57
+          ],
+          "packedBBoxHd": [
+            2,
+            57,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "garrison",
+          "season": "normal",
+          "column": 17,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-c/normal-processed/building-2.png",
+          "sourceBBox": [
+            56,
+            91,
+            454,
+            421
+          ],
+          "packedSizeHd": [
+            108,
+            90
+          ],
+          "pasteHd": [
+            2,
+            68
+          ],
+          "packedBBoxHd": [
+            2,
+            68,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "office",
+          "season": "normal",
+          "column": 18,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-c/normal-processed/building-3.png",
+          "sourceBBox": [
+            56,
+            80,
+            455,
+            431
+          ],
+          "packedSizeHd": [
+            108,
+            95
+          ],
+          "pasteHd": [
+            2,
+            63
+          ],
+          "packedBBoxHd": [
+            2,
+            63,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "market",
+          "season": "normal",
+          "column": 19,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-c/normal-processed/building-4.png",
+          "sourceBBox": [
+            56,
+            114,
+            455,
+            397
+          ],
+          "packedSizeHd": [
+            108,
+            77
+          ],
+          "pasteHd": [
+            2,
+            81
+          ],
+          "packedBBoxHd": [
+            2,
+            81,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "school",
+          "season": "normal",
+          "column": 20,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-c/normal-processed/building-5.png",
+          "sourceBBox": [
+            56,
+            80,
+            455,
+            432
+          ],
+          "packedSizeHd": [
+            108,
+            95
+          ],
+          "pasteHd": [
+            2,
+            63
+          ],
+          "packedBBoxHd": [
+            2,
+            63,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "shrine",
+          "season": "normal",
+          "column": 21,
+          "row": 0,
+          "source": "tools/render/generated/building-redesign-v2/shrine/normal-processed.png",
+          "sourceBBox": [
+            219,
+            188,
+            1111,
+            1125
+          ],
+          "packedSizeHd": [
+            108,
+            113
+          ],
+          "pasteHd": [
+            2,
+            45
+          ],
+          "packedBBoxHd": [
+            2,
+            45,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "hermitage",
+          "season": "normal",
+          "column": 22,
+          "row": 0,
+          "source": "tools/render/generated/building-redesign-v2/hermitage/normal-processed.png",
+          "sourceBBox": [
+            176,
+            216,
+            1086,
+            1055
+          ],
+          "packedSizeHd": [
+            108,
+            100
+          ],
+          "pasteHd": [
+            2,
+            58
+          ],
+          "packedBBoxHd": [
+            2,
+            58,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "cannonEmplacement",
+          "season": "normal",
+          "column": 23,
+          "row": 0,
+          "source": "tools/render/generated/building-redesign-v2/cannonEmplacement/normal-processed.png",
+          "sourceBBox": [
+            321,
+            111,
+            908,
+            1206
+          ],
+          "packedSizeHd": [
+            83,
+            154
+          ],
+          "pasteHd": [
+            14,
+            4
+          ],
+          "packedBBoxHd": [
+            14,
+            4,
+            97,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "hut",
+          "season": "winter",
+          "column": 0,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/winter-processed/building-1.png",
+          "sourceBBox": [
+            56,
+            83,
+            455,
+            428
+          ],
+          "packedSizeHd": [
+            108,
+            93
+          ],
+          "pasteHd": [
+            2,
+            65
+          ],
+          "packedBBoxHd": [
+            2,
+            65,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "ondol",
+          "season": "winter",
+          "column": 1,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/winter-processed/building-2.png",
+          "sourceBBox": [
+            56,
+            81,
+            455,
+            431
+          ],
+          "packedSizeHd": [
+            108,
+            95
+          ],
+          "pasteHd": [
+            2,
+            63
+          ],
+          "packedBBoxHd": [
+            2,
+            63,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "tileHouse",
+          "season": "winter",
+          "column": 2,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/winter-processed/building-3.png",
+          "sourceBBox": [
+            56,
+            97,
+            455,
+            415
+          ],
+          "packedSizeHd": [
+            108,
+            86
+          ],
+          "pasteHd": [
+            2,
+            72
+          ],
+          "packedBBoxHd": [
+            2,
+            72,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "storehouse",
+          "season": "winter",
+          "column": 3,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/winter-processed/building-4.png",
+          "sourceBBox": [
+            56,
+            78,
+            455,
+            434
+          ],
+          "packedSizeHd": [
+            108,
+            96
+          ],
+          "pasteHd": [
+            2,
+            62
+          ],
+          "packedBBoxHd": [
+            2,
+            62,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "cellar",
+          "season": "winter",
+          "column": 4,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/winter-processed/building-5.png",
+          "sourceBBox": [
+            56,
+            144,
+            455,
+            367
+          ],
+          "packedSizeHd": [
+            108,
+            60
+          ],
+          "pasteHd": [
+            2,
+            98
+          ],
+          "packedBBoxHd": [
+            2,
+            98,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "smokehouse",
+          "season": "winter",
+          "column": 5,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/winter-processed/building-6.png",
+          "sourceBBox": [
+            56,
+            101,
+            455,
+            410
+          ],
+          "packedSizeHd": [
+            108,
+            84
+          ],
+          "pasteHd": [
+            2,
+            74
+          ],
+          "packedBBoxHd": [
+            2,
+            74,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "jangdokdae",
+          "season": "winter",
+          "column": 6,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/winter-processed/building-7.png",
+          "sourceBBox": [
+            56,
+            117,
+            455,
+            394
+          ],
+          "packedSizeHd": [
+            108,
+            75
+          ],
+          "pasteHd": [
+            2,
+            83
+          ],
+          "packedBBoxHd": [
+            2,
+            83,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "woodShed",
+          "season": "winter",
+          "column": 7,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-a/winter-processed/building-8.png",
+          "sourceBBox": [
+            56,
+            115,
+            455,
+            396
+          ],
+          "packedSizeHd": [
+            108,
+            76
+          ],
+          "pasteHd": [
+            2,
+            82
+          ],
+          "packedBBoxHd": [
+            2,
+            82,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "clinic",
+          "season": "winter",
+          "column": 8,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/winter-processed/building-1.png",
+          "sourceBBox": [
+            56,
+            83,
+            455,
+            429
+          ],
+          "packedSizeHd": [
+            108,
+            94
+          ],
+          "pasteHd": [
+            2,
+            64
+          ],
+          "packedBBoxHd": [
+            2,
+            64,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "watermill",
+          "season": "winter",
+          "column": 9,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/winter-processed/building-2.png",
+          "sourceBBox": [
+            57,
+            91,
+            455,
+            420
+          ],
+          "packedSizeHd": [
+            108,
+            89
+          ],
+          "pasteHd": [
+            2,
+            69
+          ],
+          "packedBBoxHd": [
+            2,
+            69,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "smithy",
+          "season": "winter",
+          "column": 10,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/winter-processed/building-3.png",
+          "sourceBBox": [
+            56,
+            72,
+            455,
+            439
+          ],
+          "packedSizeHd": [
+            108,
+            99
+          ],
+          "pasteHd": [
+            2,
+            59
+          ],
+          "packedBBoxHd": [
+            2,
+            59,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "charcoalKiln",
+          "season": "winter",
+          "column": 11,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/winter-processed/building-4.png",
+          "sourceBBox": [
+            56,
+            128,
+            455,
+            384
+          ],
+          "packedSizeHd": [
+            108,
+            69
+          ],
+          "pasteHd": [
+            2,
+            89
+          ],
+          "packedBBoxHd": [
+            2,
+            89,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "stable",
+          "season": "winter",
+          "column": 12,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/winter-processed/building-5.png",
+          "sourceBBox": [
+            56,
+            96,
+            455,
+            416
+          ],
+          "packedSizeHd": [
+            108,
+            87
+          ],
+          "pasteHd": [
+            2,
+            71
+          ],
+          "packedBBoxHd": [
+            2,
+            71,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "nitreYard",
+          "season": "winter",
+          "column": 13,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/winter-processed/building-6.png",
+          "sourceBBox": [
+            56,
+            83,
+            455,
+            429
+          ],
+          "packedSizeHd": [
+            108,
+            94
+          ],
+          "pasteHd": [
+            2,
+            64
+          ],
+          "packedBBoxHd": [
+            2,
+            64,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "tannery",
+          "season": "winter",
+          "column": 14,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/winter-processed/building-7.png",
+          "sourceBBox": [
+            56,
+            98,
+            455,
+            414
+          ],
+          "packedSizeHd": [
+            108,
+            86
+          ],
+          "pasteHd": [
+            2,
+            72
+          ],
+          "packedBBoxHd": [
+            2,
+            72,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "weavingHouse",
+          "season": "winter",
+          "column": 15,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-b/winter-processed/building-8.png",
+          "sourceBBox": [
+            56,
+            73,
+            455,
+            438
+          ],
+          "packedSizeHd": [
+            108,
+            99
+          ],
+          "pasteHd": [
+            2,
+            59
+          ],
+          "packedBBoxHd": [
+            2,
+            59,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "beacon",
+          "season": "winter",
+          "column": 16,
+          "row": 1,
+          "source": "tools/render/generated/building-redesign-v2/beacon/winter-processed.png",
+          "sourceBBox": [
+            149,
+            195,
+            1105,
+            1093
+          ],
+          "packedSizeHd": [
+            108,
+            101
+          ],
+          "pasteHd": [
+            2,
+            57
+          ],
+          "packedBBoxHd": [
+            2,
+            57,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "garrison",
+          "season": "winter",
+          "column": 17,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-c/winter-processed/building-2.png",
+          "sourceBBox": [
+            56,
+            90,
+            455,
+            421
+          ],
+          "packedSizeHd": [
+            108,
+            90
+          ],
+          "pasteHd": [
+            2,
+            68
+          ],
+          "packedBBoxHd": [
+            2,
+            68,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "office",
+          "season": "winter",
+          "column": 18,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-c/winter-processed/building-3.png",
+          "sourceBBox": [
+            56,
+            80,
+            455,
+            431
+          ],
+          "packedSizeHd": [
+            108,
+            95
+          ],
+          "pasteHd": [
+            2,
+            63
+          ],
+          "packedBBoxHd": [
+            2,
+            63,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "market",
+          "season": "winter",
+          "column": 19,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-c/winter-processed/building-4.png",
+          "sourceBBox": [
+            56,
+            113,
+            455,
+            398
+          ],
+          "packedSizeHd": [
+            108,
+            77
+          ],
+          "pasteHd": [
+            2,
+            81
+          ],
+          "packedBBoxHd": [
+            2,
+            81,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "school",
+          "season": "winter",
+          "column": 20,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/2x2-c/winter-processed/building-5.png",
+          "sourceBBox": [
+            56,
+            79,
+            455,
+            432
+          ],
+          "packedSizeHd": [
+            108,
+            96
+          ],
+          "pasteHd": [
+            2,
+            62
+          ],
+          "packedBBoxHd": [
+            2,
+            62,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "shrine",
+          "season": "winter",
+          "column": 21,
+          "row": 1,
+          "source": "tools/render/generated/building-redesign-v2/shrine/winter-processed.png",
+          "sourceBBox": [
+            219,
+            188,
+            1111,
+            1125
+          ],
+          "packedSizeHd": [
+            108,
+            113
+          ],
+          "pasteHd": [
+            2,
+            45
+          ],
+          "packedBBoxHd": [
+            2,
+            45,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "hermitage",
+          "season": "winter",
+          "column": 22,
+          "row": 1,
+          "source": "tools/render/generated/building-redesign-v2/hermitage/winter-processed.png",
+          "sourceBBox": [
+            177,
+            216,
+            1084,
+            1053
+          ],
+          "packedSizeHd": [
+            108,
+            100
+          ],
+          "pasteHd": [
+            2,
+            58
+          ],
+          "packedBBoxHd": [
+            2,
+            58,
+            110,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "cannonEmplacement",
+          "season": "winter",
+          "column": 23,
+          "row": 1,
+          "source": "tools/render/generated/building-redesign-v2/cannonEmplacement/winter-processed.png",
+          "sourceBBox": [
+            322,
+            110,
+            908,
+            1206
+          ],
+          "packedSizeHd": [
+            82,
+            154
+          ],
+          "pasteHd": [
+            15,
+            4
+          ],
+          "packedBBoxHd": [
+            15,
+            4,
+            97,
+            158
+          ],
+          "touchesCellEdge": false
+        }
+      ]
+    },
+    "oneTile": {
+      "group": "oneTile",
+      "frameOrder": [
+        "lumberCamp",
+        "huntLodge",
+        "herbHut",
+        "mine",
+        "ferry",
+        "dryingRack",
+        "onggiKiln",
+        "dock",
+        "watchtower"
+      ],
+      "seasons": [
+        "normal",
+        "winter"
+      ],
+      "cellHd": [
+        56,
+        80
+      ],
+      "cellStandard": [
+        28,
+        40
+      ],
+      "sheetHd": [
+        504,
+        160
+      ],
+      "sheetStandard": [
+        252,
+        80
+      ],
+      "outputHd": "public/assets/oblique-buildings-1x1-v1-hd.png",
+      "outputStandard": "public/assets/oblique-buildings-1x1-v1.png",
+      "frames": [
+        {
+          "id": "lumberCamp",
+          "season": "normal",
+          "column": 0,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-a/normal-processed/building-2.png",
+          "sourceBBox": [
+            56,
+            59,
+            454,
+            452
+          ],
+          "packedSizeHd": [
+            54,
+            53
+          ],
+          "pasteHd": [
+            1,
+            25
+          ],
+          "packedBBoxHd": [
+            1,
+            25,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "huntLodge",
+          "season": "normal",
+          "column": 1,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-a/normal-processed/building-3.png",
+          "sourceBBox": [
+            56,
+            77,
+            455,
+            434
+          ],
+          "packedSizeHd": [
+            54,
+            48
+          ],
+          "pasteHd": [
+            1,
+            30
+          ],
+          "packedBBoxHd": [
+            1,
+            30,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "herbHut",
+          "season": "normal",
+          "column": 2,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-a/normal-processed/building-4.png",
+          "sourceBBox": [
+            61,
+            57,
+            450,
+            455
+          ],
+          "packedSizeHd": [
+            54,
+            55
+          ],
+          "pasteHd": [
+            1,
+            23
+          ],
+          "packedBBoxHd": [
+            1,
+            23,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "mine",
+          "season": "normal",
+          "column": 3,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-a/normal-processed/building-5.png",
+          "sourceBBox": [
+            57,
+            77,
+            454,
+            434
+          ],
+          "packedSizeHd": [
+            54,
+            49
+          ],
+          "pasteHd": [
+            1,
+            29
+          ],
+          "packedBBoxHd": [
+            1,
+            29,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "ferry",
+          "season": "normal",
+          "column": 4,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-a/normal-processed/building-6.png",
+          "sourceBBox": [
+            56,
+            121,
+            455,
+            392
+          ],
+          "packedSizeHd": [
+            54,
+            37
+          ],
+          "pasteHd": [
+            1,
+            41
+          ],
+          "packedBBoxHd": [
+            1,
+            41,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "dryingRack",
+          "season": "normal",
+          "column": 5,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-a/normal-processed/building-7.png",
+          "sourceBBox": [
+            56,
+            119,
+            455,
+            394
+          ],
+          "packedSizeHd": [
+            54,
+            37
+          ],
+          "pasteHd": [
+            1,
+            41
+          ],
+          "packedBBoxHd": [
+            1,
+            41,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "onggiKiln",
+          "season": "normal",
+          "column": 6,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-a/normal-processed/building-8.png",
+          "sourceBBox": [
+            56,
+            80,
+            455,
+            432
+          ],
+          "packedSizeHd": [
+            54,
+            48
+          ],
+          "pasteHd": [
+            1,
+            30
+          ],
+          "packedBBoxHd": [
+            1,
+            30,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "dock",
+          "season": "normal",
+          "column": 7,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-b/normal-processed/building-1.png",
+          "sourceBBox": [
+            56,
+            79,
+            455,
+            433
+          ],
+          "packedSizeHd": [
+            54,
+            48
+          ],
+          "pasteHd": [
+            1,
+            30
+          ],
+          "packedBBoxHd": [
+            1,
+            30,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "watchtower",
+          "season": "normal",
+          "column": 8,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-b/normal-processed/building-2.png",
+          "sourceBBox": [
+            152,
+            56,
+            360,
+            455
+          ],
+          "packedSizeHd": [
+            40,
+            76
+          ],
+          "pasteHd": [
+            8,
+            2
+          ],
+          "packedBBoxHd": [
+            8,
+            2,
+            48,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "lumberCamp",
+          "season": "winter",
+          "column": 0,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-a/winter-processed/building-2.png",
+          "sourceBBox": [
+            56,
+            59,
+            455,
+            452
+          ],
+          "packedSizeHd": [
+            54,
+            53
+          ],
+          "pasteHd": [
+            1,
+            25
+          ],
+          "packedBBoxHd": [
+            1,
+            25,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "huntLodge",
+          "season": "winter",
+          "column": 1,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-a/winter-processed/building-3.png",
+          "sourceBBox": [
+            56,
+            74,
+            455,
+            437
+          ],
+          "packedSizeHd": [
+            54,
+            49
+          ],
+          "pasteHd": [
+            1,
+            29
+          ],
+          "packedBBoxHd": [
+            1,
+            29,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "herbHut",
+          "season": "winter",
+          "column": 2,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-a/winter-processed/building-4.png",
+          "sourceBBox": [
+            60,
+            56,
+            452,
+            455
+          ],
+          "packedSizeHd": [
+            54,
+            55
+          ],
+          "pasteHd": [
+            1,
+            23
+          ],
+          "packedBBoxHd": [
+            1,
+            23,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "mine",
+          "season": "winter",
+          "column": 3,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-a/winter-processed/building-5.png",
+          "sourceBBox": [
+            56,
+            75,
+            455,
+            437
+          ],
+          "packedSizeHd": [
+            54,
+            49
+          ],
+          "pasteHd": [
+            1,
+            29
+          ],
+          "packedBBoxHd": [
+            1,
+            29,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "ferry",
+          "season": "winter",
+          "column": 4,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-a/winter-processed/building-6.png",
+          "sourceBBox": [
+            56,
+            119,
+            455,
+            393
+          ],
+          "packedSizeHd": [
+            54,
+            37
+          ],
+          "pasteHd": [
+            1,
+            41
+          ],
+          "packedBBoxHd": [
+            1,
+            41,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "dryingRack",
+          "season": "winter",
+          "column": 5,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-a/winter-processed/building-7.png",
+          "sourceBBox": [
+            56,
+            115,
+            455,
+            396
+          ],
+          "packedSizeHd": [
+            54,
+            38
+          ],
+          "pasteHd": [
+            1,
+            40
+          ],
+          "packedBBoxHd": [
+            1,
+            40,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "onggiKiln",
+          "season": "winter",
+          "column": 6,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-a/winter-processed/building-8.png",
+          "sourceBBox": [
+            56,
+            78,
+            455,
+            434
+          ],
+          "packedSizeHd": [
+            54,
+            48
+          ],
+          "pasteHd": [
+            1,
+            30
+          ],
+          "packedBBoxHd": [
+            1,
+            30,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "dock",
+          "season": "winter",
+          "column": 7,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-b/winter-processed/building-1.png",
+          "sourceBBox": [
+            56,
+            79,
+            455,
+            432
+          ],
+          "packedSizeHd": [
+            54,
+            48
+          ],
+          "pasteHd": [
+            1,
+            30
+          ],
+          "packedBBoxHd": [
+            1,
+            30,
+            55,
+            78
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "watchtower",
+          "season": "winter",
+          "column": 8,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/1x1-b/winter-processed/building-2.png",
+          "sourceBBox": [
+            152,
+            56,
+            360,
+            455
+          ],
+          "packedSizeHd": [
+            40,
+            76
+          ],
+          "pasteHd": [
+            8,
+            2
+          ],
+          "packedBBoxHd": [
+            8,
+            2,
+            48,
+            78
+          ],
+          "touchesCellEdge": false
+        }
+      ]
+    },
+    "center": {
+      "group": "center",
+      "frameOrder": [
+        "settlement",
+        "bo",
+        "jin",
+        "bu"
+      ],
+      "seasons": [
+        "normal",
+        "winter"
+      ],
+      "cellHd": [
+        168,
+        160
+      ],
+      "cellStandard": [
+        84,
+        80
+      ],
+      "sheetHd": [
+        672,
+        320
+      ],
+      "sheetStandard": [
+        336,
+        160
+      ],
+      "outputHd": "public/assets/oblique-centers-v1-hd.png",
+      "outputStandard": "public/assets/oblique-centers-v1.png",
+      "frames": [
+        {
+          "id": "settlement",
+          "season": "normal",
+          "column": 0,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/center/normal-processed/building-1.png",
+          "sourceBBox": [
+            56,
+            95,
+            455,
+            417
+          ],
+          "packedSizeHd": [
+            164,
+            132
+          ],
+          "pasteHd": [
+            2,
+            26
+          ],
+          "packedBBoxHd": [
+            2,
+            26,
+            166,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "bo",
+          "season": "normal",
+          "column": 1,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/center/normal-processed/building-2.png",
+          "sourceBBox": [
+            57,
+            95,
+            455,
+            417
+          ],
+          "packedSizeHd": [
+            164,
+            133
+          ],
+          "pasteHd": [
+            2,
+            25
+          ],
+          "packedBBoxHd": [
+            2,
+            25,
+            166,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "jin",
+          "season": "normal",
+          "column": 2,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/center/normal-processed/building-3.png",
+          "sourceBBox": [
+            56,
+            88,
+            455,
+            423
+          ],
+          "packedSizeHd": [
+            164,
+            138
+          ],
+          "pasteHd": [
+            2,
+            20
+          ],
+          "packedBBoxHd": [
+            2,
+            20,
+            166,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "bu",
+          "season": "normal",
+          "column": 3,
+          "row": 0,
+          "source": "tools/render/generated/buildings-oblique-v1/center/normal-processed/building-4.png",
+          "sourceBBox": [
+            56,
+            73,
+            455,
+            438
+          ],
+          "packedSizeHd": [
+            164,
+            150
+          ],
+          "pasteHd": [
+            2,
+            8
+          ],
+          "packedBBoxHd": [
+            2,
+            8,
+            166,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "settlement",
+          "season": "winter",
+          "column": 0,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/center/winter-processed/building-1.png",
+          "sourceBBox": [
+            56,
+            92,
+            455,
+            420
+          ],
+          "packedSizeHd": [
+            164,
+            135
+          ],
+          "pasteHd": [
+            2,
+            23
+          ],
+          "packedBBoxHd": [
+            2,
+            23,
+            166,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "bo",
+          "season": "winter",
+          "column": 1,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/center/winter-processed/building-2.png",
+          "sourceBBox": [
+            56,
+            92,
+            455,
+            420
+          ],
+          "packedSizeHd": [
+            164,
+            135
+          ],
+          "pasteHd": [
+            2,
+            23
+          ],
+          "packedBBoxHd": [
+            2,
+            23,
+            166,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "jin",
+          "season": "winter",
+          "column": 2,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/center/winter-processed/building-3.png",
+          "sourceBBox": [
+            56,
+            87,
+            455,
+            425
+          ],
+          "packedSizeHd": [
+            164,
+            139
+          ],
+          "pasteHd": [
+            2,
+            19
+          ],
+          "packedBBoxHd": [
+            2,
+            19,
+            166,
+            158
+          ],
+          "touchesCellEdge": false
+        },
+        {
+          "id": "bu",
+          "season": "winter",
+          "column": 3,
+          "row": 1,
+          "source": "tools/render/generated/buildings-oblique-v1/center/winter-processed/building-4.png",
+          "sourceBBox": [
+            56,
+            72,
+            455,
+            439
+          ],
+          "packedSizeHd": [
+            164,
+            151
+          ],
+          "pasteHd": [
+            2,
+            7
+          ],
+          "packedBBoxHd": [
+            2,
+            7,
+            166,
+            158
+          ],
+          "touchesCellEdge": false
+        }
+      ]
+    }
+  }
+}

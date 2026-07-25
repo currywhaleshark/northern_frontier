@@ -5,7 +5,7 @@ import {
   DAY_BANDS, DAY_CYCLE_SUBTICKS, WORK_RATE_SCALE, WORK_SUBTICKS, dayBandOf,
 } from './dayCycle';
 import {
-  BUILDING_DEFS, footprintTilesOf, isSmithyProductUnlocked, officeEfficiencyMultiplier,
+  BUILDING_DEFS, cemeteryPlotCapacity, footprintTilesOf, isSmithyProductUnlocked, officeEfficiencyMultiplier,
   plotArea, SMITHY_PRODUCT_DEFS, smithyProductOf, sownAreaOf,
 } from './buildings';
 import { JOB_NAMES, RESOURCE_NAMES } from './constants';
@@ -16,6 +16,7 @@ import { collectHuntableTiles } from './habitats';
 import { makeRng } from './map';
 import { buryCorpse, cemeteryFreePlots, corpsesOf, laborEfficiencyMult, nextCorpseToCollect } from './lifecycle';
 import { extractMineralDeposit, mineralRemaining } from './minerals';
+import { markForestHarvest, treeStageFor } from './forestGrowth';
 import { isVeinSealedTile, recordRockMining, recordSilverMined } from './silver';
 import { getSeason } from './seasons';
 import { outdoorMult } from './weather';
@@ -1077,7 +1078,7 @@ function handleManualOrder(state: GameState, r: Resident, ctx: Ctx): boolean {
 function woodcutterTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
   gatherJob(state, r, ctx, {
-    goal: t => t.terrain === 'forest',
+    goal: t => t.terrain === 'forest' && treeStageFor(t) === 'mature',
     workTicks: a.work.chop,
     yieldRes: 'wood',
     yieldAmt: a.yields.wood * CONFIG.seasons.woodMult[ctx.season],
@@ -1089,8 +1090,10 @@ function woodcutterTick(state: GameState, r: Resident, ctx: Ctx): void {
     taskWork: '벌목 중', taskMove: '숲으로 이동', taskHaul: '목재 운반',
     onHarvest: (tile, worker, woodAmount) => {
       addCarry(worker, 'brushwood', woodAmount * CONFIG.production.brushwoodPerWood);
-      // 벌목한 숲은 이따금 개활지가 된다
-      if (ctx.rng() < a.forestDepleteChance && tile.buildingId == null) tile.terrain = 'plain';
+      // 성목을 반복 벌목하면 이따금 그루터기 단계로 내려가고 재성장을 기다린다.
+      if (tile.buildingId == null) {
+        markForestHarvest(tile, ctx.rng, a.forestDepleteChance);
+      }
     },
   });
 }
@@ -2347,7 +2350,7 @@ function undertakerTick(state: GameState, r: Resident, ctx: Ctx): void {
     const st = goTo(state, r, ctx, buildingGoal(state, cemetery.id));
     if (st === 'stuck') { r.task = '길이 막힘'; return; }
     if (st !== 'arrived') { r.task = '상여 운구'; return; }
-    if ((cemetery.graves ?? 0) >= f.plotsPerCemetery) {
+    if ((cemetery.graves ?? 0) >= cemeteryPlotCapacity(cemetery)) {
       r.task = '묘 자리 부족';
       corpse.carried = false;
       corpse.x = r.x;

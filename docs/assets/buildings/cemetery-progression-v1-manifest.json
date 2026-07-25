@@ -1,0 +1,277 @@
+{
+  "version": 1,
+  "source": "tools/render/generated/cemetery-progression-hd-v1",
+  "seasons": [
+    "normal",
+    "winter"
+  ],
+  "frameOrder": "0, 1, 2, 3, 4 graves",
+  "cellHd": [
+    56,
+    80
+  ],
+  "cellStandard": [
+    28,
+    40
+  ],
+  "sheetHd": [
+    280,
+    160
+  ],
+  "sheetStandard": [
+    140,
+    80
+  ],
+  "frames": [
+    {
+      "season": "normal",
+      "graveCount": 0,
+      "sourceBBox": [
+        52,
+        133,
+        460,
+        376
+      ],
+      "packedSizeHd": [
+        54,
+        32
+      ],
+      "pasteHd": [
+        1,
+        46
+      ],
+      "packedBBoxHd": [
+        1,
+        46,
+        55,
+        78
+      ],
+      "touchesCellEdge": false
+    },
+    {
+      "season": "normal",
+      "graveCount": 1,
+      "sourceBBox": [
+        51,
+        132,
+        460,
+        377
+      ],
+      "packedSizeHd": [
+        54,
+        32
+      ],
+      "pasteHd": [
+        1,
+        46
+      ],
+      "packedBBoxHd": [
+        1,
+        46,
+        55,
+        78
+      ],
+      "touchesCellEdge": false
+    },
+    {
+      "season": "normal",
+      "graveCount": 2,
+      "sourceBBox": [
+        51,
+        131,
+        460,
+        378
+      ],
+      "packedSizeHd": [
+        54,
+        33
+      ],
+      "pasteHd": [
+        1,
+        45
+      ],
+      "packedBBoxHd": [
+        1,
+        45,
+        55,
+        78
+      ],
+      "touchesCellEdge": false
+    },
+    {
+      "season": "normal",
+      "graveCount": 3,
+      "sourceBBox": [
+        51,
+        131,
+        460,
+        378
+      ],
+      "packedSizeHd": [
+        54,
+        33
+      ],
+      "pasteHd": [
+        1,
+        45
+      ],
+      "packedBBoxHd": [
+        1,
+        45,
+        55,
+        78
+      ],
+      "touchesCellEdge": false
+    },
+    {
+      "season": "normal",
+      "graveCount": 4,
+      "sourceBBox": [
+        51,
+        131,
+        460,
+        380
+      ],
+      "packedSizeHd": [
+        54,
+        33
+      ],
+      "pasteHd": [
+        1,
+        45
+      ],
+      "packedBBoxHd": [
+        1,
+        45,
+        55,
+        78
+      ],
+      "touchesCellEdge": false
+    },
+    {
+      "season": "winter",
+      "graveCount": 0,
+      "sourceBBox": [
+        56,
+        135,
+        455,
+        377
+      ],
+      "packedSizeHd": [
+        54,
+        33
+      ],
+      "pasteHd": [
+        1,
+        45
+      ],
+      "packedBBoxHd": [
+        1,
+        45,
+        55,
+        78
+      ],
+      "touchesCellEdge": false
+    },
+    {
+      "season": "winter",
+      "graveCount": 1,
+      "sourceBBox": [
+        56,
+        134,
+        455,
+        376
+      ],
+      "packedSizeHd": [
+        54,
+        33
+      ],
+      "pasteHd": [
+        1,
+        45
+      ],
+      "packedBBoxHd": [
+        1,
+        45,
+        55,
+        78
+      ],
+      "touchesCellEdge": false
+    },
+    {
+      "season": "winter",
+      "graveCount": 2,
+      "sourceBBox": [
+        56,
+        133,
+        455,
+        378
+      ],
+      "packedSizeHd": [
+        54,
+        33
+      ],
+      "pasteHd": [
+        1,
+        45
+      ],
+      "packedBBoxHd": [
+        1,
+        45,
+        55,
+        78
+      ],
+      "touchesCellEdge": false
+    },
+    {
+      "season": "winter",
+      "graveCount": 3,
+      "sourceBBox": [
+        56,
+        133,
+        455,
+        376
+      ],
+      "packedSizeHd": [
+        54,
+        33
+      ],
+      "pasteHd": [
+        1,
+        45
+      ],
+      "packedBBoxHd": [
+        1,
+        45,
+        55,
+        78
+      ],
+      "touchesCellEdge": false
+    },
+    {
+      "season": "winter",
+      "graveCount": 4,
+      "sourceBBox": [
+        56,
+        134,
+        455,
+        378
+      ],
+      "packedSizeHd": [
+        54,
+        33
+      ],
+      "pasteHd": [
+        1,
+        45
+      ],
+      "packedBBoxHd": [
+        1,
+        45,
+        55,
+        78
+      ],
+      "touchesCellEdge": false
+    }
+  ]
+}

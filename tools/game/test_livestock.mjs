@@ -47,7 +47,7 @@ function addStable(
   assert.equal(state.resources.milk, 0, 'milk is initialized as a first-class food resource');
   assert.equal(state.resources.wool, 0, 'wool is initialized as a first-class material resource');
   assert.equal(state.resources.hay, 0, 'hay is initialized as a first-class winter-feed resource');
-  assert.deepEqual(livestock.IMPLEMENTED_LIVESTOCK_IDS, ['chicken', 'goat', 'sheep', 'cattle', 'horse']);
+  assert.deepEqual(livestock.IMPLEMENTED_LIVESTOCK_IDS, ['chicken', 'goat', 'sheep', 'pig', 'cattle', 'horse']);
   assert.deepEqual(livestock.createDefaultLivestockState(), {
     species: 'chicken', headcount: 4, growth: 0, feedShortageDays: 0,
   });
@@ -58,7 +58,31 @@ function addStable(
     species: 'goat', headcount: CONFIG.livestock.goat.capacity, growth: 0, feedShortageDays: 0,
   }, 'species-specific stable capacity is enforced');
   assert.equal(livestock.livestockCapacity('sheep'), CONFIG.livestock.sheep.capacity);
+  assert.equal(livestock.livestockCapacity('pig'), CONFIG.livestock.pig.capacity);
   assert.equal(livestock.livestockCapacity('cattle'), CONFIG.livestock.cattle.capacity);
+}
+
+{
+  const highestOtherMeat = Math.max(
+    ...livestock.IMPLEMENTED_LIVESTOCK_IDS
+      .filter(species => species !== 'pig')
+      .map(species => CONFIG.livestock[species].slaughterMeatPerHead),
+  );
+  assert.ok(CONFIG.livestock.pig.slaughterMeatPerHead > highestOtherMeat,
+    'pigs yield more meat per slaughtered head than every other livestock species');
+  const state = simulation.newGame(2026071720);
+  const stable = addStable(state, 1, 'pig');
+  assert.equal(livestock.slaughterStableLivestock(state, stable.id, 1), null);
+  assert.equal(stable.inventory.meat, 12);
+}
+
+{
+  const state = simulation.newGame(2026071721);
+  const stable = addStable(state, 0);
+  assert.equal(livestock.acquireFirstLivestockFromTrade(state, '송상'), true);
+  assert.ok(state.unlockedLivestock.includes('pig'));
+  assert.equal(stable.livestock.species, 'pig');
+  assert.equal(stable.livestock.headcount, 2);
 }
 
 {

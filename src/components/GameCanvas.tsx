@@ -3,14 +3,16 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type WheelEvent as ReactWheelEvent } from 'react';
 import { CONFIG } from '../game/config';
 import { JOB_NAMES, RESOURCE_NAMES } from '../game/constants';
-import { buildingCostFor } from '../game/buildings';
+import { buildingCostFor, isAreaBuildingType } from '../game/buildings';
 import { getActiveSprites, onAtlasAssetSettled } from '../render/atlas';
 import { findResidentAt, renderScene, terrainVisualSignature } from '../render/renderer';
 import { createResidentPresentationSnapshotCache } from '../render/residentPresentation';
 import { sceneViewportFromScroll, type SceneViewport } from '../render/sceneViewport';
 import { getPointerAction } from '../game/selectionActions';
 import { foreignSiteAt } from '../game/foreignSites';
-import type { BuildingTypeId, GameState, SelectedEntity } from '../game/types';
+import { LIVESTOCK_DEFS, normalizeLivestockState } from '../game/livestock';
+import { pastureRequiredHerders, stableLivestockCapacity, validateStablePasture } from '../game/pastures';
+import type { BuildingTypeId, GameState, PastureArea, SelectedEntity } from '../game/types';
 import { FactionName } from './FactionName';
 import { recordRuntimePerf, recordRuntimePerfSince, runtimePerfStartTime } from '../perf/runtimePerf';
 import { mapBackingScaleForZoom, steppedMapZoom } from '../ui/mapZoom';
@@ -26,6 +28,7 @@ interface Props {
   animationActive: boolean;
   zoom: number;
   placingType: BuildingTypeId | null;
+  pastureStableId: number | null;
   selected: { x: number; y: number } | null;
   selectedEntity: SelectedEntity | null;
   selectedResidentId: number | null;
@@ -35,6 +38,7 @@ interface Props {
   anim: { readonly current: { at: number; ms: number } };
   onTileClick: (x: number, y: number) => void;
   onPlacePlot: (x: number, y: number, w: number, h: number) => void;
+  onPlacePasture: (x: number, y: number, w: number, h: number) => void;
   onResidentClick: (id: number) => void;
   onContextAction: (x: number, y: number) => void;
   onCancelPlace: () => void;
@@ -42,8 +46,8 @@ interface Props {
 }
 
 export function GameCanvas({
-  state, version, animationActive, zoom, placingType, selected, selectedEntity, selectedResidentId, anim,
-  onTileClick, onPlacePlot, onResidentClick, onContextAction, onCancelPlace, onZoomChange,
+  state, version, animationActive, zoom, placingType, pastureStableId, selected, selectedEntity, selectedResidentId, anim,
+  onTileClick, onPlacePlot, onPlacePasture, onResidentClick, onContextAction, onCancelPlace, onZoomChange,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawRef = useRef<(animationTimeMs: number) => void>(() => undefined);
@@ -64,8 +68,10 @@ export function GameCanvas({
   // 드래그 패닝 상태 (리렌더 없이 추적)
   const drag = useRef({ active: false, button: 0, sx: 0, sy: 0, scrollL: 0, scrollT: 0, moved: false });
   const zoomAnchorRef = useRef<{ worldX: number; worldY: number; boxX: number; boxY: number } | null>(null);
-  // 경작지(밭/논) 배치 중 드래그 크기 지정 — 기준 칸(anchor)에서 현재 칸까지의 사각형
-  const isPlotPlacing = placingType === 'field' || placingType === 'paddy';
+  // 경작지와 묘역 배치 중 드래그 크기 지정 — 기준 칸(anchor)에서 현재 칸까지의 사각형
+  const isPlotPlacing = placingType != null && isAreaBuildingType(placingType);
+  const isPasturePlacing = pastureStableId != null;
+  const isAreaDragging = isPlotPlacing || isPasturePlacing;
   const [plotDrag, setPlotDrag] = useState<{ ax: number; ay: number; cx: number; cy: number } | null>(null);
 
   const scrollBox = () => canvasRef.current?.closest('.canvas-wrap') as HTMLElement | null;
@@ -135,7 +141,7 @@ export function GameCanvas({
     ? { x: Math.floor(mouse.mx / TILE), y: Math.floor(mouse.my / TILE) }
     : null;
   const hoveredTile = hoverTile ? state.map[hoverTile.y]?.[hoverTile.x] : null;
-  const pointerAction = placingType ? null : getPointerAction(state, selectedEntity, hoveredTile);
+  const pointerAction = placingType || isPasturePlacing ? null : getPointerAction(state, selectedEntity, hoveredTile);
   const selectedBuildingId = selectedEntity?.kind === 'building' ? selectedEntity.id : null;
   const terrainSignature = useMemo(() => terrainVisualSignature(state), [state, version]);
   const residentPresentation = residentPresentationCacheRef.current.get(state, version);
@@ -145,6 +151,7 @@ export function GameCanvas({
     const tile = state.map[y]?.[x];
     if (!tile) return 'outside';
     if (placingType) return `placing:${x},${y}`;
+    if (isPasturePlacing) return `pasture:${x},${y}`;
     const frameAlpha = Math.max(0, Math.min(1, (performance.now() - anim.current.at) / anim.current.ms));
     const resident = findResidentAt(state, point.mx, point.my, frameAlpha, CLICK_RADIUS, residentPresentation);
     if (resident) return `resident:${resident.id}`;
@@ -162,10 +169,10 @@ export function GameCanvas({
 
   // 배치 모드가 끝나면 진행 중이던 크기 지정도 버린다
   useEffect(() => {
-    if (!isPlotPlacing) setPlotDrag(null);
-  }, [isPlotPlacing]);
+    if (!isAreaDragging) setPlotDrag(null);
+  }, [isAreaDragging]);
 
-  const maxSide = CONFIG.farming.maxPlotSide;
+  const maxSide = isPasturePlacing ? CONFIG.pasture.maxSide : CONFIG.farming.maxPlotSide;
   const clampTo = (value: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, value));
   const plotRectFrom = (dragState: { ax: number; ay: number; cx: number; cy: number }) => {
     const x = Math.min(dragState.ax, dragState.cx);
@@ -177,7 +184,7 @@ export function GameCanvas({
     };
   };
   // 미리보기 사각형: 드래그 중이면 그 범위, 아니면 호버 칸 1×1
-  const placingRect = isPlotPlacing
+  const placingRect = isAreaDragging
     ? (plotDrag
       ? plotRectFrom(plotDrag)
       : (hoverTile && hoverTile.x >= 0 && hoverTile.y >= 0 && hoverTile.x < w && hoverTile.y < h
@@ -194,6 +201,9 @@ export function GameCanvas({
     const runtimeDrawStart = runtimePerfStartTime();
     renderScene(canvas, state, {
       alpha: frameAlpha, animationTimeMs, hover: hoverTile, placingType, placingRect, selected, selectedResidentId,
+      pasturePlacement: isPasturePlacing && placingRect && pastureStableId != null
+        ? { stableId: pastureStableId, rect: placingRect }
+        : null,
       selectedBuildingId, viewport: viewportRef.current ?? undefined, terrainVisualSignature: terrainSignature,
       sprites: getActiveSprites(), residentPresentation,
       renderScale,
@@ -278,7 +288,7 @@ export function GameCanvas({
   };
 
   // 툴팁 대상: 주민 우선, 그다음 (발견된) 습격 무리
-  const hoveredResident = mouse && !placingType
+  const hoveredResident = mouse && !placingType && !isPasturePlacing
     ? findResidentAt(state, mouse.mx, mouse.my, alpha, CLICK_RADIUS, residentPresentation)
     : null;
   let raiderHovered = false;
@@ -294,7 +304,7 @@ export function GameCanvas({
   const actionTooltip = mouse && !hoveredResident && !raiderHovered && !hoveredSite && pointerAction && pointerAction.kind !== 'none'
     ? pointerAction
     : null;
-  const canvasCursor = placingType
+  const canvasCursor = placingType || isPasturePlacing
     ? 'crosshair'
     : panning
       ? 'grabbing'
@@ -315,8 +325,8 @@ export function GameCanvas({
         style={{ cursor: canvasCursor, width: '100%', height: '100%' }}
         onWheel={handleWheel}
         onPointerDown={e => {
-          // 경작지 배치 중에는 좌클릭 드래그가 화면 이동이 아니라 크기 지정이다
-          if (isPlotPlacing && e.button === 0) {
+          // 경작지·묘역 배치 중에는 좌클릭 드래그가 화면 이동이 아니라 크기 지정이다
+          if (isAreaDragging && e.button === 0) {
             const m = toMouse(e);
             const tx = Math.floor(m.mx / TILE), ty = Math.floor(m.my / TILE);
             if (tx < 0 || ty < 0 || tx >= w || ty >= h) return;
@@ -326,7 +336,7 @@ export function GameCanvas({
           }
           // 좌클릭(평시) 또는 중클릭(배치 중 포함)으로 패닝 시작
           if (e.button !== 0 && e.button !== 1) return;
-          if (e.button === 0 && isPlotPlacing) return;
+          if (e.button === 0 && isAreaDragging) return;
           const box = scrollBox();
           if (!box) return;
           drag.current = {
@@ -373,7 +383,8 @@ export function GameCanvas({
             const rect = plotRectFrom(plotDrag);
             setPlotDrag(null);
             try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
-            onPlacePlot(rect.x, rect.y, rect.w, rect.h);
+            if (isPasturePlacing) onPlacePasture(rect.x, rect.y, rect.w, rect.h);
+            else onPlacePlot(rect.x, rect.y, rect.w, rect.h);
             return;
           }
           const resetZoom = drag.current.button === 1 && !drag.current.moved;
@@ -389,8 +400,8 @@ export function GameCanvas({
           setMouse(null);
         }}
         onClick={e => {
-          // 경작지 배치는 pointerup에서 이미 처리되었다
-          if (isPlotPlacing) return;
+          // 경작지·묘역 배치는 pointerup에서 이미 처리되었다
+          if (isAreaDragging) return;
           // 드래그로 화면을 옮긴 직후의 클릭은 무시한다
           if (drag.current.moved) { drag.current.moved = false; return; }
           const m = toMouse(e);
@@ -408,7 +419,7 @@ export function GameCanvas({
         }}
         onContextMenu={e => {
           e.preventDefault();
-          if (placingType) {
+          if (placingType || isPasturePlacing) {
             setPlotDrag(null);
             onCancelPlace();
             return;
@@ -419,17 +430,37 @@ export function GameCanvas({
           onContextAction(tx, ty);
         }}
       />
-      {mouse && placingRect && placingType && (
+      {mouse && placingRect && (placingType || isPasturePlacing) && (
         <div ref={tooltipRef} className="map-tooltip" style={{ left: 0, top: 0 }}>
           <b>{placingRect.w}×{placingRect.h} ({placingRect.w * placingRect.h}칸)</b>
-          <div className="muted">
-            {Object.entries(buildingCostFor(placingType, placingRect.w, placingRect.h))
-              .map(([res, amt]) => `${RESOURCE_NAMES[res as keyof typeof RESOURCE_NAMES] ?? res} ${amt}`)
-              .join(' · ')}
-            {' · 농부 '}
-            {Math.max(1, Math.ceil((placingRect.w * placingRect.h) / CONFIG.farming.tilesPerFarmer))}명
-          </div>
-          <div className="muted">끌어서 크기 지정 (최대 {CONFIG.farming.maxPlotSide}×{CONFIG.farming.maxPlotSide})</div>
+          {isPasturePlacing && pastureStableId != null ? (() => {
+            const stable = state.buildings.find(building => building.id === pastureStableId);
+            const livestock = stable ? normalizeLivestockState(stable.livestock) : null;
+            const preview = stable ? { ...stable, pasture: placingRect as PastureArea } : null;
+            const error = validateStablePasture(state, pastureStableId, placingRect);
+            return (
+              <>
+                <div className="muted">
+                  {preview && livestock
+                    ? `${LIVESTOCK_DEFS[livestock.species].name} ${stableLivestockCapacity(preview, livestock.species)}마리 · 목동 ${pastureRequiredHerders(preview)}명`
+                    : '축사를 찾을 수 없음'}
+                </div>
+                <div className="muted">{error ?? `끌어서 크기 지정 (최대 ${CONFIG.pasture.maxSide}×${CONFIG.pasture.maxSide})`}</div>
+              </>
+            );
+          })() : placingType ? (
+            <>
+              <div className="muted">
+                {Object.entries(buildingCostFor(placingType, placingRect.w, placingRect.h))
+                  .map(([res, amt]) => `${RESOURCE_NAMES[res as keyof typeof RESOURCE_NAMES] ?? res} ${amt}`)
+                  .join(' · ')}
+                {placingType === 'cemetery'
+                  ? ` · 묘 자리 ${placingRect.w * placingRect.h * CONFIG.funeral.plotsPerTile}기`
+                  : ` · 농부 ${Math.max(1, Math.ceil((placingRect.w * placingRect.h) / CONFIG.farming.tilesPerFarmer))}명`}
+              </div>
+              <div className="muted">끌어서 크기 지정 (최대 {CONFIG.farming.maxPlotSide}×{CONFIG.farming.maxPlotSide})</div>
+            </>
+          ) : null}
         </div>
       )}
       {mouse && (hoveredResident || raiderHovered || hoveredSite || actionTooltip) && (

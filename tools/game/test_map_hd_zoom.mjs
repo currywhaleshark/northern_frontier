@@ -27,6 +27,14 @@ assert.match(canvasSource, /canvasWidth: logicalWidth/);
 assert.match(canvasSource, /canvasHeight: logicalHeight/);
 assert.doesNotMatch(canvasSource, /mx:.*canvasRef\.current!\.width/);
 
+// 미니맵 뷰포트 사각형은 "논리 픽셀당 화면 픽셀"을 써야 한다. 백킹 캔버스가 2배가 되는
+// 최대 줌에서 canvas.width를 그대로 나누면 배율이 절반으로 나와 사각형이 어긋난다.
+const minimapSource = readFileSync(new URL('../../src/components/Minimap.tsx', import.meta.url), 'utf8');
+assert.match(minimapSource, /canvas\.dataset\.renderScale/);
+assert.match(minimapSource, /getBoundingClientRect\(\)\.width \/ \(canvas\.width \/ backingScale\)/);
+assert.doesNotMatch(minimapSource, /getBoundingClientRect\(\)\.width \/ canvas\.width/);
+assert.match(minimapSource, /resizeObserver\.observe\(mapCanvas\)/);
+
 const rendererSource = readFileSync(new URL('../../src/render/renderer.ts', import.meta.url), 'utf8');
 assert.match(rendererSource, /logicalWidth = canvas\.width \/ renderScale/);
 assert.match(rendererSource, /ctx\.setTransform\(renderScale, 0, 0, renderScale, 0, 0\)/);

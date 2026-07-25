@@ -8,7 +8,7 @@
 import { CONFIG } from '../game/config';
 import {
   armedMusketeers, BUILDING_DEFS, buildingCostFor, buildingFootprintDims, buildingFootprintSize,
-  canAfford, canAffordCost, canPlaceBuildingAt, canPlaceOn, isPlotBuildingType,
+  canAfford, canAffordCost, canPlaceBuildingAt, canPlaceOn, isAreaBuildingType, isPlotBuildingType,
 } from '../game/buildings';
 import { COLLAPSE_RATIO } from '../game/battles';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
@@ -19,7 +19,14 @@ import { findHabitatIconAtTile } from '../game/habitats';
 import { isBuildingFootprintExplored, isExplored } from '../game/exploration';
 import { builtWallTileSet, isWallBuilding, wallConnectionsFromSet } from '../game/walls';
 import { assignedWorkers, workerSlotConfig, workerSlotCount } from '../game/workerSlots';
-import { jitterOf, placeholderSprites, type SpriteAPI } from './sprites';
+import {
+  jitterOf,
+  placeholderSprites,
+  type BuildingDrawParams,
+  type ResidentDrawParams,
+  type SpriteAPI,
+  type TerrainDrawParams,
+} from './sprites';
 import { militiaWeaponForResident } from './militiaWeaponAssignment';
 import { farmerSpriteActionFor } from './residentFarmerAssets';
 import type { ResidentWorkStance } from './residentWorkLayout';
@@ -37,8 +44,23 @@ import { activePredatorScoutIds } from '../game/expeditionIntel';
 import { isBuriedSilverVeinTile } from '../game/silver';
 import { activeExpeditionTargetMarkers, type ExpeditionTargetMarker } from '../game/expeditionTargets';
 import { workplaceActivityStyle, type WorkplaceActivityStyle } from '../game/workplacePresentation';
-import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, Resident, Season, Terrain } from '../game/types';
+import { normalizeLivestockState } from '../game/livestock';
+import { normalizePastureArea, validateStablePasture } from '../game/pastures';
+import { treeStageFor } from '../game/forestGrowth';
+import {
+  mineralRemaining,
+  mineralVisualTier,
+  tileMineralResource,
+} from '../game/minerals';
+import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, PastureArea, Resident, Season, Terrain } from '../game/types';
 import { pixelRectIntersectsViewport, tileRectIntersectsViewport, type SceneViewport } from './sceneViewport';
+import {
+  mountainDepthAt,
+  mountainProfileFor,
+  terrainNeighborsFor,
+  terrainVisualHash,
+  treeSpeciesFromHash,
+} from './terrainGrowthVisuals';
 
 const TILE = CONFIG.ui.tileSize;
 
@@ -66,6 +88,7 @@ export interface SceneOptions {
   hover: { x: number; y: number } | null;
   placingType: BuildingTypeId | null;
   placingRect?: { x: number; y: number; w: number; h: number } | null; // 경작지 드래그 크기 지정 미리보기
+  pasturePlacement?: { stableId: number; rect: PastureArea } | null;
   selected: { x: number; y: number } | null;
   selectedResidentId: number | null;
   selectedBuildingId?: number | null;
@@ -90,7 +113,22 @@ export function terrainVisualSignature(state: Pick<GameState, 'map'>): number {
   let hash = 0x811c9dc5;
   for (const row of state.map) {
     for (const tile of row) {
-      const visualCode = TERRAIN_VISUAL_CODE[tile.terrain] * 2 + (tile.hasIron ? 1 : 0);
+      const treeStage = treeStageFor(tile);
+      const treeCode = treeStage === 'stump' ? 1 : treeStage === 'young' ? 2 : treeStage === 'mature' ? 3 : 0;
+      const resourceCode = tile.terrain === 'rock'
+        ? tile.hasSilver ? 3 : tile.hasIron ? 2 : 1
+        : 0;
+      const tier = tile.terrain === 'rock' ? mineralVisualTier(mineralRemaining(tile)) : null;
+      const tierCode = tier === 'trace' ? 1
+        : tier === 'small' ? 2
+          : tier === 'medium' ? 3
+            : tier === 'large' ? 4
+              : tier === 'huge' ? 5
+                : 0;
+      const visualCode = TERRAIN_VISUAL_CODE[tile.terrain] * 256
+        + treeCode * 32
+        + resourceCode * 8
+        + tierCode;
       hash = Math.imul(hash ^ visualCode, 0x01000193);
     }
   }
@@ -139,53 +177,281 @@ export function findResidentAt(
 let terrainLayer: HTMLCanvasElement | null = null;
 let terrainKey = '';
 
+function terrainParams(
+  state: GameState,
+  x: number,
+  y: number,
+  season: Season,
+  winter: boolean,
+  frozenRiver: boolean,
+  renderScale: 1 | 2,
+): TerrainDrawParams {
+  const tile = state.map[y][x];
+  const isLand = (tx: number, ty: number): boolean => {
+    const neighbor = state.map[ty]?.[tx];
+    return neighbor ? neighbor.terrain !== 'river' : false;
+  };
+  const stableHash = terrainVisualHash(x, y);
+  const mountainNearby = tile.terrain === 'forest' && [-1, 0, 1].some(dy =>
+    [-1, 0, 1].some(dx =>
+      (dx !== 0 || dy !== 0) && state.map[y + dy]?.[x + dx]?.terrain === 'mountain'));
+  const mountainNeighbors = tile.terrain === 'mountain'
+    ? terrainNeighborsFor(state.map, x, y, 'mountain')
+    : undefined;
+  const remaining = tile.terrain === 'rock' ? mineralRemaining(tile) : 0;
+  return {
+    terrain: tile.terrain,
+    season,
+    winter,
+    frozenRiver,
+    hasIron: tile.hasIron,
+    hasSilver: tile.hasSilver,
+    treeStage: treeStageFor(tile) ?? undefined,
+    treeSpecies: tile.terrain === 'forest'
+      ? treeSpeciesFromHash(stableHash, mountainNearby)
+      : undefined,
+    mineralResource: tile.terrain === 'rock' ? tileMineralResource(tile) : undefined,
+    mineralTier: tile.terrain === 'rock' ? mineralVisualTier(remaining) : undefined,
+    mountainProfile: mountainNeighbors
+      ? mountainProfileFor(mountainNeighbors, mountainDepthAt(state.map, x, y), stableHash)
+      : undefined,
+    highDefinition: renderScale === 2,
+    tileX: x,
+    tileY: y,
+    x: x * TILE,
+    y: y * TILE,
+    size: TILE,
+    banks: tile.terrain === 'river'
+      ? {
+          n: isLand(x, y - 1), e: isLand(x + 1, y), s: isLand(x, y + 1), w: isLand(x - 1, y),
+          ne: isLand(x + 1, y - 1), se: isLand(x + 1, y + 1),
+          sw: isLand(x - 1, y + 1), nw: isLand(x - 1, y - 1),
+        }
+      : undefined,
+  };
+}
+
 function drawTerrainLayer(
   state: GameState,
   width: number,
   height: number,
   sprites: SpriteAPI,
   visualSignature: number,
+  renderScale: 1 | 2,
 ): HTMLCanvasElement {
   const season = getSeason(state.day);
   const winter = season === 'winter';
   const frozenRiver = winter && state.weather !== 'thawFlood';
   // 계절·결빙·실제 타일 시각 속성이 바뀔 때만 다시 그린다.
-  const key = `${season}|${frozenRiver ? 1 : 0}|${visualSignature}|${width}|${height}|${sprites.id}`;
+  const key = `${season}|${frozenRiver ? 1 : 0}|${visualSignature}|${width}|${height}|${renderScale}|${sprites.id}`;
   if (terrainLayer && terrainKey === key) return terrainLayer;
 
-  if (!terrainLayer || terrainLayer.width !== width || terrainLayer.height !== height) {
+  const physicalWidth = Math.round(width * renderScale);
+  const physicalHeight = Math.round(height * renderScale);
+  if (!terrainLayer || terrainLayer.width !== physicalWidth || terrainLayer.height !== physicalHeight) {
     terrainLayer = document.createElement('canvas');
-    terrainLayer.width = width;
-    terrainLayer.height = height;
+    terrainLayer.width = physicalWidth;
+    terrainLayer.height = physicalHeight;
   }
   const ctx = terrainLayer.getContext('2d')!;
   ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, width, height);
-  // 지도 밖은 강이 이어지는 것으로 취급 (가장자리에 둑이 생기지 않게)
-  const isLand = (x: number, y: number) => {
-    const t = state.map[y]?.[x];
-    return t ? t.terrain !== 'river' : false;
-  };
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, physicalWidth, physicalHeight);
+  ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
   for (let y = 0; y < state.map.length; y++) {
     const row = state.map[y];
     for (let x = 0; x < row.length; x++) {
-      const tile = row[x];
-      sprites.drawTerrain(ctx, {
-        terrain: tile.terrain, season, winter, frozenRiver,
-        hasIron: tile.hasIron, tileX: x, tileY: y,
-        x: x * TILE, y: y * TILE, size: TILE,
-        banks: tile.terrain === 'river'
-          ? {
-              n: isLand(x, y - 1), e: isLand(x + 1, y), s: isLand(x, y + 1), w: isLand(x - 1, y),
-              ne: isLand(x + 1, y - 1), se: isLand(x + 1, y + 1),
-              sw: isLand(x - 1, y + 1), nw: isLand(x - 1, y - 1),
-            }
-          : undefined,
-      });
+      sprites.drawTerrain(ctx, terrainParams(state, x, y, season, winter, frozenRiver, renderScale));
     }
   }
   terrainKey = key;
   return terrainLayer;
+}
+
+function drawTerrainOverlays(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  sprites: SpriteAPI,
+  viewport: SceneViewport,
+  renderScale: 1 | 2,
+): void {
+  if (!sprites.drawTerrainOverlay) return;
+  const season = getSeason(state.day);
+  const winter = season === 'winter';
+  const frozenRiver = winter && state.weather !== 'thawFlood';
+  const mapWidth = state.map[0]?.length ?? 0;
+  const minX = Math.max(0, viewport.tileMinX - 4);
+  const maxX = Math.min(mapWidth - 1, viewport.tileMaxX + 4);
+  const minY = Math.max(0, viewport.tileMinY - 1);
+  const maxY = Math.min(state.map.length - 1, viewport.tileMaxY + 4);
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= Math.min(maxX, state.map[y].length - 1); x++) {
+      const terrain = state.map[y][x].terrain;
+      if (terrain !== 'forest' && terrain !== 'mountain') continue;
+      sprites.drawTerrainOverlay(
+        ctx,
+        terrainParams(state, x, y, season, winter, frozenRiver, renderScale),
+      );
+    }
+  }
+}
+
+function drawTerrainProps(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  sprites: SpriteAPI,
+  viewport: SceneViewport,
+  renderScale: 1 | 2,
+): void {
+  if (!sprites.drawTerrainProp) return;
+  const season = getSeason(state.day);
+  const winter = season === 'winter';
+  const frozenRiver = winter && state.weather !== 'thawFlood';
+  const mapWidth = state.map[0]?.length ?? 0;
+  const minX = Math.max(0, viewport.tileMinX - 4);
+  const maxX = Math.min(mapWidth - 1, viewport.tileMaxX + 4);
+  const minY = Math.max(0, viewport.tileMinY - 1);
+  const maxY = Math.min(state.map.length - 1, viewport.tileMaxY + 4);
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= Math.min(maxX, state.map[y].length - 1); x++) {
+      const tile = state.map[y][x];
+      if (tile.terrain !== 'rock' && treeStageFor(tile) !== 'stump') continue;
+      sprites.drawTerrainProp(
+        ctx,
+        terrainParams(state, x, y, season, winter, frozenRiver, renderScale),
+      );
+    }
+  }
+}
+
+function rectsIntersect(
+  ax: number,
+  ay: number,
+  aw: number,
+  ah: number,
+  bx: number,
+  by: number,
+  bw: number,
+  bh: number,
+): boolean {
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
+
+interface TreeCanopyProxy {
+  cx: number;
+  cy: number;
+  rx: number;
+  ry: number;
+  trunkHalfWidth: number;
+  trunkTop: number;
+  trunkBottom: number;
+}
+
+function treeCanopiesIntersectingRect(
+  state: GameState,
+  left: number,
+  top: number,
+  width: number,
+  height: number,
+): TreeCanopyProxy[] {
+  const canopies: TreeCanopyProxy[] = [];
+  const minX = Math.max(0, Math.floor((left - 32) / TILE));
+  const maxX = Math.min((state.map[0]?.length ?? 0) - 1, Math.floor((left + width + 32) / TILE));
+  const minY = Math.max(0, Math.floor(top / TILE));
+  const maxY = Math.min(state.map.length - 1, Math.floor((top + height + 72) / TILE));
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= Math.min(maxX, state.map[y].length - 1); x++) {
+      const stage = treeStageFor(state.map[y][x]);
+      if (stage !== 'young' && stage !== 'mature') continue;
+      const anchorX = x * TILE + TILE / 2;
+      const anchorY = y * TILE + TILE;
+      const canopy = stage === 'mature'
+        ? {
+            cx: anchorX, cy: anchorY - 41.5, rx: 29, ry: 26.5,
+            trunkHalfWidth: 3.5, trunkTop: anchorY - 29, trunkBottom: anchorY - 2,
+          }
+        : {
+            cx: anchorX, cy: anchorY - 27, rx: 17, ry: 16,
+            trunkHalfWidth: 2.5, trunkTop: anchorY - 20, trunkBottom: anchorY - 2,
+          };
+      if (rectsIntersect(
+        left,
+        top,
+        width,
+        height,
+        canopy.cx - canopy.rx,
+        canopy.cy - canopy.ry,
+        canopy.rx * 2,
+        canopy.trunkBottom - (canopy.cy - canopy.ry),
+      )) {
+        canopies.push(canopy);
+      }
+    }
+  }
+  return canopies;
+}
+
+function drawOccludedEntityGhosts(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  sprites: SpriteAPI,
+  buildings: readonly BuildingDrawParams[],
+  residents: readonly ResidentDrawParams[],
+): void {
+  for (const building of buildings) {
+    const canopies = treeCanopiesIntersectingRect(
+      state,
+      building.x,
+      building.y,
+      building.size,
+      building.size,
+    );
+    if (canopies.length === 0) continue;
+    ctx.save();
+    ctx.beginPath();
+    for (const canopy of canopies) {
+      ctx.moveTo(canopy.cx + canopy.rx, canopy.cy);
+      ctx.ellipse(canopy.cx, canopy.cy, canopy.rx, canopy.ry, 0, 0, Math.PI * 2);
+      ctx.rect(
+        canopy.cx - canopy.trunkHalfWidth,
+        canopy.trunkTop,
+        canopy.trunkHalfWidth * 2,
+        canopy.trunkBottom - canopy.trunkTop,
+      );
+    }
+    ctx.clip();
+    ctx.filter = 'opacity(42%)';
+    sprites.drawBuilding(ctx, building);
+    ctx.restore();
+  }
+  for (const resident of residents) {
+    const scale = resident.sizeScale ?? 1;
+    const size = TILE * scale;
+    const canopies = treeCanopiesIntersectingRect(
+      state,
+      resident.x - size / 2,
+      resident.y - size / 2,
+      size,
+      size,
+    );
+    if (canopies.length === 0) continue;
+    ctx.save();
+    ctx.beginPath();
+    for (const canopy of canopies) {
+      ctx.moveTo(canopy.cx + canopy.rx, canopy.cy);
+      ctx.ellipse(canopy.cx, canopy.cy, canopy.rx, canopy.ry, 0, 0, Math.PI * 2);
+      ctx.rect(
+        canopy.cx - canopy.trunkHalfWidth,
+        canopy.trunkTop,
+        canopy.trunkHalfWidth * 2,
+        canopy.trunkBottom - canopy.trunkTop,
+      );
+    }
+    ctx.clip();
+    ctx.filter = 'opacity(48%)';
+    sprites.drawResident(ctx, resident);
+    ctx.restore();
+  }
 }
 
 // 굴뚝 연기: 위로 오르며 흩어지는 회백색 입자 (건물 id로 위상을 어긋나게)
@@ -918,6 +1184,85 @@ declare global {
   interface Window { __renderPerf?: Record<string, RenderPerfBucket> }
 }
 
+function drawPastureGround(
+  ctx: CanvasRenderingContext2D,
+  area: PastureArea,
+  winter: boolean,
+  highlighted: boolean,
+): void {
+  const x = area.x * TILE;
+  const y = area.y * TILE;
+  const width = area.w * TILE;
+  const height = area.h * TILE;
+  ctx.save();
+  ctx.fillStyle = winter ? 'rgba(205,220,224,0.16)' : 'rgba(118,139,70,0.16)';
+  ctx.fillRect(x + 1, y + 1, width - 2, height - 2);
+  ctx.strokeStyle = highlighted ? 'rgba(245,203,94,0.95)' : 'rgba(111,76,43,0.78)';
+  ctx.lineWidth = highlighted ? 2 : 1.25;
+  ctx.setLineDash([Math.max(3, TILE * 0.22), Math.max(2, TILE * 0.13)]);
+  ctx.strokeRect(x + 1.5, y + 1.5, width - 3, height - 3);
+  ctx.setLineDash([]);
+  ctx.fillStyle = winter ? '#aa9271' : '#76502f';
+  const post = Math.max(2, Math.round(TILE * 0.12));
+  for (const [px, py] of [
+    [x + 1, y + 1],
+    [x + width - post - 1, y + 1],
+    [x + 1, y + height - post * 2 - 1],
+    [x + width - post - 1, y + height - post * 2 - 1],
+  ]) ctx.fillRect(px, py, post, post * 2);
+  ctx.restore();
+}
+
+function livestockPositionSeed(stableId: number, animalIndex: number, salt: number): number {
+  let value = (stableId * 73856093) ^ (animalIndex * 19349663) ^ (salt * 83492791);
+  value = Math.imul(value ^ (value >>> 13), 1274126177);
+  return ((value ^ (value >>> 16)) >>> 0) / 0xffffffff;
+}
+
+function drawPastureLivestock(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  sprites: SpriteAPI,
+  viewport: SceneViewport,
+  animationTimeMs: number,
+  highDefinition: boolean,
+): void {
+  const animals: Array<{
+    species: ReturnType<typeof normalizeLivestockState>['species'];
+    x: number;
+    y: number;
+    facing: 1 | -1;
+  }> = [];
+  for (const stable of state.buildings) {
+    if (stable.type !== 'stable' || !stable.built) continue;
+    const pasture = normalizePastureArea(stable.pasture);
+    if (!pasture || !tileRectIntersectsViewport(viewport, pasture.x, pasture.y, pasture.w, pasture.h)) continue;
+    const livestock = normalizeLivestockState(stable.livestock);
+    const visible = Math.min(
+      Math.max(0, Math.floor(livestock.headcount)),
+      CONFIG.pasture.visibleAnimalLimit,
+    );
+    const inset = TILE * 0.28;
+    const usableWidth = Math.max(1, pasture.w * TILE - inset * 2);
+    const usableHeight = Math.max(1, pasture.h * TILE - inset * 2);
+    for (let index = 0; index < visible; index++) {
+      const baseX = pasture.x * TILE + inset + livestockPositionSeed(stable.id, index, 1) * usableWidth;
+      const baseY = pasture.y * TILE + inset + livestockPositionSeed(stable.id, index, 2) * usableHeight;
+      const phase = animationTimeMs / 2200 + livestockPositionSeed(stable.id, index, 3) * Math.PI * 2;
+      animals.push({
+        species: livestock.species,
+        x: Math.min(pasture.x * TILE + pasture.w * TILE - inset, Math.max(pasture.x * TILE + inset, baseX + Math.sin(phase) * 1.8)),
+        y: Math.min(pasture.y * TILE + pasture.h * TILE - inset, Math.max(pasture.y * TILE + inset, baseY + Math.cos(phase * 0.73) * 1.2)),
+        facing: livestockPositionSeed(stable.id, index, 4) > 0.5 ? 1 : -1,
+      });
+    }
+  }
+  animals.sort((left, right) => left.y - right.y || left.x - right.x);
+  for (const animal of animals) {
+    sprites.drawLivestock(ctx, { ...animal, highDefinition });
+  }
+}
+
 export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: SceneOptions): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -947,6 +1292,8 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     perfLast = now;
   };
   const sprites = o.sprites ?? placeholderSprites;
+  const occludedBuildingDraws: BuildingDrawParams[] = [];
+  const occludedResidentDraws: ResidentDrawParams[] = [];
   const predatorScoutIds = activePredatorScoutIds(state);
   const presentation = o.residentPresentation ?? buildResidentPresentationSnapshot(state);
   const lerp = (a: number, b: number) => a + (b - a) * o.alpha;
@@ -959,6 +1306,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     logicalHeight,
     sprites,
     o.terrainVisualSignature ?? terrainVisualSignature(state),
+    renderScale,
   );
   // 짐승이 떠난(비활성) 서식지는 지도에서도 숨긴다
   const habitats = state.habitats.filter(h => h.active && isExplored(state, h.x, h.y));
@@ -966,17 +1314,18 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   ctx.clearRect(viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight);
   ctx.drawImage(
     layer,
-    viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight,
+    viewport.pixelX * renderScale,
+    viewport.pixelY * renderScale,
+    viewport.pixelWidth * renderScale,
+    viewport.pixelHeight * renderScale,
     viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight,
   );
   ctx.save();
   ctx.beginPath();
   ctx.rect(viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight);
   ctx.clip();
-  if (hoveredHabitat) drawHabitatRange(ctx, hoveredHabitat);
-  for (const habitat of habitats) {
-    if (tileRectIntersectsViewport(viewport, habitat.x, habitat.y)) drawHabitatIcon(ctx, habitat);
-  }
+  // 바닥 캐시와 분리해 큰 노두가 뒤에 그려지는 이웃 타일 바닥에 잘리지 않게 한다.
+  drawTerrainProps(ctx, state, sprites, viewport, renderScale);
 
   const activeClaimZones = new Map<number, ClaimZone>();
   for (const point of [o.hover, o.selected]) {
@@ -1004,6 +1353,12 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   // 2) 건물 — 지붕이 위 타일에 겹치므로 y 순서로 그린다
   const season = getSeason(state.day);
   const heating = (season === 'autumn' || season === 'winter') && state.resources.firewood > 0;
+  for (const stable of state.buildings) {
+    if (stable.type !== 'stable' || !stable.built) continue;
+    const pasture = normalizePastureArea(stable.pasture);
+    if (!pasture || !tileRectIntersectsViewport(viewport, pasture.x, pasture.y, pasture.w, pasture.h)) continue;
+    drawPastureGround(ctx, pasture, season === 'winter', o.selectedBuildingId === stable.id);
+  }
   // 끝난 전투 자리의 교란 자국 — 건물·주민 아래 바닥 데칼로 깔린다
   for (const scar of state.battleScars ?? []) {
     if (scar.until < state.day) continue;
@@ -1040,13 +1395,16 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       for (let i = 0; i < area; i++) {
         const cellX = b.x + (i % dims.w);
         const cellY = b.y + Math.floor(i / dims.w);
-        sprites.drawBuilding(ctx, {
+        const drawParams: BuildingDrawParams = {
           type: b.type, built: b.built, ghost: false,
           season,
+          highDefinition: renderScale === 2,
           progress01: def.buildDays > 0 ? b.progress / def.buildDays : 1,
           growth01: i < sown ? b.fieldGrowth / 100 : 0,
           x: cellX * TILE, y: cellY * TILE, size: TILE,
-        });
+        };
+        sprites.drawBuilding(ctx, drawParams);
+        occludedBuildingDraws.push(drawParams);
       }
       if (b.repairing) {
         sprites.drawBuildingDamage(ctx, { season, x: b.x * TILE, y: b.y * TILE, size });
@@ -1054,16 +1412,38 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       }
       continue;
     }
-    sprites.drawBuilding(ctx, {
+    if (b.type === 'cemetery') {
+      const area = dims.w * dims.h;
+      const graves = b.built ? Math.min(area * CONFIG.funeral.plotsPerTile, Math.max(0, b.graves ?? 0)) : 0;
+      for (let i = 0; i < area; i++) {
+        const cellX = b.x + (i % dims.w);
+        const cellY = b.y + Math.floor(i / dims.w);
+        const drawParams: BuildingDrawParams = {
+          type: b.type, built: b.built, ghost: false,
+          season,
+          highDefinition: renderScale === 2,
+          progress01: def.buildDays > 0 ? b.progress / def.buildDays : 1,
+          graveCount: Math.min(CONFIG.funeral.plotsPerTile, Math.max(0, graves - i * CONFIG.funeral.plotsPerTile)),
+          x: cellX * TILE, y: cellY * TILE, size: TILE,
+        };
+        sprites.drawBuilding(ctx, drawParams);
+        occludedBuildingDraws.push(drawParams);
+      }
+      continue;
+    }
+    const drawParams: BuildingDrawParams = {
       type: b.type, built: b.built, ghost: false,
       rank: b.type === 'center' ? state.rank : undefined,
       season,
+      highDefinition: renderScale === 2,
       progress01: def.buildDays > 0 ? b.progress / def.buildDays : 1,
       connections: b.built && isWallBuilding(b.type)
         ? wallConnectionsFromSet(wallTiles, b.x, b.y)
         : undefined,
       x: drawX, y: drawY, size,
-    });
+    };
+    sprites.drawBuilding(ctx, drawParams);
+    occludedBuildingDraws.push(drawParams);
     if (b.repairing) {
       sprites.drawBuildingDamage(ctx, { season, x: drawX, y: drawY, size });
       drawDamageSmoke(ctx, drawX, drawY, b.id, size / TILE);
@@ -1089,6 +1469,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     const selected = !!o.selected && foreignSiteAt(state, o.selected.x, o.selected.y)?.id === site.id;
     drawForeignSite(ctx, sprites, site, selected, season);
   }
+  drawPastureLivestock(ctx, state, sprites, viewport, o.animationTimeMs, renderScale === 2);
 
   lap('2-buildings');
   drawWorkerSlotOverlays(ctx, state, visibleBuildings, o.selectedBuildingId, presentation.indoorResidentIds);
@@ -1119,7 +1500,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   for (const site of visibleSites) {
     for (const actor of foreignSiteActors(state, site, activityTime)) {
       if (!pixelRectIntersectsViewport(viewport, actor.x * TILE - TILE, actor.y * TILE - TILE, TILE * 2, TILE * 2)) continue;
-      sprites.drawResident(ctx, {
+      const drawParams: ResidentDrawParams = {
         job: actor.job,
         gender: actor.gender,
         x: actor.x * TILE,
@@ -1130,7 +1511,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
         moving: actor.moving,
         facing: actor.facing,
         foreignFaction: site.factionName ?? undefined,
-      });
+      };
+      sprites.drawResident(ctx, drawParams);
+      occludedResidentDraws.push(drawParams);
     }
   }
   // 매장을 기다리는 시신 — 장의사가 운구 중이면 표시하지 않는다
@@ -1156,7 +1539,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       if (dest) leisureFacing = dest.x * TILE + TILE / 2 >= p.x ? 1 : -1;
     }
     if (!pixelRectIntersectsViewport(viewport, p.x - TILE, p.y - TILE, TILE * 2, TILE * 2)) continue;
-    sprites.drawResident(ctx, {
+    const drawParams: ResidentDrawParams = {
       job: r.job,
       gender: r.gender,
       x: p.x,
@@ -1178,7 +1561,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       stage: r.stage,
       sizeScale: r.stage === 'infant' ? 0.42 : r.stage === 'child' ? 0.62 : r.stage === 'youth' ? 0.8 : 1,
       animationTimeMs: o.animationTimeMs + stableResidentAnimationOffset(r.id),
-    });
+    };
+    sprites.drawResident(ctx, drawParams);
+    occludedResidentDraws.push(drawParams);
   }
 
   // 5) 아군 원정부대 — 집결 중에는 개별 주민, 출발 후에는 단일 부대로 표시한다.
@@ -1240,6 +1625,16 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       }
     }
   }
+
+  // 키 큰 나무와 산맥은 발자국 타일보다 위로 솟아 배우를 부분적으로 가린다.
+  drawTerrainOverlays(ctx, state, sprites, viewport, renderScale);
+  drawOccludedEntityGhosts(ctx, state, sprites, occludedBuildingDraws, occludedResidentDraws);
+  // 사냥터 범위와 표식은 수관보다 위에 그려 항상 식별 가능하게 한다.
+  if (hoveredHabitat) drawHabitatRange(ctx, hoveredHabitat);
+  for (const habitat of habitats) {
+    if (tileRectIntersectsViewport(viewport, habitat.x, habitat.y)) drawHabitatIcon(ctx, habitat);
+  }
+  lap('6-terrain-overlays');
 
   lap('3-6-actors');
 
@@ -1305,8 +1700,20 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   }
 
   // 11) 건설 배치 미리보기 — 날씨 위에 얹어 잘 보이게
-  if (o.placingType && isPlotBuildingType(o.placingType) && o.placingRect) {
-    // 경작지: 드래그 사각형을 칸별 유효/무효로 칠한다
+  if (o.pasturePlacement) {
+    const { stableId, rect } = o.pasturePlacement;
+    const valid = validateStablePasture(state, stableId, rect) == null;
+    ctx.fillStyle = valid ? 'rgba(111,191,115,0.38)' : 'rgba(224,108,92,0.42)';
+    ctx.fillRect(rect.x * TILE, rect.y * TILE, rect.w * TILE, rect.h * TILE);
+    ctx.strokeStyle = valid ? 'rgba(255,214,90,0.95)' : 'rgba(245,145,125,0.95)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
+    ctx.strokeRect(rect.x * TILE + 1, rect.y * TILE + 1, rect.w * TILE - 2, rect.h * TILE - 2);
+    ctx.setLineDash([]);
+    ctx.lineWidth = 1;
+  }
+  if (o.placingType && isAreaBuildingType(o.placingType) && o.placingRect) {
+    // 경작지·묘역: 드래그 사각형을 칸별 유효/무효로 칠한다
     const def = BUILDING_DEFS[o.placingType];
     const rect = o.placingRect;
     const affordable = canAffordCost(state, buildingCostFor(o.placingType, rect.w, rect.h));
@@ -1321,7 +1728,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
         ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE);
         sprites.drawBuilding(ctx, {
           type: o.placingType, built: true, ghost: true, progress01: 1,
-          season,
+          season, highDefinition: renderScale === 2,
           x: tx * TILE, y: ty * TILE, size: TILE,
         });
       }
@@ -1345,7 +1752,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     ctx.fillRect(o.hover.x * TILE, o.hover.y * TILE, size, size);
     sprites.drawBuilding(ctx, {
       type: o.placingType, built: true, ghost: true, progress01: 1,
-      season,
+      season, highDefinition: renderScale === 2,
       x: o.hover.x * TILE, y: o.hover.y * TILE, size,
     });
   }

@@ -26,6 +26,14 @@ const agents = await import(pathToFileURL(join(compiledDir, 'agents.mjs')).href)
 const minerals = await import(pathToFileURL(join(compiledDir, 'minerals.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
+assert.equal(minerals.mineralVisualTier(1), 'trace');
+assert.equal(minerals.mineralVisualTier(20), 'small');
+assert.equal(minerals.mineralVisualTier(40), 'medium');
+assert.equal(minerals.mineralVisualTier(65), 'large');
+assert.equal(minerals.mineralVisualTier(90), 'huge');
+assert.equal(minerals.mineralVisualTier(50), 'medium');
+assert.equal(minerals.mineralVisualTier(100), 'huge');
+
 let naturalStoneCount = 0;
 let naturalIronCount = 0;
 const generationSeeds = Array.from({ length: 32 }, (_value, index) => 1 + index * 104729);

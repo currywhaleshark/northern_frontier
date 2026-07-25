@@ -3,15 +3,17 @@ import { addLog } from './events';
 import { addBuildingStock } from './inventory';
 import { getSeason } from './seasons';
 import { reconcileMountAssignments } from './weapons';
+import { pastureRequiredHerders, stableLivestockCapacity } from './pastures';
 import type { Building, GameState, LivestockId, LivestockState, ResourceId, Season } from './types';
 
-export const LIVESTOCK_IDS = ['chicken', 'goat', 'sheep', 'cattle', 'horse'] as const satisfies readonly LivestockId[];
-export const IMPLEMENTED_LIVESTOCK_IDS = ['chicken', 'goat', 'sheep', 'cattle', 'horse'] as const satisfies readonly LivestockId[];
+export const LIVESTOCK_IDS = ['chicken', 'goat', 'sheep', 'pig', 'cattle', 'horse'] as const satisfies readonly LivestockId[];
+export const IMPLEMENTED_LIVESTOCK_IDS = ['chicken', 'goat', 'sheep', 'pig', 'cattle', 'horse'] as const satisfies readonly LivestockId[];
 
 export const LIVESTOCK_DEFS = {
   chicken: { name: '닭', icon: '🐔' },
   goat: { name: '염소', icon: '🐐' },
   sheep: { name: '양', icon: '🐑' },
+  pig: { name: '돼지', icon: '🐖' },
   cattle: { name: '소', icon: '🐄' },
   horse: { name: '군마', icon: '🐎' },
 } as const satisfies Record<LivestockId, { name: string; icon: string }>;
@@ -97,6 +99,13 @@ export function livestockCapacity(_species: LivestockId): number {
   return speciesConfig(_species).capacity;
 }
 
+export function livestockCapacityForStable(
+  stable: Pick<Building, 'type' | 'pasture'>,
+  species: LivestockId,
+): number {
+  return stableLivestockCapacity(stable, species);
+}
+
 export function livestockDailyFeedNeed(livestock: LivestockState, season?: Season): number {
   const config = speciesConfig(livestock.species);
   if (config.grazesOutsideWinter && season !== 'winter') return 0;
@@ -140,6 +149,7 @@ export function updateLivestock(state: GameState): LivestockDailyReport {
     }
 
     const config = speciesConfig(livestock.species);
+    const capacity = stableLivestockCapacity(stable, livestock.species);
     const need = livestockDailyFeedNeed(livestock, season);
     const available = finiteNonNegative(state.resources[config.feedResource]);
     const consumed = Math.min(need, available);
@@ -149,15 +159,26 @@ export function updateLivestock(state: GameState): LivestockDailyReport {
 
     if (consumed + 1e-9 >= need) {
       livestock.feedShortageDays = 0;
-      if (livestock.headcount >= 2 && livestock.headcount < config.capacity) {
-        livestock.growth += livestock.headcount * config.breedingPerHeadPerDay;
-        while (livestock.growth >= 1 && livestock.headcount < config.capacity) {
+      const requiredHerders = pastureRequiredHerders(stable);
+      const activeHerders = stable.pasture
+        ? state.residents.filter(resident =>
+          resident.alive &&
+          !resident.sick &&
+          resident.job === 'herder' &&
+          resident.assignedBuildingId === stable.id).length
+        : requiredHerders;
+      const careMultiplier = requiredHerders > 0
+        ? Math.min(1, activeHerders / requiredHerders)
+        : 1;
+      if (livestock.headcount >= 2 && livestock.headcount < capacity) {
+        livestock.growth += livestock.headcount * config.breedingPerHeadPerDay * careMultiplier;
+        while (livestock.growth >= 1 && livestock.headcount < capacity) {
           livestock.growth -= 1;
           livestock.headcount += 1;
           report.births += 1;
         }
       }
-      if (livestock.headcount >= config.capacity) livestock.growth = 0;
+      if (livestock.headcount >= capacity) livestock.growth = 0;
       continue;
     }
 
@@ -343,7 +364,7 @@ export function acquireLivestock(
     .sort((left, right) => Number(right.id === preferredStableId) - Number(left.id === preferredStableId));
   const freeCapacity = stables.reduce((total, stable) => {
     const livestock = ensureLivestockState(stable);
-    return total + livestockCapacity(species) - (livestock.species === species ? livestock.headcount : 0);
+    return total + livestockCapacityForStable(stable, species) - (livestock.species === species ? livestock.headcount : 0);
   }, 0);
   if (freeCapacity < requested) return '가축을 들일 빈 축사가 부족합니다.';
 
@@ -356,7 +377,7 @@ export function acquireLivestock(
       stable.livestock = createLivestockState(species, 0);
       livestock = stable.livestock;
     }
-    const received = Math.min(remaining, livestockCapacity(species) - livestock.headcount);
+    const received = Math.min(remaining, livestockCapacityForStable(stable, species) - livestock.headcount);
     livestock.headcount += received;
     remaining -= received;
   }
@@ -368,7 +389,7 @@ const TRADE_LIVESTOCK_BY_FACTION: Readonly<Record<string, typeof IMPLEMENTED_LIV
   '니마차 우디캐': 'goat',
   '올량합 부락': 'sheep',
   '만상': 'cattle',
-  '송상': 'cattle',
+  '송상': 'pig',
 };
 
 export function acquireFirstLivestockFromTrade(state: GameState, factionName: string): boolean {
