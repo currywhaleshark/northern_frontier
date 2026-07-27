@@ -1977,6 +1977,12 @@ function visualDayFraction(state: GameState, alpha: number): number {
     : subU / subticks;
 }
 
+// 연중 태양 기세 — 하지(여름 중앙)에 1, 동지에 0인 날짜 기반 연속 코사인.
+// 그림자 길이(태양 고도)와 황혼 색조가 공유한다.
+function annualSunFactor01(day: number): number {
+  return (1 + Math.cos(Math.PI * 2 * (getDayOfYear(day) - CONFIG.time.seasonDays * 1.5) / CONFIG.time.yearDays)) / 2;
+}
+
 interface DayShadow {
   ux: number; // 높이 1px가 만드는 화면 가로 오프셋 (부호 = 해 반대 방향)
   uy: number; // 높이 1px가 만드는 화면 세로(아래) 오프셋 — 3/4 시점이라 항상 살짝 앞으로 깔린다
@@ -1992,10 +1998,8 @@ function dayShadowFor(state: GameState, dayFrac: number): DayShadow | null {
   // 방향과 길이를 32단계로 고정해 미세한 떨림과 불필요한 매 프레임 변화를 줄인다.
   const progress = Math.round((dayFrac - dawnT) / daylight * 32) / 32;
   const diurnal = Math.max(0, Math.sin(Math.PI * progress));
-  // 태양 고도의 연중 변화 — 하지(여름 중앙)에 가장 높고 동지에 가장 낮다.
-  // 날짜 기반 연속 곡선이라 겨울로 갈수록 그림자가 서서히 길어지고 계절 경계에서 튀지 않는다.
-  const annual = Math.cos(Math.PI * 2 * (getDayOfYear(state.day) - CONFIG.time.seasonDays * 1.5) / CONFIG.time.yearDays);
-  const altitude = diurnal * (0.8 + 0.2 * annual);
+  // 태양 고도의 연중 변화 — 겨울로 갈수록 그림자가 서서히 길어지고 계절 경계에서 튀지 않는다.
+  const altitude = diurnal * (0.6 + 0.4 * annualSunFactor01(state.day));
   // 전단 계수: 모든 피사체가 자기 높이에 이 값을 곱한 만큼 같은 각도로 눕는다.
   // 정오에는 발밑에 고이고 해가 낮을수록(아침·저녁, 그리고 겨울) 길게 눕는다.
   const ux = (progress * 2 - 1) * (0.22 + Math.pow(1 - altitude, 1.5) * 1.5);
@@ -2248,18 +2252,36 @@ function drawDayNight(ctx: CanvasRenderingContext2D, state: GameState, dayFrac: 
     : -Math.sin(Math.PI * ((dayFrac - duskT + 1) % 1) / (1 - daylight)); // 밤 구간: 0→-1→0
   const night = Math.max(0, -sun);             // 낮엔 0, 자정에 1
 
-  // 밤의 푸른 어둠
+  const fillViewport = () => ctx.fillRect(viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight);
+  // 검푸른 밤 — 멀티플라이로 따뜻한 색을 눌러 식히고, 스크린으로 남빛 바닥광을 깔아
+  // 어두운 부분까지 푸르게 만든다. 단순 알파 덮기보다 대비가 살아 훨씬 밤답다.
   if (night > 0.002) {
-    ctx.fillStyle = `rgba(16,24,56,${(night * 0.5).toFixed(3)})`;
-    ctx.fillRect(viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight);
+    const mix = (from: number, to: number) => Math.round(from + (to - from) * night);
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = `rgb(${mix(255, 52)},${mix(255, 74)},${mix(255, 148)})`;
+    fillViewport();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = `rgba(24,42,108,${(night * 0.5).toFixed(3)})`;
+    fillViewport();
+    ctx.restore();
   }
-  // 여명/황혼의 따뜻한 빛 (해가 지평선 근처일 때만)
+  // 여명/황혼의 따뜻한 빛 (해가 지평선 근처일 때만) — 멀티플라이 틴트라
+  // 눈밭도 분홍으로 뜨지 않고 불그스름하게 물든다.
   const twilight = Math.max(0, 1 - Math.abs(sun) * 3.5);
   if (twilight > 0.002) {
     const dusk = dayFrac > 0.25 && dayFrac < 0.75; // 해질녘은 붉게, 새벽은 노랗게
-    const col = dusk ? '255,110,70' : '255,175,95';
-    ctx.fillStyle = `rgba(${col},${(twilight * 0.17).toFixed(3)})`;
-    ctx.fillRect(viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight);
+    // 동지에 가까울수록 석양이 더 붉고 짙어진다 (겨울 낮은 해의 긴 대기 산란).
+    const winterness = 1 - annualSunFactor01(state.day);
+    const col = dusk
+      ? `235,${Math.round(150 - winterness * 45)},${Math.round(120 - winterness * 50)}`
+      : '255,215,170';
+    const strength = twilight * (dusk ? 0.4 + winterness * 0.15 : 0.3);
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = `rgba(${col},${strength.toFixed(3)})`;
+    fillViewport();
+    ctx.restore();
   }
   // 밤이 깊어지면 집·군영·중심지 창에 불이 켜진다
   if (night > 0.28) {
