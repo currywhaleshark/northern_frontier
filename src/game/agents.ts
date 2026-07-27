@@ -6,7 +6,7 @@ import {
 } from './dayCycle';
 import {
   BUILDING_DEFS, buildingCostFor, cemeteryPlotCapacity, clearBuildingTiles, computeDefense, footprintTilesOf,
-  isPlotBuildingType, isSmithyProductUnlocked, occupyBuildingTiles, officeEfficiencyMultiplier,
+  isBuildingUpperPassageTile, isPlotBuildingType, isSmithyProductUnlocked, occupyBuildingTiles, officeEfficiencyMultiplier,
   plotArea, SMITHY_PRODUCT_DEFS, smithyProductOf, sownAreaOf,
 } from './buildings';
 import { JOB_NAMES, RESOURCE_NAMES } from './constants';
@@ -163,7 +163,7 @@ export function isTerrainPassable(state: GameState, x: number, y: number): boole
   const t = state.map[y]?.[x];
   if (!t) return false;
   const building = buildingAtTile(state, t);
-  if (building && !isPassableBuilding(building.type)) return false;
+  if (building && !isPassableBuilding(building.type) && !isBuildingUpperPassageTile(building, x, y)) return false;
   if (t.terrain === 'mountain') return false;
   if (t.terrain === 'river') {
     if (building && (building.type === 'bridge' || building.type === 'ferry' || building.type === 'dock')) return true;

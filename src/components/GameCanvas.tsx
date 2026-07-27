@@ -68,6 +68,7 @@ export function GameCanvas({
   const pointerPositionRef = useRef<{ mx: number; my: number } | null>(null);
   const hoverSemanticKeyRef = useRef('outside');
   const residentPresentationCacheRef = useRef<ReturnType<typeof createResidentPresentationSnapshotCache> | null>(null);
+  const habitatIconRef = useRef<HTMLImageElement | null>(null);
   if (!residentPresentationCacheRef.current) {
     residentPresentationCacheRef.current = createResidentPresentationSnapshotCache();
   }
@@ -264,6 +265,7 @@ export function GameCanvas({
         ? { stableId: pastureStableId, rect: placingRect }
         : null,
       selectedBuildingId, viewport: viewportRef.current ?? undefined, terrainVisualSignature: terrainSignature,
+      habitatIcon: habitatIconRef.current ?? undefined,
       sprites: getActiveSprites(), residentPresentation,
       renderScale,
       residentJobMarkers: showResidentJobMarkers,
@@ -301,6 +303,18 @@ export function GameCanvas({
   });
 
   useEffect(() => onAtlasAssetSettled(requestCanvasRender), [requestCanvasRender]);
+
+  useEffect(() => {
+    const image = new Image();
+    image.onload = () => {
+      habitatIconRef.current = image;
+      requestCanvasRender();
+    };
+    image.src = '/assets/ui/hunting-habitat-icon-v1.png';
+    return () => {
+      image.onload = null;
+    };
+  }, [requestCanvasRender]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

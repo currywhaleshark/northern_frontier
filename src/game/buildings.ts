@@ -328,6 +328,24 @@ export function buildingFootprintDims(building: Pick<Building, 'type' | 'w' | 'h
   return { w: size, h: size };
 }
 
+// 하나의 큰 스프라이트가 두 행을 덮는 건물은 위 행을 건물 뒤 통로로 쓴다.
+// 밭·논·묘역은 칸별 스프라이트이므로 이 깊이 표현의 대상이 아니다.
+export function isWalkBehindBuilding(
+  building: Pick<Building, 'type' | 'w' | 'h'>,
+): boolean {
+  return !isAreaBuildingType(building.type) && buildingFootprintDims(building).h === 2;
+}
+
+export function isBuildingUpperPassageTile(
+  building: Pick<Building, 'type' | 'x' | 'y' | 'w' | 'h'>,
+  x: number,
+  y: number,
+): boolean {
+  if (!isWalkBehindBuilding(building) || y !== building.y) return false;
+  const { w } = buildingFootprintDims(building);
+  return x >= building.x && x < building.x + w;
+}
+
 type OperationalAreaBuilding = Pick<Building, 'type' | 'w' | 'h'> & Partial<Pick<Building, 'expansion'>>;
 
 export function plotArea(building: OperationalAreaBuilding): number {

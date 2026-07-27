@@ -2176,6 +2176,15 @@ export const atlasSprites: SpriteAPI = {
     const bob = (p.moving ? Math.floor(animationTime / 130) % 2 : 0) * CF;
     let drewOptionalResidentPresentation = false;
 
+    if (p.selected) {
+      ctx.strokeStyle = '#d9a441';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y + half - CF, 7 * CF, 3 * CF, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+
     const specialRect = p.special ? specialResidentSourceRect(p.special) : null;
     if (p.special && drawApprovedI2VLocomotion(ctx, p, animationTime)) {
       drewOptionalResidentPresentation = true;
@@ -2254,14 +2263,6 @@ export const atlasSprites: SpriteAPI = {
       ctx.strokeStyle = 'rgba(0,0,0,0.5)';
       ctx.fillRect(p.x + half - 5 * CF, p.y + CF, b, b);
       ctx.strokeRect(p.x + half - 5 * CF, p.y + CF, b, b);
-    }
-    if (p.selected) {
-      ctx.strokeStyle = '#d9a441';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y + half - CF, 7 * CF, 3 * CF, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.lineWidth = 1;
     }
   },
 

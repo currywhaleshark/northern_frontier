@@ -284,6 +284,14 @@ export const placeholderSprites: SpriteAPI = {
   },
 
   drawResident(ctx, p) {
+    if (p.selected) {
+      ctx.strokeStyle = '#d9a441';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 5.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
     ctx.fillStyle = p.foreignFaction
       ? FACTIONS.find(faction => faction.name === p.foreignFaction)?.color ?? '#d2a958'
       : JOB_COLORS[p.job];
@@ -296,14 +304,6 @@ export const placeholderSprites: SpriteAPI = {
     if (p.carrying && p.showCargoMarker !== false) {
       ctx.fillStyle = '#f0e6c8';
       ctx.fillRect(p.x - 1.5, p.y - 6, 3, 3);
-    }
-    if (p.selected) {
-      ctx.strokeStyle = '#d9a441';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 5.5, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.lineWidth = 1;
     }
   },
 

@@ -107,8 +107,8 @@ function onlyBuilderAt(state, x, y) {
   clearMapToPlain(state);
   addBuilt(state, 'storehouse', 5, 5);
 
-  assert.equal(agents.isPassable(state, 5, 5), false, 'solid building origin blocks movement');
-  assert.equal(agents.isPassable(state, 6, 5), false, 'solid building east footprint blocks movement');
+  assert.equal(agents.isPassable(state, 5, 5), true, 'upper-left footprint is a walk-behind passage');
+  assert.equal(agents.isPassable(state, 6, 5), true, 'upper-right footprint is a walk-behind passage');
   assert.equal(agents.isPassable(state, 5, 6), false, 'solid building south footprint blocks movement');
   assert.equal(agents.isPassable(state, 6, 6), false, 'solid building southeast footprint blocks movement');
 }
@@ -123,8 +123,12 @@ function onlyBuilderAt(state, x, y) {
   assert.equal(path.at(-1).x, 8);
   assert.equal(path.at(-1).y, 5);
   assert.ok(
-    path.every(step => state.map[step.y][step.x].buildingId == null),
-    'path does not step through solid building footprint',
+    path.some(step => step.y === 5 && (step.x === 5 || step.x === 6)),
+    'the shortest path uses the building upper-row passage',
+  );
+  assert.ok(
+    path.every(step => agents.isPassable(state, step.x, step.y)),
+    'path never steps onto the blocked lower row',
   );
 }
 
