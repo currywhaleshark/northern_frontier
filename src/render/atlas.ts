@@ -35,9 +35,7 @@ import { FACTIONS, JOB_COLORS } from '../game/constants';
 import { isGateBuilding, isWallBuilding } from '../game/walls';
 import type { BuildingTypeId, JobId, Season, Terrain } from '../game/types';
 import {
-  historicalTerrainSampleOffsetFromHash,
   historicalTerrainSourceRect,
-  historicalTerrainVariantFor,
 } from './historicalTerrain';
 import {
   RIVER_AUTOTILE_SIZE,
@@ -283,6 +281,39 @@ let chars: HTMLImageElement | null = null;
 let riverSheet: HTMLImageElement | null = null;
 let historicalTerrainSheet: HTMLImageElement | null = null;
 let historicalTerrainHdSheet: HTMLImageElement | null = null;
+type SeamlessGroundFamily = 'plain' | 'forest' | 'rock';
+interface SeamlessGroundPair {
+  standard: HTMLImageElement | null;
+  highDefinition: HTMLImageElement | null;
+}
+const SEAMLESS_GROUND_VERSIONS: Record<SeamlessGroundFamily, string> = {
+  plain: 'v3',
+  forest: 'v1',
+  rock: 'v1',
+};
+const seamlessGroundSheets: Record<
+  SeamlessGroundFamily,
+  Record<Season, SeamlessGroundPair>
+> = {
+  plain: {
+    spring: { standard: null, highDefinition: null },
+    summer: { standard: null, highDefinition: null },
+    autumn: { standard: null, highDefinition: null },
+    winter: { standard: null, highDefinition: null },
+  },
+  forest: {
+    spring: { standard: null, highDefinition: null },
+    summer: { standard: null, highDefinition: null },
+    autumn: { standard: null, highDefinition: null },
+    winter: { standard: null, highDefinition: null },
+  },
+  rock: {
+    spring: { standard: null, highDefinition: null },
+    summer: { standard: null, highDefinition: null },
+    autumn: { standard: null, highDefinition: null },
+    winter: { standard: null, highDefinition: null },
+  },
+};
 let terrainObjectSheet: HTMLImageElement | null = null;
 let terrainGrowthSheet: HTMLImageElement | null = null;
 let terrainGrowthHdSheet: HTMLImageElement | null = null;
@@ -388,6 +419,7 @@ export interface AtlasAssetState {
 const atlasAssetStates: AtlasAssetState[] = [];
 const atlasAssetSettledListeners = new Set<() => void>();
 const warnedAssetFailures = new Set<string>();
+const requestedSeamlessGroundSeasons = new Set<Season>();
 
 function loadAtlasAsset(
   src: string,
@@ -413,6 +445,25 @@ function loadAtlasAsset(
   image.src = src;
 }
 
+function requestSeamlessGroundSeason(season: Season, required: boolean): void {
+  if (requestedSeamlessGroundSeasons.has(season)) return;
+  requestedSeamlessGroundSeasons.add(season);
+  for (const family of ['plain', 'forest', 'rock'] as const) {
+    const version = SEAMLESS_GROUND_VERSIONS[family];
+    const pair = seamlessGroundSheets[family][season];
+    loadAtlasAsset(
+      `/assets/folk-warm-${family}-${season}-seamless-${version}-standard-448px.png`,
+      required,
+      image => { pair.standard = image; },
+    );
+    loadAtlasAsset(
+      `/assets/folk-warm-${family}-${season}-seamless-${version}-hd-896px.png`,
+      required,
+      image => { pair.highDefinition = image; },
+    );
+  }
+}
+
 function ensureLoaded(): void {
   if (started || typeof Image === 'undefined') return;
   started = true;
@@ -421,6 +472,8 @@ function ensureLoaded(): void {
   loadAtlasAsset('/assets/river-mask-autotile-28px-sheet.png', true, image => { riverSheet = image; });
   loadAtlasAsset('/assets/folk-warm-terrain-v3-28px-sheet.png', true, image => { historicalTerrainSheet = image; });
   loadAtlasAsset('/assets/folk-warm-terrain-v3-56px-sheet.png', true, image => { historicalTerrainHdSheet = image; });
+  // 새 게임의 봄 자산만 시작 준비에 포함하고, 나머지 계절은 실제 진입 시 요청한다.
+  requestSeamlessGroundSeason('spring', true);
   loadAtlasAsset(GENERATED_TERRAIN_OBJECT_SHEET.src, true, image => { terrainObjectSheet = image; });
   loadAtlasAsset(TERRAIN_GROWTH_SHEETS.standard.src, true, image => { terrainGrowthSheet = image; });
   loadAtlasAsset(TERRAIN_GROWTH_SHEETS.highDefinition.src, true, image => { terrainGrowthHdSheet = image; });
@@ -1593,82 +1646,273 @@ function activeHistoricalTerrain(
   return null;
 }
 
-function drawHistoricalGround(
-  ctx: CanvasRenderingContext2D, terrain: Terrain, p: TerrainDrawParams, h: number,
-): boolean {
-  const active = activeHistoricalTerrain(p.highDefinition);
-  if (!active) return false;
-  const rect = historicalTerrainSourceRect(terrain, p.season, active.sourceScale);
-  if (!rect) return false;
-  const variant = historicalTerrainVariantFor(terrain, h);
-  const sampleOffset = historicalTerrainSampleOffsetFromHash(h, active.sourceScale);
-  ctx.save();
-  ctx.translate(p.x + (variant.flipX ? p.size : 0), p.y + (variant.flipY ? p.size : 0));
-  ctx.scale(variant.flipX ? -1 : 1, variant.flipY ? -1 : 1);
-  ctx.drawImage(
+function activeSeamlessGroundTerrain(
+  terrain: Terrain,
+  season: Season,
+  highDefinition: boolean | undefined,
+): { image: HTMLImageElement; sourceScale: 1 | 2 } | null {
+  if (typeof Image !== 'undefined') requestSeamlessGroundSeason(season, false);
+  let family: SeamlessGroundFamily | null = null;
+  if (terrain === 'plain' || terrain === 'center' || terrain === 'fertile') {
+    family = 'plain';
+  } else if (terrain === 'forest') {
+    family = 'forest';
+  } else if (terrain === 'mountain' || terrain === 'rock') {
+    family = 'rock';
+  }
+  if (!family) return null;
+  const pair = seamlessGroundSheets[family][season];
+  if (highDefinition && pair.highDefinition) {
+    return { image: pair.highDefinition, sourceScale: 2 };
+  }
+  if (pair.standard) return { image: pair.standard, sourceScale: 1 };
+  if (pair.highDefinition) return { image: pair.highDefinition, sourceScale: 2 };
+  return null;
+}
+
+const historicalGroundPatterns = new Map<string, HTMLCanvasElement>();
+
+function quiltedHistoricalGroundPattern(
+  terrain: Terrain,
+  season: Season,
+  active: { image: HTMLImageElement; sourceScale: 1 | 2 },
+): HTMLCanvasElement | null {
+  const rect = historicalTerrainSourceRect(terrain, season, active.sourceScale);
+  if (!rect) return null;
+  const key = `${active.image.src}|${terrain}|${season}|${active.sourceScale}`;
+  const cached = historicalGroundPatterns.get(key);
+  if (cached) return cached;
+  const canvas = document.createElement('canvas');
+  const gridSize = 8;
+  const step = rect.sw;
+  const feather = 6 * active.sourceScale;
+  canvas.width = step * gridSize;
+  canvas.height = step * gridSize;
+  const patternCtx = canvas.getContext('2d');
+  if (!patternCtx) return null;
+  patternCtx.imageSmoothingEnabled = false;
+
+  // 셀 안쪽 표본을 여러 위상·방향으로 겹쳐 160 논리 픽셀짜리 매크로 텍스처를 만든다.
+  // 조각 가장자리는 서로 페더링하고 캔버스 바깥으로 나간 기여분은 반대편에 더한다.
+  // 따라서 매크로 텍스처 자체가 무봉제이면서 짧은 거울 반복의 띠 무늬도 피한다.
+  const centeredInset = active.sourceScale;
+  const sourceCanvas = document.createElement('canvas');
+  sourceCanvas.width = rect.sw;
+  sourceCanvas.height = rect.sh;
+  const sourceCtx = sourceCanvas.getContext('2d', { willReadFrequently: true });
+  if (!sourceCtx) return null;
+  sourceCtx.imageSmoothingEnabled = false;
+  sourceCtx.drawImage(
     active.image,
-    rect.sx + sampleOffset.dx,
-    rect.sy + sampleOffset.dy,
+    rect.sx + centeredInset,
+    rect.sy + centeredInset,
     rect.sw,
     rect.sh,
     0,
     0,
-    p.size,
-    p.size,
+    rect.sw,
+    rect.sh,
   );
-  ctx.restore();
+  const sourcePixels = sourceCtx.getImageData(0, 0, rect.sw, rect.sh).data;
+  const accum = new Float32Array(canvas.width * canvas.height * 3);
+  const weights = new Float32Array(canvas.width * canvas.height);
+  const mirrorIndex = (value: number): number => {
+    const period = step * 2;
+    const wrapped = positiveMod(value, period);
+    return wrapped < step ? wrapped : period - 1 - wrapped;
+  };
+  const edgeWeight = (value: number): number => {
+    if (value < 0) return (value + feather + 1) / (feather + 1);
+    if (value >= step) return (step + feather - value) / (feather + 1);
+    return 1;
+  };
+
+  let randomState = 0x811c9dc5;
+  for (const char of `${terrain}:${season}`) {
+    randomState ^= char.charCodeAt(0);
+    randomState = Math.imul(randomState, 0x01000193) >>> 0;
+  }
+  const nextRandom = (): number => {
+    randomState ^= randomState << 13;
+    randomState ^= randomState >>> 17;
+    randomState ^= randomState << 5;
+    return randomState >>> 0;
+  };
+
+  for (let cellY = 0; cellY < gridSize; cellY++) {
+    for (let cellX = 0; cellX < gridSize; cellX++) {
+      const phaseX = (nextRandom() % 40) * active.sourceScale;
+      const phaseY = (nextRandom() % 40) * active.sourceScale;
+      const rotation = nextRandom() % 4;
+      for (let localY = -feather; localY < step + feather; localY++) {
+        const weightY = edgeWeight(localY);
+        const destY = positiveMod(cellY * step + localY, canvas.height);
+        for (let localX = -feather; localX < step + feather; localX++) {
+          const weight = weightY * edgeWeight(localX);
+          const destX = positiveMod(cellX * step + localX, canvas.width);
+          let sampleX = localX;
+          let sampleY = localY;
+          if (rotation === 1) [sampleX, sampleY] = [localY, -localX];
+          else if (rotation === 2) [sampleX, sampleY] = [-localX, -localY];
+          else if (rotation === 3) [sampleX, sampleY] = [-localY, localX];
+          sampleX = mirrorIndex(sampleX + phaseX);
+          sampleY = mirrorIndex(sampleY + phaseY);
+          const sourceIndex = (sampleY * step + sampleX) * 4;
+          const destIndex = destY * canvas.width + destX;
+          const colorIndex = destIndex * 3;
+          accum[colorIndex] += sourcePixels[sourceIndex] * weight;
+          accum[colorIndex + 1] += sourcePixels[sourceIndex + 1] * weight;
+          accum[colorIndex + 2] += sourcePixels[sourceIndex + 2] * weight;
+          weights[destIndex] += weight;
+        }
+      }
+    }
+  }
+
+  const output = patternCtx.createImageData(canvas.width, canvas.height);
+  for (let pixel = 0; pixel < weights.length; pixel++) {
+    const weight = weights[pixel] || 1;
+    const sourceIndex = pixel * 3;
+    const outputIndex = pixel * 4;
+    output.data[outputIndex] = Math.round(accum[sourceIndex] / weight);
+    output.data[outputIndex + 1] = Math.round(accum[sourceIndex + 1] / weight);
+    output.data[outputIndex + 2] = Math.round(accum[sourceIndex + 2] / weight);
+    output.data[outputIndex + 3] = 255;
+  }
+  patternCtx.putImageData(output, 0, 0);
+  historicalGroundPatterns.set(key, canvas);
+  return canvas;
+}
+
+function positiveMod(value: number, modulus: number): number {
+  return ((value % modulus) + modulus) % modulus;
+}
+
+function drawWrappedHistoricalGround(
+  ctx: CanvasRenderingContext2D,
+  pattern: HTMLCanvasElement | HTMLImageElement,
+  sourceScale: 1 | 2,
+  p: TerrainDrawParams,
+): void {
+  const logicalPatternSize = pattern.width / sourceScale;
+  let destY = p.y;
+  let sourceY = positiveMod(p.y, logicalPatternSize);
+  let remainingH = p.size;
+  while (remainingH > 0) {
+    const pieceH = Math.min(remainingH, logicalPatternSize - sourceY);
+    let destX = p.x;
+    let sourceX = positiveMod(p.x, logicalPatternSize);
+    let remainingW = p.size;
+    while (remainingW > 0) {
+      const pieceW = Math.min(remainingW, logicalPatternSize - sourceX);
+      ctx.drawImage(
+        pattern,
+        sourceX * sourceScale,
+        sourceY * sourceScale,
+        pieceW * sourceScale,
+        pieceH * sourceScale,
+        destX,
+        destY,
+        pieceW,
+        pieceH,
+      );
+      destX += pieceW;
+      remainingW -= pieceW;
+      sourceX = 0;
+    }
+    destY += pieceH;
+    remainingH -= pieceH;
+    sourceY = 0;
+  }
+}
+
+function drawHistoricalGround(
+  ctx: CanvasRenderingContext2D, terrain: Terrain, p: TerrainDrawParams,
+): boolean {
+  const seamlessGround = activeSeamlessGroundTerrain(
+    terrain,
+    p.season,
+    p.highDefinition,
+  );
+  if (seamlessGround) {
+    drawWrappedHistoricalGround(
+      ctx,
+      seamlessGround.image,
+      seamlessGround.sourceScale,
+      p,
+    );
+    return true;
+  }
+  const active = activeHistoricalTerrain(p.highDefinition);
+  if (!active) return false;
+  const pattern = quiltedHistoricalGroundPattern(terrain, p.season, active);
+  if (!pattern) return false;
+  drawWrappedHistoricalGround(ctx, pattern, active.sourceScale, p);
   return true;
 }
 
-// 이웃 지형 바닥 번짐 — 우세 지형(숲>바위>풀)의 바닥이 들쭉날쭉한 픽셀 밴드로
-// 타일 경계를 넘어 이어져, 지면 계열이 다른 타일끼리의 직선 절단면을 감춘다.
+const GROUND_EDGE_BAYER_4 = [
+  0, 8, 2, 10,
+  12, 4, 14, 6,
+  3, 11, 1, 9,
+  15, 7, 13, 5,
+] as const;
+
+// 이웃 지형 바닥 번짐 — 우세 지형(숲>바위>풀)을 월드 좌표 고정 픽셀 디더로 섞는다.
+// HD에서는 0.5 논리 px(실제 1px) 셀을 써 확대해도 경계 해상도가 굵어지지 않는다.
 function blendGroundEdges(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): void {
   const blend = p.blendEdges;
   if (!blend) return;
-  const active = activeHistoricalTerrain(p.highDefinition);
-  if (!active) return;
-  const segments = 7;
-  const seg = p.size / segments;
+  const samplesPerLogicalPixel = p.highDefinition ? 2 : 1;
+  const sampleSize = 1 / samplesPerLogicalPixel;
+  const axisSamples = Math.ceil(p.size * samplesPerLogicalPixel);
+  const blendDepth = Math.min(9, p.size * 0.36);
+  const depthSamples = Math.ceil(blendDepth * samplesPerLogicalPixel);
   const dirs = [['n', blend.n], ['e', blend.e], ['s', blend.s], ['w', blend.w]] as const;
   for (let dirIndex = 0; dirIndex < dirs.length; dirIndex++) {
     const neighborTerrain = dirs[dirIndex][1];
     if (!neighborTerrain) continue;
-    const rect = historicalTerrainSourceRect(neighborTerrain, p.season, active.sourceScale);
-    if (!rect) continue;
     const dir = dirs[dirIndex][0];
     ctx.save();
     ctx.beginPath();
-    // 구간마다 깊이가 2~7px로 출렁이는 결정적 스캘럽 — 매 프레임 같은 모양을 유지한다.
-    for (let i = 0; i < segments; i++) {
-      const depth = 2 + (hash(p.tileX * 4 + dirIndex, p.tileY * segments + i) % 6);
-      if (dir === 'n') ctx.rect(p.x + i * seg, p.y, seg, depth);
-      else if (dir === 's') ctx.rect(p.x + i * seg, p.y + p.size - depth, seg, depth);
-      else if (dir === 'w') ctx.rect(p.x, p.y + i * seg, depth, seg);
-      else ctx.rect(p.x + p.size - depth, p.y + i * seg, depth, seg);
+    for (let along = 0; along < axisSamples; along++) {
+      for (let depth = 0; depth < depthSamples; depth++) {
+        const horizontal = dir === 'n' || dir === 's';
+        const localSampleX = horizontal
+          ? along
+          : dir === 'w' ? depth : axisSamples - depth - 1;
+        const localSampleY = horizontal
+          ? dir === 'n' ? depth : axisSamples - depth - 1
+          : along;
+        const worldSampleX = p.tileX * axisSamples + localSampleX;
+        const worldSampleY = p.tileY * axisSamples + localSampleY;
+        const coarseNoise = (
+          (hash(worldSampleX >> 2, (worldSampleY >> 2) + dirIndex * 131) % 1024) / 1023
+          - 0.5
+        ) * 0.28;
+        const distance = (depth + 0.5) * sampleSize;
+        const coverage = Math.max(
+          0,
+          Math.min(1, 1 - distance / blendDepth + coarseNoise),
+        );
+        const bayerIndex = positiveMod(worldSampleX, 4)
+          + positiveMod(worldSampleY, 4) * 4;
+        const threshold = (GROUND_EDGE_BAYER_4[bayerIndex] + 0.5) / 16;
+        if (depth !== 0 && threshold > coverage) continue;
+        const localX = localSampleX * sampleSize;
+        const localY = localSampleY * sampleSize;
+        ctx.rect(p.x + localX, p.y + localY, sampleSize, sampleSize);
+      }
     }
     ctx.clip();
-    const sampleOffset = historicalTerrainSampleOffsetFromHash(
-      hash(p.tileX + dirIndex * 7, p.tileY),
-      active.sourceScale,
-    );
-    ctx.drawImage(
-      active.image,
-      rect.sx + sampleOffset.dx,
-      rect.sy + sampleOffset.dy,
-      rect.sw,
-      rect.sh,
-      p.x,
-      p.y,
-      p.size,
-      p.size,
-    );
+    drawHistoricalGround(ctx, neighborTerrain, p);
     ctx.restore();
   }
 }
 
 // 강 타일: 밑에 이웃 평지와 같은 땅 텍스처를 깔고, 이웃 정보로 물 영역을 계산해 채운다.
 // 물은 뭍 방향으로만 둑 여백을 두므로 지도상의 강 폭(1~3타일)이 화면에 그대로 드러난다.
-function drawRiverTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParams, h: number): void {
+function drawRiverTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): void {
   const nb = p.banks!;
   const f = p.size / RIVER_AUTOTILE_SIZE;
   const inset = RIVER_BANK_INSET * f;
@@ -1676,7 +1920,7 @@ function drawRiverTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParams, h: n
   const bankColor = RIVER_BANK_COLORS[p.season];
 
   // 1) 땅 밑바탕 — 주변 지형과 같은 시트라 물가 바깥이 이웃 타일과 이어진다
-  drawHistoricalGround(ctx, 'plain', p, h);
+  drawHistoricalGround(ctx, 'plain', p);
 
   const box = riverWaterBox(nb);
   const bx = p.x + box.x0 * f;
@@ -1920,7 +2164,7 @@ export const atlasSprites: SpriteAPI = {
     // 강: 이웃 정보 기반 면적 렌더링 — 땅 밑바탕 + 물 영역 + 둑 (겨울엔 얼음 텍스처)
     if (p.terrain === 'river') {
       if (riverSheet && historicalTerrainSheet && p.banks) {
-        drawRiverTile(ctx, p, h);
+        drawRiverTile(ctx, p);
         return;
       }
       blit(ctx, sheet, h % 7 === 0 ? WATER_SPARKLE : WATER, p.x, p.y, p.size);
@@ -1941,7 +2185,7 @@ export const atlasSprites: SpriteAPI = {
     }
 
     // 바닥 (겨울엔 크림색 지면으로 갈아 눈밭 느낌을 낸다)
-    const drewHistoricalGround = drawHistoricalGround(ctx, p.terrain, p, h);
+    const drewHistoricalGround = drawHistoricalGround(ctx, p.terrain, p);
 
     if (!drewHistoricalGround) {
       let base: CR = GRASS;
