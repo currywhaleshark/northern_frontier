@@ -87,7 +87,7 @@ html, body, #root {
   color: var(--text);
   font: inherit;
   text-align: left;
-  cursor: pointer;
+  cursor: default;
 }
 .ongoing-objective:hover { background: #2b3239; }
 .ongoing-objective.ready { border-color: var(--good); }
@@ -1283,6 +1283,34 @@ html, body, #root {
 }
 .job-row small { color: var(--muted); font-size: 10px; font-weight: 400; }
 .job-row .count { min-width: 24px; text-align: center; font-weight: bold; }
+.job-row-detail {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.job-row-detail:hover,
+.job-row-detail:focus-visible {
+  color: var(--accent);
+  outline: none;
+}
+.job-row-detail > span:first-child { min-width: 0; }
+.job-row-detail > span:last-child { flex: 0 0 auto; color: var(--accent); font-size: 18px; }
+.job-row-detail .job-detail-hint {
+  display: block;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 9px;
+}
 .job-row-summary {
   display: flex;
   align-items: center;

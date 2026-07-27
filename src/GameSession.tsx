@@ -658,6 +658,11 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     bump();
   };
 
+  const handleReassignJob = (from: JobId, to: JobId) => {
+    reassignJob(stateRef.current, from, to);
+    bump();
+  };
+
   const handleAutoAssignBuildings = (types: readonly AutoAssignBuildingType[]) => {
     const assigned = autoAssignWorkersToBuildingTypes(stateRef.current, types);
     addLog(
@@ -1575,6 +1580,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                     {() => (
                       <JobPanel
                         state={stateRef.current}
+                        onReassign={handleReassignJob}
                         onSetResidentJobs={handleSetResidentJobs}
                         uiPrefs={uiPrefs}
                         onUiPrefsChange={setUiPrefs}
