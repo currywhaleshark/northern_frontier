@@ -15,7 +15,6 @@ import { getSeason } from '../game/seasons';
 import { spoilagePreview } from '../game/spoilage';
 import { isBuriedSilverVeinTile } from '../game/silver';
 import type { SiteGiftType } from '../game/siteDiplomacy';
-import { isWallBuilding } from '../game/walls';
 import { combatDefaultWeaponName } from '../game/combatCapabilities';
 import { enrolledStudentIds, isSchoolAge, schoolSeatCount } from '../game/education';
 import { specialResidentSkills } from '../game/specialResidents';
@@ -57,6 +56,9 @@ interface Props {
   onSlaughterLivestock: (buildingId: number, amount: number) => void;
   onDefinePasture: (buildingId: number) => void;
   onExpandArea: (buildingId: number) => void;
+  onStartBuildingDemolition: (buildingId: number) => void;
+  onBeginBuildingRelocation: (buildingId: number) => void;
+  onTogglePriorityBuilding: (buildingId: number) => void;
   onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
   onConvertFieldToPaddy: (buildingId: number) => void;
   onSetPlotPlowOxen: (buildingId: number, count: number) => void;
@@ -68,7 +70,6 @@ interface Props {
   onUnassignWorker: (residentId: number) => void;
   onSelectResident: (residentId: number) => void;
   onCancelBuildingConstruction: (buildingId: number) => void;
-  onDemolishBuilding: (x: number, y: number) => void;
   onSendSiteGift: (siteId: number, gift: SiteGiftType) => void;
   onRequestSitePassage: (siteId: number) => void;
   onRequestSiteHunting: (siteId: number) => void;
@@ -259,6 +260,9 @@ export function SelectionContextBar({
   onSlaughterLivestock,
   onDefinePasture,
   onExpandArea,
+  onStartBuildingDemolition,
+  onBeginBuildingRelocation,
+  onTogglePriorityBuilding,
   onSetBuildingCrop,
   onConvertFieldToPaddy,
   onSetPlotPlowOxen,
@@ -270,7 +274,6 @@ export function SelectionContextBar({
   onUnassignWorker,
   onSelectResident,
   onCancelBuildingConstruction,
-  onDemolishBuilding,
   onSendSiteGift,
   onRequestSitePassage,
   onRequestSiteHunting,
@@ -402,11 +405,18 @@ export function SelectionContextBar({
                         return (
                           <>
                             <tr><td>건물</td><td><BuildingIcon type={building.type} size={22} /> {def.name}</td></tr>
-                            <tr><td>상태</td><td>{building.built
-                              ? building.expansion
+                            <tr><td>상태</td><td>{building.workOrder
+                              ? `${building.workOrder.kind === 'demolish'
+                                ? '해체 중'
+                                : building.workOrder.phase === 'dismantling' ? '이전 해체 중' : '이전 재건축 중'} ${Math.floor((building.workOrder.progress / Math.max(1, building.workOrder.required)) * 100)}%`
+                              : building.built
+                                ? building.expansion
                                 ? `영역 확장 중 ${Math.floor((building.expansion.progress / Math.max(1, building.expansion.required)) * 100)}% · ${building.type === 'field' || building.type === 'paddy' ? '농부' : '건축가'}`
                                 : '완공'
                               : `${building.repairing ? '수리 중' : '건설 중'} ${Math.floor((building.progress / Math.max(1, def.buildDays)) * 100)}%`}</td></tr>
+                            {state.priorityBuildingId === building.id && (
+                              <tr><td>공사 순위</td><td>최우선</td></tr>
+                            )}
                             {def.capacity > 0 && (
                               <tr><td>입주</td><td>{occupants.length}/{building.built ? def.capacity : 0}명</td></tr>
                             )}
@@ -510,7 +520,7 @@ export function SelectionContextBar({
                                   .join(', ')}</td>
                               </tr>
                             )}
-                            {!building.built && !building.repairing && (
+                            {!building.built && !building.repairing && !building.workOrder && (
                               <tr>
                                 <td>건설</td>
                                 <td>
@@ -524,12 +534,6 @@ export function SelectionContextBar({
                                     }}
                                   >건설 취소</button>
                                 </td>
-                              </tr>
-                            )}
-                            {isWallBuilding(building.type) && (
-                              <tr>
-                                <td>정비</td>
-                                <td><button className="btn small" type="button" onClick={() => onDemolishBuilding(tile.x, tile.y)}>철거</button></td>
                               </tr>
                             )}
                             <tr><td colSpan={2} className="muted small">{def.desc}</td></tr>
@@ -554,6 +558,9 @@ export function SelectionContextBar({
                 onSlaughterLivestock={onSlaughterLivestock}
                 onDefinePasture={onDefinePasture}
                 onExpandArea={onExpandArea}
+                onStartBuildingDemolition={onStartBuildingDemolition}
+                onBeginBuildingRelocation={onBeginBuildingRelocation}
+                onTogglePriorityBuilding={onTogglePriorityBuilding}
                 onSetBuildingCrop={onSetBuildingCrop}
                 onConvertFieldToPaddy={onConvertFieldToPaddy}
                 onSetPlotPlowOxen={onSetPlotPlowOxen}

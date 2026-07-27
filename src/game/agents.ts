@@ -5,7 +5,8 @@ import {
   DAY_BANDS, DAY_CYCLE_SUBTICKS, WORK_RATE_SCALE, WORK_SUBTICKS, dayBandOf,
 } from './dayCycle';
 import {
-  BUILDING_DEFS, cemeteryPlotCapacity, footprintTilesOf, isPlotBuildingType, isSmithyProductUnlocked, officeEfficiencyMultiplier,
+  BUILDING_DEFS, buildingCostFor, cemeteryPlotCapacity, clearBuildingTiles, computeDefense, footprintTilesOf,
+  isPlotBuildingType, isSmithyProductUnlocked, occupyBuildingTiles, officeEfficiencyMultiplier,
   plotArea, SMITHY_PRODUCT_DEFS, smithyProductOf, sownAreaOf,
 } from './buildings';
 import { JOB_NAMES, RESOURCE_NAMES } from './constants';
@@ -38,9 +39,11 @@ import { rankProductionEfficiency } from './productionEfficiency';
 import { buildGoalField, describeGoal, type DescribedGoal, type GoalField } from './pathGoals';
 import { farmWorkTileForTick } from './farmWorkTiles';
 import { reconcileResidentHomes, residentHome } from './residents';
+import { reconcileMountAssignments } from './weapons';
 import { canEnterForeignTerritory, canWorkForeignTerritory, noteTerritoryViolation } from './territory';
 import {
-  assignedBuildingForResident, assignedWorkers, autoAssignWorkersToBuilding, isResidentInAssignedSlot,
+  assignedBuildingForResident, assignedWorkers, autoAssignWorkersToBuilding, clearAssignmentsForBuilding,
+  isResidentInAssignedSlot,
 } from './workerSlots';
 import {
   addBuildingStock, buildingStock, depositResidentToBuilding, depositResidentToSettlement,
@@ -1317,6 +1320,7 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
 }
 
 function isConstructionForJob(building: Building, job: 'farmer' | 'builder'): boolean {
+  if (building.workOrder) return job === 'builder';
   if (building.repairing) return job === 'builder';
   const requiredJob = isPlotBuildingType(building.type) ? 'farmer' : 'builder';
   return requiredJob === job && (!building.built || building.expansion != null);
@@ -1324,6 +1328,8 @@ function isConstructionForJob(building: Building, job: 'farmer' | 'builder'): bo
 
 function constructionTarget(state: GameState, r: Resident, job: 'farmer' | 'builder'): Building | null {
   const sites = state.buildings.filter(building => isConstructionForJob(building, job));
+  const priority = sites.find(building => building.id === state.priorityBuildingId);
+  if (priority) return priority;
   const repairs = sites.filter(b => b.repairing);
   return nearestBuilding(r, repairs.length > 0 ? repairs : sites);
 }
@@ -1336,20 +1342,95 @@ function farmerConstructionTarget(state: GameState, r: Resident): Building | nul
   return constructionTarget(state, r, 'farmer');
 }
 
+function completeBuildingDemolition(state: GameState, building: Building, ctx: Ctx): void {
+  const def = BUILDING_DEFS[building.type];
+  const cost = buildingCostFor(building.type, building.w ?? 1, building.h ?? 1);
+  for (const [resource, amount] of Object.entries(cost)) {
+    if ((amount ?? 0) <= 0) continue;
+    state.resources[resource as ResourceId] += Math.max(1, Math.floor((amount ?? 0) * 0.5));
+  }
+  for (const [resource, amount] of Object.entries(building.inventory ?? {})) {
+    state.resources[resource as ResourceId] += amount ?? 0;
+  }
+  clearBuildingTiles(state, building.id);
+  clearAssignmentsForBuilding(state, building.id);
+  state.buildings = state.buildings.filter(candidate => candidate.id !== building.id);
+  if (state.priorityBuildingId === building.id) state.priorityBuildingId = null;
+  reconcileResidentHomes(state, ctx.rng);
+  reconcileMountAssignments(state);
+  state.resources.defense = computeDefense(state);
+  addLog(state, `${def.name} 해체가 끝났습니다. 자재 일부를 회수했습니다.`, 'info', true);
+}
+
+function advanceBuildingWorkOrder(state: GameState, building: Building, ctx: Ctx, work: number): boolean {
+  const order = building.workOrder;
+  if (!order) return false;
+  const def = BUILDING_DEFS[building.type];
+  order.progress += work;
+  if (order.progress < order.required) return true;
+
+  if (order.kind === 'demolish') {
+    completeBuildingDemolition(state, building, ctx);
+    return true;
+  }
+  if (order.phase === 'dismantling') {
+    const destination = order.destination;
+    if (!destination) {
+      delete building.workOrder;
+      building.built = true;
+      if (state.priorityBuildingId === building.id) state.priorityBuildingId = null;
+      addLog(state, `${def.name} 이전 위치를 찾지 못해 작업을 중단했습니다.`, 'bad', true);
+      return true;
+    }
+    clearBuildingTiles(state, building.id);
+    building.x = destination.x;
+    building.y = destination.y;
+    if (building.w != null) building.w = destination.w;
+    if (building.h != null) building.h = destination.h;
+    if (building.type === 'stable') delete building.pasture;
+    occupyBuildingTiles(state, building);
+    for (const tile of footprintTilesOf(state, building) ?? []) {
+      if (tile.terrain === 'forest') {
+        tile.terrain = 'plain';
+        state.resources.wood += 3;
+      }
+    }
+    order.phase = 'rebuilding';
+    order.progress = 0;
+    order.required = Math.max(1, def.buildDays);
+    addLog(state, `${def.name} 해체를 마치고 새 위치에서 재건축을 시작했습니다.`, 'info');
+    return true;
+  }
+
+  building.built = true;
+  delete building.workOrder;
+  if (state.priorityBuildingId === building.id) state.priorityBuildingId = null;
+  reconcileResidentHomes(state, ctx.rng);
+  reconcileMountAssignments(state);
+  state.resources.defense = computeDefense(state);
+  addLog(state, `${def.name} 이전이 완료되었습니다.`, 'good', true);
+  return true;
+}
+
 function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target: Building): void {
   const expansion = target.expansion;
   const def = BUILDING_DEFS[target.type];
   const st = goTo(state, r, ctx, buildingGoal(state, target.id));
   if (st === 'arrived') {
     r.phase = 'working';
-    r.task = expansion ? '영역 확장 중' : target.repairing ? '건물 수리 중' : '건설 중';
+    r.task = target.workOrder
+      ? target.workOrder.phase === 'rebuilding' ? '이전 재건축 중' : '건물 해체 중'
+      : expansion ? '영역 확장 중'
+        : target.repairing ? '건물 수리 중' : '건설 중';
     const work = CONFIG.agents.work.buildPerSubtick * effOf(r) * ctx.tMod *
       Math.max(0.5, ctx.outdoor) * WORK_RATE_SCALE;
     gainSkillTick(r);
+    if (advanceBuildingWorkOrder(state, target, ctx, work)) return;
     if (expansion) {
       expansion.progress += work;
       if (expansion.progress >= expansion.required) {
         delete target.expansion;
+        if (state.priorityBuildingId === target.id) state.priorityBuildingId = null;
         addLog(state, `${def.name} 영역 확장이 끝났습니다.`, 'good', true);
       }
       return;
@@ -1361,6 +1442,7 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
       target.progress = def.buildDays;
       target.built = true;
       target.repairing = false;
+      if (state.priorityBuildingId === target.id) state.priorityBuildingId = null;
       reconcileResidentHomes(state, ctx.rng);
       addLog(state, repaired
         ? `${def.name} 수리가 끝나 다시 가동됩니다.`

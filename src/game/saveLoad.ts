@@ -1857,6 +1857,29 @@ export function loadGame(slot = 1): GameState | null {
     if (!parsed.unlockedLivestock.includes('chicken')) parsed.unlockedLivestock.push('chicken');
     for (const building of parsed.buildings) {
       if (building.built) building.repairing = false;
+      if (building.workOrder) {
+        const order = building.workOrder;
+        const validKind = order.kind === 'demolish' || order.kind === 'relocate';
+        const validPhase = order.phase === 'dismantling' || order.phase === 'rebuilding';
+        const progress = Number(order.progress);
+        const required = Number(order.required);
+        const destination = normalizePastureArea(order.destination);
+        const validDestination = order.kind !== 'relocate' || destination != null;
+        if (!validKind || !validPhase || !Number.isFinite(progress) ||
+            !Number.isFinite(required) || required <= 0 || !validDestination) {
+          delete building.workOrder;
+          building.built = true;
+        } else {
+          building.workOrder = {
+            kind: order.kind,
+            phase: order.phase,
+            progress: Math.max(0, progress),
+            required,
+            ...(destination ? { destination } : {}),
+          };
+          building.built = false;
+        }
+      }
       if (building.expansion) {
         const expansion = building.expansion;
         const fromArea = normalizePastureArea(expansion.fromArea);
@@ -1924,6 +1947,11 @@ export function loadGame(slot = 1): GameState | null {
         else delete building.pasture;
       }
     }
+    const priorityBuilding = parsed.buildings.find(building => building.id === parsed.priorityBuildingId);
+    parsed.priorityBuildingId = priorityBuilding &&
+      (!priorityBuilding.built || priorityBuilding.repairing || priorityBuilding.expansion || priorityBuilding.workOrder)
+      ? priorityBuilding.id
+      : null;
     ensureProcessingReserves(parsed);
     if (parsed.lastPetitionDay == null) parsed.lastPetitionDay = 0;
     if (parsed.cannonsGranted == null) parsed.cannonsGranted = 0;

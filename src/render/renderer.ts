@@ -8,7 +8,8 @@
 import { CONFIG } from '../game/config';
 import {
   armedMusketeers, BUILDING_DEFS, buildingCostFor, buildingFootprintDims, buildingFootprintSize,
-  canAfford, canAffordCost, canPlaceBuildingAt, canPlaceOn, isAreaBuildingType, isPlotBuildingType,
+  canAfford, canAffordCost, canPlaceBuildingAt, canPlaceOn, canRelocateBuildingAt,
+  isAreaBuildingType, isPlotBuildingType,
 } from '../game/buildings';
 import { COLLAPSE_RATIO } from '../game/battles';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
@@ -90,6 +91,7 @@ export interface SceneOptions {
   placingRect?: { x: number; y: number; w: number; h: number } | null; // 경작지 드래그 크기 지정 미리보기
   pasturePlacement?: { stableId: number; rect: PastureArea } | null;
   areaExpansion?: { buildingId: number; type: BuildingTypeId; rect: PastureArea } | null;
+  relocationPlacement?: { buildingId: number; rect: PastureArea } | null;
   selected: { x: number; y: number } | null;
   selectedResidentId: number | null;
   selectedBuildingId?: number | null;
@@ -1391,18 +1393,22 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     const drawY = b.type === 'center'
       ? b.y * TILE + footprintHeight - size
       : b.y * TILE;
+    const visuallyBuilt = b.built || b.workOrder?.phase === 'dismantling';
+    const visualProgress = b.workOrder?.phase === 'rebuilding'
+      ? b.workOrder.progress / Math.max(1, b.workOrder.required)
+      : def.buildDays > 0 ? b.progress / def.buildDays : 1;
     if (isPlotBuildingType(b.type)) {
       // 경작지는 발자국 칸마다 스프라이트를 타일링 — 파종을 마친 칸만 작물이 자라 보인다
       const area = dims.w * dims.h;
-      const sown = b.built ? Math.min(area, Math.max(0, Math.floor(b.sownArea ?? area))) : 0;
+      const sown = visuallyBuilt ? Math.min(area, Math.max(0, Math.floor(b.sownArea ?? area))) : 0;
       for (let i = 0; i < area; i++) {
         const cellX = b.x + (i % dims.w);
         const cellY = b.y + Math.floor(i / dims.w);
         const drawParams: BuildingDrawParams = {
-          type: b.type, built: b.built, ghost: false,
+          type: b.type, built: visuallyBuilt, ghost: false,
           season,
           highDefinition: renderScale === 2,
-          progress01: def.buildDays > 0 ? b.progress / def.buildDays : 1,
+          progress01: visualProgress,
           growth01: i < sown ? b.fieldGrowth / 100 : 0,
           x: cellX * TILE, y: cellY * TILE, size: TILE,
         };
@@ -1417,15 +1423,15 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     }
     if (b.type === 'cemetery') {
       const area = dims.w * dims.h;
-      const graves = b.built ? Math.min(area * CONFIG.funeral.plotsPerTile, Math.max(0, b.graves ?? 0)) : 0;
+      const graves = visuallyBuilt ? Math.min(area * CONFIG.funeral.plotsPerTile, Math.max(0, b.graves ?? 0)) : 0;
       for (let i = 0; i < area; i++) {
         const cellX = b.x + (i % dims.w);
         const cellY = b.y + Math.floor(i / dims.w);
         const drawParams: BuildingDrawParams = {
-          type: b.type, built: b.built, ghost: false,
+          type: b.type, built: visuallyBuilt, ghost: false,
           season,
           highDefinition: renderScale === 2,
-          progress01: def.buildDays > 0 ? b.progress / def.buildDays : 1,
+          progress01: visualProgress,
           graveCount: Math.min(CONFIG.funeral.plotsPerTile, Math.max(0, graves - i * CONFIG.funeral.plotsPerTile)),
           x: cellX * TILE, y: cellY * TILE, size: TILE,
         };
@@ -1435,12 +1441,12 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       continue;
     }
     const drawParams: BuildingDrawParams = {
-      type: b.type, built: b.built, ghost: false,
+      type: b.type, built: visuallyBuilt, ghost: false,
       rank: b.type === 'center' ? state.rank : undefined,
       season,
       highDefinition: renderScale === 2,
-      progress01: def.buildDays > 0 ? b.progress / def.buildDays : 1,
-      connections: b.built && isWallBuilding(b.type)
+      progress01: visualProgress,
+      connections: visuallyBuilt && isWallBuilding(b.type)
         ? wallConnectionsFromSet(wallTiles, b.x, b.y)
         : undefined,
       x: drawX, y: drawY, size,
@@ -1709,6 +1715,46 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   }
 
   // 11) 건설 배치 미리보기 — 날씨 위에 얹어 잘 보이게
+  if (o.relocationPlacement) {
+    const { buildingId, rect } = o.relocationPlacement;
+    const building = state.buildings.find(candidate => candidate.id === buildingId);
+    const valid = !!building &&
+      canRelocateBuildingAt(state, building, rect.x, rect.y) &&
+      Array.from({ length: rect.h }, (_, dy) =>
+        Array.from({ length: rect.w }, (_unused, dx) => {
+          const x = rect.x + dx;
+          const y = rect.y + dy;
+          return isExplored(state, x, y) && !foreignSiteAt(state, x, y);
+        })).flat().every(Boolean);
+    ctx.fillStyle = valid ? 'rgba(111,191,115,0.42)' : 'rgba(224,108,92,0.45)';
+    ctx.fillRect(rect.x * TILE, rect.y * TILE, rect.w * TILE, rect.h * TILE);
+    if (building) {
+      if (isAreaBuildingType(building.type)) {
+        for (let dy = 0; dy < rect.h; dy++) {
+          for (let dx = 0; dx < rect.w; dx++) {
+            sprites.drawBuilding(ctx, {
+              type: building.type, built: true, ghost: true, progress01: 1,
+              season, highDefinition: renderScale === 2,
+              x: (rect.x + dx) * TILE, y: (rect.y + dy) * TILE, size: TILE,
+            });
+          }
+        }
+      } else {
+        sprites.drawBuilding(ctx, {
+          type: building.type, built: true, ghost: true, progress01: 1,
+          season, highDefinition: renderScale === 2,
+          x: rect.x * TILE, y: rect.y * TILE,
+          size: TILE * buildingFootprintSize(building.type),
+        });
+      }
+    }
+    ctx.strokeStyle = valid ? 'rgba(255,214,90,0.95)' : 'rgba(245,145,125,0.95)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
+    ctx.strokeRect(rect.x * TILE + 1, rect.y * TILE + 1, rect.w * TILE - 2, rect.h * TILE - 2);
+    ctx.setLineDash([]);
+    ctx.lineWidth = 1;
+  }
   if (o.pasturePlacement) {
     const { stableId, rect } = o.pasturePlacement;
     const valid = validateStablePasture(state, stableId, rect) == null;

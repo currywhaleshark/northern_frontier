@@ -5,7 +5,7 @@ import { CONFIG } from './config';
 import { isJobUnlocked, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } from './constants';
 import {
   BUILDING_DEFS, buildingCostFor, buildingFootprintTiles, canAfford, canAffordCost,
-  cannonPlacementsUsed, canPlaceBuildingAt, canPlaceOn, clampPlotSide,
+  buildingFootprintDims, cannonPlacementsUsed, canPlaceBuildingAt, canPlaceOn, canRelocateBuildingAt, clampPlotSide,
   clearBuildingTiles, computeDefense, getBuilding, isBuildingUnlocked,
   footprintTilesOf, isAreaBuildingType, isPaddyEligibleTile, isPlotBuildingType, isSmithyProductUnlocked,
   occupyBuildingTiles, plotArea, SMITHY_PRODUCT_DEFS,
@@ -121,6 +121,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     territoryViolations: [],
     residents: [],
     buildings: [],
+    priorityBuildingId: null,
     nextBuildingId: 1,
     nextResidentId: 1,
     resources: startRes,
@@ -395,6 +396,7 @@ export function cancelBuildingConstruction(state: GameState, buildingId: number)
   clearBuildingTiles(state, building.id);
   clearAssignmentsForBuilding(state, building.id);
   state.buildings = state.buildings.filter(candidate => candidate.id !== building.id);
+  if (state.priorityBuildingId === building.id) state.priorityBuildingId = null;
   reconcileMountAssignments(state);
   const constructionJob: JobId = isPlotBuildingType(building.type) ? 'farmer' : 'builder';
   for (const resident of state.residents) {
@@ -884,6 +886,82 @@ export function expandAreaBuilding(
     `${BUILDING_DEFS[building.type].name} 영역 확장을 시작했습니다. 추가 ${addedTiles}칸 · ${worker}가 공사합니다.`,
     'info',
   );
+  return null;
+}
+
+export function buildingHasActiveWork(building: Building): boolean {
+  return !building.built ||
+    building.repairing === true ||
+    building.expansion != null ||
+    building.workOrder != null;
+}
+
+export function startBuildingDemolition(state: GameState, buildingId: number): string | null {
+  const building = state.buildings.find(candidate => candidate.id === buildingId);
+  if (!building || !building.built) return '완공된 건물을 선택해야 합니다.';
+  if (building.type === 'center') return '마을 중심지는 해체할 수 없습니다.';
+  if (building.expansion || building.workOrder || building.repairing) return '진행 중인 작업이 끝난 뒤 해체할 수 있습니다.';
+  const def = BUILDING_DEFS[building.type];
+  building.built = false;
+  building.workOrder = {
+    kind: 'demolish',
+    phase: 'dismantling',
+    progress: 0,
+    required: Math.max(1, def.buildDays * 0.5),
+  };
+  reconcileResidentHomes(state, makeRng(state.seed + state.day * 41 + building.id));
+  state.resources.defense = computeDefense(state);
+  addLog(state, `${def.name} 해체를 시작했습니다. 건축가가 해체를 마치면 자재 일부를 회수합니다.`, 'info');
+  return null;
+}
+
+export function startBuildingRelocation(
+  state: GameState,
+  buildingId: number,
+  x: number,
+  y: number,
+): string | null {
+  const building = state.buildings.find(candidate => candidate.id === buildingId);
+  if (!building || !building.built) return '완공된 건물을 선택해야 합니다.';
+  if (building.type === 'center') return '마을 중심지는 이전할 수 없습니다.';
+  if (building.expansion || building.workOrder || building.repairing) return '진행 중인 작업이 끝난 뒤 이전할 수 있습니다.';
+  const { w, h } = buildingFootprintDims(building);
+  if (!isBuildingFootprintExplored(state, building.type, x, y, w, h)) return '아직 답사하지 않은 곳입니다.';
+  const destinationTiles = buildingFootprintTiles(state, building.type, x, y, w, h) ?? [];
+  if (destinationTiles.some(tile => foreignSiteAt(state, tile.x, tile.y))) {
+    return '현지 거점이 자리한 곳으로는 이전할 수 없습니다.';
+  }
+  if (!canRelocateBuildingAt(state, building, x, y)) return '이곳으로는 건물을 이전할 수 없습니다.';
+
+  const def = BUILDING_DEFS[building.type];
+  building.built = false;
+  building.workOrder = {
+    kind: 'relocate',
+    phase: 'dismantling',
+    progress: 0,
+    required: Math.max(1, def.buildDays * 0.5),
+    destination: { x, y, w, h },
+  };
+  reconcileResidentHomes(state, makeRng(state.seed + state.day * 43 + building.id));
+  state.resources.defense = computeDefense(state);
+  addLog(
+    state,
+    `${def.name} 이전을 시작했습니다. 건축가가 기존 건물을 해체한 뒤 새 위치에 자재 비용 없이 다시 짓습니다.`,
+    'info',
+  );
+  return null;
+}
+
+export function togglePriorityBuilding(state: GameState, buildingId: number): string | null {
+  const building = state.buildings.find(candidate => candidate.id === buildingId);
+  if (!building || !buildingHasActiveWork(building)) return '작업 중인 건물만 우선순위로 지정할 수 있습니다.';
+  if (state.priorityBuildingId === buildingId) {
+    state.priorityBuildingId = null;
+    addLog(state, `${BUILDING_DEFS[building.type].name} 우선 작업 지정을 해제했습니다.`, 'info');
+  } else {
+    state.priorityBuildingId = buildingId;
+    addLog(state, `${BUILDING_DEFS[building.type].name}을(를) 최우선 작업으로 지정했습니다.`, 'info');
+  }
   return null;
 }
 

@@ -398,6 +398,16 @@ export function canPlaceBuildingAt(
   const tiles = buildingFootprintTiles(state, type, x, y, w, h);
   if (!tiles) return false;
   if (tiles.some(tile => state.buildings.some(building => {
+    const destination = building.workOrder?.kind === 'relocate'
+      ? building.workOrder.destination
+      : undefined;
+    return !!destination &&
+      tile.x >= destination.x &&
+      tile.y >= destination.y &&
+      tile.x < destination.x + destination.w &&
+      tile.y < destination.y + destination.h;
+  }))) return false;
+  if (tiles.some(tile => state.buildings.some(building => {
     const pasture = building.pasture;
     return !!pasture &&
       tile.x >= pasture.x &&
@@ -409,6 +419,50 @@ export function canPlaceBuildingAt(
   const def = BUILDING_DEFS[type];
   if (!tiles.every(tile => canPlaceOn(def, tile, state))) return false;
   if (type === 'mine') return hasKnownMineralDepositNear(state, x, y);
+  return true;
+}
+
+export function canRelocateBuildingAt(
+  state: GameState,
+  building: Pick<Building, 'id' | 'type' | 'x' | 'y' | 'w' | 'h'>,
+  x: number,
+  y: number,
+): boolean {
+  const { w, h } = buildingFootprintDims(building);
+  const tiles = buildingFootprintTiles(state, building.type, x, y, w, h);
+  if (!tiles) return false;
+  if (x === building.x && y === building.y) return false;
+  const overlapsReservedDestination = tiles.some(tile => state.buildings.some(candidate => {
+    if (candidate.id === building.id) return false;
+    const destination = candidate.workOrder?.kind === 'relocate'
+      ? candidate.workOrder.destination
+      : undefined;
+    return !!destination &&
+      tile.x >= destination.x && tile.y >= destination.y &&
+      tile.x < destination.x + destination.w && tile.y < destination.y + destination.h;
+  }));
+  if (overlapsReservedDestination) return false;
+  const overlapsPasture = tiles.some(tile => state.buildings.some(candidate => {
+    const pasture = candidate.pasture;
+    return !!pasture &&
+      tile.x >= pasture.x && tile.y >= pasture.y &&
+      tile.x < pasture.x + pasture.w && tile.y < pasture.y + pasture.h;
+  }));
+  if (overlapsPasture) return false;
+
+  const def = BUILDING_DEFS[building.type];
+  const usableTiles = tiles.map(tile => tile.buildingId === building.id
+    ? { ...tile, buildingId: null }
+    : tile);
+  if (building.type === 'watermill') {
+    if (usableTiles.some(tile => tile.buildingId != null)) return false;
+    const hasRiver = usableTiles.some(tile => tile.terrain === 'river');
+    const hasLand = usableTiles.some(isWatermillLandTile);
+    return hasRiver && hasLand &&
+      usableTiles.every(tile => tile.terrain === 'river' || isWatermillLandTile(tile));
+  }
+  if (!usableTiles.every(tile => canPlaceOn(def, tile, state))) return false;
+  if (building.type === 'mine') return hasKnownMineralDepositNear(state, x, y);
   return true;
 }
 

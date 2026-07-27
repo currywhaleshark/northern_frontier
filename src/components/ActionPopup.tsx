@@ -38,6 +38,9 @@ interface Props {
   onSlaughterLivestock: (buildingId: number, amount: number) => void;
   onDefinePasture: (buildingId: number) => void;
   onExpandArea: (buildingId: number) => void;
+  onStartBuildingDemolition: (buildingId: number) => void;
+  onBeginBuildingRelocation: (buildingId: number) => void;
+  onTogglePriorityBuilding: (buildingId: number) => void;
   onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
   onConvertFieldToPaddy: (buildingId: number) => void;
   onSetPlotPlowOxen: (buildingId: number, count: number) => void;
@@ -71,6 +74,9 @@ export function ActionPopup({
   onSlaughterLivestock,
   onDefinePasture,
   onExpandArea,
+  onStartBuildingDemolition,
+  onBeginBuildingRelocation,
+  onTogglePriorityBuilding,
   onSetBuildingCrop,
   onConvertFieldToPaddy,
   onSetPlotPlowOxen,
@@ -89,7 +95,10 @@ export function ActionPopup({
   const slotConfig = building.built ? workerSlotConfig(building.type) : null;
   const centerTarget = building.type === 'center' ? nextRank(state.rank) : null;
   const centerReason = centerTarget ? centerPromotionUpgradeReason(state, building.id) : null;
-  if (actions.length === 0 && !slotConfig && !centerTarget) return null;
+  const activeBuildingWork = Boolean(
+    !building.built || building.repairing || building.expansion || building.workOrder,
+  );
+  if (actions.length === 0 && !slotConfig && !centerTarget && !activeBuildingWork) return null;
 
   const def = BUILDING_DEFS[building.type];
   const footprint = footprintTilesOf(state, building) ?? [];
@@ -156,6 +165,39 @@ export function ActionPopup({
       {plotDims && (
         <div className="muted small">
           {plotDims.w}×{plotDims.h} 경작지 · 파종 {plotSown}/{plotAreaTiles}칸 · 성장 {Math.round(building.fieldGrowth)}%
+        </div>
+      )}
+
+      {activeBuildingWork && (
+        <button
+          className={`action-command${state.priorityBuildingId === building.id ? ' active' : ''}`}
+          type="button"
+          onClick={() => onTogglePriorityBuilding(building.id)}
+          title="담당 일꾼들이 다음 근무일에도 이 작업을 가장 먼저 선택합니다"
+        >
+          <span>{state.priorityBuildingId === building.id ? '우선 공사 해제' : '우선 공사 지정'}</span>
+          <div className="muted small">다음 출근 때도 최우선 작업</div>
+        </button>
+      )}
+
+      {building.built && building.type !== 'center' && !activeBuildingWork && (
+        <div className="action-grid">
+          <button
+            className="action-chip"
+            type="button"
+            onClick={() => onBeginBuildingRelocation(building.id)}
+            title="건축가가 해체한 뒤 지정한 위치에 자재 비용 없이 다시 짓습니다"
+          >
+            이전
+          </button>
+          <button
+            className="action-chip danger"
+            type="button"
+            onClick={() => onStartBuildingDemolition(building.id)}
+            title="건축가가 해체를 마치면 건설 자재 일부를 회수합니다"
+          >
+            해체
+          </button>
         </div>
       )}
 

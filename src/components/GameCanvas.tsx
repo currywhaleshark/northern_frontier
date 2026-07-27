@@ -32,6 +32,7 @@ interface Props {
   placingType: BuildingTypeId | null;
   pastureStableId: number | null;
   expandingBuildingId: number | null;
+  relocatingBuildingId: number | null;
   selected: { x: number; y: number } | null;
   selectedEntity: SelectedEntity | null;
   selectedResidentId: number | null;
@@ -42,6 +43,7 @@ interface Props {
   onTileClick: (x: number, y: number) => void;
   onPlacePlot: (x: number, y: number, w: number, h: number) => void;
   onPlacePasture: (x: number, y: number, w: number, h: number) => void;
+  onPlaceRelocation: (x: number, y: number) => void;
   onResidentClick: (id: number) => void;
   onContextAction: (x: number, y: number) => void;
   onCancelPlace: () => void;
@@ -50,8 +52,10 @@ interface Props {
 
 export function GameCanvas({
   state, version, animationActive, zoom, showResidentJobMarkers, showResidentCargoMarkers,
-  placingType, pastureStableId, expandingBuildingId, selected, selectedEntity, selectedResidentId, anim,
-  onTileClick, onPlacePlot, onPlacePasture, onResidentClick, onContextAction, onCancelPlace, onZoomChange,
+  placingType, pastureStableId, expandingBuildingId, relocatingBuildingId,
+  selected, selectedEntity, selectedResidentId, anim,
+  onTileClick, onPlacePlot, onPlacePasture, onPlaceRelocation,
+  onResidentClick, onContextAction, onCancelPlace, onZoomChange,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawRef = useRef<(animationTimeMs: number) => void>(() => undefined);
@@ -77,6 +81,10 @@ export function GameCanvas({
     ? null
     : state.buildings.find(building => building.id === expandingBuildingId) ?? null;
   const isFootprintExpanding = expansionBuilding != null && isAreaBuildingType(expansionBuilding.type);
+  const relocationBuilding = relocatingBuildingId == null
+    ? null
+    : state.buildings.find(building => building.id === relocatingBuildingId) ?? null;
+  const isRelocating = relocationBuilding != null;
   const isPlotPlacing = (placingType != null && isAreaBuildingType(placingType)) || isFootprintExpanding;
   const isPasturePlacing = pastureStableId != null;
   const isAreaDragging = isPlotPlacing || isPasturePlacing;
@@ -149,7 +157,7 @@ export function GameCanvas({
     ? { x: Math.floor(mouse.mx / TILE), y: Math.floor(mouse.my / TILE) }
     : null;
   const hoveredTile = hoverTile ? state.map[hoverTile.y]?.[hoverTile.x] : null;
-  const pointerAction = placingType || isPasturePlacing || isFootprintExpanding
+  const pointerAction = placingType || isPasturePlacing || isFootprintExpanding || isRelocating
     ? null
     : getPointerAction(state, selectedEntity, hoveredTile);
   const selectedBuildingId = selectedEntity?.kind === 'building' ? selectedEntity.id : null;
@@ -160,7 +168,7 @@ export function GameCanvas({
     const x = Math.floor(point.mx / TILE), y = Math.floor(point.my / TILE);
     const tile = state.map[y]?.[x];
     if (!tile) return 'outside';
-    if (placingType || isFootprintExpanding) return `placing:${x},${y}`;
+    if (placingType || isFootprintExpanding || isRelocating) return `placing:${x},${y}`;
     if (isPasturePlacing) return `pasture:${x},${y}`;
     const frameAlpha = Math.max(0, Math.min(1, (performance.now() - anim.current.at) / anim.current.ms));
     const resident = findResidentAt(state, point.mx, point.my, frameAlpha, CLICK_RADIUS, residentPresentation);
@@ -227,6 +235,14 @@ export function GameCanvas({
         : null))
     : null;
   const placingRect = rawPlacingRect ? expandedRect(rawPlacingRect) : null;
+  const relocationRect = relocationBuilding && hoverTile &&
+    hoverTile.x >= 0 && hoverTile.y >= 0 && hoverTile.x < w && hoverTile.y < h
+    ? {
+      x: hoverTile.x,
+      y: hoverTile.y,
+      ...buildingFootprintDims(relocationBuilding),
+    }
+    : null;
 
   drawRef.current = (animationTimeMs) => {
     const canvas = canvasRef.current;
@@ -239,6 +255,9 @@ export function GameCanvas({
       alpha: frameAlpha, animationTimeMs, hover: hoverTile, placingType, placingRect, selected, selectedResidentId,
       areaExpansion: isFootprintExpanding && expansionBuilding && placingRect
         ? { buildingId: expansionBuilding.id, type: expansionBuilding.type, rect: placingRect }
+        : null,
+      relocationPlacement: relocationBuilding && relocationRect
+        ? { buildingId: relocationBuilding.id, rect: relocationRect }
         : null,
       pasturePlacement: isPasturePlacing && placingRect && pastureStableId != null
         ? { stableId: pastureStableId, rect: placingRect }
@@ -345,7 +364,7 @@ export function GameCanvas({
   const actionTooltip = mouse && !hoveredResident && !raiderHovered && !hoveredSite && pointerAction && pointerAction.kind !== 'none'
     ? pointerAction
     : null;
-  const canvasCursor = placingType || isPasturePlacing || isFootprintExpanding
+  const canvasCursor = placingType || isPasturePlacing || isFootprintExpanding || isRelocating
     ? 'crosshair'
     : panning
       ? 'grabbing'
@@ -449,6 +468,10 @@ export function GameCanvas({
           const tx = Math.floor(m.mx / TILE), ty = Math.floor(m.my / TILE);
           if (tx < 0 || ty < 0 || tx >= w || ty >= h) return;
           if (!placingType) {
+            if (isRelocating) {
+              onPlaceRelocation(tx, ty);
+              return;
+            }
             // 반경 내 가장 가까운 주민을 우선 선택
             const resident = findResidentAt(state, m.mx, m.my, alpha, CLICK_RADIUS, residentPresentation);
             if (resident) {
@@ -460,7 +483,7 @@ export function GameCanvas({
         }}
         onContextMenu={e => {
           e.preventDefault();
-          if (placingType || isPasturePlacing || isFootprintExpanding) {
+          if (placingType || isPasturePlacing || isFootprintExpanding || isRelocating) {
             setPlotDrag(null);
             onCancelPlace();
             return;
@@ -523,6 +546,13 @@ export function GameCanvas({
               <div className="muted">끌어서 크기 지정 (최대 {CONFIG.farming.maxPlotSide}×{CONFIG.farming.maxPlotSide})</div>
             </>
           ) : null}
+        </div>
+      )}
+      {mouse && relocationRect && relocationBuilding && (
+        <div ref={tooltipRef} className="map-tooltip" style={{ left: 0, top: 0 }}>
+          <b>{BUILDING_DEFS[relocationBuilding.type].name} 이전</b>
+          <div className="muted">{relocationRect.w}×{relocationRect.h} · 자재 비용 없음</div>
+          <div className="muted">건축가가 기존 건물을 해체한 뒤 이곳에 재건축</div>
         </div>
       )}
       {mouse && (hoveredResident || raiderHovered || hoveredSite || actionTooltip) && (

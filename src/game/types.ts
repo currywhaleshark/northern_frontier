@@ -436,6 +436,14 @@ export interface BuildingExpansion {
   addedTiles: number;
 }
 
+export interface BuildingWorkOrder {
+  kind: 'demolish' | 'relocate';
+  phase: 'dismantling' | 'rebuilding';
+  progress: number;
+  required: number;
+  destination?: PastureArea;
+}
+
 export interface Building {
   id: number;
   type: BuildingTypeId;
@@ -456,6 +464,7 @@ export interface Building {
   livestock?: LivestockState; // 축사 전용: 축종·마릿수·번식·사료 부족 상태
   pasture?: PastureArea; // 축사 전용: 완공 후 지정하는 인접 방목 영역
   expansion?: BuildingExpansion; // 완공된 영역형 건물의 확장 공사
+  workOrder?: BuildingWorkOrder; // 건축가가 수행하는 해체 또는 이전 공사
   graves?: number; // 묘역 전용: 안장된 묘 수 (한 타일의 2×2 소구획에 최대 4기)
   burialRecords?: BurialRecord[]; // 묘지 전용: 이름·사인·사망일을 보존하는 안치 기록
   inventory?: Partial<Record<ResourceId, number>>; // 운반 전 생산지 현장 재고
@@ -1506,6 +1515,7 @@ export interface GameState {
   territoryViolations: TerritoryViolation[];
   residents: Resident[];
   buildings: Building[];
+  priorityBuildingId?: number | null; // 건설·수리·확장·해체·이전 중 최우선 작업
   nextBuildingId: number;
   nextResidentId: number;
   resources: Record<ResourceId, number>;

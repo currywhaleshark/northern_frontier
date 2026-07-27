@@ -3,10 +3,11 @@ import { lazy, Profiler, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { CONFIG } from './game/config';
 import {
   assignNearestWorkerToBuilding, assignResidentToBuilding,
-  advanceDay, advanceTick, autoAssignWorkersToBuildingTypes, cancelBuildingConstruction, continueAfterVictory, demolishBuilding, newGame, reassignJob, resolveChoice, setResidentJob,
+  advanceDay, advanceTick, autoAssignWorkersToBuildingTypes, cancelBuildingConstruction, continueAfterVictory, newGame, reassignJob, resolveChoice, setResidentJob,
   setBuildingCrop, setDryingProduct, setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
   assignPlotPlowOxen, defineStablePasture, expandAreaBuilding, setLivestockSpecies, slaughterLivestock,
-  convertFieldToPaddy, setYouthActivity, toggleResidentCart,
+  buildingHasActiveWork, convertFieldToPaddy, setYouthActivity, startBuildingDemolition,
+  startBuildingRelocation, togglePriorityBuilding, toggleResidentCart,
   unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
 import { hasAnySave, loadGame, saveGame } from './game/saveLoad';
@@ -51,7 +52,7 @@ import { openPredatorHunt, startPredatorScout } from './game/specialEvents';
 import { getPointerAction, selectedEntityAfterTileClick } from './game/selectionActions';
 import { makeRng } from './game/map';
 import { openTerritoryOrderConfirmation } from './game/territory';
-import { computeDefense } from './game/buildings';
+import { BUILDING_DEFS, computeDefense } from './game/buildings';
 import { createExpedition, predatorExpeditionTarget } from './game/expedition';
 import { purchasePredatorIntel } from './game/predatorIntelTrade';
 import { isForeignSiteOperational } from './game/foreignSites';
@@ -273,6 +274,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   const [placingType, setPlacingType] = useState<BuildingTypeId | null>(null);
   const [pastureStableId, setPastureStableId] = useState<number | null>(null);
   const [expandingBuildingId, setExpandingBuildingId] = useState<number | null>(null);
+  const [relocatingBuildingId, setRelocatingBuildingId] = useState<number | null>(null);
   const [selected, setSelected] = useState<{ x: number; y: number } | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
   const [canLoad, setCanLoad] = useState(hasAnySave());
@@ -555,7 +557,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   };
 
   const handleTileClick = (x: number, y: number) => {
-    if (pastureStableId != null || expandingBuildingId != null) return;
+    if (pastureStableId != null || expandingBuildingId != null || relocatingBuildingId != null) return;
     if (placingType) {
       const err = tryPlaceBuilding(stateRef.current, placingType, x, y);
       if (err) addLog(stateRef.current, err, 'bad');
@@ -713,6 +715,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     }
     setPlacingType(null);
     setExpandingBuildingId(null);
+    setRelocatingBuildingId(null);
     setPastureStableId(buildingId);
   };
 
@@ -729,6 +732,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       return;
     }
     setPlacingType(null);
+    setRelocatingBuildingId(null);
     if (building.type === 'stable') {
       if (!building.pasture) {
         handleDefinePasture(buildingId);
@@ -740,6 +744,49 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       setPastureStableId(null);
       setExpandingBuildingId(buildingId);
     }
+  };
+
+  const handleStartBuildingDemolition = (buildingId: number) => {
+    const building = stateRef.current.buildings.find(candidate => candidate.id === buildingId);
+    if (!building) return;
+    if (!window.confirm(`${BUILDING_DEFS[building.type].name}을(를) 해체할까요? 건축가가 작업을 마치면 자재 일부만 돌아옵니다.`)) return;
+    const err = startBuildingDemolition(stateRef.current, buildingId);
+    if (err) addLog(stateRef.current, err, 'bad');
+    else playSfx('hammer');
+    bump();
+  };
+
+  const handleBeginBuildingRelocation = (buildingId: number) => {
+    const building = stateRef.current.buildings.find(candidate =>
+      candidate.id === buildingId && candidate.built && candidate.type !== 'center');
+    if (!building) {
+      addLog(stateRef.current, '이전할 수 있는 완공 건물을 선택해야 합니다.', 'bad');
+      bump();
+      return;
+    }
+    setPlacingType(null);
+    setPastureStableId(null);
+    setExpandingBuildingId(null);
+    setRelocatingBuildingId(buildingId);
+  };
+
+  const handlePlaceBuildingRelocation = (x: number, y: number) => {
+    if (relocatingBuildingId == null) return;
+    const err = startBuildingRelocation(stateRef.current, relocatingBuildingId, x, y);
+    if (err) addLog(stateRef.current, err, 'bad');
+    else {
+      playSfx('hammer');
+      setRelocatingBuildingId(null);
+    }
+    bump();
+  };
+
+  const handleTogglePriorityBuilding = (buildingId: number) => {
+    const building = stateRef.current.buildings.find(candidate => candidate.id === buildingId);
+    if (!building || !buildingHasActiveWork(building)) return;
+    const err = togglePriorityBuilding(stateRef.current, buildingId);
+    if (err) addLog(stateRef.current, err, 'bad');
+    bump();
   };
 
   const handleSetBuildingCrop = (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => {
@@ -792,18 +839,6 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const handleUnassignWorker = (residentId: number) => {
     unassignResidentFromBuilding(stateRef.current, residentId);
-    bump();
-  };
-
-  const handleDemolishBuilding = (x: number, y: number) => {
-    const err = demolishBuilding(stateRef.current, x, y);
-    if (err) {
-      addLog(stateRef.current, err, 'info');
-    } else {
-      playSfx('hammer');
-      setSelected(null);
-      setSelectedEntity(null);
-    }
     bump();
   };
 
@@ -1306,6 +1341,9 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               onSlaughterLivestock={handleSlaughterLivestock}
               onDefinePasture={handleDefinePasture}
               onExpandArea={handleExpandArea}
+              onStartBuildingDemolition={handleStartBuildingDemolition}
+              onBeginBuildingRelocation={handleBeginBuildingRelocation}
+              onTogglePriorityBuilding={handleTogglePriorityBuilding}
               onSetBuildingCrop={handleSetBuildingCrop}
               onConvertFieldToPaddy={handleConvertFieldToPaddy}
               onSetPlotPlowOxen={handleSetPlotPlowOxen}
@@ -1317,7 +1355,6 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               onUnassignWorker={handleUnassignWorker}
               onSelectResident={handleResidentClick}
               onCancelBuildingConstruction={handleCancelBuildingConstruction}
-              onDemolishBuilding={handleDemolishBuilding}
               onSendSiteGift={handleSendSiteGift}
               onRequestSitePassage={handleRequestSitePassage}
               onRequestSiteHunting={handleRequestSiteHunting}
@@ -1390,6 +1427,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                     placingType={placingType}
                     pastureStableId={pastureStableId}
                     expandingBuildingId={expandingBuildingId}
+                    relocatingBuildingId={relocatingBuildingId}
                     selected={selected}
                     selectedEntity={selectedEntity}
                     selectedResidentId={inspResidentId}
@@ -1397,12 +1435,14 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                     onTileClick={handleTileClick}
                     onPlacePlot={handlePlacePlot}
                     onPlacePasture={handlePlacePasture}
+                    onPlaceRelocation={handlePlaceBuildingRelocation}
                     onResidentClick={handleResidentClick}
                     onContextAction={handleContextAction}
                     onCancelPlace={() => {
                       setPlacingType(null);
                       setPastureStableId(null);
                       setExpandingBuildingId(null);
+                      setRelocatingBuildingId(null);
                     }}
                     onZoomChange={zoom => setUiPrefs(current => setMapZoom(current, zoom))}
                   />
@@ -1418,6 +1458,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                 setPlacingType={type => {
                   setPastureStableId(null);
                   setExpandingBuildingId(null);
+                  setRelocatingBuildingId(null);
                   setPlacingType(type);
                 }}
                 onClearSelection={handleClearSelection}

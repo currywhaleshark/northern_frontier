@@ -2269,10 +2269,18 @@ html, body, #root {
   text-overflow: ellipsis;
 }
 .action-chip:hover:not(:disabled) { border-color: var(--accent); }
-.action-chip.active {
+.action-chip.active,
+.action-command.active {
   border-color: var(--accent);
   color: var(--accent);
   font-weight: 700;
+}
+.action-chip.danger {
+  border-color: color-mix(in srgb, var(--bad) 65%, var(--border));
+  color: #efb0a9;
+}
+.action-chip.danger:hover:not(:disabled) {
+  border-color: var(--bad);
 }
 .action-chip:disabled,
 .action-command:disabled {
