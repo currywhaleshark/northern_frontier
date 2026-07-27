@@ -57,6 +57,7 @@ import {
   tileMineralResource,
 } from '../game/minerals';
 import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, PastureArea, Resident, Season, Terrain } from '../game/types';
+import { historicalTerrainColumn } from './historicalTerrain';
 import { pixelRectIntersectsViewport, tileRectIntersectsViewport, type SceneViewport } from './sceneViewport';
 import {
   mountainDepthAt,
@@ -186,6 +187,26 @@ export function findResidentAt(
 let terrainLayer: HTMLCanvasElement | null = null;
 let terrainKey = '';
 
+// 지면 계열이 다른 이웃 중 우세한 쪽(숲 > 바위 > 풀)만 이 타일 가장자리로 번진다.
+// 양방향으로 번지면 경계가 두 겹으로 뭉개지므로 한 방향만 허용한다.
+const GROUND_BLEND_PRECEDENCE: Record<number, number> = { 0: 0, 3: 1, 5: 2 };
+
+function groundBlendNeighbor(
+  map: GameState['map'],
+  selfColumn: number | null,
+  nx: number,
+  ny: number,
+): Terrain | undefined {
+  if (selfColumn == null) return undefined;
+  const neighbor = map[ny]?.[nx];
+  if (!neighbor) return undefined;
+  const column = historicalTerrainColumn(neighbor.terrain);
+  if (column == null || column === selfColumn) return undefined;
+  return (GROUND_BLEND_PRECEDENCE[column] ?? 0) > (GROUND_BLEND_PRECEDENCE[selfColumn] ?? 0)
+    ? neighbor.terrain
+    : undefined;
+}
+
 function terrainParams(
   state: GameState,
   x: number,
@@ -208,6 +229,11 @@ function terrainParams(
     ? terrainNeighborsFor(state.map, x, y, 'mountain')
     : undefined;
   const remaining = tile.terrain === 'rock' ? mineralRemaining(tile) : 0;
+  const selfGroundColumn = historicalTerrainColumn(tile.terrain);
+  const blendN = groundBlendNeighbor(state.map, selfGroundColumn, x, y - 1);
+  const blendE = groundBlendNeighbor(state.map, selfGroundColumn, x + 1, y);
+  const blendS = groundBlendNeighbor(state.map, selfGroundColumn, x, y + 1);
+  const blendW = groundBlendNeighbor(state.map, selfGroundColumn, x - 1, y);
   return {
     terrain: tile.terrain,
     season,
@@ -236,6 +262,9 @@ function terrainParams(
           ne: isLand(x + 1, y - 1), se: isLand(x + 1, y + 1),
           sw: isLand(x - 1, y + 1), nw: isLand(x - 1, y - 1),
         }
+      : undefined,
+    blendEdges: blendN || blendE || blendS || blendW
+      ? { n: blendN, e: blendE, s: blendS, w: blendW }
       : undefined,
   };
 }

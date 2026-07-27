@@ -1620,6 +1620,52 @@ function drawHistoricalGround(
   return true;
 }
 
+// 이웃 지형 바닥 번짐 — 우세 지형(숲>바위>풀)의 바닥이 들쭉날쭉한 픽셀 밴드로
+// 타일 경계를 넘어 이어져, 지면 계열이 다른 타일끼리의 직선 절단면을 감춘다.
+function blendGroundEdges(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): void {
+  const blend = p.blendEdges;
+  if (!blend) return;
+  const active = activeHistoricalTerrain(p.highDefinition);
+  if (!active) return;
+  const segments = 7;
+  const seg = p.size / segments;
+  const dirs = [['n', blend.n], ['e', blend.e], ['s', blend.s], ['w', blend.w]] as const;
+  for (let dirIndex = 0; dirIndex < dirs.length; dirIndex++) {
+    const neighborTerrain = dirs[dirIndex][1];
+    if (!neighborTerrain) continue;
+    const rect = historicalTerrainSourceRect(neighborTerrain, p.season, active.sourceScale);
+    if (!rect) continue;
+    const dir = dirs[dirIndex][0];
+    ctx.save();
+    ctx.beginPath();
+    // 구간마다 깊이가 2~7px로 출렁이는 결정적 스캘럽 — 매 프레임 같은 모양을 유지한다.
+    for (let i = 0; i < segments; i++) {
+      const depth = 2 + (hash(p.tileX * 4 + dirIndex, p.tileY * segments + i) % 6);
+      if (dir === 'n') ctx.rect(p.x + i * seg, p.y, seg, depth);
+      else if (dir === 's') ctx.rect(p.x + i * seg, p.y + p.size - depth, seg, depth);
+      else if (dir === 'w') ctx.rect(p.x, p.y + i * seg, depth, seg);
+      else ctx.rect(p.x + p.size - depth, p.y + i * seg, depth, seg);
+    }
+    ctx.clip();
+    const sampleOffset = historicalTerrainSampleOffsetFromHash(
+      hash(p.tileX + dirIndex * 7, p.tileY),
+      active.sourceScale,
+    );
+    ctx.drawImage(
+      active.image,
+      rect.sx + sampleOffset.dx,
+      rect.sy + sampleOffset.dy,
+      rect.sw,
+      rect.sh,
+      p.x,
+      p.y,
+      p.size,
+      p.size,
+    );
+    ctx.restore();
+  }
+}
+
 // 강 타일: 밑에 이웃 평지와 같은 땅 텍스처를 깔고, 이웃 정보로 물 영역을 계산해 채운다.
 // 물은 뭍 방향으로만 둑 여백을 두므로 지도상의 강 폭(1~3타일)이 화면에 그대로 드러난다.
 function drawRiverTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParams, h: number): void {
@@ -1912,6 +1958,9 @@ export const atlasSprites: SpriteAPI = {
       ctx.fillStyle = fertileGroundWash(p.season);
       ctx.fillRect(p.x, p.y, p.size, p.size);
     }
+
+    // 우세 이웃 지형의 바닥이 경계를 넘어 번진다 (숲·바위 경계의 직선 절단 완화).
+    blendGroundEdges(ctx, p);
 
     // 새 자산이 준비되지 않은 동안에는 기존 한 칸 소품을 폴백으로 유지한다.
     if (!activeTerrainGrowthSheet(p.highDefinition)) {

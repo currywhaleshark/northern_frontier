@@ -59,6 +59,9 @@ export interface TerrainDrawParams {
     n: boolean; e: boolean; s: boolean; w: boolean;
     ne: boolean; se: boolean; sw: boolean; nw: boolean;
   };
+  // 지면 계열이 다른 우세 이웃 지형(숲>바위>풀)이 이 타일 가장자리로 번진다.
+  // 타일 경계가 직선으로 잘리는 것을 감추는 용도.
+  blendEdges?: { n?: Terrain; e?: Terrain; s?: Terrain; w?: Terrain };
 }
 
 export interface BuildingDrawParams {
