@@ -89,6 +89,7 @@ export interface SceneOptions {
   placingType: BuildingTypeId | null;
   placingRect?: { x: number; y: number; w: number; h: number } | null; // 경작지 드래그 크기 지정 미리보기
   pasturePlacement?: { stableId: number; rect: PastureArea } | null;
+  areaExpansion?: { buildingId: number; type: BuildingTypeId; rect: PastureArea } | null;
   selected: { x: number; y: number } | null;
   selectedResidentId: number | null;
   selectedBuildingId?: number | null;
@@ -97,6 +98,8 @@ export interface SceneOptions {
   sprites?: SpriteAPI;
   residentPresentation?: ResidentPresentationSnapshot;
   renderScale?: 1 | 2;
+  residentJobMarkers?: boolean;
+  residentCargoMarkers?: boolean;
 }
 
 const TERRAIN_VISUAL_CODE: Record<Terrain, number> = {
@@ -1507,6 +1510,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
         y: actor.y * TILE,
         sick: false,
         carrying: actor.carrying,
+        showCargoMarker: o.residentCargoMarkers ?? true,
         selected: false,
         moving: actor.moving,
         facing: actor.facing,
@@ -1520,10 +1524,12 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   for (const corpse of state.corpses ?? []) {
     if (corpse.carried || corpse.withExpedition) continue;
     if (!tileRectIntersectsViewport(viewport, corpse.x, corpse.y)) continue;
-    ctx.font = `${Math.round(TILE * 0.55)}px serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('⚰️', corpse.x * TILE + TILE / 2, corpse.y * TILE + TILE / 2);
+    sprites.drawCorpse(ctx, {
+      x: corpse.x * TILE,
+      y: corpse.y * TILE,
+      size: TILE,
+      highDefinition: renderScale === 2,
+    });
   }
   for (const r of state.residents) {
     if (!r.alive || predatorScoutIds.has(r.id) || presentation.indoorResidentIds.has(r.id)) continue;
@@ -1545,16 +1551,19 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       x: p.x,
       y: p.y,
       sick: r.sick,
-      carrying: Object.keys(r.carrying).length > 0,
+      carrying: Object.values(r.carrying).some(amount => amount > 0),
       carryingWood: (r.carrying.wood ?? 0) > 0 || (r.carrying.brushwood ?? 0) > 0,
       carryingGame: (r.carrying.meat ?? 0) > 0 || (r.carrying.hide ?? 0) > 0,
       carryingMinerals: (r.carrying.stone ?? 0) > 0 || (r.carrying.iron ?? 0) > 0 ||
         (r.carrying.silver ?? 0) > 0,
+      showJobMarker: o.residentJobMarkers ?? true,
+      showCargoMarker: o.residentCargoMarkers ?? true,
       cartEquipped: r.cartEquipped,
       farmerAction: farmerSpriteActionFor(r, presentation.oxPlowFarmerIds),
       selected: r.id === o.selectedResidentId,
       moving: r.px !== r.x || r.py !== r.y,
-      working: r.phase === 'working' && r.px === r.x && r.py === r.y,
+      working: r.phase === 'working' && r.px === r.x && r.py === r.y ||
+        r.job === 'undertaker' && r.task === '묘지 돌봄' && r.px === r.x && r.py === r.y,
       facing: workStance?.facing ?? leisureFacing ?? (r.x < r.px ? -1 : 1),
       militiaWeapon: militiaWeaponForResident(state, r),
       special: r.special,
@@ -1712,7 +1721,37 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     ctx.setLineDash([]);
     ctx.lineWidth = 1;
   }
-  if (o.placingType && isAreaBuildingType(o.placingType) && o.placingRect) {
+  if (o.areaExpansion) {
+    const { buildingId, type, rect } = o.areaExpansion;
+    const def = BUILDING_DEFS[type];
+    for (let dy = 0; dy < rect.h; dy++) {
+      for (let dx = 0; dx < rect.w; dx++) {
+        const tx = rect.x + dx;
+        const ty = rect.y + dy;
+        const tile = state.map[ty]?.[tx];
+        const ownTile = tile?.buildingId === buildingId;
+        const ok = !!tile && isExplored(state, tx, ty) &&
+          (ownTile || (canPlaceOn(def, tile, state) && !foreignSiteAt(state, tx, ty)));
+        ctx.fillStyle = ownTile
+          ? 'rgba(255,214,90,0.2)'
+          : ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
+        ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE);
+        if (!ownTile) {
+          sprites.drawBuilding(ctx, {
+            type, built: true, ghost: true, progress01: 1,
+            season, highDefinition: renderScale === 2,
+            x: tx * TILE, y: ty * TILE, size: TILE,
+          });
+        }
+      }
+    }
+    ctx.strokeStyle = 'rgba(255,214,90,0.95)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
+    ctx.strokeRect(rect.x * TILE + 1, rect.y * TILE + 1, rect.w * TILE - 2, rect.h * TILE - 2);
+    ctx.setLineDash([]);
+    ctx.lineWidth = 1;
+  } else if (o.placingType && isAreaBuildingType(o.placingType) && o.placingRect) {
     // 경작지·묘역: 드래그 사각형을 칸별 유효/무효로 칠한다
     const def = BUILDING_DEFS[o.placingType];
     const rect = o.placingRect;

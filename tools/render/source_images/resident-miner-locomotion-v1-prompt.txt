@@ -1,0 +1,7 @@
+Create an exact 2-row by 3-column pixel-art sprite sheet for the Northern Frontier miner characters, using the attached reference as the strict identity and clothing-color reference. Match the existing crisp 16-bit Korean historical RPG overworld style, 3/4 view from slightly above, full body, facing and traveling to screen-right.
+
+Top row: the same adult male miner in all three cells. Bottom row: the same adult female miner in all three cells. Preserve the reference's deep muted purple upper garment, pale gray-white trousers or long skirt, dark footwear, and muted red-brown head wrapping. A traditional iron pickaxe with a wooden handle is clearly held safely down at the side in every cell.
+
+Column 1 is a stationary neutral idle with both feet together. Column 2 is a left-leg-forward walking key. Column 3 is a true opposite right-leg-forward walking key, changing the lower-body silhouette rather than merely rotating the waist. The pickaxe stays safely low and is never swung.
+
+Exact six equal cells with no grid lines. Keep identity, clothes, tool, pixel scale, baseline, and bounding box consistent. Everything fits fully inside each cell with safe margin. No jige, ore, rocks, dust, shadows, scenery, text, labels, or UI. Background is solid flat #FF00FF.

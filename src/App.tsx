@@ -5,7 +5,13 @@ import { LazyUiBoundary } from './components/LazyUiBoundary';
 import { hasAnyStoredSave } from './game/saveStorage';
 import { initAudio, setSfxSettings } from './sound/sfx';
 import { initMusic, setMusicScene, setMusicSettings } from './sound/music';
-import { loadUiPrefs, saveUiPrefs, setAudioPrefs } from './ui/uiPrefs';
+import {
+  loadUiPrefs,
+  saveUiPrefs,
+  setAudioPrefs,
+  setAutoFastForwardSleepingNight,
+  setResidentMarkerPrefs,
+} from './ui/uiPrefs';
 import type { GameSessionLaunch, GameSessionReturnTarget } from './sessionLaunch';
 
 const GameSession = lazy(() => import('./GameSession'));
@@ -117,7 +123,12 @@ export default function App() {
       {settingsOpen && (
         <SettingsDialog
           audio={uiPrefs.audio}
+          residentMarkers={uiPrefs}
+          autoFastForwardSleepingNight={uiPrefs.autoFastForwardSleepingNight}
           onChange={update => setUiPrefs(current => setAudioPrefs(current, update))}
+          onResidentMarkersChange={update => setUiPrefs(current => setResidentMarkerPrefs(current, update))}
+          onAutoFastForwardSleepingNightChange={enabled =>
+            setUiPrefs(current => setAutoFastForwardSleepingNight(current, enabled))}
           onClose={() => setSettingsOpen(false)}
           backLabel="메인 메뉴로"
         />

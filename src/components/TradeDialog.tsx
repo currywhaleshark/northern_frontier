@@ -14,6 +14,7 @@ import { predatorIntelOffers } from '../game/predatorIntelTrade';
 import type { GameState, PredatorKind, ResourceId, SpecialItemId } from '../game/types';
 import { FactionName } from './FactionName';
 import { TradeResourceIcon } from './TradeResourceIcon';
+import { UiIcon } from './UiIcon';
 
 interface Props {
   state: GameState;
@@ -181,7 +182,7 @@ export function TradeDialog({ state, onNegotiate, onBuyPredatorIntel, onChoose }
             <div className="trade-side-label">{isExtortion ? '그들이 요구하는 것' : '우리가 내놓는 것'}</div>
             {offeredSpecial ? (
               <div className="trade-locked-resource trade-special-offer">
-                <span className="trade-special-icon" aria-hidden="true">{SPECIAL_ITEM_DEFS[offeredSpecial].icon}</span>
+                <span className="trade-special-icon"><UiIcon name={SPECIAL_ITEM_DEFS[offeredSpecial].icon} size={28} /></span>
                 <div>
                   <strong>{SPECIAL_ITEM_DEFS[offeredSpecial].name} 1</strong>
                   <div className={hasPayment ? 'muted small' : 'small trade-shortage'}>
@@ -228,7 +229,7 @@ export function TradeDialog({ state, onNegotiate, onBuyPredatorIntel, onChoose }
                       title={`${SPECIAL_ITEM_DEFS[item].desc} 가치 ${SPECIAL_ITEM_DEFS[item].tradeValue}`}
                       onClick={() => onNegotiate(get, getAmt, item)}
                     >
-                      <span aria-hidden="true">{SPECIAL_ITEM_DEFS[item].icon}</span>
+                      <UiIcon name={SPECIAL_ITEM_DEFS[item].icon} size={20} />
                       {SPECIAL_ITEM_DEFS[item].name} ({state.specialItems[item]})
                     </button>
                   ))}

@@ -42,7 +42,7 @@ import {
 } from './consumption';
 import { edictFoodRationMultiplier, edictFuelRationMultiplier } from './edicts';
 import { getPointerAction } from './selectionActions';
-import { createExploration, isBuildingFootprintExplored, refreshExploration } from './exploration';
+import { createExploration, isBuildingFootprintExplored, isExplored, refreshExploration } from './exploration';
 import { LUXURY_RESOURCES } from './resourceCatalog';
 import { DRYING_PRODUCT_DEFS } from './preservation';
 import { haulerCarryCapacity, returnResidentCart, setResidentCartEquipped } from './equipment';
@@ -69,7 +69,7 @@ import {
   createDefaultLivestockState, ensureLivestockState, livestockCapacityForStable, setPlotPlowOxen,
   setStableLivestock, slaughterStableLivestock, updateLivestock,
 } from './livestock';
-import { pastureRequiredHerders, setStablePasture } from './pastures';
+import { normalizePastureArea, pastureRequiredHerders, setStablePasture, validateStablePasture } from './pastures';
 import { resolveTerritoryWarning, updateTerritoryWarnings } from './territory';
 import {
   foreignSiteAt, generateForeignSites, revealForeignSitesFromExploration, updateSeasonalForeignSites,
@@ -85,7 +85,7 @@ import {
 } from './workerSlots';
 import type { AutoAssignBuildingType } from './workerSlots';
 import type {
-  Building, BuildingTypeId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId, PointerAction, Resident, ResourceId, Season, SmithyProductId, YouthActivity,
+  Building, BuildingTypeId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId, PastureArea, PointerAction, Resident, ResourceId, Season, SmithyProductId, YouthActivity,
 } from './types';
 
 // ─────────────────────────── 새 게임 ───────────────────────────
@@ -396,8 +396,9 @@ export function cancelBuildingConstruction(state: GameState, buildingId: number)
   clearAssignmentsForBuilding(state, building.id);
   state.buildings = state.buildings.filter(candidate => candidate.id !== building.id);
   reconcileMountAssignments(state);
+  const constructionJob: JobId = isPlotBuildingType(building.type) ? 'farmer' : 'builder';
   for (const resident of state.residents) {
-    if (!resident.alive || resident.job !== 'builder') continue;
+    if (!resident.alive || resident.job !== constructionJob) continue;
     resetAgent(state, resident);
     resident.task = '새 공사 확인 중';
   }
@@ -755,6 +756,132 @@ export function defineStablePasture(
   addLog(
     state,
     `축사 방목지를 ${w}×${h}칸으로 정했습니다. ${livestockCapacityForStable(stable, livestock.species)}마리 수용 · 목동 ${pastureRequiredHerders(stable)}명 필요.`,
+    'info',
+  );
+  return null;
+}
+
+function areaContains(outer: PastureArea, inner: PastureArea): boolean {
+  return outer.x <= inner.x &&
+    outer.y <= inner.y &&
+    outer.x + outer.w >= inner.x + inner.w &&
+    outer.y + outer.h >= inner.y + inner.h;
+}
+
+function expansionCost(
+  type: BuildingTypeId,
+  addedTiles: number,
+): Partial<Record<ResourceId, number>> {
+  if (type === 'stable') return { wood: addedTiles };
+  const cost: Partial<Record<ResourceId, number>> = {};
+  for (const [resource, amount] of Object.entries(BUILDING_DEFS[type].cost)) {
+    cost[resource as ResourceId] = (amount ?? 0) * addedTiles;
+  }
+  return cost;
+}
+
+export function expandAreaBuilding(
+  state: GameState,
+  buildingId: number,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): string | null {
+  const building = state.buildings.find(candidate => candidate.id === buildingId);
+  if (!building || !building.built) return '완공된 영역형 건물을 선택해야 합니다.';
+  if (building.repairing) return '수리가 끝난 뒤 확장할 수 있습니다.';
+  if (building.expansion) return '이미 확장 공사 중입니다.';
+  if (!isAreaBuildingType(building.type) && building.type !== 'stable') {
+    return '확장할 수 없는 건물입니다.';
+  }
+
+  const maxSide = building.type === 'stable'
+    ? CONFIG.pasture.maxSide
+    : CONFIG.farming.maxPlotSide;
+  if (![x, y, w, h].every(Number.isFinite) || w < 1 || h < 1 || w > maxSide || h > maxSide) {
+    return `확장 영역은 최대 ${maxSide}×${maxSide}칸입니다.`;
+  }
+  const target: PastureArea = {
+    x: Math.floor(x),
+    y: Math.floor(y),
+    w: Math.floor(w),
+    h: Math.floor(h),
+  };
+  const current: PastureArea = building.type === 'stable'
+    ? normalizePastureArea(building.pasture) ?? { x: 0, y: 0, w: 0, h: 0 }
+    : {
+      x: building.x,
+      y: building.y,
+      w: building.w ?? (building.type === 'cemetery' ? 2 : 1),
+      h: building.h ?? (building.type === 'cemetery' ? 2 : 1),
+    };
+  if (current.w < 1 || current.h < 1) return '먼저 방목지를 지정해야 합니다.';
+  if (!areaContains(target, current)) return '기존 영역을 모두 포함한 채 바깥으로 확장해야 합니다.';
+  const addedTiles = target.w * target.h - current.w * current.h;
+  if (addedTiles <= 0) return '추가된 영역이 없습니다.';
+
+  if (building.type === 'stable') {
+    const error = validateStablePasture(state, building.id, target);
+    if (error) return error;
+  } else {
+    const def = BUILDING_DEFS[building.type];
+    for (let ty = target.y; ty < target.y + target.h; ty++) {
+      for (let tx = target.x; tx < target.x + target.w; tx++) {
+        const tile = state.map[ty]?.[tx];
+        if (!tile) return '지도 밖입니다.';
+        if (!isExplored(state, tx, ty)) return '아직 답사하지 않은 곳입니다.';
+        if (tile.buildingId === building.id) continue;
+        if (!canPlaceOn(def, tile, state) || foreignSiteAt(state, tx, ty)) {
+          return '확장할 영역에 다른 건물이나 사용할 수 없는 지형이 있습니다.';
+        }
+        const overlapsPasture = state.buildings.some(candidate => {
+          const pasture = candidate.pasture;
+          return !!pasture &&
+            tx >= pasture.x && ty >= pasture.y &&
+            tx < pasture.x + pasture.w && ty < pasture.y + pasture.h;
+        });
+        if (overlapsPasture) return '다른 축사의 방목지와 겹칩니다.';
+      }
+    }
+  }
+
+  const cost = expansionCost(building.type, addedTiles);
+  if (!canAffordCost(state, cost)) return '확장에 필요한 자원이 부족합니다.';
+  for (const [resource, amount] of Object.entries(cost)) {
+    state.resources[resource as ResourceId] -= amount ?? 0;
+  }
+
+  const maximumTiles = maxSide * maxSide;
+  building.expansion = {
+    kind: building.type === 'stable' ? 'pasture' : 'footprint',
+    fromArea: current,
+    targetArea: target,
+    progress: 0,
+    required: Math.max(1, BUILDING_DEFS[building.type].buildDays * addedTiles / maximumTiles),
+    addedTiles,
+  };
+  if (building.type === 'stable') {
+    building.pasture = target;
+  } else {
+    clearBuildingTiles(state, building.id);
+    building.x = target.x;
+    building.y = target.y;
+    building.w = target.w;
+    building.h = target.h;
+    occupyBuildingTiles(state, building);
+    const footprint = footprintTilesOf(state, building) ?? [];
+    for (const tile of footprint) {
+      if (tile.terrain === 'forest') {
+        tile.terrain = 'plain';
+        state.resources.wood += 3;
+      }
+    }
+  }
+  const worker = building.type === 'field' || building.type === 'paddy' ? '농부' : '건축가';
+  addLog(
+    state,
+    `${BUILDING_DEFS[building.type].name} 영역 확장을 시작했습니다. 추가 ${addedTiles}칸 · ${worker}가 공사합니다.`,
     'info',
   );
   return null;

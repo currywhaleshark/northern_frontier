@@ -2,14 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { SEASON_NAMES } from '../game/constants';
 import { getDayOfSeason, getSeason, getYear } from '../game/seasons';
 import type { GameState, LogEntry } from '../game/types';
+import { UiIcon, type UiIconName } from './UiIcon';
 
-const LOG_SYMBOL: Record<LogEntry['kind'], string> = {
-  info: '●',
-  good: '✓',
-  bad: '!',
-  raid: '⚔',
-  weather: '※',
-  trade: '↔',
+const LOG_ICON: Record<LogEntry['kind'], UiIconName> = {
+  info: 'important',
+  good: 'success',
+  bad: 'warning',
+  raid: 'raid',
+  weather: 'weatherClear',
+  trade: 'friendly',
 };
 
 const LOG_FILTERS: readonly { id: LogEntry['kind'] | 'all'; label: string }[] = [
@@ -33,12 +34,12 @@ function LogDate({ day }: { day: number }) {
 function LogRow({ entry, compact = false }: { entry: LogEntry; compact?: boolean }) {
   return (
     <div className={`unified-log-item unified-log-${entry.kind}${entry.important ? ' important' : ''}${compact ? ' compact' : ''}`}>
-      <span className="unified-log-symbol" aria-hidden="true">{LOG_SYMBOL[entry.kind]}</span>
+      <span className="unified-log-symbol"><UiIcon name={LOG_ICON[entry.kind]} size={18} /></span>
       <span className="unified-log-content">
         <LogDate day={entry.day} />
         <span className="unified-log-text">{entry.text}</span>
       </span>
-      {entry.important && <span className="unified-log-important" title="중요 소식" aria-label="중요 소식">★</span>}
+      {entry.important && <span className="unified-log-important" title="중요 소식"><UiIcon name="important" size={18} label="중요 소식" /></span>}
     </div>
   );
 }

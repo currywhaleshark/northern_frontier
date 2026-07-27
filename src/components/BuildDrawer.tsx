@@ -17,6 +17,8 @@ import {
 } from '../ui/buildPresentation';
 import type { UiPrefs } from '../ui/uiPrefs';
 import type { BuildingTypeId, GameState, ResourceId } from '../game/types';
+import { BuildingIcon } from './BuildingIcon';
+import { UiIcon } from './UiIcon';
 
 interface Props {
   state: GameState;
@@ -198,7 +200,7 @@ export function BuildDrawer({
       >
         <BuildingThumb type={type} state={state} />
         <strong className="build-drawer-item-name">{def.name}</strong>
-        {rankLocked && <span className="build-drawer-item-lock" aria-hidden="true">🔒</span>}
+        {rankLocked && <UiIcon name="lock" size={18} className="build-drawer-item-lock" />}
         {resourceShortage && <span className="build-drawer-item-status">자원 부족</span>}
       </button>
     );
@@ -208,7 +210,7 @@ export function BuildDrawer({
     <div className="build-drawer-shell" aria-label="건설 도구">
       {placingType && isBuildableBuildingType(placingType) && (
         <div className="build-placement-status" role="status">
-          <span aria-hidden="true">{BUILDING_DEFS[placingType].emoji}</span>
+          <BuildingIcon type={placingType} size={26} />
           <strong>{BUILDING_DEFS[placingType].name} 배치 중</strong>
           <span>지도 클릭 · Esc/우클릭 취소</span>
           <button type="button" onClick={() => setPlacingType(null)}>취소</button>
@@ -228,7 +230,7 @@ export function BuildDrawer({
           )}
           <header className="build-drawer-head">
             <div>
-              <span aria-hidden="true">{activeCategory.icon}</span>
+              <UiIcon name={activeCategory.icon} size={24} />
               <strong>{activeCategory.label}</strong>
               <small>{activeCategory.types.length}종</small>
             </div>
@@ -270,7 +272,7 @@ export function BuildDrawer({
               aria-pressed={open}
               onClick={() => toggleCategory(category.id)}
             >
-              <span aria-hidden="true">{category.icon}</span>
+              <UiIcon name={category.icon} size={22} />
               <span>{category.label}</span>
               {placing && <i aria-hidden="true" />}
             </button>

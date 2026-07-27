@@ -1,0 +1,5 @@
+Create an exact 2-row by 4-column 2D pixel-art sprite sheet for the ordinary male and female Northern Frontier hunters, matching the existing hunter identity, clothing palette, bow, quiver, dark outlines, chunky 16-bit RPG style, right-facing 3/4 view, and full-body scale.
+
+The hunting bow and arrow quiver remain clearly visible in every cell. Column 1 is a stationary idle carrying the bow safely down. Column 2 is a grounded contact stride. Column 3 is a feet-together passing pose. Column 4 is the opposite-foot toe-off pose with one supporting foot planted and the other boot visibly lifted backward with magenta space underneath. The walk reads as a 2-3-4-3 loop. There is no aiming, firing, or combat motion during travel.
+
+Keep each gender's identity, clothes, bow, quiver, scale, and bounding box consistent. The entire hunter, bow, and quiver fit within every cell with safe margins. No prey, carcass, blood, tree, scenery, shadow, text, labels, UI, borders, or extra props. Exactly eight cells on a solid flat #FF00FF background.

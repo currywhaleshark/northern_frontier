@@ -4,6 +4,7 @@ import { getRelation } from '../../game/relations';
 import { FACTION_ARTWORK } from '../../game/tradePresentation';
 import type { GameState } from '../../game/types';
 import { FactionName } from '../FactionName';
+import { UiIcon } from '../UiIcon';
 
 interface Props {
   state: GameState;
@@ -42,7 +43,7 @@ export function FactionsWindow({ state, onRequestTrade }: Props) {
             )}
             <div className="faction-entry-body">
               <div className="faction-entry-heading">
-                <span>{faction.hostile ? '⚔️' : '🤝'} <FactionName name={faction.name} /></span>
+                <span><UiIcon name={faction.hostile ? 'hostile' : 'friendly'} size={20} /> <FactionName name={faction.name} /></span>
                 <span className="faction-relation" style={{ color }}>{Math.round(relation)}</span>
               </div>
               <RelationBar value={relation} color={color} />

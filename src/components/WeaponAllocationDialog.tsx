@@ -131,7 +131,7 @@ export function WeaponAllocationDialog({
                   <option
                     value="horse"
                     disabled={currentMount !== 'horse' && mounted >= horseStock(state)}
-                  >🐎 군마</option>
+                  >군마</option>
                 </select>
               </label>
             );

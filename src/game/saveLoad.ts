@@ -1857,6 +1857,29 @@ export function loadGame(slot = 1): GameState | null {
     if (!parsed.unlockedLivestock.includes('chicken')) parsed.unlockedLivestock.push('chicken');
     for (const building of parsed.buildings) {
       if (building.built) building.repairing = false;
+      if (building.expansion) {
+        const expansion = building.expansion;
+        const fromArea = normalizePastureArea(expansion.fromArea);
+        const targetArea = normalizePastureArea(expansion.targetArea);
+        const progress = Number(expansion.progress);
+        const required = Number(expansion.required);
+        const addedTiles = Number(expansion.addedTiles);
+        const validKind = expansion.kind === 'footprint' || expansion.kind === 'pasture';
+        if (!building.built || !validKind || !fromArea || !targetArea ||
+            !Number.isFinite(progress) || !Number.isFinite(required) || required <= 0 ||
+            !Number.isFinite(addedTiles) || addedTiles <= 0) {
+          delete building.expansion;
+        } else {
+          building.expansion = {
+            kind: expansion.kind,
+            fromArea,
+            targetArea,
+            progress: Math.max(0, progress),
+            required,
+            addedTiles: Math.max(1, Math.floor(addedTiles)),
+          };
+        }
+      }
       if (building.type === 'cemetery') {
         // v20 이전 묘지는 고정 2×2 건물이었으므로 저장된 발자국이 없으면 그대로 보존한다.
         if (!Number.isFinite(building.w)) building.w = 2;

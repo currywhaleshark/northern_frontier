@@ -5,7 +5,7 @@ import {
   assignNearestWorkerToBuilding, assignResidentToBuilding,
   advanceDay, advanceTick, autoAssignWorkersToBuildingTypes, cancelBuildingConstruction, continueAfterVictory, demolishBuilding, newGame, reassignJob, resolveChoice, setResidentJob,
   setBuildingCrop, setDryingProduct, setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
-  assignPlotPlowOxen, defineStablePasture, setLivestockSpecies, slaughterLivestock,
+  assignPlotPlowOxen, defineStablePasture, expandAreaBuilding, setLivestockSpecies, slaughterLivestock,
   convertFieldToPaddy, setYouthActivity, toggleResidentCart,
   unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
 } from './game/simulation';
@@ -81,11 +81,19 @@ import {
   resetDockWindowLayout,
   saveUiPrefs,
   setAudioPrefs,
+  setAutoFastForwardSleepingNight,
+  setResidentMarkerPrefs,
   setDockWindowLayout,
   setMapZoom,
   togglePinnedDockWindow,
   type UiPrefs,
 } from './ui/uiPrefs';
+import {
+  createNightAutoSpeedState,
+  markNightSpeedOverride,
+  nightAutoSpeedTarget,
+  type NightAutoSpeedState,
+} from './ui/nightAutoSpeed';
 import { bringDockWindowToFront } from './ui/dockLayout';
 import { advanceGameClock } from './ui/gameClock';
 import { appointConfinedSpecialResident } from './game/specialResidents';
@@ -124,7 +132,21 @@ const ExpeditionMusterDialog = lazy(() => import('./components/ExpeditionMusterD
 const SpecialResidentsWindow = lazy(() => import('./components/dock/SpecialResidentsWindow')
   .then(module => ({ default: module.SpecialResidentsWindow })));
 
-function RuntimeGameEffects({ state, setSpeed }: { state: GameState; setSpeed: (speed: number) => void }) {
+function RuntimeGameEffects({
+  state,
+  speed,
+  setSpeed,
+  autoFastForwardSleepingNight,
+  nightAutoSpeedState,
+  suspended,
+}: {
+  state: GameState;
+  speed: number;
+  setSpeed: (speed: number) => void;
+  autoFastForwardSleepingNight: boolean;
+  nightAutoSpeedState: { current: NightAutoSpeedState };
+  suspended: boolean;
+}) {
   const sndRef = useRef({
     logLen: 0,
     pending: null as string | null,
@@ -179,12 +201,34 @@ function RuntimeGameEffects({ state, setSpeed }: { state: GameState; setSpeed: (
 
   // 저녁·밤 풀벌레 — 겨울엔 울지 않는다
   const dayBand = uiDayBand(state.subTick);
+  const allLivingResidentsSleeping = state.residents.some(resident => resident.alive) &&
+    state.residents.every(resident => !resident.alive || resident.phase === 'sleeping');
   const cricketWinter = getSeason(state.day) === 'winter';
   useEffect(() => {
     setDayBandAmbient(dayBand, cricketWinter);
   }, [dayBand, cricketWinter]);
 
   useEffect(() => () => stopDayBandAmbient(), []);
+
+  useEffect(() => {
+    if (suspended) return;
+    const target = nightAutoSpeedTarget(
+      nightAutoSpeedState.current,
+      state,
+      speed,
+      autoFastForwardSleepingNight,
+    );
+    if (target != null && target !== speed) setSpeed(target);
+  }, [
+    allLivingResidentsSleeping,
+    autoFastForwardSleepingNight,
+    dayBand,
+    nightAutoSpeedState,
+    setSpeed,
+    speed,
+    state.day,
+    suspended,
+  ]);
 
   useEffect(() => {
     if (state.tacticalBattle) setSpeed(0);
@@ -223,8 +267,12 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   // 전투 시뮬레이션 모드: 샌드박스 상태에서 전술 전투만 테스트, 끝나면 메뉴로 복귀
   const [simMode, setSimMode] = useState(launch.kind === 'battleSimulation');
   const [speed, setSpeed] = useState(launch.kind === 'battleSimulation' ? 0 : 1);
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
+  const nightAutoSpeedStateRef = useRef(createNightAutoSpeedState());
   const [placingType, setPlacingType] = useState<BuildingTypeId | null>(null);
   const [pastureStableId, setPastureStableId] = useState<number | null>(null);
+  const [expandingBuildingId, setExpandingBuildingId] = useState<number | null>(null);
   const [selected, setSelected] = useState<{ x: number; y: number } | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
   const [canLoad, setCanLoad] = useState(hasAnySave());
@@ -263,6 +311,12 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   useEffect(() => {
     if (speed > 0) lastPlayingSpeedRef.current = speed;
   }, [speed]);
+
+  const setUserSpeed = useCallback((nextSpeed: number) => {
+    if (nextSpeed === speedRef.current) return;
+    markNightSpeedOverride(nightAutoSpeedStateRef.current, stateRef.current);
+    setSpeed(nextSpeed);
+  }, []);
 
   useEffect(() => {
     setOpenDockWindowIds(current => {
@@ -469,6 +523,16 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   }, []);
 
   const handlePlacePlot = (x: number, y: number, w: number, h: number) => {
+    if (expandingBuildingId != null) {
+      const err = expandAreaBuilding(stateRef.current, expandingBuildingId, x, y, w, h);
+      if (err) addLog(stateRef.current, err, 'bad');
+      else {
+        playSfx('hammer');
+        setExpandingBuildingId(null);
+      }
+      bump();
+      return;
+    }
     if (!placingType) return;
     const err = tryPlaceBuilding(stateRef.current, placingType, x, y, w, h);
     if (err) addLog(stateRef.current, err, 'bad');
@@ -481,14 +545,17 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const handlePlacePasture = (x: number, y: number, w: number, h: number) => {
     if (pastureStableId == null) return;
-    const err = defineStablePasture(stateRef.current, pastureStableId, x, y, w, h);
+    const stable = stateRef.current.buildings.find(building => building.id === pastureStableId);
+    const err = stable?.pasture
+      ? expandAreaBuilding(stateRef.current, pastureStableId, x, y, w, h)
+      : defineStablePasture(stateRef.current, pastureStableId, x, y, w, h);
     if (err) addLog(stateRef.current, err, 'bad');
     else setPastureStableId(null);
     bump();
   };
 
   const handleTileClick = (x: number, y: number) => {
-    if (pastureStableId != null) return;
+    if (pastureStableId != null || expandingBuildingId != null) return;
     if (placingType) {
       const err = tryPlaceBuilding(stateRef.current, placingType, x, y);
       if (err) addLog(stateRef.current, err, 'bad');
@@ -513,8 +580,8 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     setInspResidentId(null);
   };
 
-  const handleReassign = (from: JobId, to: JobId) => {
-    reassignJob(stateRef.current, from, to);
+  const handleSetResidentJobs = (residentIds: readonly number[], job: JobId) => {
+    for (const residentId of residentIds) setResidentJob(stateRef.current, residentId, job);
     bump();
   };
 
@@ -645,7 +712,34 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       return;
     }
     setPlacingType(null);
+    setExpandingBuildingId(null);
     setPastureStableId(buildingId);
+  };
+
+  const handleExpandArea = (buildingId: number) => {
+    const building = stateRef.current.buildings.find(candidate => candidate.id === buildingId && candidate.built);
+    if (!building || (!['field', 'paddy', 'cemetery', 'stable'].includes(building.type))) {
+      addLog(stateRef.current, '확장할 수 있는 완공 건물을 선택해야 합니다.', 'info');
+      bump();
+      return;
+    }
+    if (building.expansion) {
+      addLog(stateRef.current, '이미 확장 공사 중입니다.', 'info');
+      bump();
+      return;
+    }
+    setPlacingType(null);
+    if (building.type === 'stable') {
+      if (!building.pasture) {
+        handleDefinePasture(buildingId);
+        return;
+      }
+      setExpandingBuildingId(null);
+      setPastureStableId(buildingId);
+    } else {
+      setPastureStableId(null);
+      setExpandingBuildingId(buildingId);
+    }
   };
 
   const handleSetBuildingCrop = (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => {
@@ -1097,13 +1191,13 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
       if (event.code === 'Space') {
         event.preventDefault();
-        setSpeed(current => current === 0 ? lastPlayingSpeedRef.current || 1 : 0);
+        setUserSpeed(speedRef.current === 0 ? lastPlayingSpeedRef.current || 1 : 0);
         return;
       }
       const shortcutSpeed = speedForHotkey(event.code);
       if (shortcutSpeed != null) {
         event.preventDefault();
-        setSpeed(shortcutSpeed);
+        setUserSpeed(shortcutSpeed);
         return;
       }
       const dockId = dockWindowForHotkey(event.key);
@@ -1116,7 +1210,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [
     closeGameMenu, edictDialogOpen, expeditionMusterRequest, gameMenuView, openGameMenu, placingType,
-    slotDialogMode, toggleDockWindow, weaponDialogOpen,
+    setUserSpeed, slotDialogMode, toggleDockWindow, weaponDialogOpen,
   ]);
 
   const handleContextAction = (x: number, y: number) => {
@@ -1211,6 +1305,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               onSetLivestockSpecies={handleSetLivestockSpecies}
               onSlaughterLivestock={handleSlaughterLivestock}
               onDefinePasture={handleDefinePasture}
+              onExpandArea={handleExpandArea}
               onSetBuildingCrop={handleSetBuildingCrop}
               onConvertFieldToPaddy={handleConvertFieldToPaddy}
               onSetPlotPlowOxen={handleSetPlotPlowOxen}
@@ -1240,7 +1335,16 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     <Profiler id="game-app" onRender={recordAppRender}>
     <div className="app">
       <RuntimeVersionBoundary store={uiVersionStore}>
-        {() => <RuntimeGameEffects state={stateRef.current} setSpeed={setSpeed} />}
+        {() => (
+          <RuntimeGameEffects
+            state={stateRef.current}
+            speed={speed}
+            setSpeed={setSpeed}
+            autoFastForwardSleepingNight={uiPrefs.autoFastForwardSleepingNight}
+            nightAutoSpeedState={nightAutoSpeedStateRef}
+            suspended={gameMenuView != null || slotDialogMode != null}
+          />
+        )}
       </RuntimeVersionBoundary>
       <Profiler id="topbar-boundary" onRender={recordAppRender}>
         <RuntimeVersionBoundary store={uiVersionStore}>
@@ -1248,7 +1352,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
             <TopBar
               state={stateRef.current}
               speed={speed}
-              setSpeed={setSpeed}
+              setSpeed={setUserSpeed}
               onOpenMenu={openGameMenu}
               uiPrefs={uiPrefs}
               onUiPrefsChange={setUiPrefs}
@@ -1281,8 +1385,11 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                     version={runtimeVersion}
                     animationActive={speed > 0 && !runtimeState.pendingChoice && !runtimeState.pendingPromotionNotice && !runtimeState.tacticalBattle && !runtimeState.tacticalBattleReport && !runtimeState.gameOver}
                     zoom={uiPrefs.mapZoom}
+                    showResidentJobMarkers={uiPrefs.showResidentJobMarkers}
+                    showResidentCargoMarkers={uiPrefs.showResidentCargoMarkers}
                     placingType={placingType}
                     pastureStableId={pastureStableId}
+                    expandingBuildingId={expandingBuildingId}
                     selected={selected}
                     selectedEntity={selectedEntity}
                     selectedResidentId={inspResidentId}
@@ -1295,6 +1402,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                     onCancelPlace={() => {
                       setPlacingType(null);
                       setPastureStableId(null);
+                      setExpandingBuildingId(null);
                     }}
                     onZoomChange={zoom => setUiPrefs(current => setMapZoom(current, zoom))}
                   />
@@ -1309,6 +1417,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                 placingType={placingType}
                 setPlacingType={type => {
                   setPastureStableId(null);
+                  setExpandingBuildingId(null);
                   setPlacingType(type);
                 }}
                 onClearSelection={handleClearSelection}
@@ -1345,7 +1454,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                     {() => (
                       <JobPanel
                         state={stateRef.current}
-                        onReassign={handleReassign}
+                        onSetResidentJobs={handleSetResidentJobs}
                         uiPrefs={uiPrefs}
                         onUiPrefsChange={setUiPrefs}
                         onAutoAssign={handleAutoAssignBuildings}
@@ -1522,7 +1631,12 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       {gameMenuView === 'settings' && (
         <SettingsDialog
           audio={uiPrefs.audio}
+          residentMarkers={uiPrefs}
+          autoFastForwardSleepingNight={uiPrefs.autoFastForwardSleepingNight}
           onChange={update => setUiPrefs(current => setAudioPrefs(current, update))}
+          onResidentMarkersChange={update => setUiPrefs(current => setResidentMarkerPrefs(current, update))}
+          onAutoFastForwardSleepingNightChange={enabled =>
+            setUiPrefs(current => setAutoFastForwardSleepingNight(current, enabled))}
           onClose={() => setGameMenuView('main')}
         />
       )}

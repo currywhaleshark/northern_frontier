@@ -1,5 +1,6 @@
 import { BUILD_MENU_ORDER } from '../game/buildings';
 import type { BuildingTypeId } from '../game/types';
+import type { UiIconName } from './uiIconAssets';
 
 export type BuildableBuildingTypeId = Exclude<BuildingTypeId, 'center'>;
 
@@ -55,7 +56,7 @@ export const BUILD_CATEGORY_BY_TYPE = {
 export interface BuildCategory {
   id: BuildCategoryId;
   label: string;
-  icon: string;
+  icon: UiIconName;
   types: readonly BuildableBuildingTypeId[];
 }
 
@@ -96,11 +97,11 @@ export function finishBuildPlacement(
 }
 
 const BUILD_CATEGORY_META: ReadonlyArray<Omit<BuildCategory, 'types'>> = [
-  { id: 'housing', label: '주거', icon: '🏠' },
-  { id: 'production', label: '생산', icon: '⚒️' },
-  { id: 'farming', label: '농사', icon: '🌾' },
-  { id: 'defense', label: '방어', icon: '🛡️' },
-  { id: 'special', label: '특수', icon: '🏛️' },
+  { id: 'housing', label: '주거', icon: 'buildHousing' },
+  { id: 'production', label: '생산', icon: 'buildProduction' },
+  { id: 'farming', label: '농사', icon: 'buildFarming' },
+  { id: 'defense', label: '방어', icon: 'buildDefense' },
+  { id: 'special', label: '특수', icon: 'buildSpecial' },
 ];
 
 export const BUILD_CATEGORIES: readonly BuildCategory[] = BUILD_CATEGORY_META.map(category => ({

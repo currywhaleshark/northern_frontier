@@ -15,6 +15,7 @@ const assetOutput = ts.transpileModule(assetSource, {
 }).outputText;
 const assetModuleUrl = `data:text/javascript;base64,${Buffer.from(assetOutput).toString('base64')}`;
 const {
+  RESIDENT_HERBALIST_GATHER_HD_SHEET,
   RESIDENT_HERBALIST_GATHER_SHEET,
   RESIDENT_HERBALIST_LOCOMOTION_SHEET,
   herbalistGatherFrameIndex,
@@ -35,7 +36,14 @@ assert.deepEqual(RESIDENT_HERBALIST_GATHER_SHEET, {
   columns: 4,
   rows: 2,
   frameDurationMs: 200,
-  src: '/assets/resident-herbalist-gather-v1.png',
+  src: '/assets/resident-herbalist-gather-v2.png',
+});
+assert.deepEqual(RESIDENT_HERBALIST_GATHER_HD_SHEET, {
+  frameSize: 80,
+  columns: 4,
+  rows: 2,
+  frameDurationMs: 200,
+  src: '/assets/resident-herbalist-gather-hd-v2.png',
 });
 
 assert.equal(herbalistLocomotionFrameIndex(false, 600), 0, 'stationary herbalists use idle');
@@ -57,6 +65,10 @@ assert.deepEqual(
   herbalistGatherSourceRect('male', 400),
   { sx: 80, sy: 0, sw: 40, sh: 40 },
 );
+assert.deepEqual(
+  herbalistGatherSourceRect('female', 400, true),
+  { sx: 160, sy: 80, sw: 80, sh: 80 },
+);
 
 const locomotionPng = readFileSync(
   new URL('../../public/assets/resident-herbalist-locomotion-v1.png', import.meta.url),
@@ -64,10 +76,15 @@ const locomotionPng = readFileSync(
 assert.equal(locomotionPng.readUInt32BE(16), 120, 'locomotion sheet has three 40px columns');
 assert.equal(locomotionPng.readUInt32BE(20), 80, 'locomotion sheet has two gender rows');
 const gatherPng = readFileSync(
-  new URL('../../public/assets/resident-herbalist-gather-v1.png', import.meta.url),
+  new URL('../../public/assets/resident-herbalist-gather-v2.png', import.meta.url),
 );
 assert.equal(gatherPng.readUInt32BE(16), 160, 'gather sheet has four 40px columns');
 assert.equal(gatherPng.readUInt32BE(20), 80, 'gather sheet has two gender rows');
+const gatherHdPng = readFileSync(
+  new URL('../../public/assets/resident-herbalist-gather-hd-v2.png', import.meta.url),
+);
+assert.equal(gatherHdPng.readUInt32BE(16), 320, 'HD gather sheet has four 80px columns');
+assert.equal(gatherHdPng.readUInt32BE(20), 160, 'HD gather sheet has two gender rows');
 
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
 assert.match(

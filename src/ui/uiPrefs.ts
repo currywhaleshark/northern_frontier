@@ -28,7 +28,7 @@ import {
 
 export const UI_PREFS_KEY = 'buksae-ui-prefs';
 export const LEGACY_BUILD_MENU_OPEN_KEY = 'buksae-buildmenu-open';
-export const UI_PREFS_VERSION = 6;
+export const UI_PREFS_VERSION = 8;
 export const MAX_STARRED_RESOURCES = 8;
 export const DEFAULT_MAP_ZOOM = 1;
 
@@ -39,7 +39,12 @@ export interface AudioPrefs {
   musicVolume: number;
 }
 
-export interface UiPrefs {
+export interface ResidentMarkerPrefs {
+  showResidentJobMarkers: boolean;
+  showResidentCargoMarkers: boolean;
+}
+
+export interface UiPrefs extends ResidentMarkerPrefs {
   version: typeof UI_PREFS_VERSION;
   starredResources: StockResourceId[];
   pinnedResourceGroups: ResourceDisplayGroupId[];
@@ -49,6 +54,7 @@ export interface UiPrefs {
   dockWindowLayouts: DockWindowLayouts;
   audio: AudioPrefs;
   mapZoom: number;
+  autoFastForwardSleepingNight: boolean;
 }
 
 export interface UiPrefsStorage {
@@ -73,6 +79,9 @@ export function defaultUiPrefs(buildDrawerLastCategory = DEFAULT_BUILD_CATEGORY)
       musicVolume: 0.7,
     },
     mapZoom: DEFAULT_MAP_ZOOM,
+    showResidentJobMarkers: true,
+    showResidentCargoMarkers: true,
+    autoFastForwardSleepingNight: true,
   };
 }
 
@@ -128,10 +137,15 @@ export function normalizeUiPrefs(value: unknown, migratedBuildCategory = DEFAULT
     dockWindowLayouts?: unknown;
     audio?: unknown;
     mapZoom?: unknown;
+    showResidentJobMarkers?: unknown;
+    showResidentCargoMarkers?: unknown;
+    autoFastForwardSleepingNight?: unknown;
   };
   if (candidate.version !== 1 && candidate.version !== 2
     && candidate.version !== 3 && candidate.version !== 4
-    && candidate.version !== 5 && candidate.version !== UI_PREFS_VERSION) {
+    && candidate.version !== 5 && candidate.version !== 6
+    && candidate.version !== 7
+    && candidate.version !== UI_PREFS_VERSION) {
     return defaultUiPrefs();
   }
   return {
@@ -157,6 +171,15 @@ export function normalizeUiPrefs(value: unknown, migratedBuildCategory = DEFAULT
     mapZoom: candidate.version >= 6
       ? normalizeMapZoom(candidate.mapZoom)
       : DEFAULT_MAP_ZOOM,
+    showResidentJobMarkers: candidate.version >= 7
+      ? candidate.showResidentJobMarkers !== false
+      : true,
+    showResidentCargoMarkers: candidate.version >= 7
+      ? candidate.showResidentCargoMarkers !== false
+      : true,
+    autoFastForwardSleepingNight: candidate.version >= 8
+      ? candidate.autoFastForwardSleepingNight !== false
+      : true,
   };
 }
 
@@ -294,6 +317,27 @@ export function setAudioPrefs(prefs: UiPrefs, audio: Partial<AudioPrefs>): UiPre
     ...prefs,
     audio: normalizeAudioPrefs({ ...prefs.audio, ...audio }),
   };
+}
+
+export function setResidentMarkerPrefs(
+  prefs: UiPrefs,
+  markers: Partial<ResidentMarkerPrefs>,
+): UiPrefs {
+  return {
+    ...prefs,
+    showResidentJobMarkers: typeof markers.showResidentJobMarkers === 'boolean'
+      ? markers.showResidentJobMarkers
+      : prefs.showResidentJobMarkers,
+    showResidentCargoMarkers: typeof markers.showResidentCargoMarkers === 'boolean'
+      ? markers.showResidentCargoMarkers
+      : prefs.showResidentCargoMarkers,
+  };
+}
+
+export function setAutoFastForwardSleepingNight(prefs: UiPrefs, enabled: boolean): UiPrefs {
+  return enabled === prefs.autoFastForwardSleepingNight
+    ? prefs
+    : { ...prefs, autoFastForwardSleepingNight: enabled };
 }
 
 export function setMapZoom(prefs: UiPrefs, mapZoom: number): UiPrefs {

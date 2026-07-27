@@ -1,5 +1,6 @@
 // 특수 주민 공통 명부와 사건 획득 규칙.
 // UI·사건·렌더러가 같은 인물 정의를 쓴다.
+import type { UiIconName } from '../ui/uiIconAssets';
 import { CONFIG } from './config';
 import { computeDefense } from './buildings';
 import { rankAtLeast } from './constants';
@@ -23,7 +24,7 @@ import type {
 // 종교인(무당·노승)은 존재 자체가 능력이라 스킬 없이 benefit 문구만 쓴다.
 export interface SpecialResidentSkill {
   id: string;
-  icon: string;
+  icon: UiIconName;
   name: string;
   effect: string;
 }
@@ -32,7 +33,7 @@ export interface SpecialResidentDefinition {
   id: SpecialResidentId;
   name: string;
   shortName: string;
-  badge: string;
+  badge: UiIconName;
   gender: Gender;
   age: number;
   job: JobId;
@@ -49,7 +50,7 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     id: 'mudang',
     name: '만신 월향',
     shortName: '월향',
-    badge: '🎐',
+    badge: 'shaman',
     gender: 'female',
     age: CONFIG.religion.mudangAge,
     job: 'shaman',
@@ -66,7 +67,7 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     id: 'nosung',
     name: '노승 해운',
     shortName: '해운',
-    badge: '🕯',
+    badge: 'monk',
     gender: 'male',
     age: CONFIG.religion.nosungAge,
     job: 'monk',
@@ -83,7 +84,7 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     id: 'exiledScholar',
     name: '귀양 선비 윤문겸',
     shortName: '윤문겸',
-    badge: '📜',
+    badge: 'scholar',
     gender: 'male',
     age: CONFIG.specialResidents.exiledScholarAge,
     job: 'clerk',
@@ -94,7 +95,7 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     skills: [
       {
         id: 'hanyangBrush',
-        icon: '🖋',
+        icon: 'calligraphy',
         name: '한양의 붓끝',
         effect: `조정에서 단련된 문서 솜씨. 그가 관아에 있는 것만으로 관청 행정 효율 +${Math.round(CONFIG.specialResidents.exiledScholarOfficeBonus * 100)}%p.`,
       },
@@ -108,7 +109,7 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     id: 'jurchenWarrior',
     name: '귀순 무사 아라개',
     shortName: '아라개',
-    badge: '⚔',
+    badge: 'hostile',
     gender: 'male',
     age: CONFIG.specialResidents.jurchenWarriorAge,
     job: 'militia',
@@ -119,13 +120,13 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     skills: [
       {
         id: 'shadowAmbush',
-        icon: '🌘',
+        icon: 'moon',
         name: '숲그늘 매복',
         effect: '사냥꾼만 아는 매복술을 익힌 수비병. 전술 전투에서 그의 무리는 매복 명령을 쓸 수 있다.',
       },
       {
         id: 'veteranSpear',
-        icon: '🔱',
+        icon: 'trident',
         name: '백전 창술',
         effect: `병기고와 무관하게 자신의 창으로 싸우며, 전술 기본 전력 +${CONFIG.specialResidents.jurchenWarriorBasePowerBonus}.`,
       },
@@ -139,7 +140,7 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     id: 'tigerHunter',
     name: '착호 포수 박돌개',
     shortName: '박돌개',
-    badge: '🐅',
+    badge: 'tiger',
     gender: 'male',
     age: CONFIG.specialResidents.tigerHunterAge,
     job: 'hunter',
@@ -150,13 +151,13 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     skills: [
       {
         id: 'trackReading',
-        icon: '🐾',
+        icon: 'tracking',
         name: '범 발자국 읽기',
         effect: `그가 마을에 있으면 맹수 흔적 추적 기간이 ${CONFIG.specialResidents.tigerHunterScoutDaysReduction}일 줄어든다.`,
       },
       {
         id: 'oneEyedAim',
-        icon: '🎯',
+        icon: 'target',
         name: '외눈 조준',
         effect: `백전의 사냥 솜씨. 전술 기본 전력 +${CONFIG.specialResidents.tigerHunterBasePowerBonus}.`,
       },
@@ -170,7 +171,7 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     id: 'geomancer',
     name: '맹인 지관 허생',
     shortName: '허생',
-    badge: '⛰',
+    badge: 'geomancer',
     gender: 'male',
     age: CONFIG.specialResidents.geomancerAge,
     job: 'miner',
@@ -181,7 +182,7 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     skills: [
       {
         id: 'mountainReading',
-        icon: '⛰',
+        icon: 'geomancer',
         name: '산세 읽기',
         effect: `그가 마을에 있으면 모든 채광 산출 +${Math.round(CONFIG.specialResidents.geomancerMiningYieldBonus * 100)}%, 은맥을 알아볼 확률이 크게 오른다.`,
       },
@@ -195,7 +196,7 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     id: 'uinyeo',
     name: '내의원 의녀 단심',
     shortName: '단심',
-    badge: '🌿',
+    badge: 'herb',
     gender: 'female',
     age: CONFIG.specialResidents.uinyeoAge,
     job: 'physician',
@@ -206,13 +207,13 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     skills: [
       {
         id: 'goldenNeedle',
-        icon: '🪡',
+        icon: 'needle',
         name: '금침',
         effect: `내의원에서 익힌 침술. 자신의 치료 효율 +${Math.round((CONFIG.specialResidents.uinyeoTreatmentMult - 1) * 100)}%.`,
       },
       {
         id: 'quarantineCraft',
-        icon: '🌿',
+        icon: 'herb',
         name: '방역',
         effect: `그가 살아 있으면 역병이 번질 확률이 ${Math.round((1 - CONFIG.specialResidents.uinyeoEpidemicSpreadMult) * 100)}% 줄어든다.`,
       },
@@ -226,7 +227,7 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     id: 'runawaySmith',
     name: '도망 야장 막쇠',
     shortName: '막쇠',
-    badge: '🔨',
+    badge: 'smith',
     gender: 'male',
     age: CONFIG.specialResidents.runawaySmithAge,
     job: 'smith',
@@ -237,7 +238,7 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     skills: [
       {
         id: 'lowbornHammer',
-        icon: '🔨',
+        icon: 'smith',
         name: '천출의 망치',
         effect: `병장기를 만들던 손. 자신의 대장간 작업 산출 +${Math.round((CONFIG.specialResidents.runawaySmithSmithyMult - 1) * 100)}%.`,
       },
@@ -251,7 +252,7 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     id: 'interpreter',
     name: '퇴역 역관 배수겸',
     shortName: '배수겸',
-    badge: '🗣',
+    badge: 'interpreter',
     gender: 'male',
     age: CONFIG.specialResidents.interpreterAge,
     job: 'clerk',
@@ -262,7 +263,7 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     skills: [
       {
         id: 'jurchenTongue',
-        icon: '🗣',
+        icon: 'interpreter',
         name: '여진말 능통',
         effect: `여진 세력과의 관계 상승량 +${Math.round((CONFIG.specialResidents.interpreterRelationGainMult - 1) * 100)}%.`,
       },
@@ -276,7 +277,7 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     id: 'hangwae',
     name: '항왜 철포수 사야카',
     shortName: '사야카',
-    badge: '💥',
+    badge: 'cannon',
     gender: 'male',
     age: CONFIG.specialResidents.hangwaeAge,
     job: 'militia',
@@ -287,13 +288,13 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     skills: [
       {
         id: 'matchlockMaster',
-        icon: '💥',
+        icon: 'cannon',
         name: '철포 백발',
         effect: `개인 조총을 늘 지니며, 조총 사격 전력 +${CONFIG.specialResidents.hangwaeMusketPowerBonus}.`,
       },
       {
         id: 'powderThrift',
-        icon: '🎇',
+        icon: 'fireworks',
         name: '화약 아끼는 손',
         effect: `그가 마을에 있으면 모든 조총 사수의 화약 소모가 ${Math.round((1 - CONFIG.specialResidents.hangwaePowderMult) * 100)}% 줄어든다.`,
       },

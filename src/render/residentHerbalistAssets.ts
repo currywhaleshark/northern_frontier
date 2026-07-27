@@ -13,7 +13,15 @@ export const RESIDENT_HERBALIST_GATHER_SHEET = {
   columns: 4,
   rows: 2,
   frameDurationMs: 200,
-  src: '/assets/resident-herbalist-gather-v1.png',
+  src: '/assets/resident-herbalist-gather-v2.png',
+} as const;
+
+export const RESIDENT_HERBALIST_GATHER_HD_SHEET = {
+  frameSize: 80,
+  columns: 4,
+  rows: 2,
+  frameDurationMs: 200,
+  src: '/assets/resident-herbalist-gather-hd-v2.png',
 } as const;
 
 const HERBALIST_WALK_SEQUENCE = [0, 1, 0, 2] as const;
@@ -55,9 +63,16 @@ export function herbalistLocomotionSourceRect(
   );
 }
 
-export function herbalistGatherSourceRect(gender: Gender, elapsedMs: number) {
+export function herbalistGatherSourceRect(
+  gender: Gender,
+  elapsedMs: number,
+  highDefinition = false,
+) {
+  const frameSize = highDefinition
+    ? RESIDENT_HERBALIST_GATHER_HD_SHEET.frameSize
+    : RESIDENT_HERBALIST_GATHER_SHEET.frameSize;
   return sourceRect(
-    RESIDENT_HERBALIST_GATHER_SHEET.frameSize,
+    frameSize,
     gender,
     herbalistGatherFrameIndex(elapsedMs),
   );

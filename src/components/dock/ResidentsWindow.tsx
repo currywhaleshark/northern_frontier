@@ -5,6 +5,7 @@ import { LIFE_STAGE_NAMES } from '../../game/lifecycle';
 import { COMBAT_WEAPON_NAMES } from '../../game/weapons';
 import { filteredResidents, type ResidentSort, type ResidentStatusFilter } from '../../ui/residentListPresentation';
 import type { GameState, JobId, Resident } from '../../game/types';
+import { UiIcon } from '../UiIcon';
 
 function residentRoleLabel(resident: Resident): string {
   if (resident.stage) return LIFE_STAGE_NAMES[resident.stage];
@@ -71,7 +72,7 @@ export function ResidentsWindow({
       <div className="panel-title">민심 내역 — 고을이 클수록 바라는 것이 많아진다</div>
       {moraleFactors.map(factor => (
         <div key={factor.id} className="small" style={{ color: factor.delta > 0 ? '#6fbf73' : '#e06c5c' }}>
-          {factor.delta > 0 ? '✓' : '·'} {factor.label} ({factor.delta > 0 ? '+' : ''}{factor.delta})
+          {factor.delta > 0 ? <UiIcon name="success" size={17} /> : '·'} {factor.label} ({factor.delta > 0 ? '+' : ''}{factor.delta})
         </div>
       ))}
       {lockedFactors.length > 0 && (
@@ -80,7 +81,7 @@ export function ResidentsWindow({
         </div>
       )}
       <button type="button" className="btn small weapon-allocation-open" onClick={onOpenWeaponAllocation} style={{ marginTop: 6 }}>
-        ⚔ 병기고 무기·군마 배분
+        <UiIcon name="arsenal" size={20} /> 병기고 무기·군마 배분
       </button>
       <div className="resident-list-controls" aria-label="주민 목록 필터와 정렬">
         <label>
@@ -126,12 +127,13 @@ export function ResidentsWindow({
             disabled={!resident.alive}
             onClick={() => onSelectResident(resident.id)}
           >
-            <span>{resident.special ? '★ ' : ''}{resident.name}{resident.sick ? ' 🤒' : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</span>
-            <span className="muted">{resident.alive
-              ? `${resident.cartEquipped ? '🛒 ' : ''}${residentRoleLabel(resident)} · ${workplaceLabel(state, resident)}${state.weaponAssignments[resident.id]
-                ? ` · ${COMBAT_WEAPON_NAMES[state.weaponAssignments[resident.id]!]}`
-                : ''}${state.mountAssignments[resident.id] ? ' · 🐎 기마' : ''}`
-              : '사망'}</span>
+            <span>{resident.special && <><UiIcon name="important" size={18} /> </>}{resident.name}{resident.sick && <> <UiIcon name="sick" size={18} /></>}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</span>
+            <span className="muted">{resident.alive ? <>
+              {resident.cartEquipped && <><UiIcon name="cart" size={18} /> </>}
+              {residentRoleLabel(resident)} · {workplaceLabel(state, resident)}
+              {state.weaponAssignments[resident.id] ? ` · ${COMBAT_WEAPON_NAMES[state.weaponAssignments[resident.id]!]}` : ''}
+              {state.mountAssignments[resident.id] && <> · <UiIcon name="mounted" size={18} /> 기마</>}
+            </> : '사망'}</span>
           </button>
         ))}
         {visibleResidents.length === 0 && <div className="resident-list-empty">현재 필터에 맞는 주민이 없습니다.</div>}

@@ -1,12 +1,9 @@
-import { RESOURCE_ICONS } from '../game/constants';
 import { RESOURCE_SPRITES, type ResourceIconId } from '../game/tradePresentation';
-import type { ResourceId } from '../game/types';
 
 export function ResourceIcon({ resource, size = 38 }: { resource: ResourceIconId; size?: number }) {
   const sprite = RESOURCE_SPRITES[resource];
   if (!sprite) {
-    const fallback = RESOURCE_ICONS[resource as ResourceId] ?? '•';
-    return <span className="resource-icon-fallback" style={{ width: size, height: size }}>{fallback}</span>;
+    return <span className="resource-icon-fallback" style={{ width: size, height: size }} />;
   }
   return (
     <span

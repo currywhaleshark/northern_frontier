@@ -18,6 +18,7 @@ const WORKPLACE_PRESENTATIONS: Partial<Record<BuildingTypeId, WorkplacePresentat
   weavingHouse: { mode: 'interior', activity: 'craft' },
   smokehouse: { mode: 'interior', activity: 'fire' },
   school: { mode: 'interior', activity: 'service' },
+  office: { mode: 'interior', activity: 'service' },
   shrine: { mode: 'interior', activity: 'service' },
   hermitage: { mode: 'interior', activity: 'service' },
 

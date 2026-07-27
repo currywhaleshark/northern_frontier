@@ -12,6 +12,7 @@ const assetOutput = ts.transpileModule(assetSource, {
 }).outputText;
 const assetModuleUrl = `data:text/javascript;base64,${Buffer.from(assetOutput).toString('base64')}`;
 const {
+  RESIDENT_MINER_LOAD_HD_SHEET,
   RESIDENT_MINER_LOAD_SHEET,
   RESIDENT_MINER_LOCOMOTION_SHEET,
   RESIDENT_MINER_WORK_SHEET,
@@ -31,8 +32,12 @@ assert.deepEqual(RESIDENT_MINER_WORK_SHEET, {
   src: '/assets/resident-miner-work-v1.png',
 });
 assert.deepEqual(RESIDENT_MINER_LOAD_SHEET, {
-  frameSize: 40, columns: 3, rows: 2, frameDurationMs: 140,
-  src: '/assets/resident-miner-load-v1.png',
+  frameSize: 64, displayFrameSize: 40, columns: 4, rows: 2, frameDurationMs: 200,
+  src: '/assets/resident-miner-jige-walk-v1.png',
+});
+assert.deepEqual(RESIDENT_MINER_LOAD_HD_SHEET, {
+  frameSize: 128, displayFrameSize: 40, columns: 4, rows: 2, frameDurationMs: 200,
+  src: '/assets/resident-miner-jige-walk-hd-v1.png',
 });
 
 assert.equal(minerLocomotionFrameIndex(false, 420), 0);
@@ -44,16 +49,22 @@ assert.deepEqual(
 assert.deepEqual([0, 160, 320, 480, 640].map(minerWorkFrameIndex), [0, 1, 2, 1, 0]);
 assert.deepEqual(minerLocomotionSourceRect('female', true, 420), { sx: 80, sy: 40, sw: 40, sh: 40 });
 assert.deepEqual(minerWorkSourceRect('male', 320), { sx: 80, sy: 0, sw: 40, sh: 40 });
-assert.deepEqual(minerLoadSourceRect('female', false, 420), { sx: 0, sy: 40, sw: 40, sh: 40 });
+assert.deepEqual(minerLoadSourceRect('female', false, 420), { sx: 0, sy: 64, sw: 64, sh: 64 });
+assert.deepEqual(minerLoadSourceRect('male', true, 600, true),
+  { sx: 384, sy: 0, sw: 128, sh: 128 });
 
-for (const filename of [
-  'resident-miner-locomotion-v1.png',
-  'resident-miner-work-v1.png',
-  'resident-miner-load-v1.png',
-]) {
+for (const filename of ['resident-miner-locomotion-v1.png', 'resident-miner-work-v1.png']) {
   const png = readFileSync(new URL(`../../public/assets/${filename}`, import.meta.url));
   assert.equal(png.readUInt32BE(16), 120, `${filename} is three 40px columns wide`);
   assert.equal(png.readUInt32BE(20), 80, `${filename} is two 40px gender rows tall`);
+}
+for (const [filename, width, height] of [
+  ['resident-miner-jige-walk-v1.png', 256, 128],
+  ['resident-miner-jige-walk-hd-v1.png', 512, 256],
+]) {
+  const png = readFileSync(new URL(`../../public/assets/${filename}`, import.meta.url));
+  assert.equal(png.readUInt32BE(16), width, `${filename} width`);
+  assert.equal(png.readUInt32BE(20), height, `${filename} height`);
 }
 
 const rendererSource = readFileSync(new URL('../../src/render/renderer.ts', import.meta.url), 'utf8');
@@ -71,8 +82,8 @@ assert.match(atlasSource, /if \(p\.carryingMinerals\)/,
   'ore-carrying miners use the loaded jige sheet');
 assert.match(atlasSource, /return draw\(residentMinerLocomotionSheet/,
   'unladen adult miners use the pickaxe locomotion sheet');
-assert.match(atlasSource, /if \(p\.carrying && !integratedCargo\)/,
-  'generic cargo remains for fallbacks but does not overlap an integrated ore jige');
+assert.match(atlasSource, /if \(p\.carrying && !integratedCargo && p\.showCargoMarker !== false\)/,
+  'optional generic cargo remains for fallbacks but does not overlap an integrated ore jige');
 
 const youthBranch = atlasSource.indexOf('newContentResidentSheet && newContentRect');
 const minerBranch = atlasSource.indexOf('drawOptionalResidentPresentation(ctx, p');

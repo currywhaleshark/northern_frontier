@@ -11,11 +11,12 @@
     "test:terrain-growth": "node tools/render/test_historical_terrain.mjs && node tools/render/test_terrain_growth_assets.mjs && node tools/render/test_terrain_growth_visuals.mjs",
     "test:building-assets": "node tools/render/test_cemetery_assets.mjs && node tools/render/test_oblique_building_assets.mjs",
     "test:livestock-assets": "node tools/render/test_livestock_assets.mjs",
+    "test:corpse-assets": "node tools/render/test_corpse_coffin_assets.mjs",
     "measure:runtime": "node tools/game/measure_runtime_performance.mjs",
     "test:combat": "node tools/game/test_tactical_battle.mjs",
     "gen:sprite-metrics": "node tools/game/generate_tactical_sprite_metrics.mjs",
     "edit:head-boxes": "node tools/game/head_box_editor.mjs",
-    "check": "npm run test:game && npm run test:terrain-growth && npm run test:building-assets && npm run test:livestock-assets && npm run build"
+    "check": "npm run test:game && npm run test:terrain-growth && npm run test:building-assets && npm run test:livestock-assets && npm run test:corpse-assets && npm run build"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

@@ -26,19 +26,24 @@ export function normalizePastureArea(raw: unknown): PastureArea | null {
   };
 }
 
-export function pastureTileCount(building: Pick<Building, 'pasture'>): number {
-  const pasture = normalizePastureArea(building.pasture);
+type OperationalPastureBuilding = Pick<Building, 'pasture'> & Partial<Pick<Building, 'expansion'>>;
+
+export function pastureTileCount(building: OperationalPastureBuilding): number {
+  const expansion = building.expansion?.kind === 'pasture' ? building.expansion : null;
+  const pasture = normalizePastureArea(expansion?.fromArea ?? building.pasture);
   return pasture ? pasture.w * pasture.h : 0;
 }
 
-export function pastureRequiredHerders(building: Pick<Building, 'type' | 'pasture'>): number {
+export function pastureRequiredHerders(
+  building: Pick<Building, 'type' | 'pasture'> & Partial<Pick<Building, 'expansion'>>,
+): number {
   if (building.type !== 'stable') return 0;
   const area = pastureTileCount(building);
   return area > 0 ? Math.max(1, Math.ceil(area / CONFIG.pasture.tilesPerHerder)) : 2;
 }
 
 export function stableLivestockCapacity(
-  building: Pick<Building, 'type' | 'pasture'>,
+  building: Pick<Building, 'type' | 'pasture'> & Partial<Pick<Building, 'expansion'>>,
   species: LivestockId,
 ): number {
   if (building.type !== 'stable') return 0;

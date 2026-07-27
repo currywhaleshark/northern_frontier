@@ -3,6 +3,7 @@ import { availablePredatorScouts, predatorScoutDuration } from '../game/expediti
 import { SPECIAL_ITEM_DEFS } from '../game/specialItems';
 import { predatorHuntChance } from '../game/specialEvents';
 import type { GameState, SpecialItemId, WildlifeKind } from '../game/types';
+import { UiIcon } from './UiIcon';
 
 interface Props {
   state: GameState;
@@ -115,7 +116,7 @@ export function InspectorPanel({ state, onOrganizeHunt, onScoutPredator }: Props
         const def = SPECIAL_ITEM_DEFS[item];
         return (
           <div key={item} className="special-item-row" title={def.desc}>
-            <span className="special-item-icon" aria-hidden="true">{def.icon}</span>
+            <span className="special-item-icon"><UiIcon name={def.icon} size={28} /></span>
             <div>
               <strong>{def.name}</strong>
               <span className="muted small">{def.inventoryNote}</span>

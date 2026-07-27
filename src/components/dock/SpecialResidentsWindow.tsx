@@ -3,6 +3,7 @@ import {
   SPECIAL_RESIDENT_ROSTER,
 } from '../../game/specialResidents';
 import type { GameState, SpecialResidentId } from '../../game/types';
+import { UiIcon } from '../UiIcon';
 
 interface Props {
   state: GameState;
@@ -55,7 +56,7 @@ export function SpecialResidentsWindow({
             className={`special-resident-card${resident?.id === selectedResidentId ? ' selected' : ''}`}
           >
             <header>
-              <span className="special-resident-badge" aria-hidden="true">{definition.badge}</span>
+              <span className="special-resident-badge"><UiIcon name={definition.badge} size={28} /></span>
               <div>
                 <strong>{definition.name}</strong>
                 <span>{definition.epithet}</span>
@@ -71,7 +72,7 @@ export function SpecialResidentsWindow({
                     {definition.skills!.map(skill => (
                       <div key={skill.id} className="special-skill-row">
                         <span className="special-skill-chip">
-                          <span aria-hidden="true">{skill.icon}</span> {skill.name}
+                          <UiIcon name={skill.icon} size={18} /> {skill.name}
                         </span>
                         <span className="special-skill-effect">{skill.effect}</span>
                       </div>

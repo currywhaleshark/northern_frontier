@@ -1,0 +1,7 @@
+Create an exact 2-row by 3-column pixel-art sprite sheet for the Northern Frontier miner characters carrying mined ore on a traditional Korean wooden jige A-frame backpack carrier, using the attached reference as the strict identity and clothing-color reference. Match the existing crisp 16-bit Korean historical RPG overworld style, 3/4 view from slightly above, full body, traveling to screen-right.
+
+Top row is the same adult male and bottom row is the same adult female. Preserve the deep muted purple upper garment, pale gray-white trousers or long skirt, dark footwear, and muted red-brown head wrapping. Every cell has the same jige loaded with a compact tied bundle of gray stones and dark reddish ore; the pickaxe is secured to its outside.
+
+Column 1 is loaded idle with feet together. Column 2 has the near-side leg forward and the far leg trailing. Column 3 is the true opposite stride: the far-side leg crosses visibly forward while the near-side leg trails. The lower-body silhouette must change; do not fake it by rotating only the waist.
+
+Exact six equal cells with no grid lines. Keep identity, clothes, jige, ore, pickaxe, pixel scale, baseline, and bounding box consistent. Everything fits fully inside each cell with safe margin. No loose stones, dust, shadows, scenery, text, labels, or UI. Background is solid flat #FF00FF.

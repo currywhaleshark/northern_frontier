@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { RESOURCE_NAMES, WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
+import { RESOURCE_NAMES, WEATHER_NAMES } from '../game/constants';
 import { countBuilt } from '../game/buildings';
 import { getSeason } from '../game/seasons';
 import { banditLairDoctrineDefinition, enemyPlanCounterLabelsForAction, enemyPlanSummaryView } from '../game/enemyPlan';
@@ -68,6 +68,7 @@ import {
 } from '../game/tacticalRoutes';
 import { commandDescription, commandLabel } from './tactical/commandText';
 import { computeCommandPopoverPlacement } from './tactical/popoverPlacement';
+import { WeatherIcon } from './UiIcon';
 import {
   facingLabel, facingPenaltyText, facingTransitionText,
   stageOrderCommandLabel, stageOrderPenaltyText, stageOrderTransitionText,
@@ -1135,7 +1136,7 @@ export function TacticalBattleScreen({
             <div><span>{hunt ? '짐승 상태' : assault ? '정보' : '전황'}</span><strong>{hunt
               ? battle.huntPredatorState === 'hidden' ? '은닉' : battle.huntPredatorState === 'wounded' ? '부상' : battle.huntPredatorState === 'fled' ? '도주' : '발각'
               : assault ? (battle.warned ? '정찰 완료' : '정보 부족') : battle.warned ? '경보됨' : '기습'}</strong></div>
-            <div><span>날씨</span><strong>{WEATHER_ICONS[state.weather]} {WEATHER_NAMES[state.weather]}</strong></div>
+            <div><span>날씨</span><strong><WeatherIcon weather={state.weather} size={20} /> {WEATHER_NAMES[state.weather]}</strong></div>
           </div>
           {enemyIntelOpen && (raidIntel || lairIntelPlan) && (
             <div className="tactical-enemy-intel-dropdown" role="region" aria-label="적 정보 상세">

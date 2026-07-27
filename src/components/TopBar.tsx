@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { housingCapacity } from '../game/buildings';
 import { CONFIG } from '../game/config';
-import { RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES, WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
+import { RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES, WEATHER_NAMES } from '../game/constants';
 import { nextRank } from '../game/promotion';
 import { avg, livingResidents, residentHome } from '../game/residents';
 import { getDayOfSeason, getSeason, getYear } from '../game/seasons';
@@ -28,6 +28,7 @@ import { DayArcWidget } from './DayArcWidget';
 import { TimeControls } from './TimeControls';
 import { ResourceBreakdownPopover } from './ResourceBreakdownPopover';
 import { ResourceIcon } from './TradeResourceIcon';
+import { UiIcon, WeatherIcon } from './UiIcon';
 import type { GameState, ResourceId } from '../game/types';
 
 interface Props {
@@ -202,7 +203,7 @@ export function TopBar({
       <div className="topbar-row">
         <span className="date-box">
           {getYear(state.day)}년차 {SEASON_NAMES[getSeason(state.day)]} {getDayOfSeason(state.day)}일
-          {' '}{WEATHER_ICONS[state.weather]} {WEATHER_NAMES[state.weather]}
+          {' '}<WeatherIcon weather={state.weather} size={20} /> {WEATHER_NAMES[state.weather]}
         </span>
         <DayArcWidget subTick={state.subTick} speed={speed} />
         <span className="pop-box">
@@ -219,7 +220,7 @@ export function TopBar({
           <TimeControls speed={speed} setSpeed={setSpeed} paused={state.pendingChoice != null || state.pendingPromotionNotice != null || state.tacticalBattle != null || state.tacticalBattleReport != null || state.gameOver != null} />
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
           <button className="btn topbar-menu-button" onClick={onOpenMenu} title="게임 메뉴 (Esc)" aria-label="게임 메뉴 열기">
-            ☰ <kbd>Esc</kbd>
+            <UiIcon name="menu" size={20} /> <kbd>Esc</kbd>
           </button>
         </span>
       </div>

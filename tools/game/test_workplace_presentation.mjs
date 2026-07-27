@@ -18,7 +18,7 @@ const {
 
 const expectedInterior = [
   'watermill', 'smithy', 'clinic', 'tannery', 'weavingHouse', 'smokehouse',
-  'school', 'shrine', 'hermitage',
+  'school', 'office', 'shrine', 'hermitage',
 ];
 const expectedYard = ['woodShed', 'charcoalKiln', 'stable', 'nitreYard', 'dryingRack', 'onggiKiln'];
 const expectedVisible = ['field', 'paddy', 'ferry', 'cemetery', 'mine', 'lumberCamp', 'huntLodge', 'herbHut'];

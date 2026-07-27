@@ -1,7 +1,7 @@
 // 전투 시뮬레이션 설정 화면 — 메인 메뉴에서 진입해 조건을 지정/랜덤으로 고르고 전투만 테스트한다
 import { useState } from 'react';
 import { CONFIG } from '../game/config';
-import { WEATHER_ICONS, WEATHER_NAMES } from '../game/constants';
+import { WEATHER_NAMES } from '../game/constants';
 import {
   BATTLE_SIMULATION_COMBAT_SPECIAL_RESIDENTS, BATTLE_SIMULATION_ENEMIES,
   type BattleSimDefenderCounts, type BattleSimDefenderMountCounts, type BattleSimMountableDefenderKey,
@@ -16,6 +16,7 @@ import type {
   BattleMode, EnemyDoctrineId, EnemyStratagemId, Season, SpecialResidentId, TacticalRouteSide, TigerTier, WeatherId,
 } from '../game/types';
 import { MenuSnowLayer } from './MenuSnowLayer';
+import { UiIcon, WeatherIcon } from './UiIcon';
 
 interface Props {
   onStart: (options: BattleSimulationOptions) => void;
@@ -376,11 +377,11 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
               </select>
             </label>
             <label className="sim-field">
-              <span>날씨</span>
+              <span>날씨 {weather !== RANDOM && <WeatherIcon weather={weather} size={20} />}</span>
               <select value={weather} onChange={event => setWeather(event.target.value as SimSetting<WeatherId>)}>
                 <option value={RANDOM}>랜덤</option>
                 {WEATHERS.map(id => (
-                  <option key={id} value={id}>{WEATHER_ICONS[id]} {WEATHER_NAMES[id]}</option>
+                  <option key={id} value={id}>{WEATHER_NAMES[id]}</option>
                 ))}
               </select>
             </label>
@@ -465,7 +466,7 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
                           className={`sim-choice${selected ? ' active' : ''}`}
                           title={definition.name}
                           onClick={() => toggleSpecialResident(definition.id)}
-                        >{definition.badge} {definition.shortName}</button>
+                        ><UiIcon name={definition.badge} size={20} /> {definition.shortName}</button>
                         {mountable && (
                           <button
                             className={`sim-choice sim-mount-choice${mounted ? ' active' : ''}`}
@@ -473,7 +474,7 @@ export function BattleSimulationSetup({ onStart, onBack }: Props) {
                             onClick={() => setMountedSpecialResidents(prev => mounted
                               ? prev.filter(candidate => candidate !== definition.id)
                               : [...prev, definition.id])}
-                          >🐎 기마</button>
+                          ><UiIcon name="mounted" size={20} /> 기마</button>
                         )}
                       </div>
                     );

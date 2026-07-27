@@ -3,6 +3,7 @@
 // 배치 규칙 판정은 전부 백엔드 unavailable-reason/mutation이 담당하고, 이 컴포넌트는
 // 카드 표시·드래그 좌표·피드백 문구만 책임진다.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { UiIcon } from '../UiIcon';
 import { combatDefaultWeaponName } from '../../game/combatCapabilities';
 import {
   placeTacticalDeploymentGroup,
@@ -167,7 +168,7 @@ function DeploymentCard({
           <span>{locked ? '보호 대상' : cardWeaponText(view, group)}</span>
           {featured && (
             <span className="tactical-deploy-card-featured" title={featured.traitLabel}>
-              ★ {featured.name} · {featured.traitLabel}
+              <UiIcon name="important" size={17} /> {featured.name} · {featured.traitLabel}
             </span>
           )}
           <span className={`tactical-deploy-card-placement${placement ? '' : ' pending'}`}>

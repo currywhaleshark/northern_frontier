@@ -10,6 +10,14 @@ export const RESIDENT_FARMER_TILL_SHEET = {
   src: '/assets/resident-farmer-till-v1.png',
 } as const;
 
+export const RESIDENT_FARMER_TILL_HD_SHEET = {
+  frameSize: 80,
+  columns: 3,
+  rows: 2,
+  frameDurationMs: 180,
+  src: '/assets/resident-farmer-till-hd-v1.png',
+} as const;
+
 export const RESIDENT_FARMER_HARVEST_SHEET = {
   frameSize: 40,
   columns: 3,
@@ -18,12 +26,28 @@ export const RESIDENT_FARMER_HARVEST_SHEET = {
   src: '/assets/resident-farmer-harvest-v1.png',
 } as const;
 
+export const RESIDENT_FARMER_HARVEST_HD_SHEET = {
+  frameSize: 80,
+  columns: 3,
+  rows: 2,
+  frameDurationMs: 220,
+  src: '/assets/resident-farmer-harvest-hd-v1.png',
+} as const;
+
 export const RESIDENT_FARMER_OX_PLOW_SHEET = {
   frameSize: 72,
   columns: 3,
   rows: 2,
   frameDurationMs: 160,
   src: '/assets/resident-farmer-ox-plow-v1.png',
+} as const;
+
+export const RESIDENT_FARMER_OX_PLOW_HD_SHEET = {
+  frameSize: 144,
+  columns: 3,
+  rows: 2,
+  frameDurationMs: 160,
+  src: '/assets/resident-farmer-ox-plow-hd-v1.png',
 } as const;
 
 const TILL_SEQUENCE = [0, 1, 2, 1] as const;
@@ -56,16 +80,25 @@ function sourceRect(frameSize: number, gender: Gender, frame: number) {
   };
 }
 
-export function farmerTillSourceRect(gender: Gender, elapsedMs: number) {
-  return sourceRect(RESIDENT_FARMER_TILL_SHEET.frameSize, gender, farmerTillFrameIndex(elapsedMs));
+export function farmerTillSourceRect(gender: Gender, elapsedMs: number, highDefinition = false) {
+  const frameSize = highDefinition
+    ? RESIDENT_FARMER_TILL_HD_SHEET.frameSize
+    : RESIDENT_FARMER_TILL_SHEET.frameSize;
+  return sourceRect(frameSize, gender, farmerTillFrameIndex(elapsedMs));
 }
 
-export function farmerHarvestSourceRect(gender: Gender, elapsedMs: number) {
-  return sourceRect(RESIDENT_FARMER_HARVEST_SHEET.frameSize, gender, farmerHarvestFrameIndex(elapsedMs));
+export function farmerHarvestSourceRect(gender: Gender, elapsedMs: number, highDefinition = false) {
+  const frameSize = highDefinition
+    ? RESIDENT_FARMER_HARVEST_HD_SHEET.frameSize
+    : RESIDENT_FARMER_HARVEST_SHEET.frameSize;
+  return sourceRect(frameSize, gender, farmerHarvestFrameIndex(elapsedMs));
 }
 
-export function farmerOxPlowSourceRect(gender: Gender, elapsedMs: number) {
-  return sourceRect(RESIDENT_FARMER_OX_PLOW_SHEET.frameSize, gender, farmerOxPlowFrameIndex(elapsedMs));
+export function farmerOxPlowSourceRect(gender: Gender, elapsedMs: number, highDefinition = false) {
+  const frameSize = highDefinition
+    ? RESIDENT_FARMER_OX_PLOW_HD_SHEET.frameSize
+    : RESIDENT_FARMER_OX_PLOW_SHEET.frameSize;
+  return sourceRect(frameSize, gender, farmerOxPlowFrameIndex(elapsedMs));
 }
 
 type FarmerPresentationResident = Pick<Resident,

@@ -122,7 +122,7 @@ function pushBuilt(state, type, extra = {}) {
   assert.equal(firewoodStep.isDone(state), true, 'yard, worker, and stockpile complete the lesson together');
 
   const buildHint = coachSource.indexOf("{ tut: 'build-item-woodShed'");
-  const workerHint = coachSource.indexOf("{ tut: 'job-plus-woodSplitter'");
+  const workerHint = coachSource.indexOf("{ tut: 'job-detail-woodSplitter'");
   assert.ok(buildHint >= 0 && workerHint > buildHint, 'coach points to wood yard construction before staffing');
   assert.match(coachSource, /coachHorizontalPlacement\(rect\.left \+ rect\.width \/ 2, window\.innerWidth\)/,
     'coach bubble placement follows the actual center of its target');

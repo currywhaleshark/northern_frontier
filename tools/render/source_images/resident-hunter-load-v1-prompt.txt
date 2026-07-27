@@ -1,0 +1,5 @@
+Create an exact 2-row by 4-column 2D pixel-art sprite sheet for the ordinary male and female Northern Frontier hunters returning with game, matching the existing hunter identity, clothing palette, bow, quiver, dark outlines, chunky 16-bit RPG style, right-facing 3/4 view, and full-body scale.
+
+In every cell the hunter carries the same small roe deer carcass horizontally across both shoulders behind the neck. The compact body, head, and hanging legs remain readable and completely non-gory, with no blood or wounds. The hunting bow and quiver remain visibly secured on the back. Column 1 is a stationary loaded idle. Column 2 is a grounded contact stride. Column 3 is a feet-together passing pose. Column 4 is the opposite-foot toe-off pose with the other boot visibly lifted backward. The walk reads as a 2-3-4-3 loop.
+
+Keep each gender's identity, clothes, prey, bow, quiver, scale, and bounding box consistent. The entire hunter and prey fit within every cell with safe margins. No loose pieces, blood, wounds, tree, scenery, shadow, text, labels, UI, borders, or extra props. Exactly eight cells on a solid flat #FF00FF background.

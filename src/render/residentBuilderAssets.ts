@@ -5,10 +5,21 @@ export const RESIDENT_BUILDER_WORK_SHEET = {
   columns: 4,
   rows: 2,
   frameDurationMsByGender: {
-    male: 167,
+    male: 200,
     female: 200,
   },
-  src: '/assets/resident-builder-work-v1.png',
+  src: '/assets/resident-builder-work-v2.png',
+} as const;
+
+export const RESIDENT_BUILDER_WORK_HD_SHEET = {
+  frameSize: 80,
+  columns: 4,
+  rows: 2,
+  frameDurationMsByGender: {
+    male: 200,
+    female: 200,
+  },
+  src: '/assets/resident-builder-work-hd-v2.png',
 } as const;
 
 export const RESIDENT_BUILDER_LOCOMOTION_SHEET = {
@@ -45,9 +56,12 @@ function sourceRect(frameSize: number, gender: Gender, frame: number) {
   };
 }
 
-export function builderWorkSourceRect(gender: Gender, elapsedMs: number) {
+export function builderWorkSourceRect(gender: Gender, elapsedMs: number, highDefinition = false) {
+  const frameSize = highDefinition
+    ? RESIDENT_BUILDER_WORK_HD_SHEET.frameSize
+    : RESIDENT_BUILDER_WORK_SHEET.frameSize;
   return sourceRect(
-    RESIDENT_BUILDER_WORK_SHEET.frameSize,
+    frameSize,
     gender,
     builderWorkFrameIndex(gender, elapsedMs),
   );

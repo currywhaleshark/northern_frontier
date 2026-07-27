@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type WheelEvent as ReactWheelEvent } from 'react';
 import { CONFIG } from '../game/config';
 import { JOB_NAMES, RESOURCE_NAMES } from '../game/constants';
-import { buildingCostFor, isAreaBuildingType } from '../game/buildings';
+import { BUILDING_DEFS, buildingCostFor, buildingFootprintDims, isAreaBuildingType } from '../game/buildings';
 import { getActiveSprites, onAtlasAssetSettled } from '../render/atlas';
 import { findResidentAt, renderScene, terrainVisualSignature } from '../render/renderer';
 import { createResidentPresentationSnapshotCache } from '../render/residentPresentation';
@@ -27,8 +27,11 @@ interface Props {
   version: number;
   animationActive: boolean;
   zoom: number;
+  showResidentJobMarkers: boolean;
+  showResidentCargoMarkers: boolean;
   placingType: BuildingTypeId | null;
   pastureStableId: number | null;
+  expandingBuildingId: number | null;
   selected: { x: number; y: number } | null;
   selectedEntity: SelectedEntity | null;
   selectedResidentId: number | null;
@@ -46,7 +49,8 @@ interface Props {
 }
 
 export function GameCanvas({
-  state, version, animationActive, zoom, placingType, pastureStableId, selected, selectedEntity, selectedResidentId, anim,
+  state, version, animationActive, zoom, showResidentJobMarkers, showResidentCargoMarkers,
+  placingType, pastureStableId, expandingBuildingId, selected, selectedEntity, selectedResidentId, anim,
   onTileClick, onPlacePlot, onPlacePasture, onResidentClick, onContextAction, onCancelPlace, onZoomChange,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -69,7 +73,11 @@ export function GameCanvas({
   const drag = useRef({ active: false, button: 0, sx: 0, sy: 0, scrollL: 0, scrollT: 0, moved: false });
   const zoomAnchorRef = useRef<{ worldX: number; worldY: number; boxX: number; boxY: number } | null>(null);
   // 경작지와 묘역 배치 중 드래그 크기 지정 — 기준 칸(anchor)에서 현재 칸까지의 사각형
-  const isPlotPlacing = placingType != null && isAreaBuildingType(placingType);
+  const expansionBuilding = expandingBuildingId == null
+    ? null
+    : state.buildings.find(building => building.id === expandingBuildingId) ?? null;
+  const isFootprintExpanding = expansionBuilding != null && isAreaBuildingType(expansionBuilding.type);
+  const isPlotPlacing = (placingType != null && isAreaBuildingType(placingType)) || isFootprintExpanding;
   const isPasturePlacing = pastureStableId != null;
   const isAreaDragging = isPlotPlacing || isPasturePlacing;
   const [plotDrag, setPlotDrag] = useState<{ ax: number; ay: number; cx: number; cy: number } | null>(null);
@@ -141,7 +149,9 @@ export function GameCanvas({
     ? { x: Math.floor(mouse.mx / TILE), y: Math.floor(mouse.my / TILE) }
     : null;
   const hoveredTile = hoverTile ? state.map[hoverTile.y]?.[hoverTile.x] : null;
-  const pointerAction = placingType || isPasturePlacing ? null : getPointerAction(state, selectedEntity, hoveredTile);
+  const pointerAction = placingType || isPasturePlacing || isFootprintExpanding
+    ? null
+    : getPointerAction(state, selectedEntity, hoveredTile);
   const selectedBuildingId = selectedEntity?.kind === 'building' ? selectedEntity.id : null;
   const terrainSignature = useMemo(() => terrainVisualSignature(state), [state, version]);
   const residentPresentation = residentPresentationCacheRef.current.get(state, version);
@@ -150,7 +160,7 @@ export function GameCanvas({
     const x = Math.floor(point.mx / TILE), y = Math.floor(point.my / TILE);
     const tile = state.map[y]?.[x];
     if (!tile) return 'outside';
-    if (placingType) return `placing:${x},${y}`;
+    if (placingType || isFootprintExpanding) return `placing:${x},${y}`;
     if (isPasturePlacing) return `pasture:${x},${y}`;
     const frameAlpha = Math.max(0, Math.min(1, (performance.now() - anim.current.at) / anim.current.ms));
     const resident = findResidentAt(state, point.mx, point.my, frameAlpha, CLICK_RADIUS, residentPresentation);
@@ -183,14 +193,40 @@ export function GameCanvas({
       h: Math.abs(dragState.cy - dragState.ay) + 1,
     };
   };
+  const existingExpansionArea: PastureArea | null = isFootprintExpanding && expansionBuilding
+    ? {
+      x: expansionBuilding.x,
+      y: expansionBuilding.y,
+      ...buildingFootprintDims(expansionBuilding),
+    }
+    : isPasturePlacing && pastureStableId != null
+      ? state.buildings.find(building => building.id === pastureStableId)?.pasture ?? null
+      : null;
+  const expandedRect = (raw: PastureArea): PastureArea => {
+    if (!existingExpansionArea) return raw;
+    let left = Math.min(existingExpansionArea.x, raw.x);
+    let top = Math.min(existingExpansionArea.y, raw.y);
+    let right = Math.max(existingExpansionArea.x + existingExpansionArea.w, raw.x + raw.w);
+    let bottom = Math.max(existingExpansionArea.y + existingExpansionArea.h, raw.y + raw.h);
+    if (right - left > maxSide) {
+      if (raw.x < existingExpansionArea.x) left = existingExpansionArea.x + existingExpansionArea.w - maxSide;
+      else right = existingExpansionArea.x + maxSide;
+    }
+    if (bottom - top > maxSide) {
+      if (raw.y < existingExpansionArea.y) top = existingExpansionArea.y + existingExpansionArea.h - maxSide;
+      else bottom = existingExpansionArea.y + maxSide;
+    }
+    return { x: left, y: top, w: right - left, h: bottom - top };
+  };
   // 미리보기 사각형: 드래그 중이면 그 범위, 아니면 호버 칸 1×1
-  const placingRect = isAreaDragging
+  const rawPlacingRect = isAreaDragging
     ? (plotDrag
       ? plotRectFrom(plotDrag)
       : (hoverTile && hoverTile.x >= 0 && hoverTile.y >= 0 && hoverTile.x < w && hoverTile.y < h
         ? { x: hoverTile.x, y: hoverTile.y, w: 1, h: 1 }
         : null))
     : null;
+  const placingRect = rawPlacingRect ? expandedRect(rawPlacingRect) : null;
 
   drawRef.current = (animationTimeMs) => {
     const canvas = canvasRef.current;
@@ -201,12 +237,17 @@ export function GameCanvas({
     const runtimeDrawStart = runtimePerfStartTime();
     renderScene(canvas, state, {
       alpha: frameAlpha, animationTimeMs, hover: hoverTile, placingType, placingRect, selected, selectedResidentId,
+      areaExpansion: isFootprintExpanding && expansionBuilding && placingRect
+        ? { buildingId: expansionBuilding.id, type: expansionBuilding.type, rect: placingRect }
+        : null,
       pasturePlacement: isPasturePlacing && placingRect && pastureStableId != null
         ? { stableId: pastureStableId, rect: placingRect }
         : null,
       selectedBuildingId, viewport: viewportRef.current ?? undefined, terrainVisualSignature: terrainSignature,
       sprites: getActiveSprites(), residentPresentation,
       renderScale,
+      residentJobMarkers: showResidentJobMarkers,
+      residentCargoMarkers: showResidentCargoMarkers,
     });
     if (perf) {
       const bucket = perf['renderScene-total'] ?? (perf['renderScene-total'] = { total: 0, count: 0 });
@@ -304,7 +345,7 @@ export function GameCanvas({
   const actionTooltip = mouse && !hoveredResident && !raiderHovered && !hoveredSite && pointerAction && pointerAction.kind !== 'none'
     ? pointerAction
     : null;
-  const canvasCursor = placingType || isPasturePlacing
+  const canvasCursor = placingType || isPasturePlacing || isFootprintExpanding
     ? 'crosshair'
     : panning
       ? 'grabbing'
@@ -380,7 +421,7 @@ export function GameCanvas({
         }}
         onPointerUp={e => {
           if (plotDrag) {
-            const rect = plotRectFrom(plotDrag);
+            const rect = placingRect ?? plotRectFrom(plotDrag);
             setPlotDrag(null);
             try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
             if (isPasturePlacing) onPlacePasture(rect.x, rect.y, rect.w, rect.h);
@@ -419,7 +460,7 @@ export function GameCanvas({
         }}
         onContextMenu={e => {
           e.preventDefault();
-          if (placingType || isPasturePlacing) {
+          if (placingType || isPasturePlacing || isFootprintExpanding) {
             setPlotDrag(null);
             onCancelPlace();
             return;
@@ -430,7 +471,7 @@ export function GameCanvas({
           onContextAction(tx, ty);
         }}
       />
-      {mouse && placingRect && (placingType || isPasturePlacing) && (
+      {mouse && placingRect && (placingType || isPasturePlacing || isFootprintExpanding) && (
         <div ref={tooltipRef} className="map-tooltip" style={{ left: 0, top: 0 }}>
           <b>{placingRect.w}×{placingRect.h} ({placingRect.w * placingRect.h}칸)</b>
           {isPasturePlacing && pastureStableId != null ? (() => {
@@ -445,7 +486,28 @@ export function GameCanvas({
                     ? `${LIVESTOCK_DEFS[livestock.species].name} ${stableLivestockCapacity(preview, livestock.species)}마리 · 목동 ${pastureRequiredHerders(preview)}명`
                     : '축사를 찾을 수 없음'}
                 </div>
-                <div className="muted">{error ?? `끌어서 크기 지정 (최대 ${CONFIG.pasture.maxSide}×${CONFIG.pasture.maxSide})`}</div>
+                <div className="muted">
+                  {stable?.pasture
+                    ? `추가 ${Math.max(0, placingRect.w * placingRect.h - stable.pasture.w * stable.pasture.h)}칸 · 건축가 공사`
+                    : error ?? `끌어서 크기 지정 (최대 ${CONFIG.pasture.maxSide}×${CONFIG.pasture.maxSide})`}
+                </div>
+              </>
+            );
+          })() : isFootprintExpanding && expansionBuilding ? (() => {
+            const current = buildingFootprintDims(expansionBuilding);
+            const added = Math.max(0, placingRect.w * placingRect.h - current.w * current.h);
+            const def = BUILDING_DEFS[expansionBuilding.type];
+            return (
+              <>
+                <div className="muted">
+                  추가 {added}칸
+                  {added > 0 && Object.entries(def.cost)
+                    .map(([res, amount]) => ` · ${RESOURCE_NAMES[res as keyof typeof RESOURCE_NAMES] ?? res} ${(amount ?? 0) * added}`)
+                    .join('')}
+                </div>
+                <div className="muted">
+                  기존 영역을 포함해 확장 · {expansionBuilding.type === 'field' || expansionBuilding.type === 'paddy' ? '농부' : '건축가'} 공사
+                </div>
               </>
             );
           })() : placingType ? (

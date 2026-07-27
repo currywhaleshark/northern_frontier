@@ -1,6 +1,7 @@
 import { BUILDING_DEFS, BUILD_MENU_ORDER } from '../game/buildings';
 import { JOB_MIN_RANK, JOB_NAMES, JOB_ORDER, RANK_NAMES } from '../game/constants';
 import type { PromotionRank } from '../game/promotion';
+import { BuildingIcon } from './BuildingIcon';
 
 interface Props {
   rank: PromotionRank;
@@ -43,7 +44,7 @@ export function PromotionModal({ rank, onAcknowledge }: Props) {
           <div className="promotion-unlock-grid">
             {buildings.map(type => (
               <div key={type} className="promotion-unlock-item">
-                <span aria-hidden="true">{BUILDING_DEFS[type].emoji}</span>
+                <BuildingIcon type={type} size={28} />
                 <strong>{BUILDING_DEFS[type].name}</strong>
               </div>
             ))}

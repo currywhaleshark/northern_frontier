@@ -1,6 +1,7 @@
 import type { StockResourceId } from '../ui/resourceDisplay';
 import { MAX_STARRED_RESOURCES } from '../ui/uiPrefs';
 import { ResourceIcon } from './TradeResourceIcon';
+import { UiIcon } from './UiIcon';
 
 export interface ResourceBreakdownItem {
   id: StockResourceId;
@@ -81,7 +82,11 @@ export function ResourceBreakdownPopover({
                 onToggleStarred(item.id);
               }}
             >
-              {item.starred ? '★' : '☆'}
+              <UiIcon
+                name="important"
+                size={18}
+                className={item.starred ? '' : 'resource-star-inactive'}
+              />
             </button>
           </span>
         </div>

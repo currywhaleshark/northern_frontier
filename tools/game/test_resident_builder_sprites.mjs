@@ -13,6 +13,7 @@ const assetOutput = ts.transpileModule(assetSource, {
 const assetModuleUrl = `data:text/javascript;base64,${Buffer.from(assetOutput).toString('base64')}`;
 const {
   RESIDENT_BUILDER_LOCOMOTION_SHEET,
+  RESIDENT_BUILDER_WORK_HD_SHEET,
   RESIDENT_BUILDER_WORK_SHEET,
   builderLocomotionFrameIndex,
   builderLocomotionSourceRect,
@@ -31,8 +32,15 @@ assert.deepEqual(RESIDENT_BUILDER_WORK_SHEET, {
   frameSize: 40,
   columns: 4,
   rows: 2,
-  frameDurationMsByGender: { male: 167, female: 200 },
-  src: '/assets/resident-builder-work-v1.png',
+  frameDurationMsByGender: { male: 200, female: 200 },
+  src: '/assets/resident-builder-work-v2.png',
+});
+assert.deepEqual(RESIDENT_BUILDER_WORK_HD_SHEET, {
+  frameSize: 80,
+  columns: 4,
+  rows: 2,
+  frameDurationMsByGender: { male: 200, female: 200 },
+  src: '/assets/resident-builder-work-hd-v2.png',
 });
 
 assert.equal(builderLocomotionFrameIndex(false, 600), 0, 'stationary builders use the idle frame');
@@ -42,9 +50,9 @@ assert.deepEqual(
   'builder walk reuses neutral between the two distinct step poses',
 );
 assert.deepEqual(
-  [0, 167, 334, 501, 668].map(elapsed => builderWorkFrameIndex('male', elapsed)),
+  [0, 200, 400, 600, 800].map(elapsed => builderWorkFrameIndex('male', elapsed)),
   [0, 1, 2, 3, 0],
-  'male builder preserves the curated 6fps work timing',
+  'male builder uses the shared 5fps work timing',
 );
 assert.deepEqual(
   [0, 200, 400, 600, 800].map(elapsed => builderWorkFrameIndex('female', elapsed)),
@@ -55,14 +63,18 @@ assert.deepEqual(
   builderLocomotionSourceRect('female', true, 600),
   { sx: 80, sy: 40, sw: 40, sh: 40 },
 );
-assert.deepEqual(builderWorkSourceRect('male', 334), { sx: 80, sy: 0, sw: 40, sh: 40 });
+assert.deepEqual(builderWorkSourceRect('male', 400), { sx: 80, sy: 0, sw: 40, sh: 40 });
+assert.deepEqual(builderWorkSourceRect('female', 400, true), { sx: 160, sy: 80, sw: 80, sh: 80 });
 
 const locomotionPng = readFileSync(new URL('../../public/assets/resident-builder-locomotion-v1.png', import.meta.url));
 assert.equal(locomotionPng.readUInt32BE(16), 120, 'locomotion sheet has three 40px columns');
 assert.equal(locomotionPng.readUInt32BE(20), 80, 'locomotion sheet has two gender rows');
-const workPng = readFileSync(new URL('../../public/assets/resident-builder-work-v1.png', import.meta.url));
+const workPng = readFileSync(new URL('../../public/assets/resident-builder-work-v2.png', import.meta.url));
 assert.equal(workPng.readUInt32BE(16), 160, 'work sheet has four 40px columns');
 assert.equal(workPng.readUInt32BE(20), 80, 'work sheet has two gender rows');
+const workHdPng = readFileSync(new URL('../../public/assets/resident-builder-work-hd-v2.png', import.meta.url));
+assert.equal(workHdPng.readUInt32BE(16), 320, 'HD work sheet has four 80px columns');
+assert.equal(workHdPng.readUInt32BE(20), 160, 'HD work sheet has two gender rows');
 
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
 assert.match(atlasSource, /case ['"]builder['"]:\s*if \(p\.working && !p\.moving\)/,

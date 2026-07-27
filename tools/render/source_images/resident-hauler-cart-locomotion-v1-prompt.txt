@@ -1,0 +1,1 @@
+Adult male and female historical Korean haulers pulling an empty two-wheeled wooden handcart, without a jige. Two rows by three columns: idle, near-leg step, opposite far-leg step. Match the existing resident palette and keep every subject inside a flat #FF00FF cell.

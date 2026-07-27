@@ -85,7 +85,7 @@ assert.match(atlasSource, /if \(p\.carryingWood\)/,
   'timber-carrying woodcutters use the jige sheet');
 assert.match(atlasSource, /woodcutterLocomotionSourceRect\(p\.gender, Boolean\(p\.moving\), animationTimeMs\)/,
   'unladen woodcutters use idle or axe-carrying walk frames');
-assert.match(atlasSource, /if \(p\.carrying && !integratedCargo\)/,
-  'generic cargo remains for fallbacks but does not overlap an integrated jige load');
+assert.match(atlasSource, /if \(p\.carrying && !integratedCargo && p\.showCargoMarker !== false\)/,
+  'optional generic cargo remains for fallbacks but does not overlap an integrated jige load');
 
 console.log('resident work sprite tests passed');

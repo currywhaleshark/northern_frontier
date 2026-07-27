@@ -1,6 +1,7 @@
 // 사건 선택지 모달 — 열려 있는 동안 시뮬레이션은 멈춘다
 import type { PendingChoice } from '../game/types';
 import { renderFactionText } from './FactionName';
+import { UiIcon } from './UiIcon';
 
 interface Props {
   choice: PendingChoice;
@@ -33,7 +34,7 @@ export function EventModal({ choice, onChoose }: Props) {
             onClick={() => onChoose(opt.id)}
           >
             <div className="label">{opt.label}</div>
-            <div className="desc">{opt.disabled ? `⛔ ${opt.disabledReason}` : opt.desc}</div>
+            <div className="desc">{opt.disabled ? <><UiIcon name="disabled" size={18} /> {opt.disabledReason}</> : opt.desc}</div>
           </button>
         ))}
       </div>

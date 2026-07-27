@@ -37,6 +37,8 @@ const {
   loadUiPrefs,
   normalizeUiPrefs,
   saveUiPrefs,
+  setAutoFastForwardSleepingNight,
+  setResidentMarkerPrefs,
   setDockWindowLayout,
   setAutoAssignBuildingTypes,
   resetDockWindowLayout,
@@ -89,9 +91,12 @@ assert.deepEqual(normalized.autoAssignBuildingTypes, ['field', 'smithy'],
 assert.deepEqual(normalized.pinnedDockWindows, ['jobs', 'processing', 'residents', 'factions', 'court'],
   'dock preferences must remove duplicate and unknown window pins');
 assert.deepEqual(normalized.dockWindowLayouts, {}, 'v4 prefs must start without saved window layouts');
-assert.equal(normalized.version, 6, 'v4 prefs must migrate to the current schema without resetting');
+assert.equal(normalized.version, 8, 'v4 prefs must migrate to the current schema without resetting');
 assert.deepEqual(normalized.audio, { sfxEnabled: true, sfxVolume: 0.7, musicEnabled: true, musicVolume: 0.7 });
 assert.equal(normalized.mapZoom, 1);
+assert.equal(normalized.showResidentJobMarkers, true);
+assert.equal(normalized.showResidentCargoMarkers, true);
+assert.equal(normalized.autoFastForwardSleepingNight, true);
 
 const legacyStorage = memoryStorage({
   [UI_PREFS_KEY]: JSON.stringify({
@@ -102,7 +107,7 @@ const legacyStorage = memoryStorage({
   [LEGACY_BUILD_MENU_OPEN_KEY]: JSON.stringify({ 생산: true }),
 });
 const migrated = loadUiPrefs(legacyStorage);
-assert.equal(migrated.version, 6, 'v1 prefs must migrate to the current schema');
+assert.equal(migrated.version, 8, 'v1 prefs must migrate to the current schema');
 assert.deepEqual(migrated.starredResources, ['tools'], 'v1 stars must survive migration');
 assert.deepEqual(migrated.pinnedResourceGroups, ['materials'], 'v1 group pins must survive migration');
 assert.equal(migrated.buildDrawerLastCategory, 'production',
@@ -176,6 +181,27 @@ assert.deepEqual(v6Settings.audio, {
   musicVolume: 0,
 });
 assert.equal(v6Settings.mapZoom, 2, 'zoom preferences must clamp to the supported range');
+assert.equal(v6Settings.showResidentJobMarkers, true,
+  'pre-marker prefs must keep resident job markers visible while migrating');
+assert.equal(v6Settings.showResidentCargoMarkers, true,
+  'pre-marker prefs must keep resident cargo markers visible while migrating');
+
+const v7Markers = normalizeUiPrefs({
+  ...defaultUiPrefs(),
+  version: 7,
+  showResidentJobMarkers: false,
+  showResidentCargoMarkers: false,
+});
+assert.equal(v7Markers.showResidentJobMarkers, false);
+assert.equal(v7Markers.showResidentCargoMarkers, false);
+assert.equal(v7Markers.autoFastForwardSleepingNight, true,
+  'pre-auto-night prefs must enable the existing automatic night behavior while migrating');
+
+const v8NightSpeed = normalizeUiPrefs({
+  ...defaultUiPrefs(),
+  autoFastForwardSleepingNight: false,
+});
+assert.equal(v8NightSpeed.autoFastForwardSleepingNight, false);
 
 let prefs = defaultUiPrefs();
 for (const resource of DISPLAY_RESOURCE_ORDER.slice(0, MAX_STARRED_RESOURCES)) {
@@ -216,9 +242,17 @@ assert.deepEqual(prefs.dockWindowLayouts.jobs, { x: 12, y: 19, width: 340, heigh
 prefs = resetDockWindowLayout(prefs, 'jobs');
 assert.deepEqual(prefs.dockWindowLayouts, {});
 
+prefs = setResidentMarkerPrefs(prefs, { showResidentJobMarkers: false });
+assert.equal(prefs.showResidentJobMarkers, false);
+assert.equal(prefs.showResidentCargoMarkers, true);
+prefs = setResidentMarkerPrefs(prefs, { showResidentCargoMarkers: false });
+assert.equal(prefs.showResidentCargoMarkers, false);
+prefs = setAutoFastForwardSleepingNight(prefs, false);
+assert.equal(prefs.autoFastForwardSleepingNight, false);
+
 const storage = memoryStorage();
 saveUiPrefs(normalized, storage);
 assert.deepEqual(loadUiPrefs(storage), normalized, 'saved prefs must round-trip independently');
-assert.equal(JSON.parse(storage.value()).version, 6, 'saved prefs must retain their own schema version');
+assert.equal(JSON.parse(storage.value()).version, 8, 'saved prefs must retain their own schema version');
 
 console.log('ui prefs tests passed');

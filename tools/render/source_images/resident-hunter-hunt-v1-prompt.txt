@@ -1,0 +1,1 @@
+Reuse the ordinary male and female hunter idle and bow-draw attack cells from defender-roles-poses-v2.png. The source crop contains two gender columns and two pose rows: idle on the first row and bow draw on the second row. Preserve the original tactical art, clothing, bows, quivers, and transparent background while scaling and feet-aligning the cells for settlement rendering.

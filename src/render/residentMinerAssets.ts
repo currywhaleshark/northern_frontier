@@ -16,16 +16,35 @@ export const RESIDENT_MINER_WORK_SHEET = {
   src: '/assets/resident-miner-work-v1.png',
 } as const;
 
-export const RESIDENT_MINER_LOAD_SHEET = {
-  frameSize: 40,
+export const RESIDENT_MINER_WORK_HD_SHEET = {
+  frameSize: 80,
   columns: 3,
   rows: 2,
-  frameDurationMs: 140,
-  src: '/assets/resident-miner-load-v1.png',
+  frameDurationMs: 160,
+  src: '/assets/resident-miner-work-hd-v1.png',
+} as const;
+
+export const RESIDENT_MINER_LOAD_SHEET = {
+  frameSize: 64,
+  displayFrameSize: 40,
+  columns: 4,
+  rows: 2,
+  frameDurationMs: 200,
+  src: '/assets/resident-miner-jige-walk-v1.png',
+} as const;
+
+export const RESIDENT_MINER_LOAD_HD_SHEET = {
+  frameSize: 128,
+  displayFrameSize: 40,
+  columns: 4,
+  rows: 2,
+  frameDurationMs: 200,
+  src: '/assets/resident-miner-jige-walk-hd-v1.png',
 } as const;
 
 const MINER_WALK_SEQUENCE = [0, 1, 0, 2] as const;
 const MINER_WORK_SEQUENCE = [0, 1, 2, 1] as const;
+const MINER_LOAD_SEQUENCE = [0, 1, 2, 3] as const;
 
 export function minerLocomotionFrameIndex(moving: boolean, elapsedMs: number): number {
   if (!moving) return 0;
@@ -55,14 +74,31 @@ export function minerLocomotionSourceRect(gender: Gender, moving: boolean, elaps
   );
 }
 
-export function minerWorkSourceRect(gender: Gender, elapsedMs: number) {
-  return sourceRect(RESIDENT_MINER_WORK_SHEET.frameSize, gender, minerWorkFrameIndex(elapsedMs));
+export function minerWorkSourceRect(gender: Gender, elapsedMs: number, highDefinition = false) {
+  const frameSize = highDefinition
+    ? RESIDENT_MINER_WORK_HD_SHEET.frameSize
+    : RESIDENT_MINER_WORK_SHEET.frameSize;
+  return sourceRect(frameSize, gender, minerWorkFrameIndex(elapsedMs));
 }
 
-export function minerLoadSourceRect(gender: Gender, moving: boolean, elapsedMs: number) {
+export function minerLoadFrameIndex(moving: boolean, elapsedMs: number): number {
+  if (!moving) return 0;
+  const step = Math.floor(Math.max(0, elapsedMs) / RESIDENT_MINER_LOAD_SHEET.frameDurationMs);
+  return MINER_LOAD_SEQUENCE[step % MINER_LOAD_SEQUENCE.length];
+}
+
+export function minerLoadSourceRect(
+  gender: Gender,
+  moving: boolean,
+  elapsedMs: number,
+  highDefinition = false,
+) {
+  const frameSize = highDefinition
+    ? RESIDENT_MINER_LOAD_HD_SHEET.frameSize
+    : RESIDENT_MINER_LOAD_SHEET.frameSize;
   return sourceRect(
-    RESIDENT_MINER_LOAD_SHEET.frameSize,
+    frameSize,
     gender,
-    minerLocomotionFrameIndex(moving, elapsedMs),
+    minerLoadFrameIndex(moving, elapsedMs),
   );
 }

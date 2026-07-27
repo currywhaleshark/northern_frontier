@@ -1,0 +1,10 @@
+Use case: stylized-concept
+Asset type: single-frame 2D game prop sprite for an overworld map
+Primary request: one clearly readable rectangular wooden coffin for an unburied corpse marker
+Scene/backdrop: perfectly flat solid #FF00FF chroma-key background, one uniform color only, no texture, no gradient, no shadow on the background
+Subject: a plain closed Joseon-era wooden coffin, long simple rectangular box made from dark brown rough timber planks, visible plank seams and iron-dark corner fasteners, no ornament, no cross, no handles, no cloth, no body
+Style/medium: crisp detailed 2D pixel art matching a warm historical frontier settlement game, strong dark outline, readable at small game scale
+Composition/framing: single centered sprite, slightly tilted orthographic top-down 3/4 view from above consistent with oblique-top-view buildings; long axis runs from upper-left toward lower-right; entire coffin fully visible with generous magenta margin on all four sides; the coffin fills about 58% of the square canvas
+Lighting/mood: restrained warm brown highlights with a darker underside so it stands out on tan earth, no cast shadow
+Constraints: exactly one coffin only; single frame; full subject contained; no cropped edges; no detached objects; no labels; no UI; no text; no watermark; background must remain pure #FF00FF; do not use magenta anywhere in the coffin
+Avoid: hexagonal fantasy coffin silhouette, ornate funeral decoration, European cross, stone sarcophagus, floor plane, scenery, grass, dirt, people

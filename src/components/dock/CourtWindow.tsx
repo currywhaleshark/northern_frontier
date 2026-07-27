@@ -6,6 +6,7 @@ import { LUXURY_RESOURCES } from '../../game/resourceCatalog';
 import { suspicionBreakdown } from '../../game/suspicion';
 import { tributeReserved } from '../../game/tributeReserve';
 import type { GameState, ResourceId } from '../../game/types';
+import { UiIcon } from '../UiIcon';
 
 interface Props {
   state: GameState;
@@ -54,7 +55,7 @@ export function CourtWindow({
           <div className="panel-title" style={{ marginTop: 8 }}>다음 승격 — {RANK_NAMES[target]}</div>
           {promotionConditions(state, target).map(([ok, text], index) => (
             <div key={index} className="small" style={{ color: ok ? '#6fbf73' : '#e06c5c' }}>
-              {ok ? '✓' : '·'} {text}
+              {ok ? <UiIcon name="success" size={17} /> : '·'} {text}
             </div>
           ))}
         </>
@@ -70,7 +71,7 @@ export function CourtWindow({
           )}
           {tribute.resolved ? (
             <div className="small" style={{ color: tribute.paid ? '#6fbf73' : '#e06c5c' }}>
-              {tribute.paid ? '올해 세공 납부 완료 ✓' : '올해 세공을 바치지 못했습니다'}
+              {tribute.paid ? <>올해 세공 납부 완료 <UiIcon name="success" size={17} /></> : '올해 세공을 바치지 못했습니다'}
             </div>
           ) : (
             <>
@@ -152,7 +153,7 @@ export function CourtWindow({
               : '염초장을 세우면 화약 생산이 멈추는 대신 의심이 오르지 않습니다'}
             onClick={onToggleNitre}
           >
-            {hidden ? '⚗️ 염초장 은닉 중' : state.nitrePaused ? '⚗️ 염초장 가동 재개' : '⚗️ 염초장 가동 중지'}
+            <UiIcon name="nitre" size={19} /> {hidden ? '염초장 은닉 중' : state.nitrePaused ? '염초장 가동 재개' : '염초장 가동 중지'}
           </button>
         </div>
       )}
@@ -164,7 +165,7 @@ export function CourtWindow({
           title={petitionReason ?? '명성을 들여 조정의 지원 물자를 청합니다 (계절당 1회)'}
           onClick={onPetition}
         >
-          📜 조정에 청원
+          <UiIcon name="petition" size={19} /> 조정에 청원
         </button>
         {petitionReason && <div className="muted small" style={{ marginTop: 3 }}>{petitionReason}</div>}
       </div>

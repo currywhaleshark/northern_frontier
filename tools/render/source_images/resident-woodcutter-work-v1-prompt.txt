@@ -1,0 +1,7 @@
+Create a compact 2D pixel-art animation sprite sheet matching the existing Northern Frontier resident sheets: crisp chunky 16-bit RPG pixels, limited earthy Joseon frontier palette, dark readable outlines, 3/4 view from slightly above, full body, facing right. Preserve the original resident woodcutter clothing palette rather than introducing new job colors.
+
+Exactly 2 rows by 3 equal columns with no borders. The top row is one consistent adult male Korean woodcutter wearing the original desaturated charcoal gray-olive upper tunic, muted gray-beige wraps and headcloth, and warm brown trousers. The bottom row is one consistent adult female Korean woodcutter wearing the original muted moss/olive upper jacket and long warm brown skirt, with tied hair and a headcloth. Within each row, keep character identity, clothing, axe, proportions, pixel scale, and bounding box consistent.
+
+Column 1 is a balanced wind-up with both hands holding a small wood axe raised back. Column 2 is a forceful downward swing with the torso leaning into the chop. Column 3 is a low follow-through and recovery with the axe head near the ground. The motion must read clearly when played 1-2-3-2.
+
+Only the worker and hand axe. No tree, stump, wood chips, text, labels, UI, shadows, scenery, floating effects, or extra props. The entire character and axe must fit inside every cell with safe magenta margin on all sides. Nothing may cross a cell edge. Use the same silhouette scale in every frame. The background must be solid flat #FF00FF with no gradients, texture, halo, or transparency.

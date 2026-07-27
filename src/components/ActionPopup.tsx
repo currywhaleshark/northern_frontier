@@ -12,14 +12,17 @@ import {
   IMPLEMENTED_LIVESTOCK_IDS, LIVESTOCK_DEFS, normalizeLivestockState,
   plotPlowOxenMax, plowOxenAssigned, plowOxenOf, plowOxenPool,
 } from '../game/livestock';
-import { pastureRequiredHerders, pastureTileCount, stableLivestockCapacity } from '../game/pastures';
+import { pastureTileCount, stableLivestockCapacity } from '../game/pastures';
 import { getBuildingActions } from '../game/selectionActions';
 import { centerPromotionUpgradeReason, nextRank } from '../game/promotion';
 import {
   assignedSlotResidents, availableWorkerSlots, isResidentAvailableForWorkerSlot, workerSlotConfig, workerSlotCount,
 } from '../game/workerSlots';
 import type { BuildingTypeId, CropId, DryingProductId, GameState, LivestockId, ResourceId, SmithyProductId } from '../game/types';
+import { BuildingIcon } from './BuildingIcon';
 import { FactionName } from './FactionName';
+import { LivestockIcon } from './LivestockIcon';
+import { UiIcon } from './UiIcon';
 
 const TILE = CONFIG.ui.tileSize;
 
@@ -34,6 +37,7 @@ interface Props {
   onSetLivestockSpecies: (buildingId: number, species: LivestockId) => void;
   onSlaughterLivestock: (buildingId: number, amount: number) => void;
   onDefinePasture: (buildingId: number) => void;
+  onExpandArea: (buildingId: number) => void;
   onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
   onConvertFieldToPaddy: (buildingId: number) => void;
   onSetPlotPlowOxen: (buildingId: number, count: number) => void;
@@ -66,6 +70,7 @@ export function ActionPopup({
   onSetLivestockSpecies,
   onSlaughterLivestock,
   onDefinePasture,
+  onExpandArea,
   onSetBuildingCrop,
   onConvertFieldToPaddy,
   onSetPlotPlowOxen,
@@ -109,7 +114,7 @@ export function ActionPopup({
     <div className={embedded ? 'selection-building-actions' : 'action-popup'} style={embedded ? undefined : style}>
       {!embedded && (
         <div className="action-popup-head">
-          <span>{def.emoji} {def.name}</span>
+          <span><BuildingIcon type={building.type} size={24} /> {def.name}</span>
           <button className="icon-btn" type="button" onClick={onClose} aria-label="닫기">x</button>
         </div>
       )}
@@ -143,7 +148,7 @@ export function ActionPopup({
           title="배급·난방 같은 시행 세칙을 반포합니다"
           onClick={onOpenEdicts}
         >
-          <span>📜 절목</span>
+          <span><UiIcon name="decree" size={20} /> 절목</span>
           <div className="muted small">시행 중 {edictSlotsUsed(state)}/{edictSlotCapacity(state)}개</div>
         </button>
       )}
@@ -153,6 +158,29 @@ export function ActionPopup({
           {plotDims.w}×{plotDims.h} 경작지 · 파종 {plotSown}/{plotAreaTiles}칸 · 성장 {Math.round(building.fieldGrowth)}%
         </div>
       )}
+
+      {building.built && (building.type === 'field' || building.type === 'paddy' || building.type === 'cemetery') && (() => {
+        const dims = buildingFootprintDims(building);
+        const area = dims.w * dims.h;
+        const maximum = CONFIG.farming.maxPlotSide ** 2;
+        const atMaximum = area >= maximum;
+        return (
+          <button
+            className="action-command"
+            type="button"
+            disabled={atMaximum || building.expansion != null}
+            title={atMaximum
+              ? `최대 영역 ${CONFIG.farming.maxPlotSide}×${CONFIG.farming.maxPlotSide}칸입니다`
+              : building.expansion
+                ? '확장 공사 중입니다'
+                : `기존 영역에 붙여 최대 ${CONFIG.farming.maxPlotSide}×${CONFIG.farming.maxPlotSide}칸까지 확장합니다`}
+            onClick={() => onExpandArea(building.id)}
+          >
+            <span>영역 확장</span>
+            <div className="muted small">{area}/{maximum}칸 · {building.type === 'field' || building.type === 'paddy' ? '농부' : '건축가'} 공사</div>
+          </button>
+        );
+      })()}
 
       {slotConfig && (
         <div className="worker-slot-panel">
@@ -387,15 +415,18 @@ export function ActionPopup({
           <div className="worker-slot-panel">
             <div className="worker-slot-summary">
               <span>축종</span>
-              <span className="muted small">{LIVESTOCK_DEFS[livestock.species].icon} {LIVESTOCK_DEFS[livestock.species].name} {livestock.headcount}/{capacity}마리</span>
+              <span className="muted small"><LivestockIcon species={livestock.species} size={20} /> {LIVESTOCK_DEFS[livestock.species].name} {livestock.headcount}/{capacity}마리</span>
             </div>
             <button
               className="action-command"
               type="button"
+              disabled={pastureTiles >= CONFIG.pasture.maxSide ** 2 || building.expansion != null}
               title={`최대 ${CONFIG.pasture.maxSide}×${CONFIG.pasture.maxSide} · 약 ${CONFIG.pasture.tilesPerHerder}칸마다 목동 1명`}
-              onClick={() => onDefinePasture(building.id)}
+              onClick={() => pastureTiles > 0 ? onExpandArea(building.id) : onDefinePasture(building.id)}
             >
-              {pastureTiles > 0 ? `방목지 다시 지정 (${pastureTiles}칸 · 목동 ${pastureRequiredHerders(building)}명)` : '방목지 지정'}
+              {pastureTiles > 0
+                ? `방목지 확장 (${pastureTiles}/${CONFIG.pasture.maxSide ** 2}칸 · 건축가 공사)`
+                : '방목지 지정'}
             </button>
             <div className="action-grid">
               {IMPLEMENTED_LIVESTOCK_IDS.map(species => (
@@ -406,7 +437,7 @@ export function ActionPopup({
                   disabled={!state.unlockedLivestock.includes(species)}
                   onClick={() => onSetLivestockSpecies(building.id, species)}
                 >
-                  {LIVESTOCK_DEFS[species].icon} {LIVESTOCK_DEFS[species].name}
+                  <LivestockIcon species={species} size={20} /> {LIVESTOCK_DEFS[species].name}
                 </button>
               ))}
             </div>

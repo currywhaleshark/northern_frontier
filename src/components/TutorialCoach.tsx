@@ -37,7 +37,9 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       done: state => countJob(state, 'woodSplitter') >= 1,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
-        { tut: 'job-plus-woodSplitter', text: '장작꾼 ＋를 누르십시오. 원목을 장작으로 팹니다. 무직이 없으면 다른 직업의 −를 먼저 누르십시오.' },
+        { tut: 'job-detail-woodSplitter', text: '장작꾼을 눌러 상세 배정을 여십시오.' },
+        { tut: 'job-candidate-woodSplitter', text: '아래 무직자 명단에서 장작꾼으로 배정할 주민을 체크하십시오.' },
+        { tut: 'job-assign-selected-woodSplitter', text: '선택 배정을 눌러 장작꾼으로 올리십시오.' },
       ],
     },
     {
@@ -70,7 +72,9 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       done: state => countJob(state, 'hunter') >= 2,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
-        { tut: 'job-plus-hunter', text: '사냥꾼 ＋를 눌러 2명 이상으로 만드십시오.' },
+        { tut: 'job-detail-hunter', text: '사냥꾼을 눌러 상세 배정을 여십시오.' },
+        { tut: 'job-candidate-hunter', text: '아래 무직자 명단에서 사냥꾼으로 배정할 주민을 체크하십시오.' },
+        { tut: 'job-assign-selected-hunter', text: '선택 배정을 눌러 사냥꾼을 2명 이상으로 만드십시오.' },
       ],
     },
   ],
@@ -86,7 +90,9 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       done: state => countJob(state, 'militia') >= 1,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
-        { tut: 'job-plus-militia', text: '수비병 ＋를 눌러 1명 이상 두십시오.' },
+        { tut: 'job-detail-militia', text: '수비병을 눌러 상세 배정을 여십시오.' },
+        { tut: 'job-candidate-militia', text: '아래 무직자 명단에서 수비병으로 배정할 주민을 체크하십시오.' },
+        { tut: 'job-assign-selected-militia', text: '선택 배정을 눌러 수비병을 1명 이상 두십시오.' },
       ],
     },
   ],

@@ -10,13 +10,13 @@ export const LIVESTOCK_IDS = ['chicken', 'goat', 'sheep', 'pig', 'cattle', 'hors
 export const IMPLEMENTED_LIVESTOCK_IDS = ['chicken', 'goat', 'sheep', 'pig', 'cattle', 'horse'] as const satisfies readonly LivestockId[];
 
 export const LIVESTOCK_DEFS = {
-  chicken: { name: '닭', icon: '🐔' },
-  goat: { name: '염소', icon: '🐐' },
-  sheep: { name: '양', icon: '🐑' },
-  pig: { name: '돼지', icon: '🐖' },
-  cattle: { name: '소', icon: '🐄' },
-  horse: { name: '군마', icon: '🐎' },
-} as const satisfies Record<LivestockId, { name: string; icon: string }>;
+  chicken: { name: '닭' },
+  goat: { name: '염소' },
+  sheep: { name: '양' },
+  pig: { name: '돼지' },
+  cattle: { name: '소' },
+  horse: { name: '군마' },
+} as const satisfies Record<LivestockId, { name: string }>;
 
 export interface LivestockDailyReport {
   grainConsumed: number;

@@ -3,8 +3,7 @@
 // 나중에 실제 그래픽(스프라이트 아틀라스, 타일셋)을 붙일 때는
 // SpriteAPI를 구현한 객체 하나만 새로 만들어 renderer에 넘기면 된다.
 // 게임 로직과 렌더러는 "무엇을 그릴지"만 알고, "어떻게 그릴지"는 여기서 결정한다.
-// 현재 구현(placeholderSprites)은 단색 사각형 + 이모지 임시 그래픽이다.
-import { BUILDING_DEFS } from '../game/buildings';
+// 현재 구현(placeholderSprites)은 이미지가 준비되기 전 단색 도형을 표시한다.
 import { FACTIONS, JOB_COLORS } from '../game/constants';
 import type { BuildingTypeId, ForeignSiteStatus, ForeignSiteType, Gender, JobId, LifeStage, LivestockId, Rank, Season, SpecialResidentId, Terrain } from '../game/types';
 import type { TreeStage } from '../game/forestGrowth';
@@ -88,6 +87,8 @@ export interface ResidentDrawParams {
   carryingWood?: boolean;
   carryingGame?: boolean;
   carryingMinerals?: boolean;
+  showJobMarker?: boolean;
+  showCargoMarker?: boolean;
   cartEquipped?: boolean;
   farmerAction?: 'till' | 'harvest' | 'oxPlow';
   selected: boolean;
@@ -152,6 +153,13 @@ export interface LivestockDrawParams {
   highDefinition?: boolean;
 }
 
+export interface CorpseDrawParams {
+  x: number;
+  y: number;
+  size: number;
+  highDefinition?: boolean;
+}
+
 export interface SpriteAPI {
   id: string; // 지형 레이어 캐시 키에 들어간다 — 스프라이트 세트가 바뀌면 다시 그린다
   drawTerrain(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): void;
@@ -160,6 +168,7 @@ export interface SpriteAPI {
   drawBuilding(ctx: CanvasRenderingContext2D, p: BuildingDrawParams): void;
   drawBuildingDamage(ctx: CanvasRenderingContext2D, p: BuildingDamageDrawParams): void;
   drawLivestock(ctx: CanvasRenderingContext2D, p: LivestockDrawParams): void;
+  drawCorpse(ctx: CanvasRenderingContext2D, p: CorpseDrawParams): void;
   drawForeignStructure(ctx: CanvasRenderingContext2D, p: ForeignStructureDrawParams): boolean;
   drawResident(ctx: CanvasRenderingContext2D, p: ResidentDrawParams): void;
   drawExpedition(ctx: CanvasRenderingContext2D, p: ExpeditionDrawParams): void;
@@ -203,28 +212,28 @@ export const placeholderSprites: SpriteAPI = {
   },
 
   drawBuilding(ctx, p) {
-    const def = BUILDING_DEFS[p.type];
-    const cx = p.x + p.size / 2, cy = p.y + p.size / 2;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = `${p.size - 2}px serif`;
+    const alpha = p.ghost ? 0.8 : p.built ? 1 : 0.5;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#6f4b32';
+    ctx.fillRect(p.x + p.size * 0.18, p.y + p.size * 0.42, p.size * 0.64, p.size * 0.42);
+    ctx.fillStyle = '#b06f3c';
+    ctx.beginPath();
+    ctx.moveTo(p.x + p.size * 0.08, p.y + p.size * 0.45);
+    ctx.lineTo(p.x + p.size * 0.5, p.y + p.size * 0.12);
+    ctx.lineTo(p.x + p.size * 0.92, p.y + p.size * 0.45);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
     if (p.ghost) {
-      ctx.globalAlpha = 0.8;
-      ctx.fillText(def.emoji, cx, cy);
-      ctx.globalAlpha = 1;
       return;
     }
     if (!p.built) {
-      ctx.globalAlpha = 0.5;
-      ctx.fillText(def.emoji, cx, cy);
-      ctx.globalAlpha = 1;
       // 공정률 막대
       ctx.fillStyle = '#10141a';
       ctx.fillRect(p.x + 2, p.y + p.size - 4, p.size - 4, 3);
       ctx.fillStyle = '#d9a441';
       ctx.fillRect(p.x + 2, p.y + p.size - 4, (p.size - 4) * p.progress01, 3);
-    } else {
-      ctx.fillText(def.emoji, cx, cy);
     }
   },
 
@@ -244,18 +253,30 @@ export const placeholderSprites: SpriteAPI = {
   },
 
   drawLivestock(ctx, p) {
-    const icons: Record<LivestockId, string> = {
-      chicken: '🐔',
-      goat: '🐐',
-      sheep: '🐑',
-      pig: '🐖',
-      cattle: '🐄',
-      horse: '🐎',
+    const colors: Record<LivestockId, string> = {
+      chicken: '#e5dfc7',
+      goat: '#9c8062',
+      sheep: '#d8d2bd',
+      pig: '#c88e7a',
+      cattle: '#72543d',
+      horse: '#8a5d3d',
     };
-    ctx.font = '16px serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(icons[p.species], p.x, p.y);
+    const radius = p.species === 'chicken' ? 2.5 : p.species === 'cattle' || p.species === 'horse' ? 4.5 : 3.5;
+    ctx.fillStyle = colors[p.species];
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, radius * 1.35, radius, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(p.x + radius * 0.75, p.y - radius * 0.8, radius * 0.65, radius * 0.65);
+  },
+
+  drawCorpse(ctx, p) {
+    ctx.save();
+    ctx.fillStyle = '#5e3d2c';
+    ctx.strokeStyle = '#291c17';
+    ctx.lineWidth = 1;
+    ctx.fillRect(p.x + p.size * 0.12, p.y + p.size * 0.28, p.size * 0.76, p.size * 0.44);
+    ctx.strokeRect(p.x + p.size * 0.12, p.y + p.size * 0.28, p.size * 0.76, p.size * 0.44);
+    ctx.restore();
   },
 
   drawForeignStructure() {
@@ -272,7 +293,7 @@ export const placeholderSprites: SpriteAPI = {
     ctx.strokeStyle = p.sick ? '#e06c5c' : 'rgba(0,0,0,0.6)';
     ctx.lineWidth = 1;
     ctx.stroke();
-    if (p.carrying) {
+    if (p.carrying && p.showCargoMarker !== false) {
       ctx.fillStyle = '#f0e6c8';
       ctx.fillRect(p.x - 1.5, p.y - 6, 3, 3);
     }

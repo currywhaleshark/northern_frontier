@@ -7,253 +7,253 @@ import type { Building, BuildingDef, BuildingTypeId, GameState, Rank, ResourceId
 
 export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   center: {
-    id: 'center', name: '마을 중심지', emoji: '🏯',
+    id: 'center', name: '마을 중심지',
     desc: '개척지의 심장. 파괴되면 마을은 끝장난다.',
     cost: {}, buildDays: 0, slots: 0, capacity: 4, defense: 5,
     winterBonus: false, placement: 'land', unique: true,
   },
   hut: {
-    id: 'hut', name: '초가집', emoji: '🛖',
+    id: 'hut', name: '초가집',
     desc: '4명이 사는 움집. 겨울엔 웃풍이 심하다.',
     cost: { wood: 7 }, buildDays: 5, slots: 0, capacity: 4, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   ondol: {
-    id: 'ondol', name: '온돌집', emoji: '🏠',
+    id: 'ondol', name: '온돌집',
     desc: '보(堡) 승격 후 건설. 구들을 놓아 겨울 체온 손실을 크게 줄인다. 5명 수용.',
     cost: { wood: 12, stone: 8 }, buildDays: 10, slots: 0, capacity: 5, defense: 0,
     winterBonus: true, placement: 'land', unique: false, minRank: 'bo',
   },
   tileHouse: {
-    id: 'tileHouse', name: '기와집', emoji: '🏘️',
+    id: 'tileHouse', name: '기와집',
     desc: '진(鎭) 승격 후 건설. 온돌을 갖춘 상위 주거. 7명 수용.',
     cost: { wood: 18, stone: 16, tools: 2 }, buildDays: 14, slots: 0, capacity: 7, defense: 0,
     winterBonus: true, placement: 'land', unique: false, minRank: 'jin',
   },
   storehouse: {
-    id: 'storehouse', name: '창고', emoji: '🏚️',
+    id: 'storehouse', name: '창고',
     desc: '모든 짐을 부리는 하역 거점. 작업지 가까이 지으면 운반이 빨라지고, 습격 약탈 피해도 조금 줄인다.',
     cost: { wood: 9, stone: 2 }, buildDays: 6, slots: 0, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   cellar: {
-    id: 'cellar', name: '움 저장고', emoji: '🕳️',
+    id: 'cellar', name: '움 저장고',
     desc: `땅의 냉기를 이용해 생선·고기·채소 ${CONFIG.spoilage.cellarCapacity}만큼의 부패를 늦춘다. 여러 동의 보호 용량은 합산된다.`,
     cost: { wood: 5, stone: 3 }, buildDays: 4, slots: 0, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   smokehouse: {
-    id: 'smokehouse', name: '훈연소', emoji: '♨️',
+    id: 'smokehouse', name: '훈연소',
     desc: '갈무리꾼이 고기와 장작 또는 숯을 써서 오래 두는 보존육을 만든다.',
     cost: { wood: 8, stone: 4, tools: 1 }, buildDays: 6, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   dryingRack: {
-    id: 'dryingRack', name: '건조대', emoji: '🎏',
+    id: 'dryingRack', name: '건조대',
     desc: '강가에서 생선을 자반이나 건어물로 갈무리한다. 건어물은 소금이 들지 않지만 비가 오면 작업이 멈춘다.',
     cost: { wood: 8, stone: 2, tools: 1 }, buildDays: 5, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'riverbank', unique: false,
   },
   onggiKiln: {
-    id: 'onggiKiln', name: '옹기가마', emoji: '🏺',
+    id: 'onggiKiln', name: '옹기가마',
     desc: '보(堡) 승격 후 강가에 짓는다. 옹기장이가 현지 점토를 빚어 장작이나 숯으로 옹기를 굽는다.',
     cost: { wood: 12, stone: 6, tools: 2 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'riverbank', unique: false, minRank: 'bo',
   },
   jangdokdae: {
-    id: 'jangdokdae', name: '장독대', emoji: '🫙',
+    id: 'jangdokdae', name: '장독대',
     desc: '보(堡) 승격 후 마당에 짓는다. 늦가을부터 초겨울까지 콩과 소금을 옹기에 담그면 시간이 장을 익힌다.',
     cost: { wood: 6, stone: 3, tools: 1 }, buildDays: 5, slots: 0, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'bo',
   },
   bridge: {
-    id: 'bridge', name: '다리', emoji: '🌉',
+    id: 'bridge', name: '다리',
     desc: '강 위에 놓아 사계절 주민 통행을 가능하게 한다.',
     cost: { wood: 14, stone: 9 }, buildDays: 8, slots: 0, capacity: 0, defense: 0,
     winterBonus: false, placement: 'river', unique: false,
   },
   lumberCamp: {
-    id: 'lumberCamp', name: '벌목장', emoji: '🪓',
+    id: 'lumberCamp', name: '벌목장',
     desc: '벌목꾼이 목재를 부리는 거점. 숲 가까이 지으면 나르는 거리가 크게 줄어든다.',
     cost: { wood: 5 }, buildDays: 4, slots: 4, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   woodShed: {
-    id: 'woodShed', name: '장작마당', emoji: '🪓',
+    id: 'woodShed', name: '장작마당',
     desc: '장작꾼이 창고에서 목재를 가져와 쌓아 두고 장작으로 패는 작업장.',
     cost: { wood: 7, stone: 2, tools: 1 }, buildDays: 5, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   huntLodge: {
-    id: 'huntLodge', name: '사냥막', emoji: '🏹',
+    id: 'huntLodge', name: '사냥막',
     desc: '사냥꾼이 사냥감을 부리는 거점. 짐승 서식지 가까이 지으면 왕복이 줄어든다.',
     cost: { wood: 7, hide: 2 }, buildDays: 4, slots: 4, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   herbHut: {
-    id: 'herbHut', name: '약초막', emoji: '🌿',
+    id: 'herbHut', name: '약초막',
     desc: '약초꾼이 약초와 야생 먹거리를 부리는 거점. 숲 가까이 지으면 채집 왕복이 줄어든다.',
     cost: { wood: 5 }, buildDays: 3, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   clinic: {
-    id: 'clinic', name: '의원', emoji: '⚕️',
+    id: 'clinic', name: '의원',
     desc: '진(鎭) 승격 후 건설. 의원이 약초로 병자와 중상자를 치료하고 역병의 진단과 방역을 돕는다.',
     cost: { wood: 14, stone: 10, herbs: 4, tools: 2 }, buildDays: 9, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
   },
   field: {
-    id: 'field', name: '밭', emoji: '🌾',
+    id: 'field', name: '밭',
     desc: '곡물·채소·콩·목화 중 작물을 골라 기른다. 비옥한 땅이면 소출 +30%.',
     cost: { wood: 2, tools: 1 }, buildDays: 3, slots: 1, capacity: 0, defense: 0,
     winterBonus: false, placement: 'field', unique: false,
   },
   paddy: {
-    id: 'paddy', name: '논', emoji: '🌱',
+    id: 'paddy', name: '논',
     desc: '보(堡) 승격 후 강가 비옥지에 짓는 벼 재배지. 많은 곡물을 거두고 방앗간으로 효율을 높일 수 있다.',
     cost: { wood: 4, tools: 1 }, buildDays: 4, slots: 1, capacity: 0, defense: 0,
     winterBonus: false, placement: 'paddy', unique: false, minRank: 'bo',
   },
   watermill: {
-    id: 'watermill', name: '방앗간', emoji: '🛞',
+    id: 'watermill', name: '방앗간',
     desc: '보(堡) 승격 후 강가에 짓는 물레방아식 방앗간. 창고의 벼를 가져와 먹을 수 있는 곡물로 도정한다.',
     cost: { wood: 16, stone: 10, tools: 2 }, buildDays: 10, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'watermill', unique: false, minRank: 'bo',
   },
   smithy: {
-    id: 'smithy', name: '대장간', emoji: '⚒️',
+    id: 'smithy', name: '대장간',
     desc: '대장장이가 창고에서 철과 재료를 가져와 도구, 수레와 무기를 만드는 작업장.',
     cost: { wood: 9, stone: 5 }, buildDays: 8, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   mine: {
-    id: 'mine', name: '채광장', emoji: '⛏️',
+    id: 'mine', name: '채광장',
     desc: `보(堡) 승격 후 건설. 광상 위가 아닌 주변 빈 땅에 세우면 채광꾼이 반경 ${CONFIG.minerals.mineWorkRadius}칸의 돌·철·은을 캐 와 하역한다.`,
     cost: { wood: 10, stone: 8, tools: 2 }, buildDays: 8, slots: 4, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'bo',
   },
   ferry: {
-    id: 'ferry', name: '나루터', emoji: '⛵',
+    id: 'ferry', name: '나루터',
     desc: '보(堡) 승격 후 건설. 육지와 맞닿은 강 타일에 두어 어부가 식량을 얻는 거점.',
     cost: { wood: 14, stone: 4, tools: 1 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'riverbank', unique: false, minRank: 'bo',
   },
   charcoalKiln: {
-    id: 'charcoalKiln', name: '숯가마', emoji: '🔥',
+    id: 'charcoalKiln', name: '숯가마',
     desc: '진(鎭) 승격 후 건설. 숯쟁이가 창고의 목재를 가져와 고효율 연료인 숯으로 굽는다.',
     cost: { wood: 12, stone: 12, tools: 1 }, buildDays: 8, slots: 3, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
   },
   stable: {
-    id: 'stable', name: '축사', emoji: '🐂',
+    id: 'stable', name: '축사',
     desc: '진(鎭) 승격 후 건설. 완공 뒤 인접 평지에 방목지를 지정하며, 넓을수록 더 많은 가축과 목동이 필요하다.',
     cost: { wood: 16, stone: 6, grain: 8, tools: 1 }, buildDays: 9, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
   },
   nitreYard: {
-    id: 'nitreYard', name: '염초장', emoji: '⚗️',
+    id: 'nitreYard', name: '염초장',
     desc: '부(府) 승격 후 건설. 염초장이 장작과 돌에서 염초를 걸러 화약을 만든다.',
     cost: { wood: 18, stone: 18, iron: 2, tools: 3 }, buildDays: 12, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'bu',
   },
   dock: {
-    id: 'dock', name: '부두', emoji: '⚓',
+    id: 'dock', name: '부두',
     desc: '부(府) 승격 후 강가에 짓는 대형 교역 거점. 장터 교역 규모가 커지고 상단 회전이 빨라진다.',
     cost: { wood: 24, stone: 12, iron: 2, tools: 3 }, buildDays: 12, slots: 4, capacity: 0, defense: 0,
     winterBonus: false, placement: 'riverbank', unique: true, minRank: 'bu',
   },
   tannery: {
-    id: 'tannery', name: '가죽공방', emoji: '🧵',
+    id: 'tannery', name: '가죽공방',
     desc: '가죽을 손질해 방한 성능이 좋은 가죽옷을 만든다.',
     cost: { wood: 7, tools: 1 }, buildDays: 5, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   weavingHouse: {
-    id: 'weavingHouse', name: '베틀집', emoji: '🧶',
+    id: 'weavingHouse', name: '베틀집',
     desc: '목화를 무명옷으로 짜는 작업장.',
     cost: { wood: 14, tools: 2 }, buildDays: 8, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'bo',
   },
   beacon: {
-    id: 'beacon', name: '봉수대', emoji: '🗻',
+    id: 'beacon', name: '봉수대',
     desc: '습격 조기 경보 확률이 크게 오르고, 습격 시 경보 대응이 가능해진다.',
     cost: { wood: 5, stone: 11 }, buildDays: 8, slots: 1, capacity: 0, defense: 4,
     winterBonus: false, placement: 'land', unique: true,
   },
   palisade: {
-    id: 'palisade', name: '목책', emoji: '🚧',
+    id: 'palisade', name: '목책',
     desc: '통나무 방책 한 구간. 방어도 +3. 여러 개 지을 수 있다.',
     cost: { wood: 4 }, buildDays: 2, slots: 0, capacity: 0, defense: 3,
     winterBonus: false, placement: 'land', unique: false,
   },
   earthFort: {
-    id: 'earthFort', name: '토성', emoji: '🧱',
+    id: 'earthFort', name: '토성',
     desc: '진(鎭) 승격 후 건설. 목책보다 튼튼한 흙 성벽 구간. 방어도 +9.',
     cost: { wood: 8, stone: 8 }, buildDays: 5, slots: 0, capacity: 0, defense: 9,
     winterBonus: false, placement: 'land', unique: false, minRank: 'jin',
   },
   stoneWall: {
-    id: 'stoneWall', name: '석벽', emoji: '🧱',
+    id: 'stoneWall', name: '석벽',
     desc: '부(府) 승격 후 건설. 토성보다 더 단단한 석조 방어 구간. 방어도 +16.',
     cost: { stone: 10, iron: 1, tools: 1 }, buildDays: 6, slots: 0, capacity: 0, defense: 16,
     winterBonus: false, placement: 'land', unique: false, minRank: 'bu',
   },
   gate: {
-    id: 'gate', name: '성문', emoji: '🚪',
+    id: 'gate', name: '성문',
     desc: '성벽 사이의 출입구. 주민은 드나들 수 있지만 습격자는 막힌다.',
     cost: { wood: 5 }, buildDays: 2, slots: 0, capacity: 0, defense: 2,
     winterBonus: false, placement: 'land', unique: false,
   },
   watchtower: {
-    id: 'watchtower', name: '망루', emoji: '🗼',
+    id: 'watchtower', name: '망루',
     desc: '방어도 +8, 조기 경보 확률 증가.',
     cost: { wood: 9, stone: 2 }, buildDays: 6, slots: 2, capacity: 0, defense: 8,
     winterBonus: false, placement: 'land', unique: false,
   },
   garrison: {
-    id: 'garrison', name: '군영', emoji: '⛺',
+    id: 'garrison', name: '군영',
     desc: '방어도 +25. 수비병의 방어 기여가 커진다. 승리 조건에 필요하다.',
     cost: { wood: 18, stone: 9, iron: 4 }, buildDays: 14, slots: 6, capacity: 0, defense: 25,
     winterBonus: false, placement: 'land', unique: true,
   },
   office: {
-    id: 'office', name: '관청', emoji: '📜',
+    id: 'office', name: '관청',
     desc: '부(府) 승격 후 건설. 아전이 행정을 맡으면 자원 수집과 생산 효율이 높아진다.',
     cost: { wood: 24, stone: 24, iron: 2, tools: 4 }, buildDays: 14, slots: 4, capacity: 0, defense: 6,
     winterBonus: false, placement: 'land', unique: true, minRank: 'bu',
   },
   market: {
-    id: 'market', name: '장터', emoji: '🏮',
+    id: 'market', name: '장터',
     desc: '북방 세력과의 교역이 열리고, 습격 시 협상을 시도할 수 있다.',
     cost: { wood: 11, stone: 4 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: true,
   },
   cemetery: {
-    id: 'cemetery', name: '묘지', emoji: '🪦',
+    id: 'cemetery', name: '묘지',
     desc: '세상을 떠난 이들을 안장한다. 장의사가 시신을 수습해 묻으면 마을이 위로를 얻고, 시신을 방치하면 민심이 상한다.',
     cost: { wood: 4, stone: 6 }, buildDays: 4, slots: 1, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   school: {
-    id: 'school', name: '서당', emoji: '📖',
+    id: 'school', name: '서당',
     desc: '훈장이 아이들에게 글을 가르친다. 진(鎭)쯤 되는 고을의 주민들은 글 배울 곳을 바란다.',
     cost: { wood: 10, stone: 4, tools: 1 }, buildDays: 8, slots: 1, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: true, minRank: 'jin',
   },
   shrine: {
-    id: 'shrine', name: '당집', emoji: '🎐',
+    id: 'shrine', name: '당집',
     desc: '마을의 안녕을 비는 무속의 당. 떠돌이 무당이 마을에 들어와야 지을 수 있다.',
     cost: { wood: 8, stone: 2, hide: 2 }, buildDays: 6, slots: 1, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: true, minRank: 'jin',
   },
   hermitage: {
-    id: 'hermitage', name: '암자', emoji: '🕯️',
+    id: 'hermitage', name: '암자',
     desc: '명복을 빌고 상례를 돕는 작은 절. 노승이 마을에 의탁해야 지을 수 있다.',
     cost: { wood: 10, stone: 6 }, buildDays: 8, slots: 1, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: true, minRank: 'jin',
   },
   cannonEmplacement: {
-    id: 'cannonEmplacement', name: '불랑기포대', emoji: '💥',
+    id: 'cannonEmplacement', name: '불랑기포대',
     desc: '조정이 하사한 불랑기포를 얹은 포대. 방어도 +40, 화약이 있으면 전투 방어가 크게 오른다 (교전마다 화약 소모). 부(府) 승격 후 조정 청원으로만 받을 수 있다.',
     cost: { wood: 6, stone: 10 }, buildDays: 6, slots: 1, capacity: 0, defense: 40,
     winterBonus: false, placement: 'land', unique: false,
@@ -328,20 +328,27 @@ export function buildingFootprintDims(building: Pick<Building, 'type' | 'w' | 'h
   return { w: size, h: size };
 }
 
-export function plotArea(building: Pick<Building, 'type' | 'w' | 'h'>): number {
-  const { w, h } = buildingFootprintDims(building);
+type OperationalAreaBuilding = Pick<Building, 'type' | 'w' | 'h'> & Partial<Pick<Building, 'expansion'>>;
+
+export function plotArea(building: OperationalAreaBuilding): number {
+  const expansion = building.expansion?.kind === 'footprint' ? building.expansion : null;
+  const { w, h } = expansion
+    ? expansion.fromArea
+    : buildingFootprintDims(building);
   return w * h;
 }
 
 export function cemeteryPlotCapacity(
-  building: Pick<Building, 'type' | 'w' | 'h'>,
+  building: OperationalAreaBuilding,
 ): number {
   if (building.type !== 'cemetery') return 0;
   return plotArea(building) * CONFIG.funeral.plotsPerTile;
 }
 
 // 경작지의 파종 칸 수 — 구버전 세이브(sownArea 없음)는 자라던 밭이면 전체 파종으로 본다
-export function sownAreaOf(farm: Pick<Building, 'type' | 'w' | 'h' | 'sownArea' | 'fieldGrowth'>): number {
+export function sownAreaOf(
+  farm: Pick<Building, 'type' | 'w' | 'h' | 'sownArea' | 'fieldGrowth'> & Partial<Pick<Building, 'expansion'>>,
+): number {
   const area = plotArea(farm);
   const raw = typeof farm.sownArea === 'number' && Number.isFinite(farm.sownArea)
     ? farm.sownArea

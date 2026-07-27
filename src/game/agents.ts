@@ -5,7 +5,7 @@ import {
   DAY_BANDS, DAY_CYCLE_SUBTICKS, WORK_RATE_SCALE, WORK_SUBTICKS, dayBandOf,
 } from './dayCycle';
 import {
-  BUILDING_DEFS, cemeteryPlotCapacity, footprintTilesOf, isSmithyProductUnlocked, officeEfficiencyMultiplier,
+  BUILDING_DEFS, cemeteryPlotCapacity, footprintTilesOf, isPlotBuildingType, isSmithyProductUnlocked, officeEfficiencyMultiplier,
   plotArea, SMITHY_PRODUCT_DEFS, smithyProductOf, sownAreaOf,
 } from './buildings';
 import { JOB_NAMES, RESOURCE_NAMES } from './constants';
@@ -1188,6 +1188,11 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
   const p = CONFIG.production;
   const f = CONFIG.farming;
+  const construction = farmerConstructionTarget(state, r);
+  if (construction) {
+    constructionWorkerTick(state, r, ctx, construction);
+    return;
+  }
   const farm = assignedBuildingForResident(state, r);
 
   if (!farm || (farm.type !== 'field' && farm.type !== 'paddy') || !isResidentInAssignedSlot(state, r, farm)) {
@@ -1311,27 +1316,46 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 }
 
-function builderTarget(state: GameState, r: Resident): Building | null {
-  const sites = state.buildings.filter(b => !b.built);
+function isConstructionForJob(building: Building, job: 'farmer' | 'builder'): boolean {
+  if (building.repairing) return job === 'builder';
+  const requiredJob = isPlotBuildingType(building.type) ? 'farmer' : 'builder';
+  return requiredJob === job && (!building.built || building.expansion != null);
+}
+
+function constructionTarget(state: GameState, r: Resident, job: 'farmer' | 'builder'): Building | null {
+  const sites = state.buildings.filter(building => isConstructionForJob(building, job));
   const repairs = sites.filter(b => b.repairing);
   return nearestBuilding(r, repairs.length > 0 ? repairs : sites);
 }
 
-function builderTick(state: GameState, r: Resident, ctx: Ctx): void {
-  const target = builderTarget(state, r);
-  if (!target) {
-    r.phase = 'rest';
-    loiterNearCenter(state, r, ctx, '지을 것 없음');
-    return;
-  }
+function builderTarget(state: GameState, r: Resident): Building | null {
+  return constructionTarget(state, r, 'builder');
+}
+
+function farmerConstructionTarget(state: GameState, r: Resident): Building | null {
+  return constructionTarget(state, r, 'farmer');
+}
+
+function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target: Building): void {
+  const expansion = target.expansion;
+  const def = BUILDING_DEFS[target.type];
   const st = goTo(state, r, ctx, buildingGoal(state, target.id));
   if (st === 'arrived') {
     r.phase = 'working';
-    r.task = target.repairing ? '건물 수리 중' : '건설 중';
-    const def = BUILDING_DEFS[target.type];
-    target.progress += CONFIG.agents.work.buildPerSubtick * effOf(r) * ctx.tMod *
+    r.task = expansion ? '영역 확장 중' : target.repairing ? '건물 수리 중' : '건설 중';
+    const work = CONFIG.agents.work.buildPerSubtick * effOf(r) * ctx.tMod *
       Math.max(0.5, ctx.outdoor) * WORK_RATE_SCALE;
     gainSkillTick(r);
+    if (expansion) {
+      expansion.progress += work;
+      if (expansion.progress >= expansion.required) {
+        delete target.expansion;
+        addLog(state, `${def.name} 영역 확장이 끝났습니다.`, 'good', true);
+      }
+      return;
+    }
+
+    target.progress += work;
     if (target.progress >= def.buildDays) {
       const repaired = target.repairing === true;
       target.progress = def.buildDays;
@@ -1359,6 +1383,16 @@ function builderTick(state: GameState, r: Resident, ctx: Ctx): void {
     r.phase = 'toWork';
     r.task = st === 'stuck' ? '길이 막힘' : '공사장으로 이동';
   }
+}
+
+function builderTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const target = builderTarget(state, r);
+  if (!target) {
+    r.phase = 'rest';
+    loiterNearCenter(state, r, ctx, '지을 것 없음');
+    return;
+  }
+  constructionWorkerTick(state, r, ctx, target);
 }
 
 const HAUL_PRIORITY: ResourceId[] = [
@@ -2549,8 +2583,10 @@ function dawnCommutePlan(state: GameState, r: Resident): DawnCommutePlan | null 
     };
   }
 
-  if (r.job === 'builder') {
-    const target = builderTarget(state, r);
+  if (r.job === 'builder' || r.job === 'farmer') {
+    const target = r.job === 'builder'
+      ? builderTarget(state, r)
+      : farmerConstructionTarget(state, r);
     if (target) {
       return {
         phase: 'toWork',

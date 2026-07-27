@@ -10,13 +10,6 @@ export const DAY_BAND_NAMES: Readonly<Record<DayBand, string>> = {
   night: '밤',
 };
 
-export const DAY_BAND_ICONS: Readonly<Record<DayBand, string>> = {
-  dawn: '🌅',
-  work: '☀️',
-  evening: '🌇',
-  night: '🌙',
-};
-
 // dayBandOf는 범위 밖에서 throw하는 계약 — UI는 어떤 subTick이 와도 그리긴 해야 하므로
 // 정수화·클램프 후 조회한다 (런타임이 아직 8서브틱인 M1-BE 이전 구간 포함).
 export function uiDayBand(subTick: number): DayBand {

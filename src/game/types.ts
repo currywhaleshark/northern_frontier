@@ -427,6 +427,15 @@ export interface PastureArea {
   h: number;
 }
 
+export interface BuildingExpansion {
+  kind: 'footprint' | 'pasture';
+  fromArea: PastureArea;
+  targetArea: PastureArea;
+  progress: number;
+  required: number;
+  addedTiles: number;
+}
+
 export interface Building {
   id: number;
   type: BuildingTypeId;
@@ -446,6 +455,7 @@ export interface Building {
   fermentBatches?: FermentBatch[]; // 장독대 전용: 절대일 기준 숙성 배치
   livestock?: LivestockState; // 축사 전용: 축종·마릿수·번식·사료 부족 상태
   pasture?: PastureArea; // 축사 전용: 완공 후 지정하는 인접 방목 영역
+  expansion?: BuildingExpansion; // 완공된 영역형 건물의 확장 공사
   graves?: number; // 묘역 전용: 안장된 묘 수 (한 타일의 2×2 소구획에 최대 4기)
   burialRecords?: BurialRecord[]; // 묘지 전용: 이름·사인·사망일을 보존하는 안치 기록
   inventory?: Partial<Record<ResourceId, number>>; // 운반 전 생산지 현장 재고
@@ -461,7 +471,6 @@ export interface FermentBatch {
 export interface BuildingDef {
   id: BuildingTypeId;
   name: string;
-  emoji: string;
   desc: string;
   cost: Partial<Record<ResourceId, number>>;
   buildDays: number;        // 필요한 총 건축가-일수

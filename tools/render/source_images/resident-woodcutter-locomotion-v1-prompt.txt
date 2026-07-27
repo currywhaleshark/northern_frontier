@@ -1,0 +1,7 @@
+Create an exact 2-row by 4-column pixel-art sprite sheet for the Northern Frontier woodcutter characters. Match the existing 16-bit RPG pixel style, 3/4 view from slightly above, right-facing direction, proportions, and original clothing palette.
+
+The top row is one consistent adult male wearing a charcoal gray-olive upper tunic, gray-beige wraps and headcloth, and warm brown trousers. The bottom row is one consistent adult female wearing a muted moss/olive upper jacket, long warm brown skirt, and gray-beige headcloth. The woodcutter's hand axe must remain clearly visible in every cell.
+
+Column 1 is a stationary neutral idle holding the axe safely down at the side. Column 2 is a grounded contact stride. Column 3 is a feet-together passing pose. Column 4 is the opposite-foot toe-off pose: one foot supports the body while the other bends backward with the boot visibly lifted off the ground. During walking the axe stays safely held close to the body and never becomes a chopping or attack pose. The walk reads as a 2-3-4-3 loop.
+
+Keep character identity, clothes, axe, pixel scale, and bounding box consistent within each row. The entire worker and axe must fit inside every cell with safe margin on all sides. No jige, load, timber, tree, stump, chips, shadow, text, labels, UI, scenery, or extra props. Exactly eight cells with no borders. Background is solid flat #FF00FF.

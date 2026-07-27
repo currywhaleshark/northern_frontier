@@ -36,7 +36,10 @@ import type {
   YouthActivity,
 } from '../game/types';
 import { ActionPopup } from './ActionPopup';
+import { BuildingIcon } from './BuildingIcon';
 import { ForeignSitePanel } from './ForeignSitePanel';
+import { LivestockIcon } from './LivestockIcon';
+import { UiIcon } from './UiIcon';
 
 interface Props {
   state: GameState;
@@ -53,6 +56,7 @@ interface Props {
   onSetLivestockSpecies: (buildingId: number, species: LivestockId) => void;
   onSlaughterLivestock: (buildingId: number, amount: number) => void;
   onDefinePasture: (buildingId: number) => void;
+  onExpandArea: (buildingId: number) => void;
   onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
   onConvertFieldToPaddy: (buildingId: number) => void;
   onSetPlotPlowOxen: (buildingId: number, count: number) => void;
@@ -95,7 +99,7 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
   return (
     <table className="insp-table">
       <tbody>
-        <tr><td>이름</td><td>{resident.name} ({resident.age}세){resident.literate ? <span title="문해자 — 의원·아전·훈장을 맡을 수 있고 숙련이 빨리 오릅니다"> 📖</span> : ''}{resident.sick ? ' 🤒' : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</td></tr>
+        <tr><td>이름</td><td>{resident.name} ({resident.age}세){resident.literate ? <span title="문해자 — 의원·아전·훈장을 맡을 수 있고 숙련이 빨리 오릅니다"> <UiIcon name="literate" size={18} /></span> : ''}{resident.sick ? <span title="환자"> <UiIcon name="sick" size={18} /></span> : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</td></tr>
         {resident.origin && <tr><td>출신</td><td>{resident.origin}</td></tr>}
         {resident.spouseId != null && (
           <tr><td>배우자</td><td>{familyReferenceName(state, resident.spouseId, undefined)}</td></tr>
@@ -155,7 +159,7 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
             <td className="special-skill-cell">
               {specialResidentSkills(resident.special).map(skill => (
                 <span key={skill.id} className="special-skill-chip" title={skill.effect}>
-                  <span aria-hidden="true">{skill.icon}</span> {skill.name}
+                  <UiIcon name={skill.icon} size={18} /> {skill.name}
                 </span>
               ))}
             </td>
@@ -183,7 +187,7 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
           <tr>
             <td>운반 장비</td>
             <td>
-              <span>{resident.cartEquipped ? `🛒 수레 · 적재 ${haulerCarryCapacity(resident)}` : `지게 · 적재 ${haulerCarryCapacity(resident)}`}</span>{' '}
+              <span>{resident.cartEquipped && <><UiIcon name="cart" size={20} /> </>}{resident.cartEquipped ? '수레' : '지게'} · 적재 {haulerCarryCapacity(resident)}</span>{' '}
               <button
                 type="button"
                 className="btn small"
@@ -214,7 +218,7 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
           <tr>
             <td>주거</td>
             <td>{home
-              ? `${BUILDING_DEFS[home.type].emoji} ${BUILDING_DEFS[home.type].name} (${home.x}, ${home.y})`
+              ? <><BuildingIcon type={home.type} size={22} /> {BUILDING_DEFS[home.type].name} ({home.x}, {home.y})</>
               : '노숙'}</td>
           </tr>
         )}
@@ -254,6 +258,7 @@ export function SelectionContextBar({
   onSetLivestockSpecies,
   onSlaughterLivestock,
   onDefinePasture,
+  onExpandArea,
   onSetBuildingCrop,
   onConvertFieldToPaddy,
   onSetPlotPlowOxen,
@@ -315,13 +320,13 @@ export function SelectionContextBar({
   const title = foreignSite
     ? foreignSite.name
     : building
-      ? `${BUILDING_DEFS[building.type].emoji} ${BUILDING_DEFS[building.type].name}`
+      ? BUILDING_DEFS[building.type].name
       : explored ? TERRAIN_NAMES[tile.terrain] : '미답사 지역';
 
   return (
     <section className="selection-context-bar" aria-label={`${title} 선택 정보`}>
       <header className="selection-context-head">
-        <div><strong>{title}</strong><span>({tile.x}, {tile.y})</span></div>
+        <div><strong>{building && <><BuildingIcon type={building.type} size={24} /> </>}{title}</strong><span>({tile.x}, {tile.y})</span></div>
         <button type="button" aria-label="선택 해제" title="선택 해제" onClick={onClear}>×</button>
       </header>
       <div className="selection-context-body">
@@ -385,7 +390,7 @@ export function SelectionContextBar({
                       )}
                       {tile.terrain === 'forest' && state.habitats.some(habitat =>
                         habitat.active && (habitat.x - tile.x) ** 2 + (habitat.y - tile.y) ** 2 <= habitat.radius ** 2) && (
-                        <tr><td>서식지</td><td>🐾 짐승 서식지 범위 (사냥 가능)</td></tr>
+                        <tr><td>서식지</td><td><UiIcon name="habitat" size={20} /> 짐승 서식지 범위 (사냥 가능)</td></tr>
                       )}
                       {building && (() => {
                         const def = BUILDING_DEFS[building.type];
@@ -396,9 +401,11 @@ export function SelectionContextBar({
                           : null;
                         return (
                           <>
-                            <tr><td>건물</td><td>{def.emoji} {def.name}</td></tr>
+                            <tr><td>건물</td><td><BuildingIcon type={building.type} size={22} /> {def.name}</td></tr>
                             <tr><td>상태</td><td>{building.built
-                              ? '완공'
+                              ? building.expansion
+                                ? `영역 확장 중 ${Math.floor((building.expansion.progress / Math.max(1, building.expansion.required)) * 100)}% · ${building.type === 'field' || building.type === 'paddy' ? '농부' : '건축가'}`
+                                : '완공'
                               : `${building.repairing ? '수리 중' : '건설 중'} ${Math.floor((building.progress / Math.max(1, def.buildDays)) * 100)}%`}</td></tr>
                             {def.capacity > 0 && (
                               <tr><td>입주</td><td>{occupants.length}/{building.built ? def.capacity : 0}명</td></tr>
@@ -452,7 +459,7 @@ export function SelectionContextBar({
                               const feedNeed = livestockDailyFeedNeed(livestock, seasonalGrazer ? 'winter' : season);
                               return (
                                 <>
-                                  <tr><td>축종</td><td>{LIVESTOCK_DEFS[livestock.species].icon} {LIVESTOCK_DEFS[livestock.species].name}</td></tr>
+                                  <tr><td>축종</td><td><LivestockIcon species={livestock.species} size={20} /> {LIVESTOCK_DEFS[livestock.species].name}</td></tr>
                                   <tr><td>마릿수</td><td>{livestock.headcount}/{livestockCapacityForStable(building, livestock.species)}마리</td></tr>
                                   <tr>
                                     <td>방목지</td>
@@ -546,6 +553,7 @@ export function SelectionContextBar({
                 onSetLivestockSpecies={onSetLivestockSpecies}
                 onSlaughterLivestock={onSlaughterLivestock}
                 onDefinePasture={onDefinePasture}
+                onExpandArea={onExpandArea}
                 onSetBuildingCrop={onSetBuildingCrop}
                 onConvertFieldToPaddy={onConvertFieldToPaddy}
                 onSetPlotPlowOxen={onSetPlotPlowOxen}

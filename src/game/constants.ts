@@ -26,11 +26,6 @@ export const WEATHER_NAMES: Record<WeatherId, string> = {
   blizzard: '눈보라', coldSnap: '혹한', thawFlood: '해빙기 홍수',
 };
 
-export const WEATHER_ICONS: Record<WeatherId, string> = {
-  clear: '☀️', rain: '🌧️', frost: '🌫️', heavySnow: '🌨️',
-  blizzard: '🌬️', coldSnap: '🥶', thawFlood: '🌊',
-};
-
 export const TERRAIN_NAMES: Record<Terrain, string> = {
   forest: '숲', plain: '평지', river: '강', mountain: '산지',
   fertile: '비옥한 땅', rock: '바위/철광', center: '마을 터',
@@ -123,10 +118,6 @@ export const JOB_COLORS: Record<JobId, string> = {
 
 export const RESOURCE_NAMES = Object.fromEntries(
   Object.entries(RESOURCE_DEFS).map(([id, def]) => [id, def.name]),
-) as Record<ResourceId, string>;
-
-export const RESOURCE_ICONS = Object.fromEntries(
-  Object.entries(RESOURCE_DEFS).map(([id, def]) => [id, def.icon]),
 ) as Record<ResourceId, string>;
 
 export const RESOURCE_ORDER: ResourceId[] = CATALOG_RESOURCE_ORDER;

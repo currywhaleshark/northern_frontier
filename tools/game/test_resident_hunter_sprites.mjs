@@ -13,6 +13,7 @@ const assetOutput = ts.transpileModule(assetSource, {
 const assetModuleUrl = `data:text/javascript;base64,${Buffer.from(assetOutput).toString('base64')}`;
 const {
   RESIDENT_HUNTER_HUNT_SHEET,
+  RESIDENT_HUNTER_LOAD_HD_SHEET,
   RESIDENT_HUNTER_LOAD_SHEET,
   RESIDENT_HUNTER_LOCOMOTION_SHEET,
   hunterHuntPoseIndex,
@@ -37,11 +38,20 @@ assert.deepEqual(RESIDENT_HUNTER_LOCOMOTION_SHEET, {
   src: '/assets/resident-hunter-locomotion-v1.png',
 });
 assert.deepEqual(RESIDENT_HUNTER_LOAD_SHEET, {
-  frameSize: 40,
+  frameSize: 64,
+  displayFrameSize: 40,
   columns: 4,
   rows: 2,
-  frameDurationMs: 140,
-  src: '/assets/resident-hunter-load-v1.png',
+  frameDurationMs: 200,
+  src: '/assets/resident-hunter-load-v2.png',
+});
+assert.deepEqual(RESIDENT_HUNTER_LOAD_HD_SHEET, {
+  frameSize: 128,
+  displayFrameSize: 40,
+  columns: 4,
+  rows: 2,
+  frameDurationMs: 200,
+  src: '/assets/resident-hunter-load-hd-v2.png',
 });
 
 assert.deepEqual([0, 240, 480, 720, 960].map(hunterHuntPoseIndex), [0, 1, 1, 0, 0]);
@@ -53,12 +63,15 @@ assert.deepEqual(
   [0, 1, 0, 3, 0],
 );
 assert.deepEqual(hunterLocomotionSourceRect('female', true, 280), { sx: 0, sy: 40, sw: 40, sh: 40 });
-assert.deepEqual(hunterLoadSourceRect('male', false, 280), { sx: 0, sy: 0, sw: 40, sh: 40 });
+assert.deepEqual(hunterLoadSourceRect('male', false, 280), { sx: 0, sy: 0, sw: 64, sh: 64 });
+assert.deepEqual(hunterLoadSourceRect('female', true, 400, true),
+  { sx: 256, sy: 128, sw: 128, sh: 128 });
 
 const dimensions = [
   ['resident-hunter-hunt-v1.png', 80, 80],
   ['resident-hunter-locomotion-v1.png', 160, 80],
-  ['resident-hunter-load-v1.png', 160, 80],
+  ['resident-hunter-load-v2.png', 256, 128],
+  ['resident-hunter-load-hd-v2.png', 512, 256],
 ];
 for (const [filename, width, height] of dimensions) {
   const png = readFileSync(new URL(`../../public/assets/${filename}`, import.meta.url));
