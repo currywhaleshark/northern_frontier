@@ -130,6 +130,17 @@ try {
     false,
     'the HD woodcutter work is optional presentation',
   );
+  assert.equal(
+    initialStates.find(asset => asset.src === '/assets/resident-approved-i2v-locomotion-v1.png')?.required,
+    false,
+    'approved profession locomotion is an optional presentation asset',
+  );
+  assert.equal(
+    initialStates.find(asset =>
+      asset.src === '/assets/resident-approved-i2v-locomotion-hd-v1.png')?.required,
+    false,
+    'approved HD profession locomotion is an optional presentation asset',
+  );
 
   const failedWorkSrc = '/assets/resident-woodcutter-work-v1.png';
   const lateHunterSrc = '/assets/resident-hunter-hunt-v1.png';
@@ -290,6 +301,42 @@ try {
     'a standing unemployed woman holds the first HD atlas frame',
   );
 
+  const approvedFarmerContext = drawContext();
+  atlas.atlasSprites.drawResident(approvedFarmerContext, residentParams({
+    job: 'farmer', moving: true, working: false, animationTimeMs: 260,
+  }));
+  assert.equal(
+    approvedFarmerContext.images[0],
+    FakeImage.bySrc.get('/assets/resident-approved-i2v-locomotion-v1.png'),
+    'an approved adult farmer uses the new standard I2V walk',
+  );
+  assert.deepEqual(
+    approvedFarmerContext.drawCalls[0].args.slice(0, 4),
+    [38, 42, 38, 42],
+    'the approved farmer samples the second variable-cell walk frame',
+  );
+
+  const approvedSpearContext = drawContext(2);
+  atlas.atlasSprites.drawResident(approvedSpearContext, residentParams({
+    job: 'militia', militiaWeapon: 'spears',
+    moving: true, working: false, animationTimeMs: 260,
+  }));
+  assert.equal(
+    approvedSpearContext.images[0],
+    FakeImage.bySrc.get('/assets/resident-approved-i2v-locomotion-hd-v1.png'),
+    'an approved spear militia resident uses the HD I2V source at 2x backing scale',
+  );
+  assert.deepEqual(
+    approvedSpearContext.drawCalls[0].args.slice(0, 4),
+    [68, 2472, 68, 88],
+    'the HD spear row keeps its expanded exact-2x source cell',
+  );
+  assert.deepEqual(
+    approvedSpearContext.drawCalls[0].args.slice(4),
+    [-17, -30, 34, 44],
+    'the expanded spear cell draws at logical size so the body is not shrunk',
+  );
+
   const youthWalkingContext = drawContext();
   atlas.atlasSprites.drawResident(youthWalkingContext, residentParams({
     job: 'idle', moving: true, working: false, stage: 'youth',
@@ -306,8 +353,19 @@ try {
   }));
   assert.equal(
     undertakerWalkingContext.images[0],
-    FakeImage.bySrc.get('/assets/resident-common-locomotion-v1.png'),
-    'adult new-content jobs can walk instead of remaining on their static portrait',
+    FakeImage.bySrc.get('/assets/resident-approved-i2v-locomotion-v1.png'),
+    'an approved undertaker uses the selected I2V walk',
+  );
+
+  const sayakaWalkingContext = drawContext(2);
+  atlas.atlasSprites.drawResident(sayakaWalkingContext, residentParams({
+    job: 'militia', militiaWeapon: 'muskets', special: 'hangwae',
+    moving: true, working: false,
+  }));
+  assert.equal(
+    sayakaWalkingContext.images[0],
+    FakeImage.bySrc.get('/assets/resident-approved-i2v-locomotion-hd-v1.png'),
+    'an approved named special resident uses the HD I2V walk before the static portrait',
   );
 
   FakeImage.bySrc = new Map();

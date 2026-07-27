@@ -1,0 +1,9209 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-runtime-variant-manifest",
+  "characterId": "resident-approved-i2v-locomotion-v1",
+  "engine": "component-row",
+  "game_input": "/assets/resident-approved-i2v-locomotion-v1.png",
+  "high_definition_game_input": "/assets/resident-approved-i2v-locomotion-hd-v1.png",
+  "degraded_static_fallback": false,
+  "display": {
+    "bodyHeight": 36,
+    "anchor": "feet-bottom-center",
+    "variableCells": true
+  },
+  "animation": {
+    "rows": {
+      "farmer_male_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "farmer_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "farmer_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "farmer_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "fisher_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "fisher_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "fisher_female_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "fisher_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "hauler_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "hauler_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "hauler_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "hauler_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "herbalist_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "herbalist_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "herbalist_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "herbalist_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "herder_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "herder_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "herder_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "herder_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "hunter_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "hunter_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "hunter_female_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "hunter_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_unarmed_male_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_unarmed_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_unarmed_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_unarmed_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_spear_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_spear_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_spear_female_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_spear_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_horn_bow_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_horn_bow_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_horn_bow_female_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_horn_bow_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_musket_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_musket_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_musket_female_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "militia_musket_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "wood_splitter_male_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "wood_splitter_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "wood_splitter_female_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "wood_splitter_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "miller_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "miller_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "miller_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "miller_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "builder_male_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "builder_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "builder_female_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "builder_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "physician_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "physician_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "physician_female_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "physician_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "curer_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "curer_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "curer_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "curer_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "potter_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "potter_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "potter_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "potter_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "smith_male_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "smith_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "smith_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "smith_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "miner_male_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "miner_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "miner_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "miner_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "charcoal_burner_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "charcoal_burner_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "charcoal_burner_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "charcoal_burner_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "tanner_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "tanner_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "tanner_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "tanner_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "weaver_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "weaver_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "weaver_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "weaver_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "powder_maker_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "powder_maker_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "powder_maker_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "powder_maker_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "clerk_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "clerk_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "clerk_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "clerk_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "watchman_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "watchman_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "watchman_female_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "watchman_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "undertaker_male_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "undertaker_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "undertaker_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "undertaker_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "teacher_male_idle": {
+        "row": 0,
+        "frames": 5,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "teacher_male_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "teacher_female_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "teacher_female_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "shaman_named_wolhyang_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "shaman_named_wolhyang_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "monk_named_haeun_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "monk_named_haeun_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "exiled_scholar_yun_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "exiled_scholar_yun_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "jurchen_warrior_aragae_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "jurchen_warrior_aragae_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "tiger_hunter_bakdolgae_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "tiger_hunter_bakdolgae_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "geomancer_heosaeng_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "geomancer_heosaeng_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "uinyeo_dansim_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "uinyeo_dansim_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "runaway_smith_maksoe_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "runaway_smith_maksoe_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "interpreter_baesugyeom_idle": {
+        "row": 0,
+        "frames": 3,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "interpreter_baesugyeom_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "hangwae_sayaka_idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "hangwae_sayaka_walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      }
+    }
+  },
+  "frame_layout": {
+    "sheetWidth": 160,
+    "sheetHeight": 5264,
+    "cellWidth": 40,
+    "cellHeight": 48,
+    "row_cells": {
+      "farmer_male_idle": {
+        "width": 38,
+        "height": 42
+      },
+      "farmer_male_walk": {
+        "width": 38,
+        "height": 42
+      },
+      "farmer_female_idle": {
+        "width": 36,
+        "height": 42
+      },
+      "farmer_female_walk": {
+        "width": 36,
+        "height": 42
+      },
+      "fisher_male_idle": {
+        "width": 36,
+        "height": 42
+      },
+      "fisher_male_walk": {
+        "width": 36,
+        "height": 42
+      },
+      "fisher_female_idle": {
+        "width": 30,
+        "height": 42
+      },
+      "fisher_female_walk": {
+        "width": 30,
+        "height": 42
+      },
+      "hauler_male_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "hauler_male_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "hauler_female_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "hauler_female_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "herbalist_male_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "herbalist_male_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "herbalist_female_idle": {
+        "width": 32,
+        "height": 42
+      },
+      "herbalist_female_walk": {
+        "width": 32,
+        "height": 42
+      },
+      "herder_male_idle": {
+        "width": 36,
+        "height": 42
+      },
+      "herder_male_walk": {
+        "width": 36,
+        "height": 42
+      },
+      "herder_female_idle": {
+        "width": 30,
+        "height": 42
+      },
+      "herder_female_walk": {
+        "width": 30,
+        "height": 42
+      },
+      "hunter_male_idle": {
+        "width": 30,
+        "height": 42
+      },
+      "hunter_male_walk": {
+        "width": 30,
+        "height": 42
+      },
+      "hunter_female_idle": {
+        "width": 30,
+        "height": 42
+      },
+      "hunter_female_walk": {
+        "width": 30,
+        "height": 42
+      },
+      "militia_unarmed_male_idle": {
+        "width": 28,
+        "height": 48
+      },
+      "militia_unarmed_male_walk": {
+        "width": 28,
+        "height": 48
+      },
+      "militia_unarmed_female_idle": {
+        "width": 28,
+        "height": 44
+      },
+      "militia_unarmed_female_walk": {
+        "width": 28,
+        "height": 44
+      },
+      "militia_spear_male_idle": {
+        "width": 34,
+        "height": 44
+      },
+      "militia_spear_male_walk": {
+        "width": 34,
+        "height": 44
+      },
+      "militia_spear_female_idle": {
+        "width": 28,
+        "height": 46
+      },
+      "militia_spear_female_walk": {
+        "width": 28,
+        "height": 46
+      },
+      "militia_horn_bow_male_idle": {
+        "width": 30,
+        "height": 42
+      },
+      "militia_horn_bow_male_walk": {
+        "width": 30,
+        "height": 42
+      },
+      "militia_horn_bow_female_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "militia_horn_bow_female_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "militia_musket_male_idle": {
+        "width": 30,
+        "height": 42
+      },
+      "militia_musket_male_walk": {
+        "width": 30,
+        "height": 42
+      },
+      "militia_musket_female_idle": {
+        "width": 30,
+        "height": 42
+      },
+      "militia_musket_female_walk": {
+        "width": 30,
+        "height": 42
+      },
+      "wood_splitter_male_idle": {
+        "width": 40,
+        "height": 42
+      },
+      "wood_splitter_male_walk": {
+        "width": 40,
+        "height": 42
+      },
+      "wood_splitter_female_idle": {
+        "width": 36,
+        "height": 42
+      },
+      "wood_splitter_female_walk": {
+        "width": 36,
+        "height": 42
+      },
+      "miller_male_idle": {
+        "width": 38,
+        "height": 42
+      },
+      "miller_male_walk": {
+        "width": 38,
+        "height": 42
+      },
+      "miller_female_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "miller_female_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "builder_male_idle": {
+        "width": 36,
+        "height": 42
+      },
+      "builder_male_walk": {
+        "width": 36,
+        "height": 42
+      },
+      "builder_female_idle": {
+        "width": 36,
+        "height": 42
+      },
+      "builder_female_walk": {
+        "width": 36,
+        "height": 42
+      },
+      "physician_male_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "physician_male_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "physician_female_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "physician_female_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "curer_male_idle": {
+        "width": 32,
+        "height": 42
+      },
+      "curer_male_walk": {
+        "width": 32,
+        "height": 42
+      },
+      "curer_female_idle": {
+        "width": 32,
+        "height": 42
+      },
+      "curer_female_walk": {
+        "width": 32,
+        "height": 42
+      },
+      "potter_male_idle": {
+        "width": 32,
+        "height": 42
+      },
+      "potter_male_walk": {
+        "width": 32,
+        "height": 42
+      },
+      "potter_female_idle": {
+        "width": 32,
+        "height": 42
+      },
+      "potter_female_walk": {
+        "width": 32,
+        "height": 42
+      },
+      "smith_male_idle": {
+        "width": 40,
+        "height": 42
+      },
+      "smith_male_walk": {
+        "width": 40,
+        "height": 42
+      },
+      "smith_female_idle": {
+        "width": 32,
+        "height": 42
+      },
+      "smith_female_walk": {
+        "width": 32,
+        "height": 42
+      },
+      "miner_male_idle": {
+        "width": 40,
+        "height": 44
+      },
+      "miner_male_walk": {
+        "width": 40,
+        "height": 44
+      },
+      "miner_female_idle": {
+        "width": 38,
+        "height": 42
+      },
+      "miner_female_walk": {
+        "width": 38,
+        "height": 42
+      },
+      "charcoal_burner_male_idle": {
+        "width": 34,
+        "height": 42
+      },
+      "charcoal_burner_male_walk": {
+        "width": 34,
+        "height": 42
+      },
+      "charcoal_burner_female_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "charcoal_burner_female_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "tanner_male_idle": {
+        "width": 30,
+        "height": 42
+      },
+      "tanner_male_walk": {
+        "width": 30,
+        "height": 42
+      },
+      "tanner_female_idle": {
+        "width": 30,
+        "height": 42
+      },
+      "tanner_female_walk": {
+        "width": 30,
+        "height": 42
+      },
+      "weaver_male_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "weaver_male_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "weaver_female_idle": {
+        "width": 30,
+        "height": 42
+      },
+      "weaver_female_walk": {
+        "width": 30,
+        "height": 42
+      },
+      "powder_maker_male_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "powder_maker_male_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "powder_maker_female_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "powder_maker_female_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "clerk_male_idle": {
+        "width": 32,
+        "height": 42
+      },
+      "clerk_male_walk": {
+        "width": 32,
+        "height": 42
+      },
+      "clerk_female_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "clerk_female_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "watchman_male_idle": {
+        "width": 28,
+        "height": 44
+      },
+      "watchman_male_walk": {
+        "width": 28,
+        "height": 44
+      },
+      "watchman_female_idle": {
+        "width": 28,
+        "height": 44
+      },
+      "watchman_female_walk": {
+        "width": 28,
+        "height": 44
+      },
+      "undertaker_male_idle": {
+        "width": 38,
+        "height": 42
+      },
+      "undertaker_male_walk": {
+        "width": 38,
+        "height": 42
+      },
+      "undertaker_female_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "undertaker_female_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "teacher_male_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "teacher_male_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "teacher_female_idle": {
+        "width": 30,
+        "height": 42
+      },
+      "teacher_female_walk": {
+        "width": 30,
+        "height": 42
+      },
+      "shaman_named_wolhyang_idle": {
+        "width": 32,
+        "height": 42
+      },
+      "shaman_named_wolhyang_walk": {
+        "width": 32,
+        "height": 42
+      },
+      "monk_named_haeun_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "monk_named_haeun_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "exiled_scholar_yun_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "exiled_scholar_yun_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "jurchen_warrior_aragae_idle": {
+        "width": 28,
+        "height": 48
+      },
+      "jurchen_warrior_aragae_walk": {
+        "width": 28,
+        "height": 48
+      },
+      "tiger_hunter_bakdolgae_idle": {
+        "width": 28,
+        "height": 44
+      },
+      "tiger_hunter_bakdolgae_walk": {
+        "width": 28,
+        "height": 44
+      },
+      "geomancer_heosaeng_idle": {
+        "width": 32,
+        "height": 42
+      },
+      "geomancer_heosaeng_walk": {
+        "width": 32,
+        "height": 42
+      },
+      "uinyeo_dansim_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "uinyeo_dansim_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "runaway_smith_maksoe_idle": {
+        "width": 30,
+        "height": 42
+      },
+      "runaway_smith_maksoe_walk": {
+        "width": 30,
+        "height": 42
+      },
+      "interpreter_baesugyeom_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "interpreter_baesugyeom_walk": {
+        "width": 28,
+        "height": 42
+      },
+      "hangwae_sayaka_idle": {
+        "width": 28,
+        "height": 42
+      },
+      "hangwae_sayaka_walk": {
+        "width": 28,
+        "height": 42
+      }
+    },
+    "rows": {
+      "farmer_male_idle": [
+        {
+          "x": 0,
+          "y": 0,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 38,
+          "y": 0,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 76,
+          "y": 0,
+          "w": 38,
+          "h": 42
+        }
+      ],
+      "farmer_male_walk": [
+        {
+          "x": 0,
+          "y": 42,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 38,
+          "y": 42,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 76,
+          "y": 42,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 114,
+          "y": 42,
+          "w": 38,
+          "h": 42
+        }
+      ],
+      "farmer_female_idle": [
+        {
+          "x": 0,
+          "y": 84,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 36,
+          "y": 84,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 72,
+          "y": 84,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 108,
+          "y": 84,
+          "w": 36,
+          "h": 42
+        }
+      ],
+      "farmer_female_walk": [
+        {
+          "x": 0,
+          "y": 126,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 36,
+          "y": 126,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 72,
+          "y": 126,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 108,
+          "y": 126,
+          "w": 36,
+          "h": 42
+        }
+      ],
+      "fisher_male_idle": [
+        {
+          "x": 0,
+          "y": 168,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 36,
+          "y": 168,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 72,
+          "y": 168,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 108,
+          "y": 168,
+          "w": 36,
+          "h": 42
+        }
+      ],
+      "fisher_male_walk": [
+        {
+          "x": 0,
+          "y": 210,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 36,
+          "y": 210,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 72,
+          "y": 210,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 108,
+          "y": 210,
+          "w": 36,
+          "h": 42
+        }
+      ],
+      "fisher_female_idle": [
+        {
+          "x": 0,
+          "y": 252,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 252,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 252,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "fisher_female_walk": [
+        {
+          "x": 0,
+          "y": 294,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 294,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 294,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 294,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "hauler_male_idle": [
+        {
+          "x": 0,
+          "y": 336,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 336,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 336,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 336,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "hauler_male_walk": [
+        {
+          "x": 0,
+          "y": 378,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 378,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 378,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 378,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "hauler_female_idle": [
+        {
+          "x": 0,
+          "y": 420,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 420,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 420,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 420,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "hauler_female_walk": [
+        {
+          "x": 0,
+          "y": 462,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 462,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 462,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 462,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "herbalist_male_idle": [
+        {
+          "x": 0,
+          "y": 504,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 504,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 504,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 504,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "herbalist_male_walk": [
+        {
+          "x": 0,
+          "y": 546,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 546,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 546,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 546,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "herbalist_female_idle": [
+        {
+          "x": 0,
+          "y": 588,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 588,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 588,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 588,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "herbalist_female_walk": [
+        {
+          "x": 0,
+          "y": 630,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 630,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 630,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 630,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "herder_male_idle": [
+        {
+          "x": 0,
+          "y": 672,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 36,
+          "y": 672,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 72,
+          "y": 672,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 108,
+          "y": 672,
+          "w": 36,
+          "h": 42
+        }
+      ],
+      "herder_male_walk": [
+        {
+          "x": 0,
+          "y": 714,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 36,
+          "y": 714,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 72,
+          "y": 714,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 108,
+          "y": 714,
+          "w": 36,
+          "h": 42
+        }
+      ],
+      "herder_female_idle": [
+        {
+          "x": 0,
+          "y": 756,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 756,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 756,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 756,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "herder_female_walk": [
+        {
+          "x": 0,
+          "y": 798,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 798,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 798,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 798,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "hunter_male_idle": [
+        {
+          "x": 0,
+          "y": 840,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 840,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 840,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 840,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "hunter_male_walk": [
+        {
+          "x": 0,
+          "y": 882,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 882,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 882,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 882,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "hunter_female_idle": [
+        {
+          "x": 0,
+          "y": 924,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 924,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 924,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "hunter_female_walk": [
+        {
+          "x": 0,
+          "y": 966,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 966,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 966,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 966,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "militia_unarmed_male_idle": [
+        {
+          "x": 0,
+          "y": 1008,
+          "w": 28,
+          "h": 48
+        },
+        {
+          "x": 28,
+          "y": 1008,
+          "w": 28,
+          "h": 48
+        },
+        {
+          "x": 56,
+          "y": 1008,
+          "w": 28,
+          "h": 48
+        }
+      ],
+      "militia_unarmed_male_walk": [
+        {
+          "x": 0,
+          "y": 1056,
+          "w": 28,
+          "h": 48
+        },
+        {
+          "x": 28,
+          "y": 1056,
+          "w": 28,
+          "h": 48
+        },
+        {
+          "x": 56,
+          "y": 1056,
+          "w": 28,
+          "h": 48
+        },
+        {
+          "x": 84,
+          "y": 1056,
+          "w": 28,
+          "h": 48
+        }
+      ],
+      "militia_unarmed_female_idle": [
+        {
+          "x": 0,
+          "y": 1104,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 28,
+          "y": 1104,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 56,
+          "y": 1104,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 84,
+          "y": 1104,
+          "w": 28,
+          "h": 44
+        }
+      ],
+      "militia_unarmed_female_walk": [
+        {
+          "x": 0,
+          "y": 1148,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 28,
+          "y": 1148,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 56,
+          "y": 1148,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 84,
+          "y": 1148,
+          "w": 28,
+          "h": 44
+        }
+      ],
+      "militia_spear_male_idle": [
+        {
+          "x": 0,
+          "y": 1192,
+          "w": 34,
+          "h": 44
+        },
+        {
+          "x": 34,
+          "y": 1192,
+          "w": 34,
+          "h": 44
+        },
+        {
+          "x": 68,
+          "y": 1192,
+          "w": 34,
+          "h": 44
+        },
+        {
+          "x": 102,
+          "y": 1192,
+          "w": 34,
+          "h": 44
+        }
+      ],
+      "militia_spear_male_walk": [
+        {
+          "x": 0,
+          "y": 1236,
+          "w": 34,
+          "h": 44
+        },
+        {
+          "x": 34,
+          "y": 1236,
+          "w": 34,
+          "h": 44
+        },
+        {
+          "x": 68,
+          "y": 1236,
+          "w": 34,
+          "h": 44
+        },
+        {
+          "x": 102,
+          "y": 1236,
+          "w": 34,
+          "h": 44
+        }
+      ],
+      "militia_spear_female_idle": [
+        {
+          "x": 0,
+          "y": 1280,
+          "w": 28,
+          "h": 46
+        },
+        {
+          "x": 28,
+          "y": 1280,
+          "w": 28,
+          "h": 46
+        },
+        {
+          "x": 56,
+          "y": 1280,
+          "w": 28,
+          "h": 46
+        }
+      ],
+      "militia_spear_female_walk": [
+        {
+          "x": 0,
+          "y": 1326,
+          "w": 28,
+          "h": 46
+        },
+        {
+          "x": 28,
+          "y": 1326,
+          "w": 28,
+          "h": 46
+        },
+        {
+          "x": 56,
+          "y": 1326,
+          "w": 28,
+          "h": 46
+        },
+        {
+          "x": 84,
+          "y": 1326,
+          "w": 28,
+          "h": 46
+        }
+      ],
+      "militia_horn_bow_male_idle": [
+        {
+          "x": 0,
+          "y": 1372,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 1372,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 1372,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 1372,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "militia_horn_bow_male_walk": [
+        {
+          "x": 0,
+          "y": 1414,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 1414,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 1414,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 1414,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "militia_horn_bow_female_idle": [
+        {
+          "x": 0,
+          "y": 1456,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 1456,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 1456,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "militia_horn_bow_female_walk": [
+        {
+          "x": 0,
+          "y": 1498,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 1498,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 1498,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 1498,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "militia_musket_male_idle": [
+        {
+          "x": 0,
+          "y": 1540,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 1540,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 1540,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 1540,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "militia_musket_male_walk": [
+        {
+          "x": 0,
+          "y": 1582,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 1582,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 1582,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 1582,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "militia_musket_female_idle": [
+        {
+          "x": 0,
+          "y": 1624,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 1624,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 1624,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "militia_musket_female_walk": [
+        {
+          "x": 0,
+          "y": 1666,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 1666,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 1666,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 1666,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "wood_splitter_male_idle": [
+        {
+          "x": 0,
+          "y": 1708,
+          "w": 40,
+          "h": 42
+        },
+        {
+          "x": 40,
+          "y": 1708,
+          "w": 40,
+          "h": 42
+        },
+        {
+          "x": 80,
+          "y": 1708,
+          "w": 40,
+          "h": 42
+        }
+      ],
+      "wood_splitter_male_walk": [
+        {
+          "x": 0,
+          "y": 1750,
+          "w": 40,
+          "h": 42
+        },
+        {
+          "x": 40,
+          "y": 1750,
+          "w": 40,
+          "h": 42
+        },
+        {
+          "x": 80,
+          "y": 1750,
+          "w": 40,
+          "h": 42
+        },
+        {
+          "x": 120,
+          "y": 1750,
+          "w": 40,
+          "h": 42
+        }
+      ],
+      "wood_splitter_female_idle": [
+        {
+          "x": 0,
+          "y": 1792,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 36,
+          "y": 1792,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 72,
+          "y": 1792,
+          "w": 36,
+          "h": 42
+        }
+      ],
+      "wood_splitter_female_walk": [
+        {
+          "x": 0,
+          "y": 1834,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 36,
+          "y": 1834,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 72,
+          "y": 1834,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 108,
+          "y": 1834,
+          "w": 36,
+          "h": 42
+        }
+      ],
+      "miller_male_idle": [
+        {
+          "x": 0,
+          "y": 1876,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 38,
+          "y": 1876,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 76,
+          "y": 1876,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 114,
+          "y": 1876,
+          "w": 38,
+          "h": 42
+        }
+      ],
+      "miller_male_walk": [
+        {
+          "x": 0,
+          "y": 1918,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 38,
+          "y": 1918,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 76,
+          "y": 1918,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 114,
+          "y": 1918,
+          "w": 38,
+          "h": 42
+        }
+      ],
+      "miller_female_idle": [
+        {
+          "x": 0,
+          "y": 1960,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 1960,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 1960,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 1960,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "miller_female_walk": [
+        {
+          "x": 0,
+          "y": 2002,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 2002,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 2002,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 2002,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "builder_male_idle": [
+        {
+          "x": 0,
+          "y": 2044,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 36,
+          "y": 2044,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 72,
+          "y": 2044,
+          "w": 36,
+          "h": 42
+        }
+      ],
+      "builder_male_walk": [
+        {
+          "x": 0,
+          "y": 2086,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 36,
+          "y": 2086,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 72,
+          "y": 2086,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 108,
+          "y": 2086,
+          "w": 36,
+          "h": 42
+        }
+      ],
+      "builder_female_idle": [
+        {
+          "x": 0,
+          "y": 2128,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 36,
+          "y": 2128,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 72,
+          "y": 2128,
+          "w": 36,
+          "h": 42
+        }
+      ],
+      "builder_female_walk": [
+        {
+          "x": 0,
+          "y": 2170,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 36,
+          "y": 2170,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 72,
+          "y": 2170,
+          "w": 36,
+          "h": 42
+        },
+        {
+          "x": 108,
+          "y": 2170,
+          "w": 36,
+          "h": 42
+        }
+      ],
+      "physician_male_idle": [
+        {
+          "x": 0,
+          "y": 2212,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 2212,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 2212,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 2212,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "physician_male_walk": [
+        {
+          "x": 0,
+          "y": 2254,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 2254,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 2254,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 2254,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "physician_female_idle": [
+        {
+          "x": 0,
+          "y": 2296,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 2296,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 2296,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "physician_female_walk": [
+        {
+          "x": 0,
+          "y": 2338,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 2338,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 2338,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 2338,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "curer_male_idle": [
+        {
+          "x": 0,
+          "y": 2380,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 2380,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 2380,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 2380,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "curer_male_walk": [
+        {
+          "x": 0,
+          "y": 2422,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 2422,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 2422,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 2422,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "curer_female_idle": [
+        {
+          "x": 0,
+          "y": 2464,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 2464,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 2464,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 2464,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "curer_female_walk": [
+        {
+          "x": 0,
+          "y": 2506,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 2506,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 2506,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 2506,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "potter_male_idle": [
+        {
+          "x": 0,
+          "y": 2548,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 2548,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 2548,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 2548,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "potter_male_walk": [
+        {
+          "x": 0,
+          "y": 2590,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 2590,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 2590,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 2590,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "potter_female_idle": [
+        {
+          "x": 0,
+          "y": 2632,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 2632,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 2632,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 2632,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "potter_female_walk": [
+        {
+          "x": 0,
+          "y": 2674,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 2674,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 2674,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 2674,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "smith_male_idle": [
+        {
+          "x": 0,
+          "y": 2716,
+          "w": 40,
+          "h": 42
+        },
+        {
+          "x": 40,
+          "y": 2716,
+          "w": 40,
+          "h": 42
+        },
+        {
+          "x": 80,
+          "y": 2716,
+          "w": 40,
+          "h": 42
+        }
+      ],
+      "smith_male_walk": [
+        {
+          "x": 0,
+          "y": 2758,
+          "w": 40,
+          "h": 42
+        },
+        {
+          "x": 40,
+          "y": 2758,
+          "w": 40,
+          "h": 42
+        },
+        {
+          "x": 80,
+          "y": 2758,
+          "w": 40,
+          "h": 42
+        },
+        {
+          "x": 120,
+          "y": 2758,
+          "w": 40,
+          "h": 42
+        }
+      ],
+      "smith_female_idle": [
+        {
+          "x": 0,
+          "y": 2800,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 2800,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 2800,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 2800,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "smith_female_walk": [
+        {
+          "x": 0,
+          "y": 2842,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 2842,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 2842,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 2842,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "miner_male_idle": [
+        {
+          "x": 0,
+          "y": 2884,
+          "w": 40,
+          "h": 44
+        },
+        {
+          "x": 40,
+          "y": 2884,
+          "w": 40,
+          "h": 44
+        },
+        {
+          "x": 80,
+          "y": 2884,
+          "w": 40,
+          "h": 44
+        }
+      ],
+      "miner_male_walk": [
+        {
+          "x": 0,
+          "y": 2928,
+          "w": 40,
+          "h": 44
+        },
+        {
+          "x": 40,
+          "y": 2928,
+          "w": 40,
+          "h": 44
+        },
+        {
+          "x": 80,
+          "y": 2928,
+          "w": 40,
+          "h": 44
+        },
+        {
+          "x": 120,
+          "y": 2928,
+          "w": 40,
+          "h": 44
+        }
+      ],
+      "miner_female_idle": [
+        {
+          "x": 0,
+          "y": 2972,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 38,
+          "y": 2972,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 76,
+          "y": 2972,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 114,
+          "y": 2972,
+          "w": 38,
+          "h": 42
+        }
+      ],
+      "miner_female_walk": [
+        {
+          "x": 0,
+          "y": 3014,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 38,
+          "y": 3014,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 76,
+          "y": 3014,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 114,
+          "y": 3014,
+          "w": 38,
+          "h": 42
+        }
+      ],
+      "charcoal_burner_male_idle": [
+        {
+          "x": 0,
+          "y": 3056,
+          "w": 34,
+          "h": 42
+        },
+        {
+          "x": 34,
+          "y": 3056,
+          "w": 34,
+          "h": 42
+        },
+        {
+          "x": 68,
+          "y": 3056,
+          "w": 34,
+          "h": 42
+        },
+        {
+          "x": 102,
+          "y": 3056,
+          "w": 34,
+          "h": 42
+        }
+      ],
+      "charcoal_burner_male_walk": [
+        {
+          "x": 0,
+          "y": 3098,
+          "w": 34,
+          "h": 42
+        },
+        {
+          "x": 34,
+          "y": 3098,
+          "w": 34,
+          "h": 42
+        },
+        {
+          "x": 68,
+          "y": 3098,
+          "w": 34,
+          "h": 42
+        },
+        {
+          "x": 102,
+          "y": 3098,
+          "w": 34,
+          "h": 42
+        }
+      ],
+      "charcoal_burner_female_idle": [
+        {
+          "x": 0,
+          "y": 3140,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 3140,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 3140,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 3140,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "charcoal_burner_female_walk": [
+        {
+          "x": 0,
+          "y": 3182,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 3182,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 3182,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 3182,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "tanner_male_idle": [
+        {
+          "x": 0,
+          "y": 3224,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 3224,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 3224,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 3224,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "tanner_male_walk": [
+        {
+          "x": 0,
+          "y": 3266,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 3266,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 3266,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 3266,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "tanner_female_idle": [
+        {
+          "x": 0,
+          "y": 3308,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 3308,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 3308,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 3308,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "tanner_female_walk": [
+        {
+          "x": 0,
+          "y": 3350,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 3350,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 3350,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 3350,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "weaver_male_idle": [
+        {
+          "x": 0,
+          "y": 3392,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 3392,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 3392,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 3392,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "weaver_male_walk": [
+        {
+          "x": 0,
+          "y": 3434,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 3434,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 3434,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 3434,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "weaver_female_idle": [
+        {
+          "x": 0,
+          "y": 3476,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 3476,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 3476,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 3476,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "weaver_female_walk": [
+        {
+          "x": 0,
+          "y": 3518,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 3518,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 3518,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 3518,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "powder_maker_male_idle": [
+        {
+          "x": 0,
+          "y": 3560,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 3560,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 3560,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 3560,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "powder_maker_male_walk": [
+        {
+          "x": 0,
+          "y": 3602,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 3602,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 3602,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 3602,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "powder_maker_female_idle": [
+        {
+          "x": 0,
+          "y": 3644,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 3644,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 3644,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 3644,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "powder_maker_female_walk": [
+        {
+          "x": 0,
+          "y": 3686,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 3686,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 3686,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 3686,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "clerk_male_idle": [
+        {
+          "x": 0,
+          "y": 3728,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 3728,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 3728,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 3728,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "clerk_male_walk": [
+        {
+          "x": 0,
+          "y": 3770,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 3770,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 3770,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 3770,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "clerk_female_idle": [
+        {
+          "x": 0,
+          "y": 3812,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 3812,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 3812,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 3812,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "clerk_female_walk": [
+        {
+          "x": 0,
+          "y": 3854,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 3854,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 3854,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 3854,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "watchman_male_idle": [
+        {
+          "x": 0,
+          "y": 3896,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 28,
+          "y": 3896,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 56,
+          "y": 3896,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 84,
+          "y": 3896,
+          "w": 28,
+          "h": 44
+        }
+      ],
+      "watchman_male_walk": [
+        {
+          "x": 0,
+          "y": 3940,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 28,
+          "y": 3940,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 56,
+          "y": 3940,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 84,
+          "y": 3940,
+          "w": 28,
+          "h": 44
+        }
+      ],
+      "watchman_female_idle": [
+        {
+          "x": 0,
+          "y": 3984,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 28,
+          "y": 3984,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 56,
+          "y": 3984,
+          "w": 28,
+          "h": 44
+        }
+      ],
+      "watchman_female_walk": [
+        {
+          "x": 0,
+          "y": 4028,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 28,
+          "y": 4028,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 56,
+          "y": 4028,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 84,
+          "y": 4028,
+          "w": 28,
+          "h": 44
+        }
+      ],
+      "undertaker_male_idle": [
+        {
+          "x": 0,
+          "y": 4072,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 38,
+          "y": 4072,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 76,
+          "y": 4072,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 114,
+          "y": 4072,
+          "w": 38,
+          "h": 42
+        }
+      ],
+      "undertaker_male_walk": [
+        {
+          "x": 0,
+          "y": 4114,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 38,
+          "y": 4114,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 76,
+          "y": 4114,
+          "w": 38,
+          "h": 42
+        },
+        {
+          "x": 114,
+          "y": 4114,
+          "w": 38,
+          "h": 42
+        }
+      ],
+      "undertaker_female_idle": [
+        {
+          "x": 0,
+          "y": 4156,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 4156,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 4156,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 4156,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "undertaker_female_walk": [
+        {
+          "x": 0,
+          "y": 4198,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 4198,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 4198,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 4198,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "teacher_male_idle": [
+        {
+          "x": 0,
+          "y": 4240,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 4240,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 4240,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 4240,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 112,
+          "y": 4240,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "teacher_male_walk": [
+        {
+          "x": 0,
+          "y": 4282,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 4282,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 4282,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 4282,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "teacher_female_idle": [
+        {
+          "x": 0,
+          "y": 4324,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 4324,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 4324,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 4324,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "teacher_female_walk": [
+        {
+          "x": 0,
+          "y": 4366,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 4366,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 4366,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 4366,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "shaman_named_wolhyang_idle": [
+        {
+          "x": 0,
+          "y": 4408,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 4408,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 4408,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 4408,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "shaman_named_wolhyang_walk": [
+        {
+          "x": 0,
+          "y": 4450,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 4450,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 4450,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 4450,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "monk_named_haeun_idle": [
+        {
+          "x": 0,
+          "y": 4492,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 4492,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 4492,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 4492,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "monk_named_haeun_walk": [
+        {
+          "x": 0,
+          "y": 4534,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 4534,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 4534,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 4534,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "exiled_scholar_yun_idle": [
+        {
+          "x": 0,
+          "y": 4576,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 4576,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 4576,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 4576,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "exiled_scholar_yun_walk": [
+        {
+          "x": 0,
+          "y": 4618,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 4618,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 4618,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 4618,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "jurchen_warrior_aragae_idle": [
+        {
+          "x": 0,
+          "y": 4660,
+          "w": 28,
+          "h": 48
+        },
+        {
+          "x": 28,
+          "y": 4660,
+          "w": 28,
+          "h": 48
+        },
+        {
+          "x": 56,
+          "y": 4660,
+          "w": 28,
+          "h": 48
+        },
+        {
+          "x": 84,
+          "y": 4660,
+          "w": 28,
+          "h": 48
+        }
+      ],
+      "jurchen_warrior_aragae_walk": [
+        {
+          "x": 0,
+          "y": 4708,
+          "w": 28,
+          "h": 48
+        },
+        {
+          "x": 28,
+          "y": 4708,
+          "w": 28,
+          "h": 48
+        },
+        {
+          "x": 56,
+          "y": 4708,
+          "w": 28,
+          "h": 48
+        },
+        {
+          "x": 84,
+          "y": 4708,
+          "w": 28,
+          "h": 48
+        }
+      ],
+      "tiger_hunter_bakdolgae_idle": [
+        {
+          "x": 0,
+          "y": 4756,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 28,
+          "y": 4756,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 56,
+          "y": 4756,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 84,
+          "y": 4756,
+          "w": 28,
+          "h": 44
+        }
+      ],
+      "tiger_hunter_bakdolgae_walk": [
+        {
+          "x": 0,
+          "y": 4800,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 28,
+          "y": 4800,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 56,
+          "y": 4800,
+          "w": 28,
+          "h": 44
+        },
+        {
+          "x": 84,
+          "y": 4800,
+          "w": 28,
+          "h": 44
+        }
+      ],
+      "geomancer_heosaeng_idle": [
+        {
+          "x": 0,
+          "y": 4844,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 4844,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 4844,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 4844,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "geomancer_heosaeng_walk": [
+        {
+          "x": 0,
+          "y": 4886,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 32,
+          "y": 4886,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 64,
+          "y": 4886,
+          "w": 32,
+          "h": 42
+        },
+        {
+          "x": 96,
+          "y": 4886,
+          "w": 32,
+          "h": 42
+        }
+      ],
+      "uinyeo_dansim_idle": [
+        {
+          "x": 0,
+          "y": 4928,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 4928,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 4928,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 4928,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "uinyeo_dansim_walk": [
+        {
+          "x": 0,
+          "y": 4970,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 4970,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 4970,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 4970,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "runaway_smith_maksoe_idle": [
+        {
+          "x": 0,
+          "y": 5012,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 5012,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 5012,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 5012,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "runaway_smith_maksoe_walk": [
+        {
+          "x": 0,
+          "y": 5054,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 30,
+          "y": 5054,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 60,
+          "y": 5054,
+          "w": 30,
+          "h": 42
+        },
+        {
+          "x": 90,
+          "y": 5054,
+          "w": 30,
+          "h": 42
+        }
+      ],
+      "interpreter_baesugyeom_idle": [
+        {
+          "x": 0,
+          "y": 5096,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 5096,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 5096,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "interpreter_baesugyeom_walk": [
+        {
+          "x": 0,
+          "y": 5138,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 5138,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 5138,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 5138,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "hangwae_sayaka_idle": [
+        {
+          "x": 0,
+          "y": 5180,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 5180,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 5180,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 5180,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "hangwae_sayaka_walk": [
+        {
+          "x": 0,
+          "y": 5222,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 5222,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 5222,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 5222,
+          "w": 28,
+          "h": 42
+        }
+      ]
+    }
+  },
+  "high_definition_frame_layout": {
+    "sheetWidth": 320,
+    "sheetHeight": 10528,
+    "cellWidth": 80,
+    "cellHeight": 96,
+    "row_cells": {
+      "farmer_male_idle": {
+        "width": 76,
+        "height": 84
+      },
+      "farmer_male_walk": {
+        "width": 76,
+        "height": 84
+      },
+      "farmer_female_idle": {
+        "width": 72,
+        "height": 84
+      },
+      "farmer_female_walk": {
+        "width": 72,
+        "height": 84
+      },
+      "fisher_male_idle": {
+        "width": 72,
+        "height": 84
+      },
+      "fisher_male_walk": {
+        "width": 72,
+        "height": 84
+      },
+      "fisher_female_idle": {
+        "width": 60,
+        "height": 84
+      },
+      "fisher_female_walk": {
+        "width": 60,
+        "height": 84
+      },
+      "hauler_male_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "hauler_male_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "hauler_female_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "hauler_female_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "herbalist_male_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "herbalist_male_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "herbalist_female_idle": {
+        "width": 64,
+        "height": 84
+      },
+      "herbalist_female_walk": {
+        "width": 64,
+        "height": 84
+      },
+      "herder_male_idle": {
+        "width": 72,
+        "height": 84
+      },
+      "herder_male_walk": {
+        "width": 72,
+        "height": 84
+      },
+      "herder_female_idle": {
+        "width": 60,
+        "height": 84
+      },
+      "herder_female_walk": {
+        "width": 60,
+        "height": 84
+      },
+      "hunter_male_idle": {
+        "width": 60,
+        "height": 84
+      },
+      "hunter_male_walk": {
+        "width": 60,
+        "height": 84
+      },
+      "hunter_female_idle": {
+        "width": 60,
+        "height": 84
+      },
+      "hunter_female_walk": {
+        "width": 60,
+        "height": 84
+      },
+      "militia_unarmed_male_idle": {
+        "width": 56,
+        "height": 96
+      },
+      "militia_unarmed_male_walk": {
+        "width": 56,
+        "height": 96
+      },
+      "militia_unarmed_female_idle": {
+        "width": 56,
+        "height": 88
+      },
+      "militia_unarmed_female_walk": {
+        "width": 56,
+        "height": 88
+      },
+      "militia_spear_male_idle": {
+        "width": 68,
+        "height": 88
+      },
+      "militia_spear_male_walk": {
+        "width": 68,
+        "height": 88
+      },
+      "militia_spear_female_idle": {
+        "width": 56,
+        "height": 92
+      },
+      "militia_spear_female_walk": {
+        "width": 56,
+        "height": 92
+      },
+      "militia_horn_bow_male_idle": {
+        "width": 60,
+        "height": 84
+      },
+      "militia_horn_bow_male_walk": {
+        "width": 60,
+        "height": 84
+      },
+      "militia_horn_bow_female_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "militia_horn_bow_female_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "militia_musket_male_idle": {
+        "width": 60,
+        "height": 84
+      },
+      "militia_musket_male_walk": {
+        "width": 60,
+        "height": 84
+      },
+      "militia_musket_female_idle": {
+        "width": 60,
+        "height": 84
+      },
+      "militia_musket_female_walk": {
+        "width": 60,
+        "height": 84
+      },
+      "wood_splitter_male_idle": {
+        "width": 80,
+        "height": 84
+      },
+      "wood_splitter_male_walk": {
+        "width": 80,
+        "height": 84
+      },
+      "wood_splitter_female_idle": {
+        "width": 72,
+        "height": 84
+      },
+      "wood_splitter_female_walk": {
+        "width": 72,
+        "height": 84
+      },
+      "miller_male_idle": {
+        "width": 76,
+        "height": 84
+      },
+      "miller_male_walk": {
+        "width": 76,
+        "height": 84
+      },
+      "miller_female_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "miller_female_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "builder_male_idle": {
+        "width": 72,
+        "height": 84
+      },
+      "builder_male_walk": {
+        "width": 72,
+        "height": 84
+      },
+      "builder_female_idle": {
+        "width": 72,
+        "height": 84
+      },
+      "builder_female_walk": {
+        "width": 72,
+        "height": 84
+      },
+      "physician_male_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "physician_male_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "physician_female_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "physician_female_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "curer_male_idle": {
+        "width": 64,
+        "height": 84
+      },
+      "curer_male_walk": {
+        "width": 64,
+        "height": 84
+      },
+      "curer_female_idle": {
+        "width": 64,
+        "height": 84
+      },
+      "curer_female_walk": {
+        "width": 64,
+        "height": 84
+      },
+      "potter_male_idle": {
+        "width": 64,
+        "height": 84
+      },
+      "potter_male_walk": {
+        "width": 64,
+        "height": 84
+      },
+      "potter_female_idle": {
+        "width": 64,
+        "height": 84
+      },
+      "potter_female_walk": {
+        "width": 64,
+        "height": 84
+      },
+      "smith_male_idle": {
+        "width": 80,
+        "height": 84
+      },
+      "smith_male_walk": {
+        "width": 80,
+        "height": 84
+      },
+      "smith_female_idle": {
+        "width": 64,
+        "height": 84
+      },
+      "smith_female_walk": {
+        "width": 64,
+        "height": 84
+      },
+      "miner_male_idle": {
+        "width": 80,
+        "height": 88
+      },
+      "miner_male_walk": {
+        "width": 80,
+        "height": 88
+      },
+      "miner_female_idle": {
+        "width": 76,
+        "height": 84
+      },
+      "miner_female_walk": {
+        "width": 76,
+        "height": 84
+      },
+      "charcoal_burner_male_idle": {
+        "width": 68,
+        "height": 84
+      },
+      "charcoal_burner_male_walk": {
+        "width": 68,
+        "height": 84
+      },
+      "charcoal_burner_female_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "charcoal_burner_female_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "tanner_male_idle": {
+        "width": 60,
+        "height": 84
+      },
+      "tanner_male_walk": {
+        "width": 60,
+        "height": 84
+      },
+      "tanner_female_idle": {
+        "width": 60,
+        "height": 84
+      },
+      "tanner_female_walk": {
+        "width": 60,
+        "height": 84
+      },
+      "weaver_male_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "weaver_male_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "weaver_female_idle": {
+        "width": 60,
+        "height": 84
+      },
+      "weaver_female_walk": {
+        "width": 60,
+        "height": 84
+      },
+      "powder_maker_male_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "powder_maker_male_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "powder_maker_female_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "powder_maker_female_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "clerk_male_idle": {
+        "width": 64,
+        "height": 84
+      },
+      "clerk_male_walk": {
+        "width": 64,
+        "height": 84
+      },
+      "clerk_female_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "clerk_female_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "watchman_male_idle": {
+        "width": 56,
+        "height": 88
+      },
+      "watchman_male_walk": {
+        "width": 56,
+        "height": 88
+      },
+      "watchman_female_idle": {
+        "width": 56,
+        "height": 88
+      },
+      "watchman_female_walk": {
+        "width": 56,
+        "height": 88
+      },
+      "undertaker_male_idle": {
+        "width": 76,
+        "height": 84
+      },
+      "undertaker_male_walk": {
+        "width": 76,
+        "height": 84
+      },
+      "undertaker_female_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "undertaker_female_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "teacher_male_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "teacher_male_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "teacher_female_idle": {
+        "width": 60,
+        "height": 84
+      },
+      "teacher_female_walk": {
+        "width": 60,
+        "height": 84
+      },
+      "shaman_named_wolhyang_idle": {
+        "width": 64,
+        "height": 84
+      },
+      "shaman_named_wolhyang_walk": {
+        "width": 64,
+        "height": 84
+      },
+      "monk_named_haeun_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "monk_named_haeun_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "exiled_scholar_yun_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "exiled_scholar_yun_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "jurchen_warrior_aragae_idle": {
+        "width": 56,
+        "height": 96
+      },
+      "jurchen_warrior_aragae_walk": {
+        "width": 56,
+        "height": 96
+      },
+      "tiger_hunter_bakdolgae_idle": {
+        "width": 56,
+        "height": 88
+      },
+      "tiger_hunter_bakdolgae_walk": {
+        "width": 56,
+        "height": 88
+      },
+      "geomancer_heosaeng_idle": {
+        "width": 64,
+        "height": 84
+      },
+      "geomancer_heosaeng_walk": {
+        "width": 64,
+        "height": 84
+      },
+      "uinyeo_dansim_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "uinyeo_dansim_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "runaway_smith_maksoe_idle": {
+        "width": 60,
+        "height": 84
+      },
+      "runaway_smith_maksoe_walk": {
+        "width": 60,
+        "height": 84
+      },
+      "interpreter_baesugyeom_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "interpreter_baesugyeom_walk": {
+        "width": 56,
+        "height": 84
+      },
+      "hangwae_sayaka_idle": {
+        "width": 56,
+        "height": 84
+      },
+      "hangwae_sayaka_walk": {
+        "width": 56,
+        "height": 84
+      }
+    },
+    "rows": {
+      "farmer_male_idle": [
+        {
+          "x": 0,
+          "y": 0,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 76,
+          "y": 0,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 152,
+          "y": 0,
+          "w": 76,
+          "h": 84
+        }
+      ],
+      "farmer_male_walk": [
+        {
+          "x": 0,
+          "y": 84,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 76,
+          "y": 84,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 152,
+          "y": 84,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 228,
+          "y": 84,
+          "w": 76,
+          "h": 84
+        }
+      ],
+      "farmer_female_idle": [
+        {
+          "x": 0,
+          "y": 168,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 72,
+          "y": 168,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 144,
+          "y": 168,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 216,
+          "y": 168,
+          "w": 72,
+          "h": 84
+        }
+      ],
+      "farmer_female_walk": [
+        {
+          "x": 0,
+          "y": 252,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 72,
+          "y": 252,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 144,
+          "y": 252,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 216,
+          "y": 252,
+          "w": 72,
+          "h": 84
+        }
+      ],
+      "fisher_male_idle": [
+        {
+          "x": 0,
+          "y": 336,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 72,
+          "y": 336,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 144,
+          "y": 336,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 216,
+          "y": 336,
+          "w": 72,
+          "h": 84
+        }
+      ],
+      "fisher_male_walk": [
+        {
+          "x": 0,
+          "y": 420,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 72,
+          "y": 420,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 144,
+          "y": 420,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 216,
+          "y": 420,
+          "w": 72,
+          "h": 84
+        }
+      ],
+      "fisher_female_idle": [
+        {
+          "x": 0,
+          "y": 504,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 504,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 504,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "fisher_female_walk": [
+        {
+          "x": 0,
+          "y": 588,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 588,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 588,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 588,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "hauler_male_idle": [
+        {
+          "x": 0,
+          "y": 672,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 672,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 672,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 672,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "hauler_male_walk": [
+        {
+          "x": 0,
+          "y": 756,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 756,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 756,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 756,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "hauler_female_idle": [
+        {
+          "x": 0,
+          "y": 840,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 840,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 840,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 840,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "hauler_female_walk": [
+        {
+          "x": 0,
+          "y": 924,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 924,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 924,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 924,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "herbalist_male_idle": [
+        {
+          "x": 0,
+          "y": 1008,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 1008,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 1008,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 1008,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "herbalist_male_walk": [
+        {
+          "x": 0,
+          "y": 1092,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 1092,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 1092,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 1092,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "herbalist_female_idle": [
+        {
+          "x": 0,
+          "y": 1176,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 1176,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 1176,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 1176,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "herbalist_female_walk": [
+        {
+          "x": 0,
+          "y": 1260,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 1260,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 1260,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 1260,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "herder_male_idle": [
+        {
+          "x": 0,
+          "y": 1344,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 72,
+          "y": 1344,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 144,
+          "y": 1344,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 216,
+          "y": 1344,
+          "w": 72,
+          "h": 84
+        }
+      ],
+      "herder_male_walk": [
+        {
+          "x": 0,
+          "y": 1428,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 72,
+          "y": 1428,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 144,
+          "y": 1428,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 216,
+          "y": 1428,
+          "w": 72,
+          "h": 84
+        }
+      ],
+      "herder_female_idle": [
+        {
+          "x": 0,
+          "y": 1512,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 1512,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 1512,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 1512,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "herder_female_walk": [
+        {
+          "x": 0,
+          "y": 1596,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 1596,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 1596,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 1596,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "hunter_male_idle": [
+        {
+          "x": 0,
+          "y": 1680,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 1680,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 1680,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 1680,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "hunter_male_walk": [
+        {
+          "x": 0,
+          "y": 1764,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 1764,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 1764,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 1764,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "hunter_female_idle": [
+        {
+          "x": 0,
+          "y": 1848,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 1848,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 1848,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "hunter_female_walk": [
+        {
+          "x": 0,
+          "y": 1932,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 1932,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 1932,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 1932,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "militia_unarmed_male_idle": [
+        {
+          "x": 0,
+          "y": 2016,
+          "w": 56,
+          "h": 96
+        },
+        {
+          "x": 56,
+          "y": 2016,
+          "w": 56,
+          "h": 96
+        },
+        {
+          "x": 112,
+          "y": 2016,
+          "w": 56,
+          "h": 96
+        }
+      ],
+      "militia_unarmed_male_walk": [
+        {
+          "x": 0,
+          "y": 2112,
+          "w": 56,
+          "h": 96
+        },
+        {
+          "x": 56,
+          "y": 2112,
+          "w": 56,
+          "h": 96
+        },
+        {
+          "x": 112,
+          "y": 2112,
+          "w": 56,
+          "h": 96
+        },
+        {
+          "x": 168,
+          "y": 2112,
+          "w": 56,
+          "h": 96
+        }
+      ],
+      "militia_unarmed_female_idle": [
+        {
+          "x": 0,
+          "y": 2208,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 56,
+          "y": 2208,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 112,
+          "y": 2208,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 168,
+          "y": 2208,
+          "w": 56,
+          "h": 88
+        }
+      ],
+      "militia_unarmed_female_walk": [
+        {
+          "x": 0,
+          "y": 2296,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 56,
+          "y": 2296,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 112,
+          "y": 2296,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 168,
+          "y": 2296,
+          "w": 56,
+          "h": 88
+        }
+      ],
+      "militia_spear_male_idle": [
+        {
+          "x": 0,
+          "y": 2384,
+          "w": 68,
+          "h": 88
+        },
+        {
+          "x": 68,
+          "y": 2384,
+          "w": 68,
+          "h": 88
+        },
+        {
+          "x": 136,
+          "y": 2384,
+          "w": 68,
+          "h": 88
+        },
+        {
+          "x": 204,
+          "y": 2384,
+          "w": 68,
+          "h": 88
+        }
+      ],
+      "militia_spear_male_walk": [
+        {
+          "x": 0,
+          "y": 2472,
+          "w": 68,
+          "h": 88
+        },
+        {
+          "x": 68,
+          "y": 2472,
+          "w": 68,
+          "h": 88
+        },
+        {
+          "x": 136,
+          "y": 2472,
+          "w": 68,
+          "h": 88
+        },
+        {
+          "x": 204,
+          "y": 2472,
+          "w": 68,
+          "h": 88
+        }
+      ],
+      "militia_spear_female_idle": [
+        {
+          "x": 0,
+          "y": 2560,
+          "w": 56,
+          "h": 92
+        },
+        {
+          "x": 56,
+          "y": 2560,
+          "w": 56,
+          "h": 92
+        },
+        {
+          "x": 112,
+          "y": 2560,
+          "w": 56,
+          "h": 92
+        }
+      ],
+      "militia_spear_female_walk": [
+        {
+          "x": 0,
+          "y": 2652,
+          "w": 56,
+          "h": 92
+        },
+        {
+          "x": 56,
+          "y": 2652,
+          "w": 56,
+          "h": 92
+        },
+        {
+          "x": 112,
+          "y": 2652,
+          "w": 56,
+          "h": 92
+        },
+        {
+          "x": 168,
+          "y": 2652,
+          "w": 56,
+          "h": 92
+        }
+      ],
+      "militia_horn_bow_male_idle": [
+        {
+          "x": 0,
+          "y": 2744,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 2744,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 2744,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 2744,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "militia_horn_bow_male_walk": [
+        {
+          "x": 0,
+          "y": 2828,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 2828,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 2828,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 2828,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "militia_horn_bow_female_idle": [
+        {
+          "x": 0,
+          "y": 2912,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 2912,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 2912,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "militia_horn_bow_female_walk": [
+        {
+          "x": 0,
+          "y": 2996,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 2996,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 2996,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 2996,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "militia_musket_male_idle": [
+        {
+          "x": 0,
+          "y": 3080,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 3080,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 3080,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 3080,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "militia_musket_male_walk": [
+        {
+          "x": 0,
+          "y": 3164,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 3164,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 3164,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 3164,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "militia_musket_female_idle": [
+        {
+          "x": 0,
+          "y": 3248,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 3248,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 3248,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "militia_musket_female_walk": [
+        {
+          "x": 0,
+          "y": 3332,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 3332,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 3332,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 3332,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "wood_splitter_male_idle": [
+        {
+          "x": 0,
+          "y": 3416,
+          "w": 80,
+          "h": 84
+        },
+        {
+          "x": 80,
+          "y": 3416,
+          "w": 80,
+          "h": 84
+        },
+        {
+          "x": 160,
+          "y": 3416,
+          "w": 80,
+          "h": 84
+        }
+      ],
+      "wood_splitter_male_walk": [
+        {
+          "x": 0,
+          "y": 3500,
+          "w": 80,
+          "h": 84
+        },
+        {
+          "x": 80,
+          "y": 3500,
+          "w": 80,
+          "h": 84
+        },
+        {
+          "x": 160,
+          "y": 3500,
+          "w": 80,
+          "h": 84
+        },
+        {
+          "x": 240,
+          "y": 3500,
+          "w": 80,
+          "h": 84
+        }
+      ],
+      "wood_splitter_female_idle": [
+        {
+          "x": 0,
+          "y": 3584,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 72,
+          "y": 3584,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 144,
+          "y": 3584,
+          "w": 72,
+          "h": 84
+        }
+      ],
+      "wood_splitter_female_walk": [
+        {
+          "x": 0,
+          "y": 3668,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 72,
+          "y": 3668,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 144,
+          "y": 3668,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 216,
+          "y": 3668,
+          "w": 72,
+          "h": 84
+        }
+      ],
+      "miller_male_idle": [
+        {
+          "x": 0,
+          "y": 3752,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 76,
+          "y": 3752,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 152,
+          "y": 3752,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 228,
+          "y": 3752,
+          "w": 76,
+          "h": 84
+        }
+      ],
+      "miller_male_walk": [
+        {
+          "x": 0,
+          "y": 3836,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 76,
+          "y": 3836,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 152,
+          "y": 3836,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 228,
+          "y": 3836,
+          "w": 76,
+          "h": 84
+        }
+      ],
+      "miller_female_idle": [
+        {
+          "x": 0,
+          "y": 3920,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 3920,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 3920,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 3920,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "miller_female_walk": [
+        {
+          "x": 0,
+          "y": 4004,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 4004,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 4004,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 4004,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "builder_male_idle": [
+        {
+          "x": 0,
+          "y": 4088,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 72,
+          "y": 4088,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 144,
+          "y": 4088,
+          "w": 72,
+          "h": 84
+        }
+      ],
+      "builder_male_walk": [
+        {
+          "x": 0,
+          "y": 4172,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 72,
+          "y": 4172,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 144,
+          "y": 4172,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 216,
+          "y": 4172,
+          "w": 72,
+          "h": 84
+        }
+      ],
+      "builder_female_idle": [
+        {
+          "x": 0,
+          "y": 4256,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 72,
+          "y": 4256,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 144,
+          "y": 4256,
+          "w": 72,
+          "h": 84
+        }
+      ],
+      "builder_female_walk": [
+        {
+          "x": 0,
+          "y": 4340,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 72,
+          "y": 4340,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 144,
+          "y": 4340,
+          "w": 72,
+          "h": 84
+        },
+        {
+          "x": 216,
+          "y": 4340,
+          "w": 72,
+          "h": 84
+        }
+      ],
+      "physician_male_idle": [
+        {
+          "x": 0,
+          "y": 4424,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 4424,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 4424,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 4424,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "physician_male_walk": [
+        {
+          "x": 0,
+          "y": 4508,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 4508,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 4508,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 4508,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "physician_female_idle": [
+        {
+          "x": 0,
+          "y": 4592,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 4592,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 4592,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "physician_female_walk": [
+        {
+          "x": 0,
+          "y": 4676,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 4676,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 4676,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 4676,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "curer_male_idle": [
+        {
+          "x": 0,
+          "y": 4760,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 4760,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 4760,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 4760,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "curer_male_walk": [
+        {
+          "x": 0,
+          "y": 4844,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 4844,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 4844,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 4844,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "curer_female_idle": [
+        {
+          "x": 0,
+          "y": 4928,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 4928,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 4928,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 4928,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "curer_female_walk": [
+        {
+          "x": 0,
+          "y": 5012,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 5012,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 5012,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 5012,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "potter_male_idle": [
+        {
+          "x": 0,
+          "y": 5096,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 5096,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 5096,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 5096,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "potter_male_walk": [
+        {
+          "x": 0,
+          "y": 5180,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 5180,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 5180,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 5180,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "potter_female_idle": [
+        {
+          "x": 0,
+          "y": 5264,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 5264,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 5264,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 5264,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "potter_female_walk": [
+        {
+          "x": 0,
+          "y": 5348,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 5348,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 5348,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 5348,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "smith_male_idle": [
+        {
+          "x": 0,
+          "y": 5432,
+          "w": 80,
+          "h": 84
+        },
+        {
+          "x": 80,
+          "y": 5432,
+          "w": 80,
+          "h": 84
+        },
+        {
+          "x": 160,
+          "y": 5432,
+          "w": 80,
+          "h": 84
+        }
+      ],
+      "smith_male_walk": [
+        {
+          "x": 0,
+          "y": 5516,
+          "w": 80,
+          "h": 84
+        },
+        {
+          "x": 80,
+          "y": 5516,
+          "w": 80,
+          "h": 84
+        },
+        {
+          "x": 160,
+          "y": 5516,
+          "w": 80,
+          "h": 84
+        },
+        {
+          "x": 240,
+          "y": 5516,
+          "w": 80,
+          "h": 84
+        }
+      ],
+      "smith_female_idle": [
+        {
+          "x": 0,
+          "y": 5600,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 5600,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 5600,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 5600,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "smith_female_walk": [
+        {
+          "x": 0,
+          "y": 5684,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 5684,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 5684,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 5684,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "miner_male_idle": [
+        {
+          "x": 0,
+          "y": 5768,
+          "w": 80,
+          "h": 88
+        },
+        {
+          "x": 80,
+          "y": 5768,
+          "w": 80,
+          "h": 88
+        },
+        {
+          "x": 160,
+          "y": 5768,
+          "w": 80,
+          "h": 88
+        }
+      ],
+      "miner_male_walk": [
+        {
+          "x": 0,
+          "y": 5856,
+          "w": 80,
+          "h": 88
+        },
+        {
+          "x": 80,
+          "y": 5856,
+          "w": 80,
+          "h": 88
+        },
+        {
+          "x": 160,
+          "y": 5856,
+          "w": 80,
+          "h": 88
+        },
+        {
+          "x": 240,
+          "y": 5856,
+          "w": 80,
+          "h": 88
+        }
+      ],
+      "miner_female_idle": [
+        {
+          "x": 0,
+          "y": 5944,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 76,
+          "y": 5944,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 152,
+          "y": 5944,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 228,
+          "y": 5944,
+          "w": 76,
+          "h": 84
+        }
+      ],
+      "miner_female_walk": [
+        {
+          "x": 0,
+          "y": 6028,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 76,
+          "y": 6028,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 152,
+          "y": 6028,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 228,
+          "y": 6028,
+          "w": 76,
+          "h": 84
+        }
+      ],
+      "charcoal_burner_male_idle": [
+        {
+          "x": 0,
+          "y": 6112,
+          "w": 68,
+          "h": 84
+        },
+        {
+          "x": 68,
+          "y": 6112,
+          "w": 68,
+          "h": 84
+        },
+        {
+          "x": 136,
+          "y": 6112,
+          "w": 68,
+          "h": 84
+        },
+        {
+          "x": 204,
+          "y": 6112,
+          "w": 68,
+          "h": 84
+        }
+      ],
+      "charcoal_burner_male_walk": [
+        {
+          "x": 0,
+          "y": 6196,
+          "w": 68,
+          "h": 84
+        },
+        {
+          "x": 68,
+          "y": 6196,
+          "w": 68,
+          "h": 84
+        },
+        {
+          "x": 136,
+          "y": 6196,
+          "w": 68,
+          "h": 84
+        },
+        {
+          "x": 204,
+          "y": 6196,
+          "w": 68,
+          "h": 84
+        }
+      ],
+      "charcoal_burner_female_idle": [
+        {
+          "x": 0,
+          "y": 6280,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 6280,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 6280,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 6280,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "charcoal_burner_female_walk": [
+        {
+          "x": 0,
+          "y": 6364,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 6364,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 6364,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 6364,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "tanner_male_idle": [
+        {
+          "x": 0,
+          "y": 6448,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 6448,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 6448,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 6448,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "tanner_male_walk": [
+        {
+          "x": 0,
+          "y": 6532,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 6532,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 6532,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 6532,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "tanner_female_idle": [
+        {
+          "x": 0,
+          "y": 6616,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 6616,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 6616,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 6616,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "tanner_female_walk": [
+        {
+          "x": 0,
+          "y": 6700,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 6700,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 6700,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 6700,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "weaver_male_idle": [
+        {
+          "x": 0,
+          "y": 6784,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 6784,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 6784,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 6784,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "weaver_male_walk": [
+        {
+          "x": 0,
+          "y": 6868,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 6868,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 6868,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 6868,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "weaver_female_idle": [
+        {
+          "x": 0,
+          "y": 6952,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 6952,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 6952,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 6952,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "weaver_female_walk": [
+        {
+          "x": 0,
+          "y": 7036,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 7036,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 7036,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 7036,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "powder_maker_male_idle": [
+        {
+          "x": 0,
+          "y": 7120,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 7120,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 7120,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 7120,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "powder_maker_male_walk": [
+        {
+          "x": 0,
+          "y": 7204,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 7204,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 7204,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 7204,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "powder_maker_female_idle": [
+        {
+          "x": 0,
+          "y": 7288,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 7288,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 7288,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 7288,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "powder_maker_female_walk": [
+        {
+          "x": 0,
+          "y": 7372,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 7372,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 7372,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 7372,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "clerk_male_idle": [
+        {
+          "x": 0,
+          "y": 7456,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 7456,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 7456,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 7456,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "clerk_male_walk": [
+        {
+          "x": 0,
+          "y": 7540,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 7540,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 7540,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 7540,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "clerk_female_idle": [
+        {
+          "x": 0,
+          "y": 7624,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 7624,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 7624,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 7624,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "clerk_female_walk": [
+        {
+          "x": 0,
+          "y": 7708,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 7708,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 7708,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 7708,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "watchman_male_idle": [
+        {
+          "x": 0,
+          "y": 7792,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 56,
+          "y": 7792,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 112,
+          "y": 7792,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 168,
+          "y": 7792,
+          "w": 56,
+          "h": 88
+        }
+      ],
+      "watchman_male_walk": [
+        {
+          "x": 0,
+          "y": 7880,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 56,
+          "y": 7880,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 112,
+          "y": 7880,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 168,
+          "y": 7880,
+          "w": 56,
+          "h": 88
+        }
+      ],
+      "watchman_female_idle": [
+        {
+          "x": 0,
+          "y": 7968,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 56,
+          "y": 7968,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 112,
+          "y": 7968,
+          "w": 56,
+          "h": 88
+        }
+      ],
+      "watchman_female_walk": [
+        {
+          "x": 0,
+          "y": 8056,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 56,
+          "y": 8056,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 112,
+          "y": 8056,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 168,
+          "y": 8056,
+          "w": 56,
+          "h": 88
+        }
+      ],
+      "undertaker_male_idle": [
+        {
+          "x": 0,
+          "y": 8144,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 76,
+          "y": 8144,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 152,
+          "y": 8144,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 228,
+          "y": 8144,
+          "w": 76,
+          "h": 84
+        }
+      ],
+      "undertaker_male_walk": [
+        {
+          "x": 0,
+          "y": 8228,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 76,
+          "y": 8228,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 152,
+          "y": 8228,
+          "w": 76,
+          "h": 84
+        },
+        {
+          "x": 228,
+          "y": 8228,
+          "w": 76,
+          "h": 84
+        }
+      ],
+      "undertaker_female_idle": [
+        {
+          "x": 0,
+          "y": 8312,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 8312,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 8312,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 8312,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "undertaker_female_walk": [
+        {
+          "x": 0,
+          "y": 8396,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 8396,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 8396,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 8396,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "teacher_male_idle": [
+        {
+          "x": 0,
+          "y": 8480,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 8480,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 8480,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 8480,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 224,
+          "y": 8480,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "teacher_male_walk": [
+        {
+          "x": 0,
+          "y": 8564,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 8564,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 8564,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 8564,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "teacher_female_idle": [
+        {
+          "x": 0,
+          "y": 8648,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 8648,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 8648,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 8648,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "teacher_female_walk": [
+        {
+          "x": 0,
+          "y": 8732,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 8732,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 8732,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 8732,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "shaman_named_wolhyang_idle": [
+        {
+          "x": 0,
+          "y": 8816,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 8816,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 8816,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 8816,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "shaman_named_wolhyang_walk": [
+        {
+          "x": 0,
+          "y": 8900,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 8900,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 8900,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 8900,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "monk_named_haeun_idle": [
+        {
+          "x": 0,
+          "y": 8984,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 8984,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 8984,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 8984,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "monk_named_haeun_walk": [
+        {
+          "x": 0,
+          "y": 9068,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 9068,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 9068,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 9068,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "exiled_scholar_yun_idle": [
+        {
+          "x": 0,
+          "y": 9152,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 9152,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 9152,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 9152,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "exiled_scholar_yun_walk": [
+        {
+          "x": 0,
+          "y": 9236,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 9236,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 9236,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 9236,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "jurchen_warrior_aragae_idle": [
+        {
+          "x": 0,
+          "y": 9320,
+          "w": 56,
+          "h": 96
+        },
+        {
+          "x": 56,
+          "y": 9320,
+          "w": 56,
+          "h": 96
+        },
+        {
+          "x": 112,
+          "y": 9320,
+          "w": 56,
+          "h": 96
+        },
+        {
+          "x": 168,
+          "y": 9320,
+          "w": 56,
+          "h": 96
+        }
+      ],
+      "jurchen_warrior_aragae_walk": [
+        {
+          "x": 0,
+          "y": 9416,
+          "w": 56,
+          "h": 96
+        },
+        {
+          "x": 56,
+          "y": 9416,
+          "w": 56,
+          "h": 96
+        },
+        {
+          "x": 112,
+          "y": 9416,
+          "w": 56,
+          "h": 96
+        },
+        {
+          "x": 168,
+          "y": 9416,
+          "w": 56,
+          "h": 96
+        }
+      ],
+      "tiger_hunter_bakdolgae_idle": [
+        {
+          "x": 0,
+          "y": 9512,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 56,
+          "y": 9512,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 112,
+          "y": 9512,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 168,
+          "y": 9512,
+          "w": 56,
+          "h": 88
+        }
+      ],
+      "tiger_hunter_bakdolgae_walk": [
+        {
+          "x": 0,
+          "y": 9600,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 56,
+          "y": 9600,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 112,
+          "y": 9600,
+          "w": 56,
+          "h": 88
+        },
+        {
+          "x": 168,
+          "y": 9600,
+          "w": 56,
+          "h": 88
+        }
+      ],
+      "geomancer_heosaeng_idle": [
+        {
+          "x": 0,
+          "y": 9688,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 9688,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 9688,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 9688,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "geomancer_heosaeng_walk": [
+        {
+          "x": 0,
+          "y": 9772,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 64,
+          "y": 9772,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 128,
+          "y": 9772,
+          "w": 64,
+          "h": 84
+        },
+        {
+          "x": 192,
+          "y": 9772,
+          "w": 64,
+          "h": 84
+        }
+      ],
+      "uinyeo_dansim_idle": [
+        {
+          "x": 0,
+          "y": 9856,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 9856,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 9856,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 9856,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "uinyeo_dansim_walk": [
+        {
+          "x": 0,
+          "y": 9940,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 9940,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 9940,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 9940,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "runaway_smith_maksoe_idle": [
+        {
+          "x": 0,
+          "y": 10024,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 10024,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 10024,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 10024,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "runaway_smith_maksoe_walk": [
+        {
+          "x": 0,
+          "y": 10108,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 60,
+          "y": 10108,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 120,
+          "y": 10108,
+          "w": 60,
+          "h": 84
+        },
+        {
+          "x": 180,
+          "y": 10108,
+          "w": 60,
+          "h": 84
+        }
+      ],
+      "interpreter_baesugyeom_idle": [
+        {
+          "x": 0,
+          "y": 10192,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 10192,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 10192,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "interpreter_baesugyeom_walk": [
+        {
+          "x": 0,
+          "y": 10276,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 10276,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 10276,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 10276,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "hangwae_sayaka_idle": [
+        {
+          "x": 0,
+          "y": 10360,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 10360,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 10360,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 10360,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "hangwae_sayaka_walk": [
+        {
+          "x": 0,
+          "y": 10444,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 10444,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 10444,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 10444,
+          "w": 56,
+          "h": 84
+        }
+      ]
+    }
+  },
+  "characters": [
+    "farmer_male",
+    "farmer_female",
+    "fisher_male",
+    "fisher_female",
+    "hauler_male",
+    "hauler_female",
+    "herbalist_male",
+    "herbalist_female",
+    "herder_male",
+    "herder_female",
+    "hunter_male",
+    "hunter_female",
+    "militia_unarmed_male",
+    "militia_unarmed_female",
+    "militia_spear_male",
+    "militia_spear_female",
+    "militia_horn_bow_male",
+    "militia_horn_bow_female",
+    "militia_musket_male",
+    "militia_musket_female",
+    "wood_splitter_male",
+    "wood_splitter_female",
+    "miller_male",
+    "miller_female",
+    "builder_male",
+    "builder_female",
+    "physician_male",
+    "physician_female",
+    "curer_male",
+    "curer_female",
+    "potter_male",
+    "potter_female",
+    "smith_male",
+    "smith_female",
+    "miner_male",
+    "miner_female",
+    "charcoal_burner_male",
+    "charcoal_burner_female",
+    "tanner_male",
+    "tanner_female",
+    "weaver_male",
+    "weaver_female",
+    "powder_maker_male",
+    "powder_maker_female",
+    "clerk_male",
+    "clerk_female",
+    "watchman_male",
+    "watchman_female",
+    "undertaker_male",
+    "undertaker_female",
+    "teacher_male",
+    "teacher_female",
+    "shaman_named_wolhyang",
+    "monk_named_haeun",
+    "exiled_scholar_yun",
+    "jurchen_warrior_aragae",
+    "tiger_hunter_bakdolgae",
+    "geomancer_heosaeng",
+    "uinyeo_dansim",
+    "runaway_smith_maksoe",
+    "interpreter_baesugyeom",
+    "hangwae_sayaka"
+  ],
+  "source_runs": {
+    "farmer_male": {
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/farmer_male/hd",
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/farmer_male/standard"
+    },
+    "farmer_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/farmer_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/farmer_female/hd"
+    },
+    "fisher_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/fisher_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/fisher_male/hd"
+    },
+    "fisher_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/fisher_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/fisher_female/hd"
+    },
+    "hauler_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/hauler_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/hauler_male/hd"
+    },
+    "hauler_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/hauler_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/hauler_female/hd"
+    },
+    "herbalist_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/herbalist_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/herbalist_male/hd"
+    },
+    "herbalist_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/herbalist_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/herbalist_female/hd"
+    },
+    "herder_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/herder_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/herder_male/hd"
+    },
+    "herder_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/herder_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/herder_female/hd"
+    },
+    "hunter_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/hunter_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/hunter_male/hd"
+    },
+    "hunter_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/hunter_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/hunter_female/hd"
+    },
+    "militia_unarmed_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_unarmed_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_unarmed_male/hd"
+    },
+    "militia_unarmed_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_unarmed_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_unarmed_female/hd"
+    },
+    "militia_spear_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_spear_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_spear_male/hd"
+    },
+    "militia_spear_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_spear_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_spear_female/hd"
+    },
+    "militia_horn_bow_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_horn_bow_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_horn_bow_male/hd"
+    },
+    "militia_horn_bow_female": {
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_horn_bow_female/hd",
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_horn_bow_female/standard"
+    },
+    "militia_musket_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_musket_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_musket_male/hd"
+    },
+    "militia_musket_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_musket_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/militia_musket_female/hd"
+    },
+    "wood_splitter_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/wood_splitter_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/wood_splitter_male/hd"
+    },
+    "wood_splitter_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/wood_splitter_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/wood_splitter_female/hd"
+    },
+    "miller_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/miller_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/miller_male/hd"
+    },
+    "miller_female": {
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/miller_female/hd",
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/miller_female/standard"
+    },
+    "builder_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/builder_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/builder_male/hd"
+    },
+    "builder_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/builder_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/builder_female/hd"
+    },
+    "physician_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/physician_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/physician_male/hd"
+    },
+    "physician_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/physician_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/physician_female/hd"
+    },
+    "curer_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/curer_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/curer_male/hd"
+    },
+    "curer_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/curer_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/curer_female/hd"
+    },
+    "potter_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/potter_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/potter_male/hd"
+    },
+    "potter_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/potter_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/potter_female/hd"
+    },
+    "smith_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/smith_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/smith_male/hd"
+    },
+    "smith_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/smith_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/smith_female/hd"
+    },
+    "miner_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/miner_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/miner_male/hd"
+    },
+    "miner_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/miner_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/miner_female/hd"
+    },
+    "charcoal_burner_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/charcoal_burner_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/charcoal_burner_male/hd"
+    },
+    "charcoal_burner_female": {
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/charcoal_burner_female/hd",
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/charcoal_burner_female/standard"
+    },
+    "tanner_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/tanner_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/tanner_male/hd"
+    },
+    "tanner_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/tanner_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/tanner_female/hd"
+    },
+    "weaver_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/weaver_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/weaver_male/hd"
+    },
+    "weaver_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/weaver_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/weaver_female/hd"
+    },
+    "powder_maker_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/powder_maker_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/powder_maker_male/hd"
+    },
+    "powder_maker_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/powder_maker_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/powder_maker_female/hd"
+    },
+    "clerk_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/clerk_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/clerk_male/hd"
+    },
+    "clerk_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/clerk_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/clerk_female/hd"
+    },
+    "watchman_male": {
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/watchman_male/hd",
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/watchman_male/standard"
+    },
+    "watchman_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/watchman_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/watchman_female/hd"
+    },
+    "undertaker_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/undertaker_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/undertaker_male/hd"
+    },
+    "undertaker_female": {
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/undertaker_female/hd",
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/undertaker_female/standard"
+    },
+    "teacher_male": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/teacher_male/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/teacher_male/hd"
+    },
+    "teacher_female": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/teacher_female/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/teacher_female/hd"
+    },
+    "shaman_named_wolhyang": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/shaman_named_wolhyang/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/shaman_named_wolhyang/hd"
+    },
+    "monk_named_haeun": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/monk_named_haeun/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/monk_named_haeun/hd"
+    },
+    "exiled_scholar_yun": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/exiled_scholar_yun/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/exiled_scholar_yun/hd"
+    },
+    "jurchen_warrior_aragae": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/jurchen_warrior_aragae/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/jurchen_warrior_aragae/hd"
+    },
+    "tiger_hunter_bakdolgae": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/tiger_hunter_bakdolgae/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/tiger_hunter_bakdolgae/hd"
+    },
+    "geomancer_heosaeng": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/geomancer_heosaeng/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/geomancer_heosaeng/hd"
+    },
+    "uinyeo_dansim": {
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/uinyeo_dansim/hd",
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/uinyeo_dansim/standard"
+    },
+    "runaway_smith_maksoe": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/runaway_smith_maksoe/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/runaway_smith_maksoe/hd"
+    },
+    "interpreter_baesugyeom": {
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/interpreter_baesugyeom/hd",
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/interpreter_baesugyeom/standard"
+    },
+    "hangwae_sayaka": {
+      "standard": "tools/render/generated/resident-approved-i2v-locomotion-v1/hangwae_sayaka/standard",
+      "hd": "tools/render/generated/resident-approved-i2v-locomotion-v1/hangwae_sayaka/hd"
+    }
+  }
+}

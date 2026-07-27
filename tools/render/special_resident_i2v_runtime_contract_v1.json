@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "kind": "special-resident-i2v-runtime-contract",
+  "notes": [
+    "flip_x_at_runtime is applied only while composing the game-facing sheet.",
+    "Accepted curation packages remain in their source orientation.",
+    "The six special-residents-v2 sources already use this same flip in compose_special_resident_assets_v2.py."
+  ],
+  "characters": {
+    "mudang_wolhyang": { "flip_x_at_runtime": false },
+    "monk_haeun": { "flip_x_at_runtime": false },
+    "exiled_scholar_yun": { "flip_x_at_runtime": false },
+    "jurchen_warrior_aragae": { "flip_x_at_runtime": false },
+    "tiger_hunter_bakdolgae": { "flip_x_at_runtime": true },
+    "geomancer_heosaeng": { "flip_x_at_runtime": true },
+    "uinyeo_dansim": { "flip_x_at_runtime": true },
+    "runaway_smith_maksoe": { "flip_x_at_runtime": true },
+    "interpreter_baesugyeom": { "flip_x_at_runtime": true },
+    "hangwae_sayaka": { "flip_x_at_runtime": true }
+  }
+}

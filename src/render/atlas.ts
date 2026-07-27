@@ -196,6 +196,11 @@ import {
   idleVideoWalkSourceRect,
 } from './residentIdleVideoWalkAssets';
 import {
+  RESIDENT_APPROVED_I2V_SHEETS,
+  approvedI2VSourceRect,
+  isApprovedI2VJob,
+} from './residentApprovedI2VLocomotionAssets';
+import {
   RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS,
   woodcutterVideoWalkSourceRect,
   type WoodcutterVideoWalkKind,
@@ -284,6 +289,8 @@ let residentHerbalistGatherSheet: HTMLImageElement | null = null;
 let residentCommonLocomotionSheet: HTMLImageElement | null = null;
 let residentIdleVideoWalkSheet: HTMLImageElement | null = null;
 let residentIdleVideoWalkHdSheet: HTMLImageElement | null = null;
+let residentApprovedI2VSheet: HTMLImageElement | null = null;
+let residentApprovedI2VHdSheet: HTMLImageElement | null = null;
 let residentWoodcutterVideoWalkSheet: HTMLImageElement | null = null;
 let residentWoodcutterVideoWalkHdSheet: HTMLImageElement | null = null;
 let residentWoodcutterVideoWorkSheet: HTMLImageElement | null = null;
@@ -390,6 +397,10 @@ function ensureLoaded(): void {
   loadAtlasAsset(RESIDENT_IDLE_VIDEO_WALK_SHEETS.standard.src, false, image => { residentIdleVideoWalkSheet = image; });
   loadAtlasAsset(RESIDENT_IDLE_VIDEO_WALK_SHEETS.highDefinition.src, false,
     image => { residentIdleVideoWalkHdSheet = image; });
+  loadAtlasAsset(RESIDENT_APPROVED_I2V_SHEETS.standard.src, false,
+    image => { residentApprovedI2VSheet = image; });
+  loadAtlasAsset(RESIDENT_APPROVED_I2V_SHEETS.highDefinition.src, false,
+    image => { residentApprovedI2VHdSheet = image; });
   loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.standard.src, false,
     image => { residentWoodcutterVideoWalkSheet = image; });
   loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.highDefinition.src, false,
@@ -776,6 +787,70 @@ function drawIdleVideoWalk(
   return true;
 }
 
+function drawApprovedI2VLocomotion(
+  ctx: CanvasRenderingContext2D,
+  p: ResidentDrawParams,
+  animationTimeMs: number,
+): boolean {
+  const wantsHighDefinition = canvasBackingScale(ctx) >= 1.5;
+  const highDefinition = wantsHighDefinition && residentApprovedI2VHdSheet != null;
+  const image = highDefinition ? residentApprovedI2VHdSheet : residentApprovedI2VSheet;
+  if (!image) return false;
+  const rect = approvedI2VSourceRect(
+    p.job,
+    p.gender,
+    p.militiaWeapon,
+    Boolean(p.moving),
+    animationTimeMs,
+    highDefinition,
+    p.special,
+  );
+  if (!rect) return false;
+  const textureScale = highDefinition ? 0.5 : 1;
+  const sizeScale = p.sizeScale ?? 1;
+  const displayWidth = rect.sw * textureScale * sizeScale;
+  const displayHeight = rect.sh * textureScale * sizeScale;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.scale(generatedCharacterFacingScale(p.facing), 1);
+  ctx.drawImage(
+    image,
+    rect.sx,
+    rect.sy,
+    rect.sw,
+    rect.sh,
+    -displayWidth / 2,
+    CHALF - displayHeight,
+    displayWidth,
+    displayHeight,
+  );
+  ctx.restore();
+  return true;
+}
+
+function allowsApprovedI2VLocomotion(p: ResidentDrawParams): boolean {
+  if (p.stage) return false;
+  switch (p.job) {
+    case 'farmer':
+      return Boolean(p.moving) || p.farmerAction == null;
+    case 'hunter':
+      return !(p.working && !p.moving) && !p.carryingGame;
+    case 'hauler':
+      return !p.cartEquipped;
+    case 'herbalist':
+    case 'builder':
+      return !(p.working && !p.moving);
+    case 'miner':
+      return !(p.working && !p.moving) && !p.carryingMinerals;
+    case 'fisher':
+    case 'herder':
+    case 'militia':
+      return true;
+    default:
+      return isApprovedI2VJob(p.job) && (Boolean(p.moving) || !p.working);
+  }
+}
+
 function drawWoodcutterVideoWalk(
   ctx: CanvasRenderingContext2D,
   p: ResidentDrawParams,
@@ -854,6 +929,9 @@ function drawOptionalResidentPresentation(
     drawResidentCellRect(ctx, residentCommonLocomotionSheet, rect, p);
     return true;
   };
+
+  if (allowsApprovedI2VLocomotion(p) &&
+      drawApprovedI2VLocomotion(ctx, p, animationTimeMs)) return true;
 
   switch (p.job) {
     case 'idle':
@@ -1710,7 +1788,9 @@ export const atlasSprites: SpriteAPI = {
     let drewOptionalResidentPresentation = false;
 
     const specialRect = p.special ? specialResidentSourceRect(p.special) : null;
-    if (specialResidentSheet && specialRect) {
+    if (p.special && drawApprovedI2VLocomotion(ctx, p, animationTime)) {
+      drewOptionalResidentPresentation = true;
+    } else if (specialResidentSheet && specialRect) {
       drawGeneratedCharacterRect(ctx, specialResidentSheet, specialRect, p.x, p.y, p.facing, bob, 1.16);
     } else if (foreignResidentSheet && foreignRect) {
       drawGeneratedCharacterRect(ctx, foreignResidentSheet, foreignRect, p.x, p.y, p.facing, bob);
