@@ -13,7 +13,7 @@ import {
 } from '../game/buildings';
 import { COLLAPSE_RATIO } from '../game/battles';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
-import { getSeason } from '../game/seasons';
+import { getDayOfYear, getSeason } from '../game/seasons';
 import { DAY_BANDS, DAY_CYCLE_SUBTICKS } from '../game/dayCycle';
 import { LEISURE_CLUSTER_CAPACITY } from '../game/agents';
 import { findHabitatIconAtTile } from '../game/habitats';
@@ -1698,6 +1698,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     });
   }
 
+  const dayFrac = visualDayFraction(state, o.alpha);
+  drawWorldShadows(ctx, state, viewport, localResidentDraws, dayFrac, sprites, renderScale);
+
   // 건물·주민·가축·부대·큰 나무/산맥을 하나의 화면 행 기준으로 정렬한다.
   queueTerrainOverlays(ctx, state, sprites, viewport, renderScale, rowRenderQueue);
   rowRenderQueue.sort((left, right) =>
@@ -1741,12 +1744,6 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   // 72서브틱 체제에서는 한낮 = 노동 대역 중앙, 자정 = 밤 대역 중앙으로 정렬한다 (M4 계약).
   // 두 중앙이 정확히 반나절(SUB/2) 떨어져 있어 균등 선형 이동만으로 두 앵커가 동시에 성립한다.
   // 이전 설정을 읽는 개발 빌드에서는 종전 선형 매핑을 유지한다.
-  const SUB: number = CONFIG.agents.subticksPerDay;
-  const subU = (state.subTick + o.alpha) % SUB;
-  const workCenter = (DAY_BANDS.work.start + DAY_BANDS.work.end + 1) / 2;
-  const dayFrac = SUB === DAY_CYCLE_SUBTICKS
-    ? ((subU - workCenter + 0.25 * SUB + SUB) % SUB) / SUB
-    : subU / SUB;
   drawDayNight(ctx, state, dayFrac, viewport);
   lap('7-daynight');
 
@@ -1970,6 +1967,277 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
 const SEASON_DAYLIGHT_FRAC: Readonly<Record<Season, number>> = {
   spring: 0.5, summer: 0.58, autumn: 0.5, winter: 0.42,
 };
+
+function visualDayFraction(state: GameState, alpha: number): number {
+  const subticks: number = CONFIG.agents.subticksPerDay;
+  const subU = (state.subTick + alpha) % subticks;
+  const workCenter = (DAY_BANDS.work.start + DAY_BANDS.work.end + 1) / 2;
+  return subticks === DAY_CYCLE_SUBTICKS
+    ? ((subU - workCenter + 0.25 * subticks + subticks) % subticks) / subticks
+    : subU / subticks;
+}
+
+interface DayShadow {
+  ux: number; // 높이 1px가 만드는 화면 가로 오프셋 (부호 = 해 반대 방향)
+  uy: number; // 높이 1px가 만드는 화면 세로(아래) 오프셋 — 3/4 시점이라 항상 살짝 앞으로 깔린다
+  angle: number;
+  alpha: number;
+}
+
+function dayShadowFor(state: GameState, dayFrac: number): DayShadow | null {
+  const daylight = SEASON_DAYLIGHT_FRAC[getSeason(state.day)];
+  const dawnT = 0.25 - daylight / 2;
+  const duskT = 0.25 + daylight / 2;
+  if (dayFrac < dawnT || dayFrac >= duskT) return null;
+  // 방향과 길이를 32단계로 고정해 미세한 떨림과 불필요한 매 프레임 변화를 줄인다.
+  const progress = Math.round((dayFrac - dawnT) / daylight * 32) / 32;
+  const diurnal = Math.max(0, Math.sin(Math.PI * progress));
+  // 태양 고도의 연중 변화 — 하지(여름 중앙)에 가장 높고 동지에 가장 낮다.
+  // 날짜 기반 연속 곡선이라 겨울로 갈수록 그림자가 서서히 길어지고 계절 경계에서 튀지 않는다.
+  const annual = Math.cos(Math.PI * 2 * (getDayOfYear(state.day) - CONFIG.time.seasonDays * 1.5) / CONFIG.time.yearDays);
+  const altitude = diurnal * (0.8 + 0.2 * annual);
+  // 전단 계수: 모든 피사체가 자기 높이에 이 값을 곱한 만큼 같은 각도로 눕는다.
+  // 정오에는 발밑에 고이고 해가 낮을수록(아침·저녁, 그리고 겨울) 길게 눕는다.
+  const ux = (progress * 2 - 1) * (0.22 + Math.pow(1 - altitude, 1.5) * 1.5);
+  const uy = 0.1 + diurnal * 0.08;
+  const weatherMultiplier =
+    state.weather === 'clear' || state.weather === 'coldSnap' ? 1
+      : state.weather === 'frost' ? 0.78
+        : state.weather === 'rain' || state.weather === 'thawFlood' ? 0.48
+          : 0.34;
+  const alpha = (0.1 + Math.sqrt(altitude) * 0.16) * weatherMultiplier;
+  if (alpha < 0.04) return null;
+  return { ux, uy, angle: Math.atan2(uy, ux), alpha };
+}
+
+// 그림자 합성 레이어 — 모든 그림자를 불투명하게 모아 마지막에 한 번만 옅게 얹는다.
+// 나무·건물·주민 그림자가 겹쳐도 이중으로 어두워지는 얼룩이 생기지 않는다.
+let shadowLayer: HTMLCanvasElement | null = null;
+
+// 건물 그림자 실루엣 캐시 — 스프라이트를 오프스크린에 그려 알파만 남기고 검게 굽는다.
+// 키당 한 번만 생성하므로 이후에는 건물당 drawImage 두 번이 전부다.
+// baseRow: 실루엣의 실제 시각적 밑변(마지막 불투명 행). 봉수대처럼 스프라이트가
+// 풋프린트 밑변까지 닿지 않는 건물은 이 줄에 그림자를 붙여야 잘려 보이지 않는다.
+interface BuildingShadowSilhouette {
+  canvas: HTMLCanvasElement;
+  baseRow: number;
+  visualHeight: number;
+}
+
+const buildingShadowSilhouettes = new Map<string, BuildingShadowSilhouette>();
+
+// 마당형 건물 — 스프라이트 앞쪽이 마당(지면)이고 본채는 뒤에 서 있는 유형.
+// groundFrac: 실루엣 시각 높이 중 아래쪽 마당 비율(그림자 투영에서 제외).
+// anchorDepthFrac: 풋프린트 밑변에서 뒤로 물러날 깊이 비율(본채 접지선).
+const COURTYARD_SHADOW_OVERRIDES: Partial<Record<Building['type'], { groundFrac: number; anchorDepthFrac: number }>> = {
+  center: { groundFrac: 0.33, anchorDepthFrac: 0.5 },
+};
+
+function buildingShadowSilhouette(
+  sprites: SpriteAPI,
+  state: GameState,
+  building: Building,
+  dims: { w: number; h: number },
+  season: Season,
+  highDefinition: boolean,
+  wallTiles: ReadonlySet<string>,
+): BuildingShadowSilhouette | null {
+  const size = dims.w * TILE;
+  const connections = isWallBuilding(building.type)
+    ? wallConnectionsFromSet(wallTiles, building.x, building.y)
+    : undefined;
+  const rank = building.type === 'center' ? state.rank : undefined;
+  const key = [
+    sprites.id, building.type, season, size, rank ?? '', highDefinition ? 1 : 0,
+    connections ? `${+connections.n}${+connections.e}${+connections.s}${+connections.w}` : '',
+  ].join('|');
+  const cached = buildingShadowSilhouettes.get(key);
+  if (cached) return cached;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size * 2;
+  const silCtx = canvas.getContext('2d');
+  if (!silCtx) return null;
+  sprites.drawBuilding(silCtx, {
+    type: building.type, rank, built: true, progress01: 1, ghost: false,
+    season, highDefinition, connections,
+    x: 0, y: size, size,
+  });
+  silCtx.globalCompositeOperation = 'source-in';
+  silCtx.fillStyle = '#161b21';
+  silCtx.fillRect(0, 0, canvas.width, canvas.height);
+  // 알파에서 시각적 밑변·꼭대기를 찾는다. 은은한 스프라이트 내장 그림자는 무시한다.
+  // 시트가 아직 로드 전이면 빈 캔버스가 나온다 — 캐시하지 않고 다음 프레임에 다시 시도한다.
+  const probe = silCtx.getImageData(0, 0, canvas.width, canvas.height).data;
+  let topRow = -1;
+  let baseRow = -1;
+  for (let y = 0; y < canvas.height; y++) {
+    let rowHasPixel = false;
+    for (let x = 0; x < canvas.width; x++) {
+      if (probe[(y * canvas.width + x) * 4 + 3] > 32) { rowHasPixel = true; break; }
+    }
+    if (rowHasPixel) {
+      if (topRow < 0) topRow = y;
+      baseRow = y;
+    }
+  }
+  if (baseRow < 0) return null;
+  const entry: BuildingShadowSilhouette = { canvas, baseRow, visualHeight: baseRow - topRow + 1 };
+  buildingShadowSilhouettes.set(key, entry);
+  return entry;
+}
+
+function drawWorldShadows(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  viewport: SceneViewport,
+  residents: readonly ResidentDrawParams[],
+  dayFrac: number,
+  sprites: SpriteAPI,
+  renderScale: 1 | 2,
+): void {
+  const shadow = dayShadowFor(state, dayFrac);
+  if (!shadow) return;
+  const layerW = Math.max(1, Math.ceil(viewport.pixelWidth));
+  const layerH = Math.max(1, Math.ceil(viewport.pixelHeight));
+  if (!shadowLayer) shadowLayer = document.createElement('canvas');
+  if (shadowLayer.width < layerW || shadowLayer.height < layerH) {
+    shadowLayer.width = layerW;
+    shadowLayer.height = layerH;
+  }
+  const layer = shadowLayer.getContext('2d');
+  if (!layer) return;
+  layer.setTransform(1, 0, 0, 1, 0, 0);
+  layer.clearRect(0, 0, shadowLayer.width, shadowLayer.height);
+  layer.translate(-viewport.pixelX, -viewport.pixelY);
+  layer.fillStyle = '#161b21';
+
+  // 건물 — 스프라이트 알파를 구운 실루엣을 밑변 기준으로 눕혀 지면에 투영한다.
+  // 밭·논·묘역은 바닥 시설이라 제외하고, 공사 중인 건물은 아직 벽이 없으니 건너뛴다.
+  // 오블리크 스프라이트는 세로축에 깊이와 높이가 섞여 있어 전단을 0.6배로 보정한다.
+  const season = getSeason(state.day);
+  const wallTiles = builtWallTileSet(state);
+  const shearX = shadow.ux * 0.6;
+  // 세로 눌림은 uy(접지 오프셋)와 분리해 실루엣이 덩어리로 보일 만큼 남긴다.
+  // 해가 낮을수록 그림자가 앞으로도 더 뻗는다.
+  const flattenY = Math.min(0.42, 0.16 + Math.abs(shearX) * 0.3);
+  for (const building of state.buildings) {
+    if (!building.built || isAreaBuildingType(building.type)) continue;
+    const dims = buildingFootprintDims(building);
+    const sil = buildingShadowSilhouette(sprites, state, building, dims, season, renderScale === 2, wallTiles);
+    if (!sil) continue;
+    const reachTiles = Math.ceil((Math.abs(shearX) * sil.visualHeight + 6) / TILE);
+    if (!tileRectIntersectsViewport(
+      viewport,
+      building.x - reachTiles, building.y - 1,
+      dims.w + reachTiles * 2, dims.h + 3,
+    )) continue;
+    const baseX = building.x * TILE;
+    // 그림자는 풋프린트 밑변이 아니라 스프라이트의 시각적 밑변에 붙인다.
+    // 봉수대처럼 스프라이트가 풋프린트 아래까지 닿지 않는 건물도 잘려 보이지 않는다.
+    // 접지선에 딱 붙이지 않고 접지면 절반쯤 안쪽(위)으로 물러나 시작해야
+    // 그림자가 건물 밑에서 흘러나오듯 이어진다. 물러남은 반 칸을 넘지 않는다.
+    // 마당형 건물은 마당 부분을 잘라내고 본채 접지선(깊이 비율)에 붙인다.
+    const courtyard = COURTYARD_SHADOW_OVERRIDES[building.type];
+    const bottomGap = sil.canvas.height - 1 - sil.baseRow;
+    const lift = Math.min(TILE * 0.5, sil.visualHeight * 0.16);
+    const baseRowUsed = courtyard
+      ? sil.baseRow - Math.round(sil.visualHeight * courtyard.groundFrac)
+      : sil.baseRow;
+    const frontAnchor = courtyard
+      ? (building.y + dims.h) * TILE - 1 - dims.h * TILE * courtyard.anchorDepthFrac
+      : (building.y + dims.h) * TILE - 1 - bottomGap - lift;
+    const backOffset = dims.h * TILE * (courtyard ? 0.2 : 0.5);
+    // 접지선 기준으로 한 번, 그보다 뒤쪽 기준으로 한 번 찍는다.
+    // 뒤쪽 사본이 옆벽을 절반 높이까지만 감싸 상자 부피감을 만든다.
+    for (const anchor of [frontAnchor, frontAnchor - backOffset]) {
+      layer.save();
+      layer.transform(1, 0, -shearX, -flattenY, baseX + shearX * baseRowUsed, anchor + flattenY * baseRowUsed);
+      layer.drawImage(sil.canvas, 0, 0, sil.canvas.width, baseRowUsed + 1, 0, 0, sil.canvas.width, baseRowUsed + 1);
+      layer.restore();
+    }
+  }
+
+  // 나무 — 실제 수관 비례(treeCanopiesIntersectingRect와 같은 치수)를 지면에 투영한다.
+  const minX = Math.max(0, viewport.tileMinX - 5);
+  const maxX = Math.min((state.map[0]?.length ?? 0) - 1, viewport.tileMaxX + 5);
+  const minY = Math.max(0, viewport.tileMinY - 3);
+  const maxY = Math.min(state.map.length - 1, viewport.tileMaxY + 2);
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= Math.min(maxX, state.map[y].length - 1); x++) {
+      const stage = treeStageFor(state.map[y][x]);
+      if (stage !== 'young' && stage !== 'mature') continue;
+      const mature = stage === 'mature';
+      const canopyHeight = mature ? 41.5 : 27;
+      const canopyRx = mature ? 29 : 17;
+      const trunkHalf = mature ? 3.5 : 2.5;
+      const footX = x * TILE + TILE / 2;
+      const footY = (y + 1) * TILE - 2;
+      const cx = footX + shadow.ux * canopyHeight;
+      const cy = footY + shadow.uy * canopyHeight;
+      // 줄기 — 발치에서 수관 그림자 중심까지 가늘어지며 이어진다.
+      layer.beginPath();
+      layer.moveTo(footX - trunkHalf, footY);
+      layer.lineTo(footX + trunkHalf, footY);
+      layer.lineTo(cx + trunkHalf * 0.6, cy);
+      layer.lineTo(cx - trunkHalf * 0.6, cy);
+      layer.closePath();
+      layer.fill();
+      // 수관 — 회전 없는 가로 타원. 태양 방위는 중심 이동과 가로 반지름으로만 표현해,
+      // 정오에 ux 부호가 바뀌어도 타원이 빙글 돌지 않는다.
+      const rx = canopyRx * (0.92 + Math.abs(shadow.ux) * 0.4);
+      const ry = canopyRx * 0.36;
+      layer.beginPath();
+      layer.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      layer.fill();
+      // 보조 타원 — 줄기 쪽으로 되돌아오며 윤곽을 흩뜨린다 (타일 좌표 기반 결정적 지터).
+      const drift = ((x * 31 + y * 17) % 7 - 3) * 0.9;
+      layer.beginPath();
+      layer.ellipse(
+        footX + shadow.ux * canopyHeight * 0.55 + drift,
+        footY + shadow.uy * canopyHeight * 0.55,
+        rx * 0.62,
+        ry * 0.72,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      layer.fill();
+    }
+  }
+
+  // 주민 — 발끝에서 뻗는 캡슐 + 발밑 접지 타원.
+  // 스프라이트 발끝은 sizeScale과 무관하게 y + TILE/2에 고정이므로 발 위치에 scale을 곱하지 않는다.
+  for (const resident of residents) {
+    const scale = resident.sizeScale ?? 1;
+    const footX = resident.x;
+    const footY = resident.y + TILE / 2 - 1.5;
+    const heightPx = TILE * 0.78 * scale;
+    const endX = footX + shadow.ux * heightPx;
+    const endY = footY + shadow.uy * heightPx;
+    const along = Math.max(2.6 * scale, Math.hypot(endX - footX, endY - footY) / 2 + 1.2);
+    layer.beginPath();
+    layer.ellipse(
+      (footX + endX) / 2,
+      (footY + endY) / 2,
+      along,
+      Math.max(1.6, 2.6 * scale),
+      shadow.angle,
+      0,
+      Math.PI * 2,
+    );
+    layer.fill();
+    layer.beginPath();
+    layer.ellipse(footX, footY + 0.8, 3.4 * scale + 0.6, 1.9 * scale + 0.4, 0, 0, Math.PI * 2);
+    layer.fill();
+  }
+
+  ctx.save();
+  ctx.globalAlpha = shadow.alpha;
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(shadowLayer, 0, 0, layerW, layerH, viewport.pixelX, viewport.pixelY, layerW, layerH);
+  ctx.restore();
+}
 
 function drawDayNight(ctx: CanvasRenderingContext2D, state: GameState, dayFrac: number, viewport: SceneViewport): void {
   const daylight = SEASON_DAYLIGHT_FRAC[getSeason(state.day)];
