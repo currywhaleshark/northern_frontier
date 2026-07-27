@@ -10,6 +10,7 @@ import {
   footprintTilesOf, isAreaBuildingType, isPaddyEligibleTile, isPlotBuildingType, isSmithyProductUnlocked,
   occupyBuildingTiles, plotArea, SMITHY_PRODUCT_DEFS,
 } from './buildings';
+import { forestTilesInArea, forestTilesInFootprint, pendingClearingTiles } from './landClearing';
 import { isWallBuilding } from './walls';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
 import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
@@ -280,6 +281,18 @@ function findNearbySpots(
 
 // ─────────────────────────── 플레이어 행동 ───────────────────────────
 
+/**
+ * 나무를 낀 자리에 지정했을 때 tryPlaceBuilding·expandAreaBuilding이 돌려주는 표식.
+ * 다른 검사를 모두 통과했다는 뜻이므로, UI는 이때만 개간 확인 모달을 띄우고
+ * 플레이어가 수락하면 `approveClearing: true`로 다시 부른다.
+ */
+export const CLEARING_APPROVAL_REQUIRED = '__clearing_approval_required__';
+
+export interface PlacementOptions {
+  /** 공사터의 나무를 베고 짓겠다고 플레이어가 이미 수락했는가 */
+  approveClearing?: boolean;
+}
+
 export function tryPlaceBuilding(
   state: GameState,
   type: BuildingTypeId,
@@ -287,6 +300,7 @@ export function tryPlaceBuilding(
   y: number,
   plotW?: number,
   plotH?: number,
+  options: PlacementOptions = {},
 ): string | null {
   const def = BUILDING_DEFS[type];
   const tile = state.map[y]?.[x];
@@ -319,6 +333,10 @@ export function tryPlaceBuilding(
   }
   const cost = buildingCostFor(type, w ?? 1, h ?? 1);
   if (!canAffordCost(state, cost)) return '자원이 부족합니다.';
+  // 마지막 관문: 나무를 끼고 지정했다면 개간에 동의를 받는다.
+  if (!options.approveClearing && forestTilesInFootprint(state, type, x, y, w, h).length > 0) {
+    return CLEARING_APPROVAL_REQUIRED;
+  }
 
   for (const [res, amt] of Object.entries(cost)) {
     state.resources[res as keyof typeof state.resources] -= amt ?? 0;
@@ -341,15 +359,16 @@ export function tryPlaceBuilding(
   if (type === 'jangdokdae') b.fermentBatches = [];
   if (type === 'stable') b.livestock = createDefaultLivestockState();
   state.buildings.push(b);
-  const tiles = buildingFootprintTiles(state, type, x, y, w, h) ?? [];
   occupyBuildingTiles(state, b);
-  for (const footprintTile of tiles) {
-    if (footprintTile.terrain === 'forest') {
-      footprintTile.terrain = 'plain';
-      state.resources.wood += 3; // 개간하며 얻는 목재
-    }
-  }
-  addLog(state, `${def.name} 건설을 시작했습니다.`, 'info');
+  // 나무는 그대로 서 있다 — 벌목꾼이 베어 옮겨야 공사가 시작된다.
+  const standingTrees = pendingClearingTiles(state, b).length;
+  addLog(
+    state,
+    standingTrees > 0
+      ? `${def.name} 자리를 정했습니다. 벌목꾼이 나무 ${standingTrees}그루를 먼저 베어냅니다.`
+      : `${def.name} 건설을 시작했습니다.`,
+    'info',
+  );
   noteBuildingClaimIntrusions(state, b);
   return null;
 }
@@ -789,6 +808,7 @@ export function expandAreaBuilding(
   y: number,
   w: number,
   h: number,
+  options: PlacementOptions = {},
 ): string | null {
   const building = state.buildings.find(candidate => candidate.id === buildingId);
   if (!building || !building.built) return '완공된 영역형 건물을 선택해야 합니다.';
@@ -850,6 +870,8 @@ export function expandAreaBuilding(
 
   const cost = expansionCost(building.type, addedTiles);
   if (!canAffordCost(state, cost)) return '확장에 필요한 자원이 부족합니다.';
+  const expansionTrees = forestTilesInArea(state, building.type, target).length;
+  if (!options.approveClearing && expansionTrees > 0) return CLEARING_APPROVAL_REQUIRED;
   for (const [resource, amount] of Object.entries(cost)) {
     state.resources[resource as ResourceId] -= amount ?? 0;
   }
@@ -872,18 +894,14 @@ export function expandAreaBuilding(
     building.w = target.w;
     building.h = target.h;
     occupyBuildingTiles(state, building);
-    const footprint = footprintTilesOf(state, building) ?? [];
-    for (const tile of footprint) {
-      if (tile.terrain === 'forest') {
-        tile.terrain = 'plain';
-        state.resources.wood += 3;
-      }
-    }
+    // 넓힌 자리의 나무도 벌목꾼이 베어낸 뒤에야 공사가 진행된다.
   }
   const worker = building.type === 'field' || building.type === 'paddy' ? '농부' : '건축가';
   addLog(
     state,
-    `${BUILDING_DEFS[building.type].name} 영역 확장을 시작했습니다. 추가 ${addedTiles}칸 · ${worker}가 공사합니다.`,
+    expansionTrees > 0
+      ? `${BUILDING_DEFS[building.type].name} 영역 확장을 정했습니다. 추가 ${addedTiles}칸 · 벌목꾼이 나무 ${expansionTrees}그루를 벤 뒤 ${worker}가 공사합니다.`
+      : `${BUILDING_DEFS[building.type].name} 영역 확장을 시작했습니다. 추가 ${addedTiles}칸 · ${worker}가 공사합니다.`,
     'info',
   );
   return null;
@@ -920,6 +938,7 @@ export function startBuildingRelocation(
   buildingId: number,
   x: number,
   y: number,
+  options: PlacementOptions = {},
 ): string | null {
   const building = state.buildings.find(candidate => candidate.id === buildingId);
   if (!building || !building.built) return '완공된 건물을 선택해야 합니다.';
@@ -932,6 +951,8 @@ export function startBuildingRelocation(
     return '현지 거점이 자리한 곳으로는 이전할 수 없습니다.';
   }
   if (!canRelocateBuildingAt(state, building, x, y)) return '이곳으로는 건물을 이전할 수 없습니다.';
+  const destinationTrees = forestTilesInFootprint(state, building.type, x, y, w, h).length;
+  if (!options.approveClearing && destinationTrees > 0) return CLEARING_APPROVAL_REQUIRED;
 
   const def = BUILDING_DEFS[building.type];
   building.built = false;
@@ -946,7 +967,9 @@ export function startBuildingRelocation(
   state.resources.defense = computeDefense(state);
   addLog(
     state,
-    `${def.name} 이전을 시작했습니다. 건축가가 기존 건물을 해체한 뒤 새 위치에 자재 비용 없이 다시 짓습니다.`,
+    destinationTrees > 0
+      ? `${def.name} 이전을 시작했습니다. 건축가가 해체하는 동안 벌목꾼이 새 자리의 나무 ${destinationTrees}그루를 베어냅니다.`
+      : `${def.name} 이전을 시작했습니다. 건축가가 기존 건물을 해체한 뒤 새 위치에 자재 비용 없이 다시 짓습니다.`,
     'info',
   );
   return null;

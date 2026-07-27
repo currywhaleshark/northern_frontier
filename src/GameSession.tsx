@@ -9,7 +9,10 @@ import {
   buildingHasActiveWork, convertFieldToPaddy, setYouthActivity, startBuildingDemolition,
   startBuildingRelocation, togglePriorityBuilding, toggleResidentCart,
   unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
+  CLEARING_APPROVAL_REQUIRED,
 } from './game/simulation';
+import { forestTilesInArea, forestTilesInFootprint } from './game/landClearing';
+import { ClearingConfirmDialog } from './components/ClearingConfirmDialog';
 import { hasAnySave, loadGame, saveGame } from './game/saveLoad';
 import { addLog, negotiateTrade, requestTrade, tradeNegotiationOf } from './game/events';
 import { jobWorkforceCounts } from './game/residents';
@@ -52,7 +55,7 @@ import { openPredatorHunt, startPredatorScout } from './game/specialEvents';
 import { getPointerAction, selectedEntityAfterTileClick } from './game/selectionActions';
 import { makeRng } from './game/map';
 import { openTerritoryOrderConfirmation } from './game/territory';
-import { BUILDING_DEFS, computeDefense } from './game/buildings';
+import { BUILDING_DEFS, buildingFootprintDims, computeDefense } from './game/buildings';
 import { createExpedition, predatorExpeditionTarget } from './game/expedition';
 import { purchasePredatorIntel } from './game/predatorIntelTrade';
 import { isForeignSiteOperational } from './game/foreignSites';
@@ -70,7 +73,7 @@ import {
 } from './game/tacticalBattle';
 import { mergeHuntGroups, setHuntPreparationZone, splitHuntGroup } from './game/tacticalHunt';
 import type {
-  BuildingTypeId, CombatWeaponId, CropId, DryingProductId, EdictId, EdictLevel, GameState, JobId, LivestockId, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId, YouthActivity,
+  BuildingTypeId, CombatWeaponId, CropId, DryingProductId, EdictId, EdictLevel, GameState, JobId, LivestockId, LogEntry, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId, YouthActivity,
   PreparationActionId, PredatorKind, SpecialItemId, SpecialResidentId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
 import { markScenarioFlag } from './game/scenario';
@@ -102,6 +105,8 @@ import type { DockWindowId, FloatingWindowId } from './ui/dockPresentation';
 import type { AutoAssignBuildingType } from './game/workerSlots';
 import { RuntimeVersionBoundary } from './components/RuntimeVersionBoundary';
 import { createRuntimeVersionStore, uiRefreshIntervalMs } from './ui/runtimeVersionStore';
+import { ActionNoticeLayer } from './components/ActionNotice';
+import { createActionNoticeStore } from './ui/actionNotices';
 import {
   recordRuntimePerf, recordRuntimePerfSince, runtimePerfSnapshot, runtimePerfStartTime,
   startRuntimePerf, stopRuntimePerf, summarizeRuntimePerf,
@@ -258,12 +263,30 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   const mapViewportRef = useRef<HTMLDivElement>(null);
   const [runtimeVersionStore] = useState(createRuntimeVersionStore);
   const [uiVersionStore] = useState(createRuntimeVersionStore);
+  const [actionNoticeStore] = useState(createActionNoticeStore);
   const [, setVersion] = useState(0);
   const bump = useCallback(() => {
     runtimeVersionStore.publish();
     uiVersionStore.publish();
     setVersion(v => v + 1);
   }, [runtimeVersionStore, uiVersionStore]);
+
+  // 조작 결과 안내: 로그에 남기고 화면 가운데에도 띄운다. 거절 사유를 로그에서
+  // 찾아 읽어야 했던 탓에 "왜 안 되는지 모르겠다"가 되기 때문이다.
+  const notify = useCallback((
+    message: string | null | undefined,
+    kind: LogEntry['kind'] = 'info',
+    important = kind === 'raid',
+  ) => {
+    if (!message) return;
+    addLog(stateRef.current, message, kind, important);
+    actionNoticeStore.push(
+      message,
+      kind === 'bad' || kind === 'raid' ? 'bad' : kind === 'good' ? 'good' : 'info',
+    );
+  }, [actionNoticeStore]);
+
+  useEffect(() => () => actionNoticeStore.clear(), [actionNoticeStore]);
 
   // 전투 시뮬레이션 모드: 샌드박스 상태에서 전술 전투만 테스트, 끝나면 메뉴로 복귀
   const [simMode, setSimMode] = useState(launch.kind === 'battleSimulation');
@@ -275,6 +298,10 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   const [pastureStableId, setPastureStableId] = useState<number | null>(null);
   const [expandingBuildingId, setExpandingBuildingId] = useState<number | null>(null);
   const [relocatingBuildingId, setRelocatingBuildingId] = useState<number | null>(null);
+  // 개간 동의를 기다리는 공사 지정 — 수락하면 confirm이 같은 배치를 다시 실행한다
+  const [clearingRequest, setClearingRequest] = useState<
+    { title: string; trees: number; detail: string; confirm: () => void } | null
+  >(null);
   const [selected, setSelected] = useState<{ x: number; y: number } | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
   const [canLoad, setCanLoad] = useState(hasAnySave());
@@ -524,25 +551,66 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     setSpeed(menuRestoreSpeedRef.current);
   }, []);
 
+  // 나무를 낀 자리는 곧바로 짓지 않고 개간 동의를 먼저 받는다. attempt는 다른 검사를
+  // 모두 통과했을 때만 개간 표식을 돌려주므로, 모달은 "짓기는 가능한 자리"에만 뜬다.
+  const commitPlacement = (
+    attempt: (approveClearing: boolean) => string | null,
+    describe: () => { title: string; trees: number; detail: string },
+    onPlaced: () => void,
+  ) => {
+    const err = attempt(false);
+    if (err === CLEARING_APPROVAL_REQUIRED) {
+      setClearingRequest({
+        ...describe(),
+        confirm: () => {
+          const retryError = attempt(true);
+          if (retryError) notify(retryError, 'bad');
+          else {
+            playSfx('hammer');
+            onPlaced();
+          }
+          bump();
+        },
+      });
+      return;
+    }
+    if (err) notify(err, 'bad');
+    else {
+      playSfx('hammer');
+      onPlaced();
+    }
+    bump();
+  };
+
   const handlePlacePlot = (x: number, y: number, w: number, h: number) => {
     if (expandingBuildingId != null) {
-      const err = expandAreaBuilding(stateRef.current, expandingBuildingId, x, y, w, h);
-      if (err) addLog(stateRef.current, err, 'bad');
-      else {
-        playSfx('hammer');
-        setExpandingBuildingId(null);
-      }
-      bump();
+      const buildingId = expandingBuildingId;
+      const building = stateRef.current.buildings.find(candidate => candidate.id === buildingId);
+      commitPlacement(
+        approveClearing =>
+          expandAreaBuilding(stateRef.current, buildingId, x, y, w, h, { approveClearing }),
+        () => ({
+          title: `${building ? BUILDING_DEFS[building.type].name : '건물'} 영역 확장`,
+          trees: building
+            ? forestTilesInArea(stateRef.current, building.type, { x, y, w, h }).length
+            : 0,
+          detail: '벌목 우선도는 건설 우선도를 따릅니다.',
+        }),
+        () => setExpandingBuildingId(null),
+      );
       return;
     }
     if (!placingType) return;
-    const err = tryPlaceBuilding(stateRef.current, placingType, x, y, w, h);
-    if (err) addLog(stateRef.current, err, 'bad');
-    else {
-      playSfx('hammer');
-      setPlacingType(null);
-    }
-    bump();
+    const type = placingType;
+    commitPlacement(
+      approveClearing => tryPlaceBuilding(stateRef.current, type, x, y, w, h, { approveClearing }),
+      () => ({
+        title: `${BUILDING_DEFS[type].name} 건설`,
+        trees: forestTilesInFootprint(stateRef.current, type, x, y, w, h).length,
+        detail: '벌목 우선도는 건설 우선도를 따릅니다.',
+      }),
+      () => setPlacingType(null),
+    );
   };
 
   const handlePlacePasture = (x: number, y: number, w: number, h: number) => {
@@ -551,7 +619,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     const err = stable?.pasture
       ? expandAreaBuilding(stateRef.current, pastureStableId, x, y, w, h)
       : defineStablePasture(stateRef.current, pastureStableId, x, y, w, h);
-    if (err) addLog(stateRef.current, err, 'bad');
+    if (err) notify(err, 'bad');
     else setPastureStableId(null);
     bump();
   };
@@ -559,13 +627,16 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   const handleTileClick = (x: number, y: number) => {
     if (pastureStableId != null || expandingBuildingId != null || relocatingBuildingId != null) return;
     if (placingType) {
-      const err = tryPlaceBuilding(stateRef.current, placingType, x, y);
-      if (err) addLog(stateRef.current, err, 'bad');
-      else {
-        playSfx('hammer');
-        setPlacingType(null);
-      }
-      bump();
+      const type = placingType;
+      commitPlacement(
+        approveClearing => tryPlaceBuilding(stateRef.current, type, x, y, undefined, undefined, { approveClearing }),
+        () => ({
+          title: `${BUILDING_DEFS[type].name} 건설`,
+          trees: forestTilesInFootprint(stateRef.current, type, x, y).length,
+          detail: '벌목 우선도는 건설 우선도를 따릅니다.',
+        }),
+        () => setPlacingType(null),
+      );
       return;
     }
     const tile = stateRef.current.map[y]?.[x];
@@ -633,7 +704,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const handleSetYouthActivity = (id: number, activity: YouthActivity) => {
     const error = setYouthActivity(stateRef.current, id, activity);
-    if (error) addLog(stateRef.current, error, 'info');
+    if (error) notify(error, 'info');
     bump();
   };
 
@@ -644,7 +715,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const handleToggleResidentCart = (id: number) => {
     const err = toggleResidentCart(stateRef.current, id);
-    if (err) addLog(stateRef.current, err, 'info');
+    if (err) notify(err, 'info');
     bump();
   };
 
@@ -655,13 +726,13 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const handleSetResidentWeapon = (id: number, weapon: CombatWeaponId | null) => {
     const error = setResidentWeapon(stateRef.current, id, weapon);
-    if (error) addLog(stateRef.current, error, 'info');
+    if (error) notify(error, 'info');
     refreshWeaponDefense();
   };
 
   const handleSetResidentMount = (id: number, mount: MountId | null) => {
     const error = setResidentMount(stateRef.current, id, mount);
-    if (error) addLog(stateRef.current, error, 'info');
+    if (error) notify(error, 'info');
     bump();
   };
 
@@ -683,25 +754,25 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const handleSetSmithyProduct = (buildingId: number, product: SmithyProductId) => {
     const err = setSmithyProduct(stateRef.current, buildingId, product);
-    if (err) addLog(stateRef.current, err, 'info');
+    if (err) notify(err, 'info');
     bump();
   };
 
   const handleSetDryingProduct = (buildingId: number, product: DryingProductId) => {
     const err = setDryingProduct(stateRef.current, buildingId, product);
-    if (err) addLog(stateRef.current, err, 'info');
+    if (err) notify(err, 'info');
     bump();
   };
 
   const handleSetLivestockSpecies = (buildingId: number, species: LivestockId) => {
     const err = setLivestockSpecies(stateRef.current, buildingId, species);
-    if (err) addLog(stateRef.current, err, 'info');
+    if (err) notify(err, 'info');
     bump();
   };
 
   const handleSlaughterLivestock = (buildingId: number, amount: number) => {
     const err = slaughterLivestock(stateRef.current, buildingId, amount);
-    if (err) addLog(stateRef.current, err, 'info');
+    if (err) notify(err, 'info');
     bump();
   };
 
@@ -709,7 +780,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     const stable = stateRef.current.buildings.find(building =>
       building.id === buildingId && building.type === 'stable' && building.built);
     if (!stable) {
-      addLog(stateRef.current, '완공된 축사를 선택해야 합니다.', 'info');
+      notify('완공된 축사를 선택해야 합니다.', 'info');
       bump();
       return;
     }
@@ -722,12 +793,12 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   const handleExpandArea = (buildingId: number) => {
     const building = stateRef.current.buildings.find(candidate => candidate.id === buildingId && candidate.built);
     if (!building || (!['field', 'paddy', 'cemetery', 'stable'].includes(building.type))) {
-      addLog(stateRef.current, '확장할 수 있는 완공 건물을 선택해야 합니다.', 'info');
+      notify('확장할 수 있는 완공 건물을 선택해야 합니다.', 'info');
       bump();
       return;
     }
     if (building.expansion) {
-      addLog(stateRef.current, '이미 확장 공사 중입니다.', 'info');
+      notify('이미 확장 공사 중입니다.', 'info');
       bump();
       return;
     }
@@ -751,7 +822,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     if (!building) return;
     if (!window.confirm(`${BUILDING_DEFS[building.type].name}을(를) 해체할까요? 건축가가 작업을 마치면 자재 일부만 돌아옵니다.`)) return;
     const err = startBuildingDemolition(stateRef.current, buildingId);
-    if (err) addLog(stateRef.current, err, 'bad');
+    if (err) notify(err, 'bad');
     else playSfx('hammer');
     bump();
   };
@@ -760,7 +831,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     const building = stateRef.current.buildings.find(candidate =>
       candidate.id === buildingId && candidate.built && candidate.type !== 'center');
     if (!building) {
-      addLog(stateRef.current, '이전할 수 있는 완공 건물을 선택해야 합니다.', 'bad');
+      notify('이전할 수 있는 완공 건물을 선택해야 합니다.', 'bad');
       bump();
       return;
     }
@@ -772,51 +843,60 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const handlePlaceBuildingRelocation = (x: number, y: number) => {
     if (relocatingBuildingId == null) return;
-    const err = startBuildingRelocation(stateRef.current, relocatingBuildingId, x, y);
-    if (err) addLog(stateRef.current, err, 'bad');
-    else {
-      playSfx('hammer');
-      setRelocatingBuildingId(null);
-    }
-    bump();
+    const buildingId = relocatingBuildingId;
+    const building = stateRef.current.buildings.find(candidate => candidate.id === buildingId);
+    commitPlacement(
+      approveClearing => startBuildingRelocation(stateRef.current, buildingId, x, y, { approveClearing }),
+      () => {
+        const dims = building ? buildingFootprintDims(building) : { w: 1, h: 1 };
+        return {
+          title: `${building ? BUILDING_DEFS[building.type].name : '건물'} 이전`,
+          trees: building
+            ? forestTilesInFootprint(stateRef.current, building.type, x, y, dims.w, dims.h).length
+            : 0,
+          detail: '건축가가 해체하는 동안 벌목꾼이 새 자리를 먼저 치웁니다.',
+        };
+      },
+      () => setRelocatingBuildingId(null),
+    );
   };
 
   const handleTogglePriorityBuilding = (buildingId: number) => {
     const building = stateRef.current.buildings.find(candidate => candidate.id === buildingId);
     if (!building || !buildingHasActiveWork(building)) return;
     const err = togglePriorityBuilding(stateRef.current, buildingId);
-    if (err) addLog(stateRef.current, err, 'bad');
+    if (err) notify(err, 'bad');
     bump();
   };
 
   const handleSetBuildingCrop = (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => {
     const err = setBuildingCrop(stateRef.current, buildingId, cropId, mode);
-    if (err) addLog(stateRef.current, err, 'info');
+    if (err) notify(err, 'info');
     bump();
   };
 
   const handleConvertFieldToPaddy = (buildingId: number) => {
     const err = convertFieldToPaddy(stateRef.current, buildingId);
-    if (err) addLog(stateRef.current, err, 'info');
+    if (err) notify(err, 'info');
     else playSfx('hammer');
     bump();
   };
 
   const handleSetPlotPlowOxen = (buildingId: number, count: number) => {
     const err = assignPlotPlowOxen(stateRef.current, buildingId, count);
-    if (err) addLog(stateRef.current, err, 'info');
+    if (err) notify(err, 'info');
     bump();
   };
 
   const handleUpgradeHousing = (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => {
     const err = upgradeHousingBuilding(stateRef.current, buildingId, targetType);
-    if (err) addLog(stateRef.current, err, 'info');
+    if (err) notify(err, 'info');
     bump();
   };
 
   const handleUpgradeCenter = (buildingId: number) => {
     const err = upgradeSettlementCenter(stateRef.current, buildingId);
-    if (err) addLog(stateRef.current, err, 'info');
+    if (err) notify(err, 'info');
     else {
       setSpeed(0);
       playSfx('good');
@@ -833,7 +913,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const handleAssignNearestWorker = (buildingId: number) => {
     const err = assignNearestWorkerToBuilding(stateRef.current, buildingId);
-    if (err) addLog(stateRef.current, err, 'info');
+    if (err) notify(err, 'info');
     bump();
   };
 
@@ -855,7 +935,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
         setWeaponDialogOpen(false);
         setExpeditionMusterRequest({ kind: 'predatorHunt', predatorKind: predator });
       } else {
-        addLog(stateRef.current, '토벌대가 향할 활성 짐승 서식지가 없습니다.', 'info', true);
+        notify('토벌대가 향할 활성 짐승 서식지가 없습니다.', 'info', true);
       }
     }
     bump();
@@ -864,7 +944,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   const handleCancelBuildingConstruction = (buildingId: number) => {
     const err = cancelBuildingConstruction(stateRef.current, buildingId);
     if (err) {
-      addLog(stateRef.current, err, 'info');
+      notify(err, 'info');
     } else {
       playSfx('hammer');
       setSelected(null);
@@ -875,7 +955,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const handleTacticalAction = (action: () => string | null): string | null => {
     const error = action();
-    if (error) addLog(stateRef.current, error, 'info');
+    if (error) notify(error, 'info');
     bump();
     return error;
   };
@@ -941,7 +1021,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   // 세력 탭/장터 타일에서 해당 세력의 전용 협상창을 연다.
   const handleRequestTrade = (factionName: string) => {
     const err = requestTrade(stateRef.current, factionName);
-    if (err) addLog(stateRef.current, err, 'info');
+    if (err) notify(err, 'info');
     bump();
   };
 
@@ -957,20 +1037,20 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const handleSetTributeReserve = (resource: ResourceId, amount: number) => {
     const message = setTributeReserve(stateRef.current, resource, amount);
-    if (message) addLog(stateRef.current, message, 'info');
+    if (message) notify(message, 'info');
     bump();
   };
 
   const handleUseLuxuryGood = (resource: ResourceId) => {
     const error = useLuxuryGood(stateRef.current, resource);
-    if (error) addLog(stateRef.current, error, 'info');
+    if (error) notify(error, 'info');
     bump();
   };
 
   // 조정 탭에서 지원 물자를 청원한다
   const handlePetition = () => {
     const err = requestPetition(stateRef.current);
-    if (err) addLog(stateRef.current, err, 'info');
+    if (err) notify(err, 'info');
     bump();
   };
 
@@ -983,7 +1063,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   // 절목 — 중심지에서 령을 반포·변경한다 (막힌 경우 이유를 로그로 알린다)
   const handleSetEdictLevel = (id: EdictId, level: EdictLevel) => {
     const err = setEdictLevel(stateRef.current, id, level);
-    if (err) addLog(stateRef.current, err, 'info');
+    if (err) notify(err, 'info');
     bump();
   };
 
@@ -999,19 +1079,19 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     const err = action === 'break-seal'
       ? breakSilverSeal(stateRef.current, rng)
       : reopenBuriedVein(stateRef.current);
-    if (err) addLog(stateRef.current, err, 'info');
+    if (err) notify(err, 'info');
     bump();
   };
 
   const handleOrganizeHunt = (kind: WildlifeKind) => {
     if (kind !== 'boar') {
       if (!stateRef.current.incidents.predatorThreats[kind]) {
-        addLog(stateRef.current, '현재 추적 중인 맹수가 없습니다.', 'info');
+        notify('현재 추적 중인 맹수가 없습니다.', 'info');
         bump();
         return;
       }
       if (!predatorExpeditionTarget(stateRef.current, kind)) {
-        addLog(stateRef.current, '토벌대가 향할 활성 짐승 서식지가 없습니다.', 'info');
+        notify('토벌대가 향할 활성 짐승 서식지가 없습니다.', 'info');
         bump();
         return;
       }
@@ -1021,7 +1101,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       return;
     }
     const error = openPredatorHunt(stateRef.current, kind);
-    if (error) addLog(stateRef.current, error, 'info');
+    if (error) notify(error, 'info');
     bump();
   };
 
@@ -1033,7 +1113,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const handleSiteAction = (action: () => string | null) => {
     const error = action();
-    if (error) addLog(stateRef.current, error, 'info', true);
+    if (error) notify(error, 'info', true);
     bump();
   };
 
@@ -1057,7 +1137,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
           ? '이미 비어 있거나 불탄 산채입니다.'
           : null;
     if (error) {
-      addLog(stateRef.current, error, 'info', true);
+      notify(error, 'info', true);
       bump();
       return;
     }
@@ -1071,13 +1151,13 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     const error = negotiation
       ? purchasePredatorIntel(stateRef.current, negotiation.faction, kind)
       : '정보를 살 거래 상대가 없습니다.';
-    if (error) addLog(stateRef.current, error, 'info', true);
+    if (error) notify(error, 'info', true);
     bump();
   };
 
   const handleScoutPredator = (kind: PredatorKind, residentId: number) => {
     const error = startPredatorScout(stateRef.current, kind, residentId);
-    if (error) addLog(stateRef.current, error, 'info', true);
+    if (error) notify(error, 'info', true);
     bump();
   };
 
@@ -1107,7 +1187,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       });
     }
     if (error) {
-      addLog(stateRef.current, error, 'info', true);
+      notify(error, 'info', true);
     } else {
       stateRef.current.resources.defense = computeDefense(stateRef.current);
       setExpeditionMusterRequest(null);
@@ -1118,10 +1198,10 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const handleSaveToSlot = (slot: number) => {
     if (saveGame(stateRef.current, slot)) {
-      addLog(stateRef.current, `${slot}번 슬롯에 진행 상황을 저장했습니다.`, 'info');
+      notify(`${slot}번 슬롯에 진행 상황을 저장했습니다.`, 'info');
       setCanLoad(true);
     } else {
-      addLog(stateRef.current, '저장에 실패했습니다.', 'bad');
+      notify('저장에 실패했습니다.', 'bad');
     }
     setSlotDialogMode(null);
     bump();
@@ -1135,7 +1215,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     }
     setSimMode(false);
     stateRef.current = loaded;
-    addLog(stateRef.current, `${slot}번 슬롯의 진행 상황을 불러왔습니다.`, 'info');
+    notify(`${slot}번 슬롯의 진행 상황을 불러왔습니다.`, 'info');
     setSelected(null);
     setSelectedEntity(null);
     setPlacingType(null);
@@ -1269,7 +1349,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       err = action.label;
     }
 
-    if (err) addLog(stateRef.current, err, action.kind === 'invalid' ? 'info' : 'bad');
+    if (err) notify(err, action.kind === 'invalid' ? 'info' : 'bad');
     bump();
   };
 
@@ -1746,6 +1826,21 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
           시뮬레이션 종료
         </button>
       )}
+      {clearingRequest && (
+        <ClearingConfirmDialog
+          title={clearingRequest.title}
+          trees={clearingRequest.trees}
+          detail={clearingRequest.detail}
+          onConfirm={() => {
+            const request = clearingRequest;
+            setClearingRequest(null);
+            request.confirm();
+          }}
+          onCancel={() => setClearingRequest(null)}
+        />
+      )}
+      {/* 조작 거절 알림은 모달 위에도 보여야 하므로 앱 최상단에 둔다 (클릭은 통과) */}
+      <ActionNoticeLayer store={actionNoticeStore} />
       {runtimePerfEnabled && (
         <aside style={{ position: 'fixed', left: 8, bottom: 8, zIndex: 10000, maxWidth: 'min(720px, 90vw)' }}>
           {runtimePerfCapturing

@@ -425,6 +425,9 @@ export const CONFIG = {
       silver: 0.5,
     },
     forestDepleteChance: 0.12, // 벌목 1회당 성목이 그루터기가 될 확률
+    // 공사터 개간: 한 현장에 붙는 벌목꾼 상한. 낮게 잡아야 벌목꾼이 한 곳에
+    // 우르르 몰리지 않고, 사람이 많으면 여러 공사터를 동시에 열 수 있다.
+    clearingCuttersPerSite: 2,
     forestRegrowChance: 0.003,  // 봄여름, 숲 인접 평지가 숲이 될 하루 확률
     forestPioneerChance: 0.00018, // 봄여름, 고립된 평지에 새 숲 씨앗이 들 확률
     forestStumpSproutChance: 0.012, // 봄여름, 그루터기가 어린나무로 회복될 하루 확률

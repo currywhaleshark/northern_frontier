@@ -6760,3 +6760,70 @@ html, body, #root {
   image-rendering: pixelated;
 }
 .resource-star-inactive { opacity: 0.28; }
+
+/* ── 조작 거절 알림 (화면 가운데 플로트) ──
+   로그만으로는 왜 안 되는지 놓치기 때문에, 클릭에 대한 거절 사유를 가운데에 띄운다.
+   모달(z100)·전술 오버레이(z180)·장계(z190) 위에 떠야 하고, 지도/모달 클릭을
+   가로막으면 안 되므로 레이어 전체가 pointer-events: none이다. */
+.action-notice-layer {
+  position: fixed;
+  z-index: 1300;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: min(520px, calc(100vw - 40px));
+  pointer-events: none;
+}
+.action-notice {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 9px 16px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--muted);
+  border-radius: 5px;
+  background: rgba(14, 18, 22, 0.95);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: left;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  animation:
+    action-notice-in 150ms ease-out both,
+    action-notice-out 320ms ease-in forwards;
+  /* --notice-ms는 알림마다 노출 시간이 달라서 인라인으로 넘어온다 */
+  animation-delay: 0ms, calc(var(--notice-ms, 2600ms) - 320ms);
+}
+.action-notice.bad { border-left-color: var(--bad); color: #f2cfc8; }
+.action-notice.good { border-left-color: var(--good); color: #d3ecd4; }
+.action-notice.info { border-left-color: var(--accent); }
+.action-notice-repeat { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+@keyframes action-notice-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes action-notice-out {
+  from { opacity: 1; }
+  to { opacity: 0; transform: translateY(-5px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-notice { animation: action-notice-out 200ms ease-in forwards; animation-delay: calc(var(--notice-ms, 2600ms) - 200ms); }
+}
+
+/* ── 공사터 개간 확인 ── */
+.modal.clearing-confirm-dialog { max-width: 380px; }
+.clearing-confirm-dialog .body { white-space: normal; }
+.clearing-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}

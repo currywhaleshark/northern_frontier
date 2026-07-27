@@ -47,6 +47,7 @@ import { activeExpeditionTargetMarkers, type ExpeditionTargetMarker } from '../g
 import { workplaceActivityStyle, type WorkplaceActivityStyle } from '../game/workplacePresentation';
 import { normalizeLivestockState } from '../game/livestock';
 import { normalizePastureArea, validateStablePasture } from '../game/pastures';
+import { acceptsClearedLand, forestTilesInFootprint } from '../game/landClearing';
 import { treeStageFor } from '../game/forestGrowth';
 import {
   mineralRemaining,
@@ -1726,7 +1727,12 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
           const y = rect.y + dy;
           return isExplored(state, x, y) && !foreignSiteAt(state, x, y);
         })).flat().every(Boolean);
-    ctx.fillStyle = valid ? 'rgba(111,191,115,0.42)' : 'rgba(224,108,92,0.45)';
+    // 새 자리에 나무가 있으면 "옮길 수는 있으나 먼저 개간해야 한다"로 칠한다
+    const needsClearing = valid && !!building &&
+      forestTilesInFootprint(state, building.type, rect.x, rect.y, rect.w, rect.h).length > 0;
+    ctx.fillStyle = needsClearing
+      ? 'rgba(224,164,92,0.45)'
+      : valid ? 'rgba(111,191,115,0.42)' : 'rgba(224,108,92,0.45)';
     ctx.fillRect(rect.x * TILE, rect.y * TILE, rect.w * TILE, rect.h * TILE);
     if (building) {
       if (isAreaBuildingType(building.type)) {
@@ -1778,9 +1784,12 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
         const ownTile = tile?.buildingId === buildingId;
         const ok = !!tile && isExplored(state, tx, ty) &&
           (ownTile || (canPlaceOn(def, tile, state) && !foreignSiteAt(state, tx, ty)));
+        // 벨 나무가 선 칸은 "지을 수는 있으나 먼저 개간해야 하는 칸"으로 따로 칠한다
+        const needsClearing = ok && !ownTile && acceptsClearedLand(def) && tile!.terrain === 'forest';
         ctx.fillStyle = ownTile
           ? 'rgba(255,214,90,0.2)'
-          : ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
+          : needsClearing ? 'rgba(224,164,92,0.45)'
+            : ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
         ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE);
         if (!ownTile) {
           sprites.drawBuilding(ctx, {
@@ -1809,7 +1818,10 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
         const tile = state.map[ty]?.[tx];
         const ok = affordable && !!tile && isExplored(state, tx, ty) &&
           canPlaceOn(def, tile, state) && !foreignSiteAt(state, tx, ty);
-        ctx.fillStyle = ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
+        const needsClearing = ok && acceptsClearedLand(def) && tile!.terrain === 'forest';
+        ctx.fillStyle = needsClearing
+          ? 'rgba(224,164,92,0.45)'
+          : ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
         ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE);
         sprites.drawBuilding(ctx, {
           type: o.placingType, built: true, ghost: true, progress01: 1,
@@ -1833,7 +1845,11 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     const ok = isBuildingFootprintExplored(state, o.placingType, o.hover.x, o.hover.y) &&
       canPlaceBuildingAt(state, o.placingType, o.hover.x, o.hover.y) &&
       canAfford(state, def) && !overlapsForeignSite;
-    ctx.fillStyle = ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
+    const needsClearing = ok &&
+      forestTilesInFootprint(state, o.placingType, o.hover.x, o.hover.y).length > 0;
+    ctx.fillStyle = needsClearing
+      ? 'rgba(224,164,92,0.45)'
+      : ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
     ctx.fillRect(o.hover.x * TILE, o.hover.y * TILE, size, size);
     sprites.drawBuilding(ctx, {
       type: o.placingType, built: true, ghost: true, progress01: 1,

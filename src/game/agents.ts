@@ -17,7 +17,8 @@ import { collectHuntableTiles } from './habitats';
 import { makeRng } from './map';
 import { buryCorpse, cemeteryFreePlots, corpsesOf, laborEfficiencyMult, nextCorpseToCollect } from './lifecycle';
 import { extractMineralDeposit, mineralRemaining } from './minerals';
-import { markForestHarvest, treeStageFor } from './forestGrowth';
+import { clearTreeStage, markForestHarvest, treeStageFor } from './forestGrowth';
+import { assignClearingCrews, clearingBlocksWork, clearingSites, pendingClearingTiles } from './landClearing';
 import { isVeinSealedTile, recordRockMining, recordSilverMined } from './silver';
 import { getSeason } from './seasons';
 import { outdoorMult } from './weather';
@@ -68,6 +69,10 @@ interface Ctx {
   goalFields: Partial<Record<'forest' | 'huntable' | 'mineral', GoalField>>;
   goalFieldUserCounts: Record<'forest' | 'huntable' | 'mineral', number>;
   farmerWorkIdsByPlot: Map<number, number[]>;
+  /** 이번 서브틱에 공사터 개간을 맡은 벌목꾼 (주민 id → 건물 id) */
+  clearingCrew: Map<number, number>;
+  /** 개간 담당이 따로 있는 나무 ("x,y") — 일반 벌목은 이 칸을 건드리지 않는다 */
+  clearingReserved: Set<string>;
 }
 
 const PRODUCING_JOBS = [
@@ -795,6 +800,8 @@ interface GatherOpts {
   adjustHarvestAmount?: (tile: Tile, r: Resident, amount: number) => number;
   onHarvest?: (tile: Tile, r: Resident, amount: number) => void;
   goalField?: () => GoalField;
+  /** 작업지에 갈 길이 없을 때의 대체 행동. true를 돌려주면 이 틱을 넘겨받는다. */
+  onStuck?: () => boolean;
 }
 
 type GatherGoalKind = 'forest' | 'huntable' | 'mineral';
@@ -883,6 +890,7 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
     r.workTimer = o.workTicks;
     r.task = o.taskWork;
   } else if (st === 'stuck') {
+    if (o.onStuck?.()) return;
     r.phase = 'rest';
     if (carryTotal(r) > 0) r.phase = 'toDeposit';
     else loiterNearCenter(state, r, ctx, o.taskNone ?? '갈 곳 없음');
@@ -1078,10 +1086,62 @@ function handleManualOrder(state: GameState, r: Resident, ctx: Ctx): boolean {
 
 // ─────────────────────────── 직업별 행동 ───────────────────────────
 
-function woodcutterTick(state: GameState, r: Resident, ctx: Ctx): void {
+// 공사터 개간 — 배정받은 현장의 나무만 골라 베고, 벤 자리는 평지가 되어 공사가 열린다.
+// 일반 벌목과 달리 그루터기를 남기지 않는다: 자리를 비우는 것이 목적이기 때문이다.
+function clearingWoodcutterTick(state: GameState, r: Resident, ctx: Ctx, siteId: number): void {
   const a = CONFIG.agents;
+  const site = state.buildings.find(building => building.id === siteId);
+  const targets = site ? pendingClearingTiles(state, site) : [];
+  if (targets.length === 0) {
+    woodcutterTick(state, r, ctx, true);
+    return;
+  }
+  // 공사터 칸은 건물이 들어서 있어 밟지 못하는 경우가 많다(움집 등). 그래서 건축가와
+  // 같이 옆 칸에 서서 베고, 벤 나무는 발밑이 아니라 인접한 그 나무를 지운다.
+  const treeAt = (x: number, y: number): Tile | undefined =>
+    targets.find(tree => tree.terrain === 'forest' &&
+      Math.abs(tree.x - x) <= 1 && Math.abs(tree.y - y) <= 1);
   gatherJob(state, r, ctx, {
-    goal: t => t.terrain === 'forest' && treeStageFor(t) === 'mature',
+    goal: t => treeAt(t.x, t.y) != null,
+    workTicks: a.work.chop,
+    yieldRes: 'wood',
+    yieldAmt: a.yields.wood * CONFIG.seasons.woodMult[ctx.season],
+    cap: a.carryCap.wood,
+    depositExtra: ['lumberCamp'],
+    taskWork: '공사터 벌목 중', taskMove: '공사터로 이동', taskHaul: '목재 운반',
+    // 강 건너처럼 갈 길이 없는 공사터라면 놀리지 말고 평소 벌목으로 돌린다.
+    // 길찾기 실패 쿨다운은 이 사람 몫으로 한 번 비워 준다 — 그러지 않으면 공사터에서
+    // 걸린 쿨다운 때문에 이어지는 일반 벌목까지 같이 막혀 그냥 서 있게 된다.
+    onStuck: () => {
+      pathFailUntil.delete(r.id);
+      woodcutterTick(state, r, ctx, true);
+      return true;
+    },
+    onHarvest: (_tile, worker, woodAmount) => {
+      addCarry(worker, 'brushwood', woodAmount * CONFIG.production.brushwoodPerWood);
+      // 한 번 베면 그 칸은 완전히 열린다 — 공사가 여기서부터 시작된다.
+      const felled = treeAt(worker.x, worker.y);
+      if (!felled) return;
+      felled.terrain = 'plain';
+      clearTreeStage(felled);
+    },
+  });
+}
+
+function woodcutterTick(state: GameState, r: Resident, ctx: Ctx, skipClearing = false): void {
+  const a = CONFIG.agents;
+  if (!skipClearing) {
+    const siteId = ctx.clearingCrew.get(r.id);
+    if (siteId != null) {
+      clearingWoodcutterTick(state, r, ctx, siteId);
+      return;
+    }
+  }
+  gatherJob(state, r, ctx, {
+    // 공사터로 잡힌 나무는 개간 담당이 따로 있으므로 건드리지 않는다
+    // (건물이 이미 올라앉은 칸, 그리고 이전 목적지처럼 아직 비어 있는 예정지 모두)
+    goal: t => t.terrain === 'forest' && t.buildingId == null &&
+      !ctx.clearingReserved.has(`${t.x},${t.y}`) && treeStageFor(t) === 'mature',
     workTicks: a.work.chop,
     yieldRes: 'wood',
     yieldAmt: a.yields.wood * CONFIG.seasons.woodMult[ctx.season],
@@ -1319,7 +1379,10 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 }
 
-function isConstructionForJob(building: Building, job: 'farmer' | 'builder'): boolean {
+function isConstructionForJob(state: GameState, building: Building, job: 'farmer' | 'builder'): boolean {
+  // 나무가 아직 서 있으면 벌목꾼 차례다 — 건축가·농부는 자리가 빌 때까지 기다린다.
+  // (이전의 해체 단계는 옛 자리 일이라 새 자리 나무와 무관하게 계속 진행한다)
+  if (clearingBlocksWork(state, building)) return false;
   if (building.workOrder) return job === 'builder';
   if (building.repairing) return job === 'builder';
   const requiredJob = isPlotBuildingType(building.type) ? 'farmer' : 'builder';
@@ -1327,7 +1390,7 @@ function isConstructionForJob(building: Building, job: 'farmer' | 'builder'): bo
 }
 
 function constructionTarget(state: GameState, r: Resident, job: 'farmer' | 'builder'): Building | null {
-  const sites = state.buildings.filter(building => isConstructionForJob(building, job));
+  const sites = state.buildings.filter(building => isConstructionForJob(state, building, job));
   const priority = sites.find(building => building.id === state.priorityBuildingId);
   if (priority) return priority;
   const repairs = sites.filter(b => b.repairing);
@@ -1389,16 +1452,14 @@ function advanceBuildingWorkOrder(state: GameState, building: Building, ctx: Ctx
     if (building.h != null) building.h = destination.h;
     if (building.type === 'stable') delete building.pasture;
     occupyBuildingTiles(state, building);
-    for (const tile of footprintTilesOf(state, building) ?? []) {
-      if (tile.terrain === 'forest') {
-        tile.terrain = 'plain';
-        state.resources.wood += 3;
-      }
-    }
     order.phase = 'rebuilding';
     order.progress = 0;
     order.required = Math.max(1, def.buildDays);
-    addLog(state, `${def.name} 해체를 마치고 새 위치에서 재건축을 시작했습니다.`, 'info');
+    // 새 자리에 아직 나무가 서 있으면 벌목이 끝날 때까지 재건축은 열리지 않는다.
+    const standingTrees = pendingClearingTiles(state, building).length;
+    addLog(state, standingTrees > 0
+      ? `${def.name} 해체를 마쳤습니다. 새 자리의 나무 ${standingTrees}그루를 벤 뒤 재건축을 시작합니다.`
+      : `${def.name} 해체를 마치고 새 위치에서 재건축을 시작했습니다.`, 'info');
     return true;
   }
 
@@ -3076,6 +3137,16 @@ export function agentsTick(state: GameState): void {
     goalFields: {},
     goalFieldUserCounts,
     farmerWorkIdsByPlot: new Map(),
+    // 개간 배정은 서브틱마다 다시 계산한다 — 저장 상태가 아니라 이번 틱의 인력 배치다.
+    clearingCrew: assignClearingCrews(
+      state,
+      living.filter(resident => resident.job === 'woodcutter' &&
+        !resident.sick && state.day >= (resident.quarantinedUntil ?? 0) &&
+        !resident.manualOrder),
+    ),
+    clearingReserved: new Set(
+      clearingSites(state).flatMap(site => site.tiles.map(tile => `${tile.x},${tile.y}`)),
+    ),
   };
 
   for (const r of living) {

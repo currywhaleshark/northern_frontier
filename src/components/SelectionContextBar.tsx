@@ -1,4 +1,5 @@
 import { BUILDING_DEFS, cemeteryPlotCapacity, getBuilding } from '../game/buildings';
+import { clearingBlocksWork, pendingClearingTiles } from '../game/landClearing';
 import { isJobUnlocked, JOB_NAMES, JOB_ORDER, RESOURCE_NAMES, TERRAIN_NAMES } from '../game/constants';
 import { cropIdForBuilding, CROP_DEFS } from '../game/crops';
 import { CONFIG } from '../game/config';
@@ -405,7 +406,9 @@ export function SelectionContextBar({
                         return (
                           <>
                             <tr><td>건물</td><td><BuildingIcon type={building.type} size={22} /> {def.name}</td></tr>
-                            <tr><td>상태</td><td>{building.workOrder
+                            <tr><td>상태</td><td>{clearingBlocksWork(state, building)
+                              ? `벌목 대기 · 나무 ${pendingClearingTiles(state, building).length}그루`
+                              : building.workOrder
                               ? `${building.workOrder.kind === 'demolish'
                                 ? '해체 중'
                                 : building.workOrder.phase === 'dismantling' ? '이전 해체 중' : '이전 재건축 중'} ${Math.floor((building.workOrder.progress / Math.max(1, building.workOrder.required)) * 100)}%`

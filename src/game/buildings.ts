@@ -603,7 +603,8 @@ export function canPlaceOn(def: BuildingDef, tile: Tile, state?: GameState): boo
   if (def.placement === 'paddy') return isPaddyEligibleTile(state, tile);
   if (def.placement === 'watermill') return false;
   if (def.placement === 'field') {
-    return tile.terrain === 'fertile' || tile.terrain === 'plain';
+    // 숲도 받는다 — 벌목꾼이 베어 평지로 만든 뒤에야 농부가 공사를 시작한다.
+    return tile.terrain === 'fertile' || tile.terrain === 'plain' || tile.terrain === 'forest';
   }
   if (tile.terrain === 'river' || tile.terrain === 'mountain' || tile.terrain === 'rock' || tile.terrain === 'center') {
     return false;
