@@ -1,4 +1,5 @@
 // 주민 생성과 일일 생존 판정
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import {
   FEMALE_GIVEN_NAMES,
@@ -320,14 +321,14 @@ export function killResident(
           ? 'disease'
           : 'other';
   if (combatDeath) {
-    addLog(state, `${r.name}이(가) 전투 중 전사했습니다. (${cause})`, 'raid', true);
+    addLog(state, `${withJosa(r.name, '이/가')} 전투 중 전사했습니다. (${cause})`, 'raid', true);
     if (horseLost) addLog(state, '기수가 쓰러지는 과정에서 군마 한 필도 잃었습니다.', 'bad', true);
   } else if (cause === '호환') {
-    addLog(state, `${r.name}이(가) 호환을 당해 목숨을 잃었습니다.`, 'bad', true);
+    addLog(state, `${withJosa(r.name, '이/가')} 호환을 당해 목숨을 잃었습니다.`, 'bad', true);
   } else if (cause === '늑대 습격') {
-    addLog(state, `${r.name}이(가) 늑대 떼의 습격으로 목숨을 잃었습니다.`, 'bad', true);
+    addLog(state, `${withJosa(r.name, '이/가')} 늑대 떼의 습격으로 목숨을 잃었습니다.`, 'bad', true);
   } else {
-    addLog(state, `${r.name}이(가) ${cause}(으)로 세상을 떠났습니다.`, 'bad', true);
+    addLog(state, `${withJosa(r.name, '이/가')} ${withJosa(cause, '으로/로')} 세상을 떠났습니다.`, 'bad', true);
   }
   // 이웃의 죽음은 마을 전체의 사기를 깎는다 — 노승의 재(齋)가 있으면 슬픔이 덜하다
   const griefLoss = hasResidentMonk(state) ? CONFIG.satisfaction.monkGriefRelief : 6;
@@ -389,7 +390,7 @@ export function updateResidentNeeds(
       if (r.hunger < 25) chance += hcfg.sickHungryChance;
       if (rng() < chance) {
         r.sick = true;
-        addLog(state, `${r.name}이(가) 병에 걸렸습니다.`, 'bad');
+        addLog(state, `${withJosa(r.name, '이/가')} 병에 걸렸습니다.`, 'bad');
       }
     }
 
@@ -409,7 +410,7 @@ export function updateResidentNeeds(
       const recover = hasHerbs ? hcfg.recoverChanceHerbs : hcfg.recoverChance;
       if (rng() < recover) {
         r.sick = false;
-        addLog(state, `${r.name}이(가) 병에서 회복했습니다.`, 'good');
+        addLog(state, `${withJosa(r.name, '이/가')} 병에서 회복했습니다.`, 'good');
       }
     } else if (r.hunger > 50 && r.warmth > 50) {
       r.health = Math.min(100, r.health + hcfg.naturalHeal);

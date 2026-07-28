@@ -1,3 +1,4 @@
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { addLog } from './events';
 import { addForeignSiteMemory } from './foreignSites';
@@ -153,9 +154,9 @@ export function updateTerritoryWarnings(state: GameState): void {
       {
         id: 'compensate',
         label: '사과하고 배상한다',
-        desc: `곡물 ${grain}을 내어 관계 악화를 줄입니다.`,
+        desc: `곡물 ${withJosa(grain, '을/를')} 내어 관계 악화를 줄입니다.`,
         disabled: state.resources.grain < grain,
-        disabledReason: `곡물 ${grain}이 필요합니다.`,
+        disabledReason: `곡물 ${withJosa(grain, '이/가')} 필요합니다.`,
       },
       { id: 'apologize', label: '잘못을 인정한다', desc: '명성에 작은 손해를 감수하고 사과합니다.' },
       { id: 'ignore', label: '항의를 무시한다', desc: '관계와 경계심이 크게 악화됩니다.' },
@@ -180,7 +181,7 @@ export function resolveTerritoryWarning(state: GameState, optionId: string): voi
     state.resources.grain -= grain;
     if (faction) changeRelation(state, faction, CONFIG.foreignSites.violationCompensationRelation);
     site.alarm = Math.min(100, site.alarm + 2);
-    addLog(state, `${site.name}의 항의에 사과하고 곡물 ${grain}을 배상했습니다.`, 'info', true);
+    addLog(state, `${site.name}의 항의에 사과하고 곡물 ${withJosa(grain, '을/를')} 배상했습니다.`, 'info', true);
   } else if (optionId === 'apologize') {
     state.resources.reputation = Math.max(0, state.resources.reputation - 1);
     if (faction) changeRelation(state, faction, CONFIG.foreignSites.violationApologyRelation);

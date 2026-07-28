@@ -1,3 +1,4 @@
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import type {
   TacticalAnimationEvent,
@@ -80,7 +81,7 @@ export function prepareTacticalRaiderSupportRound(
       events.push({
         zoneId: group.zoneId, kind: 'supportReload', side: 'raider', groupId: group.id,
         actorGroupIds: [group.id], durationMs: 540,
-        text: `${group.label}가 새 전선으로 포구 방향을 맞춥니다.`, float: '방향 조정',
+        text: `${withJosa(group.label, '이/가')} 새 전선으로 포구 방향을 맞춥니다.`, float: '방향 조정',
       });
       lines.push(`${group.label}: 이동 뒤 포구 방향을 다시 맞추느라 이번 교전에는 발사하지 못합니다.`);
       continue;
@@ -90,7 +91,7 @@ export function prepareTacticalRaiderSupportRound(
       events.push({
         zoneId: group.zoneId, kind: 'supportReload', side: 'raider', groupId: group.id,
         actorGroupIds: [group.id], durationMs: 500,
-        text: `${group.label}가 다음 사격을 준비합니다.`, float: '재장전',
+        text: `${withJosa(group.label, '이/가')} 다음 사격을 준비합니다.`, float: '재장전',
       });
       continue;
     }
@@ -147,9 +148,9 @@ export function applyTacticalRaiderSupportTreatment(
     events.push({
       zoneId: medic.zoneId, kind: 'enemyTreatment', side: 'raider', groupId: medic.id,
       actorGroupIds: [medic.id], durationMs: 560,
-      text: `${medic.label}가 전열의 부상병을 수습합니다.`, float: `전력 +${Math.round(medicRestored)}`,
+      text: `${withJosa(medic.label, '이/가')} 전열의 부상병을 수습합니다.`, float: `전력 +${Math.round(medicRestored)}`,
     });
-    lines.push(`${medic.label}: 생존 부상병을 치료해 적 전력 ${Math.round(medicRestored)}을 회복했습니다.`);
+    lines.push(`${medic.label}: 생존 부상병을 치료해 적 전력 ${withJosa(Math.round(medicRestored), '을/를')} 회복했습니다.`);
   }
   return restored;
 }

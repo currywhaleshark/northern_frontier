@@ -1,3 +1,4 @@
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { footprintTilesOf, sownAreaOf } from './buildings';
 import { cropIdForBuilding, CROP_DEFS } from './crops';
@@ -204,16 +205,16 @@ function openWildlifeEvent(state: GameState, kind: WildlifeKind, rng: () => numb
     state.pendingChoice = {
       kind: 'incident',
       title: '멧돼지 떼 습격',
-      body: `멧돼지 떼가 ${target.type === 'paddy' ? '논' : '밭'}으로 몰려들어 작물을 헤쳤습니다. 이번 소출이 약 ${lost}% 줄었습니다.\n${predatorReadinessLabel(state, kind)}`,
+      body: `멧돼지 떼가 ${withJosa(target.type === 'paddy' ? '논' : '밭', '으로/로')} 몰려들어 작물을 헤쳤습니다. 이번 소출이 약 ${lost}% 줄었습니다.\n${predatorReadinessLabel(state, kind)}`,
       illustration: wildlifeIllustration(kind),
       options: [
         { id: 'hunt-now', label: '토벌한다', desc: '부상 위험을 감수하고 몰아냅니다. 성공하면 고기와 가죽을 얻습니다.' },
         {
           id: 'trap',
           label: '덫을 놓는다',
-          desc: `목재 ${CONFIG.specialEvents.boarTrapWood}, 도구 ${CONFIG.specialEvents.boarTrapTools}을 써서 안전하게 수를 줄입니다. 보상은 적습니다.`,
+          desc: `목재 ${CONFIG.specialEvents.boarTrapWood}, 도구 ${withJosa(CONFIG.specialEvents.boarTrapTools, '을/를')} 써서 안전하게 수를 줄입니다. 보상은 적습니다.`,
           disabled: state.resources.wood < CONFIG.specialEvents.boarTrapWood || state.resources.tools < CONFIG.specialEvents.boarTrapTools,
-          disabledReason: `목재 ${CONFIG.specialEvents.boarTrapWood}, 도구 ${CONFIG.specialEvents.boarTrapTools}이 필요합니다`,
+          disabledReason: `목재 ${CONFIG.specialEvents.boarTrapWood}, 도구 ${withJosa(CONFIG.specialEvents.boarTrapTools, '이/가')} 필요합니다`,
         },
         { id: 'leave', label: '그냥 둔다', desc: '멧돼지가 주변에 눌러앉아 밤마다 농작물과 저장 식량을 노릴 수 있습니다.' },
       ],
@@ -255,9 +256,9 @@ function openWildlifeEvent(state: GameState, kind: WildlifeKind, rng: () => numb
       ...(wolf ? [{
         id: 'bait',
         label: '고기를 내어 멀리 유인한다',
-        desc: `고기 ${CONFIG.specialEvents.wolfBaitMeat}을 써서 늑대 떼를 마을에서 떼어 놓습니다.`,
+        desc: `고기 ${withJosa(CONFIG.specialEvents.wolfBaitMeat, '을/를')} 써서 늑대 떼를 마을에서 떼어 놓습니다.`,
         disabled: state.resources.meat < CONFIG.specialEvents.wolfBaitMeat,
-        disabledReason: `고기 ${CONFIG.specialEvents.wolfBaitMeat}이 필요합니다`,
+        disabledReason: `고기 ${withJosa(CONFIG.specialEvents.wolfBaitMeat, '이/가')} 필요합니다`,
       }] : []),
     ],
     data: { eventId: kind, predator: kind },
@@ -292,7 +293,7 @@ function openPlagueSuspicionEvent(state: GameState, rng: () => number): void {
   state.pendingChoice = {
     kind: 'incident',
     title: '역병 의심 증상',
-    body: `${suspect.name}이(가) 고열과 기침으로 쓰러졌습니다. 단순한 병치레일 수도 있지만 역병의 첫 증상일 수도 있습니다.`,
+    body: `${withJosa(suspect.name, '이/가')} 고열과 기침으로 쓰러졌습니다. 단순한 병치레일 수도 있지만 역병의 첫 증상일 수도 있습니다.`,
     illustration: { src: '/assets/events/plague-suspicion-v1.png', alt: '고열로 누운 주민을 살피며 격리를 고민하는 개척지 사람들' },
     options: [
       ...(localPhysician ? [{
@@ -328,10 +329,10 @@ function openEpidemicEvent(state: GameState): void {
       {
         id: 'request-physician',
         label: '의원 파견을 요청한다',
-        desc: `명성 ${cost.physicianReputationCost}, 곡물 ${cost.physicianGrainCost}, 약초 ${cost.physicianHerbCost}을 들여 조정 의원과 수행 인력을 맞이합니다.`,
+        desc: `명성 ${cost.physicianReputationCost}, 곡물 ${cost.physicianGrainCost}, 약초 ${withJosa(cost.physicianHerbCost, '을/를')} 들여 조정 의원과 수행 인력을 맞이합니다.`,
         disabled: state.resources.reputation < cost.physicianReputationCost ||
           state.resources.grain < cost.physicianGrainCost || state.resources.herbs < cost.physicianHerbCost,
-        disabledReason: `명성 ${cost.physicianReputationCost}, 곡물 ${cost.physicianGrainCost}, 약초 ${cost.physicianHerbCost}이 필요합니다`,
+        disabledReason: `명성 ${cost.physicianReputationCost}, 곡물 ${cost.physicianGrainCost}, 약초 ${withJosa(cost.physicianHerbCost, '이/가')} 필요합니다`,
       },
       { id: 'leave-epidemic', label: '그냥 둔다', desc: '생업은 유지하지만 환자가 늘고 중환자나 사망자가 생길 수 있습니다.' },
     ],
@@ -345,11 +346,11 @@ function openGrainRequisitionEvent(state: GameState): void {
   state.pendingChoice = {
     kind: 'incident',
     title: '긴급 군량 징발',
-    body: `변방으로 향하는 관군이 군량으로 곡물 ${amount}을 요구합니다. 현재 곡물 ${Math.floor(state.resources.grain)}.`,
+    body: `변방으로 향하는 관군이 군량으로 곡물 ${withJosa(amount, '을/를')} 요구합니다. 현재 곡물 ${Math.floor(state.resources.grain)}.`,
     illustration: { src: '/assets/events/grain-requisition-v1.png', alt: '북방 개척지에 도착해 군량을 요구하는 조선 관군 행렬' },
     options: [
-      { id: 'give-full', label: '전량 제공한다', desc: `곡물 ${amount}을 제공합니다. 명성이 오르고 전역의 습격 위협이 크게 줄어듭니다.`, disabled: state.resources.grain < amount, disabledReason: `곡물 ${amount}이 필요합니다` },
-      { id: 'give-half', label: '절반만 제공한다', desc: `곡물 ${half}을 제공합니다. 명성과 치안이 조금 나아집니다.`, disabled: state.resources.grain < half, disabledReason: `곡물 ${half}이 필요합니다` },
+      { id: 'give-full', label: '전량 제공한다', desc: `곡물 ${withJosa(amount, '을/를')} 제공합니다. 명성이 오르고 전역의 습격 위협이 크게 줄어듭니다.`, disabled: state.resources.grain < amount, disabledReason: `곡물 ${withJosa(amount, '이/가')} 필요합니다` },
+      { id: 'give-half', label: '절반만 제공한다', desc: `곡물 ${withJosa(half, '을/를')} 제공합니다. 명성과 치안이 조금 나아집니다.`, disabled: state.resources.grain < half, disabledReason: `곡물 ${withJosa(half, '이/가')} 필요합니다` },
       { id: 'refuse', label: '거부한다', desc: '곡물은 지키지만 명성이 떨어지고 조정의 의심을 삽니다.' },
     ],
     data: { eventId: 'grainRequisition', amount },
@@ -510,7 +511,7 @@ function activateWildlifeThreat(state: GameState, kind: WildlifeKind, rng: () =>
   const message = kind === 'wolf'
     ? `늑대 떼가 숲에 자리를 잡았습니다. ${untilDay - state.day}일 동안 숲에 드나드는 주민이 위험합니다.`
     : kind === 'tiger'
-      ? `${threatName}이(가) 개척지 주변에 자리를 잡았습니다. ${untilDay - state.day}일 동안 낮의 숲과 밤의 마을이 위험합니다.`
+      ? `${withJosa(threatName, '이/가')} 개척지 주변에 자리를 잡았습니다. ${untilDay - state.day}일 동안 낮의 숲과 밤의 마을이 위험합니다.`
       : `멧돼지 떼가 개척지 주변에 눌러앉았습니다. ${untilDay - state.day}일 동안 밤마다 농작물과 저장 식량이 위험합니다.`;
   addLog(state, message, 'bad', true);
 }
@@ -558,7 +559,7 @@ function huntFailure(
       ? Math.round((38 + Math.floor(rng() * 23)) * tigerDanger)
       : 18 + Math.floor(rng() * 13);
   victim.health = Math.max(1, victim.health - damage);
-  addLog(state, `${victim.name}이(가) ${wildlifeName(kind, state)} 토벌 중 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
+  addLog(state, `${withJosa(victim.name, '이/가')} ${wildlifeName(kind, state)} 토벌 중 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
   return { residentId: victim.id, killed: false, damage };
 }
 
@@ -612,7 +613,7 @@ export function applyWildlifeHuntOutcome(
       state.resources.hide += hide;
       state.resources.reputation = Math.min(100, state.resources.reputation + reputation);
       discoverItem(state, 'tigerPelt');
-      addLog(state, `${defeatedThreatName}를 토벌했습니다. 고기 ${meat}, 가죽 ${hide}, 호피 1, 명성 +${reputation}.`, 'good', true);
+      addLog(state, `${withJosa(defeatedThreatName, '을/를')} 토벌했습니다. 고기 ${meat}, 가죽 ${hide}, 호피 1, 명성 +${reputation}.`, 'good', true);
       return { loot: { meat, hide }, specialItem: 'tigerPelt' };
     } else {
       const meat = 13 + Math.floor(rng() * 8);
@@ -635,7 +636,7 @@ export function applyWildlifeHuntOutcome(
     return { loot: { meat, hide } };
   }
   if (outcome === 'escaped') {
-    addLog(state, `${knownThreatName}이(가) 포위망을 빠져나갔습니다. 위협은 그대로 남습니다.`, 'info', true);
+    addLog(state, `${withJosa(knownThreatName, '이/가')} 포위망을 빠져나갔습니다. 위협은 그대로 남습니다.`, 'info', true);
     return { loot: {} };
   }
   activateWildlifeThreat(state, kind, rng);
@@ -717,7 +718,7 @@ export function startPredatorScout(state: GameState, kind: PredatorKind, residen
   hunter.task = `${kind === 'wolf' ? '늑대' : '호랑이'} 흔적 추적 출발`;
   addLog(
     state,
-    `${hunter.name}이(가) ${kind === 'wolf' ? '늑대 떼' : '호랑이'}의 흔적을 쫓으러 떠났습니다. ${duration}일 뒤 규모를 보고합니다.` +
+    `${withJosa(hunter.name, '이/가')} ${kind === 'wolf' ? '늑대 떼' : '호랑이'}의 흔적을 쫓으러 떠났습니다. ${duration}일 뒤 규모를 보고합니다.` +
       (usedGyrfalcon ? ' 해동청도 함께 띄웠습니다.' : ''),
     'info',
     true,
@@ -740,7 +741,7 @@ function openPredatorScoutSelection(state: GameState, kind: PredatorKind): void 
         const duration = predatorScoutDuration(skill, usedGyrfalcon, expertTracker);
         return {
           id: `scout:${scout.id}`,
-          label: `${scout.name}을(를) 보낸다`,
+          label: `${withJosa(scout.name, '을/를')} 보낸다`,
           desc: `사냥 숙련 ${Math.round(skill * 100)}% · ${duration}일 소요${usedGyrfalcon ? ' · 해동청 동행' : ''}`,
         };
       }),
@@ -781,10 +782,10 @@ function resolvePlagueSuspicion(state: GameState, optionId: string, data: Record
     resident.quarantinedUntil = state.day + duration;
     resident.task = '격리 중';
     addLog(state, physicianDiagnosis
-      ? `의원이 ${resident.name}을(를) 진맥합니다. ${duration}일 동안 격리해 역병 여부를 가립니다.`
-      : `${resident.name}을(를) ${duration}일 동안 격리했습니다. 배정은 유지되지만 일을 쉬게 됩니다.`, 'info', true);
+      ? `의원이 ${withJosa(resident.name, '을/를')} 진맥합니다. ${duration}일 동안 격리해 역병 여부를 가립니다.`
+      : `${withJosa(resident.name, '을/를')} ${duration}일 동안 격리했습니다. 배정은 유지되지만 일을 쉬게 됩니다.`, 'info', true);
   } else {
-    addLog(state, `${resident.name}을(를) 격리하지 않고 경과를 지켜봅니다.`, 'bad', true);
+    addLog(state, `${withJosa(resident.name, '을/를')} 격리하지 않고 경과를 지켜봅니다.`, 'bad', true);
   }
   state.incidents.plagueCase = {
     residentId,
@@ -839,12 +840,12 @@ function resolveGrainRequisition(state: GameState, optionId: string, amount: num
     state.resources.grain -= amount;
     state.resources.reputation = Math.min(100, state.resources.reputation + 5);
     state.threat = Math.max(0, state.threat - 28);
-    addLog(state, `관군에 군량 ${amount}을 모두 내주었습니다. 명성 +5, 습격 위협 -28.`, 'good', true);
+    addLog(state, `관군에 군량 ${withJosa(amount, '을/를')} 모두 내주었습니다. 명성 +5, 습격 위협 -28.`, 'good', true);
   } else if (optionId === 'give-half' && state.resources.grain >= half) {
     state.resources.grain -= half;
     state.resources.reputation = Math.min(100, state.resources.reputation + 2);
     state.threat = Math.max(0, state.threat - 10);
-    addLog(state, `관군에 군량 ${half}을 내주었습니다. 명성 +2, 습격 위협 -10.`, 'good', true);
+    addLog(state, `관군에 군량 ${withJosa(half, '을/를')} 내주었습니다. 명성 +2, 습격 위협 -10.`, 'good', true);
   } else if (optionId === 'refuse') {
     state.resources.reputation = Math.max(0, state.resources.reputation - 4);
     state.suspicion = Math.min(100, state.suspicion + 8);
@@ -885,14 +886,14 @@ function resolveEarlyFrost(state: GameState, optionId: string, buildingId: numbe
     farm.inventory[crop.output] = (farm.inventory[crop.output] ?? 0) + amount;
     farm.fieldGrowth = 0;
     farm.sownArea = 0;
-    addLog(state, `${crop.name}을(를) 서둘러 거두어 ${amount.toFixed(1)}을 확보했습니다.`, 'good', true);
+    addLog(state, `${withJosa(crop.name, '을/를')} 서둘러 거두어 ${withJosa(amount.toFixed(1), '을/를')} 확보했습니다.`, 'good', true);
   } else if (optionId === 'wait-harvest') {
     if (rng() < 0.58) {
       addLog(state, '이른 서리가 곧 걷혔습니다. 작물이 버텨 정상 수확을 기대할 수 있습니다.', 'good', true);
     } else {
       const before = farm.fieldGrowth;
       farm.fieldGrowth *= 0.25;
-      addLog(state, `${crop.name}이(가) 서리를 견디지 못해 예상 소출의 ${Math.round(before - farm.fieldGrowth)}%를 잃었습니다.`, 'bad', true);
+      addLog(state, `${withJosa(crop.name, '이/가')} 서리를 견디지 못해 예상 소출의 ${Math.round(before - farm.fieldGrowth)}%를 잃었습니다.`, 'bad', true);
     }
   }
 }
@@ -1016,7 +1017,7 @@ function predatorEncounter(state: GameState, kind: 'wolf' | 'tiger', candidates:
     ? 16 + Math.floor(rng() * 13)
     : Math.round((28 + Math.floor(rng() * 19)) * tigerDanger);
   victim.health = Math.max(1, victim.health - damage);
-  addLog(state, `${victim.name}이(가) ${kind === 'wolf' ? '숲에서 늑대에게 물려' : `${wildlifeName(kind, state)}의 습격을 받아`} 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
+  addLog(state, `${withJosa(victim.name, '이/가')} ${kind === 'wolf' ? '숲에서 늑대에게 물려' : `${wildlifeName(kind, state)}의 습격을 받아`} 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
 }
 
 function damageBoarTargets(state: GameState, rng: () => number): void {
@@ -1025,7 +1026,7 @@ function damageBoarTargets(state: GameState, rng: () => number): void {
     const farm = farms[Math.floor(rng() * farms.length)];
     const before = farm.fieldGrowth;
     farm.fieldGrowth *= 1 - (0.08 + rng() * 0.08);
-    addLog(state, `밤사이 멧돼지가 ${farm.type === 'paddy' ? '논' : '밭'}을 헤쳐 예상 소출 ${Math.max(1, Math.round(before - farm.fieldGrowth))}%를 잃었습니다.`, 'bad', true);
+    addLog(state, `밤사이 멧돼지가 ${withJosa(farm.type === 'paddy' ? '논' : '밭', '을/를')} 헤쳐 예상 소출 ${Math.max(1, Math.round(before - farm.fieldGrowth))}%를 잃었습니다.`, 'bad', true);
   }
   if (rng() < CONFIG.specialEvents.boarStoredFoodDamageChance) {
     const available = FOOD_RESOURCES.filter(resource => state.resources[resource] >= 1);
@@ -1033,7 +1034,7 @@ function damageBoarTargets(state: GameState, rng: () => number): void {
     if (resource) {
       const lost = Math.min(state.resources[resource], 2 + Math.floor(rng() * 5));
       state.resources[resource] -= lost;
-      addLog(state, `멧돼지가 저장고를 헤쳐 식량 ${lost.toFixed(0)}을 망쳤습니다.`, 'bad', true);
+      addLog(state, `멧돼지가 저장고를 헤쳐 식량 ${withJosa(lost.toFixed(0), '을/를')} 망쳤습니다.`, 'bad', true);
     }
   }
 }
@@ -1063,7 +1064,7 @@ function updatePlagueCase(state: GameState, rng: () => number): void {
     resident.sick = false;
     resident.quarantinedUntil = 0;
     addLog(state, plagueCase.real
-      ? `${resident.name}이(가) 격리 중 회복했습니다. 실제 역병이었지만 마을 안 전염은 막았습니다.`
+      ? `${withJosa(resident.name, '이/가')} 격리 중 회복했습니다. 실제 역병이었지만 마을 안 전염은 막았습니다.`
       : `${resident.name}의 증상은 역병이 아니었습니다. 며칠 앓은 뒤 회복했습니다.`, 'good', true);
     state.incidents.plagueCase = null;
     return;
@@ -1151,7 +1152,7 @@ function updatePredatorScouting(state: GameState): void {
     hunter.task = '흔적 추적 보고 후 귀환';
     addLog(
       state,
-      `${hunter.name}이(가) ${kind === 'wolf' ? '늑대 떼' : exact ? wildlifeName(kind, state) : '큰 호랑이'}의 흔적을 쫓고 돌아왔습니다. ` +
+      `${withJosa(hunter.name, '이/가')} ${kind === 'wolf' ? '늑대 떼' : exact ? wildlifeName(kind, state) : '큰 호랑이'}의 흔적을 쫓고 돌아왔습니다. ` +
         `적 규모를 ${exact ? '정확히' : '대략'} 파악했습니다.`,
       exact ? 'good' : 'info',
       true,
@@ -1171,7 +1172,7 @@ export function updateSpecialEvents(state: GameState, rng: () => number): void {
       const message = kind === 'wolf'
         ? '늑대 떼의 흔적이 숲에서 사라졌습니다.'
         : kind === 'tiger'
-          ? `${expiredName}가 다른 산줄기로 자취를 감췄습니다.`
+          ? `${withJosa(expiredName, '이/가')} 다른 산줄기로 자취를 감췄습니다.`
           : '멧돼지 떼가 다른 골짜기로 이동해 밤의 피해가 멎었습니다.';
       addLog(state, message, 'info', true);
     }

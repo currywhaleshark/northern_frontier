@@ -3,6 +3,7 @@
 // 승패는 교전이 시작되는 순간 기존 즉시 판정과 똑같은 확률
 // defense/(defense+power)로 한 번 굴려 정한다. 이후의 소모전(전력 감소·부상)은
 // 그 결과를 향해 수렴하는 연출이다 — 밸런스가 기존 공식과 정확히 일치한다.
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { armedMusketeers, computeDefense, countBuilt } from './buildings';
 import { createCombatRoster } from './combatRoster';
@@ -160,8 +161,8 @@ export function startBattle(state: GameState, mode: BattleMode): boolean {
   };
   state.pendingChoice = null;
   addLog(state, mode === 'levy'
-    ? `온 마을이 낫과 도끼를 들었습니다. ${state.battle.faction}이(가) 마을 안으로 밀고 들어와 방어전이 벌어집니다.`
-    : `수비병이 마을 밖으로 요격에 나섭니다. ${state.battle.faction}과(와) 외곽에서 맞붙습니다.`, 'raid');
+    ? `온 마을이 낫과 도끼를 들었습니다. ${withJosa(state.battle.faction, '이/가')} 마을 안으로 밀고 들어와 방어전이 벌어집니다.`
+    : `수비병이 마을 밖으로 요격에 나섭니다. ${withJosa(state.battle.faction, '과/와')} 외곽에서 맞붙습니다.`, 'raid');
   return true;
 }
 
@@ -280,8 +281,8 @@ function finishBattle(state: GameState, outcome: BattleOutcome, rng: () => numbe
     addLog(
       state,
       location === 'outskirts'
-        ? `${side}이(가) ${battle.faction}을(를) 외곽에서 몰아냈습니다! 부상자 ${injured}명, 건물 피해는 없습니다.`
-        : `${side}이(가) ${battle.faction}을(를) 마을 안에서 물리쳤습니다! 부상자 ${injured}명, 건물 ${damaged.length}채가 파손되었습니다.`,
+        ? `${withJosa(side, '이/가')} ${withJosa(battle.faction, '을/를')} 외곽에서 몰아냈습니다! 부상자 ${injured}명, 건물 피해는 없습니다.`
+        : `${withJosa(side, '이/가')} ${withJosa(battle.faction, '을/를')} 마을 안에서 물리쳤습니다! 부상자 ${injured}명, 건물 ${damaged.length}채가 파손되었습니다.`,
       'good',
       true,
     );
@@ -307,7 +308,7 @@ function finishBattle(state: GameState, outcome: BattleOutcome, rng: () => numbe
       state,
       location === 'outskirts'
         ? `외곽 요격선이 무너져 적이 마을로 들이닥쳤습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`
-        : `${side}이(가) 마을 안에서 밀려났습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`,
+        : `${withJosa(side, '이/가')} 마을 안에서 밀려났습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`,
       'raid',
     );
   }

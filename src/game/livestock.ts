@@ -1,3 +1,4 @@
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { addLog } from './events';
 import { addBuildingStock } from './inventory';
@@ -326,7 +327,7 @@ export function lootLivestock(state: GameState, ratio: number): LivestockLootRep
     const details = Object.entries(report.bySpecies)
       .map(([species, amount]) => `${LIVESTOCK_DEFS[species as LivestockId].name} ${amount}마리`)
       .join(', ');
-    addLog(state, `습격대가 축사를 털어 ${details}를 끌고 갔습니다.`, 'bad', true);
+    addLog(state, `습격대가 축사를 털어 ${withJosa(details, '을/를')} 끌고 갔습니다.`, 'bad', true);
   }
   reconcileMountAssignments(state);
   reconcilePlowOxen(state);
@@ -399,7 +400,7 @@ export function acquireFirstLivestockFromTrade(state: GameState, factionName: st
   if (error) return false;
   addLog(
     state,
-    `${factionName}과(와)의 거래로 ${LIVESTOCK_DEFS[species].name} 사육법이 열렸습니다.`,
+    `${withJosa(factionName, '과/와')}의 거래로 ${LIVESTOCK_DEFS[species].name} 사육법이 열렸습니다.`,
     'trade',
   );
   return true;
@@ -424,7 +425,7 @@ export function slaughterStableLivestock(state: GameState, buildingId: number, a
   const hideText = hide > 0 ? `, 가죽 ${hide.toFixed(1)}` : '';
   addLog(
     state,
-    `${LIVESTOCK_DEFS[livestock.species].name} ${requested}마리를 도축해 고기 ${meat.toFixed(1)}${hideText}을(를) 축사에 쌓았습니다.`,
+    `${LIVESTOCK_DEFS[livestock.species].name} ${requested}마리를 도축해 고기 ${meat.toFixed(1)}${withJosa(hideText, '을/를')} 축사에 쌓았습니다.`,
     'info',
   );
   return null;

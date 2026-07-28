@@ -3,6 +3,7 @@
 // 북방 세력과의 지나친 유착이 의심을 올리고, 세공 납부·청원(조정과의 접촉)이 낮춘다.
 // 40+ 감찰 어사 / 70+ 견책·몰수 / 100 강등과 토벌 유예 — 유예 안에 결백을 증명하지
 // 못하면 조정 토벌군이 내려온다.
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { applyBattleDefenseMultipliers, cannonBattleMult, consumeBattlePowder } from './battles';
 import { countBuilt } from './buildings';
@@ -150,7 +151,7 @@ export function openInspection(state: GameState): void {
     options: [
       {
         id: 'bribe', label: '후하게 대접한다',
-        desc: `식량 ${s.bribeCost.food}, 가죽 ${s.bribeCost.hide}을 들여 어사의 붓끝을 무디게 합니다. (의심 -${s.bribeDecay})`,
+        desc: `식량 ${s.bribeCost.food}, 가죽 ${withJosa(s.bribeCost.hide, '을/를')} 들여 어사의 붓끝을 무디게 합니다. (의심 -${s.bribeDecay})`,
         disabled: !canBribe,
         disabledReason: '대접할 물자가 부족합니다',
       },
@@ -267,7 +268,7 @@ export function resolveCrackdown(state: GameState, optionId: string, rng: () => 
   const seized = seizeFirearms(state, 1);
   state.suspicion = Math.min(state.suspicion, 40);
   state.resources.reputation = Math.max(0, state.resources.reputation - 10);
-  addLog(state, `성문을 열고 처분을 기다렸습니다. 토벌군이 ${seized}을(를) 모두 거두어 돌아갑니다. 마을은 무사합니다.`, 'info');
+  addLog(state, `성문을 열고 처분을 기다렸습니다. 토벌군이 ${withJosa(seized, '을/를')} 모두 거두어 돌아갑니다. 마을은 무사합니다.`, 'info');
 }
 
 // ── 일일 갱신: 의심 누적과 구간별 사건 ──
@@ -299,7 +300,7 @@ export function updateSuspicion(state: GameState, rng: () => number): void {
     state.suspicion = s.crackdownStartSuspicion;
     state.crackdownDeadline = state.day + s.crackdownGraceDays;
     if (before !== after) {
-      addLog(state, `조정이 모반 혐의로 ${RANK_NAMES[before]}을(를) ${RANK_NAMES[after]}(으)로 강등하였습니다. (몰수: ${seized})`, 'bad', true);
+      addLog(state, `조정이 모반 혐의로 ${withJosa(RANK_NAMES[before], '을/를')} ${withJosa(RANK_NAMES[after], '으로/로')} 강등하였습니다. (몰수: ${seized})`, 'bad', true);
     } else {
       addLog(state, `조정이 모반 혐의를 물어 물자를 몰수했습니다. (몰수: ${seized})`, 'bad', true);
     }

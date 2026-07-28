@@ -2216,7 +2216,7 @@ export function applyTacticalFieldTreatment(
       byZone[healer.zoneId] = (byZone[healer.zoneId] ?? 0) + returned;
     }
     if (healerTreated > 0) {
-      event(events, healer.zoneId, 'report', `${healer.label}이 약초로 응급 처치를 마쳐 부상자 ${healerTreated}명을 전열에 복귀시킵니다.`, 620, {
+      event(events, healer.zoneId, 'report', `${withJosa(healer.label, '이/가')} 약초로 응급 처치를 마쳐 부상자 ${healerTreated}명을 전열에 복귀시킵니다.`, 620, {
         side: 'defender', groupId: healer.id, float: `응급치료 +${healerTreated}`,
       });
       lines.push(`${healer.label}: 약초를 써 부상자 ${healerTreated}명이 전열에 복귀했습니다.`);
@@ -2374,7 +2374,7 @@ export function resolveTacticalRound(state: GameState): string | null {
     if (moraleBonus > 0) {
       battle.raiderMorale = clamp(battle.raiderMorale + moraleBonus, 0, 100);
       battle.raiderGroups.forEach(group => { group.morale = clamp(group.morale + moraleBonus, 0, 100); });
-      lines.push(`야간 접근으로 적이 첫 교전 기세 +${moraleBonus}을 얻었습니다.`);
+      lines.push(`야간 접근으로 적이 첫 교전 기세 +${withJosa(moraleBonus, '을/를')} 얻었습니다.`);
     }
   }
   const lootBag: Partial<Record<ResourceId, number>> = {};
@@ -2931,7 +2931,7 @@ function tacticalFlankOutcomeSummary(
   if (outcome === 'defenderReachedRear') return `${label}에서 아군 우회대 ${defenderArrivals}개 조가 적 후열에 도달했습니다.`;
   if (outcome === 'defenderHeld') return `${label}의 차단대가 적 우회 시도를 저지했습니다.`;
   if (outcome === 'contested') return `${label}의 통제권을 두고 교전했으나 출구 돌파는 없었습니다.`;
-  return `${label}이 열렸지만 경로 교전이나 후열 도달은 없었습니다.`;
+  return `${withJosa(label, '이/가')} 열렸지만 경로 교전이나 후열 도달은 없었습니다.`;
 }
 
 export function tacticalBattleTacticsReport(battle: TacticalBattle): TacticalBattleTacticsReport {

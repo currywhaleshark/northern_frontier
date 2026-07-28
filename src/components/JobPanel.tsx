@@ -1,4 +1,5 @@
 // 직업 배정 패널: 직업별 상세 화면에서 주민을 직접 골라 배정·해제한다.
+import { withJosa } from '../game/josa';
 import { useState } from 'react';
 import { BUILDING_DEFS } from '../game/buildings';
 import { isJobUnlocked, JOB_DESC, JOB_NAMES, JOB_ORDER } from '../game/constants';
@@ -363,7 +364,7 @@ export function JobPanel({
                 disabled={assignableIdle === 0}
                 title={assignableIdle === 0
                   ? gated ? '무직 문해자가 없습니다' : '이 직업을 맡을 수 있는 무직 주민이 없습니다'
-                  : `무직 주민 1명을 ${JOB_NAMES[job]}(으)로 배정`}
+                  : `무직 주민 1명을 ${withJosa(JOB_NAMES[job], '으로/로')} 배정`}
                 onClick={() => onReassign('idle', job)}
               >＋</button>
             </span>

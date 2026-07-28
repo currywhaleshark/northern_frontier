@@ -1,5 +1,6 @@
 // 주민 에이전트 시뮬레이션 — 서브틱 단위의 이동, 작업, 운반
 // 자원은 창고/거점에 짐을 부려야 마을 비축량에 더해진다.
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import {
   DAY_BANDS, DAY_CYCLE_SUBTICKS, WORK_RATE_SCALE, WORK_SUBTICKS, dayBandOf,
@@ -940,9 +941,9 @@ function logMineralDepletion(state: GameState, tile: Tile, resource: 'stone' | '
     state,
     mine
       ? otherDeposits > 0
-        ? depositName + '이(가) 고갈되었습니다. 채광꾼들이 주변의 다른 광상으로 옮겨갑니다.'
-        : depositName + '이(가) 고갈되었습니다. 채광장 주변 광상이 모두 바닥났습니다.'
-      : depositName + '이(가) 고갈되어 지표에서 사라졌습니다.',
+        ? withJosa(depositName, '이/가') + ' 고갈되었습니다. 채광꾼들이 주변의 다른 광상으로 옮겨갑니다.'
+        : withJosa(depositName, '이/가') + ' 고갈되었습니다. 채광장 주변 광상이 모두 바닥났습니다.'
+      : withJosa(depositName, '이/가') + ' 고갈되어 지표에서 사라졌습니다.',
     'bad',
     true,
   );
@@ -1180,7 +1181,7 @@ function hunterTick(state: GameState, r: Resident, ctx: Ctx): void {
     onHarvest: (_tile, res, meatAmount) => {
       addCarry(res, 'hide', (meatAmount / CONFIG.production.meatPerGame) * CONFIG.production.hidePerGame);
       if (ctx.rng() < 0.06) {
-        addLog(state, `사냥꾼 ${res.name}이(가) 노루를 잡아 식량과 가죽을 가져옵니다.`, 'good');
+        addLog(state, `사냥꾼 ${withJosa(res.name, '이/가')} 노루를 잡아 식량과 가죽을 가져옵니다.`, 'good');
       }
     },
   });
@@ -1333,7 +1334,7 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
       }
       gainSkillTick(r);
     } else {
-      r.task = st === 'stuck' ? '길이 막힘' : `${BUILDING_DEFS[farm.type].name}(으)로 이동`;
+      r.task = st === 'stuck' ? '길이 막힘' : `${withJosa(BUILDING_DEFS[farm.type].name, '으로/로')} 이동`;
     }
     return;
   }
@@ -1348,7 +1349,7 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
       farm.sownArea = Math.min(area, sown + sowRate);
       gainSkillTick(r);
     } else {
-      r.task = st === 'stuck' ? '길이 막힘' : `${BUILDING_DEFS[farm.type].name}(으)로 이동`;
+      r.task = st === 'stuck' ? '길이 막힘' : `${withJosa(BUILDING_DEFS[farm.type].name, '으로/로')} 이동`;
     }
     return;
   }
@@ -1375,7 +1376,7 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
     );
     gainSkillTick(r);
   } else {
-    r.task = st === 'stuck' ? '길이 막힘' : `${BUILDING_DEFS[farm.type].name}(으)로 이동`;
+    r.task = st === 'stuck' ? '길이 막힘' : `${withJosa(BUILDING_DEFS[farm.type].name, '으로/로')} 이동`;
   }
 }
 
@@ -1507,7 +1508,7 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
       reconcileResidentHomes(state, ctx.rng);
       addLog(state, repaired
         ? `${def.name} 수리가 끝나 다시 가동됩니다.`
-        : `${def.name}이(가) 완공되었습니다.`, 'good',
+        : `${withJosa(def.name, '이/가')} 완공되었습니다.`, 'good',
       repaired || def.slots > 0 || def.capacity > 0 || def.unique);
       const autoAssigned = autoAssignWorkersToBuilding(state, target.id);
       for (const worker of autoAssigned) resetAgent(state, worker);
@@ -2086,7 +2087,7 @@ function curerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const st = goTo(state, r, ctx, buildingGoal(state, workplace.id));
   if (st !== 'arrived') {
     r.phase = st === 'stuck' ? 'rest' : 'toWork';
-    r.task = st === 'stuck' ? '길이 막힘' : `${BUILDING_DEFS[workplace.type].name}(으)로 이동`;
+    r.task = st === 'stuck' ? '길이 막힘' : `${withJosa(BUILDING_DEFS[workplace.type].name, '으로/로')} 이동`;
     return;
   }
   if (rainBlocked) {
@@ -2303,7 +2304,7 @@ function physicianTick(state: GameState, r: Resident, ctx: Ctx): void {
   r.task = `${result.patient?.name ?? '환자'} 진료 중`;
   gainSkillTick(r);
   if (result.status === 'recovered' && result.patient) {
-    addLog(state, `의원 ${r.name}의 치료로 ${result.patient.name}이(가) 병에서 회복했습니다.`, 'good');
+    addLog(state, `의원 ${r.name}의 치료로 ${withJosa(result.patient.name, '이/가')} 병에서 회복했습니다.`, 'good');
   }
 }
 

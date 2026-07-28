@@ -1,3 +1,4 @@
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { FACTIONS } from './constants';
 import { addLog } from './events';
@@ -266,10 +267,10 @@ export function addForeignSiteMemory(
 
 function discoveryMessage(site: ForeignSite): string {
   if (site.type === 'fishingVillage') return `강가의 ${site.name}에서 연기가 피어오릅니다.`;
-  if (site.type === 'seasonalCamp') return `숲 너머에서 ${site.name}를 발견했습니다.`;
+  if (site.type === 'seasonalCamp') return `숲 너머에서 ${withJosa(site.name, '을/를')} 발견했습니다.`;
   if (site.type === 'banditLair') return '산비탈 깊은 곳에서 변경 마적의 산채 흔적을 찾았습니다.';
   if (site.type === 'ruin') return '버려진 야영지에서 오래된 화살촉과 부러진 솥을 발견했습니다.';
-  return `숲 너머에서 ${site.name}이(가) 발견되었습니다.`;
+  return `숲 너머에서 ${withJosa(site.name, '이/가')} 발견되었습니다.`;
 }
 
 export function revealForeignSitesFromExploration(state: GameState): void {
@@ -311,7 +312,7 @@ export function updateSeasonalForeignSites(state: GameState, season = getSeason(
     if (!site.discovered) continue;
     addLog(state, active
       ? `${site.name}에 다시 연기가 올랐습니다.`
-      : `계절이 바뀌며 ${site.name}가 비었습니다.`, 'info', true);
+      : `계절이 바뀌며 ${withJosa(site.name, '이/가')} 비었습니다.`, 'info', true);
     addForeignSiteMemory(state, site.id, active ? '사냥꾼들이 계절 야영지로 돌아왔습니다.' : '계절이 바뀌어 야영지가 비었습니다.', 'neutral');
   }
 }

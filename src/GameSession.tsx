@@ -1,4 +1,5 @@
 // 최상위 컴포넌트: 게임 상태 보관, 게임 루프, 플레이어 입력 연결
+import { withJosa } from './game/josa';
 import { lazy, Profiler, useCallback, useEffect, useLayoutEffect, useRef, useState, type ProfilerOnRenderCallback } from 'react';
 import { CONFIG } from './game/config';
 import {
@@ -825,7 +826,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   const handleStartBuildingDemolition = (buildingId: number) => {
     const building = stateRef.current.buildings.find(candidate => candidate.id === buildingId);
     if (!building) return;
-    if (!window.confirm(`${BUILDING_DEFS[building.type].name}을(를) 해체할까요? 건축가가 작업을 마치면 자재 일부만 돌아옵니다.`)) return;
+    if (!window.confirm(`${withJosa(BUILDING_DEFS[building.type].name, '을/를')} 해체할까요? 건축가가 작업을 마치면 자재 일부만 돌아옵니다.`)) return;
     const err = startBuildingDemolition(stateRef.current, buildingId);
     if (err) notify(err, 'bad');
     else playSfx('hammer');

@@ -1,3 +1,4 @@
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { FACTIONS, RESOURCE_NAMES, SEASON_NAMES } from './constants';
 import { countBuilt } from './buildings';
@@ -101,8 +102,8 @@ function validatesFactionPair(factionName: string, give: ResourceId, get: Resour
   if (!faction) return '세력을 찾을 수 없습니다.';
   if (give === get) return '같은 물품끼리는 거래할 수 없습니다.';
   if (ABSTRACT_RESOURCES.has(give) || ABSTRACT_RESOURCES.has(get)) return '명성과 방어도는 교역할 수 없습니다.';
-  if (!faction.imports.includes(give)) return `${faction.name}이(가) 받지 않는 물품입니다.`;
-  if (!faction.exports.includes(get)) return `${faction.name}이(가) 내놓지 않는 물품입니다.`;
+  if (!faction.imports.includes(give)) return `${withJosa(faction.name, '이/가')} 받지 않는 물품입니다.`;
+  if (!faction.exports.includes(get)) return `${withJosa(faction.name, '이/가')} 내놓지 않는 물품입니다.`;
   return null;
 }
 
@@ -125,13 +126,13 @@ export function quoteTrade(state: GameState, factionName: string, request: Trade
     return rejected(factionName, request, '명성과 방어도는 교역할 수 없습니다.');
   }
   if (!faction.imports.includes(request.give)) {
-    return rejected(factionName, request, `${faction.name}이(가) 받지 않는 물품입니다.`);
+    return rejected(factionName, request, `${withJosa(faction.name, '이/가')} 받지 않는 물품입니다.`);
   }
   if (!faction.exports.includes(request.get)) {
-    return rejected(factionName, request, `${faction.name}이(가) 내놓지 않는 물품입니다.`);
+    return rejected(factionName, request, `${withJosa(faction.name, '이/가')} 내놓지 않는 물품입니다.`);
   }
   if ((state.resources[request.give] ?? 0) < request.giveAmt) {
-    return rejected(factionName, request, `${RESOURCE_NAMES[request.give]}이(가) 부족합니다.`);
+    return rejected(factionName, request, `${withJosa(RESOURCE_NAMES[request.give], '이/가')} 부족합니다.`);
   }
 
   const margin = silverAdjustedMargin(
@@ -171,12 +172,12 @@ export function quoteFactionDemand(
   if (!faction) return rejectedDemand('세력을 찾을 수 없습니다.');
   if (!validTradeAmount(getAmt)) return rejectedDemand('받을 수량은 1 이상의 정수여야 합니다.');
   if (!faction.exports.includes(get) || ABSTRACT_RESOURCES.has(get)) {
-    return rejectedDemand(`${faction.name}이(가) 내놓지 않는 물품입니다.`);
+    return rejectedDemand(`${withJosa(faction.name, '이/가')} 내놓지 않는 물품입니다.`);
   }
   const capacity = factionTradeCapacity(state, factionName, get);
   if (getAmt > capacity) {
     return rejectedDemand(
-      `${SEASON_NAMES[getSeason(state.day)]}에는 ${RESOURCE_NAMES[get]}을(를) ${capacity}까지만 내놓을 수 있습니다.`,
+      `${SEASON_NAMES[getSeason(state.day)]}에는 ${withJosa(RESOURCE_NAMES[get], '을/를')} ${capacity}까지만 내놓을 수 있습니다.`,
     );
   }
   const getUnitValue = factionValue(factionName, get);
@@ -241,14 +242,14 @@ export function evaluateFactionProposal(
     return {
       outcome: 'countered', offer: counter, maxGetAmt,
       message: offer.getAmt > capacity
-        ? `${RESOURCE_NAMES[offer.get]}은(는) 이번 철에 ${capacity}까지만 내놓을 수 있다고 합니다.`
+        ? `${withJosa(RESOURCE_NAMES[offer.get], '은/는')} 이번 철에 ${capacity}까지만 내놓을 수 있다고 합니다.`
         : `${RESOURCE_NAMES[offer.get]} ${maxGetAmt}이라면 거래하겠다고 역제안합니다.`,
     };
   }
   return {
     outcome: 'rejected', offer, maxGetAmt,
     message: offer.getAmt > capacity
-      ? `${RESOURCE_NAMES[offer.get]}은(는) 이번 철 최대 ${capacity}까지만 교역할 수 있습니다.`
+      ? `${withJosa(RESOURCE_NAMES[offer.get], '은/는')} 이번 철 최대 ${capacity}까지만 교역할 수 있습니다.`
       : '요구가 지나치다며 제안을 거부했습니다. 수량을 낮춰 다시 협상할 수 있습니다.',
   };
 }

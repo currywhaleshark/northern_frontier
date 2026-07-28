@@ -1,3 +1,4 @@
+import { withJosa } from '../../game/josa';
 import { FACTIONS, RESOURCE_NAMES } from '../../game/constants';
 import { canRequestTrade, factionTradeUnlockReason } from '../../game/events';
 import { getRelation } from '../../game/relations';
@@ -75,7 +76,7 @@ export function FactionsWindow({ state, onRequestTrade }: Props) {
                     className="btn small faction-trade-button"
                     type="button"
                     disabled={!!tradeReason}
-                    title={tradeReason ?? `${faction.name}과 교역 협상을 엽니다`}
+                    title={tradeReason ?? `${withJosa(faction.name, '과/와')} 교역 협상을 엽니다`}
                     onClick={() => onRequestTrade(faction.name)}
                   >
                     교역

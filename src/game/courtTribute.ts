@@ -1,6 +1,7 @@
 // 조정 세공(歲貢) — 해마다 한양 조정에 바치는 공물.
 // 봄 첫날 그해 요구량이 공지되어 세 계절 동안 준비하고, 겨울 첫날 사자가 도착해 거둬 간다.
 // 바치면 명성이 오르고(격년 하사품), 못 바치면 명성이 크게 떨어지며 국경이 험악해진다.
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
@@ -110,7 +111,7 @@ export function openCourtTributeChoice(state: GameState): void {
       {
         id: 'pay-silver',
         label: '은으로 대납한다',
-        desc: `은 ${tributeSilverCost(tribute)}을 한 번에 치릅니다. 명성 +${t.repPaid + t.silverPayRepBonus}, ` +
+        desc: `은 ${withJosa(tributeSilverCost(tribute), '을/를')} 한 번에 치릅니다. 명성 +${t.repPaid + t.silverPayRepBonus}, ` +
           '은까지 바치는 성실함에 조정의 의심이 깊이 씻깁니다.',
         disabled: (state.resources.silver ?? 0) < tributeSilverCost(tribute),
         disabledReason: (state.resources.silver ?? 0) < tributeSilverCost(tribute) ? '은이 부족합니다' : undefined,
@@ -131,7 +132,7 @@ function grantFullTributeReward(state: GameState, tribute: CourtTribute): void {
   const rng = makeRng(state.seed + tribute.year * 9203 + 5);
   if (rng() < 0.5) {
     state.resources.tools += t.rewardTools;
-    addLog(state, `조정에서 하사품이 내려왔습니다. 도구 ${t.rewardTools}을(를) 받았습니다.`, 'good', true);
+    addLog(state, `조정에서 하사품이 내려왔습니다. 도구 ${withJosa(t.rewardTools, '을/를')} 받았습니다.`, 'good', true);
   } else {
     state.resources.cottonClothes += t.rewardCottonClothes;
     addLog(state, `조정에서 하사품이 내려왔습니다. 무명옷 ${t.rewardCottonClothes}벌을 받았습니다.`, 'good', true);

@@ -1,3 +1,4 @@
+import { withJosa } from './josa';
 import { addLog } from './events';
 import { CONFIG } from './config';
 import { beginExpeditionReturn } from './expedition';
@@ -573,7 +574,7 @@ export function resolveAssaultRound(state: GameState): string | null {
     group.readyMuskets = musketAllocation.byGroup[group.id] ?? 0;
   }
   if (musketAllocation.powderRequired > 0) {
-    lines.push(`조총 사격에 화약 ${musketAllocation.powderRequired.toFixed(1)}을 소모했습니다.`);
+    lines.push(`조총 사격에 화약 ${withJosa(musketAllocation.powderRequired.toFixed(1), '을/를')} 소모했습니다.`);
   }
 
   const commands = new Set(players.map(group => group.command));

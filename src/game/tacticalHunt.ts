@@ -1,3 +1,4 @@
+import { withJosa } from './josa';
 import { addLog } from './events';
 import { CONFIG } from './config';
 import { combatGroupLabel, tacticalGroupCapabilities, tacticalGroupPower } from './combatCapabilities';
@@ -204,7 +205,7 @@ export function huntPreparationUnavailableReason(state: GameState, actionId: Pre
   if (!battle || battle.assaultKind !== 'predatorHunt') return '진행 중인 맹수 사냥이 없습니다.';
   if (!HUNT_PREPARATIONS.some(action => action.id === actionId)) return '이 준비는 몰이사냥에서 사용할 수 없습니다.';
   if (actionId === 'placeBait' && state.resources.meat < HUNT_CONFIG.baitMeatCost) {
-    return `미끼로 쓸 고기 ${HUNT_CONFIG.baitMeatCost}이 필요합니다.`;
+    return `미끼로 쓸 고기 ${withJosa(HUNT_CONFIG.baitMeatCost, '이/가')} 필요합니다.`;
   }
   if (actionId === 'setHuntTraps' && !battle.defenderGroups.some(group => group.role === 'hunter' || group.role === 'watchman')) {
     return '함정을 놓을 사냥꾼이나 파수꾼이 없습니다.';
@@ -305,7 +306,7 @@ export function setHuntPreparationZone(
   if (zone.id === 'huntDen') return '덤불 심처에는 미끼나 함정을 미리 놓을 수 없습니다.';
   if (actionId === 'placeBait') {
     if (!action.applied) {
-      if (state.resources.meat < HUNT_CONFIG.baitMeatCost) return `미끼로 쓸 고기 ${HUNT_CONFIG.baitMeatCost}이 필요합니다.`;
+      if (state.resources.meat < HUNT_CONFIG.baitMeatCost) return `미끼로 쓸 고기 ${withJosa(HUNT_CONFIG.baitMeatCost, '이/가')} 필요합니다.`;
       state.resources.meat = Math.max(0, state.resources.meat - HUNT_CONFIG.baitMeatCost);
       action.applied = true;
       battle.huntBaitPlaced = true;
@@ -447,7 +448,7 @@ function beastAttack(
     );
   if (spearWall) hitChance *= HUNT_CONFIG.ambush.spearWallMultiplier[kind];
   hitChance *= hitChanceMultiplier;
-  addEvent(events, zoneId, 'beastAmbush', `${beastName}가 ${target.label} 한 곳을 노려 덮칩니다.`, {
+  addEvent(events, zoneId, 'beastAmbush', `${withJosa(beastName, '이/가')} ${target.label} 한 곳을 노려 덮칩니다.`, {
     side: 'raider', groupId: target.id, float: '급습!',
   });
   if (rng() >= hitChance) return { wounded: 0, killed: 0 };
@@ -533,7 +534,7 @@ function triggerHuntTrap(
     tiger.power = Math.max(0, tiger.power - damage);
     if (tiger.power <= 0.8) {
       tiger.killed = Math.max(tiger.killed, 1);
-      addEvent(events, zone.id, 'casualty', `${tiger.label}이 함정의 치명상을 입고 쓰러집니다.`, {
+      addEvent(events, zone.id, 'casualty', `${withJosa(tiger.label, '이/가')} 함정의 치명상을 입고 쓰러집니다.`, {
         side: 'raider', groupId: tiger.id, casualties: 1, killed: 1, float: '사살!',
       });
       return 1;
@@ -790,7 +791,7 @@ export function resolveHuntRound(state: GameState): string | null {
           lines.push(text);
           addEvent(events, actionZone.id, 'retreat', text, { side: 'raider', float: '돌파 성공!' });
         } else {
-          addEvent(events, actionZone.id, 'advance', `${actionZone.name}으로 뛰쳐나온 맹수의 돌파를 사냥대가 막아 세웁니다.`, {
+          addEvent(events, actionZone.id, 'advance', `${withJosa(actionZone.name, '으로/로')} 뛰쳐나온 맹수의 돌파를 사냥대가 막아 세웁니다.`, {
             side: 'defender', float: '돌파 저지!',
           });
         }
@@ -883,7 +884,7 @@ export function resolveHuntRound(state: GameState): string | null {
     if (counterattackContributed) battle.huntCounterattackCount = (battle.huntCounterattackCount ?? 0) + 1;
     const volleyShots = tacticalDefenderShotCounts(players.filter(group => group.command === 'volley'));
     if (musketeers > 0) {
-      lines.push(`조총 사격에 화약 ${musketAllocation.powderRequired.toFixed(1)}을 소모했습니다.`);
+      lines.push(`조총 사격에 화약 ${withJosa(musketAllocation.powderRequired.toFixed(1), '을/를')} 소모했습니다.`);
     }
     if ((volleyShots.arrows ?? 0) + (volleyShots.muskets ?? 0) > 0) {
       addEvent(events, actionZone.id, 'volley', '발각된 짐승을 향해 조총과 각궁을 일제히 쏩니다.', {
@@ -907,7 +908,7 @@ export function resolveHuntRound(state: GameState): string | null {
       if (tiger.power <= 0.8) {
         tiger.killed = 1;
         beastsKilled = 1;
-        addEvent(events, tiger.zoneId, 'casualty', `${tiger.label}이 치명상을 입고 쓰러집니다.`, {
+        addEvent(events, tiger.zoneId, 'casualty', `${withJosa(tiger.label, '이/가')} 치명상을 입고 쓰러집니다.`, {
           side: 'raider', groupId: tiger.id, casualties: 1, killed: 1, float: '사살!',
         });
       } else if (tiger.power < battle.originalPower * 0.55) battle.huntPredatorState = 'wounded';

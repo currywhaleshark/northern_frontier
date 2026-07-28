@@ -1,6 +1,7 @@
 // 시뮬레이션 오케스트레이터
 // 하루는 SUBTICKS개의 서브틱으로 나뉜다. 서브틱마다 주민 에이전트가 이동/작업/운반하고,
 // 하루가 넘어갈 때 소비/생존/위협/이벤트 등 일일 처리를 한다.
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { isJobUnlocked, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } from './constants';
 import {
@@ -394,7 +395,7 @@ export function demolishBuilding(state: GameState, x: number, y: number): string
   state.buildings = state.buildings.filter(b => b.id !== building.id);
   reconcileMountAssignments(state);
   state.resources.defense = computeDefense(state);
-  addLog(state, `${def.name}을(를) 철거했습니다.`, 'info');
+  addLog(state, `${withJosa(def.name, '을/를')} 철거했습니다.`, 'info');
   return null;
 }
 
@@ -439,7 +440,7 @@ export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
     ?? state.residents.find(res => res.alive && !res.special && res.job === from && eligible(res));
   if (!r) {
     if (isLiterateJob(to) && state.residents.some(res => res.alive && !res.special && res.job === from)) {
-      addLog(state, `${JOB_NAMES[to]}은(는) 글을 아는 주민만 맡을 수 있습니다. 서당에서 아이를 가르치거나 문해자 유민을 기다리십시오.`, 'info');
+      addLog(state, `${withJosa(JOB_NAMES[to], '은/는')} 글을 아는 주민만 맡을 수 있습니다. 서당에서 아이를 가르치거나 문해자 유민을 기다리십시오.`, 'info');
     }
     return false;
   }
@@ -458,19 +459,19 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
   if (!isJobUnlocked(state.rank, job)) return;
   const r = state.residents.find(res => res.id === id);
   if (r?.stage && r.stage !== 'youth') {
-    addLog(state, `${r.name}은(는) 아직 아이라 일을 맡길 수 없습니다.`, 'info');
+    addLog(state, `${withJosa(r.name, '은/는')} 아직 아이라 일을 맡길 수 없습니다.`, 'info');
     return;
   }
   if (r?.stage === 'youth' && youthActivityOf(r) !== 'work') {
-    addLog(state, `${r.name}은(는) 서당에 다니는 소년이라 생산 일을 맡길 수 없습니다. 먼저 일 돕기를 선택하십시오.`, 'info');
+    addLog(state, `${withJosa(r.name, '은/는')} 서당에 다니는 소년이라 생산 일을 맡길 수 없습니다. 먼저 일 돕기를 선택하십시오.`, 'info');
     return;
   }
   if (r?.stage === 'youth' && !isYouthWorkJob(job)) {
-    addLog(state, `${r.name}은(는) 소년이라 안전한 일 돕기 직무만 맡을 수 있습니다.`, 'info');
+    addLog(state, `${withJosa(r.name, '은/는')} 소년이라 안전한 일 돕기 직무만 맡을 수 있습니다.`, 'info');
     return;
   }
   if (r?.special) {
-    addLog(state, `${r.name}은(는) 제 소명이 있는 사람이라 다른 일을 맡지 않습니다.`, 'info');
+    addLog(state, `${withJosa(r.name, '은/는')} 제 소명이 있는 사람이라 다른 일을 맡지 않습니다.`, 'info');
     return;
   }
   if ((job === 'shaman' || job === 'monk') && !r?.special) {
@@ -478,7 +479,7 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
     return;
   }
   if (r && isLiterateJob(job) && r.literate !== true) {
-    addLog(state, `${r.name}은(는) 글을 몰라 ${JOB_NAMES[job]}을(를) 맡을 수 없습니다. 서당에서 배운 아이나 문해자 유민이 필요합니다.`, 'info');
+    addLog(state, `${withJosa(r.name, '은/는')} 글을 몰라 ${withJosa(JOB_NAMES[job], '을/를')} 맡을 수 없습니다. 서당에서 배운 아이나 문해자 유민이 필요합니다.`, 'info');
     return;
   }
   if (r && r.alive) {
@@ -520,8 +521,8 @@ export function setYouthActivity(
   addLog(
     state,
     activity === 'school'
-      ? `${resident.name}이(가) 일손을 놓고 서당에 다니기 시작했습니다.`
-      : `${resident.name}이(가) 서당 공부를 멈추고 반몫으로 일을 돕습니다.`,
+      ? `${withJosa(resident.name, '이/가')} 일손을 놓고 서당에 다니기 시작했습니다.`
+      : `${withJosa(resident.name, '이/가')} 서당 공부를 멈추고 반몫으로 일을 돕습니다.`,
     'info',
   );
   return null;
@@ -537,7 +538,7 @@ export function toggleResidentCart(state: GameState, id: number): string | null 
   addLog(
     state,
     equipping
-      ? `${resident.name}에게 수레를 장비했습니다. 적재량이 ${haulerCarryCapacity(resident)}(으)로 늘어납니다.`
+      ? `${resident.name}에게 수레를 장비했습니다. 적재량이 ${withJosa(haulerCarryCapacity(resident), '으로/로')} 늘어납니다.`
       : `${resident.name}의 수레를 마을 비축으로 돌려보냈습니다.`,
     'good',
   );
@@ -690,7 +691,7 @@ export function setBuildingCrop(
   const building = state.buildings.find(b => b.id === buildingId);
   if (!building || (building.type !== 'field' && building.type !== 'paddy')) return '작물을 고를 수 있는 건물이 아닙니다.';
   if (!building.built) return '완공된 밭이나 논에서만 작물을 고를 수 있습니다.';
-  if (!isCropAllowedOnBuilding(cropId, building.type)) return `${CROP_DEFS[cropId].name}은(는) 이곳에서 기를 수 없습니다.`;
+  if (!isCropAllowedOnBuilding(cropId, building.type)) return `${withJosa(CROP_DEFS[cropId].name, '은/는')} 이곳에서 기를 수 없습니다.`;
 
   const currentCrop = cropIdForBuilding(building);
   const hasStandingCrop = currentCrop != null && building.fieldGrowth > 0.5;
@@ -698,7 +699,7 @@ export function setBuildingCrop(
 
   if (mode === 'queue' && hasStandingCrop && currentCrop !== cropId) {
     building.queuedCropId = cropId;
-    addLog(state, `${BUILDING_DEFS[building.type].name}의 다음 작물을 ${CROP_DEFS[cropId].name}(으)로 예약했습니다.`, 'info');
+    addLog(state, `${BUILDING_DEFS[building.type].name}의 다음 작물을 ${withJosa(CROP_DEFS[cropId].name, '으로/로')} 예약했습니다.`, 'info');
     return null;
   }
 
@@ -707,7 +708,7 @@ export function setBuildingCrop(
   building.queuedCropId = null;
   if (canPlantCropNow(cropId, building.type, season)) {
     building.cropId = cropId;
-    addLog(state, `${BUILDING_DEFS[building.type].name}에 ${CROP_DEFS[cropId].name}을(를) 심기로 했습니다.`, 'info');
+    addLog(state, `${BUILDING_DEFS[building.type].name}에 ${withJosa(CROP_DEFS[cropId].name, '을/를')} 심기로 했습니다.`, 'info');
   } else {
     building.cropId = null;
     building.queuedCropId = cropId;
@@ -754,7 +755,7 @@ export function setSmithyProduct(state: GameState, buildingId: number, product: 
     return `${rankName} 승격 후 생산할 수 있습니다.`;
   }
   building.smithyProduct = product;
-  addLog(state, `대장간 생산품을 ${SMITHY_PRODUCT_DEFS[product].name}(으)로 바꿨습니다.`, 'info');
+  addLog(state, `대장간 생산품을 ${withJosa(SMITHY_PRODUCT_DEFS[product].name, '으로/로')} 바꿨습니다.`, 'info');
   return null;
 }
 
@@ -900,8 +901,8 @@ export function expandAreaBuilding(
   addLog(
     state,
     expansionTrees > 0
-      ? `${BUILDING_DEFS[building.type].name} 영역 확장을 정했습니다. 추가 ${addedTiles}칸 · 벌목꾼이 나무 ${expansionTrees}그루를 벤 뒤 ${worker}가 공사합니다.`
-      : `${BUILDING_DEFS[building.type].name} 영역 확장을 시작했습니다. 추가 ${addedTiles}칸 · ${worker}가 공사합니다.`,
+      ? `${BUILDING_DEFS[building.type].name} 영역 확장을 정했습니다. 추가 ${addedTiles}칸 · 벌목꾼이 나무 ${expansionTrees}그루를 벤 뒤 ${withJosa(worker, '이/가')} 공사합니다.`
+      : `${BUILDING_DEFS[building.type].name} 영역 확장을 시작했습니다. 추가 ${addedTiles}칸 · ${withJosa(worker, '이/가')} 공사합니다.`,
     'info',
   );
   return null;
@@ -983,7 +984,7 @@ export function togglePriorityBuilding(state: GameState, buildingId: number): st
     addLog(state, `${BUILDING_DEFS[building.type].name} 우선 작업 지정을 해제했습니다.`, 'info');
   } else {
     state.priorityBuildingId = buildingId;
-    addLog(state, `${BUILDING_DEFS[building.type].name}을(를) 최우선 작업으로 지정했습니다.`, 'info');
+    addLog(state, `${withJosa(BUILDING_DEFS[building.type].name, '을/를')} 최우선 작업으로 지정했습니다.`, 'info');
   }
   return null;
 }
@@ -1000,7 +1001,7 @@ export function setDryingProduct(state: GameState, buildingId: number, product: 
   const building = state.buildings.find(b => b.id === buildingId);
   if (!building || building.type !== 'dryingRack') return '건조대를 찾을 수 없습니다.';
   building.dryingProduct = product;
-  addLog(state, `건조대 생산품을 ${DRYING_PRODUCT_DEFS[product].name}(으)로 바꿨습니다.`, 'info');
+  addLog(state, `건조대 생산품을 ${withJosa(DRYING_PRODUCT_DEFS[product].name, '으로/로')} 바꿨습니다.`, 'info');
   return null;
 }
 
@@ -1068,7 +1069,7 @@ export function useLuxuryGood(state: GameState, resource: ResourceId): string | 
   for (const resident of livingResidents(state)) {
     resident.morale = Math.min(100, resident.morale + CONFIG.petition.luxuryMorale);
   }
-  addLog(state, `${RESOURCE_NAMES[resource]}을(를) 나누어 주민들의 사기를 북돋았습니다.`, 'good');
+  addLog(state, `${withJosa(RESOURCE_NAMES[resource], '을/를')} 나누어 주민들의 사기를 북돋았습니다.`, 'good');
   return null;
 }
 
@@ -1213,7 +1214,7 @@ function settleSowingDeadline(state: GameState, prev: string, next: string): voi
 function onSeasonChange(state: GameState, prev: string, next: string): void {
   resetFactionTradeCapacityUsage(state);
   updateSeasonalForeignSites(state, next as ReturnType<typeof getSeason>);
-  addLog(state, `${SEASON_NAMES[next as keyof typeof SEASON_NAMES]}이(가) 시작되었습니다. (${getYear(state.day)}년차)`, 'weather');
+  addLog(state, `${withJosa(SEASON_NAMES[next as keyof typeof SEASON_NAMES], '이/가')} 시작되었습니다. (${getYear(state.day)}년차)`, 'weather');
   settleSowingDeadline(state, prev, next);
 
   if (next === 'winter') {
@@ -1310,15 +1311,46 @@ function updateHabitats(state: GameState): void {
   }
 }
 
-// 도구 마모: 생산직 인원 수에 비례
+// 공용 도구 마모. 손도구 의존도가 낮은 직종은 적게, 운반은 별도 장비(수레)로 보아
+// 제외한다. 직업만 배정됐을 뿐 실제 일감이 없는 겨울 농부·건축가도 닳지 않는다.
+const TOOL_WEAR_JOB_WEIGHT: Partial<Record<JobId, number>> = {
+  woodcutter: 1,
+  woodSplitter: 1,
+  hunter: 0.6,
+  farmer: 1,
+  miller: 0.5,
+  builder: 1,
+  curer: 0.45,
+  potter: 0.6,
+  smith: 0.6,
+  miner: 1,
+  fisher: 0.6,
+  charcoalBurner: 0.5,
+  herder: 0.25,
+  powderMaker: 0.5,
+  tanner: 0.5,
+  weaver: 0.35,
+  herbalist: 0.5,
+};
+
+export function dailyToolWear(state: GameState): number {
+  const winter = getSeason(state.day) === 'winter';
+  const hasConstruction = state.buildings.some(building =>
+    !building.built || building.expansion != null || building.workOrder != null);
+  const wearUnits = state.residents.reduce((sum, resident) => {
+    if (!resident.alive || resident.sick || state.day < (resident.quarantinedUntil ?? 0)) return sum;
+    if (resident.stage && resident.stage !== 'youth') return sum;
+    if (resident.job === 'farmer' && winter) return sum;
+    if (resident.job === 'builder' && !hasConstruction) return sum;
+    const jobWeight = TOOL_WEAR_JOB_WEIGHT[resident.job] ?? 0;
+    const laborWeight = resident.stage === 'youth' ? 0.5 : 1;
+    return sum + jobWeight * laborWeight;
+  }, 0);
+  return wearUnits * CONFIG.production.toolWearPerWorker;
+}
+
 function runToolWear(state: GameState): void {
-  const producing = [
-    'woodcutter', 'woodSplitter', 'hunter', 'farmer', 'miller', 'builder', 'curer', 'potter', 'smith', 'miner', 'fisher',
-    'charcoalBurner', 'herder', 'powderMaker', 'tanner', 'weaver', 'herbalist', 'hauler',
-  ];
-  const n = state.residents.filter(r =>
-    r.alive && !r.sick && state.day >= (r.quarantinedUntil ?? 0) && producing.includes(r.job)).length;
-  state.resources.tools = Math.max(0, state.resources.tools - n * CONFIG.production.toolWearPerWorker);
+  state.resources.tools = Math.max(0, state.resources.tools - dailyToolWear(state));
 }
 
 function runConsumptionAndNeeds(state: GameState, rng: () => number): void {

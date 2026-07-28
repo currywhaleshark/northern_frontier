@@ -224,7 +224,6 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
               : '노숙'}</td>
           </tr>
         )}
-        <tr><td>위치</td><td>({resident.x}, {resident.y})</td></tr>
         {Object.keys(resident.carrying).length > 0 && (
           <tr>
             <td>{resident.cartEquipped ? '수레 짐' : '지게 짐'}</td>
@@ -350,7 +349,6 @@ export function SelectionContextBar({
             <div className="selection-context-info">
               <table className="insp-table">
                 <tbody>
-                  <tr><td>위치</td><td>({tile.x}, {tile.y})</td></tr>
                   {!explored ? (
                     <>
                       <tr><td>상태</td><td>미답사</td></tr>
@@ -405,7 +403,6 @@ export function SelectionContextBar({
                           : null;
                         return (
                           <>
-                            <tr><td>건물</td><td><BuildingIcon type={building.type} size={22} /> {def.name}</td></tr>
                             <tr><td>상태</td><td>{clearingBlocksWork(state, building)
                               ? `벌목 대기 · 나무 ${pendingClearingTiles(state, building).length}그루`
                               : building.workOrder

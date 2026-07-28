@@ -1,3 +1,4 @@
+import { withJosa } from '../game/josa';
 import {
   BUILDING_DEFS, buildingCostFor, buildingFootprintDims, footprintTilesOf, getBuilding, isBuildingUnlocked,
   isSmithyProductUnlocked, SMITHY_PRODUCT_DEFS, SMITHY_PRODUCT_ORDER, smithyProductOf,
@@ -151,7 +152,7 @@ export function ActionPopup({
             className="btn"
             type="button"
             disabled={centerReason != null}
-            title={centerReason ?? `${RANK_NAMES[centerTarget]}로 승격합니다`}
+            title={centerReason ?? `${withJosa(RANK_NAMES[centerTarget], '으로/로')} 승격합니다`}
             onClick={() => onUpgradeCenter(building.id)}
           >
             중심지 업그레이드

@@ -1960,7 +1960,7 @@ export function TacticalBattleScreen({
                 {report.lines.map((line, index) => <p key={`${line}-${index}`}>{line}</p>)}
                 {(report.raiderPowerRestored ?? 0) > 0 && (
                   <p className="tactical-report-treatment">
-                    적 의원대가 부상 병력을 추슬러 전투력 {Math.round(report.raiderPowerRestored ?? 0)}을 회복했습니다.
+                    적 의원대가 부상 병력을 추슬러 전투력 {withJosa(Math.round(report.raiderPowerRestored ?? 0), '을/를')} 회복했습니다.
                   </p>
                 )}
               </div>
