@@ -623,9 +623,58 @@ export const CONFIG = {
       autumn: { clear: 0.5, rain: 0.2, frost: 0.2, heavySnow: 0.1, blizzard: 0, coldSnap: 0, thawFlood: 0 },
       winter: { clear: 0.35, frost: 0.15, heavySnow: 0.2, blizzard: 0.15, coldSnap: 0.15, rain: 0, thawFlood: 0 },
     } as Record<string, Record<string, number>>,
+    schedule: {
+      precipitationAnomalyFactor: 0.45,
+      temperatureColdFactor: 0.4,
+      temperatureWarmFactor: 0.25,
+      storminessFactor: 0.4,
+      // 해빙 홍수는 직전 겨울에 예정된 적설일과 현재 봄 기온으로만 정한다.
+      // 1년차에는 normalWinterSnowDays를 직전 겨울 적설 대신 사용한다.
+      thawFlood: {
+        normalWinterSnowDays: 4,
+        snowDayFactor: 0.35,
+        temperatureAnomalyFactor: 0.65,
+        maxDays: 4,
+      },
+      seasonalJitterWeights: { minusOne: 0.15, zero: 0.7, plusOne: 0.15 },
+      yearSeedMultiplier: 0x85ebca6b,
+      seasonSalts: {
+        spring: 0x1b56c4e9,
+        summer: 0x2d8f31a7,
+        autumn: 0x4a72e6d3,
+        winter: 0x6c05b91f,
+      },
+      streamSalts: {
+        thawFlood: 0x1020304,
+        precipitationTotal: 0x2131415,
+        precipitationSplit: 0x3242526,
+        nonPrecipitationSplit: 0x4353637,
+        runs: 0x5464748,
+      },
+      runMax: {
+        clear: 3,
+        rain: 3,
+        frost: 3,
+        heavySnow: 2,
+        blizzard: 2,
+        coldSnap: 2,
+        thawFlood: 2,
+      },
+    },
     outdoorMult: { clear: 1, rain: 0.8, frost: 0.9, heavySnow: 0.5, blizzard: 0.15, coldSnap: 0.6, thawFlood: 0.5 },
     firewoodMult: { clear: 1, rain: 1.1, frost: 1.2, heavySnow: 1.4, blizzard: 1.8, coldSnap: 1.7, thawFlood: 1 },
     warmthLossMult: { clear: 1, rain: 1.05, frost: 1.2, heavySnow: 1.3, blizzard: 1.8, coldSnap: 1.7, thawFlood: 1 },
+  },
+
+  // 연간 기후는 저장하지 않고 세계 시드·연차에서 재생성한다. 축별 salt를 분리해
+  // 후속 축을 추가하거나 한 축의 난수 소비를 바꿔도 기존 축 값이 흔들리지 않게 한다.
+  climate: {
+    annualSalts: {
+      temperature: 0x2f6e2b1,
+      precipitation: 0x51a9d73,
+      storminess: 0x7c3d5e9,
+    },
+    yearSeedMultiplier: 0x9e3779b1,
   },
 
   threat: {
