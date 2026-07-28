@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 37, '절목 migration ships with schema version 37');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 39, 'wearables migration ships with schema version 39');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -73,6 +73,8 @@ assert.equal(typeof saveLoad.migrateV33ToV34, 'function');
 assert.equal(typeof saveLoad.migrateV34ToV35, 'function');
 assert.equal(typeof saveLoad.migrateV35ToV36, 'function');
 assert.equal(typeof saveLoad.migrateV36ToV37, 'function');
+assert.equal(typeof saveLoad.migrateV37ToV38, 'function');
+assert.equal(typeof saveLoad.migrateV38ToV39, 'function');
 
 {
   const migrated = saveLoad.migrateV24ToV25({ schemaVersion: 24, tacticalBattle: { phase: 'deployment' } });

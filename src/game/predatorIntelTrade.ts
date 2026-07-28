@@ -1,3 +1,4 @@
+import { withJosa } from './josa';
 import { addLog, tradeNegotiationOf } from './events';
 import { predatorExpeditionTarget } from './expedition';
 import { isForeignSiteOperational } from './foreignSites';
@@ -66,7 +67,7 @@ export function purchasePredatorIntel(
   const offer = predatorIntelOffers(state, factionName).find(candidate => candidate.kind === kind);
   if (!offer) return '지금 이 세력에게서 살 수 있는 맹수 정보가 없습니다.';
   if (state.resources[offer.priceResource] < offer.priceAmount) {
-    return `곡식이 부족합니다. 정보값으로 ${offer.priceAmount}이 필요합니다.`;
+    return `곡식이 부족합니다. 정보값으로 ${withJosa(offer.priceAmount, '이/가')} 필요합니다.`;
   }
   const threat = state.incidents.predatorThreats[kind];
   if (!threat) return '그사이 맹수의 흔적이 사라졌습니다.';
@@ -87,13 +88,13 @@ export function purchasePredatorIntel(
   changeRelation(state, factionName, 1);
   const negotiation = tradeNegotiationOf(state.pendingChoice);
   if (negotiation) {
-    negotiation.message = `${offer.siteName}의 사냥꾼들이 ${offer.label}를 넘겼습니다. ` +
+    negotiation.message = `${offer.siteName}의 사냥꾼들이 ${withJosa(offer.label, '을/를')} 넘겼습니다. ` +
       `규모를 ${offer.precision === 'exact' ? '정확히' : '대략'} 파악했습니다.`;
     if (state.pendingChoice) state.pendingChoice.body = negotiation.message;
   }
   addLog(
     state,
-    `${factionName}에게 곡식 ${offer.priceAmount}을 주고 ${offer.label}를 샀습니다. ` +
+    `${factionName}에게 곡식 ${withJosa(offer.priceAmount, '을/를')} 주고 ${withJosa(offer.label, '을/를')} 샀습니다. ` +
       `적 규모를 ${offer.precision === 'exact' ? '정확히' : '대략'} 파악했습니다.`,
     'trade',
     true,

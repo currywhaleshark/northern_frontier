@@ -49,7 +49,7 @@ export const FACTION_ARTWORK: Record<string, FactionArtwork> = {
   },
 };
 
-export type ResourceIconId = ResourceId | 'foodGroup' | 'fuelGroup' | 'clothingGroup' | 'luxuryGroup';
+export type ResourceIconId = ResourceId | 'foodGroup' | 'fuelGroup' | 'clothingGroup' | 'footwearGroup' | 'luxuryGroup';
 
 export interface TradeResourceSprite {
   atlas: string;
@@ -74,6 +74,7 @@ export const RESOURCE_SPRITES: Partial<Record<ResourceIconId, TradeResourceSprit
   fish: { atlas: BASE_ATLAS, columns: 4, rows: 2, column: 1, row: 1 },
   herbs: { atlas: BASE_ATLAS, columns: 4, rows: 2, column: 2, row: 1 },
   hideClothes: { atlas: BASE_ATLAS, columns: 4, rows: 2, column: 3, row: 1 },
+  leatherShoes: { atlas: BASE_ATLAS, columns: 4, rows: 2, column: 3, row: 1 },
   wood: { atlas: EXTENDED_ATLAS, columns: 4, rows: 3, column: 0, row: 0 },
   firewood: { atlas: EXTENDED_ATLAS, columns: 4, rows: 3, column: 1, row: 0 },
   stone: { atlas: EXTENDED_ATLAS, columns: 4, rows: 3, column: 2, row: 0 },
@@ -97,6 +98,7 @@ export const RESOURCE_SPRITES: Partial<Record<ResourceIconId, TradeResourceSprit
   defense: { atlas: COMPLETE_ATLAS, columns: 4, rows: 3, column: 0, row: 2 },
   foodGroup: { atlas: COMPLETE_ATLAS, columns: 4, rows: 3, column: 1, row: 2 },
   clothingGroup: { atlas: COMPLETE_ATLAS, columns: 4, rows: 3, column: 2, row: 2 },
+  footwearGroup: { atlas: COMPLETE_ATLAS, columns: 4, rows: 3, column: 2, row: 2 },
   luxuryGroup: { atlas: COMPLETE_ATLAS, columns: 4, rows: 3, column: 3, row: 2 },
   fuelGroup: { atlas: FUEL_GROUP_ICON, columns: 1, rows: 1, column: 0, row: 0 },
   eggs: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 0, row: 0 },
@@ -111,5 +113,6 @@ export const RESOURCE_SPRITES: Partial<Record<ResourceIconId, TradeResourceSprit
   onggi: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 1, row: 2 },
   wool: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 2, row: 2 },
   hay: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 3, row: 2 },
+  strawShoes: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 3, row: 2 },
   silver: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 0, row: 3 },
 };

@@ -242,7 +242,7 @@ export function BuildDrawer({
           </header>
           <div className="build-drawer-list">
             <div className="build-drawer-group-label" role="heading" aria-level={2}>
-              <span>현재 단계</span><small>{currentRankBuildItems.length}종 · 자원 부족 항목도 여기에 표시</small>
+              <span>현재 단계</span><small>{currentRankBuildItems.length}종</small>
             </div>
             {currentRankBuildItems.map(renderBuildItem)}
             {rankLockedBuildItems.length > 0 && (

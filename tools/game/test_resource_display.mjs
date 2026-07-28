@@ -29,6 +29,8 @@ transpileDirectory(new URL('../../src/ui/', import.meta.url), join(rootDir, 'ui'
 
 const display = await import(pathToFileURL(join(rootDir, 'ui', 'resourceDisplay.mjs')).href);
 const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
+const topBarSource = readFileSync(new URL('../../src/components/TopBar.tsx', import.meta.url), 'utf8');
+const popoverSource = readFileSync(new URL('../../src/components/ResourceBreakdownPopover.tsx', import.meta.url), 'utf8');
 const {
   DISPLAY_RESOURCE_ORDER,
   RESOURCE_DISPLAY_GROUPS,
@@ -40,7 +42,7 @@ const {
 } = display;
 
 const groupedResources = RESOURCE_DISPLAY_GROUPS.flatMap(group => group.resources);
-assert.equal(RESOURCE_DISPLAY_GROUPS.length, 7, 'the top bar must have seven stock groups');
+assert.equal(RESOURCE_DISPLAY_GROUPS.length, 8, 'the top bar must have eight stock groups');
 assert.equal(new Set(groupedResources).size, groupedResources.length,
   'a stock resource must not appear in more than one display group');
 assert.deepEqual([...groupedResources].sort(), [...STOCK_RESOURCE_ORDER].sort(),
@@ -49,6 +51,8 @@ assert.deepEqual(DISPLAY_RESOURCE_ORDER, groupedResources,
   'starred resource order must follow display group order');
 assert.equal(RESOURCE_DISPLAY_GROUP_BY_RESOURCE.rice, 'food', 'unmilled rice belongs in the food display group');
 assert.equal(RESOURCE_DISPLAY_GROUP_BY_RESOURCE.salt, 'materials', 'salt belongs in the materials display group');
+assert.equal(RESOURCE_DISPLAY_GROUP_BY_RESOURCE.strawShoes, 'footwear', 'straw shoes belong in the footwear group');
+assert.equal(RESOURCE_DISPLAY_GROUP_BY_RESOURCE.leatherShoes, 'footwear', 'leather shoes belong in the footwear group');
 assert.equal(RESOURCE_DISPLAY_GROUP_BY_RESOURCE.preciousMetal, 'valuables',
   'precious metal has its own display group without changing gameplay luxury rules');
 assert.equal('reputation' in RESOURCE_DISPLAY_GROUP_BY_RESOURCE, false, 'reputation is a metric, not stock');
@@ -72,6 +76,24 @@ assert.equal(resourceDisplayGroupTotal(state, 'luxury'), 5,
   'the luxury display total must not double-count the separate valuables group');
 assert.equal(resourceDisplayGroupTotal(state, 'valuables'), 11,
   'the valuables display total must contain precious metal');
+state.resources.strawShoes = 1.75;
+state.resources.leatherShoes = 2;
+assert.equal(resourceDisplayGroupTotal(state, 'footwear'), 3.75,
+  'footwear stock is reported separately from equipped coverage');
+state.resources.strawShoes = Number.NaN;
+state.resources.hay = Number.NaN;
+assert.equal(resourceDisplayGroupTotal(state, 'footwear'), 2,
+  'invalid footwear stock never leaks NaN into the HUD');
+assert.equal(Number.isFinite(resourceDisplayGroupTotal(state, 'materials')), true,
+  'invalid hay stock never leaks NaN into the materials HUD');
+assert.match(topBarSource, /Math\.floor\(resourceDisplayGroupTotal\(state, group\.id\)\)/,
+  'top-bar resource group totals must discard fractional stock');
+assert.ok((topBarSource.match(/Math\.floor\(state\.resources\[resource\]\)/g) ?? []).length >= 2,
+  'top-bar metric and starred resources must discard fractional stock');
+assert.match(popoverSource, /Math\.floor\(item\.amount\)/,
+  'resource breakdown stock amounts must discard fractional stock');
+assert.doesNotMatch(popoverSource, /item\.amount\.toFixed/,
+  'resource breakdown stock amounts must not expose fractional stock');
 
 const popoverZIndexMatch = cssSource.match(/\.resource-breakdown-popover\s*\{[^}]*z-index:\s*(\d+);/);
 const unifiedLogZIndexMatch = cssSource.match(/\.unified-log\s*\{[^}]*z-index:\s*(\d+);/);

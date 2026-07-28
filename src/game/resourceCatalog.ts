@@ -4,6 +4,7 @@ export type ResourceCategory =
   | 'food'
   | 'fuel'
   | 'clothing'
+  | 'footwear'
   | 'material'
   | 'military'
   | 'luxury'
@@ -25,6 +26,7 @@ export const FOOD_RESOURCES = [
 ] as const satisfies readonly ResourceId[];
 export const FUEL_RESOURCES = ['brushwood', 'firewood', 'charcoal'] as const satisfies readonly ResourceId[];
 export const CLOTHING_RESOURCES = ['hideClothes', 'cottonClothes'] as const satisfies readonly ResourceId[];
+export const FOOTWEAR_RESOURCES = ['strawShoes', 'leatherShoes'] as const satisfies readonly ResourceId[];
 export const LUXURY_RESOURCES = ['porcelain', 'brassware', 'lacquerware', 'silk', 'preciousMetal'] as const satisfies readonly ResourceId[];
 
 export const RESOURCE_DEFS: Record<ResourceId, ResourceDef> = {
@@ -53,6 +55,8 @@ export const RESOURCE_DEFS: Record<ResourceId, ResourceDef> = {
   carts: { id: 'carts', name: '수레', category: 'material', tradeBaseValue: 16 },
   hide: { id: 'hide', name: '가죽', category: 'material', tradeBaseValue: 1.8 },
   hideClothes: { id: 'hideClothes', name: '가죽옷', category: 'clothing', clothingValue: 1.1, tradeBaseValue: 3.4 },
+  strawShoes: { id: 'strawShoes', name: '짚신', category: 'footwear', tradeBaseValue: 1.2 },
+  leatherShoes: { id: 'leatherShoes', name: '가죽신', category: 'footwear', tradeBaseValue: 3.2 },
   cotton: { id: 'cotton', name: '목화', category: 'material', tradeBaseValue: 1.7 },
   wool: { id: 'wool', name: '양털', category: 'material', tradeBaseValue: 2 },
   hay: { id: 'hay', name: '건초', category: 'material', tradeBaseValue: 0.6 },
@@ -79,7 +83,7 @@ export const RESOURCE_ORDER: ResourceId[] = [
   'grain', 'rice', 'meat', 'eggs', 'milk', 'fish', 'curedMeat', 'saltedFish', 'driedFish', 'vegetables', 'kimchi', 'beans', 'jang',
   'brushwood', 'firewood', 'charcoal',
   'wood', 'stone', 'iron', 'tools', 'onggi', 'carts', 'hide', 'cotton', 'wool', 'hay', 'herbs', 'salt',
-  'hideClothes', 'cottonClothes',
+  'hideClothes', 'cottonClothes', 'strawShoes', 'leatherShoes',
   'porcelain', 'brassware', 'lacquerware', 'silk', 'preciousMetal', 'silver',
   'gunpowder', 'spears', 'hornBows', 'muskets', 'reputation', 'defense',
 ];

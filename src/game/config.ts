@@ -53,7 +53,7 @@ export const CONFIG = {
       grain: 100, rice: 0, meat: 0, eggs: 0, milk: 0, fish: 0, curedMeat: 0, saltedFish: 0, driedFish: 0, vegetables: 0, kimchi: 0, beans: 0, jang: 0, salt: 0,
       brushwood: 12, firewood: 45, charcoal: 0,
       wood: 30, stone: 12, iron: 4, tools: 10, onggi: 0, carts: 0,
-      hide: 6, hideClothes: 12, cotton: 0, wool: 0, hay: 0, cottonClothes: 0, herbs: 5,
+      hide: 6, hideClothes: 12, strawShoes: 0, leatherShoes: 0, cotton: 0, wool: 0, hay: 0, cottonClothes: 0, herbs: 5,
       porcelain: 0, brassware: 0, lacquerware: 0, silk: 0, preciousMetal: 0, silver: 0,
       gunpowder: 0, spears: 0, hornBows: 0, muskets: 0,
       reputation: 50, defense: 0,
@@ -80,6 +80,22 @@ export const CONFIG = {
     noClothesLossMult: 0.9,   // 옷 없는 비율만큼 추가 손실 (×이 값)
     monotonyMoralePenalty: 8,
     vegetableShortageHealthPenalty: 1,
+  },
+
+  wearables: {
+    clothingWearPerDay: 0.008,
+    footwearWearPerDay: 0.04,
+    winterWearMultiplier: 2.5,
+    badWeatherWearMultiplier: 1.3,
+    outdoorFootwearWearMultiplier: 1.5,
+    childWearMultiplier: 0.5,
+    barefootMoveMultiplier: 0.85,
+    strawShoeMoveMultiplier: 1,
+    leatherShoeMoveMultiplier: 1.03,
+    strawShoeHayPerUnit: 2,
+    strawShoePerEvening: 0.3,
+    strawShoeStockBuffer: 2,
+    livestockHayReserveDays: 3,
   },
 
   health: {
@@ -354,7 +370,7 @@ export const CONFIG = {
     lumberCampBonus: 1.4,
     huntLodgeBonus: 1.5,
     herbHutBonus: 1.6,
-    toolWearPerWorker: 0.015,  // 생산직 1인당 하루 도구 마모
+    toolWearPerWorker: 0.01,   // 중노동 생산직 1인당 하루 도구 마모 기준
     skillGainPerDay: 0.012,
     skillEffect: 0.5,          // 숙련 1.0일 때 생산 +50%
   },
@@ -425,6 +441,9 @@ export const CONFIG = {
       silver: 0.5,
     },
     forestDepleteChance: 0.12, // 벌목 1회당 성목이 그루터기가 될 확률
+    // 공사터 개간: 한 현장에 붙는 벌목꾼 상한. 낮게 잡아야 벌목꾼이 한 곳에
+    // 우르르 몰리지 않고, 사람이 많으면 여러 공사터를 동시에 열 수 있다.
+    clearingCuttersPerSite: 2,
     forestRegrowChance: 0.003,  // 봄여름, 숲 인접 평지가 숲이 될 하루 확률
     forestPioneerChance: 0.00018, // 봄여름, 고립된 평지에 새 숲 씨앗이 들 확률
     forestStumpSproutChance: 0.012, // 봄여름, 그루터기가 어린나무로 회복될 하루 확률
@@ -434,6 +453,12 @@ export const CONFIG = {
       habitatYieldBase: 0.8,     // 서식지 기본
       habitatYieldPerTile: 0.012, // 서식지 숲 1타일당 가산 (숲 50타일에서 최대치)
       habitatYieldMax: 1.4,
+      prey: {
+        rabbit: { weight: 0.30, meat: 2, hide: 0.25 },
+        pheasant: { weight: 0.25, meat: 1.5, hide: 0 },
+        roeDeer: { weight: 0.30, meat: 4, hide: 1 },
+        wildBoar: { weight: 0.15, meat: 12, hide: 3.5 },
+      },
     },
   },
 
@@ -973,7 +998,7 @@ export const CONFIG = {
       grain: 28, rice: 24, meat: 16, eggs: 14, fish: 18, curedMeat: 12, saltedFish: 12, driedFish: 12, vegetables: 14, beans: 14, jang: 8,
       brushwood: 24, firewood: 20, charcoal: 12,
       wood: 24, stone: 20, iron: 9, tools: 6, onggi: 4, carts: 2,
-      hide: 14, hideClothes: 7, cotton: 12, cottonClothes: 7, herbs: 10, salt: 12,
+      hide: 14, hideClothes: 7, strawShoes: 8, leatherShoes: 6, cotton: 12, cottonClothes: 7, herbs: 10, salt: 12,
       gunpowder: 4, spears: 6, hornBows: 4, muskets: 3,
       porcelain: 5, brassware: 5, lacquerware: 5, silk: 4, preciousMetal: 3,
       silver: 12, // 상단이 한 철에 싣고 오는 은 — 은 수취(수출 흑자)의 상한

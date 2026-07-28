@@ -1,5 +1,6 @@
 // 하늘 시계 — 포물선 궤적 위를 낮에는 해가, 밤에는 달이 좌→우로 흐르는 HUD 시간 표시.
 // 대역 정의(DAY_BANDS)에서 위치를 파생하므로 서브틱 수가 바뀌어도 자동 적응한다.
+import { withJosa } from '../game/josa';
 import { useRef } from 'react';
 import { DAY_BANDS } from '../game/dayCycle';
 import { CONFIG } from '../game/config';
@@ -38,7 +39,7 @@ export function DayArcWidget({ subTick, speed }: { subTick: number; speed: numbe
   const transitionMs = !movedBackward && Number.isFinite(tickMs) ? Math.min(600, tickMs * 0.9) : 0;
 
   return (
-    <span className="day-arc" title={`${DAY_BAND_NAMES[band]} — ${night ? '달' : '해'}가 하늘을 지납니다`}>
+    <span className="day-arc" title={`${DAY_BAND_NAMES[band]} — ${withJosa(night ? '달' : '해', '이/가')} 하늘을 지납니다`}>
       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-label={`시간대: ${DAY_BAND_NAMES[band]}`} role="img">
         {/* 궤적 점선과 지평선 */}
         <path

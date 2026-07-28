@@ -1,3 +1,4 @@
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { isExplored } from './exploration';
 import { foreignSiteAt } from './foreignSites';
@@ -114,7 +115,7 @@ export function validateStablePasture(
           : species === 'pig' ? '돼지'
             : species === 'cattle' ? '소'
               : '군마';
-    return `현재 ${speciesName}를 수용하려면 더 넓은 방목지가 필요합니다.`;
+    return `현재 ${withJosa(speciesName, '을/를')} 수용하려면 더 넓은 방목지가 필요합니다.`;
   }
   return null;
 }

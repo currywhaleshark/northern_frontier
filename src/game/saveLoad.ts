@@ -45,6 +45,7 @@ import {
 } from './tacticalRoutes';
 import { isYouthWorkJob } from './youth';
 import { normalizeResidentFamilyReferences } from './family';
+import { normalizeResidentWearables, TANNERY_PRODUCT_DEFS } from './wearables';
 import {
   gradeTacticalBattle, raidDefenseObjectiveResult, tacticalClosingSummary, tacticalOutcomeResult,
 } from './tacticalCore';
@@ -595,6 +596,41 @@ export function migrateV37ToV38(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 38 };
 }
 
+// v39: 창고의 의복을 개인 착용 상태로 이전한다. 구 저장의 보온 수준이 갑자기
+// 사라지지 않도록 생존 주민에게 좋은 옷부터 한 벌씩 배분하고 창고 수량은 그만큼 뺀다.
+export function migrateV38ToV39(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const resources = migrated.resources && typeof migrated.resources === 'object'
+    ? migrated.resources as Record<string, unknown>
+    : {};
+  resources.strawShoes = normalizedAmount(resources.strawShoes);
+  resources.leatherShoes = normalizedAmount(resources.leatherShoes);
+  const residents = Array.isArray(migrated.residents)
+    ? (migrated.residents.filter(entry => entry && typeof entry === 'object') as RawSave[])
+      .slice()
+    : [];
+  residents.sort((a, b) => Number(a.id ?? 0) - Number(b.id ?? 0));
+  for (const resident of residents) {
+    if (resident.alive === false) continue;
+    const worn = resident.worn && typeof resident.worn === 'object'
+      ? resident.worn as RawSave
+      : {};
+    if (worn.clothing) continue;
+    const resource = normalizedAmount(resources.hideClothes) >= 1
+      ? 'hideClothes'
+      : normalizedAmount(resources.cottonClothes) >= 1
+        ? 'cottonClothes'
+        : null;
+    if (!resource) break;
+    resources[resource] = normalizedAmount(resources[resource]) - 1;
+    worn.clothing = { resource, wear: 0.5 };
+    resident.worn = worn;
+  }
+  migrated.resources = resources;
+  migrated.schemaVersion = 39;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -638,6 +674,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 35) migrated = migrateV35ToV36(migrated);
     else if (version === 36) migrated = migrateV36ToV37(migrated);
     else if (version === 37) migrated = migrateV37ToV38(migrated);
+    else if (version === 38) migrated = migrateV38ToV39(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -1674,6 +1711,7 @@ export function loadGame(slot = 1): GameState | null {
     if (!parsed.map || !parsed.residents || !parsed.resources || !parsed.buildings) return null;
     if (parsed.subTick == null || parsed.residents.some(r => r.x == null || r.px == null)) return null;
     for (const resident of parsed.residents) {
+      normalizeResidentWearables(resident);
       if (typeof resident.origin !== 'string' || resident.origin.trim().length === 0) delete resident.origin;
       else resident.origin = resident.origin.trim();
       if (resident.stage === 'youth') {
@@ -1915,6 +1953,11 @@ export function loadGame(slot = 1): GameState | null {
         while (building.burialRecords.length < graveCount) building.burialRecords.push({});
       }
       if (building.type === 'smithy' && !building.smithyProduct) building.smithyProduct = 'tools';
+      if (building.type === 'tannery' &&
+          (!building.tanneryProduct ||
+           !Object.prototype.hasOwnProperty.call(TANNERY_PRODUCT_DEFS, building.tanneryProduct))) {
+        building.tanneryProduct = 'auto';
+      }
       if (building.type === 'dryingRack' && building.dryingProduct !== 'driedFish') {
         building.dryingProduct = 'saltedFish';
       }

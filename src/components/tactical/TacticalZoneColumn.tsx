@@ -1,3 +1,4 @@
+import { withJosa } from '../../game/josa';
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { combatSpriteDescriptor, tacticalGroupCapabilities } from '../../game/combatCapabilities';
 import { CONFIG } from '../../game/config';
@@ -1128,7 +1129,7 @@ export function TacticalZoneColumn({
             key={edge.side}
             className={`tactical-zone-move-edge ${edge.side}${reason ? ' deploy-anchor-blocked' : hovered ? ' deploy-anchor-hover' : ' deploy-anchor-valid'}`}
             data-deploy-anchor={anchorId}
-            title={reason ?? `${edge.destinationZone.name}(으)로 ${stageOrderCommandLabel(preview?.command ?? null)}`}
+            title={reason ?? `${withJosa(edge.destinationZone.name, '으로/로')} ${stageOrderCommandLabel(preview?.command ?? null)}`}
             aria-label={reason ?? `${stageOrderCommandLabel(preview?.command ?? null)} · ${edge.destinationZone.name}`}
           >
             <b>{edge.side === 'left' ? '◀' : '▶'}</b>
@@ -1629,7 +1630,7 @@ export function TacticalZoneColumn({
                       key={side}
                       className={`tactical-facing-arrow ${side}`}
                       disabled={current}
-                      title={current ? '현재 방향입니다.' : `${facingLabel(facing)}으로 방향전환`}
+                      title={current ? '현재 방향입니다.' : `${withJosa(facingLabel(facing), '으로/로')} 방향전환`}
                       aria-label={`${group.label} ${facingLabel(facing)} 방향전환`}
                       onClick={event => {
                         event.stopPropagation();

@@ -1,3 +1,4 @@
+import { withJosa } from '../game/josa';
 import { useEffect, useMemo, useState } from 'react';
 import { CONFIG } from '../game/config';
 import { FACTIONS, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } from '../game/constants';
@@ -25,12 +26,13 @@ interface Props {
 
 type TradeCategory = Exclude<ResourceCategory, 'abstract'>;
 
-const TRADE_CATEGORY_ORDER: TradeCategory[] = ['food', 'fuel', 'material', 'clothing', 'military', 'luxury', 'currency'];
+const TRADE_CATEGORY_ORDER: TradeCategory[] = ['food', 'fuel', 'material', 'clothing', 'footwear', 'military', 'luxury', 'currency'];
 const TRADE_CATEGORY_LABELS: Record<TradeCategory, string> = {
   food: '식량',
   fuel: '연료',
   material: '자재',
   clothing: '의복',
+  footwear: '신발',
   military: '군수',
   luxury: '사치',
   currency: '은',
@@ -260,7 +262,7 @@ export function TradeDialog({ state, onNegotiate, onBuyPredatorIntel, onChoose }
                           disabled={!affordable}
                           title={affordable
                             ? `${offer.siteName}에서 목표까지 약 ${offer.distance}칸`
-                            : `곡식 ${offer.priceAmount}이 필요합니다`}
+                            : `곡식 ${withJosa(offer.priceAmount, '이/가')} 필요합니다`}
                           onClick={() => onBuyPredatorIntel(offer.kind)}
                         >
                           <span aria-hidden="true">卷</span>

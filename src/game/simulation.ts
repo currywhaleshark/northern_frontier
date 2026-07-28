@@ -1,15 +1,17 @@
 // 시뮬레이션 오케스트레이터
 // 하루는 SUBTICKS개의 서브틱으로 나뉜다. 서브틱마다 주민 에이전트가 이동/작업/운반하고,
 // 하루가 넘어갈 때 소비/생존/위협/이벤트 등 일일 처리를 한다.
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { isJobUnlocked, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } from './constants';
 import {
   BUILDING_DEFS, buildingCostFor, buildingFootprintTiles, canAfford, canAffordCost,
   buildingFootprintDims, cannonPlacementsUsed, canPlaceBuildingAt, canPlaceOn, canRelocateBuildingAt, clampPlotSide,
   clearBuildingTiles, computeDefense, getBuilding, isBuildingUnlocked,
-  footprintTilesOf, isAreaBuildingType, isPaddyEligibleTile, isPlotBuildingType, isSmithyProductUnlocked,
+  footprintTilesOf, isAreaBuildingType, isPaddyFootprintEligible, isPlotBuildingType, isSmithyProductUnlocked,
   occupyBuildingTiles, plotArea, SMITHY_PRODUCT_DEFS,
 } from './buildings';
+import { forestTilesInArea, forestTilesInFootprint, pendingClearingTiles } from './landClearing';
 import { isWallBuilding } from './walls';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
 import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
@@ -38,8 +40,9 @@ import {
   canPlantCropNow, cropIdForBuilding, CROP_DEFS, defaultCropForBuildingType, isCropAllowedOnBuilding,
 } from './crops';
 import {
-  clothingCoverageTotal, consumeClothingWear, consumeFoodByDiet, consumeFuelHeat, foodTotal,
+  clothingCoverageTotal, consumeFoodByDiet, consumeFuelHeat, foodTotal,
 } from './consumption';
+import { TANNERY_PRODUCT_DEFS, wearablesDailyTick } from './wearables';
 import { edictFoodRationMultiplier, edictFuelRationMultiplier } from './edicts';
 import { getPointerAction } from './selectionActions';
 import { createExploration, isBuildingFootprintExplored, isExplored, refreshExploration } from './exploration';
@@ -85,7 +88,7 @@ import {
 } from './workerSlots';
 import type { AutoAssignBuildingType } from './workerSlots';
 import type {
-  Building, BuildingTypeId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId, PastureArea, PointerAction, Resident, ResourceId, Season, SmithyProductId, YouthActivity,
+  Building, BuildingTypeId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId, PastureArea, PointerAction, Resident, ResourceId, Season, SmithyProductId, TanneryProductId, YouthActivity,
 } from './types';
 
 // ─────────────────────────── 새 게임 ───────────────────────────
@@ -280,6 +283,18 @@ function findNearbySpots(
 
 // ─────────────────────────── 플레이어 행동 ───────────────────────────
 
+/**
+ * 나무를 낀 자리에 지정했을 때 tryPlaceBuilding·expandAreaBuilding이 돌려주는 표식.
+ * 다른 검사를 모두 통과했다는 뜻이므로, UI는 이때만 개간 확인 모달을 띄우고
+ * 플레이어가 수락하면 `approveClearing: true`로 다시 부른다.
+ */
+export const CLEARING_APPROVAL_REQUIRED = '__clearing_approval_required__';
+
+export interface PlacementOptions {
+  /** 공사터의 나무를 베고 짓겠다고 플레이어가 이미 수락했는가 */
+  approveClearing?: boolean;
+}
+
 export function tryPlaceBuilding(
   state: GameState,
   type: BuildingTypeId,
@@ -287,6 +302,7 @@ export function tryPlaceBuilding(
   y: number,
   plotW?: number,
   plotH?: number,
+  options: PlacementOptions = {},
 ): string | null {
   const def = BUILDING_DEFS[type];
   const tile = state.map[y]?.[x];
@@ -319,6 +335,10 @@ export function tryPlaceBuilding(
   }
   const cost = buildingCostFor(type, w ?? 1, h ?? 1);
   if (!canAffordCost(state, cost)) return '자원이 부족합니다.';
+  // 마지막 관문: 나무를 끼고 지정했다면 개간에 동의를 받는다.
+  if (!options.approveClearing && forestTilesInFootprint(state, type, x, y, w, h).length > 0) {
+    return CLEARING_APPROVAL_REQUIRED;
+  }
 
   for (const [res, amt] of Object.entries(cost)) {
     state.resources[res as keyof typeof state.resources] -= amt ?? 0;
@@ -337,19 +357,21 @@ export function tryPlaceBuilding(
     b.plowOxen = 0;
   }
   if (type === 'smithy') b.smithyProduct = 'tools';
+  if (type === 'tannery') b.tanneryProduct = 'auto';
   if (type === 'dryingRack') b.dryingProduct = 'saltedFish';
   if (type === 'jangdokdae') b.fermentBatches = [];
   if (type === 'stable') b.livestock = createDefaultLivestockState();
   state.buildings.push(b);
-  const tiles = buildingFootprintTiles(state, type, x, y, w, h) ?? [];
   occupyBuildingTiles(state, b);
-  for (const footprintTile of tiles) {
-    if (footprintTile.terrain === 'forest') {
-      footprintTile.terrain = 'plain';
-      state.resources.wood += 3; // 개간하며 얻는 목재
-    }
-  }
-  addLog(state, `${def.name} 건설을 시작했습니다.`, 'info');
+  // 나무는 그대로 서 있다 — 벌목꾼이 베어 옮겨야 공사가 시작된다.
+  const standingTrees = pendingClearingTiles(state, b).length;
+  addLog(
+    state,
+    standingTrees > 0
+      ? `${def.name} 자리를 정했습니다. 벌목꾼이 나무 ${standingTrees}그루를 먼저 베어냅니다.`
+      : `${def.name} 건설을 시작했습니다.`,
+    'info',
+  );
   noteBuildingClaimIntrusions(state, b);
   return null;
 }
@@ -375,7 +397,7 @@ export function demolishBuilding(state: GameState, x: number, y: number): string
   state.buildings = state.buildings.filter(b => b.id !== building.id);
   reconcileMountAssignments(state);
   state.resources.defense = computeDefense(state);
-  addLog(state, `${def.name}을(를) 철거했습니다.`, 'info');
+  addLog(state, `${withJosa(def.name, '을/를')} 철거했습니다.`, 'info');
   return null;
 }
 
@@ -420,7 +442,7 @@ export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
     ?? state.residents.find(res => res.alive && !res.special && res.job === from && eligible(res));
   if (!r) {
     if (isLiterateJob(to) && state.residents.some(res => res.alive && !res.special && res.job === from)) {
-      addLog(state, `${JOB_NAMES[to]}은(는) 글을 아는 주민만 맡을 수 있습니다. 서당에서 아이를 가르치거나 문해자 유민을 기다리십시오.`, 'info');
+      addLog(state, `${withJosa(JOB_NAMES[to], '은/는')} 글을 아는 주민만 맡을 수 있습니다. 서당에서 아이를 가르치거나 문해자 유민을 기다리십시오.`, 'info');
     }
     return false;
   }
@@ -439,19 +461,19 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
   if (!isJobUnlocked(state.rank, job)) return;
   const r = state.residents.find(res => res.id === id);
   if (r?.stage && r.stage !== 'youth') {
-    addLog(state, `${r.name}은(는) 아직 아이라 일을 맡길 수 없습니다.`, 'info');
+    addLog(state, `${withJosa(r.name, '은/는')} 아직 아이라 일을 맡길 수 없습니다.`, 'info');
     return;
   }
   if (r?.stage === 'youth' && youthActivityOf(r) !== 'work') {
-    addLog(state, `${r.name}은(는) 서당에 다니는 소년이라 생산 일을 맡길 수 없습니다. 먼저 일 돕기를 선택하십시오.`, 'info');
+    addLog(state, `${withJosa(r.name, '은/는')} 서당에 다니는 소년이라 생산 일을 맡길 수 없습니다. 먼저 일 돕기를 선택하십시오.`, 'info');
     return;
   }
   if (r?.stage === 'youth' && !isYouthWorkJob(job)) {
-    addLog(state, `${r.name}은(는) 소년이라 안전한 일 돕기 직무만 맡을 수 있습니다.`, 'info');
+    addLog(state, `${withJosa(r.name, '은/는')} 소년이라 안전한 일 돕기 직무만 맡을 수 있습니다.`, 'info');
     return;
   }
   if (r?.special) {
-    addLog(state, `${r.name}은(는) 제 소명이 있는 사람이라 다른 일을 맡지 않습니다.`, 'info');
+    addLog(state, `${withJosa(r.name, '은/는')} 제 소명이 있는 사람이라 다른 일을 맡지 않습니다.`, 'info');
     return;
   }
   if ((job === 'shaman' || job === 'monk') && !r?.special) {
@@ -459,7 +481,7 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
     return;
   }
   if (r && isLiterateJob(job) && r.literate !== true) {
-    addLog(state, `${r.name}은(는) 글을 몰라 ${JOB_NAMES[job]}을(를) 맡을 수 없습니다. 서당에서 배운 아이나 문해자 유민이 필요합니다.`, 'info');
+    addLog(state, `${withJosa(r.name, '은/는')} 글을 몰라 ${withJosa(JOB_NAMES[job], '을/를')} 맡을 수 없습니다. 서당에서 배운 아이나 문해자 유민이 필요합니다.`, 'info');
     return;
   }
   if (r && r.alive) {
@@ -501,8 +523,8 @@ export function setYouthActivity(
   addLog(
     state,
     activity === 'school'
-      ? `${resident.name}이(가) 일손을 놓고 서당에 다니기 시작했습니다.`
-      : `${resident.name}이(가) 서당 공부를 멈추고 반몫으로 일을 돕습니다.`,
+      ? `${withJosa(resident.name, '이/가')} 일손을 놓고 서당에 다니기 시작했습니다.`
+      : `${withJosa(resident.name, '이/가')} 서당 공부를 멈추고 반몫으로 일을 돕습니다.`,
     'info',
   );
   return null;
@@ -518,7 +540,7 @@ export function toggleResidentCart(state: GameState, id: number): string | null 
   addLog(
     state,
     equipping
-      ? `${resident.name}에게 수레를 장비했습니다. 적재량이 ${haulerCarryCapacity(resident)}(으)로 늘어납니다.`
+      ? `${resident.name}에게 수레를 장비했습니다. 적재량이 ${withJosa(haulerCarryCapacity(resident), '으로/로')} 늘어납니다.`
       : `${resident.name}의 수레를 마을 비축으로 돌려보냈습니다.`,
     'good',
   );
@@ -671,7 +693,7 @@ export function setBuildingCrop(
   const building = state.buildings.find(b => b.id === buildingId);
   if (!building || (building.type !== 'field' && building.type !== 'paddy')) return '작물을 고를 수 있는 건물이 아닙니다.';
   if (!building.built) return '완공된 밭이나 논에서만 작물을 고를 수 있습니다.';
-  if (!isCropAllowedOnBuilding(cropId, building.type)) return `${CROP_DEFS[cropId].name}은(는) 이곳에서 기를 수 없습니다.`;
+  if (!isCropAllowedOnBuilding(cropId, building.type)) return `${withJosa(CROP_DEFS[cropId].name, '은/는')} 이곳에서 기를 수 없습니다.`;
 
   const currentCrop = cropIdForBuilding(building);
   const hasStandingCrop = currentCrop != null && building.fieldGrowth > 0.5;
@@ -679,7 +701,7 @@ export function setBuildingCrop(
 
   if (mode === 'queue' && hasStandingCrop && currentCrop !== cropId) {
     building.queuedCropId = cropId;
-    addLog(state, `${BUILDING_DEFS[building.type].name}의 다음 작물을 ${CROP_DEFS[cropId].name}(으)로 예약했습니다.`, 'info');
+    addLog(state, `${BUILDING_DEFS[building.type].name}의 다음 작물을 ${withJosa(CROP_DEFS[cropId].name, '으로/로')} 예약했습니다.`, 'info');
     return null;
   }
 
@@ -688,7 +710,7 @@ export function setBuildingCrop(
   building.queuedCropId = null;
   if (canPlantCropNow(cropId, building.type, season)) {
     building.cropId = cropId;
-    addLog(state, `${BUILDING_DEFS[building.type].name}에 ${CROP_DEFS[cropId].name}을(를) 심기로 했습니다.`, 'info');
+    addLog(state, `${BUILDING_DEFS[building.type].name}에 ${withJosa(CROP_DEFS[cropId].name, '을/를')} 심기로 했습니다.`, 'info');
   } else {
     building.cropId = null;
     building.queuedCropId = cropId;
@@ -703,10 +725,10 @@ export function convertFieldToPaddy(state: GameState, buildingId: number): strin
   if (!building.built) return '완공된 밭만 논으로 전환할 수 있습니다.';
   const def = BUILDING_DEFS.paddy;
   if (!isBuildingUnlocked(state.rank, 'paddy')) return `${RANK_NAMES[def.minRank ?? 'bo']} 승격 후 논을 만들 수 있습니다.`;
-  // 다칸 밭은 모든 칸이 강가 비옥지여야 논이 될 수 있다
+  // 다칸 밭은 평지·비옥지로 이루어지고, 영역 중 한 칸만 강물에 닿으면 논이 될 수 있다.
   const footprint = footprintTilesOf(state, building) ?? [];
-  if (footprint.length === 0 || !footprint.every(tile => isPaddyEligibleTile(state, tile))) {
-    return '논은 강가의 비옥한 땅에만 만들 수 있습니다.';
+  if (!isPaddyFootprintEligible(state, footprint)) {
+    return '논 영역 중 한 칸 이상이 강물에 맞닿아야 합니다.';
   }
   const cost = buildingCostFor('paddy', building.w ?? 1, building.h ?? 1);
   if (!canAffordCost(state, cost)) return '자원이 부족합니다.';
@@ -735,7 +757,7 @@ export function setSmithyProduct(state: GameState, buildingId: number, product: 
     return `${rankName} 승격 후 생산할 수 있습니다.`;
   }
   building.smithyProduct = product;
-  addLog(state, `대장간 생산품을 ${SMITHY_PRODUCT_DEFS[product].name}(으)로 바꿨습니다.`, 'info');
+  addLog(state, `대장간 생산품을 ${withJosa(SMITHY_PRODUCT_DEFS[product].name, '으로/로')} 바꿨습니다.`, 'info');
   return null;
 }
 
@@ -789,6 +811,7 @@ export function expandAreaBuilding(
   y: number,
   w: number,
   h: number,
+  options: PlacementOptions = {},
 ): string | null {
   const building = state.buildings.find(candidate => candidate.id === buildingId);
   if (!building || !building.built) return '완공된 영역형 건물을 선택해야 합니다.';
@@ -828,6 +851,16 @@ export function expandAreaBuilding(
     if (error) return error;
   } else {
     const def = BUILDING_DEFS[building.type];
+    const targetTiles = [];
+    for (let ty = target.y; ty < target.y + target.h; ty++) {
+      for (let tx = target.x; tx < target.x + target.w; tx++) {
+        const tile = state.map[ty]?.[tx];
+        if (tile) targetTiles.push(tile);
+      }
+    }
+    if (building.type === 'paddy' && !isPaddyFootprintEligible(state, targetTiles)) {
+      return '논 영역 중 한 칸 이상이 강물에 맞닿아야 합니다.';
+    }
     for (let ty = target.y; ty < target.y + target.h; ty++) {
       for (let tx = target.x; tx < target.x + target.w; tx++) {
         const tile = state.map[ty]?.[tx];
@@ -850,6 +883,8 @@ export function expandAreaBuilding(
 
   const cost = expansionCost(building.type, addedTiles);
   if (!canAffordCost(state, cost)) return '확장에 필요한 자원이 부족합니다.';
+  const expansionTrees = forestTilesInArea(state, building.type, target).length;
+  if (!options.approveClearing && expansionTrees > 0) return CLEARING_APPROVAL_REQUIRED;
   for (const [resource, amount] of Object.entries(cost)) {
     state.resources[resource as ResourceId] -= amount ?? 0;
   }
@@ -872,18 +907,14 @@ export function expandAreaBuilding(
     building.w = target.w;
     building.h = target.h;
     occupyBuildingTiles(state, building);
-    const footprint = footprintTilesOf(state, building) ?? [];
-    for (const tile of footprint) {
-      if (tile.terrain === 'forest') {
-        tile.terrain = 'plain';
-        state.resources.wood += 3;
-      }
-    }
+    // 넓힌 자리의 나무도 벌목꾼이 베어낸 뒤에야 공사가 진행된다.
   }
   const worker = building.type === 'field' || building.type === 'paddy' ? '농부' : '건축가';
   addLog(
     state,
-    `${BUILDING_DEFS[building.type].name} 영역 확장을 시작했습니다. 추가 ${addedTiles}칸 · ${worker}가 공사합니다.`,
+    expansionTrees > 0
+      ? `${BUILDING_DEFS[building.type].name} 영역 확장을 정했습니다. 추가 ${addedTiles}칸 · 벌목꾼이 나무 ${expansionTrees}그루를 벤 뒤 ${withJosa(worker, '이/가')} 공사합니다.`
+      : `${BUILDING_DEFS[building.type].name} 영역 확장을 시작했습니다. 추가 ${addedTiles}칸 · ${withJosa(worker, '이/가')} 공사합니다.`,
     'info',
   );
   return null;
@@ -920,6 +951,7 @@ export function startBuildingRelocation(
   buildingId: number,
   x: number,
   y: number,
+  options: PlacementOptions = {},
 ): string | null {
   const building = state.buildings.find(candidate => candidate.id === buildingId);
   if (!building || !building.built) return '완공된 건물을 선택해야 합니다.';
@@ -932,6 +964,8 @@ export function startBuildingRelocation(
     return '현지 거점이 자리한 곳으로는 이전할 수 없습니다.';
   }
   if (!canRelocateBuildingAt(state, building, x, y)) return '이곳으로는 건물을 이전할 수 없습니다.';
+  const destinationTrees = forestTilesInFootprint(state, building.type, x, y, w, h).length;
+  if (!options.approveClearing && destinationTrees > 0) return CLEARING_APPROVAL_REQUIRED;
 
   const def = BUILDING_DEFS[building.type];
   building.built = false;
@@ -946,7 +980,9 @@ export function startBuildingRelocation(
   state.resources.defense = computeDefense(state);
   addLog(
     state,
-    `${def.name} 이전을 시작했습니다. 건축가가 기존 건물을 해체한 뒤 새 위치에 자재 비용 없이 다시 짓습니다.`,
+    destinationTrees > 0
+      ? `${def.name} 이전을 시작했습니다. 건축가가 해체하는 동안 벌목꾼이 새 자리의 나무 ${destinationTrees}그루를 베어냅니다.`
+      : `${def.name} 이전을 시작했습니다. 건축가가 기존 건물을 해체한 뒤 새 위치에 자재 비용 없이 다시 짓습니다.`,
     'info',
   );
   return null;
@@ -960,7 +996,7 @@ export function togglePriorityBuilding(state: GameState, buildingId: number): st
     addLog(state, `${BUILDING_DEFS[building.type].name} 우선 작업 지정을 해제했습니다.`, 'info');
   } else {
     state.priorityBuildingId = buildingId;
-    addLog(state, `${BUILDING_DEFS[building.type].name}을(를) 최우선 작업으로 지정했습니다.`, 'info');
+    addLog(state, `${withJosa(BUILDING_DEFS[building.type].name, '을/를')} 최우선 작업으로 지정했습니다.`, 'info');
   }
   return null;
 }
@@ -977,7 +1013,7 @@ export function setDryingProduct(state: GameState, buildingId: number, product: 
   const building = state.buildings.find(b => b.id === buildingId);
   if (!building || building.type !== 'dryingRack') return '건조대를 찾을 수 없습니다.';
   building.dryingProduct = product;
-  addLog(state, `건조대 생산품을 ${DRYING_PRODUCT_DEFS[product].name}(으)로 바꿨습니다.`, 'info');
+  addLog(state, `건조대 생산품을 ${withJosa(DRYING_PRODUCT_DEFS[product].name, '으로/로')} 바꿨습니다.`, 'info');
   return null;
 }
 
@@ -1045,7 +1081,7 @@ export function useLuxuryGood(state: GameState, resource: ResourceId): string | 
   for (const resident of livingResidents(state)) {
     resident.morale = Math.min(100, resident.morale + CONFIG.petition.luxuryMorale);
   }
-  addLog(state, `${RESOURCE_NAMES[resource]}을(를) 나누어 주민들의 사기를 북돋았습니다.`, 'good');
+  addLog(state, `${withJosa(RESOURCE_NAMES[resource], '을/를')} 나누어 주민들의 사기를 북돋았습니다.`, 'good');
   return null;
 }
 
@@ -1130,6 +1166,7 @@ function endOfDay(state: GameState): void {
   updateHabitats(state);
   runToolWear(state);
   runConsumptionAndNeeds(state, rng);
+  wearablesDailyTick(state);
   dailyEducationTick(state); // 취학 아동의 글공부 누적 (성인 전환 판정보다 먼저)
   lifecycleDailyTick(state, rng); // 성장·노화·혼인·출산·장례 (소비/체온 갱신 뒤)
   updateLivestock(state);
@@ -1190,7 +1227,7 @@ function settleSowingDeadline(state: GameState, prev: string, next: string): voi
 function onSeasonChange(state: GameState, prev: string, next: string): void {
   resetFactionTradeCapacityUsage(state);
   updateSeasonalForeignSites(state, next as ReturnType<typeof getSeason>);
-  addLog(state, `${SEASON_NAMES[next as keyof typeof SEASON_NAMES]}이(가) 시작되었습니다. (${getYear(state.day)}년차)`, 'weather');
+  addLog(state, `${withJosa(SEASON_NAMES[next as keyof typeof SEASON_NAMES], '이/가')} 시작되었습니다. (${getYear(state.day)}년차)`, 'weather');
   settleSowingDeadline(state, prev, next);
 
   if (next === 'winter') {
@@ -1287,15 +1324,59 @@ function updateHabitats(state: GameState): void {
   }
 }
 
-// 도구 마모: 생산직 인원 수에 비례
+// 공용 도구 마모. 손도구 의존도가 낮은 직종은 적게, 운반은 별도 장비(수레)로 보아
+// 제외한다. 직업만 배정됐을 뿐 실제 일감이 없는 겨울 농부·건축가도 닳지 않는다.
+const TOOL_WEAR_JOB_WEIGHT: Partial<Record<JobId, number>> = {
+  woodcutter: 1,
+  woodSplitter: 1,
+  hunter: 0.6,
+  farmer: 1,
+  miller: 0.5,
+  builder: 1,
+  curer: 0.45,
+  potter: 0.6,
+  smith: 0.6,
+  miner: 1,
+  fisher: 0.6,
+  charcoalBurner: 0.5,
+  herder: 0.25,
+  powderMaker: 0.5,
+  tanner: 0.5,
+  weaver: 0.35,
+  herbalist: 0.5,
+};
+
+export function dailyToolWear(state: GameState): number {
+  const winter = getSeason(state.day) === 'winter';
+  const hasConstruction = state.buildings.some(building =>
+    !building.built || building.expansion != null || building.workOrder != null);
+  const wearUnits = state.residents.reduce((sum, resident) => {
+    if (!resident.alive || resident.sick || state.day < (resident.quarantinedUntil ?? 0)) return sum;
+    if (resident.stage && resident.stage !== 'youth') return sum;
+    if (resident.job === 'farmer' && winter) return sum;
+    if (resident.job === 'builder' && !hasConstruction) return sum;
+    const jobWeight = TOOL_WEAR_JOB_WEIGHT[resident.job] ?? 0;
+    const laborWeight = resident.stage === 'youth' ? 0.5 : 1;
+    return sum + jobWeight * laborWeight;
+  }, 0);
+  return wearUnits * CONFIG.production.toolWearPerWorker;
+}
+
+export function setTanneryProduct(
+  state: GameState,
+  buildingId: number,
+  product: TanneryProductId,
+): string | null {
+  const building = state.buildings.find(candidate => candidate.id === buildingId);
+  if (!building || building.type !== 'tannery') return '무두장을 찾을 수 없습니다.';
+  if (!Object.prototype.hasOwnProperty.call(TANNERY_PRODUCT_DEFS, product)) return '알 수 없는 생산품입니다.';
+  building.tanneryProduct = product;
+  addLog(state, `무두장 생산 방식을 ${withJosa(TANNERY_PRODUCT_DEFS[product].name, '으로/로')} 바꿨습니다.`, 'info');
+  return null;
+}
+
 function runToolWear(state: GameState): void {
-  const producing = [
-    'woodcutter', 'woodSplitter', 'hunter', 'farmer', 'miller', 'builder', 'curer', 'potter', 'smith', 'miner', 'fisher',
-    'charcoalBurner', 'herder', 'powderMaker', 'tanner', 'weaver', 'herbalist', 'hauler',
-  ];
-  const n = state.residents.filter(r =>
-    r.alive && !r.sick && state.day >= (r.quarantinedUntil ?? 0) && producing.includes(r.job)).length;
-  state.resources.tools = Math.max(0, state.resources.tools - n * CONFIG.production.toolWearPerWorker);
+  state.resources.tools = Math.max(0, state.resources.tools - dailyToolWear(state));
 }
 
 function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
@@ -1324,11 +1405,8 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
   const firewoodRatio = fwNeed > 0 ? Math.min(1, heatProvided / fwNeed) : 1;
   const fuelShortage = heatProvided < rationedFwNeed - 0.000001;
 
-  // 옷
+  // 실제 착용 중인 옷의 보급률. 마모는 개인별 일일 처리에서 적용한다.
   const clothesCoverage = Math.min(1, clothingCoverageTotal(state) / Math.max(1, weight));
-  if (season === 'winter') {
-    consumeClothingWear(state, weight * cfg.clothesWearWinter);
-  }
 
   const rng2 = makeRng(state.seed + state.day * 104729);
   updateResidentNeeds(

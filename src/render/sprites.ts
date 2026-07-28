@@ -59,6 +59,9 @@ export interface TerrainDrawParams {
     n: boolean; e: boolean; s: boolean; w: boolean;
     ne: boolean; se: boolean; sw: boolean; nw: boolean;
   };
+  // 지면 계열이 다른 우세 이웃 지형(숲>바위>풀)이 이 타일 가장자리로 번진다.
+  // 타일 경계가 직선으로 잘리는 것을 감추는 용도.
+  blendEdges?: { n?: Terrain; e?: Terrain; s?: Terrain; w?: Terrain };
 }
 
 export interface BuildingDrawParams {
@@ -284,6 +287,14 @@ export const placeholderSprites: SpriteAPI = {
   },
 
   drawResident(ctx, p) {
+    if (p.selected) {
+      ctx.strokeStyle = '#d9a441';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 5.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
     ctx.fillStyle = p.foreignFaction
       ? FACTIONS.find(faction => faction.name === p.foreignFaction)?.color ?? '#d2a958'
       : JOB_COLORS[p.job];
@@ -296,14 +307,6 @@ export const placeholderSprites: SpriteAPI = {
     if (p.carrying && p.showCargoMarker !== false) {
       ctx.fillStyle = '#f0e6c8';
       ctx.fillRect(p.x - 1.5, p.y - 6, 3, 3);
-    }
-    if (p.selected) {
-      ctx.strokeStyle = '#d9a441';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 5.5, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.lineWidth = 1;
     }
   },
 

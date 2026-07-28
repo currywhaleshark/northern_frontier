@@ -1,4 +1,5 @@
 // 주민 생성과 일일 생존 판정
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import {
   FEMALE_GIVEN_NAMES,
@@ -17,6 +18,7 @@ import { getSeason } from './seasons';
 import { warmthLossWeatherMult } from './weather';
 import { releaseResidentMount } from './weapons';
 import { canResidentTakeJob } from './youth';
+import { residentColdProtection } from './wearables';
 import type { Building, GameState, Gender, JobId, Resident, Tile } from './types';
 
 export function rollResidentGender(rng: () => number): Gender {
@@ -320,14 +322,14 @@ export function killResident(
           ? 'disease'
           : 'other';
   if (combatDeath) {
-    addLog(state, `${r.name}이(가) 전투 중 전사했습니다. (${cause})`, 'raid', true);
+    addLog(state, `${withJosa(r.name, '이/가')} 전투 중 전사했습니다. (${cause})`, 'raid', true);
     if (horseLost) addLog(state, '기수가 쓰러지는 과정에서 군마 한 필도 잃었습니다.', 'bad', true);
   } else if (cause === '호환') {
-    addLog(state, `${r.name}이(가) 호환을 당해 목숨을 잃었습니다.`, 'bad', true);
+    addLog(state, `${withJosa(r.name, '이/가')} 호환을 당해 목숨을 잃었습니다.`, 'bad', true);
   } else if (cause === '늑대 습격') {
-    addLog(state, `${r.name}이(가) 늑대 떼의 습격으로 목숨을 잃었습니다.`, 'bad', true);
+    addLog(state, `${withJosa(r.name, '이/가')} 늑대 떼의 습격으로 목숨을 잃었습니다.`, 'bad', true);
   } else {
-    addLog(state, `${r.name}이(가) ${cause}(으)로 세상을 떠났습니다.`, 'bad', true);
+    addLog(state, `${withJosa(r.name, '이/가')} ${withJosa(cause, '으로/로')} 세상을 떠났습니다.`, 'bad', true);
   }
   // 이웃의 죽음은 마을 전체의 사기를 깎는다 — 노승의 재(齋)가 있으면 슬픔이 덜하다
   const griefLoss = hasResidentMonk(state) ? CONFIG.satisfaction.monkGriefRelief : 6;
@@ -342,7 +344,7 @@ export function updateResidentNeeds(
   rng: () => number,
   fedRatio: number,        // 0~1, 식량이 부족하면 1 미만
   firewoodRatio: number,   // 0~1, 장작 충족률
-  clothesCoverage: number, // 0~1, 옷 보급률
+  _clothesCoverage: number, // 구 호출부 호환용. 실제 보온은 개인 착용품으로 계산한다.
   dietVarietyScore: number, // 0~1, 그날 먹은 식품군 다양성
   vegetableRatio: number,   // 0~1, 권장 채소 몫 충족률
   excludedResidentIds: ReadonlySet<number> = new Set(),
@@ -369,6 +371,7 @@ export function updateResidentNeeds(
     if (season === 'spring' || season === 'summer') {
       r.warmth = Math.min(100, r.warmth + cfg.warmthRegenWarmSeason);
     } else {
+      const clothesCoverage = residentColdProtection(r);
       let loss = season === 'winter' ? cfg.warmthLossWinterBase : cfg.warmthLossWinterBase * 0.35;
       loss *= warmthLossWeatherMult(state.weather);
       loss *= 1 + (1 - clothesCoverage) * cfg.noClothesLossMult;
@@ -389,7 +392,7 @@ export function updateResidentNeeds(
       if (r.hunger < 25) chance += hcfg.sickHungryChance;
       if (rng() < chance) {
         r.sick = true;
-        addLog(state, `${r.name}이(가) 병에 걸렸습니다.`, 'bad');
+        addLog(state, `${withJosa(r.name, '이/가')} 병에 걸렸습니다.`, 'bad');
       }
     }
 
@@ -409,7 +412,7 @@ export function updateResidentNeeds(
       const recover = hasHerbs ? hcfg.recoverChanceHerbs : hcfg.recoverChance;
       if (rng() < recover) {
         r.sick = false;
-        addLog(state, `${r.name}이(가) 병에서 회복했습니다.`, 'good');
+        addLog(state, `${withJosa(r.name, '이/가')} 병에서 회복했습니다.`, 'good');
       }
     } else if (r.hunger > 50 && r.warmth > 50) {
       r.health = Math.min(100, r.health + hcfg.naturalHeal);

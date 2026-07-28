@@ -64,6 +64,39 @@ def chroma_alpha(image: Image.Image) -> Image.Image:
     return alpha
 
 
+def magenta_spill(pixel: tuple[int, int, int, int]) -> bool:
+    red, green, blue, _alpha = pixel
+    minimum_magenta_channel = min(red, blue)
+    bright_key_spill = (
+        minimum_magenta_channel - green > 25
+        and (red + blue) / 2 > 65
+        and green <= 120
+        and abs(red - blue) <= 96
+    )
+    # Image generation also leaves a dark plum fringe where the solid key
+    # mixes with outlines. Keep bright pink blossoms and cool snow shading,
+    # but reject low-green purple pixels close to transparent gaps/edges.
+    dark_key_spill = (
+        minimum_magenta_channel >= 28
+        and green <= 64
+        and minimum_magenta_channel - green >= 10
+        and abs(red - blue) <= 72
+    )
+    return bright_key_spill or dark_key_spill
+
+
+def aggressive_magenta_spill(pixel: tuple[int, int, int, int]) -> bool:
+    """Detect muted key mixtures in assets that contain no intentional pink."""
+    red, green, blue, alpha = pixel
+    minimum_magenta_channel = min(red, blue)
+    return (
+        alpha > 2
+        and minimum_magenta_channel >= 12
+        and minimum_magenta_channel - green >= 4
+        and abs(red - blue) <= 150
+    )
+
+
 def runs_from_projection(
     projection: list[int],
     expected: int,
@@ -132,7 +165,13 @@ def occupied_bounds(alpha: Image.Image, rows: int, cols: int) -> list[list[tuple
     return result
 
 
-def despill_sprite(source: Image.Image, alpha: Image.Image, bounds: tuple[int, int, int, int]) -> Image.Image:
+def despill_sprite(
+    source: Image.Image,
+    alpha: Image.Image,
+    bounds: tuple[int, int, int, int],
+    *,
+    aggressive: bool = False,
+) -> Image.Image:
     left, top, right, bottom = bounds
     margin = 4
     crop_box = (
@@ -146,17 +185,14 @@ def despill_sprite(source: Image.Image, alpha: Image.Image, bounds: tuple[int, i
     rgba = list(sprite.getdata())
     av = list(sprite_alpha.getdata())
     width, height = sprite.size
-
-    def magenta_dominant(pixel: tuple[int, int, int, int]) -> bool:
-        red, green, blue, _alpha = pixel
-        return min(red, blue) - green > 25 and (red + blue) / 2 > 65
+    spill_check = aggressive_magenta_spill if aggressive else magenta_spill
 
     # Multi-source nearest-colour propagation gives translucent or magenta-
     # contaminated edge pixels the nearest clean interior colour.
     nearest: list[int | None] = [None] * (width * height)
     queue: deque[int] = deque()
     for index, value in enumerate(av):
-        if value >= 220 and not magenta_dominant(rgba[index]):
+        if value >= 220 and not spill_check(rgba[index]):
             nearest[index] = index
             queue.append(index)
     while queue:
@@ -203,7 +239,10 @@ def despill_sprite(source: Image.Image, alpha: Image.Image, bounds: tuple[int, i
             continue
         red, green, blue, _old_alpha = rgba[index]
         depth = edge_depth[index]
-        contaminated_edge = magenta_dominant(rgba[index]) and depth is not None and depth <= 4
+        contaminated_edge = (
+            spill_check(rgba[index])
+            and (aggressive or (depth is not None and depth <= 4))
+        )
         if (value < 220 or contaminated_edge) and nearest[index] is not None:
             inner = rgba[nearest[index]]
             blend = 1.0 if contaminated_edge else (220 - value) / 220
@@ -213,6 +252,80 @@ def despill_sprite(source: Image.Image, alpha: Image.Image, bounds: tuple[int, i
         cleaned.append((red, green, blue, value))
     sprite.putdata(cleaned)
     return sprite
+
+
+def despill_composited_edges(
+    image: Image.Image,
+    max_depth: int = 8,
+    *,
+    aggressive: bool = False,
+) -> Image.Image:
+    """Remove chroma-coloured outline pixels introduced or retained by resize."""
+    result = image.convert("RGBA")
+    rgba = list(result.getdata())
+    width, height = result.size
+    spill_check = aggressive_magenta_spill if aggressive else magenta_spill
+
+    nearest: list[int | None] = [None] * (width * height)
+    nearest_queue: deque[int] = deque()
+    for index, pixel in enumerate(rgba):
+        if pixel[3] >= 220 and not spill_check(pixel):
+            nearest[index] = index
+            nearest_queue.append(index)
+    while nearest_queue:
+        index = nearest_queue.popleft()
+        x = index % width
+        y = index // width
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if nx < 0 or nx >= width or ny < 0 or ny >= height:
+                continue
+            neighbor = ny * width + nx
+            if nearest[neighbor] is not None:
+                continue
+            nearest[neighbor] = nearest[index]
+            nearest_queue.append(neighbor)
+
+    edge_depth: list[int | None] = [None] * (width * height)
+    edge_queue: deque[int] = deque()
+    for index, pixel in enumerate(rgba):
+        x = index % width
+        y = index // width
+        if pixel[3] <= 2 or x == 0 or y == 0 or x == width - 1 or y == height - 1:
+            edge_depth[index] = 0
+            edge_queue.append(index)
+    while edge_queue:
+        index = edge_queue.popleft()
+        depth = edge_depth[index] or 0
+        if depth >= max_depth:
+            continue
+        x = index % width
+        y = index // width
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if nx < 0 or nx >= width or ny < 0 or ny >= height:
+                continue
+            neighbor = ny * width + nx
+            if edge_depth[neighbor] is not None:
+                continue
+            edge_depth[neighbor] = depth + 1
+            edge_queue.append(neighbor)
+
+    cleaned: list[tuple[int, int, int, int]] = []
+    for index, pixel in enumerate(rgba):
+        red, green, blue, alpha = pixel
+        if alpha <= 2:
+            cleaned.append((0, 0, 0, 0))
+            continue
+        depth = edge_depth[index]
+        if (
+            spill_check(pixel)
+            and (aggressive or (depth is not None and depth <= max_depth))
+            and nearest[index] is not None
+        ):
+            inner = rgba[nearest[index]]
+            red, green, blue = inner[:3]
+        cleaned.append((red, green, blue, alpha))
+    result.putdata(cleaned)
+    return result
 
 
 def checkerboard(size: tuple[int, int], square: int = 12) -> Image.Image:
@@ -243,7 +356,15 @@ def main() -> None:
         alpha = chroma_alpha(source)
         bounds = occupied_bounds(alpha, layout.rows, layout.cols)
         sprites = [
-            [despill_sprite(source, alpha, bounds[row][col]) for col in range(layout.cols)]
+            [
+                despill_sprite(
+                    source,
+                    alpha,
+                    bounds[row][col],
+                    aggressive=layout.name == "minerals" or (layout.name == "trees" and row == 3),
+                )
+                for col in range(layout.cols)
+            ]
             for row in range(layout.rows)
         ]
         max_width = max(sprite.width for row in sprites for sprite in row)
@@ -284,10 +405,50 @@ def main() -> None:
             "frames": group_frames,
         }
 
+    tree_rows_height = HD_CELL[1] * LAYOUTS[0].rows
+    tree_region = despill_composited_edges(
+        atlas.crop((0, 0, atlas.width, tree_rows_height)),
+    )
+    atlas.paste(tree_region, (0, 0))
+    winter_tree_top = HD_CELL[1] * 3
+    winter_tree_region = despill_composited_edges(
+        atlas.crop((0, winter_tree_top, atlas.width, tree_rows_height)),
+        aggressive=True,
+    )
+    atlas.paste(winter_tree_region, (0, winter_tree_top))
+    mineral_top = HD_CELL[1] * LAYOUTS[1].atlas_row
+    mineral_bottom = mineral_top + HD_CELL[1] * LAYOUTS[1].rows
+    mineral_region = despill_composited_edges(
+        atlas.crop((0, mineral_top, atlas.width, mineral_bottom)),
+        aggressive=True,
+    )
+    atlas.paste(mineral_region, (0, mineral_top))
+
     standard = atlas.resize(
         (STD_CELL[0] * ATLAS_COLS, STD_CELL[1] * ATLAS_ROWS),
         Image.Resampling.LANCZOS,
     )
+    standard_tree_rows_height = STD_CELL[1] * LAYOUTS[0].rows
+    standard_tree_region = despill_composited_edges(
+        standard.crop((0, 0, standard.width, standard_tree_rows_height)),
+        max_depth=4,
+    )
+    standard.paste(standard_tree_region, (0, 0))
+    standard_winter_tree_top = STD_CELL[1] * 3
+    standard_winter_tree_region = despill_composited_edges(
+        standard.crop((0, standard_winter_tree_top, standard.width, standard_tree_rows_height)),
+        max_depth=4,
+        aggressive=True,
+    )
+    standard.paste(standard_winter_tree_region, (0, standard_winter_tree_top))
+    standard_mineral_top = STD_CELL[1] * LAYOUTS[1].atlas_row
+    standard_mineral_bottom = standard_mineral_top + STD_CELL[1] * LAYOUTS[1].rows
+    standard_mineral_region = despill_composited_edges(
+        standard.crop((0, standard_mineral_top, standard.width, standard_mineral_bottom)),
+        max_depth=4,
+        aggressive=True,
+    )
+    standard.paste(standard_mineral_region, (0, standard_mineral_top))
     hd_path = OUTPUT_DIR / "folk-warm-terrain-growth-v1-hd.png"
     std_path = OUTPUT_DIR / "folk-warm-terrain-growth-v1.png"
     atlas.save(hd_path, optimize=True)

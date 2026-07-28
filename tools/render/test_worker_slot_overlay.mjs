@@ -196,13 +196,27 @@ renderScene(makeCanvas(ops), state, {
   sprites,
 });
 
+const fieldIndex = ops.findIndex(op => op.kind === 'building' && op.type === 'field');
+const farmerIndex = ops.findIndex(op => op.kind === 'resident' && op.job === 'farmer');
+const smithyIndex = ops.findIndex(op => op.kind === 'building' && op.type === 'smithy');
+const smithIndex = ops.findIndex(op => op.kind === 'resident' && op.job === 'smith');
+assert.ok(
+  fieldIndex < farmerIndex,
+  'tile-based fields stay on the ground layer below row-sorted actors',
+);
+assert.ok(
+  farmerIndex < smithyIndex && smithyIndex < smithIndex,
+  'world sprites interleave by row: upper resident, middle building, lower resident',
+);
+
 const lastBuildingIndex = Math.max(...ops.map((op, index) => op.kind === 'building' ? index : -1));
-const firstResidentIndex = ops.findIndex(op => op.kind === 'resident');
+const lastResidentIndex = Math.max(...ops.map((op, index) => op.kind === 'resident' ? index : -1));
+const lastWorldSpriteIndex = Math.max(lastBuildingIndex, lastResidentIndex);
 const slotArcs = ops
   .map((op, index) => ({ ...op, index }))
-  .filter(op => op.kind === 'arc' && op.index > lastBuildingIndex && op.index < firstResidentIndex);
+  .filter(op => op.kind === 'arc' && op.index > lastWorldSpriteIndex);
 
-assert.ok(slotArcs.length >= 3, 'slotted buildings draw overlay arcs between buildings and residents');
+assert.ok(slotArcs.length >= 3, 'slotted buildings draw UI overlay arcs above the row-sorted world queue');
 assert.ok(
   slotArcs.some(op => op.radius >= 4 && op.fillStyle === JOB_COLORS.farmer),
   'selected filled field slot draws an expanded badge using the worker job color',

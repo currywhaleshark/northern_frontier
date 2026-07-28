@@ -12,6 +12,7 @@ import { getPointerAction } from '../game/selectionActions';
 import { foreignSiteAt } from '../game/foreignSites';
 import { LIVESTOCK_DEFS, normalizeLivestockState } from '../game/livestock';
 import { pastureRequiredHerders, stableLivestockCapacity, validateStablePasture } from '../game/pastures';
+import { forestTilesInArea, forestTilesInFootprint } from '../game/landClearing';
 import type { BuildingTypeId, GameState, PastureArea, SelectedEntity } from '../game/types';
 import { FactionName } from './FactionName';
 import { recordRuntimePerf, recordRuntimePerfSince, runtimePerfStartTime } from '../perf/runtimePerf';
@@ -67,6 +68,7 @@ export function GameCanvas({
   const pointerPositionRef = useRef<{ mx: number; my: number } | null>(null);
   const hoverSemanticKeyRef = useRef('outside');
   const residentPresentationCacheRef = useRef<ReturnType<typeof createResidentPresentationSnapshotCache> | null>(null);
+  const habitatIconRef = useRef<HTMLImageElement | null>(null);
   if (!residentPresentationCacheRef.current) {
     residentPresentationCacheRef.current = createResidentPresentationSnapshotCache();
   }
@@ -263,6 +265,7 @@ export function GameCanvas({
         ? { stableId: pastureStableId, rect: placingRect }
         : null,
       selectedBuildingId, viewport: viewportRef.current ?? undefined, terrainVisualSignature: terrainSignature,
+      habitatIcon: habitatIconRef.current ?? undefined,
       sprites: getActiveSprites(), residentPresentation,
       renderScale,
       residentJobMarkers: showResidentJobMarkers,
@@ -300,6 +303,18 @@ export function GameCanvas({
   });
 
   useEffect(() => onAtlasAssetSettled(requestCanvasRender), [requestCanvasRender]);
+
+  useEffect(() => {
+    const image = new Image();
+    image.onload = () => {
+      habitatIconRef.current = image;
+      requestCanvasRender();
+    };
+    image.src = '/assets/ui/hunting-habitat-icon-v1.png';
+    return () => {
+      image.onload = null;
+    };
+  }, [requestCanvasRender]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -531,6 +546,12 @@ export function GameCanvas({
                 <div className="muted">
                   기존 영역을 포함해 확장 · {expansionBuilding.type === 'field' || expansionBuilding.type === 'paddy' ? '농부' : '건축가'} 공사
                 </div>
+                {(() => {
+                  const trees = forestTilesInArea(state, expansionBuilding.type, placingRect).length;
+                  return trees > 0
+                    ? <div className="muted">나무 {trees}그루를 벌목한 뒤 공사</div>
+                    : null;
+                })()}
               </>
             );
           })() : placingType ? (
@@ -543,6 +564,12 @@ export function GameCanvas({
                   ? ` · 묘 자리 ${placingRect.w * placingRect.h * CONFIG.funeral.plotsPerTile}기`
                   : ` · 농부 ${Math.max(1, Math.ceil((placingRect.w * placingRect.h) / CONFIG.farming.tilesPerFarmer))}명`}
               </div>
+              {(() => {
+                const trees = forestTilesInFootprint(state, placingType, placingRect.x, placingRect.y, placingRect.w, placingRect.h).length;
+                return trees > 0
+                  ? <div className="muted">나무 {trees}그루를 벌목한 뒤 공사</div>
+                  : null;
+              })()}
               <div className="muted">끌어서 크기 지정 (최대 {CONFIG.farming.maxPlotSide}×{CONFIG.farming.maxPlotSide})</div>
             </>
           ) : null}
@@ -553,6 +580,14 @@ export function GameCanvas({
           <b>{BUILDING_DEFS[relocationBuilding.type].name} 이전</b>
           <div className="muted">{relocationRect.w}×{relocationRect.h} · 자재 비용 없음</div>
           <div className="muted">건축가가 기존 건물을 해체한 뒤 이곳에 재건축</div>
+          {(() => {
+            const trees = forestTilesInFootprint(
+              state, relocationBuilding.type, relocationRect.x, relocationRect.y, relocationRect.w, relocationRect.h,
+            ).length;
+            return trees > 0
+              ? <div className="muted">나무 {trees}그루를 벌목한 뒤 재건축</div>
+              : null;
+          })()}
         </div>
       )}
       {mouse && (hoveredResident || raiderHovered || hoveredSite || actionTooltip) && (

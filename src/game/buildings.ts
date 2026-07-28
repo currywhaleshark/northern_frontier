@@ -328,6 +328,24 @@ export function buildingFootprintDims(building: Pick<Building, 'type' | 'w' | 'h
   return { w: size, h: size };
 }
 
+// 하나의 큰 스프라이트가 두 행을 덮는 건물은 위 행을 건물 뒤 통로로 쓴다.
+// 밭·논·묘역은 칸별 스프라이트이므로 이 깊이 표현의 대상이 아니다.
+export function isWalkBehindBuilding(
+  building: Pick<Building, 'type' | 'w' | 'h'>,
+): boolean {
+  return !isAreaBuildingType(building.type) && buildingFootprintDims(building).h === 2;
+}
+
+export function isBuildingUpperPassageTile(
+  building: Pick<Building, 'type' | 'x' | 'y' | 'w' | 'h'>,
+  x: number,
+  y: number,
+): boolean {
+  if (!isWalkBehindBuilding(building) || y !== building.y) return false;
+  const { w } = buildingFootprintDims(building);
+  return x >= building.x && x < building.x + w;
+}
+
 type OperationalAreaBuilding = Pick<Building, 'type' | 'w' | 'h'> & Partial<Pick<Building, 'expansion'>>;
 
 export function plotArea(building: OperationalAreaBuilding): number {
@@ -418,6 +436,7 @@ export function canPlaceBuildingAt(
   if (type === 'watermill') return canPlaceWatermillAt(state, x, y);
   const def = BUILDING_DEFS[type];
   if (!tiles.every(tile => canPlaceOn(def, tile, state))) return false;
+  if (type === 'paddy' && !isPaddyFootprintEligible(state, tiles)) return false;
   if (type === 'mine') return hasKnownMineralDepositNear(state, x, y);
   return true;
 }
@@ -462,6 +481,7 @@ export function canRelocateBuildingAt(
       usableTiles.every(tile => tile.terrain === 'river' || isWatermillLandTile(tile));
   }
   if (!usableTiles.every(tile => canPlaceOn(def, tile, state))) return false;
+  if (building.type === 'paddy' && !isPaddyFootprintEligible(state, usableTiles)) return false;
   if (building.type === 'mine') return hasKnownMineralDepositNear(state, x, y);
   return true;
 }
@@ -574,8 +594,21 @@ function hasAdjacentRiver(state: GameState | undefined, tile: Tile): boolean {
   );
 }
 
+function isPaddyLandTile(tile: Tile): boolean {
+  return tile.terrain === 'fertile' || tile.terrain === 'plain';
+}
+
 export function isPaddyEligibleTile(state: GameState | undefined, tile: Tile): boolean {
-  return tile.terrain === 'fertile' && hasAdjacentRiver(state, tile);
+  return isPaddyLandTile(tile) && hasAdjacentRiver(state, tile);
+}
+
+export function isPaddyFootprintEligible(
+  state: GameState | undefined,
+  tiles: readonly Tile[],
+): boolean {
+  return tiles.length > 0 &&
+    tiles.every(isPaddyLandTile) &&
+    tiles.some(tile => isPaddyEligibleTile(state, tile));
 }
 
 function isWatermillLandTile(tile: Tile): boolean {
@@ -600,10 +633,11 @@ export function canPlaceOn(def: BuildingDef, tile: Tile, state?: GameState): boo
   if (def.placement === 'river') return tile.terrain === 'river';
   if (def.placement === 'rock') return tile.terrain === 'rock';
   if (def.placement === 'riverbank') return isRiverbank(state, tile);
-  if (def.placement === 'paddy') return isPaddyEligibleTile(state, tile);
+  if (def.placement === 'paddy') return isPaddyLandTile(tile);
   if (def.placement === 'watermill') return false;
   if (def.placement === 'field') {
-    return tile.terrain === 'fertile' || tile.terrain === 'plain';
+    // 숲도 받는다 — 벌목꾼이 베어 평지로 만든 뒤에야 농부가 공사를 시작한다.
+    return tile.terrain === 'fertile' || tile.terrain === 'plain' || tile.terrain === 'forest';
   }
   if (tile.terrain === 'river' || tile.terrain === 'mountain' || tile.terrain === 'rock' || tile.terrain === 'center') {
     return false;

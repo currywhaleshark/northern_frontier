@@ -1,3 +1,4 @@
+import { withJosa } from '../game/josa';
 import { FACTIONS, RESOURCE_NAMES } from '../game/constants';
 import { CONFIG } from '../game/config';
 import { isClaimPermissionActive } from '../game/claimZones';
@@ -131,7 +132,7 @@ export function ForeignSitePanel({
                   className="btn small"
                   type="button"
                   disabled={disabled}
-                  title={disabled ? `${RESOURCE_NAMES[def.resource]}이(가) 부족하거나 야영지가 비어 있습니다` : `${def.label}을(를) 예물로 보냅니다`}
+                  title={disabled ? `${withJosa(RESOURCE_NAMES[def.resource], '이/가')} 부족하거나 야영지가 비어 있습니다` : `${withJosa(def.label, '을/를')} 예물로 보냅니다`}
                   onClick={() => onSendGift(site.id, gift)}
                 >{def.label}</button>
               );

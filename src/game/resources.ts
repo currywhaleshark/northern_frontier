@@ -4,14 +4,16 @@ import type { GameState, ResourceId } from './types';
 
 export function addRes(state: GameState, id: ResourceId, amount: number): void {
   if (!Number.isFinite(amount)) return;
-  state.resources[id] = Math.max(0, (state.resources[id] ?? 0) + amount);
+  const current = Number.isFinite(state.resources[id]) ? Math.max(0, state.resources[id]) : 0;
+  state.resources[id] = Math.max(0, current + amount);
 }
 
 // 요청량만큼 소비하고 실제로 소비한 양을 반환
 export function spendRes(state: GameState, id: ResourceId, amount: number): number {
   const requested = Number.isFinite(amount) ? Math.max(0, amount) : 0;
-  const spent = Math.min(state.resources[id] ?? 0, requested);
-  state.resources[id] -= spent;
+  const current = Number.isFinite(state.resources[id]) ? Math.max(0, state.resources[id]) : 0;
+  const spent = Math.min(current, requested);
+  state.resources[id] = current - spent;
   return spent;
 }
 

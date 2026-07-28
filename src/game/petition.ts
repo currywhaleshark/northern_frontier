@@ -1,6 +1,7 @@
 // 조정 청원 — 명성을 소모해 조정 지원 물자를 받는다 (승격 단계 ≥ 보, 계절당 1회).
 // 명성이 높고 승격 단계가 오를수록 더 좋은 물자가 목록에 뜬다:
 // 보: 기본 물자와 소량 화약 / 진: 조총·화약·사치품 / 부: 불랑기포(포대 배치권).
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { RANK_NAMES, RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
@@ -174,7 +175,7 @@ export function resolvePetition(state: GameState, optionId: string): void {
     grantedParts.push('불랑기포 1문');
     addLog(state, '조정이 불랑기포를 내렸습니다. 건설 메뉴에서 포대를 지어 얹으십시오.', 'good');
   }
-  addLog(state, `청원이 받아들여졌습니다. 조정에서 ${grantedParts.join(', ')}이(가) 내려왔습니다.`, 'good');
+  addLog(state, `청원이 받아들여졌습니다. 조정에서 ${withJosa(grantedParts.join(', '), '이/가')} 내려왔습니다.`, 'good');
 }
 
 // 봄마다: 진(鎭) 이상은 조정이 화약을 소량 정기 지급한다 (의도적으로 부족하게)

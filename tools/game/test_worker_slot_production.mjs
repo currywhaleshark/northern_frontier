@@ -161,7 +161,10 @@ function prepareState(seed) {
 
 {
   const state = prepareState(2026070914);
-  const tannery = addBuilt(state, 'tannery', 10, 10, { inventory: { hide: 10 } });
+  const tannery = addBuilt(state, 'tannery', 10, 10, {
+    inventory: { hide: 10 },
+    tanneryProduct: 'hideClothes',
+  });
   const tanner = workableResident(state, 0, 'tanner', 9, 10);
   assert.equal(workerSlots.assignResidentToBuilding(state, tanner.id, tannery.id), null);
   state.resources.hide = 10;

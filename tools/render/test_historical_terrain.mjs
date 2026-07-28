@@ -4,6 +4,14 @@ import { Buffer } from 'node:buffer';
 import ts from 'typescript';
 
 const source = readFileSync(new URL('../../src/render/historicalTerrain.ts', import.meta.url), 'utf8');
+const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
+
+function pngSize(path) {
+  const png = readFileSync(new URL(path, import.meta.url));
+  assert.equal(png.toString('ascii', 1, 4), 'PNG', `${path} is a PNG`);
+  return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+}
+
 const output = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.ES2022,
@@ -77,5 +85,25 @@ assert.deepEqual(historicalTerrainVariantFor('plain', 3), { flipX: true, flipY: 
 assert.deepEqual(historicalTerrainVariantFor('forest', 3), { flipX: false, flipY: false });
 assert.deepEqual(historicalTerrainVariantFor('mountain', 3), { flipX: false, flipY: false });
 assert.deepEqual(historicalTerrainVariantFor('rock', 3), { flipX: false, flipY: false });
+
+for (const [family, version] of [
+  ['plain', 'v3'],
+  ['forest', 'v1'],
+  ['rock', 'v1'],
+]) {
+  for (const season of ['spring', 'summer', 'autumn', 'winter']) {
+    const standardPath =
+      `../../public/assets/folk-warm-${family}-${season}-seamless-${version}-standard-448px.png`;
+    const hdPath =
+      `../../public/assets/folk-warm-${family}-${season}-seamless-${version}-hd-896px.png`;
+    assert.deepEqual(pngSize(standardPath), { width: 448, height: 448 });
+    assert.deepEqual(pngSize(hdPath), { width: 896, height: 896 });
+  }
+}
+
+assert.match(atlasSource, /SEAMLESS_GROUND_VERSIONS/);
+assert.match(atlasSource, /activeSeamlessGroundTerrain/);
+assert.match(atlasSource, /GROUND_EDGE_BAYER_4/);
+assert.match(atlasSource, /samplesPerLogicalPixel = p\.highDefinition \? 2 : 1/);
 
 console.log('historical terrain tests passed');

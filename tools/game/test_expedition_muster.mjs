@@ -156,6 +156,16 @@ function prepareCombatants(seed) {
     'the muster UI must not use the legacy per-resident defense helper');
   assert.match(source, /조총 준비/);
   assert.match(source, /화약 부족/);
+  assert.match(source, /원정 전력<\/span><strong>\{Math\.round\(expeditionPower\)\}/,
+    'the muster summary rounds fractional expedition power for display');
+  assert.match(source, /Math\.round\(currentDefense\).*Math\.round\(remainingDefense\)/,
+    'the muster summary rounds fractional village defense values for display');
+  assert.match(source, /Math\.round\(personalPower\)/,
+    'individual expedition member power is displayed as a rounded integer');
+
+  const engagementSource = readFileSync(new URL('../../src/game/expeditionEngagement.ts', import.meta.url), 'utf8');
+  assert.match(engagementSource, /전력 \$\{Math\.round\(expeditionCombatPower\(/,
+    'the predator engagement confirmation rounds fractional expedition power');
 }
 
 console.log('expedition muster tests passed');

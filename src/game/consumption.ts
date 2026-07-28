@@ -1,4 +1,5 @@
-import { CLOTHING_RESOURCES, FOOD_RESOURCES, FUEL_RESOURCES, RESOURCE_DEFS } from './resourceCatalog';
+import { FOOD_RESOURCES, FUEL_RESOURCES, RESOURCE_DEFS } from './resourceCatalog';
+import { clothingCoverageTotal as equippedClothingCoverageTotal } from './wearables';
 import type { GameState, ResourceId } from './types';
 
 export interface ConsumptionResult {
@@ -37,10 +38,7 @@ export function fuelHeatTotal(state: GameState): number {
 }
 
 export function clothingCoverageTotal(state: GameState): number {
-  return CLOTHING_RESOURCES.reduce(
-    (sum, id) => sum + finitePositive(state.resources[id] ?? 0) * (RESOURCE_DEFS[id].clothingValue ?? 0),
-    0,
-  );
+  return equippedClothingCoverageTotal(state);
 }
 
 export function luxuryStockTotal(state: GameState): number {

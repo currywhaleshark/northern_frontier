@@ -546,8 +546,8 @@ function tacticalRouteStageMoveResolution(
     destinationZoneId: destination.zoneId,
     destinationLine: rearRaid ? 'rear' : destination.line,
     warning: rearRaid
-      ? `${currentRoute.label}을 빠져나가 방책 방어선의 적 후열을 급습합니다.`
-      : `${battle.zones.find(zone => zone.id === destination.zoneId)?.name ?? (destination.zoneId === 'approach' ? '진입로' : '창고지대')} ${destination.line === 'rear' ? '후열' : destination.line === 'middle' ? '중열' : '전열'}로 합류합니다.`,
+      ? `${withJosa(currentRoute.label, '을/를')} 빠져나가 방책 방어선의 적 후열을 급습합니다.`
+      : `${battle.zones.find(zone => zone.id === destination.zoneId)?.name ?? (destination.zoneId === 'approach' ? '진입로' : '창고지대')} ${withJosa(destination.line === 'rear' ? '후열' : destination.line === 'middle' ? '중열' : '전열', '으로/로')} 합류합니다.`,
     reason: null,
   };
 }
@@ -936,7 +936,7 @@ export function resolveTacticalRouteRound(
       raiders.forEach(group => { if (group.routeTransit) setTacticalRouteTransitStep(group.routeTransit, 1); });
     }
     const engagementLines = [
-      `${route.label} 중간 지점에서 ${blockers.map(group => group.label).join(', ')}와 ${raiders.map(group => group.label).join(', ')}가 교전했습니다.`,
+      `${route.label} 중간 지점에서 ${withJosa(blockers.map(group => group.label).join(', '), '과/와')} ${withJosa(raiders.map(group => group.label).join(', '), '이/가')} 교전했습니다.`,
       outcome === 'defenderHeld' ? '차단대가 우회로를 지켜 적을 입구로 밀어냈습니다.'
         : outcome === 'raiderBreakthrough' ? '적이 차단대를 밀어내고 후방 출구를 향합니다.'
           : '양측이 우회로 중간 지점에서 대치합니다.',
@@ -1017,7 +1017,7 @@ export function resolveTacticalRouteRound(
       ? `${withJosa(group.label, '이/가')} ${withJosa(route.label, '을/를')} 통과해 적 후열을 급습합니다.`
       : intendedRearAssault
         ? `${withJosa(group.label, '이/가')} ${withJosa(route.label, '을/를')} 통과했지만 목책에 적이 없어 진입로로 합류합니다.`
-      : `${withJosa(group.label, '이/가')} ${route.label}에서 ${group.zoneId === route.approachZoneId ? '진입로' : '창고지대'}로 합류합니다.`);
+      : `${withJosa(group.label, '이/가')} ${route.label}에서 ${withJosa(group.zoneId === route.approachZoneId ? '진입로' : '창고지대', '으로/로')} 합류합니다.`);
   }
   return result;
 }

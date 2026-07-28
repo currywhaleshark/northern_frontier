@@ -54,7 +54,6 @@ export function ResidentsWindow({
   const [statusFilter, setStatusFilter] = useState<ResidentStatusFilter>('all');
   const [sort, setSort] = useState<ResidentSort>('arrival');
   const moraleFactors = (state.moraleFactors ?? []).filter(factor => factor.unlocked && factor.delta !== 0);
-  const lockedFactors = (state.moraleFactors ?? []).filter(factor => !factor.unlocked);
   const presentJobs = [...new Set(state.residents.map(resident => resident.job))]
     .sort((left, right) => JOB_NAMES[left].localeCompare(JOB_NAMES[right], 'ko-KR'));
   const jobOptions = jobFilter !== 'all' && !presentJobs.includes(jobFilter)
@@ -69,17 +68,12 @@ export function ResidentsWindow({
   const selectedHidden = selectedResidentId != null && !visibleResidents.some(resident => resident.id === selectedResidentId);
   return (
     <div>
-      <div className="panel-title">민심 내역 — 고을이 클수록 바라는 것이 많아진다</div>
+      <div className="panel-title">민심 내역</div>
       {moraleFactors.map(factor => (
         <div key={factor.id} className="small" style={{ color: factor.delta > 0 ? '#6fbf73' : '#e06c5c' }}>
           {factor.delta > 0 ? <UiIcon name="success" size={17} /> : '·'} {factor.label} ({factor.delta > 0 ? '+' : ''}{factor.delta})
         </div>
       ))}
-      {lockedFactors.length > 0 && (
-        <div className="small muted">
-          잠긴 기대: {lockedFactors.map(factor => factor.label).join(' · ')} — 승격하면 주민들이 바라기 시작합니다
-        </div>
-      )}
       <button type="button" className="btn small weapon-allocation-open" onClick={onOpenWeaponAllocation} style={{ marginTop: 6 }}>
         <UiIcon name="arsenal" size={20} /> 병기고 무기·군마 배분
       </button>

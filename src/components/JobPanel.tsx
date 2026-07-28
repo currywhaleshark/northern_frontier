@@ -1,4 +1,5 @@
 // 직업 배정 패널: 직업별 상세 화면에서 주민을 직접 골라 배정·해제한다.
+import { withJosa } from '../game/josa';
 import { useState } from 'react';
 import { BUILDING_DEFS } from '../game/buildings';
 import { isJobUnlocked, JOB_DESC, JOB_NAMES, JOB_ORDER } from '../game/constants';
@@ -25,6 +26,7 @@ const BUILDING_SLOT_JOBS = new Set(
 
 interface Props {
   state: GameState;
+  onReassign: (from: JobId, to: JobId) => void;
   onSetResidentJobs: (residentIds: readonly number[], job: JobId) => void;
   uiPrefs: UiPrefs;
   onUiPrefsChange: (update: (current: UiPrefs) => UiPrefs) => void;
@@ -99,7 +101,14 @@ function toggleSelected(
   setSelected(next);
 }
 
-export function JobPanel({ state, onSetResidentJobs, uiPrefs, onUiPrefsChange, onAutoAssign }: Props) {
+export function JobPanel({
+  state,
+  onReassign,
+  onSetResidentJobs,
+  uiPrefs,
+  onUiPrefsChange,
+  onAutoAssign,
+}: Props) {
   const [selectedJob, setSelectedJob] = useState<JobId | null>(null);
   const [selectedAssignedIds, setSelectedAssignedIds] = useState<Set<number>>(() => new Set());
   const [selectedIdleIds, setSelectedIdleIds] = useState<Set<number>>(() => new Set());
@@ -316,28 +325,50 @@ export function JobPanel({ state, onSetResidentJobs, uiPrefs, onUiPrefsChange, o
             isResidentAvailableForWorkerSlot(state, resident)).length
           : null;
         return (
-          <button
-            type="button"
-            className="job-row job-row-open"
+          <div
+            className="job-row"
             key={job}
             title={`${JOB_DESC[job]}${gated ? '\n문해자 전용 — 글을 아는 주민만 맡습니다' : ''}`}
-            data-tut={`job-detail-${job}`}
-            onClick={() => openJobDetail(job)}
           >
-            <span>
-              {JOB_NAMES[job]}
-              {gated && <span aria-label="문해자 전용" title="문해자 전용"> <UiIcon name="literate" size={18} /></span>}
-              {unassigned != null && <small> (배치 가능 {unassigned})</small>}
-            </span>
-            <span className="job-row-summary">
+            <button
+              type="button"
+              className="job-row-detail"
+              data-tut={`job-detail-${job}`}
+              onClick={() => openJobDetail(job)}
+              title={`${JOB_NAMES[job]} 상세 배정 열기`}
+            >
+              <span>
+                {JOB_NAMES[job]}
+                {gated && <span aria-label="문해자 전용" title="문해자 전용"> <UiIcon name="literate" size={18} /></span>}
+                {unassigned != null && <small> (배치 가능 {unassigned})</small>}
+                <small className="job-detail-hint">상세 배정 · 무직 후보 {assignableIdle}</small>
+              </span>
+              <span aria-hidden="true">›</span>
+            </button>
+            <span className="job-controls">
+              <button
+                type="button"
+                className="job-btn"
+                disabled={count.total === 0}
+                title={`${JOB_NAMES[job]} 1명을 무직으로 전환`}
+                onClick={() => onReassign(job, 'idle')}
+              >−</button>
               <span className="job-count-breakdown" aria-label={`성인 ${count.adult}명, 소년 ${count.youth}명`}>
                 <span>성인 <strong>{count.adult}</strong></span>
                 <small>소년 {count.youth}</small>
               </span>
-              <small>무직 후보 {assignableIdle}</small>
-              <span aria-hidden="true">›</span>
+              <button
+                type="button"
+                className="job-btn"
+                data-tut={`job-plus-${job}`}
+                disabled={assignableIdle === 0}
+                title={assignableIdle === 0
+                  ? gated ? '무직 문해자가 없습니다' : '이 직업을 맡을 수 있는 무직 주민이 없습니다'
+                  : `무직 주민 1명을 ${withJosa(JOB_NAMES[job], '으로/로')} 배정`}
+                onClick={() => onReassign('idle', job)}
+              >＋</button>
             </span>
-          </button>
+          </div>
         );
       })}
     </div>

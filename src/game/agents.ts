@@ -1,12 +1,13 @@
 // 주민 에이전트 시뮬레이션 — 서브틱 단위의 이동, 작업, 운반
 // 자원은 창고/거점에 짐을 부려야 마을 비축량에 더해진다.
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import {
   DAY_BANDS, DAY_CYCLE_SUBTICKS, WORK_RATE_SCALE, WORK_SUBTICKS, dayBandOf,
 } from './dayCycle';
 import {
   BUILDING_DEFS, buildingCostFor, cemeteryPlotCapacity, clearBuildingTiles, computeDefense, footprintTilesOf,
-  isPlotBuildingType, isSmithyProductUnlocked, occupyBuildingTiles, officeEfficiencyMultiplier,
+  isBuildingUpperPassageTile, isPlotBuildingType, isSmithyProductUnlocked, occupyBuildingTiles, officeEfficiencyMultiplier,
   plotArea, SMITHY_PRODUCT_DEFS, smithyProductOf, sownAreaOf,
 } from './buildings';
 import { JOB_NAMES, RESOURCE_NAMES } from './constants';
@@ -14,10 +15,12 @@ import { addLog } from './events';
 import { enrolledStudentIds, skillGainMult } from './education';
 import { haulerCarryCapacity, haulingMoveSpeedMultiplier, scaledCarryCapacity } from './equipment';
 import { collectHuntableTiles } from './habitats';
+import { huntPreyName, rollHuntPrey, scaledHuntYield, type HuntPreyDef } from './hunting';
 import { makeRng } from './map';
 import { buryCorpse, cemeteryFreePlots, corpsesOf, laborEfficiencyMult, nextCorpseToCollect } from './lifecycle';
 import { extractMineralDeposit, mineralRemaining } from './minerals';
-import { markForestHarvest, treeStageFor } from './forestGrowth';
+import { clearTreeStage, markForestHarvest, treeStageFor } from './forestGrowth';
+import { assignClearingCrews, clearingBlocksWork, clearingSites, pendingClearingTiles } from './landClearing';
 import { isVeinSealedTile, recordRockMining, recordSilverMined } from './silver';
 import { getSeason } from './seasons';
 import { outdoorMult } from './weather';
@@ -29,6 +32,10 @@ import { clothingCoverageTotal, foodTotal, fuelHeatTotal } from './consumption';
 import { isExplored } from './exploration';
 import { activePredatorScoutIds } from './expeditionIntel';
 import { FOOD_RESOURCES, FUEL_RESOURCES } from './resourceCatalog';
+import {
+  craftStrawShoesAtHome, equipMissingWearables, footwearCoverageTotal,
+  normalizeWearableResourceStocks, residentFootwearMoveMultiplier, resolvedTanneryProduct, TANNERY_PRODUCT_DEFS,
+} from './wearables';
 import { isGateBuilding } from './walls';
 import {
   ensureLivestockState, hayFromHarvestProgress, livestockProductForHerder, plotWorkMultiplier,
@@ -68,6 +75,10 @@ interface Ctx {
   goalFields: Partial<Record<'forest' | 'huntable' | 'mineral', GoalField>>;
   goalFieldUserCounts: Record<'forest' | 'huntable' | 'mineral', number>;
   farmerWorkIdsByPlot: Map<number, number[]>;
+  /** 이번 서브틱에 공사터 개간을 맡은 벌목꾼 (주민 id → 건물 id) */
+  clearingCrew: Map<number, number>;
+  /** 개간 담당이 따로 있는 나무 ("x,y") — 일반 벌목은 이 칸을 건드리지 않는다 */
+  clearingReserved: Set<string>;
 }
 
 const PRODUCING_JOBS = [
@@ -158,7 +169,7 @@ export function isTerrainPassable(state: GameState, x: number, y: number): boole
   const t = state.map[y]?.[x];
   if (!t) return false;
   const building = buildingAtTile(state, t);
-  if (building && !isPassableBuilding(building.type)) return false;
+  if (building && !isPassableBuilding(building.type) && !isBuildingUpperPassageTile(building, x, y)) return false;
   if (t.terrain === 'mountain') return false;
   if (t.terrain === 'river') {
     if (building && (building.type === 'bridge' || building.type === 'ferry' || building.type === 'dock')) return true;
@@ -370,6 +381,7 @@ function moveSteps(state: GameState, r: Resident, ctx: Ctx): number {
     sp = Math.min(sp, CONFIG.agents.moveSpeedSnow);
   }
   sp *= haulingMoveSpeedMultiplier(r);
+  sp *= residentFootwearMoveMultiplier(r);
   const n = Math.floor(sp);
   return n + (ctx.rng() < sp - n ? 1 : 0);
 }
@@ -790,11 +802,13 @@ interface GatherOpts {
   onDeposit?: (resident: Resident) => void;
   taskWork: string;
   taskMove: string;
-  taskHaul: string;
+  taskHaul: string | ((resident: Resident) => string);
   taskNone?: string;
   adjustHarvestAmount?: (tile: Tile, r: Resident, amount: number) => number;
   onHarvest?: (tile: Tile, r: Resident, amount: number) => void;
   goalField?: () => GoalField;
+  /** 작업지에 갈 길이 없을 때의 대체 행동. true를 돌려주면 이 틱을 넘겨받는다. */
+  onStuck?: () => boolean;
 }
 
 type GatherGoalKind = 'forest' | 'huntable' | 'mineral';
@@ -843,7 +857,7 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
   if (carryTotal(r) >= scaledCarryCapacity(o.cap) ||
     (r.phase === 'toDeposit' && carryTotal(r) > 0)) {
     r.phase = 'toDeposit';
-    r.task = o.taskHaul;
+    r.task = typeof o.taskHaul === 'function' ? o.taskHaul(r) : o.taskHaul;
     const targets = o.depositTargets?.(state, r) ?? depositBuildings(state, o.depositExtra);
     const st = goTo(state, r, ctx, buildingInteractionGoal(state, targets.map(building => building.id)));
     if (isSettledAtGoal(r, st)) {
@@ -883,6 +897,7 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
     r.workTimer = o.workTicks;
     r.task = o.taskWork;
   } else if (st === 'stuck') {
+    if (o.onStuck?.()) return;
     r.phase = 'rest';
     if (carryTotal(r) > 0) r.phase = 'toDeposit';
     else loiterNearCenter(state, r, ctx, o.taskNone ?? '갈 곳 없음');
@@ -932,9 +947,9 @@ function logMineralDepletion(state: GameState, tile: Tile, resource: 'stone' | '
     state,
     mine
       ? otherDeposits > 0
-        ? depositName + '이(가) 고갈되었습니다. 채광꾼들이 주변의 다른 광상으로 옮겨갑니다.'
-        : depositName + '이(가) 고갈되었습니다. 채광장 주변 광상이 모두 바닥났습니다.'
-      : depositName + '이(가) 고갈되어 지표에서 사라졌습니다.',
+        ? withJosa(depositName, '이/가') + ' 고갈되었습니다. 채광꾼들이 주변의 다른 광상으로 옮겨갑니다.'
+        : withJosa(depositName, '이/가') + ' 고갈되었습니다. 채광장 주변 광상이 모두 바닥났습니다.'
+      : withJosa(depositName, '이/가') + ' 고갈되어 지표에서 사라졌습니다.',
     'bad',
     true,
   );
@@ -1078,10 +1093,62 @@ function handleManualOrder(state: GameState, r: Resident, ctx: Ctx): boolean {
 
 // ─────────────────────────── 직업별 행동 ───────────────────────────
 
-function woodcutterTick(state: GameState, r: Resident, ctx: Ctx): void {
+// 공사터 개간 — 배정받은 현장의 나무만 골라 베고, 벤 자리는 평지가 되어 공사가 열린다.
+// 일반 벌목과 달리 그루터기를 남기지 않는다: 자리를 비우는 것이 목적이기 때문이다.
+function clearingWoodcutterTick(state: GameState, r: Resident, ctx: Ctx, siteId: number): void {
   const a = CONFIG.agents;
+  const site = state.buildings.find(building => building.id === siteId);
+  const targets = site ? pendingClearingTiles(state, site) : [];
+  if (targets.length === 0) {
+    woodcutterTick(state, r, ctx, true);
+    return;
+  }
+  // 공사터 칸은 건물이 들어서 있어 밟지 못하는 경우가 많다(움집 등). 그래서 건축가와
+  // 같이 옆 칸에 서서 베고, 벤 나무는 발밑이 아니라 인접한 그 나무를 지운다.
+  const treeAt = (x: number, y: number): Tile | undefined =>
+    targets.find(tree => tree.terrain === 'forest' &&
+      Math.abs(tree.x - x) <= 1 && Math.abs(tree.y - y) <= 1);
   gatherJob(state, r, ctx, {
-    goal: t => t.terrain === 'forest' && treeStageFor(t) === 'mature',
+    goal: t => treeAt(t.x, t.y) != null,
+    workTicks: a.work.chop,
+    yieldRes: 'wood',
+    yieldAmt: a.yields.wood * CONFIG.seasons.woodMult[ctx.season],
+    cap: a.carryCap.wood,
+    depositExtra: ['lumberCamp'],
+    taskWork: '공사터 벌목 중', taskMove: '공사터로 이동', taskHaul: '목재 운반',
+    // 강 건너처럼 갈 길이 없는 공사터라면 놀리지 말고 평소 벌목으로 돌린다.
+    // 길찾기 실패 쿨다운은 이 사람 몫으로 한 번 비워 준다 — 그러지 않으면 공사터에서
+    // 걸린 쿨다운 때문에 이어지는 일반 벌목까지 같이 막혀 그냥 서 있게 된다.
+    onStuck: () => {
+      pathFailUntil.delete(r.id);
+      woodcutterTick(state, r, ctx, true);
+      return true;
+    },
+    onHarvest: (_tile, worker, woodAmount) => {
+      addCarry(worker, 'brushwood', woodAmount * CONFIG.production.brushwoodPerWood);
+      // 한 번 베면 그 칸은 완전히 열린다 — 공사가 여기서부터 시작된다.
+      const felled = treeAt(worker.x, worker.y);
+      if (!felled) return;
+      felled.terrain = 'plain';
+      clearTreeStage(felled);
+    },
+  });
+}
+
+function woodcutterTick(state: GameState, r: Resident, ctx: Ctx, skipClearing = false): void {
+  const a = CONFIG.agents;
+  if (!skipClearing) {
+    const siteId = ctx.clearingCrew.get(r.id);
+    if (siteId != null) {
+      clearingWoodcutterTick(state, r, ctx, siteId);
+      return;
+    }
+  }
+  gatherJob(state, r, ctx, {
+    // 공사터로 잡힌 나무는 개간 담당이 따로 있으므로 건드리지 않는다
+    // (건물이 이미 올라앉은 칸, 그리고 이전 목적지처럼 아직 비어 있는 예정지 모두)
+    goal: t => t.terrain === 'forest' && t.buildingId == null &&
+      !ctx.clearingReserved.has(`${t.x},${t.y}`) && treeStageFor(t) === 'mature',
     workTicks: a.work.chop,
     yieldRes: 'wood',
     yieldAmt: a.yields.wood * CONFIG.seasons.woodMult[ctx.season],
@@ -1103,6 +1170,7 @@ function woodcutterTick(state: GameState, r: Resident, ctx: Ctx): void {
 
 function hunterTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
+  let caught: { prey: HuntPreyDef; meat: number; hide: number } | null = null;
   gatherJob(state, r, ctx, {
     // 짐승이 사는 서식지 범위 안에서만 사냥이 된다 (렌더러의 서식지 원과 동일 판정)
     goal: t => ctx.huntable.has(`${t.x},${t.y}`),
@@ -1116,13 +1184,32 @@ function hunterTick(state: GameState, r: Resident, ctx: Ctx): void {
     goalField: ctx.goalFieldUserCounts.huntable >= 3
       ? () => gatherGoalField(state, ctx, 'huntable', t => ctx.huntable.has(`${t.x},${t.y}`))
       : undefined,
-    taskWork: '사냥 중', taskMove: '서식지로 이동', taskHaul: '사냥감 운반',
+    taskWork: '사냥감 추적 중',
+    taskMove: '서식지로 이동',
+    taskHaul: resident => `${huntPreyName(resident.lastHuntPrey)} 운반`,
+    adjustHarvestAmount: (_tile, _resident, baselineMeat) => {
+      const prey = rollHuntPrey(ctx.rng);
+      const yields = scaledHuntYield(prey, baselineMeat);
+      caught = { prey, ...yields };
+      return yields.meat;
+    },
     onHarvest: (_tile, res, meatAmount) => {
-      addCarry(res, 'hide', (meatAmount / CONFIG.production.meatPerGame) * CONFIG.production.hidePerGame);
-      if (ctx.rng() < 0.06) {
-        addLog(state, `사냥꾼 ${res.name}이(가) 노루를 잡아 식량과 가죽을 가져옵니다.`, 'good');
+      if (!caught) return;
+      res.lastHuntPrey = caught.prey.id;
+      res.task = `${caught.prey.name} 사냥 성공`;
+      addCarry(res, 'hide', caught.hide);
+      if (ctx.rng() < 0.08) {
+        const yieldText = caught.hide > 0
+          ? `고기 ${meatAmount.toFixed(1)}과 가죽 ${caught.hide.toFixed(1)}`
+          : `고기 ${meatAmount.toFixed(1)}`;
+        addLog(
+          state,
+          `사냥꾼 ${withJosa(res.name, '이/가')} ${withJosa(caught.prey.name, '을/를')} 잡아 ${yieldText} 분량을 가져옵니다.`,
+          'good',
+        );
       }
     },
+    onDeposit: resident => { delete resident.lastHuntPrey; },
   });
 }
 
@@ -1273,7 +1360,7 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
       }
       gainSkillTick(r);
     } else {
-      r.task = st === 'stuck' ? '길이 막힘' : `${BUILDING_DEFS[farm.type].name}(으)로 이동`;
+      r.task = st === 'stuck' ? '길이 막힘' : `${withJosa(BUILDING_DEFS[farm.type].name, '으로/로')} 이동`;
     }
     return;
   }
@@ -1288,7 +1375,7 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
       farm.sownArea = Math.min(area, sown + sowRate);
       gainSkillTick(r);
     } else {
-      r.task = st === 'stuck' ? '길이 막힘' : `${BUILDING_DEFS[farm.type].name}(으)로 이동`;
+      r.task = st === 'stuck' ? '길이 막힘' : `${withJosa(BUILDING_DEFS[farm.type].name, '으로/로')} 이동`;
     }
     return;
   }
@@ -1315,11 +1402,14 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
     );
     gainSkillTick(r);
   } else {
-    r.task = st === 'stuck' ? '길이 막힘' : `${BUILDING_DEFS[farm.type].name}(으)로 이동`;
+    r.task = st === 'stuck' ? '길이 막힘' : `${withJosa(BUILDING_DEFS[farm.type].name, '으로/로')} 이동`;
   }
 }
 
-function isConstructionForJob(building: Building, job: 'farmer' | 'builder'): boolean {
+function isConstructionForJob(state: GameState, building: Building, job: 'farmer' | 'builder'): boolean {
+  // 나무가 아직 서 있으면 벌목꾼 차례다 — 건축가·농부는 자리가 빌 때까지 기다린다.
+  // (이전의 해체 단계는 옛 자리 일이라 새 자리 나무와 무관하게 계속 진행한다)
+  if (clearingBlocksWork(state, building)) return false;
   if (building.workOrder) return job === 'builder';
   if (building.repairing) return job === 'builder';
   const requiredJob = isPlotBuildingType(building.type) ? 'farmer' : 'builder';
@@ -1327,7 +1417,7 @@ function isConstructionForJob(building: Building, job: 'farmer' | 'builder'): bo
 }
 
 function constructionTarget(state: GameState, r: Resident, job: 'farmer' | 'builder'): Building | null {
-  const sites = state.buildings.filter(building => isConstructionForJob(building, job));
+  const sites = state.buildings.filter(building => isConstructionForJob(state, building, job));
   const priority = sites.find(building => building.id === state.priorityBuildingId);
   if (priority) return priority;
   const repairs = sites.filter(b => b.repairing);
@@ -1389,16 +1479,14 @@ function advanceBuildingWorkOrder(state: GameState, building: Building, ctx: Ctx
     if (building.h != null) building.h = destination.h;
     if (building.type === 'stable') delete building.pasture;
     occupyBuildingTiles(state, building);
-    for (const tile of footprintTilesOf(state, building) ?? []) {
-      if (tile.terrain === 'forest') {
-        tile.terrain = 'plain';
-        state.resources.wood += 3;
-      }
-    }
     order.phase = 'rebuilding';
     order.progress = 0;
     order.required = Math.max(1, def.buildDays);
-    addLog(state, `${def.name} 해체를 마치고 새 위치에서 재건축을 시작했습니다.`, 'info');
+    // 새 자리에 아직 나무가 서 있으면 벌목이 끝날 때까지 재건축은 열리지 않는다.
+    const standingTrees = pendingClearingTiles(state, building).length;
+    addLog(state, standingTrees > 0
+      ? `${def.name} 해체를 마쳤습니다. 새 자리의 나무 ${standingTrees}그루를 벤 뒤 재건축을 시작합니다.`
+      : `${def.name} 해체를 마치고 새 위치에서 재건축을 시작했습니다.`, 'info');
     return true;
   }
 
@@ -1446,7 +1534,7 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
       reconcileResidentHomes(state, ctx.rng);
       addLog(state, repaired
         ? `${def.name} 수리가 끝나 다시 가동됩니다.`
-        : `${def.name}이(가) 완공되었습니다.`, 'good',
+        : `${withJosa(def.name, '이/가')} 완공되었습니다.`, 'good',
       repaired || def.slots > 0 || def.capacity > 0 || def.unique);
       const autoAssigned = autoAssignWorkersToBuilding(state, target.id);
       for (const worker of autoAssigned) resetAgent(state, worker);
@@ -1481,13 +1569,14 @@ const HAUL_PRIORITY: ResourceId[] = [
   'grain', 'rice', 'vegetables', 'kimchi', 'beans', 'meat', 'eggs', 'milk', 'fish',
   'curedMeat', 'saltedFish', 'driedFish', 'jang',
   'firewood', 'brushwood', 'charcoal', 'wood',
-  'hideClothes', 'cottonClothes', 'tools', 'onggi', 'carts', 'gunpowder', 'spears', 'hornBows', 'muskets',
+  'hideClothes', 'cottonClothes', 'strawShoes', 'leatherShoes', 'tools', 'onggi', 'carts', 'gunpowder', 'spears', 'hornBows', 'muskets',
   'hide', 'cotton', 'wool', 'hay', 'herbs', 'stone', 'iron',
 ];
 
 const FOOD_HAUL_RESOURCES = new Set<ResourceId>([...FOOD_RESOURCES, 'rice']);
 const FUEL_HAUL_RESOURCES = new Set<ResourceId>(FUEL_RESOURCES);
 const CLOTHING_HAUL_RESOURCES = new Set<ResourceId>(['hideClothes', 'cottonClothes']);
+const FOOTWEAR_HAUL_RESOURCES = new Set<ResourceId>(['strawShoes', 'leatherShoes']);
 const COMBAT_HAUL_RESOURCES = new Set<ResourceId>(['gunpowder', 'spears', 'hornBows', 'muskets']);
 const JANGDOKDAE_SUPPLY_PRIORITY = ['onggi', 'salt', 'beans'] as const satisfies readonly ResourceId[];
 
@@ -1640,6 +1729,7 @@ function assignHaulTask(state: GameState, resident: Resident): boolean {
   const fuelLow = fuelHeatTotal(state) < population * 2;
   const toolsLow = state.resources.tools < 3;
   const clothingLow = clothingCoverageTotal(state) < population * 0.5;
+  const footwearLow = footwearCoverageTotal(state) < population * 0.5;
   const anySick = living.some(other => other.sick);
   const cartlessHauler = living.some(other => other.job === 'hauler' && !other.cartEquipped);
   const combatTension = state.threat >= CONFIG.threat.raidThreshold || state.raiders != null || state.battle != null;
@@ -1649,6 +1739,7 @@ function assignHaulTask(state: GameState, resident: Resident): boolean {
     (resource === 'tools' && toolsLow) ||
     (resource === 'carts' && state.resources.carts < 1 && state.resources.carts + available >= 1 && cartlessHauler) ||
     (CLOTHING_HAUL_RESOURCES.has(resource) && clothingLow) ||
+    (FOOTWEAR_HAUL_RESOURCES.has(resource) && footwearLow) ||
     (resource === 'herbs' && anySick) ||
     (COMBAT_HAUL_RESOURCES.has(resource) && combatTension);
 
@@ -2025,7 +2116,7 @@ function curerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const st = goTo(state, r, ctx, buildingGoal(state, workplace.id));
   if (st !== 'arrived') {
     r.phase = st === 'stuck' ? 'rest' : 'toWork';
-    r.task = st === 'stuck' ? '길이 막힘' : `${BUILDING_DEFS[workplace.type].name}(으)로 이동`;
+    r.task = st === 'stuck' ? '길이 막힘' : `${withJosa(BUILDING_DEFS[workplace.type].name, '으로/로')} 이동`;
     return;
   }
   if (rainBlocked) {
@@ -2242,7 +2333,7 @@ function physicianTick(state: GameState, r: Resident, ctx: Ctx): void {
   r.task = `${result.patient?.name ?? '환자'} 진료 중`;
   gainSkillTick(r);
   if (result.status === 'recovered' && result.patient) {
-    addLog(state, `의원 ${r.name}의 치료로 ${result.patient.name}이(가) 병에서 회복했습니다.`, 'good');
+    addLog(state, `의원 ${r.name}의 치료로 ${withJosa(result.patient.name, '이/가')} 병에서 회복했습니다.`, 'good');
   }
 }
 
@@ -2292,6 +2383,8 @@ function tannerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const tannery = assignedWorkplace(state, r, ctx, 'tannery', '무두장 배정 없음');
   if (!tannery) return;
 
+  const product = resolvedTanneryProduct(state, tannery);
+  const productDef = TANNERY_PRODUCT_DEFS[product];
   const target = (p.tanneryHidePerDay / 5) * effOf(r) * ctx.outputMod * WORK_RATE_SCALE;
   if (supplyWorkplaceInputs(state, r, ctx, tannery, { hide: target })) return;
 
@@ -2313,9 +2406,9 @@ function tannerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   takeBuildingStock(tannery, 'hide', hideUsed);
-  addBuildingStock(tannery, 'hideClothes', hideUsed / 2);
+  addBuildingStock(tannery, productDef.output!, hideUsed / productDef.hidePerUnit);
   r.phase = 'working';
-  r.task = '무두질';
+  r.task = productDef.task;
   gainSkillTick(r);
 }
 
@@ -2735,7 +2828,9 @@ function morningMoveTilesPerTick(state: GameState, r: Resident, ctx: Ctx): numbe
   if (state.weather === 'blizzard' || state.weather === 'heavySnow') {
     speed = Math.min(speed, CONFIG.agents.moveSpeedSnow);
   }
-  return Math.max(1, Math.floor(speed * haulingMoveSpeedMultiplier(r)));
+  return Math.max(1, Math.floor(
+    speed * haulingMoveSpeedMultiplier(r) * residentFootwearMoveMultiplier(r),
+  ));
 }
 
 function morningPreparationAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
@@ -2769,6 +2864,7 @@ function waitForMorningWake(state: GameState, r: Resident, wakeSubTick: number):
 
 function dawnAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
   r.task = '아침 채비';
+  equipMissingWearables(state, r);
   const unavailable = r.stage != null || r.sick || state.day < (r.quarantinedUntil ?? 0) ||
     r.health < 20 || state.day < (r.birthRecoveryUntil ?? 0);
   if (unavailable) {
@@ -2879,7 +2975,8 @@ function returnHomeAgentTick(
   if (result === 'arrived') {
     r.phase = 'sleeping';
     r.path = [];
-    r.task = sleepingTask;
+    const crafted = reason === 'sleep' && home ? craftStrawShoesAtHome(state, r) : 0;
+    r.task = crafted > 0 ? '짚신을 삼고 잠듦' : sleepingTask;
   } else if (result === 'stuck') {
     r.path = [];
     r.task = '귀갓길을 찾지 못함';
@@ -3032,6 +3129,7 @@ function closeOutWorkday(state: GameState, r: Resident, ctx: Ctx): boolean {
 // ─────────────────────────── 틱 진입점 ───────────────────────────
 
 export function agentsTick(state: GameState): void {
+  normalizeWearableResourceStocks(state);
   const dayBand = dayBandOf(state.subTick);
   const rngSubTick = dayBand === 'work' ? state.subTick - DAY_BANDS.work.start : state.subTick;
   const rng = makeRng(state.seed + state.day * 7919 + rngSubTick * 101 + 7);
@@ -3076,6 +3174,16 @@ export function agentsTick(state: GameState): void {
     goalFields: {},
     goalFieldUserCounts,
     farmerWorkIdsByPlot: new Map(),
+    // 개간 배정은 서브틱마다 다시 계산한다 — 저장 상태가 아니라 이번 틱의 인력 배치다.
+    clearingCrew: assignClearingCrews(
+      state,
+      living.filter(resident => resident.job === 'woodcutter' &&
+        !resident.sick && state.day >= (resident.quarantinedUntil ?? 0) &&
+        !resident.manualOrder),
+    ),
+    clearingReserved: new Set(
+      clearingSites(state).flatMap(site => site.tiles.map(tile => `${tile.x},${tile.y}`)),
+    ),
   };
 
   for (const r of living) {

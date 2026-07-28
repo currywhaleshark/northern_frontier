@@ -115,11 +115,12 @@ function runTicks(state, ticks) {
   for (let i = 0; i < ticks; i++) simulation.advanceTick(state);
 }
 
-function makePaddyEligibleTile(state, x, y) {
-  state.map[y][x].terrain = 'fertile';
-  state.map[y][x + 1].terrain = 'river';
-  state.map[y][x + 1].buildingId = null;
-  return state.map[y][x];
+function makePaddyFootprintTouchRiver(state, x, y, w = 3, h = 3) {
+  for (let ty = y; ty < y + h; ty++) {
+    for (let tx = x; tx < x + w; tx++) state.map[ty][tx].terrain = 'plain';
+  }
+  state.map[y + Math.floor(h / 2)][x - 1].terrain = 'river';
+  state.map[y + Math.floor(h / 2)][x - 1].buildingId = null;
 }
 
 {
@@ -178,13 +179,28 @@ function makePaddyEligibleTile(state, x, y) {
 
 {
   const state = prepareState();
-  const eligible = makePaddyEligibleTile(state, 10, 10);
-  const dry = state.map[14][14];
-  dry.terrain = 'fertile';
-  assert.equal(buildings.canPlaceBuildingAt(state, 'paddy', eligible.x, eligible.y), true, 'paddy fits fertile river-adjacent land');
-  assert.equal(buildings.canPlaceBuildingAt(state, 'paddy', dry.x, dry.y), false, 'paddy rejects fertile land away from a river');
+  makePaddyFootprintTouchRiver(state, 10, 10);
+  assert.equal(
+    buildings.canPlaceBuildingAt(state, 'paddy', 10, 10, 3, 3),
+    true,
+    'a 3x3 paddy needs only one footprint tile touching the river',
+  );
+  assert.equal(
+    buildings.canPlaceBuildingAt(state, 'paddy', 15, 15, 3, 3),
+    false,
+    'a paddy footprint still needs at least one orthogonally adjacent river tile',
+  );
+  state.map[11][11].terrain = 'rock';
+  assert.equal(
+    buildings.canPlaceBuildingAt(state, 'paddy', 10, 10, 3, 3),
+    false,
+    'river access does not permit rock inside a paddy',
+  );
+  state.map[11][11].terrain = 'plain';
 
-  const field = addBuilt(state, 'field', eligible.x, eligible.y, { cropId: 'millet', fieldGrowth: 20 });
+  const field = addBuilt(state, 'field', 10, 10, {
+    w: 3, h: 3, cropId: 'millet', fieldGrowth: 20,
+  });
   assert.equal(simulation.convertFieldToPaddy(state, field.id), null);
   assert.equal(field.type, 'paddy', 'field converts in place to a paddy');
   assert.equal(field.cropId, 'rice');

@@ -1,5 +1,6 @@
 // 특수 주민 공통 명부와 사건 획득 규칙.
 // UI·사건·렌더러가 같은 인물 정의를 쓴다.
+import { withJosa } from './josa';
 import type { UiIconName } from '../ui/uiIconAssets';
 import { CONFIG } from './config';
 import { computeDefense } from './buildings';
@@ -364,7 +365,7 @@ function recruitSpecialResident(
   };
   markSpent(state, id);
   state.resources.defense = computeDefense(state);
-  addLog(state, `${definition.name}이(가) 마을 사람이 되었습니다.`, 'good', true);
+  addLog(state, `${withJosa(definition.name, '이/가')} 마을 사람이 되었습니다.`, 'good', true);
 }
 
 export function maybeOfferExiledScholar(state: GameState, rng: () => number): boolean {
@@ -382,13 +383,13 @@ export function maybeOfferExiledScholar(state: GameState, rng: () => number): bo
     title: '북관의 유배객 — 붓을 든 죄인',
     body:
       '조정에서 사람 하나를 이 변방에 안치하라는 공문이 왔습니다.\n' +
-      `${definition.shortName}은(는) 장부와 문서에 능하지만, 죄인을 관아에 들이면 조정의 눈초리를 감당해야 합니다.`,
+      `${withJosa(definition.shortName, '은/는')} 장부와 문서에 능하지만, 죄인을 관아에 들이면 조정의 눈초리를 감당해야 합니다.`,
     illustration: definition.illustration,
     options: [
       {
         id: 'appoint',
         label: '관아 일을 맡긴다',
-        desc: `${definition.name}이(가) 아전으로 합류합니다. ${definition.benefit}, ${definition.risk}.`,
+        desc: `${withJosa(definition.name, '이/가')} 아전으로 합류합니다. ${definition.benefit}, ${definition.risk}.`,
       },
       {
         id: 'confine',
@@ -398,7 +399,7 @@ export function maybeOfferExiledScholar(state: GameState, rng: () => number): bo
     ],
     data: { special: id, phase: 'arrival' },
   };
-  addLog(state, `${definition.name}을(를) 북관에 안치하라는 공문이 도착했습니다.`, 'info', true);
+  addLog(state, `${withJosa(definition.name, '을/를')} 북관에 안치하라는 공문이 도착했습니다.`, 'info', true);
   return true;
 }
 
@@ -426,7 +427,7 @@ export function maybeOfferJurchenWarrior(state: GameState, rng: () => number): b
       {
         id: 'accept',
         label: '향화인으로 받아들인다',
-        desc: `${definition.name}이 수비병으로 합류합니다. ${definition.benefit} ${definition.risk}`,
+        desc: `${withJosa(definition.name, '이/가')} 수비병으로 합류합니다. ${definition.benefit} ${definition.risk}`,
       },
       {
         id: 'decline',
@@ -566,7 +567,7 @@ function maybeOfferSimpleArrival(state: GameState, rng: () => number, spec: Simp
       {
         id: 'accept',
         label: spec.acceptLabel,
-        desc: `${definition.name}이(가) ${spec.acceptRole}(으)로 합류합니다. ${definition.benefit}. ${definition.risk}.`,
+        desc: `${withJosa(definition.name, '이/가')} ${withJosa(spec.acceptRole, '으로/로')} 합류합니다. ${definition.benefit}. ${definition.risk}.`,
       },
       { id: 'decline', label: spec.declineLabel, desc: spec.declineDesc },
     ],
@@ -594,7 +595,7 @@ export function resolveSpecialResidentChoice(
     }
     const untilDay = state.day + CONFIG.specialResidents.exiledScholarConfinedDays;
     specialResidentRecordsOf(state)[id] = { status: 'confined', availableUntilDay: untilDay };
-    addLog(state, `윤문겸을(를) 객사에 안치했습니다. ${untilDay}일까지 다시 등용할 수 있습니다.`, 'info', true);
+    addLog(state, `윤문겸을 객사에 안치했습니다. ${untilDay}일까지 다시 등용할 수 있습니다.`, 'info', true);
     return;
   }
 
@@ -636,7 +637,7 @@ export function resolveSpecialResidentChoice(
     if (optionId === 'accept') {
       recruitSpecialResident(state, id, rng, originFaction);
       changeRelation(state, originFaction, -CONFIG.specialResidents.jurchenWarriorRecruitRelationLoss);
-      addLog(state, `${originFaction}은(는) 아라개를 받아들인 일을 배신자 비호로 여깁니다.`, 'bad', true);
+      addLog(state, `${withJosa(originFaction, '은/는')} 아라개를 받아들인 일을 배신자 비호로 여깁니다.`, 'bad', true);
       return;
     }
     specialResidentRecordsOf(state)[id] = { status: 'declined', originFaction };
@@ -665,7 +666,7 @@ export function resolveSpecialResidentChoice(
     }
     specialResidentRecordsOf(state)[id] = { status: 'declined' };
     const definition = specialResidentDefinition(id);
-    addLog(state, `${definition.shortName}은(는) 발길을 돌렸습니다. 다시 오지 않을 것입니다.`, 'info', true);
+    addLog(state, `${withJosa(definition.shortName, '은/는')} 발길을 돌렸습니다. 다시 오지 않을 것입니다.`, 'info', true);
     return;
   }
 
@@ -689,7 +690,7 @@ export function resolveSpecialResidentChoice(
       state.resources.silver = Math.max(
         0, state.resources.silver - CONFIG.specialResidents.runawaySmithRansomSilver,
       );
-      addLog(state, `추노꾼에게 은 ${CONFIG.specialResidents.runawaySmithRansomSilver}을 치르고 막쇠의 몸값을 셈했습니다. 언젠가 또 다른 자가 올지 모릅니다.`, 'info', true);
+      addLog(state, `추노꾼에게 은 ${withJosa(CONFIG.specialResidents.runawaySmithRansomSilver, '을/를')} 치르고 막쇠의 몸값을 셈했습니다. 언젠가 또 다른 자가 올지 모릅니다.`, 'info', true);
       return;
     }
     if (optionId === 'surrender') {
@@ -773,7 +774,7 @@ function syncSpecialResidentRecords(state: GameState): void {
     records[definition.id] = { status: 'dead', residentId: resident.id };
     addLog(
       state,
-      `${definition.name}이(가) 세상을 떠났습니다. 그 인연과 재주는 다시 돌아오지 않습니다.`,
+      `${withJosa(definition.name, '이/가')} 세상을 떠났습니다. 그 인연과 재주는 다시 돌아오지 않습니다.`,
       'bad',
       true,
     );
@@ -1053,7 +1054,7 @@ export function dailySpecialResidentTick(state: GameState, rng: () => number): v
   if (scholar?.status === 'confined' && (scholar.availableUntilDay ?? Infinity) < state.day) {
     specialResidentRecordsOf(state).exiledScholar = { status: 'departed' };
     const fate = rng() < 0.5 ? '사면되어 한양으로 돌아갔습니다' : '변방의 겨울을 넘기지 못했습니다';
-    addLog(state, `안치했던 윤문겸은(는) ${fate}. 등용할 기회가 닫혔습니다.`, 'info', true);
+    addLog(state, `안치했던 윤문겸은 ${fate}. 등용할 기회가 닫혔습니다.`, 'info', true);
   }
   if (state.pendingChoice) return;
   const followups = [

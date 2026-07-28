@@ -1,3 +1,4 @@
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
@@ -47,7 +48,7 @@ export function sendGiftToSite(state: GameState, siteId: number, giftType: SiteG
   const blocked = canAddressSite(site);
   if (blocked) return blocked;
   const gift = SITE_GIFTS[giftType];
-  if (state.resources[gift.resource] < gift.amount) return `${RESOURCE_NAMES[gift.resource]} ${gift.amount}이(가) 필요합니다.`;
+  if (state.resources[gift.resource] < gift.amount) return `${RESOURCE_NAMES[gift.resource]} ${withJosa(gift.amount, '이/가')} 필요합니다.`;
 
   state.resources[gift.resource] -= gift.amount;
   site.goodwill = Math.min(100, site.goodwill + CONFIG.foreignSites.giftGoodwill);
@@ -59,8 +60,8 @@ export function sendGiftToSite(state: GameState, siteId: number, giftType: SiteG
   if (giftType === 'tools' && site.factionName && site.factionName !== '조정') {
     state.suspicion = Math.min(100, state.suspicion + 2);
   }
-  addForeignSiteMemory(state, site.id, `개척지에서 ${gift.label}을(를) 예물로 보냈습니다.`, 'good');
-  addLog(state, `${site.name}에 ${gift.label}을(를) 예물로 보내 예를 갖췄습니다.`, 'good', true);
+  addForeignSiteMemory(state, site.id, `개척지에서 ${withJosa(gift.label, '을/를')} 예물로 보냈습니다.`, 'good');
+  addLog(state, `${site.name}에 ${withJosa(gift.label, '을/를')} 예물로 보내 예를 갖췄습니다.`, 'good', true);
   return null;
 }
 
@@ -79,7 +80,7 @@ export function requestPassagePermission(state: GameState, siteId: number): stri
     return '아직 신용이 부족해 통행 허락을 받지 못했습니다. 먼저 예를 갖추는 편이 좋겠습니다.';
   }
   const cost = score >= 170 ? 0 : CONFIG.foreignSites.passageGiftGrain;
-  if (state.resources.grain < cost) return `통행 예물로 곡물 ${cost}이 필요합니다.`;
+  if (state.resources.grain < cost) return `통행 예물로 곡물 ${withJosa(cost, '이/가')} 필요합니다.`;
   state.resources.grain -= cost;
   const until = state.day + CONFIG.foreignSites.passageDays;
   for (const zone of zones) zone.permittedUntilDay = until;
@@ -112,14 +113,14 @@ export function requestHuntingRights(state: GameState, siteId: number): string |
   const cost = site.trust >= 65 || (site.factionName ? getRelation(state, site.factionName) : 0) >= 70
     ? CONFIG.foreignSites.highTrustHuntingGiftGrain
     : CONFIG.foreignSites.huntingGiftGrain;
-  if (state.resources.grain < cost) return `사냥터 사용의 답례로 곡물 ${cost}이 필요합니다.`;
+  if (state.resources.grain < cost) return `사냥터 사용의 답례로 곡물 ${withJosa(cost, '이/가')} 필요합니다.`;
   state.resources.grain -= cost;
   const until = state.day + CONFIG.foreignSites.huntingRightsDays;
   for (const zone of zones) zone.permittedUntilDay = until;
   site.trust = Math.min(100, site.trust + 6);
   site.lastInteractionDay = state.day;
   addForeignSiteMemory(state, site.id, `${until}일까지 사냥터와 숲을 함께 쓰기로 약조했습니다.`, 'good');
-  addLog(state, `${site.name}에 사냥터 사용을 청했습니다. 곡물 ${cost}을 답례하고 ${CONFIG.foreignSites.huntingRightsDays}일 동안 이용을 묵인받았습니다.`, 'good', true);
+  addLog(state, `${site.name}에 사냥터 사용을 청했습니다. 곡물 ${withJosa(cost, '을/를')} 답례하고 ${CONFIG.foreignSites.huntingRightsDays}일 동안 이용을 묵인받았습니다.`, 'good', true);
   return null;
 }
 
@@ -137,7 +138,7 @@ export function requestSiteDefectors(state: GameState, siteId: number): string |
   if (site.goodwill < config.siteMinGoodwill || site.trust < config.siteMinTrust) {
     return `호의 ${config.siteMinGoodwill}, 신용 ${config.siteMinTrust} 이상이어야 주민 이주를 의논할 수 있습니다.`;
   }
-  if (site.favors < config.siteFavorCost) return `이 부탁에는 거점의 은혜 ${config.siteFavorCost}가 필요합니다.`;
+  if (site.favors < config.siteFavorCost) return `이 부탁에는 거점의 은혜 ${withJosa(config.siteFavorCost, '이/가')} 필요합니다.`;
   if (site.population < config.siteGroupMin) return '옮겨 올 수 있는 주민이 남아 있지 않습니다.';
   const count = Math.min(
     config.siteGroupMax,
@@ -197,7 +198,7 @@ export function scoutBanditLair(state: GameState, siteId: number, rng: () => num
   if (victim) {
     const damage = 14 + Math.floor(rng() * 18);
     victim.health = Math.max(1, victim.health - damage);
-    addLog(state, `${victim.name}이(가) 산채 정찰 중 발각되어 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
+    addLog(state, `${withJosa(victim.name, '이/가')} 산채 정찰 중 발각되어 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
   }
   addForeignSiteMemory(state, site.id, '개척지 정찰대가 접근했다가 산채 경계병에게 발각되었습니다.', 'bad');
   return '정찰대가 발각되었습니다. 산채의 경계가 강화되고 전역 위협이 높아졌습니다.';
@@ -278,7 +279,7 @@ export function applyBanditLairOutcome(
     state.resources.reputation = Math.min(100, state.resources.reputation + 2);
     if (site.factionName) changeRelation(state, site.factionName, -5);
     addForeignSiteMemory(state, site.id, '토벌대가 산채 마당과 창고를 털고 물러났습니다.', 'bad');
-    addLog(state, `토벌대가 산채 마당까지 돌파해 곡물 ${grain}, 가죽 ${hide}, 도구 ${tools}을 빼앗고 이탈했습니다. 산채는 남았습니다.`, 'good', true);
+    addLog(state, `토벌대가 산채 마당까지 돌파해 곡물 ${grain}, 가죽 ${hide}, 도구 ${withJosa(tools, '을/를')} 빼앗고 이탈했습니다. 산채는 남았습니다.`, 'good', true);
     return null;
   }
   if (outcome === 'abandoned') {
@@ -293,7 +294,7 @@ export function applyBanditLairOutcome(
     state.resources.reputation = Math.min(100, state.resources.reputation + 3);
     if (site.factionName) changeRelation(state, site.factionName, -7);
     addForeignSiteMemory(state, site.id, '두목과 잔당이 달아나 산채가 버려졌습니다.', 'bad');
-    addLog(state, `두목과 잔당이 노획 일부를 챙겨 달아났습니다. 버려진 산채에서 곡물 ${grain}, 가죽 ${hide}을 거두었습니다.`, 'good', true);
+    addLog(state, `두목과 잔당이 노획 일부를 챙겨 달아났습니다. 버려진 산채에서 곡물 ${grain}, 가죽 ${withJosa(hide, '을/를')} 거두었습니다.`, 'good', true);
     return null;
   }
   site.status = 'fortified';
@@ -338,7 +339,7 @@ export function resolveBanditLairAssault(
     victim.health = Math.max(1, victim.health - damage);
     result.injuredResidentId = victim.id;
     result.injuryDamage = damage;
-    addLog(state, `${victim.name}이(가) 산채 토벌 실패로 중상을 입었습니다. (건강 -${damage})`, 'bad', true);
+    addLog(state, `${withJosa(victim.name, '이/가')} 산채 토벌 실패로 중상을 입었습니다. (건강 -${damage})`, 'bad', true);
   }
   return result;
 }

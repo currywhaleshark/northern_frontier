@@ -92,6 +92,14 @@ function footprintIds(state, type, x, y) {
     'a newly designated cemetery may start from one tile');
   assert.deepEqual(buildings.buildingFootprintDims({ type: 'cemetery' }), { w: 2, h: 2 },
     'legacy cemeteries preserve their old 2x2 footprint');
+  assert.equal(buildings.isWalkBehindBuilding({ type: 'center' }), true,
+    'the two-row center uses upper-row walk-behind depth');
+  assert.equal(buildings.isWalkBehindBuilding({ type: 'storehouse' }), true,
+    'a regular 2x2 building uses upper-row walk-behind depth');
+  assert.equal(buildings.isWalkBehindBuilding({ type: 'field', w: 3, h: 2 }), false,
+    'expanded fields remain independent ground cells');
+  assert.equal(buildings.isWalkBehindBuilding({ type: 'cemetery', w: 3, h: 2 }), false,
+    'tiled area buildings do not become one large depth sprite');
   assert.equal(buildings.cemeteryPlotCapacity({ type: 'cemetery', w: 1, h: 1 }), 4);
   assert.equal(buildings.cemeteryPlotCapacity({ type: 'cemetery', w: 3, h: 2 }), 24);
 }

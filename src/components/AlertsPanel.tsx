@@ -1,4 +1,5 @@
 // 주요 위기 알림 패널
+import { withJosa } from '../game/josa';
 import { CONFIG } from '../game/config';
 import { foodTotal, fuelHeatTotal } from '../game/consumption';
 import { avg, livingResidents, residentHome } from '../game/residents';
@@ -72,7 +73,7 @@ export function computeAlerts(state: GameState): AlertItem[] {
       );
       alerts.push({
         id: 'livestockFeedForecast',
-        text: `겨울 가축 사료가 부족합니다. ${needs}이 필요하니 비축하거나 일부를 도축하십시오.`,
+        text: `겨울 가축 사료가 부족합니다. ${withJosa(needs, '이/가')} 필요하니 비축하거나 일부를 도축하십시오.`,
         level: coverage < 0.3 ? 'danger' : 'warn',
       });
     }
@@ -147,10 +148,10 @@ export function computeAlerts(state: GameState): AlertItem[] {
       id: 'raidIncoming',
       text: state.battle
         ? state.battle.location === 'village' || state.battle.mode === 'levy'
-          ? `마을 안에서 ${state.raiders.faction}과(와) 방어전이 벌어지고 있습니다!`
-          : `마을 외곽에서 ${state.raiders.faction}을(를) 요격 중입니다.`
+          ? `마을 안에서 ${withJosa(state.raiders.faction, '과/와')} 방어전이 벌어지고 있습니다!`
+          : `마을 외곽에서 ${withJosa(state.raiders.faction, '을/를')} 요격 중입니다.`
         : state.raiders.spotted
-          ? `습격 임박! ${state.raiders.faction}이(가) 마을로 접근 중입니다. 방비를 갖추십시오.`
+          ? `습격 임박! ${withJosa(state.raiders.faction, '이/가')} 마을로 접근 중입니다. 방비를 갖추십시오.`
           : '불길한 기척이 감돕니다. 국경 쪽 개들이 짖어댑니다.',
       level: 'danger',
     });

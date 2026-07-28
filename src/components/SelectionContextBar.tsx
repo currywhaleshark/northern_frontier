@@ -1,4 +1,5 @@
 import { BUILDING_DEFS, cemeteryPlotCapacity, getBuilding } from '../game/buildings';
+import { clearingBlocksWork, pendingClearingTiles } from '../game/landClearing';
 import { isJobUnlocked, JOB_NAMES, JOB_ORDER, RESOURCE_NAMES, TERRAIN_NAMES } from '../game/constants';
 import { cropIdForBuilding, CROP_DEFS } from '../game/crops';
 import { CONFIG } from '../game/config';
@@ -32,12 +33,14 @@ import type {
   ResourceId,
   SelectedEntity,
   SmithyProductId,
+  TanneryProductId,
   YouthActivity,
 } from '../game/types';
 import { ActionPopup } from './ActionPopup';
 import { BuildingIcon } from './BuildingIcon';
 import { ForeignSitePanel } from './ForeignSitePanel';
 import { LivestockIcon } from './LivestockIcon';
+import { ResourceIcon } from './TradeResourceIcon';
 import { UiIcon } from './UiIcon';
 
 interface Props {
@@ -51,6 +54,7 @@ interface Props {
   onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
   onUpgradeCenter: (buildingId: number) => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
+  onSetTanneryProduct: (buildingId: number, product: TanneryProductId) => void;
   onSetDryingProduct: (buildingId: number, product: DryingProductId) => void;
   onSetLivestockSpecies: (buildingId: number, species: LivestockId) => void;
   onSlaughterLivestock: (buildingId: number, amount: number) => void;
@@ -203,6 +207,37 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
             </td>
           </tr>
         )}
+        {resident.alive && (
+          <tr>
+            <td>착용품</td>
+            <td>
+              <div className="wearable-slots" aria-label="주민 착용품">
+                {([
+                  ['clothing', '의복'],
+                  ['footwear', '신발'],
+                ] as const).map(([slot, label]) => {
+                  const item = resident.worn?.[slot];
+                  const title = item
+                    ? `${RESOURCE_NAMES[item.resource]} · 내구도 ${Math.max(0, Math.floor((1 - item.wear) * 100))}%`
+                    : `${label} 미착용`;
+                  return (
+                    <div
+                      key={slot}
+                      className={`wearable-slot${item ? ' equipped' : ' empty'}`}
+                      title={title}
+                      aria-label={title}
+                    >
+                      <span className="wearable-slot-label">{label}</span>
+                      <span className="wearable-slot-icon">
+                        {item && <ResourceIcon resource={item.resource} size={36} />}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </td>
+          </tr>
+        )}
         {resident.alive && (resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter') && (
           <>
             <tr>
@@ -223,7 +258,6 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
               : '노숙'}</td>
           </tr>
         )}
-        <tr><td>위치</td><td>({resident.x}, {resident.y})</td></tr>
         {Object.keys(resident.carrying).length > 0 && (
           <tr>
             <td>{resident.cartEquipped ? '수레 짐' : '지게 짐'}</td>
@@ -255,6 +289,7 @@ export function SelectionContextBar({
   onUpgradeHousing,
   onUpgradeCenter,
   onSetSmithyProduct,
+  onSetTanneryProduct,
   onSetDryingProduct,
   onSetLivestockSpecies,
   onSlaughterLivestock,
@@ -349,7 +384,6 @@ export function SelectionContextBar({
             <div className="selection-context-info">
               <table className="insp-table">
                 <tbody>
-                  <tr><td>위치</td><td>({tile.x}, {tile.y})</td></tr>
                   {!explored ? (
                     <>
                       <tr><td>상태</td><td>미답사</td></tr>
@@ -404,8 +438,9 @@ export function SelectionContextBar({
                           : null;
                         return (
                           <>
-                            <tr><td>건물</td><td><BuildingIcon type={building.type} size={22} /> {def.name}</td></tr>
-                            <tr><td>상태</td><td>{building.workOrder
+                            <tr><td>상태</td><td>{clearingBlocksWork(state, building)
+                              ? `벌목 대기 · 나무 ${pendingClearingTiles(state, building).length}그루`
+                              : building.workOrder
                               ? `${building.workOrder.kind === 'demolish'
                                 ? '해체 중'
                                 : building.workOrder.phase === 'dismantling' ? '이전 해체 중' : '이전 재건축 중'} ${Math.floor((building.workOrder.progress / Math.max(1, building.workOrder.required)) * 100)}%`
@@ -553,6 +588,7 @@ export function SelectionContextBar({
                 onUpgradeHousing={onUpgradeHousing}
                 onUpgradeCenter={onUpgradeCenter}
                 onSetSmithyProduct={onSetSmithyProduct}
+                onSetTanneryProduct={onSetTanneryProduct}
                 onSetDryingProduct={onSetDryingProduct}
                 onSetLivestockSpecies={onSetLivestockSpecies}
                 onSlaughterLivestock={onSlaughterLivestock}

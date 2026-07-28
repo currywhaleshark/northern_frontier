@@ -32,6 +32,7 @@ const constants = await import(pathToFileURL(join(compiledDir, 'constants.mjs'))
   ]);
   assert.deepEqual(catalog.FUEL_RESOURCES, ['brushwood', 'firewood', 'charcoal']);
   assert.deepEqual(catalog.CLOTHING_RESOURCES, ['hideClothes', 'cottonClothes']);
+  assert.deepEqual(catalog.FOOTWEAR_RESOURCES, ['strawShoes', 'leatherShoes']);
   assert.equal(catalog.RESOURCE_DEFS.rice.category, 'material');
   assert.equal(catalog.FOOD_RESOURCES.includes('rice'), false);
   assert.equal(constants.RESOURCE_NAMES.rice, '벼');
@@ -120,7 +121,9 @@ const constants = await import(pathToFileURL(join(compiledDir, 'constants.mjs'))
   const state = simulation.newGame(2026071007);
   state.resources.hideClothes = 2;
   state.resources.cottonClothes = 2;
-  assert.equal(consumption.clothingCoverageTotal(state), 4.2);
+  state.residents[0].worn = { clothing: { resource: 'hideClothes', wear: 0.2 } };
+  state.residents[1].worn = { clothing: { resource: 'cottonClothes', wear: 0.4 } };
+  assert.equal(consumption.clothingCoverageTotal(state), 1.85);
   consumption.consumeClothingWear(state, 1);
   assert.equal(state.resources.cottonClothes, 1);
   assert.equal(state.resources.hideClothes, 2);

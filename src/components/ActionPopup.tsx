@@ -1,3 +1,4 @@
+import { withJosa } from '../game/josa';
 import {
   BUILDING_DEFS, buildingCostFor, buildingFootprintDims, footprintTilesOf, getBuilding, isBuildingUnlocked,
   isSmithyProductUnlocked, SMITHY_PRODUCT_DEFS, SMITHY_PRODUCT_ORDER, smithyProductOf,
@@ -8,17 +9,19 @@ import { allowedCropsForBuilding, cropIdForBuilding, CROP_DEFS } from '../game/c
 import { edictSlotCapacity, edictSlotsUsed } from '../game/edicts';
 import { canRequestTrade, factionTradeUnlockReason } from '../game/events';
 import { DRYING_PRODUCT_DEFS, DRYING_PRODUCT_ORDER, dryingProductOf } from '../game/preservation';
+import { TANNERY_PRODUCT_DEFS, TANNERY_PRODUCT_ORDER, tanneryProductOf } from '../game/wearables';
 import {
   IMPLEMENTED_LIVESTOCK_IDS, LIVESTOCK_DEFS, normalizeLivestockState,
   plotPlowOxenMax, plowOxenAssigned, plowOxenOf, plowOxenPool,
 } from '../game/livestock';
 import { pastureTileCount, stableLivestockCapacity } from '../game/pastures';
+import { bedShare, LIFE_STAGE_NAMES } from '../game/lifecycle';
 import { getBuildingActions } from '../game/selectionActions';
 import { centerPromotionUpgradeReason, nextRank } from '../game/promotion';
 import {
   assignedSlotResidents, availableWorkerSlots, isResidentAvailableForWorkerSlot, workerSlotConfig, workerSlotCount,
 } from '../game/workerSlots';
-import type { BuildingTypeId, CropId, DryingProductId, GameState, LivestockId, ResourceId, SmithyProductId } from '../game/types';
+import type { BuildingTypeId, CropId, DryingProductId, GameState, LivestockId, ResourceId, SmithyProductId, TanneryProductId } from '../game/types';
 import { BuildingIcon } from './BuildingIcon';
 import { FactionName } from './FactionName';
 import { LivestockIcon } from './LivestockIcon';
@@ -33,6 +36,7 @@ interface Props {
   onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
   onUpgradeCenter: (buildingId: number) => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
+  onSetTanneryProduct: (buildingId: number, product: TanneryProductId) => void;
   onSetDryingProduct: (buildingId: number, product: DryingProductId) => void;
   onSetLivestockSpecies: (buildingId: number, species: LivestockId) => void;
   onSlaughterLivestock: (buildingId: number, amount: number) => void;
@@ -69,6 +73,7 @@ export function ActionPopup({
   onUpgradeHousing,
   onUpgradeCenter,
   onSetSmithyProduct,
+  onSetTanneryProduct,
   onSetDryingProduct,
   onSetLivestockSpecies,
   onSlaughterLivestock,
@@ -98,8 +103,9 @@ export function ActionPopup({
   const activeBuildingWork = Boolean(
     !building.built || building.repairing || building.expansion || building.workOrder,
   );
-  if (actions.length === 0 && !slotConfig && !centerTarget && !activeBuildingWork) return null;
-
+  // 예전에는 특별한 조작이 없는 건물(초가집처럼 슬롯도 액션도 없는 것)에서 아무것도
+  // 렌더하지 않아, 이전·해체 버튼까지 같이 사라졌다. 건물을 골랐으면 기본 정보와
+  // 버튼은 항상 보여 준다.
   const def = BUILDING_DEFS[building.type];
   const footprint = footprintTilesOf(state, building) ?? [];
   const maxX = Math.max(building.x, ...footprint.map(tile => tile.x));
@@ -118,6 +124,14 @@ export function ActionPopup({
   const plotDims = isCropBuilding ? buildingFootprintDims(building) : null;
   const plotAreaTiles = plotDims ? plotDims.w * plotDims.h : 0;
   const plotSown = isCropBuilding ? Math.min(plotAreaTiles, Math.max(0, Math.floor(building.sownArea ?? 0))) : 0;
+  // 주거 건물은 입주자 명단을 함께 보여 준다. 아이는 어른보다 자리를 덜 차지하므로
+  // 정원과 실제 인원이 어긋날 수 있어, 어긋날 때만 차지한 자리 수를 덧붙인다.
+  const occupants = def.capacity > 0
+    ? state.residents.filter(candidate => candidate.alive && candidate.homeBuildingId === building.id)
+    : null;
+  const occupantBeds = occupants
+    ? occupants.reduce((sum, occupant) => sum + bedShare(occupant), 0)
+    : 0;
 
   return (
     <div className={embedded ? 'selection-building-actions' : 'action-popup'} style={embedded ? undefined : style}>
@@ -141,7 +155,7 @@ export function ActionPopup({
             className="btn"
             type="button"
             disabled={centerReason != null}
-            title={centerReason ?? `${RANK_NAMES[centerTarget]}로 승격합니다`}
+            title={centerReason ?? `${withJosa(RANK_NAMES[centerTarget], '으로/로')} 승격합니다`}
             onClick={() => onUpgradeCenter(building.id)}
           >
             중심지 업그레이드
@@ -223,6 +237,43 @@ export function ActionPopup({
           </button>
         );
       })()}
+
+      {occupants && (
+        <div className="worker-slot-panel">
+          <div className="worker-slot-summary">
+            <span>입주자</span>
+            <span className="muted small">
+              {occupants.length}/{building.built ? def.capacity : 0}명
+              {occupantBeds > occupants.length ? ` · 자리 ${occupantBeds}` : ''}
+            </span>
+          </div>
+          {occupants.length === 0 && (
+            <div className="muted small">아직 아무도 살지 않습니다.</div>
+          )}
+          {occupants.map(occupant => (
+            <div className="worker-slot-row" key={occupant.id}>
+              <button
+                className="worker-slot-main"
+                type="button"
+                onClick={() => onSelectResident(occupant.id)}
+                title={`${occupant.name} 선택`}
+              >
+                <span
+                  className="worker-slot-dot"
+                  style={{ backgroundColor: JOB_COLORS[occupant.job] }}
+                />
+                <span className="worker-slot-text">
+                  <span className="worker-slot-name">{occupant.name}</span>
+                  <span className="muted small">
+                    {occupant.stage ? LIFE_STAGE_NAMES[occupant.stage] : JOB_NAMES[occupant.job]}
+                    {occupant.sick ? ' · 와병' : ''}
+                  </span>
+                </span>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {slotConfig && (
         <div className="worker-slot-panel">
@@ -418,6 +469,29 @@ export function ActionPopup({
                 disabled={!unlocked}
                 title={unlocked ? recipe : `${RANK_NAMES[productDef.minRank ?? 'bo']} 승격 후 생산`}
                 onClick={() => onSetSmithyProduct(building.id, product)}
+              >
+                {productDef.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {building.type === 'tannery' && (
+        <div className="action-grid" role="group" aria-label="무두장 생산 방식">
+          {TANNERY_PRODUCT_ORDER.map(product => {
+            const productDef = TANNERY_PRODUCT_DEFS[product];
+            const active = tanneryProductOf(building) === product;
+            const recipe = product === 'auto'
+              ? '옷과 신발의 부족분을 비교해 자동 생산'
+              : `가죽 ${productDef.hidePerUnit} → ${productDef.name} 1`;
+            return (
+              <button
+                key={product}
+                className={`action-chip${active ? ' active' : ''}`}
+                type="button"
+                title={recipe}
+                onClick={() => onSetTanneryProduct(building.id, product)}
               >
                 {productDef.name}
               </button>

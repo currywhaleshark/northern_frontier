@@ -1,4 +1,5 @@
 // 이벤트 로그, 교역 제안, 잡보(분위기) 이벤트
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { FACTIONS, FLAVOR_LOGS_CALM, FLAVOR_LOGS_TENSE, RESOURCE_NAMES } from './constants';
 import { countBuilt } from './buildings';
@@ -113,7 +114,7 @@ export function maybeOfferTrade(state: GameState, rng: () => number, daysSinceTr
     getAmt: 0,
     round: 0,
     margin: relationMargin(getRelation(state, faction.name)),
-    message: `${faction.name} 상단이 ${RESOURCE_NAMES[tpl.give]} ${tpl.giveAmt}을(를) 급히 구하러 왔습니다. 평소보다 후하게 쳐주겠다고 하니 받을 물품과 수량을 제시하십시오.`,
+    message: `${faction.name} 상단이 ${RESOURCE_NAMES[tpl.give]} ${withJosa(tpl.giveAmt, '을/를')} 급히 구하러 왔습니다. 평소보다 후하게 쳐주겠다고 하니 받을 물품과 수량을 제시하십시오.`,
   });
   return true;
 }
@@ -198,11 +199,11 @@ export function negotiateTrade(
     negotiation.round += 1;
     if (maxGetAmt < 1) {
       negotiation.phase = 'rejected';
-      negotiation.message = `${item.name}을(를) 내놓아도 받을 만한 몫이 나오지 않는다고 합니다.`;
+      negotiation.message = `${withJosa(item.name, '을/를')} 내놓아도 받을 만한 몫이 나오지 않는다고 합니다.`;
     } else if (getAmt <= maxGetAmt) {
       negotiation.phase = 'accepted';
       negotiation.getAmt = getAmt;
-      negotiation.message = `${item.name}을(를) 보자 상대가 바로 조건을 받아들입니다.`;
+      negotiation.message = `${withJosa(item.name, '을/를')} 보자 상대가 바로 조건을 받아들입니다.`;
     } else if (getAmt <= Math.ceil(maxGetAmt * CONFIG.trade.counterTolerance)) {
       negotiation.phase = 'countered';
       negotiation.message = `${item.name} 한 점이라면 ${RESOURCE_NAMES[get]} ${maxGetAmt}까지 내놓겠다고 합니다.`;
@@ -210,7 +211,7 @@ export function negotiateTrade(
       negotiation.phase = 'rejected';
       negotiation.getAmt = getAmt;
       negotiation.message = getAmt > capacity
-        ? `${RESOURCE_NAMES[get]}은(는) 이번 철 최대 ${capacity}까지만 교역할 수 있습니다.`
+        ? `${withJosa(RESOURCE_NAMES[get], '은/는')} 이번 철 최대 ${capacity}까지만 교역할 수 있습니다.`
         : `${item.name} 한 점으로는 요구한 수량을 맞출 수 없습니다.`;
     }
     updateTradeNegotiation(state, negotiation);
@@ -247,8 +248,8 @@ export function negotiateTrade(
     negotiation.round = nextRound;
     negotiation.margin = quote.margin;
     negotiation.message = improved
-      ? `${factionNameFor(negotiation)}이 조금 양보해 ${RESOURCE_NAMES[quote.give]} ${quote.giveAmt}을(를) 요구합니다.`
-      : `${factionNameFor(negotiation)}은(는) ${RESOURCE_NAMES[quote.give]} ${quote.giveAmt}을(를) 내놓으라고 요구합니다.`;
+      ? `${withJosa(factionNameFor(negotiation), '이/가')} 조금 양보해 ${RESOURCE_NAMES[quote.give]} ${withJosa(quote.giveAmt, '을/를')} 요구합니다.`
+      : `${withJosa(factionNameFor(negotiation), '은/는')} ${RESOURCE_NAMES[quote.give]} ${withJosa(quote.giveAmt, '을/를')} 내놓으라고 요구합니다.`;
     updateTradeNegotiation(state, negotiation);
     return null;
   }
@@ -310,7 +311,7 @@ function resolveInitiatedTrade(state: GameState, optionId: string): void {
       state.initiatedTradeDays = [...(state.initiatedTradeDays ?? []), state.day].slice(-20);
     }
     changeRelation(state, faction, CONFIG.relations.tradeAccept);
-    addLog(state, `장터에서 ${faction}과(와) ${RESOURCE_NAMES[quote.give]}을(를) ${RESOURCE_NAMES[quote.get]}(으)로 교환했습니다.`, 'trade');
+    addLog(state, `장터에서 ${withJosa(faction, '과/와')} ${withJosa(RESOURCE_NAMES[quote.give], '을/를')} ${withJosa(RESOURCE_NAMES[quote.get], '으로/로')} 교환했습니다.`, 'trade');
     acquireFirstLivestockFromTrade(state, faction);
   }
   state.pendingChoice = null;
@@ -339,12 +340,12 @@ export function resolveTrade(state: GameState, optionId: string): void {
         return;
       }
       if (specialItem && (state.specialItems[specialItem] ?? 0) < 1) {
-        negotiation.message = `${SPECIAL_ITEM_DEFS[specialItem].name}이(가) 기물함에 없습니다.`;
+        negotiation.message = `${withJosa(SPECIAL_ITEM_DEFS[specialItem].name, '이/가')} 기물함에 없습니다.`;
         updateTradeNegotiation(state, negotiation);
         return;
       }
       if (!specialItem && negotiation.give && (state.resources[negotiation.give] ?? 0) < negotiation.giveAmt) {
-        negotiation.message = `${RESOURCE_NAMES[negotiation.give]}이(가) 부족해 거래를 확정할 수 없습니다.`;
+        negotiation.message = `${withJosa(RESOURCE_NAMES[negotiation.give], '이/가')} 부족해 거래를 확정할 수 없습니다.`;
         updateTradeNegotiation(state, negotiation);
         return;
       }
@@ -362,8 +363,8 @@ export function resolveTrade(state: GameState, optionId: string): void {
       }
       addLog(
         state,
-        `${negotiation.faction}과(와) ${specialItem ? `${SPECIAL_ITEM_DEFS[specialItem].name} 1` : `${RESOURCE_NAMES[negotiation.give!]} ${negotiation.giveAmt}`}을(를) ` +
-          `${RESOURCE_NAMES[negotiation.get]} ${negotiation.getAmt}(으)로 교환했습니다.`,
+        `${withJosa(negotiation.faction, '과/와')} ${withJosa(specialItem ? `${SPECIAL_ITEM_DEFS[specialItem].name} 1` : `${RESOURCE_NAMES[negotiation.give!]} ${negotiation.giveAmt}`, '을/를')} ` +
+          `${RESOURCE_NAMES[negotiation.get]} ${withJosa(negotiation.getAmt, '으로/로')} 교환했습니다.`,
         'trade',
       );
       acquireFirstLivestockFromTrade(state, negotiation.faction);
@@ -375,7 +376,7 @@ export function resolveTrade(state: GameState, optionId: string): void {
         state.resources.reputation = Math.max(0, state.resources.reputation - 1);
         state.tradeRefusedDays = 10;
         changeRelation(state, negotiation.faction, CONFIG.relations.tradeDecline);
-        addLog(state, `${negotiation.faction}과(와)의 교역 협상이 결렬됐습니다. 국경의 공기가 서늘해집니다.`, 'trade');
+        addLog(state, `${withJosa(negotiation.faction, '과/와')}의 교역 협상이 결렬됐습니다. 국경의 공기가 서늘해집니다.`, 'trade');
       } else {
         addLog(state, `${negotiation.faction}에 보낸 교역 사절을 거두었습니다.`, 'info');
       }
@@ -395,7 +396,7 @@ export function resolveTrade(state: GameState, optionId: string): void {
     useFactionTradeCapacity(state, d.faction, d.get, d.getAmt);
     state.resources.reputation = Math.min(100, state.resources.reputation + 2);
     changeRelation(state, d.faction, CONFIG.relations.tradeAccept);
-    addLog(state, `장터에서 ${d.faction}과(와) ${RESOURCE_NAMES[d.give]}을(를) ${RESOURCE_NAMES[d.get]}(으)로 교환했습니다.`, 'trade');
+    addLog(state, `장터에서 ${withJosa(d.faction, '과/와')} ${withJosa(RESOURCE_NAMES[d.give], '을/를')} ${withJosa(RESOURCE_NAMES[d.get], '으로/로')} 교환했습니다.`, 'trade');
     acquireFirstLivestockFromTrade(state, d.faction);
   } else {
     state.resources.reputation = Math.max(0, state.resources.reputation - 1);

@@ -1,3 +1,4 @@
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { addLog } from './events';
 import {
@@ -136,7 +137,7 @@ export function updateFermentation(state: GameState): FermentationReport {
   if (report.completedJang > 0) {
     addLog(
       state,
-      `장 ${report.completedJang.toFixed(0)}이 익었습니다. 옹기 ${recoveredJangOnggi.toFixed(1)}개를 다시 쓸 수 있습니다.`,
+      `장 ${withJosa(report.completedJang.toFixed(0), '이/가')} 익었습니다. 옹기 ${recoveredJangOnggi.toFixed(1)}개를 다시 쓸 수 있습니다.`,
       'good',
       true,
     );
@@ -149,7 +150,7 @@ export function updateFermentation(state: GameState): FermentationReport {
     }
     addLog(
       state,
-      `김치 ${report.completedKimchi.toFixed(0)}이 익었습니다. 옹기 ${recoveredKimchiOnggi.toFixed(1)}개를 되찾고 주민 사기 +${morale.toFixed(1)}.`,
+      `김치 ${withJosa(report.completedKimchi.toFixed(0), '이/가')} 익었습니다. 옹기 ${recoveredKimchiOnggi.toFixed(1)}개를 되찾고 주민 사기 +${morale.toFixed(1)}.`,
       'good',
       true,
     );

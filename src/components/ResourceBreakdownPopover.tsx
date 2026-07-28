@@ -1,3 +1,4 @@
+import { withJosa } from '../game/josa';
 import type { StockResourceId } from '../ui/resourceDisplay';
 import { MAX_STARRED_RESOURCES } from '../ui/uiPrefs';
 import { ResourceIcon } from './TradeResourceIcon';
@@ -59,7 +60,7 @@ export function ResourceBreakdownPopover({
             {item.label}
           </span>
           <span className="resource-breakdown-actions">
-            <span>{item.amount.toFixed(1)}</span>
+            <span>{Math.floor(item.amount)}</span>
             {item.spoilagePerDay !== undefined && item.spoilagePerDay > 0 && (
               <small
                 className="muted"
@@ -73,7 +74,7 @@ export function ResourceBreakdownPopover({
                 ? `${item.label} 별표 해제`
                 : starLimitReached
                   ? `별표는 최대 ${MAX_STARRED_RESOURCES}개까지 표시할 수 있습니다`
-                  : `${item.label}을 상단바에 표시`}
+                  : `${withJosa(item.label, '을/를')} 상단바에 표시`}
               aria-label={item.starred ? `${item.label} 별표 해제` : `${item.label} 별표 추가`}
               aria-pressed={item.starred}
               disabled={!item.starred && starLimitReached}

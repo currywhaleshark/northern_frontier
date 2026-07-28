@@ -2,6 +2,7 @@
 // 시설은 상주 인력 없이도 기본 만족(신앙)을 준다. 네임드가 상주하면 결이 다른 부가 효과:
 // 무당 = 당집의 활력(사기 가산), 노승 = 상례 보정(사망 슬픔 완화·안장 위로).
 // 계획: docs/superpowers/plans/2026-07-17-satisfaction-religion.md (M3)
+import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { rankAtLeast } from './constants';
 import { addLog } from './events';
@@ -81,7 +82,7 @@ function openReligionChoice(state: GameState, person: ReligionPerson): void {
       {
         id: 'accept',
         label: person.acceptLabel,
-        desc: `${person.name}이(가) 주민이 되고 ${person.building} 건설이 열립니다. 종교는 순수한 만족 콘텐츠 — 조정의 눈총은 없습니다.`,
+        desc: `${withJosa(person.name, '이/가')} 주민이 되고 ${person.building} 건설이 열립니다. 종교는 순수한 만족 콘텐츠 — 조정의 눈총은 없습니다.`,
       },
       {
         id: 'decline',
@@ -91,7 +92,7 @@ function openReligionChoice(state: GameState, person: ReligionPerson): void {
     ],
     data: { special: person.special },
   };
-  addLog(state, `${person.name}이(가) 마을 어귀에 나타났습니다.`, 'info', true);
+  addLog(state, `${withJosa(person.name, '이/가')} 마을 어귀에 나타났습니다.`, 'info', true);
 }
 
 export function resolveReligionChoice(state: GameState, optionId: string): void {
@@ -104,7 +105,7 @@ export function resolveReligionChoice(state: GameState, optionId: string): void 
 
   if (optionId !== 'accept') {
     state.religionOfferCooldownUntil = state.day + r.declineRetryDays;
-    addLog(state, `${person.name}이(가) 조용히 발길을 돌렸습니다. 인연이 있으면 다시 올 것입니다.`, 'info');
+    addLog(state, `${withJosa(person.name, '이/가')} 조용히 발길을 돌렸습니다. 인연이 있으면 다시 올 것입니다.`, 'info');
     return;
   }
 
@@ -121,7 +122,7 @@ export function resolveReligionChoice(state: GameState, optionId: string): void 
   state.religionOfferCooldownUntil = state.day + r.declineRetryDays;
   addLog(
     state,
-    `${person.name}이(가) 마을 사람이 되었습니다. 이제 ${person.building}을 지을 수 있습니다.`,
+    `${withJosa(person.name, '이/가')} 마을 사람이 되었습니다. 이제 ${withJosa(person.building, '을/를')} 지을 수 있습니다.`,
     'good',
     true,
   );
