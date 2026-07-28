@@ -7,6 +7,7 @@ import {
 import type { Building, GameState } from '../game/types';
 import { selectOxPlowFarmerIds } from './residentFarmerAssets';
 import { residentWorkStances, type ResidentWorkStance } from './residentWorkLayout';
+import { workAnchor } from './spriteStudioRegistries';
 
 export interface ResidentPresentationSnapshot {
   buildingById: ReadonlyMap<number, Building>;
@@ -44,7 +45,13 @@ export function buildResidentPresentationSnapshot(state: GameState): ResidentPre
     buildingById,
     indoorResidentIds,
     workplaceActiveCountByBuilding,
-    workStances: residentWorkStances(state.residents, CONFIG.ui.tileSize, indoorResidentIds),
+    workStances: residentWorkStances(
+      state.residents,
+      CONFIG.ui.tileSize,
+      indoorResidentIds,
+      (x, y) => state.map?.[y]?.[x]?.terrain,
+      workAnchor,
+    ),
     oxPlowFarmerIds: selectOxPlowFarmerIds(state.buildings, state.residents),
   };
 }
