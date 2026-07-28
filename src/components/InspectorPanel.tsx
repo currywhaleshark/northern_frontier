@@ -1,6 +1,7 @@
 // 지도 선택 정보와 분리된 전역 사건·기물함 관리 창.
 import { availablePredatorScouts, predatorScoutDuration } from '../game/expeditionIntel';
 import { SPECIAL_ITEM_DEFS } from '../game/specialItems';
+import { isUsableSpecialItem } from '../game/specialItemActions';
 import { predatorHuntChance } from '../game/specialEvents';
 import type { GameState, SpecialItemId, WildlifeKind } from '../game/types';
 import { UiIcon } from './UiIcon';
@@ -9,9 +10,10 @@ interface Props {
   state: GameState;
   onOrganizeHunt: (kind: WildlifeKind) => void;
   onScoutPredator: (kind: 'wolf' | 'tiger', residentId: number) => void;
+  onUseSpecialItem: (item: SpecialItemId) => void;
 }
 
-export function InspectorPanel({ state, onOrganizeHunt, onScoutPredator }: Props) {
+export function InspectorPanel({ state, onOrganizeHunt, onScoutPredator, onUseSpecialItem }: Props) {
   const threats = (['wolf', 'tiger', 'boar'] as const)
     .map(kind => state.incidents.predatorThreats[kind])
     .filter(threat => threat != null);
@@ -122,6 +124,11 @@ export function InspectorPanel({ state, onOrganizeHunt, onScoutPredator }: Props
               <span className="muted small">{def.inventoryNote}</span>
             </div>
             <b>{state.specialItems[item]}</b>
+            {isUsableSpecialItem(item) && state.specialItems[item] > 0 && (
+              <button className="btn small" type="button" onClick={() => onUseSpecialItem(item)}>
+                사용
+              </button>
+            )}
           </div>
         );
       })}

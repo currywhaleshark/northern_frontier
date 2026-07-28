@@ -56,6 +56,72 @@ function arrivalForecast(state: GameState, count: number) {
   };
 }
 
+interface ImmigrationParty {
+  count: number;
+  children: number;
+  elders: number;
+  story: typeof IMMIGRATION_STORIES[number];
+}
+
+function createImmigrationParty(rng: () => number): ImmigrationParty {
+  const im = CONFIG.immigration;
+  const count = im.groupMin + Math.floor(rng() * (im.groupMax - im.groupMin + 1));
+  // 가족 구성 — 홀몸만 오지 않는다. 아이·노부모가 섞이면 즉시 전력은 줄지만 뿌리가 내린다.
+  const l = CONFIG.lifecycle;
+  const children = count >= 3 && rng() < l.immigrantChildChance ? 1 : 0;
+  const elders = count - children >= 2 && rng() < l.immigrantElderChance ? 1 : 0;
+  const story = IMMIGRATION_STORIES[Math.floor(rng() * IMMIGRATION_STORIES.length)];
+  return { count, children, elders, story };
+}
+
+function openImmigrationChoice(
+  state: GameState,
+  party: ImmigrationParty,
+  options: { granted: boolean; setCooldown: boolean },
+): boolean {
+  const living = livingResidents(state);
+  if (living.length === 0) return false;
+  const { count, children, elders, story } = party;
+  const compositionLabel = children + elders > 0
+    ? ` (장정 ${count - children - elders}, ${[children > 0 ? `아이 ${children}` : '', elders > 0 ? `노부모 ${elders}` : ''].filter(Boolean).join(', ')})`
+    : '';
+  const forecast = arrivalForecast(state, count);
+
+  state.pendingChoice = {
+    kind: 'immigration',
+    title: options.granted ? '조정의 모민 방문' : story.title,
+    illustration: {
+      src: '/assets/events/immigration-arrival-v2.png',
+      alt: '성책 앞에서 받아들여 달라고 청하는 유민들',
+    },
+    body:
+      (options.granted
+        ? `조정의 모민 방문을 받은 한 가구가 개척지의 성책 앞에 도착했습니다. ${story.body}`
+        : story.body) + '\n\n' +
+      `일행: ${count}명${compositionLabel}\n` +
+      `현재 주거: ${living.length}명 / ${forecast.housing.total}명 수용 (빈자리 ${forecast.freeBeds}명)\n` +
+      `수용 후: ${forecast.afterPopulation}명 / ${forecast.housing.total}명 수용` +
+      (forecast.afterHomeless > 0 ? ` · 노숙 ${forecast.afterHomeless}명 예상\n` : ' · 전원 입주 가능\n') +
+      `현재 식량: ${Math.floor(forecast.currentFood)} · 현재 인구 기준 약 ${forecast.currentFoodDays.toFixed(1)}일분\n` +
+      `수용 후 식량 여유: 약 ${forecast.afterFoodDays.toFixed(1)}일분`,
+    options: [
+      {
+        id: 'accept',
+        label: '받아들인다',
+        desc: `인구 +${count}. ${forecast.afterHomeless > 0 ? `노숙 ${forecast.afterHomeless}명 발생.` : '전원 입주 가능.'} 식량은 약 ${forecast.afterFoodDays.toFixed(1)}일분이 됩니다.`,
+      },
+      {
+        id: 'reject',
+        label: '돌려보낸다',
+        desc: options.granted ? '인구 변화 없음. 조정의 모민 방문을 정중히 사양합니다.' : `인구 변화 없음. 명성 -${CONFIG.immigration.rejectReputation}.`,
+      },
+    ],
+    data: { count, children, elders, ...(options.granted ? { granted: true } : {}) },
+  };
+  if (options.setCooldown) state.lastImmigrationDay = state.day;
+  return true;
+}
+
 export function openDefectorImmigrationChoice(
   state: GameState,
   origin: string,
@@ -127,50 +193,14 @@ export function maybeOfferImmigration(state: GameState, rng: () => number): bool
   if (state.day - lastDay < im.cooldownDays) return false;
   if (rng() >= Math.min(1, im.dailyChance * rankEffects(state.rank).immigration)) return false;
 
-  const living = livingResidents(state);
-  if (living.length === 0) return false;
-  const count = im.groupMin + Math.floor(rng() * (im.groupMax - im.groupMin + 1));
-  // 가족 구성 — 홀몸만 오지 않는다. 아이·노부모가 섞이면 즉시 전력은 줄지만 뿌리가 내린다.
-  const l = CONFIG.lifecycle;
-  const children = count >= 3 && rng() < l.immigrantChildChance ? 1 : 0;
-  const elders = count - children >= 2 && rng() < l.immigrantElderChance ? 1 : 0;
-  const compositionLabel = children + elders > 0
-    ? ` (장정 ${count - children - elders}, ${[children > 0 ? `아이 ${children}` : '', elders > 0 ? `노부모 ${elders}` : ''].filter(Boolean).join(', ')})`
-    : '';
-  const story = IMMIGRATION_STORIES[Math.floor(rng() * IMMIGRATION_STORIES.length)];
-  const forecast = arrivalForecast(state, count);
+  return openImmigrationChoice(state, createImmigrationParty(rng), { granted: false, setCooldown: true });
+}
 
-  state.pendingChoice = {
-    kind: 'immigration',
-    title: story.title,
-    illustration: {
-      src: '/assets/events/immigration-arrival-v2.png',
-      alt: '성책 앞에서 받아들여 달라고 청하는 유민들',
-    },
-    body:
-      `${story.body}\n\n` +
-      `일행: ${count}명${compositionLabel}\n` +
-      `현재 주거: ${living.length}명 / ${forecast.housing.total}명 수용 (빈자리 ${forecast.freeBeds}명)\n` +
-      `수용 후: ${forecast.afterPopulation}명 / ${forecast.housing.total}명 수용` +
-      (forecast.afterHomeless > 0 ? ` · 노숙 ${forecast.afterHomeless}명 예상\n` : ' · 전원 입주 가능\n') +
-      `현재 식량: ${Math.floor(forecast.currentFood)} · 현재 인구 기준 약 ${forecast.currentFoodDays.toFixed(1)}일분\n` +
-      `수용 후 식량 여유: 약 ${forecast.afterFoodDays.toFixed(1)}일분`,
-    options: [
-      {
-        id: 'accept',
-        label: '받아들인다',
-        desc: `인구 +${count}. ${forecast.afterHomeless > 0 ? `노숙 ${forecast.afterHomeless}명 발생.` : '전원 입주 가능.'} 식량은 약 ${forecast.afterFoodDays.toFixed(1)}일분이 됩니다.`,
-      },
-      {
-        id: 'reject',
-        label: '돌려보낸다',
-        desc: `인구 변화 없음. 명성 -${im.rejectReputation}.`,
-      },
-    ],
-    data: { count, children, elders },
-  };
-  state.lastImmigrationDay = state.day;
-  return true;
+/** 하사 모민 방문은 계절·확률·일일 이민 쿨다운과 무관하되, 모달/전투/패배 상태는 막는다. */
+export function openGrantedImmigrationChoice(state: GameState): boolean {
+  if (state.pendingChoice || state.battle || state.gameOver) return false;
+  const rng = makeRng(state.seed + state.day * 15485863 + 97);
+  return openImmigrationChoice(state, createImmigrationParty(rng), { granted: true, setCooldown: false });
 }
 
 export function resolveImmigration(state: GameState, optionId: string): void {
@@ -236,6 +266,10 @@ export function resolveImmigration(state: GameState, optionId: string): void {
   }
 
   if (optionId === 'reject') {
+    if (choice.data.granted === true) {
+      addLog(state, '조정의 모민 방문을 정중히 사양했습니다.', 'info', true);
+      return;
+    }
     if (origin) {
       changeRelation(state, origin, -CONFIG.defectors.rejectRelation);
       if (sourceSite) {

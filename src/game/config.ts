@@ -1122,6 +1122,7 @@ export const CONFIG = {
     artifactPityMisses: 4,
     artifactRngYearSalt: 17107,
     artifactRngSeedOffset: 43,
+    reliefGrainVoucherAmount: 48,
   },
 
   // 생애 주기 — 압축 성장(총 2.5게임년) + 나이별 소비 몫 + 노년·자연사.
