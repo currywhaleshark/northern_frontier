@@ -18,6 +18,7 @@ import { getSeason } from './seasons';
 import { warmthLossWeatherMult } from './weather';
 import { releaseResidentMount } from './weapons';
 import { canResidentTakeJob } from './youth';
+import { residentColdProtection } from './wearables';
 import type { Building, GameState, Gender, JobId, Resident, Tile } from './types';
 
 export function rollResidentGender(rng: () => number): Gender {
@@ -343,7 +344,7 @@ export function updateResidentNeeds(
   rng: () => number,
   fedRatio: number,        // 0~1, 식량이 부족하면 1 미만
   firewoodRatio: number,   // 0~1, 장작 충족률
-  clothesCoverage: number, // 0~1, 옷 보급률
+  _clothesCoverage: number, // 구 호출부 호환용. 실제 보온은 개인 착용품으로 계산한다.
   dietVarietyScore: number, // 0~1, 그날 먹은 식품군 다양성
   vegetableRatio: number,   // 0~1, 권장 채소 몫 충족률
   excludedResidentIds: ReadonlySet<number> = new Set(),
@@ -370,6 +371,7 @@ export function updateResidentNeeds(
     if (season === 'spring' || season === 'summer') {
       r.warmth = Math.min(100, r.warmth + cfg.warmthRegenWarmSeason);
     } else {
+      const clothesCoverage = residentColdProtection(r);
       let loss = season === 'winter' ? cfg.warmthLossWinterBase : cfg.warmthLossWinterBase * 0.35;
       loss *= warmthLossWeatherMult(state.weather);
       loss *= 1 + (1 - clothesCoverage) * cfg.noClothesLossMult;

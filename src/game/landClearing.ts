@@ -8,7 +8,7 @@ import { CONFIG } from './config';
 import type { Building, BuildingDef, BuildingTypeId, GameState, Resident, Tile } from './types';
 
 /** 벌목한 자리는 평지가 된다 — 평지에 지을 수 있는 건물만 나무를 끼고 지정할 수 있다.
- *  논은 비옥지+강가라야 하고, 강·바위·물레방아 자리는 애초에 숲과 무관하다. */
+ *  논은 평지·비옥지 중 영역 한 칸 이상이 강가에 닿아야 하고, 숲은 먼저 밭으로 개간한다. */
 export function acceptsClearedLand(def: BuildingDef): boolean {
   return def.placement === 'land' || def.placement === 'field';
 }

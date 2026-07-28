@@ -33,12 +33,14 @@ import type {
   ResourceId,
   SelectedEntity,
   SmithyProductId,
+  TanneryProductId,
   YouthActivity,
 } from '../game/types';
 import { ActionPopup } from './ActionPopup';
 import { BuildingIcon } from './BuildingIcon';
 import { ForeignSitePanel } from './ForeignSitePanel';
 import { LivestockIcon } from './LivestockIcon';
+import { ResourceIcon } from './TradeResourceIcon';
 import { UiIcon } from './UiIcon';
 
 interface Props {
@@ -52,6 +54,7 @@ interface Props {
   onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
   onUpgradeCenter: (buildingId: number) => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
+  onSetTanneryProduct: (buildingId: number, product: TanneryProductId) => void;
   onSetDryingProduct: (buildingId: number, product: DryingProductId) => void;
   onSetLivestockSpecies: (buildingId: number, species: LivestockId) => void;
   onSlaughterLivestock: (buildingId: number, amount: number) => void;
@@ -204,6 +207,37 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
             </td>
           </tr>
         )}
+        {resident.alive && (
+          <tr>
+            <td>착용품</td>
+            <td>
+              <div className="wearable-slots" aria-label="주민 착용품">
+                {([
+                  ['clothing', '의복'],
+                  ['footwear', '신발'],
+                ] as const).map(([slot, label]) => {
+                  const item = resident.worn?.[slot];
+                  const title = item
+                    ? `${RESOURCE_NAMES[item.resource]} · 내구도 ${Math.max(0, Math.floor((1 - item.wear) * 100))}%`
+                    : `${label} 미착용`;
+                  return (
+                    <div
+                      key={slot}
+                      className={`wearable-slot${item ? ' equipped' : ' empty'}`}
+                      title={title}
+                      aria-label={title}
+                    >
+                      <span className="wearable-slot-label">{label}</span>
+                      <span className="wearable-slot-icon">
+                        {item && <ResourceIcon resource={item.resource} size={36} />}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </td>
+          </tr>
+        )}
         {resident.alive && (resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter') && (
           <>
             <tr>
@@ -255,6 +289,7 @@ export function SelectionContextBar({
   onUpgradeHousing,
   onUpgradeCenter,
   onSetSmithyProduct,
+  onSetTanneryProduct,
   onSetDryingProduct,
   onSetLivestockSpecies,
   onSlaughterLivestock,
@@ -553,6 +588,7 @@ export function SelectionContextBar({
                 onUpgradeHousing={onUpgradeHousing}
                 onUpgradeCenter={onUpgradeCenter}
                 onSetSmithyProduct={onSetSmithyProduct}
+                onSetTanneryProduct={onSetTanneryProduct}
                 onSetDryingProduct={onSetDryingProduct}
                 onSetLivestockSpecies={onSetLivestockSpecies}
                 onSlaughterLivestock={onSlaughterLivestock}

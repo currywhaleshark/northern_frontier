@@ -70,6 +70,7 @@ export type JobId =
 export type CombatWeaponId = 'musket' | 'hornBow' | 'spear';
 export type MountId = 'horse';
 export type WeaponAllocationMode = 'auto' | 'manual';
+export type HuntPreyId = 'rabbit' | 'pheasant' | 'roeDeer' | 'wildBoar';
 
 export type ResourceId =
   | 'grain'      // 먹을 수 있는 곡물(밭 수확물 + 도정한 벼)
@@ -97,6 +98,8 @@ export type ResourceId =
   | 'carts'      // 운반꾼이 장비하는 수레
   | 'hide'       // 가죽
   | 'hideClothes' // 가죽옷
+  | 'strawShoes' // 짚신
+  | 'leatherShoes' // 가죽신
   | 'cotton'     // 목화
   | 'wool'       // 양털
   | 'hay'        // 건초 (초식 가축의 겨울 사료)
@@ -116,6 +119,13 @@ export type ResourceId =
   | 'defense';   // 방어도
 
 export type SmithyProductId = 'tools' | 'carts' | 'spears' | 'hornBows' | 'muskets' | 'silverwork';
+export type TanneryProductId = 'auto' | 'hideClothes' | 'leatherShoes';
+export type WearableSlot = 'clothing' | 'footwear';
+
+export interface WornItem {
+  resource: Extract<ResourceId, 'hideClothes' | 'cottonClothes' | 'strawShoes' | 'leatherShoes'>;
+  wear: number; // 0(새것) ~ 1(수명 종료)
+}
 
 export type DryingProductId = 'saltedFish' | 'driedFish';
 
@@ -395,6 +405,10 @@ export interface Resident {
   alive: boolean;
   sick: boolean;
   quarantinedUntil?: number; // 이 날까지 격리되어 배정은 유지하지만 일을 하지 못한다
+  worn?: Partial<Record<WearableSlot, WornItem>>; // 사망·이탈 시 창고로 회수하지 않는다.
+  lastWearableCheckDay?: number; // 새벽 자율 수령 중복 방지
+  lastStrawShoeCraftDay?: number; // 저녁 짚신 생산 중복 방지
+  lastHuntPrey?: HuntPreyId; // 사냥 성공 후 운반 중인 사냥감 표시
   // ── 에이전트 상태 (지도 위 이동/작업/운반) ──
   x: number;
   y: number;
@@ -459,6 +473,7 @@ export interface Building {
   cropId?: CropId | null; // 밭/논 전용: 현재 선택/재배 작물
   queuedCropId?: CropId | null; // 밭/논 전용: 수확 뒤 또는 다음 파종철에 적용할 작물
   smithyProduct?: SmithyProductId; // 대장간 전용: 현재 생산품
+  tanneryProduct?: TanneryProductId; // 무두장 전용: 자동/가죽옷/가죽신
   dryingProduct?: DryingProductId; // 건조대 전용: 현재 생산품
   fermentBatches?: FermentBatch[]; // 장독대 전용: 절대일 기준 숙성 배치
   livestock?: LivestockState; // 축사 전용: 축종·마릿수·번식·사료 부족 상태

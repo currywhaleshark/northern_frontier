@@ -148,7 +148,7 @@ export const COMMON_TRADE_RESOURCES: ResourceId[] = [
   'grain', 'rice', 'meat', 'fish', 'vegetables',
   'brushwood', 'firewood', 'charcoal',
   'wood', 'stone', 'iron', 'tools', 'hide', 'herbs',
-  'hideClothes', 'cotton', 'cottonClothes',
+  'hideClothes', 'cotton', 'cottonClothes', 'strawShoes', 'leatherShoes',
 ];
 
 export const FACTIONS: Faction[] = [

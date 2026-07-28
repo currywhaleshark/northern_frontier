@@ -5,7 +5,7 @@ import { CONFIG } from './game/config';
 import {
   assignNearestWorkerToBuilding, assignResidentToBuilding,
   advanceDay, advanceTick, autoAssignWorkersToBuildingTypes, cancelBuildingConstruction, continueAfterVictory, newGame, reassignJob, resolveChoice, setResidentJob,
-  setBuildingCrop, setDryingProduct, setSmithyProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
+  setBuildingCrop, setDryingProduct, setSmithyProduct, setTanneryProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
   assignPlotPlowOxen, defineStablePasture, expandAreaBuilding, setLivestockSpecies, slaughterLivestock,
   buildingHasActiveWork, convertFieldToPaddy, setYouthActivity, startBuildingDemolition,
   startBuildingRelocation, togglePriorityBuilding, toggleResidentCart,
@@ -74,7 +74,7 @@ import {
 } from './game/tacticalBattle';
 import { mergeHuntGroups, setHuntPreparationZone, splitHuntGroup } from './game/tacticalHunt';
 import type {
-  BuildingTypeId, CombatWeaponId, CropId, DryingProductId, EdictId, EdictLevel, GameState, JobId, LivestockId, LogEntry, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId, YouthActivity,
+  BuildingTypeId, CombatWeaponId, CropId, DryingProductId, EdictId, EdictLevel, GameState, JobId, LivestockId, LogEntry, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId, TanneryProductId, YouthActivity,
   PreparationActionId, PredatorKind, SpecialItemId, SpecialResidentId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
 import { markScenarioFlag } from './game/scenario';
@@ -169,7 +169,7 @@ function RuntimeGameEffects({
     if (state.log.length > m.logLen) {
       for (const e of state.log.slice(m.logLen).slice(-3)) {
         if (e.kind === 'good') {
-          if (e.text.includes('노루')) playSfx('hunt');
+          if (['토끼', '꿩', '노루', '멧돼지'].some(prey => e.text.includes(prey))) playSfx('hunt');
           else if (e.text.includes('회복')) playSfx('heal');
           else if (e.text.includes('이주민')) playSfx('welcome');
           else playSfx('good');
@@ -437,6 +437,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       build: (type: BuildingTypeId, x: number, y: number) => tryPlaceBuilding(stateRef.current, type, x, y),
       job: (from: JobId, to: JobId) => reassignJob(stateRef.current, from, to),
       smithy: (id: number, product: SmithyProductId) => setSmithyProduct(stateRef.current, id, product),
+      tannery: (id: number, product: TanneryProductId) => setTanneryProduct(stateRef.current, id, product),
       drying: (id: number, product: DryingProductId) => setDryingProduct(stateRef.current, id, product),
       livestock: (id: number, species: LivestockId) => setLivestockSpecies(stateRef.current, id, species),
       slaughter: (id: number, amount = 1) => slaughterLivestock(stateRef.current, id, amount),
@@ -760,6 +761,12 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const handleSetSmithyProduct = (buildingId: number, product: SmithyProductId) => {
     const err = setSmithyProduct(stateRef.current, buildingId, product);
+    if (err) notify(err, 'info');
+    bump();
+  };
+
+  const handleSetTanneryProduct = (buildingId: number, product: TanneryProductId) => {
+    const err = setTanneryProduct(stateRef.current, buildingId, product);
     if (err) notify(err, 'info');
     bump();
   };
@@ -1422,6 +1429,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               onUpgradeHousing={handleUpgradeHousing}
               onUpgradeCenter={handleUpgradeCenter}
               onSetSmithyProduct={handleSetSmithyProduct}
+              onSetTanneryProduct={handleSetTanneryProduct}
               onSetDryingProduct={handleSetDryingProduct}
               onSetLivestockSpecies={handleSetLivestockSpecies}
               onSlaughterLivestock={handleSlaughterLivestock}

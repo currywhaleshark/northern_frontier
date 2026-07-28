@@ -8,7 +8,7 @@ import {
   BUILDING_DEFS, buildingCostFor, buildingFootprintTiles, canAfford, canAffordCost,
   buildingFootprintDims, cannonPlacementsUsed, canPlaceBuildingAt, canPlaceOn, canRelocateBuildingAt, clampPlotSide,
   clearBuildingTiles, computeDefense, getBuilding, isBuildingUnlocked,
-  footprintTilesOf, isAreaBuildingType, isPaddyEligibleTile, isPlotBuildingType, isSmithyProductUnlocked,
+  footprintTilesOf, isAreaBuildingType, isPaddyFootprintEligible, isPlotBuildingType, isSmithyProductUnlocked,
   occupyBuildingTiles, plotArea, SMITHY_PRODUCT_DEFS,
 } from './buildings';
 import { forestTilesInArea, forestTilesInFootprint, pendingClearingTiles } from './landClearing';
@@ -40,8 +40,9 @@ import {
   canPlantCropNow, cropIdForBuilding, CROP_DEFS, defaultCropForBuildingType, isCropAllowedOnBuilding,
 } from './crops';
 import {
-  clothingCoverageTotal, consumeClothingWear, consumeFoodByDiet, consumeFuelHeat, foodTotal,
+  clothingCoverageTotal, consumeFoodByDiet, consumeFuelHeat, foodTotal,
 } from './consumption';
+import { TANNERY_PRODUCT_DEFS, wearablesDailyTick } from './wearables';
 import { edictFoodRationMultiplier, edictFuelRationMultiplier } from './edicts';
 import { getPointerAction } from './selectionActions';
 import { createExploration, isBuildingFootprintExplored, isExplored, refreshExploration } from './exploration';
@@ -87,7 +88,7 @@ import {
 } from './workerSlots';
 import type { AutoAssignBuildingType } from './workerSlots';
 import type {
-  Building, BuildingTypeId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId, PastureArea, PointerAction, Resident, ResourceId, Season, SmithyProductId, YouthActivity,
+  Building, BuildingTypeId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId, PastureArea, PointerAction, Resident, ResourceId, Season, SmithyProductId, TanneryProductId, YouthActivity,
 } from './types';
 
 // ─────────────────────────── 새 게임 ───────────────────────────
@@ -356,6 +357,7 @@ export function tryPlaceBuilding(
     b.plowOxen = 0;
   }
   if (type === 'smithy') b.smithyProduct = 'tools';
+  if (type === 'tannery') b.tanneryProduct = 'auto';
   if (type === 'dryingRack') b.dryingProduct = 'saltedFish';
   if (type === 'jangdokdae') b.fermentBatches = [];
   if (type === 'stable') b.livestock = createDefaultLivestockState();
@@ -723,10 +725,10 @@ export function convertFieldToPaddy(state: GameState, buildingId: number): strin
   if (!building.built) return '완공된 밭만 논으로 전환할 수 있습니다.';
   const def = BUILDING_DEFS.paddy;
   if (!isBuildingUnlocked(state.rank, 'paddy')) return `${RANK_NAMES[def.minRank ?? 'bo']} 승격 후 논을 만들 수 있습니다.`;
-  // 다칸 밭은 모든 칸이 강가 비옥지여야 논이 될 수 있다
+  // 다칸 밭은 평지·비옥지로 이루어지고, 영역 중 한 칸만 강물에 닿으면 논이 될 수 있다.
   const footprint = footprintTilesOf(state, building) ?? [];
-  if (footprint.length === 0 || !footprint.every(tile => isPaddyEligibleTile(state, tile))) {
-    return '논은 강가의 비옥한 땅에만 만들 수 있습니다.';
+  if (!isPaddyFootprintEligible(state, footprint)) {
+    return '논 영역 중 한 칸 이상이 강물에 맞닿아야 합니다.';
   }
   const cost = buildingCostFor('paddy', building.w ?? 1, building.h ?? 1);
   if (!canAffordCost(state, cost)) return '자원이 부족합니다.';
@@ -849,6 +851,16 @@ export function expandAreaBuilding(
     if (error) return error;
   } else {
     const def = BUILDING_DEFS[building.type];
+    const targetTiles = [];
+    for (let ty = target.y; ty < target.y + target.h; ty++) {
+      for (let tx = target.x; tx < target.x + target.w; tx++) {
+        const tile = state.map[ty]?.[tx];
+        if (tile) targetTiles.push(tile);
+      }
+    }
+    if (building.type === 'paddy' && !isPaddyFootprintEligible(state, targetTiles)) {
+      return '논 영역 중 한 칸 이상이 강물에 맞닿아야 합니다.';
+    }
     for (let ty = target.y; ty < target.y + target.h; ty++) {
       for (let tx = target.x; tx < target.x + target.w; tx++) {
         const tile = state.map[ty]?.[tx];
@@ -1154,6 +1166,7 @@ function endOfDay(state: GameState): void {
   updateHabitats(state);
   runToolWear(state);
   runConsumptionAndNeeds(state, rng);
+  wearablesDailyTick(state);
   dailyEducationTick(state); // 취학 아동의 글공부 누적 (성인 전환 판정보다 먼저)
   lifecycleDailyTick(state, rng); // 성장·노화·혼인·출산·장례 (소비/체온 갱신 뒤)
   updateLivestock(state);
@@ -1349,6 +1362,19 @@ export function dailyToolWear(state: GameState): number {
   return wearUnits * CONFIG.production.toolWearPerWorker;
 }
 
+export function setTanneryProduct(
+  state: GameState,
+  buildingId: number,
+  product: TanneryProductId,
+): string | null {
+  const building = state.buildings.find(candidate => candidate.id === buildingId);
+  if (!building || building.type !== 'tannery') return '무두장을 찾을 수 없습니다.';
+  if (!Object.prototype.hasOwnProperty.call(TANNERY_PRODUCT_DEFS, product)) return '알 수 없는 생산품입니다.';
+  building.tanneryProduct = product;
+  addLog(state, `무두장 생산 방식을 ${withJosa(TANNERY_PRODUCT_DEFS[product].name, '으로/로')} 바꿨습니다.`, 'info');
+  return null;
+}
+
 function runToolWear(state: GameState): void {
   state.resources.tools = Math.max(0, state.resources.tools - dailyToolWear(state));
 }
@@ -1379,11 +1405,8 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
   const firewoodRatio = fwNeed > 0 ? Math.min(1, heatProvided / fwNeed) : 1;
   const fuelShortage = heatProvided < rationedFwNeed - 0.000001;
 
-  // 옷
+  // 실제 착용 중인 옷의 보급률. 마모는 개인별 일일 처리에서 적용한다.
   const clothesCoverage = Math.min(1, clothingCoverageTotal(state) / Math.max(1, weight));
-  if (season === 'winter') {
-    consumeClothingWear(state, weight * cfg.clothesWearWinter);
-  }
 
   const rng2 = makeRng(state.seed + state.day * 104729);
   updateResidentNeeds(

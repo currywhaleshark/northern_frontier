@@ -9,7 +9,7 @@ import { CONFIG } from '../game/config';
 import {
   armedMusketeers, BUILDING_DEFS, buildingCostFor, buildingFootprintDims, buildingFootprintSize,
   canAfford, canAffordCost, canPlaceBuildingAt, canPlaceOn, canRelocateBuildingAt,
-  isAreaBuildingType, isPlotBuildingType,
+  isAreaBuildingType, isPaddyFootprintEligible, isPlotBuildingType,
 } from '../game/buildings';
 import { COLLAPSE_RATIO } from '../game/battles';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
@@ -1903,13 +1903,18 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   if (o.areaExpansion) {
     const { buildingId, type, rect } = o.areaExpansion;
     const def = BUILDING_DEFS[type];
+    const rectTiles = Array.from({ length: rect.h }, (_, dy) =>
+      Array.from({ length: rect.w }, (__, dx) => state.map[rect.y + dy]?.[rect.x + dx]),
+    ).flat().filter(tile => tile != null);
+    const paddyAreaValid = type !== 'paddy' ||
+      (rectTiles.length === rect.w * rect.h && isPaddyFootprintEligible(state, rectTiles));
     for (let dy = 0; dy < rect.h; dy++) {
       for (let dx = 0; dx < rect.w; dx++) {
         const tx = rect.x + dx;
         const ty = rect.y + dy;
         const tile = state.map[ty]?.[tx];
         const ownTile = tile?.buildingId === buildingId;
-        const ok = !!tile && isExplored(state, tx, ty) &&
+        const ok = paddyAreaValid && !!tile && isExplored(state, tx, ty) &&
           (ownTile || (canPlaceOn(def, tile, state) && !foreignSiteAt(state, tx, ty)));
         // 벨 나무가 선 칸은 "지을 수는 있으나 먼저 개간해야 하는 칸"으로 따로 칠한다
         const needsClearing = ok && !ownTile && acceptsClearedLand(def) && tile!.terrain === 'forest';
@@ -1927,7 +1932,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
         }
       }
     }
-    ctx.strokeStyle = 'rgba(255,214,90,0.95)';
+    ctx.strokeStyle = paddyAreaValid ? 'rgba(255,214,90,0.95)' : 'rgba(245,145,125,0.95)';
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 3]);
     ctx.strokeRect(rect.x * TILE + 1, rect.y * TILE + 1, rect.w * TILE - 2, rect.h * TILE - 2);
@@ -1938,12 +1943,17 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     const def = BUILDING_DEFS[o.placingType];
     const rect = o.placingRect;
     const affordable = canAffordCost(state, buildingCostFor(o.placingType, rect.w, rect.h));
+    const rectTiles = Array.from({ length: rect.h }, (_, dy) =>
+      Array.from({ length: rect.w }, (__, dx) => state.map[rect.y + dy]?.[rect.x + dx]),
+    ).flat().filter(tile => tile != null);
+    const paddyAreaValid = o.placingType !== 'paddy' ||
+      (rectTiles.length === rect.w * rect.h && isPaddyFootprintEligible(state, rectTiles));
     for (let dy = 0; dy < rect.h; dy++) {
       for (let dx = 0; dx < rect.w; dx++) {
         const tx = rect.x + dx;
         const ty = rect.y + dy;
         const tile = state.map[ty]?.[tx];
-        const ok = affordable && !!tile && isExplored(state, tx, ty) &&
+        const ok = affordable && paddyAreaValid && !!tile && isExplored(state, tx, ty) &&
           canPlaceOn(def, tile, state) && !foreignSiteAt(state, tx, ty);
         const needsClearing = ok && acceptsClearedLand(def) && tile!.terrain === 'forest';
         ctx.fillStyle = needsClearing
@@ -1957,7 +1967,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
         });
       }
     }
-    ctx.strokeStyle = 'rgba(255,214,90,0.9)';
+    ctx.strokeStyle = paddyAreaValid ? 'rgba(255,214,90,0.9)' : 'rgba(245,145,125,0.95)';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(rect.x * TILE + 0.75, rect.y * TILE + 0.75, rect.w * TILE - 1.5, rect.h * TILE - 1.5);
     ctx.lineWidth = 1;

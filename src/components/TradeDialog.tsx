@@ -26,12 +26,13 @@ interface Props {
 
 type TradeCategory = Exclude<ResourceCategory, 'abstract'>;
 
-const TRADE_CATEGORY_ORDER: TradeCategory[] = ['food', 'fuel', 'material', 'clothing', 'military', 'luxury', 'currency'];
+const TRADE_CATEGORY_ORDER: TradeCategory[] = ['food', 'fuel', 'material', 'clothing', 'footwear', 'military', 'luxury', 'currency'];
 const TRADE_CATEGORY_LABELS: Record<TradeCategory, string> = {
   food: '식량',
   fuel: '연료',
   material: '자재',
   clothing: '의복',
+  footwear: '신발',
   military: '군수',
   luxury: '사치',
   currency: '은',

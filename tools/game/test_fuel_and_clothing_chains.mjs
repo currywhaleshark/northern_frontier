@@ -127,7 +127,7 @@ function runTicks(state, ticks) {
 {
   const state = prepare(2026071011);
   addBuilt(state, 'center', 2, 2);
-  const tannery = addBuilt(state, 'tannery', 9, 9);
+  const tannery = addBuilt(state, 'tannery', 9, 9, { tanneryProduct: 'hideClothes' });
   const tanner = worker(state, 'tanner', 8, 9);
   state.resources.hide = 10;
   assert.equal(workerSlots.assignResidentToBuilding(state, tanner.id, tannery.id), null);
@@ -153,6 +153,7 @@ function hutWarmthAfterWinter(weather) {
   addBuilt(state, 'center', 2, 2);
   addBuilt(state, 'hut', 5, 5);
   const resident = worker(state, 'idle', 4, 5);
+  resident.worn = { clothing: { resource: 'hideClothes', wear: 0 } };
   state.day = 37;
   state.weather = weather;
   for (let day = 0; day < 12; day++) {

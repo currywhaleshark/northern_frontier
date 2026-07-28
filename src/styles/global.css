@@ -625,6 +625,38 @@ html, body, #root {
 }
 .selection-building-actions .worker-slot-panel { margin-bottom: 0; }
 .selection-context-bar .insp-table td:first-child { width: 96px; }
+.wearable-slots {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 7px;
+  align-items: flex-start;
+}
+.wearable-slot {
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+}
+.wearable-slot-label {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+}
+.wearable-slot-icon {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(12, 15, 18, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+.wearable-slot.equipped .wearable-slot-icon {
+  border-color: rgba(199, 168, 95, 0.58);
+  background: rgba(42, 37, 25, 0.72);
+}
 .burial-record {
   display: grid;
   gap: 1px;

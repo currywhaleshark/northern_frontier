@@ -47,7 +47,8 @@ export function isRaidProtectedBuildingInventory(building: Building): boolean {
 
 export function addSettlementStock(state: GameState, resource: ResourceId, amount: number): void {
   if (!Number.isFinite(amount) || amount <= 0) return;
-  state.resources[resource] = Math.max(0, (state.resources[resource] ?? 0) + amount);
+  const current = Number.isFinite(state.resources[resource]) ? Math.max(0, state.resources[resource]) : 0;
+  state.resources[resource] = current + amount;
 }
 
 export function depositResidentToBuilding(building: Building, resident: Resident): void {

@@ -9,6 +9,7 @@ import { allowedCropsForBuilding, cropIdForBuilding, CROP_DEFS } from '../game/c
 import { edictSlotCapacity, edictSlotsUsed } from '../game/edicts';
 import { canRequestTrade, factionTradeUnlockReason } from '../game/events';
 import { DRYING_PRODUCT_DEFS, DRYING_PRODUCT_ORDER, dryingProductOf } from '../game/preservation';
+import { TANNERY_PRODUCT_DEFS, TANNERY_PRODUCT_ORDER, tanneryProductOf } from '../game/wearables';
 import {
   IMPLEMENTED_LIVESTOCK_IDS, LIVESTOCK_DEFS, normalizeLivestockState,
   plotPlowOxenMax, plowOxenAssigned, plowOxenOf, plowOxenPool,
@@ -20,7 +21,7 @@ import { centerPromotionUpgradeReason, nextRank } from '../game/promotion';
 import {
   assignedSlotResidents, availableWorkerSlots, isResidentAvailableForWorkerSlot, workerSlotConfig, workerSlotCount,
 } from '../game/workerSlots';
-import type { BuildingTypeId, CropId, DryingProductId, GameState, LivestockId, ResourceId, SmithyProductId } from '../game/types';
+import type { BuildingTypeId, CropId, DryingProductId, GameState, LivestockId, ResourceId, SmithyProductId, TanneryProductId } from '../game/types';
 import { BuildingIcon } from './BuildingIcon';
 import { FactionName } from './FactionName';
 import { LivestockIcon } from './LivestockIcon';
@@ -35,6 +36,7 @@ interface Props {
   onUpgradeHousing: (buildingId: number, targetType: Extract<BuildingTypeId, 'ondol' | 'tileHouse'>) => void;
   onUpgradeCenter: (buildingId: number) => void;
   onSetSmithyProduct: (buildingId: number, product: SmithyProductId) => void;
+  onSetTanneryProduct: (buildingId: number, product: TanneryProductId) => void;
   onSetDryingProduct: (buildingId: number, product: DryingProductId) => void;
   onSetLivestockSpecies: (buildingId: number, species: LivestockId) => void;
   onSlaughterLivestock: (buildingId: number, amount: number) => void;
@@ -71,6 +73,7 @@ export function ActionPopup({
   onUpgradeHousing,
   onUpgradeCenter,
   onSetSmithyProduct,
+  onSetTanneryProduct,
   onSetDryingProduct,
   onSetLivestockSpecies,
   onSlaughterLivestock,
@@ -466,6 +469,29 @@ export function ActionPopup({
                 disabled={!unlocked}
                 title={unlocked ? recipe : `${RANK_NAMES[productDef.minRank ?? 'bo']} 승격 후 생산`}
                 onClick={() => onSetSmithyProduct(building.id, product)}
+              >
+                {productDef.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {building.type === 'tannery' && (
+        <div className="action-grid" role="group" aria-label="무두장 생산 방식">
+          {TANNERY_PRODUCT_ORDER.map(product => {
+            const productDef = TANNERY_PRODUCT_DEFS[product];
+            const active = tanneryProductOf(building) === product;
+            const recipe = product === 'auto'
+              ? '옷과 신발의 부족분을 비교해 자동 생산'
+              : `가죽 ${productDef.hidePerUnit} → ${productDef.name} 1`;
+            return (
+              <button
+                key={product}
+                className={`action-chip${active ? ' active' : ''}`}
+                type="button"
+                title={recipe}
+                onClick={() => onSetTanneryProduct(building.id, product)}
               >
                 {productDef.name}
               </button>

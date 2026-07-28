@@ -15,6 +15,7 @@ import { addLog } from './events';
 import { enrolledStudentIds, skillGainMult } from './education';
 import { haulerCarryCapacity, haulingMoveSpeedMultiplier, scaledCarryCapacity } from './equipment';
 import { collectHuntableTiles } from './habitats';
+import { huntPreyName, rollHuntPrey, scaledHuntYield, type HuntPreyDef } from './hunting';
 import { makeRng } from './map';
 import { buryCorpse, cemeteryFreePlots, corpsesOf, laborEfficiencyMult, nextCorpseToCollect } from './lifecycle';
 import { extractMineralDeposit, mineralRemaining } from './minerals';
@@ -31,6 +32,10 @@ import { clothingCoverageTotal, foodTotal, fuelHeatTotal } from './consumption';
 import { isExplored } from './exploration';
 import { activePredatorScoutIds } from './expeditionIntel';
 import { FOOD_RESOURCES, FUEL_RESOURCES } from './resourceCatalog';
+import {
+  craftStrawShoesAtHome, equipMissingWearables, footwearCoverageTotal,
+  normalizeWearableResourceStocks, residentFootwearMoveMultiplier, resolvedTanneryProduct, TANNERY_PRODUCT_DEFS,
+} from './wearables';
 import { isGateBuilding } from './walls';
 import {
   ensureLivestockState, hayFromHarvestProgress, livestockProductForHerder, plotWorkMultiplier,
@@ -376,6 +381,7 @@ function moveSteps(state: GameState, r: Resident, ctx: Ctx): number {
     sp = Math.min(sp, CONFIG.agents.moveSpeedSnow);
   }
   sp *= haulingMoveSpeedMultiplier(r);
+  sp *= residentFootwearMoveMultiplier(r);
   const n = Math.floor(sp);
   return n + (ctx.rng() < sp - n ? 1 : 0);
 }
@@ -796,7 +802,7 @@ interface GatherOpts {
   onDeposit?: (resident: Resident) => void;
   taskWork: string;
   taskMove: string;
-  taskHaul: string;
+  taskHaul: string | ((resident: Resident) => string);
   taskNone?: string;
   adjustHarvestAmount?: (tile: Tile, r: Resident, amount: number) => number;
   onHarvest?: (tile: Tile, r: Resident, amount: number) => void;
@@ -851,7 +857,7 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
   if (carryTotal(r) >= scaledCarryCapacity(o.cap) ||
     (r.phase === 'toDeposit' && carryTotal(r) > 0)) {
     r.phase = 'toDeposit';
-    r.task = o.taskHaul;
+    r.task = typeof o.taskHaul === 'function' ? o.taskHaul(r) : o.taskHaul;
     const targets = o.depositTargets?.(state, r) ?? depositBuildings(state, o.depositExtra);
     const st = goTo(state, r, ctx, buildingInteractionGoal(state, targets.map(building => building.id)));
     if (isSettledAtGoal(r, st)) {
@@ -1164,6 +1170,7 @@ function woodcutterTick(state: GameState, r: Resident, ctx: Ctx, skipClearing = 
 
 function hunterTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
+  let caught: { prey: HuntPreyDef; meat: number; hide: number } | null = null;
   gatherJob(state, r, ctx, {
     // 짐승이 사는 서식지 범위 안에서만 사냥이 된다 (렌더러의 서식지 원과 동일 판정)
     goal: t => ctx.huntable.has(`${t.x},${t.y}`),
@@ -1177,13 +1184,32 @@ function hunterTick(state: GameState, r: Resident, ctx: Ctx): void {
     goalField: ctx.goalFieldUserCounts.huntable >= 3
       ? () => gatherGoalField(state, ctx, 'huntable', t => ctx.huntable.has(`${t.x},${t.y}`))
       : undefined,
-    taskWork: '사냥 중', taskMove: '서식지로 이동', taskHaul: '사냥감 운반',
+    taskWork: '사냥감 추적 중',
+    taskMove: '서식지로 이동',
+    taskHaul: resident => `${huntPreyName(resident.lastHuntPrey)} 운반`,
+    adjustHarvestAmount: (_tile, _resident, baselineMeat) => {
+      const prey = rollHuntPrey(ctx.rng);
+      const yields = scaledHuntYield(prey, baselineMeat);
+      caught = { prey, ...yields };
+      return yields.meat;
+    },
     onHarvest: (_tile, res, meatAmount) => {
-      addCarry(res, 'hide', (meatAmount / CONFIG.production.meatPerGame) * CONFIG.production.hidePerGame);
-      if (ctx.rng() < 0.06) {
-        addLog(state, `사냥꾼 ${withJosa(res.name, '이/가')} 노루를 잡아 식량과 가죽을 가져옵니다.`, 'good');
+      if (!caught) return;
+      res.lastHuntPrey = caught.prey.id;
+      res.task = `${caught.prey.name} 사냥 성공`;
+      addCarry(res, 'hide', caught.hide);
+      if (ctx.rng() < 0.08) {
+        const yieldText = caught.hide > 0
+          ? `고기 ${meatAmount.toFixed(1)}과 가죽 ${caught.hide.toFixed(1)}`
+          : `고기 ${meatAmount.toFixed(1)}`;
+        addLog(
+          state,
+          `사냥꾼 ${withJosa(res.name, '이/가')} ${withJosa(caught.prey.name, '을/를')} 잡아 ${yieldText} 분량을 가져옵니다.`,
+          'good',
+        );
       }
     },
+    onDeposit: resident => { delete resident.lastHuntPrey; },
   });
 }
 
@@ -1543,13 +1569,14 @@ const HAUL_PRIORITY: ResourceId[] = [
   'grain', 'rice', 'vegetables', 'kimchi', 'beans', 'meat', 'eggs', 'milk', 'fish',
   'curedMeat', 'saltedFish', 'driedFish', 'jang',
   'firewood', 'brushwood', 'charcoal', 'wood',
-  'hideClothes', 'cottonClothes', 'tools', 'onggi', 'carts', 'gunpowder', 'spears', 'hornBows', 'muskets',
+  'hideClothes', 'cottonClothes', 'strawShoes', 'leatherShoes', 'tools', 'onggi', 'carts', 'gunpowder', 'spears', 'hornBows', 'muskets',
   'hide', 'cotton', 'wool', 'hay', 'herbs', 'stone', 'iron',
 ];
 
 const FOOD_HAUL_RESOURCES = new Set<ResourceId>([...FOOD_RESOURCES, 'rice']);
 const FUEL_HAUL_RESOURCES = new Set<ResourceId>(FUEL_RESOURCES);
 const CLOTHING_HAUL_RESOURCES = new Set<ResourceId>(['hideClothes', 'cottonClothes']);
+const FOOTWEAR_HAUL_RESOURCES = new Set<ResourceId>(['strawShoes', 'leatherShoes']);
 const COMBAT_HAUL_RESOURCES = new Set<ResourceId>(['gunpowder', 'spears', 'hornBows', 'muskets']);
 const JANGDOKDAE_SUPPLY_PRIORITY = ['onggi', 'salt', 'beans'] as const satisfies readonly ResourceId[];
 
@@ -1702,6 +1729,7 @@ function assignHaulTask(state: GameState, resident: Resident): boolean {
   const fuelLow = fuelHeatTotal(state) < population * 2;
   const toolsLow = state.resources.tools < 3;
   const clothingLow = clothingCoverageTotal(state) < population * 0.5;
+  const footwearLow = footwearCoverageTotal(state) < population * 0.5;
   const anySick = living.some(other => other.sick);
   const cartlessHauler = living.some(other => other.job === 'hauler' && !other.cartEquipped);
   const combatTension = state.threat >= CONFIG.threat.raidThreshold || state.raiders != null || state.battle != null;
@@ -1711,6 +1739,7 @@ function assignHaulTask(state: GameState, resident: Resident): boolean {
     (resource === 'tools' && toolsLow) ||
     (resource === 'carts' && state.resources.carts < 1 && state.resources.carts + available >= 1 && cartlessHauler) ||
     (CLOTHING_HAUL_RESOURCES.has(resource) && clothingLow) ||
+    (FOOTWEAR_HAUL_RESOURCES.has(resource) && footwearLow) ||
     (resource === 'herbs' && anySick) ||
     (COMBAT_HAUL_RESOURCES.has(resource) && combatTension);
 
@@ -2354,6 +2383,8 @@ function tannerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const tannery = assignedWorkplace(state, r, ctx, 'tannery', '무두장 배정 없음');
   if (!tannery) return;
 
+  const product = resolvedTanneryProduct(state, tannery);
+  const productDef = TANNERY_PRODUCT_DEFS[product];
   const target = (p.tanneryHidePerDay / 5) * effOf(r) * ctx.outputMod * WORK_RATE_SCALE;
   if (supplyWorkplaceInputs(state, r, ctx, tannery, { hide: target })) return;
 
@@ -2375,9 +2406,9 @@ function tannerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   takeBuildingStock(tannery, 'hide', hideUsed);
-  addBuildingStock(tannery, 'hideClothes', hideUsed / 2);
+  addBuildingStock(tannery, productDef.output!, hideUsed / productDef.hidePerUnit);
   r.phase = 'working';
-  r.task = '무두질';
+  r.task = productDef.task;
   gainSkillTick(r);
 }
 
@@ -2797,7 +2828,9 @@ function morningMoveTilesPerTick(state: GameState, r: Resident, ctx: Ctx): numbe
   if (state.weather === 'blizzard' || state.weather === 'heavySnow') {
     speed = Math.min(speed, CONFIG.agents.moveSpeedSnow);
   }
-  return Math.max(1, Math.floor(speed * haulingMoveSpeedMultiplier(r)));
+  return Math.max(1, Math.floor(
+    speed * haulingMoveSpeedMultiplier(r) * residentFootwearMoveMultiplier(r),
+  ));
 }
 
 function morningPreparationAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
@@ -2831,6 +2864,7 @@ function waitForMorningWake(state: GameState, r: Resident, wakeSubTick: number):
 
 function dawnAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
   r.task = '아침 채비';
+  equipMissingWearables(state, r);
   const unavailable = r.stage != null || r.sick || state.day < (r.quarantinedUntil ?? 0) ||
     r.health < 20 || state.day < (r.birthRecoveryUntil ?? 0);
   if (unavailable) {
@@ -2941,7 +2975,8 @@ function returnHomeAgentTick(
   if (result === 'arrived') {
     r.phase = 'sleeping';
     r.path = [];
-    r.task = sleepingTask;
+    const crafted = reason === 'sleep' && home ? craftStrawShoesAtHome(state, r) : 0;
+    r.task = crafted > 0 ? '짚신을 삼고 잠듦' : sleepingTask;
   } else if (result === 'stuck') {
     r.path = [];
     r.task = '귀갓길을 찾지 못함';
@@ -3094,6 +3129,7 @@ function closeOutWorkday(state: GameState, r: Resident, ctx: Ctx): boolean {
 // ─────────────────────────── 틱 진입점 ───────────────────────────
 
 export function agentsTick(state: GameState): void {
+  normalizeWearableResourceStocks(state);
   const dayBand = dayBandOf(state.subTick);
   const rngSubTick = dayBand === 'work' ? state.subTick - DAY_BANDS.work.start : state.subTick;
   const rng = makeRng(state.seed + state.day * 7919 + rngSubTick * 101 + 7);
