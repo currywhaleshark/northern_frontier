@@ -1109,6 +1109,28 @@ export const CONFIG = {
       bu: 1.75,
     } as Record<Rank, number>,
     dockCapacityMult: 2,
+
+    // 정기거래 계약 — 성사된 협상 조건을 연 단위로 잠근다.
+    // 새 밸런스 축을 만들지 않고 우호도·교역량·계절 배율에 전부 얹는다.
+    contract: {
+      minRelation: 45,        // 이보다 낮으면 연 계약 자체가 불가 ("낯선 상대와 연 계약은 없다")
+      maxPerFaction: 2,       // 같은 세력과 동시에 맺을 수 있는 계약 수
+      maxCapacityShare: 0.5,  // getAmt 상한 = 체결 시점 그 계절 교역량 총량의 절반
+      discountMinRelation: 60, // 이 우호도부터 계약 할인이 붙는다
+      discount: 0.95,         // 스팟 협상보다 소폭 유리한 배율 — 폭을 작게 유지한다
+      graceDays: 3,           // 물량 부족 시 실행 계절 첫날부터 이만큼은 기다려 준다
+      breakStreak: 2,         // 연속 불이행이 이만큼 쌓이면 계약 파기
+      // 체결 시 우호도가 정하는 기간 (높은 구간부터 검사)
+      durations: [
+        { minRelation: 75, minYears: 6, maxYears: 7 },
+        { minRelation: 60, minYears: 4, maxYears: 5 },
+        { minRelation: 45, minYears: 2, maxYears: 3 },
+      ],
+      relationFulfill: 1,     // 한 해분을 이행하면 우호도가 소폭 오른다
+      relationMiss: 4,        // 유예까지 못 채우면 위약으로 하락
+      relationBreak: 6,       // 파기 시 추가 하락
+      relationCancel: 8,      // 플레이어 중도 해지 위약
+    },
   },
 
   extortion: {

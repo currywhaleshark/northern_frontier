@@ -107,6 +107,11 @@ html, body, #root {
   cursor: default;
 }
 .ongoing-objective.scenario .objective-title { color: #7ab3d9; }
+/* 정기거래 요약 칩 — 평시엔 조용한 회색, 미충당이면 경고 */
+.ongoing-objective.contract { border-color: var(--border); cursor: pointer; }
+.ongoing-objective.contract .objective-title { color: var(--trade); }
+.ongoing-objective.contract.warn { border-color: #d9a441; }
+.ongoing-objective.contract.warn .objective-summary { color: #d9a441; }
 
 /* 튜토리얼 코치 — 다음에 누를 곳을 가리키는 링과 말풍선 (모달 z-index 100 아래) */
 .tutorial-coach-ring {
@@ -1634,6 +1639,23 @@ html, body, #root {
 .faction-entry .bar-outer { margin: 2px 0 5px; }
 .faction-entry-actions { justify-content: flex-end; }
 .faction-trade-button { flex: 0 0 56px; }
+/* 세력별 활성 정기거래 계약 */
+.faction-contracts {
+  display: grid;
+  gap: 4px;
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px solid var(--border);
+}
+.faction-contract-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.faction-contract-terms { display: grid; gap: 1px; min-width: 0; }
+.faction-contract-terms strong { font-size: 11px; }
+.faction-contract-cancel { flex: 0 0 44px; color: var(--bad); }
 .faction-info { position: relative; }
 .faction-trade-toggle {
   width: 24px;
@@ -6591,6 +6613,24 @@ html, body, #root {
 .trade-response.accepted { border-color: var(--good); }
 .trade-response.rejected { border-color: var(--bad); }
 .trade-shortage { color: var(--bad); font-weight: 700; }
+/* 정기거래 계약 — 성사 화면에만 나타나는 잠금 제안 */
+.trade-contract-offer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  margin: 0 16px 12px;
+  padding: 9px 10px;
+  border: 1px dashed var(--trade);
+  background: var(--panel2);
+}
+.trade-contract-terms { display: grid; gap: 2px; }
+.trade-contract-terms span { color: var(--muted); font-size: 11px; }
+.trade-contract-terms strong { font-size: 12px; line-height: 1.45; }
+.trade-contract-terms em { color: var(--good); font-size: 11px; font-style: normal; }
+.trade-contract-offer.blocked { border-color: var(--border); }
+.trade-contract-offer.blocked .trade-contract-terms strong { color: var(--muted); font-weight: 400; }
+.trade-contract-offer .btn { min-height: 34px; white-space: nowrap; }
 .trade-dialog-actions {
   display: grid;
   grid-template-columns: 1fr 1.4fr 1fr;

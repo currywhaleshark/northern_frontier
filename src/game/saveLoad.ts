@@ -59,7 +59,7 @@ import type {
   PreparationActionId, RaiderUnitType, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
   SpecialItemId, SpecialResidentId, TacticalAiState, TacticalDeploymentPlacement, TacticalFeaturedResident, TacticalFormationLine,
   TacticalBattleFlankOutcome, TacticalBattleTacticsReport, TacticalFacing, TacticalPreparationEffect,
-  TacticalRaiderGroup, TacticalRoundReport,
+  TacticalRaiderGroup, TacticalRoundReport, TradeContract,
 } from './types';
 import { SAVE_SLOT_COUNT, saveSlotStorageKey } from './saveStorage';
 
@@ -640,6 +640,15 @@ export function migrateV39ToV40(raw: RawSave): RawSave {
   return migrated;
 }
 
+// v41: 정기거래 계약. 구버전 저장에는 맺어 둔 계약도 계약고도 없다.
+export function migrateV40ToV41(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  migrated.tradeContracts = [];
+  migrated.tradeContractReserve = {};
+  migrated.schemaVersion = 41;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -685,6 +694,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 37) migrated = migrateV37ToV38(migrated);
     else if (version === 38) migrated = migrateV38ToV39(migrated);
     else if (version === 39) migrated = migrateV39ToV40(migrated);
+    else if (version === 40) migrated = migrateV40ToV41(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -1544,8 +1554,9 @@ function migrateTributeItems(items: CourtTribute['items']): CourtTribute['items'
 
 function migrateResourceTaxonomy(state: GameState): void {
   state.resources = migrateResourceBag(state.resources, true) as Record<ResourceId, number>;
-  const legacyState = state as GameState & { tributeReserve?: unknown };
+  const legacyState = state as GameState & { tributeReserve?: unknown; tradeContractReserve?: unknown };
   state.tributeReserve = migrateResourceBag(legacyState.tributeReserve, false);
+  state.tradeContractReserve = migrateResourceBag(legacyState.tradeContractReserve, false);
   for (const resident of state.residents) {
     resident.carrying = migrateResourceBag(resident.carrying, false);
   }
@@ -1557,8 +1568,44 @@ function migrateResourceTaxonomy(state: GameState): void {
 
   // 레거시 모달에는 삭제된 자원 ID와 이미 계산된 교환량이 들어 있을 수 있다.
   // 다시 열 수 있는 선택지만 닫아 두어 다음 틱에 현재 규칙으로 재생성한다.
-  if (state.pendingChoice && ['trade', 'tribute', 'petition'].includes(state.pendingChoice.kind)) {
+  if (state.pendingChoice && ['trade', 'tribute', 'tradeContract', 'petition'].includes(state.pendingChoice.kind)) {
     state.pendingChoice = null;
+  }
+}
+
+const CONTRACT_SEASONS = new Set<string>(['spring', 'summer', 'autumn', 'winter']);
+
+// 정기거래 계약 정규화 — 삭제된 자원 ID나 없어진 세력을 참조하는 계약은 버린다.
+// (계약고는 살아남은 계약 기준으로 뒤에서 다시 맞춰진다)
+function sanitizeTradeContracts(state: GameState): void {
+  const raw = Array.isArray(state.tradeContracts) ? state.tradeContracts : [];
+  const kept: TradeContract[] = [];
+  for (const entry of raw as Array<Partial<TradeContract>>) {
+    if (!entry || typeof entry !== 'object') continue;
+    if (typeof entry.factionName !== 'string') continue;
+    if (!RESOURCE_ID_SET.has(String(entry.give)) || !RESOURCE_ID_SET.has(String(entry.get))) continue;
+    if (!CONTRACT_SEASONS.has(String(entry.executeSeason))) continue;
+    const giveAmt = Math.floor(normalizedAmount(entry.giveAmt));
+    const getAmt = Math.floor(normalizedAmount(entry.getAmt));
+    const durationYears = Math.floor(normalizedAmount(entry.durationYears));
+    if (giveAmt < 1 || getAmt < 1 || durationYears < 1) continue;
+    const signedYear = Math.max(1, Math.floor(normalizedAmount(entry.signedYear) || 1));
+    kept.push({
+      factionName: entry.factionName,
+      give: entry.give as ResourceId, giveAmt,
+      get: entry.get as ResourceId, getAmt,
+      executeSeason: entry.executeSeason as TradeContract['executeSeason'],
+      signedYear,
+      durationYears,
+      yearsExecuted: Math.min(durationYears, Math.floor(normalizedAmount(entry.yearsExecuted))),
+      missedStreak: Math.floor(normalizedAmount(entry.missedStreak)),
+      // 구버전·손상 저장은 체결 연도까지 정산한 것으로 본다 (되돌아가 이중 실행하지 않게)
+      lastSettledYear: Math.max(signedYear, Math.floor(normalizedAmount(entry.lastSettledYear))),
+    });
+  }
+  state.tradeContracts = kept;
+  if (!state.tradeContractReserve || typeof state.tradeContractReserve !== 'object') {
+    state.tradeContractReserve = {};
   }
 }
 
@@ -1854,6 +1901,7 @@ export function loadGame(slot = 1): GameState | null {
     } else if (!parsed.tradeCapacityUsed || typeof parsed.tradeCapacityUsed !== 'object') {
       parsed.tradeCapacityUsed = {};
     }
+    sanitizeTradeContracts(parsed);
     if (parsed.lastImmigrationDay == null) parsed.lastImmigrationDay = -999;
     if (!Number.isFinite(parsed.lastKimjangYear)) parsed.lastKimjangYear = 0;
     ensureIncidentState(parsed);

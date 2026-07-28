@@ -52,6 +52,8 @@ import { breakSilverSeal, reopenBuriedVein } from './game/silver';
 import { toggleNitreYards } from './game/suspicion';
 import { setProcessingReserve } from './game/processing';
 import { setTributeReserve } from './game/tributeReserve';
+import { cancelTradeContract, signTradeContract } from './game/tradeContracts';
+import { setTradeContractReserve } from './game/tradeContractReserve';
 import { openPredatorHunt, startPredatorScout } from './game/specialEvents';
 import { useSpecialItem } from './game/specialItemActions';
 import { getPointerAction, selectedEntityAfterTileClick } from './game/selectionActions';
@@ -75,7 +77,7 @@ import {
 } from './game/tacticalBattle';
 import { mergeHuntGroups, setHuntPreparationZone, splitHuntGroup } from './game/tacticalHunt';
 import type {
-  BuildingTypeId, CombatWeaponId, CropId, DryingProductId, EdictId, EdictLevel, GameState, JobId, LivestockId, LogEntry, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId, TanneryProductId, YouthActivity,
+  BuildingTypeId, CombatWeaponId, CropId, DryingProductId, EdictId, EdictLevel, GameState, JobId, LivestockId, LogEntry, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId, TanneryProductId, TradeContract, YouthActivity,
   PreparationActionId, PredatorKind, SpecialItemId, SpecialResidentId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
 import { markScenarioFlag } from './game/scenario';
@@ -1057,8 +1059,35 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     bump();
   };
 
+  // 협상 성사 조건을 그대로 연 단위로 잠근다 — 첫 해분은 그 자리에서 오간다
+  const handleSignTradeContract = () => {
+    const negotiation = tradeNegotiationOf(stateRef.current.pendingChoice);
+    if (!negotiation) return;
+    const error = signTradeContract(stateRef.current, negotiation);
+    if (error) {
+      notify(error, 'info');
+      bump();
+      return;
+    }
+    stateRef.current.pendingChoice = null;
+    bump();
+  };
+
   const handleSetTributeReserve = (resource: ResourceId, amount: number) => {
     const message = setTributeReserve(stateRef.current, resource, amount);
+    if (message) notify(message, 'info');
+    bump();
+  };
+
+  // 세력 창에서 계약을 중도 해지한다 — 위약으로 우호도가 떨어진다
+  const handleCancelTradeContract = (contract: TradeContract) => {
+    cancelTradeContract(stateRef.current, contract);
+    bump();
+  };
+
+  // 장터·부두의 계약고 — 일반 재고 ↔ 계약 이행분
+  const handleSetTradeContractReserve = (resource: ResourceId, amount: number) => {
+    const message = setTradeContractReserve(stateRef.current, resource, amount);
     if (message) notify(message, 'info');
     bump();
   };
@@ -1451,6 +1480,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               onConvertFieldToPaddy={handleConvertFieldToPaddy}
               onSetPlotPlowOxen={handleSetPlotPlowOxen}
               onRequestTrade={handleRequestTrade}
+              onSetTradeContractReserve={handleSetTradeContractReserve}
               onOpenEdicts={handleOpenEdicts}
               onToggleNitre={handleToggleNitre}
               onSilverVeinAction={handleSilverVeinAction}
@@ -1497,6 +1527,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               uiPrefs={uiPrefs}
               onUiPrefsChange={setUiPrefs}
               onOpenCourt={() => openDockWindow('court')}
+              onOpenFactions={() => openDockWindow('factions')}
             />
           )}
         </RuntimeVersionBoundary>
@@ -1667,7 +1698,13 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                 shortcut: 'T',
                 content: (
                   <RuntimeVersionBoundary store={uiVersionStore}>
-                    {() => <FactionsWindow state={stateRef.current} onRequestTrade={handleRequestTrade} />}
+                    {() => (
+                      <FactionsWindow
+                        state={stateRef.current}
+                        onRequestTrade={handleRequestTrade}
+                        onCancelTradeContract={handleCancelTradeContract}
+                      />
+                    )}
                   </RuntimeVersionBoundary>
                 ),
               },
@@ -1755,6 +1792,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
           state={state}
           onNegotiate={handleNegotiateTrade}
           onBuyPredatorIntel={handleBuyPredatorIntel}
+          onSignContract={handleSignTradeContract}
           onChoose={handleChoose}
         />
       ) : state.pendingChoice ? (

@@ -5,6 +5,7 @@ import { FACTIONS, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } from '../game/cons
 import { tradeNegotiationOf } from '../game/events';
 import { getRelation } from '../game/relations';
 import { FACTION_ARTWORK } from '../game/tradePresentation';
+import { contractTermsLabel, previewTradeContract, tradeContractBlockReason } from '../game/tradeContracts';
 import {
   factionTradeCapacity, factionTradeCapacitySummary, factionValue, visitorTradeMultiplier,
 } from '../game/tradeValues';
@@ -21,6 +22,7 @@ interface Props {
   state: GameState;
   onNegotiate: (get: ResourceId, getAmt: number, specialItem?: SpecialItemId, giveAmt?: number) => void;
   onBuyPredatorIntel: (kind: PredatorKind) => void;
+  onSignContract: () => void;
   onChoose: (optionId: string) => void;
 }
 
@@ -81,7 +83,7 @@ function AmountStepper({
   );
 }
 
-export function TradeDialog({ state, onNegotiate, onBuyPredatorIntel, onChoose }: Props) {
+export function TradeDialog({ state, onNegotiate, onBuyPredatorIntel, onSignContract, onChoose }: Props) {
   const negotiation = tradeNegotiationOf(state.pendingChoice);
   const faction = FACTIONS.find(candidate => candidate.name === negotiation?.faction);
   const incomingTrade = negotiation?.initiatedBy === 'faction' && negotiation.mode !== 'extortion';
@@ -155,6 +157,18 @@ export function TradeDialog({ state, onNegotiate, onBuyPredatorIntel, onChoose }
     ? negotiation.phase === 'countered' ? '조금 더 흥정한다' : '조건을 묻는다'
     : '이 조건을 제시한다';
   const valueMax = Math.max(1, giveValue, receiveValue);
+  // 성사된 조건을 그대로 연 단위로 잠글 수 있는지 — 새 협상 UI를 만들지 않고 버튼 하나로 얹는다.
+  // 확정 가능한 상태(먼저 청한 거래는 상대 요구가 나온 countered, 찾아온 제안은 accepted)면 함께 뜬다.
+  const contractOffered = !isExtortion &&
+    (negotiation.phase === 'accepted' || negotiation.phase === 'countered');
+  const contractTerms = contractOffered ? previewTradeContract(state, negotiation) : null;
+  const contractBlockReason = contractOffered
+    ? tradeContractBlockReason(
+      state, negotiation.faction, negotiation.give, negotiation.giveAmt,
+      negotiation.get, negotiation.getAmt, negotiation.specialItem,
+    )
+    : null;
+  const contractStale = contractOffered && !displayedTermsMatch;
 
   return (
     <div className="modal-overlay">
@@ -346,6 +360,33 @@ export function TradeDialog({ state, onNegotiate, onBuyPredatorIntel, onChoose }
           <span>{isExtortion ? '최후통첩' : negotiation.initiatedBy === 'faction' ? '상대 반응' : '협상 상황'}</span>
           <strong>{negotiation.message}</strong>
         </div>
+
+        {contractOffered && (
+          <div className={`trade-contract-offer${contractBlockReason ? ' blocked' : ''}`}>
+            <div className="trade-contract-terms">
+              <span>정기거래 계약</span>
+              <strong>
+                {contractTerms
+                  ? contractTermsLabel(contractTerms)
+                  : contractBlockReason ?? '이 조건은 연 계약으로 묶을 수 없습니다.'}
+              </strong>
+              {contractTerms && contractTerms.discounted && (
+                <em>우호도가 높아 계약 값이 스팟 거래보다 낫습니다.</em>
+              )}
+            </div>
+            <button
+              className="btn"
+              type="button"
+              disabled={Boolean(contractBlockReason) || !contractTerms || contractStale}
+              title={contractBlockReason
+                ?? (contractStale ? '표시된 조건이 협상 결과와 달라졌습니다. 다시 조건을 물으십시오'
+                  : '성사된 조건을 해마다 같은 철에 자동으로 주고받습니다')}
+              onClick={onSignContract}
+            >
+              이 조건으로 정기 계약
+            </button>
+          </div>
+        )}
 
         <div className={`trade-dialog-actions${isExtortion ? ' extortion-actions' : ''}`}>
           {isExtortion ? (

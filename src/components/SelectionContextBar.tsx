@@ -67,6 +67,7 @@ interface Props {
   onConvertFieldToPaddy: (buildingId: number) => void;
   onSetPlotPlowOxen: (buildingId: number, count: number) => void;
   onRequestTrade: (factionName: string) => void;
+  onSetTradeContractReserve: (resource: ResourceId, amount: number) => void;
   onOpenEdicts: () => void;
   onToggleNitre: () => void;
   onSilverVeinAction: (action: 'break-seal' | 'reopen') => void;
@@ -302,6 +303,7 @@ export function SelectionContextBar({
   onConvertFieldToPaddy,
   onSetPlotPlowOxen,
   onRequestTrade,
+  onSetTradeContractReserve,
   onOpenEdicts,
   onToggleNitre,
   onSilverVeinAction,
@@ -601,6 +603,7 @@ export function SelectionContextBar({
                 onConvertFieldToPaddy={onConvertFieldToPaddy}
                 onSetPlotPlowOxen={onSetPlotPlowOxen}
                 onRequestTrade={onRequestTrade}
+                onSetTradeContractReserve={onSetTradeContractReserve}
                 onOpenEdicts={onOpenEdicts}
                 onToggleNitre={onToggleNitre}
                 onSilverVeinAction={onSilverVeinAction}

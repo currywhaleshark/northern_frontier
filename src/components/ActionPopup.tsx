@@ -4,10 +4,12 @@ import {
   isSmithyProductUnlocked, SMITHY_PRODUCT_DEFS, SMITHY_PRODUCT_ORDER, smithyProductOf,
 } from '../game/buildings';
 import { CONFIG } from '../game/config';
-import { FACTIONS, JOB_COLORS, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES } from '../game/constants';
+import { FACTIONS, JOB_COLORS, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } from '../game/constants';
 import { allowedCropsForBuilding, cropIdForBuilding, CROP_DEFS } from '../game/crops';
 import { edictSlotCapacity, edictSlotsUsed } from '../game/edicts';
 import { canRequestTrade, factionTradeUnlockReason } from '../game/events';
+import { contractReserved, contractReserveNeeds } from '../game/tradeContractReserve';
+import { nextContractDueDay } from '../game/tradeContracts';
 import { DRYING_PRODUCT_DEFS, DRYING_PRODUCT_ORDER, dryingProductOf } from '../game/preservation';
 import { TANNERY_PRODUCT_DEFS, TANNERY_PRODUCT_ORDER, tanneryProductOf } from '../game/wearables';
 import {
@@ -49,6 +51,7 @@ interface Props {
   onConvertFieldToPaddy: (buildingId: number) => void;
   onSetPlotPlowOxen: (buildingId: number, count: number) => void;
   onRequestTrade: (factionName: string) => void;
+  onSetTradeContractReserve: (resource: ResourceId, amount: number) => void;
   onOpenEdicts: () => void;
   onToggleNitre: () => void;
   onSilverVeinAction: (action: 'break-seal' | 'reopen') => void;
@@ -86,6 +89,7 @@ export function ActionPopup({
   onConvertFieldToPaddy,
   onSetPlotPlowOxen,
   onRequestTrade,
+  onSetTradeContractReserve,
   onOpenEdicts,
   onToggleNitre,
   onSilverVeinAction,
@@ -590,6 +594,65 @@ export function ActionPopup({
           })}
         </div>
       )}
+
+      {/* 계약고 — 정기거래 이행분을 미리 잠가 둔다. 교역이 이미 장터·부두를 요구하므로 여기에 얹는다 */}
+      {(building.type === 'market' || building.type === 'dock') && (() => {
+        const needs = Object.entries(contractReserveNeeds(state))
+          .filter((entry): entry is [ResourceId, number] => entry[1] > 0);
+        if (needs.length === 0) return null;
+        const soonest = (state.tradeContracts ?? [])
+          .map(contract => ({ contract, due: nextContractDueDay(state, contract) }))
+          .filter((entry): entry is { contract: typeof entry.contract; due: number } => entry.due != null)
+          .sort((a, b) => a.due - b.due)[0];
+        return (
+          <div className="contract-reserve">
+            <div className="panel-title">계약고</div>
+            <div className="muted small">
+              정기거래로 내줄 몫을 미리 잠가 둡니다. 잠근 물자는 취사·난방에 쓰이지 않습니다.
+            </div>
+            {needs.map(([resource, need]) => {
+              const reserved = contractReserved(state, resource);
+              const usable = Math.floor(state.resources[resource] ?? 0);
+              const ready = reserved >= need;
+              return (
+                <div key={resource} className="tribute-reserve-row">
+                  <span>{RESOURCE_NAMES[resource]}</span>
+                  <span style={{ color: ready ? '#6fbf73' : '#e06c5c' }}>
+                    계약고 {reserved.toFixed(0)} / {need} · 사용 {usable}
+                  </span>
+                  <div className="tribute-reserve-controls">
+                    <button type="button" title="5 줄이기" onClick={() => onSetTradeContractReserve(resource, reserved - 5)}>-5</button>
+                    <button type="button" title="1 줄이기" onClick={() => onSetTradeContractReserve(resource, reserved - 1)}>−</button>
+                    <input
+                      type="number"
+                      min={0}
+                      max={need}
+                      step={1}
+                      value={reserved}
+                      aria-label={`${RESOURCE_NAMES[resource]} 계약 비축량`}
+                      onChange={event => onSetTradeContractReserve(resource, Number(event.target.value))}
+                    />
+                    <button type="button" title="1 늘리기" onClick={() => onSetTradeContractReserve(resource, reserved + 1)}>+</button>
+                    <button type="button" title="5 늘리기" onClick={() => onSetTradeContractReserve(resource, reserved + 5)}>+5</button>
+                    <button
+                      type="button"
+                      title="사용 가능한 재고로 다음 1회분까지 채우기"
+                      aria-label={`${RESOURCE_NAMES[resource]} 계약고 최대치 채우기`}
+                      disabled={reserved >= need || usable <= 0}
+                      onClick={() => onSetTradeContractReserve(resource, need)}
+                    >최대</button>
+                  </div>
+                </div>
+              );
+            })}
+            {soonest && (
+              <div className="muted small" style={{ marginTop: 4 }}>
+                다음 실행: {SEASON_NAMES[soonest.contract.executeSeason]} · {Math.max(0, soonest.due - state.day)}일 뒤
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {building.type === 'nitreYard' && (
         <button className="action-command" type="button" onClick={onToggleNitre}>

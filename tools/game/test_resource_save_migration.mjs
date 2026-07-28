@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 40, 'court grant artifact pity ships with schema version 40');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 41, 'recurring trade contracts ship with schema version 41');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -76,6 +76,7 @@ assert.equal(typeof saveLoad.migrateV36ToV37, 'function');
 assert.equal(typeof saveLoad.migrateV37ToV38, 'function');
 assert.equal(typeof saveLoad.migrateV38ToV39, 'function');
 assert.equal(typeof saveLoad.migrateV39ToV40, 'function');
+assert.equal(typeof saveLoad.migrateV40ToV41, 'function');
 
 {
   const migrated = saveLoad.migrateV39ToV40({ schemaVersion: 39, courtGrantArtifactMisses: 3.8 });

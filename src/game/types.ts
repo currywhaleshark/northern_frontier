@@ -593,7 +593,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'promotionDecree';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'promotionDecree';
   title: string;
   body: string;
   illustration?: {
@@ -689,6 +689,20 @@ export interface CourtTribute {
   dueDay: number;                             // 겨울 첫날 (수거일)
   resolved: boolean;                          // 올해분 처리 여부 (납부 또는 거절)
   paid: boolean;                              // 실제로 바쳤는지
+}
+
+// 정기거래 계약 — 협상이 성사된 조건을 연 단위로 잠근다.
+// 체결한 계절의 첫날마다 자동 실행되며, 교환비는 만료까지 변하지 않는다.
+export interface TradeContract {
+  factionName: string;
+  give: ResourceId; giveAmt: number;   // 매년 내주는 것
+  get: ResourceId;  getAmt: number;    // 매년 받는 것
+  executeSeason: Season;               // 체결한 계절 — 매년 이 계절 첫날 실행
+  signedYear: number;
+  durationYears: number;
+  yearsExecuted: number;
+  missedStreak: number;                // 연속 불이행 (2회면 파기)
+  lastSettledYear: number;             // 그해 몫을 이행·부분이행·불이행으로 매듭지은 연도
 }
 
 // 지도 위를 이동하는 습격 무리
@@ -1585,6 +1599,8 @@ export interface GameState {
   pendingChoice: PendingChoice | null;
   courtTribute: CourtTribute | null;  // 올해 세공 (봄 공지 때 설정)
   tributeReserve: Partial<Record<ResourceId, number>>; // 올해 세공용으로 잠근 중심지 재고
+  tradeContracts: TradeContract[];    // 세력·상단과의 연 단위 정기거래 계약
+  tradeContractReserve: Partial<Record<ResourceId, number>>; // 계약 이행용으로 잠근 중심지 재고
   tributeFailStreak: number;          // 연속 미납 횟수 (2년 연속이면 명성 하락 가중)
   tributePaidStreak: number;          // 연속 납부 년수 (승격 조건의 "공물 성실도")
   rank: Rank;                         // 현재 승격 단계
