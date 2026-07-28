@@ -4,15 +4,31 @@
     {
       "name": "buksae-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5173,
       "autoPort": true
     },
     {
       "name": "head-box-editor",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "edit:head-boxes"],
+      "runtimeArgs": [
+        "run",
+        "edit:head-boxes"
+      ],
       "port": 5183
+    },
+    {
+      "name": "sprite-studio",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "edit:sprites"
+      ],
+      "port": 5184,
+      "autoPort": true
     }
   ]
 }

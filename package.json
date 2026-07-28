@@ -16,7 +16,9 @@
     "test:combat": "node tools/game/test_tactical_battle.mjs",
     "gen:sprite-metrics": "node tools/game/generate_tactical_sprite_metrics.mjs",
     "edit:head-boxes": "node tools/game/head_box_editor.mjs",
-    "check": "npm run test:game && npm run test:terrain-growth && npm run test:building-assets && npm run test:livestock-assets && npm run test:corpse-assets && npm run build"
+    "check": "npm run test:game && npm run test:terrain-growth && npm run test:building-assets && npm run test:livestock-assets && npm run test:corpse-assets && npm run typecheck:sprites && npm run build",
+    "edit:sprites": "vite --config tools/sprite-studio/vite.config.mts",
+    "typecheck:sprites": "tsc -p tools/sprite-studio --noEmit"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
