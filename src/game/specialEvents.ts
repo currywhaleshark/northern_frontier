@@ -769,7 +769,10 @@ function resolveGinseng(state: GameState, optionId: string): void {
     state.resources.cottonClothes += 4;
     state.resources.grain += 12;
     state.resources.reputation = Math.min(100, state.resources.reputation + 5);
-    addLog(state, '산삼을 조정에 진상했습니다. 세공 면제권 1회와 곡물 12, 도구 4, 무명옷 4를 하사받았습니다.', 'good', true);
+    const timing = state.courtTribute?.resolved && state.courtTribute.year === getYear(state.day)
+      ? ' 올해 세공은 이미 처리되어, 면제권은 내년 세공에 쓰입니다.'
+      : '';
+    addLog(state, `산삼을 조정에 진상했습니다. 세공 면제권 1회와 곡물 12, 도구 4, 무명옷 4를 하사받았습니다.${timing}`, 'good', true);
   } else if (optionId === 'keep') {
     discoverItem(state, 'wildGinseng');
     addLog(state, '산삼 한 뿌리를 기물함에 보관했습니다. 교역에서 고가 제시품으로 쓸 수 있습니다.', 'good', true);
@@ -916,7 +919,10 @@ function resolveGyrfalcon(state: GameState, optionId: string): void {
     state.resources.tools += 4;
     state.resources.cottonClothes += 3;
     state.resources.reputation = Math.min(100, state.resources.reputation + 7);
-    addLog(state, '해동청을 조정에 진상했습니다. 세공 면제권 1회와 곡물 15, 도구 4, 무명옷 3을 하사받고 명성 +7.', 'good', true);
+    const timing = state.courtTribute?.resolved && state.courtTribute.year === getYear(state.day)
+      ? ' 올해 세공은 이미 처리되어, 면제권은 내년 세공에 쓰입니다.'
+      : '';
+    addLog(state, `해동청을 조정에 진상했습니다. 세공 면제권 1회와 곡물 15, 도구 4, 무명옷 3을 하사받고 명성 +7.${timing}`, 'good', true);
   } else if (optionId === 'keep') {
     discoverItem(state, 'gyrfalcon');
     addLog(state, '해동청을 길들여 기물함에 두었습니다. 습격 무리를 조기에 발견할 확률이 높아집니다.', 'good', true);

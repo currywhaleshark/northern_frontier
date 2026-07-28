@@ -125,6 +125,16 @@ const tribute = await import(pathToFileURL(join(compiledDir, 'courtTribute.mjs')
 }
 
 {
+  const state = simulation.newGame(4455);
+  state.courtTribute.resolved = true;
+  state.courtTribute.paid = true;
+  onlyEvent(state, 'wildGinseng');
+  assert.equal(specialEvents.maybeOpenSpecialEvent(state, () => 0), true);
+  specialEvents.resolveSpecialEvent(state, 'present', () => 0);
+  assert.match(state.log.at(-1).text, /내년 세공/, '이미 처리된 해의 면제권은 다음 해에 쓰인다고 안내한다');
+}
+
+{
   const state = simulation.newGame(5505);
   delete state.incidents;
   delete state.specialItems;

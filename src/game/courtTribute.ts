@@ -163,7 +163,7 @@ function grantFullTributeReward(state: GameState, tribute: CourtTribute): void {
   }
   if (labels.length === 0) return;
   const label = labels.join(', ');
-  addLog(state, `조정에서 하사품이 내려왔습니다. ${withJosa(label, '을/를')} 받았습니다.`, 'good', true);
+  addLog(state, `조정에서 하사품이 내려왔습니다. 받은 물목: ${label}.`, 'good', true);
 }
 
 /**
@@ -189,6 +189,7 @@ export function resolveTributeWaiver(
   state.tributeFailStreak = 0;
   state.tributePaidStreak += 1;
   lowerSuspicion(state, CONFIG.suspicion.tributeDecay);
+  if (state.pendingChoice?.kind === 'tribute') state.pendingChoice = null;
   addLog(
     state,
     source === 'legacy'

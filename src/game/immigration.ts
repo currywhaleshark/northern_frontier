@@ -192,6 +192,9 @@ export function maybeOfferImmigration(state: GameState, rng: () => number): bool
   const lastDay = state.lastImmigrationDay ?? -999;
   if (state.day - lastDay < im.cooldownDays) return false;
   if (rng() >= Math.min(1, im.dailyChance * rankEffects(state.rank).immigration)) return false;
+  // 기존 일일 RNG 계약: 마지막 주민이 사라진 날에는 확률 확인 1회 뒤
+  // 가족 구성 난수를 소비하지 않는다.
+  if (livingResidents(state).length === 0) return false;
 
   return openImmigrationChoice(state, createImmigrationParty(rng), { granted: false, setCooldown: true });
 }

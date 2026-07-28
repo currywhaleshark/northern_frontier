@@ -86,9 +86,18 @@ for (const source of ['legacy', 'tributeWaiverDecree']) {
   value.courtTribute = { year: 1, items: { grain: 1 }, dueDay: 109, resolved: false, paid: false };
   courtTribute.openCourtTributeChoice(value);
   assert.ok(value.pendingChoice.options.some(option => option.id === 'use-waiver-decree'));
+  assert.equal(itemActions.useSpecialItem(value, 'tributeWaiverDecree'), null);
+  assert.equal(value.specialItems.tributeWaiverDecree, 0);
+  assert.equal(value.courtTribute.resolved, true);
+  assert.equal(value.pendingChoice, null, '기물함에서 교지를 쓰더라도 열려 있던 세공 모달을 함께 닫는다');
+
+  value.specialItems.tributeWaiverDecree = 1;
+  value.courtTribute = { year: 1, items: { grain: 1 }, dueDay: 109, resolved: false, paid: false };
+  courtTribute.openCourtTributeChoice(value);
   simulation.resolveChoice(value, 'use-waiver-decree');
   assert.equal(value.specialItems.tributeWaiverDecree, 0);
   assert.equal(value.courtTribute.resolved, true);
+  assert.equal(value.pendingChoice, null);
 }
 
 // 모민 방문은 겨울/일반 이민 쿨다운을 무시하되 모달 충돌 시 소모하지 않고, 거절은 명성 손실이 없다.

@@ -81,6 +81,18 @@ function eventState(seed = 2026071101) {
 }
 
 {
+  const state = eventState(2026071104);
+  for (const resident of state.residents) resident.alive = false;
+  let rngCalls = 0;
+  assert.equal(immigration.maybeOfferImmigration(state, () => {
+    rngCalls += 1;
+    return 0;
+  }), false);
+  assert.equal(rngCalls, 1, '주민이 없으면 기존처럼 확률 확인 뒤 가족 구성 RNG를 소비하지 않는다');
+  assert.equal(state.pendingChoice, null);
+}
+
+{
   const titles = new Set();
   for (let index = 0; index < immigration.IMMIGRATION_STORIES.length; index++) {
     const state = eventState(2026071110 + index);
