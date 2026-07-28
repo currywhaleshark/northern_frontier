@@ -343,18 +343,61 @@ function signed(state, options) {
   assert.ok(state.relations[FACTION] < relationBefore, '중도 해지는 우호도를 떨어뜨린다');
 }
 
-// ── 11. 기간이 끝나면 계약이 만료된다 ──
+// ── 11. 기간이 끝나면 갱신 제안 모달이 뜬다 (정기거래에서 모달이 뜨는 유일한 자리) ──
 {
+  // 종료를 고르면 계약이 사라진다
   const state = freshState(80);
   const contract = signed(state);
   const duration = contract.durationYears;
   contract.yearsExecuted = duration;
-  contract.lastSettledYear = contract.signedYear;
 
   state.day = duration * yearDays + 1;
   tradeValues.resetFactionTradeCapacityUsage(state);
   contracts.maybeRunTradeContracts(state);
-  assert.equal(state.tradeContracts.length, 0, '기한을 다 채운 계약은 만료된다');
+  assert.ok(state.pendingChoice, '만료 계절에 갱신 제안이 열린다');
+  assert.equal(state.pendingChoice.kind, 'tradeContract', '갱신 모달의 종류');
+  assert.equal(state.tradeContracts.length, 1, '선택 전에는 계약이 남아 있다');
+
+  simulation.resolveChoice(state, 'end');
+  assert.equal(state.tradeContracts.length, 0, '종료를 고르면 계약이 끝난다');
+  assert.equal(state.pendingChoice, null, '모달이 닫힌다');
+}
+{
+  // 갱신을 고르면 현재 우호도로 조건이 다시 매겨지고 새 기간이 시작된다
+  const state = freshState(80);
+  const contract = signed(state);
+  const duration = contract.durationYears;
+  contract.yearsExecuted = duration;
+
+  state.day = duration * yearDays + 1;
+  tradeValues.resetFactionTradeCapacityUsage(state);
+  contracts.maybeRunTradeContracts(state);
+  simulation.resolveChoice(state, 'renew');
+
+  assert.equal(state.tradeContracts.length, 1, '갱신하면 계약이 이어진다');
+  const renewed = state.tradeContracts[0];
+  assert.equal(renewed.yearsExecuted, 0, '새 기간은 처음부터 센다');
+  assert.ok(renewed.durationYears >= 2, '새 기간이 매겨진다');
+  assert.equal(renewed.get, contract.get, '받는 품목은 그대로다');
+
+  // 갱신한 해의 몫은 곧바로 이어서 이행된다
+  const grainBefore = state.resources.grain;
+  state.day = duration * yearDays + 2;
+  contracts.maybeRunTradeContracts(state);
+  assert.equal(renewed.yearsExecuted, 1, '갱신 직후 그해분이 이행된다');
+  assert.equal(state.resources.grain, grainBefore + renewed.getAmt, '갱신한 조건대로 받는다');
+
+  // 우호도가 낮으면 갱신을 고를 수 없다
+  const cold = freshState(80);
+  const coldContract = signed(cold);
+  coldContract.yearsExecuted = coldContract.durationYears;
+  cold.relations[FACTION] = C.minRelation - 1;
+  cold.day = coldContract.durationYears * yearDays + 1;
+  tradeValues.resetFactionTradeCapacityUsage(cold);
+  contracts.maybeRunTradeContracts(cold);
+  assert.ok(cold.pendingChoice, '우호도가 낮아도 만료 안내는 뜬다');
+  const renewOption = cold.pendingChoice.options.find(option => option.id === 'renew');
+  assert.equal(renewOption.disabled, true, '우호도가 낮으면 갱신을 고를 수 없다');
 }
 
 // ── 12. 다음 실행일과 요약 지표 ──

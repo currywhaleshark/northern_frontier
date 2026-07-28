@@ -1558,7 +1558,7 @@ function migrateResourceTaxonomy(state: GameState): void {
 
   // 레거시 모달에는 삭제된 자원 ID와 이미 계산된 교환량이 들어 있을 수 있다.
   // 다시 열 수 있는 선택지만 닫아 두어 다음 틱에 현재 규칙으로 재생성한다.
-  if (state.pendingChoice && ['trade', 'tribute', 'petition'].includes(state.pendingChoice.kind)) {
+  if (state.pendingChoice && ['trade', 'tribute', 'tradeContract', 'petition'].includes(state.pendingChoice.kind)) {
     state.pendingChoice = null;
   }
 }

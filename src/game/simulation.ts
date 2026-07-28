@@ -15,7 +15,7 @@ import { forestTilesInArea, forestTilesInFootprint, pendingClearingTiles } from 
 import { isWallBuilding } from './walls';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
 import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
-import { maybeRunTradeContracts } from './tradeContracts';
+import { maybeRunTradeContracts, resolveTradeContractChoice } from './tradeContracts';
 import { dailyScenarioTick, resolveScenarioChoice, scenarioSuppressesRandomEvents } from './scenario';
 import { grantYearlyPowder, resolvePetition } from './petition';
 import { checkPromotion, resolvePromotionDecreeChoice } from './promotion';
@@ -1052,6 +1052,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'raid') resolveRaid(state, optionId, rng);
   else if (state.pendingChoice.kind === 'extortion') resolveExtortion(state, optionId, rng);
   else if (state.pendingChoice.kind === 'tribute') resolveCourtTribute(state, optionId);
+  else if (state.pendingChoice.kind === 'tradeContract') resolveTradeContractChoice(state, optionId);
   else if (state.pendingChoice.kind === 'petition') resolvePetition(state, optionId);
   else if (state.pendingChoice.kind === 'inspection') resolveInspection(state, optionId, rng);
   else if (state.pendingChoice.kind === 'crackdown') resolveCrackdown(state, optionId, rng);

@@ -10,7 +10,9 @@ import { addLog } from './events';
 import { makeRng } from './map';
 import { changeRelation, getRelation } from './relations';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
-import { factionTradeCapacitySummary, relationMargin, useFactionTradeCapacity } from './tradeValues';
+import {
+  factionTradeCapacitySummary, factionValue, relationMargin, silverAdjustedMargin, useFactionTradeCapacity,
+} from './tradeValues';
 import {
   canCoverContract, contractReserved, drawForContract,
   reconcileTradeContractReserve, releaseTradeContractReserve,
@@ -182,7 +184,7 @@ export function contractsInGrace(state: GameState): ContractGraceInfo[] {
   const result: ContractGraceInfo[] = [];
   for (const contract of activeContracts(state)) {
     if (contract.executeSeason !== season) continue;
-    if (contract.lastSettledYear >= year || year <= contract.signedYear) continue;
+    if (contract.lastSettledYear >= year) continue;
     if (contract.yearsExecuted >= contract.durationYears) continue;
     if (dayOfSeason > grace) continue;
     if (getRelation(state, contract.factionName) < CONFIG.trade.minRelationToTrade) continue;
@@ -278,6 +280,101 @@ function expireContract(state: GameState, contract: TradeContract): void {
   );
 }
 
+// 받을 물량을 고정한 채 현재 우호도로 내줄 몫을 다시 계산한다 (갱신용).
+// quoteFactionDemand와 같은 식이되 내주는 품목은 기존 계약 그대로 둔다.
+export function contractGiveForTerms(
+  factionName: string, give: ResourceId, get: ResourceId, getAmt: number, relation: number,
+): number {
+  const giveUnitValue = factionValue(factionName, give);
+  const getUnitValue = factionValue(factionName, get);
+  if (!(giveUnitValue > 0) || !(getUnitValue > 0)) return 0;
+  const margin = silverAdjustedMargin(contractMargin(relation), give, get);
+  return Math.max(1, Math.ceil((getAmt * getUnitValue * margin) / giveUnitValue));
+}
+
+// 만료 계약의 갱신 조건 — 현재 우호도로 기간과 교환비를 다시 매긴다.
+// 관계를 키워 두었으면 더 긴 기간·나은 값이 자연스럽게 따라온다.
+export function renewalTerms(state: GameState, contract: TradeContract): TradeContractTerms | null {
+  const relation = getRelation(state, contract.factionName);
+  if (relation < CONFIG.trade.contract.minRelation) return null;
+  const year = getYear(state.day);
+  const duration = contractDurationYears(state.seed, contract.factionName, contract.get, year, relation);
+  const giveAmt = contractGiveForTerms(contract.factionName, contract.give, contract.get, contract.getAmt, relation);
+  if (duration <= 0 || giveAmt <= 0) return null;
+  return {
+    factionName: contract.factionName,
+    give: contract.give, giveAmt,
+    get: contract.get, getAmt: contract.getAmt,
+    executeSeason: contract.executeSeason,
+    durationYears: duration,
+    margin: contractMargin(relation),
+    discounted: contractDiscount(relation) < 1,
+  };
+}
+
+// 만료 계절에 실행 대신 뜨는 갱신 제안 — 정기거래에서 모달이 뜨는 유일한 자리다
+export function openTradeContractRenewal(state: GameState, contract: TradeContract): void {
+  const terms = renewalTerms(state, contract);
+  const relation = Math.round(getRelation(state, contract.factionName));
+  state.pendingChoice = {
+    kind: 'tradeContract',
+    title: `정기거래 만료 — ${contract.factionName}`,
+    body:
+      `${withJosa(contract.factionName, '과/와')} 맺은 ${contract.durationYears}년 정기거래가 이번 철로 끝납니다.\n` +
+      `지금까지 ${SEASON_NAMES[contract.executeSeason]}마다 ${RESOURCE_NAMES[contract.give]} ${contract.giveAmt}을 내주고 ` +
+      `${RESOURCE_NAMES[contract.get]} ${contract.getAmt}을 받아 왔습니다. (현재 우호도 ${relation})`,
+    options: [
+      {
+        id: 'renew',
+        label: '계약을 잇는다',
+        desc: terms
+          ? `${contractTermsLabel(terms)}${terms.giveAmt < contract.giveAmt ? ' 관계가 깊어져 내주는 몫이 줄었습니다.' : ''}`
+          : '지금 우호도로는 새 조건을 맺을 수 없습니다.',
+        disabled: !terms,
+        disabledReason: terms ? undefined : `우호도 ${CONFIG.trade.contract.minRelation} 이상이라야 연 계약을 잇습니다`,
+      },
+      {
+        id: 'end',
+        label: '여기서 끝낸다',
+        desc: '계약을 종료합니다. 계약고에 남은 물자는 일반 재고로 돌아옵니다.',
+      },
+    ],
+    data: { factionName: contract.factionName, get: contract.get },
+  };
+}
+
+// 갱신 모달 처리 — 이어 가면 새 기간이 시작되고, 그해분은 다음 일일 처리에서 오간다
+export function resolveTradeContractChoice(state: GameState, optionId: string): void {
+  const choice = state.pendingChoice;
+  if (!choice || choice.kind !== 'tradeContract') return;
+  state.pendingChoice = null;
+  const factionName = choice.data.factionName as string;
+  const get = choice.data.get as ResourceId;
+  const contract = activeContracts(state).find(
+    entry => entry.factionName === factionName && entry.get === get,
+  );
+  if (!contract) return;
+
+  const terms = optionId === 'renew' ? renewalTerms(state, contract) : null;
+  if (!terms) {
+    expireContract(state, contract);
+    return;
+  }
+  contract.giveAmt = terms.giveAmt;
+  contract.durationYears = terms.durationYears;
+  contract.signedYear = getYear(state.day);
+  contract.yearsExecuted = 0;
+  contract.missedStreak = 0;
+  contract.lastSettledYear = getYear(state.day) - 1; // 그해분은 곧바로 이어서 이행된다
+  reconcileTradeContractReserve(state);
+  addLog(
+    state,
+    `${withJosa(factionName, '과/와')}의 정기거래를 이었습니다. ${contractTermsLabel(terms)}`,
+    'trade',
+    true,
+  );
+}
+
 // 매일 검사 — 세공 수거(maybeCollectTribute)와 같은 캐던스.
 // 실행 계절 첫날에 이행하고, 물량이 모자라면 유예 안에서 매일 다시 시도한다.
 export function maybeRunTradeContracts(state: GameState): void {
@@ -289,10 +386,13 @@ export function maybeRunTradeContracts(state: GameState): void {
 
   for (const contract of [...activeContracts(state)]) {
     if (contract.executeSeason !== season) continue;
+    // 그해 몫을 이미 매듭지었으면 건너뛴다.
+    // (체결 연도분은 체결 시 1회 실행으로 끝났고 lastSettledYear가 그해로 찍혀 있다)
     if (contract.lastSettledYear >= year) continue;
-    if (year <= contract.signedYear) continue; // 체결 연도분은 체결 시 1회 실행으로 끝났다
     if (contract.yearsExecuted >= contract.durationYears) {
-      expireContract(state, contract);
+      // 만료 — 이때만 모달이 뜬다. 다른 모달·전투와 겹치면 다음 날 다시 시도한다
+      if (!state.pendingChoice && !state.battle) openTradeContractRenewal(state, contract);
+      else if (dayOfSeason > c.graceDays) expireContract(state, contract);
       continue;
     }
     if (dayOfSeason > c.graceDays) {

@@ -589,7 +589,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'promotionDecree';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'promotionDecree';
   title: string;
   body: string;
   illustration?: {
