@@ -15,6 +15,7 @@ import { forestTilesInArea, forestTilesInFootprint, pendingClearingTiles } from 
 import { isWallBuilding } from './walls';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
 import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
+import { maybeRunTradeContracts } from './tradeContracts';
 import { dailyScenarioTick, resolveScenarioChoice, scenarioSuppressesRandomEvents } from './scenario';
 import { grantYearlyPowder, resolvePetition } from './petition';
 import { checkPromotion, resolvePromotionDecreeChoice } from './promotion';
@@ -160,6 +161,8 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     pendingChoice: null,
     courtTribute: null,
     tributeReserve: {},
+    tradeContracts: [],
+    tradeContractReserve: {},
     tributeFailStreak: 0,
     tributePaidStreak: 0,
     rank: 'settlement',
@@ -1192,6 +1195,7 @@ function endOfDay(state: GameState): void {
     maybeFlavorLog(state, rng);
   }
   maybeCollectTribute(state); // 겨울: 조정의 사자가 세공을 거둔다 (모달 충돌 시 다음 날로)
+  maybeRunTradeContracts(state); // 실행 계절 첫날: 정기거래 계약이 스스로 오간다 (평시 모달 없음)
   if (!scenarioSuppressesRandomEvents(state)) {
     dailyReligionTick(state, rng); // 떠돌이 무당/노승이 문을 두드린다 (진 이상)
     dailySpecialResidentTick(state, rng); // 귀양 선비 등 이름 있는 특수 주민
