@@ -3,6 +3,7 @@ import { availablePredatorScouts, predatorScoutDuration } from '../game/expediti
 import { SPECIAL_ITEM_DEFS } from '../game/specialItems';
 import { isUsableSpecialItem } from '../game/specialItemActions';
 import { predatorHuntChance } from '../game/specialEvents';
+import { rainGaugeClimateSummary } from '../game/disasterClimate';
 import type { GameState, SpecialItemId, WildlifeKind } from '../game/types';
 import { UiIcon } from './UiIcon';
 
@@ -19,6 +20,7 @@ export function InspectorPanel({ state, onOrganizeHunt, onScoutPredator, onUseSp
     .filter(threat => threat != null);
   const itemIds = Object.keys(SPECIAL_ITEM_DEFS) as SpecialItemId[];
   const discovered = itemIds.filter(item => state.discoveredSpecialItems.includes(item));
+  const climateSummary = rainGaugeClimateSummary(state);
 
   return (
     <div className="incident-panel">
@@ -112,6 +114,12 @@ export function InspectorPanel({ state, onOrganizeHunt, onScoutPredator, onUseSp
       )}
 
       <div className="panel-title" style={{ marginTop: 10 }}>기물함</div>
+      {climateSummary && (
+        <div className="incident-threat">
+          <div><strong>측우기 관측</strong></div>
+          <div className="muted small">{climateSummary}</div>
+        </div>
+      )}
       {discovered.length === 0 ? (
         <div className="muted small">아직 얻은 기물이 없습니다.</div>
       ) : discovered.map(item => {

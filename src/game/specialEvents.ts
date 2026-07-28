@@ -16,6 +16,11 @@ import { createCombatRoster } from './combatRoster';
 import { RESIDENT_ORIGINS } from './defectors';
 import { acquireLivestock, ensureLivestockState, livestockCapacity } from './livestock';
 import { normalizeDiscoveredSpecialItems, normalizeSpecialItemInventory } from './specialItems';
+import {
+  disasterChoiceChance,
+  disasterChoiceForecast,
+  disasterOccurrenceWeight,
+} from './disasterClimate';
 import type {
   Building,
   EpidemicState,
@@ -301,7 +306,11 @@ function openPlagueSuspicionEvent(state: GameState, rng: () => number): void {
       { id: 'isolate', label: '격리한다', desc: `${isolationDays}일 동안 일을 쉬게 합니다. 역병이라도 전염을 막을 수 있습니다.` },
       { id: 'observe', label: '그냥 둔다', desc: '단순한 병이면 혼자 낫지만 실제 역병이면 며칠 안에 마을로 번집니다.' },
     ],
-    data: { eventId: 'plagueSuspicion', residentId: suspect.id, real: rng() < CONFIG.specialEvents.plagueRealChance },
+    data: {
+      eventId: 'plagueSuspicion',
+      residentId: suspect.id,
+      real: rng() < disasterChoiceChance(state, 'plagueSuspicion', 'real-case'),
+    },
   };
 }
 
@@ -380,7 +389,12 @@ function openEarlyFrostEvent(state: GameState, rng: () => number): void {
     illustration: { src: '/assets/events/early-frost-v1.png', alt: '이른 서리가 내려 하얗게 얼어붙은 북방 개척지의 수확 전 논밭' },
     options: [
       { id: 'harvest-early', label: '조기 수확한다', desc: '현재 예상 소출의 약 절반을 즉시 확보합니다.' },
-      { id: 'wait-harvest', label: '수확철을 기다린다', desc: '서리가 걷히면 정상 수확하지만, 버티지 못하면 소출 대부분을 잃습니다.' },
+      {
+        id: 'wait-harvest',
+        label: '수확철을 기다린다',
+        desc: disasterChoiceForecast(state, 'earlyFrost', 'wait-harvest') ??
+          '서리가 걷히면 정상 수확하지만, 버티지 못하면 소출 대부분을 잃습니다.',
+      },
     ],
     data: { eventId: 'earlyFrost', targetBuildingId: target.id },
   };
@@ -462,12 +476,12 @@ export function maybeOpenSpecialEvent(state: GameState, rng: () => number): bool
   if (farms.length > 0 && !state.incidents.predatorThreats.boar && ready('boar')) candidates.push({ value: 'boar', weight: CONFIG.specialEvents.boarWeight });
   if (forestExists && ready('wildGinseng')) candidates.push({ value: 'wildGinseng', weight: CONFIG.specialEvents.ginsengWeight });
   if (!state.incidents.plagueCase && !state.incidents.epidemic && livingResidents(state).length > 2 && ready('plagueSuspicion')) {
-    candidates.push({ value: 'plagueSuspicion', weight: CONFIG.specialEvents.plagueWeight });
+    candidates.push({ value: 'plagueSuspicion', weight: disasterOccurrenceWeight(state, 'plagueSuspicion') });
   }
   if (ready('grainRequisition')) candidates.push({ value: 'grainRequisition', weight: CONFIG.specialEvents.grainRequisitionWeight });
   if (riverExists && ready('shipwreck')) candidates.push({ value: 'shipwreck', weight: CONFIG.specialEvents.shipwreckWeight });
   if (farms.length > 0 && (season === 'summer' || season === 'autumn') && ready('earlyFrost')) {
-    candidates.push({ value: 'earlyFrost', weight: CONFIG.specialEvents.earlyFrostWeight });
+    candidates.push({ value: 'earlyFrost', weight: disasterOccurrenceWeight(state, 'earlyFrost') });
   }
   if (forestExists && ready('gyrfalcon')) candidates.push({ value: 'gyrfalcon', weight: CONFIG.specialEvents.gyrfalconWeight });
   if (candidates.length === 0) return false;
@@ -885,7 +899,7 @@ function resolveEarlyFrost(state: GameState, optionId: string, buildingId: numbe
     farm.sownArea = 0;
     addLog(state, `${withJosa(crop.name, '을/를')} 서둘러 거두어 ${withJosa(amount.toFixed(1), '을/를')} 확보했습니다.`, 'good', true);
   } else if (optionId === 'wait-harvest') {
-    if (rng() < 0.58) {
+    if (rng() < disasterChoiceChance(state, 'earlyFrost', 'wait-harvest')) {
       addLog(state, '이른 서리가 곧 걷혔습니다. 작물이 버텨 정상 수확을 기대할 수 있습니다.', 'good', true);
     } else {
       const before = farm.fieldGrowth;
