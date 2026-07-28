@@ -1104,12 +1104,20 @@ export const CONFIG = {
     threatFail: 8,         // 미납 시 위협도 상승
     partialFailStreakAvoidRatio: 0.5,
     partialSuspicionDecayMult: 0.5,
-    rewardTools: 2,        // 격년 하사품 (도구 또는 옷, 결정적 롤)
-    rewardCottonClothes: 3,
     // 은 대납 — 요구 품목의 교역 가치 총합을 은 시세로 환산해 한 번에 치른다
     silverPayMarkup: 1.1,           // 환산가에 얹는 웃돈 (조정 몫의 예우)
     silverPayRepBonus: 2,           // 현물 납부 대비 추가 명성
     silverPaySuspicionDecayMult: 1.5, // 은까지 바치는 성실함 — 의심을 더 깊이 씻는다
+  },
+
+  // 격년 세공 완납 하사품 — 후보표는 courtGrants.ts에, 공통 추첨 상수는 여기 둔다.
+  courtGrants: {
+    extraPracticalChance: 0.4,
+    advancedChance: 0.35,
+    yearScalePerYear: 0.08,
+    yearScaleMax: 1.8,
+    rngYearSalt: 9203,
+    rngSeedOffset: 5,
   },
 
   // 생애 주기 — 압축 성장(총 2.5게임년) + 나이별 소비 몫 + 노년·자연사.

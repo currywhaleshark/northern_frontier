@@ -4,8 +4,10 @@
 import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
+import { rollCourtGrantRewards } from './courtGrants';
 import { addLog } from './events';
 import { makeRng } from './map';
+import { acquireLivestock, LIVESTOCK_DEFS } from './livestock';
 import { rankEffects } from './promotion';
 import { RESOURCE_DEFS } from './resourceCatalog';
 import { lowerSuspicion } from './suspicion';
@@ -127,16 +129,26 @@ export function openCourtTributeChoice(state: GameState): void {
 }
 
 function grantFullTributeReward(state: GameState, tribute: CourtTribute): void {
-  const t = CONFIG.tribute;
   if (tribute.year % 2 !== 0) return;
-  const rng = makeRng(state.seed + tribute.year * 9203 + 5);
-  if (rng() < 0.5) {
-    state.resources.tools += t.rewardTools;
-    addLog(state, `조정에서 하사품이 내려왔습니다. 도구 ${withJosa(t.rewardTools, '을/를')} 받았습니다.`, 'good', true);
-  } else {
-    state.resources.cottonClothes += t.rewardCottonClothes;
-    addLog(state, `조정에서 하사품이 내려왔습니다. 무명옷 ${t.rewardCottonClothes}벌을 받았습니다.`, 'good', true);
+  const rewards = rollCourtGrantRewards(state, tribute.year);
+  if (rewards.length === 0) return;
+  const labels: string[] = [];
+  for (const reward of rewards) {
+    if ('resource' in reward) {
+      state.resources[reward.resource] = (state.resources[reward.resource] ?? 0) + reward.amount;
+      labels.push(`${RESOURCE_NAMES[reward.resource]} ${reward.amount}`);
+      continue;
+    }
+    const error = acquireLivestock(state, reward.species, reward.amount);
+    if (error) {
+      addLog(state, `조정의 ${LIVESTOCK_DEFS[reward.species].name} 하사품을 들이지 못했습니다: ${error}`, 'bad', true);
+      continue;
+    }
+    labels.push(`${LIVESTOCK_DEFS[reward.species].name} ${reward.amount}마리`);
   }
+  if (labels.length === 0) return;
+  const label = labels.join(', ');
+  addLog(state, `조정에서 하사품이 내려왔습니다. ${withJosa(label, '을/를')} 받았습니다.`, 'good', true);
 }
 
 // 세공 선택 처리 — 효과 적용 + resolved 표시 + 모달 해제

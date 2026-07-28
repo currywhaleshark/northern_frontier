@@ -348,6 +348,52 @@ export function setStableLivestock(state: GameState, buildingId: number, species
   return null;
 }
 
+export interface LivestockAcquisitionPreflight {
+  requested: number;
+  freeCapacity: number;
+  eligibleStableIds: number[];
+  allocations: Array<{ stableId: number; amount: number }>;
+  canAcquire: boolean;
+}
+
+/**
+ * `acquireLivestock`가 쓸 축사와 수용량을 바꾸지 않고 미리 계산한다.
+ * 같은 축종이거나 비어 있는 완공 축사만 대상이며, 하사품 후보 판정도 이 규칙을 쓴다.
+ */
+export function preflightLivestockAcquisition(
+  state: Pick<GameState, 'buildings'>,
+  species: LivestockId,
+  amount = 1,
+  preferredStableId?: number,
+): LivestockAcquisitionPreflight {
+  const requested = Math.max(1, Math.floor(finiteNonNegative(amount)));
+  const eligible = state.buildings
+    .filter(building => building.type === 'stable' && building.built)
+    .map(building => ({ building, livestock: normalizeLivestockState(building.livestock) }))
+    .filter(({ livestock }) => livestock.species === species || livestock.headcount <= 0)
+    .sort((left, right) => Number(right.building.id === preferredStableId) - Number(left.building.id === preferredStableId));
+  const freeCapacity = eligible.reduce((total, { building, livestock }) => {
+    const occupied = livestock.species === species ? livestock.headcount : 0;
+    return total + Math.max(0, livestockCapacityForStable(building, species) - occupied);
+  }, 0);
+  let remaining = requested;
+  const allocations: Array<{ stableId: number; amount: number }> = [];
+  for (const { building, livestock } of eligible) {
+    if (remaining <= 0) break;
+    const occupied = livestock.species === species ? livestock.headcount : 0;
+    const received = Math.min(remaining, Math.max(0, livestockCapacityForStable(building, species) - occupied));
+    if (received > 0) allocations.push({ stableId: building.id, amount: received });
+    remaining -= received;
+  }
+  return {
+    requested,
+    freeCapacity,
+    eligibleStableIds: eligible.map(({ building }) => building.id),
+    allocations,
+    canAcquire: remaining === 0,
+  };
+}
+
 export function acquireLivestock(
   state: GameState,
   species: LivestockId,
@@ -355,34 +401,24 @@ export function acquireLivestock(
   preferredStableId?: number,
 ): string | null {
   if (!isImplementedLivestockId(species)) return '아직 들일 수 없는 가축입니다.';
-  const requested = Math.max(1, Math.floor(finiteNonNegative(amount)));
-  const stables = state.buildings
-    .filter(building => building.type === 'stable' && building.built)
-    .filter(building => {
-      const livestock = ensureLivestockState(building);
-      return livestock.species === species || livestock.headcount <= 0;
-    })
-    .sort((left, right) => Number(right.id === preferredStableId) - Number(left.id === preferredStableId));
-  const freeCapacity = stables.reduce((total, stable) => {
-    const livestock = ensureLivestockState(stable);
-    return total + livestockCapacityForStable(stable, species) - (livestock.species === species ? livestock.headcount : 0);
-  }, 0);
-  if (freeCapacity < requested) return '가축을 들일 빈 축사가 부족합니다.';
+  const preflight = preflightLivestockAcquisition(state, species, amount, preferredStableId);
+  if (!preflight.canAcquire) return '가축을 들일 빈 축사가 부족합니다.';
 
   if (!state.unlockedLivestock.includes(species)) state.unlockedLivestock.push(species);
-  let remaining = requested;
-  for (const stable of stables) {
-    if (remaining <= 0) break;
+  for (const allocation of preflight.allocations) {
+    const stable = state.buildings.find(building => building.id === allocation.stableId);
+    if (!stable || stable.type !== 'stable' || !stable.built) {
+      addLog(state, '가축 지급 중 축사 상태가 바뀌어 하사품을 들이지 못했습니다.', 'bad', true);
+      return '가축 지급 중 축사 상태가 바뀌었습니다.';
+    }
     let livestock = ensureLivestockState(stable);
     if (livestock.species !== species) {
       stable.livestock = createLivestockState(species, 0);
       livestock = stable.livestock;
     }
-    const received = Math.min(remaining, livestockCapacityForStable(stable, species) - livestock.headcount);
-    livestock.headcount += received;
-    remaining -= received;
+    livestock.headcount += allocation.amount;
   }
-  addLog(state, `${LIVESTOCK_DEFS[species].name} ${requested}마리를 들였습니다.`, 'good');
+  addLog(state, `${LIVESTOCK_DEFS[species].name} ${preflight.requested}마리를 들였습니다.`, 'good');
   return null;
 }
 
