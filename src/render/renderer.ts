@@ -46,10 +46,13 @@ import { weaponCountsForResidents } from '../game/weapons';
 import { activePredatorScoutIds } from '../game/expeditionIntel';
 import { isBuriedSilverVeinTile } from '../game/silver';
 import { activeExpeditionTargetMarkers, type ExpeditionTargetMarker } from '../game/expeditionTargets';
-import { workplaceActivityStyle, type WorkplaceActivityStyle } from '../game/workplacePresentation';
 import { normalizeLivestockState } from '../game/livestock';
 import { normalizePastureArea, validateStablePasture } from '../game/pastures';
 import { acceptsClearedLand, forestTilesInFootprint } from '../game/landClearing';
+import {
+  BUILDING_EFFECT_TABLE, buildingEffectEmitters, buildingShadowSettings,
+  type BuildingEffectWhen,
+} from './spriteStudioRegistries';
 import { treeStageFor } from '../game/forestGrowth';
 import {
   mineralRemaining,
@@ -510,63 +513,127 @@ function drawOccludedEntityGhosts(
   }
 }
 
+// ── 건물 효과 이미터 ──
+// 위치는 스프라이트 스튜디오 레지스트리에서 오고, 입자 움직임은 여기 남는다.
+// 앵커는 크기 비율(fx·fy) + 픽셀 보정(dx·dy)이라 등급마다 크기가 변하는 중심지에서도 어긋나지 않는다.
+
 // 굴뚝 연기: 위로 오르며 흩어지는 회백색 입자 (건물 id로 위상을 어긋나게)
-function drawChimneySmoke(ctx: CanvasRenderingContext2D, bx: number, by: number, id: number, footprint: number): void {
+function drawChimneySmokeAt(
+  ctx: CanvasRenderingContext2D, ax: number, ay: number, id: number, scale: number,
+): void {
   const t = performance.now() / 1000;
   for (let k = 0; k < 4; k++) {
     const ph = ((t / 2.6) + k / 4 + (id % 7) / 7) % 1; // 0(굴뚝)→1(소멸)
-    const sy = by - 13 - ph * 13;
-    const sx = bx + TILE * footprint - 4 + Math.sin((ph * 5 + id) * 2) * 1.8;
+    const sy = ay - ph * 13 * scale;
+    const sx = ax + Math.sin((ph * 5 + id) * 2) * 1.8 * scale;
     ctx.fillStyle = `rgba(206,211,218,${(0.65 * (1 - ph)).toFixed(2)})`;
     ctx.beginPath();
-    ctx.arc(sx, sy, 1.6 + ph * 2.4, 0, Math.PI * 2);
+    ctx.arc(sx, sy, (1.6 + ph * 2.4) * scale, 0, Math.PI * 2);
     ctx.fill();
   }
 }
 
-function drawWorkplaceActivity(
-  ctx: CanvasRenderingContext2D,
-  bx: number,
-  by: number,
-  id: number,
-  size: number,
-  workers: number,
-  style: WorkplaceActivityStyle,
+function drawFireSparksAt(
+  ctx: CanvasRenderingContext2D, ax: number, ay: number, id: number, scale: number, workers: number,
 ): void {
   const t = performance.now();
-  ctx.save();
-  if (style === 'fire') {
-    drawChimneySmoke(ctx, bx, by, id, size / TILE);
-    const count = Math.min(5, 2 + workers);
-    for (let i = 0; i < count; i++) {
-      const phase = ((t / 180 + i * 1.7 + id * 0.61) % 7) / 7;
-      const x = bx + size * 0.7 + Math.sin(i * 2.3 + id) * 3 + phase * 2;
-      const y = by + size * 0.68 - phase * 12;
-      ctx.fillStyle = `rgba(255,${Math.round(150 + phase * 70)},70,${(0.9 * (1 - phase)).toFixed(2)})`;
-      ctx.fillRect(Math.round(x), Math.round(y), phase < 0.45 ? 2 : 1, phase < 0.45 ? 2 : 1);
-    }
-  } else if (style === 'craft') {
-    const pulse = (Math.sin(t / 150 + id) + 1) / 2;
-    ctx.strokeStyle = `rgba(238,213,158,${(0.35 + pulse * 0.45).toFixed(2)})`;
-    ctx.lineWidth = 1.2;
-    for (let i = 0; i < Math.min(3, workers + 1); i++) {
-      const x = bx + size * (0.35 + i * 0.14);
-      const y = by + size * 0.72 - ((i + Math.floor(t / 220)) % 2) * 2;
-      ctx.beginPath();
-      ctx.moveTo(x - 2, y + 2);
-      ctx.lineTo(x + 2, y - 2);
-      ctx.stroke();
-    }
-  } else {
-    const pulse = (Math.sin(t / 420 + id * 0.7) + 1) / 2;
-    const x = bx + size * 0.5;
-    const y = by + size * 0.55;
-    ctx.fillStyle = `rgba(255,205,104,${(0.13 + pulse * 0.11).toFixed(2)})`;
+  const count = Math.min(5, 2 + workers);
+  for (let i = 0; i < count; i++) {
+    const phase = ((t / 180 + i * 1.7 + id * 0.61) % 7) / 7;
+    const x = ax + (Math.sin(i * 2.3 + id) * 3 + phase * 2) * scale;
+    const y = ay - phase * 12 * scale;
+    const dot = phase < 0.45 ? 2 : 1;
+    ctx.fillStyle = `rgba(255,${Math.round(150 + phase * 70)},70,${(0.9 * (1 - phase)).toFixed(2)})`;
+    ctx.fillRect(Math.round(x), Math.round(y), dot, dot);
+  }
+}
+
+function drawCraftGlintAt(
+  ctx: CanvasRenderingContext2D, ax: number, ay: number, id: number, scale: number,
+  workers: number, size: number,
+): void {
+  const t = performance.now();
+  const pulse = (Math.sin(t / 150 + id) + 1) / 2;
+  ctx.strokeStyle = `rgba(238,213,158,${(0.35 + pulse * 0.45).toFixed(2)})`;
+  ctx.lineWidth = 1.2 * scale;
+  for (let i = 0; i < Math.min(3, workers + 1); i++) {
+    const x = ax + size * (i * 0.14);
+    const y = ay - ((i + Math.floor(t / 220)) % 2) * 2;
     ctx.beginPath();
-    ctx.arc(x, y, 7 + pulse * 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = `rgba(255,221,139,${(0.72 + pulse * 0.2).toFixed(2)})`;
-    ctx.fillRect(Math.round(x - 2), Math.round(y - 1.5), 4, 3);
+    ctx.moveTo(x - 2 * scale, y + 2 * scale);
+    ctx.lineTo(x + 2 * scale, y - 2 * scale);
+    ctx.stroke();
+  }
+}
+
+function drawServiceGlowAt(
+  ctx: CanvasRenderingContext2D, ax: number, ay: number, id: number, scale: number,
+): void {
+  const t = performance.now();
+  const pulse = (Math.sin(t / 420 + id * 0.7) + 1) / 2;
+  ctx.fillStyle = `rgba(255,205,104,${(0.13 + pulse * 0.11).toFixed(2)})`;
+  ctx.beginPath();
+  ctx.arc(ax, ay, (7 + pulse * 2) * scale, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = `rgba(255,221,139,${(0.72 + pulse * 0.2).toFixed(2)})`;
+  ctx.fillRect(Math.round(ax - 2 * scale), Math.round(ay - 1.5 * scale), 4 * scale, 3 * scale);
+}
+
+function drawWindowGlowAt(
+  ctx: CanvasRenderingContext2D, ax: number, ay: number, scale: number, alpha: number,
+): void {
+  ctx.fillStyle = `rgba(255,205,95,${(0.85 * alpha).toFixed(2)})`;
+  ctx.fillRect(ax, ay, 3 * scale, 3 * scale);
+}
+
+const NIGHT_EFFECT_PASS: ReadonlySet<BuildingEffectWhen> = new Set<BuildingEffectWhen>(['night']);
+
+// 밤 창불이 있는 건물 종류만 추려 둔다 — 매 프레임 전 건물의 발자국을 재는 대신
+// 원본과 같은 값싼 종류 검사로 걸러 낸다.
+let nightEffectTypeCache: Set<BuildingTypeId> | null = null;
+function typesWithNightEffect(): ReadonlySet<BuildingTypeId> {
+  if (!nightEffectTypeCache) {
+    nightEffectTypeCache = new Set<BuildingTypeId>();
+    for (const [type, emitters] of Object.entries(BUILDING_EFFECT_TABLE)) {
+      if (emitters?.some(emitter => emitter.when === 'night')) {
+        nightEffectTypeCache.add(type as BuildingTypeId);
+      }
+    }
+  }
+  return nightEffectTypeCache;
+}
+
+interface BuildingEffectPass {
+  /** 이번 패스에서 그릴 발동 조건들 — 건물 패스와 밤 색조 패스가 나뉘어 있다 */
+  active: ReadonlySet<BuildingEffectWhen>;
+  workers: number;
+  /** windowGlow의 밤 램프 (0~1) */
+  nightAlpha: number;
+}
+
+function drawBuildingEffects(
+  ctx: CanvasRenderingContext2D,
+  type: BuildingTypeId,
+  id: number,
+  bx: number,
+  by: number,
+  size: number,
+  pass: BuildingEffectPass,
+): void {
+  const emitters = buildingEffectEmitters(type);
+  if (emitters.length === 0) return;
+  ctx.save();
+  for (const emitter of emitters) {
+    if (!pass.active.has(emitter.when)) continue;
+    const ax = bx + size * emitter.fx + emitter.dx;
+    const ay = by + size * emitter.fy + emitter.dy;
+    switch (emitter.kind) {
+      case 'chimneySmoke': drawChimneySmokeAt(ctx, ax, ay, id, emitter.scale); break;
+      case 'fireSparks': drawFireSparksAt(ctx, ax, ay, id, emitter.scale, pass.workers); break;
+      case 'craftGlint': drawCraftGlintAt(ctx, ax, ay, id, emitter.scale, pass.workers, size); break;
+      case 'serviceGlow': drawServiceGlowAt(ctx, ax, ay, id, emitter.scale); break;
+      case 'windowGlow': drawWindowGlowAt(ctx, ax, ay, emitter.scale, pass.nightAlpha); break;
+    }
   }
   ctx.restore();
 }
@@ -1566,7 +1633,10 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       x: drawX, y: drawY, size,
     };
     const activeWorkerCount = presentation.workplaceActiveCountByBuilding.get(b.id) ?? 0;
-    const activityStyle = workplaceActivityStyle(b.type);
+    // 밤 창불(windowGlow)은 밤 색조 패스에서 따로 그린다 — 여기서는 낮에도 도는 효과만.
+    const daytimeWhen = new Set<BuildingEffectWhen>(['always']);
+    if (activeWorkerCount > 0) daytimeWhen.add('working');
+    if (heating) daytimeWhen.add('winterHeating');
     enqueueRowDraw((b.y + dims.h) * TILE, (b.x + dims.w / 2) * TILE, () => {
       sprites.drawBuilding(ctx, drawParams);
       occludedBuildingDraws.push(drawParams);
@@ -1574,12 +1644,10 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
         sprites.drawBuildingDamage(ctx, { season, x: drawX, y: drawY, size });
         drawDamageSmoke(ctx, drawX, drawY, b.id, size / TILE);
       }
-      // 아궁이에 불을 땔 때 온돌집/중심지 굴뚝에서 연기가 오른다
-      if (b.built && heating && (b.type === 'ondol' || b.type === 'center')) {
-        drawChimneySmoke(ctx, drawX, drawY, b.id, size / TILE);
-      }
-      if (b.built && activeWorkerCount > 0 && activityStyle) {
-        drawWorkplaceActivity(ctx, drawX, drawY, b.id, size, activeWorkerCount, activityStyle);
+      if (b.built) {
+        drawBuildingEffects(ctx, b.type, b.id, drawX, drawY, size, {
+          active: daytimeWhen, workers: activeWorkerCount, nightAlpha: 0,
+        });
       }
     });
   }
@@ -2069,12 +2137,11 @@ interface BuildingShadowSilhouette {
 
 const buildingShadowSilhouettes = new Map<string, BuildingShadowSilhouette>();
 
+// 건물별 그림자 보정은 스프라이트 스튜디오 레지스트리(buildingShadowSettings)가 갖는다.
 // 마당형 건물 — 스프라이트 앞쪽이 마당(지면)이고 본채는 뒤에 서 있는 유형.
 // groundFrac: 실루엣 시각 높이 중 아래쪽 마당 비율(그림자 투영에서 제외).
 // anchorDepthFrac: 풋프린트 밑변에서 뒤로 물러날 깊이 비율(본채 접지선).
-const COURTYARD_SHADOW_OVERRIDES: Partial<Record<Building['type'], { groundFrac: number; anchorDepthFrac: number }>> = {
-  center: { groundFrac: 0.33, anchorDepthFrac: 0.5 },
-};
+// 나무·주민 그림자와 태양 물리(dayShadowFor)는 전역 시스템이라 여기서 다루지 않는다.
 
 function buildingShadowSilhouette(
   sprites: SpriteAPI,
@@ -2166,10 +2233,14 @@ function drawWorldShadows(
   const flattenY = Math.min(0.42, 0.16 + Math.abs(shearX) * 0.3);
   for (const building of state.buildings) {
     if (!building.built || isAreaBuildingType(building.type)) continue;
+    const shadowSettings = buildingShadowSettings(building.type);
+    if (shadowSettings.mode === 'none') continue;
     const dims = buildingFootprintDims(building);
     const sil = buildingShadowSilhouette(sprites, state, building, dims, season, renderScale === 2, wallTiles);
     if (!sil) continue;
-    const reachTiles = Math.ceil((Math.abs(shearX) * sil.visualHeight + 6) / TILE);
+    // 길이 배율은 이 건물의 전단에만 먹는다 — 도달 범위 계산과 변환이 같은 값을 쓴다.
+    const buildingShearX = shearX * shadowSettings.lengthScale;
+    const reachTiles = Math.ceil((Math.abs(buildingShearX) * sil.visualHeight + 6) / TILE);
     if (!tileRectIntersectsViewport(
       viewport,
       building.x - reachTiles, building.y - 1,
@@ -2181,7 +2252,7 @@ function drawWorldShadows(
     // 접지선에 딱 붙이지 않고 접지면 절반쯤 안쪽(위)으로 물러나 시작해야
     // 그림자가 건물 밑에서 흘러나오듯 이어진다. 물러남은 반 칸을 넘지 않는다.
     // 마당형 건물은 마당 부분을 잘라내고 본채 접지선(깊이 비율)에 붙인다.
-    const courtyard = COURTYARD_SHADOW_OVERRIDES[building.type];
+    const courtyard = shadowSettings.mode === 'courtyard' ? shadowSettings : null;
     const bottomGap = sil.canvas.height - 1 - sil.baseRow;
     const lift = Math.min(TILE * 0.5, sil.visualHeight * 0.16);
     const baseRowUsed = courtyard
@@ -2195,7 +2266,7 @@ function drawWorldShadows(
     // 뒤쪽 사본이 옆벽을 절반 높이까지만 감싸 상자 부피감을 만든다.
     for (const anchor of [frontAnchor, frontAnchor - backOffset]) {
       layer.save();
-      layer.transform(1, 0, -shearX, -flattenY, baseX + shearX * baseRowUsed, anchor + flattenY * baseRowUsed);
+      layer.transform(1, 0, -buildingShearX, -flattenY, baseX + buildingShearX * baseRowUsed, anchor + flattenY * baseRowUsed);
       layer.drawImage(sil.canvas, 0, 0, sil.canvas.width, baseRowUsed + 1, 0, 0, sil.canvas.width, baseRowUsed + 1);
       layer.restore();
     }
@@ -2322,18 +2393,19 @@ function drawDayNight(ctx: CanvasRenderingContext2D, state: GameState, dayFrac: 
     fillViewport();
     ctx.restore();
   }
-  // 밤이 깊어지면 집·군영·중심지 창에 불이 켜진다
+  // 밤이 깊어지면 집·군영·중심지 창에 불이 켜진다 (어느 건물인지는 레지스트리가 정한다)
   if (night > 0.28) {
     const a = Math.min(1, (night - 0.28) / 0.5);
+    const nightWhen = NIGHT_EFFECT_PASS;
+    const lit = typesWithNightEffect();
     for (const b of state.buildings) {
-      if (!b.built) continue;
-      if (b.type === 'hut' || b.type === 'ondol' || b.type === 'center' || b.type === 'garrison') {
-        const dims = buildingFootprintDims(b);
-        if (!tileRectIntersectsViewport(viewport, b.x, b.y, dims.w, dims.h)) continue;
-        const size = TILE * dims.w;
-        ctx.fillStyle = `rgba(255,205,95,${(0.85 * a).toFixed(2)})`;
-        ctx.fillRect(b.x * TILE + size * 0.5 - 1.5, b.y * TILE + size * 0.42, 3, 3);
-      }
+      if (!b.built || !lit.has(b.type)) continue;
+      const dims = buildingFootprintDims(b);
+      if (!tileRectIntersectsViewport(viewport, b.x, b.y, dims.w, dims.h)) continue;
+      // 이 패스는 중심지도 발자국 폭을 쓴다 — 등급 시각 배율은 건물 패스 쪽 이야기다.
+      drawBuildingEffects(ctx, b.type, b.id, b.x * TILE, b.y * TILE, TILE * dims.w, {
+        active: nightWhen, workers: 0, nightAlpha: a,
+      });
     }
   }
 }

@@ -141,7 +141,7 @@ export const BUILDING_EFFECT_WHENS: readonly BuildingEffectWhen[] = [
   "always"
 ];
 
-const BUILDING_EFFECTS: Partial<Record<BuildingTypeId, readonly BuildingEffectEmitter[]>> = {
+export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly BuildingEffectEmitter[]>> = {
   "charcoalKiln": [
     {
       "kind": "chimneySmoke",
@@ -417,6 +417,8 @@ const BUILDING_EFFECTS: Partial<Record<BuildingTypeId, readonly BuildingEffectEm
     }
   ]
 };
+
+const BUILDING_EFFECTS = BUILDING_EFFECT_TABLE;
 
 const NO_EFFECTS: readonly BuildingEffectEmitter[] = [];
 

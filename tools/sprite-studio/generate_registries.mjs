@@ -229,7 +229,9 @@ export interface BuildingEffectEmitter {
 export const BUILDING_EFFECT_KINDS: readonly BuildingEffectKind[] = ${literal(EFFECT_KINDS)};
 export const BUILDING_EFFECT_WHENS: readonly BuildingEffectWhen[] = ${literal(EFFECT_WHENS)};
 
-const BUILDING_EFFECTS: Partial<Record<BuildingTypeId, readonly BuildingEffectEmitter[]>> = ${literal(effectEntries)};
+export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly BuildingEffectEmitter[]>> = ${literal(effectEntries)};
+
+const BUILDING_EFFECTS = BUILDING_EFFECT_TABLE;
 
 const NO_EFFECTS: readonly BuildingEffectEmitter[] = [];
 
