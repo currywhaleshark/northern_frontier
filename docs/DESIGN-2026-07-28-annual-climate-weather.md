@@ -4,6 +4,7 @@
 - 발단: 측우기가 공개하는 연간 재해 확률을 실제 비·눈·한파의 빈도와 연결한다
 - 범위: `AnnualClimate` 생성 + 계절 날씨표 생성 + 기존 일일 날씨 추첨 교체
 - 후속: `DESIGN-2026-07-28-court-grants.md`의 측우기·재해 확률
+- 구현계획: `IMPLEMENTATION-2026-07-28-annual-climate-weather.md`
 
 ## 1. 현재 구조와 문제
 

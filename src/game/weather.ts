@@ -4,6 +4,12 @@ import { pickWeighted } from './map';
 import { getSeason } from './seasons';
 import type { WeatherId } from './types';
 
+export {
+  seasonWeatherSchedule,
+  seasonWeatherScheduleForClimate,
+  weatherForDay,
+} from './weatherSchedule';
+
 export function rollWeather(day: number, rng: () => number): WeatherId {
   const season = getSeason(day);
   const table = CONFIG.weather.table[season] as Record<WeatherId, number>;

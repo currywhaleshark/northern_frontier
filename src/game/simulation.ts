@@ -33,7 +33,7 @@ import {
   avg, createResident, livingResidents, reconcileResidentHomes, updateMorale, updateResidentNeeds,
 } from './residents';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
-import { firewoodWeatherMult, rollWeather } from './weather';
+import { firewoodWeatherMult, weatherForDay } from './weather';
 import { defaultProcessingReserves } from './processing';
 import { hasKnownMineralDepositNear } from './miningSites';
 import {
@@ -207,7 +207,10 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
   setAutomaticWeaponAllocation(state);
   reconcileResidentHomes(state, rng);
 
-  state.weather = rollWeather(1, rng);
+  // 기존 날씨 추첨이 이 위치에서 공용 RNG를 한 번 소비했다. 날씨 자체는
+  // 연간 표에서 결정하되, 뒤따르는 초기화 RNG 순서는 구세이브와 맞춘다.
+  rng();
+  state.weather = weatherForDay(s, 1);
   state.resources.defense = computeDefense(state);
   refreshExploration(state);
   revealForeignSitesFromExploration(state);
@@ -1154,7 +1157,10 @@ function endOfDay(state: GameState): void {
 
   // 날씨
   const prevWeather = state.weather;
-  state.weather = rollWeather(state.day, rng);
+  // 날씨는 순수한 연간 표에서 조회한다. 기존 rollWeather 호출과 같은 한 번의
+  // RNG 소비를 남겨 이후 일일 사건·생애주기 난수 순서를 보존한다.
+  rng();
+  state.weather = weatherForDay(state.seed, state.day);
   if (state.weather !== prevWeather) {
     if (state.weather === 'blizzard') addLog(state, '눈보라가 몰아칩니다. 장작 소모가 크게 증가하고 바깥일이 멈춥니다.', 'weather', true);
     else if (state.weather === 'coldSnap') addLog(state, '살을 에는 혹한이 닥쳤습니다. 밖에 오래 있으면 위험합니다.', 'weather', true);
