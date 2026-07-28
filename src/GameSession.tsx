@@ -53,6 +53,7 @@ import { toggleNitreYards } from './game/suspicion';
 import { setProcessingReserve } from './game/processing';
 import { setTributeReserve } from './game/tributeReserve';
 import { signTradeContract } from './game/tradeContracts';
+import { setTradeContractReserve } from './game/tradeContractReserve';
 import { openPredatorHunt, startPredatorScout } from './game/specialEvents';
 import { getPointerAction, selectedEntityAfterTileClick } from './game/selectionActions';
 import { makeRng } from './game/map';
@@ -1069,6 +1070,13 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     bump();
   };
 
+  // 장터·부두의 계약고 — 일반 재고 ↔ 계약 이행분
+  const handleSetTradeContractReserve = (resource: ResourceId, amount: number) => {
+    const message = setTradeContractReserve(stateRef.current, resource, amount);
+    if (message) notify(message, 'info');
+    bump();
+  };
+
   const handleUseLuxuryGood = (resource: ResourceId) => {
     const error = useLuxuryGood(stateRef.current, resource);
     if (error) notify(error, 'info');
@@ -1457,6 +1465,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               onConvertFieldToPaddy={handleConvertFieldToPaddy}
               onSetPlotPlowOxen={handleSetPlotPlowOxen}
               onRequestTrade={handleRequestTrade}
+              onSetTradeContractReserve={handleSetTradeContractReserve}
               onOpenEdicts={handleOpenEdicts}
               onToggleNitre={handleToggleNitre}
               onSilverVeinAction={handleSilverVeinAction}
