@@ -6591,6 +6591,24 @@ html, body, #root {
 .trade-response.accepted { border-color: var(--good); }
 .trade-response.rejected { border-color: var(--bad); }
 .trade-shortage { color: var(--bad); font-weight: 700; }
+/* 정기거래 계약 — 성사 화면에만 나타나는 잠금 제안 */
+.trade-contract-offer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  margin: 0 16px 12px;
+  padding: 9px 10px;
+  border: 1px dashed var(--trade);
+  background: var(--panel2);
+}
+.trade-contract-terms { display: grid; gap: 2px; }
+.trade-contract-terms span { color: var(--muted); font-size: 11px; }
+.trade-contract-terms strong { font-size: 12px; line-height: 1.45; }
+.trade-contract-terms em { color: var(--good); font-size: 11px; font-style: normal; }
+.trade-contract-offer.blocked { border-color: var(--border); }
+.trade-contract-offer.blocked .trade-contract-terms strong { color: var(--muted); font-weight: 400; }
+.trade-contract-offer .btn { min-height: 34px; white-space: nowrap; }
 .trade-dialog-actions {
   display: grid;
   grid-template-columns: 1fr 1.4fr 1fr;

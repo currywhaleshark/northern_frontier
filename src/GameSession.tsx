@@ -52,6 +52,7 @@ import { breakSilverSeal, reopenBuriedVein } from './game/silver';
 import { toggleNitreYards } from './game/suspicion';
 import { setProcessingReserve } from './game/processing';
 import { setTributeReserve } from './game/tributeReserve';
+import { signTradeContract } from './game/tradeContracts';
 import { openPredatorHunt, startPredatorScout } from './game/specialEvents';
 import { getPointerAction, selectedEntityAfterTileClick } from './game/selectionActions';
 import { makeRng } from './game/map';
@@ -1048,6 +1049,20 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     bump();
   };
 
+  // 협상 성사 조건을 그대로 연 단위로 잠근다 — 첫 해분은 그 자리에서 오간다
+  const handleSignTradeContract = () => {
+    const negotiation = tradeNegotiationOf(stateRef.current.pendingChoice);
+    if (!negotiation) return;
+    const error = signTradeContract(stateRef.current, negotiation);
+    if (error) {
+      notify(error, 'info');
+      bump();
+      return;
+    }
+    stateRef.current.pendingChoice = null;
+    bump();
+  };
+
   const handleSetTributeReserve = (resource: ResourceId, amount: number) => {
     const message = setTributeReserve(stateRef.current, resource, amount);
     if (message) notify(message, 'info');
@@ -1745,6 +1760,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
           state={state}
           onNegotiate={handleNegotiateTrade}
           onBuyPredatorIntel={handleBuyPredatorIntel}
+          onSignContract={handleSignTradeContract}
           onChoose={handleChoose}
         />
       ) : state.pendingChoice ? (
