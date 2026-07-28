@@ -1,0 +1,69 @@
+{
+  "_comment": "건물 효과 이미터. x = bx + size*fx + dx, y = by + size*fy + dy (size는 건물 draw 크기).",
+  "charcoalKiln": [
+    { "kind": "chimneySmoke", "fx": 1, "fy": 0, "dx": -4, "dy": -13, "scale": 1, "when": "working" },
+    { "kind": "fireSparks", "fx": 0.7, "fy": 0.68, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ],
+  "center": [
+    { "kind": "chimneySmoke", "fx": 1, "fy": 0, "dx": -4, "dy": -13, "scale": 1, "when": "winterHeating" },
+    { "kind": "windowGlow", "fx": 0.5, "fy": 0.42, "dx": -1.5, "dy": 0, "scale": 1, "when": "night" }
+  ],
+  "clinic": [
+    { "kind": "serviceGlow", "fx": 0.5, "fy": 0.55, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ],
+  "dryingRack": [
+    { "kind": "craftGlint", "fx": 0.35, "fy": 0.72, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ],
+  "garrison": [
+    { "kind": "windowGlow", "fx": 0.5, "fy": 0.42, "dx": -1.5, "dy": 0, "scale": 1, "when": "night" }
+  ],
+  "hermitage": [
+    { "kind": "serviceGlow", "fx": 0.5, "fy": 0.55, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ],
+  "hut": [
+    { "kind": "windowGlow", "fx": 0.5, "fy": 0.42, "dx": -1.5, "dy": 0, "scale": 1, "when": "night" }
+  ],
+  "nitreYard": [
+    { "kind": "craftGlint", "fx": 0.35, "fy": 0.72, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ],
+  "office": [
+    { "kind": "serviceGlow", "fx": 0.5, "fy": 0.55, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ],
+  "ondol": [
+    { "kind": "chimneySmoke", "fx": 1, "fy": 0, "dx": -4, "dy": -13, "scale": 1, "when": "winterHeating" },
+    { "kind": "windowGlow", "fx": 0.5, "fy": 0.42, "dx": -1.5, "dy": 0, "scale": 1, "when": "night" }
+  ],
+  "onggiKiln": [
+    { "kind": "chimneySmoke", "fx": 1, "fy": 0, "dx": -4, "dy": -13, "scale": 1, "when": "working" },
+    { "kind": "fireSparks", "fx": 0.7, "fy": 0.68, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ],
+  "school": [
+    { "kind": "serviceGlow", "fx": 0.5, "fy": 0.55, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ],
+  "shrine": [
+    { "kind": "serviceGlow", "fx": 0.5, "fy": 0.55, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ],
+  "smithy": [
+    { "kind": "chimneySmoke", "fx": 1, "fy": 0, "dx": -4, "dy": -13, "scale": 1, "when": "working" },
+    { "kind": "fireSparks", "fx": 0.7, "fy": 0.68, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ],
+  "smokehouse": [
+    { "kind": "chimneySmoke", "fx": 1, "fy": 0, "dx": -4, "dy": -13, "scale": 1, "when": "working" },
+    { "kind": "fireSparks", "fx": 0.7, "fy": 0.68, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ],
+  "stable": [
+    { "kind": "serviceGlow", "fx": 0.5, "fy": 0.55, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ],
+  "tannery": [
+    { "kind": "craftGlint", "fx": 0.35, "fy": 0.72, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ],
+  "watermill": [
+    { "kind": "craftGlint", "fx": 0.35, "fy": 0.72, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ],
+  "weavingHouse": [
+    { "kind": "craftGlint", "fx": 0.35, "fy": 0.72, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ],
+  "woodShed": [
+    { "kind": "craftGlint", "fx": 0.35, "fy": 0.72, "dx": 0, "dy": 0, "scale": 1, "when": "working" }
+  ]
+}

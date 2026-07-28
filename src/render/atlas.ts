@@ -229,6 +229,7 @@ import {
   undertakerWorkSourceRect,
   woodSplitterWorkSourceRect,
 } from './residentOutdoorWorkAssets';
+import { spriteDisplayMetric } from './spriteStudioRegistries';
 import {
   RESIDENT_COMMON_LOCOMOTION_SHEET,
   commonLocomotionSourceRect,
@@ -910,6 +911,29 @@ interface SourceRect {
   sh: number;
 }
 
+// 스프라이트 스튜디오의 표시 비율을 한자리에서 먹인다. 값이 없으면 1배·오프셋 0이라
+// 레지스트리 도입 전과 완전히 같은 그림이 나온다.
+function drawResidentImageRect(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  rect: SourceRect,
+  x: number,
+  y: number,
+  facing: 1 | -1 | undefined,
+  displayWidth: number,
+  displayHeight: number,
+  metricKey?: string,
+): void {
+  const metric = spriteDisplayMetric(metricKey);
+  const dw = displayWidth * metric.scale;
+  const dh = displayHeight * metric.scale;
+  ctx.save();
+  ctx.translate(x, y + metric.dy);
+  ctx.scale(generatedCharacterFacingScale(facing), 1);
+  ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, -dw / 2, CHALF - dh, dw, dh);
+  ctx.restore();
+}
+
 function drawGeneratedCharacterRect(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
@@ -919,15 +943,12 @@ function drawGeneratedCharacterRect(
   facing: 1 | -1 | undefined,
   bob: number,
   sizeScale = 1,
+  metricKey?: string,
 ): void {
   const scale = (CHAR / GENERATED_CHARACTER_SHEET.residentWidth) * sizeScale;
-  const dw = rect.sw * scale;
-  const dh = rect.sh * scale;
-  ctx.save();
-  ctx.translate(x, y - bob);
-  ctx.scale(generatedCharacterFacingScale(facing), 1);
-  ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, -dw / 2, CHALF - dh, dw, dh);
-  ctx.restore();
+  drawResidentImageRect(
+    ctx, img, rect, x, y - bob, facing, rect.sw * scale, rect.sh * scale, metricKey,
+  );
 }
 
 function drawGeneratedResident(
@@ -946,23 +967,12 @@ function drawResidentCellRect(
   img: HTMLImageElement,
   rect: SourceRect,
   p: ResidentDrawParams,
+  metricKey?: string,
 ): void {
   const displaySize = RESIDENT_COMMON_LOCOMOTION_SHEET.displaySize * (p.sizeScale ?? 1);
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.scale(generatedCharacterFacingScale(p.facing), 1);
-  ctx.drawImage(
-    img,
-    rect.sx,
-    rect.sy,
-    rect.sw,
-    rect.sh,
-    -displaySize / 2,
-    CHALF - displaySize,
-    displaySize,
-    displaySize,
+  drawResidentImageRect(
+    ctx, img, rect, p.x, p.y, p.facing, displaySize, displaySize, metricKey,
   );
-  ctx.restore();
 }
 
 function canvasBackingScale(ctx: CanvasRenderingContext2D): number {
@@ -982,23 +992,12 @@ function drawIdleVideoWalk(
   if (!image) return false;
   const rect = idleVideoWalkSourceRect(p.gender, animationTimeMs, highDefinition);
   const sizeScale = p.sizeScale ?? 1;
-  const displayWidth = RESIDENT_IDLE_VIDEO_WALK_SHEETS.displayWidth * sizeScale;
-  const displayHeight = RESIDENT_IDLE_VIDEO_WALK_SHEETS.displayHeight * sizeScale;
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.scale(generatedCharacterFacingScale(p.facing), 1);
-  ctx.drawImage(
-    image,
-    rect.sx,
-    rect.sy,
-    rect.sw,
-    rect.sh,
-    -displayWidth / 2,
-    CHALF - displayHeight,
-    displayWidth,
-    displayHeight,
+  drawResidentImageRect(
+    ctx, image, rect, p.x, p.y, p.facing,
+    RESIDENT_IDLE_VIDEO_WALK_SHEETS.displayWidth * sizeScale,
+    RESIDENT_IDLE_VIDEO_WALK_SHEETS.displayHeight * sizeScale,
+    'video.idle.walk',
   );
-  ctx.restore();
   return true;
 }
 
@@ -1023,23 +1022,12 @@ function drawApprovedI2VLocomotion(
   if (!rect) return false;
   const textureScale = highDefinition ? 0.5 : 1;
   const sizeScale = p.sizeScale ?? 1;
-  const displayWidth = rect.sw * textureScale * sizeScale;
-  const displayHeight = rect.sh * textureScale * sizeScale;
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.scale(generatedCharacterFacingScale(p.facing), 1);
-  ctx.drawImage(
-    image,
-    rect.sx,
-    rect.sy,
-    rect.sw,
-    rect.sh,
-    -displayWidth / 2,
-    CHALF - displayHeight,
-    displayWidth,
-    displayHeight,
+  drawResidentImageRect(
+    ctx, image, rect, p.x, p.y, p.facing,
+    rect.sw * textureScale * sizeScale,
+    rect.sh * textureScale * sizeScale,
+    `i2v.${p.job}`,
   );
-  ctx.restore();
   return true;
 }
 
@@ -1081,23 +1069,12 @@ function drawWoodcutterVideoWalk(
   if (!image) return false;
   const rect = woodcutterVideoWalkSourceRect(p.gender, kind, animationTimeMs, highDefinition);
   const sizeScale = p.sizeScale ?? 1;
-  const displayWidth = RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.displayWidth * sizeScale;
-  const displayHeight = RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.displayHeight * sizeScale;
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.scale(generatedCharacterFacingScale(p.facing), 1);
-  ctx.drawImage(
-    image,
-    rect.sx,
-    rect.sy,
-    rect.sw,
-    rect.sh,
-    -displayWidth / 2,
-    CHALF - displayHeight,
-    displayWidth,
-    displayHeight,
+  drawResidentImageRect(
+    ctx, image, rect, p.x, p.y, p.facing,
+    RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.displayWidth * sizeScale,
+    RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.displayHeight * sizeScale,
+    `video.woodcutter.walk.${kind}`,
   );
-  ctx.restore();
   return true;
 }
 
@@ -1112,25 +1089,12 @@ function drawWoodcutterVideoWork(
   if (!image) return false;
   const rect = woodcutterVideoWorkSourceRect(p.gender, animationTimeMs, highDefinition);
   const sizeScale = p.sizeScale ?? 1;
-  const displayWidth = RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.displayWidth *
-    sizeScale * RESIDENT_WORK_PRESENTATION_SCALE;
-  const displayHeight = RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.displayHeight *
-    sizeScale * RESIDENT_WORK_PRESENTATION_SCALE;
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.scale(generatedCharacterFacingScale(p.facing), 1);
-  ctx.drawImage(
-    image,
-    rect.sx,
-    rect.sy,
-    rect.sw,
-    rect.sh,
-    -displayWidth / 2,
-    CHALF - displayHeight,
-    displayWidth,
-    displayHeight,
+  drawResidentImageRect(
+    ctx, image, rect, p.x, p.y, p.facing,
+    RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.displayWidth * sizeScale * RESIDENT_WORK_PRESENTATION_SCALE,
+    RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.displayHeight * sizeScale * RESIDENT_WORK_PRESENTATION_SCALE,
+    'video.woodcutter.work',
   );
-  ctx.restore();
   return true;
 }
 
@@ -1143,6 +1107,7 @@ function drawOptionalResidentPresentation(
     image: HTMLImageElement | null,
     rect: SourceRect,
     textureScale = 1,
+    metricKey?: string,
   ): boolean => {
     if (!image) return false;
     drawGeneratedCharacterRect(
@@ -1154,6 +1119,7 @@ function drawOptionalResidentPresentation(
       p.facing,
       0,
       (p.sizeScale ?? 1) * textureScale,
+      metricKey,
     );
     return true;
   };
@@ -1162,12 +1128,14 @@ function drawOptionalResidentPresentation(
     highDefinition: HTMLImageElement | null,
     sourceRect: (highDefinition: boolean) => SourceRect,
     standardTextureScale = 1,
+    metricKey?: string,
   ): boolean => {
     const useHighDefinition = canvasBackingScale(ctx) >= 1.5 && highDefinition != null;
     return draw(
       useHighDefinition ? highDefinition : standard,
       sourceRect(useHighDefinition),
       useHighDefinition ? standardTextureScale * 0.5 : standardTextureScale,
+      metricKey,
     );
   };
   const drawStationaryWork = (
@@ -1175,16 +1143,18 @@ function drawOptionalResidentPresentation(
     highDefinition: HTMLImageElement | null,
     sourceRect: (highDefinition: boolean) => SourceRect,
     standardTextureScale = 1,
+    metricKey?: string,
   ): boolean => drawWork(
     standard,
     highDefinition,
     sourceRect,
     standardTextureScale * RESIDENT_WORK_PRESENTATION_SCALE *
       (RESIDENT_WORK_PRESENTATION_SCALE_BY_JOB[p.job] ?? 1),
+    metricKey,
   );
   const drawCommon = (rect: SourceRect | null): boolean => {
     if (!residentCommonLocomotionSheet || !rect) return false;
-    drawResidentCellRect(ctx, residentCommonLocomotionSheet, rect, p);
+    drawResidentCellRect(ctx, residentCommonLocomotionSheet, rect, p, 'common');
     return true;
   };
 
@@ -1206,6 +1176,7 @@ function drawOptionalResidentPresentation(
           highDefinition,
         ) ?? { sx: 0, sy: 0, sw: pair.standard.frameSize, sh: pair.standard.frameSize },
         RESIDENT_JIGE_CARGO_DISPLAY_FRAME_SIZE / pair.standard.frameSize,
+        `jige.${p.job}`,
       );
       if (drewCargo) return true;
     }
@@ -1222,6 +1193,7 @@ function drawOptionalResidentPresentation(
           residentWoodcutterWorkSheet,
           woodcutterWorkSourceRect(p.gender, animationTimeMs),
           RESIDENT_WORK_PRESENTATION_SCALE,
+          'work.woodcutter',
         );
       }
       if (!p.stage) {
@@ -1229,16 +1201,19 @@ function drawOptionalResidentPresentation(
         if (drawWoodcutterVideoWalk(ctx, p, p.moving ? animationTimeMs : 0, kind)) return true;
       }
       if (p.carryingWood) {
-        return draw(residentWoodcutterLoadSheet, woodcutterLoadSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+        return draw(residentWoodcutterLoadSheet,
+          woodcutterLoadSourceRect(p.gender, Boolean(p.moving), animationTimeMs), 1, 'load.woodcutter');
       }
       return draw(residentWoodcutterLocomotionSheet,
-        woodcutterLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+        woodcutterLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs), 1, 'walk.woodcutter');
     case 'hunter':
       if (p.working && !p.moving) {
         return drawStationaryWork(
           residentHunterHuntSheet,
           residentHunterHuntHdSheet,
           highDefinition => hunterHuntSourceRect(p.gender, animationTimeMs, highDefinition),
+          1,
+          'work.hunter',
         );
       }
       if (p.carryingGame) {
@@ -1252,10 +1227,11 @@ function drawOptionalResidentPresentation(
             highDefinition,
           ),
           RESIDENT_HUNTER_LOAD_SHEET.displayFrameSize / RESIDENT_HUNTER_LOAD_SHEET.frameSize,
+          'load.hunter',
         );
       }
       return draw(residentHunterLocomotionSheet,
-        hunterLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+        hunterLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs), 1, 'walk.hunter');
     case 'hauler':
       if (p.cartEquipped) {
         return drawWork(
@@ -1272,10 +1248,11 @@ function drawOptionalResidentPresentation(
           ),
           RESIDENT_HAULER_CART_LOCOMOTION_SHEET.displayFrameSize /
             RESIDENT_HAULER_CART_LOCOMOTION_SHEET.frameSize,
+          p.carrying ? 'cart-load.hauler' : 'cart.hauler',
         );
       }
       return draw(residentHaulerLocomotionSheet,
-        haulerLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+        haulerLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs), 1, 'walk.hauler');
     case 'farmer':
       if (p.moving) break;
       if (p.farmerAction === 'oxPlow') {
@@ -1283,6 +1260,8 @@ function drawOptionalResidentPresentation(
           residentFarmerOxPlowSheet,
           residentFarmerOxPlowHdSheet,
           highDefinition => farmerOxPlowSourceRect(p.gender, animationTimeMs, highDefinition),
+          1,
+          'work.farmer.oxPlow',
         );
       }
       if (p.farmerAction === 'harvest') {
@@ -1290,6 +1269,8 @@ function drawOptionalResidentPresentation(
           residentFarmerHarvestSheet,
           residentFarmerHarvestHdSheet,
           highDefinition => farmerHarvestSourceRect(p.gender, animationTimeMs, highDefinition),
+          1,
+          'work.farmer.harvest',
         );
       }
       if (p.farmerAction === 'till') {
@@ -1297,6 +1278,8 @@ function drawOptionalResidentPresentation(
           residentFarmerTillSheet,
           residentFarmerTillHdSheet,
           highDefinition => farmerTillSourceRect(p.gender, animationTimeMs, highDefinition),
+          1,
+          'work.farmer.till',
         );
       }
       return false;
@@ -1306,26 +1289,32 @@ function drawOptionalResidentPresentation(
           residentBuilderWorkSheet,
           residentBuilderWorkHdSheet,
           highDefinition => builderWorkSourceRect(p.gender, animationTimeMs, highDefinition),
+          1,
+          'work.builder',
         );
       }
       return draw(residentBuilderLocomotionSheet,
-        builderLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+        builderLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs), 1, 'walk.builder');
     case 'herbalist':
       if (p.working && !p.moving) {
         return drawStationaryWork(
           residentHerbalistGatherSheet,
           residentHerbalistGatherHdSheet,
           highDefinition => herbalistGatherSourceRect(p.gender, animationTimeMs, highDefinition),
+          1,
+          'work.herbalist',
         );
       }
       return draw(residentHerbalistLocomotionSheet,
-        herbalistLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+        herbalistLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs), 1, 'walk.herbalist');
     case 'miner':
       if (p.working && !p.moving) {
         return drawStationaryWork(
           residentMinerWorkSheet,
           residentMinerWorkHdSheet,
           highDefinition => minerWorkSourceRect(p.gender, animationTimeMs, highDefinition),
+          1,
+          'work.miner',
         );
       }
       if (p.carryingMinerals) {
@@ -1339,16 +1328,19 @@ function drawOptionalResidentPresentation(
             highDefinition,
           ),
           RESIDENT_MINER_LOAD_SHEET.displayFrameSize / RESIDENT_MINER_LOAD_SHEET.frameSize,
+          'load.miner',
         );
       }
       return draw(residentMinerLocomotionSheet,
-        minerLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs));
+        minerLocomotionSourceRect(p.gender, Boolean(p.moving), animationTimeMs), 1, 'walk.miner');
     case 'woodSplitter':
       if (p.working && !p.moving) {
         return drawStationaryWork(
           residentWoodSplitterWorkSheet,
           residentWoodSplitterWorkHdSheet,
           highDefinition => woodSplitterWorkSourceRect(p.gender, animationTimeMs, highDefinition),
+          1,
+          'work.woodSplitter',
         );
       }
       break;
@@ -1359,6 +1351,7 @@ function drawOptionalResidentPresentation(
           residentFisherWorkHdSheet,
           highDefinition => fisherWorkSourceRect(p.gender, animationTimeMs, highDefinition),
           RESIDENT_FISHER_WORK_SHEET.displayFrameSize / RESIDENT_FISHER_WORK_SHEET.frameSize,
+          'work.fisher',
         );
       }
       break;
@@ -1369,6 +1362,7 @@ function drawOptionalResidentPresentation(
           residentHerderWorkHdSheet,
           highDefinition => herderWorkSourceRect(p.gender, animationTimeMs, highDefinition),
           RESIDENT_HERDER_WORK_SHEET.displayFrameSize / RESIDENT_HERDER_WORK_SHEET.frameSize,
+          'work.herder',
         );
       }
       break;
@@ -1380,6 +1374,7 @@ function drawOptionalResidentPresentation(
           highDefinition => charcoalBurnerWorkSourceRect(p.gender, animationTimeMs, highDefinition),
           RESIDENT_CHARCOAL_BURNER_WORK_SHEET.displayFrameSize /
             RESIDENT_CHARCOAL_BURNER_WORK_SHEET.frameSize,
+          'work.charcoalBurner',
         );
       }
       break;
@@ -1391,6 +1386,7 @@ function drawOptionalResidentPresentation(
           highDefinition => powderMakerWorkSourceRect(p.gender, animationTimeMs, highDefinition),
           RESIDENT_POWDER_MAKER_WORK_SHEET.displayFrameSize /
             RESIDENT_POWDER_MAKER_WORK_SHEET.frameSize,
+          'work.powderMaker',
         );
       }
       break;
@@ -1402,6 +1398,7 @@ function drawOptionalResidentPresentation(
           highDefinition => undertakerWorkSourceRect(p.gender, animationTimeMs, highDefinition),
           RESIDENT_UNDERTAKER_WORK_SHEET.displayFrameSize /
             RESIDENT_UNDERTAKER_WORK_SHEET.frameSize,
+          'work.undertaker',
         );
       }
       break;
@@ -1412,6 +1409,7 @@ function drawOptionalResidentPresentation(
           residentCurerWorkHdSheet,
           highDefinition => curerWorkSourceRect(p.gender, animationTimeMs, highDefinition),
           RESIDENT_CURER_WORK_SHEET.displayFrameSize / RESIDENT_CURER_WORK_SHEET.frameSize,
+          'work.curer',
         );
       }
       break;
@@ -1422,6 +1420,7 @@ function drawOptionalResidentPresentation(
           residentPotterWorkHdSheet,
           highDefinition => potterWorkSourceRect(p.gender, animationTimeMs, highDefinition),
           RESIDENT_POTTER_WORK_SHEET.displayFrameSize / RESIDENT_POTTER_WORK_SHEET.frameSize,
+          'work.potter',
         );
       }
       break;
