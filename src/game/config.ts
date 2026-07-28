@@ -354,7 +354,7 @@ export const CONFIG = {
     lumberCampBonus: 1.4,
     huntLodgeBonus: 1.5,
     herbHutBonus: 1.6,
-    toolWearPerWorker: 0.015,  // 생산직 1인당 하루 도구 마모
+    toolWearPerWorker: 0.01,   // 중노동 생산직 1인당 하루 도구 마모 기준
     skillGainPerDay: 0.012,
     skillEffect: 0.5,          // 숙련 1.0일 때 생산 +50%
   },

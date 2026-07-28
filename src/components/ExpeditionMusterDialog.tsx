@@ -161,11 +161,11 @@ export function ExpeditionMusterDialog({
 
         <div className="expedition-preview-grid">
           <div><span>출정 인원</span><strong>{selected.length}명</strong></div>
-          <div><span>원정 전력</span><strong>{expeditionPower}</strong></div>
+          <div><span>원정 전력</span><strong>{Math.round(expeditionPower)}</strong></div>
           <div><span>조총 준비</span><strong>{musterPreview.expeditionWeapons.readyMuskets} / 배정 {musterPreview.expeditionWeapons.assignedMuskets}</strong></div>
           <div><span>예상 성공</span><strong>{successText}</strong></div>
           <div className={remainingDefense < currentDefense * 0.6 ? 'danger' : ''}>
-            <span>마을 방어도</span><strong>{currentDefense} → {remainingDefense}</strong>
+            <span>마을 방어도</span><strong>{Math.round(currentDefense)} → {Math.round(remainingDefense)}</strong>
           </div>
         </div>
         {musterPreview.expeditionWeapons.dryMuskets > 0 && (
@@ -231,7 +231,7 @@ export function ExpeditionMusterDialog({
                           <strong>{resident.name}</strong>
                           <small>
                             건강 {Math.round(resident.health)} · {resident.task} · 전력 +
-                            {personalPower}{musketStatus}
+                            {Math.round(personalPower)}{musketStatus}
                           </small>
                         </span>
                       </label>

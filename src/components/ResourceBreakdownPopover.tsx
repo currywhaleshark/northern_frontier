@@ -60,7 +60,7 @@ export function ResourceBreakdownPopover({
             {item.label}
           </span>
           <span className="resource-breakdown-actions">
-            <span>{item.amount.toFixed(1)}</span>
+            <span>{Math.floor(item.amount)}</span>
             {item.spoilagePerDay !== undefined && item.spoilagePerDay > 0 && (
               <small
                 className="muted"

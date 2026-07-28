@@ -53,7 +53,7 @@ export function maybeOpenExpeditionEngagementChoice(state: GameState): void {
     title: `${targetName} 개전 결정`,
     body:
       `토벌대가 목표 지점에 도착했습니다.\n` +
-      `전투 가능 ${roster.length}명 · 전력 ${expeditionCombatPower(state, expedition.memberIds)} · ` +
+      `전투 가능 ${roster.length}명 · 전력 ${Math.round(expeditionCombatPower(state, expedition.memberIds))} · ` +
       `조총 ${weapons.readyMuskets} · 각궁 ${weapons.hornBows} · 창 ${weapons.spears}\n` +
       `자동 전투 예상 성공 ${Math.round(chance * 100)}%`,
     options: [

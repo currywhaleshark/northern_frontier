@@ -29,6 +29,8 @@ transpileDirectory(new URL('../../src/ui/', import.meta.url), join(rootDir, 'ui'
 
 const display = await import(pathToFileURL(join(rootDir, 'ui', 'resourceDisplay.mjs')).href);
 const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
+const topBarSource = readFileSync(new URL('../../src/components/TopBar.tsx', import.meta.url), 'utf8');
+const popoverSource = readFileSync(new URL('../../src/components/ResourceBreakdownPopover.tsx', import.meta.url), 'utf8');
 const {
   DISPLAY_RESOURCE_ORDER,
   RESOURCE_DISPLAY_GROUPS,
@@ -72,6 +74,14 @@ assert.equal(resourceDisplayGroupTotal(state, 'luxury'), 5,
   'the luxury display total must not double-count the separate valuables group');
 assert.equal(resourceDisplayGroupTotal(state, 'valuables'), 11,
   'the valuables display total must contain precious metal');
+assert.match(topBarSource, /Math\.floor\(resourceDisplayGroupTotal\(state, group\.id\)\)/,
+  'top-bar resource group totals must discard fractional stock');
+assert.ok((topBarSource.match(/Math\.floor\(state\.resources\[resource\]\)/g) ?? []).length >= 2,
+  'top-bar metric and starred resources must discard fractional stock');
+assert.match(popoverSource, /Math\.floor\(item\.amount\)/,
+  'resource breakdown stock amounts must discard fractional stock');
+assert.doesNotMatch(popoverSource, /item\.amount\.toFixed/,
+  'resource breakdown stock amounts must not expose fractional stock');
 
 const popoverZIndexMatch = cssSource.match(/\.resource-breakdown-popover\s*\{[^}]*z-index:\s*(\d+);/);
 const unifiedLogZIndexMatch = cssSource.match(/\.unified-log\s*\{[^}]*z-index:\s*(\d+);/);
