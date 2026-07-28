@@ -15,6 +15,7 @@ import { getSeason, getYear } from './seasons';
 import { createCombatRoster } from './combatRoster';
 import { RESIDENT_ORIGINS } from './defectors';
 import { acquireLivestock, ensureLivestockState, livestockCapacity } from './livestock';
+import { normalizeDiscoveredSpecialItems, normalizeSpecialItemInventory } from './specialItems';
 import type {
   Building,
   EpidemicState,
@@ -86,14 +87,10 @@ export function ensureIncidentState(state: GameState): void {
       epidemic: state.incidents.epidemic ?? null,
     };
   }
-  state.specialItems ??= { wildGinseng: 0, tigerPelt: 0, gyrfalcon: 0, boDecree: 0, jinDecree: 0, buDecree: 0 };
-  state.specialItems.wildGinseng ??= 0;
-  state.specialItems.tigerPelt ??= 0;
-  state.specialItems.gyrfalcon ??= 0;
-  state.specialItems.boDecree ??= 0;
-  state.specialItems.jinDecree ??= 0;
-  state.specialItems.buDecree ??= 0;
-  state.discoveredSpecialItems ??= [];
+  state.specialItems = normalizeSpecialItemInventory(state.specialItems);
+  state.discoveredSpecialItems = normalizeDiscoveredSpecialItems(state.discoveredSpecialItems);
+  const artifactMisses = Math.floor(Number(state.courtGrantArtifactMisses));
+  state.courtGrantArtifactMisses = Number.isFinite(artifactMisses) ? Math.max(0, artifactMisses) : 0;
   state.tributeWaivers ??= 0;
   for (const kind of ['wolf', 'tiger', 'boar'] as const) {
     const threat = state.incidents.predatorThreats[kind];

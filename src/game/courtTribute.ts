@@ -4,7 +4,7 @@
 import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
-import { rollCourtGrantRewards } from './courtGrants';
+import { rollCourtGrantArtifact, rollCourtGrantRewards } from './courtGrants';
 import { addLog } from './events';
 import { makeRng } from './map';
 import { acquireLivestock, LIVESTOCK_DEFS } from './livestock';
@@ -12,6 +12,7 @@ import { rankEffects } from './promotion';
 import { RESOURCE_DEFS } from './resourceCatalog';
 import { lowerSuspicion } from './suspicion';
 import { getSeason, getYear } from './seasons';
+import { grantSpecialItem, SPECIAL_ITEM_DEFS } from './specialItems';
 import {
   consumeTributeReserve, releaseTributeReserve, tributeReserveRatio,
 } from './tributeReserve';
@@ -131,7 +132,6 @@ export function openCourtTributeChoice(state: GameState): void {
 function grantFullTributeReward(state: GameState, tribute: CourtTribute): void {
   if (tribute.year % 2 !== 0) return;
   const rewards = rollCourtGrantRewards(state, tribute.year);
-  if (rewards.length === 0) return;
   const labels: string[] = [];
   for (const reward of rewards) {
     if ('resource' in reward) {
@@ -145,6 +145,14 @@ function grantFullTributeReward(state: GameState, tribute: CourtTribute): void {
       continue;
     }
     labels.push(`${LIVESTOCK_DEFS[reward.species].name} ${reward.amount}마리`);
+  }
+  const artifact = rollCourtGrantArtifact(state, tribute.year);
+  if (artifact.item) {
+    grantSpecialItem(state, artifact.item);
+    state.courtGrantArtifactMisses = 0;
+    labels.push(SPECIAL_ITEM_DEFS[artifact.item].name);
+  } else if (artifact.eligible) {
+    state.courtGrantArtifactMisses += 1;
   }
   if (labels.length === 0) return;
   const label = labels.join(', ');

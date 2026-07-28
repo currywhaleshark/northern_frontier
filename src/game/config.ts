@@ -1118,6 +1118,10 @@ export const CONFIG = {
     yearScaleMax: 1.8,
     rngYearSalt: 9203,
     rngSeedOffset: 5,
+    artifactChance: 0.12,
+    artifactPityMisses: 4,
+    artifactRngYearSalt: 17107,
+    artifactRngSeedOffset: 43,
   },
 
   // 생애 주기 — 압축 성장(총 2.5게임년) + 나이별 소비 몫 + 노년·자연사.

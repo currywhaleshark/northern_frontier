@@ -2,6 +2,7 @@
 import { CONFIG } from './config';
 import { createLivestockState, normalizeLivestockState, preflightLivestockAcquisition } from './livestock';
 import { makeRng } from './map';
+import type { SpecialItemId } from './specialItems';
 import type { GameState, LivestockId, Rank, ResourceId } from './types';
 
 export type CourtGrantResourceCategory = 'practical' | 'advanced';
@@ -31,6 +32,20 @@ export interface CourtGrantLivestockReward {
 }
 
 export type CourtGrantReward = CourtGrantResourceReward | CourtGrantLivestockReward;
+
+/** 이번 하사품 범위의 전용 기물. 이후 기물은 이 목록에 명시적으로 추가한다. */
+export const COURT_GRANT_ARTIFACT_IDS = [
+  'reliefGrainVoucher',
+  'tributeWaiverDecree',
+  'recruitmentNotice',
+  'rainGauge',
+] as const satisfies readonly SpecialItemId[];
+
+export interface CourtGrantArtifactRoll {
+  item: SpecialItemId | null;
+  eligible: boolean;
+  guaranteedByPity: boolean;
+}
 
 export interface CourtGrantLivestockCandidate {
   kind: 'livestock';
@@ -284,4 +299,29 @@ export function rollCourtGrantRewards(
     if (advanced) rewards.push(advanced);
   }
   return rewards;
+}
+
+/**
+ * 하사 기물은 물자·가축 추첨과 RNG 흐름을 공유하지 않는다. 따라서 등급, 축사
+ * 수용량, 앞선 하사 후보의 가지가 달라져도 같은 세계·연차의 당첨 여부는 같다.
+ * 기물 보유 상태는 이미 가진 것을 후보에서 빼는 데에만 사용한다.
+ */
+export function rollCourtGrantArtifact(
+  state: Pick<GameState, 'seed' | 'specialItems' | 'courtGrantArtifactMisses'>,
+  year: number,
+): CourtGrantArtifactRoll {
+  const eligibleItems = COURT_GRANT_ARTIFACT_IDS.filter(item => (state.specialItems[item] ?? 0) < 1);
+  if (eligibleItems.length === 0) {
+    return { item: null, eligible: false, guaranteedByPity: false };
+  }
+
+  const guaranteedByPity = state.courtGrantArtifactMisses >= CONFIG.courtGrants.artifactPityMisses;
+  const random = makeRng(
+    state.seed + year * CONFIG.courtGrants.artifactRngYearSalt + CONFIG.courtGrants.artifactRngSeedOffset,
+  );
+  if (!guaranteedByPity && random() >= CONFIG.courtGrants.artifactChance) {
+    return { item: null, eligible: true, guaranteedByPity: false };
+  }
+  const item = eligibleItems[Math.floor(random() * eligibleItems.length)] ?? null;
+  return { item, eligible: true, guaranteedByPity };
 }

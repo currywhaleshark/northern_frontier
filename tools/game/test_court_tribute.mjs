@@ -244,6 +244,35 @@ assert.ok(tributeScale(1, 40) > tributeScale(1, 12));
   assert.ok(state.log.some(entry => entry.text.includes('하사품이 내려왔습니다')));
 }
 
+// ── 기물 하사: 네 번의 적격 하사 실패 뒤 다섯 번째는 반드시 지급하며, 실제 완납만 천장을 진행시킨다 ──
+{
+  const state = simulation.newGame(9090);
+  const originalChance = CONFIG.courtGrants.artifactChance;
+  CONFIG.courtGrants.artifactChance = 0;
+  try {
+    for (const year of [2, 4, 6, 8]) {
+      state.courtTribute = { year, items: { grain: 1 }, dueDay: year * 48 - 11, resolved: false, paid: false };
+      state.resources.grain = 1;
+      assert.equal(setTributeReserve(state, 'grain', 1), null);
+      openCourtTributeChoice(state);
+      resolveCourtTribute(state, 'pay-full');
+    }
+    assert.equal(state.courtGrantArtifactMisses, 4, 'each eligible actual full payment records one artifact miss');
+
+    state.courtTribute = { year: 10, items: { grain: 1 }, dueDay: 469, resolved: false, paid: false };
+    state.resources.grain = 1;
+    assert.equal(setTributeReserve(state, 'grain', 1), null);
+    openCourtTributeChoice(state);
+    resolveCourtTribute(state, 'pay-full');
+    assert.equal(state.courtGrantArtifactMisses, 0, 'a pity award resets the miss counter');
+    assert.ok(['reliefGrainVoucher', 'tributeWaiverDecree', 'recruitmentNotice', 'rainGauge']
+      .some(item => state.specialItems[item] === 1), 'the fifth eligible grant gives one court artifact');
+    assert.ok(state.discoveredSpecialItems.some(item => state.specialItems[item] > 0), 'artifact inventory and discovery update together');
+  } finally {
+    CONFIG.courtGrants.artifactChance = originalChance;
+  }
+}
+
 // ── 부분 납부: 품목별 충족률 평균 + 비례 불이익 ──
 {
   const state = simulation.newGame(2026071020);

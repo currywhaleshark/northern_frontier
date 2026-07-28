@@ -30,7 +30,9 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
 const {
   COURT_GRANT_RESOURCE_CANDIDATES,
   COURT_GRANT_LIVESTOCK_CANDIDATES,
+  COURT_GRANT_ARTIFACT_IDS,
   grantYearScale,
+  rollCourtGrantArtifact,
   rollCourtGrantRewards,
   rollCourtGrantResources,
 } = grants;
@@ -41,6 +43,11 @@ assert.equal(grantYearScale(11), 1.8);
 assert.equal(grantYearScale(30), 1.8);
 assert.equal(CONFIG.courtGrants.extraPracticalChance, 0.4);
 assert.equal(CONFIG.courtGrants.advancedChance, 0.35);
+assert.equal(CONFIG.courtGrants.artifactChance, 0.12);
+assert.equal(CONFIG.courtGrants.artifactPityMisses, 4);
+assert.deepEqual(COURT_GRANT_ARTIFACT_IDS, [
+  'reliefGrainVoucher', 'tributeWaiverDecree', 'recruitmentNotice', 'rainGauge',
+]);
 
 assert.ok(!COURT_GRANT_RESOURCE_CANDIDATES.some(candidate => candidate.resource === 'strawShoes'));
 assert.ok(!COURT_GRANT_RESOURCE_CANDIDATES.some(candidate => candidate.resource === 'hay'));
@@ -131,6 +138,63 @@ function addEmptyStable(state) {
   assert.equal(warhorseReward.species, 'horse', 'warhorse candidate always grants horses');
   assert.equal(generalReward.amount, Math.round(2 * grantYearScale(2)));
   assert.equal(warhorseReward.amount, Math.round(1 * grantYearScale(2)));
+}
+
+function artifactRollState(seed, misses = 0) {
+  const state = simulation.newGame(seed);
+  state.courtGrantArtifactMisses = misses;
+  return state;
+}
+
+// 기물 당첨은 같은 세계·연차에서 결정적이고, 물자 풀/등급/축사 가지와 RNG를 공유하지 않는다.
+{
+  const first = rollCourtGrantArtifact(artifactRollState(20260728), 2);
+  const second = rollCourtGrantArtifact(artifactRollState(20260728), 2);
+  assert.deepEqual(first, second, 'artifact roll is deterministic for a seed and year');
+
+  const alteredBranch = artifactRollState(20260728);
+  alteredBranch.rank = 'bu';
+  addEmptyStable(alteredBranch);
+  addEmptyStable(alteredBranch);
+  assert.deepEqual(
+    rollCourtGrantArtifact(alteredBranch, 2),
+    first,
+    'artifact hit/miss never depends on rank, resource pool, or stable branch RNG use',
+  );
+}
+
+// 이미 가진 기물은 후보에서 빠지며, 소비형은 수량이 0이 되면 다시 후보가 된다.
+{
+  const originalChance = CONFIG.courtGrants.artifactChance;
+  CONFIG.courtGrants.artifactChance = 1;
+  try {
+    const state = artifactRollState(77);
+    state.specialItems.reliefGrainVoucher = 1;
+    const excluded = rollCourtGrantArtifact(state, 2);
+    assert.notEqual(excluded.item, 'reliefGrainVoucher', 'owned one-shot item is excluded until consumed');
+    state.specialItems.reliefGrainVoucher = 0;
+    let sawVoucher = false;
+    for (let seed = 1; seed <= 100; seed++) {
+      if (rollCourtGrantArtifact(artifactRollState(seed), 2).item === 'reliefGrainVoucher') sawVoucher = true;
+    }
+    assert.ok(sawVoucher, 'a consumed one-shot item becomes eligible again');
+  } finally {
+    CONFIG.courtGrants.artifactChance = originalChance;
+  }
+}
+
+// 적격 후보가 모두 비면 천장을 소모하지 않고, 네 번 놓친 뒤 다음 적격 하사는 반드시 지급한다.
+{
+  const empty = artifactRollState(5, 4);
+  for (const item of COURT_GRANT_ARTIFACT_IDS) empty.specialItems[item] = 1;
+  assert.deepEqual(rollCourtGrantArtifact(empty, 10), {
+    item: null, eligible: false, guaranteedByPity: false,
+  }, 'an empty artifact pool does not produce or consume a pity result');
+
+  const pity = rollCourtGrantArtifact(artifactRollState(5, 4), 10);
+  assert.equal(pity.eligible, true);
+  assert.equal(pity.guaranteedByPity, true);
+  assert.ok(pity.item, 'the fifth eligible grant is guaranteed after four misses');
 }
 
 // 한 하사에서 같은 가축 하사 유형이 두 번 나오지 않는다.

@@ -23,6 +23,10 @@ import { RESOURCE_IDS } from './resourceCatalog';
 import { reconcileTributeReserve } from './tributeReserve';
 import { reconcileResidentHomes } from './residents';
 import { ensureIncidentState } from './specialEvents';
+import {
+  normalizeDiscoveredSpecialItems,
+  normalizeSpecialItemInventory,
+} from './specialItems';
 import { specialResidentDefinition } from './specialResidents';
 import { TUTORIAL_SCENARIO_VERSION, TUTORIAL_STEPS } from './scenario';
 import { ensureForeignSiteState, revealForeignSitesFromExploration } from './foreignSites';
@@ -371,14 +375,10 @@ export function migrateV29ToV30(raw: RawSave): RawSave {
 // 이미 승격한 구 저장은 지나온 단계의 교지를 소급 보관해 진행을 잃지 않는다.
 export function migrateV30ToV31(raw: RawSave): RawSave {
   const migrated = clonedRecord(raw);
-  const specialItems = migrated.specialItems && typeof migrated.specialItems === 'object'
-    ? { ...migrated.specialItems as RawSave }
-    : {};
-  const discovered = new Set(Array.isArray(migrated.discoveredSpecialItems)
-    ? migrated.discoveredSpecialItems.map(String)
-    : []);
+  const specialItems = normalizeSpecialItemInventory(migrated.specialItems);
+  const discovered = new Set(normalizeDiscoveredSpecialItems(migrated.discoveredSpecialItems));
   const rank = String(migrated.rank ?? 'settlement');
-  const achieved = rank === 'bu'
+  const achieved: SpecialItemId[] = rank === 'bu'
     ? ['boDecree', 'jinDecree', 'buDecree']
     : rank === 'jin'
       ? ['boDecree', 'jinDecree']
@@ -387,7 +387,7 @@ export function migrateV30ToV31(raw: RawSave): RawSave {
     specialItems[item] = Math.max(1, Number(specialItems[item]) || 0);
     discovered.add(item);
   }
-  for (const item of ['boDecree', 'jinDecree', 'buDecree']) {
+  for (const item of ['boDecree', 'jinDecree', 'buDecree'] as const) {
     specialItems[item] = Math.max(0, Number(specialItems[item]) || 0);
   }
   migrated.specialItems = specialItems;
@@ -631,6 +631,15 @@ export function migrateV38ToV39(raw: RawSave): RawSave {
   return migrated;
 }
 
+// v40: 하사 전용 기물의 5회째 보장 횟수. 구 저장은 아직 적격 하사를 놓치지 않은 것으로 시작한다.
+export function migrateV39ToV40(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const misses = Math.floor(Number(migrated.courtGrantArtifactMisses));
+  migrated.courtGrantArtifactMisses = Number.isFinite(misses) ? Math.max(0, misses) : 0;
+  migrated.schemaVersion = 40;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -675,6 +684,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 36) migrated = migrateV36ToV37(migrated);
     else if (version === 37) migrated = migrateV37ToV38(migrated);
     else if (version === 38) migrated = migrateV38ToV39(migrated);
+    else if (version === 39) migrated = migrateV39ToV40(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -1872,19 +1882,12 @@ export function loadGame(slot = 1): GameState | null {
     if (!Object.prototype.hasOwnProperty.call(parsed, 'rank')) {
       parsed.rank = parsed.gameOver?.won ? 'bo' : 'settlement';
     }
-    const specialItemIds: SpecialItemId[] = [
-      'wildGinseng', 'tigerPelt', 'gyrfalcon', 'boDecree', 'jinDecree', 'buDecree',
-    ];
-    if (!parsed.specialItems || typeof parsed.specialItems !== 'object') {
-      parsed.specialItems = {} as Record<SpecialItemId, number>;
-    }
-    for (const item of specialItemIds) {
-      const amount = Number(parsed.specialItems[item]);
-      parsed.specialItems[item] = Number.isFinite(amount) ? Math.max(0, amount) : 0;
-    }
-    parsed.discoveredSpecialItems = Array.isArray(parsed.discoveredSpecialItems)
-      ? parsed.discoveredSpecialItems.filter((item): item is SpecialItemId => specialItemIds.includes(item))
-      : [];
+    parsed.specialItems = normalizeSpecialItemInventory(parsed.specialItems);
+    parsed.discoveredSpecialItems = normalizeDiscoveredSpecialItems(parsed.discoveredSpecialItems);
+    const courtGrantArtifactMisses = Math.floor(Number(parsed.courtGrantArtifactMisses));
+    parsed.courtGrantArtifactMisses = Number.isFinite(courtGrantArtifactMisses)
+      ? Math.max(0, courtGrantArtifactMisses)
+      : 0;
     if (parsed.pendingPromotionNotice !== 'bo' && parsed.pendingPromotionNotice !== 'jin' && parsed.pendingPromotionNotice !== 'bu') {
       parsed.pendingPromotionNotice = null;
     }
