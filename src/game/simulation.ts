@@ -58,6 +58,7 @@ import {
 import { isHaulSourceBuilding } from './inventory';
 import { maybeOfferDefectorImmigration, maybeOfferImmigration, resolveImmigration } from './immigration';
 import { createIncidentState, resolveSpecialEvent, updateSpecialEvents } from './specialEvents';
+import { createSpecialItemInventory } from './specialItems';
 import { dailyClaimTensionTick, noteBuildingClaimIntrusions } from './claimZones';
 import { applyDailySpoilage, spoilageStockSnapshot } from './spoilage';
 import { consumptionWeight, lifecycleDailyTick, resolveWeddingChoice } from './lifecycle';
@@ -151,11 +152,9 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     lastImmigrationDay: -999,
     lastKimjangYear: 0,
     incidents: createIncidentState(s),
-    specialItems: {
-      wildGinseng: 0, tigerPelt: 0, gyrfalcon: 0,
-      boDecree: 0, jinDecree: 0, buDecree: 0,
-    },
+    specialItems: createSpecialItemInventory(),
     discoveredSpecialItems: [],
+    courtGrantArtifactMisses: 0,
     tributeWaivers: 0,
     pendingChoice: null,
     courtTribute: null,

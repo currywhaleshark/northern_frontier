@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 39, 'wearables migration ships with schema version 39');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 40, 'court grant artifact pity ships with schema version 40');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -75,6 +75,21 @@ assert.equal(typeof saveLoad.migrateV35ToV36, 'function');
 assert.equal(typeof saveLoad.migrateV36ToV37, 'function');
 assert.equal(typeof saveLoad.migrateV37ToV38, 'function');
 assert.equal(typeof saveLoad.migrateV38ToV39, 'function');
+assert.equal(typeof saveLoad.migrateV39ToV40, 'function');
+
+{
+  const migrated = saveLoad.migrateV39ToV40({ schemaVersion: 39, courtGrantArtifactMisses: 3.8 });
+  assert.equal(migrated.schemaVersion, 40);
+  assert.equal(migrated.courtGrantArtifactMisses, 3, 'artifact pity misses survive migration as a non-negative integer');
+  assert.equal(saveLoad.migrateV39ToV40({ schemaVersion: 39, courtGrantArtifactMisses: -2 }).courtGrantArtifactMisses, 0);
+}
+
+{
+  const state = simulation.newGame(20260728);
+  state.courtGrantArtifactMisses = 3;
+  assert.equal(saveLoad.saveGame(state), true);
+  assert.equal(saveLoad.loadGame()?.courtGrantArtifactMisses, 3, 'artifact pity counter survives a normal save/load round trip');
+}
 
 {
   const migrated = saveLoad.migrateV24ToV25({ schemaVersion: 24, tacticalBattle: { phase: 'deployment' } });
@@ -101,11 +116,20 @@ assert.equal(typeof saveLoad.migrateV38ToV39, 'function');
 }
 
 {
-  const migrated = saveLoad.migrateV30ToV31({ schemaVersion: 30, rank: 'jin', specialItems: {} });
+  const migrated = saveLoad.migrateV30ToV31({
+    schemaVersion: 30,
+    rank: 'jin',
+    specialItems: { rainGauge: 2, unknownArtifact: 9 },
+    discoveredSpecialItems: ['rainGauge', 'rainGauge', 'unknownArtifact'],
+  });
   assert.equal(migrated.schemaVersion, 31);
   assert.equal(migrated.specialItems.boDecree, 1);
   assert.equal(migrated.specialItems.jinDecree, 1);
   assert.equal(migrated.specialItems.buDecree, 0);
+  assert.equal(migrated.specialItems.reliefGrainVoucher, 0);
+  assert.equal(migrated.specialItems.rainGauge, 2);
+  assert.deepEqual(migrated.discoveredSpecialItems, ['rainGauge', 'boDecree', 'jinDecree'],
+    '기물 도감은 현재 ID만 남기고 중복을 제거하면서 승격 교지를 보존한다');
 }
 
 {

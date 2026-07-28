@@ -36,10 +36,13 @@ globalThis.localStorage = {
 
 const compiledDir = compileGameModules();
 const tributeMod = await import(pathToFileURL(join(compiledDir, 'courtTribute.mjs')).href);
+const grantsMod = await import(pathToFileURL(join(compiledDir, 'courtGrants.mjs')).href);
+const livestockMod = await import(pathToFileURL(join(compiledDir, 'livestock.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
 const reserveMod = await import(pathToFileURL(join(compiledDir, 'tributeReserve.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
+const { rollCourtGrantResources, rollCourtGrantRewards } = grantsMod;
 
 const {
   canPayTribute,
@@ -194,18 +197,80 @@ assert.ok(tributeScale(1, 40) > tributeScale(1, 12));
 {
   const state = simulation.newGame(11);
   state.courtTribute = rollCourtTribute(state.seed, 2, 12);
+  const rewards = rollCourtGrantResources(state.seed, state.courtTribute.year, state.rank);
+  const before = Object.fromEntries(rewards.map(reward => [reward.resource, state.resources[reward.resource] ?? 0]));
   for (const [res, amt] of Object.entries(state.courtTribute.items)) {
     state.resources[res] = amt;
     setTributeReserve(state, res, amt);
   }
-  const before = state.resources.tools + state.resources.cottonClothes;
+  for (const reward of rewards) before[reward.resource] = state.resources[reward.resource] ?? 0;
   openCourtTributeChoice(state);
   resolveCourtTribute(state, 'pay-full');
-  const gained = state.resources.tools + state.resources.cottonClothes - before;
-  assert.ok(
-    gained === CONFIG.tribute.rewardTools || gained === CONFIG.tribute.rewardCottonClothes,
-    `하사품 지급 (${gained})`,
-  );
+  assert.ok(rewards.length >= 1, '짝수 연차는 실용 하사품이 보장된다');
+  for (const reward of rewards) {
+    const paidAmount = state.courtTribute.items[reward.resource] ?? 0;
+    assert.equal(state.resources[reward.resource], before[reward.resource] - paidAmount + reward.amount, `하사품 지급: ${reward.resource}`);
+  }
+}
+
+// ── 진 이상 가축 하사: 기존 acquireLivestock 경로로 축사에 들어가며 축종을 해금한다 ──
+{
+  let scenario = null;
+  for (let seed = 1; seed <= 500 && !scenario; seed++) {
+    const state = simulation.newGame(seed);
+    state.rank = 'jin';
+    const stable = {
+      id: state.nextBuildingId++, type: 'stable', x: 4, y: 4,
+      progress: 9, built: true, fieldGrowth: 0,
+      livestock: livestockMod.createLivestockState('chicken', 0),
+    };
+    state.buildings.push(stable);
+    const rewards = rollCourtGrantRewards(state, 2);
+    const livestockReward = rewards.find(reward => reward.kind === 'livestock');
+    if (livestockReward) scenario = { state, stable, livestockReward };
+  }
+  assert.ok(scenario, 'an eligible livestock grant scenario exists');
+  const { state, stable, livestockReward } = scenario;
+  state.courtTribute = rollCourtTribute(state.seed, 2, 12, state.rank);
+  for (const [res, amount] of Object.entries(state.courtTribute.items)) {
+    state.resources[res] = amount;
+    assert.equal(setTributeReserve(state, res, amount), null);
+  }
+  openCourtTributeChoice(state);
+  resolveCourtTribute(state, 'pay-full');
+  assert.equal(stable.livestock.species, livestockReward.species);
+  assert.equal(stable.livestock.headcount, livestockReward.amount);
+  assert.ok(state.unlockedLivestock.includes(livestockReward.species));
+  assert.ok(state.log.some(entry => entry.text.includes('하사품이 내려왔습니다')));
+}
+
+// ── 기물 하사: 네 번의 적격 하사 실패 뒤 다섯 번째는 반드시 지급하며, 실제 완납만 천장을 진행시킨다 ──
+{
+  const state = simulation.newGame(9090);
+  const originalChance = CONFIG.courtGrants.artifactChance;
+  CONFIG.courtGrants.artifactChance = 0;
+  try {
+    for (const year of [2, 4, 6, 8]) {
+      state.courtTribute = { year, items: { grain: 1 }, dueDay: year * 48 - 11, resolved: false, paid: false };
+      state.resources.grain = 1;
+      assert.equal(setTributeReserve(state, 'grain', 1), null);
+      openCourtTributeChoice(state);
+      resolveCourtTribute(state, 'pay-full');
+    }
+    assert.equal(state.courtGrantArtifactMisses, 4, 'each eligible actual full payment records one artifact miss');
+
+    state.courtTribute = { year: 10, items: { grain: 1 }, dueDay: 469, resolved: false, paid: false };
+    state.resources.grain = 1;
+    assert.equal(setTributeReserve(state, 'grain', 1), null);
+    openCourtTributeChoice(state);
+    resolveCourtTribute(state, 'pay-full');
+    assert.equal(state.courtGrantArtifactMisses, 0, 'a pity award resets the miss counter');
+    assert.ok(['reliefGrainVoucher', 'tributeWaiverDecree', 'recruitmentNotice', 'rainGauge']
+      .some(item => state.specialItems[item] === 1), 'the fifth eligible grant gives one court artifact');
+    assert.ok(state.discoveredSpecialItems.some(item => state.specialItems[item] > 0), 'artifact inventory and discovery update together');
+  } finally {
+    CONFIG.courtGrants.artifactChance = originalChance;
+  }
 }
 
 // ── 부분 납부: 품목별 충족률 평균 + 비례 불이익 ──

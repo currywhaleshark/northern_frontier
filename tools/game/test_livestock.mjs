@@ -165,6 +165,22 @@ function addStable(
   assert.equal(emptyStable.livestock.headcount, 2);
 }
 
+// 하사품 후보 판정은 acquireLivestock와 같은 축사·수용량 규칙을 쓴다.
+{
+  const state = simulation.newGame(2026071722);
+  const emptyStable = addStable(state, 0, 'chicken');
+  const preflight = livestock.preflightLivestockAcquisition(state, 'goat', 2);
+  assert.equal(preflight.canAcquire, true);
+  assert.deepEqual(preflight.eligibleStableIds, [emptyStable.id]);
+  assert.equal(livestock.acquireLivestock(state, 'goat', 2), null);
+  assert.equal(emptyStable.livestock.species, 'goat');
+  assert.equal(emptyStable.livestock.headcount, 2);
+
+  const full = livestock.preflightLivestockAcquisition(state, 'goat', CONFIG.livestock.goat.capacity);
+  assert.equal(full.canAcquire, false, 'the same filled stable is not eligible for an oversized grant');
+  assert.match(livestock.acquireLivestock(state, 'goat', CONFIG.livestock.goat.capacity), /부족/);
+}
+
 {
   const state = simulation.newGame(2026071714);
   const stable = addStable(state, 2, 'sheep');

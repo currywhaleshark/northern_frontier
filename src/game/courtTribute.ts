@@ -4,12 +4,15 @@
 import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
+import { rollCourtGrantArtifact, rollCourtGrantRewards } from './courtGrants';
 import { addLog } from './events';
 import { makeRng } from './map';
+import { acquireLivestock, LIVESTOCK_DEFS } from './livestock';
 import { rankEffects } from './promotion';
 import { RESOURCE_DEFS } from './resourceCatalog';
 import { lowerSuspicion } from './suspicion';
 import { getSeason, getYear } from './seasons';
+import { grantSpecialItem, SPECIAL_ITEM_DEFS } from './specialItems';
 import {
   consumeTributeReserve, releaseTributeReserve, tributeReserveRatio,
 } from './tributeReserve';
@@ -117,6 +120,13 @@ export function openCourtTributeChoice(state: GameState): void {
         disabledReason: (state.resources.silver ?? 0) < tributeSilverCost(tribute) ? '은이 부족합니다' : undefined,
       },
       {
+        id: 'use-waiver-decree',
+        label: '교지를 내보인다',
+        desc: '면세 교지 1장을 내어 올해 세공을 면제받습니다. 명성이나 하사품은 없습니다.',
+        disabled: (state.specialItems.tributeWaiverDecree ?? 0) < 1,
+        disabledReason: (state.specialItems.tributeWaiverDecree ?? 0) < 1 ? '내보일 면세 교지가 없습니다' : undefined,
+      },
+      {
         id: 'refuse',
         label: '올해는 바치지 못한다',
         desc: `명성 -${repLoss}, 위협 +${t.threatFail}. 조정의 눈 밖에 나고 국경이 험악해집니다.`,
@@ -127,25 +137,81 @@ export function openCourtTributeChoice(state: GameState): void {
 }
 
 function grantFullTributeReward(state: GameState, tribute: CourtTribute): void {
-  const t = CONFIG.tribute;
   if (tribute.year % 2 !== 0) return;
-  const rng = makeRng(state.seed + tribute.year * 9203 + 5);
-  if (rng() < 0.5) {
-    state.resources.tools += t.rewardTools;
-    addLog(state, `조정에서 하사품이 내려왔습니다. 도구 ${withJosa(t.rewardTools, '을/를')} 받았습니다.`, 'good', true);
-  } else {
-    state.resources.cottonClothes += t.rewardCottonClothes;
-    addLog(state, `조정에서 하사품이 내려왔습니다. 무명옷 ${t.rewardCottonClothes}벌을 받았습니다.`, 'good', true);
+  const rewards = rollCourtGrantRewards(state, tribute.year);
+  const labels: string[] = [];
+  for (const reward of rewards) {
+    if ('resource' in reward) {
+      state.resources[reward.resource] = (state.resources[reward.resource] ?? 0) + reward.amount;
+      labels.push(`${RESOURCE_NAMES[reward.resource]} ${reward.amount}`);
+      continue;
+    }
+    const error = acquireLivestock(state, reward.species, reward.amount);
+    if (error) {
+      addLog(state, `조정의 ${LIVESTOCK_DEFS[reward.species].name} 하사품을 들이지 못했습니다: ${error}`, 'bad', true);
+      continue;
+    }
+    labels.push(`${LIVESTOCK_DEFS[reward.species].name} ${reward.amount}마리`);
   }
+  const artifact = rollCourtGrantArtifact(state, tribute.year);
+  if (artifact.item) {
+    grantSpecialItem(state, artifact.item);
+    state.courtGrantArtifactMisses = 0;
+    labels.push(SPECIAL_ITEM_DEFS[artifact.item].name);
+  } else if (artifact.eligible) {
+    state.courtGrantArtifactMisses += 1;
+  }
+  if (labels.length === 0) return;
+  const label = labels.join(', ');
+  addLog(state, `조정에서 하사품이 내려왔습니다. 받은 물목: ${label}.`, 'good', true);
+}
+
+/**
+ * 조정이 허한 면제는 실제 납부와 달리 명성·하사품을 주지 않는다. 산삼/해동청
+ * 면제권과 하사 면세 교지가 같은 결산 경로를 써서 연속 납부만 유지하게 한다.
+ */
+export function resolveTributeWaiver(
+  state: GameState,
+  source: 'legacy' | 'tributeWaiverDecree',
+): boolean {
+  const tribute = state.courtTribute;
+  if (!tribute || tribute.resolved) return false;
+  if (source === 'legacy') {
+    if (state.tributeWaivers < 1) return false;
+    state.tributeWaivers -= 1;
+  } else {
+    if ((state.specialItems.tributeWaiverDecree ?? 0) < 1) return false;
+    state.specialItems.tributeWaiverDecree -= 1;
+  }
+  releaseTributeReserve(state);
+  tribute.paid = true;
+  tribute.resolved = true;
+  state.tributeFailStreak = 0;
+  state.tributePaidStreak += 1;
+  lowerSuspicion(state, CONFIG.suspicion.tributeDecay);
+  if (state.pendingChoice?.kind === 'tribute') state.pendingChoice = null;
+  addLog(
+    state,
+    source === 'legacy'
+      ? '산삼 진상의 공으로 올해 세공이 면제되었습니다. 조정은 이를 성실 납부로 인정했습니다.'
+      : '조정의 면세 교지를 내보여 올해 세공을 면제받았습니다. 성실 납부는 유지되지만 별도 하사품은 없습니다.',
+    'good',
+    true,
+  );
+  return true;
 }
 
 // 세공 선택 처리 — 효과 적용 + resolved 표시 + 모달 해제
 export function resolveCourtTribute(state: GameState, optionId: string): void {
   const c = state.pendingChoice;
   if (!c || c.kind !== 'tribute') return;
-  state.pendingChoice = null;
   const tribute = state.courtTribute;
   if (!tribute || tribute.resolved) return;
+  if (optionId === 'use-waiver-decree') {
+    if (resolveTributeWaiver(state, 'tributeWaiverDecree')) state.pendingChoice = null;
+    return;
+  }
+  state.pendingChoice = null;
   const t = CONFIG.tribute;
   if (optionId === 'pay') optionId = 'pay-full';
   tribute.resolved = true;
@@ -223,14 +289,7 @@ export function maybeCollectTribute(state: GameState): void {
   if (!state.courtTribute || state.courtTribute.resolved) return;
   if (state.pendingChoice || state.battle) return;
   if (state.tributeWaivers > 0) {
-    releaseTributeReserve(state);
-    state.tributeWaivers -= 1;
-    state.courtTribute.resolved = true;
-    state.courtTribute.paid = true;
-    state.tributeFailStreak = 0;
-    state.tributePaidStreak += 1;
-    lowerSuspicion(state, CONFIG.suspicion.tributeDecay);
-    addLog(state, '산삼 진상의 공으로 올해 세공이 면제되었습니다. 조정은 이를 성실 납부로 인정했습니다.', 'good', true);
+    resolveTributeWaiver(state, 'legacy');
     return;
   }
   openCourtTributeChoice(state);

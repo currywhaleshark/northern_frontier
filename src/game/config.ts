@@ -245,10 +245,8 @@ export const CONFIG = {
     tigerWeight: 2,
     ginsengWeight: 2,
     boarWeight: 4,
-    plagueWeight: 3,
     grainRequisitionWeight: 2,
     shipwreckWeight: 2,
-    earlyFrostWeight: 3,
     gyrfalconWeight: 1.5,
     wolfCooldownDays: 48,
     tigerCooldownDays: 96,
@@ -278,7 +276,6 @@ export const CONFIG = {
     boarTrapWood: 8,
     boarTrapTools: 1,
     boarTrapSuccessChance: 0.72,
-    plagueRealChance: 0.42,
     plagueIsolationDays: 7,
     plagueObservationDays: 3,
     epidemicDays: [10, 14] as const,
@@ -290,6 +287,36 @@ export const CONFIG = {
     gyrfalconWarningBonus: 0.25,
     ginsengTradeValue: 24,
     tigerPeltTradeValue: 18,
+  },
+
+  disasters: {
+    earlyFrost: {
+      occurrenceBaseWeight: 3,
+      // temperatureAnomaly가 -1인 한랭 해에는 최대 1.45배, +1인 온난 해에는 0.55배다.
+      occurrenceTemperatureCoefficient: -0.45,
+      occurrenceMinMultiplier: 0.55,
+      occurrenceMaxMultiplier: 1.45,
+      waitHarvestBaseClearChance: 0.57,
+      waitHarvestTemperatureCoefficient: 0.15,
+      waitHarvestMinClearChance: 0.42,
+      waitHarvestMaxClearChance: 0.72,
+    },
+    plagueSuspicion: {
+      occurrenceBaseWeight: 3,
+      // 온난·다습하고 궂은 해일수록 의심 환자가 사건 후보에 오를 가중치가 높다.
+      occurrenceTemperatureCoefficient: 0.2,
+      occurrencePrecipitationCoefficient: 0.25,
+      occurrenceStorminessCoefficient: 0.15,
+      occurrenceMinMultiplier: 0.55,
+      occurrenceMaxMultiplier: 1.55,
+      // 의심 증상이 실제 역병일 확률. 발생 가중치보다 좁은 범위로 제한한다.
+      realBaseChance: 0.42,
+      realTemperatureCoefficient: 0.06,
+      realPrecipitationCoefficient: 0.08,
+      realStorminessCoefficient: 0.04,
+      realMinChance: 0.28,
+      realMaxChance: 0.56,
+    },
   },
 
   production: {
@@ -1104,12 +1131,25 @@ export const CONFIG = {
     threatFail: 8,         // 미납 시 위협도 상승
     partialFailStreakAvoidRatio: 0.5,
     partialSuspicionDecayMult: 0.5,
-    rewardTools: 2,        // 격년 하사품 (도구 또는 옷, 결정적 롤)
-    rewardCottonClothes: 3,
     // 은 대납 — 요구 품목의 교역 가치 총합을 은 시세로 환산해 한 번에 치른다
     silverPayMarkup: 1.1,           // 환산가에 얹는 웃돈 (조정 몫의 예우)
     silverPayRepBonus: 2,           // 현물 납부 대비 추가 명성
     silverPaySuspicionDecayMult: 1.5, // 은까지 바치는 성실함 — 의심을 더 깊이 씻는다
+  },
+
+  // 격년 세공 완납 하사품 — 후보표는 courtGrants.ts에, 공통 추첨 상수는 여기 둔다.
+  courtGrants: {
+    extraPracticalChance: 0.4,
+    advancedChance: 0.35,
+    yearScalePerYear: 0.08,
+    yearScaleMax: 1.8,
+    rngYearSalt: 9203,
+    rngSeedOffset: 5,
+    artifactChance: 0.12,
+    artifactPityMisses: 4,
+    artifactRngYearSalt: 17107,
+    artifactRngSeedOffset: 43,
+    reliefGrainVoucherAmount: 48,
   },
 
   // 생애 주기 — 압축 성장(총 2.5게임년) + 나이별 소비 몫 + 노년·자연사.

@@ -1,0 +1,134 @@
+// 연간 기후를 재해 발생 가중치와 선택 결과 확률로 변환하는 단일 원본.
+import { annualClimate, annualClimateSummary, type AnnualClimate } from './climate';
+import { CONFIG } from './config';
+import { getYear } from './seasons';
+import type { GameState } from './types';
+
+export type ClimateDisasterEventId = 'earlyFrost' | 'plagueSuspicion';
+
+type DisasterState = Pick<GameState, 'seed' | 'day' | 'specialItems'>;
+type ClimateState = Pick<GameState, 'seed' | 'day'>;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function currentClimate(state: ClimateState): AnnualClimate {
+  return annualClimate(state.seed, getYear(state.day));
+}
+
+function earlyFrostOccurrenceWeight(climate: AnnualClimate): number {
+  const config = CONFIG.disasters.earlyFrost;
+  const multiplier = clamp(
+    1 + climate.temperatureAnomaly * config.occurrenceTemperatureCoefficient,
+    config.occurrenceMinMultiplier,
+    config.occurrenceMaxMultiplier,
+  );
+  return config.occurrenceBaseWeight * multiplier;
+}
+
+function plagueOccurrenceWeight(climate: AnnualClimate): number {
+  const config = CONFIG.disasters.plagueSuspicion;
+  const multiplier = clamp(
+    1 +
+      climate.temperatureAnomaly * config.occurrenceTemperatureCoefficient +
+      climate.precipitationAnomaly * config.occurrencePrecipitationCoefficient +
+      climate.storminess * config.occurrenceStorminessCoefficient,
+    config.occurrenceMinMultiplier,
+    config.occurrenceMaxMultiplier,
+  );
+  return config.occurrenceBaseWeight * multiplier;
+}
+
+/**
+ * 현재 연도의 재해 후보 가중치다. 연간 기후는 시드와 연차에서 재생성하므로
+ * 이 계산은 시뮬레이션 RNG를 소비하지 않는다.
+ */
+export function disasterOccurrenceWeightForClimate(
+  climate: AnnualClimate,
+  eventId: ClimateDisasterEventId,
+): number {
+  return eventId === 'earlyFrost'
+    ? earlyFrostOccurrenceWeight(climate)
+    : plagueOccurrenceWeight(climate);
+}
+
+export function disasterOccurrenceWeight(
+  state: ClimateState,
+  eventId: ClimateDisasterEventId,
+): number {
+  return disasterOccurrenceWeightForClimate(currentClimate(state), eventId);
+}
+
+function earlyFrostWaitHarvestChance(climate: AnnualClimate): number {
+  const config = CONFIG.disasters.earlyFrost;
+  return clamp(
+    config.waitHarvestBaseClearChance +
+      climate.temperatureAnomaly * config.waitHarvestTemperatureCoefficient,
+    config.waitHarvestMinClearChance,
+    config.waitHarvestMaxClearChance,
+  );
+}
+
+function plagueRealChance(climate: AnnualClimate): number {
+  const config = CONFIG.disasters.plagueSuspicion;
+  return clamp(
+    config.realBaseChance +
+      climate.temperatureAnomaly * config.realTemperatureCoefficient +
+      climate.precipitationAnomaly * config.realPrecipitationCoefficient +
+      climate.storminess * config.realStorminessCoefficient,
+    config.realMinChance,
+    config.realMaxChance,
+  );
+}
+
+/**
+ * 재해 선택·판정에 쓰는 실제 확률이다.
+ *
+ * `plagueSuspicion/real-case`는 플레이어 선택지는 아니지만 의심 환자가 실제
+ * 역병인지 결정하는 동일한 기후 확률 계약으로 등록한다.
+ */
+export function disasterChoiceChanceForClimate(
+  climate: AnnualClimate,
+  eventId: ClimateDisasterEventId,
+  optionId: string,
+): number {
+  if (eventId === 'earlyFrost' && optionId === 'wait-harvest') {
+    return earlyFrostWaitHarvestChance(climate);
+  }
+  if (eventId === 'plagueSuspicion' && optionId === 'real-case') {
+    return plagueRealChance(climate);
+  }
+  return 0;
+}
+
+export function disasterChoiceChance(
+  state: ClimateState,
+  eventId: ClimateDisasterEventId,
+  optionId: string,
+): number {
+  return disasterChoiceChanceForClimate(currentClimate(state), eventId, optionId);
+}
+
+/**
+ * 측우기 보유자에게만 공개하는 선택지 관측 문구다.
+ * 표시 숫자와 실제 판정은 모두 disasterChoiceChance를 호출한다.
+ */
+export function disasterChoiceForecast(
+  state: DisasterState,
+  eventId: ClimateDisasterEventId,
+  optionId: string,
+): string | null {
+  if ((state.specialItems?.rainGauge ?? 0) <= 0) return null;
+  if (eventId === 'earlyFrost' && optionId === 'wait-harvest') {
+    const percent = Math.round(disasterChoiceChance(state, eventId, optionId) * 100);
+    return `올해 관측상 서리가 걷힐 가능성 ${percent}%. 버티지 못하면 소출 대부분을 잃습니다.`;
+  }
+  return null;
+}
+
+/** 측우기 보유자에게만 보이는 현재 연도 관측 요약이다. */
+export function rainGaugeClimateSummary(state: DisasterState): string | null {
+  if ((state.specialItems?.rainGauge ?? 0) <= 0) return null;
+  return annualClimateSummary(currentClimate(state));
+}

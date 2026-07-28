@@ -53,6 +53,7 @@ import { toggleNitreYards } from './game/suspicion';
 import { setProcessingReserve } from './game/processing';
 import { setTributeReserve } from './game/tributeReserve';
 import { openPredatorHunt, startPredatorScout } from './game/specialEvents';
+import { useSpecialItem } from './game/specialItemActions';
 import { getPointerAction, selectedEntityAfterTileClick } from './game/selectionActions';
 import { makeRng } from './game/map';
 import { openTerritoryOrderConfirmation } from './game/territory';
@@ -954,6 +955,14 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     bump();
   };
 
+  const handleUseSpecialItem = (item: SpecialItemId) => {
+    if (item !== 'reliefGrainVoucher' && item !== 'tributeWaiverDecree' && item !== 'recruitmentNotice') return;
+    const error = useSpecialItem(stateRef.current, item);
+    if (error) notify(error, 'info');
+    else playSfx('good');
+    bump();
+  };
+
   const handleCancelBuildingConstruction = (buildingId: number) => {
     const err = cancelBuildingConstruction(stateRef.current, buildingId);
     if (err) {
@@ -1693,6 +1702,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                         state={stateRef.current}
                         onOrganizeHunt={handleOrganizeHunt}
                         onScoutPredator={handleScoutPredator}
+                        onUseSpecialItem={handleUseSpecialItem}
                       />
                     )}
                   </RuntimeVersionBoundary>

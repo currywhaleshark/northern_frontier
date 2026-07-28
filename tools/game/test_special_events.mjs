@@ -125,18 +125,31 @@ const tribute = await import(pathToFileURL(join(compiledDir, 'courtTribute.mjs')
 }
 
 {
+  const state = simulation.newGame(4455);
+  state.courtTribute.resolved = true;
+  state.courtTribute.paid = true;
+  onlyEvent(state, 'wildGinseng');
+  assert.equal(specialEvents.maybeOpenSpecialEvent(state, () => 0), true);
+  specialEvents.resolveSpecialEvent(state, 'present', () => 0);
+  assert.match(state.log.at(-1).text, /내년 세공/, '이미 처리된 해의 면제권은 다음 해에 쓰인다고 안내한다');
+}
+
+{
   const state = simulation.newGame(5505);
   delete state.incidents;
   delete state.specialItems;
   delete state.discoveredSpecialItems;
+  delete state.courtGrantArtifactMisses;
   delete state.tributeWaivers;
   specialEvents.ensureIncidentState(state);
   assert.ok(state.incidents.scheduledDays.length >= 1);
   assert.deepEqual(state.specialItems, {
     wildGinseng: 0, tigerPelt: 0, gyrfalcon: 0,
     boDecree: 0, jinDecree: 0, buDecree: 0,
+    reliefGrainVoucher: 0, tributeWaiverDecree: 0, recruitmentNotice: 0, rainGauge: 0,
   });
   assert.deepEqual(state.discoveredSpecialItems, []);
+  assert.equal(state.courtGrantArtifactMisses, 0);
   assert.equal(state.tributeWaivers, 0);
 }
 
