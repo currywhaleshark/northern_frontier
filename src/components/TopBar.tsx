@@ -8,6 +8,8 @@ import { avg, livingResidents, residentHome } from '../game/residents';
 import { getDayOfSeason, getSeason, getYear } from '../game/seasons';
 import { spoilagePreview } from '../game/spoilage';
 import { tributeReserved, tributeReserveRatio } from '../game/tributeReserve';
+import { contractsInGrace, daysUntilNextContract } from '../game/tradeContracts';
+import { contractReadinessRatio } from '../game/tradeContractReserve';
 import {
   DISPLAY_RESOURCE_ORDER,
   METRIC_RESOURCE_IDS,
@@ -37,12 +39,13 @@ interface Props {
   setSpeed: (s: number) => void;
   onOpenMenu: () => void;
   onOpenCourt: () => void;
+  onOpenFactions: () => void;
   uiPrefs: UiPrefs;
   onUiPrefsChange: (update: (current: UiPrefs) => UiPrefs) => void;
 }
 
 export function TopBar({
-  state, speed, setSpeed, onOpenMenu, onOpenCourt, uiPrefs, onUiPrefsChange,
+  state, speed, setSpeed, onOpenMenu, onOpenCourt, onOpenFactions, uiPrefs, onUiPrefsChange,
 }: Props) {
   const living = livingResidents(state);
   const pop = living.length;
@@ -60,6 +63,11 @@ export function TopBar({
   const crackdownDays = state.crackdownDeadline > 0
     ? Math.max(0, state.crackdownDeadline - state.day)
     : 0;
+  // 정기거래는 세공과 달리 요약만 — 계약이 쌓이면 품목별 전개가 곧 피로가 된다
+  const contractCount = (state.tradeContracts ?? []).length;
+  const contractDays = contractCount > 0 ? daysUntilNextContract(state) : null;
+  const contractGrace = contractCount > 0 ? contractsInGrace(state)[0] ?? null : null;
+  const contractReady = contractCount > 0 ? contractReadinessRatio(state) >= 1 : true;
   const promotionTarget = state.victoryProgressNote ? nextRank(state.rank) : null;
   const scenarioStep = currentScenarioStep(state);
   const spoilage = spoilagePreview(state);
@@ -143,7 +151,7 @@ export function TopBar({
           </div>
         )}
       </div>
-      {(scenarioStep || tribute || state.crackdownDeadline > 0 || promotionTarget) && (
+      {(scenarioStep || tribute || contractCount > 0 || state.crackdownDeadline > 0 || promotionTarget) && (
         <div className="topbar-objectives" aria-label="지속 관리 항목">
           {scenarioStep && (
             <div className="ongoing-objective scenario" title="길잡이 시나리오의 현재 목표">
@@ -172,6 +180,32 @@ export function TopBar({
                   </span>
                 ))}
               </span>
+            </button>
+          )}
+          {contractCount > 0 && (
+            <button
+              type="button"
+              className={`ongoing-objective contract${contractGrace ? ' urgent' : contractReady ? '' : ' warn'}`}
+              title="세력 창에서 정기거래 계약 확인"
+              onClick={onOpenFactions}
+            >
+              <span className="objective-title">정기거래</span>
+              {contractGrace ? (
+                <>
+                  <span className="objective-deadline">유예 {contractGrace.daysLeft}일</span>
+                  <span className="objective-summary">
+                    {RESOURCE_NAMES[contractGrace.contract.give]} {contractGrace.shortfall} 부족
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="objective-deadline">{contractCount}건</span>
+                  <span className="objective-summary">
+                    {contractDays != null ? `다음 ${contractDays}일` : '만료 대기'}
+                    {!contractReady && ' ⚠'}
+                  </span>
+                </>
+              )}
             </button>
           )}
           {state.crackdownDeadline > 0 && (

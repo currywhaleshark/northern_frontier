@@ -9,6 +9,8 @@ import {
 import { activePhysicianCount } from '../game/medicine';
 import { getDayOfSeason, getSeason } from '../game/seasons';
 import { firewoodWeatherMult } from '../game/weather';
+import { contractsInGrace } from '../game/tradeContracts';
+import { RESOURCE_NAMES } from '../game/constants';
 import type { AlertItem, GameState } from '../game/types';
 
 export function computeAlerts(state: GameState): AlertItem[] {
@@ -101,6 +103,16 @@ export function computeAlerts(state: GameState): AlertItem[] {
       id: 'buildingDamage',
       text: `습격 피해: 건물 ${damagedBuildings}채가 파손되었습니다. 건설담당이 수리를 우선합니다.`,
       level: 'danger',
+    });
+  }
+
+  // 정기거래 유예 — 기한 안에 못 채우면 불이행이 되고 연속 2회면 계약이 파기된다
+  for (const grace of contractsInGrace(state)) {
+    alerts.push({
+      id: `tradeContractGrace-${grace.contract.factionName}-${grace.contract.get}`,
+      text: `정기거래 물량 부족 — ${grace.daysLeft}일 내 ` +
+        `${RESOURCE_NAMES[grace.contract.give]} ${grace.shortfall} 필요 (${grace.contract.factionName})`,
+      level: grace.daysLeft <= 1 ? 'danger' : 'warn',
     });
   }
 
