@@ -16,7 +16,10 @@ import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { weatherForDay } from './weather';
 import { createCombatRoster } from './combatRoster';
 import { RESIDENT_ORIGINS } from './defectors';
-import { acquireLivestock, ensureLivestockState, livestockCapacity } from './livestock';
+import {
+  acquireLivestock, ensureLivestockState, LIVESTOCK_DEFS, livestockCapacity, loseStableLivestock,
+  slaughterStableLivestock,
+} from './livestock';
 import { normalizeDiscoveredSpecialItems, normalizeSpecialItemInventory } from './specialItems';
 import {
   disasterChoiceChance,
@@ -32,6 +35,9 @@ import type {
   EpidemicState,
   GameState,
   IncidentState,
+  LivestockEpidemicGroup,
+  LivestockEpidemicState,
+  LivestockId,
   Resident,
   ResourceId,
   PredatorKind,
@@ -46,6 +52,7 @@ const EVENT_COOLDOWNS: Record<SpecialEventId, number> = {
   boar: CONFIG.specialEvents.boarCooldownDays,
   wildGinseng: CONFIG.specialEvents.ginsengCooldownDays,
   plagueSuspicion: CONFIG.specialEvents.plagueCooldownDays,
+  livestockEpidemic: CONFIG.specialEvents.livestockEpidemicCooldownDays,
   grainRequisition: CONFIG.specialEvents.grainRequisitionCooldownDays,
   shipwreck: CONFIG.specialEvents.shipwreckCooldownDays,
   earlyFrost: CONFIG.specialEvents.earlyFrostCooldownDays,
@@ -57,6 +64,24 @@ const EVENT_COOLDOWNS: Record<SpecialEventId, number> = {
 };
 
 const FOOD_RESOURCES: ResourceId[] = ['grain', 'rice', 'meat', 'eggs', 'milk', 'fish', 'vegetables', 'beans'];
+
+const LIVESTOCK_EPIDEMIC_GROUPS: Record<LivestockEpidemicGroup, readonly LivestockId[]> = {
+  ruminant: ['cattle', 'sheep', 'goat'],
+  pig: ['pig'],
+  chicken: ['chicken'],
+  horse: ['horse'],
+};
+
+const LIVESTOCK_EPIDEMIC_NAMES: Record<LivestockEpidemicGroup, string> = {
+  ruminant: '우역',
+  pig: '저역',
+  chicken: '계역',
+  horse: '마역',
+};
+
+function isLivestockEpidemicGroup(value: unknown): value is LivestockEpidemicGroup {
+  return typeof value === 'string' && value in LIVESTOCK_EPIDEMIC_GROUPS;
+}
 
 function incidentSchedule(seed: number, year: number): number[] {
   const rng = makeRng(seed + year * 15485863 + 41);
@@ -78,6 +103,7 @@ export function createIncidentState(seed: number, year = 1): IncidentState {
     predatorThreats: {},
     plagueCase: null,
     epidemic: null,
+    livestockEpidemic: null,
   };
 }
 
@@ -95,6 +121,7 @@ export function ensureIncidentState(state: GameState): void {
   state.incidents.predatorThreats ??= {};
   state.incidents.plagueCase ??= null;
   state.incidents.epidemic ??= null;
+  state.incidents.livestockEpidemic ??= null;
   if (state.incidents.epidemic) {
     const epidemic = state.incidents.epidemic;
     epidemic.infectedIds = [...new Set((epidemic.infectedIds ?? [])
@@ -122,6 +149,37 @@ export function ensureIncidentState(state: GameState): void {
       return [id, Number.isFinite(infectedOnDay) ? infectedOnDay : epidemic.startedDay ?? state.day];
     }));
   }
+  if (state.incidents.livestockEpidemic) {
+    const epidemic = state.incidents.livestockEpidemic;
+    if (!isLivestockEpidemicGroup(epidemic.group)) {
+      state.incidents.livestockEpidemic = null;
+    } else {
+      epidemic.infectedStableIds = [...new Set((epidemic.infectedStableIds ?? [])
+        .map(Number)
+        .filter(Number.isFinite)
+        .map(Math.floor)
+        .filter(id => id >= 1))];
+      epidemic.mode = epidemic.mode === 'pending' ? 'pending' : 'isolated';
+      epidemic.startedDay = nonnegativeInteger(epidemic.startedDay, state.day) || state.day;
+      epidemic.quietDays = nonnegativeInteger(epidemic.quietDays);
+      epidemic.newInfectedStableIds = [...new Set((epidemic.newInfectedStableIds ?? [])
+        .map(Number)
+        .filter(Number.isFinite)
+        .map(Math.floor)
+        .filter(id => id >= 1))];
+      epidemic.totalDeaths = nonnegativeInteger(epidemic.totalDeaths);
+      epidemic.totalCulled = nonnegativeInteger(epidemic.totalCulled);
+      epidemic.recoveredStableIds = [...new Set((epidemic.recoveredStableIds ?? [])
+        .map(Number)
+        .filter(Number.isFinite)
+        .map(Math.floor)
+        .filter(id => id >= 1))];
+      epidemic.infectedSince = Object.fromEntries(epidemic.infectedStableIds.map(id => {
+        const infectedOnDay = Number(epidemic.infectedSince?.[id]);
+        return [id, Number.isFinite(infectedOnDay) ? infectedOnDay : epidemic.startedDay];
+      }));
+    }
+  }
   if (state.incidents.year !== year) {
     state.incidents = {
       year,
@@ -131,6 +189,7 @@ export function ensureIncidentState(state: GameState): void {
       predatorThreats: state.incidents.predatorThreats ?? {},
       plagueCase: state.incidents.plagueCase ?? null,
       epidemic: state.incidents.epidemic ?? null,
+      livestockEpidemic: state.incidents.livestockEpidemic ?? null,
     };
   }
   state.specialItems = normalizeSpecialItemInventory(state.specialItems);
@@ -472,6 +531,85 @@ export function epidemicOccurrenceWeight(state: GameState): number {
     populationMultiplier * crowdingMultiplier * homelessMultiplier * seasonMultiplier;
 }
 
+function livestockEpidemicGroupFor(species: LivestockId): LivestockEpidemicGroup {
+  if (species === 'cattle' || species === 'sheep' || species === 'goat') return 'ruminant';
+  if (species === 'pig') return 'pig';
+  if (species === 'horse') return 'horse';
+  return 'chicken';
+}
+
+function livestockEpidemicStables(state: GameState, group: LivestockEpidemicGroup): Building[] {
+  return state.buildings.filter(building => {
+    if (building.type !== 'stable' || !building.built) return false;
+    const livestock = ensureLivestockState(building);
+    return livestock.headcount > 0 && livestockEpidemicGroupFor(livestock.species) === group;
+  });
+}
+
+function livestockEpidemicGroups(state: GameState): Array<{ value: LivestockEpidemicGroup; weight: number }> {
+  const config = CONFIG.disasters.livestockEpidemic;
+  return (Object.keys(LIVESTOCK_EPIDEMIC_GROUPS) as LivestockEpidemicGroup[]).flatMap(group => {
+    const headcount = livestockEpidemicStables(state, group)
+      .reduce((sum, stable) => sum + ensureLivestockState(stable).headcount, 0);
+    return headcount > 0 ? [{ value: group, weight: 1 + headcount * config.headcountWeight }] : [];
+  });
+}
+
+export function livestockEpidemicOccurrenceWeight(state: GameState): number {
+  return livestockEpidemicGroups(state).length > 0
+    ? disasterOccurrenceWeight(state, 'livestockEpidemic')
+    : 0;
+}
+
+function livestockEpidemicGroupLabel(group: LivestockEpidemicGroup): string {
+  return LIVESTOCK_EPIDEMIC_GROUPS[group].map(species => LIVESTOCK_DEFS[species].name).join('·');
+}
+
+function openLivestockEpidemicEvent(state: GameState, rng: () => number): void {
+  const groups = livestockEpidemicGroups(state);
+  if (groups.length === 0) return;
+  const group = weightedPick(rng, groups);
+  const stables = livestockEpidemicStables(state, group);
+  const stable = weightedPick(rng, stables.map(candidate => ({
+    value: candidate,
+    weight: ensureLivestockState(candidate).headcount,
+  })));
+  const livestock = ensureLivestockState(stable);
+  const epidemicName = LIVESTOCK_EPIDEMIC_NAMES[group];
+  state.incidents.livestockEpidemic = {
+    group,
+    infectedStableIds: [stable.id],
+    mode: 'pending',
+    startedDay: state.day,
+    quietDays: 0,
+    newInfectedStableIds: [],
+    totalDeaths: 0,
+    totalCulled: 0,
+    recoveredStableIds: [],
+    infectedSince: { [stable.id]: state.day },
+  };
+  state.pendingChoice = {
+    kind: 'incident',
+    title: `${epidemicName} 발생`,
+    body: `${livestockEpidemicGroupLabel(group)} 축사에서 ${epidemicName} 기운이 발견됐습니다. ` +
+      `${LIVESTOCK_DEFS[livestock.species].name} ${livestock.headcount}마리가 든 축사입니다.`,
+    options: [
+      {
+        id: 'cull-livestock',
+        label: '도살 처분한다',
+        desc: `감염 축사 가축의 약 ${Math.round(CONFIG.disasters.livestockEpidemic.cullRatio * 100)}%를 도축해 고기와 가죽 일부를 회수하고 확산을 끝냅니다.`,
+      },
+      {
+        id: 'isolate-livestock',
+        label: '격리하고 버틴다',
+        desc: '목동이 돌보는 동안 자연 회복을 기다립니다. 다른 축사로 번지거나 축사가 비어 버릴 수 있습니다.',
+      },
+    ],
+    data: { eventId: 'livestockEpidemic' },
+  };
+  recordAnnals(state, 'disaster', `${epidemicName}이 발생했습니다. ${livestockEpidemicGroupLabel(group)} 축사가 위험합니다.`);
+}
+
 function locustFarms(state: GameState): Building[] {
   return standingFarms(state).filter(building => sownAreaOf(building) > 0);
 }
@@ -620,6 +758,10 @@ export function maybeOpenSpecialEvent(state: GameState, rng: () => number): bool
   if (!state.incidents.plagueCase && !state.incidents.epidemic && livingResidents(state).length > 2 && ready('plagueSuspicion')) {
     candidates.push({ value: 'plagueSuspicion', weight: epidemicOccurrenceWeight(state) });
   }
+  if (!state.incidents.livestockEpidemic && ready('livestockEpidemic')) {
+    const livestockWeight = livestockEpidemicOccurrenceWeight(state);
+    if (livestockWeight > 0) candidates.push({ value: 'livestockEpidemic', weight: livestockWeight });
+  }
   if (ready('grainRequisition')) candidates.push({ value: 'grainRequisition', weight: CONFIG.specialEvents.grainRequisitionWeight });
   if (riverExists && ready('shipwreck')) candidates.push({ value: 'shipwreck', weight: CONFIG.specialEvents.shipwreckWeight });
   if (farms.length > 0 && season === 'autumn' &&
@@ -648,6 +790,7 @@ export function maybeOpenSpecialEvent(state: GameState, rng: () => number): bool
   state.incidents.cooldownUntil[eventId] = state.day + EVENT_COOLDOWNS[eventId];
   if (eventId === 'wildGinseng') openGinsengEvent(state);
   else if (eventId === 'plagueSuspicion') openPlagueSuspicionEvent(state, rng);
+  else if (eventId === 'livestockEpidemic') openLivestockEpidemicEvent(state, rng);
   else if (eventId === 'grainRequisition') openGrainRequisitionEvent(state);
   else if (eventId === 'shipwreck') openShipwreckEvent(state);
   else if (eventId === 'earlyFrost') openEarlyFrostEvent(state, rng);
@@ -1203,6 +1346,37 @@ function resolveHorseDefectors(state: GameState, optionId: string, rng: () => nu
   );
 }
 
+function resolveLivestockEpidemic(state: GameState, optionId: string): void {
+  const epidemic = state.incidents.livestockEpidemic;
+  if (!epidemic) return;
+  const epidemicName = LIVESTOCK_EPIDEMIC_NAMES[epidemic.group];
+  if (optionId === 'cull-livestock') {
+    let culled = 0;
+    for (const stableId of epidemic.infectedStableIds) {
+      const stable = state.buildings.find(building => building.id === stableId && building.type === 'stable' && building.built);
+      if (!stable) continue;
+      const livestock = ensureLivestockState(stable);
+      const requested = Math.min(
+        livestock.headcount,
+        Math.max(1, Math.ceil(livestock.headcount * CONFIG.disasters.livestockEpidemic.cullRatio)),
+      );
+      const before = livestock.headcount;
+      if (requested > 0 && slaughterStableLivestock(state, stable.id, requested) == null) {
+        culled += before - ensureLivestockState(stable).headcount;
+      }
+    }
+    epidemic.totalCulled = (epidemic.totalCulled ?? 0) + culled;
+    state.incidents.livestockEpidemic = null;
+    addLog(state, `${epidemicName} 감염 축사에서 가축 ${culled}마리를 처분해 확산을 막았습니다.`, 'info', true);
+    recordAnnals(state, 'disaster', `${epidemicName} 발생 뒤 가축 ${culled}마리를 도살 처분해 확산을 막았습니다.`);
+    return;
+  }
+  if (optionId === 'isolate-livestock') {
+    epidemic.mode = 'isolated';
+    addLog(state, `${epidemicName} 축사를 격리했습니다. 목동이 돌보는 동안 다른 축사 전염과 폐사를 경계합니다.`, 'bad', true);
+  }
+}
+
 export function resolveSpecialEvent(state: GameState, optionId: string, rng: () => number): void {
   const choice = state.pendingChoice;
   if (!choice || choice.kind !== 'incident') return;
@@ -1213,6 +1387,7 @@ export function resolveSpecialEvent(state: GameState, optionId: string, rng: () 
   if (eventId === 'wildGinseng') return resolveGinseng(state, optionId);
   if (eventId === 'plagueSuspicion') return resolvePlagueSuspicion(state, optionId, choice.data);
   if (eventId === 'plagueOutbreak') return resolveEpidemic(state, optionId);
+  if (eventId === 'livestockEpidemic') return resolveLivestockEpidemic(state, optionId);
   if (eventId === 'grainRequisition') return resolveGrainRequisition(state, optionId, choice.data.amount as number);
   if (eventId === 'shipwreck') return resolveShipwreck(state, optionId);
   if (eventId === 'earlyFrost') return resolveEarlyFrost(state, optionId, choice.data.targetBuildingId as number);
@@ -1510,6 +1685,95 @@ function updateEpidemic(state: GameState, rng: () => number): void {
   }
 }
 
+function hasLivestockEpidemicHerder(state: GameState, stableId: number): boolean {
+  return state.residents.some(resident =>
+    resident.alive &&
+    !resident.sick &&
+    resident.job === 'herder' &&
+    resident.assignedBuildingId === stableId &&
+    state.day >= (resident.quarantinedUntil ?? 0));
+}
+
+function finishLivestockEpidemic(state: GameState, epidemic: LivestockEpidemicState): void {
+  const epidemicName = LIVESTOCK_EPIDEMIC_NAMES[epidemic.group];
+  state.incidents.livestockEpidemic = null;
+  const summary = `폐사 ${epidemic.totalDeaths ?? 0}마리, 처분 ${epidemic.totalCulled ?? 0}마리`;
+  addLog(state, `${epidemicName}이 잦아들었습니다. (${summary})`, 'good', true);
+  recordAnnals(state, 'disaster', `${epidemicName}이 잦아들었습니다. ${summary}.`);
+}
+
+function updateLivestockEpidemic(state: GameState, rng: () => number): void {
+  const epidemic = state.incidents.livestockEpidemic;
+  if (!epidemic || epidemic.mode === 'pending') return;
+  const config = CONFIG.disasters.livestockEpidemic;
+  epidemic.infectedSince ??= Object.fromEntries(epidemic.infectedStableIds.map(id => [id, epidemic.startedDay]));
+  epidemic.infectedStableIds = epidemic.infectedStableIds.filter(stableId => {
+    const stable = state.buildings.find(building => building.id === stableId && building.type === 'stable' && building.built);
+    return stable != null && ensureLivestockState(stable).headcount > 0 &&
+      livestockEpidemicGroupFor(ensureLivestockState(stable).species) === epidemic.group;
+  });
+  const infectedStables = epidemic.infectedStableIds
+    .map(stableId => state.buildings.find(building => building.id === stableId && building.type === 'stable' && building.built))
+    .filter((stable): stable is Building => stable != null);
+  const newlyInfected = new Set<number>();
+  const recovered = new Set<number>();
+  let deaths = 0;
+
+  for (const stable of infectedStables) {
+    const livestock = ensureLivestockState(stable);
+    const caredFor = hasLivestockEpidemicHerder(state, stable.id);
+    const deathChance = config.dailyDeathChance *
+      (caredFor ? config.herderDeathMultiplier : config.unattendedDeathMultiplier);
+    let stableDeaths = 0;
+    for (let animal = 0; animal < livestock.headcount; animal++) {
+      if (rng() < deathChance) stableDeaths++;
+    }
+    deaths += loseStableLivestock(state, stable.id, stableDeaths);
+    const remaining = ensureLivestockState(stable).headcount;
+    if (remaining <= 0) {
+      delete epidemic.infectedSince[stable.id];
+      continue;
+    }
+
+    const spreadTargets = livestockEpidemicStables(state, epidemic.group)
+      .filter(candidate => !epidemic.infectedStableIds.includes(candidate.id) && !newlyInfected.has(candidate.id));
+    const spreadChance = config.spreadChance * (caredFor ? config.herderSpreadMultiplier : 1);
+    if (spreadTargets.length > 0 && rng() < spreadChance) {
+      const target = spreadTargets[Math.floor(rng() * spreadTargets.length)];
+      if (target) newlyInfected.add(target.id);
+    }
+
+    const infectedDays = state.day - (epidemic.infectedSince[stable.id] ?? epidemic.startedDay);
+    const recoveryChance = config.recoveryChance + (caredFor ? config.herderRecoveryBonus : 0);
+    if (infectedDays >= config.minimumRecoveryDays && rng() < recoveryChance) {
+      recovered.add(stable.id);
+      delete epidemic.infectedSince[stable.id];
+    }
+  }
+
+  for (const stableId of newlyInfected) {
+    epidemic.infectedStableIds.push(stableId);
+    epidemic.infectedSince[stableId] = state.day;
+  }
+  epidemic.newInfectedStableIds = [...newlyInfected];
+  epidemic.quietDays = newlyInfected.size === 0 ? (epidemic.quietDays ?? 0) + 1 : 0;
+  epidemic.totalDeaths = (epidemic.totalDeaths ?? 0) + deaths;
+  epidemic.recoveredStableIds = [...new Set([...(epidemic.recoveredStableIds ?? []), ...recovered])];
+  epidemic.infectedStableIds = epidemic.infectedStableIds.filter(stableId => {
+    if (recovered.has(stableId)) return false;
+    const stable = state.buildings.find(building => building.id === stableId && building.type === 'stable' && building.built);
+    return stable != null && ensureLivestockState(stable).headcount > 0;
+  });
+
+  const epidemicName = LIVESTOCK_EPIDEMIC_NAMES[epidemic.group];
+  if (deaths > 0) addLog(state, `${epidemicName}으로 가축 ${deaths}마리가 폐사했습니다.`, 'bad', true);
+  if (newlyInfected.size > 0) {
+    addLog(state, `${epidemicName}이 같은 축종군의 축사 ${newlyInfected.size}곳으로 번졌습니다.`, 'bad', true);
+  }
+  if (recovered.size > 0) addLog(state, `${epidemicName} 감염 축사 ${recovered.size}곳이 고비를 넘겼습니다.`, 'good');
+  if (epidemic.infectedStableIds.length === 0) finishLivestockEpidemic(state, epidemic);
+}
+
 function updatePredatorScouting(state: GameState): void {
   for (const kind of ['wolf', 'tiger'] as const) {
     const threat = state.incidents.predatorThreats[kind];
@@ -1578,6 +1842,7 @@ export function updateSpecialEvents(state: GameState, rng: () => number): void {
 
   updatePlagueCase(state);
   updateEpidemic(state, rng);
+  updateLivestockEpidemic(state, rng);
   if (!state.pendingChoice) maybeOpenHorseDefectorEvent(state, rng);
   if (!state.pendingChoice) maybeOpenSpecialEvent(state, rng);
 }

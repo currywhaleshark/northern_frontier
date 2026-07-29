@@ -466,3 +466,17 @@ export function slaughterStableLivestock(state: GameState, buildingId: number, a
   );
   return null;
 }
+
+/** 질병·습격처럼 산출물 없이 가축 수만 줄어드는 경로의 단일 정합성 처리다. */
+export function loseStableLivestock(state: GameState, buildingId: number, amount: number): number {
+  const stable = state.buildings.find(building => building.id === buildingId);
+  if (!stable || stable.type !== 'stable' || !stable.built) return 0;
+  const livestock = ensureLivestockState(stable);
+  const lost = Math.min(livestock.headcount, Math.max(0, Math.floor(finiteNonNegative(amount))));
+  if (lost <= 0) return 0;
+  livestock.headcount -= lost;
+  livestock.growth = Math.min(livestock.growth, livestock.headcount > 0 ? 0.999999 : 0);
+  reconcileMountAssignments(state);
+  reconcilePlowOxen(state);
+  return lost;
+}

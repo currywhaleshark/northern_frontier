@@ -125,6 +125,25 @@ export function InspectorPanel({ state, onOrganizeHunt, onScoutPredator, onUseSp
           </div>
         </div>
       )}
+      {state.incidents.livestockEpidemic && (
+        <div className="incident-threat danger">
+          <div>
+            <strong>{state.incidents.livestockEpidemic.group === 'ruminant' ? '우역 유행' :
+              state.incidents.livestockEpidemic.group === 'pig' ? '저역 유행' :
+                state.incidents.livestockEpidemic.group === 'horse' ? '마역 유행' : '계역 유행'}</strong>
+            <span>감염 축사 {state.incidents.livestockEpidemic.infectedStableIds.length}곳</span>
+          </div>
+          <div className="muted small">
+            {state.incidents.livestockEpidemic.mode === 'pending' ? '대응 결정 대기 중' : '격리 중 · 목동이 있으면 폐사와 전염이 줄어듭니다'}
+            {' · '}오늘 새 감염 {state.incidents.livestockEpidemic.newInfectedStableIds?.length ?? 0}곳
+          </div>
+          <div className="muted small">
+            폐사 {state.incidents.livestockEpidemic.totalDeaths ?? 0}마리
+            {' · '}처분 {state.incidents.livestockEpidemic.totalCulled ?? 0}마리
+            {' · '}회복 축사 {state.incidents.livestockEpidemic.recoveredStableIds?.length ?? 0}곳
+          </div>
+        </div>
+      )}
 
       <div className="panel-title" style={{ marginTop: 10 }}>기물함</div>
       {climateSummary && (

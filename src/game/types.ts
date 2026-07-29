@@ -709,7 +709,8 @@ export type PredatorKind = 'wolf' | 'tiger';
 export type TigerTier = 'tiger' | 'greatTiger' | 'mountainLord';
 export type WildlifeKind = PredatorKind | 'boar';
 export type SpecialEventId = WildlifeKind | 'wildGinseng' | 'plagueSuspicion' | 'grainRequisition' |
-  'shipwreck' | 'earlyFrost' | 'lateFrost' | 'locust' | 'drought' | 'gyrfalcon' | 'horseDefectors';
+  'shipwreck' | 'earlyFrost' | 'lateFrost' | 'locust' | 'drought' | 'gyrfalcon' | 'horseDefectors' |
+  'livestockEpidemic';
 
 export type DisasterId =
   | 'earlyFrost'
@@ -788,6 +789,21 @@ export interface EpidemicState {
   infectedSince?: Record<number, number>;
 }
 
+export type LivestockEpidemicGroup = 'ruminant' | 'pig' | 'chicken' | 'horse';
+
+export interface LivestockEpidemicState {
+  group: LivestockEpidemicGroup;
+  infectedStableIds: number[];
+  mode: 'pending' | 'isolated';
+  startedDay: number;
+  quietDays?: number;
+  newInfectedStableIds?: number[];
+  totalDeaths?: number;
+  totalCulled?: number;
+  recoveredStableIds?: number[];
+  infectedSince?: Record<number, number>;
+}
+
 export interface IncidentState {
   year: number;
   scheduledDays: number[];
@@ -796,6 +812,7 @@ export interface IncidentState {
   predatorThreats: Partial<Record<WildlifeKind, PredatorThreat>>;
   plagueCase: PlagueCase | null;
   epidemic: EpidemicState | null;
+  livestockEpidemic: LivestockEpidemicState | null;
 }
 
 // 조정 세공(歲貢) — 봄 첫날 그해 요구량이 공지되고, 겨울 첫날 사자가 거둬 간다

@@ -82,6 +82,17 @@ export function computeAlerts(state: GameState): AlertItem[] {
     }
   }
 
+  if (state.incidents?.livestockEpidemic) {
+    const epidemic = state.incidents.livestockEpidemic;
+    const epidemicName = epidemic.group === 'ruminant' ? '우역' :
+      epidemic.group === 'pig' ? '저역' : epidemic.group === 'horse' ? '마역' : '계역';
+    alerts.push({
+      id: 'livestockEpidemic',
+      text: `${epidemicName} 유행: 감염 축사 ${epidemic.infectedStableIds.length}곳 · 오늘 새 감염 ${epidemic.newInfectedStableIds?.length ?? 0}곳 · 폐사 ${epidemic.totalDeaths ?? 0}마리.`,
+      level: 'danger',
+    });
+  }
+
   const warmth = avg(state, 'warmth');
   if (warmth < 30) alerts.push({ id: 'cold2', text: '주민들이 얼어붙고 있습니다! 장작과 옷, 온돌집이 필요합니다.', level: 'danger' });
   else if (warmth < 45) alerts.push({ id: 'cold1', text: '추위 위험: 주민 평균 체온이 낮습니다.', level: 'warn' });

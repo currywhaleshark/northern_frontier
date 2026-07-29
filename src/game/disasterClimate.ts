@@ -5,7 +5,8 @@ import { makeRng } from './map';
 import { getYear } from './seasons';
 import type { GameState } from './types';
 
-export type ClimateDisasterEventId = 'earlyFrost' | 'lateFrost' | 'locust' | 'drought' | 'plagueSuspicion';
+export type ClimateDisasterEventId =
+  'earlyFrost' | 'lateFrost' | 'locust' | 'drought' | 'plagueSuspicion' | 'livestockEpidemic';
 
 type DisasterState = Pick<GameState, 'seed' | 'day' | 'specialItems'>;
 type ClimateState = Pick<GameState, 'seed' | 'day'>;
@@ -75,6 +76,11 @@ function plagueOccurrenceWeight(climate: AnnualClimate): number {
   return config.occurrenceBaseWeight * multiplier;
 }
 
+function livestockEpidemicOccurrenceWeight(_climate: AnnualClimate): number {
+  // 축종군과 사육 두수는 사건 쪽에서 판정한다. 기후는 이 재해의 발생 요인이 아니다.
+  return CONFIG.disasters.livestockEpidemic.occurrenceBaseWeight;
+}
+
 /**
  * 현재 연도의 재해 후보 가중치다. 연간 기후는 시드와 연차에서 재생성하므로
  * 이 계산은 시뮬레이션 RNG를 소비하지 않는다.
@@ -87,6 +93,7 @@ export function disasterOccurrenceWeightForClimate(
   if (eventId === 'lateFrost') return lateFrostOccurrenceWeight(climate);
   if (eventId === 'locust') return locustOccurrenceWeight(climate);
   if (eventId === 'drought') return droughtOccurrenceWeight(climate);
+  if (eventId === 'livestockEpidemic') return livestockEpidemicOccurrenceWeight(climate);
   return plagueOccurrenceWeight(climate);
 }
 
