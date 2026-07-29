@@ -1,5 +1,8 @@
 # Militia Weapon Visuals Implementation Plan
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — 무기별 민병 스프라이트와 무기 생산 연결을 구현했다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add visible 수비병 weapon variants for 창, 각궁, and 조총 while keeping the existing `militia` job and battle math.

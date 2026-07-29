@@ -1,5 +1,8 @@
 # River Mask Tileset Builder Implementation Plan
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — 마스크 생성·검증·프리뷰와 타일 시트 출력을 완료했다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a deterministic Python/Pillow pipeline that creates, validates, and previews 28px Folk Warm river autotiles from fixed connector masks.

@@ -1,5 +1,8 @@
 # 전술전 확장 2단계 Phase 0 기준선
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — Phase 0 golden과 전투 계약 기준선을 확보했다.
+
 > 측정일: 2026-07-19
 > 기준 커밋: `b8305e4` (`Document tactical combat expansion phase 2`)
 > 백엔드 브랜치: `codex/combat-expansion-phase-2-backend`

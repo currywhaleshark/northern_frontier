@@ -1,5 +1,8 @@
 # Building Worker Slots Implementation Plan
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — 배정 모델·저장 마이그레이션·UI·생산 연결을 완료했다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add building-level worker slots so selected production buildings only operate when residents are assigned to their slots, with visible occupancy and both resident-to-building and building-to-resident assignment controls.

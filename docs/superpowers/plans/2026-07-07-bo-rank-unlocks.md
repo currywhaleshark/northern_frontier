@@ -1,5 +1,8 @@
 # Bo Rank Unlocks Implementation Plan
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — 보 등급 건물과 직업 해금을 구현했다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add the first `보(堡)` promotion unlock tier with rank-gated buildings, rank-gated jobs, bridge movement, mining, fishing, and build/job UI filtering.

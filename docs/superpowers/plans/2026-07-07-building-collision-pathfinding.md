@@ -1,5 +1,8 @@
 # Building Collision Pathfinding Implementation Plan
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — 건물 점유영역 충돌과 주민 길찾기에 반영했다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make solid buildings block residents and route pathfinding around them with A*.

@@ -1,5 +1,8 @@
 # Resource Logistics And Trade Overhaul Implementation Plan
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — 자원·물류·소비·연료·작물·의복·가치 교역 범위가 후속 구현에 반영됐다.
+
 **Status:** Implemented and verified on 2026-07-10. The review amendments below are the final contracts used by the code.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

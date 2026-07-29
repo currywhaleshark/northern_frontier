@@ -1,5 +1,8 @@
 # Jin Rank Unlocks and Ferry Placement
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — 진 등급 건물·직업 해금과 나루 배치를 구현했다.
+
 ## Goal
 
 Implement the first Jin-rank expansion pass:

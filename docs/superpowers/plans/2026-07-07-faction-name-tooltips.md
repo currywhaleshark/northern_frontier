@@ -1,5 +1,8 @@
 # Faction Name Tooltips Implementation Plan
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — 세력 색상명과 설명 툴팁을 구현했다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace dense `Faction(desc)` modal text with colored faction names whose native tooltips show the faction description.

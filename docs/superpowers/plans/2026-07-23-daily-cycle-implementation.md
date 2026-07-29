@@ -1,5 +1,8 @@
 # 하루 생활 사이클 구현 계획 — Codex/Fable 오케스트레이션
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — M0~M7, 통합·성능 게이트, 2026-07-24 최종 감사를 완료했다.
+
 - 작성일: 2026-07-23 (Fable 초안, 2026-07-24 Codex 협의 반영)
 - 설계 원전: `docs/DESIGN-2026-07-23-daily-cycle.md`
 - 체제 선례: `docs/superpowers/plans/2026-07-19-tactical-combat-expansion-phase-2.md`의 분업·계약 원칙 계승

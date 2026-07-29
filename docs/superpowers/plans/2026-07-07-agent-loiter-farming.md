@@ -1,5 +1,8 @@
 # Agent Loiter Farming Implementation Plan
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — 작업자가 지정 경작지에 머무는 동작과 회귀 테스트를 반영했다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add natural no-work loitering and keep farmers near fields during non-harvest field care.

@@ -1,5 +1,8 @@
 # Processing Reserves Implementation Plan
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — 가공 중지선과 비축 조절 UI를 구현했다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let the player reserve raw resources so automatic processing does not consume tribute or construction stockpiles.

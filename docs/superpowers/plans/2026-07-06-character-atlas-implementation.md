@@ -1,5 +1,8 @@
 # Historical Character Atlas Implementation Plan
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — 성별 메타데이터, 아틀라스 에셋, 주민 렌더 연결을 완료했다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add persistent resident gender data, generate a coordinated historical character atlas, and render gendered residents plus mounted `마적` raiders through the existing SpriteAPI boundary.

@@ -1,5 +1,8 @@
 # Wall Family Gate Implementation Plan
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — 성벽 계열 문 통행·습격 차단·철거·UI를 구현했다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add one shared `gate` building that connects to the whole wall family, lets residents pass, blocks raiders, supports wall-family demolition, and renders connected wall lines.

@@ -1,5 +1,8 @@
 # Topdown Building Regeneration Implementation Plan
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — 계절 건물 에셋을 재생성하고 렌더 경로에 연결했다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Regenerate the base generated building art so all non-field buildings use the newer top-down visual direction while fields stay unchanged.

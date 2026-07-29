@@ -1,5 +1,8 @@
 # Farm Food Yield Implementation Plan
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — 경작지 식량 산출 조정을 반영했다.
+
 ## Goal
 
 Make agriculture feel like the strongest food source per tile, especially for 50+ population winters.

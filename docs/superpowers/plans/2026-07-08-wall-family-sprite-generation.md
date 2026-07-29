@@ -1,5 +1,8 @@
 # Modular Wall Sprite Implementation Plan
 
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-07-29 — 모듈 시트 생성·검증과 성벽 렌더 연결을 완료했다.
+
 > **For agentic workers:** The previous 16-mask/bitmask wall-family route is retired. Do not regenerate or extend the 16-mask sheets unless the user explicitly asks to return to that approach.
 
 **Goal:** Ship a compact three-piece modular wall sprite system for normal wall rendering: `pillar`, `horizontal`, and `vertical` per material and season.
