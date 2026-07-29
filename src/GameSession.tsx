@@ -14,6 +14,7 @@ import {
 } from './game/simulation';
 import { forestTilesInArea, forestTilesInFootprint } from './game/landClearing';
 import { ClearingConfirmDialog } from './components/ClearingConfirmDialog';
+import { RoyalPlaqueConfirmDialog } from './components/RoyalPlaqueConfirmDialog';
 import { hasAnySave, loadGame, saveGame } from './game/saveLoad';
 import { addLog, negotiateTrade, requestTrade, tradeNegotiationOf } from './game/events';
 import { jobWorkforceCounts } from './game/residents';
@@ -56,6 +57,7 @@ import { cancelTradeContract, signTradeContract } from './game/tradeContracts';
 import { setTradeContractReserve } from './game/tradeContractReserve';
 import { openPredatorHunt, startPredatorScout } from './game/specialEvents';
 import { useSpecialItem } from './game/specialItemActions';
+import { installRoyalPlaque, royalPlaqueInstallError } from './game/royalPlaque';
 import { getPointerAction, selectedEntityAfterTileClick } from './game/selectionActions';
 import { makeRng } from './game/map';
 import { openTerritoryOrderConfirmation } from './game/territory';
@@ -306,6 +308,9 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   const [clearingRequest, setClearingRequest] = useState<
     { title: string; trees: number; detail: string; confirm: () => void } | null
   >(null);
+  const [royalPlaqueRequest, setRoyalPlaqueRequest] = useState<
+    { buildingId: number; buildingName: string } | null
+  >(null);
   const [selected, setSelected] = useState<{ x: number; y: number } | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
   const [canLoad, setCanLoad] = useState(hasAnySave());
@@ -397,6 +402,15 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   });
 
   const state = stateRef.current;
+  const royalPlaqueModalConflict = Boolean(
+    clearingRequest || gameMenuView != null || slotDialogMode != null ||
+    weaponDialogOpen || edictDialogOpen || expeditionMusterRequest != null ||
+    state.pendingChoice || state.pendingPromotionNotice || state.battle || state.tacticalBattle ||
+    state.tacticalBattleReport || state.gameOver,
+  );
+  useEffect(() => {
+    if (royalPlaqueRequest && royalPlaqueModalConflict) setRoyalPlaqueRequest(null);
+  }, [royalPlaqueRequest, royalPlaqueModalConflict]);
   const musicScene = state.tacticalBattle || state.tacticalBattleReport || state.battle
     ? 'battle'
     : 'simulation';
@@ -836,6 +850,11 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   const handleStartBuildingDemolition = (buildingId: number) => {
     const building = stateRef.current.buildings.find(candidate => candidate.id === buildingId);
     if (!building) return;
+    if (stateRef.current.royalPlaqueBuildingId === buildingId) {
+      notify('왕이 내린 사액 현판이 걸린 건물은 해체할 수 없습니다.', 'bad');
+      bump();
+      return;
+    }
     if (!window.confirm(`${withJosa(BUILDING_DEFS[building.type].name, '을/를')} 해체할까요? 건축가가 작업을 마치면 자재 일부만 돌아옵니다.`)) return;
     const err = startBuildingDemolition(stateRef.current, buildingId);
     if (err) notify(err, 'bad');
@@ -851,10 +870,59 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       bump();
       return;
     }
+    if (stateRef.current.royalPlaqueBuildingId === buildingId) {
+      notify('왕이 내린 사액 현판이 걸린 건물은 이전할 수 없습니다.', 'bad');
+      bump();
+      return;
+    }
     setPlacingType(null);
     setPastureStableId(null);
     setExpandingBuildingId(null);
     setRelocatingBuildingId(buildingId);
+  };
+
+  const handleRequestRoyalPlaqueInstallation = (buildingId: number) => {
+    const current = stateRef.current;
+    if (
+      clearingRequest || royalPlaqueRequest || gameMenuView != null || slotDialogMode != null ||
+      weaponDialogOpen || edictDialogOpen || expeditionMusterRequest != null ||
+      current.pendingChoice || current.pendingPromotionNotice || current.battle || current.tacticalBattle ||
+      current.tacticalBattleReport || current.gameOver
+    ) {
+      notify('다른 선택이나 확인을 마친 뒤 사액 현판을 설치하십시오.', 'info');
+      return;
+    }
+    const error = royalPlaqueInstallError(current, buildingId);
+    if (error) {
+      notify(error, 'bad');
+      bump();
+      return;
+    }
+    const building = current.buildings.find(candidate => candidate.id === buildingId);
+    if (!building) return;
+    setRoyalPlaqueRequest({
+      buildingId,
+      buildingName: BUILDING_DEFS[building.type].name,
+    });
+  };
+
+  const handleConfirmRoyalPlaqueInstallation = () => {
+    const request = royalPlaqueRequest;
+    setRoyalPlaqueRequest(null);
+    if (!request) return;
+    const error = installRoyalPlaque(stateRef.current, request.buildingId);
+    if (error) {
+      notify(error, 'bad');
+    } else {
+      addLog(
+        stateRef.current,
+        `${request.buildingName}에 사액 현판을 걸었습니다. 이제 이 건물은 이전하거나 해체할 수 없습니다.`,
+        'good',
+        true,
+      );
+      notify(`${request.buildingName}에 사액 현판을 영구 귀속했습니다.`, 'good');
+    }
+    bump();
   };
 
   const handlePlaceBuildingRelocation = (x: number, y: number) => {
@@ -1475,6 +1543,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               onExpandArea={handleExpandArea}
               onStartBuildingDemolition={handleStartBuildingDemolition}
               onBeginBuildingRelocation={handleBeginBuildingRelocation}
+              onRequestRoyalPlaqueInstallation={handleRequestRoyalPlaqueInstallation}
               onTogglePriorityBuilding={handleTogglePriorityBuilding}
               onSetBuildingCrop={handleSetBuildingCrop}
               onConvertFieldToPaddy={handleConvertFieldToPaddy}
@@ -1888,6 +1957,13 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
         <button className="sim-exit-button" onClick={exitBattleSimulation}>
           시뮬레이션 종료
         </button>
+      )}
+      {royalPlaqueRequest && !royalPlaqueModalConflict && (
+        <RoyalPlaqueConfirmDialog
+          buildingName={royalPlaqueRequest.buildingName}
+          onConfirm={handleConfirmRoyalPlaqueInstallation}
+          onCancel={() => setRoyalPlaqueRequest(null)}
+        />
       )}
       {clearingRequest && (
         <ClearingConfirmDialog

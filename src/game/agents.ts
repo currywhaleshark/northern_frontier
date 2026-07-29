@@ -44,6 +44,7 @@ import {
 import { performPhysicianTreatment } from './medicine';
 import { mineralDepositsInMineRange, servingMineForTile } from './miningSites';
 import { rankProductionEfficiency } from './productionEfficiency';
+import { cleanupRoyalPlaqueAfterBuildingRemoval, plaqueProductionMultiplier } from './royalPlaque';
 import { buildGoalField, describeGoal, type DescribedGoal, type GoalField } from './pathGoals';
 import { farmWorkTileForTick } from './farmWorkTiles';
 import { reconcileResidentHomes, residentHome } from './residents';
@@ -1466,6 +1467,7 @@ function completeBuildingDemolition(state: GameState, building: Building, ctx: C
   clearBuildingTiles(state, building.id);
   clearAssignmentsForBuilding(state, building.id);
   state.buildings = state.buildings.filter(candidate => candidate.id !== building.id);
+  cleanupRoyalPlaqueAfterBuildingRemoval(state, building.id);
   if (state.priorityBuildingId === building.id) state.priorityBuildingId = null;
   reconcileResidentHomes(state, ctx.rng);
   reconcileMountAssignments(state);
@@ -1948,7 +1950,7 @@ function millerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   takeBuildingStock(mill, 'rice', q);
-  addBuildingStock(mill, 'grain', q * p.grainPerRice);
+  addBuildingStock(mill, 'grain', q * p.grainPerRice * plaqueProductionMultiplier(state, mill.id));
   r.phase = 'working';
   r.task = '방아 찧기';
   gainSkillTick(state, r);
@@ -1976,7 +1978,11 @@ function woodSplitterTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
   takeBuildingStock(shed, 'wood', wood);
-  addBuildingStock(shed, 'firewood', wood * CONFIG.production.firewoodPerWood);
+  addBuildingStock(
+    shed,
+    'firewood',
+    wood * CONFIG.production.firewoodPerWood * plaqueProductionMultiplier(state, shed.id),
+  );
   r.phase = 'working';
   r.task = '장작 패기';
   gainSkillTick(state, r);
@@ -2051,7 +2057,7 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
     r.phase = 'working';
     r.task = def.task;
     consumeSmithInputs(smithy, product, made);
-    addBuildingStock(smithy, def.output, made);
+    addBuildingStock(smithy, def.output, made * plaqueProductionMultiplier(state, smithy.id));
     gainSkillTick(state, r);
   } else {
     r.phase = st === 'stuck' ? 'rest' : 'toWork';
@@ -2154,7 +2160,7 @@ function curerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   consumeRecipeInputs(workplace, inputs, made);
-  addBuildingStock(workplace, output, made);
+  addBuildingStock(workplace, output, made * plaqueProductionMultiplier(state, workplace.id));
   r.phase = 'working';
   r.task = task;
   gainSkillTick(state, r);
@@ -2194,7 +2200,7 @@ function potterTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   consumeRecipeInputs(kiln, inputs, made);
-  addBuildingStock(kiln, 'onggi', made);
+  addBuildingStock(kiln, 'onggi', made * plaqueProductionMultiplier(state, kiln.id));
   r.phase = 'working';
   r.task = '점토를 빚어 옹기 굽는 중';
   gainSkillTick(state, r);
@@ -2302,7 +2308,11 @@ function charcoalBurnerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   takeBuildingStock(kiln, 'wood', wood);
-  addBuildingStock(kiln, 'charcoal', wood * p.charcoalPerWood);
+  addBuildingStock(
+    kiln,
+    'charcoal',
+    wood * p.charcoalPerWood * plaqueProductionMultiplier(state, kiln.id),
+  );
   r.phase = 'working';
   r.task = '숯 굽기';
   gainSkillTick(state, r);
@@ -2325,7 +2335,13 @@ function herderTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   const product = livestockProductForHerder(livestock, ctx.season, (effOf(r) * ctx.outputMod) / WORK_SUBTICKS);
-  if (product && product.amount > 0) addBuildingStock(stable, product.resource, product.amount);
+  if (product && product.amount > 0) {
+    addBuildingStock(
+      stable,
+      product.resource,
+      product.amount * plaqueProductionMultiplier(state, stable.id),
+    );
+  }
   r.phase = 'working';
   r.task = product?.task ?? '가축 돌보기';
   gainSkillTick(state, r);
@@ -2393,7 +2409,7 @@ function powderMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
 
   takeBuildingStock(yard, 'firewood', made * p.gunpowderFirewoodPerPowder);
   takeBuildingStock(yard, 'stone', made * p.gunpowderStonePerPowder);
-  addBuildingStock(yard, 'gunpowder', made);
+  addBuildingStock(yard, 'gunpowder', made * plaqueProductionMultiplier(state, yard.id));
   r.phase = 'working';
   r.task = '화약 제조';
   gainSkillTick(state, r);
@@ -2427,7 +2443,11 @@ function tannerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   takeBuildingStock(tannery, 'hide', hideUsed);
-  addBuildingStock(tannery, productDef.output!, hideUsed / productDef.hidePerUnit);
+  addBuildingStock(
+    tannery,
+    productDef.output!,
+    (hideUsed / productDef.hidePerUnit) * plaqueProductionMultiplier(state, tannery.id),
+  );
   r.phase = 'working';
   r.task = productDef.task;
   gainSkillTick(state, r);
@@ -2459,7 +2479,11 @@ function weaverTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
   takeBuildingStock(weavingHouse, input, fiber);
-  addBuildingStock(weavingHouse, 'cottonClothes', fiber * CONFIG.production.cottonClothesPerCotton);
+  addBuildingStock(
+    weavingHouse,
+    'cottonClothes',
+    fiber * CONFIG.production.cottonClothesPerCotton * plaqueProductionMultiplier(state, weavingHouse.id),
+  );
   r.phase = 'working';
   r.task = input === 'wool' ? '양털 짜기' : '베 짜기';
   gainSkillTick(state, r);

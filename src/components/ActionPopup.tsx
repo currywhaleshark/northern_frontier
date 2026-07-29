@@ -18,6 +18,9 @@ import {
 } from '../game/livestock';
 import { pastureTileCount, stableLivestockCapacity } from '../game/pastures';
 import { bedShare, LIFE_STAGE_NAMES } from '../game/lifecycle';
+import {
+  isRoyalPlaqueProductionBuildingType, royalPlaqueInstallError,
+} from '../game/royalPlaque';
 import { getBuildingActions } from '../game/selectionActions';
 import { centerPromotionUpgradeReason, nextRank } from '../game/promotion';
 import {
@@ -46,6 +49,7 @@ interface Props {
   onExpandArea: (buildingId: number) => void;
   onStartBuildingDemolition: (buildingId: number) => void;
   onBeginBuildingRelocation: (buildingId: number) => void;
+  onRequestRoyalPlaqueInstallation: (buildingId: number) => void;
   onTogglePriorityBuilding: (buildingId: number) => void;
   onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
   onConvertFieldToPaddy: (buildingId: number) => void;
@@ -84,6 +88,7 @@ export function ActionPopup({
   onExpandArea,
   onStartBuildingDemolition,
   onBeginBuildingRelocation,
+  onRequestRoyalPlaqueInstallation,
   onTogglePriorityBuilding,
   onSetBuildingCrop,
   onConvertFieldToPaddy,
@@ -197,6 +202,30 @@ export function ActionPopup({
           <div className="muted small">다음 출근 때도 최우선 작업</div>
         </button>
       )}
+
+      {state.royalPlaqueBuildingId === building.id && (
+        <div className="action-command active" aria-label="사액 현판 설치됨">
+          <span><UiIcon name="calligraphy" size={20} /> 사액 현판</span>
+          <div className="muted small">영구 귀속 · 작업 산출 +25% · 이전·해체 불가</div>
+        </div>
+      )}
+
+      {building.built &&
+        isRoyalPlaqueProductionBuildingType(building.type) &&
+        state.royalPlaqueBuildingId == null &&
+        (state.specialItems.royalPlaque ?? 0) > 0 && (
+          <button
+            className="action-command"
+            type="button"
+            disabled={royalPlaqueInstallError(state, building.id) != null}
+            title={royalPlaqueInstallError(state, building.id) ??
+              '이 생산 건물에 현판을 영구 귀속해 작업 산출을 25% 늘립니다'}
+            onClick={() => onRequestRoyalPlaqueInstallation(building.id)}
+          >
+            <span><UiIcon name="calligraphy" size={20} /> 사액 현판 걸기</span>
+            <div className="muted small">한 번 설치하면 옮길 수 없습니다</div>
+          </button>
+        )}
 
       {building.built && building.type !== 'center' && !activeBuildingWork && (
         <div className="action-grid">

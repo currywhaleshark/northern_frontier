@@ -213,9 +213,9 @@ export const SPECIAL_ITEM_DEFS: Record<SpecialItemId, {
   royalPlaque: {
     name: '사액 현판',
     icon: 'calligraphy',
-    desc: '왕이 이름을 내려 준 현판. 후속 단계에서 한 생산 건물에 영구 귀속할 수 있습니다.',
+    desc: '왕이 이름을 내려 준 현판. 완공된 생산 건물 하나에 영구 귀속해 작업 산출을 25% 늘립니다.',
     tradeValue: 0,
-    inventoryNote: '하사 전용 · 설치 대상 선택 대기',
+    inventoryNote: '하사 전용 · 설치 뒤 이전·해체 불가 · 건물 소실 시 함께 소실',
   },
   jijaChongtong: {
     name: '지자총통',

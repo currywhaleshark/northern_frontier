@@ -6927,3 +6927,22 @@ html, body, #root {
   gap: 8px;
   margin-top: 14px;
 }
+
+/* ── 사액 현판 영구 귀속 확인 ── */
+.modal.royal-plaque-confirm-dialog { max-width: 430px; }
+.royal-plaque-confirm-dialog .body { white-space: normal; }
+.royal-plaque-warning {
+  margin: 10px 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(190, 111, 70, 0.55);
+  background: rgba(126, 54, 36, 0.2);
+  color: #e3ad86;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.royal-plaque-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}

@@ -5,6 +5,7 @@ import {
   addBuildingStock, buildingStock, isRaidProtectedBuildingInventory, takeBuildingStock,
 } from './inventory';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
+import { plaqueProductionMultiplier } from './royalPlaque';
 import type { Building, FermentBatch, GameState, ResourceId } from './types';
 
 export interface FermentationReport {
@@ -79,6 +80,7 @@ export function updateFermentation(state: GameState): FermentationReport {
   };
   let recoveredJangOnggi = 0;
   let recoveredKimchiOnggi = 0;
+  let completedKimchiBase = 0;
 
   for (const building of state.buildings) {
     if (!building.built || building.type !== 'jangdokdae') continue;
@@ -96,13 +98,15 @@ export function updateFermentation(state: GameState): FermentationReport {
         : CONFIG.fermentation.kimchiOutputPerOnggi;
       const usedOnggi = amount / outputPerOnggi;
       const recovered = usedOnggi * CONFIG.fermentation.onggiRecoveryRate;
-      addBuildingStock(building, batch.kind, amount);
+      const produced = amount * plaqueProductionMultiplier(state, building.id);
+      addBuildingStock(building, batch.kind, produced);
       addBuildingStock(building, 'onggi', recovered);
       if (batch.kind === 'jang') {
-        report.completedJang += amount;
+        report.completedJang += produced;
         recoveredJangOnggi += recovered;
       } else {
-        report.completedKimchi += amount;
+        report.completedKimchi += produced;
+        completedKimchiBase += amount;
         recoveredKimchiOnggi += recovered;
       }
       report.recoveredOnggi += recovered;
@@ -143,7 +147,8 @@ export function updateFermentation(state: GameState): FermentationReport {
     );
   }
   if (report.completedKimchi > 0) {
-    const completedOnggi = report.completedKimchi / CONFIG.fermentation.kimchiOutputPerOnggi;
+    // 현판은 완성품만 늘린다. 공동 작업 사기와 옹기 회수는 원래 담근 양을 따른다.
+    const completedOnggi = completedKimchiBase / CONFIG.fermentation.kimchiOutputPerOnggi;
     const morale = completedOnggi * CONFIG.fermentation.kimjangMoralePerOnggi;
     for (const resident of state.residents) {
       if (resident.alive) resident.morale = Math.min(100, resident.morale + morale);

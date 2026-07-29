@@ -89,12 +89,17 @@ assert.equal(typeof saveLoad.migrateV41ToV42, 'function');
 {
   const state = simulation.newGame(20260728);
   state.courtGrantArtifactMisses = 3;
-  state.royalPlaqueBuildingId = 17;
+  const plaqueBuilding = state.buildings.find(building => building.type !== 'center');
+  plaqueBuilding.type = 'smithy';
+  plaqueBuilding.built = true;
+  state.royalPlaqueBuildingId = plaqueBuilding.id;
+  state.specialItems.royalPlaque = 1;
+  state.discoveredSpecialItems.push('royalPlaque');
   state.artifactWeaponAssignments = { royalSpear: null, royalMusket: 3 };
   assert.equal(saveLoad.saveGame(state), true);
   const loaded = saveLoad.loadGame();
   assert.equal(loaded?.courtGrantArtifactMisses, 3, 'artifact pity counter survives a normal save/load round trip');
-  assert.equal(loaded?.royalPlaqueBuildingId, 17, 'plaque scaffold survives a normal save/load round trip');
+  assert.equal(loaded?.royalPlaqueBuildingId, plaqueBuilding.id, 'valid plaque binding survives a normal save/load round trip');
   assert.deepEqual(loaded?.artifactWeaponAssignments, { royalSpear: null, royalMusket: 3 },
     'artifact weapon scaffold survives a normal save/load round trip');
 }

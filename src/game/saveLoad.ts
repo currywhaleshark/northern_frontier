@@ -51,6 +51,7 @@ import {
 import { isYouthWorkJob } from './youth';
 import { normalizeResidentFamilyReferences } from './family';
 import { normalizeResidentWearables, TANNERY_PRODUCT_DEFS } from './wearables';
+import { normalizeRoyalPlaqueBinding } from './royalPlaque';
 import {
   gradeTacticalBattle, raidDefenseObjectiveResult, tacticalClosingSummary, tacticalOutcomeResult,
 } from './tacticalCore';
@@ -2056,6 +2057,7 @@ export function loadGame(slot = 1): GameState | null {
         else delete building.pasture;
       }
     }
+    normalizeRoyalPlaqueBinding(parsed);
     const priorityBuilding = parsed.buildings.find(building => building.id === parsed.priorityBuildingId);
     parsed.priorityBuildingId = priorityBuilding &&
       (!priorityBuilding.built || priorityBuilding.repairing || priorityBuilding.expansion || priorityBuilding.workOrder)

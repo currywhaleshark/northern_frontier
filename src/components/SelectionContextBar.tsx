@@ -62,6 +62,7 @@ interface Props {
   onExpandArea: (buildingId: number) => void;
   onStartBuildingDemolition: (buildingId: number) => void;
   onBeginBuildingRelocation: (buildingId: number) => void;
+  onRequestRoyalPlaqueInstallation: (buildingId: number) => void;
   onTogglePriorityBuilding: (buildingId: number) => void;
   onSetBuildingCrop: (buildingId: number, cropId: CropId, mode: 'queue' | 'uproot') => void;
   onConvertFieldToPaddy: (buildingId: number) => void;
@@ -298,6 +299,7 @@ export function SelectionContextBar({
   onExpandArea,
   onStartBuildingDemolition,
   onBeginBuildingRelocation,
+  onRequestRoyalPlaqueInstallation,
   onTogglePriorityBuilding,
   onSetBuildingCrop,
   onConvertFieldToPaddy,
@@ -598,6 +600,7 @@ export function SelectionContextBar({
                 onExpandArea={onExpandArea}
                 onStartBuildingDemolition={onStartBuildingDemolition}
                 onBeginBuildingRelocation={onBeginBuildingRelocation}
+                onRequestRoyalPlaqueInstallation={onRequestRoyalPlaqueInstallation}
                 onTogglePriorityBuilding={onTogglePriorityBuilding}
                 onSetBuildingCrop={onSetBuildingCrop}
                 onConvertFieldToPaddy={onConvertFieldToPaddy}

@@ -75,6 +75,7 @@ import {
   setStableLivestock, slaughterStableLivestock, updateLivestock,
 } from './livestock';
 import { normalizePastureArea, pastureRequiredHerders, setStablePasture, validateStablePasture } from './pastures';
+import { cleanupRoyalPlaqueAfterBuildingRemoval } from './royalPlaque';
 import { resolveTerritoryWarning, updateTerritoryWarnings } from './territory';
 import {
   foreignSiteAt, generateForeignSites, revealForeignSitesFromExploration, updateSeasonalForeignSites,
@@ -402,6 +403,7 @@ export function demolishBuilding(state: GameState, x: number, y: number): string
   clearBuildingTiles(state, building.id);
   clearAssignmentsForBuilding(state, building.id);
   state.buildings = state.buildings.filter(b => b.id !== building.id);
+  cleanupRoyalPlaqueAfterBuildingRemoval(state, building.id);
   reconcileMountAssignments(state);
   state.resources.defense = computeDefense(state);
   addLog(state, `${withJosa(def.name, '을/를')} 철거했습니다.`, 'info');
@@ -425,6 +427,7 @@ export function cancelBuildingConstruction(state: GameState, buildingId: number)
   clearBuildingTiles(state, building.id);
   clearAssignmentsForBuilding(state, building.id);
   state.buildings = state.buildings.filter(candidate => candidate.id !== building.id);
+  cleanupRoyalPlaqueAfterBuildingRemoval(state, building.id);
   if (state.priorityBuildingId === building.id) state.priorityBuildingId = null;
   reconcileMountAssignments(state);
   const constructionJob: JobId = isPlotBuildingType(building.type) ? 'farmer' : 'builder';
@@ -938,6 +941,9 @@ export function startBuildingDemolition(state: GameState, buildingId: number): s
   const building = state.buildings.find(candidate => candidate.id === buildingId);
   if (!building || !building.built) return '완공된 건물을 선택해야 합니다.';
   if (building.type === 'center') return '마을 중심지는 해체할 수 없습니다.';
+  if (state.royalPlaqueBuildingId === building.id) {
+    return '왕이 내린 사액 현판이 걸린 건물은 해체할 수 없습니다.';
+  }
   if (building.expansion || building.workOrder || building.repairing) return '진행 중인 작업이 끝난 뒤 해체할 수 있습니다.';
   const def = BUILDING_DEFS[building.type];
   building.built = false;
@@ -963,6 +969,9 @@ export function startBuildingRelocation(
   const building = state.buildings.find(candidate => candidate.id === buildingId);
   if (!building || !building.built) return '완공된 건물을 선택해야 합니다.';
   if (building.type === 'center') return '마을 중심지는 이전할 수 없습니다.';
+  if (state.royalPlaqueBuildingId === building.id) {
+    return '왕이 내린 사액 현판이 걸린 건물은 이전할 수 없습니다.';
+  }
   if (building.expansion || building.workOrder || building.repairing) return '진행 중인 작업이 끝난 뒤 이전할 수 있습니다.';
   const { w, h } = buildingFootprintDims(building);
   if (!isBuildingFootprintExplored(state, building.type, x, y, w, h)) return '아직 답사하지 않은 곳입니다.';
