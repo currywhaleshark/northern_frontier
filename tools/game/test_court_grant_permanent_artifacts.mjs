@@ -24,6 +24,7 @@ const compiledDir = compileGameModules();
 const specialItems = await import(pathToFileURL(join(compiledDir, 'specialItems.mjs')).href);
 const courtGrants = await import(pathToFileURL(join(compiledDir, 'courtGrants.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
+const agents = await import(pathToFileURL(join(compiledDir, 'agents.mjs')).href);
 const tacticalBattle = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
@@ -52,6 +53,29 @@ for (const job of ['hunter', 'watchman', 'militia']) {
   assert.equal(specialItems.skillGainArtifactMultiplier(state, job), CONFIG.courtGrants.skillArtifactGainMultiplier);
 }
 assert.equal(specialItems.skillGainArtifactMultiplier(state, 'woodcutter'), 1, 'military treatise does not leak to other jobs');
+
+// 배율 헬퍼만이 아니라 실제 모든 작업 경로가 공유하는 숙련 틱에도 정확히 한 번 적용된다.
+for (const [job, item] of [
+  ['farmer', 'agriculturalEdict'],
+  ['physician', 'medicalBook'],
+  ['hunter', 'militaryTreatise'],
+  ['watchman', 'militaryTreatise'],
+  ['militia', 'militaryTreatise'],
+]) {
+  const resident = state.residents[0];
+  resident.job = job;
+  resident.skills[job] = 0;
+  state.specialItems[item] = 0;
+  agents.gainSkillTick(state, resident);
+  const ordinaryGain = resident.skills[job];
+  resident.skills[job] = 0;
+  state.specialItems[item] = 1;
+  agents.gainSkillTick(state, resident);
+  assert.ok(
+    Math.abs(resident.skills[job] - ordinaryGain * CONFIG.courtGrants.skillArtifactGainMultiplier) < 1e-12,
+    `${item} multiplies the real ${job} skill tick once`,
+  );
+}
 
 const raidWithoutTelescope = tacticalBattle.settlementRaidPreparationPoints(state, true);
 state.specialItems.telescope = 1;

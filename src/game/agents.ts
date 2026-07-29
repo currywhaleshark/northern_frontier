@@ -112,7 +112,7 @@ function effOf(r: Resident): number {
   return (1 + (r.skills[r.job] ?? 0) * CONFIG.production.skillEffect) * laborEfficiencyMult(r);
 }
 
-function gainSkillTick(state: Pick<GameState, 'specialItems'>, r: Resident): void {
+export function gainSkillTick(state: Pick<GameState, 'specialItems'>, r: Resident): void {
   const cur = r.skills[r.job] ?? 0;
   // 문해자는 무엇을 배워도 빠르다 (서당 교육의 평생 보상)
   r.skills[r.job] = Math.min(
