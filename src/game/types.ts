@@ -774,8 +774,18 @@ export interface PlagueCase {
 
 export interface EpidemicState {
   infectedIds: number[];
+  /** 구 저장 호환용 고정 종료일. D7부터 종료 판정에는 사용하지 않는다. */
   untilDay: number;
   mode: 'pending' | 'isolated' | 'uncontained';
+  startedDay?: number;
+  quietDays?: number;
+  newInfectionsToday?: number;
+  totalInfected?: number;
+  recoveredCount?: number;
+  deathCount?: number;
+  peakInfected?: number;
+  quarantinedResidentIds?: number[];
+  infectedSince?: Record<number, number>;
 }
 
 export interface IncidentState {

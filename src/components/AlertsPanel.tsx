@@ -149,9 +149,15 @@ export function computeAlerts(state: GameState): AlertItem[] {
     });
   }
   if (state.incidents?.epidemic) {
+    const epidemic = state.incidents.epidemic;
+    const containment = epidemic.mode === 'isolated'
+      ? `격리 ${epidemic.quarantinedResidentIds?.length ?? epidemic.infectedIds.length}명`
+      : epidemic.mode === 'pending'
+        ? '대응 결정 대기'
+        : '미격리';
     alerts.push({
       id: 'epidemic',
-      text: `역병 유행: 환자 ${state.incidents.epidemic.infectedIds.length}명${state.incidents.epidemic.mode === 'isolated' ? ' 격리 중' : ''}.`,
+      text: `역병 유행: 환자 ${epidemic.infectedIds.length}명 · 오늘 신규 ${epidemic.newInfectionsToday ?? 0}명 · ${containment}.`,
       level: 'danger',
     });
   }

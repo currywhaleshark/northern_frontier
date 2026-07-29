@@ -109,7 +109,20 @@ export function InspectorPanel({ state, onOrganizeHunt, onScoutPredator, onUseSp
       {state.incidents.epidemic && (
         <div className="incident-threat danger">
           <div><strong>역병 유행</strong><span>환자 {state.incidents.epidemic.infectedIds.length}명</span></div>
-          <div className="muted small">{state.incidents.epidemic.mode === 'isolated' ? '환자 전원 격리 중' : state.incidents.epidemic.mode === 'pending' ? '대응 결정 대기 중' : '격리 없이 전염 중'}</div>
+          <div className="muted small">
+            {state.incidents.epidemic.mode === 'isolated'
+              ? `환자·동거인 ${state.incidents.epidemic.quarantinedResidentIds?.length ?? state.incidents.epidemic.infectedIds.length}명 격리 중`
+              : state.incidents.epidemic.mode === 'pending'
+                ? '대응 결정 대기 중'
+                : '격리 없이 집·일터 전염 중'}
+            {' · '}오늘 신규 {state.incidents.epidemic.newInfectionsToday ?? 0}명
+          </div>
+          <div className="muted small">
+            누적 {state.incidents.epidemic.totalInfected ?? state.incidents.epidemic.infectedIds.length}명
+            {' · '}회복 {state.incidents.epidemic.recoveredCount ?? 0}명
+            {' · '}사망 {state.incidents.epidemic.deathCount ?? 0}명
+            {' · '}무감염 {state.incidents.epidemic.quietDays ?? 0}일
+          </div>
         </div>
       )}
 

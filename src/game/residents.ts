@@ -413,7 +413,8 @@ export function updateResidentNeeds(
     if (r.hunger > 25 && dietVarietyScore < 0.5) r.health -= hcfg.poorDietDamage;
     if (r.hunger > 25 && vegetableRatio < 0.5) r.health -= cfg.vegetableShortageHealthPenalty;
 
-    if (r.sick) {
+    const epidemicPatient = state.incidents?.epidemic?.infectedIds.includes(r.id) === true;
+    if (r.sick && !epidemicPatient) {
       const hasHerbs = state.resources.herbs >= hcfg.herbsPerSickPerDay;
       if (hasHerbs) state.resources.herbs -= hcfg.herbsPerSickPerDay;
       r.health -= hasHerbs ? hcfg.sickDamageWithHerbs : hcfg.sickDamage;
@@ -422,7 +423,7 @@ export function updateResidentNeeds(
         r.sick = false;
         addLog(state, `${withJosa(r.name, '이/가')} 병에서 회복했습니다.`, 'good');
       }
-    } else if (r.hunger > 50 && r.warmth > 50) {
+    } else if (!r.sick && r.hunger > 50 && r.warmth > 50) {
       r.health = Math.min(100, r.health + hcfg.naturalHeal);
     }
 

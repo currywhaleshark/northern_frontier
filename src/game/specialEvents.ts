@@ -1,7 +1,7 @@
 import { withJosa } from './josa';
 import { recordAnnals } from './annals';
 import { CONFIG } from './config';
-import { footprintTilesOf, sownAreaOf } from './buildings';
+import { BUILDING_DEFS, footprintTilesOf, sownAreaOf } from './buildings';
 import { cropIdForBuilding, CROP_DEFS } from './crops';
 import { addLog } from './events';
 import { consumeExpeditionPowder, expeditionResidentsForIds } from './expedition';
@@ -10,8 +10,8 @@ import {
   predatorScoutDuration, predatorThreatProfile, tigerTierDangerMultiplier, tigerTierFromStrength, tigerTierLabel,
 } from './expeditionIntel';
 import { makeRng } from './map';
-import { hasActivePhysician } from './medicine';
-import { createResident, killResident, livingResidents, reconcileResidentHomes } from './residents';
+import { activePhysicianCount, hasActivePhysician } from './medicine';
+import { createResident, killResident, livingResidents, reconcileResidentHomes, residentHome } from './residents';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { weatherForDay } from './weather';
 import { createCombatRoster } from './combatRoster';
@@ -81,6 +81,11 @@ export function createIncidentState(seed: number, year = 1): IncidentState {
   };
 }
 
+function nonnegativeInteger(value: unknown, fallback = 0): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, Math.floor(numeric)) : fallback;
+}
+
 export function ensureIncidentState(state: GameState): void {
   const year = getYear(state.day);
   if (!state.incidents) state.incidents = createIncidentState(state.seed, year);
@@ -90,6 +95,33 @@ export function ensureIncidentState(state: GameState): void {
   state.incidents.predatorThreats ??= {};
   state.incidents.plagueCase ??= null;
   state.incidents.epidemic ??= null;
+  if (state.incidents.epidemic) {
+    const epidemic = state.incidents.epidemic;
+    epidemic.infectedIds = [...new Set((epidemic.infectedIds ?? [])
+      .map(Number)
+      .filter(Number.isFinite))];
+    epidemic.untilDay = Number.isFinite(epidemic.untilDay) ? epidemic.untilDay : state.day;
+    epidemic.startedDay = Number.isFinite(epidemic.startedDay) ? epidemic.startedDay : state.day;
+    epidemic.quietDays = nonnegativeInteger(epidemic.quietDays);
+    epidemic.newInfectionsToday = nonnegativeInteger(epidemic.newInfectionsToday);
+    epidemic.totalInfected = Math.max(
+      epidemic.infectedIds.length,
+      nonnegativeInteger(epidemic.totalInfected, epidemic.infectedIds.length),
+    );
+    epidemic.recoveredCount = nonnegativeInteger(epidemic.recoveredCount);
+    epidemic.deathCount = nonnegativeInteger(epidemic.deathCount);
+    epidemic.peakInfected = Math.max(
+      epidemic.infectedIds.length,
+      nonnegativeInteger(epidemic.peakInfected, epidemic.infectedIds.length),
+    );
+    epidemic.quarantinedResidentIds = [...new Set((epidemic.quarantinedResidentIds ?? [])
+      .map(Number)
+      .filter(Number.isFinite))];
+    epidemic.infectedSince = Object.fromEntries(epidemic.infectedIds.map(id => {
+      const infectedOnDay = Number(epidemic.infectedSince?.[id]);
+      return [id, Number.isFinite(infectedOnDay) ? infectedOnDay : epidemic.startedDay ?? state.day];
+    }));
+  }
   if (state.incidents.year !== year) {
     state.incidents = {
       year,
@@ -326,30 +358,21 @@ function openPlagueSuspicionEvent(state: GameState, rng: () => number): void {
 function openEpidemicEvent(state: GameState): void {
   const epidemic = state.incidents.epidemic;
   if (!epidemic) return;
-  const cost = CONFIG.specialEvents;
   const localPhysician = hasActivePhysician(state);
   state.pendingChoice = {
     kind: 'incident',
     title: '역병이 돌기 시작했다',
-    body: `의심 환자와 접촉한 주민들까지 같은 증상을 보입니다. 현재 환자 ${epidemic.infectedIds.length}명. 더 퍼지기 전에 결단해야 합니다.`,
+    body: `의심 환자가 실제 역병에 걸린 것으로 드러났습니다. 현재 환자 ${epidemic.infectedIds.length}명. 같은 집과 일터로 번지기 전에 결단해야 합니다.`,
     illustration: { src: '/assets/events/plague-outbreak-v1.png', alt: '역병 환자를 격리하고 의원의 진료를 준비하는 북방 개척지' },
     options: [
       {
         id: 'isolate-all',
-        label: '환자를 모두 격리한다',
+        label: '격리령을 내린다',
         desc: localPhysician
-          ? `의원이 방역과 치료를 맡아 격리 기간을 ${CONFIG.medicine.isolationDaysReduction}일 줄입니다.`
-          : '환자들의 작업을 중단하고 전염을 막습니다. 회복까지 시간이 걸립니다.',
+          ? '환자와 동거인을 함께 격리합니다. 의원이 치료와 방역을 맡아 집 안 전염도 낮춥니다.'
+          : '환자와 동거인의 작업을 중단합니다. 일터 전염은 막지만 집 안 전염 위험은 조금 남습니다.',
       },
-      {
-        id: 'request-physician',
-        label: '의원 파견을 요청한다',
-        desc: `명성 ${cost.physicianReputationCost}, 곡물 ${cost.physicianGrainCost}, 약초 ${withJosa(cost.physicianHerbCost, '을/를')} 들여 조정 의원과 수행 인력을 맞이합니다.`,
-        disabled: state.resources.reputation < cost.physicianReputationCost ||
-          state.resources.grain < cost.physicianGrainCost || state.resources.herbs < cost.physicianHerbCost,
-        disabledReason: `명성 ${cost.physicianReputationCost}, 곡물 ${cost.physicianGrainCost}, 약초 ${withJosa(cost.physicianHerbCost, '이/가')} 필요합니다`,
-      },
-      { id: 'leave-epidemic', label: '그냥 둔다', desc: '생업은 유지하지만 환자가 늘고 중환자나 사망자가 생길 수 있습니다.' },
+      { id: 'leave-epidemic', label: '그대로 둔다', desc: '생업은 유지하지만 같은 집과 일터에서 환자가 늘고 사망자가 생길 수 있습니다.' },
     ],
     data: { eventId: 'plagueOutbreak' },
   };
@@ -410,6 +433,43 @@ function openEarlyFrostEvent(state: GameState, rng: () => number): void {
     data: { eventId: 'earlyFrost', targetBuildingId: target.id },
   };
   recordAnnals(state, 'disaster', '수확을 앞둔 경작지에 이른 서리가 내렸습니다.');
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+export function epidemicOccurrenceWeight(state: GameState): number {
+  const living = livingResidents(state);
+  const population = living.length;
+  const config = CONFIG.disasters.epidemic;
+  const housingCapacity = state.buildings.reduce((sum, building) =>
+    building.built ? sum + Math.max(0, BUILDING_DEFS[building.type].capacity) : sum, 0);
+  const homeless = living.filter(resident => residentHome(state, resident) == null).length;
+  const populationMultiplier = clamp(
+    config.populationMinMultiplier + population / Math.max(1, config.populationReference) * 0.5,
+    config.populationMinMultiplier,
+    config.populationMaxMultiplier,
+  );
+  const crowdingRatio = housingCapacity > 0 ? population / housingCapacity : 2;
+  const crowdingMultiplier = clamp(
+    0.7 + crowdingRatio * 0.45,
+    config.crowdingMinMultiplier,
+    config.crowdingMaxMultiplier,
+  );
+  const homelessMultiplier = clamp(
+    1 + homeless * config.homelessMultiplierPerResident,
+    1,
+    config.homelessMaxMultiplier,
+  );
+  const season = getSeason(state.day);
+  const seasonMultiplier = season === 'summer'
+    ? config.summerOccurrenceMultiplier
+    : season === 'winter'
+      ? config.winterOccurrenceMultiplier
+      : 1;
+  return disasterOccurrenceWeight(state, 'plagueSuspicion') *
+    populationMultiplier * crowdingMultiplier * homelessMultiplier * seasonMultiplier;
 }
 
 function locustFarms(state: GameState): Building[] {
@@ -558,7 +618,7 @@ export function maybeOpenSpecialEvent(state: GameState, rng: () => number): bool
   if (farms.length > 0 && !state.incidents.predatorThreats.boar && ready('boar')) candidates.push({ value: 'boar', weight: CONFIG.specialEvents.boarWeight });
   if (forestExists && ready('wildGinseng')) candidates.push({ value: 'wildGinseng', weight: CONFIG.specialEvents.ginsengWeight });
   if (!state.incidents.plagueCase && !state.incidents.epidemic && livingResidents(state).length > 2 && ready('plagueSuspicion')) {
-    candidates.push({ value: 'plagueSuspicion', weight: disasterOccurrenceWeight(state, 'plagueSuspicion') });
+    candidates.push({ value: 'plagueSuspicion', weight: epidemicOccurrenceWeight(state) });
   }
   if (ready('grainRequisition')) candidates.push({ value: 'grainRequisition', weight: CONFIG.specialEvents.grainRequisitionWeight });
   if (riverExists && ready('shipwreck')) candidates.push({ value: 'shipwreck', weight: CONFIG.specialEvents.shipwreckWeight });
@@ -909,9 +969,43 @@ function resolvePlagueSuspicion(state: GameState, optionId: string, data: Record
   };
 }
 
+function epidemicHouseholdContacts(state: GameState, source: Resident): Resident[] {
+  const homeId = residentHome(state, source)?.id ?? null;
+  return livingResidents(state).filter(candidate =>
+    candidate.id !== source.id && (residentHome(state, candidate)?.id ?? null) === homeId);
+}
+
+function epidemicWorkplaceContacts(state: GameState, source: Resident): Resident[] {
+  const workplaceId = source.assignedBuildingId;
+  if (workplaceId == null || !state.buildings.some(building => building.id === workplaceId && building.built)) return [];
+  return livingResidents(state).filter(candidate =>
+    candidate.id !== source.id && candidate.assignedBuildingId === workplaceId);
+}
+
+function refreshEpidemicQuarantine(state: GameState, epidemic: EpidemicState): void {
+  if (epidemic.mode !== 'isolated') return;
+  const quarantined = new Set(epidemic.quarantinedResidentIds ?? []);
+  for (const id of epidemic.infectedIds) {
+    const infected = state.residents.find(resident => resident.id === id && resident.alive);
+    if (!infected) continue;
+    quarantined.add(infected.id);
+    for (const contact of epidemicHouseholdContacts(state, infected)) quarantined.add(contact.id);
+  }
+  const untilDay = state.day + CONFIG.disasters.epidemic.quarantineRefreshDays;
+  for (const id of quarantined) {
+    const resident = state.residents.find(candidate => candidate.id === id && candidate.alive);
+    if (!resident) continue;
+    resident.quarantinedUntil = Math.max(resident.quarantinedUntil ?? 0, untilDay);
+    resident.task = '격리 중';
+  }
+  epidemic.quarantinedResidentIds = [...quarantined];
+}
+
 function resolveEpidemic(state: GameState, optionId: string): void {
   const epidemic = state.incidents.epidemic;
   if (!epidemic) return;
+  // D7 이후 새 선택지에는 노출하지 않지만, 구 저장이 이 선택 모달을 보존했을 때는
+  // 기존의 즉시 파견 결과를 끝까지 처리한다.
   if (optionId === 'request-physician') {
     const cost = CONFIG.specialEvents;
     if (state.resources.reputation < cost.physicianReputationCost || state.resources.grain < cost.physicianGrainCost || state.resources.herbs < cost.physicianHerbCost) return;
@@ -927,24 +1021,30 @@ function resolveEpidemic(state: GameState, optionId: string): void {
     }
     state.incidents.epidemic = null;
     addLog(state, '조정에서 파견된 의원이 환자를 돌보고 방역을 마쳤습니다. 역병이 잦아들었습니다.', 'good', true);
+    recordAnnals(state, 'disaster', '조정 의원의 파견으로 역병을 조기에 막았습니다.');
     return;
   }
   const range = CONFIG.specialEvents.epidemicDays;
   epidemic.untilDay = state.day + range[0];
+  epidemic.quietDays = 0;
+  epidemic.newInfectionsToday = 0;
   if (optionId === 'isolate-all') {
     if (hasActivePhysician(state)) {
       epidemic.untilDay = state.day + Math.max(1, range[0] - CONFIG.medicine.isolationDaysReduction);
     }
     epidemic.mode = 'isolated';
-    for (const id of epidemic.infectedIds) {
-      const resident = state.residents.find(candidate => candidate.id === id && candidate.alive);
-      if (resident) resident.quarantinedUntil = epidemic.untilDay;
-    }
-    addLog(state, `환자 ${epidemic.infectedIds.length}명을 모두 격리했습니다. 생업은 줄지만 전염을 막습니다.`, 'info', true);
+    refreshEpidemicQuarantine(state, epidemic);
+    addLog(
+      state,
+      `환자와 동거인 ${epidemic.quarantinedResidentIds?.length ?? epidemic.infectedIds.length}명에게 격리령을 내렸습니다. ` +
+        '일터 전염은 막히지만 집 안에서는 계속 경계해야 합니다.',
+      'info',
+      true,
+    );
   } else if (optionId === 'leave-epidemic') {
     epidemic.mode = 'uncontained';
     epidemic.untilDay = state.day + range[1];
-    addLog(state, '환자들을 따로 격리하지 않았습니다. 역병이 마을 안에서 번지기 시작합니다.', 'bad', true);
+    addLog(state, '격리령을 내리지 않았습니다. 역병이 집과 일터를 따라 번지기 시작합니다.', 'bad', true);
   }
 }
 
@@ -1211,20 +1311,30 @@ function damageBoarTargets(state: GameState, rng: () => number): void {
   }
 }
 
-function startEpidemic(state: GameState, patient: Resident, rng: () => number): void {
-  const contacts = livingResidents(state).filter(resident => resident.id !== patient.id);
+function startEpidemic(state: GameState, patient: Resident): void {
   const infectedIds = [patient.id];
-  const firstContact = contacts[Math.floor(rng() * contacts.length)];
-  if (firstContact) infectedIds.push(firstContact.id);
   for (const id of infectedIds) {
     const resident = state.residents.find(candidate => candidate.id === id);
     if (resident) resident.sick = true;
   }
-  state.incidents.epidemic = { infectedIds, untilDay: state.day, mode: 'pending' };
+  state.incidents.epidemic = {
+    infectedIds,
+    untilDay: state.day,
+    mode: 'pending',
+    startedDay: state.day,
+    quietDays: 0,
+    newInfectionsToday: 0,
+    totalInfected: infectedIds.length,
+    recoveredCount: 0,
+    deathCount: 0,
+    peakInfected: infectedIds.length,
+    quarantinedResidentIds: [],
+    infectedSince: { [patient.id]: state.day },
+  };
   openEpidemicEvent(state);
 }
 
-function updatePlagueCase(state: GameState, rng: () => number): void {
+function updatePlagueCase(state: GameState): void {
   const plagueCase = state.incidents.plagueCase;
   if (!plagueCase || state.day < plagueCase.resolvesOnDay) return;
   const resident = state.residents.find(candidate => candidate.id === plagueCase.residentId);
@@ -1243,59 +1353,160 @@ function updatePlagueCase(state: GameState, rng: () => number): void {
   }
   if (state.pendingChoice || state.battle) return;
   state.incidents.plagueCase = null;
-  startEpidemic(state, resident, rng);
+  startEpidemic(state, resident);
 }
 
 function finishEpidemic(state: GameState, epidemic: EpidemicState): void {
-  for (const id of epidemic.infectedIds) {
-    const resident = state.residents.find(candidate => candidate.id === id);
-    if (resident?.alive) {
-      resident.sick = false;
+  const quarantineReleaseLimit = state.day + CONFIG.disasters.epidemic.quarantineRefreshDays;
+  for (const id of epidemic.quarantinedResidentIds ?? []) {
+    const resident = state.residents.find(candidate => candidate.id === id && candidate.alive);
+    if (resident && (resident.quarantinedUntil ?? 0) <= quarantineReleaseLimit) {
       resident.quarantinedUntil = 0;
     }
   }
   state.incidents.epidemic = null;
-  addLog(state, '긴 역병이 마침내 잦아들었습니다. 살아남은 환자들이 일터로 돌아옵니다.', 'good', true);
-  recordAnnals(state, 'disaster', '긴 역병이 마침내 잦아들었습니다.');
+  const summary = `누적 환자 ${epidemic.totalInfected ?? 0}명, 회복 ${epidemic.recoveredCount ?? 0}명, 사망 ${epidemic.deathCount ?? 0}명`;
+  addLog(state, `신규 감염이 이틀째 나타나지 않아 역병 해소를 선언했습니다. (${summary})`, 'good', true);
+  recordAnnals(state, 'disaster', `역병이 잦아들었습니다. ${summary}.`);
+}
+
+interface EpidemicCare {
+  clinicCount: number;
+  physicianCount: number;
+  herbCoverage: number;
+  spreadMultiplier: number;
+}
+
+function epidemicCare(state: GameState, patientCount: number): EpidemicCare {
+  const config = CONFIG.disasters.epidemic;
+  const clinicCount = state.buildings.filter(building => building.type === 'clinic' && building.built).length;
+  const physicianCount = activePhysicianCount(state);
+  const herbNeed = patientCount * CONFIG.health.herbsPerSickPerDay;
+  const herbCoverage = herbNeed > 0 ? Math.min(1, state.resources.herbs / herbNeed) : 0;
+  const herbMultiplier = 1 - (1 - config.herbSpreadMultiplier) * herbCoverage;
+  const spreadMultiplier = herbMultiplier *
+    Math.pow(config.clinicSpreadMultiplier, Math.min(2, clinicCount)) *
+    Math.pow(config.physicianSpreadMultiplier, Math.min(3, physicianCount));
+  return { clinicCount, physicianCount, herbCoverage, spreadMultiplier };
+}
+
+function spreadEpidemicToContactGroup(
+  epidemic: EpidemicState,
+  contacts: Resident[],
+  chance: number,
+  contactKind: 'household' | 'workplace',
+  rng: () => number,
+  newlyInfected: Map<number, 'household' | 'workplace'>,
+): void {
+  const infected = new Set(epidemic.infectedIds);
+  const candidates = contacts.filter(contact => !infected.has(contact.id) && !newlyInfected.has(contact.id));
+  if (candidates.length === 0 || rng() >= chance) return;
+  const target = candidates[Math.floor(rng() * candidates.length)];
+  if (target) newlyInfected.set(target.id, contactKind);
 }
 
 function updateEpidemic(state: GameState, rng: () => number): void {
   const epidemic = state.incidents.epidemic;
   if (!epidemic || epidemic.mode === 'pending') return;
-  if (state.day > epidemic.untilDay) {
-    finishEpidemic(state, epidemic);
-    return;
-  }
-  const physicianActive = hasActivePhysician(state);
+  const config = CONFIG.disasters.epidemic;
+  epidemic.infectedIds = epidemic.infectedIds.filter(id =>
+    state.residents.some(resident => resident.id === id && resident.alive));
+  epidemic.infectedSince ??= Object.fromEntries(epidemic.infectedIds.map(id => [id, epidemic.startedDay ?? state.day]));
+  if (epidemic.mode === 'isolated') refreshEpidemicQuarantine(state, epidemic);
+
+  const care = epidemicCare(state, epidemic.infectedIds.length);
   // 의녀 단심 '방역' — 역병이 번질 확률 자체를 줄인다
   const uinyeoActive = state.residents.some(resident => resident.alive && resident.special === 'uinyeo');
-  const spreadChance = CONFIG.specialEvents.epidemicSpreadChance *
-    (physicianActive ? CONFIG.medicine.epidemicSpreadMult : 1) *
+  const spreadMultiplier = care.spreadMultiplier *
     (uinyeoActive ? CONFIG.specialResidents.uinyeoEpidemicSpreadMult : 1);
-  if (epidemic.mode === 'uncontained' && rng() < spreadChance) {
-    const candidates = livingResidents(state).filter(resident => !epidemic.infectedIds.includes(resident.id));
-    const infected = candidates[Math.floor(rng() * candidates.length)];
-    if (infected) {
-      infected.sick = true;
-      epidemic.infectedIds.push(infected.id);
-      addLog(state, `${infected.name}에게도 역병 증상이 나타났습니다. 환자가 ${epidemic.infectedIds.length}명으로 늘었습니다.`, 'bad', true);
+  const newlyInfected = new Map<number, 'household' | 'workplace'>();
+  const infectionSources = epidemic.infectedIds
+    .map(id => state.residents.find(resident => resident.id === id && resident.alive))
+    .filter((resident): resident is Resident => resident != null);
+  for (const source of infectionSources) {
+    const householdChance = config.householdSpreadChance * spreadMultiplier *
+      (epidemic.mode === 'isolated' ? config.isolationHouseholdSpreadMultiplier : 1);
+    spreadEpidemicToContactGroup(
+      epidemic,
+      epidemicHouseholdContacts(state, source),
+      householdChance,
+      'household',
+      rng,
+      newlyInfected,
+    );
+    if (epidemic.mode === 'uncontained') {
+      spreadEpidemicToContactGroup(
+        epidemic,
+        epidemicWorkplaceContacts(state, source),
+        config.workplaceSpreadChance * spreadMultiplier,
+        'workplace',
+        rng,
+        newlyInfected,
+      );
     }
   }
-  for (const id of [...epidemic.infectedIds]) {
+  for (const [id, contactKind] of newlyInfected) {
+    const infected = state.residents.find(resident => resident.id === id && resident.alive);
+    if (!infected) continue;
+    infected.sick = true;
+    epidemic.infectedIds.push(infected.id);
+    epidemic.infectedSince[infected.id] = state.day;
+    epidemic.totalInfected = (epidemic.totalInfected ?? infectionSources.length) + 1;
+    addLog(
+      state,
+      `${infected.name}에게 ${contactKind === 'household' ? '같은 집에서' : '같은 일터에서'} 역병 증상이 나타났습니다. ` +
+        `환자가 ${epidemic.infectedIds.length}명으로 늘었습니다.`,
+      'bad',
+      true,
+    );
+  }
+  epidemic.newInfectionsToday = newlyInfected.size;
+  epidemic.quietDays = newlyInfected.size === 0 ? (epidemic.quietDays ?? 0) + 1 : 0;
+  epidemic.peakInfected = Math.max(epidemic.peakInfected ?? 0, epidemic.infectedIds.length);
+  if (epidemic.mode === 'isolated' && newlyInfected.size > 0) refreshEpidemicQuarantine(state, epidemic);
+
+  for (const id of infectionSources.map(resident => resident.id)) {
     const resident = state.residents.find(candidate => candidate.id === id && candidate.alive);
     if (!resident) continue;
     resident.sick = true;
+    const hasHerbs = state.resources.herbs >= CONFIG.health.herbsPerSickPerDay;
+    if (hasHerbs) state.resources.herbs -= CONFIG.health.herbsPerSickPerDay;
     const deathChance = CONFIG.specialEvents.epidemicDeathChance *
-      (physicianActive ? CONFIG.medicine.epidemicDeathMult : 1);
+      Math.pow(CONFIG.medicine.epidemicDeathMult, Math.min(2, care.physicianCount)) *
+      (hasHerbs ? config.herbDeathMultiplier : 1) *
+      (care.clinicCount > 0 ? config.clinicDeathMultiplier : 1);
     if (epidemic.mode === 'uncontained' && rng() < deathChance) {
       killResident(state, resident, '역병');
+      epidemic.deathCount = (epidemic.deathCount ?? 0) + 1;
+      delete epidemic.infectedSince[id];
       continue;
     }
     const rawDamage = epidemic.mode === 'isolated' ? 1 + Math.floor(rng() * 3) : 3 + Math.floor(rng() * 5);
-    const damage = physicianActive
+    const damage = care.physicianCount > 0
       ? Math.max(1, Math.round(rawDamage * CONFIG.medicine.epidemicDamageMult))
       : rawDamage;
     resident.health = Math.max(1, resident.health - damage);
+    const recoveryChance = Math.min(
+      config.maxRecoveryChance,
+      config.baseRecoveryChance +
+        (hasHerbs ? config.herbRecoveryBonus : 0) +
+        (care.clinicCount > 0 ? config.clinicRecoveryBonus : 0) +
+        care.physicianCount * config.physicianRecoveryBonus +
+        (epidemic.mode === 'isolated' ? config.isolationRecoveryBonus : 0),
+    );
+    if (state.day > (epidemic.infectedSince[id] ?? epidemic.startedDay ?? state.day) && rng() < recoveryChance) {
+      resident.sick = false;
+      epidemic.recoveredCount = (epidemic.recoveredCount ?? 0) + 1;
+      delete epidemic.infectedSince[id];
+      addLog(state, `${withJosa(resident.name, '이/가')} 역병에서 회복했습니다.`, 'good');
+    }
+  }
+  epidemic.infectedIds = epidemic.infectedIds.filter(id => {
+    const resident = state.residents.find(candidate => candidate.id === id);
+    return resident?.alive === true && resident.sick;
+  });
+  if (epidemic.infectedIds.length === 0 && (epidemic.quietDays ?? 0) >= config.quietDaysToEnd) {
+    finishEpidemic(state, epidemic);
   }
 }
 
@@ -1365,7 +1576,7 @@ export function updateSpecialEvents(state: GameState, rng: () => number): void {
   }
   if (state.incidents.predatorThreats.boar) damageBoarTargets(state, rng);
 
-  updatePlagueCase(state, rng);
+  updatePlagueCase(state);
   updateEpidemic(state, rng);
   if (!state.pendingChoice) maybeOpenHorseDefectorEvent(state, rng);
   if (!state.pendingChoice) maybeOpenSpecialEvent(state, rng);
