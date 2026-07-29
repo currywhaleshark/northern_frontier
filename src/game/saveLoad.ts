@@ -2071,6 +2071,9 @@ export function loadGame(slot = 1): GameState | null {
     parsed.lastSpringFloodYear = Number.isFinite(Number(parsed.lastSpringFloodYear))
       ? Math.max(0, Math.floor(Number(parsed.lastSpringFloodYear)))
       : 0;
+    parsed.lastSnowDamageYear = Number.isFinite(Number(parsed.lastSnowDamageYear))
+      ? Math.max(0, Math.floor(Number(parsed.lastSnowDamageYear)))
+      : 0;
     ensureForeignSiteState(parsed);
     if (!Array.isArray(parsed.territoryViolations)) parsed.territoryViolations = [];
     migrateResourceTaxonomy(parsed);

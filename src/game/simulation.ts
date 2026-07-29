@@ -75,6 +75,7 @@ import { dailySpecialResidentTick, resolveSpecialResidentChoice } from './specia
 import { dailySilverTick, resolveSilverVeinChoice } from './silver';
 import {
   advancePendingDisasters, advanceWeirReservoirs, maybeStartSpringFlood,
+  maybeStartSnowDamage,
 } from './disasters';
 import { updateFermentation } from './fermentation';
 import { isKimjangChoice, maybeOpenKimjangEvent, resolveKimjangChoice } from './kimjang';
@@ -166,6 +167,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
     incidents: createIncidentState(s),
     pendingDisasters: [],
     lastSpringFloodYear: 0,
+    lastSnowDamageYear: 0,
     specialItems: createSpecialItemInventory(),
     discoveredSpecialItems: [],
     courtGrantArtifactMisses: 0,
@@ -1213,6 +1215,7 @@ function endOfDay(state: GameState): void {
     else if (state.weather === 'thawFlood') addLog(state, '해빙기 홍수로 강물이 불었습니다. 얼음 위로는 다닐 수 없습니다.', 'weather');
   }
   const springFloodStarted = maybeStartSpringFlood(state);
+  maybeStartSnowDamage(state);
   advancePendingDisasters(state);
   const reservoirTerrainChanged = advanceWeirReservoirs(state);
   if (springFloodStarted || reservoirTerrainChanged) ensureResidentsOnPassableTiles(state);

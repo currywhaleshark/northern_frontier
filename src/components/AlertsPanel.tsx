@@ -180,6 +180,17 @@ export function computeAlerts(state: GameState): AlertItem[] {
       });
       continue;
     }
+    if (disaster.id === 'snowDamage') {
+      const damaged = Math.max(0, Math.floor(disaster.data?.damagedBuildings ?? 0));
+      if (damaged > 0) {
+        alerts.push({
+          id: `pendingDisaster-${disaster.id}`,
+          text: `설해 피해: 주거 ${damaged}채가 파손되었습니다. 건설담당이 수리합니다.`,
+          level: 'danger',
+        });
+      }
+      continue;
+    }
     if (disaster.id !== 'earlyFrost' && disaster.id !== 'lateFrost') continue;
     const daysLeft = pendingDisasterDaysRemaining(state, disaster);
     const title = disaster.id === 'earlyFrost' ? '이른 서리' : '늦서리';

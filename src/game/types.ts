@@ -1683,6 +1683,7 @@ export interface GameState {
   incidents: IncidentState;    // 연간 돌발 사건 일정과 지속 중인 맹수 위험
   pendingDisasters: PendingDisaster[]; // 선택 뒤 실제 날씨·일일 진행으로 판정하는 재해
   lastSpringFloodYear?: number; // 같은 봄에 대홍수가 거듭 발생하지 않게 하는 연차 표식
+  lastSnowDamageYear?: number; // 같은 겨울의 설해를 한 번만 판정하는 연차 표식
   specialItems: Record<SpecialItemId, number>; // 산삼·호피 등 일반 자원과 분리한 기물함
   discoveredSpecialItems: SpecialItemId[];     // 소모해도 남는 기물 도감
   courtGrantArtifactMisses: number;            // 적격 격년 하사품에서 연속으로 기물을 놓친 횟수

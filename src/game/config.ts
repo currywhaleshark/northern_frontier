@@ -362,6 +362,12 @@ export const CONFIG = {
       fertileDepositChance: 0.28,
       leveeRiverDistance: 2,
     },
+    snowDamage: {
+      triggerConsecutiveSnowDays: 2,
+      hutCollapseChance: 0.42,
+      ondolCollapseChance: 0.12,
+      alertDays: 1,
+    },
     plagueSuspicion: {
       occurrenceBaseWeight: 3,
       // 온난·다습하고 궂은 해일수록 의심 환자가 사건 후보에 오를 가중치가 높다.

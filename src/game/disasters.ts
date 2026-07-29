@@ -7,7 +7,7 @@ import { recordAnnals } from './annals';
 import { makeRng } from './map';
 import { damageBuildingTargets } from './raidDamage';
 import { getSeason, getYear } from './seasons';
-import { seasonWeatherSchedule } from './weatherSchedule';
+import { seasonWeatherSchedule, weatherForDay } from './weatherSchedule';
 import type {
   Building, CropId, DisasterAffectedTile, DisasterId, GameState, PendingDisaster, Terrain, WeatherId,
   WeirReservoirTile,
@@ -27,6 +27,7 @@ const DISASTER_IDS = new Set<DisasterId>([
 ]);
 
 const FROST_WEATHERS = new Set<WeatherId>(['frost', 'coldSnap']);
+const SNOW_DAMAGE_WEATHERS = new Set<WeatherId>(['heavySnow', 'blizzard']);
 const TERRAIN_IDS = new Set<Terrain>(['forest', 'plain', 'river', 'mountain', 'fertile', 'rock', 'center']);
 const CARDINAL_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 const SPRING_FLOOD_TILE_SET_CACHE = new WeakMap<PendingDisaster, Set<string>>();
@@ -183,6 +184,57 @@ export function startDrought(state: GameState, durationDays: number): boolean {
 
 export function isDroughtActive(state: Pick<GameState, 'pendingDisasters'>): boolean {
   return state.pendingDisasters.some(disaster => disaster.id === 'drought');
+}
+
+export function hasSnowDamageTriggerWeather(
+  state: Pick<GameState, 'seed' | 'day' | 'weather'>,
+): boolean {
+  if (!SNOW_DAMAGE_WEATHERS.has(state.weather) || state.day <= 1) return false;
+  let consecutive = 1;
+  for (let offset = 1; offset < CONFIG.disasters.snowDamage.triggerConsecutiveSnowDays; offset++) {
+    if (!SNOW_DAMAGE_WEATHERS.has(weatherForDay(state.seed, state.day - offset))) return false;
+    consecutive++;
+  }
+  return consecutive >= CONFIG.disasters.snowDamage.triggerConsecutiveSnowDays;
+}
+
+function snowDamageChance(building: Building): number {
+  if (building.type === 'hut') return CONFIG.disasters.snowDamage.hutCollapseChance;
+  if (building.type === 'ondol') return CONFIG.disasters.snowDamage.ondolCollapseChance;
+  return 0;
+}
+
+export function maybeStartSnowDamage(state: GameState): boolean {
+  if (getSeason(state.day) !== 'winter' || !hasSnowDamageTriggerWeather(state)) return false;
+  const year = getYear(state.day);
+  if (state.lastSnowDamageYear === year || hasPendingDisaster(state, 'snowDamage')) return false;
+  state.lastSnowDamageYear = year;
+
+  const rng = makeRng(state.seed + year * 88750319 + state.day * 971);
+  const targets = state.buildings.filter(building =>
+    building.built && !building.repairing && snowDamageChance(building) > 0 &&
+    rng() < snowDamageChance(building));
+  const damaged = damageBuildingTargets(state, rng, targets);
+  state.pendingDisasters.push({
+    id: 'snowDamage',
+    choiceId: 'collapse',
+    startedDay: state.day,
+    resolveDay: state.day + CONFIG.disasters.snowDamage.alertDays,
+    targetBuildingIds: targets.map(building => building.id),
+    data: { damagedBuildings: damaged.length },
+  });
+  addLog(
+    state,
+    damaged.length > 0
+      ? `이틀 내린 눈이 지붕을 짓눌렀습니다. 주거 ${damaged.length}채가 설해로 파손되어 수리가 필요합니다.`
+      : '이틀 내린 눈이 지붕을 짓눌렀지만, 마을의 주거는 설해를 버텼습니다.',
+    damaged.length > 0 ? 'bad' : 'info',
+    true,
+  );
+  if (damaged.length > 0) {
+    recordAnnals(state, 'disaster', `설해로 주거 ${damaged.length}채가 파손되었습니다.`);
+  }
+  return true;
 }
 
 export function isFarmIrrigatedByWeir(
@@ -683,6 +735,13 @@ function resolveDrought(state: GameState, endedByRain: boolean): void {
   );
 }
 
+function resolveSnowDamage(state: GameState, disaster: PendingDisaster): void {
+  const damaged = Math.max(0, Math.floor(disaster.data?.damagedBuildings ?? 0));
+  if (damaged > 0) {
+    addLog(state, `설해 피해 조사가 끝났습니다. 파손된 주거 ${damaged}채는 건설담당이 수리합니다.`, 'info');
+  }
+}
+
 export function advancePendingDisasters(state: GameState): void {
   if (state.pendingDisasters.length === 0) return;
   const remaining: PendingDisaster[] = [];
@@ -707,6 +766,7 @@ export function advancePendingDisasters(state: GameState): void {
     else if (disaster.id === 'locust') resolveLocust(state, disaster);
     else if (disaster.id === 'drought') resolveDrought(state, false);
     else if (disaster.id === 'springFlood') resolveSpringFlood(state, disaster);
+    else if (disaster.id === 'snowDamage') resolveSnowDamage(state, disaster);
   }
   state.pendingDisasters = remaining;
 }
