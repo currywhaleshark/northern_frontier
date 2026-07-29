@@ -64,6 +64,7 @@ const EXTENDED_ATLAS = '/assets/resources/trade-resource-atlas-v2.png';
 const COMPLETE_ATLAS = '/assets/resources/trade-resource-atlas-v3.png';
 const NEW_CONTENT_ATLAS = '/assets/resources/new-content-resource-atlas-v1.png';
 const FUEL_GROUP_ICON = '/assets/resources/fuel-group-v1.png';
+const COURT_ITEM_ATLAS = '/assets/ui/court-item-icons-v1.png';
 
 export const RESOURCE_SPRITES: Partial<Record<ResourceIconId, TradeResourceSprite>> = {
   grain: { atlas: BASE_ATLAS, columns: 4, rows: 2, column: 0, row: 0 },
@@ -74,7 +75,7 @@ export const RESOURCE_SPRITES: Partial<Record<ResourceIconId, TradeResourceSprit
   fish: { atlas: BASE_ATLAS, columns: 4, rows: 2, column: 1, row: 1 },
   herbs: { atlas: BASE_ATLAS, columns: 4, rows: 2, column: 2, row: 1 },
   hideClothes: { atlas: BASE_ATLAS, columns: 4, rows: 2, column: 3, row: 1 },
-  leatherShoes: { atlas: BASE_ATLAS, columns: 4, rows: 2, column: 3, row: 1 },
+  leatherShoes: { atlas: COURT_ITEM_ATLAS, columns: 4, rows: 4, column: 1, row: 0 },
   wood: { atlas: EXTENDED_ATLAS, columns: 4, rows: 3, column: 0, row: 0 },
   firewood: { atlas: EXTENDED_ATLAS, columns: 4, rows: 3, column: 1, row: 0 },
   stone: { atlas: EXTENDED_ATLAS, columns: 4, rows: 3, column: 2, row: 0 },
@@ -113,6 +114,6 @@ export const RESOURCE_SPRITES: Partial<Record<ResourceIconId, TradeResourceSprit
   onggi: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 1, row: 2 },
   wool: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 2, row: 2 },
   hay: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 3, row: 2 },
-  strawShoes: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 3, row: 2 },
+  strawShoes: { atlas: COURT_ITEM_ATLAS, columns: 4, rows: 4, column: 0, row: 0 },
   silver: { atlas: NEW_CONTENT_ATLAS, columns: 4, rows: 4, column: 0, row: 3 },
 };

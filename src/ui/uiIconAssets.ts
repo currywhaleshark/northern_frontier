@@ -9,6 +9,7 @@ interface UiIconFrame {
 const STATUS_ATLAS = '/assets/ui/status-weather-icons-v1.png';
 const ACTION_ATLAS = '/assets/ui/action-symbol-icons-v1.png';
 const SPECIAL_ATLAS = '/assets/ui/special-icons-v1.png';
+const COURT_ITEM_ATLAS = '/assets/ui/court-item-icons-v1.png';
 
 export const UI_ICON_FRAMES = {
   weatherClear: { atlas: STATUS_ATLAS, column: 0, row: 0 },
@@ -61,6 +62,20 @@ export const UI_ICON_FRAMES = {
   tracking: { atlas: SPECIAL_ATLAS, column: 1, row: 3 },
   target: { atlas: SPECIAL_ATLAS, column: 2, row: 3 },
   needle: { atlas: SPECIAL_ATLAS, column: 3, row: 3 },
+
+  grantReliefVoucher: { atlas: COURT_ITEM_ATLAS, column: 2, row: 0 },
+  grantWaiverDecree: { atlas: COURT_ITEM_ATLAS, column: 3, row: 0 },
+  grantRecruitmentNotice: { atlas: COURT_ITEM_ATLAS, column: 0, row: 1 },
+  grantRainGauge: { atlas: COURT_ITEM_ATLAS, column: 1, row: 1 },
+  grantAgriculturalEdict: { atlas: COURT_ITEM_ATLAS, column: 2, row: 1 },
+  grantMedicalBook: { atlas: COURT_ITEM_ATLAS, column: 3, row: 1 },
+  grantMilitaryTreatise: { atlas: COURT_ITEM_ATLAS, column: 0, row: 2 },
+  grantTelescope: { atlas: COURT_ITEM_ATLAS, column: 1, row: 2 },
+  grantRoyalPlaque: { atlas: COURT_ITEM_ATLAS, column: 2, row: 2 },
+  grantJijaChongtong: { atlas: COURT_ITEM_ATLAS, column: 3, row: 2 },
+  grantRoyalSpear: { atlas: COURT_ITEM_ATLAS, column: 0, row: 3 },
+  grantRoyalHornBow: { atlas: COURT_ITEM_ATLAS, column: 1, row: 3 },
+  grantRoyalMusket: { atlas: COURT_ITEM_ATLAS, column: 2, row: 3 },
 } as const satisfies Record<string, UiIconFrame>;
 
 export type UiIconName = keyof typeof UI_ICON_FRAMES;
