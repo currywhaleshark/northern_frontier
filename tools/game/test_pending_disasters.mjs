@@ -43,6 +43,23 @@ function addStandingFarm(state, id = state.nextBuildingId++) {
   return farm;
 }
 
+function addStandingPaddy(state, id = state.nextBuildingId++) {
+  const farm = {
+    id,
+    type: 'paddy',
+    x: 6,
+    y: 4,
+    built: true,
+    progress: 1,
+    fieldGrowth: 80,
+    sownArea: 1,
+    cropId: 'rice',
+    inventory: {},
+  };
+  state.buildings.push(farm);
+  return farm;
+}
+
 function advanceWeather(state, weather) {
   state.day += 1;
   state.weather = weather;
@@ -129,6 +146,47 @@ assert.equal(CURRENT_SCHEMA_VERSION, 44);
   assert.ok(state.log.some(entry => entry.text.includes('더는 거둘 작물이 없어')));
 }
 
+// 늦서리는 사흘을 관찰하며, 찬 날이 이틀에 못 미치면 봄 작물이 살아남는다.
+{
+  const state = simulation.newGame(72005);
+  state.day = 8;
+  const farm = addStandingFarm(state);
+  assert.equal(disasters.lateFrostRecoveryCropId(farm), 'buckwheat');
+  assert.equal(disasters.startLateFrostObservation(state, farm.id), true);
+  assert.equal(disasters.startLateFrostObservation(state, farm.id), false, 'late frost cannot be queued twice');
+  advanceWeather(state, 'frost');
+  advanceWeather(state, 'clear');
+  assert.equal(farm.fieldGrowth, 80);
+  advanceWeather(state, 'rain');
+  assert.equal(state.pendingDisasters.length, 0);
+  assert.equal(farm.cropId, 'millet');
+  assert.ok(state.log.some(entry => entry.text.includes('다시 기운을 차렸습니다')));
+}
+
+// 사흘 중 서리·혹한이 이틀이면 작물은 고사하고, 사용자가 여름 작물을 다시 고를 수 있게 비운다.
+{
+  const state = simulation.newGame(72006);
+  state.day = 8;
+  const farm = addStandingFarm(state);
+  disasters.startLateFrostObservation(state, farm.id);
+  advanceWeather(state, 'coldSnap');
+  advanceWeather(state, 'clear');
+  assert.equal(farm.fieldGrowth, 80);
+  advanceWeather(state, 'frost');
+  assert.equal(state.pendingDisasters.length, 0);
+  assert.equal(farm.fieldGrowth, 0);
+  assert.equal(farm.sownArea, 0);
+  assert.equal(farm.cropId, null);
+  assert.equal(farm.queuedCropId, null);
+  assert.ok(state.log.some(entry => entry.text.includes('고사했습니다')));
+}
+
+{
+  const state = simulation.newGame(72007);
+  const paddy = addStandingPaddy(state);
+  assert.equal(disasters.lateFrostRecoveryCropId(paddy), 'rice');
+}
+
 const simulationSource = readFileSync(new URL('../../src/game/simulation.ts', import.meta.url), 'utf8');
 assert.match(
   simulationSource,
@@ -139,5 +197,6 @@ assert.match(
 const rendererSource = readFileSync(new URL('../../src/render/renderer.ts', import.meta.url), 'utf8');
 assert.ok(rendererSource.includes('drawEarlyFrostCropOverlay'));
 assert.ok(rendererSource.includes("disaster.id === 'earlyFrost'"));
+assert.ok(rendererSource.includes("disaster.id === 'lateFrost'"));
 
 console.log('pending disaster tests passed');

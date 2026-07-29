@@ -61,6 +61,24 @@ assert.ok(
     disasters.disasterChoiceChanceForClimate(veryWarm, 'earlyFrost', 'wait-harvest'),
   'early frost must be less likely to clear in colder years',
 );
+assert.equal(
+  disasters.disasterOccurrenceWeightForClimate(normal, 'lateFrost'),
+  CONFIG.disasters.lateFrost.occurrenceBaseWeight,
+);
+assert.equal(
+  disasters.disasterChoiceChanceForClimate(normal, 'lateFrost', 'wait-replant'),
+  CONFIG.disasters.lateFrost.waitReplantBaseClearChance,
+);
+assert.ok(
+  disasters.disasterOccurrenceWeightForClimate(veryCold, 'lateFrost') >
+    disasters.disasterOccurrenceWeightForClimate(veryWarm, 'lateFrost'),
+  'late frost must be more likely in colder years',
+);
+assert.ok(
+  disasters.disasterChoiceChanceForClimate(veryCold, 'lateFrost', 'wait-replant') <
+    disasters.disasterChoiceChanceForClimate(veryWarm, 'lateFrost', 'wait-replant'),
+  'late frost must be less likely to clear in colder years',
+);
 
 const extremeCold = { temperatureAnomaly: -100, precipitationAnomaly: 0, storminess: 0 };
 const extremeWarm = { temperatureAnomaly: 100, precipitationAnomaly: 0, storminess: 0 };
@@ -170,7 +188,7 @@ function addStandingFarm(state) {
 
 const selectableEventIds = [
   'wolf', 'tiger', 'boar', 'wildGinseng', 'plagueSuspicion',
-  'grainRequisition', 'shipwreck', 'earlyFrost', 'gyrfalcon',
+  'grainRequisition', 'shipwreck', 'earlyFrost', 'lateFrost', 'gyrfalcon',
 ];
 
 function prepareEvents(state, allowed) {
@@ -215,6 +233,23 @@ function openOnlyEarlyFrost(state) {
   prepareEvents(state, ['earlyFrost']);
   assert.equal(specialEvents.maybeOpenSpecialEvent(state, sequenceRng([0, 0])), true);
   assert.equal(state.pendingChoice?.data.eventId, 'earlyFrost');
+}
+
+function prepareLateFrostEvents(state, allowed = ['lateFrost']) {
+  state.day = 8;
+  state.weather = 'frost';
+  state.incidents.year = 1;
+  state.incidents.scheduledDays = [state.day];
+  state.incidents.cooldownUntil = Object.fromEntries(
+    selectableEventIds.filter(id => !allowed.includes(id)).map(id => [id, 9999]),
+  );
+}
+
+function openOnlyLateFrost(state) {
+  addStandingFarm(state);
+  prepareLateFrostEvents(state);
+  assert.equal(specialEvents.maybeOpenSpecialEvent(state, sequenceRng([0, 0])), true);
+  assert.equal(state.pendingChoice?.data.eventId, 'lateFrost');
 }
 
 // 측우기는 정보만 공개한다. 미보유 상태에는 수치가 새지 않고, 보유 시 실제 함수의 값이 표시된다.
@@ -263,6 +298,42 @@ function openOnlyEarlyFrost(state) {
   state.weather = 'clear';
   assert.equal(specialEvents.maybeOpenSpecialEvent(state, sequenceRng([0, 0])), false);
   assert.equal(state.incidents.scheduledDays.length, 1, 'a clear autumn day does not consume the scheduled incident');
+}
+
+// 늦서리는 봄의 실제 서리일에만 열리고, 재파종은 주사위 없이 여름 작물 예약으로 바꾼다.
+{
+  const state = simulation.newGame(52001);
+  openOnlyLateFrost(state);
+  const farm = state.buildings.at(-1);
+  specialEvents.resolveSpecialEvent(state, 'replant-summer', sequenceRng([0]));
+  assert.equal(farm.fieldGrowth, 0);
+  assert.equal(farm.sownArea, 0);
+  assert.equal(farm.cropId, 'buckwheat');
+  assert.equal(farm.queuedCropId, null);
+  assert.deepEqual(state.pendingDisasters, []);
+}
+
+{
+  const state = simulation.newGame(52002);
+  state.specialItems.rainGauge = 1;
+  openOnlyLateFrost(state);
+  const farm = state.buildings.at(-1);
+  const option = state.pendingChoice.options.find(choice => choice.id === 'wait-replant');
+  assert.ok(option.desc.includes('%'));
+  const rng = sequenceRng([0]);
+  specialEvents.resolveSpecialEvent(state, 'wait-replant', rng);
+  assert.equal(rng.calls, 0, 'late-frost observation consumes no simulation RNG');
+  assert.equal(farm.cropId, 'millet');
+  assert.equal(state.pendingDisasters[0].resolveDay, state.day + 3);
+}
+
+{
+  const state = simulation.newGame(52003);
+  addStandingFarm(state);
+  prepareLateFrostEvents(state);
+  state.weather = 'clear';
+  assert.equal(specialEvents.maybeOpenSpecialEvent(state, sequenceRng([0, 0])), false);
+  assert.equal(state.incidents.scheduledDays.length, 1, 'a clear spring day does not consume the scheduled incident');
 }
 
 // 역병 사건도 선택 1회 + 환자 1회 + 실제 역병 1회의 기존 RNG 순서를 보존한다.

@@ -22,7 +22,9 @@ import {
   disasterChoiceForecast,
   disasterOccurrenceWeight,
 } from './disasterClimate';
-import { hasPendingDisaster, startEarlyFrostObservation } from './disasters';
+import {
+  hasPendingDisaster, lateFrostRecoveryCropId, startEarlyFrostObservation, startLateFrostObservation,
+} from './disasters';
 import type {
   Building,
   EpidemicState,
@@ -45,6 +47,7 @@ const EVENT_COOLDOWNS: Record<SpecialEventId, number> = {
   grainRequisition: CONFIG.specialEvents.grainRequisitionCooldownDays,
   shipwreck: CONFIG.specialEvents.shipwreckCooldownDays,
   earlyFrost: CONFIG.specialEvents.earlyFrostCooldownDays,
+  lateFrost: CONFIG.specialEvents.lateFrostCooldownDays,
   gyrfalcon: CONFIG.specialEvents.gyrfalconCooldownDays,
   horseDefectors: CONFIG.defectors.horseOfferCooldownDays,
 };
@@ -405,6 +408,36 @@ function openEarlyFrostEvent(state: GameState, rng: () => number): void {
   recordAnnals(state, 'disaster', '수확을 앞둔 경작지에 이른 서리가 내렸습니다.');
 }
 
+function openLateFrostEvent(state: GameState, rng: () => number): void {
+  const farms = lateFrostFarms(state);
+  const target = farms[Math.floor(rng() * farms.length)];
+  if (!target) return;
+  const cropId = cropIdForBuilding(target);
+  const recoveryCropId = lateFrostRecoveryCropId(target);
+  const recoveryCrop = recoveryCropId ? CROP_DEFS[recoveryCropId] : null;
+  state.pendingChoice = {
+    kind: 'incident',
+    title: '늦서리',
+    body: `막 자라기 시작한 ${cropId ? CROP_DEFS[cropId].name : '작물'} 위로 봄 서리가 내려앉았습니다. 지금 갈아엎으면 봄 성장분은 잃지만 여름 작물로 다시 시작할 수 있습니다.`,
+    illustration: { src: '/assets/events/early-frost-v1.png', alt: '봄 늦서리로 새싹이 하얗게 얼어붙은 북방 개척지의 논밭' },
+    options: [
+      {
+        id: 'replant-summer',
+        label: '갈아엎고 다시 심는다',
+        desc: recoveryCrop ? `${withJosa(recoveryCrop.name, '으로/로')} 전환합니다. 봄 성장분은 잃지만 여름 파종부터 다시 시작합니다.` : '여름 작물로 다시 시작합니다.',
+      },
+      {
+        id: 'wait-replant',
+        label: '새싹이 버티기를 기다린다',
+        desc: disasterChoiceForecast(state, 'lateFrost', 'wait-replant') ??
+          '이후 사흘 동안 서리나 혹한이 이틀 이상 이어지면 새싹이 고사합니다.',
+      },
+    ],
+    data: { eventId: 'lateFrost', targetBuildingId: target.id },
+  };
+  recordAnnals(state, 'disaster', '봄 파종 뒤 경작지에 늦서리가 내렸습니다.');
+}
+
 function openGyrfalconEvent(state: GameState): void {
   const currentWaiver = state.courtTribute && !state.courtTribute.resolved ? '올해' : '다음';
   state.pendingChoice = {
@@ -473,6 +506,7 @@ export function maybeOpenSpecialEvent(state: GameState, rng: () => number): bool
   const forestExists = state.map.some(row => row.some(tile => tile.terrain === 'forest'));
   const riverExists = state.map.some(row => row.some(tile => tile.terrain === 'river'));
   const farms = standingFarms(state);
+  const springFarms = lateFrostFarms(state);
   const season = getSeason(state.day);
   const candidates: Array<{ value: Exclude<SpecialEventId, 'horseDefectors'>; weight: number }> = [];
   const ready = (event: SpecialEventId) => (state.incidents.cooldownUntil[event] ?? 0) <= state.day;
@@ -490,6 +524,11 @@ export function maybeOpenSpecialEvent(state: GameState, rng: () => number): bool
       !hasPendingDisaster(state, 'earlyFrost') && ready('earlyFrost')) {
     candidates.push({ value: 'earlyFrost', weight: disasterOccurrenceWeight(state, 'earlyFrost') });
   }
+  if (springFarms.length > 0 && season === 'spring' &&
+      (state.weather === 'frost' || state.weather === 'coldSnap') &&
+      !hasPendingDisaster(state, 'lateFrost') && ready('lateFrost')) {
+    candidates.push({ value: 'lateFrost', weight: disasterOccurrenceWeight(state, 'lateFrost') });
+  }
   if (forestExists && ready('gyrfalcon')) candidates.push({ value: 'gyrfalcon', weight: CONFIG.specialEvents.gyrfalconWeight });
   if (candidates.length === 0) return false;
 
@@ -501,6 +540,7 @@ export function maybeOpenSpecialEvent(state: GameState, rng: () => number): bool
   else if (eventId === 'grainRequisition') openGrainRequisitionEvent(state);
   else if (eventId === 'shipwreck') openShipwreckEvent(state);
   else if (eventId === 'earlyFrost') openEarlyFrostEvent(state, rng);
+  else if (eventId === 'lateFrost') openLateFrostEvent(state, rng);
   else if (eventId === 'gyrfalcon') openGyrfalconEvent(state);
   else openWildlifeEvent(state, eventId, rng);
   return state.pendingChoice != null;
@@ -914,6 +954,35 @@ function resolveEarlyFrost(state: GameState, optionId: string, buildingId: numbe
   }
 }
 
+function resolveLateFrost(state: GameState, optionId: string, buildingId: number): void {
+  const farm = state.buildings.find(building => building.id === buildingId);
+  const cropId = farm ? cropIdForBuilding(farm) : null;
+  if (!farm || !cropId || farm.fieldGrowth <= 0) return;
+  if (optionId === 'replant-summer') {
+    const recoveryCropId = lateFrostRecoveryCropId(farm);
+    if (!recoveryCropId) return;
+    farm.fieldGrowth = 0;
+    farm.sownArea = 0;
+    farm.cropId = recoveryCropId;
+    farm.queuedCropId = null;
+    addLog(
+      state,
+      `${withJosa(CROP_DEFS[cropId].name, '을/를')} 갈아엎고 ${withJosa(CROP_DEFS[recoveryCropId].name, '으로/로')} 다시 심기로 했습니다.`,
+      'info',
+      true,
+    );
+  } else if (optionId === 'wait-replant') {
+    startLateFrostObservation(state, farm.id);
+  }
+}
+
+function lateFrostFarms(state: GameState): Building[] {
+  return standingFarms(state).filter(building => {
+    const cropId = cropIdForBuilding(building);
+    return cropId != null && CROP_DEFS[cropId].plantSeasons.includes('spring') && sownAreaOf(building) > 0;
+  });
+}
+
 function resolveGyrfalcon(state: GameState, optionId: string): void {
   if (optionId === 'present') {
     state.tributeWaivers += 1;
@@ -965,6 +1034,7 @@ export function resolveSpecialEvent(state: GameState, optionId: string, rng: () 
   if (eventId === 'grainRequisition') return resolveGrainRequisition(state, optionId, choice.data.amount as number);
   if (eventId === 'shipwreck') return resolveShipwreck(state, optionId);
   if (eventId === 'earlyFrost') return resolveEarlyFrost(state, optionId, choice.data.targetBuildingId as number);
+  if (eventId === 'lateFrost') return resolveLateFrost(state, optionId, choice.data.targetBuildingId as number);
   if (eventId === 'gyrfalcon') return resolveGyrfalcon(state, optionId);
   if (eventId === 'horseDefectors') return resolveHorseDefectors(state, optionId, rng);
   if (!wildlife) return;

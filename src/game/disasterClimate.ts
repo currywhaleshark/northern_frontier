@@ -4,7 +4,7 @@ import { CONFIG } from './config';
 import { getYear } from './seasons';
 import type { GameState } from './types';
 
-export type ClimateDisasterEventId = 'earlyFrost' | 'plagueSuspicion';
+export type ClimateDisasterEventId = 'earlyFrost' | 'lateFrost' | 'plagueSuspicion';
 
 type DisasterState = Pick<GameState, 'seed' | 'day' | 'specialItems'>;
 type ClimateState = Pick<GameState, 'seed' | 'day'>;
@@ -19,6 +19,16 @@ function currentClimate(state: ClimateState): AnnualClimate {
 
 function earlyFrostOccurrenceWeight(climate: AnnualClimate): number {
   const config = CONFIG.disasters.earlyFrost;
+  const multiplier = clamp(
+    1 + climate.temperatureAnomaly * config.occurrenceTemperatureCoefficient,
+    config.occurrenceMinMultiplier,
+    config.occurrenceMaxMultiplier,
+  );
+  return config.occurrenceBaseWeight * multiplier;
+}
+
+function lateFrostOccurrenceWeight(climate: AnnualClimate): number {
+  const config = CONFIG.disasters.lateFrost;
   const multiplier = clamp(
     1 + climate.temperatureAnomaly * config.occurrenceTemperatureCoefficient,
     config.occurrenceMinMultiplier,
@@ -48,9 +58,9 @@ export function disasterOccurrenceWeightForClimate(
   climate: AnnualClimate,
   eventId: ClimateDisasterEventId,
 ): number {
-  return eventId === 'earlyFrost'
-    ? earlyFrostOccurrenceWeight(climate)
-    : plagueOccurrenceWeight(climate);
+  if (eventId === 'earlyFrost') return earlyFrostOccurrenceWeight(climate);
+  if (eventId === 'lateFrost') return lateFrostOccurrenceWeight(climate);
+  return plagueOccurrenceWeight(climate);
 }
 
 export function disasterOccurrenceWeight(
@@ -67,6 +77,16 @@ function earlyFrostWaitHarvestChance(climate: AnnualClimate): number {
       climate.temperatureAnomaly * config.waitHarvestTemperatureCoefficient,
     config.waitHarvestMinClearChance,
     config.waitHarvestMaxClearChance,
+  );
+}
+
+function lateFrostWaitReplantChance(climate: AnnualClimate): number {
+  const config = CONFIG.disasters.lateFrost;
+  return clamp(
+    config.waitReplantBaseClearChance +
+      climate.temperatureAnomaly * config.waitReplantTemperatureCoefficient,
+    config.waitReplantMinClearChance,
+    config.waitReplantMaxClearChance,
   );
 }
 
@@ -97,6 +117,9 @@ export function disasterChoiceChanceForClimate(
   if (eventId === 'earlyFrost' && optionId === 'wait-harvest') {
     return earlyFrostWaitHarvestChance(climate);
   }
+  if (eventId === 'lateFrost' && optionId === 'wait-replant') {
+    return lateFrostWaitReplantChance(climate);
+  }
   if (eventId === 'plagueSuspicion' && optionId === 'real-case') {
     return plagueRealChance(climate);
   }
@@ -124,6 +147,10 @@ export function disasterChoiceForecast(
   if (eventId === 'earlyFrost' && optionId === 'wait-harvest') {
     const percent = Math.round(disasterChoiceChance(state, eventId, optionId) * 100);
     return `올해 기후로 미루어 서리가 걷힐 가능성은 약 ${percent}%입니다. 이후 나흘의 실제 날씨로 판정합니다.`;
+  }
+  if (eventId === 'lateFrost' && optionId === 'wait-replant') {
+    const percent = Math.round(disasterChoiceChance(state, eventId, optionId) * 100);
+    return `올해 기후로 미루어 새싹이 버틸 가능성은 약 ${percent}%입니다. 이후 사흘의 실제 날씨로 판정합니다.`;
   }
   return null;
 }

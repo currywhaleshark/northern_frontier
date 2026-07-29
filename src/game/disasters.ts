@@ -2,7 +2,7 @@ import { CONFIG } from './config';
 import { cropIdForBuilding, CROP_DEFS } from './crops';
 import { addLog } from './events';
 import { withJosa } from './josa';
-import type { DisasterId, GameState, PendingDisaster, WeatherId } from './types';
+import type { Building, CropId, DisasterId, GameState, PendingDisaster, WeatherId } from './types';
 
 const DISASTER_IDS = new Set<DisasterId>([
   'earlyFrost',
@@ -83,6 +83,31 @@ export function startEarlyFrostObservation(state: GameState, targetBuildingId: n
   return true;
 }
 
+export function lateFrostRecoveryCropId(building: Pick<Building, 'type'>): CropId | null {
+  if (building.type === 'field') return 'buckwheat';
+  if (building.type === 'paddy') return 'rice';
+  return null;
+}
+
+export function startLateFrostObservation(state: GameState, targetBuildingId: number): boolean {
+  if (hasPendingDisaster(state, 'lateFrost')) return false;
+  state.pendingDisasters.push({
+    id: 'lateFrost',
+    choiceId: 'wait-replant',
+    startedDay: state.day,
+    resolveDay: state.day + CONFIG.disasters.lateFrost.observationDays,
+    targetBuildingIds: [targetBuildingId],
+    progress: 0,
+  });
+  addLog(
+    state,
+    `갈아엎지 않고 ${CONFIG.disasters.lateFrost.observationDays}일 동안 새싹이 버티는지 지켜봅니다.`,
+    'info',
+    true,
+  );
+  return true;
+}
+
 function resolveEarlyFrost(state: GameState, disaster: PendingDisaster): void {
   const targetId = disaster.targetBuildingIds?.[0];
   const farm = targetId == null
@@ -114,12 +139,45 @@ function resolveEarlyFrost(state: GameState, disaster: PendingDisaster): void {
   );
 }
 
+function resolveLateFrost(state: GameState, disaster: PendingDisaster): void {
+  const targetId = disaster.targetBuildingIds?.[0];
+  const farm = targetId == null
+    ? undefined
+    : state.buildings.find(building => building.id === targetId);
+  const cropId = farm ? cropIdForBuilding(farm) : null;
+  if (!farm || !cropId || farm.fieldGrowth <= 0) {
+    addLog(state, '늦서리를 지켜보던 경작지에 더는 살필 새싹이 없어 관찰을 마쳤습니다.', 'info', true);
+    return;
+  }
+  const frostDays = Math.max(0, Math.floor(disaster.progress ?? 0));
+  if (frostDays < CONFIG.disasters.lateFrost.failureFrostDays) {
+    addLog(
+      state,
+      `늦서리가 오래 이어지지 않았습니다. ${withJosa(CROP_DEFS[cropId].name, '이/가')} 다시 기운을 차렸습니다.`,
+      'good',
+      true,
+    );
+    return;
+  }
+  farm.fieldGrowth = 0;
+  farm.sownArea = 0;
+  farm.cropId = null;
+  farm.queuedCropId = null;
+  addLog(
+    state,
+    `${CONFIG.disasters.lateFrost.observationDays}일 중 ${frostDays}일이나 찬 기운이 이어져 ` +
+      `${withJosa(CROP_DEFS[cropId].name, '이/가')} 고사했습니다. 여름 작물을 다시 심을 수 있습니다.`,
+    'bad',
+    true,
+  );
+}
+
 export function advancePendingDisasters(state: GameState): void {
   if (state.pendingDisasters.length === 0) return;
   const remaining: PendingDisaster[] = [];
   for (const disaster of state.pendingDisasters) {
     if (state.day > disaster.startedDay && state.day <= disaster.resolveDay &&
-        disaster.id === 'earlyFrost' && FROST_WEATHERS.has(state.weather)) {
+        (disaster.id === 'earlyFrost' || disaster.id === 'lateFrost') && FROST_WEATHERS.has(state.weather)) {
       disaster.progress = Math.max(0, disaster.progress ?? 0) + 1;
     }
     if (state.day < disaster.resolveDay) {
@@ -127,6 +185,7 @@ export function advancePendingDisasters(state: GameState): void {
       continue;
     }
     if (disaster.id === 'earlyFrost') resolveEarlyFrost(state, disaster);
+    else if (disaster.id === 'lateFrost') resolveLateFrost(state, disaster);
   }
   state.pendingDisasters = remaining;
 }

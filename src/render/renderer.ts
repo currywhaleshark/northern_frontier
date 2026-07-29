@@ -1570,9 +1570,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     drawBattleScarDecal(ctx, scar, state.day, season === 'winter');
   }
   const wallTiles = builtWallTileSet(state);
-  const earlyFrostBuildingIds = new Set(
+  const frostObservationBuildingIds = new Set(
     state.pendingDisasters
-      .filter(disaster => disaster.id === 'earlyFrost')
+      .filter(disaster => disaster.id === 'earlyFrost' || disaster.id === 'lateFrost')
       .flatMap(disaster => disaster.targetBuildingIds ?? []),
   );
   const sorted = [...state.buildings].sort((a, b) =>
@@ -1616,7 +1616,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
           x: cellX * TILE, y: cellY * TILE, size: TILE,
         };
         sprites.drawBuilding(ctx, drawParams);
-        if (earlyFrostBuildingIds.has(b.id)) {
+        if (frostObservationBuildingIds.has(b.id)) {
           drawEarlyFrostCropOverlay(ctx, drawParams.x, drawParams.y);
         }
         occludedBuildingDraws.push(drawParams);

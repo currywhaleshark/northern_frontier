@@ -156,11 +156,12 @@ export function computeAlerts(state: GameState): AlertItem[] {
     });
   }
   for (const disaster of state.pendingDisasters) {
-    if (disaster.id !== 'earlyFrost') continue;
+    if (disaster.id !== 'earlyFrost' && disaster.id !== 'lateFrost') continue;
     const daysLeft = pendingDisasterDaysRemaining(state, disaster);
+    const title = disaster.id === 'earlyFrost' ? '이른 서리' : '늦서리';
     alerts.push({
       id: `pendingDisaster-${disaster.id}`,
-      text: `이른 서리 경과 관찰 중 · 찬 날 ${Math.floor(disaster.progress ?? 0)}일 · ${daysLeft}일 뒤 판정`,
+      text: `${title} 경과 관찰 중 · 찬 날 ${Math.floor(disaster.progress ?? 0)}일 · ${daysLeft}일 뒤 판정`,
       level: 'warn',
     });
   }
