@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import { residentOriginProfile } from './defectors';
 import type { CombatCapability, CombatRole } from './combatRoster';
-import type { CombatWeaponId, MountId, SpecialResidentId } from './types';
+import type { ArtifactWeaponId, CombatWeaponId, MountId, SpecialResidentId } from './types';
 
 // Hunters keep a weak hunting-bow volley even without an inventory weapon.
 // This is the single policy switch for that legacy gameplay rule.
@@ -133,10 +133,17 @@ export function tacticalGroupPower(group: {
   origin?: string;
   mount?: MountId;
   weapon: CombatWeaponId | null;
+  artifactWeapon?: ArtifactWeaponId;
   readyMuskets?: number;
   featuredResidents?: ReadonlyArray<{ special: SpecialResidentId; origin?: string }>;
 }, active: number): number {
   const count = Math.max(0, active);
+  if (count > 0 && group.artifactWeapon &&
+      (group.weapon !== 'musket' || (group.readyMuskets ?? 0) > 0)) {
+    return tacticalGroupPower({ ...group, artifactWeapon: undefined }, active) +
+      combatWeaponTotalPower(group.role, group.weapon, group.origin, group.special) *
+      (CONFIG.courtGrants.artifactWeaponPowerMultiplier - 1);
+  }
   const featuredResidents = group.featuredResidents?.slice(0, count) ?? [];
   if (featuredResidents.length > 0) {
     const ready = group.weapon === 'musket'

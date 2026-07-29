@@ -95,13 +95,18 @@ assert.equal(typeof saveLoad.migrateV41ToV42, 'function');
   state.royalPlaqueBuildingId = plaqueBuilding.id;
   state.specialItems.royalPlaque = 1;
   state.discoveredSpecialItems.push('royalPlaque');
-  state.artifactWeaponAssignments = { royalSpear: null, royalMusket: 3 };
+  const artifactBearer = state.residents[0];
+  artifactBearer.job = 'militia';
+  state.specialItems.royalMusket = 1;
+  state.discoveredSpecialItems.push('royalMusket');
+  state.weaponAllocationMode = 'manual';
+  state.artifactWeaponAssignments = { royalSpear: null, royalMusket: artifactBearer.id };
   assert.equal(saveLoad.saveGame(state), true);
   const loaded = saveLoad.loadGame();
   assert.equal(loaded?.courtGrantArtifactMisses, 3, 'artifact pity counter survives a normal save/load round trip');
   assert.equal(loaded?.royalPlaqueBuildingId, plaqueBuilding.id, 'valid plaque binding survives a normal save/load round trip');
-  assert.deepEqual(loaded?.artifactWeaponAssignments, { royalSpear: null, royalMusket: 3 },
-    'artifact weapon scaffold survives a normal save/load round trip');
+  assert.deepEqual(loaded?.artifactWeaponAssignments, { royalSpear: null, royalMusket: artifactBearer.id },
+    'valid artifact weapon assignment survives a normal save/load round trip');
 }
 
 {

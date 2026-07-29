@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { BUILDING_DEFS } from '../../game/buildings';
 import { JOB_NAMES } from '../../game/constants';
 import { LIFE_STAGE_NAMES } from '../../game/lifecycle';
-import { COMBAT_WEAPON_NAMES } from '../../game/weapons';
+import {
+  ARTIFACT_WEAPON_NAMES, COMBAT_WEAPON_NAMES, artifactWeaponForResident,
+} from '../../game/weapons';
 import { filteredResidents, type ResidentSort, type ResidentStatusFilter } from '../../ui/residentListPresentation';
 import type { GameState, JobId, Resident } from '../../game/types';
 import { UiIcon } from '../UiIcon';
@@ -125,7 +127,11 @@ export function ResidentsWindow({
             <span className="muted">{resident.alive ? <>
               {resident.cartEquipped && <><UiIcon name="cart" size={18} /> </>}
               {residentRoleLabel(resident)} · {workplaceLabel(state, resident)}
-              {state.weaponAssignments[resident.id] ? ` · ${COMBAT_WEAPON_NAMES[state.weaponAssignments[resident.id]!]}` : ''}
+              {artifactWeaponForResident(state, resident.id)
+                ? ` · ${ARTIFACT_WEAPON_NAMES[artifactWeaponForResident(state, resident.id)!]}`
+                : state.weaponAssignments[resident.id]
+                  ? ` · ${COMBAT_WEAPON_NAMES[state.weaponAssignments[resident.id]!]}`
+                  : ''}
               {state.mountAssignments[resident.id] && <> · <UiIcon name="mounted" size={18} /> 기마</>}
             </> : '사망'}</span>
           </button>

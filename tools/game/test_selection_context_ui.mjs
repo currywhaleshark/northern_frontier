@@ -33,8 +33,12 @@ assert.match(contextSource, /<td>탑승<\/td>[\s\S]*mountAssignments/,
   'combat resident details must show their current mount');
 assert.match(weaponDialogSource, /onAssignMount[\s\S]*horseStock[\s\S]*className="mount-select"/,
   'the weapon allocation dialog must expose a separate horse assignment column');
-assert.match(residentsWindowSource, /무기·군마 배분[\s\S]*🐎 기마/,
+assert.match(residentsWindowSource, /무기·군마 배분[\s\S]*UiIcon name="mounted"[\s\S]*기마/,
   'the resident dock must advertise and summarize horse assignment');
+assert.match(weaponDialogSource, /onAssignArtifact[\s\S]*ARTIFACT_WEAPON_IDS[\s\S]*artifact-weapon-select/,
+  'the weapon allocation dialog must expose independent artifact weapon assignment');
+assert.match(contextSource, /artifactWeaponForResident[\s\S]*ARTIFACT_WEAPON_NAMES[\s\S]*\(고유\)/,
+  'resident selection details must identify an assigned artifact weapon');
 assert.match(appSource, /onSlaughterLivestock=\{handleSlaughterLivestock\}/,
   'the stable slaughter action must be wired to the simulation from App');
 assert.doesNotMatch(canvasSource, /ActionPopup/,

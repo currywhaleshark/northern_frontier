@@ -1,4 +1,8 @@
 import { CONFIG } from './config';
+import { withJosa } from './josa';
+import {
+  ARTIFACT_WEAPON_IDS, SPECIAL_ITEM_DEFS, type ArtifactWeaponId,
+} from './specialItems';
 import type {
   CombatWeaponId, GameState, JobId, MountId, Resident, ResourceId,
 } from './types';
@@ -15,8 +19,163 @@ export const COMBAT_WEAPON_RESOURCES: Record<CombatWeaponId, ResourceId> = {
   spear: 'spears',
 };
 export const MOUNT_NAMES: Record<MountId, string> = { horse: '군마' };
+export const ARTIFACT_WEAPON_BASE_WEAPONS: Record<ArtifactWeaponId, CombatWeaponId> = {
+  royalSpear: 'spear',
+  royalHornBow: 'hornBow',
+  royalMusket: 'musket',
+};
+export const ARTIFACT_WEAPON_NAMES: Record<ArtifactWeaponId, string> = Object.fromEntries(
+  ARTIFACT_WEAPON_IDS.map(item => [item, SPECIAL_ITEM_DEFS[item].name]),
+) as Record<ArtifactWeaponId, string>;
 
 const COMBAT_JOBS = new Set<JobId>(['militia', 'watchman', 'hunter']);
+
+function artifactEligibleResidents(state: GameState): Resident[] {
+  const roleOrder = { militia: 0, watchman: 1, hunter: 2 } as const;
+  return state.residents
+    .filter(isCombatResident)
+    .sort((left, right) =>
+      Number(!left.special) - Number(!right.special) ||
+      roleOrder[left.job as keyof typeof roleOrder] - roleOrder[right.job as keyof typeof roleOrder] ||
+      left.id - right.id);
+}
+
+function reconciledArtifactWeaponAssignments(
+  state: GameState,
+): Partial<Record<ArtifactWeaponId, number | null>> {
+  const source = state.artifactWeaponAssignments && typeof state.artifactWeaponAssignments === 'object'
+    ? state.artifactWeaponAssignments
+    : {};
+  const eligible = new Set(artifactEligibleResidents(state).map(resident => resident.id));
+  const usedResidents = new Set<number>();
+  const next: Partial<Record<ArtifactWeaponId, number | null>> = {};
+  const autoFill = new Set<ArtifactWeaponId>();
+  for (const item of ARTIFACT_WEAPON_IDS) {
+    const hasAssignment = Object.prototype.hasOwnProperty.call(source, item);
+    const residentId = source[item];
+    if (!hasAssignment) {
+      autoFill.add(item);
+      continue;
+    }
+    if (residentId == null) {
+      if (residentId === null) next[item] = null;
+      continue;
+    }
+    if (
+      (state.specialItems[item] ?? 0) <= 0 ||
+      !Number.isInteger(residentId) ||
+      !eligible.has(residentId) ||
+      usedResidents.has(residentId)
+    ) {
+      next[item] = null;
+      autoFill.add(item);
+      continue;
+    }
+    next[item] = residentId;
+    usedResidents.add(residentId);
+  }
+  // 일반 무기 자동 배분과 같은 모드 계약을 따른다. 새 하사품만 빈 우선순위 자리에
+  // 채우고, 이미 유효한 고유 무기 배정은 불필요하게 재섞지 않는다.
+  if (state.weaponAllocationMode === 'auto') {
+    const residents = artifactEligibleResidents(state);
+    for (const item of ARTIFACT_WEAPON_IDS) {
+      if ((state.specialItems[item] ?? 0) <= 0 || !autoFill.has(item)) continue;
+      const resident = residents.find(candidate => !usedResidents.has(candidate.id));
+      if (resident) {
+        next[item] = resident.id;
+        usedResidents.add(resident.id);
+      } else {
+        // 자동 배정할 주민이 아직 없으면 key를 비워 두어 이후 영입 때 다시 시도한다.
+        delete next[item];
+      }
+    }
+  }
+  return next;
+}
+
+export function resolvedArtifactWeaponAssignments(
+  state: GameState,
+): Readonly<Partial<Record<ArtifactWeaponId, number | null>>> {
+  return reconciledArtifactWeaponAssignments(state);
+}
+
+export function reconcileArtifactWeaponAssignments(state: GameState): void {
+  state.artifactWeaponAssignments = reconciledArtifactWeaponAssignments(state);
+  const holders = new Set(
+    Object.values(state.artifactWeaponAssignments).filter((id): id is number => typeof id === 'number'),
+  );
+  for (const residentId of holders) delete state.weaponAssignments[residentId];
+}
+
+export function artifactWeaponForResident(
+  state: GameState,
+  residentId: number,
+): ArtifactWeaponId | null {
+  const assignments = resolvedArtifactWeaponAssignments(state);
+  return ARTIFACT_WEAPON_IDS.find(item => assignments[item] === residentId) ?? null;
+}
+
+export function automaticArtifactWeaponAssignments(
+  state: GameState,
+): Partial<Record<ArtifactWeaponId, number | null>> {
+  const residents = artifactEligibleResidents(state);
+  const assignments: Partial<Record<ArtifactWeaponId, number | null>> = {};
+  let residentIndex = 0;
+  for (const item of ARTIFACT_WEAPON_IDS) {
+    if ((state.specialItems[item] ?? 0) <= 0) continue;
+    const resident = residents[residentIndex++];
+    if (resident) assignments[item] = resident.id;
+  }
+  return assignments;
+}
+
+export function setResidentArtifactWeapon(
+  state: GameState,
+  residentId: number,
+  item: ArtifactWeaponId | null,
+): string | null {
+  reconcileArtifactWeaponAssignments(state);
+  const resident = state.residents.find(candidate => candidate.id === residentId);
+  if (!resident) return '주민을 찾을 수 없습니다.';
+  if (!isCombatResident(resident)) return '수비병·파수꾼·사냥꾼에게만 고유 무기를 배정할 수 있습니다.';
+
+  const current = artifactWeaponForResident(state, residentId);
+  if (current === item) return null;
+  if (item != null) {
+    if (!ARTIFACT_WEAPON_IDS.includes(item)) return '알 수 없는 고유 무기입니다.';
+    if ((state.specialItems[item] ?? 0) <= 0) {
+      return `${withJosa(ARTIFACT_WEAPON_NAMES[item], '을/를')} 보유하고 있지 않습니다.`;
+    }
+    const assigned = state.artifactWeaponAssignments[item];
+    if (typeof assigned === 'number' && assigned !== residentId) {
+      return `${withJosa(ARTIFACT_WEAPON_NAMES[item], '은/는')} 다른 주민이 장착하고 있습니다.`;
+    }
+  }
+
+  if (current) state.artifactWeaponAssignments[current] = null;
+  if (item) {
+    state.artifactWeaponAssignments[item] = residentId;
+    delete state.weaponAssignments[residentId];
+  }
+  state.weaponAllocationMode = 'manual';
+  return null;
+}
+
+export function releaseResidentArtifactWeapons(
+  state: GameState,
+  residentId: number,
+  combatDeath: boolean,
+): ArtifactWeaponId[] {
+  reconcileArtifactWeaponAssignments(state);
+  const released: ArtifactWeaponId[] = [];
+  for (const item of ARTIFACT_WEAPON_IDS) {
+    if (state.artifactWeaponAssignments[item] !== residentId) continue;
+    state.artifactWeaponAssignments[item] = null;
+    if (combatDeath) state.specialItems[item] = 0;
+    released.push(item);
+  }
+  return released;
+}
 
 export interface WeaponCounts {
   muskets: number;
@@ -201,7 +360,10 @@ function assignFirstAvailable(
 // 사냥꾼·파수꾼의 역할 적성에 맞춰 나눈다.
 export function automaticWeaponAssignments(state: GameState): Partial<Record<number, CombatWeaponId>> {
   const assignments: Partial<Record<number, CombatWeaponId>> = {};
-  const residents = eligibleResidents(state);
+  const artifactHolders = new Set(
+    Object.values(resolvedArtifactWeaponAssignments(state)).filter((id): id is number => typeof id === 'number'),
+  );
+  const residents = eligibleResidents(state).filter(resident => !artifactHolders.has(resident.id));
   const militia = residents.filter(resident => resident.job === 'militia');
   const hunters = residents.filter(resident => resident.job === 'hunter');
   const watchmen = residents.filter(resident => resident.job === 'watchman');
@@ -229,6 +391,9 @@ function reconciledManualAssignments(state: GameState): Partial<Record<number, C
     ? state.weaponAssignments
     : {};
   const residents = new Map(eligibleResidents(state).map(resident => [resident.id, resident]));
+  const artifactHolders = new Set(
+    Object.values(resolvedArtifactWeaponAssignments(state)).filter((id): id is number => typeof id === 'number'),
+  );
   const used: Record<CombatWeaponId, number> = { musket: 0, hornBow: 0, spear: 0 };
   const next: Partial<Record<number, CombatWeaponId>> = {};
   const entries = Object.entries(source)
@@ -236,7 +401,12 @@ function reconciledManualAssignments(state: GameState): Partial<Record<number, C
     .sort(([a], [b]) => a - b);
 
   for (const [residentId, weapon] of entries) {
-    if (!Number.isInteger(residentId) || !residents.has(residentId) || !isCombatWeaponId(weapon)) continue;
+    if (
+      !Number.isInteger(residentId) ||
+      !residents.has(residentId) ||
+      artifactHolders.has(residentId) ||
+      !isCombatWeaponId(weapon)
+    ) continue;
     if (used[weapon] >= weaponStock(state, weapon)) continue;
     next[residentId] = weapon;
     used[weapon] += 1;
@@ -253,6 +423,7 @@ export function resolvedWeaponAssignments(
 }
 
 export function reconcileWeaponAssignments(state: GameState): void {
+  reconcileArtifactWeaponAssignments(state);
   if (state.weaponAllocationMode !== 'manual') state.weaponAllocationMode = 'auto';
   state.weaponAssignments = state.weaponAllocationMode === 'auto'
     ? automaticWeaponAssignments(state)
@@ -265,6 +436,8 @@ export function synchronizeWeaponAssignments(state: GameState): void {
 }
 
 export function setAutomaticWeaponAllocation(state: GameState): void {
+  state.artifactWeaponAssignments = automaticArtifactWeaponAssignments(state);
+  reconcileArtifactWeaponAssignments(state);
   state.weaponAllocationMode = 'auto';
   reconcileWeaponAssignments(state);
 }
@@ -272,6 +445,7 @@ export function setAutomaticWeaponAllocation(state: GameState): void {
 export function clearWeaponAssignments(state: GameState): void {
   state.weaponAllocationMode = 'manual';
   state.weaponAssignments = {};
+  state.artifactWeaponAssignments = {};
 }
 
 export function setResidentWeapon(
@@ -284,6 +458,10 @@ export function setResidentWeapon(
   if (!resident) return '주민을 찾을 수 없습니다.';
   if (!isCombatResident(resident)) return '수비병·파수꾼·사냥꾼에게만 전투 무기를 배정할 수 있습니다.';
   if (weapon != null && !isCombatWeaponId(weapon)) return '알 수 없는 무기입니다.';
+  const artifact = artifactWeaponForResident(state, residentId);
+  if (weapon != null && artifact) {
+    return `${withJosa(ARTIFACT_WEAPON_NAMES[artifact], '을/를')} 먼저 해제해야 일반 무기를 배정할 수 있습니다.`;
+  }
 
   const current = state.weaponAssignments[residentId] ?? null;
   if (current === weapon) {
@@ -306,6 +484,8 @@ export function setResidentWeapon(
 }
 
 export function assignedWeapon(state: GameState, residentId: number): CombatWeaponId | null {
+  const artifact = artifactWeaponForResident(state, residentId);
+  if (artifact) return ARTIFACT_WEAPON_BASE_WEAPONS[artifact];
   return resolvedWeaponAssignments(state)[residentId] ?? null;
 }
 

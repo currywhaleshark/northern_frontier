@@ -21,7 +21,9 @@ import { enrolledStudentIds, isSchoolAge, schoolSeatCount } from '../game/educat
 import { specialResidentSkills } from '../game/specialResidents';
 import { isYouthWorkJob } from '../game/youth';
 import { DAY_BAND_NAMES, uiDayBand } from '../ui/dayBand';
-import { COMBAT_WEAPON_NAMES, MOUNT_NAMES } from '../game/weapons';
+import {
+  ARTIFACT_WEAPON_NAMES, COMBAT_WEAPON_NAMES, MOUNT_NAMES, artifactWeaponForResident,
+} from '../game/weapons';
 import type {
   BuildingTypeId,
   CropId,
@@ -244,9 +246,11 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
           <>
             <tr>
               <td>전투 무기</td>
-              <td>{state.weaponAssignments[resident.id]
-                ? COMBAT_WEAPON_NAMES[state.weaponAssignments[resident.id]!]
-                : `${combatDefaultWeaponName(resident.job)} (기본 무장)`}</td>
+              <td>{artifactWeaponForResident(state, resident.id)
+                ? `${ARTIFACT_WEAPON_NAMES[artifactWeaponForResident(state, resident.id)!]} (고유)`
+                : state.weaponAssignments[resident.id]
+                  ? COMBAT_WEAPON_NAMES[state.weaponAssignments[resident.id]!]
+                  : `${combatDefaultWeaponName(resident.job)} (기본 무장)`}</td>
             </tr>
             <tr><td>탑승</td><td>{state.mountAssignments[resident.id] ? MOUNT_NAMES[state.mountAssignments[resident.id]!] : '도보'}</td></tr>
           </>

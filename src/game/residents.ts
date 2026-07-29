@@ -16,7 +16,9 @@ import { addCorpse } from './lifecycle';
 import { hasResidentMonk, moraleBreakdown, moraleTarget, type MoraleInputs } from './morale';
 import { getSeason } from './seasons';
 import { warmthLossWeatherMult } from './weather';
-import { releaseResidentMount } from './weapons';
+import {
+  ARTIFACT_WEAPON_NAMES, releaseResidentArtifactWeapons, releaseResidentMount,
+} from './weapons';
 import { canResidentTakeJob } from './youth';
 import { residentColdProtection } from './wearables';
 import type { Building, GameState, Gender, JobId, Resident, Tile } from './types';
@@ -299,6 +301,7 @@ export function killResident(
   if (!r.alive) return;
   returnResidentCart(state, r);
   const horseLost = releaseResidentMount(state, r.id, combatDeath);
+  const artifactWeapons = releaseResidentArtifactWeapons(state, r.id, combatDeath);
   r.alive = false;
   r.health = 0;
   r.homeBuildingId = null;
@@ -324,6 +327,9 @@ export function killResident(
   if (combatDeath) {
     addLog(state, `${withJosa(r.name, '이/가')} 전투 중 전사했습니다. (${cause})`, 'raid', true);
     if (horseLost) addLog(state, '기수가 쓰러지는 과정에서 군마 한 필도 잃었습니다.', 'bad', true);
+    for (const item of artifactWeapons) {
+      addLog(state, `${ARTIFACT_WEAPON_NAMES[item]}도 전장에서 소실되었습니다.`, 'bad', true);
+    }
   } else if (cause === '호환') {
     addLog(state, `${withJosa(r.name, '이/가')} 호환을 당해 목숨을 잃었습니다.`, 'bad', true);
   } else if (cause === '늑대 습격') {

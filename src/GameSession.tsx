@@ -66,7 +66,8 @@ import { createExpedition, predatorExpeditionTarget } from './game/expedition';
 import { purchasePredatorIntel } from './game/predatorIntelTrade';
 import { isForeignSiteOperational } from './game/foreignSites';
 import {
-  clearMountAssignments, clearWeaponAssignments, setAutomaticWeaponAllocation, setResidentMount, setResidentWeapon,
+  clearMountAssignments, clearWeaponAssignments, setAutomaticWeaponAllocation, setResidentArtifactWeapon,
+  setResidentMount, setResidentWeapon,
 } from './game/weapons';
 import {
   requestHuntingRights, requestPassagePermission, requestSiteDefectors, scoutBanditLair, sendGiftToSite,
@@ -79,7 +80,7 @@ import {
 } from './game/tacticalBattle';
 import { mergeHuntGroups, setHuntPreparationZone, splitHuntGroup } from './game/tacticalHunt';
 import type {
-  BuildingTypeId, CombatWeaponId, CropId, DryingProductId, EdictId, EdictLevel, GameState, JobId, LivestockId, LogEntry, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId, TanneryProductId, TradeContract, YouthActivity,
+  ArtifactWeaponId, BuildingTypeId, CombatWeaponId, CropId, DryingProductId, EdictId, EdictLevel, GameState, JobId, LivestockId, LogEntry, MountId, ProcessingInputId, ResourceId, SelectedEntity, SmithyProductId, TanneryProductId, TradeContract, YouthActivity,
   PreparationActionId, PredatorKind, SpecialItemId, SpecialResidentId, TacticalCommandId, TacticalFormationLine, WildlifeKind,
 } from './game/types';
 import { markScenarioFlag } from './game/scenario';
@@ -923,6 +924,12 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       notify(`${request.buildingName}에 사액 현판을 영구 귀속했습니다.`, 'good');
     }
     bump();
+  };
+
+  const handleSetResidentArtifactWeapon = (id: number, item: ArtifactWeaponId | null) => {
+    const error = setResidentArtifactWeapon(stateRef.current, id, item);
+    if (error) notify(error, 'info');
+    refreshWeaponDefense();
   };
 
   const handlePlaceBuildingRelocation = (x: number, y: number) => {
@@ -1844,6 +1851,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
           <WeaponAllocationDialog
             state={state}
             onAssign={handleSetResidentWeapon}
+            onAssignArtifact={handleSetResidentArtifactWeapon}
             onAssignMount={handleSetResidentMount}
             onAutoAssign={handleAutoAssignWeapons}
             onClear={handleClearWeaponAssignments}

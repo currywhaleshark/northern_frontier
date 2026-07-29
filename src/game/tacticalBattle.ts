@@ -18,6 +18,7 @@ import {
 } from './enemyPlan';
 import { addLog } from './events';
 import { withJosa } from './josa';
+import { ARTIFACT_WEAPON_NAMES } from './weapons';
 import { makeRng } from './map';
 import {
   applyLootLosses, damageBuildings, describeLootLosses, injure, killResidents, moraleShock,
@@ -644,23 +645,28 @@ function snapshotGroup(
   const special = snapshots[0]?.special;
   const origin = snapshots[0]?.origin;
   const mount = snapshots[0]?.mount;
+  const artifactWeapon = snapshots[0]?.artifactWeapon;
   const featuredResidents = tacticalFeaturedResidentsFromSnapshots(state, snapshots);
   const originKey = origin ? `-${origin}` : '';
   const mountKey = mount ? `-${mount}` : '';
   const specialKey = special ? `-${special}` : '';
+  const artifactKey = artifactWeapon ? `-${artifactWeapon}` : '';
   return {
-    id: `${role}-${weapon ?? 'unarmed'}${originKey}${mountKey}${specialKey}`,
+    id: `${role}-${weapon ?? 'unarmed'}${originKey}${mountKey}${specialKey}${artifactKey}`,
     kind,
     role,
     ...(special ? { special } : {}),
     ...(origin ? { origin } : {}),
     ...(mount ? { mount } : {}),
     weapon,
+    ...(artifactWeapon ? { artifactWeapon } : {}),
     readyMuskets: snapshots.filter(snapshot => snapshot.readyWeapon === 'musket').length,
-    label: special === 'jurchenWarrior'
+    label: artifactWeapon
+      ? `${ARTIFACT_WEAPON_NAMES[artifactWeapon]} ${combatGroupLabel(role, weapon)}`
+      : special === 'jurchenWarrior'
       ? `귀순 무사 ${combatGroupLabel(role, weapon)}`
       : `${mount ? '기마 ' : ''}${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
-    baseLabel: `${mount ? '기마 ' : ''}${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
+    baseLabel: `${artifactWeapon ? `${ARTIFACT_WEAPON_NAMES[artifactWeapon]} ` : ''}${mount ? '기마 ' : ''}${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
     ...(featuredResidents.length > 0 ? { featuredResidents } : {}),
     residentIds: snapshots.map(snapshot => snapshot.residentId),
     count: snapshots.length,
@@ -679,7 +685,7 @@ function snapshotGroup(
 function groupsFromSnapshots(state: GameState, snapshots: CombatantSnapshot[], assault = false): TacticalDefenderGroup[] {
   const grouped = new Map<string, CombatantSnapshot[]>();
   for (const snapshot of snapshots) {
-    const key = `${snapshot.role}:${snapshot.assignedWeapon ?? 'unarmed'}:${snapshot.origin ?? 'local'}:${snapshot.mount ?? 'foot'}:${snapshot.special ?? 'common'}`;
+    const key = `${snapshot.role}:${snapshot.assignedWeapon ?? 'unarmed'}:${snapshot.origin ?? 'local'}:${snapshot.mount ?? 'foot'}:${snapshot.special ?? 'common'}:${snapshot.artifactWeapon ?? 'ordinary'}`;
     const list = grouped.get(key) ?? [];
     list.push(snapshot);
     grouped.set(key, list);

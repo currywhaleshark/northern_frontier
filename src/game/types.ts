@@ -1152,6 +1152,7 @@ export interface TacticalDefenderGroup {
   origin?: string;
   mount?: MountId;
   weapon: CombatWeaponId | null;
+  artifactWeapon?: ArtifactWeaponId;
   readyMuskets?: number;
   label: string;
   baseLabel?: string;

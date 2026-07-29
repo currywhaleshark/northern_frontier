@@ -1,15 +1,19 @@
 import { JOB_NAMES } from '../game/constants';
 import {
-  COMBAT_WEAPON_IDS, COMBAT_WEAPON_NAMES, horseStock, MOUNT_NAMES, musketReadiness,
-  residentDefenseContribution, resolvedMountAssignments, resolvedWeaponAssignments, weaponStock,
+  ARTIFACT_WEAPON_BASE_WEAPONS, ARTIFACT_WEAPON_NAMES, COMBAT_WEAPON_IDS, COMBAT_WEAPON_NAMES,
+  artifactWeaponForResident, horseStock, MOUNT_NAMES, musketReadiness, residentDefenseContribution,
+  resolvedArtifactWeaponAssignments, resolvedMountAssignments, resolvedWeaponAssignments, weaponStock,
 } from '../game/weapons';
 import { createCombatRoster } from '../game/combatRoster';
 import { CONFIG } from '../game/config';
-import type { CombatWeaponId, GameState, MountId } from '../game/types';
+import { ARTIFACT_WEAPON_IDS, SPECIAL_ITEM_DEFS } from '../game/specialItems';
+import type { ArtifactWeaponId, CombatWeaponId, GameState, MountId } from '../game/types';
+import { UiIcon } from './UiIcon';
 
 interface Props {
   state: GameState;
   onAssign: (residentId: number, weapon: CombatWeaponId | null) => void;
+  onAssignArtifact: (residentId: number, item: ArtifactWeaponId | null) => void;
   onAssignMount: (residentId: number, mount: MountId | null) => void;
   onAutoAssign: () => void;
   onClear: () => void;
@@ -17,9 +21,10 @@ interface Props {
 }
 
 export function WeaponAllocationDialog({
-  state, onAssign, onAssignMount, onAutoAssign, onClear, onClose,
+  state, onAssign, onAssignArtifact, onAssignMount, onAutoAssign, onClear, onClose,
 }: Props) {
   const assignments = resolvedWeaponAssignments(state);
+  const artifactAssignments = resolvedArtifactWeaponAssignments(state);
   const mountAssignments = resolvedMountAssignments(state);
   const snapshots = new Map(createCombatRoster(state, { context: 'villageDefense' }).combatants
     .map(snapshot => [snapshot.residentId, snapshot]));
@@ -67,6 +72,13 @@ export function WeaponAllocationDialog({
               })()}
             </div>
           ))}
+          {ARTIFACT_WEAPON_IDS.filter(item => (state.specialItems[item] ?? 0) > 0).map(item => (
+            <div key={item} className="weapon-stock-card artifact-weapon-stock-card">
+              <strong><UiIcon name={SPECIAL_ITEM_DEFS[item].icon} size={18} /> {ARTIFACT_WEAPON_NAMES[item]}</strong>
+              <span>{typeof artifactAssignments[item] === 'number' ? '1 / 1 배정' : '0 / 1 배정'}</span>
+              <em>{COMBAT_WEAPON_NAMES[ARTIFACT_WEAPON_BASE_WEAPONS[item]]} 계열 ×1.25</em>
+            </div>
+          ))}
           <div className="weapon-stock-card mount-stock-card">
             <strong>{MOUNT_NAMES.horse}</strong>
             <span>{mounted} / {horseStock(state)} 배정</span>
@@ -85,6 +97,7 @@ export function WeaponAllocationDialog({
             <div className="muted small">무기를 배정할 수 있는 수비병·파수꾼·사냥꾼이 없습니다.</div>
           ) : residents.map(resident => {
             const current = assignments[resident.id] ?? '';
+            const currentArtifact = artifactWeaponForResident(state, resident.id) ?? '';
             const currentMount = mountAssignments[resident.id] ?? '';
             const snapshot = snapshots.get(resident.id);
             return (
@@ -100,6 +113,8 @@ export function WeaponAllocationDialog({
                   className="weapon-select"
                   value={current}
                   aria-label={`${resident.name} 무기`}
+                  disabled={currentArtifact !== ''}
+                  title={currentArtifact ? '고유 무기를 먼저 해제해야 일반 무기를 배정할 수 있습니다.' : undefined}
                   onChange={event => onAssign(
                     resident.id,
                     event.target.value ? event.target.value as CombatWeaponId : null,
@@ -115,6 +130,26 @@ export function WeaponAllocationDialog({
                       {COMBAT_WEAPON_NAMES[weapon]}
                       {weapon === 'musket' && state.resources.gunpowder <= 0 ? ' (화약 없음)' : ''}
                       {` · 방어 +${residentDefenseContribution(state, resident, weapon)}`}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="weapon-select artifact-weapon-select"
+                  value={currentArtifact}
+                  aria-label={`${resident.name} 고유 무기`}
+                  onChange={event => onAssignArtifact(
+                    resident.id,
+                    event.target.value ? event.target.value as ArtifactWeaponId : null,
+                  )}
+                >
+                  <option value="">고유 무기 없음</option>
+                  {ARTIFACT_WEAPON_IDS.filter(item => (state.specialItems[item] ?? 0) > 0).map(item => (
+                    <option
+                      key={item}
+                      value={item}
+                      disabled={currentArtifact !== item && typeof artifactAssignments[item] === 'number'}
+                    >
+                      {ARTIFACT_WEAPON_NAMES[item]} · {COMBAT_WEAPON_NAMES[ARTIFACT_WEAPON_BASE_WEAPONS[item]]} ×1.25
                     </option>
                   ))}
                 </select>

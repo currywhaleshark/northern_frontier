@@ -77,7 +77,7 @@ export function grantSpecialItem(
   if (!state.discoveredSpecialItems.includes(item)) state.discoveredSpecialItems.push(item);
 }
 
-/** 고유 무기의 장착자는 후속 전투 구현 전에도 안전한 형태로 보존한다. */
+/** 고유 무기 배정의 원시 저장 형태를 알려진 ID와 양의 주민 ID로 제한한다. */
 export function normalizeArtifactWeaponAssignments(
   value: unknown,
 ): Partial<Record<ArtifactWeaponId, number | null>> {
@@ -227,22 +227,22 @@ export const SPECIAL_ITEM_DEFS: Record<SpecialItemId, {
   royalSpear: {
     name: '어사창',
     icon: 'trident',
-    desc: '왕실이 하사한 뛰어난 창. 후속 단계에서 전투원에게 장착할 수 있습니다.',
+    desc: '왕실이 하사한 뛰어난 창. 전투원 한 명에게 맡기면 일반 창보다 강한 위력을 냅니다.',
     tradeValue: 0,
-    inventoryNote: '하사 전용 · 고유 무기 배정 대기',
+    inventoryNote: '하사 전용 · 창 계열 전투력 ×1.25 · 전사 시 소실',
   },
   royalHornBow: {
     name: '어사각궁',
     icon: 'target',
-    desc: '왕실이 하사한 뛰어난 각궁. 후속 단계에서 전투원에게 장착할 수 있습니다.',
+    desc: '왕실이 하사한 뛰어난 각궁. 전투원 한 명에게 맡기면 일반 각궁보다 강한 위력을 냅니다.',
     tradeValue: 0,
-    inventoryNote: '하사 전용 · 고유 무기 배정 대기',
+    inventoryNote: '하사 전용 · 각궁 계열 전투력 ×1.25 · 전사 시 소실',
   },
   royalMusket: {
     name: '어사조총',
     icon: 'arsenal',
-    desc: '왕실이 하사한 뛰어난 조총. 후속 단계에서 전투원에게 장착할 수 있습니다.',
+    desc: '왕실이 하사한 뛰어난 조총. 일반 조총 재고는 들지 않지만 사격하려면 화약이 필요합니다.',
     tradeValue: 0,
-    inventoryNote: '하사 전용 · 고유 무기 배정 대기',
+    inventoryNote: '하사 전용 · 조총 계열 전투력 ×1.25 · 전사 시 소실',
   },
 };

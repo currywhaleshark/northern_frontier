@@ -9,7 +9,8 @@ import { expeditionEnemyIntel } from '../game/expeditionIntel';
 import { banditLairRaidChance } from '../game/siteDiplomacy';
 import { predatorHuntChance } from '../game/specialEvents';
 import {
-  COMBAT_WEAPON_IDS, COMBAT_WEAPON_NAMES, resolvedWeaponAssignments, weaponStock,
+  ARTIFACT_WEAPON_NAMES, COMBAT_WEAPON_IDS, COMBAT_WEAPON_NAMES, artifactWeaponForResident,
+  resolvedWeaponAssignments, weaponStock,
 } from '../game/weapons';
 import type { CombatWeaponId, GameState, PredatorKind } from '../game/types';
 
@@ -214,6 +215,7 @@ export function ExpeditionMusterDialog({
                 <h3>{JOB_NAMES[role]}</h3>
                 {residents.map(resident => {
                   const current = assignments[resident.id] ?? '';
+                  const artifactWeapon = artifactWeaponForResident(state, resident.id);
                   const combatant = previewByResidentId.get(resident.id);
                   const personalPower = combatant ? combatant.basePower + combatant.weaponPower : 0;
                   const musketStatus = combatant?.assignedWeapon === 'musket'
@@ -238,12 +240,14 @@ export function ExpeditionMusterDialog({
                       <select
                         value={current}
                         aria-label={`${resident.name} 무기`}
+                        disabled={artifactWeapon != null}
+                        title={artifactWeapon ? `${ARTIFACT_WEAPON_NAMES[artifactWeapon]} 장착 중` : undefined}
                         onChange={event => onAssignWeapon(
                           resident.id,
                           event.target.value ? event.target.value as CombatWeaponId : null,
                         )}
                       >
-                        <option value="">기본 무장</option>
+                        <option value="">{artifactWeapon ? `고유무기: ${ARTIFACT_WEAPON_NAMES[artifactWeapon]}` : '기본 무장'}</option>
                         {COMBAT_WEAPON_IDS.map(weapon => (
                           <option
                             key={weapon}

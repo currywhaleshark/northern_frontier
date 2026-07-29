@@ -4,6 +4,7 @@ import { CONFIG } from './config';
 import { beginExpeditionReturn } from './expedition';
 import { combatGroupLabel, tacticalGroupCapabilities } from './combatCapabilities';
 import { createCombatRoster, type CombatantSnapshot } from './combatRoster';
+import { ARTIFACT_WEAPON_NAMES } from './weapons';
 import { makeRng } from './map';
 import { injure, killResidents } from './raidDamage';
 import { applyBanditLairOutcome, type BanditLairOutcome } from './siteDiplomacy';
@@ -61,6 +62,7 @@ function makePlayerGroup(
   if (snapshots.length === 0) return null;
   const role = snapshots[0].role;
   const weapon = snapshots[0].assignedWeapon;
+  const artifactWeapon = snapshots[0].artifactWeapon;
   const origin = snapshots[0].origin;
   const mount = snapshots[0].mount;
   const featuredResidents = tacticalFeaturedResidentsFromSnapshots(state, snapshots);
@@ -77,9 +79,10 @@ function makePlayerGroup(
     ...(origin ? { origin } : {}),
     ...(mount ? { mount } : {}),
     weapon,
+    ...(artifactWeapon ? { artifactWeapon } : {}),
     readyMuskets: snapshots.filter(snapshot => snapshot.readyWeapon === 'musket').length,
-    label: `${mount ? '기마 ' : ''}${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
-    baseLabel: `${mount ? '기마 ' : ''}${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
+    label: `${artifactWeapon ? `${ARTIFACT_WEAPON_NAMES[artifactWeapon]} ` : ''}${mount ? '기마 ' : ''}${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
+    baseLabel: `${artifactWeapon ? `${ARTIFACT_WEAPON_NAMES[artifactWeapon]} ` : ''}${mount ? '기마 ' : ''}${origin ? `${origin} 출신 ` : ''}${combatGroupLabel(role, weapon)}`,
     ...(featuredResidents.length > 0 ? { featuredResidents } : {}),
     residentIds: snapshots.map(snapshot => snapshot.residentId),
     count: snapshots.length,
@@ -106,7 +109,7 @@ export function createExpeditionTacticalGroups(state: GameState, memberIds: numb
   const snapshots = createCombatRoster(state, { context: 'expedition', memberIds }).combatants;
   const grouped = new Map<string, CombatantSnapshot[]>();
   for (const snapshot of snapshots) {
-    const key = `${snapshot.role}:${snapshot.assignedWeapon ?? 'unarmed'}:${snapshot.origin ?? 'local'}:${snapshot.mount ?? 'foot'}`;
+    const key = `${snapshot.role}:${snapshot.assignedWeapon ?? 'unarmed'}:${snapshot.origin ?? 'local'}:${snapshot.mount ?? 'foot'}:${snapshot.artifactWeapon ?? 'ordinary'}`;
     const list = grouped.get(key) ?? [];
     list.push(snapshot);
     grouped.set(key, list);

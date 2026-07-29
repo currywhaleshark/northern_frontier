@@ -1,8 +1,13 @@
 import { combatBasePower, combatCapabilities, combatWeaponTotalPower } from './combatCapabilities';
 import { activePredatorScoutIds } from './expeditionIntel';
-import { musketReadiness, resolvedMountAssignments, resolvedWeaponAssignments } from './weapons';
+import {
+  ARTIFACT_WEAPON_BASE_WEAPONS, artifactWeaponForResident, musketReadiness,
+  resolvedMountAssignments, resolvedWeaponAssignments,
+} from './weapons';
 import { CONFIG } from './config';
-import type { CombatWeaponId, GameState, MountId, Resident, SpecialResidentId } from './types';
+import type {
+  ArtifactWeaponId, CombatWeaponId, GameState, MountId, Resident, SpecialResidentId,
+} from './types';
 
 export type CombatContext = 'villageDefense' | 'expedition';
 
@@ -27,6 +32,7 @@ export interface CombatantSnapshot {
   mount?: MountId;
   assignedWeapon: CombatWeaponId | null;
   readyWeapon: CombatWeaponId | null;
+  artifactWeapon?: ArtifactWeaponId;
   capabilities: CombatCapability[];
   basePower: number;
   weaponPower: number;
@@ -84,8 +90,25 @@ export function createCombatRoster(
   const fighters = eligible.filter(resident => combatRoleForResident(resident) !== 'civilian');
   const assignments = resolvedWeaponAssignments(state);
   const mountAssignments = resolvedMountAssignments(state);
+  const effectiveWeapon = (resident: Resident): {
+    assignedWeapon: CombatWeaponId | null;
+    artifactWeapon: ArtifactWeaponId | null;
+  } => {
+    if (combatRoleForResident(resident) === 'healer') return { assignedWeapon: null, artifactWeapon: null };
+    const artifactWeapon = artifactWeaponForResident(state, resident.id);
+    const assignedWeapon = artifactWeapon
+      ? ARTIFACT_WEAPON_BASE_WEAPONS[artifactWeapon]
+      : assignments[resident.id] ?? (resident.special === 'jurchenWarrior'
+        ? 'spear'
+        : resident.special === 'hangwae' ? 'musket' : null);
+    return { assignedWeapon, artifactWeapon };
+  };
   const musketIds = fighters
-    .filter(resident => assignments[resident.id] === 'musket')
+    .filter(resident => {
+      const artifactWeapon = artifactWeaponForResident(state, resident.id);
+      return (artifactWeapon && ARTIFACT_WEAPON_BASE_WEAPONS[artifactWeapon] === 'musket') ||
+        assignments[resident.id] === 'musket';
+    })
     .map(resident => resident.id);
   const readiness = musketReadiness(
     state, musketIds, CONFIG.raid.powderPerMusket, options.gunpowderAvailable,
@@ -94,15 +117,17 @@ export function createCombatRoster(
 
   const combatants = fighters.map(resident => {
     const role = combatRoleForResident(resident);
-    const assignedWeapon = role === 'healer'
-      ? null
-      : assignments[resident.id] ?? (resident.special === 'jurchenWarrior'
-        ? 'spear'
-        : resident.special === 'hangwae' ? 'musket' : null);
+    const { assignedWeapon, artifactWeapon } = effectiveWeapon(resident);
     const readyWeapon = assignedWeapon === 'musket' && !readyMusketIds.has(resident.id)
       ? null
       : assignedWeapon;
     const basePower = combatBasePower(role, resident.origin, resident.special);
+    const normalTotalPower = combatWeaponTotalPower(
+      role, readyWeapon, resident.origin, resident.special,
+    );
+    const totalPower = artifactWeapon && readyWeapon != null
+      ? normalTotalPower * CONFIG.courtGrants.artifactWeaponPowerMultiplier
+      : normalTotalPower;
     const mount = role === 'healer' ? null : mountAssignments[resident.id] ?? null;
     const snapshot: CombatantSnapshot = {
       residentId: resident.id,
@@ -112,9 +137,10 @@ export function createCombatRoster(
       ...(mount ? { mount } : {}),
       assignedWeapon,
       readyWeapon,
+      ...(artifactWeapon ? { artifactWeapon } : {}),
       capabilities: [...combatCapabilities(role, readyWeapon, resident.origin, mount, resident.special)],
       basePower,
-      weaponPower: combatWeaponTotalPower(role, readyWeapon, resident.origin, resident.special) - basePower,
+      weaponPower: totalPower - basePower,
     };
     return snapshot;
   });
