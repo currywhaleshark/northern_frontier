@@ -258,13 +258,19 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     cost: { wood: 6, stone: 10 }, buildDays: 6, slots: 1, capacity: 0, defense: 40,
     winterBonus: false, placement: 'land', unique: false,
   },
+  chongtongEmplacement: {
+    id: 'chongtongEmplacement', name: '총통 포대',
+    desc: '하사받은 지자총통을 올린 작은 포대. 방어도 +20. 지자총통 하나로 한 곳만 세울 수 있으며, 포는 건설에 소모되지 않아 해체 뒤에도 다시 세울 수 있다.',
+    cost: { wood: 6, stone: 10 }, buildDays: 6, slots: 1, capacity: 0, defense: 20,
+    winterBonus: false, placement: 'land', unique: false,
+  },
 };
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
   'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'field', 'paddy', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'clinic',
   'smokehouse', 'dryingRack', 'smithy', 'mine', 'ferry', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office', 'cemetery', 'school', 'shrine', 'hermitage',
   'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
-  'cannonEmplacement',
+  'cannonEmplacement', 'chongtongEmplacement',
 ];
 
 export const SINGLE_TILE_BUILDINGS = [
@@ -541,6 +547,12 @@ export function rebuildBuildingFootprints(state: GameState): void {
 // 불랑기포대는 조정 하사 수(cannonsGranted)만큼만 놓을 수 있다 (건설 중 포함)
 export function cannonPlacementsUsed(state: GameState): number {
   return state.buildings.filter(b => b.type === 'cannonEmplacement').length;
+}
+
+// 지자총통은 기물함에 남아 있고, 총통 포대만 완성·건설·이전 작업을 통틀어 하나로 제한한다.
+// 해체가 끝나 건물이 목록에서 제거되면 이 값도 0이 되어 같은 총통으로 재건할 수 있다.
+export function chongtongPlacementsUsed(state: GameState): number {
+  return state.buildings.filter(b => b.type === 'chongtongEmplacement').length;
 }
 
 export function getBuilding(state: GameState, id: number | null): Building | undefined {

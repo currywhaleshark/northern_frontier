@@ -6,7 +6,7 @@ import { CONFIG } from './config';
 import { isJobUnlocked, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } from './constants';
 import {
   BUILDING_DEFS, buildingCostFor, buildingFootprintTiles, canAfford, canAffordCost,
-  buildingFootprintDims, cannonPlacementsUsed, canPlaceBuildingAt, canPlaceOn, canRelocateBuildingAt, clampPlotSide,
+  buildingFootprintDims, cannonPlacementsUsed, chongtongPlacementsUsed, canPlaceBuildingAt, canPlaceOn, canRelocateBuildingAt, clampPlotSide,
   clearBuildingTiles, computeDefense, getBuilding, isBuildingUnlocked,
   footprintTilesOf, isAreaBuildingType, isPaddyFootprintEligible, isPlotBuildingType, isSmithyProductUnlocked,
   occupyBuildingTiles, plotArea, SMITHY_PRODUCT_DEFS,
@@ -340,6 +340,10 @@ export function tryPlaceBuilding(
   if (def.unique && state.buildings.some(b => b.type === type)) return '이미 건설 중이거나 완공되었습니다.';
   if (type === 'cannonEmplacement' && cannonPlacementsUsed(state) >= state.cannonsGranted) {
     return '불랑기포는 조정의 하사가 있어야 합니다. (조정 탭에서 청원)';
+  }
+  if (type === 'chongtongEmplacement') {
+    if ((state.specialItems.jijaChongtong ?? 0) < 1) return '조정에서 하사한 지자총통이 있어야 합니다.';
+    if (chongtongPlacementsUsed(state) >= 1) return '하사받은 지자총통으로는 총통 포대 한 곳만 세울 수 있습니다.';
   }
   const cost = buildingCostFor(type, w ?? 1, h ?? 1);
   if (!canAffordCost(state, cost)) return '자원이 부족합니다.';

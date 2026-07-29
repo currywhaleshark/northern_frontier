@@ -43,6 +43,7 @@ export const BUILD_CATEGORY_BY_TYPE = {
   beacon: 'defense',
   garrison: 'defense',
   cannonEmplacement: 'defense',
+  chongtongEmplacement: 'defense',
   nitreYard: 'special',
   dock: 'special',
   market: 'special',

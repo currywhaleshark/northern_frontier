@@ -42,7 +42,7 @@ const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs'
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
 const reserveMod = await import(pathToFileURL(join(compiledDir, 'tributeReserve.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
-const { rollCourtGrantResources, rollCourtGrantRewards } = grantsMod;
+const { COURT_GRANT_ARTIFACT_IDS, rollCourtGrantResources, rollCourtGrantRewards } = grantsMod;
 
 const {
   canPayTribute,
@@ -265,7 +265,7 @@ assert.ok(tributeScale(1, 40) > tributeScale(1, 12));
     openCourtTributeChoice(state);
     resolveCourtTribute(state, 'pay-full');
     assert.equal(state.courtGrantArtifactMisses, 0, 'a pity award resets the miss counter');
-    assert.ok(['reliefGrainVoucher', 'tributeWaiverDecree', 'recruitmentNotice', 'rainGauge']
+    assert.ok(COURT_GRANT_ARTIFACT_IDS
       .some(item => state.specialItems[item] === 1), 'the fifth eligible grant gives one court artifact');
     assert.ok(state.discoveredSpecialItems.some(item => state.specialItems[item] > 0), 'artifact inventory and discovery update together');
   } finally {

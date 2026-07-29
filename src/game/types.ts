@@ -181,7 +181,8 @@ export type BuildingTypeId =
   | 'school'     // 서당 (훈장이 아이들을 가르친다 — 교육 만족)
   | 'shrine'     // 당집 (무속 — 무당이 와야 지을 수 있다)
   | 'hermitage'  // 암자 (불교 — 노승이 와야 지을 수 있다)
-  | 'cannonEmplacement'; // 불랑기포대 (부 승격 후 조정 청원으로만 배치)
+  | 'cannonEmplacement' // 불랑기포대 (부 승격 후 조정 청원으로만 배치)
+  | 'chongtongEmplacement'; // 지자총통 포대 (하사 기물 보유 시 1곳)
 
 export interface Tile {
   x: number;

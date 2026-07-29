@@ -116,6 +116,14 @@ export const COURT_GRANT_RESOURCE_CANDIDATES: readonly CourtGrantResourceCandida
   { resource: 'preciousMetal', baseAmount: 3, weight: 5, minRank: 'bu', category: 'advanced' },
 ];
 
+const CHONGTONG_POWDER_SUPPORT: CourtGrantResourceCandidate = {
+  resource: 'gunpowder',
+  baseAmount: 6,
+  weight: CONFIG.courtGrants.chongtongPowderSupportWeight,
+  minRank: 'settlement',
+  category: 'practical',
+};
+
 // 축사 수용량은 상태에 따라 달라지므로 자원 후보표와 분리한다.
 // 일반 가축에는 말을 넣지 않고, 군마는 별도 후보로만 지급한다.
 export const COURT_GRANT_LIVESTOCK_CANDIDATES: readonly CourtGrantLivestockCandidate[] = [
@@ -135,6 +143,25 @@ function candidatePool(rank: Rank, category: CourtGrantResourceCategory, exclude
     && (candidate.maxRank === undefined || rankOrder <= RANK_ORDER[candidate.maxRank])
     && !excluded.has(candidate.resource),
   );
+}
+
+function hasCompletedChongtongEmplacement(state: Pick<GameState, 'buildings'>): boolean {
+  return state.buildings.some(building => building.type === 'chongtongEmplacement' && building.built);
+}
+
+function practicalCandidatePoolForState(
+  state: Pick<GameState, 'buildings' | 'rank'>,
+  excluded: ReadonlySet<ResourceId>,
+): CourtGrantResourceCandidate[] {
+  const candidates = candidatePool(state.rank, 'practical', excluded);
+  if (!hasCompletedChongtongEmplacement(state) || excluded.has('gunpowder')) return candidates;
+  const existingGunpowder = candidates.find(candidate => candidate.resource === 'gunpowder');
+  if (!existingGunpowder) return [...candidates, CHONGTONG_POWDER_SUPPORT];
+  // 부에서는 원래 화약 12 후보가 이미 있다. 작은 지원 묶음으로 보상량을 낮추지 않고
+  // 기존 후보의 가중치만 높여 포대 보유에 따른 후속 지원 확률을 반영한다.
+  return candidates.map(candidate => candidate.resource === 'gunpowder'
+    ? { ...candidate, weight: candidate.weight + CHONGTONG_POWDER_SUPPORT.weight }
+    : candidate);
 }
 
 function weightedPick(candidates: readonly CourtGrantResourceCandidate[], random: () => number): CourtGrantResourceCandidate | null {
@@ -223,7 +250,9 @@ function pickStateReward(
   random: () => number,
   year: number,
 ): CourtGrantReward | null {
-  const resources = candidatePool(state.rank, category, excludedResources);
+  const resources = category === 'practical'
+    ? practicalCandidatePoolForState(state, excludedResources)
+    : candidatePool(state.rank, category, excludedResources);
   const candidates: Array<CourtGrantResourceCandidate | CourtGrantLivestockCandidate> = category === 'practical'
     ? [...resources, ...livestockCandidatePool(state, year, excludedLivestockGrantTypes)]
     : resources;

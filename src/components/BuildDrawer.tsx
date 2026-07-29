@@ -1,6 +1,6 @@
 // 하단 건설 드로어: 카테고리 바는 상시 노출하고 상세 목록은 비모달로 펼친다.
 import { useEffect, useRef, useState } from 'react';
-import { BUILDING_DEFS, canAfford, cannonPlacementsUsed, isBuildingUnlocked } from '../game/buildings';
+import { BUILDING_DEFS, canAfford, cannonPlacementsUsed, chongtongPlacementsUsed, isBuildingUnlocked } from '../game/buildings';
 import { RANK_NAMES, RESOURCE_NAMES } from '../game/constants';
 import { getSeason } from '../game/seasons';
 import { getActiveSprites } from '../render/atlas';
@@ -56,6 +56,10 @@ function unavailableReason(state: GameState, type: BuildableBuildingTypeId): str
   }
   if (type === 'cannonEmplacement' && cannonPlacementsUsed(state) >= state.cannonsGranted) {
     return '조정의 불랑기 하사 필요';
+  }
+  if (type === 'chongtongEmplacement') {
+    if ((state.specialItems.jijaChongtong ?? 0) < 1) return '조정의 지자총통 하사 필요';
+    if (chongtongPlacementsUsed(state) >= 1) return '총통 포대는 한 곳만 건설 가능';
   }
   if (type === 'shrine' && !(state.unlockedReligions ?? []).includes('shamanism')) {
     return '무당이 마을에 들어와야 합니다';

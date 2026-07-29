@@ -1560,6 +1560,7 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   shrine:     { roof: ROOF_DARK, base: TENT_GREEN }, // 전용 그림 나오기 전 임시
   hermitage:  { roof: ROOF_DARK, base: FACE_STONE }, // 전용 그림 나오기 전 임시
   cannonEmplacement: { base: FACE_STONE, glyph: BANNER_RED }, // 돌 포대 (전용 그림 나오기 전 임시)
+  chongtongEmplacement: { base: FACE_STONE, glyph: BANNER_RED }, // 지자총통은 기존 포대 그림을 공유
 };
 
 // ── 주민 캐릭터 매핑 (완성형 캐릭터 열) ──

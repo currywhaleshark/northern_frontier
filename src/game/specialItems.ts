@@ -220,9 +220,9 @@ export const SPECIAL_ITEM_DEFS: Record<SpecialItemId, {
   jijaChongtong: {
     name: '지자총통',
     icon: 'cannon',
-    desc: '조정이 내려 준 화포. 후속 단계에서 총통 포대를 세울 수 있습니다.',
+    desc: '조정이 내려 준 화포. 총통 포대 한 곳을 세울 수 있으며, 첫 하사 때 화약도 함께 내려옵니다.',
     tradeValue: 0,
-    inventoryNote: '하사 전용 · 총통 포대 해금 대기',
+    inventoryNote: '하사 전용 · 총통 포대 1곳 건설 가능 · 화포는 해체 뒤에도 남음',
   },
   royalSpear: {
     name: '어사창',

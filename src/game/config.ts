@@ -1174,6 +1174,8 @@ export const CONFIG = {
     reliefGrainVoucherAmount: 48,
     skillArtifactGainMultiplier: 1.15,
     telescopePreparationPoints: 2,
+    jijaChongtongPowderAward: 6,
+    chongtongPowderSupportWeight: 8,
   },
 
   // 생애 주기 — 압축 성장(총 2.5게임년) + 나이별 소비 몫 + 노년·자연사.

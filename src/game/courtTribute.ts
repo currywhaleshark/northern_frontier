@@ -155,7 +155,12 @@ function grantFullTributeReward(state: GameState, tribute: CourtTribute): void {
   }
   const artifact = rollCourtGrantArtifact(state, tribute.year);
   if (artifact.item) {
+    const isFirstJijaChongtong = artifact.item === 'jijaChongtong' && (state.specialItems.jijaChongtong ?? 0) < 1;
     grantSpecialItem(state, artifact.item);
+    if (isFirstJijaChongtong) {
+      state.resources.gunpowder += CONFIG.courtGrants.jijaChongtongPowderAward;
+      labels.push(`지자총통용 화약 ${CONFIG.courtGrants.jijaChongtongPowderAward}`);
+    }
     state.courtGrantArtifactMisses = 0;
     labels.push(SPECIAL_ITEM_DEFS[artifact.item].name);
   } else if (artifact.eligible) {

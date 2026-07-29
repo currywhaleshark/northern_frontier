@@ -52,6 +52,8 @@ export const OBLIQUE_BUILDING_1X1_TYPES = [
 const TWO_TILE_COLUMN = new Map<BuildingTypeId, number>(
   OBLIQUE_BUILDING_2X2_TYPES.map((type, index) => [type, index]),
 );
+// 별도 셀을 추가하지 않고 불랑기포대의 표준·HD 사선 뷰를 총통 포대에도 공유한다.
+TWO_TILE_COLUMN.set('chongtongEmplacement', TWO_TILE_COLUMN.get('cannonEmplacement')!);
 const ONE_TILE_COLUMN = new Map<BuildingTypeId, number>(
   OBLIQUE_BUILDING_1X1_TYPES.map((type, index) => [type, index]),
 );

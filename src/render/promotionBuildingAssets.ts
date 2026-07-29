@@ -35,6 +35,9 @@ const PROMOTION_BUILDING_COLUMNS: Partial<Record<BuildingTypeId, number>> = Obje
   PROMOTION_BUILDING_TYPES.map((type, index) => [type, index]),
 ) as Partial<Record<BuildingTypeId, number>>;
 
+// 지자총통 포대는 신규 시트를 만들기 전 불랑기포대의 표준·HD 승격 셀을 그대로 사용한다.
+PROMOTION_BUILDING_COLUMNS.chongtongEmplacement = PROMOTION_BUILDING_COLUMNS.cannonEmplacement;
+
 export function isPromotionBuildingType(type: BuildingTypeId): boolean {
   return PROMOTION_BUILDING_COLUMNS[type] != null;
 }

@@ -59,6 +59,7 @@ const BUILDING_COLUMNS: Record<BuildingTypeId, number> = {
   shrine: 9,     // 전용 그림 나오기 전 임시
   hermitage: 6,  // 전용 그림 나오기 전 임시
   cannonEmplacement: 12, // 전용 그림이 나오기 전까지 망루 그림을 빌려 쓴다
+  chongtongEmplacement: 12, // 지자총통 포대는 불랑기포대와 같은 표준·HD 셀을 공유한다
 };
 
 const FIELD_SEASON_COLUMNS: Record<Season, number> = {
