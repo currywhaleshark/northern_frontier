@@ -34,6 +34,7 @@ export const BUILD_CATEGORY_BY_TYPE = {
   weavingHouse: 'production',
   field: 'farming',
   paddy: 'farming',
+  weir: 'farming',
   stable: 'farming',
   palisade: 'defense',
   earthFort: 'defense',

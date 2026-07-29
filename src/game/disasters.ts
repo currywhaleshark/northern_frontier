@@ -133,6 +133,56 @@ export function startLocustInfestation(
   return true;
 }
 
+export function startDrought(state: GameState, durationDays: number): boolean {
+  if (hasPendingDisaster(state, 'drought')) return false;
+  const [minimumDuration, maximumDuration] = CONFIG.disasters.drought.durationDays;
+  const requestedDuration = Math.floor(durationDays);
+  const duration = Number.isFinite(requestedDuration)
+    ? Math.max(minimumDuration, Math.min(maximumDuration, requestedDuration))
+    : minimumDuration;
+  state.pendingDisasters.push({
+    id: 'drought',
+    choiceId: 'declared',
+    startedDay: state.day,
+    resolveDay: state.day + duration,
+    progress: 0,
+  });
+  addLog(state, '며칠째 비가 끊기고 강물이 줄어 가뭄이 들었습니다.', 'bad', true);
+  return true;
+}
+
+export function isDroughtActive(state: Pick<GameState, 'pendingDisasters'>): boolean {
+  return state.pendingDisasters.some(disaster => disaster.id === 'drought');
+}
+
+export function isFarmIrrigatedByWeir(
+  state: Pick<GameState, 'buildings'>,
+  farm: Pick<Building, 'type' | 'x' | 'y' | 'w' | 'h'>,
+): boolean {
+  if (farm.type !== 'field' && farm.type !== 'paddy') return false;
+  const width = Math.max(1, Math.floor(farm.w ?? 1));
+  const height = Math.max(1, Math.floor(farm.h ?? 1));
+  const right = farm.x + width - 1;
+  const bottom = farm.y + height - 1;
+  return state.buildings.some(building => {
+    if (building.type !== 'weir' || !building.built) return false;
+    const dx = building.x < farm.x ? farm.x - building.x : building.x > right ? building.x - right : 0;
+    const dy = building.y < farm.y ? farm.y - building.y : building.y > bottom ? building.y - bottom : 0;
+    return Math.max(dx, dy) <= CONFIG.disasters.drought.weirRadius;
+  });
+}
+
+export function droughtFarmGrowthMultiplier(state: GameState, farm: Building): number {
+  if (!isDroughtActive(state)) return 1;
+  return isFarmIrrigatedByWeir(state, farm)
+    ? CONFIG.disasters.drought.irrigatedFarmGrowthMultiplier
+    : CONFIG.disasters.drought.farmGrowthMultiplier;
+}
+
+export function droughtFishYieldMultiplier(state: GameState): number {
+  return isDroughtActive(state) ? CONFIG.disasters.drought.fishYieldMultiplier : 1;
+}
+
 function resolveEarlyFrost(state: GameState, disaster: PendingDisaster): void {
   const targetId = disaster.targetBuildingIds?.[0];
   const farm = targetId == null
@@ -225,10 +275,25 @@ function resolveLocust(state: GameState, disaster: PendingDisaster): void {
   );
 }
 
+function resolveDrought(state: GameState, endedByRain: boolean): void {
+  addLog(
+    state,
+    endedByRain
+      ? '마침내 비가 내려 메마른 땅을 적셨습니다. 가뭄이 풀렸습니다.'
+      : '강물이 차츰 돌아오고 메마른 기운이 누그러져 가뭄이 끝났습니다.',
+    'good',
+    true,
+  );
+}
+
 export function advancePendingDisasters(state: GameState): void {
   if (state.pendingDisasters.length === 0) return;
   const remaining: PendingDisaster[] = [];
   for (const disaster of state.pendingDisasters) {
+    if (disaster.id === 'drought' && state.day > disaster.startedDay && state.weather === 'rain') {
+      resolveDrought(state, true);
+      continue;
+    }
     if (state.day > disaster.startedDay && state.day <= disaster.resolveDay &&
         (disaster.id === 'earlyFrost' || disaster.id === 'lateFrost') && FROST_WEATHERS.has(state.weather)) {
       disaster.progress = Math.max(0, disaster.progress ?? 0) + 1;
@@ -243,6 +308,7 @@ export function advancePendingDisasters(state: GameState): void {
     if (disaster.id === 'earlyFrost') resolveEarlyFrost(state, disaster);
     else if (disaster.id === 'lateFrost') resolveLateFrost(state, disaster);
     else if (disaster.id === 'locust') resolveLocust(state, disaster);
+    else if (disaster.id === 'drought') resolveDrought(state, false);
   }
   state.pendingDisasters = remaining;
 }

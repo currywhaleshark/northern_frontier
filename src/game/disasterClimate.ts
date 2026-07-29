@@ -5,7 +5,7 @@ import { makeRng } from './map';
 import { getYear } from './seasons';
 import type { GameState } from './types';
 
-export type ClimateDisasterEventId = 'earlyFrost' | 'lateFrost' | 'locust' | 'plagueSuspicion';
+export type ClimateDisasterEventId = 'earlyFrost' | 'lateFrost' | 'locust' | 'drought' | 'plagueSuspicion';
 
 type DisasterState = Pick<GameState, 'seed' | 'day' | 'specialItems'>;
 type ClimateState = Pick<GameState, 'seed' | 'day'>;
@@ -50,6 +50,18 @@ function locustOccurrenceWeight(climate: AnnualClimate): number {
   return config.occurrenceBaseWeight * multiplier;
 }
 
+function droughtOccurrenceWeight(climate: AnnualClimate): number {
+  const config = CONFIG.disasters.drought;
+  const multiplier = clamp(
+    1 +
+      climate.temperatureAnomaly * config.occurrenceTemperatureCoefficient +
+      climate.precipitationAnomaly * config.occurrencePrecipitationCoefficient,
+    config.occurrenceMinMultiplier,
+    config.occurrenceMaxMultiplier,
+  );
+  return config.occurrenceBaseWeight * multiplier;
+}
+
 function plagueOccurrenceWeight(climate: AnnualClimate): number {
   const config = CONFIG.disasters.plagueSuspicion;
   const multiplier = clamp(
@@ -74,6 +86,7 @@ export function disasterOccurrenceWeightForClimate(
   if (eventId === 'earlyFrost') return earlyFrostOccurrenceWeight(climate);
   if (eventId === 'lateFrost') return lateFrostOccurrenceWeight(climate);
   if (eventId === 'locust') return locustOccurrenceWeight(climate);
+  if (eventId === 'drought') return droughtOccurrenceWeight(climate);
   return plagueOccurrenceWeight(climate);
 }
 

@@ -21,6 +21,8 @@ function compileGameModules() {
 }
 
 const compiledDir = compileGameModules();
+const agents = await import(pathToFileURL(join(compiledDir, 'agents.mjs')).href);
+const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
 const disasters = await import(pathToFileURL(join(compiledDir, 'disasters.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
@@ -222,6 +224,58 @@ assert.equal(CURRENT_SCHEMA_VERSION, 44);
   assert.equal(state.pendingDisasters.length, 0);
 }
 
+// 가뭄은 기간을 숨긴 채 생산 배율을 낮추고, 보 반경의 경작지만 피해가 완화된다.
+{
+  const state = simulation.newGame(72010);
+  state.day = 15;
+  const field = addStandingFarm(state);
+  const paddy = addStandingPaddy(state);
+  assert.equal(disasters.startDrought(state, 8), true);
+  assert.equal(disasters.startDrought(state, 8), false, 'only one drought can persist');
+  assert.equal(disasters.isDroughtActive(state), true);
+  assert.equal(disasters.droughtFarmGrowthMultiplier(state, field), 0.45);
+  assert.equal(disasters.droughtFishYieldMultiplier(state), 0.45);
+  state.buildings.push({
+    id: state.nextBuildingId++, type: 'weir', x: field.x + 6, y: field.y,
+    built: true, progress: 6, fieldGrowth: 0,
+  });
+  assert.equal(disasters.isFarmIrrigatedByWeir(state, field), true);
+  assert.equal(disasters.droughtFarmGrowthMultiplier(state, field), 0.72);
+  assert.equal(disasters.isFarmIrrigatedByWeir(state, paddy), true);
+}
+
+// 비는 예정 종료일보다 먼저 가뭄을 풀며, 그날부터 생산 배율도 정상으로 돌아온다.
+{
+  const state = simulation.newGame(72011);
+  state.day = 15;
+  const field = addStandingFarm(state);
+  disasters.startDrought(state, 12);
+  advanceWeather(state, 'rain');
+  assert.equal(disasters.isDroughtActive(state), false);
+  assert.equal(disasters.droughtFarmGrowthMultiplier(state, field), 1);
+  assert.equal(disasters.droughtFishYieldMultiplier(state), 1);
+  assert.ok(state.log.some(entry => entry.text.includes('가뭄이 풀렸습니다')));
+}
+
+// 보는 강 위 단칸 시설이고 정착지 단계부터 건설할 수 있다.
+{
+  const state = simulation.newGame(72012);
+  const river = state.map.flat().find(tile => tile.terrain === 'river' && tile.buildingId == null);
+  const land = state.map.flat().find(tile => tile.terrain === 'plain' && tile.buildingId == null);
+  assert.ok(river && land);
+  assert.equal(buildings.BUILDING_DEFS.weir.minRank, undefined);
+  assert.equal(buildings.buildingFootprintSize('weir'), 1);
+  assert.equal(buildings.canPlaceBuildingAt(state, 'weir', river.x, river.y), true);
+  assert.equal(buildings.canPlaceBuildingAt(state, 'weir', land.x, land.y), false);
+  const weir = {
+    id: state.nextBuildingId++, type: 'weir', x: river.x, y: river.y,
+    built: true, progress: buildings.BUILDING_DEFS.weir.buildDays, fieldGrowth: 0,
+  };
+  state.buildings.push(weir);
+  buildings.occupyBuildingTiles(state, weir);
+  assert.equal(agents.isTerrainPassable(state, river.x, river.y), false, 'a weir is not a bridge');
+}
+
 const simulationSource = readFileSync(new URL('../../src/game/simulation.ts', import.meta.url), 'utf8');
 assert.match(
   simulationSource,
@@ -235,5 +289,13 @@ assert.ok(rendererSource.includes("disaster.id === 'earlyFrost'"));
 assert.ok(rendererSource.includes("disaster.id === 'lateFrost'"));
 assert.ok(rendererSource.includes('drawLocustCropOverlay'));
 assert.ok(rendererSource.includes("disaster.id === 'locust'"));
+assert.ok(rendererSource.includes('drawDroughtCropOverlay'));
+
+const agentsSource = readFileSync(new URL('../../src/game/agents.ts', import.meta.url), 'utf8');
+assert.ok(agentsSource.includes('droughtFarmGrowthMultiplier(state, target)'));
+assert.ok(agentsSource.includes('droughtFishYieldMultiplier(state)'));
+
+const buildPresentationSource = readFileSync(new URL('../../src/ui/buildPresentation.ts', import.meta.url), 'utf8');
+assert.ok(buildPresentationSource.includes("weir: 'farming'"));
 
 console.log('pending disaster tests passed');

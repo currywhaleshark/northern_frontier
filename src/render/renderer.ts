@@ -48,6 +48,7 @@ import { isBuriedSilverVeinTile } from '../game/silver';
 import { activeExpeditionTargetMarkers, type ExpeditionTargetMarker } from '../game/expeditionTargets';
 import { normalizeLivestockState } from '../game/livestock';
 import { normalizePastureArea, validateStablePasture } from '../game/pastures';
+import { isDroughtActive, isFarmIrrigatedByWeir } from '../game/disasters';
 import { acceptsClearedLand, forestTilesInFootprint } from '../game/landClearing';
 import {
   BUILDING_EFFECT_TABLE, buildingEffectEmitters, buildingShadowSettings,
@@ -85,6 +86,7 @@ const PLACEMENT_HINT: Partial<Record<BuildingTypeId, Terrain>> = {
   paddy: 'fertile',
   mine: 'rock',
   bridge: 'river',
+  weir: 'river',
   ferry: 'river',
   watermill: 'river',
   dock: 'river',
@@ -1130,6 +1132,30 @@ function drawLocustCropOverlay(ctx: CanvasRenderingContext2D, x: number, y: numb
   ctx.restore();
 }
 
+function drawDroughtCropOverlay(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  irrigated: boolean,
+): void {
+  ctx.save();
+  ctx.fillStyle = irrigated ? 'rgba(78, 137, 142, 0.10)' : 'rgba(151, 105, 45, 0.23)';
+  ctx.fillRect(x + 1, y + 1, TILE - 2, TILE - 2);
+  if (!irrigated) {
+    ctx.strokeStyle = 'rgba(92, 62, 28, 0.48)';
+    ctx.lineWidth = 0.75;
+    ctx.beginPath();
+    ctx.moveTo(x + 5, y + 22);
+    ctx.lineTo(x + 10, y + 16);
+    ctx.lineTo(x + 8, y + 11);
+    ctx.moveTo(x + 20, y + 7);
+    ctx.lineTo(x + 16, y + 13);
+    ctx.lineTo(x + 22, y + 18);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function siteColor(site: ForeignSite): string {
   return FACTIONS.find(faction => faction.name === site.factionName)?.color ?? '#9aa0a6';
 }
@@ -1600,6 +1626,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       .filter(disaster => disaster.id === 'locust')
       .flatMap(disaster => disaster.targetBuildingIds ?? []),
   );
+  const droughtActive = isDroughtActive(state);
   const sorted = [...state.buildings].sort((a, b) =>
     (a.y + buildingFootprintDims(a).h) - (b.y + buildingFootprintDims(b).h) || a.x - b.x);
   const visibleBuildings: Building[] = [];
@@ -1629,6 +1656,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       // 경작지는 발자국 칸마다 스프라이트를 타일링 — 파종을 마친 칸만 작물이 자라 보인다
       const area = dims.w * dims.h;
       const sown = visuallyBuilt ? Math.min(area, Math.max(0, Math.floor(b.sownArea ?? area))) : 0;
+      const droughtIrrigated = droughtActive && isFarmIrrigatedByWeir(state, b);
       for (let i = 0; i < area; i++) {
         const cellX = b.x + (i % dims.w);
         const cellY = b.y + Math.floor(i / dims.w);
@@ -1646,6 +1674,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
         }
         if (locustBuildingIds.has(b.id)) {
           drawLocustCropOverlay(ctx, drawParams.x, drawParams.y, state.day);
+        }
+        if (droughtActive) {
+          drawDroughtCropOverlay(ctx, drawParams.x, drawParams.y, droughtIrrigated);
         }
         occludedBuildingDraws.push(drawParams);
       }

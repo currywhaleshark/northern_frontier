@@ -72,6 +72,12 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     cost: { wood: 14, stone: 9 }, buildDays: 8, slots: 0, capacity: 0, defense: 0,
     winterBonus: false, placement: 'river', unique: false,
   },
+  weir: {
+    id: 'weir', name: '보',
+    desc: `강물을 막아 관개하는 낮은 둑. 가뭄 때 반경 ${CONFIG.disasters.drought.weirRadius}칸의 논밭 성장 피해를 줄인다. 통행로로는 쓸 수 없다.`,
+    cost: { wood: 8, stone: 6, tools: 1 }, buildDays: 6, slots: 0, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'river', unique: false,
+  },
   lumberCamp: {
     id: 'lumberCamp', name: '벌목장',
     desc: '벌목꾼이 목재를 부리는 거점. 숲 가까이 지으면 나르는 거리가 크게 줄어든다.',
@@ -267,7 +273,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
 };
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
-  'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'field', 'paddy', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'clinic',
+  'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'field', 'paddy', 'weir', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'clinic',
   'smokehouse', 'dryingRack', 'smithy', 'mine', 'ferry', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office', 'cemetery', 'school', 'shrine', 'hermitage',
   'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement', 'chongtongEmplacement',
@@ -275,6 +281,7 @@ export const BUILD_MENU_ORDER: BuildingTypeId[] = [
 
 export const SINGLE_TILE_BUILDINGS = [
   'bridge',
+  'weir',
   'lumberCamp',
   'huntLodge',
   'herbHut',

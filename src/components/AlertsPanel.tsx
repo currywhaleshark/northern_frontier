@@ -156,6 +156,14 @@ export function computeAlerts(state: GameState): AlertItem[] {
     });
   }
   for (const disaster of state.pendingDisasters) {
+    if (disaster.id === 'drought') {
+      alerts.push({
+        id: `pendingDisaster-${disaster.id}`,
+        text: '가뭄 지속 중 · 논밭 성장과 어획이 줄었습니다. 비를 기다리거나 보의 관개권을 활용하십시오.',
+        level: 'danger',
+      });
+      continue;
+    }
     if (disaster.id === 'locust') {
       alerts.push({
         id: `pendingDisaster-${disaster.id}`,

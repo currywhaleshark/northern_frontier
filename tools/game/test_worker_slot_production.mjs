@@ -351,4 +351,54 @@ function prepareState(seed) {
   assert.equal(state.resources.hide, 1, 'unassigned herder hide deposit reaches storage');
 }
 
+function activateDrought(state) {
+  state.pendingDisasters = [{
+    id: 'drought', choiceId: 'declared', startedDay: state.day,
+    resolveDay: state.day + 8, progress: 0,
+  }];
+}
+
+function farmGrowthIncrement(seed, drought, irrigated) {
+  const state = prepareState(seed);
+  state.day = 15;
+  const field = addBuilt(state, 'field', 10, 10, {
+    cropId: 'buckwheat', sownArea: 1, fieldGrowth: 10, w: 1, h: 1,
+  });
+  if (irrigated) addBuilt(state, 'weir', 16, 10);
+  if (drought) activateDrought(state);
+  const farmer = workableResident(state, 0, 'farmer', field.x, field.y);
+  assert.equal(workerSlots.assignResidentToBuilding(state, farmer.id, field.id), null);
+  const before = field.fieldGrowth;
+  simulation.advanceTick(state);
+  return field.fieldGrowth - before;
+}
+
+{
+  const normal = farmGrowthIncrement(2026070926, false, false);
+  const drought = farmGrowthIncrement(2026070926, true, false);
+  const irrigated = farmGrowthIncrement(2026070926, true, true);
+  assert.ok(normal > 0);
+  assert.ok(Math.abs(drought / normal - CONFIG.disasters.drought.farmGrowthMultiplier) < 0.001);
+  assert.ok(Math.abs(irrigated / normal - CONFIG.disasters.drought.irrigatedFarmGrowthMultiplier) < 0.001);
+}
+
+function fisherCatch(seed, drought) {
+  const state = prepareState(seed);
+  state.day = 15;
+  state.rank = 'bo';
+  const ferry = addBuilt(state, 'ferry', 10, 10);
+  if (drought) activateDrought(state);
+  const fisher = workableResident(state, 0, 'fisher', ferry.x, ferry.y);
+  assert.equal(workerSlots.assignResidentToBuilding(state, fisher.id, ferry.id), null);
+  for (let index = 0; index < 6; index++) simulation.advanceTick(state);
+  return fisher.carrying.fish ?? 0;
+}
+
+{
+  const normal = fisherCatch(2026070927, false);
+  const drought = fisherCatch(2026070927, true);
+  assert.ok(normal > 0);
+  assert.ok(Math.abs(drought / normal - CONFIG.disasters.drought.fishYieldMultiplier) < 0.001);
+}
+
 console.log('worker slot production tests passed');

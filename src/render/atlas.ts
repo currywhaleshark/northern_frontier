@@ -1529,6 +1529,7 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   onggiKiln:  { roof: ROOF_DARK, base: FACE_STONE, glyph: CAMPFIRE },
   jangdokdae: { base: FACE_STONE, glyph: HIDE },
   bridge:     { base: FENCE },
+  weir:       { base: FENCE, glyph: WATER },
   lumberCamp: { base: LOGS },
   woodShed:   { base: LOGS, glyph: CAMPFIRE },
   huntLodge:  { base: TENT_TAN },

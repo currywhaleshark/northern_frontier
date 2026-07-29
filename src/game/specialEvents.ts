@@ -13,6 +13,7 @@ import { makeRng } from './map';
 import { hasActivePhysician } from './medicine';
 import { createResident, killResident, livingResidents, reconcileResidentHomes } from './residents';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
+import { weatherForDay } from './weather';
 import { createCombatRoster } from './combatRoster';
 import { RESIDENT_ORIGINS } from './defectors';
 import { acquireLivestock, ensureLivestockState, livestockCapacity } from './livestock';
@@ -24,7 +25,7 @@ import {
 } from './disasterClimate';
 import {
   hasPendingDisaster, lateFrostRecoveryCropId, startEarlyFrostObservation, startLateFrostObservation,
-  startLocustInfestation,
+  startDrought, startLocustInfestation,
 } from './disasters';
 import type {
   Building,
@@ -50,6 +51,7 @@ const EVENT_COOLDOWNS: Record<SpecialEventId, number> = {
   earlyFrost: CONFIG.specialEvents.earlyFrostCooldownDays,
   lateFrost: CONFIG.specialEvents.lateFrostCooldownDays,
   locust: CONFIG.specialEvents.locustCooldownDays,
+  drought: CONFIG.specialEvents.droughtCooldownDays,
   gyrfalcon: CONFIG.specialEvents.gyrfalconCooldownDays,
   horseDefectors: CONFIG.defectors.horseOfferCooldownDays,
 };
@@ -414,6 +416,14 @@ function locustFarms(state: GameState): Building[] {
   return standingFarms(state).filter(building => sownAreaOf(building) > 0);
 }
 
+export function hasDroughtTriggerWeather(state: Pick<GameState, 'seed' | 'day' | 'weather'>): boolean {
+  if (state.weather === 'rain') return false;
+  for (let offset = 1; offset < CONFIG.disasters.drought.triggerDryDays; offset++) {
+    if (weatherForDay(state.seed, state.day - offset) === 'rain') return false;
+  }
+  return true;
+}
+
 function openLateFrostEvent(state: GameState, rng: () => number): void {
   const farms = lateFrostFarms(state);
   const target = farms[Math.floor(rng() * farms.length)];
@@ -460,6 +470,13 @@ function openLocustEvent(state: GameState, rng: () => number): void {
     data: { eventId: 'locust', targetBuildingIds: targets.map(building => building.id), durationDays },
   };
   recordAnnals(state, 'disaster', '여름 들판에 황충 떼가 밀려들었습니다.');
+}
+
+function openDroughtEvent(state: GameState, rng: () => number): void {
+  const [minimumDuration, maximumDuration] = CONFIG.disasters.drought.durationDays;
+  const durationDays = minimumDuration + Math.floor(rng() * (maximumDuration - minimumDuration + 1));
+  if (!startDrought(state, durationDays)) return;
+  recordAnnals(state, 'disaster', '비가 오래 끊기고 강물이 줄어 가뭄이 들었습니다.');
 }
 
 function openGyrfalconEvent(state: GameState): void {
@@ -532,6 +549,7 @@ export function maybeOpenSpecialEvent(state: GameState, rng: () => number): bool
   const farms = standingFarms(state);
   const springFarms = lateFrostFarms(state);
   const locustTargets = locustFarms(state);
+  const droughtLivelihood = farms.length > 0 || state.buildings.some(building => building.type === 'ferry' && building.built);
   const season = getSeason(state.day);
   const candidates: Array<{ value: Exclude<SpecialEventId, 'horseDefectors'>; weight: number }> = [];
   const ready = (event: SpecialEventId) => (state.incidents.cooldownUntil[event] ?? 0) <= state.day;
@@ -558,6 +576,10 @@ export function maybeOpenSpecialEvent(state: GameState, rng: () => number): bool
       !hasPendingDisaster(state, 'locust') && ready('locust')) {
     candidates.push({ value: 'locust', weight: disasterOccurrenceWeight(state, 'locust') });
   }
+  if (droughtLivelihood && season === 'summer' && hasDroughtTriggerWeather(state) &&
+      !hasPendingDisaster(state, 'drought') && ready('drought')) {
+    candidates.push({ value: 'drought', weight: disasterOccurrenceWeight(state, 'drought') });
+  }
   if (forestExists && ready('gyrfalcon')) candidates.push({ value: 'gyrfalcon', weight: CONFIG.specialEvents.gyrfalconWeight });
   if (candidates.length === 0) return false;
 
@@ -571,9 +593,10 @@ export function maybeOpenSpecialEvent(state: GameState, rng: () => number): bool
   else if (eventId === 'earlyFrost') openEarlyFrostEvent(state, rng);
   else if (eventId === 'lateFrost') openLateFrostEvent(state, rng);
   else if (eventId === 'locust') openLocustEvent(state, rng);
+  else if (eventId === 'drought') openDroughtEvent(state, rng);
   else if (eventId === 'gyrfalcon') openGyrfalconEvent(state);
   else openWildlifeEvent(state, eventId, rng);
-  return state.pendingChoice != null;
+  return eventId === 'drought' || state.pendingChoice != null;
 }
 
 function discoverItem(state: GameState, item: SpecialItemId): void {

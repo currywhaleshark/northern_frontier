@@ -25,6 +25,7 @@ import { assignClearingCrews, clearingBlocksWork, clearingSites, pendingClearing
 import { isVeinSealedTile, recordRockMining, recordSilverMined } from './silver';
 import { getSeason } from './seasons';
 import { outdoorMult } from './weather';
+import { droughtFarmGrowthMultiplier, droughtFishYieldMultiplier } from './disasters';
 import { processableAmount } from './processing';
 import { DRYING_PRODUCT_DEFS, dryingProductOf } from './preservation';
 import { jangdokdaeInputNeeds } from './fermentation';
@@ -1417,7 +1418,8 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
   const st = goToFarmerWorkTile(state, r, ctx, target);
   if (st === 'arrived') {
     r.task = `${crop.name} 재배 중`;
-    const weatherGrow = state.weather === 'rain' ? 1.2 : state.weather === 'frost' ? 0.7 : 1;
+    const weatherGrow = (state.weather === 'rain' ? 1.2 : state.weather === 'frost' ? 0.7 : 1) *
+      droughtFarmGrowthMultiplier(state, target);
     target.fieldGrowth = Math.min(
       100,
       target.fieldGrowth + a.work.growPerSubtick * weatherGrow * effOf(r) *
@@ -2275,7 +2277,7 @@ function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
     goal: buildingInteractionGoal(state, [ferry.id]),
     workTicks: a.work.fish,
     yieldRes: 'fish',
-    yieldAmt: a.yields.fish * CONFIG.seasons.fishMult[ctx.season] * floodMult,
+    yieldAmt: a.yields.fish * CONFIG.seasons.fishMult[ctx.season] * floodMult * droughtFishYieldMultiplier(state),
     cap: a.carryCap.fish,
     depositExtra: ['ferry'],
     taskWork: '고기잡이 중',

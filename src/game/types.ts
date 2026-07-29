@@ -151,6 +151,7 @@ export type BuildingTypeId =
   | 'onggiKiln'  // 옹기가마
   | 'jangdokdae' // 장독대
   | 'bridge'     // 다리
+  | 'weir'       // 보(洑) — 가뭄 관개 시설
   | 'lumberCamp' // 벌목장
   | 'woodShed'   // 장작마당
   | 'huntLodge'  // 사냥막
@@ -694,7 +695,7 @@ export type PredatorKind = 'wolf' | 'tiger';
 export type TigerTier = 'tiger' | 'greatTiger' | 'mountainLord';
 export type WildlifeKind = PredatorKind | 'boar';
 export type SpecialEventId = WildlifeKind | 'wildGinseng' | 'plagueSuspicion' | 'grainRequisition' |
-  'shipwreck' | 'earlyFrost' | 'lateFrost' | 'locust' | 'gyrfalcon' | 'horseDefectors';
+  'shipwreck' | 'earlyFrost' | 'lateFrost' | 'locust' | 'drought' | 'gyrfalcon' | 'horseDefectors';
 
 export type DisasterId =
   | 'earlyFrost'

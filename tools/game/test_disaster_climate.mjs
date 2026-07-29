@@ -37,6 +37,7 @@ const climate = await import(pathToFileURL(join(compiledDir, 'climate.mjs')).hre
 const disasters = await import(pathToFileURL(join(compiledDir, 'disasterClimate.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const specialEvents = await import(pathToFileURL(join(compiledDir, 'specialEvents.mjs')).href);
+const weather = await import(pathToFileURL(join(compiledDir, 'weather.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 const normal = { temperatureAnomaly: 0, precipitationAnomaly: 0, storminess: 0 };
@@ -103,6 +104,20 @@ assert.ok(
   disasters.locustAnnualMultiplier(locustVariationState) >= CONFIG.disasters.locust.annualVarianceMinMultiplier &&
     disasters.locustAnnualMultiplier(locustVariationState) <= CONFIG.disasters.locust.annualVarianceMaxMultiplier,
   'locust annual variation stays within its configured range',
+);
+assert.equal(
+  disasters.disasterOccurrenceWeightForClimate(normal, 'drought'),
+  CONFIG.disasters.drought.occurrenceBaseWeight,
+);
+assert.ok(
+  disasters.disasterOccurrenceWeightForClimate(
+    { ...normal, temperatureAnomaly: 1, precipitationAnomaly: -1 },
+    'drought',
+  ) > disasters.disasterOccurrenceWeightForClimate(
+    { ...normal, temperatureAnomaly: -1, precipitationAnomaly: 1 },
+    'drought',
+  ),
+  'drought occurrence must rise in warm, dry years',
 );
 
 const extremeCold = { temperatureAnomaly: -100, precipitationAnomaly: 0, storminess: 0 };
@@ -213,7 +228,7 @@ function addStandingFarm(state) {
 
 const selectableEventIds = [
   'wolf', 'tiger', 'boar', 'wildGinseng', 'plagueSuspicion',
-  'grainRequisition', 'shipwreck', 'earlyFrost', 'lateFrost', 'locust', 'gyrfalcon',
+  'grainRequisition', 'shipwreck', 'earlyFrost', 'lateFrost', 'locust', 'drought', 'gyrfalcon',
 ];
 
 function prepareEvents(state, allowed) {
@@ -294,6 +309,16 @@ function openOnlyLocust(state, durationRoll = 0) {
   assert.equal(specialEvents.maybeOpenSpecialEvent(state, rng), true);
   assert.equal(state.pendingChoice?.data.eventId, 'locust');
   assert.equal(rng.calls, 2, 'locust selection and hidden duration each consume one RNG call');
+}
+
+function prepareDroughtEvents(state) {
+  state.day = 15;
+  state.weather = weather.weatherForDay(state.seed, state.day);
+  state.incidents.year = 1;
+  state.incidents.scheduledDays = [state.day];
+  state.incidents.cooldownUntil = Object.fromEntries(
+    selectableEventIds.filter(id => id !== 'drought').map(id => [id, 9999]),
+  );
 }
 
 // 측우기는 정보만 공개한다. 미보유 상태에는 수치가 새지 않고, 보유 시 실제 함수의 값이 표시된다.
@@ -413,6 +438,37 @@ function openOnlyLocust(state, durationRoll = 0) {
   state.incidents.scheduledDays = [state.day];
   assert.equal(specialEvents.maybeOpenSpecialEvent(state, sequenceRng([0, 0])), false);
   assert.equal(state.incidents.scheduledDays.length, 1, 'late autumn does not consume a locust incident');
+}
+
+// 가뭄은 실제 무강수 3일 구간에서만 선포되고, 선택 모달 없이 비공개 기간을 시작한다.
+{
+  let state = null;
+  for (let seed = 1; seed <= 500; seed++) {
+    const candidate = simulation.newGame(seed);
+    prepareDroughtEvents(candidate);
+    if (specialEvents.hasDroughtTriggerWeather(candidate)) {
+      state = candidate;
+      break;
+    }
+  }
+  assert.ok(state, 'a deterministic dry summer sample must exist');
+  addStandingFarm(state);
+  const rng = sequenceRng([0, 0.99]);
+  assert.equal(specialEvents.maybeOpenSpecialEvent(state, rng), true);
+  assert.equal(state.pendingChoice, null);
+  assert.equal(state.pendingDisasters[0].id, 'drought');
+  assert.equal(state.pendingDisasters[0].resolveDay, state.day + 12);
+  assert.equal(rng.calls, 2, 'drought selection and hidden duration each consume one RNG call');
+}
+
+{
+  const state = simulation.newGame(54002);
+  addStandingFarm(state);
+  prepareDroughtEvents(state);
+  state.weather = 'rain';
+  assert.equal(specialEvents.hasDroughtTriggerWeather(state), false);
+  assert.equal(specialEvents.maybeOpenSpecialEvent(state, sequenceRng([0, 0])), false);
+  assert.equal(state.incidents.scheduledDays.length, 1, 'rain does not consume a drought incident');
 }
 
 // 역병 사건도 선택 1회 + 환자 1회 + 실제 역병 1회의 기존 RNG 순서를 보존한다.
