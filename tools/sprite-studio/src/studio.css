@@ -113,6 +113,63 @@ body {
   color: var(--accent);
 }
 
+/* 탭 B — 작업 자세 */
+.stage {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 16px;
+  padding: 16px;
+  min-height: 0;
+  overflow: auto;
+}
+.stage-view { display: grid; gap: 8px; align-content: start; justify-items: start; }
+.stage-canvas {
+  image-rendering: pixelated;
+  display: block;
+  background: #0e1216;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: grab;
+  touch-action: none;
+}
+.stage-canvas:active { cursor: grabbing; }
+.stage-hint { font-size: 11px; max-width: 420px; line-height: 1.5; }
+
+.stage-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.stage-readout { font-size: 11px; }
+
+.stage-panel select,
+.seg-stack select {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 4px 6px;
+  width: 100%;
+}
+.seg-stack { display: grid; gap: 4px; }
+
+.seg { display: flex; gap: 3px; }
+.seg-btn {
+  flex: 1;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 4px;
+  padding: 3px 0;
+  cursor: pointer;
+  font-size: 11px;
+}
+.seg-btn.on { border-color: var(--accent); color: var(--accent); font-weight: bold; }
+
 .inspector {
   position: absolute;
   right: 16px;

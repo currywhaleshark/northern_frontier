@@ -11,9 +11,18 @@ export interface SpriteDisplayMetric {
   dy: number;
 }
 
+/** toolTip*은 게임이 읽지 않는다 — 코드젠이 버리고 JSON에만 남는 정합 표시용 값이다. */
+export interface WorkAnchorEdit {
+  offsetX: number;
+  offsetY: number;
+  facing: 1 | -1 | 0;
+  toolTipX?: number;
+  toolTipY?: number;
+}
+
 export interface StudioData {
   'display-metrics': Record<string, SpriteDisplayMetric>;
-  'work-anchors': Record<string, { offsetX: number; offsetY: number; facing: 1 | -1 | 0 }>;
+  'work-anchors': Record<string, WorkAnchorEdit>;
   'building-effects': Record<string, unknown[]>;
   'worker-slots': Record<string, unknown[]>;
   'building-shadows': Record<string, unknown>;

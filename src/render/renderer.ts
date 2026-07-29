@@ -59,7 +59,7 @@ import {
   mineralVisualTier,
   tileMineralResource,
 } from '../game/minerals';
-import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, PastureArea, Resident, Season, Terrain } from '../game/types';
+import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, PastureArea, Resident, Season, Terrain, Tile } from '../game/types';
 import { historicalTerrainColumn } from './historicalTerrain';
 import { pixelRectIntersectsViewport, tileRectIntersectsViewport, type SceneViewport } from './sceneViewport';
 import {
@@ -392,7 +392,7 @@ function rectsIntersect(
   return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
 }
 
-interface TreeCanopyProxy {
+export interface TreeCanopyProxy {
   sortY: number;
   cx: number;
   cy: number;
@@ -403,8 +403,13 @@ interface TreeCanopyProxy {
   trunkBottom: number;
 }
 
-function treeCanopiesIntersectingRect(
-  state: GameState,
+/** 수관 판정에 필요한 최소 지도 — 스프라이트 스튜디오가 3×3 장면으로 같은 계산을 쓴다. */
+interface CanopyMapSource {
+  map: readonly (readonly Pick<Tile, 'terrain' | 'treeStage'>[])[];
+}
+
+export function treeCanopiesIntersectingRect(
+  state: CanopyMapSource,
   left: number,
   top: number,
   width: number,
@@ -449,6 +454,32 @@ function treeCanopiesIntersectingRect(
   return canopies;
 }
 
+/** 수관에 가린 대상을 잎 안쪽에만 옅게 겹쳐 그린다 (완전히 사라지지 않게). */
+export function drawUnderCanopyGhost(
+  ctx: CanvasRenderingContext2D,
+  canopies: readonly TreeCanopyProxy[],
+  opacityFilter: string,
+  draw: () => void,
+): void {
+  if (canopies.length === 0) return;
+  ctx.save();
+  ctx.beginPath();
+  for (const canopy of canopies) {
+    ctx.moveTo(canopy.cx + canopy.rx, canopy.cy);
+    ctx.ellipse(canopy.cx, canopy.cy, canopy.rx, canopy.ry, 0, 0, Math.PI * 2);
+    ctx.rect(
+      canopy.cx - canopy.trunkHalfWidth,
+      canopy.trunkTop,
+      canopy.trunkHalfWidth * 2,
+      canopy.trunkBottom - canopy.trunkTop,
+    );
+  }
+  ctx.clip();
+  ctx.filter = opacityFilter;
+  draw();
+  ctx.restore();
+}
+
 function drawOccludedEntityGhosts(
   ctx: CanvasRenderingContext2D,
   state: GameState,
@@ -465,23 +496,7 @@ function drawOccludedEntityGhosts(
       building.size,
       building.size,
     ).filter(canopy => canopy.sortY > buildingSortY);
-    if (canopies.length === 0) continue;
-    ctx.save();
-    ctx.beginPath();
-    for (const canopy of canopies) {
-      ctx.moveTo(canopy.cx + canopy.rx, canopy.cy);
-      ctx.ellipse(canopy.cx, canopy.cy, canopy.rx, canopy.ry, 0, 0, Math.PI * 2);
-      ctx.rect(
-        canopy.cx - canopy.trunkHalfWidth,
-        canopy.trunkTop,
-        canopy.trunkHalfWidth * 2,
-        canopy.trunkBottom - canopy.trunkTop,
-      );
-    }
-    ctx.clip();
-    ctx.filter = 'opacity(42%)';
-    sprites.drawBuilding(ctx, building);
-    ctx.restore();
+    drawUnderCanopyGhost(ctx, canopies, 'opacity(42%)', () => sprites.drawBuilding(ctx, building));
   }
   for (const resident of residents) {
     const scale = resident.sizeScale ?? 1;
@@ -493,23 +508,7 @@ function drawOccludedEntityGhosts(
       size,
       size,
     ).filter(canopy => canopy.sortY > resident.y);
-    if (canopies.length === 0) continue;
-    ctx.save();
-    ctx.beginPath();
-    for (const canopy of canopies) {
-      ctx.moveTo(canopy.cx + canopy.rx, canopy.cy);
-      ctx.ellipse(canopy.cx, canopy.cy, canopy.rx, canopy.ry, 0, 0, Math.PI * 2);
-      ctx.rect(
-        canopy.cx - canopy.trunkHalfWidth,
-        canopy.trunkTop,
-        canopy.trunkHalfWidth * 2,
-        canopy.trunkBottom - canopy.trunkTop,
-      );
-    }
-    ctx.clip();
-    ctx.filter = 'opacity(48%)';
-    sprites.drawResident(ctx, resident);
-    ctx.restore();
+    drawUnderCanopyGhost(ctx, canopies, 'opacity(48%)', () => sprites.drawResident(ctx, resident));
   }
 }
 
