@@ -2,24 +2,30 @@
 // **현재 탭의 레지스트리만** 건드린다 — 한 탭에서 만진 값이 다른 탭 저장에 딸려 가면 안 된다.
 import { useCallback, useEffect, useState } from 'react';
 import {
-  loadStudioData, saveRegistry,
-  type RegistryName, type SpriteDisplayMetric, type StudioData, type WorkAnchorEdit,
+  DEFAULT_SHADOW, loadStudioData, saveRegistry,
+  type EffectEmitterEdit, type RegistryName, type ShadowSettingsEdit,
+  type SpriteDisplayMetric, type StudioData, type WorkAnchorEdit,
 } from './api';
 import { ScaleBench } from './ScaleBench';
 import { StanceStage } from './StanceStage';
+import { BuildingStage, type BuildingLayer } from './BuildingStage';
 
-type TabId = 'scale' | 'stance';
+type TabId = 'scale' | 'stance' | 'building';
 
-const TABS: readonly { id: TabId; label: string; registry: RegistryName }[] = [
-  { id: 'scale', label: '비율 정렬대', registry: 'display-metrics' },
-  { id: 'stance', label: '작업 자세', registry: 'work-anchors' },
+const TABS: readonly { id: TabId; label: string }[] = [
+  { id: 'scale', label: '비율 정렬대' },
+  { id: 'stance', label: '작업 자세' },
+  { id: 'building', label: '건물' },
 ];
 
 export function App() {
   const [data, setData] = useState<StudioData | null>(null);
   const [metrics, setMetrics] = useState<Record<string, SpriteDisplayMetric>>({});
   const [anchors, setAnchors] = useState<Record<string, WorkAnchorEdit>>({});
+  const [effects, setEffects] = useState<Record<string, EffectEmitterEdit[]>>({});
+  const [shadows, setShadows] = useState<Record<string, ShadowSettingsEdit>>({});
   const [tab, setTab] = useState<TabId>('scale');
+  const [buildingLayer, setBuildingLayer] = useState<BuildingLayer>('effects');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [animate, setAnimate] = useState(true);
   const [showReference, setShowReference] = useState(true);
@@ -31,6 +37,8 @@ export function App() {
         setData(loaded);
         setMetrics(loaded['display-metrics']);
         setAnchors(loaded['work-anchors']);
+        setEffects(loaded['building-effects']);
+        setShadows(loaded['building-shadows']);
         setStatus('');
       })
       .catch(error => setStatus(`불러오기 실패: ${error.message}`));
@@ -38,9 +46,29 @@ export function App() {
 
   const savedMetrics = data?.['display-metrics'] ?? {};
   const savedAnchors = data?.['work-anchors'] ?? {};
-  const draft = tab === 'scale' ? metrics : anchors;
-  const savedDraft = tab === 'scale' ? savedMetrics : savedAnchors;
-  const dirty = data != null && JSON.stringify(draft) !== JSON.stringify(savedDraft);
+  const savedEffects = data?.['building-effects'] ?? {};
+  const savedShadows = data?.['building-shadows'] ?? {};
+
+  // 저장·되돌리기는 현재 보고 있는 레지스트리 하나만 다룬다.
+  const registry: RegistryName = tab === 'scale' ? 'display-metrics'
+    : tab === 'stance' ? 'work-anchors'
+      : buildingLayer === 'effects' ? 'building-effects' : 'building-shadows';
+  const drafts: Record<RegistryName, unknown> = {
+    'display-metrics': metrics,
+    'work-anchors': anchors,
+    'building-effects': effects,
+    'building-shadows': shadows,
+    'worker-slots': {},
+  };
+  const savedDrafts: Record<RegistryName, unknown> = {
+    'display-metrics': savedMetrics,
+    'work-anchors': savedAnchors,
+    'building-effects': savedEffects,
+    'building-shadows': savedShadows,
+    'worker-slots': {},
+  };
+  const draft = drafts[registry];
+  const dirty = data != null && JSON.stringify(draft) !== JSON.stringify(savedDrafts[registry]);
 
   const changeMetric = useCallback((key: string, metric: SpriteDisplayMetric) => {
     setMetrics(current => {
@@ -63,23 +91,45 @@ export function App() {
     });
   }, []);
 
+  const changeEffects = useCallback((type: string, emitters: EffectEmitterEdit[]) => {
+    setEffects(current => {
+      const next = { ...current };
+      if (emitters.length === 0) delete next[type];
+      else next[type] = emitters;
+      return next;
+    });
+  }, []);
+
+  const changeShadow = useCallback((type: string, settings: ShadowSettingsEdit) => {
+    setShadows(current => {
+      const next = { ...current };
+      // 기본값이면 항목을 지운다 — 등록하지 않은 건물은 standard로 도는 게 기본이다.
+      const untouched = settings.mode === DEFAULT_SHADOW.mode && settings.groundFrac === 0 &&
+        settings.anchorDepthFrac === 0 && settings.lengthScale === 1;
+      if (untouched) delete next[type];
+      else next[type] = settings;
+      return next;
+    });
+  }, []);
+
   const save = useCallback(async () => {
-    const entry = TABS.find(item => item.id === tab)!;
     setStatus('저장 중…');
     try {
-      await saveRegistry(entry.registry, draft);
-      setData(current => (current ? { ...current, [entry.registry]: draft } as StudioData : current));
+      await saveRegistry(registry, draft);
+      setData(current => (current ? { ...current, [registry]: draft } as StudioData : current));
       setStatus('저장 완료 — 게임 dev 서버가 HMR로 반영합니다');
     } catch (error) {
       setStatus(`저장 실패: ${(error as Error).message}`);
     }
-  }, [tab, draft]);
+  }, [registry, draft]);
 
   const revert = useCallback(() => {
-    if (tab === 'scale') setMetrics(savedMetrics);
-    else setAnchors(savedAnchors);
+    if (registry === 'display-metrics') setMetrics(savedMetrics);
+    else if (registry === 'work-anchors') setAnchors(savedAnchors);
+    else if (registry === 'building-effects') setEffects(savedEffects);
+    else setShadows(savedShadows);
     setStatus('되돌렸습니다');
-  }, [tab, savedMetrics, savedAnchors]);
+  }, [registry, savedMetrics, savedAnchors, savedEffects, savedShadows]);
 
   return (
     <div className="studio">
@@ -125,12 +175,21 @@ export function App() {
           animate={animate}
           showReference={showReference}
         />
-      ) : (
+      ) : tab === 'stance' ? (
         <StanceStage
           anchors={anchors}
           savedAnchors={savedAnchors}
           onChange={changeAnchor}
           animate={animate}
+        />
+      ) : (
+        <BuildingStage
+          layer={buildingLayer}
+          onLayerChange={setBuildingLayer}
+          effects={effects}
+          shadows={shadows}
+          onEffectsChange={changeEffects}
+          onShadowChange={changeShadow}
         />
       )}
     </div>

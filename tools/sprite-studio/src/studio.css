@@ -157,6 +157,29 @@ body {
 }
 .seg-stack { display: grid; gap: 4px; }
 
+.emitter-list { display: grid; gap: 6px; }
+.emitter {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px;
+  display: grid;
+  gap: 5px;
+  cursor: pointer;
+}
+.emitter.on { border-color: var(--accent); }
+.emitter-head { display: flex; gap: 4px; align-items: center; }
+.emitter-head select { flex: 1; }
+.emitter-head .seg-btn { flex: 0 0 26px; }
+.emitter select {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 3px 5px;
+  width: 100%;
+}
+
 .seg { display: flex; gap: 3px; }
 .seg-btn {
   flex: 1;

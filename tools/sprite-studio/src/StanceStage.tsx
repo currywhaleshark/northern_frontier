@@ -22,7 +22,8 @@ const SCENE = TILE * SPAN;
 const CENTER_TILE = 1;          // 주민이 서는 칸
 const CENTER_PX = CENTER_TILE * TILE + TILE / 2;
 
-export const DEFAULT_ANCHOR: WorkAnchorEdit = { offsetX: 0, offsetY: 0, facing: 0 };
+// 값 export를 두면 vite react-refresh가 이 모듈을 컴포넌트로 못 보고 전체 새로고침을 건다.
+const DEFAULT_ANCHOR: WorkAnchorEdit = { offsetX: 0, offsetY: 0, facing: 0 };
 
 const ANCHOR_LIMIT = TILE / 2;
 

@@ -51,7 +51,7 @@ import { normalizePastureArea, validateStablePasture } from '../game/pastures';
 import { acceptsClearedLand, forestTilesInFootprint } from '../game/landClearing';
 import {
   BUILDING_EFFECT_TABLE, buildingEffectEmitters, buildingShadowSettings,
-  type BuildingEffectWhen,
+  type BuildingEffectEmitter, type BuildingEffectWhen, type BuildingShadowSettings,
 } from './spriteStudioRegistries';
 import { treeStageFor } from '../game/forestGrowth';
 import {
@@ -72,7 +72,7 @@ import {
 
 const TILE = CONFIG.ui.tileSize;
 
-const CENTER_VISUAL_SCALE: Record<GameState['rank'], number> = {
+export const CENTER_VISUAL_SCALE: Record<GameState['rank'], number> = {
   settlement: 0.78,
   bo: 0.86,
   jin: 0.93,
@@ -602,7 +602,7 @@ function typesWithNightEffect(): ReadonlySet<BuildingTypeId> {
   return nightEffectTypeCache;
 }
 
-interface BuildingEffectPass {
+export interface BuildingEffectPass {
   /** 이번 패스에서 그릴 발동 조건들 — 건물 패스와 밤 색조 패스가 나뉘어 있다 */
   active: ReadonlySet<BuildingEffectWhen>;
   workers: number;
@@ -610,7 +610,7 @@ interface BuildingEffectPass {
   nightAlpha: number;
 }
 
-function drawBuildingEffects(
+export function drawBuildingEffects(
   ctx: CanvasRenderingContext2D,
   type: BuildingTypeId,
   id: number,
@@ -618,8 +618,9 @@ function drawBuildingEffects(
   by: number,
   size: number,
   pass: BuildingEffectPass,
+  // 스프라이트 스튜디오는 아직 저장하지 않은 배열을 그대로 넘긴다.
+  emitters: readonly BuildingEffectEmitter[] = buildingEffectEmitters(type),
 ): void {
-  const emitters = buildingEffectEmitters(type);
   if (emitters.length === 0) return;
   ctx.save();
   for (const emitter of emitters) {
@@ -2089,14 +2090,14 @@ function annualSunFactor01(day: number): number {
   return (1 + Math.cos(Math.PI * 2 * (getDayOfYear(day) - CONFIG.time.seasonDays * 1.5) / CONFIG.time.yearDays)) / 2;
 }
 
-interface DayShadow {
+export interface DayShadow {
   ux: number; // 높이 1px가 만드는 화면 가로 오프셋 (부호 = 해 반대 방향)
   uy: number; // 높이 1px가 만드는 화면 세로(아래) 오프셋 — 3/4 시점이라 항상 살짝 앞으로 깔린다
   angle: number;
   alpha: number;
 }
 
-function dayShadowFor(state: GameState, dayFrac: number): DayShadow | null {
+export function dayShadowFor(state: Pick<GameState, 'day' | 'weather'>, dayFrac: number): DayShadow | null {
   const daylight = SEASON_DAYLIGHT_FRAC[getSeason(state.day)];
   const dawnT = 0.25 - daylight / 2;
   const duskT = 0.25 + daylight / 2;
@@ -2128,10 +2129,16 @@ let shadowLayer: HTMLCanvasElement | null = null;
 // 키당 한 번만 생성하므로 이후에는 건물당 drawImage 두 번이 전부다.
 // baseRow: 실루엣의 실제 시각적 밑변(마지막 불투명 행). 봉수대처럼 스프라이트가
 // 풋프린트 밑변까지 닿지 않는 건물은 이 줄에 그림자를 붙여야 잘려 보이지 않는다.
-interface BuildingShadowSilhouette {
+export interface BuildingShadowSilhouette {
   canvas: HTMLCanvasElement;
   baseRow: number;
   visualHeight: number;
+}
+
+/** 태양 물리에서 나오는 전단·눌림 — 건물 전부가 공유한다 (건물별 lengthScale은 이 위에 곱한다). */
+export function worldShadowShear(shadow: DayShadow): { shearX: number; flattenY: number } {
+  const shearX = shadow.ux * 0.6;
+  return { shearX, flattenY: Math.min(0.42, 0.16 + Math.abs(shearX) * 0.3) };
 }
 
 const buildingShadowSilhouettes = new Map<string, BuildingShadowSilhouette>();
@@ -2142,10 +2149,10 @@ const buildingShadowSilhouettes = new Map<string, BuildingShadowSilhouette>();
 // anchorDepthFrac: 풋프린트 밑변에서 뒤로 물러날 깊이 비율(본채 접지선).
 // 나무·주민 그림자와 태양 물리(dayShadowFor)는 전역 시스템이라 여기서 다루지 않는다.
 
-function buildingShadowSilhouette(
+export function buildingShadowSilhouette(
   sprites: SpriteAPI,
-  state: GameState,
-  building: Building,
+  state: Pick<GameState, 'rank'>,
+  building: Pick<Building, 'type' | 'x' | 'y'>,
   dims: { w: number; h: number },
   season: Season,
   highDefinition: boolean,
@@ -2196,6 +2203,55 @@ function buildingShadowSilhouette(
   return entry;
 }
 
+/** 눕힌 실루엣이 어디에 얹혔는지 — 스튜디오가 잘린 영역과 접지선을 겹쳐 그리는 데 쓴다. */
+export interface BuildingShadowPlacement {
+  /** 투영에 실제로 쓰인 실루엣 마지막 행 (마당형은 마당만큼 위로 잘린다) */
+  baseRowUsed: number;
+  /** 앞쪽 스탬프의 접지선 y */
+  frontAnchor: number;
+  /** 뒤쪽 스탬프가 물러나는 거리 */
+  backOffset: number;
+}
+
+/**
+ * 구운 실루엣을 지면에 눕힌다. 접지선 기준으로 한 번, 그보다 뒤쪽 기준으로 한 번 찍어
+ * 뒤쪽 사본이 옆벽을 절반 높이까지 감싸며 상자 부피감을 만든다.
+ * 게임과 스프라이트 스튜디오가 같은 투영을 쓰도록 여기 한 곳에 둔다.
+ */
+export function drawBuildingShadowSilhouette(
+  layer: CanvasRenderingContext2D,
+  sil: BuildingShadowSilhouette,
+  settings: BuildingShadowSettings,
+  baseX: number,
+  footprintBottom: number,
+  footprintDepth: number,
+  shearX: number,
+  flattenY: number,
+): BuildingShadowPlacement {
+  // 그림자는 풋프린트 밑변이 아니라 스프라이트의 시각적 밑변에 붙인다.
+  // 봉수대처럼 스프라이트가 풋프린트 아래까지 닿지 않는 건물도 잘려 보이지 않는다.
+  // 접지선에 딱 붙이지 않고 접지면 절반쯤 안쪽(위)으로 물러나 시작해야
+  // 그림자가 건물 밑에서 흘러나오듯 이어진다. 물러남은 반 칸을 넘지 않는다.
+  // 마당형 건물은 마당 부분을 잘라내고 본채 접지선(깊이 비율)에 붙인다.
+  const courtyard = settings.mode === 'courtyard' ? settings : null;
+  const bottomGap = sil.canvas.height - 1 - sil.baseRow;
+  const lift = Math.min(TILE * 0.5, sil.visualHeight * 0.16);
+  const baseRowUsed = courtyard
+    ? sil.baseRow - Math.round(sil.visualHeight * courtyard.groundFrac)
+    : sil.baseRow;
+  const frontAnchor = courtyard
+    ? footprintBottom - 1 - footprintDepth * courtyard.anchorDepthFrac
+    : footprintBottom - 1 - bottomGap - lift;
+  const backOffset = footprintDepth * (courtyard ? 0.2 : 0.5);
+  for (const anchor of [frontAnchor, frontAnchor - backOffset]) {
+    layer.save();
+    layer.transform(1, 0, -shearX, -flattenY, baseX + shearX * baseRowUsed, anchor + flattenY * baseRowUsed);
+    layer.drawImage(sil.canvas, 0, 0, sil.canvas.width, baseRowUsed + 1, 0, 0, sil.canvas.width, baseRowUsed + 1);
+    layer.restore();
+  }
+  return { baseRowUsed, frontAnchor, backOffset };
+}
+
 function drawWorldShadows(
   ctx: CanvasRenderingContext2D,
   state: GameState,
@@ -2226,10 +2282,9 @@ function drawWorldShadows(
   // 오블리크 스프라이트는 세로축에 깊이와 높이가 섞여 있어 전단을 0.6배로 보정한다.
   const season = getSeason(state.day);
   const wallTiles = builtWallTileSet(state);
-  const shearX = shadow.ux * 0.6;
   // 세로 눌림은 uy(접지 오프셋)와 분리해 실루엣이 덩어리로 보일 만큼 남긴다.
   // 해가 낮을수록 그림자가 앞으로도 더 뻗는다.
-  const flattenY = Math.min(0.42, 0.16 + Math.abs(shearX) * 0.3);
+  const { shearX, flattenY } = worldShadowShear(shadow);
   for (const building of state.buildings) {
     if (!building.built || isAreaBuildingType(building.type)) continue;
     const shadowSettings = buildingShadowSettings(building.type);
@@ -2245,30 +2300,16 @@ function drawWorldShadows(
       building.x - reachTiles, building.y - 1,
       dims.w + reachTiles * 2, dims.h + 3,
     )) continue;
-    const baseX = building.x * TILE;
-    // 그림자는 풋프린트 밑변이 아니라 스프라이트의 시각적 밑변에 붙인다.
-    // 봉수대처럼 스프라이트가 풋프린트 아래까지 닿지 않는 건물도 잘려 보이지 않는다.
-    // 접지선에 딱 붙이지 않고 접지면 절반쯤 안쪽(위)으로 물러나 시작해야
-    // 그림자가 건물 밑에서 흘러나오듯 이어진다. 물러남은 반 칸을 넘지 않는다.
-    // 마당형 건물은 마당 부분을 잘라내고 본채 접지선(깊이 비율)에 붙인다.
-    const courtyard = shadowSettings.mode === 'courtyard' ? shadowSettings : null;
-    const bottomGap = sil.canvas.height - 1 - sil.baseRow;
-    const lift = Math.min(TILE * 0.5, sil.visualHeight * 0.16);
-    const baseRowUsed = courtyard
-      ? sil.baseRow - Math.round(sil.visualHeight * courtyard.groundFrac)
-      : sil.baseRow;
-    const frontAnchor = courtyard
-      ? (building.y + dims.h) * TILE - 1 - dims.h * TILE * courtyard.anchorDepthFrac
-      : (building.y + dims.h) * TILE - 1 - bottomGap - lift;
-    const backOffset = dims.h * TILE * (courtyard ? 0.2 : 0.5);
-    // 접지선 기준으로 한 번, 그보다 뒤쪽 기준으로 한 번 찍는다.
-    // 뒤쪽 사본이 옆벽을 절반 높이까지만 감싸 상자 부피감을 만든다.
-    for (const anchor of [frontAnchor, frontAnchor - backOffset]) {
-      layer.save();
-      layer.transform(1, 0, -buildingShearX, -flattenY, baseX + buildingShearX * baseRowUsed, anchor + flattenY * baseRowUsed);
-      layer.drawImage(sil.canvas, 0, 0, sil.canvas.width, baseRowUsed + 1, 0, 0, sil.canvas.width, baseRowUsed + 1);
-      layer.restore();
-    }
+    drawBuildingShadowSilhouette(
+      layer,
+      sil,
+      shadowSettings,
+      building.x * TILE,
+      (building.y + dims.h) * TILE,
+      dims.h * TILE,
+      buildingShearX,
+      flattenY,
+    );
   }
 
   // 나무 — 실제 수관 비례(treeCanopiesIntersectingRect와 같은 치수)를 지면에 투영한다.
@@ -2352,29 +2393,45 @@ function drawWorldShadows(
   ctx.restore();
 }
 
-function drawDayNight(ctx: CanvasRenderingContext2D, state: GameState, dayFrac: number, viewport: SceneViewport): void {
+/**
+ * 검푸른 밤 — 멀티플라이로 따뜻한 색을 눌러 식히고, 스크린으로 남빛 바닥광을 깔아
+ * 어두운 부분까지 푸르게 만든다. 단순 알파 덮기보다 대비가 살아 훨씬 밤답다.
+ * 창불빛을 밤 배경 위에서 판단해야 하므로 스프라이트 스튜디오도 이 함수를 쓴다.
+ */
+export function drawNightTint(ctx: CanvasRenderingContext2D, night: number, fill: () => void): void {
+  if (night <= 0.002) return;
+  const mix = (from: number, to: number) => Math.round(from + (to - from) * night);
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = `rgb(${mix(255, 52)},${mix(255, 74)},${mix(255, 148)})`;
+  fill();
+  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = `rgba(24,42,108,${(night * 0.5).toFixed(3)})`;
+  fill();
+  ctx.restore();
+}
+
+/** 해의 세기 — 낮은 양수(정오 1), 밤은 음수(자정 −1). 계절마다 낮 길이가 다르다. */
+export function sunFactorFor(state: Pick<GameState, 'day'>, dayFrac: number): number {
   const daylight = SEASON_DAYLIGHT_FRAC[getSeason(state.day)];
   const dawnT = 0.25 - daylight / 2;
   const duskT = 0.25 + daylight / 2;
-  const sun = dayFrac >= dawnT && dayFrac < duskT
+  return dayFrac >= dawnT && dayFrac < duskT
     ? Math.sin(Math.PI * ((dayFrac - dawnT) / daylight))          // 낮 구간: 0→1→0
     : -Math.sin(Math.PI * ((dayFrac - duskT + 1) % 1) / (1 - daylight)); // 밤 구간: 0→-1→0
+}
+
+/** 밤의 깊이 (낮 0, 자정 1). */
+export function nightFactorFor(state: Pick<GameState, 'day'>, dayFrac: number): number {
+  return Math.max(0, -sunFactorFor(state, dayFrac));
+}
+
+function drawDayNight(ctx: CanvasRenderingContext2D, state: GameState, dayFrac: number, viewport: SceneViewport): void {
+  const sun = sunFactorFor(state, dayFrac);
   const night = Math.max(0, -sun);             // 낮엔 0, 자정에 1
 
   const fillViewport = () => ctx.fillRect(viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight);
-  // 검푸른 밤 — 멀티플라이로 따뜻한 색을 눌러 식히고, 스크린으로 남빛 바닥광을 깔아
-  // 어두운 부분까지 푸르게 만든다. 단순 알파 덮기보다 대비가 살아 훨씬 밤답다.
-  if (night > 0.002) {
-    const mix = (from: number, to: number) => Math.round(from + (to - from) * night);
-    ctx.save();
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = `rgb(${mix(255, 52)},${mix(255, 74)},${mix(255, 148)})`;
-    fillViewport();
-    ctx.globalCompositeOperation = 'screen';
-    ctx.fillStyle = `rgba(24,42,108,${(night * 0.5).toFixed(3)})`;
-    fillViewport();
-    ctx.restore();
-  }
+  drawNightTint(ctx, night, fillViewport);
   // 여명/황혼의 따뜻한 빛 (해가 지평선 근처일 때만) — 멀티플라이 틴트라
   // 눈밭도 분홍으로 뜨지 않고 불그스름하게 물든다.
   const twilight = Math.max(0, 1 - Math.abs(sun) * 3.5);

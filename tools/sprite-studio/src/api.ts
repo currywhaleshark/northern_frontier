@@ -20,12 +20,35 @@ export interface WorkAnchorEdit {
   toolTipY?: number;
 }
 
+export interface EffectEmitterEdit {
+  kind: 'chimneySmoke' | 'fireSparks' | 'craftGlint' | 'serviceGlow' | 'windowGlow';
+  /** 화면 좌표는 x = bx + size * fx + dx (세로도 같은 꼴) */
+  fx: number;
+  fy: number;
+  dx: number;
+  dy: number;
+  scale: number;
+  when: 'working' | 'night' | 'winterHeating' | 'always';
+}
+
+export interface ShadowSettingsEdit {
+  mode: 'standard' | 'courtyard' | 'none';
+  groundFrac: number;
+  anchorDepthFrac: number;
+  lengthScale: number;
+}
+
+/** 등록하지 않은 건물이 도는 값. 컴포넌트 모듈에 두면 react-refresh가 전체 새로고침을 건다. */
+export const DEFAULT_SHADOW: ShadowSettingsEdit = {
+  mode: 'standard', groundFrac: 0, anchorDepthFrac: 0, lengthScale: 1,
+};
+
 export interface StudioData {
   'display-metrics': Record<string, SpriteDisplayMetric>;
   'work-anchors': Record<string, WorkAnchorEdit>;
-  'building-effects': Record<string, unknown[]>;
+  'building-effects': Record<string, EffectEmitterEdit[]>;
   'worker-slots': Record<string, unknown[]>;
-  'building-shadows': Record<string, unknown>;
+  'building-shadows': Record<string, ShadowSettingsEdit>;
 }
 
 function stripComment<T extends Record<string, unknown>>(value: T): T {
