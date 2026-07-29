@@ -1944,6 +1944,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       {renameDialogOpen && (
         <SettlementRenameDialog
           currentName={state.settlementName}
+          rank={state.rank}
           onSubmit={handleSubmitRename}
           onClose={() => setRenameDialogOpen(false)}
         />

@@ -12,6 +12,7 @@ import {
 import { foodTotal, fuelHeatTotal } from '../game/consumption';
 import { LIVESTOCK_DEFS, normalizeLivestockState } from '../game/livestock';
 import { getDayOfSeason, getSeason, getYear } from '../game/seasons';
+import { settlementDisplayName } from '../game/settlementName';
 import type { AnnalsEntry, AnnalsKind, GameState, JobId, LivestockId } from '../game/types';
 
 interface Props {
@@ -182,7 +183,7 @@ export function ChronicleScreen({ state, onClose }: Props) {
         {/* ── 표제부 ── */}
         <header className="chronicle-head">
           <div className="chronicle-head-rule" />
-          <h1 className="chronicle-title">{state.settlementName} 연대기</h1>
+          <h1 className="chronicle-title">{settlementDisplayName(state)} 연대기</h1>
           <div className="chronicle-subtitle">
             {state.gameOver
               ? state.gameOver.won
@@ -297,7 +298,7 @@ export function ChronicleScreen({ state, onClose }: Props) {
 
         <footer className="chronicle-foot">
           <div className="chronicle-head-rule" />
-          <div className="muted small">{CONFIG.time.yearDays}일이 한 해 — 두만강 이북, {state.settlementName}에서.</div>
+          <div className="muted small">{CONFIG.time.yearDays}일이 한 해 — 두만강 이북, {settlementDisplayName(state)}에서.</div>
         </footer>
       </div>
     </div>

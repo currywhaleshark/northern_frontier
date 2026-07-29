@@ -52,7 +52,7 @@ import { isYouthWorkJob } from './youth';
 import { normalizeResidentFamilyReferences } from './family';
 import { normalizeResidentWearables, TANNERY_PRODUCT_DEFS } from './wearables';
 import { withJosa } from './josa';
-import { generateSettlementName } from './settlementName';
+import { generateSettlementName, normalizeSettlementNameInput } from './settlementName';
 import { recordYearlySnapshot } from './chronicleStats';
 import { normalizeRoyalPlaqueBinding } from './royalPlaque';
 import {
@@ -1687,7 +1687,9 @@ function sanitizeChronicle(state: GameState): void {
   if (typeof state.settlementName !== 'string' || !state.settlementName.trim()) {
     state.settlementName = generateSettlementName(state.seed ?? 1);
   }
-  state.settlementName = state.settlementName.trim().slice(0, 12);
+  // 행정단위 표기(촌·보·진·부)는 등급이 정한다 — 저장에는 밑이름만 남긴다.
+  state.settlementName = normalizeSettlementNameInput(state.settlementName) ||
+    generateSettlementName(state.seed ?? 1);
   const pending = state.pendingSettlementRename;
   state.pendingSettlementRename =
     pending && typeof pending === 'object' && typeof pending.requestedName === 'string' &&
@@ -2384,10 +2386,14 @@ export interface SaveSlotSummary {
   population: number | null;
   rank: string | null;
   difficulty: string | null;
+  settlementName: string | null;
 }
 
 function emptySlotSummary(slot: number): SaveSlotSummary {
-  return { slot, exists: false, savedAt: null, day: null, population: null, rank: null, difficulty: null };
+  return {
+    slot, exists: false, savedAt: null, day: null, population: null,
+    rank: null, difficulty: null, settlementName: null,
+  };
 }
 
 // 슬롯 목록 UI용 요약 — 전체 마이그레이션 없이 원본 JSON의 표시 필드만 읽는다
@@ -2408,6 +2414,9 @@ export function readSaveSlotSummary(slot: number): SaveSlotSummary {
         (entry as RawSave).alive === true).length,
       rank: typeof decoded.rank === 'string' ? decoded.rank : null,
       difficulty: typeof decoded.difficulty === 'string' ? decoded.difficulty : null,
+      settlementName: typeof decoded.settlementName === 'string' && decoded.settlementName.trim()
+        ? decoded.settlementName.trim()
+        : null,
     };
   } catch {
     return { ...emptySlotSummary(slot), exists: true };

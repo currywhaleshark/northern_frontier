@@ -3,16 +3,19 @@
 import { useState } from 'react';
 import { CONFIG } from '../game/config';
 import {
-  generateSettlementName, normalizeSettlementNameInput, SETTLEMENT_NAME_MAX_LENGTH,
+  displaySettlementName, generateSettlementName, normalizeSettlementNameInput,
+  RANK_UNITS, SETTLEMENT_NAME_MAX_LENGTH,
 } from '../game/settlementName';
+import type { Rank } from '../game/types';
 
 interface Props {
   currentName: string;
+  rank: Rank;
   onSubmit: (name: string) => void;
   onClose: () => void;
 }
 
-export function SettlementRenameDialog({ currentName, onSubmit, onClose }: Props) {
+export function SettlementRenameDialog({ currentName, rank, onSubmit, onClose }: Props) {
   const [name, setName] = useState('');
   const trimmed = normalizeSettlementNameInput(name);
   const blocked = !trimmed
@@ -27,7 +30,8 @@ export function SettlementRenameDialog({ currentName, onSubmit, onClose }: Props
         <h2>개칭을 청원한다</h2>
         <div className="body">
           <p>
-            지금 이름은 <b>{currentName}</b>입니다. 새 이름을 적어 한양으로 파발을 보냅니다.
+            지금 이름은 <b>{displaySettlementName(currentName, rank)}</b>입니다.
+            새 이름을 적어 한양으로 파발을 보냅니다.
           </p>
           <div className="settlement-name-row">
             <input
@@ -38,6 +42,7 @@ export function SettlementRenameDialog({ currentName, onSubmit, onClose }: Props
               onChange={event => setName(event.target.value)}
               placeholder="새 이름"
             />
+            <span className="settlement-name-unit" title="행정단위는 등급이 정합니다">{RANK_UNITS[rank]}</span>
             <button
               type="button"
               className="btn settlement-name-dice"

@@ -1913,6 +1913,8 @@ html, body, #root {
 .diff-name { font-weight: bold; font-size: 15px; }
 .diff-tag { color: var(--accent); font-size: 11px; margin: 2px 0 6px; }
 .diff-desc { color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+.settlement-name-box { color: var(--accent, #d9a441); letter-spacing: 1px; margin-right: 2px; }
+
 .settlement-name-row {
   display: flex;
   align-items: center;
@@ -1920,6 +1922,7 @@ html, body, #root {
   justify-content: center;
   margin: 2px 0 14px;
 }
+.settlement-name-unit { color: var(--muted); font-size: 15px; margin-left: -2px; }
 .settlement-name-label { color: var(--muted); font-size: 13px; }
 .settlement-name-input {
   width: 170px;

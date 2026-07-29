@@ -3,6 +3,7 @@
 // 승격할수록 이주민이 늘고, 국경 너머의 눈길(위협)과 조정의 세공 요구도 무거워진다.
 import { CONFIG } from './config';
 import { endGame, recordAnnals } from './annals';
+import { settlementDisplayName } from './settlementName';
 import { BUILDING_DEFS, countBuilt } from './buildings';
 import { RANK_NAMES, RANK_ORDER } from './constants';
 import { addLog } from './events';
@@ -148,6 +149,8 @@ export function upgradeSettlementCenter(state: GameState, buildingId: number): s
 }
 
 function promote(state: GameState, target: PromotionRank): void {
+  // 연대기에는 승격 이전의 표기(예: 설한촌 → 보 승격)를 남긴다
+  const beforeName = settlementDisplayName(state);
   state.rank = target;
   state.pendingPromotionNotice = target;
   state.resources.reputation = Math.min(100, state.resources.reputation + CONFIG.ranks.promotionReputation);
@@ -158,16 +161,16 @@ function promote(state: GameState, target: PromotionRank): void {
     addLog(state, '조정이 개척지를 보(堡)로 승격하였습니다! 첨사의 이름이 한양까지 알려집니다.', 'good', true);
     addLog(state, '보 승격으로 온돌집·채광장·나루터·논·방앗간과 어부·방아꾼이 열렸습니다.', 'good');
     addLog(state, '보가 되니 남쪽에서 사람이 모여들지만, 부유해진 만큼 국경 너머의 눈길도 잦아집니다. 조정의 세공도 무거워질 것입니다.', 'info');
-    recordAnnals(state, 'promotion', `${withJosa(state.settlementName, '이/가')} 보(堡)로 승격되었습니다.`, 'promotion:bo');
+    recordAnnals(state, 'promotion', `${withJosa(beforeName, '이/가')} 보(堡)로 승격되었습니다.`, 'promotion:bo');
   } else if (target === 'jin') {
     addLog(state, '조정이 보를 진(鎭)으로 승격하였습니다! 첨사는 이제 첨절제사라 불립니다.', 'good', true);
     addLog(state, '진 승격으로 기와집·토성·숯가마·축사·의원과 숯쟁이·목동·의원이 열렸습니다.', 'good');
     addLog(state, '진이 된 마을은 변경 방어의 요충이 되었습니다. 조정의 기대와 세공 요구가 한층 무거워집니다.', 'info');
-    recordAnnals(state, 'promotion', `${withJosa(state.settlementName, '이/가')} 진(鎭)으로 승격되었습니다.`, 'promotion:jin');
+    recordAnnals(state, 'promotion', `${withJosa(beforeName, '이/가')} 진(鎭)으로 승격되었습니다.`, 'promotion:jin');
   } else if (target === 'bu') {
     addLog(state, '부(府) 승격 — 개척의 대업이 완성되었습니다!', 'good', true);
     addLog(state, '부 승격으로 염초장·석벽·관청·부두와 염초장이·아전 직업이 열렸습니다.', 'good');
-    recordAnnals(state, 'promotion', `${withJosa(state.settlementName, '이/가')} 부(府)로 승격되었습니다 — 개척의 대업이 완성되었습니다.`, 'promotion:bu');
+    recordAnnals(state, 'promotion', `${withJosa(beforeName, '이/가')} 부(府)로 승격되었습니다 — 개척의 대업이 완성되었습니다.`, 'promotion:bu');
   }
 }
 

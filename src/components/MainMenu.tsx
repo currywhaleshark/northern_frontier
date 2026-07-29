@@ -70,6 +70,7 @@ export function MainMenu({
             onChange={event => setName(event.target.value)}
             placeholder="이름을 지어 주십시오"
           />
+          <span className="settlement-name-unit" title="행정단위는 승격에 따라 촌 → 보 → 진 → 부로 바뀝니다">촌</span>
           <button
             type="button"
             className="btn settlement-name-dice"

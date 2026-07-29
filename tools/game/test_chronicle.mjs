@@ -41,6 +41,15 @@ const SEED = 20260729;
     '같은 시드는 항상 같은 이름');
   assert.ok(naming.generateSettlementName(777).length >= 2, '이름이 비어 있지 않다');
 
+  // 행정단위 표기 — 저장은 밑이름, 표기는 등급이 정한다
+  assert.equal(naming.displaySettlementName('설한', 'settlement'), '설한촌');
+  assert.equal(naming.displaySettlementName('설한', 'bo'), '설한보');
+  assert.equal(naming.displaySettlementName('설한', 'jin'), '설한진');
+  assert.equal(naming.displaySettlementName('설한', 'bu'), '설한부');
+  assert.equal(naming.normalizeSettlementNameInput('설한촌'), '설한', '꼬리 행정단위는 떼어 낸다');
+  assert.equal(naming.normalizeSettlementNameInput('무촌'), '무촌', '밑이름이 두 글자가 못 되면 떼지 않는다');
+  assert.equal(naming.normalizeSettlementNameInput('가람골'), '가람골', '행정단위가 아닌 꼬리는 그대로');
+
   const unnamed = simulation.newGame(SEED);
   const named = simulation.newGame(SEED, 'normal', '가람골');
   assert.equal(named.settlementName, '가람골', '메뉴가 넘긴 이름을 그대로 쓴다');

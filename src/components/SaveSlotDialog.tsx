@@ -4,6 +4,7 @@ import { CONFIG } from '../game/config';
 import { RANK_NAMES, SEASON_NAMES } from '../game/constants';
 import { clearSave, readSaveSlotSummaries, type SaveSlotSummary } from '../game/saveLoad';
 import { getDayOfSeason, getSeason, getYear } from '../game/seasons';
+import { displaySettlementName, RANK_UNITS } from '../game/settlementName';
 import type { Difficulty, Rank } from '../game/types';
 
 interface Props {
@@ -17,6 +18,12 @@ interface Props {
 function slotDateLabel(summary: SaveSlotSummary): string | null {
   if (summary.day == null) return null;
   return `${getYear(summary.day)}년차 ${SEASON_NAMES[getSeason(summary.day)]} ${getDayOfSeason(summary.day)}일`;
+}
+
+function slotSettlementLabel(summary: SaveSlotSummary): string | null {
+  if (!summary.settlementName) return null;
+  const rank = summary.rank && summary.rank in RANK_UNITS ? summary.rank as Rank : 'settlement';
+  return displaySettlementName(summary.settlementName, rank);
 }
 
 function slotDetailLabel(summary: SaveSlotSummary): string {
@@ -74,7 +81,10 @@ export function SaveSlotDialog({ mode, onSelect, onClose, onChanged }: Props) {
                   disabled={disabled}
                   onClick={() => handleSelect(summary)}
                 >
-                  <span className="save-slot-name">{summary.slot}번 슬롯</span>
+                  <span className="save-slot-name">
+                    {summary.slot}번 슬롯
+                    {slotSettlementLabel(summary) && <> — {slotSettlementLabel(summary)}</>}
+                  </span>
                   {summary.exists ? (
                     <span className="save-slot-info">
                       <span>{dateLabel ?? '정보를 읽을 수 없는 저장'}</span>

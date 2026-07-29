@@ -36,7 +36,9 @@ import {
 import { getDayOfSeason, getDayOfYear, getSeason, getYear } from './seasons';
 import { endGame, recordAnnals, recordHarshWinter, recordPopulationMilestones } from './annals';
 import { createLifetimeStats, recordYearlySnapshot } from './chronicleStats';
-import { generateSettlementName, normalizeSettlementNameInput, processSettlementRename } from './settlementName';
+import {
+  generateSettlementName, normalizeSettlementNameInput, processSettlementRename, settlementDisplayName,
+} from './settlementName';
 import { firewoodWeatherMult, weatherForDay } from './weather';
 import { defaultProcessingReserves } from './processing';
 import { hasKnownMineralDepositNear } from './miningSites';
@@ -234,7 +236,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
   addLog(state, '조정의 명을 받아 두만강 이북 개척지에 도착했습니다. 짧은 봄 동안 겨울을 준비해야 합니다.', 'info');
   addLog(state, '나무를 베고, 집을 짓고, 식량과 장작을 모으십시오. 첫 겨울이 모든 것을 시험할 것입니다.', 'info');
   recordAnnals(state, 'founding',
-    `조정의 명을 받아 두만강 이북에 ${withJosa(state.settlementName, '을/를')} 열었습니다.`, 'founding');
+    `조정의 명을 받아 두만강 이북에 ${withJosa(settlementDisplayName(state), '을/를')} 열었습니다.`, 'founding');
   recordYearlySnapshot(state); // 1년차 스냅샷 — 정착 당일의 밑그림
   announceCourtTribute(state); // 1년차 봄이 day 1이므로 첫해 세공도 여기서 공지
   return state;

@@ -6,6 +6,7 @@ import { RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES, WEATHER_NAMES } from '../game
 import { nextRank } from '../game/promotion';
 import { avg, livingResidents, residentHome } from '../game/residents';
 import { getDayOfSeason, getSeason, getYear } from '../game/seasons';
+import { settlementDisplayName } from '../game/settlementName';
 import { spoilagePreview } from '../game/spoilage';
 import { tributeReserved, tributeReserveRatio } from '../game/tributeReserve';
 import { contractsInGrace, daysUntilNextContract } from '../game/tradeContracts';
@@ -236,7 +237,8 @@ export function TopBar({
       )}
       <div className="topbar-row">
         <span className="date-box">
-          {getYear(state.day)}년차 {SEASON_NAMES[getSeason(state.day)]} {getDayOfSeason(state.day)}일
+          <b className="settlement-name-box">{settlementDisplayName(state)}</b>
+          {' '}{getYear(state.day)}년차 {SEASON_NAMES[getSeason(state.day)]} {getDayOfSeason(state.day)}일
           {' '}<WeatherIcon weather={state.weather} size={20} /> {WEATHER_NAMES[state.weather]}
         </span>
         <DayArcWidget subTick={state.subTick} speed={speed} />

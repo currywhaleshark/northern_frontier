@@ -8,9 +8,21 @@ import { recordAnnals } from './annals';
 import { CONFIG } from './config';
 import { addLog } from './events';
 import { withJosa } from './josa';
-import type { GameState } from './types';
+import type { GameState, Rank } from './types';
 
 export const SETTLEMENT_NAME_MAX_LENGTH = 12;
+
+// 행정단위 — 저장되는 이름은 밑이름(예: "설한")이고, 표기는 등급이 정한다.
+// 정착지 설한촌 → 보 승격 후 설한보 → 설한진 → 설한부.
+export const RANK_UNITS: Record<Rank, string> = { settlement: '촌', bo: '보', jin: '진', bu: '부' };
+
+export function displaySettlementName(name: string, rank: Rank): string {
+  return `${name}${RANK_UNITS[rank]}`;
+}
+
+export function settlementDisplayName(state: Pick<GameState, 'settlementName' | 'rank'>): string {
+  return displaySettlementName(state.settlementName, state.rank);
+}
 
 // 두 글자 지명 — 북방 변경의 실제 지명 어감(회령·온성·경원…)을 따르되 실명과 겹치지 않게 조합한다.
 const NAME_HEADS = [
@@ -34,9 +46,17 @@ export function generateSettlementName(seed: number): string {
   return `${head}${tail}`;
 }
 
-/** 입력 정규화 — 앞뒤 공백 제거, 최대 길이 절단. 빈 문자열이면 빈 문자열 그대로 (호출부가 거부). */
+/**
+ * 입력 정규화 — 앞뒤 공백 제거, 최대 길이 절단. 빈 문자열이면 빈 문자열 그대로 (호출부가 거부).
+ * 행정단위는 게임이 등급에 맞춰 붙이므로, 습관적으로 붙여 적은 꼬리 단위 한 글자
+ * (촌·보·진·부)는 떼어 밑이름만 남긴다 — 남는 밑이름이 두 글자 이상일 때만.
+ */
 export function normalizeSettlementNameInput(raw: string): string {
-  return raw.trim().slice(0, SETTLEMENT_NAME_MAX_LENGTH);
+  let name = raw.trim().slice(0, SETTLEMENT_NAME_MAX_LENGTH);
+  if (name.length >= 3 && '촌보진부'.includes(name[name.length - 1])) {
+    name = name.slice(0, -1);
+  }
+  return name;
 }
 
 /** 개칭 청원이 가능한 상태인지 — 불가하면 사유 문자열, 가능하면 null. */
@@ -72,11 +92,11 @@ export function requestSettlementRename(state: GameState, rawName: string): stri
 export function processSettlementRename(state: GameState): void {
   const pending = state.pendingSettlementRename;
   if (!pending || state.day < pending.dueDay) return;
-  const oldName = state.settlementName;
+  const oldDisplay = settlementDisplayName(state);
   state.settlementName = pending.requestedName;
   state.pendingSettlementRename = null;
   state.settlementRenameCooldownUntil = state.day + CONFIG.time.yearDays;
-  const text = `조정의 허가가 내려와 ${withJosa(oldName, '이/가')} ${withJosa(state.settlementName, '으로/로')} 개칭되었습니다.`;
+  const text = `조정의 허가가 내려와 ${withJosa(oldDisplay, '이/가')} ${withJosa(settlementDisplayName(state), '으로/로')} 개칭되었습니다.`;
   recordAnnals(state, 'court', text);
   addLog(state, text, 'good', true);
 }

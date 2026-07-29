@@ -23,7 +23,7 @@ import {
 } from '../game/royalPlaque';
 import { getBuildingActions } from '../game/selectionActions';
 import { centerPromotionUpgradeReason, nextRank } from '../game/promotion';
-import { canRequestSettlementRename } from '../game/settlementName';
+import { canRequestSettlementRename, settlementDisplayName } from '../game/settlementName';
 import {
   assignedSlotResidents, availableWorkerSlots, isResidentAvailableForWorkerSlot, workerSlotConfig, workerSlotCount,
 } from '../game/workerSlots';
@@ -198,7 +198,7 @@ export function ActionPopup({
           onClick={onOpenChronicle}
         >
           <span>연대기</span>
-          <div className="muted small">{state.settlementName}의 기록 · 사건 {state.annals.length}건</div>
+          <div className="muted small">{settlementDisplayName(state)}의 기록 · 사건 {state.annals.length}건</div>
         </button>
       )}
 
@@ -216,7 +216,7 @@ export function ActionPopup({
             <div className="muted small">
               {state.pendingSettlementRename
                 ? `${state.pendingSettlementRename.requestedName} — 파발 귀환 ${Math.max(1, state.pendingSettlementRename.dueDay - state.day)}일 전`
-                : blocked ?? `현재 이름: ${state.settlementName}`}
+                : blocked ?? `현재 이름: ${settlementDisplayName(state)}`}
             </div>
           </button>
         );
