@@ -696,6 +696,28 @@ export type WildlifeKind = PredatorKind | 'boar';
 export type SpecialEventId = WildlifeKind | 'wildGinseng' | 'plagueSuspicion' | 'grainRequisition' |
   'shipwreck' | 'earlyFrost' | 'gyrfalcon' | 'horseDefectors';
 
+export type DisasterId =
+  | 'earlyFrost'
+  | 'lateFrost'
+  | 'locust'
+  | 'drought'
+  | 'springFlood'
+  | 'snowDamage'
+  | 'epidemic'
+  | 'livestockEpidemic'
+  | 'mineCollapse'
+  | 'fire';
+
+export interface PendingDisaster {
+  id: DisasterId;
+  choiceId: string;
+  startedDay: number;
+  resolveDay: number;
+  targetBuildingIds?: number[];
+  progress?: number;
+  data?: Record<string, number>;
+}
+
 export interface PredatorThreat {
   kind: WildlifeKind;
   untilDay: number;
@@ -1636,6 +1658,7 @@ export interface GameState {
   lastImmigrationDay: number; // 마지막 이주민 수용 여부 선택지가 열린 날
   lastKimjangYear: number;    // 마지막으로 김장 규모를 결정한 연도 (0이면 아직 없음)
   incidents: IncidentState;    // 연간 돌발 사건 일정과 지속 중인 맹수 위험
+  pendingDisasters: PendingDisaster[]; // 선택 뒤 실제 날씨·일일 진행으로 판정하는 재해
   specialItems: Record<SpecialItemId, number>; // 산삼·호피 등 일반 자원과 분리한 기물함
   discoveredSpecialItems: SpecialItemId[];     // 소모해도 남는 기물 도감
   courtGrantArtifactMisses: number;            // 적격 격년 하사품에서 연속으로 기물을 놓친 횟수

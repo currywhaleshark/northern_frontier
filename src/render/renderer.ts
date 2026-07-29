@@ -1093,6 +1093,23 @@ function drawFogOverlay(ctx: CanvasRenderingContext2D, state: GameState, viewpor
   ctx.restore();
 }
 
+function drawEarlyFrostCropOverlay(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.save();
+  ctx.fillStyle = 'rgba(225, 239, 246, 0.30)';
+  ctx.fillRect(x + 1, y + 1, TILE - 2, TILE - 2);
+  ctx.strokeStyle = 'rgba(242, 250, 253, 0.72)';
+  ctx.lineWidth = 0.8;
+  for (const [dx, dy] of [[6, 7], [17, 5], [12, 17], [22, 20]] as const) {
+    ctx.beginPath();
+    ctx.moveTo(x + dx - 2, y + dy);
+    ctx.lineTo(x + dx + 2, y + dy);
+    ctx.moveTo(x + dx, y + dy - 2);
+    ctx.lineTo(x + dx, y + dy + 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function siteColor(site: ForeignSite): string {
   return FACTIONS.find(faction => faction.name === site.factionName)?.color ?? '#9aa0a6';
 }
@@ -1553,6 +1570,11 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     drawBattleScarDecal(ctx, scar, state.day, season === 'winter');
   }
   const wallTiles = builtWallTileSet(state);
+  const earlyFrostBuildingIds = new Set(
+    state.pendingDisasters
+      .filter(disaster => disaster.id === 'earlyFrost')
+      .flatMap(disaster => disaster.targetBuildingIds ?? []),
+  );
   const sorted = [...state.buildings].sort((a, b) =>
     (a.y + buildingFootprintDims(a).h) - (b.y + buildingFootprintDims(b).h) || a.x - b.x);
   const visibleBuildings: Building[] = [];
@@ -1594,6 +1616,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
           x: cellX * TILE, y: cellY * TILE, size: TILE,
         };
         sprites.drawBuilding(ctx, drawParams);
+        if (earlyFrostBuildingIds.has(b.id)) {
+          drawEarlyFrostCropOverlay(ctx, drawParams.x, drawParams.y);
+        }
         occludedBuildingDraws.push(drawParams);
       }
       if (b.repairing) {

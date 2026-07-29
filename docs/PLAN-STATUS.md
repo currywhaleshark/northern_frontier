@@ -25,7 +25,7 @@
 | [연간 기후와 실제 날씨 설계](DESIGN-2026-07-28-annual-climate-weather.md) | 완료 | 결정적 연간 기후·계절 날씨·재해 확률 연결 완료 |
 | [조정 하사품 설계](DESIGN-2026-07-28-court-grants.md) | 완료 | 기본 하사품과 영구 기물·현판·총통·고유 무기 후속 범위까지 구현 |
 | [채광갱과 지하 광맥](DESIGN-2026-07-28-deep-mining.md) | 미착수 | 설계만 기록됨 |
-| [재해 확장](DESIGN-2026-07-28-disasters.md) | 일부 완료 | 연간 기후 기반 확률과 측우기 연동은 반영됐으나 신규 재해·대응 건물 대부분이 남음 |
+| [재해 확장](DESIGN-2026-07-28-disasters.md) | 일부 완료 | D0 지연 기반·D1 이른 서리 실제 날씨 추적 완료, D2~D9 남음 |
 | [정기거래 계약](DESIGN-2026-07-28-recurring-trade.md) | 완료 | 계약 체결·연간 실행·갱신·계약고·UI·경보까지 반영 |
 | [스프라이트 스튜디오 설계](DESIGN-2026-07-28-sprite-studio.md) | 완료 | 레지스트리 5종, 편집 UI, 작업자 슬롯까지 P0~P6 구현 |
 | [착용 장비와 가죽 경제](DESIGN-2026-07-28-wearables-and-footwear.md) | 완료 | 의복·신발 착용, 마모, 제작, 저장, UI 반영. 사망 회수 없음은 확정 범위 |
@@ -34,6 +34,7 @@
 | [후반 엔딩](DESIGN-2026-07-29-late-game-endings.md) | 보류 | 역사 시계의 진행 방식을 확정할 때까지 구현 보류 |
 | [연간 기후 구현계획](IMPLEMENTATION-2026-07-28-annual-climate-weather.md) | 완료 | P1~P7 구현·검증 후 `800f624`로 병합 |
 | [조정 하사품 구현계획](IMPLEMENTATION-2026-07-28-court-grants.md) | 완료 | G1~G8 및 P9~P16 후속 구현·집중 회귀 완료 |
+| [재해 확장 구현계획](IMPLEMENTATION-2026-07-29-disasters.md) | 완료 | D0+D1 구현, v44 저장·표적 회귀·프로덕션 빌드 검증 완료 |
 | [스프라이트 스튜디오 구현계획](IMPLEMENTATION-2026-07-28-sprite-studio.md) | 완료 | P0~P6 구현 후 `main` 반영 |
 
 ## 역사 계획

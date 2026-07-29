@@ -73,6 +73,7 @@ import { canResidentTakeJob, isYouthWorkJob, youthActivityOf } from './youth';
 import { dailyReligionTick, resolveReligionChoice } from './religion';
 import { dailySpecialResidentTick, resolveSpecialResidentChoice } from './specialResidents';
 import { dailySilverTick, resolveSilverVeinChoice } from './silver';
+import { advancePendingDisasters } from './disasters';
 import { updateFermentation } from './fermentation';
 import { isKimjangChoice, maybeOpenKimjangEvent, resolveKimjangChoice } from './kimjang';
 import {
@@ -161,6 +162,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
     lastImmigrationDay: -999,
     lastKimjangYear: 0,
     incidents: createIncidentState(s),
+    pendingDisasters: [],
     specialItems: createSpecialItemInventory(),
     discoveredSpecialItems: [],
     courtGrantArtifactMisses: 0,
@@ -1206,6 +1208,7 @@ function endOfDay(state: GameState): void {
     else if (state.weather === 'heavySnow') addLog(state, '폭설이 내려 발이 푹푹 빠집니다. 이동이 더뎌집니다.', 'weather');
     else if (state.weather === 'thawFlood') addLog(state, '해빙기 홍수로 강물이 불었습니다. 얼음 위로는 다닐 수 없습니다.', 'weather');
   }
+  advancePendingDisasters(state);
 
   regrowForest(state, rng, season);
   updateHabitats(state);

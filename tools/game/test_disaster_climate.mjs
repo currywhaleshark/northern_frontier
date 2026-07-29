@@ -174,7 +174,8 @@ const selectableEventIds = [
 ];
 
 function prepareEvents(state, allowed) {
-  state.day = 15;
+  state.day = 25;
+  state.weather = 'frost';
   state.incidents.year = 1;
   state.incidents.scheduledDays = [state.day];
   state.incidents.cooldownUntil = Object.fromEntries(
@@ -240,29 +241,28 @@ function openOnlyEarlyFrost(state) {
   );
 }
 
-// 표시와 실제 해결은 같은 공개 확률을 쓰며 임계값 비교는 기존의 엄격한 `<`를 유지한다.
+// 측우기 수치는 기후 기반 근사 예보다. 기다리기는 즉시 주사위를 굴리지 않고
+// 실제 날씨 추적 상태를 만든다.
 {
   const state = simulation.newGame(51001);
   state.specialItems.rainGauge = 1;
   openOnlyEarlyFrost(state);
   const farm = state.buildings.at(-1);
-  const chance = disasters.disasterChoiceChance(state, 'earlyFrost', 'wait-harvest');
-  const rng = sequenceRng([Math.max(0, chance - 1e-9)]);
+  const rng = sequenceRng([0]);
   specialEvents.resolveSpecialEvent(state, 'wait-harvest', rng);
   assert.equal(farm.fieldGrowth, 80);
-  assert.equal(rng.calls, 1);
+  assert.equal(rng.calls, 0, 'waiting for frost consumes no simulation RNG');
+  assert.equal(state.pendingDisasters.length, 1);
+  assert.equal(state.pendingDisasters[0].resolveDay, state.day + 4);
 }
 
 {
   const state = simulation.newGame(51001);
-  state.specialItems.rainGauge = 1;
-  openOnlyEarlyFrost(state);
-  const farm = state.buildings.at(-1);
-  const chance = disasters.disasterChoiceChance(state, 'earlyFrost', 'wait-harvest');
-  const rng = sequenceRng([chance]);
-  specialEvents.resolveSpecialEvent(state, 'wait-harvest', rng);
-  assert.equal(farm.fieldGrowth, 20);
-  assert.equal(rng.calls, 1);
+  addStandingFarm(state);
+  prepareEvents(state, ['earlyFrost']);
+  state.weather = 'clear';
+  assert.equal(specialEvents.maybeOpenSpecialEvent(state, sequenceRng([0, 0])), false);
+  assert.equal(state.incidents.scheduledDays.length, 1, 'a clear autumn day does not consume the scheduled incident');
 }
 
 // 역병 사건도 선택 1회 + 환자 1회 + 실제 역병 1회의 기존 RNG 순서를 보존한다.

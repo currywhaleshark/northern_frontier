@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 43, 'chronicle state ships with schema version 43');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 44, 'delayed disasters ship with schema version 44');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -79,6 +79,7 @@ assert.equal(typeof saveLoad.migrateV39ToV40, 'function');
 assert.equal(typeof saveLoad.migrateV40ToV41, 'function');
 assert.equal(typeof saveLoad.migrateV41ToV42, 'function');
 assert.equal(typeof saveLoad.migrateV42ToV43, 'function');
+assert.equal(typeof saveLoad.migrateV43ToV44, 'function');
 
 {
   const migrated = saveLoad.migrateV39ToV40({ schemaVersion: 39, courtGrantArtifactMisses: 3.8 });
@@ -102,12 +103,22 @@ assert.equal(typeof saveLoad.migrateV42ToV43, 'function');
   state.discoveredSpecialItems.push('royalMusket');
   state.weaponAllocationMode = 'manual';
   state.artifactWeaponAssignments = { royalSpear: null, royalMusket: artifactBearer.id };
+  state.pendingDisasters = [{
+    id: 'earlyFrost',
+    choiceId: 'wait-harvest',
+    startedDay: state.day,
+    resolveDay: state.day + 4,
+    targetBuildingIds: [plaqueBuilding.id],
+    progress: 1,
+  }];
   assert.equal(saveLoad.saveGame(state), true);
   const loaded = saveLoad.loadGame();
   assert.equal(loaded?.courtGrantArtifactMisses, 3, 'artifact pity counter survives a normal save/load round trip');
   assert.equal(loaded?.royalPlaqueBuildingId, plaqueBuilding.id, 'valid plaque binding survives a normal save/load round trip');
   assert.deepEqual(loaded?.artifactWeaponAssignments, { royalSpear: null, royalMusket: artifactBearer.id },
     'valid artifact weapon assignment survives a normal save/load round trip');
+  assert.deepEqual(loaded?.pendingDisasters, state.pendingDisasters,
+    'a delayed disaster survives a normal save/load round trip');
 }
 
 {
@@ -144,6 +155,18 @@ assert.equal(typeof saveLoad.migrateV42ToV43, 'function');
   assert.deepEqual(migrated.yearlySnapshots, [], 'snapshots are backfilled at load time, not in the raw migration');
   assert.equal(migrated.pendingSettlementRename, null);
   assert.equal(migrated.settlementRenameCooldownUntil, 0);
+}
+
+{
+  const migrated = saveLoad.migrateV43ToV44({
+    schemaVersion: 43,
+    seed: 777,
+    day: 61,
+    marker: 'kept',
+  });
+  assert.equal(migrated.schemaVersion, 44);
+  assert.equal(migrated.marker, 'kept');
+  assert.deepEqual(migrated.pendingDisasters, [], 'pre-D0 saves begin with no delayed disaster');
 }
 
 {

@@ -83,10 +83,11 @@ function plagueRealChance(climate: AnnualClimate): number {
 }
 
 /**
- * 재해 선택·판정에 쓰는 실제 확률이다.
+ * 기후에서 계산한 재해 선택 결과의 근사 확률이다.
  *
  * `plagueSuspicion/real-case`는 플레이어 선택지는 아니지만 의심 환자가 실제
- * 역병인지 결정하는 동일한 기후 확률 계약으로 등록한다.
+ * 역병인지 결정하는 실제 확률이다. 이른 서리의 기다리기는 D1부터 실제 날씨표를
+ * 추적하므로 이 값은 측우기 예보에만 쓴다.
  */
 export function disasterChoiceChanceForClimate(
   climate: AnnualClimate,
@@ -112,7 +113,7 @@ export function disasterChoiceChance(
 
 /**
  * 측우기 보유자에게만 공개하는 선택지 관측 문구다.
- * 표시 숫자와 실제 판정은 모두 disasterChoiceChance를 호출한다.
+ * 이른 서리는 연간 기후에서 계산한 근사 예보이며 실제 판정은 이후 날씨표를 센다.
  */
 export function disasterChoiceForecast(
   state: DisasterState,
@@ -122,7 +123,7 @@ export function disasterChoiceForecast(
   if ((state.specialItems?.rainGauge ?? 0) <= 0) return null;
   if (eventId === 'earlyFrost' && optionId === 'wait-harvest') {
     const percent = Math.round(disasterChoiceChance(state, eventId, optionId) * 100);
-    return `올해 관측상 서리가 걷힐 가능성 ${percent}%. 버티지 못하면 소출 대부분을 잃습니다.`;
+    return `올해 기후로 미루어 서리가 걷힐 가능성은 약 ${percent}%입니다. 이후 나흘의 실제 날씨로 판정합니다.`;
   }
   return null;
 }

@@ -11,6 +11,7 @@ import { getDayOfSeason, getSeason } from '../game/seasons';
 import { firewoodWeatherMult } from '../game/weather';
 import { contractsInGrace } from '../game/tradeContracts';
 import { RESOURCE_NAMES } from '../game/constants';
+import { pendingDisasterDaysRemaining } from '../game/disasters';
 import type { AlertItem, GameState } from '../game/types';
 
 export function computeAlerts(state: GameState): AlertItem[] {
@@ -152,6 +153,15 @@ export function computeAlerts(state: GameState): AlertItem[] {
       id: 'epidemic',
       text: `역병 유행: 환자 ${state.incidents.epidemic.infectedIds.length}명${state.incidents.epidemic.mode === 'isolated' ? ' 격리 중' : ''}.`,
       level: 'danger',
+    });
+  }
+  for (const disaster of state.pendingDisasters) {
+    if (disaster.id !== 'earlyFrost') continue;
+    const daysLeft = pendingDisasterDaysRemaining(state, disaster);
+    alerts.push({
+      id: `pendingDisaster-${disaster.id}`,
+      text: `이른 서리 경과 관찰 중 · 찬 날 ${Math.floor(disaster.progress ?? 0)}일 · ${daysLeft}일 뒤 판정`,
+      level: 'warn',
     });
   }
 

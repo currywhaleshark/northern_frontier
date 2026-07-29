@@ -55,6 +55,7 @@ import { withJosa } from './josa';
 import { generateSettlementName, normalizeSettlementNameInput } from './settlementName';
 import { recordYearlySnapshot } from './chronicleStats';
 import { normalizeRoyalPlaqueBinding } from './royalPlaque';
+import { normalizePendingDisasters } from './disasters';
 import {
   gradeTacticalBattle, raidDefenseObjectiveResult, tacticalClosingSummary, tacticalOutcomeResult,
 } from './tacticalCore';
@@ -714,6 +715,15 @@ export function migrateV42ToV43(raw: RawSave): RawSave {
   return migrated;
 }
 
+// v44: 선택 뒤 실제 날씨·일일 진행으로 판정하는 재해 대기열.
+// 구 저장에는 진행 중인 지연 재해가 없으므로 빈 배열로 시작한다.
+export function migrateV43ToV44(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  migrated.pendingDisasters = [];
+  migrated.schemaVersion = 44;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -762,6 +772,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 40) migrated = migrateV40ToV41(migrated);
     else if (version === 41) migrated = migrateV41ToV42(migrated);
     else if (version === 42) migrated = migrateV42ToV43(migrated);
+    else if (version === 43) migrated = migrateV43ToV44(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -2056,6 +2067,7 @@ export function loadGame(slot = 1): GameState | null {
     if (parsed.lastImmigrationDay == null) parsed.lastImmigrationDay = -999;
     if (!Number.isFinite(parsed.lastKimjangYear)) parsed.lastKimjangYear = 0;
     ensureIncidentState(parsed);
+    parsed.pendingDisasters = normalizePendingDisasters(parsed.pendingDisasters);
     ensureForeignSiteState(parsed);
     if (!Array.isArray(parsed.territoryViolations)) parsed.territoryViolations = [];
     migrateResourceTaxonomy(parsed);

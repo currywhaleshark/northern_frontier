@@ -22,6 +22,7 @@ import {
   disasterChoiceForecast,
   disasterOccurrenceWeight,
 } from './disasterClimate';
+import { hasPendingDisaster, startEarlyFrostObservation } from './disasters';
 import type {
   Building,
   EpidemicState,
@@ -396,7 +397,7 @@ function openEarlyFrostEvent(state: GameState, rng: () => number): void {
         id: 'wait-harvest',
         label: '수확철을 기다린다',
         desc: disasterChoiceForecast(state, 'earlyFrost', 'wait-harvest') ??
-          '서리가 걷히면 정상 수확하지만, 버티지 못하면 소출 대부분을 잃습니다.',
+          '이후 나흘 동안 서리나 혹한이 이틀 이상 이어지면 소출 대부분을 잃습니다.',
       },
     ],
     data: { eventId: 'earlyFrost', targetBuildingId: target.id },
@@ -484,7 +485,9 @@ export function maybeOpenSpecialEvent(state: GameState, rng: () => number): bool
   }
   if (ready('grainRequisition')) candidates.push({ value: 'grainRequisition', weight: CONFIG.specialEvents.grainRequisitionWeight });
   if (riverExists && ready('shipwreck')) candidates.push({ value: 'shipwreck', weight: CONFIG.specialEvents.shipwreckWeight });
-  if (farms.length > 0 && (season === 'summer' || season === 'autumn') && ready('earlyFrost')) {
+  if (farms.length > 0 && season === 'autumn' &&
+      (state.weather === 'frost' || state.weather === 'coldSnap') &&
+      !hasPendingDisaster(state, 'earlyFrost') && ready('earlyFrost')) {
     candidates.push({ value: 'earlyFrost', weight: disasterOccurrenceWeight(state, 'earlyFrost') });
   }
   if (forestExists && ready('gyrfalcon')) candidates.push({ value: 'gyrfalcon', weight: CONFIG.specialEvents.gyrfalconWeight });
@@ -887,7 +890,7 @@ function resolveShipwreck(state: GameState, optionId: string): void {
   }
 }
 
-function resolveEarlyFrost(state: GameState, optionId: string, buildingId: number, rng: () => number): void {
+function resolveEarlyFrost(state: GameState, optionId: string, buildingId: number): void {
   const farm = state.buildings.find(building => building.id === buildingId);
   const cropId = farm ? cropIdForBuilding(farm) : null;
   if (!farm || !cropId || farm.fieldGrowth <= 0) return;
@@ -899,20 +902,15 @@ function resolveEarlyFrost(state: GameState, optionId: string, buildingId: numbe
       : 0;
     const fertile = farm.type === 'field' ? 1 + fertileFraction * (CONFIG.production.fertileBonus - 1) : 1;
     const sown = Math.max(1, sownAreaOf(farm));
-    const amount = (farm.fieldGrowth / 100) * crop.yield * sown * fertile * 0.55;
+    const amount = (farm.fieldGrowth / 100) * crop.yield * sown * fertile *
+      CONFIG.disasters.earlyFrost.earlyHarvestYieldMultiplier;
     farm.inventory ??= {};
     farm.inventory[crop.output] = (farm.inventory[crop.output] ?? 0) + amount;
     farm.fieldGrowth = 0;
     farm.sownArea = 0;
     addLog(state, `${withJosa(crop.name, '을/를')} 서둘러 거두어 ${withJosa(amount.toFixed(1), '을/를')} 확보했습니다.`, 'good', true);
   } else if (optionId === 'wait-harvest') {
-    if (rng() < disasterChoiceChance(state, 'earlyFrost', 'wait-harvest')) {
-      addLog(state, '이른 서리가 곧 걷혔습니다. 작물이 버텨 정상 수확을 기대할 수 있습니다.', 'good', true);
-    } else {
-      const before = farm.fieldGrowth;
-      farm.fieldGrowth *= 0.25;
-      addLog(state, `${withJosa(crop.name, '이/가')} 서리를 견디지 못해 예상 소출의 ${Math.round(before - farm.fieldGrowth)}%를 잃었습니다.`, 'bad', true);
-    }
+    startEarlyFrostObservation(state, farm.id);
   }
 }
 
@@ -966,7 +964,7 @@ export function resolveSpecialEvent(state: GameState, optionId: string, rng: () 
   if (eventId === 'plagueOutbreak') return resolveEpidemic(state, optionId);
   if (eventId === 'grainRequisition') return resolveGrainRequisition(state, optionId, choice.data.amount as number);
   if (eventId === 'shipwreck') return resolveShipwreck(state, optionId);
-  if (eventId === 'earlyFrost') return resolveEarlyFrost(state, optionId, choice.data.targetBuildingId as number, rng);
+  if (eventId === 'earlyFrost') return resolveEarlyFrost(state, optionId, choice.data.targetBuildingId as number);
   if (eventId === 'gyrfalcon') return resolveGyrfalcon(state, optionId);
   if (eventId === 'horseDefectors') return resolveHorseDefectors(state, optionId, rng);
   if (!wildlife) return;
