@@ -426,24 +426,6 @@ export function buildingEffectEmitters(type: BuildingTypeId): readonly BuildingE
   return BUILDING_EFFECTS[type] ?? NO_EFFECTS;
 }
 
-// ── 야외 작업자 슬롯 ──
-// 등록하지 않은 건물은 현행 유지(건물 주변 아무 인접 칸).
-export interface BuildingWorkerSlot {
-  readonly tileDX: number;
-  readonly tileDY: number;
-  readonly offsetX: number;
-  readonly offsetY: number;
-  readonly facing: 1 | -1 | 0;
-}
-
-const BUILDING_WORKER_SLOTS: Partial<Record<BuildingTypeId, readonly BuildingWorkerSlot[]>> = {};
-
-const NO_SLOTS: readonly BuildingWorkerSlot[] = [];
-
-export function buildingWorkerSlots(type: BuildingTypeId): readonly BuildingWorkerSlot[] {
-  return BUILDING_WORKER_SLOTS[type] ?? NO_SLOTS;
-}
-
 // ── 건물 그림자 ──
 // 나무·주민 그림자와 태양 물리는 전역 시스템이라 여기서 다루지 않는다.
 export type BuildingShadowMode = 'standard' | 'courtyard' | 'none';

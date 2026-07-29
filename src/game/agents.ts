@@ -49,9 +49,10 @@ import { reconcileResidentHomes, residentHome } from './residents';
 import { reconcileMountAssignments } from './weapons';
 import { canEnterForeignTerritory, canWorkForeignTerritory, noteTerritoryViolation } from './territory';
 import {
-  assignedBuildingForResident, assignedWorkers, autoAssignWorkersToBuilding, clearAssignmentsForBuilding,
-  isResidentInAssignedSlot,
+  assignedBuildingForResident, assignedSlotResidents, assignedWorkers, autoAssignWorkersToBuilding,
+  clearAssignmentsForBuilding, isResidentInAssignedSlot,
 } from './workerSlots';
+import { buildingWorkerSlots } from './buildingWorkerSlots';
 import {
   addBuildingStock, buildingStock, depositResidentToBuilding, depositResidentToSettlement,
   isHaulSourceBuilding, isStorageBuilding, takeBuildingStock,
@@ -514,6 +515,24 @@ function unloadAtDepositGoal(
 
 function buildingGoal(state: GameState, id: number): (t: Tile) => boolean {
   return buildingInteractionGoal(state, [id]);
+}
+
+/**
+ * 서는 자리가 정해진 야외 작업 — 건물 옆 아무 칸이 아니라 등록된 칸으로 간다.
+ * 자리는 스프라이트 스튜디오에서 실물을 보며 정하고, 배정 순번(id 오름차순)이
+ * 곧 자리 번호라 두 근무자가 같은 칸을 다투지 않는다.
+ * 미등록·지도 밖·통행 불가면 기존 동작(건물 인접 아무 칸)으로 되돌아간다.
+ */
+function workerSlotGoal(state: GameState, r: Resident, building: Building): (t: Tile) => boolean {
+  const slots = buildingWorkerSlots(building.type);
+  if (slots.length === 0) return buildingGoal(state, building.id);
+  const index = assignedSlotResidents(state, building).findIndex(worker => worker.id === r.id);
+  if (index < 0) return buildingGoal(state, building.id);
+  const slot = slots[index % slots.length];
+  const sx = building.x + slot.tileDX;
+  const sy = building.y + slot.tileDY;
+  if (!state.map[sy]?.[sx] || !isPassable(state, sx, sy)) return buildingGoal(state, building.id);
+  return describeGoal(t => t.x === sx && t.y === sy, [{ x: sx, y: sy }]);
 }
 
 function goToCenter(state: GameState, r: Resident, ctx: Ctx): GoResult {
@@ -1939,7 +1958,7 @@ function woodSplitterTick(state: GameState, r: Resident, ctx: Ctx): void {
   const target = (CONFIG.production.firewoodWoodPerDay / 5) * effOf(r) *
     ctx.outputMod * WORK_RATE_SCALE;
   if (supplyWorkplaceInputs(state, r, ctx, shed, { wood: target })) return;
-  const st = goTo(state, r, ctx, buildingGoal(state, shed.id));
+  const st = goTo(state, r, ctx, workerSlotGoal(state, r, shed));
   if (st !== 'arrived') {
     r.phase = st === 'stuck' ? 'rest' : 'toWork';
     r.task = st === 'stuck' ? '길이 막힘' : '장작마당으로 이동';

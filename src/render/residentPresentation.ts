@@ -1,13 +1,38 @@
 import { CONFIG } from '../game/config';
 import { isIndoors } from '../game/dayCycle';
+import { buildingWorkerSlots } from '../game/buildingWorkerSlots';
+import { assignedSlotResidents } from '../game/workerSlots';
 import {
   residentActiveWorkplace,
   workplacePresentation,
 } from '../game/workplacePresentation';
-import type { Building, GameState } from '../game/types';
+import type { Building, GameState, Resident } from '../game/types';
 import { selectOxPlowFarmerIds } from './residentFarmerAssets';
 import { residentWorkStances, type ResidentWorkStance } from './residentWorkLayout';
 import { workAnchor } from './spriteStudioRegistries';
+
+/**
+ * 등록된 자리에 실제로 서 있는 근무자의 자세. 자리 밖이면 null이라
+ * 이동 중이거나 폴백으로 다른 칸에 선 근무자는 평소대로 벌려 세운다.
+ */
+function workerSlotStance(
+  resident: Resident,
+  building: Building,
+  slotWorkersOf: (building: Building) => readonly Resident[],
+): ResidentWorkStance | null {
+  const slots = buildingWorkerSlots(building.type);
+  if (slots.length === 0) return null;
+  const index = slotWorkersOf(building).findIndex(worker => worker.id === resident.id);
+  if (index < 0) return null;
+  const slot = slots[index % slots.length];
+  if (resident.x !== building.x + slot.tileDX || resident.y !== building.y + slot.tileDY) return null;
+  return {
+    offsetX: slot.offsetX,
+    offsetY: slot.offsetY,
+    // facing 0 = 기존 계산 유지. 이 자리 근무자는 정지 상태라 렌더러 기본값과 같다.
+    facing: slot.facing !== 0 ? slot.facing : (resident.x < resident.px ? -1 : 1),
+  };
+}
 
 export interface ResidentPresentationSnapshot {
   buildingById: ReadonlyMap<number, Building>;
@@ -23,6 +48,18 @@ export function buildResidentPresentationSnapshot(state: GameState): ResidentPre
 
   const indoorResidentIds = new Set<number>();
   const workplaceActiveCountByBuilding = new Map<number, number>();
+  const slotStances = new Map<number, ResidentWorkStance>();
+  // 배정 순번 조회는 건물마다 한 번만 — 근무자마다 부르면 주민 수의 제곱이 된다.
+  const slotWorkerCache = new Map<number, readonly Resident[]>();
+  const slotWorkersOf = (building: Building): readonly Resident[] => {
+    let workers = slotWorkerCache.get(building.id);
+    if (!workers) {
+      workers = assignedSlotResidents(state, building);
+      slotWorkerCache.set(building.id, workers);
+    }
+    return workers;
+  };
+
   for (const resident of state.residents) {
     // 취침(집 도착 후)·실내 여가(당집·암자) 재실자는 그리지 않는다 — M0 계약 isIndoors
     if (isIndoors(state, resident)) {
@@ -39,19 +76,31 @@ export function buildResidentPresentationSnapshot(state: GameState): ResidentPre
         (workplaceActiveCountByBuilding.get(building.id) ?? 0) + 1,
       );
     }
+    if (presentation.mode !== 'interior') {
+      const stance = workerSlotStance(resident, building, slotWorkersOf);
+      if (stance) slotStances.set(resident.id, stance);
+    }
   }
+
+  // 자리에 선 근무자는 벌리기에서 빼고 자리 값을 그대로 쓴다 — 정해진 칸에 고정하는 것이
+  // 목적인데 같은 칸의 다른 사람 때문에 다시 밀리면 의미가 없다.
+  const spreadExcluded = slotStances.size === 0
+    ? indoorResidentIds
+    : new Set([...indoorResidentIds, ...slotStances.keys()]);
+  const workStances = residentWorkStances(
+    state.residents,
+    CONFIG.ui.tileSize,
+    spreadExcluded,
+    (x, y) => state.map?.[y]?.[x]?.terrain,
+    workAnchor,
+  );
+  for (const [id, stance] of slotStances) workStances.set(id, stance);
 
   return {
     buildingById,
     indoorResidentIds,
     workplaceActiveCountByBuilding,
-    workStances: residentWorkStances(
-      state.residents,
-      CONFIG.ui.tileSize,
-      indoorResidentIds,
-      (x, y) => state.map?.[y]?.[x]?.terrain,
-      workAnchor,
-    ),
+    workStances,
     oxPlowFarmerIds: selectOxPlowFarmerIds(state.buildings, state.residents),
   };
 }

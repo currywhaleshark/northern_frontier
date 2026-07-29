@@ -30,8 +30,12 @@ const renderDir = join(rootDir, 'render');
 mkdirSync(renderDir, { recursive: true });
 const registrySource = readFileSync(join(ROOT, 'src', 'render', 'spriteStudioRegistries.ts'), 'utf8');
 writeFileSync(join(renderDir, 'spriteStudioRegistries.mjs'), transpile(registrySource), 'utf8');
+// 작업자 자리는 시뮬레이션이 읽으므로 game 쪽에 생성된다 (game → render import를 막기 위해).
+const slotSource = readFileSync(join(ROOT, 'src', 'game', 'buildingWorkerSlots.ts'), 'utf8');
+writeFileSync(join(renderDir, 'buildingWorkerSlots.mjs'), transpile(slotSource), 'utf8');
 
 const registries = await import(pathToFileURL(join(renderDir, 'spriteStudioRegistries.mjs')).href);
+const slotRegistry = await import(pathToFileURL(join(renderDir, 'buildingWorkerSlots.mjs')).href);
 
 // ── 1. 기본값 항등성 ──
 {
@@ -49,7 +53,7 @@ const registries = await import(pathToFileURL(join(renderDir, 'spriteStudioRegis
   const shadow = registries.buildingShadowSettings('hut');
   assert.equal(shadow.mode, 'standard', '등록하지 않은 건물은 standard');
   assert.equal(shadow.lengthScale, 1, '등록하지 않은 건물은 길이 배율 1');
-  assert.deepEqual(registries.buildingWorkerSlots('hut'), [], '등록하지 않은 건물은 슬롯 없음');
+  assert.deepEqual(slotRegistry.buildingWorkerSlots('hut'), [], '등록하지 않은 건물은 자리 없음');
   assert.deepEqual(registries.buildingEffectEmitters('palisade'), [], '효과 없는 건물은 빈 배열');
 }
 
@@ -107,6 +111,39 @@ const registries = await import(pathToFileURL(join(renderDir, 'spriteStudioRegis
   // 원본 데이터로 다시 생성한 결과가 저장소의 파일과 같아야 한다 (커밋 누락 방지).
   const regenerated = readFileSync(join(ROOT, 'src', 'render', 'spriteStudioRegistries.ts'), 'utf8');
   assert.equal(regenerated, registrySource, '생성 파일이 data/*.json과 어긋나 있다 — 코드젠을 다시 돌려 커밋할 것');
+  const regeneratedSlots = readFileSync(join(ROOT, 'src', 'game', 'buildingWorkerSlots.ts'), 'utf8');
+  assert.equal(regeneratedSlots, slotSource, '작업자 자리 생성 파일이 data와 어긋나 있다');
+}
+
+// ── 3b. 자리를 따르지 않는 건물에는 등록할 수 없다 ──
+{
+  const dataPath = join(ROOT, 'tools', 'sprite-studio', 'data', 'worker-slots.json');
+  const original = readFileSync(dataPath, 'utf8');
+  const generator = join(ROOT, 'tools', 'sprite-studio', 'generate_registries.mjs');
+  const rejects = (payload, why) => {
+    writeFileSync(dataPath, JSON.stringify(payload), 'utf8');
+    let rejected = false;
+    try {
+      execFileSync('node', [generator], { stdio: 'pipe' });
+    } catch {
+      rejected = true;
+    }
+    assert.ok(rejected, why);
+  };
+  try {
+    rejects({ smithy: [{ tileDX: 1, tileDY: 1, offsetX: 0, offsetY: 0, facing: 0 }] },
+      '아직 자리를 따르지 않는 건물은 거부해야 한다');
+    rejects({ woodShed: [{ tileDX: 0, tileDY: 0, offsetX: 0, offsetY: 0, facing: 0 }] },
+      '건물 칸 위(0,0) 자리는 통행 불가라 거부해야 한다');
+  } finally {
+    writeFileSync(dataPath, original, 'utf8');
+    execFileSync('node', [generator], { stdio: 'pipe' });
+  }
+  assert.equal(
+    readFileSync(join(ROOT, 'src', 'game', 'buildingWorkerSlots.ts'), 'utf8'),
+    slotSource,
+    '거부된 저장 뒤에도 원래 자리 데이터가 남아야 한다',
+  );
 }
 
 // ── 4. 건물 효과 초기 스냅샷이 기존 하드코딩 대상과 일치한다 ──

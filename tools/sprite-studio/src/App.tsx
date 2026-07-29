@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   DEFAULT_SHADOW, loadStudioData, saveRegistry,
   type EffectEmitterEdit, type RegistryName, type ShadowSettingsEdit,
-  type SpriteDisplayMetric, type StudioData, type WorkAnchorEdit,
+  type SpriteDisplayMetric, type StudioData, type WorkAnchorEdit, type WorkerSlotEdit,
 } from './api';
 import { ScaleBench } from './ScaleBench';
 import { StanceStage } from './StanceStage';
@@ -24,6 +24,7 @@ export function App() {
   const [anchors, setAnchors] = useState<Record<string, WorkAnchorEdit>>({});
   const [effects, setEffects] = useState<Record<string, EffectEmitterEdit[]>>({});
   const [shadows, setShadows] = useState<Record<string, ShadowSettingsEdit>>({});
+  const [slots, setSlots] = useState<Record<string, WorkerSlotEdit[]>>({});
   const [tab, setTab] = useState<TabId>('scale');
   const [buildingLayer, setBuildingLayer] = useState<BuildingLayer>('effects');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -39,6 +40,7 @@ export function App() {
         setAnchors(loaded['work-anchors']);
         setEffects(loaded['building-effects']);
         setShadows(loaded['building-shadows']);
+        setSlots(loaded['worker-slots']);
         setStatus('');
       })
       .catch(error => setStatus(`불러오기 실패: ${error.message}`));
@@ -48,24 +50,26 @@ export function App() {
   const savedAnchors = data?.['work-anchors'] ?? {};
   const savedEffects = data?.['building-effects'] ?? {};
   const savedShadows = data?.['building-shadows'] ?? {};
+  const savedSlots = data?.['worker-slots'] ?? {};
 
   // 저장·되돌리기는 현재 보고 있는 레지스트리 하나만 다룬다.
   const registry: RegistryName = tab === 'scale' ? 'display-metrics'
     : tab === 'stance' ? 'work-anchors'
-      : buildingLayer === 'effects' ? 'building-effects' : 'building-shadows';
+      : buildingLayer === 'effects' ? 'building-effects'
+        : buildingLayer === 'slots' ? 'worker-slots' : 'building-shadows';
   const drafts: Record<RegistryName, unknown> = {
     'display-metrics': metrics,
     'work-anchors': anchors,
     'building-effects': effects,
     'building-shadows': shadows,
-    'worker-slots': {},
+    'worker-slots': slots,
   };
   const savedDrafts: Record<RegistryName, unknown> = {
     'display-metrics': savedMetrics,
     'work-anchors': savedAnchors,
     'building-effects': savedEffects,
     'building-shadows': savedShadows,
-    'worker-slots': {},
+    'worker-slots': savedSlots,
   };
   const draft = drafts[registry];
   const dirty = data != null && JSON.stringify(draft) !== JSON.stringify(savedDrafts[registry]);
@@ -112,6 +116,15 @@ export function App() {
     });
   }, []);
 
+  const changeSlots = useCallback((type: string, next: WorkerSlotEdit[]) => {
+    setSlots(current => {
+      const updated = { ...current };
+      if (next.length === 0) delete updated[type];
+      else updated[type] = next;
+      return updated;
+    });
+  }, []);
+
   const save = useCallback(async () => {
     setStatus('저장 중…');
     try {
@@ -127,9 +140,10 @@ export function App() {
     if (registry === 'display-metrics') setMetrics(savedMetrics);
     else if (registry === 'work-anchors') setAnchors(savedAnchors);
     else if (registry === 'building-effects') setEffects(savedEffects);
+    else if (registry === 'worker-slots') setSlots(savedSlots);
     else setShadows(savedShadows);
     setStatus('되돌렸습니다');
-  }, [registry, savedMetrics, savedAnchors, savedEffects, savedShadows]);
+  }, [registry, savedMetrics, savedAnchors, savedEffects, savedShadows, savedSlots]);
 
   return (
     <div className="studio">
@@ -188,8 +202,11 @@ export function App() {
           onLayerChange={setBuildingLayer}
           effects={effects}
           shadows={shadows}
+          slots={slots}
           onEffectsChange={changeEffects}
           onShadowChange={changeShadow}
+          onSlotsChange={changeSlots}
+          animate={animate}
         />
       )}
     </div>

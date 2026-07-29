@@ -43,11 +43,23 @@ export const DEFAULT_SHADOW: ShadowSettingsEdit = {
   mode: 'standard', groundFrac: 0, anchorDepthFrac: 0, lengthScale: 1,
 };
 
+export interface WorkerSlotEdit {
+  /** 건물 좌상단 기준 타일 오프셋 — 근무자가 실제로 걸어가는 칸이다. */
+  tileDX: number;
+  tileDY: number;
+  offsetX: number;
+  offsetY: number;
+  facing: 1 | -1 | 0;
+}
+
+/** 자리를 실제로 따르는 건물 — generate_registries.mjs의 SLOT_BUILDING_TYPES와 같아야 한다. */
+export const SLOT_BUILDING_TYPES: readonly string[] = ['woodShed'];
+
 export interface StudioData {
   'display-metrics': Record<string, SpriteDisplayMetric>;
   'work-anchors': Record<string, WorkAnchorEdit>;
   'building-effects': Record<string, EffectEmitterEdit[]>;
-  'worker-slots': Record<string, unknown[]>;
+  'worker-slots': Record<string, WorkerSlotEdit[]>;
   'building-shadows': Record<string, ShadowSettingsEdit>;
 }
 

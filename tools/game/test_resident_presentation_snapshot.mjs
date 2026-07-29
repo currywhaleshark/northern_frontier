@@ -90,4 +90,40 @@ assert.equal(cache.get(state, 11), changed, 'alpha, hover, and other canvas-only
 const newGameState = { ...state, buildings: [...state.buildings], residents: [...state.residents] };
 assert.notEqual(cache.get(newGameState, 11), changed, 'new-game or load state identity invalidates the cache');
 
+// ── 야외 작업 자리 — 자리에 선 근무자는 벌리기에서 빠지고 자리 값을 그대로 쓴다 ──
+{
+  const { buildingWorkerSlots } = await import(
+    pathToFileURL(join(compiledDir, 'game', 'buildingWorkerSlots.mjs')).href);
+  const slots = buildingWorkerSlots('woodShed');
+  const shed = { id: 40, type: 'woodShed', built: true, x: 12, y: 12 };
+  const expected = slot => ({
+    offsetX: slot.offsetX,
+    offsetY: slot.offsetY,
+    // facing 0 = 기존 계산 유지. 정지 근무자의 기본 방향은 오른쪽이다.
+    facing: slot.facing !== 0 ? slot.facing : 1,
+  });
+
+  // 자리를 지운 데이터에서도 이 파일이 죽지 않게 — 등록된 만큼만 확인한다.
+  const workers = slots.map((slot, index) =>
+    resident(101 + index, 'woodSplitter', shed.id, shed.x + slot.tileDX, shed.y + slot.tileDY));
+  // 자리 밖에 선 근무자는 자리 값을 받지 않는다 (이동 중이거나 폴백으로 다른 칸에 선 경우).
+  const stray = resident(199, 'woodSplitter', shed.id, shed.x - 1, shed.y - 1);
+  const snapshot = presentationModule.buildResidentPresentationSnapshot({
+    rank: 'bu',
+    buildings: [shed],
+    residents: [...workers, stray],
+  });
+
+  workers.forEach((worker, index) => {
+    assert.deepEqual(snapshot.workStances.get(worker.id), expected(slots[index]),
+      `${index + 1}번 자리 근무자는 자리 값을 그대로 쓴다`);
+  });
+  const strayStance = snapshot.workStances.get(stray.id);
+  assert.ok(strayStance, '자리 밖 근무자도 평소 자세는 받는다');
+  if (slots.length > 0) {
+    assert.notDeepEqual(strayStance, expected(slots[0]),
+      '자리 밖 근무자는 자리 값이 아니라 기존 벌리기를 받는다');
+  }
+}
+
 console.log('resident presentation snapshot tests passed');

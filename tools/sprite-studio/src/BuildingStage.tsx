@@ -17,7 +17,10 @@ import { SEASON_ORDER } from '@game/game/constants';
 import { CONFIG } from '@game/game/config';
 import type { TerrainDrawParams } from '@game/render/sprites';
 import type { BuildingTypeId, Rank, Season } from '@game/game/types';
-import { DEFAULT_SHADOW, type EffectEmitterEdit, type ShadowSettingsEdit } from './api';
+import {
+  DEFAULT_SHADOW, SLOT_BUILDING_TYPES,
+  type EffectEmitterEdit, type ShadowSettingsEdit, type WorkerSlotEdit,
+} from './api';
 
 const TILE = CONFIG.ui.tileSize;
 const SPAN_X = 9;               // 그림자가 길게 누워도 잘리지 않을 만큼
@@ -28,7 +31,10 @@ const ORIGIN_X = 3;             // 건물 좌상단 타일
 const ORIGIN_Y = 3;
 const STUDIO_EFFECT_ID = 7;     // 입자 위상 오프셋용 고정 id
 
-export type BuildingLayer = 'effects' | 'shadow';
+export type BuildingLayer = 'effects' | 'shadow' | 'slots';
+
+/** 자리를 놓을 수 있는 범위 — 건물 발자국을 두 칸 넓힌 사각형. */
+const SLOT_REACH = 2;
 
 const KIND_LABEL: Record<BuildingEffectKind, string> = {
   chimneySmoke: '굴뚝 연기', fireSparks: '불꽃', craftGlint: '작업 반짝임',
@@ -110,13 +116,32 @@ function emitterAt(emitter: EffectEmitterEdit, geometry: Geometry): [number, num
   ];
 }
 
+/** 자리 칸의 화면 사각형. 건물 발자국 안은 통행 불가라 놓을 수 없다. */
+function slotTileRect(dims: { w: number; h: number }, tileDX: number, tileDY: number) {
+  return {
+    x: (ORIGIN_X + tileDX) * TILE,
+    y: (ORIGIN_Y + tileDY) * TILE,
+    blocked: tileDX >= 0 && tileDX < dims.w && tileDY >= 0 && tileDY < dims.h,
+  };
+}
+
+function slotStandPoint(slot: WorkerSlotEdit): [number, number] {
+  return [
+    (ORIGIN_X + slot.tileDX + 0.5) * TILE + slot.offsetX,
+    (ORIGIN_Y + slot.tileDY + 0.5) * TILE + slot.offsetY,
+  ];
+}
+
 function drawScene(
   ctx: CanvasRenderingContext2D,
   scene: SceneState,
   layer: BuildingLayer,
   emitters: readonly EffectEmitterEdit[],
   shadow: ShadowSettingsEdit,
+  slots: readonly WorkerSlotEdit[],
   selectedEmitter: number | null,
+  selectedSlot: number | null,
+  animationTimeMs: number,
 ): void {
   const sprites = getActiveSprites();
   const geometry = geometryFor(scene);
@@ -156,6 +181,26 @@ function drawScene(
     }
   }
 
+  // ── 자리 근무자 ──
+  // 건물보다 먼저 그린 뒤 뒤쪽 자리를 가리게 둔다 — 게임의 행 정렬에서도 건물 윗줄에 선
+  // 근무자는 건물에 가린다. 여기서 다 보이게 그리면 실제로는 안 보이는 자리를 고르게 된다.
+  const drawSlotWorker = (slot: WorkerSlotEdit) => {
+    const [x, y] = slotStandPoint(slot);
+    sprites.drawResident(ctx, {
+      job: 'woodSplitter', gender: 'male', x, y,
+      sick: false, carrying: false, selected: false,
+      showJobMarker: false, showCargoMarker: false,
+      moving: false, working: true,
+      facing: slot.facing === -1 ? -1 : 1,
+      animationTimeMs,
+    });
+  };
+  // 행 정렬 기준은 renderer와 같다: 건물은 발자국 밑변, 주민은 제 발끝 y.
+  const buildingSortY = (ORIGIN_Y + dims.h) * TILE;
+  const behind = slots.filter(slot => slotStandPoint(slot)[1] < buildingSortY);
+  const front = slots.filter(slot => slotStandPoint(slot)[1] >= buildingSortY);
+  if (layer === 'slots') behind.forEach(drawSlotWorker);
+
   // ── 건물 ──
   sprites.drawBuilding(ctx, {
     type: scene.type, built: true, progress01: 1, ghost: false,
@@ -163,6 +208,8 @@ function drawScene(
     season: scene.season, highDefinition: true,
     x: drawX, y: drawY, size,
   });
+
+  if (layer === 'slots') front.forEach(drawSlotWorker);
 
   // ── 낮 효과 (건물 패스) ──
   const daytime = new Set<BuildingEffectWhen>(['always']);
@@ -197,6 +244,41 @@ function drawScene(
       ctx.beginPath();
       ctx.arc(ax, ay, on ? 3.5 : 2.5, 0, Math.PI * 2);
       ctx.stroke();
+    });
+  } else if (layer === 'slots') {
+    for (let dy = -SLOT_REACH; dy < dims.h + SLOT_REACH; dy++) {
+      for (let dx = -SLOT_REACH; dx < dims.w + SLOT_REACH; dx++) {
+        const cell = slotTileRect(dims, dx, dy);
+        if (cell.x < 0 || cell.y < 0 || cell.x >= SCENE_W || cell.y >= SCENE_H) continue;
+        // 발자국 안은 통행 불가 — 회색으로 덮어 놓을 수 없음을 보인다.
+        ctx.fillStyle = cell.blocked ? 'rgba(20,24,28,0.45)' : 'rgba(216,222,229,0.05)';
+        ctx.fillRect(cell.x, cell.y, TILE, TILE);
+        ctx.strokeStyle = cell.blocked ? 'rgba(139,152,165,0.35)' : 'rgba(216,222,229,0.28)';
+        ctx.lineWidth = 0.4;
+        ctx.strokeRect(cell.x + 0.2, cell.y + 0.2, TILE - 0.4, TILE - 0.4);
+      }
+    }
+    slots.forEach((slot, index) => {
+      const cell = slotTileRect(dims, slot.tileDX, slot.tileDY);
+      const on = index === selectedSlot;
+      ctx.strokeStyle = on ? '#d9a441' : 'rgba(96,200,150,0.9)';
+      ctx.lineWidth = on ? 1 : 0.7;
+      ctx.strokeRect(cell.x + 0.5, cell.y + 0.5, TILE - 1, TILE - 1);
+      const [sx, sy] = slotStandPoint(slot);
+      ctx.beginPath();
+      ctx.moveTo(sx - 3, sy); ctx.lineTo(sx + 3, sy);
+      ctx.moveTo(sx, sy - 3); ctx.lineTo(sx, sy + 3);
+      ctx.stroke();
+      // 바라보는 방향 (facing 0은 기본 오른쪽)
+      const dir = slot.facing === -1 ? -1 : 1;
+      ctx.beginPath();
+      ctx.moveTo(sx + dir * 4, sy);
+      ctx.lineTo(sx + dir * 8, sy);
+      ctx.lineTo(sx + dir * 6, sy - 2);
+      ctx.stroke();
+      ctx.fillStyle = on ? '#d9a441' : 'rgba(96,200,150,0.9)';
+      ctx.font = '6px sans-serif';
+      ctx.fillText(String(index + 1), cell.x + 2, cell.y + 8);
     });
   } else if (silhouette && placement) {
     // 잘려 나간 마당 구간과 본채 접지선 — groundFrac·anchorDepthFrac이 무엇인지 눈으로 본다.
@@ -261,38 +343,47 @@ interface Props {
   onLayerChange(layer: BuildingLayer): void;
   effects: Record<string, EffectEmitterEdit[]>;
   shadows: Record<string, ShadowSettingsEdit>;
+  slots: Record<string, WorkerSlotEdit[]>;
   onEffectsChange(type: string, emitters: EffectEmitterEdit[]): void;
   onShadowChange(type: string, settings: ShadowSettingsEdit): void;
+  onSlotsChange(type: string, slots: WorkerSlotEdit[]): void;
+  animate: boolean;
 }
 
 const EDITABLE_TYPES = (Object.keys(BUILDING_DEFS) as BuildingTypeId[])
   .filter(type => !isAreaBuildingType(type));
 
 export function BuildingStage({
-  layer, onLayerChange, effects, shadows, onEffectsChange, onShadowChange,
+  layer, onLayerChange, effects, shadows, slots, onEffectsChange, onShadowChange, onSlotsChange, animate,
 }: Props) {
   const [scene, setScene] = useState<SceneState>({
     type: 'ondol', rank: 'bu', season: 'winter', workers: 2,
     heating: true, dayFrac: 0.12, emphasizeShadow: true, zoom: 3,
   });
   const [selected, setSelected] = useState<number | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [, setReady] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const dragRef = useRef<{ index: number; startX: number; startY: number; dx: number; dy: number } | null>(null);
+  const dragRef = useRef<
+    { kind: 'emitter' | 'slot'; index: number; startX: number; startY: number; dx: number; dy: number } | null
+  >(null);
 
   useEffect(() => onAtlasAssetSettled(() => setReady(value => !value)), []);
 
   const emitters = useMemo(() => effects[scene.type] ?? [], [effects, scene.type]);
   const shadow = shadows[scene.type] ?? DEFAULT_SHADOW;
+  const typeSlots = useMemo(() => slots[scene.type] ?? [], [slots, scene.type]);
+  const slotsAllowed = SLOT_BUILDING_TYPES.includes(scene.type);
   const geometry = useMemo(() => geometryFor(scene), [scene]);
   const night = nightFactorFor({ day: midSeasonDay(scene.season) }, scene.dayFrac);
   const nightAlpha = nightAlphaFor(night);
 
-  useEffect(() => { setSelected(null); }, [scene.type]);
+  useEffect(() => { setSelected(null); setSelectedSlot(null); }, [scene.type]);
 
   useEffect(() => {
     let raf = 0;
     let stopped = false;
+    const start = performance.now();
     const paint = () => {
       if (stopped) return;
       const canvas = canvasRef.current;
@@ -301,13 +392,16 @@ export function BuildingStage({
         ctx.setTransform(scene.zoom, 0, 0, scene.zoom, 0, 0);
         ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, SCENE_W, SCENE_H);
-        drawScene(ctx, scene, layer, emitters, shadow, selected);
+        drawScene(
+          ctx, scene, layer, emitters, shadow, typeSlots, selected, selectedSlot,
+          animate ? performance.now() - start : 0,
+        );
       }
       raf = requestAnimationFrame(paint);
     };
     paint();
     return () => { stopped = true; cancelAnimationFrame(raf); };
-  }, [scene, layer, emitters, shadow, selected]);
+  }, [scene, layer, emitters, shadow, typeSlots, selected, selectedSlot, animate]);
 
   const patchEmitter = useCallback((index: number, patch: Partial<EffectEmitterEdit>) => {
     onEffectsChange(scene.type, emitters.map((emitter, i) => i === index ? { ...emitter, ...patch } : emitter));
@@ -319,9 +413,41 @@ export function BuildingStage({
     return [(clientX - rect.left - border) / scene.zoom, (clientY - rect.top - border) / scene.zoom];
   };
 
+  const patchSlot = useCallback((index: number, patch: Partial<WorkerSlotEdit>) => {
+    onSlotsChange(scene.type, typeSlots.map((slot, i) => i === index ? { ...slot, ...patch } : slot));
+  }, [onSlotsChange, scene.type, typeSlots]);
+
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (layer !== 'effects') return;
     const [px, py] = logicalAt(event.currentTarget, event.clientX, event.clientY);
+
+    if (layer === 'slots') {
+      if (!slotsAllowed) return;
+      const existing = typeSlots.findIndex(slot => {
+        const [sx, sy] = slotStandPoint(slot);
+        return Math.hypot(px - sx, py - sy) <= 6;
+      });
+      if (existing >= 0) {
+        setSelectedSlot(existing);
+        dragRef.current = {
+          kind: 'slot', index: existing, startX: px, startY: py,
+          dx: typeSlots[existing].offsetX, dy: typeSlots[existing].offsetY,
+        };
+        event.currentTarget.setPointerCapture(event.pointerId);
+        return;
+      }
+      // 빈 칸을 누르면 그 칸에 자리를 놓는다. 발자국 안(통행 불가)은 거절.
+      const tileDX = Math.floor(px / TILE) - ORIGIN_X;
+      const tileDY = Math.floor(py / TILE) - ORIGIN_Y;
+      const cell = slotTileRect(geometry.dims, tileDX, tileDY);
+      if (cell.blocked) return;
+      if (Math.abs(tileDX) > geometry.dims.w + SLOT_REACH || Math.abs(tileDY) > geometry.dims.h + SLOT_REACH) return;
+      if (typeSlots.some(slot => slot.tileDX === tileDX && slot.tileDY === tileDY)) return;
+      onSlotsChange(scene.type, [...typeSlots, { tileDX, tileDY, offsetX: 0, offsetY: 0, facing: 0 }]);
+      setSelectedSlot(typeSlots.length);
+      return;
+    }
+
+    if (layer !== 'effects') return;
     let best = -1;
     let bestDistance = 6;
     emitters.forEach((emitter, index) => {
@@ -331,20 +457,33 @@ export function BuildingStage({
     });
     if (best < 0) return;
     setSelected(best);
-    dragRef.current = { index: best, startX: px, startY: py, dx: emitters[best].dx, dy: emitters[best].dy };
+    dragRef.current = {
+      kind: 'emitter', index: best, startX: px, startY: py,
+      dx: emitters[best].dx, dy: emitters[best].dy,
+    };
     event.currentTarget.setPointerCapture(event.pointerId);
-  }, [emitters, geometry, layer, scene.zoom]);
+  }, [emitters, geometry, layer, onSlotsChange, scene.type, scene.zoom, slotsAllowed, typeSlots]);
 
   const onPointerMove = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
     const drag = dragRef.current;
     if (!drag) return;
     const [px, py] = logicalAt(event.currentTarget, event.clientX, event.clientY);
+    if (drag.kind === 'slot') {
+      // 자리 안에서만 움직인다 — 칸을 벗어나면 근무자가 실제로 서는 칸과 어긋난다.
+      const limit = TILE / 2;
+      const clamp = (value: number) => Math.max(-limit, Math.min(limit, Math.round(value)));
+      patchSlot(drag.index, {
+        offsetX: clamp(drag.dx + px - drag.startX),
+        offsetY: clamp(drag.dy + py - drag.startY),
+      });
+      return;
+    }
     // 끌기는 픽셀 보정(dx·dy)만 움직인다. 크기 비율(fx·fy)은 의도해서 정하는 값이라 손대지 않는다.
     patchEmitter(drag.index, {
       dx: Math.round((drag.dx + px - drag.startX) * 10) / 10,
       dy: Math.round((drag.dy + py - drag.startY) * 10) / 10,
     });
-  }, [patchEmitter, scene.zoom]);
+  }, [patchEmitter, patchSlot, scene.zoom]);
 
   const endDrag = useCallback(() => { dragRef.current = null; }, []);
 
@@ -390,7 +529,9 @@ export function BuildingStage({
         <div className="stage-hint muted">
           {layer === 'effects'
             ? '이미터 표식을 끌면 픽셀 보정(dx·dy)이 움직입니다. 크기 비율은 아래 fx·fy로 정합니다.'
-            : '붉은 띠 = 투영에서 잘려 나간 마당, 초록 선 = 앞뒤 스탬프의 접지선.'}
+            : layer === 'shadow'
+              ? '붉은 띠 = 투영에서 잘려 나간 마당, 초록 선 = 앞뒤 스탬프의 접지선.'
+              : '빈 칸을 누르면 자리를 놓고, 자리를 끌면 칸 안에서 위치를 옮깁니다. 회색 칸(발자국)은 통행 불가라 놓을 수 없습니다. 실제 화면에서는 주민마다 고정된 ±3px 지터가 더해집니다.'}
         </div>
       </div>
 
@@ -398,14 +539,14 @@ export function BuildingStage({
         <div className="field">
           <span>레이어</span>
           <div className="seg">
-            {(['effects', 'shadow'] as const).map(value => (
+            {([['effects', '효과'], ['shadow', '그림자'], ['slots', '작업 자리']] as const).map(([value, label]) => (
               <button
                 type="button"
                 key={value}
                 className={`seg-btn${layer === value ? ' on' : ''}`}
                 onClick={() => onLayerChange(value)}
               >
-                {value === 'effects' ? '효과' : '그림자'}
+                {label}
               </button>
             ))}
           </div>
@@ -521,6 +662,56 @@ export function BuildingStage({
                 </div>
               ))}
               <button type="button" className="btn" onClick={addEmitter}>+ 이미터 추가</button>
+            </div>
+          </>
+        ) : layer === 'slots' ? (
+          <>
+            {!slotsAllowed && (
+              <div className="stage-readout muted">
+                {BUILDING_DEFS[scene.type].name}은 아직 자리를 따르지 않습니다.
+                지금은 장작마당만 근무자가 정해진 칸으로 갑니다 — 다른 건물에 등록하면 코드젠이 거절합니다.
+              </div>
+            )}
+            <div className="emitter-list">
+              {typeSlots.map((slot, index) => (
+                <div
+                  key={index}
+                  className={`emitter${selectedSlot === index ? ' on' : ''}`}
+                  onClick={() => setSelectedSlot(index)}
+                >
+                  <div className="emitter-head">
+                    <span className="muted">
+                      {index + 1}번 · 칸 ({slot.tileDX}, {slot.tileDY}) · 보정 {slot.offsetX},{slot.offsetY}
+                    </span>
+                    <button
+                      type="button"
+                      className="seg-btn"
+                      onClick={() => {
+                        onSlotsChange(scene.type, typeSlots.filter((_unused, i) => i !== index));
+                        setSelectedSlot(null);
+                      }}
+                    >
+                      −
+                    </button>
+                  </div>
+                  <div className="seg">
+                    {([0, -1, 1] as const).map(value => (
+                      <button
+                        type="button"
+                        key={value}
+                        className={`seg-btn${slot.facing === value ? ' on' : ''}`}
+                        onClick={() => patchSlot(index, { facing: value })}
+                      >
+                        {value === 0 ? '기존' : value === -1 ? '왼쪽' : '오른쪽'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="stage-readout muted">
+              자리 {typeSlots.length}개 · 배정 순번(id 오름차순)이 그대로 자리 번호입니다.
+              등록한 자리보다 근무자가 많으면 앞에서부터 다시 씁니다.
             </div>
           </>
         ) : (
