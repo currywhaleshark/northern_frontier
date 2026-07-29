@@ -723,7 +723,7 @@ function defenderGroups(state: GameState, mode: TacticalBattle['mode']): Tactica
   return attachFeaturedResidentsToTacticalGroups(result);
 }
 
-function preparationPoints(state: GameState, warned: boolean): number {
+export function settlementRaidPreparationPoints(state: GameState, warned: boolean): number {
   const prep = CONFIG.tacticalBattle.prep;
   let points = warned ? prep.warned : prep.surpriseBase;
   points += countBuilt(state, 'beacon') > 0 ? prep.beacon : 0;
@@ -731,6 +731,7 @@ function preparationPoints(state: GameState, warned: boolean): number {
   const watchmen = createCombatRoster(state, { context: 'villageDefense' }).combatants
     .filter(combatant => combatant.role === 'watchman').length;
   points += Math.min(prep.watchmenMax, Math.floor(watchmen / prep.watchmenPerPoint));
+  if ((state.specialItems.telescope ?? 0) > 0) points += CONFIG.courtGrants.telescopePreparationPoints;
   if (state.weather === 'blizzard' || state.weather === 'coldSnap') points -= prep.severeWeatherPenalty;
   return clamp(points, 0, prep.max);
 }
@@ -1019,7 +1020,7 @@ export function createTacticalBattle(
     initialEnemyPower: enemies.reduce((sum, group) => sum + group.power, 0),
     phase: 'preparation',
     round: 1,
-    prepPoints: Math.max(0, preparationPoints(state, params.warned) - enemyPlanPreparationPenalty(enemyPlan)),
+    prepPoints: Math.max(0, settlementRaidPreparationPoints(state, params.warned) - enemyPlanPreparationPenalty(enemyPlan)),
     prepActions: PREPARATION_ACTIONS.map(action => ({ ...action, selected: false, applied: false })),
     preparationEvents: [],
     zones: createZones(state, params.siege, groups),

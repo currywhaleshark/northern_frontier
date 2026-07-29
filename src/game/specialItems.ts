@@ -1,6 +1,6 @@
 import type { UiIconName } from '../ui/uiIconAssets';
 import { CONFIG } from './config';
-import type { GameState } from './types';
+import type { GameState, JobId } from './types';
 
 /**
  * 기물 ID의 단일 원본. 저장 정규화와 도감 필터도 이 목록을 사용한다.
@@ -17,9 +17,22 @@ export const SPECIAL_ITEM_IDS = [
   'tributeWaiverDecree',
   'recruitmentNotice',
   'rainGauge',
+  'agriculturalEdict',
+  'medicalBook',
+  'militaryTreatise',
+  'telescope',
+  'royalPlaque',
+  'jijaChongtong',
+  'royalSpear',
+  'royalHornBow',
+  'royalMusket',
 ] as const;
 
 export type SpecialItemId = (typeof SPECIAL_ITEM_IDS)[number];
+
+/** 고유 무기는 일반 무기 재고와 달리 개별 장착자를 기록한다. */
+export const ARTIFACT_WEAPON_IDS = ['royalSpear', 'royalHornBow', 'royalMusket'] as const satisfies readonly SpecialItemId[];
+export type ArtifactWeaponId = (typeof ARTIFACT_WEAPON_IDS)[number];
 
 const SPECIAL_ITEM_ID_SET = new Set<string>(SPECIAL_ITEM_IDS);
 
@@ -62,6 +75,34 @@ export function grantSpecialItem(
 ): void {
   state.specialItems[item] = (state.specialItems[item] ?? 0) + 1;
   if (!state.discoveredSpecialItems.includes(item)) state.discoveredSpecialItems.push(item);
+}
+
+/** 고유 무기의 장착자는 후속 전투 구현 전에도 안전한 형태로 보존한다. */
+export function normalizeArtifactWeaponAssignments(
+  value: unknown,
+): Partial<Record<ArtifactWeaponId, number | null>> {
+  const source = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const assignments: Partial<Record<ArtifactWeaponId, number | null>> = {};
+  for (const item of ARTIFACT_WEAPON_IDS) {
+    const residentId = source[item];
+    if (residentId === null) assignments[item] = null;
+    else if (Number.isInteger(residentId) && Number(residentId) > 0) assignments[item] = Number(residentId);
+  }
+  return assignments;
+}
+
+/** 보유한 조정 기물이 현재 직업의 실제 숙련도 획득에 주는 배율. */
+export function skillGainArtifactMultiplier(
+  state: Pick<GameState, 'specialItems'>,
+  job: JobId,
+): number {
+  const multiplier = CONFIG.courtGrants.skillArtifactGainMultiplier;
+  if (job === 'farmer' && (state.specialItems.agriculturalEdict ?? 0) > 0) return multiplier;
+  if (job === 'physician' && (state.specialItems.medicalBook ?? 0) > 0) return multiplier;
+  if (['militia', 'watchman', 'hunter'].includes(job) && (state.specialItems.militaryTreatise ?? 0) > 0) {
+    return multiplier;
+  }
+  return 1;
 }
 
 export const SPECIAL_ITEM_DEFS: Record<SpecialItemId, {
@@ -140,5 +181,68 @@ export const SPECIAL_ITEM_DEFS: Record<SpecialItemId, {
     desc: '해마다 달라지는 기후와 재해 선택지의 성공 가능성을 살필 수 있는 기구입니다.',
     tradeValue: 0,
     inventoryNote: '보유 중 기후·재해 정보 공개',
+  },
+  agriculturalEdict: {
+    name: '권농교서',
+    icon: 'decree',
+    desc: '농사법을 널리 권하는 조정의 교서. 농부의 숙련 성장이 빨라집니다.',
+    tradeValue: 0,
+    inventoryNote: '보유 중 농부 숙련 성장 +15%',
+  },
+  medicalBook: {
+    name: '의서',
+    icon: 'needle',
+    desc: '치료법을 모은 귀한 의서. 의원의 숙련 성장이 빨라집니다.',
+    tradeValue: 0,
+    inventoryNote: '보유 중 의원 숙련 성장 +15%',
+  },
+  militaryTreatise: {
+    name: '병서',
+    icon: 'calligraphy',
+    desc: '군무와 병법을 기록한 책. 사냥꾼·파수꾼·수비병의 숙련 성장을 돕습니다.',
+    tradeValue: 0,
+    inventoryNote: '보유 중 군무 직업 숙련 성장 +15%',
+  },
+  telescope: {
+    name: '천리경',
+    icon: 'target',
+    desc: '먼 곳의 움직임을 살피는 기구. 마을을 지키는 전투의 준비 시간을 늘립니다.',
+    tradeValue: 0,
+    inventoryNote: '보유 중 정착지 습격 준비 점수 +2',
+  },
+  royalPlaque: {
+    name: '사액 현판',
+    icon: 'calligraphy',
+    desc: '왕이 이름을 내려 준 현판. 후속 단계에서 한 생산 건물에 영구 귀속할 수 있습니다.',
+    tradeValue: 0,
+    inventoryNote: '하사 전용 · 설치 대상 선택 대기',
+  },
+  jijaChongtong: {
+    name: '지자총통',
+    icon: 'cannon',
+    desc: '조정이 내려 준 화포. 후속 단계에서 총통 포대를 세울 수 있습니다.',
+    tradeValue: 0,
+    inventoryNote: '하사 전용 · 총통 포대 해금 대기',
+  },
+  royalSpear: {
+    name: '어사창',
+    icon: 'trident',
+    desc: '왕실이 하사한 뛰어난 창. 후속 단계에서 전투원에게 장착할 수 있습니다.',
+    tradeValue: 0,
+    inventoryNote: '하사 전용 · 고유 무기 배정 대기',
+  },
+  royalHornBow: {
+    name: '어사각궁',
+    icon: 'target',
+    desc: '왕실이 하사한 뛰어난 각궁. 후속 단계에서 전투원에게 장착할 수 있습니다.',
+    tradeValue: 0,
+    inventoryNote: '하사 전용 · 고유 무기 배정 대기',
+  },
+  royalMusket: {
+    name: '어사조총',
+    icon: 'arsenal',
+    desc: '왕실이 하사한 뛰어난 조총. 후속 단계에서 전투원에게 장착할 수 있습니다.',
+    tradeValue: 0,
+    inventoryNote: '하사 전용 · 고유 무기 배정 대기',
   },
 };

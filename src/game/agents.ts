@@ -13,6 +13,7 @@ import {
 import { JOB_NAMES, RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
 import { enrolledStudentIds, skillGainMult } from './education';
+import { skillGainArtifactMultiplier } from './specialItems';
 import { haulerCarryCapacity, haulingMoveSpeedMultiplier, scaledCarryCapacity } from './equipment';
 import { collectHuntableTiles } from './habitats';
 import { huntPreyName, rollHuntPrey, scaledHuntYield, type HuntPreyDef } from './hunting';
@@ -110,12 +111,13 @@ function effOf(r: Resident): number {
   return (1 + (r.skills[r.job] ?? 0) * CONFIG.production.skillEffect) * laborEfficiencyMult(r);
 }
 
-function gainSkillTick(r: Resident): void {
+function gainSkillTick(state: Pick<GameState, 'specialItems'>, r: Resident): void {
   const cur = r.skills[r.job] ?? 0;
   // 문해자는 무엇을 배워도 빠르다 (서당 교육의 평생 보상)
   r.skills[r.job] = Math.min(
     1,
-    cur + (CONFIG.production.skillGainPerDay / 5) * skillGainMult(r) * WORK_RATE_SCALE,
+    cur + (CONFIG.production.skillGainPerDay / 5) * skillGainMult(r) *
+      skillGainArtifactMultiplier(state, r.job) * WORK_RATE_SCALE,
   );
 }
 
@@ -898,7 +900,7 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
     if (!knownGoal(state.map[r.y][r.x])) { r.phase = 'rest'; return; } // 서 있던 타일이 변함(벌목 소진 등)
     r.task = o.taskWork;
     r.workTimer -= ctx.outdoor; // 궂은 날씨엔 일이 더디다
-    gainSkillTick(r);
+    gainSkillTick(state, r);
     if (r.workTimer <= 0) {
       const base = typeof o.yieldAmt === 'function' ? o.yieldAmt(state.map[r.y][r.x]) : o.yieldAmt;
       const requested = base * ctx.tMod * ctx.outputMod * effOf(r) * WORK_RATE_SCALE;
@@ -1377,7 +1379,7 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
           target.queuedCropId = null;
         }
       }
-      gainSkillTick(r);
+      gainSkillTick(state, r);
     } else {
       r.task = st === 'stuck' ? '길이 막힘' : `${withJosa(BUILDING_DEFS[farm.type].name, '으로/로')} 이동`;
     }
@@ -1392,7 +1394,7 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
       const sowRate = ctx.outdoor * effOf(r) * plotWorkMultiplier(state, farm) *
         WORK_RATE_SCALE / f.sowWorkPerTile;
       farm.sownArea = Math.min(area, sown + sowRate);
-      gainSkillTick(r);
+      gainSkillTick(state, r);
     } else {
       r.task = st === 'stuck' ? '길이 막힘' : `${withJosa(BUILDING_DEFS[farm.type].name, '으로/로')} 이동`;
     }
@@ -1419,7 +1421,7 @@ function farmerTick(state: GameState, r: Resident, ctx: Ctx): void {
       target.fieldGrowth + a.work.growPerSubtick * weatherGrow * effOf(r) *
         workBoost * WORK_RATE_SCALE / perTileDivisor,
     );
-    gainSkillTick(r);
+  gainSkillTick(state, r);
   } else {
     r.task = st === 'stuck' ? '길이 막힘' : `${withJosa(BUILDING_DEFS[farm.type].name, '으로/로')} 이동`;
   }
@@ -1531,7 +1533,7 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
         : target.repairing ? '건물 수리 중' : '건설 중';
     const work = CONFIG.agents.work.buildPerSubtick * effOf(r) * ctx.tMod *
       Math.max(0.5, ctx.outdoor) * WORK_RATE_SCALE;
-    gainSkillTick(r);
+    gainSkillTick(state, r);
     if (advanceBuildingWorkOrder(state, target, ctx, work)) return;
     if (expansion) {
       expansion.progress += work;
@@ -1949,7 +1951,7 @@ function millerTick(state: GameState, r: Resident, ctx: Ctx): void {
   addBuildingStock(mill, 'grain', q * p.grainPerRice);
   r.phase = 'working';
   r.task = '방아 찧기';
-  gainSkillTick(r);
+  gainSkillTick(state, r);
 }
 
 function woodSplitterTick(state: GameState, r: Resident, ctx: Ctx): void {
@@ -1977,7 +1979,7 @@ function woodSplitterTick(state: GameState, r: Resident, ctx: Ctx): void {
   addBuildingStock(shed, 'firewood', wood * CONFIG.production.firewoodPerWood);
   r.phase = 'working';
   r.task = '장작 패기';
-  gainSkillTick(r);
+  gainSkillTick(state, r);
 }
 
 function smithMaxCraftable(smithy: Building, product: SmithyProductId): number {
@@ -2050,7 +2052,7 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
     r.task = def.task;
     consumeSmithInputs(smithy, product, made);
     addBuildingStock(smithy, def.output, made);
-    gainSkillTick(r);
+    gainSkillTick(state, r);
   } else {
     r.phase = st === 'stuck' ? 'rest' : 'toWork';
     r.task = st === 'stuck' ? '길이 막힘' : '대장간으로 이동';
@@ -2155,7 +2157,7 @@ function curerTick(state: GameState, r: Resident, ctx: Ctx): void {
   addBuildingStock(workplace, output, made);
   r.phase = 'working';
   r.task = task;
-  gainSkillTick(r);
+  gainSkillTick(state, r);
 }
 
 function potterTick(state: GameState, r: Resident, ctx: Ctx): void {
@@ -2195,7 +2197,7 @@ function potterTick(state: GameState, r: Resident, ctx: Ctx): void {
   addBuildingStock(kiln, 'onggi', made);
   r.phase = 'working';
   r.task = '점토를 빚어 옹기 굽는 중';
-  gainSkillTick(r);
+  gainSkillTick(state, r);
 }
 
 function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
@@ -2303,7 +2305,7 @@ function charcoalBurnerTick(state: GameState, r: Resident, ctx: Ctx): void {
   addBuildingStock(kiln, 'charcoal', wood * p.charcoalPerWood);
   r.phase = 'working';
   r.task = '숯 굽기';
-  gainSkillTick(r);
+  gainSkillTick(state, r);
 }
 
 function herderTick(state: GameState, r: Resident, ctx: Ctx): void {
@@ -2326,7 +2328,7 @@ function herderTick(state: GameState, r: Resident, ctx: Ctx): void {
   if (product && product.amount > 0) addBuildingStock(stable, product.resource, product.amount);
   r.phase = 'working';
   r.task = product?.task ?? '가축 돌보기';
-  gainSkillTick(r);
+  gainSkillTick(state, r);
 }
 
 function physicianTick(state: GameState, r: Resident, ctx: Ctx): void {
@@ -2350,7 +2352,7 @@ function physicianTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
   r.phase = 'working';
   r.task = `${result.patient?.name ?? '환자'} 진료 중`;
-  gainSkillTick(r);
+  gainSkillTick(state, r);
   if (result.status === 'recovered' && result.patient) {
     addLog(state, `의원 ${r.name}의 치료로 ${withJosa(result.patient.name, '이/가')} 병에서 회복했습니다.`, 'good');
   }
@@ -2394,7 +2396,7 @@ function powderMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
   addBuildingStock(yard, 'gunpowder', made);
   r.phase = 'working';
   r.task = '화약 제조';
-  gainSkillTick(r);
+  gainSkillTick(state, r);
 }
 
 function tannerTick(state: GameState, r: Resident, ctx: Ctx): void {
@@ -2428,7 +2430,7 @@ function tannerTick(state: GameState, r: Resident, ctx: Ctx): void {
   addBuildingStock(tannery, productDef.output!, hideUsed / productDef.hidePerUnit);
   r.phase = 'working';
   r.task = productDef.task;
-  gainSkillTick(r);
+  gainSkillTick(state, r);
 }
 
 function weaverTick(state: GameState, r: Resident, ctx: Ctx): void {
@@ -2460,7 +2462,7 @@ function weaverTick(state: GameState, r: Resident, ctx: Ctx): void {
   addBuildingStock(weavingHouse, 'cottonClothes', fiber * CONFIG.production.cottonClothesPerCotton);
   r.phase = 'working';
   r.task = input === 'wool' ? '양털 짜기' : '베 짜기';
-  gainSkillTick(r);
+  gainSkillTick(state, r);
 }
 
 function clerkTick(state: GameState, r: Resident, ctx: Ctx): void {
@@ -2474,7 +2476,7 @@ function clerkTick(state: GameState, r: Resident, ctx: Ctx): void {
   if (st === 'arrived') {
     r.phase = 'working';
     r.task = '관청 업무';
-    gainSkillTick(r);
+    gainSkillTick(state, r);
   } else {
     r.phase = st === 'stuck' ? 'rest' : 'toWork';
     r.task = st === 'stuck' ? '길이 막힘' : '관청으로 이동';

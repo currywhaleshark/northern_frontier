@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 41, 'recurring trade contracts ship with schema version 41');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 42, 'court grant follow-up state ships with schema version 42');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -77,6 +77,7 @@ assert.equal(typeof saveLoad.migrateV37ToV38, 'function');
 assert.equal(typeof saveLoad.migrateV38ToV39, 'function');
 assert.equal(typeof saveLoad.migrateV39ToV40, 'function');
 assert.equal(typeof saveLoad.migrateV40ToV41, 'function');
+assert.equal(typeof saveLoad.migrateV41ToV42, 'function');
 
 {
   const migrated = saveLoad.migrateV39ToV40({ schemaVersion: 39, courtGrantArtifactMisses: 3.8 });
@@ -88,8 +89,21 @@ assert.equal(typeof saveLoad.migrateV40ToV41, 'function');
 {
   const state = simulation.newGame(20260728);
   state.courtGrantArtifactMisses = 3;
+  state.royalPlaqueBuildingId = 17;
+  state.artifactWeaponAssignments = { royalSpear: null, royalMusket: 3 };
   assert.equal(saveLoad.saveGame(state), true);
-  assert.equal(saveLoad.loadGame()?.courtGrantArtifactMisses, 3, 'artifact pity counter survives a normal save/load round trip');
+  const loaded = saveLoad.loadGame();
+  assert.equal(loaded?.courtGrantArtifactMisses, 3, 'artifact pity counter survives a normal save/load round trip');
+  assert.equal(loaded?.royalPlaqueBuildingId, 17, 'plaque scaffold survives a normal save/load round trip');
+  assert.deepEqual(loaded?.artifactWeaponAssignments, { royalSpear: null, royalMusket: 3 },
+    'artifact weapon scaffold survives a normal save/load round trip');
+}
+
+{
+  const migrated = saveLoad.migrateV41ToV42({ schemaVersion: 41, marker: 'kept' });
+  assert.equal(migrated.schemaVersion, 42);
+  assert.equal(migrated.royalPlaqueBuildingId, null, 'old saves begin with no installed plaque');
+  assert.deepEqual(migrated.artifactWeaponAssignments, {}, 'old saves begin with no artifact weapon assignments');
 }
 
 {

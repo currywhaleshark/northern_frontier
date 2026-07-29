@@ -47,6 +47,8 @@ assert.equal(CONFIG.courtGrants.artifactChance, 0.12);
 assert.equal(CONFIG.courtGrants.artifactPityMisses, 4);
 assert.deepEqual(COURT_GRANT_ARTIFACT_IDS, [
   'reliefGrainVoucher', 'tributeWaiverDecree', 'recruitmentNotice', 'rainGauge',
+  'agriculturalEdict', 'medicalBook', 'militaryTreatise', 'telescope', 'royalPlaque', 'jijaChongtong',
+  'royalSpear', 'royalHornBow', 'royalMusket',
 ]);
 
 assert.ok(!COURT_GRANT_RESOURCE_CANDIDATES.some(candidate => candidate.resource === 'strawShoes'));

@@ -39,6 +39,15 @@ export const COURT_GRANT_ARTIFACT_IDS = [
   'tributeWaiverDecree',
   'recruitmentNotice',
   'rainGauge',
+  'agriculturalEdict',
+  'medicalBook',
+  'militaryTreatise',
+  'telescope',
+  'royalPlaque',
+  'jijaChongtong',
+  'royalSpear',
+  'royalHornBow',
+  'royalMusket',
 ] as const satisfies readonly SpecialItemId[];
 
 export interface CourtGrantArtifactRoll {

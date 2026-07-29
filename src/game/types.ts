@@ -1,9 +1,11 @@
 // 게임 전역 타입 정의
 import type { CombatRole } from './combatRoster';
+import type { ArtifactWeaponId as ArtifactWeaponIdType } from './specialItems';
 import type { SpecialItemId as SpecialItemIdType } from './specialItems';
 
 // 기물 ID의 런타임 원본은 specialItems.ts에 둔다. 이 별칭은 기존 타입 import 경로를 보존한다.
 export type SpecialItemId = SpecialItemIdType;
+export type ArtifactWeaponId = ArtifactWeaponIdType;
 
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
@@ -1576,6 +1578,8 @@ export interface GameState {
   specialItems: Record<SpecialItemId, number>; // 산삼·호피 등 일반 자원과 분리한 기물함
   discoveredSpecialItems: SpecialItemId[];     // 소모해도 남는 기물 도감
   courtGrantArtifactMisses: number;            // 적격 격년 하사품에서 연속으로 기물을 놓친 횟수
+  royalPlaqueBuildingId: number | null;        // 사액 현판이 영구 귀속된 건물 (후속 설치 전에는 null)
+  artifactWeaponAssignments: Partial<Record<ArtifactWeaponId, number | null>>; // 고유 무기별 장착 주민
   tributeWaivers: number;      // 산삼 진상으로 얻은 세공 면제 횟수
   // ── 생애 주기·장례 (구버전 저장에는 없음) ──
   corpses?: Corpse[];          // 매장 대기 시신

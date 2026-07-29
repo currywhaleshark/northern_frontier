@@ -156,6 +156,8 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     specialItems: createSpecialItemInventory(),
     discoveredSpecialItems: [],
     courtGrantArtifactMisses: 0,
+    royalPlaqueBuildingId: null,
+    artifactWeaponAssignments: {},
     tributeWaivers: 0,
     pendingChoice: null,
     courtTribute: null,

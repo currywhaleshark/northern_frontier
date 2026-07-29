@@ -24,6 +24,7 @@ import { reconcileTributeReserve } from './tributeReserve';
 import { reconcileResidentHomes } from './residents';
 import { ensureIncidentState } from './specialEvents';
 import {
+  normalizeArtifactWeaponAssignments,
   normalizeDiscoveredSpecialItems,
   normalizeSpecialItemInventory,
 } from './specialItems';
@@ -649,6 +650,15 @@ export function migrateV40ToV41(raw: RawSave): RawSave {
   return migrated;
 }
 
+// v42: 후속 하사품의 설치·고유 무기 배정 상태. 구 저장은 현판 미설치·무기 미배정으로 시작한다.
+export function migrateV41ToV42(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  migrated.royalPlaqueBuildingId = null;
+  migrated.artifactWeaponAssignments = {};
+  migrated.schemaVersion = 42;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -695,6 +705,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 38) migrated = migrateV38ToV39(migrated);
     else if (version === 39) migrated = migrateV39ToV40(migrated);
     else if (version === 40) migrated = migrateV40ToV41(migrated);
+    else if (version === 41) migrated = migrateV41ToV42(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -1932,6 +1943,10 @@ export function loadGame(slot = 1): GameState | null {
     }
     parsed.specialItems = normalizeSpecialItemInventory(parsed.specialItems);
     parsed.discoveredSpecialItems = normalizeDiscoveredSpecialItems(parsed.discoveredSpecialItems);
+    parsed.royalPlaqueBuildingId = Number.isInteger(parsed.royalPlaqueBuildingId) && Number(parsed.royalPlaqueBuildingId) > 0
+      ? Number(parsed.royalPlaqueBuildingId)
+      : null;
+    parsed.artifactWeaponAssignments = normalizeArtifactWeaponAssignments(parsed.artifactWeaponAssignments);
     const courtGrantArtifactMisses = Math.floor(Number(parsed.courtGrantArtifactMisses));
     parsed.courtGrantArtifactMisses = Number.isFinite(courtGrantArtifactMisses)
       ? Math.max(0, courtGrantArtifactMisses)
