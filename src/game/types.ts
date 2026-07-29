@@ -1504,6 +1504,7 @@ export interface TacticalBattle {
   }>;
   huntCounterattackCount?: number;
   preliminaryBombardmentCannons?: number;
+  preliminaryBombardmentChongtongs?: number;
   preliminaryBombardmentCasualties?: number;
   resourceSnapshot?: Partial<Record<ResourceId, number>>;
 }

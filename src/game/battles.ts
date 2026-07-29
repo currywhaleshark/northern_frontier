@@ -5,12 +5,13 @@
 // 그 결과를 향해 수렴하는 연출이다 — 밸런스가 기존 공식과 정확히 일치한다.
 import { withJosa } from './josa';
 import { CONFIG } from './config';
-import { armedMusketeers, computeDefense, countBuilt } from './buildings';
+import { computeDefense } from './buildings';
+import { activeArtillery, type ActiveArtillery } from './artillery';
 import { createCombatRoster } from './combatRoster';
 import { addLog } from './events';
 import { changeRelation } from './relations';
 import { resetAgent } from './agents';
-import { consumeMusketPowder } from './weapons';
+import { consumeMusketPowder, musketReadiness } from './weapons';
 import { damageBuildings, injure, killResidents, loot, moraleShock } from './raidDamage';
 import type { Battle, BattleLocation, BattleMode, BattleOutcome, GameState, RaiderBand, Resident, WeatherId } from './types';
 
@@ -49,28 +50,30 @@ export function raidBandSize(power: number): number {
   return Math.max(1, Math.min(6, 3 + Math.floor(power / 25)));
 }
 
-// 포대 가동 여부 — 완공 포대가 있고 화약이 있으면 전투 방어 배율이 붙는다
+function battleMusketIds(state: GameState): number[] {
+  return createCombatRoster(state, { context: 'villageDefense' }).combatants
+    .filter(combatant => combatant.assignedWeapon === 'musket')
+    .map(combatant => combatant.residentId);
+}
+
+// 조총이 먼저 화약을 배정받고 남은 양으로 가동할 포병을 계산한다.
+export function activeBattleArtillery(state: GameState): ActiveArtillery {
+  const muskets = musketReadiness(state, battleMusketIds(state), CONFIG.raid.powderPerMusket);
+  return activeArtillery(state, Math.max(0, state.resources.gunpowder - muskets.powderRequired));
+}
+
+// 공개 API 호환: 불랑기포와 총통을 합친 실제 가동 포병의 방어 배율을 반환한다.
 export function cannonBattleMult(state: GameState): number {
-  const musketPowder = armedMusketeers(state) * CONFIG.raid.powderPerMusket;
-  const cannonPowder = Math.max(0, state.resources.gunpowder - musketPowder);
-  return countBuilt(state, 'cannonEmplacement') > 0 && cannonPowder >= CONFIG.raid.powderPerCannon
-    ? CONFIG.raid.cannonBattleMult
-    : 1;
+  return activeBattleArtillery(state).defenseMultiplier;
 }
 
 // 교전 개시 시 화약 소모: 조총 무장 수비병 + 가동 포대. 비축분이 모자라면 있는 만큼만 쓴다.
 export function consumeBattlePowder(state: GameState): void {
-  const musketIds = createCombatRoster(state, { context: 'villageDefense' }).combatants
-    .filter(combatant => combatant.assignedWeapon === 'musket')
-    .map(combatant => combatant.residentId);
+  const musketIds = battleMusketIds(state);
   const musketUsed = consumeMusketPowder(state, musketIds, CONFIG.raid.powderPerMusket);
-  const firingCannons = Math.min(
-    countBuilt(state, 'cannonEmplacement'),
-    Math.floor((state.resources.gunpowder + 1e-9) / CONFIG.raid.powderPerCannon),
-  );
-  const cannonUsed = firingCannons * CONFIG.raid.powderPerCannon;
-  state.resources.gunpowder = Math.max(0, state.resources.gunpowder - cannonUsed);
-  const used = musketUsed + cannonUsed;
+  const artillery = activeArtillery(state, state.resources.gunpowder);
+  state.resources.gunpowder = Math.max(0, state.resources.gunpowder - artillery.powderCost);
+  const used = musketUsed + artillery.powderCost;
   if (used <= 0) return;
   addLog(state, `전선에 총성과 포성이 울립니다! (화약 -${used.toFixed(1)})`, 'raid');
 }

@@ -1,4 +1,7 @@
 import { resetAgent } from './agents';
+import {
+  activeArtillery, artilleryMoralePenalty, artilleryPieceCount, describeArtillery,
+} from './artillery';
 import { countBuilt } from './buildings';
 import { combatGroupLabel, tacticalGroupCapabilities } from './combatCapabilities';
 import { createCombatRoster, isCombatReadyResident, type CombatantSnapshot, type CombatRole } from './combatRoster';
@@ -1099,8 +1102,11 @@ export function tacticalPreparationUnavailableReason(
     if (!hasEligibleCivilian) return '추가로 소집할 전투 가능한 주민이 없습니다.';
   }
   if (actionId === 'preliminaryBombardment') {
-    if (countBuilt(state, 'cannonEmplacement') <= 0) return '완성된 불랑기포대가 없습니다.';
-    if (state.resources.gunpowder < CONFIG.raid.powderPerCannon) return '포격에 쓸 화약이 부족합니다.';
+    if (
+      countBuilt(state, 'cannonEmplacement') <= 0 &&
+      countBuilt(state, 'chongtongEmplacement') <= 0
+    ) return '완성된 불랑기포대나 총통 포대가 없습니다.';
+    if (artilleryPieceCount(activeArtillery(state)) <= 0) return '포격에 쓸 화약이 부족합니다.';
   }
   if (actionId === 'openFlankRoute') return '열 우회로의 좌·우 방향을 먼저 선택하십시오.';
   return null;
@@ -1110,17 +1116,15 @@ function applyPreliminaryBombardment(
   state: GameState,
   battle: TacticalBattle,
 ): Array<{ groupId: string; casualties: number }> {
-  const builtCannons = countBuilt(state, 'cannonEmplacement');
-  const powderPerCannon = CONFIG.raid.powderPerCannon;
-  const firingCannons = Math.min(builtCannons, Math.floor(state.resources.gunpowder / powderPerCannon));
-  if (firingCannons <= 0) return [];
+  const artillery = activeArtillery(state);
+  if (artilleryPieceCount(artillery) <= 0) return [];
 
-  state.resources.gunpowder -= firingCannons * powderPerCannon;
+  state.resources.gunpowder = Math.max(0, state.resources.gunpowder - artillery.powderCost);
   const activeRaiders = battle.raiderGroups.reduce(
     (sum, group) => sum + Math.max(0, group.count - group.killed), 0,
   );
-  // 포대마다 남은 적의 6%를 추가로 제압한다. 수가 늘수록 계속 강해지되 완만하게 누적된다.
-  const lossRate = 1 - Math.pow(0.94, firingCannons);
+  const lossRate = artillery.bombardmentStrength;
+  const moralePenalty = artilleryMoralePenalty(artillery);
   let casualtiesLeft = Math.min(activeRaiders, Math.max(1, Math.round(activeRaiders * lossRate)));
   let raidersLeft = activeRaiders;
   const casualtyGroups: Array<{ groupId: string; casualties: number }> = [];
@@ -1133,19 +1137,20 @@ function applyPreliminaryBombardment(
     group.revealed = true;
     if (casualties > 0) casualtyGroups.push({ groupId: group.id, casualties });
     group.power = Math.max(0, group.power * (1 - lossRate));
-    group.morale = Math.max(0, group.morale - (4 + firingCannons * 2));
+    group.morale = Math.max(0, group.morale - moralePenalty);
     casualtiesLeft -= casualties;
     raidersLeft -= active;
   }
   const casualties = activeRaiders - battle.raiderGroups.reduce(
     (sum, group) => sum + Math.max(0, group.count - group.killed), 0,
   );
-  battle.preliminaryBombardmentCannons = firingCannons;
+  battle.preliminaryBombardmentCannons = artillery.cannonCount;
+  battle.preliminaryBombardmentChongtongs = artillery.chongtongCount;
   battle.preliminaryBombardmentCasualties = casualties;
-  battle.raiderMorale = Math.max(0, battle.raiderMorale - (4 + firingCannons * 2));
+  battle.raiderMorale = Math.max(0, battle.raiderMorale - moralePenalty);
   addLog(
     state,
-    `불랑기포 ${firingCannons}문이 사전포격을 가해 적 ${casualties}명을 쓰러뜨렸습니다.`,
+    `${describeArtillery(artillery)}이 사전포격을 가해 적 ${casualties}명을 쓰러뜨렸습니다.`,
     'raid',
   );
   return casualtyGroups;
@@ -1265,10 +1270,11 @@ function applySelectedPreparationActions(state: GameState, battle: TacticalBattl
     } else if (actionId === 'preliminaryBombardment') {
       const casualtyGroups = applyPreliminaryBombardment(state, battle);
       const cannons = battle.preliminaryBombardmentCannons ?? 0;
+      const chongtongs = battle.preliminaryBombardmentChongtongs ?? 0;
       preparationEvent(
         events, 'approach', 'bombardment',
-        `불랑기포 ${cannons}문이 불을 뿜고 포탄이 적의 대열 한복판에 떨어집니다.`, 1350,
-        { side: 'raider', float: '사전포격!', shots: { cannons } },
+        `${describeArtillery({ cannonCount: cannons, chongtongCount: chongtongs })}이 불을 뿜고 포탄이 적의 대열 한복판에 떨어집니다.`, 1350,
+        { side: 'raider', float: '사전포격!', shots: { cannons: cannons + chongtongs } },
       );
       for (const casualty of casualtyGroups) {
         preparationEvent(

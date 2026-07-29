@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { artilleryPieceCount, describeArtillery } from '../game/artillery';
 import { RESOURCE_NAMES, WEATHER_NAMES } from '../game/constants';
 import { countBuilt } from '../game/buildings';
 import { getSeason } from '../game/seasons';
@@ -106,7 +107,7 @@ const PREP_DESCRIPTIONS: Record<PreparationActionId, string> = {
   prepareVolley: '각궁·조총·파수꾼의 일제 사격 효과를 높입니다.',
   firePrevention: '물통과 젖은 가죽을 배치해 적 불화살의 압박과 화재 피해를 줄입니다.',
   torchWatch: '접근로를 밝혀 야간 접근의 첫 교전 기세와 사격 교란을 줄입니다.',
-  preliminaryBombardment: '보유한 불랑기포대로 접전 전에 포격합니다. 포대 1문당 화약 2를 소모합니다.',
+  preliminaryBombardment: '보유한 불랑기포대와 총통 포대로 접전 전에 포격합니다. 포대 1문당 화약 2를 소모합니다.',
   musterMilitia: '피난 주민 일부를 민병으로 소집합니다. 마을 기세가 조금 낮아집니다.',
   openFlankRoute: '경로를 열면 배치 단계에서 아군을 차단대로 보낼 수 있고, 교전 지휘에서 그 차단대에 우회 기동을 명령할 수 있습니다.',
   nightAssault: '밤이 깊기를 기다려 숲길 초기 돌파와 기습 효과를 얻습니다.',
@@ -1546,8 +1547,14 @@ export function TacticalBattleScreen({
               <div className="tactical-panel-heading">
                 <div>
                   <strong>{hunt ? '사냥대 배치' : assault ? '토벌대 배치' : '수비대 배치'}</strong>
-                  <span>{battle.preliminaryBombardmentCannons
-                    ? `사전포격 ${battle.preliminaryBombardmentCannons}문 · 적 ${battle.preliminaryBombardmentCasualties ?? 0}명 전투불능`
+                  <span>{artilleryPieceCount({
+                    cannonCount: battle.preliminaryBombardmentCannons ?? 0,
+                    chongtongCount: battle.preliminaryBombardmentChongtongs ?? 0,
+                  }) > 0
+                    ? `사전포격 ${describeArtillery({
+                      cannonCount: battle.preliminaryBombardmentCannons ?? 0,
+                      chongtongCount: battle.preliminaryBombardmentChongtongs ?? 0,
+                    })} · 적 ${battle.preliminaryBombardmentCasualties ?? 0}명 전투불능`
                     : deploymentView.unavailableReason ?? '카드를 무대 전열로 끌거나 구역·전열 단추로 배치합니다.'}</span>
                 </div>
                 <div className="tactical-deploy-heading-actions">

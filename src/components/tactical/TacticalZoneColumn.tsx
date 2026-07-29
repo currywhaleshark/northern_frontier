@@ -1,5 +1,6 @@
 import { withJosa } from '../../game/josa';
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { describeArtillery } from '../../game/artillery';
 import { combatSpriteDescriptor, tacticalGroupCapabilities } from '../../game/combatCapabilities';
 import { CONFIG } from '../../game/config';
 import {
@@ -635,7 +636,10 @@ function zoneEffects(zoneId: string, battle: NonNullable<GameState['tacticalBatt
   const labels: string[] = [];
   if (zoneId === 'approach' && active.has('setAmbush')) labels.push('사냥꾼 매복 배치');
   if (zoneId === 'approach' && active.has('preliminaryBombardment')) {
-    labels.push(`사전포격 ${battle.preliminaryBombardmentCannons ?? 0}문`);
+    labels.push(`사전포격 ${describeArtillery({
+      cannonCount: battle.preliminaryBombardmentCannons ?? 0,
+      chongtongCount: battle.preliminaryBombardmentChongtongs ?? 0,
+    })}`);
   }
   if (zoneId === 'wall' && active.has('repairWall')) labels.push('응급 수리');
   if (zoneId === 'wall' && active.has('prepareVolley')) labels.push('사격 준비');

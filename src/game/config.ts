@@ -734,8 +734,11 @@ export const CONFIG = {
     hornBowDefense: 16,        // 각궁으로 무장한 수비병 1인당 방어 기여
     musketDefense: 18,         // 조총으로 무장한 수비병 1인당 방어 기여 (화약이 있을 때만)
     powderPerMusket: 0.4,      // 교전당 조총 1정 화약 소모
-    powderPerCannon: 2,        // 교전당 불랑기포 1문 화약 소모
+    powderPerCannon: 2,        // 교전당 불랑기포·지자총통 1문 화약 소모
     cannonBattleMult: 1.2,     // 포대 가동 시(화약 보유) 전투 방어 배율
+    chongtongBattleMult: 1.1,  // 총통 포대 가동 시 전투 방어 배율
+    cannonBombardmentLossRate: 0.06,    // 사전포격 때 불랑기포 1문당 적 손실률
+    chongtongBombardmentLossRate: 0.03, // 사전포격 때 지자총통 1문당 적 손실률
     levyDefensePerResident: 4, // 징집된 일반 주민 1인당 방어 기여 (수비병 12, 파수꾼 6과 비교)
     warnedDefenseMult: 1.25,
     // 지도 위 습격 무리 이동
