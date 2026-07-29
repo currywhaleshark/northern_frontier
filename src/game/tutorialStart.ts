@@ -9,7 +9,8 @@ import type { GameState } from './types';
 export const TUTORIAL_SEED = 20260718;
 
 export function createTutorialGame(): GameState {
-  const state = newGame(TUTORIAL_SEED, 'easy');
+  // 시나리오는 고정된 마을 이름을 쓴다 (설계 §1-1)
+  const state = newGame(TUTORIAL_SEED, 'easy', '길잡이골');
   ensureTutorialInvariants(state);
   const builtHouses = state.buildings.filter(building =>
     building.built && (building.type === 'hut' || building.type === 'ondol' || building.type === 'tileHouse')).length;

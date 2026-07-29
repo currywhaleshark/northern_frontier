@@ -51,11 +51,15 @@ import {
 import { isYouthWorkJob } from './youth';
 import { normalizeResidentFamilyReferences } from './family';
 import { normalizeResidentWearables, TANNERY_PRODUCT_DEFS } from './wearables';
+import { withJosa } from './josa';
+import { generateSettlementName } from './settlementName';
+import { recordYearlySnapshot } from './chronicleStats';
 import { normalizeRoyalPlaqueBinding } from './royalPlaque';
 import {
   gradeTacticalBattle, raidDefenseObjectiveResult, tacticalClosingSummary, tacticalOutcomeResult,
 } from './tacticalCore';
 import type {
+  AnnalsEntry, AnnalsKind, LogEntry, YearlySnapshot,
   CombatWeaponId, CourtTribute, DefenderGroupKind, EdictId, EdictLevel, EdictState,
   EnemyObjectiveId, FermentBatch, GameState, Gender, Resident, ResourceId,
   PreparationActionId, RaiderUnitType, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
@@ -660,6 +664,56 @@ export function migrateV41ToV42(raw: RawSave): RawSave {
   return migrated;
 }
 
+// v43: 연대기 — 정착지 이름·사건 기록·평생 통계·연도별 스냅샷.
+// 이름은 시드의 순수 함수라 같은 저장을 다시 마이그레이션해도 바뀌지 않는다.
+// 연대기는 로그의 important 항목만큼만 복원한다 (로그가 잘려 있어 불완전함을 감수).
+export function migrateV42ToV43(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const seed = Number.isFinite(Number(migrated.seed)) ? Number(migrated.seed) : 1;
+  const day = Math.max(1, Math.floor(Number(migrated.day) || 1));
+  const name = generateSettlementName(seed);
+  migrated.settlementName = name;
+  migrated.pendingSettlementRename = null;
+  migrated.settlementRenameCooldownUntil = 0;
+
+  const annals: AnnalsEntry[] = [{
+    day: 1,
+    kind: 'founding',
+    text: `조정의 명을 받아 두만강 이북에 ${withJosa(name, '을/를')} 열었습니다.`,
+    dedupeKey: 'founding',
+  }];
+  const log = Array.isArray(migrated.log) ? migrated.log : [];
+  for (const entry of log as Array<Partial<LogEntry>>) {
+    if (!entry || entry.important !== true) continue;
+    if (typeof entry.text !== 'string' || !entry.text) continue;
+    const kind: AnnalsKind = entry.kind === 'raid' ? 'raid' : entry.kind === 'trade' ? 'trade' : 'legacy';
+    annals.push({ day: Math.max(1, Math.floor(Number(entry.day) || 1)), kind, text: entry.text });
+  }
+  if (day > 1) {
+    annals.push({
+      day,
+      kind: 'legacy',
+      text: '이전 기록은 남아 있는 주요 소식만 복원되었습니다.',
+      dedupeKey: 'legacy:migration',
+    });
+  }
+  migrated.annals = annals;
+
+  migrated.lifetimeStats = {
+    trackingSinceDay: day,
+    births: 0,
+    deathsByCause: { combat: 0, starvation: 0, cold: 0, disease: 0, other: 0 },
+    raidsRepelled: 0,
+    raidsSuffered: 0,
+    tradesCompleted: 0,
+    grantsReceived: 0,
+  };
+  // 첫 스냅샷은 로드 정규화에서 실제 상태로 찍는다 (원시 저장만으로는 산식을 돌릴 수 없다).
+  migrated.yearlySnapshots = [];
+  migrated.schemaVersion = 43;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -707,6 +761,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 39) migrated = migrateV39ToV40(migrated);
     else if (version === 40) migrated = migrateV40ToV41(migrated);
     else if (version === 41) migrated = migrateV41ToV42(migrated);
+    else if (version === 42) migrated = migrateV42ToV43(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -1621,6 +1676,87 @@ function sanitizeTradeContracts(state: GameState): void {
   }
 }
 
+const ANNALS_KINDS = new Set<AnnalsKind>([
+  'legacy', 'founding', 'promotion', 'winter', 'disaster', 'raid', 'battle',
+  'special', 'grant', 'population', 'building', 'trade', 'court', 'ending',
+]);
+
+// 연대기 정규화 — 손상된 항목은 버리고, 카운터는 유한값으로 강제한다.
+// 마이그레이션 직후의 저장은 스냅샷이 비어 있으므로 현재 상태를 첫 건으로 찍는다.
+function sanitizeChronicle(state: GameState): void {
+  if (typeof state.settlementName !== 'string' || !state.settlementName.trim()) {
+    state.settlementName = generateSettlementName(state.seed ?? 1);
+  }
+  state.settlementName = state.settlementName.trim().slice(0, 12);
+  const pending = state.pendingSettlementRename;
+  state.pendingSettlementRename =
+    pending && typeof pending === 'object' && typeof pending.requestedName === 'string' &&
+    pending.requestedName.trim() && Number.isFinite(pending.sentDay) && Number.isFinite(pending.dueDay)
+      ? {
+          requestedName: pending.requestedName.trim().slice(0, 12),
+          sentDay: Math.max(1, Math.floor(pending.sentDay)),
+          dueDay: Math.max(1, Math.floor(pending.dueDay)),
+        }
+      : null;
+  state.settlementRenameCooldownUntil = Math.max(0, Math.floor(
+    Number.isFinite(state.settlementRenameCooldownUntil) ? state.settlementRenameCooldownUntil : 0));
+
+  const rawAnnals = Array.isArray(state.annals) ? state.annals : [];
+  state.annals = rawAnnals.filter((entry): entry is AnnalsEntry =>
+    entry != null && typeof entry === 'object' &&
+    typeof entry.text === 'string' && entry.text.length > 0 &&
+    Number.isFinite(entry.day) && ANNALS_KINDS.has(entry.kind));
+
+  const stats = state.lifetimeStats;
+  const finiteCount = (value: unknown): number =>
+    Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : 0;
+  const causes = stats && typeof stats === 'object' && stats.deathsByCause && typeof stats.deathsByCause === 'object'
+    ? stats.deathsByCause
+    : {} as Record<string, number>;
+  state.lifetimeStats = {
+    trackingSinceDay: stats && Number.isFinite(stats.trackingSinceDay)
+      ? Math.max(1, Math.floor(stats.trackingSinceDay))
+      : Math.max(1, Math.floor(state.day ?? 1)),
+    births: finiteCount(stats?.births),
+    deathsByCause: {
+      combat: finiteCount(causes.combat),
+      starvation: finiteCount(causes.starvation),
+      cold: finiteCount(causes.cold),
+      disease: finiteCount(causes.disease),
+      other: finiteCount(causes.other),
+    },
+    raidsRepelled: finiteCount(stats?.raidsRepelled),
+    raidsSuffered: finiteCount(stats?.raidsSuffered),
+    tradesCompleted: finiteCount(stats?.tradesCompleted),
+    grantsReceived: finiteCount(stats?.grantsReceived),
+  };
+
+  const rawSnapshots = Array.isArray(state.yearlySnapshots) ? state.yearlySnapshots : [];
+  const seenYears = new Set<number>();
+  state.yearlySnapshots = rawSnapshots
+    .filter((snapshot): snapshot is YearlySnapshot =>
+      snapshot != null && typeof snapshot === 'object' && Number.isFinite(snapshot.year))
+    .filter(snapshot => {
+      const year = Math.floor(snapshot.year);
+      if (seenYears.has(year)) return false;
+      seenYears.add(year);
+      return true;
+    })
+    .map(snapshot => ({
+      year: Math.floor(snapshot.year),
+      population: finiteCount(snapshot.population),
+      food: finiteCount(snapshot.food),
+      fuelHeat: finiteCount(snapshot.fuelHeat),
+      combatReadyResidents: finiteCount(snapshot.combatReadyResidents),
+      buildings: finiteCount(snapshot.buildings),
+      fieldTiles: finiteCount(snapshot.fieldTiles),
+      paddyTiles: finiteCount(snapshot.paddyTiles),
+      wallSegments: finiteCount(snapshot.wallSegments),
+      silver: finiteCount(snapshot.silver),
+    }));
+  if (state.yearlySnapshots.length === 0) recordYearlySnapshot(state);
+}
+
 function isGender(value: unknown): value is Gender {
   return value === 'male' || value === 'female';
 }
@@ -1914,6 +2050,7 @@ export function loadGame(slot = 1): GameState | null {
       parsed.tradeCapacityUsed = {};
     }
     sanitizeTradeContracts(parsed);
+    sanitizeChronicle(parsed);
     if (parsed.lastImmigrationDay == null) parsed.lastImmigrationDay = -999;
     if (!Number.isFinite(parsed.lastKimjangYear)) parsed.lastKimjangYear = 0;
     ensureIncidentState(parsed);

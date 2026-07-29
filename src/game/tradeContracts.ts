@@ -4,6 +4,7 @@
 // 여진 씨족의 물물교환과 상단의 은 거래는 give/get에 은이 들어가느냐의 차이일 뿐,
 // 계약 모델은 하나다.
 import { withJosa } from './josa';
+import { recordAnnals } from './annals';
 import { CONFIG } from './config';
 import { FACTIONS, RESOURCE_NAMES, SEASON_NAMES, SEASON_ORDER } from './constants';
 import { addLog } from './events';
@@ -240,6 +241,7 @@ function executeContract(state: GameState, contract: TradeContract, due: DueAmou
     'trade',
     partial,
   );
+  state.lifetimeStats.tradesCompleted++; // 계약 이행분 1회 (계약 생성은 세지 않는다)
   reconcileTradeContractReserve(state);
 }
 
@@ -258,6 +260,8 @@ function missContract(state: GameState, contract: TradeContract, year: number): 
       'bad',
       true,
     );
+    recordAnnals(state, 'trade',
+      `${withJosa(contract.factionName, '과/와')}의 정기거래(${contractLabel(contract)})가 불이행 끝에 파기되었습니다.`);
     return;
   }
   addLog(
@@ -484,6 +488,9 @@ export function signTradeContract(state: GameState, negotiation: TradeNegotiatio
     'trade',
     true,
   );
+  recordAnnals(state, 'trade',
+    `${withJosa(terms.factionName, '과/와')} ${terms.durationYears}년 정기거래를 맺었습니다 (${contractTermsLabel(terms)}).`);
+  state.lifetimeStats.tradesCompleted++; // 체결 즉시 오간 첫 해분 — 계약 생성 자체는 따로 세지 않는다
   return null;
 }
 

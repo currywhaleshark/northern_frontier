@@ -55,6 +55,7 @@ import {
   clearAssignmentsForBuilding, isResidentInAssignedSlot,
 } from './workerSlots';
 import { buildingWorkerSlots } from './buildingWorkerSlots';
+import { recordNotableBuildingCompletion } from './annals';
 import {
   addBuildingStock, buildingStock, depositResidentToBuilding, depositResidentToSettlement,
   isHaulSourceBuilding, isStorageBuilding, takeBuildingStock,
@@ -1559,6 +1560,7 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
         ? `${def.name} 수리가 끝나 다시 가동됩니다.`
         : `${withJosa(def.name, '이/가')} 완공되었습니다.`, 'good',
       repaired || def.slots > 0 || def.capacity > 0 || def.unique);
+      if (!repaired) recordNotableBuildingCompletion(state, target.type); // 최초 완공만 연대기에 (dedupe)
       const autoAssigned = autoAssignWorkersToBuilding(state, target.id);
       for (const worker of autoAssigned) resetAgent(state, worker);
       if (autoAssigned.length > 0) {

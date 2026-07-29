@@ -324,6 +324,8 @@ export function killResident(
         : cause === '병' || cause.includes('질병') || cause.includes('역병')
           ? 'disease'
           : 'other';
+  state.lifetimeStats.deathsByCause[state.lastDeathCause] =
+    (state.lifetimeStats.deathsByCause[state.lastDeathCause] ?? 0) + 1;
   if (combatDeath) {
     addLog(state, `${withJosa(r.name, '이/가')} 전투 중 전사했습니다. (${cause})`, 'raid', true);
     if (horseLost) addLog(state, '기수가 쓰러지는 과정에서 군마 한 필도 잃었습니다.', 'bad', true);

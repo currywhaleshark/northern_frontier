@@ -17,6 +17,7 @@ import { ClearingConfirmDialog } from './components/ClearingConfirmDialog';
 import { RoyalPlaqueConfirmDialog } from './components/RoyalPlaqueConfirmDialog';
 import { hasAnySave, loadGame, saveGame } from './game/saveLoad';
 import { addLog, negotiateTrade, requestTrade, tradeNegotiationOf } from './game/events';
+import { requestSettlementRename } from './game/settlementName';
 import { jobWorkforceCounts } from './game/residents';
 import { playSfx, setSfxSettings, stopWeatherAmbient, setWeatherAmbient, setDayBandAmbient, stopDayBandAmbient } from './sound/sfx';
 import { getSeason } from './game/seasons';
@@ -47,6 +48,8 @@ import { UnifiedLog } from './components/UnifiedLog';
 import type { ExpeditionMusterRequest } from './components/ExpeditionMusterDialog';
 import { LazyUiBoundary } from './components/LazyUiBoundary';
 import { EdictDialog } from './components/EdictDialog';
+import { ChronicleScreen } from './components/ChronicleScreen';
+import { SettlementRenameDialog } from './components/SettlementRenameDialog';
 import { setEdictLevel } from './game/edicts';
 import { requestPetition } from './game/petition';
 import { breakSilverSeal, reopenBuriedVein } from './game/silver';
@@ -259,7 +262,7 @@ function initialSessionState(launch: GameSessionLaunch): GameState {
   if (launch.kind === 'loaded') return launch.state;
   if (launch.kind === 'tutorial') return createTutorialGame();
   if (launch.kind === 'battleSimulation') return createBattleSimulation(launch.options);
-  return newGame(undefined, launch.difficulty);
+  return newGame(undefined, launch.difficulty, launch.settlementName);
 }
 
 export default function GameSession({ launch, onReturnToMenu }: GameSessionProps) {
@@ -330,6 +333,8 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   );
   const [weaponDialogOpen, setWeaponDialogOpen] = useState(false);
   const [edictDialogOpen, setEdictDialogOpen] = useState(false);
+  const [chronicleOpen, setChronicleOpen] = useState(false);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [expeditionMusterRequest, setExpeditionMusterRequest] = useState<ExpeditionMusterRequest | null>(null);
   const [runtimePerfReport, setRuntimePerfReport] = useState<string | null>(null);
   const [runtimePerfCapturing, setRuntimePerfCapturing] = useState(false);
@@ -1186,6 +1191,27 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     setEdictDialogOpen(true);
   };
 
+  // 연대기 — 회고 화면. 열람 전용이라 시간만 멈춘다.
+  const handleOpenChronicle = () => {
+    setSpeed(0);
+    setChronicleOpen(true);
+  };
+
+  const handleOpenRenameDialog = () => {
+    setSpeed(0);
+    setRenameDialogOpen(true);
+  };
+
+  const handleSubmitRename = (name: string) => {
+    const error = requestSettlementRename(stateRef.current, name);
+    if (error) {
+      notify(error, 'bad');
+      return;
+    }
+    setRenameDialogOpen(false);
+    bump();
+  };
+
   // 절목 — 중심지에서 령을 반포·변경한다 (막힌 경우 이유를 로그로 알린다)
   const handleSetEdictLevel = (id: EdictId, level: EdictLevel) => {
     const err = setEdictLevel(stateRef.current, id, level);
@@ -1558,6 +1584,8 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               onRequestTrade={handleRequestTrade}
               onSetTradeContractReserve={handleSetTradeContractReserve}
               onOpenEdicts={handleOpenEdicts}
+              onOpenChronicle={handleOpenChronicle}
+              onRequestSettlementRename={handleOpenRenameDialog}
               onToggleNitre={handleToggleNitre}
               onSilverVeinAction={handleSilverVeinAction}
               onAssignNearestWorker={handleAssignNearestWorker}
@@ -1910,13 +1938,24 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
         />
       )}
 
+      {chronicleOpen && (
+        <ChronicleScreen state={state} onClose={() => setChronicleOpen(false)} />
+      )}
+      {renameDialogOpen && (
+        <SettlementRenameDialog
+          currentName={state.settlementName}
+          onSubmit={handleSubmitRename}
+          onClose={() => setRenameDialogOpen(false)}
+        />
+      )}
+
       {state.scenario && <TutorialCoach state={state} />}
 
       {state.pendingPromotionNotice && state.pendingPromotionNotice !== 'settlement' && (
         <PromotionModal rank={state.pendingPromotionNotice} onAcknowledge={handleAcknowledgePromotion} />
       )}
 
-      {state.gameOver && (
+      {state.gameOver && !chronicleOpen && (
         <div className="modal-overlay">
           <div className={`modal gameover ${state.gameOver.won ? 'won' : 'lost'}`}>
             <h2>{state.gameOver.won ? '승격 — 개척 성공' : '개척 실패'}</h2>
@@ -1928,6 +1967,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
             {state.gameOver.won && (
               <button className="btn primary" onClick={handleContinueAfterVictory}>계속 플레이</button>
             )}
+            <button className="btn" onClick={() => setChronicleOpen(true)}>연대기 보기</button>
             <button className="btn" onClick={() => onReturnToMenu('main')}>
               {state.gameOver.won ? '개척 종료' : '메인 메뉴로'}
             </button>

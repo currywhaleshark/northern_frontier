@@ -23,6 +23,7 @@ import {
 } from '../game/royalPlaque';
 import { getBuildingActions } from '../game/selectionActions';
 import { centerPromotionUpgradeReason, nextRank } from '../game/promotion';
+import { canRequestSettlementRename } from '../game/settlementName';
 import {
   assignedSlotResidents, availableWorkerSlots, isResidentAvailableForWorkerSlot, workerSlotConfig, workerSlotCount,
 } from '../game/workerSlots';
@@ -57,6 +58,8 @@ interface Props {
   onRequestTrade: (factionName: string) => void;
   onSetTradeContractReserve: (resource: ResourceId, amount: number) => void;
   onOpenEdicts: () => void;
+  onOpenChronicle: () => void;
+  onRequestSettlementRename: () => void;
   onToggleNitre: () => void;
   onSilverVeinAction: (action: 'break-seal' | 'reopen') => void;
   onAssignNearestWorker: (buildingId: number) => void;
@@ -96,6 +99,8 @@ export function ActionPopup({
   onRequestTrade,
   onSetTradeContractReserve,
   onOpenEdicts,
+  onOpenChronicle,
+  onRequestSettlementRename,
   onToggleNitre,
   onSilverVeinAction,
   onAssignNearestWorker,
@@ -185,6 +190,38 @@ export function ActionPopup({
         </button>
       )}
 
+      {building.type === 'center' && building.built && (
+        <button
+          className="action-command"
+          type="button"
+          title="마을이 걸어온 주요 사건과 통계를 봅니다"
+          onClick={onOpenChronicle}
+        >
+          <span>연대기</span>
+          <div className="muted small">{state.settlementName}의 기록 · 사건 {state.annals.length}건</div>
+        </button>
+      )}
+
+      {building.type === 'center' && building.built && (() => {
+        const blocked = canRequestSettlementRename(state);
+        return (
+          <button
+            className="action-command"
+            type="button"
+            disabled={Boolean(blocked)}
+            title={blocked ?? `파발 왕복 ${CONFIG.settlementNaming.renameTravelDays}일 · 허가 후 1년간 재개칭 불가`}
+            onClick={onRequestSettlementRename}
+          >
+            <span>개칭을 청원한다</span>
+            <div className="muted small">
+              {state.pendingSettlementRename
+                ? `${state.pendingSettlementRename.requestedName} — 파발 귀환 ${Math.max(1, state.pendingSettlementRename.dueDay - state.day)}일 전`
+                : blocked ?? `현재 이름: ${state.settlementName}`}
+            </div>
+          </button>
+        );
+      })()}
+
       {plotDims && (
         <div className="muted small">
           {plotDims.w}×{plotDims.h} 경작지 · 파종 {plotSown}/{plotAreaTiles}칸 · 성장 {Math.round(building.fieldGrowth)}%
@@ -205,7 +242,7 @@ export function ActionPopup({
 
       {state.royalPlaqueBuildingId === building.id && (
         <div className="action-command active" aria-label="사액 현판 설치됨">
-          <span><UiIcon name="calligraphy" size={20} /> 사액 현판</span>
+          <span><UiIcon name="grantRoyalPlaque" size={20} /> 사액 현판</span>
           <div className="muted small">영구 귀속 · 작업 산출 +25% · 이전·해체 불가</div>
         </div>
       )}
@@ -222,7 +259,7 @@ export function ActionPopup({
               '이 생산 건물에 현판을 영구 귀속해 작업 산출을 25% 늘립니다'}
             onClick={() => onRequestRoyalPlaqueInstallation(building.id)}
           >
-            <span><UiIcon name="calligraphy" size={20} /> 사액 현판 걸기</span>
+            <span><UiIcon name="grantRoyalPlaque" size={20} /> 사액 현판 걸기</span>
             <div className="muted small">한 번 설치하면 옮길 수 없습니다</div>
           </button>
         )}

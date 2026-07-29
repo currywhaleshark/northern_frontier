@@ -1,4 +1,5 @@
 import { withJosa } from './josa';
+import { recordAnnals } from './annals';
 import { CONFIG } from './config';
 import { footprintTilesOf, sownAreaOf } from './buildings';
 import { cropIdForBuilding, CROP_DEFS } from './crops';
@@ -344,6 +345,8 @@ function openEpidemicEvent(state: GameState): void {
     ],
     data: { eventId: 'plagueOutbreak' },
   };
+  // 발병 자체가 연대기감이다 — 대응 결과와 무관하게 여기서 1회 기록한다.
+  recordAnnals(state, 'disaster', `역병이 돌기 시작했습니다. 환자 ${epidemic.infectedIds.length}명.`);
 }
 
 function openGrainRequisitionEvent(state: GameState): void {
@@ -398,6 +401,7 @@ function openEarlyFrostEvent(state: GameState, rng: () => number): void {
     ],
     data: { eventId: 'earlyFrost', targetBuildingId: target.id },
   };
+  recordAnnals(state, 'disaster', '수확을 앞둔 경작지에 이른 서리가 내렸습니다.');
 }
 
 function openGyrfalconEvent(state: GameState): void {
@@ -1101,6 +1105,7 @@ function finishEpidemic(state: GameState, epidemic: EpidemicState): void {
   }
   state.incidents.epidemic = null;
   addLog(state, '긴 역병이 마침내 잦아들었습니다. 살아남은 환자들이 일터로 돌아옵니다.', 'good', true);
+  recordAnnals(state, 'disaster', '긴 역병이 마침내 잦아들었습니다.');
 }
 
 function updateEpidemic(state: GameState, rng: () => number): void {

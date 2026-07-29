@@ -1,6 +1,7 @@
 import { withJosa } from './josa';
 import { addLog } from './events';
 import { CONFIG } from './config';
+import { recordAnnals } from './annals';
 import { beginExpeditionReturn } from './expedition';
 import { combatGroupLabel, tacticalGroupCapabilities } from './combatCapabilities';
 import { createCombatRoster, type CombatantSnapshot } from './combatRoster';
@@ -957,6 +958,9 @@ export function finishBanditLairTacticalAssault(state: GameState): void {
         ? 'abandoned'
         : strategicOutcome === 'withdrawal' ? 'unchanged' : 'fortified',
   };
+  recordAnnals(state, 'battle',
+    `${battle.factionName} 산채 토벌 — ${outcomeLabels[outcome] ?? '교전 종료'}. ` +
+      `전사 ${people.killed.length}명, 적 ${raidersKilled}명 처치.`);
   state.tacticalBattle = null;
   const returnError = beginExpeditionReturn(state, '토벌대가 산채 직접 지휘전을 마치고 귀환길에 올랐습니다.');
   if (returnError) addLog(state, returnError, 'bad', true);

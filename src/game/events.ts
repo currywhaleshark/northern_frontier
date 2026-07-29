@@ -367,6 +367,7 @@ export function resolveTrade(state: GameState, optionId: string): void {
           `${RESOURCE_NAMES[negotiation.get]} ${withJosa(negotiation.getAmt, '으로/로')} 교환했습니다.`,
         'trade',
       );
+      state.lifetimeStats.tradesCompleted++; // 실제 자원이 오간 순간에만 센다
       acquireFirstLivestockFromTrade(state, negotiation.faction);
       state.pendingChoice = null;
       return;

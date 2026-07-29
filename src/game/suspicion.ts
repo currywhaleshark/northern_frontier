@@ -5,6 +5,7 @@
 // 못하면 조정 토벌군이 내려온다.
 import { withJosa } from './josa';
 import { CONFIG } from './config';
+import { endGame, recordAnnals } from './annals';
 import { applyBattleDefenseMultipliers, cannonBattleMult, consumeBattlePowder } from './battles';
 import { countBuilt } from './buildings';
 import { FACTIONS, RANK_NAMES, RANK_ORDER } from './constants';
@@ -255,11 +256,10 @@ export function resolveCrackdown(state: GameState, optionId: string, rng: () => 
       state.threat = Math.max(0, state.threat - 20);
       addLog(state, '토벌군을 물리쳤습니다. 이제 조정과는 돌이킬 수 없는 강을 건넜습니다 — 변방은 스스로의 힘으로 서야 합니다.', 'raid');
       addLog(state, '조정의 하사와 배급은 더 이상 기대할 수 없습니다. (명성이 바닥까지 떨어졌습니다)', 'bad');
+      recordAnnals(state, 'battle', '조정 토벌군을 물리쳤습니다 — 조정과는 돌이킬 수 없는 강을 건넜습니다.');
     } else {
-      state.gameOver = {
-        won: false,
-        reason: '조정 토벌군이 성문을 부수고 들어왔습니다. 첨사는 모반의 죄로 압송되었고, 개척지는 조정의 손에 해체되었습니다.',
-      };
+      endGame(state, false,
+        '조정 토벌군이 성문을 부수고 들어왔습니다. 첨사는 모반의 죄로 압송되었고, 개척지는 조정의 손에 해체되었습니다.');
     }
     return;
   }
@@ -301,8 +301,11 @@ export function updateSuspicion(state: GameState, rng: () => number): void {
     state.crackdownDeadline = state.day + s.crackdownGraceDays;
     if (before !== after) {
       addLog(state, `조정이 모반 혐의로 ${withJosa(RANK_NAMES[before], '을/를')} ${withJosa(RANK_NAMES[after], '으로/로')} 강등하였습니다. (몰수: ${seized})`, 'bad', true);
+      recordAnnals(state, 'court',
+        `조정이 모반 혐의로 ${withJosa(RANK_NAMES[before], '을/를')} ${withJosa(RANK_NAMES[after], '으로/로')} 강등하고 토벌 유예를 선고했습니다.`);
     } else {
       addLog(state, `조정이 모반 혐의를 물어 물자를 몰수했습니다. (몰수: ${seized})`, 'bad', true);
+      recordAnnals(state, 'court', '조정이 모반 혐의를 물어 물자를 몰수하고 토벌 유예를 선고했습니다.');
     }
     addLog(state, `조정이 마지막 기회를 주었습니다 — ${s.crackdownGraceDays}일 안에 의심을 ${s.crackdownClearBelow} 아래로 내려 결백을 증명하십시오. 못하면 토벌군이 내려옵니다.`, 'raid');
     return;
@@ -314,6 +317,7 @@ export function updateSuspicion(state: GameState, rng: () => number): void {
     const seized = seizeFirearms(state, s.censureSeizeRatio);
     state.resources.reputation = Math.max(0, state.resources.reputation - s.censureRep);
     addLog(state, `조정의 견책이 내려왔습니다. 명성이 크게 깎이고 화기가 몰수되었습니다. (몰수: ${seized}) 이대로면 강등을 면치 못합니다.`, 'bad', true);
+    recordAnnals(state, 'court', '모반 혐의로 조정의 견책이 내려와 화기를 몰수당했습니다.');
     return;
   }
 

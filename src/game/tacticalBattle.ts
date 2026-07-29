@@ -6,6 +6,7 @@ import { countBuilt } from './buildings';
 import { combatGroupLabel, tacticalGroupCapabilities } from './combatCapabilities';
 import { createCombatRoster, isCombatReadyResident, type CombatantSnapshot, type CombatRole } from './combatRoster';
 import { CONFIG } from './config';
+import { recordAnnals } from './annals';
 import { RESOURCE_NAMES } from './constants';
 import {
   applyEnemyPlanPreparationCounter, createEnemyPlan, enemyObjectiveProfile,
@@ -3171,6 +3172,13 @@ export function finishTacticalBattle(state: GameState): void {
     result === 'victory' ? 'good' : 'raid',
     true,
   );
+  // 전술전은 여기가 최종 결산이다 — 장계 확인·중간 라운드에서는 세지 않는다.
+  recordAnnals(state, 'raid',
+    `${battle.factionName}의 습격 방어전 — ${TACTICAL_BATTLE_GRADE_LABELS[battleGrade]}. ${casualtyText}, 건물 ${damaged.length}곳 파손.`);
+  if (result === 'victory') state.lifetimeStats.raidsRepelled++;
+  if (killedPeople.length > 0 || damaged.length > 0 || hasLoot(lootLosses)) {
+    state.lifetimeStats.raidsSuffered++;
+  }
   state.tacticalBattle = null;
 }
 

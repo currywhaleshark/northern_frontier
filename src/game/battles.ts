@@ -4,6 +4,7 @@
 // defense/(defense+power)로 한 번 굴려 정한다. 이후의 소모전(전력 감소·부상)은
 // 그 결과를 향해 수렴하는 연출이다 — 밸런스가 기존 공식과 정확히 일치한다.
 import { withJosa } from './josa';
+import { recordAnnals } from './annals';
 import { CONFIG } from './config';
 import { computeDefense } from './buildings';
 import { activeArtillery, type ActiveArtillery } from './artillery';
@@ -281,14 +282,13 @@ function finishBattle(state: GameState, outcome: BattleOutcome, rng: () => numbe
     state.resources.reputation = Math.min(100, state.resources.reputation + 5);
     moraleShock(state, -8);
     changeRelation(state, battle.faction, CONFIG.relations.militiaWin);
-    addLog(
-      state,
-      location === 'outskirts'
-        ? `${withJosa(side, '이/가')} ${withJosa(battle.faction, '을/를')} 외곽에서 몰아냈습니다! 부상자 ${injured}명, 건물 피해는 없습니다.`
-        : `${withJosa(side, '이/가')} ${withJosa(battle.faction, '을/를')} 마을 안에서 물리쳤습니다! 부상자 ${injured}명, 건물 ${damaged.length}채가 파손되었습니다.`,
-      'good',
-      true,
-    );
+    const winText = location === 'outskirts'
+      ? `${withJosa(side, '이/가')} ${withJosa(battle.faction, '을/를')} 외곽에서 몰아냈습니다! 부상자 ${injured}명, 건물 피해는 없습니다.`
+      : `${withJosa(side, '이/가')} ${withJosa(battle.faction, '을/를')} 마을 안에서 물리쳤습니다! 부상자 ${injured}명, 건물 ${damaged.length}채가 파손되었습니다.`;
+    addLog(state, winText, 'good', true);
+    recordAnnals(state, 'raid', winText);
+    state.lifetimeStats.raidsRepelled++;
+    if (injured > 0 || damaged.length > 0) state.lifetimeStats.raidsSuffered++;
   } else {
     const killed = killResidents(
       state,
@@ -307,13 +307,12 @@ function finishBattle(state: GameState, outcome: BattleOutcome, rng: () => numbe
     const damaged = damageBuildings(state, rng, damageCount);
     moraleShock(state, 15);
     changeRelation(state, battle.faction, CONFIG.relations.militiaLoss);
-    addLog(
-      state,
-      location === 'outskirts'
-        ? `외곽 요격선이 무너져 적이 마을로 들이닥쳤습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`
-        : `${withJosa(side, '이/가')} 마을 안에서 밀려났습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`,
-      'raid',
-    );
+    const lossText = location === 'outskirts'
+      ? `외곽 요격선이 무너져 적이 마을로 들이닥쳤습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`
+      : `${withJosa(side, '이/가')} 마을 안에서 밀려났습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`;
+    addLog(state, lossText, 'raid');
+    recordAnnals(state, 'raid', `${battle.faction}의 습격 — ${lossText}`);
+    state.lifetimeStats.raidsSuffered++;
   }
 
   state.threat = CONFIG.threat.afterRaidThreat;

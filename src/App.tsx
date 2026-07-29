@@ -104,7 +104,7 @@ export default function App() {
     <>
       <MainMenu
         canContinue={canLoad}
-        onStart={difficulty => setLaunch({ kind: 'new', difficulty })}
+        onStart={(difficulty, settlementName) => setLaunch({ kind: 'new', difficulty, settlementName })}
         onStartTutorial={() => setLaunch({ kind: 'tutorial' })}
         onContinue={() => setLoadDialogOpen(true)}
         onOpenBattleSim={() => setMenuView('battleSim')}

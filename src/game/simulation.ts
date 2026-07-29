@@ -33,7 +33,10 @@ import { resetFactionTradeCapacityUsage } from './tradeValues';
 import {
   avg, createResident, livingResidents, reconcileResidentHomes, updateMorale, updateResidentNeeds,
 } from './residents';
-import { getDayOfSeason, getSeason, getYear } from './seasons';
+import { getDayOfSeason, getDayOfYear, getSeason, getYear } from './seasons';
+import { endGame, recordAnnals, recordHarshWinter, recordPopulationMilestones } from './annals';
+import { createLifetimeStats, recordYearlySnapshot } from './chronicleStats';
+import { generateSettlementName, normalizeSettlementNameInput, processSettlementRename } from './settlementName';
 import { firewoodWeatherMult, weatherForDay } from './weather';
 import { defaultProcessingReserves } from './processing';
 import { hasKnownMineralDepositNear } from './miningSites';
@@ -96,10 +99,12 @@ import type {
 
 // ─────────────────────────── 새 게임 ───────────────────────────
 
-export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameState {
+export function newGame(seed?: number, difficulty: Difficulty = 'normal', settlementName?: string): GameState {
   const s = seed ?? Math.floor(Math.random() * 2 ** 31);
   const rng = makeRng(s);
   const { tiles, centerX, centerY } = generateMap(s);
+  // 메뉴는 항상 입력값을 넘긴다. 이름 없는 호출(테스트·디버그)만 시드 자동 이름을 쓴다.
+  const resolvedName = normalizeSettlementNameInput(settlementName ?? '') || generateSettlementName(s);
 
   // 난이도에 따라 시작 물자를 조절 (명성/방어도는 제외)
   const diff = CONFIG.difficulty[difficulty];
@@ -181,6 +186,12 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
     censured: false,
     crackdownDeadline: 0,
     log: [],
+    settlementName: resolvedName,
+    pendingSettlementRename: null,
+    settlementRenameCooldownUntil: 0,
+    annals: [],
+    lifetimeStats: createLifetimeStats(1),
+    yearlySnapshots: [],
     totalDeaths: 0,
     starvationDeathsThisYear: 0,
     winterStartPop: 0,
@@ -222,6 +233,9 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal'): GameS
 
   addLog(state, '조정의 명을 받아 두만강 이북 개척지에 도착했습니다. 짧은 봄 동안 겨울을 준비해야 합니다.', 'info');
   addLog(state, '나무를 베고, 집을 짓고, 식량과 장작을 모으십시오. 첫 겨울이 모든 것을 시험할 것입니다.', 'info');
+  recordAnnals(state, 'founding',
+    `조정의 명을 받아 두만강 이북에 ${withJosa(state.settlementName, '을/를')} 열었습니다.`, 'founding');
+  recordYearlySnapshot(state); // 1년차 스냅샷 — 정착 당일의 밑그림
   announceCourtTribute(state); // 1년차 봄이 day 1이므로 첫해 세공도 여기서 공지
   return state;
 }
@@ -1171,6 +1185,11 @@ function endOfDay(state: GameState): void {
   const season = getSeason(state.day);
   const rng = makeRng(state.seed + state.day * 7919);
 
+  // 연대기 일일 처리 — 연초 스냅샷은 그날의 소비·출생·사건을 처리하기 전 상태를 찍는다.
+  if (getDayOfYear(state.day) === 1) recordYearlySnapshot(state);
+  processSettlementRename(state);
+  recordPopulationMilestones(state, livingResidents(state).length);
+
   if (season !== prevSeason) onSeasonChange(state, prevSeason, season);
 
   // 날씨
@@ -1276,6 +1295,7 @@ function onSeasonChange(state: GameState, prev: string, next: string): void {
     const pop = livingResidents(state).length;
     if (pop < 5) state.badWinterStreak++;
     else state.badWinterStreak = 0;
+    recordHarshWinter(state); // 사망률 문턱을 넘긴 겨울만 연대기에 남는다
     addLog(state, `얼음이 풀립니다. 지난겨울 사망 ${state.winterDeaths}명 (사망률 ${(state.lastWinterDeathRate * 100).toFixed(0)}%).`,
       state.winterDeaths > 0 ? 'bad' : 'good');
   }
@@ -1478,20 +1498,20 @@ function checkEndConditions(state: GameState): void {
           : state.lastDeathCause === 'disease'
             ? '질병으로 주민 전원이 숨졌습니다. 개척지는 끝내 버려졌습니다.'
             : '주민 전원이 숨져 개척지가 버려졌습니다.';
-    state.gameOver = { won: false, reason };
+    endGame(state, false, reason);
     return;
   }
   if (!state.buildings.some(b => b.type === 'center' && b.built)) {
-    state.gameOver = { won: false, reason: '마을 중심지가 파괴되었습니다. 개척은 실패로 끝났습니다.' };
+    endGame(state, false, '마을 중심지가 파괴되었습니다. 개척은 실패로 끝났습니다.');
     return;
   }
   if (state.badWinterStreak >= 2) {
-    state.gameOver = { won: false, reason: '두 해 연속 겨울을 넘긴 주민이 다섯도 되지 않습니다. 조정은 개척지를 포기했습니다.' };
+    endGame(state, false, '두 해 연속 겨울을 넘긴 주민이 다섯도 되지 않습니다. 조정은 개척지를 포기했습니다.');
     return;
   }
   const starveLimit = Math.max(4, Math.ceil((living.length + state.starvationDeathsThisYear) * 0.3));
   if (state.starvationDeathsThisYear >= starveLimit) {
-    state.gameOver = { won: false, reason: '식량 부족으로 대규모 아사가 벌어졌습니다. 살아남은 이들은 마을을 버리고 떠났습니다.' };
+    endGame(state, false, '식량 부족으로 대규모 아사가 벌어졌습니다. 살아남은 이들은 마을을 버리고 떠났습니다.');
     return;
   }
 

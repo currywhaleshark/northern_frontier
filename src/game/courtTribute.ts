@@ -2,6 +2,7 @@
 // 봄 첫날 그해 요구량이 공지되어 세 계절 동안 준비하고, 겨울 첫날 사자가 도착해 거둬 간다.
 // 바치면 명성이 오르고(격년 하사품), 못 바치면 명성이 크게 떨어지며 국경이 험악해진다.
 import { withJosa } from './josa';
+import { recordAnnals } from './annals';
 import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import { rollCourtGrantArtifact, rollCourtGrantRewards } from './courtGrants';
@@ -169,6 +170,8 @@ function grantFullTributeReward(state: GameState, tribute: CourtTribute): void {
   if (labels.length === 0) return;
   const label = labels.join(', ');
   addLog(state, `조정에서 하사품이 내려왔습니다. 받은 물목: ${label}.`, 'good', true);
+  recordAnnals(state, 'grant', `조정에서 하사품이 내려왔습니다 — ${label}.`);
+  state.lifetimeStats.grantsReceived++; // 하사 행사 1회 (품목 수는 세지 않는다)
 }
 
 /**

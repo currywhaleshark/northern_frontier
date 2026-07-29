@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 42, 'court grant follow-up state ships with schema version 42');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 43, 'chronicle state ships with schema version 43');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -78,6 +78,7 @@ assert.equal(typeof saveLoad.migrateV38ToV39, 'function');
 assert.equal(typeof saveLoad.migrateV39ToV40, 'function');
 assert.equal(typeof saveLoad.migrateV40ToV41, 'function');
 assert.equal(typeof saveLoad.migrateV41ToV42, 'function');
+assert.equal(typeof saveLoad.migrateV42ToV43, 'function');
 
 {
   const migrated = saveLoad.migrateV39ToV40({ schemaVersion: 39, courtGrantArtifactMisses: 3.8 });
@@ -114,6 +115,35 @@ assert.equal(typeof saveLoad.migrateV41ToV42, 'function');
   assert.equal(migrated.schemaVersion, 42);
   assert.equal(migrated.royalPlaqueBuildingId, null, 'old saves begin with no installed plaque');
   assert.deepEqual(migrated.artifactWeaponAssignments, {}, 'old saves begin with no artifact weapon assignments');
+}
+
+{
+  // v43 연대기 — 이름은 시드의 순수 함수, 로그 백필은 important 한정, 카운터는 0부터.
+  const legacyLog = [
+    { day: 3, text: '습격을 물리쳤습니다.', kind: 'raid', important: true },
+    { day: 4, text: '평범한 소식.', kind: 'info' },
+    { day: 5, text: '교역이 성사되었습니다.', kind: 'trade', important: true },
+    { day: 6, text: '좋은 일.', kind: 'good', important: true },
+  ];
+  const migrated = saveLoad.migrateV42ToV43({ schemaVersion: 42, seed: 777, day: 60, log: legacyLog });
+  assert.equal(migrated.schemaVersion, 43);
+  assert.equal(typeof migrated.settlementName, 'string');
+  assert.ok(migrated.settlementName.length > 0, 'old saves get an auto settlement name');
+  assert.equal(
+    saveLoad.migrateV42ToV43({ schemaVersion: 42, seed: 777, day: 60, log: [] }).settlementName,
+    migrated.settlementName,
+    'the auto name is a pure function of the seed',
+  );
+  const kinds = migrated.annals.map(entry => entry.kind);
+  assert.deepEqual(kinds, ['founding', 'raid', 'trade', 'legacy', 'legacy'],
+    'backfill keeps raid/trade kinds and folds the rest into legacy');
+  assert.ok(migrated.annals.some(entry => entry.dedupeKey === 'legacy:migration'),
+    'migration leaves an incomplete-restore marker');
+  assert.equal(migrated.lifetimeStats.trackingSinceDay, 60, 'lifetime stats start counting at migration day');
+  assert.equal(migrated.lifetimeStats.births, 0);
+  assert.deepEqual(migrated.yearlySnapshots, [], 'snapshots are backfilled at load time, not in the raw migration');
+  assert.equal(migrated.pendingSettlementRename, null);
+  assert.equal(migrated.settlementRenameCooldownUntil, 0);
 }
 
 {

@@ -1,6 +1,7 @@
 // 특수 주민 공통 명부와 사건 획득 규칙.
 // UI·사건·렌더러가 같은 인물 정의를 쓴다.
 import { withJosa } from './josa';
+import { recordAnnals } from './annals';
 import type { UiIconName } from '../ui/uiIconAssets';
 import { CONFIG } from './config';
 import { computeDefense } from './buildings';
@@ -366,6 +367,7 @@ function recruitSpecialResident(
   markSpent(state, id);
   state.resources.defense = computeDefense(state);
   addLog(state, `${withJosa(definition.name, '이/가')} 마을 사람이 되었습니다.`, 'good', true);
+  recordAnnals(state, 'special', `${withJosa(definition.name, '이/가')} 마을 사람이 되었습니다.`, `special:${id}`);
 }
 
 export function maybeOfferExiledScholar(state: GameState, rng: () => number): boolean {

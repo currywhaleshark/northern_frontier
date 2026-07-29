@@ -572,6 +572,64 @@ export interface LogEntry {
   important?: boolean; // 통합 로그 축약 상태의 주요 소식에 노출
 }
 
+// ── 연대기 — 영구 보존되는 굵직한 사건 기록 ──
+// 로그(state.log)는 용량 제한으로 잘리는 흘러가는 소식이고, 연대기는 회고 화면이 읽는
+// 마을의 역사다. 계획: docs/DESIGN-2026-07-29-chronicle-screen.md
+export type AnnalsKind =
+  | 'legacy'      // 구세이브에서 복원한 불완전한 과거 기록
+  | 'founding'    // 정착 (기록 시작)
+  | 'promotion'   // 보/진/부 승격
+  | 'winter'      // 혹독한 월동 (겨울 사망률 문턱 초과 시만)
+  | 'disaster'    // 재해 (이른서리·역병·해빙기 홍수 등)
+  | 'raid'        // 습격과 그 결과 (격퇴/피해)
+  | 'battle'      // 전술 전투 (원정·토벌)
+  | 'special'     // 특수 주민 등장·이탈
+  | 'grant'       // 하사·교지·사액
+  | 'population'  // 인구 이정표
+  | 'building'    // 주요 건물 최초 완공
+  | 'trade'       // 정기거래 체결·갱신·파기
+  | 'court'       // 조정 관련 (견책·감찰·토벌 유예·개칭 허가)
+  | 'ending';     // 엔딩 도달
+
+export interface AnnalsEntry {
+  day: number;
+  kind: AnnalsKind;
+  text: string;       // 기록 시점에 완성된 한 문장 (화면에서 조립하지 않는다)
+  dedupeKey?: string; // 인구 이정표·최초 완공처럼 저장 전체에서 1회인 사건
+}
+
+// 평생 통계 — 열람 전용 누적 카운터. 기존 totalDeaths류는 다른 시스템이 쓰므로 병행 유지.
+export interface LifetimeStats {
+  trackingSinceDay: number; // 신규 게임 1, 구세이브는 마이그레이션 당시 day
+  births: number;
+  deathsByCause: Record<DeathCauseId, number>;
+  raidsRepelled: number;   // 최종 방어 결과가 승리인 습격
+  raidsSuffered: number;   // 약탈·건물 피해·주민 사망 중 하나 이상이 있었던 습격
+  tradesCompleted: number; // 실제 자원이 오간 거래 1회씩
+  grantsReceived: number;  // 조정 하사 행사 1회씩
+}
+
+// 연도별 스냅샷 — 연초 상태 1건씩, 추이 그래프용
+export interface YearlySnapshot {
+  year: number;
+  population: number;
+  food: number;                 // foodTotal(state)
+  fuelHeat: number;             // fuelHeatTotal(state)
+  combatReadyResidents: number;
+  buildings: number;            // 일반 건물만 (경작지·성벽 제외)
+  fieldTiles: number;
+  paddyTiles: number;
+  wallSegments: number;         // 목책+토성+석벽
+  silver: number;
+}
+
+// 개칭 청원 — 파발이 한양을 왕복하는 동안의 대기 상태
+export interface PendingSettlementRename {
+  requestedName: string;
+  sentDay: number;
+  dueDay: number;
+}
+
 // 은맥의 생애: offered(선택 대기) → secret(잠채) / sanctioned(설점) / sealed(봉인) / buried(묻어둠)
 export type SilverVeinStatus = 'offered' | 'secret' | 'sanctioned' | 'sealed' | 'buried';
 
@@ -1626,6 +1684,13 @@ export interface GameState {
   censured: boolean;                  // 현 의심 고조 구간에서 견책을 이미 받았는지
   crackdownDeadline: number;          // 토벌 유예 마감일 (0이면 없음)
   log: LogEntry[];
+  // 연대기 — docs/DESIGN-2026-07-29-chronicle-screen.md
+  settlementName: string;
+  pendingSettlementRename: PendingSettlementRename | null;
+  settlementRenameCooldownUntil: number; // 이 날까지 재개칭 불가 (0 = 제한 없음)
+  annals: AnnalsEntry[];
+  lifetimeStats: LifetimeStats;
+  yearlySnapshots: YearlySnapshot[];
   totalDeaths: number;
   starvationDeathsThisYear: number;
   winterStartPop: number;

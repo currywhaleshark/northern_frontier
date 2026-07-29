@@ -72,6 +72,8 @@ interface Props {
   onRequestTrade: (factionName: string) => void;
   onSetTradeContractReserve: (resource: ResourceId, amount: number) => void;
   onOpenEdicts: () => void;
+  onOpenChronicle: () => void;
+  onRequestSettlementRename: () => void;
   onToggleNitre: () => void;
   onSilverVeinAction: (action: 'break-seal' | 'reopen') => void;
   onAssignNearestWorker: (buildingId: number) => void;
@@ -311,6 +313,8 @@ export function SelectionContextBar({
   onRequestTrade,
   onSetTradeContractReserve,
   onOpenEdicts,
+  onOpenChronicle,
+  onRequestSettlementRename,
   onToggleNitre,
   onSilverVeinAction,
   onAssignNearestWorker,
@@ -612,6 +616,8 @@ export function SelectionContextBar({
                 onRequestTrade={onRequestTrade}
                 onSetTradeContractReserve={onSetTradeContractReserve}
                 onOpenEdicts={onOpenEdicts}
+                onOpenChronicle={onOpenChronicle}
+                onRequestSettlementRename={onRequestSettlementRename}
                 onToggleNitre={onToggleNitre}
                 onSilverVeinAction={onSilverVeinAction}
                 onAssignNearestWorker={onAssignNearestWorker}

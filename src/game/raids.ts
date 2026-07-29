@@ -1,6 +1,7 @@
 // 습격 시스템 — 위협도 누적, 지도 위 습격 무리 접근, 위기 선택지와 결과 판정
 import { withJosa } from './josa';
 import { CONFIG } from './config';
+import { recordAnnals } from './annals';
 import { FACTIONS, RESOURCE_NAMES, type Faction } from './constants';
 import { computeDefense, countBuilt, footprintTilesOf } from './buildings';
 import { addLog } from './events';
@@ -357,9 +358,13 @@ function resolveFightFallback(
     state.resources.reputation = Math.min(100, state.resources.reputation + 5);
     moraleShock(state, -8); // 사기 상승
     changeRelation(state, faction, CONFIG.relations.militiaWin); // 물리치면 원한이 남는다
-    addLog(state, mode === 'garrison'
+    const winText = mode === 'garrison'
       ? `${withJosa(side, '이/가')} ${withJosa(faction, '을/를')} 외곽에서 물리쳤습니다! 부상자 ${injured}명, 건물 피해는 없습니다.`
-      : `${withJosa(side, '이/가')} ${withJosa(faction, '을/를')} 마을 안에서 물리쳤습니다! 부상자 ${injured}명, 건물 ${damaged.length}채가 파손되었습니다.`, 'good', true);
+      : `${withJosa(side, '이/가')} ${withJosa(faction, '을/를')} 마을 안에서 물리쳤습니다! 부상자 ${injured}명, 건물 ${damaged.length}채가 파손되었습니다.`;
+    addLog(state, winText, 'good', true);
+    recordAnnals(state, 'raid', winText);
+    state.lifetimeStats.raidsRepelled++;
+    if (injured > 0 || damaged.length > 0) state.lifetimeStats.raidsSuffered++;
   } else {
     const killed = killResidents(
       state,
@@ -376,7 +381,10 @@ function resolveFightFallback(
     const damaged = damageBuildings(state, rng, damageCount);
     moraleShock(state, 15);
     changeRelation(state, faction, CONFIG.relations.militiaLoss);
-    addLog(state, `${withJosa(side, '이/가')} 밀려났습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`, 'raid');
+    const lossText = `${withJosa(side, '이/가')} 밀려났습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`;
+    addLog(state, lossText, 'raid');
+    recordAnnals(state, 'raid', `${faction}의 습격 — ${lossText}`);
+    state.lifetimeStats.raidsSuffered++;
   }
 }
 
@@ -713,6 +721,8 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
       moraleShock(state, 4);
       changeRelation(state, faction, CONFIG.relations.tribute);
       addLog(state, `${faction}에게 공물을 내어보냈습니다. 싸움은 피했지만 그들과의 사이는 눅어졌습니다.`, 'raid');
+      recordAnnals(state, 'raid', `${faction}의 위협에 공물을 내어보내고 싸움을 피했습니다.`);
+      state.lifetimeStats.raidsSuffered++;
       break;
     }
     case 'negotiate': {
@@ -727,6 +737,8 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
         state.threat = Math.max(0, state.threat - 30);
         changeRelation(state, faction, CONFIG.relations.negotiateSuccess);
         addLog(state, `장터에서의 협상이 통했습니다. ${withJosa(faction, '이/가')} 식량 ${withJosa(give, '을/를')} 받고 가죽 4를 남기고 물러갑니다. 명성이 올랐습니다.`, 'good', true);
+        recordAnnals(state, 'raid', `${faction}의 습격을 장터의 협상으로 물렸습니다.`);
+        state.lifetimeStats.raidsRepelled++;
       } else {
         if (expeditionOrder) {
           addLog(state, `협상이 결렬되었습니다. 격분한 ${withJosa(faction, '이/가')} 방책을 공격하기 시작합니다!`, 'raid', true);
@@ -744,6 +756,8 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
         moraleShock(state, 12);
         changeRelation(state, faction, CONFIG.relations.negotiateFail);
         addLog(state, `협상이 결렬되었습니다. 격분한 ${withJosa(faction, '이/가')} 마을을 휩쓸었습니다. 부상자 ${injured}명, ${lootMsg}, 건물 ${damaged.length}채 파손.`, 'raid');
+        recordAnnals(state, 'raid', `협상 결렬 — ${withJosa(faction, '이/가')} 마을을 휩쓸었습니다 (부상 ${injured}명, 건물 ${damaged.length}채 파손).`);
+        state.lifetimeStats.raidsSuffered++;
       }
       break;
     }
@@ -753,6 +767,9 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
       const lootMsg = loot(state, 0.1);
       changeRelation(state, faction, CONFIG.relations.beacon);
       addLog(state, `봉수대에 불길이 올랐습니다. 인근 진보의 응원 신호에 ${withJosa(faction, '이/가')} 서둘러 물러갑니다. ${lootMsg}.`, 'good', true);
+      recordAnnals(state, 'raid', `봉수 신호로 ${faction}의 습격을 물렸습니다.`);
+      state.lifetimeStats.raidsRepelled++;
+      state.lifetimeStats.raidsSuffered++; // 물러가며 소량을 약탈해 간다
       break;
     }
   }

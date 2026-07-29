@@ -286,6 +286,7 @@ function tryBirths(state: GameState, rng: () => number): void {
 
     const baby = createNewborn(state, rng, mother, father);
     state.residents.push(baby);
+    state.lifetimeStats.births++;
     const winterExtra = getSeason(state.day) === 'winter' ? l.birthWinterExtraRecovery : 0;
     mother.birthRecoveryUntil = state.day + l.birthRecoveryDays + winterExtra;
     addLog(state, `${withJosa(mother.name, '이/가')} ${baby.gender === 'male' ? '사내' : '계집'}아이를 낳았습니다. 이름은 ${baby.name}.`, 'good', true);

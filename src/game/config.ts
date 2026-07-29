@@ -1487,6 +1487,11 @@ export const CONFIG = {
     firewood: 100,
   },
 
+  // 정착지 개칭 — 파발이 한양을 왕복하는 행정 절차 (docs/DESIGN-2026-07-29-chronicle-screen.md §1-1)
+  settlementNaming: {
+    renameTravelDays: 12,  // 조정 청원과 같은 한 계절 왕복 감각
+  },
+
   // 조정 청원 — 명성을 소모해 조정 지원 물자를 받는다 (승격 단계 ≥ 보, 계절당 1회)
   petition: {
     cooldownDays: 12,  // 분기(계절)당 1회
