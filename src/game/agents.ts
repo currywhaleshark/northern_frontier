@@ -25,7 +25,10 @@ import { assignClearingCrews, clearingBlocksWork, clearingSites, pendingClearing
 import { isVeinSealedTile, recordRockMining, recordSilverMined } from './silver';
 import { getSeason } from './seasons';
 import { outdoorMult } from './weather';
-import { droughtFarmGrowthMultiplier, droughtFishYieldMultiplier } from './disasters';
+import {
+  droughtFarmGrowthMultiplier, droughtFishYieldMultiplier, initializeWeirReservoir,
+  isSpringFloodedTile, restoreWeirReservoir,
+} from './disasters';
 import { processableAmount } from './processing';
 import { DRYING_PRODUCT_DEFS, dryingProductOf } from './preservation';
 import { jangdokdaeInputNeeds } from './fermentation';
@@ -154,6 +157,7 @@ const PASSABLE_BUILDING_TYPES: ReadonlySet<BuildingTypeId> = new Set<BuildingTyp
   'field',
   'paddy',
   'bridge',
+  'levee',
   'ferry',
   'dock',
   'lumberCamp',
@@ -174,6 +178,7 @@ function isPassableBuilding(type: BuildingTypeId): boolean {
 export function isTerrainPassable(state: GameState, x: number, y: number): boolean {
   const t = state.map[y]?.[x];
   if (!t) return false;
+  if (isSpringFloodedTile(state, x, y)) return false;
   const building = buildingAtTile(state, t);
   if (building && !isPassableBuilding(building.type) && !isBuildingUpperPassageTile(building, x, y)) return false;
   if (t.terrain === 'mountain') return false;
@@ -801,7 +806,7 @@ function nearestPassableTile(state: GameState, x: number, y: number, maxRadius =
   return null;
 }
 
-function ensureResidentOnPassableTile(state: GameState, r: Resident): void {
+export function ensureResidentOnPassableTile(state: GameState, r: Resident): void {
   const ignored = r.manualOrder?.unauthorizedSiteIds ?? [];
   if (isPassable(state, r.x, r.y, ignored)) return;
   const tile = nearestPassableTile(state, r.x, r.y);
@@ -811,6 +816,12 @@ function ensureResidentOnPassableTile(state: GameState, r: Resident): void {
   r.px = tile.x;
   r.py = tile.y;
   r.path = [];
+}
+
+export function ensureResidentsOnPassableTiles(state: GameState): void {
+  for (const resident of state.residents) {
+    if (resident.alive) ensureResidentOnPassableTile(state, resident);
+  }
 }
 
 // ─────────────────────────── 채집형 작업 공통 루틴 ───────────────────────────
@@ -1467,6 +1478,7 @@ function completeBuildingDemolition(state: GameState, building: Building, ctx: C
   for (const [resource, amount] of Object.entries(building.inventory ?? {})) {
     state.resources[resource as ResourceId] += amount ?? 0;
   }
+  restoreWeirReservoir(state, building);
   clearBuildingTiles(state, building.id);
   clearAssignmentsForBuilding(state, building.id);
   state.buildings = state.buildings.filter(candidate => candidate.id !== building.id);
@@ -1498,6 +1510,7 @@ function advanceBuildingWorkOrder(state: GameState, building: Building, ctx: Ctx
       addLog(state, `${def.name} 이전 위치를 찾지 못해 작업을 중단했습니다.`, 'bad', true);
       return true;
     }
+    restoreWeirReservoir(state, building);
     clearBuildingTiles(state, building.id);
     building.x = destination.x;
     building.y = destination.y;
@@ -1518,6 +1531,7 @@ function advanceBuildingWorkOrder(state: GameState, building: Building, ctx: Ctx
 
   building.built = true;
   delete building.workOrder;
+  initializeWeirReservoir(state, building);
   if (state.priorityBuildingId === building.id) state.priorityBuildingId = null;
   reconcileResidentHomes(state, ctx.rng);
   reconcileMountAssignments(state);
@@ -1556,6 +1570,7 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
       target.progress = def.buildDays;
       target.built = true;
       target.repairing = false;
+      initializeWeirReservoir(state, target);
       if (state.priorityBuildingId === target.id) state.priorityBuildingId = null;
       reconcileResidentHomes(state, ctx.rng);
       addLog(state, repaired

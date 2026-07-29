@@ -2068,6 +2068,9 @@ export function loadGame(slot = 1): GameState | null {
     if (!Number.isFinite(parsed.lastKimjangYear)) parsed.lastKimjangYear = 0;
     ensureIncidentState(parsed);
     parsed.pendingDisasters = normalizePendingDisasters(parsed.pendingDisasters);
+    parsed.lastSpringFloodYear = Number.isFinite(Number(parsed.lastSpringFloodYear))
+      ? Math.max(0, Math.floor(Number(parsed.lastSpringFloodYear)))
+      : 0;
     ensureForeignSiteState(parsed);
     if (!Array.isArray(parsed.territoryViolations)) parsed.territoryViolations = [];
     migrateResourceTaxonomy(parsed);

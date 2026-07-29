@@ -48,7 +48,9 @@ import { isBuriedSilverVeinTile } from '../game/silver';
 import { activeExpeditionTargetMarkers, type ExpeditionTargetMarker } from '../game/expeditionTargets';
 import { normalizeLivestockState } from '../game/livestock';
 import { normalizePastureArea, validateStablePasture } from '../game/pastures';
-import { isDroughtActive, isFarmIrrigatedByWeir } from '../game/disasters';
+import {
+  activeSpringFloodTiles, isDroughtActive, isFarmIrrigatedByWeir, weirReservoirWaterVisuals,
+} from '../game/disasters';
 import { acceptsClearedLand, forestTilesInFootprint } from '../game/landClearing';
 import {
   BUILDING_EFFECT_TABLE, buildingEffectEmitters, buildingShadowSettings,
@@ -87,6 +89,7 @@ const PLACEMENT_HINT: Partial<Record<BuildingTypeId, Terrain>> = {
   mine: 'rock',
   bridge: 'river',
   weir: 'river',
+  levee: 'river',
   ferry: 'river',
   watermill: 'river',
   dock: 'river',
@@ -1095,6 +1098,41 @@ function drawFogOverlay(ctx: CanvasRenderingContext2D, state: GameState, viewpor
   ctx.restore();
 }
 
+function drawWaterRiseOverlay(
+  ctx: CanvasRenderingContext2D,
+  tileX: number,
+  tileY: number,
+  progress: number,
+  animationTimeMs: number,
+  flood: boolean,
+): void {
+  const clamped = Math.max(0, Math.min(1, progress));
+  if (clamped <= 0) return;
+  const x = tileX * TILE;
+  const bottom = (tileY + 1) * TILE;
+  const top = bottom - TILE * clamped;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, top, TILE, bottom - top);
+  ctx.clip();
+  ctx.fillStyle = flood ? 'rgba(72, 129, 157, 0.54)' : 'rgba(70, 132, 158, 0.62)';
+  ctx.fillRect(x, top, TILE, bottom - top);
+  ctx.strokeStyle = flood ? 'rgba(201, 231, 234, 0.76)' : 'rgba(190, 228, 230, 0.82)';
+  ctx.lineWidth = 1;
+  const phase = animationTimeMs / 360 + tileX * 0.8 + tileY * 0.45;
+  for (let offset = 4; offset < TILE; offset += 8) {
+    const waveY = top + offset;
+    ctx.beginPath();
+    for (let px = 1; px < TILE; px += 3) {
+      const py = waveY + Math.sin(phase + px * 0.45 + offset) * 0.8;
+      if (px === 1) ctx.moveTo(x + px, py);
+      else ctx.lineTo(x + px, py);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawEarlyFrostCropOverlay(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   ctx.save();
   ctx.fillStyle = 'rgba(225, 239, 246, 0.30)';
@@ -1575,6 +1613,20 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   ctx.clip();
   // 바닥 캐시와 분리해 큰 노두가 뒤에 그려지는 이웃 타일 바닥에 잘리지 않게 한다.
   drawTerrainProps(ctx, state, sprites, viewport, renderScale);
+  for (const water of weirReservoirWaterVisuals(state)) {
+    if (!isExplored(state, water.x, water.y) ||
+        !tileRectIntersectsViewport(viewport, water.x, water.y)) continue;
+    drawWaterRiseOverlay(ctx, water.x, water.y, water.progress, o.animationTimeMs, false);
+  }
+  const activeFlood = state.pendingDisasters.find(disaster => disaster.id === 'springFlood');
+  const floodRiseProgress = activeFlood?.startedDay === state.day
+    ? Math.min(1, 0.25 + (state.subTick + o.alpha) / (DAY_CYCLE_SUBTICKS * 0.6))
+    : 1;
+  for (const flooded of activeSpringFloodTiles(state)) {
+    if (!isExplored(state, flooded.x, flooded.y) ||
+        !tileRectIntersectsViewport(viewport, flooded.x, flooded.y)) continue;
+    drawWaterRiseOverlay(ctx, flooded.x, flooded.y, floodRiseProgress, o.animationTimeMs, true);
+  }
 
   const activeClaimZones = new Map<number, ClaimZone>();
   for (const point of [o.hover, o.selected]) {

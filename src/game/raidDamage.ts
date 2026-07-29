@@ -4,7 +4,7 @@ import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import { lootLivestock } from './livestock';
 import { killResident, livingResidents, reconcileResidentHomes } from './residents';
-import type { BuildingTypeId, GameState, ResourceId } from './types';
+import type { Building, BuildingTypeId, GameState, ResourceId } from './types';
 
 export function applyLootLosses(
   state: GameState,
@@ -115,6 +115,28 @@ export function damageBuildings(state: GameState, rng: () => number, count: numb
     damaged.push(b.type);
   }
   reconcileResidentHomes(state, rng);
+  return damaged;
+}
+
+export function damageBuildingTargets(
+  state: GameState,
+  rng: () => number,
+  targets: readonly Building[],
+): BuildingTypeId[] {
+  const damaged: BuildingTypeId[] = [];
+  const seen = new Set<number>();
+  for (const building of targets) {
+    if (seen.has(building.id) || building.type === 'center' || !building.built) continue;
+    seen.add(building.id);
+    const def = BUILDING_DEFS[building.type];
+    const min = CONFIG.raid.repairProgressMin;
+    const max = CONFIG.raid.repairProgressMax;
+    building.built = false;
+    building.repairing = true;
+    building.progress = def.buildDays * (min + rng() * Math.max(0, max - min));
+    damaged.push(building.type);
+  }
+  if (damaged.length > 0) reconcileResidentHomes(state, rng);
   return damaged;
 }
 

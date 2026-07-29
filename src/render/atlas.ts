@@ -1530,6 +1530,7 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   jangdokdae: { base: FACE_STONE, glyph: HIDE },
   bridge:     { base: FENCE },
   weir:       { base: FENCE, glyph: WATER },
+  levee:      { base: FACE_STONE, glyph: WATER },
   lumberCamp: { base: LOGS },
   woodShed:   { base: LOGS, glyph: CAMPFIRE },
   huntLodge:  { base: TENT_TAN },

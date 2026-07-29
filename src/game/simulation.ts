@@ -23,7 +23,7 @@ import { resolveCrackdown, resolveInspection, updateSuspicion } from './suspicio
 import { generateMap, makeRng } from './map';
 import { advanceForestGrowth, setTreeStage } from './forestGrowth';
 import { isHabitatActive, spawnAnimalHabitats } from './habitats';
-import { agentsTick, resetAgent, SUBTICKS } from './agents';
+import { agentsTick, ensureResidentsOnPassableTiles, resetAgent, SUBTICKS } from './agents';
 import { battleTick } from './battles';
 import {
   checkRaidTrigger, raidHoldTick, raidersTick, resolveExpeditionRaidOrder, resolveExtortion, resolveRaid, updateThreat,
@@ -73,7 +73,9 @@ import { canResidentTakeJob, isYouthWorkJob, youthActivityOf } from './youth';
 import { dailyReligionTick, resolveReligionChoice } from './religion';
 import { dailySpecialResidentTick, resolveSpecialResidentChoice } from './specialResidents';
 import { dailySilverTick, resolveSilverVeinChoice } from './silver';
-import { advancePendingDisasters } from './disasters';
+import {
+  advancePendingDisasters, advanceWeirReservoirs, maybeStartSpringFlood,
+} from './disasters';
 import { updateFermentation } from './fermentation';
 import { isKimjangChoice, maybeOpenKimjangEvent, resolveKimjangChoice } from './kimjang';
 import {
@@ -163,6 +165,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
     lastKimjangYear: 0,
     incidents: createIncidentState(s),
     pendingDisasters: [],
+    lastSpringFloodYear: 0,
     specialItems: createSpecialItemInventory(),
     discoveredSpecialItems: [],
     courtGrantArtifactMisses: 0,
@@ -437,6 +440,7 @@ export function cancelBuildingConstruction(state: GameState, buildingId: number)
   if (!building) return '취소할 건설 현장이 없습니다.';
   if (building.built) return '완공된 건물은 건설 취소할 수 없습니다.';
   if (building.repairing) return '수리 중인 건물은 건설 취소할 수 없습니다.';
+  if (building.workOrder) return '해체·이전 작업은 건설 취소로 중단할 수 없습니다.';
 
   const def = BUILDING_DEFS[building.type];
   for (const [res, amount] of Object.entries(def.cost)) {
@@ -1208,7 +1212,10 @@ function endOfDay(state: GameState): void {
     else if (state.weather === 'heavySnow') addLog(state, '폭설이 내려 발이 푹푹 빠집니다. 이동이 더뎌집니다.', 'weather');
     else if (state.weather === 'thawFlood') addLog(state, '해빙기 홍수로 강물이 불었습니다. 얼음 위로는 다닐 수 없습니다.', 'weather');
   }
+  const springFloodStarted = maybeStartSpringFlood(state);
   advancePendingDisasters(state);
+  const reservoirTerrainChanged = advanceWeirReservoirs(state);
+  if (springFloodStarted || reservoirTerrainChanged) ensureResidentsOnPassableTiles(state);
 
   regrowForest(state, rng, season);
   updateHabitats(state);

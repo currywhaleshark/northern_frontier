@@ -35,6 +35,7 @@ export const BUILD_CATEGORY_BY_TYPE = {
   field: 'farming',
   paddy: 'farming',
   weir: 'farming',
+  levee: 'defense',
   stable: 'farming',
   palisade: 'defense',
   earthFort: 'defense',

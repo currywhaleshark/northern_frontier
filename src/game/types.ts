@@ -152,6 +152,7 @@ export type BuildingTypeId =
   | 'jangdokdae' // 장독대
   | 'bridge'     // 다리
   | 'weir'       // 보(洑) — 가뭄 관개 시설
+  | 'levee'      // 제방(堤防) — 대홍수 범람 차단
   | 'lumberCamp' // 벌목장
   | 'woodShed'   // 장작마당
   | 'huntLodge'  // 사냥막
@@ -466,6 +467,18 @@ export interface BuildingWorkOrder {
   destination?: PastureArea;
 }
 
+export interface WeirReservoirTile {
+  x: number;
+  y: number;
+  originalTerrain: Extract<Terrain, 'plain' | 'fertile'>;
+}
+
+export interface WeirReservoirState {
+  startedDay: number;
+  floodedCount: number;
+  tiles: WeirReservoirTile[];
+}
+
 export interface Building {
   id: number;
   type: BuildingTypeId;
@@ -488,6 +501,7 @@ export interface Building {
   pasture?: PastureArea; // 축사 전용: 완공 후 지정하는 인접 방목 영역
   expansion?: BuildingExpansion; // 완공된 영역형 건물의 확장 공사
   workOrder?: BuildingWorkOrder; // 건축가가 수행하는 해체 또는 이전 공사
+  weirReservoir?: WeirReservoirState; // 보 전용: 상류 영구 침수 칸과 원래 지형
   graves?: number; // 묘역 전용: 안장된 묘 수 (한 타일의 2×2 소구획에 최대 4기)
   burialRecords?: BurialRecord[]; // 묘지 전용: 이름·사인·사망일을 보존하는 안치 기록
   inventory?: Partial<Record<ResourceId, number>>; // 운반 전 생산지 현장 재고
@@ -717,6 +731,14 @@ export interface PendingDisaster {
   targetBuildingIds?: number[];
   progress?: number;
   data?: Record<string, number>;
+  affectedTiles?: DisasterAffectedTile[];
+}
+
+export interface DisasterAffectedTile {
+  x: number;
+  y: number;
+  originalTerrain: Terrain;
+  depth?: number;
 }
 
 export interface PredatorThreat {
@@ -1660,6 +1682,7 @@ export interface GameState {
   lastKimjangYear: number;    // 마지막으로 김장 규모를 결정한 연도 (0이면 아직 없음)
   incidents: IncidentState;    // 연간 돌발 사건 일정과 지속 중인 맹수 위험
   pendingDisasters: PendingDisaster[]; // 선택 뒤 실제 날씨·일일 진행으로 판정하는 재해
+  lastSpringFloodYear?: number; // 같은 봄에 대홍수가 거듭 발생하지 않게 하는 연차 표식
   specialItems: Record<SpecialItemId, number>; // 산삼·호피 등 일반 자원과 분리한 기물함
   discoveredSpecialItems: SpecialItemId[];     // 소모해도 남는 기물 도감
   courtGrantArtifactMisses: number;            // 적격 격년 하사품에서 연속으로 기물을 놓친 횟수

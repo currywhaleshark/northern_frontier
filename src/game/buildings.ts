@@ -74,9 +74,15 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   weir: {
     id: 'weir', name: '보',
-    desc: `강물을 막아 관개하는 낮은 둑. 가뭄 때 반경 ${CONFIG.disasters.drought.weirRadius}칸의 논밭 성장 피해를 줄인다. 통행로로는 쓸 수 없다.`,
+    desc: `강물을 막아 관개하는 낮은 둑. 가뭄 때 반경 ${CONFIG.disasters.drought.weirRadius}칸의 논밭 성장 피해를 줄이고, 완공 뒤 상류 강변 최대 ${CONFIG.disasters.drought.reservoirTileCount}칸에 물이 찬다. 통행로로는 쓸 수 없다.`,
     cost: { wood: 8, stone: 6, tools: 1 }, buildDays: 6, slots: 0, capacity: 0, defense: 0,
     winterBonus: false, placement: 'river', unique: false,
+  },
+  levee: {
+    id: 'levee', name: '제방',
+    desc: `강에서 ${CONFIG.disasters.springFlood.leveeRiverDistance}칸 이내 땅에 쌓는 낮은 둑. 주민은 둑 위로 다니며 대홍수 범람을 막지만, 막힌 곳에는 비옥한 퇴적도 오지 않는다.`,
+    cost: { wood: 3, stone: 4 }, buildDays: 3, slots: 0, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false,
   },
   lumberCamp: {
     id: 'lumberCamp', name: '벌목장',
@@ -275,13 +281,14 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
   'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'field', 'paddy', 'weir', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'clinic',
   'smokehouse', 'dryingRack', 'smithy', 'mine', 'ferry', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office', 'cemetery', 'school', 'shrine', 'hermitage',
-  'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
+  'levee', 'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement', 'chongtongEmplacement',
 ];
 
 export const SINGLE_TILE_BUILDINGS = [
   'bridge',
   'weir',
+  'levee',
   'lumberCamp',
   'huntLodge',
   'herbHut',
@@ -428,6 +435,8 @@ export function canPlaceBuildingAt(
 ): boolean {
   const tiles = buildingFootprintTiles(state, type, x, y, w, h);
   if (!tiles) return false;
+  if (tiles.some(tile => isWeirReservoirReservedTile(state, tile.x, tile.y) ||
+      isSpringFloodAffectedTile(state, tile.x, tile.y))) return false;
   if (tiles.some(tile => state.buildings.some(building => {
     const destination = building.workOrder?.kind === 'relocate'
       ? building.workOrder.destination
@@ -450,6 +459,7 @@ export function canPlaceBuildingAt(
   const def = BUILDING_DEFS[type];
   if (!tiles.every(tile => canPlaceOn(def, tile, state))) return false;
   if (type === 'paddy' && !isPaddyFootprintEligible(state, tiles)) return false;
+  if (type === 'levee' && !isLeveePlacementEligible(state, x, y)) return false;
   if (type === 'mine') return hasKnownMineralDepositNear(state, x, y);
   return true;
 }
@@ -464,6 +474,8 @@ export function canRelocateBuildingAt(
   const tiles = buildingFootprintTiles(state, building.type, x, y, w, h);
   if (!tiles) return false;
   if (x === building.x && y === building.y) return false;
+  if (tiles.some(tile => isWeirReservoirReservedTile(state, tile.x, tile.y) ||
+      isSpringFloodAffectedTile(state, tile.x, tile.y))) return false;
   const overlapsReservedDestination = tiles.some(tile => state.buildings.some(candidate => {
     if (candidate.id === building.id) return false;
     const destination = candidate.workOrder?.kind === 'relocate'
@@ -495,6 +507,7 @@ export function canRelocateBuildingAt(
   }
   if (!usableTiles.every(tile => canPlaceOn(def, tile, state))) return false;
   if (building.type === 'paddy' && !isPaddyFootprintEligible(state, usableTiles)) return false;
+  if (building.type === 'levee' && !isLeveePlacementEligible(state, x, y)) return false;
   if (building.type === 'mine') return hasKnownMineralDepositNear(state, x, y);
   return true;
 }
@@ -554,6 +567,29 @@ export function rebuildBuildingFootprints(state: GameState): void {
 // 불랑기포대는 조정 하사 수(cannonsGranted)만큼만 놓을 수 있다 (건설 중 포함)
 export function cannonPlacementsUsed(state: GameState): number {
   return state.buildings.filter(b => b.type === 'cannonEmplacement').length;
+}
+
+function isWeirReservoirReservedTile(state: GameState, x: number, y: number): boolean {
+  return state.buildings.some(building =>
+    building.type === 'weir' &&
+    building.weirReservoir?.tiles.some(tile => tile.x === x && tile.y === y));
+}
+
+function isSpringFloodAffectedTile(state: GameState, x: number, y: number): boolean {
+  return state.pendingDisasters.some(disaster =>
+    disaster.id === 'springFlood' &&
+    disaster.affectedTiles?.some(tile => tile.x === x && tile.y === y));
+}
+
+export function isLeveePlacementEligible(state: GameState, x: number, y: number): boolean {
+  const radius = CONFIG.disasters.springFlood.leveeRiverDistance;
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) > radius) continue;
+      if (state.map[y + dy]?.[x + dx]?.terrain === 'river') return true;
+    }
+  }
+  return false;
 }
 
 // 지자총통은 기물함에 남아 있고, 총통 포대만 완성·건설·이전 작업을 통틀어 하나로 제한한다.

@@ -172,6 +172,14 @@ export function computeAlerts(state: GameState): AlertItem[] {
       });
       continue;
     }
+    if (disaster.id === 'springFlood') {
+      alerts.push({
+        id: `pendingDisaster-${disaster.id}`,
+        text: `대홍수 범람 중 · 강변 통행이 막혔습니다. ${pendingDisasterDaysRemaining(state, disaster)}일 안에 물이 빠질 전망입니다.`,
+        level: 'danger',
+      });
+      continue;
+    }
     if (disaster.id !== 'earlyFrost' && disaster.id !== 'lateFrost') continue;
     const daysLeft = pendingDisasterDaysRemaining(state, disaster);
     const title = disaster.id === 'earlyFrost' ? '이른 서리' : '늦서리';

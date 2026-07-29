@@ -1,8 +1,17 @@
 import { CONFIG } from './config';
+import { BUILDING_DEFS } from './buildings';
 import { cropIdForBuilding, CROP_DEFS } from './crops';
 import { addLog } from './events';
 import { withJosa } from './josa';
-import type { Building, CropId, DisasterId, GameState, PendingDisaster, WeatherId } from './types';
+import { recordAnnals } from './annals';
+import { makeRng } from './map';
+import { damageBuildingTargets } from './raidDamage';
+import { getSeason, getYear } from './seasons';
+import { seasonWeatherSchedule } from './weatherSchedule';
+import type {
+  Building, CropId, DisasterAffectedTile, DisasterId, GameState, PendingDisaster, Terrain, WeatherId,
+  WeirReservoirTile,
+} from './types';
 
 const DISASTER_IDS = new Set<DisasterId>([
   'earlyFrost',
@@ -18,6 +27,9 @@ const DISASTER_IDS = new Set<DisasterId>([
 ]);
 
 const FROST_WEATHERS = new Set<WeatherId>(['frost', 'coldSnap']);
+const TERRAIN_IDS = new Set<Terrain>(['forest', 'plain', 'river', 'mountain', 'fertile', 'rock', 'center']);
+const CARDINAL_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
+const SPRING_FLOOD_TILE_SET_CACHE = new WeakMap<PendingDisaster, Set<string>>();
 
 function finiteDay(value: unknown): number | null {
   const day = Math.floor(Number(value));
@@ -47,6 +59,23 @@ export function normalizePendingDisasters(value: unknown): PendingDisaster[] {
         .filter((entry): entry is [string, number] => Number.isFinite(Number(entry[1])))
         .map(([key, entryValue]) => [key, Number(entryValue)]))
       : undefined;
+    const affectedTiles = Array.isArray(candidate.affectedTiles)
+      ? candidate.affectedTiles.flatMap(rawTile => {
+        if (!rawTile || typeof rawTile !== 'object') return [];
+        const tile = rawTile as Partial<DisasterAffectedTile>;
+        const x = Math.floor(Number(tile.x));
+        const y = Math.floor(Number(tile.y));
+        if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 ||
+            !TERRAIN_IDS.has(tile.originalTerrain as Terrain)) return [];
+        const depth = Math.floor(Number(tile.depth));
+        return [{
+          x,
+          y,
+          originalTerrain: tile.originalTerrain as Terrain,
+          ...(Number.isFinite(depth) && depth > 0 ? { depth } : {}),
+        }];
+      })
+      : undefined;
     normalized.push({
       id: candidate.id as DisasterId,
       choiceId: candidate.choiceId,
@@ -55,6 +84,7 @@ export function normalizePendingDisasters(value: unknown): PendingDisaster[] {
       ...(targetBuildingIds && targetBuildingIds.length > 0 ? { targetBuildingIds } : {}),
       ...(progress != null ? { progress } : {}),
       ...(data && Object.keys(data).length > 0 ? { data } : {}),
+      ...(affectedTiles && affectedTiles.length > 0 ? { affectedTiles } : {}),
     });
   }
   return normalized;
@@ -183,6 +213,373 @@ export function droughtFishYieldMultiplier(state: GameState): number {
   return isDroughtActive(state) ? CONFIG.disasters.drought.fishYieldMultiplier : 1;
 }
 
+function tileKey(x: number, y: number): string {
+  return `${x},${y}`;
+}
+
+function isReservoirLand(tile: { terrain: Terrain }): boolean {
+  return tile.terrain === 'plain' || tile.terrain === 'fertile';
+}
+
+function isAdjacentToRiver(state: Pick<GameState, 'map'>, x: number, y: number): boolean {
+  return CARDINAL_DIRS.some(([dx, dy]) => state.map[y + dy]?.[x + dx]?.terrain === 'river');
+}
+
+function reservoirTileOwnedByOtherWeir(
+  state: Pick<GameState, 'buildings'>,
+  ownerId: number,
+  x: number,
+  y: number,
+): boolean {
+  return state.buildings.some(building =>
+    building.id !== ownerId &&
+    building.type === 'weir' &&
+    building.weirReservoir?.tiles.some(tile => tile.x === x && tile.y === y));
+}
+
+function reservoirCandidates(state: GameState, weir: Building): WeirReservoirTile[] {
+  const radius = CONFIG.disasters.drought.reservoirSearchRadius;
+  const candidates: WeirReservoirTile[] = [];
+  for (let y = weir.y - radius; y < weir.y; y++) {
+    for (let x = weir.x - radius; x <= weir.x + radius; x++) {
+      const tile = state.map[y]?.[x];
+      if (!tile || !isReservoirLand(tile) || tile.buildingId != null) continue;
+      if (!isAdjacentToRiver(state, x, y)) continue;
+      if (reservoirTileOwnedByOtherWeir(state, weir.id, x, y)) continue;
+      if (state.pendingDisasters.some(disaster =>
+        disaster.id === 'springFlood' &&
+        disaster.affectedTiles?.some(affected => affected.x === x && affected.y === y))) continue;
+      candidates.push({ x, y, originalTerrain: tile.terrain as 'plain' | 'fertile' });
+    }
+  }
+  candidates.sort((left, right) => {
+    const leftDy = weir.y - left.y;
+    const rightDy = weir.y - right.y;
+    const leftDistance = Math.max(Math.abs(left.x - weir.x), leftDy);
+    const rightDistance = Math.max(Math.abs(right.x - weir.x), rightDy);
+    return leftDistance - rightDistance ||
+      leftDy - rightDy ||
+      Math.abs(left.x - weir.x) - Math.abs(right.x - weir.x) ||
+      left.x - right.x;
+  });
+  return candidates.slice(0, CONFIG.disasters.drought.reservoirTileCount);
+}
+
+export function initializeWeirReservoir(state: GameState, weir: Building): boolean {
+  if (weir.type !== 'weir' || !weir.built || weir.weirReservoir) return false;
+  const tiles = reservoirCandidates(state, weir);
+  if (tiles.length === 0) return false;
+  weir.weirReservoir = {
+    startedDay: state.day,
+    floodedCount: 0,
+    tiles,
+  };
+  return true;
+}
+
+function reservoirFillThreshold(index: number, tileCount: number): number {
+  const totalDays = Math.max(1, CONFIG.disasters.drought.reservoirFillDays);
+  return Math.max(1, Math.ceil(totalDays * (index + 1) / Math.max(1, tileCount)));
+}
+
+export interface ReservoirWaterVisual {
+  x: number;
+  y: number;
+  progress: number;
+}
+
+export function weirReservoirWaterVisuals(state: GameState): ReservoirWaterVisual[] {
+  const visuals: ReservoirWaterVisual[] = [];
+  for (const building of state.buildings) {
+    const reservoir = building.weirReservoir;
+    if (building.type !== 'weir' || !reservoir) continue;
+    const elapsed = Math.max(0, state.day - reservoir.startedDay);
+    for (let index = 0; index < reservoir.tiles.length; index++) {
+      const target = reservoir.tiles[index];
+      if (state.map[target.y]?.[target.x]?.terrain === 'river') continue;
+      const threshold = reservoirFillThreshold(index, reservoir.tiles.length);
+      const previousThreshold = index === 0
+        ? 0
+        : reservoirFillThreshold(index - 1, reservoir.tiles.length) - 1;
+      const span = Math.max(1, threshold - previousThreshold);
+      const progress = Math.max(0, Math.min(1, (elapsed - previousThreshold) / span));
+      if (progress > 0) visuals.push({ x: target.x, y: target.y, progress });
+    }
+  }
+  return visuals;
+}
+
+export function advanceWeirReservoirs(state: GameState): boolean {
+  for (const building of state.buildings) {
+    if (building.type === 'weir' && building.built && !building.weirReservoir) {
+      initializeWeirReservoir(state, building);
+    }
+  }
+
+  let terrainChanged = false;
+  for (const building of state.buildings) {
+    const reservoir = building.weirReservoir;
+    if (building.type !== 'weir' || !building.built || !reservoir) continue;
+    const elapsed = Math.max(0, state.day - reservoir.startedDay);
+    const before = reservoir.floodedCount;
+    let floodedCount = 0;
+    for (let index = 0; index < reservoir.tiles.length; index++) {
+      const target = reservoir.tiles[index];
+      const tile = state.map[target.y]?.[target.x];
+      if (!tile) continue;
+      if (tile.terrain === 'river') {
+        floodedCount++;
+        continue;
+      }
+      if (elapsed < reservoirFillThreshold(index, reservoir.tiles.length) || tile.buildingId != null) continue;
+      if (!isReservoirLand(tile)) continue;
+      tile.terrain = 'river';
+      floodedCount++;
+      terrainChanged = true;
+    }
+    reservoir.floodedCount = floodedCount;
+    if (before < reservoir.tiles.length && floodedCount === reservoir.tiles.length) {
+      addLog(state, `보 상류에 물이 다 차 강변 ${floodedCount}칸이 잔잔한 저수면으로 바뀌었습니다.`, 'info', true);
+    }
+  }
+  return terrainChanged;
+}
+
+export function restoreWeirReservoir(state: GameState, weir: Building): boolean {
+  const reservoir = weir.weirReservoir;
+  if (weir.type !== 'weir' || !reservoir) return false;
+  let terrainChanged = false;
+  for (const target of reservoir.tiles) {
+    if (reservoirTileOwnedByOtherWeir(state, weir.id, target.x, target.y)) continue;
+    const tile = state.map[target.y]?.[target.x];
+    if (!tile || tile.terrain !== 'river') continue;
+    tile.terrain = target.originalTerrain;
+    terrainChanged = true;
+  }
+  delete weir.weirReservoir;
+  return terrainChanged;
+}
+
+function floodableTerrain(terrain: Terrain): boolean {
+  return terrain !== 'river' && terrain !== 'mountain' && terrain !== 'rock';
+}
+
+export function springFloodAffectedTiles(state: GameState, maximumDepth: number): DisasterAffectedTile[] {
+  const depthLimit = Math.max(1, Math.floor(maximumDepth));
+  const queue: Array<{ x: number; y: number; depth: number }> = [];
+  const visited = new Set<string>();
+  for (const row of state.map) {
+    for (const tile of row) {
+      if (tile.terrain !== 'river') continue;
+      queue.push({ x: tile.x, y: tile.y, depth: 0 });
+      visited.add(tileKey(tile.x, tile.y));
+    }
+  }
+
+  const affected: DisasterAffectedTile[] = [];
+  for (let cursor = 0; cursor < queue.length; cursor++) {
+    const current = queue[cursor];
+    for (const [dx, dy] of CARDINAL_DIRS) {
+      const x = current.x + dx;
+      const y = current.y + dy;
+      const key = tileKey(x, y);
+      if (visited.has(key)) continue;
+      visited.add(key);
+      const tile = state.map[y]?.[x];
+      if (!tile) continue;
+      if (tile.terrain === 'river') {
+        queue.push({ x, y, depth: current.depth });
+        continue;
+      }
+      const depth = current.depth + 1;
+      if (depth > depthLimit || !floodableTerrain(tile.terrain)) continue;
+      const building = tile.buildingId == null
+        ? undefined
+        : state.buildings.find(candidate => candidate.id === tile.buildingId);
+      if (building?.type === 'levee' && building.built) continue;
+      affected.push({ x, y, originalTerrain: tile.terrain, depth });
+      queue.push({ x, y, depth });
+    }
+  }
+  return affected;
+}
+
+export function isSpringFloodActive(state: Pick<GameState, 'pendingDisasters'>): boolean {
+  return state.pendingDisasters.some(disaster => disaster.id === 'springFlood');
+}
+
+export function isSpringFloodedTile(
+  state: Pick<GameState, 'pendingDisasters'>,
+  x: number,
+  y: number,
+): boolean {
+  const disaster = state.pendingDisasters.find(candidate => candidate.id === 'springFlood');
+  if (!disaster) return false;
+  let tiles = SPRING_FLOOD_TILE_SET_CACHE.get(disaster);
+  if (!tiles) {
+    tiles = new Set((disaster.affectedTiles ?? []).map(tile => tileKey(tile.x, tile.y)));
+    SPRING_FLOOD_TILE_SET_CACHE.set(disaster, tiles);
+  }
+  return tiles.has(tileKey(x, y));
+}
+
+export function activeSpringFloodTiles(
+  state: Pick<GameState, 'pendingDisasters'>,
+): readonly DisasterAffectedTile[] {
+  return state.pendingDisasters.find(disaster => disaster.id === 'springFlood')?.affectedTiles ?? [];
+}
+
+function floodedBuildingIds(state: GameState, tiles: readonly DisasterAffectedTile[]): Set<number> {
+  const ids = new Set<number>();
+  for (const target of tiles) {
+    const buildingId = state.map[target.y]?.[target.x]?.buildingId;
+    if (buildingId != null) ids.add(buildingId);
+  }
+  return ids;
+}
+
+function applySpringFloodDamage(
+  state: GameState,
+  affectedTiles: readonly DisasterAffectedTile[],
+  maximumDepth: number,
+  rng: () => number,
+): {
+  damagedBuildings: number;
+  lostGrowth: number;
+  breachedWeirs: number;
+  breachedReservoirTiles: DisasterAffectedTile[];
+} {
+  const floodedIds = floodedBuildingIds(state, affectedTiles);
+  const damageTargets: Building[] = [];
+  let breachedWeirs = 0;
+  const breachedReservoirTiles: DisasterAffectedTile[] = [];
+  for (const building of state.buildings) {
+    if (!building.built || building.type === 'center' || building.type === 'levee') continue;
+    if (building.type === 'weir') {
+      const breachChance = maximumDepth >= CONFIG.disasters.springFlood.deepDepth
+        ? CONFIG.disasters.springFlood.weirBreachChanceDeep
+        : CONFIG.disasters.springFlood.weirBreachChanceShallow;
+      if (rng() < breachChance) {
+        for (const tile of building.weirReservoir?.tiles ?? []) {
+          breachedReservoirTiles.push({
+            x: tile.x,
+            y: tile.y,
+            originalTerrain: tile.originalTerrain,
+            depth: 1,
+          });
+        }
+        restoreWeirReservoir(state, building);
+        damageTargets.push(building);
+        breachedWeirs++;
+        continue;
+      }
+    }
+    const placement = BUILDING_DEFS[building.type].placement;
+    const flooded = floodedIds.has(building.id);
+    const exposedToRiver = placement === 'river' || placement === 'riverbank' || placement === 'watermill';
+    const chance = flooded
+      ? CONFIG.disasters.springFlood.floodedBuildingDamageChance
+      : exposedToRiver ? CONFIG.disasters.springFlood.riverBuildingDamageChance : 0;
+    if (chance > 0 && rng() < chance) damageTargets.push(building);
+  }
+  const damagedBuildings = damageBuildingTargets(state, rng, damageTargets).length;
+
+  let lostGrowth = 0;
+  for (const building of state.buildings) {
+    if ((building.type !== 'field' && building.type !== 'paddy') ||
+        !floodedIds.has(building.id) || building.fieldGrowth <= 0) continue;
+    const loss = Math.min(building.fieldGrowth, CONFIG.disasters.springFlood.cropGrowthLoss);
+    building.fieldGrowth -= loss;
+    if (building.fieldGrowth <= 0.5) {
+      building.fieldGrowth = 0;
+      building.sownArea = 0;
+    }
+    lostGrowth += loss;
+  }
+  return { damagedBuildings, lostGrowth, breachedWeirs, breachedReservoirTiles };
+}
+
+export function startSpringFlood(
+  state: GameState,
+  maximumDepth: number,
+  drainageDays: number,
+  rng: () => number = makeRng(state.seed + getYear(state.day) * 49979687 + 1709),
+): boolean {
+  if (isSpringFloodActive(state)) return false;
+  const affectedTiles = springFloodAffectedTiles(state, maximumDepth);
+  if (affectedTiles.length === 0) return false;
+  const duration = Math.max(1, Math.floor(drainageDays));
+  const damage = applySpringFloodDamage(state, affectedTiles, maximumDepth, rng);
+  const affectedKeys = new Set(affectedTiles.map(tile => tileKey(tile.x, tile.y)));
+  for (const tile of damage.breachedReservoirTiles) {
+    if (affectedKeys.has(tileKey(tile.x, tile.y))) continue;
+    affectedTiles.push(tile);
+    affectedKeys.add(tileKey(tile.x, tile.y));
+  }
+  state.pendingDisasters.push({
+    id: 'springFlood',
+    choiceId: 'inundated',
+    startedDay: state.day,
+    resolveDay: state.day + duration,
+    progress: 0,
+    affectedTiles,
+    data: {
+      maximumDepth: Math.max(1, Math.floor(maximumDepth)),
+      damagedBuildings: damage.damagedBuildings,
+      breachedWeirs: damage.breachedWeirs,
+      lostGrowth: damage.lostGrowth,
+      depositSeed: (state.seed + getYear(state.day) * 67867967 + 2099) >>> 0,
+    },
+  });
+  addLog(
+    state,
+    `눈 녹은 물이 한꺼번에 밀려와 강이 ${Math.max(1, Math.floor(maximumDepth))}칸 너비로 범람했습니다. ` +
+      `건물 ${damage.damagedBuildings}채가 파손되고 경작지 성장도 ${Math.round(damage.lostGrowth)}%p를 잃었습니다.` +
+      (damage.breachedWeirs > 0 ? ` 보 ${damage.breachedWeirs}곳이 터져 저수지가 빠졌습니다.` : ''),
+    'bad',
+    true,
+  );
+  recordAnnals(state, 'disaster', '해빙기 대홍수가 나 강변이 물에 잠겼습니다.');
+  return true;
+}
+
+export function maybeStartSpringFlood(state: GameState): boolean {
+  if (getSeason(state.day) !== 'spring' || state.weather !== 'thawFlood') return false;
+  const year = getYear(state.day);
+  if (state.lastSpringFloodYear === year || isSpringFloodActive(state)) return false;
+  const thawDays = seasonWeatherSchedule(state.seed, year, 'spring')
+    .filter(weather => weather === 'thawFlood').length;
+  if (thawDays < CONFIG.disasters.springFlood.triggerMinThawFloodDays) return false;
+  state.lastSpringFloodYear = year;
+  const depth = thawDays >= CONFIG.disasters.springFlood.deepFloodMinThawFloodDays
+    ? CONFIG.disasters.springFlood.deepDepth
+    : CONFIG.disasters.springFlood.shallowDepth;
+  const [minimumDuration, maximumDuration] = CONFIG.disasters.springFlood.drainageDays;
+  const rng = makeRng(state.seed + year * 49979687 + 1709);
+  const duration = minimumDuration + Math.floor(rng() * (maximumDuration - minimumDuration + 1));
+  return startSpringFlood(state, depth, duration, rng);
+}
+
+function resolveSpringFlood(state: GameState, disaster: PendingDisaster): void {
+  const rng = makeRng(Math.floor(disaster.data?.depositSeed ?? (state.seed + state.day * 2099)));
+  let fertileTiles = 0;
+  for (const target of disaster.affectedTiles ?? []) {
+    const tile = state.map[target.y]?.[target.x];
+    if (!tile || target.originalTerrain !== 'plain' || tile.terrain !== 'plain') continue;
+    if (rng() >= CONFIG.disasters.springFlood.fertileDepositChance) continue;
+    tile.terrain = 'fertile';
+    fertileTiles++;
+  }
+  addLog(
+    state,
+    fertileTiles > 0
+      ? `큰물이 빠졌습니다. 강이 남긴 흙으로 평지 ${fertileTiles}칸이 비옥해졌습니다.`
+      : '큰물이 빠지고 강변 길이 다시 열렸습니다.',
+    fertileTiles > 0 ? 'good' : 'info',
+    true,
+  );
+}
+
 function resolveEarlyFrost(state: GameState, disaster: PendingDisaster): void {
   const targetId = disaster.targetBuildingIds?.[0];
   const farm = targetId == null
@@ -309,6 +706,7 @@ export function advancePendingDisasters(state: GameState): void {
     else if (disaster.id === 'lateFrost') resolveLateFrost(state, disaster);
     else if (disaster.id === 'locust') resolveLocust(state, disaster);
     else if (disaster.id === 'drought') resolveDrought(state, false);
+    else if (disaster.id === 'springFlood') resolveSpringFlood(state, disaster);
   }
   state.pendingDisasters = remaining;
 }
