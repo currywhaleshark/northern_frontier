@@ -12,7 +12,7 @@ import {
 import { makeRng } from './map';
 import { hasActivePhysician } from './medicine';
 import { createResident, killResident, livingResidents, reconcileResidentHomes } from './residents';
-import { getSeason, getYear } from './seasons';
+import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { createCombatRoster } from './combatRoster';
 import { RESIDENT_ORIGINS } from './defectors';
 import { acquireLivestock, ensureLivestockState, livestockCapacity } from './livestock';
@@ -24,6 +24,7 @@ import {
 } from './disasterClimate';
 import {
   hasPendingDisaster, lateFrostRecoveryCropId, startEarlyFrostObservation, startLateFrostObservation,
+  startLocustInfestation,
 } from './disasters';
 import type {
   Building,
@@ -48,6 +49,7 @@ const EVENT_COOLDOWNS: Record<SpecialEventId, number> = {
   shipwreck: CONFIG.specialEvents.shipwreckCooldownDays,
   earlyFrost: CONFIG.specialEvents.earlyFrostCooldownDays,
   lateFrost: CONFIG.specialEvents.lateFrostCooldownDays,
+  locust: CONFIG.specialEvents.locustCooldownDays,
   gyrfalcon: CONFIG.specialEvents.gyrfalconCooldownDays,
   horseDefectors: CONFIG.defectors.horseOfferCooldownDays,
 };
@@ -408,6 +410,10 @@ function openEarlyFrostEvent(state: GameState, rng: () => number): void {
   recordAnnals(state, 'disaster', '수확을 앞둔 경작지에 이른 서리가 내렸습니다.');
 }
 
+function locustFarms(state: GameState): Building[] {
+  return standingFarms(state).filter(building => sownAreaOf(building) > 0);
+}
+
 function openLateFrostEvent(state: GameState, rng: () => number): void {
   const farms = lateFrostFarms(state);
   const target = farms[Math.floor(rng() * farms.length)];
@@ -436,6 +442,24 @@ function openLateFrostEvent(state: GameState, rng: () => number): void {
     data: { eventId: 'lateFrost', targetBuildingId: target.id },
   };
   recordAnnals(state, 'disaster', '봄 파종 뒤 경작지에 늦서리가 내렸습니다.');
+}
+
+function openLocustEvent(state: GameState, rng: () => number): void {
+  const targets = locustFarms(state);
+  if (targets.length === 0) return;
+  const [minimumDuration, maximumDuration] = CONFIG.disasters.locust.durationDays;
+  const durationDays = minimumDuration + Math.floor(rng() * (maximumDuration - minimumDuration + 1));
+  state.pendingChoice = {
+    kind: 'incident',
+    title: '황충 떼',
+    body: '누런 메뚜기 떼가 들판 너머에서 밀려와 자라는 작물을 뒤덮었습니다. 지금 거두면 소출은 줄지만 남은 것을 지킬 수 있고, 버티면 떼가 떠날 때까지 밭을 내어주어야 합니다.',
+    options: [
+      { id: 'harvest-early', label: '서둘러 거둔다', desc: '모든 대상 경작지의 남은 예상 소출 약 절반을 즉시 확보합니다.' },
+      { id: 'endure', label: '버틴다', desc: '황충 떼가 떠날 때까지 매일 경작지 성장도가 깎입니다.' },
+    ],
+    data: { eventId: 'locust', targetBuildingIds: targets.map(building => building.id), durationDays },
+  };
+  recordAnnals(state, 'disaster', '여름 들판에 황충 떼가 밀려들었습니다.');
 }
 
 function openGyrfalconEvent(state: GameState): void {
@@ -507,6 +531,7 @@ export function maybeOpenSpecialEvent(state: GameState, rng: () => number): bool
   const riverExists = state.map.some(row => row.some(tile => tile.terrain === 'river'));
   const farms = standingFarms(state);
   const springFarms = lateFrostFarms(state);
+  const locustTargets = locustFarms(state);
   const season = getSeason(state.day);
   const candidates: Array<{ value: Exclude<SpecialEventId, 'horseDefectors'>; weight: number }> = [];
   const ready = (event: SpecialEventId) => (state.incidents.cooldownUntil[event] ?? 0) <= state.day;
@@ -529,6 +554,10 @@ export function maybeOpenSpecialEvent(state: GameState, rng: () => number): bool
       !hasPendingDisaster(state, 'lateFrost') && ready('lateFrost')) {
     candidates.push({ value: 'lateFrost', weight: disasterOccurrenceWeight(state, 'lateFrost') });
   }
+  if (locustTargets.length > 0 && (season === 'summer' || (season === 'autumn' && getDayOfSeason(state.day) <= 4)) &&
+      !hasPendingDisaster(state, 'locust') && ready('locust')) {
+    candidates.push({ value: 'locust', weight: disasterOccurrenceWeight(state, 'locust') });
+  }
   if (forestExists && ready('gyrfalcon')) candidates.push({ value: 'gyrfalcon', weight: CONFIG.specialEvents.gyrfalconWeight });
   if (candidates.length === 0) return false;
 
@@ -541,6 +570,7 @@ export function maybeOpenSpecialEvent(state: GameState, rng: () => number): bool
   else if (eventId === 'shipwreck') openShipwreckEvent(state);
   else if (eventId === 'earlyFrost') openEarlyFrostEvent(state, rng);
   else if (eventId === 'lateFrost') openLateFrostEvent(state, rng);
+  else if (eventId === 'locust') openLocustEvent(state, rng);
   else if (eventId === 'gyrfalcon') openGyrfalconEvent(state);
   else openWildlifeEvent(state, eventId, rng);
   return state.pendingChoice != null;
@@ -930,28 +960,57 @@ function resolveShipwreck(state: GameState, optionId: string): void {
   }
 }
 
+function harvestFarmEarly(state: GameState, farm: Building): { cropName: string; amount: number } | null {
+  const cropId = farm ? cropIdForBuilding(farm) : null;
+  if (!cropId || farm.fieldGrowth <= 0) return null;
+  const crop = CROP_DEFS[cropId];
+  const footprint = footprintTilesOf(state, farm) ?? [];
+  const fertileFraction = footprint.length > 0
+    ? footprint.filter(tile => tile.terrain === 'fertile').length / footprint.length
+    : 0;
+  const fertile = farm.type === 'field' ? 1 + fertileFraction * (CONFIG.production.fertileBonus - 1) : 1;
+  const sown = Math.max(1, sownAreaOf(farm));
+  const amount = (farm.fieldGrowth / 100) * crop.yield * sown * fertile *
+    CONFIG.disasters.earlyFrost.earlyHarvestYieldMultiplier;
+  farm.inventory ??= {};
+  farm.inventory[crop.output] = (farm.inventory[crop.output] ?? 0) + amount;
+  farm.fieldGrowth = 0;
+  farm.sownArea = 0;
+  return { cropName: crop.name, amount };
+}
+
 function resolveEarlyFrost(state: GameState, optionId: string, buildingId: number): void {
   const farm = state.buildings.find(building => building.id === buildingId);
-  const cropId = farm ? cropIdForBuilding(farm) : null;
-  if (!farm || !cropId || farm.fieldGrowth <= 0) return;
-  const crop = CROP_DEFS[cropId];
+  if (!farm) return;
   if (optionId === 'harvest-early') {
-    const footprint = footprintTilesOf(state, farm) ?? [];
-    const fertileFraction = footprint.length > 0
-      ? footprint.filter(tile => tile.terrain === 'fertile').length / footprint.length
-      : 0;
-    const fertile = farm.type === 'field' ? 1 + fertileFraction * (CONFIG.production.fertileBonus - 1) : 1;
-    const sown = Math.max(1, sownAreaOf(farm));
-    const amount = (farm.fieldGrowth / 100) * crop.yield * sown * fertile *
-      CONFIG.disasters.earlyFrost.earlyHarvestYieldMultiplier;
-    farm.inventory ??= {};
-    farm.inventory[crop.output] = (farm.inventory[crop.output] ?? 0) + amount;
-    farm.fieldGrowth = 0;
-    farm.sownArea = 0;
-    addLog(state, `${withJosa(crop.name, '을/를')} 서둘러 거두어 ${withJosa(amount.toFixed(1), '을/를')} 확보했습니다.`, 'good', true);
-  } else if (optionId === 'wait-harvest') {
+    const harvest = harvestFarmEarly(state, farm);
+    if (harvest) {
+      addLog(state, `${withJosa(harvest.cropName, '을/를')} 서둘러 거두어 ${withJosa(harvest.amount.toFixed(1), '을/를')} 확보했습니다.`, 'good', true);
+    }
+  } else if (optionId === 'wait-harvest' && cropIdForBuilding(farm) && farm.fieldGrowth > 0) {
     startEarlyFrostObservation(state, farm.id);
   }
+}
+
+function resolveLocust(state: GameState, optionId: string, data: Record<string, unknown>): void {
+  const targetIds = Array.isArray(data.targetBuildingIds)
+    ? data.targetBuildingIds.map(value => Math.floor(Number(value))).filter(id => Number.isFinite(id) && id >= 1)
+    : [];
+  if (optionId === 'harvest-early') {
+    const harvests = targetIds
+      .map(id => state.buildings.find(building => building.id === id))
+      .filter((building): building is Building => building != null)
+      .map(building => harvestFarmEarly(state, building))
+      .filter((harvest): harvest is { cropName: string; amount: number } => harvest != null);
+    const total = harvests.reduce((sum, harvest) => sum + harvest.amount, 0);
+    if (harvests.length > 0) {
+      addLog(state, `황충이 번지기 전에 경작지 ${harvests.length}곳을 서둘러 거두어 ${total.toFixed(1)}만큼 확보했습니다.`, 'good', true);
+    } else {
+      addLog(state, '황충이 닥치기 전에 거둘 수 있는 작물이 없었습니다.', 'info', true);
+    }
+    return;
+  }
+  if (optionId === 'endure') startLocustInfestation(state, targetIds, Number(data.durationDays));
 }
 
 function resolveLateFrost(state: GameState, optionId: string, buildingId: number): void {
@@ -1035,6 +1094,7 @@ export function resolveSpecialEvent(state: GameState, optionId: string, rng: () 
   if (eventId === 'shipwreck') return resolveShipwreck(state, optionId);
   if (eventId === 'earlyFrost') return resolveEarlyFrost(state, optionId, choice.data.targetBuildingId as number);
   if (eventId === 'lateFrost') return resolveLateFrost(state, optionId, choice.data.targetBuildingId as number);
+  if (eventId === 'locust') return resolveLocust(state, optionId, choice.data);
   if (eventId === 'gyrfalcon') return resolveGyrfalcon(state, optionId);
   if (eventId === 'horseDefectors') return resolveHorseDefectors(state, optionId, rng);
   if (!wildlife) return;

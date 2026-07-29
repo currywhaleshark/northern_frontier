@@ -1110,6 +1110,26 @@ function drawEarlyFrostCropOverlay(ctx: CanvasRenderingContext2D, x: number, y: 
   ctx.restore();
 }
 
+function drawLocustCropOverlay(ctx: CanvasRenderingContext2D, x: number, y: number, day: number): void {
+  ctx.save();
+  ctx.fillStyle = 'rgba(112, 76, 25, 0.78)';
+  ctx.strokeStyle = 'rgba(64, 45, 18, 0.82)';
+  ctx.lineWidth = 0.8;
+  for (let index = 0; index < 7; index++) {
+    const phase = day * 3 + index * 11 + Math.floor(x + y) * 2;
+    const px = x + 3 + ((phase * 7) % (TILE - 6));
+    const py = y + 4 + ((phase * 5) % (TILE - 8));
+    ctx.beginPath();
+    ctx.ellipse(px, py, 1.45, 0.8, (phase % 5) * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(px - 2, py + 1);
+    ctx.lineTo(px + 2, py - 1);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function siteColor(site: ForeignSite): string {
   return FACTIONS.find(faction => faction.name === site.factionName)?.color ?? '#9aa0a6';
 }
@@ -1575,6 +1595,11 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       .filter(disaster => disaster.id === 'earlyFrost' || disaster.id === 'lateFrost')
       .flatMap(disaster => disaster.targetBuildingIds ?? []),
   );
+  const locustBuildingIds = new Set(
+    state.pendingDisasters
+      .filter(disaster => disaster.id === 'locust')
+      .flatMap(disaster => disaster.targetBuildingIds ?? []),
+  );
   const sorted = [...state.buildings].sort((a, b) =>
     (a.y + buildingFootprintDims(a).h) - (b.y + buildingFootprintDims(b).h) || a.x - b.x);
   const visibleBuildings: Building[] = [];
@@ -1618,6 +1643,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
         sprites.drawBuilding(ctx, drawParams);
         if (frostObservationBuildingIds.has(b.id)) {
           drawEarlyFrostCropOverlay(ctx, drawParams.x, drawParams.y);
+        }
+        if (locustBuildingIds.has(b.id)) {
+          drawLocustCropOverlay(ctx, drawParams.x, drawParams.y, state.day);
         }
         occludedBuildingDraws.push(drawParams);
       }

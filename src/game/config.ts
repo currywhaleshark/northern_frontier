@@ -257,6 +257,7 @@ export const CONFIG = {
     shipwreckCooldownDays: 72,
     earlyFrostCooldownDays: 48,
     lateFrostCooldownDays: 48,
+    locustCooldownDays: 72,
     gyrfalconCooldownDays: 144,
     wolfThreatDays: [12, 18] as const,
     tigerThreatDays: [18, 24] as const,
@@ -317,6 +318,18 @@ export const CONFIG = {
       waitReplantTemperatureCoefficient: 0.14,
       waitReplantMinClearChance: 0.42,
       waitReplantMaxClearChance: 0.72,
+    },
+    locust: {
+      occurrenceBaseWeight: 2.4,
+      // 온난·건조한 해일수록 황충이 들기 쉽고, 같은 기후라도 연차 고유의 변덕을 남긴다.
+      occurrenceTemperatureCoefficient: 0.28,
+      occurrencePrecipitationCoefficient: -0.36,
+      occurrenceMinMultiplier: 0.5,
+      occurrenceMaxMultiplier: 1.65,
+      annualVarianceMinMultiplier: 0.72,
+      annualVarianceMaxMultiplier: 1.28,
+      durationDays: [2, 5] as const,
+      dailyGrowthLoss: 12,
     },
     plagueSuspicion: {
       occurrenceBaseWeight: 3,

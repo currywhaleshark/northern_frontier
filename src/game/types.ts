@@ -694,7 +694,7 @@ export type PredatorKind = 'wolf' | 'tiger';
 export type TigerTier = 'tiger' | 'greatTiger' | 'mountainLord';
 export type WildlifeKind = PredatorKind | 'boar';
 export type SpecialEventId = WildlifeKind | 'wildGinseng' | 'plagueSuspicion' | 'grainRequisition' |
-  'shipwreck' | 'earlyFrost' | 'lateFrost' | 'gyrfalcon' | 'horseDefectors';
+  'shipwreck' | 'earlyFrost' | 'lateFrost' | 'locust' | 'gyrfalcon' | 'horseDefectors';
 
 export type DisasterId =
   | 'earlyFrost'

@@ -1,10 +1,11 @@
 // 연간 기후를 재해 발생 가중치와 선택 결과 확률로 변환하는 단일 원본.
 import { annualClimate, annualClimateSummary, type AnnualClimate } from './climate';
 import { CONFIG } from './config';
+import { makeRng } from './map';
 import { getYear } from './seasons';
 import type { GameState } from './types';
 
-export type ClimateDisasterEventId = 'earlyFrost' | 'lateFrost' | 'plagueSuspicion';
+export type ClimateDisasterEventId = 'earlyFrost' | 'lateFrost' | 'locust' | 'plagueSuspicion';
 
 type DisasterState = Pick<GameState, 'seed' | 'day' | 'specialItems'>;
 type ClimateState = Pick<GameState, 'seed' | 'day'>;
@@ -37,6 +38,18 @@ function lateFrostOccurrenceWeight(climate: AnnualClimate): number {
   return config.occurrenceBaseWeight * multiplier;
 }
 
+function locustOccurrenceWeight(climate: AnnualClimate): number {
+  const config = CONFIG.disasters.locust;
+  const multiplier = clamp(
+    1 +
+      climate.temperatureAnomaly * config.occurrenceTemperatureCoefficient +
+      climate.precipitationAnomaly * config.occurrencePrecipitationCoefficient,
+    config.occurrenceMinMultiplier,
+    config.occurrenceMaxMultiplier,
+  );
+  return config.occurrenceBaseWeight * multiplier;
+}
+
 function plagueOccurrenceWeight(climate: AnnualClimate): number {
   const config = CONFIG.disasters.plagueSuspicion;
   const multiplier = clamp(
@@ -60,14 +73,24 @@ export function disasterOccurrenceWeightForClimate(
 ): number {
   if (eventId === 'earlyFrost') return earlyFrostOccurrenceWeight(climate);
   if (eventId === 'lateFrost') return lateFrostOccurrenceWeight(climate);
+  if (eventId === 'locust') return locustOccurrenceWeight(climate);
   return plagueOccurrenceWeight(climate);
+}
+
+/** 같은 시드·연도에서 재현되는 황충 전용의 작은 발생 변동이다. */
+export function locustAnnualMultiplier(state: ClimateState): number {
+  const config = CONFIG.disasters.locust;
+  const rng = makeRng(state.seed + getYear(state.day) * 32452843 + 293);
+  return config.annualVarianceMinMultiplier + rng() *
+    (config.annualVarianceMaxMultiplier - config.annualVarianceMinMultiplier);
 }
 
 export function disasterOccurrenceWeight(
   state: ClimateState,
   eventId: ClimateDisasterEventId,
 ): number {
-  return disasterOccurrenceWeightForClimate(currentClimate(state), eventId);
+  const weight = disasterOccurrenceWeightForClimate(currentClimate(state), eventId);
+  return eventId === 'locust' ? weight * locustAnnualMultiplier(state) : weight;
 }
 
 function earlyFrostWaitHarvestChance(climate: AnnualClimate): number {

@@ -187,6 +187,41 @@ assert.equal(CURRENT_SCHEMA_VERSION, 44);
   assert.equal(disasters.lateFrostRecoveryCropId(paddy), 'rice');
 }
 
+// 황충은 시작 다음 날부터 비공개 기간만큼 대상 경작지의 성장도를 매일 깎는다.
+{
+  const state = simulation.newGame(72008);
+  state.day = 15;
+  const field = addStandingFarm(state);
+  const paddy = addStandingPaddy(state);
+  assert.equal(disasters.startLocustInfestation(state, [field.id, paddy.id], 3), true);
+  assert.equal(disasters.startLocustInfestation(state, [field.id], 3), false, 'only one locust swarm can persist');
+  advanceWeather(state, 'clear');
+  assert.equal(field.fieldGrowth, 68);
+  assert.equal(paddy.fieldGrowth, 68);
+  advanceWeather(state, 'rain');
+  assert.equal(field.fieldGrowth, 56);
+  advanceWeather(state, 'clear');
+  assert.equal(state.pendingDisasters.length, 0);
+  assert.equal(field.fieldGrowth, 44);
+  assert.equal(paddy.fieldGrowth, 44);
+  assert.ok(state.log.some(entry => entry.text.includes('황충 떼가 다른 들판으로 떠났습니다')));
+}
+
+// 성장도가 바닥난 경작지는 파종 칸을 비워 다음 작기를 준비한다.
+{
+  const state = simulation.newGame(72009);
+  state.day = 15;
+  const field = addStandingFarm(state);
+  field.fieldGrowth = 15;
+  assert.equal(disasters.startLocustInfestation(state, [field.id], 2), true);
+  advanceWeather(state, 'clear');
+  assert.equal(field.fieldGrowth, 3);
+  advanceWeather(state, 'clear');
+  assert.equal(field.fieldGrowth, 0);
+  assert.equal(field.sownArea, 0);
+  assert.equal(state.pendingDisasters.length, 0);
+}
+
 const simulationSource = readFileSync(new URL('../../src/game/simulation.ts', import.meta.url), 'utf8');
 assert.match(
   simulationSource,
@@ -198,5 +233,7 @@ const rendererSource = readFileSync(new URL('../../src/render/renderer.ts', impo
 assert.ok(rendererSource.includes('drawEarlyFrostCropOverlay'));
 assert.ok(rendererSource.includes("disaster.id === 'earlyFrost'"));
 assert.ok(rendererSource.includes("disaster.id === 'lateFrost'"));
+assert.ok(rendererSource.includes('drawLocustCropOverlay'));
+assert.ok(rendererSource.includes("disaster.id === 'locust'"));
 
 console.log('pending disaster tests passed');

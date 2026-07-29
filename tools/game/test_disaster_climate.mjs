@@ -79,6 +79,31 @@ assert.ok(
     disasters.disasterChoiceChanceForClimate(veryWarm, 'lateFrost', 'wait-replant'),
   'late frost must be less likely to clear in colder years',
 );
+assert.equal(
+  disasters.disasterOccurrenceWeightForClimate(normal, 'locust'),
+  CONFIG.disasters.locust.occurrenceBaseWeight,
+);
+assert.ok(
+  disasters.disasterOccurrenceWeightForClimate(
+    { ...normal, temperatureAnomaly: 1, precipitationAnomaly: -1 },
+    'locust',
+  ) > disasters.disasterOccurrenceWeightForClimate(
+    { ...normal, temperatureAnomaly: -1, precipitationAnomaly: 1 },
+    'locust',
+  ),
+  'locust occurrence must rise in warm, dry years',
+);
+const locustVariationState = { seed: 72008, day: 15 };
+assert.equal(
+  disasters.locustAnnualMultiplier(locustVariationState),
+  disasters.locustAnnualMultiplier(locustVariationState),
+  'locust annual variation must be deterministic',
+);
+assert.ok(
+  disasters.locustAnnualMultiplier(locustVariationState) >= CONFIG.disasters.locust.annualVarianceMinMultiplier &&
+    disasters.locustAnnualMultiplier(locustVariationState) <= CONFIG.disasters.locust.annualVarianceMaxMultiplier,
+  'locust annual variation stays within its configured range',
+);
 
 const extremeCold = { temperatureAnomaly: -100, precipitationAnomaly: 0, storminess: 0 };
 const extremeWarm = { temperatureAnomaly: 100, precipitationAnomaly: 0, storminess: 0 };
@@ -188,7 +213,7 @@ function addStandingFarm(state) {
 
 const selectableEventIds = [
   'wolf', 'tiger', 'boar', 'wildGinseng', 'plagueSuspicion',
-  'grainRequisition', 'shipwreck', 'earlyFrost', 'lateFrost', 'gyrfalcon',
+  'grainRequisition', 'shipwreck', 'earlyFrost', 'lateFrost', 'locust', 'gyrfalcon',
 ];
 
 function prepareEvents(state, allowed) {
@@ -250,6 +275,25 @@ function openOnlyLateFrost(state) {
   prepareLateFrostEvents(state);
   assert.equal(specialEvents.maybeOpenSpecialEvent(state, sequenceRng([0, 0])), true);
   assert.equal(state.pendingChoice?.data.eventId, 'lateFrost');
+}
+
+function prepareLocustEvents(state) {
+  state.day = 15;
+  state.weather = 'clear';
+  state.incidents.year = 1;
+  state.incidents.scheduledDays = [state.day];
+  state.incidents.cooldownUntil = Object.fromEntries(
+    selectableEventIds.filter(id => id !== 'locust').map(id => [id, 9999]),
+  );
+}
+
+function openOnlyLocust(state, durationRoll = 0) {
+  addStandingFarm(state);
+  prepareLocustEvents(state);
+  const rng = sequenceRng([0, durationRoll]);
+  assert.equal(specialEvents.maybeOpenSpecialEvent(state, rng), true);
+  assert.equal(state.pendingChoice?.data.eventId, 'locust');
+  assert.equal(rng.calls, 2, 'locust selection and hidden duration each consume one RNG call');
 }
 
 // 측우기는 정보만 공개한다. 미보유 상태에는 수치가 새지 않고, 보유 시 실제 함수의 값이 표시된다.
@@ -334,6 +378,41 @@ function openOnlyLateFrost(state) {
   state.weather = 'clear';
   assert.equal(specialEvents.maybeOpenSpecialEvent(state, sequenceRng([0, 0])), false);
   assert.equal(state.incidents.scheduledDays.length, 1, 'a clear spring day does not consume the scheduled incident');
+}
+
+// 황충은 여름에만 발생하며, 버티기는 추가 RNG 없이 비공개 체류 상태를 만든다.
+{
+  const state = simulation.newGame(53001);
+  openOnlyLocust(state, 0.99);
+  const field = state.buildings.at(-1);
+  assert.equal(state.pendingChoice.data.durationDays, 5);
+  const rng = sequenceRng([0]);
+  specialEvents.resolveSpecialEvent(state, 'endure', rng);
+  assert.equal(rng.calls, 0, 'enduring locusts consumes no simulation RNG after the event opens');
+  assert.equal(state.pendingDisasters[0].resolveDay, state.day + 5);
+  assert.deepEqual(state.pendingDisasters[0].targetBuildingIds, [field.id]);
+}
+
+// 정착지 단위 조기 수확은 황충 대기열을 만들지 않고 대상 밭의 남은 소출을 확보한다.
+{
+  const state = simulation.newGame(53002);
+  openOnlyLocust(state);
+  const field = state.buildings.at(-1);
+  specialEvents.resolveSpecialEvent(state, 'harvest-early', sequenceRng([0]));
+  assert.equal(field.fieldGrowth, 0);
+  assert.equal(field.sownArea, 0);
+  assert.ok(field.inventory.grain > 0);
+  assert.deepEqual(state.pendingDisasters, []);
+}
+
+{
+  const state = simulation.newGame(53003);
+  addStandingFarm(state);
+  prepareLocustEvents(state);
+  state.day = 29; // 가을 다섯째 날: 초가을 범위를 벗어난다.
+  state.incidents.scheduledDays = [state.day];
+  assert.equal(specialEvents.maybeOpenSpecialEvent(state, sequenceRng([0, 0])), false);
+  assert.equal(state.incidents.scheduledDays.length, 1, 'late autumn does not consume a locust incident');
 }
 
 // 역병 사건도 선택 1회 + 환자 1회 + 실제 역병 1회의 기존 RNG 순서를 보존한다.

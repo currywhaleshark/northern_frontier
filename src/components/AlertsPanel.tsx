@@ -156,6 +156,14 @@ export function computeAlerts(state: GameState): AlertItem[] {
     });
   }
   for (const disaster of state.pendingDisasters) {
+    if (disaster.id === 'locust') {
+      alerts.push({
+        id: `pendingDisaster-${disaster.id}`,
+        text: '황충 떼가 경작지를 갉아먹고 있습니다.',
+        level: 'danger',
+      });
+      continue;
+    }
     if (disaster.id !== 'earlyFrost' && disaster.id !== 'lateFrost') continue;
     const daysLeft = pendingDisasterDaysRemaining(state, disaster);
     const title = disaster.id === 'earlyFrost' ? '이른 서리' : '늦서리';

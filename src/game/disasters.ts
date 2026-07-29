@@ -108,6 +108,31 @@ export function startLateFrostObservation(state: GameState, targetBuildingId: nu
   return true;
 }
 
+export function startLocustInfestation(
+  state: GameState,
+  targetBuildingIds: number[],
+  durationDays: number,
+): boolean {
+  if (hasPendingDisaster(state, 'locust')) return false;
+  const [minimumDuration, maximumDuration] = CONFIG.disasters.locust.durationDays;
+  const requestedDuration = Math.floor(durationDays);
+  const duration = Number.isFinite(requestedDuration)
+    ? Math.max(minimumDuration, Math.min(maximumDuration, requestedDuration))
+    : minimumDuration;
+  const targets = [...new Set(targetBuildingIds.filter(id => Number.isInteger(id) && id >= 1))];
+  if (targets.length === 0) return false;
+  state.pendingDisasters.push({
+    id: 'locust',
+    choiceId: 'endure',
+    startedDay: state.day,
+    resolveDay: state.day + duration,
+    targetBuildingIds: targets,
+    progress: 0,
+  });
+  addLog(state, '황충 떼가 경작지에 내려앉아 잎과 이삭을 갉아먹기 시작했습니다.', 'bad', true);
+  return true;
+}
+
 function resolveEarlyFrost(state: GameState, disaster: PendingDisaster): void {
   const targetId = disaster.targetBuildingIds?.[0];
   const farm = targetId == null
@@ -172,6 +197,34 @@ function resolveLateFrost(state: GameState, disaster: PendingDisaster): void {
   );
 }
 
+function damageLocustFarms(state: GameState, disaster: PendingDisaster): void {
+  let lostGrowth = 0;
+  for (const id of disaster.targetBuildingIds ?? []) {
+    const farm = state.buildings.find(building => building.id === id);
+    if (!farm || (farm.type !== 'field' && farm.type !== 'paddy') || farm.fieldGrowth <= 0) continue;
+    const loss = Math.min(farm.fieldGrowth, CONFIG.disasters.locust.dailyGrowthLoss);
+    farm.fieldGrowth -= loss;
+    if (farm.fieldGrowth <= 0.5) {
+      farm.fieldGrowth = 0;
+      farm.sownArea = 0;
+    }
+    lostGrowth += loss;
+  }
+  disaster.progress = Math.max(0, disaster.progress ?? 0) + lostGrowth;
+}
+
+function resolveLocust(state: GameState, disaster: PendingDisaster): void {
+  const lostGrowth = Math.round(Math.max(0, disaster.progress ?? 0));
+  addLog(
+    state,
+    lostGrowth > 0
+      ? `황충 떼가 다른 들판으로 떠났습니다. 경작지 성장도를 모두 합쳐 ${lostGrowth}%p 갉아먹었습니다.`
+      : '황충 떼가 떠났지만 이미 남아 있던 작물이 없었습니다.',
+    lostGrowth > 0 ? 'bad' : 'info',
+    true,
+  );
+}
+
 export function advancePendingDisasters(state: GameState): void {
   if (state.pendingDisasters.length === 0) return;
   const remaining: PendingDisaster[] = [];
@@ -180,12 +233,16 @@ export function advancePendingDisasters(state: GameState): void {
         (disaster.id === 'earlyFrost' || disaster.id === 'lateFrost') && FROST_WEATHERS.has(state.weather)) {
       disaster.progress = Math.max(0, disaster.progress ?? 0) + 1;
     }
+    if (state.day > disaster.startedDay && state.day <= disaster.resolveDay && disaster.id === 'locust') {
+      damageLocustFarms(state, disaster);
+    }
     if (state.day < disaster.resolveDay) {
       remaining.push(disaster);
       continue;
     }
     if (disaster.id === 'earlyFrost') resolveEarlyFrost(state, disaster);
     else if (disaster.id === 'lateFrost') resolveLateFrost(state, disaster);
+    else if (disaster.id === 'locust') resolveLocust(state, disaster);
   }
   state.pendingDisasters = remaining;
 }
