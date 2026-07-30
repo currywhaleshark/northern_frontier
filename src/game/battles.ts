@@ -14,6 +14,7 @@ import { changeRelation } from './relations';
 import { resetAgent } from './agents';
 import { consumeMusketPowder, musketReadiness } from './weapons';
 import { damageBuildings, injure, killResidents, loot, moraleShock } from './raidDamage';
+import { factionRaidPartyLabel } from './diplomaticFigures';
 import type { Battle, BattleLocation, BattleMode, BattleOutcome, GameState, RaiderBand, Resident, WeatherId } from './types';
 
 export const BATTLE_MUSTER_DEADLINE = 5;
@@ -165,8 +166,8 @@ export function startBattle(state: GameState, mode: BattleMode): boolean {
   };
   state.pendingChoice = null;
   addLog(state, mode === 'levy'
-    ? `온 마을이 낫과 도끼를 들었습니다. ${withJosa(state.battle.faction, '이/가')} 마을 안으로 밀고 들어와 방어전이 벌어집니다.`
-    : `수비병이 마을 밖으로 요격에 나섭니다. ${withJosa(state.battle.faction, '과/와')} 외곽에서 맞붙습니다.`, 'raid');
+    ? `온 마을이 낫과 도끼를 들었습니다. ${withJosa(factionRaidPartyLabel(state, state.battle.faction), '이/가')} 마을 안으로 밀고 들어와 방어전이 벌어집니다.`
+    : `수비병이 마을 밖으로 요격에 나섭니다. ${withJosa(factionRaidPartyLabel(state, state.battle.faction), '과/와')} 외곽에서 맞붙습니다.`, 'raid');
   return true;
 }
 
@@ -283,8 +284,8 @@ function finishBattle(state: GameState, outcome: BattleOutcome, rng: () => numbe
     moraleShock(state, -8);
     changeRelation(state, battle.faction, CONFIG.relations.militiaWin);
     const winText = location === 'outskirts'
-      ? `${withJosa(side, '이/가')} ${withJosa(battle.faction, '을/를')} 외곽에서 몰아냈습니다! 부상자 ${injured}명, 건물 피해는 없습니다.`
-      : `${withJosa(side, '이/가')} ${withJosa(battle.faction, '을/를')} 마을 안에서 물리쳤습니다! 부상자 ${injured}명, 건물 ${damaged.length}채가 파손되었습니다.`;
+      ? `${withJosa(side, '이/가')} ${withJosa(factionRaidPartyLabel(state, battle.faction), '을/를')} 외곽에서 몰아냈습니다! 부상자 ${injured}명, 건물 피해는 없습니다.`
+      : `${withJosa(side, '이/가')} ${withJosa(factionRaidPartyLabel(state, battle.faction), '을/를')} 마을 안에서 물리쳤습니다! 부상자 ${injured}명, 건물 ${damaged.length}채가 파손되었습니다.`;
     addLog(state, winText, 'good', true);
     recordAnnals(state, 'raid', winText);
     state.lifetimeStats.raidsRepelled++;
@@ -311,7 +312,7 @@ function finishBattle(state: GameState, outcome: BattleOutcome, rng: () => numbe
       ? `외곽 요격선이 무너져 적이 마을로 들이닥쳤습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`
       : `${withJosa(side, '이/가')} 마을 안에서 밀려났습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`;
     addLog(state, lossText, 'raid');
-    recordAnnals(state, 'raid', `${battle.faction}의 습격 — ${lossText}`);
+    recordAnnals(state, 'raid', `${factionRaidPartyLabel(state, battle.faction)}의 습격 — ${lossText}`);
     state.lifetimeStats.raidsSuffered++;
   }
 

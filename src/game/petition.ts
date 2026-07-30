@@ -8,6 +8,7 @@ import { addLog } from './events';
 import { RANK_ORDER } from './promotion';
 import { livingResidents } from './residents';
 import { lowerSuspicion } from './suspicion';
+import { BORDER_COMMANDER_TITLE, borderCommanderEffects } from './diplomaticFigures';
 import type { GameState, Rank, ResourceId } from './types';
 
 export interface PetitionOffer {
@@ -25,57 +26,57 @@ export interface PetitionOffer {
 export const PETITION_OFFERS: PetitionOffer[] = [
   {
     id: 'grain', minRank: 'bo', repMin: 25, repCost: 5,
-    label: '구휼 곡식을 청한다', desc: '곡물 30. 흉년의 허리를 잇는다.',
+    label: '구휼 곡식을 청한다', desc: '흉년의 허리를 잇는 구휼미를 청한다.',
     gives: { grain: 30 },
   },
   {
     id: 'tools', minRank: 'bo', repMin: 30, repCost: 5,
-    label: '연장을 청한다', desc: '도구 5. 무뎌진 낫과 도끼를 갈음한다.',
+    label: '연장을 청한다', desc: '무뎌진 낫과 도끼를 갈음할 연장을 청한다.',
     gives: { tools: 5 },
   },
   {
     id: 'cotton-clothes', minRank: 'bo', repMin: 30, repCost: 5,
-    label: '겨울옷을 청한다', desc: '무명옷 8. 혹한을 나는 조정의 구휼품.',
+    label: '겨울옷을 청한다', desc: '혹한을 날 조정의 구휼품을 청한다.',
     gives: { cottonClothes: 8 },
   },
   {
     id: 'powder-small', minRank: 'bo', repMin: 45, repCost: 8,
-    label: '화약 소량을 청한다', desc: '화약 4. 조정은 변방에 화약을 잘 내주지 않는다.',
+    label: '화약 소량을 청한다', desc: '조정이 변방에 좀처럼 내주지 않는 화약을 청한다.',
     gives: { gunpowder: 4 },
   },
   {
     id: 'muskets', minRank: 'jin', repMin: 55, repCost: 12,
-    label: '조총을 청한다', desc: '조총 4정. 화약이 있으면 수비병의 방어 기여가 크게 오른다.',
+    label: '조총을 청한다', desc: '화약과 함께 쓰면 수비에 큰 힘이 될 조총을 청한다.',
     gives: { muskets: 4 },
   },
   {
     id: 'powder', minRank: 'jin', repMin: 50, repCost: 8,
-    label: '화약을 청한다', desc: '화약 10. 진(鎭)의 이름값으로 얻어낸 몫.',
+    label: '화약을 청한다', desc: '진(鎭)의 이름값으로 더 넉넉한 화약을 청한다.',
     gives: { gunpowder: 10 },
   },
   {
     id: 'porcelain', minRank: 'jin', repMin: 45, repCost: 6,
-    label: '자기를 청한다', desc: '자기 2. 교역과 사기 진작에 쓸 수 있다.',
+    label: '자기를 청한다', desc: '교역과 사기 진작에 쓸 자기를 청한다.',
     gives: { porcelain: 2 },
   },
   {
     id: 'brassware', minRank: 'jin', repMin: 45, repCost: 6,
-    label: '유기를 청한다', desc: '유기 2. 교역과 사기 진작에 쓸 수 있다.',
+    label: '유기를 청한다', desc: '교역과 사기 진작에 쓸 유기를 청한다.',
     gives: { brassware: 2 },
   },
   {
     id: 'lacquerware', minRank: 'jin', repMin: 45, repCost: 6,
-    label: '칠기를 청한다', desc: '칠기 2. 교역과 사기 진작에 쓸 수 있다.',
+    label: '칠기를 청한다', desc: '교역과 사기 진작에 쓸 칠기를 청한다.',
     gives: { lacquerware: 2 },
   },
   {
     id: 'silk', minRank: 'jin', repMin: 50, repCost: 8,
-    label: '비단을 청한다', desc: '비단 2. 고가 교역품이자 사치품이다.',
+    label: '비단을 청한다', desc: '고가 교역품이자 사치품인 비단을 청한다.',
     gives: { silk: 2 },
   },
   {
     id: 'preciousMetal', minRank: 'bu', repMin: 65, repCost: 12,
-    label: '귀금속을 청한다', desc: '귀금속 1. 매우 높은 가치의 사치품이다.',
+    label: '귀금속을 청한다', desc: '가치 높은 사치품인 귀금속을 청한다.',
     gives: { preciousMetal: 1 },
   },
   {
@@ -89,6 +90,18 @@ function rankAtLeast(rank: Rank, min: Rank): boolean {
   return RANK_ORDER.indexOf(rank) >= RANK_ORDER.indexOf(min);
 }
 
+export function petitionReputationCost(state: GameState, offer: PetitionOffer): number {
+  return Math.max(1, Math.round(
+    offer.repCost * borderCommanderEffects(state).petitionReputationMultiplier,
+  ));
+}
+
+export function petitionResourceAmount(state: GameState, amount: number): number {
+  return Math.max(0, Math.round(
+    amount * borderCommanderEffects(state).petitionResourceMultiplier,
+  ));
+}
+
 // 지금 청원할 수 있는지 — 불가하면 사유 문자열 (UI 버튼 비활성 사유와 공유)
 export function canPetition(state: GameState): string | null {
   if (!rankAtLeast(state.rank, 'bo')) return '보(堡) 승격 후에 청원할 수 있습니다';
@@ -100,15 +113,15 @@ export function canPetition(state: GameState): string | null {
   return null;
 }
 
-function offerDesc(offer: PetitionOffer): string {
+function offerDesc(state: GameState, offer: PetitionOffer): string {
   const parts: string[] = [];
   if (offer.gives) {
     parts.push(Object.entries(offer.gives)
-      .map(([res, amt]) => `${RESOURCE_NAMES[res as ResourceId]} +${amt}`).join(', '));
+      .map(([res, amt]) => `${RESOURCE_NAMES[res as ResourceId]} +${petitionResourceAmount(state, amt)}`).join(', '));
   }
   if (offer.morale) parts.push(`전 주민 사기 +${offer.morale}`);
   if (offer.cannon) parts.push('불랑기포대 배치권 +1');
-  parts.push(`명성 -${offer.repCost}`);
+  parts.push(`명성 -${petitionReputationCost(state, offer)}`);
   return `${offer.desc} (${parts.join(', ')})`;
 }
 
@@ -122,7 +135,8 @@ export function requestPetition(state: GameState): string | null {
     kind: 'petition',
     title: `조정에 청원 — ${RANK_NAMES[state.rank]}`,
     body:
-      `한양에 사자를 보내 지원을 청합니다. 조정은 명성이 높은 수령의 청을 후하게 듣습니다.\n` +
+      `${BORDER_COMMANDER_TITLE} ${state.borderCommander.name}에게 사자를 보내 조정의 지원을 청합니다. ` +
+      `명성이 높은 수령의 청은 후하게 다뤄집니다.\n` +
       `현재 명성: ${Math.floor(state.resources.reputation)} · 청원은 계절당 한 번입니다.`,
     illustration: {
       src: '/assets/events/court-petition-v1.png',
@@ -132,7 +146,7 @@ export function requestPetition(state: GameState): string | null {
       ...offers.map(o => ({
         id: o.id,
         label: o.label,
-        desc: offerDesc(o),
+        desc: offerDesc(state, o),
         disabled: state.resources.reputation < o.repMin,
         disabledReason: `명성 ${o.repMin} 이상이 필요합니다`,
       })),
@@ -153,15 +167,16 @@ export function resolvePetition(state: GameState, optionId: string): void {
   const offer = PETITION_OFFERS.find(o => o.id === optionId);
   if (!offer || state.resources.reputation < offer.repMin) return;
 
-  state.resources.reputation = Math.max(0, state.resources.reputation - offer.repCost);
+  state.resources.reputation = Math.max(0, state.resources.reputation - petitionReputationCost(state, offer));
   state.lastPetitionDay = state.day;
   lowerSuspicion(state, CONFIG.suspicion.petitionDecay); // 조정과의 접촉은 의심을 누그러뜨린다
 
   const grantedParts: string[] = [];
   if (offer.gives) {
     for (const [res, amt] of Object.entries(offer.gives)) {
-      state.resources[res as ResourceId] += amt ?? 0;
-      grantedParts.push(`${RESOURCE_NAMES[res as ResourceId]} ${amt}`);
+      const granted = petitionResourceAmount(state, amt ?? 0);
+      state.resources[res as ResourceId] += granted;
+      grantedParts.push(`${RESOURCE_NAMES[res as ResourceId]} ${granted}`);
     }
   }
   if (offer.morale) {
@@ -175,7 +190,12 @@ export function resolvePetition(state: GameState, optionId: string): void {
     grantedParts.push('불랑기포 1문');
     addLog(state, '조정이 불랑기포를 내렸습니다. 건설 메뉴에서 포대를 지어 얹으십시오.', 'good');
   }
-  addLog(state, `청원이 받아들여졌습니다. 조정에서 ${withJosa(grantedParts.join(', '), '이/가')} 내려왔습니다.`, 'good');
+  addLog(
+    state,
+    `청원이 받아들여졌습니다. ${withJosa(`북병사 ${state.borderCommander.name}`, '이/가')} ` +
+      `${withJosa(grantedParts.join(', '), '을/를')} 내려보냈습니다.`,
+    'good',
+  );
 }
 
 // 봄마다: 진(鎭) 이상은 조정이 화약을 소량 정기 지급한다 (의도적으로 부족하게)
@@ -183,5 +203,9 @@ export function grantYearlyPowder(state: GameState): void {
   const amount = CONFIG.petition.yearlyPowder[state.rank] ?? 0;
   if (amount <= 0) return;
   state.resources.gunpowder += amount;
-  addLog(state, `조정의 연례 화약 배급이 내려왔습니다. (화약 +${amount})`, 'good');
+  addLog(
+    state,
+    `북병사 ${state.borderCommander.name} 명의의 연례 화약 배급이 내려왔습니다. (화약 +${amount})`,
+    'good',
+  );
 }

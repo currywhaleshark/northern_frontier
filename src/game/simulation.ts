@@ -90,6 +90,10 @@ import {
 } from './livestock';
 import { normalizePastureArea, pastureRequiredHerders, setStablePasture, validateStablePasture } from './pastures';
 import { cleanupRoyalPlaqueAfterBuildingRemoval } from './royalPlaque';
+import {
+  createBorderCommander, createFactionLeaders, updateDiplomaticFigures,
+} from './diplomaticFigures';
+import { dailyDiplomacyTick } from './diplomacy';
 import { resolveTerritoryWarning, updateTerritoryWarnings } from './territory';
 import {
   foreignSiteAt, generateForeignSites, revealForeignSitesFromExploration, updateSeasonalForeignSites,
@@ -156,6 +160,13 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
     processingReserves: defaultProcessingReserves(),
     threat: 25,
     relations: initRelations(),
+    factionLeaders: createFactionLeaders(s),
+    borderCommander: createBorderCommander(s, 0),
+    diplomaticPacts: [],
+    claimAccords: [],
+    pendingEnvoys: [],
+    giftEnvoyDays: {},
+    proximityWarnings: [],
     expedition: null,
     raidHold: null,
     raiders: null,
@@ -1225,6 +1236,7 @@ export function advanceDay(state: GameState): void {
 function endOfDay(state: GameState): void {
   const prevSeason = getSeason(state.day);
   state.day++;
+  updateDiplomaticFigures(state);
   const season = getSeason(state.day);
   const rng = makeRng(state.seed + state.day * 7919);
 
@@ -1264,6 +1276,7 @@ function endOfDay(state: GameState): void {
   updateLivestock(state);
   applyDailySpoilage(state);
   updateFermentation(state);
+  dailyDiplomacyTick(state);
 
   driftRelations(state);
   updateThreat(state);

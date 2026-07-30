@@ -1620,6 +1620,27 @@ export const CONFIG = {
     lowRelThreatScale: 0.02,
   },
 
+  // 외교 활동 — 사절·예물(A1)과 습격 귀띔(A3)의 수치를 여기서 한 번에 조절한다.
+  diplomacy: {
+    envoyTravelDays: 6,
+    giftRelationGainScale: 2,
+    giftRelationGainMax: 18,
+    repeatGiftYearMultiplier: 0.5,
+    giftSuspicion: 1.5,
+    raidTipRelation: 70,
+  },
+
+  // 임기제 북병사 성향(F2) — 부족 지도자 성향은 수치에 닿지 않는다.
+  borderCommanderEffects: {
+    strictSuspicionRiseMultiplier: 1.15,
+    strictGrantRankShift: 1,
+    greedyPetitionReputationMultiplier: 1.25,
+    greedyGrantRankShift: -1,
+    lenientSuspicionDecayMultiplier: 1.25,
+    tacticianPetitionResourceMultiplier: 1.25,
+    tacticianThreatDecayMultiplier: 1.15,
+  },
+
   immigration: {
     dailyChance: 0.12,
     cooldownDays: 8,

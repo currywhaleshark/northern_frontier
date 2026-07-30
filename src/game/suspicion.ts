@@ -14,6 +14,7 @@ import { getRelation } from './relations';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
 import { silverSuspicionFactors } from './silver';
 import { isNorthernDefectorOrigin } from './defectors';
+import { BORDER_COMMANDER_TITLE, borderCommanderEffects } from './diplomaticFigures';
 import type { GameState, Rank } from './types';
 
 export interface SuspicionFactor {
@@ -104,7 +105,19 @@ export function suspicionBreakdown(state: GameState): SuspicionFactor[] {
   }
   factors.push(...silverSuspicionFactors(state)); // 잠채 — 익명 라벨로만 표시된다
   factors.push({ id: 'decay', label: '세월이 눈총을 씻는다', delta: -s.baseDecay });
-  return factors;
+  const effects = borderCommanderEffects(state);
+  return factors.map(factor => ({
+    ...factor,
+    delta: factor.delta > 0
+      ? factor.delta * effects.suspicionRiseMultiplier
+      : factor.id === 'decay'
+        ? factor.delta * effects.suspicionNaturalDecayMultiplier
+        : factor.delta,
+  }));
+}
+
+function commanderSubject(state: GameState): string {
+  return `${BORDER_COMMANDER_TITLE} ${state.borderCommander.name}`;
 }
 
 export function lowerSuspicion(state: GameState, amount: number): void {
@@ -134,15 +147,16 @@ function seizeFirearms(state: GameState, ratio: number): string {
 
 export function openInspection(state: GameState): void {
   const s = CONFIG.suspicion;
+  const commander = commanderSubject(state);
   const canBribe = edibleFoodTotal(state) >= s.bribeCost.food && state.resources.hide >= s.bribeCost.hide;
   const hasYards = countBuilt(state, 'nitreYard') > 0;
   const northernDefectors = state.residents.filter(resident =>
     resident.alive && isNorthernDefectorOrigin(resident.origin)).length;
   state.pendingChoice = {
     kind: 'inspection',
-    title: '감찰 어사 — 조정의 눈',
+    title: `감찰 어사 — ${state.borderCommander.name}의 장계`,
     body:
-      '한양에서 감찰 어사가 내려왔습니다. 변방 수령이 화약을 만들고 오랑캐와 내통한다는\n' +
+      `${commander}의 장계로 한양에서 감찰 어사가 내려왔습니다. 변방 수령이 화약을 만들고 오랑캐와 내통한다는\n` +
       `소문의 진위를 캐러 온 것입니다. (현재 모반 의심: ${Math.round(state.suspicion)})` +
       (northernDefectors > 0 ? `\n귀순 야인 ${northernDefectors}명도 신원과 행적을 조사받습니다.` : ''),
     illustration: {
@@ -169,7 +183,7 @@ export function openInspection(state: GameState): void {
     ],
     data: {},
   };
-  addLog(state, '감찰 어사가 마을에 들었습니다. 조정이 이곳을 의심하고 있습니다.', 'bad', true);
+  addLog(state, `${commander}의 장계로 감찰 어사가 마을에 들었습니다. 조정이 이곳을 의심하고 있습니다.`, 'bad', true);
 }
 
 export function resolveInspection(state: GameState, optionId: string, rng: () => number): void {
@@ -211,11 +225,12 @@ export function resolveInspection(state: GameState, optionId: string, rng: () =>
 
 export function openCrackdown(state: GameState): void {
   const s = CONFIG.suspicion;
+  const commander = commanderSubject(state);
   state.pendingChoice = {
     kind: 'crackdown',
-    title: '조정 토벌군 — 모반 혐의',
+    title: `조정 토벌군 — ${state.borderCommander.name}의 장계`,
     body:
-      '유예가 끝났습니다. 조정이 모반 혐의로 토벌군을 내려보냈습니다.\n' +
+      `${commander}의 장계가 조정에 닿았습니다. 유예가 끝나 조정이 모반 혐의로 토벌군을 내려보냈습니다.\n` +
       '어떤 습격 무리보다 크고, 깃발에는 관군의 위엄이 서려 있습니다.\n' +
       `추정 규모: ${s.crackdownPower} / 현재 방어도: ${state.resources.defense}`,
     illustration: {
@@ -234,7 +249,7 @@ export function openCrackdown(state: GameState): void {
     ],
     data: {},
   };
-  addLog(state, '조정 토벌군이 마을 앞에 진을 쳤습니다. 선택의 시간입니다.', 'raid');
+  addLog(state, `${commander}의 장계 뒤 조정 토벌군이 마을 앞에 진을 쳤습니다. 선택의 시간입니다.`, 'raid');
 }
 
 export function resolveCrackdown(state: GameState, optionId: string, rng: () => number): void {
@@ -300,12 +315,12 @@ export function updateSuspicion(state: GameState, rng: () => number): void {
     state.suspicion = s.crackdownStartSuspicion;
     state.crackdownDeadline = state.day + s.crackdownGraceDays;
     if (before !== after) {
-      addLog(state, `조정이 모반 혐의로 ${withJosa(RANK_NAMES[before], '을/를')} ${withJosa(RANK_NAMES[after], '으로/로')} 강등하였습니다. (몰수: ${seized})`, 'bad', true);
+      addLog(state, `${commanderSubject(state)}의 장계로 조정이 모반 혐의에 ${withJosa(RANK_NAMES[before], '을/를')} ${withJosa(RANK_NAMES[after], '으로/로')} 강등하였습니다. (몰수: ${seized})`, 'bad', true);
       recordAnnals(state, 'court',
-        `조정이 모반 혐의로 ${withJosa(RANK_NAMES[before], '을/를')} ${withJosa(RANK_NAMES[after], '으로/로')} 강등하고 토벌 유예를 선고했습니다.`);
+        `${commanderSubject(state)}의 장계로 조정이 모반 혐의에 ${withJosa(RANK_NAMES[before], '을/를')} ${withJosa(RANK_NAMES[after], '으로/로')} 강등하고 토벌 유예를 선고했습니다.`);
     } else {
-      addLog(state, `조정이 모반 혐의를 물어 물자를 몰수했습니다. (몰수: ${seized})`, 'bad', true);
-      recordAnnals(state, 'court', '조정이 모반 혐의를 물어 물자를 몰수하고 토벌 유예를 선고했습니다.');
+      addLog(state, `${commanderSubject(state)}의 장계로 조정이 모반 혐의를 물어 물자를 몰수했습니다. (몰수: ${seized})`, 'bad', true);
+      recordAnnals(state, 'court', `${commanderSubject(state)}의 장계로 조정이 모반 혐의를 물어 물자를 몰수하고 토벌 유예를 선고했습니다.`);
     }
     addLog(state, `조정이 마지막 기회를 주었습니다 — ${s.crackdownGraceDays}일 안에 의심을 ${s.crackdownClearBelow} 아래로 내려 결백을 증명하십시오. 못하면 토벌군이 내려옵니다.`, 'raid');
     return;
@@ -316,8 +331,8 @@ export function updateSuspicion(state: GameState, rng: () => number): void {
     state.censured = true;
     const seized = seizeFirearms(state, s.censureSeizeRatio);
     state.resources.reputation = Math.max(0, state.resources.reputation - s.censureRep);
-    addLog(state, `조정의 견책이 내려왔습니다. 명성이 크게 깎이고 화기가 몰수되었습니다. (몰수: ${seized}) 이대로면 강등을 면치 못합니다.`, 'bad', true);
-    recordAnnals(state, 'court', '모반 혐의로 조정의 견책이 내려와 화기를 몰수당했습니다.');
+    addLog(state, `${commanderSubject(state)} 명의의 견책이 내려왔습니다. 명성이 크게 깎이고 화기가 몰수되었습니다. (몰수: ${seized}) 이대로면 강등을 면치 못합니다.`, 'bad', true);
+    recordAnnals(state, 'court', `${commanderSubject(state)} 명의의 견책이 내려와 화기를 몰수당했습니다.`);
     return;
   }
 

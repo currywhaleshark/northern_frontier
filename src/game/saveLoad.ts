@@ -58,6 +58,10 @@ import { recordYearlySnapshot } from './chronicleStats';
 import { normalizeRoyalPlaqueBinding } from './royalPlaque';
 import { normalizePendingDisasters } from './disasters';
 import {
+  borderCommanderTermIndex, createBorderCommander, createFactionLeaders, normalizeDiplomaticFigures,
+} from './diplomaticFigures';
+import { normalizeDiplomacyState } from './diplomacy';
+import {
   gradeTacticalBattle, raidDefenseObjectiveResult, tacticalClosingSummary, tacticalOutcomeResult,
 } from './tacticalCore';
 import type {
@@ -751,6 +755,34 @@ export function migrateV46ToV47(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 47 };
 }
 
+// v48: 외교 인물은 시드와 현재 임기에서 결정적으로 생성한다.
+// 구 저장을 여는 행위만으로 과거 부임 로그를 만들지는 않는다.
+export function migrateV47ToV48(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const seed = Number.isFinite(Number(migrated.seed)) ? Number(migrated.seed) : 1;
+  const day = Number.isFinite(Number(migrated.day)) ? Math.max(1, Math.floor(Number(migrated.day))) : 1;
+  const termIndex = borderCommanderTermIndex(day);
+  return {
+    ...migrated,
+    factionLeaders: createFactionLeaders(seed),
+    borderCommander: createBorderCommander(seed, termIndex),
+    schemaVersion: 48,
+  };
+}
+
+// v49: 능동 외교의 사절·맹약·협정 상태. 구 저장에는 진행 중인 사절이 없다.
+export function migrateV48ToV49(raw: RawSave): RawSave {
+  return {
+    ...clonedRecord(raw),
+    diplomaticPacts: [],
+    claimAccords: [],
+    pendingEnvoys: [],
+    giftEnvoyDays: {},
+    proximityWarnings: [],
+    schemaVersion: 49,
+  };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -803,6 +835,8 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 44) migrated = migrateV44ToV45(migrated);
     else if (version === 45) migrated = migrateV45ToV46(migrated);
     else if (version === 46) migrated = migrateV46ToV47(migrated);
+    else if (version === 47) migrated = migrateV47ToV48(migrated);
+    else if (version === 48) migrated = migrateV48ToV49(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -2181,6 +2215,8 @@ export function loadGame(slot = 1): GameState | null {
     migrateResourceTaxonomy(parsed);
     // 구버전 저장 마이그레이션: 없는 필드는 기본값으로 채운다
     if (!parsed.relations) parsed.relations = initRelations();
+    normalizeDiplomaticFigures(parsed);
+    normalizeDiplomacyState(parsed);
     if (!parsed.difficulty) parsed.difficulty = 'normal';
     if (!parsed.habitats) {
       // 사냥터 지형이 있던 구버전: 사냥터를 숲으로 바꾸고 시드로 서식지를 새로 뽑는다

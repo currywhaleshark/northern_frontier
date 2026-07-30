@@ -5,6 +5,10 @@ import { rankProductionEfficiency } from '../../game/productionEfficiency';
 import { LUXURY_RESOURCES } from '../../game/resourceCatalog';
 import { suspicionBreakdown } from '../../game/suspicion';
 import { tributeReserved } from '../../game/tributeReserve';
+import {
+  BORDER_COMMANDER_TITLE, borderCommanderDaysRemaining, borderCommanderRumor,
+  borderCommanderTemperLabel,
+} from '../../game/diplomaticFigures';
 import type { GameState, ResourceId } from '../../game/types';
 import { UiIcon } from '../UiIcon';
 
@@ -42,6 +46,19 @@ export function CourtWindow({
 
   return (
     <div>
+      <div className="court-commander-card">
+        <div className="court-commander-heading">
+          <span>현 북병사</span>
+          <strong>체차까지 {borderCommanderDaysRemaining(state)}일</strong>
+        </div>
+        <div className="court-commander-name">{state.borderCommander.name}</div>
+        <div className="muted small">{BORDER_COMMANDER_TITLE}</div>
+        <div className="court-commander-rumor">
+          <b>{borderCommanderTemperLabel(state.borderCommander.temper)}</b>
+          <span>{borderCommanderRumor(state.borderCommander.temper)}</span>
+        </div>
+      </div>
+
       <table className="insp-table">
         <tbody>
           <tr><td>승격 단계</td><td>{RANK_NAMES[state.rank]}</td></tr>

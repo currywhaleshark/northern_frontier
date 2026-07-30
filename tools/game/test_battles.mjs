@@ -606,15 +606,17 @@ assert.equal(
   assert.ok(state.gameOver.reason.includes('눈 속에 묻혔'));
 }
 
-// 습격 모달 본문은 세력 설명을 괄호로 붙이지 않고 UI 툴팁에 맡긴다
+// 습격 모달 본문은 지도자 무리(대표 없는 세력은 세력명)만 적고 세력 설명은 UI 툴팁에 맡긴다
 {
   const state = simulation.newGame(6161);
   const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs')).href);
   const faction = FACTIONS.find(f => f.hostile);
   raids.openRaidChoice(state, () => 0, true, 42, faction.name);
+  const leader = state.factionLeaders[faction.name];
+  const raidLabel = leader ? `${leader.name} ${leader.title}의 무리` : faction.name;
   assert.equal(state.pendingChoice.illustration.src, '/assets/events/raid-charge-v2.png');
   assert.ok(state.pendingChoice.illustration.alt.includes('마적'));
-  assert.ok(state.pendingChoice.body.includes(faction.name));
+  assert.ok(state.pendingChoice.body.includes(raidLabel));
   assert.equal(state.pendingChoice.body.includes(`(${faction.desc})`), false);
 }
 

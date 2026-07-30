@@ -22,6 +22,10 @@ import { isWallBuilding } from './walls';
 import { findRaidOriginSite } from './foreignSites';
 import { createTacticalBattle } from './tacticalBattle';
 import { activePredatorScoutIds } from './expeditionIntel';
+import { announceRaidTip, raidTipInformant } from './diplomacy';
+import { borderCommanderEffects, factionLeaderSubject, factionRaidPartyLabel } from './diplomaticFigures';
+
+type RaidWarningSource = 'diplomatic';
 
 // 위협도 일일 갱신
 export function updateThreat(state: GameState): void {
@@ -45,6 +49,8 @@ export function updateThreat(state: GameState): void {
   // 난이도·승격 단계: 위협이 오를 때만 배율 적용 (내릴 때는 그대로) — 부유해질수록 노려진다
   if (delta > 0) {
     delta *= CONFIG.difficulty[state.difficulty ?? 'normal'].threatGain * rankEffects(state.rank).threatGain;
+  } else if (delta < 0) {
+    delta *= borderCommanderEffects(state).threatDecayMultiplier;
   }
   state.threat = Math.max(0, Math.min(100, state.threat + delta));
   if (state.tradeRefusedDays > 0) state.tradeRefusedDays--;
@@ -86,6 +92,7 @@ export function openExtortionDemand(
   warned: boolean,
   power: number,
   factionName: string,
+  warningSource?: RaidWarningSource,
 ): boolean {
   const faction = FACTIONS.find(candidate => candidate.name === factionName);
   if (!faction?.extortionDemands?.length) return false;
@@ -98,8 +105,9 @@ export function openExtortionDemand(
   const pool = affordable.length > 0 ? affordable : demands;
   const demand = pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))];
   const resourceName = RESOURCE_NAMES[demand.resource];
+  const leader = factionLeaderSubject(state, faction.name);
   const message =
-    `${faction.name}의 무장 사절이 ${resourceName} ${withJosa(demand.amount, '을/를')} 내놓으라고 통보합니다. ` +
+    `${leader}의 무장 사절이 ${resourceName} ${withJosa(demand.amount, '을/를')} 내놓으라고 통보합니다. ` +
     '요구를 들어주면 이번에는 물러나지만, 거절하면 대기 중인 무리가 곧장 마을로 향합니다.';
   const negotiation: TradeNegotiation = {
     faction: faction.name,
@@ -116,12 +124,12 @@ export function openExtortionDemand(
   };
   state.pendingChoice = {
     kind: 'extortion',
-    title: `칼끝의 거래 — ${faction.name}`,
+    title: `칼끝의 거래 — ${leader}`,
     body: message,
     options: [],
-    data: { faction: faction.name, power, warned, negotiation },
+    data: { faction: faction.name, power, warned, warningSource, negotiation },
   };
-  addLog(state, `${faction.name}의 무장 사절이 공물을 요구하며 최후통첩을 전했습니다.`, 'raid', true);
+  addLog(state, `${leader}의 무장 사절이 공물을 요구하며 최후통첩을 전했습니다.`, 'raid', true);
   return true;
 }
 
@@ -182,8 +190,14 @@ export function checkRaidTrigger(state: GameState, rng: () => number): void {
   if (!warned && originSite && (originSite.scoutedUntilDay ?? 0) >= state.day) {
     warned = rng() < CONFIG.foreignSites.banditScoutWarningBonus;
   }
-  if (openExtortionDemand(state, rng, warned, power, faction.name)) return;
-  spawnRaiders(state, rng, warned, faction.name, power);
+  const informant = raidTipInformant(state, faction.name);
+  const warningSource = informant ? 'diplomatic' : undefined;
+  if (informant) {
+    warned = true;
+    announceRaidTip(state, informant, faction.name);
+  }
+  if (openExtortionDemand(state, rng, warned, power, faction.name, warningSource)) return;
+  spawnRaiders(state, rng, warned, faction.name, power, warningSource);
 }
 
 // 지도 가장자리(주로 북쪽)에서 습격 무리를 스폰
@@ -193,6 +207,7 @@ export function spawnRaiders(
   warned: boolean,
   factionName?: string,
   powerIn?: number,
+  warningSource?: RaidWarningSource,
 ): void {
   const center = state.buildings.find(b => b.type === 'center');
   if (!center) return;
@@ -296,8 +311,8 @@ export function spawnRaiders(
     speed: warned ? CONFIG.raid.raiderSpeedWarned : CONFIG.raid.raiderSpeedSurprise,
     trail: [],
   };
-  if (warned) {
-    addLog(state, `${originUsed && originSite?.scoutedUntilDay && originSite.scoutedUntilDay >= state.day ? '정찰해 둔 산길에서 움직임을 포착했습니다!' : '봉수와 망루에서 경보!'} ${withJosa(faction.name, '이/가')} 접근하고 있습니다. 들이닥치기 전에 대비하십시오.`, 'raid');
+  if (warned && warningSource !== 'diplomatic') {
+    addLog(state, `${originUsed && originSite?.scoutedUntilDay && originSite.scoutedUntilDay >= state.day ? '정찰해 둔 산길에서 움직임을 포착했습니다!' : '봉수와 망루에서 경보!'} ${withJosa(factionRaidPartyLabel(state, faction.name), '이/가')} 접근하고 있습니다. 들이닥치기 전에 대비하십시오.`, 'raid');
   }
 }
 
@@ -325,11 +340,11 @@ export function raidersTick(state: GameState, rng: () => number): void {
   const dist = center ? Math.abs(band.x - center.x) + Math.abs(band.y - center.y) : 0;
   if (!band.spotted && dist <= CONFIG.raid.spotDistance) {
     band.spotted = true;
-    addLog(state, `경계병이 접근하는 무장 무리를 발견했습니다! ${withJosa(band.faction, '으로/로')} 보입니다.`, 'raid');
+    addLog(state, `경계병이 접근하는 무장 무리를 발견했습니다! ${withJosa(factionRaidPartyLabel(state, band.faction), '으로/로')} 보입니다.`, 'raid');
   }
   if (band.path.length === 0 || dist <= CONFIG.raid.arriveDistance) {
     if (band.siege) {
-      addLog(state, `${withJosa(band.faction, '이/가')} 방책 앞에서 멈춰 섰습니다. 목책과 토성이 그들을 가로막고 있습니다.`, 'raid');
+      addLog(state, `${withJosa(factionRaidPartyLabel(state, band.faction), '이/가')} 방책 앞에서 멈춰 섰습니다. 목책과 토성이 그들을 가로막고 있습니다.`, 'raid');
     }
     openRaidChoice(state, rng, band.warned, band.power, band.faction, band.siege);
   }
@@ -359,8 +374,8 @@ function resolveFightFallback(
     moraleShock(state, -8); // 사기 상승
     changeRelation(state, faction, CONFIG.relations.militiaWin); // 물리치면 원한이 남는다
     const winText = mode === 'garrison'
-      ? `${withJosa(side, '이/가')} ${withJosa(faction, '을/를')} 외곽에서 물리쳤습니다! 부상자 ${injured}명, 건물 피해는 없습니다.`
-      : `${withJosa(side, '이/가')} ${withJosa(faction, '을/를')} 마을 안에서 물리쳤습니다! 부상자 ${injured}명, 건물 ${damaged.length}채가 파손되었습니다.`;
+      ? `${withJosa(side, '이/가')} ${withJosa(factionRaidPartyLabel(state, faction), '을/를')} 외곽에서 물리쳤습니다! 부상자 ${injured}명, 건물 피해는 없습니다.`
+      : `${withJosa(side, '이/가')} ${withJosa(factionRaidPartyLabel(state, faction), '을/를')} 마을 안에서 물리쳤습니다! 부상자 ${injured}명, 건물 ${damaged.length}채가 파손되었습니다.`;
     addLog(state, winText, 'good', true);
     recordAnnals(state, 'raid', winText);
     state.lifetimeStats.raidsRepelled++;
@@ -383,7 +398,7 @@ function resolveFightFallback(
     changeRelation(state, faction, CONFIG.relations.militiaLoss);
     const lossText = `${withJosa(side, '이/가')} 밀려났습니다. 전사 ${killed}명, 부상 ${injured}명, ${lootMsg}. 건물 ${damaged.length}채가 파손되었습니다.`;
     addLog(state, lossText, 'raid');
-    recordAnnals(state, 'raid', `${faction}의 습격 — ${lossText}`);
+    recordAnnals(state, 'raid', `${factionRaidPartyLabel(state, faction)}의 습격 — ${lossText}`);
     state.lifetimeStats.raidsSuffered++;
   }
 }
@@ -395,6 +410,7 @@ export function resolveExtortion(state: GameState, optionId: string, rng: () => 
   const faction = choice.data.faction as string;
   const power = choice.data.power as number;
   const warned = Boolean(choice.data.warned);
+  const warningSource = choice.data.warningSource === 'diplomatic' ? 'diplomatic' : undefined;
   if (!negotiation.give || negotiation.giveAmt <= 0) return;
 
   if (optionId === 'pay') {
@@ -413,7 +429,7 @@ export function resolveExtortion(state: GameState, optionId: string, rng: () => 
     changeRelation(state, faction, CONFIG.relations.tribute);
     addLog(
       state,
-      `${faction}에게 ${RESOURCE_NAMES[negotiation.give]} ${withJosa(negotiation.giveAmt, '을/를')} 넘겼습니다. 무리는 약속대로 길을 돌렸습니다.`,
+      `${factionLeaderSubject(state, faction)}에게 ${RESOURCE_NAMES[negotiation.give]} ${withJosa(negotiation.giveAmt, '을/를')} 넘겼습니다. 무리는 약속대로 길을 돌렸습니다.`,
       'trade',
       true,
     );
@@ -424,8 +440,8 @@ export function resolveExtortion(state: GameState, optionId: string, rng: () => 
   if (optionId === 'refuse') {
     state.pendingChoice = null;
     changeRelation(state, faction, CONFIG.relations.negotiateFail);
-    addLog(state, `${faction}의 요구를 거부했습니다. 무장한 무리가 마을을 향해 움직이기 시작합니다!`, 'raid', true);
-    spawnRaiders(state, rng, warned, faction, power);
+    addLog(state, `${factionLeaderSubject(state, faction)}의 요구를 거부했습니다. 무장한 무리가 마을을 향해 움직이기 시작합니다!`, 'raid', true);
+    spawnRaiders(state, rng, warned, faction, power, warningSource);
   }
 }
 
@@ -455,13 +471,13 @@ function openExpeditionRaidOrderChoice(
   const joinedDefense = computeDefense(state, { includeExpedition: true });
   state.pendingChoice = {
     kind: 'expeditionRaidOrder',
-    title: `원정 중 습격 — ${faction}`,
+    title: `원정 중 습격 — ${factionRaidPartyLabel(state, faction)}`,
     illustration: {
       src: '/assets/events/raid-charge-v2.png',
       alt: '원정대가 자리를 비운 사이 마을로 접근하는 무장 세력',
     },
     body:
-      `${withJosa(faction, '이/가')} 마을 외곽에 도달했습니다. 먼저 토벌대에 내릴 명령을 정해야 합니다.` +
+      `${withJosa(factionRaidPartyLabel(state, faction), '이/가')} 마을 외곽에 도달했습니다. 먼저 토벌대에 내릴 명령을 정해야 합니다.` +
       `\n현재 잔류 방어도 ${currentDefense} / 원정대 합류 시 ${joinedDefense}` +
       `\n예상 귀환 ${eta == null ? '불명' : `${eta}틱`} / 적 공격 유예 ${EXPEDITION_RAID_HOLD_TICKS}틱`,
     options: [
@@ -478,7 +494,7 @@ function openExpeditionRaidOrderChoice(
     ],
     data: { power, faction, warned, siege },
   };
-  addLog(state, `${faction}의 습격이 시작되었습니다. 원정대에 보낼 명령을 정해야 합니다!`, 'raid', true);
+  addLog(state, `${factionRaidPartyLabel(state, faction)}의 습격이 시작되었습니다. 원정대에 보낼 명령을 정해야 합니다!`, 'raid', true);
 }
 
 export function resolveExpeditionRaidOrder(state: GameState, optionId: string): void {
@@ -522,13 +538,13 @@ export function openRaidChoice(
 
   const choice: PendingChoice = {
     kind: 'raid',
-    title: `습격 임박! — ${faction.name}`,
+    title: `습격 임박! — ${factionRaidPartyLabel(state, faction.name)}`,
     illustration: {
       src: '/assets/events/raid-charge-v2.png',
       alt: '무기를 들고 말을 몰아 마을로 돌진하는 마적들',
     },
     body:
-      `${withJosa(faction.name, '이/가')} 마을 외곽에 도달했습니다. 지금 대응을 정해야 합니다.` +
+      `${withJosa(factionRaidPartyLabel(state, faction.name), '이/가')} 마을 외곽에 도달했습니다. 지금 대응을 정해야 합니다.` +
       (warned ? ' 경보 덕분에 미리 대비할 시간이 있었습니다.' : ' 아무런 경보도 없이 들이닥쳤습니다!') +
       (siege ? '\n방책이 무리를 가로막고 있어 방어에 유리합니다.' : '') +
       (getRelation(state, faction.name) >= 60 ? '\n낯익은 얼굴들입니다. 말이 통할지도 모릅니다.'
@@ -588,7 +604,7 @@ export function openRaidChoice(
     },
   };
   if (context.forcedDefense) {
-    choice.title = `수성 교전 임박! — ${faction.name}`;
+    choice.title = `수성 교전 임박! — ${factionRaidPartyLabel(state, faction.name)}`;
     choice.options = choice.options.filter(option => option.id === 'levy' || option.id === 'manual-levy');
   } else if (expeditionOrder) {
     choice.options.splice(1, 0, {
@@ -598,7 +614,7 @@ export function openRaidChoice(
     });
   }
   state.pendingChoice = choice;
-  if (!context.suppressStartLog) addLog(state, `${faction.name}의 습격이 시작되었습니다!`, 'raid');
+  if (!context.suppressStartLog) addLog(state, `${factionRaidPartyLabel(state, faction.name)}의 습격이 시작되었습니다!`, 'raid');
 }
 
 export function raidHoldTick(state: GameState, rng: () => number): void {
@@ -720,8 +736,8 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
       state.threat = Math.max(0, state.threat - 25);
       moraleShock(state, 4);
       changeRelation(state, faction, CONFIG.relations.tribute);
-      addLog(state, `${faction}에게 공물을 내어보냈습니다. 싸움은 피했지만 그들과의 사이는 눅어졌습니다.`, 'raid');
-      recordAnnals(state, 'raid', `${faction}의 위협에 공물을 내어보내고 싸움을 피했습니다.`);
+      addLog(state, `${factionLeaderSubject(state, faction)}에게 공물을 내어보냈습니다. 싸움은 피했지만 그들과의 사이는 눅어졌습니다.`, 'raid');
+      recordAnnals(state, 'raid', `${factionRaidPartyLabel(state, faction)}의 위협에 공물을 내어보내고 싸움을 피했습니다.`);
       state.lifetimeStats.raidsSuffered++;
       break;
     }
@@ -736,12 +752,12 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
         state.resources.reputation = Math.min(100, state.resources.reputation + 5);
         state.threat = Math.max(0, state.threat - 30);
         changeRelation(state, faction, CONFIG.relations.negotiateSuccess);
-        addLog(state, `장터에서의 협상이 통했습니다. ${withJosa(faction, '이/가')} 식량 ${withJosa(give, '을/를')} 받고 가죽 4를 남기고 물러갑니다. 명성이 올랐습니다.`, 'good', true);
-        recordAnnals(state, 'raid', `${faction}의 습격을 장터의 협상으로 물렸습니다.`);
+        addLog(state, `장터에서의 협상이 통했습니다. ${withJosa(factionRaidPartyLabel(state, faction), '이/가')} 식량 ${withJosa(give, '을/를')} 받고 가죽 4를 남기고 물러갑니다. 명성이 올랐습니다.`, 'good', true);
+        recordAnnals(state, 'raid', `${factionRaidPartyLabel(state, faction)}의 습격을 장터의 협상으로 물렸습니다.`);
         state.lifetimeStats.raidsRepelled++;
       } else {
         if (expeditionOrder) {
-          addLog(state, `협상이 결렬되었습니다. 격분한 ${withJosa(faction, '이/가')} 방책을 공격하기 시작합니다!`, 'raid', true);
+          addLog(state, `협상이 결렬되었습니다. 격분한 ${withJosa(factionRaidPartyLabel(state, faction), '이/가')} 방책을 공격하기 시작합니다!`, 'raid', true);
           openRaidChoice(state, rng, warned, power, faction, true, {
             expeditionOrder,
             forcedDefense: true,
@@ -755,8 +771,8 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
         const damaged = damageBuildings(state, rng, CONFIG.raid.buildingDamage.shelter + 1);
         moraleShock(state, 12);
         changeRelation(state, faction, CONFIG.relations.negotiateFail);
-        addLog(state, `협상이 결렬되었습니다. 격분한 ${withJosa(faction, '이/가')} 마을을 휩쓸었습니다. 부상자 ${injured}명, ${lootMsg}, 건물 ${damaged.length}채 파손.`, 'raid');
-        recordAnnals(state, 'raid', `협상 결렬 — ${withJosa(faction, '이/가')} 마을을 휩쓸었습니다 (부상 ${injured}명, 건물 ${damaged.length}채 파손).`);
+        addLog(state, `협상이 결렬되었습니다. 격분한 ${withJosa(factionRaidPartyLabel(state, faction), '이/가')} 마을을 휩쓸었습니다. 부상자 ${injured}명, ${lootMsg}, 건물 ${damaged.length}채 파손.`, 'raid');
+        recordAnnals(state, 'raid', `협상 결렬 — ${withJosa(factionRaidPartyLabel(state, faction), '이/가')} 마을을 휩쓸었습니다 (부상 ${injured}명, 건물 ${damaged.length}채 파손).`);
         state.lifetimeStats.raidsSuffered++;
       }
       break;
@@ -766,8 +782,8 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
       state.threat = Math.max(0, state.threat - 35);
       const lootMsg = loot(state, 0.1);
       changeRelation(state, faction, CONFIG.relations.beacon);
-      addLog(state, `봉수대에 불길이 올랐습니다. 인근 진보의 응원 신호에 ${withJosa(faction, '이/가')} 서둘러 물러갑니다. ${lootMsg}.`, 'good', true);
-      recordAnnals(state, 'raid', `봉수 신호로 ${faction}의 습격을 물렸습니다.`);
+      addLog(state, `봉수대에 불길이 올랐습니다. 인근 진보의 응원 신호에 ${withJosa(factionRaidPartyLabel(state, faction), '이/가')} 서둘러 물러갑니다. ${lootMsg}.`, 'good', true);
+      recordAnnals(state, 'raid', `봉수 신호로 ${factionRaidPartyLabel(state, faction)}의 습격을 물렸습니다.`);
       state.lifetimeStats.raidsRepelled++;
       state.lifetimeStats.raidsSuffered++; // 물러가며 소량을 약탈해 간다
       break;

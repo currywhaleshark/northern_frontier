@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 47, 'mine-collapse-ready saves ship with schema version 47');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 49, 'diplomatic-action-ready saves ship with schema version 49');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -83,6 +83,8 @@ assert.equal(typeof saveLoad.migrateV43ToV44, 'function');
 assert.equal(typeof saveLoad.migrateV44ToV45, 'function');
 assert.equal(typeof saveLoad.migrateV45ToV46, 'function');
 assert.equal(typeof saveLoad.migrateV46ToV47, 'function');
+assert.equal(typeof saveLoad.migrateV47ToV48, 'function');
+assert.equal(typeof saveLoad.migrateV48ToV49, 'function');
 
 {
   const migrated = saveLoad.migrateV39ToV40({ schemaVersion: 39, courtGrantArtifactMisses: 3.8 });
@@ -252,6 +254,29 @@ assert.equal(typeof saveLoad.migrateV46ToV47, 'function');
   const migrated = saveLoad.migrateV46ToV47({ schemaVersion: 46, marker: 'mine-collapse-ready' });
   assert.equal(migrated.schemaVersion, 47);
   assert.equal(migrated.marker, 'mine-collapse-ready');
+}
+
+{
+  const migrated = saveLoad.migrateV47ToV48({
+    schemaVersion: 47,
+    marker: 'diplomatic-figure-ready',
+    seed: 20260730,
+    day: 97,
+    log: [],
+  });
+  assert.equal(migrated.schemaVersion, 48);
+  assert.equal(migrated.marker, 'diplomatic-figure-ready');
+  assert.equal(migrated.borderCommander.termIndex, 1);
+  assert.equal(Object.keys(migrated.factionLeaders).length, 5);
+  assert.deepEqual(migrated.log, [], '외교 인물 마이그레이션은 과거 부임 로그를 만들지 않는다');
+}
+
+{
+  const migrated = saveLoad.migrateV48ToV49({ schemaVersion: 48, marker: 'diplomatic-action-ready' });
+  assert.equal(migrated.schemaVersion, 49);
+  assert.equal(migrated.marker, 'diplomatic-action-ready');
+  assert.deepEqual(migrated.pendingEnvoys, []);
+  assert.deepEqual(migrated.giftEnvoyDays, {});
 }
 
 {

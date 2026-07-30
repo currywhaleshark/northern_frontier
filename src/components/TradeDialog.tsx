@@ -13,6 +13,9 @@ import { RESOURCE_DEFS, type ResourceCategory } from '../game/resourceCatalog';
 import { getSeason } from '../game/seasons';
 import { SPECIAL_ITEM_DEFS } from '../game/specialItems';
 import { predatorIntelOffers } from '../game/predatorIntelTrade';
+import {
+  factionLeaderEnvoyLabel, factionLeaderFor, factionLeaderGreeting,
+} from '../game/diplomaticFigures';
 import type { GameState, PredatorKind, ResourceId, SpecialItemId } from '../game/types';
 import { FactionName } from './FactionName';
 import { TradeResourceIcon } from './TradeResourceIcon';
@@ -141,6 +144,7 @@ export function TradeDialog({
   if (!negotiation || !faction) return null;
   const isExtortion = negotiation.mode === 'extortion';
   const artwork = FACTION_ARTWORK[faction.name];
+  const leader = factionLeaderFor(state, faction.name);
   const relation = getRelation(state, faction.name);
   const capacitySummary = factionTradeCapacitySummary(state, faction.name, get);
   const capacity = capacitySummary.remaining;
@@ -196,6 +200,12 @@ export function TradeDialog({
           <div>
             {isExtortion && <div className="trade-kind-label">무장 사절의 최후통첩</div>}
             <h2><FactionName name={faction.name} /></h2>
+            {leader && (
+              <div className="trade-envoy-line">
+                <strong>{factionLeaderEnvoyLabel(leader)}</strong>
+                <span>“{factionLeaderGreeting(leader)}”</span>
+              </div>
+            )}
             <div className="muted small">{faction.desc}</div>
           </div>
           <div className="trade-relation" title="현재 관계도">

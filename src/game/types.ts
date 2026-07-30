@@ -592,6 +592,28 @@ export interface TradeEvaluation {
   message: string;
 }
 
+export type DiplomaticEnvoyKind = 'gift' | 'pact' | 'aidRequest';
+
+export interface PendingEnvoy {
+  factionName: string;
+  kind: DiplomaticEnvoyKind;
+  payload: Partial<Record<ResourceId, number>>;
+  dueDay: number;
+  // 발송 순간 확정한 보정. 왕복 중 세이브를 다시 읽어도 답신 결과가 바뀌지 않는다.
+  relationGain?: number;
+  giftValue?: number;
+}
+
+export interface DiplomaticPact {
+  factionName: string;
+  untilDay: number;
+}
+
+export interface ClaimAccord {
+  zoneId: number;
+  untilDay: number;
+}
+
 export interface LogEntry {
   day: number;
   text: string;
@@ -681,7 +703,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'promotionDecree' | 'mineCollapse';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'promotionDecree' | 'mineCollapse' | 'giftEnvoy';
   title: string;
   body: string;
   illustration?: {
@@ -1699,6 +1721,24 @@ export interface EdictState {
   sinceDay: number;   // 조령모개 판정·"n일째 시행" 표기
 }
 
+export type FactionLeaderTemper = 'bold' | 'wily' | 'taciturn' | 'fierce';
+
+export interface FactionLeader {
+  name: string;
+  title: '족장' | '추장';
+  temper: FactionLeaderTemper;
+}
+
+export type BorderCommanderTemper = 'strict' | 'greedy' | 'lenient' | 'tactician';
+
+export interface BorderCommander {
+  name: string;
+  temper: BorderCommanderTemper;
+  termIndex: number;
+  // F2 온건 성향의 세공 유예가 같은 임기에 반복되지 않게 하는 자리.
+  tributeLeniencyUsed: boolean;
+}
+
 export interface GameState {
   schemaVersion: number;
   day: number;          // 경과 일수 (1부터)
@@ -1730,6 +1770,13 @@ export interface GameState {
   processingReserves: Record<ProcessingInputId, number>; // 자동 가공/소비 전에 남길 원자재 수량
   threat: number;         // 습격 위협도 0~100
   relations: Record<string, number>; // 세력별 우호도 0~100 (키: 세력 이름)
+  factionLeaders: Record<string, FactionLeader>; // 5개 여진 세력의 결정적 지도자
+  borderCommander: BorderCommander; // 현 함경북도 병마절도사
+  diplomaticPacts: DiplomaticPact[]; // 화친 맹약(E2) — E1에서 저장 자리를 먼저 만든다
+  claimAccords: ClaimAccord[]; // 생활권 협정(E5)
+  pendingEnvoys: PendingEnvoy[]; // 예물·맹약·원병 사절 왕복 상태
+  giftEnvoyDays: Record<string, number[]>; // 세력별 예물 발송일 — 계절 제한·연차 반감용
+  proximityWarnings: string[]; // 세력×사유 경고 dedupe(E4)
   expedition: Expedition | null; // 지도 위 토벌 원정대. 동시에 하나만 운용
   raidHold: RaidHoldState | null; // 원정대 귀환을 기다리는 완전 수성 상태
   raiders: RaiderBand | null; // 접근 중인 습격 무리

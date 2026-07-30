@@ -1710,6 +1710,34 @@ html, body, #root {
   border-radius: 5px;
 }
 .faction-entry-body { min-width: 0; }
+.court-commander-card {
+  margin-bottom: 9px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--gold) 48%, var(--border));
+  border-left: 3px solid var(--gold);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--panel2) 88%, var(--gold));
+}
+.court-commander-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.court-commander-heading strong { color: var(--gold); font-size: 10px; }
+.court-commander-name { margin-top: 2px; color: var(--text); font-size: 16px; font-weight: 800; }
+.court-commander-rumor {
+  display: flex;
+  gap: 6px;
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px dotted var(--border);
+  font-size: 11px;
+}
+.court-commander-rumor b { flex: 0 0 auto; color: var(--gold); }
+.court-commander-rumor span { color: var(--muted); }
 .faction-entry-heading,
 .faction-entry-actions {
   display: flex;
@@ -1718,6 +1746,16 @@ html, body, #root {
   gap: 6px;
 }
 .faction-entry-heading { min-height: 21px; }
+.faction-leader-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 1px 0 3px;
+  font-size: 10px;
+}
+.faction-leader-line strong { color: var(--text); font-weight: 650; }
+.faction-leader-line span { color: var(--gold); }
 .faction-relation {
   flex: 0 0 auto;
   font-size: 11px;
@@ -1726,6 +1764,8 @@ html, body, #root {
 .faction-entry .bar-outer { margin: 2px 0 5px; }
 .faction-entry-actions { justify-content: flex-end; }
 .faction-trade-button { flex: 0 0 56px; }
+.faction-gift-button { flex: 0 0 48px; color: var(--gold); }
+.faction-envoy-status { margin: 3px 0 1px; color: var(--gold); font-size: 10px; }
 /* 세력별 활성 정기거래 계약 */
 .faction-contracts {
   display: grid;
@@ -6699,6 +6739,54 @@ html, body, #root {
   overflow-x: hidden;
 }
 .modal.trade-dialog.extortion-dialog { border-color: #a65b52; }
+.modal.gift-envoy-dialog { max-width: 470px; }
+.gift-envoy-dialog .body { white-space: normal; }
+.gift-envoy-dialog .body p { margin: 0 0 9px; }
+.gift-envoy-leader { color: var(--muted); font-size: 12px; }
+.gift-envoy-leader b { color: var(--trade); }
+.gift-resource-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.gift-resource-picker button {
+  display: grid;
+  gap: 2px;
+  min-width: 76px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel2);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.gift-resource-picker button.active { border-color: var(--gold); box-shadow: inset 0 -2px 0 var(--gold); }
+.gift-resource-picker small { color: var(--muted); font-size: 10px; }
+.gift-envoy-amount {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+.gift-envoy-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  margin-top: 10px;
+  padding: 8px;
+  border-left: 2px solid var(--gold);
+  background: var(--panel2);
+  color: var(--muted);
+  font-size: 11px;
+}
+.gift-envoy-preview strong { color: var(--good); }
+.gift-envoy-repeat { color: var(--gold); font-size: 11px; }
 .trade-faction-art {
   display: block;
   width: 100%;
@@ -6714,6 +6802,16 @@ html, body, #root {
   padding: 12px 16px;
 }
 .trade-dialog-heading h2 { margin-bottom: 4px; }
+.trade-envoy-line {
+  display: grid;
+  gap: 1px;
+  margin: 2px 0 6px;
+  padding-left: 7px;
+  border-left: 2px solid color-mix(in srgb, var(--trade) 65%, transparent);
+  font-size: 11px;
+}
+.trade-envoy-line strong { color: var(--trade); }
+.trade-envoy-line span { color: var(--text); line-height: 1.4; }
 .trade-kind-label {
   margin-bottom: 3px;
   color: #d98778;

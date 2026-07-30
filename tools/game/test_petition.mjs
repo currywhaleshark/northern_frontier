@@ -117,7 +117,7 @@ function prepareBuildableLandTile(state, type) {
   resolvePetition(state, 'grain');
   assert.equal(state.pendingChoice, null);
   assert.equal(state.resources.grain, grain0 + 30);
-  assert.equal(state.resources.reputation, 26 - grainOffer.repCost);
+  assert.equal(state.resources.reputation, 26 - petition.petitionReputationCost(state, grainOffer));
   assert.equal(state.lastPetitionDay, state.day);
   assert.ok(canPetition(state).includes('일 뒤'), '쿨다운 시작');
 

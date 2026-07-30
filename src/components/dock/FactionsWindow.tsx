@@ -5,6 +5,10 @@ import { getRelation } from '../../game/relations';
 import { FACTION_ARTWORK } from '../../game/tradePresentation';
 import { contractsForFaction, nextContractDueDay } from '../../game/tradeContracts';
 import { contractReserved } from '../../game/tradeContractReserve';
+import {
+  factionLeaderFor, factionLeaderTemperLabel,
+} from '../../game/diplomaticFigures';
+import { canOpenGiftEnvoy, giftEnvoyRemainingDays } from '../../game/diplomacy';
 import type { GameState, TradeContract } from '../../game/types';
 import { FactionName } from '../FactionName';
 import { UiIcon } from '../UiIcon';
@@ -12,6 +16,7 @@ import { UiIcon } from '../UiIcon';
 interface Props {
   state: GameState;
   onRequestTrade: (factionName: string) => void;
+  onOpenGiftEnvoy: (factionName: string) => void;
   onCancelTradeContract: (contract: TradeContract) => void;
 }
 
@@ -68,7 +73,7 @@ function ContractList({ state, factionName, onCancel }: {
   );
 }
 
-export function FactionsWindow({ state, onRequestTrade, onCancelTradeContract }: Props) {
+export function FactionsWindow({ state, onRequestTrade, onOpenGiftEnvoy, onCancelTradeContract }: Props) {
   return (
     <div>
       <div className="muted small" style={{ marginBottom: 6 }}>
@@ -79,6 +84,9 @@ export function FactionsWindow({ state, onRequestTrade, onCancelTradeContract }:
         const color = relation >= 60 ? '#6fbf73' : relation >= 40 ? '#d9a441' : '#e06c5c';
         const artwork = FACTION_ARTWORK[faction.name];
         const tradeReason = faction.exports.length > 0 ? canRequestTrade(state, faction.name) : null;
+        const leader = factionLeaderFor(state, faction.name);
+        const giftReason = leader ? canOpenGiftEnvoy(state, faction.name) : null;
+        const giftRemainingDays = leader ? giftEnvoyRemainingDays(state, faction.name) : null;
         return (
           <div key={faction.name} className="faction-entry" title={faction.desc}>
             {artwork && (
@@ -95,6 +103,12 @@ export function FactionsWindow({ state, onRequestTrade, onCancelTradeContract }:
                 <span><UiIcon name={faction.hostile ? 'hostile' : 'friendly'} size={20} /> <FactionName name={faction.name} /></span>
                 <span className="faction-relation" style={{ color }}>{Math.round(relation)}</span>
               </div>
+              {leader && (
+                <div className="faction-leader-line">
+                  <strong>{leader.name} {leader.title}</strong>
+                  <span>{factionLeaderTemperLabel(leader.temper)}</span>
+                </div>
+              )}
               <RelationBar value={relation} color={color} />
               <div className="faction-entry-actions">
                 <div className="faction-info">
@@ -130,7 +144,21 @@ export function FactionsWindow({ state, onRequestTrade, onCancelTradeContract }:
                     교역
                   </button>
                 )}
+                {leader && (
+                  <button
+                    className="btn small faction-gift-button"
+                    type="button"
+                    disabled={!!giftReason}
+                    title={giftReason ?? `${leader.name} ${leader.title}에게 사치품이나 은을 예물로 보냅니다`}
+                    onClick={() => onOpenGiftEnvoy(faction.name)}
+                  >
+                    예물
+                  </button>
+                )}
               </div>
+              {giftRemainingDays != null && (
+                <div className="faction-envoy-status">예물 사절 왕복 중 · {giftRemainingDays}일</div>
+              )}
               <ContractList state={state} factionName={faction.name} onCancel={onCancelTradeContract} />
             </div>
           </div>

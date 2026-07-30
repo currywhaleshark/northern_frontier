@@ -68,7 +68,7 @@ function advanceWeather(state, weather) {
   disasters.advancePendingDisasters(state);
 }
 
-assert.equal(CURRENT_SCHEMA_VERSION, 47);
+assert.equal(CURRENT_SCHEMA_VERSION, 49);
 {
   const state = simulation.newGame(72001);
   assert.deepEqual(state.pendingDisasters, []);

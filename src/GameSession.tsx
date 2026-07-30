@@ -32,6 +32,7 @@ import { ResidentsWindow } from './components/dock/ResidentsWindow';
 import { EventModal } from './components/EventModal';
 import { PromotionModal } from './components/PromotionModal';
 import { TradeDialog } from './components/TradeDialog';
+import { GiftEnvoyDialog } from './components/GiftEnvoyDialog';
 import { GameCanvas } from './components/GameCanvas';
 import { MapLayerTabs } from './components/MapLayerTabs';
 import { InspectorPanel } from './components/InspectorPanel';
@@ -58,6 +59,7 @@ import { toggleNitreYards } from './game/suspicion';
 import { setProcessingReserve } from './game/processing';
 import { setTributeReserve } from './game/tributeReserve';
 import { cancelTradeContract, signTradeContract } from './game/tradeContracts';
+import { cancelGiftEnvoy, openGiftEnvoy, sendGiftEnvoy } from './game/diplomacy';
 import { setTradeContractReserve } from './game/tradeContractReserve';
 import { openPredatorHunt, startPredatorScout } from './game/specialEvents';
 import { useSpecialItem } from './game/specialItemActions';
@@ -1144,6 +1146,27 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     bump();
   };
 
+  const handleOpenGiftEnvoy = (factionName: string) => {
+    const err = openGiftEnvoy(stateRef.current, factionName);
+    if (err) notify(err, 'info');
+    bump();
+  };
+
+  const handleSendGiftEnvoy = (resource: ResourceId, amount: number) => {
+    const factionName = stateRef.current.pendingChoice?.kind === 'giftEnvoy'
+      ? stateRef.current.pendingChoice.data.factionName as string
+      : '';
+    const err = sendGiftEnvoy(stateRef.current, factionName, resource, amount);
+    if (err) notify(err, 'info');
+    else playSfx('good');
+    bump();
+  };
+
+  const handleCancelGiftEnvoy = () => {
+    cancelGiftEnvoy(stateRef.current);
+    bump();
+  };
+
   const handleNegotiateTrade = (
     get: ResourceId,
     getAmt: number,
@@ -1836,6 +1859,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                       <FactionsWindow
                         state={stateRef.current}
                         onRequestTrade={handleRequestTrade}
+                        onOpenGiftEnvoy={handleOpenGiftEnvoy}
                         onCancelTradeContract={handleCancelTradeContract}
                       />
                     )}
@@ -1921,6 +1945,12 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
           state={state}
           onSetEdictLevel={handleSetEdictLevel}
           onClose={() => setEdictDialogOpen(false)}
+        />
+      ) : state.pendingChoice?.kind === 'giftEnvoy' ? (
+        <GiftEnvoyDialog
+          state={state}
+          onSend={handleSendGiftEnvoy}
+          onClose={handleCancelGiftEnvoy}
         />
       ) : tradeNegotiationOf(state.pendingChoice) ? (
         <TradeDialog

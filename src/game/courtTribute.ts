@@ -14,6 +14,7 @@ import { RESOURCE_DEFS } from './resourceCatalog';
 import { lowerSuspicion } from './suspicion';
 import { getSeason, getYear } from './seasons';
 import { grantSpecialItem, SPECIAL_ITEM_DEFS } from './specialItems';
+import { BORDER_COMMANDER_TITLE } from './diplomaticFigures';
 import {
   consumeTributeReserve, releaseTributeReserve, tributeReserveRatio,
 } from './tributeReserve';
@@ -62,6 +63,10 @@ export function tributeSilverCost(tribute: CourtTribute): number {
   return Math.max(1, Math.ceil(totalValue * CONFIG.tribute.silverPayMarkup / RESOURCE_DEFS.silver.tradeBaseValue));
 }
 
+export function hasLenientTributeGrace(state: Pick<GameState, 'borderCommander'>): boolean {
+  return state.borderCommander.temper === 'lenient' && !state.borderCommander.tributeLeniencyUsed;
+}
+
 // 봄 첫날: 올해 세공 공지
 export function announceCourtTribute(state: GameState): void {
   releaseTributeReserve(state);
@@ -70,7 +75,8 @@ export function announceCourtTribute(state: GameState): void {
   state.courtTribute = rollCourtTribute(state.seed, year, pop, state.rank);
   addLog(
     state,
-    `조정에서 파발이 왔습니다. 올해 세공: ${tributeItemsLabel(state.courtTribute.items)} — 겨울이 오기 전까지 준비하십시오.`,
+    `${BORDER_COMMANDER_TITLE} ${state.borderCommander.name} 명의의 파발이 왔습니다. ` +
+      `올해 세공: ${tributeItemsLabel(state.courtTribute.items)} — 겨울이 오기 전까지 준비하십시오.`,
     'info',
     true,
   );
@@ -85,12 +91,14 @@ export function openCourtTributeChoice(state: GameState): void {
   const preparedRatio = tributeReserveRatio(state, tribute);
   const failStreakNext = state.tributeFailStreak + 1;
   const repLoss = t.repFail + (failStreakNext >= 2 ? t.repFailStreakExtra : 0);
+  const lenientGrace = hasLenientTributeGrace(state);
 
   state.pendingChoice = {
     kind: 'tribute',
-    title: '조정의 사자 — 세공 수거',
+    title: `${state.borderCommander.name} 북병사의 사자 — 세공 수거`,
     body:
-      `한양에서 조정의 사자가 당도했습니다. 올해 세공을 거두러 왔습니다.\n` +
+      `${BORDER_COMMANDER_TITLE} ${state.borderCommander.name}의 명을 받은 사자가 당도했습니다. ` +
+      `올해 세공을 거두러 왔습니다.\n` +
       `요구: ${label}`,
     illustration: {
       src: '/assets/events/court-tribute-v1.png',
@@ -130,7 +138,9 @@ export function openCourtTributeChoice(state: GameState): void {
       {
         id: 'refuse',
         label: '올해는 바치지 못한다',
-        desc: `명성 -${repLoss}, 위협 +${t.threatFail}. 조정의 눈 밖에 나고 국경이 험악해집니다.`,
+        desc: lenientGrace
+          ? '현 북병사가 변방 사정을 참작해 이번 임기 한 번은 불이행의 문책을 유예합니다. 성실 납부로 인정되지는 않습니다.'
+          : `명성 -${repLoss}, 위협 +${t.threatFail}. 조정의 눈 밖에 나고 국경이 험악해집니다.`,
       },
     ],
     data: { year: tribute.year },
@@ -169,8 +179,18 @@ function grantFullTributeReward(state: GameState, tribute: CourtTribute): void {
   }
   if (labels.length === 0) return;
   const label = labels.join(', ');
-  addLog(state, `조정에서 하사품이 내려왔습니다. 받은 물목: ${label}.`, 'good', true);
-  recordAnnals(state, 'grant', `조정에서 하사품이 내려왔습니다 — ${label}.`);
+  addLog(
+    state,
+    `${withJosa(`북병사 ${state.borderCommander.name}`, '이/가')} 전한 교지와 함께 하사품이 내려왔습니다. ` +
+      `받은 물목: ${label}.`,
+    'good',
+    true,
+  );
+  recordAnnals(
+    state,
+    'grant',
+    `${withJosa(`북병사 ${state.borderCommander.name}`, '이/가')} 전한 교지와 함께 하사품이 내려왔습니다 — ${label}.`,
+  );
   state.lifetimeStats.grantsReceived++; // 하사 행사 1회 (품목 수는 세지 않는다)
 }
 
@@ -268,6 +288,22 @@ export function resolveCourtTribute(state: GameState, optionId: string): void {
       state,
       `준비한 만큼 세공을 바쳤습니다. 납부율 ${(ratio * 100).toFixed(0)}%. 성실 납부로 인정되지는 않습니다.`,
       'bad',
+      true,
+    );
+    return;
+  }
+
+  if (optionId === 'refuse' && hasLenientTributeGrace(state)) {
+    releaseTributeReserve(state);
+    tribute.paid = false;
+    state.borderCommander.tributeLeniencyUsed = true;
+    state.tributePaidStreak = 0;
+    state.tributeFailStreak = 0;
+    addLog(
+      state,
+      `${withJosa(`북병사 ${state.borderCommander.name}`, '이/가')} 변방 사정을 참작해 ` +
+        '올해 세공 불이행의 문책을 유예했습니다. 성실 납부로 인정되지는 않습니다.',
+      'info',
       true,
     );
     return;

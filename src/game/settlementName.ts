@@ -7,6 +7,7 @@
 import { recordAnnals } from './annals';
 import { CONFIG } from './config';
 import { addLog } from './events';
+import { BORDER_COMMANDER_TITLE } from './diplomaticFigures';
 import { withJosa } from './josa';
 import type { GameState, Rank } from './types';
 
@@ -96,7 +97,8 @@ export function processSettlementRename(state: GameState): void {
   state.settlementName = pending.requestedName;
   state.pendingSettlementRename = null;
   state.settlementRenameCooldownUntil = state.day + CONFIG.time.yearDays;
-  const text = `조정의 허가가 내려와 ${withJosa(oldDisplay, '이/가')} ${withJosa(settlementDisplayName(state), '으로/로')} 개칭되었습니다.`;
+  const commander = `${BORDER_COMMANDER_TITLE} ${state.borderCommander.name}`;
+  const text = `${withJosa(commander, '이/가')} 조정의 허가를 전해 ${withJosa(oldDisplay, '이/가')} ${withJosa(settlementDisplayName(state), '으로/로')} 개칭되었습니다.`;
   recordAnnals(state, 'court', text);
   addLog(state, text, 'good', true);
 }

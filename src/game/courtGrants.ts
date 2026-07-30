@@ -2,6 +2,7 @@
 import { CONFIG } from './config';
 import { createLivestockState, normalizeLivestockState, preflightLivestockAcquisition } from './livestock';
 import { makeRng } from './map';
+import { borderCommanderEffects } from './diplomaticFigures';
 import type { SpecialItemId } from './specialItems';
 import type { GameState, LivestockId, Rank, ResourceId } from './types';
 
@@ -71,6 +72,16 @@ const RANK_ORDER: Record<Rank, number> = {
   jin: 2,
   bu: 3,
 };
+
+const GRANT_RANKS: readonly Rank[] = ['settlement', 'bo', 'jin', 'bu'];
+
+export function courtGrantEffectiveRank(
+  state: Pick<GameState, 'rank'> & Partial<Pick<GameState, 'borderCommander'>>,
+): Rank {
+  const shift = state.borderCommander ? borderCommanderEffects(state as Pick<GameState, 'borderCommander'>).courtGrantRankShift : 0;
+  const index = Math.max(0, Math.min(GRANT_RANKS.length - 1, RANK_ORDER[state.rank] + shift));
+  return GRANT_RANKS[index];
+}
 
 // 짚신은 가내수공업으로 자급되므로 하사 대상에서 제외한다.
 // 실용 물자는 누적되고, 선행 물자는 그 단계에서 새로 의미가 생기는 품목으로 교체된다.
@@ -308,17 +319,18 @@ function reserveGrantLivestock(
 
 /**
  * 실제 세공 하사에 쓰는 추첨. 자원 중복 제외는 유지하고, 축사가 받을 수 있을 때만 가축 후보를 넣는다.
- * 수용량만 상태에서 읽으며 그 밖의 재고·연속 납부 상태는 확률이나 가중치에 영향을 주지 않는다.
+ * 수용량과 현 북병사의 하사 등급 보정만 상태에서 읽으며 재고·연속 납부 상태는
+ * 확률이나 가중치에 영향을 주지 않는다.
  */
 export function rollCourtGrantRewards(
-  state: Pick<GameState, 'seed' | 'rank' | 'buildings'>,
+  state: Pick<GameState, 'seed' | 'rank' | 'buildings'> & Partial<Pick<GameState, 'borderCommander'>>,
   year: number,
 ): CourtGrantReward[] {
   const random = makeRng(state.seed + year * CONFIG.courtGrants.rngYearSalt + CONFIG.courtGrants.rngSeedOffset);
   const excludedResources = new Set<ResourceId>();
   const excludedLivestockGrantTypes = new Set<CourtGrantLivestockReward['grantType']>();
   const rewards: CourtGrantReward[] = [];
-  const projectedState = cloneGrantState(state);
+  const projectedState = cloneGrantState({ ...state, rank: courtGrantEffectiveRank(state) });
 
   const guaranteed = pickStateReward(projectedState, 'practical', excludedResources, excludedLivestockGrantTypes, random, year);
   if (guaranteed) {
