@@ -153,6 +153,7 @@ export type BuildingTypeId =
   | 'bridge'     // 다리
   | 'weir'       // 보(洑) — 가뭄 관개 시설
   | 'levee'      // 제방(堤防) — 대홍수 범람 차단
+  | 'canal'      // 농수로 — 강물을 내륙 논으로 잇는 통행 가능한 도랑
   | 'lumberCamp' // 벌목장
   | 'woodShed'   // 장작마당
   | 'huntLodge'  // 사냥막

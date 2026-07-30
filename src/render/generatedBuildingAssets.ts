@@ -30,6 +30,7 @@ const BUILDING_COLUMNS: Record<BuildingTypeId, number> = {
   bridge: 11,
   weir: 11,
   levee: 11,
+  canal: 11,
   lumberCamp: 4,
   woodShed: 4,
   huntLodge: 5,

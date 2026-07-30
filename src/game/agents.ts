@@ -163,6 +163,7 @@ const PASSABLE_BUILDING_TYPES: ReadonlySet<BuildingTypeId> = new Set<BuildingTyp
   'field',
   'paddy',
   'bridge',
+  'canal',
   'ferry',
   'dock',
   'lumberCamp',

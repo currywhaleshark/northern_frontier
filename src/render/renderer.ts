@@ -19,6 +19,7 @@ import { LEISURE_CLUSTER_CAPACITY } from '../game/agents';
 import { findHabitatIconAtTile } from '../game/habitats';
 import { isBuildingFootprintExplored, isExplored } from '../game/exploration';
 import { builtWallTileSet, isWallBuilding, wallConnectionsFromSet } from '../game/walls';
+import { canalConnectionsAt, canalRiverEdgesAt, flowingCanalTileSet, wouldCanalFlowAt } from '../game/irrigation';
 import { assignedWorkers, workerSlotConfig, workerSlotCount } from '../game/workerSlots';
 import {
   jitterOf,
@@ -1999,6 +2000,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     drawBattleScarDecal(ctx, scar, state.day, season === 'winter');
   }
   const wallTiles = builtWallTileSet(state);
+  const flowingCanals = flowingCanalTileSet(state);
   const frostObservationBuildingIds = new Set(
     state.pendingDisasters
       .filter(disaster => disaster.id === 'earlyFrost' || disaster.id === 'lateFrost')
@@ -2105,7 +2107,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       progress01: visualProgress,
       connections: visuallyBuilt && isWallBuilding(b.type)
         ? wallConnectionsFromSet(wallTiles, b.x, b.y)
-        : undefined,
+        : b.type === 'canal' ? canalConnectionsAt(state, b.x, b.y, visuallyBuilt) : undefined,
+      canalFlowing: b.type === 'canal' && visuallyBuilt && flowingCanals.has(`${b.x},${b.y}`),
+      canalRiverEdges: b.type === 'canal' ? canalRiverEdgesAt(state, b.x, b.y) : undefined,
       waterworksOrientation: b.type === 'weir' || b.type === 'levee'
         ? waterworksOrientationAt(state, b.type, b.x, b.y, leveeEdge)
         : undefined,
@@ -2120,6 +2124,12 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
         : undefined,
       x: drawX, y: drawY, size,
     };
+    if (b.type === 'canal') {
+      // 낮은 도랑은 논밭처럼 바닥층에 둔다. 주민·나무보다 뒤에 깔려야 통행 표현이 자연스럽다.
+      drawBuildingSprite(ctx, sprites, drawParams);
+      occludedBuildingDraws.push(drawParams);
+      continue;
+    }
     const activeWorkerCount = presentation.workplaceActiveCountByBuilding.get(b.id) ?? 0;
     // 밤 창불(windowGlow)은 밤 색조 패스에서 따로 그린다 — 여기서는 낮에도 도는 효과만.
     const daytimeWhen = new Set<BuildingEffectWhen>(['always']);
@@ -2616,6 +2626,13 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
           : undefined,
       waterworksOrientation: o.placingType === 'weir' || o.placingType === 'levee'
         ? waterworksOrientationAt(state, o.placingType, o.hover.x, o.hover.y, o.leveePlacementEdge ?? undefined)
+        : undefined,
+      connections: o.placingType === 'canal'
+        ? canalConnectionsAt(state, o.hover.x, o.hover.y)
+        : undefined,
+      canalFlowing: o.placingType === 'canal' && wouldCanalFlowAt(state, o.hover.x, o.hover.y),
+      canalRiverEdges: o.placingType === 'canal'
+        ? canalRiverEdgesAt(state, o.hover.x, o.hover.y)
         : undefined,
       waterworksEdge: o.placingType === 'levee'
         ? o.leveePlacementEdge ?? undefined

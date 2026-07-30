@@ -891,6 +891,128 @@ function blitWaterworksBuilding(
   );
 }
 
+function drawCanalBuilding(ctx: CanvasRenderingContext2D, p: BuildingDrawParams): void {
+  const half = p.size / 2;
+  const width = Math.max(2, p.size * 0.2);
+  const connections = p.connections ?? { n: false, e: false, s: false, w: false };
+  const river = p.canalRiverEdges ?? { n: false, e: false, s: false, w: false };
+  const riverReach = p.size * 0.36;
+  const activeEdges = (['n', 'e', 's', 'w'] as const).filter(edge => connections[edge]);
+  const edgePoint = (edge: 'n' | 'e' | 's' | 'w'): readonly [number, number] => {
+    if (edge === 'n') return [p.x + half, p.y];
+    if (edge === 'e') return [p.x + p.size, p.y + half];
+    if (edge === 's') return [p.x + half, p.y + p.size];
+    return [p.x, p.y + half];
+  };
+  const traceCanal = () => {
+    if (activeEdges.length === 0) {
+      ctx.moveTo(p.x + p.size * 0.22, p.y + half);
+      ctx.lineTo(p.x + p.size * 0.78, p.y + half);
+      return;
+    }
+    if (activeEdges.length === 1) {
+      const [ex, ey] = edgePoint(activeEdges[0]);
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(p.x + half, p.y + half);
+      return;
+    }
+    if (activeEdges.length === 2) {
+      const [ax, ay] = edgePoint(activeEdges[0]);
+      const [bx, by] = edgePoint(activeEdges[1]);
+      ctx.moveTo(ax, ay);
+      if (activeEdges[0] !== 'n' || activeEdges[1] !== 's') {
+        if (activeEdges[0] !== 'e' || activeEdges[1] !== 'w') {
+          ctx.lineTo(p.x + half, p.y + half);
+        }
+      }
+      ctx.lineTo(bx, by);
+      return;
+    }
+    if (connections.n && connections.s) {
+      ctx.moveTo(p.x + half, p.y);
+      ctx.lineTo(p.x + half, p.y + p.size);
+    } else {
+      if (connections.n) {
+        ctx.moveTo(p.x + half, p.y);
+        ctx.lineTo(p.x + half, p.y + half);
+      }
+      if (connections.s) {
+        ctx.moveTo(p.x + half, p.y + p.size);
+        ctx.lineTo(p.x + half, p.y + half);
+      }
+    }
+    if (connections.e && connections.w) {
+      ctx.moveTo(p.x, p.y + half);
+      ctx.lineTo(p.x + p.size, p.y + half);
+    } else {
+      if (connections.e) {
+        ctx.moveTo(p.x + p.size, p.y + half);
+        ctx.lineTo(p.x + half, p.y + half);
+      }
+      if (connections.w) {
+        ctx.moveTo(p.x, p.y + half);
+        ctx.lineTo(p.x + half, p.y + half);
+      }
+    }
+  };
+  const strokeCanal = (color: string, lineWidth: number) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = activeEdges.length === 0 ? 'round' : 'butt';
+    ctx.beginPath();
+    traceCanal();
+    ctx.stroke();
+    if (activeEdges.length === 1) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(p.x + half, p.y + half, lineWidth / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+  const drawRiverMouth = (edge: 'n' | 'e' | 's' | 'w') => {
+    const overlap = p.size * 0.08;
+    const startHalf = width * 0.65;
+    const endHalf = width * 0.9;
+    const horizontal = edge === 'e' || edge === 'w';
+    const startX = edge === 'e' ? p.x + p.size - overlap : edge === 'w' ? p.x + overlap : p.x + half;
+    const startY = edge === 's' ? p.y + p.size - overlap : edge === 'n' ? p.y + overlap : p.y + half;
+    const endX = edge === 'e' ? p.x + p.size + riverReach : edge === 'w' ? p.x - riverReach : startX;
+    const endY = edge === 's' ? p.y + p.size + riverReach : edge === 'n' ? p.y - riverReach : startY;
+    const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
+    gradient.addColorStop(0, 'rgba(73,138,168,1)');
+    gradient.addColorStop(0.58, 'rgba(73,138,168,0.88)');
+    gradient.addColorStop(1, 'rgba(73,138,168,0.12)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    if (horizontal) {
+      ctx.moveTo(startX, startY - startHalf);
+      ctx.lineTo(endX, endY - endHalf);
+      ctx.lineTo(endX, endY + endHalf);
+      ctx.lineTo(startX, startY + startHalf);
+    } else {
+      ctx.moveTo(startX - startHalf, startY);
+      ctx.lineTo(endX - endHalf, endY);
+      ctx.lineTo(endX + endHalf, endY);
+      ctx.lineTo(startX + startHalf, startY);
+    }
+    ctx.closePath();
+    ctx.fill();
+  };
+  ctx.save();
+  // 타일 경계는 butt로 정확히 맞대고, 한 타일 안의 실제 꺾임만 round join으로 잇는다.
+  ctx.lineJoin = 'round';
+  strokeCanal(p.canalFlowing ? '#3b728b' : '#725f42', width + Math.max(2, p.size * 0.08));
+  strokeCanal(p.canalFlowing ? '#498aa8' : '#9a8055', width);
+  if (p.canalFlowing) {
+    strokeCanal('rgba(112,166,187,0.55)', Math.max(1, p.size * 0.045));
+    if (river.n) drawRiverMouth('n');
+    if (river.e) drawRiverMouth('e');
+    if (river.s) drawRiverMouth('s');
+    if (river.w) drawRiverMouth('w');
+  }
+  ctx.restore();
+}
+
 function blitPromotionBuilding(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
@@ -1608,6 +1730,7 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   bridge:     { base: FENCE },
   weir:       { base: FENCE, glyph: WATER },
   levee:      { base: FACE_STONE, glyph: WATER },
+  canal:      { base: DIRT, glyph: WATER },
   lumberCamp: { base: LOGS },
   woodShed:   { base: LOGS, glyph: CAMPFIRE },
   huntLodge:  { base: TENT_TAN },
@@ -2372,6 +2495,13 @@ export const atlasSprites: SpriteAPI = {
     }
 
     if (drawWallFamilyBuilding(ctx, p)) {
+      ctx.globalAlpha = 1;
+      drawProgressBar(ctx, p);
+      return;
+    }
+
+    if (p.type === 'canal') {
+      drawCanalBuilding(ctx, p);
       ctx.globalAlpha = 1;
       drawProgressBar(ctx, p);
       return;

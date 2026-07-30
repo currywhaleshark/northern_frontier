@@ -36,6 +36,7 @@ export const BUILD_CATEGORY_BY_TYPE = {
   weavingHouse: 'production',
   field: 'farming',
   paddy: 'farming',
+  canal: 'farming',
   weir: 'farming',
   levee: 'defense',
   stable: 'farming',

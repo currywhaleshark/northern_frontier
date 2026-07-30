@@ -819,10 +819,10 @@ export function convertFieldToPaddy(state: GameState, buildingId: number): strin
   if (!building.built) return '완공된 밭만 논으로 전환할 수 있습니다.';
   const def = BUILDING_DEFS.paddy;
   if (!isBuildingUnlocked(state.rank, 'paddy')) return `${RANK_NAMES[def.minRank ?? 'bo']} 승격 후 논을 만들 수 있습니다.`;
-  // 다칸 밭은 평지·비옥지로 이루어지고, 영역 중 한 칸만 강물에 닿으면 논이 될 수 있다.
+  // 다칸 밭은 평지·비옥지로 이루어지고, 영역 중 한 칸만 강이나 물이 흐르는 농수로에 닿으면 논이 된다.
   const footprint = footprintTilesOf(state, building) ?? [];
   if (!isPaddyFootprintEligible(state, footprint)) {
-    return '논 영역 중 한 칸 이상이 강물에 맞닿아야 합니다.';
+    return '논 영역 중 한 칸 이상이 강이나 물이 흐르는 농수로에 맞닿아야 합니다.';
   }
   const cost = buildingCostFor('paddy', building.w ?? 1, building.h ?? 1);
   if (!canAffordCost(state, cost)) return '자원이 부족합니다.';
@@ -953,7 +953,7 @@ export function expandAreaBuilding(
       }
     }
     if (building.type === 'paddy' && !isPaddyFootprintEligible(state, targetTiles)) {
-      return '논 영역 중 한 칸 이상이 강물에 맞닿아야 합니다.';
+      return '논 영역 중 한 칸 이상이 강이나 물이 흐르는 농수로에 맞닿아야 합니다.';
     }
     for (let ty = target.y; ty < target.y + target.h; ty++) {
       for (let tx = target.x; tx < target.x + target.w; tx++) {

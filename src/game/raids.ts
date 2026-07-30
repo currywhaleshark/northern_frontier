@@ -144,11 +144,12 @@ function buildingAt(state: GameState, buildingId: number): Building | undefined 
   return state.buildings.find(building => building.id === buildingId);
 }
 
-function raiderCanUseBuilding(building: Building): boolean {
+export function raiderCanUseBuilding(building: Building): boolean {
   return building.built && (
     building.type === 'bridge' ||
     building.type === 'ferry' ||
-    building.type === 'dock'
+    building.type === 'dock' ||
+    building.type === 'canal'
   );
 }
 

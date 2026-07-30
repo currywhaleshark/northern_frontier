@@ -4,6 +4,7 @@ import { rankAtLeast } from './constants';
 import { createCombatRoster } from './combatRoster';
 import { hasKnownMineralDepositNear } from './miningSites';
 import { aquiferSampleAt, oreSampleAt } from './subsurfaceVeins';
+import { hasAdjacentFlowingCanal } from './irrigation';
 import type { Building, BuildingDef, BuildingTypeId, GameState, Rank, ResourceId, SmithyProductId, Tile } from './types';
 
 export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
@@ -85,6 +86,12 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     cost: { wood: 3, stone: 4 }, buildDays: 3, slots: 0, capacity: 0, defense: 0,
     winterBonus: false, placement: 'river', unique: false,
   },
+  canal: {
+    id: 'canal', name: '농수로',
+    desc: '강에서 물을 끌어 내륙 비옥지에 논을 여는 낮은 도랑. 서로 이어 강에 닿은 구간만 물이 흐르며, 마른 도랑도 통행할 수 있다.',
+    cost: { wood: 2, stone: 1 }, buildDays: 2, slots: 0, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false, minRank: 'bo',
+  },
   lumberCamp: {
     id: 'lumberCamp', name: '벌목장',
     desc: '벌목꾼이 목재를 부리는 거점. 숲 가까이 지으면 나르는 거리가 크게 줄어든다.',
@@ -123,7 +130,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   paddy: {
     id: 'paddy', name: '논',
-    desc: '보(堡) 승격 후 강가 비옥지에 짓는 벼 재배지. 많은 곡물을 거두고 방앗간으로 효율을 높일 수 있다.',
+    desc: '보(堡) 승격 후 강가 또는 물이 흐르는 농수로 옆 비옥지에 짓는 벼 재배지. 많은 곡물을 거두고 방앗간으로 효율을 높일 수 있다.',
     cost: { wood: 4, tools: 1 }, buildDays: 4, slots: 1, capacity: 0, defense: 0,
     winterBonus: false, placement: 'paddy', unique: false, minRank: 'bo',
   },
@@ -292,7 +299,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
 };
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
-  'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'well', 'field', 'paddy', 'weir', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'clinic',
+  'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'well', 'field', 'paddy', 'canal', 'weir', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'clinic',
   'smokehouse', 'dryingRack', 'smithy', 'mine', 'deepMine', 'ferry', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office', 'cemetery', 'school', 'shrine', 'hermitage',
   'levee', 'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement', 'chongtongEmplacement',
@@ -302,6 +309,7 @@ export const SINGLE_TILE_BUILDINGS = [
   'bridge',
   'weir',
   'levee',
+  'canal',
   'lumberCamp',
   'huntLodge',
   'herbHut',
@@ -775,12 +783,13 @@ function hasAdjacentRiver(state: GameState | undefined, tile: Tile): boolean {
   );
 }
 
-function isPaddyLandTile(tile: Tile): boolean {
-  return tile.terrain === 'fertile' || tile.terrain === 'plain';
+function isPaddyPlacementTile(tile: Tile): boolean {
+  return tile.terrain === 'fertile' || tile.terrain === 'plain' || tile.terrain === 'forest';
 }
 
 export function isPaddyEligibleTile(state: GameState | undefined, tile: Tile): boolean {
-  return isPaddyLandTile(tile) && hasAdjacentRiver(state, tile);
+  return isPaddyPlacementTile(tile) &&
+    (hasAdjacentRiver(state, tile) || hasAdjacentFlowingCanal(state, tile.x, tile.y));
 }
 
 export function isPaddyFootprintEligible(
@@ -788,7 +797,7 @@ export function isPaddyFootprintEligible(
   tiles: readonly Tile[],
 ): boolean {
   return tiles.length > 0 &&
-    tiles.every(isPaddyLandTile) &&
+    tiles.every(isPaddyPlacementTile) &&
     tiles.some(tile => isPaddyEligibleTile(state, tile));
 }
 
@@ -814,7 +823,7 @@ export function canPlaceOn(def: BuildingDef, tile: Tile, state?: GameState): boo
   if (def.placement === 'river') return tile.terrain === 'river';
   if (def.placement === 'rock') return tile.terrain === 'rock';
   if (def.placement === 'riverbank') return isRiverbank(state, tile);
-  if (def.placement === 'paddy') return isPaddyLandTile(tile);
+  if (def.placement === 'paddy') return isPaddyPlacementTile(tile);
   if (def.placement === 'watermill') return false;
   if (def.placement === 'field') {
     // 숲도 받는다 — 벌목꾼이 베어 평지로 만든 뒤에야 농부가 공사를 시작한다.

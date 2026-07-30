@@ -7,10 +7,10 @@ import { BUILDING_DEFS, buildingFootprintTiles, isAreaBuildingType } from './bui
 import { CONFIG } from './config';
 import type { Building, BuildingDef, BuildingTypeId, GameState, Resident, Tile } from './types';
 
-/** 벌목한 자리는 평지가 된다 — 평지에 지을 수 있는 건물만 나무를 끼고 지정할 수 있다.
- *  논은 평지·비옥지 중 영역 한 칸 이상이 강가에 닿아야 하고, 숲은 먼저 밭으로 개간한다. */
+/** 벌목한 자리는 평지가 된다 — 평지에 지을 수 있는 건물은 나무를 끼고 지정할 수 있다.
+ *  논도 강·유효 수로 인접 조건을 만족하면 숲을 포함해 지정하고 먼저 개간할 수 있다. */
 export function acceptsClearedLand(def: BuildingDef): boolean {
-  return def.placement === 'land' || def.placement === 'field';
+  return def.placement === 'land' || def.placement === 'field' || def.placement === 'paddy';
 }
 
 export function isClearableForestTile(tile: Tile | undefined): boolean {
