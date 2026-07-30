@@ -5,6 +5,7 @@ import { createCombatRoster, isCombatReadyResident, type CombatantSnapshot } fro
 import { deliverExpeditionCorpses, loseExpeditionCorpses } from './lifecycle';
 import { consumeMusketPowder, reconcileWeaponAssignments, resolvedMountAssignments } from './weapons';
 import { habitatForestTiles } from './habitats';
+import { breakDiplomaticPact } from './diplomacy';
 import type {
   Expedition, ExpeditionKind, GameState, PredatorKind, Resident, ResourceId,
 } from './types';
@@ -251,6 +252,10 @@ export function createExpedition(state: GameState, input: CreateExpeditionInput)
     carriedLoot: input.carriedLoot,
   };
   state.expedition = expedition;
+  if (input.kind === 'lairAssault' && input.targetSiteId != null) {
+    const site = state.foreignSites.find(candidate => candidate.id === input.targetSiteId);
+    if (site?.factionName) breakDiplomaticPact(state, site.factionName, 'lairAssault');
+  }
   for (const member of members) {
     resetAgent(state, member);
     member.path = findPath(

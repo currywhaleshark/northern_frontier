@@ -84,8 +84,7 @@ interface Props {
   onSelectResident: (residentId: number) => void;
   onCancelBuildingConstruction: (buildingId: number) => void;
   onSendSiteGift: (siteId: number, gift: SiteGiftType) => void;
-  onRequestSitePassage: (siteId: number) => void;
-  onRequestSiteHunting: (siteId: number) => void;
+  onOpenClaimAccord: (factionName: string, zoneId: number) => void;
   onRequestSiteDefectors: (siteId: number) => void;
   onScoutBanditLair: (siteId: number) => void;
   onRaidBanditLair: (siteId: number) => void;
@@ -342,8 +341,7 @@ export function SelectionContextBar({
   onSelectResident,
   onCancelBuildingConstruction,
   onSendSiteGift,
-  onRequestSitePassage,
-  onRequestSiteHunting,
+  onOpenClaimAccord,
   onRequestSiteDefectors,
   onScoutBanditLair,
   onRaidBanditLair,
@@ -405,8 +403,7 @@ export function SelectionContextBar({
             state={state}
             site={foreignSite}
             onSendGift={onSendSiteGift}
-            onRequestPassage={onRequestSitePassage}
-            onRequestHunting={onRequestSiteHunting}
+            onOpenClaimAccord={onOpenClaimAccord}
             onRequestDefectors={onRequestSiteDefectors}
             onScoutLair={onScoutBanditLair}
             onRaidLair={onRaidBanditLair}

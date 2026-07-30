@@ -59,6 +59,7 @@ import { farmWorkTileForTick } from './farmWorkTiles';
 import { reconcileResidentHomes, residentHome } from './residents';
 import { reconcileMountAssignments } from './weapons';
 import { canEnterForeignTerritory, canWorkForeignTerritory, noteTerritoryViolation } from './territory';
+import { noteProximityBuildingCompletion } from './proximityWarnings';
 import {
   assignedBuildingForResident, assignedSlotResidents, assignedWorkers, autoAssignWorkersToBuilding,
   clearAssignmentsForBuilding, isResidentInAssignedSlot,
@@ -1661,6 +1662,7 @@ function advanceBuildingWorkOrder(state: GameState, building: Building, ctx: Ctx
 
   building.built = true;
   delete building.workOrder;
+  noteProximityBuildingCompletion(state, building);
   initializeWeirReservoir(state, building);
   if (state.priorityBuildingId === building.id) state.priorityBuildingId = null;
   reconcileResidentHomes(state, ctx.rng);
@@ -1688,6 +1690,7 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
       expansion.progress += work;
       if (expansion.progress >= expansion.required) {
         delete target.expansion;
+        noteProximityBuildingCompletion(state, target);
         if (state.priorityBuildingId === target.id) state.priorityBuildingId = null;
         addLog(state, `${def.name} 영역 확장이 끝났습니다.`, 'good', true);
       }
@@ -1701,6 +1704,7 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
       target.built = true;
       target.repairing = false;
       delete target.repairCause;
+      if (!repaired) noteProximityBuildingCompletion(state, target);
       initializeWeirReservoir(state, target);
       if (state.priorityBuildingId === target.id) state.priorityBuildingId = null;
       reconcileResidentHomes(state, ctx.rng);

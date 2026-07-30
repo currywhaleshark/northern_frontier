@@ -22,7 +22,7 @@ import { isWallBuilding } from './walls';
 import { findRaidOriginSite } from './foreignSites';
 import { createTacticalBattle } from './tacticalBattle';
 import { activePredatorScoutIds } from './expeditionIntel';
-import { announceRaidTip, raidTipInformant } from './diplomacy';
+import { activeDiplomaticPact, announceRaidTip, raidTipInformant } from './diplomacy';
 import { borderCommanderEffects, factionLeaderSubject, factionRaidPartyLabel } from './diplomaticFigures';
 
 type RaidWarningSource = 'diplomatic';
@@ -68,16 +68,18 @@ function raidPower(state: GameState, rng: () => number): number {
   return Math.round(base * CONFIG.difficulty[state.difficulty ?? 'normal'].raidPower);
 }
 
-function pickFaction(state: GameState, rng: () => number): Faction {
+function pickFaction(state: GameState, rng: () => number): Faction | null {
   // 관계가 나쁜 세력일수록 습격에 나설 확률이 높다.
   // 위협도가 아주 높으면 평화 성향 씨족도 굶주림에 몰려 내려올 수 있다 (절반 가중).
   const cands: { f: Faction; w: number }[] = [];
   for (const f of FACTIONS) {
     if (f.raidEligible === false) continue;
+    if (activeDiplomaticPact(state, f.name)) continue;
     const rel = getRelation(state, f.name);
     if (f.hostile) cands.push({ f, w: Math.max(5, 110 - rel) });
     else if (state.threat > 85) cands.push({ f, w: Math.max(2, (90 - rel) * 0.5) });
   }
+  if (cands.length === 0) return null;
   let r = rng() * cands.reduce((s, c) => s + c.w, 0);
   for (const c of cands) {
     r -= c.w;
@@ -94,6 +96,7 @@ export function openExtortionDemand(
   factionName: string,
   warningSource?: RaidWarningSource,
 ): boolean {
+  if (activeDiplomaticPact(state, factionName)) return false;
   const faction = FACTIONS.find(candidate => candidate.name === factionName);
   if (!faction?.extortionDemands?.length) return false;
 
@@ -186,6 +189,7 @@ export function checkRaidTrigger(state: GameState, rng: () => number): void {
   let warned = warningChance > 0 && rng() < warningChance;
   const power = raidPower(state, rng);
   const faction = pickFaction(state, rng);
+  if (!faction) return;
   const originSite = findRaidOriginSite(state, faction.name);
   if (!warned && originSite && (originSite.scoutedUntilDay ?? 0) >= state.day) {
     warned = rng() < CONFIG.foreignSites.banditScoutWarningBonus;
@@ -209,10 +213,12 @@ export function spawnRaiders(
   powerIn?: number,
   warningSource?: RaidWarningSource,
 ): void {
+  if (factionName && activeDiplomaticPact(state, factionName)) return;
   const center = state.buildings.find(b => b.type === 'center');
   if (!center) return;
   const power = powerIn ?? raidPower(state, rng);
   const faction = FACTIONS.find(candidate => candidate.name === factionName) ?? pickFaction(state, rng);
+  if (!faction) return;
   const h = state.map.length, w = state.map[0]?.length ?? 0;
   if (w <= 0 || h <= 0) return;
 
@@ -525,6 +531,7 @@ export function openRaidChoice(
   powerIn?: number, factionName?: string, siege = false, context: RaidChoiceContext = {},
 ): void {
   const faction = FACTIONS.find(f => f.name === factionName) ?? pickFaction(state, rng);
+  if (!faction) return;
   const power = powerIn ?? raidPower(state, rng);
   if (state.expedition && !context.expeditionOrder && state.expedition.phase !== 'return') {
     openExpeditionRaidOrderChoice(state, power, faction.name, warned, siege);

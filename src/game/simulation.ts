@@ -69,6 +69,7 @@ import { maybeOfferDefectorImmigration, maybeOfferImmigration, resolveImmigratio
 import { createIncidentState, resolveSpecialEvent, updateSpecialEvents } from './specialEvents';
 import { createSpecialItemInventory } from './specialItems';
 import { dailyClaimTensionTick, noteBuildingClaimIntrusions } from './claimZones';
+import { dailyProximityWarningTick } from './proximityWarnings';
 import { applyDailySpoilage, spoilageStockSnapshot } from './spoilage';
 import { consumptionWeight, lifecycleDailyTick, resolveWeddingChoice } from './lifecycle';
 import { applyJobChangeCarryover, dailyEducationTick, isLiterateJob } from './education';
@@ -93,7 +94,7 @@ import { cleanupRoyalPlaqueAfterBuildingRemoval } from './royalPlaque';
 import {
   createBorderCommander, createFactionLeaders, updateDiplomaticFigures,
 } from './diplomaticFigures';
-import { dailyDiplomacyTick } from './diplomacy';
+import { dailyDiplomacyTick, resolveClaimAccordOffer, resolveClaimAccordRenewal, resolvePactRenewal } from './diplomacy';
 import { resolveTerritoryWarning, updateTerritoryWarnings } from './territory';
 import {
   foreignSiteAt, generateForeignSites, revealForeignSitesFromExploration, updateSeasonalForeignSites,
@@ -167,6 +168,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
     pendingEnvoys: [],
     giftEnvoyDays: {},
     proximityWarnings: [],
+    proximityWarningProgress: {},
     expedition: null,
     raidHold: null,
     raiders: null,
@@ -1146,6 +1148,9 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'scenario') resolveScenarioChoice(state, optionId);
   else if (state.pendingChoice.kind === 'promotionDecree') resolvePromotionDecreeChoice(state, optionId);
   else if (state.pendingChoice.kind === 'mineCollapse') resolveMineCollapseChoice(state, optionId);
+  else if (state.pendingChoice.kind === 'pactRenewal') resolvePactRenewal(state, optionId);
+  else if (state.pendingChoice.kind === 'claimAccordRenewal') resolveClaimAccordRenewal(state, optionId);
+  else if (state.pendingChoice.kind === 'claimAccordOffer') resolveClaimAccordOffer(state, optionId);
   else resolveTrade(state, optionId);
   reconcileWeaponAssignments(state);
   reconcileMountAssignments(state);
@@ -1303,6 +1308,7 @@ function endOfDay(state: GameState): void {
     updateSpecialEvents(state, rng); // 기존 제도권 사건과 모달이 겹치면 예정일을 넘겨 다음 날 재시도
     updateTerritoryWarnings(state);
     dailyClaimTensionTick(state);
+    dailyProximityWarningTick(state);
   }
   dailyScenarioTick(state); // 시나리오 스텝 진행 — 모달이 비어 있을 때 다음 안내를 연다
 

@@ -592,7 +592,7 @@ export interface TradeEvaluation {
   message: string;
 }
 
-export type DiplomaticEnvoyKind = 'gift' | 'pact' | 'aidRequest';
+export type DiplomaticEnvoyKind = 'gift' | 'pact' | 'claimAccord' | 'aidRequest';
 
 export interface PendingEnvoy {
   factionName: string;
@@ -602,6 +602,10 @@ export interface PendingEnvoy {
   // 발송 순간 확정한 보정. 왕복 중 세이브를 다시 읽어도 답신 결과가 바뀌지 않는다.
   relationGain?: number;
   giftValue?: number;
+  pactYears?: number;
+  // 생활권 협정은 사절을 보낼 때 대상 구역과 가격을 고정한다.
+  claimZoneId?: number;
+  claimAccordUntilDay?: number;
 }
 
 export interface DiplomaticPact {
@@ -619,6 +623,7 @@ export interface LogEntry {
   text: string;
   kind: 'info' | 'good' | 'bad' | 'raid' | 'weather' | 'trade';
   important?: boolean; // 통합 로그 축약 상태의 주요 소식에 노출
+  notice?: boolean; // 액션 중앙 플로트에도 한 번 띄울 중요한 게임 내 통지
 }
 
 // ── 연대기 — 영구 보존되는 굵직한 사건 기록 ──
@@ -703,7 +708,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'promotionDecree' | 'mineCollapse' | 'giftEnvoy';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'promotionDecree' | 'mineCollapse' | 'giftEnvoy' | 'pactEnvoy' | 'pactRenewal' | 'claimAccordEnvoy' | 'claimAccordRenewal' | 'claimAccordOffer';
   title: string;
   body: string;
   illustration?: {
@@ -729,6 +734,8 @@ export interface ScenarioState {
 
 export interface TerritoryViolation {
   siteId: number;
+  // 항의를 생활권 협정으로 수습할 때 실제 침범 구역만 제안 대상으로 삼는다.
+  zoneIds: number[];
   firstDay: number;
   lastDay: number;
   warningDay: number;
@@ -1774,9 +1781,10 @@ export interface GameState {
   borderCommander: BorderCommander; // 현 함경북도 병마절도사
   diplomaticPacts: DiplomaticPact[]; // 화친 맹약(E2) — E1에서 저장 자리를 먼저 만든다
   claimAccords: ClaimAccord[]; // 생활권 협정(E5)
-  pendingEnvoys: PendingEnvoy[]; // 예물·맹약·원병 사절 왕복 상태
+  pendingEnvoys: PendingEnvoy[]; // 예물·맹약·생활권 협정·원병 사절 왕복 상태
   giftEnvoyDays: Record<string, number[]>; // 세력별 예물 발송일 — 계절 제한·연차 반감용
   proximityWarnings: string[]; // 세력×사유 경고 dedupe(E4)
+  proximityWarningProgress: Record<string, number>; // E4 완충 작업·거점 배회의 누적 일수
   expedition: Expedition | null; // 지도 위 토벌 원정대. 동시에 하나만 운용
   raidHold: RaidHoldState | null; // 원정대 귀환을 기다리는 완전 수성 상태
   raiders: RaiderBand | null; // 접근 중인 습격 무리

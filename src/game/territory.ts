@@ -3,7 +3,9 @@ import { CONFIG } from './config';
 import { addLog } from './events';
 import { addForeignSiteMemory } from './foreignSites';
 import { changeRelation } from './relations';
-import type { ForeignSite, GameState, PointerAction, TerritoryViolation } from './types';
+import { breakDiplomaticPact } from './diplomacy';
+import { isClaimPermissionActive } from './claimZones';
+import type { ClaimZone, ForeignSite, GameState, PointerAction, TerritoryViolation } from './types';
 
 export type TerritoryUse = 'passage' | 'work';
 
@@ -39,7 +41,7 @@ export function unauthorizedTerritorySiteIds(
   for (const [siteId, zones] of coveringSites(state, x, y)) {
     if (ignored.has(siteId)) continue;
     const relevant = use === 'passage' ? zones : zones.filter(zone => zone.kind !== 'passage');
-    const permitted = relevant.some(zone => (zone.permittedUntilDay ?? 0) >= state.day);
+    const permitted = relevant.some(zone => isClaimPermissionActive(state, zone));
     if (!permitted) blocked.push(siteId);
   }
   return blocked;
@@ -92,6 +94,14 @@ function warningDelay(state: GameState, siteId: number): number {
   return min + Math.abs(state.seed + state.day * 31 + siteId * 17) % (max - min + 1);
 }
 
+function unauthorizedZonesForSite(
+  state: GameState, siteId: number, x: number, y: number, use: TerritoryUse,
+): ClaimZone[] {
+  const zones = coveringSites(state, x, y).get(siteId) ?? [];
+  return (use === 'passage' ? zones : zones.filter(zone => zone.kind !== 'passage'))
+    .filter(zone => !isClaimPermissionActive(state, zone));
+}
+
 export function noteTerritoryViolation(
   state: GameState,
   siteIds: readonly number[],
@@ -104,10 +114,12 @@ export function noteTerritoryViolation(
   for (const siteId of actual) {
     const site = state.foreignSites.find(candidate => candidate.id === siteId);
     if (!site) continue;
+    const zoneIds = unauthorizedZonesForSite(state, siteId, x, y, use).map(zone => zone.id);
     let violation = state.territoryViolations.find(candidate => candidate.siteId === siteId);
     if (!violation) {
       violation = {
         siteId,
+        zoneIds,
         firstDay: state.day,
         lastDay: state.day,
         warningDay: state.day + warningDelay(state, siteId),
@@ -120,6 +132,7 @@ export function noteTerritoryViolation(
       addLog(state, `${site.factionName ?? site.name}의 경계표를 허락 없이 넘었습니다. 발각되면 항의가 올 수 있습니다.`, 'bad', true);
       addForeignSiteMemory(state, site.id, '개척지 주민이 허락 없이 생활권에 들어왔다는 흔적이 남았습니다.', 'bad');
     }
+    violation.zoneIds = [...new Set([...(violation.zoneIds ?? []), ...zoneIds])].slice(0, 24);
     const dayField = use === 'passage' ? 'lastPassageDay' : 'lastWorkDay';
     if (violation[dayField] !== state.day) {
       violation[dayField] = state.day;
@@ -160,6 +173,12 @@ export function updateTerritoryWarnings(state: GameState): void {
       },
       { id: 'apologize', label: '잘못을 인정한다', desc: '명성에 작은 손해를 감수하고 사과합니다.' },
       { id: 'ignore', label: '항의를 무시한다', desc: '관계와 경계심이 크게 악화됩니다.' },
+      {
+        id: 'accord', label: '생활권 협정을 제안한다',
+        desc: '은 또는 그들이 받는 물자를 동봉한 사절로, 해당 생활권의 연간 권리를 청합니다.',
+        disabled: !site.factionName,
+        disabledReason: site.factionName ? undefined : '소속을 확인할 수 없어 협정할 수 없습니다.',
+      },
     ],
     data: { mode: 'warning', siteId: site.id },
   };
@@ -187,10 +206,29 @@ export function resolveTerritoryWarning(state: GameState, optionId: string): voi
     if (faction) changeRelation(state, faction, CONFIG.foreignSites.violationApologyRelation);
     site.alarm = Math.min(100, site.alarm + 6);
     addLog(state, `${site.name}의 항의에 잘못을 인정하고 재발 방지를 약속했습니다.`, 'bad', true);
+  } else if (optionId === 'accord') {
+    const violation = state.territoryViolations?.find(candidate => candidate.siteId === siteId);
+    const zoneId = violation?.zoneIds.find(id => {
+      const zone = state.claimZones.find(candidate => candidate.id === id);
+      return zone?.siteId === siteId;
+    }) ?? -1;
+    if (zoneId < 0 || !faction) return;
+    state.pendingChoice = {
+      kind: 'claimAccordOffer',
+      title: `${site.factionName ?? site.name}의 생활권 협정`,
+      body: `${site.name}의 항의에 답해, 침범한 생활권의 채집·작업 권리를 정식으로 청할 수 있습니다.`,
+      options: [
+        { id: 'propose', label: '협정을 제안한다', desc: '은 또는 그들이 받는 물자를 골라 사절에게 맡깁니다.' },
+        { id: 'decline', label: '지금은 제안하지 않는다', desc: '이번 항의는 더는 키우지 않고 물러납니다.' },
+      ],
+      data: { factionName: faction, zoneId, fallback: 'territoryApology', siteId },
+    };
+    return;
   } else if (optionId === 'ignore') {
     if (faction) changeRelation(state, faction, CONFIG.foreignSites.violationIgnoreRelation);
     site.alarm = Math.min(100, site.alarm + 15);
     state.threat = Math.min(100, state.threat + 4);
+    if (faction) breakDiplomaticPact(state, faction, 'territoryViolation');
     addLog(state, `${site.name}의 항의를 묵살했습니다. 국경의 긴장이 크게 높아집니다.`, 'bad', true);
   } else return;
   addForeignSiteMemory(state, site.id, optionId === 'compensate'

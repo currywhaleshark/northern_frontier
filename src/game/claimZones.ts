@@ -4,6 +4,7 @@ import { CONFIG } from './config';
 import { addLog } from './events';
 import { addForeignSiteMemory, isForeignSiteOperational } from './foreignSites';
 import { changeRelation } from './relations';
+import { activeClaimAccord } from './diplomacy';
 import type { Building, ClaimZone, GameState } from './types';
 
 export function claimZonesAt(state: GameState, x: number, y: number): ClaimZone[] {
@@ -15,7 +16,7 @@ export function claimZonesAt(state: GameState, x: number, y: number): ClaimZone[
 }
 
 export function isClaimPermissionActive(state: GameState, zone: ClaimZone): boolean {
-  return (zone.permittedUntilDay ?? 0) >= state.day;
+  return (zone.permittedUntilDay ?? 0) >= state.day || !!activeClaimAccord(state, zone.id);
 }
 
 function claimLabel(zone: ClaimZone): string {

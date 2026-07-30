@@ -2,6 +2,7 @@ import { withJosa } from '../game/josa';
 import { FACTIONS, RESOURCE_NAMES } from '../game/constants';
 import { CONFIG } from '../game/config';
 import { isClaimPermissionActive } from '../game/claimZones';
+import { canOpenClaimAccordEnvoy, claimAccordEnvoyRemainingDays, claimAccordRemainingDays } from '../game/diplomacy';
 import { SITE_GIFTS, type SiteGiftType } from '../game/siteDiplomacy';
 import type { ClaimKind, ForeignSite, ForeignSiteStatus, ForeignSiteType, GameState } from '../game/types';
 import { FactionName } from './FactionName';
@@ -40,8 +41,7 @@ interface Props {
   state: GameState;
   site: ForeignSite;
   onSendGift: (siteId: number, gift: SiteGiftType) => void;
-  onRequestPassage: (siteId: number) => void;
-  onRequestHunting: (siteId: number) => void;
+  onOpenClaimAccord: (factionName: string, zoneId: number) => void;
   onRequestDefectors: (siteId: number) => void;
   onScoutLair: (siteId: number) => void;
   onRaidLair: (siteId: number) => void;
@@ -59,15 +59,13 @@ function estimatePower(state: GameState, site: ForeignSite): string {
 }
 
 export function ForeignSitePanel({
-  state, site, onSendGift, onRequestPassage, onRequestHunting, onRequestDefectors, onScoutLair, onRaidLair,
+  state, site, onSendGift, onOpenClaimAccord, onRequestDefectors, onScoutLair, onRaidLair,
 }: Props) {
   const faction = FACTIONS.find(candidate => candidate.name === site.factionName);
   const zones = state.claimZones.filter(zone => zone.siteId === site.id && zone.discovered);
   const inactive = site.type === 'seasonalCamp' && site.seasonalActive === false;
   const operational = site.status !== 'burned' && site.status !== 'abandoned';
-  const hasPassage = zones.some(zone => zone.kind === 'passage');
   const passageActive = zones.some(zone => zone.kind === 'passage' && isClaimPermissionActive(state, zone));
-  const hasHunting = zones.some(zone => zone.kind === 'hunting' || zone.kind === 'forest');
 
   return (
     <div className="foreign-site-panel">
@@ -90,7 +88,7 @@ export function ForeignSitePanel({
           산길 개방 · 교역 한도 +{Math.round((CONFIG.foreignSites.passageTradeCapacityMult - 1) * 100)}% · 상단 회전 {CONFIG.foreignSites.passageTradeCooldownReduction}일 단축
         </div>
       )}
-      {hasPassage && operational && !passageActive && (
+      {zones.some(zone => zone.kind === 'passage') && operational && !passageActive && (
         <div className="foreign-site-notice">
           통행 제한 · 일반 이동과 작업은 생활권을 우회하며, 강제 명령은 외교 항의로 이어질 수 있습니다
         </div>
@@ -110,12 +108,22 @@ export function ForeignSitePanel({
       {zones.length > 0 && (
         <div className="foreign-site-claims">
           <div className="small muted">확인된 생활권</div>
-          {zones.map(zone => (
+          {zones.map(zone => {
+            const accordDays = claimAccordRemainingDays(state, zone.id);
+            const envoyDays = claimAccordEnvoyRemainingDays(state, zone.id);
+            const accordReason = site.factionName ? canOpenClaimAccordEnvoy(state, site.factionName, zone.id) : '소속을 확인할 수 없습니다';
+            return (
             <div key={zone.id}>
               <span>{CLAIM_NAMES[zone.kind]}</span>
-              <span>{isClaimPermissionActive(state, zone) ? `${zone.permittedUntilDay! - state.day}일 허락` : '허락 없음'}</span>
+              <span>{accordDays != null ? `협정 ${accordDays}일` : envoyDays != null ? `사절 ${envoyDays}일` : isClaimPermissionActive(state, zone) ? `${Math.max(0, (zone.permittedUntilDay ?? state.day) - state.day)}일 허락` : '허락 없음'}</span>
+              {site.factionName && (
+                <button className="btn small" type="button" disabled={inactive || !!accordReason} title={accordReason ?? `은 또는 ${site.factionName}이 받는 물자로 1년 협정을 제안합니다`} onClick={() => onOpenClaimAccord(site.factionName!, zone.id)}>
+                  협정 제안
+                </button>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -139,8 +147,6 @@ export function ForeignSitePanel({
             })}
           </div>
           <div className="foreign-site-requests">
-            {hasPassage && <button className="btn small" type="button" disabled={inactive} onClick={() => onRequestPassage(site.id)}>통행 허락 청하기</button>}
-            {hasHunting && <button className="btn small" type="button" disabled={inactive} onClick={() => onRequestHunting(site.id)}>사냥터 사용 청하기</button>}
             {(site.status === 'hungry' || site.status === 'sick') && (
               <button className="btn small" type="button" disabled={inactive} onClick={() => onRequestDefectors(site.id)}>
                 귀순 의향 묻기

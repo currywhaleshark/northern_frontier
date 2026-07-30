@@ -1783,7 +1783,9 @@ html, body, #root {
 .faction-entry-actions { justify-content: flex-end; }
 .faction-trade-button { flex: 0 0 56px; }
 .faction-gift-button { flex: 0 0 48px; color: var(--gold); }
+.faction-pact-button { flex: 0 0 48px; color: #85c7cb; }
 .faction-envoy-status { margin: 3px 0 1px; color: var(--gold); font-size: 10px; }
+.faction-pact-status { margin: 3px 0 1px; color: #85c7cb; font-size: 10px; }
 /* 세력별 활성 정기거래 계약 */
 .faction-contracts {
   display: grid;

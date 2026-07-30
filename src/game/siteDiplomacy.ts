@@ -3,8 +3,8 @@ import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
 import { addForeignSiteMemory, isForeignSiteOperational } from './foreignSites';
-import { changeRelation, getRelation } from './relations';
-import { revealPassageRoute } from './passage';
+import { changeRelation } from './relations';
+import { openClaimAccordEnvoy } from './diplomacy';
 import { livingResidents } from './residents';
 import { residentLogName } from './residentLogName';
 import { createCombatRoster } from './combatRoster';
@@ -38,11 +38,6 @@ function canAddressSite(site: ForeignSite): string | null {
   return null;
 }
 
-function diplomacyScore(state: GameState, site: ForeignSite): number {
-  const relation = site.factionName ? getRelation(state, site.factionName) : 50;
-  return site.goodwill + relation + site.trust * 0.5 - site.alarm * 0.4;
-}
-
 export function sendGiftToSite(state: GameState, siteId: number, giftType: SiteGiftType): string | null {
   const site = getSite(state, siteId);
   if (!site) return '거점을 찾을 수 없습니다.';
@@ -71,30 +66,10 @@ export function requestPassagePermission(state: GameState, siteId: number): stri
   if (!site) return '거점을 찾을 수 없습니다.';
   const blocked = canAddressSite(site);
   if (blocked) return blocked;
-  const zones = state.claimZones.filter(zone => zone.siteId === site.id && zone.kind === 'passage');
-  if (zones.length === 0) return '이 거점과 협의할 통행로가 없습니다.';
-  const score = diplomacyScore(state, site);
-  if (score < 105) {
-    site.alarm = Math.min(100, site.alarm + 6);
-    if (site.factionName) changeRelation(state, site.factionName, -2);
-    addForeignSiteMemory(state, site.id, '통행 약조를 맺기에는 아직 신용이 부족하다고 답했습니다.', 'bad');
-    return '아직 신용이 부족해 통행 허락을 받지 못했습니다. 먼저 예를 갖추는 편이 좋겠습니다.';
-  }
-  const cost = score >= 170 ? 0 : CONFIG.foreignSites.passageGiftGrain;
-  if (state.resources.grain < cost) return `통행 예물로 곡물 ${withJosa(cost, '이/가')} 필요합니다.`;
-  state.resources.grain -= cost;
-  const until = state.day + CONFIG.foreignSites.passageDays;
-  for (const zone of zones) zone.permittedUntilDay = until;
-  const revealed = revealPassageRoute(state, site);
-  site.trust = Math.min(100, site.trust + 5);
-  site.goodwill = Math.min(100, site.goodwill + 3);
-  site.lastInteractionDay = state.day;
-  addForeignSiteMemory(state, site.id, `${until}일까지 산길 통행과 상단 왕래를 보장하기로 약조했습니다.`, 'good');
-  addLog(state,
-    `${site.name}에 통행을 청해 ${CONFIG.foreignSites.passageDays}일 동안 산길을 이용하기로 약조했습니다` +
-      `${cost > 0 ? ` (곡물 -${cost})` : ''}. 길잡이가 산길 ${revealed}칸을 새로 알려 주었습니다.`,
-    'good', true);
-  return null;
+  const zone = state.claimZones.find(candidate => candidate.siteId === site.id && candidate.kind === 'passage' && candidate.discovered);
+  if (!zone) return '이 거점과 협의할 통행로를 아직 찾지 못했습니다.';
+  if (!site.factionName) return '소속을 확인할 수 없는 거점에는 생활권 협정을 제안할 수 없습니다.';
+  return openClaimAccordEnvoy(state, site.factionName, zone.id);
 }
 
 export function requestHuntingRights(state: GameState, siteId: number): string | null {
@@ -102,27 +77,11 @@ export function requestHuntingRights(state: GameState, siteId: number): string |
   if (!site) return '거점을 찾을 수 없습니다.';
   const blocked = canAddressSite(site);
   if (blocked) return blocked;
-  const zones = state.claimZones.filter(zone => zone.siteId === site.id && (zone.kind === 'hunting' || zone.kind === 'forest'));
-  if (zones.length === 0) return '이 거점과 협의할 사냥터가 없습니다.';
-  const score = diplomacyScore(state, site);
-  if (score < 100) {
-    site.alarm = Math.min(100, site.alarm + 5);
-    if (site.factionName) changeRelation(state, site.factionName, -2);
-    addForeignSiteMemory(state, site.id, '사냥터를 함께 쓰자는 청을 거절했습니다.', 'bad');
-    return '사냥터를 나눌 만큼 신뢰가 쌓이지 않았습니다. 예물을 보내거나 관계를 다져야 합니다.';
-  }
-  const cost = site.trust >= 65 || (site.factionName ? getRelation(state, site.factionName) : 0) >= 70
-    ? CONFIG.foreignSites.highTrustHuntingGiftGrain
-    : CONFIG.foreignSites.huntingGiftGrain;
-  if (state.resources.grain < cost) return `사냥터 사용의 답례로 곡물 ${withJosa(cost, '이/가')} 필요합니다.`;
-  state.resources.grain -= cost;
-  const until = state.day + CONFIG.foreignSites.huntingRightsDays;
-  for (const zone of zones) zone.permittedUntilDay = until;
-  site.trust = Math.min(100, site.trust + 6);
-  site.lastInteractionDay = state.day;
-  addForeignSiteMemory(state, site.id, `${until}일까지 사냥터와 숲을 함께 쓰기로 약조했습니다.`, 'good');
-  addLog(state, `${site.name}에 사냥터 사용을 청했습니다. 곡물 ${withJosa(cost, '을/를')} 답례하고 ${CONFIG.foreignSites.huntingRightsDays}일 동안 이용을 묵인받았습니다.`, 'good', true);
-  return null;
+  const zone = state.claimZones.find(candidate => candidate.siteId === site.id &&
+    (candidate.kind === 'hunting' || candidate.kind === 'forest') && candidate.discovered);
+  if (!zone) return '이 거점과 협의할 사냥터를 아직 찾지 못했습니다.';
+  if (!site.factionName) return '소속을 확인할 수 없는 거점에는 생활권 협정을 제안할 수 없습니다.';
+  return openClaimAccordEnvoy(state, site.factionName, zone.id);
 }
 
 export function requestSiteDefectors(state: GameState, siteId: number): string | null {

@@ -783,6 +783,28 @@ export function migrateV48ToV49(raw: RawSave): RawSave {
   };
 }
 
+// v50: 외교 근접 경고는 완충 작업·거점 배회 일수를 저장한다.
+// 기존 저장은 아직 경고를 시작하지 않은 것으로 보아 빈 진행값에서 다시 센다.
+export function migrateV49ToV50(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), proximityWarningProgress: {}, schemaVersion: 50 };
+}
+
+// v51: 생활권 협정 사절은 대상 구역과 출발 당시 고정한 만료일을 함께 저장한다.
+// v50 저장에는 진행 중인 협정 사절이 없으므로 기존 외교 상태를 그대로 둔다.
+export function migrateV50ToV51(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  if (Array.isArray(migrated.territoryViolations)) {
+    migrated.territoryViolations = migrated.territoryViolations.map(entry => ({
+      ...(entry && typeof entry === 'object' ? entry as RawSave : {}),
+      zoneIds: Array.isArray((entry as RawSave)?.zoneIds)
+        ? ((entry as RawSave).zoneIds as unknown[]).filter(Number.isFinite).map(value => Math.max(0, Math.floor(Number(value)))).slice(0, 24)
+        : [],
+    }));
+  }
+  migrated.schemaVersion = 51;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -837,6 +859,8 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 46) migrated = migrateV46ToV47(migrated);
     else if (version === 47) migrated = migrateV47ToV48(migrated);
     else if (version === 48) migrated = migrateV48ToV49(migrated);
+    else if (version === 49) migrated = migrateV49ToV50(migrated);
+    else if (version === 50) migrated = migrateV50ToV51(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }

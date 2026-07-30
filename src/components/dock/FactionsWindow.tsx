@@ -8,7 +8,11 @@ import { contractReserved } from '../../game/tradeContractReserve';
 import {
   factionLeaderFor, factionLeaderPortraitPath, factionLeaderTemperLabel,
 } from '../../game/diplomaticFigures';
-import { canOpenGiftEnvoy, giftEnvoyRemainingDays } from '../../game/diplomacy';
+import {
+  canOpenGiftEnvoy, canOpenPactEnvoy, giftEnvoyRemainingDays,
+  canOpenClaimAccordEnvoy, claimAccordEnvoyRemainingDays, claimAccordLabel, claimAccordRemainingDays,
+  claimAccordZonesForFaction, pactEnvoyRemainingDays, pactRemainingDays,
+} from '../../game/diplomacy';
 import type { GameState, TradeContract } from '../../game/types';
 import { FactionName } from '../FactionName';
 import { UiIcon } from '../UiIcon';
@@ -17,6 +21,8 @@ interface Props {
   state: GameState;
   onRequestTrade: (factionName: string) => void;
   onOpenGiftEnvoy: (factionName: string) => void;
+  onOpenPactEnvoy: (factionName: string) => void;
+  onOpenClaimAccord: (factionName: string, zoneId: number) => void;
   onCancelTradeContract: (contract: TradeContract) => void;
 }
 
@@ -73,7 +79,7 @@ function ContractList({ state, factionName, onCancel }: {
   );
 }
 
-export function FactionsWindow({ state, onRequestTrade, onOpenGiftEnvoy, onCancelTradeContract }: Props) {
+export function FactionsWindow({ state, onRequestTrade, onOpenGiftEnvoy, onOpenPactEnvoy, onOpenClaimAccord, onCancelTradeContract }: Props) {
   return (
     <div>
       <div className="muted small" style={{ marginBottom: 6 }}>
@@ -88,6 +94,10 @@ export function FactionsWindow({ state, onRequestTrade, onOpenGiftEnvoy, onCance
         const leaderPortrait = leader ? factionLeaderPortraitPath(leader) : null;
         const giftReason = leader ? canOpenGiftEnvoy(state, faction.name) : null;
         const giftRemainingDays = leader ? giftEnvoyRemainingDays(state, faction.name) : null;
+        const pactReason = leader ? canOpenPactEnvoy(state, faction.name) : null;
+        const pactEnvoyDays = leader ? pactEnvoyRemainingDays(state, faction.name) : null;
+        const pactDays = leader ? pactRemainingDays(state, faction.name) : null;
+        const accordZones = leader ? claimAccordZonesForFaction(state, faction.name) : [];
         return (
           <div key={faction.name} className="faction-entry" title={faction.desc}>
             {(leaderPortrait || artwork) && (
@@ -156,10 +166,38 @@ export function FactionsWindow({ state, onRequestTrade, onOpenGiftEnvoy, onCance
                     예물
                   </button>
                 )}
+                {leader && (
+                  <button
+                    className="btn small faction-pact-button"
+                    type="button"
+                    disabled={!!pactReason}
+                    title={pactReason ?? `${leader.name} ${leader.title}에게 예물을 동봉해 화친 맹약을 제안합니다`}
+                    onClick={() => onOpenPactEnvoy(faction.name)}
+                  >
+                    맹약
+                  </button>
+                )}
               </div>
               {giftRemainingDays != null && (
                 <div className="faction-envoy-status">예물 사절 왕복 중 · {giftRemainingDays}일</div>
               )}
+              {pactEnvoyDays != null && (
+                <div className="faction-envoy-status">맹약 사절 왕복 중 · {pactEnvoyDays}일</div>
+              )}
+              {pactDays != null && (
+                <div className="faction-pact-status">화친 맹약 · 잔여 {pactDays}일</div>
+              )}
+              {accordZones.map(zone => {
+                const accordDays = claimAccordRemainingDays(state, zone.id);
+                const envoyDays = claimAccordEnvoyRemainingDays(state, zone.id);
+                const reason = canOpenClaimAccordEnvoy(state, faction.name, zone.id);
+                return (
+                  <div className="faction-envoy-status" key={`accord-${zone.id}`}>
+                    <span>{claimAccordLabel(zone)} · {accordDays != null ? `협정 잔여 ${accordDays}일` : envoyDays != null ? `사절 왕복 중 · ${envoyDays}일` : '협정 없음'}</span>
+                    <button className="btn small faction-pact-button" type="button" disabled={!!reason} title={reason ?? `${leader!.name} ${leader!.title}에게 이 생활권의 연간 채집·작업 권리를 청합니다`} onClick={() => onOpenClaimAccord(faction.name, zone.id)}>협정</button>
+                  </div>
+                );
+              })}
               <ContractList state={state} factionName={faction.name} onCancel={onCancelTradeContract} />
             </div>
           </div>

@@ -20,9 +20,11 @@ export function addLog(
   text: string,
   kind: LogEntry['kind'] = 'info',
   important = kind === 'raid',
+  notice = false,
 ): void {
   const entry: LogEntry = { day: state.day, text, kind };
   if (important) entry.important = true;
+  if (notice) entry.notice = true;
   state.log.push(entry);
   if (state.log.length > CONFIG.ui.logLimit) {
     state.log.splice(0, state.log.length - CONFIG.ui.logLimit);

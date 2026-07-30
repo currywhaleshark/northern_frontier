@@ -10,7 +10,8 @@ export interface PassageRoute {
 
 function passagePermissionActive(state: GameState, siteId: number): boolean {
   return state.claimZones.some(zone => zone.siteId === siteId && zone.kind === 'passage' &&
-    (zone.permittedUntilDay ?? 0) >= state.day);
+    ((zone.permittedUntilDay ?? 0) >= state.day ||
+      state.claimAccords.some(accord => accord.zoneId === zone.id && accord.untilDay > state.day)));
 }
 
 export function hasActivePassageForFaction(state: GameState, factionName: string): boolean {

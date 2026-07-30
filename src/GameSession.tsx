@@ -33,6 +33,7 @@ import { EventModal } from './components/EventModal';
 import { PromotionModal } from './components/PromotionModal';
 import { TradeDialog } from './components/TradeDialog';
 import { GiftEnvoyDialog } from './components/GiftEnvoyDialog';
+import { ClaimAccordDialog } from './components/ClaimAccordDialog';
 import { GameCanvas } from './components/GameCanvas';
 import { MapLayerTabs } from './components/MapLayerTabs';
 import { InspectorPanel } from './components/InspectorPanel';
@@ -59,7 +60,10 @@ import { toggleNitreYards } from './game/suspicion';
 import { setProcessingReserve } from './game/processing';
 import { setTributeReserve } from './game/tributeReserve';
 import { cancelTradeContract, signTradeContract } from './game/tradeContracts';
-import { cancelGiftEnvoy, openGiftEnvoy, sendGiftEnvoy } from './game/diplomacy';
+import {
+  cancelClaimAccordEnvoy, cancelGiftEnvoy, cancelPactEnvoy, openClaimAccordEnvoy, openGiftEnvoy, openPactEnvoy,
+  sendClaimAccordEnvoy, sendGiftEnvoy, sendPactEnvoy,
+} from './game/diplomacy';
 import { setTradeContractReserve } from './game/tradeContractReserve';
 import { openPredatorHunt, startPredatorScout } from './game/specialEvents';
 import { useSpecialItem } from './game/specialItemActions';
@@ -78,7 +82,7 @@ import {
   setResidentMount, setResidentWeapon,
 } from './game/weapons';
 import {
-  requestHuntingRights, requestPassagePermission, requestSiteDefectors, scoutBanditLair, sendGiftToSite,
+  requestSiteDefectors, scoutBanditLair, sendGiftToSite,
   type SiteGiftType,
 } from './game/siteDiplomacy';
 import {
@@ -122,7 +126,7 @@ import type { AutoAssignBuildingType } from './game/workerSlots';
 import { RuntimeVersionBoundary } from './components/RuntimeVersionBoundary';
 import { createRuntimeVersionStore, uiRefreshIntervalMs } from './ui/runtimeVersionStore';
 import { ActionNoticeLayer } from './components/ActionNotice';
-import { createActionNoticeStore } from './ui/actionNotices';
+import { createActionNoticeStore, type ActionNoticeStore } from './ui/actionNotices';
 import {
   recordRuntimePerf, recordRuntimePerfSince, runtimePerfSnapshot, runtimePerfStartTime,
   startRuntimePerf, stopRuntimePerf, summarizeRuntimePerf,
@@ -161,6 +165,7 @@ function RuntimeGameEffects({
   autoFastForwardSleepingNight,
   nightAutoSpeedState,
   suspended,
+  actionNoticeStore,
 }: {
   state: GameState;
   speed: number;
@@ -168,6 +173,7 @@ function RuntimeGameEffects({
   autoFastForwardSleepingNight: boolean;
   nightAutoSpeedState: { current: NightAutoSpeedState };
   suspended: boolean;
+  actionNoticeStore: ActionNoticeStore;
 }) {
   const sndRef = useRef({
     logLen: 0,
@@ -182,7 +188,8 @@ function RuntimeGameEffects({
     const m = sndRef.current;
     if (state.log.length < m.logLen) m.logLen = state.log.length;
     if (state.log.length > m.logLen) {
-      for (const e of state.log.slice(m.logLen).slice(-3)) {
+      const newEntries = state.log.slice(m.logLen);
+      for (const e of newEntries.slice(-3)) {
         if (e.kind === 'good') {
           if (['토끼', '꿩', '노루', '멧돼지'].some(prey => e.text.includes(prey))) playSfx('hunt');
           else if (e.text.includes('회복')) playSfx('heal');
@@ -195,6 +202,12 @@ function RuntimeGameEffects({
         } else if (e.kind === 'raid') playSfx('raidDrum');
         else if (e.kind === 'trade') playSfx('tradeBell');
         else if (e.kind === 'weather' && (e.text.includes('눈보라') || e.text.includes('혹한'))) playSfx('gust');
+      }
+      // 게임 진행 중에도 반드시 놓치지 말아야 하는 외교 경고만 중앙 플로트로 보낸다.
+      // 불러온 저장의 과거 로그는 다시 띄우지 않는다.
+      for (const e of newEntries) {
+        if (!e.notice || e.day !== state.day) continue;
+        actionNoticeStore.push(e.text, e.kind === 'bad' || e.kind === 'raid' ? 'bad' : e.kind === 'good' ? 'good' : 'info');
       }
       m.logLen = state.log.length;
     }
@@ -1152,6 +1165,12 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     bump();
   };
 
+  const handleOpenPactEnvoy = (factionName: string) => {
+    const err = openPactEnvoy(stateRef.current, factionName);
+    if (err) notify(err, 'info');
+    bump();
+  };
+
   const handleSendGiftEnvoy = (resource: ResourceId, amount: number) => {
     const factionName = stateRef.current.pendingChoice?.kind === 'giftEnvoy'
       ? stateRef.current.pendingChoice.data.factionName as string
@@ -1164,6 +1183,42 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const handleCancelGiftEnvoy = () => {
     cancelGiftEnvoy(stateRef.current);
+    bump();
+  };
+
+  const handleSendPactEnvoy = (resource: ResourceId, amount: number) => {
+    const factionName = stateRef.current.pendingChoice?.kind === 'pactEnvoy'
+      ? stateRef.current.pendingChoice.data.factionName as string
+      : '';
+    const err = sendPactEnvoy(stateRef.current, factionName, resource, amount);
+    if (err) notify(err, 'info');
+    else playSfx('good');
+    bump();
+  };
+
+  const handleCancelPactEnvoy = () => {
+    cancelPactEnvoy(stateRef.current);
+    bump();
+  };
+
+  const handleOpenClaimAccord = (factionName: string, zoneId: number) => {
+    const err = openClaimAccordEnvoy(stateRef.current, factionName, zoneId);
+    if (err) notify(err, 'info');
+    bump();
+  };
+
+  const handleSendClaimAccordEnvoy = (resource: ResourceId, amount: number) => {
+    const choice = stateRef.current.pendingChoice;
+    const factionName = choice?.kind === 'claimAccordEnvoy' ? choice.data.factionName as string : '';
+    const zoneId = choice?.kind === 'claimAccordEnvoy' ? choice.data.zoneId as number : -1;
+    const err = sendClaimAccordEnvoy(stateRef.current, factionName, zoneId, resource, amount);
+    if (err) notify(err, 'info');
+    else playSfx('good');
+    bump();
+  };
+
+  const handleCancelClaimAccordEnvoy = () => {
+    cancelClaimAccordEnvoy(stateRef.current);
     bump();
   };
 
@@ -1309,10 +1364,6 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const handleSendSiteGift = (siteId: number, gift: SiteGiftType) =>
     handleSiteAction(() => sendGiftToSite(stateRef.current, siteId, gift));
-  const handleRequestSitePassage = (siteId: number) =>
-    handleSiteAction(() => requestPassagePermission(stateRef.current, siteId));
-  const handleRequestSiteHunting = (siteId: number) =>
-    handleSiteAction(() => requestHuntingRights(stateRef.current, siteId));
   const handleRequestSiteDefectors = (siteId: number) =>
     handleSiteAction(() => requestSiteDefectors(stateRef.current, siteId));
   const handleScoutBanditLair = (siteId: number) =>
@@ -1644,8 +1695,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               onSelectResident={handleResidentClick}
               onCancelBuildingConstruction={handleCancelBuildingConstruction}
               onSendSiteGift={handleSendSiteGift}
-              onRequestSitePassage={handleRequestSitePassage}
-              onRequestSiteHunting={handleRequestSiteHunting}
+              onOpenClaimAccord={handleOpenClaimAccord}
               onRequestSiteDefectors={handleRequestSiteDefectors}
               onScoutBanditLair={handleScoutBanditLair}
               onRaidBanditLair={handleRaidBanditLair}
@@ -1668,6 +1718,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
             autoFastForwardSleepingNight={uiPrefs.autoFastForwardSleepingNight}
             nightAutoSpeedState={nightAutoSpeedStateRef}
             suspended={gameMenuView != null || slotDialogMode != null}
+            actionNoticeStore={actionNoticeStore}
           />
         )}
       </RuntimeVersionBoundary>
@@ -1860,6 +1911,8 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                         state={stateRef.current}
                         onRequestTrade={handleRequestTrade}
                         onOpenGiftEnvoy={handleOpenGiftEnvoy}
+                        onOpenPactEnvoy={handleOpenPactEnvoy}
+                        onOpenClaimAccord={handleOpenClaimAccord}
                         onCancelTradeContract={handleCancelTradeContract}
                       />
                     )}
@@ -1946,12 +1999,14 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
           onSetEdictLevel={handleSetEdictLevel}
           onClose={() => setEdictDialogOpen(false)}
         />
-      ) : state.pendingChoice?.kind === 'giftEnvoy' ? (
+      ) : state.pendingChoice?.kind === 'giftEnvoy' || state.pendingChoice?.kind === 'pactEnvoy' ? (
         <GiftEnvoyDialog
           state={state}
-          onSend={handleSendGiftEnvoy}
-          onClose={handleCancelGiftEnvoy}
+          onSend={state.pendingChoice.kind === 'pactEnvoy' ? handleSendPactEnvoy : handleSendGiftEnvoy}
+          onClose={state.pendingChoice.kind === 'pactEnvoy' ? handleCancelPactEnvoy : handleCancelGiftEnvoy}
         />
+      ) : state.pendingChoice?.kind === 'claimAccordEnvoy' ? (
+        <ClaimAccordDialog state={state} onSend={handleSendClaimAccordEnvoy} onClose={handleCancelClaimAccordEnvoy} />
       ) : tradeNegotiationOf(state.pendingChoice) ? (
         <TradeDialog
           state={state}
