@@ -1,6 +1,6 @@
 // 시뮬레이션 밸런스 값 모음 — 숫자 튜닝은 전부 여기서 한다.
 import { DAY_CYCLE_SUBTICKS } from './dayCycle';
-import type { JobId, LivestockId, ProcessingInputId, Rank, ResourceId, Season } from './types';
+import type { JobId, LivestockId, ProcessingInputId, Rank, ResourceId, Season, WeatherId } from './types';
 
 export const CONFIG = {
   map: {
@@ -439,6 +439,65 @@ export const CONFIG = {
       herderRecoveryBonus: 0.18,
       minimumRecoveryDays: 2,
       cullRatio: 0.5,
+    },
+    fire: {
+      dailyIgnitionChance: 0.0025,
+      precipitationCoefficient: -0.62,
+      annualMinMultiplier: 0.5,
+      annualMaxMultiplier: 1.8,
+      dryDayBonus: 0.16,
+      dryDayCap: 5,
+      maxWaterSourceDistance: 12,
+      bucketAmount: 0.35,
+      initialIntensity: 0.85,
+      intensityGrowthPerTick: 0.055,
+      burnProgressPerIntensity: 0.12,
+      waterSuppressionPerBucket: 1.05,
+      spreadChancePerTick: 0.026,
+      spreadRange: 1,
+      damageBurnProgress: 3.4,
+      maximumDurationDays: 6,
+      maximumRespondersPerSite: 3,
+      nitreExplosionBurnProgress: 0.8,
+      nitreExplosionGunpowder: 3,
+      nitreExplosionIntensity: 1.4,
+      burnProgressMultipliers: {
+        hut: 1.2,
+        ondol: 1,
+        tileHouse: 0.58,
+        charcoalKiln: 1.25,
+        default: 1,
+      } as Record<string, number>,
+      sourceWeights: {
+        nitreYard: 6,
+        charcoalKiln: 5,
+        onggiKiln: 4.5,
+        smithy: 4,
+        smokehouse: 3,
+        hut: 1.4,
+        ondol: 1.1,
+        tileHouse: 0.35,
+        default: 1,
+      } as Record<string, number>,
+      noIgnitionWeather: ['rain', 'thawFlood', 'heavySnow', 'blizzard'] as WeatherId[],
+    },
+    mineCollapse: {
+      dailyBaseChance: 0.004,
+      minimumRiskMultiplier: 0.35,
+      maximumRiskMultiplier: 2,
+      rainMultiplier: 1.8,
+      thawFloodMultiplier: 2.7,
+      warningChance: 0.64,
+      warningLeadDays: [1, 3] as const,
+      urgentRescueDays: 2,
+      carefulRescueDays: 4,
+      baseSurvivalChance: 0.96,
+      dailySurvivalLoss: 0.1,
+      survivorInjury: [24, 42] as const,
+      urgentSecondaryCollapseChance: 0.3,
+      urgentRescuerInjuries: [1, 2] as const,
+      urgentRescuerInjurySeverity: 24,
+      repairProgress: [0.28, 0.52] as const,
     },
     plagueSuspicion: {
       occurrenceBaseWeight: 3,

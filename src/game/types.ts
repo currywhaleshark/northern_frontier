@@ -424,6 +424,8 @@ export interface Resident {
   lastWearableCheckDay?: number; // 새벽 자율 수령 중복 방지
   lastStrawShoeCraftDay?: number; // 저녁 짚신 생산 중복 방지
   lastHuntPrey?: HuntPreyId; // 사냥 성공 후 운반 중인 사냥감 표시
+  fireResponse?: FireResponse; // 평시 화재의 물 긷기·운반·진화 왕복 상태
+  trappedInMineId?: number; // 갱도 붕괴 구조가 끝날 때까지 일반 생활·노동에서 제외
   // ── 에이전트 상태 (지도 위 이동/작업/운반) ──
   x: number;
   y: number;
@@ -513,10 +515,10 @@ export interface Building {
   burialRecords?: BurialRecord[]; // 묘지 전용: 이름·사인·사망일을 보존하는 안치 기록
   inventory?: Partial<Record<ResourceId, number>>; // 운반 전 생산지 현장 재고
   repairing?: boolean; // 외부 피해로 파손되어 건설담당의 수리가 필요한 상태
-  repairCause?: BuildingRepairCause; // 우측 경고에서 습격·설해·대홍수 피해를 구분한다
+  repairCause?: BuildingRepairCause; // 우측 경고에서 습격·설해·대홍수·화재 피해를 구분한다
 }
 
-export type BuildingRepairCause = 'raid' | 'snowDamage' | 'springFlood';
+export type BuildingRepairCause = 'raid' | 'snowDamage' | 'springFlood' | 'fire' | 'mineCollapse';
 
 export interface FermentBatch {
   kind: 'jang' | 'kimchi';
@@ -679,7 +681,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'promotionDecree';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'promotionDecree' | 'mineCollapse';
   title: string;
   body: string;
   illustration?: {
@@ -743,6 +745,30 @@ export interface PendingDisaster {
   progress?: number;
   data?: Record<string, number>;
   affectedTiles?: DisasterAffectedTile[];
+  fireSites?: FireSite[];
+  trappedResidentIds?: number[];
+}
+
+export interface FireSite {
+  buildingId: number;
+  intensity: number;
+  burnProgress: number;
+  suppressionProgress: number;
+  ignitedDay: number;
+  ignitedSubTick: number;
+}
+
+export type FireResponsePhase = 'toWater' | 'toFire';
+export type FireWaterSourceKind = 'well' | 'river';
+
+export interface FireResponse {
+  buildingId: number;
+  sourceKind: FireWaterSourceKind;
+  sourceBuildingId?: number;
+  sourceX: number;
+  sourceY: number;
+  phase: FireResponsePhase;
+  carriedWater: number;
 }
 
 export interface DisasterAffectedTile {

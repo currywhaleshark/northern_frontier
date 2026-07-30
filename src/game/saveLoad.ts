@@ -739,6 +739,18 @@ export function migrateV44ToV45(raw: RawSave): RawSave {
   return migrated;
 }
 
+// v46: 평시 화재는 pendingDisasters 안에 불길·진화 주민 상태를 보관한다.
+// 구 저장에는 활성 화재가 없으므로 별도 필드를 만들지 않고 버전만 올린다.
+export function migrateV45ToV46(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 46 };
+}
+
+// v47: 갱도 붕괴는 pendingDisasters와 주민의 선택형 매몰 상태를 보관한다.
+// 구 저장에는 진행 중인 붕괴가 없으므로 버전만 올린다.
+export function migrateV46ToV47(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 47 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -789,6 +801,8 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 42) migrated = migrateV42ToV43(migrated);
     else if (version === 43) migrated = migrateV43ToV44(migrated);
     else if (version === 44) migrated = migrateV44ToV45(migrated);
+    else if (version === 45) migrated = migrateV45ToV46(migrated);
+    else if (version === 46) migrated = migrateV46ToV47(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -2097,6 +2111,65 @@ export function loadGame(slot = 1): GameState | null {
     if (!Number.isFinite(parsed.lastKimjangYear)) parsed.lastKimjangYear = 0;
     ensureIncidentState(parsed);
     parsed.pendingDisasters = normalizePendingDisasters(parsed.pendingDisasters);
+    const buildingIds = new Set(parsed.buildings.map(building => building.id));
+    const residentIds = new Set(parsed.residents.filter(resident => resident.alive).map(resident => resident.id));
+    parsed.pendingDisasters = parsed.pendingDisasters.flatMap(disaster => {
+      if (disaster.id === 'fire') {
+        const fireSites = (disaster.fireSites ?? []).filter(site => buildingIds.has(site.buildingId));
+        return fireSites.length > 0 ? [{ ...disaster, fireSites }] : [];
+      }
+      if (disaster.id === 'mineCollapse') {
+        const mineId = disaster.targetBuildingIds?.[0];
+        const mine = mineId == null ? undefined : parsed.buildings.find(building =>
+          building.id === mineId && building.type === 'deepMine');
+        if (!mine) return [];
+        if (disaster.choiceId === 'warning') return [{ ...disaster, trappedResidentIds: undefined }];
+        const trappedResidentIds = (disaster.trappedResidentIds ?? []).filter(id => residentIds.has(id));
+        return trappedResidentIds.length > 0 ? [{ ...disaster, trappedResidentIds }] : [];
+      }
+      return [disaster];
+    });
+    const activeFireSiteIds = new Set(
+      parsed.pendingDisasters
+        .filter(disaster => disaster.id === 'fire')
+        .flatMap(disaster => disaster.fireSites?.map(site => site.buildingId) ?? []),
+    );
+    for (const resident of parsed.residents) {
+      const fireResponse = resident.fireResponse;
+      if (!fireResponse) continue;
+      const valid = activeFireSiteIds.has(fireResponse.buildingId) &&
+        (fireResponse.sourceKind === 'well' || fireResponse.sourceKind === 'river') &&
+        (fireResponse.phase === 'toWater' || fireResponse.phase === 'toFire') &&
+        Number.isFinite(fireResponse.sourceX) && Number.isFinite(fireResponse.sourceY) &&
+        Number.isFinite(fireResponse.carriedWater) && fireResponse.carriedWater >= 0 &&
+        (fireResponse.sourceKind !== 'well' || buildingIds.has(fireResponse.sourceBuildingId ?? -1));
+      if (!valid) {
+        delete resident.fireResponse;
+        continue;
+      }
+      fireResponse.sourceX = Math.floor(fireResponse.sourceX);
+      fireResponse.sourceY = Math.floor(fireResponse.sourceY);
+      fireResponse.carriedWater = Math.max(0, fireResponse.carriedWater);
+    }
+    const trappedMineByResidentId = new Map<number, number>();
+    for (const disaster of parsed.pendingDisasters) {
+      if (disaster.id !== 'mineCollapse' || disaster.choiceId === 'warning') continue;
+      const mineId = disaster.targetBuildingIds?.[0];
+      if (mineId == null) continue;
+      for (const residentId of disaster.trappedResidentIds ?? []) {
+        trappedMineByResidentId.set(residentId, mineId);
+      }
+    }
+    for (const resident of parsed.residents) {
+      const mineId = trappedMineByResidentId.get(resident.id);
+      if (resident.alive && mineId != null) resident.trappedInMineId = mineId;
+      else delete resident.trappedInMineId;
+    }
+    if (parsed.pendingChoice?.kind === 'mineCollapse' &&
+        !parsed.pendingDisasters.some(disaster =>
+          disaster.id === 'mineCollapse' && disaster.choiceId === 'awaitingRescueChoice')) {
+      parsed.pendingChoice = null;
+    }
     parsed.lastSpringFloodYear = Number.isFinite(Number(parsed.lastSpringFloodYear))
       ? Math.max(0, Math.floor(Number(parsed.lastSpringFloodYear)))
       : 0;

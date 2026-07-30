@@ -50,8 +50,13 @@ export function residentConsumptionShare(resident: Pick<Resident, 'stage'>): num
 }
 
 // 식량·장작·의복 소비의 기준 인구 — 아이는 성인보다 적게 먹고 적게 입는다.
-export function consumptionWeight(state: GameState): number {
-  return livingResidents(state).reduce((sum, r) => sum + residentConsumptionShare(r), 0);
+export function consumptionWeight(
+  state: GameState,
+  excludedResidentIds: ReadonlySet<number> = new Set(),
+): number {
+  return livingResidents(state)
+    .filter(resident => !excludedResidentIds.has(resident.id))
+    .reduce((sum, resident) => sum + residentConsumptionShare(resident), 0);
 }
 
 // 주거 정원 계산용 — 아이는 침상 정원의 절반만 차지한다.

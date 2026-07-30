@@ -12,6 +12,8 @@ import { firewoodWeatherMult } from '../game/weather';
 import { contractsInGrace } from '../game/tradeContracts';
 import { RESOURCE_NAMES } from '../game/constants';
 import { pendingDisasterDaysRemaining } from '../game/disasters';
+import { nearestFireWaterSource } from '../game/fire';
+import { mineCollapseSurvivalChance } from '../game/mineCollapse';
 import { buildingRepairCause } from '../game/raidDamage';
 import type { AlertItem, BuildingRepairCause, GameState } from '../game/types';
 
@@ -114,6 +116,8 @@ export function computeAlerts(state: GameState): AlertItem[] {
     raid: 0,
     snowDamage: 0,
     springFlood: 0,
+    fire: 0,
+    mineCollapse: 0,
   };
   for (const building of state.buildings) {
     if (!building.repairing) continue;
@@ -123,6 +127,8 @@ export function computeAlerts(state: GameState): AlertItem[] {
     { cause: 'raid', label: '습격 피해', subject: '건물' },
     { cause: 'snowDamage', label: '설해 피해', subject: '주거' },
     { cause: 'springFlood', label: '대홍수 피해', subject: '건물' },
+    { cause: 'fire', label: '화재 피해', subject: '건물' },
+    { cause: 'mineCollapse', label: '갱도 붕괴 피해', subject: '채광갱' },
   ];
   for (const { cause, label, subject } of damageAlerts) {
     const count = damagedBuildings[cause];
@@ -189,6 +195,44 @@ export function computeAlerts(state: GameState): AlertItem[] {
     });
   }
   for (const disaster of state.pendingDisasters) {
+    if (disaster.id === 'mineCollapse') {
+      const trapped = disaster.trappedResidentIds?.length ?? 0;
+      if (disaster.choiceId === 'warning') {
+        alerts.push({
+          id: 'pendingDisaster-mineCollapse',
+          text: `갱도 붕괴 전조 · ${pendingDisasterDaysRemaining(state, disaster)}일 안에 붕괴할 조짐입니다. 채광꾼을 빼면 인명 피해를 피할 수 있습니다.`,
+          level: 'danger',
+        });
+      } else if (disaster.choiceId === 'awaitingRescueChoice') {
+        alerts.push({
+          id: 'pendingDisaster-mineCollapse',
+          text: `채광갱 붕괴 · ${trapped}명 매몰 · 구조 방식 결정 대기`,
+          level: 'danger',
+        });
+      } else {
+        alerts.push({
+          id: 'pendingDisaster-mineCollapse',
+          text: `갱도 구조 중 · ${trapped}명 매몰 · ${pendingDisasterDaysRemaining(state, disaster)}일 뒤 도달 · 생존 가능성 약 ${Math.round(mineCollapseSurvivalChance(disaster) * 100)}%`,
+          level: 'danger',
+        });
+      }
+      continue;
+    }
+    if (disaster.id === 'fire') {
+      const sites = disaster.fireSites ?? [];
+      const activeSiteIds = new Set(sites.map(site => site.buildingId));
+      const responders = living.filter(resident => resident.fireResponse && activeSiteIds.has(resident.fireResponse.buildingId)).length;
+      const waterless = sites.filter(site => {
+        const building = state.buildings.find(candidate => candidate.id === site.buildingId);
+        return !building || !nearestFireWaterSource(state, building);
+      }).length;
+      alerts.push({
+        id: 'pendingDisaster-fire',
+        text: `화재 발생 · 불길 ${sites.length}곳 · 진화 ${responders}명${waterless > 0 ? ` · 급수 불가 ${waterless}곳` : ''}`,
+        level: 'danger',
+      });
+      continue;
+    }
     if (disaster.id === 'drought') {
       alerts.push({
         id: `pendingDisaster-${disaster.id}`,

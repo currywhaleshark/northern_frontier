@@ -5,6 +5,7 @@ import { addLog } from './events';
 import { withJosa } from './josa';
 import { recordAnnals } from './annals';
 import { makeRng } from './map';
+import { advanceMineCollapseDisaster } from './mineCollapse';
 import { damageBuildingTargets } from './raidDamage';
 import { getSeason, getYear } from './seasons';
 import { seasonWeatherSchedule, weatherForDay } from './weatherSchedule';
@@ -77,6 +78,35 @@ export function normalizePendingDisasters(value: unknown): PendingDisaster[] {
         }];
       })
       : undefined;
+    const fireSites = candidate.id === 'fire' && Array.isArray(candidate.fireSites)
+      ? candidate.fireSites.flatMap(rawSite => {
+        if (!rawSite || typeof rawSite !== 'object') return [];
+        const site = rawSite as Partial<import('./types').FireSite>;
+        const buildingId = Math.floor(Number(site.buildingId));
+        const intensity = Number(site.intensity);
+        const burnProgress = Number(site.burnProgress);
+        const suppressionProgress = Number(site.suppressionProgress);
+        const ignitedDay = finiteDay(site.ignitedDay);
+        const ignitedSubTick = Math.floor(Number(site.ignitedSubTick));
+        if (!Number.isFinite(buildingId) || buildingId < 1 ||
+            !Number.isFinite(intensity) || !Number.isFinite(burnProgress) ||
+            !Number.isFinite(suppressionProgress) || ignitedDay == null ||
+            !Number.isFinite(ignitedSubTick) || ignitedSubTick < 0) return [];
+        return [{
+          buildingId,
+          intensity: Math.max(0, intensity),
+          burnProgress: Math.max(0, burnProgress),
+          suppressionProgress: Math.max(0, suppressionProgress),
+          ignitedDay,
+          ignitedSubTick,
+        }];
+      })
+      : undefined;
+    const trappedResidentIds = candidate.id === 'mineCollapse' && Array.isArray(candidate.trappedResidentIds)
+      ? [...new Set(candidate.trappedResidentIds
+        .map(id => Math.floor(Number(id)))
+        .filter(id => Number.isFinite(id) && id >= 1))]
+      : undefined;
     normalized.push({
       id: candidate.id as DisasterId,
       choiceId: candidate.choiceId,
@@ -86,6 +116,8 @@ export function normalizePendingDisasters(value: unknown): PendingDisaster[] {
       ...(progress != null ? { progress } : {}),
       ...(data && Object.keys(data).length > 0 ? { data } : {}),
       ...(affectedTiles && affectedTiles.length > 0 ? { affectedTiles } : {}),
+      ...(fireSites && fireSites.length > 0 ? { fireSites } : {}),
+      ...(trappedResidentIds && trappedResidentIds.length > 0 ? { trappedResidentIds } : {}),
     });
   }
   return normalized;
@@ -762,6 +794,10 @@ export function advancePendingDisasters(state: GameState): void {
   if (state.pendingDisasters.length === 0) return;
   const remaining: PendingDisaster[] = [];
   for (const disaster of state.pendingDisasters) {
+    if (disaster.id === 'mineCollapse') {
+      if (advanceMineCollapseDisaster(state, disaster) === 'keep') remaining.push(disaster);
+      continue;
+    }
     if (disaster.id === 'drought' && state.day > disaster.startedDay && state.weather === 'rain') {
       resolveDrought(state, true);
       continue;
@@ -783,6 +819,9 @@ export function advancePendingDisasters(state: GameState): void {
     else if (disaster.id === 'drought') resolveDrought(state, false);
     else if (disaster.id === 'springFlood') resolveSpringFlood(state, disaster);
     else if (disaster.id === 'snowDamage') resolveSnowDamage(state, disaster);
+    // 화재는 일 단위 resolveDay가 아니라 서브틱 연소·진화로 끝난다.
+    // 기한을 넘긴 경우도 fire.advanceFire가 마지막 피해를 정산한다.
+    else if (disaster.id === 'fire') remaining.push(disaster);
   }
   state.pendingDisasters = remaining;
 }

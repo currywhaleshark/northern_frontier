@@ -126,6 +126,7 @@ export function damageBuildingTargets(
   rng: () => number,
   targets: readonly Building[],
   repairCause: BuildingRepairCause,
+  repairProgress?: { min: number; max: number },
 ): BuildingTypeId[] {
   const damaged: BuildingTypeId[] = [];
   const seen = new Set<number>();
@@ -133,8 +134,8 @@ export function damageBuildingTargets(
     if (seen.has(building.id) || building.type === 'center' || !building.built) continue;
     seen.add(building.id);
     const def = BUILDING_DEFS[building.type];
-    const min = CONFIG.raid.repairProgressMin;
-    const max = CONFIG.raid.repairProgressMax;
+    const min = repairProgress?.min ?? CONFIG.raid.repairProgressMin;
+    const max = repairProgress?.max ?? CONFIG.raid.repairProgressMax;
     building.built = false;
     building.repairing = true;
     building.repairCause = repairCause;
@@ -152,7 +153,7 @@ export function buildingRepairCause(
   if (building.repairCause) return building.repairCause;
   for (const disaster of state.pendingDisasters) {
     if (!disaster.targetBuildingIds?.includes(building.id)) continue;
-    if (disaster.id === 'snowDamage' || disaster.id === 'springFlood') return disaster.id;
+    if (disaster.id === 'snowDamage' || disaster.id === 'springFlood' || disaster.id === 'mineCollapse') return disaster.id;
   }
   // 원인 필드가 없던 구 저장의 파손 상태는 기존 의미였던 습격 피해로 이어 간다.
   return 'raid';

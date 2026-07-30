@@ -437,7 +437,7 @@ function signed(state, options) {
   assert.equal(migrated.schemaVersion, 41, '세이브 버전이 41로 오른다');
   assert.deepEqual(migrated.tradeContracts, [], '구세이브는 빈 계약 배열로 시작한다');
   assert.deepEqual(migrated.tradeContractReserve, {}, '구세이브는 빈 계약고로 시작한다');
-  assert.equal(CURRENT_SCHEMA_VERSION, 45, '현재 세이브 버전이 45다');
+  assert.equal(CURRENT_SCHEMA_VERSION, 47, '현재 세이브 버전이 47이다');
 
   const state = freshState(80);
   const contract = signed(state);

@@ -50,6 +50,7 @@ import { performPhysicianTreatment } from './medicine';
 import { mineralDepositsInMineRange, servingMineForTile } from './miningSites';
 import { oreSampleAt } from './subsurfaceVeins';
 import { waterDependentProductionMultiplier } from './waterSupply';
+import { activeFireDisaster, applyFireWater, drawFireWater, nearestFireWaterSource } from './fire';
 import { rankProductionEfficiency } from './productionEfficiency';
 import { cleanupRoyalPlaqueAfterBuildingRemoval, plaqueProductionMultiplier } from './royalPlaque';
 import { buildGoalField, describeGoal, type DescribedGoal, type GoalField } from './pathGoals';
@@ -527,6 +528,128 @@ function unloadAtDepositGoal(
 
 function buildingGoal(state: GameState, id: number): (t: Tile) => boolean {
   return buildingInteractionGoal(state, [id]);
+}
+
+function riverWaterGoal(state: GameState, riverX: number, riverY: number): (t: Tile) => boolean {
+  const points: { x: number; y: number }[] = [];
+  const width = state.map[0]?.length ?? 0;
+  const indices = new Set<number>();
+  for (const [dx, dy] of DIRS) {
+    const x = riverX + dx;
+    const y = riverY + dy;
+    if (!state.map[y]?.[x] || !isPassable(state, x, y)) continue;
+    indices.add(y * width + x);
+  }
+  for (const index of [...indices].sort((a, b) => a - b)) {
+    points.push({ x: index % width, y: Math.floor(index / width) });
+  }
+  return describeGoal(tile => indices.has(tile.y * width + tile.x), points);
+}
+
+function canRespondToFire(state: GameState, resident: Resident): boolean {
+  if (!resident.alive || resident.sick || resident.health < 20 || state.day < (resident.quarantinedUntil ?? 0)) return false;
+  if (state.day < (resident.birthRecoveryUntil ?? 0)) return false;
+  if (resident.stage && (resident.stage !== 'youth' || resident.youthActivity === 'school')) return false;
+  if (state.expedition?.memberIds.includes(resident.id) || state.battle?.defenderIds.includes(resident.id)) return false;
+  return !activePredatorScoutIds(state).has(resident.id);
+}
+
+function assignFireResponses(state: GameState, residents: readonly Resident[]): void {
+  const disaster = activeFireDisaster(state);
+  const sites = disaster?.fireSites ?? [];
+  const activeIds = new Set(sites.map(site => site.buildingId));
+  for (const resident of residents) {
+    if (resident.fireResponse && (!activeIds.has(resident.fireResponse.buildingId) || !canRespondToFire(state, resident))) {
+      delete resident.fireResponse;
+    }
+  }
+  if (sites.length === 0) return;
+  const assignedBySite = new Map<number, number>();
+  for (const resident of residents) {
+    if (resident.fireResponse) {
+      assignedBySite.set(resident.fireResponse.buildingId, (assignedBySite.get(resident.fireResponse.buildingId) ?? 0) + 1);
+    }
+  }
+  for (const site of sites) {
+    const building = state.buildings.find(candidate => candidate.id === site.buildingId && candidate.built);
+    if (!building) continue;
+    const source = nearestFireWaterSource(state, building);
+    if (!source) continue;
+    const available = residents
+      .filter(resident => !resident.fireResponse && canRespondToFire(state, resident))
+      .sort((a, b) => Math.abs(a.x - building.x) + Math.abs(a.y - building.y) -
+        (Math.abs(b.x - building.x) + Math.abs(b.y - building.y)) || a.id - b.id);
+    let assigned = assignedBySite.get(building.id) ?? 0;
+    for (const resident of available) {
+      if (assigned >= CONFIG.disasters.fire.maximumRespondersPerSite) break;
+      resident.fireResponse = {
+        buildingId: building.id,
+        sourceKind: source.kind,
+        sourceBuildingId: source.buildingId,
+        sourceX: source.x,
+        sourceY: source.y,
+        phase: 'toWater',
+        carriedWater: 0,
+      };
+      resident.path = [];
+      clearHaulTask(resident);
+      assigned++;
+    }
+  }
+}
+
+function fireResponseAgentTick(state: GameState, resident: Resident, ctx: Ctx): boolean {
+  const response = resident.fireResponse;
+  if (!response) return false;
+  const burning = activeFireDisaster(state)?.fireSites?.some(site => site.buildingId === response.buildingId);
+  const building = state.buildings.find(candidate => candidate.id === response.buildingId && candidate.built);
+  if (!burning || !building || !canRespondToFire(state, resident)) {
+    delete resident.fireResponse;
+    return false;
+  }
+  clearHaulTask(resident);
+  if (response.phase === 'toWater') {
+    resident.task = response.sourceKind === 'well' ? '우물로 물 뜨러 이동' : '강으로 물 뜨러 이동';
+    const goal = response.sourceKind === 'well' && response.sourceBuildingId != null
+      ? buildingGoal(state, response.sourceBuildingId)
+      : riverWaterGoal(state, response.sourceX, response.sourceY);
+    const result = goTo(state, resident, ctx, goal);
+    if (!isSettledAtGoal(resident, result)) return true;
+    const amount = drawFireWater(state, {
+      kind: response.sourceKind,
+      buildingId: response.sourceBuildingId,
+      x: response.sourceX,
+      y: response.sourceY,
+      distance: 0,
+    });
+    if (amount <= 0) {
+      const source = nearestFireWaterSource(state, building);
+      if (!source) {
+        delete resident.fireResponse;
+        resident.path = [];
+        return false;
+      }
+      response.sourceKind = source.kind;
+      response.sourceBuildingId = source.buildingId;
+      response.sourceX = source.x;
+      response.sourceY = source.y;
+      resident.path = [];
+      return true;
+    }
+    response.carriedWater = amount;
+    response.phase = 'toFire';
+    resident.path = [];
+    return true;
+  }
+  resident.task = '화재 현장으로 물 운반';
+  const result = goTo(state, resident, ctx, buildingGoal(state, building.id));
+  if (!isSettledAtGoal(resident, result)) return true;
+  applyFireWater(state, building.id, response.carriedWater);
+  response.carriedWater = 0;
+  response.phase = 'toWater';
+  resident.task = '불길에 물 붓는 중';
+  resident.path = [];
+  return true;
 }
 
 /**
@@ -3324,12 +3447,20 @@ export function agentsTick(state: GameState): void {
       clearingSites(state).flatMap(site => site.tiles.map(tile => `${tile.x},${tile.y}`)),
     ),
   };
+  assignFireResponses(state, living);
 
   for (const r of living) {
     ensureResidentOnPassableTile(state, r);
     // 보간용 직전 위치 기록
     r.px = r.x;
     r.py = r.y;
+    if (r.trappedInMineId != null) {
+      r.task = '갱도에 매몰됨';
+      r.path = [];
+      r.phase = 'rest';
+      clearHaulTask(r);
+      continue;
+    }
     if (predatorScouts.has(r.id)) {
       resumeCriticalActivity(r);
       r.task = '맹수 흔적 추적 중';
@@ -3366,6 +3497,7 @@ export function agentsTick(state: GameState): void {
       battleAgentTick(state, r, ctx);
       continue;
     }
+    if (fireResponseAgentTick(state, r, ctx)) continue;
     // 폭설·눈보라에는 실외 작업자가 일과/여가보다 귀가와 입실을 우선한다.
     const sheltersFromSnow = OUTDOOR_JOBS.includes(r.job) &&
       (state.weather === 'heavySnow' || ctx.outdoor < CONFIG.agents.shelterThreshold);

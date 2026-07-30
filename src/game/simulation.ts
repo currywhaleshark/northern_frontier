@@ -81,6 +81,8 @@ import {
   maybeStartSnowDamage,
 } from './disasters';
 import { updateFermentation } from './fermentation';
+import { advanceFire, maybeStartFire } from './fire';
+import { maybeStartMineCollapse, resolveMineCollapseChoice } from './mineCollapse';
 import { isKimjangChoice, maybeOpenKimjangEvent, resolveKimjangChoice } from './kimjang';
 import {
   createDefaultLivestockState, ensureLivestockState, livestockCapacityForStable, setPlotPlowOxen,
@@ -1132,6 +1134,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'specialResident') resolveSpecialResidentChoice(state, optionId, rng);
   else if (state.pendingChoice.kind === 'scenario') resolveScenarioChoice(state, optionId);
   else if (state.pendingChoice.kind === 'promotionDecree') resolvePromotionDecreeChoice(state, optionId);
+  else if (state.pendingChoice.kind === 'mineCollapse') resolveMineCollapseChoice(state, optionId);
   else resolveTrade(state, optionId);
   reconcileWeaponAssignments(state);
   reconcileMountAssignments(state);
@@ -1183,6 +1186,8 @@ export function advanceTick(state: GameState): void {
   };
   agentsTick(state);
   lap('t1-agents');
+  advanceFire(state);
+  lap('t1-fire');
   reconcileWeaponAssignments(state);
   reconcileMountAssignments(state);
   lap('t2-reconcile');
@@ -1265,6 +1270,8 @@ function endOfDay(state: GameState): void {
   // 시나리오(튜토리얼) 중에는 랜덤 사건을 잠근다. 결정론적 처리(세공, 날씨)는 그대로.
   // 규칙: 새 랜덤 일일 시스템은 반드시 이 게이트 뒤에 추가한다.
   if (!scenarioSuppressesRandomEvents(state)) {
+    maybeStartFire(state, rng);
+    maybeStartMineCollapse(state, rng);
     checkRaidTrigger(state, rng);
     if (maybeOfferTrade(state, rng, state.day - state.lastTradeDay)) {
       state.lastTradeDay = state.day;
@@ -1440,7 +1447,8 @@ export function dailyToolWear(state: GameState): number {
   const hasConstruction = state.buildings.some(building =>
     !building.built || building.expansion != null || building.workOrder != null);
   const wearUnits = state.residents.reduce((sum, resident) => {
-    if (!resident.alive || resident.sick || state.day < (resident.quarantinedUntil ?? 0)) return sum;
+    if (!resident.alive || resident.sick || resident.trappedInMineId != null ||
+        state.day < (resident.quarantinedUntil ?? 0)) return sum;
     if (resident.stage && resident.stage !== 'youth') return sum;
     if (resident.job === 'farmer' && winter) return sum;
     if (resident.job === 'builder' && !hasConstruction) return sum;
@@ -1474,9 +1482,12 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
   const living = livingResidents(state);
   const pop = living.length;
   if (pop === 0) return;
+  const trappedResidentIds = new Set(
+    living.filter(resident => resident.trappedInMineId != null).map(resident => resident.id),
+  );
 
   // 나이 단계별 소비 몫 — 아이는 성인보다 적게 먹고 적게 입는다
-  const weight = consumptionWeight(state);
+  const weight = consumptionWeight(state, trappedResidentIds);
 
   // 식량 — 절미령이 서면 창고에서 내주는 몫만 줄어든다. 배부름은 평시 몫을 기준으로 재므로
   // 아껴 먹인 만큼 끼니를 거른 이가 생기고, 배고픔과 건강이 서서히 무너진다.
@@ -1501,7 +1512,10 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
   updateResidentNeeds(
     state, rng2, fedRatio, firewoodRatio, clothesCoverage,
     foodResult.varietyScore, foodResult.vegetableRatio,
-    new Set(state.expedition?.memberIds ?? []),
+    new Set([
+      ...(state.expedition?.memberIds ?? []),
+      ...trappedResidentIds,
+    ]),
   );
 
   // 밥상에 장·김치가 올랐는지 — 진 티어의 "밥상의 격" 성분이 이 날짜를 본다

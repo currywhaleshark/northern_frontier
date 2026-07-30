@@ -1289,6 +1289,53 @@ function drawFogOverlay(ctx: CanvasRenderingContext2D, state: GameState, viewpor
   ctx.restore();
 }
 
+// 평시 화재는 작업장 불씨와 혼동되지 않도록 주황 불길과 검은 연기를 함께 그린다.
+// 별도 스프라이트 시트 없이도 표준/HD 캔버스에서 같은 픽셀 밀도로 보이게 논리 좌표로만 계산한다.
+function drawBuildingFire(
+  ctx: CanvasRenderingContext2D,
+  bx: number,
+  by: number,
+  id: number,
+  size: number,
+  intensity: number,
+): void {
+  const t = performance.now() / 1000;
+  const strength = Math.max(0.4, Math.min(3.2, intensity));
+  const centerX = bx + size * 0.5;
+  const baseY = by + size * 0.58;
+  const flameCount = Math.min(6, 2 + Math.ceil(strength));
+  ctx.save();
+  for (let i = 0; i < flameCount; i++) {
+    const phase = t * (2.5 + i * 0.13) + id * 0.71 + i * 1.9;
+    const offsetX = ((i - (flameCount - 1) / 2) * size * 0.11) + Math.sin(phase) * 1.7;
+    const height = size * (0.23 + strength * 0.075) * (0.78 + (Math.sin(phase * 1.7) + 1) * 0.13);
+    const width = Math.max(3, size * (0.09 + strength * 0.015));
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(238,77,30,0.9)' : 'rgba(255,154,46,0.94)';
+    ctx.beginPath();
+    ctx.moveTo(centerX + offsetX - width, baseY);
+    ctx.quadraticCurveTo(centerX + offsetX - width * 0.45, baseY - height * 0.56, centerX + offsetX, baseY - height);
+    ctx.quadraticCurveTo(centerX + offsetX + width * 0.85, baseY - height * 0.42, centerX + offsetX + width, baseY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,225,106,0.92)';
+    ctx.beginPath();
+    ctx.ellipse(centerX + offsetX, baseY - height * 0.3, width * 0.33, height * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const smokeCount = Math.min(7, 3 + Math.ceil(strength));
+  for (let i = 0; i < smokeCount; i++) {
+    const phase = (t * 0.42 + i * 0.19 + (id % 13) * 0.071) % 1;
+    const x = centerX + Math.sin(phase * 7 + id + i) * size * (0.11 + phase * 0.15);
+    const y = baseY - size * (0.26 + phase * (0.72 + strength * 0.1));
+    const radius = size * (0.055 + phase * 0.09) * (0.8 + strength * 0.12);
+    ctx.fillStyle = `rgba(45,39,37,${(0.56 * (1 - phase) * (0.6 + strength * 0.12)).toFixed(2)})`;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawWellSupplyRange(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -1800,7 +1847,8 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     ? cachedWaterVisualSnapshot(state, o.stateVersion, previewWell, previewWaterBuilding)
     : null;
   for (const r of state.residents) {
-    if (!r.alive || predatorScoutIds.has(r.id) || presentation.indoorResidentIds.has(r.id)) continue;
+    if (!r.alive || r.trappedInMineId != null || predatorScoutIds.has(r.id) ||
+        presentation.indoorResidentIds.has(r.id)) continue;
     const workStance = presentation.workStances.get(r.id);
     const p = residentPixelPos(r, o.alpha, workStance);
     // 저녁 마실 — 같은 타일에 모인 소그룹(최대 4인)이 겹치지 않게 둘러서고, 마실 지점을 바라본다.
@@ -1959,6 +2007,12 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       .flatMap(disaster => disaster.targetBuildingIds ?? []),
   );
   const droughtActive = isDroughtActive(state);
+  const fireByBuildingId = new Map(
+    state.pendingDisasters
+      .filter(disaster => disaster.id === 'fire')
+      .flatMap(disaster => disaster.fireSites ?? [])
+      .map(site => [site.buildingId, site]),
+  );
   const sorted = [...state.buildings].sort((a, b) =>
     (a.y + buildingFootprintDims(a).h) - (b.y + buildingFootprintDims(b).h) || a.x - b.x);
   const visibleBuildings: Building[] = [];
@@ -2080,6 +2134,8 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
           sprites.drawBuildingDamage(ctx, { season, x: drawX, y: drawY, size });
           drawDamageSmoke(ctx, drawX, drawY, b.id, size / TILE);
         }
+        const fire = fireByBuildingId.get(b.id);
+        if (fire) drawBuildingFire(ctx, drawX, drawY, b.id, size, fire.intensity);
         if (b.built) {
           drawBuildingEffects(ctx, b.type, b.id, drawX, drawY, size, {
             active: daytimeWhen, workers: activeWorkerCount, nightAlpha: 0,

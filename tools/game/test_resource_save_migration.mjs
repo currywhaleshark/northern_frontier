@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 45, 'subsurface resources ship with schema version 45');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 47, 'mine-collapse-ready saves ship with schema version 47');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -81,6 +81,8 @@ assert.equal(typeof saveLoad.migrateV41ToV42, 'function');
 assert.equal(typeof saveLoad.migrateV42ToV43, 'function');
 assert.equal(typeof saveLoad.migrateV43ToV44, 'function');
 assert.equal(typeof saveLoad.migrateV44ToV45, 'function');
+assert.equal(typeof saveLoad.migrateV45ToV46, 'function');
+assert.equal(typeof saveLoad.migrateV46ToV47, 'function');
 
 {
   const migrated = saveLoad.migrateV39ToV40({ schemaVersion: 39, courtGrantArtifactMisses: 3.8 });
@@ -139,6 +141,42 @@ assert.equal(typeof saveLoad.migrateV44ToV45, 'function');
   assert.equal(loadedNovice?.religiousVocation, 'monk');
   assert.equal(loadedNovice?.religiousMentorId, artifactBearer.id);
   assert.equal(loadedNovice?.task, '동자승', 'a saved novice remains in novice training');
+}
+
+{
+  const state = simulation.newGame(20260730);
+  const mine = state.buildings.find(building => building.type !== 'center');
+  mine.type = 'deepMine';
+  mine.built = false;
+  mine.repairing = true;
+  mine.repairCause = 'mineCollapse';
+  const trapped = state.residents[0];
+  trapped.trappedInMineId = mine.id;
+  trapped.task = '갱도에 매몰됨';
+  state.pendingDisasters = [{
+    id: 'mineCollapse',
+    choiceId: 'awaitingRescueChoice',
+    startedDay: state.day,
+    resolveDay: state.day,
+    targetBuildingIds: [mine.id],
+    trappedResidentIds: [trapped.id],
+    data: { collapseDay: state.day, resolutionSeed: 77 },
+  }];
+  state.pendingChoice = {
+    kind: 'mineCollapse',
+    title: '채광갱 붕괴 — 매몰자 구조',
+    body: 'test',
+    options: [{ id: 'urgent', label: '서둘러 판다', desc: 'test' }],
+    data: { buildingId: mine.id },
+  };
+  assert.equal(saveLoad.saveGame(state), true);
+  const loaded = saveLoad.loadGame();
+  assert.equal(loaded?.pendingDisasters[0]?.id, 'mineCollapse');
+  assert.deepEqual(loaded?.pendingDisasters[0]?.trappedResidentIds, [trapped.id]);
+  assert.equal(loaded?.residents.find(resident => resident.id === trapped.id)?.trappedInMineId, mine.id,
+    'an active trapped resident survives save/load');
+  assert.equal(loaded?.pendingChoice?.kind, 'mineCollapse',
+    'the rescue choice survives alongside its active collapse');
 }
 
 {
@@ -202,6 +240,18 @@ assert.equal(typeof saveLoad.migrateV44ToV45, 'function');
     'pre-subsurface saves receive deterministic full aquifer levels');
   assert.ok(Array.isArray(migrated.oreVeinRemaining) && migrated.oreVeinRemaining.length > 0,
     'pre-subsurface saves receive deterministic full ore reserves');
+}
+
+{
+  const migrated = saveLoad.migrateV45ToV46({ schemaVersion: 45, marker: 'fire-ready' });
+  assert.equal(migrated.schemaVersion, 46);
+  assert.equal(migrated.marker, 'fire-ready');
+}
+
+{
+  const migrated = saveLoad.migrateV46ToV47({ schemaVersion: 46, marker: 'mine-collapse-ready' });
+  assert.equal(migrated.schemaVersion, 47);
+  assert.equal(migrated.marker, 'mine-collapse-ready');
 }
 
 {
