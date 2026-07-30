@@ -1709,8 +1709,17 @@ html, body, #root {
   border: 1px solid var(--border);
   border-radius: 5px;
 }
+.faction-entry-portrait {
+  width: 56px;
+  height: 56px;
+  justify-self: center;
+  object-position: center top;
+}
 .faction-entry-body { min-width: 0; }
 .court-commander-card {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 10px;
   margin-bottom: 9px;
   padding: 9px 10px;
   border: 1px solid color-mix(in srgb, var(--gold) 48%, var(--border));
@@ -1718,6 +1727,15 @@ html, body, #root {
   border-radius: 5px;
   background: color-mix(in srgb, var(--panel2) 88%, var(--gold));
 }
+.court-commander-portrait {
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  object-position: center top;
+  border: 1px solid color-mix(in srgb, var(--gold) 42%, var(--border));
+  border-radius: 4px;
+}
+.court-commander-details { min-width: 0; }
 .court-commander-heading {
   display: flex;
   align-items: center;
@@ -6801,6 +6819,23 @@ html, body, #root {
   gap: 14px;
   padding: 12px 16px;
 }
+.trade-dialog-heading-main {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.trade-dialog-heading-copy { min-width: 0; }
+.trade-leader-portrait {
+  flex: 0 0 84px;
+  width: 84px;
+  height: 84px;
+  object-fit: cover;
+  object-position: center top;
+  border: 1px solid color-mix(in srgb, var(--trade) 58%, var(--border));
+  border-radius: 5px;
+  box-shadow: 0 2px 8px #0007;
+}
 .trade-dialog-heading h2 { margin-bottom: 4px; }
 .trade-envoy-line {
   display: grid;
@@ -7033,6 +7068,11 @@ html, body, #root {
   .modal.trade-dialog { width: 94%; }
   .trade-faction-art { height: 122px; }
   .trade-dialog-heading { padding: 10px 12px; }
+  .trade-leader-portrait {
+    flex-basis: 64px;
+    width: 64px;
+    height: 64px;
+  }
   .trade-offer-grid {
     grid-template-columns: 1fr;
     margin: 0 12px;

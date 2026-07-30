@@ -6,7 +6,7 @@ import { FACTION_ARTWORK } from '../../game/tradePresentation';
 import { contractsForFaction, nextContractDueDay } from '../../game/tradeContracts';
 import { contractReserved } from '../../game/tradeContractReserve';
 import {
-  factionLeaderFor, factionLeaderTemperLabel,
+  factionLeaderFor, factionLeaderPortraitPath, factionLeaderTemperLabel,
 } from '../../game/diplomaticFigures';
 import { canOpenGiftEnvoy, giftEnvoyRemainingDays } from '../../game/diplomacy';
 import type { GameState, TradeContract } from '../../game/types';
@@ -85,17 +85,18 @@ export function FactionsWindow({ state, onRequestTrade, onOpenGiftEnvoy, onCance
         const artwork = FACTION_ARTWORK[faction.name];
         const tradeReason = faction.exports.length > 0 ? canRequestTrade(state, faction.name) : null;
         const leader = factionLeaderFor(state, faction.name);
+        const leaderPortrait = leader ? factionLeaderPortraitPath(leader) : null;
         const giftReason = leader ? canOpenGiftEnvoy(state, faction.name) : null;
         const giftRemainingDays = leader ? giftEnvoyRemainingDays(state, faction.name) : null;
         return (
           <div key={faction.name} className="faction-entry" title={faction.desc}>
-            {artwork && (
+            {(leaderPortrait || artwork) && (
               <img
-                className="faction-entry-art"
-                src={artwork.src}
-                alt={artwork.alt}
+                className={`faction-entry-art${leaderPortrait ? ' faction-entry-portrait' : ''}`}
+                src={leaderPortrait ?? artwork.src}
+                alt={leader ? `${leader.name} ${leader.title} 초상` : artwork.alt}
                 loading="lazy"
-                style={{ objectPosition: artwork.position }}
+                style={leaderPortrait ? undefined : { objectPosition: artwork.position }}
               />
             )}
             <div className="faction-entry-body">

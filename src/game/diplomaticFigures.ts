@@ -82,6 +82,10 @@ function stableHash(seed: number, salt: string): number {
   return hash >>> 0;
 }
 
+function portraitVariant(name: string): 1 | 2 {
+  return (stableHash(0, name) % 2 + 1) as 1 | 2;
+}
+
 function pick<T>(values: readonly T[], seed: number, salt: string): T {
   return values[stableHash(seed, salt) % values.length];
 }
@@ -168,6 +172,18 @@ export function updateDiplomaticFigures(state: GameState): void {
 export function factionLeaderFor(state: GameState, factionName: string): FactionLeader | null {
   if (!isDiplomaticFactionName(factionName)) return null;
   return state.factionLeaders?.[factionName] ?? null;
+}
+
+export function factionLeaderPortraitPath(
+  leader: Pick<FactionLeader, 'name' | 'temper'>,
+): string {
+  return `/assets/portraits/faction-${leader.temper}-${portraitVariant(leader.name)}.png`;
+}
+
+export function borderCommanderPortraitPath(
+  commander: Pick<BorderCommander, 'name' | 'temper'>,
+): string {
+  return `/assets/portraits/border-${commander.temper}-${portraitVariant(commander.name)}.png`;
 }
 
 // 습격·통첩처럼 세력 전체가 행동하는 문구에서는 지도자의 무리로 보이게 한다.

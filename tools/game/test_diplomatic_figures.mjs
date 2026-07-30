@@ -97,13 +97,44 @@ assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 49);
   assert.deepEqual(commander, replayed, '같은 시드와 임기의 북병사는 항상 같다');
   assert.notEqual(commander.name, next.name, '인접 임기는 같은 이름을 쓰지 않는다');
   assert.equal(typeof figures.borderCommanderRumor(commander.temper), 'string');
+  assert.equal(
+    figures.borderCommanderPortraitPath(commander),
+    figures.borderCommanderPortraitPath(replayed),
+    '같은 이름의 북병사는 항상 같은 초상을 쓴다',
+  );
+  assert.match(
+    figures.borderCommanderPortraitPath(commander),
+    new RegExp(`^/assets/portraits/border-${commander.temper}-[12]\\.png$`),
+  );
+}
+
+{
+  const leaders = figures.createFactionLeaders(73004);
+  for (const leader of Object.values(leaders)) {
+    const portrait = figures.factionLeaderPortraitPath(leader);
+    assert.equal(portrait, figures.factionLeaderPortraitPath({ ...leader }));
+    assert.match(portrait, new RegExp(`^/assets/portraits/faction-${leader.temper}-[12]\\.png$`));
+  }
+}
+
+{
+  const portraitDir = new URL('../../public/assets/portraits/', import.meta.url);
+  const files = readdirSync(portraitDir).filter(file => file.endsWith('.png')).sort();
+  assert.equal(files.length, 16, 'F4 초상 풀은 정확히 16종이다');
+  for (const file of files) {
+    const png = readFileSync(new URL(file, portraitDir));
+    assert.equal(png.toString('ascii', 1, 4), 'PNG');
+    assert.equal(png.readUInt32BE(16), 1024, `${file} 너비`);
+    assert.equal(png.readUInt32BE(20), 1024, `${file} 높이`);
+  }
 }
 
 const courtSource = readFileSync(new URL('../../src/components/dock/CourtWindow.tsx', import.meta.url), 'utf8');
 const factionsSource = readFileSync(new URL('../../src/components/dock/FactionsWindow.tsx', import.meta.url), 'utf8');
 const tradeSource = readFileSync(new URL('../../src/components/TradeDialog.tsx', import.meta.url), 'utf8');
 assert.match(courtSource, /court-commander-card/);
-assert.match(factionsSource, /factionLeaderFor/);
-assert.match(tradeSource, /factionLeaderGreeting/);
+assert.match(courtSource, /borderCommanderPortraitPath/);
+assert.match(factionsSource, /factionLeaderPortraitPath/);
+assert.match(tradeSource, /factionLeaderPortraitPath/);
 
 console.log('diplomatic figure tests passed');
