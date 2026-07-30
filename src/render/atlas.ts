@@ -61,6 +61,11 @@ import {
   generatedBuildingSourceRect,
 } from './generatedBuildingAssets';
 import {
+  WATERWORK_BUILDING_SHEETS,
+  isWaterworksBuildingType,
+  waterworksBuildingSourceRect,
+} from './waterworksBuildingAssets';
+import {
   isPromotionBuildingType,
   PROMOTION_LARGE_BUILDING_SHEET,
   PROMOTION_BUILDING_SHEET,
@@ -244,6 +249,10 @@ import {
   isApprovedI2VJob,
 } from './residentApprovedI2VLocomotionAssets';
 import {
+  RELIGIOUS_SUCCESSOR_SHEETS,
+  religiousSuccessorSourceRect,
+} from './religiousSuccessorAssets';
+import {
   RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS,
   woodcutterVideoWalkSourceRect,
   type WoodcutterVideoWalkKind,
@@ -320,6 +329,8 @@ let terrainGrowthSheet: HTMLImageElement | null = null;
 let terrainGrowthHdSheet: HTMLImageElement | null = null;
 let buildingSheet: HTMLImageElement | null = null;
 let largeBuildingSheet: HTMLImageElement | null = null;
+let waterworksBuildingSheet: HTMLImageElement | null = null;
+let waterworksBuildingHdSheet: HTMLImageElement | null = null;
 let generatedCharacterSheet: HTMLImageElement | null = null;
 let promotionBuildingSheet: HTMLImageElement | null = null;
 let promotionLargeBuildingSheet: HTMLImageElement | null = null;
@@ -403,6 +414,8 @@ let residentIdleVideoWalkSheet: HTMLImageElement | null = null;
 let residentIdleVideoWalkHdSheet: HTMLImageElement | null = null;
 let residentApprovedI2VSheet: HTMLImageElement | null = null;
 let residentApprovedI2VHdSheet: HTMLImageElement | null = null;
+let religiousSuccessorSheet: HTMLImageElement | null = null;
+let religiousSuccessorHdSheet: HTMLImageElement | null = null;
 let residentWoodcutterVideoWalkSheet: HTMLImageElement | null = null;
 let residentWoodcutterVideoWalkHdSheet: HTMLImageElement | null = null;
 let residentWoodcutterVideoWorkSheet: HTMLImageElement | null = null;
@@ -480,6 +493,8 @@ function ensureLoaded(): void {
   loadAtlasAsset(TERRAIN_GROWTH_SHEETS.highDefinition.src, true, image => { terrainGrowthHdSheet = image; });
   loadAtlasAsset(GENERATED_BUILDING_SHEET.src, true, image => { buildingSheet = image; });
   loadAtlasAsset(GENERATED_LARGE_BUILDING_SHEET.src, true, image => { largeBuildingSheet = image; });
+  loadAtlasAsset(WATERWORK_BUILDING_SHEETS.standard.src, true, image => { waterworksBuildingSheet = image; });
+  loadAtlasAsset(WATERWORK_BUILDING_SHEETS.highDefinition.src, true, image => { waterworksBuildingHdSheet = image; });
   loadAtlasAsset(PROMOTION_BUILDING_SHEET.src, true, image => { promotionBuildingSheet = image; });
   loadAtlasAsset(PROMOTION_LARGE_BUILDING_SHEET.src, true, image => { promotionLargeBuildingSheet = image; });
   loadAtlasAsset(PROMOTION_CHARACTER_SHEET.src, true, image => { promotionCharacterSheet = image; });
@@ -595,6 +610,10 @@ function ensureLoaded(): void {
     image => { residentApprovedI2VSheet = image; });
   loadAtlasAsset(RESIDENT_APPROVED_I2V_SHEETS.highDefinition.src, false,
     image => { residentApprovedI2VHdSheet = image; });
+  loadAtlasAsset(RELIGIOUS_SUCCESSOR_SHEETS.standard.src, false,
+    image => { religiousSuccessorSheet = image; });
+  loadAtlasAsset(RELIGIOUS_SUCCESSOR_SHEETS.highDefinition.src, false,
+    image => { religiousSuccessorHdSheet = image; });
   loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.standard.src, false,
     image => { residentWoodcutterVideoWalkSheet = image; });
   loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WALK_SHEETS.highDefinition.src, false,
@@ -844,6 +863,34 @@ function blitNewContentBuilding(
   ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
 }
 
+function blitWaterworksBuilding(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  p: BuildingDrawParams,
+  highDefinition: boolean,
+): void {
+  const sheet = highDefinition
+    ? WATERWORK_BUILDING_SHEETS.highDefinition
+    : WATERWORK_BUILDING_SHEETS.standard;
+  const rect = waterworksBuildingSourceRect(p.type, p.waterworksOrientation ?? 'horizontal', sheet);
+  if (!rect) return;
+  const destHeight = sheet.spriteHeight * (p.size / sheet.tileSize);
+  const edge = p.type === 'levee' ? p.waterworksEdge : undefined;
+  const offsetX = edge === 'e' ? p.size * 0.5 : edge === 'w' ? -p.size * 0.5 : 0;
+  const offsetY = edge === 's' ? p.size * 0.5 : edge === 'n' ? -p.size * 0.5 : 0;
+  ctx.drawImage(
+    img,
+    rect.sx,
+    rect.sy,
+    rect.sw,
+    rect.sh,
+    p.x + offsetX,
+    p.y + p.size - destHeight + offsetY,
+    p.size,
+    destHeight,
+  );
+}
+
 function blitPromotionBuilding(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
@@ -1027,6 +1074,36 @@ function drawApprovedI2VLocomotion(
     rect.sw * textureScale * sizeScale,
     rect.sh * textureScale * sizeScale,
     `i2v.${p.job}`,
+  );
+  return true;
+}
+
+function drawReligiousSuccessorStatic(
+  ctx: CanvasRenderingContext2D,
+  p: ResidentDrawParams,
+): boolean {
+  if (p.special || !p.religiousVocation) return false;
+  const wantsHighDefinition = canvasBackingScale(ctx) >= 1.5;
+  const highDefinition = wantsHighDefinition && religiousSuccessorHdSheet != null;
+  const image = highDefinition ? religiousSuccessorHdSheet : religiousSuccessorSheet;
+  if (!image) return false;
+  const rect = religiousSuccessorSourceRect(
+    p.religiousVocation,
+    p.gender,
+    p.stage,
+    highDefinition,
+  );
+  if (!rect) return false;
+  drawResidentImageRect(
+    ctx,
+    image,
+    rect,
+    p.x,
+    p.y,
+    p.facing,
+    RELIGIOUS_SUCCESSOR_SHEETS.standard.residentWidth,
+    RELIGIOUS_SUCCESSOR_SHEETS.standard.spriteHeight,
+    `religious.${p.religiousVocation}.${p.stage ? 'novice' : 'adult'}`,
   );
   return true;
 }
@@ -1539,6 +1616,8 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   field:      { base: DIRT }, // 성장 단계는 drawBuilding에서 덧그림
   smithy:     { roof: ROOF_DARK, base: FACE_DOOR, glyph: ANVIL },
   mine:       { base: ROCK_GRAY2, glyph: ANVIL },
+  well:       { base: FACE_STONE, glyph: WATER },
+  deepMine:   { roof: ROOF_DARK, base: ROCK_GRAY2, glyph: ANVIL },
   ferry:      { base: TENT_TAN, glyph: WATER },
   charcoalKiln: { base: CAMPFIRE, glyph: LOGS },
   stable:     { base: TENT_TAN, glyph: HIDE },
@@ -2298,6 +2377,17 @@ export const atlasSprites: SpriteAPI = {
       return;
     }
 
+    if (isWaterworksBuildingType(p.type)) {
+      const useHighDefinition = Boolean(p.highDefinition && waterworksBuildingHdSheet);
+      const image = useHighDefinition ? waterworksBuildingHdSheet : waterworksBuildingSheet ?? waterworksBuildingHdSheet;
+      if (image) {
+        blitWaterworksBuilding(ctx, image, p, useHighDefinition || !waterworksBuildingSheet);
+        ctx.globalAlpha = 1;
+        drawProgressBar(ctx, p);
+        return;
+      }
+    }
+
     if (isNewContentBuildingType(p.type)) {
       const useLarge = p.size > NEW_CONTENT_BUILDING_SHEET.tileSize && newContentLargeBuildingSheet;
       const image = useLarge ? newContentLargeBuildingSheet : newContentBuildingSheet;
@@ -2464,6 +2554,7 @@ export const atlasSprites: SpriteAPI = {
     const foreignRect = foreignResidentSourceRect(p.foreignFaction, p.gender);
     const newContentRect = newContentResidentSourceRect(p.job, p.gender, p.stage);
     if (!characterSheet && !specializedSheet && !militiaSheet && !kenneyChars && !specialResidentSheet &&
+        !religiousSuccessorSheet && !religiousSuccessorHdSheet &&
         (!newContentResidentSheet || !newContentRect) && (!foreignResidentSheet || !foreignRect)) return;
     ctx.imageSmoothingEnabled = false;
     const half = CHALF;
@@ -2485,6 +2576,8 @@ export const atlasSprites: SpriteAPI = {
       drewOptionalResidentPresentation = true;
     } else if (specialResidentSheet && specialRect) {
       drawGeneratedCharacterRect(ctx, specialResidentSheet, specialRect, p.x, p.y, p.facing, bob, 1.16);
+    } else if (drawReligiousSuccessorStatic(ctx, p)) {
+      drewOptionalResidentPresentation = true;
     } else if (foreignResidentSheet && foreignRect) {
       drawGeneratedCharacterRect(ctx, foreignResidentSheet, foreignRect, p.x, p.y, p.facing, bob);
     } else if (newContentResidentSheet && newContentRect && p.stage) {

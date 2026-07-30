@@ -12,6 +12,7 @@ import {
 import { makeRng } from './map';
 import { activePhysicianCount, hasActivePhysician } from './medicine';
 import { createResident, killResident, livingResidents, reconcileResidentHomes, residentHome } from './residents';
+import { residentLogName } from './residentLogName';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { weatherForDay } from './weather';
 import { createCombatRoster } from './combatRoster';
@@ -395,7 +396,7 @@ function openPlagueSuspicionEvent(state: GameState, rng: () => number): void {
   state.pendingChoice = {
     kind: 'incident',
     title: '역병 의심 증상',
-    body: `${withJosa(suspect.name, '이/가')} 고열과 기침으로 쓰러졌습니다. 단순한 병치레일 수도 있지만 역병의 첫 증상일 수도 있습니다.`,
+    body: `${withJosa(residentLogName(suspect), '이/가')} 고열과 기침으로 쓰러졌습니다. 단순한 병치레일 수도 있지만 역병의 첫 증상일 수도 있습니다.`,
     illustration: { src: '/assets/events/plague-suspicion-v1.png', alt: '고열로 누운 주민을 살피며 격리를 고민하는 개척지 사람들' },
     options: [
       ...(localPhysician ? [{
@@ -593,6 +594,7 @@ function openLivestockEpidemicEvent(state: GameState, rng: () => number): void {
     title: `${epidemicName} 발생`,
     body: `${livestockEpidemicGroupLabel(group)} 축사에서 ${epidemicName} 기운이 발견됐습니다. ` +
       `${LIVESTOCK_DEFS[livestock.species].name} ${livestock.headcount}마리가 든 축사입니다.`,
+    illustration: { src: '/assets/events/livestock-epidemic-v1.png', alt: '격리 줄을 친 축사에서 병든 소를 돌보는 북방 개척지 목동' },
     options: [
       {
         id: 'cull-livestock',
@@ -633,7 +635,7 @@ function openLateFrostEvent(state: GameState, rng: () => number): void {
     kind: 'incident',
     title: '늦서리',
     body: `막 자라기 시작한 ${cropId ? CROP_DEFS[cropId].name : '작물'} 위로 봄 서리가 내려앉았습니다. 지금 갈아엎으면 봄 성장분은 잃지만 여름 작물로 다시 시작할 수 있습니다.`,
-    illustration: { src: '/assets/events/early-frost-v1.png', alt: '봄 늦서리로 새싹이 하얗게 얼어붙은 북방 개척지의 논밭' },
+    illustration: { src: '/assets/events/late-frost-v1.png', alt: '봄 늦서리로 새싹이 하얗게 얼어붙은 북방 개척지의 논밭' },
     options: [
       {
         id: 'replant-summer',
@@ -661,6 +663,7 @@ function openLocustEvent(state: GameState, rng: () => number): void {
     kind: 'incident',
     title: '황충 떼',
     body: '누런 메뚜기 떼가 들판 너머에서 밀려와 자라는 작물을 뒤덮었습니다. 지금 거두면 소출은 줄지만 남은 것을 지킬 수 있고, 버티면 떼가 떠날 때까지 밭을 내어주어야 합니다.',
+    illustration: { src: '/assets/events/locust-swarm-v1.png', alt: '누런 황충 떼가 북방 개척지의 여름 들판을 뒤덮고 이를 막는 주민들' },
     options: [
       { id: 'harvest-early', label: '서둘러 거둔다', desc: '모든 대상 경작지의 남은 예상 소출 약 절반을 즉시 확보합니다.' },
       { id: 'endure', label: '버틴다', desc: '황충 떼가 떠날 때까지 매일 경작지 성장도가 깎입니다.' },
@@ -873,7 +876,7 @@ function huntFailure(
       ? Math.round((38 + Math.floor(rng() * 23)) * tigerDanger)
       : 18 + Math.floor(rng() * 13);
   victim.health = Math.max(1, victim.health - damage);
-  addLog(state, `${withJosa(victim.name, '이/가')} ${wildlifeName(kind, state)} 토벌 중 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
+  addLog(state, `${withJosa(residentLogName(victim), '이/가')} ${wildlifeName(kind, state)} 토벌 중 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
   return { residentId: victim.id, killed: false, damage };
 }
 
@@ -1032,7 +1035,7 @@ export function startPredatorScout(state: GameState, kind: PredatorKind, residen
   hunter.task = `${kind === 'wolf' ? '늑대' : '호랑이'} 흔적 추적 출발`;
   addLog(
     state,
-    `${withJosa(hunter.name, '이/가')} ${kind === 'wolf' ? '늑대 떼' : '호랑이'}의 흔적을 쫓으러 떠났습니다. ${duration}일 뒤 규모를 보고합니다.` +
+    `${withJosa(residentLogName(hunter), '이/가')} ${kind === 'wolf' ? '늑대 떼' : '호랑이'}의 흔적을 쫓으러 떠났습니다. ${duration}일 뒤 규모를 보고합니다.` +
       (usedGyrfalcon ? ' 해동청도 함께 띄웠습니다.' : ''),
     'info',
     true,
@@ -1055,7 +1058,7 @@ function openPredatorScoutSelection(state: GameState, kind: PredatorKind): void 
         const duration = predatorScoutDuration(skill, usedGyrfalcon, expertTracker);
         return {
           id: `scout:${scout.id}`,
-          label: `${withJosa(scout.name, '을/를')} 보낸다`,
+          label: `${withJosa(residentLogName(scout), '을/를')} 보낸다`,
           desc: `사냥 숙련 ${Math.round(skill * 100)}% · ${duration}일 소요${usedGyrfalcon ? ' · 해동청 동행' : ''}`,
         };
       }),
@@ -1099,10 +1102,10 @@ function resolvePlagueSuspicion(state: GameState, optionId: string, data: Record
     resident.quarantinedUntil = state.day + duration;
     resident.task = '격리 중';
     addLog(state, physicianDiagnosis
-      ? `의원이 ${withJosa(resident.name, '을/를')} 진맥합니다. ${duration}일 동안 격리해 역병 여부를 가립니다.`
-      : `${withJosa(resident.name, '을/를')} ${duration}일 동안 격리했습니다. 배정은 유지되지만 일을 쉬게 됩니다.`, 'info', true);
+      ? `의원이 ${withJosa(residentLogName(resident), '을/를')} 진맥합니다. ${duration}일 동안 격리해 역병 여부를 가립니다.`
+      : `${withJosa(residentLogName(resident), '을/를')} ${duration}일 동안 격리했습니다. 배정은 유지되지만 일을 쉬게 됩니다.`, 'info', true);
   } else {
-    addLog(state, `${withJosa(resident.name, '을/를')} 격리하지 않고 경과를 지켜봅니다.`, 'bad', true);
+    addLog(state, `${withJosa(residentLogName(resident), '을/를')} 격리하지 않고 경과를 지켜봅니다.`, 'bad', true);
   }
   state.incidents.plagueCase = {
     residentId,
@@ -1464,7 +1467,7 @@ function predatorEncounter(state: GameState, kind: 'wolf' | 'tiger', candidates:
     ? 16 + Math.floor(rng() * 13)
     : Math.round((28 + Math.floor(rng() * 19)) * tigerDanger);
   victim.health = Math.max(1, victim.health - damage);
-  addLog(state, `${withJosa(victim.name, '이/가')} ${kind === 'wolf' ? '숲에서 늑대에게 물려' : `${wildlifeName(kind, state)}의 습격을 받아`} 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
+  addLog(state, `${withJosa(residentLogName(victim), '이/가')} ${kind === 'wolf' ? '숲에서 늑대에게 물려' : `${wildlifeName(kind, state)}의 습격을 받아`} 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
 }
 
 function damageBoarTargets(state: GameState, rng: () => number): void {
@@ -1521,8 +1524,8 @@ function updatePlagueCase(state: GameState): void {
     resident.sick = false;
     resident.quarantinedUntil = 0;
     addLog(state, plagueCase.real
-      ? `${withJosa(resident.name, '이/가')} 격리 중 회복했습니다. 실제 역병이었지만 마을 안 전염은 막았습니다.`
-      : `${resident.name}의 증상은 역병이 아니었습니다. 며칠 앓은 뒤 회복했습니다.`, 'good', true);
+      ? `${withJosa(residentLogName(resident), '이/가')} 격리 중 회복했습니다. 실제 역병이었지만 마을 안 전염은 막았습니다.`
+      : `${residentLogName(resident)}의 증상은 역병이 아니었습니다. 며칠 앓은 뒤 회복했습니다.`, 'good', true);
     state.incidents.plagueCase = null;
     return;
   }
@@ -1629,7 +1632,7 @@ function updateEpidemic(state: GameState, rng: () => number): void {
     epidemic.totalInfected = (epidemic.totalInfected ?? infectionSources.length) + 1;
     addLog(
       state,
-      `${infected.name}에게 ${contactKind === 'household' ? '같은 집에서' : '같은 일터에서'} 역병 증상이 나타났습니다. ` +
+      `${residentLogName(infected)}에게 ${contactKind === 'household' ? '같은 집에서' : '같은 일터에서'} 역병 증상이 나타났습니다. ` +
         `환자가 ${epidemic.infectedIds.length}명으로 늘었습니다.`,
       'bad',
       true,
@@ -1673,7 +1676,7 @@ function updateEpidemic(state: GameState, rng: () => number): void {
       resident.sick = false;
       epidemic.recoveredCount = (epidemic.recoveredCount ?? 0) + 1;
       delete epidemic.infectedSince[id];
-      addLog(state, `${withJosa(resident.name, '이/가')} 역병에서 회복했습니다.`, 'good');
+      addLog(state, `${withJosa(residentLogName(resident), '이/가')} 역병에서 회복했습니다.`, 'good');
     }
   }
   epidemic.infectedIds = epidemic.infectedIds.filter(id => {
@@ -1800,7 +1803,7 @@ function updatePredatorScouting(state: GameState): void {
     hunter.task = '흔적 추적 보고 후 귀환';
     addLog(
       state,
-      `${withJosa(hunter.name, '이/가')} ${kind === 'wolf' ? '늑대 떼' : exact ? wildlifeName(kind, state) : '큰 호랑이'}의 흔적을 쫓고 돌아왔습니다. ` +
+      `${withJosa(residentLogName(hunter), '이/가')} ${kind === 'wolf' ? '늑대 떼' : exact ? wildlifeName(kind, state) : '큰 호랑이'}의 흔적을 쫓고 돌아왔습니다. ` +
         `적 규모를 ${exact ? '정확히' : '대략'} 파악했습니다.`,
       exact ? 'good' : 'info',
       true,

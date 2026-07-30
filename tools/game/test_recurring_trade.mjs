@@ -38,6 +38,19 @@ const tradeValues = await import(pathToFileURL(join(gameDir, 'tradeValues.mjs'))
 const saveLoad = await import(pathToFileURL(join(gameDir, 'saveLoad.mjs')).href);
 const { CURRENT_SCHEMA_VERSION } = await import(pathToFileURL(join(gameDir, 'saveSchema.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(gameDir, 'config.mjs')).href);
+const tradeDialogSource = readFileSync(new URL('../../src/components/TradeDialog.tsx', import.meta.url), 'utf8');
+const gameSessionSource = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
+
+assert.match(
+  tradeDialogSource,
+  /aria-disabled=\{Boolean\(contractActionBlockReason\)\}[\s\S]*onContractBlocked\(contractActionBlockReason\)/,
+  'a blocked recurring-contract action remains clickable and reports its exact reason',
+);
+assert.match(
+  gameSessionSource,
+  /onContractBlocked=\{reason => notify\(reason, 'info'\)\}/,
+  'recurring-contract block reasons use the shared center action notice',
+);
 
 const FACTION = '오도리 씨족';
 const C = CONFIG.trade.contract;
@@ -424,7 +437,7 @@ function signed(state, options) {
   assert.equal(migrated.schemaVersion, 41, '세이브 버전이 41로 오른다');
   assert.deepEqual(migrated.tradeContracts, [], '구세이브는 빈 계약 배열로 시작한다');
   assert.deepEqual(migrated.tradeContractReserve, {}, '구세이브는 빈 계약고로 시작한다');
-  assert.equal(CURRENT_SCHEMA_VERSION, 44, '현재 세이브 버전이 44다');
+  assert.equal(CURRENT_SCHEMA_VERSION, 45, '현재 세이브 버전이 45다');
 
   const state = freshState(80);
   const contract = signed(state);

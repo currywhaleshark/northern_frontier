@@ -1,15 +1,27 @@
 // 종교 — 사람이 먼저 온다. 떠돌이 무당/노승이 마을에 들어와야 당집/암자를 지을 수 있고,
-// 시설은 상주 인력 없이도 기본 만족(신앙)을 준다. 네임드가 상주하면 결이 다른 부가 효과:
-// 무당 = 당집의 활력(사기 가산), 노승 = 상례 보정(사망 슬픔 완화·안장 위로).
+// 시설은 상주 인력 없이도 기본 만족(신앙)을 준다. 월향·해운은 후계를 남기며,
+// 네임드가 상주할 때만 일반 후계자보다 강한 큰굿·천도재 효과를 낸다.
 // 계획: docs/superpowers/plans/2026-07-17-satisfaction-religion.md (M3)
 import { withJosa } from './josa';
 import { CONFIG } from './config';
-import { rankAtLeast } from './constants';
+import { computeDefense } from './buildings';
+import { JOB_NAMES, rankAtLeast } from './constants';
 import { addLog } from './events';
-import { createResident, reconcileResidentHomes } from './residents';
+import { returnResidentCart } from './equipment';
+import { resetAgent } from './agents';
+import {
+  createResident, reconcileResidentHomes,
+} from './residents';
+import { residentLogName } from './residentLogName';
 import { makeRng } from './map';
 import { specialResidentDefinition } from './specialResidents';
-import type { GameState, ReligionId, SpecialResidentId } from './types';
+import {
+  reconcileMountAssignments, reconcileWeaponAssignments,
+} from './weapons';
+import { clearIncompatibleAssignment } from './workerSlots';
+import type {
+  GameState, JobId, ReligionId, Resident, SpecialResidentId,
+} from './types';
 
 interface ReligionPerson {
   special: SpecialResidentId;
@@ -65,6 +77,122 @@ export function unlockedReligionsOf(state: GameState): ReligionId[] {
 function spentSpecials(state: GameState): SpecialResidentId[] {
   if (!state.spentSpecialIds) state.spentSpecialIds = [];
   return state.spentSpecialIds;
+}
+
+function forceReligiousJob(
+  state: GameState,
+  resident: Resident,
+  job: Extract<JobId, 'shaman' | 'monk'>,
+  mentor?: Resident | null,
+): void {
+  returnResidentCart(state, resident);
+  resident.religiousVocation = job;
+  if (mentor) resident.religiousMentorId = mentor.id;
+  else delete resident.religiousMentorId;
+  resident.job = job;
+  clearIncompatibleAssignment(state, resident);
+  resetAgent(state, resident);
+  resident.task = JOB_NAMES[job];
+  reconcileWeaponAssignments(state);
+  reconcileMountAssignments(state);
+  state.resources.defense = computeDefense(state);
+}
+
+function successorCandidate(state: GameState, rng: () => number): Resident | null {
+  const candidates = state.residents.filter(resident =>
+    resident.alive && !resident.stage && !resident.special && !resident.religiousVocation &&
+    resident.job !== 'shaman' && resident.job !== 'monk');
+  if (candidates.length === 0) return null;
+  return candidates[Math.min(candidates.length - 1, Math.floor(rng() * candidates.length))];
+}
+
+function ensureShamanSuccession(state: GameState, rng: () => number): void {
+  if (!isReligionUnlocked(state, 'shamanism')) return;
+  const livingShamans = state.residents.filter(resident =>
+    resident.alive && resident.job === 'shaman');
+  const livingShamanIds = new Set(livingShamans.map(resident => resident.id));
+  const named = livingShamans.find(resident => resident.special === 'mudang');
+  const lineageHolder = named ?? [...livingShamans]
+    .filter(resident =>
+      resident.religiousMentorId == null ||
+      !livingShamanIds.has(resident.religiousMentorId))
+    .sort((left, right) => left.id - right.id)[0];
+  if (lineageHolder) {
+    const hasLivingSuccessor = livingShamans.some(resident =>
+      resident.religiousMentorId === lineageHolder.id);
+    if (hasLivingSuccessor) return;
+    if (lineageHolder.special === 'mudang' &&
+        lineageHolder.age < CONFIG.religion.mudangSuccessionAge) return;
+  }
+
+  const successor = successorCandidate(state, rng);
+  if (!successor) return;
+  forceReligiousJob(state, successor, 'shaman', lineageHolder);
+  addLog(
+    state,
+    lineageHolder
+      ? `${withJosa(residentLogName(lineageHolder), '이/가')} ${withJosa(residentLogName(successor), '을/를')} 신제자로 삼아 내림굿을 내렸습니다. ${withJosa(residentLogName(successor), '은/는')} 다음 신맥을 이을 단 한 명의 후계자가 되었습니다.`
+      : `월향에게서 시작된 신맥이 ${residentLogName(successor)}에게 내렸습니다. ${withJosa(residentLogName(successor), '은/는')} 끊어진 무당의 소명을 다시 이었습니다.`,
+    'good',
+    true,
+  );
+}
+
+function createMonkNovice(
+  state: GameState,
+  rng: () => number,
+  mentor: Resident | null,
+): Resident {
+  const novice = createResident(state, rng, 'idle');
+  novice.age = 2;
+  novice.stage = 'youth';
+  novice.stageProgress = 0;
+  novice.youthActivity = 'work';
+  novice.education = 0;
+  novice.religiousVocation = 'monk';
+  if (mentor) novice.religiousMentorId = mentor.id;
+  novice.job = 'idle';
+  novice.assignedBuildingId = null;
+  novice.task = '동자승';
+  state.residents.push(novice);
+  reconcileResidentHomes(state, rng);
+  addLog(
+    state,
+    mentor
+      ? `${withJosa(residentLogName(mentor), '이/가')} ${withJosa(residentLogName(novice), '을/를')} 거두었습니다. 성인이 되면 승려의 길을 잇습니다.`
+      : `해운이 생전에 거두어 둔 ${withJosa(residentLogName(novice), '이/가')} 암자의 법맥을 잇기 위해 모습을 드러냈습니다.`,
+    'good',
+    true,
+  );
+  return novice;
+}
+
+function ensureMonkSuccession(state: GameState, rng: () => number): void {
+  if (!isReligionUnlocked(state, 'buddhism')) return;
+  const livingNovice = state.residents.some(resident =>
+    resident.alive && resident.religiousVocation === 'monk' && resident.stage != null);
+  if (livingNovice) return;
+
+  const livingMonks = state.residents
+    .filter(resident => resident.alive && !resident.stage && resident.job === 'monk')
+    .sort((left, right) =>
+      Number(right.special === 'nosung') - Number(left.special === 'nosung') ||
+      right.age - left.age ||
+      left.id - right.id);
+  const mentor = livingMonks.find(candidate =>
+    candidate.age >= CONFIG.religion.monkNoviceMentorAge &&
+    !state.residents.some(resident =>
+      resident.alive && resident.religiousMentorId === candidate.id));
+  if (mentor) {
+    createMonkNovice(state, rng, mentor);
+    return;
+  }
+  if (livingMonks.length === 0) createMonkNovice(state, rng, null);
+}
+
+export function reconcileReligiousSuccession(state: GameState, rng: () => number): void {
+  ensureShamanSuccession(state, rng);
+  ensureMonkSuccession(state, rng);
 }
 
 export function isReligionUnlocked(state: GameState, religion: ReligionId): boolean {
@@ -126,10 +254,12 @@ export function resolveReligionChoice(state: GameState, optionId: string): void 
     'good',
     true,
   );
+  reconcileReligiousSuccession(state, rng);
 }
 
 // 일일 판정 — 진(鎭) 이상에서 아직 오지 않은 종교인이 낮은 확률로 문을 두드린다.
 export function dailyReligionTick(state: GameState, rng: () => number): void {
+  reconcileReligiousSuccession(state, rng);
   const r = CONFIG.religion;
   if (!rankAtLeast(state.rank, r.minRank)) return;
   if (state.pendingChoice || state.battle || state.gameOver) return;

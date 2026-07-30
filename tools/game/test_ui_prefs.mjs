@@ -33,12 +33,14 @@ const {
   LEGACY_BUILD_MENU_OPEN_KEY,
   MAX_STARRED_RESOURCES,
   UI_PREFS_KEY,
+  UI_PREFS_VERSION,
   defaultUiPrefs,
   loadUiPrefs,
   normalizeUiPrefs,
   saveUiPrefs,
   setAutoFastForwardSleepingNight,
   setResidentMarkerPrefs,
+  setMapLayerVisibility,
   setDockWindowLayout,
   setAutoAssignBuildingTypes,
   resetDockWindowLayout,
@@ -91,11 +93,13 @@ assert.deepEqual(normalized.autoAssignBuildingTypes, ['field', 'smithy'],
 assert.deepEqual(normalized.pinnedDockWindows, ['jobs', 'processing', 'residents', 'factions', 'court'],
   'dock preferences must remove duplicate and unknown window pins');
 assert.deepEqual(normalized.dockWindowLayouts, {}, 'v4 prefs must start without saved window layouts');
-assert.equal(normalized.version, 8, 'v4 prefs must migrate to the current schema without resetting');
+assert.equal(normalized.version, 9, 'v4 prefs must migrate to the current schema without resetting');
 assert.deepEqual(normalized.audio, { sfxEnabled: true, sfxVolume: 0.7, musicEnabled: true, musicVolume: 0.7 });
 assert.equal(normalized.mapZoom, 1);
 assert.equal(normalized.showResidentJobMarkers, true);
 assert.equal(normalized.showResidentCargoMarkers, true);
+assert.equal(normalized.showAquiferLayer, false);
+assert.equal(normalized.showOreLayer, false);
 assert.equal(normalized.autoFastForwardSleepingNight, true);
 
 const legacyStorage = memoryStorage({
@@ -107,7 +111,7 @@ const legacyStorage = memoryStorage({
   [LEGACY_BUILD_MENU_OPEN_KEY]: JSON.stringify({ 생산: true }),
 });
 const migrated = loadUiPrefs(legacyStorage);
-assert.equal(migrated.version, 8, 'v1 prefs must migrate to the current schema');
+assert.equal(migrated.version, 9, 'v1 prefs must migrate to the current schema');
 assert.deepEqual(migrated.starredResources, ['tools'], 'v1 stars must survive migration');
 assert.deepEqual(migrated.pinnedResourceGroups, ['materials'], 'v1 group pins must survive migration');
 assert.equal(migrated.buildDrawerLastCategory, 'production',
@@ -199,9 +203,12 @@ assert.equal(v7Markers.autoFastForwardSleepingNight, true,
 
 const v8NightSpeed = normalizeUiPrefs({
   ...defaultUiPrefs(),
+  version: 8,
   autoFastForwardSleepingNight: false,
 });
 assert.equal(v8NightSpeed.autoFastForwardSleepingNight, false);
+assert.equal(v8NightSpeed.showAquiferLayer, false, 'pre-layer prefs must begin with overlays hidden');
+assert.equal(v8NightSpeed.showOreLayer, false, 'pre-layer prefs must begin with overlays hidden');
 
 let prefs = defaultUiPrefs();
 for (const resource of DISPLAY_RESOURCE_ORDER.slice(0, MAX_STARRED_RESOURCES)) {
@@ -249,10 +256,16 @@ prefs = setResidentMarkerPrefs(prefs, { showResidentCargoMarkers: false });
 assert.equal(prefs.showResidentCargoMarkers, false);
 prefs = setAutoFastForwardSleepingNight(prefs, false);
 assert.equal(prefs.autoFastForwardSleepingNight, false);
+prefs = setMapLayerVisibility(prefs, 'aquifer', true);
+assert.equal(prefs.showAquiferLayer, true);
+assert.equal(prefs.showOreLayer, false);
+prefs = setMapLayerVisibility(prefs, 'ore', true);
+assert.equal(prefs.showOreLayer, true);
 
 const storage = memoryStorage();
 saveUiPrefs(normalized, storage);
 assert.deepEqual(loadUiPrefs(storage), normalized, 'saved prefs must round-trip independently');
-assert.equal(JSON.parse(storage.value()).version, 8, 'saved prefs must retain their own schema version');
+assert.equal(JSON.parse(storage.value()).version, UI_PREFS_VERSION,
+  'saved prefs must retain their own schema version');
 
 console.log('ui prefs tests passed');

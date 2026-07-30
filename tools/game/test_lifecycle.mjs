@@ -45,6 +45,27 @@ function healthyState(seed) {
   return state;
 }
 
+// ── 표시 나이: 성장기만 0~15세로 가속하고 성인은 실제 나이를 쓴다 ──
+{
+  const state = healthyState(2026071731);
+  const kid = state.residents[0];
+  lifecycle.applyLifeStage(kid, 'infant');
+  assert.equal(lifecycle.residentDisplayAge(kid), 0);
+  kid.stageProgress = L.stageDays.infant - 1;
+  assert.equal(lifecycle.residentDisplayAge(kid), 3);
+
+  lifecycle.applyLifeStage(kid, 'child');
+  assert.equal(lifecycle.residentDisplayAge(kid), 3);
+  lifecycle.applyLifeStage(kid, 'youth');
+  assert.equal(lifecycle.residentDisplayAge(kid), 9);
+  kid.stageProgress = L.stageDays.youth - 1;
+  assert.equal(lifecycle.residentDisplayAge(kid), 15);
+
+  kid.stage = null;
+  kid.age = 23;
+  assert.equal(lifecycle.residentDisplayAge(kid), 23);
+}
+
 // ── 소비 몫: 아이는 성인보다 적게 먹는다 ──
 {
   const state = healthyState(2026071720);
@@ -125,6 +146,33 @@ function healthyState(seed) {
     .every((r, i) => r.morale >= moraleBefore[i]), 'the feast lifts everyone');
 }
 
+// ── 종교인 혼인: 무당은 가능하지만 승려·동자승은 독신이다 ──
+{
+  const state = healthyState(2026071730);
+  for (const resident of state.residents) {
+    resident.spouseId = null;
+    resident.age = CONFIG.lifecycle.maxMarriageAge;
+    resident.stage = null;
+    delete resident.religiousVocation;
+  }
+  const male = state.residents.find(resident => resident.gender === 'male');
+  const female = state.residents.find(resident => resident.gender === 'female');
+  assert.ok(male && female);
+  male.age = 25;
+  male.job = 'monk';
+  male.religiousVocation = 'monk';
+  female.age = 25;
+  lifecycle.lifecycleDailyTick(state, () => 0);
+  assert.equal(male.spouseId, null, 'a monk is excluded from marriage candidates');
+  assert.equal(female.spouseId, null);
+
+  male.job = 'shaman';
+  male.religiousVocation = 'shaman';
+  lifecycle.lifecycleDailyTick(state, () => 0);
+  assert.equal(male.spouseId, female.id, 'a shaman remains eligible to marry');
+  assert.equal(female.spouseId, male.id);
+}
+
 // ── 출산: 같은 집 부부에게서 아기가 태어나고 산모는 몸을 추스른다 ──
 {
   const state = healthyState(2026071725);
@@ -194,6 +242,43 @@ function healthyState(seed) {
   lifecycle.lifecycleDailyTick(state, () => 0.999);
   assert.ok(state.residents.find(r => r.alive).morale < moraleBefore2,
     'an unburied corpse hurts morale');
+}
+
+// ── 방치 경고: 묘지 자리와 장의사 부족을 실제 원인대로 구분한다 ──
+{
+  const state = healthyState(2026071732);
+  assert.match(lifecycle.unburiedDelayMessage(state), /묘지가 필요/,
+    'a settlement without a cemetery is told to build one');
+
+  const fullCemetery = {
+    id: state.nextBuildingId++, type: 'cemetery', x: 6, y: 6,
+    progress: 9, built: true, fieldGrowth: 0, w: 1, h: 1,
+    graves: CONFIG.funeral.plotsPerTile,
+  };
+  state.buildings.push(fullCemetery);
+  assert.match(lifecycle.unburiedDelayMessage(state), /묘 자리가 모두 찼습니다/,
+    'full grave plots are not misreported as an undertaker shortage');
+
+  fullCemetery.graves = 0;
+  assert.match(lifecycle.unburiedDelayMessage(state), /장의사가 없습니다/,
+    'free plots without an available assigned undertaker report a labor shortage');
+
+  const freeCemetery = {
+    id: state.nextBuildingId++, type: 'cemetery', x: 8, y: 6,
+    progress: 9, built: true, fieldGrowth: 0, w: 1, h: 1,
+    graves: 0,
+  };
+  state.buildings.push(freeCemetery);
+  const undertaker = state.residents.find(resident => resident.alive);
+  undertaker.job = 'undertaker';
+  undertaker.assignedBuildingId = fullCemetery.id;
+  fullCemetery.graves = CONFIG.funeral.plotsPerTile;
+  assert.match(lifecycle.unburiedDelayMessage(state), /배정된 묘지의 자리가 찼습니다/,
+    'an undertaker assigned to a full cemetery is told to move to the cemetery with free plots');
+
+  undertaker.assignedBuildingId = freeCemetery.id;
+  assert.match(lifecycle.unburiedDelayMessage(state), /수습하고 있으나/,
+    'an available undertaker with free assigned plots reports an actual processing delay');
 }
 
 // ── 원정 전사자: 시신을 수습해 돌아오고, 전멸하면 잃는다 ──

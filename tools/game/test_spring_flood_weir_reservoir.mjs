@@ -65,7 +65,7 @@ function addBuilding(state, type, x, y, extras = {}) {
     ...extras,
   };
   state.buildings.push(building);
-  state.map[y][x].buildingId = building.id;
+  buildings.occupyBuildingTiles(state, building);
   return building;
 }
 
@@ -128,17 +128,40 @@ function addBuilding(state, type, x, y, extras = {}) {
 
 {
   const open = makeState();
-  assert.equal(buildings.canPlaceBuildingAt(open, 'levee', 2, 4), true,
-    'levees may be built within two tiles of the river');
-  assert.equal(buildings.canPlaceBuildingAt(open, 'levee', 1, 4), false,
-    'levees may not be built farther than two tiles from the river');
+  assert.equal(buildings.canPlaceBuildingAt(open, 'levee', 4, 4), true,
+    'levees are anchored on a river tile that has a land-facing edge');
+  assert.equal(buildings.canPlaceBuildingAt(open, 'levee', 3, 4), false,
+    'levees are not anchored on the adjacent farmland tile');
   assert.ok(disasters.springFloodAffectedTiles(open, 2).some(tile => tile.x === 2 && tile.y === 4));
 
   const protectedState = makeState();
-  addBuilding(protectedState, 'levee', 3, 4);
+  addBuilding(protectedState, 'levee', 4, 4, { leveeEdge: 'w' });
+  assert.equal(protectedState.map[4][4].buildingId, null,
+    'a levee edge must not occupy its river anchor tile');
   const protectedTiles = disasters.springFloodAffectedTiles(protectedState, 2);
   assert.equal(protectedTiles.some(tile => tile.x === 2 && tile.y === 4), false,
     'a levee segment must block the direct two-tile flood path behind it');
+
+  assert.equal(buildings.canPlaceBuildingAt(protectedState, 'field', 3, 4, 1, 1), true,
+    'the adjacent farmland tile remains free beside a levee edge');
+  assert.equal(buildings.canPlaceBuildingAt(protectedState, 'dryingRack', 4, 4), true,
+    'ordinary riverbank buildings may share the levee river tile');
+  assert.equal(buildings.canPlaceBuildingAt(protectedState, 'ferry', 4, 4), false,
+    'a ferry may not overlap a levee edge');
+  assert.equal(buildings.canPlaceBuildingAt(protectedState, 'dock', 4, 4), false,
+    'a dock may not overlap a levee edge');
+  assert.equal(buildings.canPlaceBuildingAt(protectedState, 'watermill', 3, 4), false,
+    'a watermill footprint may not overlap a levee edge');
+  assert.equal(buildings.canPlaceBuildingAt(protectedState, 'levee', 4, 4), true,
+    'the opposite bank edge of the same river tile remains available');
+
+  const occupiedRiverbank = makeState();
+  const dryingRack = addBuilding(occupiedRiverbank, 'dryingRack', 4, 4);
+  assert.equal(buildings.canPlaceBuildingAt(occupiedRiverbank, 'levee', 4, 4), true,
+    'a levee edge may be added after an ordinary riverbank building');
+  addBuilding(occupiedRiverbank, 'levee', 4, 4, { leveeEdge: 'w' });
+  assert.equal(occupiedRiverbank.map[4][4].buildingId, dryingRack.id,
+    'adding a levee must preserve ordinary riverbank building occupancy');
 }
 
 {
@@ -152,6 +175,10 @@ function addBuilding(state, type, x, y, extras = {}) {
   assert.equal(disasters.startSpringFlood(state, 2, 1, () => 0), true);
   assert.equal(weir.built, false);
   assert.equal(weir.repairing, true);
+  assert.equal(weir.repairCause, 'springFlood',
+    'a breached weir repair must retain the great-flood alert cause');
+  assert.deepEqual(state.pendingDisasters[0].targetBuildingIds, [weir.id],
+    'the active flood must retain its damaged building ids for old-save alert fallback');
   assert.equal(weir.weirReservoir, undefined, 'a breached weir must release its reservoir immediately');
   assert.equal(state.map[4][3].terrain, 'plain');
   assert.equal(state.map[4][5].terrain, 'plain');

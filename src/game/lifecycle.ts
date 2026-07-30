@@ -3,14 +3,16 @@
 // 새해마다 1살씩만 먹는다(비대칭 — 압축 노화는 개국공신을 너무 일찍 데려간다).
 // 계획: docs/superpowers/plans/2026-07-17-marriage-birth-growth.md
 import { withJosa } from './josa';
-import { BUILDING_DEFS, cemeteryPlotCapacity, countBuilt } from './buildings';
+import { BUILDING_DEFS, cemeteryPlotCapacity } from './buildings';
 import { CONFIG } from './config';
 import { addLog } from './events';
 import { settleEducationOnAdulthood } from './education';
-import { hasResidentMonk } from './morale';
+import { residentMonkBurialBonus } from './morale';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
 import { killResident, livingResidents, rollResidentName } from './residents';
+import { residentLogName } from './residentLogName';
 import { getDayOfYear, getSeason } from './seasons';
+import { assignedWorkers } from './workerSlots';
 import { youthLaborMult } from './youth';
 import type { Building, Corpse, GameState, LifeStage, Resident } from './types';
 
@@ -18,6 +20,26 @@ export const LIFE_STAGE_ORDER: LifeStage[] = ['infant', 'child', 'youth'];
 export const LIFE_STAGE_NAMES: Record<LifeStage, string> = {
   infant: '아기', child: '어린이', youth: '소년',
 };
+
+// 성장기는 실제 게임 진행을 120일로 압축하므로 저장된 단계 번호(0~2)를 나이로 직접
+// 보여주지 않는다. 전체 성장 진행도를 0~15세에 대응시키고, 성인부터는 실제 age를 쓴다.
+export function residentDisplayAge(
+  resident: Pick<Resident, 'age' | 'stage' | 'stageProgress'>,
+): number {
+  if (!resident.stage) return resident.age;
+  const stageIndex = LIFE_STAGE_ORDER.indexOf(resident.stage);
+  const stageDurations = LIFE_STAGE_ORDER.map(stage => CONFIG.lifecycle.stageDays[stage]);
+  const totalGrowthDays = stageDurations.reduce((sum, days) => sum + days, 0);
+  const elapsedBeforeStage = stageDurations
+    .slice(0, stageIndex)
+    .reduce((sum, days) => sum + days, 0);
+  const currentStageDays = stageDurations[stageIndex];
+  const stageProgress = Math.max(0, Math.min(currentStageDays, resident.stageProgress ?? 0));
+  const acceleratedAge = Math.floor(
+    (elapsedBeforeStage + stageProgress) / totalGrowthDays * CONFIG.lifecycle.adultAge,
+  );
+  return Math.min(CONFIG.lifecycle.adultAge - 1, acceleratedAge);
+}
 
 // ── 소비 몫 ──────────────────────────────────────────────
 
@@ -79,14 +101,17 @@ function growStages(state: GameState): void {
     r.stage = null;
     r.stageProgress = 0;
     r.age = l.adultAge;
-    r.job = 'idle';
-    r.task = '무직';
+    const ordainedMonk = r.religiousVocation === 'monk';
+    r.job = ordainedMonk ? 'monk' : 'idle';
+    r.task = ordainedMonk ? '승려' : '무직';
     const educationResult = settleEducationOnAdulthood(r);
     addLog(
       state,
-      educationResult
-        ? `${withJosa(r.name, '이/가')} 글을 깨친 어른으로 자랐습니다. 의원·아전·훈장을 맡을 수 있고, 아전·훈장 일을 시작할 밑천도 닦았습니다.`
-        : `${withJosa(r.name, '이/가')} 어엿한 한 사람 몫의 일손으로 자랐습니다.`,
+      ordainedMonk
+        ? `${withJosa(residentLogName(r), '이/가')} 수계를 마치고 어엿한 승려가 되었습니다. 해운에게서 이어진 법맥을 지킵니다.`
+        : educationResult
+        ? `${withJosa(residentLogName(r), '이/가')} 글을 깨친 어른으로 자랐습니다. 의원·아전·훈장을 맡을 수 있고, 아전·훈장 일을 시작할 밑천도 닦았습니다.`
+        : `${withJosa(residentLogName(r), '이/가')} 어엿한 한 사람 몫의 일손으로 자랐습니다.`,
       'good', true,
     );
   }
@@ -129,6 +154,7 @@ export function laborEfficiencyMult(
 
 function isMarriageEligible(state: GameState, r: Resident): boolean {
   if (!r.alive || r.stage) return false;
+  if (r.religiousVocation === 'monk' || r.job === 'monk') return false;
   if (r.age >= CONFIG.lifecycle.maxMarriageAge) return false;
   if (r.spouseId != null) {
     const spouse = state.residents.find(other => other.id === r.spouseId);
@@ -161,7 +187,7 @@ export function openWeddingChoice(state: GameState, a: Resident, b: Resident): v
     kind: 'wedding',
     title: '혼례 — 변방의 경사',
     body:
-      `${withJosa(a.name, '과/와')} ${withJosa(b.name, '이/가')} 백년가약을 맺었습니다.\n` +
+      `${withJosa(residentLogName(a), '과/와')} ${withJosa(residentLogName(b), '이/가')} 백년가약을 맺었습니다.\n` +
       '변방의 살림살이에도 경사는 경사 — 잔치를 열어 마을의 시름을 씻을 수도 있습니다.',
     options: [
       {
@@ -208,7 +234,7 @@ function tryMarriage(state: GameState, rng: () => number): void {
   groom.spouseId = bride.id;
   bride.spouseId = groom.id;
   cohouseCouple(state, groom, bride);
-  addLog(state, `${withJosa(groom.name, '과/와')} ${withJosa(bride.name, '이/가')} 혼인했습니다.`, 'good', true);
+  addLog(state, `${withJosa(residentLogName(groom), '과/와')} ${withJosa(residentLogName(bride), '이/가')} 혼인했습니다.`, 'good', true);
   // 시나리오(튜토리얼) 중에는 혼인 잔치 모달을 생략한다 — 혼인 자체는 그대로 진행
   if (!state.pendingChoice && !state.battle && !state.scenario) openWeddingChoice(state, groom, bride);
 }
@@ -289,7 +315,7 @@ function tryBirths(state: GameState, rng: () => number): void {
     state.lifetimeStats.births++;
     const winterExtra = getSeason(state.day) === 'winter' ? l.birthWinterExtraRecovery : 0;
     mother.birthRecoveryUntil = state.day + l.birthRecoveryDays + winterExtra;
-    addLog(state, `${withJosa(mother.name, '이/가')} ${baby.gender === 'male' ? '사내' : '계집'}아이를 낳았습니다. 이름은 ${baby.name}.`, 'good', true);
+    addLog(state, `${withJosa(residentLogName(mother), '이/가')} ${baby.gender === 'male' ? '사내' : '계집'}아이를 낳았습니다. 이름은 ${baby.name}.`, 'good', true);
   }
 }
 
@@ -308,6 +334,7 @@ export function addCorpse(state: GameState, resident: Resident, cause: string): 
   corpses.push({
     id: state.nextCorpseId++,
     name: resident.name,
+    residentLabel: residentLogName(resident),
     x: resident.x,
     y: resident.y,
     deathDay: state.day,
@@ -329,7 +356,7 @@ export function deliverExpeditionCorpses(state: GameState, x: number, y: number)
   addLog(
     state,
     delivered.length === 1
-      ? `토벌대가 전사한 ${delivered[0].name}의 시신을 수습해 돌아왔습니다.`
+      ? `토벌대가 전사한 ${delivered[0].residentLabel ?? delivered[0].name}의 시신을 수습해 돌아왔습니다.`
       : `토벌대가 전사자 ${delivered.length}명의 시신을 수습해 돌아왔습니다.`,
     'info',
     true,
@@ -378,11 +405,11 @@ export function buryCorpse(state: GameState, corpseId: number, cemetery: Buildin
   });
   // 노승이 재(齋)를 올려 주면 위로가 깊어진다
   const relief = CONFIG.funeral.burialMoraleRelief
-    + (hasResidentMonk(state) ? CONFIG.satisfaction.monkBurialBonus : 0);
+    + residentMonkBurialBonus(state);
   for (const r of livingResidents(state)) {
     r.morale = Math.min(100, r.morale + relief);
   }
-  addLog(state, `${withJosa(corpse.name, '을/를')} 양지바른 묘지에 안장했습니다. 마을이 위로를 얻습니다.`, 'info', true);
+  addLog(state, `${withJosa(corpse.residentLabel ?? corpse.name, '을/를')} 양지바른 묘지에 안장했습니다. 마을이 위로를 얻습니다.`, 'info', true);
   return true;
 }
 
@@ -396,15 +423,33 @@ function unburiedPenalty(state: GameState): void {
     r.morale = Math.max(0, r.morale - f.unburiedMoralePerDay);
   }
   if (state.day % 4 === 0) {
-    const hasCemetery = countBuilt(state, 'cemetery') > 0;
-    addLog(
-      state,
-      hasCemetery
-        ? '거두지 못한 시신이 방치되어 있습니다. 장의사의 손이 모자랍니다.'
-        : '거두지 못한 시신이 방치되어 민심이 흉흉합니다. 묘지가 필요합니다.',
-      'bad',
-    );
+    addLog(state, unburiedDelayMessage(state), 'bad');
   }
+}
+
+export function unburiedDelayMessage(state: GameState): string {
+  const cemeteries = state.buildings.filter(building =>
+    building.type === 'cemetery' && building.built);
+  if (cemeteries.length === 0) {
+    return '거두지 못한 시신이 방치되어 민심이 흉흉합니다. 묘지가 필요합니다.';
+  }
+  if (cemeteryFreePlots(state) <= 0) {
+    return '거두지 못한 시신이 방치되어 있습니다. 묘 자리가 모두 찼습니다. 묘지를 늘리거나 새로 지어야 합니다.';
+  }
+  const staffedCemeteries = cemeteries.filter(cemetery =>
+    assignedWorkers(state, cemetery).some(worker => worker.job === 'undertaker'));
+  if (staffedCemeteries.length === 0) {
+    return '거두지 못한 시신이 방치되어 있습니다. 묘지에 일할 장의사가 없습니다.';
+  }
+  const staffedFreePlots = staffedCemeteries.reduce(
+    (sum, cemetery) =>
+      sum + Math.max(0, cemeteryPlotCapacity(cemetery) - (cemetery.graves ?? 0)),
+    0,
+  );
+  if (staffedFreePlots <= 0) {
+    return '거두지 못한 시신이 방치되어 있습니다. 장의사가 배정된 묘지의 자리가 찼습니다. 빈 묘지로 재배정해야 합니다.';
+  }
+  return '거두지 못한 시신이 방치되어 있습니다. 장의사가 수습하고 있으나 장례가 지연되고 있습니다.';
 }
 
 // ── 일일 진입점 ──────────────────────────────────────────

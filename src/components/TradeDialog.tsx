@@ -23,6 +23,7 @@ interface Props {
   onNegotiate: (get: ResourceId, getAmt: number, specialItem?: SpecialItemId, giveAmt?: number) => void;
   onBuyPredatorIntel: (kind: PredatorKind) => void;
   onSignContract: () => void;
+  onContractBlocked: (reason: string) => void;
   onChoose: (optionId: string) => void;
 }
 
@@ -83,7 +84,14 @@ function AmountStepper({
   );
 }
 
-export function TradeDialog({ state, onNegotiate, onBuyPredatorIntel, onSignContract, onChoose }: Props) {
+export function TradeDialog({
+  state,
+  onNegotiate,
+  onBuyPredatorIntel,
+  onSignContract,
+  onContractBlocked,
+  onChoose,
+}: Props) {
   const negotiation = tradeNegotiationOf(state.pendingChoice);
   const faction = FACTIONS.find(candidate => candidate.name === negotiation?.faction);
   const incomingTrade = negotiation?.initiatedBy === 'faction' && negotiation.mode !== 'extortion';
@@ -169,6 +177,9 @@ export function TradeDialog({ state, onNegotiate, onBuyPredatorIntel, onSignCont
     )
     : null;
   const contractStale = contractOffered && !displayedTermsMatch;
+  const contractActionBlockReason = contractBlockReason
+    ?? (contractStale ? '표시된 조건이 협상 결과와 달라졌습니다. 다시 조건을 물으십시오' : null)
+    ?? (!contractTerms ? '이 조건은 연 계약으로 묶을 수 없습니다.' : null);
 
   return (
     <div className="modal-overlay">
@@ -375,13 +386,18 @@ export function TradeDialog({ state, onNegotiate, onBuyPredatorIntel, onSignCont
               )}
             </div>
             <button
-              className="btn"
+              className={`btn${contractActionBlockReason ? ' blocked' : ''}`}
               type="button"
-              disabled={Boolean(contractBlockReason) || !contractTerms || contractStale}
-              title={contractBlockReason
-                ?? (contractStale ? '표시된 조건이 협상 결과와 달라졌습니다. 다시 조건을 물으십시오'
-                  : '성사된 조건을 해마다 같은 철에 자동으로 주고받습니다')}
-              onClick={onSignContract}
+              aria-disabled={Boolean(contractActionBlockReason)}
+              title={contractActionBlockReason
+                ?? '성사된 조건을 해마다 같은 철에 자동으로 주고받습니다'}
+              onClick={() => {
+                if (contractActionBlockReason) {
+                  onContractBlocked(contractActionBlockReason);
+                  return;
+                }
+                onSignContract();
+              }}
             >
               이 조건으로 정기 계약
             </button>

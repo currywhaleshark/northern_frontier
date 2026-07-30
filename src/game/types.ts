@@ -159,6 +159,8 @@ export type BuildingTypeId =
   | 'herbHut'    // 약초막
   | 'clinic'     // 의원
   | 'mine'       // 채광장
+  | 'well'       // 우물 — 지하수 수맥 위 급수 시설
+  | 'deepMine'   // 채광갱 — 지하 광맥을 캐는 부 단계 작업장
   | 'ferry'      // 나루터
   | 'charcoalKiln' // 숯가마
   | 'stable'     // 축사
@@ -350,6 +352,7 @@ export interface SpecialResidentRecord {
 }
 
 export type ReligionId = 'shamanism' | 'buddhism';
+export type ReligiousVocation = 'shaman' | 'monk';
 
 // 민심 내역 — 티어가 오를수록 기대 항목이 늘어난다 (조정 탭 의심 내역과 같은 문법)
 export interface MoraleFactor {
@@ -363,6 +366,7 @@ export interface MoraleFactor {
 export interface Corpse {
   id: number;
   name: string;
+  residentLabel?: string;   // 사망 당시 역할을 보존한 로그용 이름
   x: number;
   y: number;
   deathDay: number;
@@ -401,6 +405,8 @@ export interface Resident {
   fatherId?: number;
   fatherName?: string;
   special?: SpecialResidentId; // 네임드 특수 주민 — 직업 고정, 게임당 1회
+  religiousVocation?: ReligiousVocation; // 종교 후계 소명 — 네임드 특기 없이 무당/승려 직업만 고정
+  religiousMentorId?: number;   // 종교 계보: 내림굿을 내리거나 동자승으로 거둔 스승 주민 id
   birthRecoveryUntil?: number; // 산모 회복 — 이 날까지 노동 이탈
   corpseCarryId?: number | null; // 장의사가 운구 중인 시신 id
   hunger: number;   // 0(굶주림) ~ 100(포만)
@@ -502,11 +508,15 @@ export interface Building {
   expansion?: BuildingExpansion; // 완공된 영역형 건물의 확장 공사
   workOrder?: BuildingWorkOrder; // 건축가가 수행하는 해체 또는 이전 공사
   weirReservoir?: WeirReservoirState; // 보 전용: 상류 영구 침수 칸과 원래 지형
+  leveeEdge?: 'n' | 'e' | 's' | 'w'; // 제방 전용: 강 타일에서 둑이 붙는 육지 쪽 변
   graves?: number; // 묘역 전용: 안장된 묘 수 (한 타일의 2×2 소구획에 최대 4기)
   burialRecords?: BurialRecord[]; // 묘지 전용: 이름·사인·사망일을 보존하는 안치 기록
   inventory?: Partial<Record<ResourceId, number>>; // 운반 전 생산지 현장 재고
-  repairing?: boolean; // 습격으로 파손되어 건설담당의 수리가 필요한 상태
+  repairing?: boolean; // 외부 피해로 파손되어 건설담당의 수리가 필요한 상태
+  repairCause?: BuildingRepairCause; // 우측 경고에서 습격·설해·대홍수 피해를 구분한다
 }
+
+export type BuildingRepairCause = 'raid' | 'snowDamage' | 'springFlood';
 
 export interface FermentBatch {
   kind: 'jang' | 'kimchi';
@@ -1671,6 +1681,8 @@ export interface GameState {
   seed: number;
   weather: WeatherId;
   map: Tile[][];
+  aquiferLevels: number[]; // 결정적 수맥별 현재 수위. 기하는 seed에서 재계산
+  oreVeinRemaining: number[]; // 결정적 지하 광맥별 남은 매장량
   exploration: ExplorationState;
   habitats: AnimalHabitat[];
   foreignSites: ForeignSite[];

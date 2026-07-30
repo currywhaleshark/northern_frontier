@@ -717,7 +717,7 @@ function classifyDeaths(beforeAlive, state, newLogs, metrics) {
     if (!resident || resident.alive) continue;
     const corpse = state.corpses?.find(candidate => candidate.name === before.name && candidate.deathDay === state.day);
     const cause = corpse?.cause ?? '';
-    if (logText.includes(`${before.name}이(가) 전투 중 전사`)) metrics.deathCauses.combat++;
+    if (logText.includes(before.name) && logText.includes('전투 중 전사')) metrics.deathCauses.combat++;
     else if (cause.includes('굶') || logText.includes(`${before.name}이(가) 굶`)) metrics.deathCauses.starvation++;
     else if (/동상|추위|혹한|동사/.test(cause) || new RegExp(`${before.name}.*(?:동상|추위|혹한|동사)`).test(logText)) metrics.deathCauses.cold++;
     else if (/병|질병|역병/.test(cause) || new RegExp(`${before.name}.*(?:병|질병|역병)`).test(logText)) metrics.deathCauses.disease++;

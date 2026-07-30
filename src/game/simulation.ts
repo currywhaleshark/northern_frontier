@@ -9,7 +9,7 @@ import {
   buildingFootprintDims, cannonPlacementsUsed, chongtongPlacementsUsed, canPlaceBuildingAt, canPlaceOn, canRelocateBuildingAt, clampPlotSide,
   clearBuildingTiles, computeDefense, getBuilding, isBuildingUnlocked,
   footprintTilesOf, isAreaBuildingType, isPaddyFootprintEligible, isPlotBuildingType, isSmithyProductUnlocked,
-  occupyBuildingTiles, plotArea, SMITHY_PRODUCT_DEFS,
+  occupyBuildingTiles, plotArea, preferredLeveeEdgeAt, SMITHY_PRODUCT_DEFS,
 } from './buildings';
 import { forestTilesInArea, forestTilesInFootprint, pendingClearingTiles } from './landClearing';
 import { isWallBuilding } from './walls';
@@ -33,6 +33,7 @@ import { resetFactionTradeCapacityUsage } from './tradeValues';
 import {
   avg, createResident, livingResidents, reconcileResidentHomes, updateMorale, updateResidentNeeds,
 } from './residents';
+import { residentLogName } from './residentLogName';
 import { getDayOfSeason, getDayOfYear, getSeason, getYear } from './seasons';
 import { endGame, recordAnnals, recordHarshWinter, recordPopulationMilestones } from './annals';
 import { createLifetimeStats, recordYearlySnapshot } from './chronicleStats';
@@ -42,6 +43,8 @@ import {
 import { firewoodWeatherMult, weatherForDay } from './weather';
 import { defaultProcessingReserves } from './processing';
 import { hasKnownMineralDepositNear } from './miningSites';
+import { initialAquiferLevels, initialOreVeinRemaining } from './subsurfaceVeins';
+import { dailyAquiferTick } from './waterSupply';
 import {
   canPlantCropNow, cropIdForBuilding, CROP_DEFS, defaultCropForBuildingType, isCropAllowedOnBuilding,
 } from './crops';
@@ -128,6 +131,8 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
     seed: s,
     weather: 'clear',
     map: tiles,
+    aquiferLevels: initialAquiferLevels(s, tiles[0]?.length ?? 0, tiles.length),
+    oreVeinRemaining: initialOreVeinRemaining(s, tiles[0]?.length ?? 0, tiles.length),
     exploration: createExploration({ map: tiles }),
     // 짐승 서식지: 숲 덩어리마다 난이도별 확률로 자리 잡는다 (마을 근처 하나는 보장)
     habitats: spawnAnimalHabitats(tiles, centerX, centerY, rng, diff.habitatChance),
@@ -324,6 +329,8 @@ export const CLEARING_APPROVAL_REQUIRED = '__clearing_approval_required__';
 export interface PlacementOptions {
   /** 공사터의 나무를 베고 짓겠다고 플레이어가 이미 수락했는가 */
   approveClearing?: boolean;
+  /** 제방을 붙일 강 타일의 육지 쪽 변 */
+  leveeEdge?: Building['leveeEdge'];
 }
 
 export function tryPlaceBuilding(
@@ -360,6 +367,16 @@ export function tryPlaceBuilding(
     }
   }
   if (!canPlaceBuildingAt(state, type, x, y, w, h)) return '이곳에는 지을 수 없습니다.';
+  const leveeEdge = type === 'levee'
+    ? options.leveeEdge ?? preferredLeveeEdgeAt(state, x, y) ?? undefined
+    : undefined;
+  if (type === 'levee' && preferredLeveeEdgeAt(
+    state,
+    x,
+    y,
+    leveeEdge === 'e' ? 1 : leveeEdge === 'w' ? 0 : 0.5,
+    leveeEdge === 's' ? 1 : leveeEdge === 'n' ? 0 : 0.5,
+  ) !== leveeEdge) return '선택한 강변에는 제방을 놓을 수 없습니다.';
   if (def.unique && state.buildings.some(b => b.type === type)) return '이미 건설 중이거나 완공되었습니다.';
   if (type === 'cannonEmplacement' && cannonPlacementsUsed(state) >= state.cannonsGranted) {
     return '불랑기포는 조정의 하사가 있어야 합니다. (조정 탭에서 청원)';
@@ -382,6 +399,7 @@ export function tryPlaceBuilding(
     id: state.nextBuildingId++, type, x, y, progress: 0, built: false, fieldGrowth: 0,
     cropId: defaultCropForBuildingType(type),
     queuedCropId: null,
+    leveeEdge,
   };
   if (isAreaBuildingType(type)) {
     b.w = w;
@@ -474,6 +492,7 @@ export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
   if (!isJobUnlocked(state.rank, to)) return false;
   // 문해자 전용 관직 — 글을 아는 주민만 후보가 된다
   const eligible = (res: Resident) => canResidentTakeJob(res, to)
+    && !res.religiousVocation
     && (!isLiterateJob(to) || res.literate === true);
   const r = state.residents.find(res =>
     res.alive && !res.special && res.job === from && res.assignedBuildingId == null && eligible(res))
@@ -499,19 +518,27 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
   if (!isJobUnlocked(state.rank, job)) return;
   const r = state.residents.find(res => res.id === id);
   if (r?.stage && r.stage !== 'youth') {
-    addLog(state, `${withJosa(r.name, '은/는')} 아직 아이라 일을 맡길 수 없습니다.`, 'info');
+    addLog(state, `${withJosa(residentLogName(r), '은/는')} 아직 아이라 일을 맡길 수 없습니다.`, 'info');
     return;
   }
   if (r?.stage === 'youth' && youthActivityOf(r) !== 'work') {
-    addLog(state, `${withJosa(r.name, '은/는')} 서당에 다니는 소년이라 생산 일을 맡길 수 없습니다. 먼저 일 돕기를 선택하십시오.`, 'info');
+    addLog(state, `${withJosa(residentLogName(r), '은/는')} 서당에 다니는 소년이라 생산 일을 맡길 수 없습니다. 먼저 일 돕기를 선택하십시오.`, 'info');
     return;
   }
   if (r?.stage === 'youth' && !isYouthWorkJob(job)) {
-    addLog(state, `${withJosa(r.name, '은/는')} 소년이라 안전한 일 돕기 직무만 맡을 수 있습니다.`, 'info');
+    addLog(state, `${withJosa(residentLogName(r), '은/는')} 소년이라 안전한 일 돕기 직무만 맡을 수 있습니다.`, 'info');
     return;
   }
   if (r?.special) {
-    addLog(state, `${withJosa(r.name, '은/는')} 제 소명이 있는 사람이라 다른 일을 맡지 않습니다.`, 'info');
+    addLog(state, `${withJosa(residentLogName(r), '은/는')} 제 소명이 있는 사람이라 다른 일을 맡지 않습니다.`, 'info');
+    return;
+  }
+  if (r?.religiousVocation) {
+    addLog(
+      state,
+      `${withJosa(residentLogName(r), '은/는')} ${r.religiousVocation === 'monk' ? '승려' : '무당'}의 소명을 이어받아 다른 일을 맡지 않습니다.`,
+      'info',
+    );
     return;
   }
   if ((job === 'shaman' || job === 'monk') && !r?.special) {
@@ -519,7 +546,7 @@ export function setResidentJob(state: GameState, id: number, job: JobId): void {
     return;
   }
   if (r && isLiterateJob(job) && r.literate !== true) {
-    addLog(state, `${withJosa(r.name, '은/는')} 글을 몰라 ${withJosa(JOB_NAMES[job], '을/를')} 맡을 수 없습니다. 서당에서 배운 아이나 문해자 유민이 필요합니다.`, 'info');
+    addLog(state, `${withJosa(residentLogName(r), '은/는')} 글을 몰라 ${withJosa(JOB_NAMES[job], '을/를')} 맡을 수 없습니다. 서당에서 배운 아이나 문해자 유민이 필요합니다.`, 'info');
     return;
   }
   if (r && r.alive) {
@@ -542,6 +569,7 @@ export function setYouthActivity(
   const resident = state.residents.find(candidate => candidate.id === id);
   if (!resident?.alive) return '소년 주민을 찾을 수 없습니다.';
   if (resident.stage !== 'youth') return '소년에게만 활동을 정할 수 있습니다.';
+  if (resident.religiousVocation === 'monk') return '동자승은 스승을 따라 수행 중이라 다른 활동을 고를 수 없습니다.';
   if (youthActivityOf(resident) === activity) return null;
 
   if (activity === 'school') {
@@ -561,8 +589,8 @@ export function setYouthActivity(
   addLog(
     state,
     activity === 'school'
-      ? `${withJosa(resident.name, '이/가')} 일손을 놓고 서당에 다니기 시작했습니다.`
-      : `${withJosa(resident.name, '이/가')} 서당 공부를 멈추고 반몫으로 일을 돕습니다.`,
+      ? `${withJosa(residentLogName(resident), '이/가')} 일손을 놓고 서당에 다니기 시작했습니다.`
+      : `${withJosa(residentLogName(resident), '이/가')} 서당 공부를 멈추고 반몫으로 일을 돕습니다.`,
     'info',
   );
   return null;
@@ -578,8 +606,8 @@ export function toggleResidentCart(state: GameState, id: number): string | null 
   addLog(
     state,
     equipping
-      ? `${resident.name}에게 수레를 장비했습니다. 적재량이 ${withJosa(haulerCarryCapacity(resident), '으로/로')} 늘어납니다.`
-      : `${resident.name}의 수레를 마을 비축으로 돌려보냈습니다.`,
+      ? `${residentLogName(resident)}에게 수레를 장비했습니다. 적재량이 ${withJosa(Math.floor(haulerCarryCapacity(resident)), '으로/로')} 늘어납니다.`
+      : `${residentLogName(resident)}의 수레를 마을 비축으로 돌려보냈습니다.`,
     'good',
   );
   return null;
@@ -1219,6 +1247,7 @@ function endOfDay(state: GameState): void {
   advancePendingDisasters(state);
   const reservoirTerrainChanged = advanceWeirReservoirs(state);
   if (springFloodStarted || reservoirTerrainChanged) ensureResidentsOnPassableTiles(state);
+  dailyAquiferTick(state);
 
   regrowForest(state, rng, season);
   updateHabitats(state);

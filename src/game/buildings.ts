@@ -3,6 +3,7 @@ import { CONFIG } from './config';
 import { rankAtLeast } from './constants';
 import { createCombatRoster } from './combatRoster';
 import { hasKnownMineralDepositNear } from './miningSites';
+import { aquiferSampleAt, oreSampleAt } from './subsurfaceVeins';
 import type { Building, BuildingDef, BuildingTypeId, GameState, Rank, ResourceId, SmithyProductId, Tile } from './types';
 
 export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
@@ -80,9 +81,9 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   levee: {
     id: 'levee', name: '제방',
-    desc: `강에서 ${CONFIG.disasters.springFlood.leveeRiverDistance}칸 이내 땅에 쌓는 낮은 둑. 주민은 둑 위로 다니며 대홍수 범람을 막지만, 막힌 곳에는 비옥한 퇴적도 오지 않는다.`,
+    desc: '강 타일의 육지 쪽 변에 가로·세로로 붙여 쌓는 낮은 둑. 인접 논밭을 차지하지 않고 일반 강가 건물과 공존하지만 방앗간·나루터·부두와는 겹칠 수 없다. 대홍수 범람을 막는 대신 뒤편에는 비옥한 퇴적도 오지 않는다.',
     cost: { wood: 3, stone: 4 }, buildDays: 3, slots: 0, capacity: 0, defense: 0,
-    winterBonus: false, placement: 'land', unique: false,
+    winterBonus: false, placement: 'river', unique: false,
   },
   lumberCamp: {
     id: 'lumberCamp', name: '벌목장',
@@ -143,6 +144,18 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     desc: `보(堡) 승격 후 건설. 광상 위가 아닌 주변 빈 땅에 세우면 채광꾼이 반경 ${CONFIG.minerals.mineWorkRadius}칸의 돌·철·은을 캐 와 하역한다.`,
     cost: { wood: 10, stone: 8, tools: 2 }, buildDays: 8, slots: 4, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false, minRank: 'bo',
+  },
+  well: {
+    id: 'well', name: '우물',
+    desc: `수맥 위에 파는 무인 급수 시설. 반경 ${CONFIG.water.wellRadius}칸 급수 기반이 되며, 수맥의 중심에 가까울수록 물이 풍부하다.`,
+    cost: { wood: 4, stone: 6, tools: 1 }, buildDays: 4, slots: 0, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false,
+  },
+  deepMine: {
+    id: 'deepMine', name: '채광갱',
+    desc: '부(府) 승격 후 지하 광맥 위에 세우는 2×2 갱도. 채광꾼 4명이 광맥의 철이나 석재를 직접 캐며 같은 광맥의 매장량을 공유한다.',
+    cost: { wood: 30, stone: 24, iron: 12, tools: 6 }, buildDays: 18, slots: 4, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false, minRank: 'bu',
   },
   ferry: {
     id: 'ferry', name: '나루터',
@@ -255,13 +268,13 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   shrine: {
     id: 'shrine', name: '당집',
     desc: '마을의 안녕을 비는 무속의 당. 떠돌이 무당이 마을에 들어와야 지을 수 있다.',
-    cost: { wood: 8, stone: 2, hide: 2 }, buildDays: 6, slots: 1, capacity: 0, defense: 0,
+    cost: { wood: 8, stone: 2, hide: 2 }, buildDays: 6, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: true, minRank: 'jin',
   },
   hermitage: {
     id: 'hermitage', name: '암자',
     desc: '명복을 빌고 상례를 돕는 작은 절. 노승이 마을에 의탁해야 지을 수 있다.',
-    cost: { wood: 10, stone: 6 }, buildDays: 8, slots: 1, capacity: 0, defense: 0,
+    cost: { wood: 10, stone: 6 }, buildDays: 8, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: true, minRank: 'jin',
   },
   cannonEmplacement: {
@@ -279,8 +292,8 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
 };
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
-  'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'field', 'paddy', 'weir', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'clinic',
-  'smokehouse', 'dryingRack', 'smithy', 'mine', 'ferry', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office', 'cemetery', 'school', 'shrine', 'hermitage',
+  'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'well', 'field', 'paddy', 'weir', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'clinic',
+  'smokehouse', 'dryingRack', 'smithy', 'mine', 'deepMine', 'ferry', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office', 'cemetery', 'school', 'shrine', 'hermitage',
   'levee', 'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement', 'chongtongEmplacement',
 ];
@@ -293,6 +306,7 @@ export const SINGLE_TILE_BUILDINGS = [
   'huntLodge',
   'herbHut',
   'mine',
+  'well',
   'field',
   'paddy',
   'ferry',
@@ -455,12 +469,29 @@ export function canPlaceBuildingAt(
       tile.x < pasture.x + pasture.w &&
       tile.y < pasture.y + pasture.h;
   }))) return false;
-  if (type === 'watermill') return canPlaceWatermillAt(state, x, y);
+  if (type === 'watermill') {
+    return !tiles.some(tile => leveeAtTile(state, tile.x, tile.y)) && canPlaceWatermillAt(state, x, y);
+  }
+  if (type === 'levee') {
+    if (!isLeveePlacementEligible(state, x, y)) return false;
+    const tile = tiles[0];
+    const occupying = tile.buildingId == null ? undefined : state.buildings.find(building => building.id === tile.buildingId);
+    return !occupying || !isLeveeIncompatibleBuildingType(occupying.type);
+  }
+  if (isLeveeIncompatibleBuildingType(type) && tiles.some(tile => leveeAtTile(state, tile.x, tile.y))) {
+    return false;
+  }
   const def = BUILDING_DEFS[type];
   if (!tiles.every(tile => canPlaceOn(def, tile, state))) return false;
   if (type === 'paddy' && !isPaddyFootprintEligible(state, tiles)) return false;
-  if (type === 'levee' && !isLeveePlacementEligible(state, x, y)) return false;
   if (type === 'mine') return hasKnownMineralDepositNear(state, x, y);
+  if (type === 'well') {
+    return aquiferSampleAt(state.seed, state.map[0]?.length ?? 0, state.map.length, x, y) != null;
+  }
+  if (type === 'deepMine') {
+    const sample = oreSampleAt(state.seed, state.map[0]?.length ?? 0, state.map.length, x, y);
+    return sample != null && (state.oreVeinRemaining[sample.vein.id] ?? 0) > 0;
+  }
   return true;
 }
 
@@ -494,6 +525,15 @@ export function canRelocateBuildingAt(
   }));
   if (overlapsPasture) return false;
 
+  if (building.type === 'levee') {
+    const tile = tiles[0];
+    if (availableLeveeEdgesAt(state, x, y, building.id).length === 0) return false;
+    const occupying = tile.buildingId == null ? undefined : state.buildings.find(candidate => candidate.id === tile.buildingId);
+    return !occupying || occupying.id === building.id || !isLeveeIncompatibleBuildingType(occupying.type);
+  }
+  if (isLeveeIncompatibleBuildingType(building.type) &&
+      tiles.some(tile => leveeAtTile(state, tile.x, tile.y, building.id))) return false;
+
   const def = BUILDING_DEFS[building.type];
   const usableTiles = tiles.map(tile => tile.buildingId === building.id
     ? { ...tile, buildingId: null }
@@ -507,8 +547,14 @@ export function canRelocateBuildingAt(
   }
   if (!usableTiles.every(tile => canPlaceOn(def, tile, state))) return false;
   if (building.type === 'paddy' && !isPaddyFootprintEligible(state, usableTiles)) return false;
-  if (building.type === 'levee' && !isLeveePlacementEligible(state, x, y)) return false;
   if (building.type === 'mine') return hasKnownMineralDepositNear(state, x, y);
+  if (building.type === 'well') {
+    return aquiferSampleAt(state.seed, state.map[0]?.length ?? 0, state.map.length, x, y) != null;
+  }
+  if (building.type === 'deepMine') {
+    const sample = oreSampleAt(state.seed, state.map[0]?.length ?? 0, state.map.length, x, y);
+    return sample != null && (state.oreVeinRemaining[sample.vein.id] ?? 0) > 0;
+  }
   return true;
 }
 
@@ -538,6 +584,7 @@ export function occupyBuildingTiles(
   state: GameState,
   building: Pick<Building, 'id' | 'type' | 'x' | 'y' | 'w' | 'h'>,
 ): void {
+  if (building.type === 'levee') return;
   const tiles = footprintTilesOf(state, building);
   if (!tiles) return;
   for (const tile of tiles) tile.buildingId = building.id;
@@ -556,6 +603,7 @@ export function rebuildBuildingFootprints(state: GameState): void {
     for (const tile of row) tile.buildingId = null;
   }
   for (const building of state.buildings) {
+    if (building.type === 'levee') continue;
     const tiles = footprintTilesOf(state, building);
     if (!tiles) continue;
     for (const tile of tiles) {
@@ -581,15 +629,93 @@ function isSpringFloodAffectedTile(state: GameState, x: number, y: number): bool
     disaster.affectedTiles?.some(tile => tile.x === x && tile.y === y));
 }
 
-export function isLeveePlacementEligible(state: GameState, x: number, y: number): boolean {
-  const radius = CONFIG.disasters.springFlood.leveeRiverDistance;
-  for (let dy = -radius; dy <= radius; dy++) {
-    for (let dx = -radius; dx <= radius; dx++) {
-      if (Math.max(Math.abs(dx), Math.abs(dy)) > radius) continue;
-      if (state.map[y + dy]?.[x + dx]?.terrain === 'river') return true;
-    }
+export type LeveeEdge = 'n' | 'e' | 's' | 'w';
+
+const LEVEE_EDGE_OFFSETS: ReadonlyArray<readonly [LeveeEdge, number, number]> = [
+  ['n', 0, -1],
+  ['e', 1, 0],
+  ['s', 0, 1],
+  ['w', -1, 0],
+];
+
+const LEVEE_INCOMPATIBLE_BUILDINGS: ReadonlySet<BuildingTypeId> = new Set([
+  'watermill',
+  'ferry',
+  'dock',
+]);
+
+export function isLeveeIncompatibleBuildingType(type: BuildingTypeId): boolean {
+  return LEVEE_INCOMPATIBLE_BUILDINGS.has(type);
+}
+
+export function leveeAtTile(
+  state: Pick<GameState, 'buildings'>,
+  x: number,
+  y: number,
+  ignoredBuildingId?: number,
+): Building | undefined {
+  return state.buildings.find(building => building.id !== ignoredBuildingId &&
+    building.type === 'levee' && building.x === x && building.y === y);
+}
+
+function isLeveeBankLand(tile: Tile | undefined): boolean {
+  return tile != null &&
+    tile.terrain !== 'river' &&
+    tile.terrain !== 'mountain' &&
+    tile.terrain !== 'rock' &&
+    tile.terrain !== 'center';
+}
+
+export function leveeEdgesAt(state: Pick<GameState, 'map'>, x: number, y: number): LeveeEdge[] {
+  if (state.map[y]?.[x]?.terrain !== 'river') return [];
+  const edges: LeveeEdge[] = [];
+  for (const [edge, dx, dy] of LEVEE_EDGE_OFFSETS) {
+    if (isLeveeBankLand(state.map[y + dy]?.[x + dx])) edges.push(edge);
   }
-  return false;
+  return edges;
+}
+
+export function leveeAtEdge(
+  state: Pick<GameState, 'buildings'>,
+  x: number,
+  y: number,
+  edge: LeveeEdge,
+  ignoredBuildingId?: number,
+): Building | undefined {
+  return state.buildings.find(building => building.id !== ignoredBuildingId &&
+    building.type === 'levee' && building.x === x && building.y === y &&
+    building.leveeEdge === edge);
+}
+
+export function availableLeveeEdgesAt(
+  state: Pick<GameState, 'map' | 'buildings'>,
+  x: number,
+  y: number,
+  ignoredBuildingId?: number,
+): LeveeEdge[] {
+  return leveeEdgesAt(state, x, y).filter(edge => !leveeAtEdge(state, x, y, edge, ignoredBuildingId));
+}
+
+export function preferredLeveeEdgeAt(
+  state: Pick<GameState, 'map' | 'buildings'>,
+  x: number,
+  y: number,
+  localX = 0.5,
+  localY = 0.5,
+  ignoredBuildingId?: number,
+): LeveeEdge | null {
+  const distance: Record<LeveeEdge, number> = {
+    n: localY,
+    e: 1 - localX,
+    s: 1 - localY,
+    w: localX,
+  };
+  return availableLeveeEdgesAt(state, x, y, ignoredBuildingId)
+    .sort((a, b) => distance[a] - distance[b])[0] ?? null;
+}
+
+export function isLeveePlacementEligible(state: GameState, x: number, y: number): boolean {
+  return availableLeveeEdgesAt(state, x, y).length > 0;
 }
 
 // 지자총통은 기물함에 남아 있고, 총통 포대만 완성·건설·이전 작업을 통틀어 하나로 제한한다.

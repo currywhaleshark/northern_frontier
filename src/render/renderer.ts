@@ -9,7 +9,7 @@ import { CONFIG } from '../game/config';
 import {
   armedMusketeers, BUILDING_DEFS, buildingCostFor, buildingFootprintDims, buildingFootprintSize,
   canAfford, canAffordCost, canPlaceBuildingAt, canPlaceOn, canRelocateBuildingAt,
-  isAreaBuildingType, isPaddyFootprintEligible, isPlotBuildingType,
+  isAreaBuildingType, isPaddyFootprintEligible, isPlotBuildingType, preferredLeveeEdgeAt, type LeveeEdge,
 } from '../game/buildings';
 import { COLLAPSE_RATIO } from '../game/battles';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
@@ -45,6 +45,17 @@ import { activePassageRoutes } from '../game/passage';
 import { weaponCountsForResidents } from '../game/weapons';
 import { activePredatorScoutIds } from '../game/expeditionIntel';
 import { isBuriedSilverVeinTile } from '../game/silver';
+import { aquiferSampleAt, hasSubsurfaceInsight, oreSampleAt } from '../game/subsurfaceVeins';
+import {
+  waterSupplySnapshot,
+  wellWaterStatus,
+  wellWaterStatusAt,
+  PREVIEW_WATER_BUILDING_ID,
+  waterDemandForBuildingPlacement,
+  type PreviewWell,
+  type PreviewWaterBuilding,
+  type WaterSupplySnapshot,
+} from '../game/waterSupply';
 import { activeExpeditionTargetMarkers, type ExpeditionTargetMarker } from '../game/expeditionTargets';
 import { normalizeLivestockState } from '../game/livestock';
 import { normalizePastureArea, validateStablePasture } from '../game/pastures';
@@ -72,6 +83,7 @@ import {
   terrainVisualHash,
   treeSpeciesFromHash,
 } from './terrainGrowthVisuals';
+import { waterLayerTintForBuilding } from './waterLayerPresentation';
 
 const TILE = CONFIG.ui.tileSize;
 
@@ -100,6 +112,7 @@ export interface SceneOptions {
   animationTimeMs: number; // 이 장면의 모든 주민 source rect가 공유하는 RAF 시간
   hover: { x: number; y: number } | null;
   placingType: BuildingTypeId | null;
+  leveePlacementEdge?: LeveeEdge | null;
   placingRect?: { x: number; y: number; w: number; h: number } | null; // 경작지 드래그 크기 지정 미리보기
   pasturePlacement?: { stableId: number; rect: PastureArea } | null;
   areaExpansion?: { buildingId: number; type: BuildingTypeId; rect: PastureArea } | null;
@@ -114,7 +127,85 @@ export interface SceneOptions {
   renderScale?: 1 | 2;
   residentJobMarkers?: boolean;
   residentCargoMarkers?: boolean;
+  showAquiferLayer?: boolean;
+  showOreLayer?: boolean;
+  stateVersion?: number;
   habitatIcon?: CanvasImageSource;
+}
+
+function drawSubsurfaceLayers(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  viewport: SceneViewport,
+  showAquifer: boolean,
+  showOre: boolean,
+): void {
+  if (!showAquifer && !showOre) return;
+  const precise = hasSubsurfaceInsight(state);
+  const mapWidth = state.map[0]?.length ?? 0;
+  const minX = Math.max(0, viewport.tileMinX - 1);
+  const maxX = Math.min(mapWidth - 1, viewport.tileMaxX + 1);
+  const minY = Math.max(0, viewport.tileMinY - 1);
+  const maxY = Math.min(state.map.length - 1, viewport.tileMaxY + 1);
+
+  ctx.save();
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= Math.min(maxX, state.map[y].length - 1); x++) {
+      if (!isExplored(state, x, y)) continue;
+      if (showAquifer) {
+        const sample = aquiferSampleAt(state.seed, mapWidth, state.map.length, x, y);
+        if (sample) {
+          const remaining = state.aquiferLevels[sample.vein.id] ?? sample.vein.capacity;
+          const depletion = Math.max(0.18, Math.min(1, remaining / Math.max(1, sample.vein.capacity)));
+          const strength = precise ? sample.normalizedRichness : 0.58;
+          ctx.fillStyle = `rgba(31, 168, 222, ${(0.28 + strength * 0.34) * depletion})`;
+          ctx.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2);
+          ctx.strokeStyle = `rgba(158, 237, 255, ${precise ? 0.48 + strength * 0.4 : 0.62})`;
+          ctx.lineWidth = precise && strength > 0.68 ? 2.25 : 1.5;
+          ctx.strokeRect(x * TILE + 1.5, y * TILE + 1.5, TILE - 3, TILE - 3);
+        }
+      }
+      if (showOre) {
+        const sample = oreSampleAt(state.seed, mapWidth, state.map.length, x, y);
+        if (sample) {
+          const remaining = state.oreVeinRemaining[sample.vein.id] ?? sample.vein.capacity;
+          const depletion = Math.max(0.18, Math.min(1, remaining / Math.max(1, sample.vein.capacity)));
+          const strength = precise ? sample.normalizedRichness : 0.58;
+          const color = sample.vein.mineral === 'iron' ? '177, 83, 48' : '146, 151, 158';
+          ctx.fillStyle = `rgba(${color}, ${(0.25 + strength * 0.35) * depletion})`;
+          ctx.fillRect(x * TILE + 2, y * TILE + 2, TILE - 4, TILE - 4);
+          ctx.strokeStyle = `rgba(${color}, ${precise ? 0.52 + strength * 0.38 : 0.66})`;
+          ctx.lineWidth = precise && strength > 0.68 ? 2.25 : 1.5;
+          ctx.beginPath();
+          ctx.moveTo(x * TILE + TILE / 2, y * TILE + 3);
+          ctx.lineTo(x * TILE + TILE - 3, y * TILE + TILE / 2);
+          ctx.lineTo(x * TILE + TILE / 2, y * TILE + TILE - 3);
+          ctx.lineTo(x * TILE + 3, y * TILE + TILE / 2);
+          ctx.closePath();
+          ctx.stroke();
+        }
+      }
+    }
+  }
+  ctx.restore();
+}
+
+function waterworksOrientationAt(
+  state: Pick<GameState, 'map'>,
+  type: BuildingTypeId,
+  x: number,
+  y: number,
+  leveeEdge?: LeveeEdge,
+): 'horizontal' | 'vertical' {
+  if (type === 'levee') {
+    const edge = leveeEdge;
+    return edge === 'e' || edge === 'w' ? 'vertical' : 'horizontal';
+  }
+  const northSouth = Number(state.map[y - 1]?.[x]?.terrain === 'river') +
+    Number(state.map[y + 1]?.[x]?.terrain === 'river');
+  const eastWest = Number(state.map[y]?.[x - 1]?.terrain === 'river') +
+    Number(state.map[y]?.[x + 1]?.terrain === 'river');
+  return northSouth >= eastWest ? 'horizontal' : 'vertical';
 }
 
 const TERRAIN_VISUAL_CODE: Record<Terrain, number> = {
@@ -321,6 +412,96 @@ interface RowRenderEntry {
   draw: () => void;
 }
 
+function drawMutedTerrainSprite(
+  ctx: CanvasRenderingContext2D,
+  draw: () => void,
+): void {
+  ctx.save();
+  ctx.globalAlpha *= 0.34;
+  ctx.filter = 'grayscale(72%) brightness(118%)';
+  draw();
+  ctx.restore();
+}
+
+let buildingTintCanvas: HTMLCanvasElement | null = null;
+let waterVisualSnapshotCache: {
+  state: GameState;
+  version: number;
+  previewKey: string;
+  snapshot: WaterSupplySnapshot;
+} | null = null;
+
+function cachedWaterVisualSnapshot(
+  state: GameState,
+  version: number | undefined,
+  previewWell: PreviewWell | undefined,
+  previewBuilding: PreviewWaterBuilding | undefined,
+): WaterSupplySnapshot {
+  if (version == null) return waterSupplySnapshot(state, previewWell, previewBuilding);
+  const previewKey = [
+    previewWell ? `well:${previewWell.x},${previewWell.y}` : 'well:none',
+    previewBuilding
+      ? `building:${previewBuilding.type},${previewBuilding.x},${previewBuilding.y}`
+      : 'building:none',
+  ].join('|');
+  if (waterVisualSnapshotCache?.state === state &&
+      waterVisualSnapshotCache.version === version &&
+      waterVisualSnapshotCache.previewKey === previewKey) {
+    return waterVisualSnapshotCache.snapshot;
+  }
+  const snapshot = waterSupplySnapshot(state, previewWell, previewBuilding);
+  waterVisualSnapshotCache = { state, version, previewKey, snapshot };
+  return snapshot;
+}
+
+function drawBuildingSprite(
+  ctx: CanvasRenderingContext2D,
+  sprites: SpriteAPI,
+  params: BuildingDrawParams,
+): void {
+  if (!params.tint) {
+    sprites.drawBuilding(ctx, params);
+    return;
+  }
+  const margin = Math.ceil(params.size);
+  const required = Math.max(8, margin * 3);
+  if (!buildingTintCanvas) buildingTintCanvas = document.createElement('canvas');
+  if (buildingTintCanvas.width < required || buildingTintCanvas.height < required) {
+    buildingTintCanvas.width = Math.max(buildingTintCanvas.width, required);
+    buildingTintCanvas.height = Math.max(buildingTintCanvas.height, required);
+  }
+  const tintCtx = buildingTintCanvas.getContext('2d')!;
+  tintCtx.setTransform(1, 0, 0, 1, 0, 0);
+  tintCtx.globalAlpha = 1;
+  tintCtx.globalCompositeOperation = 'source-over';
+  tintCtx.filter = 'none';
+  tintCtx.imageSmoothingEnabled = false;
+  tintCtx.clearRect(0, 0, required, required);
+  sprites.drawBuilding(tintCtx, {
+    ...params,
+    tint: undefined,
+    x: margin,
+    y: margin,
+  });
+  tintCtx.save();
+  tintCtx.globalCompositeOperation = 'source-atop';
+  tintCtx.globalAlpha = params.tint.alpha;
+  tintCtx.fillStyle = params.tint.color;
+  tintCtx.fillRect(0, 0, required, required);
+  tintCtx.restore();
+  ctx.drawImage(
+    buildingTintCanvas,
+    0,
+    0,
+    required,
+    required,
+    params.x - margin,
+    params.y - margin,
+    required,
+    required,
+  );
+}
+
 function queueTerrainOverlays(
   ctx: CanvasRenderingContext2D,
   state: GameState,
@@ -328,6 +509,7 @@ function queueTerrainOverlays(
   viewport: SceneViewport,
   renderScale: 1 | 2,
   queue: RowRenderEntry[],
+  muted = false,
 ): void {
   if (!sprites.drawTerrainOverlay && !sprites.drawTerrainProp) return;
   const season = getSeason(state.day);
@@ -348,8 +530,12 @@ function queueTerrainOverlays(
         sortX: (x + 0.5) * TILE,
         serial: queue.length,
         draw: () => {
-          if (terrain === 'rock') sprites.drawTerrainProp?.(ctx, params);
-          else sprites.drawTerrainOverlay?.(ctx, params);
+          const draw = () => {
+            if (terrain === 'rock') sprites.drawTerrainProp?.(ctx, params);
+            else sprites.drawTerrainOverlay?.(ctx, params);
+          };
+          if (muted) drawMutedTerrainSprite(ctx, draw);
+          else draw();
         },
       });
     }
@@ -501,7 +687,12 @@ function drawOccludedEntityGhosts(
       building.size,
       building.size,
     ).filter(canopy => canopy.sortY > buildingSortY);
-    drawUnderCanopyGhost(ctx, canopies, 'opacity(42%)', () => sprites.drawBuilding(ctx, building));
+    drawUnderCanopyGhost(
+      ctx,
+      canopies,
+      'opacity(42%)',
+      () => drawBuildingSprite(ctx, sprites, building),
+    );
   }
   for (const resident of residents) {
     const scale = resident.sizeScale ?? 1;
@@ -1098,6 +1289,34 @@ function drawFogOverlay(ctx: CanvasRenderingContext2D, state: GameState, viewpor
   ctx.restore();
 }
 
+function drawWellSupplyRange(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  emphasis = true,
+  color = '#6dd3f2',
+): void {
+  const cx = (x + 0.5) * TILE;
+  const cy = (y + 0.5) * TILE;
+  const radius = CONFIG.water.wellRadius * TILE;
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.globalAlpha = emphasis ? 0.13 : 0.06;
+  ctx.lineWidth = emphasis ? 2 : 1.25;
+  ctx.setLineDash(emphasis ? [7, 5] : [4, 5]);
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - radius);
+  ctx.lineTo(cx + radius, cy);
+  ctx.lineTo(cx, cy + radius);
+  ctx.lineTo(cx - radius, cy);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = emphasis ? 0.95 : 0.54;
+  ctx.strokeStyle = color;
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawWaterRiseOverlay(
   ctx: CanvasRenderingContext2D,
   tileX: number,
@@ -1368,7 +1587,7 @@ function drawForeignSiteProp(
       size: TILE,
     });
     if (!drewForeign) {
-      sprites.drawBuilding(ctx, {
+      drawBuildingSprite(ctx, sprites, {
         type,
         built: true,
         ghost: false,
@@ -1542,6 +1761,44 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     rowRenderQueue.push({ sortY, sortX, serial: rowRenderQueue.length, draw });
   };
   const localResidentDraws: ResidentDrawParams[] = [];
+  const showAquiferLayer = o.showAquiferLayer ?? false;
+  const showOreLayer = o.showOreLayer ?? false;
+  const subsurfaceLayerActive = showAquiferLayer || showOreLayer;
+  const selectedWell = o.selectedBuildingId == null
+    ? undefined
+    : state.buildings.find(building =>
+        building.id === o.selectedBuildingId && building.type === 'well');
+  const waterVisualizationActive =
+    showAquiferLayer || o.placingType === 'well' || selectedWell != null;
+  const validWaterPlacement = o.placingType && o.hover
+    ? isBuildingFootprintExplored(
+        state,
+        o.placingType,
+        o.hover.x,
+        o.hover.y,
+      ) && canPlaceBuildingAt(state, o.placingType, o.hover.x, o.hover.y)
+    : false;
+  const previewWell = o.placingType === 'well' && o.hover && validWaterPlacement
+    ? o.hover
+    : undefined;
+  const previewWaterDemand = showAquiferLayer && o.placingType
+    ? waterDemandForBuildingPlacement(o.placingType)
+    : 0;
+  const previewWaterBuilding: PreviewWaterBuilding | undefined =
+    showAquiferLayer && o.placingType && o.hover && validWaterPlacement && previewWaterDemand > 0
+      ? {
+          id: PREVIEW_WATER_BUILDING_ID,
+          type: o.placingType,
+          x: o.hover.x,
+          y: o.hover.y,
+          w: buildingFootprintSize(o.placingType),
+          h: buildingFootprintSize(o.placingType),
+          demand: previewWaterDemand,
+        }
+      : undefined;
+  const waterSnapshot = waterVisualizationActive
+    ? cachedWaterVisualSnapshot(state, o.stateVersion, previewWell, previewWaterBuilding)
+    : null;
   for (const r of state.residents) {
     if (!r.alive || predatorScoutIds.has(r.id) || presentation.indoorResidentIds.has(r.id)) continue;
     const workStance = presentation.workStances.get(r.id);
@@ -1579,6 +1836,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       militiaWeapon: militiaWeaponForResident(state, r),
       special: r.special,
       stage: r.stage,
+      religiousVocation: r.religiousVocation,
       sizeScale: r.stage === 'infant' ? 0.42 : r.stage === 'child' ? 0.62 : r.stage === 'youth' ? 0.8 : 1,
       animationTimeMs: o.animationTimeMs + stableResidentAnimationOffset(r.id),
     };
@@ -1599,20 +1857,42 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   const habitats = state.habitats.filter(h => h.active && isExplored(state, h.x, h.y));
   const hoveredHabitat = o.hover ? findHabitatIconAtTile(habitats, o.hover.x, o.hover.y) : null;
   ctx.clearRect(viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight);
-  ctx.drawImage(
-    layer,
-    viewport.pixelX * renderScale,
-    viewport.pixelY * renderScale,
-    viewport.pixelWidth * renderScale,
-    viewport.pixelHeight * renderScale,
-    viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight,
-  );
+  if (subsurfaceLayerActive) {
+    ctx.fillStyle = '#dce5e3';
+    ctx.fillRect(viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight);
+    ctx.save();
+    ctx.globalAlpha = 0.46;
+    ctx.filter = 'grayscale(68%) brightness(112%)';
+    ctx.drawImage(
+      layer,
+      viewport.pixelX * renderScale,
+      viewport.pixelY * renderScale,
+      viewport.pixelWidth * renderScale,
+      viewport.pixelHeight * renderScale,
+      viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight,
+    );
+    ctx.restore();
+  } else {
+    ctx.drawImage(
+      layer,
+      viewport.pixelX * renderScale,
+      viewport.pixelY * renderScale,
+      viewport.pixelWidth * renderScale,
+      viewport.pixelHeight * renderScale,
+      viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight,
+    );
+  }
   ctx.save();
   ctx.beginPath();
   ctx.rect(viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight);
   ctx.clip();
   // 바닥 캐시와 분리해 큰 노두가 뒤에 그려지는 이웃 타일 바닥에 잘리지 않게 한다.
-  drawTerrainProps(ctx, state, sprites, viewport, renderScale);
+  if (subsurfaceLayerActive) {
+    drawMutedTerrainSprite(ctx, () => drawTerrainProps(ctx, state, sprites, viewport, renderScale));
+  } else {
+    drawTerrainProps(ctx, state, sprites, viewport, renderScale);
+  }
+  drawSubsurfaceLayers(ctx, state, viewport, showAquiferLayer, showOreLayer);
   for (const water of weirReservoirWaterVisuals(state)) {
     if (!isExplored(state, water.x, water.y) ||
         !tileRectIntersectsViewport(viewport, water.x, water.y)) continue;
@@ -1720,7 +2000,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
           growth01: i < sown ? b.fieldGrowth / 100 : 0,
           x: cellX * TILE, y: cellY * TILE, size: TILE,
         };
-        sprites.drawBuilding(ctx, drawParams);
+        drawBuildingSprite(ctx, sprites, drawParams);
         if (frostObservationBuildingIds.has(b.id)) {
           drawEarlyFrostCropOverlay(ctx, drawParams.x, drawParams.y);
         }
@@ -1752,11 +2032,14 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
           graveCount: Math.min(CONFIG.funeral.plotsPerTile, Math.max(0, graves - i * CONFIG.funeral.plotsPerTile)),
           x: cellX * TILE, y: cellY * TILE, size: TILE,
         };
-        sprites.drawBuilding(ctx, drawParams);
+        drawBuildingSprite(ctx, sprites, drawParams);
         occludedBuildingDraws.push(drawParams);
       }
       continue;
     }
+    const leveeEdge = b.type === 'levee'
+      ? b.leveeEdge ?? preferredLeveeEdgeAt(state, b.x, b.y) ?? undefined
+      : undefined;
     const drawParams: BuildingDrawParams = {
       type: b.type, built: visuallyBuilt, ghost: false,
       rank: b.type === 'center' ? state.rank : undefined,
@@ -1766,6 +2049,18 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       connections: visuallyBuilt && isWallBuilding(b.type)
         ? wallConnectionsFromSet(wallTiles, b.x, b.y)
         : undefined,
+      waterworksOrientation: b.type === 'weir' || b.type === 'levee'
+        ? waterworksOrientationAt(state, b.type, b.x, b.y, leveeEdge)
+        : undefined,
+      waterworksEdge: leveeEdge,
+      tint: waterVisualizationActive
+        ? waterLayerTintForBuilding(
+            b.type,
+            b.built,
+            waterSnapshot?.buildings.get(b.id),
+            b.type === 'well' ? wellWaterStatus(state, b) : null,
+          ) ?? undefined
+        : undefined,
       x: drawX, y: drawY, size,
     };
     const activeWorkerCount = presentation.workplaceActiveCountByBuilding.get(b.id) ?? 0;
@@ -1773,19 +2068,25 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     const daytimeWhen = new Set<BuildingEffectWhen>(['always']);
     if (activeWorkerCount > 0) daytimeWhen.add('working');
     if (heating) daytimeWhen.add('winterHeating');
-    enqueueRowDraw((b.y + dims.h) * TILE, (b.x + dims.w / 2) * TILE, () => {
-      sprites.drawBuilding(ctx, drawParams);
-      occludedBuildingDraws.push(drawParams);
-      if (b.repairing) {
-        sprites.drawBuildingDamage(ctx, { season, x: drawX, y: drawY, size });
-        drawDamageSmoke(ctx, drawX, drawY, b.id, size / TILE);
-      }
-      if (b.built) {
-        drawBuildingEffects(ctx, b.type, b.id, drawX, drawY, size, {
-          active: daytimeWhen, workers: activeWorkerCount, nightAlpha: 0,
-        });
-      }
-    });
+    const leveeSortOffsetX = leveeEdge === 'e' ? 0.5 : leveeEdge === 'w' ? -0.5 : 0;
+    const leveeSortOffsetY = leveeEdge === 's' ? 0.5 : leveeEdge === 'n' ? -0.5 : 0;
+    enqueueRowDraw(
+      (b.y + dims.h + leveeSortOffsetY) * TILE,
+      (b.x + dims.w / 2 + leveeSortOffsetX) * TILE,
+      () => {
+        drawBuildingSprite(ctx, sprites, drawParams);
+        occludedBuildingDraws.push(drawParams);
+        if (b.repairing) {
+          sprites.drawBuildingDamage(ctx, { season, x: drawX, y: drawY, size });
+          drawDamageSmoke(ctx, drawX, drawY, b.id, size / TILE);
+        }
+        if (b.built) {
+          drawBuildingEffects(ctx, b.type, b.id, drawX, drawY, size, {
+            active: daytimeWhen, workers: activeWorkerCount, nightAlpha: 0,
+          });
+        }
+      },
+    );
   }
 
   const discoveredSites = state.foreignSites.filter(candidate => candidate.discovered);
@@ -1935,7 +2236,15 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   drawWorldShadows(ctx, state, viewport, localResidentDraws, dayFrac, sprites, renderScale);
 
   // 건물·주민·가축·부대·큰 나무/산맥을 하나의 화면 행 기준으로 정렬한다.
-  queueTerrainOverlays(ctx, state, sprites, viewport, renderScale, rowRenderQueue);
+  queueTerrainOverlays(
+    ctx,
+    state,
+    sprites,
+    viewport,
+    renderScale,
+    rowRenderQueue,
+    subsurfaceLayerActive,
+  );
   rowRenderQueue.sort((left, right) =>
     left.sortY - right.sortY || left.sortX - right.sortX || left.serial - right.serial);
   for (const entry of rowRenderQueue) entry.draw();
@@ -2021,6 +2330,25 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     ? undefined
     : state.buildings.find(building => building.id === o.selectedBuildingId && building.type === 'mine');
   if (selectedMine) drawMineWorkRange(ctx, selectedMine.x, selectedMine.y);
+  if (waterVisualizationActive) {
+    for (const well of state.buildings) {
+      if (well.type !== 'well' ||
+          !isBuildingFootprintExplored(state, well.type, well.x, well.y, well.w, well.h)) continue;
+      const tint = waterLayerTintForBuilding(
+        well.type,
+        well.built,
+        undefined,
+        wellWaterStatus(state, well),
+      );
+      drawWellSupplyRange(
+        ctx,
+        well.x,
+        well.y,
+        selectedWell?.id === well.id,
+        tint?.color,
+      );
+    }
+  }
 
   // 10) 배치 모드: 관련 자원 하이라이트 (사냥막→서식지 범위, 밭→비옥한 땅)
   if (o.placingType) {
@@ -2029,6 +2357,23 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       for (const habitat of habitats) drawHabitatRange(ctx, habitat);
     }
     if (o.placingType === 'mine' && o.hover) drawMineWorkRange(ctx, o.hover.x, o.hover.y);
+    if (o.placingType === 'well') {
+      if (o.hover) {
+        const previewTint = waterLayerTintForBuilding(
+          'well',
+          true,
+          undefined,
+          wellWaterStatusAt(state, o.hover.x, o.hover.y),
+        );
+        drawWellSupplyRange(
+          ctx,
+          o.hover.x,
+          o.hover.y,
+          true,
+          previewTint?.color ?? '#76e4ff',
+        );
+      }
+    }
     const want = PLACEMENT_HINT[o.placingType];
     if (want) {
       const pulse = 0.22 + 0.14 * Math.sin(performance.now() / 280);
@@ -2069,7 +2414,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       if (isAreaBuildingType(building.type)) {
         for (let dy = 0; dy < rect.h; dy++) {
           for (let dx = 0; dx < rect.w; dx++) {
-            sprites.drawBuilding(ctx, {
+            drawBuildingSprite(ctx, sprites, {
               type: building.type, built: true, ghost: true, progress01: 1,
               season, highDefinition: renderScale === 2,
               x: (rect.x + dx) * TILE, y: (rect.y + dy) * TILE, size: TILE,
@@ -2077,7 +2422,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
           }
         }
       } else {
-        sprites.drawBuilding(ctx, {
+        drawBuildingSprite(ctx, sprites, {
           type: building.type, built: true, ghost: true, progress01: 1,
           season, highDefinition: renderScale === 2,
           x: rect.x * TILE, y: rect.y * TILE,
@@ -2128,7 +2473,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
             : ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
         ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE);
         if (!ownTile) {
-          sprites.drawBuilding(ctx, {
+          drawBuildingSprite(ctx, sprites, {
             type, built: true, ghost: true, progress01: 1,
             season, highDefinition: renderScale === 2,
             x: tx * TILE, y: ty * TILE, size: TILE,
@@ -2164,7 +2509,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
           ? 'rgba(224,164,92,0.45)'
           : ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
         ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE);
-        sprites.drawBuilding(ctx, {
+        drawBuildingSprite(ctx, sprites, {
           type: o.placingType, built: true, ghost: true, progress01: 1,
           season, highDefinition: renderScale === 2,
           x: tx * TILE, y: ty * TILE, size: TILE,
@@ -2192,9 +2537,30 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       ? 'rgba(224,164,92,0.45)'
       : ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
     ctx.fillRect(o.hover.x * TILE, o.hover.y * TILE, size, size);
-    sprites.drawBuilding(ctx, {
+    drawBuildingSprite(ctx, sprites, {
       type: o.placingType, built: true, ghost: true, progress01: 1,
       season, highDefinition: renderScale === 2,
+      tint: o.placingType === 'well'
+        ? waterLayerTintForBuilding(
+            'well',
+            true,
+            undefined,
+            wellWaterStatusAt(state, o.hover.x, o.hover.y),
+          ) ?? undefined
+        : showAquiferLayer
+          ? waterLayerTintForBuilding(
+              o.placingType,
+              true,
+              waterSnapshot?.buildings.get(PREVIEW_WATER_BUILDING_ID),
+              null,
+            ) ?? undefined
+          : undefined,
+      waterworksOrientation: o.placingType === 'weir' || o.placingType === 'levee'
+        ? waterworksOrientationAt(state, o.placingType, o.hover.x, o.hover.y, o.leveePlacementEdge ?? undefined)
+        : undefined,
+      waterworksEdge: o.placingType === 'levee'
+        ? o.leveePlacementEdge ?? undefined
+        : undefined,
       x: o.hover.x * TILE, y: o.hover.y * TILE, size,
     });
   }

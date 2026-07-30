@@ -2,10 +2,11 @@ import type { GameState, JobId, Resident } from '../game/types';
 
 export type ResidentStatusFilter = 'all' | 'attention' | 'workplace' | 'young' | 'special' | 'dead';
 export type ResidentSort = 'arrival' | 'name' | 'health' | 'job' | 'workplace';
+export type ResidentJobFilter = 'all' | 'religious' | JobId;
 
 export interface ResidentListFilters {
   query: string;
-  job: 'all' | JobId;
+  job: ResidentJobFilter;
   status: ResidentStatusFilter;
   sort: ResidentSort;
 }
@@ -54,11 +55,22 @@ function compareResidents(left: Resident, right: Resident, sort: ResidentSort): 
   return Number(lacksWorkplace(right)) - Number(lacksWorkplace(left)) || compareById(left, right);
 }
 
+function matchesJob(resident: Resident, job: ResidentJobFilter): boolean {
+  if (job === 'all') return true;
+  if (job === 'religious') {
+    return resident.religiousVocation === 'shaman' ||
+      resident.religiousVocation === 'monk' ||
+      resident.job === 'shaman' ||
+      resident.job === 'monk';
+  }
+  return resident.job === job;
+}
+
 export function filteredResidents(state: GameState, filters: ResidentListFilters): Resident[] {
   const query = normalized(filters.query);
   return state.residents
     .filter(resident =>
-      (filters.job === 'all' || resident.job === filters.job) &&
+      matchesJob(resident, filters.job) &&
       matchesStatus(state, resident, filters.status) &&
       (!query || normalized(resident.name).includes(query)),
     )

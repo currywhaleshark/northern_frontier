@@ -13,6 +13,7 @@ const VISIBLE_WORKPLACE: WorkplacePresentation = { mode: 'visible', activity: nu
 const WORKPLACE_PRESENTATIONS: Partial<Record<BuildingTypeId, WorkplacePresentation>> = {
   watermill: { mode: 'interior', activity: 'craft' },
   smithy: { mode: 'interior', activity: 'fire' },
+  deepMine: { mode: 'interior', activity: 'craft' },
   clinic: { mode: 'interior', activity: 'service' },
   tannery: { mode: 'interior', activity: 'craft' },
   weavingHouse: { mode: 'interior', activity: 'craft' },

@@ -6,6 +6,7 @@ import { addForeignSiteMemory, isForeignSiteOperational } from './foreignSites';
 import { changeRelation, getRelation } from './relations';
 import { revealPassageRoute } from './passage';
 import { livingResidents } from './residents';
+import { residentLogName } from './residentLogName';
 import { createCombatRoster } from './combatRoster';
 import { openDefectorImmigrationChoice } from './immigration';
 import {
@@ -198,7 +199,7 @@ export function scoutBanditLair(state: GameState, siteId: number, rng: () => num
   if (victim) {
     const damage = 14 + Math.floor(rng() * 18);
     victim.health = Math.max(1, victim.health - damage);
-    addLog(state, `${withJosa(victim.name, '이/가')} 산채 정찰 중 발각되어 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
+    addLog(state, `${withJosa(residentLogName(victim), '이/가')} 산채 정찰 중 발각되어 부상을 입었습니다. (건강 -${damage})`, 'bad', true);
   }
   addForeignSiteMemory(state, site.id, '개척지 정찰대가 접근했다가 산채 경계병에게 발각되었습니다.', 'bad');
   return '정찰대가 발각되었습니다. 산채의 경계가 강화되고 전역 위협이 높아졌습니다.';
@@ -339,7 +340,7 @@ export function resolveBanditLairAssault(
     victim.health = Math.max(1, victim.health - damage);
     result.injuredResidentId = victim.id;
     result.injuryDamage = damage;
-    addLog(state, `${withJosa(victim.name, '이/가')} 산채 토벌 실패로 중상을 입었습니다. (건강 -${damage})`, 'bad', true);
+    addLog(state, `${withJosa(residentLogName(victim), '이/가')} 산채 토벌 실패로 중상을 입었습니다. (건강 -${damage})`, 'bad', true);
   }
   return result;
 }

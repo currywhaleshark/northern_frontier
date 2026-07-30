@@ -22,6 +22,7 @@ function compileGameModules() {
 
 const compiledDir = compileGameModules();
 const disasters = await import(pathToFileURL(join(compiledDir, 'disasters.mjs')).href);
+const raidDamage = await import(pathToFileURL(join(compiledDir, 'raidDamage.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const weatherSchedule = await import(pathToFileURL(join(compiledDir, 'weatherSchedule.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
@@ -84,6 +85,9 @@ assert.ok(run, 'the deterministic winter weather table must contain a two-day sn
 
   assert.equal(hut.repairing, true, 'huts must be vulnerable to snow damage');
   assert.equal(ondol.repairing, true, 'ondol homes must be damageable at their lower chance');
+  assert.equal(hut.repairCause, 'snowDamage', 'snow damage repairs must retain their alert cause');
+  assert.equal(ondol.repairCause, 'snowDamage', 'all damaged homes must retain the snow cause');
+  assert.equal(raidDamage.buildingRepairCause(state, hut), 'snowDamage');
   assert.notEqual(tileHouse.repairing, true, 'tile houses must be immune to snow damage');
   assert.equal(state.pendingDisasters[0].id, 'snowDamage');
   assert.equal(state.pendingDisasters[0].targetBuildingIds.length, 2);
@@ -94,6 +98,24 @@ assert.ok(run, 'the deterministic winter weather table must contain a two-day sn
   state.day += 1;
   disasters.advancePendingDisasters(state);
   assert.deepEqual(state.pendingDisasters, []);
+}
+
+{
+  const state = simulation.newGame(992, 'normal', '구저장설해촌');
+  const hut = state.buildings.find(building => building.type === 'hut');
+  assert.ok(hut);
+  hut.built = false;
+  hut.repairing = true;
+  delete hut.repairCause;
+  state.pendingDisasters = [{
+    id: 'snowDamage',
+    choiceId: 'collapse',
+    startedDay: state.day,
+    resolveDay: state.day + 1,
+    targetBuildingIds: [hut.id],
+  }];
+  assert.equal(raidDamage.buildingRepairCause(state, hut), 'snowDamage',
+    'an active legacy snow disaster must not be mislabeled as raid damage');
 }
 
 {

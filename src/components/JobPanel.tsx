@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { BUILDING_DEFS } from '../game/buildings';
 import { isJobUnlocked, JOB_DESC, JOB_NAMES, JOB_ORDER } from '../game/constants';
 import { isLiterateJob } from '../game/education';
+import { residentDisplayAge } from '../game/lifecycle';
 import { jobWorkforceCounts } from '../game/residents';
 import { canResidentTakeJob } from '../game/youth';
 import {
@@ -46,6 +47,7 @@ function byJobSkill(job: JobId) {
 
 function assignmentBlockReason(resident: Resident, job: JobId): string | null {
   if (resident.special) return '고정 직업';
+  if (resident.religiousVocation) return '종교 소명 고정';
   if (!canResidentTakeJob(resident, job)) {
     return resident.stage === 'youth' ? '소년 배정 불가' : '아직 일을 맡길 수 없음';
   }
@@ -84,7 +86,7 @@ function ResidentAssignmentRow({
         <strong>{resident.name}</strong>
         {disabledReason && <small>{disabledReason}</small>}
       </span>
-      <span>{resident.age}세</span>
+      <span>{residentDisplayAge(resident)}세</span>
       <span className="job-assignment-skill">숙련 {Math.round(jobSkill(resident, job) * 100)}%</span>
     </label>
   );

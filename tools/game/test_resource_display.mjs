@@ -94,6 +94,16 @@ assert.match(popoverSource, /Math\.floor\(item\.amount\)/,
   'resource breakdown stock amounts must discard fractional stock');
 assert.doesNotMatch(popoverSource, /item\.amount\.toFixed/,
   'resource breakdown stock amounts must not expose fractional stock');
+assert.match(popoverSource, /className="resource-breakdown-amount"/,
+  'resource amounts use a dedicated alignment column');
+assert.match(popoverSource, /className="muted resource-breakdown-spoilage"/,
+  'spoilage text uses a dedicated non-wrapping column');
+assert.match(cssSource, /\.resource-breakdown-popover\s*\{[^}]*width:\s*max-content;[^}]*min-width:\s*220px;/,
+  'the resource popover expands to fit spoilage rows');
+assert.match(cssSource, /\.resource-breakdown-label\s*\{[^}]*white-space:\s*nowrap;/,
+  'resource names must remain on one line');
+assert.match(cssSource, /\.resource-breakdown-actions\s*\{[^}]*white-space:\s*nowrap;/,
+  'resource amounts, spoilage, and star actions must remain on one line');
 
 const popoverZIndexMatch = cssSource.match(/\.resource-breakdown-popover\s*\{[^}]*z-index:\s*(\d+);/);
 const unifiedLogZIndexMatch = cssSource.match(/\.unified-log\s*\{[^}]*z-index:\s*(\d+);/);

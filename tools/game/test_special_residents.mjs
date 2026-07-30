@@ -71,16 +71,14 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
   ]);
   assert.ok(roster.every(resident => resident.illustration.src.startsWith('/assets/events/special-')));
 
-  // 종교인은 존재 자체가 능력이라 스킬이 없고, 나머지 특수 주민은 패시브 스킬을 최소 하나 가진다
+  // 종교인도 후계자가 물려받지 못하는 네임드 고유 특기를 명시한다.
   for (const definition of roster) {
     const skills = specialResidents.specialResidentSkills(definition.id);
-    if (definition.id === 'mudang' || definition.id === 'nosung') {
-      assert.equal(skills.length, 0, `${definition.id} has no passive skills`);
-    } else {
-      assert.ok(skills.length >= 1, `${definition.id} defines passive skills`);
-      assert.ok(skills.every(skill => skill.id && skill.icon && skill.name && skill.effect));
-    }
+    assert.ok(skills.length >= 1, `${definition.id} defines passive skills`);
+    assert.ok(skills.every(skill => skill.id && skill.icon && skill.name && skill.effect));
   }
+  assert.ok(specialResidents.specialResidentSkills('mudang').some(skill => skill.id === 'greatGut'));
+  assert.ok(specialResidents.specialResidentSkills('nosung').some(skill => skill.id === 'cheondojae'));
   assert.ok(
     specialResidents.specialResidentSkills('jurchenWarrior').some(skill => skill.id === 'shadowAmbush'),
     'jurchenWarrior ambush is surfaced as a passive skill',

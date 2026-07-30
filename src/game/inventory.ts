@@ -2,7 +2,7 @@ import type { Building, BuildingTypeId, GameState, Resident, ResourceId } from '
 
 const HAUL_SOURCE_BUILDING_TYPES: ReadonlySet<BuildingTypeId> = new Set([
   'field', 'paddy', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut',
-  'smithy', 'mine', 'ferry', 'watermill', 'charcoalKiln', 'stable',
+  'smithy', 'mine', 'deepMine', 'ferry', 'watermill', 'charcoalKiln', 'stable',
   'nitreYard', 'tannery', 'weavingHouse',
   'smokehouse', 'dryingRack',
   'onggiKiln', 'jangdokdae',

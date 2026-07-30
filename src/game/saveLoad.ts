@@ -36,6 +36,7 @@ import {
 } from './weapons';
 import { beginExpeditionReturn } from './expedition';
 import { CURRENT_SCHEMA_VERSION } from './saveSchema';
+import { initialAquiferLevels, initialOreVeinRemaining, normalizeSubsurfaceState } from './subsurfaceVeins';
 import { defaultRaiderFormationLine } from './tacticalTargeting';
 import { legacyTacticalPlanMetadata, tacticalCompositionTemplate } from './tacticalCompositions';
 import { createTacticalRaiderSupportState, tacticalSupportKindForUnitType } from './tacticalSupport';
@@ -724,6 +725,20 @@ export function migrateV43ToV44(raw: RawSave): RawSave {
   return migrated;
 }
 
+// v45: 시드에서 재계산하는 수맥·지하 광맥 기하와, 저장해야 하는 수위·잔량 배열.
+// 구 저장은 모든 지하 자원을 만수위·만재 상태로 시작한다.
+export function migrateV44ToV45(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  const map = Array.isArray(migrated.map) ? migrated.map as unknown[][] : [];
+  const width = Array.isArray(map[0]) ? map[0].length : 0;
+  const height = map.length;
+  const seed = Number.isFinite(Number(migrated.seed)) ? Number(migrated.seed) : 1;
+  migrated.aquiferLevels = initialAquiferLevels(seed, width, height);
+  migrated.oreVeinRemaining = initialOreVeinRemaining(seed, width, height);
+  migrated.schemaVersion = 45;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -773,6 +788,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 41) migrated = migrateV41ToV42(migrated);
     else if (version === 42) migrated = migrateV42ToV43(migrated);
     else if (version === 43) migrated = migrateV43ToV44(migrated);
+    else if (version === 44) migrated = migrateV44ToV45(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -1932,17 +1948,29 @@ export function loadGame(slot = 1): GameState | null {
       normalizeResidentWearables(resident);
       if (typeof resident.origin !== 'string' || resident.origin.trim().length === 0) delete resident.origin;
       else resident.origin = resident.origin.trim();
+      if (resident.religiousVocation !== 'shaman' && resident.religiousVocation !== 'monk') {
+        delete resident.religiousVocation;
+      }
+      if (!Number.isInteger(resident.religiousMentorId)) delete resident.religiousMentorId;
       if (resident.stage === 'youth') {
         resident.youthActivity = resident.youthActivity === 'school' ? 'school' : 'work';
         resident.education = typeof resident.education === 'number' && Number.isFinite(resident.education)
           ? Math.max(0, resident.education)
           : 0;
-        if (resident.youthActivity === 'school' || !isYouthWorkJob(resident.job)) {
+        if (resident.religiousVocation === 'monk') {
+          resident.job = 'idle';
+          resident.youthActivity = 'work';
+          resident.assignedBuildingId = null;
+          resident.task = '동자승';
+        } else if (resident.youthActivity === 'school' || !isYouthWorkJob(resident.job)) {
           resident.job = 'idle';
           resident.assignedBuildingId = null;
         }
       } else {
         delete resident.youthActivity;
+        if (resident.alive && resident.religiousVocation) {
+          resident.job = resident.religiousVocation;
+        }
       }
     }
     normalizeResidentFamilyReferences(parsed);
@@ -2049,6 +2077,7 @@ export function loadGame(slot = 1): GameState | null {
       }
     }
     ensureMineralDeposits(parsed.map);
+    normalizeSubsurfaceState(parsed);
     ensureForestGrowth(parsed.map);
     if (parsed.battle && !parsed.battle.mode) parsed.battle.mode = 'garrison';
     if (parsed.battle && !parsed.battle.location) {

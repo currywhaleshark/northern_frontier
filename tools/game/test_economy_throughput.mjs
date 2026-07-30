@@ -41,10 +41,11 @@ assert.equal(equipment.haulerCarryCapacity({ job: 'hauler', cartEquipped: false,
 const agentsSource = readFileSync(new URL('../../src/game/agents.ts', import.meta.url), 'utf8');
 assert.match(agentsSource, /outputMod:\s*laborOutputMod\s*\*\s*CONFIG\.production\.resourceOutputMultiplier/,
   'the output multiplier is composed once when the daily worker context is built');
-assert.equal((agentsSource.match(/ctx\.outputMod/g) ?? []).length, 13,
-  'all thirteen gathering, farming, crafting, and livestock output paths use the shared output modifier');
-assert.match(agentsSource, /performPhysicianTreatment\(state, r, effOf\(r\) \* ctx\.mMod, ctx\.rng\)/,
-  'the resource adjustment does not boost physician treatment strength');
+assert.equal((agentsSource.match(/ctx\.outputMod/g) ?? []).length, 14,
+  'all fourteen gathering, farming, mining, crafting, and livestock output paths use the shared output modifier');
+assert.match(agentsSource,
+  /performPhysicianTreatment\([\s\S]*?effOf\(r\) \* ctx\.mMod \* waterDependentProductionMultiplier\(state, clinic\),[\s\S]*?ctx\.rng/,
+  'physician treatment uses labor and water supply modifiers without the resource output adjustment');
 assert.match(agentsSource, /scaledCarryCapacity\(o\.cap\)/,
   'gatherers use the shared carrying adjustment');
 assert.match(agentsSource,
@@ -52,7 +53,7 @@ assert.match(agentsSource,
   'processing workers use the shared carrying adjustment when fetching inputs');
 
 const simulationSource = readFileSync(new URL('../../src/game/simulation.ts', import.meta.url), 'utf8');
-assert.match(simulationSource, /적재량이 \$\{haulerCarryCapacity\(resident\)\}/,
-  'the cart equipment log displays the adjusted carrying capacity');
+assert.match(simulationSource, /적재량이 \$\{withJosa\(Math\.floor\(haulerCarryCapacity\(resident\)\)/,
+  'the cart equipment log floors the adjusted carrying capacity before display');
 
 console.log('economy throughput adjustment tests passed');

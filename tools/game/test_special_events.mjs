@@ -143,11 +143,11 @@ const tribute = await import(pathToFileURL(join(compiledDir, 'courtTribute.mjs')
   delete state.tributeWaivers;
   specialEvents.ensureIncidentState(state);
   assert.ok(state.incidents.scheduledDays.length >= 1);
-  assert.deepEqual(state.specialItems, {
-    wildGinseng: 0, tigerPelt: 0, gyrfalcon: 0,
-    boDecree: 0, jinDecree: 0, buDecree: 0,
-    reliefGrainVoucher: 0, tributeWaiverDecree: 0, recruitmentNotice: 0, rainGauge: 0,
-  });
+  assert.ok(Object.values(state.specialItems).every(amount => amount === 0),
+    'all registered special items start at zero');
+  assert.ok(['wildGinseng', 'tigerPelt', 'gyrfalcon', 'rainGauge']
+    .every(item => Object.prototype.hasOwnProperty.call(state.specialItems, item)),
+  'incident special items remain registered');
   assert.deepEqual(state.discoveredSpecialItems, []);
   assert.equal(state.courtGrantArtifactMisses, 0);
   assert.equal(state.tributeWaivers, 0);

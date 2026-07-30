@@ -13,6 +13,7 @@ export interface WorkerSlotConfig {
 export const AUTO_ASSIGN_BUILDING_TYPES = [
   'field', 'paddy', 'watermill', 'woodShed', 'charcoalKiln', 'smithy',
   'stable', 'clinic', 'nitreYard', 'ferry', 'tannery', 'weavingHouse', 'smokehouse', 'dryingRack', 'onggiKiln',
+  'deepMine',
 ] as const satisfies readonly BuildingTypeId[];
 export type AutoAssignBuildingType = typeof AUTO_ASSIGN_BUILDING_TYPES[number];
 
@@ -32,10 +33,11 @@ export const SLOTTED_BUILDING_CONFIG: Partial<Record<BuildingTypeId, WorkerSlotC
   smokehouse: { job: 'curer', slots: 2 },
   dryingRack: { job: 'curer', slots: 2 },
   onggiKiln: { job: 'potter', slots: 2 },
+  deepMine: { job: 'miner', slots: 4 },
   cemetery: { job: 'undertaker', slots: 1 },
   school: { job: 'teacher', slots: 1 },
-  shrine: { job: 'shaman', slots: 1 },
-  hermitage: { job: 'monk', slots: 1 },
+  shrine: { job: 'shaman', slots: 2 },
+  hermitage: { job: 'monk', slots: 2 },
 };
 
 export function isResidentAvailableForWorkerSlot(
@@ -205,6 +207,9 @@ export function canAssignResidentToBuilding(
   const config = workerSlotConfig(building.type);
   if (!config) return 'building has no worker slots';
   if (!isJobUnlocked(state.rank, config.job)) return 'job is locked by rank';
+  if ((config.job === 'shaman' || config.job === 'monk') && resident.job !== config.job) {
+    return 'resident has no matching religious vocation';
+  }
   if (!canResidentTakeJob(resident, config.job)) {
     return resident.stage === 'youth'
       ? '이 일은 소년에게 맡길 수 없습니다'
@@ -271,6 +276,7 @@ export function assignNearestWorkerToBuilding(state: GameState, buildingId: numb
   const candidate = state.residents
     .filter(resident =>
       resident.assignedBuildingId == null &&
+      ((config.job !== 'shaman' && config.job !== 'monk') || resident.job === config.job) &&
       isResidentAvailableForWorkerSlot(state, resident))
     .sort((a, b) => {
       const jobPreference = Number(b.job === config.job) - Number(a.job === config.job);

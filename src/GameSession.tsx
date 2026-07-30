@@ -33,6 +33,7 @@ import { EventModal } from './components/EventModal';
 import { PromotionModal } from './components/PromotionModal';
 import { TradeDialog } from './components/TradeDialog';
 import { GameCanvas } from './components/GameCanvas';
+import { MapLayerTabs } from './components/MapLayerTabs';
 import { InspectorPanel } from './components/InspectorPanel';
 import { JobPanel } from './components/JobPanel';
 import { GameMenu } from './components/GameMenu';
@@ -64,7 +65,9 @@ import { installRoyalPlaque, royalPlaqueInstallError } from './game/royalPlaque'
 import { getPointerAction, selectedEntityAfterTileClick } from './game/selectionActions';
 import { makeRng } from './game/map';
 import { openTerritoryOrderConfirmation } from './game/territory';
-import { BUILDING_DEFS, buildingFootprintDims, computeDefense } from './game/buildings';
+import {
+  BUILDING_DEFS, buildingFootprintDims, computeDefense, preferredLeveeEdgeAt,
+} from './game/buildings';
 import { createExpedition, predatorExpeditionTarget } from './game/expedition';
 import { purchasePredatorIntel } from './game/predatorIntelTrade';
 import { isForeignSiteOperational } from './game/foreignSites';
@@ -99,6 +102,7 @@ import {
   setResidentMarkerPrefs,
   setDockWindowLayout,
   setMapZoom,
+  setMapLayerVisibility,
   togglePinnedDockWindow,
   type UiPrefs,
 } from './ui/uiPrefs';
@@ -649,12 +653,23 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     bump();
   };
 
-  const handleTileClick = (x: number, y: number) => {
+  const handleTileClick = (x: number, y: number, localX: number, localY: number) => {
     if (pastureStableId != null || expandingBuildingId != null || relocatingBuildingId != null) return;
     if (placingType) {
       const type = placingType;
+      const leveeEdge = type === 'levee'
+        ? preferredLeveeEdgeAt(stateRef.current, x, y, localX, localY) ?? undefined
+        : undefined;
       commitPlacement(
-        approveClearing => tryPlaceBuilding(stateRef.current, type, x, y, undefined, undefined, { approveClearing }),
+        approveClearing => tryPlaceBuilding(
+          stateRef.current,
+          type,
+          x,
+          y,
+          undefined,
+          undefined,
+          { approveClearing, leveeEdge },
+        ),
         () => ({
           title: `${BUILDING_DEFS[type].name} 건설`,
           trees: forestTilesInFootprint(stateRef.current, type, x, y).length,
@@ -1530,23 +1545,36 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       label: '미니맵',
       className: 'hud-minimap-window',
       content: (
-        <div className="minimap-overlay">
-          <Profiler id="minimap-boundary" onRender={recordAppRender}>
-            <RuntimeVersionBoundary store={runtimeVersionStore}>
-              {runtimeVersion => {
-                const runtimeState = stateRef.current;
-                return (
-                  <Minimap
-                    state={runtimeState}
-                    version={runtimeVersion}
-                    animationActive={speed > 0 && !runtimeState.pendingChoice && !runtimeState.pendingPromotionNotice && !runtimeState.tacticalBattle && !runtimeState.tacticalBattleReport && !runtimeState.gameOver}
-                    viewportRef={mapViewportRef}
-                    selected={selected}
-                  />
-                );
-              }}
-            </RuntimeVersionBoundary>
-          </Profiler>
+        <div className="minimap-with-layers">
+          <MapLayerTabs
+            attachedToMinimap
+            showAquifer={uiPrefs.showAquiferLayer || placingType === 'well'}
+            showOre={uiPrefs.showOreLayer || placingType === 'deepMine'}
+            aquiferAutomatic={placingType === 'well'}
+            oreAutomatic={placingType === 'deepMine'}
+            onToggleAquifer={() => setUiPrefs(current =>
+              setMapLayerVisibility(current, 'aquifer', !current.showAquiferLayer))}
+            onToggleOre={() => setUiPrefs(current =>
+              setMapLayerVisibility(current, 'ore', !current.showOreLayer))}
+          />
+          <div className="minimap-overlay">
+            <Profiler id="minimap-boundary" onRender={recordAppRender}>
+              <RuntimeVersionBoundary store={runtimeVersionStore}>
+                {runtimeVersion => {
+                  const runtimeState = stateRef.current;
+                  return (
+                    <Minimap
+                      state={runtimeState}
+                      version={runtimeVersion}
+                      animationActive={speed > 0 && !runtimeState.pendingChoice && !runtimeState.pendingPromotionNotice && !runtimeState.tacticalBattle && !runtimeState.tacticalBattleReport && !runtimeState.gameOver}
+                      viewportRef={mapViewportRef}
+                      selected={selected}
+                    />
+                  );
+                }}
+              </RuntimeVersionBoundary>
+            </Profiler>
+          </div>
         </div>
       ),
     },
@@ -1662,6 +1690,8 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                     zoom={uiPrefs.mapZoom}
                     showResidentJobMarkers={uiPrefs.showResidentJobMarkers}
                     showResidentCargoMarkers={uiPrefs.showResidentCargoMarkers}
+                    showAquiferLayer={uiPrefs.showAquiferLayer || placingType === 'well'}
+                    showOreLayer={uiPrefs.showOreLayer || placingType === 'deepMine'}
                     placingType={placingType}
                     pastureStableId={pastureStableId}
                     expandingBuildingId={expandingBuildingId}
@@ -1898,6 +1928,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
           onNegotiate={handleNegotiateTrade}
           onBuyPredatorIntel={handleBuyPredatorIntel}
           onSignContract={handleSignTradeContract}
+          onContractBlocked={reason => notify(reason, 'info')}
           onChoose={handleChoose}
         />
       ) : state.pendingChoice ? (

@@ -1339,11 +1339,18 @@ function deployCommandableToZone(state, zoneId) {
 {
   const state = simulation.newGame(2026071209);
   prepareDefenders(state);
+  const armedHunterIds = state.residents
+    .filter(resident => resident.job === 'hunter')
+    .map(resident => resident.id);
+  state.weaponAllocationMode = 'manual';
+  state.weaponAssignments = Object.fromEntries(armedHunterIds.map(id => [id, 'spear']));
   const battle = tactical.createTacticalBattle(state, {
     factionName: 'ambush-preparation-test', power: 60, warned: true, siege: false, mode: 'garrison',
   });
-  const hunters = battle.defenderGroups.find(group => group.kind === 'hunter');
+  const hunters = battle.defenderGroups.find(group => group.role === 'hunter');
   assert.ok(hunters);
+  assert.equal(hunters.weapon, 'spear', 'the regression fixture uses hunters carrying non-hunting-bow gear');
+  assert.notEqual(hunters.kind, 'hunter', 'armed hunters use their weapon kind while retaining the hunter role');
   assert.equal(hunters.ambushed, false);
   assert.equal(tactical.spendPreparationAction(state, 'setAmbush'), null);
   assert.equal(hunters.ambushed, false, 'selecting a preparation does not apply it yet');
@@ -1353,6 +1360,17 @@ function deployCommandableToZone(state, zoneId) {
   assert.equal(battle.phase, 'preparationExecution');
   assert.ok(battle.preparationEvents.some(event => event.kind === 'prepareAmbush' && event.groupId === hunters.id));
   tactical.advanceTacticalPhase(state);
+  assert.equal(battle.phase, 'deployment');
+  assert.equal(
+    tactical.placeTacticalDeploymentGroup(state, hunters.id, {
+      zoneId: 'approach',
+      line: hunters.line,
+    }),
+    null,
+  );
+  assert.equal(hunters.ambushed, true,
+    'manually placing an armed hunter on the approach activates the prepared ambush');
+  tactical.applyAutoDeployTacticalGroups(battle);
   tactical.advanceTacticalPhase(state);
   assert.equal(hunters.ambushed, true, 'placing hunters on the approach activates the prepared ambush');
   assert.equal(hunters.command, 'ambush', 'an ambushed hunter defaults to the surprise attack command');

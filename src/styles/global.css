@@ -204,7 +204,9 @@ html, body, #root {
   top: calc(100% + 5px);
   left: 0;
   z-index: 50;
-  min-width: 180px;
+  width: max-content;
+  min-width: 220px;
+  max-width: min(320px, calc(100vw - 16px));
   padding: 7px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -224,17 +226,30 @@ html, body, #root {
 .resource-breakdown-label {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 6px;
+  white-space: nowrap;
 }
-.resource-breakdown-row { padding: 2px 0; }
+.resource-breakdown-row {
+  padding: 2px 0;
+  white-space: nowrap;
+}
 .resource-breakdown-row.low { color: var(--bad); font-weight: 700; }
 .resource-breakdown-actions {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
+  flex: 1 0 auto;
   gap: 6px;
   min-width: 64px;
+  white-space: nowrap;
 }
+.resource-breakdown-amount {
+  min-width: 4ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.resource-breakdown-spoilage { white-space: nowrap; }
 .resource-star-button {
   width: 24px;
   height: 24px;
@@ -303,6 +318,66 @@ html, body, #root {
      스크롤을 막으므로 쓰지 않는다. inline-block 캔버스가 자연스럽게 스크롤된다. */
 }
 .canvas-wrap canvas { image-rendering: pixelated; display: block; }
+
+.map-layer-tabs {
+  position: absolute;
+  z-index: 44;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: auto;
+}
+.map-layer-tabs.minimap-attached {
+  position: static;
+  z-index: auto;
+  left: auto;
+  top: auto;
+  transform: none;
+  flex: 0 0 auto;
+  align-self: flex-start;
+}
+.map-layer-tab {
+  min-width: 58px;
+  padding: 6px 7px;
+  display: grid;
+  grid-template-columns: 19px 1fr;
+  align-items: center;
+  gap: 2px 5px;
+  color: #b7bec5;
+  background: rgba(17, 21, 24, 0.88);
+  border: 1px solid rgba(168, 177, 184, 0.35);
+  border-radius: 3px;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.35);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.map-layer-tab:hover { color: #f1eadc; border-color: rgba(218, 205, 174, 0.72); }
+.map-layer-tab-mark {
+  grid-row: 1 / span 2;
+  font-family: serif;
+  font-size: 17px;
+  line-height: 1;
+}
+.map-layer-tab-auto {
+  grid-column: 2;
+  color: #d6c38e;
+  font-size: 9px;
+  line-height: 1;
+}
+.map-layer-tab.aquifer.active {
+  color: #d8f5ff;
+  border-color: #59b9dc;
+  background: rgba(20, 57, 72, 0.92);
+}
+.map-layer-tab.ore.active {
+  color: #ffe8d5;
+  border-color: #bd7252;
+  background: rgba(67, 37, 29, 0.92);
+}
 
 /* ── 우측 도킹 관리 창 ── */
 .dock-frame {
@@ -687,6 +762,17 @@ html, body, #root {
 }
 
 /* ── 미니맵 ── */
+.minimap-with-layers {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 5px;
+  overflow: auto;
+  pointer-events: auto;
+  scrollbar-width: thin;
+}
 .minimap-overlay {
   position: relative;
   flex: 0 0 auto;
@@ -803,11 +889,12 @@ html, body, #root {
   overflow: hidden;
 }
 .hud-minimap-window .minimap-overlay {
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
   height: 100%;
-  overflow: auto;
+  overflow: visible;
   pointer-events: auto;
-  scrollbar-width: thin;
 }
 .hud-minimap-window .minimap-panel {
   width: 100%;

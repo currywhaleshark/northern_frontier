@@ -20,6 +20,12 @@ npm run preview  # 빌드 결과 미리보기
 npm run test:game
 ```
 
+Windows에서는 저장소 루트의 배치 파일을 더블클릭해 바로 실행할 수 있습니다.
+
+- `run-game.bat` — 본 게임
+- `run-head-box-editor.bat` — 헤드박스 편집기
+- `run-sprite-studio.bat` — 스프라이트 스튜디오
+
 기술 스택은 **TypeScript + React + Vite + HTML Canvas**입니다.
 
 ## 기본 플레이 흐름

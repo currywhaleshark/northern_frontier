@@ -51,8 +51,6 @@ const JOB_IDENTITIES: Partial<Record<JobId, string>> = {
   watchman: 'watchman',
   undertaker: 'undertaker',
   teacher: 'teacher',
-  shaman: 'shaman_named_wolhyang',
-  monk: 'monk_named_haeun',
 };
 
 const MILITIA_IDENTITIES: Record<MilitiaWeaponSpriteId | 'unarmed', string> = {

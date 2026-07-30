@@ -50,7 +50,7 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 44, 'delayed disasters ship with schema version 44');
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 45, 'subsurface resources ship with schema version 45');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');
@@ -80,6 +80,7 @@ assert.equal(typeof saveLoad.migrateV40ToV41, 'function');
 assert.equal(typeof saveLoad.migrateV41ToV42, 'function');
 assert.equal(typeof saveLoad.migrateV42ToV43, 'function');
 assert.equal(typeof saveLoad.migrateV43ToV44, 'function');
+assert.equal(typeof saveLoad.migrateV44ToV45, 'function');
 
 {
   const migrated = saveLoad.migrateV39ToV40({ schemaVersion: 39, courtGrantArtifactMisses: 3.8 });
@@ -103,6 +104,16 @@ assert.equal(typeof saveLoad.migrateV43ToV44, 'function');
   state.discoveredSpecialItems.push('royalMusket');
   state.weaponAllocationMode = 'manual';
   state.artifactWeaponAssignments = { royalSpear: null, royalMusket: artifactBearer.id };
+  const shamanSuccessor = state.residents[1];
+  shamanSuccessor.religiousVocation = 'shaman';
+  shamanSuccessor.job = 'shaman';
+  const monkNovice = state.residents[2];
+  monkNovice.religiousVocation = 'monk';
+  monkNovice.religiousMentorId = artifactBearer.id;
+  monkNovice.stage = 'youth';
+  monkNovice.stageProgress = 7;
+  monkNovice.job = 'idle';
+  monkNovice.task = '동자승';
   state.pendingDisasters = [{
     id: 'earlyFrost',
     choiceId: 'wait-harvest',
@@ -119,6 +130,15 @@ assert.equal(typeof saveLoad.migrateV43ToV44, 'function');
     'valid artifact weapon assignment survives a normal save/load round trip');
   assert.deepEqual(loaded?.pendingDisasters, state.pendingDisasters,
     'a delayed disaster survives a normal save/load round trip');
+  assert.equal(
+    loaded?.residents.find(resident => resident.id === shamanSuccessor.id)?.religiousVocation,
+    'shaman',
+    'a shaman successor vocation survives save/load',
+  );
+  const loadedNovice = loaded?.residents.find(resident => resident.id === monkNovice.id);
+  assert.equal(loadedNovice?.religiousVocation, 'monk');
+  assert.equal(loadedNovice?.religiousMentorId, artifactBearer.id);
+  assert.equal(loadedNovice?.task, '동자승', 'a saved novice remains in novice training');
 }
 
 {
@@ -167,6 +187,21 @@ assert.equal(typeof saveLoad.migrateV43ToV44, 'function');
   assert.equal(migrated.schemaVersion, 44);
   assert.equal(migrated.marker, 'kept');
   assert.deepEqual(migrated.pendingDisasters, [], 'pre-D0 saves begin with no delayed disaster');
+}
+
+{
+  const legacy = simulation.newGame(20260729);
+  const migrated = saveLoad.migrateV44ToV45({
+    ...legacy,
+    schemaVersion: 44,
+    aquiferLevels: undefined,
+    oreVeinRemaining: undefined,
+  });
+  assert.equal(migrated.schemaVersion, 45);
+  assert.ok(Array.isArray(migrated.aquiferLevels) && migrated.aquiferLevels.length > 0,
+    'pre-subsurface saves receive deterministic full aquifer levels');
+  assert.ok(Array.isArray(migrated.oreVeinRemaining) && migrated.oreVeinRemaining.length > 0,
+    'pre-subsurface saves receive deterministic full ore reserves');
 }
 
 {

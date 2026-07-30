@@ -35,6 +35,7 @@ export const OBLIQUE_BUILDING_2X2_TYPES = [
   'shrine',
   'hermitage',
   'cannonEmplacement',
+  'deepMine',
 ] as const satisfies readonly BuildingTypeId[];
 
 export const OBLIQUE_BUILDING_1X1_TYPES = [
@@ -47,6 +48,7 @@ export const OBLIQUE_BUILDING_1X1_TYPES = [
   'onggiKiln',
   'dock',
   'watchtower',
+  'well',
 ] as const satisfies readonly BuildingTypeId[];
 
 const TWO_TILE_COLUMN = new Map<BuildingTypeId, number>(
@@ -67,14 +69,14 @@ const CENTER_COLUMN: Record<Rank, number> = {
 export const OBLIQUE_BUILDING_SHEETS = {
   oneTile: {
     standard: {
-      src: '/assets/oblique-buildings-1x1-v1.png',
+      src: '/assets/oblique-buildings-1x1-v2.png',
       cellWidth: 28,
       cellHeight: 40,
       columns: OBLIQUE_BUILDING_1X1_TYPES.length,
       rows: 2,
     },
     highDefinition: {
-      src: '/assets/oblique-buildings-1x1-v1-hd.png',
+      src: '/assets/oblique-buildings-1x1-v2-hd.png',
       cellWidth: 56,
       cellHeight: 80,
       columns: OBLIQUE_BUILDING_1X1_TYPES.length,
@@ -83,14 +85,14 @@ export const OBLIQUE_BUILDING_SHEETS = {
   },
   twoTile: {
     standard: {
-      src: '/assets/oblique-buildings-2x2-v1.png',
+      src: '/assets/oblique-buildings-2x2-v2.png',
       cellWidth: 56,
       cellHeight: 80,
       columns: OBLIQUE_BUILDING_2X2_TYPES.length,
       rows: 2,
     },
     highDefinition: {
-      src: '/assets/oblique-buildings-2x2-v1-hd.png',
+      src: '/assets/oblique-buildings-2x2-v2-hd.png',
       cellWidth: 112,
       cellHeight: 160,
       columns: OBLIQUE_BUILDING_2X2_TYPES.length,

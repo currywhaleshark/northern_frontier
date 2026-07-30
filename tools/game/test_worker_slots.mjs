@@ -107,6 +107,10 @@ function prepareState(seed = 2026070901, rank = 'bu') {
   assert.deepEqual(workerSlots.workerSlotConfig('nitreYard'), { job: 'powderMaker', slots: 2 });
   assert.deepEqual(workerSlots.workerSlotConfig('ferry'), { job: 'fisher', slots: 2 });
   assert.deepEqual(workerSlots.workerSlotConfig('tannery'), { job: 'tanner', slots: 2 });
+  assert.deepEqual(workerSlots.workerSlotConfig('shrine'), { job: 'shaman', slots: 2 });
+  assert.deepEqual(workerSlots.workerSlotConfig('hermitage'), { job: 'monk', slots: 2 });
+  assert.equal(buildings.BUILDING_DEFS.shrine.slots, 2);
+  assert.equal(buildings.BUILDING_DEFS.hermitage.slots, 2);
   assert.equal(workerSlots.workerSlotConfig('center'), null);
   assert.equal(workerSlots.isSlottedProductionBuilding('center'), false);
   assert.equal(workerSlots.isSlottedProductionBuilding('field'), true);
@@ -130,6 +134,30 @@ function prepareState(seed = 2026070901, rank = 'bu') {
   assert.match(workerSlots.assignResidentToBuilding(state, second.id, field.id), /slot|capacity|full/i);
   assert.equal(second.job, 'idle');
   assert.equal(second.assignedBuildingId, null);
+}
+
+{
+  const state = prepareState();
+  const shrine = addBuilt(state, 'shrine', 10, 10);
+  const holder = workableResident(state, 0, 'shaman', 9, 10);
+  const successor = workableResident(state, 1, 'shaman', 11, 10);
+  const commoner = workableResident(state, 2, 'idle', 10, 11);
+
+  assert.equal(workerSlots.assignResidentToBuilding(state, holder.id, shrine.id), null);
+  assert.equal(workerSlots.assignResidentToBuilding(state, successor.id, shrine.id), null);
+  assert.deepEqual(
+    workerSlots.assignedSlotResidents(state, shrine).map(resident => resident.id),
+    [holder.id, successor.id],
+    'a shrine accepts the lineage holder and one adult successor',
+  );
+  assert.equal(workerSlots.availableWorkerSlots(state, shrine), 0);
+  workerSlots.unassignResidentFromBuilding(state, successor.id);
+  assert.match(
+    workerSlots.assignResidentToBuilding(state, commoner.id, shrine.id),
+    /religious vocation/i,
+    'an empty religious slot must not turn an unrelated commoner into a shaman',
+  );
+  assert.equal(commoner.job, 'idle');
 }
 
 {

@@ -28,7 +28,7 @@ import {
 
 export const UI_PREFS_KEY = 'buksae-ui-prefs';
 export const LEGACY_BUILD_MENU_OPEN_KEY = 'buksae-buildmenu-open';
-export const UI_PREFS_VERSION = 8;
+export const UI_PREFS_VERSION = 9;
 export const MAX_STARRED_RESOURCES = 8;
 export const DEFAULT_MAP_ZOOM = 1;
 
@@ -54,6 +54,8 @@ export interface UiPrefs extends ResidentMarkerPrefs {
   dockWindowLayouts: DockWindowLayouts;
   audio: AudioPrefs;
   mapZoom: number;
+  showAquiferLayer: boolean;
+  showOreLayer: boolean;
   autoFastForwardSleepingNight: boolean;
 }
 
@@ -79,6 +81,8 @@ export function defaultUiPrefs(buildDrawerLastCategory = DEFAULT_BUILD_CATEGORY)
       musicVolume: 0.7,
     },
     mapZoom: DEFAULT_MAP_ZOOM,
+    showAquiferLayer: false,
+    showOreLayer: false,
     showResidentJobMarkers: true,
     showResidentCargoMarkers: true,
     autoFastForwardSleepingNight: true,
@@ -139,12 +143,14 @@ export function normalizeUiPrefs(value: unknown, migratedBuildCategory = DEFAULT
     mapZoom?: unknown;
     showResidentJobMarkers?: unknown;
     showResidentCargoMarkers?: unknown;
+    showAquiferLayer?: unknown;
+    showOreLayer?: unknown;
     autoFastForwardSleepingNight?: unknown;
   };
   if (candidate.version !== 1 && candidate.version !== 2
     && candidate.version !== 3 && candidate.version !== 4
     && candidate.version !== 5 && candidate.version !== 6
-    && candidate.version !== 7
+    && candidate.version !== 7 && candidate.version !== 8
     && candidate.version !== UI_PREFS_VERSION) {
     return defaultUiPrefs();
   }
@@ -177,6 +183,12 @@ export function normalizeUiPrefs(value: unknown, migratedBuildCategory = DEFAULT
     showResidentCargoMarkers: candidate.version >= 7
       ? candidate.showResidentCargoMarkers !== false
       : true,
+    showAquiferLayer: candidate.version >= 9
+      ? candidate.showAquiferLayer === true
+      : false,
+    showOreLayer: candidate.version >= 9
+      ? candidate.showOreLayer === true
+      : false,
     autoFastForwardSleepingNight: candidate.version >= 8
       ? candidate.autoFastForwardSleepingNight !== false
       : true,
@@ -343,4 +355,14 @@ export function setAutoFastForwardSleepingNight(prefs: UiPrefs, enabled: boolean
 export function setMapZoom(prefs: UiPrefs, mapZoom: number): UiPrefs {
   const normalized = normalizeMapZoom(mapZoom);
   return normalized === prefs.mapZoom ? prefs : { ...prefs, mapZoom: normalized };
+}
+
+export function setMapLayerVisibility(
+  prefs: UiPrefs,
+  layer: 'aquifer' | 'ore',
+  visible: boolean,
+): UiPrefs {
+  return layer === 'aquifer'
+    ? { ...prefs, showAquiferLayer: visible }
+    : { ...prefs, showOreLayer: visible };
 }

@@ -24,6 +24,20 @@ const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const events = await import(pathToFileURL(join(compiledDir, 'events.mjs')).href);
 const residents = await import(pathToFileURL(join(compiledDir, 'residents.mjs')).href);
+const { residentLogName } = await import(pathToFileURL(join(compiledDir, 'residentLogName.mjs')).href);
+
+assert.equal(residentLogName({
+  name: '김봄', job: 'farmer', special: undefined, stage: null, religiousVocation: undefined,
+}), '농부 김봄', 'ordinary adults receive their current job before their name');
+assert.equal(residentLogName({
+  name: '이산', job: 'idle', special: undefined, stage: 'youth', religiousVocation: undefined,
+}), '소년 이산', 'growing residents use their life stage as the log role');
+assert.equal(residentLogName({
+  name: '박달', job: 'idle', special: undefined, stage: 'youth', religiousVocation: 'monk',
+}), '동자승 박달', 'a novice uses the religious role instead of the generic youth label');
+assert.equal(residentLogName({
+  name: '착호 포수 박돌개', job: 'hunter', special: 'tigerHunter', stage: null, religiousVocation: undefined,
+}), '착호 포수 박돌개', 'named residents keep their existing titled name');
 
 const state = simulation.newGame(2026071020);
 assert.equal(state.log.at(-1)?.important, true, 'the annual tribute announcement is important');
@@ -39,7 +53,13 @@ assert.equal(state.log.at(-1)?.important, true, 'callers can promote any log kin
 
 const victim = state.residents.find(resident => resident.alive);
 assert.ok(victim);
+victim.name = '김봄';
+victim.job = 'farmer';
 residents.killResident(state, victim, 'test cause');
 assert.equal(state.log.at(-1)?.important, true, 'resident deaths are always important');
+assert.match(state.log.at(-1)?.text ?? '', /^농부 김봄/,
+  'resident death logs identify an ordinary resident by job and name');
+assert.equal(state.corpses.at(-1)?.residentLabel, '농부 김봄',
+  'the death-time role is preserved for later corpse and burial logs');
 
 console.log('important log tests passed');

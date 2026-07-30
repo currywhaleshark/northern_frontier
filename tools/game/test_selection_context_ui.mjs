@@ -8,6 +8,7 @@ const canvasSource = readFileSync(new URL('../../src/components/GameCanvas.tsx',
 const inspectorSource = readFileSync(new URL('../../src/components/InspectorPanel.tsx', import.meta.url), 'utf8');
 const actionPopupSource = readFileSync(new URL('../../src/components/ActionPopup.tsx', import.meta.url), 'utf8');
 const jobPanelSource = readFileSync(new URL('../../src/components/JobPanel.tsx', import.meta.url), 'utf8');
+const weaponAllocationSource = readFileSync(new URL('../../src/components/WeaponAllocationDialog.tsx', import.meta.url), 'utf8');
 const weaponDialogSource = readFileSync(new URL('../../src/components/WeaponAllocationDialog.tsx', import.meta.url), 'utf8');
 const residentsWindowSource = readFileSync(new URL('../../src/components/dock/ResidentsWindow.tsx', import.meta.url), 'utf8');
 const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
@@ -19,6 +20,21 @@ assert.match(appSource,
   'the selection context must appear conditionally as a floating HUD window');
 assert.match(contextSource, /selectedEntity\.kind === 'resident'/,
   'resident selection must render in the bottom context bar');
+assert.match(contextSource,
+  /resident\.religiousVocation === 'monk'[\s\S]*resident\.stage[\s\S]*'동자승'/,
+  'a selected monk novice must be labelled as a novice rather than unemployed');
+assert.match(contextSource,
+  /JOB_ORDER\.includes\(resident\.job\)[\s\S]*\[resident\.job\][\s\S]*\.filter\(job => job === resident\.job/,
+  'a selected religious resident must retain a current-job option even when that job is not assignable');
+assert.match(contextSource,
+  /적재 \{Math\.floor\(haulerCarryCapacity\(resident\)\)\}/,
+  'hauler carry capacity must be floored before it is shown');
+assert.match(weaponAllocationSource,
+  /Math\.floor\(snapshot\.basePower \+ snapshot\.weaponPower\)/,
+  'artifact-adjusted personal defense contribution must not expose a fractional tail');
+assert.match(canvasSource,
+  /hoveredResident\.religiousVocation === 'monk'[\s\S]*hoveredResident\.stage[\s\S]*'동자승'/,
+  'the map resident tooltip must use the same novice label');
 assert.match(contextSource, /foreignSiteAt[\s\S]*<ForeignSitePanel/,
   'foreign-site actions must remain available in the bottom context bar');
 assert.match(contextSource, /<ActionPopup[\s\S]*embedded/,

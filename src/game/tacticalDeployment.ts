@@ -1,4 +1,4 @@
-import { combatGroupLabel } from './combatCapabilities';
+import { combatGroupLabel, tacticalGroupCapabilities } from './combatCapabilities';
 import { CONFIG } from './config';
 import { specialResidentDefinition } from './specialResidents';
 import { syncTacticalRouteControl } from './tacticalRoutes';
@@ -140,13 +140,14 @@ export function defaultTacticalDeploymentPlacement(
   if (battle.orientation === 'assault') {
     return { zoneId: 'lairTrail', line: group.kind === 'healer' ? 'rear' : group.line };
   }
-  const zoneId = group.kind === 'hunter'
+  const ambushCapable = tacticalGroupCapabilities(group).has('ambush');
+  const zoneId = ambushCapable
     ? 'approach'
     : group.id.includes('-levy') ? 'storehouse' : 'wall';
   return {
     zoneId,
     line: group.kind === 'healer' ? 'rear' : group.line,
-    ...(group.kind === 'hunter' && preparationApplied(battle as TacticalBattle, 'setAmbush')
+    ...(ambushCapable && preparationApplied(battle as TacticalBattle, 'setAmbush')
       ? { hidden: true }
       : {}),
   };
@@ -261,11 +262,11 @@ export function tacticalDeploymentPlacementUnavailableReason(
   }
   if (battle.orientation === 'assault' && battle.assaultKind === 'banditLair') {
     if (placement.zoneId === 'lairTrail') return null;
-    const infiltratingHunter = group.kind === 'hunter' && placement.zoneId === 'lairWall' &&
+    const infiltratingHunter = group.role === 'hunter' && placement.zoneId === 'lairWall' &&
       preparationApplied(battle, 'preInfiltration');
     if (!infiltratingHunter) return '토벌대는 진입로에만 배치할 수 있습니다.';
     if (activeCount(group) > 3) return '선행 침투조는 최대 3명까지 전방에 숨길 수 있습니다.';
-    if (battle.defenderGroups.some(candidate => candidate.id !== group.id && candidate.kind === 'hunter' &&
+    if (battle.defenderGroups.some(candidate => candidate.id !== group.id && candidate.role === 'hunter' &&
         battle.deploymentPlacements?.[candidate.id]?.zoneId === 'lairWall')) {
       return '선행 침투는 사냥꾼 1개 조만 전방에 배치할 수 있습니다.';
     }
@@ -283,9 +284,9 @@ export function placeTacticalDeploymentGroup(
   const reason = tacticalDeploymentPlacementUnavailableReason(battle, groupId, placement);
   if (reason) return reason;
   const group = battle.defenderGroups.find(candidate => candidate.id === groupId)!;
-  const hidden = (battle.orientation === 'assault' && group.kind === 'hunter' &&
+  const hidden = (battle.orientation === 'assault' && group.role === 'hunter' &&
       placement.zoneId === 'lairWall' && preparationApplied(battle, 'preInfiltration')) ||
-    (battle.orientation !== 'assault' && group.kind === 'hunter' &&
+    (battle.orientation !== 'assault' && tacticalGroupCapabilities(group).has('ambush') &&
       placement.zoneId === 'approach' && preparationApplied(battle, 'setAmbush'));
   const next: TacticalDeploymentPlacement = {
     zoneId: placement.zoneId,

@@ -1,10 +1,12 @@
-// 습격 피해 처리 공용 헬퍼 — 즉시 판정(raids.ts)과 지도 전투(battles.ts)가 함께 쓴다
+// 건물 파손 및 습격 피해 처리 공용 헬퍼
 import { BUILDING_DEFS, countBuilt } from './buildings';
 import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import { lootLivestock } from './livestock';
 import { killResident, livingResidents, reconcileResidentHomes } from './residents';
-import type { Building, BuildingTypeId, GameState, ResourceId } from './types';
+import type {
+  Building, BuildingRepairCause, BuildingTypeId, GameState, ResourceId,
+} from './types';
 
 export function applyLootLosses(
   state: GameState,
@@ -111,6 +113,7 @@ export function damageBuildings(state: GameState, rng: () => number, count: numb
     const max = CONFIG.raid.repairProgressMax;
     b.built = false;
     b.repairing = true;
+    b.repairCause = 'raid';
     b.progress = def.buildDays * (min + rng() * Math.max(0, max - min));
     damaged.push(b.type);
   }
@@ -122,6 +125,7 @@ export function damageBuildingTargets(
   state: GameState,
   rng: () => number,
   targets: readonly Building[],
+  repairCause: BuildingRepairCause,
 ): BuildingTypeId[] {
   const damaged: BuildingTypeId[] = [];
   const seen = new Set<number>();
@@ -133,11 +137,25 @@ export function damageBuildingTargets(
     const max = CONFIG.raid.repairProgressMax;
     building.built = false;
     building.repairing = true;
+    building.repairCause = repairCause;
     building.progress = def.buildDays * (min + rng() * Math.max(0, max - min));
     damaged.push(building.type);
   }
   if (damaged.length > 0) reconcileResidentHomes(state, rng);
   return damaged;
+}
+
+export function buildingRepairCause(
+  state: Pick<GameState, 'pendingDisasters'>,
+  building: Pick<Building, 'id' | 'repairCause'>,
+): BuildingRepairCause {
+  if (building.repairCause) return building.repairCause;
+  for (const disaster of state.pendingDisasters) {
+    if (!disaster.targetBuildingIds?.includes(building.id)) continue;
+    if (disaster.id === 'snowDamage' || disaster.id === 'springFlood') return disaster.id;
+  }
+  // 원인 필드가 없던 구 저장의 파손 상태는 기존 의미였던 습격 피해로 이어 간다.
+  return 'raid';
 }
 
 export function moraleShock(state: GameState, amount: number): void {

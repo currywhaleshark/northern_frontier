@@ -5,17 +5,21 @@ import { LIFE_STAGE_NAMES } from '../../game/lifecycle';
 import {
   ARTIFACT_WEAPON_NAMES, COMBAT_WEAPON_NAMES, artifactWeaponForResident,
 } from '../../game/weapons';
-import { filteredResidents, type ResidentSort, type ResidentStatusFilter } from '../../ui/residentListPresentation';
+import {
+  filteredResidents, type ResidentJobFilter, type ResidentSort, type ResidentStatusFilter,
+} from '../../ui/residentListPresentation';
 import type { GameState, JobId, Resident } from '../../game/types';
 import { UiIcon } from '../UiIcon';
 
 function residentRoleLabel(resident: Resident): string {
+  if (resident.stage === 'youth' && resident.religiousVocation === 'monk') return '동자승';
   if (resident.stage) return LIFE_STAGE_NAMES[resident.stage];
   return JOB_NAMES[resident.job];
 }
 
 function workplaceLabel(state: GameState, resident: Resident): string {
   if (!resident.alive) return '사망';
+  if (resident.stage === 'youth' && resident.religiousVocation === 'monk') return '암자 수행 중';
   if (resident.stage) return '성장 중';
   const workplace = state.buildings.find(building => building.id === resident.assignedBuildingId);
   return workplace ? `${BUILDING_DEFS[workplace.type].name} 배정` : '근무지 없음';
@@ -52,15 +56,23 @@ export function ResidentsWindow({
   onOpenWeaponAllocation,
 }: Props) {
   const [query, setQuery] = useState('');
-  const [jobFilter, setJobFilter] = useState<'all' | JobId>('all');
+  const [jobFilter, setJobFilter] = useState<ResidentJobFilter>('all');
   const [statusFilter, setStatusFilter] = useState<ResidentStatusFilter>('all');
   const [sort, setSort] = useState<ResidentSort>('arrival');
   const moraleFactors = (state.moraleFactors ?? []).filter(factor => factor.unlocked && factor.delta !== 0);
+  const hasReligiousResidents = state.residents.some(resident =>
+    resident.religiousVocation != null ||
+    resident.job === 'shaman' ||
+    resident.job === 'monk');
   const presentJobs = [...new Set(state.residents.map(resident => resident.job))]
+    .filter(job => job !== 'shaman' && job !== 'monk')
     .sort((left, right) => JOB_NAMES[left].localeCompare(JOB_NAMES[right], 'ko-KR'));
-  const jobOptions = jobFilter !== 'all' && !presentJobs.includes(jobFilter)
-    ? [jobFilter, ...presentJobs]
-    : presentJobs;
+  const jobOptions: Array<{ id: Exclude<ResidentJobFilter, 'all'>; label: string }> = [
+    ...(hasReligiousResidents || jobFilter === 'religious'
+      ? [{ id: 'religious' as const, label: '종교인' }]
+      : []),
+    ...presentJobs.map((job: JobId) => ({ id: job, label: JOB_NAMES[job] })),
+  ];
   const visibleResidents = filteredResidents(state, {
     query,
     job: jobFilter,
@@ -92,9 +104,9 @@ export function ResidentsWindow({
         </label>
         <label>
           <span>직업</span>
-          <select aria-label="주민 직업 필터" value={jobFilter} onChange={event => setJobFilter(event.target.value as 'all' | JobId)}>
+          <select aria-label="주민 직업 필터" value={jobFilter} onChange={event => setJobFilter(event.target.value as ResidentJobFilter)}>
             <option value="all">모든 직업</option>
-            {jobOptions.map(job => <option key={job} value={job}>{JOB_NAMES[job]}</option>)}
+            {jobOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
           </select>
         </label>
         <label>

@@ -106,7 +106,7 @@ export function WeaponAllocationDialog({
                   <strong>{resident.name}</strong>
                   <small>
                     {JOB_NAMES[resident.job]} · {resident.task} · 건강 {Math.round(resident.health)} · 방어 기여 +
-                    {snapshot ? snapshot.basePower + snapshot.weaponPower : 0}
+                    {snapshot ? Math.floor(snapshot.basePower + snapshot.weaponPower) : 0}
                   </small>
                 </span>
                 <select

@@ -24,12 +24,12 @@
 | [절목 시스템](DESIGN-2026-07-23-edict-system.md) | 일부 완료 | 골격·절미령·절탄령 완료, 2·3차 절목 미착수 |
 | [연간 기후와 실제 날씨 설계](DESIGN-2026-07-28-annual-climate-weather.md) | 완료 | 결정적 연간 기후·계절 날씨·재해 확률 연결 완료 |
 | [조정 하사품 설계](DESIGN-2026-07-28-court-grants.md) | 완료 | 기본 하사품과 영구 기물·현판·총통·고유 무기 후속 범위까지 구현 |
-| [채광갱과 지하 광맥](DESIGN-2026-07-28-deep-mining.md) | 미착수 | 설계만 기록됨 |
+| [채광갱과 지하 광맥](DESIGN-2026-07-28-deep-mining.md) | 완료 | M1~M4와 2×2 채광갱 계절 아트·표준/HD 연결·표적 검증 완료 |
 | [재해 확장](DESIGN-2026-07-28-disasters.md) | 일부 완료 | D0~D8 완료, D9 갱도 붕괴와 우물 선행 화재가 남음 |
-| [정기거래 계약](DESIGN-2026-07-28-recurring-trade.md) | 완료 | 계약 체결·연간 실행·갱신·계약고·UI·경보까지 반영 |
+| [정기거래 계약](DESIGN-2026-07-28-recurring-trade.md) | 완료 | 계약 전 과정·UI·경보와 체결 불가 사유 중앙 플로트까지 반영 |
 | [스프라이트 스튜디오 설계](DESIGN-2026-07-28-sprite-studio.md) | 완료 | 레지스트리 5종, 편집 UI, 작업자 슬롯까지 P0~P6 구현 |
 | [착용 장비와 가죽 경제](DESIGN-2026-07-28-wearables-and-footwear.md) | 완료 | 의복·신발 착용, 마모, 제작, 저장, UI 반영. 사망 회수 없음은 확정 범위 |
-| [우물과 급수](DESIGN-2026-07-28-wells-and-water.md) | 미착수 | 설계만 기록됨 |
+| [우물과 급수](DESIGN-2026-07-28-wells-and-water.md) | 일부 완료 | 내륙·시작 수맥, 복수 우물·공정 배분과 약 30명 평시 생활권 조정, 레이어·배치 미리보기·우물 아트 완료. 농수로·화재가 남음 |
 | [연대기 화면](DESIGN-2026-07-29-chronicle-screen.md) | 완료 | C1~C4 구현·검증 완료 (v43). 행정단위 표기(촌·보·진·부)와 상단바·저장 슬롯 표기가 범위 외 추가로 반영됨 |
 | [후반 엔딩](DESIGN-2026-07-29-late-game-endings.md) | 보류 | 역사 시계의 진행 방식을 확정할 때까지 구현 보류 |
 | [연간 기후 구현계획](IMPLEMENTATION-2026-07-28-annual-climate-weather.md) | 완료 | P1~P7 구현·검증 후 `800f624`로 병합 |
@@ -38,10 +38,13 @@
 | [재해 확장 D2 구현계획](IMPLEMENTATION-2026-07-29-disasters-late-frost.md) | 완료 | 밭/논 여름 재파종, 3일 실제 날씨 판정, 공유 백화/경보, 표적 회귀·빌드 완료 |
 | [재해 확장 D3 구현계획](IMPLEMENTATION-2026-07-29-disasters-locust.md) | 완료 | 비공개 2~5일 누적 피해·정착지 단위 수확·황충 오버레이·표적 회귀·빌드 완료 |
 | [재해 확장 D4 구현계획](IMPLEMENTATION-2026-07-29-disasters-drought-weir.md) | 완료 | 무강수 3일 가뭄·강우 해소·농업/어획 피해·보 관개·표적 회귀·빌드 완료 |
-| [재해 확장 D5 구현계획](IMPLEMENTATION-2026-07-29-disasters-spring-flood-levee.md) | 완료 | 대홍수·제방·보 저수지·보 파괴 구현, D5 표적 회귀와 프로덕션 빌드 완료 |
-| [재해 확장 D6 구현계획](IMPLEMENTATION-2026-07-29-disasters-snow-damage.md) | 완료 | 실제 연속 적설 설해·주거 붕괴·수리 재배치·경보·저장 및 표적 회귀 완료 |
+| [재해 확장 D5 구현계획](IMPLEMENTATION-2026-07-29-disasters-spring-flood-levee.md) | 완료 | 대홍수·보 저수지·보 파괴·제방과 원인별 피해 경보 구현, D5 표적 회귀와 빌드 완료 |
+| [재해 확장 D6 구현계획](IMPLEMENTATION-2026-07-29-disasters-snow-damage.md) | 완료 | 실제 연속 적설 설해·주거 붕괴·수리 재배치와 원인별 피해 경보 및 표적 회귀 완료 |
 | [재해 확장 D7 구현계획](IMPLEMENTATION-2026-07-29-disasters-epidemic.md) | 완료 | 여름·인구 발생 가중, 집·일터 전염망, 동거인 격리, 의료 회복, 2일 무감염 종료와 표적 회귀 완료 |
 | [재해 확장 D8 구현계획](IMPLEMENTATION-2026-07-29-disasters-livestock-epidemic.md) | 완료 | 축종군 발생·축사 전염·도살 처분·격리와 목동 간호·농우/군마 정합성·표적 회귀 완료 |
+| [재난 일러스트와 수리 시설 아트 구현계획](IMPLEMENTATION-2026-07-29-disaster-art-and-waterworks.md) | 완료 | 깨끗한 수묵담채 사건 카드 3종과 준탑뷰 보·제방 가로/세로 자산, 제방 변 배치·중첩 규칙, 표적 회귀·빌드 완료 |
+| [지하 레이어·우물·채광갱 1차 구현계획](IMPLEMENTATION-2026-07-29-subsurface-layers-well-deep-mine.md) | 완료 | P0~P15: 지하자원·채광갱·급수, 복수 우물·공정 배분·실플레이 완화와 레이어·가상 배치 영향까지 검증 완료 |
+| [지하 시설 건물 스프라이트 구현계획](IMPLEMENTATION-2026-07-29-subsurface-building-art.md) | 완료 | 우물·채광장·채광갱 계절형과 v2 표준/HD 아틀라스 연결, 알파·열 매핑 검사와 빌드 완료 |
 | [스프라이트 스튜디오 구현계획](IMPLEMENTATION-2026-07-28-sprite-studio.md) | 완료 | P0~P6 구현 후 `main` 반영 |
 
 ## 역사 계획
@@ -79,17 +82,17 @@
 | [자원 물류·교역 개편](superpowers/plans/2026-07-10-resource-logistics-trade-overhaul.md) | 완료 | 자원 카탈로그, 물류, 소비, 연료·작물·의복, 가치 교역으로 후속 구현됨 |
 | [전투 연출 로드맵](superpowers/plans/2026-07-13-battle-presentation-roadmap.md) | 완료 | 1차 연출 범위와 체크리스트 완료 |
 | [공격 원정 전투](superpowers/plans/2026-07-13-offensive-expedition-battles.md) | 완료 | 산채·맹수 원정, 자동·직접 전투, 시뮬레이터까지 구현 |
-| [전술 전투 검토 수정](superpowers/plans/2026-07-13-tactical-combat-review-fixes.md) | 완료 | Task 1~8·10과 회귀 보정 완료 기록 확인 |
+| [전술 전투 검토 수정](superpowers/plans/2026-07-13-tactical-combat-review-fixes.md) | 완료 | Task 1~8·10과 무장 종류 무관 사냥꾼 준비 매복 회귀 보정 완료 |
 | [가축·의원·귀순병·병종](superpowers/plans/2026-07-14-livestock-physician-defectors-units.md) | 일부 완료 | 가축·의원·귀순병·기마병은 구현, 팽배수 등 명시적 후속 범위가 남음 |
 | [전술 진형·적 계책](superpowers/plans/2026-07-14-tactical-formation-and-enemy-plans.md) | 완료 | 3열 진형, 표적, 후방 교전, 적 계획이 후속 전술 단계에 통합됨 |
 | [호랑이 몰이사냥](superpowers/plans/2026-07-14-tiger-hunt-encirclement-rework.md) | 완료 | 포위망·결정표·반격 창구와 전술 화면 구현 |
-| [UI 재구성](superpowers/plans/2026-07-14-ui-reorganization.md) | 완료 | 건설 드로어·도킹 창·선택 바·통합 로그와 안정화 완료 |
+| [UI 재구성](superpowers/plans/2026-07-14-ui-reorganization.md) | 완료 | 건설 드로어·도킹 창·선택 바·통합 로그와 자원 상세 행·계산 수치·주민 역할 호칭 표시 안정화 완료 |
 | [발효·김장](superpowers/plans/2026-07-15-fermentation-kimjang.md) | 완료 | 부패·보존·발효·장독대·김장 구현 |
 | [논밭 드래그 크기](superpowers/plans/2026-07-17-farm-plot-drag-sizing.md) | 완료 | 가변 경작지·면적 노동·농우 연결 구현 |
 | [이동식 관리 창](superpowers/plans/2026-07-17-floating-management-windows.md) | 완료 | 관리 창·미니맵·선택 컨텍스트까지 확장 완료 |
-| [혼인·출산·성장](superpowers/plans/2026-07-17-marriage-birth-growth.md) | 완료 | 생애 주기, 장례, 소년 노동·서당 후속까지 통합 |
+| [혼인·출산·성장](superpowers/plans/2026-07-17-marriage-birth-growth.md) | 완료 | 생애 주기·장례 지연 원인 안내·소년 후속·성장기 가속 표시 나이와 종교인 혼인 예외까지 통합 |
 | [런타임 성능 안정화](superpowers/plans/2026-07-17-runtime-performance-stabilization.md) | 완료 | 렌더 시계·viewport·탐사·광역 경로 최적화와 측정 기록 완료 |
-| [만족도·종교](superpowers/plans/2026-07-17-satisfaction-religion.md) | 완료 | 성분 만족도·서당·무속·불교 구현 |
+| [만족도·종교](superpowers/plans/2026-07-17-satisfaction-religion.md) | 완료 | 두 종교·단일 후계 계보·2인 시설 슬롯·종교인 남녀 정적/HD 자산·저장·명부/선택 UI 구현. 동작은 8월 1일 이후 후속 |
 | [은 화폐](superpowers/plans/2026-07-17-silver-currency.md) | 완료 | 확정 범위 G1~G2 완료, G3 상평통보는 의도적 비범위로 보류 |
 | [특수 주민](superpowers/plans/2026-07-17-special-residents.md) | 일부 완료 | 공통 명부와 확정 주민은 구현, 추가 후보 S3는 남음 |
 | [전술 확장 2단계 기준선](superpowers/plans/2026-07-19-tactical-combat-expansion-phase-2-baseline.md) | 완료 | Phase 0 golden·계약 기준선 확보 |

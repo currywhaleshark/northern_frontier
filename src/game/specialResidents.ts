@@ -23,7 +23,6 @@ import type {
 } from './types';
 
 // 특수 주민 고유의 패시브 스킬 — 명부·주민 선택 정보에 항상 붙어 다니는 표식.
-// 종교인(무당·노승)은 존재 자체가 능력이라 스킬 없이 benefit 문구만 쓴다.
 export interface SpecialResidentSkill {
   id: string;
   icon: UiIconName;
@@ -58,8 +57,16 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     job: 'shaman',
     epithet: '산신을 모시는 떠돌이 무당',
     story: '방울과 부채를 지니고 북방의 산신을 모시며 마을에 들어왔다.',
-    benefit: '당집에 상주하면 마을의 사기를 끌어올린다.',
-    risk: '지속적인 조정 위험은 없지만, 사망하면 다시 얻을 수 없다.',
+    benefit: `당집에 상주하면 일반 무당의 굿 소리에 더해 사기 +${CONFIG.satisfaction.namedShamanCheerBonus}.`,
+    risk: '사망하면 월향의 고유한 큰굿은 사라지지만, 내림굿을 받은 후계 무당이 당집을 지킨다.',
+    skills: [
+      {
+        id: 'greatGut',
+        icon: 'shaman',
+        name: '만신의 큰굿',
+        effect: `월향이 당집에 상주하면 일반 무당 효과에 더해 마을 사기 +${CONFIG.satisfaction.namedShamanCheerBonus}. 후계자는 이 특기를 물려받지 않는다.`,
+      },
+    ],
     illustration: {
       src: '/assets/events/special-mudang-wolhyang-v1.png',
       alt: '눈 내리는 북방 성책 앞에 방울과 부채를 든 만신 월향',
@@ -75,8 +82,16 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     job: 'monk',
     epithet: '망자의 명복을 비는 떠돌이 승려',
     story: '잿빛 승복 한 벌로 변방을 걸으며 살아 있는 이와 죽은 이를 함께 돌본다.',
-    benefit: '암자에 상주하면 사망과 장례의 슬픔을 줄인다.',
-    risk: '노년의 자연사 위험을 지닌 대체 불가한 인물이다.',
+    benefit: `암자에 상주하면 사망 사기 하락을 ${CONFIG.satisfaction.namedMonkGriefRelief}로 줄이고 안장 위로 +${CONFIG.satisfaction.namedMonkBurialBonus}.`,
+    risk: '노년의 자연사 위험이 있으나, 미리 거둔 동자승이 성장하면 일반 승려로 법맥을 잇는다.',
+    skills: [
+      {
+        id: 'cheondojae',
+        icon: 'monk',
+        name: '해운의 천도재',
+        effect: `사망 사기 하락을 ${CONFIG.satisfaction.namedMonkGriefRelief}로 줄이고 안장 위로 +${CONFIG.satisfaction.namedMonkBurialBonus}. 후계 승려의 상례 보정보다 강하다.`,
+      },
+    ],
     illustration: {
       src: '/assets/events/special-monk-haeun-v1.png',
       alt: '북방 개척지 성문 앞에 목탁과 바랑을 들고 선 노승 해운',
@@ -179,14 +194,14 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     job: 'miner',
     epithet: '지팡이로 산맥을 짚는 떠돌이 풍수',
     story: '눈이 멀고서야 산세가 보인다는 지관. 지팡이로 땅을 두드리며 맥을 짚는다.',
-    benefit: `채광꾼 고정 · 채광 산출 +${Math.round(CONFIG.specialResidents.geomancerMiningYieldBonus * 100)}% · 은맥 발견 확률 상승`,
+    benefit: `채광꾼 고정 · 수맥·광맥 농도 판독 · 채광 산출 +${Math.round(CONFIG.specialResidents.geomancerMiningYieldBonus * 100)}% · 은맥 발견 확률 상승`,
     risk: '은이 나오기 시작하면 잠채 소문이 더 빨리 퍼진다',
     skills: [
       {
         id: 'mountainReading',
         icon: 'geomancer',
         name: '산세 읽기',
-        effect: `그가 마을에 있으면 모든 채광 산출 +${Math.round(CONFIG.specialResidents.geomancerMiningYieldBonus * 100)}%, 은맥을 알아볼 확률이 크게 오른다.`,
+        effect: `그가 마을에 있으면 수맥·광맥 레이어의 농도가 선명하게 드러나고, 모든 채광 산출 +${Math.round(CONFIG.specialResidents.geomancerMiningYieldBonus * 100)}%, 은맥을 알아볼 확률이 크게 오른다.`,
       },
     ],
     illustration: {

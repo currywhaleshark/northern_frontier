@@ -12,7 +12,8 @@ import { firewoodWeatherMult } from '../game/weather';
 import { contractsInGrace } from '../game/tradeContracts';
 import { RESOURCE_NAMES } from '../game/constants';
 import { pendingDisasterDaysRemaining } from '../game/disasters';
-import type { AlertItem, GameState } from '../game/types';
+import { buildingRepairCause } from '../game/raidDamage';
+import type { AlertItem, BuildingRepairCause, GameState } from '../game/types';
 
 export function computeAlerts(state: GameState): AlertItem[] {
   const alerts: AlertItem[] = [];
@@ -109,11 +110,26 @@ export function computeAlerts(state: GameState): AlertItem[] {
     });
   }
 
-  const damagedBuildings = state.buildings.filter(building => building.repairing).length;
-  if (damagedBuildings > 0) {
+  const damagedBuildings: Record<BuildingRepairCause, number> = {
+    raid: 0,
+    snowDamage: 0,
+    springFlood: 0,
+  };
+  for (const building of state.buildings) {
+    if (!building.repairing) continue;
+    damagedBuildings[buildingRepairCause(state, building)]++;
+  }
+  const damageAlerts: Array<{ cause: BuildingRepairCause; label: string; subject: string }> = [
+    { cause: 'raid', label: '습격 피해', subject: '건물' },
+    { cause: 'snowDamage', label: '설해 피해', subject: '주거' },
+    { cause: 'springFlood', label: '대홍수 피해', subject: '건물' },
+  ];
+  for (const { cause, label, subject } of damageAlerts) {
+    const count = damagedBuildings[cause];
+    if (count <= 0) continue;
     alerts.push({
-      id: 'buildingDamage',
-      text: `습격 피해: 건물 ${damagedBuildings}채가 파손되었습니다. 건설담당이 수리를 우선합니다.`,
+      id: `buildingDamage-${cause}`,
+      text: `${label}: ${subject} ${count}채가 파손되었습니다. 건설담당이 수리합니다.`,
       level: 'danger',
     });
   }
@@ -198,14 +214,6 @@ export function computeAlerts(state: GameState): AlertItem[] {
       continue;
     }
     if (disaster.id === 'snowDamage') {
-      const damaged = Math.max(0, Math.floor(disaster.data?.damagedBuildings ?? 0));
-      if (damaged > 0) {
-        alerts.push({
-          id: `pendingDisaster-${disaster.id}`,
-          text: `설해 피해: 주거 ${damaged}채가 파손되었습니다. 건설담당이 수리합니다.`,
-          level: 'danger',
-        });
-      }
       continue;
     }
     if (disaster.id !== 'earlyFrost' && disaster.id !== 'lateFrost') continue;

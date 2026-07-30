@@ -44,7 +44,7 @@ function clearMapToPlain(state) {
   state.exploration = { explored: state.map.map(row => row.map(() => true)) };
 }
 
-function addBuilt(state, type, x, y) {
+function addBuilt(state, type, x, y, extras = {}) {
   const building = {
     id: 9200 + state.buildings.length,
     type,
@@ -53,6 +53,7 @@ function addBuilt(state, type, x, y) {
     progress: buildings.BUILDING_DEFS[type].buildDays,
     built: true,
     fieldGrowth: 0,
+    ...extras,
   };
   state.buildings.push(building);
   buildings.occupyBuildingTiles(state, building);
@@ -265,6 +266,32 @@ function prepareResident(resident, job, x, y) {
     selectionActions.selectedEntityAfterTileClick(state, { kind: 'resident', id: resident.id }, smithyTile),
     { kind: 'building', id: smithy.id },
     'clicking a building replaces the current resident selection',
+  );
+}
+
+{
+  const state = simulation.newGame(2026072901);
+  clearMapToPlain(state);
+  state.map[10][10].terrain = 'river';
+  const dryingRack = addBuilt(state, 'dryingRack', 10, 10);
+  const levee = addBuilt(state, 'levee', 10, 10, { leveeEdge: 'e' });
+  const sharedTile = state.map[10][10];
+
+  assert.equal(sharedTile.buildingId, dryingRack.id, 'a levee overlay preserves the primary riverbank building id');
+  assert.deepEqual(
+    selectionActions.selectedEntityAfterTileClick(state, null, sharedTile),
+    { kind: 'building', id: dryingRack.id },
+    'the first click selects the primary riverbank building',
+  );
+  assert.deepEqual(
+    selectionActions.selectedEntityAfterTileClick(state, { kind: 'building', id: dryingRack.id }, sharedTile),
+    { kind: 'building', id: levee.id },
+    'a repeated click cycles from the riverbank building to the levee edge',
+  );
+  assert.deepEqual(
+    selectionActions.selectedEntityAfterTileClick(state, { kind: 'building', id: levee.id }, sharedTile),
+    { kind: 'building', id: dryingRack.id },
+    'another click cycles back to the riverbank building',
   );
 }
 

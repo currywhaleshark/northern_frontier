@@ -10,6 +10,7 @@ import { foreignSiteAt } from '../game/foreignSites';
 import { mineralRemaining } from '../game/minerals';
 import { mineMineralSummary } from '../game/miningSites';
 import { livestockCapacityForStable, livestockDailyFeedNeed, LIVESTOCK_DEFS, normalizeLivestockState } from '../game/livestock';
+import { residentDisplayAge } from '../game/lifecycle';
 import { pastureRequiredHerders, pastureTileCount } from '../game/pastures';
 import { residentHome } from '../game/residents';
 import { getSeason } from '../game/seasons';
@@ -20,6 +21,7 @@ import { combatDefaultWeaponName } from '../game/combatCapabilities';
 import { enrolledStudentIds, isSchoolAge, schoolSeatCount } from '../game/education';
 import { specialResidentSkills } from '../game/specialResidents';
 import { isYouthWorkJob } from '../game/youth';
+import { buildingWaterSupply, wellWaterStatus } from '../game/waterSupply';
 import { DAY_BAND_NAMES, uiDayBand } from '../ui/dayBand';
 import {
   ARTIFACT_WEAPON_NAMES, COMBAT_WEAPON_NAMES, MOUNT_NAMES, artifactWeaponForResident,
@@ -110,7 +112,7 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
   return (
     <table className="insp-table">
       <tbody>
-        <tr><td>이름</td><td>{resident.name} ({resident.age}세){resident.literate ? <span title="문해자 — 의원·아전·훈장을 맡을 수 있고 숙련이 빨리 오릅니다"> <UiIcon name="literate" size={18} /></span> : ''}{resident.sick ? <span title="환자"> <UiIcon name="sick" size={18} /></span> : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</td></tr>
+        <tr><td>이름</td><td>{resident.name} ({residentDisplayAge(resident)}세){resident.literate ? <span title="문해자 — 의원·아전·훈장을 맡을 수 있고 숙련이 빨리 오릅니다"> <UiIcon name="literate" size={18} /></span> : ''}{resident.sick ? <span title="환자"> <UiIcon name="sick" size={18} /></span> : ''}{state.day < (resident.quarantinedUntil ?? 0) ? ' · 격리' : ''}</td></tr>
         {resident.origin && <tr><td>출신</td><td>{resident.origin}</td></tr>}
         {resident.spouseId != null && (
           <tr><td>배우자</td><td>{familyReferenceName(state, resident.spouseId, undefined)}</td></tr>
@@ -125,29 +127,38 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
           <tr>
             <td>소년기 활동</td>
             <td>
-              <div role="group" aria-label="소년기 활동 선택">
-                <button
-                  type="button"
-                  className="btn small"
-                  aria-pressed={youthActivity === 'work'}
-                  onClick={() => onSetYouthActivity('work')}
-                >일 돕기</button>{' '}
-                <button
-                  type="button"
-                  className="btn small"
-                  aria-pressed={youthActivity === 'school'}
-                  onClick={() => onSetYouthActivity('school')}
-                >서당 다니기</button>
-              </div>
-              <small className="muted">
-                {youthActivity === 'work'
+              {resident.religiousVocation === 'monk' ? (
+                <>
+                  <strong>동자승 수행</strong>
+                  <small className="muted"> · 성인이 되면 승려로 수계하며 직업이 고정됩니다.</small>
+                </>
+              ) : (
+                <>
+                  <div role="group" aria-label="소년기 활동 선택">
+                    <button
+                      type="button"
+                      className="btn small"
+                      aria-pressed={youthActivity === 'work'}
+                      onClick={() => onSetYouthActivity('work')}
+                    >일 돕기</button>{' '}
+                    <button
+                      type="button"
+                      className="btn small"
+                      aria-pressed={youthActivity === 'school'}
+                      onClick={() => onSetYouthActivity('school')}
+                    >서당 다니기</button>
+                  </div>
+                  <small className="muted">
+                    {youthActivity === 'work'
                   ? '성인 노동력의 50% · 운반꾼·농부·장작패기·목동만 가능'
                   : enrolled
                     ? '서당 가동 · 교육 진행 중'
                     : activeSchoolSeats <= 0
                       ? '진행 정지 — 완공된 서당과 건강한 훈장이 필요합니다.'
                       : '진행 정지 — 서당 정원이 찼습니다.'}
-              </small>
+                  </small>
+                </>
+              )}
             </td>
           </tr>
         )}
@@ -181,15 +192,23 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
           <td>
             <select
               value={resident.job}
-              disabled={!resident.alive || (!!resident.stage && (resident.stage !== 'youth' || youthActivity !== 'work'))}
-              title={resident.stage === 'youth' && youthActivity === 'school'
+              disabled={!resident.alive || Boolean(resident.special) || Boolean(resident.religiousVocation)
+                || (!!resident.stage && (resident.stage !== 'youth' || youthActivity !== 'work'))}
+              title={resident.religiousVocation
+                ? '종교 소명을 이어받아 직업이 고정됩니다'
+                : resident.stage === 'youth' && youthActivity === 'school'
                 ? '서당에 다니는 동안 생산 직무를 맡을 수 없습니다'
                 : resident.stage && resident.stage !== 'youth' ? '아직 직업을 맡을 수 없는 나이입니다' : undefined}
               onChange={event => onSetJob(event.target.value as JobId)}
             >
-              {JOB_ORDER.filter(job => job === resident.job || (isJobUnlocked(state.rank, job)
+              {[...JOB_ORDER, ...(JOB_ORDER.includes(resident.job) ? [] : [resident.job])]
+                .filter(job => job === resident.job || (isJobUnlocked(state.rank, job)
                 && (resident.stage !== 'youth' || isYouthWorkJob(job)))).map(job => (
-                <option key={job} value={job}>{JOB_NAMES[job]}</option>
+                <option key={job} value={job}>
+                  {job === resident.job && resident.religiousVocation === 'monk' && resident.stage
+                    ? '동자승'
+                    : JOB_NAMES[job]}
+                </option>
               ))}
             </select>
           </td>
@@ -198,7 +217,7 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
           <tr>
             <td>운반 장비</td>
             <td>
-              <span>{resident.cartEquipped && <><UiIcon name="cart" size={20} /> </>}{resident.cartEquipped ? '수레' : '지게'} · 적재 {haulerCarryCapacity(resident)}</span>{' '}
+              <span>{resident.cartEquipped && <><UiIcon name="cart" size={20} /> </>}{resident.cartEquipped ? '수레' : '지게'} · 적재 {Math.floor(haulerCarryCapacity(resident))}</span>{' '}
               <button
                 type="button"
                 className="btn small"
@@ -448,6 +467,8 @@ export function SelectionContextBar({
                         const cropId = building.type === 'field' || building.type === 'paddy'
                           ? cropIdForBuilding(building)
                           : null;
+                        const water = building.built ? buildingWaterSupply(state, building) : null;
+                        const wellStatus = building.built ? wellWaterStatus(state, building) : null;
                         return (
                           <>
                             <tr><td>상태</td><td>{clearingBlocksWork(state, building)
@@ -466,6 +487,27 @@ export function SelectionContextBar({
                             )}
                             {def.capacity > 0 && (
                               <tr><td>입주</td><td>{occupants.length}/{building.built ? def.capacity : 0}명</td></tr>
+                            )}
+                            {wellStatus && (
+                              <>
+                                <tr>
+                                  <td>수맥 수위</td>
+                                  <td>{Math.floor(wellStatus.levelRatio * 100)}% · {wellStatus.level.toFixed(1)}/{wellStatus.capacity}</td>
+                                </tr>
+                                <tr>
+                                  <td>하루 공급</td>
+                                  <td>{wellStatus.dailyOutput.toFixed(1)} · 반경 {CONFIG.water.wellRadius}칸</td>
+                                </tr>
+                              </>
+                            )}
+                            {water && water.demand > 0 && (
+                              <tr>
+                                <td>급수</td>
+                                <td>
+                                  {water.source === 'river' ? '강' : water.source === 'well' ? '우물' : '미급수'} ·{' '}
+                                  {Math.floor(water.ratio * 100)}% ({water.supplied.toFixed(1)}/{water.demand.toFixed(1)})
+                                </td>
+                              </tr>
                             )}
                             {building.type === 'cellar' && building.built && (
                               <tr>

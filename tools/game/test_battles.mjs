@@ -536,6 +536,11 @@ assert.equal(
   assert.equal(state.battle, null);
   assert.equal(state.totalDeaths, defenders.length, 'forced rolls show that deaths are not capped at three');
   assert.equal(state.buildings.filter(building => building.repairing).length, 2);
+  assert.ok(
+    state.buildings.filter(building => building.repairing)
+      .every(building => building.repairCause === 'raid'),
+    'battle-damaged buildings must retain the raid alert cause',
+  );
   assert.ok(state.log.some(entry => entry.text.includes(`전사 ${defenders.length}명`)));
   const deathLogs = state.log.filter(entry => entry.text.includes('전투 중 전사했습니다'));
   assert.equal(deathLogs.length, defenders.length);

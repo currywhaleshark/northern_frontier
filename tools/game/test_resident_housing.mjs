@@ -131,6 +131,7 @@ function assertValidHomes(state, expectedHomeless = 0) {
   raidDamage.damageBuildings(state, () => rolls.shift() ?? 0.5, 1);
   assert.equal(target.built, false);
   assert.equal(target.repairing, true);
+  assert.equal(target.repairCause, 'raid');
   assert.ok(displacedIds.every(id => state.residents.find(resident => resident.id === id).homeBuildingId == null));
   assertValidHomes(state, buildings.BUILDING_DEFS.hut.capacity);
 
@@ -143,6 +144,7 @@ function assertValidHomes(state, expectedHomeless = 0) {
 
   assert.equal(target.built, true, 'the builder should finish the repair');
   assert.equal(target.repairing, false);
+  assert.equal(target.repairCause, undefined, 'completed repairs must clear their alert cause');
   assertValidHomes(state);
   assert.equal(living(state).filter(resident => resident.homeBuildingId === target.id).length, buildings.BUILDING_DEFS.hut.capacity);
 }

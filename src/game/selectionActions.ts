@@ -48,6 +48,13 @@ function tileBuilding(state: GameState, tile: Tile): Building | undefined {
   return tile.buildingId == null ? undefined : getBuilding(state, tile.buildingId);
 }
 
+function tileBuildings(state: GameState, tile: Tile): Building[] {
+  const primary = tileBuilding(state, tile);
+  const overlays = state.buildings.filter(building =>
+    building.type === 'levee' && building.x === tile.x && building.y === tile.y);
+  return primary ? [primary, ...overlays.filter(building => building.id !== primary.id)] : overlays;
+}
+
 export function tileBelongsToBuilding(state: GameState, tile: Tile, building: Building): boolean {
   const footprint = footprintTilesOf(state, building);
   return !!footprint?.some(part => part.x === tile.x && part.y === tile.y);
@@ -181,7 +188,7 @@ export function canResidentWorkTarget(
 }
 
 export function selectedEntityFromTile(state: GameState, tile: Tile): SelectedEntity {
-  const building = tileBuilding(state, tile);
+  const building = tileBuildings(state, tile)[0];
   return building ? { kind: 'building', id: building.id } : { kind: 'tile', x: tile.x, y: tile.y };
 }
 
@@ -191,8 +198,14 @@ export function selectedEntityAfterTileClick(
   tile: Tile,
 ): SelectedEntity | null {
   const explored = isExplored(state, tile.x, tile.y);
+  const buildings = explored ? tileBuildings(state, tile) : [];
+  const nextBuilding = buildings.length > 1 && current?.kind === 'building'
+    ? buildings[(buildings.findIndex(building => building.id === current.id) + 1) % buildings.length]
+    : buildings[0];
   const next = explored
-    ? selectedEntityFromTile(state, tile)
+    ? nextBuilding
+      ? { kind: 'building' as const, id: nextBuilding.id }
+      : selectedEntityFromTile(state, tile)
     : { kind: 'tile' as const, x: tile.x, y: tile.y };
 
   if (current?.kind === 'tile'

@@ -1,0 +1,254 @@
+{
+  "version": 1,
+  "projection": "inclined orthographic top-down",
+  "anchor": "bottom-center",
+  "sourceAtlas": "oblique-buildings-v1",
+  "groups": {
+    "oneTile": {
+      "frameOrder": [
+        "lumberCamp",
+        "huntLodge",
+        "herbHut",
+        "mine",
+        "ferry",
+        "dryingRack",
+        "onggiKiln",
+        "dock",
+        "watchtower",
+        "well"
+      ],
+      "cellHd": [
+        56,
+        80
+      ],
+      "cellStandard": [
+        28,
+        40
+      ],
+      "sheetHd": [
+        560,
+        160
+      ],
+      "sheetStandard": [
+        280,
+        80
+      ],
+      "outputHd": "public/assets/oblique-buildings-1x1-v2-hd.png",
+      "outputStandard": "public/assets/oblique-buildings-1x1-v2.png",
+      "frames": [
+        {
+          "id": "mine",
+          "season": "normal",
+          "source": "tools/render/source_images/subsurface-buildings-v1/mine-normal-alpha.png",
+          "visiblePixelCountHd": 1443,
+          "partialAlphaPixelCountHd": 587,
+          "keyGreenPixelCountHd": 0,
+          "sourceBBox": [
+            260,
+            164,
+            1263,
+            818
+          ],
+          "packedSizeHd": [
+            54,
+            35
+          ],
+          "pasteHd": [
+            1,
+            43
+          ],
+          "packedBBoxHd": [
+            1,
+            43,
+            55,
+            78
+          ],
+          "touchesCellEdge": false,
+          "column": 3,
+          "row": 0
+        },
+        {
+          "id": "well",
+          "season": "normal",
+          "source": "tools/render/source_images/subsurface-buildings-v1/well-normal-alpha.png",
+          "visiblePixelCountHd": 1268,
+          "partialAlphaPixelCountHd": 366,
+          "keyGreenPixelCountHd": 0,
+          "sourceBBox": [
+            456,
+            459,
+            1080,
+            799
+          ],
+          "packedSizeHd": [
+            54,
+            29
+          ],
+          "pasteHd": [
+            1,
+            49
+          ],
+          "packedBBoxHd": [
+            1,
+            49,
+            55,
+            78
+          ],
+          "touchesCellEdge": false,
+          "column": 9,
+          "row": 0
+        },
+        {
+          "id": "mine",
+          "season": "winter",
+          "source": "tools/render/source_images/subsurface-buildings-v1/mine-winter-alpha.png",
+          "visiblePixelCountHd": 1439,
+          "partialAlphaPixelCountHd": 585,
+          "keyGreenPixelCountHd": 0,
+          "sourceBBox": [
+            260,
+            164,
+            1262,
+            817
+          ],
+          "packedSizeHd": [
+            54,
+            35
+          ],
+          "pasteHd": [
+            1,
+            43
+          ],
+          "packedBBoxHd": [
+            1,
+            43,
+            55,
+            78
+          ],
+          "touchesCellEdge": false,
+          "column": 3,
+          "row": 1
+        },
+        {
+          "id": "well",
+          "season": "winter",
+          "source": "tools/render/source_images/subsurface-buildings-v1/well-winter-alpha.png",
+          "visiblePixelCountHd": 1269,
+          "partialAlphaPixelCountHd": 362,
+          "keyGreenPixelCountHd": 0,
+          "sourceBBox": [
+            456,
+            459,
+            1080,
+            799
+          ],
+          "packedSizeHd": [
+            54,
+            29
+          ],
+          "pasteHd": [
+            1,
+            49
+          ],
+          "packedBBoxHd": [
+            1,
+            49,
+            55,
+            78
+          ],
+          "touchesCellEdge": false,
+          "column": 9,
+          "row": 1
+        }
+      ]
+    },
+    "twoTile": {
+      "frameOrderAppend": [
+        "deepMine"
+      ],
+      "cellHd": [
+        112,
+        160
+      ],
+      "cellStandard": [
+        56,
+        80
+      ],
+      "sheetHd": [
+        2800,
+        320
+      ],
+      "sheetStandard": [
+        1400,
+        160
+      ],
+      "outputHd": "public/assets/oblique-buildings-2x2-v2-hd.png",
+      "outputStandard": "public/assets/oblique-buildings-2x2-v2.png",
+      "frames": [
+        {
+          "id": "deepMine",
+          "season": "normal",
+          "source": "tools/render/source_images/subsurface-buildings-v1/deepMine-normal-alpha.png",
+          "visiblePixelCountHd": 5799,
+          "partialAlphaPixelCountHd": 809,
+          "keyGreenPixelCountHd": 0,
+          "sourceBBox": [
+            218,
+            237,
+            1310,
+            848
+          ],
+          "packedSizeHd": [
+            108,
+            60
+          ],
+          "pasteHd": [
+            2,
+            98
+          ],
+          "packedBBoxHd": [
+            2,
+            98,
+            110,
+            158
+          ],
+          "touchesCellEdge": false,
+          "column": 24,
+          "row": 0
+        },
+        {
+          "id": "deepMine",
+          "season": "winter",
+          "source": "tools/render/source_images/subsurface-buildings-v1/deepMine-winter-alpha.png",
+          "visiblePixelCountHd": 5805,
+          "partialAlphaPixelCountHd": 825,
+          "keyGreenPixelCountHd": 0,
+          "sourceBBox": [
+            218,
+            237,
+            1310,
+            847
+          ],
+          "packedSizeHd": [
+            108,
+            60
+          ],
+          "pasteHd": [
+            2,
+            98
+          ],
+          "packedBBoxHd": [
+            2,
+            98,
+            110,
+            158
+          ],
+          "touchesCellEdge": false,
+          "column": 24,
+          "row": 1
+        }
+      ]
+    }
+  },
+  "contactSheet": "docs/assets/buildings/subsurface-buildings-v1-contact.png"
+}

@@ -26,6 +26,8 @@ export const BUILD_CATEGORY_BY_TYPE = {
   herbHut: 'production',
   clinic: 'special',
   mine: 'production',
+  well: 'housing',
+  deepMine: 'production',
   ferry: 'production',
   charcoalKiln: 'production',
   watermill: 'production',

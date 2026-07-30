@@ -44,7 +44,9 @@ export function SpecialResidentsWindow({
         const status = active
           ? `활동 중 · ${JOB_NAMES[resident!.job]}${record?.originFaction ? ` · ${record.originFaction} 출신` : ''}`
           : dead
-            ? '사망 · 대체 불가'
+            ? definition.id === 'mudang' || definition.id === 'nosung'
+              ? '사망 · 후계 전승'
+              : '사망 · 대체 불가'
             : confined
               ? `안치 중 · ${record.availableUntilDay}일까지 등용 가능`
               : pending

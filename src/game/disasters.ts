@@ -1,5 +1,5 @@
 import { CONFIG } from './config';
-import { BUILDING_DEFS } from './buildings';
+import { BUILDING_DEFS, leveeAtEdge, type LeveeEdge } from './buildings';
 import { cropIdForBuilding, CROP_DEFS } from './crops';
 import { addLog } from './events';
 import { withJosa } from './josa';
@@ -214,7 +214,7 @@ export function maybeStartSnowDamage(state: GameState): boolean {
   const targets = state.buildings.filter(building =>
     building.built && !building.repairing && snowDamageChance(building) > 0 &&
     rng() < snowDamageChance(building));
-  const damaged = damageBuildingTargets(state, rng, targets);
+  const damaged = damageBuildingTargets(state, rng, targets, 'snowDamage');
   state.pendingDisasters.push({
     id: 'snowDamage',
     choiceId: 'collapse',
@@ -416,6 +416,13 @@ function floodableTerrain(terrain: Terrain): boolean {
   return terrain !== 'river' && terrain !== 'mountain' && terrain !== 'rock';
 }
 
+function edgeFromStep(dx: number, dy: number): LeveeEdge {
+  if (dx > 0) return 'e';
+  if (dx < 0) return 'w';
+  if (dy > 0) return 's';
+  return 'n';
+}
+
 export function springFloodAffectedTiles(state: GameState, maximumDepth: number): DisasterAffectedTile[] {
   const depthLimit = Math.max(1, Math.floor(maximumDepth));
   const queue: Array<{ x: number; y: number; depth: number }> = [];
@@ -436,19 +443,23 @@ export function springFloodAffectedTiles(state: GameState, maximumDepth: number)
       const y = current.y + dy;
       const key = tileKey(x, y);
       if (visited.has(key)) continue;
-      visited.add(key);
       const tile = state.map[y]?.[x];
       if (!tile) continue;
       if (tile.terrain === 'river') {
+        visited.add(key);
         queue.push({ x, y, depth: current.depth });
         continue;
       }
       const depth = current.depth + 1;
-      if (depth > depthLimit || !floodableTerrain(tile.terrain)) continue;
-      const building = tile.buildingId == null
-        ? undefined
-        : state.buildings.find(candidate => candidate.id === tile.buildingId);
-      if (building?.type === 'levee' && building.built) continue;
+      if (depth > depthLimit || !floodableTerrain(tile.terrain)) {
+        visited.add(key);
+        continue;
+      }
+      const levee = state.map[current.y]?.[current.x]?.terrain === 'river'
+        ? leveeAtEdge(state, current.x, current.y, edgeFromStep(dx, dy))
+        : undefined;
+      if (levee?.built) continue;
+      visited.add(key);
       affected.push({ x, y, originalTerrain: tile.terrain, depth });
       queue.push({ x, y, depth });
     }
@@ -497,6 +508,7 @@ function applySpringFloodDamage(
   rng: () => number,
 ): {
   damagedBuildings: number;
+  damagedBuildingIds: number[];
   lostGrowth: number;
   breachedWeirs: number;
   breachedReservoirTiles: DisasterAffectedTile[];
@@ -534,7 +546,10 @@ function applySpringFloodDamage(
       : exposedToRiver ? CONFIG.disasters.springFlood.riverBuildingDamageChance : 0;
     if (chance > 0 && rng() < chance) damageTargets.push(building);
   }
-  const damagedBuildings = damageBuildingTargets(state, rng, damageTargets).length;
+  const damagedBuildings = damageBuildingTargets(state, rng, damageTargets, 'springFlood').length;
+  const damagedBuildingIds = damageTargets
+    .filter(building => building.repairing && building.repairCause === 'springFlood')
+    .map(building => building.id);
 
   let lostGrowth = 0;
   for (const building of state.buildings) {
@@ -548,7 +563,7 @@ function applySpringFloodDamage(
     }
     lostGrowth += loss;
   }
-  return { damagedBuildings, lostGrowth, breachedWeirs, breachedReservoirTiles };
+  return { damagedBuildings, damagedBuildingIds, lostGrowth, breachedWeirs, breachedReservoirTiles };
 }
 
 export function startSpringFlood(
@@ -575,6 +590,7 @@ export function startSpringFlood(
     resolveDay: state.day + duration,
     progress: 0,
     affectedTiles,
+    targetBuildingIds: damage.damagedBuildingIds,
     data: {
       maximumDepth: Math.max(1, Math.floor(maximumDepth)),
       damagedBuildings: damage.damagedBuildings,

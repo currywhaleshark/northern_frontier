@@ -142,24 +142,24 @@ export const BUILDING_EFFECT_WHENS: readonly BuildingEffectWhen[] = [
 ];
 
 export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly BuildingEffectEmitter[]>> = {
-  "charcoalKiln": [
-    {
-      "kind": "chimneySmoke",
-      "fx": 1,
-      "fy": 0,
-      "dx": -4,
-      "dy": -13,
-      "scale": 1,
-      "when": "working"
-    },
+  "beacon": [
     {
       "kind": "fireSparks",
-      "fx": 0.7,
-      "fy": 0.68,
+      "fx": 0.5,
+      "fy": 0.2,
       "dx": 0,
       "dy": 0,
       "scale": 1,
-      "when": "working"
+      "when": "always"
+    },
+    {
+      "kind": "chimneySmoke",
+      "fx": 0.5,
+      "fy": 0.2,
+      "dx": 0,
+      "dy": 0,
+      "scale": 1,
+      "when": "always"
     }
   ],
   "center": [
@@ -167,8 +167,8 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "chimneySmoke",
       "fx": 1,
       "fy": 0,
-      "dx": -4,
-      "dy": -13,
+      "dx": -17,
+      "dy": 29,
       "scale": 1,
       "when": "winterHeating"
     },
@@ -176,10 +176,39 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "windowGlow",
       "fx": 0.5,
       "fy": 0.42,
-      "dx": -1.5,
-      "dy": 0,
+      "dx": -10.5,
+      "dy": -19.7,
       "scale": 1,
       "when": "night"
+    },
+    {
+      "kind": "windowGlow",
+      "fx": 0.5,
+      "fy": 0.2,
+      "dx": -3.3,
+      "dy": -1.3,
+      "scale": 1,
+      "when": "night"
+    }
+  ],
+  "charcoalKiln": [
+    {
+      "kind": "chimneySmoke",
+      "fx": 1,
+      "fy": 0,
+      "dx": -33.7,
+      "dy": 21,
+      "scale": 1,
+      "when": "working"
+    },
+    {
+      "kind": "fireSparks",
+      "fx": 0.7,
+      "fy": 0.68,
+      "dx": -20.3,
+      "dy": 9.3,
+      "scale": 1,
+      "when": "working"
     }
   ],
   "clinic": [
@@ -187,8 +216,8 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "serviceGlow",
       "fx": 0.5,
       "fy": 0.55,
-      "dx": 0,
-      "dy": 0,
+      "dx": 3,
+      "dy": 7.3,
       "scale": 1,
       "when": "working"
     }
@@ -206,13 +235,22 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
   ],
   "garrison": [
     {
-      "kind": "windowGlow",
+      "kind": "serviceGlow",
       "fx": 0.5,
       "fy": 0.42,
-      "dx": -1.5,
-      "dy": 0,
+      "dx": 4.2,
+      "dy": 10.3,
       "scale": 1,
-      "when": "night"
+      "when": "always"
+    },
+    {
+      "kind": "serviceGlow",
+      "fx": 0.5,
+      "fy": 0.2,
+      "dx": -19,
+      "dy": 23,
+      "scale": 1,
+      "when": "always"
     }
   ],
   "hermitage": [
@@ -220,8 +258,8 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "serviceGlow",
       "fx": 0.5,
       "fy": 0.55,
-      "dx": 0,
-      "dy": 0,
+      "dx": -1.3,
+      "dy": -3,
       "scale": 1,
       "when": "working"
     }
@@ -231,8 +269,26 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "windowGlow",
       "fx": 0.5,
       "fy": 0.42,
-      "dx": -1.5,
-      "dy": 0,
+      "dx": 2.2,
+      "dy": 14.7,
+      "scale": 1,
+      "when": "night"
+    },
+    {
+      "kind": "windowGlow",
+      "fx": 0.5,
+      "fy": 0.2,
+      "dx": 8,
+      "dy": 27,
+      "scale": 1,
+      "when": "night"
+    },
+    {
+      "kind": "chimneySmoke",
+      "fx": 0.5,
+      "fy": 0.2,
+      "dx": -16.3,
+      "dy": -0.7,
       "scale": 1,
       "when": "night"
     }
@@ -253,8 +309,8 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "serviceGlow",
       "fx": 0.5,
       "fy": 0.55,
-      "dx": 0,
-      "dy": 0,
+      "dx": -2.3,
+      "dy": 2.3,
       "scale": 1,
       "when": "working"
     }
@@ -264,8 +320,8 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "chimneySmoke",
       "fx": 1,
       "fy": 0,
-      "dx": -4,
-      "dy": -13,
+      "dx": -43.3,
+      "dy": 7.3,
       "scale": 1,
       "when": "winterHeating"
     },
@@ -273,8 +329,17 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "windowGlow",
       "fx": 0.5,
       "fy": 0.42,
-      "dx": -1.5,
-      "dy": 0,
+      "dx": -16.5,
+      "dy": 13.7,
+      "scale": 1,
+      "when": "night"
+    },
+    {
+      "kind": "windowGlow",
+      "fx": 0.5,
+      "fy": 0.2,
+      "dx": 8,
+      "dy": 26.3,
       "scale": 1,
       "when": "night"
     }
@@ -284,8 +349,8 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "chimneySmoke",
       "fx": 1,
       "fy": 0,
-      "dx": -4,
-      "dy": -13,
+      "dx": -16,
+      "dy": 4.3,
       "scale": 1,
       "when": "working"
     },
@@ -293,8 +358,8 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "fireSparks",
       "fx": 0.7,
       "fy": 0.68,
-      "dx": 0,
-      "dy": 0,
+      "dx": -10.7,
+      "dy": 0.3,
       "scale": 1,
       "when": "working"
     }
@@ -304,8 +369,8 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "serviceGlow",
       "fx": 0.5,
       "fy": 0.55,
-      "dx": 0,
-      "dy": 0,
+      "dx": -1.3,
+      "dy": 3.3,
       "scale": 1,
       "when": "working"
     }
@@ -315,8 +380,8 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "serviceGlow",
       "fx": 0.5,
       "fy": 0.55,
-      "dx": 0,
-      "dy": 0,
+      "dx": -4.3,
+      "dy": 3.7,
       "scale": 1,
       "when": "working"
     }
@@ -326,8 +391,8 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "chimneySmoke",
       "fx": 1,
       "fy": 0,
-      "dx": -4,
-      "dy": -13,
+      "dx": -11.7,
+      "dy": 6.7,
       "scale": 1,
       "when": "working"
     },
@@ -335,8 +400,8 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "fireSparks",
       "fx": 0.7,
       "fy": 0.68,
-      "dx": 0,
-      "dy": 0,
+      "dx": 2.3,
+      "dy": 2,
       "scale": 1,
       "when": "working"
     }
@@ -346,8 +411,8 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "chimneySmoke",
       "fx": 1,
       "fy": 0,
-      "dx": -4,
-      "dy": -13,
+      "dx": -48,
+      "dy": 14,
       "scale": 1,
       "when": "working"
     },
@@ -366,8 +431,8 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "kind": "serviceGlow",
       "fx": 0.5,
       "fy": 0.55,
-      "dx": 0,
-      "dy": 0,
+      "dx": 3,
+      "dy": 5.3,
       "scale": 1,
       "when": "working"
     }
@@ -383,6 +448,46 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "when": "working"
     }
   ],
+  "tileHouse": [
+    {
+      "kind": "chimneySmoke",
+      "fx": 0.5,
+      "fy": 0.2,
+      "dx": 6.7,
+      "dy": 2.7,
+      "scale": 1,
+      "when": "winterHeating"
+    },
+    {
+      "kind": "windowGlow",
+      "fx": 0.5,
+      "fy": 0.2,
+      "dx": -18.7,
+      "dy": 28.3,
+      "scale": 1,
+      "when": "night"
+    },
+    {
+      "kind": "windowGlow",
+      "fx": 0.5,
+      "fy": 0.2,
+      "dx": 7.3,
+      "dy": 28,
+      "scale": 1,
+      "when": "night"
+    }
+  ],
+  "watchtower": [
+    {
+      "kind": "serviceGlow",
+      "fx": 0.5,
+      "fy": 0.2,
+      "dx": 0.3,
+      "dy": -4.7,
+      "scale": 1,
+      "when": "night"
+    }
+  ],
   "watermill": [
     {
       "kind": "craftGlint",
@@ -395,17 +500,6 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
     }
   ],
   "weavingHouse": [
-    {
-      "kind": "craftGlint",
-      "fx": 0.35,
-      "fy": 0.72,
-      "dx": 0,
-      "dy": 0,
-      "scale": 1,
-      "when": "working"
-    }
-  ],
-  "woodShed": [
     {
       "kind": "craftGlint",
       "fx": 0.35,

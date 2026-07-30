@@ -22,6 +22,37 @@ export const CONFIG = {
     nearbyMinDistance: 4,
     nearbyMaxDistance: 7,
     mineWorkRadius: 6, // 채광장 거점에서 주변 광상을 찾아 왕복하는 반경
+    deepMinePerDay: 1.8,
+    deepMineStoneByproductRatio: 0.28,
+  },
+
+  water: {
+    wellRadius: 6,
+    riverCoverageRadius: 3,
+    aquiferInlandShare: 0.35,
+    aquiferInlandAdditionRatio: 0.6,
+    aquiferInlandMinRiverDistance: 9,
+    aquiferMinSpacing: 8,
+    startingAquiferRadius: 6,
+    startingAquiferCapacity: 130,
+    // 보통 수맥 하나가 평시 성인 약 30명분의 생활용수를 감당하되,
+    // 복수 우물·산업 수요·가뭄이 겹치면 저장 수위를 소모하도록 맞춘 값.
+    wellDailyOutput: 12,
+    aquiferBaseRecoveryPerDay: 9,
+    aquiferRainRecoveryBonus: 6,
+    aquiferSnowRecoveryBonus: 2,
+    climateRecoveryFactor: 0.5,
+    safeLevelRatio: 0.25,
+    productionFloor: 0.5,
+    unservedSickChance: 0.006,
+    unservedMoralePenalty: 0.6,
+    demand: {
+      housingPerBed: 0.3,
+      tannery: 4,
+      onggiKiln: 1.5,
+      clinic: 2,
+      stablePerHead: 0.25,
+    },
   },
 
   time: {
@@ -362,7 +393,6 @@ export const CONFIG = {
       weirBreachChanceShallow: 0.24,
       weirBreachChanceDeep: 0.46,
       fertileDepositChance: 0.28,
-      leveeRiverDistance: 2,
     },
     snowDamage: {
       triggerConsecutiveSnowDays: 2,
@@ -1359,12 +1389,15 @@ export const CONFIG = {
     luxuryPerCapita: 0.4,
     religionGood: 6, religionMissing: -6,  // 부: 종교 시설
     shamanCheer: 2,                        // 당집에 무당 상주 (부가)
+    namedShamanCheerBonus: 2,              // 월향의 큰굿 — 일반 후계 무당에게는 없음
     promotionCheer: 8,                     // 승격 직후 완충 버프
     promotionCheerDays: 12,
     legacyTransitionCheer: 8,              // 구저장 고티어가 새 기대에 적응하는 동안의 별도 완충
     legacyTransitionDays: 12,
     monkGriefRelief: 3,                    // 노승 상주 시 사망 사기 하락 6 → 3
     monkBurialBonus: 2,                    // 노승 상주 시 안장 위로 +2
+    namedMonkGriefRelief: 2,               // 해운의 천도재 — 일반 후계 승려보다 강함
+    namedMonkBurialBonus: 3,
   },
 
   // 절목 — 중심지에서 반포하는 시행 세칙. 평시(기본값)는 기존 거동과 완전히 같다.
@@ -1387,13 +1420,15 @@ export const CONFIG = {
     },
   },
 
-  // 종교인 등장 — 사람이 먼저 온다. 네임드가 합류해야 그 갈래의 시설이 열린다.
+  // 종교인 등장 — 네임드가 갈래를 열고, 이후에는 신맥·법맥 후계자가 시설을 잇는다.
   religion: {
     minRank: 'jin' as Rank,
     dailyChance: 0.02,
     declineRetryDays: 36,   // 거절해도 훗날 다시 문을 두드린다
     mudangAge: 44,
     nosungAge: 62,          // 노승은 자연사 시계도 함께 돈다
+    mudangSuccessionAge: 55,
+    monkNoviceMentorAge: 55,
   },
 
   // 이름 있는 특수 주민 — 크게 돕는 만큼 지속 위험을 가져온다.

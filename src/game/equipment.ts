@@ -50,7 +50,7 @@ export function setResidentCartEquipped(
 
   const uncartedCapacity = scaledCarryCapacity(CONFIG.agents.haulerCarryCap);
   if (carriedAmount(resident) > uncartedCapacity + 0.0001) {
-    return `짐을 ${uncartedCapacity} 이하로 내린 뒤 수레를 반납할 수 있습니다.`;
+    return `짐을 ${Math.floor(uncartedCapacity)} 이하로 내린 뒤 수레를 반납할 수 있습니다.`;
   }
   returnResidentCart(state, resident);
   return null;

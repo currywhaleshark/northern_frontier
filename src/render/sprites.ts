@@ -5,11 +5,12 @@
 // 게임 로직과 렌더러는 "무엇을 그릴지"만 알고, "어떻게 그릴지"는 여기서 결정한다.
 // 현재 구현(placeholderSprites)은 이미지가 준비되기 전 단색 도형을 표시한다.
 import { FACTIONS, JOB_COLORS } from '../game/constants';
-import type { BuildingTypeId, ForeignSiteStatus, ForeignSiteType, Gender, JobId, LifeStage, LivestockId, Rank, Season, SpecialResidentId, Terrain } from '../game/types';
+import type { BuildingTypeId, ForeignSiteStatus, ForeignSiteType, Gender, JobId, LifeStage, LivestockId, Rank, ReligiousVocation, Season, SpecialResidentId, Terrain } from '../game/types';
 import type { TreeStage } from '../game/forestGrowth';
 import type { MineralResource, MineralVisualTier } from '../game/minerals';
 import type { MilitiaWeaponSpriteId } from './militiaWeaponAssets';
 import type { MountainProfile, TreeSpecies } from './terrainGrowthVisuals';
+import type { WaterworksOrientation } from './waterworksBuildingAssets';
 
 // 계절별 지형 팔레트 (임시 그래픽용)
 const TERRAIN_PALETTES: Record<Season, Record<Terrain, string>> = {
@@ -75,6 +76,9 @@ export interface BuildingDrawParams {
   graveCount?: number; // 묘역 타일 전용: 이 칸의 2×2 소구획에 놓인 묘 수 0~4
   highDefinition?: boolean; // 2배 backing canvas에서는 HD 원본을 선택
   connections?: { n: boolean; e: boolean; s: boolean; w: boolean }; // 성벽 계열 연결 렌더링
+  waterworksOrientation?: WaterworksOrientation; // 보·제방의 가로/세로 전용 셀
+  waterworksEdge?: 'n' | 'e' | 's' | 'w'; // 제방이 걸리는 강 쪽 타일 변
+  tint?: { color: string; alpha: number }; // 정보 레이어에서 스프라이트 알파에만 입히는 상태색
   x: number;
   y: number;
   size: number;
@@ -101,6 +105,7 @@ export interface ResidentDrawParams {
   militiaWeapon?: MilitiaWeaponSpriteId;
   foreignFaction?: string;
   stage?: LifeStage | null;
+  religiousVocation?: ReligiousVocation;
   sizeScale?: number; // 아이 축소 표시 (전용 시트가 나오기 전 폴백)
   special?: SpecialResidentId;
   animationTimeMs?: number; // 한 캔버스 프레임에서 공유하는 애니메이션 시간

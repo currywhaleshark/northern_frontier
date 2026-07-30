@@ -17,18 +17,42 @@ export interface MoraleInputs {
   clothesCoverage: number; // 0~1
 }
 
-function activeSpecialWorker(state: GameState, buildingType: 'shrine' | 'hermitage', job: Resident['job']): boolean {
-  return state.buildings.some(building =>
-    building.type === buildingType && building.built &&
-    assignedWorkers(state, building).some(worker => worker.job === job && worker.alive && !worker.sick));
+function activeReligiousWorker(
+  state: GameState,
+  buildingType: 'shrine' | 'hermitage',
+  job: Resident['job'],
+): Resident | null {
+  for (const building of state.buildings) {
+    if (building.type !== buildingType || !building.built) continue;
+    const worker = assignedWorkers(state, building)
+      .find(candidate => candidate.job === job && candidate.alive && !candidate.sick);
+    if (worker) return worker;
+  }
+  return null;
 }
 
 export function hasResidentShaman(state: GameState): boolean {
-  return activeSpecialWorker(state, 'shrine', 'shaman');
+  return activeReligiousWorker(state, 'shrine', 'shaman') != null;
 }
 
 export function hasResidentMonk(state: GameState): boolean {
-  return activeSpecialWorker(state, 'hermitage', 'monk');
+  return activeReligiousWorker(state, 'hermitage', 'monk') != null;
+}
+
+export function residentMonkGriefLoss(state: GameState): number {
+  const monk = activeReligiousWorker(state, 'hermitage', 'monk');
+  if (!monk) return 6;
+  return monk.special === 'nosung'
+    ? CONFIG.satisfaction.namedMonkGriefRelief
+    : CONFIG.satisfaction.monkGriefRelief;
+}
+
+export function residentMonkBurialBonus(state: GameState): number {
+  const monk = activeReligiousWorker(state, 'hermitage', 'monk');
+  if (!monk) return 0;
+  return monk.special === 'nosung'
+    ? CONFIG.satisfaction.namedMonkBurialBonus
+    : CONFIG.satisfaction.monkBurialBonus;
 }
 
 // 서당이 "가동" 중인가 — 건물 + 훈장 배정 (취학 아동이 없어도 글 배울 곳이 있다는 사실이 기대를 채운다)
@@ -95,6 +119,15 @@ export function moraleBreakdown(state: GameState, inputs: MoraleInputs): MoraleF
   // ── 부가 ──
   if (hasResidentShaman(state)) {
     factors.push({ id: 'shaman', label: '당집의 굿 소리', unlocked: true, delta: s.shamanCheer });
+    const shaman = activeReligiousWorker(state, 'shrine', 'shaman');
+    if (shaman?.special === 'mudang') {
+      factors.push({
+        id: 'named-shaman',
+        label: '월향의 큰굿',
+        unlocked: true,
+        delta: s.namedShamanCheerBonus,
+      });
+    }
   }
   if (state.day < (state.promotionCheerUntil ?? 0)) {
     factors.push({ id: 'promotion', label: '승격의 경사', unlocked: true, delta: s.promotionCheer });

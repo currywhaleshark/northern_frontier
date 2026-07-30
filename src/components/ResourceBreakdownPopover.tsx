@@ -60,10 +60,10 @@ export function ResourceBreakdownPopover({
             {item.label}
           </span>
           <span className="resource-breakdown-actions">
-            <span>{Math.floor(item.amount)}</span>
+            <span className="resource-breakdown-amount">{Math.floor(item.amount)}</span>
             {item.spoilagePerDay !== undefined && item.spoilagePerDay > 0 && (
               <small
-                className="muted"
+                className="muted resource-breakdown-spoilage"
                 title={`${item.label} 예상 일일 부패량`}
               >부패 중 -{formatSpoilagePerDay(item.spoilagePerDay)}/일</small>
             )}

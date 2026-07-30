@@ -18,6 +18,10 @@ assert.match(alertsSource, /className="alert-stack"/,
   'alerts must render as a thin overlay stack rather than a sidebar section');
 assert.doesNotMatch(alertsSource, /className="section"/,
   'the alert overlay must not retain the padded sidebar section shell');
+assert.match(alertsSource, /buildingRepairCause\(state, building\)/,
+  'damaged-building alerts must classify each repair by its actual cause');
+assert.match(alertsSource, /label: '습격 피해'[\s\S]*label: '설해 피해'[\s\S]*label: '대홍수 피해'/,
+  'raid, snow, and great-flood damage must use distinct alert labels');
 
 assert.match(topBarSource, /promotionTarget[\s\S]*nextRank\(state\.rank\)/,
   'the TopBar must derive the next promotion target');

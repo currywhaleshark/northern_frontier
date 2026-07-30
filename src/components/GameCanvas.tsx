@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type WheelEvent as ReactWheelEvent } from 'react';
 import { CONFIG } from '../game/config';
 import { JOB_NAMES, RESOURCE_NAMES } from '../game/constants';
-import { BUILDING_DEFS, buildingCostFor, buildingFootprintDims, isAreaBuildingType } from '../game/buildings';
+import {
+  BUILDING_DEFS, buildingCostFor, buildingFootprintDims, isAreaBuildingType, preferredLeveeEdgeAt,
+} from '../game/buildings';
 import { getActiveSprites, onAtlasAssetSettled } from '../render/atlas';
 import { findResidentAt, renderScene, terrainVisualSignature } from '../render/renderer';
 import { createResidentPresentationSnapshotCache } from '../render/residentPresentation';
@@ -30,6 +32,8 @@ interface Props {
   zoom: number;
   showResidentJobMarkers: boolean;
   showResidentCargoMarkers: boolean;
+  showAquiferLayer: boolean;
+  showOreLayer: boolean;
   placingType: BuildingTypeId | null;
   pastureStableId: number | null;
   expandingBuildingId: number | null;
@@ -41,7 +45,7 @@ interface Props {
   // 게임 루프가 상태를 변이한 그 콜백에서 anim도 함께 갱신하므로, RAF가 그리는 순간
   // ref를 읽어야 "새 위치 + 옛 시각" 불일치 프레임(틱마다 순간이동으로 보임)이 없다.
   anim: { readonly current: { at: number; ms: number } };
-  onTileClick: (x: number, y: number) => void;
+  onTileClick: (x: number, y: number, localX: number, localY: number) => void;
   onPlacePlot: (x: number, y: number, w: number, h: number) => void;
   onPlacePasture: (x: number, y: number, w: number, h: number) => void;
   onPlaceRelocation: (x: number, y: number) => void;
@@ -53,6 +57,7 @@ interface Props {
 
 export function GameCanvas({
   state, version, animationActive, zoom, showResidentJobMarkers, showResidentCargoMarkers,
+  showAquiferLayer, showOreLayer,
   placingType, pastureStableId, expandingBuildingId, relocatingBuildingId,
   selected, selectedEntity, selectedResidentId, anim,
   onTileClick, onPlacePlot, onPlacePasture, onPlaceRelocation,
@@ -158,6 +163,15 @@ export function GameCanvas({
   const hoverTile = mouse
     ? { x: Math.floor(mouse.mx / TILE), y: Math.floor(mouse.my / TILE) }
     : null;
+  const leveePlacementEdge = placingType === 'levee' && hoverTile && mouse
+    ? preferredLeveeEdgeAt(
+      state,
+      hoverTile.x,
+      hoverTile.y,
+      mouse.mx / TILE - hoverTile.x,
+      mouse.my / TILE - hoverTile.y,
+    )
+    : null;
   const hoveredTile = hoverTile ? state.map[hoverTile.y]?.[hoverTile.x] : null;
   const pointerAction = placingType || isPasturePlacing || isFootprintExpanding || isRelocating
     ? null
@@ -170,6 +184,16 @@ export function GameCanvas({
     const x = Math.floor(point.mx / TILE), y = Math.floor(point.my / TILE);
     const tile = state.map[y]?.[x];
     if (!tile) return 'outside';
+    if (placingType === 'levee') {
+      const edge = preferredLeveeEdgeAt(
+        state,
+        x,
+        y,
+        point.mx / TILE - x,
+        point.my / TILE - y,
+      );
+      return `placing:${x},${y}:${edge ?? 'none'}`;
+    }
     if (placingType || isFootprintExpanding || isRelocating) return `placing:${x},${y}`;
     if (isPasturePlacing) return `pasture:${x},${y}`;
     const frameAlpha = Math.max(0, Math.min(1, (performance.now() - anim.current.at) / anim.current.ms));
@@ -255,6 +279,7 @@ export function GameCanvas({
     const runtimeDrawStart = runtimePerfStartTime();
     renderScene(canvas, state, {
       alpha: frameAlpha, animationTimeMs, hover: hoverTile, placingType, placingRect, selected, selectedResidentId,
+      leveePlacementEdge,
       areaExpansion: isFootprintExpanding && expansionBuilding && placingRect
         ? { buildingId: expansionBuilding.id, type: expansionBuilding.type, rect: placingRect }
         : null,
@@ -270,6 +295,9 @@ export function GameCanvas({
       renderScale,
       residentJobMarkers: showResidentJobMarkers,
       residentCargoMarkers: showResidentCargoMarkers,
+      showAquiferLayer,
+      showOreLayer,
+      stateVersion: version,
     });
     if (perf) {
       const bucket = perf['renderScene-total'] ?? (perf['renderScene-total'] = { total: 0, count: 0 });
@@ -494,7 +522,7 @@ export function GameCanvas({
               return;
             }
           }
-          onTileClick(tx, ty);
+          onTileClick(tx, ty, m.mx / TILE - tx, m.my / TILE - ty);
         }}
         onContextMenu={e => {
           e.preventDefault();
@@ -594,7 +622,11 @@ export function GameCanvas({
         <div ref={tooltipRef} className="map-tooltip" style={{ left: 0, top: 0 }}>
           {hoveredResident ? (
             <>
-              <b>{hoveredResident.name}</b> · {JOB_NAMES[hoveredResident.job]}
+              <b>{hoveredResident.name}</b> · {
+                hoveredResident.religiousVocation === 'monk' && hoveredResident.stage
+                  ? '동자승'
+                  : JOB_NAMES[hoveredResident.job]
+              }
               <div className="muted">{hoveredResident.task}{hoveredResident.sick ? ' · 앓는 중' : ''}</div>
             </>
           ) : raiderHovered ? (

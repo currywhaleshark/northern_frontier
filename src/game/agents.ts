@@ -8,17 +8,18 @@ import {
 import {
   BUILDING_DEFS, buildingCostFor, cemeteryPlotCapacity, clearBuildingTiles, computeDefense, footprintTilesOf,
   isBuildingUpperPassageTile, isPlotBuildingType, isSmithyProductUnlocked, occupyBuildingTiles, officeEfficiencyMultiplier,
-  plotArea, SMITHY_PRODUCT_DEFS, smithyProductOf, sownAreaOf,
+  plotArea, preferredLeveeEdgeAt, SMITHY_PRODUCT_DEFS, smithyProductOf, sownAreaOf,
 } from './buildings';
 import { JOB_NAMES, RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
+import { residentLogName } from './residentLogName';
 import { enrolledStudentIds, skillGainMult } from './education';
 import { skillGainArtifactMultiplier } from './specialItems';
 import { haulerCarryCapacity, haulingMoveSpeedMultiplier, scaledCarryCapacity } from './equipment';
 import { collectHuntableTiles } from './habitats';
 import { huntPreyName, rollHuntPrey, scaledHuntYield, type HuntPreyDef } from './hunting';
 import { makeRng } from './map';
-import { buryCorpse, cemeteryFreePlots, corpsesOf, laborEfficiencyMult, nextCorpseToCollect } from './lifecycle';
+import { buryCorpse, corpsesOf, laborEfficiencyMult, nextCorpseToCollect } from './lifecycle';
 import { extractMineralDeposit, mineralRemaining } from './minerals';
 import { clearTreeStage, markForestHarvest, treeStageFor } from './forestGrowth';
 import { assignClearingCrews, clearingBlocksWork, clearingSites, pendingClearingTiles } from './landClearing';
@@ -47,6 +48,8 @@ import {
 } from './livestock';
 import { performPhysicianTreatment } from './medicine';
 import { mineralDepositsInMineRange, servingMineForTile } from './miningSites';
+import { oreSampleAt } from './subsurfaceVeins';
+import { waterDependentProductionMultiplier } from './waterSupply';
 import { rankProductionEfficiency } from './productionEfficiency';
 import { cleanupRoyalPlaqueAfterBuildingRemoval, plaqueProductionMultiplier } from './royalPlaque';
 import { buildGoalField, describeGoal, type DescribedGoal, type GoalField } from './pathGoals';
@@ -157,7 +160,6 @@ const PASSABLE_BUILDING_TYPES: ReadonlySet<BuildingTypeId> = new Set<BuildingTyp
   'field',
   'paddy',
   'bridge',
-  'levee',
   'ferry',
   'dock',
   'lumberCamp',
@@ -1239,7 +1241,7 @@ function hunterTick(state: GameState, r: Resident, ctx: Ctx): void {
           : `고기 ${meatAmount.toFixed(1)}`;
         addLog(
           state,
-          `사냥꾼 ${withJosa(res.name, '이/가')} ${withJosa(caught.prey.name, '을/를')} 잡아 ${yieldText} 분량을 가져옵니다.`,
+          `${withJosa(residentLogName(res), '이/가')} ${withJosa(caught.prey.name, '을/를')} 잡아 ${yieldText} 분량을 가져옵니다.`,
           'good',
         );
       }
@@ -1517,6 +1519,9 @@ function advanceBuildingWorkOrder(state: GameState, building: Building, ctx: Ctx
     if (building.w != null) building.w = destination.w;
     if (building.h != null) building.h = destination.h;
     if (building.type === 'stable') delete building.pasture;
+    if (building.type === 'levee') {
+      building.leveeEdge = preferredLeveeEdgeAt(state, building.x, building.y, 0.5, 0.5, building.id) ?? undefined;
+    }
     occupyBuildingTiles(state, building);
     order.phase = 'rebuilding';
     order.progress = 0;
@@ -1570,6 +1575,7 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
       target.progress = def.buildDays;
       target.built = true;
       target.repairing = false;
+      delete target.repairCause;
       initializeWeirReservoir(state, target);
       if (state.priorityBuildingId === target.id) state.priorityBuildingId = null;
       reconcileResidentHomes(state, ctx.rng);
@@ -2195,7 +2201,7 @@ function potterTick(state: GameState, r: Resident, ctx: Ctx): void {
       : CONFIG.production.firewoodPerOnggi,
   };
   const target = (CONFIG.production.onggiPerDay / 5) * effOf(r) *
-    ctx.outputMod * WORK_RATE_SCALE;
+    ctx.outputMod * WORK_RATE_SCALE * waterDependentProductionMultiplier(state, kiln);
   const requirements = scaledRequirements(inputs, target);
 
   if (carryTotal(r) > 0) {
@@ -2226,6 +2232,61 @@ function potterTick(state: GameState, r: Resident, ctx: Ctx): void {
 }
 
 function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const assignedMine = assignedBuildingForResident(state, r);
+  if (assignedMine?.type === 'deepMine') {
+    const sample = oreSampleAt(
+      state.seed,
+      state.map[0]?.length ?? 0,
+      state.map.length,
+      assignedMine.x,
+      assignedMine.y,
+    );
+    const remaining = sample ? state.oreVeinRemaining[sample.vein.id] ?? 0 : 0;
+    if (!sample || remaining <= 0) {
+      loiterNearBuilding(state, r, ctx, assignedMine, 2, '지하 광맥이 다함');
+      return;
+    }
+    const status = goTo(state, r, ctx, workerSlotGoal(state, r, assignedMine));
+    if (status !== 'arrived') {
+      r.phase = status === 'stuck' ? 'rest' : 'toWork';
+      r.task = status === 'stuck' ? '채광갱 길이 막힘' : '채광갱으로 이동';
+      return;
+    }
+    const geomancerMult = state.residents.some(resident => resident.alive && resident.special === 'geomancer')
+      ? 1 + CONFIG.specialResidents.geomancerMiningYieldBonus
+      : 1;
+    const richnessMult = 0.45 + sample.normalizedRichness * 0.75;
+    const target = (CONFIG.minerals.deepMinePerDay / 5) * effOf(r) *
+      ctx.outputMod * WORK_RATE_SCALE * geomancerMult * richnessMult;
+    const mined = Math.min(remaining, target);
+    if (mined <= 0) {
+      r.phase = 'rest';
+      r.task = '지하 광맥이 다함';
+      return;
+    }
+    state.oreVeinRemaining[sample.vein.id] = remaining - mined;
+    addBuildingStock(
+      assignedMine,
+      sample.vein.mineral,
+      mined * plaqueProductionMultiplier(state, assignedMine.id),
+    );
+    if (sample.vein.mineral === 'iron') {
+      addBuildingStock(
+        assignedMine,
+        'stone',
+        mined * CONFIG.minerals.deepMineStoneByproductRatio *
+          plaqueProductionMultiplier(state, assignedMine.id),
+      );
+    }
+    if (remaining > 0 && state.oreVeinRemaining[sample.vein.id] <= 0) {
+      addLog(state, `${sample.vein.mineral === 'iron' ? '철맥' : '석맥'}의 맥이 다했습니다.`, 'bad', true);
+    }
+    r.phase = 'working';
+    r.task = sample.vein.mineral === 'iron' ? '갱내 철맥 채굴 중' : '갱내 석맥 채굴 중';
+    gainSkillTick(state, r);
+    return;
+  }
+
   const a = CONFIG.agents;
   const miningTile = state.map[r.y]?.[r.x];
   const miningIron = miningTile?.terrain === 'rock' && miningTile.hasIron;
@@ -2353,7 +2414,11 @@ function herderTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
 
-  const product = livestockProductForHerder(livestock, ctx.season, (effOf(r) * ctx.outputMod) / WORK_SUBTICKS);
+  const product = livestockProductForHerder(
+    livestock,
+    ctx.season,
+    (effOf(r) * ctx.outputMod * waterDependentProductionMultiplier(state, stable)) / WORK_SUBTICKS,
+  );
   if (product && product.amount > 0) {
     addBuildingStock(
       stable,
@@ -2376,7 +2441,12 @@ function physicianTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
 
-  const result = performPhysicianTreatment(state, r, effOf(r) * ctx.mMod, ctx.rng);
+  const result = performPhysicianTreatment(
+    state,
+    r,
+    effOf(r) * ctx.mMod * waterDependentProductionMultiplier(state, clinic),
+    ctx.rng,
+  );
   if (result.status === 'no-patient') {
     loiterNearBuilding(state, r, ctx, clinic, 3, '진료할 환자 없음');
     return;
@@ -2389,7 +2459,11 @@ function physicianTick(state: GameState, r: Resident, ctx: Ctx): void {
   r.task = `${result.patient?.name ?? '환자'} 진료 중`;
   gainSkillTick(state, r);
   if (result.status === 'recovered' && result.patient) {
-    addLog(state, `의원 ${r.name}의 치료로 ${withJosa(result.patient.name, '이/가')} 병에서 회복했습니다.`, 'good');
+    addLog(
+      state,
+      `${residentLogName(r)}의 치료로 ${withJosa(residentLogName(result.patient), '이/가')} 병에서 회복했습니다.`,
+      'good',
+    );
   }
 }
 
@@ -2441,7 +2515,8 @@ function tannerTick(state: GameState, r: Resident, ctx: Ctx): void {
 
   const product = resolvedTanneryProduct(state, tannery);
   const productDef = TANNERY_PRODUCT_DEFS[product];
-  const target = (p.tanneryHidePerDay / 5) * effOf(r) * ctx.outputMod * WORK_RATE_SCALE;
+  const target = (p.tanneryHidePerDay / 5) * effOf(r) * ctx.outputMod * WORK_RATE_SCALE *
+    waterDependentProductionMultiplier(state, tannery);
   if (supplyWorkplaceInputs(state, r, ctx, tannery, { hide: target })) return;
 
   const st = goTo(state, r, ctx, buildingGoal(state, tannery.id));
@@ -2641,7 +2716,7 @@ function undertakerTick(state: GameState, r: Resident, ctx: Ctx): void {
     loiterNearBuilding(state, r, ctx, cemetery, 2, '묘지 돌봄');
     return;
   }
-  if (cemeteryFreePlots(state) <= 0) {
+  if ((cemetery.graves ?? 0) >= cemeteryPlotCapacity(cemetery)) {
     loiterNearBuilding(state, r, ctx, cemetery, 2, '묘 자리 부족');
     return;
   }

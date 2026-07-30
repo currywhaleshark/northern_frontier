@@ -11,9 +11,10 @@ import {
 import { BUILDING_DEFS } from './buildings';
 import { isNorthernDefectorOrigin, NORTHERN_DEFECTOR_NAMES } from './defectors';
 import { addLog } from './events';
+import { residentLogName } from './residentLogName';
 import { returnResidentCart } from './equipment';
 import { addCorpse } from './lifecycle';
-import { hasResidentMonk, moraleBreakdown, moraleTarget, type MoraleInputs } from './morale';
+import { moraleBreakdown, moraleTarget, residentMonkGriefLoss, type MoraleInputs } from './morale';
 import { getSeason } from './seasons';
 import { warmthLossWeatherMult } from './weather';
 import {
@@ -21,6 +22,7 @@ import {
 } from './weapons';
 import { canResidentTakeJob } from './youth';
 import { residentColdProtection } from './wearables';
+import { waterSupplySnapshot } from './waterSupply';
 import type { Building, GameState, Gender, JobId, Resident, Tile } from './types';
 
 export function rollResidentGender(rng: () => number): Gender {
@@ -327,20 +329,20 @@ export function killResident(
   state.lifetimeStats.deathsByCause[state.lastDeathCause] =
     (state.lifetimeStats.deathsByCause[state.lastDeathCause] ?? 0) + 1;
   if (combatDeath) {
-    addLog(state, `${withJosa(r.name, '이/가')} 전투 중 전사했습니다. (${cause})`, 'raid', true);
+    addLog(state, `${withJosa(residentLogName(r), '이/가')} 전투 중 전사했습니다. (${cause})`, 'raid', true);
     if (horseLost) addLog(state, '기수가 쓰러지는 과정에서 군마 한 필도 잃었습니다.', 'bad', true);
     for (const item of artifactWeapons) {
       addLog(state, `${ARTIFACT_WEAPON_NAMES[item]}도 전장에서 소실되었습니다.`, 'bad', true);
     }
   } else if (cause === '호환') {
-    addLog(state, `${withJosa(r.name, '이/가')} 호환을 당해 목숨을 잃었습니다.`, 'bad', true);
+    addLog(state, `${withJosa(residentLogName(r), '이/가')} 호환을 당해 목숨을 잃었습니다.`, 'bad', true);
   } else if (cause === '늑대 습격') {
-    addLog(state, `${withJosa(r.name, '이/가')} 늑대 떼의 습격으로 목숨을 잃었습니다.`, 'bad', true);
+    addLog(state, `${withJosa(residentLogName(r), '이/가')} 늑대 떼의 습격으로 목숨을 잃었습니다.`, 'bad', true);
   } else {
-    addLog(state, `${withJosa(r.name, '이/가')} ${withJosa(cause, '으로/로')} 세상을 떠났습니다.`, 'bad', true);
+    addLog(state, `${withJosa(residentLogName(r), '이/가')} ${withJosa(cause, '으로/로')} 세상을 떠났습니다.`, 'bad', true);
   }
   // 이웃의 죽음은 마을 전체의 사기를 깎는다 — 노승의 재(齋)가 있으면 슬픔이 덜하다
-  const griefLoss = hasResidentMonk(state) ? CONFIG.satisfaction.monkGriefRelief : 6;
+  const griefLoss = residentMonkGriefLoss(state);
   for (const other of state.residents) {
     if (other.alive) other.morale = Math.max(0, other.morale - griefLoss);
   }
@@ -362,6 +364,7 @@ export function updateResidentNeeds(
   const season = getSeason(state.day);
   const living = livingResidents(state).filter(resident => !excludedResidentIds.has(resident.id));
   reconcileResidentHomes(state, rng);
+  const waterSupply = waterSupplySnapshot(state);
 
   for (const r of living) {
     // ── 식사 ──
@@ -371,6 +374,9 @@ export function updateResidentNeeds(
 
     // ── 실제 입주 중인 집의 난방만 적용 ──
     const home = residentHome(state, r);
+    const waterRatio = home
+      ? waterSupply.buildings.get(home.id)?.ratio ?? 1
+      : 0;
     const housingType: 'ondol' | 'hut' | 'none' = home
       ? BUILDING_DEFS[home.type].winterBonus ? 'ondol' : 'hut'
       : 'none';
@@ -398,10 +404,18 @@ export function updateResidentNeeds(
       if (r.warmth < 30) chance += hcfg.sickColdChance;
       if (season === 'summer') chance += hcfg.sickSummerChance;
       if (r.hunger < 25) chance += hcfg.sickHungryChance;
+      chance += (1 - waterRatio) * CONFIG.water.unservedSickChance;
       if (rng() < chance) {
         r.sick = true;
-        addLog(state, `${withJosa(r.name, '이/가')} 병에 걸렸습니다.`, 'bad');
+        addLog(state, `${withJosa(residentLogName(r), '이/가')} 병에 걸렸습니다.`, 'bad');
       }
+    }
+
+    if (waterRatio < 1) {
+      r.morale = Math.max(
+        0,
+        r.morale - (1 - waterRatio) * CONFIG.water.unservedMoralePenalty,
+      );
     }
 
     // ── 건강 판정 ──
@@ -421,7 +435,7 @@ export function updateResidentNeeds(
       const recover = hasHerbs ? hcfg.recoverChanceHerbs : hcfg.recoverChance;
       if (rng() < recover) {
         r.sick = false;
-        addLog(state, `${withJosa(r.name, '이/가')} 병에서 회복했습니다.`, 'good');
+        addLog(state, `${withJosa(residentLogName(r), '이/가')} 병에서 회복했습니다.`, 'good');
       }
     } else if (!r.sick && r.hunger > 50 && r.warmth > 50) {
       r.health = Math.min(100, r.health + hcfg.naturalHeal);
