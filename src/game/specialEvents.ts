@@ -835,7 +835,11 @@ function activateWildlifeThreat(state: GameState, kind: WildlifeKind, rng: () =>
 
 function huntCandidates(state: GameState, memberIds?: Iterable<number>): Resident[] {
   const selected = memberIds ? new Set(memberIds) : null;
-  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
+  const away = new Set([
+    ...(state.expedition?.memberIds ?? []),
+    ...(state.warDispatch?.memberIds ?? []),
+    ...activePredatorScoutIds(state),
+  ]);
   const available = livingResidents(state).filter(resident =>
     (selected ? selected.has(resident.id) : !away.has(resident.id)) &&
     state.day >= (resident.quarantinedUntil ?? 0));

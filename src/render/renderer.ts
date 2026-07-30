@@ -271,9 +271,11 @@ export function findResidentAt(
   const expeditionUnitIds = state.expedition && state.expedition.phase !== 'muster'
     ? new Set(state.expedition.memberIds)
     : new Set<number>();
+  const warDispatchIds = new Set(state.warDispatch?.memberIds ?? []);
   for (const r of state.residents) {
     if (!r.alive) continue;
     if (expeditionUnitIds.has(r.id)) continue;
+    if (warDispatchIds.has(r.id)) continue;
     if (presentation.indoorResidentIds.has(r.id)) continue;
     const p = residentPixelPos(r, alpha, presentation.workStances.get(r.id));
     const d = Math.hypot(p.x - mx, p.y - my);
@@ -1801,6 +1803,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   const occludedBuildingDraws: BuildingDrawParams[] = [];
   const occludedResidentDraws: ResidentDrawParams[] = [];
   const predatorScoutIds = activePredatorScoutIds(state);
+  const warDispatchIds = new Set(state.warDispatch?.memberIds ?? []);
   const presentation = o.residentPresentation ?? buildResidentPresentationSnapshot(state);
   const lerp = (a: number, b: number) => a + (b - a) * o.alpha;
   const rowRenderQueue: RowRenderEntry[] = [];
@@ -1847,7 +1850,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     ? cachedWaterVisualSnapshot(state, o.stateVersion, previewWell, previewWaterBuilding)
     : null;
   for (const r of state.residents) {
-    if (!r.alive || r.trappedInMineId != null || predatorScoutIds.has(r.id) ||
+    if (!r.alive || r.trappedInMineId != null || predatorScoutIds.has(r.id) || warDispatchIds.has(r.id) ||
         presentation.indoorResidentIds.has(r.id)) continue;
     const workStance = presentation.workStances.get(r.id);
     const p = residentPixelPos(r, o.alpha, workStance);

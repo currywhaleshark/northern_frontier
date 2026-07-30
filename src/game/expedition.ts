@@ -6,6 +6,7 @@ import { deliverExpeditionCorpses, loseExpeditionCorpses } from './lifecycle';
 import { consumeMusketPowder, reconcileWeaponAssignments, resolvedMountAssignments } from './weapons';
 import { habitatForestTiles } from './habitats';
 import { breakDiplomaticPact } from './diplomacy';
+import { attachReadyAidToExpedition, externalAidCombatPower } from './militaryAid';
 import type {
   Expedition, ExpeditionKind, GameState, PredatorKind, Resident, ResourceId,
 } from './types';
@@ -45,7 +46,8 @@ export function availableExpeditionResidents(state: GameState): Resident[] {
 
 export function expeditionCombatPower(state: GameState, memberIds: Iterable<number>): number {
   return createCombatRoster(state, { context: 'expedition', memberIds }).combatants
-    .reduce((total, combatant) => total + combatant.basePower + combatant.weaponPower, 0);
+    .reduce((total, combatant) => total + combatant.basePower + combatant.weaponPower, 0) +
+    externalAidCombatPower(state.expedition?.externalAid);
 }
 
 export interface CombatRosterWeaponSummary {
@@ -250,6 +252,9 @@ export function createExpedition(state: GameState, input: CreateExpeditionInput)
     speed: Math.max(0.25, input.speed ?? 1.25),
     ticks: 0,
     carriedLoot: input.carriedLoot,
+    ...(input.kind === 'lairAssault'
+      ? { externalAid: attachReadyAidToExpedition(state, input.targetSiteId) }
+      : {}),
   };
   state.expedition = expedition;
   if (input.kind === 'lairAssault' && input.targetSiteId != null) {
@@ -362,6 +367,16 @@ function completeReturn(state: GameState, expedition: Expedition): void {
     member.task = '대기';
   }
   addLog(state, `토벌대 ${members.length}명이 마을로 돌아왔습니다.`, 'info', true);
+  if (expedition.externalAid) {
+    const survived = Math.max(0, expedition.externalAid.committed - expedition.externalAid.killed);
+    addLog(
+      state,
+      `${expedition.externalAid.factionName} 원병 ${survived}명이 토벌을 마치고 자기 부족으로 돌아갔습니다.` +
+        (expedition.externalAid.killed > 0 ? ` 전사 ${expedition.externalAid.killed}명.` : ''),
+      expedition.externalAid.killed > 0 ? 'raid' : 'good',
+      true,
+    );
+  }
   deliverExpeditionCorpses(state, expedition.musterX, expedition.musterY); // 전사자도 함께 돌아온다
 }
 

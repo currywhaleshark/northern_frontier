@@ -805,6 +805,17 @@ export function migrateV50ToV51(raw: RawSave): RawSave {
   return migrated;
 }
 
+// v52: 산채 원병 대기/합류와 부족 전쟁 민병 파견 상태를 저장한다.
+export function migrateV51ToV52(raw: RawSave): RawSave {
+  return {
+    ...clonedRecord(raw),
+    militaryAid: null,
+    warDispatch: null,
+    lastWarParticipationOfferYear: 0,
+    schemaVersion: 52,
+  };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -861,6 +872,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 48) migrated = migrateV48ToV49(migrated);
     else if (version === 49) migrated = migrateV49ToV50(migrated);
     else if (version === 50) migrated = migrateV50ToV51(migrated);
+    else if (version === 51) migrated = migrateV51ToV52(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -1115,7 +1127,11 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     const ids = Array.isArray(group.residentIds)
       ? [...new Set(group.residentIds.filter(id => Number.isInteger(id) && residentIds.has(Number(id))).map(Number))]
       : [];
-    const count = ids.length;
+    const externalAidFactionName = typeof group.externalAidFactionName === 'string' &&
+      group.externalAidFactionName.length > 0 ? group.externalAidFactionName : undefined;
+    const count = externalAidFactionName
+      ? Math.max(0, Math.floor(Number(group.count) || 0))
+      : ids.length;
     const killed = Math.min(count, Math.max(0, Math.floor(Number(group.killed) || 0)));
     const wounded = Math.min(count - killed, Math.max(0, Math.floor(Number(group.wounded) || 0)));
     const weapon = kind === 'healer' ? null : group.weapon === 'musket' || group.weapon === 'hornBow' || group.weapon === 'spear'
@@ -1161,6 +1177,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       ...group,
       id,
       kind, role, weapon,
+      externalAidFactionName,
       readyMuskets: weapon === 'musket' ? Math.min(count, Math.max(0, Math.floor(Number(group.readyMuskets) || count))) : 0,
       label,
       baseLabel,
@@ -1606,6 +1623,18 @@ function migrateTacticalBattleReport(raw: unknown): TacticalBattleReport | null 
   report.highlights = Array.isArray(report.highlights) ? report.highlights : [];
   report.loot = report.loot && typeof report.loot === 'object' ? report.loot : {};
   report.recoveredLoot = report.recoveredLoot && typeof report.recoveredLoot === 'object' ? report.recoveredLoot : {};
+  if (report.externalAid && typeof report.externalAid.factionName === 'string') {
+    const committed = Math.max(0, Math.floor(Number(report.externalAid.committed) || 0));
+    const killed = Math.min(committed, Math.max(0, Math.floor(Number(report.externalAid.killed) || 0)));
+    report.externalAid = {
+      factionName: report.externalAid.factionName,
+      committed,
+      killed,
+      wounded: Math.min(committed - killed, Math.max(0, Math.floor(Number(report.externalAid.wounded) || 0))),
+    };
+  } else {
+    delete report.externalAid;
+  }
   report.tactics = migrateTacticalBattleTacticsReport(report.tactics);
   const looted = Object.values(report.loot).some(amount => (amount ?? 0) > 1e-9);
   report.enemyRouted = report.enemyRouted === true || (
@@ -1645,8 +1674,8 @@ function migrateTacticalBattleReport(raw: unknown): TacticalBattleReport | null 
     friendlyPower: report.initialFriendlyPower,
     enemyPower: report.initialEnemyPower,
     defendersCommitted: Number(report.defendersCommitted) || 0,
-    defendersKilled: report.killed.length,
-    defendersWounded: report.wounded.length,
+    defendersKilled: report.killed.length + (report.externalAid?.killed ?? 0),
+    defendersWounded: report.wounded.length + (report.externalAid?.wounded ?? 0),
     enemiesCommitted: Number(report.raidersCommitted) || 0,
     enemiesKilled: Number(report.raidersKilled) || 0,
     loot: report.loot,
@@ -1971,6 +2000,18 @@ function migrateExpeditionState(state: GameState): void {
       expedition.musterY = Number.isFinite(expedition.musterY) ? expedition.musterY : expedition.y;
       expedition.speed = Number.isFinite(expedition.speed) ? Math.max(0.25, expedition.speed) : 1.25;
       expedition.ticks = Number.isFinite(expedition.ticks) ? Math.max(0, expedition.ticks) : 0;
+      if (expedition.externalAid && typeof expedition.externalAid.factionName === 'string') {
+        const committed = Math.max(0, Math.floor(expedition.externalAid.committed || 0));
+        const killed = Math.min(committed, Math.max(0, Math.floor(expedition.externalAid.killed || 0)));
+        expedition.externalAid = {
+          factionName: expedition.externalAid.factionName,
+          committed,
+          killed,
+          wounded: Math.min(committed - killed, Math.max(0, Math.floor(expedition.externalAid.wounded || 0))),
+        };
+      } else {
+        delete expedition.externalAid;
+      }
       state.expedition = expedition.memberIds.length >= 1 ? expedition : null;
     }
   }

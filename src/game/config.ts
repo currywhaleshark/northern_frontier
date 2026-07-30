@@ -1637,6 +1637,17 @@ export const CONFIG = {
     claimAccordBaseValue: 4,
     claimAccordRadiusValue: 2,
     claimAccordMinimumRelationMultiplier: 0.5,
+    aidRelationRequired: 80,
+    aidSuspicion: 15,
+    aidBaseWarriors: 3,
+    aidMaxWarriors: 5,
+    aidGrainPerWarrior: 4,
+    aidMeatPerWarrior: 2,
+    warDispatchDays: 10,
+    warDispatchRelationGain: 16,
+    warDispatchOpposingRelationLoss: 18,
+    warDispatchSuspicion: 8,
+    warDispatchDeclineRelationLoss: 1,
   },
 
   // 임기제 북병사 성향(F2) — 부족 지도자 성향은 수치에 닿지 않는다.

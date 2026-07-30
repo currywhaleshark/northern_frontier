@@ -36,7 +36,11 @@ export function updateThreat(state: GameState): void {
   if (edibleFoodTotal(state) + state.resources.hide > t.wealthThreshold) delta += t.wealthExtra;
   if (state.resources.reputation < 35) delta += t.lowRepExtra;
   if (state.tradeRefusedDays > 0) delta += t.tradeRefusedExtra;
-  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
+  const away = new Set([
+    ...(state.expedition?.memberIds ?? []),
+    ...(state.warDispatch?.memberIds ?? []),
+    ...activePredatorScoutIds(state),
+  ]);
   const villageWatchmen = state.residents.filter(resident =>
     resident.alive && resident.job === 'watchman' && !away.has(resident.id)).length;
   delta -= villageWatchmen * t.perWatchman;
@@ -360,7 +364,7 @@ export function raidersTick(state: GameState, rng: () => number): void {
 function resolveFightFallback(
   state: GameState, rng: () => number, faction: string, successP: number, side: string, mode: BattleMode,
 ): void {
-  const away = new Set(state.expedition?.memberIds ?? []);
+  const away = new Set([...(state.expedition?.memberIds ?? []), ...(state.warDispatch?.memberIds ?? [])]);
   const defenderIds = state.residents
     .filter(resident => resident.alive && !away.has(resident.id) && !resident.sick && resident.health >= 20 &&
       (mode === 'levy' || resident.job === 'militia' || resident.job === 'watchman'))
@@ -461,7 +465,11 @@ interface RaidChoiceContext {
 }
 
 function villageResidentIds(state: GameState): number[] {
-  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
+  const away = new Set([
+    ...(state.expedition?.memberIds ?? []),
+    ...(state.warDispatch?.memberIds ?? []),
+    ...activePredatorScoutIds(state),
+  ]);
   return state.residents.filter(resident => resident.alive && !away.has(resident.id)).map(resident => resident.id);
 }
 

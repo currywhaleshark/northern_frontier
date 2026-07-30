@@ -13,6 +13,7 @@ import {
   canOpenClaimAccordEnvoy, claimAccordEnvoyRemainingDays, claimAccordLabel, claimAccordRemainingDays,
   claimAccordZonesForFaction, pactEnvoyRemainingDays, pactRemainingDays,
 } from '../../game/diplomacy';
+import { aidEnvoyRemainingDays, canOpenAidRequest } from '../../game/militaryAid';
 import type { GameState, TradeContract } from '../../game/types';
 import { FactionName } from '../FactionName';
 import { UiIcon } from '../UiIcon';
@@ -23,6 +24,7 @@ interface Props {
   onOpenGiftEnvoy: (factionName: string) => void;
   onOpenPactEnvoy: (factionName: string) => void;
   onOpenClaimAccord: (factionName: string, zoneId: number) => void;
+  onOpenAidRequest: (factionName: string) => void;
   onCancelTradeContract: (contract: TradeContract) => void;
 }
 
@@ -79,7 +81,7 @@ function ContractList({ state, factionName, onCancel }: {
   );
 }
 
-export function FactionsWindow({ state, onRequestTrade, onOpenGiftEnvoy, onOpenPactEnvoy, onOpenClaimAccord, onCancelTradeContract }: Props) {
+export function FactionsWindow({ state, onRequestTrade, onOpenGiftEnvoy, onOpenPactEnvoy, onOpenClaimAccord, onOpenAidRequest, onCancelTradeContract }: Props) {
   return (
     <div>
       <div className="muted small" style={{ marginBottom: 6 }}>
@@ -98,6 +100,8 @@ export function FactionsWindow({ state, onRequestTrade, onOpenGiftEnvoy, onOpenP
         const pactEnvoyDays = leader ? pactEnvoyRemainingDays(state, faction.name) : null;
         const pactDays = leader ? pactRemainingDays(state, faction.name) : null;
         const accordZones = leader ? claimAccordZonesForFaction(state, faction.name) : [];
+        const aidReason = leader ? canOpenAidRequest(state, faction.name) : null;
+        const aidEnvoyDays = leader ? aidEnvoyRemainingDays(state, faction.name) : null;
         return (
           <div key={faction.name} className="faction-entry" title={faction.desc}>
             {(leaderPortrait || artwork) && (
@@ -170,6 +174,17 @@ export function FactionsWindow({ state, onRequestTrade, onOpenGiftEnvoy, onOpenP
                   <button
                     className="btn small faction-pact-button"
                     type="button"
+                    disabled={!!aidReason}
+                    title={aidReason ?? `${leader.name} ${leader.title}에게 발견한 산채 토벌 원병을 청합니다`}
+                    onClick={() => onOpenAidRequest(faction.name)}
+                  >
+                    원병
+                  </button>
+                )}
+                {leader && (
+                  <button
+                    className="btn small faction-pact-button"
+                    type="button"
                     disabled={!!pactReason}
                     title={pactReason ?? `${leader.name} ${leader.title}에게 예물을 동봉해 화친 맹약을 제안합니다`}
                     onClick={() => onOpenPactEnvoy(faction.name)}
@@ -186,6 +201,23 @@ export function FactionsWindow({ state, onRequestTrade, onOpenGiftEnvoy, onOpenP
               )}
               {pactDays != null && (
                 <div className="faction-pact-status">화친 맹약 · 잔여 {pactDays}일</div>
+              )}
+              {aidEnvoyDays != null && (
+                <div className="faction-envoy-status">원병 사절 왕복 중 · {aidEnvoyDays}일</div>
+              )}
+              {state.militaryAid?.factionName === faction.name && (
+                <div className="faction-pact-status">
+                  원병 {state.militaryAid.warriorCount}명 대기 · 목표 {
+                    state.foreignSites.find(site => site.id === state.militaryAid?.targetSiteId)?.name ?? '산채'
+                  }
+                </div>
+              )}
+              {state.warDispatch?.requesterFactionName === faction.name && (
+                <div className="faction-envoy-status">
+                  부족 전쟁 파견 {state.warDispatch.memberIds.length}명 · 잔여 {
+                    Math.max(0, state.warDispatch.dueDay - state.day)
+                  }일
+                </div>
               )}
               {accordZones.map(zone => {
                 const accordDays = claimAccordRemainingDays(state, zone.id);

@@ -11,6 +11,7 @@ import { injure, killResidents } from './raidDamage';
 import { applyBanditLairOutcome, type BanditLairOutcome } from './siteDiplomacy';
 import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
 import { resolveEngagementExchange, tacticalMovementCommandPowerMultiplier } from './tacticalEngagement';
+import { externalAidActiveCount, externalAidCombatPower } from './militaryAid';
 import { tacticalTargetingRole } from './tacticalTargeting';
 import {
   attachFeaturedResidentsToTacticalGroups,
@@ -115,9 +116,34 @@ export function createExpeditionTacticalGroups(state: GameState, memberIds: numb
     list.push(snapshot);
     grouped.set(key, list);
   }
-  return attachFeaturedResidentsToTacticalGroups([...grouped.values()]
+  const residentGroups = attachFeaturedResidentsToTacticalGroups([...grouped.values()]
     .map(group => makePlayerGroup(state, group))
     .filter((group): group is TacticalDefenderGroup => group != null));
+  const aid = state.expedition?.externalAid;
+  const aidCount = externalAidActiveCount(aid);
+  if (!aid || aidCount <= 0) return residentGroups;
+  residentGroups.push({
+    id: 'assault-external-jurchen-aid',
+    kind: 'militia-spear',
+    role: 'militia',
+    special: 'jurchenWarrior',
+    origin: aid.factionName,
+    weapon: 'spear',
+    label: `${aid.factionName} 원병 창잡이`,
+    baseLabel: `${aid.factionName} 원병 창잡이`,
+    residentIds: [],
+    externalAidFactionName: aid.factionName,
+    count: aidCount,
+    zoneId: 'lairTrail',
+    command: null,
+    power: externalAidCombatPower(aid),
+    wounded: 0,
+    killed: 0,
+    line: 'front',
+    facing: 'towardEnemy',
+    ambushed: false,
+  });
+  return residentGroups;
 }
 
 function doctrineEffectScale(plan: BanditLairDefensePlan): number {
@@ -863,8 +889,21 @@ export function finishBanditLairTacticalAssault(state: GameState): void {
   const beforeHealth = new Map(state.residents.map(resident => [resident.id, resident.health]));
   let casualties = 0;
   for (const group of battle.defenderGroups) {
-    if (group.killed > 0) killResidents(state, rng, group.killed, 1, group.residentIds);
-    if (group.wounded > 0) injure(state, rng, group.wounded, 20, group.residentIds, true);
+    if (group.externalAidFactionName) {
+      if (state.expedition?.externalAid) {
+        state.expedition.externalAid.killed = Math.min(
+          state.expedition.externalAid.committed,
+          state.expedition.externalAid.killed + group.killed,
+        );
+        state.expedition.externalAid.wounded = Math.min(
+          state.expedition.externalAid.committed - state.expedition.externalAid.killed,
+          state.expedition.externalAid.wounded + group.wounded,
+        );
+      }
+    } else {
+      if (group.killed > 0) killResidents(state, rng, group.killed, 1, group.residentIds);
+      if (group.wounded > 0) injure(state, rng, group.wounded, 20, group.residentIds, true);
+    }
     casualties += group.killed + group.wounded;
   }
   const strategicOutcome: BanditLairOutcome = outcome === 'assaultVictory'
@@ -894,6 +933,9 @@ export function finishBanditLairTacticalAssault(state: GameState): void {
     ];
   }
   const people = tacticalPeopleReport(state, battle, beforeHealth);
+  const externalAid = state.expedition?.externalAid;
+  const externalCommitted = externalAid?.committed ?? 0;
+  const externalKilled = externalAid?.killed ?? 0;
   const raidersCommitted = battle.raiderGroups.reduce((sum, group) => sum + group.count, 0);
   const raidersKilled = Math.min(raidersCommitted, battle.raiderGroups.reduce((sum, group) => sum + group.killed, 0));
   const battleDefendersKilled = battle.defenderGroups.reduce((sum, group) => sum + group.killed, 0);
@@ -904,7 +946,7 @@ export function finishBanditLairTacticalAssault(state: GameState): void {
     result,
     friendlyPower: battle.initialFriendlyPower,
     enemyPower: battle.initialEnemyPower,
-    defendersCommitted: people.committed,
+    defendersCommitted: people.committed + externalCommitted,
     defendersKilled: battleDefendersKilled,
     defendersWounded: battleDefendersWounded,
     enemiesCommitted: raidersCommitted,
@@ -937,10 +979,11 @@ export function finishBanditLairTacticalAssault(state: GameState): void {
     rounds: battle.reports.length,
     villageMorale: Math.round(battle.villageMorale),
     raiderMorale: Math.round(battle.raiderMorale),
-    defendersCommitted: people.committed,
-    defendersSurvived: people.survived,
+    defendersCommitted: people.committed + externalCommitted,
+    defendersSurvived: people.survived + Math.max(0, externalCommitted - externalKilled),
     killed: people.killed,
     wounded: people.wounded,
+    ...(externalAid ? { externalAid: { ...externalAid } } : {}),
     raidersCommitted,
     raidersKilled,
     raidersEscaped: Math.max(0, raidersCommitted - raidersKilled),

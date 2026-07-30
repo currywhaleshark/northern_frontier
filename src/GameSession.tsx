@@ -64,6 +64,7 @@ import {
   cancelClaimAccordEnvoy, cancelGiftEnvoy, cancelPactEnvoy, openClaimAccordEnvoy, openGiftEnvoy, openPactEnvoy,
   sendClaimAccordEnvoy, sendGiftEnvoy, sendPactEnvoy,
 } from './game/diplomacy';
+import { openAidRequest } from './game/militaryAid';
 import { setTradeContractReserve } from './game/tradeContractReserve';
 import { openPredatorHunt, startPredatorScout } from './game/specialEvents';
 import { useSpecialItem } from './game/specialItemActions';
@@ -1207,6 +1208,12 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     bump();
   };
 
+  const handleOpenAidRequest = (factionName: string) => {
+    const err = openAidRequest(stateRef.current, factionName);
+    if (err) notify(err, 'info');
+    bump();
+  };
+
   const handleSendClaimAccordEnvoy = (resource: ResourceId, amount: number) => {
     const choice = stateRef.current.pendingChoice;
     const factionName = choice?.kind === 'claimAccordEnvoy' ? choice.data.factionName as string : '';
@@ -1913,6 +1920,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                         onOpenGiftEnvoy={handleOpenGiftEnvoy}
                         onOpenPactEnvoy={handleOpenPactEnvoy}
                         onOpenClaimAccord={handleOpenClaimAccord}
+                        onOpenAidRequest={handleOpenAidRequest}
                         onCancelTradeContract={handleCancelTradeContract}
                       />
                     )}

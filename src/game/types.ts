@@ -606,6 +606,8 @@ export interface PendingEnvoy {
   // 생활권 협정은 사절을 보낼 때 대상 구역과 가격을 고정한다.
   claimZoneId?: number;
   claimAccordUntilDay?: number;
+  aidTargetSiteId?: number;
+  aidWarriorCount?: number;
 }
 
 export interface DiplomaticPact {
@@ -616,6 +618,28 @@ export interface DiplomaticPact {
 export interface ClaimAccord {
   zoneId: number;
   untilDay: number;
+}
+
+export interface ReadyMilitaryAid {
+  factionName: string;
+  targetSiteId: number;
+  warriorCount: number;
+  arrivedDay: number;
+}
+
+export interface ExpeditionExternalAid {
+  factionName: string;
+  committed: number;
+  killed: number;
+  wounded: number;
+}
+
+export interface WarDispatch {
+  requesterFactionName: string;
+  opposingFactionName: string;
+  memberIds: number[];
+  sentDay: number;
+  dueDay: number;
 }
 
 export interface LogEntry {
@@ -708,7 +732,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'promotionDecree' | 'mineCollapse' | 'giftEnvoy' | 'pactEnvoy' | 'pactRenewal' | 'claimAccordEnvoy' | 'claimAccordRenewal' | 'claimAccordOffer';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'promotionDecree' | 'mineCollapse' | 'giftEnvoy' | 'pactEnvoy' | 'pactRenewal' | 'claimAccordEnvoy' | 'claimAccordRenewal' | 'claimAccordOffer' | 'aidRequestEnvoy' | 'warParticipationRequest' | 'warParticipationResult';
   title: string;
   body: string;
   illustration?: {
@@ -943,6 +967,7 @@ export interface Expedition {
   speed: number;
   ticks: number;
   carriedLoot?: Partial<Record<ResourceId, number>>;
+  externalAid?: ExpeditionExternalAid;
 }
 
 export interface RaidHoldState {
@@ -1355,6 +1380,7 @@ export interface TacticalDefenderGroup {
   featuredDetachment?: boolean;
   deploymentCohortId?: string;
   residentIds: number[];
+  externalAidFactionName?: string;
   count: number;
   zoneId: string;
   command: TacticalCommandId | null;
@@ -1627,6 +1653,7 @@ export interface TacticalBattleReport {
   tactics?: TacticalBattleTacticsReport;
   siteOutcome?: 'burned' | 'abandoned' | 'fortified' | 'unchanged';
   predatorOutcome?: 'killed' | 'repelled' | 'escaped' | 'huntersDefeated' | 'withdrawn';
+  externalAid?: ExpeditionExternalAid;
 }
 
 export interface TacticalBattle {
@@ -1782,6 +1809,9 @@ export interface GameState {
   diplomaticPacts: DiplomaticPact[]; // 화친 맹약(E2) — E1에서 저장 자리를 먼저 만든다
   claimAccords: ClaimAccord[]; // 생활권 협정(E5)
   pendingEnvoys: PendingEnvoy[]; // 예물·맹약·생활권 협정·원병 사절 왕복 상태
+  militaryAid: ReadyMilitaryAid | null; // 목표 산채 원정에 합류할 외부 원병
+  warDispatch: WarDispatch | null; // 부족 전쟁에 파견되어 마을을 비운 민병
+  lastWarParticipationOfferYear: number;
   giftEnvoyDays: Record<string, number[]>; // 세력별 예물 발송일 — 계절 제한·연차 반감용
   proximityWarnings: string[]; // 세력×사유 경고 dedupe(E4)
   proximityWarningProgress: Record<string, number>; // E4 완충 작업·거점 배회의 누적 일수

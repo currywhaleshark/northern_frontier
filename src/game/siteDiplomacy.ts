@@ -10,6 +10,9 @@ import { residentLogName } from './residentLogName';
 import { createCombatRoster } from './combatRoster';
 import { openDefectorImmigrationChoice } from './immigration';
 import {
+  externalAidActiveCount, externalAidCombatPower, militaryAidForLair,
+} from './militaryAid';
+import {
   banditLairDoctrineDefinition, ensureBanditLairDefensePlan, refreshBanditLairDoctrine,
 } from './enemyPlan';
 import {
@@ -113,7 +116,7 @@ export function requestSiteDefectors(state: GameState, siteId: number): string |
 }
 
 function fieldTeam(state: GameState, memberIds?: Iterable<number>) {
-  const away = new Set(state.expedition?.memberIds ?? []);
+  const away = new Set([...(state.expedition?.memberIds ?? []), ...(state.warDispatch?.memberIds ?? [])]);
   const selected = memberIds ? new Set(memberIds) : null;
   const available = livingResidents(state).filter(resident =>
     (selected ? selected.has(resident.id) : !away.has(resident.id)) &&
@@ -189,6 +192,8 @@ export interface BanditLairAssaultResult {
   injuredResidentId?: number;
   injuryDamage?: number;
   loot: Partial<Record<ResourceId, number>>;
+  externalAidKilled?: number;
+  externalAidWounded?: number;
 }
 
 export function applyBanditLairOutcome(
@@ -293,6 +298,24 @@ export function resolveBanditLairAssault(
     loot: outcome === 'victory' ? { grain: 8, hide: 6, tools: 2 } : {},
   };
   if (outcome === 'victory') return result;
+  const externalAid = militaryAidForLair(state, siteId);
+  if (externalAid && externalAidActiveCount(externalAid) > 0 && rng() < 0.6) {
+    const killed = rng() < 0.3 ? 1 : 0;
+    const wounded = killed > 0 ? 0 : 1;
+    result.externalAidKilled = killed;
+    result.externalAidWounded = wounded;
+    if (state.expedition?.externalAid) {
+      state.expedition.externalAid.killed += killed;
+      state.expedition.externalAid.wounded += wounded;
+    }
+    addLog(
+      state,
+      `${externalAid.factionName} 원병이 패주를 막다 ${killed > 0 ? '1명 전사' : '1명 부상'}했습니다.`,
+      'raid',
+      true,
+    );
+    return result;
+  }
   const victim = members[Math.floor(rng() * members.length)];
   if (victim) {
     const damage = 24 + Math.floor(rng() * 25);
@@ -325,11 +348,14 @@ export function banditLairRaidChance(
   const watchmen = combatants.filter(resident => resident.role === 'watchman').length;
   const hunters = combatants.filter(resident => resident.role === 'hunter').length;
   const power = combatants.reduce((sum, resident) => sum + resident.basePower + resident.weaponPower, 0);
+  const externalAid = militaryAidForLair(state, siteId);
+  const aidCount = externalAidActiveCount(externalAid);
+  const totalPower = power + externalAidCombatPower(externalAid);
   const readyMuskets = combatants.filter(resident => resident.readyWeapon === 'musket').length;
   const bowsAndSpears = combatants.filter(resident =>
     resident.readyWeapon === 'hornBow' || resident.readyWeapon === 'spear').length;
   const openFieldChance = Math.max(0.1, Math.min(0.9,
-    0.18 + power / 240 + militia * 0.07 + watchmen * 0.045 + hunters * 0.04 +
+    0.18 + totalPower / 240 + (militia + aidCount) * 0.07 + watchmen * 0.045 + hunters * 0.04 +
     readyMuskets * 0.08 + bowsAndSpears * 0.018 - site.militaryPower / 180));
   const defensePlan = ensureBanditLairDefensePlan(site);
   const defenseConfig = CONFIG.foreignSites.banditLairDefense;

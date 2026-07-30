@@ -11,6 +11,7 @@ import { changeRelation, getRelation } from './relations';
 import { LUXURY_RESOURCES } from './resourceCatalog';
 import { getSeason, getYear } from './seasons';
 import { factionValue } from './tradeValues';
+import { dailyMilitaryDiplomacyTick, normalizeMilitaryAidState, resolveAidEnvoy } from './militaryAid';
 import type { ClaimZone, FactionLeader, GameState, PendingEnvoy, ResourceId } from './types';
 
 const GIFT_RESOURCES = [...LUXURY_RESOURCES, 'silver'] as const satisfies readonly ResourceId[];
@@ -699,10 +700,12 @@ export function dailyDiplomacyTick(state: GameState): void {
       if (envoy.kind === 'gift') resolveGiftEnvoy(state, envoy);
       else if (envoy.kind === 'pact') resolvePactEnvoy(state, envoy);
       else if (envoy.kind === 'claimAccord') resolveClaimAccordEnvoy(state, envoy);
+      else if (envoy.kind === 'aidRequest') resolveAidEnvoy(state, envoy);
     }
   }
   offerPactRenewal(state);
   offerClaimAccordRenewal(state);
+  dailyMilitaryDiplomacyTick(state);
 }
 
 export function giftEnvoyRemainingDays(state: GameState, factionName: string): number | null {
@@ -752,6 +755,12 @@ export function normalizeDiplomacyState(state: GameState): void {
         claimAccordUntilDay: typeof envoy.claimAccordUntilDay === 'number' && Number.isFinite(envoy.claimAccordUntilDay)
           ? Math.max(0, Math.floor(envoy.claimAccordUntilDay))
           : undefined,
+        aidTargetSiteId: typeof envoy.aidTargetSiteId === 'number' && Number.isFinite(envoy.aidTargetSiteId)
+          ? Math.max(0, Math.floor(envoy.aidTargetSiteId))
+          : undefined,
+        aidWarriorCount: typeof envoy.aidWarriorCount === 'number' && Number.isFinite(envoy.aidWarriorCount)
+          ? Math.max(1, Math.min(CONFIG.diplomacy.aidMaxWarriors, Math.floor(envoy.aidWarriorCount)))
+          : undefined,
       }))
     : [];
   state.giftEnvoyDays = state.giftEnvoyDays && typeof state.giftEnvoyDays === 'object'
@@ -769,4 +778,5 @@ export function normalizeDiplomacyState(state: GameState): void {
       .slice(-512)
       .map(([key, value]) => [key, Math.max(0, Math.min(99, Math.floor(value)))]))
     : {};
+  normalizeMilitaryAidState(state);
 }

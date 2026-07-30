@@ -60,6 +60,7 @@ export function isCombatReadyResident(
   if (!physicallyReady(state, resident)) return false;
   const scouts = activePredatorScoutIds(state);
   if (scouts.has(resident.id)) return false;
+  if (state.warDispatch?.memberIds.includes(resident.id)) return false;
 
   if (context === 'villageDefense') {
     if (state.expedition?.memberIds.includes(resident.id)) return false;

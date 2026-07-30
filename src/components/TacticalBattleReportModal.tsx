@@ -109,6 +109,12 @@ export function TacticalBattleReportModal({ report, onClose }: Props) {
               ) : <p>부상자 없음</p>}
             </div>
             <p className="battle-report-survivors">생존 {report.defendersSurvived}명 / 동원 {report.defendersCommitted}명</p>
+            {report.externalAid && (
+              <p className="battle-report-survivors">
+                {report.externalAid.factionName} 원병 · 동원 {report.externalAid.committed}명 ·
+                전사 {report.externalAid.killed}명 · 부상 {report.externalAid.wounded}명
+              </p>
+            )}
           </section>
 
           <section className="battle-report-section enemy">

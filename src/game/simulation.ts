@@ -95,6 +95,9 @@ import {
   createBorderCommander, createFactionLeaders, updateDiplomaticFigures,
 } from './diplomaticFigures';
 import { dailyDiplomacyTick, resolveClaimAccordOffer, resolveClaimAccordRenewal, resolvePactRenewal } from './diplomacy';
+import {
+  resolveAidRequestChoice, resolveWarParticipationChoice, resolveWarParticipationResult,
+} from './militaryAid';
 import { resolveTerritoryWarning, updateTerritoryWarnings } from './territory';
 import {
   foreignSiteAt, generateForeignSites, revealForeignSitesFromExploration, updateSeasonalForeignSites,
@@ -166,6 +169,9 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
     diplomaticPacts: [],
     claimAccords: [],
     pendingEnvoys: [],
+    militaryAid: null,
+    warDispatch: null,
+    lastWarParticipationOfferYear: 0,
     giftEnvoyDays: {},
     proximityWarnings: [],
     proximityWarningProgress: {},
@@ -508,6 +514,7 @@ export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
   // 문해자 전용 관직 — 글을 아는 주민만 후보가 된다
   const eligible = (res: Resident) => canResidentTakeJob(res, to)
     && !res.religiousVocation
+    && !state.warDispatch?.memberIds.includes(res.id)
     && (!isLiterateJob(to) || res.literate === true);
   const r = state.residents.find(res =>
     res.alive && !res.special && res.job === from && res.assignedBuildingId == null && eligible(res))
@@ -532,6 +539,10 @@ export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
 export function setResidentJob(state: GameState, id: number, job: JobId): void {
   if (!isJobUnlocked(state.rank, job)) return;
   const r = state.residents.find(res => res.id === id);
+  if (r && state.warDispatch?.memberIds.includes(r.id)) {
+    addLog(state, `${withJosa(residentLogName(r), '은/는')} 부족 전쟁에 파견 중이라 귀환 전에는 직업을 바꿀 수 없습니다.`, 'info');
+    return;
+  }
   if (r?.stage && r.stage !== 'youth') {
     addLog(state, `${withJosa(residentLogName(r), '은/는')} 아직 아이라 일을 맡길 수 없습니다.`, 'info');
     return;
@@ -680,6 +691,7 @@ export function issueResidentMoveOrder(
 ): string | null {
   const resident = state.residents.find(res => res.id === residentId && res.alive);
   if (!resident) return '선택한 주민이 없습니다.';
+  if (state.warDispatch?.memberIds.includes(resident.id)) return '부족 전쟁에 파견 중인 민병에게는 명령을 내릴 수 없습니다.';
   const tile = state.map[y]?.[x];
   if (!tile) return '지도 밖입니다.';
 
@@ -702,6 +714,7 @@ export function issueResidentWorkOrder(
   if (requestedAction.kind !== 'work') return '작업 명령이 아닙니다.';
   const resident = state.residents.find(res => res.id === residentId && res.alive);
   if (!resident) return '선택한 주민이 없습니다.';
+  if (state.warDispatch?.memberIds.includes(resident.id)) return '부족 전쟁에 파견 중인 민병에게는 명령을 내릴 수 없습니다.';
   const tile = state.map[requestedAction.y]?.[requestedAction.x];
   if (!tile) return '지도 밖입니다.';
 
@@ -1151,6 +1164,9 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'pactRenewal') resolvePactRenewal(state, optionId);
   else if (state.pendingChoice.kind === 'claimAccordRenewal') resolveClaimAccordRenewal(state, optionId);
   else if (state.pendingChoice.kind === 'claimAccordOffer') resolveClaimAccordOffer(state, optionId);
+  else if (state.pendingChoice.kind === 'aidRequestEnvoy') resolveAidRequestChoice(state, optionId);
+  else if (state.pendingChoice.kind === 'warParticipationRequest') resolveWarParticipationChoice(state, optionId);
+  else if (state.pendingChoice.kind === 'warParticipationResult') resolveWarParticipationResult(state);
   else resolveTrade(state, optionId);
   reconcileWeaponAssignments(state);
   reconcileMountAssignments(state);
@@ -1467,6 +1483,7 @@ export function dailyToolWear(state: GameState): number {
     !building.built || building.expansion != null || building.workOrder != null);
   const wearUnits = state.residents.reduce((sum, resident) => {
     if (!resident.alive || resident.sick || resident.trappedInMineId != null ||
+        state.warDispatch?.memberIds.includes(resident.id) ||
         state.day < (resident.quarantinedUntil ?? 0)) return sum;
     if (resident.stage && resident.stage !== 'youth') return sum;
     if (resident.job === 'farmer' && winter) return sum;
@@ -1533,6 +1550,7 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
     foodResult.varietyScore, foodResult.vegetableRatio,
     new Set([
       ...(state.expedition?.memberIds ?? []),
+      ...(state.warDispatch?.memberIds ?? []),
       ...trappedResidentIds,
     ]),
   );

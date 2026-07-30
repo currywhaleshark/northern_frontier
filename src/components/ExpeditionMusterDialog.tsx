@@ -7,6 +7,7 @@ import {
 import { isForeignSiteOperational } from '../game/foreignSites';
 import { expeditionEnemyIntel } from '../game/expeditionIntel';
 import { banditLairRaidChance } from '../game/siteDiplomacy';
+import { externalAidCombatPower, militaryAidForLair } from '../game/militaryAid';
 import { predatorHuntChance } from '../game/specialEvents';
 import {
   ARTIFACT_WEAPON_NAMES, COMBAT_WEAPON_IDS, COMBAT_WEAPON_NAMES, artifactWeaponForResident,
@@ -74,7 +75,10 @@ export function ExpeditionMusterDialog({
     excludedResidentIds: selected,
     gunpowderAvailable: musterPreview.remainingGunpowder,
   });
-  const expeditionPower = musterPreview.expeditionPower;
+  const waitingAid = request.kind === 'lairAssault' && request.siteId != null
+    ? militaryAidForLair(state, request.siteId)
+    : undefined;
+  const expeditionPower = musterPreview.expeditionPower + externalAidCombatPower(waitingAid);
   const successChance = request.kind === 'lairAssault'
     ? banditLairRaidChance(state, request.siteId, selected)
     : predatorHuntChance(state, request.predatorKind, selected);
@@ -163,6 +167,9 @@ export function ExpeditionMusterDialog({
         <div className="expedition-preview-grid">
           <div><span>출정 인원</span><strong>{selected.length}명</strong></div>
           <div><span>원정 전력</span><strong>{Math.round(expeditionPower)}</strong></div>
+          {waitingAid && (
+            <div><span>{waitingAid.factionName} 원병</span><strong>{waitingAid.committed}명</strong></div>
+          )}
           <div><span>조총 준비</span><strong>{musterPreview.expeditionWeapons.readyMuskets} / 배정 {musterPreview.expeditionWeapons.assignedMuskets}</strong></div>
           <div><span>예상 성공</span><strong>{successText}</strong></div>
           <div className={remainingDefense < currentDefense * 0.6 ? 'danger' : ''}>

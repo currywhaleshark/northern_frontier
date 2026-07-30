@@ -717,7 +717,11 @@ function defenderGroups(state: GameState, mode: TacticalBattle['mode']): Tactica
   }
 
   const used = new Set([...roster.combatants.map(item => item.residentId), ...levyIds]);
-  const away = new Set([...(state.expedition?.memberIds ?? []), ...activePredatorScoutIds(state)]);
+  const away = new Set([
+    ...(state.expedition?.memberIds ?? []),
+    ...(state.warDispatch?.memberIds ?? []),
+    ...activePredatorScoutIds(state),
+  ]);
   const civilianIds = state.residents
     .filter(resident => resident.alive && !away.has(resident.id) && !used.has(resident.id))
     .map(resident => resident.id);

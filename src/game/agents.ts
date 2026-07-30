@@ -553,6 +553,7 @@ function canRespondToFire(state: GameState, resident: Resident): boolean {
   if (state.day < (resident.birthRecoveryUntil ?? 0)) return false;
   if (resident.stage && (resident.stage !== 'youth' || resident.youthActivity === 'school')) return false;
   if (state.expedition?.memberIds.includes(resident.id) || state.battle?.defenderIds.includes(resident.id)) return false;
+  if (state.warDispatch?.memberIds.includes(resident.id)) return false;
   return !activePredatorScoutIds(state).has(resident.id);
 }
 
@@ -3404,10 +3405,12 @@ export function agentsTick(state: GameState): void {
   const season = getSeason(state.day);
   const living = state.residents.filter(r => r.alive);
   const predatorScouts = activePredatorScoutIds(state);
+  const warDispatchIds = new Set(state.warDispatch?.memberIds ?? []);
   const enrolledStudents = enrolledStudentIds(state); // 서당 정원 안의 취학 아동
   if (living.length === 0) return;
   const leisureResidents = living.filter(resident =>
     !predatorScouts.has(resident.id) &&
+    !warDispatchIds.has(resident.id) &&
     !state.expedition?.memberIds.includes(resident.id) &&
     !state.battle?.defenderIds.includes(resident.id) &&
     !state.raidHold);
@@ -3416,6 +3419,7 @@ export function agentsTick(state: GameState): void {
     : new Map<number, number>();
 
   const producers = living.filter(r =>
+    !warDispatchIds.has(r.id) &&
     PRODUCING_JOBS.includes(r.job) && !r.sick && state.day >= (r.quarantinedUntil ?? 0) && r.health >= 20).length;
   const t = state.resources.tools;
   const tMod = producers <= 0 || t >= producers ? 1 : 0.6 + 0.4 * (t / producers);
@@ -3423,6 +3427,7 @@ export function agentsTick(state: GameState): void {
   const center = state.buildings.find(b => b.type === 'center');
   const goalFieldUserCounts = { forest: 0, huntable: 0, mineral: 0 };
   for (const resident of living) {
+    if (warDispatchIds.has(resident.id)) continue;
     if (resident.job === 'woodcutter' || resident.job === 'herbalist') goalFieldUserCounts.forest++;
     else if (resident.job === 'hunter') goalFieldUserCounts.huntable++;
     else if (resident.job === 'miner') goalFieldUserCounts.mineral++;
@@ -3446,6 +3451,7 @@ export function agentsTick(state: GameState): void {
     clearingCrew: assignClearingCrews(
       state,
       living.filter(resident => resident.job === 'woodcutter' &&
+        !warDispatchIds.has(resident.id) &&
         !resident.sick && state.day >= (resident.quarantinedUntil ?? 0) &&
         !resident.manualOrder),
     ),
@@ -3501,6 +3507,15 @@ export function agentsTick(state: GameState): void {
     if (state.battle?.defenderIds.includes(r.id)) {
       resumeCriticalActivity(r);
       battleAgentTick(state, r, ctx);
+      continue;
+    }
+    if (warDispatchIds.has(r.id)) {
+      resumeCriticalActivity(r);
+      r.task = '부족 전쟁 파견 중';
+      clearHaulTask(r);
+      r.path = [];
+      r.manualOrder = null;
+      if (carryTotal(r) > 0) depositAll(state, r);
       continue;
     }
     if (fireResponseAgentTick(state, r, ctx)) continue;
