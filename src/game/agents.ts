@@ -51,6 +51,7 @@ import { mineralDepositsInMineRange, servingMineForTile } from './miningSites';
 import { oreSampleAt } from './subsurfaceVeins';
 import { waterDependentProductionMultiplier } from './waterSupply';
 import { activeFireDisaster, applyFireWater, drawFireWater, nearestFireWaterSource } from './fire';
+import { mineCollapseRepairLocked } from './mineCollapse';
 import { rankProductionEfficiency } from './productionEfficiency';
 import { cleanupRoyalPlaqueAfterBuildingRemoval, plaqueProductionMultiplier } from './royalPlaque';
 import { buildGoalField, describeGoal, type DescribedGoal, type GoalField } from './pathGoals';
@@ -1571,6 +1572,7 @@ function isConstructionForJob(state: GameState, building: Building, job: 'farmer
   // 나무가 아직 서 있으면 벌목꾼 차례다 — 건축가·농부는 자리가 빌 때까지 기다린다.
   // (이전의 해체 단계는 옛 자리 일이라 새 자리 나무와 무관하게 계속 진행한다)
   if (clearingBlocksWork(state, building)) return false;
+  if (mineCollapseRepairLocked(state, building)) return false;
   if (building.workOrder) return job === 'builder';
   if (building.repairing) return job === 'builder';
   const requiredJob = isPlotBuildingType(building.type) ? 'farmer' : 'builder';

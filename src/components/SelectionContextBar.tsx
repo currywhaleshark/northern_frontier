@@ -9,6 +9,7 @@ import { familyReferenceName } from '../game/family';
 import { foreignSiteAt } from '../game/foreignSites';
 import { mineralRemaining } from '../game/minerals';
 import { mineMineralSummary } from '../game/miningSites';
+import { mineCollapseRepairLocked } from '../game/mineCollapse';
 import { livestockCapacityForStable, livestockDailyFeedNeed, LIVESTOCK_DEFS, normalizeLivestockState } from '../game/livestock';
 import { residentDisplayAge } from '../game/lifecycle';
 import { pastureRequiredHerders, pastureTileCount } from '../game/pastures';
@@ -481,7 +482,9 @@ export function SelectionContextBar({
                                 ? building.expansion
                                 ? `영역 확장 중 ${Math.floor((building.expansion.progress / Math.max(1, building.expansion.required)) * 100)}% · ${building.type === 'field' || building.type === 'paddy' ? '농부' : '건축가'}`
                                 : '완공'
-                              : `${building.repairing ? '수리 중' : '건설 중'} ${Math.floor((building.progress / Math.max(1, def.buildDays)) * 100)}%`}</td></tr>
+                              : mineCollapseRepairLocked(state, building)
+                                ? '갱도 붕괴 · 매몰자 구조 중 · 수리 대기'
+                                : `${building.repairing ? '수리 중' : '건설 중'} ${Math.floor((building.progress / Math.max(1, def.buildDays)) * 100)}%`}</td></tr>
                             {state.priorityBuildingId === building.id && (
                               <tr><td>공사 순위</td><td>최우선</td></tr>
                             )}

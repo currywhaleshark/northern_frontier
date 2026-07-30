@@ -8,6 +8,7 @@
 - `public/assets/events/late-frost-v1.png`
 - `public/assets/events/locust-swarm-v1.png`
 - `public/assets/events/livestock-epidemic-v1.png`
+- `public/assets/events/mine-collapse-v1.png`
 
 셋 중에서는 한 장의 세부 묘사를 그대로 복제하기보다 아래 공통 특성을 유지한다.
 

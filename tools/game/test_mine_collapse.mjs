@@ -80,8 +80,13 @@ function collapseState(seed) {
   const { state, mine, miners } = collapseState(202607303);
   assert.equal(collapse.startMineCollapse(state, mine, () => 0.25, false), true);
   assert.equal(state.pendingChoice?.kind, 'mineCollapse');
+  assert.equal(state.pendingChoice?.illustration?.src, '/assets/events/mine-collapse-v1.png');
   assert.equal(state.pendingDisasters[0].trappedResidentIds.length, miners.length);
   assert.ok(miners.every(resident => resident.trappedInMineId === mine.id));
+  assert.equal(mine.built, false, 'a collapsed mine must stop operating as a destroyed building');
+  assert.equal(mine.repairing, true, 'the destroyed mine must retain its eventual repair contract');
+  assert.equal(collapse.mineCollapseRepairLocked(state, mine), true,
+    'builders must not repair the mine while trapped workers are still inside');
   collapse.resolveMineCollapseChoice(state, 'urgent');
   const rescue = state.pendingDisasters[0];
   assert.equal(rescue.choiceId, 'urgent');
@@ -93,6 +98,10 @@ function collapseState(seed) {
   state.day = rescue.resolveDay;
   disasters.advancePendingDisasters(state);
   assert.equal(state.pendingDisasters.length, 0);
+  assert.equal(collapse.mineCollapseRepairLocked(state, mine), false,
+    'the mine must become repairable only after rescue resolution');
+  assert.equal(mine.built, false);
+  assert.equal(mine.repairing, true);
   assert.ok(miners.every(resident => resident.trappedInMineId == null));
   assert.equal(miners.filter(resident => resident.alive).length +
     miners.filter(resident => !resident.alive).length, miners.length);
@@ -110,6 +119,13 @@ function collapseState(seed) {
   }]);
   assert.deepEqual(normalized[0].trappedResidentIds, [8],
     'save normalization must deduplicate and reject invalid trapped resident ids');
+}
+
+{
+  const illustration = readFileSync(new URL('../../public/assets/events/mine-collapse-v1.png', import.meta.url));
+  assert.equal(illustration.toString('ascii', 1, 4), 'PNG');
+  assert.equal(illustration.readUInt32BE(16), 2172);
+  assert.equal(illustration.readUInt32BE(20), 724);
 }
 
 console.log('mine collapse disaster checks passed');

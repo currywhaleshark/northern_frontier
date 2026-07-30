@@ -15,6 +15,17 @@ function activeMineCollapse(state: Pick<GameState, 'pendingDisasters'>): Pending
   return state.pendingDisasters.find(disaster => disaster.id === 'mineCollapse');
 }
 
+export function mineCollapseRepairLocked(
+  state: Pick<GameState, 'pendingDisasters'>,
+  building: Pick<Building, 'id' | 'built' | 'repairing' | 'repairCause'>,
+): boolean {
+  if (building.built || !building.repairing || building.repairCause !== 'mineCollapse') return false;
+  return state.pendingDisasters.some(disaster =>
+    disaster.id === 'mineCollapse' &&
+    disaster.choiceId !== 'warning' &&
+    disaster.targetBuildingIds?.includes(building.id));
+}
+
 function wetWeatherMultiplier(state: Pick<GameState, 'weather'>): number {
   if (state.weather === 'thawFlood') return CONFIG.disasters.mineCollapse.thawFloodMultiplier;
   if (state.weather === 'rain') return CONFIG.disasters.mineCollapse.rainMultiplier;
@@ -73,6 +84,10 @@ function openRescueChoice(state: GameState, disaster: PendingDisaster): void {
     body: `채광갱이 무너져 ${trappedResidents(state, disaster).length}명이 갱 안에 갇혔습니다.\n` +
       `매몰자: ${trappedNames(state, disaster)}\n` +
       '서두르면 빨리 닿지만 구조대가 2차 붕괴에 휘말릴 수 있고, 조심스럽게 파면 구조대는 안전하지만 매몰자가 버틸 시간이 줄어듭니다.',
+    illustration: {
+      src: '/assets/events/mine-collapse-v1.png',
+      alt: '무너진 채광갱 입구에서 부서진 갱목과 토사를 살피며 구조를 준비하는 조선 시대 광부들',
+    },
     options: [
       {
         id: 'urgent',
@@ -239,8 +254,15 @@ function resolveRescue(state: GameState, disaster: PendingDisaster): void {
     if (rescueInjuries > 0) addLog(state, `서두르던 구조대가 2차 붕괴에 휘말려 ${rescueInjuries}명이 다쳤습니다.`, 'bad', true);
   }
 
+  const mine = state.buildings.find(building =>
+    building.id === disaster.targetBuildingIds?.[0] &&
+    building.type === 'deepMine' &&
+    !building.built &&
+    building.repairing &&
+    building.repairCause === 'mineCollapse');
   const text = `갱도 구조가 끝났습니다. 생존 구조 ${rescued}명, 사망 ${killed}명` +
-    (rescueInjuries > 0 ? `, 구조대 부상 ${rescueInjuries}명` : '') + '.';
+    (rescueInjuries > 0 ? `, 구조대 부상 ${rescueInjuries}명` : '') +
+    (mine ? '. 붕괴한 채광갱은 이제 건설담당이 수리할 수 있습니다.' : '.');
   addLog(state, text, killed > 0 ? 'bad' : 'good', true);
   recordAnnals(state, 'disaster', text);
 }

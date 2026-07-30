@@ -7,6 +7,7 @@ import { isExplored } from './exploration';
 import { foreignSiteAt } from './foreignSites';
 import { isHaulSourceBuilding } from './inventory';
 import { isMineralDeposit, servingMineForTile } from './miningSites';
+import { mineCollapseRepairLocked } from './mineCollapse';
 import { isVeinSealedTile } from './silver';
 import { canAssignResidentToBuilding, workerSlotConfig } from './workerSlots';
 import { unauthorizedTerritorySiteIds } from './territory';
@@ -109,6 +110,9 @@ export function canResidentWorkTarget(
         ? { ok: true, label: '방앗간 작업', buildingId: building?.id }
         : { ok: false, label: '방앗간이 아닙니다' };
     case 'builder':
+      if (building && mineCollapseRepairLocked(state, building)) {
+        return { ok: false, label: '매몰자 구조가 끝난 뒤 수리할 수 있습니다' };
+      }
       return building && !building.built
         ? { ok: true, label: '건설', buildingId: building.id }
         : { ok: false, label: '건설할 건물이 아닙니다' };

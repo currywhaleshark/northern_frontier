@@ -13,7 +13,7 @@ import { contractsInGrace } from '../game/tradeContracts';
 import { RESOURCE_NAMES } from '../game/constants';
 import { pendingDisasterDaysRemaining } from '../game/disasters';
 import { nearestFireWaterSource } from '../game/fire';
-import { mineCollapseSurvivalChance } from '../game/mineCollapse';
+import { mineCollapseRepairLocked, mineCollapseSurvivalChance } from '../game/mineCollapse';
 import { buildingRepairCause } from '../game/raidDamage';
 import type { AlertItem, BuildingRepairCause, GameState } from '../game/types';
 
@@ -120,7 +120,7 @@ export function computeAlerts(state: GameState): AlertItem[] {
     mineCollapse: 0,
   };
   for (const building of state.buildings) {
-    if (!building.repairing) continue;
+    if (!building.repairing || mineCollapseRepairLocked(state, building)) continue;
     damagedBuildings[buildingRepairCause(state, building)]++;
   }
   const damageAlerts: Array<{ cause: BuildingRepairCause; label: string; subject: string }> = [
