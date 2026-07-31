@@ -34,7 +34,7 @@ export function WinterChecklistPanel({ state, onClose }: Props) {
             <h2 id="winter-checklist-title">겨울 점검</h2>
             <div className="muted small">
               {SEASON_NAMES[season]} 기준 · 인구 소비 몫 {readiness.weight.toFixed(1)} ·
-              {shortfalls === 0 ? ' 여섯 가지 모두 갖추었습니다' : ` ${shortfalls}가지가 아직 모자랍니다`}
+              {shortfalls === 0 ? ' 다섯 가지 모두 갖추었습니다' : ` ${shortfalls}가지가 아직 모자랍니다`}
             </div>
           </div>
           <button type="button" className="icon-btn" aria-label="닫기" onClick={onClose}>×</button>

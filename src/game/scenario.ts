@@ -10,19 +10,26 @@ import { buildingFootprintDims } from './buildings';
 import { CONFIG } from './config';
 import { consumeFuelHeat } from './consumption';
 import { addLog } from './events';
-import { openGuideOnce } from './guides';
+import { markGuideSeen, openGuideOnce } from './guides';
+import { openScriptedImmigrationChoice } from './immigration';
 import { makeRng } from './map';
+import { spawnRaiders } from './raids';
 import { residentLogName } from './residentLogName';
 import { withJosa } from './josa';
 import { getDayOfSeason, getSeason } from './seasons';
+import { tributeReserved } from './tributeReserve';
 import { isWallBuilding } from './walls';
 import { buildingTouchesWaterCoverage, naturalWaterCoverageTileSets } from './waterCoverage';
 import { dailyFuelHeatNeed, winterReadiness } from './winterReadiness';
-import type { GameState, JobId, Resident, ScenarioState } from './types';
+import type { GameState, JobId, Resident, ResourceId, ScenarioState } from './types';
 
-// 4 = R4에서 세공(tribute) 스텝을 덜어 10스텝이 된 판. 스텝 수가 바뀌면 진행 위치의 뜻이
+// 진행 표식은 잎 모듈에 있다 (agents.ts가 누계를 올려야 해서 순환을 끊었다).
+// 부르는 쪽은 예전처럼 scenario에서 가져다 쓴다.
+export { countScenarioProgress, markScenarioFlag } from './scenarioFlags';
+
+// 5 = R5에서 둘째 해 7스텝을 이어 붙여 17스텝이 된 판. 스텝 수가 바뀌면 진행 위치의 뜻이
 // 달라지므로 반드시 올린다 — 구판 저장은 로드에서 일반 모드로 해제된다.
-export const TUTORIAL_SCENARIO_VERSION = 4;
+export const TUTORIAL_SCENARIO_VERSION = 5;
 
 /** 소목표 하나 — 칩에 `라벨 (현재/목표)`로 선다. 라벨은 짧은 명사, 칩은 수치 요약이다. */
 export interface ScenarioGoalProgress {
@@ -137,6 +144,30 @@ function scriptedPatient(state: GameState): Resident | null {
   const id = state.scenario?.flags.patientResidentId;
   if (id == null) return null;
   return state.residents.find(resident => resident.id === id) ?? null;
+}
+
+function livingCount(state: GameState): number {
+  return state.residents.filter(resident => resident.alive).length;
+}
+
+// 누계 표식 (대장간의 도구·가죽공방의 가죽옷) — agents.ts가 지어낸 만큼 쌓아 준다
+function counted(state: GameState, key: string): number {
+  return flags(state)[key] ?? 0;
+}
+
+// 10단계: 올해 세공고에 한 품목이라도 넣어 두었는가 (요구 품목이 곧 가죽옷이다)
+function tributeReserveStarted(state: GameState): boolean {
+  const tribute = state.courtTribute;
+  if (!tribute || tribute.resolved) return false;
+  return (Object.entries(tribute.items) as [ResourceId, number][])
+    .some(([resource, required]) => (required ?? 0) > 0 && tributeReserved(state, resource) >= 1);
+}
+
+// 16단계: 지금 습격이 진행 중인가 (무리·전투·습격 선택지 어느 하나라도)
+function raidInProgress(state: GameState): boolean {
+  if (state.raiders || state.battle || state.tacticalBattle || state.raidHold) return true;
+  const kind = state.pendingChoice?.kind;
+  return kind === 'raid' || kind === 'extortion' || kind === 'expeditionRaidOrder';
 }
 
 // 스텝 원형 — 소목표(progress)만 적는다. isDone·goal은 아래에서 이 배열로부터 파생시킨다.
@@ -326,7 +357,8 @@ const TUTORIAL_STEP_SPECS: readonly ScenarioStepSpec[] = [
       '이제 겨울입니다. 바깥일이 멈추고 장작과 곳간이 줄어드는 계절입니다.\n\n' +
       '· 장작이 떨어지면 체온이, 곳간이 비면 배가 먼저 무너집니다.\n' +
       '· 병자는 약초로 다스리고, 옷이 모자라면 체온이 더 빨리 식습니다.\n' +
-      `· 겨울 ${CONFIG.tutorial.winterEndDayOfSeason}일째 아침까지 버티면 길잡이가 끝납니다.`,
+      `· 겨울 ${CONFIG.tutorial.winterEndDayOfSeason}일째 아침까지 첫 고비를 넘기십시오. ` +
+      '봄이 오면 조정의 파발과 함께 새 과제가 찾아옵니다.',
     // 통제 사건: 기후는 건드리지 않고 그날의 장작 소모만 올린다 (계획 §2-다 A안)
     onDay: state => {
       const scenario = state.scenario;
@@ -349,10 +381,177 @@ const TUTORIAL_STEP_SPECS: readonly ScenarioStepSpec[] = [
       target: CONFIG.tutorial.winterEndDayOfSeason,
     }],
   },
+
+  // ────────────────────── 둘째 해 (R5) ──────────────────────
+  // 첫 겨울은 정착의 고비였고, 여기서부터는 조정·살림·바깥세상을 배운다.
+  // 순서: 세공 파발 → 무두장이 → 유민 → 광물 → 대장간 → 장터 → 전투(마무리).
+  {
+    id: 'tribute',
+    title: '조정의 파발',
+    body:
+      '봄이 왔습니다. 조정은 첫 해의 정착을 지켜보았고, 올해부터 해마다 세공(歲貢)을 거둡니다.\n\n' +
+      '· 북병사(北兵使)의 파발이 올해 요구를 알립니다. 봄에 공지되어 겨울 첫날 사자가 거두어 갑니다.\n' +
+      '· 상단 바에 세공 칩이 섭니다. 눌러 조정 창을 여십시오 — 북병사의 이름과 성향, 올해 요구가 그곳에 있습니다.\n' +
+      '· 요구 품목은 세공고에 미리 옮겨 두십시오. 넣어 둔 몫은 겨울 소비와 분리되어 잠깁니다.\n' +
+      '· 다 채우지 못하면 명성이 깎이고 국경이 험악해집니다. 성실히 바치면 격년으로 하사품이 내려옵니다.\n' +
+      '· 파발이 아직 오지 않았거든 시간을 흘리십시오. 봄 첫날에 옵니다.',
+    // 이 스텝이 세공 길잡이 모듈의 내용을 그대로 가르친다 — 시나리오가 걷힌 뒤
+    // 같은 트리거(봄 파발)가 다시 돌아도 두 번 설명하지 않게 본 것으로 적어 둔다.
+    onStart: state => markGuideSeen(state, 'tribute'),
+    progress: state => [
+      boolGoal('세공 공지', state.courtTribute != null),
+      flagGoal(state, '조정 창', 'courtWindowOpened'),
+      boolGoal('세공고', tributeReserveStarted(state)),
+    ],
+  },
+  {
+    id: 'tanning',
+    title: '무두장이와 가죽공방',
+    body:
+      '올해 조정이 찾는 것은 가죽옷입니다. 가죽옷은 저절로 생기지 않습니다 — 무두장이가 가죽공방에서 짓습니다.\n\n' +
+      '· 건설 목록(생산)에서 가죽공방을 세우고, 직업 배정에서 무두장이를 두십시오.\n' +
+      '· 가죽 2장이 옷 한 벌이 됩니다. 가죽은 사냥꾼이 짐승을 잡아 가져옵니다.\n' +
+      '· 사냥꾼이 모자라면 가죽이 끊깁니다. 사냥꾼 수와 곳간의 가죽을 함께 살피십시오.\n' +
+      '· 지은 옷은 겨울 체온도 지킵니다. 바칠 몫과 입힐 몫을 함께 셈해 두십시오.',
+    onStart: state => markGuideSeen(state, 'tannery'),
+    progress: state => [
+      { label: '가죽공방', current: builtCount(state, type => type === 'tannery'), target: 1 },
+      { label: '무두장이', current: jobCount(state, 'tanner'), target: 1 },
+      // 시작 재고(가죽옷 18벌)가 아니라 가죽공방이 실제로 지어낸 양을 센다 — agents.ts가 쌓아 준다
+      { label: '가죽옷', current: counted(state, 'hideClothesMade'), target: goalTarget(state, 'hideClothesMadeGoal') },
+    ],
+  },
+  {
+    id: 'immigrants',
+    title: '흘러든 사람들',
+    body:
+      '남쪽에서 떠돌던 이들이 개척지의 연기를 보고 찾아옵니다. 북방의 살림은 결국 사람 수입니다.\n\n' +
+      '· 받아들이면 인구가 늘고 일손이 붙지만, 먹일 밥과 누일 자리도 함께 늘어납니다.\n' +
+      '· 제안 창에 수용 후의 주거와 식량 일분이 함께 적힙니다. 그 셈을 보고 정하십시오.\n' +
+      '· 돌려보내도 됩니다. 다만 야박하다는 소문이 돌아 명성이 조금 깎입니다.\n' +
+      '· 새로 온 이들은 무직으로 도착합니다. 직업 배정에서 일자리를 마련해 주십시오.',
+    // 통제 사건: 인구 기준선을 적어 두고, 이튿날부터 유민 제안을 직접 연다
+    onStart: state => {
+      const scenario = state.scenario;
+      if (!scenario) return;
+      if (scenario.flags.immigrantBasePop == null) scenario.flags.immigrantBasePop = livingCount(state);
+    },
+    // 랜덤 게이트는 우회하되 모달·수용/거절 처리는 일반 유민과 같은 경로를 쓴다.
+    // 돌려보냈으면 며칠 뒤 다시 찾아온다 — 거절이 스텝을 영영 잠그면 안 된다.
+    onDay: (state, rng) => {
+      const scenario = state.scenario;
+      if (!scenario || (scenario.flags.immigrantsJoined ?? 0) > 0) return;
+      const base = scenario.flags.immigrantBasePop ?? livingCount(state);
+      if (livingCount(state) > base) {
+        scenario.flags.immigrantsJoined = 1;
+        return;
+      }
+      const lastOffer = scenario.flags.immigrantOfferDay;
+      if (lastOffer != null && state.day - lastOffer < CONFIG.tutorial.immigrantRetryDays) return;
+      if (!openScriptedImmigrationChoice(state, rng)) return;
+      scenario.flags.immigrantOfferDay = state.day;
+      addLog(state, '떠돌던 사람들이 성책 앞에 이르렀습니다. 받아들일지 정하십시오.', 'info', true);
+    },
+    progress: state => [boolGoal('유민 수용', (flags(state).immigrantsJoined ?? 0) > 0)],
+  },
+  {
+    id: 'minerals',
+    title: '노두와 채광',
+    body:
+      '돌과 철은 땅에서 납니다. 어디에 묻혀 있는지부터 보아야 합니다.\n\n' +
+      '· 미니맵 곁의 광맥(鑛) 탭을 켜 보십시오. 땅속에 묻힌 자리가 색으로 드러납니다.\n' +
+      '· 지표에 드러난 바위 자리가 노두입니다. 개척지 곁에도 돌 노두와 철 노두가 하나씩 있습니다.\n' +
+      '· 직업 배정에서 채광꾼을 두십시오. 채광꾼은 거점이 없어도 노두를 찾아가 캐고 창고로 나릅니다.\n' +
+      '· 철 노두를 캐면 돌이 함께 딸려 옵니다. 노두는 한이 있어 다 캐면 평지로 돌아갑니다.\n' +
+      `· 채광장은 보(堡)로 오른 뒤의 확장입니다. 반경 ${CONFIG.minerals.mineWorkRadius}칸의 노두를 그곳에 부려 왕복을 줄입니다.\n` +
+      '· 땅속 깊은 광맥을 통째로 뚫는 채광갱은 그보다 더 뒤, 부(府)의 살림입니다.',
+    progress: state => [
+      flagGoal(state, '광맥 탭', 'oreToggled'),
+      { label: '채광꾼', current: jobCount(state, 'miner'), target: 1 },
+      // 곳간 재고가 아니라 캐낸 양 — 돌은 공사에 곧바로 쓰여 재고로는 늘지 않는 날이 있다
+      { label: '돌·철', current: counted(state, 'mineralsMined'), target: goalTarget(state, 'mineralsMinedGoal') },
+    ],
+  },
+  {
+    id: 'smithy',
+    title: '대장간과 도구',
+    body:
+      '도구는 닳습니다. 곳간의 도구가 마르면 공사도 농사도 함께 더뎌집니다.\n\n' +
+      '· 건설 목록(생산)에서 대장간을 세우고, 직업 배정에서 대장장이를 두십시오.\n' +
+      '· 대장간은 철 하나와 목재 하나로 도구 하나를 냅니다. 대장장이가 창고에서 재료를 가져옵니다.\n' +
+      '· 대장간을 고르면 무엇을 지을지 고를 수 있습니다. 수레와 무기는 뒤에 열립니다.\n' +
+      '· 철이 떨어지면 망치질이 멎습니다. 곳간의 철을 함께 살피십시오.',
+    progress: state => [
+      { label: '대장간', current: builtCount(state, type => type === 'smithy'), target: 1 },
+      { label: '대장장이', current: jobCount(state, 'smith'), target: 1 },
+      { label: '도구', current: counted(state, 'toolsCrafted'), target: goalTarget(state, 'toolsCraftedGoal') },
+    ],
+  },
+  {
+    id: 'market',
+    title: '장터와 교역',
+    body:
+      '국경 너머에도 사람이 삽니다. 이 땅에서 나지 않는 것은 그들에게서 얻습니다.\n\n' +
+      '· 건설 목록(생산)에서 장터를 세우십시오. 장터가 서야 상단이 찾아오고, 이쪽에서 사람을 보낼 수도 있습니다.\n' +
+      '· 하단 독의 세력 창에서 상대를 고르고 교역을 청하십시오. 받을 물품과 수량을 정하면 상대가 조건을 냅니다.\n' +
+      '· 사이가 좋은 세력일수록 후하게 쳐줍니다. 선물은 사이를 풀어 줍니다.\n' +
+      '· 다만 월경 교역이 잦으면 조정의 의심이 오릅니다. 저울질이 필요합니다.\n' +
+      '· 습격이 닥쳤을 때 장터가 있으면 협상으로 물릴 길도 생깁니다.',
+    // 교역 1회는 누계로 센다 — 스텝에 들어선 뒤에 오간 거래만 친다
+    onStart: state => {
+      const scenario = state.scenario;
+      if (!scenario) return;
+      if (scenario.flags.tradesBase == null) scenario.flags.tradesBase = state.lifetimeStats.tradesCompleted;
+    },
+    progress: state => {
+      const base = flags(state).tradesBase ?? state.lifetimeStats.tradesCompleted;
+      return [
+        { label: '장터', current: builtCount(state, type => type === 'market'), target: 1 },
+        { label: '교역', current: Math.min(1, Math.max(0, state.lifetimeStats.tradesCompleted - base)), target: 1 },
+      ];
+    },
+  },
+  {
+    id: 'battle',
+    title: '첫 습격',
+    body:
+      '파수꾼이 강 건너의 움직임을 알려 왔습니다. 마침내 그들이 옵니다.\n\n' +
+      '· 무리가 마을에 닿으면 어떻게 맞설지 고르게 됩니다. 목책은 그들의 길을 막고, 수비병은 그 뒤에서 싸웁니다.\n' +
+      '· 수비병으로 요격하면 마을 밖에서 맞서 건물이 상하지 않고, 민병을 징집하면 모두가 마을 안에서 싸웁니다.\n' +
+      '· 직접 지휘를 고르면 전투 두루마리가 열려 배치와 전략을 손수 정할 수 있습니다.\n' +
+      '· 싸우지 않는 길도 있습니다 — 공물을 내어보내거나, 장터가 있으면 협상을 걸 수 있습니다.\n' +
+      '· 무리가 물러가면 길잡이가 끝납니다. 어느 길로 물리든 마을이 남으면 됩니다.',
+    // 통제 사건: 작은 무리 하나를 직접 불러 세운다. 전력은 CONFIG에서만 오고,
+    // 그 뒤의 흐름(접근 → 선택지 → 전투 → 결산)은 실전과 완전히 같은 경로다.
+    onDay: (state, rng) => {
+      const scenario = state.scenario;
+      if (!scenario || (scenario.flags.raidRepelled ?? 0) > 0) return;
+      if (scenario.flags.raidSpawnDay == null) {
+        if (state.pendingChoice || state.gameOver || raidInProgress(state)) return;
+        spawnRaiders(state, rng, true, CONFIG.tutorial.scriptedRaidFaction, CONFIG.tutorial.scriptedRaidPower);
+        if (!state.raiders && !state.pendingChoice) return; // 스폰에 실패하면 내일 다시
+        scenario.flags.raidAlerted = 1;
+        scenario.flags.raidSpawnDay = state.day;
+        addLog(state, '파수꾼이 강 건너에서 다가오는 작은 무리를 알렸습니다. 목책 안으로 사람을 거두십시오.', 'raid', true);
+        return;
+      }
+      // 물러갔는지는 "습격이 끝났고 마을이 남았는가"로 본다 — 이겨야만 통과하면
+      // 한 번 밀린 개척지가 마지막 스텝에 갇힌다. 실전에서는 물러나는 것도 하나의 답이다.
+      if (state.day <= scenario.flags.raidSpawnDay) return;
+      if (raidInProgress(state) || state.gameOver) return;
+      if (livingCount(state) <= 0) return;
+      scenario.flags.raidRepelled = 1;
+      addLog(state, '무리가 물러갔습니다. 마을은 남았습니다.', 'good', true);
+    },
+    progress: state => [
+      flagGoal(state, '습격 경보', 'raidAlerted'),
+      flagGoal(state, '격퇴', 'raidRepelled'),
+    ],
+  },
 ];
 
 // isDone·goal은 여기 한 곳에서만 만들어진다 — 진행 배열과 완료 판정이 갈라질 수 없는 구조다.
-// (전 소목표 current ≥ target ⇔ isDone. 회귀 테스트가 10스텝 전부에서 이 등가를 확인한다)
+// (전 소목표 current ≥ target ⇔ isDone. 회귀 테스트가 17스텝 전부에서 이 등가를 확인한다)
 export const TUTORIAL_STEPS: readonly ScenarioStepDefinition[] = TUTORIAL_STEP_SPECS.map(spec => ({
   ...spec,
   goal: state => formatScenarioGoal(spec.progress(state)),
@@ -374,12 +573,6 @@ export function currentScenarioStep(state: GameState): ScenarioStepDefinition | 
   const scenario = state.scenario;
   if (!scenario || scenario.completed) return null;
   return TUTORIAL_STEPS[scenario.stepIndex] ?? null;
-}
-
-// UI 상호작용 플래그 (예: App에서 주민 선택 시 residentSelected)
-export function markScenarioFlag(state: GameState, key: string): void {
-  if (!state.scenario || state.scenario.completed) return;
-  state.scenario.flags[key] = 1;
 }
 
 export function createTutorialScenarioState(goals: Record<string, number>): ScenarioState {
@@ -405,11 +598,13 @@ function openStepModal(state: GameState, step: ScenarioStepDefinition, index: nu
 function openCompletionModal(state: GameState): void {
   state.pendingChoice = {
     kind: 'scenario',
-    title: '길잡이 — 첫 겨울을 넘기다',
+    title: '길잡이 — 두 해를 넘기다',
     body:
-      '첫 겨울은 끝났지만 북방은 이제부터입니다.\n\n' +
-      '잠가 두었던 일들이 이제 모두 열립니다 — 강 건너의 습격과 상단의 왕래, 불과 역병과 재해, ' +
-      '세력의 사절까지. 가축과 광산, 갈무리와 절임, 원정과 진법은 아직 손대지 않은 살림입니다.\n\n' +
+      '두 해를 넘겼습니다. 첫 겨울을 나고, 조정에 세공을 셈하고, 사람을 들이고, 무리를 물렸습니다. ' +
+      '이제부터가 진짜 북방입니다.\n\n' +
+      '잠가 두었던 일들이 모두 열립니다 — 습격은 위협도를 따라 스스로 오고, 상단과 사절이 왕래하며, ' +
+      '불과 역병과 재해가 하늘의 몫으로 내립니다. 가축과 광산, 갈무리와 절임, 원정과 진법, ' +
+      '그리고 보(堡)로의 승격은 아직 손대지 않은 살림입니다.\n\n' +
       '처음 보는 일이 나올 때마다 짧은 길잡이를 붙여 드릴 수 있습니다. 어느 쪽이든 뒤에 설정에서 다시 바꿀 수 있습니다.',
     options: [
       { id: 'guided', label: '계속해서 안내받는다', desc: '처음 보는 일에 짧은 안내가 붙습니다.' },
@@ -492,6 +687,6 @@ export function resolveScenarioChoice(state: GameState, optionId: string): void 
       : '길잡이를 마쳤습니다. 이제 모든 사건이 열립니다. 안내 없이 스스로 꾸려 가십시오.',
     'info', true,
   );
-  // 첫 겨울을 넘긴 직후 — 개칭 청원을 여기서 잇는다 (일반 게임은 겨울 다음 봄 첫날)
+  // 두 해를 넘긴 직후 — 개칭 청원을 여기서 잇는다 (일반 게임은 첫 겨울 다음 봄 첫날)
   openGuideOnce(state, 'rename');
 }

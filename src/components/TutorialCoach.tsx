@@ -49,7 +49,7 @@ function sownArea(state: GameState): number {
     .reduce((sum, building) => sum + (building.sownArea ?? 0), 0);
 }
 
-// 11스텝의 소목표 순서를 그대로 따른다 (scenario.ts의 TUTORIAL_STEPS와 같은 순서·같은 id).
+// 17스텝의 소목표 순서를 그대로 따른다 (scenario.ts의 TUTORIAL_STEPS와 같은 순서·같은 id).
 // 가리킬 UI가 없는 소목표(관찰·대기)는 힌트를 두지 않는다 — 코치는 조용히 물러난다.
 //
 // 직업 배정 안내는 이원화되어 있다 (R2-1). 1단계 벌목꾼 한 번만 상세 4단 경로
@@ -277,8 +277,117 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       }],
     },
   ],
-  // 마지막 스텝은 버티는 일뿐이라 가리킬 곳이 없다
+  // 첫 겨울은 버티는 일뿐이라 가리킬 곳이 없다 (R5에서 완료 지점이 아니라 중간 스텝이 되었다)
   winter: [],
+
+  // ── 둘째 해 (R5) ──
+  tribute: [
+    {
+      done: state => state.courtTribute != null,
+      path: [{ tut: 'time-play', text: '시간을 흘려 봄 첫날의 파발을 기다리십시오. 북병사의 사자가 올해 요구를 알립니다.' }],
+    },
+    {
+      done: state => marked(state, 'courtWindowOpened'),
+      path: [{ tut: 'dock-court', text: '하단 독의 조정 창을 여십시오. 북병사의 이름과 성향, 올해 세공이 그곳에 있습니다.' }],
+    },
+    {
+      // 얕은 앵커(독 아이콘) → 깊은 앵커(창 안의 세공고 칸). 창이 닫혀 있으면 코치가 스스로 물러난다
+      path: [
+        { tut: 'dock-court', text: '조정 창을 여십시오.' },
+        { tut: 'tribute-reserve', text: '세공고에 올해 요구 품목을 옮겨 두십시오. 넣어 둔 몫은 겨울 소비와 분리되어 잠깁니다.' },
+      ],
+    },
+  ],
+  tanning: [
+    {
+      done: state => placedCount(state, type => type === 'tannery') >= 1,
+      path: [
+        { tut: 'build-cat-production', text: '생산 건설 목록을 여십시오.' },
+        { tut: 'build-item-tannery', text: '가죽공방을 골라 빈 땅에 배치하십시오. 가죽옷은 여기서 나옵니다.' },
+      ],
+    },
+    {
+      done: state => countJob(state, 'tanner') >= 1,
+      path: [
+        { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
+        {
+          tut: 'job-plus-tanner',
+          text: '무두장이 옆의 ＋를 눌러 한 사람 두십시오. 가죽 2장이 옷 한 벌이 됩니다.',
+        },
+      ],
+    },
+    {
+      path: [{ tut: 'time-play', text: '시간을 흘려 무두장이가 가죽옷을 짓게 하십시오. 가죽이 끊기거든 사냥꾼을 더 두십시오.' }],
+    },
+  ],
+  // 유민은 스텝이 직접 부르는 통제 사건이다 — 가리킬 곳은 시간뿐이고, 판단은 제안 창에서 한다
+  immigrants: [
+    {
+      path: [{ tut: 'time-play', text: '시간을 흘리십시오. 떠돌던 이들이 성책 앞에 닿으면 받아들일지 정하게 됩니다.' }],
+    },
+  ],
+  minerals: [
+    {
+      done: state => marked(state, 'oreToggled'),
+      path: [{ tut: 'map-layer-ore', text: '광맥(鑛) 탭을 눌러 땅속에 묻힌 자리를 드러내십시오.' }],
+    },
+    {
+      done: state => countJob(state, 'miner') >= 1,
+      path: [
+        { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
+        {
+          tut: 'job-plus-miner',
+          text: '채광꾼 옆의 ＋를 눌러 한 사람 두십시오. 거점이 없어도 마을 곁 노두를 찾아가 캡니다.',
+        },
+      ],
+    },
+    {
+      path: [{ tut: 'time-play', text: '시간을 흘려 채광꾼이 돌과 철을 캐 오게 하십시오. 채광장은 보(堡)로 오른 뒤의 확장입니다.' }],
+    },
+  ],
+  smithy: [
+    {
+      done: state => placedCount(state, type => type === 'smithy') >= 1,
+      path: [
+        { tut: 'build-cat-production', text: '생산 건설 목록을 여십시오.' },
+        { tut: 'build-item-smithy', text: '대장간을 골라 빈 땅에 배치하십시오. 철과 목재가 도구가 되는 곳입니다.' },
+      ],
+    },
+    {
+      done: state => countJob(state, 'smith') >= 1,
+      path: [
+        { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
+        {
+          tut: 'job-plus-smith',
+          text: '대장장이 옆의 ＋를 눌러 한 사람 두십시오. 대장장이가 창고에서 철과 목재를 가져옵니다.',
+        },
+      ],
+    },
+    {
+      path: [{ tut: 'time-play', text: '시간을 흘려 대장간이 도구를 짓게 하십시오. 철이 마르면 망치질이 멎습니다.' }],
+    },
+  ],
+  market: [
+    {
+      done: state => placedCount(state, type => type === 'market') >= 1,
+      path: [
+        { tut: 'build-cat-special', text: '특수 건설 목록을 여십시오.' },
+        { tut: 'build-item-market', text: '장터를 골라 빈 땅에 배치하십시오. 장터가 서야 상단과 왕래가 열립니다.' },
+      ],
+    },
+    {
+      path: [{
+        tut: 'dock-factions',
+        text: '세력 창을 열어 사이가 좋은 상대에게 교역을 청하십시오. 받을 물품과 수량을 정하면 조건이 나옵니다.',
+      }],
+    },
+  ],
+  // 마지막 스텝 — 무리가 닿으면 선택 창이 열리고, 코치는 모달 앞에서 물러난다
+  battle: [
+    {
+      path: [{ tut: 'time-play', text: '시간을 흘리십시오. 무리가 마을에 닿으면 어떻게 맞설지 고르게 됩니다.' }],
+    },
+  ],
 };
 
 function visibleAnchor(tut: string): HTMLElement | null {

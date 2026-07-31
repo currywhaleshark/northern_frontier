@@ -371,6 +371,12 @@ function resolveWarDispatch(state: GameState, dispatch: WarDispatch): void {
   }
 }
 
+// scenario.ts의 scenarioActive와 같은 판정 — 순환 import를 피해 여기서 직접 본다
+// (scenario → raids → diplomacy → militaryAid 경로가 이미 있어 되짚어 부를 수 없다).
+function scenarioRunning(state: GameState): boolean {
+  return state.scenario != null && !state.scenario.completed;
+}
+
 export function dailyMilitaryDiplomacyTick(state: GameState): void {
   if (state.warDispatch && state.warDispatch.dueDay <= state.day) {
     resolveWarDispatch(state, state.warDispatch);
@@ -378,6 +384,12 @@ export function dailyMilitaryDiplomacyTick(state: GameState): void {
   if (state.pendingChoice || state.warDispatch || getYear(state.day) <= state.lastWarParticipationOfferYear) return;
   const year = getYear(state.day);
   if (year < 2) return;
+  // 참전 요청은 랜덤 사건이 아니라 연 1회의 결정론 사건이라 게이트 밖에 있다.
+  // 그러나 둘째 해부터 오므로 R5로 길잡이가 둘째 해까지 늘어나면서 스텝 안내를 덮게 되었고,
+  // 수락하면 수비병이 마을을 비워 16단계의 통제 습격까지 어그러진다.
+  // 여기서는 미루기만 한다 — lastWarParticipationOfferYear를 적지 않으므로
+  // 길잡이가 끝나는 즉시(같은 해라도) 전령이 다시 온다.
+  if (scenarioRunning(state)) return;
   const offerDay = 10 + stableRoll(state, year) % 20;
   const dayOfYear = (state.day - 1) % CONFIG.time.yearDays + 1;
   if (dayOfYear < offerDay) return;

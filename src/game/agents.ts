@@ -20,6 +20,8 @@ import { haulerCarryCapacity, haulingMoveSpeedMultiplier, scaledCarryCapacity } 
 import { collectHuntableTiles } from './habitats';
 import { huntPreyName, rollHuntPrey, scaledHuntYield, type HuntPreyDef } from './hunting';
 import { makeRng } from './map';
+// 잎 모듈에서 직접 가져온다 — scenario.ts를 거치면 agents → scenario → raids → agents 고리가 생긴다
+import { countScenarioProgress } from './scenarioFlags';
 import { buryCorpse, corpsesOf, laborEfficiencyMult, nextCorpseToCollect } from './lifecycle';
 import { extractMineralDeposit, mineralRemaining } from './minerals';
 import { clearTreeStage, markForestHarvest, treeStageFor } from './forestGrowth';
@@ -2216,6 +2218,9 @@ function smithTick(state: GameState, r: Resident, ctx: Ctx): void {
     r.task = def.task;
     consumeSmithInputs(smithy, product, made);
     addBuildingStock(smithy, def.output, made * plaqueProductionMultiplier(state, smithy.id));
+    // 길잡이 14단계(대장간)의 '도구' 누계 — 완성품 재고가 아니라 지어낸 양을 센다.
+    // 재고로 세면 시작 도구 15개가 이미 목표를 넘겨 아무것도 가르치지 못한다.
+    if (product === 'tools') countScenarioProgress(state, 'toolsCrafted', made);
     gainSkillTick(state, r);
   } else {
     r.phase = st === 'stuck' ? 'rest' : 'toWork';
@@ -2468,6 +2473,9 @@ function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
         return extraction.amount * sanctionKeep;
       }
       if (extraction.amount > 0) recordRockMining(state, tile);
+      // 길잡이 13단계(광물)의 '돌·철' 누계 — 곳간 재고가 아니라 캐낸 양을 센다
+      // (돌은 공사에 곧바로 쓰여 재고로는 늘지 않는 날이 있다)
+      countScenarioProgress(state, 'mineralsMined', extraction.amount);
       return extraction.amount;
     },
     onHarvest: (tile, worker, amount) => {
@@ -2670,11 +2678,10 @@ function tannerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   takeBuildingStock(tannery, 'hide', hideUsed);
-  addBuildingStock(
-    tannery,
-    productDef.output!,
-    (hideUsed / productDef.hidePerUnit) * plaqueProductionMultiplier(state, tannery.id),
-  );
+  const tanned = (hideUsed / productDef.hidePerUnit) * plaqueProductionMultiplier(state, tannery.id);
+  addBuildingStock(tannery, productDef.output!, tanned);
+  // 길잡이 11단계(가죽공방)의 '가죽옷' 누계 — 시작 재고 18벌과 섞이지 않게 지어낸 양만 센다
+  if (productDef.output === 'hideClothes') countScenarioProgress(state, 'hideClothesMade', tanned);
   r.phase = 'working';
   r.task = productDef.task;
   gainSkillTick(state, r);

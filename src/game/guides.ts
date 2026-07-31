@@ -182,10 +182,12 @@ export const GUIDE_MODULES: Record<GuideModuleId, GuideModule> = {
   rename: {
     id: 'rename',
     title: '개칭 청원',
-    summary: '첫 겨울을 넘겼습니다 — 중심지에서 개칭을 청원해 이 땅의 이름을 문서에 올릴 수 있습니다.',
+    // 발화 지점이 둘이라 문구를 계절에 매지 않는다 — 일반 게임은 겨울 다음 봄 첫날,
+    // 길잡이는 두 해를 마친 자리에서 잇는다 (R5 전에는 첫 겨울 직후였다)
+    summary: '겨울을 넘겼습니다 — 중심지에서 개칭을 청원해 이 땅의 이름을 문서에 올릴 수 있습니다.',
     format: 'card',
     body:
-      '첫 겨울을 넘겼습니다. 이제 이 땅에 제 이름을 붙일 때입니다.\n' +
+      '겨울을 넘기고 이 땅에 뿌리를 내렸습니다. 이제 제 이름을 붙일 때입니다.\n' +
       '· 중심지를 골라 개칭을 청원하십시오. 파발이 오가고 북병사의 허가가 내려와야 이름이 바뀝니다.\n' +
       '· 바뀐 이름은 조정의 문서와 연대기에 함께 남습니다.\n' +
       '· 한 번 고치면 한동안 다시 고칠 수 없습니다.',
@@ -225,6 +227,18 @@ export function setGuidesEnabled(state: GameState, enabled: boolean): void {
 
 export function hasSeenGuide(state: GameState, moduleId: string): boolean {
   return state.guides?.seen?.[moduleId] != null;
+}
+
+/**
+ * 발화 없이 "이미 본 것"으로만 적어 둔다 — 길잡이 시나리오의 스텝이 같은 내용을
+ * 직접 가르친 경우에 쓴다 (R5의 세공 파발·가죽공방 두 모듈). 스텝이 끝나고 시나리오가
+ * 걷힌 뒤 같은 트리거(둘째 해 봄 파발)가 다시 돌아도 두 번 설명하지 않게 하려는 것이다.
+ * 일반 게임의 R4 흐름은 이 함수를 부르지 않으므로 그대로 남는다.
+ */
+export function markGuideSeen(state: GameState, moduleId: GuideModuleId): void {
+  const guides = ensureGuideState(state);
+  if (guides.seen[moduleId] != null) return;
+  guides.seen[moduleId] = state.day;
 }
 
 // scenario.ts의 scenarioActive와 같은 판정 — 순환 import를 피해 여기서 직접 본다.

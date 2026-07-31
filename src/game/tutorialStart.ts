@@ -3,6 +3,9 @@
 // 불변식이 깨지면 테스트가 먼저 알려주고, 그때 시드를 다시 고르거나 보정을 넓힌다.
 import { CONFIG } from './config';
 import { addLog } from './events';
+import { isExplored } from './exploration';
+import { setMineralDeposit } from './minerals';
+import { isMineralDeposit } from './miningSites';
 import { newGame } from './simulation';
 import { createTutorialScenarioState, dailyScenarioTick } from './scenario';
 import { aquiferSampleAt } from './subsurfaceVeins';
@@ -31,6 +34,10 @@ export function createTutorialGame(): GameState {
     sownAreaGoal: CONFIG.tutorial.sownAreaGoal,
     foodDaysGoal: CONFIG.tutorial.foodDaysGoal,
     firewoodDaysGoal: CONFIG.tutorial.firewoodDaysGoal,
+    // 둘째 해(R5) — 지어낸 양으로 세는 두 목표. 시작 재고와 섞이지 않는다
+    hideClothesMadeGoal: CONFIG.tutorial.hideClothesMadeGoal,
+    mineralsMinedGoal: CONFIG.tutorial.mineralsMinedGoal,
+    toolsCraftedGoal: CONFIG.tutorial.toolsCraftedGoal,
   });
   dailyScenarioTick(state); // 첫 안내 모달을 게임 시작과 동시에 연다
   return state;
@@ -88,4 +95,60 @@ export function ensureTutorialInvariants(state: GameState): void {
   if (water.wellSpots === 0 && water.naturalWaterTiles === 0) {
     addLog(state, '이 지도에는 마을 곁에 물 자리가 없습니다. 길잡이 시드를 다시 골라야 합니다.', 'bad', true);
   }
+
+  // 광물 스텝(13단계, R5): 채광꾼이 걸어가 캘 노두가 마을 곁에 있어야 한다.
+  // 지도 생성이 이미 개척지 둘레(nearbyMinDistance~nearbyMaxDistance)에 돌·철 노두를
+  // 하나씩 심어 준다 (map.ts의 placeNearbyMineralDeposits — 본게임 공통 보장이다).
+  // 그 보장이 어떤 이유로든 어긋난 시드라면 최소한으로 채워 넣는다.
+  const outcrops = tutorialNearbyOutcrops(state);
+  if (outcrops.stone === 0) ensureTutorialOutcrop(state, false);
+  if (outcrops.iron === 0) ensureTutorialOutcrop(state, true);
+}
+
+export interface TutorialOutcrops {
+  stone: number; // 마을 근처의 돌 노두 수 (탐사되어 눈에 보이는 것만)
+  iron: number;  // 마을 근처의 철 노두 수
+}
+
+/**
+ * 마을 근처에서 채광꾼이 오갈 만한 거리에 드러난 노두 — 13단계가 기대는 지물이다.
+ * 판정 반경은 물 불변식과 같은 눈금을 쓴다 (걸어 다니며 일할 만한 거리).
+ */
+export function tutorialNearbyOutcrops(state: GameState): TutorialOutcrops {
+  const center = state.buildings.find(building => building.type === 'center');
+  const originX = center?.x ?? Math.floor((state.map[0]?.length ?? 1) / 2);
+  const originY = center?.y ?? Math.floor(state.map.length / 2);
+  const found: TutorialOutcrops = { stone: 0, iron: 0 };
+  for (let dy = -TUTORIAL_WATER_RADIUS; dy <= TUTORIAL_WATER_RADIUS; dy++) {
+    const span = TUTORIAL_WATER_RADIUS - Math.abs(dy);
+    for (let dx = -span; dx <= span; dx++) {
+      const tile = state.map[originY + dy]?.[originX + dx];
+      if (!tile || !isMineralDeposit(tile) || !isExplored(state, tile.x, tile.y)) continue;
+      if (tile.hasIron) found.iron++;
+      else if (!tile.hasSilver) found.stone++;
+    }
+  }
+  return found;
+}
+
+// 보정: 마을 가까운 탐사된 평지 한 칸을 노두로 바꾼다 (지도 생성의 보장과 같은 매장량)
+function ensureTutorialOutcrop(state: GameState, hasIron: boolean): void {
+  const center = state.buildings.find(building => building.type === 'center');
+  const originX = center?.x ?? Math.floor((state.map[0]?.length ?? 1) / 2);
+  const originY = center?.y ?? Math.floor(state.map.length / 2);
+  const amount = hasIron ? CONFIG.minerals.nearbyIron : CONFIG.minerals.nearbyStone;
+  for (let radius = CONFIG.minerals.nearbyMinDistance; radius <= TUTORIAL_WATER_RADIUS; radius++) {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+        const tile = state.map[originY + dy]?.[originX + dx];
+        if (!tile || tile.terrain !== 'plain' || tile.buildingId != null) continue;
+        if (!isExplored(state, tile.x, tile.y)) continue;
+        setMineralDeposit(tile, hasIron, amount);
+        addLog(state, `마을 어귀의 흙을 걷어 내니 ${hasIron ? '철' : '돌'}이 드러났습니다.`, 'info');
+        return;
+      }
+    }
+  }
+  addLog(state, '이 지도에는 마을 곁에 노두가 없습니다. 길잡이 시드를 다시 골라야 합니다.', 'bad', true);
 }

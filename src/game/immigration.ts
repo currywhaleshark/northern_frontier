@@ -199,6 +199,17 @@ export function maybeOfferImmigration(state: GameState, rng: () => number): bool
   return openImmigrationChoice(state, createImmigrationParty(rng), { granted: false, setCooldown: true });
 }
 
+/**
+ * 길잡이 12단계의 통제 유민 — 계절·확률·쿨다운을 건너뛰고 곧바로 제안 모달을 연다.
+ * 랜덤 게이트(scenarioSuppressesRandomEvents)는 우회하되 모달의 내용·수용/거절 처리는
+ * 일반 유민과 완전히 같은 경로를 쓴다 (openImmigrationChoice → resolveImmigration).
+ * 쿨다운을 남기지 않는 이유: 거절해도 며칠 뒤 스텝이 다시 제안해야 잠기지 않는다.
+ */
+export function openScriptedImmigrationChoice(state: GameState, rng: () => number): boolean {
+  if (state.pendingChoice || state.battle || state.gameOver) return false;
+  return openImmigrationChoice(state, createImmigrationParty(rng), { granted: false, setCooldown: false });
+}
+
 /** 하사 모민 방문은 계절·확률·일일 이민 쿨다운과 무관하되, 모달/전투/패배 상태는 막는다. */
 export function openGrantedImmigrationChoice(state: GameState): boolean {
   if (state.pendingChoice || state.battle || state.gameOver) return false;

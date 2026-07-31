@@ -36,6 +36,7 @@ export function MapLayerTabs({
       <button
         type="button"
         className={`map-layer-tab ore${showOre ? ' active' : ''}`}
+        data-tut="map-layer-ore"
         aria-pressed={showOre}
         title={oreAutomatic ? '갱도 배치 중 자동 표시 · 눌러 상시 표시 전환' : '광물 레이어 켜기/끄기'}
         onClick={onToggleOre}

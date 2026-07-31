@@ -91,7 +91,7 @@ export function MainMenu({
           >
             개척 시작
           </button>
-          <button className="btn menu-btn" onClick={onStartTutorial} title="고정된 마을에서 첫 겨울까지 기본 살림을 안내합니다">
+          <button className="btn menu-btn" onClick={onStartTutorial} title="고정된 마을에서 두 해 살림을 안내합니다 — 첫 겨울을 넘기고, 세공·교역·첫 습격까지">
             길잡이 (튜토리얼)
           </button>
           {canContinue && (

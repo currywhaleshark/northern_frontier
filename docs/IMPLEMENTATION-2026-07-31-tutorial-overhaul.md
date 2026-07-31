@@ -1,6 +1,6 @@
 # 튜토리얼 개편 착수 지시문 — 「길잡이: 첫 겨울」
 
-> **계획 상태:** 완료 — R4 포함. M0~M6(f1df2e7, f03c3cb, 58956ca, 7a0ac40) 위에 플레이테스트 후속 R1 4건(c7b7d33)·2차 후속 R2 3건(712008d)·3차 후속 R3(목표 칩 진행도, 093ed65)·4차 후속 R4(세공 개시 시기 개편 — 첫 해 무세공·10스텝·가죽옷 고정·길잡이 2모듈) 반영 (문서 말미 R1~R4 절)
+> **계획 상태:** 완료 — R5 포함. M0~M6(f1df2e7, f03c3cb, 58956ca, 7a0ac40) 위에 플레이테스트 후속 R1 4건(c7b7d33)·2차 후속 R2 3건(712008d)·3차 후속 R3(목표 칩 진행도, 093ed65)·4차 후속 R4(세공 개시 시기 개편 — 첫 해 무세공·10스텝·가죽옷 고정·길잡이 2모듈, 0b28ada)·5차 후속 R5(둘째 해 연장 — 17스텝·버전 5·겨울 점검 5항목·통제 유민과 통제 습격, 미커밋) 반영 (문서 말미 R1~R5 절)
 > **M0~M1 검증:** `test_tutorial_scenario.mjs`·`tsc --noEmit`·`npm run build` 통과 (Fable 재확인 포함). 시드 20260718 유지 — 수맥 우물 자리 137칸으로 4단계 성립. `npm run test:game`의 22개 실패는 HEAD에서도 동일한 선행 실패로 이번 변경과 무관 확인
 > **담당:** Claude Opus 단독 (`src/game/**` + `src/components/**` 모두 — Codex 분업 없음)
 > **작성:** 2026-07-31 Fable (검토·계획), 원전: [`docs/superpowers/plans/2026-07-31-tutorial-overhaul.md`](superpowers/plans/2026-07-31-tutorial-overhaul.md)
@@ -500,4 +500,129 @@ M1 보고의 지적이 사실이었고, 실측은 그보다 더 헐거웠다 (�
 - `test_court_tribute`·`test_promotion`·`test_suspicion`·`test_special_events`·`test_diplomatic_figures_f2` 통과 (수정 후)
 - `test_court_grants`·`test_court_grant_consumables`·`test_court_item_icons`·`test_silver_economy`·
   `test_chongtong_emplacement`·`test_release_candidate_save_roundtrip`·`test_important_logs` 무수정 통과
+- `npx tsc --noEmit`·`npm run build` 통과
+
+## R5 — 둘째 해 연장 (2026-08-01 사용자 피드백)
+
+튜토리얼을 첫 겨울에서 끝내지 않고 **둘째 해까지 연장**한다. 겨울 점검의 세공고 항목은 첫 해 무세공(R4)으로 무의미해졌으니 제거한다.
+
+둘째 해 스텝(사용자 지정 순서): 세공 파발(R4 guides를 스텝으로 승격) → 무두장이·가죽공방 → 유민 유입 → 광물 → 대장간 → 장터 → **전투(마무리)**.
+
+제약 확인: 채광장(mine)은 보(堡) 승격 전용(5년 생존·인구 40 — 둘째 해 불가)이므로 광물 스텝은 광맥(鑛) 레이어·광상 확인 + 채광장 소개까지. 대장간·장터는 촌 등급 건설 가능(시작 철 4, 도구 10).
+
+- [x] 겨울 점검 세공고 항목 제거 (6→5항목)
+- [x] winter 스텝을 완료 지점에서 중간 스텝으로 — 이후 둘째 해 7스텝 추가 (총 17스텝, 시나리오 버전 5)
+- [x] 10 세공 파발: 봄 공지 수신(가죽옷 고정 — 시나리오 중에도 적용되게 판정 수정) + 조정 창 열기 + 세공고 일부 비축
+- [x] 11 무두장이: 가죽공방 건설 + 무두장이 배정 + 가죽옷 생산
+- [x] 12 유민: scripted 유민 수용 (인구 증가 관찰)
+- [x] 13 광물: 광맥 레이어 켜기 + 채광꾼 배정 + 지표 노두에서 돌·철 채굴 (재정정 반영 — 채광장 잠금은 그대로)
+- [x] 14 대장간: 건설 + 대장장이 + 도구 제작
+- [x] 15 장터: 건설 + 첫 교역 1회
+- [x] 16 전투: scripted 소규모 습격 경보 → 격퇴 (기존 습격 흐름, 규모 통제)
+- [x] R4 tribute/tannery guides는 튜토리얼 출신에서 중복 발화 방지(스텝이 대신 가르침 — seen 처리), 일반 게임 R4 흐름 유지
+- [x] 완료 모달 문구 갱신, 코치 힌트·회귀 테스트(두 해 완주) 전면 갱신
+
+**R5 정정 (2026-08-01 사용자):** 채광꾼 직업은 등급 제한이 없으므로(JOB_MIN_RANK에 miner 없음) **채광장(mine)의 보(堡) 잠금을 해제해 정착지(촌) 단계부터 건설 가능하게 한다 (본게임 공통).** 광물 스텝(13)은 소개가 아니라 실습으로: 광맥 레이어 → 채광장 건설 → 채광꾼 배정 → 돌/철 확보. 튜토리얼 시드에 마을 근처 광상 불변식 필요.
+
+**R5 재정정 (2026-08-01 사용자):** 채광장 잠금 해제는 하지 않는다(보 전용 유지). 채광꾼은 채광장 없이도 지표 노두(rock 타일 광상)를 캘 수 있으므로(`minerTick` 채집 경로), **새 게임 생성 시 마을 옆에 노두 2개(석재·철)를 고정 배치**한다 — 시작 수맥 보장과 같은 방식, 본게임 공통. 광물 스텝은 광맥 레이어 → 채광꾼 배정 → 돌/철 확보 (건설 없음). 채광장·채광갱은 승격 후 확장으로 본문 소개만.
+
+### R5 최종 17스텝
+
+첫 해 10스텝(R4)은 그대로다. 아래는 둘째 해 7스텝 — 라벨은 목표 칩에 서는 문자열이고, 판정은 그 라벨이 읽는 상태다.
+
+| # | id | 제목 | 소목표 (라벨 / 목표) | 판정 |
+|---|---|---|---|---|
+| 10 | `tribute` | 조정의 파발 | 세공 공지 1 · 조정 창 1 · 세공고 1 | `courtTribute != null` / 플래그 `courtWindowOpened` / 요구 품목 중 하나라도 세공고 ≥ 1 |
+| 11 | `tanning` | 무두장이와 가죽공방 | 가죽공방 1 · 무두장이 1 · 가죽옷 `hideClothesMadeGoal`(2) | 완공 수 / 직업 수 / **지어낸 누계**(`hideClothesMade`) |
+| 12 | `immigrants` | 흘러든 사람들 | 유민 수용 1 | 통제 사건. 인구가 `immigrantBasePop`을 넘긴 날 `immigrantsJoined` 걸쇠 |
+| 13 | `minerals` | 노두와 채광 | 광맥 탭 1 · 채광꾼 1 · 돌·철 `mineralsMinedGoal`(8) | 플래그 `oreToggled` / 직업 수 / **캐낸 누계**(`mineralsMined`) |
+| 14 | `smithy` | 대장간과 도구 | 대장간 1 · 대장장이 1 · 도구 `toolsCraftedGoal`(3) | 완공 수 / 직업 수 / **지어낸 누계**(`toolsCrafted`) |
+| 15 | `market` | 장터와 교역 | 장터 1 · 교역 1 | 완공 수 / `lifetimeStats.tradesCompleted − tradesBase ≥ 1` |
+| 16 | `battle` | 첫 습격 | 습격 경보 1 · 격퇴 1 | 통제 사건. 플래그 `raidAlerted` / `raidRepelled` |
+
+**세 곳의 "지어낸 누계"를 재고 대신 쓴 이유**: 길잡이 시작 곳간에 이미 가죽옷 18·도구 15가 실려 있고, 돌은 공사에 곧바로 쓰여 재고로는 늘지 않는 날이 있다. 재고를 보면 아무것도 하지 않아도 달성되거나(가죽옷·도구) 열심히 해도 눈금이 안 오른다(돌). 누계는 `agents.ts`의 생산 훅이 `countScenarioProgress`로 올린다.
+
+**잎 모듈 `scenarioFlags.ts`를 새로 뗀 이유**: `agents.ts`가 누계를 올려야 하는데 `scenario.ts`는 R5에서 `raids.ts`를 부르고 `raids.ts`는 `agents.ts`를 부른다 — `agents → scenario → raids → agents` 고리가 생긴다. 상태만 만지고 아무것도 import하지 않는 `markScenarioFlag`·`countScenarioProgress` 둘만 떼어 고리를 끊었다. `scenario.ts`가 그대로 다시 내보내므로 부르는 쪽의 관례는 변하지 않았다.
+
+### R5 통제 사건 2건 — 잠금 방지
+
+**유민(12단계).** `immigration.ts`에 `openScriptedImmigrationChoice(state, rng)`를 신설했다. 계절·확률·쿨다운만 건너뛰고 모달 생성(`openImmigrationChoice`)과 수용/거절 처리(`resolveImmigration`)는 일반 유민과 같은 경로다. 쿨다운을 남기지 않으므로 다음 제안이 막히지 않는다.
+
+- 진행도는 **인구 증가**로 본다: `onStart`가 `immigrantBasePop`을 적고, `onDay`가 인구가 그것을 넘긴 날 `immigrantsJoined` 걸쇠를 건다. 걸쇠를 쓰는 이유는 이후 사망으로 인구가 도로 줄어도 스텝이 되돌아가지 않게 하려는 것이다.
+- **거절해도 잠기지 않는다**: `immigrantOfferDay`를 적어 두고 `CONFIG.tutorial.immigrantRetryDays`(4일) 뒤에 다시 제안한다. 실기동에서 52일 거절 → 56일 재제안 → 수용(+5명)을 확인했다.
+
+**습격(16단계).** `raids.ts`의 `spawnRaiders(state, rng, warned, factionName, powerIn)`를 그대로 쓴다 — 규모 인자는 `powerIn`이고 `CONFIG.tutorial.scriptedRaidPower = 8`을 넘긴다. 무리 크기는 `min(6, 3 + floor(power/25))`라 최솟값 **3명**이 되고, 이보다 작게 하려면 규모 공식을 건드려야 해 그대로 두었다(지시문의 "2~3명" 중 하한). 경보는 항상 켠 채(`warned = true`) 스폰하므로 접근하는 동안 대비할 날이 생긴다. 이후 흐름(접근 → 습격 선택지 → 전투 → 결산)은 실전과 완전히 같다.
+
+- **격퇴 판정은 "습격 종료 + 마을 생존"이다** — `raiders`·`battle`·`tacticalBattle`·`raidHold`가 모두 없고 습격 계열 모달도 없으며 산 주민이 있으면 `raidRepelled`를 건다. 이기지 못한 개척지(피난·공물)가 마지막 스텝에 갇히면 안 되기 때문이다. 실전에서는 물러나는 것도 하나의 답이다.
+- 스폰 당일에는 판정하지 않는다(`raidSpawnDay` 비교). 스폰과 결산이 같은 날 겹치는 것을 막는 걸쇠다.
+- 8단계에서 갖춘 목책·수비병·파수꾼으로 감당 가능한 규모임을 모범 답안 테스트가 확인한다 — 수비병 요격을 골라 `raidsRepelled`가 오르는 것까지 단언한다.
+
+### R5 광물 스텝 — 판정 방식과 시드 확인
+
+채광장(`mine`)은 보(堡) 전용 그대로다. 채광꾼은 거점이 없어도 `minerTick`의 채집 경로로 지표 노두(`terrain === 'rock' ∧ mineralRemaining > 0`)를 캐 창고로 나르므로, 스텝은 **광맥 탭 → 채광꾼 배정 → 돌·철 채굴**로 성립한다.
+
+**노두 보장은 이미 본게임 공통으로 있었다.** `map.ts`의 `placeNearbyMineralDeposits`가 지도 생성에서 개척지 중심 반경 `nearbyMinDistance`(4)~`nearbyMaxDistance`(7)에 돌 노두 1(매장량 36)과 철 노두 1(16)을 심는다 — 시작 수맥 보장과 같은 결의 보정형이다. 새로 만들 것이 없어 지도 생성 코드는 손대지 않았고, 대신 `ensureTutorialInvariants`에 그 보장을 검증하는 불변식(`tutorialNearbyOutcrops`)을 두고 어긋난 시드에서만 같은 매장량으로 채워 넣는다.
+
+**시드 확인**: 20260718 — 중심(36,34) 기준 철 노두 (36,29) 거리 5·매장량 16, 돌 노두 (41,33) 거리 6·매장량 36. 둘 다 **시작 시야 안에 이미 드러나 있다.** 임의 시드 4종(20260718·20260801·12345·999983)에서도 돌 1 + 철 1이 서는 것을 회귀 테스트가 확인한다.
+
+**목표치 산정**: 실측(길잡이 시드, 채광꾼 1명) 하루 약 1.8~2.0. `mineralsMinedGoal = 8`이면 나흘이다. 실기동에서 5일 만에 스텝이 닫혔다.
+
+### R5 guides 중복 방지
+
+`guides.ts`에 **`markGuideSeen(state, moduleId)`**를 더했다 — 발화 없이 `seen`에만 적는다. 10단계 `tribute`의 `onStart`가 `tribute` 모듈을, 11단계 `tanning`의 `onStart`가 `tannery` 모듈을 그렇게 적는다.
+
+- **왜 필요한가**: `openGuideOnce`의 `scenarioRunning` 가드는 시나리오 중 발화만 막을 뿐 `seen`을 남기지 않는다. R5로 세공 파발이 시나리오 중에 오게 되면서, 그대로 두면 길잡이가 끝난 뒤 셋째 해 봄 파발에서 같은 안내가 뒤늦게 떴다.
+- **왜 onStart인가**: 스텝이 열리는 순간이 곧 "그 내용을 화면으로 가르치기 시작한 순간"이다. 완료 시점으로 미루면 그 사이에 낀 파발에서 안내가 새어 나온다.
+- **일반 게임의 R4 흐름은 그대로다** — `markGuideSeen`을 부르는 곳은 두 스텝의 `onStart`뿐이고, 시나리오 없는 게임은 예전처럼 파발 모달 → 가죽공방 카드로 이어진다 (회귀 테스트 유지).
+
+### R5 곁가지 — 참전 요청 유예
+
+둘째 해까지 늘리자 게이트 **밖**의 결정론 사건 하나가 길잡이를 덮었다: `militaryAid.ts`의 `dailyMilitaryDiplomacyTick`이 여는 참전 요청(2년차부터 연 1회, 그해 10~30일 사이). 랜덤 사건이 아니어서 `scenarioSuppressesRandomEvents` 블록에 있지 않았고, 수락하면 수비병이 마을을 비워 16단계의 통제 습격까지 어그러진다.
+
+- R4의 세공 게이트와 같은 방식으로 **함수 안에** 한 줄 유예를 두었다 (게이트 블록 구조는 손대지 않았다).
+- `lastWarParticipationOfferYear`를 적지 않으므로 **미루기만 한다** — 길잡이가 끝나면 같은 해에도 곧바로 전령이 온다. 실기동에서 완료 이튿날 도착을 확인했다.
+
+### R5 변경 파일
+
+- `src/game/scenarioFlags.ts` (신규) — `markScenarioFlag`·`countScenarioProgress` (순환 차단용 잎 모듈)
+- `src/game/scenario.ts` — 버전 5, 둘째 해 7스텝, winter 본문 교정, 완료 모달 문구, 표식 함수 재수출
+- `src/game/config.ts` — `tutorial`에 R5 6항목(가죽옷·도구·돌철 목표, 유민 재제안 간격, 통제 습격 전력·세력)
+- `src/game/tutorialStart.ts` — 새 목표치 주입, 노두 불변식(`tutorialNearbyOutcrops`)과 보정
+- `src/game/agents.ts` — 생산 훅 3곳에서 누계 적립(대장간 도구·가죽공방 가죽옷·채광 돌철)
+- `src/game/winterReadiness.ts` — 세공고 항목 제거 (6→5)
+- `src/game/courtTribute.ts` — 가죽옷 고정 판정을 `tutorialGraduate ∨ scenarioActive`로 확장
+- `src/game/guides.ts` — `markGuideSeen`, `rename` 모듈 문구를 계절에 매지 않게 교정
+- `src/game/immigration.ts` — `openScriptedImmigrationChoice`
+- `src/game/militaryAid.ts` — 시나리오 중 참전 요청 유예
+- `src/components/TutorialCoach.tsx` — 둘째 해 7스텝 힌트, 새 앵커 경로
+- `src/components/MapLayerTabs.tsx` — 광맥 탭에 `data-tut="map-layer-ore"`
+- `src/components/WinterChecklistPanel.tsx` — 머리글 "다섯 가지"
+- `src/components/MainMenu.tsx` — 길잡이 버튼 설명을 두 해로
+- `src/GameSession.tsx` — `courtWindowOpened` 부활, `oreToggled` 연결
+- `tools/game/test_tutorial_scenario.mjs` — 두 해 완주, R5 블록 8종
+
+### R5 수정한 기존 테스트
+
+`tools/game/test_tutorial_scenario.mjs` 한 종뿐이다 (10스텝·버전 4·겨울 점검 세공 항목·완료 문구를 전제하던 블록). 채광장 잠금을 그대로 두었고 노두 보장도 기존 코드라, 다른 테스트는 손대지 않았다.
+
+`npm run test:game`의 실패 22종은 이 작업 전(HEAD)과 같은 목록이다 — `test_smithy_products`·`test_mine_worksite`는 이번에 `agents.ts`를 건드렸으므로 그 변경만 되돌려 따로 확인했고, 되돌려도 같은 자리에서 실패하는 선행 실패였다.
+
+### R5 실기동 확인 (dev 서버, 상태 주입)
+
+- 길잡이 새 게임 첫 모달이 「길잡이 **1/17** — 이름과 첫 기록」
+- 10단계: 둘째 해 봄 첫날 파발이 오고 「세공 가죽옷 8」이 시나리오 중에 고정됨. 칩이 「✅세공 공지 (1/1) · 조정 창 (0/1) · 세공고 (0/1)」로 서고, 코치가 조정 창 → (창을 열면) 세공고 칸으로 따라 들어간다. 조정 창을 열자 `courtWindowOpened`가 서고 「최대」로 6/8을 채우자 세 항목 모두 ✅. `guides.seen.tribute`가 발화 없이 적혔다
+- 11단계 진입 시 `guides.seen.tannery`가 발화 없이 적히고 카드는 뜨지 않았다
+- 12단계: 「부역을 피해 달아난 백성들」 모달이 떠 수용 후 인구/식량 셈이 그대로 보였다. 돌려보내니 나흘 뒤 다시 와서 수용(+5명) → 이튿날 13단계
+- 13단계: 광맥 탭을 누르자 플래그가 서고, 채광꾼 1명을 두니 하루 2 안팎으로 캐어 5일 만에 8에 닿았다 (재고 돌 18→23, 철 8→12)
+- 14단계: 대장간을 짓고 대장장이를 두니 완공 이튿날 도구 누계가 목표를 넘어 15단계로
+- 15단계: 장터 완공 뒤 세력 창에서 오도리 씨족에게 교역을 청해 장작 2 ↔ 곡물 1을 확정하자 「✅교역 (1/1)」
+- 16단계: 「습격 임박! — 변경 마적 / 추정 규모: 소규모 / 현재 방어도: 50」. 수비병 요격을 고르자 전투가 열려 물리쳤고, 이튿날 「무리가 물러갔습니다」와 함께 완료 모달 「길잡이 — 두 해를 넘기다」(선택지 2개)
+- 완료 후: 겨울 점검 패널이 식량·땔감·주거·옷과 신발·병자 **5항목**, 머리글은 「…2가지가 아직 모자랍니다」. 미뤄 두었던 참전 요청이 이튿날 도착
+
+### R5 테스트·검증 결과
+
+- `node tools/game/test_tutorial_scenario.mjs` 통과 (두 해 완주 + R5 블록 8종)
+- `test_court_tribute`·`test_promotion`·`test_suspicion`·`test_special_events`·`test_diplomatic_figures_f2`·
+  `test_immigration`·`test_battles`·`test_diplomatic_actions_e2~e6`·`test_diplomatic_figures_f3` 무수정 통과
+- `npm run test:game` 실패 22종 — HEAD와 동일한 선행 실패 목록 (새로 깨진 것 없음)
 - `npx tsc --noEmit`·`npm run build` 통과

@@ -8,9 +8,8 @@ import { foodTotal, fuelHeatTotal } from './consumption';
 import { consumptionWeight } from './lifecycle';
 import { livingResidents, residentHome } from './residents';
 import { getSeason } from './seasons';
-import { tributeReserved } from './tributeReserve';
 import { firewoodWeatherMult } from './weather';
-import type { GameState, ResourceId } from './types';
+import type { GameState } from './types';
 
 export interface WinterReadiness {
   weight: number;          // 소비 몫 합계 — 아이는 성인보다 적게 먹고 적게 땐다
@@ -53,8 +52,10 @@ export function winterReadiness(state: GameState): WinterReadiness {
 
 export type WinterCheckVerdict = 'ok' | 'warn' | 'bad';
 
+// R5: 세공고 항목은 걷었다. R4로 첫 해에는 조정이 거두지 않아 첫 겨울 점검에서는 늘 "요구 없음 ✓"이었고,
+// 둘째 해부터는 세공 진행이 상단 바의 세공 칩과 조정 창에 이미 상시로 떠 있다 — 같은 눈금을 두 번 그리는 셈이었다.
 export interface WinterCheckItem {
-  id: 'food' | 'firewood' | 'housing' | 'wearables' | 'tribute' | 'sick';
+  id: 'food' | 'firewood' | 'housing' | 'wearables' | 'sick';
   label: string;
   verdict: WinterCheckVerdict;
   value: string;   // 지금 수치 한 줄
@@ -92,13 +93,6 @@ export function winterChecklist(state: GameState): WinterCheckItem[] {
   const unclothed = living.filter(resident => !resident.worn?.clothing).length;
   const exposed = Math.max(barefoot, unclothed);
 
-  const tribute = state.courtTribute && !state.courtTribute.resolved ? state.courtTribute : null;
-  const tributeEntries = tribute
-    ? (Object.entries(tribute.items) as [ResourceId, number][]).filter(([, required]) => required > 0)
-    : [];
-  const tributeMet = tributeEntries.filter(([resource, required]) =>
-    tributeReserved(state, resource) >= required).length;
-
   const sick = living.filter(resident => resident.sick).length;
 
   return [
@@ -131,17 +125,6 @@ export function winterChecklist(state: GameState): WinterCheckItem[] {
       verdict: exposed === 0 ? 'ok' : exposed * 4 <= population ? 'warn' : 'bad',
       value: `옷 없음 ${unclothed}명 · 신 없음 ${barefoot}명`,
       advice: '베틀집과 가죽공방이 옷과 신을 냅니다. 헐벗으면 체온이 더 빨리 식습니다.',
-    },
-    {
-      id: 'tribute',
-      label: '세공고',
-      verdict: tributeEntries.length === 0
-        ? 'ok'
-        : tributeMet >= tributeEntries.length ? 'ok' : tributeMet > 0 ? 'warn' : 'bad',
-      value: tributeEntries.length === 0
-        ? '올해 거둘 세공이 없습니다'
-        : `요구 ${tributeEntries.length}품목 중 ${tributeMet}품목 충당`,
-      advice: '세공고에 넣어 둔 몫은 겨울 소비와 분리되어 잠깁니다. 조정 창에서 채우십시오.',
     },
     {
       id: 'sick',

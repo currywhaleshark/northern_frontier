@@ -1821,6 +1821,16 @@ export const CONFIG = {
     firewoodDaysGoal: 24,        // 겨울 12일의 두 배. 도달 시점 22.7일분 — 더 패야 넘는다
     meatGoal: 6,
     winterEndDayOfSeason: 10,    // 첫 겨울 스텝 완료일 (겨울 n일째)
+
+    // ── 둘째 해(R5) ──
+    hideClothesMadeGoal: 2,      // 11단계: 가죽공방이 실제로 지어낸 가죽옷 수 (시작 재고와 섞이지 않는다)
+    // 13단계: 채광꾼이 지표 노두에서 캐낸 돌·철의 합. 2026-08-01 실측(길잡이 시드, 채광꾼 1명)
+    // 하루 약 1.8~2.0 — 나흘이면 닿는 눈금이다. 채광장 없이 캐는 것을 보이는 데 그 정도면 족하다
+    mineralsMinedGoal: 8,
+    toolsCraftedGoal: 3,         // 14단계: 대장간이 지어낸 도구 수. 시작 철 6(쉬움 배율)로 6개까지 가능하다
+    immigrantRetryDays: 4,       // 12단계: 유민을 돌려보냈을 때 다시 찾아오기까지의 날수
+    scriptedRaidPower: 8,        // 16단계: 통제 습격의 전력. 8단계의 목책·수비병·파수꾼으로 감당할 규모
+    scriptedRaidFaction: '변경 마적', // 가장 사이가 나쁜 무리 — 협정이 걸릴 일이 없다
   },
 
   ui: {

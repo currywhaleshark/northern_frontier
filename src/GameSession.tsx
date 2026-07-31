@@ -1556,12 +1556,13 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       : bringDockWindowToFront(current, id));
   }, [openDockWindowIds]);
 
-  // 튜토리얼 1단계 — 직업 배정 창을 실제로 연 순간을 기록한다.
-  // 여는 길이 여럿(독 아이콘·단축키·고정 창 복원)이라 열린 목록 자체를 본다.
-  // (조정 창의 courtWindowOpened는 R4에서 세공 스텝이 사라지며 함께 걷었다 — 읽는 곳이 없었다)
+  // 튜토리얼 1단계·10단계 — 직업 배정 창과 조정 창을 실제로 연 순간을 기록한다.
+  // 여는 길이 여럿(독 아이콘·단축키·세공 칩·고정 창 복원)이라 열린 목록 자체를 본다.
+  // (courtWindowOpened는 R4에서 잠시 걷었다가, R5에서 세공 파발이 스텝으로 돌아오며 되살렸다)
   useEffect(() => {
     const runtimeState = stateRef.current;
     if (openDockWindowIds.includes('jobs')) markScenarioFlag(runtimeState, 'jobPanelOpened');
+    if (openDockWindowIds.includes('court')) markScenarioFlag(runtimeState, 'courtWindowOpened');
     // 세력 창 첫 열람 — 초회 도움말(카드). 시나리오 중에는 guides가 스스로 물러난다.
     if (openDockWindowIds.includes('factions') && openGuideOnce(runtimeState, 'diplomacy')) bump();
   }, [bump, openDockWindowIds]);
@@ -1683,8 +1684,11 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               markScenarioFlag(stateRef.current, 'aquiferToggled');
               setUiPrefs(current => setMapLayerVisibility(current, 'aquifer', !current.showAquiferLayer));
             }}
-            onToggleOre={() => setUiPrefs(current =>
-              setMapLayerVisibility(current, 'ore', !current.showOreLayer))}
+            onToggleOre={() => {
+              // 튜토리얼 13단계(광맥 탭) 달성 플래그 — 갱도 배치 중 자동 표시는 해당하지 않는다
+              markScenarioFlag(stateRef.current, 'oreToggled');
+              setUiPrefs(current => setMapLayerVisibility(current, 'ore', !current.showOreLayer));
+            }}
           />
           <div className="minimap-overlay">
             <Profiler id="minimap-boundary" onRender={recordAppRender}>

@@ -12,6 +12,7 @@ import { makeRng } from './map';
 import { acquireLivestock, LIVESTOCK_DEFS } from './livestock';
 import { rankEffects } from './promotion';
 import { RESOURCE_DEFS } from './resourceCatalog';
+import { scenarioActive } from './scenario';
 import { lowerSuspicion } from './suspicion';
 import { getSeason, getYear } from './seasons';
 import { grantSpecialItem, SPECIAL_ITEM_DEFS } from './specialItems';
@@ -69,10 +70,18 @@ export function hasLenientTributeGrace(state: Pick<GameState, 'borderCommander'>
 }
 
 /**
- * 튜토리얼(길잡이)을 마친 게임의 첫 세공은 가죽옷으로 고정한다 — 파발 길잡이에서
- * 무두장이·가죽공방 안내로 곧장 잇기 위함이다. 수량은 일반 롤과 같은 셈
- * (품목 기준량 × 연차·인구·승격 배율)이라 난이도는 건드리지 않는다.
+ * 길잡이의 첫 세공은 가죽옷으로 고정한다 — 세공 스텝에서 무두장이·가죽공방 스텝으로
+ * 곧장 잇기 위함이다. 수량은 일반 롤과 같은 셈(품목 기준량 × 연차·인구·승격 배율)이라
+ * 난이도는 건드리지 않는다.
+ *
+ * R5에서 판정을 `tutorialGraduate`(완주 표식)에서 `길잡이 중이거나 완주했거나`로 넓혔다.
+ * 튜토리얼이 둘째 해까지 이어지면서 파발이 **시나리오가 도는 동안** 오게 되었기 때문이다.
+ * (완주 표식은 시나리오가 걷힐 때 서므로, 진행 중에는 아직 false다)
  */
+function tributeItemIsGuided(state: GameState): boolean {
+  return state.tutorialGraduate === true || scenarioActive(state);
+}
+
 function firstGraduateTributeItems(state: GameState, year: number, pop: number): Partial<Record<ResourceId, number>> {
   const scale = tributeScale(year, pop, state.rank);
   return { hideClothes: Math.max(1, Math.round(CONFIG.tribute.baseAmounts.hideClothes * scale)) };
@@ -99,7 +108,7 @@ export function announceCourtTribute(state: GameState): void {
   const isFirstTribute = state.courtTribute == null;
   const pop = state.residents.filter(r => r.alive).length;
   const tribute = rollCourtTribute(state.seed, year, pop, state.rank);
-  if (state.tutorialGraduate && isFirstTribute) {
+  if (tributeItemIsGuided(state) && isFirstTribute) {
     tribute.items = firstGraduateTributeItems(state, year, pop);
   }
   state.courtTribute = tribute;
