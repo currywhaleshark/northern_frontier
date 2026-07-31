@@ -29,6 +29,7 @@ export const CONFIG = {
   water: {
     wellRadius: 6,
     riverCoverageRadius: 3,
+    canalCoverageRadius: 1,
     aquiferInlandShare: 0.35,
     aquiferInlandAdditionRatio: 0.6,
     aquiferInlandMinRiverDistance: 9,

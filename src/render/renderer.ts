@@ -57,6 +57,10 @@ import {
   type PreviewWaterBuilding,
   type WaterSupplySnapshot,
 } from '../game/waterSupply';
+import {
+  waterCoverageTileKey,
+  type NaturalWaterCoverage,
+} from '../game/waterCoverage';
 import { activeExpeditionTargetMarkers, type ExpeditionTargetMarker } from '../game/expeditionTargets';
 import { normalizeLivestockState } from '../game/livestock';
 import { normalizePastureArea, validateStablePasture } from '../game/pastures';
@@ -1367,6 +1371,39 @@ function drawWellSupplyRange(
   ctx.restore();
 }
 
+function drawNaturalWaterCoverage(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  viewport: SceneViewport,
+  coverage: NaturalWaterCoverage,
+): void {
+  ctx.save();
+  ctx.lineWidth = 1;
+  for (let y = viewport.tileMinY; y <= viewport.tileMaxY; y++) {
+    const row = state.map[y];
+    if (!row) continue;
+    for (let x = viewport.tileMinX; x <= Math.min(viewport.tileMaxX, row.length - 1); x++) {
+      if (!isExplored(state, x, y)) continue;
+      const tileKey = waterCoverageTileKey(x, y);
+      const source = coverage.river.has(tileKey)
+        ? 'river'
+        : coverage.canal.has(tileKey)
+          ? 'canal'
+          : null;
+      if (!source) continue;
+      ctx.fillStyle = source === 'river'
+        ? 'rgba(79, 214, 200, 0.25)'
+        : 'rgba(73, 138, 168, 0.29)';
+      ctx.strokeStyle = source === 'river'
+        ? 'rgba(118, 242, 226, 0.58)'
+        : 'rgba(111, 187, 217, 0.62)';
+      ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+      ctx.strokeRect(x * TILE + 0.5, y * TILE + 0.5, TILE - 1, TILE - 1);
+    }
+  }
+  ctx.restore();
+}
+
 function drawWaterRiseOverlay(
   ctx: CanvasRenderingContext2D,
   tileX: number,
@@ -1850,6 +1887,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   const waterSnapshot = waterVisualizationActive
     ? cachedWaterVisualSnapshot(state, o.stateVersion, previewWell, previewWaterBuilding)
     : null;
+  const naturalWaterCoverage = waterSnapshot?.naturalCoverage ?? null;
   for (const r of state.residents) {
     if (!r.alive || r.trappedInMineId != null || predatorScoutIds.has(r.id) || warDispatchIds.has(r.id) ||
         presentation.indoorResidentIds.has(r.id)) continue;
@@ -1945,6 +1983,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     drawTerrainProps(ctx, state, sprites, viewport, renderScale);
   }
   drawSubsurfaceLayers(ctx, state, viewport, showAquiferLayer, showOreLayer);
+  if (naturalWaterCoverage) {
+    drawNaturalWaterCoverage(ctx, state, viewport, naturalWaterCoverage);
+  }
   for (const water of weirReservoirWaterVisuals(state)) {
     if (!isExplored(state, water.x, water.y) ||
         !tileRectIntersectsViewport(viewport, water.x, water.y)) continue;

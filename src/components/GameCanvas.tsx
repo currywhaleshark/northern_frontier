@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { CONFIG } from '../game/config';
 import { JOB_NAMES, RESOURCE_NAMES } from '../game/constants';
 import {
-  BUILDING_DEFS, buildingCostFor, buildingFootprintDims, isAreaBuildingType, preferredLeveeEdgeAt,
+  BUILDING_DEFS, buildingCostFor, buildingFootprintDims, canPlaceBuildingAt, isAreaBuildingType, preferredLeveeEdgeAt,
 } from '../game/buildings';
 import { getActiveSprites, onAtlasAssetSettled } from '../render/atlas';
 import { findResidentAt, renderScene, terrainVisualSignature } from '../render/renderer';
@@ -15,10 +15,13 @@ import { foreignSiteAt } from '../game/foreignSites';
 import { LIVESTOCK_DEFS, normalizeLivestockState } from '../game/livestock';
 import { pastureRequiredHerders, stableLivestockCapacity, validateStablePasture } from '../game/pastures';
 import { forestTilesInArea, forestTilesInFootprint } from '../game/landClearing';
+import { isExplored } from '../game/exploration';
 import type { BuildingTypeId, GameState, PastureArea, SelectedEntity } from '../game/types';
 import { FactionName } from './FactionName';
 import { recordRuntimePerf, recordRuntimePerfSince, runtimePerfStartTime } from '../perf/runtimePerf';
 import { mapBackingScaleForZoom, steppedMapZoom } from '../ui/mapZoom';
+import { hasSubsurfaceInsight } from '../game/subsurfaceVeins';
+import { wellWaterStatusAt } from '../game/waterSupply';
 
 const TILE = CONFIG.ui.tileSize;
 const CLICK_RADIUS = Math.round(TILE * 0.65); // 주민 클릭 판정 반경(픽셀)
@@ -173,6 +176,16 @@ export function GameCanvas({
     )
     : null;
   const hoveredTile = hoverTile ? state.map[hoverTile.y]?.[hoverTile.x] : null;
+  const wellPlacementExplored = placingType === 'well' && hoverTile
+    ? isExplored(state, hoverTile.x, hoverTile.y)
+    : false;
+  const wellPlacementStatus = placingType === 'well' && hoverTile && wellPlacementExplored
+    ? wellWaterStatusAt(state, hoverTile.x, hoverTile.y)
+    : null;
+  const wellPlacementValid = placingType === 'well' && hoverTile && wellPlacementExplored
+    ? canPlaceBuildingAt(state, 'well', hoverTile.x, hoverTile.y)
+    : false;
+  const geomancerPresent = placingType === 'well' && hasSubsurfaceInsight(state);
   const pointerAction = placingType || isPasturePlacing || isFootprintExpanding || isRelocating
     ? null
     : getPointerAction(state, selectedEntity, hoveredTile);
@@ -601,6 +614,21 @@ export function GameCanvas({
               <div className="muted">끌어서 크기 지정 (최대 {CONFIG.farming.maxPlotSide}×{CONFIG.farming.maxPlotSide})</div>
             </>
           ) : null}
+        </div>
+      )}
+      {mouse && placingType === 'well' && hoverTile && (
+        <div ref={tooltipRef} className="map-tooltip" style={{ left: 0, top: 0 }}>
+          <b>우물 배치</b>
+          {!wellPlacementExplored ? <div className="muted">아직 답사하지 않은 곳입니다</div>
+          : wellPlacementValid && wellPlacementStatus ? (
+            geomancerPresent ? (
+              <div className="muted">
+                예상 취수 하루 {Math.floor(wellPlacementStatus.dailyOutput)} · 수위 {Math.floor(wellPlacementStatus.levelRatio * 100)}%
+              </div>
+            ) : <div className="muted">물이 있는 땅입니다</div>
+          ) : !wellPlacementStatus ? (
+            <div className="muted">수맥이 없습니다</div>
+          ) : <div className="muted">여기는 우물을 지을 수 없습니다</div>}
         </div>
       )}
       {mouse && relocationRect && relocationBuilding && (

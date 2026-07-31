@@ -504,7 +504,13 @@ export function SelectionContextBar({
                               <tr>
                                 <td>급수</td>
                                 <td>
-                                  {water.source === 'river' ? '강' : water.source === 'well' ? '우물' : '미급수'} ·{' '}
+                                  {water.source === 'river'
+                                    ? '강'
+                                    : water.source === 'canal'
+                                      ? '농수로'
+                                      : water.source === 'well'
+                                        ? '우물'
+                                        : '미급수'} ·{' '}
                                   {Math.floor(water.ratio * 100)}% ({water.supplied.toFixed(1)}/{water.demand.toFixed(1)})
                                 </td>
                               </tr>

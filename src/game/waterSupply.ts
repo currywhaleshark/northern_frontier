@@ -4,10 +4,14 @@ import { CONFIG } from './config';
 import { isDroughtActive } from './disasters';
 import { getYear } from './seasons';
 import { aquiferSampleAt, aquiferVeins } from './subsurfaceVeins';
-import { buildingHasRiverWaterAccess } from './waterCoverage';
+import {
+  buildingTouchesWaterCoverage,
+  naturalWaterCoverageTileSets,
+  type NaturalWaterCoverage,
+} from './waterCoverage';
 import type { Building, BuildingTypeId, GameState, Resident } from './types';
 
-export type WaterSupplySource = 'river' | 'well' | 'none';
+export type WaterSupplySource = 'river' | 'canal' | 'well' | 'none';
 
 export interface BuildingWaterSupply {
   demand: number;
@@ -19,6 +23,7 @@ export interface BuildingWaterSupply {
 export interface WaterSupplySnapshot {
   buildings: Map<number, BuildingWaterSupply>;
   aquiferConsumption: number[];
+  naturalCoverage: NaturalWaterCoverage;
 }
 
 export interface WellWaterStatus {
@@ -220,10 +225,15 @@ export function waterSupplySnapshot(
   const buildings = new Map<number, BuildingWaterSupply>();
   const suppliedByBuilding = new Map<number, number>();
   const wellDemandBuildings: WaterDemandEntry[] = [];
+  const naturalCoverage = naturalWaterCoverageTileSets(state);
 
   for (const { building, demand } of demandBuildings) {
-    if (buildingHasRiverWaterAccess(state, building)) {
+    if (buildingTouchesWaterCoverage(building, naturalCoverage.river)) {
       buildings.set(building.id, { demand, supplied: demand, ratio: 1, source: 'river' });
+      continue;
+    }
+    if (buildingTouchesWaterCoverage(building, naturalCoverage.canal)) {
+      buildings.set(building.id, { demand, supplied: demand, ratio: 1, source: 'canal' });
       continue;
     }
     wellDemandBuildings.push({ building, demand });
@@ -255,7 +265,7 @@ export function waterSupplySnapshot(
     aquiferConsumption[source.veinId] =
       (aquiferConsumption[source.veinId] ?? 0) + consumed;
   }
-  return { buildings, aquiferConsumption };
+  return { buildings, aquiferConsumption, naturalCoverage };
 }
 
 export function buildingWaterSupply(state: GameState, building: Building): BuildingWaterSupply {

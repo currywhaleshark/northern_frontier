@@ -17,7 +17,13 @@ for (const file of readdirSync(srcDir).filter(file => file.endsWith('.ts'))) {
   writeFileSync(join(outDir, file.replace(/\.ts$/, '.mjs')), output, 'utf8');
 }
 
-const { nearestRiverDistance, buildingHasRiverWaterAccess } =
+const {
+  buildingHasCanalWaterAccess,
+  buildingHasRiverWaterAccess,
+  naturalWaterCoverageTileSets,
+  nearestRiverDistance,
+  waterCoverageTileKey,
+} =
   await import(pathToFileURL(join(outDir, 'waterCoverage.mjs')).href);
 const {
   buildingWaterSupply,
@@ -26,9 +32,11 @@ const {
   waterDemandForBuildingPlacement,
   waterDependentProductionMultiplier,
   waterSupplySnapshot,
+  wellWaterStatusAt,
 } = await import(pathToFileURL(join(outDir, 'waterSupply.mjs')).href);
 const { aquiferSampleAt, aquiferVeins, initialAquiferLevels } =
   await import(pathToFileURL(join(outDir, 'subsurfaceVeins.mjs')).href);
+const { CONFIG } = await import(pathToFileURL(join(outDir, 'config.mjs')).href);
 
 const map = Array.from({ length: 9 }, (_, y) =>
   Array.from({ length: 9 }, (_, x) => ({
@@ -48,6 +56,67 @@ assert.equal(buildingHasRiverWaterAccess(state, {
 assert.equal(buildingHasRiverWaterAccess(state, {
   type: 'hut', x: 8, y: 0, w: 2, h: 2,
 }), false);
+
+const canalMap = Array.from({ length: 12 }, (_, y) =>
+  Array.from({ length: 12 }, (_, x) => ({
+    x,
+    y,
+    terrain: x === 0 ? 'river' : 'plain',
+    buildingId: null,
+  })));
+const canals = Array.from({ length: 5 }, (_, index) => ({
+  id: 100 + index,
+  type: 'canal',
+  x: index + 1,
+  y: 5,
+  w: 1,
+  h: 1,
+  built: true,
+}));
+const canalHouse = {
+  id: 200,
+  type: 'hut',
+  x: 6,
+  y: 5,
+  w: 2,
+  h: 2,
+  built: true,
+};
+const canalState = {
+  seed: 33,
+  day: 1,
+  weather: 'clear',
+  map: canalMap,
+  buildings: [...canals, canalHouse],
+  residents: [{ id: 201, alive: true, stage: null, homeBuildingId: canalHouse.id }],
+  aquiferLevels: [],
+  pendingDisasters: [],
+};
+const naturalCoverage = naturalWaterCoverageTileSets(canalState);
+assert.equal(naturalCoverage.canal.has(waterCoverageTileKey(6, 5)), true,
+  'a flowing canal supplies one Manhattan tile beyond its channel');
+assert.equal(naturalCoverage.canal.has(waterCoverageTileKey(7, 5)), false,
+  'canal daily-water coverage ends beyond one Manhattan tile');
+assert.equal(buildingHasCanalWaterAccess(canalState, canalHouse), true);
+let canalSupply = buildingWaterSupply(canalState, canalHouse);
+assert.equal(canalSupply.source, 'canal');
+assert.equal(canalSupply.ratio, 1, 'a river-connected canal fully supplies an adjacent home');
+assert.equal(waterSupplySnapshot(canalState).aquiferConsumption.length, 0,
+  'canal supply does not consume groundwater');
+
+canals[2].built = false;
+assert.equal(buildingHasCanalWaterAccess(canalState, canalHouse), false,
+  'a broken canal chain leaves the detached section dry');
+assert.equal(buildingWaterSupply(canalState, canalHouse).source, 'none',
+  'a dry canal is not a daily-water source');
+canals[2].built = true;
+
+const riverPriorityHouse = { ...canalHouse, id: 202, x: 3 };
+canalState.buildings = [...canals, riverPriorityHouse];
+canalState.residents = [{ id: 203, alive: true, stage: null, homeBuildingId: riverPriorityHouse.id }];
+canalSupply = buildingWaterSupply(canalState, riverPriorityHouse);
+assert.equal(canalSupply.source, 'river',
+  'river coverage remains the displayed source where river and canal ranges overlap');
 
 const seed = 20260729;
 const size = 30;
@@ -75,6 +144,13 @@ const supplyState = {
   aquiferLevels: initialAquiferLevels(seed, size, size),
   pendingDisasters: [],
 };
+
+const previewStatus = wellWaterStatusAt(supplyState, aquifer.cx, aquifer.cy);
+assert.ok(previewStatus, 'an aquifer tile exposes the same well status used by placement preview');
+assert.equal(previewStatus.dailyOutput, CONFIG.water.wellDailyOutput,
+  'a full aquifer center uses the live well-output calculation without a preview-specific value');
+assert.equal(wellWaterStatusAt(supplyState, 0, 0), null,
+  'a tile without an aquifer has no placement yield to display');
 
 let supply = buildingWaterSupply(supplyState, house);
 assert.equal(supply.source, 'well');

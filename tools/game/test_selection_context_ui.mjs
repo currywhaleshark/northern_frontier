@@ -29,12 +29,21 @@ assert.match(contextSource,
 assert.match(contextSource,
   /적재 \{Math\.floor\(haulerCarryCapacity\(resident\)\)\}/,
   'hauler carry capacity must be floored before it is shown');
+assert.match(contextSource,
+  /water\.source === 'canal'[\s\S]*'농수로'/,
+  'building water details must identify canal supply separately from wells and rivers');
 assert.match(weaponAllocationSource,
   /Math\.floor\(snapshot\.basePower \+ snapshot\.weaponPower\)/,
   'artifact-adjusted personal defense contribution must not expose a fractional tail');
 assert.match(canvasSource,
   /hoveredResident\.religiousVocation === 'monk'[\s\S]*hoveredResident\.stage[\s\S]*'동자승'/,
   'the map resident tooltip must use the same novice label');
+assert.match(canvasSource,
+  /isExplored\(state, hoverTile\.x, hoverTile\.y\)[\s\S]*wellWaterStatusAt\(state, hoverTile\.x, hoverTile\.y\)/,
+  'well placement must not sample underground water before the tile has been explored');
+assert.match(canvasSource,
+  /geomancerPresent \? \([\s\S]*예상 취수 하루 \{Math\.floor\(wellPlacementStatus\.dailyOutput\)\}[\s\S]*수위 \{Math\.floor\(wellPlacementStatus\.levelRatio \* 100\)\}%[\s\S]*\) : <div className="muted">물이 있는 땅입니다<\/div>/,
+  'well placement must keep non-geomancer guidance qualitative and show geomancers integer live output data');
 assert.match(contextSource, /foreignSiteAt[\s\S]*<ForeignSitePanel/,
   'foreign-site actions must remain available in the bottom context bar');
 assert.match(contextSource, /<ActionPopup[\s\S]*embedded/,
