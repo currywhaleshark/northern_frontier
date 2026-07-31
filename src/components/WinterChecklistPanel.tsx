@@ -42,7 +42,7 @@ export function WinterChecklistPanel({ state, onClose }: Props) {
 
         <div className="muted small edict-rules">
           일분은 지금 인구가 겨울 소모로 먹고 땔 때의 셈입니다. 사람이 늘면 그만큼 줄어듭니다.
-          모자란 것은 겨울에 채울 수 없으니, 가을에 미리 눌러 보십시오.
+          겨울에도 채울 수는 있으나 폭설과 혹한에 일손이 묶이는 날이 잦으니, 가을에 미리 눌러 보십시오.
         </div>
 
         <ul className="winter-checklist-items">

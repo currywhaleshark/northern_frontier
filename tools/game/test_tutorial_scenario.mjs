@@ -231,9 +231,9 @@ function stepById(id) {
   assignJobs(state, { farmer: 1 });
   assert.equal(sowingStep.isDone(state), true, 'placing four tiles completes the sowing step before any plowing');
 
-  // 코치는 밭 배치를 먼저 가리키고, 그 뒤에 농부 배정을 가리킨다
+  // 코치는 밭 배치를 먼저 가리키고, 그 뒤에 농부 배정(＋ 빠른 배정)을 가리킨다
   const fieldHint = coachSource.indexOf("{ tut: 'build-item-field'");
-  const farmerHint = coachSource.indexOf("{ tut: 'job-detail-farmer'");
+  const farmerHint = coachSource.indexOf("tut: 'job-plus-farmer'");
   assert.ok(fieldHint >= 0 && farmerHint > fieldHint, 'coach points to the plot before staffing the farmer');
 
   // 3단계는 그 파종이 실제로 끝나야 넘어간다 — 병행 구조의 잠금장치
@@ -264,10 +264,10 @@ function stepById(id) {
   assert.equal(hearthStep.isDone(state), true, 'yard, worker, stockpile and sowing complete the lesson together');
 
   const buildHint = coachSource.indexOf("{ tut: 'build-item-woodShed'");
-  const workerHint = coachSource.indexOf("{ tut: 'job-detail-woodSplitter'");
+  const workerHint = coachSource.indexOf("tut: 'job-plus-woodSplitter'");
   assert.ok(buildHint >= 0 && workerHint > buildHint, 'coach points to wood yard construction before staffing');
   // 전원 무직 시작이므로 공사를 올릴 건축가도 이 스텝에서 안내한다 (배치 → 건축가 → 장작꾼 순)
-  const builderHint = coachSource.indexOf("{ tut: 'job-detail-builder'");
+  const builderHint = coachSource.indexOf("tut: 'job-plus-builder'");
   assert.ok(
     builderHint > buildHint && builderHint < workerHint,
     'coach staffs the builder between placing the yard and staffing the splitter',
@@ -331,6 +331,87 @@ function stepById(id) {
 }
 
 {
+  // R2-2: 첫 병자 스텝은 병자의 회복만으로 끝나지 않는다 — 약초막과 약초꾼을 함께 요구한다
+  const state = tutorialStart.createTutorialGame();
+  const patientStep = stepById('patient');
+  const sufferer = state.residents.find(resident => resident.alive && !resident.special);
+  sufferer.sick = true;
+  state.scenario.flags.patientResidentId = sufferer.id;
+  assert.equal(patientStep.isDone(state), false, 'a sick settler alone does not close the patient step');
+  sufferer.sick = false;
+  assert.equal(
+    patientStep.isDone(state), false,
+    'recovery without a herb hut leaves the herbalist lesson untaught (R2-2)',
+  );
+  pushBuilt(state, 'herbHut');
+  assert.equal(patientStep.isDone(state), false, 'the herb hut still needs a herbalist working out of it');
+  assignJobs(state, { herbalist: 1 });
+  assert.equal(patientStep.isDone(state), true, 'hut, herbalist and a recovered patient close the step together');
+  sufferer.sick = true;
+  assert.equal(patientStep.isDone(state), false, 'a staffed herb hut does not close the step while the patient lies ill');
+
+  // 코치는 약초막 배치를 먼저 가리키고 그다음 약초꾼 ＋를 가리킨다
+  const hutHint = coachSource.indexOf("{ tut: 'build-item-herbHut'");
+  const herbalistHint = coachSource.indexOf("tut: 'job-plus-herbalist'");
+  assert.ok(hutHint >= 0 && herbalistHint > hutHint, 'coach places the herb hut before staffing the herbalist');
+  // 건축가를 그새 물렸으면 약초막이 터만 잡힌 채 서고 스텝이 멎는다 — 구제 힌트가 그 사이에 있다
+  const rescueHint = coachSource.indexOf('약초막은 터만 잡힌 채 오르지 않습니다');
+  assert.ok(
+    rescueHint > hutHint && rescueHint < herbalistHint,
+    'coach recovers a builder-less settlement before the placed herb hut stalls the step',
+  );
+}
+
+{
+  // R2-1: 직업 배정 안내 이원화 — 상세 4단 경로는 1단계 벌목꾼 하나뿐이고 나머지는 전부 ＋ 경로다
+  const detailAnchors = [...coachSource.matchAll(/tut: 'job-(?:detail|candidate|assign-selected)-(\w+)'/g)]
+    .map(match => match[1]);
+  assert.deepEqual(
+    [...new Set(detailAnchors)], ['woodcutter'],
+    'only the first job (woodcutter) is taught through the detail panel — every other job uses the ＋ path',
+  );
+  for (const job of ['hauler', 'farmer', 'builder', 'woodSplitter', 'hunter', 'herbalist', 'militia', 'watchman']) {
+    assert.ok(
+      coachSource.includes(`tut: 'job-plus-${job}'`),
+      `coach staffs ${job} through the quick ＋ button (R2-1)`,
+    );
+  }
+  // ＋ 경로도 얕은 앵커(dock-jobs)를 앞에 두어, 창이 접혀 있으면 코치가 그리로 물러난다
+  for (const match of coachSource.matchAll(/tut: 'job-plus-(\w+)'/g)) {
+    const before = coachSource.slice(0, match.index);
+    assert.ok(
+      before.lastIndexOf("tut: 'dock-jobs'") > before.lastIndexOf('path: ['),
+      `the ${match[1]} ＋ hint keeps dock-jobs as its shallow fallback anchor`,
+    );
+  }
+  // 상세 경로를 한 번 밟은 자리에서 ＋의 존재를 일러 준다
+  assert.ok(
+    /다음부터는 직업 옆의 ＋/.test(coachSource),
+    'the woodcutter hint hands off to the quick ＋ button for later jobs',
+  );
+  const workingStep = stepById('working');
+  assert.match(workingStep.body, /＋/, 'the working step body introduces the quick assignment button');
+}
+
+{
+  // R2-3: "겨울에는 채울 수 없다"는 잘못된 설명이었다 — 세 곳 모두에서 사라졌는지 본다
+  const checklistSource = readFileSync(new URL('../../src/components/WinterChecklistPanel.tsx', import.meta.url), 'utf8');
+  const scenarioSource = readFileSync(new URL('../../src/game/scenario.ts', import.meta.url), 'utf8');
+  for (const [label, source] of [
+    ['WinterChecklistPanel', checklistSource],
+    ['TutorialCoach', coachSource],
+    ['scenario', scenarioSource],
+  ]) {
+    assert.ok(
+      !/겨울에 채울 수 없/.test(source),
+      `${label} no longer claims winter stores cannot be replenished (R2-3)`,
+    );
+  }
+  assert.match(stepById('stocktake').body, /겨울에도 채울 수는 있으나/,
+    'the stocktake step explains that winter work is merely interrupted, not impossible');
+}
+
+{
   // 완주: 각 스텝의 모범 답안 → 제한 일수 안에 다음 스텝
   const state = tutorialStart.createTutorialGame();
   const plots = () => state.buildings.filter(building => building.type === 'field' || building.type === 'paddy');
@@ -363,8 +444,9 @@ function stepById(id) {
       assignJobs(s, { hunter: 2 });
       s.resources.meat = (s.scenario.flags.meatGoal ?? 0) + 10;
     },
-    // 첫 병자는 스텝 훅이 붙인다 — 모범 답안은 약초꾼을 두고 약초를 대는 것뿐이다
+    // 첫 병자는 스텝 훅이 붙인다 — 모범 답안은 약초막을 세우고 약초꾼을 두는 것이다 (R2-2)
     patient: s => {
+      pushBuilt(s, 'herbHut');
       assignJobs(s, { herbalist: 1 });
       s.resources.herbs = Math.max(s.resources.herbs, 20);
     },

@@ -107,6 +107,8 @@ export const TUTORIAL_STEPS: readonly ScenarioStepDefinition[] = [
       '사람은 저마다 맡은 일이 다릅니다. 벌목꾼이 벤 나무도 운반꾼이 창고에 들여야 비로소 비축입니다.\n\n' +
       '· 하단 독의 직업 배정 창을 여십시오. 누가 무슨 일을 하는지 한눈에 보입니다.\n' +
       '· 벌목꾼과 운반꾼을 각각 한 사람 이상 두십시오. 건축가가 있어야 집도 오릅니다.\n' +
+      '· 벌목꾼은 직업을 눌러 상세 배정으로 사람을 골라 보십시오. 누구를 앉히는지 그곳에서 정합니다.\n' +
+      '· 그다음부터는 직업 옆의 ＋만 눌러도 무직자 하나가 그 일로 올라갑니다. 급할 때는 이 편이 빠릅니다.\n' +
       '· 땅바닥에 쌓인 자원은 아직 살림이 아닙니다. 창고에 들어와야 곳간에 잡힙니다.',
     isDone: state =>
       (flags(state).jobPanelOpened ?? 0) > 0 &&
@@ -181,13 +183,16 @@ export const TUTORIAL_STEPS: readonly ScenarioStepDefinition[] = [
   {
     id: 'patient',
     title: '첫 병자',
-    goal: () => '병자가 자리를 털고 일어나기',
+    goal: () => '약초막을 세우고 약초꾼 1명을 두어, 병자가 자리를 털고 일어나기',
     body:
       '앓아누운 이가 생겼습니다. 병자는 일을 못 하고, 곳간의 약초를 축내며, 그대로 두면 목숨을 잃습니다.\n\n' +
-      '· 약초는 약초꾼이 캐 옵니다. 병자는 매일 조금씩 약초를 씁니다 — 곳간의 잔량을 살피십시오.\n' +
+      '· 약초는 약초꾼의 몫입니다. 숲을 돌며 약초와 산물을 캐어 곳간에 비축합니다.\n' +
+      '· 그 약초를 병자가 매일 조금씩 씁니다. 뒤에 의원을 세우면 의원(醫員)도 같은 약초로 치료합니다.\n' +
+      '· 건설 목록(생산)에서 약초막을 숲 가까이 세우십시오. 약초꾼이 그곳에 짐을 부려 채집 왕복이 줄어듭니다.\n' +
+      '· 직업 배정에서 약초꾼 옆의 ＋를 눌러 한 사람 두십시오.\n' +
       '· 약초가 있으면 회복이 빠릅니다. 떨어지면 몸이 스스로 이겨 내기를 기다릴 수밖에 없습니다.\n' +
       '· 굶주림과 추위는 병을 부릅니다. 밥과 아궁이가 곧 약입니다.\n' +
-      '· 뒤에 진(鎭)으로 오르면 의원을 세워 의원(醫員)이 병자를 돌보고 역병을 격리합니다.',
+      '· 뒤에 진(鎭)으로 오르면 의원을 세워 병자를 돌보고 역병을 격리합니다.',
     // 통제 사건: 건강한 성인 한 사람을 눕힌다 (역병 시스템은 쓰지 않는다 — 계획 §2-라)
     onStart: state => {
       const scenario = state.scenario;
@@ -199,7 +204,13 @@ export const TUTORIAL_STEPS: readonly ScenarioStepDefinition[] = [
       scenario.flags.patientResidentId = candidate.id;
       addLog(state, `${withJosa(residentLogName(candidate), '이/가')} 앓아누웠습니다. 약초를 살피십시오.`, 'bad', true);
     },
+    // 약초막 완공을 함께 요구한다 (R2-2). 약초꾼은 약초막이 없어도 숲에서 캐 오지만
+    // (`agents.ts` herbalistTick — 약초막은 depositExtra, 곧 가까운 하역처다),
+    // 거점을 세워 두어야 왕복이 줄어 병자에게 약초가 제때 닿는다. 직업마다 거점이 있다는
+    // 문법을 여기서 한 번 더 밟게 하려고 배치가 아니라 완공을 조건으로 둔다.
     isDone: state => {
+      if (builtCount(state, type => type === 'herbHut') < 1) return false;
+      if (jobCount(state, 'herbalist') < 1) return false;
       const patient = scriptedPatient(state);
       if (!patient) return true;      // 병자를 붙이지 못했거나 기록이 사라지면 붙들지 않는다
       return !patient.alive || !patient.sick;
@@ -244,7 +255,8 @@ export const TUTORIAL_STEPS: readonly ScenarioStepDefinition[] = [
     goal: state =>
       `겨울 점검을 열고 식량 ${flags(state).foodDaysGoal ?? 0}일분·장작 ${flags(state).firewoodDaysGoal ?? 0}일분 채우기`,
     body:
-      '겨울에 들기 전에 곳간을 셈해야 합니다. 모자란 것은 겨울에 채울 수 없습니다.\n\n' +
+      '겨울에 들기 전에 곳간을 셈해야 합니다. 겨울에도 채울 수는 있으나 ' +
+      '폭설과 혹한에 일손이 묶이는 날이 잦으니, 미리 쌓아 두는 편이 안전합니다.\n\n' +
       '· 겨울 점검을 열어 식량과 장작이 며칠분인지 확인하십시오.\n' +
       '· 일분은 지금 인구가 겨울 소모로 먹고 땔 때의 셈입니다. 인구가 늘면 그만큼 줄어듭니다.\n' +
       '· 섶과 숯도 땔감으로 함께 셉니다. 숯은 같은 부피로 더 오래 탑니다.\n' +

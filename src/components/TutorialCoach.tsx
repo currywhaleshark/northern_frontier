@@ -51,6 +51,11 @@ function sownArea(state: GameState): number {
 
 // 11스텝의 소목표 순서를 그대로 따른다 (scenario.ts의 TUTORIAL_STEPS와 같은 순서·같은 id).
 // 가리킬 UI가 없는 소목표(관찰·대기)는 힌트를 두지 않는다 — 코치는 조용히 물러난다.
+//
+// 직업 배정 안내는 이원화되어 있다 (R2-1). 1단계 벌목꾼 한 번만 상세 4단 경로
+// (`job-detail-*` → 후보 체크 → 선택 배정)로 가르쳐 상세 창의 존재를 보여주고,
+// 그 뒤의 모든 직업은 빠른 배정 2단 경로(`dock-jobs` → `job-plus-{job}`)로 안내한다.
+// ＋ 버튼이 접혀 보이지 않으면 코치는 얕은 앵커(`dock-jobs`)로 스스로 물러난다.
 const STEP_HINTS: Record<string, readonly CoachHint[]> = {
   naming: [
     {
@@ -80,16 +85,23 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
         { tut: 'job-detail-woodcutter', text: '벌목꾼을 눌러 상세 배정을 여십시오.' },
         { tut: 'job-candidate-woodcutter', text: '아래 무직자 명단에서 벌목꾼으로 배정할 주민을 체크하십시오.' },
-        { tut: 'job-assign-selected-woodcutter', text: '선택 배정을 눌러 벌목꾼을 한 사람 이상 두십시오.' },
+        {
+          tut: 'job-assign-selected-woodcutter',
+          text: '선택 배정을 눌러 벌목꾼을 한 사람 이상 두십시오. 상세 배정은 이렇게 씁니다 — '
+            + '다음부터는 직업 옆의 ＋만 눌러도 무직자 하나가 그 일로 올라갑니다.',
+        },
       ],
     },
     {
+      // 여기서부터는 상세 창을 거치지 않는다 — ＋ 한 번이 무직자 하나를 그 자리에서 올린다
       done: state => countJob(state, 'hauler') >= 1,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
-        { tut: 'job-detail-hauler', text: '운반꾼을 눌러 상세 배정을 여십시오.' },
-        { tut: 'job-candidate-hauler', text: '아래 무직자 명단에서 운반꾼으로 배정할 주민을 체크하십시오.' },
-        { tut: 'job-assign-selected-hauler', text: '선택 배정을 눌러 운반꾼을 두십시오. 자원은 창고에 들어와야 곳간에 잡힙니다.' },
+        {
+          tut: 'job-plus-hauler',
+          text: '운반꾼 옆의 ＋를 눌러 한 사람 올리십시오. 앞으로는 이 ＋만으로 빠르게 배정하면 됩니다. '
+            + '자원은 창고에 들어와야 곳간에 잡힙니다.',
+        },
       ],
     },
   ],
@@ -106,9 +118,10 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       done: state => countJob(state, 'farmer') >= 1,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
-        { tut: 'job-detail-farmer', text: '농부를 눌러 상세 배정을 여십시오. 밭을 갈고 씨를 뿌리는 것은 농부의 몫입니다.' },
-        { tut: 'job-candidate-farmer', text: '아래 무직자 명단에서 농부로 배정할 주민을 체크하십시오.' },
-        { tut: 'job-assign-selected-farmer', text: '선택 배정을 눌러 농부를 한 사람 이상 두십시오. 파종철은 짧습니다.' },
+        {
+          tut: 'job-plus-farmer',
+          text: '농부 옆의 ＋를 눌러 한 사람 이상 두십시오. 밭을 갈고 씨를 뿌리는 것은 농부의 몫이며, 파종철은 짧습니다.',
+        },
       ],
     },
   ],
@@ -133,18 +146,21 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       done: state => countJob(state, 'builder') >= 1,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
-        { tut: 'job-detail-builder', text: '건축가를 눌러 상세 배정을 여십시오. 초가집도 장작마당도 건축가가 짓습니다.' },
-        { tut: 'job-candidate-builder', text: '아래 무직자 명단에서 건축가로 배정할 주민을 체크하십시오.' },
-        { tut: 'job-assign-selected-builder', text: '선택 배정을 눌러 건축가를 한 사람 이상 두십시오. 건축가가 없으면 공사가 오르지 않습니다.' },
+        {
+          tut: 'job-plus-builder',
+          text: '건축가 옆의 ＋를 눌러 한 사람 이상 두십시오. 초가집도 장작마당도 건축가가 짓습니다 — '
+            + '건축가가 없으면 터만 잡힌 채 공사가 오르지 않습니다.',
+        },
       ],
     },
     {
       done: state => countJob(state, 'woodSplitter') >= 1,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
-        { tut: 'job-detail-woodSplitter', text: '장작꾼을 눌러 상세 배정을 여십시오.' },
-        { tut: 'job-candidate-woodSplitter', text: '아래 무직자 명단에서 장작꾼으로 배정할 주민을 체크하십시오.' },
-        { tut: 'job-assign-selected-woodSplitter', text: '선택 배정을 눌러 장작꾼으로 올리십시오. 장작꾼은 장작마당이 있어야 일합니다.' },
+        {
+          tut: 'job-plus-woodSplitter',
+          text: '장작꾼 옆의 ＋를 눌러 한 사람 이상 올리십시오. 장작꾼은 장작마당이 있어야 일합니다.',
+        },
       ],
     },
     {
@@ -152,9 +168,10 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       done: state => sownArea(state) >= goal(state, 'sownAreaGoal') || countJob(state, 'farmer') >= 1,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
-        { tut: 'job-detail-farmer', text: '농부를 눌러 상세 배정을 여십시오. 밭을 갈고 씨를 뿌리는 것은 농부의 몫입니다.' },
-        { tut: 'job-candidate-farmer', text: '아래 무직자 명단에서 농부로 배정할 주민을 체크하십시오.' },
-        { tut: 'job-assign-selected-farmer', text: '선택 배정을 눌러 농부를 한 사람 이상 두십시오.' },
+        {
+          tut: 'job-plus-farmer',
+          text: '농부 옆의 ＋를 눌러 한 사람 이상 두십시오. 밭을 갈고 씨를 뿌리는 것은 농부의 몫입니다.',
+        },
       ],
     },
     {
@@ -178,9 +195,7 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       done: state => countJob(state, 'hunter') >= 2,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
-        { tut: 'job-detail-hunter', text: '사냥꾼을 눌러 상세 배정을 여십시오.' },
-        { tut: 'job-candidate-hunter', text: '아래 무직자 명단에서 사냥꾼으로 배정할 주민을 체크하십시오.' },
-        { tut: 'job-assign-selected-hunter', text: '선택 배정을 눌러 사냥꾼을 두 사람 이상으로 만드십시오.' },
+        { tut: 'job-plus-hunter', text: '사냥꾼 옆의 ＋를 두 번 눌러 사냥꾼을 두 사람 이상으로 만드십시오.' },
       ],
     },
     {
@@ -189,12 +204,34 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
   ],
   patient: [
     {
+      // 약초막은 약초꾼의 거점이다 — 숲 가까이 두면 짐을 그곳에 부려 왕복이 줄어든다
+      done: state => placedCount(state, type => type === 'herbHut') >= 1,
+      path: [
+        { tut: 'build-cat-production', text: '생산 건설 목록을 여십시오.' },
+        { tut: 'build-item-herbHut', text: '약초막을 골라 숲 가까운 빈 땅에 배치하십시오. 약초꾼이 그곳에 약초를 부립니다.' },
+      ],
+    },
+    {
+      // 3단계에서 둔 건축가를 그새 물렸다면 터만 잡힌 채 공사가 오르지 않는다 — 정상 진행에서는 뜨지 않는다
+      done: state => countJob(state, 'builder') >= 1
+        || placedCount(state, type => type === 'herbHut') === 0
+        || state.buildings.some(building => building.type === 'herbHut' && building.built),
+      path: [
+        { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
+        {
+          tut: 'job-plus-builder',
+          text: '건축가 옆의 ＋를 눌러 한 사람 두십시오. 건축가가 없으면 약초막은 터만 잡힌 채 오르지 않습니다.',
+        },
+      ],
+    },
+    {
       done: state => countJob(state, 'herbalist') >= 1,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
-        { tut: 'job-detail-herbalist', text: '약초꾼을 눌러 상세 배정을 여십시오. 병자가 쓰는 약초는 약초꾼이 캐 옵니다.' },
-        { tut: 'job-candidate-herbalist', text: '아래 무직자 명단에서 약초꾼으로 배정할 주민을 체크하십시오.' },
-        { tut: 'job-assign-selected-herbalist', text: '선택 배정을 눌러 약초꾼을 한 사람 이상 두십시오.' },
+        {
+          tut: 'job-plus-herbalist',
+          text: '약초꾼 옆의 ＋를 눌러 한 사람 이상 두십시오. 병자가 쓰는 약초는 약초꾼이 숲에서 캐 옵니다.',
+        },
       ],
     },
     {
@@ -226,18 +263,14 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       done: state => countJob(state, 'militia') >= 1,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
-        { tut: 'job-detail-militia', text: '수비병을 눌러 상세 배정을 여십시오. 수비병은 싸우는 사람입니다.' },
-        { tut: 'job-candidate-militia', text: '아래 무직자 명단에서 수비병으로 배정할 주민을 체크하십시오.' },
-        { tut: 'job-assign-selected-militia', text: '선택 배정을 눌러 수비병을 한 사람 이상 두십시오.' },
+        { tut: 'job-plus-militia', text: '수비병 옆의 ＋를 눌러 한 사람 이상 두십시오. 수비병은 싸우는 사람입니다.' },
       ],
     },
     {
       done: state => countJob(state, 'watchman') >= 1,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
-        { tut: 'job-detail-watchman', text: '파수꾼을 눌러 상세 배정을 여십시오. 파수꾼은 지켜보아 노림 자체를 줄입니다.' },
-        { tut: 'job-candidate-watchman', text: '아래 무직자 명단에서 파수꾼으로 배정할 주민을 체크하십시오.' },
-        { tut: 'job-assign-selected-watchman', text: '선택 배정을 눌러 파수꾼을 한 사람 이상 두십시오.' },
+        { tut: 'job-plus-watchman', text: '파수꾼 옆의 ＋를 눌러 한 사람 이상 두십시오. 파수꾼은 지켜보아 노림 자체를 줄입니다.' },
       ],
     },
   ],
@@ -248,7 +281,11 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
     },
     {
       // 점검을 연 뒤에는 같은 칩이 식량·장작 일분을 계속 비춘다 — 목표에 닿을 때까지 그곳을 가리킨다
-      path: [{ tut: 'checklist-open', text: '식량과 장작의 일분이 목표에 닿을 때까지 쌓으십시오. 모자란 것은 겨울에 채울 수 없습니다.' }],
+      path: [{
+        tut: 'checklist-open',
+        text: '식량과 장작의 일분이 목표에 닿을 때까지 쌓으십시오. 겨울에도 채울 수는 있으나 '
+          + '폭설과 혹한에 일손이 묶이는 날이 잦으니, 미리 쌓아 두는 편이 안전합니다.',
+      }],
     },
   ],
   // 마지막 스텝은 버티는 일뿐이라 가리킬 곳이 없다
