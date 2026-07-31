@@ -17,6 +17,7 @@ import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events'
 import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
 import { maybeRunTradeContracts, resolveTradeContractChoice } from './tradeContracts';
 import { dailyScenarioTick, resolveScenarioChoice, scenarioSuppressesRandomEvents } from './scenario';
+import { dailyGuideTick, flushGuideModal, openGuideOnce } from './guides';
 import { grantYearlyPowder, resolvePetition } from './petition';
 import { checkPromotion, resolvePromotionDecreeChoice } from './promotion';
 import { resolveCrackdown, resolveInspection, updateSuspicion } from './suspicion';
@@ -1140,6 +1141,11 @@ export function resolveChoice(state: GameState, optionId: string): void {
     }
     return;
   }
+  if (state.pendingChoice.kind === 'guide') {
+    state.pendingChoice = null;
+    flushGuideModal(state);
+    return;
+  }
   const incidentNonce = state.pendingChoice.kind === 'incident'
     ? state.incidents.resolutionCount++
     : 0;
@@ -1171,6 +1177,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'warParticipationRequest') resolveWarParticipationChoice(state, optionId);
   else if (state.pendingChoice.kind === 'warParticipationResult') resolveWarParticipationResult(state);
   else resolveTrade(state, optionId);
+  flushGuideModal(state); // 자리가 비었으면 미뤄 둔 초회 도움말을 잇는다
   reconcileWeaponAssignments(state);
   reconcileMountAssignments(state);
   state.resources.defense = computeDefense(state);
@@ -1330,6 +1337,7 @@ function endOfDay(state: GameState): void {
     dailyProximityWarningTick(state);
   }
   dailyScenarioTick(state, rng); // 시나리오 스텝 진행 — 통제 사건(onDay)과 다음 안내를 함께 처리한다
+  dailyGuideTick(state);         // 미뤄 둔 초회 도움말 모달을 자리가 비었을 때 연다
 
   state.resources.defense = computeDefense(state);
   checkEndConditions(state);
@@ -1396,7 +1404,10 @@ function onSeasonChange(state: GameState, prev: string, next: string): void {
   }
   if (next === 'autumn') {
     addLog(state, '수확철입니다. 곡식을 거두고 장작을 쌓아 두십시오. 국경 너머의 움직임도 잦아지는 때입니다.', 'info');
+    openGuideOnce(state, 'preservation'); // 첫 가을 — 갈무리 길잡이(카드)
   }
+  // 첫 겨울을 넘긴 봄 첫날 — 개칭 청원 길잡이(카드)
+  if (prev === 'winter' && next === 'spring') openGuideOnce(state, 'rename');
 }
 
 // 봄/여름, 숲 인접 평지가 천천히 다시 숲이 된다

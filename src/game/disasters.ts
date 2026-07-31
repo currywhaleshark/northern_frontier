@@ -2,6 +2,7 @@ import { CONFIG } from './config';
 import { BUILDING_DEFS, leveeAtEdge, type LeveeEdge } from './buildings';
 import { cropIdForBuilding, CROP_DEFS } from './crops';
 import { addLog } from './events';
+import { openGuideOnce } from './guides';
 import { withJosa } from './josa';
 import { recordAnnals } from './annals';
 import { makeRng } from './map';
@@ -143,6 +144,7 @@ export function startEarlyFrostObservation(state: GameState, targetBuildingId: n
     'info',
     true,
   );
+  openGuideOnce(state, 'disaster');
   return true;
 }
 
@@ -168,6 +170,7 @@ export function startLateFrostObservation(state: GameState, targetBuildingId: nu
     'info',
     true,
   );
+  openGuideOnce(state, 'disaster');
   return true;
 }
 
@@ -193,6 +196,7 @@ export function startLocustInfestation(
     progress: 0,
   });
   addLog(state, '황충 떼가 경작지에 내려앉아 잎과 이삭을 갉아먹기 시작했습니다.', 'bad', true);
+  openGuideOnce(state, 'disaster');
   return true;
 }
 
@@ -211,6 +215,7 @@ export function startDrought(state: GameState, durationDays: number): boolean {
     progress: 0,
   });
   addLog(state, '며칠째 비가 끊기고 강물이 줄어 가뭄이 들었습니다.', 'bad', true);
+  openGuideOnce(state, 'disaster');
   return true;
 }
 
@@ -266,6 +271,7 @@ export function maybeStartSnowDamage(state: GameState): boolean {
   if (damaged.length > 0) {
     recordAnnals(state, 'disaster', `설해로 주거 ${damaged.length}채가 파손되었습니다.`);
   }
+  openGuideOnce(state, 'disaster');
   return true;
 }
 
@@ -640,6 +646,7 @@ export function startSpringFlood(
     true,
   );
   recordAnnals(state, 'disaster', '해빙기 대홍수가 나 강변이 물에 잠겼습니다.');
+  openGuideOnce(state, 'disaster');
   return true;
 }
 

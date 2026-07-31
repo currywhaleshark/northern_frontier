@@ -27,6 +27,7 @@ import {
   type UiPrefs,
 } from '../ui/uiPrefs';
 import { currentScenarioStep } from '../game/scenario';
+import { winterReadiness } from '../game/winterReadiness';
 import { DayArcWidget } from './DayArcWidget';
 import { TimeControls } from './TimeControls';
 import { ResourceBreakdownPopover } from './ResourceBreakdownPopover';
@@ -41,12 +42,14 @@ interface Props {
   onOpenMenu: () => void;
   onOpenCourt: () => void;
   onOpenFactions: () => void;
+  onOpenWinterChecklist: () => void;
   uiPrefs: UiPrefs;
   onUiPrefsChange: (update: (current: UiPrefs) => UiPrefs) => void;
 }
 
 export function TopBar({
-  state, speed, setSpeed, onOpenMenu, onOpenCourt, onOpenFactions, uiPrefs, onUiPrefsChange,
+  state, speed, setSpeed, onOpenMenu, onOpenCourt, onOpenFactions, onOpenWinterChecklist,
+  uiPrefs, onUiPrefsChange,
 }: Props) {
   const living = livingResidents(state);
   const pop = living.length;
@@ -72,6 +75,12 @@ export function TopBar({
   const promotionTarget = state.victoryProgressNote ? nextRank(state.rank) : null;
   const scenarioStep = currentScenarioStep(state);
   const spoilage = spoilagePreview(state);
+  // 겨울 점검 진입점 — 길잡이 9단계에서는 늘, 평시에는 가을·겨울에만 상단에 선다.
+  const season = getSeason(state.day);
+  const showWinterChecklist = scenarioStep?.id === 'stocktake' ||
+    ((!state.scenario || state.scenario.completed) && (season === 'autumn' || season === 'winter'));
+  const readiness = showWinterChecklist ? winterReadiness(state) : null;
+  const readinessDays = (days: number): string => Number.isFinite(days) ? `${Math.floor(days)}일분` : '넉넉함';
   return (
     <div className="topbar">
       <div className="topbar-row topbar-resource-row" aria-label="자원 현황">
@@ -152,7 +161,7 @@ export function TopBar({
           </div>
         )}
       </div>
-      {(scenarioStep || tribute || contractCount > 0 || state.crackdownDeadline > 0 || promotionTarget) && (
+      {(scenarioStep || showWinterChecklist || tribute || contractCount > 0 || state.crackdownDeadline > 0 || promotionTarget) && (
         <div className="topbar-objectives" aria-label="지속 관리 항목">
           {scenarioStep && (
             <div className="ongoing-objective scenario" title="길잡이 시나리오의 현재 목표">
@@ -160,6 +169,19 @@ export function TopBar({
               <span className="objective-deadline">{scenarioStep.title}</span>
               <span className="objective-summary">{scenarioStep.goal(state)}</span>
             </div>
+          )}
+          {showWinterChecklist && readiness && (
+            <button
+              type="button"
+              className="ongoing-objective winter-check"
+              data-tut="checklist-open"
+              title="겨울 점검 — 식량·장작 일분과 주거·옷·세공·병자를 한 자리에서 확인"
+              onClick={onOpenWinterChecklist}
+            >
+              <span className="objective-title">겨울 점검</span>
+              <span className="objective-deadline">식량 {readinessDays(readiness.foodDays)}</span>
+              <span className="objective-summary">장작 {readinessDays(readiness.firewoodDays)}</span>
+            </button>
           )}
           {tribute && (
             <button

@@ -2,6 +2,7 @@ import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { FACTIONS } from './constants';
 import { addLog } from './events';
+import { openGuideOnce } from './guides';
 import { isExplored } from './exploration';
 import { getSeason } from './seasons';
 import type {
@@ -288,6 +289,8 @@ export function revealForeignSitesFromExploration(state: GameState): void {
     site.discovered = true;
     if (site.status === 'hidden') site.status = 'stable';
     addLog(state, discoveryMessage(site), site.type === 'banditLair' ? 'bad' : 'info', true);
+    // 첫 산채 발견 / 첫 세력 접촉 — 초회 길잡이(카드)
+    openGuideOnce(state, site.type === 'banditLair' ? 'expedition' : 'diplomacy');
     addForeignSiteMemory(state, site.id, '개척지 사람들이 처음 이곳의 위치를 확인했습니다.', 'neutral');
   }
 

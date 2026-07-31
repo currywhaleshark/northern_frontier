@@ -733,7 +733,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'promotionDecree' | 'mineCollapse' | 'giftEnvoy' | 'pactEnvoy' | 'pactRenewal' | 'claimAccordEnvoy' | 'claimAccordRenewal' | 'claimAccordOffer' | 'aidRequestEnvoy' | 'warParticipationRequest' | 'warParticipationResult';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'guide' | 'promotionDecree' | 'mineCollapse' | 'giftEnvoy' | 'pactEnvoy' | 'pactRenewal' | 'claimAccordEnvoy' | 'claimAccordRenewal' | 'claimAccordOffer' | 'aidRequestEnvoy' | 'warParticipationRequest' | 'warParticipationResult';
   title: string;
   body: string;
   illustration?: {
@@ -763,6 +763,14 @@ export interface ScenarioState {
 export interface GuideState {
   enabled: boolean;              // 완료 모달·설정에서 켜고 끈다
   seen: Record<string, number>;  // 모듈 id → 처음 본 날 (1회성 보장)
+}
+
+// 화면에 떠 있는 비차단 길잡이 카드 (시간을 멈추지 않는다 — 닫기 전까지 남는다)
+export interface GuideCardEntry {
+  moduleId: string;
+  title: string;
+  body: string;
+  day: number;
 }
 
 export interface TerritoryViolation {
@@ -1864,6 +1872,8 @@ export interface GameState {
   specialResidentRecords?: Partial<Record<SpecialResidentId, SpecialResidentRecord>>; // 안치·합류·이탈 상태
   scenario?: ScenarioState | null;  // 튜토리얼 등 스크립트 시나리오 (없으면 일반 모드)
   guides?: GuideState;              // 초회 도움말 (구버전 저장에는 없음 = 끈 상태로 보정)
+  guideCards?: GuideCardEntry[];    // 지금 떠 있는 비차단 길잡이 카드
+  guideModalQueue?: string[];       // 모달 형식 길잡이 대기열 (다른 모달과 겹치지 않게 미룬다)
   // ── 은맥 (게임당 1회 — 채광 중 발견 사건으로만 등장) ──
   silverVein?: SilverVeinState | null; // 구버전 저장에는 없음
   silverPityDays?: number;     // 발견 전 누적 채광일 (보장 발동용)

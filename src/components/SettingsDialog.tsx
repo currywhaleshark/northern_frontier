@@ -4,6 +4,9 @@ interface Props {
   audio: AudioPrefs;
   residentMarkers: ResidentMarkerPrefs;
   autoFastForwardSleepingNight: boolean;
+  // 초회 도움말 — 게임 중에만 넘어온다 (메인 메뉴에는 상태가 없다)
+  guidesEnabled?: boolean;
+  onGuidesEnabledChange?: (enabled: boolean) => void;
   onChange: (update: Partial<AudioPrefs>) => void;
   onResidentMarkersChange: (update: Partial<ResidentMarkerPrefs>) => void;
   onAutoFastForwardSleepingNightChange: (enabled: boolean) => void;
@@ -49,6 +52,8 @@ export function SettingsDialog({
   audio,
   residentMarkers,
   autoFastForwardSleepingNight,
+  guidesEnabled,
+  onGuidesEnabledChange,
   onChange,
   onResidentMarkersChange,
   onAutoFastForwardSleepingNightChange,
@@ -106,6 +111,19 @@ export function SettingsDialog({
                 <small>모든 주민이 잠들면 아침까지 빠르게 진행합니다. 밤중에 직접 배속을 바꾸면 그날은 다시 올리지 않습니다.</small>
               </span>
             </label>
+            {onGuidesEnabledChange && (
+              <label className="settings-display-option">
+                <input
+                  type="checkbox"
+                  checked={guidesEnabled === true}
+                  onChange={event => onGuidesEnabledChange(event.target.checked)}
+                />
+                <span>
+                  <strong>초회 도움말 (길잡이)</strong>
+                  <small>처음 보는 살림·사건에 짧은 안내가 한 번씩 붙습니다. 이미 본 안내는 다시 뜨지 않습니다.</small>
+                </span>
+              </label>
+            )}
           </div>
         </div>
         <div className="settings-section">

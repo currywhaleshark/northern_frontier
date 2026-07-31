@@ -7,6 +7,7 @@ import { settlementDisplayName } from './settlementName';
 import { BUILDING_DEFS, countBuilt } from './buildings';
 import { RANK_NAMES, RANK_ORDER } from './constants';
 import { addLog } from './events';
+import { openGuideOnce } from './guides';
 import { withJosa } from './josa';
 import { foodTotal, fuelHeatTotal } from './consumption';
 import { livingResidents } from './residents';
@@ -153,6 +154,7 @@ function promote(state: GameState, target: PromotionRank): void {
   const beforeName = settlementDisplayName(state);
   state.rank = target;
   state.pendingPromotionNotice = target;
+  openGuideOnce(state, 'chronicle'); // 첫 승격 — 초회 길잡이(카드)
   state.resources.reputation = Math.min(100, state.resources.reputation + CONFIG.ranks.promotionReputation);
   // 승격 직후 완충 — 새 기대 항목이 미충족으로 들어와도 잔치 분위기가 첫 며칠을 받쳐 준다
   state.promotionCheerUntil = state.day + CONFIG.satisfaction.promotionCheerDays;

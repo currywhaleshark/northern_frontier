@@ -5,6 +5,7 @@ import { recordAnnals } from './annals';
 import { FACTIONS, RESOURCE_NAMES, type Faction } from './constants';
 import { computeDefense, countBuilt, footprintTilesOf } from './buildings';
 import { addLog } from './events';
+import { openGuideOnce } from './guides';
 import {
   applyBattleDefenseMultipliers, cannonBattleMult, consumeBattlePowder, levyDefenseBonus, startBattle,
 } from './battles';
@@ -205,6 +206,8 @@ export function checkRaidTrigger(state: GameState, rng: () => number): void {
     warned = true;
     announceRaidTip(state, informant, faction.name);
   }
+  // 첫 습격 경보 — 초회 길잡이(모달). 대기열에 넣어 두면 습격 선택지를 덮지 않는다.
+  openGuideOnce(state, 'battle');
   if (openExtortionDemand(state, rng, warned, power, faction.name, warningSource)) return;
   spawnRaiders(state, rng, warned, faction.name, power, warningSource);
 }

@@ -209,8 +209,16 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       ],
     },
   ],
-  // 겨울 점검 패널이 아직 없다 — 패널이 서면(M4) 그 진입점을 여기에 잇는다
-  stocktake: [],
+  stocktake: [
+    {
+      done: state => marked(state, 'checklistOpened'),
+      path: [{ tut: 'checklist-open', text: '상단의 겨울 점검을 눌러 곳간이 며칠분인지 확인하십시오.' }],
+    },
+    {
+      // 점검을 연 뒤에는 같은 칩이 식량·장작 일분을 계속 비춘다 — 목표에 닿을 때까지 그곳을 가리킨다
+      path: [{ tut: 'checklist-open', text: '식량과 장작의 일분이 목표에 닿을 때까지 쌓으십시오. 모자란 것은 겨울에 채울 수 없습니다.' }],
+    },
+  ],
   // 마지막 스텝은 버티는 일뿐이라 가리킬 곳이 없다
   winter: [],
 };

@@ -3,6 +3,7 @@ import { buildingFootprintDims, isPlotBuildingType } from './buildings';
 import { annualClimate } from './climate';
 import { CONFIG } from './config';
 import { addLog } from './events';
+import { openGuideOnce } from './guides';
 import { buildingStock, takeBuildingStock } from './inventory';
 import { damageBuildingTargets } from './raidDamage';
 import { recordAnnals } from './annals';
@@ -150,6 +151,7 @@ export function maybeStartFire(state: GameState, rng: () => number): boolean {
     data: {},
   });
   addLog(state, `${building.type === 'nitreYard' ? '염초장' : '건물'}에서 불길이 일었습니다. 가까운 주민들이 물을 길어 불을 끕니다.`, 'bad', true);
+  openGuideOnce(state, 'fire'); // 첫 발화 — 초회 길잡이(모달)
   return true;
 }
 

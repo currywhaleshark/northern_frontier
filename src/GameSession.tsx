@@ -100,6 +100,9 @@ import { markScenarioFlag } from './game/scenario';
 import { acknowledgePromotionNotice, upgradeSettlementCenter } from './game/promotion';
 import { createTutorialGame } from './game/tutorialStart';
 import { TutorialCoach } from './components/TutorialCoach';
+import { GuideCardLayer } from './components/GuideCard';
+import { WinterChecklistPanel } from './components/WinterChecklistPanel';
+import { dismissGuideCard, guideCards, guidesEnabled, openGuideOnce, setGuidesEnabled } from './game/guides';
 import {
   loadUiPrefs,
   resetDockWindowLayout,
@@ -354,6 +357,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   const [weaponDialogOpen, setWeaponDialogOpen] = useState(false);
   const [edictDialogOpen, setEdictDialogOpen] = useState(false);
   const [chronicleOpen, setChronicleOpen] = useState(false);
+  const [winterChecklistOpen, setWinterChecklistOpen] = useState(false);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [expeditionMusterRequest, setExpeditionMusterRequest] = useState<ExpeditionMusterRequest | null>(null);
   const [runtimePerfReport, setRuntimePerfReport] = useState<string | null>(null);
@@ -1305,6 +1309,20 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     setRenameDialogOpen(true);
   };
 
+  // 겨울 점검 — 길잡이 9단계의 완료 조건(checklistOpened)이 여기서 서명된다.
+  // 이 한 줄이 없으면 9단계가 영영 끝나지 않는다.
+  const handleOpenWinterChecklist = () => {
+    markScenarioFlag(stateRef.current, 'checklistOpened');
+    setSpeed(0);
+    setWinterChecklistOpen(true);
+    bump();
+  };
+
+  const handleDismissGuideCard = (moduleId: string) => {
+    dismissGuideCard(stateRef.current, moduleId);
+    bump();
+  };
+
   const handleSubmitRename = (name: string) => {
     const error = requestSettlementRename(stateRef.current, name);
     if (error) {
@@ -1530,7 +1548,9 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     const runtimeState = stateRef.current;
     if (openDockWindowIds.includes('jobs')) markScenarioFlag(runtimeState, 'jobPanelOpened');
     if (openDockWindowIds.includes('court')) markScenarioFlag(runtimeState, 'courtWindowOpened');
-  }, [openDockWindowIds]);
+    // 세력 창 첫 열람 — 초회 도움말(카드). 시나리오 중에는 guides가 스스로 물러난다.
+    if (openDockWindowIds.includes('factions') && openGuideOnce(runtimeState, 'diplomacy')) bump();
+  }, [bump, openDockWindowIds]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1757,6 +1777,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               onUiPrefsChange={setUiPrefs}
               onOpenCourt={() => openDockWindow('court')}
               onOpenFactions={() => openDockWindow('factions')}
+              onOpenWinterChecklist={handleOpenWinterChecklist}
             />
           )}
         </RuntimeVersionBoundary>
@@ -2066,6 +2087,11 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
           onResidentMarkersChange={update => setUiPrefs(current => setResidentMarkerPrefs(current, update))}
           onAutoFastForwardSleepingNightChange={enabled =>
             setUiPrefs(current => setAutoFastForwardSleepingNight(current, enabled))}
+          guidesEnabled={guidesEnabled(stateRef.current)}
+          onGuidesEnabledChange={enabled => {
+            setGuidesEnabled(stateRef.current, enabled);
+            bump();
+          }}
           onClose={() => setGameMenuView('main')}
         />
       )}
@@ -2090,7 +2116,12 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
         />
       )}
 
+      {winterChecklistOpen && (
+        <WinterChecklistPanel state={state} onClose={() => setWinterChecklistOpen(false)} />
+      )}
+
       {state.scenario && <TutorialCoach state={state} />}
+      <GuideCardLayer cards={guideCards(state)} onDismiss={handleDismissGuideCard} />
 
       {state.pendingPromotionNotice && state.pendingPromotionNotice !== 'settlement' && (
         <PromotionModal rank={state.pendingPromotionNotice} onAcknowledge={handleAcknowledgePromotion} />

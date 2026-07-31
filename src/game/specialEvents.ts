@@ -4,6 +4,7 @@ import { CONFIG } from './config';
 import { BUILDING_DEFS, footprintTilesOf, sownAreaOf } from './buildings';
 import { cropIdForBuilding, CROP_DEFS } from './crops';
 import { addLog } from './events';
+import { openGuideOnce } from './guides';
 import { consumeExpeditionPowder, expeditionResidentsForIds } from './expedition';
 import {
   activePredatorScoutIds, availablePredatorScouts, generatedPredatorThreatProfile, materializePredatorThreat,
@@ -302,6 +303,7 @@ function openWildlifeEvent(state: GameState, kind: WildlifeKind, rng: () => numb
     const farms = standingFarms(state);
     const target = farms[Math.floor(rng() * farms.length)];
     if (!target) return;
+    openGuideOnce(state, 'beast'); // 첫 맹수 흔적 — 초회 길잡이(카드)
     const before = target.fieldGrowth;
     target.fieldGrowth *= 1 - CONFIG.specialEvents.boarInitialCropLoss;
     const lost = Math.max(1, Math.round(before - target.fieldGrowth));
@@ -326,6 +328,7 @@ function openWildlifeEvent(state: GameState, kind: WildlifeKind, rng: () => numb
     return;
   }
 
+  openGuideOnce(state, 'beast'); // 첫 맹수 흔적 — 초회 길잡이(카드)
   const wolf = kind === 'wolf';
   const scoutAvailable = availablePredatorScouts(state).length > 0;
   state.pendingChoice = {

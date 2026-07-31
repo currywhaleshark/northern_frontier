@@ -3,6 +3,7 @@
 // 모반 의심(suspicion)이 그림자처럼 따라붙는다. 계획: docs/superpowers/plans/2026-07-17-silver-currency.md
 import { CONFIG } from './config';
 import { addLog } from './events';
+import { openGuideOnce } from './guides';
 import { convertToSilverDeposit, mineralRemaining, rollSilverDepositAmount } from './minerals';
 import { lowerSuspicion } from './suspicion';
 import type { SuspicionFactor } from './suspicion';
@@ -88,6 +89,7 @@ export function openSilverVeinChoice(state: GameState): void {
     data: { x: v.x, y: v.y },
   };
   addLog(state, '채광장에서 은맥이 드러났습니다. 결정을 내려야 합니다.', 'info', true);
+  openGuideOnce(state, 'mining'); // 첫 은맥 발견 — 초회 길잡이(카드)
 }
 
 export function resolveSilverVeinChoice(state: GameState, optionId: string, rng: () => number): void {

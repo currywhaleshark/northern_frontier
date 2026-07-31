@@ -1,6 +1,7 @@
 import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { addLog } from './events';
+import { openGuideOnce } from './guides';
 import { addBuildingStock } from './inventory';
 import { getSeason } from './seasons';
 import { reconcileMountAssignments } from './weapons';
@@ -419,6 +420,9 @@ export function acquireLivestock(
     livestock.headcount += allocation.amount;
   }
   addLog(state, `${LIVESTOCK_DEFS[species].name} ${preflight.requested}마리를 들였습니다.`, 'good');
+  // 첫 가축 / 첫 농우 — 초회 길잡이(카드)
+  openGuideOnce(state, 'livestock');
+  if (species === 'cattle') openGuideOnce(state, 'oxen');
   return null;
 }
 

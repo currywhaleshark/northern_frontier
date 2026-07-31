@@ -2584,6 +2584,16 @@ export function loadGame(slot = 1): GameState | null {
     parsed.guides = guides && typeof guides === 'object' && guides.seen != null && typeof guides.seen === 'object'
       ? { enabled: guides.enabled === true, seen: { ...guides.seen } }
       : { enabled: false, seen: {} };
+    // 떠 있던 카드와 미뤄 둔 모달은 표시용이라 형태만 맞춰 둔다 (1회성은 seen이 지킨다)
+    parsed.guideCards = Array.isArray(parsed.guideCards)
+      ? parsed.guideCards.filter((card: unknown) => {
+        const entry = card as { moduleId?: unknown; title?: unknown; body?: unknown };
+        return typeof entry?.moduleId === 'string' && typeof entry.title === 'string' && typeof entry.body === 'string';
+      })
+      : [];
+    parsed.guideModalQueue = Array.isArray(parsed.guideModalQueue)
+      ? parsed.guideModalQueue.filter((id: unknown) => typeof id === 'string')
+      : [];
     rebuildBuildingFootprints(parsed);
     reconcileResidentHomes(parsed, makeRng((parsed.seed ?? 1) + parsed.day * 32452843));
     ensureExploration(parsed);

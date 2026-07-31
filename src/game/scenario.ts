@@ -11,6 +11,7 @@ import { CONFIG } from './config';
 import { consumeFuelHeat } from './consumption';
 import { addLog } from './events';
 import { announceCourtTribute } from './courtTribute';
+import { openGuideOnce } from './guides';
 import { makeRng } from './map';
 import { residentLogName } from './residentLogName';
 import { withJosa } from './josa';
@@ -410,4 +411,6 @@ export function resolveScenarioChoice(state: GameState, optionId: string): void 
       : '길잡이를 마쳤습니다. 이제 모든 사건이 열립니다. 안내 없이 스스로 꾸려 가십시오.',
     'info', true,
   );
+  // 첫 겨울을 넘긴 직후 — 개칭 청원을 여기서 잇는다 (일반 게임은 겨울 다음 봄 첫날)
+  openGuideOnce(state, 'rename');
 }

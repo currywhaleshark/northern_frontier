@@ -410,15 +410,73 @@ function stepById(id) {
 }
 
 {
-  // 초회 도움말: 켜져 있을 때 1회만, 꺼져 있으면 전부 미표시
+  // 초회 도움말: 길잡이 시나리오가 도는 동안에는 절대 발화하지 않는다 (이중 안내 금지)
   const state = tutorialStart.createTutorialGame();
+  assert.equal(state.guides.enabled, true);
+  assert.equal(guides.openGuideOnce(state, 'fire'), false, 'guides stay silent while the tutorial runs');
+  assert.equal(guides.hasSeenGuide(state, 'fire'), false, 'a suppressed guide is not marked as seen');
+  assert.deepEqual(state.guides.seen, {});
+  // 시나리오가 끝나면 같은 트리거가 열린다
+  state.scenario = null;
   assert.equal(guides.openGuideOnce(state, 'fire'), true);
   assert.equal(guides.openGuideOnce(state, 'fire'), false, 'the same module never opens twice');
   assert.equal(guides.hasSeenGuide(state, 'fire'), true);
   assert.equal(state.guides.seen.fire, state.day);
+}
+
+{
+  // 형식 구분: 습격·화재·재해만 모달(대기열 → 자리 비면 pendingChoice), 나머지는 비차단 카드
+  const modalIds = ['fire', 'battle', 'disaster'];
+  for (const id of Object.keys(guides.GUIDE_MODULES)) {
+    const module = guides.GUIDE_MODULES[id];
+    assert.equal(module.id, id, `guide module ${id} carries its own id`);
+    assert.ok(module.title && module.summary && module.body, `guide module ${id} has text`);
+    assert.equal(
+      module.format, modalIds.includes(id) ? 'modal' : 'card',
+      `guide module ${id} uses the planned format`,
+    );
+  }
+  // 계획서 §5 트리거 표의 12개 모듈이 전부 있다
+  assert.deepEqual(Object.keys(guides.GUIDE_MODULES).sort(), [
+    'battle', 'beast', 'chronicle', 'diplomacy', 'disaster', 'expedition',
+    'fire', 'livestock', 'mining', 'oxen', 'preservation', 'rename',
+  ]);
+
+  const state = tutorialStart.createTutorialGame();
+  state.scenario = null;
+  state.pendingChoice = null;
+  // 카드: 시간을 멈추지 않고 화면에 서고, 로그에도 한 줄 남는다
+  assert.equal(guides.openGuideOnce(state, 'livestock'), true);
+  assert.equal(state.pendingChoice, null, 'a card guide never blocks the clock');
+  assert.equal(guides.guideCards(state).length, 1);
+  assert.ok(state.log.some(entry => entry.text.includes('길잡이 — 가축과 축사')), 'the card is echoed in the log');
+  guides.dismissGuideCard(state, 'livestock');
+  assert.equal(guides.guideCards(state).length, 0);
+
+  // 모달: 트리거 시점에는 대기열에만 들어가 다른 사건 모달을 덮지 않는다
+  state.pendingChoice = { kind: 'incident', title: '다른 사건', body: '', options: [], data: {} };
+  assert.equal(guides.openGuideOnce(state, 'battle'), true);
+  assert.equal(state.pendingChoice.kind, 'incident', 'a queued guide never clobbers a live event modal');
+  state.pendingChoice = null;
+  guides.dailyGuideTick(state);
+  assert.equal(state.pendingChoice?.kind, 'guide');
+  assert.equal(state.pendingChoice.data.guideId, 'battle');
+  simulation.resolveChoice(state, 'ok');
+  assert.equal(state.pendingChoice, null, 'the guide modal closes on acknowledgement');
+}
+
+{
+  // enabled=false: 어떤 트리거도 발화하지 않고 seen도 남지 않는다
+  const state = tutorialStart.createTutorialGame();
+  state.scenario = null;
+  state.pendingChoice = null;
   guides.setGuidesEnabled(state, false);
-  assert.equal(guides.openGuideOnce(state, 'livestock'), false, 'nothing opens while the help is off');
-  assert.equal(guides.hasSeenGuide(state, 'livestock'), false);
+  for (const id of Object.keys(guides.GUIDE_MODULES)) {
+    assert.equal(guides.openGuideOnce(state, id), false, `${id} stays silent while the help is off`);
+    assert.equal(guides.hasSeenGuide(state, id), false);
+  }
+  assert.equal(guides.guideCards(state).length, 0);
+  assert.equal(state.pendingChoice, null);
 }
 
 {
@@ -462,6 +520,23 @@ function stepById(id) {
       reloaded.log.filter(entry => entry.text.includes('아궁이가 쉬지 못했습니다')).length, 1,
       'the reloaded log still carries exactly one cold snap warning',
     );
+  }
+
+  // 초회 도움말의 1회성은 저장·로드를 건너 살아남는다 — 불러온 마을에 같은 안내가 다시 오면 안 된다
+  {
+    const seenState = tutorialStart.createTutorialGame();
+    seenState.scenario = null;
+    seenState.pendingChoice = null;
+    assert.equal(guides.openGuideOnce(seenState, 'mining'), true);
+    assert.equal(guides.openGuideOnce(seenState, 'chronicle'), true);
+    assert.equal(saveLoad.saveGame(seenState, 3), true);
+    const reloaded = saveLoad.loadGame(3);
+    assert.ok(reloaded, 'a save with seen guides reloads');
+    assert.equal(reloaded.guides.enabled, true);
+    assert.equal(reloaded.guides.seen.mining, seenState.day, 'the seen day survives the save');
+    assert.equal(guides.hasSeenGuide(reloaded, 'chronicle'), true);
+    assert.equal(guides.openGuideOnce(reloaded, 'mining'), false, 'a reloaded settlement never re-fires a guide');
+    assert.equal(guides.openGuideOnce(reloaded, 'chronicle'), false);
   }
 
   // 버전 해제: 코드의 튜토리얼 버전이 바뀌면 저장은 일반 모드로 이어진다

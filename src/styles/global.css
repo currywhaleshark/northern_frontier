@@ -164,6 +164,84 @@ html, body, #root {
   font-weight: 700;
   font-size: 11px;
 }
+
+/* 겨울 점검 칩 — 가을·겨울과 길잡이 9단계에만 서는 진입점 */
+.ongoing-objective.winter-check { border-color: #8fb6c9; cursor: pointer; }
+.ongoing-objective.winter-check .objective-title { color: #8fb6c9; }
+
+/* ── 초회 도움말 카드 ──
+   코치 말풍선(가리키는 파란 말풍선)과 구별되게 왼쪽 아래에 쌓인다.
+   시간을 멈추지 않으므로 지도 조작을 가리지 않게 폭을 좁게 잡고, 카드 안에서만 클릭을 받는다. */
+.guide-card-layer {
+  position: fixed;
+  left: 12px;
+  bottom: 64px;
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(320px, calc(100vw - 24px));
+  pointer-events: none;
+}
+.guide-card {
+  pointer-events: auto;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-left: 3px solid #d3b26a;
+  border-radius: 6px;
+  background: rgba(18, 24, 30, 0.96);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.guide-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+.guide-card-head strong { flex: 1 1 auto; min-width: 0; }
+.guide-card-label {
+  color: #d3b26a;
+  font-weight: 700;
+  font-size: 11px;
+}
+.guide-card-body > div { margin-top: 2px; }
+
+/* ── 겨울 점검 패널 ── */
+.modal.winter-checklist-panel { max-width: 520px; text-align: left; }
+.winter-checklist-items {
+  list-style: none;
+  margin: 10px 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.winter-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--muted);
+  border-radius: 5px;
+}
+.winter-check-item.ok { border-left-color: var(--good); }
+.winter-check-item.warn { border-left-color: #d9a441; }
+.winter-check-item.bad { border-left-color: var(--bad); }
+.winter-check-mark {
+  flex: 0 0 auto;
+  width: 18px;
+  text-align: center;
+  font-weight: 700;
+}
+.winter-check-item.ok .winter-check-mark { color: var(--good); }
+.winter-check-item.warn .winter-check-mark { color: #d9a441; }
+.winter-check-item.bad .winter-check-mark { color: var(--bad); }
+.winter-check-text { min-width: 0; }
+.winter-check-value { margin: 1px 0 2px; }
 .objective-summary {
   min-width: 0;
   overflow: hidden;

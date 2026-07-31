@@ -1,6 +1,6 @@
 # 튜토리얼 개편 착수 지시문 — 「길잡이: 첫 겨울」
 
-> **계획 상태:** 진행 중 — M0~M1 커밋(f1df2e7), M2·M3 완료 (2026-07-31 Opus, 미커밋), 다음 배정: M4
+> **계획 상태:** 진행 중 — M0~M1 커밋(f1df2e7, f03c3cb), M2~M5 완료 (2026-07-31 Opus, 미커밋), 다음 배정: M6(감사)
 > **M0~M1 검증:** `test_tutorial_scenario.mjs`·`tsc --noEmit`·`npm run build` 통과 (Fable 재확인 포함). 시드 20260718 유지 — 수맥 우물 자리 137칸으로 4단계 성립. `npm run test:game`의 22개 실패는 HEAD에서도 동일한 선행 실패로 이번 변경과 무관 확인
 > **담당:** Claude Opus 단독 (`src/game/**` + `src/components/**` 모두 — Codex 분업 없음)
 > **작성:** 2026-07-31 Fable (검토·계획), 원전: [`docs/superpowers/plans/2026-07-31-tutorial-overhaul.md`](superpowers/plans/2026-07-31-tutorial-overhaul.md)
@@ -77,7 +77,56 @@
 - [x] 병자: onStart 경고 로그와 본문·코치(약초꾼 배정) 안내가 같은 곳을 가리키는지 확인
 - [x] 1회성 플래그(`coldSnapWarned`·`patientResidentId`) 저장·로드 유지를 회귀 테스트로 고정
 
-## M4~M6 (후속 배정 — 착수 전 이 문서 갱신)
-- M4: `WinterChecklistPanel.tsx` — `winterReadiness` 재사용, 9단계 자동 표시 + 가을~겨울 상시 진입점
-- M5: `guides` 트리거 11곳 연결(계획서 §5 표 — `rename` 포함), `GuideCard` 비차단 카드 + 습격·화재·재해는 모달, `SettingsDialog` 토글
+## M4 — 겨울 점검 패널 (완료)
+
+- [x] 판정은 게임 측에: `winterReadiness.ts`에 `winterChecklist(state)` 추가 — 6항목 `ok/warn/bad`.
+      기준은 시나리오 flags(`foodDaysGoal`·`firewoodDaysGoal`)가 있으면 그것을, 없으면 `CONFIG.tutorial`의 같은 값을 쓴다.
+      두 눈금(9단계 완료 조건 / 패널 표시)이 갈라지지 않게 하려는 것이다
+- [x] 신규 `src/components/WinterChecklistPanel.tsx` — 표시 전용. 기존 창 관례(`modal-overlay` + `modal`, `edict-heading`)를 따랐다
+- [x] 진입점은 상단 바 `topbar-objectives`의 칩(`ongoing-objective winter-check`) — 9단계 중에는 늘, 평시에는 시나리오 종료 후 가을·겨울에만 선다.
+      칩에 일분 요약(식량/장작)이 함께 떠서 열지 않고도 눈금이 보인다
+- [x] `markScenarioFlag(state, 'checklistOpened')`를 진입 핸들러(`handleOpenWinterChecklist`)에 연결 — M2 인계 사항 1 해소
+- [x] 칩에 `data-tut="checklist-open"` 앵커, `TutorialCoach`의 `STEP_HINTS.stocktake` 2단 힌트(열기 → 목표까지 쌓기) — M2 인계 사항 2 해소
+
+**판정 기준** (전부 `winterChecklist`):
+
+| 항목 | ✓ | △ | ✕ |
+|---|---|---|---|
+| 식량 | 일분 ≥ `foodDaysGoal`(18) | ≥ 한 계절(12일) | 그 미만 |
+| 땔감 | 일분 ≥ `firewoodDaysGoal`(14) | ≥ 한 계절(12일) | 그 미만 |
+| 주거 | 노숙 0 ∧ 빈자리 > 0 | 노숙 0 ∧ 빈자리 0 | 노숙 ≥ 1 |
+| 옷과 신발 | 결핍 0명 | 결핍 ≤ 인구 1/4 | 그 초과 |
+| 세공고 | 요구 없음 또는 전 품목 충당 | 일부 충당 | 하나도 없음 |
+| 병자 | 0명 | ≤ 인구 1/10 | 그 초과 |
+
+## M5 — 선택형 길잡이 (완료)
+
+- [x] `src/game/guides.ts` 확장: `GUIDE_MODULES` 12개(제목·로그 한 줄·본문·형식), `openGuideOnce`가 표시까지 맡는다.
+      **`scenarioRunning` 가드로 시나리오 중에는 전부 미발화** (순환 import를 피해 `state.scenario` 술어를 직접 본다)
+- [x] 형식: 습격·화재·재해만 모달(`PendingChoice.kind = 'guide'`), 나머지 9개는 비차단 카드.
+      모달은 트리거 시점에 곧바로 열지 않고 `guideModalQueue`에 넣는다 — 같은 틱에 이어지는 사건 모달이 덮어쓰는 것을 막기 위함이다.
+      `dailyGuideTick`(endOfDay 말미)과 `resolveChoice` 끝에서 자리를 보고 연다
+- [x] 신규 `GuideCard.tsx`(`GuideCardLayer`) — 코치 말풍선과 구별되는 왼쪽 아래 금색 카드, 닫기 버튼. 표시와 동시에 로그에도 한 줄
+- [x] `SettingsDialog.tsx` 상시 토글(게임 중에만 표시 — 메인 메뉴에는 상태가 없다). 끄면 떠 있던 카드·대기열도 함께 걷는다
+- [x] 트리거 12곳 (전부 한 줄):
+
+| 모듈 | 형식 | 연결 지점 |
+|---|---|---|
+| `preservation` | 카드 | `agents.ts` 완공 훅(움 저장고·훈연소·건조대·장독대) / `simulation.ts` `onSeasonChange` 첫 가을 |
+| `livestock` | 카드 | `agents.ts` 완공 훅(축사) / `livestock.ts` `acquireLivestock` |
+| `oxen` | 카드 | `livestock.ts` `acquireLivestock` (species === 'cattle') |
+| `disaster` | 모달 | `disasters.ts` 6개 발생 함수(이른서리·늦서리·황충·가뭄·설해·대홍수) |
+| `fire` | 모달 | `fire.ts` `maybeStartFire` |
+| `diplomacy` | 카드 | `foreignSites.ts` 첫 거점 발견(산채 제외) / `GameSession.tsx` 세력 창 첫 열람 |
+| `battle` | 모달 | `raids.ts` `checkRaidTrigger` (습격 성사 직전) |
+| `expedition` | 카드 | `foreignSites.ts` 첫 산채 발견 |
+| `beast` | 카드 | `specialEvents.ts` `openWildlifeEvent` (멧돼지·늑대·호랑이 2지점) |
+| `mining` | 카드 | `silver.ts` `openSilverVeinChoice` / `agents.ts` 완공 훅(채광갱) |
+| `chronicle` | 카드 | `promotion.ts` `upgradeSettlementCenter` |
+| `rename` | 카드 | `simulation.ts` `onSeasonChange` 겨울→봄 / `scenario.ts` `resolveScenarioChoice` (튜토리얼 완료 직후) |
+
+- [x] `endOfDay`의 랜덤 게이트 블록 구조 무변경 — `dailyGuideTick`은 `dailyScenarioTick` 바로 뒤에 한 줄로 붙였다
+- [x] 회귀 테스트 추가: 시나리오 중 미발화·seen 미기록, 12모듈 형식표, 카드/모달 경로(모달은 살아 있는 사건 모달을 덮지 않는다), 저장·로드 후 seen 유지, `enabled=false` 전량 미발화
+
+## M6 (후속 배정)
 - M6: §9 테스트 전량 + `PLAN-STATUS.md`·본 문서 상태 갱신

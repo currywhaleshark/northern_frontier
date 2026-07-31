@@ -12,6 +12,7 @@ import {
 } from './buildings';
 import { JOB_NAMES, RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
+import { openBuildingCompletionGuide } from './guides';
 import { residentLogName } from './residentLogName';
 import { enrolledStudentIds, skillGainMult } from './education';
 import { skillGainArtifactMultiplier } from './specialItems';
@@ -1715,6 +1716,7 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
         : `${withJosa(def.name, '이/가')} 완공되었습니다.`, 'good',
       repaired || def.slots > 0 || def.capacity > 0 || def.unique);
       if (!repaired) recordNotableBuildingCompletion(state, target.type); // 최초 완공만 연대기에 (dedupe)
+      if (!repaired) openBuildingCompletionGuide(state, target.type); // 처음 서는 살림이면 초회 길잡이
       const autoAssigned = autoAssignWorkersToBuilding(state, target.id);
       for (const worker of autoAssigned) resetAgent(state, worker);
       if (autoAssigned.length > 0) {
