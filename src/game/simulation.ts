@@ -249,11 +249,10 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
   for (const spot of hutSpots) placePrebuilt(state, 'hut', spot.x, spot.y);
   generateForeignSites(state, rng);
 
-  // 시작 주민 (마을 중심에서 출발)
-  for (const [job, count] of Object.entries(CONFIG.start.jobs)) {
-    for (let i = 0; i < count; i++) {
-      state.residents.push(createResident(state, rng, job as JobId));
-    }
+  // 시작 주민 (마을 중심에서 출발) — 전원 무직이다.
+  // 누구에게 무슨 일을 맡길지는 첫날부터 플레이어가 정한다. 시작 분포 config는 폐지했다.
+  for (let i = 0; i < CONFIG.start.residents; i++) {
+    state.residents.push(createResident(state, rng, 'idle'));
   }
   // 개척민 중 글을 아는 이 — 의원·아전·훈장의 콜드 스타트를 막는다
   for (const resident of state.residents.slice(0, CONFIG.education.startLiterateAdults)) {

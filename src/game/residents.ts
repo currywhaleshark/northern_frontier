@@ -363,6 +363,10 @@ export function updateResidentNeeds(
   const hcfg = CONFIG.health;
   const season = getSeason(state.day);
   const living = livingResidents(state).filter(resident => !excludedResidentIds.has(resident.id));
+  // 길잡이(시나리오) 중에는 자연 발병을 잠근다 — 6단계가 붙이는 통제 병자만 남겨,
+  // "첫 병자"가 무엇을 가르치는지 흐려지지 않게 한다. 시나리오가 끝나면 그대로 되돌아온다.
+  // 순환 import를 피해 guides.ts와 같은 방식으로 state.scenario를 직접 본다.
+  const scenarioRunning = state.scenario != null && !state.scenario.completed;
   reconcileResidentHomes(state, rng);
   const waterSupply = waterSupplySnapshot(state);
 
@@ -399,7 +403,7 @@ export function updateResidentNeeds(
     }
 
     // ── 질병 발생 ──
-    if (!r.sick && r.alive) {
+    if (!r.sick && r.alive && !scenarioRunning) {
       let chance = hcfg.sickBaseChance;
       if (r.warmth < 30) chance += hcfg.sickColdChance;
       if (season === 'summer') chance += hcfg.sickSummerChance;

@@ -1,6 +1,6 @@
 # 튜토리얼 개편 착수 지시문 — 「길잡이: 첫 겨울」
 
-> **계획 상태:** 완료 — M0~M5 커밋(f1df2e7, f03c3cb, 58956ca), M6(감사·마무리) 완료 (2026-07-31 Opus)
+> **계획 상태:** 완료 — R1 포함. M0~M6(f1df2e7, f03c3cb, 58956ca, 7a0ac40) 위에 플레이테스트 후속 R1 4건 반영 (문서 말미 R1 절)
 > **M0~M1 검증:** `test_tutorial_scenario.mjs`·`tsc --noEmit`·`npm run build` 통과 (Fable 재확인 포함). 시드 20260718 유지 — 수맥 우물 자리 137칸으로 4단계 성립. `npm run test:game`의 22개 실패는 HEAD에서도 동일한 선행 실패로 이번 변경과 무관 확인
 > **담당:** Claude Opus 단독 (`src/game/**` + `src/components/**` 모두 — Codex 분업 없음)
 > **작성:** 2026-07-31 Fable (검토·계획), 원전: [`docs/superpowers/plans/2026-07-31-tutorial-overhaul.md`](superpowers/plans/2026-07-31-tutorial-overhaul.md)
@@ -194,3 +194,53 @@ M1 보고의 지적이 사실이었고, 실측은 그보다 더 헐거웠다 (�
 - `src/game/disasters.ts` — 재해 발생 함수 추가 시 `openGuideOnce`를 함께 넣으라는 규칙 주석
 - `tools/game/test_tutorial_scenario.mjs` — §9-7 완료 후 개방 블록 신규, 버전 2 저장 케이스, 표시용 guide 필드 정규화 케이스
 - `docs/IMPLEMENTATION-2026-07-31-tutorial-overhaul.md`·`docs/superpowers/plans/2026-07-31-tutorial-overhaul.md`·`docs/PLAN-STATUS.md` — 상태 갱신
+
+## R1 — 플레이테스트 후속 라운드 (2026-07-31 사용자 피드백)
+
+첫 실플레이에서 나온 네 가지 지시. 튜토리얼뿐 아니라 본 게임 공통 사항이 셋 있다.
+
+1. **시작 직업 전원 무직 (본 게임 공통)** — 현행은 `CONFIG`의 시작 분포(벌목 2·사냥 2·농부 2·건축 2·운반 1·약초 1·파수 1)로 배정된 채 시작한다. 새 게임은 전원 `idle`로 시작하고 플레이어가 직접 배분한다. 튜토리얼은 각 스텝에서 필요한 직업을 그때그때 배분 안내한다(코치) — 이미 배분돼 있어 안내가 헛도는 문제의 해소.
+   - [x] `newGame` 전원 무직화 — 인원수는 여태 쓰이지 않던 `CONFIG.start.residents`(12)가 맡고, `CONFIG.start.jobs`는 옛 분포를 남긴 주석으로 사장 처리했다. 참조는 `simulation.ts` 한 곳뿐이었다
+   - [x] 튜토리얼: `sowing` isDone에 `farmer ≥ 1` 추가(goal·본문 문구 동반 갱신), 코치에 농부 4단 경로 추가. `hearth`는 isDone 불변 + 코치에 건축가 4단 경로(배치 → 건축가 → 장작꾼 순)와 본문 한 줄 추가. `working`·`hunting`·`patient`·`defense` 힌트는 전원 무직 기준에서도 순서가 그대로 성립해 손대지 않았다
+   - [x] 회귀 테스트는 새 `assignJobs(state, {...})` 헬퍼로 스텝마다 필요한 직업을 주입하도록 고쳤다 (게임 로직은 테스트에 맞추지 않았다)
+2. **시작 건초 지급 (본 게임 공통)** — 첫 수확 전에는 건초(`hay`)가 없어 짚신(`strawShoes`)을 못 삼고, 겨울 점검의 신발 항목이 오르지 않는다. 시작 자원에 건초를 지급한다.
+   - [x] `hay: 0 → 30`. 근거: `wearables.strawShoeHayPerUnit = 2`(짚신 1켤레 = 건초 2), 맨발로 출발하는 시작 인구 12명 + `strawShoeStockBuffer = 2` = 14켤레 → 28. 마모 교체 1켤레분을 더해 30. 난이도 배율이 곱해지므로 수월 45·표준 30·혹한은 그 이하다
+   - [x] 짚신은 시설 없이 주민이 저녁에 집에서 삼는다(`craftStrawShoesAtHome`) — 튜토리얼 범위 안에서 신발 항목이 실제로 오른다. 다만 축사가 서면 `livestockHayReserveDays`(3일분)만큼은 가축 몫으로 먼저 떼어 둔다
+3. **첫 병자 스텝 전 자연 병자 통제** — 6단계 scripted 병자보다 먼저 자연 병자(`residents.ts` 일일 확률)가 발생해 통제 사건의 의미가 흐려진다. 시나리오 진행 중에는 자연 질병 발생을 잠근다(scripted 병자만 존재). 시나리오 종료 후 정상 복귀.
+   - [x] `updateResidentNeeds`의 질병 발생 블록에 `scenarioRunning` 가드 — guides.ts와 같이 `state.scenario`를 직접 보아 순환 import를 피했다. `scenarioSuppressesRandomEvents` 게이트 블록은 손대지 않았다
+   - [x] 회귀 테스트 2건: 완주 블록의 매일 단언(scripted 병자 외 병자 0명)과, 추위·굶주림을 극단으로 밀며 40일을 도는 전용 블록(시나리오 중 0명 → 시나리오 해제 후 다시 발병)
+4. **일시정지 시작과 스텝 자동 일시정지** — 게임(일반·튜토리얼 공통)은 일시정지 상태로 시작한다. 튜토리얼은 다음 스텝 안내(모달)가 제시될 때마다 자동 일시정지해, "배속 버튼을 눌러 시간을 흐르게 하십시오" 지시가 자연스럽게 이어지게 한다.
+   - [x] `GameSession`의 시작 배속을 `launch.kind === 'loaded' ? 1 : 0`으로 — 새 마을(일반·길잡이)과 전투 시뮬은 멈춘 채로 열리고, 불러온 저장만 종전대로 1배속
+   - [x] `RuntimeGameEffects`에 `pendingChoice.kind === 'scenario'` 감시 효과 — 스텝이 바뀔 때마다(`phase:stepId` 키) `setSpeed(0)`. 전술전 자동 정지와 같은 관례를 따랐다. 모달은 원래 틱만 멈출 뿐이었으므로, 닫은 뒤에도 정지가 남는 것은 이 효과가 처음 만든 동작이다
+   - [x] 0단계 흐름 점검 — 정지로 시작하니 ▶ 누르기가 첫 자연 동작이 되어 `speedChanged`가 자연히 켜진다. 다만 멈춘 채로 ⏸을 다시 누르는 손도 배속을 다룬 것이므로 M2의 "조기 반환 앞 마킹"은 그대로 둔다(주석에 근거를 남겼다). 코치 문구 「▶ 1배를 눌러 시간을 흐르게 하십시오」는 그대로 맞아떨어진다
+
+### R1 실기동 확인 (dev 서버, 길잡이 새 게임)
+
+- 하단 독의 직업 칩이 「무직 12명」으로 서고 `residents.every(job === 'idle')`이 참이다
+- 상단 시간 조작이 「⏸ 정지」에 걸린 채 0단계 모달이 열린다. 모달을 닫아도 정지 그대로다
+- 시작 곳간의 건초 45 (수월 배율 1.5 × 30)
+- ▶를 눌러 하루를 넘기자 1단계 모달이 열리며 배속이 10배 → 정지로 스스로 내려앉는다. 2단계 모달에서도 같다
+- 코치가 「직업 배정 창을 여십시오」 → 「벌목꾼을 눌러 상세 배정을 여십시오」로 이어지고,
+  2단계에서는 밭을 배치하자 「농사 건설 목록」 힌트가 「농부를 눌러 상세 배정을 여십시오」로 넘어간다
+- 2단계 목표 문구가 「밭을 4칸 이상 배치하고 농부 1명 두기」로 뜬다
+- 3단계에서 초가집·장작마당을 놓자 코치가 「건축가를 눌러 상세 배정을 여십시오」로 넘어가고,
+  모달 본문에 건축가 배정 한 줄이 실려 있다
+- 시작 인구에 `special` 주민은 없다 — `newGame`은 `createResident`만 부르고 그 함수는 `special`을 세우지 않는다. 예외 처리가 필요 없다
+
+### R1 변경 파일
+
+- `src/game/config.ts` — `start.resources.hay` 30(산정 근거 주석), `start.jobs` 사장 처리
+- `src/game/simulation.ts` — `newGame`이 `CONFIG.start.residents`만큼 `idle` 주민을 만든다
+- `src/game/residents.ts` — 질병 발생 블록에 시나리오 가드
+- `src/game/scenario.ts` — `sowing` isDone·goal·본문, `hearth` 본문(건축가 한 줄)
+- `src/components/TutorialCoach.tsx` — `placedPlotArea` 헬퍼, `sowing` 농부 경로, `hearth` 건축가 경로
+- `src/GameSession.tsx` — 시작 배속 0, 시나리오 모달 자동 일시정지, `setUserSpeed` 주석 보강
+- `tools/game/test_tutorial_scenario.mjs` — `assignJobs` 헬퍼, 전원 무직·시작 건초 단언(길잡이·일반 게임 양쪽), 농부 소목표·코치 순서 단언, 자연 발병 잠금 블록, 정지 시작·스텝 자동 정지의 소스 단언
+- `tools/game/test_livestock.mjs` — 시작 건초 0 전제를 `CONFIG.start.resources.hay` 기준으로 고쳤다 (이번 변경으로 새로 깨진 유일한 테스트)
+
+### R1 테스트·검증 결과
+
+- `node tools/game/test_tutorial_scenario.mjs` 통과 (보강분 포함)
+- `npx tsc --noEmit`·`npm run build` 통과
+- `npm run test:game` — 직전 HEAD(7a0ac40)를 별도 워크트리에 뽑아 받은 선행 실패 22건과 목록이 일치한다.
+  이번 변경으로 새로 깨진 것은 `test_livestock.mjs` 한 건뿐이었고 테스트 쪽 전제를 고쳐 되살렸다

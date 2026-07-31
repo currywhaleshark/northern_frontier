@@ -40,6 +40,7 @@ const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const scenario = await import(pathToFileURL(join(compiledDir, 'scenario.mjs')).href);
 const tutorialStart = await import(pathToFileURL(join(compiledDir, 'tutorialStart.mjs')).href);
+const config = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 const crops = await import(pathToFileURL(join(compiledDir, 'crops.mjs')).href);
 const guides = await import(pathToFileURL(join(compiledDir, 'guides.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
@@ -47,6 +48,7 @@ const saveSchema = await import(pathToFileURL(join(compiledDir, 'saveSchema.mjs'
 const seasons = await import(pathToFileURL(join(compiledDir, 'seasons.mjs')).href);
 const winter = await import(pathToFileURL(join(compiledDir, 'winterReadiness.mjs')).href);
 const coachSource = readFileSync(new URL('../../src/components/TutorialCoach.tsx', import.meta.url), 'utf8');
+const sessionSource = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
 
 // 시나리오 중 허용되는 모달 — scenario(길잡이), tribute(결정론적 세공 수거)
 const ALLOWED_MODAL_KINDS = new Set(['scenario', 'tribute']);
@@ -91,6 +93,21 @@ function markFlags(state, ...keys) {
   for (const key of keys) scenario.markScenarioFlag(state, key);
 }
 
+// 개척민은 전원 무직으로 시작한다(R1-1) — 테스트가 필요한 직업을 그때그때 배분한다
+function assignJobs(state, counts) {
+  for (const [job, count] of Object.entries(counts)) {
+    let remaining = count - state.residents.filter(r => r.alive && r.job === job).length;
+    if (remaining <= 0) continue;
+    for (const resident of state.residents) {
+      if (remaining <= 0) break;
+      if (!resident.alive || resident.special || resident.job !== 'idle') continue;
+      resident.job = job;
+      remaining--;
+    }
+    assert.equal(remaining, 0, `not enough idle settlers to staff ${job}`);
+  }
+}
+
 function stepById(id) {
   const step = scenario.TUTORIAL_STEPS.find(candidate => candidate.id === id);
   assert.ok(step, `step ${id} missing`);
@@ -128,6 +145,49 @@ function stepById(id) {
   // 초회 도움말은 새 게임에서 켜진 채로 시작한다 (일반 게임 포함)
   assert.equal(a.guides?.enabled, true);
   assert.deepEqual(a.guides.seen, {});
+  // R1-1: 개척민은 전원 무직으로 도착한다 (일반 게임 공통) — 배분은 첫날부터 플레이어의 몫이다
+  assert.equal(
+    a.residents.every(resident => resident.job === 'idle'), true,
+    'every founding settler starts unemployed',
+  );
+  assert.ok(a.residents.length > 0, 'the settlement starts with people');
+  // R1-2: 첫 수확 전에도 짚신을 삼을 수 있게 건초를 실어 보낸다
+  const barefoot = a.residents.filter(resident => resident.alive && resident.stage !== 'infant').length;
+  assert.ok(
+    a.resources.hay >= barefoot * 2,
+    `starting hay covers a straw shoe for everyone (need ${barefoot * 2}, got ${a.resources.hay})`,
+  );
+}
+
+{
+  // R1-2: 일반 게임의 시작 건초도 짚신 수요 기준을 넘는다 (표준 난이도, 배율 1)
+  const plain = simulation.newGame(20260731, 'normal');
+  const hayPerShoe = config.CONFIG.wearables.strawShoeHayPerUnit;
+  const buffer = config.CONFIG.wearables.strawShoeStockBuffer;
+  const need = plain.residents.filter(resident => resident.alive).length + buffer;
+  assert.ok(
+    plain.resources.hay >= need * hayPerShoe,
+    `a normal new game ships hay for ${need} pairs (need ${need * hayPerShoe}, got ${plain.resources.hay})`,
+  );
+  assert.equal(plain.residents.every(resident => resident.job === 'idle'), true,
+    'a normal new game also starts everyone unemployed');
+}
+
+{
+  // R1-4: 새 마을은 멈춘 채로 열리고, 길잡이 스텝 안내가 설 때마다 다시 멈춘다.
+  // 배속은 UI 상태라 헤드리스로는 재지 못한다 — 연결이 살아 있는지를 소스로 못 박는다.
+  assert.match(
+    sessionSource, /useState\(launch\.kind === 'loaded' \? 1 : 0\)/,
+    'a new settlement (normal or tutorial) opens paused; only a loaded save keeps 1x',
+  );
+  assert.match(
+    sessionSource, /state\.pendingChoice\?\.kind === 'scenario' \? state\.pendingChoice : null/,
+    'the session watches for scenario step modals',
+  );
+  assert.match(
+    sessionSource, /if \(scenarioModalKey\) setSpeed\(0\)/,
+    'every new scenario step modal drops the clock to a pause — closing it does not resume',
+  );
 }
 
 {
@@ -145,6 +205,7 @@ function stepById(id) {
   simulation.advanceDay(state);
   assert.equal(scenario.currentScenarioStep(state)?.id, 'working');
   markFlags(state, 'jobPanelOpened');
+  assignJobs(state, { woodcutter: 1, hauler: 1 }); // 전원 무직으로 시작하므로 여기서 직접 배분한다
   closeModals(state);
   keepAlive(state);
   simulation.advanceDay(state);
@@ -163,7 +224,17 @@ function stepById(id) {
     fieldGrowth: 0, w: 2, h: 2, sownArea: 0,
     cropId: crops.defaultCropForBuildingType('field'), queuedCropId: null,
   });
+  assert.equal(
+    sowingStep.isDone(state), false,
+    'placed plots without a farmer leave the land idle — the step waits for the assignment (R1-1)',
+  );
+  assignJobs(state, { farmer: 1 });
   assert.equal(sowingStep.isDone(state), true, 'placing four tiles completes the sowing step before any plowing');
+
+  // 코치는 밭 배치를 먼저 가리키고, 그 뒤에 농부 배정을 가리킨다
+  const fieldHint = coachSource.indexOf("{ tut: 'build-item-field'");
+  const farmerHint = coachSource.indexOf("{ tut: 'job-detail-farmer'");
+  assert.ok(fieldHint >= 0 && farmerHint > fieldHint, 'coach points to the plot before staffing the farmer');
 
   // 3단계는 그 파종이 실제로 끝나야 넘어간다 — 병행 구조의 잠금장치
   const hearthStep = stepById('hearth');
@@ -195,6 +266,12 @@ function stepById(id) {
   const buildHint = coachSource.indexOf("{ tut: 'build-item-woodShed'");
   const workerHint = coachSource.indexOf("{ tut: 'job-detail-woodSplitter'");
   assert.ok(buildHint >= 0 && workerHint > buildHint, 'coach points to wood yard construction before staffing');
+  // 전원 무직 시작이므로 공사를 올릴 건축가도 이 스텝에서 안내한다 (배치 → 건축가 → 장작꾼 순)
+  const builderHint = coachSource.indexOf("{ tut: 'job-detail-builder'");
+  assert.ok(
+    builderHint > buildHint && builderHint < workerHint,
+    'coach staffs the builder between placing the yard and staffing the splitter',
+  );
   assert.match(coachSource, /coachHorizontalPlacement\(rect\.left \+ rect\.width \/ 2, window\.innerWidth\)/,
     'coach bubble placement follows the actual center of its target');
   assert.match(coachSource, /'--coach-arrow-offset': `\$\{arrowOffset\}px`/,
@@ -261,19 +338,19 @@ function stepById(id) {
     naming: s => markFlags(s, 'residentSelected', 'minimapClicked', 'speedChanged'),
     working: s => {
       markFlags(s, 'jobPanelOpened');
-      const idle = s.residents.filter(r => r.alive && !r.special && r.job !== 'woodcutter' && r.job !== 'hauler');
-      if (!s.residents.some(r => r.alive && r.job === 'woodcutter') && idle[0]) idle[0].job = 'woodcutter';
-      if (!s.residents.some(r => r.alive && r.job === 'hauler') && idle[1]) idle[1].job = 'hauler';
+      assignJobs(s, { woodcutter: 1, hauler: 1 });
     },
-    // 밭을 네 칸 배치한다 — 갈이·파종은 아직이다
-    sowing: s => pushBuilt(s, 'field', {
-      w: 2, h: 2, sownArea: 0, cropId: crops.defaultCropForBuildingType('field'), queuedCropId: null,
-    }),
+    // 밭을 네 칸 배치하고 농부를 둔다 — 갈이·파종은 아직이다
+    sowing: s => {
+      pushBuilt(s, 'field', {
+        w: 2, h: 2, sownArea: 0, cropId: crops.defaultCropForBuildingType('field'), queuedCropId: null,
+      });
+      assignJobs(s, { farmer: 1 });
+    },
     hearth: s => {
       pushBuilt(s, 'woodShed');
       pushBuilt(s, 'hut');
-      const worker = s.residents.find(r => r.alive && !r.special && r.job !== 'woodSplitter');
-      if (worker) worker.job = 'woodSplitter';
+      assignJobs(s, { builder: 1, woodSplitter: 1 });
       s.resources.firewood = (s.scenario.flags.firewoodGoal ?? 0) + 5;
       // 그동안 농부가 갈고 뿌렸다 — 병행 구조의 결과를 흉내낸다
       for (const plot of plots()) plot.sownArea = s.scenario.flags.sownAreaGoal;
@@ -283,21 +360,21 @@ function stepById(id) {
       pushBuilt(s, 'well');
     },
     hunting: s => {
-      const candidates = s.residents.filter(r => r.alive && !r.special && r.job !== 'hunter');
-      for (const resident of candidates.slice(0, 2)) resident.job = 'hunter';
+      assignJobs(s, { hunter: 2 });
       s.resources.meat = (s.scenario.flags.meatGoal ?? 0) + 10;
     },
-    // 첫 병자는 스텝 훅이 붙인다 — 모범 답안은 약초를 대는 것뿐이다
-    patient: s => { s.resources.herbs = Math.max(s.resources.herbs, 20); },
+    // 첫 병자는 스텝 훅이 붙인다 — 모범 답안은 약초꾼을 두고 약초를 대는 것뿐이다
+    patient: s => {
+      assignJobs(s, { herbalist: 1 });
+      s.resources.herbs = Math.max(s.resources.herbs, 20);
+    },
     tribute: s => {
       markFlags(s, 'courtWindowOpened');
       s.tributeReserve.grain = (s.tributeReserve.grain ?? 0) + 3;
     },
     defense: s => {
       pushBuilt(s, 'palisade');
-      const pool = s.residents.filter(r => r.alive && !r.special && r.job !== 'militia' && r.job !== 'watchman');
-      if (pool[0]) pool[0].job = 'militia';
-      if (!s.residents.some(r => r.alive && r.job === 'watchman') && pool[1]) pool[1].job = 'watchman';
+      assignJobs(s, { militia: 1, watchman: 1 });
     },
     stocktake: s => markFlags(s, 'checklistOpened'),
     winter: () => {},
@@ -352,6 +429,15 @@ function stepById(id) {
         if (fuelBeforeColdSnap != null) fuelAfterColdSnap = winter.winterReadiness(state).fuelHeatStock;
       }
       assert.equal(state.gameOver, null, `game over during step ${step.id}`);
+      // R1-3: 길잡이 동안 병자는 6단계가 붙인 통제 병자 하나뿐이다 — 자연 발병은 잠겨 있다
+      if (state.scenario && !state.scenario.completed) {
+        const scriptedId = state.scenario.flags.patientResidentId ?? null;
+        const strays = state.residents.filter(r => r.alive && r.sick && r.id !== scriptedId);
+        assert.equal(
+          strays.length, 0,
+          `natural illness during the tutorial (step ${step.id}, day ${state.day}): ${strays.map(r => r.name).join(', ')}`,
+        );
+      }
       // 완료 모달은 시나리오를 해제하며 닫히므로 닫기 전에 내용을 붙잡아 둔다
       if (state.pendingChoice?.kind === 'scenario' && state.pendingChoice.data.phase === 'complete') {
         completionModal = state.pendingChoice;
@@ -394,6 +480,45 @@ function stepById(id) {
   assert.ok(state.log.some(entry => entry.text.includes('길잡이를 마쳤습니다')));
   // 완료 후에는 랜덤 사건 게이트가 열린다
   assert.equal(scenario.scenarioSuppressesRandomEvents(state), false);
+}
+
+{
+  // R1-3: 자연 발병 잠금 — 병을 부르는 조건(추위·굶주림)을 극단으로 밀어도
+  // 길잡이가 도는 동안에는 아무도 앓아눕지 않는다. 6단계의 통제 병자만이 유일한 병자다.
+  const state = tutorialStart.createTutorialGame();
+  closeModals(state);
+  const inviteIllness = s => {
+    for (const resident of s.residents) {
+      if (!resident.alive) continue;
+      resident.warmth = 5;   // sickColdChance
+      resident.hunger = 5;   // sickHungryChance
+      resident.health = 100; // 죽어서 표본이 사라지지 않게 받쳐 준다
+      resident.sick = false;
+    }
+  };
+  for (let day = 0; day < 40; day++) {
+    inviteIllness(state);
+    keepAlive(state);
+    simulation.advanceDay(state);
+    closeModals(state);
+    const scriptedId = state.scenario?.flags.patientResidentId ?? null;
+    const strays = state.residents.filter(resident =>
+      resident.alive && resident.sick && resident.id !== scriptedId);
+    assert.equal(strays.length, 0, `natural illness fired during the tutorial on day ${state.day}`);
+  }
+
+  // 길잡이가 끝나면 같은 조건에서 다시 병자가 난다 — 잠금은 시나리오 동안만이다
+  state.scenario = null;
+  state.guides = { enabled: false, seen: {} };
+  let fellIll = false;
+  for (let day = 0; day < 40 && !fellIll; day++) {
+    inviteIllness(state);
+    keepAlive(state);
+    state.pendingChoice = null;
+    simulation.advanceDay(state);
+    fellIll = state.residents.some(resident => resident.alive && resident.sick);
+  }
+  assert.equal(fellIll, true, 'natural illness returns once the tutorial hands off');
 }
 
 {

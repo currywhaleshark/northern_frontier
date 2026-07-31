@@ -273,6 +273,16 @@ function RuntimeGameEffects({
     if (state.tacticalBattle) setSpeed(0);
   }, [state.tacticalBattle?.id, setSpeed]);
 
+  // 길잡이 안내가 새로 열릴 때마다 시간을 멈춘다. 모달을 닫아도 멈춘 채로 남으므로
+  // 플레이어가 스스로 ▶를 눌러야 다음 하루가 흐른다 — "시간을 흘리십시오"라는 말이 헛돌지 않게.
+  const scenarioModal = state.pendingChoice?.kind === 'scenario' ? state.pendingChoice : null;
+  const scenarioModalKey = scenarioModal
+    ? `${String(scenarioModal.data.phase ?? '')}:${String(scenarioModal.data.stepId ?? '')}`
+    : null;
+  useEffect(() => {
+    if (scenarioModalKey) setSpeed(0);
+  }, [scenarioModalKey, setSpeed]);
+
   return null;
 }
 
@@ -323,7 +333,9 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   // 전투 시뮬레이션 모드: 샌드박스 상태에서 전술 전투만 테스트, 끝나면 메뉴로 복귀
   const [simMode, setSimMode] = useState(launch.kind === 'battleSimulation');
-  const [speed, setSpeed] = useState(launch.kind === 'battleSimulation' ? 0 : 1);
+  // 새로 여는 마을(일반·길잡이 모두)은 멈춘 채로 시작한다 — 첫 화면을 둘러보고
+  // 사람에게 일을 맡긴 뒤에 스스로 ▶를 눌러 시간을 흐르게 한다. 불러온 저장은 종전대로 1배속.
+  const [speed, setSpeed] = useState(launch.kind === 'loaded' ? 1 : 0);
   const speedRef = useRef(speed);
   speedRef.current = speed;
   const nightAutoSpeedStateRef = useRef(createNightAutoSpeedState());
@@ -382,6 +394,8 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
 
   const setUserSpeed = useCallback((nextSpeed: number) => {
     // 튜토리얼 0단계(배속 조작) 달성 플래그 — 이미 그 배속이어도 누른 것은 누른 것이다.
+    // 이제 게임이 정지 상태로 시작하므로 ▶ 누르기가 첫 자연 동작이지만,
+    // 멈춘 채로 ⏸을 다시 누르는 손도 배속을 다룬 것이라 조기 반환 앞에서 표시한다.
     // 야간 자동 가속은 setSpeed를 직접 쓰므로 이 경로를 타지 않는다.
     markScenarioFlag(stateRef.current, 'speedChanged');
     if (nextSpeed === speedRef.current) return;

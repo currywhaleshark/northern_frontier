@@ -116,13 +116,16 @@ export const TUTORIAL_STEPS: readonly ScenarioStepDefinition[] = [
   {
     id: 'sowing',
     title: '봄 파종',
-    goal: state => `밭을 ${flags(state).sownAreaGoal ?? 0}칸 이상 배치하기 (갈이와 파종은 농부가 잇습니다)`,
+    goal: state => `밭을 ${flags(state).sownAreaGoal ?? 0}칸 이상 배치하고 농부 1명 두기 (갈이와 파종은 농부가 잇습니다)`,
     body:
       '봄은 짧습니다. 파종철이 지나면 그 칸은 한 해 내내 놉니다.\n\n' +
       '· 건설 목록(농사)에서 밭을 끌어 크기를 정해 배치하십시오.\n' +
       '· 밭을 선택하면 작물을 고르고 농우를 붙일 수 있습니다. 조·기장은 척박한 땅에서도 견딥니다.\n' +
+      '· 직업 배정에서 농부를 한 사람 이상 두십시오. 밭만 그어 두면 땅은 그대로 놉니다.\n' +
       '· 배치까지가 그대의 몫입니다. 갈이와 파종은 농부가 이어가니, 그동안 다른 일을 보십시오.',
-    isDone: state => placedPlotArea(state) >= (flags(state).sownAreaGoal ?? Infinity),
+    isDone: state =>
+      placedPlotArea(state) >= (flags(state).sownAreaGoal ?? Infinity) &&
+      jobCount(state, 'farmer') >= 1,
   },
   {
     id: 'hearth',
@@ -134,8 +137,10 @@ export const TUTORIAL_STEPS: readonly ScenarioStepDefinition[] = [
       '북방의 겨울은 장작이 떨어지는 순간부터 사람을 잡아갑니다. 노숙하는 주민은 그 전에 얼어 죽습니다.\n\n' +
       '· 목재와 장작은 다릅니다. 벌목꾼이 벤 것은 목재이고, 장작마당에서 장작꾼이 패야 땔감이 됩니다. ' +
       '원료를 가공해 비축하는 이 문법은 앞으로도 되풀이됩니다.\n' +
-      '· 건설 목록(주거)에서 초가집을, (생산)에서 장작마당을 지으십시오. 두 공사는 건축가가 맡습니다.\n' +
-      '· 직업 배정에서 장작꾼을 한 사람 이상 두십시오. 장작꾼은 장작마당이 있어야 일합니다.\n' +
+      '· 건설 목록(주거)에서 초가집을, (생산)에서 장작마당을 지으십시오.\n' +
+      '· 두 공사는 건축가가 맡습니다. 직업 배정에서 건축가를 한 사람 이상 두십시오 — ' +
+      '건축가가 없으면 터만 잡힌 채 공사가 오르지 않습니다.\n' +
+      '· 직업 배정에서 장작꾼도 한 사람 이상 두십시오. 장작꾼은 장작마당이 있어야 일합니다.\n' +
       '· 그동안 농부는 밭을 갈고 씨를 뿌립니다. 파종이 더디거든 농부가 모자란 것입니다.',
     isDone: state =>
       builtCount(state, type => type === 'hut' || type === 'ondol' || type === 'tileHouse')

@@ -85,16 +85,16 @@ export const CONFIG = {
       grain: 100, rice: 0, meat: 0, eggs: 0, milk: 0, fish: 0, curedMeat: 0, saltedFish: 0, driedFish: 0, vegetables: 0, kimchi: 0, beans: 0, jang: 0, salt: 0,
       brushwood: 12, firewood: 45, charcoal: 0,
       wood: 30, stone: 12, iron: 4, tools: 10, onggi: 0, carts: 0,
-      hide: 6, hideClothes: 12, strawShoes: 0, leatherShoes: 0, cotton: 0, wool: 0, hay: 0, cottonClothes: 0, herbs: 5,
+      // 건초 30: 첫 수확 전에도 짚신을 삼을 수 있게 실은 밑천이다.
+      // 짚신 1켤레 = 건초 2(wearables.strawShoeHayPerUnit)이고, 시작 인구 12명이 맨발로 출발하므로
+      // 12켤레 + 재고 여유분 2켤레(strawShoeStockBuffer) = 14켤레 → 건초 28. 여기에 마모 교체 1켤레분을 더해 30.
+      hide: 6, hideClothes: 12, strawShoes: 0, leatherShoes: 0, cotton: 0, wool: 0, hay: 30, cottonClothes: 0, herbs: 5,
       porcelain: 0, brassware: 0, lacquerware: 0, silk: 0, preciousMetal: 0, silver: 0,
       gunpowder: 0, spears: 0, hornBows: 0, muskets: 0,
       reputation: 50, defense: 0,
     },
-    // 시작 직업 구성
-    jobs: {
-      woodcutter: 2, hunter: 2, farmer: 2, builder: 2,
-      hauler: 1, herbalist: 1, watchman: 1, idle: 1,
-    } as Record<string, number>,
+    // 시작 직업 구성은 폐지했다 — 개척민은 전원 무직으로 도착하고, 배분은 처음부터 플레이어의 몫이다.
+    // (옛 분포: 벌목 2·사냥 2·농부 2·건축 2·운반 1·약초 1·파수 1·무직 1)
   },
 
   needs: {

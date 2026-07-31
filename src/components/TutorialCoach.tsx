@@ -3,6 +3,7 @@
 // 화면에 실제로 보이는 가장 깊은 앵커를 가리킨다. 창을 열고 닫아도 스스로 따라가고,
 // 앵커가 사라진 UI 개편에도 조용히 물러날 뿐 게임을 막지 않는다.
 import { useEffect, useState, type CSSProperties } from 'react';
+import { buildingFootprintDims } from '../game/buildings';
 import { currentScenarioStep } from '../game/scenario';
 import { countJob } from '../game/residents';
 import { isWallBuilding } from '../game/walls';
@@ -29,6 +30,16 @@ function placedCount(
   predicate: (type: GameState['buildings'][number]['type']) => boolean,
 ): number {
   return state.buildings.filter(building => predicate(building.type)).length;
+}
+
+// 배치만 된 밭 면적 (scenario.ts의 placedPlotArea와 같은 셈)
+function placedPlotArea(state: GameState): number {
+  return state.buildings
+    .filter(building => building.type === 'field' || building.type === 'paddy')
+    .reduce((sum, building) => {
+      const { w, h } = buildingFootprintDims(building);
+      return sum + w * h;
+    }, 0);
 }
 
 // 실제로 씨가 들어간 면적 (scenario.ts의 totalSownArea와 같은 셈)
@@ -84,9 +95,20 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
   ],
   sowing: [
     {
+      done: state => placedPlotArea(state) >= goal(state, 'sownAreaGoal'),
       path: [
         { tut: 'build-cat-farming', text: '농사 건설 목록을 여십시오.' },
         { tut: 'build-item-field', text: '밭을 고른 뒤 지도에서 끌어 크기를 정해 배치하십시오. 갈이와 파종은 농부가 잇습니다.' },
+      ],
+    },
+    {
+      // 밭만 그어 두면 땅은 논다 — 전원 무직으로 출발하므로 농부는 여기서 처음 배정한다
+      done: state => countJob(state, 'farmer') >= 1,
+      path: [
+        { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
+        { tut: 'job-detail-farmer', text: '농부를 눌러 상세 배정을 여십시오. 밭을 갈고 씨를 뿌리는 것은 농부의 몫입니다.' },
+        { tut: 'job-candidate-farmer', text: '아래 무직자 명단에서 농부로 배정할 주민을 체크하십시오.' },
+        { tut: 'job-assign-selected-farmer', text: '선택 배정을 눌러 농부를 한 사람 이상 두십시오. 파종철은 짧습니다.' },
       ],
     },
   ],
@@ -104,6 +126,16 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       path: [
         { tut: 'build-cat-production', text: '생산 건설 목록을 여십시오.' },
         { tut: 'build-item-woodShed', text: '장작마당을 골라 빈 땅에 배치하십시오. 목재는 여기서 장작이 됩니다.' },
+      ],
+    },
+    {
+      // 터만 잡히고 공사가 오르지 않는 일을 막는다 — 두 공사는 건축가의 몫이다
+      done: state => countJob(state, 'builder') >= 1,
+      path: [
+        { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
+        { tut: 'job-detail-builder', text: '건축가를 눌러 상세 배정을 여십시오. 초가집도 장작마당도 건축가가 짓습니다.' },
+        { tut: 'job-candidate-builder', text: '아래 무직자 명단에서 건축가로 배정할 주민을 체크하십시오.' },
+        { tut: 'job-assign-selected-builder', text: '선택 배정을 눌러 건축가를 한 사람 이상 두십시오. 건축가가 없으면 공사가 오르지 않습니다.' },
       ],
     },
     {

@@ -46,7 +46,12 @@ function addStable(
   assert.equal(state.resources.eggs, 0, 'eggs are initialized as a first-class stock resource');
   assert.equal(state.resources.milk, 0, 'milk is initialized as a first-class food resource');
   assert.equal(state.resources.wool, 0, 'wool is initialized as a first-class material resource');
-  assert.equal(state.resources.hay, 0, 'hay is initialized as a first-class winter-feed resource');
+  // 건초는 R1에서 시작 물자로 편입됐다(짚신 밑천) — 값은 config가 정하고, 여기서는 자원으로 서는지만 본다
+  assert.equal(
+    state.resources.hay, CONFIG.start.resources.hay,
+    'hay is initialized as a first-class winter-feed resource',
+  );
+  assert.ok(state.resources.hay > 0, 'a new settlement ships hay so straw shoes can be made before the harvest');
   assert.deepEqual(livestock.IMPLEMENTED_LIVESTOCK_IDS, ['chicken', 'goat', 'sheep', 'pig', 'cattle', 'horse']);
   assert.deepEqual(livestock.createDefaultLivestockState(), {
     species: 'chicken', headcount: 4, growth: 0, feedShortageDays: 0,
