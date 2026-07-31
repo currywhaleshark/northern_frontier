@@ -5,8 +5,9 @@
 //  - 파종은 배치만으로 끝나고, 집·장작 스텝이 끝날 때 파종이 병행 완료되는지
 //  - 시나리오 중 스크립트되지 않은 랜덤 모달이 뜨지 않는지 (허용: scenario, tribute)
 //  - 통제 사건(첫 병자·혹한 경고)이 스텝 훅으로만 일어나는지
-//  - 코드의 튜토리얼 버전이 바뀌면 저장이 일반 모드로 해제되는지
+//  - 코드의 튜토리얼 버전이 바뀌면(구판 버전 2 포함) 저장이 일반 모드로 해제되는지
 //  - 초회 도움말(guides)이 새 게임에서 켜지고 구버전 저장에서는 꺼지는지
+//  - 완료 선택 뒤에 랜덤 사건 게이트가 술어만이 아니라 endOfDay에서도 실제로 열리는지
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -396,6 +397,64 @@ function stepById(id) {
 }
 
 {
+  // 완료 후 개방 (계획 §9-7) — 게이트가 술어로만 열리는 게 아니라 endOfDay에서 실제로 풀리는지 본다.
+  // 습격 판정(checkRaidTrigger)은 게이트 안에만 있으므로, 위협도를 매일 최대로 밀어 두고
+  // 같은 날수를 돌려 "길잡이 중"과 "완료 후"를 맞대어 본다.
+  const PROBE_DAYS = 30;
+  // 습격이 실제로 섰다는 흔적 — 전부 게이트 안(checkRaidTrigger)에서만 생긴다
+  const raidFired = s =>
+    s.raiders != null || s.battle != null || s.tacticalBattle != null ||
+    s.raidCooldown > 0 || s.guides?.seen?.battle != null;
+
+  const probeRaids = (s, { strictModals }) => {
+    for (let day = 0; day < PROBE_DAYS; day++) {
+      keepAlive(s);
+      s.threat = 100;      // 위협도 최대 — 게이트만 열려 있으면 습격이 온다
+      s.raidCooldown = 0;
+      simulation.advanceDay(s);
+      assert.equal(s.gameOver, null, 'the raid probe never ends the game');
+      if (raidFired(s)) return true;
+      if (strictModals) {
+        closeModals(s); // 길잡이 중에는 허용 목록 밖의 모달이 뜨면 그 자리에서 실패한다
+      } else {
+        let guard = 0;
+        while (s.pendingChoice && guard++ < 10) {
+          const option = s.pendingChoice.options.find(candidate => !candidate.disabled);
+          if (!option) break;
+          simulation.resolveChoice(s, option.id);
+        }
+      }
+    }
+    return raidFired(s);
+  };
+
+  // 잠금: 길잡이가 도는 동안에는 위협도가 꽉 차 있어도 습격이 오지 않는다
+  const locked = tutorialStart.createTutorialGame();
+  assert.equal(scenario.scenarioSuppressesRandomEvents(locked), true);
+  assert.equal(
+    probeRaids(locked, { strictModals: true }), false,
+    'a running tutorial keeps the raid gate shut even at maximum threat',
+  );
+  assert.ok(scenario.currentScenarioStep(locked), 'the probe leaves the tutorial running');
+
+  // 개방: 완료 선택을 마친 뒤 같은 조건에서는 습격이 실제로 온다
+  const opened = tutorialStart.createTutorialGame();
+  opened.scenario.stepIndex = scenario.TUTORIAL_STEPS.length;
+  opened.scenario.completed = true;
+  opened.scenario.introShown = true;
+  opened.pendingChoice = null;
+  scenario.dailyScenarioTick(opened);
+  assert.equal(opened.pendingChoice?.data.phase, 'complete');
+  simulation.resolveChoice(opened, 'guided');
+  assert.equal(opened.scenario, null);
+  assert.equal(scenario.scenarioSuppressesRandomEvents(opened), false);
+  assert.equal(
+    probeRaids(opened, { strictModals: false }), true,
+    'the completion choice actually reopens the random event gate in endOfDay',
+  );
+}
+
+{
   // '이제 스스로 운영한다'를 고르면 초회 도움말이 꺼진 채로 이어진다
   const state = tutorialStart.createTutorialGame();
   state.scenario.stepIndex = scenario.TUTORIAL_STEPS.length;
@@ -539,6 +598,32 @@ function stepById(id) {
     assert.equal(guides.openGuideOnce(reloaded, 'chronicle'), false);
   }
 
+  // guideCards·guideModalQueue는 스키마를 올리지 않고 얹은 표시용 필드다.
+  // 그래도 안전한 근거: 로드가 둘 다 형태만 보고 빈 목록으로 정규화하고,
+  // 1회성 보장은 스키마 v53에 실린 guides.seen이 지킨다.
+  {
+    const shown = tutorialStart.createTutorialGame();
+    shown.scenario = null;
+    shown.pendingChoice = null;
+    assert.equal(guides.openGuideOnce(shown, 'livestock'), true);  // 카드
+    assert.equal(guides.openGuideOnce(shown, 'fire'), true);       // 모달 대기열
+    assert.equal(shown.guideCards.length, 1);
+    assert.equal(shown.guideModalQueue.length, 1);
+    assert.equal(saveLoad.saveGame(shown, 4), true);
+    const key = 'buksae-save-v3-slot4';
+    const raw = JSON.parse(globalThis.localStorage.getItem(key));
+    delete raw.guideCards;      // 두 필드가 없던 시절의 저장을 흉내낸다
+    delete raw.guideModalQueue;
+    globalThis.localStorage.setItem(key, JSON.stringify(raw));
+    const bare = saveLoad.loadGame(4);
+    assert.ok(bare, 'a save without the transient guide fields still loads');
+    assert.deepEqual(bare.guideCards, [], 'missing guide cards normalize to an empty list');
+    assert.deepEqual(bare.guideModalQueue, [], 'a missing guide queue normalizes to an empty list');
+    // 잃어버린 것은 표시뿐 — 다시 뜨지 않는다는 약속은 seen이 지킨다
+    assert.equal(guides.hasSeenGuide(bare, 'fire'), true);
+    assert.equal(guides.openGuideOnce(bare, 'fire'), false);
+  }
+
   // 버전 해제: 코드의 튜토리얼 버전이 바뀌면 저장은 일반 모드로 이어진다
   const state = tutorialStart.createTutorialGame();
   state.pendingChoice = null; // 모달은 저장 대상이지만 여기선 진행 위치만 본다
@@ -551,6 +636,21 @@ function stepById(id) {
   assert.ok(loaded, 'outdated tutorial save still loads');
   assert.equal(loaded.scenario, null, 'outdated tutorial is detached to normal mode');
   assert.ok(loaded.log.some(entry => entry.text.includes('길잡이 시나리오가 갱신')));
+
+  // 실제로 남아 있을 구판은 버전 2(옛 8스텝)다 — 같은 경로로 해제되고 게이트도 함께 열린다
+  const v2Raw = JSON.parse(globalThis.localStorage.getItem('buksae-save-v3'));
+  v2Raw.scenario = {
+    id: 'tutorial', version: 2, stepIndex: 3, introShown: true, flags: { firewoodGoal: 40 },
+  };
+  globalThis.localStorage.setItem('buksae-save-v3', JSON.stringify(v2Raw));
+  const fromV2 = saveLoad.loadGame(1);
+  assert.ok(fromV2, 'a version 2 tutorial save still loads');
+  assert.equal(fromV2.scenario, null, 'the old eight-step tutorial is detached to normal mode');
+  assert.ok(fromV2.log.some(entry => entry.text.includes('길잡이 시나리오가 갱신')));
+  assert.equal(
+    scenario.scenarioSuppressesRandomEvents(fromV2), false,
+    'a detached save plays with the random event gate open',
+  );
 
   // 스키마 v52 저장(초회 도움말 이전)은 안내가 꺼진 채로 이어진다
   const legacy = JSON.parse(globalThis.localStorage.getItem('buksae-save-v3'));

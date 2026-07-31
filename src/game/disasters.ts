@@ -15,6 +15,9 @@ import type {
   WeirReservoirTile,
 } from './types';
 
+// 재해 발생 함수는 저마다 openGuideOnce(state, 'disaster') 한 줄을 들고 있다 (초회 길잡이 — 모달).
+// 규칙: 새 재해 발생 함수를 추가하면 그 자리에도 openGuideOnce(state, 'disaster')를 함께 넣는다.
+// 공통 진입점이 없어 개별로 걸린 구조라, 빠뜨리면 그 재해로 처음 만난 플레이어에게만 안내가 없다.
 const DISASTER_IDS = new Set<DisasterId>([
   'earlyFrost',
   'lateFrost',
