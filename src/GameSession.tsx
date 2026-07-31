@@ -377,6 +377,9 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   }, [speed]);
 
   const setUserSpeed = useCallback((nextSpeed: number) => {
+    // 튜토리얼 0단계(배속 조작) 달성 플래그 — 이미 그 배속이어도 누른 것은 누른 것이다.
+    // 야간 자동 가속은 setSpeed를 직접 쓰므로 이 경로를 타지 않는다.
+    markScenarioFlag(stateRef.current, 'speedChanged');
     if (nextSpeed === speedRef.current) return;
     markNightSpeedOverride(nightAutoSpeedStateRef.current, stateRef.current);
     setSpeed(nextSpeed);
@@ -1521,6 +1524,14 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       : bringDockWindowToFront(current, id));
   }, [openDockWindowIds]);
 
+  // 튜토리얼 1·7단계 — 직업 배정 창과 조정 창을 실제로 연 순간을 기록한다.
+  // 여는 길이 여럿(독 아이콘·단축키·세공 칩·고정 창 복원)이라 열린 목록 자체를 본다.
+  useEffect(() => {
+    const runtimeState = stateRef.current;
+    if (openDockWindowIds.includes('jobs')) markScenarioFlag(runtimeState, 'jobPanelOpened');
+    if (openDockWindowIds.includes('court')) markScenarioFlag(runtimeState, 'courtWindowOpened');
+  }, [openDockWindowIds]);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
@@ -1633,8 +1644,11 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
             showOre={uiPrefs.showOreLayer || placingType === 'deepMine'}
             aquiferAutomatic={placingType === 'well'}
             oreAutomatic={placingType === 'deepMine'}
-            onToggleAquifer={() => setUiPrefs(current =>
-              setMapLayerVisibility(current, 'aquifer', !current.showAquiferLayer))}
+            onToggleAquifer={() => {
+              // 튜토리얼 4단계(수맥 탭) 달성 플래그 — 우물 배치 중 자동 표시는 해당하지 않는다
+              markScenarioFlag(stateRef.current, 'aquiferToggled');
+              setUiPrefs(current => setMapLayerVisibility(current, 'aquifer', !current.showAquiferLayer));
+            }}
             onToggleOre={() => setUiPrefs(current =>
               setMapLayerVisibility(current, 'ore', !current.showOreLayer))}
           />
@@ -1650,6 +1664,8 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                       animationActive={speed > 0 && !runtimeState.pendingChoice && !runtimeState.pendingPromotionNotice && !runtimeState.tacticalBattle && !runtimeState.tacticalBattleReport && !runtimeState.gameOver}
                       viewportRef={mapViewportRef}
                       selected={selected}
+                      // 튜토리얼 0단계(미니맵으로 시점 옮기기) 달성 플래그
+                      onNavigate={() => markScenarioFlag(stateRef.current, 'minimapClicked')}
                     />
                   );
                 }}

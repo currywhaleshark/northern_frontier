@@ -85,7 +85,7 @@ function pushBuilt(state, type, extra = {}) {
   });
 }
 
-// UI 훅 플래그는 M2에서 컴포넌트가 연결한다 — 여기서는 테스트가 직접 주입한다
+// UI 훅 플래그는 컴포넌트가 연결한다(M2) — 여기서는 테스트가 직접 주입한다
 function markFlags(state, ...keys) {
   for (const key of keys) scenario.markScenarioFlag(state, key);
 }
@@ -428,6 +428,41 @@ function stepById(id) {
     setItem(key, value) { this.store[key] = String(value); },
     removeItem(key) { delete this.store[key]; },
   };
+
+  // 통제 사건의 1회성 플래그는 진행 위치와 함께 저장을 건너 살아남는다 —
+  // 불러온 겨울에서 혹한이 두 번 오면 안 된다
+  {
+    const incident = tutorialStart.createTutorialGame();
+    incident.pendingChoice = null;
+    let winterDay = incident.day;
+    while (!(seasons.getSeason(winterDay) === 'winter' &&
+      seasons.getDayOfSeason(winterDay) === 4)) winterDay++;
+    incident.day = winterDay;
+    incident.scenario.stepIndex = EXPECTED_STEP_IDS.indexOf('winter');
+    incident.scenario.introShown = true;
+    incident.resources.firewood = 200;
+    const patient = incident.residents.find(resident => resident.alive && !resident.special);
+    scenario.dailyScenarioTick(incident); // 혹한 1회 발화
+    incident.scenario.flags.patientResidentId = patient.id;
+    assert.equal(incident.scenario.flags.coldSnapWarned, 1);
+    assert.equal(saveLoad.saveGame(incident, 2), true);
+    const reloaded = saveLoad.loadGame(2);
+    assert.ok(reloaded?.scenario, 'the tutorial save reloads with its scenario intact');
+    assert.equal(reloaded.scenario.flags.coldSnapWarned, 1, 'the cold snap stays fired across a save');
+    assert.equal(
+      reloaded.scenario.flags.patientResidentId, patient.id,
+      'the scripted patient is remembered across a save',
+    );
+    const fuelBefore = winter.winterReadiness(reloaded).fuelHeatStock;
+    reloaded.pendingChoice = null;
+    scenario.dailyScenarioTick(reloaded);
+    assert.equal(winter.winterReadiness(reloaded).fuelHeatStock, fuelBefore,
+      'a reloaded winter never re-fires the cold snap');
+    assert.equal(
+      reloaded.log.filter(entry => entry.text.includes('아궁이가 쉬지 못했습니다')).length, 1,
+      'the reloaded log still carries exactly one cold snap warning',
+    );
+  }
 
   // 버전 해제: 코드의 튜토리얼 버전이 바뀌면 저장은 일반 모드로 이어진다
   const state = tutorialStart.createTutorialGame();

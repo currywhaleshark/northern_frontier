@@ -22,6 +22,7 @@ export function MapLayerTabs({
       <button
         type="button"
         className={`map-layer-tab aquifer${showAquifer ? ' active' : ''}`}
+        data-tut="map-layer-aquifer"
         aria-pressed={showAquifer}
         title={aquiferAutomatic
           ? '우물 배치 중 자동 표시 · 청록 강급수 / 파랑 우물급수 / 노랑 부족 / 빨강 미급수'

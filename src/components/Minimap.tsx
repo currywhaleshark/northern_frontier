@@ -74,6 +74,8 @@ interface Props {
   animationActive: boolean;
   viewportRef: RefObject<HTMLDivElement>;
   selected: { x: number; y: number } | null;
+  // 미니맵으로 시점을 옮긴 순간 (튜토리얼 0단계의 minimapClicked 플래그)
+  onNavigate?: () => void;
 }
 
 function factionColor(site: ForeignSite): string {
@@ -124,7 +126,7 @@ function recordMinimapRedraw(name: 'minimap-base-redraw' | 'minimap-overlay-redr
   bucket.count++;
 }
 
-export function Minimap({ state, version, animationActive, viewportRef, selected }: Props) {
+export function Minimap({ state, version, animationActive, viewportRef, selected, onNavigate }: Props) {
   const baseCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const dragging = useRef(false);
@@ -340,6 +342,7 @@ export function Minimap({ state, version, animationActive, viewportRef, selected
   const navigateToCenter = () => {
     const box = viewportRef.current;
     if (box) centerViewportOnSettlement(state, box);
+    onNavigate?.();
   };
 
   const markerLabelAt = (clientX: number, clientY: number): string | null => {
@@ -378,7 +381,7 @@ export function Minimap({ state, version, animationActive, viewportRef, selected
         {!visibleRaid && targetMarkers.length > 0 && <span className="minimap-target-label">토벌 목표</span>}
         <button type="button" className="minimap-center-btn" title="마을 중심으로 이동" aria-label="마을 중심으로 이동" onClick={navigateToCenter}>◎</button>
       </div>
-      <div className="minimap-canvas-wrap">
+      <div className="minimap-canvas-wrap" data-tut="minimap">
         <canvas
           ref={baseCanvasRef}
           className="minimap-base-canvas"
@@ -396,6 +399,7 @@ export function Minimap({ state, version, animationActive, viewportRef, selected
             dragging.current = true;
             event.currentTarget.setPointerCapture(event.pointerId);
             navigate(event.clientX, event.clientY);
+            onNavigate?.();
           }}
           onPointerMove={handlePointerMove}
           onPointerUp={event => {

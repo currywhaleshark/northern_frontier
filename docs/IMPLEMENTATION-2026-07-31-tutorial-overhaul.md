@@ -1,6 +1,6 @@
 # 튜토리얼 개편 착수 지시문 — 「길잡이: 첫 겨울」
 
-> **계획 상태:** 진행 중 — M0~M1 완료 (2026-07-31 Opus, 미커밋), 다음 배정: M2
+> **계획 상태:** 진행 중 — M0~M1 커밋(f1df2e7), M2·M3 완료 (2026-07-31 Opus, 미커밋), 다음 배정: M4
 > **M0~M1 검증:** `test_tutorial_scenario.mjs`·`tsc --noEmit`·`npm run build` 통과 (Fable 재확인 포함). 시드 20260718 유지 — 수맥 우물 자리 137칸으로 4단계 성립. `npm run test:game`의 22개 실패는 HEAD에서도 동일한 선행 실패로 이번 변경과 무관 확인
 > **담당:** Claude Opus 단독 (`src/game/**` + `src/components/**` 모두 — Codex 분업 없음)
 > **작성:** 2026-07-31 Fable (검토·계획), 원전: [`docs/superpowers/plans/2026-07-31-tutorial-overhaul.md`](superpowers/plans/2026-07-31-tutorial-overhaul.md)
@@ -62,10 +62,22 @@
 
 **M0~M1 완료 기준**: `node tools/game/test_tutorial_scenario.mjs` 통과 + 타입 검사/프로덕션 빌드 통과 + 새 튜토리얼을 실제 기동해 0~2단계 진행 확인(수동 또는 헤드리스). 커밋은 사용자 확인 후.
 
-## M2~M6 (후속 배정 — 착수 전 이 문서 갱신)
+## M2 — UI 훅 연결 + 코치 전면 갱신 (완료)
 
-- M2: UI 훅 `markScenarioFlag` 연결(미니맵·배속·직업 창·수맥 탭·조정 창·점검 패널) + `STEP_HINTS` 11단계 + 신규 `data-tut` 앵커 (계획서 §6 표)
-- M3: (M1에서 병자·혹한을 스텝 훅으로 이미 구현하므로) 잔여 통제 사건 다듬기 — 경고 문구·배율 config·1회성 검증
+- [x] `markScenarioFlag` 연결: `minimapClicked`(Minimap `onNavigate` → GameSession), `speedChanged`(`setUserSpeed`),
+      `jobPanelOpened`·`courtWindowOpened`(`openDockWindowIds` 감시 effect — 독 아이콘·단축키·세공 칩·고정 창 복원을 모두 덮는다),
+      `aquiferToggled`(수맥 탭 핸들러). `checklistOpened`는 M4가 패널과 함께 연결한다
+- [x] `STEP_HINTS` 11스텝 전면 개정 — 구 id(wake/firewood/housing) 제거, 소목표 순서대로 얕은 곳→깊은 곳 앵커 경로
+- [x] 신규 앵커: `minimap`(Minimap), `map-layer-aquifer`(MapLayerTabs), `court-figure`(CourtWindow 북병사 카드)
+- [x] `stocktake`·`winter`는 가리킬 UI가 없어 빈 힌트 — 겨울 점검 패널이 서면(M4) `stocktake`에 진입점을 잇는다
+
+## M3 — 통제 사건 다듬기 (완료)
+
+- [x] 혹한: 문구·배율·발화일 모두 `CONFIG.tutorial`에서만 오고 경고는 important 로그, 기후 시스템 무손상 확인
+- [x] 병자: onStart 경고 로그와 본문·코치(약초꾼 배정) 안내가 같은 곳을 가리키는지 확인
+- [x] 1회성 플래그(`coldSnapWarned`·`patientResidentId`) 저장·로드 유지를 회귀 테스트로 고정
+
+## M4~M6 (후속 배정 — 착수 전 이 문서 갱신)
 - M4: `WinterChecklistPanel.tsx` — `winterReadiness` 재사용, 9단계 자동 표시 + 가을~겨울 상시 진입점
 - M5: `guides` 트리거 11곳 연결(계획서 §5 표 — `rename` 포함), `GuideCard` 비차단 카드 + 습격·화재·재해는 모달, `SettingsDialog` 토글
 - M6: §9 테스트 전량 + `PLAN-STATUS.md`·본 문서 상태 갱신

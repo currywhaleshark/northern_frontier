@@ -46,7 +46,7 @@ export function CourtWindow({
 
   return (
     <div>
-      <div className="court-commander-card">
+      <div className="court-commander-card" data-tut="court-figure">
         <img
           className="court-commander-portrait"
           src={borderCommanderPortraitPath(state.borderCommander)}
