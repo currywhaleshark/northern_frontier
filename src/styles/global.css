@@ -107,6 +107,11 @@ html, body, #root {
   cursor: default;
 }
 .ongoing-objective.scenario .objective-title { color: #7ab3d9; }
+/* 길잡이 소목표 — `✅라벨 (현재/목표)`. 항목이 다섯인 스텝(집과 장작)도 줄바꿈으로 받는다 */
+.scenario-goals { gap: 4px 10px; row-gap: 4px; }
+.scenario-goals > span { display: inline-flex; align-items: center; gap: 3px; }
+.scenario-goals > span + span::before { content: '·'; color: var(--muted); }
+.scenario-goals > span.complete { color: var(--good); opacity: 0.6; }
 /* 정기거래 요약 칩 — 평시엔 조용한 회색, 미충당이면 경고 */
 .ongoing-objective.contract { border-color: var(--border); cursor: pointer; }
 .ongoing-objective.contract .objective-title { color: var(--trade); }

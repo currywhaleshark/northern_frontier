@@ -1,6 +1,6 @@
 # 튜토리얼 개편 착수 지시문 — 「길잡이: 첫 겨울」
 
-> **계획 상태:** 완료 — R2 포함. M0~M6(f1df2e7, f03c3cb, 58956ca, 7a0ac40) 위에 플레이테스트 후속 R1 4건(c7b7d33)과 2차 후속 R2 3건 반영 (문서 말미 R1·R2 절)
+> **계획 상태:** 완료 — R3 포함. M0~M6(f1df2e7, f03c3cb, 58956ca, 7a0ac40) 위에 플레이테스트 후속 R1 4건(c7b7d33)·2차 후속 R2 3건(712008d)·3차 후속 R3(목표 칩 진행도) 반영 (문서 말미 R1·R2·R3 절)
 > **M0~M1 검증:** `test_tutorial_scenario.mjs`·`tsc --noEmit`·`npm run build` 통과 (Fable 재확인 포함). 시드 20260718 유지 — 수맥 우물 자리 137칸으로 4단계 성립. `npm run test:game`의 22개 실패는 HEAD에서도 동일한 선행 실패로 이번 변경과 무관 확인
 > **담당:** Claude Opus 단독 (`src/game/**` + `src/components/**` 모두 — Codex 분업 없음)
 > **작성:** 2026-07-31 Fable (검토·계획), 원전: [`docs/superpowers/plans/2026-07-31-tutorial-overhaul.md`](superpowers/plans/2026-07-31-tutorial-overhaul.md)
@@ -315,6 +315,63 @@ M1 보고의 지적이 사실이었고, 실측은 그보다 더 헐거웠다 (�
   R2-1 이원화 블록(상세 앵커는 벌목꾼 하나뿐·＋ 8종·＋ 힌트의 얕은 앵커), R2-3 문구 블록
 
 ### R2 테스트·검증 결과
+
+- `node tools/game/test_tutorial_scenario.mjs` 통과 (보강분 포함)
+- `npx tsc --noEmit`·`npm run build` 통과
+
+## R3 — 목표 칩 진행도 표기 (2026-07-31 사용자 피드백)
+
+목표 칩이 문장 대신 **소목표별 현재/목표 수치**를 보여주고, 완료된 소목표는 시각적으로 표시한다. 예:
+`✅초가집 (1/1) · 장작마당 (0/1) · ✅장작꾼 (2/1) · 장작 (85/93) · ✅파종 (4/4)`
+
+- [x] `ScenarioGoalProgress { label; current; target }` 신설. 스텝 원형(`ScenarioStepSpec`)에는 `progress`만 적고,
+      `TUTORIAL_STEPS`가 그 배열에서 `isDone`(전 항목 current ≥ target)과 `goal`(문자열 조합)을 **파생**시킨다 —
+      두 눈금이 갈라질 수 없는 구조다. 손으로 적은 `isDone`은 한 스텝도 남기지 않았다
+- [x] 11스텝 전부 소목표 분해 (아래 표). 플래그·대기·사건은 0/1 이진, 자원·일분은 수치
+- [x] 상단 바 목표 칩 렌더 개편 — `objective-items`(세공 칩과 같은 관례) 위에 `scenario-goals`,
+      완료 항목은 `complete` 클래스로 ✅ + 초록 + 흐림. 스텝 모달 하단 `목표: …`도 같은 형식(구분자 ·)
+- [x] 회귀 테스트: 11스텝 정합 블록 + 완주 중 매일 정합 단언 + 표본 값 단언
+
+### R3 소목표 분해표
+
+| # | id | 소목표 (라벨 / 목표) |
+|---|---|---|
+| 0 | `naming` | 주민 선택 1 · 미니맵 1 · 배속 1 · 이튿날 아침 1 (전부 이진) |
+| 1 | `working` | 직업 창 1 · 벌목꾼 1 · 운반꾼 1 |
+| 2 | `sowing` | 밭 배치 `sownAreaGoal`(4) · 농부 1 |
+| 3 | `hearth` | 초가집 `houseGoal` · 장작마당 `woodShedGoal` · 장작꾼 1 · 장작 `firewoodGoal` · 파종 `sownAreaGoal` |
+| 4 | `water` | 수맥 탭 1 · 물자리 1 (우물 수 ∨ 자연 급수 밭 — 우물이 서 있으면 강 급수권 계산을 건너뛴다) |
+| 5 | `hunting` | 사냥꾼 2 · 고기 `meatGoal` |
+| 6 | `patient` | 약초막 1 · 약초꾼 1 · 병자 회복 1 |
+| 7 | `tribute` | 조정 창 1 · 세공고 비축 1 |
+| 8 | `defense` | 목책 1 · 수비병 1 · 파수꾼 1 |
+| 9 | `stocktake` | 겨울 점검 1 · 식량 일분 `foodDaysGoal`(30) · 장작 일분 `firewoodDaysGoal`(24) |
+| 10 | `winter` | 겨울 `winterEndDayOfSeason` (겨울이 아니면 0일차) |
+
+**표시 규칙**: 현재값은 **내림**한다. 반올림하면 장작 92.6/93이 "93/93"으로 보여 완료가 아닌데 완료처럼 읽힌다
+(`goalNumberText`에 근거 주석). 목표를 넘긴 항목은 `(2/1)`처럼 그대로 보이되 완료로 친다.
+목표치가 주입되지 않은 경우(Infinity)는 `(현재/?)`로 남아 영영 미완이다 — 기존 `?? Infinity` 관례와 같은 뜻이다.
+
+### R3 실기동 확인 (dev 서버, 길잡이 새 게임)
+
+- 0단계 칩이 「길잡이 · 이름과 첫 기록 · 주민 선택 (0/1) · 미니맵 (0/1) · 배속 (0/1) · 이튿날 아침 (0/1)」로 서고,
+  스텝 모달 하단도 같은 문자열이다
+- 미니맵을 누르고 ▶를 누르자 그 두 항목이 그 자리에서 「✅미니맵 (1/1) · ✅배속 (1/1)」로 바뀐다 (초록 + 흐림)
+- 주민 창에서 주민을 고르고 하루를 넘기니 「✅이튿날 아침 (1/1)」까지 차고 1단계로 넘어갔다 —
+  1단계 칩은 「직업 창 (0/1) · 벌목꾼 (0/1) · 운반꾼 (0/1)」
+- 3단계(항목 5개)를 상태 주입으로 세워 보니 「✅초가집 (3/3) · 장작마당 (0/1) · ✅장작꾼 (2/1) · 장작 (85/93) · ✅파종 (4/4)」이
+  1500px 폭에서 한 줄에 들어가고, 좁아지면 제목 줄 아래로 접힌다 (칩이 터지지 않는다)
+
+### R3 변경 파일
+
+- `src/game/scenario.ts` — `ScenarioGoalProgress`·`ScenarioStepSpec`, `scenarioGoalDone`/`scenarioProgressComplete`/
+  `formatScenarioGoalItem`/`formatScenarioGoal`, 11스텝 `progress`, `TUTORIAL_STEPS`의 isDone·goal 파생
+- `src/components/TopBar.tsx` — 목표 칩이 문장 대신 소목표 배열을 그린다
+- `src/styles/global.css` — `.scenario-goals`(구분자 ·, 완료 항목 초록·흐림)
+- `tools/game/test_tutorial_scenario.mjs` — R3 정합 블록(라벨·순서·형식·소스 단언), 모달 형식 블록,
+  완주 중 매일 정합 단언과 표본 값 단언
+
+### R3 테스트·검증 결과
 
 - `node tools/game/test_tutorial_scenario.mjs` 통과 (보강분 포함)
 - `npx tsc --noEmit`·`npm run build` 통과

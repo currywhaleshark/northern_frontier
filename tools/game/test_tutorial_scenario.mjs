@@ -114,6 +114,43 @@ function stepById(id) {
   return step;
 }
 
+// ── R3: 목표 칩의 소목표 진행 배열 ──
+// isDone은 진행 배열에서 파생된다. 두 눈금이 갈라지면 칩이 "다 찼는데 안 넘어간다"고 거짓말한다.
+function progressItems(step, state) {
+  const items = step.progress(state);
+  assert.ok(Array.isArray(items) && items.length > 0, `step ${step.id} exposes at least one sub-goal`);
+  for (const item of items) {
+    assert.equal(typeof item.label, 'string', `${step.id} sub-goal label is a string`);
+    assert.ok(
+      item.label.length > 0 && item.label.length <= 8 && !item.label.includes('십시오'),
+      `${step.id} sub-goal label is a short noun, not a sentence (${item.label})`,
+    );
+    assert.equal(typeof item.current, 'number', `${step.id}/${item.label} current is numeric`);
+    assert.equal(typeof item.target, 'number', `${step.id}/${item.label} target is numeric`);
+    assert.ok(item.current >= 0, `${step.id}/${item.label} never goes negative`);
+    assert.ok(item.target > 0, `${step.id}/${item.label} has a positive target`);
+  }
+  return items;
+}
+
+// 정합: (전 소목표 current ≥ target) ⇔ isDone
+function assertProgressMatchesIsDone(step, state, where) {
+  const items = progressItems(step, state);
+  const allMet = items.every(item => item.current >= item.target);
+  assert.equal(
+    step.isDone(state), allMet,
+    `step ${step.id} isDone disagrees with its sub-goals (${where}): ` +
+      items.map(item => `${item.label} ${item.current}/${item.target}`).join(' · '),
+  );
+  assert.equal(scenario.scenarioProgressComplete(items), allMet);
+}
+
+function goalItem(step, state, label) {
+  const item = step.progress(state).find(candidate => candidate.label === label);
+  assert.ok(item, `step ${step.id} has a '${label}' sub-goal`);
+  return item;
+}
+
 {
   // 결정론: 같은 시드에서 같은 시작 상태가 나온다
   const a = tutorialStart.createTutorialGame();
@@ -194,6 +231,88 @@ function stepById(id) {
   // 11스텝 구성과 버전
   assert.deepEqual(scenario.TUTORIAL_STEPS.map(step => step.id), EXPECTED_STEP_IDS);
   assert.equal(scenario.TUTORIAL_SCENARIO_VERSION, 3);
+}
+
+{
+  // R3: 소목표 진행 배열 — 11스텝 전부에서 진행 배열과 isDone이 한 술어에서 나온다
+  const state = tutorialStart.createTutorialGame();
+  for (const step of scenario.TUTORIAL_STEPS) {
+    assertProgressMatchesIsDone(step, state, 'a fresh settlement');
+    assert.equal(step.isDone(state), false, `nothing is achieved on the first morning (${step.id})`);
+  }
+
+  // 스텝별 소목표 라벨 — 순서까지 못 박는다 (칩과 코치가 같은 순서를 따른다)
+  const labelsOf = id => stepById(id).progress(state).map(item => item.label);
+  assert.deepEqual(labelsOf('naming'), ['주민 선택', '미니맵', '배속', '이튿날 아침']);
+  assert.deepEqual(labelsOf('working'), ['직업 창', '벌목꾼', '운반꾼']);
+  assert.deepEqual(labelsOf('sowing'), ['밭 배치', '농부']);
+  assert.deepEqual(labelsOf('hearth'), ['초가집', '장작마당', '장작꾼', '장작', '파종']);
+  assert.deepEqual(labelsOf('water'), ['수맥 탭', '물자리']);
+  assert.deepEqual(labelsOf('hunting'), ['사냥꾼', '고기']);
+  assert.deepEqual(labelsOf('patient'), ['약초막', '약초꾼', '병자 회복']);
+  assert.deepEqual(labelsOf('tribute'), ['조정 창', '세공고 비축']);
+  assert.deepEqual(labelsOf('defense'), ['목책', '수비병', '파수꾼']);
+  assert.deepEqual(labelsOf('stocktake'), ['겨울 점검', '식량 일분', '장작 일분']);
+  assert.deepEqual(labelsOf('winter'), ['겨울']);
+
+  // 목표 한 줄은 진행 배열에서 조합된다 — 문장이 아니라 수치 요약이다
+  const naming = stepById('naming');
+  assert.equal(naming.goal(state), scenario.formatScenarioGoal(naming.progress(state)));
+  assert.match(naming.goal(state), /미니맵 \(0\/1\)/);
+  assert.ok(!naming.goal(state).includes('✅'), 'nothing is checked off on the first morning');
+  markFlags(state, 'minimapClicked');
+  assert.match(naming.goal(state), /✅미니맵 \(1\/1\)/, 'a met sub-goal is marked complete');
+  assert.equal(goalItem(naming, state, '미니맵').current, 1);
+  assert.equal(goalItem(naming, state, '이튿날 아침').current, state.day >= 2 ? 1 : 0);
+
+  // 목표를 넘겨도 완료로 보되 수치는 그대로 보인다 (✅장작꾼 (2/1))
+  const hearth = stepById('hearth');
+  assignJobs(state, { woodSplitter: 2 });
+  const splitterGoal = goalItem(hearth, state, '장작꾼');
+  assert.deepEqual([splitterGoal.current, splitterGoal.target], [2, 1]);
+  assert.match(scenario.formatScenarioGoalItem(splitterGoal), /^장작꾼 \(2\/1\)$/);
+  assert.equal(scenario.scenarioGoalDone(splitterGoal), true, 'overshooting a target still counts as done');
+
+  // 자원형은 내림해 보인다 — 반올림하면 92.6/93이 다 찬 것처럼 읽힌다
+  state.resources.firewood = (state.scenario.flags.firewoodGoal ?? 0) - 0.4;
+  const firewoodGoal = goalItem(hearth, state, '장작');
+  assert.equal(
+    scenario.formatScenarioGoalItem(firewoodGoal),
+    `장작 (${state.scenario.flags.firewoodGoal - 1}/${state.scenario.flags.firewoodGoal})`,
+    'a firewood stock just short of the target never displays as met',
+  );
+  assert.equal(scenario.scenarioGoalDone(firewoodGoal), false);
+
+  // 손으로 적은 isDone은 남아 있지 않다 — 남으면 두 눈금이 다시 갈라진다
+  const scenarioSource = readFileSync(new URL('../../src/game/scenario.ts', import.meta.url), 'utf8');
+  assert.equal(
+    (scenarioSource.match(/^\s{4}isDone:/gm) ?? []).length, 0,
+    'no step declares isDone by hand — TUTORIAL_STEPS derives it from progress (R3)',
+  );
+  assert.match(
+    scenarioSource, /isDone: state => scenarioProgressComplete\(spec\.progress\(state\)\)/,
+    'isDone is derived from the sub-goal array in exactly one place',
+  );
+
+  // 상단 바 칩은 문장이 아니라 이 배열을 그린다
+  const topBarSource = readFileSync(new URL('../../src/components/TopBar.tsx', import.meta.url), 'utf8');
+  assert.match(topBarSource, /scenarioStep\.progress\(state\)\.map/, 'the objective chip renders the sub-goal array');
+  assert.match(topBarSource, /scenarioGoalDone\(item\)/, 'the chip marks met items through the shared predicate');
+  assert.ok(
+    !topBarSource.includes('scenarioStep.goal(state)'),
+    'the chip no longer renders the sentence form (it would duplicate the sub-goal array)',
+  );
+}
+
+{
+  // R3: 스텝 시작 모달 하단의 `목표: …`도 칩과 같은 형식이다
+  const state = tutorialStart.createTutorialGame();
+  const modal = state.pendingChoice;
+  assert.equal(modal?.kind, 'scenario');
+  assert.equal(modal.data.phase, 'step');
+  const step = stepById(modal.data.stepId);
+  assert.equal(modal.options[0].desc, `목표: ${scenario.formatScenarioGoal(step.progress(state))}`);
+  assert.match(modal.options[0].desc, /주민 선택 \(0\/1\) · 미니맵 \(0\/1\)/);
 }
 
 {
@@ -495,12 +614,45 @@ function stepById(id) {
       assert.equal(state.incidents.plagueCase, null, 'the scripted patient does not use the plague system');
     }
     assert.ok(solvers[step.id], `solver missing for step ${step.id} — add one when adding steps`);
+    // R3: 모범 답안을 두기 전에도 진행 배열과 isDone은 같은 답을 낸다
+    assertProgressMatchesIsDone(step, state, `before the model answer for ${step.id}`);
     solvers[step.id](state);
+    // R3 표본: 진행 배열의 현재값이 실제 상태를 그대로 읽는다
+    const jobs = job => state.residents.filter(r => r.alive && r.job === job).length;
+    if (step.id === 'sowing') {
+      const placed = plots().reduce((sum, plot) => sum + (plot.w ?? 1) * (plot.h ?? 1), 0);
+      assert.deepEqual(
+        [goalItem(step, state, '밭 배치').current, goalItem(step, state, '밭 배치').target],
+        [placed, state.scenario.flags.sownAreaGoal],
+      );
+      assert.equal(goalItem(step, state, '농부').current, jobs('farmer'));
+    }
+    if (step.id === 'hearth') {
+      assert.equal(goalItem(step, state, '장작').current, state.resources.firewood);
+      assert.equal(goalItem(step, state, '장작꾼').current, jobs('woodSplitter'));
+      assert.equal(
+        goalItem(step, state, '파종').current,
+        plots().reduce((sum, plot) => sum + (plot.sownArea ?? 0), 0),
+      );
+    }
+    if (step.id === 'hunting') {
+      assert.equal(goalItem(step, state, '고기').current, state.resources.meat);
+      assert.equal(goalItem(step, state, '사냥꾼').target, 2);
+    }
+    if (step.id === 'stocktake') {
+      assert.equal(goalItem(step, state, '식량 일분').current, winter.winterReadiness(state).foodDays);
+      assert.equal(goalItem(step, state, '장작 일분').target, state.scenario.flags.firewoodDaysGoal);
+    }
+    if (step.id === 'patient') {
+      assert.equal(goalItem(step, state, '병자 회복').current, 0, 'the scripted patient is still abed');
+    }
     let guard = 0;
     while (state.scenario && !state.scenario.completed && state.scenario.stepIndex === index) {
       assert.ok(guard++ < 60, `step ${step.id} did not complete within 60 days`);
       holdGoals(state, step.id);
       keepAlive(state);
+      // R3: 완주 내내 매일 — 진행 배열이 다 찼는데 스텝이 안 넘어가는 일(또는 그 반대)은 없다
+      assertProgressMatchesIsDone(step, state, `day ${state.day} of ${step.id}`);
       if (step.id === 'winter' && fuelBeforeColdSnap == null &&
         seasons.getSeason(state.day + 1) === 'winter' && seasons.getDayOfSeason(state.day + 1) === 4) {
         fuelBeforeColdSnap = winter.winterReadiness(state).fuelHeatStock;

@@ -26,7 +26,7 @@ import {
   toggleStarredResource,
   type UiPrefs,
 } from '../ui/uiPrefs';
-import { currentScenarioStep } from '../game/scenario';
+import { currentScenarioStep, formatScenarioGoalItem, scenarioGoalDone } from '../game/scenario';
 import { winterReadiness } from '../game/winterReadiness';
 import { DayArcWidget } from './DayArcWidget';
 import { TimeControls } from './TimeControls';
@@ -164,10 +164,21 @@ export function TopBar({
       {(scenarioStep || showWinterChecklist || tribute || contractCount > 0 || state.crackdownDeadline > 0 || promotionTarget) && (
         <div className="topbar-objectives" aria-label="지속 관리 항목">
           {scenarioStep && (
-            <div className="ongoing-objective scenario" title="길잡이 시나리오의 현재 목표">
+            <div className="ongoing-objective scenario" title="길잡이 시나리오의 현재 목표 — 소목표별 현재/목표">
               <span className="objective-title">길잡이</span>
               <span className="objective-deadline">{scenarioStep.title}</span>
-              <span className="objective-summary">{scenarioStep.goal(state)}</span>
+              {/* 소목표는 세공 칩과 같은 관례로 — 완료 항목에 complete 클래스가 붙는다 */}
+              <span className="objective-items scenario-goals">
+                {scenarioStep.progress(state).map(item => {
+                  const done = scenarioGoalDone(item);
+                  return (
+                    <span key={item.label} className={done ? 'complete' : undefined}>
+                      {done && <span aria-hidden="true">✅</span>}
+                      {formatScenarioGoalItem(item)}
+                    </span>
+                  );
+                })}
+              </span>
             </div>
           )}
           {showWinterChecklist && readiness && (
