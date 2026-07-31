@@ -1804,6 +1804,18 @@ export const CONFIG = {
     },
   },
 
+  // 길잡이(튜토리얼) 전용 수치 — 통제 사건과 겨울 점검 기준.
+  // 기후 시스템은 건드리지 않는다: 혹한은 그날의 소모만 올리는 연출이다.
+  tutorial: {
+    coldSnapDayOfWinter: 4,      // 겨울 n일째 아침에 한 번 발화
+    coldSnapFirewoodMult: 1.3,   // 발화한 날 하루치 장작 소모 배율
+    sownAreaGoal: 4,             // 봄 파종 스텝: 배치해야 할 밭 면적(칸)
+    foodDaysGoal: 18,            // 겨울 점검 스텝: 겨울 기준 식량 일분
+    firewoodDaysGoal: 14,        // 겨울 점검 스텝: 겨울 기준 장작 일분
+    meatGoal: 6,
+    winterEndDayOfSeason: 10,    // 첫 겨울 스텝 완료일 (겨울 n일째)
+  },
+
   ui: {
     logLimit: 120,
     tileSize: 28, // 지도 칸 픽셀 크기 (렌더/히트판정 전부 이 값을 따른다). 지도는 드래그로 이동.

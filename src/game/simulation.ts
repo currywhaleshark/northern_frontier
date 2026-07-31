@@ -236,6 +236,9 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
     gameOver: null,
     lastDeathCause: 'other',
     victoryProgressNote: '',
+    // 초회 도움말은 튜토리얼을 거치지 않은 새 마을에도 기본으로 켜 둔다.
+    // 튜토리얼 완료 모달과 설정에서 끌 수 있고, 구버전 저장은 로드 시 꺼진다.
+    guides: { enabled: true, seen: {} },
   };
   state.spoilageStockAtDayStart = spoilageStockSnapshot(state);
 
@@ -1326,7 +1329,7 @@ function endOfDay(state: GameState): void {
     dailyClaimTensionTick(state);
     dailyProximityWarningTick(state);
   }
-  dailyScenarioTick(state); // 시나리오 스텝 진행 — 모달이 비어 있을 때 다음 안내를 연다
+  dailyScenarioTick(state, rng); // 시나리오 스텝 진행 — 통제 사건(onDay)과 다음 안내를 함께 처리한다
 
   state.resources.defense = computeDefense(state);
   checkEndConditions(state);

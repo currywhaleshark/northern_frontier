@@ -816,6 +816,12 @@ export function migrateV51ToV52(raw: RawSave): RawSave {
   };
 }
 
+// v53: 초회 도움말(guides) 상태. 이미 시스템을 아는 진행 중인 마을에 뒤늦은 안내가
+// 쏟아지지 않도록 구버전 저장은 꺼진 상태로 보정한다. 새 게임만 켜진 채 시작한다.
+export function migrateV52ToV53(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), guides: { enabled: false, seen: {} }, schemaVersion: 53 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -873,6 +879,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 49) migrated = migrateV49ToV50(migrated);
     else if (version === 50) migrated = migrateV50ToV51(migrated);
     else if (version === 51) migrated = migrateV51ToV52(migrated);
+    else if (version === 52) migrated = migrateV52ToV53(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -2572,6 +2579,11 @@ export function loadGame(slot = 1): GameState | null {
     } else {
       parsed.scenario = null;
     }
+    // 초회 도움말: 손상되었거나 없으면 꺼진 상태로 본다 (구버전 저장 보정과 같은 규칙)
+    const guides = parsed.guides;
+    parsed.guides = guides && typeof guides === 'object' && guides.seen != null && typeof guides.seen === 'object'
+      ? { enabled: guides.enabled === true, seen: { ...guides.seen } }
+      : { enabled: false, seen: {} };
     rebuildBuildingFootprints(parsed);
     reconcileResidentHomes(parsed, makeRng((parsed.seed ?? 1) + parsed.day * 32452843));
     ensureExploration(parsed);

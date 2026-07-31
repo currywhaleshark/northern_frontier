@@ -757,6 +757,14 @@ export interface ScenarioState {
   flags: Record<string, number>;    // 스텝 목표 수치와 UI 훅 플래그 (예: residentSelected)
 }
 
+// ── 초회 도움말(길잡이 모듈) — 시나리오와 분리된 상태 ──
+// 시나리오는 랜덤 사건을 잠그므로 안내를 이어가려고 붙들어 둘 수 없다.
+// 튜토리얼이 끝난 뒤에도, 튜토리얼을 거치지 않은 일반 게임에서도 이 상태만으로 안내가 산다.
+export interface GuideState {
+  enabled: boolean;              // 완료 모달·설정에서 켜고 끈다
+  seen: Record<string, number>;  // 모듈 id → 처음 본 날 (1회성 보장)
+}
+
 export interface TerritoryViolation {
   siteId: number;
   // 항의를 생활권 협정으로 수습할 때 실제 침범 구역만 제안 대상으로 삼는다.
@@ -1855,6 +1863,7 @@ export interface GameState {
   spentSpecialIds?: SpecialResidentId[]; // 이미 등장한 네임드 (게임당 1회)
   specialResidentRecords?: Partial<Record<SpecialResidentId, SpecialResidentRecord>>; // 안치·합류·이탈 상태
   scenario?: ScenarioState | null;  // 튜토리얼 등 스크립트 시나리오 (없으면 일반 모드)
+  guides?: GuideState;              // 초회 도움말 (구버전 저장에는 없음 = 끈 상태로 보정)
   // ── 은맥 (게임당 1회 — 채광 중 발견 사건으로만 등장) ──
   silverVein?: SilverVeinState | null; // 구버전 저장에는 없음
   silverPityDays?: number;     // 발견 전 누적 채광일 (보장 발동용)

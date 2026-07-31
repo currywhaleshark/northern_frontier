@@ -63,6 +63,8 @@
 | [외교 활동 E4 근접 경고 구현계획](IMPLEMENTATION-2026-07-30-diplomatic-actions-e4.md) | 완료 | P0~P3: 경계 밖 2칸 완충의 건물/3일 작업, 발견 거점 외곽 3칸의 3일 배회, 세력×사유 dedupe·4일 약한 압박·중앙 플로트·v50 저장을 E4/E2 표적 회귀와 빌드로 검증 |
 | [외교 활동 E5 생활권 협정 구현계획](IMPLEMENTATION-2026-07-30-diplomatic-actions-e5.md) | 완료 | `gpt-5.6-terra / high`: 구역별 사절·반경/관계 가격·연간 권리, 통행/사냥 허가 통합·길/교역 정합, 경고/항의 수습과 v51 저장을 E5/E4/E2 표적 회귀·빌드로 검증 |
 | [스프라이트 스튜디오 구현계획](IMPLEMENTATION-2026-07-28-sprite-studio.md) | 완료 | P0~P6 구현 후 `main` 반영 |
+| [튜토리얼 개편 구현계획](superpowers/plans/2026-07-31-tutorial-overhaul.md) | 일부 완료 | 전 결정 확정(병행 구조·개칭 후속 안내·guides 일반 확대·혹한 A안·병자 회복 관찰). M0~M1 착수 |
+| [튜토리얼 개편 착수 지시문](IMPLEMENTATION-2026-07-31-tutorial-overhaul.md) | 일부 완료 | Claude Opus 단독 담당. M0~M1 완료(11스텝·guides 상태·스키마 53·회귀 갱신, 미커밋). 다음 M2(UI 훅·코치) |
 
 ## 역사 계획
 
