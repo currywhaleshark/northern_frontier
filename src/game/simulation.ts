@@ -17,7 +17,7 @@ import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events'
 import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
 import { maybeRunTradeContracts, resolveTradeContractChoice } from './tradeContracts';
 import { dailyScenarioTick, resolveScenarioChoice, scenarioSuppressesRandomEvents } from './scenario';
-import { dailyGuideTick, flushGuideModal, openGuideOnce } from './guides';
+import { dailyGuideTick, flushGuideModal, openGuideFollowUp, openGuideOnce } from './guides';
 import { grantYearlyPowder, resolvePetition } from './petition';
 import { checkPromotion, resolvePromotionDecreeChoice } from './promotion';
 import { resolveCrackdown, resolveInspection, updateSuspicion } from './suspicion';
@@ -274,7 +274,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
   recordAnnals(state, 'founding',
     `조정의 명을 받아 두만강 이북에 ${withJosa(settlementDisplayName(state), '을/를')} 열었습니다.`, 'founding');
   recordYearlySnapshot(state); // 1년차 스냅샷 — 정착 당일의 밑그림
-  announceCourtTribute(state); // 1년차 봄이 day 1이므로 첫해 세공도 여기서 공지
+  announceCourtTribute(state); // 1년차 봄이 day 1 — 첫 해는 요구 없이 예고 한 줄만 남는다 (R4)
   return state;
 }
 
@@ -1141,7 +1141,9 @@ export function resolveChoice(state: GameState, optionId: string): void {
     return;
   }
   if (state.pendingChoice.kind === 'guide') {
+    const guideId = String(state.pendingChoice.data.guideId ?? '');
     state.pendingChoice = null;
+    openGuideFollowUp(state, guideId); // 세공 파발 뒤의 가죽공방 카드처럼 이어 붙는 안내
     flushGuideModal(state);
     return;
   }

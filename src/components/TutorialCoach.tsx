@@ -238,19 +238,8 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       path: [{ tut: 'time-play', text: '시간을 흘려 병자가 자리를 털고 일어나기를 기다리십시오.' }],
     },
   ],
-  tribute: [
-    {
-      done: state => marked(state, 'courtWindowOpened'),
-      path: [{ tut: 'tribute-chip', text: '상단의 세공 칩을 눌러 조정 창을 여십시오.' }],
-    },
-    {
-      path: [
-        { tut: 'tribute-chip', text: '상단의 세공 칩을 눌러 조정 창을 여십시오.' },
-        { tut: 'court-figure', text: '북병사의 이름과 성향을 살피십시오. 올해 세공은 그 아래에 적혀 있습니다.' },
-        { tut: 'tribute-reserve', text: '＋ 또는 최대 버튼으로 요구 품목을 세공고에 비축하십시오.' },
-      ],
-    },
-  ],
+  // R4: 세공 스텝은 사라졌다 — 첫 해에는 조정이 거두지 않으므로, 세공·세공고·북병사는
+  // 둘째 해 봄 첫 파발에서 길잡이 모듈(tribute)이 맡는다.
   defense: [
     {
       done: state => state.buildings.some(building => isWallBuilding(building.type)),

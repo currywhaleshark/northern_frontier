@@ -85,6 +85,16 @@ export function CourtWindow({
         </>
       )}
 
+      {/* 첫 해에는 조정이 거두지 않는다 (R4) — 빈 자리를 두지 않고 그 사실을 적어 둔다 */}
+      {!tribute && (
+        <>
+          <div className="panel-title" style={{ marginTop: 8 }}>올해 세공</div>
+          <div className="small muted">
+            조정은 첫 해의 정착을 지켜보고 있습니다. 세공은 이듬해 봄 파발로 공지됩니다.
+          </div>
+        </>
+      )}
+
       {tribute && (
         <>
           <div className="panel-title" style={{ marginTop: 8 }}>올해 세공 ({tribute.year}년차)</div>

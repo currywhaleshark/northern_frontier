@@ -130,6 +130,8 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
 
 {
   const state = simulation.newGame(73056);
+  // R4: 첫 해에는 조정이 거두지 않는다 — 유예 경로만 보려고 둘째 해분을 직접 세운다
+  state.courtTribute = tribute.rollCourtTribute(state.seed, 2, state.residents.length, state.rank);
   state.borderCommander.temper = 'lenient';
   state.borderCommander.tributeLeniencyUsed = false;
   state.tributeFailStreak = 1;
@@ -150,7 +152,7 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
   assert.equal(state.resources.reputation, repBefore);
   assert.equal(state.threat, threatBefore);
 
-  state.courtTribute = tribute.rollCourtTribute(state.seed, 2, state.residents.length, state.rank);
+  state.courtTribute = tribute.rollCourtTribute(state.seed, 3, state.residents.length, state.rank);
   tribute.openCourtTributeChoice(state);
   tribute.resolveCourtTribute(state, 'refuse');
   assert.equal(state.tributeFailStreak, 1, '같은 임기의 두 번째 미납에는 유예가 없다');

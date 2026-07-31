@@ -1345,6 +1345,9 @@ export const CONFIG = {
   // 조정 세공(歲貢) — 봄 첫날 공지, 겨울 첫날 수거.
   // 장작은 걷지 않는다. 곡물은 먹을 수도 바칠 수도 있어 밭 확장과 비축 판단을 압박한다.
   tribute: {
+    // 첫 해는 정착이 우선이라 조정이 거두지 않는다 — 세공은 이 연차의 봄부터 시작한다 (R4).
+    // 첫 해 겨울 수거도 courtTribute가 없으니 자연히 없다.
+    firstYear: 2,
     baseAmounts: { hide: 8, grain: 25, iron: 3, hideClothes: 6, herbs: 6 }, // 품목별 기준량
     yearScale: 0.3,        // 연차당 요구량 증가 (1 + 0.3×(연차-1))
     popScaleBase: 0.7,     // 인구 배율 = 0.7 + 인구/40

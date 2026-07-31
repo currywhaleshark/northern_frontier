@@ -96,21 +96,38 @@ assert.ok(tributeScale(1, 40) > tributeScale(1, 12));
   }
 }
 
-// ── 새 게임: 1년차 세공이 공지되어 있다 ──
+// R4: 세공은 둘째 해부터다. 세공 경로를 보는 블록은 이 헬퍼로 그해 봄에 세워 둔다.
+// (길잡이 모듈은 여기 관심사가 아니므로 꺼 둔다 — 발화 순서는 튜토리얼 회귀 테스트가 본다)
+function newGameInTributeYear(seed, year = 2) {
+  const state = simulation.newGame(seed);
+  state.guides = { enabled: false, seen: {} };
+  state.day = (year - 1) * CONFIG.time.yearDays + 1;
+  tributeMod.announceCourtTribute(state);
+  return state;
+}
+
+// ── 새 게임: 첫 해에는 세공이 없다 (R4) ──
 {
   const state = simulation.newGame(11);
-  assert.ok(state.courtTribute, '새 게임에 세공이 설정된다');
-  assert.equal(state.courtTribute.year, 1);
-  assert.equal(state.courtTribute.resolved, false);
+  assert.equal(state.courtTribute, null, '첫 해에는 조정이 거두지 않는다');
   assert.equal(state.tributeFailStreak, 0);
   assert.deepEqual(state.tributeReserve, {});
-  assert.ok(state.log.some(e => e.text.includes('세공')), '공지 로그');
+  assert.ok(state.log.some(e => e.text.includes('세공은 이듬해 봄부터')), '첫 해 예고 로그');
+}
+
+// ── 둘째 해 봄: 파발로 그해 세공이 공지된다 ──
+{
+  const state = newGameInTributeYear(11);
+  assert.ok(state.courtTribute, '둘째 해에 세공이 공지된다');
+  assert.equal(state.courtTribute.year, 2);
+  assert.equal(state.courtTribute.resolved, false);
+  assert.ok(state.log.some(e => e.text.includes('파발이 왔습니다')), '공지 로그');
 }
 
 // ── 겨울 수거 모달: 매일 검사 가드 (모달/전투 충돌 시 미룬다) ──
 {
-  const state = simulation.newGame(11);
-  state.day = CONFIG.time.seasonDays * 3 + 1; // 겨울 첫날
+  const state = newGameInTributeYear(11);
+  state.day = CONFIG.time.yearDays + CONFIG.time.seasonDays * 3 + 1; // 둘째 해 겨울 첫날
 
   state.pendingChoice = { kind: 'raid', title: '', body: '', options: [], data: {} };
   maybeCollectTribute(state);
@@ -126,24 +143,39 @@ assert.ok(tributeScale(1, 40) > tributeScale(1, 12));
   assert.equal(state.pendingChoice?.kind, 'tribute', '충돌이 없으면 연다');
 
   // 겨울이 아니면 열지 않는다
-  const state2 = simulation.newGame(11);
-  state2.day = 5;
+  const state2 = newGameInTributeYear(11);
+  state2.day = CONFIG.time.yearDays + 5;
   maybeCollectTribute(state2);
   assert.equal(state2.pendingChoice, null);
+
+  // 첫 해 겨울에는 요구 자체가 없어 사자가 오지 않는다 (R4)
+  const firstYear = simulation.newGame(11);
+  firstYear.day = CONFIG.time.seasonDays * 3 + 1;
+  maybeCollectTribute(firstYear);
+  assert.equal(firstYear.pendingChoice, null, '첫 해 겨울에는 수거 모달이 없다');
 }
 
 // ── 시뮬레이션 통합: 가을 마지막 날 → 겨울 첫날에 모달이 열린다 ──
 {
-  const state = simulation.newGame(11);
-  state.day = CONFIG.time.seasonDays * 3; // 가을 마지막 날
+  const state = newGameInTributeYear(11);
+  state.day = CONFIG.time.yearDays + CONFIG.time.seasonDays * 3; // 둘째 해 가을 마지막 날
   state.threat = 0; // 습격 변수 제거
   simulation.advanceDay(state);
+  // 둘째 해에는 다른 결정론·랜덤 사건이 먼저 떠 있을 수 있다 — 그러면 수거는 다음 날로 미뤄진다
+  let guard = 0;
+  while (state.pendingChoice && state.pendingChoice.kind !== 'tribute') {
+    assert.ok(guard++ < 5, '세공 수거 모달이 며칠 안에 열린다');
+    const option = state.pendingChoice.options.find(candidate => !candidate.disabled);
+    assert.ok(option);
+    simulation.resolveChoice(state, option.id);
+    if (!state.pendingChoice) simulation.advanceDay(state);
+  }
   assert.equal(state.pendingChoice?.kind, 'tribute');
 }
 
 // ── 납부: 자원 차감 + 명성 + paid + streak 초기화 ──
 {
-  const state = simulation.newGame(11);
+  const state = newGameInTributeYear(11);
   const tribute = state.courtTribute;
   for (const [res, amt] of Object.entries(tribute.items)) {
     state.resources[res] = amt + 5;
@@ -167,7 +199,7 @@ assert.ok(tributeScale(1, 40) > tributeScale(1, 12));
 
 // ── 자원 부족이면 납부 선택지가 비활성화된다 ──
 {
-  const state = simulation.newGame(11);
+  const state = newGameInTributeYear(11);
   for (const res of Object.keys(state.courtTribute.items)) state.resources[res] = 0;
   openCourtTributeChoice(state);
   assert.equal(state.pendingChoice.options[0].disabled, true);
@@ -320,7 +352,7 @@ assert.ok(tributeScale(1, 40) > tributeScale(1, 12));
 
 // ── 미납: 명성 하락 + 위협 상승 + streak, 2년 연속이면 가중 ──
 {
-  const state = simulation.newGame(11);
+  const state = newGameInTributeYear(11);
   const t = CONFIG.tribute;
   const rep0 = state.resources.reputation;
   const threat0 = state.threat;
@@ -333,7 +365,7 @@ assert.ok(tributeScale(1, 40) > tributeScale(1, 12));
   assert.equal(state.courtTribute.resolved, true);
 
   // 이듬해에도 미납 → 가중 하락
-  state.courtTribute = rollCourtTribute(state.seed, 2, 12);
+  state.courtTribute = rollCourtTribute(state.seed, 3, 12);
   const rep1 = state.resources.reputation;
   openCourtTributeChoice(state);
   resolveCourtTribute(state, 'refuse');
@@ -341,20 +373,63 @@ assert.ok(tributeScale(1, 40) > tributeScale(1, 12));
   assert.equal(state.tributeFailStreak, 2);
 }
 
+// ── R4: 길잡이 출신 게임의 첫 세공은 가죽옷 고정, 이후 해와 일반 게임은 랜덤 롤 ──
+{
+  const graduate = simulation.newGame(11);
+  graduate.guides = { enabled: false, seen: {} };
+  graduate.tutorialGraduate = true;
+  graduate.day = CONFIG.time.yearDays + 1; // 둘째 해 봄 — 이 게임의 첫 세공
+  tributeMod.announceCourtTribute(graduate);
+  const pop = graduate.residents.filter(r => r.alive).length;
+  assert.deepEqual(Object.keys(graduate.courtTribute.items), ['hideClothes'], '첫 세공은 가죽옷 한 품목');
+  assert.equal(
+    graduate.courtTribute.items.hideClothes,
+    Math.max(1, Math.round(CONFIG.tribute.baseAmounts.hideClothes * tributeScale(2, pop, graduate.rank))),
+    '고정 품목의 수량도 기준량 × 연차·인구·승격 배율을 따른다',
+  );
+
+  // 셋째 해부터는 일반 롤로 돌아간다
+  graduate.day = CONFIG.time.yearDays * 2 + 1;
+  tributeMod.announceCourtTribute(graduate);
+  assert.deepEqual(
+    graduate.courtTribute.items,
+    rollCourtTribute(graduate.seed, 3, graduate.residents.filter(r => r.alive).length, graduate.rank).items,
+    '고정은 첫 세공 한 번뿐이다',
+  );
+
+  // 일반 게임(표식 없음)은 첫 세공부터 랜덤이다
+  const plain = newGameInTributeYear(11);
+  assert.deepEqual(
+    plain.courtTribute.items,
+    rollCourtTribute(plain.seed, 2, plain.residents.filter(r => r.alive).length, plain.rank).items,
+    '일반 게임의 품목은 추첨 그대로',
+  );
+}
+
 // ── 저장 마이그레이션: 구버전 저장은 세공을 재생성, 겨울 로드면 올해분 면제 ──
 {
+  // 첫 해 저장은 재생성하지 않는다 — 조정이 거두지 않는 해다 (R4)
+  const first = simulation.newGame(5);
+  delete first.courtTribute;
+  delete first.tributeFailStreak;
+  assert.equal(saveLoad.saveGame(first), true);
+  const loadedFirst = saveLoad.loadGame();
+  assert.equal(loadedFirst.courtTribute, null, '첫 해 저장은 세공 없이 이어진다');
+  assert.equal(loadedFirst.tributeFailStreak, 0);
+
   const state = simulation.newGame(5);
+  state.day = CONFIG.time.yearDays + 3; // 둘째 해 봄
   delete state.courtTribute;
   delete state.tributeFailStreak;
   assert.equal(saveLoad.saveGame(state), true);
   const loaded = saveLoad.loadGame();
   assert.ok(loaded.courtTribute, '세공 재생성');
-  assert.equal(loaded.courtTribute.year, 1);
+  assert.equal(loaded.courtTribute.year, 2);
   assert.equal(loaded.courtTribute.resolved, false);
   assert.equal(loaded.tributeFailStreak, 0);
 
   const winter = simulation.newGame(5);
-  winter.day = CONFIG.time.seasonDays * 3 + 2; // 겨울
+  winter.day = CONFIG.time.yearDays + CONFIG.time.seasonDays * 3 + 2; // 둘째 해 겨울
   delete winter.courtTribute;
   delete winter.tributeFailStreak;
   saveLoad.saveGame(winter);

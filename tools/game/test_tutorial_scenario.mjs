@@ -41,6 +41,7 @@ const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs'
 const scenario = await import(pathToFileURL(join(compiledDir, 'scenario.mjs')).href);
 const tutorialStart = await import(pathToFileURL(join(compiledDir, 'tutorialStart.mjs')).href);
 const config = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
+const courtTribute = await import(pathToFileURL(join(compiledDir, 'courtTribute.mjs')).href);
 const crops = await import(pathToFileURL(join(compiledDir, 'crops.mjs')).href);
 const guides = await import(pathToFileURL(join(compiledDir, 'guides.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
@@ -50,13 +51,15 @@ const winter = await import(pathToFileURL(join(compiledDir, 'winterReadiness.mjs
 const coachSource = readFileSync(new URL('../../src/components/TutorialCoach.tsx', import.meta.url), 'utf8');
 const sessionSource = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
 
-// 시나리오 중 허용되는 모달 — scenario(길잡이), tribute(결정론적 세공 수거)
-const ALLOWED_MODAL_KINDS = new Set(['scenario', 'tribute']);
+// 시나리오 중 허용되는 모달 — scenario(길잡이)뿐이다.
+// R4로 첫 해에는 세공 자체가 없으므로 세공 수거 모달도 길잡이 중에는 뜰 수 없다.
+const ALLOWED_MODAL_KINDS = new Set(['scenario']);
 
-// 11스텝의 id — 계획서 §3 단계표. 순서가 바뀌면 코치·문구도 함께 손봐야 한다.
+// 10스텝의 id — 계획서 §3 단계표에서 R4가 세공 스텝을 덜어낸 판.
+// 순서가 바뀌면 코치·문구도 함께 손봐야 한다.
 const EXPECTED_STEP_IDS = [
   'naming', 'working', 'sowing', 'hearth', 'water', 'hunting',
-  'patient', 'tribute', 'defense', 'stocktake', 'winter',
+  'patient', 'defense', 'stocktake', 'winter',
 ];
 
 function closeModals(state) {
@@ -70,6 +73,21 @@ function closeModals(state) {
     );
     const option = state.pendingChoice.options.find(candidate => !candidate.disabled);
     assert.ok(option, `no selectable option in ${kind} modal`);
+    simulation.resolveChoice(state, option.id);
+  }
+}
+
+// 시나리오가 끝난 뒤에는 허용 목록이 없다 — 뜬 모달을 그때그때 닫는다.
+// 길잡이 모달만은 남겨 둔다 (R4의 발화 순서를 그 자리에서 확인해야 한다).
+function resolveNonGuideModals(state) {
+  let guard = 0;
+  while (state.pendingChoice && state.pendingChoice.kind !== 'guide') {
+    assert.ok(guard++ < 12, 'post-tutorial modal resolution loop stuck');
+    const option = state.pendingChoice.options.find(candidate => !candidate.disabled);
+    if (!option) {
+      state.pendingChoice = null;
+      break;
+    }
     simulation.resolveChoice(state, option.id);
   }
 }
@@ -228,13 +246,18 @@ function goalItem(step, state, label) {
 }
 
 {
-  // 11스텝 구성과 버전
+  // 10스텝 구성과 버전 (R4: 세공 스텝을 덜어내며 버전을 올렸다)
   assert.deepEqual(scenario.TUTORIAL_STEPS.map(step => step.id), EXPECTED_STEP_IDS);
-  assert.equal(scenario.TUTORIAL_SCENARIO_VERSION, 3);
+  assert.equal(scenario.TUTORIAL_STEPS.length, 10);
+  assert.equal(scenario.TUTORIAL_SCENARIO_VERSION, 4);
+  assert.equal(
+    scenario.TUTORIAL_STEPS.some(step => step.id === 'tribute'), false,
+    'the tribute step is gone — the court is taught by the second-year dispatch guide (R4)',
+  );
 }
 
 {
-  // R3: 소목표 진행 배열 — 11스텝 전부에서 진행 배열과 isDone이 한 술어에서 나온다
+  // R3: 소목표 진행 배열 — 10스텝 전부에서 진행 배열과 isDone이 한 술어에서 나온다
   const state = tutorialStart.createTutorialGame();
   for (const step of scenario.TUTORIAL_STEPS) {
     assertProgressMatchesIsDone(step, state, 'a fresh settlement');
@@ -250,7 +273,6 @@ function goalItem(step, state, label) {
   assert.deepEqual(labelsOf('water'), ['수맥 탭', '물자리']);
   assert.deepEqual(labelsOf('hunting'), ['사냥꾼', '고기']);
   assert.deepEqual(labelsOf('patient'), ['약초막', '약초꾼', '병자 회복']);
-  assert.deepEqual(labelsOf('tribute'), ['조정 창', '세공고 비축']);
   assert.deepEqual(labelsOf('defense'), ['목책', '수비병', '파수꾼']);
   assert.deepEqual(labelsOf('stocktake'), ['겨울 점검', '식량 일분', '장작 일분']);
   assert.deepEqual(labelsOf('winter'), ['겨울']);
@@ -404,11 +426,23 @@ function goalItem(step, state, label) {
   assert.equal(stepById('water').isDone(state), false, 'the water step waits for the aquifer layer to be opened');
   markFlags(state, 'aquiferToggled');
   assert.equal(stepById('water').isDone(state), true, 'an opened aquifer tab plus a finished well closes the water step');
+}
 
-  state.tributeReserve.grain = 3;
-  assert.equal(stepById('tribute').isDone(state), false, 'the tribute step waits for the court window');
-  markFlags(state, 'courtWindowOpened');
-  assert.equal(stepById('tribute').isDone(state), true);
+{
+  // R4: 첫 해에는 조정이 세공을 거두지 않는다 (본게임 공통) — 새 게임에 요구가 없고 예고만 남는다
+  const plain = simulation.newGame(20260801, 'normal');
+  assert.equal(plain.courtTribute, null, 'a first-year settlement has no tribute demand');
+  assert.ok(
+    plain.log.some(entry => entry.text.includes('세공은 이듬해 봄부터')),
+    'the first spring foretells that tribute begins the following year',
+  );
+  // 길잡이 새 게임도 마찬가지 — 시나리오가 세공을 강제로 공지하던 훅이 사라졌다
+  const tutorial = tutorialStart.createTutorialGame();
+  assert.equal(tutorial.courtTribute, null, 'the tutorial no longer forces a first-year tribute');
+  // 겨울 점검의 세공 항목은 "요구 없음 → ✓"으로 뜬다
+  const tributeRow = winter.winterChecklist(tutorial).find(row => row.id === 'tribute');
+  assert.equal(tributeRow.verdict, 'ok');
+  assert.match(tributeRow.value, /올해 거둘 세공이 없습니다/);
 }
 
 {
@@ -569,10 +603,6 @@ function goalItem(step, state, label) {
       assignJobs(s, { herbalist: 1 });
       s.resources.herbs = Math.max(s.resources.herbs, 20);
     },
-    tribute: s => {
-      markFlags(s, 'courtWindowOpened');
-      s.tributeReserve.grain = (s.tributeReserve.grain ?? 0) + 3;
-    },
     defense: s => {
       pushBuilt(s, 'palisade');
       assignJobs(s, { militia: 1, watchman: 1 });
@@ -714,6 +744,103 @@ function goalItem(step, state, label) {
   assert.ok(state.log.some(entry => entry.text.includes('길잡이를 마쳤습니다')));
   // 완료 후에는 랜덤 사건 게이트가 열린다
   assert.equal(scenario.scenarioSuppressesRandomEvents(state), false);
+  // R4: 완주 표식이 남고, 첫 해 내내 세공은 한 번도 요구되지 않았다
+  assert.equal(state.tutorialGraduate, true, 'finishing the tutorial leaves a mark on the game');
+  assert.equal(state.courtTribute, null, 'the guided first year is never asked for tribute');
+  assert.equal(
+    state.log.some(entry => entry.text.includes('세공을 거두러')), false,
+    'no collector ever came during the tutorial year',
+  );
+}
+
+{
+  // R4: 길잡이를 마친 게임의 둘째 해 봄 — 파발이 오고, 첫 세공 품목은 가죽옷으로 고정된다.
+  //     파발 모달(tribute)을 닫으면 곧바로 가죽공방 카드(tannery)가 이어 선다.
+  const state = tutorialStart.createTutorialGame();
+  state.scenario.stepIndex = scenario.TUTORIAL_STEPS.length;
+  state.scenario.completed = true;
+  state.scenario.introShown = true;
+  state.pendingChoice = null;
+  scenario.dailyScenarioTick(state);
+  simulation.resolveChoice(state, 'guided');
+  assert.equal(state.tutorialGraduate, true);
+  assert.equal(state.guides.enabled, true);
+  assert.equal(state.courtTribute, null, 'the first year carries no tribute demand');
+
+  // 첫 해 마지막 날 → 둘째 해 봄 첫날. 세공 공지는 이 계절 전환에서 온다
+  state.day = config.CONFIG.time.yearDays;
+  state.threat = 0; // 습격 모달이 파발 안내를 가리지 않게 한다
+  keepAlive(state);
+  resolveNonGuideModals(state);
+  simulation.advanceDay(state);
+  assert.equal(state.gameOver, null);
+  assert.equal(seasons.getSeason(state.day), 'spring');
+  assert.equal(seasons.getYear(state.day), 2);
+
+  assert.ok(state.courtTribute, 'the second spring brings the first tribute demand');
+  assert.equal(state.courtTribute.year, 2);
+  assert.deepEqual(
+    Object.keys(state.courtTribute.items), ['hideClothes'],
+    "a tutorial graduate's first tribute is fixed to hide clothes (R4)",
+  );
+  // 수량은 일반 롤과 같은 셈 — 품목 기준량 × 연차·인구·승격 배율
+  const pop = state.residents.filter(resident => resident.alive).length;
+  const expected = Math.max(1, Math.round(
+    config.CONFIG.tribute.baseAmounts.hideClothes * courtTribute.tributeScale(2, pop, state.rank)));
+  assert.equal(state.courtTribute.items.hideClothes, expected, 'the fixed item keeps the usual amount rule');
+  assert.ok(state.log.some(entry => entry.text.includes('파발이 왔습니다')), 'the dispatch is logged');
+
+  // 길잡이 모듈: 파발은 모달, 가죽공방은 그 뒤를 잇는 카드
+  assert.equal(guides.hasSeenGuide(state, 'tribute'), true);
+  assert.equal(guides.hasSeenGuide(state, 'tannery'), false, 'the tannery card waits for the dispatch to be read');
+  let flushGuard = 0;
+  while (state.pendingChoice?.kind !== 'guide') {
+    assert.ok(flushGuard++ < 8, 'the tribute guide modal gets its turn');
+    if (state.pendingChoice) resolveNonGuideModals(state);
+    else guides.dailyGuideTick(state);
+  }
+  assert.equal(state.pendingChoice.data.guideId, 'tribute');
+  const cardsBefore = guides.guideCards(state).map(card => card.moduleId);
+  assert.ok(!cardsBefore.includes('tannery'));
+  simulation.resolveChoice(state, 'ok');
+  const cardsAfter = guides.guideCards(state).map(card => card.moduleId);
+  assert.ok(cardsAfter.includes('tannery'), 'the tannery card follows the tribute modal (R4)');
+  assert.equal(cardsAfter.length, cardsBefore.length + 1, 'exactly one card is added');
+  assert.ok(state.log.some(entry => entry.text.includes('무두장이와 가죽공방')), 'the card is echoed in the log');
+}
+
+{
+  // R4: 일반 게임(길잡이를 거치지 않은 새 마을)도 첫 해에는 세공이 없고,
+  //     둘째 해 봄에 품목이 고정되지 않은 세공이 공지되며 파발 안내가 한 번 뜬다
+  const state = simulation.newGame(20260802, 'normal');
+  assert.equal(state.tutorialGraduate, undefined, 'a normal game carries no tutorial mark');
+  assert.equal(state.courtTribute, null, 'a normal first year has no tribute either');
+  assert.equal(state.guides.enabled, true);
+  state.day = config.CONFIG.time.yearDays;
+  state.threat = 0;
+  keepAlive(state);
+  resolveNonGuideModals(state);
+  simulation.advanceDay(state);
+  assert.ok(state.courtTribute, 'the normal game is asked from the second year on');
+  assert.deepEqual(
+    state.courtTribute.items,
+    courtTribute.rollCourtTribute(state.seed, 2, state.residents.filter(r => r.alive).length, state.rank).items,
+    'a normal game keeps the random roll — only tutorial graduates get a fixed first item',
+  );
+  assert.equal(guides.hasSeenGuide(state, 'tribute'), true, 'the dispatch guide fires in normal games too');
+
+  // 셋째 해에는 다시 뜨지 않는다 (1회성)
+  const seenDay = state.guides.seen.tribute;
+  state.day = config.CONFIG.time.yearDays * 2;
+  state.courtTribute.resolved = true;
+  resolveNonGuideModals(state);
+  guides.dailyGuideTick(state); // 대기 중이던 파발 모달을 열고
+  if (state.pendingChoice?.kind === 'guide') simulation.resolveChoice(state, 'ok'); // 닫아 하루를 진행시킨다
+  resolveNonGuideModals(state);
+  keepAlive(state);
+  simulation.advanceDay(state);
+  assert.equal(state.courtTribute.year, 3, 'the third year is announced as usual');
+  assert.equal(state.guides.seen.tribute, seenDay, 'the dispatch guide never fires twice');
 }
 
 {
@@ -843,8 +970,8 @@ function goalItem(step, state, label) {
 }
 
 {
-  // 형식 구분: 습격·화재·재해만 모달(대기열 → 자리 비면 pendingChoice), 나머지는 비차단 카드
-  const modalIds = ['fire', 'battle', 'disaster'];
+  // 형식 구분: 습격·화재·재해와 세공 파발만 모달(대기열 → 자리 비면 pendingChoice), 나머지는 비차단 카드
+  const modalIds = ['fire', 'battle', 'disaster', 'tribute'];
   for (const id of Object.keys(guides.GUIDE_MODULES)) {
     const module = guides.GUIDE_MODULES[id];
     assert.equal(module.id, id, `guide module ${id} carries its own id`);
@@ -854,10 +981,11 @@ function goalItem(step, state, label) {
       `guide module ${id} uses the planned format`,
     );
   }
-  // 계획서 §5 트리거 표의 12개 모듈이 전부 있다
+  // 계획서 §5 트리거 표의 12개 모듈 + R4의 세공 파발·가죽공방 2개
   assert.deepEqual(Object.keys(guides.GUIDE_MODULES).sort(), [
     'battle', 'beast', 'chronicle', 'diplomacy', 'disaster', 'expedition',
     'fire', 'livestock', 'mining', 'oxen', 'preservation', 'rename',
+    'tannery', 'tribute',
   ]);
 
   const state = tutorialStart.createTutorialGame();
@@ -983,6 +1111,30 @@ function goalItem(step, state, label) {
     assert.equal(guides.openGuideOnce(bare, 'fire'), false);
   }
 
+  // R4: 길잡이 완주 표식은 저장을 건너 살아남는다 — 둘째 해 첫 세공 품목 고정이 여기에 달렸다.
+  // 표식이 없는 저장(일반 게임·구버전)은 아닌 것으로 정규화되므로 스키마를 올리지 않았다.
+  {
+    const graduate = tutorialStart.createTutorialGame();
+    graduate.scenario.stepIndex = scenario.TUTORIAL_STEPS.length;
+    graduate.scenario.completed = true;
+    graduate.scenario.introShown = true;
+    graduate.pendingChoice = null;
+    scenario.dailyScenarioTick(graduate);
+    simulation.resolveChoice(graduate, 'solo'); // 안내를 껐어도 표식은 남는다
+    assert.equal(graduate.tutorialGraduate, true);
+    assert.equal(saveLoad.saveGame(graduate, 4), true);
+    const reloaded = saveLoad.loadGame(4);
+    assert.equal(reloaded.tutorialGraduate, true, 'the tutorial mark survives a save');
+    assert.equal(reloaded.guides.enabled, false, 'the mark is independent of the help toggle');
+
+    const key = 'buksae-save-v3-slot4';
+    const raw = JSON.parse(globalThis.localStorage.getItem(key));
+    delete raw.tutorialGraduate; // 표식이 없던 시절의 저장(=일반 게임)을 흉내낸다
+    globalThis.localStorage.setItem(key, JSON.stringify(raw));
+    const bare = saveLoad.loadGame(4);
+    assert.equal(bare.tutorialGraduate, false, 'a save without the mark is not treated as a graduate');
+  }
+
   // 버전 해제: 코드의 튜토리얼 버전이 바뀌면 저장은 일반 모드로 이어진다
   const state = tutorialStart.createTutorialGame();
   state.pendingChoice = null; // 모달은 저장 대상이지만 여기선 진행 위치만 본다
@@ -996,20 +1148,23 @@ function goalItem(step, state, label) {
   assert.equal(loaded.scenario, null, 'outdated tutorial is detached to normal mode');
   assert.ok(loaded.log.some(entry => entry.text.includes('길잡이 시나리오가 갱신')));
 
-  // 실제로 남아 있을 구판은 버전 2(옛 8스텝)다 — 같은 경로로 해제되고 게이트도 함께 열린다
-  const v2Raw = JSON.parse(globalThis.localStorage.getItem('buksae-save-v3'));
-  v2Raw.scenario = {
-    id: 'tutorial', version: 2, stepIndex: 3, introShown: true, flags: { firewoodGoal: 40 },
-  };
-  globalThis.localStorage.setItem('buksae-save-v3', JSON.stringify(v2Raw));
-  const fromV2 = saveLoad.loadGame(1);
-  assert.ok(fromV2, 'a version 2 tutorial save still loads');
-  assert.equal(fromV2.scenario, null, 'the old eight-step tutorial is detached to normal mode');
-  assert.ok(fromV2.log.some(entry => entry.text.includes('길잡이 시나리오가 갱신')));
-  assert.equal(
-    scenario.scenarioSuppressesRandomEvents(fromV2), false,
-    'a detached save plays with the random event gate open',
-  );
+  // 실제로 남아 있을 구판은 버전 2(옛 8스텝)와 버전 3(R3까지의 11스텝)이다 —
+  // 둘 다 같은 경로로 해제되고 게이트도 함께 열린다
+  for (const oldVersion of [2, 3]) {
+    const oldRaw = JSON.parse(globalThis.localStorage.getItem('buksae-save-v3'));
+    oldRaw.scenario = {
+      id: 'tutorial', version: oldVersion, stepIndex: 3, introShown: true, flags: { firewoodGoal: 40 },
+    };
+    globalThis.localStorage.setItem('buksae-save-v3', JSON.stringify(oldRaw));
+    const fromOld = saveLoad.loadGame(1);
+    assert.ok(fromOld, `a version ${oldVersion} tutorial save still loads`);
+    assert.equal(fromOld.scenario, null, `the version ${oldVersion} tutorial is detached to normal mode`);
+    assert.ok(fromOld.log.some(entry => entry.text.includes('길잡이 시나리오가 갱신')));
+    assert.equal(
+      scenario.scenarioSuppressesRandomEvents(fromOld), false,
+      'a detached save plays with the random event gate open',
+    );
+  }
 
   // 스키마 v52 저장(초회 도움말 이전)은 안내가 꺼진 채로 이어진다
   const legacy = JSON.parse(globalThis.localStorage.getItem('buksae-save-v3'));

@@ -32,6 +32,7 @@ const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs'
 const specialEvents = await import(pathToFileURL(join(compiledDir, 'specialEvents.mjs')).href);
 const events = await import(pathToFileURL(join(compiledDir, 'events.mjs')).href);
 const tribute = await import(pathToFileURL(join(compiledDir, 'courtTribute.mjs')).href);
+const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 {
   for (let seed = 1; seed <= 30; seed++) {
@@ -106,7 +107,9 @@ const tribute = await import(pathToFileURL(join(compiledDir, 'courtTribute.mjs')
 {
   const state = simulation.newGame(4404);
   state.tributeWaivers = 1;
-  state.day = 37;
+  // R4: 첫 해에는 세공이 없으므로 둘째 해 겨울로 옮겨 면제권 자동 적용만 본다
+  state.day = CONFIG.time.yearDays + 37;
+  state.courtTribute = tribute.rollCourtTribute(state.seed, 2, state.residents.length, state.rank);
   assert.ok(state.courtTribute && !state.courtTribute.resolved);
   tribute.maybeCollectTribute(state);
   assert.equal(state.tributeWaivers, 0);
@@ -126,6 +129,8 @@ const tribute = await import(pathToFileURL(join(compiledDir, 'courtTribute.mjs')
 
 {
   const state = simulation.newGame(4455);
+  // R4: 첫 해에는 세공이 없다 — "올해분이 이미 처리된" 상황만 흉내내어 문구를 확인한다
+  state.courtTribute = tribute.rollCourtTribute(state.seed, 1, state.residents.length, state.rank);
   state.courtTribute.resolved = true;
   state.courtTribute.paid = true;
   onlyEvent(state, 'wildGinseng');

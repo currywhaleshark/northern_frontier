@@ -13,7 +13,8 @@ export type GuideFormat = 'card' | 'modal';
 
 export type GuideModuleId =
   | 'preservation' | 'livestock' | 'oxen' | 'disaster' | 'fire' | 'diplomacy'
-  | 'battle' | 'expedition' | 'beast' | 'mining' | 'chronicle' | 'rename';
+  | 'battle' | 'expedition' | 'beast' | 'mining' | 'chronicle' | 'rename'
+  | 'tribute' | 'tannery';
 
 export interface GuideModule {
   id: GuideModuleId;
@@ -150,6 +151,34 @@ export const GUIDE_MODULES: Record<GuideModuleId, GuideModule> = {
       '· 중심지를 누르면 연대기가 열립니다. 이 땅에서 일어난 일이 해마다 적혀 있습니다.\n' +
       '· 등급이 오르면 조정의 기대도 함께 오릅니다. 세공이 무거워지는 것을 셈해 두십시오.',
   },
+  // 세공 파발 — 둘째 해 봄 첫 공지에 발화한다. 첫 해는 조정이 거두지 않으므로
+  // 이 안내가 곧 세공이라는 살림의 첫 소개다 (R4). 즉시 손을 대야 하는 일이라 모달로 둔다.
+  tribute: {
+    id: 'tribute',
+    title: '세공(歲貢)과 파발',
+    summary: '북병사의 파발이 올해 세공을 알렸습니다 — 조정 창에서 세공고에 미리 비축하십시오.',
+    format: 'modal',
+    body:
+      '북병사(北兵使) 명의의 파발이 왔습니다. 올해부터 조정이 해마다 세공을 거둡니다.\n\n' +
+      '· 봄에 공지된 요구를 세 계절 동안 마련하고, 겨울 첫날 조정의 사자가 거두어 갑니다.\n' +
+      '· 상단 바의 세공 칩을 눌러 조정 창을 여십시오. 북병사의 이름과 성향, 올해 요구가 그곳에 있습니다.\n' +
+      '· 요구 품목은 세공고에 미리 비축하십시오. 넣어 둔 몫은 겨울 소비와 분리되어 잠깁니다.\n' +
+      '· 다 채우지 못하면 명성이 깎이고 국경이 험악해집니다. 해를 거듭해 미납하면 더 아픕니다.\n' +
+      '· 성실히 바치면 명성이 오르고, 격년으로 조정의 하사품이 내려옵니다.',
+  },
+  // 세공 파발(모달)을 닫은 직후 이어 붙는 카드 — 요구 품목이 가죽옷일 때만 온다 (openGuideFollowUp)
+  tannery: {
+    id: 'tannery',
+    title: '무두장이와 가죽공방',
+    summary: '가죽옷은 무두장이가 가죽공방에서 짓습니다 — 가죽 2장이 옷 한 벌이 됩니다.',
+    format: 'card',
+    body:
+      '가죽옷은 저절로 생기지 않습니다. 무두장이가 가죽공방에서 짓습니다.\n' +
+      '· 건설 목록(생산)의 가죽공방을 세우고, 직업 배정에서 무두장이를 두십시오.\n' +
+      '· 가죽 2장이 옷 한 벌이 됩니다. 가죽은 사냥꾼이 짐승을 잡아 가져옵니다.\n' +
+      '· 사냥꾼이 모자라면 가죽이 끊깁니다. 사냥막과 사냥꾼의 수를 함께 살피십시오.\n' +
+      '· 지은 옷은 겨울 체온도 지킵니다. 바칠 몫과 입힐 몫을 함께 셈해 두십시오.',
+  },
   rename: {
     id: 'rename',
     title: '개칭 청원',
@@ -262,6 +291,19 @@ export function openGuideOnce(state: GameState, moduleId: GuideModuleId | string
     ];
   }
   return true;
+}
+
+/**
+ * 모달 길잡이를 닫은 직후 이어 붙는 안내 — 한 호흡 뒤에 오는 후속 카드다.
+ * 세공 파발(모달)을 읽고 나면, 그 요구가 가죽옷일 때에 한해 가죽공방 카드가 잇는다.
+ * 조건을 "튜토리얼 출신"이 아니라 "요구 품목에 가죽옷이 있음"으로 두는 이유:
+ * 튜토리얼 출신은 첫 세공이 가죽옷으로 고정되어 있으니 언제나 이어지고,
+ * 일반 게임은 실제로 가죽옷을 요구할 때만 뜬다 — 안내가 화면의 사실과 어긋나지 않는다.
+ */
+export function openGuideFollowUp(state: GameState, moduleId: string): void {
+  if (moduleId === 'tribute' && (state.courtTribute?.items.hideClothes ?? 0) > 0) {
+    openGuideOnce(state, 'tannery');
+  }
 }
 
 /** 건물 완공 훅 — 처음 서는 살림이면 그에 맞는 길잡이를 연다. */

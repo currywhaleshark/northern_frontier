@@ -7,6 +7,7 @@ import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import { rollCourtGrantArtifact, rollCourtGrantRewards } from './courtGrants';
 import { addLog } from './events';
+import { openGuideOnce } from './guides';
 import { makeRng } from './map';
 import { acquireLivestock, LIVESTOCK_DEFS } from './livestock';
 import { rankEffects } from './promotion';
@@ -67,12 +68,41 @@ export function hasLenientTributeGrace(state: Pick<GameState, 'borderCommander'>
   return state.borderCommander.temper === 'lenient' && !state.borderCommander.tributeLeniencyUsed;
 }
 
-// 봄 첫날: 올해 세공 공지
+/**
+ * 튜토리얼(길잡이)을 마친 게임의 첫 세공은 가죽옷으로 고정한다 — 파발 길잡이에서
+ * 무두장이·가죽공방 안내로 곧장 잇기 위함이다. 수량은 일반 롤과 같은 셈
+ * (품목 기준량 × 연차·인구·승격 배율)이라 난이도는 건드리지 않는다.
+ */
+function firstGraduateTributeItems(state: GameState, year: number, pop: number): Partial<Record<ResourceId, number>> {
+  const scale = tributeScale(year, pop, state.rank);
+  return { hideClothes: Math.max(1, Math.round(CONFIG.tribute.baseAmounts.hideClothes * scale)) };
+}
+
+// 봄 첫날: 올해 세공 공지 (첫 해는 거두지 않는다 — CONFIG.tribute.firstYear)
 export function announceCourtTribute(state: GameState): void {
   releaseTributeReserve(state);
   const year = getYear(state.day);
+  if (year < CONFIG.tribute.firstYear) {
+    // 첫 해는 정착이 우선 — 요구 없이 예고만 남긴다. 겨울 수거도 courtTribute가 없어 일어나지 않는다.
+    state.courtTribute = null;
+    addLog(
+      state,
+      '조정은 첫 해의 정착을 지켜보고 있습니다. 세공은 이듬해 봄부터 거둔다 하니, ' +
+        '올해는 겨울을 넘기는 일에만 힘쓰십시오.',
+      'info',
+      true,
+    );
+    return;
+  }
+  // "이 게임의 첫 세공"은 아직 한 해분도 공지된 적이 없다는 뜻이다 — 첫 해 공지가 null을
+  // 남기므로 연차를 세지 않아도 알 수 있고, 길잡이를 늦게 마친 게임에서도 어긋나지 않는다.
+  const isFirstTribute = state.courtTribute == null;
   const pop = state.residents.filter(r => r.alive).length;
-  state.courtTribute = rollCourtTribute(state.seed, year, pop, state.rank);
+  const tribute = rollCourtTribute(state.seed, year, pop, state.rank);
+  if (state.tutorialGraduate && isFirstTribute) {
+    tribute.items = firstGraduateTributeItems(state, year, pop);
+  }
+  state.courtTribute = tribute;
   addLog(
     state,
     `${BORDER_COMMANDER_TITLE} ${state.borderCommander.name} 명의의 파발이 왔습니다. ` +
@@ -80,6 +110,8 @@ export function announceCourtTribute(state: GameState): void {
     'info',
     true,
   );
+  // 첫 파발 — 세공이라는 살림 자체를 처음 보는 자리다 (길잡이 모달, 이어서 가죽공방 카드)
+  openGuideOnce(state, 'tribute');
 }
 
 // 겨울 첫날(또는 모달 충돌 시 그 다음 날): 조정의 사자가 세공을 거두러 온다

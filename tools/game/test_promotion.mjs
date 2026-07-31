@@ -193,6 +193,8 @@ function addBuilt(state, type, n = 1) {
 // ── 세공 납부/미납이 성실도(연속 납부)를 갱신한다 ──
 {
   const state = simulation.newGame(11);
+  // R4: 첫 해에는 조정이 거두지 않는다 — 성실도 경로만 보려고 둘째 해분을 직접 세운다
+  state.courtTribute = tributeMod.rollCourtTribute(state.seed, 2, 12, state.rank);
   const reserveMod = await import(pathToFileURL(join(compiledDir, 'tributeReserve.mjs')).href);
   for (const [res, amt] of Object.entries(state.courtTribute.items)) {
     state.resources[res] = amt;
@@ -202,7 +204,7 @@ function addBuilt(state, type, n = 1) {
   tributeMod.resolveCourtTribute(state, 'pay-full');
   assert.equal(state.tributePaidStreak, 1);
 
-  state.courtTribute = tributeMod.rollCourtTribute(state.seed, 2, 12);
+  state.courtTribute = tributeMod.rollCourtTribute(state.seed, 3, 12);
   tributeMod.openCourtTributeChoice(state);
   tributeMod.resolveCourtTribute(state, 'refuse');
   assert.equal(state.tributePaidStreak, 0, '미납 시 성실도 초기화');

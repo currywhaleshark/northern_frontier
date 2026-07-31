@@ -115,6 +115,8 @@ const factorOf = (state, id) => suspicionBreakdown(state).find(f => f.id === id)
 {
   const state = simulation.newGame(11);
   state.suspicion = 30;
+  // R4: 첫 해에는 세공이 없다 — 납부가 의심을 씻는지만 보려고 둘째 해분을 직접 세운다
+  state.courtTribute = tributeMod.rollCourtTribute(state.seed, 2, 12, state.rank);
   const reserveMod = await import(pathToFileURL(join(compiledDir, 'tributeReserve.mjs')).href);
   for (const [res, amt] of Object.entries(state.courtTribute.items)) {
     state.resources[res] = amt;

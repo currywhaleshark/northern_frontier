@@ -2482,15 +2482,21 @@ export function loadGame(slot = 1): GameState | null {
       });
       parsed.expectationTransitionNotified = true;
     }
-    // 세공 없는 구버전: 시드로 올해분을 재생성. 이미 겨울이면 올해분은 면제 (다음 봄부터 정상 진행)
+    // 세공 없는 구버전: 시드로 올해분을 재생성. 이미 겨울이면 올해분은 면제 (다음 봄부터 정상 진행).
+    // 첫 해는 조정이 거두지 않으므로(R4) 재생성 없이 비워 둔다.
     if (!Object.prototype.hasOwnProperty.call(parsed, 'courtTribute')) {
-      const pop = parsed.residents.filter(r => r.alive).length;
-      const tribute = rollCourtTribute(parsed.seed ?? 1, getYear(parsed.day), pop, parsed.rank);
-      if (getSeason(parsed.day) === 'winter') {
-        tribute.resolved = true;
-        tribute.paid = true;
+      const year = getYear(parsed.day);
+      if (year < CONFIG.tribute.firstYear) {
+        parsed.courtTribute = null;
+      } else {
+        const pop = parsed.residents.filter(r => r.alive).length;
+        const tribute = rollCourtTribute(parsed.seed ?? 1, year, pop, parsed.rank);
+        if (getSeason(parsed.day) === 'winter') {
+          tribute.resolved = true;
+          tribute.paid = true;
+        }
+        parsed.courtTribute = tribute;
       }
-      parsed.courtTribute = tribute;
     }
     if (parsed.tributeFailStreak == null) parsed.tributeFailStreak = 0;
     reconcileTributeReserve(parsed);
@@ -2579,6 +2585,8 @@ export function loadGame(slot = 1): GameState | null {
     } else {
       parsed.scenario = null;
     }
+    // 길잡이 출신 표식: 없으면 아닌 것으로 본다 (새 게임 기본값과 같으므로 스키마를 올리지 않는다)
+    parsed.tutorialGraduate = parsed.tutorialGraduate === true;
     // 초회 도움말: 손상되었거나 없으면 꺼진 상태로 본다 (구버전 저장 보정과 같은 규칙)
     const guides = parsed.guides;
     parsed.guides = guides && typeof guides === 'object' && guides.seen != null && typeof guides.seen === 'object'

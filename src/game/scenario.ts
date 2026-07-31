@@ -10,7 +10,6 @@ import { buildingFootprintDims } from './buildings';
 import { CONFIG } from './config';
 import { consumeFuelHeat } from './consumption';
 import { addLog } from './events';
-import { announceCourtTribute } from './courtTribute';
 import { openGuideOnce } from './guides';
 import { makeRng } from './map';
 import { residentLogName } from './residentLogName';
@@ -21,7 +20,9 @@ import { buildingTouchesWaterCoverage, naturalWaterCoverageTileSets } from './wa
 import { dailyFuelHeatNeed, winterReadiness } from './winterReadiness';
 import type { GameState, JobId, Resident, ScenarioState } from './types';
 
-export const TUTORIAL_SCENARIO_VERSION = 3;
+// 4 = R4에서 세공(tribute) 스텝을 덜어 10스텝이 된 판. 스텝 수가 바뀌면 진행 위치의 뜻이
+// 달라지므로 반드시 올린다 — 구판 저장은 로드에서 일반 모드로 해제된다.
+export const TUTORIAL_SCENARIO_VERSION = 4;
 
 /** 소목표 하나 — 칩에 `라벨 (현재/목표)`로 선다. 라벨은 짧은 명사, 칩은 수치 요약이다. */
 export interface ScenarioGoalProgress {
@@ -285,24 +286,6 @@ const TUTORIAL_STEP_SPECS: readonly ScenarioStepSpec[] = [
     },
   },
   {
-    id: 'tribute',
-    title: '조정의 몫',
-    body:
-      '봄에 조정이 공지한 세공은 겨울에 사자가 와서 거둡니다. 미리 떼어 두지 않으면 겨울 곳간에서 그대로 빠져나갑니다.\n\n' +
-      '· 상단 바의 세공 칩을 눌러 조정 창을 여십시오. 북병사(北兵使)의 이름과 성향이 그곳에 있습니다.\n' +
-      '· 세공고에 요구 품목을 비축하면 소비와 분리되어 잠깁니다.\n' +
-      '· 다 못 채우면 명성이 깎이고, 해를 거듭해 미납하면 더 아픕니다.\n' +
-      '· 조정은 개척지가 홀로 강해지는 것도 눈여겨봅니다. 화약을 스스로 만들고 월경 교역이 잦으면 ' +
-      '의심이 오릅니다 — 길잡이 동안에는 오르지 않으니 문법만 익혀 두십시오.',
-    progress: state => [
-      flagGoal(state, '조정 창', 'courtWindowOpened'),
-      boolGoal('세공고 비축', Object.values(state.tributeReserve).some(amount => (amount ?? 0) > 0)),
-    ],
-    onStart: state => {
-      if (!state.courtTribute) announceCourtTribute(state);
-    },
-  },
-  {
     id: 'defense',
     title: '방어의 기초',
     body:
@@ -369,7 +352,7 @@ const TUTORIAL_STEP_SPECS: readonly ScenarioStepSpec[] = [
 ];
 
 // isDone·goal은 여기 한 곳에서만 만들어진다 — 진행 배열과 완료 판정이 갈라질 수 없는 구조다.
-// (전 소목표 current ≥ target ⇔ isDone. 회귀 테스트가 11스텝 전부에서 이 등가를 확인한다)
+// (전 소목표 current ≥ target ⇔ isDone. 회귀 테스트가 10스텝 전부에서 이 등가를 확인한다)
 export const TUTORIAL_STEPS: readonly ScenarioStepDefinition[] = TUTORIAL_STEP_SPECS.map(spec => ({
   ...spec,
   goal: state => formatScenarioGoal(spec.progress(state)),
@@ -497,6 +480,9 @@ export function resolveScenarioChoice(state: GameState, optionId: string): void 
   // 시나리오는 여기서 끝난다 — 붙들고 있으면 랜덤 사건 게이트가 영영 열리지 않는다.
   // 이후의 안내는 시나리오와 분리된 guides 상태가 맡는다.
   state.scenario = null;
+  // 길잡이 출신이라는 표식은 시나리오가 걷힌 뒤에도 남는다 — 둘째 해 첫 세공 품목을
+  // 가죽옷으로 고정해 무두장이·가죽공방 안내로 잇는 데 쓴다 (R4). 저장에 함께 실린다.
+  state.tutorialGraduate = true;
   const guided = optionId !== 'solo';
   state.guides = { enabled: guided, seen: state.guides?.seen ?? {} };
   addLog(

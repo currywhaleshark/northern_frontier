@@ -1,6 +1,6 @@
 # 튜토리얼 개편 착수 지시문 — 「길잡이: 첫 겨울」
 
-> **계획 상태:** 완료 — R3 포함. M0~M6(f1df2e7, f03c3cb, 58956ca, 7a0ac40) 위에 플레이테스트 후속 R1 4건(c7b7d33)·2차 후속 R2 3건(712008d)·3차 후속 R3(목표 칩 진행도) 반영 (문서 말미 R1·R2·R3 절)
+> **계획 상태:** 완료 — R4 포함. M0~M6(f1df2e7, f03c3cb, 58956ca, 7a0ac40) 위에 플레이테스트 후속 R1 4건(c7b7d33)·2차 후속 R2 3건(712008d)·3차 후속 R3(목표 칩 진행도, 093ed65)·4차 후속 R4(세공 개시 시기 개편 — 첫 해 무세공·10스텝·가죽옷 고정·길잡이 2모듈) 반영 (문서 말미 R1~R4 절)
 > **M0~M1 검증:** `test_tutorial_scenario.mjs`·`tsc --noEmit`·`npm run build` 통과 (Fable 재확인 포함). 시드 20260718 유지 — 수맥 우물 자리 137칸으로 4단계 성립. `npm run test:game`의 22개 실패는 HEAD에서도 동일한 선행 실패로 이번 변경과 무관 확인
 > **담당:** Claude Opus 단독 (`src/game/**` + `src/components/**` 모두 — Codex 분업 없음)
 > **작성:** 2026-07-31 Fable (검토·계획), 원전: [`docs/superpowers/plans/2026-07-31-tutorial-overhaul.md`](superpowers/plans/2026-07-31-tutorial-overhaul.md)
@@ -374,4 +374,130 @@ M1 보고의 지적이 사실이었고, 실측은 그보다 더 헐거웠다 (�
 ### R3 테스트·검증 결과
 
 - `node tools/game/test_tutorial_scenario.mjs` 통과 (보강분 포함)
+- `npx tsc --noEmit`·`npm run build` 통과
+
+## R4 — 세공 개시 시기 개편 (2026-08-01 사용자 피드백)
+
+첫 해는 정착이 우선 — **본게임·튜토리얼 공통으로 첫 해에는 세공 요구가 없고 둘째 해부터 시작한다.** 튜토리얼은 첫 해(첫 겨울 완주) 후 둘째 해 봄에 세공 파발이 오면 그때 설명하고, 첫 세공 품목을 가죽옷으로 고정해 무두장이·가죽공방 안내로 잇는다.
+
+- [x] 세공 공지를 둘째 해 봄부터 (본게임 공통 — 첫 해 겨울 수거도 자연히 없음)
+- [x] 시나리오에서 tribute 스텝 제거 (11→10스텝) — 조정 창·세공고·북병사 학습은 둘째 해 파발 guide로 이동
+- [x] 튜토리얼 출신 게임 표식(저장 유지) — 첫 세공 품목을 가죽옷(hideClothes)으로 고정
+- [x] guides에 `tribute` 모듈 추가(모달): 파발 도착 시 세공·세공고·미납 결과 설명. 뒤이어 무두장이·가죽공방 카드(가죽 2→옷 1, 사냥꾼 가죽 수급)
+- [x] 파생 정리: 코치 tribute 힌트 제거, `courtWindowOpened` 플래그 정리, 겨울 점검 세공 항목(첫 해 "요구 없음 ✓") 확인
+- [x] 회귀: 10스텝 완주, 첫 해 무세공, 둘째 해 공지·고정 품목·guide 발화
+
+### R4 게이트 위치와 파생 영향
+
+게이트는 **`announceCourtTribute` 함수 내부**에 두었다 (`CONFIG.tribute.firstYear = 2`).
+호출부가 셋(새 게임 첫날·봄 계절 전환·구버전 저장 재생성)이라 함수 안이 한 곳이고,
+"공지되지 않은 해에는 `courtTribute`가 null"이라는 불변식을 한 자리에서 지킬 수 있다.
+첫 해에는 요구 대신 사극체 예고 한 줄을 남긴다 —
+「조정은 첫 해의 정착을 지켜보고 있습니다. 세공은 이듬해 봄부터 거둔다 하니…」
+
+파생 영향 점검 (모두 "기록 없음"으로 자연 처리 — 보정 없음):
+
+| 계 | 첫 해 무세공의 영향 | 판정 |
+|---|---|---|
+| 겨울 수거(`maybeCollectTribute`) | `courtTribute`가 null이라 조기 반환 | 그대로 (표적 테스트 추가) |
+| 하사품(`courtGrants`) | 격년(짝수 연차) 완납에만 딸린다. 첫 완납이 2년차이므로 첫 하사도 2년차 — 이전과 같다 | 변화 없음 |
+| 승격 조건(`tributePaidStreak`) | 성실도 축적이 한 해 늦어진다(진 승격 3년 연속 → 최단 4년차 겨울). 승격 조건 자체가 5년 생존·인구 40을 함께 요구하므로 병목이 아니다 | 그대로 |
+| 청원·의심(`suspicion`) | 세공 납부의 의심 감쇠가 한 해 늦게 시작. 첫 해에는 염초장·월경 교역도 거의 없어 의심이 오르지 않는다 | 그대로 |
+| 면제권(산삼·면세 교지) | `courtTribute`가 null이면 "다음 해분"으로 안내하는 분기가 이미 있다 | 그대로 |
+| 겨울 점검 세공 항목 | 요구 목록이 비면 `ok` + 「올해 거둘 세공이 없습니다」 — 첫 해에 ✓로 뜬다 | 그대로 (회귀 단언 추가) |
+| 조정 창 | 세공 절이 통째로 빠져 허전했다 — 첫 해 안내 한 줄을 넣었다 | 보정 |
+| 상단 바 세공 칩 | `courtTribute`가 null이면 칩 자체가 서지 않는다 | 그대로 |
+
+### R4 표식(`tutorialGraduate`) 구현
+
+- `GameState.tutorialGraduate?: boolean` — `resolveScenarioChoice`의 완료 처리에서 `true`
+  (**두 선택지 모두**. 안내를 끈 사람도 길잡이 출신이다)
+- 저장: 로드 정규화에서 `parsed.tutorialGraduate = parsed.tutorialGraduate === true`.
+  **스키마는 올리지 않았다** — 없을 때의 기본값(false)이 새 게임 기본값과 같아 마이그레이션이 필요 없다.
+  (v53은 `guides.enabled`가 "구버전은 꺼짐 / 새 게임은 켜짐"으로 갈려 마이그레이션이 필요했던 경우다)
+- **첫 세공 판정은 연차가 아니라 `state.courtTribute == null`로 한다.** 첫 해 공지가 null을 남기므로
+  "아직 한 해분도 공지된 적이 없다"가 곧 첫 세공이다. 길잡이를 늦게 마친 게임에서도 어긋나지 않는다.
+
+### R4 가죽옷 고정 수량
+
+`rollCourtTribute`의 품목만 덮고 수량 규칙은 그대로 쓴다 —
+`max(1, round(baseAmounts.hideClothes(6) × tributeScale(연차, 인구, 승격)))`.
+표준 2년차·인구 14·개척지 기준 `1.3 × (0.7 + 14/40) = 1.365` → **가죽옷 8벌**(가죽 16장).
+난이도 축(연차·인구·승격)을 건드리지 않으므로 일반 롤이 가죽옷을 뽑았을 때와 같은 무게다.
+
+### R4 길잡이 2모듈 — 형식·트리거 (M5 표 형식)
+
+| 모듈 | 형식 | 트리거 | 조건 |
+|---|---|---|---|
+| `tribute` | 모달 | `announceCourtTribute`의 첫 공지(둘째 해 봄 파발) | 일반 게임 포함 전부 1회 |
+| `tannery` | 카드 | `tribute` 모달을 닫는 순간(`openGuideFollowUp`) | 그해 요구 품목에 가죽옷이 있을 때만 |
+
+- **모달→카드 이어 발화**는 새 상태 없이 붙였다. `resolveChoice`의 `kind === 'guide'` 분기에서
+  닫힌 모듈 id를 `openGuideFollowUp`에 넘기고, 그 안에서 후속 카드를 연다 (저장 계약 무변경).
+- **`tannery`의 조건을 "튜토리얼 출신"이 아니라 "요구 품목에 가죽옷이 있음"으로 둔 근거**:
+  길잡이 출신은 첫 세공이 가죽옷으로 고정되어 있으니 언제나 이어지고, 일반 게임은 실제로
+  가죽옷을 요구할 때만 뜬다 — 지시문의 두 요구("튜토리얼 출신에서 이어 발화 / 일반 게임에서
+  다른 품목이면 뜨지 않게")를 모두 만족하면서, 안내가 화면의 사실과 어긋나지 않는다.
+- **가죽공방이 이미 서 있어도 발화한다.** 카드의 알맹이는 건물이 아니라 "가죽 2 → 옷 1"과
+  "가죽은 사냥꾼이 가져온다"는 공급 사슬이다. 건물만 있고 무두장이가 없으면 옷은 한 벌도 나오지 않으므로,
+  건물 유무로 가르면 정작 필요한 사람에게 안내가 가지 않는다. 문구도 건물·직업을 한 줄에 묶어 적었다.
+
+### R4 파생 정리 판단
+
+- **`courtWindowOpened`는 사장 처리했다** — 시나리오에서 참조가 사라지자 `GameSession`의
+  `markScenarioFlag` 호출이 읽는 곳 없는 쓰기만 남는다. 호출 한 줄을 걷고 그 자리에 이유를 주석으로 남겼다
+  (`markScenarioFlag` 자체는 다른 플래그가 계속 쓴다).
+- **`TUTORIAL_SCENARIO_VERSION 3 → 4`.** 스텝 수가 바뀌면 저장된 `stepIndex`의 뜻이 달라진다
+  (구판 8단계 = 방어가 새 판에서는 겨울 점검). 로드에서 일반 모드로 해제되게 버전을 올렸다.
+- 랜덤 사건 게이트(`scenarioSuppressesRandomEvents`) 구조는 손대지 않았다 — 세공은 여전히 게이트 밖의 결정론 사건이다.
+
+### R4 수정한 기존 테스트
+
+첫 해에 세공이 있다고 전제하던 블록만 둘째 해로 옮겼다 (`rollCourtTribute(seed, 2, …)` 주입 또는 날짜 이동).
+
+| 파일 | 고친 곳 |
+|---|---|
+| `tools/game/test_court_tribute.mjs` | 새 게임 블록을 "첫 해 무세공 + 둘째 해 공지" 둘로 분리, `newGameInTributeYear` 헬퍼 도입(수거 가드·시뮬 통합·납부·부족·미납), 저장 마이그레이션을 첫 해(null)·둘째 해(재생성)로 분리, 가죽옷 고정 블록 신설 |
+| `tools/game/test_promotion.mjs` | 성실도 블록에 둘째 해 세공 주입 (이듬해 미납은 3년차로) |
+| `tools/game/test_suspicion.mjs` | 세공 납부 의심 감쇠 블록에 둘째 해 세공 주입 |
+| `tools/game/test_special_events.mjs` | 산삼 면제권 자동 적용을 둘째 해 겨울로, "이미 처리된 해" 블록에 올해분 명시 |
+| `tools/game/test_diplomatic_figures_f2.mjs` | 관대한 북병사 유예 블록에 둘째 해 세공 주입 (두 번째 미납은 3년차) |
+| `tools/game/test_tutorial_scenario.mjs` | 10스텝·버전 4·허용 모달에서 tribute 제외, 첫 해 무세공/겨울 점검 ✓, 둘째 해 공지·고정 품목·모듈 발화 순서, 일반 게임 랜덤 품목·1회성, 표식 저장, 구판 v2·v3 해제 |
+
+`tools/game/test_resource_save_migration.mjs`는 `CURRENT_SCHEMA_VERSION === 49`를 단언하는
+**HEAD에서도 실패하는 선행 실패**다 (현재 53). 이번 변경과 무관하며 손대지 않았다.
+
+### R4 실기동 확인 (dev 서버)
+
+- 일반 새 게임 첫날 로그에 「조정은 첫 해의 정착을 지켜보고 있습니다 — 세공은 이듬해 봄부터」가 서고,
+  `courtTribute`는 null이며 상단 바에 세공 칩이 없다. 조정 창에는 「올해 세공 / 조정은 첫 해의 정착을 지켜보고 있습니다」
+- 표식을 주입하고(`tutorialGraduate`) 둘째 해 봄으로 넘기니
+  「함경북도 병마절도사 김종평 명의의 파발이 왔습니다. 올해 세공: 가죽옷 8」 로그와 함께
+  세공 칩이 「가죽옷 0/8 · 36일 남음」으로 섰다
+- 유민 사건 모달이 먼저 떠 있어 파발 안내는 대기열에서 기다렸고, 그 모달을 닫자 곧바로
+  「길잡이 — 세공(歲貢)과 파발」 모달이 열렸다. 「알겠소」를 누르자 그 자리에서
+  「길잡이 — 무두장이와 가죽공방」 카드가 이어 섰다 (로그에도 두 줄 모두 남음)
+- 조정 창의 세공 절이 「올해 세공 (2년차) · 가죽옷 · 세공고 0 / 8」로 뜬다
+- 길잡이 새 게임의 첫 모달 제목이 「길잡이 1/10 — 이름과 첫 기록」이고, 첫 해 세공은 공지되지 않는다
+
+### R4 변경 파일
+
+- `src/game/config.ts` — `tribute.firstYear = 2`
+- `src/game/courtTribute.ts` — 첫 해 게이트와 예고 로그, 길잡이 출신 첫 세공의 가죽옷 고정(`firstGraduateTributeItems`), 첫 공지에서 `tribute` 길잡이 발화
+- `src/game/guides.ts` — `tribute`(모달)·`tannery`(카드) 모듈, 모달 뒤를 잇는 `openGuideFollowUp`
+- `src/game/simulation.ts` — 길잡이 모달 해소 시 후속 안내 호출, 새 게임 주석
+- `src/game/scenario.ts` — tribute 스텝 제거(10스텝), 버전 4, 완주 시 `tutorialGraduate` 표식
+- `src/game/types.ts` — `GameState.tutorialGraduate?: boolean`
+- `src/game/saveLoad.ts` — 표식 정규화, 구버전 세공 재생성의 첫 해 예외
+- `src/components/TutorialCoach.tsx` — tribute 힌트 제거(사유 주석)
+- `src/components/dock/CourtWindow.tsx` — 첫 해 안내 한 줄
+- `src/GameSession.tsx` — `courtWindowOpened` 표시 제거(사유 주석)
+- 회귀 테스트 6종 (위 표)
+
+### R4 테스트·검증 결과
+
+- `node tools/game/test_tutorial_scenario.mjs` 통과 (보강분 포함)
+- `test_court_tribute`·`test_promotion`·`test_suspicion`·`test_special_events`·`test_diplomatic_figures_f2` 통과 (수정 후)
+- `test_court_grants`·`test_court_grant_consumables`·`test_court_item_icons`·`test_silver_economy`·
+  `test_chongtong_emplacement`·`test_release_candidate_save_roundtrip`·`test_important_logs` 무수정 통과
 - `npx tsc --noEmit`·`npm run build` 통과

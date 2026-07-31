@@ -1871,6 +1871,7 @@ export interface GameState {
   spentSpecialIds?: SpecialResidentId[]; // 이미 등장한 네임드 (게임당 1회)
   specialResidentRecords?: Partial<Record<SpecialResidentId, SpecialResidentRecord>>; // 안치·합류·이탈 상태
   scenario?: ScenarioState | null;  // 튜토리얼 등 스크립트 시나리오 (없으면 일반 모드)
+  tutorialGraduate?: boolean;       // 길잡이를 완주하고 이어 가는 게임 (첫 세공 품목 고정에 쓴다)
   guides?: GuideState;              // 초회 도움말 (구버전 저장에는 없음 = 끈 상태로 보정)
   guideCards?: GuideCardEntry[];    // 지금 떠 있는 비차단 길잡이 카드
   guideModalQueue?: string[];       // 모달 형식 길잡이 대기열 (다른 모달과 겹치지 않게 미룬다)
