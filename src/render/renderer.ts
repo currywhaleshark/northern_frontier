@@ -1458,11 +1458,71 @@ function floodRiseFrom(state: GameState, x: number, y: number): WaterRiseFrom {
   return 'bottom';
 }
 
-// 강 흐름 시각화 — 물비늘이 위에서 아래로 흘러내리며 햇빛에 반짝인다.
+// 강 흐름 시각화 — 물비늘이 강줄기를 따라 상류에서 하류로 흘러내리며 햇빛에 반짝인다.
 // 범람·해빙 중에는 흙탕물 색으로 탁해진다. 겨울 결빙 강은 흐르지 않는다.
 function riverGlintHash(x: number, y: number, i: number): number {
   const h = Math.sin(x * 127.1 + y * 311.7 + i * 74.7) * 43758.5453;
   return h - Math.floor(h);
+}
+
+// 타일별 흐름 방향 필드 — 강 연결을 성분마다 가장 북쪽 칸(상류)에서 BFS로 훑어,
+// 각 칸이 하류 이웃을 향하는 단위 방향을 갖는다. ㄱ·ㄴ자로 꺾이는 구간에서는
+// 그 칸의 방향이 옆으로 눕는다. 지형은 불변이라 시드당 한 번만 계산한다.
+let riverFlowCache: { key: string; dirs: Map<number, readonly [number, number]> } | null = null;
+
+function riverFlowDirs(state: GameState): Map<number, readonly [number, number]> {
+  const height = state.map.length;
+  const width = state.map[0]?.length ?? 0;
+  const key = `${state.seed}:${width}x${height}`;
+  if (riverFlowCache?.key === key) return riverFlowCache.dirs;
+
+  const idxOf = (x: number, y: number) => y * width + x;
+  const riverIdx = new Set<number>();
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (state.map[y][x].terrain === 'river') riverIdx.add(idxOf(x, y));
+    }
+  }
+  const dist = new Map<number, number>();
+  const NEIGHBORS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
+  // 성분별 상류 출발점: 아직 거리가 없는 강 칸 중 가장 북쪽(같으면 서쪽) 칸
+  const sorted = [...riverIdx].sort((a, b) => a - b); // idx 정렬 = y 우선, x 차선
+  for (const source of sorted) {
+    if (dist.has(source)) continue;
+    dist.set(source, 0);
+    const queue = [source];
+    for (let head = 0; head < queue.length; head++) {
+      const current = queue[head];
+      const cx = current % width;
+      const cy = (current - cx) / width;
+      for (const [dx, dy] of NEIGHBORS) {
+        const next = idxOf(cx + dx, cy + dy);
+        if (cx + dx < 0 || cx + dx >= width || cy + dy < 0 || cy + dy >= height) continue;
+        if (!riverIdx.has(next) || dist.has(next)) continue;
+        dist.set(next, (dist.get(current) ?? 0) + 1);
+        queue.push(next);
+      }
+    }
+  }
+  const dirs = new Map<number, readonly [number, number]>();
+  for (const idx of riverIdx) {
+    const x = idx % width;
+    const y = (idx - x) / width;
+    const here = dist.get(idx) ?? 0;
+    let dir: readonly [number, number] | null = null;
+    let incoming: readonly [number, number] | null = null;
+    for (const [dx, dy] of NEIGHBORS) {
+      if (x + dx < 0 || x + dx >= width || y + dy < 0 || y + dy >= height) continue;
+      const neighbor = idxOf(x + dx, y + dy);
+      if (!riverIdx.has(neighbor)) continue;
+      const d = dist.get(neighbor);
+      if (d === here + 1 && !dir) dir = [dx, dy];
+      if (d === here - 1 && !incoming) incoming = [dx, dy];
+    }
+    dirs.set(idx, dir ?? incoming ?? [0, 1]); // 하구는 들어온 방향을 그대로 잇는다
+  }
+  riverFlowCache = { key, dirs };
+  return dirs;
 }
 
 function drawRiverFlow(
@@ -1475,6 +1535,8 @@ function drawRiverFlow(
   const frozen = getSeason(state.day) === 'winter' && state.weather !== 'thawFlood';
   if (frozen) return;
   const turbid = muddy || state.weather === 'thawFlood';
+  const flowDirs = riverFlowDirs(state);
+  const mapWidth = state.map[0]?.length ?? 0;
   ctx.save();
   for (let ty = viewport.tileMinY; ty <= viewport.tileMaxY; ty++) {
     for (let tx = viewport.tileMinX; tx <= viewport.tileMaxX; tx++) {
@@ -1486,14 +1548,21 @@ function drawRiverFlow(
         ctx.fillStyle = 'rgba(121, 94, 53, 0.30)';
         ctx.fillRect(px, py, TILE, TILE);
       }
+      const [dirX, dirY] = flowDirs.get(ty * mapWidth + tx) ?? [0, 1];
+      const perpX = -dirY;
+      const perpY = dirX;
+      const centerX = px + TILE / 2;
+      const centerY = py + TILE / 2;
       ctx.lineWidth = 1;
       for (let i = 0; i < 3; i++) {
         const seed = riverGlintHash(tx, ty, i);
-        // 물비늘 하나가 칸 위에서 아래로 흘러 내려가는 진행도 (칸·비늘마다 위상이 어긋난다)
+        // 물비늘 하나가 이 칸의 흐름 방향을 따라 지나가는 진행도 (칸·비늘마다 위상이 어긋난다)
         const phase = (animationTimeMs / (turbid ? 2600 : 1900) + seed) % 1;
-        const gx = px + 3 + riverGlintHash(tx, ty, i + 7) * (TILE - 8) +
+        const along = (phase - 0.5) * TILE;
+        const offset = (riverGlintHash(tx, ty, i + 7) - 0.5) * (TILE - 8) +
           Math.sin(animationTimeMs / 700 + seed * 12) * 1.5;
-        const gy = py + phase * TILE;
+        const gx = centerX + dirX * along + perpX * offset;
+        const gy = centerY + dirY * along + perpY * offset;
         const alpha = Math.sin(Math.PI * phase) * (turbid ? 0.22 : 0.4);
         if (alpha <= 0.02) continue;
         ctx.strokeStyle = turbid
@@ -1501,7 +1570,7 @@ function drawRiverFlow(
           : `rgba(233, 246, 252, ${alpha.toFixed(3)})`;
         ctx.beginPath();
         ctx.moveTo(gx, gy);
-        ctx.lineTo(gx + 0.8, gy + 3.2);
+        ctx.lineTo(gx + dirX * 3.2 + perpX * 0.8, gy + dirY * 3.2 + perpY * 0.8);
         ctx.stroke();
       }
     }
