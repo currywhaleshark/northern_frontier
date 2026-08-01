@@ -63,6 +63,7 @@
 | [외교 활동 E4 근접 경고 구현계획](IMPLEMENTATION-2026-07-30-diplomatic-actions-e4.md) | 완료 | P0~P3: 경계 밖 2칸 완충의 건물/3일 작업, 발견 거점 외곽 3칸의 3일 배회, 세력×사유 dedupe·4일 약한 압박·중앙 플로트·v50 저장을 E4/E2 표적 회귀와 빌드로 검증 |
 | [외교 활동 E5 생활권 협정 구현계획](IMPLEMENTATION-2026-07-30-diplomatic-actions-e5.md) | 완료 | `gpt-5.6-terra / high`: 구역별 사절·반경/관계 가격·연간 권리, 통행/사냥 허가 통합·길/교역 정합, 경고/항의 수습과 v51 저장을 E5/E4/E2 표적 회귀·빌드로 검증 |
 | [스프라이트 스튜디오 구현계획](IMPLEMENTATION-2026-07-28-sprite-studio.md) | 완료 | P0~P6 구현 후 `main` 반영 |
+| [채집 영역 체제 설계](DESIGN-2026-08-01-gathering-zones.md) | 미착수 | 작업영역 G1~G4(벌목장→사냥·서식지 자원화→배치 필수화·채광장 1티어→숙식 움막) 설계 확정. 방어 개편보다 먼저 착수. 움막은 국지 재고 특례(A안), 가구당 분배는 독립 설계 후보 |
 | [방어 개편 설계](DESIGN-2026-08-01-defense-overhaul.md) | 미착수 | 벽 드래그·침입 우회 예산·공성 상태·망루 무장화·성벽 무대 5단계 설계 확정 (2026-08-01 구술). 구현계획 미작성 |
 | [튜토리얼 개편 구현계획](superpowers/plans/2026-07-31-tutorial-overhaul.md) | 완료 | M0~M6 반영. 병행 구조·개칭 후속 안내·guides 일반 확대·혹한 A안·병자 회복 관찰 전 결정 구현. §9 테스트 7항목 전수 커버, §11 비범위(전투 2·3차, 초회 팝업, 재해 종별 확장)는 후속 |
 | [튜토리얼 개편 착수 지시문](IMPLEMENTATION-2026-07-31-tutorial-overhaul.md) | 완료 | M0~M6과 후속 R1~R6 완료. 2026-08-01 첫해 세공 면제 로그 문구를 다듬고, 매해 봄 세공 파발에 요구·기한을 보여주는 수묵담채 삽화 사건 창을 연결함 |
@@ -110,9 +111,9 @@
 | [발효·김장](superpowers/plans/2026-07-15-fermentation-kimjang.md) | 완료 | 부패·보존·발효·장독대·김장 구현 |
 | [논밭 드래그 크기](superpowers/plans/2026-07-17-farm-plot-drag-sizing.md) | 완료 | 가변 경작지·면적 노동·농우 연결 구현 |
 | [이동식 관리 창](superpowers/plans/2026-07-17-floating-management-windows.md) | 완료 | 관리 창·미니맵·선택 컨텍스트까지 확장 완료 |
-| [혼인·출산·성장](superpowers/plans/2026-07-17-marriage-birth-growth.md) | 완료 | 생애 주기·장례 지연 원인 안내·소년 후속·성장기 가속 표시 나이와 종교인 혼인 예외까지 통합 |
+| [혼인·출산·성장](superpowers/plans/2026-07-17-marriage-birth-growth.md) | 완료 | 생애 주기·장례·소년 활동과 성장기 표시 나이·종교인 혼인 예외 구현. 소년 5직업 남녀 표준/HD I2V 완료, 어린이 전용 동작은 후속 |
 | [런타임 성능 안정화](superpowers/plans/2026-07-17-runtime-performance-stabilization.md) | 완료 | 렌더 시계·viewport·탐사·광역 경로 최적화와 측정 기록 완료 |
-| [만족도·종교](superpowers/plans/2026-07-17-satisfaction-religion.md) | 완료 | 두 종교·단일 후계 계보·2인 시설 슬롯·종교인 남녀 정적/HD 자산·저장·명부/선택 UI 구현. 동작은 8월 1일 이후 후속 |
+| [만족도·종교](superpowers/plans/2026-07-17-satisfaction-religion.md) | 완료 | 두 종교·단일 후계 계보·2인 시설 슬롯·저장·명부/선택 UI와 일반 무당·승려·동자승 남녀 표준/HD idle·walk I2V 구현 |
 | [은 화폐](superpowers/plans/2026-07-17-silver-currency.md) | 완료 | 확정 범위 G1~G2 완료, G3 상평통보는 의도적 비범위로 보류 |
 | [특수 주민](superpowers/plans/2026-07-17-special-residents.md) | 일부 완료 | 공통 명부와 확정 주민은 구현, 추가 후보 S3는 남음 |
 | [전술 확장 2단계 기준선](superpowers/plans/2026-07-19-tactical-combat-expansion-phase-2-baseline.md) | 완료 | Phase 0 golden·계약 기준선 확보 |
