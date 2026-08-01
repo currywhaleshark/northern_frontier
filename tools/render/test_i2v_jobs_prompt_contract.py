@@ -54,6 +54,22 @@ def main() -> None:
     require(walk, "low nape-level jjokmeori")
     assert "exactly one full gait period" not in walk
 
+    youth = locomotion.build_prompt("youth_farmer_female", "walk")
+    require(youth, "Age and scale lock")
+    require(youth, "adolescent helper")
+    require(youth, "Do not age up")
+    require(youth, "one long-handled Korean hoe held low")
+
+    novice = locomotion.build_prompt("religious_novice_male", "walk")
+    require(novice, "Age and vocation lock")
+    require(novice, "completely shaved head")
+    require(novice, "Do not add adult height")
+
+    shaman = locomotion.build_prompt("religious_shaman_female", "idle")
+    require(shaman, "Vocation lock")
+    require(shaman, "ordinary daily movement")
+    require(shaman, "no dancing")
+
     assert api.should_retry_after_ingest("retry", 1, 3)
     assert api.should_retry_after_ingest("retry", 2, 3)
     assert not api.should_retry_after_ingest("retry", 3, 3)

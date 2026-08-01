@@ -1,4 +1,10 @@
-import type { Gender, JobId, SpecialResidentId } from '../game/types';
+import type {
+  Gender,
+  JobId,
+  LifeStage,
+  ReligiousVocation,
+  SpecialResidentId,
+} from '../game/types';
 import type { MilitiaWeaponSpriteId } from './militiaWeaponAssets';
 import approvedI2VManifest from './residentApprovedI2VLocomotionManifest.json';
 
@@ -73,6 +79,14 @@ const SPECIAL_IDENTITIES: Record<SpecialResidentId, string> = {
   hangwae: 'hangwae_sayaka',
 };
 
+const YOUTH_IDENTITIES: Partial<Record<JobId, string>> = {
+  idle: 'idle',
+  hauler: 'hauler',
+  farmer: 'farmer',
+  woodSplitter: 'wood_splitter',
+  herder: 'herder',
+};
+
 export const RESIDENT_APPROVED_I2V_SHEETS = {
   standard: {
     src: approvedI2VManifest.game_input,
@@ -97,10 +111,26 @@ function rowName(
   militiaWeapon: MilitiaWeaponSpriteId | undefined,
   moving: boolean,
   special?: SpecialResidentId,
+  stage?: LifeStage | null,
+  religiousVocation?: ReligiousVocation,
 ): string | null {
   if (special) {
     const identity = SPECIAL_IDENTITIES[special];
     return `${identity}_${moving ? 'walk' : 'idle'}`;
+  }
+  if (religiousVocation) {
+    const vocation = religiousVocation === 'shaman'
+      ? 'shaman'
+      : stage != null
+        ? 'novice'
+        : 'monk';
+    return `religious_${vocation}_${gender}_${moving ? 'walk' : 'idle'}`;
+  }
+  if (stage === 'youth') {
+    const identity = YOUTH_IDENTITIES[job];
+    return identity
+      ? `youth_${identity}_${gender}_${moving ? 'walk' : 'idle'}`
+      : null;
   }
   const identity = identityFor(job, militiaWeapon);
   return identity ? `${identity}_${gender}_${moving ? 'walk' : 'idle'}` : null;
@@ -129,8 +159,18 @@ export function approvedI2VSourceRect(
   elapsedMs: number,
   highDefinition: boolean,
   special?: SpecialResidentId,
+  stage?: LifeStage | null,
+  religiousVocation?: ReligiousVocation,
 ): ApprovedI2VSourceRect | null {
-  const row = rowName(job, gender, militiaWeapon, moving, special);
+  const row = rowName(
+    job,
+    gender,
+    militiaWeapon,
+    moving,
+    special,
+    stage,
+    religiousVocation,
+  );
   if (!row) return null;
   const layout = highDefinition ? highDefinitionRows[row] : standardRows[row];
   const animation = animationRows[row];

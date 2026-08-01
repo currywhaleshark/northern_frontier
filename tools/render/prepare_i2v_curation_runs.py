@@ -88,6 +88,10 @@ def action_attempts(character: str, action: str) -> list[tuple[int, Path]]:
         videos = sorted((attempt_dir / "raw").glob("*.mp4"))
         if not videos:
             videos = sorted(attempt_dir.glob("*.mp4"))
+        if not videos:
+            # A provider-side failure may leave prompt/log provenance without a video.
+            # Keep that evidence, but do not treat it as a curation candidate.
+            continue
         if len(videos) != 1:
             raise RuntimeError(f"{attempt_dir}: expected exactly one MP4, found {len(videos)}")
         attempts.append((int(attempt_dir.name.removeprefix("attempt-")), videos[0]))

@@ -1187,6 +1187,8 @@ function drawApprovedI2VLocomotion(
     animationTimeMs,
     highDefinition,
     p.special,
+    p.stage,
+    p.religiousVocation,
   );
   if (!rect) return false;
   const textureScale = highDefinition ? 0.5 : 1;
@@ -2684,6 +2686,7 @@ export const atlasSprites: SpriteAPI = {
     const foreignRect = foreignResidentSourceRect(p.foreignFaction, p.gender);
     const newContentRect = newContentResidentSourceRect(p.job, p.gender, p.stage);
     if (!characterSheet && !specializedSheet && !militiaSheet && !kenneyChars && !specialResidentSheet &&
+        !residentApprovedI2VSheet && !residentApprovedI2VHdSheet &&
         !religiousSuccessorSheet && !religiousSuccessorHdSheet &&
         (!newContentResidentSheet || !newContentRect) && (!foreignResidentSheet || !foreignRect)) return;
     ctx.imageSmoothingEnabled = false;
@@ -2706,6 +2709,9 @@ export const atlasSprites: SpriteAPI = {
       drewOptionalResidentPresentation = true;
     } else if (specialResidentSheet && specialRect) {
       drawGeneratedCharacterRect(ctx, specialResidentSheet, specialRect, p.x, p.y, p.facing, bob, 1.16);
+    } else if (!p.special && (p.religiousVocation || p.stage === 'youth') &&
+        drawApprovedI2VLocomotion(ctx, p, animationTime)) {
+      drewOptionalResidentPresentation = true;
     } else if (drawReligiousSuccessorStatic(ctx, p)) {
       drewOptionalResidentPresentation = true;
     } else if (foreignResidentSheet && foreignRect) {

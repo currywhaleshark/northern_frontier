@@ -93,6 +93,22 @@ CHARACTERS = (
     "runaway_smith_maksoe",
     "interpreter_baesugyeom",
     "hangwae_sayaka",
+    "youth_idle_male",
+    "youth_idle_female",
+    "youth_hauler_male",
+    "youth_hauler_female",
+    "youth_farmer_male",
+    "youth_farmer_female",
+    "youth_wood_splitter_male",
+    "youth_wood_splitter_female",
+    "youth_herder_male",
+    "youth_herder_female",
+    "religious_shaman_male",
+    "religious_shaman_female",
+    "religious_monk_male",
+    "religious_monk_female",
+    "religious_novice_male",
+    "religious_novice_female",
 )
 STATES = ("idle", "walk")
 MAGENTA = (255, 0, 255, 255)

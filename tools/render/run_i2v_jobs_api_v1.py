@@ -19,6 +19,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 # Local pipeline helpers
@@ -275,6 +276,7 @@ def run_batch(
     stop_on_fail: bool = False,
     skip_existing: bool = False,
     progress_path: Path | None = None,
+    workers: int = 1,
 ) -> dict:
     token, auth_meta = load_token()
     print(f"auth={auth_meta}", flush=True)
@@ -293,86 +295,70 @@ def run_batch(
 
     for character in characters:
         summary["characters"][character] = {}
-        for action in actions:
+
+    def run_unit(character: str, action: str) -> tuple[str, list[str]]:
+        errors: list[str] = []
+        if skip_existing and has_complete_output(character, action):
+            print(f"[skip] {character}/{action} already has mp4+8 frames", flush=True)
+            return "skipped", errors
+
+        last_status = "failed"
+        for attempt in range(start_attempt, max_attempts + 1):
+            try:
+                mp4 = generate_one(
+                    token,
+                    character,
+                    action,
+                    attempt,
+                    duration=duration,
+                    resolution=resolution,
+                    model=model,
+                )
+                ingest(
+                    character,
+                    action,
+                    mp4,
+                    attempt,
+                    max_attempts=max_attempts,
+                )
+                run_path = out_dir(character, action) / "run.json"
+                run = json.loads(run_path.read_text(encoding="utf-8"))
+                last_status = run.get("status", "unknown")
+                print(f"  ingest status={last_status}", flush=True)
+                if last_status == "passed":
+                    break
+                if should_retry_after_ingest(last_status, attempt, max_attempts):
+                    print(f"  QA failed → retry {attempt + 1}", flush=True)
+                    continue
+                if has_complete_output(character, action):
+                    break
+            except Exception as exc:
+                message = f"{character}/{action} attempt {attempt}: {exc}"
+                print(f"  ERROR {message}", flush=True)
+                errors.append(message)
+                last_status = "error"
+                if attempt >= max_attempts:
+                    break
+                time.sleep(2)
+        return last_status, errors
+
+    units = [(character, action) for character in characters for action in actions]
+    if workers <= 0 or workers > 4:
+        raise ValueError("workers must be between 1 and 4")
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {
+            executor.submit(run_unit, character, action): (character, action)
+            for character, action in units
+        }
+        for future in as_completed(futures):
+            character, action = futures[future]
             summary["total"] += 1
-            if skip_existing and has_complete_output(character, action):
-                print(f"[skip] {character}/{action} already has mp4+8 frames", flush=True)
-                summary["characters"][character][action] = "skipped"
+            last_status, errors = future.result()
+            summary["errors"].extend(errors)
+            summary["characters"][character][action] = last_status
+            if last_status == "skipped":
                 summary["skipped"] += 1
                 continue
-
-            last_status = "failed"
-            for attempt in range(start_attempt, max_attempts + 1):
-                try:
-                    mp4 = generate_one(
-                        token,
-                        character,
-                        action,
-                        attempt,
-                        duration=duration,
-                        resolution=resolution,
-                        model=model,
-                    )
-                    ingest(
-                        character,
-                        action,
-                        mp4,
-                        attempt,
-                        max_attempts=max_attempts,
-                    )
-                    run_path = out_dir(character, action) / "run.json"
-                    run = json.loads(run_path.read_text(encoding="utf-8"))
-                    last_status = run.get("status", "unknown")
-                    print(f"  ingest status={last_status}", flush=True)
-                    if last_status == "passed":
-                        break
-                    if should_retry_after_ingest(
-                        last_status,
-                        attempt,
-                        max_attempts,
-                    ):
-                        print(f"  QA failed → retry {attempt + 1}", flush=True)
-                        continue
-                    # At the configured final attempt, cmd_ingest promotes the
-                    # failed result for human inspection instead of hiding it.
-                    if has_complete_output(character, action):
-                        break
-                except Exception as e:
-                    msg = f"{character}/{action} attempt {attempt}: {e}"
-                    print(f"  ERROR {msg}", flush=True)
-                    summary["errors"].append(msg)
-                    last_status = "error"
-                    # Quota / auth / ZDR: stop the whole batch
-                    err_l = str(e).lower()
-                    if any(
-                        k in err_l
-                        for k in (
-                            "429",
-                            "rate limit",
-                            "resource_exhausted",
-                            "quota",
-                            "permission",
-                            "unauthorized",
-                            "401",
-                            "403",
-                            "upload_url",
-                            "zero data retention",
-                        )
-                    ):
-                        summary["characters"][character][action] = last_status
-                        summary["failed"] += 1
-                        summary["stopped_reason"] = str(e)
-                        if progress_path:
-                            progress_path.write_text(
-                                json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
-                                encoding="utf-8",
-                            )
-                        print(f"STOPPING BATCH: {e}", flush=True)
-                        return summary
-                    if attempt >= max_attempts:
-                        break
-                    time.sleep(2)
-            summary["characters"][character][action] = last_status
             if last_status in ("passed", "done", "best_effort", "retry", "failed"):
                 # failed QA still counts as completed asset if frames exist
                 if has_complete_output(character, action):
@@ -390,13 +376,15 @@ def run_batch(
                     json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
                     encoding="utf-8",
                 )
-            # gentle spacing between jobs
-            time.sleep(1.0)
 
     return summary
 
 
 def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     p = argparse.ArgumentParser(description="i2v jobs via xAI Video API")
     p.add_argument(
         "--characters",
@@ -409,6 +397,7 @@ def main() -> None:
     p.add_argument("--duration", type=int, default=DEFAULT_DURATION)
     p.add_argument("--resolution", default=DEFAULT_RESOLUTION, choices=["480p", "720p", "1080p"])
     p.add_argument("--model", default=DEFAULT_MODEL)
+    p.add_argument("--workers", type=int, default=4, choices=[1, 2, 3, 4])
     p.add_argument(
         "--start-attempt",
         type=int,
@@ -458,6 +447,7 @@ def main() -> None:
         model=args.model,
         skip_existing=args.skip_existing,
         progress_path=progress_path,
+        workers=args.workers,
     )
     report_path = OUTPUT_ROOT / "api_run_summary.json"
     report_path.write_text(

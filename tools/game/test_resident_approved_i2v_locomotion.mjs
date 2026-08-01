@@ -46,7 +46,7 @@ const hdRows = manifest.high_definition_frame_layout.rows;
 assert.equal(manifest.engine, 'component-row');
 assert.equal(manifest.degraded_static_fallback, false);
 assert.equal(manifest.display.variableCells, true);
-assert.equal(Object.keys(rows).length, 124, '62 approved identities expose idle and walk rows');
+assert.equal(Object.keys(rows).length, 156, '78 approved identities expose idle and walk rows');
 
 for (const [name, rects] of Object.entries(rows)) {
   assert.deepEqual(
@@ -88,7 +88,45 @@ assert.deepEqual(
 );
 assert.deepEqual(
   assets.approvedI2VSourceRect(
-    'militia', 'male', 'muskets', true, 200, false, 'hangwae',
+    'farmer', 'female', undefined, true, 200, false, undefined, 'youth',
+  ),
+  expectedRect('youth_farmer_female_walk', 1),
+  'a youth farm helper uses the dedicated shorter youth row',
+);
+assert.deepEqual(
+  assets.approvedI2VSourceRect(
+    'woodSplitter', 'male', undefined, false, 0, true, undefined, 'youth',
+  ),
+  {
+    sx: hdRows.youth_wood_splitter_male_idle[0].x,
+    sy: hdRows.youth_wood_splitter_male_idle[0].y,
+    sw: hdRows.youth_wood_splitter_male_idle[0].w,
+    sh: hdRows.youth_wood_splitter_male_idle[0].h,
+  },
+  'youth rows expose the exact 2x HD source rectangle',
+);
+assert.deepEqual(
+  assets.approvedI2VSourceRect(
+    'shaman', 'male', undefined, false, 0, false, undefined, undefined, 'shaman',
+  ),
+  expectedRect('religious_shaman_male_idle'),
+);
+assert.deepEqual(
+  assets.approvedI2VSourceRect(
+    'monk', 'female', undefined, true, 200, false, undefined, undefined, 'monk',
+  ),
+  expectedRect('religious_monk_female_walk', 1),
+);
+assert.deepEqual(
+  assets.approvedI2VSourceRect(
+    'monk', 'male', undefined, true, 200, false, undefined, 'child', 'monk',
+  ),
+  expectedRect('religious_novice_male_walk', 1),
+  'a growing monk successor uses the novice row',
+);
+assert.deepEqual(
+  assets.approvedI2VSourceRect(
+    'militia', 'male', 'muskets', true, 200, false, 'hangwae', 'youth', 'monk',
   ),
   expectedRect('hangwae_sayaka_walk', 1),
   'a named special resident overrides the ordinary job identity',

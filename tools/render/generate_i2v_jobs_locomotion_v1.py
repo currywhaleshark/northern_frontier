@@ -40,7 +40,13 @@ EXPORT_ROOT = (
 )
 JOBS_DIR = EXPORT_ROOT / "01_jobs"
 SPECIAL_RESIDENTS_DIR = EXPORT_ROOT / "04_special_residents"
-SOURCE_DIRS = (JOBS_DIR, SPECIAL_RESIDENTS_DIR)
+YOUTH_RELIGIOUS_DIR = ROOT / "tools" / "render" / "source_images" / "youth-religious-i2v-v1"
+YOUTH_RELIGIOUS_V2_DIR = ROOT / "tools" / "render" / "source_images" / "youth-religious-i2v-v2" / "raw"
+SOURCE_DIRS = (JOBS_DIR, SPECIAL_RESIDENTS_DIR, YOUTH_RELIGIOUS_DIR)
+CHARACTER_SOURCE_OVERRIDES = {
+    "youth_farmer_male": YOUTH_RELIGIOUS_V2_DIR / "youth_farmer_male.png",
+    "youth_farmer_female": YOUTH_RELIGIOUS_V2_DIR / "youth_farmer_female.png",
+}
 ACTION_SOURCE_OVERRIDES = {
     (
         "jurchen_warrior_aragae",
@@ -77,6 +83,70 @@ MOTION_REFERENCE_NOTES = {
 
 # Short identity lock phrases so the video model preserves props without redesigning.
 CHARACTER_IDENTITY: dict[str, str] = {
+    "youth_idle_male": (
+        "Joseon adolescent boy, visibly shorter and slighter than an adult, with tied-back "
+        "hair, beige jeogori, loose blue-gray trousers, cloth belt, and straw shoes"
+    ),
+    "youth_idle_female": (
+        "Joseon adolescent girl, visibly shorter and slighter than an adult, with a braided "
+        "low hairstyle, beige jeogori, muted rose chima, and straw shoes"
+    ),
+    "youth_hauler_male": (
+        "Joseon adolescent boy hauler with tied-back hair, beige work clothes, loose blue-gray "
+        "trousers, straw shoes, and one small empty wooden jige backpack with coiled rope"
+    ),
+    "youth_hauler_female": (
+        "Joseon adolescent girl hauler with braided low hair, beige jeogori, muted rose chima, "
+        "straw shoes, and one small empty woven carrying basket with shoulder straps"
+    ),
+    "youth_farmer_male": (
+        "Joseon adolescent boy farm helper with tied-back hair, beige work clothes, loose "
+        "blue-gray trousers, straw shoes, and one long-handled Korean hoe held low"
+    ),
+    "youth_farmer_female": (
+        "Joseon adolescent girl farm helper with braided low hair, beige jeogori, muted rose "
+        "chima, straw shoes, and one long-handled Korean hoe held low"
+    ),
+    "youth_wood_splitter_male": (
+        "Joseon adolescent boy wood-splitting helper with tied-back hair, beige work clothes, "
+        "blue-gray trousers, straw shoes, and one compact wood axe held low"
+    ),
+    "youth_wood_splitter_female": (
+        "Joseon adolescent girl wood-splitting helper with braided low hair, beige jeogori, "
+        "muted rose chima, straw shoes, and one compact wood axe held low"
+    ),
+    "youth_herder_male": (
+        "Joseon adolescent boy herding helper with tied-back hair, beige work clothes, "
+        "blue-gray trousers, straw shoes, one slim herding staff, and one coiled rope"
+    ),
+    "youth_herder_female": (
+        "Joseon adolescent girl herding helper with braided low hair, beige jeogori, muted "
+        "rose chima, straw shoes, one slim herding staff, and one coiled rope"
+    ),
+    "religious_shaman_male": (
+        "adult male Joseon village shaman in a black brimmed ritual hat, cream robe, vivid but "
+        "restrained red-blue ritual vest and sash, holding one small brass ritual bell"
+    ),
+    "religious_shaman_female": (
+        "adult female Joseon village shaman with coiled black hair and a small dark headpiece, "
+        "cream jeogori, red-blue ritual vest and muted red chima, holding one small brass bell"
+    ),
+    "religious_monk_male": (
+        "adult male Joseon Buddhist monk with a fully shaved head, plain layered gray robes, "
+        "dark sash, straw sandals, and one short strand of wooden prayer beads"
+    ),
+    "religious_monk_female": (
+        "adult female Joseon Buddhist nun with a fully shaved head, plain layered gray robes, "
+        "dark sash, straw sandals, and one short strand of wooden prayer beads"
+    ),
+    "religious_novice_male": (
+        "young Joseon boy novice monk with a fully shaved head, child proportions, plain light "
+        "gray robes, dark sash, cloth leggings, and straw sandals"
+    ),
+    "religious_novice_female": (
+        "young Joseon girl novice monk with a fully shaved head, child proportions, plain light "
+        "gray robes, dark sash, long gray lower robe, and straw sandals"
+    ),
     "farmer_male": (
         "adult male Joseon farmer with wide straw hat, goatee, blue-gray vest over "
         "white sleeves, blue baggy pants, straw shoes, long-handled hoe held low in "
@@ -312,6 +382,13 @@ def source_png_for_character(character: str, action: str | None = None) -> Path:
         if not override.exists():
             raise FileNotFoundError(f"missing action source override: {override}")
         return override
+    character_override = CHARACTER_SOURCE_OVERRIDES.get(character)
+    if character_override is not None:
+        if not character_override.exists():
+            raise FileNotFoundError(
+                f"missing character source override: {character_override}"
+            )
+        return character_override
     matches = [directory / f"{character}.png" for directory in SOURCE_DIRS]
     existing = [path for path in matches if path.exists()]
     if not existing:
@@ -402,7 +479,27 @@ def build_prompt(character: str, action: str) -> str:
             "No foot sliding, teleporting limbs, fused legs, or foot shape morphing. "
             "The repeated gait must remain periodic so the first and last frames connect cleanly."
         )
-    action_note = CHARACTER_ACTION_NOTES.get((character, action), "")
+    role_lock = ""
+    if character.startswith("youth_"):
+        role_lock = (
+            "Age and scale lock: this is an adolescent helper, not an adult and not a toddler. "
+            "Keep the exact shorter height, youthful face, slim limbs, head-to-body ratio, and "
+            "modest half-labor tool scale from the source throughout the clip. Do not age up, "
+            "grow taller, broaden the shoulders, or replace the clothing with adult workwear. "
+        )
+    elif character.startswith("religious_novice_"):
+        role_lock = (
+            "Age and vocation lock: this is one young novice monk with a completely shaved head "
+            "and child proportions. Do not add adult height, hair, hat, prayer beads, staff, or "
+            "ceremonial props. Keep the plain novice robes unchanged. "
+        )
+    elif character.startswith("religious_"):
+        role_lock = (
+            "Vocation lock: preserve the exact Korean religious clothing and handheld object from "
+            "the source. This locomotion clip is ordinary daily movement, not a ritual performance; "
+            "no dancing, chanting gesture, bowing, bell shaking, bead swinging, or magic effect. "
+        )
+    action_note = role_lock + CHARACTER_ACTION_NOTES.get((character, action), "")
     return f"{common} {action_note}{motion}"
 
 
