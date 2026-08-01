@@ -1404,6 +1404,9 @@ function drawNaturalWaterCoverage(
   ctx.restore();
 }
 
+// 물이 차오르는 방향 — 범람은 이웃한 강 쪽 변에서 밀려들고, 보 저수지는 아래에서 차오른다.
+type WaterRiseFrom = 'bottom' | 'left' | 'right' | 'top';
+
 function drawWaterRiseOverlay(
   ctx: CanvasRenderingContext2D,
   tileX: number,
@@ -1411,29 +1414,168 @@ function drawWaterRiseOverlay(
   progress: number,
   animationTimeMs: number,
   flood: boolean,
+  from: WaterRiseFrom = 'bottom',
 ): void {
   const clamped = Math.max(0, Math.min(1, progress));
   if (clamped <= 0) return;
   const x = tileX * TILE;
-  const bottom = (tileY + 1) * TILE;
-  const top = bottom - TILE * clamped;
+  const y = tileY * TILE;
+  const span = TILE * clamped;
+  const rect = from === 'left' ? [x, y, span, TILE] as const
+    : from === 'right' ? [x + TILE - span, y, span, TILE] as const
+      : from === 'top' ? [x, y, TILE, span] as const
+        : [x, y + TILE - span, TILE, span] as const;
+  const [rectX, rectY, rectW, rectH] = rect;
   ctx.save();
   ctx.beginPath();
-  ctx.rect(x, top, TILE, bottom - top);
+  ctx.rect(rectX, rectY, rectW, rectH);
   ctx.clip();
   ctx.fillStyle = flood ? 'rgba(72, 129, 157, 0.54)' : 'rgba(70, 132, 158, 0.62)';
-  ctx.fillRect(x, top, TILE, bottom - top);
+  ctx.fillRect(rectX, rectY, rectW, rectH);
   ctx.strokeStyle = flood ? 'rgba(201, 231, 234, 0.76)' : 'rgba(190, 228, 230, 0.82)';
   ctx.lineWidth = 1;
   const phase = animationTimeMs / 360 + tileX * 0.8 + tileY * 0.45;
   for (let offset = 4; offset < TILE; offset += 8) {
-    const waveY = top + offset;
+    const waveY = y + offset;
     ctx.beginPath();
     for (let px = 1; px < TILE; px += 3) {
       const py = waveY + Math.sin(phase + px * 0.45 + offset) * 0.8;
       if (px === 1) ctx.moveTo(x + px, py);
       else ctx.lineTo(x + px, py);
     }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// 범람 칸이 접한 강 쪽 변 — 좌우 강을 먼저 보고, 없으면 상하, 그것도 없으면 아래에서 차오른다.
+function floodRiseFrom(state: GameState, x: number, y: number): WaterRiseFrom {
+  const terrainAt = (tx: number, ty: number) => state.map[ty]?.[tx]?.terrain;
+  if (terrainAt(x - 1, y) === 'river') return 'left';
+  if (terrainAt(x + 1, y) === 'river') return 'right';
+  if (terrainAt(x, y - 1) === 'river') return 'top';
+  if (terrainAt(x, y + 1) === 'river') return 'bottom';
+  return 'bottom';
+}
+
+// 강 흐름 시각화 — 물비늘이 위에서 아래로 흘러내리며 햇빛에 반짝인다.
+// 범람·해빙 중에는 흙탕물 색으로 탁해진다. 겨울 결빙 강은 흐르지 않는다.
+function riverGlintHash(x: number, y: number, i: number): number {
+  const h = Math.sin(x * 127.1 + y * 311.7 + i * 74.7) * 43758.5453;
+  return h - Math.floor(h);
+}
+
+function drawRiverFlow(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  viewport: SceneViewport,
+  animationTimeMs: number,
+  muddy: boolean,
+): void {
+  const frozen = getSeason(state.day) === 'winter' && state.weather !== 'thawFlood';
+  if (frozen) return;
+  const turbid = muddy || state.weather === 'thawFlood';
+  ctx.save();
+  for (let ty = viewport.tileMinY; ty <= viewport.tileMaxY; ty++) {
+    for (let tx = viewport.tileMinX; tx <= viewport.tileMaxX; tx++) {
+      const tile = state.map[ty]?.[tx];
+      if (!tile || tile.terrain !== 'river' || !isExplored(state, tx, ty)) continue;
+      const px = tx * TILE;
+      const py = ty * TILE;
+      if (turbid) {
+        ctx.fillStyle = 'rgba(121, 94, 53, 0.30)';
+        ctx.fillRect(px, py, TILE, TILE);
+      }
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 3; i++) {
+        const seed = riverGlintHash(tx, ty, i);
+        // 물비늘 하나가 칸 위에서 아래로 흘러 내려가는 진행도 (칸·비늘마다 위상이 어긋난다)
+        const phase = (animationTimeMs / (turbid ? 2600 : 1900) + seed) % 1;
+        const gx = px + 3 + riverGlintHash(tx, ty, i + 7) * (TILE - 8) +
+          Math.sin(animationTimeMs / 700 + seed * 12) * 1.5;
+        const gy = py + phase * TILE;
+        const alpha = Math.sin(Math.PI * phase) * (turbid ? 0.22 : 0.4);
+        if (alpha <= 0.02) continue;
+        ctx.strokeStyle = turbid
+          ? `rgba(214, 190, 148, ${alpha.toFixed(3)})`
+          : `rgba(233, 246, 252, ${alpha.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.moveTo(gx, gy);
+        ctx.lineTo(gx + 0.8, gy + 3.2);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+// 숲 새 떼 — 주민이 숲 칸에 들어서면 이따금 작은 새 몇 마리가 날아오른다.
+// 순수 연출이라 게임 상태에 남기지 않고 렌더러 안에서만 산다.
+interface BirdFlight {
+  x: number; y: number;      // 출발 픽셀
+  vx: number; vy: number;    // 픽셀/초 (위로 오르며 옆으로 흩어진다)
+  born: number;              // animationTimeMs 기준 출생 시각
+  seed: number;              // 날갯짓 위상
+}
+const BIRD_FLIGHT_MS = 1500;
+const BIRD_TILE_COOLDOWN_MS = 9000;
+const birdFlights: BirdFlight[] = [];
+const birdResidentTileMemo = new Map<number, string>();
+const birdTileCooldown = new Map<string, number>();
+
+function spawnForestBirds(state: GameState, timeMs: number): void {
+  for (const r of state.residents) {
+    if (!r.alive) { birdResidentTileMemo.delete(r.id); continue; }
+    const key = `${r.x},${r.y}`;
+    if (birdResidentTileMemo.get(r.id) === key) continue; // 같은 칸에 머무는 동안은 조용히
+    birdResidentTileMemo.set(r.id, key);
+    const tile = state.map[r.y]?.[r.x];
+    if (!tile || tile.terrain !== 'forest' || !isExplored(state, r.x, r.y)) continue;
+    if ((birdTileCooldown.get(key) ?? 0) > timeMs) continue;
+    if (riverGlintHash(r.x, r.y, Math.floor(timeMs / 1000)) > 0.35) continue; // 매번은 아니고 이따금
+    birdTileCooldown.set(key, timeMs + BIRD_TILE_COOLDOWN_MS);
+    const flock = 2 + Math.floor(riverGlintHash(r.x, r.y, 3) * 3); // 2~4마리
+    for (let i = 0; i < flock && birdFlights.length < 60; i++) {
+      const jitter = riverGlintHash(r.x + i, r.y, i);
+      birdFlights.push({
+        x: (r.x + 0.3 + jitter * 0.4) * TILE,
+        y: (r.y + 0.25 + riverGlintHash(r.x, r.y + i, i) * 0.3) * TILE,
+        vx: (jitter - 0.5) * 26,
+        vy: -(20 + jitter * 14),
+        born: timeMs + i * 90, // 순차로 날아올라 떼 같아 보이게
+        seed: jitter * Math.PI * 2,
+      });
+    }
+  }
+}
+
+function drawForestBirds(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  viewport: SceneViewport,
+  timeMs: number,
+): void {
+  spawnForestBirds(state, timeMs);
+  if (birdFlights.length === 0) return;
+  ctx.save();
+  ctx.lineWidth = 1;
+  for (let i = birdFlights.length - 1; i >= 0; i--) {
+    const bird = birdFlights[i];
+    const t = (timeMs - bird.born) / BIRD_FLIGHT_MS;
+    if (t >= 1) { birdFlights.splice(i, 1); continue; }
+    if (t < 0) continue; // 아직 날아오르기 전 (순차 출발)
+    const bx = bird.x + bird.vx * t * (BIRD_FLIGHT_MS / 1000);
+    const by = bird.y + bird.vy * t * (BIRD_FLIGHT_MS / 1000);
+    if (bx < viewport.pixelX - 8 || bx > viewport.pixelX + viewport.pixelWidth + 8 ||
+        by < viewport.pixelY - 8 || by > viewport.pixelY + viewport.pixelHeight + 8) continue;
+    const alpha = t < 0.15 ? t / 0.15 : 1 - Math.max(0, (t - 0.6) / 0.4);
+    // 아주 작은 ˅꼴 — 날갯짓으로 벌어졌다 오므라든다
+    const flap = 1.1 + Math.sin(timeMs / 70 + bird.seed) * 0.9;
+    ctx.strokeStyle = `rgba(50, 46, 40, ${(alpha * 0.85).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.moveTo(bx - 2, by - flap);
+    ctx.lineTo(bx, by);
+    ctx.lineTo(bx + 2, by - flap);
     ctx.stroke();
   }
   ctx.restore();
@@ -1998,8 +2140,12 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   for (const flooded of activeSpringFloodTiles(state)) {
     if (!isExplored(state, flooded.x, flooded.y) ||
         !tileRectIntersectsViewport(viewport, flooded.x, flooded.y)) continue;
-    drawWaterRiseOverlay(ctx, flooded.x, flooded.y, floodRiseProgress, o.animationTimeMs, true);
+    drawWaterRiseOverlay(
+      ctx, flooded.x, flooded.y, floodRiseProgress, o.animationTimeMs, true,
+      floodRiseFrom(state, flooded.x, flooded.y),
+    );
   }
+  drawRiverFlow(ctx, state, viewport, o.animationTimeMs, activeFlood != null);
 
   const activeClaimZones = new Map<number, ClaimZone>();
   for (const point of [o.hover, o.selected]) {
@@ -2391,6 +2537,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   lap('6-terrain-overlays');
 
   lap('3-6-actors');
+
+  // 숲에서 날아오르는 새 — 밤낮 색조에 함께 물들도록 색조 직전에 그린다.
+  drawForestBirds(ctx, state, viewport, o.animationTimeMs);
 
   // 7) 밤낮 색조 — 하루 진행도(subTick+보간)로 계산. 세계를 물들이고 창에는 불이 켜진다.
   // 72서브틱 체제에서는 한낮 = 노동 대역 중앙, 자정 = 밤 대역 중앙으로 정렬한다 (M4 계약).
