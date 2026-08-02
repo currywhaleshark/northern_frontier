@@ -1625,6 +1625,17 @@ function drawOptionalResidentPresentation(
         );
       }
       break;
+    case 'saltMaker':
+      if (p.working && !p.moving) {
+        return drawStationaryWork(
+          residentPotterWorkSheet,
+          residentPotterWorkHdSheet,
+          highDefinition => potterWorkSourceRect(p.gender, animationTimeMs, highDefinition),
+          RESIDENT_POTTER_WORK_SHEET.displayFrameSize / RESIDENT_POTTER_WORK_SHEET.frameSize,
+          'work.saltMaker',
+        );
+      }
+      break;
     default:
       break;
   }
@@ -1728,6 +1739,7 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   smokehouse: { roof: ROOF_DARK, base: FACE_STONE, glyph: CAMPFIRE },
   dryingRack: { base: FENCE, glyph: WATER },
   onggiKiln:  { roof: ROOF_DARK, base: FACE_STONE, glyph: CAMPFIRE },
+  saltworks:  { roof: ROOF_DARK, base: FACE_STONE, glyph: WATER },
   jangdokdae: { base: FACE_STONE, glyph: HIDE },
   bridge:     { base: FENCE },
   weir:       { base: FENCE, glyph: WATER },
@@ -1784,6 +1796,7 @@ const CHAR_BY_JOB: Record<JobId, CR> = {
   physician:  [1, 5],
   curer:      [1, 7],
   potter:     [1, 9],
+  saltMaker:  [1, 9],
   smith:      [1, 9],
   miner:      [1, 9],
   fisher:     [1, 10],
@@ -2124,6 +2137,13 @@ const LAKE_WATER_COLORS: Record<Season, string> = {
   winter: '#3e6f9e',
 };
 
+const SEA_WATER_COLORS: Record<Season, string> = {
+  spring: '#285f82',
+  summer: '#275f88',
+  autumn: '#315f7c',
+  winter: '#376b91',
+};
+
 // 자연 수면 타일: 강·호수 모두 뭍 방향에만 둑 여백을 둔다.
 function drawNaturalWaterTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): void {
   const nb = p.banks!;
@@ -2152,8 +2172,8 @@ function drawNaturalWaterTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParam
 
   // 3) 물 — 강은 방향성이 있는 시트, 액체 호수는 고요한 단색 수면을 쓴다.
   // 호수의 움직임은 별도 물가 파문 레이어만 담당해 강물 같은 사선 흐름이 생기지 않는다.
-  if (p.terrain === 'lake' && !p.frozenRiver) {
-    ctx.fillStyle = LAKE_WATER_COLORS[p.season];
+  if ((p.terrain === 'lake' || p.terrain === 'sea') && !p.frozenRiver) {
+    ctx.fillStyle = p.terrain === 'sea' ? SEA_WATER_COLORS[p.season] : LAKE_WATER_COLORS[p.season];
     ctx.fillRect(bx, by, bw, bh);
   } else {
     const fill = riverFillSourceRect(p.season, p.frozenRiver);
@@ -2381,7 +2401,7 @@ export const atlasSprites: SpriteAPI = {
     const h = hash(p.tileX, p.tileY);
 
     // 자연 수면: 이웃 정보 기반 면적 렌더링 — 땅 밑바탕 + 물 영역 + 둑 (결빙 시 얼음 텍스처)
-    if (p.terrain === 'river' || p.terrain === 'lake') {
+    if (p.terrain === 'river' || p.terrain === 'lake' || p.terrain === 'sea') {
       if (riverSheet && historicalTerrainSheet && p.banks) {
         drawNaturalWaterTile(ctx, p);
         return;

@@ -4,7 +4,7 @@ import {
   rollMineralDepositAmount, setMineralDeposit,
 } from './minerals';
 import { ensureForestGrowth } from './forestGrowth';
-import { isNaturalWaterTerrain } from './terrain';
+import { isNaturalWaterTerrain, isOpenWaterTerrain } from './terrain';
 import type { MapRegion, Tile, Terrain } from './types';
 
 // mulberry32 시드 난수 — 지도 생성과 시뮬레이션 전반에서 사용
@@ -60,7 +60,7 @@ function reachableFromCenter(tiles: Tile[][], centerX: number, centerY: number):
     const current = queue[index];
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const next = tiles[current.y + dy]?.[current.x + dx];
-      if (!next || isNaturalWaterTerrain(next.terrain) ||
+      if (!next || isOpenWaterTerrain(next.terrain) ||
           next.terrain === 'mountain' || next.terrain === 'rock') continue;
       const key = next.x + ',' + next.y;
       if (reachable.has(key)) continue;
@@ -112,6 +112,7 @@ export function generateMap(
   const h = Math.max(16, Math.floor(dimensions.height));
   const mountainRegion = region === 'mountain';
   const lakeRegion = region === 'lake';
+  const coastRegion = region === 'coast';
   const areaScale = (w * h) / (44 * 44);
   const scaledCount = (base: number): number => Math.max(1, Math.round(base * areaScale));
 
@@ -159,6 +160,7 @@ export function generateMap(
   // 호수 지역에서만 추가 RNG를 소비한다. 호수 안의 기존 강 칸은 고요한 수면으로 합쳐
   // 유입·유출 강만 남기고 큰 물그릇을 강 흐름 애니메이션에서 분리한다.
   if (lakeRegion) carveLakeBasin(tiles, rng);
+  if (coastRegion) carveSeaCoast(tiles, rng);
 
   // 산지: 동쪽/북쪽 가장자리에 능선
   for (let i = 0; i < scaledCount(lakeRegion ? 7 : 10); i++) {
@@ -199,7 +201,7 @@ export function generateMap(
       const edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
         const t = tiles[y + dy]?.[x + dx];
         return t && t.terrain !== 'mountain' && t.terrain !== 'rock' &&
-          !isNaturalWaterTerrain(t.terrain);
+          !isOpenWaterTerrain(t.terrain);
       });
       if (edge && rng() < (mountainRegion ? 0.38 : lakeRegion ? 0.15 : 0.25)) {
         const hasIron = rng() < (mountainRegion ? 0.6 : 0.5);
@@ -233,12 +235,12 @@ export function generateMap(
       const x = Math.floor(w / 2 + (rng() - 0.5) * (6 + r * 2));
       const y = Math.floor(h / 2 + (rng() - 0.5) * (6 + r * 2));
       const t = tiles[y]?.[x];
-      const clearLakeFootprint = !lakeRegion || Array.from({ length: 4 }, (_row, dy) =>
+      const clearWaterFootprint = (!lakeRegion && !coastRegion) || Array.from({ length: 4 }, (_row, dy) =>
         Array.from({ length: 5 }, (_cell, dx) => tiles[y - 1 + dy]?.[x - 1 + dx]))
         .flat()
-        .every(candidate => candidate && !isNaturalWaterTerrain(candidate.terrain) &&
+        .every(candidate => candidate && !isOpenWaterTerrain(candidate.terrain) &&
           candidate.terrain !== 'mountain' && candidate.terrain !== 'rock');
-      if (t && clearLakeFootprint &&
+      if (t && clearWaterFootprint &&
           (t.terrain === 'plain' || t.terrain === 'fertile' || t.terrain === 'forest')) {
         centerX = x; centerY = y;
         break outer;
@@ -249,7 +251,7 @@ export function generateMap(
   for (let dy = -1; dy <= 2; dy++) {
     for (let dx = -1; dx <= 3; dx++) {
       const t = tiles[centerY + dy]?.[centerX + dx];
-      if (t && !isNaturalWaterTerrain(t.terrain)) {
+      if (t && !isOpenWaterTerrain(t.terrain)) {
         t.terrain = 'plain';
         t.hasIron = false;
         delete t.mineralRemaining;
@@ -257,7 +259,7 @@ export function generateMap(
     }
   }
   tiles[centerY][centerX].terrain = 'center';
-  if (lakeRegion) ensureNearbyForest(tiles, centerX, centerY);
+  if (lakeRegion || coastRegion) ensureNearbyForest(tiles, centerX, centerY);
   placeNearbyMineralDeposits(tiles, centerX, centerY, rng);
   ensureForestGrowth(tiles);
 
@@ -291,6 +293,37 @@ function carveLakeBasin(tiles: Tile[][], rng: () => number): void {
         tiles[y][x].terrain = 'lake';
       }
     }
+  }
+}
+
+function carveSeaCoast(tiles: Tile[][], rng: () => number): void {
+  const w = tiles[0]?.length ?? 0;
+  const h = tiles.length;
+  if (w === 0 || h === 0) return;
+  const targetDepth = h * (0.20 + rng() * 0.025);
+  const phaseA = rng() * Math.PI * 2;
+  const phaseB = rng() * Math.PI * 2;
+  const shoreline: number[] = [];
+  let noise = 0;
+  for (let x = 0; x < w; x++) {
+    noise = Math.max(-1.5, Math.min(1.5, noise + (rng() - 0.5) * 0.65));
+    const normalizedX = x / Math.max(1, w - 1);
+    const broad = Math.sin(normalizedX * Math.PI * 2 + phaseA) * h * 0.018;
+    const coves = Math.sin(normalizedX * Math.PI * 5 + phaseB) * h * 0.009;
+    shoreline[x] = Math.max(
+      Math.floor(h * 0.68),
+      Math.min(h - 3, Math.round(h - targetDepth + broad + coves + noise)),
+    );
+  }
+  // 인접 열의 해안선이 한 칸씩 이어지게 하여 고립된 수면이나 대각선 틈을 만들지 않는다.
+  for (let x = 1; x < w; x++) {
+    shoreline[x] = Math.max(shoreline[x - 1] - 1, Math.min(shoreline[x - 1] + 1, shoreline[x]));
+  }
+  for (let x = w - 2; x >= 0; x--) {
+    shoreline[x] = Math.max(shoreline[x + 1] - 1, Math.min(shoreline[x + 1] + 1, shoreline[x]));
+  }
+  for (let x = 0; x < w; x++) {
+    for (let y = shoreline[x]; y < h; y++) tiles[y][x].terrain = 'sea';
   }
 }
 

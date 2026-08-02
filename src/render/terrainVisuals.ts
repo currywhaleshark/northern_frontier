@@ -9,6 +9,7 @@ export function terrainCanopyLayer(terrain: Terrain): TerrainCanopyLayer {
     case 'plain':
     case 'river':
     case 'lake':
+    case 'sea':
     case 'mountain':
     case 'fertile':
     case 'rock':

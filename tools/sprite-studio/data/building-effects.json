@@ -355,6 +355,26 @@
       "when": "night"
     }
   ],
+  "saltworks": [
+    {
+      "kind": "chimneySmoke",
+      "fx": 0.7,
+      "fy": 0.18,
+      "dx": 0,
+      "dy": 0,
+      "scale": 1,
+      "when": "working"
+    },
+    {
+      "kind": "fireSparks",
+      "fx": 0.5,
+      "fy": 0.68,
+      "dx": 0,
+      "dy": 0,
+      "scale": 0.8,
+      "when": "working"
+    }
+  ],
   "watchtower": [
     {
       "kind": "serviceGlow",

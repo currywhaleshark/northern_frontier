@@ -39,6 +39,7 @@ const CORE_TESTS = testFiles(
   'map_forest_regrowth',
   'map_region_s3',
   'map_region_s4_lake',
+  'map_region_s5_coast',
   'map_size_s2',
   'mine_collapse',
   'mine_worksite',

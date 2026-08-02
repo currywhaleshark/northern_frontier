@@ -1,6 +1,6 @@
 // 하단 건설 드로어: 카테고리 바는 상시 노출하고 상세 목록은 비모달로 펼친다.
 import { useEffect, useRef, useState } from 'react';
-import { BUILDING_DEFS, canAfford, cannonPlacementsUsed, chongtongPlacementsUsed, isBuildingUnlocked } from '../game/buildings';
+import { BUILDING_DEFS, canAfford, cannonPlacementsUsed, chongtongPlacementsUsed, isBuildingAvailableInRegion, isBuildingUnlocked } from '../game/buildings';
 import { RANK_NAMES, RESOURCE_NAMES } from '../game/constants';
 import { getSeason } from '../game/seasons';
 import { getActiveSprites } from '../render/atlas';
@@ -52,6 +52,7 @@ function unavailableReason(state: GameState, type: BuildableBuildingTypeId): str
   if (!isBuildingUnlocked(state.rank, type)) {
     return `${RANK_NAMES[def.minRank!]} 승격 필요`;
   }
+  if (!isBuildingAvailableInRegion(state.worldSetup?.region, type)) return '해안 지역 전용';
   if (def.unique && state.buildings.some(building => building.type === type)) {
     return '이미 건설 완료';
   }

@@ -608,6 +608,8 @@ export const CONFIG = {
     onggiPerDay: 0.75,
     firewoodPerOnggi: 1,
     charcoalPerOnggi: 0.65,
+    saltPerDay: 0.75,
+    firewoodPerSalt: 1.25,
     tanneryHidePerDay: 2,      // 가죽공방 하루 가죽 소비 (가죽 2 → 옷 1)
     weaverCottonPerDay: 2,
     cottonClothesPerCotton: 0.5,

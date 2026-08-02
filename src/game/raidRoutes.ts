@@ -88,7 +88,7 @@ export function wallBreachCost(building: Building): number {
 
 export function isRaidTileTraversable(state: GameState, x: number, y: number, assault: boolean): boolean {
   const tile = state.map[y]?.[x];
-  if (!tile || tile.terrain === 'mountain' || tile.terrain === 'rock') return false;
+  if (!tile || tile.terrain === 'mountain' || tile.terrain === 'rock' || tile.terrain === 'sea') return false;
   const building = buildingAt(state, x, y);
   if (building) {
     if (isBlockingDefenseWall(building)) return assault;

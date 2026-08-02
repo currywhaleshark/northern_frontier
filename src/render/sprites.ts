@@ -15,19 +15,19 @@ import type { WaterworksOrientation } from './waterworksBuildingAssets';
 // 계절별 지형 팔레트 (임시 그래픽용)
 const TERRAIN_PALETTES: Record<Season, Record<Terrain, string>> = {
   spring: {
-    forest: '#2f5d3a', plain: '#7c8b58', river: '#3e6f9e', lake: '#477c9b', mountain: '#6d6a63',
+    forest: '#2f5d3a', plain: '#7c8b58', river: '#3e6f9e', lake: '#477c9b', sea: '#285f82', mountain: '#6d6a63',
     fertile: '#8a7a45', rock: '#7d7468', center: '#a08858',
   },
   summer: {
-    forest: '#2a6b3a', plain: '#84955c', river: '#3a6fa8', lake: '#4785ae', mountain: '#6d6a63',
+    forest: '#2a6b3a', plain: '#84955c', river: '#3a6fa8', lake: '#4785ae', sea: '#275f88', mountain: '#6d6a63',
     fertile: '#96833f', rock: '#7d7468', center: '#a08858',
   },
   autumn: {
-    forest: '#6b5a2e', plain: '#8f7f4e', river: '#3e6a92', lake: '#4a7695', mountain: '#69655e',
+    forest: '#6b5a2e', plain: '#8f7f4e', river: '#3e6a92', lake: '#4a7695', sea: '#315f7c', mountain: '#69655e',
     fertile: '#7d6a3a', rock: '#78706a', center: '#a08858',
   },
   winter: {
-    forest: '#46564e', plain: '#c3ccd3', river: '#a8cbdd', lake: '#b2cbd8', mountain: '#8d949c',
+    forest: '#46564e', plain: '#c3ccd3', river: '#a8cbdd', lake: '#b2cbd8', sea: '#376b91', mountain: '#8d949c',
     fertile: '#bcc6cd', rock: '#828a92', center: '#b0a890',
   },
 };
@@ -203,7 +203,7 @@ export const placeholderSprites: SpriteAPI = {
       ctx.stroke();
     }
     // 눈 얼룩 (결정적 패턴)
-    if (p.winter && p.terrain !== 'river' && p.terrain !== 'lake' && (p.tileX * 7 + p.tileY * 13) % 5 === 0) {
+    if (p.winter && p.terrain !== 'river' && p.terrain !== 'lake' && p.terrain !== 'sea' && (p.tileX * 7 + p.tileY * 13) % 5 === 0) {
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
       ctx.fillRect(
         p.x + ((p.tileX * 3 + p.tileY) % (p.size - 4)),

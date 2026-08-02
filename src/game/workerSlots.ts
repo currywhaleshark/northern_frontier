@@ -13,7 +13,7 @@ export interface WorkerSlotConfig {
 export const AUTO_ASSIGN_BUILDING_TYPES = [
   'lumberCamp', 'huntLodge', 'herbHut', 'mine',
   'field', 'paddy', 'watermill', 'woodShed', 'charcoalKiln', 'smithy',
-  'stable', 'clinic', 'nitreYard', 'ferry', 'tannery', 'weavingHouse', 'smokehouse', 'dryingRack', 'onggiKiln',
+  'stable', 'clinic', 'nitreYard', 'ferry', 'tannery', 'weavingHouse', 'smokehouse', 'dryingRack', 'onggiKiln', 'saltworks',
   'deepMine', 'watchtower',
 ] as const satisfies readonly BuildingTypeId[];
 export type AutoAssignBuildingType = typeof AUTO_ASSIGN_BUILDING_TYPES[number];
@@ -39,6 +39,7 @@ export const SLOTTED_BUILDING_CONFIG: Partial<Record<BuildingTypeId, WorkerSlotC
   smokehouse: { job: 'curer', slots: 2 },
   dryingRack: { job: 'curer', slots: 2 },
   onggiKiln: { job: 'potter', slots: 2 },
+  saltworks: { job: 'saltMaker', slots: 2 },
   deepMine: { job: 'miner', slots: 4 },
   cemetery: { job: 'undertaker', slots: 1 },
   school: { job: 'teacher', slots: 1 },

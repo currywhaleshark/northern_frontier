@@ -44,7 +44,7 @@ function siteFits(state: GameState, tile: Tile, width: number, height: number): 
     for (let x = tile.x; x < tile.x + width; x++) {
       const target = state.map[y]?.[x];
       if (!target || target.buildingId != null || target.terrain === 'river' ||
-          target.terrain === 'lake' || target.terrain === 'center') return false;
+          target.terrain === 'lake' || target.terrain === 'sea' || target.terrain === 'center') return false;
     }
   }
   return state.foreignSites.every(site => manhattan(tile, site) >= CONFIG.foreignSites.minSiteSpacing);
@@ -66,7 +66,7 @@ function chooseSiteTile(
   const center = centerOf(state);
   const fallback = state.map.flat()
     .filter(tile => tile.buildingId == null && tile.terrain !== 'river' &&
-      tile.terrain !== 'lake' && tile.terrain !== 'center')
+      tile.terrain !== 'lake' && tile.terrain !== 'sea' && tile.terrain !== 'center')
     .sort((a, b) => manhattan(b, center) - manhattan(a, center))[0];
   return fallback ?? state.map[1][1];
 }

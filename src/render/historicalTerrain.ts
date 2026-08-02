@@ -28,6 +28,7 @@ export function historicalTerrainColumn(terrain: Terrain): number | null {
       return 3; // 산맥과 광상 아래에는 바위·자갈 지면을 쓴다.
     case 'river':
     case 'lake':
+    case 'sea':
       return null;
   }
 }

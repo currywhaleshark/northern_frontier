@@ -10,6 +10,7 @@ export const ROYAL_PLAQUE_PRODUCTION_BUILDING_TYPES = [
   'smokehouse',
   'dryingRack',
   'onggiKiln',
+  'saltworks',
   'jangdokdae',
   'woodShed',
   'watermill',

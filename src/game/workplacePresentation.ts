@@ -29,6 +29,7 @@ const WORKPLACE_PRESENTATIONS: Partial<Record<BuildingTypeId, WorkplacePresentat
   nitreYard: { mode: 'yard', activity: 'craft' },
   dryingRack: { mode: 'yard', activity: 'craft' },
   onggiKiln: { mode: 'yard', activity: 'fire' },
+  saltworks: { mode: 'yard', activity: 'fire' },
 };
 
 export function workplacePresentation(type: BuildingTypeId): WorkplacePresentation {

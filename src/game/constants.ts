@@ -27,7 +27,7 @@ export const WEATHER_NAMES: Record<WeatherId, string> = {
 };
 
 export const TERRAIN_NAMES: Record<Terrain, string> = {
-  forest: '숲', plain: '평지', river: '강', lake: '호수', mountain: '산지',
+  forest: '숲', plain: '평지', river: '강', lake: '호수', sea: '바다', mountain: '산지',
   fertile: '비옥한 땅', rock: '바위/철광', center: '마을 터',
 };
 
@@ -35,7 +35,7 @@ export const JOB_NAMES: Record<JobId, string> = {
   idle: '무직', woodcutter: '벌목꾼', hunter: '사냥꾼', farmer: '농부',
   woodSplitter: '장작꾼',
   miller: '방아꾼',
-  builder: '건축가', hauler: '운반꾼', herbalist: '약초꾼', physician: '의원', curer: '갈무리꾼', potter: '옹기장이', smith: '대장장이',
+  builder: '건축가', hauler: '운반꾼', herbalist: '약초꾼', physician: '의원', curer: '갈무리꾼', potter: '옹기장이', saltMaker: '염부', smith: '대장장이',
   miner: '채광꾼', fisher: '어부',
   charcoalBurner: '숯쟁이', herder: '목동',
   tanner: '무두장이',
@@ -48,7 +48,7 @@ export const JOB_NAMES: Record<JobId, string> = {
 
 export const JOB_ORDER: JobId[] = [
   'idle', 'woodcutter', 'woodSplitter', 'hunter', 'farmer', 'miller', 'builder',
-  'hauler', 'herbalist', 'physician', 'curer', 'potter', 'smith', 'miner', 'fisher', 'charcoalBurner', 'herder',
+  'hauler', 'herbalist', 'physician', 'curer', 'potter', 'saltMaker', 'smith', 'miner', 'fisher', 'charcoalBurner', 'herder',
   'tanner', 'weaver', 'powderMaker', 'clerk', 'undertaker', 'teacher',
   'watchman', 'militia',
 ]; // shaman·monk는 네임드 전용이라 배정 목록에 없다
@@ -83,6 +83,7 @@ export const JOB_DESC: Record<JobId, string> = {
   physician: '진(鎭) 승격 후 의원에서 약초로 병자와 중상자를 치료하고 역병의 진단과 방역을 돕습니다.',
   curer: '훈연소에서 고기를 보존육으로 만들고, 건조대에서 생선을 자반이나 건어물로 갈무리합니다.',
   potter: '보(堡) 승격 후 강가의 점토를 빚고 연료로 구워 옹기를 만듭니다.',
+  saltMaker: '해안의 자염막에서 바닷물을 장작으로 끓여 소금을 만듭니다.',
   smith: '창고에서 철과 필요한 재료를 가져와 지정 대장간에서 도구와 무기를 만듭니다.',
   miner: '정착지 단계부터 광상을 찾아 돌·철·은을 캡니다. 채광장이 있으면 반경 안의 광물을 그곳에 하역합니다.',
   fisher: '보(堡) 승격 후 배치할 수 있습니다. 나루터에서 강고기를 잡아 식량을 보탭니다.',
@@ -105,7 +106,7 @@ export const JOB_COLORS: Record<JobId, string> = {
   idle: '#9aa5ad', woodcutter: '#b0793a', hunter: '#7fa653', farmer: '#d9c26b',
   woodSplitter: '#c48b46',
   miller: '#b9a27a',
-  builder: '#d98d5f', hauler: '#8fb7c9', herbalist: '#6fce9e', physician: '#77b7a8', curer: '#c88964', potter: '#a56d4a', smith: '#c96f6f',
+  builder: '#d98d5f', hauler: '#8fb7c9', herbalist: '#6fce9e', physician: '#77b7a8', curer: '#c88964', potter: '#a56d4a', saltMaker: '#d7c5a0', smith: '#c96f6f',
   miner: '#9a8f7a', fisher: '#5ba7d8',
   charcoalBurner: '#d66f3f', herder: '#c7a85b',
   tanner: '#b9825a',

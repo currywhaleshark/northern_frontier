@@ -5,7 +5,7 @@ const HAUL_SOURCE_BUILDING_TYPES: ReadonlySet<BuildingTypeId> = new Set([
   'smithy', 'mine', 'deepMine', 'ferry', 'watermill', 'charcoalKiln', 'stable',
   'nitreYard', 'tannery', 'weavingHouse',
   'smokehouse', 'dryingRack',
-  'onggiKiln', 'jangdokdae',
+  'onggiKiln', 'jangdokdae', 'saltworks',
 ]);
 
 export function ensureBuildingInventory(building: Building): Partial<Record<ResourceId, number>> {

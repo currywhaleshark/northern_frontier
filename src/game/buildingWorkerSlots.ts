@@ -39,6 +39,22 @@ const BUILDING_WORKER_SLOTS: Partial<Record<BuildingTypeId, readonly BuildingWor
       "offsetY": -8,
       "facing": -1
     }
+  ],
+  "saltworks": [
+    {
+      "tileDX": -1,
+      "tileDY": 1,
+      "offsetX": 0,
+      "offsetY": 0,
+      "facing": 1
+    },
+    {
+      "tileDX": 2,
+      "tileDY": 1,
+      "offsetX": 0,
+      "offsetY": 0,
+      "facing": -1
+    }
   ]
 };
 

@@ -1475,11 +1475,11 @@ function goalItem(step, state, label) {
       `guide module ${id} uses the planned format`,
     );
   }
-  // 계획서 §5 트리거 표의 12개 모듈 + R4의 세공 파발·가죽공방 2개
+  // 기존 14개 모듈 + S5 해안 시작·자염막 완공 안내 2개
   assert.deepEqual(Object.keys(guides.GUIDE_MODULES).sort(), [
-    'battle', 'beast', 'chronicle', 'diplomacy', 'disaster', 'expedition',
+    'battle', 'beast', 'chronicle', 'coast', 'diplomacy', 'disaster', 'expedition',
     'fire', 'livestock', 'mining', 'oxen', 'preservation', 'rename',
-    'tannery', 'tribute',
+    'saltworks', 'tannery', 'tribute',
   ]);
 
   const state = tutorialStart.createTutorialGame();

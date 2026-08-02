@@ -440,6 +440,23 @@ export function ActionPopup({
         </div>
       )}
 
+      {building.type === 'saltworks' && building.built && (
+        <div className="worker-slot-panel">
+          <div className="worker-slot-summary">
+            <span>자염 생산</span>
+            <span className="muted small">
+              장작 {(building.inventory?.firewood ?? 0).toFixed(1)} · 소금 {(building.inventory?.salt ?? 0).toFixed(1)}
+            </span>
+          </div>
+          <div className="muted small">
+            염부 1명 하루 소금 {CONFIG.production.saltPerDay} · 소금 1당 장작 {CONFIG.production.firewoodPerSalt}
+          </div>
+          <div className="muted small">
+            바닷물은 식수·농수·소방수로 쓸 수 없으며, 자염막은 겨울에도 가동합니다.
+          </div>
+        </div>
+      )}
+
       {isCropBuilding && (
         <div className="worker-slot-panel">
           <div className="worker-slot-summary">

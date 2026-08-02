@@ -26,6 +26,7 @@ const BUILDING_COLUMNS: Record<BuildingTypeId, number> = {
   smokehouse: 10,
   dryingRack: 5,
   onggiKiln: 10,
+  saltworks: 10,
   jangdokdae: 9,
   bridge: 11,
   weir: 11,

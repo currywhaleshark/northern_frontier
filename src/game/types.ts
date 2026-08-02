@@ -69,6 +69,7 @@ export type Terrain =
   | 'plain'    // 평지
   | 'river'    // 강 (겨울에는 얼어붙은 강으로 표시)
   | 'lake'     // 호수 (가장자리부터 점진적으로 결빙·해빙)
+  | 'sea'      // 바다 (해수 — 식수·농수 불가, 결빙하지 않음)
   | 'mountain' // 산지
   | 'fertile'  // 비옥한 땅
   | 'rock'     // 바위/철광
@@ -99,6 +100,7 @@ export type JobId =
   | 'physician'  // 의원
   | 'curer'      // 갈무리꾼
   | 'potter'     // 옹기장이
+  | 'saltMaker'  // 염부
   | 'smith'      // 대장장이
   | 'miner'      // 채광꾼
   | 'fisher'     // 어부
@@ -191,6 +193,7 @@ export type BuildingTypeId =
   | 'smokehouse' // 훈연소
   | 'dryingRack' // 건조대
   | 'onggiKiln'  // 옹기가마
+  | 'saltworks'  // 자염막 — 해안에서 장작으로 바닷물을 끓여 소금 생산
   | 'jangdokdae' // 장독대
   | 'bridge'     // 다리
   | 'weir'       // 보(洑) — 가뭄 관개 시설
@@ -618,9 +621,10 @@ export interface BuildingDef {
   capacity: number;         // 주거 수용 인원
   defense: number;          // 제공 방어도
   winterBonus: boolean;     // 겨울 보너스 여부
-  placement: 'land' | 'field' | 'paddy' | 'river' | 'rock' | 'riverbank' | 'watermill' | 'any';
+  placement: 'land' | 'field' | 'paddy' | 'river' | 'rock' | 'riverbank' | 'coast' | 'watermill' | 'any';
   unique: boolean;          // 하나만 건설 가능 여부
   minRank?: Rank;
+  region?: MapRegion;       // 특정 지역에서만 건설 가능한 시설
 }
 
 // 교역 제안: 마을이 give를 내주고 get을 받는다

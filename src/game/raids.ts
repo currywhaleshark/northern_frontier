@@ -168,7 +168,7 @@ export function raiderCanUseBuilding(building: Building): boolean {
 // 습격자 통행 규칙: 산, 지표 광상, 강물, 건물 발자국은 막는다. 겨울 얼음강과 완공된 교통 건물만 예외다.
 function raiderPassable(state: GameState, x: number, y: number): boolean {
   const t = state.map[y]?.[x];
-  if (!t || t.terrain === 'mountain' || t.terrain === 'rock') return false;
+  if (!t || t.terrain === 'mountain' || t.terrain === 'rock' || t.terrain === 'sea') return false;
   if (t.buildingId != null) {
     const building = buildingAt(state, t.buildingId);
     if (building && raiderCanUseBuilding(building)) return true;

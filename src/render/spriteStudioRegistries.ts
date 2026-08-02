@@ -22,6 +22,7 @@ export const SPRITE_DISPLAY_METRIC_KEYS: readonly string[] = [
   "i2v.physician",
   "i2v.curer",
   "i2v.potter",
+  "i2v.saltMaker",
   "i2v.smith",
   "i2v.miner",
   "i2v.charcoalBurner",
@@ -49,6 +50,7 @@ export const SPRITE_DISPLAY_METRIC_KEYS: readonly string[] = [
   "jige.smith",
   "jige.curer",
   "jige.potter",
+  "jige.saltMaker",
   "jige.charcoalBurner",
   "jige.powderMaker",
   "jige.tanner",
@@ -72,6 +74,7 @@ export const SPRITE_DISPLAY_METRIC_KEYS: readonly string[] = [
   "work.undertaker",
   "work.curer",
   "work.potter",
+  "work.saltMaker",
   "work.farmer.oxPlow",
   "work.farmer.harvest",
   "work.farmer.till",
@@ -495,6 +498,26 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "dy": 28,
       "scale": 1,
       "when": "night"
+    }
+  ],
+  "saltworks": [
+    {
+      "kind": "chimneySmoke",
+      "fx": 0.7,
+      "fy": 0.18,
+      "dx": 0,
+      "dy": 0,
+      "scale": 1,
+      "when": "working"
+    },
+    {
+      "kind": "fireSparks",
+      "fx": 0.5,
+      "fy": 0.68,
+      "dx": 0,
+      "dy": 0,
+      "scale": 0.8,
+      "when": "working"
     }
   ],
   "watchtower": [

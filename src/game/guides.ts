@@ -14,7 +14,7 @@ export type GuideFormat = 'card' | 'modal';
 export type GuideModuleId =
   | 'preservation' | 'livestock' | 'oxen' | 'disaster' | 'fire' | 'diplomacy'
   | 'battle' | 'expedition' | 'beast' | 'mining' | 'chronicle' | 'rename'
-  | 'tribute' | 'tannery';
+  | 'tribute' | 'tannery' | 'coast' | 'saltworks';
 
 export interface GuideModule {
   id: GuideModuleId;
@@ -180,6 +180,28 @@ export const GUIDE_MODULES: Record<GuideModuleId, GuideModule> = {
       '· 사냥꾼이 모자라면 가죽이 끊깁니다. 사냥막과 사냥꾼의 수를 함께 살피십시오.\n' +
       '· 지은 옷은 겨울 체온도 지킵니다. 바칠 몫과 입힐 몫을 함께 셈해 두십시오.',
   },
+  coast: {
+    id: 'coast',
+    title: '해안과 바닷물',
+    summary: '바닷물은 얼지 않지만 마시거나 농사·소방에 쓸 수 없습니다 — 시작 수맥과 담수 하천을 지키십시오.',
+    format: 'card',
+    body:
+      '남쪽의 큰 물은 바다입니다. 겨울에도 얼지 않고 사람이 건널 수 없습니다.\n' +
+      '· 바닷물은 마실 수 없고 논·농수로·화재 진압에도 쓰지 못합니다. 우물과 담수 하천을 따로 확보하십시오.\n' +
+      '· 바다가 차지한 만큼 농지와 수맥이 적습니다. 시작 정착지 가까운 수맥은 보장되지만 확장할수록 물을 먼저 살펴야 합니다.\n' +
+      '· 대신 해안에서는 자염막을 지어 소금을 자급할 수 있습니다.',
+  },
+  saltworks: {
+    id: 'saltworks',
+    title: '자염과 겨울 장작',
+    summary: '자염막은 바닷물을 장작으로 끓여 소금을 냅니다 — 겨울 난방 몫과 경쟁합니다.',
+    format: 'card',
+    body:
+      '자염막이 섰습니다. 염부를 배정하고 장작을 들이면 소금을 냅니다.\n' +
+      '· 바닷물과 맞닿은 2×2 육지에만 지을 수 있고, 물길이 끊기면 생산도 멎습니다.\n' +
+      '· 염부 한 명은 하루 소금 0.75를 내며 소금 하나마다 장작 1.25를 태웁니다.\n' +
+      '· 겨울에도 가동하지만 난방 장작과 같은 재고를 씁니다. 추위가 오기 전에는 가동 인원을 조절하십시오.',
+  },
   rename: {
     id: 'rename',
     title: '개칭 청원',
@@ -203,6 +225,7 @@ const BUILDING_GUIDES: Partial<Record<BuildingTypeId, GuideModuleId>> = {
   jangdokdae: 'preservation',
   stable: 'livestock',
   deepMine: 'mining',
+  saltworks: 'saltworks',
 };
 
 function ensureGuideState(state: GameState): GuideState {

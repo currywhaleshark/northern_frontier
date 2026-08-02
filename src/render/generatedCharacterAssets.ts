@@ -22,6 +22,7 @@ const RESIDENT_COLUMNS: Record<JobId, number> = {
   physician: 6,
   curer: 5,
   potter: 7,
+  saltMaker: 7,
   smith: 7,
   miner: 7,
   fisher: 2,

@@ -78,10 +78,9 @@ const { CONFIG } = await load('config');
   assert.equal(lake.region, 'lake', 'S4부터 호수는 선택값을 보존한다');
   assert.equal(options.worldSetupLabel(lake), '호수의 대형 개척지');
 
-  for (const futureRegion of ['coast']) {
-    assert.equal(options.normalizeNewGameOptions({ region: futureRegion }).region, 'plains',
-      `${futureRegion}은 S5 전까지 평원으로 보정한다`);
-  }
+  const coast = options.normalizeNewGameOptions({ ...mountain, region: 'coast' });
+  assert.equal(coast.region, 'coast', 'S5부터 해안은 선택값을 보존한다');
+  assert.equal(options.worldSetupLabel(coast), '해안의 대형 개척지');
 
   assert.deepEqual(options.mapDimensionsForSize('small'), { width: 56, height: 56 });
   assert.deepEqual(options.mapDimensionsForSize('medium'), { width: 72, height: 72 });

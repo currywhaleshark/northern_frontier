@@ -8,7 +8,7 @@ import {
 import {
   BUILDING_DEFS, buildingCostForInstance, cemeteryPlotCapacity, clearBuildingTiles, computeDefense, footprintTilesOf,
   isBuildingUpperPassageTile, isPlotBuildingType, isSmithyProductUnlocked, occupyBuildingTiles, officeEfficiencyMultiplier,
-  plotArea, preferredLeveeEdgeAt, SMITHY_PRODUCT_DEFS, smithyProductOf, sownAreaOf,
+  plotArea, preferredLeveeEdgeAt, saltworksHasSeaAccess, SMITHY_PRODUCT_DEFS, smithyProductOf, sownAreaOf,
 } from './buildings';
 import { JOB_NAMES, RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
@@ -106,12 +106,12 @@ interface Ctx {
 }
 
 const PRODUCING_JOBS = [
-  'woodcutter', 'woodSplitter', 'hunter', 'farmer', 'miller', 'builder', 'curer', 'potter', 'smith', 'miner', 'fisher',
+  'woodcutter', 'woodSplitter', 'hunter', 'farmer', 'miller', 'builder', 'curer', 'potter', 'saltMaker', 'smith', 'miner', 'fisher',
   'charcoalBurner', 'herder', 'powderMaker', 'tanner', 'weaver', 'herbalist', 'hauler',
 ];
 const OUTDOOR_JOBS = [
   'woodcutter', 'woodSplitter', 'hunter', 'herbalist', 'farmer', 'builder', 'miner', 'fisher',
-  'charcoalBurner', 'herder',
+  'charcoalBurner', 'herder', 'saltMaker',
 ];
 const GATHERING_JOBS = ['woodcutter', 'hunter', 'herbalist', 'miner', 'fisher'];
 
@@ -203,7 +203,7 @@ export function isTerrainPassable(state: GameState, x: number, y: number): boole
   if (siegeGateClosed && !breachedPassage) return false;
   if (building && !breachedPassage && !isPassableBuilding(building.type) &&
       !isBuildingUpperPassageTile(building, x, y)) return false;
-  if (t.terrain === 'mountain' || t.terrain === 'rock') return false;
+  if (t.terrain === 'mountain' || t.terrain === 'rock' || t.terrain === 'sea') return false;
   if (t.terrain === 'river') {
     if (building && (building.type === 'bridge' || building.type === 'ferry' || building.type === 'dock')) return true;
     // 겨울 언 강 위는 걸어서 건널 수 있다 (해빙기 홍수 제외)
@@ -868,6 +868,7 @@ function workplaceInputResources(building: Building): ResourceId[] {
     case 'smokehouse': return ['meat', 'firewood', 'charcoal'];
     case 'dryingRack': return Object.keys(DRYING_PRODUCT_DEFS[dryingProductOf(building)].inputPerUnit) as ResourceId[];
     case 'onggiKiln': return ['firewood', 'charcoal'];
+    case 'saltworks': return ['firewood'];
     case 'jangdokdae': return ['beans', 'salt', 'onggi'];
     default: return [];
   }
@@ -2606,6 +2607,46 @@ function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
   });
 }
 
+function saltMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const saltworks = assignedWorkplace(state, r, ctx, 'saltworks', '자염막 배정 없음');
+  if (!saltworks) return;
+  if (!saltworksHasSeaAccess(state, saltworks)) {
+    r.phase = 'rest';
+    r.task = '바닷물 길이 끊김';
+    return;
+  }
+  const inputs: WorkplaceInputs = { firewood: CONFIG.production.firewoodPerSalt };
+  const target = (CONFIG.production.saltPerDay / 5) * effOf(r) *
+    ctx.outputMod * WORK_RATE_SCALE;
+  const requirements = scaledRequirements(inputs, target);
+
+  if (carryTotal(r) > 0) {
+    supplyWorkplaceInputs(state, r, ctx, saltworks, requirements);
+    return;
+  }
+  if (supplyWorkplaceInputs(state, r, ctx, saltworks, requirements)) return;
+
+  const st = goTo(state, r, ctx, workerSlotGoal(state, r, saltworks));
+  if (st !== 'arrived') {
+    r.phase = st === 'stuck' ? 'rest' : 'toWork';
+    r.task = st === 'stuck' ? '길이 막힘' : '자염막으로 이동';
+    return;
+  }
+
+  const made = Math.min(target, maxCraftableFrom(saltworks, inputs));
+  if (made <= WORK_CRAFT_EPSILON) {
+    r.phase = 'rest';
+    r.task = inputWaitTask(saltworks, requirements);
+    return;
+  }
+
+  consumeRecipeInputs(saltworks, inputs, made);
+  addBuildingStock(saltworks, 'salt', made * plaqueProductionMultiplier(state, saltworks.id));
+  r.phase = 'working';
+  r.task = '바닷물 끓여 소금 내는 중';
+  gainSkillTick(state, r);
+}
+
 function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
   const floodMult = state.weather === 'thawFlood' ? 0.25 : 1;
@@ -3960,6 +4001,7 @@ export function agentsTick(state: GameState): void {
       case 'hauler': haulerTick(state, r, ctx); break;
       case 'curer': curerTick(state, r, ctx); break;
       case 'potter': potterTick(state, r, ctx); break;
+      case 'saltMaker': saltMakerTick(state, r, ctx); break;
       case 'smith': smithTick(state, r, ctx); break;
       case 'miner': minerTick(state, r, ctx); break;
       case 'fisher': fisherTick(state, r, ctx); break;

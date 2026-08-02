@@ -7,7 +7,7 @@ import { isJobUnlocked, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } fr
 import {
   BUILDING_DEFS, buildingCostFor, buildingCostForInstance, buildingFootprintTiles, canAfford, canAffordCost,
   buildingFootprintDims, cannonPlacementsUsed, chongtongPlacementsUsed, canPlaceBuildingAt, canPlaceOn, canRelocateBuildingAt, clampPlotSide,
-  clearBuildingTiles, computeDefense, getBuilding, isBuildingUnlocked,
+  clearBuildingTiles, computeDefense, getBuilding, isBuildingAvailableInRegion, isBuildingUnlocked,
   footprintTilesOf, isAreaBuildingType, isPaddyFootprintEligible, isPlotBuildingType, isSmithyProductUnlocked,
   occupyBuildingTiles, plotArea, preferredLeveeEdgeAt, SMITHY_PRODUCT_DEFS,
 } from './buildings';
@@ -310,6 +310,7 @@ export function newGameFromOptions(
     `${worldSetupLabel(state.worldSetup)}입니다.`, 'founding');
   recordYearlySnapshot(state); // 1년차 스냅샷 — 정착 당일의 밑그림
   announceCourtTribute(state); // 1년차 봄이 day 1 — 첫 해는 요구 없이 예고 한 줄만 남는다 (R4)
+  if (state.worldSetup.region === 'coast') openGuideOnce(state, 'coast');
   return state;
 }
 
@@ -419,6 +420,9 @@ export function tryPlaceBuilding(
   if (!isBuildingUnlocked(state.rank, type)) {
     const rankName = def.minRank ? RANK_NAMES[def.minRank] : RANK_NAMES.bo;
     return `${rankName} 승격 후 지을 수 있습니다.`;
+  }
+  if (!isBuildingAvailableInRegion(state.worldSetup?.region, type)) {
+    return '해안 지역에서만 지을 수 있습니다.';
   }
   if (!isBuildingFootprintExplored(state, type, x, y, w, h)) return '아직 답사하지 않은 곳입니다.';
   revealForeignSitesFromExploration(state);
@@ -1712,6 +1716,7 @@ const TOOL_WEAR_JOB_WEIGHT: Partial<Record<JobId, number>> = {
   builder: 1,
   curer: 0.45,
   potter: 0.6,
+  saltMaker: 0.5,
   smith: 0.6,
   miner: 1,
   fisher: 0.6,

@@ -454,7 +454,7 @@ export function restoreWeirReservoir(state: GameState, weir: Building): boolean 
 }
 
 function floodableTerrain(terrain: Terrain): boolean {
-  return terrain !== 'river' && terrain !== 'lake' && terrain !== 'mountain' && terrain !== 'rock';
+  return terrain !== 'river' && terrain !== 'lake' && terrain !== 'sea' && terrain !== 'mountain' && terrain !== 'rock';
 }
 
 function edgeFromStep(dx: number, dy: number): LeveeEdge {

@@ -40,6 +40,7 @@ const expectedProductionTypes = [
   'smokehouse',
   'dryingRack',
   'onggiKiln',
+  'saltworks',
   'jangdokdae',
   'woodShed',
   'watermill',

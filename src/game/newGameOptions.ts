@@ -30,7 +30,7 @@ export const SETUP_LEVEL_NAMES: Record<SetupLevel, string> = {
 };
 
 const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
-const ACTIVE_MAP_REGIONS: readonly MapRegion[] = ['plains', 'mountain', 'lake'];
+const ACTIVE_MAP_REGIONS: readonly MapRegion[] = ['plains', 'mountain', 'lake', 'coast'];
 const MAP_SIZES: readonly MapSize[] = ['small', 'medium', 'large'];
 const SETUP_LEVELS: readonly SetupLevel[] = ['low', 'normal', 'high'];
 export const MAX_NEW_GAME_SEED = 0x7fffffff;
@@ -132,8 +132,7 @@ export function optionsForDifficulty(
 }
 
 /**
- * S4에서는 평원·산지·호수와 세 지도 크기를 보존한다.
- * 해안은 S5에서 구현할 때 잠금을 푼다.
+ * S5에서는 평원·산지·호수·해안과 세 지도 크기를 보존한다.
  */
 export function normalizeNewGameOptions(raw: Partial<NewGameOptions> | null | undefined): NewGameOptions {
   const defaults = defaultNewGameOptions();

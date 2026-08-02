@@ -1,4 +1,4 @@
-import { isNaturalWaterTerrain } from '../game/terrain';
+import { isOpenWaterTerrain } from '../game/terrain';
 import type { ForeignSite, Tile } from '../game/types';
 import { FOREIGN_SITE_CORE_SHEET } from './foreignSiteAssets';
 import { TERRAIN_GROWTH_DRAW_SIZE } from './terrainGrowthAssets';
@@ -57,7 +57,7 @@ export function mountainOverlayBlockers(
   for (let y = minTileY; y <= maxTileY; y++) {
     for (let x = minTileX; x <= maxTileX; x++) {
       const tile = map[y]?.[x];
-      if (!tile || !isNaturalWaterTerrain(tile.terrain)) continue;
+      if (!tile || !isOpenWaterTerrain(tile.terrain)) continue;
       blockers.push({ x: x * tileSize, y: y * tileSize, w: tileSize, h: tileSize });
     }
   }

@@ -19,6 +19,7 @@ export const BUILD_CATEGORY_BY_TYPE = {
   smokehouse: 'production',
   dryingRack: 'production',
   onggiKiln: 'production',
+  saltworks: 'production',
   jangdokdae: 'production',
   lumberCamp: 'production',
   woodShed: 'production',

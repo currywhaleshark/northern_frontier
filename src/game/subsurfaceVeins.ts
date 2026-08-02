@@ -24,8 +24,8 @@ export interface VeinSample<T extends SubsurfaceVein> {
 const aquiferCache = new Map<string, readonly SubsurfaceVein[]>();
 const oreCache = new Map<string, readonly OreVein[]>();
 
-function normalizedRegion(region: MapRegion): 'plains' | 'mountain' | 'lake' {
-  return region === 'mountain' || region === 'lake' ? region : 'plains';
+function normalizedRegion(region: MapRegion): 'plains' | 'mountain' | 'lake' | 'coast' {
+  return region === 'mountain' || region === 'lake' || region === 'coast' ? region : 'plains';
 }
 
 function cacheKey(seed: number, width: number, height: number, region: MapRegion): string {
@@ -149,11 +149,14 @@ export function aquiferVeins(
   const rng = makeRng((seed ^ 0x4a71f39d) >>> 0);
   const mediumArea = MAP_SIZE_DIMENSIONS.medium.width * MAP_SIZE_DIMENSIONS.medium.height;
   const areaScale = Math.max(0.55, Math.sqrt(Math.max(1, width * height) / mediumArea));
-  const countMultiplier = resolvedRegion === 'mountain' ? 0.65 : resolvedRegion === 'lake' ? 1.2 : 1;
-  const radiusMultiplier = resolvedRegion === 'mountain' ? 0.75 : resolvedRegion === 'lake' ? 1.1 : 1;
-  const capacityMultiplier = resolvedRegion === 'mountain' ? 0.75 : resolvedRegion === 'lake' ? 1.15 : 1;
+  const countMultiplier = resolvedRegion === 'mountain' || resolvedRegion === 'coast'
+    ? 0.65 : resolvedRegion === 'lake' ? 1.2 : 1;
+  const radiusMultiplier = resolvedRegion === 'mountain' ? 0.75
+    : resolvedRegion === 'coast' ? 0.85 : resolvedRegion === 'lake' ? 1.1 : 1;
+  const capacityMultiplier = resolvedRegion === 'mountain' ? 0.75
+    : resolvedRegion === 'coast' ? 0.8 : resolvedRegion === 'lake' ? 1.15 : 1;
   const baseCount = Math.max(
-    resolvedRegion === 'mountain' ? 1 : 2,
+    resolvedRegion === 'mountain' || resolvedRegion === 'coast' ? 1 : 2,
     Math.round((4 + Math.floor(rng() * 3)) * areaScale * countMultiplier),
   );
   const veins: SubsurfaceVein[] = [];
@@ -174,7 +177,7 @@ export function aquiferVeins(
   }
   const riverCenters = riverCenterline(seed, width, height);
   const inlandCount = Math.max(
-    resolvedRegion === 'mountain' ? 1 : 2,
+    resolvedRegion === 'mountain' || resolvedRegion === 'coast' ? 1 : 2,
     Math.ceil(
       baseCount * CONFIG.water.aquiferInlandAdditionRatio *
       countMultiplier,

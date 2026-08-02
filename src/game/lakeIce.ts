@@ -1,4 +1,5 @@
 import { getDayOfSeason, getSeason } from './seasons';
+import { isOpenWaterTerrain } from './terrain';
 import type { Tile } from './types';
 
 const CARDINAL_STEPS = [[0, -1], [1, 0], [0, 1], [-1, 0]] as const;
@@ -30,7 +31,7 @@ function lakeIceField(map: Tile[][]): LakeIceField {
       if (!isLake(map, x, y)) continue;
       const shore = CARDINAL_STEPS.some(([dx, dy]) => {
         const neighbor = map[y + dy]?.[x + dx];
-        return neighbor != null && neighbor.terrain !== 'lake' && neighbor.terrain !== 'river';
+        return neighbor != null && !isOpenWaterTerrain(neighbor.terrain);
       });
       if (!shore) continue;
       distances.set(key(x, y), 0);
