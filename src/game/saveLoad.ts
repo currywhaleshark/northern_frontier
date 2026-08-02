@@ -51,6 +51,7 @@ import {
 } from './tacticalRoutes';
 import { isYouthWorkJob } from './youth';
 import { initializeWallIntegrity } from './raidRoutes';
+import { initializeWatchtowerIntegrity } from './watchtowers';
 import { normalizeResidentFamilyReferences } from './family';
 import { normalizeResidentWearables, TANNERY_PRODUCT_DEFS } from './wearables';
 import { withJosa } from './josa';
@@ -838,6 +839,16 @@ export function migrateV54ToV55(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), siegeState: null, schemaVersion: 55 };
 }
 
+// v56: P4 망루 사격 궤적·일일 상한·철수 상태. 구 저장의 망루에는 파수꾼을 강제 배정하지 않는다.
+export function migrateV55ToV56(raw: RawSave): RawSave {
+  return {
+    ...clonedRecord(raw),
+    watchtowerProjectiles: [],
+    nextWatchtowerProjectileId: 1,
+    schemaVersion: 56,
+  };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -898,6 +909,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 52) migrated = migrateV52ToV53(migrated);
     else if (version === 53) migrated = migrateV53ToV54(migrated);
     else if (version === 54) migrated = migrateV54ToV55(migrated);
+    else if (version === 55) migrated = migrateV55ToV56(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -2149,6 +2161,19 @@ export function loadGame(slot = 1): GameState | null {
     if (parsed.subTick == null || parsed.residents.some(r => r.x == null || r.px == null)) return null;
     for (const resident of parsed.residents) {
       normalizeResidentWearables(resident);
+      const escapeTower = Number.isInteger(resident.watchtowerEscapeTowerId)
+        ? parsed.buildings.find(building => building.id === resident.watchtowerEscapeTowerId && building.type === 'watchtower')
+        : undefined;
+      if (!resident.alive || !escapeTower || !Number.isFinite(resident.watchtowerEscapeDeadlineTick)) {
+        delete resident.watchtowerEscapeTowerId;
+        delete resident.watchtowerEscapeDeadlineTick;
+        delete resident.watchtowerEscapeHasRoute;
+      } else {
+        resident.assignedBuildingId = null;
+        resident.watchtowerEscapeDeadlineTick = Math.max(0, Math.floor(resident.watchtowerEscapeDeadlineTick!));
+        resident.watchtowerEscapeHasRoute = resident.watchtowerEscapeHasRoute === true;
+        resident.path = Array.isArray(resident.path) ? resident.path : [];
+      }
       if (typeof resident.origin !== 'string' || resident.origin.trim().length === 0) delete resident.origin;
       else resident.origin = resident.origin.trim();
       if (resident.religiousVocation !== 'shaman' && resident.religiousVocation !== 'monk') {
@@ -2457,6 +2482,17 @@ export function loadGame(slot = 1): GameState | null {
               .filter(([, amount]) => typeof amount === 'number' && Number.isFinite(amount) && amount >= 0));
           }
         }
+      } else if (building.type === 'watchtower') {
+        initializeWatchtowerIntegrity(building);
+        delete building.breached;
+        delete building.structureRepair;
+        building.watchtowerLastShotTick = Number.isFinite(building.watchtowerLastShotTick)
+          ? Math.floor(building.watchtowerLastShotTick!) : undefined;
+        building.watchtowerDamageDay = Number.isFinite(building.watchtowerDamageDay)
+          ? Math.max(0, Math.floor(building.watchtowerDamageDay!)) : undefined;
+        building.watchtowerDamageToday = Number.isFinite(building.watchtowerDamageToday)
+          ? Math.max(0, Math.min(CONFIG.watchtower.bowDailyDamageCap, building.watchtowerDamageToday!)) : 0;
+        building.watchtowerHadTarget = building.watchtowerHadTarget === true;
       } else {
         delete building.structureIntegrity;
         delete building.structureIntegrityMax;
@@ -2580,6 +2616,32 @@ export function loadGame(slot = 1): GameState | null {
         delete band.breachTargetId;
         if (band.phase === 'breaching') band.phase = 'approaching';
       }
+      const validTowerTarget = Number.isInteger(band.towerTargetId) && parsed.buildings.some(building =>
+        building.id === band.towerTargetId && building.type === 'watchtower' && building.built && !building.repairing);
+      const validTowerReturnTarget = !!band.towerReturnTarget &&
+        Number.isFinite(band.towerReturnTarget.x) && Number.isFinite(band.towerReturnTarget.y) &&
+        parsed.map[Math.floor(band.towerReturnTarget.y)]?.[Math.floor(band.towerReturnTarget.x)] != null;
+      if (!validTowerTarget) {
+        delete band.towerTargetId;
+        if (validTowerReturnTarget) {
+          band.routeTarget = {
+            x: Math.floor(band.towerReturnTarget!.x),
+            y: Math.floor(band.towerReturnTarget!.y),
+          };
+          band.path = [];
+          delete band.route;
+        }
+        delete band.towerReturnTarget;
+      } else if (validTowerReturnTarget) {
+        band.towerReturnTarget = {
+          x: Math.floor(band.towerReturnTarget!.x),
+          y: Math.floor(band.towerReturnTarget!.y),
+        };
+      } else {
+        delete band.towerReturnTarget;
+      }
+      band.suppressedUntilTick = Number.isFinite(band.suppressedUntilTick)
+        ? Math.max(0, Math.floor(band.suppressedUntilTick!)) : undefined;
       const route = band.route;
       if (!route || (route.kind !== 'open' && route.kind !== 'assault') || !Array.isArray(route.steps) ||
           !Array.isArray(route.breaches) || !Number.isFinite(route.totalCost)) {
@@ -2603,6 +2665,27 @@ export function loadGame(slot = 1): GameState | null {
         route.totalCost = Math.max(0, route.totalCost);
       }
     }
+    const projectileIds = new Set<number>();
+    parsed.watchtowerProjectiles = Array.isArray(parsed.watchtowerProjectiles)
+      ? parsed.watchtowerProjectiles.filter(shot => {
+        if (!shot || !Number.isInteger(shot.id) || projectileIds.has(shot.id) ||
+            !Number.isInteger(shot.towerId) || !parsed.buildings.some(building => building.id === shot.towerId) ||
+            !Number.isFinite(shot.fromX) || !Number.isFinite(shot.fromY) ||
+            !Number.isFinite(shot.toX) || !Number.isFinite(shot.toY) ||
+            !Number.isFinite(shot.ageTicks) || !Number.isFinite(shot.durationTicks) || shot.durationTicks <= 0) return false;
+        projectileIds.add(shot.id);
+        shot.ageTicks = Math.max(0, Math.floor(shot.ageTicks));
+        shot.durationTicks = Math.max(1, Math.floor(shot.durationTicks));
+        shot.bow = shot.bow === true;
+        return shot.ageTicks < shot.durationTicks;
+      }).slice(-24)
+      : [];
+    parsed.nextWatchtowerProjectileId = Number.isInteger(parsed.nextWatchtowerProjectileId)
+      ? Math.max(1, parsed.nextWatchtowerProjectileId) : 1;
+    parsed.nextWatchtowerProjectileId = Math.max(
+      parsed.nextWatchtowerProjectileId,
+      ...parsed.watchtowerProjectiles.map(shot => shot.id + 1),
+    );
     ensureProcessingReserves(parsed);
     if (parsed.lastPetitionDay == null) parsed.lastPetitionDay = 0;
     if (parsed.cannonsGranted == null) parsed.cannonsGranted = 0;

@@ -116,7 +116,7 @@ for (const [type, emitters] of Object.entries(buildingEffects)) {
 
 // 자리를 실제로 따르는 건물만 허용한다 — agents.ts에서 workerSlotGoal을 쓰는 tick의 목록이다.
 // 다른 건물에 등록하면 근무자는 그 칸으로 가지 않으므로 조용한 무효 데이터가 된다.
-const SLOT_BUILDING_TYPES = ['woodShed'];
+const SLOT_BUILDING_TYPES = ['woodShed', 'watchtower'];
 
 const workerSlots = readData('worker-slots');
 for (const [type, slots] of Object.entries(workerSlots)) {

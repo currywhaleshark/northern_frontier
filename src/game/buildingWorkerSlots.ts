@@ -30,6 +30,15 @@ const BUILDING_WORKER_SLOTS: Partial<Record<BuildingTypeId, readonly BuildingWor
       "offsetY": 0,
       "facing": -1
     }
+  ],
+  "watchtower": [
+    {
+      "tileDX": 1,
+      "tileDY": 0,
+      "offsetX": -5,
+      "offsetY": -8,
+      "facing": -1
+    }
   ]
 };
 

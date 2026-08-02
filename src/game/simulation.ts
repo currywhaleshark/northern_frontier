@@ -35,6 +35,7 @@ import { battleTick } from './battles';
 import {
   checkRaidTrigger, raidHoldTick, raidersTick, resolveExpeditionRaidOrder, resolveExtortion, resolveRaid, updateThreat,
 } from './raids';
+import { watchtowerTick } from './watchtowers';
 import { processSiegeDay, siegeTick } from './siege';
 import { driftRelations, initRelations } from './relations';
 import { resetFactionTradeCapacityUsage } from './tradeValues';
@@ -193,6 +194,8 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
     raidHold: null,
     siegeState: null,
     raiders: null,
+    watchtowerProjectiles: [],
+    nextWatchtowerProjectileId: 1,
     battle: null,
     battleScars: [],
     tacticalBattle: null,
@@ -1436,6 +1439,7 @@ export function advanceTick(state: GameState): void {
   lap('t5-exploration');
   battleTick(state, tickRng);
   raidersTick(state, tickRng);
+  watchtowerTick(state);
   lap('t6-battles');
   state.subTick++;
   if (state.subTick >= SUBTICKS) {

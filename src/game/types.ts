@@ -432,6 +432,9 @@ export interface Resident {
   lastHuntPrey?: HuntPreyId; // 사냥 성공 후 운반 중인 사냥감 표시
   fireResponse?: FireResponse; // 평시 화재의 물 긷기·운반·진화 왕복 상태
   trappedInMineId?: number; // 갱도 붕괴 구조가 끝날 때까지 일반 생활·노동에서 제외
+  watchtowerEscapeTowerId?: number; // P4 무너지는 망루에서 탈출 중인 출발 건물
+  watchtowerEscapeDeadlineTick?: number; // 퇴로가 없을 때 부상·사망을 판정할 유예
+  watchtowerEscapeHasRoute?: boolean; // 저장 후에도 탈출/고립을 구분한다
   // ── 에이전트 상태 (지도 위 이동/작업/운반) ──
   x: number;
   y: number;
@@ -538,8 +541,8 @@ export interface Building {
   workOrder?: BuildingWorkOrder; // 건축가가 수행하는 해체 또는 이전 공사
   gateWallType?: SolidWallBuildingTypeId; // 성문 전용: 전환 전 벽 등급
   gateConversion?: GateConversion; // 완공 벽을 막힌 상태로 유지하며 진행하는 성문 전환 공사
-  structureIntegrity?: number; // P2 성벽·성문의 현재 구조 내구
-  structureIntegrityMax?: number; // 기반 벽 등급에서 정한 최대 구조 내구
+  structureIntegrity?: number; // P2 성벽·성문과 P4 망루의 현재 구조 내구
+  structureIntegrityMax?: number; // 기반 벽 등급 또는 망루에서 정한 최대 구조 내구
   breached?: boolean; // 내구가 0이 되어 양쪽 모두 통과 가능한 잔해가 된 상태
   structureRepair?: StructureRepair; // 돌파 잔해를 다시 차단 상태로 되돌리는 건축가 공사
   weirReservoir?: WeirReservoirState; // 보 전용: 상류 영구 침수 칸과 원래 지형
@@ -550,6 +553,10 @@ export interface Building {
   gatheringWorkArea?: GatheringWorkArea; // 채집 거점 전용: 건물과 독립적으로 옮기고 넓힐 수 있는 원형 작업영역
   linkedGatheringBuildingId?: number | null; // 숙식 움막 전용: 한 동이 맡는 채집 거점
   repairing?: boolean; // 외부 피해로 파손되어 건설담당의 수리가 필요한 상태
+  watchtowerLastShotTick?: number; // P4 망루의 마지막 사격 절대 틱
+  watchtowerDamageDay?: number; // P4 일일 피해 상한을 계산한 날짜
+  watchtowerDamageToday?: number; // P4 해당 날짜에 실제로 준 누적 피해
+  watchtowerHadTarget?: boolean; // P4 사거리 진입 즉시 사격을 위한 직전 표적 상태
   repairCause?: BuildingRepairCause; // 우측 경고에서 습격·설해·대홍수·화재 피해를 구분한다
 }
 
@@ -1009,6 +1016,9 @@ export interface RaiderBand {
   routeRevision?: number;
   routeTarget?: { x: number; y: number };
   breachTargetId?: number;
+  towerTargetId?: number; // P4 피격 뒤 재표적한 망루
+  towerReturnTarget?: { x: number; y: number }; // 망루 공격 뒤 돌아갈 원래 목표
+  suppressedUntilTick?: number; // P4 피해 상한 뒤에도 남는 사격 억제
   speed: number;     // 서브틱당 이동 타일
   trail: { x: number; y: number }[]; // 지나온 자취 (눈밭 발자국 렌더링용)
 }
@@ -1046,6 +1056,18 @@ export interface RaidHoldState {
   siege: boolean;
   expeditionOrder: ExpeditionRaidOrder;
   ticksRemaining: number;
+}
+
+export interface WatchtowerProjectile {
+  id: number;
+  towerId: number;
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  ageTicks: number;
+  durationTicks: number;
+  bow: boolean;
 }
 
 export type SiegePhase = 'evacuation' | 'encirclement' | 'wallCombat' | 'sortie' | 'withdrawal';
@@ -1918,6 +1940,8 @@ export interface GameState {
   raidHold: RaidHoldState | null; // 원정대 귀환을 기다리는 완전 수성 상태
   siegeState: SiegeState | null; // P3 하루 단위 장기 공성 상태
   raiders: RaiderBand | null; // 접근 중인 습격 무리
+  watchtowerProjectiles: WatchtowerProjectile[]; // P4 오버월드 화살 궤적
+  nextWatchtowerProjectileId: number;
   battle: Battle | null;      // 지도 위에서 진행 중인 습격 전투
   battleScars?: BattleScar[]; // 끝난 전투 자리의 교란 자국 (구버전 저장에는 없음)
   tacticalBattle: TacticalBattle | null; // 직접 지휘하는 두루마리형 습격 전투

@@ -1776,6 +1776,12 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
         target.structureIntegrity = target.structureIntegrityMax;
         target.breached = false;
         bumpDefenseTopology(state);
+      } else if (target.type === 'watchtower') {
+        target.structureIntegrityMax = CONFIG.watchtower.integrityMax;
+        target.structureIntegrity = target.structureIntegrityMax;
+        target.watchtowerDamageDay = state.day;
+        target.watchtowerDamageToday = 0;
+        target.watchtowerHadTarget = false;
       }
       if (!repaired) noteProximityBuildingCompletion(state, target);
       initializeWeirReservoir(state, target);
@@ -2804,6 +2810,13 @@ function clerkTick(state: GameState, r: Resident, ctx: Ctx): void {
 }
 
 function watchmanTick(state: GameState, r: Resident, ctx: Ctx): void {
+  const assignedTower = assignedBuildingForResident(state, r);
+  if (assignedTower?.type === 'watchtower') {
+    const st = goTo(state, r, ctx, workerSlotGoal(state, r, assignedTower));
+    r.phase = st === 'arrived' ? 'working' : st === 'stuck' ? 'rest' : 'toWork';
+    r.task = st === 'arrived' ? '망루 주둔' : st === 'stuck' ? '망루 접근로 막힘' : '망루로 이동';
+    return;
+  }
   r.task = '경계 근무';
   // 방어 시설 사이를 순찰한다
   const posts = state.buildings.filter(b =>
@@ -3718,6 +3731,29 @@ export function agentsTick(state: GameState): void {
       goToCenter(state, r, ctx);
       continue;
     }
+    if (r.watchtowerEscapeTowerId != null) {
+      resumeCriticalActivity(r);
+      clearHaulTask(r);
+      r.manualOrder = null;
+      r.phase = 'toWork';
+      if (r.watchtowerEscapeHasRoute && r.path.length > 0) {
+        const next = r.path.shift()!;
+        r.x = next.x;
+        r.y = next.y;
+        r.task = '망루에서 철수 중';
+      } else if (r.watchtowerEscapeHasRoute) {
+        delete r.watchtowerEscapeTowerId;
+        delete r.watchtowerEscapeDeadlineTick;
+        delete r.watchtowerEscapeHasRoute;
+        r.phase = 'rest';
+        r.task = '수비대에 합류';
+      } else {
+        r.path = [];
+        r.phase = 'rest';
+        r.task = '망루에 고립됨';
+      }
+      continue;
+    }
     const siegeDisposition = siegeResidentDisposition(state, r);
     if (siegeDisposition === 'evacuate') {
       resumeCriticalActivity(r);
@@ -3758,6 +3794,11 @@ export function agentsTick(state: GameState): void {
     if (r.lodgingHomeRestDay === state.day) {
       returnHomeAgentTick(state, r, ctx);
       r.task = r.phase === 'sleeping' ? '집에서 쉬며 움막 보급을 준비함' : '움막 보급을 위해 귀가 중';
+      continue;
+    }
+    const stationedTower = assignedBuildingForResident(state, r);
+    if (r.job === 'watchman' && stationedTower?.type === 'watchtower') {
+      watchmanTick(state, r, ctx);
       continue;
     }
     // 폭설·눈보라에는 실외 작업자가 일과/여가보다 귀가와 입실을 우선한다.

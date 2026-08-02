@@ -245,8 +245,8 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   watchtower: {
     id: 'watchtower', name: '망루',
-    desc: '방어도 +8, 조기 경보 확률 증가.',
-    cost: { wood: 9, stone: 2 }, buildDays: 6, slots: 2, capacity: 0, defense: 8,
+    desc: '방어도 +8. 파수꾼 1명이 주둔하면 7칸 안의 습격자에게 화살을 쏜다.',
+    cost: { wood: 9, stone: 2 }, buildDays: 6, slots: 1, capacity: 0, defense: 8,
     winterBonus: false, placement: 'land', unique: false,
   },
   garrison: {

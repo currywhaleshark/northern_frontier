@@ -29,6 +29,7 @@ import { activePredatorScoutIds } from './expeditionIntel';
 import { activeDiplomaticPact, announceRaidTip, raidTipInformant } from './diplomacy';
 import { borderCommanderEffects, factionLeaderSubject, factionRaidPartyLabel } from './diplomaticFigures';
 import { canStartLongSiege, openLongSiegeChoice, resolveSiegeChoice } from './siege';
+import { isStationedWatchman, watchtowerAssaultDamage } from './watchtowers';
 
 type RaidWarningSource = 'diplomatic';
 
@@ -47,7 +48,8 @@ export function updateThreat(state: GameState): void {
     ...activePredatorScoutIds(state),
   ]);
   const villageWatchmen = state.residents.filter(resident =>
-    resident.alive && resident.job === 'watchman' && !away.has(resident.id)).length;
+    resident.alive && resident.job === 'watchman' && !away.has(resident.id) &&
+    !isStationedWatchman(state, resident)).length;
   delta -= villageWatchmen * t.perWatchman;
   delta -= Math.min(state.resources.defense / t.defenseFactor, t.maxDefenseThreatReduction);
   // 적대 세력들과의 관계가 나쁠수록 국경이 험악해진다
@@ -225,6 +227,23 @@ function replanRaidBand(state: GameState, band: RaiderBand): boolean {
   const center = state.buildings.find(building => building.type === 'center');
   band.siege = !!center && plan.kind === 'assault' &&
     isProtectedBoundaryBreach(state, center, plan.breaches[0]);
+  return true;
+}
+
+function resumeRaidObjectiveAfterTower(state: GameState, band: RaiderBand): boolean {
+  const returnTarget = band.towerReturnTarget;
+  delete band.towerReturnTarget;
+  if (returnTarget) {
+    band.routeTarget = returnTarget;
+    return replanRaidBand(state, band);
+  }
+  const center = state.buildings.find(building => building.type === 'center' && building.built);
+  if (!center) return false;
+  const planned = centerApproachPlans(state, { x: band.x, y: band.y }, center, band.power)[0];
+  if (!planned) return false;
+  applyRaidPlan(state, band, planned.plan, planned.target);
+  band.siege = planned.plan.kind === 'assault' &&
+    isProtectedBoundaryBreach(state, center, planned.plan.breaches[0]);
   return true;
 }
 
@@ -419,10 +438,31 @@ export function raidersTick(state: GameState, rng: () => number): void {
   band.py = band.y;
   if (state.raidHold) return;
   if (state.battle) return; // 전투 중엔 무리가 전선에 묶인다
+  if (band.towerTargetId != null) {
+    const tower = state.buildings.find(building =>
+      building.id === band.towerTargetId && building.type === 'watchtower' && building.built);
+    if (!tower || tower.repairing || (tower.structureIntegrity ?? 1) <= 0) {
+      delete band.towerTargetId;
+      resumeRaidObjectiveAfterTower(state, band);
+    } else {
+      const adjacent = Math.abs(band.x - tower.x) <= 1 && Math.abs(band.y - tower.y) <= 1;
+      if (adjacent && band.path.length === 0) {
+        if (watchtowerAssaultDamage(state, band, tower)) {
+          delete band.towerTargetId;
+          resumeRaidObjectiveAfterTower(state, band);
+        }
+        return;
+      }
+    }
+  }
   if (band.route && band.routeRevision !== state.defenseTopologyRevision) {
     replanRaidBand(state, band);
   }
-  let steps = Math.floor(band.speed) + (rng() < band.speed % 1 ? 1 : 0);
+  const now = state.day * SUBTICKS + state.subTick;
+  const effectiveSpeed = now < (band.suppressedUntilTick ?? 0)
+    ? band.speed * CONFIG.watchtower.suppressionSpeedMultiplier
+    : band.speed;
+  let steps = Math.floor(effectiveSpeed) + (rng() < effectiveSpeed % 1 ? 1 : 0);
   while (steps-- > 0 && band.path.length > 0) {
     const next = band.path[0];
     const nextBuildingId = state.map[next.y]?.[next.x]?.buildingId;
@@ -457,6 +497,16 @@ export function raidersTick(state: GameState, rng: () => number): void {
     if (band.trail.length > 26) band.trail.shift();
     band.x = next.x;
     band.y = next.y;
+  }
+  if (band.towerTargetId != null) {
+    const tower = state.buildings.find(building => building.id === band.towerTargetId && building.type === 'watchtower');
+    if (tower && Math.abs(band.x - tower.x) <= 1 && Math.abs(band.y - tower.y) <= 1 && band.path.length === 0) {
+      if (watchtowerAssaultDamage(state, band, tower)) {
+        delete band.towerTargetId;
+        resumeRaidObjectiveAfterTower(state, band);
+      }
+      return;
+    }
   }
   const center = state.buildings.find(b => b.type === 'center');
   const dist = center ? Math.abs(band.x - center.x) + Math.abs(band.y - center.y) : 0;

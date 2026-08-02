@@ -27,6 +27,7 @@ import { canRequestSettlementRename, settlementDisplayName } from '../game/settl
 import {
   assignedSlotResidents, availableWorkerSlots, isResidentAvailableForWorkerSlot, workerSlotConfig, workerSlotCount,
 } from '../game/workerSlots';
+import { assignedWeapon } from '../game/weapons';
 import type { BuildingTypeId, CropId, DryingProductId, GameState, LivestockId, ResourceId, SmithyProductId, TanneryProductId } from '../game/types';
 import { BuildingIcon } from './BuildingIcon';
 import { FactionName } from './FactionName';
@@ -423,6 +424,19 @@ export function ActionPopup({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {building.type === 'watchtower' && (
+        <div className="worker-slot-panel">
+          <div className="worker-slot-summary">
+            <span>망루 전투 상태</span>
+            <span className="muted small">사거리 {CONFIG.watchtower.range}칸</span>
+          </div>
+          <div className="muted small">
+            주둔 {slotWorkers.length}/1 · 무기 {slotWorkers[0] && assignedWeapon(state, slotWorkers[0].id) === 'hornBow' ? '각궁' : '단궁'}
+            {' · '}내구 {Math.ceil(building.structureIntegrity ?? CONFIG.watchtower.integrityMax)}/{CONFIG.watchtower.integrityMax}
+          </div>
         </div>
       )}
 

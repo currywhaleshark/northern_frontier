@@ -1075,6 +1075,38 @@ function drawMineWorkRange(ctx: CanvasRenderingContext2D, x: number, y: number):
   ctx.restore();
 }
 
+function drawWatchtowerProjectiles(ctx: CanvasRenderingContext2D, state: GameState, alpha: number): void {
+  for (const shot of state.watchtowerProjectiles ?? []) {
+    const progress = Math.max(0, Math.min(1, (shot.ageTicks + alpha) / Math.max(1, shot.durationTicks)));
+    const fromX = shot.fromX * TILE + TILE / 2;
+    const fromY = shot.fromY * TILE + TILE * 0.12;
+    const toX = shot.toX * TILE + TILE / 2;
+    const toY = shot.toY * TILE + TILE / 2;
+    const x = fromX + (toX - fromX) * progress;
+    const y = fromY + (toY - fromY) * progress - Math.sin(progress * Math.PI) * TILE * 0.18;
+    const angle = Math.atan2(toY - fromY, toX - fromX);
+    const tail = shot.bow ? 11 : 8;
+    ctx.save();
+    ctx.strokeStyle = shot.bow ? '#f2d18a' : '#d7b06a';
+    ctx.fillStyle = '#f4e4bd';
+    ctx.lineWidth = shot.bow ? 2 : 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x - Math.cos(angle) * tail, y - Math.sin(angle) * tail);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(3, 0);
+    ctx.lineTo(-2, -2.5);
+    ctx.lineTo(-1, 0);
+    ctx.lineTo(-2, 2.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
 function drawGatheringWorkRange(
   ctx: CanvasRenderingContext2D,
   building: Pick<Building, 'type' | 'x' | 'y' | 'gatheringWorkArea'> & { type: GatheringBuildingType },
@@ -2657,6 +2689,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   rowRenderQueue.sort((left, right) =>
     left.sortY - right.sortY || left.sortX - right.sortX || left.serial - right.serial);
   for (const entry of rowRenderQueue) entry.draw();
+  drawWatchtowerProjectiles(ctx, state, o.alpha);
 
   drawWorkerSlotOverlays(ctx, state, visibleBuildings, o.selectedBuildingId, presentation.indoorResidentIds);
   lap('2b-slotOverlays');

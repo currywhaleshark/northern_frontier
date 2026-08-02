@@ -64,6 +64,9 @@ export function isCombatReadyResident(
 
   if (context === 'villageDefense') {
     if (state.expedition?.memberIds.includes(resident.id)) return false;
+    if (resident.assignedBuildingId != null && state.buildings.some(building =>
+      building.id === resident.assignedBuildingId && building.type === 'watchtower' &&
+      building.built && !building.repairing && (building.structureIntegrity ?? 1) > 0)) return false;
   } else {
     if (!allowedMemberIds?.has(resident.id)) return false;
     if (state.battle?.defenderIds.includes(resident.id)) return false;

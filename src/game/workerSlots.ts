@@ -14,11 +14,12 @@ export const AUTO_ASSIGN_BUILDING_TYPES = [
   'lumberCamp', 'huntLodge', 'herbHut', 'mine',
   'field', 'paddy', 'watermill', 'woodShed', 'charcoalKiln', 'smithy',
   'stable', 'clinic', 'nitreYard', 'ferry', 'tannery', 'weavingHouse', 'smokehouse', 'dryingRack', 'onggiKiln',
-  'deepMine',
+  'deepMine', 'watchtower',
 ] as const satisfies readonly BuildingTypeId[];
 export type AutoAssignBuildingType = typeof AUTO_ASSIGN_BUILDING_TYPES[number];
 
 export const SLOTTED_BUILDING_CONFIG: Partial<Record<BuildingTypeId, WorkerSlotConfig>> = {
+  watchtower: { job: 'watchman', slots: 1 },
   lumberCamp: { job: 'woodcutter', slots: 4 },
   huntLodge: { job: 'hunter', slots: 4 },
   herbHut: { job: 'herbalist', slots: 2 },

@@ -996,6 +996,23 @@ export const CONFIG = {
     repairBuildDaysMultiplier: 0.5,
   },
 
+  watchtower: {
+    range: 7,
+    integrityMax: 80,
+    escapeIntegrityRatio: 0.25,
+    fireIntervalTicks: 6,
+    projectileDurationTicks: 5,
+    baseDamage: 0.45,
+    bowDamage: 0.8,
+    dailyDamageCap: 5,
+    bowDailyDamageCap: 7,
+    suppressionTicks: 7,
+    suppressionSpeedMultiplier: 0.82,
+    assaultDamagePerPower: 0.012,
+    minimumAssaultDamage: 0.7,
+    escapeGraceTicks: 10,
+  },
+
   siege: {
     evacuationTicks: 36,
     baseEnemySupplyDays: 5,

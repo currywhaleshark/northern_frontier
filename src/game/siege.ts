@@ -12,6 +12,7 @@ import {
 } from './raidRoutes';
 import { FOOD_RESOURCES } from './resourceCatalog';
 import { getSeason } from './seasons';
+import { isStationedWatchman } from './watchtowers';
 import type {
   Building, GameState, PendingChoice, RaiderBand, Resident, ResourceId, SiegeStance, SiegeState,
 } from './types';
@@ -67,10 +68,11 @@ function intelLevel(state: GameState, warned: boolean): number {
     ...(state.warDispatch?.memberIds ?? []),
   ]);
   const patrolWatchmen = state.residents.filter(resident =>
-    resident.alive && resident.job === 'watchman' && !away.has(resident.id)).length;
+    resident.alive && resident.job === 'watchman' && !away.has(resident.id) &&
+    !isStationedWatchman(state, resident)).length;
   let level = warned ? 1 : 0;
   if (countBuilt(state, 'beacon') > 0) level++;
-  if (patrolWatchmen >= 2 || countBuilt(state, 'watchtower') > 0) level++;
+  if (patrolWatchmen >= 2 || state.residents.some(resident => isStationedWatchman(state, resident))) level++;
   if ((state.specialItems?.gyrfalcon ?? 0) > 0 || (state.specialItems?.telescope ?? 0) > 0) level++;
   return Math.min(4, level);
 }
