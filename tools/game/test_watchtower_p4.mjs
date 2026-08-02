@@ -270,7 +270,7 @@ function bandAt(x, y, power = 40) {
   assert.equal(doomedWatchman.alive, false, '중상자는 고립 탈출 유예 뒤 전사할 수 있다');
 }
 
-// v56 저장은 주둔·사격·철수 필드를 보존하고 구 저장에 주둔자를 강제 생성하지 않는다.
+// 현재 저장은 주둔·사격·철수 필드를 보존하고 구 저장에 주둔자를 강제 생성하지 않는다.
 {
   installStorage();
   const state = freshState(2026080206);
@@ -281,7 +281,7 @@ function bandAt(x, y, power = 40) {
   watchtowers.watchtowerTick(state);
   assert.equal(saveLoad.saveGame(state), true);
   const loaded = saveLoad.loadGame();
-  assert.equal(loaded.schemaVersion, 56);
+  assert.equal(loaded.schemaVersion, 57);
   assert.equal(loaded.residents.find(entry => entry.id === watchman.id).assignedBuildingId, tower.id);
   assert.equal(loaded.watchtowerProjectiles.length, 1);
   const migrated = saveLoad.migrateV55ToV56({ schemaVersion: 55, residents: [], buildings: [] });

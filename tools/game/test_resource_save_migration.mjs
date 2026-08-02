@@ -86,6 +86,19 @@ assert.equal(typeof saveLoad.migrateV45ToV46, 'function');
 assert.equal(typeof saveLoad.migrateV46ToV47, 'function');
 assert.equal(typeof saveLoad.migrateV47ToV48, 'function');
 assert.equal(typeof saveLoad.migrateV48ToV49, 'function');
+assert.equal(typeof saveLoad.migrateV56ToV57, 'function',
+  'v57 adds the durable new-game world setup snapshot');
+
+{
+  const migrated = saveLoad.migrateV56ToV57({ schemaVersion: 56, difficulty: 'easy' });
+  assert.equal(migrated.schemaVersion, 57);
+  assert.deepEqual(
+    [migrated.worldSetup.region, migrated.worldSetup.mapSize, migrated.worldSetup.baseDifficulty,
+      migrated.worldSetup.difficultyPreset, migrated.worldSetup.seedSource],
+    ['plains', 'medium', 'easy', 'easy', 'legacy'],
+    'v56 saves inherit their prior difficulty and the only S1 map shape',
+  );
+}
 
 {
   const migrated = saveLoad.migrateV39ToV40({ schemaVersion: 39, courtGrantArtifactMisses: 3.8 });

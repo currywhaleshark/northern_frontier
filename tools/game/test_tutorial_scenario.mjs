@@ -57,6 +57,17 @@ const coachSource = readFileSync(new URL('../../src/components/TutorialCoach.tsx
 const sessionSource = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
 const agentsSource = readFileSync(new URL('../../src/game/agents.ts', import.meta.url), 'utf8');
 
+// 길잡이는 설정 화면을 우회하지만 고정 월드 설정을 명시적으로 남긴다.
+{
+  const tutorial = tutorialStart.createTutorialGame();
+  assert.equal(tutorial.seed, tutorialStart.TUTORIAL_SEED);
+  assert.deepEqual(
+    [tutorial.worldSetup.region, tutorial.worldSetup.mapSize, tutorial.worldSetup.seedSource],
+    ['plains', 'medium', 'tutorial'],
+    '튜토리얼은 평원·중형의 고정 시드를 쓴다',
+  );
+}
+
 // 시나리오 중 허용되는 모달 — 길잡이 스텝과 그 스텝이 직접 불러 세운 통제 사건뿐이다.
 // R5로 둘째 해가 붙으면서 통제 유민·습격, 세공 파발 공지·수거가 늘었다.
 // 모두 랜덤 게이트 밖에서 열리는 통제·결정론 사건이다.

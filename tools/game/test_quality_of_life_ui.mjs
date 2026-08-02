@@ -79,4 +79,23 @@ assert.match(musicSource, /Math\.max\(0, Math\.min\(1, \(now - startedAt\) \/ CR
 assert.match(atlasSource, /specialResidentSheet[\s\S]*bob, 1\.16/,
   'special residents must render slightly larger than ordinary residents');
 
+// 새 게임 설정은 독립 화면이며 메뉴는 네 진입점과 조건부 이어하기만 맡는다.
+{
+  const app = readFileSync(new URL('../../src/App.tsx', import.meta.url), 'utf8');
+  const menu = readFileSync(new URL('../../src/components/MainMenu.tsx', import.meta.url), 'utf8');
+  const launch = readFileSync(new URL('../../src/sessionLaunch.ts', import.meta.url), 'utf8');
+  const session = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
+  assert.match(app, /menuView[^\n]*'newGameSetup'/);
+  assert.match(app, /NewGameSetup/);
+  assert.doesNotMatch(menu, /settlement-name-input|diff-card/,
+    'main menu no longer owns settlement or difficulty inputs');
+  for (const entry of ['>시작<', '튜토리얼', '전투 시뮬레이션', '>설정<']) {
+    assert.ok(menu.includes(entry), `main menu preserves the ${entry} entry point`);
+  }
+  assert.match(menu, /canContinue[\s\S]*이어하기/,
+    'continue remains a conditional auxiliary action');
+  assert.match(launch, /kind:\s*'new';\s*options:\s*NewGameOptions/);
+  assert.match(session, /newGameFromOptions\(launch\.options\)/);
+}
+
 console.log('quality-of-life UI tests passed');

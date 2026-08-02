@@ -59,7 +59,9 @@ export function updateThreat(state: GameState): void {
   }
   // 난이도·승격 단계: 위협이 오를 때만 배율 적용 (내릴 때는 그대로) — 부유해질수록 노려진다
   if (delta > 0) {
-    delta *= CONFIG.difficulty[state.difficulty ?? 'normal'].threatGain * rankEffects(state.rank).threatGain;
+    const threatGain = state.worldSetup?.effective.threatGainMultiplier ??
+      CONFIG.difficulty[state.difficulty ?? 'normal'].threatGain;
+    delta *= threatGain * rankEffects(state.rank).threatGain;
   } else if (delta < 0) {
     delta *= borderCommanderEffects(state).threatDecayMultiplier;
   }
@@ -76,7 +78,9 @@ function raidPower(state: GameState, rng: () => number): number {
   const base =
     r.basePower + scaledYears * r.powerPerYear +
     rng() * r.powerRandom + wealth / r.wealthPowerDiv;
-  return Math.round(base * CONFIG.difficulty[state.difficulty ?? 'normal'].raidPower);
+  const raidPowerMultiplier = state.worldSetup?.effective.raidPowerMultiplier ??
+    CONFIG.difficulty[state.difficulty ?? 'normal'].raidPower;
+  return Math.round(base * raidPowerMultiplier);
 }
 
 function pickFaction(state: GameState, rng: () => number): Faction | null {

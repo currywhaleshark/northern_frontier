@@ -40,6 +40,7 @@ const CORE_TESTS = testFiles(
   'mine_collapse',
   'mine_worksite',
   'night_auto_speed',
+  'new_game_setup',
   'onggi',
   'pastures',
   'pathfinding_collision',

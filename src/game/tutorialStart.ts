@@ -6,7 +6,8 @@ import { addLog } from './events';
 import { isExplored } from './exploration';
 import { setMineralDeposit } from './minerals';
 import { isMineralDeposit } from './miningSites';
-import { newGame } from './simulation';
+import { optionsForDifficulty } from './newGameOptions';
+import { newGameFromOptions } from './simulation';
 import { createTutorialScenarioState, dailyScenarioTick } from './scenario';
 import { aquiferSampleAt } from './subsurfaceVeins';
 import { naturalWaterCoverageTileSets } from './waterCoverage';
@@ -21,7 +22,10 @@ const TUTORIAL_WATER_RADIUS = 8;
 
 export function createTutorialGame(): GameState {
   // 시나리오는 고정된 마을 이름을 쓴다 (설계 §1-1) — 표기는 "길잡이촌"이 된다
-  const state = newGame(TUTORIAL_SEED, 'easy', '길잡이');
+  const state = newGameFromOptions(
+    optionsForDifficulty('easy', '길잡이', TUTORIAL_SEED),
+    'tutorial',
+  );
   ensureTutorialInvariants(state);
   const builtHouses = state.buildings.filter(building =>
     building.built && (building.type === 'hut' || building.type === 'ondol' || building.type === 'tileHouse')).length;

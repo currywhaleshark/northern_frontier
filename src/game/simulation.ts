@@ -69,6 +69,9 @@ import { DRYING_PRODUCT_DEFS } from './preservation';
 import { haulerCarryCapacity, returnResidentCart, setResidentCartEquipped } from './equipment';
 import { reconcileMountAssignments, reconcileWeaponAssignments, setAutomaticWeaponAllocation } from './weapons';
 import { CURRENT_SCHEMA_VERSION } from './saveSchema';
+import {
+  normalizeNewGameOptions, optionsForDifficulty, worldSetupLabel, worldSetupSnapshot,
+} from './newGameOptions';
 import { bumpDefenseTopology, effectiveWallType, initializeWallIntegrity } from './raidRoutes';
 import { expeditionTick } from './expedition';
 import {
@@ -127,24 +130,33 @@ import {
 } from './workerSlots';
 import type { AutoAssignBuildingType } from './workerSlots';
 import type {
-  Building, BuildingTypeId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId, PastureArea, PointerAction, Resident, ResourceId, Season, SmithyProductId, TanneryProductId, YouthActivity,
+  Building, BuildingTypeId, CropId, Difficulty, DryingProductId, GameState, JobId, LivestockId,
+  NewGameOptions, PastureArea, PointerAction, Resident, ResourceId, Season, SmithyProductId,
+  TanneryProductId, WorldSetupSnapshot, YouthActivity,
 } from './types';
 
 // ─────────────────────────── 새 게임 ───────────────────────────
 
-export function newGame(seed?: number, difficulty: Difficulty = 'normal', settlementName?: string): GameState {
-  const s = seed ?? Math.floor(Math.random() * 2 ** 31);
+export function newGameFromOptions(
+  rawOptions: Partial<NewGameOptions>,
+  seedSourceOverride?: WorldSetupSnapshot['seedSource'],
+): GameState {
+  const options = normalizeNewGameOptions(rawOptions);
+  const s = options.seed ?? Math.floor(Math.random() * 2 ** 31);
+  const seedSource = seedSourceOverride ?? (options.seed == null ? 'random' : 'manual');
+  const worldSetup = worldSetupSnapshot(options, seedSource);
+  const difficulty = options.baseDifficulty;
   const rng = makeRng(s);
   const { tiles, centerX, centerY } = generateMap(s);
   // 메뉴는 항상 입력값을 넘긴다. 이름 없는 호출(테스트·디버그)만 시드 자동 이름을 쓴다.
-  const resolvedName = normalizeSettlementNameInput(settlementName ?? '') || generateSettlementName(s);
+  const resolvedName = normalizeSettlementNameInput(options.settlementName) || generateSettlementName(s);
 
-  // 난이도에 따라 시작 물자를 조절 (명성/방어도는 제외)
-  const diff = CONFIG.difficulty[difficulty];
+  // S0부터는 시작 당시의 실효값 스냅샷을 읽는다. 프리셋 값은 기존 CONFIG와 정확히 같다.
+  const effective = worldSetup.effective;
   const startRes: Record<ResourceId, number> = { ...CONFIG.start.resources };
   for (const key of Object.keys(startRes) as ResourceId[]) {
     if (key === 'reputation' || key === 'defense') continue;
-    startRes[key] = Math.round(startRes[key] * diff.startRes);
+    startRes[key] = Math.round(startRes[key] * effective.startResourceMultiplier);
   }
 
   const state: GameState = {
@@ -152,6 +164,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
     day: 1,
     subTick: 0,
     difficulty,
+    worldSetup,
     seed: s,
     weather: 'clear',
     map: tiles,
@@ -159,7 +172,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
     oreVeinRemaining: initialOreVeinRemaining(s, tiles[0]?.length ?? 0, tiles.length),
     exploration: createExploration({ map: tiles }),
     // 짐승 서식지: 숲 덩어리마다 난이도별 확률로 자리 잡는다 (마을 근처 하나는 보장)
-    habitats: spawnAnimalHabitats(tiles, centerX, centerY, rng, diff.habitatChance),
+    habitats: spawnAnimalHabitats(tiles, centerX, centerY, rng, effective.habitatChance),
     foreignSites: [],
     claimZones: [],
     nextForeignSiteId: 1,
@@ -289,10 +302,19 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
   addLog(state, '조정의 명을 받아 두만강 이북 개척지에 도착했습니다. 짧은 봄 동안 겨울을 준비해야 합니다.', 'info');
   addLog(state, '나무를 베고, 집을 짓고, 식량과 장작을 모으십시오. 첫 겨울이 모든 것을 시험할 것입니다.', 'info');
   recordAnnals(state, 'founding',
-    `조정의 명을 받아 두만강 이북에 ${withJosa(settlementDisplayName(state), '을/를')} 열었습니다.`, 'founding');
+    `조정의 명을 받아 두만강 이북에 ${withJosa(settlementDisplayName(state), '을/를')} 열었습니다. ` +
+    `${worldSetupLabel(state.worldSetup)}입니다.`, 'founding');
   recordYearlySnapshot(state); // 1년차 스냅샷 — 정착 당일의 밑그림
   announceCourtTribute(state); // 1년차 봄이 day 1 — 첫 해는 요구 없이 예고 한 줄만 남는다 (R4)
   return state;
+}
+
+/** 기존 테스트·도구의 3인자 호출을 보존하는 호환 래퍼. 새 UI는 newGameFromOptions를 쓴다. */
+export function newGame(seed?: number, difficulty: Difficulty = 'normal', settlementName?: string): GameState {
+  return newGameFromOptions(
+    optionsForDifficulty(difficulty, settlementName ?? '', seed),
+    seed == null ? 'random' : 'legacy',
+  );
 }
 
 function placePrebuilt(state: GameState, type: BuildingTypeId, x: number, y: number): void {

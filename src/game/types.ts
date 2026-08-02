@@ -11,6 +11,45 @@ export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
+// 새 게임 설정 — 지도 생성 단계가 순차 구현되어도 저장에는 처음 고른 세계 조건을 고정한다.
+export type MapRegion = 'plains' | 'mountain' | 'lake' | 'coast';
+export type MapSize = 'small' | 'medium' | 'large';
+export type SetupLevel = 'low' | 'normal' | 'high';
+
+export interface NewGameTuning {
+  startingResources: SetupLevel;
+  resourceDensity: SetupLevel;
+  climateSeverity: SetupLevel;
+  threat: SetupLevel;
+}
+
+export interface NewGameOptions {
+  settlementName: string;
+  difficultyPreset: Difficulty | 'custom';
+  baseDifficulty: Difficulty;
+  region: MapRegion;
+  mapSize: MapSize;
+  tuning: NewGameTuning;
+  seed?: number;
+}
+
+export interface WorldSetupSnapshot {
+  difficultyPreset: Difficulty | 'custom';
+  baseDifficulty: Difficulty;
+  region: MapRegion;
+  mapSize: MapSize;
+  tuning: NewGameTuning;
+  seedSource: 'random' | 'manual' | 'legacy' | 'tutorial';
+  effective: {
+    startResourceMultiplier: number;
+    threatGainMultiplier: number;
+    raidPowerMultiplier: number;
+    habitatChance: number;
+    resourceDensityMultiplier: number;
+    climateSeverityMultiplier: number;
+  };
+}
+
 // 승격 사다리: 개척지 → 보(堡) → 진(鎭) → 부(府). 부 승격이 최종 승리.
 export type Rank = 'settlement' | 'bo' | 'jin' | 'bu';
 
@@ -1898,6 +1937,7 @@ export interface GameState {
   day: number;          // 경과 일수 (1부터)
   subTick: number;      // 하루 안의 서브틱 (0 ~ SUBTICKS-1)
   difficulty: Difficulty;
+  worldSetup: WorldSetupSnapshot;
   seed: number;
   weather: WeatherId;
   map: Tile[][];

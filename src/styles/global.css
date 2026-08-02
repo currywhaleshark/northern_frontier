@@ -2256,6 +2256,34 @@ html, body, #root {
 .menu-btn { padding: 9px 26px; font-size: 15px; }
 .menu-footer { border-top: 1px solid var(--border); padding-top: 10px; }
 
+/* ── 새 게임 설정 ── */
+.new-game-setup { overflow-y: auto; align-items: flex-start; padding: 28px 0; }
+.new-game-setup-panel { max-width: 760px; text-align: left; }
+.new-game-setup-heading { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+.new-game-setup-heading .menu-title { margin: 0; font-size: 28px; letter-spacing: 3px; }
+.new-game-setup-heading .menu-subtitle { margin: 5px 0 0; }
+.new-game-setup-section { margin: 0 0 17px; }
+.new-game-setup-section h2 { margin: 0 0 8px; color: var(--text); font-size: 14px; }
+.new-game-setup-section > label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 13px; }
+.new-game-setup-section .settlement-name-row { justify-content: flex-start; margin: 0; }
+.setup-seed-row input { width: min(260px, 100%); padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: rgba(10, 14, 18, 0.75); color: var(--text); font: inherit; }
+.setup-seed-row input:focus { outline: none; border-color: var(--accent); }
+.setup-input-error { margin: 5px 0 0; color: var(--bad); font-size: 11px; }
+.setup-card-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.setup-card { display: grid; min-height: 76px; align-content: start; gap: 5px; padding: 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel2); color: var(--text); font: inherit; text-align: left; }
+.setup-card.selected { border-color: var(--accent); background: #33301f; }
+.setup-card span { color: var(--muted); font-size: 11px; line-height: 1.4; }
+.setup-card:disabled { cursor: not-allowed; opacity: 0.54; }
+.new-game-tuning { margin: 0 0 20px; padding: 10px; border: 1px solid var(--border); border-radius: 7px; background: rgba(10, 14, 18, 0.34); }
+.new-game-tuning summary { cursor: pointer; color: var(--text); }
+.new-game-tuning summary span { color: var(--muted); font-size: 11px; }
+.new-game-tuning > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.new-game-tuning label { display: grid; gap: 4px; color: var(--muted); font-size: 11px; }
+.new-game-tuning select { padding: 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel2); color: var(--muted); }
+.new-game-tuning p { grid-column: 1 / -1; margin: 2px 0 0; }
+.new-game-setup-actions { display: flex; justify-content: flex-end; gap: 10px; }
+@media (max-width: 640px) { .new-game-setup { padding: 12px 0; } .new-game-setup-panel { padding: 20px; } .new-game-setup-heading { gap: 10px; } .new-game-setup-heading .menu-title { font-size: 23px; } .diff-row { flex-direction: column; } .new-game-tuning > div { grid-template-columns: 1fr; } }
+
 /* ── 연대기 — 두루마리형 회고 화면 ── */
 .chronicle-overlay {
   --modal-layer: 260;

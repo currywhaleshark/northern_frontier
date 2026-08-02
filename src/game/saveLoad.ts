@@ -66,11 +66,12 @@ import { normalizeDiplomacyState } from './diplomacy';
 import { addLog } from './events';
 import { assignResidentToBuilding, assignedBuildingForResident } from './workerSlots';
 import { normalizeLodgingHutState } from './lodgingHuts';
+import { defaultWorldSetupForDifficulty, normalizeWorldSetupSnapshot } from './newGameOptions';
 import {
   gradeTacticalBattle, raidDefenseObjectiveResult, tacticalClosingSummary, tacticalOutcomeResult,
 } from './tacticalCore';
 import type {
-  AnnalsEntry, AnnalsKind, LogEntry, YearlySnapshot,
+  AnnalsEntry, AnnalsKind, Difficulty, LogEntry, YearlySnapshot,
   CombatWeaponId, CourtTribute, DefenderGroupKind, EdictId, EdictLevel, EdictState,
   EnemyObjectiveId, FermentBatch, GameState, Gender, Resident, ResourceId,
   PreparationActionId, RaiderUnitType, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
@@ -849,6 +850,19 @@ export function migrateV55ToV56(raw: RawSave): RawSave {
   };
 }
 
+// v57: 새 게임 설정 스냅샷. 구 저장은 기존 난이도의 밸런스를 보존한 평원·중형으로 잇는다.
+export function migrateV56ToV57(raw: RawSave): RawSave {
+  const cloned = clonedRecord(raw);
+  const difficulty: Difficulty = cloned.difficulty === 'easy' || cloned.difficulty === 'hard'
+    ? cloned.difficulty
+    : 'normal';
+  return {
+    ...cloned,
+    worldSetup: defaultWorldSetupForDifficulty(difficulty, 'legacy'),
+    schemaVersion: 57,
+  };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -910,6 +924,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 53) migrated = migrateV53ToV54(migrated);
     else if (version === 54) migrated = migrateV54ToV55(migrated);
     else if (version === 55) migrated = migrateV55ToV56(migrated);
+    else if (version === 56) migrated = migrateV56ToV57(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -2397,7 +2412,10 @@ export function loadGame(slot = 1): GameState | null {
     if (!parsed.relations) parsed.relations = initRelations();
     normalizeDiplomaticFigures(parsed);
     normalizeDiplomacyState(parsed);
-    if (!parsed.difficulty) parsed.difficulty = 'normal';
+    if (parsed.difficulty !== 'easy' && parsed.difficulty !== 'hard' && parsed.difficulty !== 'normal') {
+      parsed.difficulty = 'normal';
+    }
+    parsed.worldSetup = normalizeWorldSetupSnapshot(parsed.worldSetup, parsed.difficulty);
     if (!parsed.habitats) {
       // 사냥터 지형이 있던 구버전: 사냥터를 숲으로 바꾸고 시드로 서식지를 새로 뽑는다
       let cx = Math.floor(parsed.map[0].length / 2);
@@ -2410,7 +2428,7 @@ export function loadGame(slot = 1): GameState | null {
       }
       parsed.habitats = spawnAnimalHabitats(
         parsed.map, cx, cy, makeRng(parsed.seed ?? 1),
-        CONFIG.difficulty[parsed.difficulty].habitatChance,
+        parsed.worldSetup.effective.habitatChance,
       );
     }
     for (const habitat of parsed.habitats) rebalanceLoadedHabitatReserve(parsed.map, habitat);
@@ -2969,13 +2987,16 @@ export interface SaveSlotSummary {
   population: number | null;
   rank: string | null;
   difficulty: string | null;
+  difficultyPreset: string | null;
+  region: string | null;
+  mapSize: string | null;
   settlementName: string | null;
 }
 
 function emptySlotSummary(slot: number): SaveSlotSummary {
   return {
     slot, exists: false, savedAt: null, day: null, population: null,
-    rank: null, difficulty: null, settlementName: null,
+    rank: null, difficulty: null, difficultyPreset: null, region: null, mapSize: null, settlementName: null,
   };
 }
 
@@ -2988,6 +3009,10 @@ export function readSaveSlotSummary(slot: number): SaveSlotSummary {
     const day = Number(decoded.day);
     const savedAt = Number(decoded.savedAt);
     const residents = Array.isArray(decoded.residents) ? decoded.residents : [];
+    const worldSetup = decoded.worldSetup && typeof decoded.worldSetup === 'object'
+      ? decoded.worldSetup as RawSave
+      : {};
+    const legacyDifficulty = typeof decoded.difficulty === 'string' ? decoded.difficulty : null;
     return {
       slot,
       exists: true,
@@ -2996,7 +3021,12 @@ export function readSaveSlotSummary(slot: number): SaveSlotSummary {
       population: residents.filter(entry => entry && typeof entry === 'object' &&
         (entry as RawSave).alive === true).length,
       rank: typeof decoded.rank === 'string' ? decoded.rank : null,
-      difficulty: typeof decoded.difficulty === 'string' ? decoded.difficulty : null,
+      difficulty: legacyDifficulty,
+      difficultyPreset: typeof worldSetup.difficultyPreset === 'string'
+        ? worldSetup.difficultyPreset
+        : legacyDifficulty,
+      region: typeof worldSetup.region === 'string' ? worldSetup.region : 'plains',
+      mapSize: typeof worldSetup.mapSize === 'string' ? worldSetup.mapSize : 'medium',
       settlementName: typeof decoded.settlementName === 'string' && decoded.settlementName.trim()
         ? decoded.settlementName.trim()
         : null,

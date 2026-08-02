@@ -4,7 +4,7 @@ import { lazy, Profiler, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { CONFIG } from './game/config';
 import {
   assignNearestWorkerToBuilding, assignResidentToBuilding,
-  advanceDay, advanceTick, autoAssignWorkersToBuildingTypes, cancelBuildingConstruction, continueAfterVictory, newGame, reassignJob, resolveChoice, setResidentJob,
+  advanceDay, advanceTick, autoAssignWorkersToBuildingTypes, cancelBuildingConstruction, continueAfterVictory, newGame, newGameFromOptions, reassignJob, resolveChoice, setResidentJob,
   setBuildingCrop, setDryingProduct, setSmithyProduct, setTanneryProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
   assignPlotPlowOxen, defineStablePasture, expandAreaBuilding, setLivestockSpecies, slaughterLivestock,
   buildingHasActiveWork, convertFieldToPaddy, setYouthActivity, startBreachedWallRepair, startBuildingDemolition,
@@ -299,7 +299,7 @@ function initialSessionState(launch: GameSessionLaunch): GameState {
   if (launch.kind === 'loaded') return launch.state;
   if (launch.kind === 'tutorial') return createTutorialGame();
   if (launch.kind === 'battleSimulation') return createBattleSimulation(launch.options);
-  return newGame(undefined, launch.difficulty, launch.settlementName);
+  return newGameFromOptions(launch.options);
 }
 
 export default function GameSession({ launch, onReturnToMenu }: GameSessionProps) {

@@ -1,7 +1,7 @@
 # 새 게임 설정 S0+S1 구현계획 — 옵션 계약·시작 설정 화면
 
-> **계획 상태:** 미착수
-> **상태 갱신:** 2026-08-02 — 코드 대조와 범위 분할 완료. 기존 밸런스·지도 RNG를 유지하는 옵션 계약과 시작 설정 화면을 첫 구현 묶음으로 확정했다.
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-08-02 — 옵션·저장 계약, v57 마이그레이션, 시작 설정 화면과 회귀 검증까지 S0+S1 범위를 완료했다.
 
 - 상위 설계: [새 게임 설정 개편](DESIGN-2026-08-01-new-game-setup.md)
 - 후속 의존: [어선과 출어](DESIGN-2026-08-02-fishing-boats.md)는 S4 호수 지형 이후
@@ -100,8 +100,8 @@ export interface WorldSetupSnapshot extends Omit<NewGameOptions, 'settlementName
 
 ### P0 — 계약·순수 테스트
 
-- [ ] `src/game/newGameOptions.ts` 타입, 기본값, 프리셋 변환, 정규화, 표시 문구 구현
-- [ ] `tools/game/test_new_game_setup.mjs` 신설:
+- [x] `src/game/newGameOptions.ts` 타입, 기본값, 프리셋 변환, 정규화, 표시 문구 구현
+- [x] `tools/game/test_new_game_setup.mjs` 신설:
   - 기본값 normal/plains/medium
   - 같은 수동 시드+옵션의 정규화 결과 결정론
   - easy/normal/hard의 실효값이 현행 CONFIG와 동일
@@ -110,32 +110,31 @@ export interface WorldSetupSnapshot extends Omit<NewGameOptions, 'settlementName
 
 ### P1 — 시뮬레이션·저장 연결
 
-- [ ] `newGameFromOptions(options)` 추가, 기존 `newGame`은 이를 부르는 호환 래퍼로 전환
-- [ ] `GameState.worldSetup`, 스키마 v57, v56→v57 마이그레이션과 손상 저장 정규화
-- [ ] `createTutorialGame()`은 고정 옵션을 명시하고 튜토리얼 시드·지도 불변식 유지
-- [ ] `recordAnnals` 창건 문장과 `SaveSlotSummary`에 지역·크기 문맥 연결
-- [ ] 기존 `test_chronicle`, `test_resource_save_migration`, `test_tutorial_scenario` 보강
+- [x] `newGameFromOptions(options)` 추가, 기존 `newGame`은 이를 부르는 호환 래퍼로 전환
+- [x] `GameState.worldSetup`, 스키마 v57, v56→v57 마이그레이션과 손상 저장 정규화
+- [x] `createTutorialGame()`은 고정 옵션을 명시하고 튜토리얼 시드·지도 불변식 유지
+- [x] `recordAnnals` 창건 문장과 `SaveSlotSummary`에 지역·크기 문맥 연결
+- [x] 기존 `test_chronicle`, `test_resource_save_migration`, `test_tutorial_scenario` 보강
 
 ### P2 — 시작 설정 화면
 
-- [ ] `src/components/NewGameSetup.tsx` 신설: 이름·주사위·난이도·시드·지역·크기·세부설정
-- [ ] disabled 카드는 키보드·스크린리더에도 선택 불가이며 `준비 중` 사유를 노출
-- [ ] `MainMenu`는 선택 상태를 가지지 않고 시작·튜토리얼·이어하기·전투·설정 진입만 담당
-- [ ] `App`에 `newGameSetup` 화면과 뒤로 가기 흐름 추가
-- [ ] `GameSessionLaunch`의 `kind: 'new'`는 개별 필드 대신 `options` 객체를 전달
-- [ ] `GameSession.initialSessionState`는 `newGameFromOptions(launch.options)` 사용
-- [ ] 기존 메뉴 설경·음악·설정·저장 다이얼로그 동작 유지
+- [x] `src/components/NewGameSetup.tsx` 신설: 이름·주사위·난이도·시드·지역·크기·세부설정
+- [x] disabled 카드는 키보드·스크린리더에도 선택 불가이며 `준비 중` 사유를 노출
+- [x] `MainMenu`는 선택 상태를 가지지 않고 시작·튜토리얼·이어하기·전투·설정 진입만 담당
+- [x] `App`에 `newGameSetup` 화면과 뒤로 가기 흐름 추가
+- [x] `GameSessionLaunch`의 `kind: 'new'`는 개별 필드 대신 `options` 객체를 전달
+- [x] `GameSession.initialSessionState`는 `newGameFromOptions(launch.options)` 사용
+- [x] 기존 메뉴 설경·음악·설정·저장 다이얼로그 동작 유지
 
 ### P3 — UI·통합 회귀
 
-- [ ] `test_quality_of_life_ui.mjs`: 메인 메뉴의 입력 제거, 시작 설정 화면과 조건부 이어하기 보존
-- [ ] `test_new_game_setup.mjs`: App→sessionLaunch→simulation 소스 계약과 표시 문구
-- [ ] 수동 스모크:
-  - 시작 → 이름 재굴림 → easy 선택 → 수동 시드 입력 → 개척 시작
-  - 같은 입력 두 번 시작 시 지도·주민·시작 자원 동일
-  - 이어하기·튜토리얼·전투 시뮬레이터·설정 진입 회귀 없음
-  - 저장 슬롯에 `평원 · 중형 · 이주민` 문맥 표시
-- [ ] `npm run test:game` core, `npm run build` 통과
+- [x] `test_quality_of_life_ui.mjs`: 메인 메뉴의 입력 제거, 시작 설정 화면과 조건부 이어하기 보존
+- [x] `test_new_game_setup.mjs`: App→sessionLaunch→simulation 소스 계약과 표시 문구
+- [x] 통합 스모크·회귀:
+  - 실제 화면에서 시작 → 이름 입력 → easy 선택 → 수동 시드 입력 → 개척 시작
+  - 자동 회귀에서 같은 입력의 지도·주민·시작 자원 결정론 확인
+  - 메뉴 진입점과 저장 슬롯의 `평원 · 중형 · 이주민` 문맥을 소스·저장 회귀로 확인
+- [x] `npm run test:game` core 78개, `npm run build` 통과
 
 ## 4. 파일 소유권과 하위 모델 분업
 
@@ -150,7 +149,7 @@ export interface WorldSetupSnapshot extends Omit<NewGameOptions, 'settlementName
 
 - 주 에이전트가 P0 타입 계약을 먼저 커밋하거나 최소한 파일 인터페이스를 고정한 뒤 하위 A/B를 시작한다.
 - 하위 에이전트는 전체 core를 각각 돌리지 않는다. 자기 표적 테스트만 실행하고, 주 에이전트가 통합 후
-  core 77개와 빌드를 한 번 실행한다.
+  core 78개와 빌드를 실행한다.
 - 지도 크기 고정 참조 전수 감사와 성능 측정은 S2 계획의 하위 모델 조사 과제로 넘긴다.
 
 ## 5. 비범위
@@ -167,3 +166,11 @@ export interface WorldSetupSnapshot extends Omit<NewGameOptions, 'settlementName
 - 기존 normal·무작위 시드로 시작했을 때 S0 이전과 같은 72×72 지도·주민·시작 자원 결과가 나온다.
 - 수동 시드와 설정 스냅샷이 저장·로드·슬롯 요약·창건 연대기에 일관되게 남는다.
 - v56 저장이 평원·중형으로 이관되고 core 게임 테스트와 프로덕션 빌드가 통과한다.
+
+## 7. 완료 기록
+
+- 하위 A/B는 계획대로 `gpt-5.6-terra / medium`으로 UI와 테스트를 분리 구현했고, 주 에이전트가
+  데이터 계약·저장 마이그레이션·최종 통합을 담당했다.
+- 검증: `npx tsc --noEmit`, `npm run test:game` 78/78, `npm run build` 통과.
+- 브라우저 스모크: 메인 메뉴→새 개척 설정→이름 `청설`·easy·시드 `20260802`→게임 생성 성공,
+  잠긴 지역/크기와 범위 밖 시드 비활성화 및 콘솔 오류 없음 확인.

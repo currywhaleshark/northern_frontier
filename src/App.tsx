@@ -1,5 +1,6 @@
 import { lazy, useEffect, useState } from 'react';
 import { MainMenu } from './components/MainMenu';
+import { NewGameSetup } from './components/NewGameSetup';
 import { SettingsDialog } from './components/SettingsDialog';
 import { LazyUiBoundary } from './components/LazyUiBoundary';
 import { hasAnyStoredSave } from './game/saveStorage';
@@ -22,7 +23,7 @@ const BattleSimulationSetup = lazy(() => import('./components/BattleSimulationSe
 
 export default function App() {
   const [launch, setLaunch] = useState<GameSessionLaunch | null>(null);
-  const [menuView, setMenuView] = useState<'main' | 'battleSim'>('main');
+  const [menuView, setMenuView] = useState<'main' | 'newGameSetup' | 'battleSim'>('main');
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [canLoad, setCanLoad] = useState(hasAnyStoredSave);
@@ -100,11 +101,15 @@ export default function App() {
     );
   }
 
+  if (menuView === 'newGameSetup') {
+    return <NewGameSetup onStart={options => setLaunch({ kind: 'new', options })} onBack={() => setMenuView('main')} />;
+  }
+
   return (
     <>
       <MainMenu
         canContinue={canLoad}
-        onStart={(difficulty, settlementName) => setLaunch({ kind: 'new', difficulty, settlementName })}
+        onStart={() => setMenuView('newGameSetup')}
         onStartTutorial={() => setLaunch({ kind: 'tutorial' })}
         onContinue={() => setLoadDialogOpen(true)}
         onOpenBattleSim={() => setMenuView('battleSim')}

@@ -5,6 +5,7 @@ import { RANK_NAMES, SEASON_NAMES } from '../game/constants';
 import { clearSave, readSaveSlotSummaries, type SaveSlotSummary } from '../game/saveLoad';
 import { getDayOfSeason, getSeason, getYear } from '../game/seasons';
 import { displaySettlementName, RANK_UNITS } from '../game/settlementName';
+import { MAP_REGION_NAMES, MAP_SIZE_NAMES } from '../game/newGameOptions';
 import type { Difficulty, Rank } from '../game/types';
 
 interface Props {
@@ -30,8 +31,19 @@ function slotDetailLabel(summary: SaveSlotSummary): string {
   const parts: string[] = [];
   if (summary.rank && summary.rank in RANK_NAMES) parts.push(RANK_NAMES[summary.rank as Rank]);
   if (summary.population != null) parts.push(`인구 ${summary.population}`);
-  if (summary.difficulty && summary.difficulty in CONFIG.difficulty) {
-    parts.push(CONFIG.difficulty[summary.difficulty as Difficulty].name);
+  if (summary.region && summary.region in MAP_REGION_NAMES) {
+    parts.push(MAP_REGION_NAMES[summary.region as keyof typeof MAP_REGION_NAMES]);
+  }
+  if (summary.mapSize && summary.mapSize in MAP_SIZE_NAMES) {
+    parts.push(MAP_SIZE_NAMES[summary.mapSize as keyof typeof MAP_SIZE_NAMES]);
+  }
+  if (summary.difficultyPreset === 'custom') {
+    parts.push('사용자 설정');
+  } else {
+    const difficulty = summary.difficultyPreset ?? summary.difficulty;
+    if (difficulty && difficulty in CONFIG.difficulty) {
+      parts.push(CONFIG.difficulty[difficulty as Difficulty].name);
+    }
   }
   return parts.join(' · ');
 }

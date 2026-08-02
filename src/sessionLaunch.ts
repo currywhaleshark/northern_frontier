@@ -1,10 +1,10 @@
 import type { BattleSimulationOptions } from './game/battleSimulation';
-import type { Difficulty, GameState } from './game/types';
+import type { GameState, NewGameOptions } from './game/types';
 
 export type GameSessionLaunch =
-  | { kind: 'new'; difficulty: Difficulty; settlementName: string }
+  | { kind: 'new'; options: NewGameOptions }
   | { kind: 'tutorial' }
   | { kind: 'loaded'; state: GameState }
   | { kind: 'battleSimulation'; options: BattleSimulationOptions };
 
-export type GameSessionReturnTarget = 'main' | 'battleSim';
+export type GameSessionReturnTarget = 'main' | 'newGameSetup' | 'battleSim';

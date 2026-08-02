@@ -76,6 +76,19 @@ const SEED = 20260729;
   assert.equal(state.lifetimeStats.trackingSinceDay, 1, '신규 게임은 1일부터 기록');
 }
 
+// 새 게임 설정은 창건 기록에 평원·중형 문맥을 한 번만 보탠다.
+{
+  const state = simulation.newGameFromOptions({
+    settlementName: '가람골', difficultyPreset: 'normal', baseDifficulty: 'normal',
+    region: 'plains', mapSize: 'medium',
+    tuning: { startingResources: 'normal', resourceDensity: 'normal', climateSeverity: 'normal', threat: 'normal' },
+    seed: SEED,
+  });
+  const founding = state.annals.filter(entry => entry.kind === 'founding');
+  assert.equal(founding.length, 1, '설정 문맥은 창건 기록을 중복하지 않는다');
+  assert.match(founding[0].text, /평원의 중형 개척지/);
+}
+
 // ── 하루 넘기기 — 서브틱 끝으로 밀고 한 틱 (일일 처리만 빠르게 돈다) ──
 function skipDays(state, days) {
   for (let i = 0; i < days; i++) {
