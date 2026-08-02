@@ -106,6 +106,31 @@ export interface FishingGroundState {
   recoveryPerDay: number;
 }
 
+export type FishingBoatStatus =
+  | 'moored'
+  | 'boarded'
+  | 'underway'
+  | 'fishing'
+  | 'returning'
+  | 'repairing'
+  | 'disabled';
+
+export interface FishingBoatState {
+  id: number;
+  portId: number;
+  boatyardId?: number | null;
+  fisherId?: number | null;
+  x: number;
+  y: number;
+  cargoFish: number;
+  cargoCapacity: number;
+  durability: number;
+  maxDurability: number;
+  status: FishingBoatStatus;
+  route: FishingGroundTile[];
+  routeIndex: number;
+}
+
 export type JobId =
   | 'idle'       // 무직
   | 'woodcutter' // 벌목꾼
@@ -229,6 +254,8 @@ export type BuildingTypeId =
   | 'well'       // 우물 — 지하수 수맥 위 급수 시설
   | 'deepMine'   // 채광갱 — 지하 광맥을 캐는 부 단계 작업장
   | 'ferry'      // 낚시터 (구 저장 호환을 위해 내부 ID 유지)
+  | 'fishingPort' // 포구 — 호수·바다 연안 어로와 어선 계류 거점
+  | 'boatyard'    // 배무이터 — 어선 건조·본수리 시설
   | 'charcoalKiln' // 숯가마
   | 'stable'     // 축사
   | 'nitreYard'  // 염초장
@@ -514,6 +541,7 @@ export interface Resident {
   lodgingHomeRestDay?: number | null; // 비축 소진 뒤 집에서 쉬는 절대일
   carrying: Partial<Record<ResourceId, number>>; // 지고 있는 짐
   cartEquipped: boolean; // 운반용 수레 장비 여부
+  fishingBoatId?: number | null; // 승선 중인 어선. 육상 이동과 동시에 유지하지 않는다.
   haulTask: HaulTask | null; // 생산지 재고 운반 예약
   manualOrder: ManualOrder | null;  // 플레이어가 우클릭으로 지정한 이동/작업 명령
 }
@@ -623,6 +651,15 @@ export interface Building {
   watchtowerDamageToday?: number; // P4 해당 날짜에 실제로 준 누적 피해
   watchtowerHadTarget?: boolean; // P4 사거리 진입 즉시 사격을 위한 직전 표적 상태
   repairCause?: BuildingRepairCause; // 우측 경고에서 습격·설해·대홍수·화재 피해를 구분한다
+  boatWorkOrder?: FishingBoatWorkOrder; // 배무이터 전용 어선 건조·본수리 공정
+}
+
+export interface FishingBoatWorkOrder {
+  kind: 'build' | 'repair';
+  portId: number;
+  boatId?: number;
+  progress: number;
+  required: number;
 }
 
 export type BuildingRepairCause = 'raid' | 'snowDamage' | 'springFlood' | 'fire' | 'mineCollapse';
@@ -643,7 +680,7 @@ export interface BuildingDef {
   capacity: number;         // 주거 수용 인원
   defense: number;          // 제공 방어도
   winterBonus: boolean;     // 겨울 보너스 여부
-  placement: 'land' | 'field' | 'paddy' | 'river' | 'rock' | 'riverbank' | 'coast' | 'mudflat' | 'watermill' | 'any';
+  placement: 'land' | 'field' | 'paddy' | 'river' | 'rock' | 'riverbank' | 'coast' | 'mudflat' | 'fishingWaterfront' | 'watermill' | 'any';
   unique: boolean;          // 하나만 건설 가능 여부
   minRank?: Rank;
   region?: MapRegion;       // 특정 지역에서만 건설 가능한 시설
@@ -1973,6 +2010,8 @@ export interface GameState {
   exploration: ExplorationState;
   habitats: AnimalHabitat[];
   fishingGrounds: FishingGroundState[];
+  fishingBoats: FishingBoatState[];
+  nextFishingBoatId: number;
   foreignSites: ForeignSite[];
   claimZones: ClaimZone[];
   nextForeignSiteId: number;

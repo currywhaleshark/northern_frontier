@@ -17,6 +17,7 @@ import { ensureMineralDeposits } from './minerals';
 import { ensureForestGrowth } from './forestGrowth';
 import { ensureTidalFlatStocks } from './tidalFlats';
 import { ensureFishingGrounds } from './fishingGrounds';
+import { normalizeFishingBoats } from './fishingBoats';
 import { ensureProcessingReserves } from './processing';
 import { initRelations } from './relations';
 import { getSeason, getYear } from './seasons';
@@ -873,6 +874,11 @@ export function migrateV57ToV58(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), fishingGrounds: [], schemaVersion: 58 };
 }
 
+// v59: 포구에 계류되는 개별 어선과 다음 선체 ID. 구 저장은 빈 선단으로 시작한다.
+export function migrateV58ToV59(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), fishingBoats: [], nextFishingBoatId: 1, schemaVersion: 59 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -936,6 +942,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 55) migrated = migrateV55ToV56(migrated);
     else if (version === 56) migrated = migrateV56ToV57(migrated);
     else if (version === 57) migrated = migrateV57ToV58(migrated);
+    else if (version === 58) migrated = migrateV58ToV59(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -2339,6 +2346,7 @@ export function loadGame(slot = 1): GameState | null {
     ensureMineralDeposits(parsed.map);
     ensureTidalFlatStocks(parsed.map);
     ensureFishingGrounds(parsed);
+    normalizeFishingBoats(parsed);
     normalizeSubsurfaceState(parsed);
     ensureForestGrowth(parsed.map);
     if (parsed.battle && !parsed.battle.mode) parsed.battle.mode = 'garrison';
@@ -2632,7 +2640,7 @@ export function loadGame(slot = 1): GameState | null {
     const priorityBuilding = parsed.buildings.find(building => building.id === parsed.priorityBuildingId);
     parsed.priorityBuildingId = priorityBuilding &&
       (!priorityBuilding.built || priorityBuilding.repairing || priorityBuilding.expansion || priorityBuilding.workOrder ||
-        priorityBuilding.gateConversion || priorityBuilding.structureRepair)
+        priorityBuilding.gateConversion || priorityBuilding.structureRepair || priorityBuilding.boatWorkOrder)
       ? priorityBuilding.id
       : null;
     if (parsed.raiders) {

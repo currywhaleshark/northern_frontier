@@ -54,6 +54,7 @@ import { defaultProcessingReserves } from './processing';
 import { hasKnownMineralDepositNear } from './miningSites';
 import { initialAquiferLevels, initialOreVeinRemaining } from './subsurfaceVeins';
 import { advanceFishingGrounds, ensureFishingGrounds, spawnFishingGrounds } from './fishingGrounds';
+import { fishingWaterfrontAccessTiles } from './fishingBoats';
 import { dailyAquiferTick } from './waterSupply';
 import {
   canPlantCropNow, cropIdForBuilding, CROP_DEFS, defaultCropForBuildingType, isCropAllowedOnBuilding,
@@ -179,6 +180,8 @@ export function newGameFromOptions(
     // 짐승 서식지: 숲 덩어리마다 난이도별 확률로 자리 잡는다 (마을 근처 하나는 보장)
     habitats: spawnAnimalHabitats(tiles, centerX, centerY, rng, effective.habitatChance),
     fishingGrounds: spawnFishingGrounds(tiles, effective.resourceDensityMultiplier),
+    fishingBoats: [],
+    nextFishingBoatId: 1,
     foreignSites: [],
     claimZones: [],
     nextForeignSiteId: 1,
@@ -345,6 +348,10 @@ function placePrebuilt(state: GameState, type: BuildingTypeId, x: number, y: num
   }
   if (type === 'jangdokdae') b.fermentBatches = [];
   if (type === 'stable') b.livestock = createDefaultLivestockState();
+  if (type === 'fishingPort') {
+    const water = fishingWaterfrontAccessTiles(state.map, x, y, 1, 1)[0];
+    if (water) b.gatheringWorkArea = { ...water, radius: CONFIG.gatheringZones.fishingPortRadius };
+  }
   state.buildings.push(b);
   const tiles = footprintTilesOf(state, b) ?? [];
   occupyBuildingTiles(state, b);
@@ -496,6 +503,10 @@ export function tryPlaceBuilding(
   if (type === 'dryingRack') b.dryingProduct = 'saltedFish';
   if (type === 'jangdokdae') b.fermentBatches = [];
   if (type === 'stable') b.livestock = createDefaultLivestockState();
+  if (type === 'fishingPort') {
+    const water = fishingWaterfrontAccessTiles(state.map, x, y, 1, 1)[0];
+    if (water) b.gatheringWorkArea = { ...water, radius: CONFIG.gatheringZones.fishingPortRadius };
+  }
   state.buildings.push(b);
   occupyBuildingTiles(state, b);
   // 나무는 그대로 서 있다 — 벌목꾼이 베어 옮겨야 공사가 시작된다.
@@ -1197,7 +1208,8 @@ export function buildingHasActiveWork(building: Building): boolean {
     building.expansion != null ||
     building.workOrder != null ||
     building.gateConversion != null ||
-    building.structureRepair != null;
+    building.structureRepair != null ||
+    building.boatWorkOrder != null;
 }
 
 export function startBuildingDemolition(state: GameState, buildingId: number): string | null {
@@ -1207,7 +1219,10 @@ export function startBuildingDemolition(state: GameState, buildingId: number): s
   if (state.royalPlaqueBuildingId === building.id) {
     return '왕이 내린 사액 현판이 걸린 건물은 해체할 수 없습니다.';
   }
-  if (building.expansion || building.workOrder || building.repairing || building.gateConversion || building.structureRepair) return '진행 중인 작업이 끝난 뒤 해체할 수 있습니다.';
+  if (building.type === 'fishingPort' && state.fishingBoats.some(boat => boat.portId === building.id)) {
+    return '계류 어선을 다른 포구로 옮긴 뒤 해체할 수 있습니다.';
+  }
+  if (building.expansion || building.workOrder || building.repairing || building.gateConversion || building.structureRepair || building.boatWorkOrder) return '진행 중인 작업이 끝난 뒤 해체할 수 있습니다.';
   const def = BUILDING_DEFS[building.type];
   building.built = false;
   if (isWallBuilding(building.type)) bumpDefenseTopology(state);
@@ -1237,7 +1252,10 @@ export function startBuildingRelocation(
   if (state.royalPlaqueBuildingId === building.id) {
     return '왕이 내린 사액 현판이 걸린 건물은 이전할 수 없습니다.';
   }
-  if (building.expansion || building.workOrder || building.repairing || building.structureRepair) return '진행 중인 작업이 끝난 뒤 이전할 수 있습니다.';
+  if (building.type === 'fishingPort' && state.fishingBoats.some(boat => boat.portId === building.id)) {
+    return '계류 어선을 다른 포구로 옮긴 뒤 이전할 수 있습니다.';
+  }
+  if (building.expansion || building.workOrder || building.repairing || building.structureRepair || building.boatWorkOrder) return '진행 중인 작업이 끝난 뒤 이전할 수 있습니다.';
   const { w, h } = buildingFootprintDims(building);
   if (!isBuildingFootprintExplored(state, building.type, x, y, w, h)) return '아직 답사하지 않은 곳입니다.';
   const destinationTiles = buildingFootprintTiles(state, building.type, x, y, w, h) ?? [];

@@ -1757,6 +1757,8 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   well:       { base: FACE_STONE, glyph: WATER },
   deepMine:   { roof: ROOF_DARK, base: ROCK_GRAY2, glyph: ANVIL },
   ferry:      { base: TENT_TAN, glyph: WATER },
+  fishingPort: { base: TENT_TAN, glyph: WATER },
+  boatyard:   { base: LOGS, glyph: WATER },
   tidalFishery: { base: FENCE, glyph: WATER },
   charcoalKiln: { base: CAMPFIRE, glyph: LOGS },
   stable:     { base: TENT_TAN, glyph: HIDE },

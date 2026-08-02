@@ -1,8 +1,9 @@
 import { CONFIG } from './config';
 import { treeStageFor } from './forestGrowth';
+import { fishingBoatRoute, fishingWaterAccessForBuilding } from './fishingBoats';
 import type { Building, BuildingTypeId, GameState, GatheringWorkArea, Tile } from './types';
 
-export type GatheringBuildingType = Extract<BuildingTypeId, 'lumberCamp' | 'huntLodge' | 'herbHut' | 'tidalFishery'>;
+export type GatheringBuildingType = Extract<BuildingTypeId, 'lumberCamp' | 'huntLodge' | 'herbHut' | 'tidalFishery' | 'fishingPort'>;
 type GatheringAnchor = Pick<Building, 'type' | 'x' | 'y' | 'gatheringWorkArea'>;
 type TilePoint = Pick<Tile, 'x' | 'y'>;
 
@@ -21,11 +22,12 @@ function defaultRadius(type: GatheringBuildingType): number {
   if (type === 'huntLodge') return CONFIG.gatheringZones.huntLodgeRadius;
   if (type === 'herbHut') return CONFIG.gatheringZones.herbHutRadius;
   if (type === 'tidalFishery') return CONFIG.gatheringZones.tidalFisheryRadius;
+  if (type === 'fishingPort') return CONFIG.gatheringZones.fishingPortRadius;
   return CONFIG.gatheringZones.lumberCampRadius;
 }
 
 export function isGatheringBuildingType(type: BuildingTypeId | null | undefined): type is GatheringBuildingType {
-  return type === 'lumberCamp' || type === 'huntLodge' || type === 'herbHut' || type === 'tidalFishery';
+  return type === 'lumberCamp' || type === 'huntLodge' || type === 'herbHut' || type === 'tidalFishery' || type === 'fishingPort';
 }
 
 export function isTileInGatheringWorkArea(anchor: GatheringAnchor, tile: TilePoint): boolean {
@@ -59,9 +61,19 @@ export function adjustGatheringWorkArea(
   const current = gatheringWorkArea(building as GatheringAnchor);
   const mapWidth = state.map[0]?.length ?? 1;
   const mapHeight = state.map.length || 1;
+  const nextX = Math.max(0, Math.min(mapWidth - 1, current.x + Math.trunc(deltaX)));
+  const nextY = Math.max(0, Math.min(mapHeight - 1, current.y + Math.trunc(deltaY)));
+  if (building.type === 'fishingPort' &&
+      state.map[nextY]?.[nextX]?.terrain !== 'lake' && state.map[nextY]?.[nextX]?.terrain !== 'sea') {
+    return '포구 작업영역의 중심은 같은 호수나 바다 위에 두어야 합니다.';
+  }
+  if (building.type === 'fishingPort' && !fishingWaterAccessForBuilding(state, building)
+    .some(access => fishingBoatRoute(state.map, access, { x: nextX, y: nextY }).length > 0)) {
+    return '포구와 물길이 이어진 같은 수역 안에서만 작업영역을 옮길 수 있습니다.';
+  }
   building.gatheringWorkArea = {
-    x: Math.max(0, Math.min(mapWidth - 1, current.x + Math.trunc(deltaX))),
-    y: Math.max(0, Math.min(mapHeight - 1, current.y + Math.trunc(deltaY))),
+    x: nextX,
+    y: nextY,
     radius: Math.max(CONFIG.gatheringZones.lumberCampMinRadius,
       Math.min(CONFIG.gatheringZones.lumberCampMaxRadius, current.radius + Math.trunc(deltaRadius))),
   };

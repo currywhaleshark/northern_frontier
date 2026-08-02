@@ -12,6 +12,7 @@ import { contractReserved, contractReserveNeeds } from '../game/tradeContractRes
 import { nextContractDueDay } from '../game/tradeContracts';
 import { gatheringWorkArea } from '../game/gatheringZones';
 import { fishingGroundAt, fishingGroundSummaryInArea } from '../game/fishingGrounds';
+import { nearestCompatibleFishingPort } from '../game/fishingBoats';
 import { DRYING_PRODUCT_DEFS, DRYING_PRODUCT_ORDER, dryingProductOf } from '../game/preservation';
 import { TANNERY_PRODUCT_DEFS, TANNERY_PRODUCT_ORDER, tanneryProductOf } from '../game/wearables';
 import {
@@ -49,6 +50,8 @@ interface Props {
   onSetDryingProduct: (buildingId: number, product: DryingProductId) => void;
   onSetLivestockSpecies: (buildingId: number, species: LivestockId) => void;
   onSlaughterLivestock: (buildingId: number, amount: number) => void;
+  onStartFishingBoatConstruction: (boatyardId: number) => void;
+  onStartFishingBoatRepair: (boatyardId: number, boatId: number) => void;
   onDefinePasture: (buildingId: number) => void;
   onExpandArea: (buildingId: number) => void;
   onStartBuildingDemolition: (buildingId: number) => void;
@@ -91,6 +94,8 @@ export function ActionPopup({
   onSetDryingProduct,
   onSetLivestockSpecies,
   onSlaughterLivestock,
+  onStartFishingBoatConstruction,
+  onStartFishingBoatRepair,
   onDefinePasture,
   onExpandArea,
   onStartBuildingDemolition,
@@ -491,6 +496,70 @@ export function ActionPopup({
               어장 비축 {ground?.stock.toFixed(1) ?? '0.0'} / {ground?.capacity.toFixed(1) ?? '0.0'}
             </div>
             <div className="muted small">낚시터 어부는 배를 타지 않고 이 작은 강 연안 어장만 이용합니다.</div>
+          </div>
+        );
+      })()}
+
+      {building.type === 'fishingPort' && building.built && (() => {
+        const area = gatheringWorkArea(building);
+        const kind = state.map[area.y]?.[area.x]?.terrain === 'lake' ? 'lake' : 'sea';
+        const summary = fishingGroundSummaryInArea(state.fishingGrounds, area, kind);
+        const boats = state.fishingBoats.filter(boat => boat.portId === building.id);
+        return (
+          <div className="worker-slot-panel">
+            <div className="worker-slot-summary">
+              <span>포구 선단</span>
+              <span className="muted small">어선 {boats.length}척 · 어획물 {(building.inventory?.fish ?? 0).toFixed(1)}</span>
+            </div>
+            <div className="muted small">
+              작업영역 어장 {summary.grounds}곳 · 비축 {summary.stock.toFixed(1)} / {summary.capacity.toFixed(1)}
+            </div>
+            <div className="muted small">
+              {boats.length > 0
+                ? boats.map(boat => `#${boat.id} ${Math.ceil(boat.durability)}/${boat.maxDurability}`).join(' · ')
+                : '배무이터에서 같은 수역의 이 포구로 보낼 어선을 건조할 수 있습니다.'}
+            </div>
+          </div>
+        );
+      })()}
+
+      {building.type === 'boatyard' && building.built && (() => {
+        const order = building.boatWorkOrder;
+        const port = nearestCompatibleFishingPort(state, building);
+        const repairable = state.fishingBoats.filter(boat =>
+          boat.fisherId == null && boat.durability < boat.maxDurability &&
+          (boat.status === 'moored' || boat.status === 'disabled'));
+        return (
+          <div className="worker-slot-panel">
+            <div className="worker-slot-summary">
+              <span>어선 작업</span>
+              <span className="muted small">
+                {order
+                  ? `${order.kind === 'build' ? '건조' : '본수리'} ${Math.floor(order.progress * 10) / 10}/${order.required}일`
+                  : port ? `${BUILDING_DEFS.fishingPort.name} #${port.id} 연결` : '연결 포구 없음'}
+              </span>
+            </div>
+            <button
+              className="action-command"
+              type="button"
+              disabled={order != null || port == null}
+              title={`목재 ${CONFIG.fishingBoats.buildWood} · 도구 ${CONFIG.fishingBoats.buildTools} · 건축가 ${CONFIG.fishingBoats.buildWorkDays}일`}
+              onClick={() => onStartFishingBoatConstruction(building.id)}
+            >
+              어선 건조
+            </button>
+            {repairable.map(boat => (
+              <button
+                key={boat.id}
+                className="action-command"
+                type="button"
+                disabled={order != null}
+                title={`목재 ${CONFIG.fishingBoats.repairWood} · 도구 ${CONFIG.fishingBoats.repairTools} · 건축가 ${CONFIG.fishingBoats.repairWorkDays}일`}
+                onClick={() => onStartFishingBoatRepair(building.id, boat.id)}
+              >
+                어선 #{boat.id} 본수리 ({Math.ceil(boat.durability)}/{boat.maxDurability})
+              </button>
+            ))}
           </div>
         );
       })()}

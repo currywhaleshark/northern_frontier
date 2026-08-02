@@ -8,6 +8,7 @@ import { hasAdjacentFlowingCanal } from './irrigation';
 import { isNaturalWaterTerrain } from './terrain';
 import { coastalGroundAt, seaDistanceAt } from './tidalFlats';
 import { fishingGroundAt, fishingGroundSummaryInArea } from './fishingGrounds';
+import { fishingWaterfrontAccessTiles } from './fishingBoats';
 import { GATE_CONVERSION_COSTS } from './walls';
 import type { Building, BuildingDef, BuildingTypeId, GameState, MapRegion, Rank, ResourceId, SmithyProductId, Tile } from './types';
 
@@ -192,6 +193,18 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     cost: { wood: 14, stone: 4, tools: 1 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'riverbank', unique: false, minRank: 'bo',
   },
+  fishingPort: {
+    id: 'fishingPort', name: '포구',
+    desc: `보(堡) 승격 후 호수나 바닷가에 짓는 어업 거점. 어부 2명이 반경 ${CONFIG.gatheringZones.fishingPortRadius}칸의 연안 어장을 이용하고 어선을 계류한다.`,
+    cost: { wood: 12, stone: 4, tools: 1 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'fishingWaterfront', unique: false, minRank: 'bo',
+  },
+  boatyard: {
+    id: 'boatyard', name: '배무이터',
+    desc: '보(堡) 승격 후 호수나 바닷가에 짓는다. 건축가가 목재와 도구를 들여 포구에 배치할 어선을 만들고 손상된 배를 본수리한다.',
+    cost: { wood: 16, stone: 4, tools: 2 }, buildDays: 9, slots: 0, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'fishingWaterfront', unique: false, minRank: 'bo',
+  },
   charcoalKiln: {
     id: 'charcoalKiln', name: '숯가마',
     desc: '진(鎭) 승격 후 건설. 숯쟁이가 창고의 목재를 가져와 고효율 연료인 숯으로 굽는다.',
@@ -322,7 +335,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
   'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'well', 'field', 'paddy', 'canal', 'weir', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'lodgingHut', 'clinic',
-  'smokehouse', 'dryingRack', 'saltworks', 'tidalFishery', 'smithy', 'mine', 'deepMine', 'ferry', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office', 'cemetery', 'school', 'shrine', 'hermitage',
+  'smokehouse', 'dryingRack', 'saltworks', 'tidalFishery', 'smithy', 'mine', 'deepMine', 'ferry', 'fishingPort', 'boatyard', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office', 'cemetery', 'school', 'shrine', 'hermitage',
   'levee', 'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement', 'chongtongEmplacement',
 ];
@@ -341,6 +354,7 @@ export const SINGLE_TILE_BUILDINGS = [
   'field',
   'paddy',
   'ferry',
+  'fishingPort',
   'tidalFishery',
   'dryingRack',
   'onggiKiln',
@@ -516,6 +530,10 @@ export function canPlaceBuildingAt(
   }
   const def = BUILDING_DEFS[type];
   if (!tiles.every(tile => canPlaceOn(def, tile, state))) return false;
+  if ((type === 'fishingPort' || type === 'boatyard')) {
+    const dims = buildingFootprintDims({ type, w, h });
+    if (fishingWaterfrontAccessTiles(state.map, x, y, dims.w, dims.h).length === 0) return false;
+  }
   if (type === 'saltworks' && !saltworksFootprintHasSeaAccess(state, x, y, 2, 2)) return false;
   if (type === 'ferry' && !fishingGroundAt(state.fishingGrounds ?? [], x, y, 'shore')) return false;
   if (type === 'tidalFishery' && fishingGroundSummaryInArea(
@@ -588,6 +606,8 @@ export function canRelocateBuildingAt(
       usableTiles.every(tile => tile.terrain === 'river' || isWatermillLandTile(tile));
   }
   if (!usableTiles.every(tile => canPlaceOn(def, tile, state))) return false;
+  if ((building.type === 'fishingPort' || building.type === 'boatyard') &&
+      fishingWaterfrontAccessTiles(state.map, x, y, w, h).length === 0) return false;
   if (building.type === 'saltworks' && !saltworksFootprintHasSeaAccess(state, x, y, 2, 2)) return false;
   if (building.type === 'ferry' && !fishingGroundAt(state.fishingGrounds ?? [], x, y, 'shore')) return false;
   if (building.type === 'tidalFishery' && fishingGroundSummaryInArea(
@@ -926,6 +946,9 @@ export function canPlaceOn(def: BuildingDef, tile: Tile, state?: GameState): boo
     return tile.terrain === 'fertile' || tile.terrain === 'plain' || tile.terrain === 'forest';
   }
   if (def.placement === 'mudflat') return tile.terrain === 'mudflat';
+  if (def.placement === 'fishingWaterfront') {
+    return tile.terrain === 'fertile' || tile.terrain === 'plain' || tile.terrain === 'forest';
+  }
   if (state && (tile.terrain === 'plain' || tile.terrain === 'fertile' ||
       tile.terrain === 'forest' || tile.terrain === 'rock') &&
       coastalGroundAt(state.map, tile.x, tile.y) != null) return false;

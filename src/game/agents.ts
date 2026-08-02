@@ -60,8 +60,9 @@ import { oreSampleAt } from './subsurfaceVeins';
 import { tidalFlatYieldMultiplier } from './tidalFlats';
 import {
   ensureFishingGrounds, fishingGroundAt, fishingGroundStockAt, fishingGroundSummaryInArea,
-  takeFishingGroundStock,
+  takeFishingGroundStock, takeFishingGroundStockById,
 } from './fishingGrounds';
+import { advanceFishingBoatWork } from './fishingBoats';
 import { waterDependentProductionMultiplier } from './waterSupply';
 import { activeFireDisaster, applyFireWater, drawFireWater, nearestFireWaterSource } from './fire';
 import { mineCollapseRepairLocked } from './mineCollapse';
@@ -1652,6 +1653,7 @@ function isConstructionForJob(state: GameState, building: Building, job: 'farmer
   if (clearingBlocksWork(state, building)) return false;
   if (mineCollapseRepairLocked(state, building)) return false;
   if (building.workOrder) return job === 'builder';
+  if (building.boatWorkOrder) return job === 'builder';
   if (building.gateConversion) return job === 'builder';
   if (building.structureRepair) {
     const band = state.raiders;
@@ -1773,12 +1775,20 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
       : target.structureRepair ? '돌파 성벽 수리 중'
       : target.workOrder
       ? target.workOrder.phase === 'rebuilding' ? '이전 재건축 중' : '건물 해체 중'
+      : target.boatWorkOrder
+        ? target.boatWorkOrder.kind === 'build' ? '어선 건조 중' : '어선 본수리 중'
       : expansion ? '영역 확장 중'
         : target.repairing ? '건물 수리 중' : '건설 중';
     const work = CONFIG.agents.work.buildPerSubtick * effOf(r) * ctx.tMod *
       Math.max(0.5, ctx.outdoor) * WORK_RATE_SCALE;
     gainSkillTick(state, r);
     if (advanceBuildingWorkOrder(state, target, ctx, work)) return;
+    if (target.boatWorkOrder) {
+      const result = advanceFishingBoatWork(state, target, work);
+      if (result === 'built') addLog(state, '새 어선이 완성되어 연결된 포구에 계류되었습니다.', 'good', true);
+      else if (result === 'repaired') addLog(state, '어선 본수리가 끝나 다시 출항할 수 있습니다.', 'good', true);
+      return;
+    }
     if (target.gateConversion) {
       const conversion = target.gateConversion;
       conversion.progress += work;
@@ -2664,7 +2674,7 @@ function saltMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
 
 function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
-  const workplace = assignedWorkplaceOfTypes(state, r, ctx, ['ferry', 'tidalFishery'], '어로 거점 배정 없음');
+  const workplace = assignedWorkplaceOfTypes(state, r, ctx, ['ferry', 'tidalFishery', 'fishingPort'], '어로 거점 배정 없음');
   if (!workplace) return;
   if (workplace.type === 'tidalFishery') {
     if (!state.fishingGrounds.some(ground => ground.kind === 'mudflat')) ensureFishingGrounds(state);
@@ -2696,6 +2706,47 @@ function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
             warningDays.set(workplace.id, state.day);
             addLog(state, '어살터 작업영역의 갯벌 비축이 바닥났습니다. 며칠 쉬면 다시 찹니다.', 'bad', true);
           }
+        }
+        return taken;
+      },
+    });
+    return;
+  }
+  if (workplace.type === 'fishingPort') {
+    const area = gatheringWorkArea(workplace);
+    const availableGround = () => state.fishingGrounds
+      .filter(ground => ground.depthBand === 'shore' && (ground.kind === 'lake' || ground.kind === 'sea') &&
+        ground.stock > WORK_STOCK_EPSILON && ground.tiles.some(tile =>
+          (tile.x - area.x) ** 2 + (tile.y - area.y) ** 2 <= area.radius ** 2 &&
+          (ground.kind !== 'lake' || !isLakeIceAt(state.map, state.day, tile.x, tile.y))))
+      .sort((left, right) =>
+        (left.x - area.x) ** 2 + (left.y - area.y) ** 2 -
+        ((right.x - area.x) ** 2 + (right.y - area.y) ** 2) || left.id.localeCompare(right.id))[0];
+    const interactionGoal = buildingInteractionGoal(state, [workplace.id]);
+    gatherJob(state, r, ctx, {
+      goal: tile => interactionGoal(tile) && availableGround() != null,
+      workTicks: a.work.fish,
+      yieldRes: 'fish',
+      yieldAmt: a.yields.fish * CONFIG.seasons.fishMult[ctx.season],
+      cap: a.carryCap.fish,
+      depositExtra: ['fishingPort'],
+      depositTargets: () => [workplace],
+      taskWork: '포구 연안에서 낚시 중',
+      taskMove: '포구로 이동',
+      taskHaul: '포구 어획물 하역',
+      taskNone: '포구 연안 어장이 고갈됨',
+      adjustHarvestAmount: (_tile, _resident, requested) => {
+        const ground = availableGround();
+        if (!ground) return 0;
+        const taken = takeFishingGroundStockById(state.fishingGrounds, ground.id, requested);
+        const kind = state.map[area.y]?.[area.x]?.terrain === 'lake' ? 'lake' : 'sea';
+        const remaining = fishingGroundSummaryInArea(state.fishingGrounds, area, kind).stock;
+        const warningDays = tidalDepletionWarningDaysFor(state);
+        const lastWarningDay = warningDays.get(workplace.id) ?? -Infinity;
+        if (remaining <= WORK_STOCK_EPSILON &&
+            state.day - lastWarningDay >= CONFIG.tidalFlats.depletionLogCooldownDays) {
+          warningDays.set(workplace.id, state.day);
+          addLog(state, '포구 작업영역의 연안 어장이 바닥났습니다. 어선을 준비하거나 다른 어장을 찾으십시오.', 'bad', true);
         }
         return taken;
       },
@@ -3709,7 +3760,7 @@ function endOfDayDepositExtra(r: Resident): BuildingTypeId[] {
     case 'woodcutter': return ['lumberCamp'];
     case 'hunter': return ['huntLodge'];
     case 'herbalist': return ['herbHut'];
-    case 'fisher': return ['ferry', 'tidalFishery'];
+    case 'fisher': return ['ferry', 'tidalFishery', 'fishingPort'];
     default: return [];
   }
 }

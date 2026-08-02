@@ -42,6 +42,8 @@ const BUILDING_COLUMNS: Record<BuildingTypeId, number> = {
   well: 3,
   deepMine: 10,
   ferry: 5,
+  fishingPort: 5, // 전용 포구 자산 전 임시 수변 시설 셀
+  boatyard: 4, // 전용 배무이터 자산 전 임시 목재 작업장 셀
   tidalFishery: 5,
   charcoalKiln: 10,
   stable: 5,

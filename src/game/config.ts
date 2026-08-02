@@ -34,6 +34,7 @@ export const CONFIG = {
     huntLodgeRadius: 7,
     herbHutRadius: 6,
     tidalFisheryRadius: 6,
+    fishingPortRadius: 9,
     lodgingSupplyDays: 3,
     lodgingHomeRestDays: 1,
   },
@@ -62,6 +63,18 @@ export const CONFIG = {
       lake: { shore: 0.12, mid: 0.16, deep: 0.2 },
       sea: { shore: 0.13, mid: 0.18, deep: 0.24 },
     },
+  },
+
+  fishingBoats: {
+    buildWood: 12,
+    buildTools: 1,
+    buildWorkDays: 6,
+    repairWood: 4,
+    repairTools: 1,
+    repairWorkDays: 3,
+    cargoCapacity: 12,
+    durability: 100,
+    minimumDepartureDurability: 25,
   },
 
   habitats: {

@@ -221,6 +221,30 @@ function prepareState(seed) {
 }
 
 {
+  const state = prepareState(2026080301);
+  state.rank = 'bo';
+  for (let y = 10; y <= 18; y++) for (let x = 8; x <= 18; x++) state.map[y][x].terrain = 'lake';
+  fishingGrounds.ensureFishingGrounds(state);
+  const port = addBuilt(state, 'fishingPort', 10, 9, {
+    gatheringWorkArea: { x: 10, y: 10, radius: CONFIG.gatheringZones.fishingPortRadius },
+    inventory: {},
+  });
+  const fisher = workableResident(state, 0, 'fisher', port.x, port.y);
+  assert.equal(workerSlots.assignResidentToBuilding(state, fisher.id, port.id), null);
+  const before = state.fishingGrounds
+    .filter(ground => ground.kind === 'lake' && ground.depthBand === 'shore')
+    .reduce((sum, ground) => sum + ground.stock, 0);
+
+  for (let i = 0; i < 6; i++) simulation.advanceTick(state);
+
+  const after = state.fishingGrounds
+    .filter(ground => ground.kind === 'lake' && ground.depthBand === 'shore')
+    .reduce((sum, ground) => sum + ground.stock, 0);
+  assert.ok((fisher.carrying.fish ?? 0) > 0, '포구에 배정된 어부는 배 없이 연안 어장을 이용한다');
+  assert.ok(after < before, '포구 도보 어로는 연안 공유 비축만 줄인다');
+}
+
+{
   const state = prepareState(2026070918);
   state.rank = 'jin';
   const stable = addBuilt(state, 'stable', 10, 10);

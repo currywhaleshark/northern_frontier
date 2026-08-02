@@ -31,6 +31,8 @@ export const BUILD_CATEGORY_BY_TYPE = {
   well: 'housing',
   deepMine: 'production',
   ferry: 'production',
+  fishingPort: 'production',
+  boatyard: 'production',
   tidalFishery: 'production',
   charcoalKiln: 'production',
   watermill: 'production',

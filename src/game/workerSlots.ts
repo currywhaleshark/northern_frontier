@@ -14,6 +14,7 @@ export const AUTO_ASSIGN_BUILDING_TYPES = [
   'lumberCamp', 'huntLodge', 'herbHut', 'mine',
   'field', 'paddy', 'watermill', 'woodShed', 'charcoalKiln', 'smithy',
   'stable', 'clinic', 'nitreYard', 'ferry', 'tidalFishery', 'tannery', 'weavingHouse', 'smokehouse', 'dryingRack', 'onggiKiln', 'saltworks',
+  'fishingPort',
   'deepMine', 'watchtower',
 ] as const satisfies readonly BuildingTypeId[];
 export type AutoAssignBuildingType = typeof AUTO_ASSIGN_BUILDING_TYPES[number];
@@ -34,6 +35,7 @@ export const SLOTTED_BUILDING_CONFIG: Partial<Record<BuildingTypeId, WorkerSlotC
   clinic: { job: 'physician', slots: 2 },
   nitreYard: { job: 'powderMaker', slots: 2 },
   ferry: { job: 'fisher', slots: 2 },
+  fishingPort: { job: 'fisher', slots: 2 },
   tidalFishery: { job: 'fisher', slots: 2 },
   tannery: { job: 'tanner', slots: 2 },
   weavingHouse: { job: 'weaver', slots: 2 },

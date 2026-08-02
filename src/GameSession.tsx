@@ -14,6 +14,7 @@ import {
 } from './game/simulation';
 import { forestTilesInArea, forestTilesInFootprint } from './game/landClearing';
 import { adjustGatheringWorkArea } from './game/gatheringZones';
+import { startFishingBoatConstruction, startFishingBoatRepair } from './game/fishingBoats';
 import { isSolidWallBuilding } from './game/walls';
 import { ClearingConfirmDialog } from './components/ClearingConfirmDialog';
 import { RoyalPlaqueConfirmDialog } from './components/RoyalPlaqueConfirmDialog';
@@ -1141,6 +1142,20 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     bump();
   };
 
+  const handleStartFishingBoatConstruction = (boatyardId: number) => {
+    const err = startFishingBoatConstruction(stateRef.current, boatyardId);
+    notify(err ?? '어선 건조를 시작했습니다. 건축가가 배무이터에서 작업합니다.', err ? 'bad' : 'info');
+    if (!err) playSfx('hammer');
+    bump();
+  };
+
+  const handleStartFishingBoatRepair = (boatyardId: number, boatId: number) => {
+    const err = startFishingBoatRepair(stateRef.current, boatyardId, boatId);
+    notify(err ?? `어선 #${boatId} 본수리를 시작했습니다.`, err ? 'bad' : 'info');
+    if (!err) playSfx('hammer');
+    bump();
+  };
+
   const handleSiegeStance = (stance: import('./game/types').SiegeStance) => {
     const error = changeSiegeStance(stateRef.current, stance);
     if (error) notify(error, 'info', true);
@@ -1817,6 +1832,8 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               onSetDryingProduct={handleSetDryingProduct}
               onSetLivestockSpecies={handleSetLivestockSpecies}
               onSlaughterLivestock={handleSlaughterLivestock}
+              onStartFishingBoatConstruction={handleStartFishingBoatConstruction}
+              onStartFishingBoatRepair={handleStartFishingBoatRepair}
               onDefinePasture={handleDefinePasture}
               onExpandArea={handleExpandArea}
               onStartBuildingDemolition={handleStartBuildingDemolition}

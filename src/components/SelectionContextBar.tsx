@@ -69,6 +69,8 @@ interface Props {
   onSetDryingProduct: (buildingId: number, product: DryingProductId) => void;
   onSetLivestockSpecies: (buildingId: number, species: LivestockId) => void;
   onSlaughterLivestock: (buildingId: number, amount: number) => void;
+  onStartFishingBoatConstruction: (boatyardId: number) => void;
+  onStartFishingBoatRepair: (boatyardId: number, boatId: number) => void;
   onDefinePasture: (buildingId: number) => void;
   onExpandArea: (buildingId: number) => void;
   onStartBuildingDemolition: (buildingId: number) => void;
@@ -328,6 +330,8 @@ export function SelectionContextBar({
   onSetDryingProduct,
   onSetLivestockSpecies,
   onSlaughterLivestock,
+  onStartFishingBoatConstruction,
+  onStartFishingBoatRepair,
   onDefinePasture,
   onExpandArea,
   onStartBuildingDemolition,
@@ -370,13 +374,21 @@ export function SelectionContextBar({
   const spoilage = spoilagePreview(state);
   const mineSummary = building?.type === 'mine' ? mineMineralSummary(state, building) : null;
   const gatheringBuilding = building && isGatheringBuildingType(building.type) ? building : null;
-  const gatheringSummary = gatheringBuilding ? gatheringForestSummary(state, gatheringBuilding) : null;
+  const gatheringSummary = gatheringBuilding && gatheringBuilding.type !== 'fishingPort'
+    ? gatheringForestSummary(state, gatheringBuilding) : null;
   const gatheringArea = gatheringBuilding ? gatheringWorkArea(gatheringBuilding) : null;
   const habitatSummary = gatheringBuilding?.type === 'huntLodge' && gatheringArea
     ? habitatReserveSummaryInArea(state.map, state.habitats, gatheringArea)
     : null;
   const tidalSummary = gatheringBuilding?.type === 'tidalFishery' && gatheringArea
     ? fishingGroundSummaryInArea(state.fishingGrounds, gatheringArea, 'mudflat')
+    : null;
+  const portFishingSummary = gatheringBuilding?.type === 'fishingPort' && gatheringArea
+    ? fishingGroundSummaryInArea(
+      state.fishingGrounds,
+      gatheringArea,
+      state.map[gatheringArea.y]?.[gatheringArea.x]?.terrain === 'lake' ? 'lake' : 'sea',
+    )
     : null;
   const lodgingHut = building?.type === 'lodgingHut' ? building : null;
   const lodgingWorksite = lodgingHut ? linkedLodgingWorksite(state, lodgingHut) : null;
@@ -537,6 +549,31 @@ export function SelectionContextBar({
                             <tr>
                               <td>영역 조절</td>
                               <td style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                <button className="btn small" type="button" title="작업영역을 북쪽으로 이동" onClick={() => onAdjustGatheringArea(gatheringBuilding.id, 0, -1, 0)}>↑</button>
+                                <button className="btn small" type="button" title="작업영역을 서쪽으로 이동" onClick={() => onAdjustGatheringArea(gatheringBuilding.id, -1, 0, 0)}>←</button>
+                                <button className="btn small" type="button" title="작업영역을 동쪽으로 이동" onClick={() => onAdjustGatheringArea(gatheringBuilding.id, 1, 0, 0)}>→</button>
+                                <button className="btn small" type="button" title="작업영역을 남쪽으로 이동" onClick={() => onAdjustGatheringArea(gatheringBuilding.id, 0, 1, 0)}>↓</button>
+                                <button className="btn small" type="button" disabled={gatheringArea.radius <= CONFIG.gatheringZones.lumberCampMinRadius} onClick={() => onAdjustGatheringArea(gatheringBuilding.id, 0, 0, -1)}>반경 −</button>
+                                <button className="btn small" type="button" disabled={gatheringArea.radius >= CONFIG.gatheringZones.lumberCampMaxRadius} onClick={() => onAdjustGatheringArea(gatheringBuilding.id, 0, 0, 1)}>반경 +</button>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      )}
+                      {gatheringBuilding?.type === 'fishingPort' && gatheringArea && portFishingSummary && (
+                        <>
+                          <tr>
+                            <td>수상 작업영역</td>
+                            <td>중심 ({gatheringArea.x}, {gatheringArea.y}) · 반경 {gatheringArea.radius}칸</td>
+                          </tr>
+                          <tr>
+                            <td>어장 비축</td>
+                            <td>{portFishingSummary.stock.toFixed(1)} / {portFishingSummary.capacity.toFixed(1)} · {portFishingSummary.grounds}곳</td>
+                          </tr>
+                          {gatheringBuilding.built && (
+                            <tr>
+                              <td>영역 조정</td>
+                              <td>
                                 <button className="btn small" type="button" title="작업영역을 북쪽으로 이동" onClick={() => onAdjustGatheringArea(gatheringBuilding.id, 0, -1, 0)}>↑</button>
                                 <button className="btn small" type="button" title="작업영역을 서쪽으로 이동" onClick={() => onAdjustGatheringArea(gatheringBuilding.id, -1, 0, 0)}>←</button>
                                 <button className="btn small" type="button" title="작업영역을 동쪽으로 이동" onClick={() => onAdjustGatheringArea(gatheringBuilding.id, 1, 0, 0)}>→</button>
@@ -760,6 +797,8 @@ export function SelectionContextBar({
                 onSetDryingProduct={onSetDryingProduct}
                 onSetLivestockSpecies={onSetLivestockSpecies}
                 onSlaughterLivestock={onSlaughterLivestock}
+                onStartFishingBoatConstruction={onStartFishingBoatConstruction}
+                onStartFishingBoatRepair={onStartFishingBoatRepair}
                 onDefinePasture={onDefinePasture}
                 onExpandArea={onExpandArea}
                 onStartBuildingDemolition={onStartBuildingDemolition}

@@ -305,6 +305,18 @@ export function takeFishingGroundStock(
   return taken;
 }
 
+export function takeFishingGroundStockById(
+  grounds: FishingGroundState[],
+  groundId: string,
+  amount: number,
+): number {
+  const ground = grounds.find(candidate => candidate.id === groundId);
+  if (!ground || !Number.isFinite(amount) || amount <= 0) return 0;
+  const taken = Math.min(ground.stock, amount);
+  ground.stock = Math.max(0, ground.stock - taken);
+  return taken;
+}
+
 export interface FishingGroundSummary {
   grounds: number;
   tiles: number;

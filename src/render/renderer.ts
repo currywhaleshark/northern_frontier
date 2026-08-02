@@ -1157,6 +1157,8 @@ function drawGatheringWorkRange(
     ? { fill: 'rgba(217,164,65,0.11)', stroke: 'rgba(232,184,84,0.95)' }
     : building.type === 'herbHut'
       ? { fill: 'rgba(112,188,150,0.11)', stroke: 'rgba(125,214,169,0.95)' }
+      : building.type === 'fishingPort'
+        ? { fill: 'rgba(68,157,205,0.11)', stroke: 'rgba(91,190,234,0.95)' }
       : { fill: 'rgba(105,175,96,0.11)', stroke: 'rgba(132,211,117,0.95)' };
   ctx.fillStyle = color.fill;
   ctx.strokeStyle = color.stroke;
