@@ -181,6 +181,8 @@ const slotRegistry = await import(pathToFileURL(join(renderDir, 'buildingWorkerS
   assert.ok(stanceStage.includes('인접 광상 위치'), '작업 자세 탭에 인접 광상 위치 조절 UI가 없다');
   assert.ok(stanceStage.includes("job === 'miner' && !target ? 'plain' : terrain"),
     '광부가 서는 통행 칸과 광상 대상 칸이 시각적으로 분리되지 않았다');
+  assert.ok(stanceStage.includes('residentWorkRenderSortY('),
+    '작업 자세 탭이 게임과 같은 방향별 작업 대상 정렬을 사용하지 않는다');
 }
 
 console.log('sprite studio registry tests passed');

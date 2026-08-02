@@ -31,6 +31,24 @@ export interface WorkLayoutTarget {
 
 export type WorkLayoutTargetLookup = (resident: WorkLayoutResident) => WorkLayoutTarget | null;
 
+const WORK_TARGET_FOREGROUND_SORT_EPSILON = 0.01;
+
+/**
+ * 작업 대상과 주민의 타일 깊이를 함께 보는 행 정렬값.
+ *
+ * 대상이 주민보다 아래쪽이면 주민은 실제로 대상 뒤에 있으므로 기존 발끝 정렬을 유지한다.
+ * 같은 행(좌우 작업)이거나 대상이 위쪽이면 대상 소품 직후에 그려 큰 노두에 깔리지 않게 한다.
+ */
+export function residentWorkRenderSortY(
+  resident: Pick<WorkLayoutResident, 'x' | 'y'>,
+  target: WorkLayoutTarget | null | undefined,
+  visualFootY: number,
+  tileSize: number,
+): number {
+  if (!target || target.y > resident.y) return visualFootY;
+  return Math.max(visualFootY, (target.y + 1) * tileSize + WORK_TARGET_FOREGROUND_SORT_EPSILON);
+}
+
 /**
  * 같은 작업점의 주민을 좌우로 벌리고 실제 타일 중심을 바라보게 한다.
  * 시뮬레이션 좌표는 건드리지 않는 렌더 전용 배치라 생산과 길찾기에 영향이 없다.

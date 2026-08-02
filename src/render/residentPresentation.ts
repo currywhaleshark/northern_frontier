@@ -14,6 +14,7 @@ import { selectOxPlowFarmerIds } from './residentFarmerAssets';
 import {
   residentWorkStances,
   type ResidentWorkStance,
+  type WorkLayoutTarget,
   type WorkLayoutResident,
 } from './residentWorkLayout';
 import { workAnchor } from './spriteStudioRegistries';
@@ -25,7 +26,8 @@ function adjacentMinerWorkTarget(
   resident: WorkLayoutResident,
   buildingById: ReadonlyMap<number, Building>,
 ) {
-  if (resident.job !== 'miner' || resident.phase !== 'working') return null;
+  if (resident.job !== 'miner' || resident.phase !== 'working' ||
+      resident.x !== resident.px || resident.y !== resident.py) return null;
   const mine = resident.assignedBuildingId == null ? null : buildingById.get(resident.assignedBuildingId);
   if (!mine || mine.type !== 'mine') return null;
   for (const [dx, dy] of CARDINAL_DIRECTIONS) {
@@ -66,6 +68,7 @@ export interface ResidentPresentationSnapshot {
   indoorResidentIds: ReadonlySet<number>;
   workplaceActiveCountByBuilding: ReadonlyMap<number, number>;
   workStances: ReadonlyMap<number, ResidentWorkStance>;
+  workTargets: ReadonlyMap<number, WorkLayoutTarget>;
   oxPlowFarmerIds: ReadonlySet<number>;
 }
 
@@ -114,13 +117,18 @@ export function buildResidentPresentationSnapshot(state: GameState): ResidentPre
   const spreadExcluded = slotStances.size === 0
     ? indoorResidentIds
     : new Set([...indoorResidentIds, ...slotStances.keys()]);
+  const workTargets = new Map<number, WorkLayoutTarget>();
+  for (const resident of state.residents) {
+    const target = adjacentMinerWorkTarget(state, resident, buildingById);
+    if (target) workTargets.set(resident.id, target);
+  }
   const workStances = residentWorkStances(
     state.residents,
     CONFIG.ui.tileSize,
     spreadExcluded,
     (x, y) => state.map?.[y]?.[x]?.terrain,
     workAnchor,
-    resident => adjacentMinerWorkTarget(state, resident, buildingById),
+    resident => workTargets.get(resident.id) ?? null,
   );
   for (const [id, stance] of slotStances) workStances.set(id, stance);
 
@@ -129,6 +137,7 @@ export function buildResidentPresentationSnapshot(state: GameState): ResidentPre
     indoorResidentIds,
     workplaceActiveCountByBuilding,
     workStances,
+    workTargets,
     oxPlowFarmerIds: selectOxPlowFarmerIds(state.buildings, state.residents),
   };
 }

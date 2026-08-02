@@ -90,6 +90,25 @@ assert.equal(cache.get(state, 11), changed, 'alpha, hover, and other canvas-only
 const newGameState = { ...state, buildings: [...state.buildings], residents: [...state.residents] };
 assert.notEqual(cache.get(newGameState, 11), changed, 'new-game or load state identity invalidates the cache');
 
+// ── 인접 채광 대상 — 실제 게임 렌더 정렬이 쓸 노두 좌표를 스냅샷에 고정한다 ──
+{
+  const mine = { id: 35, type: 'mine', built: true, x: 2, y: 2 };
+  const stationaryMiner = resident(35, 'miner', mine.id, 3, 2);
+  const movingMiner = resident(36, 'miner', mine.id, 3, 3, { px: 2 });
+  const map = Array.from({ length: 6 }, (_row, y) =>
+    Array.from({ length: 6 }, (_cell, x) => ({ x, y, terrain: 'plain' })));
+  map[2][4] = { x: 4, y: 2, terrain: 'rock', mineralRemaining: 80 };
+  map[3][4] = { x: 4, y: 3, terrain: 'rock', mineralRemaining: 80 };
+
+  const snapshot = presentationModule.buildResidentPresentationSnapshot({
+    rank: 'settlement', buildings: [mine], residents: [stationaryMiner, movingMiner], map,
+  });
+  assert.deepEqual(snapshot.workTargets.get(stationaryMiner.id), { x: 4, y: 2, terrain: 'rock' },
+    '정지 채광꾼은 실제 인접 노두를 렌더 정렬 대상으로 전달한다');
+  assert.equal(snapshot.workTargets.has(movingMiner.id), false,
+    '이동 중 채광꾼은 아직 노두 작업 가림 순서를 적용하지 않는다');
+}
+
 // ── 야외 작업 자리 — 자리에 선 근무자는 벌리기에서 빠지고 자리 값을 그대로 쓴다 ──
 {
   const { buildingWorkerSlots } = await import(

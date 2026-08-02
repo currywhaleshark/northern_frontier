@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getActiveSprites, onAtlasAssetSettled } from '@game/render/atlas';
 import { WORK_ANCHOR_KEYS } from '@game/render/spriteStudioRegistries';
-import { residentWorkStances } from '@game/render/residentWorkLayout';
+import { residentWorkRenderSortY, residentWorkStances } from '@game/render/residentWorkLayout';
 import { drawUnderCanopyGhost, treeCanopiesIntersectingRect } from '@game/render/renderer';
 import { jitterOf, type ResidentDrawParams, type TerrainDrawParams } from '@game/render/sprites';
 import { CONFIG } from '@game/game/config';
@@ -183,9 +183,8 @@ function drawScene(
     }
   }
 
-  // 행 정렬 — renderer.ts의 rowRenderQueue와 **같은 규칙**이다. 노두·나무는 칸 밑변
-  // ((y+1)*TILE), 주민은 자기 발끝 y로 정렬되므로 대상물이 주민을 가리는 일이 실제로 있다.
-  // 여기서 순서를 뒤집으면 "보이는 위치"를 맞춰도 게임에서는 가려진다.
+  // 행 정렬 — renderer.ts와 같은 대상 인식 정렬을 쓴다. 노두 위쪽에서 캐면 실제 후방 가림을
+  // 유지하고, 좌우·아래쪽에서 캐면 큰 노두가 광부를 덮지 않게 노두 직후에 그린다.
   const queue: { sortY: number; sortX: number; serial: number; draw: () => void }[] = [];
   const residentDraws: ResidentDrawParams[] = [];
   for (const actor of actors) {
@@ -205,7 +204,17 @@ function drawScene(
       animationTimeMs,
     };
     residentDraws.push(params);
-    queue.push({ sortY: actor.y, sortX: actor.x, serial: queue.length, draw: () => sprites.drawResident(ctx, params) });
+    queue.push({
+      sortY: residentWorkRenderSortY(
+        { x: CENTER_TILE, y: CENTER_TILE },
+        { x: targetTile.x, y: targetTile.y, terrain },
+        actor.y,
+        TILE,
+      ),
+      sortX: actor.x,
+      serial: queue.length,
+      draw: () => sprites.drawResident(ctx, params),
+    });
   }
   const targetParams = tileParams(targetTile.x, targetTile.y, terrain, options, true);
   queue.push({

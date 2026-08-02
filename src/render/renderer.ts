@@ -36,7 +36,7 @@ import {
 } from './sprites';
 import { militiaWeaponForResident } from './militiaWeaponAssignment';
 import { farmerSpriteActionFor } from './residentFarmerAssets';
-import type { ResidentWorkStance } from './residentWorkLayout';
+import { residentWorkRenderSortY, type ResidentWorkStance } from './residentWorkLayout';
 import {
   buildResidentPresentationSnapshot,
   type ResidentPresentationSnapshot,
@@ -2162,6 +2162,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     rowRenderQueue.push({ sortY, sortX, serial: rowRenderQueue.length, draw });
   };
   const localResidentDraws: ResidentDrawParams[] = [];
+  const localResidentSortYs: number[] = [];
   const showAquiferLayer = o.showAquiferLayer ?? false;
   const showOreLayer = o.showOreLayer ?? false;
   const subsurfaceLayerActive = showAquiferLayer || showOreLayer;
@@ -2244,6 +2245,12 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       animationTimeMs: o.animationTimeMs + stableResidentAnimationOffset(r.id),
     };
     localResidentDraws.push(params);
+    localResidentSortYs.push(residentWorkRenderSortY(
+      r,
+      presentation.workTargets.get(r.id),
+      p.y,
+      TILE,
+    ));
   }
   ctx.imageSmoothingEnabled = false;
 
@@ -2600,8 +2607,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     enqueueRowDraw((corpse.y + 1) * TILE, (corpse.x + 0.5) * TILE, () =>
       sprites.drawCorpse(ctx, drawParams));
   }
-  for (const resident of localResidentDraws) {
-    enqueueRowDraw(resident.y, resident.x, () => {
+  for (let index = 0; index < localResidentDraws.length; index++) {
+    const resident = localResidentDraws[index];
+    enqueueRowDraw(localResidentSortYs[index], resident.x, () => {
       sprites.drawResident(ctx, resident);
       occludedResidentDraws.push(resident);
     });

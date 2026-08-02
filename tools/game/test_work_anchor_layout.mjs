@@ -9,7 +9,7 @@ const source = readFileSync(new URL('../../src/render/residentWorkLayout.ts', im
 const output = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
 }).outputText;
-const { residentWorkStances } = await import(
+const { residentWorkRenderSortY, residentWorkStances } = await import(
   `data:text/javascript;base64,${Buffer.from(output).toString('base64')}`
 );
 
@@ -102,6 +102,35 @@ const rock = () => 'rock';
   const resting = [{ id: 2, alive: true, phase: 'rest', job: 'miner', assignedBuildingId: null, x: 5, y: 7, px: 5, py: 7 }];
   assert.equal(residentWorkStances(moving, TILE, undefined, rock, table).size, 0, '이동 중은 제외');
   assert.equal(residentWorkStances(resting, TILE, undefined, rock, table).size, 0, '근무 중이 아니면 제외');
+}
+
+// ── 7. 노두와의 방향별 깊이 — 위쪽만 뒤, 좌우·아래쪽은 앞 ──
+{
+  const resident = { x: 5, y: 7 };
+  const visualFootY = (resident.y + 0.5) * TILE;
+  const target = (x, y) => ({ x, y, terrain: 'rock' });
+  const rockBottom = y => (y + 1) * TILE;
+
+  assert.equal(
+    residentWorkRenderSortY(resident, target(5, 8), visualFootY, TILE),
+    visualFootY,
+    '노두 위쪽의 광부는 실제 후방이므로 기존 정렬을 유지한다',
+  );
+  for (const [label, workTarget] of [
+    ['오른쪽', target(6, 7)],
+    ['왼쪽', target(4, 7)],
+    ['위쪽', target(5, 6)],
+  ]) {
+    assert.ok(
+      residentWorkRenderSortY(resident, workTarget, visualFootY, TILE) > rockBottom(workTarget.y),
+      `${label} 노두를 캐는 광부는 노두 뒤에 깔리지 않는다`,
+    );
+  }
+  assert.equal(
+    residentWorkRenderSortY(resident, null, visualFootY, TILE),
+    visualFootY,
+    '작업 대상이 없으면 기존 정렬이 변하지 않는다',
+  );
 }
 
 console.log('work anchor layout tests passed');
