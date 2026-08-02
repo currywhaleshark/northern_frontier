@@ -1867,7 +1867,7 @@ function builderTick(state: GameState, r: Resident, ctx: Ctx): void {
 
 const HAUL_PRIORITY: ResourceId[] = [
   'grain', 'rice', 'vegetables', 'kimchi', 'beans', 'meat', 'eggs', 'milk', 'fish',
-  'curedMeat', 'saltedFish', 'driedFish', 'jang',
+  'curedMeat', 'saltedFish', 'driedFish', 'jang', 'salt',
   'firewood', 'brushwood', 'charcoal', 'wood',
   'hideClothes', 'cottonClothes', 'strawShoes', 'leatherShoes', 'tools', 'onggi', 'carts', 'gunpowder', 'spears', 'hornBows', 'muskets',
   'hide', 'cotton', 'wool', 'hay', 'herbs', 'stone', 'iron',

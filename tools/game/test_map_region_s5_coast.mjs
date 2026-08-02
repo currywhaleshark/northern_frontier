@@ -233,6 +233,33 @@ function prepareSaltProduction(workerCount) {
   assert.equal(inventory.isHaulSourceBuilding(two.saltworks), true, '자염막 소금은 운반꾼 회수 대상이다');
 }
 
+// 자동 운반꾼은 자염막 재고에서 소금을 실제로 집어 정착지 재고에 넣는다.
+{
+  const state = simulation.newGameFromOptions({
+    ...options.optionsForDifficulty('normal', '', 20260875), region: 'coast', seed: 20260875,
+  });
+  clearForPlacement(state);
+  addBuilt(state, 'center', 2, 2);
+  for (let x = 10; x <= 11; x++) state.map[12][x].terrain = 'sea';
+  const saltworks = addBuilt(state, 'saltworks', 10, 10, { inventory: { salt: 6 } });
+  for (const resident of state.residents) resident.alive = false;
+  const hauler = state.residents[0];
+  Object.assign(hauler, {
+    alive: true, sick: false, health: 100, hunger: 100, warmth: 100, morale: 70,
+    job: 'hauler', assignedBuildingId: null, x: 9, y: 11, px: 9, py: 11,
+    phase: 'rest', path: [], workTimer: 0, targetId: null, carrying: {}, haulTask: null,
+    manualOrder: null, skills: {},
+  });
+  state.subTick = 9;
+  state.pendingChoice = null;
+  state.resources.salt = 0;
+
+  for (let index = 0; index < 12; index++) simulation.advanceTick(state);
+
+  assert.equal(saltworks.inventory.salt, 0, '운반꾼이 자염막 소금 재고를 비운다');
+  assert.equal(state.resources.salt, 6, '자염막 소금이 정착지 재고에 들어간다');
+}
+
 // 신규 지형·건물·직업은 저장 왕복에서 유지된다.
 {
   const { state, saltworks } = prepareSaltProduction(1);
