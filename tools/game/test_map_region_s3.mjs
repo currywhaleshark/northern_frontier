@@ -71,6 +71,7 @@ function summarize(state, width, height) {
     forest: 0,
     surfaceMineral: 0,
     ordinaryAquiferCapacity: 0,
+    undergroundOreFootprint: 0,
     undergroundOreCapacity: 0,
     habitatCapacity: state.habitats.reduce((sum, habitat) => sum + habitat.capacity, 0),
   };
@@ -87,8 +88,9 @@ function summarize(state, width, height) {
   }
   const aquifers = subsurface.aquiferVeins(state.seed, width, height, state.worldSetup.region);
   result.ordinaryAquiferCapacity = aquifers.slice(0, -1).reduce((sum, vein) => sum + vein.capacity, 0);
-  result.undergroundOreCapacity = subsurface.oreVeins(state.seed, width, height, state.worldSetup.region)
-    .reduce((sum, vein) => sum + vein.capacity, 0);
+  const oreVeins = subsurface.oreVeins(state.seed, width, height, state.worldSetup.region);
+  result.undergroundOreFootprint = oreVeins.reduce((sum, vein) => sum + vein.radius ** 2, 0);
+  result.undergroundOreCapacity = oreVeins.reduce((sum, vein) => sum + vein.capacity, 0);
   return result;
 }
 
@@ -156,8 +158,10 @@ assert.ok(mountainsTotal.interiorMountain > plainsTotal.interiorMountain,
 assert.ok(mountainsTotal.forest > plainsTotal.forest, '산지는 표본 합계에서 숲이 더 많다');
 assert.ok(mountainsTotal.surfaceMineral > plainsTotal.surfaceMineral,
   '산지는 표본 합계에서 표면 광상이 더 풍부하다');
+assert.ok(mountainsTotal.undergroundOreFootprint <= plainsTotal.undergroundOreFootprint * 1.15,
+  '산지 광맥의 점유 면적은 평원 대비 과도하게 늘지 않는다');
 assert.ok(mountainsTotal.undergroundOreCapacity > plainsTotal.undergroundOreCapacity,
-  '산지는 표본 합계에서 지하 광맥이 더 풍부하다');
+  '산지는 광맥 수보다 개별 매장량으로 지하 광물이 더 풍부하다');
 assert.ok(mountainsTotal.habitatCapacity > plainsTotal.habitatCapacity,
   '산지는 표본 합계에서 사냥 서식지 수용력이 더 크다');
 

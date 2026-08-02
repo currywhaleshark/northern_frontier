@@ -218,7 +218,7 @@ export function oreVeins(
   const mediumArea = MAP_SIZE_DIMENSIONS.medium.width * MAP_SIZE_DIMENSIONS.medium.height;
   const areaScale = Math.max(0.55, Math.sqrt(Math.max(1, width * height) / mediumArea));
   const perMineral = Math.max(1, Math.round(
-    (2 + Math.floor(rng() * 2)) * areaScale * (resolvedRegion === 'mountain' ? 1.5 : 1),
+    (2 + Math.floor(rng() * 2)) * areaScale * (resolvedRegion === 'mountain' ? 1.1 : 1),
   ));
   const minerals = [
     ...Array.from({ length: perMineral }, () => 'iron' as const),
@@ -233,11 +233,11 @@ export function oreVeins(
       cy: center.y,
       radius: Math.max(3, Math.round(
         (4 + rng() * 3) * Math.min(1.25, areaScale) *
-        (resolvedRegion === 'mountain' ? 1.1 : 1),
+        (resolvedRegion === 'mountain' ? 0.9 : 1),
       )),
       capacity: Math.round(
         (mineral === 'iron' ? 420 + rng() * 260 : 560 + rng() * 340) *
-        (resolvedRegion === 'mountain' ? 1.25 : 1),
+        (resolvedRegion === 'mountain' ? 1.4 : 1),
       ),
     };
   });
