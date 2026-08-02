@@ -226,6 +226,8 @@ function addBuiltMarket(state) {
   assert.deepEqual(loaded.expedition.memberIds, state.expedition.memberIds);
   assert.ok(loaded.expedition.memberIds.every(id =>
     loaded.residents.find(resident => resident.id === id)?.task === '토벌 출정'));
+  assert.equal(loaded.residents.find(resident => resident.id === loaded.expedition.memberIds[2])?.job, 'hunter',
+    'gathering assignment migration preserves an active expedition member job');
 
   delete state.expedition;
   delete state.raidHold;

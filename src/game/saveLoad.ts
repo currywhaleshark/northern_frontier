@@ -2892,6 +2892,13 @@ const GATHERING_ASSIGNMENT_BUILDINGS: Partial<Record<Resident['job'], readonly G
 export function migrateGatheringAssignments(state: GameState): { assigned: number; idled: number } {
   let assigned = 0;
   let idled = 0;
+  const activeDutyResidentIds = new Set([
+    ...(state.expedition?.memberIds ?? []),
+    ...(state.warDispatch?.memberIds ?? []),
+    ...(state.battle?.defenderIds ?? []),
+    ...(state.tacticalBattle?.defenderGroups.flatMap(group => group.residentIds) ?? []),
+    ...(state.siegeState?.defenderIds ?? []),
+  ]);
   const residents = [...state.residents].sort((a, b) => a.id - b.id);
   for (const resident of residents) {
     if (!resident.alive) continue;
@@ -2899,6 +2906,8 @@ export function migrateGatheringAssignments(state: GameState): { assigned: numbe
     if (!buildingTypes) continue;
     const current = assignedBuildingForResident(state, resident);
     if (current && buildingTypes.includes(current.type)) continue;
+    const activeDuty = activeDutyResidentIds.has(resident.id);
+    const activeDutyTask = resident.task;
     resident.assignedBuildingId = null;
     const candidates = state.buildings
       .filter(building => building.built && buildingTypes.includes(building.type))
@@ -2912,7 +2921,10 @@ export function migrateGatheringAssignments(state: GameState): { assigned: numbe
     resident.manualOrder = null;
     if (target) {
       assigned++;
-      resident.task = '가까운 채집 거점에 다시 배정됨';
+      resident.task = activeDuty ? activeDutyTask : '가까운 채집 거점에 다시 배정됨';
+    } else if (activeDuty) {
+      // 출정·전투 중인 주민은 임무와 직업을 보존한다. 복귀 뒤 플레이어가 새 거점을 배정할 수 있다.
+      continue;
     } else {
       resident.job = 'idle';
       resident.task = '채집 거점이 없어 무직 전환';

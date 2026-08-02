@@ -233,7 +233,27 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
       "when": "working"
     }
   ],
+  "deepMine": [
+    {
+      "kind": "craftGlint",
+      "fx": 0.35,
+      "fy": 0.72,
+      "dx": 0,
+      "dy": 0,
+      "scale": 1,
+      "when": "working"
+    }
+  ],
   "garrison": [
+    {
+      "kind": "windowGlow",
+      "fx": 0.5,
+      "fy": 0.42,
+      "dx": 4.2,
+      "dy": 10.3,
+      "scale": 1,
+      "when": "night"
+    },
     {
       "kind": "serviceGlow",
       "fx": 0.5,
@@ -489,6 +509,17 @@ export const BUILDING_EFFECT_TABLE: Partial<Record<BuildingTypeId, readonly Buil
     }
   ],
   "watermill": [
+    {
+      "kind": "craftGlint",
+      "fx": 0.35,
+      "fy": 0.72,
+      "dx": 0,
+      "dy": 0,
+      "scale": 1,
+      "when": "working"
+    }
+  ],
+  "woodShed": [
     {
       "kind": "craftGlint",
       "fx": 0.35,

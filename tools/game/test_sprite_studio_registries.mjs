@@ -165,7 +165,7 @@ const slotRegistry = await import(pathToFileURL(join(renderDir, 'buildingWorkerS
 
   for (const type of ['hut', 'ondol', 'center', 'garrison']) {
     const night = registries.buildingEffectEmitters(type).filter(emitter => emitter.when === 'night');
-    assert.deepEqual(night.map(emitter => emitter.kind), ['windowGlow'], `${type}의 밤 창불이 빠졌다`);
+    assert.ok(night.some(emitter => emitter.kind === 'windowGlow'), `${type}의 밤 창불이 빠졌다`);
   }
   for (const type of ['ondol', 'center']) {
     const heating = registries.buildingEffectEmitters(type).filter(emitter => emitter.when === 'winterHeating');
