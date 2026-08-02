@@ -98,7 +98,8 @@ export const GATE_CONVERSION_COSTS: Readonly<Record<SolidWallBuildingTypeId, Par
 export function builtWallTileMap(state: Pick<GameState, 'buildings'>): Map<string, BuildingTypeId> {
   const tiles = new Map<string, BuildingTypeId>();
   for (const building of state.buildings) {
-    if (building.built && isWallBuilding(building.type)) {
+    if (building.built && isWallBuilding(building.type) && building.breached !== true &&
+        (building.structureIntegrity == null || building.structureIntegrity > 0)) {
       tiles.set(wallTileKey(building.x, building.y), building.type);
     }
   }

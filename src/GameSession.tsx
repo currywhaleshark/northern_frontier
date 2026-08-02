@@ -7,7 +7,7 @@ import {
   advanceDay, advanceTick, autoAssignWorkersToBuildingTypes, cancelBuildingConstruction, continueAfterVictory, newGame, reassignJob, resolveChoice, setResidentJob,
   setBuildingCrop, setDryingProduct, setSmithyProduct, setTanneryProduct, issueResidentMoveOrder, issueResidentWorkOrder, upgradeHousingBuilding,
   assignPlotPlowOxen, defineStablePasture, expandAreaBuilding, setLivestockSpecies, slaughterLivestock,
-  buildingHasActiveWork, convertFieldToPaddy, setYouthActivity, startBuildingDemolition,
+  buildingHasActiveWork, convertFieldToPaddy, setYouthActivity, startBreachedWallRepair, startBuildingDemolition,
   startBuildingRelocation, togglePriorityBuilding, toggleResidentCart,
   startGateConversion, tryPlaceWallLine, unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
   CLEARING_APPROVAL_REQUIRED,
@@ -963,6 +963,13 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     bump();
   };
 
+  const handleStartBreachedWallRepair = (buildingId: number) => {
+    const err = startBreachedWallRepair(stateRef.current, buildingId);
+    if (err) notify(err, 'bad');
+    else playSfx('hammer');
+    bump();
+  };
+
   const handleBeginBuildingRelocation = (buildingId: number) => {
     const building = stateRef.current.buildings.find(candidate =>
       candidate.id === buildingId && candidate.built && candidate.type !== 'center');
@@ -1781,6 +1788,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               onDefinePasture={handleDefinePasture}
               onExpandArea={handleExpandArea}
               onStartBuildingDemolition={handleStartBuildingDemolition}
+              onStartBreachedWallRepair={handleStartBreachedWallRepair}
               onBeginBuildingRelocation={handleBeginBuildingRelocation}
               onRequestRoyalPlaqueInstallation={handleRequestRoyalPlaqueInstallation}
               onTogglePriorityBuilding={handleTogglePriorityBuilding}

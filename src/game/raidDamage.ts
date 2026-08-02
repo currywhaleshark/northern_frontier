@@ -4,6 +4,8 @@ import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import { lootLivestock } from './livestock';
 import { killResident, livingResidents, reconcileResidentHomes } from './residents';
+import { isWallBuilding } from './walls';
+import { bumpDefenseTopology } from './raidRoutes';
 import type {
   Building, BuildingRepairCause, BuildingTypeId, GameState, ResourceId,
 } from './types';
@@ -105,6 +107,7 @@ export function damageBuildings(state: GameState, rng: () => number, count: numb
   // 중심지는 파괴 대상에서 제외한다. 파손 건물은 철거하지 않고 건설담당이 복구한다.
   const candidates = state.buildings.filter(b => b.type !== 'center' && b.built);
   const damaged: BuildingTypeId[] = [];
+  let defenseTopologyChanged = false;
   for (let i = 0; i < count && candidates.length > 0; i++) {
     const idx = Math.floor(rng() * candidates.length);
     const b = candidates.splice(idx, 1)[0];
@@ -115,9 +118,11 @@ export function damageBuildings(state: GameState, rng: () => number, count: numb
     b.repairing = true;
     b.repairCause = 'raid';
     b.progress = def.buildDays * (min + rng() * Math.max(0, max - min));
+    if (isWallBuilding(b.type)) defenseTopologyChanged = true;
     damaged.push(b.type);
   }
   reconcileResidentHomes(state, rng);
+  if (defenseTopologyChanged) bumpDefenseTopology(state);
   return damaged;
 }
 
@@ -129,6 +134,7 @@ export function damageBuildingTargets(
   repairProgress?: { min: number; max: number },
 ): BuildingTypeId[] {
   const damaged: BuildingTypeId[] = [];
+  let defenseTopologyChanged = false;
   const seen = new Set<number>();
   for (const building of targets) {
     if (seen.has(building.id) || building.type === 'center' || !building.built) continue;
@@ -140,9 +146,11 @@ export function damageBuildingTargets(
     building.repairing = true;
     building.repairCause = repairCause;
     building.progress = def.buildDays * (min + rng() * Math.max(0, max - min));
+    if (isWallBuilding(building.type)) defenseTopologyChanged = true;
     damaged.push(building.type);
   }
   if (damaged.length > 0) reconcileResidentHomes(state, rng);
+  if (defenseTopologyChanged) bumpDefenseTopology(state);
   return damaged;
 }
 

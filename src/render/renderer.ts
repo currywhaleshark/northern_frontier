@@ -2469,6 +2469,20 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       () => {
         drawBuildingSprite(ctx, sprites, drawParams);
         occludedBuildingDraws.push(drawParams);
+        if (b.breached) {
+          ctx.save();
+          ctx.fillStyle = 'rgba(48, 38, 31, 0.5)';
+          ctx.fillRect(drawX + size * 0.08, drawY + size * 0.58, size * 0.84, size * 0.3);
+          ctx.strokeStyle = 'rgba(235, 184, 112, 0.9)';
+          ctx.lineWidth = Math.max(1.5, size * 0.055);
+          ctx.beginPath();
+          ctx.moveTo(drawX + size * 0.24, drawY + size * 0.3);
+          ctx.lineTo(drawX + size * 0.75, drawY + size * 0.8);
+          ctx.moveTo(drawX + size * 0.75, drawY + size * 0.3);
+          ctx.lineTo(drawX + size * 0.24, drawY + size * 0.8);
+          ctx.stroke();
+          ctx.restore();
+        }
         if (b.repairing) {
           sprites.drawBuildingDamage(ctx, { season, x: drawX, y: drawY, size });
           drawDamageSmoke(ctx, drawX, drawY, b.id, size / TILE);

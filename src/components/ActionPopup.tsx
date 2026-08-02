@@ -49,6 +49,7 @@ interface Props {
   onDefinePasture: (buildingId: number) => void;
   onExpandArea: (buildingId: number) => void;
   onStartBuildingDemolition: (buildingId: number) => void;
+  onStartBreachedWallRepair: (buildingId: number) => void;
   onBeginBuildingRelocation: (buildingId: number) => void;
   onRequestRoyalPlaqueInstallation: (buildingId: number) => void;
   onTogglePriorityBuilding: (buildingId: number) => void;
@@ -90,6 +91,7 @@ export function ActionPopup({
   onDefinePasture,
   onExpandArea,
   onStartBuildingDemolition,
+  onStartBreachedWallRepair,
   onBeginBuildingRelocation,
   onRequestRoyalPlaqueInstallation,
   onTogglePriorityBuilding,
@@ -115,7 +117,8 @@ export function ActionPopup({
   const centerTarget = building.type === 'center' ? nextRank(state.rank) : null;
   const centerReason = centerTarget ? centerPromotionUpgradeReason(state, building.id) : null;
   const activeBuildingWork = Boolean(
-    !building.built || building.repairing || building.expansion || building.workOrder || building.gateConversion,
+    !building.built || building.repairing || building.expansion || building.workOrder ||
+    building.gateConversion || building.structureRepair,
   );
   // 예전에는 특별한 조작이 없는 건물(초가집처럼 슬롯도 액션도 없는 것)에서 아무것도
   // 렌더하지 않아, 이전·해체 버튼까지 같이 사라졌다. 건물을 골랐으면 기본 정보와
@@ -237,6 +240,18 @@ export function ActionPopup({
         >
           <span>{state.priorityBuildingId === building.id ? '우선 공사 해제' : '우선 공사 지정'}</span>
           <div className="muted small">다음 출근 때도 최우선 작업</div>
+        </button>
+      )}
+
+      {building.built && building.breached === true && !building.structureRepair && (
+        <button
+          className="action-command"
+          type="button"
+          onClick={() => onStartBreachedWallRepair(building.id)}
+          title="자재를 투입하고 건축가가 수리를 마칠 때까지 잔해 통로는 열린 채로 유지됩니다"
+        >
+          <span>돌파 구간 수리</span>
+          <div className="muted small">침입자가 인접한 동안에는 시작할 수 없음</div>
         </button>
       )}
 

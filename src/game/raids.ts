@@ -3,13 +3,13 @@ import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { recordAnnals } from './annals';
 import { FACTIONS, RESOURCE_NAMES, type Faction } from './constants';
-import { computeDefense, countBuilt, footprintTilesOf } from './buildings';
+import { BUILDING_DEFS, computeDefense, countBuilt, footprintTilesOf } from './buildings';
 import { addLog } from './events';
 import { openGuideOnce } from './guides';
 import {
   applyBattleDefenseMultipliers, cannonBattleMult, consumeBattlePowder, levyDefenseBonus, startBattle,
 } from './battles';
-import { findPath, SUBTICKS } from './agents';
+import { SUBTICKS } from './agents';
 import { estimateExpeditionReturnTicks, orderExpeditionReturn } from './expedition';
 import { damageBuildings, injure, killResidents, loot, moraleShock } from './raidDamage';
 import { rankEffects } from './promotion';
@@ -17,9 +17,12 @@ import { changeRelation, getRelation, hostileRelationsAvg } from './relations';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
 import { getSeason, getYear } from './seasons';
 import type {
-  BattleMode, Building, ExpeditionRaidOrder, GameState, PendingChoice, TradeNegotiation,
+  BattleMode, Building, ExpeditionRaidOrder, GameState, PendingChoice, RaiderBand, RaidRoutePlan, TradeNegotiation,
 } from './types';
-import { isWallBuilding } from './walls';
+import {
+  bumpDefenseTopology, effectiveWallType, isBlockingDefenseWall, isRaidTileTraversable,
+  isProtectedBoundaryBreach, planRaidRoute, wallIntegrity, wallIntegrityMax,
+} from './raidRoutes';
 import { findRaidOriginSite } from './foreignSites';
 import { createTacticalBattle } from './tacticalBattle';
 import { activePredatorScoutIds } from './expeditionIntel';
@@ -161,6 +164,7 @@ function raiderPassable(state: GameState, x: number, y: number): boolean {
   if (t.buildingId != null) {
     const building = buildingAt(state, t.buildingId);
     if (building && raiderCanUseBuilding(building)) return true;
+    if (building?.breached === true && effectiveWallType(building)) return true;
     return false;
   }
   if (t.terrain === 'river') {
@@ -169,12 +173,85 @@ function raiderPassable(state: GameState, x: number, y: number): boolean {
   return true;
 }
 
-function raiderBuildingApproachGoal(state: GameState, building: Building): (tile: { x: number; y: number }) => boolean {
-  const footprint = footprintTilesOf(state, building) ?? [];
-  return tile =>
-    raiderPassable(state, tile.x, tile.y) &&
-    footprint.some(footprintTile =>
-      Math.max(Math.abs(footprintTile.x - tile.x), Math.abs(footprintTile.y - tile.y)) === 1);
+function centerApproachPlans(
+  state: GameState,
+  start: { x: number; y: number },
+  center: Building,
+  power: number,
+  options: { allowBlockedStart?: boolean } = {},
+): Array<{ plan: RaidRoutePlan; target: { x: number; y: number } }> {
+  const footprint = footprintTilesOf(state, center) ?? [{ x: center.x, y: center.y }];
+  const seen = new Set<string>();
+  const candidates: Array<{ x: number; y: number }> = [];
+  for (const tile of footprint) {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const x = tile.x + dx;
+        const y = tile.y + dy;
+        const key = `${x},${y}`;
+        if (seen.has(key) || footprint.some(part => part.x === x && part.y === y)) continue;
+        seen.add(key);
+        if (isRaidTileTraversable(state, x, y, true)) candidates.push({ x, y });
+      }
+    }
+  }
+  return candidates.flatMap(target => {
+    const plan = planRaidRoute(state, start, target, power, options);
+    return plan ? [{ plan, target }] : [];
+  }).sort((a, b) => a.plan.totalCost - b.plan.totalCost);
+}
+
+function applyRaidPlan(
+  state: GameState,
+  band: RaiderBand,
+  plan: RaidRoutePlan,
+  target: { x: number; y: number },
+): void {
+  band.route = plan;
+  band.path = [...plan.steps];
+  band.routeTarget = target;
+  band.routeRevision = state.defenseTopologyRevision;
+  band.phase = 'approaching';
+  delete band.breachTargetId;
+}
+
+function replanRaidBand(state: GameState, band: RaiderBand): boolean {
+  if (!band.routeTarget) return false;
+  const plan = planRaidRoute(state, { x: band.x, y: band.y }, band.routeTarget, band.power);
+  if (!plan) return false;
+  applyRaidPlan(state, band, plan, band.routeTarget);
+  const center = state.buildings.find(building => building.type === 'center');
+  band.siege = !!center && plan.kind === 'assault' &&
+    isProtectedBoundaryBreach(state, center, plan.breaches[0]);
+  return true;
+}
+
+function breachDamagePerTick(state: GameState, band: RaiderBand): number {
+  const weatherMultiplier = CONFIG.raidPathing.breachWeatherMultiplier[state.weather];
+  return Math.max(CONFIG.raidPathing.minimumBreachDamage,
+    band.power * CONFIG.raidPathing.breachDamagePerPower) * weatherMultiplier;
+}
+
+function advanceRaidBreach(state: GameState, band: RaiderBand, building: Building): boolean {
+  const starting = band.phase !== 'breaching' || band.breachTargetId !== building.id;
+  band.phase = 'breaching';
+  band.breachTargetId = building.id;
+  building.structureIntegrityMax = wallIntegrityMax(building);
+  building.structureIntegrity = wallIntegrity(building);
+  if (starting) {
+    addLog(state, `${withJosa(factionRaidPartyLabel(state, band.faction), '이/가')} ${BUILDING_DEFS[effectiveWallType(building)!].name} 구간을 부수기 시작했습니다.`, 'raid', true);
+  }
+  building.structureIntegrity = Math.max(0, building.structureIntegrity - breachDamagePerTick(state, band));
+  if (building.structureIntegrity > 0) return false;
+  building.breached = true;
+  delete building.structureRepair;
+  band.phase = 'approaching';
+  delete band.breachTargetId;
+  bumpDefenseTopology(state);
+  state.resources.defense = computeDefense(state);
+  addLog(state, `${BUILDING_DEFS[effectiveWallType(building)!].name} 구간이 돌파되어 잔해 통로가 열렸습니다.`, 'raid', true);
+  return true;
 }
 
 // 습격 발생 판정: 성사되면 지도 가장자리에 습격 무리가 나타나 마을로 접근한다
@@ -230,16 +307,11 @@ export function spawnRaiders(
   const h = state.map.length, w = state.map[0]?.length ?? 0;
   if (w <= 0 || h <= 0) return;
 
-  // 방책이 마을을 완전히 두르고 있으면 중심지까지의 길이 없다 → 방책 앞 공성
-  const barrierTiles = new Set(
-    state.buildings.filter(b => b.built && isWallBuilding(b.type)).map(b => b.y * w + b.x));
-  const nearBarrier = (tx: number, ty: number) =>
-    [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]
-      .some(([dx, dy]) => barrierTiles.has((ty + dy) * w + (tx + dx)));
-
   let spawn: { x: number; y: number } | null = null;
   let path: { x: number; y: number }[] | null = null;
   let siege = false;
+  let route: RaidRoutePlan | undefined;
+  let routeTarget: { x: number; y: number } | undefined;
   let originUsed = false;
   const originSite = findRaidOriginSite(state, faction.name);
   if (originSite) {
@@ -257,13 +329,13 @@ export function spawnRaiders(
     }
     starts.sort((a, b) => a.order - b.order);
     for (const start of starts) {
-      const pass = (x: number, y: number) => originPassable(x, y);
-      path = findPath(state, start.x, start.y, raiderBuildingApproachGoal(state, center), pass);
-      if (!path && barrierTiles.size > 0) {
-        path = findPath(state, start.x, start.y, tile => nearBarrier(tile.x, tile.y), pass);
-        siege = !!path;
-      }
-      if (path) {
+      const planned = centerApproachPlans(state, start, center, power, { allowBlockedStart: true })[0];
+      if (planned) {
+        path = planned.plan.steps;
+        route = planned.plan;
+        routeTarget = planned.target;
+        siege = planned.plan.kind === 'assault' &&
+          isProtectedBoundaryBreach(state, center, planned.plan.breaches[0]);
         spawn = { x: start.x, y: start.y };
         originUsed = true;
         originSite.lastRaidDay = state.day;
@@ -277,15 +349,15 @@ export function spawnRaiders(
     else if (rng() < 0.5) { sx = 0; sy = Math.floor(rng() * h * 0.5); }      // 서쪽 상단
     else { sx = w - 1; sy = Math.floor(rng() * h * 0.5); }                   // 동쪽 상단
     if (!raiderPassable(state, sx, sy)) continue;
-    const pass = (x: number, y: number) => raiderPassable(state, x, y);
-    // 1순위: 중심지까지 직접 (방책에 틈이 있으면 돌아 들어온다)
-    path = findPath(state, sx, sy, raiderBuildingApproachGoal(state, center), pass);
-    // 2순위: 길이 막혔으면 방책에 붙은 타일까지 가서 공성
-    if (!path && barrierTiles.size > 0) {
-      path = findPath(state, sx, sy, tile => nearBarrier(tile.x, tile.y), pass);
-      siege = !!path;
+    const planned = centerApproachPlans(state, { x: sx, y: sy }, center, power)[0];
+    if (planned) {
+      path = planned.plan.steps;
+      route = planned.plan;
+      routeTarget = planned.target;
+      siege = planned.plan.kind === 'assault' &&
+        isProtectedBoundaryBreach(state, center, planned.plan.breaches[0]);
+      spawn = { x: sx, y: sy };
     }
-    if (path) spawn = { x: sx, y: sy };
   }
   if (!spawn || !path) {
     // 완전히 막힌 지도에서도 선택 모달은 습격대를 마을 외곽에 배치한 뒤 연다.
@@ -322,6 +394,10 @@ export function spawnRaiders(
     warned,
     spotted: warned,
     siege,
+    phase: 'approaching',
+    route,
+    routeRevision: state.defenseTopologyRevision,
+    routeTarget,
     speed: warned ? CONFIG.raid.raiderSpeedWarned : CONFIG.raid.raiderSpeedSurprise,
     trail: [],
   };
@@ -340,9 +416,38 @@ export function raidersTick(state: GameState, rng: () => number): void {
   band.py = band.y;
   if (state.raidHold) return;
   if (state.battle) return; // 전투 중엔 무리가 전선에 묶인다
+  if (band.route && band.routeRevision !== state.defenseTopologyRevision) {
+    replanRaidBand(state, band);
+  }
   let steps = Math.floor(band.speed) + (rng() < band.speed % 1 ? 1 : 0);
   while (steps-- > 0 && band.path.length > 0) {
-    const next = band.path.shift()!;
+    const next = band.path[0];
+    const nextBuildingId = state.map[next.y]?.[next.x]?.buildingId;
+    const nextBuilding = nextBuildingId == null ? undefined : buildingAt(state, nextBuildingId);
+    if (nextBuilding && isBlockingDefenseWall(nextBuilding)) {
+      if (band.route?.kind !== 'assault') {
+        if (!replanRaidBand(state, band)) {
+          openRaidChoice(state, rng, band.warned, band.power, band.faction, band.siege);
+          return;
+        }
+        continue;
+      }
+      if (band.siege) {
+        addLog(state, `${withJosa(factionRaidPartyLabel(state, band.faction), '이/가')} 방책 앞에서 멈춰 섰습니다. 보호된 중심지로 통하는 길이 막혔습니다.`, 'raid');
+        openRaidChoice(state, rng, band.warned, band.power, band.faction, true);
+        return;
+      }
+      advanceRaidBreach(state, band, nextBuilding);
+      return;
+    }
+    if (!isRaidTileTraversable(state, next.x, next.y, band.route?.kind === 'assault')) {
+      if (!replanRaidBand(state, band)) {
+        openRaidChoice(state, rng, band.warned, band.power, band.faction, band.siege);
+        return;
+      }
+      continue;
+    }
+    band.path.shift();
     // 지나온 자취를 남긴다 (겨울 눈밭 발자국)
     if (!band.trail) band.trail = [];
     band.trail.push({ x: band.x, y: band.y });
@@ -356,7 +461,11 @@ export function raidersTick(state: GameState, rng: () => number): void {
     band.spotted = true;
     addLog(state, `경계병이 접근하는 무장 무리를 발견했습니다! ${withJosa(factionRaidPartyLabel(state, band.faction), '으로/로')} 보입니다.`, 'raid');
   }
-  if (band.path.length === 0 || dist <= CONFIG.raid.arriveDistance) {
+  const remainingBlockingBreach = band.route?.breaches.some(breach => {
+    const building = buildingAt(state, breach.buildingId);
+    return !!building && isBlockingDefenseWall(building);
+  }) ?? false;
+  if (band.path.length === 0 || (dist <= CONFIG.raid.arriveDistance && !remainingBlockingBreach)) {
     if (band.siege) {
       addLog(state, `${withJosa(factionRaidPartyLabel(state, band.faction), '이/가')} 방책 앞에서 멈춰 섰습니다. 목책과 토성이 그들을 가로막고 있습니다.`, 'raid');
     }

@@ -1013,7 +1013,7 @@ export function computeDefense(
   }
   let d = 0;
   for (const b of state.buildings) {
-    if (!b.built) continue;
+    if (!b.built || b.breached === true || (b.structureIntegrity != null && b.structureIntegrity <= 0)) continue;
     const defenseType = b.type === 'gate' && b.gateWallType ? b.gateWallType : b.type;
     d += BUILDING_DEFS[defenseType].defense;
   }

@@ -67,6 +67,7 @@ import { DRYING_PRODUCT_DEFS } from './preservation';
 import { haulerCarryCapacity, returnResidentCart, setResidentCartEquipped } from './equipment';
 import { reconcileMountAssignments, reconcileWeaponAssignments, setAutomaticWeaponAllocation } from './weapons';
 import { CURRENT_SCHEMA_VERSION } from './saveSchema';
+import { bumpDefenseTopology, effectiveWallType, initializeWallIntegrity } from './raidRoutes';
 import { expeditionTick } from './expedition';
 import {
   maybeOpenExpeditionEngagementChoice, resolveExpeditionEngagementChoice,
@@ -164,6 +165,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
     territoryViolations: [],
     residents: [],
     buildings: [],
+    defenseTopologyRevision: 0,
     priorityBuildingId: null,
     nextBuildingId: 1,
     nextResidentId: 1,
@@ -601,6 +603,7 @@ export function demolishBuilding(state: GameState, x: number, y: number): string
   clearAssignmentsForBuilding(state, building.id);
   clearLodgingLinksForBuilding(state, building.id);
   state.buildings = state.buildings.filter(b => b.id !== building.id);
+  bumpDefenseTopology(state);
   cleanupRoyalPlaqueAfterBuildingRemoval(state, building.id);
   reconcileMountAssignments(state);
   state.resources.defense = computeDefense(state);
@@ -1153,7 +1156,8 @@ export function buildingHasActiveWork(building: Building): boolean {
     building.repairing === true ||
     building.expansion != null ||
     building.workOrder != null ||
-    building.gateConversion != null;
+    building.gateConversion != null ||
+    building.structureRepair != null;
 }
 
 export function startBuildingDemolition(state: GameState, buildingId: number): string | null {
@@ -1163,9 +1167,10 @@ export function startBuildingDemolition(state: GameState, buildingId: number): s
   if (state.royalPlaqueBuildingId === building.id) {
     return '왕이 내린 사액 현판이 걸린 건물은 해체할 수 없습니다.';
   }
-  if (building.expansion || building.workOrder || building.repairing || building.gateConversion) return '진행 중인 작업이 끝난 뒤 해체할 수 있습니다.';
+  if (building.expansion || building.workOrder || building.repairing || building.gateConversion || building.structureRepair) return '진행 중인 작업이 끝난 뒤 해체할 수 있습니다.';
   const def = BUILDING_DEFS[building.type];
   building.built = false;
+  if (isWallBuilding(building.type)) bumpDefenseTopology(state);
   building.workOrder = {
     kind: 'demolish',
     phase: 'dismantling',
@@ -1192,7 +1197,7 @@ export function startBuildingRelocation(
   if (state.royalPlaqueBuildingId === building.id) {
     return '왕이 내린 사액 현판이 걸린 건물은 이전할 수 없습니다.';
   }
-  if (building.expansion || building.workOrder || building.repairing) return '진행 중인 작업이 끝난 뒤 이전할 수 있습니다.';
+  if (building.expansion || building.workOrder || building.repairing || building.structureRepair) return '진행 중인 작업이 끝난 뒤 이전할 수 있습니다.';
   const { w, h } = buildingFootprintDims(building);
   if (!isBuildingFootprintExplored(state, building.type, x, y, w, h)) return '아직 답사하지 않은 곳입니다.';
   const destinationTiles = buildingFootprintTiles(state, building.type, x, y, w, h) ?? [];
@@ -1212,6 +1217,7 @@ export function startBuildingRelocation(
 
   const def = BUILDING_DEFS[building.type];
   building.built = false;
+  if (isWallBuilding(building.type)) bumpDefenseTopology(state);
   building.workOrder = {
     kind: 'relocate',
     phase: 'dismantling',
@@ -1228,6 +1234,37 @@ export function startBuildingRelocation(
       : `${def.name} 이전을 시작했습니다. 건축가가 기존 건물을 해체한 뒤 새 위치에 자재 비용 없이 다시 짓습니다.`,
     'info',
   );
+  return null;
+}
+
+export function startBreachedWallRepair(state: GameState, buildingId: number): string | null {
+  const building = getBuilding(state, buildingId);
+  const wallType = building ? effectiveWallType(building) : null;
+  if (!building || !wallType || !building.built || building.breached !== true) {
+    return '돌파된 성벽이나 성문을 선택해야 합니다.';
+  }
+  if (building.structureRepair || building.gateConversion || building.workOrder || building.repairing) {
+    return '이미 다른 작업이 진행 중입니다.';
+  }
+  const band = state.raiders;
+  if (band && Math.max(Math.abs(band.x - building.x), Math.abs(band.y - building.y)) <= 1) {
+    return '침입자가 차지했거나 바로 인접한 구간은 수리할 수 없습니다.';
+  }
+  const paidCost: Partial<Record<ResourceId, number>> = { ...CONFIG.raidPathing.repairCost[wallType] };
+  if (!canAffordCost(state, paidCost)) return '성벽 수리에 필요한 자원이 부족합니다.';
+  for (const [resource, amount] of Object.entries(paidCost)) {
+    state.resources[resource as ResourceId] -= amount ?? 0;
+  }
+  initializeWallIntegrity(building);
+  building.breached = true;
+  building.structureIntegrity = 0;
+  building.structureRepair = {
+    progress: 0,
+    required: Math.max(1, BUILDING_DEFS[wallType].buildDays * CONFIG.raidPathing.repairBuildDaysMultiplier),
+    paidCost,
+  };
+  state.priorityBuildingId = building.id;
+  addLog(state, `${BUILDING_DEFS[wallType].name} 돌파 구간의 수리를 시작했습니다. 완공될 때까지 길은 열린 채입니다.`, 'info');
   return null;
 }
 
@@ -1589,6 +1626,7 @@ function regrowForest(state: GameState, rng: () => number, season: Season): void
     for (let x = 0; x < row.length; x++) {
       const t = row[x];
       if (t.terrain === 'forest') {
+        const wasMature = t.treeStage === 'mature' || t.treeStage == null;
         advanceForestGrowth(
           t,
           season,
@@ -1596,6 +1634,7 @@ function regrowForest(state: GameState, rng: () => number, season: Season): void
           CONFIG.agents.forestStumpSproutChance,
           CONFIG.agents.forestYoungMatureChance,
         );
+        if (!wasMature && t.treeStage === 'mature') bumpDefenseTopology(state);
         continue;
       }
       if (t.terrain !== 'plain' || t.buildingId != null) continue;

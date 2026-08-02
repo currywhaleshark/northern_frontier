@@ -71,6 +71,7 @@ interface Props {
   onDefinePasture: (buildingId: number) => void;
   onExpandArea: (buildingId: number) => void;
   onStartBuildingDemolition: (buildingId: number) => void;
+  onStartBreachedWallRepair: (buildingId: number) => void;
   onBeginBuildingRelocation: (buildingId: number) => void;
   onRequestRoyalPlaqueInstallation: (buildingId: number) => void;
   onTogglePriorityBuilding: (buildingId: number) => void;
@@ -329,6 +330,7 @@ export function SelectionContextBar({
   onDefinePasture,
   onExpandArea,
   onStartBuildingDemolition,
+  onStartBreachedWallRepair,
   onBeginBuildingRelocation,
   onRequestRoyalPlaqueInstallation,
   onTogglePriorityBuilding,
@@ -553,6 +555,10 @@ export function SelectionContextBar({
                               ? `벌목 대기 · 나무 ${pendingClearingTiles(state, building).length}그루`
                               : building.gateConversion
                               ? `성문 전환 중 ${Math.floor((building.gateConversion.progress / Math.max(1, building.gateConversion.required)) * 100)}% · 기존 ${BUILDING_DEFS[building.gateConversion.wallType].name} 차단 유지`
+                              : building.structureRepair
+                              ? `돌파 구간 수리 중 ${Math.floor((building.structureRepair.progress / Math.max(1, building.structureRepair.required)) * 100)}% · 통행 가능`
+                              : building.breached
+                              ? '돌파됨 · 잔해 통로'
                               : building.workOrder
                               ? `${building.workOrder.kind === 'demolish'
                                 ? '해체 중'
@@ -564,6 +570,9 @@ export function SelectionContextBar({
                               : mineCollapseRepairLocked(state, building)
                                 ? '갱도 붕괴 · 매몰자 구조 중 · 수리 대기'
                                 : `${building.repairing ? '수리 중' : '건설 중'} ${Math.floor((building.progress / Math.max(1, def.buildDays)) * 100)}%`}</td></tr>
+                            {building.structureIntegrityMax != null && (
+                              <tr><td>구조 내구</td><td>{Math.max(0, Math.ceil(building.structureIntegrity ?? building.structureIntegrityMax))}/{building.structureIntegrityMax}</td></tr>
+                            )}
                             {state.priorityBuildingId === building.id && (
                               <tr><td>공사 순위</td><td>최우선</td></tr>
                             )}
@@ -740,6 +749,7 @@ export function SelectionContextBar({
                 onDefinePasture={onDefinePasture}
                 onExpandArea={onExpandArea}
                 onStartBuildingDemolition={onStartBuildingDemolition}
+                onStartBreachedWallRepair={onStartBreachedWallRepair}
                 onBeginBuildingRelocation={onBeginBuildingRelocation}
                 onRequestRoyalPlaqueInstallation={onRequestRoyalPlaqueInstallation}
                 onTogglePriorityBuilding={onTogglePriorityBuilding}

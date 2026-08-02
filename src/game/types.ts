@@ -490,6 +490,12 @@ export interface GateConversion {
   paidCost: Partial<Record<ResourceId, number>>;
 }
 
+export interface StructureRepair {
+  progress: number;
+  required: number;
+  paidCost: Partial<Record<ResourceId, number>>;
+}
+
 export interface WeirReservoirTile {
   x: number;
   y: number;
@@ -532,6 +538,10 @@ export interface Building {
   workOrder?: BuildingWorkOrder; // 건축가가 수행하는 해체 또는 이전 공사
   gateWallType?: SolidWallBuildingTypeId; // 성문 전용: 전환 전 벽 등급
   gateConversion?: GateConversion; // 완공 벽을 막힌 상태로 유지하며 진행하는 성문 전환 공사
+  structureIntegrity?: number; // P2 성벽·성문의 현재 구조 내구
+  structureIntegrityMax?: number; // 기반 벽 등급에서 정한 최대 구조 내구
+  breached?: boolean; // 내구가 0이 되어 양쪽 모두 통과 가능한 잔해가 된 상태
+  structureRepair?: StructureRepair; // 돌파 잔해를 다시 차단 상태로 되돌리는 건축가 공사
   weirReservoir?: WeirReservoirState; // 보 전용: 상류 영구 침수 칸과 원래 지형
   leveeEdge?: 'n' | 'e' | 's' | 'w'; // 제방 전용: 강 타일에서 둑이 붙는 육지 쪽 변
   graves?: number; // 묘역 전용: 안장된 묘 수 (한 타일의 2×2 소구획에 최대 4기)
@@ -968,6 +978,19 @@ export interface TradeContract {
   lastSettledYear: number;             // 그해 몫을 이행·부분이행·불이행으로 매듭지은 연도
 }
 
+export interface RaidBreach {
+  buildingId: number;
+  x: number;
+  y: number;
+}
+
+export interface RaidRoutePlan {
+  steps: Array<{ x: number; y: number }>;
+  breaches: RaidBreach[];
+  totalCost: number;
+  kind: 'open' | 'assault';
+}
+
 // 지도 위를 이동하는 습격 무리
 export interface RaiderBand {
   x: number;
@@ -981,6 +1004,11 @@ export interface RaiderBand {
   warned: boolean;   // 봉수/망루 조기 경보를 받았는지
   spotted: boolean;  // 접근 발견 로그를 이미 띄웠는지
   siege: boolean;    // 목책에 막혀 공성 중인지
+  phase?: 'approaching' | 'breaching';
+  route?: RaidRoutePlan;
+  routeRevision?: number;
+  routeTarget?: { x: number; y: number };
+  breachTargetId?: number;
   speed: number;     // 서브틱당 이동 타일
   trail: { x: number; y: number }[]; // 지나온 자취 (눈밭 발자국 렌더링용)
 }
@@ -1833,6 +1861,7 @@ export interface GameState {
   territoryViolations: TerritoryViolation[];
   residents: Resident[];
   buildings: Building[];
+  defenseTopologyRevision: number; // 성벽·성목 등 침입 경로 비용 지형의 변경 번호
   priorityBuildingId?: number | null; // 건설·수리·확장·해체·이전 중 최우선 작업
   nextBuildingId: number;
   nextResidentId: number;

@@ -50,6 +50,7 @@ import {
   syncTacticalRouteVisibility,
 } from './tacticalRoutes';
 import { isYouthWorkJob } from './youth';
+import { initializeWallIntegrity } from './raidRoutes';
 import { normalizeResidentFamilyReferences } from './family';
 import { normalizeResidentWearables, TANNERY_PRODUCT_DEFS } from './wearables';
 import { withJosa } from './josa';
@@ -825,6 +826,12 @@ export function migrateV52ToV53(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), guides: { enabled: false, seen: {} }, schemaVersion: 53 };
 }
 
+// v54: 방어 지형 revision과 성벽 구조 내구. 구 습격의 siege/path는 그대로 두고
+// 새 경로·돌파 단계는 로드 중 임의로 만들지 않는다.
+export function migrateV53ToV54(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), defenseTopologyRevision: 0, schemaVersion: 54 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -883,6 +890,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 50) migrated = migrateV50ToV51(migrated);
     else if (version === 51) migrated = migrateV51ToV52(migrated);
     else if (version === 52) migrated = migrateV52ToV53(migrated);
+    else if (version === 53) migrated = migrateV53ToV54(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -2330,6 +2338,9 @@ export function loadGame(slot = 1): GameState | null {
     parsed.unlockedLivestock = Array.isArray(parsed.unlockedLivestock)
       ? parsed.unlockedLivestock.filter(isImplementedLivestockId)
       : [];
+    parsed.defenseTopologyRevision = Number.isFinite(Number(parsed.defenseTopologyRevision))
+      ? Math.max(0, Math.floor(Number(parsed.defenseTopologyRevision)))
+      : 0;
     if (!parsed.unlockedLivestock.includes('chicken')) parsed.unlockedLivestock.push('chicken');
     for (const building of parsed.buildings) {
       if (building.built) building.repairing = false;
@@ -2356,6 +2367,29 @@ export function loadGame(slot = 1): GameState | null {
       } else {
         delete building.gateConversion;
         delete building.gateWallType;
+      }
+      if (building.type === 'palisade' || building.type === 'earthFort' ||
+          building.type === 'stoneWall' || building.type === 'gate') {
+        initializeWallIntegrity(building);
+        if (building.structureRepair) {
+          const repair = building.structureRepair;
+          const progress = Number(repair.progress);
+          const required = Number(repair.required);
+          if (!building.breached || !Number.isFinite(progress) || !Number.isFinite(required) || required <= 0 ||
+              !repair.paidCost || typeof repair.paidCost !== 'object') {
+            delete building.structureRepair;
+          } else {
+            repair.progress = Math.max(0, Math.min(required, progress));
+            repair.required = required;
+            repair.paidCost = Object.fromEntries(Object.entries(repair.paidCost)
+              .filter(([, amount]) => typeof amount === 'number' && Number.isFinite(amount) && amount >= 0));
+          }
+        }
+      } else {
+        delete building.structureIntegrity;
+        delete building.structureIntegrityMax;
+        delete building.breached;
+        delete building.structureRepair;
       }
       if (building.workOrder) {
         const order = building.workOrder;
@@ -2455,9 +2489,48 @@ export function loadGame(slot = 1): GameState | null {
     normalizeRoyalPlaqueBinding(parsed);
     const priorityBuilding = parsed.buildings.find(building => building.id === parsed.priorityBuildingId);
     parsed.priorityBuildingId = priorityBuilding &&
-      (!priorityBuilding.built || priorityBuilding.repairing || priorityBuilding.expansion || priorityBuilding.workOrder || priorityBuilding.gateConversion)
+      (!priorityBuilding.built || priorityBuilding.repairing || priorityBuilding.expansion || priorityBuilding.workOrder ||
+        priorityBuilding.gateConversion || priorityBuilding.structureRepair)
       ? priorityBuilding.id
       : null;
+    if (parsed.raiders) {
+      const band = parsed.raiders;
+      band.path = Array.isArray(band.path) ? band.path.filter(step => Number.isFinite(step?.x) && Number.isFinite(step?.y)) : [];
+      band.trail = Array.isArray(band.trail) ? band.trail.slice(-30) : [];
+      band.phase = band.phase === 'breaching' ? 'breaching' : 'approaching';
+      if (!Number.isFinite(band.routeRevision)) delete band.routeRevision;
+      else band.routeRevision = Math.max(0, Math.floor(band.routeRevision!));
+      if (!band.routeTarget || !Number.isFinite(band.routeTarget.x) || !Number.isFinite(band.routeTarget.y)) {
+        delete band.routeTarget;
+      }
+      if (!Number.isInteger(band.breachTargetId) ||
+          !parsed.buildings.some(building => building.id === band.breachTargetId && building.breached !== true)) {
+        delete band.breachTargetId;
+        if (band.phase === 'breaching') band.phase = 'approaching';
+      }
+      const route = band.route;
+      if (!route || (route.kind !== 'open' && route.kind !== 'assault') || !Array.isArray(route.steps) ||
+          !Array.isArray(route.breaches) || !Number.isFinite(route.totalCost)) {
+        delete band.route;
+      } else {
+        route.steps = route.steps.filter(step => Number.isFinite(step?.x) && Number.isFinite(step?.y) &&
+          parsed.map[Math.floor(step.y)]?.[Math.floor(step.x)] != null)
+          .map(step => ({ x: Math.floor(step.x), y: Math.floor(step.y) }));
+        const seenBreaches = new Set<number>();
+        route.breaches = route.breaches.filter(breach => {
+          if (!Number.isInteger(breach?.buildingId) || seenBreaches.has(breach.buildingId)) return false;
+          const building = parsed.buildings.find(candidate => candidate.id === breach.buildingId);
+          if (!building || building.breached === true || !Number.isFinite(breach.x) || !Number.isFinite(breach.y)) return false;
+          seenBreaches.add(breach.buildingId);
+          return true;
+        }).map(breach => ({
+          buildingId: breach.buildingId,
+          x: Math.floor(breach.x),
+          y: Math.floor(breach.y),
+        }));
+        route.totalCost = Math.max(0, route.totalCost);
+      }
+    }
     ensureProcessingReserves(parsed);
     if (parsed.lastPetitionDay == null) parsed.lastPetitionDay = 0;
     if (parsed.cannonsGranted == null) parsed.cannonsGranted = 0;

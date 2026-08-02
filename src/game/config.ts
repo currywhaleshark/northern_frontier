@@ -977,6 +977,25 @@ export const CONFIG = {
     repairProgressMax: 0.6,   // 파손 직후 남는 공정률 상한
   },
 
+  raidPathing: {
+    matureForestCostMultiplier: 1.8,
+    detourRatio: { small: 2.0, medium: 1.5, large: 1.2 },
+    integrityMax: { palisade: 60, earthFort: 150, stoneWall: 260 },
+    breachCostMultiplier: { palisade: 1, earthFort: 1.5, stoneWall: 2.2 },
+    breachDamagePerPower: 1 / 30,
+    minimumBreachDamage: 0.5,
+    breachWeatherMultiplier: {
+      clear: 1, rain: 0.85, frost: 1, heavySnow: 0.75,
+      blizzard: 0.55, coldSnap: 0.75, thawFlood: 0.85,
+    },
+    repairCost: {
+      palisade: { wood: 2 },
+      earthFort: { wood: 3, stone: 3 },
+      stoneWall: { stone: 4, tools: 1 },
+    },
+    repairBuildDaysMultiplier: 0.5,
+  },
+
   tacticalBattle: {
     maxRounds: 5,
     hunt: {

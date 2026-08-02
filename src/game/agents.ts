@@ -45,7 +45,8 @@ import {
   craftStrawShoesAtHome, equipMissingWearables, footwearCoverageTotal,
   normalizeWearableResourceStocks, residentFootwearMoveMultiplier, resolvedTanneryProduct, TANNERY_PRODUCT_DEFS,
 } from './wearables';
-import { isGateBuilding } from './walls';
+import { isGateBuilding, isWallBuilding } from './walls';
+import { bumpDefenseTopology, wallIntegrityMax } from './raidRoutes';
 import {
   ensureLivestockState, hayFromHarvestProgress, livestockProductForHerder, plotWorkMultiplier,
 } from './livestock';
@@ -192,7 +193,9 @@ export function isTerrainPassable(state: GameState, x: number, y: number): boole
   if (!t) return false;
   if (isSpringFloodedTile(state, x, y)) return false;
   const building = buildingAtTile(state, t);
-  if (building && !isPassableBuilding(building.type) && !isBuildingUpperPassageTile(building, x, y)) return false;
+  const breachedPassage = building?.breached === true && isWallBuilding(building.type);
+  if (building && !breachedPassage && !isPassableBuilding(building.type) &&
+      !isBuildingUpperPassageTile(building, x, y)) return false;
   if (t.terrain === 'mountain') return false;
   if (t.terrain === 'river') {
     if (building && (building.type === 'bridge' || building.type === 'ferry' || building.type === 'dock')) return true;
@@ -1275,6 +1278,7 @@ function clearingWoodcutterTick(state: GameState, r: Resident, ctx: Ctx, siteId:
       if (!felled) return;
       felled.terrain = 'plain';
       clearTreeStage(felled);
+      bumpDefenseTopology(state);
     },
   });
 }
@@ -1315,7 +1319,7 @@ function woodcutterTick(state: GameState, r: Resident, ctx: Ctx, skipClearing = 
       addCarry(worker, 'brushwood', woodAmount * CONFIG.production.brushwoodPerWood);
       // 성목을 반복 벌목하면 이따금 그루터기 단계로 내려가고 재성장을 기다린다.
       if (tile.buildingId == null) {
-        markForestHarvest(tile, ctx.rng, a.forestDepleteChance);
+        if (markForestHarvest(tile, ctx.rng, a.forestDepleteChance)) bumpDefenseTopology(state);
       }
     },
   });
@@ -1587,6 +1591,11 @@ function isConstructionForJob(state: GameState, building: Building, job: 'farmer
   if (mineCollapseRepairLocked(state, building)) return false;
   if (building.workOrder) return job === 'builder';
   if (building.gateConversion) return job === 'builder';
+  if (building.structureRepair) {
+    const band = state.raiders;
+    const contested = !!band && Math.max(Math.abs(band.x - building.x), Math.abs(band.y - building.y)) <= 1;
+    return job === 'builder' && !contested;
+  }
   if (building.repairing) return job === 'builder';
   const requiredJob = isPlotBuildingType(building.type) ? 'farmer' : 'builder';
   return requiredJob === job && (!building.built || building.expansion != null);
@@ -1674,6 +1683,12 @@ function advanceBuildingWorkOrder(state: GameState, building: Building, ctx: Ctx
   }
 
   building.built = true;
+  if (isWallBuilding(building.type)) {
+    building.structureIntegrityMax = wallIntegrityMax(building);
+    building.structureIntegrity = building.structureIntegrityMax;
+    building.breached = false;
+    bumpDefenseTopology(state);
+  }
   delete building.workOrder;
   noteProximityBuildingCompletion(state, building);
   initializeWeirReservoir(state, building);
@@ -1693,6 +1708,7 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
     r.phase = 'working';
     r.task = target.gateConversion
       ? '성문 전환 중'
+      : target.structureRepair ? '돌파 성벽 수리 중'
       : target.workOrder
       ? target.workOrder.phase === 'rebuilding' ? '이전 재건축 중' : '건물 해체 중'
       : expansion ? '영역 확장 중'
@@ -1709,9 +1725,27 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
         target.gateWallType = conversion.wallType;
         target.progress = BUILDING_DEFS.gate.buildDays;
         delete target.gateConversion;
+        target.structureIntegrityMax = wallIntegrityMax(target);
+        target.structureIntegrity = target.structureIntegrityMax;
+        bumpDefenseTopology(state);
         if (state.priorityBuildingId === target.id) state.priorityBuildingId = null;
         state.resources.defense = computeDefense(state);
         addLog(state, `${BUILDING_DEFS[conversion.wallType].name} 구간의 성문 전환이 끝났습니다.`, 'good', true);
+      }
+      return;
+    }
+    if (target.structureRepair) {
+      const repair = target.structureRepair;
+      repair.progress += work;
+      if (repair.progress >= repair.required) {
+        target.structureIntegrityMax = wallIntegrityMax(target);
+        target.structureIntegrity = target.structureIntegrityMax;
+        target.breached = false;
+        delete target.structureRepair;
+        if (state.priorityBuildingId === target.id) state.priorityBuildingId = null;
+        bumpDefenseTopology(state);
+        state.resources.defense = computeDefense(state);
+        addLog(state, `${BUILDING_DEFS[target.type].name} 돌파 구간의 수리가 끝나 다시 길을 막습니다.`, 'good', true);
       }
       return;
     }
@@ -1733,6 +1767,12 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
       target.built = true;
       target.repairing = false;
       delete target.repairCause;
+      if (isWallBuilding(target.type)) {
+        target.structureIntegrityMax = wallIntegrityMax(target);
+        target.structureIntegrity = target.structureIntegrityMax;
+        target.breached = false;
+        bumpDefenseTopology(state);
+      }
       if (!repaired) noteProximityBuildingCompletion(state, target);
       initializeWeirReservoir(state, target);
       if (state.priorityBuildingId === target.id) state.priorityBuildingId = null;
