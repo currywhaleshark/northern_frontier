@@ -1757,6 +1757,7 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   well:       { base: FACE_STONE, glyph: WATER },
   deepMine:   { roof: ROOF_DARK, base: ROCK_GRAY2, glyph: ANVIL },
   ferry:      { base: TENT_TAN, glyph: WATER },
+  tidalFishery: { base: FENCE, glyph: WATER },
   charcoalKiln: { base: CAMPFIRE, glyph: LOGS },
   stable:     { base: TENT_TAN, glyph: HIDE },
   nitreYard:  { roof: ROOF_DARK, base: FACE_STONE, glyph: CAMPFIRE },
@@ -2144,6 +2145,47 @@ const SEA_WATER_COLORS: Record<Season, string> = {
   winter: '#376b91',
 };
 
+const COAST_GROUND_COLORS: Record<Season, Record<'mudflat' | 'sand' | 'shingle' | 'rocky', string>> = {
+  spring: { mudflat: '#75654d', sand: '#a99a73', shingle: '#9c927b', rocky: '#817d70' },
+  summer: { mudflat: '#6f5f47', sand: '#b1a078', shingle: '#a3977d', rocky: '#817b6e' },
+  autumn: { mudflat: '#675946', sand: '#9e8d69', shingle: '#93866f', rocky: '#797367' },
+  winter: { mudflat: '#89837a', sand: '#b8b1a3', shingle: '#aca79c', rocky: '#96958f' },
+};
+
+function drawCoastalGround(
+  ctx: CanvasRenderingContext2D,
+  p: TerrainDrawParams,
+  kind: 'mudflat' | 'sand' | 'shingle' | 'rocky',
+): void {
+  ctx.fillStyle = COAST_GROUND_COLORS[p.season][kind];
+  ctx.fillRect(p.x, p.y, p.size, p.size);
+  const h = hash(p.tileX, p.tileY);
+  if (kind === 'mudflat') {
+    ctx.strokeStyle = p.winter ? 'rgba(211,220,220,0.24)' : 'rgba(61,91,91,0.38)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(p.x + 2, p.y + 7 + (h % 4));
+    ctx.quadraticCurveTo(p.x + p.size * 0.45, p.y + 4 + ((h >>> 3) % 7), p.x + p.size - 2, p.y + 12 + ((h >>> 6) % 6));
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(166,184,166,0.38)';
+    if (h % 3 === 0) {
+      ctx.fillRect(p.x + 5 + (h % 9), p.y + 3, 1, 7);
+      ctx.fillRect(p.x + 8 + ((h >>> 4) % 10), p.y + 5, 1, 6);
+    }
+    return;
+  }
+  const dots = kind === 'rocky' ? 5 : kind === 'shingle' ? 8 : 3;
+  for (let i = 0; i < dots; i++) {
+    const px = p.x + 3 + ((h >>> (i % 12)) + i * 7) % Math.max(1, p.size - 6);
+    const py = p.y + 3 + ((h >>> ((i + 5) % 14)) + i * 11) % Math.max(1, p.size - 6);
+    ctx.fillStyle = kind === 'sand'
+      ? 'rgba(215,205,169,0.34)'
+      : kind === 'rocky' ? 'rgba(65,65,61,0.48)' : 'rgba(67,65,61,0.34)';
+    const size = kind === 'rocky' ? 2 + (i % 2) : 1;
+    ctx.fillRect(px, py, size, size);
+  }
+}
+
 // 자연 수면 타일: 강·호수 모두 뭍 방향에만 둑 여백을 둔다.
 function drawNaturalWaterTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): void {
   const nb = p.banks!;
@@ -2153,7 +2195,8 @@ function drawNaturalWaterTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParam
   const bankColor = RIVER_BANK_COLORS[p.season];
 
   // 1) 땅 밑바탕 — 주변 지형과 같은 시트라 물가 바깥이 이웃 타일과 이어진다
-  drawHistoricalGround(ctx, 'plain', p);
+  if (p.terrain === 'sea' && p.coastalGround) drawCoastalGround(ctx, p, p.coastalGround);
+  else drawHistoricalGround(ctx, 'plain', p);
 
   const box = riverWaterBox(nb);
   const bx = p.x + box.x0 * f;
@@ -2423,6 +2466,11 @@ export const atlasSprites: SpriteAPI = {
       return;
     }
 
+    if (p.terrain === 'mudflat') {
+      drawCoastalGround(ctx, p, 'mudflat');
+      return;
+    }
+
     // 바닥 (겨울엔 크림색 지면으로 갈아 눈밭 느낌을 낸다)
     const drewHistoricalGround = drawHistoricalGround(ctx, p.terrain, p);
 
@@ -2440,6 +2488,10 @@ export const atlasSprites: SpriteAPI = {
     if (p.terrain === 'fertile') {
       ctx.fillStyle = fertileGroundWash(p.season);
       ctx.fillRect(p.x, p.y, p.size, p.size);
+    }
+
+    if (p.coastalGround && (p.terrain === 'plain' || p.terrain === 'fertile')) {
+      drawCoastalGround(ctx, p, p.coastalGround);
     }
 
     // 우세 이웃 지형의 바닥이 경계를 넘어 번진다 (숲·바위 경계의 직선 절단 완화).

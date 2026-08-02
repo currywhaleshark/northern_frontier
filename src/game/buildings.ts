@@ -6,6 +6,7 @@ import { hasKnownMineralDepositNear } from './miningSites';
 import { aquiferSampleAt, oreSampleAt } from './subsurfaceVeins';
 import { hasAdjacentFlowingCanal } from './irrigation';
 import { isNaturalWaterTerrain } from './terrain';
+import { coastalGroundAt, seaDistanceAt, tidalFlatTileCountNear } from './tidalFlats';
 import { GATE_CONVERSION_COSTS } from './walls';
 import type { Building, BuildingDef, BuildingTypeId, GameState, MapRegion, Rank, ResourceId, SmithyProductId, Tile } from './types';
 
@@ -66,9 +67,15 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   saltworks: {
     id: 'saltworks', name: '자염막',
-    desc: '해안에서 염부가 바닷물을 장작으로 끓여 소금을 만든다. 겨울에도 가동하지만 난방용 장작과 경쟁한다.',
+    desc: '모래·갯벌 뒤 바다와 가장 가까운 평지에 짓는다. 염부가 바닷물을 장작으로 끓여 소금을 만들며 겨울에는 난방용 장작과 경쟁한다.',
     cost: { wood: 10, stone: 4, tools: 1 }, buildDays: 6, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'coast', unique: false, region: 'coast',
+  },
+  tidalFishery: {
+    id: 'tidalFishery', name: '어살터',
+    desc: `해안 갯벌에 어살을 세우는 초기 어로 거점. 어부 2명이 반경 ${CONFIG.gatheringZones.tidalFisheryRadius}칸 갯벌의 조개·게와 물고기를 거두어 현장에 하역한다.`,
+    cost: { wood: 6, tools: 1 }, buildDays: 4, slots: 2, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'mudflat', unique: false, region: 'coast',
   },
   jangdokdae: {
     id: 'jangdokdae', name: '장독대',
@@ -314,7 +321,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
   'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'well', 'field', 'paddy', 'canal', 'weir', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'lodgingHut', 'clinic',
-  'smokehouse', 'dryingRack', 'saltworks', 'smithy', 'mine', 'deepMine', 'ferry', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office', 'cemetery', 'school', 'shrine', 'hermitage',
+  'smokehouse', 'dryingRack', 'saltworks', 'tidalFishery', 'smithy', 'mine', 'deepMine', 'ferry', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office', 'cemetery', 'school', 'shrine', 'hermitage',
   'levee', 'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement', 'chongtongEmplacement',
 ];
@@ -333,6 +340,7 @@ export const SINGLE_TILE_BUILDINGS = [
   'field',
   'paddy',
   'ferry',
+  'tidalFishery',
   'dryingRack',
   'onggiKiln',
   'dock',
@@ -507,7 +515,10 @@ export function canPlaceBuildingAt(
   }
   const def = BUILDING_DEFS[type];
   if (!tiles.every(tile => canPlaceOn(def, tile, state))) return false;
-  if (type === 'saltworks' && !hasSeaAlongFootprint(state, x, y, 2, 2)) return false;
+  if (type === 'saltworks' && !saltworksFootprintHasSeaAccess(state, x, y, 2, 2)) return false;
+  if (type === 'tidalFishery' && tidalFlatTileCountNear(
+    state.map, x, y, CONFIG.gatheringZones.tidalFisheryRadius,
+  ) < CONFIG.tidalFlats.minimumPlacementTiles) return false;
   if (type === 'paddy' && !isPaddyFootprintEligible(state, tiles)) return false;
   if (type === 'mine') return hasKnownMineralDepositNear(state, x, y);
   if (type === 'well') {
@@ -575,7 +586,10 @@ export function canRelocateBuildingAt(
       usableTiles.every(tile => tile.terrain === 'river' || isWatermillLandTile(tile));
   }
   if (!usableTiles.every(tile => canPlaceOn(def, tile, state))) return false;
-  if (building.type === 'saltworks' && !hasSeaAlongFootprint(state, x, y, 2, 2)) return false;
+  if (building.type === 'saltworks' && !saltworksFootprintHasSeaAccess(state, x, y, 2, 2)) return false;
+  if (building.type === 'tidalFishery' && tidalFlatTileCountNear(
+    state.map, x, y, CONFIG.gatheringZones.tidalFisheryRadius,
+  ) < CONFIG.tidalFlats.minimumPlacementTiles) return false;
   if (building.type === 'paddy' && !isPaddyFootprintEligible(state, usableTiles)) return false;
   if (building.type === 'mine') return hasKnownMineralDepositNear(state, x, y);
   if (building.type === 'well') {
@@ -804,27 +818,30 @@ export function isBuildingAvailableInRegion(region: MapRegion | undefined, type:
   return required == null || region === required;
 }
 
-function hasSeaAlongFootprint(
+function saltworksFootprintHasSeaAccess(
   state: Pick<GameState, 'map'>,
   x: number,
   y: number,
   width: number,
   height: number,
 ): boolean {
-  for (let xx = x; xx < x + width; xx++) {
-    if (state.map[y - 1]?.[xx]?.terrain === 'sea' || state.map[y + height]?.[xx]?.terrain === 'sea') return true;
-  }
+  let touchesNearestInlandRing = false;
   for (let yy = y; yy < y + height; yy++) {
-    if (state.map[yy]?.[x - 1]?.terrain === 'sea' || state.map[yy]?.[x + width]?.terrain === 'sea') return true;
+    for (let xx = x; xx < x + width; xx++) {
+      const tile = state.map[yy]?.[xx];
+      if (!tile || coastalGroundAt(state.map, xx, yy) != null) return false;
+      if (seaDistanceAt(state.map, xx, yy, 3) === 3) touchesNearestInlandRing = true;
+    }
   }
-  return false;
+  return touchesNearestInlandRing;
 }
 
 export function saltworksHasSeaAccess(
   state: Pick<GameState, 'map'>,
   building: Pick<Building, 'x' | 'y' | 'type'>,
 ): boolean {
-  return building.type === 'saltworks' && hasSeaAlongFootprint(state, building.x, building.y, 2, 2);
+  return building.type === 'saltworks' &&
+    saltworksFootprintHasSeaAccess(state, building.x, building.y, 2, 2);
 }
 
 function isRiverbank(state: GameState | undefined, tile: Tile): boolean {
@@ -905,13 +922,17 @@ export function canPlaceOn(def: BuildingDef, tile: Tile, state?: GameState): boo
   if (def.placement === 'coast') {
     return tile.terrain === 'fertile' || tile.terrain === 'plain' || tile.terrain === 'forest';
   }
+  if (def.placement === 'mudflat') return tile.terrain === 'mudflat';
+  if (state && (tile.terrain === 'plain' || tile.terrain === 'fertile' ||
+      tile.terrain === 'forest' || tile.terrain === 'rock') &&
+      coastalGroundAt(state.map, tile.x, tile.y) != null) return false;
   if (def.placement === 'paddy') return isPaddyPlacementTile(tile);
   if (def.placement === 'watermill') return false;
   if (def.placement === 'field') {
     // 숲도 받는다 — 벌목꾼이 베어 평지로 만든 뒤에야 농부가 공사를 시작한다.
     return tile.terrain === 'fertile' || tile.terrain === 'plain' || tile.terrain === 'forest';
   }
-  if (tile.terrain === 'river' || tile.terrain === 'lake' || tile.terrain === 'sea' || tile.terrain === 'mountain' ||
+  if (tile.terrain === 'river' || tile.terrain === 'lake' || tile.terrain === 'sea' || tile.terrain === 'mudflat' || tile.terrain === 'mountain' ||
       tile.terrain === 'rock' || tile.terrain === 'center') {
     return false;
   }

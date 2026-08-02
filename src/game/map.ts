@@ -5,6 +5,7 @@ import {
 } from './minerals';
 import { ensureForestGrowth } from './forestGrowth';
 import { isNaturalWaterTerrain, isOpenWaterTerrain } from './terrain';
+import { coastalGroundAt } from './tidalFlats';
 import type { MapRegion, Tile, Terrain } from './types';
 
 // mulberry32 시드 난수 — 지도 생성과 시뮬레이션 전반에서 사용
@@ -261,9 +262,29 @@ export function generateMap(
   tiles[centerY][centerX].terrain = 'center';
   if (lakeRegion || coastRegion) ensureNearbyForest(tiles, centerX, centerY);
   placeNearbyMineralDeposits(tiles, centerX, centerY, rng);
+  if (coastRegion) clearCoastalTransitionProps(tiles);
   ensureForestGrowth(tiles);
 
   return { tiles, centerX, centerY };
+}
+
+function clearCoastalTransitionProps(tiles: Tile[][]): void {
+  for (const row of tiles) for (const tile of row) {
+    if (tile.terrain === 'mudflat') {
+      tile.hasIron = false;
+      delete tile.mineralRemaining;
+      continue;
+    }
+    if (coastalGroundAt(tiles, tile.x, tile.y) == null) continue;
+    // 모래·자갈 전이대는 지물이 없는 완충지로 남긴다. 바위 노두도 해변 바닥 표현으로만
+    // 흡수하고, 실제 산줄기는 암반 해안으로 유지한다.
+    if (tile.terrain === 'forest' || tile.terrain === 'rock') tile.terrain = 'plain';
+    if (tile.terrain === 'plain' || tile.terrain === 'fertile') {
+      tile.hasIron = false;
+      delete tile.mineralRemaining;
+      delete tile.treeStage;
+    }
+  }
 }
 
 function carveLakeBasin(tiles: Tile[][], rng: () => number): void {
@@ -322,8 +343,31 @@ function carveSeaCoast(tiles: Tile[][], rng: () => number): void {
   for (let x = w - 2; x >= 0; x--) {
     shoreline[x] = Math.max(shoreline[x + 1] - 1, Math.min(shoreline[x + 1] + 1, shoreline[x]));
   }
+  const mouthColumns = shoreline
+    .map((shoreY, x) => tiles[shoreY]?.[x]?.terrain === 'river' ? x : -1)
+    .filter(x => x >= 0);
+  const mouthCenter = mouthColumns.length > 0
+    ? Math.round(mouthColumns.reduce((sum, x) => sum + x, 0) / mouthColumns.length)
+    : Math.floor(w / 2);
   for (let x = 0; x < w; x++) {
     for (let y = shoreline[x]; y < h; y++) tiles[y][x].terrain = 'sea';
+  }
+  // 하구와 잔잔한 만의 육지 안쪽에는 실제 작업 가능한 갯벌을 남긴다. 후속 산·숲 blob은
+  // plain만 덮으므로 이 띠를 침범하지 않고, 바다 면적 18~24%도 그대로 보존된다.
+  for (let x = 0; x < w; x++) {
+    const nearMouth = Math.abs(x - mouthCenter) <= Math.max(5, Math.round(w * 0.08));
+    const neighborAverage = ((shoreline[Math.max(0, x - 2)] ?? shoreline[x]) +
+      (shoreline[Math.min(w - 1, x + 2)] ?? shoreline[x])) / 2;
+    const shelteredCove = shoreline[x] < neighborAverage - 0.25;
+    if (!nearMouth && !shelteredCove) continue;
+    const band = nearMouth ? 2 : 1;
+    for (let y = Math.max(0, shoreline[x] - band); y < shoreline[x]; y++) {
+      const tile = tiles[y][x];
+      if (tile.terrain !== 'plain') continue;
+      tile.terrain = 'mudflat';
+      tile.tidalCapacity = CONFIG.tidalFlats.capacityPerTile;
+      tile.tidalStock = tile.tidalCapacity;
+    }
   }
 }
 

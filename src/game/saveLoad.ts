@@ -15,6 +15,7 @@ import { rebalanceLoadedHabitatReserve, spawnAnimalHabitats } from './habitats';
 import { makeRng } from './map';
 import { ensureMineralDeposits } from './minerals';
 import { ensureForestGrowth } from './forestGrowth';
+import { ensureTidalFlatStocks } from './tidalFlats';
 import { ensureProcessingReserves } from './processing';
 import { initRelations } from './relations';
 import { getSeason, getYear } from './seasons';
@@ -2329,6 +2330,7 @@ export function loadGame(slot = 1): GameState | null {
     const actualMapSize = mapSizeForDimensions(parsed.map[0]?.length ?? 0, parsed.map.length);
     if (actualMapSize) parsed.worldSetup.mapSize = actualMapSize;
     ensureMineralDeposits(parsed.map);
+    ensureTidalFlatStocks(parsed.map);
     normalizeSubsurfaceState(parsed);
     ensureForestGrowth(parsed.map);
     if (parsed.battle && !parsed.battle.mode) parsed.battle.mode = 'garrison';

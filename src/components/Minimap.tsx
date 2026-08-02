@@ -46,6 +46,7 @@ export function centerViewportOnSettlement(state: GameState, box: HTMLDivElement
 const TERRAIN_COLORS: Record<Terrain, string> = {
   forest: '#274938',
   plain: '#536447',
+  mudflat: '#73664f',
   river: '#3f7188',
   lake: '#356b82',
   sea: '#245873',

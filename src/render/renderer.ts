@@ -90,6 +90,7 @@ import {
 } from '../game/minerals';
 import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, PastureArea, Resident, Season, Terrain, Tile } from '../game/types';
 import { historicalTerrainColumn } from './historicalTerrain';
+import { coastalGroundAt } from '../game/tidalFlats';
 import { pixelRectIntersectsViewport, tileRectIntersectsViewport, type SceneViewport } from './sceneViewport';
 import {
   mountainDepthAt,
@@ -236,6 +237,7 @@ function waterworksOrientationAt(
 const TERRAIN_VISUAL_CODE: Record<Terrain, number> = {
   forest: 1,
   plain: 2,
+  mudflat: 10,
   river: 3,
   mountain: 4,
   fertile: 5,
@@ -389,6 +391,7 @@ function terrainParams(
     x: x * TILE,
     y: y * TILE,
     size: TILE,
+    coastalGround: coastalGroundAt(state.map, x, y),
     banks: tile.terrain === 'river' || tile.terrain === 'lake' || tile.terrain === 'sea'
       ? {
           n: isLand(x, y - 1), e: isLand(x + 1, y), s: isLand(x, y + 1), w: isLand(x - 1, y),

@@ -9,7 +9,7 @@ import {
   buildingFootprintDims, cannonPlacementsUsed, chongtongPlacementsUsed, canPlaceBuildingAt, canPlaceOn, canRelocateBuildingAt, clampPlotSide,
   clearBuildingTiles, computeDefense, getBuilding, isBuildingAvailableInRegion, isBuildingUnlocked,
   footprintTilesOf, isAreaBuildingType, isPaddyFootprintEligible, isPlotBuildingType, isSmithyProductUnlocked,
-  occupyBuildingTiles, plotArea, preferredLeveeEdgeAt, SMITHY_PRODUCT_DEFS,
+  occupyBuildingTiles, plotArea, preferredLeveeEdgeAt, saltworksHasSeaAccess, SMITHY_PRODUCT_DEFS,
 } from './buildings';
 import { forestTilesInArea, forestTilesInFootprint, pendingClearingTiles } from './landClearing';
 import { GATE_CONVERSION_COSTS, isSolidWallBuilding, isWallBuilding, wallLineTiles } from './walls';
@@ -53,6 +53,7 @@ import { firewoodWeatherMult, weatherForDay } from './weather';
 import { defaultProcessingReserves } from './processing';
 import { hasKnownMineralDepositNear } from './miningSites';
 import { initialAquiferLevels, initialOreVeinRemaining } from './subsurfaceVeins';
+import { advanceTidalFlatStocks } from './tidalFlats';
 import { dailyAquiferTick } from './waterSupply';
 import {
   canPlantCropNow, cropIdForBuilding, CROP_DEFS, defaultCropForBuildingType, isCropAllowedOnBuilding,
@@ -442,6 +443,9 @@ export function tryPlaceBuilding(
   if (type === 'lodgingHut' && !lodgingTarget) {
     return '숙식 움막은 아직 움막이 없는 완공 채집 거점의 작업영역 안에 지어야 합니다.';
   }
+  if (type === 'saltworks' && !saltworksHasSeaAccess(state, { type, x, y })) {
+    return '자염막은 모래·갯벌 뒤 바다와 가장 가까운 평지에 지어야 합니다.';
+  }
   if (!canPlaceBuildingAt(state, type, x, y, w, h)) return '이곳에는 지을 수 없습니다.';
   const leveeEdge = type === 'levee'
     ? options.leveeEdge ?? preferredLeveeEdgeAt(state, x, y) ?? undefined
@@ -682,7 +686,7 @@ export function cancelBuildingConstruction(state: GameState, buildingId: number)
 
 // 직업 재배정: from 직업의 산 주민 1명을 to 직업으로
 export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
-  if (!isJobUnlocked(state.rank, to)) return false;
+  if (!isJobUnlocked(state.rank, to, state.worldSetup?.region)) return false;
   // 문해자 전용 관직 — 글을 아는 주민만 후보가 된다
   const eligible = (res: Resident) => canResidentTakeJob(res, to)
     && !res.religiousVocation
@@ -709,7 +713,7 @@ export function reassignJob(state: GameState, from: JobId, to: JobId): boolean {
 }
 
 export function setResidentJob(state: GameState, id: number, job: JobId): void {
-  if (!isJobUnlocked(state.rank, job)) return;
+  if (!isJobUnlocked(state.rank, job, state.worldSetup?.region)) return;
   const r = state.residents.find(res => res.id === id);
   if (r && state.warDispatch?.memberIds.includes(r.id)) {
     addLog(state, `${withJosa(residentLogName(r), '은/는')} 부족 전쟁에 파견 중이라 귀환 전에는 직업을 바꿀 수 없습니다.`, 'info');
@@ -1522,6 +1526,7 @@ function endOfDay(state: GameState): void {
   const reservoirTerrainChanged = advanceWeirReservoirs(state);
   if (springFloodStarted || reservoirTerrainChanged) ensureResidentsOnPassableTiles(state);
   dailyAquiferTick(state);
+  advanceTidalFlatStocks(state.map);
 
   regrowForest(state, rng, season);
   updateHabitats(state);

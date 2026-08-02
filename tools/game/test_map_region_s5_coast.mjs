@@ -42,6 +42,8 @@ const agents = await load('agents');
 const raidRoutes = await load('raidRoutes');
 const workerSlots = await load('workerSlots');
 const inventory = await load('inventory');
+const tidalFlats = await load('tidalFlats');
+const constants = await load('constants');
 const { CONFIG } = await load('config');
 
 const CASES = [
@@ -88,6 +90,29 @@ for (const [mapSize, width, height] of CASES) {
       `${mapSize}/${seed} 남쪽 경계 전체가 바다다`);
     assert.equal(seaIsConnectedToSouth(coast.map), true,
       `${mapSize}/${seed} 모든 바다는 남쪽 경계와 4방향으로 이어진다`);
+    const mudflatTiles = coast.map.flat().filter(tile => tile.terrain === 'mudflat');
+    assert.ok(mudflatTiles.length >= CONFIG.tidalFlats.minimumPlacementTiles,
+      `${mapSize}/${seed} 해안에는 어살터를 쓸 만큼 갯벌이 있다`);
+    assert.ok(mudflatTiles.every(tile => tile.tidalCapacity === CONFIG.tidalFlats.capacityPerTile &&
+      tile.tidalStock === CONFIG.tidalFlats.capacityPerTile),
+    `${mapSize}/${seed} 신규 갯벌 어자원이 가득 찬 상태로 시작한다`);
+    assert.ok(coast.foreignSites.every(site => {
+      for (let y = site.y; y < site.y + site.height; y++) for (let x = site.x; x < site.x + site.width; x++) {
+        if (coast.map[y]?.[x]?.terrain === 'mudflat') return false;
+      }
+      return true;
+    }), `${mapSize}/${seed} 외부 세력 거점은 갯벌을 점유하지 않는다`);
+    const coastalGroundKinds = new Set(coast.map.flat().map(tile =>
+      tidalFlats.coastalGroundAt(coast.map, tile.x, tile.y)).filter(Boolean));
+    assert.ok(coastalGroundKinds.has('mudflat') && coastalGroundKinds.has('sand'),
+      `${mapSize}/${seed} 해안 바닥에는 갯벌과 모래 전이가 함께 있다`);
+    assert.ok(coast.map.flat().every(tile => {
+      const kind = tidalFlats.coastalGroundAt(coast.map, tile.x, tile.y);
+      return kind == null || tile.terrain === 'mountain' ||
+        (tile.terrain !== 'forest' && tile.terrain !== 'rock' && tile.mineralRemaining == null);
+    }), `${mapSize}/${seed} 해안 전이대에는 나무와 노두가 배치되지 않는다`);
+    assert.ok(coast.map.flat().some(tile => buildings.canPlaceBuildingAt(coast, 'saltworks', tile.x, tile.y)),
+      `${mapSize}/${seed} 전이대 뒤 첫 평지에 자염막 입지가 최소 한 곳 있다`);
 
     const center = coast.buildings.find(building => building.type === 'center');
     assert.ok(center, `${mapSize}/${seed} 해안에도 정착 중심지가 있다`);
@@ -110,6 +135,8 @@ for (const [mapSize, width, height] of CASES) {
       const other = simulation.newGameFromOptions({ ...base, mapSize, region, seed });
       assert.equal(other.map.flat().some(tile => tile.terrain === 'sea'), false,
         `${mapSize}/${seed} ${region} 지도에는 바다가 생기지 않는다`);
+      assert.equal(other.map.flat().some(tile => tile.terrain === 'mudflat'), false,
+        `${mapSize}/${seed} ${region} 지도에는 갯벌이 생기지 않는다`);
     }
   }
 }
@@ -166,24 +193,31 @@ function addBuilt(state, type, x, y, overrides = {}) {
   return building;
 }
 
-// 자염막은 해안 지역의 2x2 육지에서 바다와 직교 인접할 때만 선다.
+// 자염막은 모래·갯벌을 비우고 그 뒤 바다에서 가장 가까운 2×2 평지에만 선다.
 {
   const coast = simulation.newGameFromOptions({
     ...options.optionsForDifficulty('normal', '', 20260870), region: 'coast', seed: 20260870,
   });
   clearForPlacement(coast);
   for (let x = 10; x <= 11; x++) coast.map[12][x].terrain = 'sea';
+  assert.equal(buildings.canPlaceBuildingAt(coast, 'saltworks', 10, 10), false,
+    '해수 바로 옆의 모래 바닥에는 자염막을 세우지 않는다');
+  assert.equal(buildings.canPlaceBuildingAt(coast, 'hut', 10, 10), false,
+    '모래·자갈 해안 전이대에는 일반 건물도 세우지 않는다');
+  coast.map[12][10].terrain = 'plain';
+  coast.map[12][11].terrain = 'plain';
+  for (let x = 10; x <= 11; x++) coast.map[14][x].terrain = 'sea';
   assert.equal(buildings.canPlaceBuildingAt(coast, 'saltworks', 10, 10), true);
-  coast.map[12][10].terrain = 'lake';
-  coast.map[12][11].terrain = 'lake';
+  coast.map[14][10].terrain = 'lake';
+  coast.map[14][11].terrain = 'lake';
   assert.equal(buildings.canPlaceBuildingAt(coast, 'saltworks', 10, 10), false, '호수는 자염 입지가 아니다');
-  coast.map[12][10].terrain = 'river';
-  coast.map[12][11].terrain = 'river';
+  coast.map[14][10].terrain = 'river';
+  coast.map[14][11].terrain = 'river';
   assert.equal(buildings.canPlaceBuildingAt(coast, 'saltworks', 10, 10), false, '강은 자염 입지가 아니다');
 
   const plains = simulation.newGame(20260871);
   clearForPlacement(plains);
-  plains.map[12][10].terrain = 'sea';
+  plains.map[14][10].terrain = 'sea';
   assert.equal(buildings.canPlaceBuildingAt(plains, 'saltworks', 10, 10), false, '평원에서는 자염막이 잠긴다');
   assert.equal(simulation.tryPlaceBuilding(plains, 'saltworks', 10, 10), '해안 지역에서만 지을 수 있습니다.');
 }
@@ -195,7 +229,7 @@ function prepareSaltProduction(workerCount) {
   });
   clearForPlacement(state);
   addBuilt(state, 'center', 2, 2);
-  for (let x = 10; x <= 11; x++) state.map[12][x].terrain = 'sea';
+  for (let x = 10; x <= 11; x++) state.map[14][x].terrain = 'sea';
   const saltworks = addBuilt(state, 'saltworks', 10, 10, { inventory: { firewood: 10 } });
   state.day = 1;
   state.subTick = 9;
@@ -240,7 +274,7 @@ function prepareSaltProduction(workerCount) {
   });
   clearForPlacement(state);
   addBuilt(state, 'center', 2, 2);
-  for (let x = 10; x <= 11; x++) state.map[12][x].terrain = 'sea';
+  for (let x = 10; x <= 11; x++) state.map[14][x].terrain = 'sea';
   const saltworks = addBuilt(state, 'saltworks', 10, 10, { inventory: { salt: 6 } });
   for (const resident of state.residents) resident.alive = false;
   const hauler = state.residents[0];
@@ -270,6 +304,146 @@ function prepareSaltProduction(workerCount) {
   assert.ok(loaded.map.flat().some(tile => tile.terrain === 'sea'));
   assert.equal(loaded.buildings.find(building => building.id === saltworks.id)?.type, 'saltworks');
   assert.equal(loaded.residents.find(resident => resident.alive)?.job, 'saltMaker');
+}
+
+// 갯벌은 해안 정착지의 어살터 전용 입지이며, 어부도 해안에서만 초기 해금된다.
+{
+  const coast = simulation.newGameFromOptions({
+    ...options.optionsForDifficulty('normal', '', 20260876), region: 'coast', seed: 20260876,
+  });
+  clearForPlacement(coast);
+  for (let y = 9; y <= 11; y++) for (let x = 9; x <= 11; x++) {
+    Object.assign(coast.map[y][x], {
+      terrain: 'mudflat',
+      tidalCapacity: CONFIG.tidalFlats.capacityPerTile,
+      tidalStock: CONFIG.tidalFlats.capacityPerTile,
+    });
+  }
+  assert.equal(buildings.canPlaceBuildingAt(coast, 'tidalFishery', 10, 10), true);
+  assert.equal(buildings.canPlaceBuildingAt(coast, 'hut', 10, 10), false, '일반 건물은 갯벌을 메우지 않는다');
+  assert.equal(constants.isJobUnlocked('settlement', 'fisher', 'coast'), true);
+  assert.equal(constants.isJobUnlocked('settlement', 'fisher', 'plains'), false);
+
+  coast.worldSetup.region = 'plains';
+  assert.equal(buildings.canPlaceBuildingAt(coast, 'tidalFishery', 10, 10), false,
+    '갯벌 데이터가 있어도 해안 지역이 아니면 어살터를 지을 수 없다');
+}
+
+function prepareTidalFishery(workerCount, { day = 1, weather = 'clear' } = {}) {
+  const state = simulation.newGameFromOptions({
+    ...options.optionsForDifficulty('normal', '', 20260880 + workerCount),
+    region: 'coast', seed: 20260880 + workerCount,
+  });
+  clearForPlacement(state);
+  addBuilt(state, 'center', 2, 2);
+  for (let y = 8; y <= 12; y++) for (let x = 8; x <= 12; x++) {
+    Object.assign(state.map[y][x], {
+      terrain: 'mudflat',
+      tidalCapacity: CONFIG.tidalFlats.capacityPerTile,
+      tidalStock: CONFIG.tidalFlats.capacityPerTile,
+    });
+  }
+  const fishery = addBuilt(state, 'tidalFishery', 10, 10, { inventory: {} });
+  for (const resident of state.residents) resident.alive = false;
+  for (let index = 0; index < workerCount; index++) {
+    const resident = state.residents[index];
+    Object.assign(resident, {
+      alive: true, sick: false, health: 100, hunger: 100, warmth: 100, morale: 70,
+      job: 'idle', assignedBuildingId: null,
+      x: 9 + index * 2, y: 10, px: 9 + index * 2, py: 10,
+      phase: 'rest', path: [], workTimer: 0, targetId: null, carrying: {}, manualOrder: null, skills: {},
+    });
+    assert.equal(workerSlots.assignResidentToBuilding(state, resident.id, fishery.id), null);
+  }
+  state.day = day;
+  state.weather = weather;
+  state.pendingChoice = null;
+  for (let subTick = 9; subTick <= 44; subTick++) {
+    state.subTick = subTick;
+    agents.agentsTick(state);
+  }
+  return { state, fishery };
+}
+
+// 어부는 실제 갯벌 칸까지 걸어가 공동 비축을 줄이고 어살터에 생선을 하역한다.
+{
+  const one = prepareTidalFishery(1);
+  const oneFish = one.fishery.inventory.fish ?? 0;
+  assert.ok(oneFish >= 1 && oneFish <= 1.2,
+    `봄 맑은 날 갯벌 어부 1인의 하루 산출 ${oneFish.toFixed(3)}은 목표 1.0~1.2다`);
+  assert.ok(one.state.map.flat().some(tile => tile.terrain === 'mudflat' &&
+    (tile.tidalStock ?? 0) < (tile.tidalCapacity ?? 0)), '실제 작업한 갯벌 칸의 공동 비축이 줄어든다');
+
+  const two = prepareTidalFishery(2);
+  assert.ok((two.fishery.inventory.fish ?? 0) > oneFish * 1.5,
+    '두 슬롯은 같은 어살터에서 한 명보다 충분히 많은 생선을 생산한다');
+  assert.equal(inventory.isHaulSourceBuilding(two.fishery), true, '어살터 어획물은 운반꾼 회수 대상이다');
+
+  const workedTile = two.state.map.flat().find(tile => tile.terrain === 'mudflat' &&
+    (tile.tidalStock ?? 0) < (tile.tidalCapacity ?? 0));
+  assert.ok(workedTile);
+  const depleted = workedTile.tidalStock;
+  tidalFlats.advanceTidalFlatStocks(two.state.map);
+  assert.ok(workedTile.tidalStock > depleted && workedTile.tidalStock <= workedTile.tidalCapacity,
+    '소모된 갯벌 어자원은 하루마다 상한까지 회복한다');
+
+  const winter = prepareTidalFishery(1, { day: 37, weather: 'clear' });
+  assert.ok((winter.fishery.inventory.fish ?? 0) > 0 && (winter.fishery.inventory.fish ?? 0) < oneFish,
+    '겨울 갯벌 어획은 멈추지 않지만 정상 계절보다 줄어든다');
+  const blizzard = prepareTidalFishery(1, { day: 1, weather: 'blizzard' });
+  assert.equal(blizzard.fishery.inventory.fish ?? 0, 0, '눈보라에는 야외 갯벌 작업을 중단한다');
+
+  const overlap = prepareTidalFishery(0);
+  const secondFishery = addBuilt(overlap.state, 'tidalFishery', 12, 10, { inventory: {} });
+  const sharedTile = overlap.state.map[9][9];
+  const firstBefore = tidalFlats.tidalFlatSummaryInArea(
+    overlap.state.map, { x: overlap.fishery.x, y: overlap.fishery.y, radius: CONFIG.gatheringZones.tidalFisheryRadius },
+  ).stock;
+  const secondBefore = tidalFlats.tidalFlatSummaryInArea(
+    overlap.state.map, { x: secondFishery.x, y: secondFishery.y, radius: CONFIG.gatheringZones.tidalFisheryRadius },
+  ).stock;
+  tidalFlats.takeTidalFlatStock(sharedTile, 1);
+  const firstAfter = tidalFlats.tidalFlatSummaryInArea(
+    overlap.state.map, { x: overlap.fishery.x, y: overlap.fishery.y, radius: CONFIG.gatheringZones.tidalFisheryRadius },
+  ).stock;
+  const secondAfter = tidalFlats.tidalFlatSummaryInArea(
+    overlap.state.map, { x: secondFishery.x, y: secondFishery.y, radius: CONFIG.gatheringZones.tidalFisheryRadius },
+  ).stock;
+  assert.equal(firstBefore - firstAfter, 1);
+  assert.equal(secondBefore - secondAfter, 1, '겹친 어살터는 같은 갯벌 타일 비축을 공유한다');
+}
+
+// 운반꾼은 어살터 현장 재고를 정착지 식량 재고로 옮긴다.
+{
+  const { state, fishery } = prepareTidalFishery(0);
+  fishery.inventory.fish = 4;
+  const hauler = state.residents[0];
+  Object.assign(hauler, {
+    alive: true, sick: false, health: 100, hunger: 100, warmth: 100, morale: 70,
+    job: 'hauler', assignedBuildingId: null, x: 9, y: 10, px: 9, py: 10,
+    phase: 'rest', path: [], workTimer: 0, targetId: null, carrying: {}, haulTask: null,
+    manualOrder: null, skills: {},
+  });
+  state.resources.fish = 0;
+  state.subTick = 9;
+  for (let index = 0; index < 24; index++) simulation.advanceTick(state);
+  assert.equal(fishery.inventory.fish, 0, '운반꾼이 어살터 어획물 재고를 비운다');
+  assert.equal(state.resources.fish, 4, '어살터 어획물이 정착지 식량 재고에 들어간다');
+}
+
+// 갯벌·어살터·남은 공동 비축은 저장 왕복에서도 유지된다.
+{
+  const { state, fishery } = prepareTidalFishery(1);
+  const workedTile = state.map.flat().find(tile => tile.terrain === 'mudflat' &&
+    (tile.tidalStock ?? 0) < (tile.tidalCapacity ?? 0));
+  assert.ok(workedTile);
+  assert.equal(saveLoad.saveGame(state, 6), true);
+  const loaded = saveLoad.loadGame(6);
+  assert.ok(loaded);
+  assert.equal(loaded.buildings.find(building => building.id === fishery.id)?.type, 'tidalFishery');
+  const loadedTile = loaded.map[workedTile.y][workedTile.x];
+  assert.equal(loadedTile.terrain, 'mudflat');
+  assert.equal(loadedTile.tidalStock, workedTile.tidalStock);
 }
 
 console.log('map region S5 coast tests passed');

@@ -11,23 +11,24 @@ import type { MineralResource, MineralVisualTier } from '../game/minerals';
 import type { MilitiaWeaponSpriteId } from './militiaWeaponAssets';
 import type { MountainProfile, TreeSpecies } from './terrainGrowthVisuals';
 import type { WaterworksOrientation } from './waterworksBuildingAssets';
+import type { CoastalGroundKind } from '../game/tidalFlats';
 
 // 계절별 지형 팔레트 (임시 그래픽용)
 const TERRAIN_PALETTES: Record<Season, Record<Terrain, string>> = {
   spring: {
-    forest: '#2f5d3a', plain: '#7c8b58', river: '#3e6f9e', lake: '#477c9b', sea: '#285f82', mountain: '#6d6a63',
+    forest: '#2f5d3a', plain: '#7c8b58', mudflat: '#74664f', river: '#3e6f9e', lake: '#477c9b', sea: '#285f82', mountain: '#6d6a63',
     fertile: '#8a7a45', rock: '#7d7468', center: '#a08858',
   },
   summer: {
-    forest: '#2a6b3a', plain: '#84955c', river: '#3a6fa8', lake: '#4785ae', sea: '#275f88', mountain: '#6d6a63',
+    forest: '#2a6b3a', plain: '#84955c', mudflat: '#716149', river: '#3a6fa8', lake: '#4785ae', sea: '#275f88', mountain: '#6d6a63',
     fertile: '#96833f', rock: '#7d7468', center: '#a08858',
   },
   autumn: {
-    forest: '#6b5a2e', plain: '#8f7f4e', river: '#3e6a92', lake: '#4a7695', sea: '#315f7c', mountain: '#69655e',
+    forest: '#6b5a2e', plain: '#8f7f4e', mudflat: '#695b47', river: '#3e6a92', lake: '#4a7695', sea: '#315f7c', mountain: '#69655e',
     fertile: '#7d6a3a', rock: '#78706a', center: '#a08858',
   },
   winter: {
-    forest: '#46564e', plain: '#c3ccd3', river: '#a8cbdd', lake: '#b2cbd8', sea: '#376b91', mountain: '#8d949c',
+    forest: '#46564e', plain: '#c3ccd3', mudflat: '#8d867c', river: '#a8cbdd', lake: '#b2cbd8', sea: '#376b91', mountain: '#8d949c',
     fertile: '#bcc6cd', rock: '#828a92', center: '#b0a890',
   },
 };
@@ -55,6 +56,7 @@ export interface TerrainDrawParams {
   x: number;     // 픽셀 좌표
   y: number;
   size: number;
+  coastalGround?: CoastalGroundKind | null;
   // 강 타일 전용: 각 방향(대각선 포함)이 뭍인지 (물가 경계 표현용)
   banks?: {
     n: boolean; e: boolean; s: boolean; w: boolean;

@@ -1,5 +1,5 @@
 // 명칭, 텍스트, 정적 정의 모음
-import type { BuildingTypeId, JobId, Rank, ResourceId, Season, Terrain, TradeOffer, WeatherId } from './types';
+import type { BuildingTypeId, JobId, MapRegion, Rank, ResourceId, Season, Terrain, TradeOffer, WeatherId } from './types';
 import { RESOURCE_DEFS, RESOURCE_ORDER as CATALOG_RESOURCE_ORDER } from './resourceCatalog';
 
 export const SEASON_NAMES: Record<Season, string> = {
@@ -27,7 +27,7 @@ export const WEATHER_NAMES: Record<WeatherId, string> = {
 };
 
 export const TERRAIN_NAMES: Record<Terrain, string> = {
-  forest: '숲', plain: '평지', river: '강', lake: '호수', sea: '바다', mountain: '산지',
+  forest: '숲', plain: '평지', mudflat: '갯벌', river: '강', lake: '호수', sea: '바다', mountain: '산지',
   fertile: '비옥한 땅', rock: '바위/철광', center: '마을 터',
 };
 
@@ -66,7 +66,8 @@ export const JOB_MIN_RANK: Partial<Record<JobId, Rank>> = {
   teacher: 'jin',
 };
 
-export function isJobUnlocked(rank: Rank | undefined, job: JobId): boolean {
+export function isJobUnlocked(rank: Rank | undefined, job: JobId, region?: MapRegion): boolean {
+  if (job === 'fisher' && region === 'coast') return true;
   return rankAtLeast(rank, JOB_MIN_RANK[job]);
 }
 
@@ -86,7 +87,7 @@ export const JOB_DESC: Record<JobId, string> = {
   saltMaker: '해안의 자염막에서 바닷물을 장작으로 끓여 소금을 만듭니다.',
   smith: '창고에서 철과 필요한 재료를 가져와 지정 대장간에서 도구와 무기를 만듭니다.',
   miner: '정착지 단계부터 광상을 찾아 돌·철·은을 캡니다. 채광장이 있으면 반경 안의 광물을 그곳에 하역합니다.',
-  fisher: '보(堡) 승격 후 배치할 수 있습니다. 나루터에서 강고기를 잡아 식량을 보탭니다.',
+  fisher: '해안에서는 어살터의 갯벌을 도보로 이용하고, 다른 지역에서는 보(堡) 승격 후 나루터에서 강고기를 잡습니다.',
   charcoalBurner: '진(鎭) 승격 후 창고에서 목재를 가져와 지정 숯가마에서 숯으로 굽습니다.',
   herder: '진(鎭) 승격 후 배치할 수 있습니다. 축사에서 가축을 돌보며 식량과 가죽을 보탭니다.',
   tanner: '무두질 작업장에서 가죽을 손질해 옷감과 방한용 의복 생산을 돕습니다.',

@@ -11,6 +11,7 @@ import { mineralRemaining } from '../game/minerals';
 import { mineMineralSummary } from '../game/miningSites';
 import { gatheringForestSummary, gatheringWorkArea, isGatheringBuildingType } from '../game/gatheringZones';
 import { habitatReserveSummaryInArea } from '../game/habitats';
+import { tidalFlatSummaryInArea } from '../game/tidalFlats';
 import {
   linkedLodgingWorksite, lodgingHutForWorksite, lodgingSupplySummary, lodgingWorkers,
 } from '../game/lodgingHuts';
@@ -209,7 +210,7 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
               onChange={event => onSetJob(event.target.value as JobId)}
             >
               {[...JOB_ORDER, ...(JOB_ORDER.includes(resident.job) ? [] : [resident.job])]
-                .filter(job => job === resident.job || (isJobUnlocked(state.rank, job)
+                .filter(job => job === resident.job || (isJobUnlocked(state.rank, job, state.worldSetup?.region)
                 && (resident.stage !== 'youth' || isYouthWorkJob(job)))).map(job => (
                 <option key={job} value={job}>
                   {job === resident.job && resident.religiousVocation === 'monk' && resident.stage
@@ -374,6 +375,9 @@ export function SelectionContextBar({
   const habitatSummary = gatheringBuilding?.type === 'huntLodge' && gatheringArea
     ? habitatReserveSummaryInArea(state.map, state.habitats, gatheringArea)
     : null;
+  const tidalSummary = gatheringBuilding?.type === 'tidalFishery' && gatheringArea
+    ? tidalFlatSummaryInArea(state.map, gatheringArea)
+    : null;
   const lodgingHut = building?.type === 'lodgingHut' ? building : null;
   const lodgingWorksite = lodgingHut ? linkedLodgingWorksite(state, lodgingHut) : null;
   const lodgingSummary = lodgingHut ? lodgingSupplySummary(state, lodgingHut) : null;
@@ -503,7 +507,7 @@ export function SelectionContextBar({
                         <>
                           <tr>
                             <td>작업 반경</td>
-                            <td>중심 ({gatheringArea.x}, {gatheringArea.y}) · 반경 {gatheringArea.radius}칸 · 확인한 숲 {gatheringSummary.forestTiles}칸</td>
+                            <td>중심 ({gatheringArea.x}, {gatheringArea.y}) · 반경 {gatheringArea.radius}칸{gatheringBuilding.type === 'tidalFishery' ? ` · 갯벌 ${tidalSummary?.tiles ?? 0}칸` : ` · 확인한 숲 ${gatheringSummary.forestTiles}칸`}</td>
                           </tr>
                           {gatheringBuilding.type === 'lumberCamp' && (
                             <tr>
@@ -519,6 +523,14 @@ export function SelectionContextBar({
                               <td>{habitatSummary.habitats > 0
                                 ? `${habitatSummary.stock.toFixed(1)} / ${habitatSummary.capacity.toFixed(1)} · 서식지 ${habitatSummary.habitats}곳`
                                 : '영역과 겹치는 서식지 없음'}</td>
+                            </tr>
+                          )}
+                          {tidalSummary && (
+                            <tr>
+                              <td>갯벌 비축</td>
+                              <td>{tidalSummary.tiles > 0
+                                ? `${tidalSummary.stock.toFixed(1)} / ${tidalSummary.capacity.toFixed(1)} · 현장 어획물 ${(gatheringBuilding.inventory?.fish ?? 0).toFixed(1)}`
+                                : '영역에 갯벌 없음'}</td>
                             </tr>
                           )}
                           {gatheringBuilding.built && (

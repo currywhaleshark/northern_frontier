@@ -13,7 +13,7 @@ export interface WorkerSlotConfig {
 export const AUTO_ASSIGN_BUILDING_TYPES = [
   'lumberCamp', 'huntLodge', 'herbHut', 'mine',
   'field', 'paddy', 'watermill', 'woodShed', 'charcoalKiln', 'smithy',
-  'stable', 'clinic', 'nitreYard', 'ferry', 'tannery', 'weavingHouse', 'smokehouse', 'dryingRack', 'onggiKiln', 'saltworks',
+  'stable', 'clinic', 'nitreYard', 'ferry', 'tidalFishery', 'tannery', 'weavingHouse', 'smokehouse', 'dryingRack', 'onggiKiln', 'saltworks',
   'deepMine', 'watchtower',
 ] as const satisfies readonly BuildingTypeId[];
 export type AutoAssignBuildingType = typeof AUTO_ASSIGN_BUILDING_TYPES[number];
@@ -34,6 +34,7 @@ export const SLOTTED_BUILDING_CONFIG: Partial<Record<BuildingTypeId, WorkerSlotC
   clinic: { job: 'physician', slots: 2 },
   nitreYard: { job: 'powderMaker', slots: 2 },
   ferry: { job: 'fisher', slots: 2 },
+  tidalFishery: { job: 'fisher', slots: 2 },
   tannery: { job: 'tanner', slots: 2 },
   weavingHouse: { job: 'weaver', slots: 2 },
   smokehouse: { job: 'curer', slots: 2 },
@@ -62,7 +63,7 @@ function slottedConfigForBuilding(
   if (!building || !building.built) return null;
   if (!isBuildingUnlocked(state.rank, building.type)) return null;
   const config = workerSlotConfig(building.type);
-  if (!config || !isJobUnlocked(state.rank, config.job)) return null;
+  if (!config || !isJobUnlocked(state.rank, config.job, state.worldSetup?.region)) return null;
   return config;
 }
 
@@ -213,7 +214,7 @@ export function canAssignResidentToBuilding(
 
   const config = workerSlotConfig(building.type);
   if (!config) return 'building has no worker slots';
-  if (!isJobUnlocked(state.rank, config.job)) return 'job is locked by rank';
+  if (!isJobUnlocked(state.rank, config.job, state.worldSetup?.region)) return 'job is locked by rank';
   if ((config.job === 'shaman' || config.job === 'monk') && resident.job !== config.job) {
     return 'resident has no matching religious vocation';
   }

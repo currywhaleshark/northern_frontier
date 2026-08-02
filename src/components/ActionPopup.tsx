@@ -10,6 +10,8 @@ import { edictSlotCapacity, edictSlotsUsed } from '../game/edicts';
 import { canRequestTrade, factionTradeUnlockReason } from '../game/events';
 import { contractReserved, contractReserveNeeds } from '../game/tradeContractReserve';
 import { nextContractDueDay } from '../game/tradeContracts';
+import { gatheringWorkArea } from '../game/gatheringZones';
+import { tidalFlatSummaryInArea } from '../game/tidalFlats';
 import { DRYING_PRODUCT_DEFS, DRYING_PRODUCT_ORDER, dryingProductOf } from '../game/preservation';
 import { TANNERY_PRODUCT_DEFS, TANNERY_PRODUCT_ORDER, tanneryProductOf } from '../game/wearables';
 import {
@@ -456,6 +458,24 @@ export function ActionPopup({
           </div>
         </div>
       )}
+
+      {building.type === 'tidalFishery' && building.built && (() => {
+        const summary = tidalFlatSummaryInArea(state.map, gatheringWorkArea(building));
+        return (
+          <div className="worker-slot-panel">
+            <div className="worker-slot-summary">
+              <span>갯벌 어로</span>
+              <span className="muted small">
+                어획물 {(building.inventory?.fish ?? 0).toFixed(1)} · 갯벌 {summary.tiles}칸
+              </span>
+            </div>
+            <div className="muted small">
+              갯벌 비축 {summary.stock.toFixed(1)} / {summary.capacity.toFixed(1)} · 매일 타일당 {CONFIG.tidalFlats.recoveryPerTilePerDay.toFixed(2)} 회복
+            </div>
+            <div className="muted small">어부는 배 없이 작업영역 안 갯벌을 오가며 어살과 조개·게를 살핍니다.</div>
+          </div>
+        );
+      })()}
 
       {isCropBuilding && (
         <div className="worker-slot-panel">

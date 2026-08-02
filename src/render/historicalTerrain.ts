@@ -29,6 +29,7 @@ export function historicalTerrainColumn(terrain: Terrain): number | null {
     case 'river':
     case 'lake':
     case 'sea':
+    case 'mudflat':
       return null;
   }
 }

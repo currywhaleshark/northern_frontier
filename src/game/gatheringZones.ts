@@ -2,7 +2,7 @@ import { CONFIG } from './config';
 import { treeStageFor } from './forestGrowth';
 import type { Building, BuildingTypeId, GameState, GatheringWorkArea, Tile } from './types';
 
-export type GatheringBuildingType = Extract<BuildingTypeId, 'lumberCamp' | 'huntLodge' | 'herbHut'>;
+export type GatheringBuildingType = Extract<BuildingTypeId, 'lumberCamp' | 'huntLodge' | 'herbHut' | 'tidalFishery'>;
 type GatheringAnchor = Pick<Building, 'type' | 'x' | 'y' | 'gatheringWorkArea'>;
 type TilePoint = Pick<Tile, 'x' | 'y'>;
 
@@ -20,11 +20,12 @@ function distanceSquared(anchor: Pick<GatheringWorkArea, 'x' | 'y'>, tile: TileP
 function defaultRadius(type: GatheringBuildingType): number {
   if (type === 'huntLodge') return CONFIG.gatheringZones.huntLodgeRadius;
   if (type === 'herbHut') return CONFIG.gatheringZones.herbHutRadius;
+  if (type === 'tidalFishery') return CONFIG.gatheringZones.tidalFisheryRadius;
   return CONFIG.gatheringZones.lumberCampRadius;
 }
 
 export function isGatheringBuildingType(type: BuildingTypeId | null | undefined): type is GatheringBuildingType {
-  return type === 'lumberCamp' || type === 'huntLodge' || type === 'herbHut';
+  return type === 'lumberCamp' || type === 'huntLodge' || type === 'herbHut' || type === 'tidalFishery';
 }
 
 export function isTileInGatheringWorkArea(anchor: GatheringAnchor, tile: TilePoint): boolean {

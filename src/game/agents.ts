@@ -57,6 +57,7 @@ import { performPhysicianTreatment } from './medicine';
 import { isTileInMineWorkArea, mineralDepositsInMineRange, servingMineForTile } from './miningSites';
 import { gatheringWorkArea, isTileInGatheringWorkArea } from './gatheringZones';
 import { oreSampleAt } from './subsurfaceVeins';
+import { takeTidalFlatStock, tidalFlatSummaryInArea, tidalFlatYieldMultiplier } from './tidalFlats';
 import { waterDependentProductionMultiplier } from './waterSupply';
 import { activeFireDisaster, applyFireWater, drawFireWater, nearestFireWaterSource } from './fire';
 import { mineCollapseRepairLocked } from './mineCollapse';
@@ -434,6 +435,7 @@ function isSettledAtGoal(resident: Resident, result: GoResult): boolean {
 const PATH_FAIL_COOLDOWN_TICKS = 3;
 const pathFailUntilByState = new WeakMap<GameState, Map<number, number>>();
 const huntDepletionWarningDayByState = new WeakMap<GameState, Map<number, number>>();
+const tidalDepletionWarningDayByState = new WeakMap<GameState, Map<number, number>>();
 
 function pathFailUntilFor(state: GameState): Map<number, number> {
   let cache = pathFailUntilByState.get(state);
@@ -449,6 +451,15 @@ function huntDepletionWarningDaysFor(state: GameState): Map<number, number> {
   if (!cache) {
     cache = new Map<number, number>();
     huntDepletionWarningDayByState.set(state, cache);
+  }
+  return cache;
+}
+
+function tidalDepletionWarningDaysFor(state: GameState): Map<number, number> {
+  let cache = tidalDepletionWarningDayByState.get(state);
+  if (!cache) {
+    cache = new Map<number, number>();
+    tidalDepletionWarningDayByState.set(state, cache);
   }
   return cache;
 }
@@ -2612,7 +2623,7 @@ function saltMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
   if (!saltworks) return;
   if (!saltworksHasSeaAccess(state, saltworks)) {
     r.phase = 'rest';
-    r.task = '바닷물 길이 끊김';
+    r.task = '바닷물 나르는 길이 끊김';
     return;
   }
   const inputs: WorkplaceInputs = { firewood: CONFIG.production.firewoodPerSalt };
@@ -2649,11 +2660,42 @@ function saltMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
 
 function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
+  const workplace = assignedWorkplaceOfTypes(state, r, ctx, ['ferry', 'tidalFishery'], '어로 거점 배정 없음');
+  if (!workplace) return;
+  if (workplace.type === 'tidalFishery') {
+    gatherJob(state, r, ctx, {
+      goal: tile => tile.terrain === 'mudflat' && tile.buildingId == null &&
+        (tile.tidalStock ?? 0) > WORK_STOCK_EPSILON && isTileInGatheringWorkArea(workplace, tile),
+      workTicks: a.work.fish,
+      yieldRes: 'fish',
+      yieldAmt: a.yields.fish * tidalFlatYieldMultiplier(ctx.season),
+      cap: a.carryCap.fish,
+      depositExtra: ['tidalFishery'],
+      depositTargets: () => [workplace],
+      taskWork: tile => (tile.x + tile.y) % 2 === 0 ? '갯벌에서 조개·게 줍는 중' : '어살을 살피는 중',
+      taskMove: '갯벌 작업지로 이동',
+      taskHaul: '갯벌 어획물 운반',
+      taskNone: '잡을 것이 없는 갯벌',
+      adjustHarvestAmount: (tile, _resident, requested) => {
+        const taken = takeTidalFlatStock(tile, requested);
+        if ((tile.tidalStock ?? 0) <= WORK_STOCK_EPSILON) {
+          const remaining = tidalFlatSummaryInArea(state.map, gatheringWorkArea(workplace)).stock;
+          const warningDays = tidalDepletionWarningDaysFor(state);
+          const lastWarningDay = warningDays.get(workplace.id) ?? -Infinity;
+          if (remaining <= WORK_STOCK_EPSILON &&
+              state.day - lastWarningDay >= CONFIG.tidalFlats.depletionLogCooldownDays) {
+            warningDays.set(workplace.id, state.day);
+            addLog(state, '어살터 작업영역의 갯벌 비축이 바닥났습니다. 며칠 쉬면 다시 찹니다.', 'bad', true);
+          }
+        }
+        return taken;
+      },
+    });
+    return;
+  }
   const floodMult = state.weather === 'thawFlood' ? 0.25 : 1;
-  const ferry = assignedWorkplace(state, r, ctx, 'ferry', '나루터 배정 없음');
-  if (!ferry) return;
   gatherJob(state, r, ctx, {
-    goal: buildingInteractionGoal(state, [ferry.id]),
+    goal: buildingInteractionGoal(state, [workplace.id]),
     workTicks: a.work.fish,
     yieldRes: 'fish',
     yieldAmt: a.yields.fish * CONFIG.seasons.fishMult[ctx.season] * floodMult * droughtFishYieldMultiplier(state),
@@ -3642,7 +3684,7 @@ function endOfDayDepositExtra(r: Resident): BuildingTypeId[] {
     case 'woodcutter': return ['lumberCamp'];
     case 'hunter': return ['huntLodge'];
     case 'herbalist': return ['herbHut'];
-    case 'fisher': return ['ferry'];
+    case 'fisher': return ['ferry', 'tidalFishery'];
     default: return [];
   }
 }

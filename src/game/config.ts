@@ -33,8 +33,19 @@ export const CONFIG = {
     lumberCampMaxRadius: 10,
     huntLodgeRadius: 7,
     herbHutRadius: 6,
+    tidalFisheryRadius: 6,
     lodgingSupplyDays: 3,
     lodgingHomeRestDays: 1,
+  },
+
+  tidalFlats: {
+    capacityPerTile: 3,
+    recoveryPerTilePerDay: 0.14,
+    // 기존 채집 주기 보정을 거친 뒤 봄 맑은 날 어부 1인 약 1.1 fish/일이 되도록 맞춘다.
+    yieldMultiplier: 0.44,
+    minimumPlacementTiles: 5,
+    depletionLogCooldownDays: 8,
+    seasonYieldMult: { spring: 1.15, summer: 1.1, autumn: 1, winter: 0.65 },
   },
 
   habitats: {

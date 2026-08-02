@@ -315,7 +315,7 @@ export function JobPanel({
           </div>
         </details>
       </div>
-      {JOB_ORDER.filter(job => job !== 'idle' && isJobUnlocked(state.rank, job)).map(job => {
+      {JOB_ORDER.filter(job => job !== 'idle' && isJobUnlocked(state.rank, job, state.worldSetup?.region)).map(job => {
         const count = jobWorkforceCounts(state, job);
         const gated = isLiterateJob(job);
         const assignableIdle = state.residents.filter(resident =>

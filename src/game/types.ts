@@ -67,6 +67,7 @@ export type WeatherId =
 export type Terrain =
   | 'forest'   // 숲
   | 'plain'    // 평지
+  | 'mudflat'  // 갯벌 (해안 어살터의 도보 작업 지형)
   | 'river'    // 강 (겨울에는 얼어붙은 강으로 표시)
   | 'lake'     // 호수 (가장자리부터 점진적으로 결빙·해빙)
   | 'sea'      // 바다 (해수 — 식수·농수 불가, 결빙하지 않음)
@@ -194,6 +195,7 @@ export type BuildingTypeId =
   | 'dryingRack' // 건조대
   | 'onggiKiln'  // 옹기가마
   | 'saltworks'  // 자염막 — 해안에서 장작으로 바닷물을 끓여 소금 생산
+  | 'tidalFishery' // 어살터 — 갯벌을 도보로 이용하는 해안 어로 거점
   | 'jangdokdae' // 장독대
   | 'bridge'     // 다리
   | 'weir'       // 보(洑) — 가뭄 관개 시설
@@ -245,6 +247,8 @@ export interface Tile {
   hasIron: boolean;       // rock 타일 중 철광 여부
   hasSilver?: boolean;    // 잠채/설점으로 은광이 된 광상. 구버전 저장은 없음
   mineralRemaining?: number; // 바위/철광의 남은 주 광물량. 구버전 저장은 없음
+  tidalStock?: number;    // 갯벌의 현재 어획 비축. 갯벌 외 지형에는 없음
+  tidalCapacity?: number; // 갯벌의 최대 어획 비축. 갯벌 외 지형에는 없음
   buildingId: number | null;
 }
 
@@ -621,7 +625,7 @@ export interface BuildingDef {
   capacity: number;         // 주거 수용 인원
   defense: number;          // 제공 방어도
   winterBonus: boolean;     // 겨울 보너스 여부
-  placement: 'land' | 'field' | 'paddy' | 'river' | 'rock' | 'riverbank' | 'coast' | 'watermill' | 'any';
+  placement: 'land' | 'field' | 'paddy' | 'river' | 'rock' | 'riverbank' | 'coast' | 'mudflat' | 'watermill' | 'any';
   unique: boolean;          // 하나만 건설 가능 여부
   minRank?: Rank;
   region?: MapRegion;       // 특정 지역에서만 건설 가능한 시설
