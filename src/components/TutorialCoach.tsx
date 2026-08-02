@@ -68,7 +68,8 @@ function sownArea(state: GameState): number {
 // 17스텝의 소목표 순서를 그대로 따른다 (scenario.ts의 TUTORIAL_STEPS와 같은 순서·같은 id).
 // 가리킬 UI가 없는 소목표(관찰·대기)는 힌트를 두지 않는다 — 코치는 조용히 물러난다.
 //
-// 직업 배정 안내는 이원화되어 있다 (R2-1). 1단계 벌목꾼 한 번만 상세 4단 경로
+// 직업 배정 안내는 이원화되어 있다 (R2-1). 벌목장 터 직후 건축가는 빠른 ＋ 경로로 먼저 두고,
+// 1단계 벌목꾼 한 번만 상세 4단 경로
 // (`job-detail-*` → 후보 체크 → 선택 배정)로 가르쳐 상세 창의 존재를 보여주고,
 // 그 뒤의 모든 직업은 빠른 배정 2단 경로(`dock-jobs` → `job-plus-{job}`)로 안내한다.
 // ＋ 버튼이 접혀 보이지 않으면 코치는 얕은 앵커(`dock-jobs`)로 스스로 물러난다.
@@ -103,6 +104,16 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       ],
     },
     {
+      done: state => countJob(state, 'builder') >= 1,
+      path: [
+        { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
+        {
+          tut: 'job-plus-builder',
+          text: '벌목장 터를 잡았으니 바로 건축가 옆의 ＋를 눌러 한 사람 두십시오. 건축가가 없으면 공사가 오르지 않습니다.',
+        },
+      ],
+    },
+    {
       done: state => countJob(state, 'woodcutter') >= 1,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
@@ -110,8 +121,7 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
         { tut: 'job-candidate-woodcutter', text: '아래 무직자 명단에서 벌목꾼으로 배정할 주민을 체크하십시오.' },
         {
           tut: 'job-assign-selected-woodcutter',
-          text: '선택 배정을 눌러 벌목꾼을 한 사람 이상 두십시오. 상세 배정은 이렇게 씁니다 — '
-            + '다음부터는 직업 옆의 ＋만 눌러도 무직자 하나가 그 일로 올라갑니다.',
+          text: '선택 배정을 눌러 벌목꾼을 한 사람 이상 두십시오. 사람을 골라 직업에 넣고 싶을 때는 이 상세 배정을 씁니다.',
         },
       ],
     },
@@ -176,14 +186,13 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       ],
     },
     {
-      // 터만 잡히고 공사가 오르지 않는 일을 막는다 — 두 공사는 건축가의 몫이다
+      // 앞 단계에서 둔 건축가를 그새 물렸을 때만 다시 보이는 구제 힌트다
       done: state => countJob(state, 'builder') >= 1,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
         {
           tut: 'job-plus-builder',
-          text: '건축가 옆의 ＋를 눌러 한 사람 이상 두십시오. 초가집도 장작마당도 건축가가 짓습니다 — '
-            + '건축가가 없으면 터만 잡힌 채 공사가 오르지 않습니다.',
+          text: '벌목장을 지은 건축가를 다른 일로 돌렸다면 다시 ＋로 한 사람 두십시오. 초가집과 장작마당도 건축가가 짓습니다.',
         },
       ],
     },

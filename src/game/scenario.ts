@@ -27,9 +27,9 @@ import type { GameState, JobId, Resident, ResourceId, ScenarioState } from './ty
 // 부르는 쪽은 예전처럼 scenario에서 가져다 쓴다.
 export { countScenarioProgress, markScenarioFlag } from './scenarioFlags';
 
-// 6 = G3에서 벌목장·채광장 배정을 튜토리얼 목표로 편입한 판. 스텝 수·목표 의미가 바뀌면 진행 위치의 뜻이
+// 7 = 벌목장 터 배치 직후 건축가 배정을 먼저 가르치는 판. 스텝 수·목표 의미가 바뀌면 진행 위치의 뜻이
 // 달라지므로 반드시 올린다 — 구판 저장은 로드에서 일반 모드로 해제된다.
-export const TUTORIAL_SCENARIO_VERSION = 6;
+export const TUTORIAL_SCENARIO_VERSION = 7;
 
 /** 소목표 하나 — 칩에 `라벨 (현재/목표)`로 선다. 라벨은 짧은 명사, 칩은 수치 요약이다. */
 export interface ScenarioGoalProgress {
@@ -104,6 +104,10 @@ function flags(state: GameState): Record<string, number> {
 
 function builtCount(state: GameState, predicate: (type: GameState['buildings'][number]['type']) => boolean): number {
   return state.buildings.filter(building => building.built && predicate(building.type)).length;
+}
+
+function placedCount(state: GameState, predicate: (type: GameState['buildings'][number]['type']) => boolean): number {
+  return state.buildings.filter(building => predicate(building.type)).length;
 }
 
 function jobCount(state: GameState, job: JobId): number {
@@ -208,13 +212,16 @@ const TUTORIAL_STEP_SPECS: readonly ScenarioStepSpec[] = [
       '사람은 저마다 맡은 일이 다릅니다. 벌목꾼이 벤 나무도 운반꾼이 창고에 들여야 비로소 비축입니다.\n\n' +
       '· 하단 독의 직업 배정 창을 여십시오. 누가 무슨 일을 하는지 한눈에 보입니다.\n' +
       '· 건설 목록(생산)에서 값싼 벌목장을 먼저 세우십시오. 채집 일은 거점에 배정된 사람만 수행합니다.\n' +
-      '· 완공된 벌목장을 선택해 벌목꾼을 한 사람 배정하고, 운반꾼도 한 사람 이상 두십시오. 건축가가 있어야 집도 오릅니다.\n' +
-      '· 벌목장을 숲에 놓았다면 미배정 벌목꾼도 공사터 나무만은 먼저 베어 길을 엽니다.\n' +
-      '· 그다음부터는 직업 옆의 ＋만 눌러도 무직자 하나가 그 일로 올라갑니다. 급할 때는 이 편이 빠릅니다.\n' +
+      '· 벌목장 터를 잡은 바로 다음, 건축가 옆의 ＋를 눌러 한 사람을 배정하십시오. 건축가가 없으면 공사가 오르지 않습니다.\n' +
+      '· 벌목장을 숲에 놓았다면 벌목꾼을 한 사람 두십시오. 거점에 아직 배정되지 않았어도 공사터 나무만은 먼저 베어 길을 엽니다.\n' +
+      '· 완공된 벌목장을 선택해 그 벌목꾼을 작업 슬롯에 배정하고, 운반꾼도 한 사람 이상 두십시오.\n' +
+      '· 직업 옆의 ＋를 누르면 무직자 하나를 그 일에 빠르게 배정할 수 있습니다.\n' +
       '· 땅바닥에 쌓인 자원은 아직 살림이 아닙니다. 창고에 들어와야 곳간에 잡힙니다.',
     progress: state => [
       flagGoal(state, '직업 창', 'jobPanelOpened'),
-      { label: '벌목장', current: builtCount(state, type => type === 'lumberCamp'), target: 1 },
+      { label: '벌목장 터', current: placedCount(state, type => type === 'lumberCamp'), target: 1 },
+      { label: '건축가', current: jobCount(state, 'builder'), target: 1 },
+      { label: '벌목장 완공', current: builtCount(state, type => type === 'lumberCamp'), target: 1 },
       { label: '벌목장 배정', current: assignedJobCount(state, 'woodcutter', ['lumberCamp']), target: 1 },
       { label: '운반꾼', current: jobCount(state, 'hauler'), target: 1 },
     ],
@@ -241,8 +248,7 @@ const TUTORIAL_STEP_SPECS: readonly ScenarioStepSpec[] = [
       '· 목재와 장작은 다릅니다. 벌목꾼이 벤 것은 목재이고, 장작마당에서 장작꾼이 패야 땔감이 됩니다. ' +
       '원료를 가공해 비축하는 이 문법은 앞으로도 되풀이됩니다.\n' +
       '· 건설 목록(주거)에서 초가집을, (생산)에서 장작마당을 지으십시오.\n' +
-      '· 두 공사는 건축가가 맡습니다. 직업 배정에서 건축가를 한 사람 이상 두십시오 — ' +
-      '건축가가 없으면 터만 잡힌 채 공사가 오르지 않습니다.\n' +
+      '· 벌목장을 지은 건축가가 두 공사도 맡습니다. 그사이 다른 직업으로 돌렸다면 다시 한 사람을 두십시오.\n' +
       '· 직업 배정에서 장작꾼도 한 사람 이상 두십시오. 장작꾼은 장작마당이 있어야 일합니다.\n' +
       '· 그동안 농부는 밭을 갈고 씨를 뿌립니다. 파종이 더디거든 농부가 모자란 것입니다.',
     progress: state => [

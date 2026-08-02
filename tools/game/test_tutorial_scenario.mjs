@@ -299,10 +299,10 @@ function goalItem(step, state, label) {
 }
 
 {
-  // 17스텝 구성과 버전 (G3: 채집 거점 배정 필수화로 저장된 진행 판정이 달라져 버전을 올렸다)
+  // 17스텝 구성과 버전 (R7: 첫 벌목장 건축가 목표 추가로 진행 판정이 달라져 버전을 올렸다)
   assert.deepEqual(scenario.TUTORIAL_STEPS.map(step => step.id), EXPECTED_STEP_IDS);
   assert.equal(scenario.TUTORIAL_STEPS.length, 17);
-  assert.equal(scenario.TUTORIAL_SCENARIO_VERSION, 6);
+  assert.equal(scenario.TUTORIAL_SCENARIO_VERSION, 7);
   // 첫 겨울은 이제 완료 지점이 아니라 중간 스텝이다
   assert.equal(scenario.TUTORIAL_STEPS[9].id, 'winter');
   assert.ok(scenario.TUTORIAL_STEPS[10], 'the winter step is followed by the second year');
@@ -336,7 +336,9 @@ function goalItem(step, state, label) {
   // 스텝별 소목표 라벨 — 순서까지 못 박는다 (칩과 코치가 같은 순서를 따른다)
   const labelsOf = id => stepById(id).progress(state).map(item => item.label);
   assert.deepEqual(labelsOf('naming'), ['주민 선택', '미니맵', '배속', '이튿날 아침']);
-  assert.deepEqual(labelsOf('working'), ['직업 창', '벌목장', '벌목장 배정', '운반꾼']);
+  assert.deepEqual(labelsOf('working'), [
+    '직업 창', '벌목장 터', '건축가', '벌목장 완공', '벌목장 배정', '운반꾼',
+  ]);
   assert.deepEqual(labelsOf('sowing'), ['밭 배치', '농부']);
   assert.deepEqual(labelsOf('hearth'), ['초가집', '장작마당', '장작꾼', '장작', '파종']);
   assert.deepEqual(labelsOf('water'), ['수맥 탭', '물자리']);
@@ -424,6 +426,7 @@ function goalItem(step, state, label) {
   assert.equal(scenario.currentScenarioStep(state)?.id, 'working');
   markFlags(state, 'jobPanelOpened');
   const camp = pushBuilt(state, 'lumberCamp');
+  assignJobs(state, { builder: 1 });
   assignWorkers(state, 'woodcutter', camp, 1);
   assignJobs(state, { hauler: 1 }); // 전원 무직으로 시작하므로 여기서 직접 배분한다
   closeModals(state);
@@ -486,11 +489,19 @@ function goalItem(step, state, label) {
   const buildHint = coachSource.indexOf("{ tut: 'build-item-woodShed'");
   const workerHint = coachSource.indexOf("tut: 'job-plus-woodSplitter'");
   assert.ok(buildHint >= 0 && workerHint > buildHint, 'coach points to wood yard construction before staffing');
-  // 전원 무직 시작이므로 공사를 올릴 건축가도 이 스텝에서 안내한다 (배치 → 건축가 → 장작꾼 순)
+  // 건축가는 벌목장 터 직후 이미 가르쳤고, 여기서는 다른 일로 돌렸을 때만 같은 앵커가 구제한다.
   const builderHint = coachSource.indexOf("tut: 'job-plus-builder'");
+  const hearthHintsSource = coachSource.slice(coachSource.indexOf('hearth: ['), coachSource.indexOf('water: ['));
+  const recoveryBuildHint = hearthHintsSource.indexOf("{ tut: 'build-item-woodShed'");
+  const recoveryBuilderHint = hearthHintsSource.indexOf("tut: 'job-plus-builder'");
+  const recoveryWorkerHint = hearthHintsSource.indexOf("tut: 'job-plus-woodSplitter'");
   assert.ok(
-    builderHint > buildHint && builderHint < workerHint,
-    'coach staffs the builder between placing the yard and staffing the splitter',
+    builderHint >= 0 && builderHint < buildHint,
+    'coach teaches builder staffing during the lumber-camp lesson, before the hearth lesson',
+  );
+  assert.ok(
+    recoveryBuilderHint > recoveryBuildHint && recoveryBuilderHint < recoveryWorkerHint,
+    'the hearth lesson retains a recovery hint if the earlier builder was reassigned',
   );
   assert.match(coachSource, /coachHorizontalPlacement\(rect\.left \+ rect\.width \/ 2, window\.innerWidth\)/,
     'coach bubble placement follows the actual center of its target');
@@ -616,13 +627,15 @@ function goalItem(step, state, label) {
       `the ${match[1]} ＋ hint keeps dock-jobs as its shallow fallback anchor`,
     );
   }
-  // 상세 경로를 한 번 밟은 자리에서 ＋의 존재를 일러 준다
+  // 벌목장 터 직후에는 건축가 ＋를 먼저 가리키고, 그 뒤 벌목꾼 상세 배정을 가르친다.
   assert.ok(
-    /다음부터는 직업 옆의 ＋/.test(coachSource),
-    'the woodcutter hint hands off to the quick ＋ button for later jobs',
+    coachSource.indexOf("tut: 'job-plus-builder'") < coachSource.indexOf("tut: 'job-detail-woodcutter'"),
+    'the builder quick assignment follows lumber-camp placement before the woodcutter detail path',
   );
   const workingStep = stepById('working');
   assert.match(workingStep.body, /＋/, 'the working step body introduces the quick assignment button');
+  assert.ok(workingStep.progress(tutorialStart.createTutorialGame()).some(item => item.label === '건축가'),
+    'the working step exposes builder assignment as an explicit goal');
 }
 
 {
@@ -652,6 +665,7 @@ function goalItem(step, state, label) {
     working: s => {
       markFlags(s, 'jobPanelOpened');
       const camp = pushBuilt(s, 'lumberCamp');
+      assignJobs(s, { builder: 1 });
       assignWorkers(s, 'woodcutter', camp, 1);
       assignJobs(s, { hauler: 1 });
     },
@@ -665,7 +679,7 @@ function goalItem(step, state, label) {
     hearth: s => {
       pushBuilt(s, 'woodShed');
       pushBuilt(s, 'hut');
-      assignJobs(s, { builder: 1, woodSplitter: 1 });
+      assignJobs(s, { woodSplitter: 1 });
       s.resources.firewood = (s.scenario.flags.firewoodGoal ?? 0) + 5;
       // 그동안 농부가 갈고 뿌렸다 — 병행 구조의 결과를 흉내낸다
       for (const plot of plots()) plot.sownArea = s.scenario.flags.sownAreaGoal;
