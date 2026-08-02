@@ -11,7 +11,7 @@ import {
 } from './waterCoverage';
 import type { Building, BuildingTypeId, GameState, Resident } from './types';
 
-export type WaterSupplySource = 'river' | 'canal' | 'well' | 'none';
+export type WaterSupplySource = 'river' | 'lake' | 'canal' | 'well' | 'none';
 
 export interface BuildingWaterSupply {
   demand: number;
@@ -232,6 +232,10 @@ export function waterSupplySnapshot(
   for (const { building, demand } of demandBuildings) {
     if (buildingTouchesWaterCoverage(building, naturalCoverage.river)) {
       buildings.set(building.id, { demand, supplied: demand, ratio: 1, source: 'river' });
+      continue;
+    }
+    if (buildingTouchesWaterCoverage(building, naturalCoverage.lake)) {
+      buildings.set(building.id, { demand, supplied: demand, ratio: 1, source: 'lake' });
       continue;
     }
     if (buildingTouchesWaterCoverage(building, naturalCoverage.canal)) {

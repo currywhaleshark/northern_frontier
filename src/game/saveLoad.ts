@@ -2376,7 +2376,8 @@ export function loadGame(slot = 1): GameState | null {
       const fireResponse = resident.fireResponse;
       if (!fireResponse) continue;
       const valid = activeFireSiteIds.has(fireResponse.buildingId) &&
-        (fireResponse.sourceKind === 'well' || fireResponse.sourceKind === 'river') &&
+        (fireResponse.sourceKind === 'well' || fireResponse.sourceKind === 'river' ||
+          fireResponse.sourceKind === 'lake') &&
         (fireResponse.phase === 'toWater' || fireResponse.phase === 'toFire') &&
         Number.isFinite(fireResponse.sourceX) && Number.isFinite(fireResponse.sourceY) &&
         Number.isFinite(fireResponse.carriedWater) && fireResponse.carriedWater >= 0 &&

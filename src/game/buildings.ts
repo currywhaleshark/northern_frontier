@@ -5,6 +5,7 @@ import { createCombatRoster } from './combatRoster';
 import { hasKnownMineralDepositNear } from './miningSites';
 import { aquiferSampleAt, oreSampleAt } from './subsurfaceVeins';
 import { hasAdjacentFlowingCanal } from './irrigation';
+import { isNaturalWaterTerrain } from './terrain';
 import { GATE_CONVERSION_COSTS } from './walls';
 import type { Building, BuildingDef, BuildingTypeId, GameState, Rank, ResourceId, SmithyProductId, Tile } from './types';
 
@@ -700,6 +701,7 @@ export function leveeAtTile(
 function isLeveeBankLand(tile: Tile | undefined): boolean {
   return tile != null &&
     tile.terrain !== 'river' &&
+    tile.terrain !== 'lake' &&
     tile.terrain !== 'mountain' &&
     tile.terrain !== 'rock' &&
     tile.terrain !== 'center';
@@ -793,6 +795,7 @@ function isRiverbank(state: GameState | undefined, tile: Tile): boolean {
   const isLand = (neighbor: Tile | undefined): boolean =>
     neighbor != null &&
     neighbor.terrain !== 'river' &&
+    neighbor.terrain !== 'lake' &&
     neighbor.terrain !== 'mountain' &&
     neighbor.terrain !== 'rock' &&
     neighbor.terrain !== 'center';
@@ -804,13 +807,17 @@ function isRiverbank(state: GameState | undefined, tile: Tile): boolean {
   );
 }
 
-function hasAdjacentRiver(state: GameState | undefined, tile: Tile): boolean {
+function hasAdjacentNaturalWater(state: GameState | undefined, tile: Tile): boolean {
   if (!state) return false;
+  const at = (x: number, y: number): boolean => {
+    const terrain = state.map[y]?.[x]?.terrain;
+    return terrain != null && isNaturalWaterTerrain(terrain);
+  };
   return (
-    state.map[tile.y - 1]?.[tile.x]?.terrain === 'river' ||
-    state.map[tile.y + 1]?.[tile.x]?.terrain === 'river' ||
-    state.map[tile.y]?.[tile.x - 1]?.terrain === 'river' ||
-    state.map[tile.y]?.[tile.x + 1]?.terrain === 'river'
+    at(tile.x, tile.y - 1) ||
+    at(tile.x, tile.y + 1) ||
+    at(tile.x - 1, tile.y) ||
+    at(tile.x + 1, tile.y)
   );
 }
 
@@ -820,7 +827,7 @@ function isPaddyPlacementTile(tile: Tile): boolean {
 
 export function isPaddyEligibleTile(state: GameState | undefined, tile: Tile): boolean {
   return isPaddyPlacementTile(tile) &&
-    (hasAdjacentRiver(state, tile) || hasAdjacentFlowingCanal(state, tile.x, tile.y));
+    (hasAdjacentNaturalWater(state, tile) || hasAdjacentFlowingCanal(state, tile.x, tile.y));
 }
 
 export function isPaddyFootprintEligible(
@@ -834,6 +841,7 @@ export function isPaddyFootprintEligible(
 
 function isWatermillLandTile(tile: Tile): boolean {
   return tile.terrain !== 'river' &&
+    tile.terrain !== 'lake' &&
     tile.terrain !== 'mountain' &&
     tile.terrain !== 'rock' &&
     tile.terrain !== 'center';
@@ -860,7 +868,8 @@ export function canPlaceOn(def: BuildingDef, tile: Tile, state?: GameState): boo
     // 숲도 받는다 — 벌목꾼이 베어 평지로 만든 뒤에야 농부가 공사를 시작한다.
     return tile.terrain === 'fertile' || tile.terrain === 'plain' || tile.terrain === 'forest';
   }
-  if (tile.terrain === 'river' || tile.terrain === 'mountain' || tile.terrain === 'rock' || tile.terrain === 'center') {
+  if (tile.terrain === 'river' || tile.terrain === 'lake' || tile.terrain === 'mountain' ||
+      tile.terrain === 'rock' || tile.terrain === 'center') {
     return false;
   }
   // land: 평지/숲/비옥지 (숲에 지으면 개간)

@@ -17,6 +17,7 @@ const {
 
 assert.equal(terrainCanopyLayer('forest'), 'forest');
 assert.equal(terrainCanopyLayer('plain'), null);
+assert.equal(terrainCanopyLayer('lake'), null);
 assert.equal(terrainCanopyLayer('fertile'), null);
 assert.equal(terrainCanopyLayer('mountain'), null);
 

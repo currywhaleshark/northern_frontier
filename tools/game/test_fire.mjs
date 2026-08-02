@@ -64,6 +64,9 @@ const sample = subsurface.aquiferSampleAt(seed, size, size, well.x, well.y);
 state.aquiferLevels[sample.vein.id] = 0;
 assert.equal(fire.nearestFireWaterSource(state, target)?.kind, 'river',
   'an empty well must be skipped in favor of a reachable river');
+map[target.y][riverX].terrain = 'lake';
+assert.equal(fire.nearestFireWaterSource(state, target)?.kind, 'lake',
+  'an empty well must also use a reachable lake as a natural firefighting source');
 
 const normalized = disasters.normalizePendingDisasters([{
   id: 'fire', choiceId: 'burning', startedDay: 8, resolveDay: 99,
@@ -96,6 +99,12 @@ assert.equal(fireState.pendingDisasters[0].fireSites[0].buildingId, target.id,
 assert.ok(fire.drawFireWater(fireState, {
   kind: 'well', buildingId: well.id, x: well.x, y: well.y, distance: 0,
 }) > 0, 'drawing a fire bucket from a well must use a real aquifer source');
+const lakeAquiferLevels = [...fireState.aquiferLevels];
+assert.ok(fire.drawFireWater(fireState, {
+  kind: 'lake', x: riverX, y: target.y, distance: 0,
+}) > 0, 'lake water supplies an ordinary firefighting bucket without draining an aquifer');
+assert.deepEqual(fireState.aquiferLevels, lakeAquiferLevels,
+  'drawing a lake bucket never drains groundwater');
 fire.applyFireWater(fireState, target.id, 1);
 fire.advanceFire(fireState);
 assert.equal(fireState.pendingDisasters.length, 0,

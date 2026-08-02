@@ -15,6 +15,7 @@ import { resetAgent } from './agents';
 import { consumeMusketPowder, musketReadiness } from './weapons';
 import { damageBuildings, injure, killResidents, loot, moraleShock } from './raidDamage';
 import { factionRaidPartyLabel } from './diplomaticFigures';
+import { isLakeIceAt } from './lakeIce';
 import type { Battle, BattleLocation, BattleMode, BattleOutcome, GameState, RaiderBand, Resident, WeatherId } from './types';
 
 export const BATTLE_MUSTER_DEADLINE = 5;
@@ -106,7 +107,8 @@ function villageBattleFront(state: GameState, band: RaiderBand): { x: number; y:
       const centerDistance = Math.abs(x - center.x) + Math.abs(y - center.y);
       if (centerDistance < 2 || centerDistance > 4) continue;
       if (tile.buildingId != null || tile.terrain === 'mountain' ||
-          tile.terrain === 'rock' || tile.terrain === 'river') continue;
+          tile.terrain === 'rock' || tile.terrain === 'river' ||
+          (tile.terrain === 'lake' && !isLakeIceAt(state.map, state.day, x, y))) continue;
       candidates.push({
         x,
         y,

@@ -33,7 +33,7 @@ const DISASTER_IDS = new Set<DisasterId>([
 
 const FROST_WEATHERS = new Set<WeatherId>(['frost', 'coldSnap']);
 const SNOW_DAMAGE_WEATHERS = new Set<WeatherId>(['heavySnow', 'blizzard']);
-const TERRAIN_IDS = new Set<Terrain>(['forest', 'plain', 'river', 'mountain', 'fertile', 'rock', 'center']);
+const TERRAIN_IDS = new Set<Terrain>(['forest', 'plain', 'river', 'lake', 'mountain', 'fertile', 'rock', 'center']);
 const CARDINAL_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 const SPRING_FLOOD_TILE_SET_CACHE = new WeakMap<PendingDisaster, Set<string>>();
 
@@ -454,7 +454,7 @@ export function restoreWeirReservoir(state: GameState, weir: Building): boolean 
 }
 
 function floodableTerrain(terrain: Terrain): boolean {
-  return terrain !== 'river' && terrain !== 'mountain' && terrain !== 'rock';
+  return terrain !== 'river' && terrain !== 'lake' && terrain !== 'mountain' && terrain !== 'rock';
 }
 
 function edgeFromStep(dx: number, dy: number): LeveeEdge {

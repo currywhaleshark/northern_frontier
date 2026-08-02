@@ -4,6 +4,7 @@ import {
   rollMineralDepositAmount, setMineralDeposit,
 } from './minerals';
 import { ensureForestGrowth } from './forestGrowth';
+import { isNaturalWaterTerrain } from './terrain';
 import type { MapRegion, Tile, Terrain } from './types';
 
 // mulberry32 시드 난수 — 지도 생성과 시뮬레이션 전반에서 사용
@@ -59,7 +60,8 @@ function reachableFromCenter(tiles: Tile[][], centerX: number, centerY: number):
     const current = queue[index];
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const next = tiles[current.y + dy]?.[current.x + dx];
-      if (!next || next.terrain === 'river' || next.terrain === 'mountain' || next.terrain === 'rock') continue;
+      if (!next || isNaturalWaterTerrain(next.terrain) ||
+          next.terrain === 'mountain' || next.terrain === 'rock') continue;
       const key = next.x + ',' + next.y;
       if (reachable.has(key)) continue;
       reachable.add(key);
@@ -109,6 +111,7 @@ export function generateMap(
   const w = Math.max(16, Math.floor(dimensions.width));
   const h = Math.max(16, Math.floor(dimensions.height));
   const mountainRegion = region === 'mountain';
+  const lakeRegion = region === 'lake';
   const areaScale = (w * h) / (44 * 44);
   const scaledCount = (base: number): number => Math.max(1, Math.round(base * areaScale));
 
@@ -153,11 +156,15 @@ export function generateMap(
     riverX = Math.max(3, Math.min(w - 4, riverX));
   }
 
+  // 호수 지역에서만 추가 RNG를 소비한다. 호수 안의 기존 강 칸은 고요한 수면으로 합쳐
+  // 유입·유출 강만 남기고 큰 물그릇을 강 흐름 애니메이션에서 분리한다.
+  if (lakeRegion) carveLakeBasin(tiles, rng);
+
   // 산지: 동쪽/북쪽 가장자리에 능선
-  for (let i = 0; i < scaledCount(10); i++) {
+  for (let i = 0; i < scaledCount(lakeRegion ? 7 : 10); i++) {
     blob(tiles, rng, w - 2 - rng() * 5, rng() * h, 26, 'mountain', ['plain']);
   }
-  for (let i = 0; i < scaledCount(6); i++) {
+  for (let i = 0; i < scaledCount(lakeRegion ? 4 : 6); i++) {
     blob(tiles, rng, rng() * w, rng() * 4, 20, 'mountain', ['plain']);
   }
 
@@ -181,7 +188,7 @@ export function generateMap(
   }
 
   // 숲: 넓게 분포
-  for (let i = 0; i < scaledCount(mountainRegion ? 40 : 26); i++) {
+  for (let i = 0; i < scaledCount(mountainRegion ? 40 : lakeRegion ? 18 : 26); i++) {
     blob(tiles, rng, rng() * w, rng() * h, mountainRegion ? 36 : 30, 'forest', ['plain']);
   }
 
@@ -191,16 +198,17 @@ export function generateMap(
       if (tiles[y][x].terrain !== 'mountain') continue;
       const edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
         const t = tiles[y + dy]?.[x + dx];
-        return t && t.terrain !== 'mountain' && t.terrain !== 'rock' && t.terrain !== 'river';
+        return t && t.terrain !== 'mountain' && t.terrain !== 'rock' &&
+          !isNaturalWaterTerrain(t.terrain);
       });
-      if (edge && rng() < (mountainRegion ? 0.38 : 0.25)) {
+      if (edge && rng() < (mountainRegion ? 0.38 : lakeRegion ? 0.15 : 0.25)) {
         const hasIron = rng() < (mountainRegion ? 0.6 : 0.5);
         setMineralDeposit(tiles[y][x], hasIron, rollMineralDepositAmount(hasIron, rng));
       }
     }
   }
 
-  // 비옥한 땅: 강 인접 평지
+  // 비옥한 땅: 강·호수 인접 평지
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       if (tiles[y][x].terrain !== 'plain') continue;
@@ -208,10 +216,12 @@ export function generateMap(
       for (let dy = -2; dy <= 2 && !nearRiver; dy++) {
         for (let dx = -2; dx <= 2 && !nearRiver; dx++) {
           const t = tiles[y + dy]?.[x + dx];
-          if (t && t.terrain === 'river') nearRiver = true;
+          if (t && isNaturalWaterTerrain(t.terrain)) nearRiver = true;
         }
       }
-      if (nearRiver && rng() < (mountainRegion ? 0.27 : 0.55)) tiles[y][x].terrain = 'fertile';
+      if (nearRiver && rng() < (mountainRegion ? 0.27 : lakeRegion ? 0.65 : 0.55)) {
+        tiles[y][x].terrain = 'fertile';
+      }
     }
   }
 
@@ -223,7 +233,13 @@ export function generateMap(
       const x = Math.floor(w / 2 + (rng() - 0.5) * (6 + r * 2));
       const y = Math.floor(h / 2 + (rng() - 0.5) * (6 + r * 2));
       const t = tiles[y]?.[x];
-      if (t && (t.terrain === 'plain' || t.terrain === 'fertile' || t.terrain === 'forest')) {
+      const clearLakeFootprint = !lakeRegion || Array.from({ length: 4 }, (_row, dy) =>
+        Array.from({ length: 5 }, (_cell, dx) => tiles[y - 1 + dy]?.[x - 1 + dx]))
+        .flat()
+        .every(candidate => candidate && !isNaturalWaterTerrain(candidate.terrain) &&
+          candidate.terrain !== 'mountain' && candidate.terrain !== 'rock');
+      if (t && clearLakeFootprint &&
+          (t.terrain === 'plain' || t.terrain === 'fertile' || t.terrain === 'forest')) {
         centerX = x; centerY = y;
         break outer;
       }
@@ -233,7 +249,7 @@ export function generateMap(
   for (let dy = -1; dy <= 2; dy++) {
     for (let dx = -1; dx <= 3; dx++) {
       const t = tiles[centerY + dy]?.[centerX + dx];
-      if (t && t.terrain !== 'river') {
+      if (t && !isNaturalWaterTerrain(t.terrain)) {
         t.terrain = 'plain';
         t.hasIron = false;
         delete t.mineralRemaining;
@@ -241,8 +257,66 @@ export function generateMap(
     }
   }
   tiles[centerY][centerX].terrain = 'center';
+  if (lakeRegion) ensureNearbyForest(tiles, centerX, centerY);
   placeNearbyMineralDeposits(tiles, centerX, centerY, rng);
   ensureForestGrowth(tiles);
 
   return { tiles, centerX, centerY };
+}
+
+function carveLakeBasin(tiles: Tile[][], rng: () => number): void {
+  const w = tiles[0]?.length ?? 0;
+  const h = tiles.length;
+  if (w === 0 || h === 0) return;
+  const targetRatio = 0.18 + rng() * 0.02;
+  const aspect = 1.12 + rng() * 0.28;
+  const radius = Math.sqrt((w * h * targetRatio) / Math.PI);
+  const rx = Math.min(w * 0.32, radius * Math.sqrt(aspect));
+  const ry = Math.min(h * 0.32, radius / Math.sqrt(aspect));
+  const marginX = rx + 3;
+  const marginY = ry + 3;
+  const cx = marginX + rng() * Math.max(1, w - marginX * 2);
+  const cy = marginY + rng() * Math.max(1, h - marginY * 2);
+  const phase3 = rng() * Math.PI * 2;
+  const phase5 = rng() * Math.PI * 2;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const nx = (x + 0.5 - cx) / rx;
+      const ny = (y + 0.5 - cy) / ry;
+      const angle = Math.atan2(ny, nx);
+      const edge = 1 + Math.sin(angle * 3 + phase3) * 0.075 + Math.sin(angle * 5 + phase5) * 0.04;
+      if (Math.hypot(nx, ny) <= edge &&
+          (tiles[y][x].terrain === 'plain' || tiles[y][x].terrain === 'river')) {
+        tiles[y][x].terrain = 'lake';
+      }
+    }
+  }
+}
+
+function ensureNearbyForest(
+  tiles: Tile[][],
+  centerX: number,
+  centerY: number,
+  minimum = 12,
+): void {
+  const reachable = reachableFromCenter(tiles, centerX, centerY);
+  const nearby = tiles.flat().filter(tile => {
+    const distance = Math.abs(tile.x - centerX) + Math.abs(tile.y - centerY);
+    return distance >= 7 && distance <= 18 && reachable.has(`${tile.x},${tile.y}`);
+  });
+  let forestCount = nearby.filter(tile => tile.terrain === 'forest').length;
+  if (forestCount >= minimum) return;
+  const candidates = nearby
+    .filter(tile => tile.terrain === 'plain')
+    .sort((left, right) => {
+      const leftDistance = Math.abs(left.x - centerX) + Math.abs(left.y - centerY);
+      const rightDistance = Math.abs(right.x - centerX) + Math.abs(right.y - centerY);
+      return leftDistance - rightDistance || left.y - right.y || left.x - right.x;
+    });
+  for (const tile of candidates) {
+    tile.terrain = 'forest';
+    forestCount++;
+    if (forestCount >= minimum) break;
+  }
 }

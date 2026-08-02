@@ -33,6 +33,7 @@ const columnCases = [
   ['center', 0],
   ['forest', 5],
   ['river', null],
+  ['lake', null],
   ['mountain', 3],
   ['rock', 3],
   ['fertile', 0],

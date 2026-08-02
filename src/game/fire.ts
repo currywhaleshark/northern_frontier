@@ -10,6 +10,7 @@ import { recordAnnals } from './annals';
 import { getSeason, getYear } from './seasons';
 import { wellWaterStatus } from './waterSupply';
 import { weatherForDay } from './weatherSchedule';
+import { isNaturalWaterTerrain } from './terrain';
 import type { Building, FireSite, FireWaterSourceKind, GameState, PendingDisaster, WeatherId } from './types';
 
 export interface FireWaterSource {
@@ -110,10 +111,10 @@ export function nearestFireWaterSource(
   }
   for (const row of state.map) {
     for (const tile of row) {
-      if (tile.terrain !== 'river') continue;
+      if (!isNaturalWaterTerrain(tile.terrain)) continue;
       const distance = footprintDistance(building, tile.x, tile.y);
       if (distance > maxDistance) continue;
-      candidates.push({ kind: 'river', x: tile.x, y: tile.y, distance });
+      candidates.push({ kind: tile.terrain === 'lake' ? 'lake' : 'river', x: tile.x, y: tile.y, distance });
     }
   }
   candidates.sort((a, b) => a.distance - b.distance ||
@@ -165,7 +166,7 @@ export function applyFireWater(state: GameState, buildingId: number, amount: num
 }
 
 export function drawFireWater(state: GameState, source: FireWaterSource): number {
-  if (source.kind === 'river') return CONFIG.disasters.fire.bucketAmount;
+  if (source.kind === 'river' || source.kind === 'lake') return CONFIG.disasters.fire.bucketAmount;
   const well = state.buildings.find(building => building.id === source.buildingId);
   const status = well ? wellWaterStatus(state, well) : null;
   if (!status || status.dailyOutput <= 0) return 0;

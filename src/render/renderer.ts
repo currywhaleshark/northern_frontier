@@ -13,7 +13,8 @@ import {
 } from '../game/buildings';
 import { COLLAPSE_RATIO } from '../game/battles';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
-import { getDayOfYear, getSeason } from '../game/seasons';
+import { getDayOfSeason, getDayOfYear, getSeason } from '../game/seasons';
+import { isLakeIceAt } from '../game/lakeIce';
 import { DAY_BANDS, DAY_CYCLE_SUBTICKS } from '../game/dayCycle';
 import { LEISURE_CLUSTER_CAPACITY } from '../game/agents';
 import { findHabitatIconAtTile } from '../game/habitats';
@@ -98,6 +99,7 @@ import {
   treeSpeciesFromHash,
 } from './terrainGrowthVisuals';
 import { waterLayerTintForBuilding } from './waterLayerPresentation';
+import { lakeShoreRipples } from './lakeShoreRipples';
 
 const TILE = CONFIG.ui.tileSize;
 
@@ -234,6 +236,7 @@ const TERRAIN_VISUAL_CODE: Record<Terrain, number> = {
   fertile: 5,
   rock: 6,
   center: 7,
+  lake: 8,
 };
 
 export function terrainVisualSignature(state: Pick<GameState, 'map'>): number {
@@ -338,7 +341,7 @@ function terrainParams(
   const tile = state.map[y][x];
   const isLand = (tx: number, ty: number): boolean => {
     const neighbor = state.map[ty]?.[tx];
-    return neighbor ? neighbor.terrain !== 'river' : false;
+    return neighbor ? neighbor.terrain !== 'river' && neighbor.terrain !== 'lake' : false;
   };
   const stableHash = terrainVisualHash(x, y);
   const mountainNearby = tile.terrain === 'forest' && [-1, 0, 1].some(dy =>
@@ -357,7 +360,10 @@ function terrainParams(
     terrain: tile.terrain,
     season,
     winter,
-    frozenRiver,
+    // Sprite contract의 이름은 기존 호환을 위해 유지한다. 호수는 날짜별 부분 결빙을 넣는다.
+    frozenRiver: tile.terrain === 'lake'
+      ? isLakeIceAt(state.map, state.day, x, y)
+      : frozenRiver,
     hasIron: tile.hasIron,
     hasSilver: tile.hasSilver,
     treeStage: treeStageFor(tile) ?? undefined,
@@ -375,7 +381,7 @@ function terrainParams(
     x: x * TILE,
     y: y * TILE,
     size: TILE,
-    banks: tile.terrain === 'river'
+    banks: tile.terrain === 'river' || tile.terrain === 'lake'
       ? {
           n: isLand(x, y - 1), e: isLand(x + 1, y), s: isLand(x, y + 1), w: isLand(x - 1, y),
           ne: isLand(x + 1, y - 1), se: isLand(x + 1, y + 1),
@@ -400,7 +406,10 @@ function drawTerrainLayer(
   const winter = season === 'winter';
   const frozenRiver = winter && state.weather !== 'thawFlood';
   // 계절·결빙·실제 타일 시각 속성이 바뀔 때만 다시 그린다.
-  const key = `${season}|${frozenRiver ? 1 : 0}|${visualSignature}|${width}|${height}|${renderScale}|${sprites.id}`;
+  const lakeIceKey = state.map.some(row => row.some(tile => tile.terrain === 'lake'))
+    ? `${season}:${getDayOfSeason(state.day)}`
+    : '';
+  const key = `${season}|${frozenRiver ? 1 : 0}|${lakeIceKey}|${visualSignature}|${width}|${height}|${renderScale}|${sprites.id}`;
   if (terrainLayer && terrainKey === key) return terrainLayer;
 
   const physicalWidth = Math.round(width * renderScale);
@@ -1489,16 +1498,18 @@ function drawNaturalWaterCoverage(
       const tileKey = waterCoverageTileKey(x, y);
       const source = coverage.river.has(tileKey)
         ? 'river'
-        : coverage.canal.has(tileKey)
-          ? 'canal'
-          : null;
+        : coverage.lake.has(tileKey)
+          ? 'lake'
+          : coverage.canal.has(tileKey)
+            ? 'canal'
+            : null;
       if (!source) continue;
       ctx.fillStyle = source === 'river'
         ? 'rgba(79, 214, 200, 0.25)'
-        : 'rgba(73, 138, 168, 0.29)';
+        : source === 'lake' ? 'rgba(61, 171, 199, 0.27)' : 'rgba(73, 138, 168, 0.29)';
       ctx.strokeStyle = source === 'river'
         ? 'rgba(118, 242, 226, 0.58)'
-        : 'rgba(111, 187, 217, 0.62)';
+        : source === 'lake' ? 'rgba(103, 210, 232, 0.60)' : 'rgba(111, 187, 217, 0.62)';
       ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
       ctx.strokeRect(x * TILE + 0.5, y * TILE + 0.5, TILE - 1, TILE - 1);
     }
@@ -1673,6 +1684,56 @@ function drawRiverFlow(
         ctx.beginPath();
         ctx.moveTo(gx, gy);
         ctx.lineTo(gx + dirX * 3.2 + perpX * 0.8, gy + dirY * 3.2 + perpY * 0.8);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+// 호수는 흐름 방향장 대신, 물가에서 안쪽으로 번지는 잔파문만 보인다.
+function drawLakeShoreRipples(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  viewport: SceneViewport,
+  animationTimeMs: number,
+): void {
+  ctx.save();
+  ctx.lineWidth = 1;
+  for (let ty = viewport.tileMinY; ty <= viewport.tileMaxY; ty++) {
+    for (let tx = viewport.tileMinX; tx <= viewport.tileMaxX; tx++) {
+      const tile = state.map[ty]?.[tx];
+      if (!tile || tile.terrain !== 'lake' || !isExplored(state, tx, ty) ||
+          isLakeIceAt(state.map, state.day, tx, ty)) continue;
+      const isLand = (x: number, y: number) => {
+        const neighbor = state.map[y]?.[x];
+        return neighbor != null && neighbor.terrain !== 'lake' && neighbor.terrain !== 'river';
+      };
+      const banks = {
+        n: isLand(tx, ty - 1), e: isLand(tx + 1, ty),
+        s: isLand(tx, ty + 1), w: isLand(tx - 1, ty),
+      };
+      const ripples = lakeShoreRipples(banks, tx, ty, animationTimeMs, TILE);
+      for (const ripple of ripples) {
+        const alpha = 0.08 + Math.sin(Math.PI * ripple.phase) * 0.18;
+        ctx.strokeStyle = `rgba(228, 244, 247, ${alpha.toFixed(3)})`;
+        const px = tx * TILE;
+        const py = ty * TILE;
+        const start = 4;
+        const end = TILE - 4;
+        ctx.beginPath();
+        for (let p = start; p <= end; p += 3) {
+          const curve = Math.sin((p / TILE) * Math.PI * 1.7 + ripple.phase * Math.PI * 2) * 0.7;
+          const horizontal = ripple.edge === 'n' || ripple.edge === 's';
+          const x = horizontal
+            ? px + p
+            : ripple.edge === 'e' ? px + TILE - ripple.offset + curve : px + ripple.offset + curve;
+          const y = horizontal
+            ? ripple.edge === 's' ? py + TILE - ripple.offset + curve : py + ripple.offset + curve
+            : py + p;
+          if (p === start) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
         ctx.stroke();
       }
     }
@@ -2324,6 +2385,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     );
   }
   drawRiverFlow(ctx, state, viewport, o.animationTimeMs, activeFlood != null);
+  drawLakeShoreRipples(ctx, state, viewport, o.animationTimeMs);
 
   const activeClaimZones = new Map<number, ClaimZone>();
   for (const point of [o.hover, o.selected]) {

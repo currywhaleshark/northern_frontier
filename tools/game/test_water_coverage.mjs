@@ -19,8 +19,10 @@ for (const file of readdirSync(srcDir).filter(file => file.endsWith('.ts'))) {
 
 const {
   buildingHasCanalWaterAccess,
+  buildingHasNaturalWaterAccess,
   buildingHasRiverWaterAccess,
   naturalWaterCoverageTileSets,
+  nearestNaturalWaterDistance,
   nearestRiverDistance,
   waterCoverageTileKey,
 } =
@@ -56,6 +58,19 @@ assert.equal(buildingHasRiverWaterAccess(state, {
 assert.equal(buildingHasRiverWaterAccess(state, {
   type: 'hut', x: 8, y: 0, w: 2, h: 2,
 }), false);
+
+const lakeMap = Array.from({ length: 9 }, (_, y) =>
+  Array.from({ length: 9 }, (_, x) => ({
+    x,
+    y,
+    terrain: x === 4 ? 'lake' : 'plain',
+  })));
+const lakeState = { map: lakeMap };
+assert.equal(nearestNaturalWaterDistance(lakeState, 1, 4), 3,
+  'lake shores share the three-tile natural water coverage radius');
+assert.equal(buildingHasNaturalWaterAccess(lakeState, {
+  type: 'hut', x: 1, y: 4, w: 2, h: 2,
+}), true, 'a lake shore is a natural daily-water source');
 
 const canalMap = Array.from({ length: 12 }, (_, y) =>
   Array.from({ length: 12 }, (_, x) => ({
@@ -165,6 +180,13 @@ assert.equal(supply.source, 'river');
 assert.equal(supply.ratio, 1);
 assert.equal(waterSupplySnapshot(supplyState).aquiferConsumption.reduce((sum, value) => sum + value, 0), 0,
   'river coverage never consumes aquifer water');
+
+supplyMap[house.y][riverX].terrain = 'lake';
+supply = buildingWaterSupply(supplyState, house);
+assert.equal(supply.source, 'lake', 'lake coverage is shown distinctly from flowing river water');
+assert.equal(supply.ratio, 1);
+assert.equal(waterSupplySnapshot(supplyState).aquiferConsumption.reduce((sum, value) => sum + value, 0), 0,
+  'lake coverage never consumes aquifer water');
 
 supplyMap[house.y][riverX].terrain = 'plain';
 supplyState.buildings = [house];

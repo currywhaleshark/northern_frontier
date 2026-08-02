@@ -30,6 +30,7 @@ import { clearTreeStage, markForestHarvest, treeStageFor } from './forestGrowth'
 import { assignClearingCrews, clearingBlocksWork, clearingSites, pendingClearingTiles } from './landClearing';
 import { isVeinSealedTile, recordRockMining, recordSilverMined } from './silver';
 import { getSeason } from './seasons';
+import { isLakeIceAt } from './lakeIce';
 import { outdoorMult } from './weather';
 import {
   droughtFarmGrowthMultiplier, droughtFishYieldMultiplier, initializeWeirReservoir,
@@ -208,6 +209,7 @@ export function isTerrainPassable(state: GameState, x: number, y: number): boole
     // 겨울 언 강 위는 걸어서 건널 수 있다 (해빙기 홍수 제외)
     return getSeason(state.day) === 'winter' && state.weather !== 'thawFlood';
   }
+  if (t.terrain === 'lake') return isLakeIceAt(state.map, state.day, x, y);
   return true;
 }
 
@@ -569,7 +571,7 @@ function buildingGoal(state: GameState, id: number): (t: Tile) => boolean {
   return buildingInteractionGoal(state, [id]);
 }
 
-function riverWaterGoal(state: GameState, riverX: number, riverY: number): (t: Tile) => boolean {
+function naturalWaterGoal(state: GameState, riverX: number, riverY: number): (t: Tile) => boolean {
   const points: { x: number; y: number }[] = [];
   const width = state.map[0]?.length ?? 0;
   const indices = new Set<number>();
@@ -649,10 +651,12 @@ function fireResponseAgentTick(state: GameState, resident: Resident, ctx: Ctx): 
   }
   clearHaulTask(resident);
   if (response.phase === 'toWater') {
-    resident.task = response.sourceKind === 'well' ? '우물로 물 뜨러 이동' : '강으로 물 뜨러 이동';
+    resident.task = response.sourceKind === 'well'
+      ? '우물로 물 뜨러 이동'
+      : response.sourceKind === 'lake' ? '호수로 물 뜨러 이동' : '강으로 물 뜨러 이동';
     const goal = response.sourceKind === 'well' && response.sourceBuildingId != null
       ? buildingGoal(state, response.sourceBuildingId)
-      : riverWaterGoal(state, response.sourceX, response.sourceY);
+      : naturalWaterGoal(state, response.sourceX, response.sourceY);
     const result = goTo(state, resident, ctx, goal);
     if (!isSettledAtGoal(resident, result)) return true;
     const amount = drawFireWater(state, {

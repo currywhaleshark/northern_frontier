@@ -1,5 +1,6 @@
 // 침입자 전용 경로 계획. 주민 A*와 통행 규칙을 공유하지 않는다.
 import { getSeason } from './seasons';
+import { isLakeIceAt } from './lakeIce';
 import { CONFIG } from './config';
 import { treeStageFor } from './forestGrowth';
 import { isGateBuilding, isSolidWallBuilding } from './walls';
@@ -94,7 +95,11 @@ export function isRaidTileTraversable(state: GameState, x: number, y: number, as
     if (effectiveWallType(building)) return true;
     return raiderCanUseBuilding(building);
   }
-  return tile.terrain !== 'river' || (getSeason(state.day) === 'winter' && state.weather !== 'thawFlood');
+  if (tile.terrain === 'river') {
+    return getSeason(state.day) === 'winter' && state.weather !== 'thawFlood';
+  }
+  if (tile.terrain === 'lake') return isLakeIceAt(state.map, state.day, x, y);
+  return true;
 }
 
 function stepCost(state: GameState, x: number, y: number, diagonal: boolean, assault: boolean): number {

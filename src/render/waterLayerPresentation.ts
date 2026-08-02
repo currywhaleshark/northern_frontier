@@ -5,6 +5,7 @@ export type WaterLayerTintKind =
   | 'well'
   | 'well-low'
   | 'river-supplied'
+  | 'lake-supplied'
   | 'canal-supplied'
   | 'well-supplied'
   | 'partially-supplied'
@@ -19,6 +20,7 @@ export interface WaterLayerTint {
 const WELL_TINT: WaterLayerTint = { kind: 'well', color: '#45c5ef', alpha: 0.48 };
 const WELL_LOW_TINT: WaterLayerTint = { kind: 'well-low', color: '#e7ad4f', alpha: 0.52 };
 const RIVER_TINT: WaterLayerTint = { kind: 'river-supplied', color: '#4fd6c8', alpha: 0.42 };
+const LAKE_TINT: WaterLayerTint = { kind: 'lake-supplied', color: '#4dadd8', alpha: 0.42 };
 const CANAL_TINT: WaterLayerTint = { kind: 'canal-supplied', color: '#498aa8', alpha: 0.44 };
 const SUPPLIED_TINT: WaterLayerTint = { kind: 'well-supplied', color: '#4b9ef2', alpha: 0.46 };
 const PARTIAL_TINT: WaterLayerTint = { kind: 'partially-supplied', color: '#efb04f', alpha: 0.54 };
@@ -41,6 +43,7 @@ export function waterLayerTintForBuilding(
   if (!supply || supply.demand <= 0) return null;
   if (supply.ratio >= 0.995) {
     if (supply.source === 'river') return RIVER_TINT;
+    if (supply.source === 'lake') return LAKE_TINT;
     if (supply.source === 'canal') return CANAL_TINT;
     return SUPPLIED_TINT;
   }

@@ -47,6 +47,7 @@ const TERRAIN_COLORS: Record<Terrain, string> = {
   forest: '#274938',
   plain: '#536447',
   river: '#3f7188',
+  lake: '#356b82',
   mountain: '#4a4b4b',
   fertile: '#788257',
   rock: '#6b6863',

@@ -55,6 +55,35 @@ assert.equal(buildings.isPaddyEligibleTile(state, map[2][4]), false,
 assert.equal(irrigation.wouldCanalFlowAt(state, 3, 2), true,
   'a placement ghost continuing a live canal previews as a water-filled channel');
 
+const lakeMap = makeMap();
+for (const row of lakeMap) row[0].terrain = 'lake';
+const lakeCanals = [
+  { id: 40, type: 'canal', x: 1, y: 2, built: true },
+  { id: 41, type: 'canal', x: 2, y: 2, built: true },
+];
+const lakeState = { map: lakeMap, buildings: lakeCanals, pendingDisasters: [] };
+for (const canal of lakeCanals) lakeMap[canal.y][canal.x].buildingId = canal.id;
+assert.deepEqual([...irrigation.flowingCanalTileSet(lakeState)].sort(), ['1,2', '2,2'],
+  'a completed canal chain may draw from a lake shore');
+assert.equal(irrigation.canalRiverEdgesAt(lakeState, 1, 2).w, true,
+  'canal inlet topology opens toward adjacent lake water as well as a river');
+assert.equal(buildings.isPaddyEligibleTile(lakeState, lakeMap[2][3]), true,
+  'a lake-fed live canal unlocks inland paddy placement');
+assert.equal(buildings.isPaddyEligibleTile(lakeState, lakeMap[2][1]), true,
+  'direct lake shore paddy placement is eligible');
+assert.equal(buildings.canPlaceBuildingAt(lakeState, 'weir', 0, 2), false,
+  'a still lake never becomes a weir placement target');
+assert.equal(buildings.canPlaceBuildingAt(lakeState, 'levee', 0, 2), false,
+  'a still lake never becomes a levee placement target');
+assert.equal(buildings.canPlaceBuildingAt(lakeState, 'watermill', 0, 2), false,
+  'a watermill still requires flowing river water');
+assert.equal(buildings.canPlaceBuildingAt(lakeState, 'bridge', 0, 2), false,
+  'a bridge remains a river-only building in S4');
+assert.equal(buildings.canPlaceBuildingAt(lakeState, 'ferry', 0, 2), false,
+  'the existing stationary ferry remains a river-only fishery');
+assert.equal(buildings.canPlaceBuildingAt(lakeState, 'dock', 0, 2), false,
+  'the trade dock remains a river-only building before the fishing-port phase');
+
 canals[2].built = true;
 flowing = irrigation.flowingCanalTileSet(state);
 assert.equal(flowing.has('3,2'), true, 'finishing the missing segment reconnects the canal tail');

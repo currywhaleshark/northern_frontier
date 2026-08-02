@@ -68,6 +68,7 @@ export type Terrain =
   | 'forest'   // 숲
   | 'plain'    // 평지
   | 'river'    // 강 (겨울에는 얼어붙은 강으로 표시)
+  | 'lake'     // 호수 (가장자리부터 점진적으로 결빙·해빙)
   | 'mountain' // 산지
   | 'fertile'  // 비옥한 땅
   | 'rock'     // 바위/철광
@@ -909,7 +910,7 @@ export interface FireSite {
 }
 
 export type FireResponsePhase = 'toWater' | 'toFire';
-export type FireWaterSourceKind = 'well' | 'river';
+export type FireWaterSourceKind = 'well' | 'river' | 'lake';
 
 export interface FireResponse {
   buildingId: number;

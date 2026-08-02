@@ -16,6 +16,7 @@ import { rankEffects } from './promotion';
 import { changeRelation, getRelation, hostileRelationsAvg } from './relations';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
 import { getSeason, getYear } from './seasons';
+import { isLakeIceAt } from './lakeIce';
 import type {
   BattleMode, Building, ExpeditionRaidOrder, GameState, PendingChoice, RaiderBand, RaidRoutePlan, TradeNegotiation,
 } from './types';
@@ -177,6 +178,7 @@ function raiderPassable(state: GameState, x: number, y: number): boolean {
   if (t.terrain === 'river') {
     return getSeason(state.day) === 'winter' && state.weather !== 'thawFlood';
   }
+  if (t.terrain === 'lake') return isLakeIceAt(state.map, state.day, x, y);
   return true;
 }
 
@@ -342,7 +344,8 @@ export function spawnRaiders(
     const originPassable = (x: number, y: number) =>
       raiderPassable(state, x, y) ||
       (state.map[y]?.[x]?.buildingId == null &&
-        (state.map[y]?.[x]?.terrain === 'mountain' || state.map[y]?.[x]?.terrain === 'river'));
+        (state.map[y]?.[x]?.terrain === 'mountain' || state.map[y]?.[x]?.terrain === 'river' ||
+          state.map[y]?.[x]?.terrain === 'lake'));
     const starts: Array<{ x: number; y: number; order: number }> = [];
     for (let y = originSite.y - 1; y <= originSite.y + originSite.height; y++) {
       for (let x = originSite.x - 1; x <= originSite.x + originSite.width; x++) {

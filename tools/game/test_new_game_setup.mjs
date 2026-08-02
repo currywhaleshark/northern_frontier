@@ -74,9 +74,13 @@ const { CONFIG } = await load('config');
     '같은 수동 시드와 옵션 정규화는 결정적이다');
   assert.equal(options.worldSetupLabel(normalized), '산지의 대형 개척지');
 
-  for (const futureRegion of ['lake', 'coast']) {
+  const lake = options.normalizeNewGameOptions({ ...mountain, region: 'lake' });
+  assert.equal(lake.region, 'lake', 'S4부터 호수는 선택값을 보존한다');
+  assert.equal(options.worldSetupLabel(lake), '호수의 대형 개척지');
+
+  for (const futureRegion of ['coast']) {
     assert.equal(options.normalizeNewGameOptions({ region: futureRegion }).region, 'plains',
-      `${futureRegion}은 S4~S5 전까지 평원으로 보정한다`);
+      `${futureRegion}은 S5 전까지 평원으로 보정한다`);
   }
 
   assert.deepEqual(options.mapDimensionsForSize('small'), { width: 56, height: 56 });

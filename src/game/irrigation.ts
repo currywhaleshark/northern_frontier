@@ -1,3 +1,4 @@
+import { isNaturalWaterTerrain } from './terrain';
 import type { BuildingTypeId, GameState } from './types';
 
 export interface CanalConnections {
@@ -25,8 +26,11 @@ export function builtCanalTileSet(state: Pick<GameState, 'buildings'>): Set<stri
     .map(building => key(building.x, building.y)));
 }
 
-function isAdjacentRiver(state: Pick<GameState, 'map'>, x: number, y: number): boolean {
-  return CARDINAL_STEPS.some(([, dx, dy]) => state.map[y + dy]?.[x + dx]?.terrain === 'river');
+function isAdjacentNaturalWater(state: Pick<GameState, 'map'>, x: number, y: number): boolean {
+  return CARDINAL_STEPS.some(([, dx, dy]) => {
+    const terrain = state.map[y + dy]?.[x + dx]?.terrain;
+    return terrain != null && isNaturalWaterTerrain(terrain);
+  });
 }
 
 export function canalRiverEdgesAt(
@@ -34,16 +38,20 @@ export function canalRiverEdgesAt(
   x: number,
   y: number,
 ): CanalConnections {
+  const naturalWaterAt = (dx: number, dy: number): boolean => {
+    const terrain = state.map[y + dy]?.[x + dx]?.terrain;
+    return terrain != null && isNaturalWaterTerrain(terrain);
+  };
   return {
-    n: state.map[y - 1]?.[x]?.terrain === 'river',
-    e: state.map[y]?.[x + 1]?.terrain === 'river',
-    s: state.map[y + 1]?.[x]?.terrain === 'river',
-    w: state.map[y]?.[x - 1]?.terrain === 'river',
+    n: naturalWaterAt(0, -1),
+    e: naturalWaterAt(1, 0),
+    s: naturalWaterAt(0, 1),
+    w: naturalWaterAt(-1, 0),
   };
 }
 
 /**
- * 강에 바로 닿는 완공 수로에서 시작해 같은 수로 구간을 BFS한다.
+ * 강·호수에 바로 닿는 완공 수로에서 시작해 같은 수로 구간을 BFS한다.
  * 끊긴 군집은 결과에 들어가지 않아 마른 도랑으로 남는다.
  */
 export function flowingCanalTileSet(state: Pick<GameState, 'map' | 'buildings'>): Set<string> {
@@ -51,7 +59,7 @@ export function flowingCanalTileSet(state: Pick<GameState, 'map' | 'buildings'>)
   const flowing = new Set<string>();
   const queue: Array<readonly [number, number]> = [];
   for (const building of state.buildings) {
-    if (building.type !== 'canal' || !building.built || !isAdjacentRiver(state, building.x, building.y)) continue;
+    if (building.type !== 'canal' || !building.built || !isAdjacentNaturalWater(state, building.x, building.y)) continue;
     const tileKey = key(building.x, building.y);
     if (canals.has(tileKey)) {
       flowing.add(tileKey);
@@ -86,7 +94,7 @@ export function wouldCanalFlowAt(
   x: number,
   y: number,
 ): boolean {
-  if (isAdjacentRiver(state, x, y)) return true;
+  if (isAdjacentNaturalWater(state, x, y)) return true;
   const flowing = flowingCanalTileSet(state);
   return CARDINAL_STEPS.some(([, dx, dy]) => flowing.has(key(x + dx, y + dy)));
 }

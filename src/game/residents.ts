@@ -76,7 +76,7 @@ export function rollResidentName(
 
 function isResidentSpawnTile(tile: Tile): boolean {
   return tile.buildingId == null && tile.terrain !== 'mountain' &&
-    tile.terrain !== 'rock' && tile.terrain !== 'river';
+    tile.terrain !== 'rock' && tile.terrain !== 'river' && tile.terrain !== 'lake';
 }
 
 function hasSpawnExit(state: GameState, start: Tile, cx: number, cy: number): boolean {
@@ -111,7 +111,8 @@ function centerLandTiles(state: GameState, cx: number, cy: number): Set<string> 
     const current = queue[index];
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const next = state.map[current.y + dy]?.[current.x + dx];
-      if (!next || next.terrain === 'river' || next.terrain === 'mountain' || next.terrain === 'rock') continue;
+      if (!next || next.terrain === 'river' || next.terrain === 'lake' ||
+          next.terrain === 'mountain' || next.terrain === 'rock') continue;
       const key = `${next.x},${next.y}`;
       if (reachable.has(key)) continue;
       reachable.add(key);

@@ -27,7 +27,7 @@ export const WEATHER_NAMES: Record<WeatherId, string> = {
 };
 
 export const TERRAIN_NAMES: Record<Terrain, string> = {
-  forest: '숲', plain: '평지', river: '강', mountain: '산지',
+  forest: '숲', plain: '평지', river: '강', lake: '호수', mountain: '산지',
   fertile: '비옥한 땅', rock: '바위/철광', center: '마을 터',
 };
 

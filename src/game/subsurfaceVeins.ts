@@ -24,8 +24,8 @@ export interface VeinSample<T extends SubsurfaceVein> {
 const aquiferCache = new Map<string, readonly SubsurfaceVein[]>();
 const oreCache = new Map<string, readonly OreVein[]>();
 
-function normalizedRegion(region: MapRegion): 'plains' | 'mountain' {
-  return region === 'mountain' ? 'mountain' : 'plains';
+function normalizedRegion(region: MapRegion): 'plains' | 'mountain' | 'lake' {
+  return region === 'mountain' || region === 'lake' ? region : 'plains';
 }
 
 function cacheKey(seed: number, width: number, height: number, region: MapRegion): string {
@@ -149,10 +149,12 @@ export function aquiferVeins(
   const rng = makeRng((seed ^ 0x4a71f39d) >>> 0);
   const mediumArea = MAP_SIZE_DIMENSIONS.medium.width * MAP_SIZE_DIMENSIONS.medium.height;
   const areaScale = Math.max(0.55, Math.sqrt(Math.max(1, width * height) / mediumArea));
-  const mountainMultiplier = resolvedRegion === 'mountain' ? 0.65 : 1;
+  const countMultiplier = resolvedRegion === 'mountain' ? 0.65 : resolvedRegion === 'lake' ? 1.2 : 1;
+  const radiusMultiplier = resolvedRegion === 'mountain' ? 0.75 : resolvedRegion === 'lake' ? 1.1 : 1;
+  const capacityMultiplier = resolvedRegion === 'mountain' ? 0.75 : resolvedRegion === 'lake' ? 1.15 : 1;
   const baseCount = Math.max(
     resolvedRegion === 'mountain' ? 1 : 2,
-    Math.round((4 + Math.floor(rng() * 3)) * areaScale * mountainMultiplier),
+    Math.round((4 + Math.floor(rng() * 3)) * areaScale * countMultiplier),
   );
   const veins: SubsurfaceVein[] = [];
   // v45까지 사용한 기본 수맥의 난수 소비와 위치를 그대로 보존한다.
@@ -165,9 +167,9 @@ export function aquiferVeins(
       cy: center.y,
       radius: Math.max(3, Math.round(
         (4 + rng() * 3) * Math.min(1.25, areaScale) *
-        (resolvedRegion === 'mountain' ? 0.75 : 1),
+        radiusMultiplier,
       )),
-      capacity: Math.round((90 + rng() * 70) * (resolvedRegion === 'mountain' ? 0.75 : 1)),
+      capacity: Math.round((90 + rng() * 70) * capacityMultiplier),
     });
   }
   const riverCenters = riverCenterline(seed, width, height);
@@ -175,7 +177,7 @@ export function aquiferVeins(
     resolvedRegion === 'mountain' ? 1 : 2,
     Math.ceil(
       baseCount * CONFIG.water.aquiferInlandAdditionRatio *
-      (resolvedRegion === 'mountain' ? 0.65 : 1),
+      countMultiplier,
     ),
   );
   for (let offset = 0; offset < inlandCount; offset++) {
@@ -187,9 +189,9 @@ export function aquiferVeins(
       cy: center.y,
       radius: Math.max(3, Math.round(
         (4 + rng() * 3) * Math.min(1.25, areaScale) *
-        (resolvedRegion === 'mountain' ? 0.75 : 1),
+        radiusMultiplier,
       )),
-      capacity: Math.round((90 + rng() * 70) * (resolvedRegion === 'mountain' ? 0.75 : 1)),
+      capacity: Math.round((90 + rng() * 70) * capacityMultiplier),
     });
   }
   const startingCenter = startingSettlementAquiferCenter(seed, width, height, resolvedRegion);
@@ -218,7 +220,8 @@ export function oreVeins(
   const mediumArea = MAP_SIZE_DIMENSIONS.medium.width * MAP_SIZE_DIMENSIONS.medium.height;
   const areaScale = Math.max(0.55, Math.sqrt(Math.max(1, width * height) / mediumArea));
   const perMineral = Math.max(1, Math.round(
-    (2 + Math.floor(rng() * 2)) * areaScale * (resolvedRegion === 'mountain' ? 1.1 : 1),
+    (2 + Math.floor(rng() * 2)) * areaScale *
+      (resolvedRegion === 'mountain' ? 1.1 : resolvedRegion === 'lake' ? 0.8 : 1),
   ));
   const minerals = [
     ...Array.from({ length: perMineral }, () => 'iron' as const),
@@ -233,11 +236,11 @@ export function oreVeins(
       cy: center.y,
       radius: Math.max(3, Math.round(
         (4 + rng() * 3) * Math.min(1.25, areaScale) *
-        (resolvedRegion === 'mountain' ? 0.9 : 1),
+        (resolvedRegion === 'mountain' ? 0.9 : resolvedRegion === 'lake' ? 0.85 : 1),
       )),
       capacity: Math.round(
         (mineral === 'iron' ? 420 + rng() * 260 : 560 + rng() * 340) *
-        (resolvedRegion === 'mountain' ? 1.4 : 1),
+        (resolvedRegion === 'mountain' ? 1.4 : resolvedRegion === 'lake' ? 0.8 : 1),
       ),
     };
   });

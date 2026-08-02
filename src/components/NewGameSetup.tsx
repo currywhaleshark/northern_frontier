@@ -18,7 +18,7 @@ const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard'];
 const REGIONS: Array<{ id: MapRegion; name: string; detail: string; enabled?: boolean }> = [
   { id: 'plains', name: '평원', detail: '넓은 들판과 강가에서 균형 있게 개척을 시작합니다.', enabled: true },
   { id: 'mountain', name: '산지', detail: '내부 능선과 깊은 숲. 물과 평지는 부족하지만 광물과 사냥감이 풍부합니다.', enabled: true },
-  { id: 'lake', name: '호수', detail: 'S4에서 준비됩니다.' },
+  { id: 'lake', name: '호수', detail: '큰 호수와 풍부한 물. 목재와 광물, 가용 평지는 부족합니다.', enabled: true },
   { id: 'coast', name: '해안', detail: 'S5에서 준비됩니다.' },
 ];
 const SIZES: Array<{ id: MapSize; name: string; detail: string }> = [

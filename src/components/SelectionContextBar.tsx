@@ -596,7 +596,9 @@ export function SelectionContextBar({
                                 <td>급수</td>
                                 <td>
                                   {water.source === 'river'
-                                    ? '강'
+                                    ? '강물'
+                                    : water.source === 'lake'
+                                      ? '호수 물'
                                     : water.source === 'canal'
                                       ? '농수로'
                                       : water.source === 'well'

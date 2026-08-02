@@ -2117,9 +2117,15 @@ function blendGroundEdges(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): 
   }
 }
 
-// 강 타일: 밑에 이웃 평지와 같은 땅 텍스처를 깔고, 이웃 정보로 물 영역을 계산해 채운다.
-// 물은 뭍 방향으로만 둑 여백을 두므로 지도상의 강 폭(1~3타일)이 화면에 그대로 드러난다.
-function drawRiverTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): void {
+const LAKE_WATER_COLORS: Record<Season, string> = {
+  spring: '#326c91',
+  summer: '#2f688c',
+  autumn: '#356a87',
+  winter: '#3e6f9e',
+};
+
+// 자연 수면 타일: 강·호수 모두 뭍 방향에만 둑 여백을 둔다.
+function drawNaturalWaterTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): void {
   const nb = p.banks!;
   const f = p.size / RIVER_AUTOTILE_SIZE;
   const inset = RIVER_BANK_INSET * f;
@@ -2144,13 +2150,19 @@ function drawRiverTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): voi
     bh + (nb.n ? strip : 0) + (nb.s ? strip : 0),
   );
 
-  // 3) 물 — 전면 물 텍스처에서 물 상자와 같은 위치를 잘라와 이웃 타일과 무늬가 이어진다
-  const fill = riverFillSourceRect(p.season, p.frozenRiver);
-  ctx.drawImage(
-    riverSheet!,
-    fill.sx + box.x0, fill.sy + box.y0, box.x1 - box.x0, box.y1 - box.y0,
-    bx, by, bw, bh,
-  );
+  // 3) 물 — 강은 방향성이 있는 시트, 액체 호수는 고요한 단색 수면을 쓴다.
+  // 호수의 움직임은 별도 물가 파문 레이어만 담당해 강물 같은 사선 흐름이 생기지 않는다.
+  if (p.terrain === 'lake' && !p.frozenRiver) {
+    ctx.fillStyle = LAKE_WATER_COLORS[p.season];
+    ctx.fillRect(bx, by, bw, bh);
+  } else {
+    const fill = riverFillSourceRect(p.season, p.frozenRiver);
+    ctx.drawImage(
+      riverSheet!,
+      fill.sx + box.x0, fill.sy + box.y0, box.x1 - box.x0, box.y1 - box.y0,
+      bx, by, bw, bh,
+    );
+  }
 
   // 4) 양옆이 뭍인 바깥 굽이 모서리는 계단식으로 둥글려 손그림 느낌을 살린다
   ctx.fillStyle = bankColor;
@@ -2361,17 +2373,17 @@ function blitTerrainGrowth(
 }
 
 export const atlasSprites: SpriteAPI = {
-  id: 'kenney-atlas-river-mask-historical-ground-terrain-growth-hd-v4',
+  id: 'kenney-atlas-lake-calm-water-historical-ground-terrain-growth-hd-v5',
 
   drawTerrain(ctx, p) {
     if (!sheet) return;
     ctx.imageSmoothingEnabled = false;
     const h = hash(p.tileX, p.tileY);
 
-    // 강: 이웃 정보 기반 면적 렌더링 — 땅 밑바탕 + 물 영역 + 둑 (겨울엔 얼음 텍스처)
-    if (p.terrain === 'river') {
+    // 자연 수면: 이웃 정보 기반 면적 렌더링 — 땅 밑바탕 + 물 영역 + 둑 (결빙 시 얼음 텍스처)
+    if (p.terrain === 'river' || p.terrain === 'lake') {
       if (riverSheet && historicalTerrainSheet && p.banks) {
-        drawRiverTile(ctx, p);
+        drawNaturalWaterTile(ctx, p);
         return;
       }
       blit(ctx, sheet, h % 7 === 0 ? WATER_SPARKLE : WATER, p.x, p.y, p.size);
