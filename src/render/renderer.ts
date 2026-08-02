@@ -18,7 +18,10 @@ import { DAY_BANDS, DAY_CYCLE_SUBTICKS } from '../game/dayCycle';
 import { LEISURE_CLUSTER_CAPACITY } from '../game/agents';
 import { findHabitatIconAtTile } from '../game/habitats';
 import { isBuildingFootprintExplored, isExplored } from '../game/exploration';
-import { builtWallTileSet, isWallBuilding, wallConnectionsFromSet } from '../game/walls';
+import {
+  builtWallTileSet, GATE_CONVERSION_COSTS, isSolidWallBuilding, isWallBuilding,
+  wallConnectionsFromSet, wallTileKey,
+} from '../game/walls';
 import { canalConnectionsAt, canalRiverEdgesAt, flowingCanalTileSet, wouldCanalFlowAt } from '../game/irrigation';
 import { assignedWorkers, workerSlotConfig, workerSlotCount } from '../game/workerSlots';
 import {
@@ -2440,7 +2443,11 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
             waterSnapshot?.buildings.get(b.id),
             b.type === 'well' ? wellWaterStatus(state, b) : null,
           ) ?? undefined
-        : undefined,
+        : b.type === 'gate' && b.gateWallType === 'earthFort'
+          ? { color: '#8b633f', alpha: 0.18 }
+          : b.type === 'gate' && b.gateWallType === 'stoneWall'
+            ? { color: '#9ca3ad', alpha: 0.22 }
+            : undefined,
       x: drawX, y: drawY, size,
     };
     if (b.type === 'canal') {
@@ -2908,6 +2915,44 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     ctx.strokeRect(rect.x * TILE + 1, rect.y * TILE + 1, rect.w * TILE - 2, rect.h * TILE - 2);
     ctx.setLineDash([]);
     ctx.lineWidth = 1;
+  } else if (o.placingType && isSolidWallBuilding(o.placingType) && o.placingRect) {
+    const type = o.placingType;
+    const rect = o.placingRect;
+    const segmentCount = rect.w * rect.h;
+    const totalCost = Object.fromEntries(Object.entries(BUILDING_DEFS[type].cost)
+      .map(([resource, amount]) => [resource, (amount ?? 0) * segmentCount]));
+    const affordable = canAffordCost(state, totalCost);
+    const previewWallTiles = builtWallTileSet(state);
+    for (let dy = 0; dy < rect.h; dy++) {
+      for (let dx = 0; dx < rect.w; dx++) previewWallTiles.add(wallTileKey(rect.x + dx, rect.y + dy));
+    }
+    const valid = affordable && Array.from({ length: rect.h }, (_, dy) =>
+      Array.from({ length: rect.w }, (__, dx) => ({ x: rect.x + dx, y: rect.y + dy })),
+    ).flat().every(({ x, y }) => isExplored(state, x, y) && !foreignSiteAt(state, x, y) &&
+      canPlaceBuildingAt(state, type, x, y));
+    for (let dy = 0; dy < rect.h; dy++) {
+      for (let dx = 0; dx < rect.w; dx++) {
+        const tx = rect.x + dx;
+        const ty = rect.y + dy;
+        const tileValid = affordable && isExplored(state, tx, ty) && !foreignSiteAt(state, tx, ty) &&
+          canPlaceBuildingAt(state, type, tx, ty);
+        const needsClearing = tileValid && state.map[ty]?.[tx]?.terrain === 'forest';
+        ctx.fillStyle = needsClearing
+          ? 'rgba(224,164,92,0.45)'
+          : tileValid ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
+        ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE);
+        drawBuildingSprite(ctx, sprites, {
+          type, built: true, ghost: true, progress01: 1,
+          season, highDefinition: renderScale === 2,
+          connections: wallConnectionsFromSet(previewWallTiles, tx, ty),
+          x: tx * TILE, y: ty * TILE, size: TILE,
+        });
+      }
+    }
+    ctx.strokeStyle = valid ? 'rgba(255,214,90,0.9)' : 'rgba(245,145,125,0.95)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(rect.x * TILE + 0.75, rect.y * TILE + 0.75, rect.w * TILE - 1.5, rect.h * TILE - 1.5);
+    ctx.lineWidth = 1;
   } else if (o.placingType && isAreaBuildingType(o.placingType) && o.placingRect) {
     // 경작지·묘역: 드래그 사각형을 칸별 유효/무효로 칠한다
     const def = BUILDING_DEFS[o.placingType];
@@ -2941,6 +2986,21 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     ctx.lineWidth = 1.5;
     ctx.strokeRect(rect.x * TILE + 0.75, rect.y * TILE + 0.75, rect.w * TILE - 1.5, rect.h * TILE - 1.5);
     ctx.lineWidth = 1;
+  } else if (o.placingType === 'gate' && o.hover) {
+    const buildingId = state.map[o.hover.y]?.[o.hover.x]?.buildingId;
+    const wall = buildingId == null ? null : state.buildings.find(building => building.id === buildingId) ?? null;
+    const valid = !!wall && isSolidWallBuilding(wall.type) && wall.built && !wall.repairing &&
+      !wall.workOrder && !wall.expansion && !wall.gateConversion &&
+      !(wall as typeof wall & { breached?: boolean }).breached &&
+      canAffordCost(state, GATE_CONVERSION_COSTS[wall.type]);
+    ctx.fillStyle = valid ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
+    ctx.fillRect(o.hover.x * TILE, o.hover.y * TILE, TILE, TILE);
+    drawBuildingSprite(ctx, sprites, {
+      type: 'gate', built: true, ghost: true, progress01: 1,
+      season, highDefinition: renderScale === 2,
+      connections: wallConnectionsFromSet(builtWallTileSet(state), o.hover.x, o.hover.y),
+      x: o.hover.x * TILE, y: o.hover.y * TILE, size: TILE,
+    });
   } else if (o.placingType && o.hover) {
     const def = BUILDING_DEFS[o.placingType];
     const footprint = buildingFootprintSize(o.placingType);

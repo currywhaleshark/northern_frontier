@@ -551,6 +551,8 @@ export function SelectionContextBar({
                           <>
                             <tr><td>상태</td><td>{clearingBlocksWork(state, building)
                               ? `벌목 대기 · 나무 ${pendingClearingTiles(state, building).length}그루`
+                              : building.gateConversion
+                              ? `성문 전환 중 ${Math.floor((building.gateConversion.progress / Math.max(1, building.gateConversion.required)) * 100)}% · 기존 ${BUILDING_DEFS[building.gateConversion.wallType].name} 차단 유지`
                               : building.workOrder
                               ? `${building.workOrder.kind === 'demolish'
                                 ? '해체 중'
@@ -695,7 +697,7 @@ export function SelectionContextBar({
                                   .join(', ')}</td>
                               </tr>
                             )}
-                            {!building.built && !building.repairing && !building.workOrder && (
+                            {(building.gateConversion || (!building.built && !building.repairing && !building.workOrder)) && (
                               <tr>
                                 <td>건설</td>
                                 <td>
@@ -703,11 +705,14 @@ export function SelectionContextBar({
                                     className="btn small"
                                     type="button"
                                     onClick={() => {
-                                      if (window.confirm(`${def.name} 건설을 취소할까요? 투입 자재는 모두 반환됩니다.`)) {
+                                      const prompt = building.gateConversion
+                                        ? '성문 전환을 취소할까요? 기존 성벽은 유지되고 추가 자재가 반환됩니다.'
+                                        : `${def.name} 건설을 취소할까요? 투입 자재는 모두 반환됩니다.`;
+                                      if (window.confirm(prompt)) {
                                         onCancelBuildingConstruction(building.id);
                                       }
                                     }}
-                                  >건설 취소</button>
+                                  >{building.gateConversion ? '성문 전환 취소' : '건설 취소'}</button>
                                 </td>
                               </tr>
                             )}

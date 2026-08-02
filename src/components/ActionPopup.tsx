@@ -115,7 +115,7 @@ export function ActionPopup({
   const centerTarget = building.type === 'center' ? nextRank(state.rank) : null;
   const centerReason = centerTarget ? centerPromotionUpgradeReason(state, building.id) : null;
   const activeBuildingWork = Boolean(
-    !building.built || building.repairing || building.expansion || building.workOrder,
+    !building.built || building.repairing || building.expansion || building.workOrder || building.gateConversion,
   );
   // 예전에는 특별한 조작이 없는 건물(초가집처럼 슬롯도 액션도 없는 것)에서 아무것도
   // 렌더하지 않아, 이전·해체 버튼까지 같이 사라졌다. 건물을 골랐으면 기본 정보와

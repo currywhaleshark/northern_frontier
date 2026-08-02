@@ -192,6 +192,8 @@ export type BuildingTypeId =
   | 'cannonEmplacement' // 불랑기포대 (부 승격 후 조정 청원으로만 배치)
   | 'chongtongEmplacement'; // 지자총통 포대 (하사 기물 보유 시 1곳)
 
+export type SolidWallBuildingTypeId = Extract<BuildingTypeId, 'palisade' | 'earthFort' | 'stoneWall'>;
+
 export interface Tile {
   x: number;
   y: number;
@@ -481,6 +483,13 @@ export interface BuildingWorkOrder {
   destination?: PastureArea;
 }
 
+export interface GateConversion {
+  wallType: SolidWallBuildingTypeId;
+  progress: number;
+  required: number;
+  paidCost: Partial<Record<ResourceId, number>>;
+}
+
 export interface WeirReservoirTile {
   x: number;
   y: number;
@@ -521,6 +530,8 @@ export interface Building {
   pasture?: PastureArea; // 축사 전용: 완공 후 지정하는 인접 방목 영역
   expansion?: BuildingExpansion; // 완공된 영역형 건물의 확장 공사
   workOrder?: BuildingWorkOrder; // 건축가가 수행하는 해체 또는 이전 공사
+  gateWallType?: SolidWallBuildingTypeId; // 성문 전용: 전환 전 벽 등급
+  gateConversion?: GateConversion; // 완공 벽을 막힌 상태로 유지하며 진행하는 성문 전환 공사
   weirReservoir?: WeirReservoirState; // 보 전용: 상류 영구 침수 칸과 원래 지형
   leveeEdge?: 'n' | 'e' | 's' | 'w'; // 제방 전용: 강 타일에서 둑이 붙는 육지 쪽 변
   graves?: number; // 묘역 전용: 안장된 묘 수 (한 타일의 2×2 소구획에 최대 4기)

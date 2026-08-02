@@ -5,14 +5,14 @@ import { withJosa } from './josa';
 import { CONFIG } from './config';
 import { isJobUnlocked, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } from './constants';
 import {
-  BUILDING_DEFS, buildingCostFor, buildingFootprintTiles, canAfford, canAffordCost,
+  BUILDING_DEFS, buildingCostFor, buildingCostForInstance, buildingFootprintTiles, canAfford, canAffordCost,
   buildingFootprintDims, cannonPlacementsUsed, chongtongPlacementsUsed, canPlaceBuildingAt, canPlaceOn, canRelocateBuildingAt, clampPlotSide,
   clearBuildingTiles, computeDefense, getBuilding, isBuildingUnlocked,
   footprintTilesOf, isAreaBuildingType, isPaddyFootprintEligible, isPlotBuildingType, isSmithyProductUnlocked,
   occupyBuildingTiles, plotArea, preferredLeveeEdgeAt, SMITHY_PRODUCT_DEFS,
 } from './buildings';
 import { forestTilesInArea, forestTilesInFootprint, pendingClearingTiles } from './landClearing';
-import { isWallBuilding } from './walls';
+import { GATE_CONVERSION_COSTS, isSolidWallBuilding, isWallBuilding, wallLineTiles } from './walls';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
 import {
   announceCourtTribute,
@@ -379,6 +379,7 @@ export function tryPlaceBuilding(
   const def = BUILDING_DEFS[type];
   const tile = state.map[y]?.[x];
   if (!tile) return '지도 밖입니다.';
+  if (type === 'gate') return '성문은 완공된 성벽 구간을 선택해 전환해야 합니다.';
   // 경작지와 묘역은 드래그 크기를 받는다 — 그 외 건물은 타입 고정 크기
   const w = isAreaBuildingType(type) ? clampPlotSide(plotW ?? 1) : undefined;
   const h = isAreaBuildingType(type) ? clampPlotSide(plotH ?? 1) : undefined;
@@ -468,6 +469,118 @@ export function tryPlaceBuilding(
   return null;
 }
 
+function multipliedCost(
+  cost: Partial<Record<ResourceId, number>>,
+  count: number,
+): Partial<Record<ResourceId, number>> {
+  const total: Partial<Record<ResourceId, number>> = {};
+  for (const [resource, amount] of Object.entries(cost)) {
+    if ((amount ?? 0) > 0) total[resource as ResourceId] = (amount ?? 0) * count;
+  }
+  return total;
+}
+
+/** 고체 성벽 선분을 전부 검증한 뒤 한 번에 배치한다. 중간 성공 상태는 존재하지 않는다. */
+export function tryPlaceWallLine(
+  state: GameState,
+  type: BuildingTypeId,
+  ax: number,
+  ay: number,
+  cx: number,
+  cy: number,
+  options: PlacementOptions = {},
+): string | null {
+  if (!isSolidWallBuilding(type)) return '직선으로 배치할 수 있는 성벽이 아닙니다.';
+  const def = BUILDING_DEFS[type];
+  if (!isBuildingUnlocked(state.rank, type)) {
+    const rankName = def.minRank ? RANK_NAMES[def.minRank] : RANK_NAMES.bo;
+    return `${rankName} 승격 후 지을 수 있습니다.`;
+  }
+  const line = wallLineTiles(ax, ay, cx, cy);
+  if (line.some(({ x, y }) => !state.map[y]?.[x])) return '지도 밖입니다.';
+  if (line.some(({ x, y }) => !isBuildingFootprintExplored(state, type, x, y))) {
+    return '아직 답사하지 않은 곳입니다.';
+  }
+  if (line.some(({ x, y }) => foreignSiteAt(state, x, y))) {
+    return '현지 거점이 자리한 곳에는 건물을 지을 수 없습니다.';
+  }
+  if (line.some(({ x, y }) => !canPlaceBuildingAt(state, type, x, y))) {
+    return '한 칸 이상 지을 수 없는 곳이 있어 성벽 전체를 놓지 않았습니다.';
+  }
+  const cost = multipliedCost(def.cost, line.length);
+  if (!canAffordCost(state, cost)) return '성벽 전체를 지을 자원이 부족합니다.';
+  const clearingTrees = line.flatMap(({ x, y }) => forestTilesInFootprint(state, type, x, y));
+  if (!options.approveClearing && clearingTrees.length > 0) return CLEARING_APPROVAL_REQUIRED;
+
+  for (const [resource, amount] of Object.entries(cost)) {
+    state.resources[resource as ResourceId] -= amount ?? 0;
+  }
+  const placed: Building[] = [];
+  for (const { x, y } of line) {
+    const building: Building = {
+      id: state.nextBuildingId++, type, x, y, progress: 0, built: false, fieldGrowth: 0,
+      cropId: defaultCropForBuildingType(type), queuedCropId: null,
+    };
+    state.buildings.push(building);
+    occupyBuildingTiles(state, building);
+    placed.push(building);
+  }
+  for (const building of placed) noteBuildingClaimIntrusions(state, building);
+  addLog(
+    state,
+    clearingTrees.length > 0
+      ? `${def.name} ${placed.length}구간의 자리를 정했습니다. 벌목꾼이 나무 ${clearingTrees.length}그루를 먼저 베어냅니다.`
+      : `${def.name} ${placed.length}구간 건설을 시작했습니다.`,
+    'info',
+  );
+  return null;
+}
+
+export function startGateConversion(state: GameState, buildingId: number): string | null {
+  const building = getBuilding(state, buildingId);
+  if (!building || !isSolidWallBuilding(building.type)) return '완공된 성벽 구간을 선택해야 합니다.';
+  if (!building.built || building.repairing || building.workOrder || building.expansion || building.gateConversion) {
+    return '완공되고 파손되지 않은 성벽만 성문으로 바꿀 수 있습니다.';
+  }
+  if ((building as Building & { breached?: boolean }).breached === true) {
+    return '돌파된 성벽은 먼저 수리해야 합니다.';
+  }
+  const wallType = building.type;
+  const paidCost = { ...GATE_CONVERSION_COSTS[wallType] };
+  if (!canAffordCost(state, paidCost)) return '성문 전환에 필요한 자원이 부족합니다.';
+  for (const [resource, amount] of Object.entries(paidCost)) {
+    state.resources[resource as ResourceId] -= amount ?? 0;
+  }
+  building.gateWallType = wallType;
+  building.gateConversion = {
+    wallType,
+    progress: 0,
+    required: Math.max(1, BUILDING_DEFS.gate.buildDays),
+    paidCost,
+  };
+  addLog(state, `${BUILDING_DEFS[wallType].name} 구간을 성문으로 바꾸는 공사를 시작했습니다. 공사 중에는 기존 벽이 길을 막습니다.`, 'info');
+  return null;
+}
+
+export function cancelGateConversion(state: GameState, buildingId: number): string | null {
+  const building = getBuilding(state, buildingId);
+  const conversion = building?.gateConversion;
+  if (!building || !conversion) return '취소할 성문 전환 공사가 없습니다.';
+  for (const [resource, amount] of Object.entries(conversion.paidCost)) {
+    state.resources[resource as ResourceId] += amount ?? 0;
+  }
+  delete building.gateConversion;
+  delete building.gateWallType;
+  if (state.priorityBuildingId === building.id) state.priorityBuildingId = null;
+  for (const resident of state.residents) {
+    if (!resident.alive || resident.job !== 'builder') continue;
+    resetAgent(state, resident);
+    resident.task = '새 공사 확인 중';
+  }
+  addLog(state, '성문 전환을 취소하고 기존 성벽을 그대로 유지했습니다. 추가 자재를 회수했습니다.', 'info');
+  return null;
+}
+
 export function demolishBuilding(state: GameState, x: number, y: number): string | null {
   const tile = state.map[y]?.[x];
   if (!tile) return '지도 밖입니다.';
@@ -476,7 +589,7 @@ export function demolishBuilding(state: GameState, x: number, y: number): string
   if (!isWallBuilding(building.type)) return '성벽 계열만 철거할 수 있습니다.';
 
   const def = BUILDING_DEFS[building.type];
-  for (const [res, amount] of Object.entries(def.cost)) {
+  for (const [res, amount] of Object.entries(buildingCostForInstance(building))) {
     const refund = Math.max(1, Math.floor((amount ?? 0) / 2));
     state.resources[res as ResourceId] += refund;
   }
@@ -498,6 +611,7 @@ export function demolishBuilding(state: GameState, x: number, y: number): string
 export function cancelBuildingConstruction(state: GameState, buildingId: number): string | null {
   const building = getBuilding(state, buildingId);
   if (!building) return '취소할 건설 현장이 없습니다.';
+  if (building.gateConversion) return cancelGateConversion(state, buildingId);
   if (building.built) return '완공된 건물은 건설 취소할 수 없습니다.';
   if (building.repairing) return '수리 중인 건물은 건설 취소할 수 없습니다.';
   if (building.workOrder) return '해체·이전 작업은 건설 취소로 중단할 수 없습니다.';
@@ -1038,7 +1152,8 @@ export function buildingHasActiveWork(building: Building): boolean {
   return !building.built ||
     building.repairing === true ||
     building.expansion != null ||
-    building.workOrder != null;
+    building.workOrder != null ||
+    building.gateConversion != null;
 }
 
 export function startBuildingDemolition(state: GameState, buildingId: number): string | null {
@@ -1048,7 +1163,7 @@ export function startBuildingDemolition(state: GameState, buildingId: number): s
   if (state.royalPlaqueBuildingId === building.id) {
     return '왕이 내린 사액 현판이 걸린 건물은 해체할 수 없습니다.';
   }
-  if (building.expansion || building.workOrder || building.repairing) return '진행 중인 작업이 끝난 뒤 해체할 수 있습니다.';
+  if (building.expansion || building.workOrder || building.repairing || building.gateConversion) return '진행 중인 작업이 끝난 뒤 해체할 수 있습니다.';
   const def = BUILDING_DEFS[building.type];
   building.built = false;
   building.workOrder = {
@@ -1072,6 +1187,7 @@ export function startBuildingRelocation(
 ): string | null {
   const building = state.buildings.find(candidate => candidate.id === buildingId);
   if (!building || !building.built) return '완공된 건물을 선택해야 합니다.';
+  if (building.gateConversion) return '성문 전환 공사가 끝난 뒤 이전할 수 있습니다.';
   if (building.type === 'center') return '마을 중심지는 이전할 수 없습니다.';
   if (state.royalPlaqueBuildingId === building.id) {
     return '왕이 내린 사액 현판이 걸린 건물은 이전할 수 없습니다.';
@@ -1536,7 +1652,7 @@ const TOOL_WEAR_JOB_WEIGHT: Partial<Record<JobId, number>> = {
 export function dailyToolWear(state: GameState): number {
   const winter = getSeason(state.day) === 'winter';
   const hasConstruction = state.buildings.some(building =>
-    !building.built || building.expansion != null || building.workOrder != null);
+    !building.built || building.expansion != null || building.workOrder != null || building.gateConversion != null);
   const wearUnits = state.residents.reduce((sum, resident) => {
     if (!resident.alive || resident.sick || resident.trappedInMineId != null ||
         state.warDispatch?.memberIds.includes(resident.id) ||

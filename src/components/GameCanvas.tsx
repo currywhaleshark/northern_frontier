@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { CONFIG } from '../game/config';
 import { JOB_NAMES, RESOURCE_NAMES } from '../game/constants';
 import {
-  BUILDING_DEFS, buildingCostFor, buildingFootprintDims, canPlaceBuildingAt, isAreaBuildingType, preferredLeveeEdgeAt,
+  BUILDING_DEFS, buildingCostFor, buildingFootprintDims, canAffordCost, canPlaceBuildingAt, isAreaBuildingType, preferredLeveeEdgeAt,
 } from '../game/buildings';
 import { getActiveSprites, onAtlasAssetSettled } from '../render/atlas';
 import { findResidentAt, renderScene, terrainVisualSignature } from '../render/renderer';
@@ -22,6 +22,7 @@ import { recordRuntimePerf, recordRuntimePerfSince, runtimePerfStartTime } from 
 import { mapBackingScaleForZoom, steppedMapZoom } from '../ui/mapZoom';
 import { hasSubsurfaceInsight } from '../game/subsurfaceVeins';
 import { wellWaterStatusAt } from '../game/waterSupply';
+import { GATE_CONVERSION_COSTS, isSolidWallBuilding, wallLineRect, type WallLineAxis } from '../game/walls';
 
 const TILE = CONFIG.ui.tileSize;
 const CLICK_RADIUS = Math.round(TILE * 0.65); // 주민 클릭 판정 반경(픽셀)
@@ -86,7 +87,7 @@ export function GameCanvas({
   // 드래그 패닝 상태 (리렌더 없이 추적)
   const drag = useRef({ active: false, button: 0, sx: 0, sy: 0, scrollL: 0, scrollT: 0, moved: false });
   const zoomAnchorRef = useRef<{ worldX: number; worldY: number; boxX: number; boxY: number } | null>(null);
-  // 경작지와 묘역 배치 중 드래그 크기 지정 — 기준 칸(anchor)에서 현재 칸까지의 사각형
+  // 영역형 건물과 직선 성벽 배치 중 드래그 지정 — 기준 칸(anchor)에서 현재 칸까지
   const expansionBuilding = expandingBuildingId == null
     ? null
     : state.buildings.find(building => building.id === expandingBuildingId) ?? null;
@@ -96,9 +97,11 @@ export function GameCanvas({
     : state.buildings.find(building => building.id === relocatingBuildingId) ?? null;
   const isRelocating = relocationBuilding != null;
   const isPlotPlacing = (placingType != null && isAreaBuildingType(placingType)) || isFootprintExpanding;
+  const isWallLinePlacing = placingType != null && isSolidWallBuilding(placingType);
   const isPasturePlacing = pastureStableId != null;
-  const isAreaDragging = isPlotPlacing || isPasturePlacing;
-  const [plotDrag, setPlotDrag] = useState<{ ax: number; ay: number; cx: number; cy: number } | null>(null);
+  const isAreaDragging = isPlotPlacing || isPasturePlacing || isWallLinePlacing;
+  type PlotDrag = { ax: number; ay: number; cx: number; cy: number; lastAxis: WallLineAxis };
+  const [plotDrag, setPlotDrag] = useState<PlotDrag | null>(null);
 
   const scrollBox = () => canvasRef.current?.closest('.canvas-wrap') as HTMLElement | null;
 
@@ -231,7 +234,10 @@ export function GameCanvas({
 
   const maxSide = isPasturePlacing ? CONFIG.pasture.maxSide : CONFIG.farming.maxPlotSide;
   const clampTo = (value: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, value));
-  const plotRectFrom = (dragState: { ax: number; ay: number; cx: number; cy: number }) => {
+  const plotRectFrom = (dragState: PlotDrag) => {
+    if (isWallLinePlacing) {
+      return wallLineRect(dragState.ax, dragState.ay, dragState.cx, dragState.cy, dragState.lastAxis);
+    }
     const x = Math.min(dragState.ax, dragState.cx);
     const y = Math.min(dragState.ay, dragState.cy);
     return {
@@ -446,7 +452,7 @@ export function GameCanvas({
             const m = toMouse(e);
             const tx = Math.floor(m.mx / TILE), ty = Math.floor(m.my / TILE);
             if (tx < 0 || ty < 0 || tx >= w || ty >= h) return;
-            setPlotDrag({ ax: tx, ay: ty, cx: tx, cy: ty });
+            setPlotDrag({ ax: tx, ay: ty, cx: tx, cy: ty, lastAxis: 'horizontal' });
             e.currentTarget.setPointerCapture(e.pointerId);
             return;
           }
@@ -473,10 +479,21 @@ export function GameCanvas({
           }
           if (plotDrag) {
             const m = point;
-            // 기준 칸에서 최대 변 길이만큼만 늘어난다 (지도 밖 금지)
-            const cx = clampTo(Math.floor(m.mx / TILE), Math.max(0, plotDrag.ax - (maxSide - 1)), Math.min(w - 1, plotDrag.ax + (maxSide - 1)));
-            const cy = clampTo(Math.floor(m.my / TILE), Math.max(0, plotDrag.ay - (maxSide - 1)), Math.min(h - 1, plotDrag.ay + (maxSide - 1)));
-            if (cx !== plotDrag.cx || cy !== plotDrag.cy) setPlotDrag({ ...plotDrag, cx, cy });
+            // 경작지·목장은 최대 변 길이를 적용하고, 성벽은 지도 끝까지 끌 수 있다.
+            const cx = isWallLinePlacing
+              ? clampTo(Math.floor(m.mx / TILE), 0, w - 1)
+              : clampTo(Math.floor(m.mx / TILE), Math.max(0, plotDrag.ax - (maxSide - 1)), Math.min(w - 1, plotDrag.ax + (maxSide - 1)));
+            const cy = isWallLinePlacing
+              ? clampTo(Math.floor(m.my / TILE), 0, h - 1)
+              : clampTo(Math.floor(m.my / TILE), Math.max(0, plotDrag.ay - (maxSide - 1)), Math.min(h - 1, plotDrag.ay + (maxSide - 1)));
+            if (cx !== plotDrag.cx || cy !== plotDrag.cy) {
+              const stepX = Math.abs(cx - plotDrag.cx);
+              const stepY = Math.abs(cy - plotDrag.cy);
+              const lastAxis = stepX === stepY
+                ? plotDrag.lastAxis
+                : stepX > stepY ? 'horizontal' : 'vertical';
+              setPlotDrag({ ...plotDrag, cx, cy, lastAxis });
+            }
             return;
           }
           const d = drag.current;
@@ -516,7 +533,7 @@ export function GameCanvas({
           setMouse(null);
         }}
         onClick={e => {
-          // 경작지·묘역 배치는 pointerup에서 이미 처리되었다
+          // 영역형 건물·직선 성벽 배치는 pointerup에서 이미 처리되었다
           if (isAreaDragging) return;
           // 드래그로 화면을 옮긴 직후의 클릭은 무시한다
           if (drag.current.moved) { drag.current.moved = false; return; }
@@ -595,6 +612,29 @@ export function GameCanvas({
                 })()}
               </>
             );
+          })() : placingType && isWallLinePlacing ? (() => {
+            const segmentCount = placingRect.w * placingRect.h;
+            const totalCost = Object.fromEntries(Object.entries(BUILDING_DEFS[placingType].cost)
+              .map(([resource, amount]) => [resource, (amount ?? 0) * segmentCount]));
+            const valid = canAffordCost(state, totalCost) && Array.from({ length: placingRect.h }, (_, dy) =>
+              Array.from({ length: placingRect.w }, (__, dx) => ({ x: placingRect.x + dx, y: placingRect.y + dy })),
+            ).flat().every(tile => isExplored(state, tile.x, tile.y) &&
+              !foreignSiteAt(state, tile.x, tile.y) && canPlaceBuildingAt(state, placingType, tile.x, tile.y));
+            const trees = Array.from({ length: placingRect.h }, (_, dy) =>
+              Array.from({ length: placingRect.w }, (__, dx) => state.map[placingRect.y + dy]?.[placingRect.x + dx]),
+            ).flat().filter(tile => tile?.terrain === 'forest').length;
+            return (
+              <>
+                <b>{BUILDING_DEFS[placingType].name} {segmentCount}구간</b>
+                <div className="muted">
+                  {Object.entries(totalCost)
+                    .map(([res, amount]) => `${RESOURCE_NAMES[res as keyof typeof RESOURCE_NAMES] ?? res} ${amount}`)
+                    .join(' · ')}
+                </div>
+                <div className="muted">{valid ? '전체 배치 가능 · 놓으면 각 구간을 따로 시공' : '전체 배치 불가 · 한 칸도 설치하지 않음'}</div>
+                {trees > 0 ? <div className="muted">나무 {trees}그루를 함께 승인하고 먼저 벌목</div> : null}
+              </>
+            );
           })() : placingType ? (
             <>
               <div className="muted">
@@ -631,6 +671,27 @@ export function GameCanvas({
           ) : <div className="muted">여기는 우물을 지을 수 없습니다</div>}
         </div>
       )}
+      {mouse && placingType === 'gate' && hoverTile && (() => {
+        const buildingId = state.map[hoverTile.y]?.[hoverTile.x]?.buildingId;
+        const wall = buildingId == null ? null : state.buildings.find(building => building.id === buildingId) ?? null;
+        const eligible = !!wall && isSolidWallBuilding(wall.type) && wall.built && !wall.repairing &&
+          !wall.workOrder && !wall.expansion && !wall.gateConversion &&
+          !(wall as typeof wall & { breached?: boolean }).breached;
+        const cost = eligible && wall && isSolidWallBuilding(wall.type) ? GATE_CONVERSION_COSTS[wall.type] : null;
+        return (
+          <div ref={tooltipRef} className="map-tooltip" style={{ left: 0, top: 0 }}>
+            <b>성문 전환</b>
+            {eligible && cost ? (
+              <>
+                <div className="muted">{BUILDING_DEFS[wall!.type].name} 등급 보존 · 공사 중 통행 차단 유지</div>
+                <div className="muted">추가 비용 {Object.entries(cost)
+                  .map(([resource, amount]) => `${RESOURCE_NAMES[resource as keyof typeof RESOURCE_NAMES] ?? resource} ${amount}`)
+                  .join(' · ')}</div>
+              </>
+            ) : <div className="muted">완공되고 파손되지 않은 목책·토성·석벽을 선택하십시오</div>}
+          </div>
+        );
+      })()}
       {mouse && relocationRect && relocationBuilding && (
         <div ref={tooltipRef} className="map-tooltip" style={{ left: 0, top: 0 }}>
           <b>{BUILDING_DEFS[relocationBuilding.type].name} 이전</b>

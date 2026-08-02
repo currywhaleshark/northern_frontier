@@ -5,6 +5,7 @@ import { createCombatRoster } from './combatRoster';
 import { hasKnownMineralDepositNear } from './miningSites';
 import { aquiferSampleAt, oreSampleAt } from './subsurfaceVeins';
 import { hasAdjacentFlowingCanal } from './irrigation';
+import { GATE_CONVERSION_COSTS } from './walls';
 import type { Building, BuildingDef, BuildingTypeId, GameState, Rank, ResourceId, SmithyProductId, Tile } from './types';
 
 export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
@@ -238,7 +239,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   gate: {
     id: 'gate', name: '성문',
-    desc: '성벽 사이의 출입구. 주민은 드나들 수 있지만 습격자는 막힌다.',
+    desc: '완공된 목책·토성·석벽 한 구간을 선택해 전환한다. 원래 벽 등급을 보존하며 공사 중에는 계속 길을 막는다.',
     cost: { wood: 5 }, buildDays: 2, slots: 0, capacity: 0, defense: 2,
     winterBonus: false, placement: 'land', unique: false,
   },
@@ -588,6 +589,21 @@ export function buildingCostFor(
     scaled[res as ResourceId] = (amt ?? 0) * area;
   }
   return scaled;
+}
+
+/** 저장된 기반 벽 등급까지 포함한 실제 건물 투자비. 해체 환급 계산에 쓴다. */
+export function buildingCostForInstance(
+  building: Pick<Building, 'type' | 'w' | 'h' | 'gateWallType'>,
+): Partial<Record<ResourceId, number>> {
+  const base = { ...buildingCostFor(building.type, building.w ?? 1, building.h ?? 1) };
+  if (building.type !== 'gate' || !building.gateWallType) return base;
+  const total: Partial<Record<ResourceId, number>> = {
+    ...BUILDING_DEFS[building.gateWallType].cost,
+  };
+  for (const [resource, amount] of Object.entries(GATE_CONVERSION_COSTS[building.gateWallType])) {
+    total[resource as ResourceId] = (total[resource as ResourceId] ?? 0) + (amount ?? 0);
+  }
+  return total;
 }
 
 export function canAffordCost(state: GameState, cost: Partial<Record<ResourceId, number>>): boolean {
@@ -997,7 +1013,9 @@ export function computeDefense(
   }
   let d = 0;
   for (const b of state.buildings) {
-    if (b.built) d += BUILDING_DEFS[b.type].defense;
+    if (!b.built) continue;
+    const defenseType = b.type === 'gate' && b.gateWallType ? b.gateWallType : b.type;
+    d += BUILDING_DEFS[defenseType].defense;
   }
   const garrisonMult = countBuilt(state, 'garrison') > 0 ? 1.3 : 1;
   const unique = new Map(combatants.map(combatant => [combatant.residentId, combatant]));

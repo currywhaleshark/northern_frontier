@@ -2333,6 +2333,30 @@ export function loadGame(slot = 1): GameState | null {
     if (!parsed.unlockedLivestock.includes('chicken')) parsed.unlockedLivestock.push('chicken');
     for (const building of parsed.buildings) {
       if (building.built) building.repairing = false;
+      const validGateWallType = building.gateWallType === 'palisade' ||
+        building.gateWallType === 'earthFort' || building.gateWallType === 'stoneWall';
+      if (building.type === 'gate') {
+        building.gateWallType = validGateWallType ? building.gateWallType : 'palisade';
+        delete building.gateConversion;
+      } else if (building.type === 'palisade' || building.type === 'earthFort' || building.type === 'stoneWall') {
+        const conversion = building.gateConversion;
+        const progress = Number(conversion?.progress);
+        const required = Number(conversion?.required);
+        if (conversion && conversion.wallType === building.type && Number.isFinite(progress) &&
+            Number.isFinite(required) && required > 0 && conversion.paidCost && typeof conversion.paidCost === 'object') {
+          building.gateWallType = building.type;
+          conversion.progress = Math.max(0, progress);
+          conversion.required = required;
+          conversion.paidCost = Object.fromEntries(Object.entries(conversion.paidCost)
+            .filter(([, amount]) => typeof amount === 'number' && Number.isFinite(amount) && amount >= 0));
+        } else {
+          delete building.gateConversion;
+          delete building.gateWallType;
+        }
+      } else {
+        delete building.gateConversion;
+        delete building.gateWallType;
+      }
       if (building.workOrder) {
         const order = building.workOrder;
         const validKind = order.kind === 'demolish' || order.kind === 'relocate';
@@ -2431,7 +2455,7 @@ export function loadGame(slot = 1): GameState | null {
     normalizeRoyalPlaqueBinding(parsed);
     const priorityBuilding = parsed.buildings.find(building => building.id === parsed.priorityBuildingId);
     parsed.priorityBuildingId = priorityBuilding &&
-      (!priorityBuilding.built || priorityBuilding.repairing || priorityBuilding.expansion || priorityBuilding.workOrder)
+      (!priorityBuilding.built || priorityBuilding.repairing || priorityBuilding.expansion || priorityBuilding.workOrder || priorityBuilding.gateConversion)
       ? priorityBuilding.id
       : null;
     ensureProcessingReserves(parsed);

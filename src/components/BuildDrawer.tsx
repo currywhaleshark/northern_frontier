@@ -31,6 +31,7 @@ interface Props {
 }
 
 function costText(type: BuildableBuildingTypeId): string {
+  if (type === 'gate') return '추가 비용: 목책 목재 1 · 토성 목재 3/도구 1 · 석벽 목재 4/철 1/도구 1';
   const parts = Object.entries(BUILDING_DEFS[type].cost).map(
     ([resource, amount]) => `${RESOURCE_NAMES[resource as ResourceId]} ${amount}`,
   );
@@ -67,7 +68,7 @@ function unavailableReason(state: GameState, type: BuildableBuildingTypeId): str
   if (type === 'hermitage' && !(state.unlockedReligions ?? []).includes('buddhism')) {
     return '노승이 마을에 의탁해야 합니다';
   }
-  if (!canAfford(state, def)) return '자원 부족';
+  if (type !== 'gate' && !canAfford(state, def)) return '자원 부족';
   return null;
 }
 
@@ -116,7 +117,7 @@ export function BuildDrawer({
     type,
     reason: unavailableReason(state, type),
     rankLocked: !isBuildingUnlocked(state.rank, type),
-    resourceShortage: isBuildingUnlocked(state.rank, type) && !canAfford(state, BUILDING_DEFS[type]),
+    resourceShortage: type !== 'gate' && isBuildingUnlocked(state.rank, type) && !canAfford(state, BUILDING_DEFS[type]),
   })) ?? [];
   const currentRankBuildItems = buildItems.filter(item => !item.rankLocked);
   const rankLockedBuildItems = buildItems.filter(item => item.rankLocked);

@@ -1,4 +1,4 @@
-import type { BuildingTypeId, GameState } from './types';
+import type { BuildingTypeId, GameState, ResourceId, SolidWallBuildingTypeId } from './types';
 
 export interface WallConnections {
   n: boolean;
@@ -32,7 +32,7 @@ export function isWallBuilding(type: BuildingTypeId): boolean {
   return WALL_BUILDING_SET.has(type);
 }
 
-export function isSolidWallBuilding(type: BuildingTypeId): boolean {
+export function isSolidWallBuilding(type: BuildingTypeId): type is SolidWallBuildingTypeId {
   return SOLID_WALL_BUILDING_SET.has(type);
 }
 
@@ -43,6 +43,57 @@ export function isGateBuilding(type: BuildingTypeId): boolean {
 export function wallTileKey(x: number, y: number): string {
   return `${x},${y}`;
 }
+
+export interface WallLineRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export type WallLineAxis = 'horizontal' | 'vertical';
+
+/** 시작점에서 현재점까지 더 많이 움직인 축으로 고정한다. 동률은 마지막으로 움직인 축을 따른다. */
+export function wallLineRect(
+  ax: number,
+  ay: number,
+  cx: number,
+  cy: number,
+  lastAxis: WallLineAxis = 'horizontal',
+): WallLineRect {
+  const dx = Math.abs(cx - ax);
+  const dy = Math.abs(cy - ay);
+  const horizontal = dx === dy ? lastAxis === 'horizontal' : dx > dy;
+  const endX = horizontal ? cx : ax;
+  const endY = horizontal ? ay : cy;
+  return {
+    x: Math.min(ax, endX),
+    y: Math.min(ay, endY),
+    w: Math.abs(endX - ax) + 1,
+    h: Math.abs(endY - ay) + 1,
+  };
+}
+
+export function wallLineTiles(
+  ax: number,
+  ay: number,
+  cx: number,
+  cy: number,
+  lastAxis: WallLineAxis = 'horizontal',
+): Array<{ x: number; y: number }> {
+  const rect = wallLineRect(ax, ay, cx, cy, lastAxis);
+  const tiles: Array<{ x: number; y: number }> = [];
+  for (let dy = 0; dy < rect.h; dy++) {
+    for (let dx = 0; dx < rect.w; dx++) tiles.push({ x: rect.x + dx, y: rect.y + dy });
+  }
+  return tiles;
+}
+
+export const GATE_CONVERSION_COSTS: Readonly<Record<SolidWallBuildingTypeId, Partial<Record<ResourceId, number>>>> = {
+  palisade: { wood: 1 },
+  earthFort: { wood: 3, tools: 1 },
+  stoneWall: { wood: 4, iron: 1, tools: 1 },
+};
 
 export function builtWallTileMap(state: Pick<GameState, 'buildings'>): Map<string, BuildingTypeId> {
   const tiles = new Map<string, BuildingTypeId>();

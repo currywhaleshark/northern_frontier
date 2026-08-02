@@ -9,11 +9,12 @@ import {
   assignPlotPlowOxen, defineStablePasture, expandAreaBuilding, setLivestockSpecies, slaughterLivestock,
   buildingHasActiveWork, convertFieldToPaddy, setYouthActivity, startBuildingDemolition,
   startBuildingRelocation, togglePriorityBuilding, toggleResidentCart,
-  unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
+  startGateConversion, tryPlaceWallLine, unassignResidentFromBuilding, useLuxuryGood, SUBTICKS, tryPlaceBuilding,
   CLEARING_APPROVAL_REQUIRED,
 } from './game/simulation';
 import { forestTilesInArea, forestTilesInFootprint } from './game/landClearing';
 import { adjustGatheringWorkArea } from './game/gatheringZones';
+import { isSolidWallBuilding } from './game/walls';
 import { ClearingConfirmDialog } from './components/ClearingConfirmDialog';
 import { RoyalPlaqueConfirmDialog } from './components/RoyalPlaqueConfirmDialog';
 import { hasAnySave, loadGame, saveGame } from './game/saveLoad';
@@ -669,6 +670,23 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     }
     if (!placingType) return;
     const type = placingType;
+    if (isSolidWallBuilding(type)) {
+      const endX = x + w - 1;
+      const endY = y + h - 1;
+      const lineTiles = Array.from({ length: h }, (_, dy) =>
+        Array.from({ length: w }, (__, dx) => stateRef.current.map[y + dy]?.[x + dx]).filter(Boolean),
+      ).flat();
+      commitPlacement(
+        approveClearing => tryPlaceWallLine(stateRef.current, type, x, y, endX, endY, { approveClearing }),
+        () => ({
+          title: `${BUILDING_DEFS[type].name} ${w * h}구간 건설`,
+          trees: lineTiles.filter(tile => tile?.terrain === 'forest').length,
+          detail: '전체 구간을 함께 승인하며, 공사터 벌목은 벌목장 작업영역과 관계없이 먼저 처리됩니다.',
+        }),
+        () => setPlacingType(null),
+      );
+      return;
+    }
     commitPlacement(
       approveClearing => tryPlaceBuilding(stateRef.current, type, x, y, w, h, { approveClearing }),
       () => ({
@@ -695,6 +713,17 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     if (pastureStableId != null || expandingBuildingId != null || relocatingBuildingId != null) return;
     if (placingType) {
       const type = placingType;
+      if (type === 'gate') {
+        const buildingId = stateRef.current.map[y]?.[x]?.buildingId;
+        const err = startGateConversion(stateRef.current, buildingId ?? -1);
+        if (err) notify(err, 'bad');
+        else {
+          playSfx('hammer');
+          setPlacingType(null);
+        }
+        bump();
+        return;
+      }
       const leveeEdge = type === 'levee'
         ? preferredLeveeEdgeAt(stateRef.current, x, y, localX, localY) ?? undefined
         : undefined;

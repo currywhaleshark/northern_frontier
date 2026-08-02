@@ -6,7 +6,7 @@ import {
   DAY_BANDS, DAY_CYCLE_SUBTICKS, WORK_RATE_SCALE, WORK_SUBTICKS, dayBandOf,
 } from './dayCycle';
 import {
-  BUILDING_DEFS, buildingCostFor, cemeteryPlotCapacity, clearBuildingTiles, computeDefense, footprintTilesOf,
+  BUILDING_DEFS, buildingCostForInstance, cemeteryPlotCapacity, clearBuildingTiles, computeDefense, footprintTilesOf,
   isBuildingUpperPassageTile, isPlotBuildingType, isSmithyProductUnlocked, occupyBuildingTiles, officeEfficiencyMultiplier,
   plotArea, preferredLeveeEdgeAt, SMITHY_PRODUCT_DEFS, smithyProductOf, sownAreaOf,
 } from './buildings';
@@ -1586,6 +1586,7 @@ function isConstructionForJob(state: GameState, building: Building, job: 'farmer
   if (clearingBlocksWork(state, building)) return false;
   if (mineCollapseRepairLocked(state, building)) return false;
   if (building.workOrder) return job === 'builder';
+  if (building.gateConversion) return job === 'builder';
   if (building.repairing) return job === 'builder';
   const requiredJob = isPlotBuildingType(building.type) ? 'farmer' : 'builder';
   return requiredJob === job && (!building.built || building.expansion != null);
@@ -1609,7 +1610,7 @@ function farmerConstructionTarget(state: GameState, r: Resident): Building | nul
 
 function completeBuildingDemolition(state: GameState, building: Building, ctx: Ctx): void {
   const def = BUILDING_DEFS[building.type];
-  const cost = buildingCostFor(building.type, building.w ?? 1, building.h ?? 1);
+  const cost = buildingCostForInstance(building);
   for (const [resource, amount] of Object.entries(cost)) {
     if ((amount ?? 0) <= 0) continue;
     state.resources[resource as ResourceId] += Math.max(1, Math.floor((amount ?? 0) * 0.5));
@@ -1690,7 +1691,9 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
   const st = goTo(state, r, ctx, buildingGoal(state, target.id));
   if (st === 'arrived') {
     r.phase = 'working';
-    r.task = target.workOrder
+    r.task = target.gateConversion
+      ? '성문 전환 중'
+      : target.workOrder
       ? target.workOrder.phase === 'rebuilding' ? '이전 재건축 중' : '건물 해체 중'
       : expansion ? '영역 확장 중'
         : target.repairing ? '건물 수리 중' : '건설 중';
@@ -1698,6 +1701,20 @@ function constructionWorkerTick(state: GameState, r: Resident, ctx: Ctx, target:
       Math.max(0.5, ctx.outdoor) * WORK_RATE_SCALE;
     gainSkillTick(state, r);
     if (advanceBuildingWorkOrder(state, target, ctx, work)) return;
+    if (target.gateConversion) {
+      const conversion = target.gateConversion;
+      conversion.progress += work;
+      if (conversion.progress >= conversion.required) {
+        target.type = 'gate';
+        target.gateWallType = conversion.wallType;
+        target.progress = BUILDING_DEFS.gate.buildDays;
+        delete target.gateConversion;
+        if (state.priorityBuildingId === target.id) state.priorityBuildingId = null;
+        state.resources.defense = computeDefense(state);
+        addLog(state, `${BUILDING_DEFS[conversion.wallType].name} 구간의 성문 전환이 끝났습니다.`, 'good', true);
+      }
+      return;
+    }
     if (expansion) {
       expansion.progress += work;
       if (expansion.progress >= expansion.required) {
