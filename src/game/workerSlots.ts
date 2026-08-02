@@ -11,6 +11,7 @@ export interface WorkerSlotConfig {
 }
 
 export const AUTO_ASSIGN_BUILDING_TYPES = [
+  'lumberCamp', 'huntLodge', 'herbHut', 'mine',
   'field', 'paddy', 'watermill', 'woodShed', 'charcoalKiln', 'smithy',
   'stable', 'clinic', 'nitreYard', 'ferry', 'tannery', 'weavingHouse', 'smokehouse', 'dryingRack', 'onggiKiln',
   'deepMine',
@@ -18,6 +19,10 @@ export const AUTO_ASSIGN_BUILDING_TYPES = [
 export type AutoAssignBuildingType = typeof AUTO_ASSIGN_BUILDING_TYPES[number];
 
 export const SLOTTED_BUILDING_CONFIG: Partial<Record<BuildingTypeId, WorkerSlotConfig>> = {
+  lumberCamp: { job: 'woodcutter', slots: 4 },
+  huntLodge: { job: 'hunter', slots: 4 },
+  herbHut: { job: 'herbalist', slots: 2 },
+  mine: { job: 'miner', slots: 4 },
   field: { job: 'farmer', slots: 1 },
   paddy: { job: 'farmer', slots: 1 },
   watermill: { job: 'miller', slots: 2 },

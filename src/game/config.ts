@@ -26,6 +26,25 @@ export const CONFIG = {
     deepMineStoneByproductRatio: 0.28,
   },
 
+  gatheringZones: {
+    // G1: 벌목장은 채광장과 같은 원형 작업영역 문법을 쓴다.
+    lumberCampRadius: 6,
+    lumberCampMinRadius: 3,
+    lumberCampMaxRadius: 10,
+    huntLodgeRadius: 7,
+    herbHutRadius: 6,
+    lodgingSupplyDays: 3,
+    lodgingHomeRestDays: 1,
+  },
+
+  habitats: {
+    reservePerForestTile: 0.5,
+    reserveMin: 4,
+    reserveMax: 30,
+    recoveryPerDayRatio: 0.08,
+    recoveryPerDayMin: 0.35,
+  },
+
   water: {
     wellRadius: 6,
     riverCoverageRadius: 3,

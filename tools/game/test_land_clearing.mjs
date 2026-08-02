@@ -246,11 +246,11 @@ function freshState() {
   assert.equal(clearing.clearingBlocksWork(state, hut), true, '재건축부터는 벌목을 기다린다');
 }
 
-// ── 7. 논은 벌목 대상이 아니다 (벤 자리는 평지라 논 조건을 못 맞춘다) ──
+// ── 7. 논도 물 조건을 만족하면 숲을 먼저 개간할 수 있다 ──
 {
   assert.equal(clearing.acceptsClearedLand(buildings.BUILDING_DEFS.field), true);
   assert.equal(clearing.acceptsClearedLand(buildings.BUILDING_DEFS.hut), true);
-  assert.equal(clearing.acceptsClearedLand(buildings.BUILDING_DEFS.paddy), false);
+  assert.equal(clearing.acceptsClearedLand(buildings.BUILDING_DEFS.paddy), true);
 }
 
 console.log('land clearing tests passed');

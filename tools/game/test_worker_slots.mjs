@@ -98,6 +98,9 @@ function prepareState(seed = 2026070901, rank = 'bu') {
 
 {
   assert.deepEqual(workerSlots.workerSlotConfig('field'), { job: 'farmer', slots: 1 });
+  assert.deepEqual(workerSlots.workerSlotConfig('lumberCamp'), { job: 'woodcutter', slots: 4 });
+  assert.deepEqual(workerSlots.workerSlotConfig('huntLodge'), { job: 'hunter', slots: 4 });
+  assert.deepEqual(workerSlots.workerSlotConfig('herbHut'), { job: 'herbalist', slots: 2 });
   assert.deepEqual(workerSlots.workerSlotConfig('paddy'), { job: 'farmer', slots: 1 });
   assert.deepEqual(workerSlots.workerSlotConfig('watermill'), { job: 'miller', slots: 2 });
   assert.deepEqual(workerSlots.workerSlotConfig('charcoalKiln'), { job: 'charcoalBurner', slots: 3 });

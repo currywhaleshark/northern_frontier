@@ -42,6 +42,8 @@ export interface AnimalHabitat {
   y: number;
   radius: number;
   active: boolean;
+  stock: number;    // 현재 남은 사냥감 비축(1회 사냥에 1 소모)
+  capacity: number; // 반경 안 숲 잔존량으로 정해지는 최대 비축
 }
 
 export type JobId =
@@ -158,6 +160,7 @@ export type BuildingTypeId =
   | 'woodShed'   // 장작마당
   | 'huntLodge'  // 사냥막
   | 'herbHut'    // 약초막
+  | 'lodgingHut' // 숙식 움막 — 채집 거점에 링크되는 원거리 숙식·보급 시설
   | 'clinic'     // 의원
   | 'mine'       // 채광장
   | 'well'       // 우물 — 지하수 수맥 위 급수 시설
@@ -437,6 +440,8 @@ export interface Resident {
   workTimer: number;                // 현재 작업지에서 남은 작업량(서브틱)
   targetId: number | null;          // 목표 건물 id (밭/건설현장/순찰지 등)
   miningDepositBuildingId?: number | null; // 현재 짐을 부릴 담당 채광장. 없으면 일반 저장 거점
+  lodgingSupplyHutId?: number | null; // 마을에서 숙식 움막으로 식량·땔감을 나르는 중
+  lodgingHomeRestDay?: number | null; // 비축 소진 뒤 집에서 쉬는 절대일
   carrying: Partial<Record<ResourceId, number>>; // 지고 있는 짐
   cartEquipped: boolean; // 운반용 수레 장비 여부
   haulTask: HaulTask | null; // 생산지 재고 운반 예약
@@ -488,6 +493,12 @@ export interface WeirReservoirState {
   tiles: WeirReservoirTile[];
 }
 
+export interface GatheringWorkArea {
+  x: number;
+  y: number;
+  radius: number;
+}
+
 export interface Building {
   id: number;
   type: BuildingTypeId;
@@ -515,6 +526,8 @@ export interface Building {
   graves?: number; // 묘역 전용: 안장된 묘 수 (한 타일의 2×2 소구획에 최대 4기)
   burialRecords?: BurialRecord[]; // 묘지 전용: 이름·사인·사망일을 보존하는 안치 기록
   inventory?: Partial<Record<ResourceId, number>>; // 운반 전 생산지 현장 재고
+  gatheringWorkArea?: GatheringWorkArea; // 채집 거점 전용: 건물과 독립적으로 옮기고 넓힐 수 있는 원형 작업영역
+  linkedGatheringBuildingId?: number | null; // 숙식 움막 전용: 한 동이 맡는 채집 거점
   repairing?: boolean; // 외부 피해로 파손되어 건설담당의 수리가 필요한 상태
   repairCause?: BuildingRepairCause; // 우측 경고에서 습격·설해·대홍수·화재 피해를 구분한다
 }
@@ -733,7 +746,7 @@ export interface ChoiceOption {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'guide' | 'promotionDecree' | 'mineCollapse' | 'giftEnvoy' | 'pactEnvoy' | 'pactRenewal' | 'claimAccordEnvoy' | 'claimAccordRenewal' | 'claimAccordOffer' | 'aidRequestEnvoy' | 'warParticipationRequest' | 'warParticipationResult';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tributeAnnouncement' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'guide' | 'promotionDecree' | 'mineCollapse' | 'giftEnvoy' | 'pactEnvoy' | 'pactRenewal' | 'claimAccordEnvoy' | 'claimAccordRenewal' | 'claimAccordOffer' | 'aidRequestEnvoy' | 'warParticipationRequest' | 'warParticipationResult';
   title: string;
   body: string;
   illustration?: {
@@ -1882,6 +1895,7 @@ export interface GameState {
   lastRockMiningTile?: { x: number; y: number }; // 그날 캐던 광상 위치
   pendingChoice: PendingChoice | null;
   courtTribute: CourtTribute | null;  // 올해 세공 (봄 공지 때 설정)
+  tributeAnnouncementPendingYear?: number; // 다른 사건 창에 막힌 세공 파발 공지를 다시 띄울 연차
   tributeReserve: Partial<Record<ResourceId, number>>; // 올해 세공용으로 잠근 중심지 재고
   tradeContracts: TradeContract[];    // 세력·상단과의 연 단위 정기거래 계약
   tradeContractReserve: Partial<Record<ResourceId, number>>; // 계약 이행용으로 잠근 중심지 재고

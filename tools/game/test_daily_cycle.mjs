@@ -59,6 +59,7 @@ const state = {
     { id: 3, type: 'hermitage', built: true },
     { id: 4, type: 'market', built: true },
     { id: 5, type: 'hut', built: false },
+    { id: 6, type: 'lodgingHut', built: true },
   ],
 };
 const resident = (overrides) => ({
@@ -71,6 +72,8 @@ const resident = (overrides) => ({
 assert.equal(isIndoors(state, resident({ phase: 'sleeping' })), true);
 assert.equal(isIndoors(state, resident({ phase: 'sleeping', homeBuildingId: null })), false);
 assert.equal(isIndoors(state, resident({ phase: 'sleeping', homeBuildingId: 5 })), false);
+assert.equal(isIndoors(state, resident({ phase: 'sleeping', targetId: 6 })), true,
+  'a resident sleeping at a completed lodging hut is indoors');
 assert.equal(isIndoors(state, resident({ phase: 'toHome' })), false);
 assert.equal(isIndoors(state, resident({ phase: 'toLeisure', targetId: 2 })), false);
 assert.equal(isIndoors(state, resident({ phase: 'leisure', targetId: 2 })), true);
@@ -330,8 +333,10 @@ try {
   const workTile = state.map[20][20];
   workTile.terrain = 'forest';
   state.exploration.explored[20][20] = true;
+  const lumberCamp = addBuilt('lumberCamp', 18, 18);
   Object.assign(active, {
     job: 'woodcutter',
+    assignedBuildingId: lumberCamp.id,
     x: 20,
     y: 20,
     px: 20,
@@ -342,7 +347,7 @@ try {
     targetId: null,
     carrying: {},
   });
-  const woodBeforeCloseout = state.resources.wood;
+  const woodBeforeCloseout = lumberCamp.inventory?.wood ?? 0;
   state.subTick = compiledDayCycle.DAY_BANDS.work.end;
   agents.agentsTick(state);
   assert.equal(active.phase, 'working');
@@ -360,8 +365,8 @@ try {
   assert.equal(active.workTimer, 0);
   assert.equal(active.carrying.wood ?? 0, 0,
     'the completed gathering load is unloaded before leisure or home');
-  assert.ok(state.resources.wood > woodBeforeCloseout,
-    'the completed gathering load reaches settlement storage during closeout');
+  assert.ok((lumberCamp.inventory?.wood ?? 0) > woodBeforeCloseout,
+    'the completed gathering load reaches its assigned lumber camp during closeout');
 
   const constructionSite = {
     id: state.nextBuildingId++,

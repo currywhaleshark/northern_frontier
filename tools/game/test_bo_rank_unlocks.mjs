@@ -35,7 +35,7 @@ const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mj
 const selectionActions = await import(pathToFileURL(join(compiledDir, 'selectionActions.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-const BO_BUILDINGS = ['ondol', 'mine', 'ferry', 'paddy', 'watermill', 'onggiKiln', 'jangdokdae'];
+const BO_BUILDINGS = ['ondol', 'ferry', 'paddy', 'watermill', 'onggiKiln', 'jangdokdae'];
 const BO_JOBS = ['fisher', 'miller', 'potter'];
 
 function boostResources(state) {
@@ -160,6 +160,7 @@ function runTicks(state, ticks) {
     assert.equal(constants.isJobUnlocked(state.rank, job), false, `${job} is locked before bo`);
   }
   assert.equal(constants.isJobUnlocked(state.rank, 'miner'), true, 'miner is a settlement-tier job');
+  assert.equal(buildings.isBuildingUnlocked(state.rank, 'mine'), true, 'mine is a settlement-tier building');
 
   const resident = state.residents.find(r => r.alive);
   simulation.setResidentJob(state, resident.id, 'miner');
@@ -305,8 +306,9 @@ function runTicks(state, ticks) {
   mineTile.hasIron = true;
   mineTile.mineralRemaining = 1;
   mineTile.buildingId = null;
-  placeBuilt(state, 'mine', mineSite);
+  const mine = placeBuilt(state, 'mine', mineSite);
   const miner = onlyWorkerAt(state, 'miner', mineTile);
+  assert.equal(workerSlots.assignResidentToBuilding(state, miner.id, mine.id), null);
   runTicks(state, 30);
 
   assert.ok((miner.carrying.iron ?? 0) > 0, 'miner carries iron from a deposit near the mine worksite');

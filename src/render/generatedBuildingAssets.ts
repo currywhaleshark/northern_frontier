@@ -35,6 +35,7 @@ const BUILDING_COLUMNS: Record<BuildingTypeId, number> = {
   woodShed: 4,
   huntLodge: 5,
   herbHut: 6,
+  lodgingHut: 5,
   clinic: 6,
   mine: 10,
   well: 3,

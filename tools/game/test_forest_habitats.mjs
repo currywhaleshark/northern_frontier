@@ -1,26 +1,35 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { Buffer } from 'node:buffer';
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 
-const source = readFileSync(new URL('../../src/game/habitats.ts', import.meta.url), 'utf8');
-const output = ts.transpileModule(source, {
-  compilerOptions: {
-    module: ts.ModuleKind.ES2022,
-    target: ts.ScriptTarget.ES2022,
-  },
-}).outputText;
-const moduleUrl = `data:text/javascript;base64,${Buffer.from(output).toString('base64')}`;
+const srcDir = new URL('../../src/game/', import.meta.url);
+const outDir = mkdtempSync(join(tmpdir(), 'northern-forest-habitat-tests-'));
+for (const file of readdirSync(srcDir).filter(name => name.endsWith('.ts'))) {
+  const source = readFileSync(new URL(file, srcDir), 'utf8');
+  let output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  output = output.replace(/(from\s+['"])(\.{1,2}\/[^'"]+)(['"])/g, (_match, start, spec, end) =>
+    /\.[cm]?js$/.test(spec) ? `${start}${spec}${end}` : `${start}${spec}.mjs${end}`);
+  writeFileSync(join(outDir, file.replace(/\.ts$/, '.mjs')), output, 'utf8');
+}
 const {
+  advanceHabitatReserve,
   collectHuntableTiles,
   findHabitatCandidates,
   findHabitatIconAtTile,
   habitatForestTiles,
+  habitatCapacity,
   habitatYieldMult,
   isForestHabitatCover,
   isHabitatActive,
+  normalizeHabitatReserve,
+  takeHabitatStock,
   spawnAnimalHabitats,
-} = await import(moduleUrl);
+} = await import(pathToFileURL(join(outDir, 'habitats.mjs')).href);
 
 const YIELD_OPTS = {
   habitatYieldBase: 0.8,
@@ -66,7 +75,10 @@ assert.equal(findHabitatCandidates(smallForest, { minTiles: 8, radius: 4 }).leng
 {
   const habitats = spawnAnimalHabitats(nineTileForest, 1, 1, () => 0.1, 0.5);
   assert.equal(habitats.length, 1);
-  assert.deepEqual(habitats[0], { id: 1, x: 1, y: 1, radius: 4, active: true });
+  assert.deepEqual(habitats[0], {
+    id: 1, x: 1, y: 1, radius: 4, active: true,
+    stock: habitatCapacity(9), capacity: habitatCapacity(9),
+  });
 }
 
 // 확률에서 전부 떨어져도 마을에서 가장 가까운 후보 하나는 보장된다
@@ -91,8 +103,8 @@ assert.equal(findHabitatCandidates(smallForest, { minTiles: 8, radius: 4 }).leng
   assert.equal(habitats[0].x, 1);
 }
 
-assert.equal(findHabitatIconAtTile([{ id: 1, x: 1, y: 1, radius: 4, active: true }], 1, 1)?.id, 1);
-assert.equal(findHabitatIconAtTile([{ id: 1, x: 1, y: 1, radius: 4, active: true }], 2, 1), null);
+assert.equal(findHabitatIconAtTile([{ id: 1, x: 1, y: 1, radius: 4, active: true, stock: 4, capacity: 4 }], 1, 1)?.id, 1);
+assert.equal(findHabitatIconAtTile([{ id: 1, x: 1, y: 1, radius: 4, active: true, stock: 4, capacity: 4 }], 2, 1), null);
 
 // 반경 안 숲 타일 수와 활성 판정 — 숲이 minTiles 아래로 줄면 짐승이 떠난다
 {
@@ -111,7 +123,7 @@ assert.equal(findHabitatIconAtTile([{ id: 1, x: 1, y: 1, radius: 4, active: true
     [0, 2], [1, 2], [2, 2],
     [11, 1],
   ]);
-  const habitats = [{ id: 1, x: 1, y: 1, radius: 4, active: true }];
+  const habitats = [{ id: 1, x: 1, y: 1, radius: 4, active: true, stock: 4, capacity: 4 }];
   const huntable = collectHuntableTiles(map, habitats, YIELD_OPTS);
   const expectedMult = 0.8 + 0.012 * 9; // base + perTile × 숲 9타일
   assert.equal(huntable.get('1,1'), expectedMult); // 서식지 중심
@@ -122,9 +134,28 @@ assert.equal(findHabitatIconAtTile([{ id: 1, x: 1, y: 1, radius: 4, active: true
 
 // 짐승이 떠난(비활성) 서식지에서는 사냥할 수 없다
 {
-  const habitats = [{ id: 1, x: 1, y: 1, radius: 4, active: false }];
+  const habitats = [{ id: 1, x: 1, y: 1, radius: 4, active: false, stock: 4, capacity: 4 }];
   const huntable = collectHuntableTiles(nineTileForest, habitats, YIELD_OPTS);
   assert.equal(huntable.size, 0);
+}
+
+// 구버전 저장의 서식지는 비축 필드가 없어도 현재 숲 기준의 가득 찬 비축으로 복원된다.
+{
+  const legacy = { id: 1, x: 1, y: 1, radius: 4, active: true };
+  normalizeHabitatReserve(nineTileForest, legacy);
+  assert.equal(legacy.capacity, habitatCapacity(9));
+  assert.equal(legacy.stock, legacy.capacity);
+}
+
+// 사냥은 비축을 소모하고, 고갈되면 사냥 가능 타일이 사라진다. 숲이 남으면 일일 회복한다.
+{
+  const habitat = { id: 1, x: 1, y: 1, radius: 4, active: true, stock: 1, capacity: habitatCapacity(9) };
+  assert.equal(takeHabitatStock(habitat, 1), 1);
+  assert.equal(habitat.stock, 0);
+  assert.equal(collectHuntableTiles(nineTileForest, [habitat], YIELD_OPTS).size, 0);
+  assert.ok(advanceHabitatReserve(nineTileForest, habitat) > 0);
+  assert.ok(habitat.stock > 0 && habitat.stock <= habitat.capacity);
+  assert.ok(collectHuntableTiles(nineTileForest, [habitat], YIELD_OPTS).size > 0);
 }
 
 // 배율은 habitatYieldMax를 넘지 않는다

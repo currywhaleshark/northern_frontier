@@ -2,6 +2,10 @@ import { FOOD_RESOURCES, FUEL_RESOURCES, RESOURCE_DEFS } from './resourceCatalog
 import { clothingCoverageTotal as equippedClothingCoverageTotal } from './wearables';
 import type { GameState, ResourceId } from './types';
 
+export interface ResourceStockState {
+  resources: Partial<Record<ResourceId, number>>;
+}
+
 export interface ConsumptionResult {
   totalConsumed: number;
   byResource: Partial<Record<ResourceId, number>>;
@@ -26,11 +30,11 @@ function finitePositive(value: number): number {
   return Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
-export function foodTotal(state: GameState): number {
+export function foodTotal(state: ResourceStockState): number {
   return FOOD_RESOURCES.reduce((sum, id) => sum + finitePositive(state.resources[id] ?? 0), 0);
 }
 
-export function fuelHeatTotal(state: GameState): number {
+export function fuelHeatTotal(state: ResourceStockState): number {
   return FUEL_RESOURCES.reduce(
     (sum, id) => sum + finitePositive(state.resources[id] ?? 0) * (RESOURCE_DEFS[id].fuelValue ?? 0),
     0,
@@ -46,7 +50,7 @@ export function luxuryStockTotal(state: GameState): number {
     .reduce((sum, id) => sum + finitePositive(state.resources[id] ?? 0), 0);
 }
 
-export function consumeFoodByDiet(state: GameState, requested: number): ConsumptionResult {
+export function consumeFoodByDiet(state: ResourceStockState, requested: number): ConsumptionResult {
   const amount = finitePositive(requested);
   const byResource: Partial<Record<ResourceId, number>> = {};
   let remaining = amount;
@@ -94,7 +98,7 @@ export function consumeFoodByDiet(state: GameState, requested: number): Consumpt
   };
 }
 
-export function consumeFuelHeat(state: GameState, requestedHeat: number): number {
+export function consumeFuelHeat(state: ResourceStockState, requestedHeat: number): number {
   let remaining = finitePositive(requestedHeat);
   let provided = 0;
   for (const id of FUEL_RESOURCES) {

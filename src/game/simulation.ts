@@ -14,7 +14,13 @@ import {
 import { forestTilesInArea, forestTilesInFootprint, pendingClearingTiles } from './landClearing';
 import { isWallBuilding } from './walls';
 import { addLog, maybeFlavorLog, maybeOfferTrade, resolveTrade } from './events';
-import { announceCourtTribute, maybeCollectTribute, resolveCourtTribute } from './courtTribute';
+import {
+  announceCourtTribute,
+  maybeCollectTribute,
+  maybeOpenCourtTributeAnnouncement,
+  resolveCourtTribute,
+  resolveCourtTributeAnnouncement,
+} from './courtTribute';
 import { maybeRunTradeContracts, resolveTradeContractChoice } from './tradeContracts';
 import { dailyScenarioTick, resolveScenarioChoice, scenarioSuppressesRandomEvents } from './scenario';
 import { dailyGuideTick, flushGuideModal, openGuideFollowUp, openGuideOnce } from './guides';
@@ -23,7 +29,7 @@ import { checkPromotion, resolvePromotionDecreeChoice } from './promotion';
 import { resolveCrackdown, resolveInspection, updateSuspicion } from './suspicion';
 import { generateMap, makeRng } from './map';
 import { advanceForestGrowth, setTreeStage } from './forestGrowth';
-import { isHabitatActive, spawnAnimalHabitats } from './habitats';
+import { advanceHabitatReserve, isHabitatActive, spawnAnimalHabitats } from './habitats';
 import { agentsTick, ensureResidentsOnPassableTiles, resetAgent, SUBTICKS } from './agents';
 import { battleTick } from './battles';
 import {
@@ -66,6 +72,10 @@ import {
   maybeOpenExpeditionEngagementChoice, resolveExpeditionEngagementChoice,
 } from './expeditionEngagement';
 import { isHaulSourceBuilding } from './inventory';
+import {
+  clearLodgingLinksForBuilding, consumeLodgingHutSupplies, isInsideLodgingWorksite,
+  lodgingHutPlacementTarget, lodgingSupplySummary,
+} from './lodgingHuts';
 import { maybeOfferDefectorImmigration, maybeOfferImmigration, resolveImmigration } from './immigration';
 import { createIncidentState, resolveSpecialEvent, updateSpecialEvents } from './specialEvents';
 import { createSpecialItemInventory } from './specialItems';
@@ -390,6 +400,10 @@ export function tryPlaceBuilding(
       return `반경 ${CONFIG.minerals.mineWorkRadius}칸 안에 발견된 광상이 있어야 합니다.`;
     }
   }
+  const lodgingTarget = type === 'lodgingHut' ? lodgingHutPlacementTarget(state, x, y) : null;
+  if (type === 'lodgingHut' && !lodgingTarget) {
+    return '숙식 움막은 아직 움막이 없는 완공 채집 거점의 작업영역 안에 지어야 합니다.';
+  }
   if (!canPlaceBuildingAt(state, type, x, y, w, h)) return '이곳에는 지을 수 없습니다.';
   const leveeEdge = type === 'levee'
     ? options.leveeEdge ?? preferredLeveeEdgeAt(state, x, y) ?? undefined
@@ -425,6 +439,7 @@ export function tryPlaceBuilding(
     queuedCropId: null,
     leveeEdge,
   };
+  if (type === 'lodgingHut') b.linkedGatheringBuildingId = lodgingTarget?.id ?? null;
   if (isAreaBuildingType(type)) {
     b.w = w;
     b.h = h;
@@ -471,6 +486,7 @@ export function demolishBuilding(state: GameState, x: number, y: number): string
 
   clearBuildingTiles(state, building.id);
   clearAssignmentsForBuilding(state, building.id);
+  clearLodgingLinksForBuilding(state, building.id);
   state.buildings = state.buildings.filter(b => b.id !== building.id);
   cleanupRoyalPlaqueAfterBuildingRemoval(state, building.id);
   reconcileMountAssignments(state);
@@ -496,6 +512,7 @@ export function cancelBuildingConstruction(state: GameState, buildingId: number)
 
   clearBuildingTiles(state, building.id);
   clearAssignmentsForBuilding(state, building.id);
+  clearLodgingLinksForBuilding(state, building.id);
   state.buildings = state.buildings.filter(candidate => candidate.id !== building.id);
   cleanupRoyalPlaqueAfterBuildingRemoval(state, building.id);
   if (state.priorityBuildingId === building.id) state.priorityBuildingId = null;
@@ -1067,6 +1084,13 @@ export function startBuildingRelocation(
     return '현지 거점이 자리한 곳으로는 이전할 수 없습니다.';
   }
   if (!canRelocateBuildingAt(state, building, x, y)) return '이곳으로는 건물을 이전할 수 없습니다.';
+  if (building.type === 'lodgingHut') {
+    const linked = building.linkedGatheringBuildingId == null ? null : state.buildings.find(candidate =>
+      candidate.id === building.linkedGatheringBuildingId && candidate.built);
+    if (!linked || !isInsideLodgingWorksite(linked, x, y)) {
+      return '숙식 움막은 연결된 채집 거점의 작업영역 안에서만 옮길 수 있습니다.';
+    }
+  }
   const destinationTrees = forestTilesInFootprint(state, building.type, x, y, w, h).length;
   if (!options.approveClearing && destinationTrees > 0) return CLEARING_APPROVAL_REQUIRED;
 
@@ -1138,12 +1162,21 @@ export function resolveChoice(state: GameState, optionId: string): void {
           : '강행할 명령이 없습니다.';
       if (error) addLog(state, error, 'bad');
     }
+    maybeOpenCourtTributeAnnouncement(state);
+    flushGuideModal(state);
+    return;
+  }
+  if (state.pendingChoice.kind === 'tributeAnnouncement') {
+    resolveCourtTributeAnnouncement(state);
+    maybeOpenCourtTributeAnnouncement(state);
+    flushGuideModal(state);
     return;
   }
   if (state.pendingChoice.kind === 'guide') {
     const guideId = String(state.pendingChoice.data.guideId ?? '');
     state.pendingChoice = null;
     openGuideFollowUp(state, guideId); // 세공 파발 뒤의 가죽공방 카드처럼 이어 붙는 안내
+    maybeOpenCourtTributeAnnouncement(state);
     flushGuideModal(state);
     return;
   }
@@ -1178,6 +1211,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'warParticipationRequest') resolveWarParticipationChoice(state, optionId);
   else if (state.pendingChoice.kind === 'warParticipationResult') resolveWarParticipationResult(state);
   else resolveTrade(state, optionId);
+  maybeOpenCourtTributeAnnouncement(state); // 다른 사건 뒤에 밀린 연례 세공 파발을 먼저 잇는다
   flushGuideModal(state); // 자리가 비었으면 미뤄 둔 초회 도움말을 잇는다
   reconcileWeaponAssignments(state);
   reconcileMountAssignments(state);
@@ -1278,6 +1312,7 @@ function endOfDay(state: GameState): void {
   recordPopulationMilestones(state, livingResidents(state).length);
 
   if (season !== prevSeason) onSeasonChange(state, prevSeason, season);
+  maybeOpenCourtTributeAnnouncement(state);
 
   // 날씨
   const prevWeather = state.weather;
@@ -1459,13 +1494,19 @@ function regrowForest(state: GameState, rng: () => number, season: Season): void
 // 서식지 점검: 반경 안 숲이 줄면 짐승이 떠나고, 숲이 되살아나면 돌아온다
 function updateHabitats(state: GameState): void {
   for (const habitat of state.habitats) {
+    const previousStock = habitat.stock;
     const active = isHabitatActive(state.map, habitat);
-    if (active === habitat.active) continue;
-    habitat.active = active;
-    if (active) {
-      addLog(state, '숲이 되살아나 짐승들이 서식지로 돌아왔습니다.', 'good');
-    } else {
-      addLog(state, '벌목으로 숲이 줄어 짐승들이 서식지를 떠났습니다.', 'bad');
+    if (active !== habitat.active) {
+      habitat.active = active;
+      if (active) {
+        addLog(state, '숲이 되살아나 짐승들이 서식지로 돌아왔습니다.', 'good');
+      } else {
+        addLog(state, '벌목으로 숲이 줄어 짐승들이 서식지를 떠났습니다.', 'bad');
+      }
+    }
+    advanceHabitatReserve(state.map, habitat);
+    if (active && previousStock <= 0 && habitat.stock > 0) {
+      addLog(state, '숲이 남은 서식지에 사냥감이 조금씩 돌아오기 시작했습니다.', 'good');
     }
   }
 }
@@ -1536,9 +1577,12 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
   const trappedResidentIds = new Set(
     living.filter(resident => resident.trappedInMineId != null).map(resident => resident.id),
   );
+  const lodgingGroups = consumeLodgingHutSupplies(state);
+  const lodgingResidentIds = new Set(lodgingGroups.flatMap(group => group.residents.map(resident => resident.id)));
 
   // 나이 단계별 소비 몫 — 아이는 성인보다 적게 먹고 적게 입는다
-  const weight = consumptionWeight(state, trappedResidentIds);
+  const settlementConsumptionExcluded = new Set([...trappedResidentIds, ...lodgingResidentIds]);
+  const weight = consumptionWeight(state, settlementConsumptionExcluded);
 
   // 식량 — 절미령이 서면 창고에서 내주는 몫만 줄어든다. 배부름은 평시 몫을 기준으로 재므로
   // 아껴 먹인 만큼 끼니를 거른 이가 생기고, 배고픔과 건강이 서서히 무너진다.
@@ -1567,11 +1611,41 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
       ...(state.expedition?.memberIds ?? []),
       ...(state.warDispatch?.memberIds ?? []),
       ...trappedResidentIds,
+      ...lodgingResidentIds,
     ]),
   );
+  for (const group of lodgingGroups) {
+    const groupIds = new Set(group.residents.map(resident => resident.id));
+    const excluded = new Set(living.filter(resident => !groupIds.has(resident.id)).map(resident => resident.id));
+    updateResidentNeeds(
+      state,
+      makeRng(state.seed + state.day * 104729 + group.hut.id * 17),
+      group.fedRatio,
+      group.firewoodRatio,
+      clothesCoverage,
+      group.foodResult.varietyScore,
+      group.foodResult.vegetableRatio,
+      excluded,
+    );
+    const remaining = lodgingSupplySummary(state, group.hut);
+    if (remaining.foodDays < 1 || remaining.fuelDays < 1) {
+      for (const resident of group.residents) {
+        resident.lodgingHomeRestDay = state.day + CONFIG.gatheringZones.lodgingHomeRestDays - 1;
+      }
+    }
+    if (group.foodResult.shortageRatio < 0.999) {
+      addLog(state, `${BUILDING_DEFS.lodgingHut.name}의 식량이 모자라 머문 일꾼들이 배를 곯았습니다.`, 'bad');
+    }
+    if (group.heatProvided < group.rationedFuelNeed - 0.000001 &&
+        (season === 'winter' || season === 'autumn')) {
+      addLog(state, `${BUILDING_DEFS.lodgingHut.name}의 땔감이 모자라 밤새 추위가 들었습니다.`, 'bad');
+    }
+  }
 
   // 밥상에 장·김치가 올랐는지 — 진 티어의 "밥상의 격" 성분이 이 날짜를 본다
-  if ((foodResult.byResource.kimchi ?? 0) + (foodResult.byResource.jang ?? 0) > 0) {
+  if ((foodResult.byResource.kimchi ?? 0) + (foodResult.byResource.jang ?? 0) +
+      lodgingGroups.reduce((sum, group) => sum + (group.foodResult.byResource.kimchi ?? 0) +
+        (group.foodResult.byResource.jang ?? 0), 0) > 0) {
     state.lastFermentMealDay = state.day;
   }
 

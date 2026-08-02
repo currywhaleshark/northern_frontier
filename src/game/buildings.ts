@@ -94,8 +94,8 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   lumberCamp: {
     id: 'lumberCamp', name: '벌목장',
-    desc: '벌목꾼이 목재를 부리는 거점. 숲 가까이 지으면 나르는 거리가 크게 줄어든다.',
-    cost: { wood: 5 }, buildDays: 4, slots: 4, capacity: 0, defense: 0,
+    desc: `벌목꾼을 배정하면 반경 ${CONFIG.gatheringZones.lumberCampRadius}칸 안의 성목만 베어 목재를 부리는 거점. 선택하면 작업영역과 남은 성목을 확인할 수 있다.`,
+    cost: { wood: 3 }, buildDays: 2, slots: 4, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   woodShed: {
@@ -106,14 +106,20 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   huntLodge: {
     id: 'huntLodge', name: '사냥막',
-    desc: '사냥꾼이 사냥감을 부리는 거점. 짐승 서식지 가까이 지으면 왕복이 줄어든다.',
+    desc: `사냥꾼을 배정하면 반경 ${CONFIG.gatheringZones.huntLodgeRadius}칸 작업영역 안의 서식지만 이용한다. 서식지 비축은 사냥으로 줄고 숲이 남으면 회복된다.`,
     cost: { wood: 7, hide: 2 }, buildDays: 4, slots: 4, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   herbHut: {
     id: 'herbHut', name: '약초막',
-    desc: '약초꾼이 약초와 야생 먹거리를 부리는 거점. 숲 가까이 지으면 채집 왕복이 줄어든다.',
+    desc: `약초꾼을 배정하면 반경 ${CONFIG.gatheringZones.herbHutRadius}칸 작업영역 안의 숲에서만 약초와 야생 먹거리를 모은다.`,
     cost: { wood: 5 }, buildDays: 3, slots: 2, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false,
+  },
+  lodgingHut: {
+    id: 'lodgingHut', name: '숙식 움막',
+    desc: `채집 거점 작업영역 안에 세우는 임시 숙소. 거점당 한 동이 자동 연결되며 작업자가 ${CONFIG.gatheringZones.lodgingSupplyDays}일분 식량·땔감을 직접 가져와 머문다. 비축이 바닥나면 하루 귀가한 뒤 다시 보급한다.`,
+    cost: { wood: 4, hide: 1 }, buildDays: 3, slots: 0, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
   clinic: {
@@ -148,9 +154,9 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   mine: {
     id: 'mine', name: '채광장',
-    desc: `보(堡) 승격 후 건설. 광상 위가 아닌 주변 빈 땅에 세우면 채광꾼이 반경 ${CONFIG.minerals.mineWorkRadius}칸의 돌·철·은을 캐 와 하역한다.`,
-    cost: { wood: 10, stone: 8, tools: 2 }, buildDays: 8, slots: 4, capacity: 0, defense: 0,
-    winterBonus: false, placement: 'land', unique: false, minRank: 'bo',
+    desc: `촌 단계 채집 거점. 광상 위가 아닌 주변 빈 땅에 세우면 배정 채광꾼이 반경 ${CONFIG.minerals.mineWorkRadius}칸의 돌·철·은을 캐 와 하역한다.`,
+    cost: { wood: 6, stone: 4, tools: 1 }, buildDays: 5, slots: 4, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false,
   },
   well: {
     id: 'well', name: '우물',
@@ -299,7 +305,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
 };
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
-  'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'well', 'field', 'paddy', 'canal', 'weir', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'clinic',
+  'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'well', 'field', 'paddy', 'canal', 'weir', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'lodgingHut', 'clinic',
   'smokehouse', 'dryingRack', 'smithy', 'mine', 'deepMine', 'ferry', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office', 'cemetery', 'school', 'shrine', 'hermitage',
   'levee', 'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement', 'chongtongEmplacement',
@@ -313,6 +319,7 @@ export const SINGLE_TILE_BUILDINGS = [
   'lumberCamp',
   'huntLodge',
   'herbHut',
+  'lodgingHut',
   'mine',
   'well',
   'field',

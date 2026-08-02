@@ -26,6 +26,7 @@ const simulation = await load('simulation');
 const miningSites = await load('miningSites');
 const selectionActions = await load('selectionActions');
 const inventory = await load('inventory');
+const workerSlots = await load('workerSlots');
 const { CONFIG } = await load('config');
 
 function prepareState(seed) {
@@ -121,6 +122,7 @@ function addBuiltMine(state, x, y) {
     job: 'miner', x, y, px: x, py: y, phase: 'rest', path: [], workTimer: 0,
     targetId: null, carrying: {}, assignedBuildingId: null,
   });
+  assert.equal(workerSlots.assignResidentToBuilding(state, miner.id, mine.id), null);
 
   for (let tick = 0; tick < CONFIG.agents.subticksPerDay * 7; tick++) simulation.advanceTick(state);
   assert.ok(deposit.mineralRemaining < 12, 'the miner walks to and extracts from a nearby deposit');

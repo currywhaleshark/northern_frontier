@@ -1737,6 +1737,7 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   woodShed:   { base: LOGS, glyph: CAMPFIRE },
   huntLodge:  { base: TENT_TAN },
   herbHut:    { roof: ROOF_BROWN, base: FACE_DOOR, glyph: HERB },
+  lodgingHut: { base: TENT_TAN, glyph: CAMPFIRE },
   clinic:     { roof: ROOF_DARK, base: FACE_DOOR, glyph: HERB },
   field:      { base: DIRT }, // 성장 단계는 drawBuilding에서 덧그림
   smithy:     { roof: ROOF_DARK, base: FACE_DOOR, glyph: ANVIL },

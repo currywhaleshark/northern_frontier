@@ -378,10 +378,16 @@ export function updateResidentNeeds(
 
     // ── 실제 입주 중인 집의 난방만 적용 ──
     const home = residentHome(state, r);
-    const waterRatio = home
+    const lodging = r.phase === 'sleeping' && r.targetId != null
+      ? state.buildings.find(building =>
+        building.id === r.targetId && building.built && building.type === 'lodgingHut') ?? null
+      : null;
+    const waterRatio = lodging ? 1 : home
       ? waterSupply.buildings.get(home.id)?.ratio ?? 1
       : 0;
-    const housingType: 'ondol' | 'hut' | 'none' = home
+    const housingType: 'ondol' | 'hut' | 'none' = lodging
+      ? 'hut'
+      : home
       ? BUILDING_DEFS[home.type].winterBonus ? 'ondol' : 'hut'
       : 'none';
 

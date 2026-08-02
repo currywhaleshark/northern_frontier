@@ -32,6 +32,22 @@ function placedCount(
   return state.buildings.filter(building => predicate(building.type)).length;
 }
 
+function builtCount(state: GameState, type: GameState['buildings'][number]['type']): number {
+  return state.buildings.filter(building => building.built && building.type === type).length;
+}
+
+function assignedJobCount(
+  state: GameState,
+  job: GameState['residents'][number]['job'],
+  type: GameState['buildings'][number]['type'],
+): number {
+  return state.residents.filter(resident => {
+    if (!resident.alive || resident.job !== job || resident.assignedBuildingId == null) return false;
+    const building = state.buildings.find(candidate => candidate.id === resident.assignedBuildingId);
+    return building?.built === true && building.type === type;
+  }).length;
+}
+
 // 배치만 된 밭 면적 (scenario.ts의 placedPlotArea와 같은 셈)
 function placedPlotArea(state: GameState): number {
   return state.buildings
@@ -80,6 +96,13 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       path: [{ tut: 'dock-jobs', text: '하단 독의 직업 배정 창을 여십시오. 누가 무슨 일을 하는지 한눈에 보입니다.' }],
     },
     {
+      done: state => placedCount(state, type => type === 'lumberCamp') >= 1,
+      path: [
+        { tut: 'build-cat-production', text: '생산 건설 목록을 여십시오.' },
+        { tut: 'build-item-lumberCamp', text: '벌목장을 골라 숲 가까운 빈 땅에 배치하십시오.' },
+      ],
+    },
+    {
       done: state => countJob(state, 'woodcutter') >= 1,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
@@ -91,6 +114,17 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
             + '다음부터는 직업 옆의 ＋만 눌러도 무직자 하나가 그 일로 올라갑니다.',
         },
       ],
+    },
+    {
+      done: state => builtCount(state, 'lumberCamp') >= 1,
+      path: [{ tut: 'time-play', text: '건축가를 두고 시간을 흘려 벌목장을 완공하십시오.' }],
+    },
+    {
+      done: state => assignedJobCount(state, 'woodcutter', 'lumberCamp') >= 1,
+      path: [{
+        tut: 'building-worker-slot-lumberCamp',
+        text: '완공된 벌목장을 선택하고 빈 작업 슬롯을 눌러 벌목꾼을 배정하십시오.',
+      }],
     },
     {
       // 여기서부터는 상세 창을 거치지 않는다 — ＋ 한 번이 무직자 하나를 그 자리에서 올린다
@@ -192,11 +226,29 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
   ],
   hunting: [
     {
+      done: state => placedCount(state, type => type === 'huntLodge') >= 1,
+      path: [
+        { tut: 'build-cat-production', text: '생산 건설 목록을 여십시오.' },
+        { tut: 'build-item-huntLodge', text: '사냥막을 골라 서식지 가까운 숲에 배치하십시오.' },
+      ],
+    },
+    {
+      done: state => builtCount(state, 'huntLodge') >= 1,
+      path: [{ tut: 'time-play', text: '시간을 흘려 사냥막을 완공하십시오.' }],
+    },
+    {
       done: state => countJob(state, 'hunter') >= 2,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
         { tut: 'job-plus-hunter', text: '사냥꾼 옆의 ＋를 두 번 눌러 사냥꾼을 두 사람 이상으로 만드십시오.' },
       ],
+    },
+    {
+      done: state => assignedJobCount(state, 'hunter', 'huntLodge') >= 2,
+      path: [{
+        tut: 'building-worker-slot-huntLodge',
+        text: '완공된 사냥막을 선택하고 빈 작업 슬롯을 두 번 눌러 사냥꾼을 배정하십시오.',
+      }],
     },
     {
       path: [{ tut: 'time-play', text: '시간을 흘려 사냥꾼이 고기를 채우게 하십시오. 고기는 상하니 쟁여 두기보다 제때 먹이십시오.' }],
@@ -233,6 +285,13 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
           text: '약초꾼 옆의 ＋를 눌러 한 사람 이상 두십시오. 병자가 쓰는 약초는 약초꾼이 숲에서 캐 옵니다.',
         },
       ],
+    },
+    {
+      done: state => assignedJobCount(state, 'herbalist', 'herbHut') >= 1,
+      path: [{
+        tut: 'building-worker-slot-herbHut',
+        text: '완공된 약초막을 선택하고 빈 작업 슬롯을 눌러 약초꾼을 배정하십시오.',
+      }],
     },
     {
       path: [{ tut: 'time-play', text: '시간을 흘려 병자가 자리를 털고 일어나기를 기다리십시오.' }],
@@ -332,17 +391,35 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       path: [{ tut: 'map-layer-ore', text: '광맥(鑛) 탭을 눌러 땅속에 묻힌 자리를 드러내십시오.' }],
     },
     {
+      done: state => placedCount(state, type => type === 'mine') >= 1,
+      path: [
+        { tut: 'build-cat-production', text: '생산 건설 목록을 여십시오.' },
+        { tut: 'build-item-mine', text: '노두가 반경 안에 들도록 주변 빈 땅에 채광장을 배치하십시오.' },
+      ],
+    },
+    {
+      done: state => builtCount(state, 'mine') >= 1,
+      path: [{ tut: 'time-play', text: '시간을 흘려 채광장을 완공하십시오.' }],
+    },
+    {
       done: state => countJob(state, 'miner') >= 1,
       path: [
         { tut: 'dock-jobs', text: '직업 배정 창을 여십시오.' },
         {
           tut: 'job-plus-miner',
-          text: '채광꾼 옆의 ＋를 눌러 한 사람 두십시오. 거점이 없어도 마을 곁 노두를 찾아가 캡니다.',
+          text: '채광꾼 옆의 ＋를 눌러 한 사람 두십시오.',
         },
       ],
     },
     {
-      path: [{ tut: 'time-play', text: '시간을 흘려 채광꾼이 돌과 철을 캐 오게 하십시오. 채광장은 보(堡)로 오른 뒤의 확장입니다.' }],
+      done: state => assignedJobCount(state, 'miner', 'mine') >= 1,
+      path: [{
+        tut: 'building-worker-slot-mine',
+        text: '완공된 채광장을 선택하고 빈 작업 슬롯을 눌러 채광꾼을 배정하십시오.',
+      }],
+    },
+    {
+      path: [{ tut: 'time-play', text: '시간을 흘려 배정된 채광꾼이 영역 안의 돌과 철을 캐 오게 하십시오.' }],
     },
   ],
   smithy: [

@@ -73,6 +73,12 @@ import {
   type BuildingEffectEmitter, type BuildingEffectWhen, type BuildingShadowSettings,
 } from './spriteStudioRegistries';
 import { treeStageFor } from '../game/forestGrowth';
+import { gatheringWorkArea, isGatheringBuildingType, type GatheringBuildingType } from '../game/gatheringZones';
+import {
+  linkedLodgingWorksite,
+  lodgingHutForWorksite,
+  lodgingHutPlacementTarget,
+} from '../game/lodgingHuts';
 import {
   mineralRemaining,
   mineralVisualTier,
@@ -1063,6 +1069,63 @@ function drawMineWorkRange(ctx: CanvasRenderingContext2D, x: number, y: number):
   ctx.arc(cx, cy, CONFIG.minerals.mineWorkRadius * TILE, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+  ctx.restore();
+}
+
+function drawGatheringWorkRange(
+  ctx: CanvasRenderingContext2D,
+  building: Pick<Building, 'type' | 'x' | 'y' | 'gatheringWorkArea'> & { type: GatheringBuildingType },
+): void {
+  const area = gatheringWorkArea(building);
+  const cx = (area.x + 0.5) * TILE;
+  const cy = (area.y + 0.5) * TILE;
+  ctx.save();
+  const color = building.type === 'huntLodge'
+    ? { fill: 'rgba(217,164,65,0.11)', stroke: 'rgba(232,184,84,0.95)' }
+    : building.type === 'herbHut'
+      ? { fill: 'rgba(112,188,150,0.11)', stroke: 'rgba(125,214,169,0.95)' }
+      : { fill: 'rgba(105,175,96,0.11)', stroke: 'rgba(132,211,117,0.95)' };
+  ctx.fillStyle = color.fill;
+  ctx.strokeStyle = color.stroke;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([7, 5]);
+  ctx.beginPath();
+  ctx.arc(cx, cy, area.radius * TILE, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawLodgingWorksiteRange(ctx: CanvasRenderingContext2D, worksite: Building): void {
+  if (worksite.type === 'mine') {
+    drawMineWorkRange(ctx, worksite.x, worksite.y);
+  } else if (isGatheringBuildingType(worksite.type)) {
+    drawGatheringWorkRange(ctx, worksite as Building & { type: GatheringBuildingType });
+  }
+}
+
+function drawLodgingLink(
+  ctx: CanvasRenderingContext2D,
+  hut: Pick<Building, 'x' | 'y' | 'w' | 'h'>,
+  worksite: Building,
+): void {
+  const hutCx = (hut.x + (hut.w ?? 1) / 2) * TILE;
+  const hutCy = (hut.y + (hut.h ?? 1) / 2) * TILE;
+  const worksiteCx = (worksite.x + (worksite.w ?? 1) / 2) * TILE;
+  const worksiteCy = (worksite.y + (worksite.h ?? 1) / 2) * TILE;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,196,92,0.98)';
+  ctx.fillStyle = 'rgba(255,220,132,0.98)';
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([8, 5]);
+  ctx.beginPath();
+  ctx.moveTo(hutCx, hutCy);
+  ctx.lineTo(worksiteCx, worksiteCy);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(worksiteCx, worksiteCy, Math.max(4, TILE * 0.18), 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
@@ -2658,6 +2721,26 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     ? undefined
     : state.buildings.find(building => building.id === o.selectedBuildingId && building.type === 'mine');
   if (selectedMine) drawMineWorkRange(ctx, selectedMine.x, selectedMine.y);
+  const selectedGatheringBuilding = o.selectedBuildingId == null
+    ? undefined
+    : state.buildings.find(building =>
+      building.id === o.selectedBuildingId && isGatheringBuildingType(building.type));
+  if (selectedGatheringBuilding && isGatheringBuildingType(selectedGatheringBuilding.type)) {
+    drawGatheringWorkRange(ctx, selectedGatheringBuilding as typeof selectedGatheringBuilding & { type: GatheringBuildingType });
+  }
+  const selectedBuilding = o.selectedBuildingId == null
+    ? undefined
+    : state.buildings.find(building => building.id === o.selectedBuildingId);
+  if (selectedBuilding?.type === 'lodgingHut') {
+    const worksite = linkedLodgingWorksite(state, selectedBuilding);
+    if (worksite) {
+      drawLodgingWorksiteRange(ctx, worksite);
+      drawLodgingLink(ctx, selectedBuilding, worksite);
+    }
+  } else if (selectedBuilding) {
+    const lodgingHut = lodgingHutForWorksite(state, selectedBuilding.id);
+    if (lodgingHut) drawLodgingLink(ctx, lodgingHut, selectedBuilding);
+  }
   if (waterVisualizationActive) {
     for (const well of state.buildings) {
       if (well.type !== 'well' ||
@@ -2685,6 +2768,16 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       for (const habitat of habitats) drawHabitatRange(ctx, habitat);
     }
     if (o.placingType === 'mine' && o.hover) drawMineWorkRange(ctx, o.hover.x, o.hover.y);
+    if (o.hover && isGatheringBuildingType(o.placingType)) {
+      drawGatheringWorkRange(ctx, { ...o.hover, type: o.placingType });
+    }
+    if (o.placingType === 'lodgingHut' && o.hover) {
+      const worksite = lodgingHutPlacementTarget(state, o.hover.x, o.hover.y);
+      if (worksite) {
+        drawLodgingWorksiteRange(ctx, worksite);
+        drawLodgingLink(ctx, { ...o.hover, w: 1, h: 1 }, worksite);
+      }
+    }
     if (o.placingType === 'well') {
       if (o.hover) {
         const previewTint = waterLayerTintForBuilding(

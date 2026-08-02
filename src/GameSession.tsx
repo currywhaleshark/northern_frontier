@@ -13,6 +13,7 @@ import {
   CLEARING_APPROVAL_REQUIRED,
 } from './game/simulation';
 import { forestTilesInArea, forestTilesInFootprint } from './game/landClearing';
+import { adjustGatheringWorkArea } from './game/gatheringZones';
 import { ClearingConfirmDialog } from './components/ClearingConfirmDialog';
 import { RoyalPlaqueConfirmDialog } from './components/RoyalPlaqueConfirmDialog';
 import { hasAnySave, loadGame, saveGame } from './game/saveLoad';
@@ -905,6 +906,17 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     }
   };
 
+  const handleAdjustGatheringArea = (
+    buildingId: number,
+    deltaX: number,
+    deltaY: number,
+    deltaRadius: number,
+  ) => {
+    const err = adjustGatheringWorkArea(stateRef.current, buildingId, deltaX, deltaY, deltaRadius);
+    if (err) notify(err, 'info');
+    bump();
+  };
+
   const handleStartBuildingDemolition = (buildingId: number) => {
     const building = stateRef.current.buildings.find(candidate => candidate.id === buildingId);
     if (!building) return;
@@ -1755,6 +1767,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               onUnassignWorker={handleUnassignWorker}
               onSelectResident={handleResidentClick}
               onCancelBuildingConstruction={handleCancelBuildingConstruction}
+              onAdjustGatheringArea={handleAdjustGatheringArea}
               onSendSiteGift={handleSendSiteGift}
               onOpenClaimAccord={handleOpenClaimAccord}
               onRequestSiteDefectors={handleRequestSiteDefectors}

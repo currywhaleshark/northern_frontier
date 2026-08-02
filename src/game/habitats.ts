@@ -1,4 +1,5 @@
-import type { AnimalHabitat, Terrain, Tile } from './types';
+import { CONFIG } from './config';
+import type { AnimalHabitat, GatheringWorkArea, Terrain, Tile } from './types';
 
 // 서식지 후보 — 숲 덩어리(연결 성분)의 중심. 지도 생성 때 확률로 서식지가 된다.
 export interface HabitatCandidate {
@@ -101,7 +102,48 @@ export function spawnAnimalHabitats(
     if (!spawned.includes(nearest)) spawned.push(nearest);
   }
 
-  return spawned.map((c, i) => ({ id: i + 1, x: c.x, y: c.y, radius: c.radius, active: true }));
+  return spawned.map((c, i) => {
+    const capacity = habitatCapacity(habitatForestTiles(map, c));
+    return { id: i + 1, x: c.x, y: c.y, radius: c.radius, active: true, stock: capacity, capacity };
+  });
+}
+
+export function habitatCapacity(forestTiles: number): number {
+  return Math.max(
+    CONFIG.habitats.reserveMin,
+    Math.min(CONFIG.habitats.reserveMax, forestTiles * CONFIG.habitats.reservePerForestTile),
+  );
+}
+
+export function normalizeHabitatReserve(map: Tile[][], habitat: AnimalHabitat): void {
+  const capacity = habitatCapacity(habitatForestTiles(map, habitat));
+  // 숲 변화가 만든 새 수용력은 즉시 반영하되, 개체수는 일일 회복으로만 늘어난다.
+  habitat.capacity = capacity;
+  habitat.stock = Number.isFinite(habitat.stock)
+    ? Math.max(0, Math.min(capacity, habitat.stock))
+    : capacity;
+}
+
+export function advanceHabitatReserve(map: Tile[][], habitat: AnimalHabitat): number {
+  const previous = Number.isFinite(habitat.stock) ? Math.max(0, habitat.stock) : 0;
+  normalizeHabitatReserve(map, habitat);
+  if (!habitat.active) {
+    habitat.stock = 0;
+    return habitat.stock - previous;
+  }
+  const recovery = Math.max(
+    CONFIG.habitats.recoveryPerDayMin,
+    habitat.capacity * CONFIG.habitats.recoveryPerDayRatio,
+  );
+  habitat.stock = Math.min(habitat.capacity, habitat.stock + recovery);
+  return habitat.stock - previous;
+}
+
+export function takeHabitatStock(habitat: AnimalHabitat, amount = 1): number {
+  const requested = Number.isFinite(amount) ? Math.max(0, amount) : 0;
+  const taken = Math.min(Math.max(0, habitat.stock), requested);
+  habitat.stock = Math.max(0, habitat.stock - taken);
+  return taken;
 }
 
 // 서식지 반경 안의 숲 타일 수 — 짐승이 머무는 조건이자 수확 배율의 근거
@@ -148,7 +190,7 @@ export function collectHuntableTiles(
 ): Map<string, number> {
   const tiles = new Map<string, number>();
   for (const habitat of habitats) {
-    if (!habitat.active) continue;
+    if (!habitat.active || habitat.stock <= 0) continue;
     const mult = habitatYieldMult(habitatForestTiles(map, habitat), opts);
     const r = habitat.radius;
     for (let dy = -r; dy <= r; dy++) {
@@ -162,6 +204,57 @@ export function collectHuntableTiles(
     }
   }
   return tiles;
+}
+
+export function huntableHabitatAtTile(
+  map: Tile[][],
+  habitats: AnimalHabitat[],
+  x: number,
+  y: number,
+  opts: HuntableYieldOptions,
+): AnimalHabitat | null {
+  const candidates = habitats.filter(habitat => {
+    if (!habitat.active || habitat.stock <= 0) return false;
+    const dx = x - habitat.x;
+    const dy = y - habitat.y;
+    return dx * dx + dy * dy <= habitat.radius ** 2 && map[y]?.[x]?.terrain === 'forest';
+  });
+  candidates.sort((a, b) =>
+    habitatYieldMult(habitatForestTiles(map, b), opts) - habitatYieldMult(habitatForestTiles(map, a), opts) ||
+    b.stock - a.stock || a.id - b.id);
+  return candidates[0] ?? null;
+}
+
+export interface HabitatReserveSummary {
+  habitats: number;
+  stock: number;
+  capacity: number;
+}
+
+export function habitatReserveSummaryInArea(
+  map: Tile[][],
+  habitats: AnimalHabitat[],
+  area: GatheringWorkArea,
+): HabitatReserveSummary {
+  const summary: HabitatReserveSummary = { habitats: 0, stock: 0, capacity: 0 };
+  for (const habitat of habitats) {
+    let overlaps = false;
+    for (let dy = -habitat.radius; dy <= habitat.radius && !overlaps; dy++) {
+      for (let dx = -habitat.radius; dx <= habitat.radius; dx++) {
+        if (dx * dx + dy * dy > habitat.radius ** 2) continue;
+        const tile = map[habitat.y + dy]?.[habitat.x + dx];
+        if (!tile || tile.terrain !== 'forest') continue;
+        const ax = tile.x - area.x;
+        const ay = tile.y - area.y;
+        if (ax * ax + ay * ay <= area.radius ** 2) { overlaps = true; break; }
+      }
+    }
+    if (!overlaps) continue;
+    summary.habitats++;
+    summary.stock += Math.max(0, habitat.stock);
+    summary.capacity += Math.max(0, habitat.capacity);
+  }
+  return summary;
 }
 
 export function findHabitatIconAtTile(

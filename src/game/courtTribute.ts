@@ -7,7 +7,7 @@ import { CONFIG } from './config';
 import { RESOURCE_NAMES } from './constants';
 import { rollCourtGrantArtifact, rollCourtGrantRewards } from './courtGrants';
 import { addLog } from './events';
-import { openGuideOnce } from './guides';
+import { markGuideSeen, openGuideFollowUp } from './guides';
 import { makeRng } from './map';
 import { acquireLivestock, LIVESTOCK_DEFS } from './livestock';
 import { rankEffects } from './promotion';
@@ -50,6 +50,49 @@ export function tributeItemsLabel(items: CourtTribute['items']): string {
   return Object.entries(items)
     .map(([res, amt]) => `${RESOURCE_NAMES[res as ResourceId]} ${amt}`)
     .join(', ');
+}
+
+export function maybeOpenCourtTributeAnnouncement(state: GameState): boolean {
+  const pendingYear = state.tributeAnnouncementPendingYear;
+  if (pendingYear == null || state.pendingChoice) return false;
+  const tribute = state.courtTribute;
+  if (!tribute || tribute.resolved || tribute.year !== pendingYear) {
+    state.tributeAnnouncementPendingYear = undefined;
+    return false;
+  }
+  const label = tributeItemsLabel(tribute.items);
+  const isFirstTribute = tribute.year === CONFIG.tribute.firstYear &&
+    state.tributePaidStreak === 0 && state.tributeFailStreak === 0;
+  state.pendingChoice = {
+    kind: 'tributeAnnouncement',
+    title: `${state.borderCommander.name} 북병사의 파발 — ${tribute.year}년차 세공`,
+    body:
+      `${BORDER_COMMANDER_TITLE} ${state.borderCommander.name}의 명을 받은 파발이 올해 세공 문서를 전했습니다.\n` +
+      `요구: ${label}\n` +
+      `기한: ${tribute.year}년차 겨울 첫날\n\n` +
+      '상단의 세공 표시나 조정 창에서 준비 상황을 확인하고, 겨울이 오기 전까지 세공고에 몫을 비축하십시오.',
+    illustration: {
+      src: '/assets/events/court-tribute-dispatch-v1.png',
+      alt: '봄 눈이 녹는 북방 개척지의 관문 앞에서 말을 탄 파발이 세공 공문을 건네는 모습',
+    },
+    options: [{
+      id: 'acknowledge',
+      label: '명을 받들겠소',
+      desc: '조정 창과 상단 세공 표시에서 올해 요구량과 비축량을 확인할 수 있습니다.',
+    }],
+    data: { year: tribute.year, firstTribute: isFirstTribute },
+  };
+  state.tributeAnnouncementPendingYear = undefined;
+  return true;
+}
+
+export function resolveCourtTributeAnnouncement(state: GameState): void {
+  const firstTribute = state.pendingChoice?.kind === 'tributeAnnouncement' &&
+    state.pendingChoice.data.firstTribute === true;
+  state.pendingChoice = null;
+  if (!firstTribute) return;
+  markGuideSeen(state, 'tribute');
+  openGuideFollowUp(state, 'tribute');
 }
 
 export function canPayTribute(state: GameState, tribute: CourtTribute): boolean {
@@ -96,8 +139,8 @@ export function announceCourtTribute(state: GameState): void {
     state.courtTribute = null;
     addLog(
       state,
-      '조정은 첫 해의 정착을 지켜보고 있습니다. 세공은 이듬해 봄부터 거둔다 하니, ' +
-        '올해는 겨울을 넘기는 일에만 힘쓰십시오.',
+      '조정은 첫 해의 정착을 지켜보고 있습니다. ' +
+        '이듬해부터는 소출의 일부를 세공으로 바쳐야 합니다.',
       'info',
       true,
     );
@@ -119,8 +162,10 @@ export function announceCourtTribute(state: GameState): void {
     'info',
     true,
   );
-  // 첫 파발 — 세공이라는 살림 자체를 처음 보는 자리다 (길잡이 모달, 이어서 가죽공방 카드)
-  openGuideOnce(state, 'tribute');
+  // 매해 중요한 공지라 로그에 묻히지 않게 삽화 창을 띄운다.
+  // 다른 선택지가 자리를 차지했으면 해소 직후까지 연차를 기억한다.
+  state.tributeAnnouncementPendingYear = year;
+  maybeOpenCourtTributeAnnouncement(state);
 }
 
 // 겨울 첫날(또는 모달 충돌 시 그 다음 날): 조정의 사자가 세공을 거두러 온다

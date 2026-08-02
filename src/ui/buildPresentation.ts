@@ -24,6 +24,7 @@ export const BUILD_CATEGORY_BY_TYPE = {
   woodShed: 'production',
   huntLodge: 'production',
   herbHut: 'production',
+  lodgingHut: 'housing',
   clinic: 'special',
   mine: 'production',
   well: 'housing',

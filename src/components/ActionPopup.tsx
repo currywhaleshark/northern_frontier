@@ -374,6 +374,7 @@ export function ActionPopup({
                 <button
                   className="worker-slot-main"
                   type="button"
+                  data-tut={!worker ? `building-worker-slot-${building.type}` : undefined}
                   disabled={disabled}
                   onClick={() => {
                     if (worker) onSelectResident(worker.id);

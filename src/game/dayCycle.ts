@@ -40,6 +40,11 @@ export function normalizeDayCycleSubTick(value: unknown): number {
 
 export function isIndoors(state: GameState, resident: Resident): boolean {
   if (resident.phase === 'sleeping') {
+    if (resident.targetId != null) {
+      const lodging = state.buildings.find(building =>
+        building.id === resident.targetId && building.built && building.type === 'lodgingHut');
+      if (lodging) return true;
+    }
     if (resident.homeBuildingId == null) return false;
     const home = state.buildings.find(building => building.id === resident.homeBuildingId);
     return Boolean(home?.built);

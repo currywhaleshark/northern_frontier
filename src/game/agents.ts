@@ -17,7 +17,7 @@ import { residentLogName } from './residentLogName';
 import { enrolledStudentIds, skillGainMult } from './education';
 import { skillGainArtifactMultiplier } from './specialItems';
 import { haulerCarryCapacity, haulingMoveSpeedMultiplier, scaledCarryCapacity } from './equipment';
-import { collectHuntableTiles } from './habitats';
+import { collectHuntableTiles, huntableHabitatAtTile, takeHabitatStock } from './habitats';
 import { huntPreyName, rollHuntPrey, scaledHuntYield, type HuntPreyDef } from './hunting';
 import { makeRng } from './map';
 // 잎 모듈에서 직접 가져온다 — scenario.ts를 거치면 agents → scenario → raids → agents 고리가 생긴다
@@ -40,7 +40,7 @@ import { canGrowCropNow, canHarvestCropNow, canPlantCropNow, cropIdForBuilding, 
 import { clothingCoverageTotal, foodTotal, fuelHeatTotal } from './consumption';
 import { isExplored } from './exploration';
 import { activePredatorScoutIds } from './expeditionIntel';
-import { FOOD_RESOURCES, FUEL_RESOURCES } from './resourceCatalog';
+import { FOOD_RESOURCES, FUEL_RESOURCES, RESOURCE_DEFS } from './resourceCatalog';
 import {
   craftStrawShoesAtHome, equipMissingWearables, footwearCoverageTotal,
   normalizeWearableResourceStocks, residentFootwearMoveMultiplier, resolvedTanneryProduct, TANNERY_PRODUCT_DEFS,
@@ -50,14 +50,15 @@ import {
   ensureLivestockState, hayFromHarvestProgress, livestockProductForHerder, plotWorkMultiplier,
 } from './livestock';
 import { performPhysicianTreatment } from './medicine';
-import { mineralDepositsInMineRange, servingMineForTile } from './miningSites';
+import { isTileInMineWorkArea, mineralDepositsInMineRange, servingMineForTile } from './miningSites';
+import { isTileInGatheringWorkArea } from './gatheringZones';
 import { oreSampleAt } from './subsurfaceVeins';
 import { waterDependentProductionMultiplier } from './waterSupply';
 import { activeFireDisaster, applyFireWater, drawFireWater, nearestFireWaterSource } from './fire';
 import { mineCollapseRepairLocked } from './mineCollapse';
 import { rankProductionEfficiency } from './productionEfficiency';
 import { cleanupRoyalPlaqueAfterBuildingRemoval, plaqueProductionMultiplier } from './royalPlaque';
-import { buildGoalField, describeGoal, type DescribedGoal, type GoalField } from './pathGoals';
+import { describeGoal, type DescribedGoal } from './pathGoals';
 import { farmWorkTileForTick } from './farmWorkTiles';
 import { reconcileResidentHomes, residentHome } from './residents';
 import { reconcileMountAssignments } from './weapons';
@@ -73,6 +74,10 @@ import {
   addBuildingStock, buildingStock, depositResidentToBuilding, depositResidentToSettlement,
   isHaulSourceBuilding, isStorageBuilding, takeBuildingStock,
 } from './inventory';
+import {
+  clearLodgingLinksForBuilding, lodgingCanHostTonight, lodgingDailyNeeds, lodgingHutForResident,
+  lodgingSupplySummary, lodgingWorkers,
+} from './lodgingHuts';
 import type {
   Building, BuildingTypeId, GameState, ManualOrder, ProcessingInputId, Resident, ResourceId, Season,
   SmithyProductId, Tile,
@@ -89,8 +94,6 @@ interface Ctx {
   rng: () => number;
   centerId: number;
   huntable: Map<string, number>; // 사냥 가능 타일 ("x,y") → 수확 배율 — 서식지 범위/크기와 연동
-  goalFields: Partial<Record<'forest' | 'huntable' | 'mineral', GoalField>>;
-  goalFieldUserCounts: Record<'forest' | 'huntable' | 'mineral', number>;
   farmerWorkIdsByPlot: Map<number, number[]>;
   /** 이번 서브틱에 공사터 개간을 맡은 벌목꾼 (주민 id → 건물 id) */
   clearingCrew: Map<number, number>;
@@ -417,7 +420,16 @@ function isSettledAtGoal(resident: Resident, result: GoResult): boolean {
 // 실패한 경로 탐색은 몇 서브틱 쉬어 간다 — 막힌 주민이 매 틱 지도 전체를 다시 뒤지는 것을 막는다.
 // (저장되지 않는 순수 성능 캐시. 지형은 서브틱 사이에 거의 변하지 않는다.)
 const PATH_FAIL_COOLDOWN_TICKS = 3;
-const pathFailUntil = new Map<number, number>();
+const pathFailUntilByState = new WeakMap<GameState, Map<number, number>>();
+
+function pathFailUntilFor(state: GameState): Map<number, number> {
+  let cache = pathFailUntilByState.get(state);
+  if (!cache) {
+    cache = new Map<number, number>();
+    pathFailUntilByState.set(state, cache);
+  }
+  return cache;
+}
 
 function absoluteTick(state: GameState): number {
   return state.day * SUBTICKS + state.subTick;
@@ -435,6 +447,7 @@ function goTo(
   const canPass = passable ?? ((x: number, y: number) => isPassable(state, x, y));
   if (isGoal(state.map[r.y][r.x])) { r.path = []; return 'arrived'; }
   if (r.path.length === 0) {
+    const pathFailUntil = pathFailUntilFor(state);
     const nowTick = absoluteTick(state);
     if ((pathFailUntil.get(r.id) ?? 0) > nowTick) return 'stuck';
     const p = bfs(state, r.x, r.y, isGoal, canPass);
@@ -973,53 +986,14 @@ interface GatherOpts {
   taskNone?: string;
   adjustHarvestAmount?: (tile: Tile, r: Resident, amount: number) => number;
   onHarvest?: (tile: Tile, r: Resident, amount: number) => void;
-  goalField?: () => GoalField;
   /** 작업지에 갈 길이 없을 때의 대체 행동. true를 돌려주면 이 틱을 넘겨받는다. */
   onStuck?: () => boolean;
-}
-
-type GatherGoalKind = 'forest' | 'huntable' | 'mineral';
-
-// 넓은 목표장 자체는 매 주민/매 서브틱이 아니라 state+일자 단위로 재사용한다.
-// 필드는 일부 아직 답사하지 못한/봉인된 후보도 포함하므로 heuristic으로만 쓰며,
-// 실제 도착 판정과 목표 목록은 아래에서 현재 답사·통행 가능한 칸으로 다시 좁힌다.
-const broadGoalFieldCache = new WeakMap<GameState, Map<GatherGoalKind, { day: number; field: GoalField }>>();
-
-function gatherGoalField(
-  state: GameState,
-  ctx: Ctx,
-  kind: GatherGoalKind,
-  goal: (tile: Tile) => boolean,
-): GoalField {
-  const cached = ctx.goalFields[kind];
-  if (cached) return cached;
-  let byKind = broadGoalFieldCache.get(state);
-  if (!byKind) {
-    byKind = new Map();
-    broadGoalFieldCache.set(state, byKind);
-  }
-  let broad = byKind.get(kind);
-  if (!broad || broad.day !== state.day) {
-    broad = { day: state.day, field: buildGoalField(state.map, goal) };
-    byKind.set(kind, broad);
-  }
-  const field: GoalField = {
-    ...broad.field,
-    goals: broad.field.goals.filter(point =>
-      isExplored(state, point.x, point.y) && canWorkForeignTerritory(state, point.x, point.y)),
-  };
-  ctx.goalFields[kind] = field;
-  return field;
 }
 
 function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void {
   const forced = r.manualOrder?.kind === 'work' ? r.manualOrder.unauthorizedSiteIds ?? [] : [];
   let knownGoal: DescribedGoal = (tile: Tile): boolean => isExplored(state, tile.x, tile.y) && o.goal(tile) &&
     canWorkForeignTerritory(state, tile.x, tile.y, forced);
-  if (forced.length === 0 && o.goalField) {
-    const field = o.goalField();
-    knownGoal = describeGoal(knownGoal, field.goals, field);
-  }
   // 짐이 찼거나 하역 중이면 거점으로
   if (carryTotal(r) >= scaledCarryCapacity(o.cap) ||
     (r.phase === 'toDeposit' && carryTotal(r) > 0)) {
@@ -1066,8 +1040,11 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
   } else if (st === 'stuck') {
     if (o.onStuck?.()) return;
     r.phase = 'rest';
-    if (carryTotal(r) > 0) r.phase = 'toDeposit';
-    else loiterNearCenter(state, r, ctx, o.taskNone ?? '갈 곳 없음');
+    if (carryTotal(r) > 0) {
+      // 마지막 자원을 캐 목표가 사라진 경우의 실패 쿨다운이 지정 거점 하역까지 막지 않게 한다.
+      pathFailUntilFor(state).delete(r.id);
+      r.phase = 'toDeposit';
+    } else loiterNearCenter(state, r, ctx, o.taskNone ?? '갈 곳 없음');
   } else {
     r.phase = 'toWork';
     r.task = o.taskMove;
@@ -1287,7 +1264,7 @@ function clearingWoodcutterTick(state: GameState, r: Resident, ctx: Ctx, siteId:
     // 길찾기 실패 쿨다운은 이 사람 몫으로 한 번 비워 준다 — 그러지 않으면 공사터에서
     // 걸린 쿨다운 때문에 이어지는 일반 벌목까지 같이 막혀 그냥 서 있게 된다.
     onStuck: () => {
-      pathFailUntil.delete(r.id);
+      pathFailUntilFor(state).delete(r.id);
       woodcutterTick(state, r, ctx, true);
       return true;
     },
@@ -1304,6 +1281,8 @@ function clearingWoodcutterTick(state: GameState, r: Resident, ctx: Ctx, siteId:
 
 function woodcutterTick(state: GameState, r: Resident, ctx: Ctx, skipClearing = false): void {
   const a = CONFIG.agents;
+  // 건설·확장·이전 예정지 개간은 정착지 공사 명령이므로 벌목장 작업영역보다 우선한다.
+  // 따라서 영역 밖 공사터라도 개간조로 배정된 벌목꾼은 먼저 그 자리를 비운다.
   if (!skipClearing) {
     const siteId = ctx.clearingCrew.get(r.id);
     if (siteId != null) {
@@ -1311,20 +1290,27 @@ function woodcutterTick(state: GameState, r: Resident, ctx: Ctx, skipClearing = 
       return;
     }
   }
+  const assignedCamp = assignedBuildingForResident(state, r);
+  const lumberCamp = assignedCamp?.type === 'lumberCamp' ? assignedCamp : null;
+  if (!lumberCamp) {
+    if (carryTotal(r) > 0) depositResidentToSettlement(state, r);
+    loiterNearCenter(state, r, ctx, '벌목장 배정 없음');
+    return;
+  }
   gatherJob(state, r, ctx, {
     // 공사터로 잡힌 나무는 개간 담당이 따로 있으므로 건드리지 않는다
     // (건물이 이미 올라앉은 칸, 그리고 이전 목적지처럼 아직 비어 있는 예정지 모두)
     goal: t => t.terrain === 'forest' && t.buildingId == null &&
+      isTileInGatheringWorkArea(lumberCamp, t) &&
       !ctx.clearingReserved.has(`${t.x},${t.y}`) && treeStageFor(t) === 'mature',
     workTicks: a.work.chop,
     yieldRes: 'wood',
     yieldAmt: a.yields.wood * CONFIG.seasons.woodMult[ctx.season],
     cap: a.carryCap.wood,
     depositExtra: ['lumberCamp'],
-    goalField: ctx.goalFieldUserCounts.forest >= 3
-      ? () => gatherGoalField(state, ctx, 'forest', t => t.terrain === 'forest')
-      : undefined,
-    taskWork: '벌목 중', taskMove: '숲으로 이동', taskHaul: '목재 운반',
+    depositTargets: () => [lumberCamp],
+    taskWork: '벌목 중', taskMove: '벌목장 영역으로 이동', taskHaul: '목재 운반',
+    taskNone: '벌목장 영역에 벨 나무 없음',
     onHarvest: (tile, worker, woodAmount) => {
       addCarry(worker, 'brushwood', woodAmount * CONFIG.production.brushwoodPerWood);
       // 성목을 반복 벌목하면 이따금 그루터기 단계로 내려가고 재성장을 기다린다.
@@ -1338,9 +1324,17 @@ function woodcutterTick(state: GameState, r: Resident, ctx: Ctx, skipClearing = 
 function hunterTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
   let caught: { prey: HuntPreyDef; meat: number; hide: number } | null = null;
+  const assignedLodge = assignedBuildingForResident(state, r);
+  const huntLodge = assignedLodge?.type === 'huntLodge' ? assignedLodge : null;
+  if (!huntLodge) {
+    if (carryTotal(r) > 0) depositResidentToSettlement(state, r);
+    loiterNearCenter(state, r, ctx, '사냥막 배정 없음');
+    return;
+  }
   gatherJob(state, r, ctx, {
     // 짐승이 사는 서식지 범위 안에서만 사냥이 된다 (렌더러의 서식지 원과 동일 판정)
-    goal: t => ctx.huntable.has(`${t.x},${t.y}`),
+    goal: t => ctx.huntable.has(`${t.x},${t.y}`) &&
+      isTileInGatheringWorkArea(huntLodge, t),
     workTicks: a.work.hunt,
     yieldRes: 'meat',
     // 서식지가 클수록 사냥감이 풍부하다
@@ -1348,16 +1342,22 @@ function hunterTick(state: GameState, r: Resident, ctx: Ctx): void {
       (ctx.huntable.get(`${t.x},${t.y}`) ?? 0) * CONFIG.production.meatPerGame,
     cap: a.carryCap.meat,
     depositExtra: ['huntLodge'],
-    goalField: ctx.goalFieldUserCounts.huntable >= 3
-      ? () => gatherGoalField(state, ctx, 'huntable', t => ctx.huntable.has(`${t.x},${t.y}`))
-      : undefined,
+    depositTargets: () => [huntLodge],
     taskWork: '사냥감 추적 중',
     taskMove: '서식지로 이동',
     taskHaul: resident => `${huntPreyName(resident.lastHuntPrey)} 운반`,
-    adjustHarvestAmount: (_tile, _resident, baselineMeat) => {
+    taskNone: '사냥막 영역에 남은 사냥감 없음',
+    adjustHarvestAmount: (tile, _resident, baselineMeat) => {
+      const habitat = huntableHabitatAtTile(state.map, state.habitats, tile.x, tile.y, a.hunting);
+      if (!habitat) return 0;
+      const taken = takeHabitatStock(habitat, 1);
+      if (taken <= 0) return 0;
       const prey = rollHuntPrey(ctx.rng);
-      const yields = scaledHuntYield(prey, baselineMeat);
+      const yields = scaledHuntYield(prey, baselineMeat * taken);
       caught = { prey, ...yields };
+      if (habitat.stock <= 0) {
+        addLog(state, '서식지의 사냥감이 바닥났습니다. 숲을 남겨 두면 천천히 회복됩니다.', 'bad', true);
+      }
       return yields.meat;
     },
     onHarvest: (_tile, res, meatAmount) => {
@@ -1383,6 +1383,13 @@ function hunterTick(state: GameState, r: Resident, ctx: Ctx): void {
 function herbalistTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
   const forageRatio = CONFIG.production.foragedVegetablesPerHerb;
+  const assignedHut = assignedBuildingForResident(state, r);
+  const herbHut = assignedHut?.type === 'herbHut' ? assignedHut : null;
+  if (!herbHut) {
+    if (carryTotal(r) > 0) depositResidentToSettlement(state, r);
+    loiterNearCenter(state, r, ctx, '약초막 배정 없음');
+    return;
+  }
   if (ctx.season === 'winter') {
     if (carryTotal(r) > 0) { r.phase = 'toDeposit'; }
     if (carryTotal(r) > 0) {
@@ -1394,16 +1401,15 @@ function herbalistTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
   gatherJob(state, r, ctx, {
-    goal: t => t.terrain === 'forest',
+    goal: t => t.terrain === 'forest' && isTileInGatheringWorkArea(herbHut, t),
     workTicks: a.work.herb,
     yieldRes: 'herbs',
     yieldAmt: a.yields.herbs,
     cap: a.carryCap.herbs * (1 + forageRatio),
     depositExtra: ['herbHut'],
-    goalField: ctx.goalFieldUserCounts.forest >= 3
-      ? () => gatherGoalField(state, ctx, 'forest', t => t.terrain === 'forest')
-      : undefined,
-    taskWork: '약초·산물 채집 중', taskMove: '산기슭으로 이동', taskHaul: '약초·산물 운반',
+    depositTargets: () => [herbHut],
+    taskWork: '약초·산물 채집 중', taskMove: '약초막 영역으로 이동', taskHaul: '약초·산물 운반',
+    taskNone: '약초막 영역에 채집할 숲 없음',
     onHarvest: (_tile, worker, herbAmount) => {
       addCarry(worker, 'vegetables', herbAmount * forageRatio);
     },
@@ -1614,6 +1620,7 @@ function completeBuildingDemolition(state: GameState, building: Building, ctx: C
   restoreWeirReservoir(state, building);
   clearBuildingTiles(state, building.id);
   clearAssignmentsForBuilding(state, building.id);
+  clearLodgingLinksForBuilding(state, building.id);
   state.buildings = state.buildings.filter(candidate => candidate.id !== building.id);
   cleanupRoyalPlaqueAfterBuildingRemoval(state, building.id);
   if (state.priorityBuildingId === building.id) state.priorityBuildingId = null;
@@ -2425,6 +2432,13 @@ function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
     return;
   }
 
+  if (assignedMine?.type !== 'mine') {
+    if (carryTotal(r) > 0) depositResidentToSettlement(state, r);
+    r.miningDepositBuildingId = null;
+    loiterNearCenter(state, r, ctx, '채광장 배정 없음');
+    return;
+  }
+
   const a = CONFIG.agents;
   const miningTile = state.map[r.y]?.[r.x];
   const miningIron = miningTile?.terrain === 'rock' && miningTile.hasIron;
@@ -2439,27 +2453,14 @@ function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
     ? 1 + CONFIG.specialResidents.geomancerMiningYieldBonus
     : 1;
   gatherJob(state, r, ctx, {
-    goal: t => t.terrain === 'rock' && mineralRemaining(t) > 0 && !isVeinSealedTile(state, t),
+    goal: t => isTileInMineWorkArea(assignedMine, t) &&
+      t.terrain === 'rock' && mineralRemaining(t) > 0 && !isVeinSealedTile(state, t),
     workTicks: a.work.mine,
     yieldRes: miningSilver ? 'silver' : miningIron ? 'iron' : 'stone',
     yieldAmt: tile => (tile.hasSilver ? a.yields.silver : tile.hasIron ? a.yields.iron : a.yields.stone) * geomancerMult,
     cap: miningSilver ? a.carryCap.silver : miningIron ? a.carryCap.iron : a.carryCap.stone,
     depositExtra: [],
-    goalField: ctx.goalFieldUserCounts.mineral >= 3
-      ? () => gatherGoalField(
-        state,
-        ctx,
-        'mineral',
-        t => t.terrain === 'rock' && mineralRemaining(t) > 0 && !isVeinSealedTile(state, t),
-      )
-      : undefined,
-    depositTargets: (currentState, worker) => {
-      const mine = worker.miningDepositBuildingId == null
-        ? null
-        : currentState.buildings.find(building =>
-          building.id === worker.miningDepositBuildingId && building.built && building.type === 'mine');
-      return mine ? [mine] : depositBuildings(currentState, []);
-    },
+    depositTargets: () => [assignedMine],
     onDeposit: worker => { worker.miningDepositBuildingId = null; },
     taskWork: miningSilver ? '은맥 채굴 중' : '채광 중',
     taskMove: '광상으로 이동',
@@ -2478,8 +2479,8 @@ function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
       countScenarioProgress(state, 'mineralsMined', extraction.amount);
       return extraction.amount;
     },
-    onHarvest: (tile, worker, amount) => {
-      worker.miningDepositBuildingId = servingMineForTile(state, tile)?.id ?? null;
+    onHarvest: (_tile, worker, amount) => {
+      worker.miningDepositBuildingId = assignedMine.id;
       if (miningIron) addCarry(worker, 'stone', amount * (a.yields.mineStone / a.yields.iron));
     },
   });
@@ -2976,6 +2977,109 @@ function resumeCriticalActivity(r: Resident): void {
   r.targetId = null;
 }
 
+function lodgingSupplyInTransit(state: GameState, hutId: number): { food: number; fuelHeat: number } {
+  let food = 0;
+  let fuelHeat = 0;
+  for (const resident of state.residents) {
+    if (!resident.alive || resident.lodgingSupplyHutId !== hutId) continue;
+    for (const resource of FOOD_RESOURCES) food += resident.carrying[resource] ?? 0;
+    for (const resource of FUEL_RESOURCES) {
+      fuelHeat += (resident.carrying[resource] ?? 0) * (RESOURCE_DEFS[resource].fuelValue ?? 1);
+    }
+  }
+  return { food, fuelHeat };
+}
+
+function takeLodgingFoodSupply(state: GameState, resident: Resident, requested: number): number {
+  let remaining = Math.max(0, requested);
+  let taken = 0;
+  for (const resource of FOOD_RESOURCES) {
+    if (remaining <= 0.000001) break;
+    const amount = Math.min(Math.max(0, state.resources[resource] ?? 0), remaining);
+    if (amount <= 0) continue;
+    state.resources[resource] -= amount;
+    addCarry(resident, resource, amount);
+    remaining -= amount;
+    taken += amount;
+  }
+  return taken;
+}
+
+function takeLodgingFuelSupply(state: GameState, resident: Resident, requestedHeat: number): number {
+  let remaining = Math.max(0, requestedHeat);
+  let provided = 0;
+  for (const resource of FUEL_RESOURCES) {
+    if (remaining <= 0.000001) break;
+    const value = RESOURCE_DEFS[resource].fuelValue ?? 1;
+    const units = Math.min(Math.max(0, state.resources[resource] ?? 0), remaining / value);
+    if (units <= 0) continue;
+    state.resources[resource] -= units;
+    addCarry(resident, resource, units);
+    remaining -= units * value;
+    provided += units * value;
+  }
+  return provided;
+}
+
+function residentAtVillageSupplyAnchor(state: GameState, resident: Resident, centerId: number): boolean {
+  const home = residentHome(state, resident);
+  const anchor = home ?? state.buildings.find(building => building.id === centerId && building.built) ?? null;
+  return !!anchor && buildingGoal(state, anchor.id)(state.map[resident.y][resident.x]);
+}
+
+function prepareLodgingSupply(state: GameState, resident: Resident, centerId: number): boolean {
+  const hut = lodgingHutForResident(state, resident);
+  if (!hut || resident.lodgingHomeRestDay === state.day || resident.lodgingSupplyHutId != null ||
+      carryTotal(resident) > 0 || !residentAtVillageSupplyAnchor(state, resident, centerId)) return false;
+  const workers = lodgingWorkers(state, hut).filter(worker =>
+    !worker.sick && state.day >= (worker.quarantinedUntil ?? 0) && worker.health >= 20);
+  const target = lodgingDailyNeeds(state, workers);
+  const personal = lodgingDailyNeeds(state, [resident]);
+  const stock = lodgingSupplySummary(state, hut);
+  const inbound = lodgingSupplyInTransit(state, hut.id);
+  const days = CONFIG.gatheringZones.lodgingSupplyDays;
+  const foodMissing = Math.max(0, target.rationedFood * days - stock.food - inbound.food);
+  const fuelMissing = Math.max(0, target.rationedFuelHeat * days - stock.fuelHeat - inbound.fuelHeat);
+  const foodTaken = takeLodgingFoodSupply(state, resident, Math.min(foodMissing, personal.rationedFood * days));
+  const heatTaken = takeLodgingFuelSupply(state, resident, Math.min(fuelMissing, personal.rationedFuelHeat * days));
+  if (foodTaken <= 0.000001 && heatTaken <= 0.000001) return false;
+  resident.lodgingSupplyHutId = hut.id;
+  resident.path = [];
+  resident.targetId = hut.id;
+  return true;
+}
+
+function deliverLodgingSupply(state: GameState, resident: Resident, ctx: Ctx): boolean {
+  if (resident.lodgingSupplyHutId == null) return false;
+  const hut = state.buildings.find(building =>
+    building.id === resident.lodgingSupplyHutId && building.type === 'lodgingHut' && building.built);
+  if (!hut) {
+    resident.lodgingSupplyHutId = null;
+    if (carryTotal(resident) > 0) depositResidentToSettlement(state, resident);
+    return false;
+  }
+  resident.phase = 'toDeposit';
+  resident.targetId = hut.id;
+  resident.task = '숙식 움막 보급 운반 중';
+  const result = goTo(state, resident, ctx, buildingGoal(state, hut.id));
+  if (isSettledAtGoal(resident, result)) {
+    depositResidentToBuilding(hut, resident);
+    resident.lodgingSupplyHutId = null;
+    resident.phase = 'rest';
+    resident.path = [];
+    resident.targetId = null;
+    resident.task = '숙식 움막 보급 완료';
+  } else if (result === 'stuck') {
+    depositResidentToSettlement(state, resident);
+    resident.lodgingSupplyHutId = null;
+    resident.phase = 'rest';
+    resident.path = [];
+    resident.targetId = null;
+    resident.task = '움막 보급길을 찾지 못함';
+  }
+  return true;
+}
+
 interface DawnCommutePlan {
   phase: 'toWork' | 'toDeposit';
   targetId: number | null;
@@ -3093,8 +3197,11 @@ function minimumGoalDistance(
 
 function morningCommuteDistance(state: GameState, r: Resident, ctx: Ctx, goal: DescribedGoal): number {
   const home = residentHome(state, r);
-  const origin = home
-    ? buildingGoal(state, home.id) as DescribedGoal
+  const lodging = r.phase === 'sleeping' ? lodgingHutForResident(state, r) : null;
+  const origin = lodging && r.targetId === lodging.id
+    ? buildingGoal(state, lodging.id) as DescribedGoal
+    : home
+      ? buildingGoal(state, home.id) as DescribedGoal
     : ctx.centerId >= 0
       ? buildingGoal(state, ctx.centerId) as DescribedGoal
       : null;
@@ -3114,16 +3221,20 @@ function morningMoveTilesPerTick(state: GameState, r: Resident, ctx: Ctx): numbe
 
 function morningPreparationAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
   const home = residentHome(state, r);
+  const lodging = r.phase === 'sleeping' ? lodgingHutForResident(state, r) : null;
   const center = ctx.centerId >= 0
     ? state.buildings.find(building => building.id === ctx.centerId && building.built) ?? null
     : null;
-  const anchorId = home?.id ?? center?.id ?? null;
+  const anchor = lodging && r.targetId === lodging.id ? lodging : home ?? center;
+  const anchorId = anchor?.id ?? null;
   if (r.phase !== 'rest' || r.targetId !== anchorId) {
     r.phase = 'rest';
     r.path = [];
     r.targetId = anchorId;
   }
-  if (home) {
+  if (lodging && anchorId === lodging.id) {
+    loiterNearBuilding(state, r, ctx, lodging, 2, '움막에서 아침 채비');
+  } else if (home) {
     loiterNearBuilding(state, r, ctx, home, 2, '아침 채비');
   } else if (center) {
     loiterNearBuilding(state, r, ctx, center, 2, '아침 채비');
@@ -3137,7 +3248,7 @@ function morningPreparationAgentTick(state: GameState, r: Resident, ctx: Ctx): v
 function waitForMorningWake(state: GameState, r: Resident, wakeSubTick: number): boolean {
   if (r.phase !== 'sleeping' || state.subTick >= wakeSubTick) return false;
   r.path = [];
-  r.task = '잠자는 중';
+  r.task = lodgingHutForResident(state, r)?.id === r.targetId ? '숙식 움막에서 잠자는 중' : '잠자는 중';
   return true;
 }
 
@@ -3152,6 +3263,27 @@ function dawnAgentTick(state: GameState, r: Resident, ctx: Ctx): void {
     r.path = [];
     r.targetId = null;
     return;
+  }
+
+  if (r.lodgingSupplyHutId != null) {
+    deliverLodgingSupply(state, r, ctx);
+    return;
+  }
+  const lodging = lodgingHutForResident(state, r);
+  if (lodging && !lodgingCanHostTonight(state, lodging)) {
+    if (waitForMorningWake(state, r, morningWakeSubTick(null, r.id, state.day))) return;
+    if (prepareLodgingSupply(state, r, ctx.centerId)) {
+      deliverLodgingSupply(state, r, ctx);
+      return;
+    }
+    if (residentAtVillageSupplyAnchor(state, r, ctx.centerId)) {
+      r.lodgingHomeRestDay = state.day;
+      r.task = '숙식 움막 보급 부족';
+      r.phase = 'rest';
+      r.path = [];
+      r.targetId = residentHome(state, r)?.id ?? ctx.centerId;
+      return;
+    }
   }
 
   const plan = dawnCommutePlan(state, r);
@@ -3221,14 +3353,18 @@ function returnHomeAgentTick(
 ): void {
   const home = residentHome(state, r);
   const center = state.buildings.find(building => building.id === ctx.centerId && building.built) ?? null;
-  const destination = home ?? center;
+  const lodging = r.lodgingHomeRestDay === state.day || r.sick || state.day < (r.quarantinedUntil ?? 0) || r.health < 20
+    ? null
+    : lodgingHutForResident(state, r);
+  const lodgingReady = lodging ? lodgingCanHostTonight(state, lodging) : false;
+  const destination = lodgingReady ? lodging : home ?? center;
   const sheltering = reason === 'snowShelter';
   const sleepingTask = sheltering
-    ? home ? '집 안에서 폭설 대피' : '처마 밑에서 폭설 대피'
-    : home ? '잠자리에 듦' : '처마 밑에서 잠듦';
+    ? lodgingReady ? '숙식 움막에서 폭설 대피' : home ? '집 안에서 폭설 대피' : '처마 밑에서 폭설 대피'
+    : lodgingReady ? '숙식 움막에서 잠듦' : home ? '잠자리에 듦' : '처마 밑에서 잠듦';
   const movingTask = sheltering
-    ? home ? '폭설을 피해 귀가 중' : '폭설을 피해 처마로 이동 중'
-    : home ? '집으로 돌아가는 중' : '처마를 찾아가는 중';
+    ? lodgingReady ? '폭설을 피해 숙식 움막으로 이동 중' : home ? '폭설을 피해 귀가 중' : '폭설을 피해 처마로 이동 중'
+    : lodgingReady ? '숙식 움막으로 돌아가는 중' : home ? '집으로 돌아가는 중' : '처마를 찾아가는 중';
 
   if (!destination) {
     r.phase = 'sleeping';
@@ -3254,7 +3390,7 @@ function returnHomeAgentTick(
   if (result === 'arrived') {
     r.phase = 'sleeping';
     r.path = [];
-    const crafted = reason === 'sleep' && home ? craftStrawShoesAtHome(state, r) : 0;
+    const crafted = reason === 'sleep' && home && !lodgingReady ? craftStrawShoesAtHome(state, r) : 0;
     r.task = crafted > 0 ? '짚신을 삼고 잠듦' : sleepingTask;
   } else if (result === 'stuck') {
     r.path = [];
@@ -3435,14 +3571,6 @@ export function agentsTick(state: GameState): void {
   const tMod = producers <= 0 || t >= producers ? 1 : 0.6 + 0.4 * (t / producers);
   const mAvg = living.reduce((s, r) => s + r.morale, 0) / living.length;
   const center = state.buildings.find(b => b.type === 'center');
-  const goalFieldUserCounts = { forest: 0, huntable: 0, mineral: 0 };
-  for (const resident of living) {
-    if (warDispatchIds.has(resident.id)) continue;
-    if (resident.job === 'woodcutter' || resident.job === 'herbalist') goalFieldUserCounts.forest++;
-    else if (resident.job === 'hunter') goalFieldUserCounts.huntable++;
-    else if (resident.job === 'miner') goalFieldUserCounts.mineral++;
-  }
-
   const laborOutputMod = (0.8 + (mAvg / 100) * 0.4) * officeEfficiencyMultiplier(state) *
     rankProductionEfficiency(state.rank);
   const ctx: Ctx = {
@@ -3454,8 +3582,6 @@ export function agentsTick(state: GameState): void {
     rng,
     centerId: center ? center.id : -1,
     huntable: collectHuntableTiles(state.map, state.habitats, CONFIG.agents.hunting),
-    goalFields: {},
-    goalFieldUserCounts,
     farmerWorkIdsByPlot: new Map(),
     // 개간 배정은 서브틱마다 다시 계산한다 — 저장 상태가 아니라 이번 틱의 인력 배치다.
     clearingCrew: assignClearingCrews(
@@ -3529,6 +3655,12 @@ export function agentsTick(state: GameState): void {
       continue;
     }
     if (fireResponseAgentTick(state, r, ctx)) continue;
+    if (r.lodgingSupplyHutId != null && deliverLodgingSupply(state, r, ctx)) continue;
+    if (r.lodgingHomeRestDay === state.day) {
+      returnHomeAgentTick(state, r, ctx);
+      r.task = r.phase === 'sleeping' ? '집에서 쉬며 움막 보급을 준비함' : '움막 보급을 위해 귀가 중';
+      continue;
+    }
     // 폭설·눈보라에는 실외 작업자가 일과/여가보다 귀가와 입실을 우선한다.
     const sheltersFromSnow = OUTDOOR_JOBS.includes(r.job) &&
       (state.weather === 'heavySnow' || ctx.outdoor < CONFIG.agents.shelterThreshold);
@@ -3549,6 +3681,11 @@ export function agentsTick(state: GameState): void {
       const departureSubTick = DAY_BANDS.evening.start + eveningDepartureDelay(r.id, state.day);
       if (state.subTick < departureSubTick) {
         waitForEveningDeparture(r);
+        continue;
+      }
+      const lodging = lodgingHutForResident(state, r);
+      if (lodging && lodgingCanHostTonight(state, lodging)) {
+        returnHomeAgentTick(state, r, ctx);
         continue;
       }
       eveningLeisureAgentTick(state, r, ctx, eveningAssignments.get(r.id));

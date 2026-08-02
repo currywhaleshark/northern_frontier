@@ -30,6 +30,7 @@ const compiledDir = compileGameModules();
 const agents = await import(pathToFileURL(join(compiledDir, 'agents.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
+const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
 const selectionActions = await import(pathToFileURL(join(compiledDir, 'selectionActions.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
@@ -48,10 +49,13 @@ function clearMapToPlain(state) {
     for (const tile of row) {
       tile.terrain = 'plain';
       tile.hasIron = false;
+      tile.hasSilver = false;
       tile.buildingId = null;
     }
   }
   state.buildings = [];
+  state.foreignSites = [];
+  state.silverVein = null;
   state.exploration = { explored: state.map.map(row => row.map(() => true)) };
 }
 
@@ -158,6 +162,8 @@ function onlyResident(state, job, x, y) {
   assert.equal(blockedAction.kind, 'invalid', 'haulers cannot be ordered to quarry');
 
   const miner = onlyResident(state, 'miner', 7, 4);
+  const mine = addBuilt(state, 'mine', 8, 4);
+  assert.equal(workerSlots.assignResidentToBuilding(state, miner.id, mine.id), null);
   const action = selectionActions.getPointerAction(state, { kind: 'resident', id: miner.id }, rockTile);
   assert.equal(action.kind, 'work');
   const error = simulation.issueResidentWorkOrder(state, miner.id, action);
@@ -170,7 +176,7 @@ function onlyResident(state, job, x, y) {
   }
 
   assert.equal(sawCarry, true, 'settlement-tier miner should quarry stone before depositing');
-  assert.ok(state.resources.stone > 0, 'miner should deposit manually quarried stone');
+  assert.ok((mine.inventory?.stone ?? 0) > 0, 'miner should deposit manually quarried stone at the assigned mine');
   assert.equal(rockTile.terrain, 'plain', 'depleted stone outcrops disappear');
   assert.equal(rockTile.mineralRemaining, 0);
   assert.ok(state.log.some(entry => entry.text.includes('석재 노두') && entry.text.includes('고갈')));
@@ -186,17 +192,19 @@ function onlyResident(state, job, x, y) {
   ironTile.hasIron = true;
   ironTile.mineralRemaining = 1.5;
   const miner = onlyResident(state, 'miner', 7, 4);
+  const mine = addBuilt(state, 'mine', 8, 4);
+  assert.equal(workerSlots.assignResidentToBuilding(state, miner.id, mine.id), null);
 
   const action = selectionActions.getPointerAction(state, { kind: 'resident', id: miner.id }, ironTile);
   assert.equal(action.kind, 'work');
   assert.ok(action.label.includes('철광'));
   assert.equal(simulation.issueResidentWorkOrder(state, miner.id, action), null);
 
-  for (let i = 0; i < 180 && state.resources.iron <= 0; i++) {
+  for (let i = 0; i < 180 && (mine.inventory?.iron ?? 0) <= 0; i++) {
     agentsWorkTick(state);
   }
 
-  assert.ok(state.resources.iron > 0, 'manual iron orders deliver iron instead of stone');
+  assert.ok((mine.inventory?.iron ?? 0) > 0, 'manual iron orders deliver iron to the assigned mine');
   assert.equal(ironTile.terrain, 'plain');
   assert.equal(ironTile.mineralRemaining, 0);
 }
@@ -208,6 +216,8 @@ function onlyResident(state, job, x, y) {
   const forestTile = state.map[4][10];
   forestTile.terrain = 'forest';
   const herbalist = onlyResident(state, 'herbalist', 7, 4);
+  const herbHut = addBuilt(state, 'herbHut', 8, 4);
+  assert.equal(workerSlots.assignResidentToBuilding(state, herbalist.id, herbHut.id), null);
 
   const action = selectionActions.getPointerAction(
     state,

@@ -1,7 +1,7 @@
 # 만족도·종교 계획: 티어가 오를수록 늘어나는 기대 — 서당과 두 갈래 신앙
 
 > **계획 상태:** 완료
-> **상태 갱신:** 2026-07-30 — 단일 후계 계보와 일반 종교인 자산·저장·명부·선택 정보 표시까지 보강했다.
+> **상태 갱신:** 2026-08-01 — 일반 무당·승려·동자승 남녀의 표준/HD idle·walk I2V 애니메이션까지 연결했다.
 
 > 역사 계획 (2026-07-18): 체크박스와 후속 항목은 작성 시점 기록이다. 구저장 완충과 소년
 > 서당 연동의 현재 상태는 [UI 재구성 릴리스 후보](../../release-candidates/2026-07-ui-reorganization.md)를 기준으로 한다.
@@ -169,11 +169,14 @@
   동자승은 성장 전까지 작업 슬롯을 차지하지 않는다. 주민 선택 정보창에서는 배정 가능한 일반
   직업 목록에 없는 현재 종교 직업도 보존해 월향·해운과 일반 후계자를 각각 `무당`·`승려`로
   표시하며, 성장 중인 후계자는 지도 툴팁과 함께 `무직` 대신 `동자승`으로 표시한다.
-- 걷기·작업 애니메이션은 Grok 사용량 회복 뒤인 **2026-08-01 이후 후속 범위**로 남긴다.
+- **2026-08-01 후속 완료:** 일반 무당·승려·동자승 남녀 6종에 전용 idle·walk I2V 행을
+  만들고 표준/HD 아틀라스에 연결했다. 일반 종교인은 일상 보행만 하며 월향·해운의 네임드
+  외형은 기존 전용 행을 유지한다. 동자승은 성장 단계 배율을 그대로 적용한다.
 - 표적 검증: `test_satisfaction.mjs`, `test_special_residents.mjs`,
   `test_resource_save_migration.mjs`, `test_resident_list_presentation.mjs`,
   `test_religious_successor_assets.mjs`, `test_religious_successor_asset_pixels.py`,
-  `test_worker_slots.mjs`, `test_selection_context_ui.mjs`.
+  `test_worker_slots.mjs`, `test_selection_context_ui.mjs`,
+  `test_resident_approved_i2v_locomotion.mjs`, `test_i2v_jobs_prompt_contract.py`.
 
 ## 7. 미해결 질문 (구현 전 확정 필요)
 

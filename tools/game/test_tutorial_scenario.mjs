@@ -41,6 +41,7 @@ const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs'
 const scenario = await import(pathToFileURL(join(compiledDir, 'scenario.mjs')).href);
 const tutorialStart = await import(pathToFileURL(join(compiledDir, 'tutorialStart.mjs')).href);
 const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
+const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
 const config = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 const courtTribute = await import(pathToFileURL(join(compiledDir, 'courtTribute.mjs')).href);
 const crops = await import(pathToFileURL(join(compiledDir, 'crops.mjs')).href);
@@ -56,10 +57,9 @@ const sessionSource = readFileSync(new URL('../../src/GameSession.tsx', import.m
 const agentsSource = readFileSync(new URL('../../src/game/agents.ts', import.meta.url), 'utf8');
 
 // 시나리오 중 허용되는 모달 — 길잡이 스텝과 그 스텝이 직접 불러 세운 통제 사건뿐이다.
-// R5로 둘째 해가 붙으면서 셋이 늘었다: 통제 유민(immigration)·통제 습격(raid)과
-// 둘째 해 겨울의 세공 수거(tribute). 어느 것도 랜덤 게이트를 거치지 않는다 —
-// 유민·습격은 스텝 훅이 직접 열고, 세공 수거는 본디 게이트 밖의 결정론 사건이다.
-const ALLOWED_MODAL_KINDS = new Set(['scenario', 'immigration', 'raid', 'tribute']);
+// R5로 둘째 해가 붙으면서 통제 유민·습격, 세공 파발 공지·수거가 늘었다.
+// 모두 랜덤 게이트 밖에서 열리는 통제·결정론 사건이다.
+const ALLOWED_MODAL_KINDS = new Set(['scenario', 'immigration', 'raid', 'tributeAnnouncement', 'tribute']);
 
 // 17스텝의 id — 첫 해 10스텝(R4)에 둘째 해 7스텝(R5)을 이어 붙인 판.
 // 순서가 바뀌면 코치·문구도 함께 손봐야 한다.
@@ -118,11 +118,13 @@ function keepAlive(state) {
 }
 
 function pushBuilt(state, type, extra = {}) {
-  state.buildings.push({
+  const building = {
     id: state.nextBuildingId++,
     type, x: 1, y: 1, progress: 99, built: true, fieldGrowth: 0,
     ...extra,
-  });
+  };
+  state.buildings.push(building);
+  return building;
 }
 
 // UI 훅 플래그는 컴포넌트가 연결한다(M2) — 여기서는 테스트가 직접 주입한다
@@ -143,6 +145,38 @@ function assignJobs(state, counts) {
     }
     assert.equal(remaining, 0, `not enough idle settlers to staff ${job}`);
   }
+}
+
+function assignWorkers(state, job, building, count) {
+  assignJobs(state, { [job]: count });
+  const candidates = state.residents.filter(resident =>
+    resident.alive && resident.job === job && resident.assignedBuildingId == null);
+  assert.ok(candidates.length >= count, `not enough unassigned ${job} workers`);
+  for (const resident of candidates.slice(0, count)) {
+    assert.equal(workerSlots.assignResidentToBuilding(state, resident.id, building.id), null);
+  }
+}
+
+function pushMineNearOutcrop(state) {
+  const center = state.buildings.find(building => building.type === 'center');
+  assert.ok(center, 'tutorial center missing');
+  const outcrops = state.map.flat().filter(tile =>
+    tile.terrain === 'rock' && (tile.mineralRemaining ?? 0) > 0
+      && Math.abs(tile.x - center.x) + Math.abs(tile.y - center.y) <= 8);
+  assert.ok(outcrops.length > 0, 'tutorial outcrop missing');
+  const radius = config.CONFIG.minerals.mineWorkRadius;
+  for (const outcrop of outcrops) {
+    for (let y = outcrop.y - radius; y <= outcrop.y + radius; y++) {
+      for (let x = outcrop.x - radius; x <= outcrop.x + radius; x++) {
+        if ((x - outcrop.x) ** 2 + (y - outcrop.y) ** 2 > radius ** 2) continue;
+        if (!buildings.canPlaceBuildingAt(state, 'mine', x, y)) continue;
+        const mine = pushBuilt(state, 'mine', { x, y });
+        buildings.occupyBuildingTiles(state, mine);
+        return mine;
+      }
+    }
+  }
+  assert.fail('no valid tutorial mine site near an outcrop');
 }
 
 function stepById(id) {
@@ -265,10 +299,10 @@ function goalItem(step, state, label) {
 }
 
 {
-  // 17스텝 구성과 버전 (R5: 둘째 해 7스텝을 이어 붙이며 버전을 올렸다)
+  // 17스텝 구성과 버전 (G3: 채집 거점 배정 필수화로 저장된 진행 판정이 달라져 버전을 올렸다)
   assert.deepEqual(scenario.TUTORIAL_STEPS.map(step => step.id), EXPECTED_STEP_IDS);
   assert.equal(scenario.TUTORIAL_STEPS.length, 17);
-  assert.equal(scenario.TUTORIAL_SCENARIO_VERSION, 5);
+  assert.equal(scenario.TUTORIAL_SCENARIO_VERSION, 6);
   // 첫 겨울은 이제 완료 지점이 아니라 중간 스텝이다
   assert.equal(scenario.TUTORIAL_STEPS[9].id, 'winter');
   assert.ok(scenario.TUTORIAL_STEPS[10], 'the winter step is followed by the second year');
@@ -302,12 +336,12 @@ function goalItem(step, state, label) {
   // 스텝별 소목표 라벨 — 순서까지 못 박는다 (칩과 코치가 같은 순서를 따른다)
   const labelsOf = id => stepById(id).progress(state).map(item => item.label);
   assert.deepEqual(labelsOf('naming'), ['주민 선택', '미니맵', '배속', '이튿날 아침']);
-  assert.deepEqual(labelsOf('working'), ['직업 창', '벌목꾼', '운반꾼']);
+  assert.deepEqual(labelsOf('working'), ['직업 창', '벌목장', '벌목장 배정', '운반꾼']);
   assert.deepEqual(labelsOf('sowing'), ['밭 배치', '농부']);
   assert.deepEqual(labelsOf('hearth'), ['초가집', '장작마당', '장작꾼', '장작', '파종']);
   assert.deepEqual(labelsOf('water'), ['수맥 탭', '물자리']);
-  assert.deepEqual(labelsOf('hunting'), ['사냥꾼', '고기']);
-  assert.deepEqual(labelsOf('patient'), ['약초막', '약초꾼', '병자 회복']);
+  assert.deepEqual(labelsOf('hunting'), ['사냥막', '사냥막 배정', '고기']);
+  assert.deepEqual(labelsOf('patient'), ['약초막', '약초막 배정', '병자 회복']);
   assert.deepEqual(labelsOf('defense'), ['목책', '수비병', '파수꾼']);
   assert.deepEqual(labelsOf('stocktake'), ['겨울 점검', '식량 일분', '장작 일분']);
   assert.deepEqual(labelsOf('winter'), ['겨울']);
@@ -315,7 +349,7 @@ function goalItem(step, state, label) {
   assert.deepEqual(labelsOf('tribute'), ['세공 공지', '조정 창', '세공고']);
   assert.deepEqual(labelsOf('tanning'), ['가죽공방', '무두장이', '가죽옷']);
   assert.deepEqual(labelsOf('immigrants'), ['유민 수용']);
-  assert.deepEqual(labelsOf('minerals'), ['광맥 탭', '채광꾼', '돌·철']);
+  assert.deepEqual(labelsOf('minerals'), ['광맥 탭', '채광장', '채광장 배정', '돌·철']);
   assert.deepEqual(labelsOf('smithy'), ['대장간', '대장장이', '도구']);
   assert.deepEqual(labelsOf('market'), ['장터', '교역']);
   assert.deepEqual(labelsOf('battle'), ['습격 경보', '격퇴']);
@@ -389,7 +423,9 @@ function goalItem(step, state, label) {
   simulation.advanceDay(state);
   assert.equal(scenario.currentScenarioStep(state)?.id, 'working');
   markFlags(state, 'jobPanelOpened');
-  assignJobs(state, { woodcutter: 1, hauler: 1 }); // 전원 무직으로 시작하므로 여기서 직접 배분한다
+  const camp = pushBuilt(state, 'lumberCamp');
+  assignWorkers(state, 'woodcutter', camp, 1);
+  assignJobs(state, { hauler: 1 }); // 전원 무직으로 시작하므로 여기서 직접 배분한다
   closeModals(state);
   keepAlive(state);
   simulation.advanceDay(state);
@@ -476,7 +512,7 @@ function goalItem(step, state, label) {
   const plain = simulation.newGame(20260801, 'normal');
   assert.equal(plain.courtTribute, null, 'a first-year settlement has no tribute demand');
   assert.ok(
-    plain.log.some(entry => entry.text.includes('세공은 이듬해 봄부터')),
+    plain.log.some(entry => entry.text.includes('이듬해부터는 소출의 일부를 세공으로')),
     'the first spring foretells that tribute begins the following year',
   );
   // 길잡이 새 게임도 마찬가지 — 시나리오가 세공을 강제로 공지하던 훅이 사라졌다
@@ -535,17 +571,21 @@ function goalItem(step, state, label) {
     patientStep.isDone(state), false,
     'recovery without a herb hut leaves the herbalist lesson untaught (R2-2)',
   );
-  pushBuilt(state, 'herbHut');
+  const hut = pushBuilt(state, 'herbHut');
   assert.equal(patientStep.isDone(state), false, 'the herb hut still needs a herbalist working out of it');
   assignJobs(state, { herbalist: 1 });
-  assert.equal(patientStep.isDone(state), true, 'hut, herbalist and a recovered patient close the step together');
+  assert.equal(patientStep.isDone(state), false, 'an unassigned herbalist does not satisfy the herb-hut lesson');
+  assignWorkers(state, 'herbalist', hut, 1);
+  assert.equal(patientStep.isDone(state), true, 'hut, assigned herbalist and a recovered patient close the step together');
   sufferer.sick = true;
   assert.equal(patientStep.isDone(state), false, 'a staffed herb hut does not close the step while the patient lies ill');
 
-  // 코치는 약초막 배치를 먼저 가리키고 그다음 약초꾼 ＋를 가리킨다
+  // 코치는 약초막 배치 → 직업 → 건물 슬롯 배정을 차례로 가리킨다
   const hutHint = coachSource.indexOf("{ tut: 'build-item-herbHut'");
   const herbalistHint = coachSource.indexOf("tut: 'job-plus-herbalist'");
-  assert.ok(hutHint >= 0 && herbalistHint > hutHint, 'coach places the herb hut before staffing the herbalist');
+  const herbSlotHint = coachSource.indexOf("tut: 'building-worker-slot-herbHut'");
+  assert.ok(hutHint >= 0 && herbalistHint > hutHint && herbSlotHint > herbalistHint,
+    'coach places the herb hut, chooses the job, then assigns its worker slot');
   // 건축가를 그새 물렸으면 약초막이 터만 잡힌 채 서고 스텝이 멎는다 — 구제 힌트가 그 사이에 있다
   const rescueHint = coachSource.indexOf('약초막은 터만 잡힌 채 오르지 않습니다');
   assert.ok(
@@ -611,7 +651,9 @@ function goalItem(step, state, label) {
     naming: s => markFlags(s, 'residentSelected', 'minimapClicked', 'speedChanged'),
     working: s => {
       markFlags(s, 'jobPanelOpened');
-      assignJobs(s, { woodcutter: 1, hauler: 1 });
+      const camp = pushBuilt(s, 'lumberCamp');
+      assignWorkers(s, 'woodcutter', camp, 1);
+      assignJobs(s, { hauler: 1 });
     },
     // 밭을 네 칸 배치하고 농부를 둔다 — 갈이·파종은 아직이다
     sowing: s => {
@@ -633,13 +675,14 @@ function goalItem(step, state, label) {
       pushBuilt(s, 'well');
     },
     hunting: s => {
-      assignJobs(s, { hunter: 2 });
+      const lodge = pushBuilt(s, 'huntLodge');
+      assignWorkers(s, 'hunter', lodge, 2);
       s.resources.meat = (s.scenario.flags.meatGoal ?? 0) + 10;
     },
     // 첫 병자는 스텝 훅이 붙인다 — 모범 답안은 약초막을 세우고 약초꾼을 두는 것이다 (R2-2)
     patient: s => {
-      pushBuilt(s, 'herbHut');
-      assignJobs(s, { herbalist: 1 });
+      const hut = pushBuilt(s, 'herbHut');
+      assignWorkers(s, 'herbalist', hut, 1);
       s.resources.herbs = Math.max(s.resources.herbs, 20);
     },
     defense: s => {
@@ -662,7 +705,8 @@ function goalItem(step, state, label) {
     immigrants: () => {},
     minerals: s => {
       markFlags(s, 'oreToggled');
-      assignJobs(s, { miner: 1 }); // 채광장은 필요 없다 — 채광꾼이 마을 곁 노두를 직접 캔다
+      const mine = pushMineNearOutcrop(s);
+      assignWorkers(s, 'miner', mine, 1);
     },
     smithy: s => {
       pushBuilt(s, 'smithy');
@@ -671,11 +715,15 @@ function goalItem(step, state, label) {
     },
     market: s => {
       pushBuilt(s, 'market');
-      s.lifetimeStats.tradesCompleted += 1; // 세력 창에서 교역 한 번을 마친 셈
+      const base = s.scenario.flags.tradesBase ?? s.lifetimeStats.tradesCompleted;
+      s.scenario.flags.tradesBase = base;
+      s.lifetimeStats.tradesCompleted = base + 1; // 세력 창에서 교역 한 번을 마친 셈
     },
     // 습격도 통제 사건이다 — 스텝이 무리를 불러 세우고 closeModals가 수비병 요격을 고른다
     battle: () => {},
   };
+
+  let tributeReserveSeen = false;
 
   // 스텝 조건을 하루치 소비가 되돌리지 않게 유지한다 (모범 답안을 계속 성립시킨다)
   const holdGoals = (s, stepId) => {
@@ -694,6 +742,7 @@ function goalItem(step, state, label) {
         if ((required ?? 0) <= 0) continue;
         s.resources[resource] = Math.max(s.resources[resource] ?? 0, required);
         tributeReserve.setTributeReserve(s, resource, required);
+        tributeReserveSeen ||= tributeReserve.tributeReserved(s, resource) >= 1;
       }
     }
   };
@@ -749,7 +798,7 @@ function goalItem(step, state, label) {
     }
     if (step.id === 'hunting') {
       assert.equal(goalItem(step, state, '고기').current, state.resources.meat);
-      assert.equal(goalItem(step, state, '사냥꾼').target, 2);
+      assert.equal(goalItem(step, state, '사냥막 배정').target, 2);
     }
     if (step.id === 'stocktake') {
       assert.equal(goalItem(step, state, '식량 일분').current, winter.winterReadiness(state).foodDays);
@@ -871,7 +920,7 @@ function goalItem(step, state, label) {
     popAfterImmigrants > popBeforeImmigrants,
     `accepting the scripted party grows the settlement (${popBeforeImmigrants} → ${popAfterImmigrants})`,
   );
-  // 광물: 주입 없이 실제 채광꾼이 마을 곁 노두를 캐 목표에 닿았다 (모범 답안은 배정뿐이다)
+  // 광물: 주입 없이 실제 채광장 배정자가 영역 안 노두를 캐 목표에 닿았다.
   assert.ok(
     mineralsMined >= config.CONFIG.tutorial.mineralsMinedGoal,
     `an assigned miner actually reaches the haul target (got ${mineralsMined})`,
@@ -884,10 +933,11 @@ function goalItem(step, state, label) {
     'the model answer (militia intercept) repels the scripted raid',
   );
   assert.ok(state.log.some(entry => entry.text.includes('무리가 물러갔습니다')), 'the raid step logs its close');
-  // 10단계가 가르친 대로 세공고에 몫이 잠겨 있다 (수거는 그해 겨울, 길잡이가 끝난 뒤에 온다)
+  // 10단계가 가르친 대로 세공고에 몫을 잠갔다. G3의 거점 건설 실습으로 완주가 늦어지면
+  // 겨울 사자가 길잡이 도중 이미 정상 수거할 수도 있다.
   assert.ok(
-    tributeReserve.tributeReserved(state, 'hideClothes') >= 1,
-    'the tribute step leaves the reserve stocked for the winter collector',
+    tributeReserveSeen,
+    'the tribute step stocks the reserve before any later winter collection',
   );
   // 길잡이 모듈 중복 방지: 스텝이 가르친 두 모듈은 본 것으로 적혀 다시 뜨지 않는다
   assert.equal(guides.hasSeenGuide(state, 'tribute'), true, 'the tribute guide is marked seen by its step (R5)');
@@ -904,9 +954,7 @@ function goalItem(step, state, label) {
 }
 
 {
-  // R5-1 광물 스텝은 실습이다: 광맥 탭 → 채광꾼 배정 → 지표 노두에서 돌·철 캐기.
-  // 채광장(mine)은 보(堡) 전용으로 그대로 두었다 — 채광꾼은 거점 없이도 노두를 캐기 때문이다
-  // (agents.ts minerTick의 채집 경로). 본문은 채광장·채광갱을 뒷날의 확장으로만 소개한다.
+  // G3 광물 스텝은 실습이다: 광맥 탭 → 촌 단계 채광장 → 작업자 배정 → 돌·철 캐기.
   const state = tutorialStart.createTutorialGame();
   const step = stepById('minerals');
   const outcrops = tutorialStart.tutorialNearbyOutcrops(state);
@@ -918,18 +966,20 @@ function goalItem(step, state, label) {
   );
   assert.equal(step.isDone(state), false);
   markFlags(state, 'oreToggled');
+  const mine = pushMineNearOutcrop(state);
   assignJobs(state, { miner: 1 });
-  assert.equal(step.isDone(state), false, 'a miner alone does not close the step — something must be mined');
+  assert.equal(step.isDone(state), false, 'an unassigned miner does not satisfy the worksite goal');
+  assignWorkers(state, 'miner', mine, 1);
+  assert.equal(step.isDone(state), false, 'a staffed mine still needs to extract something');
   scenario.countScenarioProgress(state, 'mineralsMined', state.scenario.flags.mineralsMinedGoal);
-  assert.equal(step.isDone(state), true, 'ore tab, miner and a first haul close the mineral step');
+  assert.equal(step.isDone(state), true, 'ore tab, staffed mine and a first haul close the mineral step');
   assert.equal(
     goalItem(step, state, '돌·철').target, config.CONFIG.tutorial.mineralsMinedGoal,
     'the haul target comes from CONFIG',
   );
-  // 채광장은 여전히 보(堡) 전용이고, 본문은 그것을 뒷날의 확장으로 소개한다
-  assert.equal(buildings.BUILDING_DEFS.mine.minRank, 'bo', 'the mine stays a bo-rank building');
-  assert.match(step.body, /채광장은 보\(堡\)로 오른 뒤의 확장/);
-  assert.ok(!/채광장을 세우/.test(step.body), 'the step never asks for a mine it cannot build');
+  assert.equal(buildings.BUILDING_DEFS.mine.minRank, undefined, 'the mine is available at settlement rank');
+  assert.match(step.body, /채광장을 세우십시오/);
+  assert.match(step.body, /배정된 채광장 반경/);
   // 노두 보장은 본게임 공통이다 — 아무 시드에서나 마을 곁에 돌·철이 하나씩 선다
   for (const seed of [20260718, 20260801, 12345, 999983]) {
     const plain = simulation.newGame(seed, 'normal');
@@ -1178,21 +1228,17 @@ function goalItem(step, state, label) {
   assert.equal(state.courtTribute.items.hideClothes, expected, 'the fixed item keeps the usual amount rule');
   assert.ok(state.log.some(entry => entry.text.includes('파발이 왔습니다')), 'the dispatch is logged');
 
-  // 길잡이 모듈: 파발은 모달, 가죽공방은 그 뒤를 잇는 카드
-  assert.equal(guides.hasSeenGuide(state, 'tribute'), true);
+  // 연례 파발 삽화 창을 읽으면 첫 세공 길잡이를 겸하고, 가죽공방 카드가 잇는다.
+  assert.equal(state.pendingChoice?.kind, 'tributeAnnouncement');
+  assert.equal(state.pendingChoice?.illustration?.src, '/assets/events/court-tribute-dispatch-v1.png');
+  assert.equal(guides.hasSeenGuide(state, 'tribute'), false, 'the guide is not seen before the dispatch is read');
   assert.equal(guides.hasSeenGuide(state, 'tannery'), false, 'the tannery card waits for the dispatch to be read');
-  let flushGuard = 0;
-  while (state.pendingChoice?.kind !== 'guide') {
-    assert.ok(flushGuard++ < 8, 'the tribute guide modal gets its turn');
-    if (state.pendingChoice) resolveNonGuideModals(state);
-    else guides.dailyGuideTick(state);
-  }
-  assert.equal(state.pendingChoice.data.guideId, 'tribute');
   const cardsBefore = guides.guideCards(state).map(card => card.moduleId);
   assert.ok(!cardsBefore.includes('tannery'));
-  simulation.resolveChoice(state, 'ok');
+  simulation.resolveChoice(state, 'acknowledge');
+  assert.equal(guides.hasSeenGuide(state, 'tribute'), true);
   const cardsAfter = guides.guideCards(state).map(card => card.moduleId);
-  assert.ok(cardsAfter.includes('tannery'), 'the tannery card follows the tribute modal (R4)');
+  assert.ok(cardsAfter.includes('tannery'), 'the tannery card follows the illustrated dispatch modal (R6)');
   assert.equal(cardsAfter.length, cardsBefore.length + 1, 'exactly one card is added');
   assert.ok(state.log.some(entry => entry.text.includes('무두장이와 가죽공방')), 'the card is echoed in the log');
 }
@@ -1215,19 +1261,21 @@ function goalItem(step, state, label) {
     courtTribute.rollCourtTribute(state.seed, 2, state.residents.filter(r => r.alive).length, state.rank).items,
     'a normal game keeps the random roll — only tutorial graduates get a fixed first item',
   );
-  assert.equal(guides.hasSeenGuide(state, 'tribute'), true, 'the dispatch guide fires in normal games too');
+  assert.equal(state.pendingChoice?.kind, 'tributeAnnouncement', 'normal games receive the illustrated annual dispatch too');
+  simulation.resolveChoice(state, 'acknowledge');
+  assert.equal(guides.hasSeenGuide(state, 'tribute'), true, 'the first dispatch doubles as the tribute guide');
 
-  // 셋째 해에는 다시 뜨지 않는다 (1회성)
+  // 셋째 해에도 파발 창은 다시 뜨되, 초회 길잡이 처리는 반복하지 않는다.
   const seenDay = state.guides.seen.tribute;
   state.day = config.CONFIG.time.yearDays * 2;
   state.courtTribute.resolved = true;
   resolveNonGuideModals(state);
-  guides.dailyGuideTick(state); // 대기 중이던 파발 모달을 열고
-  if (state.pendingChoice?.kind === 'guide') simulation.resolveChoice(state, 'ok'); // 닫아 하루를 진행시킨다
   resolveNonGuideModals(state);
   keepAlive(state);
   simulation.advanceDay(state);
   assert.equal(state.courtTribute.year, 3, 'the third year is announced as usual');
+  assert.equal(state.pendingChoice?.kind, 'tributeAnnouncement', 'the illustrated dispatch appears every year');
+  simulation.resolveChoice(state, 'acknowledge');
   assert.equal(state.guides.seen.tribute, seenDay, 'the dispatch guide never fires twice');
 }
 

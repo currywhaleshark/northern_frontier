@@ -46,9 +46,11 @@ const isExploredSource = explorationSource.slice(
 assert.match(explorationSource, /return state\.exploration\.explored\[y\]\?\.\[x\] === true/, 'isExplored is a bounds-safe O(1) lookup');
 assert.doesNotMatch(isExploredSource, /ensureExploration\(state\)/, 'isExplored does not validate all map rows');
 assert.doesNotMatch(agentsSource, /refreshExploration\(state\)/, 'agentsTick does not duplicate the simulation exploration refresh');
-assert.match(agentsSource, /const broadGoalFieldCache = new WeakMap<GameState/, 'broad path fields are runtime-only and never serialized');
-assert.match(agentsSource, /if \(!broad \|\| broad\.day !== state\.day\)/, 'goal fields are reused during a day instead of rebuilt per resident');
-assert.match(agentsSource, /ctx\.goalFieldUserCounts\.forest >= 3/, 'small new settlements avoid goal-field construction spikes');
+assert.match(agentsSource, /const pathFailUntilByState = new WeakMap<GameState/, 'path failure cooldowns are runtime-only and isolated per game state');
+assert.match(agentsSource, /function pathFailUntilFor\(state: GameState\)/, 'path cooldown lookups use the current game state instead of resident ids globally');
+assert.doesNotMatch(agentsSource, /broadGoalFieldCache/, 'gatherers no longer share global resource goals that bypass their assigned work area');
+assert.match(agentsSource, /isTileInGatheringWorkArea\(lumberCamp, t\)/, 'woodcutting path goals are bounded by the assigned work area');
+assert.match(agentsSource, /isTileInMineWorkArea\(assignedMine, t\)/, 'mining path goals are bounded by the assigned mine');
 assert.match(agentsSource, /described\.goalHeuristic\?\.length === w \* h/, 'A* consumes a shared heuristic field when supplied');
 
 console.log('runtime performance structure tests passed');

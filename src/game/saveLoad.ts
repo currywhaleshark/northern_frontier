@@ -10,7 +10,7 @@ import {
   enemyDoctrineDefinitions, enemyObjectiveDefinition, flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
   migrateBanditLairDefensePlan, migrateEnemyPlan,
 } from './enemyPlan';
-import { spawnAnimalHabitats } from './habitats';
+import { normalizeHabitatReserve, spawnAnimalHabitats } from './habitats';
 import { makeRng } from './map';
 import { ensureMineralDeposits } from './minerals';
 import { ensureForestGrowth } from './forestGrowth';
@@ -61,6 +61,9 @@ import {
   borderCommanderTermIndex, createBorderCommander, createFactionLeaders, normalizeDiplomaticFigures,
 } from './diplomaticFigures';
 import { normalizeDiplomacyState } from './diplomacy';
+import { addLog } from './events';
+import { assignResidentToBuilding, assignedBuildingForResident } from './workerSlots';
+import { normalizeLodgingHutState } from './lodgingHuts';
 import {
   gradeTacticalBattle, raidDefenseObjectiveResult, tacticalClosingSummary, tacticalOutcomeResult,
 } from './tacticalCore';
@@ -2305,6 +2308,7 @@ export function loadGame(slot = 1): GameState | null {
         CONFIG.difficulty[parsed.difficulty].habitatChance,
       );
     }
+    for (const habitat of parsed.habitats) normalizeHabitatReserve(parsed.map, habitat);
     // 승격 없는 구버전: 옛 승리(진보 승격)를 이뤘다면 보에서 이어간다
     if (!Object.prototype.hasOwnProperty.call(parsed, 'rank')) {
       parsed.rank = parsed.gameOver?.won ? 'bo' : 'settlement';
@@ -2498,6 +2502,14 @@ export function loadGame(slot = 1): GameState | null {
         parsed.courtTribute = tribute;
       }
     }
+    const pendingTributeAnnouncementYear = parsed.tributeAnnouncementPendingYear;
+    if (typeof pendingTributeAnnouncementYear !== 'number' ||
+        !Number.isFinite(pendingTributeAnnouncementYear) ||
+        pendingTributeAnnouncementYear < CONFIG.tribute.firstYear) {
+      delete parsed.tributeAnnouncementPendingYear;
+    } else {
+      parsed.tributeAnnouncementPendingYear = Math.floor(pendingTributeAnnouncementYear);
+    }
     if (parsed.tributeFailStreak == null) parsed.tributeFailStreak = 0;
     reconcileTributeReserve(parsed);
     migrateResidentGender(parsed);
@@ -2603,6 +2615,8 @@ export function loadGame(slot = 1): GameState | null {
       ? parsed.guideModalQueue.filter((id: unknown) => typeof id === 'string')
       : [];
     rebuildBuildingFootprints(parsed);
+    migrateGatheringAssignments(parsed);
+    normalizeLodgingHutState(parsed);
     reconcileResidentHomes(parsed, makeRng((parsed.seed ?? 1) + parsed.day * 32452843));
     ensureExploration(parsed);
     refreshExploration(parsed);
@@ -2612,6 +2626,55 @@ export function loadGame(slot = 1): GameState | null {
   } catch {
     return null;
   }
+}
+
+const GATHERING_ASSIGNMENT_BUILDINGS: Partial<Record<Resident['job'], readonly GameState['buildings'][number]['type'][]>> = {
+  woodcutter: ['lumberCamp'],
+  hunter: ['huntLodge'],
+  herbalist: ['herbHut'],
+  miner: ['mine', 'deepMine'],
+};
+
+/** G3 저장 호환: 방랑 채집꾼을 가까운 거점 빈 슬롯에 붙이고, 자리가 없으면 무직으로 돌린다. */
+export function migrateGatheringAssignments(state: GameState): { assigned: number; idled: number } {
+  let assigned = 0;
+  let idled = 0;
+  const residents = [...state.residents].sort((a, b) => a.id - b.id);
+  for (const resident of residents) {
+    if (!resident.alive) continue;
+    const buildingTypes = GATHERING_ASSIGNMENT_BUILDINGS[resident.job];
+    if (!buildingTypes) continue;
+    const current = assignedBuildingForResident(state, resident);
+    if (current && buildingTypes.includes(current.type)) continue;
+    resident.assignedBuildingId = null;
+    const candidates = state.buildings
+      .filter(building => building.built && buildingTypes.includes(building.type))
+      .sort((a, b) =>
+        Math.abs(resident.x - a.x) + Math.abs(resident.y - a.y) -
+        (Math.abs(resident.x - b.x) + Math.abs(resident.y - b.y)) || a.id - b.id);
+    const target = candidates.find(building => assignResidentToBuilding(state, resident.id, building.id) == null);
+    resident.path = [];
+    resident.phase = 'rest';
+    resident.targetId = null;
+    resident.manualOrder = null;
+    if (target) {
+      assigned++;
+      resident.task = '가까운 채집 거점에 다시 배정됨';
+    } else {
+      resident.job = 'idle';
+      resident.task = '채집 거점이 없어 무직 전환';
+      idled++;
+    }
+  }
+  if (assigned > 0 || idled > 0) {
+    addLog(
+      state,
+      `채집 거점 체제로 전환했습니다. 가까운 거점 자동 배정 ${assigned}명 · 거점이 없어 무직 전환 ${idled}명.`,
+      'info',
+      true,
+    );
+  }
+  return { assigned, idled };
 }
 
 export function hasSave(slot = 1): boolean {

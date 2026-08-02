@@ -9,6 +9,11 @@ import { familyReferenceName } from '../game/family';
 import { foreignSiteAt } from '../game/foreignSites';
 import { mineralRemaining } from '../game/minerals';
 import { mineMineralSummary } from '../game/miningSites';
+import { gatheringForestSummary, gatheringWorkArea, isGatheringBuildingType } from '../game/gatheringZones';
+import { habitatReserveSummaryInArea } from '../game/habitats';
+import {
+  linkedLodgingWorksite, lodgingHutForWorksite, lodgingSupplySummary, lodgingWorkers,
+} from '../game/lodgingHuts';
 import { mineCollapseRepairLocked } from '../game/mineCollapse';
 import { livestockCapacityForStable, livestockDailyFeedNeed, LIVESTOCK_DEFS, normalizeLivestockState } from '../game/livestock';
 import { residentDisplayAge } from '../game/lifecycle';
@@ -83,6 +88,7 @@ interface Props {
   onUnassignWorker: (residentId: number) => void;
   onSelectResident: (residentId: number) => void;
   onCancelBuildingConstruction: (buildingId: number) => void;
+  onAdjustGatheringArea: (buildingId: number, deltaX: number, deltaY: number, deltaRadius: number) => void;
   onSendSiteGift: (siteId: number, gift: SiteGiftType) => void;
   onOpenClaimAccord: (factionName: string, zoneId: number) => void;
   onRequestSiteDefectors: (siteId: number) => void;
@@ -340,6 +346,7 @@ export function SelectionContextBar({
   onUnassignWorker,
   onSelectResident,
   onCancelBuildingConstruction,
+  onAdjustGatheringArea,
   onSendSiteGift,
   onOpenClaimAccord,
   onRequestSiteDefectors,
@@ -359,6 +366,16 @@ export function SelectionContextBar({
     : null;
   const spoilage = spoilagePreview(state);
   const mineSummary = building?.type === 'mine' ? mineMineralSummary(state, building) : null;
+  const gatheringBuilding = building && isGatheringBuildingType(building.type) ? building : null;
+  const gatheringSummary = gatheringBuilding ? gatheringForestSummary(state, gatheringBuilding) : null;
+  const gatheringArea = gatheringBuilding ? gatheringWorkArea(gatheringBuilding) : null;
+  const habitatSummary = gatheringBuilding?.type === 'huntLodge' && gatheringArea
+    ? habitatReserveSummaryInArea(state.map, state.habitats, gatheringArea)
+    : null;
+  const lodgingHut = building?.type === 'lodgingHut' ? building : null;
+  const lodgingWorksite = lodgingHut ? linkedLodgingWorksite(state, lodgingHut) : null;
+  const lodgingSummary = lodgingHut ? lodgingSupplySummary(state, lodgingHut) : null;
+  const linkedHut = building ? lodgingHutForWorksite(state, building.id) : null;
   const buriedSilverVeinHere = isBuriedSilverVeinTile(state, tile ?? { x: -1, y: -1 });
 
   if (resident) {
@@ -452,6 +469,69 @@ export function SelectionContextBar({
                               mineSummary.silver > 0 ? `은 ${mineSummary.silver.toFixed(1)}` : '',
                             ].filter(Boolean).join(' · ') || '고갈'}</td>
                           </tr>
+                        </>
+                      )}
+                      {linkedHut && (
+                        <tr>
+                          <td>숙식 움막</td>
+                          <td>연결됨 · 식량 {lodgingSupplySummary(state, linkedHut).food.toFixed(1)} · 땔감 {lodgingSupplySummary(state, linkedHut).fuelHeat.toFixed(1)}열</td>
+                        </tr>
+                      )}
+                      {lodgingHut && lodgingSummary && (
+                        <>
+                          <tr>
+                            <td>연결 거점</td>
+                            <td>{lodgingWorksite ? BUILDING_DEFS[lodgingWorksite.type].name : '연결 끊김'}</td>
+                          </tr>
+                          <tr>
+                            <td>체류 작업자</td>
+                            <td>{lodgingWorkers(state, lodgingHut).length}명 · {CONFIG.gatheringZones.lodgingSupplyDays}일 체류 / {CONFIG.gatheringZones.lodgingHomeRestDays}일 귀가</td>
+                          </tr>
+                          <tr>
+                            <td>식량 비축</td>
+                            <td>{lodgingSummary.food.toFixed(1)} · {lodgingSummary.workers > 0 ? `${lodgingSummary.foodDays.toFixed(1)}일분` : '배정 작업자 없음'}</td>
+                          </tr>
+                          <tr>
+                            <td>땔감 비축</td>
+                            <td>{lodgingSummary.fuelHeat.toFixed(1)}열 · {lodgingSummary.workers > 0 ? `${lodgingSummary.fuelDays.toFixed(1)}일분` : '배정 작업자 없음'}</td>
+                          </tr>
+                        </>
+                      )}
+                      {gatheringSummary && gatheringArea && gatheringBuilding && (
+                        <>
+                          <tr>
+                            <td>작업 반경</td>
+                            <td>중심 ({gatheringArea.x}, {gatheringArea.y}) · 반경 {gatheringArea.radius}칸 · 확인한 숲 {gatheringSummary.forestTiles}칸</td>
+                          </tr>
+                          {gatheringBuilding.type === 'lumberCamp' && (
+                            <tr>
+                              <td>벌목 가능</td>
+                              <td>{gatheringSummary.matureTrees > 0
+                                ? `성목 ${gatheringSummary.matureTrees}그루`
+                                : '영역에 벨 성목 없음'}</td>
+                            </tr>
+                          )}
+                          {habitatSummary && (
+                            <tr>
+                              <td>사냥감 비축</td>
+                              <td>{habitatSummary.habitats > 0
+                                ? `${habitatSummary.stock.toFixed(1)} / ${habitatSummary.capacity.toFixed(1)} · 서식지 ${habitatSummary.habitats}곳`
+                                : '영역과 겹치는 서식지 없음'}</td>
+                            </tr>
+                          )}
+                          {gatheringBuilding.built && (
+                            <tr>
+                              <td>영역 조절</td>
+                              <td style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                <button className="btn small" type="button" title="작업영역을 북쪽으로 이동" onClick={() => onAdjustGatheringArea(gatheringBuilding.id, 0, -1, 0)}>↑</button>
+                                <button className="btn small" type="button" title="작업영역을 서쪽으로 이동" onClick={() => onAdjustGatheringArea(gatheringBuilding.id, -1, 0, 0)}>←</button>
+                                <button className="btn small" type="button" title="작업영역을 동쪽으로 이동" onClick={() => onAdjustGatheringArea(gatheringBuilding.id, 1, 0, 0)}>→</button>
+                                <button className="btn small" type="button" title="작업영역을 남쪽으로 이동" onClick={() => onAdjustGatheringArea(gatheringBuilding.id, 0, 1, 0)}>↓</button>
+                                <button className="btn small" type="button" disabled={gatheringArea.radius <= CONFIG.gatheringZones.lumberCampMinRadius} onClick={() => onAdjustGatheringArea(gatheringBuilding.id, 0, 0, -1)}>반경 −</button>
+                                <button className="btn small" type="button" disabled={gatheringArea.radius >= CONFIG.gatheringZones.lumberCampMaxRadius} onClick={() => onAdjustGatheringArea(gatheringBuilding.id, 0, 0, 1)}>반경 +</button>
+                              </td>
+                            </tr>
+                          )}
                         </>
                       )}
                       {tile.terrain === 'forest' && state.habitats.some(habitat =>

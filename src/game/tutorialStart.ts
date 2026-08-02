@@ -80,12 +80,15 @@ export function ensureTutorialInvariants(state: GameState): void {
   // 사냥 스텝: 활성 서식지가 하나는 있어야 한다 (newGame이 마을 근처 하나를 보장하지만 이중 안전망)
   if (!state.habitats.some(habitat => habitat.active)) {
     const forest = state.map.flat().find(tile => tile.terrain === 'forest');
+    const capacity = 8;
     state.habitats.push({
       id: 1 + state.habitats.reduce((max, habitat) => Math.max(max, habitat.id), 0),
       x: forest?.x ?? 5,
       y: forest?.y ?? 5,
       radius: 3,
       active: true,
+      stock: capacity,
+      capacity,
     });
   }
 
@@ -96,7 +99,7 @@ export function ensureTutorialInvariants(state: GameState): void {
     addLog(state, '이 지도에는 마을 곁에 물 자리가 없습니다. 길잡이 시드를 다시 골라야 합니다.', 'bad', true);
   }
 
-  // 광물 스텝(13단계, R5): 채광꾼이 걸어가 캘 노두가 마을 곁에 있어야 한다.
+  // 광물 스텝(13단계, G3): 첫 채광장의 작업영역에 넣을 노두가 마을 곁에 있어야 한다.
   // 지도 생성이 이미 개척지 둘레(nearbyMinDistance~nearbyMaxDistance)에 돌·철 노두를
   // 하나씩 심어 준다 (map.ts의 placeNearbyMineralDeposits — 본게임 공통 보장이다).
   // 그 보장이 어떤 이유로든 어긋난 시드라면 최소한으로 채워 넣는다.
@@ -111,7 +114,7 @@ export interface TutorialOutcrops {
 }
 
 /**
- * 마을 근처에서 채광꾼이 오갈 만한 거리에 드러난 노두 — 13단계가 기대는 지물이다.
+ * 마을 근처에서 첫 채광장이 품을 만한 거리에 드러난 노두 — 13단계가 기대는 지물이다.
  * 판정 반경은 물 불변식과 같은 눈금을 쓴다 (걸어 다니며 일할 만한 거리).
  */
 export function tutorialNearbyOutcrops(state: GameState): TutorialOutcrops {

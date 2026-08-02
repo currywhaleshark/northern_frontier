@@ -98,11 +98,14 @@ assert.ok(tributeScale(1, 40) > tributeScale(1, 12));
 
 // R4: 세공은 둘째 해부터다. 세공 경로를 보는 블록은 이 헬퍼로 그해 봄에 세워 둔다.
 // (길잡이 모듈은 여기 관심사가 아니므로 꺼 둔다 — 발화 순서는 튜토리얼 회귀 테스트가 본다)
-function newGameInTributeYear(seed, year = 2) {
+function newGameInTributeYear(seed, year = 2, keepAnnouncement = false) {
   const state = simulation.newGame(seed);
   state.guides = { enabled: false, seen: {} };
   state.day = (year - 1) * CONFIG.time.yearDays + 1;
   tributeMod.announceCourtTribute(state);
+  if (!keepAnnouncement && state.pendingChoice?.kind === 'tributeAnnouncement') {
+    simulation.resolveChoice(state, 'acknowledge');
+  }
   return state;
 }
 
@@ -112,16 +115,40 @@ function newGameInTributeYear(seed, year = 2) {
   assert.equal(state.courtTribute, null, '첫 해에는 조정이 거두지 않는다');
   assert.equal(state.tributeFailStreak, 0);
   assert.deepEqual(state.tributeReserve, {});
-  assert.ok(state.log.some(e => e.text.includes('세공은 이듬해 봄부터')), '첫 해 예고 로그');
+  assert.ok(state.log.some(e => e.text.includes('이듬해부터는 소출의 일부를 세공으로')), '첫 해 예고 로그');
 }
 
 // ── 둘째 해 봄: 파발로 그해 세공이 공지된다 ──
 {
-  const state = newGameInTributeYear(11);
+  const state = newGameInTributeYear(11, 2, true);
   assert.ok(state.courtTribute, '둘째 해에 세공이 공지된다');
   assert.equal(state.courtTribute.year, 2);
   assert.equal(state.courtTribute.resolved, false);
   assert.ok(state.log.some(e => e.text.includes('파발이 왔습니다')), '공지 로그');
+  assert.equal(state.pendingChoice?.kind, 'tributeAnnouncement', '파발 도착은 연례 삽화 창으로 알린다');
+  assert.equal(state.pendingChoice?.illustration?.src, '/assets/events/court-tribute-dispatch-v1.png');
+  assert.ok(state.pendingChoice?.body.includes(tributeMod.tributeItemsLabel(state.courtTribute.items)));
+  simulation.resolveChoice(state, 'acknowledge');
+  assert.equal(state.pendingChoice, null, '파발 공지는 확인 후 닫힌다');
+}
+
+// 다른 사건 창이 열려 있어도 세공 파발은 그 뒤에 이어서 반드시 뜬다.
+{
+  const state = simulation.newGame(12);
+  state.guides = { enabled: false, seen: {} };
+  state.day = CONFIG.time.yearDays + 1;
+  state.pendingChoice = {
+    kind: 'guide',
+    title: '먼저 온 안내',
+    body: '세공 파발을 잠시 기다리게 한다.',
+    options: [{ id: 'ok', label: '확인', desc: '닫는다.' }],
+    data: { guideId: '' },
+  };
+  tributeMod.announceCourtTribute(state);
+  assert.equal(state.pendingChoice.kind, 'guide', '기존 사건을 덮어쓰지 않는다');
+  assert.equal(state.tributeAnnouncementPendingYear, 2, '못 띄운 파발 연차를 기억한다');
+  simulation.resolveChoice(state, 'ok');
+  assert.equal(state.pendingChoice?.kind, 'tributeAnnouncement', '기존 사건 해소 직후 파발 창을 잇는다');
 }
 
 // ── 겨울 수거 모달: 매일 검사 가드 (모달/전투 충돌 시 미룬다) ──

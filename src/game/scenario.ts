@@ -27,9 +27,9 @@ import type { GameState, JobId, Resident, ResourceId, ScenarioState } from './ty
 // 부르는 쪽은 예전처럼 scenario에서 가져다 쓴다.
 export { countScenarioProgress, markScenarioFlag } from './scenarioFlags';
 
-// 5 = R5에서 둘째 해 7스텝을 이어 붙여 17스텝이 된 판. 스텝 수가 바뀌면 진행 위치의 뜻이
+// 6 = G3에서 벌목장·채광장 배정을 튜토리얼 목표로 편입한 판. 스텝 수·목표 의미가 바뀌면 진행 위치의 뜻이
 // 달라지므로 반드시 올린다 — 구판 저장은 로드에서 일반 모드로 해제된다.
-export const TUTORIAL_SCENARIO_VERSION = 5;
+export const TUTORIAL_SCENARIO_VERSION = 6;
 
 /** 소목표 하나 — 칩에 `라벨 (현재/목표)`로 선다. 라벨은 짧은 명사, 칩은 수치 요약이다. */
 export interface ScenarioGoalProgress {
@@ -108,6 +108,19 @@ function builtCount(state: GameState, predicate: (type: GameState['buildings'][n
 
 function jobCount(state: GameState, job: JobId): number {
   return state.residents.filter(resident => resident.alive && resident.job === job).length;
+}
+
+function assignedJobCount(
+  state: GameState,
+  job: JobId,
+  buildingTypes: readonly GameState['buildings'][number]['type'][],
+): number {
+  const validIds = new Set(state.buildings
+    .filter(building => building.built && buildingTypes.includes(building.type))
+    .map(building => building.id));
+  return state.residents.filter(resident =>
+    resident.alive && resident.job === job && resident.assignedBuildingId != null &&
+    validIds.has(resident.assignedBuildingId)).length;
 }
 
 function isPlot(building: GameState['buildings'][number]): boolean {
@@ -194,13 +207,15 @@ const TUTORIAL_STEP_SPECS: readonly ScenarioStepSpec[] = [
     body:
       '사람은 저마다 맡은 일이 다릅니다. 벌목꾼이 벤 나무도 운반꾼이 창고에 들여야 비로소 비축입니다.\n\n' +
       '· 하단 독의 직업 배정 창을 여십시오. 누가 무슨 일을 하는지 한눈에 보입니다.\n' +
-      '· 벌목꾼과 운반꾼을 각각 한 사람 이상 두십시오. 건축가가 있어야 집도 오릅니다.\n' +
-      '· 벌목꾼은 직업을 눌러 상세 배정으로 사람을 골라 보십시오. 누구를 앉히는지 그곳에서 정합니다.\n' +
+      '· 건설 목록(생산)에서 값싼 벌목장을 먼저 세우십시오. 채집 일은 거점에 배정된 사람만 수행합니다.\n' +
+      '· 완공된 벌목장을 선택해 벌목꾼을 한 사람 배정하고, 운반꾼도 한 사람 이상 두십시오. 건축가가 있어야 집도 오릅니다.\n' +
+      '· 벌목장을 숲에 놓았다면 미배정 벌목꾼도 공사터 나무만은 먼저 베어 길을 엽니다.\n' +
       '· 그다음부터는 직업 옆의 ＋만 눌러도 무직자 하나가 그 일로 올라갑니다. 급할 때는 이 편이 빠릅니다.\n' +
       '· 땅바닥에 쌓인 자원은 아직 살림이 아닙니다. 창고에 들어와야 곳간에 잡힙니다.',
     progress: state => [
       flagGoal(state, '직업 창', 'jobPanelOpened'),
-      { label: '벌목꾼', current: jobCount(state, 'woodcutter'), target: 1 },
+      { label: '벌목장', current: builtCount(state, type => type === 'lumberCamp'), target: 1 },
+      { label: '벌목장 배정', current: assignedJobCount(state, 'woodcutter', ['lumberCamp']), target: 1 },
       { label: '운반꾼', current: jobCount(state, 'hauler'), target: 1 },
     ],
   },
@@ -270,12 +285,13 @@ const TUTORIAL_STEP_SPECS: readonly ScenarioStepSpec[] = [
     title: '사냥과 갈무리',
     body:
       '숲의 서식지에는 짐승이 삽니다. 사냥은 곡식이 떨어졌을 때의 두 번째 곳간입니다.\n\n' +
-      '· 직업 배정에서 사냥꾼을 두 사람 이상 두십시오.\n' +
-      '· 사냥꾼은 서식지 근처에서 사냥해 고기와 가죽을 가져옵니다.\n' +
+      '· 서식지 가까운 숲에 사냥막을 세우고, 완공된 사냥막에 사냥꾼을 두 사람 배정하십시오.\n' +
+      '· 사냥꾼은 배정된 사냥막의 작업영역 안에서만 사냥해 고기와 가죽을 그곳에 부립니다. 사냥막을 선택하면 작업영역과 짐승 비축을 볼 수 있습니다.\n' +
       '· 고기는 상합니다. 여름에는 더 빨리 상하니 쟁여 두기보다 제때 먹이는 편이 낫습니다.\n' +
       '· 뒤에 훈연장과 움집, 독을 갖추면 말리고 절여 겨울까지 두는 법을 배웁니다.',
     progress: state => [
-      { label: '사냥꾼', current: jobCount(state, 'hunter'), target: 2 },
+      { label: '사냥막', current: builtCount(state, type => type === 'huntLodge'), target: 1 },
+      { label: '사냥막 배정', current: assignedJobCount(state, 'hunter', ['huntLodge']), target: 2 },
       { label: '고기', current: state.resources.meat, target: goalTarget(state, 'meatGoal') },
     ],
   },
@@ -286,8 +302,8 @@ const TUTORIAL_STEP_SPECS: readonly ScenarioStepSpec[] = [
       '앓아누운 이가 생겼습니다. 병자는 일을 못 하고, 곳간의 약초를 축내며, 그대로 두면 목숨을 잃습니다.\n\n' +
       '· 약초는 약초꾼의 몫입니다. 숲을 돌며 약초와 산물을 캐어 곳간에 비축합니다.\n' +
       '· 그 약초를 병자가 매일 조금씩 씁니다. 뒤에 의원을 세우면 의원(醫員)도 같은 약초로 치료합니다.\n' +
-      '· 건설 목록(생산)에서 약초막을 숲 가까이 세우십시오. 약초꾼이 그곳에 짐을 부려 채집 왕복이 줄어듭니다.\n' +
-      '· 직업 배정에서 약초꾼 옆의 ＋를 눌러 한 사람 두십시오.\n' +
+      '· 건설 목록(생산)에서 약초막을 숲 가까이 세우십시오. 약초꾼은 배정된 약초막의 작업영역에서만 캡니다.\n' +
+      '· 완공된 약초막을 선택해 약초꾼을 한 사람 배정하십시오.\n' +
       '· 약초가 있으면 회복이 빠릅니다. 떨어지면 몸이 스스로 이겨 내기를 기다릴 수밖에 없습니다.\n' +
       '· 굶주림과 추위는 병을 부릅니다. 밥과 아궁이가 곧 약입니다.\n' +
       '· 뒤에 진(鎭)으로 오르면 의원을 세워 병자를 돌보고 역병을 격리합니다.',
@@ -302,15 +318,12 @@ const TUTORIAL_STEP_SPECS: readonly ScenarioStepSpec[] = [
       scenario.flags.patientResidentId = candidate.id;
       addLog(state, `${withJosa(residentLogName(candidate), '이/가')} 앓아누웠습니다. 약초를 살피십시오.`, 'bad', true);
     },
-    // 약초막 완공을 함께 요구한다 (R2-2). 약초꾼은 약초막이 없어도 숲에서 캐 오지만
-    // (`agents.ts` herbalistTick — 약초막은 depositExtra, 곧 가까운 하역처다),
-    // 거점을 세워 두어야 왕복이 줄어 병자에게 약초가 제때 닿는다. 직업마다 거점이 있다는
-    // 문법을 여기서 한 번 더 밟게 하려고 배치가 아니라 완공을 조건으로 둔다.
+    // G3 이후 약초꾼은 약초막 배정이 있어야만 작업영역에서 채집한다.
     progress: state => {
       const patient = scriptedPatient(state);
       return [
         { label: '약초막', current: builtCount(state, type => type === 'herbHut'), target: 1 },
-        { label: '약초꾼', current: jobCount(state, 'herbalist'), target: 1 },
+        { label: '약초막 배정', current: assignedJobCount(state, 'herbalist', ['herbHut']), target: 1 },
         // 병자를 붙이지 못했거나 기록이 사라지면 붙들지 않는다
         boolGoal('병자 회복', !patient || !patient.alive || !patient.sick),
       ];
@@ -461,13 +474,14 @@ const TUTORIAL_STEP_SPECS: readonly ScenarioStepSpec[] = [
       '돌과 철은 땅에서 납니다. 어디에 묻혀 있는지부터 보아야 합니다.\n\n' +
       '· 미니맵 곁의 광맥(鑛) 탭을 켜 보십시오. 땅속에 묻힌 자리가 색으로 드러납니다.\n' +
       '· 지표에 드러난 바위 자리가 노두입니다. 개척지 곁에도 돌 노두와 철 노두가 하나씩 있습니다.\n' +
-      '· 직업 배정에서 채광꾼을 두십시오. 채광꾼은 거점이 없어도 노두를 찾아가 캐고 창고로 나릅니다.\n' +
+      `· 노두 곁 빈 땅에 채광장을 세우십시오. 채광꾼은 배정된 채광장 반경 ${CONFIG.minerals.mineWorkRadius}칸 안에서만 캐고 그곳에 부립니다.\n` +
+      '· 완공된 채광장을 선택해 채광꾼을 배정하십시오. 채집 직업은 모두 거점 배정이 필요합니다.\n' +
       '· 철 노두를 캐면 돌이 함께 딸려 옵니다. 노두는 한이 있어 다 캐면 평지로 돌아갑니다.\n' +
-      `· 채광장은 보(堡)로 오른 뒤의 확장입니다. 반경 ${CONFIG.minerals.mineWorkRadius}칸의 노두를 그곳에 부려 왕복을 줄입니다.\n` +
       '· 땅속 깊은 광맥을 통째로 뚫는 채광갱은 그보다 더 뒤, 부(府)의 살림입니다.',
     progress: state => [
       flagGoal(state, '광맥 탭', 'oreToggled'),
-      { label: '채광꾼', current: jobCount(state, 'miner'), target: 1 },
+      { label: '채광장', current: builtCount(state, type => type === 'mine'), target: 1 },
+      { label: '채광장 배정', current: assignedJobCount(state, 'miner', ['mine']), target: 1 },
       // 곳간 재고가 아니라 캐낸 양 — 돌은 공사에 곧바로 쓰여 재고로는 늘지 않는 날이 있다
       { label: '돌·철', current: counted(state, 'mineralsMined'), target: goalTarget(state, 'mineralsMinedGoal') },
     ],

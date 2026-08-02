@@ -82,7 +82,8 @@ function runTicks(state, ticks) {
   addBuilt(state, 'center', 2, 2);
   const camp = addBuilt(state, 'lumberCamp', 9, 9);
   for (let y = 6; y <= 10; y++) for (let x = 5; x <= 8; x++) state.map[y][x].terrain = 'forest';
-  worker(state, 'woodcutter', 8, 8);
+  const cutter = worker(state, 'woodcutter', 8, 8);
+  assert.equal(workerSlots.assignResidentToBuilding(state, cutter.id, camp.id), null);
   runTicks(state, CONFIG.agents.subticksPerDay * 4);
   assert.ok((camp.inventory.wood ?? 0) > 0);
   assert.ok((camp.inventory.brushwood ?? 0) > 0);
@@ -94,7 +95,8 @@ function runTicks(state, ticks) {
   const lodge = addBuilt(state, 'huntLodge', 9, 9);
   for (let y = 11; y <= 17; y++) for (let x = 11; x <= 17; x++) state.map[y][x].terrain = 'forest';
   state.habitats = [{ id: 1, x: 14, y: 14, radius: 4, active: true }];
-  worker(state, 'hunter', 14, 14);
+  const hunter = worker(state, 'hunter', 14, 14);
+  assert.equal(workerSlots.assignResidentToBuilding(state, hunter.id, lodge.id), null);
   runTicks(state, CONFIG.agents.subticksPerDay * 4);
   assert.ok((lodge.inventory.meat ?? 0) > 0);
   assert.ok((lodge.inventory.hide ?? 0) > 0);
