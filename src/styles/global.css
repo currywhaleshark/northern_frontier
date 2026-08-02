@@ -863,6 +863,7 @@ html, body, #root {
   pointer-events: none;
 }
 .minimap-panel {
+  position: relative;
   width: 204px;
   padding: 7px;
   border: 1px solid rgba(214, 221, 224, 0.26);
@@ -924,6 +925,68 @@ html, body, #root {
   cursor: pointer;
 }
 .minimap-center-btn:hover { border-color: var(--accent); color: var(--accent); }
+.minimap-center-btn.active { border-color: var(--accent); color: var(--accent); }
+.building-finder { position: static; margin-left: auto; }
+.building-finder + .minimap-center-btn { margin-left: 0; }
+.building-finder-popover {
+  position: absolute;
+  z-index: 12;
+  top: 36px;
+  right: 7px;
+  width: min(252px, calc(100% - 14px));
+  max-height: 330px;
+  box-sizing: border-box;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(217, 164, 65, 0.68);
+  border-radius: 6px;
+  background: rgba(14, 18, 21, 0.98);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.58);
+  color: var(--text);
+}
+.building-finder-popover header,
+.building-finder-nav { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.building-finder-popover header strong { font-size: 12px; color: var(--accent); }
+.building-finder-popover input,
+.building-finder-popover select {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel2);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+}
+.building-finder-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.building-finder-nav button { padding: 4px 9px; font-size: 10px; }
+.building-finder-nav span { color: var(--muted); font-size: 10px; }
+.building-finder-results {
+  max-height: 190px;
+  display: grid;
+  gap: 3px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.building-finder-results > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.building-finder-results > button:hover,
+.building-finder-results > button.active { border-color: var(--accent); background: rgba(217, 164, 65, 0.12); }
+.building-finder-results small { color: var(--muted); font-size: 9px; white-space: nowrap; }
 .minimap-canvas-wrap {
   position: relative;
   width: 188px;
@@ -995,9 +1058,9 @@ html, body, #root {
 .hud-minimap-window .minimap-overlay {
   flex: 1 1 auto;
   min-width: 0;
-  width: auto;
+  width: 100%;
   height: 100%;
-  overflow: visible;
+  overflow: auto;
   pointer-events: auto;
 }
 .hud-minimap-window .minimap-panel {

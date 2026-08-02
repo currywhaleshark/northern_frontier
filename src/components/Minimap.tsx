@@ -11,6 +11,7 @@ import {
   minimapBaseInvalidationKey,
   minimapOverlayInvalidationKey,
 } from './minimapRenderModel';
+import { BuildingFinder } from './BuildingFinder';
 
 const TILE = CONFIG.ui.tileSize;
 const MAP_SIZE = 188;
@@ -74,6 +75,8 @@ interface Props {
   animationActive: boolean;
   viewportRef: RefObject<HTMLDivElement>;
   selected: { x: number; y: number } | null;
+  selectedBuildingId: number | null;
+  onFocusBuilding: (buildingId: number) => void;
   // 미니맵으로 시점을 옮긴 순간 (튜토리얼 0단계의 minimapClicked 플래그)
   onNavigate?: () => void;
 }
@@ -126,7 +129,9 @@ function recordMinimapRedraw(name: 'minimap-base-redraw' | 'minimap-overlay-redr
   bucket.count++;
 }
 
-export function Minimap({ state, version, animationActive, viewportRef, selected, onNavigate }: Props) {
+export function Minimap({
+  state, version, animationActive, viewportRef, selected, selectedBuildingId, onFocusBuilding, onNavigate,
+}: Props) {
   const baseCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const dragging = useRef(false);
@@ -379,6 +384,11 @@ export function Minimap({ state, version, animationActive, viewportRef, selected
       <div className="minimap-heading">
         {visibleRaid && <span className="minimap-alert-label">습격 경보</span>}
         {!visibleRaid && targetMarkers.length > 0 && <span className="minimap-target-label">토벌 목표</span>}
+        <BuildingFinder
+          state={state}
+          selectedBuildingId={selectedBuildingId}
+          onFocusBuilding={onFocusBuilding}
+        />
         <button type="button" className="minimap-center-btn" title="마을 중심으로 이동" aria-label="마을 중심으로 이동" onClick={navigateToCenter}>◎</button>
       </div>
       <div className="minimap-canvas-wrap" data-tut="minimap">

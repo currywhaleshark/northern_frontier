@@ -1596,6 +1596,27 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     if (viewport) centerViewportOnTile(viewport, resident.x, resident.y);
   };
 
+  const handleFocusBuilding = useCallback((buildingId: number) => {
+    const building = stateRef.current.buildings.find(candidate => candidate.id === buildingId);
+    if (!building) return;
+    setPlacingType(null);
+    setPastureStableId(null);
+    setExpandingBuildingId(null);
+    setRelocatingBuildingId(null);
+    setSelected({ x: building.x, y: building.y });
+    setSelectedEntity({ kind: 'building', id: building.id });
+    setInspResidentId(null);
+    const viewport = mapViewportRef.current;
+    if (viewport) {
+      const dims = buildingFootprintDims(building);
+      centerViewportOnTile(
+        viewport,
+        building.x + (dims.w - 1) / 2,
+        building.y + (dims.h - 1) / 2,
+      );
+    }
+  }, []);
+
   const openDockWindow = useCallback((id: DockWindowId) => {
     setOpenDockWindowIds(current => current.includes(id) ? current : [...current, id]);
     setFloatingWindowOrder(current => bringDockWindowToFront(current, id));
@@ -1761,6 +1782,8 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                       animationActive={speed > 0 && !runtimeState.pendingChoice && !runtimeState.pendingPromotionNotice && !runtimeState.tacticalBattle && !runtimeState.tacticalBattleReport && !runtimeState.gameOver}
                       viewportRef={mapViewportRef}
                       selected={selected}
+                      selectedBuildingId={selectedEntity?.kind === 'building' ? selectedEntity.id : null}
+                      onFocusBuilding={handleFocusBuilding}
                       // 튜토리얼 0단계(미니맵으로 시점 옮기기) 달성 플래그
                       onNavigate={() => markScenarioFlag(stateRef.current, 'minimapClicked')}
                     />
