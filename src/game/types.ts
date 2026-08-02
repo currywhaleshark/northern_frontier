@@ -129,6 +129,11 @@ export interface FishingBoatState {
   status: FishingBoatStatus;
   route: FishingGroundTile[];
   routeIndex: number;
+  targetGroundId?: string | null;
+  tripDepthBand?: Extract<FishingGroundDepthBand, 'mid' | 'deep'> | null;
+  tripCatchTarget?: number;
+  tripDistance?: number;
+  fishingProgress?: number;
 }
 
 export type JobId =

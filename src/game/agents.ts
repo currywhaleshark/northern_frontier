@@ -62,7 +62,10 @@ import {
   ensureFishingGrounds, fishingGroundAt, fishingGroundStockAt, fishingGroundSummaryInArea,
   takeFishingGroundStock, takeFishingGroundStockById,
 } from './fishingGrounds';
-import { advanceFishingBoatWork } from './fishingBoats';
+import {
+  advanceFishingBoatWork, advanceLakeFishingTrip, boardFishingBoat, disembarkFishingBoat,
+  lakeFishingTripPlan, startLakeFishingTrip,
+} from './fishingBoats';
 import { waterDependentProductionMultiplier } from './waterSupply';
 import { activeFireDisaster, applyFireWater, drawFireWater, nearestFireWaterSource } from './fire';
 import { mineCollapseRepairLocked } from './mineCollapse';
@@ -1006,7 +1009,10 @@ export function ensureResidentOnPassableTile(state: GameState, r: Resident): voi
 
 export function ensureResidentsOnPassableTiles(state: GameState): void {
   for (const resident of state.residents) {
-    if (resident.alive) ensureResidentOnPassableTile(state, resident);
+    const boat = resident.fishingBoatId == null
+      ? undefined
+      : state.fishingBoats.find(candidate => candidate.id === resident.fishingBoatId && candidate.fisherId === resident.id);
+    if (resident.alive && !boat) ensureResidentOnPassableTile(state, resident);
   }
 }
 
@@ -2714,6 +2720,34 @@ function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
   if (workplace.type === 'fishingPort') {
     const area = gatheringWorkArea(workplace);
+    const portKind = state.map[area.y]?.[area.x]?.terrain;
+    if (portKind === 'lake' && carryTotal(r) <= WORK_STOCK_EPSILON) {
+      const remainingWorkSubticks = DAY_BANDS.work.end - state.subTick + 1;
+      const candidate = state.fishingBoats
+        .filter(boat => boat.portId === workplace.id && boat.status === 'moored' && boat.fisherId == null)
+        .map(boat => ({ boat, plan: lakeFishingTripPlan(state, boat, remainingWorkSubticks) }))
+        .filter((entry): entry is { boat: GameState['fishingBoats'][number]; plan: NonNullable<typeof entry.plan> } =>
+          entry.plan != null)
+        .sort((left, right) =>
+          right.plan.expectedCatch - left.plan.expectedCatch ||
+          left.plan.requiredSubticks - right.plan.requiredSubticks || left.boat.id - right.boat.id)[0];
+      if (candidate) {
+        const st = goTo(state, r, ctx, buildingInteractionGoal(state, [workplace.id]));
+        if (st === 'arrived') {
+          const boardError = boardFishingBoat(state, candidate.boat.id, r.id);
+          const tripError = boardError == null
+            ? startLakeFishingTrip(state, candidate.boat.id, remainingWorkSubticks)
+            : boardError;
+          if (tripError != null && boardError == null) disembarkFishingBoat(state, candidate.boat.id);
+          r.phase = tripError == null ? 'toWork' : 'rest';
+          r.task = tripError == null ? '호수 중·심수 어장으로 출항' : tripError;
+        } else {
+          r.phase = st === 'stuck' ? 'rest' : 'toWork';
+          r.task = st === 'stuck' ? '포구 길이 막힘' : '어선에 타러 포구로 이동';
+        }
+        return;
+      }
+    }
     const availableGround = () => state.fishingGrounds
       .filter(ground => ground.depthBand === 'shore' && (ground.kind === 'lake' || ground.kind === 'sea') &&
         ground.stock > WORK_STOCK_EPSILON && ground.tiles.some(tile =>
@@ -3902,6 +3936,24 @@ export function agentsTick(state: GameState): void {
   assignFireResponses(state, living);
 
   for (const r of living) {
+    const activeBoat = r.fishingBoatId == null
+      ? undefined
+      : state.fishingBoats.find(boat => boat.id === r.fishingBoatId && boat.fisherId === r.id);
+    if (activeBoat) {
+      r.px = r.x;
+      r.py = r.y;
+      if (activeBoat.status === 'boarded') {
+        const remainingWorkSubticks = DAY_BANDS.work.end - state.subTick + 1;
+        if (dayBand === 'work' && startLakeFishingTrip(state, activeBoat.id, remainingWorkSubticks) == null) {
+          r.task = '호수 중·심수 어장으로 출항';
+        } else {
+          disembarkFishingBoat(state, activeBoat.id);
+        }
+      } else {
+        advanceLakeFishingTrip(state, activeBoat.id, dayBand !== 'work');
+      }
+      continue;
+    }
     ensureResidentOnPassableTile(state, r);
     // 보간용 직전 위치 기록
     r.px = r.x;

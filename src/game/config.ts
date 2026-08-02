@@ -75,6 +75,17 @@ export const CONFIG = {
     cargoCapacity: 12,
     durability: 100,
     minimumDepartureDurability: 25,
+    baseCatchPerTrip: 4,
+    midCatchMultiplier: 1.4,
+    deepCatchMultiplier: 1.8,
+    distanceCatchBonusPerTile: 0.025,
+    maximumDistanceCatchBonus: 0.5,
+    fishingWorkSubticks: 6,
+    departureDurabilityCost: 1.5,
+    travelDurabilityPerTile: 0.18,
+    catchDurabilityPerFish: 0.35,
+    deepDurabilityMultiplier: 1.25,
+    returnSafetySubticks: 2,
   },
 
   habitats: {

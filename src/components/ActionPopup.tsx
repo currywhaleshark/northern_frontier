@@ -503,8 +503,14 @@ export function ActionPopup({
       {building.type === 'fishingPort' && building.built && (() => {
         const area = gatheringWorkArea(building);
         const kind = state.map[area.y]?.[area.x]?.terrain === 'lake' ? 'lake' : 'sea';
-        const summary = fishingGroundSummaryInArea(state.fishingGrounds, area, kind);
+        const shore = fishingGroundSummaryInArea(state.fishingGrounds, area, kind, 'shore');
+        const mid = fishingGroundSummaryInArea(state.fishingGrounds, area, kind, 'mid');
+        const deep = fishingGroundSummaryInArea(state.fishingGrounds, area, kind, 'deep');
         const boats = state.fishingBoats.filter(boat => boat.portId === building.id);
+        const statusName = {
+          moored: '계류', boarded: '승선', underway: '출항', fishing: '조업', returning: '귀항',
+          repairing: '수리', disabled: '사용 불가',
+        } as const;
         return (
           <div className="worker-slot-panel">
             <div className="worker-slot-summary">
@@ -512,13 +518,27 @@ export function ActionPopup({
               <span className="muted small">어선 {boats.length}척 · 어획물 {(building.inventory?.fish ?? 0).toFixed(1)}</span>
             </div>
             <div className="muted small">
-              작업영역 어장 {summary.grounds}곳 · 비축 {summary.stock.toFixed(1)} / {summary.capacity.toFixed(1)}
+              연안 {shore.grounds}곳 {shore.stock.toFixed(1)}/{shore.capacity.toFixed(1)} · 중수심 {mid.grounds}곳
+              {' '}{mid.stock.toFixed(1)}/{mid.capacity.toFixed(1)} · 심수 {deep.grounds}곳 {deep.stock.toFixed(1)}/{deep.capacity.toFixed(1)}
             </div>
             <div className="muted small">
               {boats.length > 0
-                ? boats.map(boat => `#${boat.id} ${Math.ceil(boat.durability)}/${boat.maxDurability}`).join(' · ')
+                ? boats.map(boat => {
+                  const tripCatch = boat.tripCatchTarget ?? 0;
+                  const depthCost = boat.tripDepthBand === 'deep' ? CONFIG.fishingBoats.deepDurabilityMultiplier : 1;
+                  const tripDurability = CONFIG.fishingBoats.departureDurabilityCost +
+                    (boat.tripDistance ?? 0) * CONFIG.fishingBoats.travelDurabilityPerTile +
+                    tripCatch * CONFIG.fishingBoats.catchDurabilityPerFish * depthCost;
+                  return `#${boat.id} ${statusName[boat.status]} · 내구 ${Math.ceil(boat.durability)}/${boat.maxDurability}` +
+                    ` · 적재 ${boat.cargoFish.toFixed(1)}/${boat.cargoCapacity}` +
+                    (boat.tripDepthBand
+                      ? ` · ${boat.tripDepthBand === 'deep' ? '심수' : '중수심'} 왕복 ${boat.tripDistance ?? 0}칸` +
+                        ` · 예상 ${tripCatch.toFixed(1)}획/내구 -${tripDurability.toFixed(1)}`
+                      : '');
+                }).join(' / ')
                 : '배무이터에서 같은 수역의 이 포구로 보낼 어선을 건조할 수 있습니다.'}
             </div>
+            {kind === 'lake' && <div className="muted small">호수 어선은 겨울과 봄 1~6일에는 출항하지 않습니다.</div>}
           </div>
         );
       })()}

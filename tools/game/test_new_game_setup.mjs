@@ -118,9 +118,9 @@ const { CONFIG } = await load('config');
     '창건 연대기는 시작 설정 문맥을 한 번 남긴다');
 }
 
-// P1: v56 저장은 기본 설정으로 v57 중간 단계에 이관되며 현재 스키마는 어선 상태를 포함한 후속 v59이다.
+// P1: v56 저장은 기본 설정으로 v57 중간 단계에 이관되며 현재 스키마는 호수 출어 상태를 포함한 v60이다.
 {
-  assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 59, '개별 어선 저장 스키마는 v59이다');
+  assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 60, '호수 출어 상태 저장 스키마는 v60이다');
   assert.equal(typeof saveLoad.migrateV56ToV57, 'function');
   const migrated = saveLoad.migrateV56ToV57({ schemaVersion: 56, difficulty: 'hard' });
   assert.equal(migrated.schemaVersion, 57);

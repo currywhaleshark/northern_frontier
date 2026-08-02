@@ -127,7 +127,7 @@ assert.ok(state.nextFishingBoatId > boat.id);
 assert.equal(saveLoad.saveGame(state, 7), true);
 const loaded = saveLoad.loadGame(7);
 assert.ok(loaded);
-assert.equal(loaded.schemaVersion, 59);
+assert.equal(loaded.schemaVersion, 60);
 assert.equal(loaded.fishingBoats.length, 1);
 assert.equal(loaded.fishingBoats[0].id, boat.id);
 assert.equal(loaded.fishingBoats[0].portId, port.id);

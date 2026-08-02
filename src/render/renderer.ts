@@ -1113,6 +1113,50 @@ function drawMineWorkRange(ctx: CanvasRenderingContext2D, x: number, y: number):
   ctx.restore();
 }
 
+function drawFishingBoatPlaceholder(
+  ctx: CanvasRenderingContext2D,
+  boat: GameState['fishingBoats'][number],
+): void {
+  const cx = (boat.x + 0.5) * TILE;
+  const cy = (boat.y + 0.58) * TILE;
+  const damaged = boat.durability <= boat.maxDurability * 0.35;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = damaged ? '#76513a' : '#9a673d';
+  ctx.strokeStyle = damaged ? '#3f2a21' : '#4f3423';
+  ctx.lineWidth = Math.max(1.2, TILE * 0.045);
+  ctx.beginPath();
+  ctx.moveTo(-TILE * 0.38, -TILE * 0.1);
+  ctx.quadraticCurveTo(-TILE * 0.28, TILE * 0.22, 0, TILE * 0.24);
+  ctx.quadraticCurveTo(TILE * 0.28, TILE * 0.22, TILE * 0.38, -TILE * 0.1);
+  ctx.quadraticCurveTo(0, TILE * 0.04, -TILE * 0.38, -TILE * 0.1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(232, 207, 157, 0.9)';
+  ctx.lineWidth = Math.max(1, TILE * 0.035);
+  ctx.beginPath();
+  ctx.moveTo(-TILE * 0.26, -TILE * 0.02);
+  ctx.lineTo(TILE * 0.29, -TILE * 0.02);
+  ctx.stroke();
+  if (boat.status === 'underway' || boat.status === 'returning') {
+    ctx.strokeStyle = '#6b472d';
+    ctx.beginPath();
+    ctx.moveTo(-TILE * 0.08, 0);
+    ctx.lineTo(-TILE * 0.32, TILE * 0.32);
+    ctx.moveTo(TILE * 0.08, 0);
+    ctx.lineTo(TILE * 0.32, TILE * 0.32);
+    ctx.stroke();
+  }
+  if (boat.cargoFish > 0) {
+    ctx.fillStyle = '#b9d8d7';
+    ctx.beginPath();
+    ctx.arc(0, TILE * 0.09, Math.min(TILE * 0.1, TILE * 0.04 + boat.cargoFish * 0.004 * TILE), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawWatchtowerProjectiles(ctx: CanvasRenderingContext2D, state: GameState, alpha: number): void {
   for (const shot of state.watchtowerProjectiles ?? []) {
     const progress = Math.max(0, Math.min(1, (shot.ageTicks + alpha) / Math.max(1, shot.durationTicks)));
@@ -2780,6 +2824,11 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     };
     enqueueRowDraw((corpse.y + 1) * TILE, (corpse.x + 0.5) * TILE, () =>
       sprites.drawCorpse(ctx, drawParams));
+  }
+  for (const boat of state.fishingBoats) {
+    if (!isExplored(state, boat.x, boat.y) || !tileRectIntersectsViewport(viewport, boat.x, boat.y)) continue;
+    enqueueRowDraw((boat.y + 0.82) * TILE, (boat.x + 0.5) * TILE, () =>
+      drawFishingBoatPlaceholder(ctx, boat));
   }
   for (let index = 0; index < localResidentDraws.length; index++) {
     const resident = localResidentDraws[index];

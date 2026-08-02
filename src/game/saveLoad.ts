@@ -879,6 +879,11 @@ export function migrateV58ToV59(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), fishingBoats: [], nextFishingBoatId: 1, schemaVersion: 59 };
 }
 
+// v60: 호수 출어 중인 어선의 표적 어장·예상 어획·항해 거리·조업 진행 상태.
+export function migrateV59ToV60(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 60 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -943,6 +948,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 56) migrated = migrateV56ToV57(migrated);
     else if (version === 57) migrated = migrateV57ToV58(migrated);
     else if (version === 58) migrated = migrateV58ToV59(migrated);
+    else if (version === 59) migrated = migrateV59ToV60(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
