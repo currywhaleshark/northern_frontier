@@ -28,7 +28,7 @@ export function pickWeighted<T extends string>(rng: () => number, table: Record<
 }
 
 function blob(tiles: Tile[][], rng: () => number, cx: number, cy: number, size: number, terrain: Terrain, over: Terrain[]) {
-  const w = CONFIG.map.width, h = CONFIG.map.height;
+  const w = tiles[0]?.length ?? 0, h = tiles.length;
   let x = cx, y = cy;
   for (let i = 0; i < size; i++) {
     const xi = Math.round(x), yi = Math.round(y);
@@ -90,9 +90,13 @@ function placeNearbyMineralDeposits(
 }
 
 // 두만강 이북 개척지 지형 생성
-export function generateMap(seed: number): { tiles: Tile[][]; centerX: number; centerY: number } {
+export function generateMap(
+  seed: number,
+  dimensions: Readonly<{ width: number; height: number }> = CONFIG.map,
+): { tiles: Tile[][]; centerX: number; centerY: number } {
   const rng = makeRng(seed);
-  const w = CONFIG.map.width, h = CONFIG.map.height;
+  const w = Math.max(16, Math.floor(dimensions.width));
+  const h = Math.max(16, Math.floor(dimensions.height));
   const areaScale = (w * h) / (44 * 44);
   const scaledCount = (base: number): number => Math.max(1, Math.round(base * areaScale));
 

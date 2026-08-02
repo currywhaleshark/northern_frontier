@@ -19,6 +19,7 @@
     "test:livestock-assets": "node tools/render/test_livestock_assets.mjs",
     "test:corpse-assets": "node tools/render/test_corpse_coffin_assets.mjs",
     "measure:runtime": "node tools/game/measure_runtime_performance.mjs",
+    "measure:map-sizes": "node tools/game/measure_map_size_s2.mjs",
     "test:combat": "node tools/game/test_tactical_battle.mjs",
     "gen:sprite-metrics": "node tools/game/generate_tactical_sprite_metrics.mjs",
     "edit:head-boxes": "node tools/game/head_box_editor.mjs",

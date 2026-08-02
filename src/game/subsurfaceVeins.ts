@@ -1,5 +1,6 @@
 import { generateMap, makeRng } from './map';
 import { CONFIG } from './config';
+import { MAP_SIZE_DIMENSIONS } from './newGameOptions';
 import type { GameState } from './types';
 
 export interface SubsurfaceVein {
@@ -98,16 +99,10 @@ function startingSettlementAquiferCenter(
   width: number,
   height: number,
 ): { x: number; y: number } {
-  if (width === CONFIG.map.width && height === CONFIG.map.height) {
-    const generated = generateMap(seed);
-    return {
-      x: Math.min(width - 1, generated.centerX + 1),
-      y: Math.min(height - 1, generated.centerY + 1),
-    };
-  }
+  const generated = generateMap(seed, { width, height });
   return {
-    x: Math.max(0, Math.floor(width / 2)),
-    y: Math.max(0, Math.floor(height / 2)),
+    x: Math.min(width - 1, generated.centerX + 1),
+    y: Math.min(height - 1, generated.centerY + 1),
   };
 }
 
@@ -141,7 +136,8 @@ export function aquiferVeins(seed: number, width: number, height: number): reado
   const cached = aquiferCache.get(key);
   if (cached) return cached;
   const rng = makeRng((seed ^ 0x4a71f39d) >>> 0);
-  const areaScale = Math.max(0.55, Math.sqrt(Math.max(1, width * height) / (72 * 72)));
+  const mediumArea = MAP_SIZE_DIMENSIONS.medium.width * MAP_SIZE_DIMENSIONS.medium.height;
+  const areaScale = Math.max(0.55, Math.sqrt(Math.max(1, width * height) / mediumArea));
   const baseCount = Math.max(2, Math.round((4 + Math.floor(rng() * 3)) * areaScale));
   const veins: SubsurfaceVein[] = [];
   // v45까지 사용한 기본 수맥의 난수 소비와 위치를 그대로 보존한다.
@@ -186,7 +182,8 @@ export function oreVeins(seed: number, width: number, height: number): readonly 
   const cached = oreCache.get(key);
   if (cached) return cached;
   const rng = makeRng((seed ^ 0x6d2b79f5) >>> 0);
-  const areaScale = Math.max(0.55, Math.sqrt(Math.max(1, width * height) / (72 * 72)));
+  const mediumArea = MAP_SIZE_DIMENSIONS.medium.width * MAP_SIZE_DIMENSIONS.medium.height;
+  const areaScale = Math.max(0.55, Math.sqrt(Math.max(1, width * height) / mediumArea));
   const perMineral = Math.max(1, Math.round((2 + Math.floor(rng() * 2)) * areaScale));
   const minerals = [
     ...Array.from({ length: perMineral }, () => 'iron' as const),

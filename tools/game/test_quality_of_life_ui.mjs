@@ -47,6 +47,7 @@ for (const name of ['jobs', 'processing', 'residents', 'special-residents', 'fac
 
 const appSource = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
 const mainMenuSource = readFileSync(new URL('../../src/components/MainMenu.tsx', import.meta.url), 'utf8');
+const newGameSetupSource = readFileSync(new URL('../../src/components/NewGameSetup.tsx', import.meta.url), 'utf8');
 const readmeSource = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
 const topBarSource = readFileSync(new URL('../../src/components/TopBar.tsx', import.meta.url), 'utf8');
 const gameMenuSource = readFileSync(new URL('../../src/components/GameMenu.tsx', import.meta.url), 'utf8');
@@ -62,7 +63,7 @@ assert.doesNotMatch(mainMenuSource, /다섯 해의 겨울/,
   'the title screen must not present the obsolete five-winter goal as the whole game');
 assert.match(mainMenuSource, /부\(府\)로 성장/,
   'the title screen must describe the current promotion objective');
-assert.match(readmeSource, /72×72 절차 생성 지도/);
+assert.match(readmeSource, /소형 56×56 · 중형 72×72 · 대형 96×96 절차 생성 지도/);
 assert.match(readmeSource, /`Space` \| 일시정지/);
 assert.match(readmeSource, /효과음\(SE\)과 배경 음악\(BGM\)/);
 assert.doesNotMatch(topBarSource, /onClick=\{onSave\}|onClick=\{onLoad\}|onClick=\{onNewGame\}/,
@@ -96,6 +97,14 @@ assert.match(atlasSource, /specialResidentSheet[\s\S]*bob, 1\.16/,
     'continue remains a conditional auxiliary action');
   assert.match(launch, /kind:\s*'new';\s*options:\s*NewGameOptions/);
   assert.match(session, /newGameFromOptions\(launch\.options\)/);
+  for (const size of ['small', 'medium', 'large']) {
+    assert.match(newGameSetupSource, new RegExp(`id: '${size}'`), `new game setup offers the ${size} map size`);
+  }
+  const sizeCardsSource = newGameSetupSource.split('SIZES.map(size =>')[1]?.split('</button>)}')[0] ?? '';
+  assert.doesNotMatch(sizeCardsSource, /disabled=/,
+    'all map size cards must remain selectable');
+  assert.match(newGameSetupSource, /onClick=\{\(\) => setOptions\(current => \(\{ \.\.\.current, mapSize: size\.id \}\)\)\}/,
+    'map size cards persist their selected option');
 }
 
 console.log('quality-of-life UI tests passed');

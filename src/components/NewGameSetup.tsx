@@ -21,10 +21,10 @@ const REGIONS: Array<{ id: MapRegion; name: string; detail: string; enabled?: bo
   { id: 'lake', name: '호수', detail: 'S4에서 준비됩니다.' },
   { id: 'coast', name: '해안', detail: 'S5에서 준비됩니다.' },
 ];
-const SIZES: Array<{ id: MapSize; name: string; detail: string; enabled?: boolean }> = [
-  { id: 'small', name: '소형', detail: '지도 크기 구현 후 준비됩니다.' },
-  { id: 'medium', name: '중형', detail: '현재 표준 지도 크기입니다.', enabled: true },
-  { id: 'large', name: '대형', detail: '지도 크기 구현 후 준비됩니다.' },
+const SIZES: Array<{ id: MapSize; name: string; detail: string }> = [
+  { id: 'small', name: '소형', detail: '56×56 · 짧고 밀도 높은 개척지입니다.' },
+  { id: 'medium', name: '중형', detail: '72×72 · 현재 표준 지도 크기입니다.' },
+  { id: 'large', name: '대형', detail: '96×96 · 넓은 변경을 장기적으로 개척합니다.' },
 ];
 
 function rollCandidateName(): string {
@@ -113,9 +113,8 @@ export function NewGameSetup({ onStart, onBack }: Props) {
         </div></section>
         <section className="new-game-setup-section"><h2>지도 크기</h2><div className="setup-card-row">
           {SIZES.map(size => <button key={size.id} className={`setup-card${options.mapSize === size.id ? ' selected' : ''}`}
-            disabled={!size.enabled} title={size.enabled ? undefined : `${size.detail} 준비 중`}
             onClick={() => setOptions(current => ({ ...current, mapSize: size.id }))}>
-            <strong>{size.name}</strong><span>{size.enabled ? size.detail : `준비 중 · ${size.detail}`}</span>
+            <strong>{size.name}</strong><span>{size.detail}</span>
           </button>)}
         </div></section>
 

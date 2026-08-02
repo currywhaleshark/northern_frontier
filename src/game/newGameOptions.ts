@@ -30,8 +30,21 @@ export const SETUP_LEVEL_NAMES: Record<SetupLevel, string> = {
 };
 
 const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
+const MAP_SIZES: readonly MapSize[] = ['small', 'medium', 'large'];
 const SETUP_LEVELS: readonly SetupLevel[] = ['low', 'normal', 'high'];
 export const MAX_NEW_GAME_SEED = 0x7fffffff;
+
+export interface MapDimensions {
+  width: number;
+  height: number;
+}
+
+export const MAP_SIZE_DIMENSIONS: Record<MapSize, Readonly<MapDimensions>> = {
+  small: { width: 56, height: 56 },
+  // 현행 CONFIG 지도는 중형 호환 기준선이다.
+  medium: { width: CONFIG.map.width, height: CONFIG.map.height },
+  large: { width: 96, height: 96 },
+};
 
 const PRESET_TUNING: Record<Difficulty, NewGameTuning> = {
   easy: {
@@ -54,6 +67,21 @@ const HABITAT_CHANCE: Record<SetupLevel, number> = { low: 0.45, normal: 0.65, hi
 
 function isDifficulty(value: unknown): value is Difficulty {
   return typeof value === 'string' && DIFFICULTIES.includes(value as Difficulty);
+}
+
+function isMapSize(value: unknown): value is MapSize {
+  return typeof value === 'string' && MAP_SIZES.includes(value as MapSize);
+}
+
+export function mapDimensionsForSize(mapSize: MapSize): MapDimensions {
+  return { ...MAP_SIZE_DIMENSIONS[mapSize] };
+}
+
+export function mapSizeForDimensions(width: number, height: number): MapSize | null {
+  return MAP_SIZES.find(mapSize => {
+    const dimensions = MAP_SIZE_DIMENSIONS[mapSize];
+    return dimensions.width === width && dimensions.height === height;
+  }) ?? null;
 }
 
 function setupLevel(value: unknown, fallback: SetupLevel): SetupLevel {
@@ -99,8 +127,8 @@ export function optionsForDifficulty(
 }
 
 /**
- * S0+S1에서는 평원·중형만 실제 구현되어 있으므로 다른 값은 안전한 기본값으로 되돌린다.
- * 후속 S2~S5는 각 선택지를 구현하면서 이 잠금을 순서대로 푼다.
+ * S2에서는 세 지도 크기를 모두 보존하고, 지역만 평원으로 잠근다.
+ * 후속 S3~S5는 각 지역을 구현하면서 지역 잠금을 순서대로 푼다.
  */
 export function normalizeNewGameOptions(raw: Partial<NewGameOptions> | null | undefined): NewGameOptions {
   const defaults = defaultNewGameOptions();
@@ -122,7 +150,7 @@ export function normalizeNewGameOptions(raw: Partial<NewGameOptions> | null | un
     difficultyPreset,
     baseDifficulty,
     region: 'plains',
-    mapSize: 'medium',
+    mapSize: isMapSize(raw?.mapSize) ? raw.mapSize : defaults.mapSize,
     tuning,
     seed: normalizeNewGameSeed(raw?.seed),
   };

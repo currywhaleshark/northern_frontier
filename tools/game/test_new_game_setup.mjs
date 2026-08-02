@@ -36,7 +36,7 @@ const saveLoad = await load('saveLoad');
 const tutorialStart = await load('tutorialStart');
 const { CONFIG } = await load('config');
 
-// P0: 기본 입력, 프리셋 실효값, 잠긴 지도 선택지와 정규화 결정론.
+// P0/S2: 기본 입력, 프리셋 실효값, 지역 잠금과 지도 크기 정규화 결정론.
 {
   const defaults = options.defaultNewGameOptions();
   assert.deepEqual(
@@ -68,11 +68,19 @@ const { CONFIG } = await load('config');
   const normalized = options.normalizeNewGameOptions(unsafe);
   assert.equal(normalized.settlementName, '설한');
   assert.equal(normalized.region, 'plains', '아직 잠긴 지역은 평원으로 보정한다');
-  assert.equal(normalized.mapSize, 'medium', '아직 잠긴 크기는 중형으로 보정한다');
+  assert.equal(normalized.mapSize, 'large', 'S2부터 유효한 지도 크기는 보존한다');
   assert.equal(normalized.seed, 123, '시드는 안전한 정수로 정규화한다');
   assert.deepEqual(options.normalizeNewGameOptions(unsafe), normalized,
     '같은 수동 시드와 옵션 정규화는 결정적이다');
-  assert.equal(options.worldSetupLabel(normalized), '평원의 중형 개척지');
+  assert.equal(options.worldSetupLabel(normalized), '평원의 대형 개척지');
+
+  assert.deepEqual(options.mapDimensionsForSize('small'), { width: 56, height: 56 });
+  assert.deepEqual(options.mapDimensionsForSize('medium'), { width: 72, height: 72 });
+  assert.deepEqual(options.mapDimensionsForSize('large'), { width: 96, height: 96 });
+  assert.equal(options.mapSizeForDimensions(56, 56), 'small');
+  assert.equal(options.mapSizeForDimensions(72, 72), 'medium');
+  assert.equal(options.mapSizeForDimensions(96, 96), 'large');
+  assert.equal(options.mapSizeForDimensions(64, 64), null);
 }
 
 // P1: 새 게임은 옵션만 받아 worldSetup을 남기며, 이름 정규화는 시뮬레이션 RNG를 바꾸지 않는다.

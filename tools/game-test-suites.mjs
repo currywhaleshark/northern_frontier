@@ -37,6 +37,7 @@ const CORE_TESTS = testFiles(
   'lumber_camp_worksite',
   'manual_orders',
   'map_forest_regrowth',
+  'map_size_s2',
   'mine_collapse',
   'mine_worksite',
   'night_auto_speed',

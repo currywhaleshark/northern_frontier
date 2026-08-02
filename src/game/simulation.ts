@@ -70,7 +70,7 @@ import { haulerCarryCapacity, returnResidentCart, setResidentCartEquipped } from
 import { reconcileMountAssignments, reconcileWeaponAssignments, setAutomaticWeaponAllocation } from './weapons';
 import { CURRENT_SCHEMA_VERSION } from './saveSchema';
 import {
-  normalizeNewGameOptions, optionsForDifficulty, worldSetupLabel, worldSetupSnapshot,
+  mapDimensionsForSize, normalizeNewGameOptions, optionsForDifficulty, worldSetupLabel, worldSetupSnapshot,
 } from './newGameOptions';
 import { bumpDefenseTopology, effectiveWallType, initializeWallIntegrity } from './raidRoutes';
 import { expeditionTick } from './expedition';
@@ -147,7 +147,7 @@ export function newGameFromOptions(
   const worldSetup = worldSetupSnapshot(options, seedSource);
   const difficulty = options.baseDifficulty;
   const rng = makeRng(s);
-  const { tiles, centerX, centerY } = generateMap(s);
+  const { tiles, centerX, centerY } = generateMap(s, mapDimensionsForSize(options.mapSize));
   // 메뉴는 항상 입력값을 넘긴다. 이름 없는 호출(테스트·디버그)만 시드 자동 이름을 쓴다.
   const resolvedName = normalizeSettlementNameInput(options.settlementName) || generateSettlementName(s);
 
