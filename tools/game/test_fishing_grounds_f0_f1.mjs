@@ -120,4 +120,31 @@ const coast = simulation.newGameFromOptions({ region: 'coast', seed: 20260891 })
 assert.ok(coast.fishingGrounds.some(ground => ground.kind === 'mudflat'));
 assert.ok(coast.fishingGrounds.some(ground => ground.kind === 'sea' && ground.depthBand !== 'shore'));
 
+// 기본 자원 밀도는 모든 후보를 표시하던 초기 구현의 약 1/3만 남긴다.
+{
+  const map = plainMap(40, 40);
+  for (let y = 1; y < 40; y++) for (let x = 0; x < 40; x++) map[y][x].terrain = 'sea';
+  const all = groundsApi.spawnFishingGrounds(structuredClone(map), 3);
+  const normal = groundsApi.spawnFishingGrounds(structuredClone(map), 1);
+  assert.ok(normal.length / all.length >= 0.2 && normal.length / all.length <= 0.45,
+    `기본 어장 수 ${normal.length}/${all.length}는 전체 후보의 약 1/3이다`);
+  const omittedShore = all.find(candidate => candidate.depthBand === 'shore'
+    && !normal.some(ground => ground.tiles.some(tile => tile.x === candidate.x && tile.y === candidate.y)));
+  assert.ok(omittedShore, '기본 밀도 표본에서 빠진 연안 어장이 있다');
+  const loaded = {
+    map: structuredClone(map),
+    fishingGrounds: structuredClone(normal),
+    buildings: [{ type: 'ferry', x: omittedShore.x, y: omittedShore.y, built: true }],
+    worldSetup: { effective: { resourceDensityMultiplier: 1 } },
+  };
+  groundsApi.ensureFishingGrounds(loaded);
+  assert.ok(groundsApi.fishingGroundAt(loaded.fishingGrounds, omittedShore.x, omittedShore.y, 'shore'),
+    '구 저장에서 이미 지어진 낚시터를 받치는 어장은 밀도 표본에서 빠져도 보존한다');
+  const marker = normal[0];
+  assert.equal(groundsApi.findFishingGroundIconAtTile(normal, marker.x, marker.y)?.id, marker.id,
+    '어장 중심 타일에서 지도 표식을 찾는다');
+  assert.equal(groundsApi.findFishingGroundIconAtTile(normal, marker.x + 1, marker.y)?.id === marker.id, false,
+    '어장 표식은 중심 타일 하나에만 뜬다');
+}
+
 console.log('fishing grounds F0/F1 tests passed');

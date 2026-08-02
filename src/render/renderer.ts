@@ -18,6 +18,7 @@ import { isLakeIceAt } from '../game/lakeIce';
 import { DAY_BANDS, DAY_CYCLE_SUBTICKS } from '../game/dayCycle';
 import { LEISURE_CLUSTER_CAPACITY } from '../game/agents';
 import { findHabitatIconAtTile } from '../game/habitats';
+import { findFishingGroundIconAtTile, fishingGroundAt } from '../game/fishingGrounds';
 import { isBuildingFootprintExplored, isExplored } from '../game/exploration';
 import {
   builtWallTileSet, GATE_CONVERSION_COSTS, isSolidWallBuilding, isWallBuilding,
@@ -88,7 +89,7 @@ import {
   mineralVisualTier,
   tileMineralResource,
 } from '../game/minerals';
-import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, ForeignSite, GameState, PastureArea, Resident, Season, Terrain, Tile } from '../game/types';
+import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, FishingGroundState, ForeignSite, GameState, PastureArea, Resident, Season, Terrain, Tile } from '../game/types';
 import { historicalTerrainColumn } from './historicalTerrain';
 import { coastalGroundAt } from '../game/tidalFlats';
 import { pixelRectIntersectsViewport, tileRectIntersectsViewport, type SceneViewport } from './sceneViewport';
@@ -1168,6 +1169,38 @@ function drawGatheringWorkRange(
   ctx.restore();
 }
 
+function fishingGroundRgb(ground: FishingGroundState): string {
+  if (ground.kind === 'mudflat') return '72,186,157';
+  if (ground.depthBand === 'shore') return '66,200,188';
+  if (ground.depthBand === 'mid') return '73,157,221';
+  return '103,121,219';
+}
+
+function drawFishingGroundRange(ctx: CanvasRenderingContext2D, ground: FishingGroundState): void {
+  const rgb = fishingGroundRgb(ground);
+  const stockRatio = ground.capacity > 0 ? Math.max(0, Math.min(1, ground.stock / ground.capacity)) : 0;
+  const tileKeys = new Set(ground.tiles.map(tile => `${tile.x},${tile.y}`));
+  ctx.save();
+  ctx.fillStyle = `rgba(${rgb},${(0.08 + stockRatio * 0.08).toFixed(3)})`;
+  ctx.strokeStyle = `rgba(${rgb},${(0.58 + stockRatio * 0.34).toFixed(3)})`;
+  ctx.lineWidth = 2;
+  ctx.setLineDash(ground.depthBand === 'shore' ? [5, 4] : ground.depthBand === 'mid' ? [8, 5] : [11, 5]);
+  for (const tile of ground.tiles) {
+    ctx.fillRect(tile.x * TILE + 1, tile.y * TILE + 1, TILE - 2, TILE - 2);
+  }
+  ctx.beginPath();
+  for (const tile of ground.tiles) {
+    const left = tile.x * TILE;
+    const top = tile.y * TILE;
+    if (!tileKeys.has(`${tile.x},${tile.y - 1}`)) { ctx.moveTo(left, top); ctx.lineTo(left + TILE, top); }
+    if (!tileKeys.has(`${tile.x + 1},${tile.y}`)) { ctx.moveTo(left + TILE, top); ctx.lineTo(left + TILE, top + TILE); }
+    if (!tileKeys.has(`${tile.x},${tile.y + 1}`)) { ctx.moveTo(left + TILE, top + TILE); ctx.lineTo(left, top + TILE); }
+    if (!tileKeys.has(`${tile.x - 1},${tile.y}`)) { ctx.moveTo(left, top + TILE); ctx.lineTo(left, top); }
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawLodgingWorksiteRange(ctx: CanvasRenderingContext2D, worksite: Building): void {
   if (worksite.type === 'mine') {
     drawMineWorkRange(ctx, worksite.x, worksite.y);
@@ -1767,6 +1800,53 @@ function drawStillWaterShoreRipples(
   ctx.restore();
 }
 
+function drawFishingGroundIcon(ctx: CanvasRenderingContext2D, ground: FishingGroundState): void {
+  const cx = (ground.x + 0.5) * TILE;
+  const cy = (ground.y + 0.5) * TILE;
+  const radius = TILE * 0.35;
+  const rgb = fishingGroundRgb(ground);
+  const stockRatio = ground.capacity > 0 ? Math.max(0, Math.min(1, ground.stock / ground.capacity)) : 0;
+  const scale = TILE / 32;
+  ctx.save();
+  ctx.globalAlpha = 0.58 + stockRatio * 0.42;
+  ctx.fillStyle = 'rgba(13,35,48,0.82)';
+  ctx.strokeStyle = stockRatio > 0.08 ? `rgba(${rgb},0.98)` : 'rgba(151,155,157,0.9)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = stockRatio > 0.08 ? `rgb(${rgb})` : 'rgb(151,155,157)';
+  ctx.beginPath();
+  ctx.ellipse(cx - 1 * scale, cy - 1 * scale, 7 * scale, 4 * scale, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx + 5 * scale, cy - 1 * scale);
+  ctx.lineTo(cx + 11 * scale, cy - 6 * scale);
+  ctx.lineTo(cx + 10 * scale, cy + 4 * scale);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = 'rgba(9,25,34,0.95)';
+  ctx.beginPath();
+  ctx.arc(cx - 4 * scale, cy - 2 * scale, 1.1 * scale, 0, Math.PI * 2);
+  ctx.fill();
+
+  const depthMarks = ground.depthBand === 'shore' ? 1 : ground.depthBand === 'mid' ? 2 : 3;
+  ctx.strokeStyle = `rgba(${rgb},0.95)`;
+  ctx.lineWidth = Math.max(1, 1.25 * scale);
+  ctx.setLineDash([]);
+  for (let index = 0; index < depthMarks; index++) {
+    const markY = cy + (6 + index * 2.5) * scale;
+    ctx.beginPath();
+    ctx.moveTo(cx - 7 * scale, markY);
+    ctx.quadraticCurveTo(cx - 3.5 * scale, markY - 2 * scale, cx, markY);
+    ctx.quadraticCurveTo(cx + 3.5 * scale, markY + 2 * scale, cx + 7 * scale, markY);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 // 숲 새 떼 — 주민이 숲 칸에 들어서면 이따금 작은 새 몇 마리가 날아오른다.
 // 순수 연출이라 게임 상태에 남기지 않고 렌더러 안에서만 산다.
 interface BirdFlight {
@@ -2353,6 +2433,10 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   // 짐승이 떠난(비활성) 서식지는 지도에서도 숨긴다
   const habitats = state.habitats.filter(h => h.active && isExplored(state, h.x, h.y));
   const hoveredHabitat = o.hover ? findHabitatIconAtTile(habitats, o.hover.x, o.hover.y) : null;
+  const fishingGrounds = state.fishingGrounds.filter(ground => isExplored(state, ground.x, ground.y));
+  const hoveredFishingGround = o.hover
+    ? findFishingGroundIconAtTile(fishingGrounds, o.hover.x, o.hover.y)
+    : null;
   ctx.clearRect(viewport.pixelX, viewport.pixelY, viewport.pixelWidth, viewport.pixelHeight);
   if (subsurfaceLayerActive) {
     ctx.fillStyle = '#dce5e3';
@@ -2813,7 +2897,11 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   }
 
   drawOccludedEntityGhosts(ctx, state, sprites, occludedBuildingDraws, occludedResidentDraws);
-  // 사냥터 범위와 표식은 수관보다 위에 그려 항상 식별 가능하게 한다.
+  // 사냥터·어장 범위와 표식은 수관·수면 효과보다 위에 그려 항상 식별 가능하게 한다.
+  if (hoveredFishingGround) drawFishingGroundRange(ctx, hoveredFishingGround);
+  for (const ground of fishingGrounds) {
+    if (tileRectIntersectsViewport(viewport, ground.x, ground.y)) drawFishingGroundIcon(ctx, ground);
+  }
   if (hoveredHabitat) drawHabitatRange(ctx, hoveredHabitat);
   for (const habitat of habitats) {
     if (tileRectIntersectsViewport(viewport, habitat.x, habitat.y)) {
@@ -2885,6 +2973,19 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   const selectedBuilding = o.selectedBuildingId == null
     ? undefined
     : state.buildings.find(building => building.id === o.selectedBuildingId);
+  if (selectedBuilding?.type === 'ferry') {
+    const ground = fishingGroundAt(state.fishingGrounds, selectedBuilding.x, selectedBuilding.y, 'shore');
+    if (ground) drawFishingGroundRange(ctx, ground);
+  } else if (selectedBuilding?.type === 'tidalFishery') {
+    const area = gatheringWorkArea(selectedBuilding);
+    for (const ground of state.fishingGrounds) {
+      if (ground.kind !== 'mudflat' || ground.depthBand !== 'shore') continue;
+      if (ground.tiles.some(tile =>
+        (tile.x - area.x) ** 2 + (tile.y - area.y) ** 2 <= area.radius ** 2)) {
+        drawFishingGroundRange(ctx, ground);
+      }
+    }
+  }
   if (selectedBuilding?.type === 'lodgingHut') {
     const worksite = linkedLodgingWorksite(state, selectedBuilding);
     if (worksite) {
@@ -2920,6 +3021,12 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     // 사냥막 배치 중엔 모든 서식지 범위를 보여줘 자리를 잡기 쉽게 한다
     if (o.placingType === 'huntLodge') {
       for (const habitat of habitats) drawHabitatRange(ctx, habitat);
+    }
+    if (o.placingType === 'ferry' || o.placingType === 'tidalFishery') {
+      const kind = o.placingType === 'ferry' ? 'river' : 'mudflat';
+      for (const ground of fishingGrounds) {
+        if (ground.kind === kind && ground.depthBand === 'shore') drawFishingGroundRange(ctx, ground);
+      }
     }
     if (o.placingType === 'mine' && o.hover) drawMineWorkRange(ctx, o.hover.x, o.hover.y);
     if (o.hover && isGatheringBuildingType(o.placingType)) {

@@ -6,7 +6,8 @@ import { hasKnownMineralDepositNear } from './miningSites';
 import { aquiferSampleAt, oreSampleAt } from './subsurfaceVeins';
 import { hasAdjacentFlowingCanal } from './irrigation';
 import { isNaturalWaterTerrain } from './terrain';
-import { coastalGroundAt, seaDistanceAt, tidalFlatTileCountNear } from './tidalFlats';
+import { coastalGroundAt, seaDistanceAt } from './tidalFlats';
+import { fishingGroundAt, fishingGroundSummaryInArea } from './fishingGrounds';
 import { GATE_CONVERSION_COSTS } from './walls';
 import type { Building, BuildingDef, BuildingTypeId, GameState, MapRegion, Rank, ResourceId, SmithyProductId, Tile } from './types';
 
@@ -516,9 +517,10 @@ export function canPlaceBuildingAt(
   const def = BUILDING_DEFS[type];
   if (!tiles.every(tile => canPlaceOn(def, tile, state))) return false;
   if (type === 'saltworks' && !saltworksFootprintHasSeaAccess(state, x, y, 2, 2)) return false;
-  if (type === 'tidalFishery' && tidalFlatTileCountNear(
-    state.map, x, y, CONFIG.gatheringZones.tidalFisheryRadius,
-  ) < CONFIG.tidalFlats.minimumPlacementTiles) return false;
+  if (type === 'ferry' && !fishingGroundAt(state.fishingGrounds ?? [], x, y, 'shore')) return false;
+  if (type === 'tidalFishery' && fishingGroundSummaryInArea(
+    state.fishingGrounds ?? [], { x, y, radius: CONFIG.gatheringZones.tidalFisheryRadius }, 'mudflat',
+  ).grounds === 0) return false;
   if (type === 'paddy' && !isPaddyFootprintEligible(state, tiles)) return false;
   if (type === 'mine') return hasKnownMineralDepositNear(state, x, y);
   if (type === 'well') {
@@ -587,9 +589,10 @@ export function canRelocateBuildingAt(
   }
   if (!usableTiles.every(tile => canPlaceOn(def, tile, state))) return false;
   if (building.type === 'saltworks' && !saltworksFootprintHasSeaAccess(state, x, y, 2, 2)) return false;
-  if (building.type === 'tidalFishery' && tidalFlatTileCountNear(
-    state.map, x, y, CONFIG.gatheringZones.tidalFisheryRadius,
-  ) < CONFIG.tidalFlats.minimumPlacementTiles) return false;
+  if (building.type === 'ferry' && !fishingGroundAt(state.fishingGrounds ?? [], x, y, 'shore')) return false;
+  if (building.type === 'tidalFishery' && fishingGroundSummaryInArea(
+    state.fishingGrounds ?? [], { x, y, radius: CONFIG.gatheringZones.tidalFisheryRadius }, 'mudflat',
+  ).grounds === 0) return false;
   if (building.type === 'paddy' && !isPaddyFootprintEligible(state, usableTiles)) return false;
   if (building.type === 'mine') return hasKnownMineralDepositNear(state, x, y);
   if (building.type === 'well') {

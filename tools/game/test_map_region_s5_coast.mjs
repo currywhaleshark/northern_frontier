@@ -321,6 +321,7 @@ function prepareSaltProduction(workerCount) {
       tidalStock: CONFIG.tidalFlats.capacityPerTile,
     });
   }
+  fishingGrounds.ensureFishingGrounds(coast);
   assert.equal(buildings.canPlaceBuildingAt(coast, 'tidalFishery', 10, 10), true);
   assert.equal(buildings.canPlaceBuildingAt(coast, 'hut', 10, 10), false, '일반 건물은 갯벌을 메우지 않는다');
   assert.equal(constants.isJobUnlocked('settlement', 'fisher', 'coast'), true);

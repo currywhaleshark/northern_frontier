@@ -160,18 +160,82 @@ function clearLegacyTidalReserves(map: Tile[][]): void {
   }
 }
 
-export function spawnFishingGrounds(map: Tile[][]): FishingGroundState[] {
-  const grounds = baseFishingGrounds(map);
+function groundDensityRoll(id: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < id.length; index++) {
+    hash = Math.imul(hash ^ id.charCodeAt(index), 0x01000193);
+  }
+  return (hash >>> 0) / 0x100000000;
+}
+
+function sampledFishingGrounds(
+  grounds: FishingGroundState[],
+  densityMultiplier = 1,
+): FishingGroundState[] {
+  // 기본 설정에서는 전체 후보의 약 1/3만 실제 어장으로 연다. 맞춤 자원 밀도는 이 기준을 조절한다.
+  const chance = Math.max(0.18, Math.min(1, densityMultiplier / 3));
+  const selected = grounds.filter(ground => groundDensityRoll(ground.id) < chance);
+  for (const kind of ['river', 'mudflat', 'lake', 'sea'] as const) {
+    for (const depthBand of ['shore', 'mid', 'deep'] as const) {
+      const candidates = grounds.filter(ground => ground.kind === kind && ground.depthBand === depthBand);
+      if (candidates.length === 0 || selected.some(ground => ground.kind === kind && ground.depthBand === depthBand)) continue;
+      selected.push([...candidates].sort((left, right) =>
+        groundDensityRoll(left.id) - groundDensityRoll(right.id) || left.y - right.y || left.x - right.x)[0]);
+    }
+  }
+  return selected.sort((left, right) => left.y - right.y || left.x - right.x || left.id.localeCompare(right.id));
+}
+
+export function spawnFishingGrounds(map: Tile[][], densityMultiplier = 1): FishingGroundState[] {
+  const grounds = sampledFishingGrounds(baseFishingGrounds(map), densityMultiplier);
   clearLegacyTidalReserves(map);
   return grounds;
 }
 
-export function ensureFishingGrounds(state: Pick<GameState, 'map' | 'fishingGrounds'>): void {
+type FishingGroundStateOwner = Pick<GameState, 'map' | 'fishingGrounds'> &
+  Partial<Pick<GameState, 'buildings' | 'worldSetup'>>;
+
+function preserveBuiltFacilityGrounds(
+  selected: FishingGroundState[],
+  allGrounds: FishingGroundState[],
+  state: FishingGroundStateOwner,
+): FishingGroundState[] {
+  if (!Array.isArray(state.buildings)) return selected;
+  const byId = new Map(selected.map(ground => [ground.id, ground]));
+  const add = (ground: FishingGroundState | null | undefined): void => {
+    if (ground && !byId.has(ground.id)) byId.set(ground.id, ground);
+  };
+  for (const building of state.buildings) {
+    if (!building.built) continue;
+    if (building.type === 'ferry') {
+      add(fishingGroundAt(allGrounds, building.x, building.y, 'shore'));
+      continue;
+    }
+    if (building.type !== 'tidalFishery') continue;
+    const area = building.gatheringWorkArea ?? {
+      x: building.x,
+      y: building.y,
+      radius: CONFIG.gatheringZones.tidalFisheryRadius,
+    };
+    const alreadyServed = [...byId.values()].some(ground => ground.kind === 'mudflat' && ground.tiles.some(tile =>
+      (tile.x - area.x) ** 2 + (tile.y - area.y) ** 2 <= area.radius ** 2));
+    if (alreadyServed) continue;
+    add(allGrounds.find(ground => ground.kind === 'mudflat' && ground.tiles.some(tile =>
+      (tile.x - area.x) ** 2 + (tile.y - area.y) ** 2 <= area.radius ** 2)));
+  }
+  return [...byId.values()].sort((left, right) => left.y - right.y || left.x - right.x || left.id.localeCompare(right.id));
+}
+
+export function ensureFishingGrounds(state: FishingGroundStateOwner): void {
   const existing = Array.isArray(state.fishingGrounds) ? state.fishingGrounds : [];
   const existingById = new Map(existing
     .filter(ground => ground && typeof ground.id === 'string')
     .map(ground => [ground.id, ground]));
-  const grounds = baseFishingGrounds(state.map);
+  const allGrounds = baseFishingGrounds(state.map);
+  const densityMultiplier = state.worldSetup?.effective.resourceDensityMultiplier ?? 1;
+  const grounds = preserveBuiltFacilityGrounds(
+    sampledFishingGrounds(allGrounds, densityMultiplier), allGrounds, state,
+  );
   for (const ground of grounds) {
     const previous = existingById.get(ground.id);
     if (!previous) continue;
@@ -207,6 +271,14 @@ export function fishingGroundAt(
     if (ground.tiles.some(tile => tile.x === x && tile.y === y)) return ground;
   }
   return null;
+}
+
+export function findFishingGroundIconAtTile(
+  grounds: readonly FishingGroundState[],
+  x: number,
+  y: number,
+): FishingGroundState | null {
+  return grounds.find(ground => ground.x === x && ground.y === y) ?? null;
 }
 
 export function fishingGroundStockAt(
