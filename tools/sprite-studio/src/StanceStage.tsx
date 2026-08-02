@@ -44,6 +44,13 @@ const TREE_STAGES: readonly Exclude<TreeStage, 'stump'>[] = ['young', 'mature'];
 const TREE_STAGE_LABEL: Record<string, string> = { young: '어린나무', mature: '성목' };
 const SPECIES: readonly TreeSpecies[] = ['broadleaf', 'conifer'];
 const SPECIES_LABEL: Record<TreeSpecies, string> = { broadleaf: '활엽수', conifer: '침엽수' };
+type TargetDirection = 'right' | 'left' | 'down' | 'up';
+const TARGET_DIRECTIONS: Readonly<Record<TargetDirection, { dx: number; dy: number; label: string }>> = {
+  right: { dx: 1, dy: 0, label: '오른쪽' },
+  left: { dx: -1, dy: 0, label: '왼쪽' },
+  down: { dx: 0, dy: 1, label: '아래' },
+  up: { dx: 0, dy: -1, label: '위' },
+};
 
 interface SceneOptions {
   season: Season;
@@ -64,6 +71,13 @@ interface Actor {
 function parseContext(key: string): { job: JobId; terrain: Terrain } {
   const [job, terrain] = key.split('@');
   return { job: job as JobId, terrain: terrain as Terrain };
+}
+
+function targetTileFor(contextKey: string, direction: TargetDirection): { x: number; y: number } {
+  const { job } = parseContext(contextKey);
+  if (job !== 'miner') return { x: CENTER_TILE, y: CENTER_TILE };
+  const { dx, dy } = TARGET_DIRECTIONS[direction];
+  return { x: CENTER_TILE + dx, y: CENTER_TILE + dy };
 }
 
 function tileParams(
@@ -112,13 +126,16 @@ function buildActors(
   count: number,
   anchors: Record<string, WorkAnchorEdit>,
   jitter: boolean,
+  targetDirection: TargetDirection,
 ): Actor[] {
   const { job, terrain } = parseContext(contextKey);
+  const targetTile = targetTileFor(contextKey, targetDirection);
   const residents = Array.from({ length: count }, (_unused, index) => ({
     id: index + 1,
     alive: true,
     phase: 'working' as const,
     job,
+    assignedBuildingId: null,
     x: CENTER_TILE,
     y: CENTER_TILE,
     px: CENTER_TILE,
@@ -128,8 +145,9 @@ function buildActors(
     residents,
     TILE,
     undefined,
-    () => terrain,
+    () => job === 'miner' ? 'plain' : terrain,
     key => anchors[key] ?? null,
+    () => ({ x: targetTile.x, y: targetTile.y, terrain }),
   );
   return residents.map(resident => {
     const stance = stances.get(resident.id);
@@ -151,14 +169,17 @@ function drawScene(
   anchor: WorkAnchorEdit,
   options: SceneOptions,
   animationTimeMs: number,
+  targetDirection: TargetDirection,
 ): void {
   const sprites = getActiveSprites();
   const { job, terrain } = parseContext(contextKey);
+  const targetTile = targetTileFor(contextKey, targetDirection);
 
   for (let ty = 0; ty < SPAN; ty++) {
     for (let tx = 0; tx < SPAN; tx++) {
-      const target = tx === CENTER_TILE && ty === CENTER_TILE;
-      sprites.drawTerrain(ctx, tileParams(tx, ty, terrain, options, target));
+      const target = tx === targetTile.x && ty === targetTile.y;
+      const tileTerrain = job === 'miner' && !target ? 'plain' : terrain;
+      sprites.drawTerrain(ctx, tileParams(tx, ty, tileTerrain, options, target));
     }
   }
 
@@ -186,10 +207,10 @@ function drawScene(
     residentDraws.push(params);
     queue.push({ sortY: actor.y, sortX: actor.x, serial: queue.length, draw: () => sprites.drawResident(ctx, params) });
   }
-  const targetParams = tileParams(CENTER_TILE, CENTER_TILE, terrain, options, true);
+  const targetParams = tileParams(targetTile.x, targetTile.y, terrain, options, true);
   queue.push({
-    sortY: (CENTER_TILE + 1) * TILE,
-    sortX: (CENTER_TILE + 0.5) * TILE,
+    sortY: (targetTile.y + 1) * TILE,
+    sortX: (targetTile.x + 0.5) * TILE,
     serial: queue.length,
     draw: () => {
       if (terrain === 'rock') sprites.drawTerrainProp?.(ctx, targetParams);
@@ -216,7 +237,7 @@ function drawScene(
   // 안내선은 맨 위에 — 대상물에 가려지면 기준으로 쓸 수 없다.
   ctx.strokeStyle = 'rgba(217,164,65,0.55)';
   ctx.lineWidth = 0.5;
-  ctx.strokeRect(CENTER_TILE * TILE + 0.25, CENTER_TILE * TILE + 0.25, TILE - 0.5, TILE - 0.5);
+  ctx.strokeRect(targetTile.x * TILE + 0.25, targetTile.y * TILE + 0.25, TILE - 0.5, TILE - 0.5);
 
   // 칸 중심 (앵커 0 기준점)
   ctx.strokeStyle = 'rgba(255,255,255,0.3)';
@@ -228,8 +249,10 @@ function drawScene(
   ctx.stroke();
 
   // 도구 접점 — 게임은 읽지 않는다. 도끼날·곡괭이 끝이 대상물에 닿는지 눈으로 맞추는 표시.
-  const tipX = CENTER_PX + (anchor.toolTipX ?? 0);
-  const tipY = CENTER_PX + (anchor.toolTipY ?? 0);
+  const targetCenterX = targetTile.x * TILE + TILE / 2;
+  const targetCenterY = targetTile.y * TILE + TILE / 2;
+  const tipX = targetCenterX + (anchor.toolTipX ?? 0);
+  const tipY = targetCenterY + (anchor.toolTipY ?? 0);
   ctx.strokeStyle = 'rgba(224,108,92,0.95)';
   ctx.lineWidth = 0.75;
   ctx.beginPath();
@@ -257,6 +280,7 @@ export function StanceStage({ anchors, savedAnchors, onChange, animate }: Props)
   const [workers, setWorkers] = useState(1);
   const [zoom, setZoom] = useState<number>(4);
   const [jitter, setJitter] = useState(true);
+  const [targetDirection, setTargetDirection] = useState<TargetDirection>('right');
   const [options, setOptions] = useState<SceneOptions>({
     season: 'summer', mineral: 'iron', tier: 'large', species: 'broadleaf', stage: 'mature',
   });
@@ -272,8 +296,8 @@ export function StanceStage({ anchors, savedAnchors, onChange, animate }: Props)
   const { terrain } = useMemo(() => parseContext(contextKey), [contextKey]);
 
   const actors = useMemo(
-    () => buildActors(contextKey, workers, anchors, jitter),
-    [contextKey, workers, anchors, jitter],
+    () => buildActors(contextKey, workers, anchors, jitter, targetDirection),
+    [contextKey, workers, anchors, jitter, targetDirection],
   );
 
   useEffect(() => {
@@ -288,13 +312,21 @@ export function StanceStage({ anchors, savedAnchors, onChange, animate }: Props)
         ctx.setTransform(zoom, 0, 0, zoom, 0, 0);
         ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, SCENE, SCENE);
-        drawScene(ctx, contextKey, actors, anchor, options, animate ? performance.now() - start : 0);
+        drawScene(
+          ctx,
+          contextKey,
+          actors,
+          anchor,
+          options,
+          animate ? performance.now() - start : 0,
+          targetDirection,
+        );
       }
       raf = requestAnimationFrame(paint);
     };
     paint();
     return () => { stopped = true; cancelAnimationFrame(raf); };
-  }, [contextKey, actors, anchor, options, animate, zoom]);
+  }, [contextKey, actors, anchor, options, animate, zoom, targetDirection]);
 
   const update = useCallback(
     (patch: Partial<WorkAnchorEdit>) => onChange(contextKey, { ...anchor, ...patch }),
@@ -310,13 +342,14 @@ export function StanceStage({ anchors, savedAnchors, onChange, animate }: Props)
 
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
     const [px, py] = logicalAt(event.currentTarget, event.clientX, event.clientY);
-    const tipX = CENTER_PX + (anchor.toolTipX ?? 0);
-    const tipY = CENTER_PX + (anchor.toolTipY ?? 0);
+    const targetTile = targetTileFor(contextKey, targetDirection);
+    const tipX = targetTile.x * TILE + TILE / 2 + (anchor.toolTipX ?? 0);
+    const tipY = targetTile.y * TILE + TILE / 2 + (anchor.toolTipY ?? 0);
     // 십자가 먼저 — 주민 몸통에 겹쳐 있어도 집을 수 있어야 한다.
     const kind: DragKind = Math.hypot(px - tipX, py - tipY) <= 5 ? 'toolTip' : 'resident';
     dragRef.current = { kind, startX: px, startY: py, base: anchor };
     event.currentTarget.setPointerCapture(event.pointerId);
-  }, [anchor, zoom]);
+  }, [anchor, contextKey, targetDirection, zoom]);
 
   const onPointerMove = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
     const drag = dragRef.current;
@@ -412,6 +445,24 @@ export function StanceStage({ anchors, savedAnchors, onChange, animate }: Props)
             ))}
           </div>
         </div>
+
+        {terrain === 'rock' && (
+          <div className="field">
+            <span>인접 광상 위치</span>
+            <div className="seg">
+              {(Object.keys(TARGET_DIRECTIONS) as TargetDirection[]).map(direction => (
+                <button
+                  type="button"
+                  key={direction}
+                  className={`seg-btn${targetDirection === direction ? ' on' : ''}`}
+                  onClick={() => setTargetDirection(direction)}
+                >
+                  {TARGET_DIRECTIONS[direction].label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="field">
           <span>대상물</span>

@@ -17,7 +17,7 @@ const TILE = 28;
 const lookup = table => key => table[key] ?? null;
 const workers = jobs => jobs.map((job, index) => ({
   id: index + 1, alive: true, phase: 'working', job,
-  x: 5, y: 7, px: 5, py: 7,
+  assignedBuildingId: null, x: 5, y: 7, px: 5, py: 7,
 }));
 const rock = () => 'rock';
 
@@ -80,11 +80,26 @@ const rock = () => 'rock';
   assert.equal(new Set([1, 2, 3].map(id => anchored.get(id).offsetX)).size, 3, '세 명이 겹치지 않는다');
 }
 
-// ── 5. 근무 중이 아니거나 이동 중이면 배치 대상이 아니다 ──
+// ── 5. 서 있는 평지와 별도로 인접 광상을 작업 문맥으로 적용하고 그쪽을 바라본다 ──
+{
+  const crew = workers(['miner']);
+  const table = lookup({ 'miner@rock': { offsetX: 3, offsetY: -2, facing: 0 } });
+  const rightTarget = () => ({ x: 6, y: 7, terrain: 'rock' });
+  const leftTarget = () => ({ x: 4, y: 7, terrain: 'rock' });
+  const right = residentWorkStances(crew, TILE, undefined, () => 'plain', table, rightTarget).get(1);
+  const left = residentWorkStances(crew, TILE, undefined, () => 'plain', table, leftTarget).get(1);
+  const plain = residentWorkStances(crew, TILE, undefined, () => 'plain', lookup({})).get(1);
+  assert.equal(right.offsetX, plain.offsetX + 3, '인접 광상 문맥에도 miner@rock 앵커가 적용된다');
+  assert.equal(right.offsetY, plain.offsetY - 2);
+  assert.equal(right.facing, 1, '오른쪽 광상을 바라본다');
+  assert.equal(left.facing, -1, '왼쪽 광상을 바라본다');
+}
+
+// ── 6. 근무 중이 아니거나 이동 중이면 배치 대상이 아니다 ──
 {
   const table = lookup({ 'miner@rock': { offsetX: 99, offsetY: 0, facing: 0 } });
-  const moving = [{ id: 1, alive: true, phase: 'working', job: 'miner', x: 5, y: 7, px: 4, py: 7 }];
-  const resting = [{ id: 2, alive: true, phase: 'rest', job: 'miner', x: 5, y: 7, px: 5, py: 7 }];
+  const moving = [{ id: 1, alive: true, phase: 'working', job: 'miner', assignedBuildingId: null, x: 5, y: 7, px: 4, py: 7 }];
+  const resting = [{ id: 2, alive: true, phase: 'rest', job: 'miner', assignedBuildingId: null, x: 5, y: 7, px: 5, py: 7 }];
   assert.equal(residentWorkStances(moving, TILE, undefined, rock, table).size, 0, '이동 중은 제외');
   assert.equal(residentWorkStances(resting, TILE, undefined, rock, table).size, 0, '근무 중이 아니면 제외');
 }

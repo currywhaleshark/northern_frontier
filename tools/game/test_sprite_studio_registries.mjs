@@ -173,4 +173,14 @@ const slotRegistry = await import(pathToFileURL(join(renderDir, 'buildingWorkerS
   }
 }
 
+// ── 5. 작업 자세 탭은 광부의 네 방향 인접 광상을 실제 분리된 칸으로 미리 본다 ──
+{
+  const stanceStage = readFileSync(join(ROOT, 'tools', 'sprite-studio', 'src', 'StanceStage.tsx'), 'utf8');
+  assert.ok(stanceStage.includes("type TargetDirection = 'right' | 'left' | 'down' | 'up'"),
+    '광상 네 방향 선택 계약이 빠졌다');
+  assert.ok(stanceStage.includes('인접 광상 위치'), '작업 자세 탭에 인접 광상 위치 조절 UI가 없다');
+  assert.ok(stanceStage.includes("job === 'miner' && !target ? 'plain' : terrain"),
+    '광부가 서는 통행 칸과 광상 대상 칸이 시각적으로 분리되지 않았다');
+}
+
 console.log('sprite studio registry tests passed');

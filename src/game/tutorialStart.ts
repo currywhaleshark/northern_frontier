@@ -69,7 +69,7 @@ export function tutorialWaterAccess(state: GameState): TutorialWaterAccess {
       const y = originY + dy;
       const tile = state.map[y]?.[x];
       if (!tile) continue;
-      if (tile.terrain !== 'river' && tile.terrain !== 'mountain' &&
+      if (tile.terrain !== 'river' && tile.terrain !== 'mountain' && tile.terrain !== 'rock' &&
         aquiferSampleAt(
           state.seed, width, state.map.length, x, y, state.worldSetup?.region,
         ) != null) {

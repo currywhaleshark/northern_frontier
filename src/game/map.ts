@@ -59,7 +59,7 @@ function reachableFromCenter(tiles: Tile[][], centerX: number, centerY: number):
     const current = queue[index];
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const next = tiles[current.y + dy]?.[current.x + dx];
-      if (!next || next.terrain === 'river' || next.terrain === 'mountain') continue;
+      if (!next || next.terrain === 'river' || next.terrain === 'mountain' || next.terrain === 'rock') continue;
       const key = next.x + ',' + next.y;
       if (reachable.has(key)) continue;
       reachable.add(key);

@@ -105,7 +105,8 @@ function villageBattleFront(state: GameState, band: RaiderBand): { x: number; y:
       const tile = state.map[y][x];
       const centerDistance = Math.abs(x - center.x) + Math.abs(y - center.y);
       if (centerDistance < 2 || centerDistance > 4) continue;
-      if (tile.buildingId != null || tile.terrain === 'mountain' || tile.terrain === 'river') continue;
+      if (tile.buildingId != null || tile.terrain === 'mountain' ||
+          tile.terrain === 'rock' || tile.terrain === 'river') continue;
       candidates.push({
         x,
         y,

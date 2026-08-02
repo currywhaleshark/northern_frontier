@@ -6,7 +6,10 @@ export interface ResidentWorkStance {
   facing: 1 | -1;
 }
 
-type WorkLayoutResident = Pick<Resident, 'id' | 'alive' | 'phase' | 'job' | 'x' | 'y' | 'px' | 'py'>;
+export type WorkLayoutResident = Pick<
+  Resident,
+  'id' | 'alive' | 'phase' | 'job' | 'assignedBuildingId' | 'x' | 'y' | 'px' | 'py'
+>;
 
 /** 서 있는 지형을 알려 주면 "<직업>@<지형>" 앵커를 찾는다. 없으면 기존 배치 그대로. */
 export type WorkLayoutTerrainLookup = (x: number, y: number) => Terrain | undefined;
@@ -19,6 +22,14 @@ export interface WorkStanceAnchor {
 }
 
 export type WorkAnchorLookup = (key: string) => WorkStanceAnchor | null;
+
+export interface WorkLayoutTarget {
+  x: number;
+  y: number;
+  terrain: Terrain;
+}
+
+export type WorkLayoutTargetLookup = (resident: WorkLayoutResident) => WorkLayoutTarget | null;
 
 /**
  * 같은 작업점의 주민을 좌우로 벌리고 실제 타일 중심을 바라보게 한다.
@@ -34,6 +45,7 @@ export function residentWorkStances(
   excludedResidentIds?: ReadonlySet<number>,
   terrainAt?: WorkLayoutTerrainLookup,
   anchorFor?: WorkAnchorLookup,
+  targetFor?: WorkLayoutTargetLookup,
 ): Map<number, ResidentWorkStance> {
   const groups = new Map<string, WorkLayoutResident[]>();
   for (const resident of residents) {
@@ -47,10 +59,19 @@ export function residentWorkStances(
   }
 
   // 앵커 조회가 없거나 값이 비면 전부 0이라 기존 배치와 완전히 같다.
-  const anchorOf = (resident: WorkLayoutResident) => {
-    if (!terrainAt || !anchorFor) return null;
-    const terrain = terrainAt(resident.x, resident.y);
-    return terrain ? anchorFor(`${resident.job}@${terrain}`) : null;
+  const contextOf = (resident: WorkLayoutResident) => {
+    const target = targetFor?.(resident) ?? null;
+    const terrain = target?.terrain ?? terrainAt?.(resident.x, resident.y);
+    const anchor = terrain && anchorFor ? anchorFor(`${resident.job}@${terrain}`) : null;
+    return { anchor, target };
+  };
+  const facingTowardTarget = (
+    resident: WorkLayoutResident,
+    target: WorkLayoutTarget | null,
+    fallback: 1 | -1,
+  ): 1 | -1 => {
+    if (!target || target.x === resident.x) return fallback;
+    return target.x > resident.x ? 1 : -1;
   };
 
   const stances = new Map<number, ResidentWorkStance>();
@@ -59,8 +80,8 @@ export function residentWorkStances(
     if (group.length === 1) {
       const resident = group[0];
       const side = resident.id % 2 === 0 ? -1 : 1;
-      const anchor = anchorOf(resident);
-      const facing: 1 | -1 = side < 0 ? 1 : -1;
+      const { anchor, target } = contextOf(resident);
+      const facing = facingTowardTarget(resident, target, side < 0 ? 1 : -1);
       stances.set(resident.id, {
         offsetX: side * tileSize * 0.12 + (anchor?.offsetX ?? 0),
         offsetY: anchor?.offsetY ?? 0,
@@ -81,8 +102,9 @@ export function residentWorkStances(
       const column = index - rowStart;
       const offsetX = (column - (rowCount - 1) / 2) * xSpacing * tileSize;
       const offsetY = (row - (rows - 1) / 2) * ySpacing * tileSize;
-      const anchor = anchorOf(resident);
-      const facing: 1 | -1 = offsetX < 0 ? 1 : offsetX > 0 ? -1 : (resident.id % 2 === 0 ? 1 : -1);
+      const { anchor, target } = contextOf(resident);
+      const spreadFacing: 1 | -1 = offsetX < 0 ? 1 : offsetX > 0 ? -1 : (resident.id % 2 === 0 ? 1 : -1);
+      const facing = facingTowardTarget(resident, target, spreadFacing);
       stances.set(resident.id, {
         offsetX: offsetX + (anchor?.offsetX ?? 0),
         offsetY: offsetY + (anchor?.offsetY ?? 0),

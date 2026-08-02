@@ -2,14 +2,41 @@ import { CONFIG } from '../game/config';
 import { isIndoors } from '../game/dayCycle';
 import { buildingWorkerSlots } from '../game/buildingWorkerSlots';
 import { assignedSlotResidents } from '../game/workerSlots';
+import { mineralRemaining } from '../game/minerals';
+import { isTileInMineWorkArea } from '../game/miningSites';
+import { isVeinSealedTile } from '../game/silver';
 import {
   residentActiveWorkplace,
   workplacePresentation,
 } from '../game/workplacePresentation';
 import type { Building, GameState, Resident } from '../game/types';
 import { selectOxPlowFarmerIds } from './residentFarmerAssets';
-import { residentWorkStances, type ResidentWorkStance } from './residentWorkLayout';
+import {
+  residentWorkStances,
+  type ResidentWorkStance,
+  type WorkLayoutResident,
+} from './residentWorkLayout';
 import { workAnchor } from './spriteStudioRegistries';
+
+const CARDINAL_DIRECTIONS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
+
+function adjacentMinerWorkTarget(
+  state: GameState,
+  resident: WorkLayoutResident,
+  buildingById: ReadonlyMap<number, Building>,
+) {
+  if (resident.job !== 'miner' || resident.phase !== 'working') return null;
+  const mine = resident.assignedBuildingId == null ? null : buildingById.get(resident.assignedBuildingId);
+  if (!mine || mine.type !== 'mine') return null;
+  for (const [dx, dy] of CARDINAL_DIRECTIONS) {
+    const tile = state.map[resident.y + dy]?.[resident.x + dx];
+    if (tile && isTileInMineWorkArea(mine, tile) && tile.terrain === 'rock' &&
+        mineralRemaining(tile) > 0 && !isVeinSealedTile(state, tile)) {
+      return { x: tile.x, y: tile.y, terrain: tile.terrain };
+    }
+  }
+  return null;
+}
 
 /**
  * 등록된 자리에 실제로 서 있는 근무자의 자세. 자리 밖이면 null이라
@@ -93,6 +120,7 @@ export function buildResidentPresentationSnapshot(state: GameState): ResidentPre
     spreadExcluded,
     (x, y) => state.map?.[y]?.[x]?.terrain,
     workAnchor,
+    resident => adjacentMinerWorkTarget(state, resident, buildingById),
   );
   for (const [id, stance] of slotStances) workStances.set(id, stance);
 

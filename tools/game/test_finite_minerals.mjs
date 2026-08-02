@@ -53,11 +53,14 @@ for (const seed of generationSeeds) {
     const distance = Math.abs(deposit.x - center.x) + Math.abs(deposit.y - center.y);
     assert.ok(distance >= CONFIG.minerals.nearbyMinDistance);
     assert.ok(distance <= CONFIG.minerals.nearbyMaxDistance);
+    const approachTiles = new Set([[1, 0], [-1, 0], [0, 1], [0, -1]].map(
+      ([dx, dy]) => `${deposit.x + dx},${deposit.y + dy}`,
+    ));
     const reachableByResident = state.residents.some(resident =>
-      agents.findPath(state, resident.x, resident.y, tile => tile === deposit));
+      agents.findPath(state, resident.x, resident.y, tile => approachTiles.has(`${tile.x},${tile.y}`)));
     assert.ok(
       reachableByResident,
-      `seed ${seed} residents cannot reach nearby ${deposit.hasIron ? 'iron' : 'stone'} at ${deposit.x},${deposit.y}`,
+      `seed ${seed} residents cannot approach nearby ${deposit.hasIron ? 'iron' : 'stone'} at ${deposit.x},${deposit.y}`,
     );
   }
 

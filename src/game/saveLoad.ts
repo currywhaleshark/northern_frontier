@@ -1,5 +1,6 @@
 // localStorage 저장/불러오기
 import { CONFIG } from './config';
+import { ensureResidentsOnPassableTiles } from './agents';
 import { normalizeDayCycleSubTick } from './dayCycle';
 import { clampPlotSide, computeDefense, rebuildBuildingFootprints } from './buildings';
 import { combatGroupLabel } from './combatCapabilities';
@@ -2893,6 +2894,7 @@ export function loadGame(slot = 1): GameState | null {
       ? parsed.guideModalQueue.filter((id: unknown) => typeof id === 'string')
       : [];
     rebuildBuildingFootprints(parsed);
+    ensureResidentsOnPassableTiles(parsed);
     normalizeSiegeState(parsed);
     migrateGatheringAssignments(parsed);
     normalizeLodgingHutState(parsed);

@@ -44,6 +44,7 @@ const CORE_TESTS = testFiles(
   'night_auto_speed',
   'new_game_setup',
   'onggi',
+  'outcrop_obstacles_s3',
   'pastures',
   'pathfinding_collision',
   'pending_disasters',

@@ -202,7 +202,7 @@ export function isTerrainPassable(state: GameState, x: number, y: number): boole
   if (siegeGateClosed && !breachedPassage) return false;
   if (building && !breachedPassage && !isPassableBuilding(building.type) &&
       !isBuildingUpperPassageTile(building, x, y)) return false;
-  if (t.terrain === 'mountain') return false;
+  if (t.terrain === 'mountain' || t.terrain === 'rock') return false;
   if (t.terrain === 'river') {
     if (building && (building.type === 'bridge' || building.type === 'ferry' || building.type === 'dock')) return true;
     // 겨울 언 강 위는 걸어서 건널 수 있다 (해빙기 홍수 제외)
@@ -221,6 +221,7 @@ export function isPassable(
 }
 
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+const CARDINAL_DIRS = DIRS.slice(0, 4);
 
 function goalTiles(state: GameState, isGoal: (t: Tile) => boolean): { x: number; y: number }[] {
   const goals: { x: number; y: number }[] = [];
@@ -992,14 +993,16 @@ export function ensureResidentsOnPassableTiles(state: GameState): void {
 
 interface GatherOpts {
   goal: (t: Tile) => boolean;
+  /** 작업자가 설 수 있는 칸에서 실제 채집 대상을 찾는다. 생략하면 현재 칸이 대상이다. */
+  targetFromWorkTile?: (workTile: Tile) => Tile | null;
   workTicks: number;
-  yieldRes: ResourceId;
+  yieldRes: ResourceId | ((tile: Tile) => ResourceId);
   yieldAmt: number | ((tile: Tile) => number); // 보정 전 1회 채집량 (타일에 따라 달라질 수 있다)
-  cap: number;            // 이만큼 지면 하역하러 간다
+  cap: number | ((tile: Tile) => number); // 이만큼 지면 하역하러 간다
   depositExtra: BuildingTypeId[];
   depositTargets?: (state: GameState, resident: Resident) => Building[];
   onDeposit?: (resident: Resident) => void;
-  taskWork: string;
+  taskWork: string | ((tile: Tile) => string);
   taskMove: string;
   taskHaul: string | ((resident: Resident) => string);
   taskNone?: string;
@@ -1011,10 +1014,17 @@ interface GatherOpts {
 
 function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void {
   const forced = r.manualOrder?.kind === 'work' ? r.manualOrder.unauthorizedSiteIds ?? [] : [];
-  let knownGoal: DescribedGoal = (tile: Tile): boolean => isExplored(state, tile.x, tile.y) && o.goal(tile) &&
-    canWorkForeignTerritory(state, tile.x, tile.y, forced);
+  const targetFrom = o.targetFromWorkTile ?? ((workTile: Tile): Tile => workTile);
+  let knownGoal: DescribedGoal = (workTile: Tile): boolean => {
+    const target = targetFrom(workTile);
+    return target != null && isExplored(state, target.x, target.y) && o.goal(target) &&
+      canWorkForeignTerritory(state, target.x, target.y, forced);
+  };
+  const currentTile = state.map[r.y][r.x];
+  const currentTarget = targetFrom(currentTile) ?? currentTile;
+  const carryCap = typeof o.cap === 'function' ? o.cap(currentTarget) : o.cap;
   // 짐이 찼거나 하역 중이면 거점으로
-  if (carryTotal(r) >= scaledCarryCapacity(o.cap) ||
+  if (carryTotal(r) >= scaledCarryCapacity(carryCap) ||
     (r.phase === 'toDeposit' && carryTotal(r) > 0)) {
     r.phase = 'toDeposit';
     r.task = typeof o.taskHaul === 'function' ? o.taskHaul(r) : o.taskHaul;
@@ -1036,16 +1046,20 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
   }
   // 작업 중
   if (r.phase === 'working') {
-    if (!knownGoal(state.map[r.y][r.x])) { r.phase = 'rest'; return; } // 서 있던 타일이 변함(벌목 소진 등)
-    r.task = o.taskWork;
+    const workTile = state.map[r.y][r.x];
+    if (!knownGoal(workTile)) { r.phase = 'rest'; return; } // 서 있던 타일이나 대상이 변함(벌목·채광 소진 등)
+    const target = targetFrom(workTile);
+    if (!target) { r.phase = 'rest'; return; }
+    r.task = typeof o.taskWork === 'function' ? o.taskWork(target) : o.taskWork;
     r.workTimer -= ctx.outdoor; // 궂은 날씨엔 일이 더디다
     gainSkillTick(state, r);
     if (r.workTimer <= 0) {
-      const base = typeof o.yieldAmt === 'function' ? o.yieldAmt(state.map[r.y][r.x]) : o.yieldAmt;
+      const resource = typeof o.yieldRes === 'function' ? o.yieldRes(target) : o.yieldRes;
+      const base = typeof o.yieldAmt === 'function' ? o.yieldAmt(target) : o.yieldAmt;
       const requested = base * ctx.tMod * ctx.outputMod * effOf(r) * WORK_RATE_SCALE;
-      const amt = Math.max(0, o.adjustHarvestAmount?.(state.map[r.y][r.x], r, requested) ?? requested);
-      if (amt > 0) addCarry(r, o.yieldRes, amt);
-      o.onHarvest?.(state.map[r.y][r.x], r, amt);
+      const amt = Math.max(0, o.adjustHarvestAmount?.(target, r, requested) ?? requested);
+      if (amt > 0) addCarry(r, resource, amt);
+      o.onHarvest?.(target, r, amt);
       r.phase = 'rest';
     }
     return;
@@ -1055,7 +1069,9 @@ function gatherJob(state: GameState, r: Resident, ctx: Ctx, o: GatherOpts): void
   if (st === 'arrived') {
     r.phase = 'working';
     r.workTimer = o.workTicks;
-    r.task = o.taskWork;
+    const target = targetFrom(state.map[r.y][r.x]);
+    r.task = target && typeof o.taskWork === 'function' ? o.taskWork(target) :
+      typeof o.taskWork === 'string' ? o.taskWork : o.taskMove;
   } else if (st === 'stuck') {
     if (o.onStuck?.()) return;
     r.phase = 'rest';
@@ -2530,37 +2546,45 @@ function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
 
   const a = CONFIG.agents;
-  const miningTile = state.map[r.y]?.[r.x];
-  const miningIron = miningTile?.terrain === 'rock' && miningTile.hasIron;
-  const miningSilver = miningTile?.terrain === 'rock' && !!miningTile.hasSilver;
-  // 설점(보고 후 허가) 채굴은 산출의 큰 몫이 조정 몫으로 빠진다
-  const sanctionKeep = state.silverVein?.status === 'sanctioned'
-    && state.silverVein.x === miningTile?.x && state.silverVein.y === miningTile?.y
-    ? 1 - CONFIG.silver.sanctionTaxRatio
-    : 1;
   // 맹인 지관 허생 '산세 읽기' — 마을 전체 채광 산출이 오른다
   const geomancerMult = state.residents.some(resident => resident.alive && resident.special === 'geomancer')
     ? 1 + CONFIG.specialResidents.geomancerMiningYieldBonus
     : 1;
+  let minedResource: 'stone' | 'iron' | 'silver' = 'stone';
   gatherJob(state, r, ctx, {
     goal: t => isTileInMineWorkArea(assignedMine, t) &&
       t.terrain === 'rock' && mineralRemaining(t) > 0 && !isVeinSealedTile(state, t),
+    targetFromWorkTile: workTile => {
+      for (const [dx, dy] of CARDINAL_DIRS) {
+        const target = state.map[workTile.y + dy]?.[workTile.x + dx];
+        if (target && isTileInMineWorkArea(assignedMine, target) &&
+            target.terrain === 'rock' && mineralRemaining(target) > 0 &&
+            !isVeinSealedTile(state, target)) return target;
+      }
+      return null;
+    },
     workTicks: a.work.mine,
-    yieldRes: miningSilver ? 'silver' : miningIron ? 'iron' : 'stone',
+    yieldRes: tile => tile.hasSilver ? 'silver' : tile.hasIron ? 'iron' : 'stone',
     yieldAmt: tile => (tile.hasSilver ? a.yields.silver : tile.hasIron ? a.yields.iron : a.yields.stone) * geomancerMult,
-    cap: miningSilver ? a.carryCap.silver : miningIron ? a.carryCap.iron : a.carryCap.stone,
+    cap: tile => tile.hasSilver ? a.carryCap.silver : tile.hasIron ? a.carryCap.iron : a.carryCap.stone,
     depositExtra: [],
     depositTargets: () => [assignedMine],
     onDeposit: worker => { worker.miningDepositBuildingId = null; },
-    taskWork: miningSilver ? '은맥 채굴 중' : '채광 중',
+    taskWork: tile => tile.hasSilver ? '은맥 채굴 중' : tile.hasIron ? '철광 채굴 중' : '채석 중',
     taskMove: '광상으로 이동',
     taskHaul: '광물 운반',
     taskNone: '캘 광상 없음',
     adjustHarvestAmount: (tile, _worker, amount) => {
       const extraction = extractMineralDeposit(tile, amount);
+      minedResource = extraction.resource;
       if (extraction.depleted) logMineralDepletion(state, tile, extraction.resource);
       if (extraction.resource === 'silver') {
         recordSilverMined(state, extraction.amount);
+        // 설점(보고 후 허가) 채굴은 산출의 큰 몫이 조정 몫으로 빠진다.
+        const sanctionKeep = state.silverVein?.status === 'sanctioned' &&
+          state.silverVein.x === tile.x && state.silverVein.y === tile.y
+          ? 1 - CONFIG.silver.sanctionTaxRatio
+          : 1;
         return extraction.amount * sanctionKeep;
       }
       if (extraction.amount > 0) recordRockMining(state, tile);
@@ -2571,7 +2595,9 @@ function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
     },
     onHarvest: (_tile, worker, amount) => {
       worker.miningDepositBuildingId = assignedMine.id;
-      if (miningIron) addCarry(worker, 'stone', amount * (a.yields.mineStone / a.yields.iron));
+      if (minedResource === 'iron') {
+        addCarry(worker, 'stone', amount * (a.yields.mineStone / a.yields.iron));
+      }
     },
   });
 }
