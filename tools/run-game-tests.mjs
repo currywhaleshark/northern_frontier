@@ -3,14 +3,44 @@ import { availableParallelism } from 'node:os';
 import { readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GAME_TEST_SUITE_NAMES, resolveGameTestSuites } from './game-test-suites.mjs';
 
 const toolsDir = dirname(fileURLToPath(import.meta.url));
 const gameDir = join(toolsDir, 'game');
-const filters = process.argv.slice(2).map(value => value.toLowerCase());
-const tests = readdirSync(gameDir)
+const allTests = readdirSync(gameDir)
   .filter(file => file.startsWith('test_') && file.endsWith('.mjs'))
-  .filter(file => filters.length === 0 || filters.some(filter => file.toLowerCase().includes(filter)))
   .sort((a, b) => a.localeCompare(b));
+const suites = resolveGameTestSuites(allTests);
+
+let requestedSuite = null;
+let listSuites = false;
+const filters = [];
+for (let index = 0; index < process.argv.slice(2).length; index++) {
+  const argument = process.argv.slice(2)[index];
+  if (argument === '--list-suites') {
+    listSuites = true;
+  } else if (argument === '--suite') {
+    requestedSuite = process.argv.slice(2)[++index] ?? '';
+  } else if (argument.startsWith('--suite=')) {
+    requestedSuite = argument.slice('--suite='.length);
+  } else {
+    filters.push(argument.toLowerCase());
+  }
+}
+
+if (listSuites) {
+  for (const suite of GAME_TEST_SUITE_NAMES) process.stdout.write(`${suite}: ${suites[suite].length}\n`);
+  process.exit(0);
+}
+
+const suiteName = requestedSuite ?? (filters.length > 0 ? 'full' : 'core');
+if (!GAME_TEST_SUITE_NAMES.includes(suiteName)) {
+  process.stderr.write(`Unknown game test suite: ${suiteName}\nAvailable: ${GAME_TEST_SUITE_NAMES.join(', ')}\n`);
+  process.exit(1);
+}
+
+const tests = suites[suiteName]
+  .filter(file => filters.length === 0 || filters.some(filter => file.toLowerCase().includes(filter)));
 
 if (tests.length === 0) {
   process.stderr.write(`No game tests matched: ${filters.join(', ')}\n`);
@@ -98,7 +128,7 @@ async function worker() {
 }
 
 process.stdout.write(
-  `Running ${tests.length} game tests with ${workerCount} workers and a ${timeoutMs}ms per-test timeout.\n`,
+  `Running ${tests.length} ${suiteName} game tests with ${workerCount} workers and a ${timeoutMs}ms per-test timeout.\n`,
 );
 await Promise.all(Array.from({ length: workerCount }, () => worker()));
 

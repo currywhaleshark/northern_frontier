@@ -177,9 +177,20 @@ npm run test:game
 npm run build
 ```
 
-게임 테스트 러너는 기본적으로 최대 4개 파일을 병렬 실행하고, 개별 파일이 60초를 넘기면 실패로 처리합니다.
-파일명 일부를 넘겨 표적 테스트만 실행할 수 있으며, 필요하면 `GAME_TEST_WORKERS`와
-`GAME_TEST_TIMEOUT_MS` 환경 변수로 동시 실행 수와 제한시간을 조절할 수 있습니다.
+`npm run test:game`은 저장·경제·건축·튜토리얼·방어의 핵심 회귀만 실행합니다. 전체 203개는
+병합 전이나 릴리스 후보에서 `npm run test:game:full`로 확인하고, 변경 범위에 따라 아래 묶음을 추가합니다.
+
+```bash
+npm run test:game:slow     # 나머지 시스템·대형 전술·릴리스 검사
+npm run test:game:balance  # 다중 시드·계절·수치 계약
+npm run test:game:assets   # 아틀라스·스프라이트·렌더 레지스트리
+npm run test:game:ui       # TSX·CSS·HUD 구조 계약
+npm run test:game:suites   # 현재 묶음별 테스트 수
+```
+
+러너는 최대 4개 파일을 병렬 실행하고 개별 파일이 60초를 넘기면 실패로 처리합니다. 파일명 일부를
+넘기면 묶음과 관계없이 해당 테스트를 찾아 실행하며, 필요하면 `GAME_TEST_WORKERS`와
+`GAME_TEST_TIMEOUT_MS`로 동시 실행 수와 제한시간을 조절할 수 있습니다.
 
 ```bash
 npm run test:game -- forest_habitats tutorial_scenario
