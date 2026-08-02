@@ -16,20 +16,21 @@ import { makeRng } from './map';
 import { spawnRaiders } from './raids';
 import { residentLogName } from './residentLogName';
 import { withJosa } from './josa';
-import { getDayOfSeason, getSeason } from './seasons';
+import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { tributeReserved } from './tributeReserve';
 import { isWallBuilding } from './walls';
 import { buildingTouchesWaterCoverage, naturalWaterCoverageTileSets } from './waterCoverage';
-import { dailyFuelHeatNeed, winterReadiness } from './winterReadiness';
+import { dailyFuelHeatNeed } from './winterReadiness';
 import type { GameState, JobId, Resident, ResourceId, ScenarioState } from './types';
 
 // 진행 표식은 잎 모듈에 있다 (agents.ts가 누계를 올려야 해서 순환을 끊었다).
 // 부르는 쪽은 예전처럼 scenario에서 가져다 쓴다.
 export { countScenarioProgress, markScenarioFlag } from './scenarioFlags';
 
-// 7 = 벌목장 터 배치 직후 건축가 배정을 먼저 가르치는 판. 스텝 수·목표 의미가 바뀌면 진행 위치의 뜻이
-// 달라지므로 반드시 올린다 — 구판 저장은 로드에서 일반 모드로 해제된다.
-export const TUTORIAL_SCENARIO_VERSION = 7;
+// 8 = 겨울 점검의 비축량을 합격선에서 권장선으로 바꾸고, 첫 겨울을 놓친 진행을 달력에 복구하는 판.
+// 스텝 수·목표 의미가 바뀌면 진행 위치의 뜻이 달라지므로 반드시 올린다. v7은 스텝 순서가 같아
+// 로드에서 v8로 호환 승격하고, 그보다 오래된 판은 일반 모드로 해제한다.
+export const TUTORIAL_SCENARIO_VERSION = 8;
 
 /** 소목표 하나 — 칩에 `라벨 (현재/목표)`로 선다. 라벨은 짧은 명사, 칩은 수치 요약이다. */
 export interface ScenarioGoalProgress {
@@ -96,6 +97,23 @@ function boolGoal(label: string, met: boolean): ScenarioGoalProgress {
 // 목표치는 flags에 주입된다. 없으면 영영 못 이룬 것으로 본다 (기존 isDone의 ?? Infinity와 같은 뜻)
 function goalTarget(state: GameState, key: string): number {
   return flags(state)[key] ?? Infinity;
+}
+
+/** 첫해 겨울이 시작됐거나 이미 지났는가. 길잡이 새 게임은 언제나 첫해 봄 1일에 시작한다. */
+function firstTutorialWinterReached(state: GameState): boolean {
+  const year = getYear(state.day);
+  return year > 1 || (year === 1 && getSeason(state.day) === 'winter');
+}
+
+/** 첫 겨울 생존 눈금. 봄이 와도 0으로 되돌리지 않아 둘째 해 단계가 다음 겨울까지 밀리지 않는다. */
+function firstTutorialWinterProgress(state: GameState): number {
+  const target = CONFIG.tutorial.winterEndDayOfSeason;
+  const year = getYear(state.day);
+  if (year > 1) return target;
+  if (year === 1 && getSeason(state.day) === 'winter') {
+    return Math.min(getDayOfSeason(state.day), target);
+  }
+  return 0;
 }
 
 function flags(state: GameState): Record<string, number> {
@@ -359,15 +377,24 @@ const TUTORIAL_STEP_SPECS: readonly ScenarioStepSpec[] = [
       '· 겨울 점검을 열어 식량과 장작이 며칠분인지 확인하십시오.\n' +
       '· 일분은 지금 인구가 겨울 소모로 먹고 땔 때의 셈입니다. 인구가 늘면 그만큼 줄어듭니다.\n' +
       '· 섶과 숯도 땔감으로 함께 셉니다. 숯은 같은 부피로 더 오래 탑니다.\n' +
-      '· 넉넉할수록 겨울이 편합니다. 혹한이 닥친 날은 하루 소모가 껑충 뜁니다.',
-    progress: state => {
-      const readiness = winterReadiness(state);
-      return [
-        flagGoal(state, '겨울 점검', 'checklistOpened'),
-        { label: '식량 일분', current: readiness.foodDays, target: goalTarget(state, 'foodDaysGoal') },
-        { label: '장작 일분', current: readiness.firewoodDays, target: goalTarget(state, 'firewoodDaysGoal') },
-      ];
+      '· 식량 30일분과 땔감 24일분은 넉넉함의 권장선이지 합격선이 아닙니다. 부족해도 점검을 열면 계속할 수 있습니다.\n' +
+      '· 점검 전에 겨울이 닥치면 길잡이는 생존 단계로 자동 전환됩니다. 혹한이 닥친 날은 하루 소모가 껑충 뜁니다.',
+    onDay: state => {
+      const active = state.scenario;
+      if (!active || (active.flags.checklistOpened ?? 0) > 0 ||
+        (active.flags.stocktakeAutoAdvanced ?? 0) > 0 || !firstTutorialWinterReached(state)) return;
+      active.flags.stocktakeAutoAdvanced = 1;
+      addLog(
+        state,
+        '첫 겨울이 시작되었거나 이미 지났습니다. 준비 수치가 권장선에 못 미쳐도 길잡이는 생존 단계로 이어집니다. 겨울 점검에서 부족한 항목을 계속 보충하십시오.',
+        'bad', true,
+      );
     },
+    // 점검을 여는 것이 필수 학습이다. 달력이 먼저 겨울에 닿으면 진행 고착을 막기 위해 자동 통과한다.
+    progress: state => [boolGoal(
+      '겨울 점검',
+      (state.scenario?.flags.checklistOpened ?? 0) > 0 || firstTutorialWinterReached(state),
+    )],
   },
   {
     id: 'winter',
@@ -382,7 +409,8 @@ const TUTORIAL_STEP_SPECS: readonly ScenarioStepSpec[] = [
     onDay: state => {
       const scenario = state.scenario;
       if (!scenario || (scenario.flags.coldSnapWarned ?? 0) > 0) return;
-      if (getSeason(state.day) !== 'winter') return;
+      // 첫 겨울을 놓친 구 저장이 다음 겨울에 들어와도 통제 혹한을 뒤늦게 재생하지 않는다.
+      if (getYear(state.day) !== 1 || getSeason(state.day) !== 'winter') return;
       if (getDayOfSeason(state.day) < CONFIG.tutorial.coldSnapDayOfWinter) return;
       scenario.flags.coldSnapWarned = 1;
       const extraHeat = dailyFuelHeatNeed(state) * Math.max(0, CONFIG.tutorial.coldSnapFirewoodMult - 1);
@@ -393,10 +421,10 @@ const TUTORIAL_STEP_SPECS: readonly ScenarioStepSpec[] = [
         'bad', true,
       );
     },
-    // 겨울에 들기 전에는 0일차 — 계절이 바뀌어야 셈이 오른다
+    // 첫 겨울 전에는 0일차. 첫 겨울 목표일을 넘긴 뒤에는 봄이 와도 완료 눈금을 유지한다.
     progress: state => [{
       label: '겨울',
-      current: getSeason(state.day) === 'winter' ? getDayOfSeason(state.day) : 0,
+      current: firstTutorialWinterProgress(state),
       target: CONFIG.tutorial.winterEndDayOfSeason,
     }],
   },

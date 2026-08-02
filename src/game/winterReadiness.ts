@@ -1,7 +1,7 @@
 // 겨울 점검 — "지금 곳간으로 며칠을 나는가"를 한 자리에서 계산한다.
 // 실제 소모는 endOfDay가 배급령·날씨까지 얹어 처리하지만, 점검은 앞을 내다보는 눈금이라
 // 전일 소모를 그대로 쓰지 않고 같은 식을 겨울 기준으로 다시 세워 근사한다.
-// 길잡이 9단계(겨울 점검)와 후속 겨울 점검 패널이 이 한 함수를 함께 쓴다.
+// 길잡이는 패널을 여는 법만 필수로 가르치고, 이 계산의 30/24일분은 넉넉함 권장선으로 쓴다.
 import { housingCapacity } from './buildings';
 import { CONFIG } from './config';
 import { foodTotal, fuelHeatTotal } from './consumption';
@@ -62,7 +62,7 @@ export interface WinterCheckItem {
   advice: string;  // 무엇을 보면 되는지 (해결책을 강요하지 않는다)
 }
 
-/** 시나리오가 목표치를 주입했으면 그것을, 아니면 기본 기준을 쓴다 — 9단계와 같은 눈금을 본다 */
+/** 시나리오가 권장치를 주입했으면 그것을, 아니면 기본 권장치를 쓴다. */
 function goalDays(state: GameState, key: string, fallback: number): number {
   const injected = state.scenario?.flags[key];
   return typeof injected === 'number' && injected > 0 ? injected : fallback;

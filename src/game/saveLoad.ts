@@ -2828,9 +2828,13 @@ export function loadGame(slot = 1): GameState | null {
         important: true,
       });
     }
-    // 시나리오 저장: 코드의 튜토리얼 버전과 다르면 해제하고 일반 모드로 잇는다 (짧으니 재시작이 정답)
+    // 시나리오 저장: v7→v8은 스텝 순서가 같고 완료 조건만 느슨해져 안전하게 호환 승격한다.
+    // 그 밖에 코드의 튜토리얼 버전과 다르면 해제하고 일반 모드로 잇는다.
     if (parsed.scenario) {
       const scenario = parsed.scenario;
+      if (scenario.id === 'tutorial' && scenario.version === 7 && TUTORIAL_SCENARIO_VERSION === 8) {
+        scenario.version = TUTORIAL_SCENARIO_VERSION;
+      }
       const valid = scenario.id === 'tutorial'
         && scenario.version === TUTORIAL_SCENARIO_VERSION
         && Number.isInteger(scenario.stepIndex)

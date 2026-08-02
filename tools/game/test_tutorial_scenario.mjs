@@ -5,6 +5,7 @@
 //  - 파종은 배치만으로 끝나고, 집·장작 스텝이 끝날 때 파종이 병행 완료되는지
 //  - 시나리오 중 스크립트되지 않은 랜덤 모달이 뜨지 않는지 (허용: scenario, tribute)
 //  - 통제 사건(첫 병자·혹한 경고)이 스텝 훅으로만 일어나는지
+//  - 겨울 준비가 늦어도 첫 겨울→둘째 해 봄 경계에서 시나리오가 다음 겨울까지 고착되지 않는지
 //  - 코드의 튜토리얼 버전이 바뀌면(구판 버전 2 포함) 저장이 일반 모드로 해제되는지
 //  - 초회 도움말(guides)이 새 게임에서 켜지고 구버전 저장에서는 꺼지는지
 //  - 완료 선택 뒤에 랜덤 사건 게이트가 술어만이 아니라 endOfDay에서도 실제로 열리는지
@@ -299,10 +300,10 @@ function goalItem(step, state, label) {
 }
 
 {
-  // 17스텝 구성과 버전 (R7: 첫 벌목장 건축가 목표 추가로 진행 판정이 달라져 버전을 올렸다)
+  // 17스텝 구성과 버전 (R8: 겨울 준비 지연 복구와 v7 호환 승격)
   assert.deepEqual(scenario.TUTORIAL_STEPS.map(step => step.id), EXPECTED_STEP_IDS);
   assert.equal(scenario.TUTORIAL_STEPS.length, 17);
-  assert.equal(scenario.TUTORIAL_SCENARIO_VERSION, 7);
+  assert.equal(scenario.TUTORIAL_SCENARIO_VERSION, 8);
   // 첫 겨울은 이제 완료 지점이 아니라 중간 스텝이다
   assert.equal(scenario.TUTORIAL_STEPS[9].id, 'winter');
   assert.ok(scenario.TUTORIAL_STEPS[10], 'the winter step is followed by the second year');
@@ -345,7 +346,7 @@ function goalItem(step, state, label) {
   assert.deepEqual(labelsOf('hunting'), ['사냥막', '사냥막 배정', '고기']);
   assert.deepEqual(labelsOf('patient'), ['약초막', '약초막 배정', '병자 회복']);
   assert.deepEqual(labelsOf('defense'), ['목책', '수비병', '파수꾼']);
-  assert.deepEqual(labelsOf('stocktake'), ['겨울 점검', '식량 일분', '장작 일분']);
+  assert.deepEqual(labelsOf('stocktake'), ['겨울 점검']);
   assert.deepEqual(labelsOf('winter'), ['겨울']);
   // 둘째 해 (R5)
   assert.deepEqual(labelsOf('tribute'), ['세공 공지', '조정 창', '세공고']);
@@ -555,7 +556,7 @@ function goalItem(step, state, label) {
 }
 
 {
-  // 겨울 점검: 일분 계산이 인구와 겨울 배율을 함께 본다
+  // R8: 겨울 점검은 패널 열기를 가르치는 단계다. 30/24일분은 점검표의 넉넉함 권장선이지 합격선이 아니다.
   const state = tutorialStart.createTutorialGame();
   const readiness = winter.winterReadiness(state);
   assert.ok(readiness.weight > 0, 'consumption weight counts the living');
@@ -564,9 +565,42 @@ function goalItem(step, state, label) {
   markFlags(state, 'checklistOpened');
   state.resources.grain = readiness.foodPerDay * (state.scenario.flags.foodDaysGoal - 1);
   state.resources.firewood = readiness.fuelHeatPerDay * (state.scenario.flags.firewoodDaysGoal + 2);
-  assert.equal(stocktakeStep.isDone(state), false, 'short of the food target the checklist stays open');
-  state.resources.grain = readiness.foodPerDay * (state.scenario.flags.foodDaysGoal + 2);
-  assert.equal(stocktakeStep.isDone(state), true, 'both stores at target close the checklist step');
+  assert.equal(stocktakeStep.isDone(state), true, 'opening the checklist completes the lesson even below the food recommendation');
+  const rows = winter.winterChecklist(state);
+  assert.match(rows.find(row => row.id === 'food').advice, /30일분이면 넉넉합니다/);
+  assert.match(rows.find(row => row.id === 'firewood').advice, /24일분이 기준입니다/);
+}
+
+{
+  // R8: 점검을 못 연 초보자도 첫 겨울에 자동으로 생존 단계로 넘어가고, 봄에는 둘째 해로 복구된다.
+  const state = tutorialStart.createTutorialGame();
+  state.pendingChoice = null;
+  state.scenario.stepIndex = EXPECTED_STEP_IDS.indexOf('stocktake');
+  state.scenario.introShown = true;
+  state.day = config.CONFIG.time.seasonDays * 3 + 1; // 첫해 겨울 1일
+  state.resources.grain = 0;
+  state.resources.meat = 0;
+  state.resources.fish = 0;
+  state.resources.firewood = 0;
+
+  scenario.dailyScenarioTick(state);
+  assert.equal(state.scenario.stepIndex, EXPECTED_STEP_IDS.indexOf('winter'));
+  assert.equal(state.scenario.flags.stocktakeAutoAdvanced, 1, 'the missed checklist fallback is latched once');
+  assert.equal(
+    state.log.filter(entry => entry.text.includes('권장선에 못 미쳐도 길잡이는 생존 단계로')).length,
+    1,
+    'the fallback warning is logged once',
+  );
+
+  state.pendingChoice = null;
+  state.scenario.introShown = true;
+  state.day = config.CONFIG.time.yearDays + 1; // 둘째 해 봄 1일
+  const winterStep = stepById('winter');
+  assert.equal(goalItem(winterStep, state, '겨울').current, config.CONFIG.tutorial.winterEndDayOfSeason);
+  assert.equal(winterStep.isDone(state), true, 'spring latches the first-winter milestone instead of resetting it to zero');
+  scenario.dailyScenarioTick(state);
+  assert.equal(state.scenario.stepIndex, EXPECTED_STEP_IDS.indexOf('tribute'));
+  assert.equal(state.scenario.flags.coldSnapWarned ?? 0, 0, 'a missed first winter never replays the cold snap later');
 }
 
 {
@@ -815,8 +849,7 @@ function goalItem(step, state, label) {
       assert.equal(goalItem(step, state, '사냥막 배정').target, 2);
     }
     if (step.id === 'stocktake') {
-      assert.equal(goalItem(step, state, '식량 일분').current, winter.winterReadiness(state).foodDays);
-      assert.equal(goalItem(step, state, '장작 일분').target, state.scenario.flags.firewoodDaysGoal);
+      assert.equal(goalItem(step, state, '겨울 점검').current, 1);
     }
     if (step.id === 'patient') {
       assert.equal(goalItem(step, state, '병자 회복').current, 0, 'the scripted patient is still abed');
@@ -1598,7 +1631,19 @@ function goalItem(step, state, label) {
   assert.equal(loaded.scenario, null, 'outdated tutorial is detached to normal mode');
   assert.ok(loaded.log.some(entry => entry.text.includes('길잡이 시나리오가 갱신')));
 
-  // 실제로 남아 있을 구판은 버전 2(옛 8스텝)·3(R3까지의 11스텝)·4(R4의 10스텝)다 —
+  // v7은 스텝 순서가 같아 v8로 호환 승격한다. 플레이 중이던 첫 겨울 저장을 끊지 않는다.
+  const compatibleRaw = JSON.parse(globalThis.localStorage.getItem('buksae-save-v3'));
+  compatibleRaw.scenario = {
+    id: 'tutorial', version: 7, stepIndex: EXPECTED_STEP_IDS.indexOf('stocktake'),
+    introShown: true, flags: { foodDaysGoal: 30, firewoodDaysGoal: 24 },
+  };
+  globalThis.localStorage.setItem('buksae-save-v3', JSON.stringify(compatibleRaw));
+  const fromV7 = saveLoad.loadGame(1);
+  assert.ok(fromV7?.scenario, 'a v7 tutorial save keeps its scenario');
+  assert.equal(fromV7.scenario.version, 8, 'v7 is upgraded in place to the compatible v8 rules');
+  assert.equal(fromV7.scenario.stepIndex, EXPECTED_STEP_IDS.indexOf('stocktake'));
+
+  // 실제로 남아 있을 더 오래된 구판은 버전 2(옛 8스텝)·3(R3까지의 11스텝)·4(R4의 10스텝)다 —
   // 셋 다 같은 경로로 해제되고 게이트도 함께 열린다
   for (const oldVersion of [2, 3, 4]) {
     const oldRaw = JSON.parse(globalThis.localStorage.getItem('buksae-save-v3'));

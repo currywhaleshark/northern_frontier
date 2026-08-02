@@ -334,14 +334,10 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
   stocktake: [
     {
       done: state => marked(state, 'checklistOpened'),
-      path: [{ tut: 'checklist-open', text: '상단의 겨울 점검을 눌러 곳간이 며칠분인지 확인하십시오.' }],
-    },
-    {
-      // 점검을 연 뒤에는 같은 칩이 식량·장작 일분을 계속 비춘다 — 목표에 닿을 때까지 그곳을 가리킨다
       path: [{
         tut: 'checklist-open',
-        text: '식량과 장작의 일분이 목표에 닿을 때까지 쌓으십시오. 겨울에도 채울 수는 있으나 '
-          + '폭설과 혹한에 일손이 묶이는 날이 잦으니, 미리 쌓아 두는 편이 안전합니다.',
+        text: '상단의 겨울 점검을 눌러 곳간이 며칠분인지 확인하십시오. 식량 30일분과 땔감 24일분은 '
+          + '넉넉함의 권장선이며, 부족해도 길잡이 진행을 막지는 않습니다.',
       }],
     },
   ],
