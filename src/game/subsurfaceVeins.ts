@@ -1,7 +1,7 @@
 import { generateMap, makeRng } from './map';
 import { CONFIG } from './config';
 import { MAP_SIZE_DIMENSIONS } from './newGameOptions';
-import type { GameState } from './types';
+import type { GameState, MapRegion } from './types';
 
 export interface SubsurfaceVein {
   id: number;
@@ -24,8 +24,12 @@ export interface VeinSample<T extends SubsurfaceVein> {
 const aquiferCache = new Map<string, readonly SubsurfaceVein[]>();
 const oreCache = new Map<string, readonly OreVein[]>();
 
-function cacheKey(seed: number, width: number, height: number): string {
-  return `${seed}:${width}:${height}`;
+function normalizedRegion(region: MapRegion): 'plains' | 'mountain' {
+  return region === 'mountain' ? 'mountain' : 'plains';
+}
+
+function cacheKey(seed: number, width: number, height: number, region: MapRegion): string {
+  return `${seed}:${width}:${height}:${normalizedRegion(region)}`;
 }
 
 function mapMargin(width: number, height: number): number {
@@ -98,8 +102,9 @@ function startingSettlementAquiferCenter(
   seed: number,
   width: number,
   height: number,
+  region: MapRegion,
 ): { x: number; y: number } {
-  const generated = generateMap(seed, { width, height });
+  const generated = generateMap(seed, { width, height }, region);
   return {
     x: Math.min(width - 1, generated.centerX + 1),
     y: Math.min(height - 1, generated.centerY + 1),
@@ -131,14 +136,24 @@ function strongestSample<T extends SubsurfaceVein>(
   return strongest;
 }
 
-export function aquiferVeins(seed: number, width: number, height: number): readonly SubsurfaceVein[] {
-  const key = cacheKey(seed, width, height);
+export function aquiferVeins(
+  seed: number,
+  width: number,
+  height: number,
+  region: MapRegion = 'plains',
+): readonly SubsurfaceVein[] {
+  const resolvedRegion = normalizedRegion(region);
+  const key = cacheKey(seed, width, height, resolvedRegion);
   const cached = aquiferCache.get(key);
   if (cached) return cached;
   const rng = makeRng((seed ^ 0x4a71f39d) >>> 0);
   const mediumArea = MAP_SIZE_DIMENSIONS.medium.width * MAP_SIZE_DIMENSIONS.medium.height;
   const areaScale = Math.max(0.55, Math.sqrt(Math.max(1, width * height) / mediumArea));
-  const baseCount = Math.max(2, Math.round((4 + Math.floor(rng() * 3)) * areaScale));
+  const mountainMultiplier = resolvedRegion === 'mountain' ? 0.65 : 1;
+  const baseCount = Math.max(
+    resolvedRegion === 'mountain' ? 1 : 2,
+    Math.round((4 + Math.floor(rng() * 3)) * areaScale * mountainMultiplier),
+  );
   const veins: SubsurfaceVein[] = [];
   // v45까지 사용한 기본 수맥의 난수 소비와 위치를 그대로 보존한다.
   // 구 세이브의 기존 우물이 갑자기 수맥 밖으로 밀려나지 않게 한 뒤, 내륙 수맥만 뒤에 덧붙인다.
@@ -148,12 +163,21 @@ export function aquiferVeins(seed: number, width: number, height: number): reado
       id,
       cx: center.x,
       cy: center.y,
-      radius: Math.max(3, Math.round((4 + rng() * 3) * Math.min(1.25, areaScale))),
-      capacity: Math.round(90 + rng() * 70),
+      radius: Math.max(3, Math.round(
+        (4 + rng() * 3) * Math.min(1.25, areaScale) *
+        (resolvedRegion === 'mountain' ? 0.75 : 1),
+      )),
+      capacity: Math.round((90 + rng() * 70) * (resolvedRegion === 'mountain' ? 0.75 : 1)),
     });
   }
   const riverCenters = riverCenterline(seed, width, height);
-  const inlandCount = Math.max(2, Math.ceil(baseCount * CONFIG.water.aquiferInlandAdditionRatio));
+  const inlandCount = Math.max(
+    resolvedRegion === 'mountain' ? 1 : 2,
+    Math.ceil(
+      baseCount * CONFIG.water.aquiferInlandAdditionRatio *
+      (resolvedRegion === 'mountain' ? 0.65 : 1),
+    ),
+  );
   for (let offset = 0; offset < inlandCount; offset++) {
     const id = baseCount + offset;
     const center = distributedAquiferCenter(rng, width, height, riverCenters, veins, true);
@@ -161,11 +185,14 @@ export function aquiferVeins(seed: number, width: number, height: number): reado
       id,
       cx: center.x,
       cy: center.y,
-      radius: Math.max(3, Math.round((4 + rng() * 3) * Math.min(1.25, areaScale))),
-      capacity: Math.round(90 + rng() * 70),
+      radius: Math.max(3, Math.round(
+        (4 + rng() * 3) * Math.min(1.25, areaScale) *
+        (resolvedRegion === 'mountain' ? 0.75 : 1),
+      )),
+      capacity: Math.round((90 + rng() * 70) * (resolvedRegion === 'mountain' ? 0.75 : 1)),
     });
   }
-  const startingCenter = startingSettlementAquiferCenter(seed, width, height);
+  const startingCenter = startingSettlementAquiferCenter(seed, width, height, resolvedRegion);
   veins.push({
     id: veins.length,
     cx: startingCenter.x,
@@ -177,14 +204,22 @@ export function aquiferVeins(seed: number, width: number, height: number): reado
   return veins;
 }
 
-export function oreVeins(seed: number, width: number, height: number): readonly OreVein[] {
-  const key = cacheKey(seed, width, height);
+export function oreVeins(
+  seed: number,
+  width: number,
+  height: number,
+  region: MapRegion = 'plains',
+): readonly OreVein[] {
+  const resolvedRegion = normalizedRegion(region);
+  const key = cacheKey(seed, width, height, resolvedRegion);
   const cached = oreCache.get(key);
   if (cached) return cached;
   const rng = makeRng((seed ^ 0x6d2b79f5) >>> 0);
   const mediumArea = MAP_SIZE_DIMENSIONS.medium.width * MAP_SIZE_DIMENSIONS.medium.height;
   const areaScale = Math.max(0.55, Math.sqrt(Math.max(1, width * height) / mediumArea));
-  const perMineral = Math.max(1, Math.round((2 + Math.floor(rng() * 2)) * areaScale));
+  const perMineral = Math.max(1, Math.round(
+    (2 + Math.floor(rng() * 2)) * areaScale * (resolvedRegion === 'mountain' ? 1.5 : 1),
+  ));
   const minerals = [
     ...Array.from({ length: perMineral }, () => 'iron' as const),
     ...Array.from({ length: perMineral }, () => 'stone' as const),
@@ -196,8 +231,14 @@ export function oreVeins(seed: number, width: number, height: number): readonly 
       mineral,
       cx: center.x,
       cy: center.y,
-      radius: Math.max(3, Math.round((4 + rng() * 3) * Math.min(1.25, areaScale))),
-      capacity: Math.round(mineral === 'iron' ? 420 + rng() * 260 : 560 + rng() * 340),
+      radius: Math.max(3, Math.round(
+        (4 + rng() * 3) * Math.min(1.25, areaScale) *
+        (resolvedRegion === 'mountain' ? 1.1 : 1),
+      )),
+      capacity: Math.round(
+        (mineral === 'iron' ? 420 + rng() * 260 : 560 + rng() * 340) *
+        (resolvedRegion === 'mountain' ? 1.25 : 1),
+      ),
     };
   });
   oreCache.set(key, veins);
@@ -210,8 +251,9 @@ export function aquiferSampleAt(
   height: number,
   x: number,
   y: number,
+  region: MapRegion = 'plains',
 ): VeinSample<SubsurfaceVein> | null {
-  return strongestSample(aquiferVeins(seed, width, height), x, y);
+  return strongestSample(aquiferVeins(seed, width, height, region), x, y);
 }
 
 export function oreSampleAt(
@@ -220,8 +262,9 @@ export function oreSampleAt(
   height: number,
   x: number,
   y: number,
+  region: MapRegion = 'plains',
 ): VeinSample<OreVein> | null {
-  const samples = oreVeins(seed, width, height)
+  const samples = oreVeins(seed, width, height, region)
     .map(vein => strongestSample([vein], x, y))
     .filter((sample): sample is VeinSample<OreVein> => sample != null)
     .sort((left, right) =>
@@ -230,19 +273,30 @@ export function oreSampleAt(
   return samples[0] ?? null;
 }
 
-export function initialAquiferLevels(seed: number, width: number, height: number): number[] {
-  return aquiferVeins(seed, width, height).map(vein => vein.capacity);
+export function initialAquiferLevels(
+  seed: number,
+  width: number,
+  height: number,
+  region: MapRegion = 'plains',
+): number[] {
+  return aquiferVeins(seed, width, height, region).map(vein => vein.capacity);
 }
 
-export function initialOreVeinRemaining(seed: number, width: number, height: number): number[] {
-  return oreVeins(seed, width, height).map(vein => vein.capacity);
+export function initialOreVeinRemaining(
+  seed: number,
+  width: number,
+  height: number,
+  region: MapRegion = 'plains',
+): number[] {
+  return oreVeins(seed, width, height, region).map(vein => vein.capacity);
 }
 
 export function normalizeSubsurfaceState(state: GameState): void {
   const width = state.map[0]?.length ?? 0;
   const height = state.map.length;
-  const aquifers = aquiferVeins(state.seed, width, height);
-  const ores = oreVeins(state.seed, width, height);
+  const region = state.worldSetup?.region ?? 'plains';
+  const aquifers = aquiferVeins(state.seed, width, height, region);
+  const ores = oreVeins(state.seed, width, height, region);
   state.aquiferLevels = aquifers.map(vein => {
     const value = Number(state.aquiferLevels?.[vein.id]);
     return Number.isFinite(value) ? Math.min(vein.capacity, Math.max(0, value)) : vein.capacity;

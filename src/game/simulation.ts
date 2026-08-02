@@ -147,7 +147,11 @@ export function newGameFromOptions(
   const worldSetup = worldSetupSnapshot(options, seedSource);
   const difficulty = options.baseDifficulty;
   const rng = makeRng(s);
-  const { tiles, centerX, centerY } = generateMap(s, mapDimensionsForSize(options.mapSize));
+  const { tiles, centerX, centerY } = generateMap(
+    s,
+    mapDimensionsForSize(options.mapSize),
+    options.region,
+  );
   // 메뉴는 항상 입력값을 넘긴다. 이름 없는 호출(테스트·디버그)만 시드 자동 이름을 쓴다.
   const resolvedName = normalizeSettlementNameInput(options.settlementName) || generateSettlementName(s);
 
@@ -168,8 +172,8 @@ export function newGameFromOptions(
     seed: s,
     weather: 'clear',
     map: tiles,
-    aquiferLevels: initialAquiferLevels(s, tiles[0]?.length ?? 0, tiles.length),
-    oreVeinRemaining: initialOreVeinRemaining(s, tiles[0]?.length ?? 0, tiles.length),
+    aquiferLevels: initialAquiferLevels(s, tiles[0]?.length ?? 0, tiles.length, options.region),
+    oreVeinRemaining: initialOreVeinRemaining(s, tiles[0]?.length ?? 0, tiles.length, options.region),
     exploration: createExploration({ map: tiles }),
     // 짐승 서식지: 숲 덩어리마다 난이도별 확률로 자리 잡는다 (마을 근처 하나는 보장)
     habitats: spawnAnimalHabitats(tiles, centerX, centerY, rng, effective.habitatChance),

@@ -167,7 +167,9 @@ function drawSubsurfaceLayers(
     for (let x = minX; x <= Math.min(maxX, state.map[y].length - 1); x++) {
       if (!isExplored(state, x, y)) continue;
       if (showAquifer) {
-        const sample = aquiferSampleAt(state.seed, mapWidth, state.map.length, x, y);
+        const sample = aquiferSampleAt(
+          state.seed, mapWidth, state.map.length, x, y, state.worldSetup?.region,
+        );
         if (sample) {
           const remaining = state.aquiferLevels[sample.vein.id] ?? sample.vein.capacity;
           const depletion = Math.max(0.18, Math.min(1, remaining / Math.max(1, sample.vein.capacity)));
@@ -180,7 +182,9 @@ function drawSubsurfaceLayers(
         }
       }
       if (showOre) {
-        const sample = oreSampleAt(state.seed, mapWidth, state.map.length, x, y);
+        const sample = oreSampleAt(
+          state.seed, mapWidth, state.map.length, x, y, state.worldSetup?.region,
+        );
         if (sample) {
           const remaining = state.oreVeinRemaining[sample.vein.id] ?? sample.vein.capacity;
           const depletion = Math.max(0.18, Math.min(1, remaining / Math.max(1, sample.vein.capacity)));

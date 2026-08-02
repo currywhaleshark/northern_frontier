@@ -745,8 +745,8 @@ export function migrateV44ToV45(raw: RawSave): RawSave {
   const width = Array.isArray(map[0]) ? map[0].length : 0;
   const height = map.length;
   const seed = Number.isFinite(Number(migrated.seed)) ? Number(migrated.seed) : 1;
-  migrated.aquiferLevels = initialAquiferLevels(seed, width, height);
-  migrated.oreVeinRemaining = initialOreVeinRemaining(seed, width, height);
+  migrated.aquiferLevels = initialAquiferLevels(seed, width, height, 'plains');
+  migrated.oreVeinRemaining = initialOreVeinRemaining(seed, width, height, 'plains');
   migrated.schemaVersion = 45;
   return migrated;
 }
@@ -2321,6 +2321,12 @@ export function loadGame(slot = 1): GameState | null {
         }
       }
     }
+    if (parsed.difficulty !== 'easy' && parsed.difficulty !== 'hard' && parsed.difficulty !== 'normal') {
+      parsed.difficulty = 'normal';
+    }
+    parsed.worldSetup = normalizeWorldSetupSnapshot(parsed.worldSetup, parsed.difficulty);
+    const actualMapSize = mapSizeForDimensions(parsed.map[0]?.length ?? 0, parsed.map.length);
+    if (actualMapSize) parsed.worldSetup.mapSize = actualMapSize;
     ensureMineralDeposits(parsed.map);
     normalizeSubsurfaceState(parsed);
     ensureForestGrowth(parsed.map);
@@ -2414,12 +2420,6 @@ export function loadGame(slot = 1): GameState | null {
     if (!parsed.relations) parsed.relations = initRelations();
     normalizeDiplomaticFigures(parsed);
     normalizeDiplomacyState(parsed);
-    if (parsed.difficulty !== 'easy' && parsed.difficulty !== 'hard' && parsed.difficulty !== 'normal') {
-      parsed.difficulty = 'normal';
-    }
-    parsed.worldSetup = normalizeWorldSetupSnapshot(parsed.worldSetup, parsed.difficulty);
-    const actualMapSize = mapSizeForDimensions(parsed.map[0]?.length ?? 0, parsed.map.length);
-    if (actualMapSize) parsed.worldSetup.mapSize = actualMapSize;
     if (!parsed.habitats) {
       // 사냥터 지형이 있던 구버전: 사냥터를 숲으로 바꾸고 시드로 서식지를 새로 뽑는다
       let cx = Math.floor(parsed.map[0].length / 2);

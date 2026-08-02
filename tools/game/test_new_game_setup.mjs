@@ -36,7 +36,7 @@ const saveLoad = await load('saveLoad');
 const tutorialStart = await load('tutorialStart');
 const { CONFIG } = await load('config');
 
-// P0/S2: 기본 입력, 프리셋 실효값, 지역 잠금과 지도 크기 정규화 결정론.
+// P0/S3: 기본 입력, 프리셋 실효값, 지역 잠금과 지도 크기 정규화 결정론.
 {
   const defaults = options.defaultNewGameOptions();
   assert.deepEqual(
@@ -61,18 +61,23 @@ const { CONFIG } = await load('config');
     assert.equal(setup.effective.climateSeverityMultiplier, 1);
   }
 
-  const unsafe = {
+  const mountain = {
     settlementName: '  설한촌  ', difficultyPreset: 'hard', baseDifficulty: 'hard',
-    region: 'coast', mapSize: 'large', seed: 123.9,
+    region: 'mountain', mapSize: 'large', seed: 123.9,
   };
-  const normalized = options.normalizeNewGameOptions(unsafe);
+  const normalized = options.normalizeNewGameOptions(mountain);
   assert.equal(normalized.settlementName, '설한');
-  assert.equal(normalized.region, 'plains', '아직 잠긴 지역은 평원으로 보정한다');
+  assert.equal(normalized.region, 'mountain', 'S3부터 산지는 선택값을 보존한다');
   assert.equal(normalized.mapSize, 'large', 'S2부터 유효한 지도 크기는 보존한다');
   assert.equal(normalized.seed, 123, '시드는 안전한 정수로 정규화한다');
-  assert.deepEqual(options.normalizeNewGameOptions(unsafe), normalized,
+  assert.deepEqual(options.normalizeNewGameOptions(mountain), normalized,
     '같은 수동 시드와 옵션 정규화는 결정적이다');
-  assert.equal(options.worldSetupLabel(normalized), '평원의 대형 개척지');
+  assert.equal(options.worldSetupLabel(normalized), '산지의 대형 개척지');
+
+  for (const futureRegion of ['lake', 'coast']) {
+    assert.equal(options.normalizeNewGameOptions({ region: futureRegion }).region, 'plains',
+      `${futureRegion}은 S4~S5 전까지 평원으로 보정한다`);
+  }
 
   assert.deepEqual(options.mapDimensionsForSize('small'), { width: 56, height: 56 });
   assert.deepEqual(options.mapDimensionsForSize('medium'), { width: 72, height: 72 });

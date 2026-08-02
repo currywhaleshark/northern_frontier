@@ -31,14 +31,15 @@ const seed = 20260729;
 const state = simulation.newGame(seed);
 const width = state.map[0].length;
 const height = state.map.length;
-const aquifers = subsurface.aquiferVeins(seed, width, height);
-const ores = subsurface.oreVeins(seed, width, height);
+// 평원은 v45 지하 기하의 호환 기준선이다. 지역 인자를 명시해 산지 확장 뒤에도 고정한다.
+const aquifers = subsurface.aquiferVeins(seed, width, height, 'plains');
+const ores = subsurface.oreVeins(seed, width, height, 'plains');
 
-assert.deepEqual(subsurface.aquiferVeins(seed, width, height), aquifers,
+assert.deepEqual(subsurface.aquiferVeins(seed, width, height, 'plains'), aquifers,
   'aquifer geometry must be deterministic for a map seed');
-assert.deepEqual(subsurface.oreVeins(seed, width, height), ores,
+assert.deepEqual(subsurface.oreVeins(seed, width, height, 'plains'), ores,
   'ore geometry must be deterministic for a map seed');
-assert.notDeepEqual(subsurface.aquiferVeins(seed + 1, width, height), aquifers,
+assert.notDeepEqual(subsurface.aquiferVeins(seed + 1, width, height, 'plains'), aquifers,
   'a different seed should not reuse aquifer geometry');
 assert.equal(state.aquiferLevels.length, aquifers.length);
 assert.equal(state.oreVeinRemaining.length, ores.length);
@@ -78,8 +79,8 @@ assert.deepEqual(aquifers.slice(0, legacy.length), legacy,
   'inland expansion must append veins without moving legacy v45 aquifers or existing wells');
 
 for (let sampleSeed = 101; sampleSeed <= 112; sampleSeed++) {
-  const sampleMap = mapModule.generateMap(sampleSeed).tiles;
-  const sampleAquifers = subsurface.aquiferVeins(sampleSeed, width, height);
+  const sampleMap = mapModule.generateMap(sampleSeed, undefined, 'plains').tiles;
+  const sampleAquifers = subsurface.aquiferVeins(sampleSeed, width, height, 'plains');
   const inlandCount = sampleAquifers.filter(vein => {
     const riverXs = sampleMap[vein.cy]
       .filter(tile => tile.terrain === 'river')
@@ -114,7 +115,7 @@ for (const row of state.map) {
 state.exploration.explored = state.map.map(row => row.map(() => true));
 
 const aquifer = aquifers[0];
-assert.ok(subsurface.aquiferSampleAt(seed, width, height, aquifer.cx, aquifer.cy));
+assert.ok(subsurface.aquiferSampleAt(seed, width, height, aquifer.cx, aquifer.cy, 'plains'));
 assert.equal(buildings.canPlaceBuildingAt(state, 'well', aquifer.cx, aquifer.cy), true,
   'a well can be placed over an aquifer');
 state.aquiferLevels[aquifer.id] = 0;
@@ -123,7 +124,7 @@ assert.equal(buildings.canPlaceBuildingAt(state, 'well', aquifer.cx, aquifer.cy)
 
 const ore = ores.find(candidate => candidate.cx < width - 1 && candidate.cy < height - 1);
 assert.ok(ore, 'the generated map must contain an in-bounds 2x2 ore anchor');
-const oreSample = subsurface.oreSampleAt(seed, width, height, ore.cx, ore.cy);
+const oreSample = subsurface.oreSampleAt(seed, width, height, ore.cx, ore.cy, 'plains');
 assert.ok(oreSample);
 assert.equal(buildings.canPlaceBuildingAt(state, 'deepMine', ore.cx, ore.cy), true,
   'a deep mine can be placed over a live underground vein');

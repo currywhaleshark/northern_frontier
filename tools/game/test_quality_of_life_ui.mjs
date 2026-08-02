@@ -97,6 +97,20 @@ assert.match(atlasSource, /specialResidentSheet[\s\S]*bob, 1\.16/,
     'continue remains a conditional auxiliary action');
   assert.match(launch, /kind:\s*'new';\s*options:\s*NewGameOptions/);
   assert.match(session, /newGameFromOptions\(launch\.options\)/);
+  for (const region of ['plains', 'mountain', 'lake', 'coast']) {
+    assert.match(newGameSetupSource, new RegExp(`id: '${region}'`), `new game setup declares the ${region} region`);
+  }
+  const regionCardsSource = newGameSetupSource.split('REGIONS.map(region =>')[1]?.split('</button>)}')[0] ?? '';
+  assert.match(regionCardsSource, /onClick=\{\(\) => setOptions\(current => \(\{ \.\.\.current, region: region\.id \}\)\)\}/,
+    'region cards persist their selected option');
+  assert.match(newGameSetupSource, /id: 'mountain'[\s\S]*?enabled: true/,
+    'mountain must be an available starting region');
+  for (const region of ['lake', 'coast']) {
+    assert.match(newGameSetupSource, new RegExp(`id: '${region}'[^\\n]*S[45]에서 준비됩니다`),
+      `${region} remains a future locked region`);
+  }
+  assert.match(newGameSetupSource, /내부 능선과 깊은 숲[\s\S]*물과 평지는 부족[\s\S]*광물과 사냥감이 풍부/,
+    'mountain description communicates its deliberate resource tradeoff');
   for (const size of ['small', 'medium', 'large']) {
     assert.match(newGameSetupSource, new RegExp(`id: '${size}'`), `new game setup offers the ${size} map size`);
   }

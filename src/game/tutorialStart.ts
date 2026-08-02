@@ -70,7 +70,9 @@ export function tutorialWaterAccess(state: GameState): TutorialWaterAccess {
       const tile = state.map[y]?.[x];
       if (!tile) continue;
       if (tile.terrain !== 'river' && tile.terrain !== 'mountain' &&
-        aquiferSampleAt(state.seed, width, state.map.length, x, y) != null) {
+        aquiferSampleAt(
+          state.seed, width, state.map.length, x, y, state.worldSetup?.region,
+        ) != null) {
         wellSpots++;
       }
       if (coverage.river.has(`${x},${y}`) || coverage.canal.has(`${x},${y}`)) naturalWaterTiles++;

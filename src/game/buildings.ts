@@ -502,10 +502,14 @@ export function canPlaceBuildingAt(
   if (type === 'paddy' && !isPaddyFootprintEligible(state, tiles)) return false;
   if (type === 'mine') return hasKnownMineralDepositNear(state, x, y);
   if (type === 'well') {
-    return aquiferSampleAt(state.seed, state.map[0]?.length ?? 0, state.map.length, x, y) != null;
+    return aquiferSampleAt(
+      state.seed, state.map[0]?.length ?? 0, state.map.length, x, y, state.worldSetup?.region,
+    ) != null;
   }
   if (type === 'deepMine') {
-    const sample = oreSampleAt(state.seed, state.map[0]?.length ?? 0, state.map.length, x, y);
+    const sample = oreSampleAt(
+      state.seed, state.map[0]?.length ?? 0, state.map.length, x, y, state.worldSetup?.region,
+    );
     return sample != null && (state.oreVeinRemaining[sample.vein.id] ?? 0) > 0;
   }
   return true;
@@ -565,10 +569,14 @@ export function canRelocateBuildingAt(
   if (building.type === 'paddy' && !isPaddyFootprintEligible(state, usableTiles)) return false;
   if (building.type === 'mine') return hasKnownMineralDepositNear(state, x, y);
   if (building.type === 'well') {
-    return aquiferSampleAt(state.seed, state.map[0]?.length ?? 0, state.map.length, x, y) != null;
+    return aquiferSampleAt(
+      state.seed, state.map[0]?.length ?? 0, state.map.length, x, y, state.worldSetup?.region,
+    ) != null;
   }
   if (building.type === 'deepMine') {
-    const sample = oreSampleAt(state.seed, state.map[0]?.length ?? 0, state.map.length, x, y);
+    const sample = oreSampleAt(
+      state.seed, state.map[0]?.length ?? 0, state.map.length, x, y, state.worldSetup?.region,
+    );
     return sample != null && (state.oreVeinRemaining[sample.vein.id] ?? 0) > 0;
   }
   return true;

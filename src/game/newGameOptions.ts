@@ -30,6 +30,7 @@ export const SETUP_LEVEL_NAMES: Record<SetupLevel, string> = {
 };
 
 const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
+const ACTIVE_MAP_REGIONS: readonly MapRegion[] = ['plains', 'mountain'];
 const MAP_SIZES: readonly MapSize[] = ['small', 'medium', 'large'];
 const SETUP_LEVELS: readonly SetupLevel[] = ['low', 'normal', 'high'];
 export const MAX_NEW_GAME_SEED = 0x7fffffff;
@@ -67,6 +68,10 @@ const HABITAT_CHANCE: Record<SetupLevel, number> = { low: 0.45, normal: 0.65, hi
 
 function isDifficulty(value: unknown): value is Difficulty {
   return typeof value === 'string' && DIFFICULTIES.includes(value as Difficulty);
+}
+
+function isActiveMapRegion(value: unknown): value is MapRegion {
+  return typeof value === 'string' && ACTIVE_MAP_REGIONS.includes(value as MapRegion);
 }
 
 function isMapSize(value: unknown): value is MapSize {
@@ -127,8 +132,8 @@ export function optionsForDifficulty(
 }
 
 /**
- * S2에서는 세 지도 크기를 모두 보존하고, 지역만 평원으로 잠근다.
- * 후속 S3~S5는 각 지역을 구현하면서 지역 잠금을 순서대로 푼다.
+ * S3에서는 평원·산지와 세 지도 크기를 보존한다.
+ * 호수·해안은 S4~S5에서 구현할 때 잠금을 순서대로 푼다.
  */
 export function normalizeNewGameOptions(raw: Partial<NewGameOptions> | null | undefined): NewGameOptions {
   const defaults = defaultNewGameOptions();
@@ -149,7 +154,7 @@ export function normalizeNewGameOptions(raw: Partial<NewGameOptions> | null | un
     settlementName: normalizeSettlementNameInput(raw?.settlementName ?? ''),
     difficultyPreset,
     baseDifficulty,
-    region: 'plains',
+    region: isActiveMapRegion(raw?.region) ? raw.region : defaults.region,
     mapSize: isMapSize(raw?.mapSize) ? raw.mapSize : defaults.mapSize,
     tuning,
     seed: normalizeNewGameSeed(raw?.seed),
@@ -157,13 +162,14 @@ export function normalizeNewGameOptions(raw: Partial<NewGameOptions> | null | un
 }
 
 function effectiveValues(options: NewGameOptions): WorldSetupSnapshot['effective'] {
+  const habitatMultiplier = options.region === 'mountain' ? 1.2 : 1;
   if (options.difficultyPreset !== 'custom') {
     const preset = CONFIG.difficulty[options.difficultyPreset];
     return {
       startResourceMultiplier: preset.startRes,
       threatGainMultiplier: preset.threatGain,
       raidPowerMultiplier: preset.raidPower,
-      habitatChance: preset.habitatChance,
+      habitatChance: Math.min(0.98, preset.habitatChance * habitatMultiplier),
       // 아직 지도 밀도·기후 소비처는 연결하지 않는다. S2 이후 활성화한다.
       resourceDensityMultiplier: 1,
       climateSeverityMultiplier: 1,
@@ -173,7 +179,10 @@ function effectiveValues(options: NewGameOptions): WorldSetupSnapshot['effective
     startResourceMultiplier: START_RESOURCE_MULTIPLIER[options.tuning.startingResources],
     threatGainMultiplier: THREAT_GAIN_MULTIPLIER[options.tuning.threat],
     raidPowerMultiplier: RAID_POWER_MULTIPLIER[options.tuning.threat],
-    habitatChance: HABITAT_CHANCE[options.tuning.resourceDensity],
+    habitatChance: Math.min(
+      0.98,
+      HABITAT_CHANCE[options.tuning.resourceDensity] * habitatMultiplier,
+    ),
     resourceDensityMultiplier: RESOURCE_DENSITY_MULTIPLIER[options.tuning.resourceDensity],
     climateSeverityMultiplier: CLIMATE_SEVERITY_MULTIPLIER[options.tuning.climateSeverity],
   };

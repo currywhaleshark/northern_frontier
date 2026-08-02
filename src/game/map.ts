@@ -4,7 +4,7 @@ import {
   rollMineralDepositAmount, setMineralDeposit,
 } from './minerals';
 import { ensureForestGrowth } from './forestGrowth';
-import type { Tile, Terrain } from './types';
+import type { MapRegion, Tile, Terrain } from './types';
 
 // mulberry32 시드 난수 — 지도 생성과 시뮬레이션 전반에서 사용
 export function makeRng(seed: number): () => number {
@@ -27,12 +27,22 @@ export function pickWeighted<T extends string>(rng: () => number, table: Record<
   return entries[entries.length - 1][0];
 }
 
-function blob(tiles: Tile[][], rng: () => number, cx: number, cy: number, size: number, terrain: Terrain, over: Terrain[]) {
+function blob(
+  tiles: Tile[][],
+  rng: () => number,
+  cx: number,
+  cy: number,
+  size: number,
+  terrain: Terrain,
+  over: Terrain[],
+  allow?: (x: number, y: number) => boolean,
+) {
   const w = tiles[0]?.length ?? 0, h = tiles.length;
   let x = cx, y = cy;
   for (let i = 0; i < size; i++) {
     const xi = Math.round(x), yi = Math.round(y);
-    if (xi >= 0 && yi >= 0 && xi < w && yi < h && over.includes(tiles[yi][xi].terrain)) {
+    if (xi >= 0 && yi >= 0 && xi < w && yi < h &&
+        over.includes(tiles[yi][xi].terrain) && (!allow || allow(xi, yi))) {
       tiles[yi][xi].terrain = terrain;
     }
     x += (rng() - 0.5) * 3;
@@ -93,10 +103,12 @@ function placeNearbyMineralDeposits(
 export function generateMap(
   seed: number,
   dimensions: Readonly<{ width: number; height: number }> = CONFIG.map,
+  region: MapRegion = 'plains',
 ): { tiles: Tile[][]; centerX: number; centerY: number } {
   const rng = makeRng(seed);
   const w = Math.max(16, Math.floor(dimensions.width));
   const h = Math.max(16, Math.floor(dimensions.height));
+  const mountainRegion = region === 'mountain';
   const areaScale = (w * h) / (44 * 44);
   const scaledCount = (base: number): number => Math.max(1, Math.round(base * areaScale));
 
@@ -118,8 +130,10 @@ export function generateMap(
   const widthFreq = 0.10 + rng() * 0.08; // 몇 굽이마다 폭이 바뀌는지
   let prevLo = -1, prevHi = -1;
   for (let y = 0; y < h; y++) {
-    const breadth = 2 + Math.sin(y * widthFreq + widthPhase) * 1.25 + (rng() - 0.5) * 0.6;
-    const width = Math.max(1, Math.min(3, Math.round(breadth)));
+    const breadth = mountainRegion
+      ? 1.25 + Math.sin(y * widthFreq + widthPhase) * 0.55 + (rng() - 0.5) * 0.35
+      : 2 + Math.sin(y * widthFreq + widthPhase) * 1.25 + (rng() - 0.5) * 0.6;
+    const width = Math.max(1, Math.min(mountainRegion ? 2 : 3, Math.round(breadth)));
     let lo = Math.round(riverX - (width - 1) / 2);
     let hi = lo + width - 1;
     // 이전 행의 물줄기와 좌우로 겹치게 이어 붙여, 대각선으로만 닿아 끊겨 보이는 일을 막는다
@@ -147,9 +161,28 @@ export function generateMap(
     blob(tiles, rng, rng() * w, rng() * 4, 20, 'mountain', ['plain']);
   }
 
+  // 산지는 둘레뿐 아니라 내부까지 낮고 굽은 능선이 들어온다. 정착 후보 중심부는 열어 둔다.
+  if (mountainRegion) {
+    const safeRadius = Math.max(8, Math.round(Math.min(w, h) * 0.13));
+    const allowInteriorRidge = (x: number, y: number): boolean =>
+      Math.hypot(x - w / 2, y - h / 2) >= safeRadius;
+    for (let i = 0; i < scaledCount(10); i++) {
+      blob(
+        tiles,
+        rng,
+        5 + rng() * Math.max(1, w - 10),
+        5 + rng() * Math.max(1, h - 10),
+        38,
+        'mountain',
+        ['plain'],
+        allowInteriorRidge,
+      );
+    }
+  }
+
   // 숲: 넓게 분포
-  for (let i = 0; i < scaledCount(26); i++) {
-    blob(tiles, rng, rng() * w, rng() * h, 30, 'forest', ['plain']);
+  for (let i = 0; i < scaledCount(mountainRegion ? 40 : 26); i++) {
+    blob(tiles, rng, rng() * w, rng() * h, mountainRegion ? 36 : 30, 'forest', ['plain']);
   }
 
   // 바위/철광: 산지 가장자리(평지와 맞닿은 곳)에만 생성해 주민이 걸어서 닿을 수 있게 한다
@@ -160,8 +193,8 @@ export function generateMap(
         const t = tiles[y + dy]?.[x + dx];
         return t && t.terrain !== 'mountain' && t.terrain !== 'rock' && t.terrain !== 'river';
       });
-      if (edge && rng() < 0.25) {
-        const hasIron = rng() < 0.5;
+      if (edge && rng() < (mountainRegion ? 0.38 : 0.25)) {
+        const hasIron = rng() < (mountainRegion ? 0.6 : 0.5);
         setMineralDeposit(tiles[y][x], hasIron, rollMineralDepositAmount(hasIron, rng));
       }
     }
@@ -178,7 +211,7 @@ export function generateMap(
           if (t && t.terrain === 'river') nearRiver = true;
         }
       }
-      if (nearRiver && rng() < 0.55) tiles[y][x].terrain = 'fertile';
+      if (nearRiver && rng() < (mountainRegion ? 0.27 : 0.55)) tiles[y][x].terrain = 'fertile';
     }
   }
 
