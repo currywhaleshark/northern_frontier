@@ -11,7 +11,7 @@ import { canRequestTrade, factionTradeUnlockReason } from '../game/events';
 import { contractReserved, contractReserveNeeds } from '../game/tradeContractReserve';
 import { nextContractDueDay } from '../game/tradeContracts';
 import { gatheringWorkArea } from '../game/gatheringZones';
-import { tidalFlatSummaryInArea } from '../game/tidalFlats';
+import { fishingGroundAt, fishingGroundSummaryInArea } from '../game/fishingGrounds';
 import { DRYING_PRODUCT_DEFS, DRYING_PRODUCT_ORDER, dryingProductOf } from '../game/preservation';
 import { TANNERY_PRODUCT_DEFS, TANNERY_PRODUCT_ORDER, tanneryProductOf } from '../game/wearables';
 import {
@@ -460,7 +460,7 @@ export function ActionPopup({
       )}
 
       {building.type === 'tidalFishery' && building.built && (() => {
-        const summary = tidalFlatSummaryInArea(state.map, gatheringWorkArea(building));
+        const summary = fishingGroundSummaryInArea(state.fishingGrounds, gatheringWorkArea(building), 'mudflat');
         return (
           <div className="worker-slot-panel">
             <div className="worker-slot-summary">
@@ -470,9 +470,27 @@ export function ActionPopup({
               </span>
             </div>
             <div className="muted small">
-              갯벌 비축 {summary.stock.toFixed(1)} / {summary.capacity.toFixed(1)} · 매일 타일당 {CONFIG.tidalFlats.recoveryPerTilePerDay.toFixed(2)} 회복
+              갯벌 어장 {summary.grounds}곳 · 비축 {summary.stock.toFixed(1)} / {summary.capacity.toFixed(1)} · 매일 타일당 {CONFIG.tidalFlats.recoveryPerTilePerDay.toFixed(2)} 회복
             </div>
             <div className="muted small">어부는 배 없이 작업영역 안 갯벌을 오가며 어살과 조개·게를 살핍니다.</div>
+          </div>
+        );
+      })()}
+
+      {building.type === 'ferry' && building.built && (() => {
+        const ground = fishingGroundAt(state.fishingGrounds, building.x, building.y, 'shore');
+        return (
+          <div className="worker-slot-panel">
+            <div className="worker-slot-summary">
+              <span>연안 어장</span>
+              <span className="muted small">
+                물고기 {(building.inventory?.fish ?? 0).toFixed(1)} · 반경 {ground?.radius ?? 1}칸
+              </span>
+            </div>
+            <div className="muted small">
+              어장 비축 {ground?.stock.toFixed(1) ?? '0.0'} / {ground?.capacity.toFixed(1) ?? '0.0'}
+            </div>
+            <div className="muted small">낚시터 어부는 배를 타지 않고 이 작은 강 연안 어장만 이용합니다.</div>
           </div>
         );
       })()}

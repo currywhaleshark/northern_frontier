@@ -88,6 +88,24 @@ export interface AnimalHabitat {
   capacity: number; // 반경 안 숲 잔존량으로 정해지는 최대 비축
 }
 
+export type FishingGroundKind = 'river' | 'mudflat' | 'lake' | 'sea';
+export type FishingGroundDepthBand = 'shore' | 'mid' | 'deep';
+export interface FishingGroundTile { x: number; y: number }
+
+// 어장 — 같은 수역 안에서만 잘린 공유 비축 권역. 연안은 도보, 중·심수는 어선 전용이다.
+export interface FishingGroundState {
+  id: string;
+  kind: FishingGroundKind;
+  depthBand: FishingGroundDepthBand;
+  x: number;
+  y: number;
+  radius: number;
+  tiles: FishingGroundTile[];
+  stock: number;
+  capacity: number;
+  recoveryPerDay: number;
+}
+
 export type JobId =
   | 'idle'       // 무직
   | 'woodcutter' // 벌목꾼
@@ -210,7 +228,7 @@ export type BuildingTypeId =
   | 'mine'       // 채광장
   | 'well'       // 우물 — 지하수 수맥 위 급수 시설
   | 'deepMine'   // 채광갱 — 지하 광맥을 캐는 부 단계 작업장
-  | 'ferry'      // 나루터
+  | 'ferry'      // 낚시터 (구 저장 호환을 위해 내부 ID 유지)
   | 'charcoalKiln' // 숯가마
   | 'stable'     // 축사
   | 'nitreYard'  // 염초장
@@ -247,8 +265,8 @@ export interface Tile {
   hasIron: boolean;       // rock 타일 중 철광 여부
   hasSilver?: boolean;    // 잠채/설점으로 은광이 된 광상. 구버전 저장은 없음
   mineralRemaining?: number; // 바위/철광의 남은 주 광물량. 구버전 저장은 없음
-  tidalStock?: number;    // 갯벌의 현재 어획 비축. 갯벌 외 지형에는 없음
-  tidalCapacity?: number; // 갯벌의 최대 어획 비축. 갯벌 외 지형에는 없음
+  tidalStock?: number;    // v57 이하 갯벌 비축 마이그레이션 원본. v58 런타임에서는 제거
+  tidalCapacity?: number; // v57 이하 갯벌 최대 비축 마이그레이션 원본. v58 런타임에서는 제거
   buildingId: number | null;
 }
 
@@ -1954,6 +1972,7 @@ export interface GameState {
   oreVeinRemaining: number[]; // 결정적 지하 광맥별 남은 매장량
   exploration: ExplorationState;
   habitats: AnimalHabitat[];
+  fishingGrounds: FishingGroundState[];
   foreignSites: ForeignSite[];
   claimZones: ClaimZone[];
   nextForeignSiteId: number;

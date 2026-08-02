@@ -161,7 +161,7 @@ function promote(state: GameState, target: PromotionRank): void {
 
   if (target === 'bo') {
     addLog(state, '조정이 개척지를 보(堡)로 승격하였습니다! 첨사의 이름이 한양까지 알려집니다.', 'good', true);
-    addLog(state, '보 승격으로 온돌집·채광장·나루터·논·방앗간과 어부·방아꾼이 열렸습니다.', 'good');
+    addLog(state, '보 승격으로 온돌집·채광장·낚시터·논·방앗간과 어부·방아꾼이 열렸습니다.', 'good');
     addLog(state, '보가 되니 남쪽에서 사람이 모여들지만, 부유해진 만큼 국경 너머의 눈길도 잦아집니다. 조정의 세공도 무거워질 것입니다.', 'info');
     recordAnnals(state, 'promotion', `${withJosa(beforeName, '이/가')} 보(堡)로 승격되었습니다.`, 'promotion:bo');
   } else if (target === 'jin') {

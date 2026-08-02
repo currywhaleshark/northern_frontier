@@ -48,6 +48,22 @@ export const CONFIG = {
     seasonYieldMult: { spring: 1.15, summer: 1.1, autumn: 1, winter: 0.65 },
   },
 
+  fishingGrounds: {
+    shoreRadius: 1,
+    midRadius: 3,
+    deepRadius: 5,
+    capacityPerTile: {
+      river: { shore: 2.4, mid: 2.4, deep: 2.4 },
+      lake: { shore: 2.5, mid: 3.5, deep: 4.5 },
+      sea: { shore: 2.8, mid: 4, deep: 5.2 },
+    },
+    recoveryPerTilePerDay: {
+      river: { shore: 0.11, mid: 0.11, deep: 0.11 },
+      lake: { shore: 0.12, mid: 0.16, deep: 0.2 },
+      sea: { shore: 0.13, mid: 0.18, deep: 0.24 },
+    },
+  },
+
   habitats: {
     reservePerForestTile: 1.5,
     reserveMin: 12,

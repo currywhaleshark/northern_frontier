@@ -43,6 +43,7 @@ const raidRoutes = await load('raidRoutes');
 const workerSlots = await load('workerSlots');
 const inventory = await load('inventory');
 const tidalFlats = await load('tidalFlats');
+const fishingGrounds = await load('fishingGrounds');
 const constants = await load('constants');
 const { CONFIG } = await load('config');
 
@@ -93,9 +94,10 @@ for (const [mapSize, width, height] of CASES) {
     const mudflatTiles = coast.map.flat().filter(tile => tile.terrain === 'mudflat');
     assert.ok(mudflatTiles.length >= CONFIG.tidalFlats.minimumPlacementTiles,
       `${mapSize}/${seed} 해안에는 어살터를 쓸 만큼 갯벌이 있다`);
-    assert.ok(mudflatTiles.every(tile => tile.tidalCapacity === CONFIG.tidalFlats.capacityPerTile &&
-      tile.tidalStock === CONFIG.tidalFlats.capacityPerTile),
-    `${mapSize}/${seed} 신규 갯벌 어자원이 가득 찬 상태로 시작한다`);
+    const mudflatGrounds = coast.fishingGrounds.filter(ground => ground.kind === 'mudflat');
+    assert.ok(mudflatGrounds.length > 0 && mudflatGrounds.every(ground =>
+      ground.radius === 1 && ground.stock === ground.capacity),
+    `${mapSize}/${seed} 신규 갯벌은 반경 1 어장이 가득 찬 상태로 시작한다`);
     assert.ok(coast.foreignSites.every(site => {
       for (let y = site.y; y < site.y + site.height; y++) for (let x = site.x; x < site.x + site.width; x++) {
         if (coast.map[y]?.[x]?.terrain === 'mudflat') return false;
@@ -343,6 +345,7 @@ function prepareTidalFishery(workerCount, { day = 1, weather = 'clear' } = {}) {
       tidalStock: CONFIG.tidalFlats.capacityPerTile,
     });
   }
+  fishingGrounds.ensureFishingGrounds(state);
   const fishery = addBuilt(state, 'tidalFishery', 10, 10, { inventory: {} });
   for (const resident of state.residents) resident.alive = false;
   for (let index = 0; index < workerCount; index++) {
@@ -371,20 +374,20 @@ function prepareTidalFishery(workerCount, { day = 1, weather = 'clear' } = {}) {
   const oneFish = one.fishery.inventory.fish ?? 0;
   assert.ok(oneFish >= 1 && oneFish <= 1.2,
     `봄 맑은 날 갯벌 어부 1인의 하루 산출 ${oneFish.toFixed(3)}은 목표 1.0~1.2다`);
-  assert.ok(one.state.map.flat().some(tile => tile.terrain === 'mudflat' &&
-    (tile.tidalStock ?? 0) < (tile.tidalCapacity ?? 0)), '실제 작업한 갯벌 칸의 공동 비축이 줄어든다');
+  assert.ok(one.state.fishingGrounds.some(ground => ground.kind === 'mudflat' &&
+    ground.stock < ground.capacity), '실제 작업한 갯벌 어장의 공동 비축이 줄어든다');
 
   const two = prepareTidalFishery(2);
   assert.ok((two.fishery.inventory.fish ?? 0) > oneFish * 1.5,
     '두 슬롯은 같은 어살터에서 한 명보다 충분히 많은 생선을 생산한다');
   assert.equal(inventory.isHaulSourceBuilding(two.fishery), true, '어살터 어획물은 운반꾼 회수 대상이다');
 
-  const workedTile = two.state.map.flat().find(tile => tile.terrain === 'mudflat' &&
-    (tile.tidalStock ?? 0) < (tile.tidalCapacity ?? 0));
-  assert.ok(workedTile);
-  const depleted = workedTile.tidalStock;
-  tidalFlats.advanceTidalFlatStocks(two.state.map);
-  assert.ok(workedTile.tidalStock > depleted && workedTile.tidalStock <= workedTile.tidalCapacity,
+  const workedGround = two.state.fishingGrounds.find(ground => ground.kind === 'mudflat' &&
+    ground.stock < ground.capacity);
+  assert.ok(workedGround);
+  const depleted = workedGround.stock;
+  fishingGrounds.advanceFishingGrounds(two.state.fishingGrounds);
+  assert.ok(workedGround.stock > depleted && workedGround.stock <= workedGround.capacity,
     '소모된 갯벌 어자원은 하루마다 상한까지 회복한다');
 
   const winter = prepareTidalFishery(1, { day: 37, weather: 'clear' });
@@ -395,19 +398,22 @@ function prepareTidalFishery(workerCount, { day = 1, weather = 'clear' } = {}) {
 
   const overlap = prepareTidalFishery(0);
   const secondFishery = addBuilt(overlap.state, 'tidalFishery', 12, 10, { inventory: {} });
-  const sharedTile = overlap.state.map[9][9];
-  const firstBefore = tidalFlats.tidalFlatSummaryInArea(
-    overlap.state.map, { x: overlap.fishery.x, y: overlap.fishery.y, radius: CONFIG.gatheringZones.tidalFisheryRadius },
+  const sharedGround = overlap.state.fishingGrounds.find(ground => ground.kind === 'mudflat' &&
+    ground.tiles.some(tile => tile.x === 9 && tile.y === 9));
+  assert.ok(sharedGround);
+  const sharedTile = sharedGround.tiles[0];
+  const firstBefore = fishingGrounds.fishingGroundSummaryInArea(
+    overlap.state.fishingGrounds, { x: overlap.fishery.x, y: overlap.fishery.y, radius: CONFIG.gatheringZones.tidalFisheryRadius }, 'mudflat',
   ).stock;
-  const secondBefore = tidalFlats.tidalFlatSummaryInArea(
-    overlap.state.map, { x: secondFishery.x, y: secondFishery.y, radius: CONFIG.gatheringZones.tidalFisheryRadius },
+  const secondBefore = fishingGrounds.fishingGroundSummaryInArea(
+    overlap.state.fishingGrounds, { x: secondFishery.x, y: secondFishery.y, radius: CONFIG.gatheringZones.tidalFisheryRadius }, 'mudflat',
   ).stock;
-  tidalFlats.takeTidalFlatStock(sharedTile, 1);
-  const firstAfter = tidalFlats.tidalFlatSummaryInArea(
-    overlap.state.map, { x: overlap.fishery.x, y: overlap.fishery.y, radius: CONFIG.gatheringZones.tidalFisheryRadius },
+  fishingGrounds.takeFishingGroundStock(overlap.state.fishingGrounds, sharedTile.x, sharedTile.y, 1);
+  const firstAfter = fishingGrounds.fishingGroundSummaryInArea(
+    overlap.state.fishingGrounds, { x: overlap.fishery.x, y: overlap.fishery.y, radius: CONFIG.gatheringZones.tidalFisheryRadius }, 'mudflat',
   ).stock;
-  const secondAfter = tidalFlats.tidalFlatSummaryInArea(
-    overlap.state.map, { x: secondFishery.x, y: secondFishery.y, radius: CONFIG.gatheringZones.tidalFisheryRadius },
+  const secondAfter = fishingGrounds.fishingGroundSummaryInArea(
+    overlap.state.fishingGrounds, { x: secondFishery.x, y: secondFishery.y, radius: CONFIG.gatheringZones.tidalFisheryRadius }, 'mudflat',
   ).stock;
   assert.equal(firstBefore - firstAfter, 1);
   assert.equal(secondBefore - secondAfter, 1, '겹친 어살터는 같은 갯벌 타일 비축을 공유한다');
@@ -434,16 +440,16 @@ function prepareTidalFishery(workerCount, { day = 1, weather = 'clear' } = {}) {
 // 갯벌·어살터·남은 공동 비축은 저장 왕복에서도 유지된다.
 {
   const { state, fishery } = prepareTidalFishery(1);
-  const workedTile = state.map.flat().find(tile => tile.terrain === 'mudflat' &&
-    (tile.tidalStock ?? 0) < (tile.tidalCapacity ?? 0));
-  assert.ok(workedTile);
+  const workedGround = state.fishingGrounds.find(ground => ground.kind === 'mudflat' &&
+    ground.stock < ground.capacity);
+  assert.ok(workedGround);
   assert.equal(saveLoad.saveGame(state, 6), true);
   const loaded = saveLoad.loadGame(6);
   assert.ok(loaded);
   assert.equal(loaded.buildings.find(building => building.id === fishery.id)?.type, 'tidalFishery');
-  const loadedTile = loaded.map[workedTile.y][workedTile.x];
-  assert.equal(loadedTile.terrain, 'mudflat');
-  assert.equal(loadedTile.tidalStock, workedTile.tidalStock);
+  const loadedGround = loaded.fishingGrounds.find(ground => ground.id === workedGround.id);
+  assert.ok(loadedGround);
+  assert.equal(loadedGround.stock, workedGround.stock);
 }
 
 console.log('map region S5 coast tests passed');

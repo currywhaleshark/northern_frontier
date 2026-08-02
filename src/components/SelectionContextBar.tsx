@@ -11,7 +11,7 @@ import { mineralRemaining } from '../game/minerals';
 import { mineMineralSummary } from '../game/miningSites';
 import { gatheringForestSummary, gatheringWorkArea, isGatheringBuildingType } from '../game/gatheringZones';
 import { habitatReserveSummaryInArea } from '../game/habitats';
-import { tidalFlatSummaryInArea } from '../game/tidalFlats';
+import { fishingGroundSummaryInArea } from '../game/fishingGrounds';
 import {
   linkedLodgingWorksite, lodgingHutForWorksite, lodgingSupplySummary, lodgingWorkers,
 } from '../game/lodgingHuts';
@@ -376,7 +376,7 @@ export function SelectionContextBar({
     ? habitatReserveSummaryInArea(state.map, state.habitats, gatheringArea)
     : null;
   const tidalSummary = gatheringBuilding?.type === 'tidalFishery' && gatheringArea
-    ? tidalFlatSummaryInArea(state.map, gatheringArea)
+    ? fishingGroundSummaryInArea(state.fishingGrounds, gatheringArea, 'mudflat')
     : null;
   const lodgingHut = building?.type === 'lodgingHut' ? building : null;
   const lodgingWorksite = lodgingHut ? linkedLodgingWorksite(state, lodgingHut) : null;

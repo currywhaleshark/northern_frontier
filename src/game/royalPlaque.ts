@@ -3,7 +3,7 @@ import type { Building, BuildingTypeId, GameState } from './types';
 /**
  * 사액 현판이 실제 작업 산출을 높일 수 있는 건물의 단일 목록.
  *
- * 채집 거점(벌목장·사냥막·약초막·채광장·나루터), 경작지, 주거,
+ * 채집 거점(벌목장·사냥막·약초막·채광장·낚시터), 경작지, 주거,
  * 방어·행정·의료·교통 시설은 의도적으로 포함하지 않는다.
  */
 export const ROYAL_PLAQUE_PRODUCTION_BUILDING_TYPES = [

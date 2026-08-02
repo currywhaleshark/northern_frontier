@@ -57,7 +57,11 @@ import { performPhysicianTreatment } from './medicine';
 import { isTileInMineWorkArea, mineralDepositsInMineRange, servingMineForTile } from './miningSites';
 import { gatheringWorkArea, isTileInGatheringWorkArea } from './gatheringZones';
 import { oreSampleAt } from './subsurfaceVeins';
-import { takeTidalFlatStock, tidalFlatSummaryInArea, tidalFlatYieldMultiplier } from './tidalFlats';
+import { tidalFlatYieldMultiplier } from './tidalFlats';
+import {
+  ensureFishingGrounds, fishingGroundAt, fishingGroundStockAt, fishingGroundSummaryInArea,
+  takeFishingGroundStock,
+} from './fishingGrounds';
 import { waterDependentProductionMultiplier } from './waterSupply';
 import { activeFireDisaster, applyFireWater, drawFireWater, nearestFireWaterSource } from './fire';
 import { mineCollapseRepairLocked } from './mineCollapse';
@@ -2663,9 +2667,11 @@ function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
   const workplace = assignedWorkplaceOfTypes(state, r, ctx, ['ferry', 'tidalFishery'], '어로 거점 배정 없음');
   if (!workplace) return;
   if (workplace.type === 'tidalFishery') {
+    if (!state.fishingGrounds.some(ground => ground.kind === 'mudflat')) ensureFishingGrounds(state);
     gatherJob(state, r, ctx, {
       goal: tile => tile.terrain === 'mudflat' && tile.buildingId == null &&
-        (tile.tidalStock ?? 0) > WORK_STOCK_EPSILON && isTileInGatheringWorkArea(workplace, tile),
+        fishingGroundStockAt(state.fishingGrounds, tile.x, tile.y) > WORK_STOCK_EPSILON &&
+        isTileInGatheringWorkArea(workplace, tile),
       workTicks: a.work.fish,
       yieldRes: 'fish',
       yieldAmt: a.yields.fish * tidalFlatYieldMultiplier(ctx.season),
@@ -2677,9 +2683,12 @@ function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
       taskHaul: '갯벌 어획물 운반',
       taskNone: '잡을 것이 없는 갯벌',
       adjustHarvestAmount: (tile, _resident, requested) => {
-        const taken = takeTidalFlatStock(tile, requested);
-        if ((tile.tidalStock ?? 0) <= WORK_STOCK_EPSILON) {
-          const remaining = tidalFlatSummaryInArea(state.map, gatheringWorkArea(workplace)).stock;
+        const ground = fishingGroundAt(state.fishingGrounds, tile.x, tile.y, 'shore');
+        const taken = takeFishingGroundStock(state.fishingGrounds, tile.x, tile.y, requested);
+        if (ground && ground.stock <= WORK_STOCK_EPSILON) {
+          const remaining = fishingGroundSummaryInArea(
+            state.fishingGrounds, gatheringWorkArea(workplace), 'mudflat',
+          ).stock;
           const warningDays = tidalDepletionWarningDaysFor(state);
           const lastWarningDay = warningDays.get(workplace.id) ?? -Infinity;
           if (remaining <= WORK_STOCK_EPSILON &&
@@ -2693,17 +2702,33 @@ function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
     });
     return;
   }
+  if (!fishingGroundAt(state.fishingGrounds, workplace.x, workplace.y, 'shore')) ensureFishingGrounds(state);
   const floodMult = state.weather === 'thawFlood' ? 0.25 : 1;
+  const interactionGoal = buildingInteractionGoal(state, [workplace.id]);
   gatherJob(state, r, ctx, {
-    goal: buildingInteractionGoal(state, [workplace.id]),
+    goal: tile => interactionGoal(tile) &&
+      fishingGroundStockAt(state.fishingGrounds, workplace.x, workplace.y) > WORK_STOCK_EPSILON,
     workTicks: a.work.fish,
     yieldRes: 'fish',
     yieldAmt: a.yields.fish * CONFIG.seasons.fishMult[ctx.season] * floodMult * droughtFishYieldMultiplier(state),
     cap: a.carryCap.fish,
     depositExtra: ['ferry'],
     taskWork: '고기잡이 중',
-    taskMove: '나루터로 이동',
+    taskMove: '낚시터로 이동',
     taskHaul: '물고기 운반',
+    taskNone: '낚시터 어장이 고갈됨',
+    adjustHarvestAmount: (_tile, _resident, requested) => {
+      const taken = takeFishingGroundStock(state.fishingGrounds, workplace.x, workplace.y, requested);
+      if (fishingGroundStockAt(state.fishingGrounds, workplace.x, workplace.y) <= WORK_STOCK_EPSILON) {
+        const warningDays = tidalDepletionWarningDaysFor(state);
+        const lastWarningDay = warningDays.get(workplace.id) ?? -Infinity;
+        if (state.day - lastWarningDay >= CONFIG.tidalFlats.depletionLogCooldownDays) {
+          warningDays.set(workplace.id, state.day);
+          addLog(state, '낚시터의 연안 어장이 바닥났습니다. 며칠 쉬면 다시 찹니다.', 'bad', true);
+        }
+      }
+      return taken;
+    },
   });
 }
 

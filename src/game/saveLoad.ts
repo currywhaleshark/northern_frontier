@@ -16,6 +16,7 @@ import { makeRng } from './map';
 import { ensureMineralDeposits } from './minerals';
 import { ensureForestGrowth } from './forestGrowth';
 import { ensureTidalFlatStocks } from './tidalFlats';
+import { ensureFishingGrounds } from './fishingGrounds';
 import { ensureProcessingReserves } from './processing';
 import { initRelations } from './relations';
 import { getSeason, getYear } from './seasons';
@@ -867,6 +868,11 @@ export function migrateV56ToV57(raw: RawSave): RawSave {
   };
 }
 
+// v58: 낚시터·갯벌·호수·바다가 공유하는 유한 어장. 실제 비축 환산은 지형 정규화 뒤 수행한다.
+export function migrateV57ToV58(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), fishingGrounds: [], schemaVersion: 58 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -929,6 +935,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 54) migrated = migrateV54ToV55(migrated);
     else if (version === 55) migrated = migrateV55ToV56(migrated);
     else if (version === 56) migrated = migrateV56ToV57(migrated);
+    else if (version === 57) migrated = migrateV57ToV58(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -2331,6 +2338,7 @@ export function loadGame(slot = 1): GameState | null {
     if (actualMapSize) parsed.worldSetup.mapSize = actualMapSize;
     ensureMineralDeposits(parsed.map);
     ensureTidalFlatStocks(parsed.map);
+    ensureFishingGrounds(parsed);
     normalizeSubsurfaceState(parsed);
     ensureForestGrowth(parsed.map);
     if (parsed.battle && !parsed.battle.mode) parsed.battle.mode = 'garrison';

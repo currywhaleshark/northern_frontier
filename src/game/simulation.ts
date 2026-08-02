@@ -53,7 +53,7 @@ import { firewoodWeatherMult, weatherForDay } from './weather';
 import { defaultProcessingReserves } from './processing';
 import { hasKnownMineralDepositNear } from './miningSites';
 import { initialAquiferLevels, initialOreVeinRemaining } from './subsurfaceVeins';
-import { advanceTidalFlatStocks } from './tidalFlats';
+import { advanceFishingGrounds, spawnFishingGrounds } from './fishingGrounds';
 import { dailyAquiferTick } from './waterSupply';
 import {
   canPlantCropNow, cropIdForBuilding, CROP_DEFS, defaultCropForBuildingType, isCropAllowedOnBuilding,
@@ -178,6 +178,7 @@ export function newGameFromOptions(
     exploration: createExploration({ map: tiles }),
     // 짐승 서식지: 숲 덩어리마다 난이도별 확률로 자리 잡는다 (마을 근처 하나는 보장)
     habitats: spawnAnimalHabitats(tiles, centerX, centerY, rng, effective.habitatChance),
+    fishingGrounds: spawnFishingGrounds(tiles),
     foreignSites: [],
     claimZones: [],
     nextForeignSiteId: 1,
@@ -1526,7 +1527,7 @@ function endOfDay(state: GameState): void {
   const reservoirTerrainChanged = advanceWeirReservoirs(state);
   if (springFloodStarted || reservoirTerrainChanged) ensureResidentsOnPassableTiles(state);
   dailyAquiferTick(state);
-  advanceTidalFlatStocks(state.map);
+  advanceFishingGrounds(state.fishingGrounds);
 
   regrowForest(state, rng, season);
   updateHabitats(state);

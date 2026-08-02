@@ -30,6 +30,7 @@ const compiledDir = compileGameModules();
 const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mjs')).href);
+const fishingGrounds = await import(pathToFileURL(join(compiledDir, 'fishingGrounds.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 function clearMapToPlain(state) {
@@ -195,6 +196,8 @@ function prepareState(seed) {
 {
   const state = prepareState(2026070916);
   state.rank = 'bo';
+  state.map[10][10].terrain = 'river';
+  fishingGrounds.ensureFishingGrounds(state);
   const ferry = addBuilt(state, 'ferry', 10, 10);
   const fisher = workableResident(state, 0, 'fisher', ferry.x, ferry.y);
 
@@ -206,6 +209,8 @@ function prepareState(seed) {
 {
   const state = prepareState(2026070917);
   state.rank = 'bo';
+  state.map[10][10].terrain = 'river';
+  fishingGrounds.ensureFishingGrounds(state);
   const ferry = addBuilt(state, 'ferry', 10, 10);
   const fisher = workableResident(state, 0, 'fisher', ferry.x, ferry.y);
   assert.equal(workerSlots.assignResidentToBuilding(state, fisher.id, ferry.id), null);
@@ -386,6 +391,8 @@ function fisherCatch(seed, drought) {
   const state = prepareState(seed);
   state.day = 15;
   state.rank = 'bo';
+  state.map[10][10].terrain = 'river';
+  fishingGrounds.ensureFishingGrounds(state);
   const ferry = addBuilt(state, 'ferry', 10, 10);
   if (drought) activateDrought(state);
   const fisher = workableResident(state, 0, 'fisher', ferry.x, ferry.y);

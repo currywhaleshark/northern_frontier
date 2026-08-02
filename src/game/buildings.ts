@@ -97,7 +97,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   levee: {
     id: 'levee', name: '제방',
-    desc: '강 타일의 육지 쪽 변에 가로·세로로 붙여 쌓는 낮은 둑. 인접 논밭을 차지하지 않고 일반 강가 건물과 공존하지만 방앗간·나루터·부두와는 겹칠 수 없다. 대홍수 범람을 막는 대신 뒤편에는 비옥한 퇴적도 오지 않는다.',
+    desc: '강 타일의 육지 쪽 변에 가로·세로로 붙여 쌓는 낮은 둑. 인접 논밭을 차지하지 않고 일반 강가 건물과 공존하지만 방앗간·낚시터·부두와는 겹칠 수 없다. 대홍수 범람을 막는 대신 뒤편에는 비옥한 퇴적도 오지 않는다.',
     cost: { wood: 3, stone: 4 }, buildDays: 3, slots: 0, capacity: 0, defense: 0,
     winterBonus: false, placement: 'river', unique: false,
   },
@@ -186,8 +186,8 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     winterBonus: false, placement: 'land', unique: false, minRank: 'bu',
   },
   ferry: {
-    id: 'ferry', name: '나루터',
-    desc: '보(堡) 승격 후 건설. 육지와 맞닿은 강 타일에 두어 어부가 식량을 얻는 거점.',
+    id: 'ferry', name: '낚시터',
+    desc: '보(堡) 승격 후 건설. 육지와 맞닿은 강 타일의 반경 1칸 연안 어장에서 어부가 배 없이 물고기를 잡는 거점.',
     cost: { wood: 14, stone: 4, tools: 1 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'riverbank', unique: false, minRank: 'bo',
   },

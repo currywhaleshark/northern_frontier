@@ -138,7 +138,7 @@ export function canResidentWorkTarget(
     case 'fisher':
       return buildingMatches(tile, building, ['ferry'])
         ? { ok: true, label: '고기잡이', buildingId: building?.id }
-        : { ok: false, label: '나루터가 아닙니다' };
+        : { ok: false, label: '낚시터가 아닙니다' };
     case 'smith':
       return buildingMatches(tile, building, ['smithy'])
         ? { ok: true, label: '대장간 작업', buildingId: building?.id }
