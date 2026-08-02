@@ -28,7 +28,7 @@ assert.match(appSource, /<Profiler id="log-boundary"[\s\S]*?<RuntimeVersionBound
   'the unified log owns a profiled management snapshot boundary');
 assert.match(appSource, /<Profiler id="dock-boundary"[\s\S]*?<DockFrame/,
   'dock descendant work is measured independently');
-assert.match(appSource, /<RuntimeVersionBoundary store=\{uiVersionStore\}>\s*\{\(\) => <RuntimeGameEffects/,
+assert.match(appSource, /<RuntimeVersionBoundary store=\{uiVersionStore\}>\s*\{\(\) =>\s*\(\s*<RuntimeGameEffects/,
   'sound, weather, and tactical pause effects follow the lightweight snapshot cadence');
 assert.match(appSource, /<Profiler id="minimap-boundary"[\s\S]*?<RuntimeVersionBoundary store=\{runtimeVersionStore\}>/,
   'the minimap remains on the per-tick canvas store');

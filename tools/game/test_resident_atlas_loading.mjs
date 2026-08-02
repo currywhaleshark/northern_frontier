@@ -343,8 +343,8 @@ try {
   }));
   assert.equal(
     youthWalkingContext.images[0],
-    FakeImage.bySrc.get('/assets/new-content-residents-v2.png'),
-    'common adult walking never replaces the youth presentation',
+    FakeImage.bySrc.get('/assets/resident-approved-i2v-locomotion-v1.png'),
+    'an approved youth walk uses its dedicated I2V presentation',
   );
 
   const undertakerWalkingContext = drawContext();

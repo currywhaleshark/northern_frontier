@@ -14,7 +14,7 @@ assert.match(panelSource, /data-tut=\{`job-plus-\$\{job\}`\}/,
   'the original quick-assignment tutorial anchor remains on the plus button');
 assert.match(panelSource, /resident\.skills\[job\] \?\? 0/,
   'each resident row reads skill for the selected job rather than the current job');
-assert.match(panelSource, /\{resident\.age\}세/,
+assert.match(panelSource, /\{residentDisplayAge\(resident\)\}세/,
   'detail rows show resident age');
 assert.match(panelSource, /현재 \{JOB_NAMES\[selectedJob\]\}/);
 assert.match(panelSource, />무직자</);

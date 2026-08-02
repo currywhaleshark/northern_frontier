@@ -34,10 +34,15 @@ const raidDamage = await import(pathToFileURL(join(compiledDir, 'raidDamage.mjs'
 
 const SINGLE_TILE = [
   'bridge',
+  'weir',
+  'levee',
+  'canal',
   'lumberCamp',
   'huntLodge',
   'herbHut',
+  'lodgingHut',
   'mine',
+  'well',
   'field',
   'paddy',
   'ferry',

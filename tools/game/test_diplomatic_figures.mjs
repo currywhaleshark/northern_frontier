@@ -34,8 +34,8 @@ const allowedNames = {
   '홀라온 야인': ['하질이', '부자타', '소라적', '가롱개', '망가', '구적라', '모도오', '나이곤', '보당개', '도아야', '도리야노노호', '사롱합', '호시단'],
 };
 
-assert.equal(CURRENT_SCHEMA_VERSION, 49);
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 49);
+assert.equal(CURRENT_SCHEMA_VERSION, 56);
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 56);
 
 {
   const first = figures.createFactionLeaders(20260730);

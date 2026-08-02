@@ -39,16 +39,28 @@ function prepare(seed, withKimchi) {
   for (const resource of catalog.RESOURCE_IDS) state.resources[resource] = 0;
   state.resources.grain = withKimchi ? 72 : 84;
   state.resources.herbs = 100;
+  const hutCount = Math.ceil(state.residents.length / buildings.BUILDING_DEFS.hut.capacity);
+  const huts = Array.from({ length: hutCount }, (_, index) => ({
+    id: state.nextBuildingId++,
+    type: 'hut',
+    x: index * 3,
+    y: 0,
+    progress: buildings.BUILDING_DEFS.hut.buildDays,
+    built: true,
+    fieldGrowth: 0,
+  }));
+  state.buildings.push(...huts);
   for (const resident of state.residents) {
     Object.assign(resident, {
       alive: true,
       sick: false,
-      health: 70,
+      health: 100,
       morale: 50,
       hunger: 100,
-      warmth: 60,
+      warmth: 50,
       job: 'idle',
       quarantinedUntil: 0,
+      worn: { clothing: { resource: 'hideClothes', wear: 0 } },
     });
   }
 
@@ -79,6 +91,8 @@ function runWinter(seed, withKimchi) {
   let moraleTotal = 0;
   const vegetableRatios = [];
   for (let day = 0; day < CONFIG.time.seasonDays; day++) {
+    // 이 검사는 겨울 식단만 비교한다. 매일 같은 중립 체온에서 시작해 추위 피해와 자연 회복을 모두 격리한다.
+    for (const resident of residents.livingResidents(state)) resident.warmth = 50;
     const population = residents.livingResidents(state).length;
     const foodNeed = population * CONFIG.needs.foodPerDay;
     const meal = consumption.consumeFoodByDiet(state, foodNeed);
@@ -138,6 +152,8 @@ const report = {
   },
 };
 
+console.log(JSON.stringify(report, null, 2));
+
 assert.equal(report.withKimchi.survivalRate, 1);
 assert.equal(report.withoutKimchi.survivalRate, 1, 'no-kimchi winter remains survivable');
 assert.ok(report.withKimchi.vegetableDays >= 10, 'medium kimjang covers most winter vegetable days');
@@ -150,5 +166,4 @@ assert.equal(
   'medium kimjang grants its configured community-work morale boost',
 );
 
-console.log(JSON.stringify(report, null, 2));
 console.log('kimjang balance tests passed');

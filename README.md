@@ -177,6 +177,14 @@ npm run test:game
 npm run build
 ```
 
+게임 테스트 러너는 기본적으로 최대 4개 파일을 병렬 실행하고, 개별 파일이 60초를 넘기면 실패로 처리합니다.
+파일명 일부를 넘겨 표적 테스트만 실행할 수 있으며, 필요하면 `GAME_TEST_WORKERS`와
+`GAME_TEST_TIMEOUT_MS` 환경 변수로 동시 실행 수와 제한시간을 조절할 수 있습니다.
+
+```bash
+npm run test:game -- forest_habitats tutorial_scenario
+```
+
 개별 테스트는 `tools/game/test_*.mjs`에 있습니다. 장기 교역 자동 플레이 예시는 다음과 같습니다.
 
 ```bash

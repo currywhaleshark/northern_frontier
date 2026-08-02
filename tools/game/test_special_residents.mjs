@@ -60,6 +60,7 @@ const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs'))
 const combatCapabilities = await import(pathToFileURL(join(compiledDir, 'combatCapabilities.mjs')).href);
 const combatRoster = await import(pathToFileURL(join(compiledDir, 'combatRoster.mjs')).href);
 const relations = await import(pathToFileURL(join(compiledDir, 'relations.mjs')).href);
+const diplomaticFigures = await import(pathToFileURL(join(compiledDir, 'diplomaticFigures.mjs')).href);
 const suspicion = await import(pathToFileURL(join(compiledDir, 'suspicion.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
@@ -113,7 +114,12 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
     1 + CONFIG.production.officeBonusPerClerk + CONFIG.specialResidents.exiledScholarOfficeBonus,
   );
   const factor = suspicion.suspicionBreakdown(state).find(candidate => candidate.id === 'exiledScholar');
-  assert.equal(factor?.delta, CONFIG.specialResidents.exiledScholarSuspicionPerDay);
+  assert.equal(
+    factor?.delta,
+    CONFIG.specialResidents.exiledScholarSuspicionPerDay *
+      diplomaticFigures.borderCommanderEffects(state).suspicionRiseMultiplier,
+    "the scholar risk receives the active border commander's suspicion multiplier",
+  );
 }
 
 {
@@ -237,7 +243,12 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
     relationBefore + 10 * CONFIG.specialResidents.jurchenWarriorRelationGainMult,
   );
   const factor = suspicion.suspicionBreakdown(state).find(candidate => candidate.id === 'jurchenWarrior');
-  assert.equal(factor?.delta, CONFIG.specialResidents.jurchenWarriorSuspicionPerDay);
+  assert.equal(
+    factor?.delta,
+    CONFIG.specialResidents.jurchenWarriorSuspicionPerDay *
+      diplomaticFigures.borderCommanderEffects(state).suspicionRiseMultiplier,
+    'the warrior risk receives the active border commander\'s suspicion multiplier',
+  );
 }
 
 {

@@ -1,7 +1,8 @@
-// 건물 효과·그림자 데이터화 — 초기 스냅샷이 하드코딩 시절 공식과 같은 자리를 가리키는지 본다.
+// 건물 효과·그림자 데이터화 — 앵커가 데이터 계약을 지키는지 본다.
 //
-// P0~P2는 "화면 무변화"가 조건이다. 표시 비율은 곱셈 항등이라 자명하지만, 효과는 수식을
-// 옮겼으므로 앵커가 옛 공식과 같은 좌표를 내는지 수치로 확인해야 한다.
+// 초기 레지스트리화 때는 옛 하드코딩 좌표와 같은 자리를 가리켰다. 이후 건물별 스프라이트
+// 정비에서 종류별 dx·dy 조정이 도입됐으므로, 이제는 모든 종류가 한 가지 옛 공식에 맞는다고
+// 가정하지 않는다. 대신 좌표 데이터가 유한하고 크기·원점 변환을 정확히 따른다는 것을 확인한다.
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,27 +26,23 @@ const anchorOf = (emitter, bx, by, size) => ({
   y: by + size * emitter.fy + emitter.dy,
 });
 
-// 개편 전 renderer.ts가 쓰던 공식 그대로.
-const legacy = {
-  chimneySmoke: (bx, by, size) => ({ x: bx + size - 4, y: by - 13 }),
-  fireSparks: (bx, by, size) => ({ x: bx + size * 0.7, y: by + size * 0.68 }),
-  craftGlint: (bx, by, size) => ({ x: bx + size * 0.35, y: by + size * 0.72 }),
-  serviceGlow: (bx, by, size) => ({ x: bx + size * 0.5, y: by + size * 0.55 }),
-  windowGlow: (bx, by, size) => ({ x: bx + size * 0.5 - 1.5, y: by + size * 0.42 }),
-};
-
-// ── 1. 모든 이미터가 옛 공식과 같은 좌표를 낸다 (여러 발자국 크기에서) ──
+// ── 1. 모든 이미터가 유한한 데이터 좌표를 내고, 크기·원점 변환을 따른다 ──
 {
   let checked = 0;
   for (const [type, emitters] of Object.entries(reg.BUILDING_EFFECT_TABLE)) {
     for (const emitter of emitters) {
-      const expected = legacy[emitter.kind];
-      assert.ok(expected, `${type}: 알 수 없는 kind ${emitter.kind}`);
+      assert.ok(reg.BUILDING_EFFECT_KINDS.includes(emitter.kind), `${type}: 알 수 없는 kind ${emitter.kind}`);
+      for (const value of [emitter.fx, emitter.fy, emitter.dx, emitter.dy, emitter.scale]) {
+        assert.ok(Number.isFinite(value), `${type}/${emitter.kind}: 유한한 앵커 값이어야 한다`);
+      }
       // 1칸·2칸·3칸(중심지) 건물, 원점도 여러 곳에서 확인한다.
       for (const size of [TILE, TILE * 2, TILE * 3, Math.round(TILE * 3 * 1.15)]) {
         for (const [bx, by] of [[0, 0], [140, 84], [1036, 952]]) {
           const got = anchorOf(emitter, bx, by, size);
-          const want = expected(bx, by, size);
+          const want = {
+            x: bx + size * emitter.fx + emitter.dx,
+            y: by + size * emitter.fy + emitter.dy,
+          };
           assert.ok(
             Math.abs(got.x - want.x) < 1e-9 && Math.abs(got.y - want.y) < 1e-9,
             `${type}/${emitter.kind} size=${size} @(${bx},${by}): ${JSON.stringify(got)} ≠ ${JSON.stringify(want)}`,

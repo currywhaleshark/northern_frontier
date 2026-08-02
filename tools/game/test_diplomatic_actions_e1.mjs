@@ -26,8 +26,8 @@ const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).h
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const { CURRENT_SCHEMA_VERSION } = await import(pathToFileURL(join(compiledDir, 'saveSchema.mjs')).href);
 
-assert.equal(CURRENT_SCHEMA_VERSION, 49);
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 49);
+assert.equal(CURRENT_SCHEMA_VERSION, 56);
+assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 56);
 
 {
   const state = simulation.newGame(73040);

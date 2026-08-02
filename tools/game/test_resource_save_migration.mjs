@@ -50,7 +50,8 @@ const expeditionEngagement = await import(pathToFileURL(join(compiledDir, 'exped
 const catalog = await import(pathToFileURL(join(compiledDir, 'resourceCatalog.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 49, 'diplomatic-action-ready saves ship with schema version 49');
+assert.ok(Number.isInteger(saveLoad.CURRENT_SCHEMA_VERSION) && saveLoad.CURRENT_SCHEMA_VERSION >= 49,
+  'current saves retain the diplomatic-action migration and may add newer schema steps');
 assert.equal(typeof saveLoad.migrateV7ToV8, 'function');
 assert.equal(typeof saveLoad.migrateV8ToV9, 'function');
 assert.equal(typeof saveLoad.migrateV9ToV10, 'function');

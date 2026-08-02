@@ -50,6 +50,7 @@ function simpleState() {
     exploration: { explored: map.map(row => row.map(() => true)) },
     buildings: [stable],
     foreignSites: [],
+    pendingDisasters: [],
   };
 }
 

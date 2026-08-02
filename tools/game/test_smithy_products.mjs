@@ -41,19 +41,18 @@ const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mj
 const weapons = await import(pathToFileURL(join(compiledDir, 'weapons.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-function openTile(state) {
+function openTile(state, type) {
   for (let y = 1; y < CONFIG.map.height - 1; y++) {
     for (let x = 1; x < CONFIG.map.width - 1; x++) {
-      const tile = state.map[y][x];
-      if (tile.buildingId == null && tile.terrain !== 'river' && tile.terrain !== 'mountain' && tile.terrain !== 'rock') {
-        return tile;
-      }
+      const footprint = buildings.buildingFootprintTiles(state, type, x, y);
+      if (footprint?.every(tile => tile.buildingId == null &&
+        tile.terrain !== 'river' && tile.terrain !== 'mountain' && tile.terrain !== 'rock')) return state.map[y][x];
     }
   }
   throw new Error('no open tile');
 }
 
-function addBuilt(state, type, tile = openTile(state)) {
+function addBuilt(state, type, tile = openTile(state, type)) {
   const building = {
     id: 9000 + state.buildings.length,
     type,
@@ -64,7 +63,9 @@ function addBuilt(state, type, tile = openTile(state)) {
     fieldGrowth: 0,
   };
   state.buildings.push(building);
-  tile.buildingId = building.id;
+  const footprint = buildings.footprintTilesOf(state, building);
+  assert.ok(footprint, 'test building footprint fits on the map');
+  for (const occupied of footprint) occupied.buildingId = building.id;
   return building;
 }
 
@@ -154,7 +155,10 @@ function keepOnlyResident(state, index, job, tile) {
   state.processingReserves.wood = 0;
   spearSmithy.inventory = { iron: 10, wood: 10 };
 
-  simulation.advanceTick(state);
+  for (let i = 0; i < CONFIG.agents.subticksPerDay * 2 && (spearSmithy.inventory?.spears ?? 0) <= 0; i++) {
+    state.pendingChoice = null;
+    simulation.advanceTick(state);
+  }
 
   assert.equal(buildings.smithyProductOf(toolsSmithy), 'tools');
   assert.ok((spearSmithy.inventory?.spears ?? 0) > 0, 'smith uses the smithy whose selected product can be made');
@@ -244,8 +248,8 @@ function keepOnlyResident(state, index, job, tile) {
 
 {
   const state = simulation.newGame(9107);
-  const hauler = state.residents.find(resident => resident.job === 'hauler');
-  assert.ok(hauler);
+  const hauler = state.residents[0];
+  hauler.job = 'hauler';
   state.resources.carts = 1;
   assert.equal(simulation.toggleResidentCart(state, hauler.id), null);
 

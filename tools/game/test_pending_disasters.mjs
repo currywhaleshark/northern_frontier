@@ -68,7 +68,8 @@ function advanceWeather(state, weather) {
   disasters.advancePendingDisasters(state);
 }
 
-assert.equal(CURRENT_SCHEMA_VERSION, 55);
+assert.ok(Number.isInteger(CURRENT_SCHEMA_VERSION) && CURRENT_SCHEMA_VERSION >= 44,
+  'current saves retain the pending-disaster migration and may add newer schema steps');
 {
   const state = simulation.newGame(72001);
   assert.deepEqual(state.pendingDisasters, []);

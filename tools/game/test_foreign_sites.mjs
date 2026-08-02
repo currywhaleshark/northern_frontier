@@ -27,6 +27,7 @@ const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs'
 const foreignSites = await import(pathToFileURL(join(compiledDir, 'foreignSites.mjs')).href);
 const claimZones = await import(pathToFileURL(join(compiledDir, 'claimZones.mjs')).href);
 const diplomacy = await import(pathToFileURL(join(compiledDir, 'siteDiplomacy.mjs')).href);
+const diplomaticEnvoys = await import(pathToFileURL(join(compiledDir, 'diplomacy.mjs')).href);
 const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
 const minimap = await import(pathToFileURL(join(compiledDir, 'minimap.mjs')).href);
 const activity = await import(pathToFileURL(join(compiledDir, 'foreignSiteActivity.mjs')).href);
@@ -96,11 +97,18 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
   camp.trust = 80;
   state.relations[camp.factionName] = 80;
   state.resources.grain = 100;
+  // 사냥권 협정은 발견한 사냥·숲 영유 구역을 대상으로만 열 수 있다.
+  state.claimZones
+    .filter(zone => zone.siteId === camp.id && (zone.kind === 'hunting' || zone.kind === 'forest'))
+    .forEach(zone => { zone.discovered = true; });
   assert.equal(diplomacy.requestHuntingRights(state, camp.id), null);
+  assert.equal(state.pendingChoice?.kind, 'claimAccordEnvoy',
+    '사냥권 요청은 즉시 허가하지 않고 생활권 협정 사절 준비를 연다');
   const huntingZones = state.claimZones.filter(zone => zone.siteId === camp.id &&
     (zone.kind === 'hunting' || zone.kind === 'forest'));
   assert.ok(huntingZones.length > 0);
-  assert.ok(huntingZones.every(zone => zone.permittedUntilDay > state.day));
+  assert.ok(huntingZones.every(zone => zone.permittedUntilDay == null),
+    '사절이 답신하기 전에는 작업 허가가 생기지 않는다');
 }
 
 {
@@ -194,15 +202,17 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
   const resource = FACTIONS.find(faction => faction.name === site.factionName).exports[0];
   const capacityBefore = tradeValues.factionTradeCapacitySummary(state, site.factionName, resource).total;
   const cooldownBefore = events.playerTradeCooldownDays(state, site.factionName);
+  state.claimZones
+    .filter(zone => zone.siteId === site.id && zone.kind === 'passage')
+    .forEach(zone => { zone.discovered = true; });
   assert.equal(diplomacy.requestPassagePermission(state, site.id), null);
-  assert.equal(passage.hasActivePassageForFaction(state, site.factionName), true);
-  const route = passage.passageRouteToSite(state, site);
-  assert.ok(route.length > 2, 'permission establishes a visible route');
-  assert.ok(route.every(tile => state.exploration.explored[tile.y][tile.x]), 'guides reveal the passage route');
-  assert.ok(tradeValues.factionTradeCapacitySummary(state, site.factionName, resource).total > capacityBefore,
-    'passage raises seasonal trade capacity');
-  assert.equal(events.playerTradeCooldownDays(state, site.factionName), cooldownBefore - CONFIG.foreignSites.passageTradeCooldownReduction,
-    'passage shortens caravan turnaround');
+  assert.equal(state.pendingChoice?.kind, 'claimAccordEnvoy',
+    '통행 허가 요청은 즉시 길을 열지 않고 생활권 협정 사절 준비를 연다');
+  assert.equal(passage.hasActivePassageForFaction(state, site.factionName), false);
+  assert.equal(tradeValues.factionTradeCapacitySummary(state, site.factionName, resource).total, capacityBefore,
+    '사절 답신 전에는 계절 교역 수용량이 바뀌지 않는다');
+  assert.equal(events.playerTradeCooldownDays(state, site.factionName), cooldownBefore,
+    '사절 답신 전에는 대상단 왕복일이 줄지 않는다');
 }
 
 {
@@ -233,6 +243,12 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
   state.relations[site.factionName] = 90;
   state.resources.grain = 100;
   assert.equal(diplomacy.requestPassagePermission(state, site.id), null);
+  const passageZone = zones.find(zone => zone.kind === 'passage');
+  assert.ok(passageZone, '통행 협정 대상 구역이 있어야 한다');
+  assert.equal(state.pendingChoice?.kind, 'claimAccordEnvoy');
+  assert.equal(diplomaticEnvoys.sendClaimAccordEnvoy(state, site.factionName, passageZone.id, 'grain', 100), null);
+  state.day = state.pendingEnvoys[0].dueDay;
+  diplomaticEnvoys.dailyDiplomacyTick(state);
   assert.equal(agents.isPassable(state, tile.x, tile.y), true, 'passage permission opens resident movement');
 
   resident.x = tile.x;
