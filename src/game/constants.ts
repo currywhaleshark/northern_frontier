@@ -152,6 +152,10 @@ export const COMMON_TRADE_RESOURCES: ResourceId[] = [
   'hideClothes', 'cotton', 'cottonClothes', 'strawShoes', 'leatherShoes',
 ];
 
+// 해안의 물·일반 자원 부족을 자염 교역으로 상쇄하는 희소품 가격.
+// 산지에서 직접 소금을 가져오는 골간 우디캐만 자체 산지 가격을 유지한다.
+export const SALT_DEMAND_TRADE_VALUE = 3.2;
+
 export const FACTIONS: Faction[] = [
   {
     name: '오도리 씨족', hostile: false,
@@ -167,9 +171,10 @@ export const FACTIONS: Faction[] = [
       brushwood: 0.5, firewood: 0.85, charcoal: 1.3,
       wood: 1.05, stone: 0.75, iron: 2.5, tools: 4.5,
       hide: 1.6, herbs: 1.4, hideClothes: 3.6, strawShoes: 1.1, leatherShoes: 3.1, cotton: 1.6, cottonClothes: 3.1,
+      salt: SALT_DEMAND_TRADE_VALUE,
     },
     exports: [...COMMON_TRADE_RESOURCES],
-    imports: [...COMMON_TRADE_RESOURCES, 'jang'],
+    imports: [...COMMON_TRADE_RESOURCES, 'jang', 'salt'],
     tradeCapacityByResource: {
       grain: 1.45, rice: 1.4, vegetables: 1.35, stone: 1.1,
       meat: 0.75, fish: 0.7, hide: 0.8, herbs: 0.9,
@@ -190,9 +195,10 @@ export const FACTIONS: Faction[] = [
       brushwood: 0.45, firewood: 1.05, charcoal: 1.5,
       wood: 1.2, stone: 0.9, iron: 2.6, tools: 4.2,
       hide: 1.35, herbs: 1.2, hideClothes: 3.4, strawShoes: 1.25, leatherShoes: 3.2, cotton: 1.8, cottonClothes: 3.3,
+      salt: SALT_DEMAND_TRADE_VALUE,
     },
     exports: [...COMMON_TRADE_RESOURCES],
-    imports: [...COMMON_TRADE_RESOURCES, 'jang'],
+    imports: [...COMMON_TRADE_RESOURCES, 'jang', 'salt'],
     tradeCapacityByResource: {
       meat: 1.45, hide: 1.5, hideClothes: 1.2,
       firewood: 1.15, wood: 1.1,
@@ -238,9 +244,10 @@ export const FACTIONS: Faction[] = [
       brushwood: 0.35, firewood: 0.65, charcoal: 1.2,
       wood: 0.7, stone: 1.15, iron: 2.8, tools: 4.6,
       hide: 1.25, herbs: 1.1, hideClothes: 3, strawShoes: 0.95, leatherShoes: 2.9, cotton: 2, cottonClothes: 3.5,
+      salt: SALT_DEMAND_TRADE_VALUE,
     },
     exports: [...COMMON_TRADE_RESOURCES],
-    imports: [...COMMON_TRADE_RESOURCES, 'jang'],
+    imports: [...COMMON_TRADE_RESOURCES, 'jang', 'salt'],
     tradeCapacityByResource: {
       brushwood: 1.8, firewood: 1.6, wood: 1.75,
       hide: 1.45, herbs: 1.6, meat: 1.25,
@@ -294,11 +301,11 @@ export const FACTIONS: Faction[] = [
       brushwood: 0.55, firewood: 1, charcoal: 1.5,
       wood: 1.3, stone: 0.85, iron: 2.6, tools: 4.2,
       hide: 2, herbs: 1.6, hideClothes: 3.5, cotton: 1.5, cottonClothes: 3.2,
-      porcelain: 6.2, brassware: 5.5, lacquerware: 5.8, silk: 7.5, preciousMetal: 10, salt: 1.55,
+      porcelain: 6.2, brassware: 5.5, lacquerware: 5.8, silk: 7.5, preciousMetal: 10, salt: SALT_DEMAND_TRADE_VALUE,
       silver: 8.2,
     },
     exports: [...COMMON_TRADE_RESOURCES, 'salt', 'brassware', 'silk', 'preciousMetal', 'silver'],
-    imports: [...COMMON_TRADE_RESOURCES, 'jang', 'porcelain', 'lacquerware', 'silver'],
+    imports: [...COMMON_TRADE_RESOURCES, 'jang', 'porcelain', 'lacquerware', 'silver', 'salt'],
     tradeUnlockBuilding: 'dock',
     tradeUnlockLabel: '부두 건설 후 의주 상로가 열립니다',
     raidEligible: false,
@@ -326,11 +333,11 @@ export const FACTIONS: Faction[] = [
       wood: 1.1, stone: 1, iron: 2.5, tools: 4,
       hide: 2.1, herbs: 1.7, hideClothes: 3.4, cotton: 1.8, cottonClothes: 3.1,
       porcelain: 6.5, brassware: 5.2, lacquerware: 4.8,
-      silk: 6.4, preciousMetal: 9.5, salt: 1.5,
+      silk: 6.4, preciousMetal: 9.5, salt: SALT_DEMAND_TRADE_VALUE,
       silver: 7.8,
     },
     exports: [...COMMON_TRADE_RESOURCES, 'salt', 'porcelain', 'brassware', 'lacquerware', 'silk', 'silver'],
-    imports: [...COMMON_TRADE_RESOURCES, 'jang', 'preciousMetal', 'silver'],
+    imports: [...COMMON_TRADE_RESOURCES, 'jang', 'preciousMetal', 'silver', 'salt'],
     tradeUnlockBuilding: 'dock',
     tradeUnlockLabel: '부두 건설 후 개성 상단과 거래할 수 있습니다',
     raidEligible: false,

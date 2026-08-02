@@ -23,7 +23,7 @@ function compileGameModules() {
 const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const tradeValues = await import(pathToFileURL(join(compiledDir, 'tradeValues.mjs')).href);
-const { COMMON_TRADE_RESOURCES, FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs')).href);
+const { COMMON_TRADE_RESOURCES, FACTIONS, SALT_DEMAND_TRADE_VALUE } = await import(pathToFileURL(join(compiledDir, 'constants.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 const faction = FACTIONS.find(candidate => candidate.imports.includes('tools') && candidate.exports.includes('grain'));
@@ -59,12 +59,33 @@ for (const relation of [35, 50, 65, 80]) {
   );
   assert.equal('salt' in CONFIG.tribute.baseAmounts, false, 'trade-only salt is never a tribute demand');
 
+  const tradeFactions = FACTIONS.filter(candidate => candidate.trades.length > 0);
+  const golgan = tradeFactions.find(candidate => candidate.name === '골간 우디캐');
+  const saltBuyers = tradeFactions.filter(candidate => candidate.name !== '골간 우디캐');
+  assert.ok(golgan);
+  assert.equal(golgan.imports.includes('salt'), false, 'the coastal salt supplier does not buy salt');
+  assert.equal(tradeValues.factionValue(golgan.name, 'salt'), 1.25, 'the coastal supplier keeps its local salt price');
+  for (const buyer of saltBuyers) {
+    assert.ok(buyer.imports.includes('salt'), `${buyer.name} buys salt`);
+    assert.equal(
+      tradeValues.factionValue(buyer.name, 'salt'),
+      SALT_DEMAND_TRADE_VALUE,
+      `${buyer.name} pays the regional scarcity price for salt`,
+    );
+  }
+
   const state = simulation.newGame(2026071602);
   state.resources.wood = 20;
   state.relations['골간 우디캐'] = 80;
   const quote = tradeValues.quoteTrade(state, '골간 우디캐', { give: 'wood', giveAmt: 8, get: 'salt' });
   assert.equal(quote.ok, true, 'the coastal faction can sell salt through player-initiated trade');
   assert.ok(quote.getAmt > 0);
+
+  state.resources.salt = 10;
+  state.relations['오도리 씨족'] = 80;
+  const saltSale = tradeValues.quoteTrade(state, '오도리 씨족', { give: 'salt', giveAmt: 2, get: 'grain' });
+  assert.equal(saltSale.ok, true, 'a non-coastal faction buys player-made salt');
+  assert.equal(saltSale.getAmt, 8, 'two salt buy eight grain at the friendly scarcity price');
 }
 
 {
