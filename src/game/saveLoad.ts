@@ -832,6 +832,12 @@ export function migrateV53ToV54(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), defenseTopologyRevision: 0, schemaVersion: 54 };
 }
 
+// v55: P3 장기 공성 상태 자리. 구 RaiderBand.siege는 호환 의미로만 남기며
+// 진행 정보가 없는 저장에서 SiegeState를 합성하지 않는다.
+export function migrateV54ToV55(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), siegeState: null, schemaVersion: 55 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -891,6 +897,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 51) migrated = migrateV51ToV52(migrated);
     else if (version === 52) migrated = migrateV52ToV53(migrated);
     else if (version === 53) migrated = migrateV53ToV54(migrated);
+    else if (version === 54) migrated = migrateV54ToV55(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
@@ -2052,6 +2059,71 @@ function migrateExpeditionState(state: GameState): void {
   }
 }
 
+function normalizeSiegeState(state: GameState): void {
+  const raw = (state as GameState & { siegeState?: unknown }).siegeState;
+  if (!raw || typeof raw !== 'object' || !state.raiders) {
+    state.siegeState = null;
+    return;
+  }
+  const candidate = raw as NonNullable<GameState['siegeState']>;
+  const phases = new Set(['evacuation', 'encirclement', 'wallCombat', 'sortie', 'withdrawal']);
+  const stances = new Set(['hold', 'wall', 'field']);
+  if (!phases.has(candidate.phase) || !stances.has(candidate.stance) ||
+      typeof candidate.faction !== 'string' || !Number.isFinite(candidate.raiderPower) ||
+      !Number.isFinite(candidate.enemySupply) || !Number.isFinite(candidate.evacuationDeadlineTick)) {
+    state.siegeState = null;
+    return;
+  }
+  const livingIds = new Set(state.residents.filter(resident => resident.alive).map(resident => resident.id));
+  const buildingIds = new Set(state.buildings.map(building => building.id));
+  const idList = (value: unknown, valid: ReadonlySet<number>): number[] => Array.isArray(value)
+    ? [...new Set(value.filter((id): id is number => Number.isInteger(id) && valid.has(id)))]
+    : [];
+  const estimate = candidate.enemySupplyEstimate;
+  const plunderTargetIds = idList(candidate.plunderTargetIds, buildingIds);
+  const min = Number.isFinite(estimate?.min) ? Math.max(0, Math.floor(estimate.min)) : 0;
+  const max = Number.isFinite(estimate?.max) ? Math.max(min, Math.ceil(estimate.max)) : min;
+  const loot: Partial<Record<ResourceId, number>> = {};
+  if (candidate.loot && typeof candidate.loot === 'object') {
+    for (const [resource, amount] of Object.entries(candidate.loot) as Array<[ResourceId, number]>) {
+      if (RESOURCE_ID_SET.has(resource) && Number.isFinite(amount) && amount > 0) loot[resource] = amount;
+    }
+  }
+  state.siegeState = {
+    ...candidate,
+    raiderPower: Math.max(0, candidate.raiderPower),
+    enemySupply: Math.max(0, candidate.enemySupply),
+    enemySupplyEstimate: { min, max },
+    intelLevel: Number.isFinite(candidate.intelLevel) ? Math.max(0, Math.min(4, Math.floor(candidate.intelLevel))) : 0,
+    warned: candidate.warned === true,
+    startedDay: Number.isFinite(candidate.startedDay) ? Math.max(1, Math.floor(candidate.startedDay)) : state.day,
+    lastProcessedDay: Number.isFinite(candidate.lastProcessedDay)
+      ? Math.min(state.day, Math.max(0, Math.floor(candidate.lastProcessedDay))) : state.day,
+    lastStanceChangeDay: Number.isFinite(candidate.lastStanceChangeDay)
+      ? Math.max(0, Math.floor(candidate.lastStanceChangeDay)) : state.day,
+    evacuationDeadlineTick: Math.max(0, Math.floor(candidate.evacuationDeadlineTick)),
+    defenderIds: idList(candidate.defenderIds, livingIds),
+    strandedResidentIds: idList(candidate.strandedResidentIds, livingIds),
+    plunderTargetIds,
+    plunderedTargetIds: idList(candidate.plunderedTargetIds, buildingIds),
+    activePlunderTargetId: Number.isInteger(candidate.activePlunderTargetId) &&
+      plunderTargetIds.includes(candidate.activePlunderTargetId as number)
+      ? candidate.activePlunderTargetId : undefined,
+    // 약탈조 현재 좌표는 RaiderBand에 남으므로, 로드 뒤 경로는 현 지형에서 다시 계산한다.
+    plunderPath: [],
+    loot,
+    protectedInterior: Array.isArray(candidate.protectedInterior)
+      ? [...new Set(candidate.protectedInterior.filter((tile): tile is string => typeof tile === 'string' && /^\d+,\d+$/.test(tile)))]
+      : [],
+    topologyRevision: Number.isFinite(candidate.topologyRevision)
+      ? Math.max(0, Math.floor(candidate.topologyRevision)) : state.defenseTopologyRevision,
+    breachTargetId: Number.isInteger(candidate.breachTargetId) &&
+      buildingIds.has(candidate.breachTargetId as number)
+      ? candidate.breachTargetId : undefined,
+  };
+  if (state.siegeState.phase === 'sortie' && !state.battle && !state.tacticalBattle) state.siegeState = null;
+}
+
 export function saveGame(state: GameState, slot = 1): boolean {
   try {
     localStorage.setItem(saveSlotStorageKey(slot), JSON.stringify({
@@ -2712,6 +2784,7 @@ export function loadGame(slot = 1): GameState | null {
       ? parsed.guideModalQueue.filter((id: unknown) => typeof id === 'string')
       : [];
     rebuildBuildingFootprints(parsed);
+    normalizeSiegeState(parsed);
     migrateGatheringAssignments(parsed);
     normalizeLodgingHutState(parsed);
     reconcileResidentHomes(parsed, makeRng((parsed.seed ?? 1) + parsed.day * 32452843));

@@ -194,6 +194,10 @@ export function isTerrainPassable(state: GameState, x: number, y: number): boole
   if (isSpringFloodedTile(state, x, y)) return false;
   const building = buildingAtTile(state, t);
   const breachedPassage = building?.breached === true && isWallBuilding(building.type);
+  const siegeGateClosed = building?.type === 'gate' && state.siegeState != null &&
+    state.siegeState.phase !== 'evacuation' && state.siegeState.phase !== 'sortie' &&
+    state.siegeState.phase !== 'withdrawal';
+  if (siegeGateClosed && !breachedPassage) return false;
   if (building && !breachedPassage && !isPassableBuilding(building.type) &&
       !isBuildingUpperPassageTile(building, x, y)) return false;
   if (t.terrain === 'mountain') return false;
@@ -3598,6 +3602,24 @@ function closeOutWorkday(state: GameState, r: Resident, ctx: Ctx): boolean {
   return false;
 }
 
+function siegeResidentDisposition(state: GameState, resident: Resident): 'evacuate' | 'work' | 'suspend' | 'stranded' {
+  const siege = state.siegeState;
+  if (!siege || siege.phase === 'sortie' || siege.phase === 'withdrawal') return 'work';
+  const now = state.day * DAY_CYCLE_SUBTICKS + state.subTick;
+  if (siege.phase === 'evacuation' && now < siege.evacuationDeadlineTick) return 'evacuate';
+  const interior = new Set(siege.protectedInterior);
+  if (siege.strandedResidentIds.includes(resident.id) || !interior.has(`${resident.x},${resident.y}`)) return 'stranded';
+  if (siege.phase === 'wallCombat' && siege.defenderIds.includes(resident.id)) return 'suspend';
+  if (resident.lodgingSupplyHutId != null || resident.job === 'hauler') return 'suspend';
+  const assigned = resident.assignedBuildingId == null ? null :
+    state.buildings.find(building => building.id === resident.assignedBuildingId && building.built) ?? null;
+  if (assigned && OUTDOOR_JOBS.includes(resident.job)) {
+    const footprint = footprintTilesOf(state, assigned) ?? [{ x: assigned.x, y: assigned.y }];
+    if (!footprint.every(tile => interior.has(`${tile.x},${tile.y}`))) return 'suspend';
+  }
+  return 'work';
+}
+
 // ─────────────────────────── 틱 진입점 ───────────────────────────
 
 export function agentsTick(state: GameState): void {
@@ -3694,6 +3716,26 @@ export function agentsTick(state: GameState): void {
       clearHaulTask(r);
       if (carryTotal(r) > 0) depositAll(state, r);
       goToCenter(state, r, ctx);
+      continue;
+    }
+    const siegeDisposition = siegeResidentDisposition(state, r);
+    if (siegeDisposition === 'evacuate') {
+      resumeCriticalActivity(r);
+      r.task = '성안으로 피난 중';
+      clearHaulTask(r);
+      goToCenter(state, r, ctx);
+      continue;
+    }
+    if (siegeDisposition === 'stranded' || siegeDisposition === 'suspend') {
+      resumeCriticalActivity(r);
+      r.task = siegeDisposition === 'stranded'
+        ? '성밖에 고립됨'
+        : state.siegeState?.phase === 'wallCombat' && state.siegeState.defenderIds.includes(r.id)
+          ? '성벽을 지키는 중'
+          : '공성으로 성밖 작업 중지';
+      clearHaulTask(r);
+      r.path = [];
+      r.manualOrder = null;
       continue;
     }
     // 전투에 징집된 주민은 생활 대역보다 전선 행동을 우선한다.

@@ -35,6 +35,7 @@ import { battleTick } from './battles';
 import {
   checkRaidTrigger, raidHoldTick, raidersTick, resolveExpeditionRaidOrder, resolveExtortion, resolveRaid, updateThreat,
 } from './raids';
+import { processSiegeDay, siegeTick } from './siege';
 import { driftRelations, initRelations } from './relations';
 import { resetFactionTradeCapacityUsage } from './tradeValues';
 import {
@@ -190,6 +191,7 @@ export function newGame(seed?: number, difficulty: Difficulty = 'normal', settle
     proximityWarningProgress: {},
     expedition: null,
     raidHold: null,
+    siegeState: null,
     raiders: null,
     battle: null,
     battleScars: [],
@@ -1427,6 +1429,7 @@ export function advanceTick(state: GameState): void {
   maybeOpenExpeditionEngagementChoice(state);
   const tickRng = makeRng(state.seed + state.day * 7919 + state.subTick * 131 + 3);
   raidHoldTick(state, tickRng);
+  siegeTick(state);
   lap('t4-expedition');
   refreshExploration(state);
   revealForeignSitesFromExploration(state);
@@ -1497,6 +1500,7 @@ function endOfDay(state: GameState): void {
   applyDailySpoilage(state);
   updateFermentation(state);
   dailyDiplomacyTick(state);
+  processSiegeDay(state);
 
   driftRelations(state);
   updateThreat(state);
@@ -1505,15 +1509,15 @@ function endOfDay(state: GameState): void {
   if (!scenarioSuppressesRandomEvents(state)) {
     maybeStartFire(state, rng);
     maybeStartMineCollapse(state, rng);
-    checkRaidTrigger(state, rng);
-    if (maybeOfferTrade(state, rng, state.day - state.lastTradeDay)) {
+    if (!state.siegeState) checkRaidTrigger(state, rng);
+    if (!state.siegeState && maybeOfferTrade(state, rng, state.day - state.lastTradeDay)) {
       state.lastTradeDay = state.day;
     }
-    if (!maybeOfferDefectorImmigration(state, rng)) maybeOfferImmigration(state, rng);
+    if (!state.siegeState && !maybeOfferDefectorImmigration(state, rng)) maybeOfferImmigration(state, rng);
     maybeFlavorLog(state, rng);
   }
   maybeCollectTribute(state); // 겨울: 조정의 사자가 세공을 거둔다 (모달 충돌 시 다음 날로)
-  maybeRunTradeContracts(state); // 실행 계절 첫날: 정기거래 계약이 스스로 오간다 (평시 모달 없음)
+  if (!state.siegeState) maybeRunTradeContracts(state); // 공성 중에는 상단 왕래가 끊긴다
   if (!scenarioSuppressesRandomEvents(state)) {
     dailyReligionTick(state, rng); // 떠돌이 무당/노승이 문을 두드린다 (진 이상)
     dailySpecialResidentTick(state, rng); // 귀양 선비 등 이름 있는 특수 주민

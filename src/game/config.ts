@@ -996,6 +996,37 @@ export const CONFIG = {
     repairBuildDaysMultiplier: 0.5,
   },
 
+  siege: {
+    evacuationTicks: 36,
+    baseEnemySupplyDays: 5,
+    powerPerSupplyDay: 18,
+    maxEnemySupplyDays: 14,
+    dailySupplyBurn: 1,
+    seasonBurnMultiplier: { spring: 1, summer: 0.9, autumn: 1.05, winter: 1.45 },
+    weatherBurnMultiplier: {
+      clear: 1, rain: 1.1, frost: 1.15, heavySnow: 1.3,
+      blizzard: 1.6, coldSnap: 1.45, thawFlood: 1.15,
+    },
+    dailyPlunderCap: 8,
+    inventoryPlunderCap: 5,
+    plunderMoveStepsPerDay: 8,
+    fieldSupplyPerGrowth: 0.035,
+    livestockSupplyPerHead: 0.75,
+    plunderSupplyPerFood: 0.16,
+    storageCapacityWeight: { center: 4, storehouse: 12, cellar: 8 },
+    plunderPriority: [
+      'grain', 'rice', 'hay', 'meat', 'fish', 'eggs', 'milk', 'vegetables', 'beans',
+      'firewood', 'brushwood', 'tools', 'hide', 'wood', 'iron', 'stone',
+    ] as ResourceId[],
+    wallPressureDamage: { hold: 10, wall: 6 },
+    wallAttackerLossPerDefense: 0.025,
+    wallDefenderInjuryChance: 0.18,
+    coldNoFuelHealthLoss: 3,
+    coldNoFuelMoraleLoss: 6,
+    surrenderResourceLoss: 0.32,
+    repelledLootRecovery: 0.6,
+  },
+
   tacticalBattle: {
     maxRounds: 5,
     hunt: {

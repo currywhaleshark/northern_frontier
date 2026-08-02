@@ -281,7 +281,9 @@ function interiorHas(interior, x, y) {
   const ringWall = state.buildings.find(building => building.x === 20 && building.y === 10);
   assert.equal(state.raiders.siege, true, 'replanning marks siege only when the protected ring becomes first breach');
   assert.equal(ringWall.breached, undefined, 'the protected ring does not auto-breach before the siege choice');
-  assert.equal(state.pendingChoice?.kind, 'raid', 'the existing raid choice modal is used as the P2 siege fallback');
+  assert.equal(state.pendingChoice?.kind, 'raid', 'the P3 siege opening choice uses the shared raid modal shell');
+  assert.equal(state.pendingChoice?.data.longSiegeChoice, 'initial', 'the protected ring enters the P3 long siege');
+  assert.equal(state.siegeState?.phase, 'evacuation', 'the long siege begins with a physical evacuation window');
 }
 
 // 실제 습격 틱은 벽 앞에서 멈춰 내구를 깎고, 0이 된 같은 건물 ID를 통행 가능한 잔해로 남긴다.

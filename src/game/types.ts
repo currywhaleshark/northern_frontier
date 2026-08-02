@@ -1048,6 +1048,35 @@ export interface RaidHoldState {
   ticksRemaining: number;
 }
 
+export type SiegePhase = 'evacuation' | 'encirclement' | 'wallCombat' | 'sortie' | 'withdrawal';
+export type SiegeStance = 'hold' | 'wall' | 'field';
+
+/** P3 장기 공성. P2의 RaiderBand.siege와 원정대 대기용 RaidHoldState와는 별개다. */
+export interface SiegeState {
+  phase: SiegePhase;
+  faction: string;
+  raiderPower: number;
+  enemySupply: number;
+  enemySupplyEstimate: { min: number; max: number };
+  intelLevel: number;
+  warned: boolean;
+  stance: SiegeStance;
+  startedDay: number;
+  lastProcessedDay: number;
+  lastStanceChangeDay: number;
+  evacuationDeadlineTick: number;
+  defenderIds: number[];
+  strandedResidentIds: number[];
+  plunderTargetIds: number[];
+  plunderedTargetIds: number[];
+  activePlunderTargetId?: number;
+  plunderPath: { x: number; y: number }[];
+  loot: Partial<Record<ResourceId, number>>;
+  protectedInterior: string[];
+  topologyRevision: number;
+  breachTargetId?: number;
+}
+
 export type BattlePhase = 'muster' | 'clash';
 export type BattleOutcome = 'victory' | 'defeat';
 // garrison: 수비병+파수꾼 요격 / levy: 성한 주민 전체 징집
@@ -1887,6 +1916,7 @@ export interface GameState {
   proximityWarningProgress: Record<string, number>; // E4 완충 작업·거점 배회의 누적 일수
   expedition: Expedition | null; // 지도 위 토벌 원정대. 동시에 하나만 운용
   raidHold: RaidHoldState | null; // 원정대 귀환을 기다리는 완전 수성 상태
+  siegeState: SiegeState | null; // P3 하루 단위 장기 공성 상태
   raiders: RaiderBand | null; // 접근 중인 습격 무리
   battle: Battle | null;      // 지도 위에서 진행 중인 습격 전투
   battleScars?: BattleScar[]; // 끝난 전투 자리의 교란 자국 (구버전 저장에는 없음)

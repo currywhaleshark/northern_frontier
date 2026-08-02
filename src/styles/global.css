@@ -876,6 +876,27 @@ html, body, #root {
   box-shadow: 0 0 0 2px rgba(224, 93, 74, 0.16), 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 .minimap-panel.hunt-alert { border-color: rgba(226, 153, 55, 0.72); }
+
+.siege-panel {
+  width: 246px;
+  padding: 10px;
+  border: 1px solid rgba(190, 92, 55, 0.78);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 92%, #5b2418);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.34);
+  display: grid;
+  gap: 8px;
+  pointer-events: auto;
+}
+.siege-panel header { display: flex; justify-content: space-between; gap: 8px; color: #f0c98d; }
+.siege-panel header span { color: #d58c70; font-size: 11px; }
+.siege-panel-grid { display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; font-size: 11px; }
+.siege-panel-grid span { color: var(--muted); }
+.siege-panel-grid b { color: #eadfc6; text-align: right; }
+.siege-panel-grid b.bad { color: #ee8d79; }
+.siege-stance-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.siege-stance-actions .danger { grid-column: 1 / -1; border-color: #a94f3b; color: #f0b19e; }
+.siege-panel small { color: var(--muted); font-size: 10px; }
 .minimap-heading {
   height: 26px;
   display: flex;

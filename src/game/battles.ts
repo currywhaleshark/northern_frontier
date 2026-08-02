@@ -323,6 +323,14 @@ function finishBattle(state: GameState, outcome: BattleOutcome, rng: () => numbe
     ...(state.battleScars ?? []).filter(scar => scar.until >= state.day),
     { x: battle.frontX, y: battle.frontY, until: state.day + BATTLE_SCAR_DAYS },
   ];
+  const sortieSiege = state.siegeState?.phase === 'sortie' ? state.siegeState : null;
+  if (sortieSiege && outcome === 'victory') {
+    for (const [resource, amount] of Object.entries(sortieSiege.loot) as Array<[keyof typeof state.resources, number]>) {
+      state.resources[resource] = (state.resources[resource] ?? 0) + amount * CONFIG.siege.repelledLootRecovery;
+    }
+    addLog(state, '출격대가 공성진에 남겨진 전리품 일부를 되찾았습니다.', 'good');
+  }
+  if (sortieSiege) state.siegeState = null;
   state.raiders = null;
   state.battle = null;
 

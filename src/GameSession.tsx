@@ -26,6 +26,7 @@ import { getSeason } from './game/seasons';
 import { uiDayBand } from './ui/dayBand';
 import { setMusicScene, setMusicSettings } from './sound/music';
 import { AlertsPanel } from './components/AlertsPanel';
+import { SiegePanel } from './components/SiegePanel';
 import { BuildDrawer } from './components/BuildDrawer';
 import { DockFrame, type DockOverlayItem } from './components/dock/DockFrame';
 import { CourtWindow } from './components/dock/CourtWindow';
@@ -73,6 +74,7 @@ import { useSpecialItem } from './game/specialItemActions';
 import { installRoyalPlaque, royalPlaqueInstallError } from './game/royalPlaque';
 import { getPointerAction, selectedEntityAfterTileClick } from './game/selectionActions';
 import { makeRng } from './game/map';
+import { changeSiegeStance } from './game/siege';
 import { openTerritoryOrderConfirmation } from './game/territory';
 import {
   BUILDING_DEFS, buildingFootprintDims, computeDefense, preferredLeveeEdgeAt,
@@ -1139,6 +1141,13 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     bump();
   };
 
+  const handleSiegeStance = (stance: import('./game/types').SiegeStance) => {
+    const error = changeSiegeStance(stateRef.current, stance);
+    if (error) notify(error, 'info', true);
+    else if (stance === 'field') setSpeed(1);
+    bump();
+  };
+
   const handleUseSpecialItem = (item: SpecialItemId) => {
     if (item !== 'reliefGrainVoucher' && item !== 'tributeWaiverDecree' && item !== 'recruitmentNotice') return;
     const error = useSpecialItem(stateRef.current, item);
@@ -1858,6 +1867,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
             {() => (
               <div className="right-overlay-stack">
                 <AlertsPanel state={stateRef.current} />
+                <SiegePanel state={stateRef.current} onChangeStance={handleSiegeStance} />
               </div>
             )}
           </RuntimeVersionBoundary>

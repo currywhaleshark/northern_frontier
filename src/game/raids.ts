@@ -28,6 +28,7 @@ import { createTacticalBattle } from './tacticalBattle';
 import { activePredatorScoutIds } from './expeditionIntel';
 import { activeDiplomaticPact, announceRaidTip, raidTipInformant } from './diplomacy';
 import { borderCommanderEffects, factionLeaderSubject, factionRaidPartyLabel } from './diplomaticFigures';
+import { canStartLongSiege, openLongSiegeChoice, resolveSiegeChoice } from './siege';
 
 type RaidWarningSource = 'diplomatic';
 
@@ -257,7 +258,7 @@ function advanceRaidBreach(state: GameState, band: RaiderBand, building: Buildin
 // 습격 발생 판정: 성사되면 지도 가장자리에 습격 무리가 나타나 마을로 접근한다
 export function checkRaidTrigger(state: GameState, rng: () => number): void {
   const t = CONFIG.threat;
-  if (state.pendingChoice || state.raidHold || state.raidCooldown > 0 || state.raiders || state.battle || state.tacticalBattle) return;
+  if (state.pendingChoice || state.raidHold || state.siegeState || state.raidCooldown > 0 || state.raiders || state.battle || state.tacticalBattle) return;
   if (state.threat < t.raidThreshold) return;
   let chance = (state.threat - t.raidThreshold) / t.raidChanceDiv;
   const season = getSeason(state.day);
@@ -379,7 +380,9 @@ export function spawnRaiders(
         speed: 0,
         trail: [],
       };
-      openRaidChoice(state, rng, warned, power, faction.name, true);
+      if (!canStartLongSiege(state) || !openLongSiegeChoice(state)) {
+        openRaidChoice(state, rng, warned, power, faction.name, true);
+      }
     } else {
       openRaidChoice(state, rng, warned, power, faction.name);
     }
@@ -434,7 +437,7 @@ export function raidersTick(state: GameState, rng: () => number): void {
       }
       if (band.siege) {
         addLog(state, `${withJosa(factionRaidPartyLabel(state, band.faction), '이/가')} 방책 앞에서 멈춰 섰습니다. 보호된 중심지로 통하는 길이 막혔습니다.`, 'raid');
-        openRaidChoice(state, rng, band.warned, band.power, band.faction, true);
+        if (!openLongSiegeChoice(state)) openRaidChoice(state, rng, band.warned, band.power, band.faction, true);
         return;
       }
       advanceRaidBreach(state, band, nextBuilding);
@@ -469,7 +472,9 @@ export function raidersTick(state: GameState, rng: () => number): void {
     if (band.siege) {
       addLog(state, `${withJosa(factionRaidPartyLabel(state, band.faction), '이/가')} 방책 앞에서 멈춰 섰습니다. 목책과 토성이 그들을 가로막고 있습니다.`, 'raid');
     }
-    openRaidChoice(state, rng, band.warned, band.power, band.faction, band.siege);
+    if (!band.siege || !openLongSiegeChoice(state)) {
+      openRaidChoice(state, rng, band.warned, band.power, band.faction, band.siege);
+    }
   }
 }
 
@@ -775,6 +780,7 @@ export function raidHoldTick(state: GameState, rng: () => number): void {
 export function resolveRaid(state: GameState, optionId: string, rng: () => number): void {
   const c = state.pendingChoice;
   if (!c || c.kind !== 'raid') return;
+  if (resolveSiegeChoice(state, optionId)) return;
   const power = c.data.power as number;
   const faction = c.data.faction as string;
   const warned = c.data.warned as boolean;
