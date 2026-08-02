@@ -683,7 +683,9 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
           trees: lineTiles.filter(tile => tile?.terrain === 'forest').length,
           detail: '전체 구간을 함께 승인하며, 공사터 벌목은 벌목장 작업영역과 관계없이 먼저 처리됩니다.',
         }),
-        () => setPlacingType(null),
+        // 성벽은 구간을 이어 두르는 경우가 많으므로 성공 뒤에도 배치 모드를 유지한다.
+        // 우클릭/ESC 또는 건설 목록에서 다른 항목을 고를 때만 기존 취소 경로로 빠진다.
+        () => undefined,
       );
       return;
     }

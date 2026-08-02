@@ -22,6 +22,7 @@ function compileGameModules() {
 }
 
 const compiledDir = compileGameModules();
+const sessionSource = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
 const load = name => import(pathToFileURL(join(compiledDir, `${name}.mjs`)).href);
 const simulation = await load('simulation');
 const buildings = await load('buildings');
@@ -29,6 +30,12 @@ const walls = await load('walls');
 const agents = await load('agents');
 const clearing = await load('landClearing');
 const saveLoad = await load('saveLoad');
+
+assert.match(
+  sessionSource,
+  /tryPlaceWallLine[\s\S]{0,1000}성벽은 구간을 이어 두르는 경우가 많으므로[\s\S]{0,300}\(\) => undefined/,
+  'successful wall-line placement keeps wall placement mode active for the next segment',
+);
 
 function installStorage(backing = new Map()) {
   globalThis.localStorage = {
