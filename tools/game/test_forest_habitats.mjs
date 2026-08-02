@@ -27,6 +27,7 @@ const {
   isForestHabitatCover,
   isHabitatActive,
   normalizeHabitatReserve,
+  rebalanceLoadedHabitatReserve,
   takeHabitatStock,
   spawnAnimalHabitats,
 } = await import(pathToFileURL(join(outDir, 'habitats.mjs')).href);
@@ -36,6 +37,10 @@ const YIELD_OPTS = {
   habitatYieldPerTile: 0.012,
   habitatYieldMax: 1.4,
 };
+
+assert.equal(habitatCapacity(8), 12, 'the minimum habitat reserve is tripled');
+assert.equal(habitatCapacity(20), 30, 'forest-scaled habitat reserve is tripled');
+assert.equal(habitatCapacity(100), 90, 'the maximum habitat reserve is tripled');
 
 function makeMap(width, height, forest = []) {
   const forestSet = new Set(forest.map(([x, y]) => `${x},${y}`));
@@ -145,6 +150,18 @@ assert.equal(findHabitatIconAtTile([{ id: 1, x: 1, y: 1, radius: 4, active: true
   normalizeHabitatReserve(nineTileForest, legacy);
   assert.equal(legacy.capacity, habitatCapacity(9));
   assert.equal(legacy.stock, legacy.capacity);
+}
+
+// 3배 상향 이전 저장은 남은 비율을 보존해 새 최대치로 즉시 환산한다.
+{
+  const capacity = habitatCapacity(9);
+  const legacy = {
+    id: 1, x: 1, y: 1, radius: 4, active: true,
+    stock: capacity / 6, capacity: capacity / 3,
+  };
+  rebalanceLoadedHabitatReserve(nineTileForest, legacy);
+  assert.equal(legacy.capacity, capacity);
+  assert.equal(legacy.stock, capacity / 2);
 }
 
 // 사냥은 비축을 소모하고, 고갈되면 사냥 가능 타일이 사라진다. 숲이 남으면 일일 회복한다.

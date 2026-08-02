@@ -17,7 +17,9 @@ import { residentLogName } from './residentLogName';
 import { enrolledStudentIds, skillGainMult } from './education';
 import { skillGainArtifactMultiplier } from './specialItems';
 import { haulerCarryCapacity, haulingMoveSpeedMultiplier, scaledCarryCapacity } from './equipment';
-import { collectHuntableTiles, huntableHabitatAtTile, takeHabitatStock } from './habitats';
+import {
+  collectHuntableTiles, habitatReserveSummaryInArea, huntableHabitatAtTile, takeHabitatStock,
+} from './habitats';
 import { huntPreyName, rollHuntPrey, scaledHuntYield, type HuntPreyDef } from './hunting';
 import { makeRng } from './map';
 // 잎 모듈에서 직접 가져온다 — scenario.ts를 거치면 agents → scenario → raids → agents 고리가 생긴다
@@ -52,7 +54,7 @@ import {
 } from './livestock';
 import { performPhysicianTreatment } from './medicine';
 import { isTileInMineWorkArea, mineralDepositsInMineRange, servingMineForTile } from './miningSites';
-import { isTileInGatheringWorkArea } from './gatheringZones';
+import { gatheringWorkArea, isTileInGatheringWorkArea } from './gatheringZones';
 import { oreSampleAt } from './subsurfaceVeins';
 import { waterDependentProductionMultiplier } from './waterSupply';
 import { activeFireDisaster, applyFireWater, drawFireWater, nearestFireWaterSource } from './fire';
@@ -428,12 +430,22 @@ function isSettledAtGoal(resident: Resident, result: GoResult): boolean {
 // (저장되지 않는 순수 성능 캐시. 지형은 서브틱 사이에 거의 변하지 않는다.)
 const PATH_FAIL_COOLDOWN_TICKS = 3;
 const pathFailUntilByState = new WeakMap<GameState, Map<number, number>>();
+const huntDepletionWarningDayByState = new WeakMap<GameState, Map<number, number>>();
 
 function pathFailUntilFor(state: GameState): Map<number, number> {
   let cache = pathFailUntilByState.get(state);
   if (!cache) {
     cache = new Map<number, number>();
     pathFailUntilByState.set(state, cache);
+  }
+  return cache;
+}
+
+function huntDepletionWarningDaysFor(state: GameState): Map<number, number> {
+  let cache = huntDepletionWarningDayByState.get(state);
+  if (!cache) {
+    cache = new Map<number, number>();
+    huntDepletionWarningDayByState.set(state, cache);
   }
   return cache;
 }
@@ -1364,7 +1376,17 @@ function hunterTick(state: GameState, r: Resident, ctx: Ctx): void {
       const yields = scaledHuntYield(prey, baselineMeat * taken);
       caught = { prey, ...yields };
       if (habitat.stock <= 0) {
-        addLog(state, '서식지의 사냥감이 바닥났습니다. 숲을 남겨 두면 천천히 회복됩니다.', 'bad', true);
+        const remaining = habitatReserveSummaryInArea(
+          state.map,
+          state.habitats,
+          gatheringWorkArea(huntLodge),
+        ).stock;
+        const warningDays = huntDepletionWarningDaysFor(state);
+        const lastWarningDay = warningDays.get(huntLodge.id) ?? -Infinity;
+        if (remaining <= 1e-9 && state.day - lastWarningDay >= CONFIG.habitats.depletionLogCooldownDays) {
+          warningDays.set(huntLodge.id, state.day);
+          addLog(state, '서식지의 사냥감이 바닥났습니다. 숲을 남겨 두면 천천히 회복됩니다.', 'bad', true);
+        }
       }
       return yields.meat;
     },

@@ -10,7 +10,7 @@ import {
   enemyDoctrineDefinitions, enemyObjectiveDefinition, flankPlanFromEnemyPlan, flankPlanRevealedFromEnemyPlan,
   migrateBanditLairDefensePlan, migrateEnemyPlan,
 } from './enemyPlan';
-import { normalizeHabitatReserve, spawnAnimalHabitats } from './habitats';
+import { rebalanceLoadedHabitatReserve, spawnAnimalHabitats } from './habitats';
 import { makeRng } from './map';
 import { ensureMineralDeposits } from './minerals';
 import { ensureForestGrowth } from './forestGrowth';
@@ -2413,7 +2413,7 @@ export function loadGame(slot = 1): GameState | null {
         CONFIG.difficulty[parsed.difficulty].habitatChance,
       );
     }
-    for (const habitat of parsed.habitats) normalizeHabitatReserve(parsed.map, habitat);
+    for (const habitat of parsed.habitats) rebalanceLoadedHabitatReserve(parsed.map, habitat);
     // 승격 없는 구버전: 옛 승리(진보 승격)를 이뤘다면 보에서 이어간다
     if (!Object.prototype.hasOwnProperty.call(parsed, 'rank')) {
       parsed.rank = parsed.gameOver?.won ? 'bo' : 'settlement';

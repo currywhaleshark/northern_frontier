@@ -38,11 +38,12 @@ export const CONFIG = {
   },
 
   habitats: {
-    reservePerForestTile: 0.5,
-    reserveMin: 4,
-    reserveMax: 30,
+    reservePerForestTile: 1.5,
+    reserveMin: 12,
+    reserveMax: 90,
     recoveryPerDayRatio: 0.08,
-    recoveryPerDayMin: 0.35,
+    recoveryPerDayMin: 1.05,
+    depletionLogCooldownDays: 8,
   },
 
   water: {

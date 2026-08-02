@@ -124,6 +124,19 @@ export function normalizeHabitatReserve(map: Tile[][], habitat: AnimalHabitat): 
     : capacity;
 }
 
+// 3배 비축 밸런스 이전 저장은 남아 있던 비율을 그대로 새 최대치에 옮긴다.
+// 일반 일일 정규화와 분리해 숲 재생만으로 개체수가 즉시 불어나는 일은 막는다.
+export function rebalanceLoadedHabitatReserve(map: Tile[][], habitat: AnimalHabitat): void {
+  const previousCapacity = Number(habitat.capacity);
+  const previousStock = Number(habitat.stock);
+  const nextCapacity = habitatCapacity(habitatForestTiles(map, habitat));
+  if (Number.isFinite(previousCapacity) && previousCapacity > 0 && previousCapacity < nextCapacity &&
+      Number.isFinite(previousStock)) {
+    habitat.stock = Math.max(0, previousStock) * (nextCapacity / previousCapacity);
+  }
+  normalizeHabitatReserve(map, habitat);
+}
+
 export function advanceHabitatReserve(map: Tile[][], habitat: AnimalHabitat): number {
   const previous = Number.isFinite(habitat.stock) ? Math.max(0, habitat.stock) : 0;
   normalizeHabitatReserve(map, habitat);

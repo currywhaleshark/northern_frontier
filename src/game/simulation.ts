@@ -1668,8 +1668,9 @@ function updateHabitats(state: GameState): void {
       }
     }
     advanceHabitatReserve(state.map, habitat);
-    if (active && previousStock <= 0 && habitat.stock > 0) {
-      addLog(state, '숲이 남은 서식지에 사냥감이 조금씩 돌아오기 시작했습니다.', 'good');
+    const recoveredThreshold = Math.min(habitat.capacity, Math.max(1, habitat.capacity * 0.25));
+    if (active && previousStock < recoveredThreshold && habitat.stock >= recoveredThreshold) {
+      addLog(state, '숲이 남은 서식지에 사냥감이 다시 자리 잡았습니다.', 'good');
     }
   }
 }
