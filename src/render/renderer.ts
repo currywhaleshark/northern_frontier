@@ -100,6 +100,11 @@ import {
 } from './terrainGrowthVisuals';
 import { waterLayerTintForBuilding } from './waterLayerPresentation';
 import { lakeShoreRipples } from './lakeShoreRipples';
+import {
+  mountainOverlayBlockers,
+  mountainOverlayBounds,
+  visibleOverlayRects,
+} from './terrainOverlayOcclusion';
 
 const TILE = CONFIG.ui.tileSize;
 
@@ -561,7 +566,20 @@ function queueTerrainOverlays(
         draw: () => {
           const draw = () => {
             if (terrain === 'rock') sprites.drawTerrainProp?.(ctx, params);
-            else sprites.drawTerrainOverlay?.(ctx, params);
+            else if (terrain === 'mountain') {
+              const bounds = mountainOverlayBounds(x, y, TILE);
+              const visible = visibleOverlayRects(
+                bounds,
+                mountainOverlayBlockers(state.map, state.foreignSites, x, y, TILE),
+              );
+              if (visible.length === 0) return;
+              ctx.save();
+              ctx.beginPath();
+              for (const rect of visible) ctx.rect(rect.x, rect.y, rect.w, rect.h);
+              ctx.clip();
+              sprites.drawTerrainOverlay?.(ctx, params);
+              ctx.restore();
+            } else sprites.drawTerrainOverlay?.(ctx, params);
           };
           if (muted) drawMutedTerrainSprite(ctx, draw);
           else draw();
