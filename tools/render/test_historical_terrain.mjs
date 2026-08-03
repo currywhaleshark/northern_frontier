@@ -5,6 +5,8 @@ import ts from 'typescript';
 
 const source = readFileSync(new URL('../../src/render/historicalTerrain.ts', import.meta.url), 'utf8');
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
+const rendererSource = readFileSync(new URL('../../src/render/renderer.ts', import.meta.url), 'utf8');
+const spriteContractSource = readFileSync(new URL('../../src/render/sprites.ts', import.meta.url), 'utf8');
 
 function pngSize(path) {
   const png = readFileSync(new URL(path, import.meta.url));
@@ -106,5 +108,13 @@ assert.match(atlasSource, /SEAMLESS_GROUND_VERSIONS/);
 assert.match(atlasSource, /activeSeamlessGroundTerrain/);
 assert.match(atlasSource, /GROUND_EDGE_BAYER_4/);
 assert.match(atlasSource, /samplesPerLogicalPixel = p\.highDefinition \? 2 : 1/);
+assert.match(atlasSource, /drawGroundBlendKind\(ctx, neighborGround, p\)/);
+assert.match(atlasSource, /drawCoastalGround\(ctx, p, 'mudflat'\);\s*blendGroundEdges\(ctx, p\)/);
+assert.match(rendererSource, /sand:\s*1/);
+assert.match(rendererSource, /mudflat:\s*2/);
+assert.match(rendererSource, /shingle:\s*3/);
+assert.match(rendererSource, /rocky:\s*4/);
+assert.match(rendererSource, /forest:\s*5/);
+assert.match(spriteContractSource, /export type GroundBlendKind = Terrain \| CoastalGroundKind/);
 
 console.log('historical terrain tests passed');

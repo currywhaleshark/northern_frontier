@@ -31,6 +31,7 @@ import {
   placeholderSprites,
   type BuildingDrawParams,
   type ExpeditionDrawParams,
+  type GroundBlendKind,
   type RaiderDrawParams,
   type ResidentDrawParams,
   type SpriteAPI,
@@ -318,23 +319,47 @@ export function findResidentAt(
 let terrainLayer: HTMLCanvasElement | null = null;
 let terrainKey = '';
 
-// 지면 계열이 다른 이웃 중 우세한 쪽(숲 > 바위 > 풀)만 이 타일 가장자리로 번진다.
+// 지면 계열이 다른 이웃 중 우세한 쪽만 이 타일 가장자리로 번진다.
 // 양방향으로 번지면 경계가 두 겹으로 뭉개지므로 한 방향만 허용한다.
-const GROUND_BLEND_PRECEDENCE: Record<number, number> = { 0: 0, 3: 1, 5: 2 };
+const GROUND_BLEND_PRECEDENCE: Record<GroundBlendKind, number> = {
+  plain: 0,
+  fertile: 0,
+  center: 0,
+  sand: 1,
+  mudflat: 2,
+  shingle: 3,
+  rocky: 4,
+  rock: 4,
+  mountain: 4,
+  forest: 5,
+  river: -1,
+  lake: -1,
+  sea: -1,
+};
+
+function groundVisualKindAt(map: GameState['map'], x: number, y: number): GroundBlendKind | null {
+  const tile = map[y]?.[x];
+  if (!tile || tile.terrain === 'river' || tile.terrain === 'lake') return null;
+  const coastal = coastalGroundAt(map, x, y);
+  if (
+    coastal
+    && (tile.terrain === 'sea' || tile.terrain === 'mudflat'
+      || tile.terrain === 'plain' || tile.terrain === 'fertile')
+  ) return coastal;
+  return historicalTerrainColumn(tile.terrain) == null ? null : tile.terrain;
+}
 
 function groundBlendNeighbor(
   map: GameState['map'],
-  selfColumn: number | null,
+  selfKind: GroundBlendKind | null,
   nx: number,
   ny: number,
-): Terrain | undefined {
-  if (selfColumn == null) return undefined;
-  const neighbor = map[ny]?.[nx];
-  if (!neighbor) return undefined;
-  const column = historicalTerrainColumn(neighbor.terrain);
-  if (column == null || column === selfColumn) return undefined;
-  return (GROUND_BLEND_PRECEDENCE[column] ?? 0) > (GROUND_BLEND_PRECEDENCE[selfColumn] ?? 0)
-    ? neighbor.terrain
+): GroundBlendKind | undefined {
+  if (selfKind == null) return undefined;
+  const neighborKind = groundVisualKindAt(map, nx, ny);
+  if (neighborKind == null || neighborKind === selfKind) return undefined;
+  return GROUND_BLEND_PRECEDENCE[neighborKind] > GROUND_BLEND_PRECEDENCE[selfKind]
+    ? neighborKind
     : undefined;
 }
 
@@ -360,11 +385,11 @@ function terrainParams(
     ? terrainNeighborsFor(state.map, x, y, 'mountain')
     : undefined;
   const remaining = tile.terrain === 'rock' ? mineralRemaining(tile) : 0;
-  const selfGroundColumn = historicalTerrainColumn(tile.terrain);
-  const blendN = groundBlendNeighbor(state.map, selfGroundColumn, x, y - 1);
-  const blendE = groundBlendNeighbor(state.map, selfGroundColumn, x + 1, y);
-  const blendS = groundBlendNeighbor(state.map, selfGroundColumn, x, y + 1);
-  const blendW = groundBlendNeighbor(state.map, selfGroundColumn, x - 1, y);
+  const selfGroundKind = groundVisualKindAt(state.map, x, y);
+  const blendN = groundBlendNeighbor(state.map, selfGroundKind, x, y - 1);
+  const blendE = groundBlendNeighbor(state.map, selfGroundKind, x + 1, y);
+  const blendS = groundBlendNeighbor(state.map, selfGroundKind, x, y + 1);
+  const blendW = groundBlendNeighbor(state.map, selfGroundKind, x - 1, y);
   return {
     terrain: tile.terrain,
     season,

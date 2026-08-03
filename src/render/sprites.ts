@@ -13,6 +13,8 @@ import type { MountainProfile, TreeSpecies } from './terrainGrowthVisuals';
 import type { WaterworksOrientation } from './waterworksBuildingAssets';
 import type { CoastalGroundKind } from '../game/tidalFlats';
 
+export type GroundBlendKind = Terrain | CoastalGroundKind;
+
 // 계절별 지형 팔레트 (임시 그래픽용)
 const TERRAIN_PALETTES: Record<Season, Record<Terrain, string>> = {
   spring: {
@@ -62,9 +64,9 @@ export interface TerrainDrawParams {
     n: boolean; e: boolean; s: boolean; w: boolean;
     ne: boolean; se: boolean; sw: boolean; nw: boolean;
   };
-  // 지면 계열이 다른 우세 이웃 지형(숲>바위>풀)이 이 타일 가장자리로 번진다.
+  // 지면 계열이 다른 우세 이웃 지형(숲>암반>갯벌·자갈>모래>풀)이 이 타일 가장자리로 번진다.
   // 타일 경계가 직선으로 잘리는 것을 감추는 용도.
-  blendEdges?: { n?: Terrain; e?: Terrain; s?: Terrain; w?: Terrain };
+  blendEdges?: { n?: GroundBlendKind; e?: GroundBlendKind; s?: GroundBlendKind; w?: GroundBlendKind };
 }
 
 export interface BuildingDrawParams {

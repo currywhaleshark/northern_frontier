@@ -10,6 +10,7 @@ import {
   type BuildingDrawParams,
   type ExpeditionDrawParams,
   type ForeignStructureDrawParams,
+  type GroundBlendKind,
   type RaiderDrawParams,
   type ResidentDrawParams,
   type SpriteAPI,
@@ -2081,7 +2082,19 @@ const GROUND_EDGE_BAYER_4 = [
   15, 7, 13, 5,
 ] as const;
 
-// 이웃 지형 바닥 번짐 — 우세 지형(숲>바위>풀)을 월드 좌표 고정 픽셀 디더로 섞는다.
+function drawGroundBlendKind(
+  ctx: CanvasRenderingContext2D,
+  kind: GroundBlendKind,
+  p: TerrainDrawParams,
+): void {
+  if (kind === 'mudflat' || kind === 'sand' || kind === 'shingle' || kind === 'rocky') {
+    drawCoastalGround(ctx, p, kind);
+    return;
+  }
+  drawHistoricalGround(ctx, kind, p);
+}
+
+// 이웃 지형 바닥 번짐 — 우세 지형(숲>암반>갯벌·자갈>모래>풀)을 월드 좌표 고정 픽셀 디더로 섞는다.
 // HD에서는 0.5 논리 px(실제 1px) 셀을 써 확대해도 경계 해상도가 굵어지지 않는다.
 function blendGroundEdges(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): void {
   const blend = p.blendEdges;
@@ -2093,8 +2106,8 @@ function blendGroundEdges(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): 
   const depthSamples = Math.ceil(blendDepth * samplesPerLogicalPixel);
   const dirs = [['n', blend.n], ['e', blend.e], ['s', blend.s], ['w', blend.w]] as const;
   for (let dirIndex = 0; dirIndex < dirs.length; dirIndex++) {
-    const neighborTerrain = dirs[dirIndex][1];
-    if (!neighborTerrain) continue;
+    const neighborGround = dirs[dirIndex][1];
+    if (!neighborGround) continue;
     const dir = dirs[dirIndex][0];
     ctx.save();
     ctx.beginPath();
@@ -2128,7 +2141,7 @@ function blendGroundEdges(ctx: CanvasRenderingContext2D, p: TerrainDrawParams): 
       }
     }
     ctx.clip();
-    drawHistoricalGround(ctx, neighborTerrain, p);
+    drawGroundBlendKind(ctx, neighborGround, p);
     ctx.restore();
   }
 }
@@ -2199,6 +2212,7 @@ function drawNaturalWaterTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParam
   // 1) 땅 밑바탕 — 주변 지형과 같은 시트라 물가 바깥이 이웃 타일과 이어진다
   if (p.terrain === 'sea' && p.coastalGround) drawCoastalGround(ctx, p, p.coastalGround);
   else drawHistoricalGround(ctx, 'plain', p);
+  blendGroundEdges(ctx, p);
 
   const box = riverWaterBox(nb);
   const bx = p.x + box.x0 * f;
@@ -2470,6 +2484,7 @@ export const atlasSprites: SpriteAPI = {
 
     if (p.terrain === 'mudflat') {
       drawCoastalGround(ctx, p, 'mudflat');
+      blendGroundEdges(ctx, p);
       return;
     }
 
