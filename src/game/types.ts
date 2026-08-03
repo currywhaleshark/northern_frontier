@@ -117,6 +117,13 @@ export type FishingBoatStatus =
 
 export type FishingBoatFacing = 'ne' | 'nw' | 'se' | 'sw';
 
+export type FishingPortPierDirection = 'n' | 'e' | 's' | 'w';
+
+export interface FishingPortPier {
+  direction: FishingPortPierDirection;
+  length: number;
+}
+
 export interface FishingBoatState {
   id: number;
   portId: number;
@@ -660,6 +667,7 @@ export interface Building {
   watchtowerHadTarget?: boolean; // P4 사거리 진입 즉시 사격을 위한 직전 표적 상태
   repairCause?: BuildingRepairCause; // 우측 경고에서 습격·설해·대홍수·화재 피해를 구분한다
   boatWorkOrder?: FishingBoatWorkOrder; // 배무이터 전용 어선 건조·본수리 공정
+  portPier?: FishingPortPier; // 포구 전용: 육상 포구채에서 수면 계류대까지 뻗는 직선 잔교
 }
 
 export interface FishingBoatWorkOrder {

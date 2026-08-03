@@ -54,7 +54,7 @@ import { defaultProcessingReserves } from './processing';
 import { hasKnownMineralDepositNear } from './miningSites';
 import { initialAquiferLevels, initialOreVeinRemaining } from './subsurfaceVeins';
 import { advanceFishingGrounds, ensureFishingGrounds, spawnFishingGrounds } from './fishingGrounds';
-import { fishingWaterfrontAccessTiles } from './fishingBoats';
+import { fishingPortPierAt, fishingWaterAccessForBuilding } from './fishingBoats';
 import { dailyAquiferTick } from './waterSupply';
 import {
   canPlantCropNow, cropIdForBuilding, CROP_DEFS, defaultCropForBuildingType, isCropAllowedOnBuilding,
@@ -349,7 +349,8 @@ function placePrebuilt(state: GameState, type: BuildingTypeId, x: number, y: num
   if (type === 'jangdokdae') b.fermentBatches = [];
   if (type === 'stable') b.livestock = createDefaultLivestockState();
   if (type === 'fishingPort') {
-    const water = fishingWaterfrontAccessTiles(state.map, x, y, 1, 1)[0];
+    b.portPier = fishingPortPierAt(state.map, x, y) ?? undefined;
+    const water = fishingWaterAccessForBuilding(state, b)[0];
     if (water) b.gatheringWorkArea = { ...water, radius: CONFIG.gatheringZones.fishingPortRadius };
   }
   state.buildings.push(b);
@@ -504,7 +505,8 @@ export function tryPlaceBuilding(
   if (type === 'jangdokdae') b.fermentBatches = [];
   if (type === 'stable') b.livestock = createDefaultLivestockState();
   if (type === 'fishingPort') {
-    const water = fishingWaterfrontAccessTiles(state.map, x, y, 1, 1)[0];
+    b.portPier = fishingPortPierAt(state.map, x, y) ?? undefined;
+    const water = fishingWaterAccessForBuilding(state, b)[0];
     if (water) b.gatheringWorkArea = { ...water, radius: CONFIG.gatheringZones.fishingPortRadius };
   }
   state.buildings.push(b);
@@ -1249,11 +1251,9 @@ export function startBuildingRelocation(
   if (!building || !building.built) return '완공된 건물을 선택해야 합니다.';
   if (building.gateConversion) return '성문 전환 공사가 끝난 뒤 이전할 수 있습니다.';
   if (building.type === 'center') return '마을 중심지는 이전할 수 없습니다.';
+  if (building.type === 'fishingPort') return '포구채와 잔교는 한 몸이라 이전할 수 없습니다. 해체 후 새로 지어야 합니다.';
   if (state.royalPlaqueBuildingId === building.id) {
     return '왕이 내린 사액 현판이 걸린 건물은 이전할 수 없습니다.';
-  }
-  if (building.type === 'fishingPort' && state.fishingBoats.some(boat => boat.portId === building.id)) {
-    return '계류 어선을 다른 포구로 옮긴 뒤 이전할 수 있습니다.';
   }
   if (building.expansion || building.workOrder || building.repairing || building.structureRepair || building.boatWorkOrder) return '진행 중인 작업이 끝난 뒤 이전할 수 있습니다.';
   const { w, h } = buildingFootprintDims(building);

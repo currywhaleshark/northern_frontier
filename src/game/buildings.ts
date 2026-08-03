@@ -8,7 +8,11 @@ import { hasAdjacentFlowingCanal } from './irrigation';
 import { isNaturalWaterTerrain } from './terrain';
 import { coastalGroundAt, seaDistanceAt } from './tidalFlats';
 import { fishingGroundAt, fishingGroundSummaryInArea } from './fishingGrounds';
-import { fishingWaterfrontAccessTiles } from './fishingBoats';
+import {
+  fishingPortPierAt,
+  fishingPortPierPositions,
+  fishingWaterfrontAccessTiles,
+} from './fishingBoats';
 import { GATE_CONVERSION_COSTS } from './walls';
 import type { Building, BuildingDef, BuildingTypeId, GameState, MapRegion, Rank, ResourceId, SmithyProductId, Tile } from './types';
 
@@ -195,7 +199,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
   },
   fishingPort: {
     id: 'fishingPort', name: '포구',
-    desc: `보(堡) 승격 후 호수나 바닷가에 짓는 어업 거점. 어부 2명이 반경 ${CONFIG.gatheringZones.fishingPortRadius}칸의 연안 어장을 이용하고 어선을 계류한다.`,
+    desc: `보(堡) 승격 후 짓는 어업 거점. 육상 포구채에서 호수·바다 계류대까지 3~6칸 잔교가 뻗으며, 어부 2명이 반경 ${CONFIG.gatheringZones.fishingPortRadius}칸의 연안 어장을 이용하고 어선을 계류한다.`,
     cost: { wood: 12, stone: 4, tools: 1 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'fishingWaterfront', unique: false, minRank: 'bo',
   },
@@ -462,6 +466,12 @@ export function buildingFootprintTiles(
   w?: number,
   h?: number,
 ): Tile[] | null {
+  if (type === 'fishingPort') {
+    const pier = fishingPortPierAt(state.map, x, y);
+    if (!pier) return null;
+    const tiles = fishingPortPierPositions(x, y, pier).map(position => state.map[position.y]?.[position.x]);
+    return tiles.every((tile): tile is Tile => tile != null) ? tiles : null;
+  }
   const dims = buildingFootprintDims({ type, w, h });
   const width = dims.w;
   const height = dims.h;
@@ -479,8 +489,17 @@ export function buildingFootprintTiles(
 // 기존 건물 인스턴스의 발자국 — 경작지는 저장된 w/h를 쓴다
 export function footprintTilesOf(
   state: Pick<GameState, 'map'>,
-  building: Pick<Building, 'type' | 'x' | 'y' | 'w' | 'h'>,
+  building: Pick<Building, 'type' | 'x' | 'y' | 'w' | 'h' | 'portPier'>,
 ): Tile[] | null {
+  if (building.type === 'fishingPort') {
+    if (!building.portPier) {
+      const legacyTile = state.map[building.y]?.[building.x];
+      return legacyTile ? [legacyTile] : null;
+    }
+    const tiles = fishingPortPierPositions(building.x, building.y, building.portPier)
+      .map(position => state.map[position.y]?.[position.x]);
+    return tiles.every((tile): tile is Tile => tile != null) ? tiles : null;
+  }
   const { w, h } = buildingFootprintDims(building);
   return buildingFootprintTiles(state, building.type, building.x, building.y, w, h);
 }
@@ -529,8 +548,11 @@ export function canPlaceBuildingAt(
     return false;
   }
   const def = BUILDING_DEFS[type];
-  if (!tiles.every(tile => canPlaceOn(def, tile, state))) return false;
-  if ((type === 'fishingPort' || type === 'boatyard')) {
+  if (type === 'fishingPort') {
+    const [main, ...pierTiles] = tiles;
+    if (!main || !canPlaceOn(def, main, state) || pierTiles.some(tile => tile.buildingId != null)) return false;
+  } else if (!tiles.every(tile => canPlaceOn(def, tile, state))) return false;
+  if (type === 'boatyard') {
     const dims = buildingFootprintDims({ type, w, h });
     if (fishingWaterfrontAccessTiles(state.map, x, y, dims.w, dims.h).length === 0) return false;
   }
@@ -561,6 +583,7 @@ export function canRelocateBuildingAt(
   x: number,
   y: number,
 ): boolean {
+  if (building.type === 'fishingPort') return false;
   const { w, h } = buildingFootprintDims(building);
   const tiles = buildingFootprintTiles(state, building.type, x, y, w, h);
   if (!tiles) return false;
@@ -606,7 +629,7 @@ export function canRelocateBuildingAt(
       usableTiles.every(tile => tile.terrain === 'river' || isWatermillLandTile(tile));
   }
   if (!usableTiles.every(tile => canPlaceOn(def, tile, state))) return false;
-  if ((building.type === 'fishingPort' || building.type === 'boatyard') &&
+  if (building.type === 'boatyard' &&
       fishingWaterfrontAccessTiles(state.map, x, y, w, h).length === 0) return false;
   if (building.type === 'saltworks' && !saltworksFootprintHasSeaAccess(state, x, y, 2, 2)) return false;
   if (building.type === 'ferry' && !fishingGroundAt(state.fishingGrounds ?? [], x, y, 'shore')) return false;
@@ -668,7 +691,7 @@ export function canAffordCost(state: GameState, cost: Partial<Record<ResourceId,
 
 export function occupyBuildingTiles(
   state: GameState,
-  building: Pick<Building, 'id' | 'type' | 'x' | 'y' | 'w' | 'h'>,
+  building: Pick<Building, 'id' | 'type' | 'x' | 'y' | 'w' | 'h' | 'portPier'>,
 ): void {
   if (building.type === 'levee') return;
   const tiles = footprintTilesOf(state, building);

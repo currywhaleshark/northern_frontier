@@ -61,11 +61,52 @@ state.resources.wood = 100;
 state.resources.tools = 20;
 
 assert.equal(buildings.canPlaceBuildingAt(state, 'fishingPort', 3, 3), true,
-  '포구는 호수에 맞닿은 육지에 놓인다');
+  '호수 포구채는 평지에 놓이고 잔교가 물 위로 세 칸 뻗는다');
+assert.deepEqual(boats.fishingPortPierAt(state.map, 3, 3), { direction: 's', length: 3 });
+assert.deepEqual(
+  buildings.buildingFootprintTiles(state, 'fishingPort', 3, 3).map(tile => [tile.x, tile.y]),
+  [[3, 3], [3, 4], [3, 5], [3, 6]],
+  '포구채와 잔교 세 칸은 하나의 비직사각 파츠 목록이다',
+);
 assert.equal(buildings.canPlaceBuildingAt(state, 'fishingPort', 3, 1), false,
   '포구는 물에서 떨어진 내륙에 놓이지 않는다');
 assert.equal(buildings.canPlaceBuildingAt(state, 'boatyard', 8, 2), true,
   '2×2 배무이터도 발자국 한 변이 호수에 닿으면 놓인다');
+
+const coastMap = plainMap(10, 10);
+for (let x = 0; x < 10; x++) coastMap[4][x].terrain = 'mudflat';
+for (let y = 5; y < 10; y++) for (let x = 0; x < 10; x++) coastMap[y][x].terrain = 'sea';
+const coastState = {
+  ...state,
+  map: coastMap,
+  buildings: [],
+  fishingGrounds: [],
+  exploration: { ...state.exploration, explored: coastMap.map(row => row.map(() => true)) },
+  rank: 'bo',
+  resources: { ...state.resources, wood: 100, stone: 100, tools: 20 },
+};
+assert.deepEqual(boats.fishingPortPierAt(coastMap, 5, 2), { direction: 's', length: 3 },
+  '바다 포구 잔교는 모래 해안 띠와 갯벌을 지나 수면에 닿는다');
+assert.equal(buildings.canPlaceBuildingAt(coastState, 'fishingPort', 5, 2), true);
+assert.equal(buildings.canPlaceBuildingAt(coastState, 'fishingPort', 5, 3), false,
+  '모래로 보이는 해안 타일에는 포구 본채를 놓지 않는다');
+coastMap[4][5].buildingId = 999;
+assert.equal(buildings.canPlaceBuildingAt(coastState, 'fishingPort', 5, 2), false,
+  '잔교 파츠 한 칸이라도 점유되어 있으면 전체 배치를 막는다');
+coastMap[4][5].buildingId = null;
+assert.equal(simulation.tryPlaceBuilding(coastState, 'fishingPort', 5, 2), null);
+const compositePort = coastState.buildings.find(building => building.type === 'fishingPort');
+assert.ok(compositePort);
+assert.deepEqual(compositePort?.portPier, { direction: 's', length: 3 },
+  '신축 포구는 선택된 잔교 방향과 길이를 저장한다');
+assert.ok(
+  buildings.footprintTilesOf(coastState, compositePort).every(tile => tile.buildingId === compositePort.id),
+  '포구채·잔교·계류대가 같은 건물 ID로 점유된다',
+);
+assert.equal(saveLoad.saveGame(coastState, 8), true);
+const loadedCompositePort = saveLoad.loadGame(8).buildings.find(building => building.type === 'fishingPort');
+assert.deepEqual(loadedCompositePort?.portPier, { direction: 's', length: 3 },
+  '저장/불러오기 뒤에도 복합 포구 잔교가 보존된다');
 
 const port = built(100, 'fishingPort', 3, 3);
 const yard = built(101, 'boatyard', 8, 2);

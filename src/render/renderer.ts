@@ -7,7 +7,7 @@
 // SpriteAPI 구현체만 교체하면 된다.
 import { CONFIG } from '../game/config';
 import {
-  armedMusketeers, BUILDING_DEFS, buildingCostFor, buildingFootprintDims, buildingFootprintSize,
+  armedMusketeers, BUILDING_DEFS, buildingCostFor, buildingFootprintDims, buildingFootprintSize, buildingFootprintTiles,
   canAfford, canAffordCost, canPlaceBuildingAt, canPlaceOn, canRelocateBuildingAt,
   isAreaBuildingType, isPaddyFootprintEligible, isPlotBuildingType, preferredLeveeEdgeAt, type LeveeEdge,
 } from '../game/buildings';
@@ -19,6 +19,7 @@ import { DAY_BANDS, DAY_CYCLE_SUBTICKS } from '../game/dayCycle';
 import { LEISURE_CLUSTER_CAPACITY } from '../game/agents';
 import { findHabitatIconAtTile } from '../game/habitats';
 import { findFishingGroundIconAtTile, fishingGroundAt } from '../game/fishingGrounds';
+import { fishingPortPierAt, fishingPortPierPositions } from '../game/fishingBoats';
 import { isBuildingFootprintExplored, isExplored } from '../game/exploration';
 import {
   builtWallTileSet, GATE_CONVERSION_COSTS, isSolidWallBuilding, isWallBuilding,
@@ -90,7 +91,7 @@ import {
   mineralVisualTier,
   tileMineralResource,
 } from '../game/minerals';
-import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, FishingGroundState, ForeignSite, GameState, PastureArea, Resident, Season, Terrain, Tile } from '../game/types';
+import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, FishingGroundState, FishingPortPier, ForeignSite, GameState, PastureArea, Resident, Season, Terrain, Tile } from '../game/types';
 import { historicalTerrainColumn } from './historicalTerrain';
 import { drawFishingBoatAtlas } from './atlas';
 import { fishingBoatVisualState } from './fishingBoatAssets';
@@ -1180,6 +1181,55 @@ function drawFishingBoatPlaceholder(
     ctx.beginPath();
     ctx.arc(0, TILE * 0.09, Math.min(TILE * 0.1, TILE * 0.04 + boat.cargoFish * 0.004 * TILE), 0, Math.PI * 2);
     ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawFishingPortPier(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  pier: FishingPortPier,
+  progress01 = 1,
+  ghostColor?: string,
+): void {
+  const positions = fishingPortPierPositions(x, y, pier, false);
+  const visibleSegments = ghostColor
+    ? positions.length
+    : Math.max(0, Math.min(positions.length, Math.ceil(positions.length * progress01)));
+  const horizontal = pier.direction === 'e' || pier.direction === 'w';
+  ctx.save();
+  for (let index = 0; index < visibleSegments; index++) {
+    const position = positions[index];
+    const terminal = index === positions.length - 1;
+    const cx = (position.x + 0.5) * TILE;
+    const cy = (position.y + 0.5) * TILE;
+    const width = terminal ? TILE * 0.84 : horizontal ? TILE : TILE * 0.48;
+    const height = terminal ? TILE * 0.84 : horizontal ? TILE * 0.48 : TILE;
+    const left = cx - width / 2;
+    const top = cy - height / 2;
+    ctx.fillStyle = ghostColor ?? (terminal ? '#8c6037' : '#79502f');
+    ctx.strokeStyle = ghostColor ? 'rgba(255,255,255,0.62)' : '#49301f';
+    ctx.lineWidth = 1;
+    ctx.fillRect(left, top, width, height);
+    ctx.strokeRect(left + 0.5, top + 0.5, width - 1, height - 1);
+    ctx.strokeStyle = ghostColor ? 'rgba(255,255,255,0.44)' : 'rgba(218,172,105,0.72)';
+    const plankStep = Math.max(4, Math.round(TILE * 0.2));
+    if (horizontal) {
+      for (let px = left + plankStep; px < left + width; px += plankStep) {
+        ctx.beginPath(); ctx.moveTo(px, top + 1); ctx.lineTo(px, top + height - 1); ctx.stroke();
+      }
+    } else {
+      for (let py = top + plankStep; py < top + height; py += plankStep) {
+        ctx.beginPath(); ctx.moveTo(left + 1, py); ctx.lineTo(left + width - 1, py); ctx.stroke();
+      }
+    }
+    if (terminal) {
+      ctx.fillStyle = ghostColor ?? '#4d3524';
+      const post = Math.max(2, TILE * 0.1);
+      ctx.fillRect(left + 2, top + 2, post, post);
+      ctx.fillRect(left + width - post - 2, top + height - post - 2, post, post);
+    }
   }
   ctx.restore();
 }
@@ -2673,7 +2723,24 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     const def = BUILDING_DEFS[b.type];
     const dims = buildingFootprintDims(b);
     const topMargin = b.type === 'center' ? 3 : 1;
-    if (!tileRectIntersectsViewport(viewport, b.x - 1, b.y - topMargin, dims.w + 2, dims.h + topMargin + 1)) continue;
+    const portPositions = b.type === 'fishingPort' && b.portPier
+      ? fishingPortPierPositions(b.x, b.y, b.portPier)
+      : null;
+    const bounds = portPositions
+      ? {
+          x: Math.min(...portPositions.map(position => position.x)),
+          y: Math.min(...portPositions.map(position => position.y)),
+          w: Math.max(...portPositions.map(position => position.x)) - Math.min(...portPositions.map(position => position.x)) + 1,
+          h: Math.max(...portPositions.map(position => position.y)) - Math.min(...portPositions.map(position => position.y)) + 1,
+        }
+      : { x: b.x, y: b.y, w: dims.w, h: dims.h };
+    if (!tileRectIntersectsViewport(
+      viewport,
+      bounds.x - 1,
+      bounds.y - topMargin,
+      bounds.w + 2,
+      bounds.h + topMargin + 1,
+    )) continue;
     visibleBuildings.push(b);
     const footprintWidth = TILE * dims.w;
     const footprintHeight = TILE * dims.h;
@@ -2690,6 +2757,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     const visualProgress = b.workOrder?.phase === 'rebuilding'
       ? b.workOrder.progress / Math.max(1, b.workOrder.required)
       : def.buildDays > 0 ? b.progress / def.buildDays : 1;
+    if (b.type === 'fishingPort' && b.portPier) {
+      drawFishingPortPier(ctx, b.x, b.y, b.portPier, visuallyBuilt ? 1 : visualProgress);
+    }
     if (isPlotBuildingType(b.type)) {
       // 경작지는 발자국 칸마다 스프라이트를 타일링 — 파종을 마친 칸만 작물이 자라 보인다
       const area = dims.w * dims.h;
@@ -3375,10 +3445,8 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     const def = BUILDING_DEFS[o.placingType];
     const footprint = buildingFootprintSize(o.placingType);
     const size = TILE * footprint;
-    const overlapsForeignSite = Array.from({ length: footprint }, (_, dy) =>
-      Array.from({ length: footprint }, (_unused, dx) => foreignSiteAt(state, o.hover!.x + dx, o.hover!.y + dy)))
-      .flat()
-      .some(site => site != null);
+    const previewTiles = buildingFootprintTiles(state, o.placingType, o.hover.x, o.hover.y);
+    const overlapsForeignSite = previewTiles?.some(tile => foreignSiteAt(state, tile.x, tile.y) != null) ?? false;
     const ok = isBuildingFootprintExplored(state, o.placingType, o.hover.x, o.hover.y) &&
       canPlaceBuildingAt(state, o.placingType, o.hover.x, o.hover.y) &&
       canAfford(state, def) && !overlapsForeignSite;
@@ -3388,6 +3456,19 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       ? 'rgba(224,164,92,0.45)'
       : ok ? 'rgba(111,191,115,0.45)' : 'rgba(224,108,92,0.45)';
     ctx.fillRect(o.hover.x * TILE, o.hover.y * TILE, size, size);
+    if (o.placingType === 'fishingPort') {
+      const pier = fishingPortPierAt(state.map, o.hover.x, o.hover.y);
+      if (pier) {
+        drawFishingPortPier(
+          ctx,
+          o.hover.x,
+          o.hover.y,
+          pier,
+          1,
+          ok ? 'rgba(111,191,115,0.58)' : 'rgba(224,108,92,0.58)',
+        );
+      }
+    }
     drawBuildingSprite(ctx, sprites, {
       type: o.placingType, built: true, ghost: true, progress01: 1,
       season, highDefinition: renderScale === 2,

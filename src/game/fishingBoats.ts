@@ -6,13 +6,14 @@ import { isLakeIceAt } from './lakeIce';
 import { makeRng } from './map';
 import { seaConditionAt } from './seaConditions';
 import { getDayOfSeason, getSeason } from './seasons';
+import { coastalGroundAt } from './tidalFlats';
 import type {
-  Building, FishingBoatFacing, FishingBoatState, FishingGroundDepthBand, FishingGroundTile,
-  GameState, Resident, Tile,
+  Building, FishingBoatFacing, FishingBoatState, FishingGroundDepthBand, FishingGroundTile, FishingPortPier,
+  FishingPortPierDirection, GameState, Resident, Tile,
 } from './types';
 
 type WaterKind = 'lake' | 'sea';
-type WaterfrontBuilding = Pick<Building, 'id' | 'type' | 'x' | 'y' | 'built' | 'boatWorkOrder'>;
+type WaterfrontBuilding = Pick<Building, 'id' | 'type' | 'x' | 'y' | 'built' | 'boatWorkOrder' | 'portPier'>;
 
 const WATER_DIRECTIONS = [
   { x: 0, y: -1 },
@@ -22,6 +23,88 @@ const WATER_DIRECTIONS = [
 ] as const;
 
 const BOAT_FACINGS = new Set<FishingBoatFacing>(['ne', 'nw', 'se', 'sw']);
+
+export const FISHING_PORT_PIER_MIN_LENGTH = 3;
+export const FISHING_PORT_PIER_MAX_LENGTH = 6;
+
+const PORT_PIER_DIRECTIONS: readonly {
+  direction: FishingPortPierDirection;
+  x: number;
+  y: number;
+}[] = [
+  { direction: 'n', x: 0, y: -1 },
+  { direction: 'e', x: 1, y: 0 },
+  { direction: 's', x: 0, y: 1 },
+  { direction: 'w', x: -1, y: 0 },
+];
+
+function portPierStep(direction: FishingPortPierDirection): { x: number; y: number } {
+  const found = PORT_PIER_DIRECTIONS.find(candidate => candidate.direction === direction) ?? PORT_PIER_DIRECTIONS[0];
+  return { x: found.x, y: found.y };
+}
+
+export function fishingPortPierPositions(
+  x: number,
+  y: number,
+  pier: FishingPortPier,
+  includeMain = true,
+): FishingGroundTile[] {
+  const step = portPierStep(pier.direction);
+  const positions: FishingGroundTile[] = includeMain ? [{ x, y }] : [];
+  for (let distance = 1; distance <= pier.length; distance++) {
+    positions.push({ x: x + step.x * distance, y: y + step.y * distance });
+  }
+  return positions;
+}
+
+function validSeaPierPath(map: Tile[][], positions: FishingGroundTile[]): boolean {
+  let enteredSea = false;
+  for (const position of positions) {
+    const tile = map[position.y]?.[position.x];
+    if (!tile) return false;
+    if (tile.terrain === 'sea') {
+      enteredSea = true;
+      continue;
+    }
+    if (enteredSea || tile.terrain === 'lake' || tile.terrain === 'river') return false;
+    if (tile.terrain === 'mudflat') continue;
+    if ((tile.terrain === 'plain' || tile.terrain === 'fertile') &&
+        coastalGroundAt(map, tile.x, tile.y) != null) continue;
+    return false;
+  }
+  return enteredSea;
+}
+
+export function fishingPortPierAt(map: Tile[][], x: number, y: number): FishingPortPier | null {
+  const main = map[y]?.[x];
+  if (!main || (main.terrain !== 'plain' && main.terrain !== 'fertile') || coastalGroundAt(map, x, y) != null) {
+    return null;
+  }
+  for (let length = FISHING_PORT_PIER_MIN_LENGTH; length <= FISHING_PORT_PIER_MAX_LENGTH; length++) {
+    for (const candidate of PORT_PIER_DIRECTIONS) {
+      const pier: FishingPortPier = { direction: candidate.direction, length };
+      const positions = fishingPortPierPositions(x, y, pier, false);
+      const terminal = positions[positions.length - 1];
+      const water = waterKind(map[terminal.y]?.[terminal.x]);
+      if (water === 'lake' && positions.every(position => map[position.y]?.[position.x]?.terrain === 'lake')) {
+        return pier;
+      }
+      if (water === 'sea' && validSeaPierPath(map, positions)) return pier;
+    }
+  }
+  return null;
+}
+
+export function fishingPortMooringTile(
+  map: Tile[][],
+  x: number,
+  y: number,
+  pier: FishingPortPier,
+): FishingGroundTile | null {
+  const positions = fishingPortPierPositions(x, y, pier, false);
+  const terminal = positions[positions.length - 1];
+  return waterKind(map[terminal.y]?.[terminal.x]) ? terminal : null;
+}
 
 export function fishingBoatFacingForStep(dx: number, dy: number): FishingBoatFacing | null {
   if (Math.abs(dx) >= Math.abs(dy) && dx > 0) return 'ne';
@@ -62,8 +145,12 @@ export function fishingWaterfrontAccessTiles(
 
 export function fishingWaterAccessForBuilding(
   state: Pick<GameState, 'map'>,
-  building: Pick<Building, 'type' | 'x' | 'y'>,
+  building: Pick<Building, 'type' | 'x' | 'y' | 'portPier'>,
 ): FishingGroundTile[] {
+  if (building.type === 'fishingPort' && building.portPier) {
+    const mooring = fishingPortMooringTile(state.map, building.x, building.y, building.portPier);
+    return mooring ? [mooring] : [];
+  }
   const { w, h } = footprintSize(building.type);
   return fishingWaterfrontAccessTiles(state.map, building.x, building.y, w, h);
 }
