@@ -2,10 +2,33 @@
 // config.ts에 값이 하나 늘면 편집기에도 저절로 하나 늘어야 한다.
 import { CONFIG_DEFAULTS } from '@game/game/config';
 import { BUILDING_DEF_DEFAULTS } from '@game/game/buildings';
+import {
+  JOB_NAMES, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES, TERRAIN_NAMES, WEATHER_NAMES,
+} from '@game/game/constants';
+import { LIVESTOCK_DEFS } from '@game/game/livestock';
 import { balanceBlockReason, balanceTiming, type BalanceTiming } from '../balance-meta.mjs';
+import { resolveFieldNote, type FieldNote } from '../field-notes.mjs';
 import type { OverrideValue, KeyComment } from './api';
 
-export type { BalanceTiming };
+export type { BalanceTiming, FieldNote };
+
+/**
+ * 게임의 이름표를 리프 이름 → 한국어 표로 모은다.
+ * 용어집에 베끼지 않고 원본에서 읽는다 — 이름이 바뀌면 편집기 설명도 같이 바뀐다.
+ * 뒤에 오는 표가 앞을 덮으므로, 겹치는 이름은 더 좁은 쪽을 뒤에 둔다.
+ */
+export const GAME_TERMS: Record<string, string> = {
+  ...TERRAIN_NAMES,
+  ...JOB_NAMES,
+  ...RESOURCE_NAMES,
+  ...WEATHER_NAMES,
+  ...SEASON_NAMES,
+  ...RANK_NAMES,
+  ...Object.fromEntries(Object.entries(LIVESTOCK_DEFS).map(([id, def]) => [id, def.name])),
+  ...Object.fromEntries(
+    Object.entries(BUILDING_DEF_DEFAULTS).map(([id, def]) => [id, def.name]),
+  ),
+};
 
 export interface BalanceField {
   /** 오버레이 경로 키. `buildings.`로 시작하면 BUILDING_DEFS 몫이다. */
@@ -85,15 +108,32 @@ export function categoryLabel(id: string, comments: Record<string, KeyComment>):
   return head ? `${id} · ${head}` : id;
 }
 
-export function fieldComment(field: BalanceField, comments: Record<string, KeyComment>): string | undefined {
-  const own = comments[field.path];
-  if (!own) return undefined;
-  return [own.side, own.above].filter(Boolean).join(' — ');
+/**
+ * 필드 하나의 설명. config.ts 주석 → 경로 사전 → 리프 용어집 → 조상 문맥 순으로
+ * 무엇이든 하나는 나오게 한다 (설계서 §8-2). source로 고유/유추를 가른다.
+ */
+export function fieldNote(field: BalanceField, comments: Record<string, KeyComment>): FieldNote {
+  return resolveFieldNote({
+    path: field.path,
+    leaf: field.leaf,
+    comments,
+    terms: GAME_TERMS,
+    groupNote: buildingGroupNote(field.group),
+  });
 }
 
-/** 검색 대상 문자열 — 경로와 한글 주석을 함께 훑는다. */
+/** 건물 묶음은 config.ts 주석 대신 건물 설명이 문맥이 된다. */
+function buildingGroupNote(groupPath: string): string | null {
+  const segments = groupPath.split('.');
+  if (segments[0] !== 'buildings' || segments.length < 2) return null;
+  const def = (BUILDING_DEF_DEFAULTS as Record<string, { name: string; desc: string } | undefined>)[segments[1]];
+  return def ? `${def.name} — ${def.desc}` : null;
+}
+
+/** 검색 대상 문자열 — 경로와 한글 설명(주석·사전·용어집·조상 문맥)을 함께 훑는다. */
 export function searchText(field: BalanceField, comments: Record<string, KeyComment>): string {
-  const parts = [field.path, fieldComment(field, comments) ?? ''];
+  const note = fieldNote(field, comments);
+  const parts = [field.path, note.text, note.context ?? ''];
   const groupComment = comments[field.group];
   if (groupComment) parts.push(groupComment.above ?? '', groupComment.side ?? '');
   if (field.category === 'buildings') {

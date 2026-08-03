@@ -90,7 +90,11 @@ body {
 .badge.runtime { color: #7fd08a; border-color: #2f5136; }
 .badge.worldgen { color: #6fb3e0; border-color: #2b4a5e; }
 .badge.saved { color: #c99ade; border-color: #4a3558; }
-.note { margin: 4px 0 0; color: var(--dim); font-size: 12px; max-width: 82ch; }
+/* 고유 설명(config.ts 주석·설명 사전)은 진하게, 유추된 뜻풀이는 흐리게. */
+.note { margin: 4px 0 0; color: #c3cbd8; font-size: 12px; max-width: 82ch; cursor: help; }
+.note.derived { color: var(--dim); font-style: italic; }
+.note-mark { color: #6c7381; margin-right: 5px; font-style: normal; }
+.note.context { color: #79808d; font-style: normal; font-size: 11px; margin-top: 2px; }
 .warn { margin: 4px 0 0; color: var(--warn); font-size: 12px; }
 .row-edit { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
 .row-edit input[type='number'] {

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { loadBalance, saveOverrides, type KeyComment, type OverrideValue } from './api';
 import {
-  buildFields, categoryLabel, fieldComment, groupLabel, searchText,
+  buildFields, categoryLabel, fieldNote, groupLabel, searchText,
   type BalanceField,
 } from './fields';
+import type { FieldNoteSource } from '../field-notes.mjs';
 import { BALANCE_TIMINGS, balanceValueWarning } from '../balance-meta.mjs';
 
 type Overrides = Record<string, OverrideValue>;
@@ -263,10 +264,20 @@ interface RowProps {
   onReset: () => void;
 }
 
+/** 설명이 어디서 왔는지 — 유추된 뜻풀이를 고유 설명으로 오해하지 않게 한다. */
+const NOTE_SOURCE_HINT: Record<FieldNoteSource, string> = {
+  own: 'config.ts 주석 — 설계 의도가 적힌 고유 설명',
+  dict: '편집기 설명 사전(tools/balance-studio/field-notes.mjs)의 고유 설명',
+  glossary: '리프 이름 용어집에서 자동으로 붙인 뜻풀이',
+  ancestor: '상위 묶음 주석에서 물려받은 문맥',
+  none: '',
+};
+
 function FieldRow({ field, comments, override, draft, onDraft, onDraftEnd, onChange, onReset }: RowProps) {
   const changed = override !== undefined;
   const value = changed ? override : field.defaultValue;
-  const note = fieldComment(field, comments);
+  const note = fieldNote(field, comments);
+  const derived = note.source === 'glossary' || note.source === 'ancestor';
   const timing = BALANCE_TIMINGS[field.timing];
   const ratio = changed ? ratioText(field.defaultValue, value) : null;
   const warning = changed ? balanceValueWarning(field.defaultValue, value) : null;
@@ -278,7 +289,13 @@ function FieldRow({ field, comments, override, draft, onDraft, onDraftEnd, onCha
         <span className={`badge ${field.timing}`} title={timing.hint}>{timing.label}</span>
         {changed && <span className="mark">변경됨</span>}
       </div>
-      {note && <p className="note">{note}</p>}
+      {note.text && (
+        <p className={derived ? 'note derived' : 'note'} title={NOTE_SOURCE_HINT[note.source]}>
+          {derived && <span className="note-mark">≈</span>}
+          {note.text}
+        </p>
+      )}
+      {note.context && <p className="note context" title="상위 묶음 주석에서 온 문맥">↳ {note.context}</p>}
       <div className="row-edit">
         {field.kind === 'boolean' ? (
           <label className="bool">
