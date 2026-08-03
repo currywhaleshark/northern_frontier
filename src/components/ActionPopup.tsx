@@ -4,7 +4,7 @@ import {
   isSmithyProductUnlocked, SMITHY_PRODUCT_DEFS, SMITHY_PRODUCT_ORDER, smithyProductOf,
 } from '../game/buildings';
 import { CONFIG } from '../game/config';
-import { FACTIONS, JOB_COLORS, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES } from '../game/constants';
+import { FACTIONS, JOB_COLORS, JOB_NAMES, RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES, WEATHER_NAMES } from '../game/constants';
 import { allowedCropsForBuilding, cropIdForBuilding, CROP_DEFS } from '../game/crops';
 import { edictSlotCapacity, edictSlotsUsed } from '../game/edicts';
 import { canRequestTrade, factionTradeUnlockReason } from '../game/events';
@@ -12,7 +12,8 @@ import { contractReserved, contractReserveNeeds } from '../game/tradeContractRes
 import { nextContractDueDay } from '../game/tradeContracts';
 import { gatheringWorkArea } from '../game/gatheringZones';
 import { fishingGroundAt, fishingGroundSummaryInArea } from '../game/fishingGrounds';
-import { nearestCompatibleFishingPort } from '../game/fishingBoats';
+import { fishingBoatExpectedDurabilityCost, nearestCompatibleFishingPort } from '../game/fishingBoats';
+import { forecastSeaCondition, SEA_CONDITION_NAMES, seaConditionAt } from '../game/seaConditions';
 import { DRYING_PRODUCT_DEFS, DRYING_PRODUCT_ORDER, dryingProductOf } from '../game/preservation';
 import { TANNERY_PRODUCT_DEFS, TANNERY_PRODUCT_ORDER, tanneryProductOf } from '../game/wearables';
 import {
@@ -507,6 +508,8 @@ export function ActionPopup({
         const mid = fishingGroundSummaryInArea(state.fishingGrounds, area, kind, 'mid');
         const deep = fishingGroundSummaryInArea(state.fishingGrounds, area, kind, 'deep');
         const boats = state.fishingBoats.filter(boat => boat.portId === building.id);
+        const seaCondition = kind === 'sea' ? seaConditionAt(state) : null;
+        const seaForecast = kind === 'sea' ? forecastSeaCondition(state) : null;
         const statusName = {
           moored: '계류', boarded: '승선', underway: '출항', fishing: '조업', returning: '귀항',
           repairing: '수리', disabled: '사용 불가',
@@ -525,10 +528,14 @@ export function ActionPopup({
               {boats.length > 0
                 ? boats.map(boat => {
                   const tripCatch = boat.tripCatchTarget ?? 0;
-                  const depthCost = boat.tripDepthBand === 'deep' ? CONFIG.fishingBoats.deepDurabilityMultiplier : 1;
-                  const tripDurability = CONFIG.fishingBoats.departureDurabilityCost +
-                    (boat.tripDistance ?? 0) * CONFIG.fishingBoats.travelDurabilityPerTile +
-                    tripCatch * CONFIG.fishingBoats.catchDurabilityPerFish * depthCost;
+                  const conditionMultiplier = seaCondition === 'storm'
+                    ? CONFIG.fishingBoats.stormTravelDurabilityMultiplier
+                    : seaCondition === 'rough' ? CONFIG.fishingBoats.roughDurabilityMultiplier : 1;
+                  const tripDurability = boat.tripDepthBand
+                    ? fishingBoatExpectedDurabilityCost(
+                      boat.tripDepthBand, boat.tripDistance ?? 0, tripCatch, conditionMultiplier,
+                    )
+                    : 0;
                   return `#${boat.id} ${statusName[boat.status]} · 내구 ${Math.ceil(boat.durability)}/${boat.maxDurability}` +
                     ` · 적재 ${boat.cargoFish.toFixed(1)}/${boat.cargoCapacity}` +
                     (boat.tripDepthBand
@@ -539,6 +546,14 @@ export function ActionPopup({
                 : '배무이터에서 같은 수역의 이 포구로 보낼 어선을 건조할 수 있습니다.'}
             </div>
             {kind === 'lake' && <div className="muted small">호수 어선은 겨울과 봄 1~6일에는 출항하지 않습니다.</div>}
+            {seaCondition && seaForecast && (
+              <div className="muted small">
+                오늘 바다 {SEA_CONDITION_NAMES[seaCondition]}
+                {seaCondition === 'rough' ? ` · 내구 소모 ${Math.round(CONFIG.fishingBoats.roughDurabilityMultiplier * 100)}%` : ''}
+                {seaCondition === 'storm' ? ' · 신규 출항 취소' : ''}
+                {' '}· 내일 {WEATHER_NAMES[seaForecast.weather]} / {SEA_CONDITION_NAMES[seaForecast.condition]}
+              </div>
+            )}
           </div>
         );
       })()}

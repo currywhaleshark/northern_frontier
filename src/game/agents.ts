@@ -63,8 +63,8 @@ import {
   takeFishingGroundStock, takeFishingGroundStockById,
 } from './fishingGrounds';
 import {
-  advanceFishingBoatWork, advanceLakeFishingTrip, boardFishingBoat, disembarkFishingBoat,
-  lakeFishingTripPlan, startLakeFishingTrip,
+  advanceFishingBoatTrip, advanceFishingBoatWork, boardFishingBoat, disembarkFishingBoat,
+  fishingBoatTripPlan, startFishingBoatTrip,
 } from './fishingBoats';
 import { waterDependentProductionMultiplier } from './waterSupply';
 import { activeFireDisaster, applyFireWater, drawFireWater, nearestFireWaterSource } from './fire';
@@ -2721,11 +2721,11 @@ function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
   if (workplace.type === 'fishingPort') {
     const area = gatheringWorkArea(workplace);
     const portKind = state.map[area.y]?.[area.x]?.terrain;
-    if (portKind === 'lake' && carryTotal(r) <= WORK_STOCK_EPSILON) {
+    if ((portKind === 'lake' || portKind === 'sea') && carryTotal(r) <= WORK_STOCK_EPSILON) {
       const remainingWorkSubticks = DAY_BANDS.work.end - state.subTick + 1;
       const candidate = state.fishingBoats
         .filter(boat => boat.portId === workplace.id && boat.status === 'moored' && boat.fisherId == null)
-        .map(boat => ({ boat, plan: lakeFishingTripPlan(state, boat, remainingWorkSubticks) }))
+        .map(boat => ({ boat, plan: fishingBoatTripPlan(state, boat, remainingWorkSubticks) }))
         .filter((entry): entry is { boat: GameState['fishingBoats'][number]; plan: NonNullable<typeof entry.plan> } =>
           entry.plan != null)
         .sort((left, right) =>
@@ -2736,11 +2736,11 @@ function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
         if (st === 'arrived') {
           const boardError = boardFishingBoat(state, candidate.boat.id, r.id);
           const tripError = boardError == null
-            ? startLakeFishingTrip(state, candidate.boat.id, remainingWorkSubticks)
+            ? startFishingBoatTrip(state, candidate.boat.id, remainingWorkSubticks)
             : boardError;
           if (tripError != null && boardError == null) disembarkFishingBoat(state, candidate.boat.id);
           r.phase = tripError == null ? 'toWork' : 'rest';
-          r.task = tripError == null ? '호수 중·심수 어장으로 출항' : tripError;
+          r.task = tripError == null ? `${portKind === 'sea' ? '바다' : '호수'} 중·심수 어장으로 출항` : tripError;
         } else {
           r.phase = st === 'stuck' ? 'rest' : 'toWork';
           r.task = st === 'stuck' ? '포구 길이 막힘' : '어선에 타러 포구로 이동';
@@ -3944,13 +3944,13 @@ export function agentsTick(state: GameState): void {
       r.py = r.y;
       if (activeBoat.status === 'boarded') {
         const remainingWorkSubticks = DAY_BANDS.work.end - state.subTick + 1;
-        if (dayBand === 'work' && startLakeFishingTrip(state, activeBoat.id, remainingWorkSubticks) == null) {
-          r.task = '호수 중·심수 어장으로 출항';
+        if (dayBand === 'work' && startFishingBoatTrip(state, activeBoat.id, remainingWorkSubticks) == null) {
+          r.task = `${state.map[activeBoat.y]?.[activeBoat.x]?.terrain === 'sea' ? '바다' : '호수'} 중·심수 어장으로 출항`;
         } else {
           disembarkFishingBoat(state, activeBoat.id);
         }
       } else {
-        advanceLakeFishingTrip(state, activeBoat.id, dayBand !== 'work');
+        advanceFishingBoatTrip(state, activeBoat.id, dayBand !== 'work');
       }
       continue;
     }

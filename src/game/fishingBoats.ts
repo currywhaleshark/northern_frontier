@@ -1,7 +1,10 @@
 import { CONFIG } from './config';
+import { addLog } from './events';
 import { takeFishingGroundStockById } from './fishingGrounds';
 import { addBuildingStock } from './inventory';
 import { isLakeIceAt } from './lakeIce';
+import { makeRng } from './map';
+import { seaConditionAt } from './seaConditions';
 import { getDayOfSeason, getSeason } from './seasons';
 import type {
   Building, FishingBoatState, FishingGroundDepthBand, FishingGroundTile,
@@ -152,15 +155,16 @@ function syncFisherToBoat(state: GameState, boat: FishingBoatState): void {
   fisher.x = boat.x;
   fisher.y = boat.y;
   fisher.path = [];
+  const waterName = state.map[boat.y]?.[boat.x]?.terrain === 'sea' ? '바다' : '호수';
   fisher.phase = boat.status === 'fishing' ? 'working' : 'toWork';
   fisher.task = boat.status === 'fishing'
-    ? '호수 어장에서 조업 중'
+    ? `${waterName} 어장에서 조업 중`
     : boat.status === 'returning'
       ? '포구로 귀항 중'
-      : '호수 어장으로 항해 중';
+      : `${waterName} 어장으로 항해 중`;
 }
 
-export interface LakeFishingTripPlan {
+export interface FishingBoatTripPlan {
   groundId: string;
   depthBand: Extract<FishingGroundDepthBand, 'mid' | 'deep'>;
   target: FishingGroundTile;
@@ -172,6 +176,8 @@ export interface LakeFishingTripPlan {
   expectedDurabilityCost: number;
   requiredSubticks: number;
 }
+
+export type LakeFishingTripPlan = FishingBoatTripPlan;
 
 export function lakeFishingDepartureAllowed(day: number): boolean {
   const season = getSeason(day);
@@ -192,39 +198,52 @@ export function fishingBoatExpectedCatch(
   return CONFIG.fishingBoats.baseCatchPerTrip * depthMultiplier * (1 + distanceBonus);
 }
 
-function expectedTripDurabilityCost(
+function seaDurabilityMultiplier(state: GameState, kind: WaterKind): number {
+  if (kind !== 'sea') return 1;
+  const condition = seaConditionAt(state);
+  if (condition === 'storm') return CONFIG.fishingBoats.stormTravelDurabilityMultiplier;
+  return condition === 'rough' ? CONFIG.fishingBoats.roughDurabilityMultiplier : 1;
+}
+
+export function fishingBoatExpectedDurabilityCost(
   depthBand: Extract<FishingGroundDepthBand, 'mid' | 'deep'>,
   roundTripDistance: number,
   expectedCatch: number,
+  conditionMultiplier = 1,
 ): number {
   const depthMultiplier = depthBand === 'deep' ? CONFIG.fishingBoats.deepDurabilityMultiplier : 1;
-  return CONFIG.fishingBoats.departureDurabilityCost +
+  return (CONFIG.fishingBoats.departureDurabilityCost +
     roundTripDistance * CONFIG.fishingBoats.travelDurabilityPerTile +
-    expectedCatch * CONFIG.fishingBoats.catchDurabilityPerFish * depthMultiplier;
+    expectedCatch * CONFIG.fishingBoats.catchDurabilityPerFish * depthMultiplier) * conditionMultiplier;
 }
 
-export function lakeFishingTripPlan(
+export function fishingBoatTripPlan(
   state: GameState,
   boat: FishingBoatState,
   remainingWorkSubticks: number,
-): LakeFishingTripPlan | null {
-  if (!lakeFishingDepartureAllowed(state.day) ||
+): FishingBoatTripPlan | null {
+  const kind = waterKind(state.map[boat.y]?.[boat.x]);
+  if (!kind || (kind === 'lake' && !lakeFishingDepartureAllowed(state.day)) ||
+      (kind === 'sea' && seaConditionAt(state) === 'storm') ||
       (boat.status !== 'moored' && boat.status !== 'boarded') ||
       boat.durability < CONFIG.fishingBoats.minimumDepartureDurability ||
       boat.cargoFish >= boat.cargoCapacity || remainingWorkSubticks <= 0) return null;
   const port = state.buildings.find(building =>
     building.id === boat.portId && building.type === 'fishingPort' && building.built);
-  if (!port || state.map[boat.y]?.[boat.x]?.terrain !== 'lake') return null;
+  if (!port) return null;
   const area = portWorkArea(port);
-  const candidates: LakeFishingTripPlan[] = [];
+  const candidates: FishingBoatTripPlan[] = [];
   for (const ground of state.fishingGrounds) {
-    if (ground.kind !== 'lake' || (ground.depthBand !== 'mid' && ground.depthBand !== 'deep') || ground.stock <= 0) continue;
+    if (ground.kind !== kind || (ground.depthBand !== 'mid' && ground.depthBand !== 'deep') || ground.stock <= 0) continue;
     for (const target of ground.tiles) {
-      if (!pointInArea(target, area) || isLakeIceAt(state.map, state.day, target.x, target.y)) continue;
+      if (!pointInArea(target, area) ||
+          (kind === 'lake' && isLakeIceAt(state.map, state.day, target.x, target.y))) continue;
       const route = fishingBoatRoute(state.map, boat, target);
-      if (route.length === 0 || route.some(point => isLakeIceAt(state.map, state.day, point.x, point.y))) continue;
+      if (route.length === 0 ||
+          (kind === 'lake' && route.some(point => isLakeIceAt(state.map, state.day, point.x, point.y)))) continue;
       const returnRoute = shortestRouteToPort(state, port, target);
-      if (returnRoute.length === 0 || returnRoute.some(point => isLakeIceAt(state.map, state.day, point.x, point.y))) continue;
+      if (returnRoute.length === 0 ||
+          (kind === 'lake' && returnRoute.some(point => isLakeIceAt(state.map, state.day, point.x, point.y)))) continue;
       const outboundDistance = Math.max(0, route.length - 1);
       const returnDistance = Math.max(0, returnRoute.length - 1);
       const roundTripDistance = outboundDistance + returnDistance;
@@ -236,7 +255,9 @@ export function lakeFishingTripPlan(
       if (expectedCatch <= 0) continue;
       const requiredSubticks = roundTripDistance + CONFIG.fishingBoats.fishingWorkSubticks +
         CONFIG.fishingBoats.returnSafetySubticks;
-      const expectedDurabilityCost = expectedTripDurabilityCost(ground.depthBand, roundTripDistance, expectedCatch);
+      const expectedDurabilityCost = fishingBoatExpectedDurabilityCost(
+        ground.depthBand, roundTripDistance, expectedCatch, seaDurabilityMultiplier(state, kind),
+      );
       if (requiredSubticks > remainingWorkSubticks || expectedDurabilityCost >= boat.durability) continue;
       candidates.push({
         groundId: ground.id,
@@ -261,15 +282,39 @@ export function lakeFishingTripPlan(
   })[0] ?? null;
 }
 
-export function startLakeFishingTrip(
+export function lakeFishingTripPlan(
+  state: GameState,
+  boat: FishingBoatState,
+  remainingWorkSubticks: number,
+): LakeFishingTripPlan | null {
+  return state.map[boat.y]?.[boat.x]?.terrain === 'lake'
+    ? fishingBoatTripPlan(state, boat, remainingWorkSubticks)
+    : null;
+}
+
+export function seaFishingTripPlan(
+  state: GameState,
+  boat: FishingBoatState,
+  remainingWorkSubticks: number,
+): FishingBoatTripPlan | null {
+  return state.map[boat.y]?.[boat.x]?.terrain === 'sea'
+    ? fishingBoatTripPlan(state, boat, remainingWorkSubticks)
+    : null;
+}
+
+export function startFishingBoatTrip(
   state: GameState,
   boatId: number,
   remainingWorkSubticks: number,
 ): string | null {
   const boat = state.fishingBoats.find(candidate => candidate.id === boatId);
   if (!boat || boat.status !== 'boarded' || boat.fisherId == null) return '어부가 승선한 계류 어선이 필요합니다.';
-  const plan = lakeFishingTripPlan(state, boat, remainingWorkSubticks);
-  if (!plan) return '일몰 전에 다녀올 수 있는 호수 중·심수 어장이 없습니다.';
+  const kind = waterKind(state.map[boat.y]?.[boat.x]);
+  const plan = fishingBoatTripPlan(state, boat, remainingWorkSubticks);
+  if (!plan) {
+    if (kind === 'sea' && seaConditionAt(state) === 'storm') return '풍랑 예보로 오늘 바다 출항이 취소되었습니다.';
+    return `일몰 전에 다녀올 수 있는 ${kind === 'sea' ? '바다' : '호수'} 중·심수 어장이 없습니다.`;
+  }
   boat.targetGroundId = plan.groundId;
   boat.tripDepthBand = plan.depthBand;
   boat.tripCatchTarget = Math.min(boat.cargoCapacity, boat.cargoFish + plan.expectedCatch);
@@ -278,10 +323,15 @@ export function startLakeFishingTrip(
   boat.route = plan.route;
   boat.routeIndex = 0;
   boat.status = 'underway';
-  boat.durability = Math.max(0, boat.durability - CONFIG.fishingBoats.departureDurabilityCost);
+  boat.durability = Math.max(0,
+    boat.durability - CONFIG.fishingBoats.departureDurabilityCost *
+      seaDurabilityMultiplier(state, kind ?? 'lake'));
   syncFisherToBoat(state, boat);
   return null;
 }
+
+export const startLakeFishingTrip = startFishingBoatTrip;
+export const startSeaFishingTrip = startFishingBoatTrip;
 
 function beginReturn(state: GameState, boat: FishingBoatState): void {
   const port = state.buildings.find(building =>
@@ -302,10 +352,34 @@ function unloadFishingBoat(state: GameState, boat: FishingBoatState): void {
   else boat.status = boat.durability > 0 ? 'moored' : 'disabled';
 }
 
-export function advanceLakeFishingTrip(state: GameState, boatId: number, forceReturn = false): void {
+function applySeaStormHazard(state: GameState, boat: FishingBoatState): void {
+  const rng = makeRng(
+    state.seed + state.day * 0x45d9f3b + boat.id * 0x119de1f3 + CONFIG.fishingBoats.seaConditionSalt,
+  );
+  const hullDamage = CONFIG.fishingBoats.stormHullDamageMin +
+    rng() * (CONFIG.fishingBoats.stormHullDamageMax - CONFIG.fishingBoats.stormHullDamageMin);
+  boat.durability = Math.max(0, boat.durability - hullDamage);
+  const fisher = boat.fisherId == null ? undefined : state.residents.find(resident => resident.id === boat.fisherId);
+  let injuryText = '';
+  if (fisher && rng() < CONFIG.fishingBoats.stormInjuryChance) {
+    const injury = CONFIG.fishingBoats.stormInjuryMin +
+      rng() * (CONFIG.fishingBoats.stormInjuryMax - CONFIG.fishingBoats.stormInjuryMin);
+    fisher.health = Math.max(5, fisher.health - injury);
+    injuryText = ` 어부도 파도에 휩쓸려 다쳤습니다.`;
+  }
+  addLog(state, `출어 중 풍랑을 만나 어선 #${boat.id}의 선체가 ${Math.ceil(hullDamage)}만큼 파손되었습니다.${injuryText}`, 'bad', true);
+}
+
+export function advanceFishingBoatTrip(state: GameState, boatId: number, forceReturn = false): void {
   const boat = state.fishingBoats.find(candidate => candidate.id === boatId);
   if (!boat || boat.fisherId == null ||
       (boat.status !== 'underway' && boat.status !== 'fishing' && boat.status !== 'returning')) return;
+  const kind = waterKind(state.map[boat.y]?.[boat.x]);
+  const seaCondition = kind === 'sea' ? seaConditionAt(state) : 'calm';
+  if (kind === 'sea' && seaCondition === 'storm' && boat.status !== 'returning') {
+    applySeaStormHazard(state, boat);
+    beginReturn(state, boat);
+  }
   if (forceReturn && boat.status !== 'returning') beginReturn(state, boat);
   if (boat.status === 'underway' || boat.status === 'returning') {
     const nextIndex = boat.routeIndex + 1;
@@ -314,7 +388,13 @@ export function advanceLakeFishingTrip(state: GameState, boatId: number, forceRe
       boat.routeIndex = nextIndex;
       boat.x = next.x;
       boat.y = next.y;
-      boat.durability = Math.max(0, boat.durability - CONFIG.fishingBoats.travelDurabilityPerTile);
+      const travelMultiplier = kind === 'sea' && seaCondition === 'storm'
+        ? CONFIG.fishingBoats.stormTravelDurabilityMultiplier
+        : kind === 'sea' && seaCondition === 'rough'
+          ? CONFIG.fishingBoats.roughDurabilityMultiplier
+          : 1;
+      boat.durability = Math.max(0,
+        boat.durability - CONFIG.fishingBoats.travelDurabilityPerTile * travelMultiplier);
     }
     if (boat.route.length === 0 || boat.routeIndex >= boat.route.length - 1) {
       if (boat.status === 'returning') {
@@ -345,14 +425,18 @@ export function advanceLakeFishingTrip(state: GameState, boatId: number, forceRe
   const taken = takeFishingGroundStockById(state.fishingGrounds, ground.id, requested);
   boat.cargoFish += taken;
   const depthMultiplier = boat.tripDepthBand === 'deep' ? CONFIG.fishingBoats.deepDurabilityMultiplier : 1;
+  const conditionMultiplier = kind === 'sea' && seaCondition === 'rough'
+    ? CONFIG.fishingBoats.roughDurabilityMultiplier : 1;
   boat.durability = Math.max(0,
-    boat.durability - taken * CONFIG.fishingBoats.catchDurabilityPerFish * depthMultiplier);
+    boat.durability - taken * CONFIG.fishingBoats.catchDurabilityPerFish * depthMultiplier * conditionMultiplier);
   if (boat.fishingProgress >= CONFIG.fishingBoats.fishingWorkSubticks ||
       boat.cargoFish >= boat.cargoCapacity || boat.cargoFish >= targetCatch || ground.stock <= 0) {
     beginReturn(state, boat);
   }
   syncFisherToBoat(state, boat);
 }
+
+export const advanceLakeFishingTrip = advanceFishingBoatTrip;
 
 export function nearestCompatibleFishingPort(
   state: Pick<GameState, 'map' | 'buildings'>,
