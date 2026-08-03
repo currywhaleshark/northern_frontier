@@ -1,0 +1,28 @@
+{
+  "states": {
+    "side_idle": {
+      "frames": 4,
+      "fps": 4,
+      "loop": true,
+      "action": "stable three-quarter side idle facing screen-right; subtle breathing and one blink; feet planted and hands empty"
+    },
+    "side_walk": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true,
+      "action": "three-quarter side walk toward screen-right; two alternating foot contacts, compact stride, gentle arm counter-swing, continuous loop"
+    },
+    "side_sea_intake": {
+      "frames": 4,
+      "fps": 5,
+      "loop": true,
+      "action": "three-quarter side salt-worker seawater intake cycle facing screen-right; lower a small wooden dipper bucket, scoop brine, lift it with both hands, return to ready pose; one connected handheld bucket only"
+    },
+    "side_kiln_work": {
+      "frames": 4,
+      "fps": 5,
+      "loop": true,
+      "action": "three-quarter side salt-kiln tending cycle facing screen-right; lean toward an off-frame boiling pan, stir brine with one short wooden paddle, straighten slightly, return; paddle remains held and connected to the hands"
+    }
+  }
+}

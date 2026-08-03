@@ -37,8 +37,10 @@ const WALK_JOBS = ['woodcutter', 'hunter', 'hauler', 'builder', 'herbalist', 'mi
 
 const WORK_JOBS = [
   'woodcutter', 'hunter', 'builder', 'herbalist', 'miner', 'woodSplitter',
-  'fisher', 'herder', 'charcoalBurner', 'powderMaker', 'undertaker', 'curer', 'potter', 'saltMaker',
+  'fisher', 'herder', 'charcoalBurner', 'powderMaker', 'undertaker', 'curer', 'potter',
 ];
+
+const SALT_MAKER_STATES = ['idle', 'walk', 'seaIntake', 'kilnWork'];
 
 const LOAD_JOBS = ['woodcutter', 'hunter', 'miner'];
 
@@ -52,6 +54,7 @@ export const SPRITE_DISPLAY_METRIC_KEYS = [
   ...JIGE_JOBS.map(job => `jige.${job}`),
   ...WALK_JOBS.map(job => `walk.${job}`),
   ...WORK_JOBS.map(job => `work.${job}`),
+  ...SALT_MAKER_STATES.map(state => `saltMaker.${state}`),
   'work.farmer.oxPlow',
   'work.farmer.harvest',
   'work.farmer.till',

@@ -226,8 +226,8 @@ function addBuilt(state, type, x, y, overrides = {}) {
 
 function prepareSaltProduction(workerCount) {
   const state = simulation.newGameFromOptions({
-    ...options.optionsForDifficulty('normal', '', 20260872 + workerCount),
-    region: 'coast', seed: 20260872 + workerCount,
+    ...options.optionsForDifficulty('normal', '', 20260872),
+    region: 'coast', seed: 20260872,
   });
   clearForPlacement(state);
   addBuilt(state, 'center', 2, 2);
@@ -255,17 +255,28 @@ function prepareSaltProduction(workerCount) {
 // 장작 1.25로 소금 1을 만들며 두 슬롯이 병렬로 생산하고 운반 대상이 된다.
 {
   const one = prepareSaltProduction(1);
-  simulation.advanceTick(one.state);
+  let sawSeaIntake = false;
+  let sawReturnWithSeaWater = false;
+  for (let tick = 0; tick < 24; tick++) {
+    simulation.advanceTick(one.state);
+    sawSeaIntake ||= one.state.residents.some(resident => resident.task === '바닷물 긷는 중');
+    sawReturnWithSeaWater ||= one.state.residents.some(
+      resident => resident.task === '바닷물 지고 자염막으로 이동',
+    );
+  }
   const oneSalt = one.saltworks.inventory.salt ?? 0;
   const oneFirewood = 10 - one.saltworks.inventory.firewood;
+  assert.equal(sawSeaIntake, true, '염부가 바다 인접 육지에서 취수한다');
+  assert.equal(sawReturnWithSeaWater, true, '취수한 염부가 자염막으로 귀환한다');
   assert.ok(oneSalt > 0, '배정 염부가 소금을 만든다');
   assert.ok(Math.abs(oneFirewood / oneSalt - CONFIG.production.firewoodPerSalt) < 1e-6,
     '소금 1당 장작 1.25를 쓴다');
 
   const two = prepareSaltProduction(2);
-  simulation.advanceTick(two.state);
-  assert.ok(Math.abs((two.saltworks.inventory.salt ?? 0) - oneSalt * 2) < 1e-6,
-    '염부 두 명은 한 명의 두 배를 병렬 생산한다');
+  for (let tick = 0; tick < 24; tick++) simulation.advanceTick(two.state);
+  const twoSalt = two.saltworks.inventory.salt ?? 0;
+  assert.ok(twoSalt >= oneSalt * 1.75,
+    `염부 두 명은 취수 왕복의 위상 차이에도 병렬 생산량을 크게 늘린다 (${oneSalt} -> ${twoSalt})`);
   assert.equal(inventory.isHaulSourceBuilding(two.saltworks), true, '자염막 소금은 운반꾼 회수 대상이다');
 }
 

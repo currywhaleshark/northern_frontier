@@ -269,6 +269,12 @@ import {
   residentJigeCargoSourceRect,
 } from './residentJigeCargoAssets';
 import {
+  RESIDENT_SALT_MAKER_DISPLAY_FRAME_SIZE,
+  RESIDENT_SALT_MAKER_SHEETS,
+  saltMakerSourceRect,
+  type SaltMakerSpriteState,
+} from './residentSaltMakerAssets';
+import {
   TERRAIN_GROWTH_DRAW_SIZE,
   TERRAIN_GROWTH_SHEETS,
   TERRAIN_GROWTH_TREE_DRAW_SCALE,
@@ -410,6 +416,8 @@ let residentCurerWorkSheet: HTMLImageElement | null = null;
 let residentCurerWorkHdSheet: HTMLImageElement | null = null;
 let residentPotterWorkSheet: HTMLImageElement | null = null;
 let residentPotterWorkHdSheet: HTMLImageElement | null = null;
+const residentSaltMakerSheets: Partial<Record<'male' | 'female', HTMLImageElement>> = {};
+const residentSaltMakerHdSheets: Partial<Record<'male' | 'female', HTMLImageElement>> = {};
 let residentCommonLocomotionSheet: HTMLImageElement | null = null;
 let residentIdleVideoWalkSheet: HTMLImageElement | null = null;
 let residentIdleVideoWalkHdSheet: HTMLImageElement | null = null;
@@ -603,6 +611,12 @@ function ensureLoaded(): void {
     image => { residentPotterWorkSheet = image; });
   loadAtlasAsset(RESIDENT_POTTER_WORK_HD_SHEET.src, false,
     image => { residentPotterWorkHdSheet = image; });
+  for (const gender of ['male', 'female'] as const) {
+    loadAtlasAsset(RESIDENT_SALT_MAKER_SHEETS[gender].standard.src, false,
+      image => { residentSaltMakerSheets[gender] = image ?? undefined; });
+    loadAtlasAsset(RESIDENT_SALT_MAKER_SHEETS[gender].highDefinition.src, false,
+      image => { residentSaltMakerHdSheets[gender] = image ?? undefined; });
+  }
   loadAtlasAsset(RESIDENT_COMMON_LOCOMOTION_SHEET.src, false, image => { residentCommonLocomotionSheet = image; });
   loadAtlasAsset(RESIDENT_IDLE_VIDEO_WALK_SHEETS.standard.src, false, image => { residentIdleVideoWalkSheet = image; });
   loadAtlasAsset(RESIDENT_IDLE_VIDEO_WALK_SHEETS.highDefinition.src, false,
@@ -1627,13 +1641,19 @@ function drawOptionalResidentPresentation(
       }
       break;
     case 'saltMaker':
-      if (p.working && !p.moving) {
-        return drawStationaryWork(
-          residentPotterWorkSheet,
-          residentPotterWorkHdSheet,
-          highDefinition => potterWorkSourceRect(p.gender, animationTimeMs, highDefinition),
-          RESIDENT_POTTER_WORK_SHEET.displayFrameSize / RESIDENT_POTTER_WORK_SHEET.frameSize,
-          'work.saltMaker',
+      if (!p.stage) {
+        const state: SaltMakerSpriteState = p.moving
+          ? 'walk'
+          : p.working
+            ? p.saltMakerAction ?? 'kilnWork'
+            : 'idle';
+        const pair = RESIDENT_SALT_MAKER_SHEETS[p.gender];
+        return drawWork(
+          residentSaltMakerSheets[p.gender] ?? null,
+          residentSaltMakerHdSheets[p.gender] ?? null,
+          highDefinition => saltMakerSourceRect(p.gender, state, animationTimeMs, highDefinition),
+          RESIDENT_SALT_MAKER_DISPLAY_FRAME_SIZE / pair.standard.frameSize,
+          `saltMaker.${state}`,
         );
       }
       break;

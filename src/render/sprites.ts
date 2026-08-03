@@ -104,6 +104,7 @@ export interface ResidentDrawParams {
   showCargoMarker?: boolean;
   cartEquipped?: boolean;
   farmerAction?: 'till' | 'harvest' | 'oxPlow';
+  saltMakerAction?: 'seaIntake' | 'kilnWork';
   selected: boolean;
   moving?: boolean;   // 이번 서브틱에 이동 중 (걷기 연출)
   working?: boolean;  // 작업 타이머가 진행 중인 제자리 작업 연출

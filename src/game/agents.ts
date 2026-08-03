@@ -2657,6 +2657,34 @@ function saltMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
   }
   if (supplyWorkplaceInputs(state, r, ctx, saltworks, requirements)) return;
 
+  const returningWithSeaWater = r.task === '바닷물 지고 자염막으로 이동';
+  if (r.task === '바닷물 긷는 중' && r.workTimer > 0) {
+    r.phase = 'working';
+    r.workTimer -= 1;
+    if (r.workTimer <= 0) {
+      r.task = '바닷물 지고 자염막으로 이동';
+      r.path = [];
+    }
+    return;
+  }
+
+  if (!returningWithSeaWater) {
+    const intakeGoal = (tile: Tile): boolean =>
+      isPassable(state, tile.x, tile.y) &&
+      Math.max(Math.abs(tile.x - saltworks.x), Math.abs(tile.y - saltworks.y)) <= 8 &&
+      CARDINAL_DIRS.some(([dx, dy]) => state.map[tile.y + dy]?.[tile.x + dx]?.terrain === 'sea');
+    const intakeMove = goTo(state, r, ctx, intakeGoal);
+    if (intakeMove !== 'arrived') {
+      r.phase = intakeMove === 'stuck' ? 'rest' : 'toWork';
+      r.task = intakeMove === 'stuck' ? '바닷물 길이 막힘' : '바닷물 뜨러 해안으로 이동';
+      return;
+    }
+    r.phase = 'working';
+    r.task = '바닷물 긷는 중';
+    r.workTimer = 4;
+    return;
+  }
+
   const st = goTo(state, r, ctx, workerSlotGoal(state, r, saltworks));
   if (st !== 'arrived') {
     r.phase = st === 'stuck' ? 'rest' : 'toWork';
@@ -2673,6 +2701,7 @@ function saltMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
 
   consumeRecipeInputs(saltworks, inputs, made);
   addBuildingStock(saltworks, 'salt', made * plaqueProductionMultiplier(state, saltworks.id));
+  r.workTimer = 0;
   r.phase = 'working';
   r.task = '바닷물 끓여 소금 내는 중';
   gainSkillTick(state, r);

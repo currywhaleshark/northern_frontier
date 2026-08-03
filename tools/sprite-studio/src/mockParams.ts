@@ -91,6 +91,20 @@ export function previewForKey(key: string): KeyPreview {
         params: { ...base, job: job('hauler'), moving: true, cartEquipped: true, carrying: true },
         label: '운반꾼 수레 · 적재',
       };
+    case 'saltMaker.idle':
+      return { params: { ...base, job: job('saltMaker'), moving: false, working: false }, label: '염부 대기' };
+    case 'saltMaker.walk':
+      return { params: { ...base, job: job('saltMaker'), moving: true, working: false }, label: '염부 해안 왕복' };
+    case 'saltMaker.seaIntake':
+      return {
+        params: { ...base, job: job('saltMaker'), moving: false, working: true, saltMakerAction: 'seaIntake' },
+        label: '염부 바닷물 취수',
+      };
+    case 'saltMaker.kilnWork':
+      return {
+        params: { ...base, job: job('saltMaker'), moving: false, working: true, saltMakerAction: 'kilnWork' },
+        label: '염부 가마 작업',
+      };
     default:
       break;
   }

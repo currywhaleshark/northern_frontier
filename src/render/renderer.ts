@@ -2470,6 +2470,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       showCargoMarker: o.residentCargoMarkers ?? true,
       cartEquipped: r.cartEquipped,
       farmerAction: farmerSpriteActionFor(r, presentation.oxPlowFarmerIds),
+      saltMakerAction: r.job === 'saltMaker' && r.task === '바닷물 긷는 중'
+        ? 'seaIntake'
+        : 'kilnWork',
       selected: r.id === o.selectedResidentId,
       moving: r.px !== r.x || r.py !== r.y,
       working: r.phase === 'working' && r.px === r.x && r.py === r.y ||
