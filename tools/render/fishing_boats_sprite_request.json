@@ -1,0 +1,95 @@
+{
+  "character": {
+    "description": "small traditional Korean Gageodo hanseon fishing boat with a broad shallow flat-bottomed hull, blunt upright bow and stern, thick layered planks, one tall rectangular tan battened sail, compact working deck, and no Western, Chinese junk, or Japanese vessel silhouette"
+  },
+  "states": {
+    "ne_sailing": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true,
+      "action": "north-east authored anchor, sailing with the tall rectangular sail fully raised"
+    },
+    "ne_moored": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true,
+      "action": "north-east authored direction, moored with mast standing and sail cloth and battens lowered and lashed near the lower mast"
+    },
+    "ne_fishing": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true,
+      "action": "north-east authored direction, active fishing with the accepted large deployed net and readable mesh"
+    },
+    "ne_lake_winter_moored": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true,
+      "action": "north-east authored direction, heavily snow-covered moored lake boat during full freeze"
+    },
+    "ne_sea_winter_sailing": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true,
+      "action": "north-east authored direction, winter sea sailing with only light residual frost and snow"
+    },
+    "ne_sea_winter_fishing": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true,
+      "action": "north-east authored direction, winter sea fishing with the accepted large wet net and readable mesh"
+    },
+    "sw_sailing": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true,
+      "action": "south-west authored anchor, sailing with the tall rectangular sail fully raised"
+    },
+    "sw_moored": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true,
+      "action": "south-west authored direction, moored with mast standing and sail cloth and battens lowered and lashed near the lower mast"
+    },
+    "sw_fishing": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true,
+      "action": "south-west authored direction, active fishing with the accepted large deployed net and readable mesh"
+    },
+    "sw_lake_winter_moored": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true,
+      "action": "south-west authored direction, heavily snow-covered moored lake boat during full freeze"
+    },
+    "sw_sea_winter_sailing": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true,
+      "action": "south-west authored direction, winter sea sailing with only light residual frost and snow"
+    },
+    "sw_sea_winter_fishing": {
+      "frames": 1,
+      "fps": 1,
+      "loop": true,
+      "action": "south-west authored direction, winter sea fishing with the accepted large wet net and readable mesh"
+    }
+  },
+  "directions": {
+    "set": [
+      "ne",
+      "sw"
+    ],
+    "mirror": {
+      "nw": "ne",
+      "se": "sw"
+    },
+    "anchor_suffix": "sailing"
+  },
+  "chroma": {
+    "mode": "rgb",
+    "unmix_reach": 6,
+    "spill_max_fraction": 0.01
+  }
+}

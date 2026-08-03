@@ -92,6 +92,8 @@ import {
 } from '../game/minerals';
 import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, FishingGroundState, ForeignSite, GameState, PastureArea, Resident, Season, Terrain, Tile } from '../game/types';
 import { historicalTerrainColumn } from './historicalTerrain';
+import { drawFishingBoatAtlas } from './atlas';
+import { fishingBoatVisualState } from './fishingBoatAssets';
 import { coastalGroundAt } from '../game/tidalFlats';
 import { pixelRectIntersectsViewport, tileRectIntersectsViewport, type SceneViewport } from './sceneViewport';
 import {
@@ -1179,6 +1181,40 @@ function drawFishingBoatPlaceholder(
     ctx.arc(0, TILE * 0.09, Math.min(TILE * 0.1, TILE * 0.04 + boat.cargoFish * 0.004 * TILE), 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
+}
+
+function drawFishingBoat(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  boat: GameState['fishingBoats'][number],
+): void {
+  const tile = state.map[boat.y]?.[boat.x];
+  const season = getSeason(state.day);
+  const frozenLake = tile?.terrain === 'lake' && isLakeIceAt(state.map, state.day, boat.x, boat.y);
+  const visualState = fishingBoatVisualState(boat.status, tile?.terrain, season, frozenLake);
+  const cx = (boat.x + 0.5) * TILE;
+  const baselineY = (boat.y + 1.1) * TILE;
+  ctx.save();
+  if (boat.status === 'disabled') ctx.globalAlpha *= 0.72;
+  const drawn = drawFishingBoatAtlas(ctx, cx, baselineY, boat.facing ?? 'ne', visualState);
+  ctx.restore();
+  if (!drawn) {
+    drawFishingBoatPlaceholder(ctx, boat);
+    return;
+  }
+  if (boat.durability > boat.maxDurability * 0.35) return;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(54, 34, 25, 0.92)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx - 16, baselineY - 23);
+  ctx.lineTo(cx - 8, baselineY - 16);
+  ctx.lineTo(cx - 13, baselineY - 10);
+  ctx.moveTo(cx + 11, baselineY - 21);
+  ctx.lineTo(cx + 5, baselineY - 14);
+  ctx.lineTo(cx + 12, baselineY - 9);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -2854,9 +2890,10 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       sprites.drawCorpse(ctx, drawParams));
   }
   for (const boat of state.fishingBoats) {
-    if (!isExplored(state, boat.x, boat.y) || !tileRectIntersectsViewport(viewport, boat.x, boat.y)) continue;
+    if (!isExplored(state, boat.x, boat.y) ||
+        !tileRectIntersectsViewport(viewport, boat.x - 2, boat.y - 4, 5, 5)) continue;
     enqueueRowDraw((boat.y + 0.82) * TILE, (boat.x + 0.5) * TILE, () =>
-      drawFishingBoatPlaceholder(ctx, boat));
+      drawFishingBoat(ctx, state, boat));
   }
   for (let index = 0; index < localResidentDraws.length; index++) {
     const resident = localResidentDraws[index];

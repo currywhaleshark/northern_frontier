@@ -7,7 +7,7 @@ import { makeRng } from './map';
 import { seaConditionAt } from './seaConditions';
 import { getDayOfSeason, getSeason } from './seasons';
 import type {
-  Building, FishingBoatState, FishingGroundDepthBand, FishingGroundTile,
+  Building, FishingBoatFacing, FishingBoatState, FishingGroundDepthBand, FishingGroundTile,
   GameState, Resident, Tile,
 } from './types';
 
@@ -20,6 +20,16 @@ const WATER_DIRECTIONS = [
   { x: 0, y: 1 },
   { x: -1, y: 0 },
 ] as const;
+
+const BOAT_FACINGS = new Set<FishingBoatFacing>(['ne', 'nw', 'se', 'sw']);
+
+export function fishingBoatFacingForStep(dx: number, dy: number): FishingBoatFacing | null {
+  if (Math.abs(dx) >= Math.abs(dy) && dx > 0) return 'ne';
+  if (Math.abs(dx) >= Math.abs(dy) && dx < 0) return 'sw';
+  if (dy > 0) return 'se';
+  if (dy < 0) return 'nw';
+  return null;
+}
 
 function waterKind(tile: Tile | undefined): WaterKind | null {
   return tile?.terrain === 'lake' || tile?.terrain === 'sea' ? tile.terrain : null;
@@ -385,6 +395,8 @@ export function advanceFishingBoatTrip(state: GameState, boatId: number, forceRe
     const nextIndex = boat.routeIndex + 1;
     const next = boat.route[nextIndex];
     if (next) {
+      const facing = fishingBoatFacingForStep(next.x - boat.x, next.y - boat.y);
+      if (facing) boat.facing = facing;
       boat.routeIndex = nextIndex;
       boat.x = next.x;
       boat.y = next.y;
@@ -542,6 +554,7 @@ export function advanceFishingBoatWork(
     fisherId: null,
     x: mooring.x,
     y: mooring.y,
+    facing: fishingBoatFacingForStep(mooring.x - port.x, mooring.y - port.y) ?? 'ne',
     cargoFish: 0,
     cargoCapacity: CONFIG.fishingBoats.cargoCapacity,
     durability: CONFIG.fishingBoats.durability,
@@ -622,6 +635,7 @@ export function normalizeFishingBoats(state: GameState): void {
     usedIds.add(boat.id);
     boat.x = Math.floor(boat.x);
     boat.y = Math.floor(boat.y);
+    boat.facing = BOAT_FACINGS.has(boat.facing) ? boat.facing : 'ne';
     boat.maxDurability = Number.isFinite(boat.maxDurability) && boat.maxDurability > 0
       ? boat.maxDurability : CONFIG.fishingBoats.durability;
     boat.durability = Number.isFinite(boat.durability)

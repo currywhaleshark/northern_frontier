@@ -28,6 +28,11 @@ const saveLoad = await load('saveLoad');
 const simulation = await load('simulation');
 const { CONFIG } = await load('config');
 
+assert.equal(boats.fishingBoatFacingForStep(1, 0), 'ne');
+assert.equal(boats.fishingBoatFacingForStep(-1, 0), 'sw');
+assert.equal(boats.fishingBoatFacingForStep(0, 1), 'se');
+assert.equal(boats.fishingBoatFacingForStep(0, -1), 'nw');
+
 const savedSlots = new Map();
 globalThis.localStorage = {
   getItem: key => savedSlots.get(key) ?? null,
@@ -86,6 +91,7 @@ assert.equal(simulation.buildingHasActiveWork(yard), true);
 assert.equal(boats.advanceFishingBoatWork(state, yard, CONFIG.fishingBoats.buildWorkDays), 'built');
 assert.equal(state.fishingBoats.length, 1);
 assert.equal(state.fishingBoats[0].portId, port.id);
+assert.ok(['ne', 'nw', 'se', 'sw'].includes(state.fishingBoats[0].facing));
 assert.equal(state.map[state.fishingBoats[0].y][state.fishingBoats[0].x].terrain, 'lake');
 assert.equal(state.priorityBuildingId, null);
 
@@ -120,6 +126,9 @@ assert.equal(migrated.nextFishingBoatId, 1);
 boat.fisherId = 999999;
 boat.status = 'boarded';
 boats.normalizeFishingBoats(state);
+boat.facing = 'invalid';
+boats.normalizeFishingBoats(state);
+assert.equal(boat.facing, 'ne', '구 저장이나 손상된 방향 값은 NE로 정규화한다');
 assert.equal(boat.fisherId, null, '로드 정규화는 사라진 어부와 선체 관계를 끊는다');
 assert.equal(boat.status, 'moored');
 assert.ok(state.nextFishingBoatId > boat.id);

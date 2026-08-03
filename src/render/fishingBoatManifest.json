@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-runtime-variant-manifest",
+  "characterId": "fishing-boats-v1",
+  "engine": "component-row",
+  "game_input": "/assets/fishing-boats-v1.png",
+  "degraded_static_fallback": false,
+  "display": {
+    "width": 126,
+    "height": 112,
+    "anchor": "waterline-bottom-center"
+  },
+  "directions": {
+    "authored": ["ne", "sw"],
+    "mirror": {
+      "nw": "ne",
+      "se": "sw"
+    }
+  },
+  "chroma": {
+    "mode": "rgb",
+    "key": "#FF00FF",
+    "key_threshold": 210,
+    "fringe_key_threshold": 250,
+    "fringe_delta": 18,
+    "unmix_reach": 6,
+    "spill_max_fraction": 0.01
+  },
+  "frame_layout": {
+    "sheetWidth": 144,
+    "sheetHeight": 1536,
+    "cellWidth": 144,
+    "cellHeight": 128,
+    "rows": {
+      "ne_sailing": [{ "x": 0, "y": 0, "w": 144, "h": 128 }],
+      "ne_moored": [{ "x": 0, "y": 128, "w": 144, "h": 128 }],
+      "ne_fishing": [{ "x": 0, "y": 256, "w": 144, "h": 128 }],
+      "ne_lake_winter_moored": [{ "x": 0, "y": 384, "w": 144, "h": 128 }],
+      "ne_sea_winter_sailing": [{ "x": 0, "y": 512, "w": 144, "h": 128 }],
+      "ne_sea_winter_fishing": [{ "x": 0, "y": 640, "w": 144, "h": 128 }],
+      "sw_sailing": [{ "x": 0, "y": 768, "w": 144, "h": 128 }],
+      "sw_moored": [{ "x": 0, "y": 896, "w": 144, "h": 128 }],
+      "sw_fishing": [{ "x": 0, "y": 1024, "w": 144, "h": 128 }],
+      "sw_lake_winter_moored": [{ "x": 0, "y": 1152, "w": 144, "h": 128 }],
+      "sw_sea_winter_sailing": [{ "x": 0, "y": 1280, "w": 144, "h": 128 }],
+      "sw_sea_winter_fishing": [{ "x": 0, "y": 1408, "w": 144, "h": 128 }]
+    }
+  }
+}

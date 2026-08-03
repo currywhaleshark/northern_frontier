@@ -115,6 +115,8 @@ export type FishingBoatStatus =
   | 'repairing'
   | 'disabled';
 
+export type FishingBoatFacing = 'ne' | 'nw' | 'se' | 'sw';
+
 export interface FishingBoatState {
   id: number;
   portId: number;
@@ -122,6 +124,7 @@ export interface FishingBoatState {
   fisherId?: number | null;
   x: number;
   y: number;
+  facing: FishingBoatFacing;
   cargoFish: number;
   cargoCapacity: number;
   durability: number;

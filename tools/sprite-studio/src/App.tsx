@@ -9,13 +9,15 @@ import {
 import { ScaleBench } from './ScaleBench';
 import { StanceStage } from './StanceStage';
 import { BuildingStage, type BuildingLayer } from './BuildingStage';
+import { BoatStage } from './BoatStage';
 
-type TabId = 'scale' | 'stance' | 'building';
+type TabId = 'scale' | 'stance' | 'building' | 'boat';
 
 const TABS: readonly { id: TabId; label: string }[] = [
   { id: 'scale', label: '비율 정렬대' },
   { id: 'stance', label: '작업 자세' },
   { id: 'building', label: '건물' },
+  { id: 'boat', label: '선박' },
 ];
 
 export function App() {
@@ -53,7 +55,7 @@ export function App() {
   const savedSlots = data?.['worker-slots'] ?? {};
 
   // 저장·되돌리기는 현재 보고 있는 레지스트리 하나만 다룬다.
-  const registry: RegistryName = tab === 'scale' ? 'display-metrics'
+  const registry: RegistryName = tab === 'scale' || tab === 'boat' ? 'display-metrics'
     : tab === 'stance' ? 'work-anchors'
       : buildingLayer === 'effects' ? 'building-effects'
         : buildingLayer === 'slots' ? 'worker-slots' : 'building-shadows';
@@ -72,7 +74,7 @@ export function App() {
     'worker-slots': savedSlots,
   };
   const draft = drafts[registry];
-  const dirty = data != null && JSON.stringify(draft) !== JSON.stringify(savedDrafts[registry]);
+  const dirty = tab !== 'boat' && data != null && JSON.stringify(draft) !== JSON.stringify(savedDrafts[registry]);
 
   const changeMetric = useCallback((key: string, metric: SpriteDisplayMetric) => {
     setMetrics(current => {
@@ -196,7 +198,7 @@ export function App() {
           onChange={changeAnchor}
           animate={animate}
         />
-      ) : (
+      ) : tab === 'building' ? (
         <BuildingStage
           layer={buildingLayer}
           onLayerChange={setBuildingLayer}
@@ -208,6 +210,8 @@ export function App() {
           onSlotsChange={changeSlots}
           animate={animate}
         />
+      ) : (
+        <BoatStage />
       )}
     </div>
   );

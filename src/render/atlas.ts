@@ -26,6 +26,11 @@ import {
   type CorpseCoffinSprite,
 } from './corpseCoffinAssets';
 import {
+  FISHING_BOAT_SHEET,
+  fishingBoatSourceRect,
+  type FishingBoatVisualState,
+} from './fishingBoatAssets';
+import {
   GENERATED_CHARACTER_SHEET,
   generatedCharacterFacingScale,
   generatedMountedRaiderSourceRect,
@@ -34,7 +39,7 @@ import {
 import { CONFIG } from '../game/config';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
 import { isGateBuilding, isWallBuilding } from '../game/walls';
-import type { BuildingTypeId, JobId, Season, Terrain } from '../game/types';
+import type { BuildingTypeId, FishingBoatFacing, JobId, Season, Terrain } from '../game/types';
 import {
   historicalTerrainSourceRect,
 } from './historicalTerrain';
@@ -365,6 +370,7 @@ let livestockSheet: HTMLImageElement | null = null;
 let livestockHdSheet: HTMLImageElement | null = null;
 let corpseCoffinSprite: HTMLImageElement | null = null;
 let corpseCoffinHdSprite: HTMLImageElement | null = null;
+let fishingBoatSheet: HTMLImageElement | null = null;
 let foreignResidentSheet: HTMLImageElement | null = null;
 let foreignSiteCoreSheet: HTMLImageElement | null = null;
 let foreignSitePropSheet: HTMLImageElement | null = null;
@@ -637,6 +643,7 @@ function ensureLoaded(): void {
     image => { residentWoodcutterVideoWorkSheet = image; });
   loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.highDefinition.src, false,
     image => { residentWoodcutterVideoWorkHdSheet = image; });
+  loadAtlasAsset(FISHING_BOAT_SHEET.src, true, image => { fishingBoatSheet = image; });
   for (const [job, pair] of Object.entries(RESIDENT_JIGE_CARGO_SHEETS) as
     [JobId, NonNullable<(typeof RESIDENT_JIGE_CARGO_SHEETS)[JobId]>][]) {
     loadAtlasAsset(pair.standard.src, false,
@@ -2112,6 +2119,30 @@ function drawGroundBlendKind(
     return;
   }
   drawHistoricalGround(ctx, kind, p);
+}
+
+export function drawFishingBoatAtlas(
+  ctx: CanvasRenderingContext2D,
+  centerX: number,
+  baselineY: number,
+  facing: FishingBoatFacing,
+  state: FishingBoatVisualState,
+): boolean {
+  ensureLoaded();
+  if (!fishingBoatSheet) return false;
+  const source = fishingBoatSourceRect(facing, state);
+  ctx.save();
+  ctx.translate(centerX, baselineY);
+  if (source.mirrorX) ctx.scale(-1, 1);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(
+    fishingBoatSheet,
+    source.x, source.y, source.w, source.h,
+    -FISHING_BOAT_SHEET.width / 2, -FISHING_BOAT_SHEET.height,
+    FISHING_BOAT_SHEET.width, FISHING_BOAT_SHEET.height,
+  );
+  ctx.restore();
+  return true;
 }
 
 // 이웃 지형 바닥 번짐 — 우세 지형(숲>암반>갯벌·자갈>모래>풀)을 월드 좌표 고정 픽셀 디더로 섞는다.
