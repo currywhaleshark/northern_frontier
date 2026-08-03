@@ -2102,6 +2102,9 @@ export interface GameState {
   specialResidentRecords?: Partial<Record<SpecialResidentId, SpecialResidentRecord>>; // 안치·합류·이탈 상태
   scenario?: ScenarioState | null;  // 튜토리얼 등 스크립트 시나리오 (없으면 일반 모드)
   tutorialGraduate?: boolean;       // 길잡이를 완주하고 이어 가는 게임 (첫 세공 품목 고정에 쓴다)
+  // 개발용 치트 패널로 상태를 건드린 게임. 밸런스 관찰·버그 리포트에서 오염 세이브를
+  // 가려내는 표식일 뿐 게임플레이 불이익은 없다. (없으면 false — 구 저장 마이그레이션 불요)
+  debugTouched?: boolean;
   guides?: GuideState;              // 초회 도움말 (구버전 저장에는 없음 = 끈 상태로 보정)
   guideCards?: GuideCardEntry[];    // 지금 떠 있는 비차단 길잡이 카드
   guideModalQueue?: string[];       // 모달 형식 길잡이 대기열 (다른 모달과 겹치지 않게 미룬다)

@@ -246,8 +246,14 @@ function snowDamageChance(building: Building): number {
 
 export function maybeStartSnowDamage(state: GameState): boolean {
   if (getSeason(state.day) !== 'winter' || !hasSnowDamageTriggerWeather(state)) return false;
+  if (state.lastSnowDamageYear === getYear(state.day)) return false;
+  return startSnowDamage(state);
+}
+
+/** 설해 발생 본체 — 계절·연속 적설·연차 게이트를 통과한 뒤의 피해 판정과 경보. */
+export function startSnowDamage(state: GameState): boolean {
+  if (hasPendingDisaster(state, 'snowDamage')) return false;
   const year = getYear(state.day);
-  if (state.lastSnowDamageYear === year || hasPendingDisaster(state, 'snowDamage')) return false;
   state.lastSnowDamageYear = year;
 
   const rng = makeRng(state.seed + year * 88750319 + state.day * 971);

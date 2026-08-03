@@ -386,7 +386,7 @@ function openGinsengEvent(state: GameState): void {
   };
 }
 
-function openPlagueSuspicionEvent(state: GameState, rng: () => number): void {
+export function openPlagueSuspicionEvent(state: GameState, rng: () => number): void {
   const residents = livingResidents(state);
   const suspect = residents[Math.floor(rng() * residents.length)];
   if (!suspect) return;
@@ -474,7 +474,7 @@ function openShipwreckEvent(state: GameState): void {
   };
 }
 
-function openEarlyFrostEvent(state: GameState, rng: () => number): void {
+export function openEarlyFrostEvent(state: GameState, rng: () => number): void {
   const farms = standingFarms(state);
   const target = farms[Math.floor(rng() * farms.length)];
   if (!target) return;
@@ -569,7 +569,7 @@ function livestockEpidemicGroupLabel(group: LivestockEpidemicGroup): string {
   return LIVESTOCK_EPIDEMIC_GROUPS[group].map(species => LIVESTOCK_DEFS[species].name).join('·');
 }
 
-function openLivestockEpidemicEvent(state: GameState, rng: () => number): void {
+export function openLivestockEpidemicEvent(state: GameState, rng: () => number): void {
   const groups = livestockEpidemicGroups(state);
   if (groups.length === 0) return;
   const group = weightedPick(rng, groups);
@@ -627,7 +627,7 @@ export function hasDroughtTriggerWeather(state: Pick<GameState, 'seed' | 'day' |
   return true;
 }
 
-function openLateFrostEvent(state: GameState, rng: () => number): void {
+export function openLateFrostEvent(state: GameState, rng: () => number): void {
   const farms = lateFrostFarms(state);
   const target = farms[Math.floor(rng() * farms.length)];
   if (!target) return;
@@ -657,7 +657,7 @@ function openLateFrostEvent(state: GameState, rng: () => number): void {
   recordAnnals(state, 'disaster', '봄 파종 뒤 경작지에 늦서리가 내렸습니다.');
 }
 
-function openLocustEvent(state: GameState, rng: () => number): void {
+export function openLocustEvent(state: GameState, rng: () => number): void {
   const targets = locustFarms(state);
   if (targets.length === 0) return;
   const [minimumDuration, maximumDuration] = CONFIG.disasters.locust.durationDays;
@@ -676,7 +676,7 @@ function openLocustEvent(state: GameState, rng: () => number): void {
   recordAnnals(state, 'disaster', '여름 들판에 황충 떼가 밀려들었습니다.');
 }
 
-function openDroughtEvent(state: GameState, rng: () => number): void {
+export function openDroughtEvent(state: GameState, rng: () => number): void {
   const [minimumDuration, maximumDuration] = CONFIG.disasters.drought.durationDays;
   const durationDays = minimumDuration + Math.floor(rng() * (maximumDuration - minimumDuration + 1));
   if (!startDrought(state, durationDays)) return;
@@ -1496,7 +1496,7 @@ function damageBoarTargets(state: GameState, rng: () => number): void {
   }
 }
 
-function startEpidemic(state: GameState, patient: Resident): void {
+export function startEpidemic(state: GameState, patient: Resident): void {
   const infectedIds = [patient.id];
   for (const id of infectedIds) {
     const resident = state.residents.find(candidate => candidate.id === id);

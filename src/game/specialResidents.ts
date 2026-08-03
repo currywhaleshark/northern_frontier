@@ -355,7 +355,7 @@ const DEMAND_COOLDOWNS: Partial<Record<SpecialResidentId, number>> = {
   hangwae: CONFIG.specialResidents.hangwaeDemandCooldownDays,
 };
 
-function recruitSpecialResident(
+export function recruitSpecialResident(
   state: GameState,
   id: SpecialResidentId,
   rng: () => number,

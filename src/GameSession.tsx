@@ -167,6 +167,12 @@ const ExpeditionMusterDialog = lazy(() => import('./components/ExpeditionMusterD
 const SpecialResidentsWindow = lazy(() => import('./components/dock/SpecialResidentsWindow')
   .then(module => ({ default: module.SpecialResidentsWindow })));
 
+// 개발용 치트 패널 — DEV 게이트 + 지연 import. 프로덕션 빌드에서는 이 삼항이 false 가지로
+// 접혀 청크와 game/debugActions 전체가 번들에서 빠진다 (docs/DESIGN-2026-08-03-debug-cheat-panel.md §2).
+const DebugCheatPanel = import.meta.env.DEV
+  ? lazy(() => import('./components/DebugCheatPanel').then(module => ({ default: module.DebugCheatPanel })))
+  : null;
+
 function RuntimeGameEffects({
   state,
   speed,
@@ -376,6 +382,8 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   const [chronicleOpen, setChronicleOpen] = useState(false);
   const [winterChecklistOpen, setWinterChecklistOpen] = useState(false);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  // 개발용 치트 패널 (백틱 토글). 프로덕션 빌드에서는 DebugCheatPanel 자체가 null이라 열리지 않는다.
+  const [debugPanelOpen, setDebugPanelOpen] = useState(false);
   const [expeditionMusterRequest, setExpeditionMusterRequest] = useState<ExpeditionMusterRequest | null>(null);
   const [runtimePerfReport, setRuntimePerfReport] = useState<string | null>(null);
   const [runtimePerfCapturing, setRuntimePerfCapturing] = useState(false);
@@ -1688,7 +1696,17 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
         return;
       }
 
-      if (isEditableTarget(event.target) || slotDialogMode || gameMenuView ||
+      if (isEditableTarget(event.target)) return;
+
+      // 백틱 — 개발용 치트 패널 토글. 모달·전투 중에도 열 수 있게 다른 게이트보다 앞에 둔다
+      // (파괴적 조작은 패널 안에서 잠기고 사유가 표시된다).
+      if (DebugCheatPanel && event.code === 'Backquote') {
+        event.preventDefault();
+        setDebugPanelOpen(open => !open);
+        return;
+      }
+
+      if (slotDialogMode || gameMenuView ||
           weaponDialogOpen || edictDialogOpen || expeditionMusterRequest) return;
       const runtimeState = stateRef.current;
       if (runtimeState.pendingChoice || runtimeState.pendingPromotionNotice || runtimeState.tacticalBattle || runtimeState.tacticalBattleReport || runtimeState.gameOver) return;
@@ -2320,6 +2338,20 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
       )}
       {/* 조작 거절 알림은 모달 위에도 보여야 하므로 앱 최상단에 둔다 (클릭은 통과) */}
       <ActionNoticeLayer store={actionNoticeStore} />
+      {DebugCheatPanel && debugPanelOpen && (
+        <LazyUiBoundary label="디버그 치트" mode="overlay">
+          <DebugCheatPanel
+            state={state}
+            onChanged={bump}
+            onClose={() => setDebugPanelOpen(false)}
+            aquiferLayer={uiPrefs.showAquiferLayer}
+            oreLayer={uiPrefs.showOreLayer}
+            onToggleMapLayer={layer => setUiPrefs(current => setMapLayerVisibility(
+              current, layer, layer === 'aquifer' ? !current.showAquiferLayer : !current.showOreLayer,
+            ))}
+          />
+        </LazyUiBoundary>
+      )}
       {runtimePerfEnabled && (
         <aside style={{ position: 'fixed', left: 8, bottom: 8, zIndex: 10000, maxWidth: 'min(720px, 90vw)' }}>
           {runtimePerfCapturing

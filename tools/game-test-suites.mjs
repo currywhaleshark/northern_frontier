@@ -11,6 +11,7 @@ const CORE_TESTS = testFiles(
   'combat_roster',
   'crop_paddy_milling',
   'daily_cycle',
+  'debug_cheat_panel',
   'education',
   'epidemic_disaster',
   'expedition',

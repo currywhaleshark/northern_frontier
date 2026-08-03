@@ -1,7 +1,8 @@
 # 디버그 치트 패널 설계 — 개발용 상태 조작·스폰·사건 발화
 
-> **계획 상태:** 미착수 (2026-08-03 사용자 요청 — 구현계획 미작성)
+> **계획 상태:** 완료 (2026-08-03 구현·검증)
 > **상태 갱신:** 2026-08-03 — 설계 확정. [밸런스 편집기](DESIGN-2026-08-03-balance-editor.md)와 짝을 이루는 개발 도구 트랙 — 편집기가 바꾼 수치를 게임 안에서 즉시 시험하는 손이 이 패널이다.
+> **상태 갱신:** 2026-08-03 — §2~§3 구현 완료. 8개 섹션, `src/game/debugActions.ts` 단일 조작 모듈, DEV 게이트 + 지연 import, `debugTouched` 표식, 프로덕션 무포함 회귀 고정. 아래 [구현 기록](#6-구현-기록-2026-08-03) 참조.
 
 - 작성일: 2026-08-03
 
@@ -47,6 +48,47 @@
 
 ## 5. 후속 결정 항목
 
-1. `debugTouched` 표식을 저장 슬롯 UI에 표시할지 (권고: 작은 아이콘)
-2. 상태 JSON 덤프의 역방향(붙여넣기 로드) 허용 여부 — 권고: 1차 제외
-3. 방어 개편 P3 이후 공성 강제 개시 버튼 추가
+1. `debugTouched` 표식을 저장 슬롯 UI에 표시할지 (권고: 작은 아이콘) — **미구현**. 필드는 저장에 실리고 패널 상단에 표시되지만 슬롯 목록에는 아직 없다.
+2. 상태 JSON 덤프의 역방향(붙여넣기 로드) 허용 여부 — 권고: 1차 제외. **제외로 확정**(덤프만 구현).
+3. 방어 개편 P3 이후 공성 강제 개시 버튼 추가 — **미구현**. 방어 개편 P5(성벽 단면 전술 무대) 이후로 미룸.
+
+## 6. 구현 기록 (2026-08-03)
+
+### 파일
+
+| 파일 | 성격 | 요지 |
+|---|---|---|
+| `src/game/debugActions.ts` | 신규 | 모든 치트 조작. UI가 부르는 유일한 진입점. 게임 코드는 이 모듈을 역참조하지 않는다 |
+| `src/components/DebugCheatPanel.tsx` | 신규 | 8개 섹션 플로팅 창. `dock-window` 클래스를 그대로 써 창 관례를 따르고, 자체 CSS는 인라인이라 프로덕션 스타일시트도 늘리지 않는다 |
+| `src/GameSession.tsx` | 수정 | `import.meta.env.DEV ? lazy(() => import(...)) : null` 게이트, 백틱(`Backquote`) 토글, 패널 렌더 |
+| `src/game/types.ts` | 수정 | `GameState.debugTouched?: boolean` |
+| `src/game/saveLoad.ts` | 수정 | 불러오기에서 `=== true` 보정 (`tutorialGraduate` 선례 — 기본값 false라 스키마 상승 불요) |
+| `src/game/disasters.ts` | 수정 | `maybeStartSnowDamage`를 게이트와 본체(`startSnowDamage`)로 분리 — 동작 동일 |
+| `src/game/specialEvents.ts` | 수정 | `openEarlyFrostEvent`·`openLateFrostEvent`·`openLocustEvent`·`openDroughtEvent`·`openPlagueSuspicionEvent`·`openLivestockEpidemicEvent`·`startEpidemic`에 `export` 추가 (본문 무변경) |
+| `src/game/specialResidents.ts` | 수정 | `recruitSpecialResident`에 `export` 추가 |
+| `src/vite-env.d.ts` | 신규 | `import.meta.env` 타입 (`vite/client`) |
+| `tools/game/test_debug_cheat_panel.mjs` | 신규 | 조작 계약 + 소스 구조 + 프로덕션 무포함 회귀 |
+
+### 섹션별 조작과 재사용 함수
+
+- **자원** — `debugAddResource`/`debugSetResource`/`debugAddAllResources`(직접 대입), 기물함 지급은 `grantSpecialItem`(재고+도감 공통 경로)
+- **시간** — `debugAdvanceDays`/`debugAdvanceToNextSeason`/`debugJumpToDate` 전부 `advanceDay` 반복. 과거로는 가지 않는다
+- **마을** — 승격은 교지 지급 후 `upgradeSettlementCenter`(실제 승격 경로), 강등·명성·의심·위협·세공 성실도는 수치 대입
+- **스폰** — `createResident` + `applyLifeStage` + `reconcileResidentHomes`, 특수 주민은 `recruitSpecialResident`, 가축은 `acquireLivestock`, 유민은 `openScriptedImmigrationChoice`
+- **사건** — 습격 `spawnRaiders`(전력 인자), 재해 6종은 `openEarlyFrostEvent`/`openLateFrostEvent`/`openLocustEvent`/`openDroughtEvent`/`startSpringFlood`/`startSnowDamage`, 화재 `maybeStartFire(state, () => 0)`, 갱도 붕괴 `startMineCollapse`, 병자 `openPlagueSuspicionEvent`, 역병 `startEpidemic`, 가축 역병 `openLivestockEpidemicEvent`, 세공 `announceCourtTribute`/`openCourtTributeChoice`
+- **주민 상태** — 회복·발병은 필드 대입, 사망은 `killResident`(시신·배우자·통계 포함)
+- **지도** — `revealAround` + `revealForeignSitesFromExploration`, 비축 리필은 `normalizeHabitatReserve`/`normalizeTidalFlatTile`을 거친 뒤 수용력까지 채움. 수맥·광맥 레이어는 게임 상태가 아니라 UI 선호값이라 세션이 넘긴 콜백으로 토글한다(표식 없음)
+- **기타** — `guides.seen` 초기화, 시나리오 스텝 이동·해제(`TUTORIAL_STEPS` 색인), 상태 JSON 덤프(클립보드)
+
+### 규칙
+
+- 모든 조작은 `(디버그) …` 로그 한 줄과 `debugTouched = true`를 남긴다. 실패는 로그 없이 패널 하단에 사유만 띄운다.
+- 파괴적 조작(시간 점프·사건 발화)은 `debugLockReason`으로 잠근다 — 모달·승격 안내·전술 전투·게임 종료. 자원·수치처럼 되돌릴 수 있는 조작은 잠금과 무관하다.
+- 사건은 확률·쿨다운·계절 게이트만 우회한다. 발생 조건 대상(경작지·축사·채광갱)이 없으면 실패 사유를 돌려준다.
+
+### 검증
+
+- `npx tsc --noEmit` 통과 / `npm run build` 통과
+- 프로덕션 번들에 `디버그 치트`·`(디버그)`·`debug-cheat-panel`·`전 지도 탐사 해제` 등 특징 문자열 없음. `DebugCheatPanel` 청크도 생성되지 않는다 (`debugTouched`만 `saveLoad` 청크에 남는데, 저장 필드라 의도된 것)
+- `npm run test:game` — 신규 `test_debug_cheat_panel.mjs` 포함 core 84개 중 `test_building_footprints.mjs` 1건 실패. 이 실패는 직전 HEAD(`55fa624`)에서도 동일하게 나는 선행 실패(어항 2×2 점유영역)로 이번 작업과 무관
+- dev 실기동: 백틱으로 패널 개폐, 곡물 +100 → `(디버그) 곡물 +100`, 5일 점프, 주민 3명 스폰, 습격(전력 8) 발화 → 평소 습격 선택지로 이어짐, 전 지도 탐사(4610칸), 보 승격, 화재·설해 발화, 모달 중 사건 발화 잠금 표시까지 확인. 콘솔 오류 없음

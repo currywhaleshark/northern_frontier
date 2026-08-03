@@ -2903,6 +2903,8 @@ export function loadGame(slot = 1): GameState | null {
     }
     // 길잡이 출신 표식: 없으면 아닌 것으로 본다 (새 게임 기본값과 같으므로 스키마를 올리지 않는다)
     parsed.tutorialGraduate = parsed.tutorialGraduate === true;
+    // 치트 표식: 같은 규칙 — 없으면 건드리지 않은 저장으로 본다 (스키마 상승 불요)
+    parsed.debugTouched = parsed.debugTouched === true;
     // 초회 도움말: 손상되었거나 없으면 꺼진 상태로 본다 (구버전 저장 보정과 같은 규칙)
     const guides = parsed.guides;
     parsed.guides = guides && typeof guides === 'object' && guides.seen != null && typeof guides.seen === 'object'
