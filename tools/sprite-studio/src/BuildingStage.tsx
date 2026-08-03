@@ -3,10 +3,10 @@
 // 건물·그림자·효과 모두 renderer.ts에서 export한 실제 함수로 그린다. 특히 그림자는
 // 실루엣을 굽고 눕히는 투영이 통째로 게임 코드다 — 여기서 맞춘 노브가 곧 실게임 값이다.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getActiveSprites, onAtlasAssetSettled } from '@game/render/atlas';
+import { drawFishingPortHouseAtlas, getActiveSprites, onAtlasAssetSettled } from '@game/render/atlas';
 import {
   buildingShadowSilhouette, CENTER_VISUAL_SCALE, dayShadowFor, drawBuildingEffects,
-  drawBuildingShadowSilhouette, drawNightTint, nightFactorFor, worldShadowShear,
+  drawBuildingShadowSilhouette, drawFishingPortPier, drawNightTint, nightFactorFor, worldShadowShear,
 } from '@game/render/renderer';
 import {
   BUILDING_EFFECT_KINDS, BUILDING_EFFECT_WHENS, BUILDING_SHADOW_MODES,
@@ -16,7 +16,8 @@ import { BUILDING_DEFS, buildingFootprintDims, isAreaBuildingType } from '@game/
 import { SEASON_ORDER } from '@game/game/constants';
 import { CONFIG } from '@game/game/config';
 import type { TerrainDrawParams } from '@game/render/sprites';
-import type { BuildingTypeId, Rank, Season } from '@game/game/types';
+import type { BuildingTypeId, FishingPortPierDirection, Rank, Season } from '@game/game/types';
+import { fishingPortPierPositions } from '@game/game/fishingBoats';
 import {
   DEFAULT_SHADOW, SLOT_BUILDING_TYPES,
   type EffectEmitterEdit, type ShadowSettingsEdit, type WorkerSlotEdit,
@@ -79,6 +80,7 @@ interface SceneState {
   dayFrac: number;
   /** 보기용 진하게 — 게임의 그림자는 알파 0.1~0.25라 맨 잔디 위에서는 눈으로 재기 어렵다. */
   emphasizeShadow: boolean;
+  portDirection: FishingPortPierDirection;
   zoom: number;
 }
 
@@ -151,6 +153,15 @@ function drawScene(
     for (let tx = 0; tx < SPAN_X; tx++) sprites.drawTerrain(ctx, groundParams(tx, ty, scene.season));
   }
 
+  if (scene.type === 'fishingPort') {
+    const studioPier = { direction: scene.portDirection, length: 3 } as const;
+    for (const position of fishingPortPierPositions(ORIGIN_X, ORIGIN_Y, studioPier, false)) {
+      ctx.fillStyle = 'rgba(47, 114, 148, 0.78)';
+      ctx.fillRect(position.x * TILE, position.y * TILE, TILE, TILE);
+    }
+    drawFishingPortPier(ctx, ORIGIN_X, ORIGIN_Y, studioPier);
+  }
+
   // ── 그림자 ──
   const day = midSeasonDay(scene.season);
   const sun = dayShadowFor({ day, weather: 'clear' }, scene.dayFrac);
@@ -202,12 +213,17 @@ function drawScene(
   if (layer === 'slots') behind.forEach(drawSlotWorker);
 
   // ── 건물 ──
-  sprites.drawBuilding(ctx, {
-    type: scene.type, built: true, progress01: 1, ghost: false,
-    rank: scene.type === 'center' ? scene.rank : undefined,
-    season: scene.season, highDefinition: true,
-    x: drawX, y: drawY, size,
-  });
+  const portHouseDrawn = scene.type === 'fishingPort'
+    ? drawFishingPortHouseAtlas(ctx, drawX, drawY, size)
+    : false;
+  if (!portHouseDrawn) {
+    sprites.drawBuilding(ctx, {
+      type: scene.type, built: true, progress01: 1, ghost: false,
+      rank: scene.type === 'center' ? scene.rank : undefined,
+      season: scene.season, highDefinition: true,
+      x: drawX, y: drawY, size,
+    });
+  }
 
   if (layer === 'slots') front.forEach(drawSlotWorker);
 
@@ -358,7 +374,7 @@ export function BuildingStage({
 }: Props) {
   const [scene, setScene] = useState<SceneState>({
     type: 'ondol', rank: 'bu', season: 'winter', workers: 2,
-    heating: true, dayFrac: 0.12, emphasizeShadow: true, zoom: 3,
+    heating: true, dayFrac: 0.12, emphasizeShadow: true, portDirection: 's', zoom: 3,
   });
   const [selected, setSelected] = useState<number | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
@@ -564,6 +580,24 @@ export function BuildingStage({
             ))}
           </select>
         </div>
+
+        {scene.type === 'fishingPort' && (
+          <div className="field">
+            <span>잔교·계류대 방향</span>
+            <div className="seg">
+              {([['n', '북'], ['e', '동'], ['s', '남'], ['w', '서']] as const).map(([value, label]) => (
+                <button
+                  type="button"
+                  key={value}
+                  className={`seg-btn${scene.portDirection === value ? ' on' : ''}`}
+                  onClick={() => patchScene({ portDirection: value })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="field">
           <span>계절</span>

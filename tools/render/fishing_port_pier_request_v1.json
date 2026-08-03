@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-request",
+  "engine": "component-row",
+  "character": {
+    "id": "fishing-port-pier-v1",
+    "description": "modular Korean wooden fishing-port pier, fixed near-top-down orthographic camera"
+  },
+  "cell": {
+    "shape": "square",
+    "size": 56,
+    "safe_margin": 0
+  },
+  "chroma_key": {
+    "name": "magenta",
+    "hex": "#FF00FF",
+    "rgb": [255, 0, 255]
+  },
+  "fit": {
+    "resample": "kcentroid",
+    "align_x": "alpha-centroid",
+    "align_y": "bottom",
+    "pixel_perfect": true,
+    "logical_height": 56,
+    "palette_size": 64,
+    "detail_bias": true,
+    "outline": 0.62
+  },
+  "states": {
+    "middle_horizontal": {
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "action": "one repeatable horizontal middle pier tile"
+    },
+    "middle_vertical": {
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "action": "one repeatable vertical middle pier tile"
+    },
+    "terminal_n": {
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "action": "north-ending authored terminal approached from screen bottom"
+    },
+    "terminal_e": {
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "action": "east-ending authored terminal approached from screen left"
+    },
+    "terminal_s": {
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "action": "south-ending authored terminal approached from screen top"
+    },
+    "terminal_w": {
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "action": "west-ending authored terminal approached from screen right"
+    }
+  }
+}

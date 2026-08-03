@@ -93,7 +93,7 @@ import {
 } from '../game/minerals';
 import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, FishingGroundState, FishingPortPier, ForeignSite, GameState, PastureArea, Resident, Season, Terrain, Tile } from '../game/types';
 import { historicalTerrainColumn } from './historicalTerrain';
-import { drawFishingBoatAtlas } from './atlas';
+import { drawFishingBoatAtlas, drawFishingPortHouseAtlas, drawFishingPortPierAtlas } from './atlas';
 import { fishingBoatVisualState } from './fishingBoatAssets';
 import { coastalGroundAt } from '../game/tidalFlats';
 import { pixelRectIntersectsViewport, tileRectIntersectsViewport, type SceneViewport } from './sceneViewport';
@@ -1185,7 +1185,7 @@ function drawFishingBoatPlaceholder(
   ctx.restore();
 }
 
-function drawFishingPortPier(
+export function drawFishingPortPier(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
@@ -1202,6 +1202,15 @@ function drawFishingPortPier(
   for (let index = 0; index < visibleSegments; index++) {
     const position = positions[index];
     const terminal = index === positions.length - 1;
+    if (drawFishingPortPierAtlas(
+      ctx,
+      position.x * TILE,
+      position.y * TILE,
+      TILE,
+      pier.direction,
+      terminal,
+      ghostColor ? 0.72 : 1,
+    )) continue;
     const cx = (position.x + 0.5) * TILE;
     const cy = (position.y + 0.5) * TILE;
     const width = terminal ? TILE * 0.84 : horizontal ? TILE : TILE * 0.48;
@@ -2862,7 +2871,10 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       (b.y + dims.h + leveeSortOffsetY) * TILE,
       (b.x + dims.w / 2 + leveeSortOffsetX) * TILE,
       () => {
-        drawBuildingSprite(ctx, sprites, drawParams);
+        const portHouseDrawn = b.type === 'fishingPort' && visuallyBuilt
+          ? drawFishingPortHouseAtlas(ctx, drawX, drawY, size)
+          : false;
+        if (!portHouseDrawn) drawBuildingSprite(ctx, sprites, drawParams);
         occludedBuildingDraws.push(drawParams);
         if (b.breached) {
           ctx.save();
@@ -3469,7 +3481,10 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
         );
       }
     }
-    drawBuildingSprite(ctx, sprites, {
+    const portHouseGhostDrawn = o.placingType === 'fishingPort'
+      ? drawFishingPortHouseAtlas(ctx, o.hover.x * TILE, o.hover.y * TILE, size, 0.72)
+      : false;
+    if (!portHouseGhostDrawn) drawBuildingSprite(ctx, sprites, {
       type: o.placingType, built: true, ghost: true, progress01: 1,
       season, highDefinition: renderScale === 2,
       tint: o.placingType === 'well'

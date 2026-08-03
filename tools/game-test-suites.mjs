@@ -109,6 +109,7 @@ const BALANCE_TESTS = testFiles(
 const ASSET_TESTS = testFiles(
   'building_effect_anchors',
   'court_item_icons',
+  'fishing_port_assets',
   'map_hd_zoom',
   'new_content_assets',
   'resident_animation_phase',

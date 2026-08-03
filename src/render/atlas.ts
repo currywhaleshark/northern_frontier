@@ -31,6 +31,13 @@ import {
   type FishingBoatVisualState,
 } from './fishingBoatAssets';
 import {
+  FISHING_PORT_HOUSE_SHEET,
+  FISHING_PORT_PIER_SHEET,
+  fishingPortHouseSourceRect,
+  fishingPortPierPart,
+  fishingPortPierSourceRect,
+} from './fishingPortAssets';
+import {
   GENERATED_CHARACTER_SHEET,
   generatedCharacterFacingScale,
   generatedMountedRaiderSourceRect,
@@ -39,7 +46,9 @@ import {
 import { CONFIG } from '../game/config';
 import { FACTIONS, JOB_COLORS } from '../game/constants';
 import { isGateBuilding, isWallBuilding } from '../game/walls';
-import type { BuildingTypeId, FishingBoatFacing, JobId, Season, Terrain } from '../game/types';
+import type {
+  BuildingTypeId, FishingBoatFacing, FishingPortPierDirection, JobId, Season, Terrain,
+} from '../game/types';
 import {
   historicalTerrainSourceRect,
 } from './historicalTerrain';
@@ -371,6 +380,8 @@ let livestockHdSheet: HTMLImageElement | null = null;
 let corpseCoffinSprite: HTMLImageElement | null = null;
 let corpseCoffinHdSprite: HTMLImageElement | null = null;
 let fishingBoatSheet: HTMLImageElement | null = null;
+let fishingPortHouseSheet: HTMLImageElement | null = null;
+let fishingPortPierSheet: HTMLImageElement | null = null;
 let foreignResidentSheet: HTMLImageElement | null = null;
 let foreignSiteCoreSheet: HTMLImageElement | null = null;
 let foreignSitePropSheet: HTMLImageElement | null = null;
@@ -644,6 +655,8 @@ function ensureLoaded(): void {
   loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.highDefinition.src, false,
     image => { residentWoodcutterVideoWorkHdSheet = image; });
   loadAtlasAsset(FISHING_BOAT_SHEET.src, true, image => { fishingBoatSheet = image; });
+  loadAtlasAsset(FISHING_PORT_HOUSE_SHEET.src, false, image => { fishingPortHouseSheet = image; });
+  loadAtlasAsset(FISHING_PORT_PIER_SHEET.src, false, image => { fishingPortPierSheet = image; });
   for (const [job, pair] of Object.entries(RESIDENT_JIGE_CARGO_SHEETS) as
     [JobId, NonNullable<(typeof RESIDENT_JIGE_CARGO_SHEETS)[JobId]>][]) {
     loadAtlasAsset(pair.standard.src, false,
@@ -2140,6 +2153,54 @@ export function drawFishingBoatAtlas(
     source.x, source.y, source.w, source.h,
     -FISHING_BOAT_SHEET.width / 2, -FISHING_BOAT_SHEET.height,
     FISHING_BOAT_SHEET.width, FISHING_BOAT_SHEET.height,
+  );
+  ctx.restore();
+  return true;
+}
+
+export function drawFishingPortHouseAtlas(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  alpha = 1,
+): boolean {
+  ensureLoaded();
+  if (!fishingPortHouseSheet) return false;
+  const source = fishingPortHouseSourceRect();
+  const scale = size / FISHING_PORT_HOUSE_SHEET.width;
+  const height = FISHING_PORT_HOUSE_SHEET.height * scale;
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(
+    fishingPortHouseSheet,
+    source.x, source.y, source.w, source.h,
+    x, y + size - height, size, height,
+  );
+  ctx.restore();
+  return true;
+}
+
+export function drawFishingPortPierAtlas(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  direction: FishingPortPierDirection,
+  terminal: boolean,
+  alpha = 1,
+): boolean {
+  ensureLoaded();
+  if (!fishingPortPierSheet) return false;
+  const source = fishingPortPierSourceRect(fishingPortPierPart(direction, terminal));
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(
+    fishingPortPierSheet,
+    source.x, source.y, source.w, source.h,
+    x, y, size, size,
   );
   ctx.restore();
   return true;
