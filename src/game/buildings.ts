@@ -1,4 +1,5 @@
 // 건물 정의와 배치/방어 관련 헬퍼
+import { applyBalanceOverrides, cloneBalanceTree } from './balanceOverlay';
 import { CONFIG } from './config';
 import { rankAtLeast } from './constants';
 import { createCombatRoster } from './combatRoster';
@@ -16,7 +17,8 @@ import {
 import { GATE_CONVERSION_COSTS } from './walls';
 import type { Building, BuildingDef, BuildingTypeId, GameState, MapRegion, Rank, ResourceId, SmithyProductId, Tile } from './types';
 
-export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
+// 아래 리터럴은 **기본값**이다. 밸런스 편집기 오버레이는 리터럴 바로 뒤에서 얹어 BUILDING_DEFS가 된다.
+export const BUILDING_DEF_DEFAULTS: Record<BuildingTypeId, BuildingDef> = {
   center: {
     id: 'center', name: '마을 중심지',
     desc: '개척지의 심장. 파괴되면 마을은 끝장난다.',
@@ -336,6 +338,12 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> = {
     winterBonus: false, placement: 'land', unique: false,
   },
 };
+
+// ── 오버레이 병합 ───────────────────────────────────────────────────────
+// 리터럴 **바로 뒤**에서 끝낸다. 이 파일 아래쪽 함수도, 이 모듈을 import하는 쪽도
+// 전부 병합이 끝난 BUILDING_DEFS만 본다. 오버레이가 비면 기본값의 깊은 복사본이다.
+export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> =
+  applyBalanceOverrides(cloneBalanceTree(BUILDING_DEF_DEFAULTS), 'buildings.');
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
   'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'well', 'field', 'paddy', 'canal', 'weir', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'lodgingHut', 'clinic',

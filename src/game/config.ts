@@ -1,8 +1,12 @@
 // 시뮬레이션 밸런스 값 모음 — 숫자 튜닝은 전부 여기서 한다.
+//
+// 아래 리터럴은 **기본값**이다. 밸런스 편집기(npm run edit:balance)가 남긴 오버레이는
+// 이 파일 말미에서 얹어져 `CONFIG`가 된다 — 기본값·주석 원본은 그대로 두고 바뀐 값만 덮는다.
+import { applyBalanceOverrides, cloneBalanceTree } from './balanceOverlay';
 import { DAY_CYCLE_SUBTICKS } from './dayCycle';
 import type { JobId, LivestockId, ProcessingInputId, Rank, ResourceId, Season, WeatherId } from './types';
 
-export const CONFIG = {
+export const CONFIG_DEFAULTS = {
   map: {
     width: 72,
     height: 72,
@@ -1998,4 +2002,11 @@ export const CONFIG = {
   },
 } as const;
 
-export type Config = typeof CONFIG;
+export type Config = typeof CONFIG_DEFAULTS;
+
+// ── 오버레이 병합 ───────────────────────────────────────────────────────
+// **이 자리가 중요하다.** 다른 모듈은 import 시점에 값을 읽어가기도 하므로
+// (`const TILE = CONFIG.ui.tileSize` 같은 모듈 최상위 대입), 병합은 config.ts 본문 안에서 끝난다.
+// ESM은 import된 모듈 본문을 소비자 본문보다 먼저 끝까지 실행하므로 순서가 보장된다.
+// 오버레이가 비어 있으면 기본값의 깊은 복사본 = 도입 이전과 완전히 같은 값이다.
+export const CONFIG: Config = applyBalanceOverrides(cloneBalanceTree(CONFIG_DEFAULTS), '');

@@ -25,8 +25,19 @@ Windows에서는 저장소 루트의 배치 파일을 더블클릭해 바로 실
 - `run-game.bat` — 본 게임
 - `run-head-box-editor.bat` — 헤드박스 편집기
 - `run-sprite-studio.bat` — 스프라이트 스튜디오
+- `run-balance-studio.bat` — 밸런스 편집기
 
 기술 스택은 **TypeScript + React + Vite + HTML Canvas**입니다.
+
+### 밸런스 편집기
+
+`npm run edit:balance` (기본 http://localhost:5185). 게임 수치는 `src/game/config.ts`와
+`src/game/buildings.ts`의 **기본값**을 그대로 두고, 바꾼 값만
+`tools/balance-studio/data/balance-overrides.json`에 경로 키(`"minerals.nearbyStone": 40`)로 쌓는다.
+저장하면 코드젠이 `src/game/balanceOverrides.ts`를 굽고, 게임 dev 서버가 HMR로 집어 간다.
+기본값과 같아진 키는 저절로 사라지므로 diff에는 "무엇을 바꿨나"만 남는다.
+게임과 테스트는 같은 병합 값을 본다 — 테스트만 우회하는 경로는 없다.
+조정한 값이 확정되면 편집기의 "흡수용 diff"로 목록을 뽑아 기본값(config.ts)에 흡수한다.
 
 ## 기본 플레이 흐름
 

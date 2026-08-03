@@ -29,6 +29,16 @@
       ],
       "port": 5184,
       "autoPort": true
+    },
+    {
+      "name": "balance-studio",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "edit:balance"
+      ],
+      "port": 5185,
+      "autoPort": true
     }
   ]
 }

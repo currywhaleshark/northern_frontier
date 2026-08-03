@@ -1,7 +1,8 @@
 # 밸런스 편집기 설계 — 오버레이 방식 별도 앱 (스프라이트 스튜디오 계승)
 
-> **계획 상태:** 미착수 (2026-08-03 사용자 요청, B안(오버레이) 확정 — 구현계획 미작성)
+> **계획 상태:** 완료 (B1~B4 구현 — §8 구현 기록)
 > **상태 갱신:** 2026-08-03 — 설계 확정. [디버그 치트 패널](DESIGN-2026-08-03-debug-cheat-panel.md)과 짝 — 편집기가 바꾼 수치를 패널로 즉석 검증하는 순환.
+> **상태 갱신:** 2026-08-03 — B1~B4 구현 완료. 오버레이 병합 골격·편집기 앱·주석 동반 표시·반영 시점 배지·흡수용 diff까지.
 
 - 작성일: 2026-08-03
 - 선례: 스프라이트 스튜디오 (`tools/sprite-studio` — 별도 vite 앱, `data/*.json`, 저장 → 코드젠 → 게임 HMR)
@@ -59,6 +60,41 @@
 
 ## 7. 후속 결정 항목
 
-1. 진행 중 게임에 런타임 값을 반영하는 "다시 읽기" 버튼(리로드 없이) 제공 여부 — 권고: 1차 제외, HMR 리로드로 충분
-2. 오버레이 프리셋(밸런스 실험 세트 저장·전환) — 권고: B4 이후
-3. config.ts 주석 파싱의 견고성 — 실패 시 주석 없이 폼만 (기능 저하로 처리, 차단 아님)
+1. 진행 중 게임에 런타임 값을 반영하는 "다시 읽기" 버튼(리로드 없이) 제공 여부 — 권고: 1차 제외, HMR 리로드로 충분 → **1차 제외로 진행**
+2. 오버레이 프리셋(밸런스 실험 세트 저장·전환) — 권고: B4 이후 → **미구현(후속)**
+3. config.ts 주석 파싱의 견고성 — 실패 시 주석 없이 폼만 (기능 저하로 처리, 차단 아님) → **줄 단위 수확기로 구현, 273개 경로에서 주석 확보**
+
+## 8. 구현 기록 (2026-08-03)
+
+### 파일
+
+| 파일 | 몫 |
+|---|---|
+| `src/game/balanceOverlay.ts` | 병합 로직 — `applyBalanceOverrides(target, prefix)`, `cloneBalanceTree` |
+| `src/game/balanceOverrides.ts` | **생성물**(정렬된 리터럴). 직접 수정 금지 |
+| `src/game/config.ts` | 리터럴을 `CONFIG_DEFAULTS`로 두고, 파일 말미에서 `CONFIG = applyBalanceOverrides(cloneBalanceTree(CONFIG_DEFAULTS), '')` |
+| `src/game/buildings.ts` | 리터럴을 `BUILDING_DEF_DEFAULTS`로 두고, 리터럴 바로 뒤에서 `BUILDING_DEFS = applyBalanceOverrides(…, 'buildings.')` |
+| `tools/balance-studio/data/balance-overrides.json` | 편집 원본(경로 키 → 값, git 추적) |
+| `tools/balance-studio/generate_balance_overrides.mjs` | 코드젠 + 검증 (`npm run gen:balance`) |
+| `tools/balance-studio/balance-meta.mjs` (+`.d.mts`) | 차단 목록·반영 시점·값 경고의 **단일 원본**. 코드젠과 편집기가 같이 읽는다 |
+| `tools/balance-studio/parse_config_comments.mjs` | config.ts 주석 수확기 |
+| `tools/balance-studio/vite.config.mts` · `src/**` | 편집기 앱 (`npm run edit:balance`, 포트 5185) |
+
+### 병합 시점 보장
+
+`CONFIG`·`BUILDING_DEFS`를 **정의한 모듈 본문 안에서** 병합을 끝낸다. ESM은 import된 모듈 본문을
+소비자 본문보다 먼저 끝까지 실행하므로, `const TILE = CONFIG.ui.tileSize` 같은 모듈 최상위 대입도
+이미 병합된 값을 읽는다. config.ts는 `./dayCycle`·`./types`·오버레이 모듈만 import하므로 순환이 없고,
+`balanceOverrides.ts`는 `import type`만 쓰는 순수 데이터라 런타임 순환을 만들지 않는다.
+빈 오버레이일 때 `CONFIG`는 기본값의 깊은 복사본 = 도입 이전과 완전히 같은 값이다.
+
+### 검증 지점
+
+- 코드젠이 없는 경로·형 불일치·차단 키를 **에러로 중단**한다 (`src/game/*.ts`를 임시 transpile해 기본값 트리와 대조 — 게임 테스트 하니스와 같은 수법).
+- dev 서버는 저장 실패 시 JSON을 되돌리고 코드젠을 다시 돌린다 (스프라이트 스튜디오와 동일).
+- 편집기는 0 이하·1 초과 확률·정수 자리 소수를 경고로 표시한다(막지는 않는다).
+
+### 남은 것
+
+- 오버레이 프리셋, 리로드 없는 "다시 읽기"
+- 흡수 라운드는 사람이 한다 — "흡수용 diff" 버튼이 `키: 기본값 -> 오버레이값` 목록을 뽑아 준다
