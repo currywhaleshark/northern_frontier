@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-runtime-building-manifest",
+  "characterId": "tidal-fishery-building-v1",
+  "engine": "component-row",
+  "game_input": "/assets/tidal-fishery-building-v1.png",
+  "degraded_static_fallback": false,
+  "display": {
+    "width": 28,
+    "height": 40,
+    "sourceScale": 2,
+    "anchor": "tile-bottom-left"
+  },
+  "seasonFrames": {
+    "normal": 0,
+    "winter": 1
+  },
+  "frame_layout": {
+    "sheetWidth": 112,
+    "sheetHeight": 80,
+    "cellWidth": 56,
+    "cellHeight": 80,
+    "rows": {
+      "seasonal": [
+        { "x": 0, "y": 0, "w": 56, "h": 80 },
+        { "x": 56, "y": 0, "w": 56, "h": 80 }
+      ]
+    }
+  }
+}
