@@ -50,6 +50,10 @@ import {
   saltworksBuildingSourceRect,
 } from './saltworksBuildingAssets';
 import {
+  BOATYARD_BUILDING_SHEET,
+  boatyardBuildingSourceRect,
+} from './boatyardBuildingAssets';
+import {
   GENERATED_CHARACTER_SHEET,
   generatedCharacterFacingScale,
   generatedMountedRaiderSourceRect,
@@ -327,6 +331,7 @@ let historicalTerrainHdSheet: HTMLImageElement | null = null;
 let coastalGroundSheet: HTMLImageElement | null = null;
 let tidalFisheryBuildingSheet: HTMLImageElement | null = null;
 let saltworksBuildingSheet: HTMLImageElement | null = null;
+let boatyardBuildingSheet: HTMLImageElement | null = null;
 type SeamlessGroundFamily = 'plain' | 'forest' | 'rock';
 interface SeamlessGroundPair {
   standard: HTMLImageElement | null;
@@ -530,6 +535,7 @@ function ensureLoaded(): void {
   loadAtlasAsset(COASTAL_GROUND_SHEET.src, true, image => { coastalGroundSheet = image; });
   loadAtlasAsset(TIDAL_FISHERY_BUILDING_SHEET.src, true, image => { tidalFisheryBuildingSheet = image; });
   loadAtlasAsset(SALTWORKS_BUILDING_SHEET.src, true, image => { saltworksBuildingSheet = image; });
+  loadAtlasAsset(BOATYARD_BUILDING_SHEET.src, true, image => { boatyardBuildingSheet = image; });
   // 새 게임의 봄 자산만 시작 준비에 포함하고, 나머지 계절은 실제 진입 시 요청한다.
   requestSeamlessGroundSeason('spring', true);
   loadAtlasAsset(GENERATED_TERRAIN_OBJECT_SHEET.src, true, image => { terrainObjectSheet = image; });
@@ -2106,6 +2112,27 @@ function blitSaltworksBuilding(
   return true;
 }
 
+function blitBoatyardBuilding(
+  ctx: CanvasRenderingContext2D,
+  p: BuildingDrawParams,
+): boolean {
+  if (p.type !== 'boatyard' || !boatyardBuildingSheet) return false;
+  const rect = boatyardBuildingSourceRect(p.season);
+  const destHeight = p.size * (BOATYARD_BUILDING_SHEET.height / BOATYARD_BUILDING_SHEET.width);
+  ctx.drawImage(
+    boatyardBuildingSheet,
+    rect.x,
+    rect.y,
+    rect.w,
+    rect.h,
+    p.x,
+    p.y + p.size - destHeight,
+    p.size,
+    destHeight,
+  );
+  return true;
+}
+
 function quiltedHistoricalGroundPattern(
   terrain: Terrain,
   season: Season,
@@ -2812,6 +2839,12 @@ export const atlasSprites: SpriteAPI = {
     }
 
     if (blitSaltworksBuilding(ctx, p)) {
+      ctx.globalAlpha = 1;
+      drawProgressBar(ctx, p);
+      return;
+    }
+
+    if (blitBoatyardBuilding(ctx, p)) {
       ctx.globalAlpha = 1;
       drawProgressBar(ctx, p);
       return;

@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-runtime-building-manifest",
+  "characterId": "boatyard-building-v1",
+  "engine": "component-row",
+  "game_input": "/assets/boatyard-building-v1.png",
+  "degraded_static_fallback": false,
+  "display": {
+    "width": 56,
+    "height": 80,
+    "sourceScale": 2,
+    "anchor": "footprint-bottom-left"
+  },
+  "seasonFrames": {
+    "normal": 0,
+    "winter": 1
+  },
+  "frame_layout": {
+    "sheetWidth": 224,
+    "sheetHeight": 160,
+    "cellWidth": 112,
+    "cellHeight": 160,
+    "rows": {
+      "seasonal": [
+        { "x": 0, "y": 0, "w": 112, "h": 160 },
+        { "x": 112, "y": 0, "w": 112, "h": 160 }
+      ]
+    }
+  }
+}
