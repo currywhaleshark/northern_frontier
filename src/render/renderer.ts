@@ -1195,6 +1195,7 @@ export function drawFishingPortPier(
   pier: FishingPortPier,
   progress01 = 1,
   ghostColor?: string,
+  season: Season = 'summer',
 ): void {
   const positions = fishingPortPierPositions(x, y, pier, false);
   const visibleSegments = ghostColor
@@ -1213,6 +1214,7 @@ export function drawFishingPortPier(
       pier.direction,
       terminal,
       ghostColor ? 0.72 : 1,
+      season,
     )) continue;
     const cx = (position.x + 0.5) * TILE;
     const cy = (position.y + 0.5) * TILE;
@@ -2821,7 +2823,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       ? b.workOrder.progress / Math.max(1, b.workOrder.required)
       : def.buildDays > 0 ? b.progress / def.buildDays : 1;
     if (b.type === 'fishingPort' && b.portPier) {
-      drawFishingPortPier(ctx, b.x, b.y, b.portPier, visuallyBuilt ? 1 : visualProgress);
+      drawFishingPortPier(ctx, b.x, b.y, b.portPier, visuallyBuilt ? 1 : visualProgress, undefined, season);
     }
     if (isPlotBuildingType(b.type)) {
       // 경작지는 발자국 칸마다 스프라이트를 타일링 — 파종을 마친 칸만 작물이 자라 보인다
@@ -2926,7 +2928,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       (b.x + dims.w / 2 + leveeSortOffsetX) * TILE,
       () => {
         const portHouseDrawn = b.type === 'fishingPort' && visuallyBuilt
-          ? drawFishingPortHouseAtlas(ctx, drawX, drawY, size)
+          ? drawFishingPortHouseAtlas(ctx, drawX, drawY, size, 1, season)
           : false;
         if (!portHouseDrawn) drawBuildingSprite(ctx, sprites, drawParams);
         occludedBuildingDraws.push(drawParams);
@@ -3533,11 +3535,12 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
           pier,
           1,
           ok ? 'rgba(111,191,115,0.58)' : 'rgba(224,108,92,0.58)',
+          season,
         );
       }
     }
     const portHouseGhostDrawn = o.placingType === 'fishingPort'
-      ? drawFishingPortHouseAtlas(ctx, o.hover.x * TILE, o.hover.y * TILE, size, 0.72)
+      ? drawFishingPortHouseAtlas(ctx, o.hover.x * TILE, o.hover.y * TILE, size, 0.72, season)
       : false;
     if (!portHouseGhostDrawn) drawBuildingSprite(ctx, sprites, {
       type: o.placingType, built: true, ghost: true, progress01: 1,

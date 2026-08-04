@@ -32,7 +32,9 @@ import {
 } from './fishingBoatAssets';
 import {
   FISHING_PORT_HOUSE_SHEET,
+  FISHING_PORT_HOUSE_WINTER_SHEET,
   FISHING_PORT_PIER_SHEET,
+  FISHING_PORT_PIER_WINTER_SHEET,
   fishingPortHouseSourceRect,
   fishingPortPierPart,
   fishingPortPierSourceRect,
@@ -401,7 +403,9 @@ let corpseCoffinSprite: HTMLImageElement | null = null;
 let corpseCoffinHdSprite: HTMLImageElement | null = null;
 let fishingBoatSheet: HTMLImageElement | null = null;
 let fishingPortHouseSheet: HTMLImageElement | null = null;
+let fishingPortHouseWinterSheet: HTMLImageElement | null = null;
 let fishingPortPierSheet: HTMLImageElement | null = null;
+let fishingPortPierWinterSheet: HTMLImageElement | null = null;
 let foreignResidentSheet: HTMLImageElement | null = null;
 let foreignSiteCoreSheet: HTMLImageElement | null = null;
 let foreignSitePropSheet: HTMLImageElement | null = null;
@@ -680,7 +684,9 @@ function ensureLoaded(): void {
     image => { residentWoodcutterVideoWorkHdSheet = image; });
   loadAtlasAsset(FISHING_BOAT_SHEET.src, true, image => { fishingBoatSheet = image; });
   loadAtlasAsset(FISHING_PORT_HOUSE_SHEET.src, false, image => { fishingPortHouseSheet = image; });
+  loadAtlasAsset(FISHING_PORT_HOUSE_WINTER_SHEET.src, false, image => { fishingPortHouseWinterSheet = image; });
   loadAtlasAsset(FISHING_PORT_PIER_SHEET.src, false, image => { fishingPortPierSheet = image; });
+  loadAtlasAsset(FISHING_PORT_PIER_WINTER_SHEET.src, false, image => { fishingPortPierWinterSheet = image; });
   for (const [job, pair] of Object.entries(RESIDENT_JIGE_CARGO_SHEETS) as
     [JobId, NonNullable<(typeof RESIDENT_JIGE_CARGO_SHEETS)[JobId]>][]) {
     loadAtlasAsset(pair.standard.src, false,
@@ -2277,17 +2283,20 @@ export function drawFishingPortHouseAtlas(
   y: number,
   size: number,
   alpha = 1,
+  season: Season = 'summer',
 ): boolean {
   ensureLoaded();
-  if (!fishingPortHouseSheet) return false;
-  const source = fishingPortHouseSourceRect();
+  const winter = season === 'winter' && fishingPortHouseWinterSheet !== null;
+  const sheet = winter ? fishingPortHouseWinterSheet : fishingPortHouseSheet;
+  if (!sheet) return false;
+  const source = fishingPortHouseSourceRect(winter ? 'winter' : 'summer');
   const scale = size / FISHING_PORT_HOUSE_SHEET.width;
   const height = FISHING_PORT_HOUSE_SHEET.height * scale;
   ctx.save();
   ctx.globalAlpha *= alpha;
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(
-    fishingPortHouseSheet,
+    sheet,
     source.x, source.y, source.w, source.h,
     x, y + size - height, size, height,
   );
@@ -2303,10 +2312,16 @@ export function drawFishingPortPierAtlas(
   direction: FishingPortPierDirection,
   terminal: boolean,
   alpha = 1,
+  season: Season = 'summer',
 ): boolean {
   ensureLoaded();
-  if (!fishingPortPierSheet) return false;
-  const source = fishingPortPierSourceRect(fishingPortPierPart(direction, terminal));
+  const winter = season === 'winter' && fishingPortPierWinterSheet !== null;
+  const sheet = winter ? fishingPortPierWinterSheet : fishingPortPierSheet;
+  if (!sheet) return false;
+  const source = fishingPortPierSourceRect(
+    fishingPortPierPart(direction, terminal),
+    winter ? 'winter' : 'summer',
+  );
   const drawScale = terminal
     ? FISHING_PORT_PIER_SHEET.terminalScale
     : FISHING_PORT_PIER_SHEET.middleScale;
@@ -2317,7 +2332,7 @@ export function drawFishingPortPierAtlas(
   ctx.globalAlpha *= alpha;
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(
-    fishingPortPierSheet,
+    sheet,
     source.x, source.y, source.w, source.h,
     drawX, drawY, drawSize, drawSize,
   );

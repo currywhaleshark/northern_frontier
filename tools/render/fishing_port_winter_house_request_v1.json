@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-request",
+  "engine": "component-row",
+  "character": {
+    "id": "fishing-port-winter-house-v1",
+    "description": "winter variant of the locked late-Joseon Korean fishing-port shore house"
+  },
+  "cell": {
+    "shape": "rect",
+    "width": 56,
+    "height": 80,
+    "safe_margin_x": 2,
+    "safe_margin_y": 2
+  },
+  "chroma_key": {
+    "name": "magenta",
+    "hex": "#FF00FF",
+    "rgb": [255, 0, 255]
+  },
+  "fit": {
+    "resample": "kcentroid",
+    "align_x": "alpha-centroid",
+    "align_y": "bottom",
+    "pixel_perfect": true,
+    "logical_height": 80,
+    "palette_size": 64,
+    "detail_bias": true,
+    "outline": 0.62
+  },
+  "states": {
+    "winter": {
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "action": "the exact locked fishing-port shore house with light broken winter snow only"
+    }
+  }
+}
