@@ -33,7 +33,9 @@ import {
 import {
   FISHING_PORT_HOUSE_SHEET,
   FISHING_PORT_HOUSE_WINTER_SHEET,
+  FISHING_PORT_PIER_HD_SHEET,
   FISHING_PORT_PIER_SHEET,
+  FISHING_PORT_PIER_WINTER_HD_SHEET,
   FISHING_PORT_PIER_WINTER_SHEET,
   fishingPortHouseSourceRect,
   fishingPortPierPart,
@@ -405,7 +407,9 @@ let fishingBoatSheet: HTMLImageElement | null = null;
 let fishingPortHouseSheet: HTMLImageElement | null = null;
 let fishingPortHouseWinterSheet: HTMLImageElement | null = null;
 let fishingPortPierSheet: HTMLImageElement | null = null;
+let fishingPortPierHdSheet: HTMLImageElement | null = null;
 let fishingPortPierWinterSheet: HTMLImageElement | null = null;
+let fishingPortPierWinterHdSheet: HTMLImageElement | null = null;
 let foreignResidentSheet: HTMLImageElement | null = null;
 let foreignSiteCoreSheet: HTMLImageElement | null = null;
 let foreignSitePropSheet: HTMLImageElement | null = null;
@@ -686,7 +690,9 @@ function ensureLoaded(): void {
   loadAtlasAsset(FISHING_PORT_HOUSE_SHEET.src, false, image => { fishingPortHouseSheet = image; });
   loadAtlasAsset(FISHING_PORT_HOUSE_WINTER_SHEET.src, false, image => { fishingPortHouseWinterSheet = image; });
   loadAtlasAsset(FISHING_PORT_PIER_SHEET.src, false, image => { fishingPortPierSheet = image; });
+  loadAtlasAsset(FISHING_PORT_PIER_HD_SHEET.src, false, image => { fishingPortPierHdSheet = image; });
   loadAtlasAsset(FISHING_PORT_PIER_WINTER_SHEET.src, false, image => { fishingPortPierWinterSheet = image; });
+  loadAtlasAsset(FISHING_PORT_PIER_WINTER_HD_SHEET.src, false, image => { fishingPortPierWinterHdSheet = image; });
   for (const [job, pair] of Object.entries(RESIDENT_JIGE_CARGO_SHEETS) as
     [JobId, NonNullable<(typeof RESIDENT_JIGE_CARGO_SHEETS)[JobId]>][]) {
     loadAtlasAsset(pair.standard.src, false,
@@ -2313,14 +2319,30 @@ export function drawFishingPortPierAtlas(
   terminal: boolean,
   alpha = 1,
   season: Season = 'summer',
+  highDefinition = false,
 ): boolean {
   ensureLoaded();
-  const winter = season === 'winter' && fishingPortPierWinterSheet !== null;
-  const sheet = winter ? fishingPortPierWinterSheet : fishingPortPierSheet;
+  let sheet: HTMLImageElement | null = null;
+  let sourceSeason: Season = 'summer';
+  let sourceHighDefinition = false;
+  if (season === 'winter' && highDefinition && fishingPortPierWinterHdSheet) {
+    sheet = fishingPortPierWinterHdSheet;
+    sourceSeason = 'winter';
+    sourceHighDefinition = true;
+  } else if (season === 'winter' && fishingPortPierWinterSheet) {
+    sheet = fishingPortPierWinterSheet;
+    sourceSeason = 'winter';
+  } else if (highDefinition && fishingPortPierHdSheet) {
+    sheet = fishingPortPierHdSheet;
+    sourceHighDefinition = true;
+  } else {
+    sheet = fishingPortPierSheet;
+  }
   if (!sheet) return false;
   const source = fishingPortPierSourceRect(
     fishingPortPierPart(direction, terminal),
-    winter ? 'winter' : 'summer',
+    sourceSeason,
+    sourceHighDefinition,
   );
   const drawScale = terminal
     ? FISHING_PORT_PIER_SHEET.terminalScale

@@ -19,6 +19,8 @@ const houseRows = house.frame_layout.rows as Record<string, FrameRect[]>;
 const pierRows = pier.frame_layout.rows as Record<string, FrameRect[]>;
 const winterHouseRows = house.winter_frame_layout.rows as Record<string, FrameRect[]>;
 const winterPierRows = pier.winter_frame_layout.rows as Record<string, FrameRect[]>;
+const hdPierRows = pier.hd_frame_layout.rows as Record<string, FrameRect[]>;
+const winterHdPierRows = pier.winter_hd_frame_layout.rows as Record<string, FrameRect[]>;
 
 export const FISHING_PORT_HOUSE_SHEET = {
   src: house.game_input,
@@ -43,8 +45,26 @@ export const FISHING_PORT_PIER_SHEET = {
   terminalScale: pier.display.terminalScale,
 } as const;
 
+export const FISHING_PORT_PIER_HD_SHEET = {
+  src: pier.hd_game_input,
+  width: pier.display.width,
+  height: pier.display.height,
+  anchor: pier.display.anchor,
+  middleScale: pier.display.middleScale,
+  terminalScale: pier.display.terminalScale,
+} as const;
+
 export const FISHING_PORT_PIER_WINTER_SHEET = {
   src: pier.winter_game_input,
+  width: pier.display.width,
+  height: pier.display.height,
+  anchor: pier.display.anchor,
+  middleScale: pier.display.middleScale,
+  terminalScale: pier.display.terminalScale,
+} as const;
+
+export const FISHING_PORT_PIER_WINTER_HD_SHEET = {
+  src: pier.winter_hd_game_input,
   width: pier.display.width,
   height: pier.display.height,
   anchor: pier.display.anchor,
@@ -74,8 +94,12 @@ export function fishingPortPierPart(
 export function fishingPortPierSourceRect(
   part: FishingPortPierPart,
   season: Season = 'summer',
+  highDefinition = false,
 ): FrameRect {
-  const rect = (season === 'winter' ? winterPierRows : pierRows)[part]?.[0];
+  const rows = season === 'winter'
+    ? highDefinition ? winterHdPierRows : winterPierRows
+    : highDefinition ? hdPierRows : pierRows;
+  const rect = rows[part]?.[0];
   if (!rect) throw new Error(`Missing fishing port pier atlas row: ${part}`);
   return rect;
 }

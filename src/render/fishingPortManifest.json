@@ -36,7 +36,9 @@
     },
     "pier": {
       "game_input": "/assets/fishing-port-pier-v1.png",
+      "hd_game_input": "/assets/fishing-port-pier-hd-v1.png",
       "winter_game_input": "/assets/fishing-port-pier-winter-v1.png",
+      "winter_hd_game_input": "/assets/fishing-port-pier-winter-hd-v1.png",
       "display": {
         "width": 28,
         "height": 28,
@@ -58,6 +60,20 @@
           "terminal_w": [{ "x": 0, "y": 303, "w": 56, "h": 33 }]
         }
       },
+      "hd_frame_layout": {
+        "sheetWidth": 224,
+        "sheetHeight": 1344,
+        "cellWidth": 224,
+        "cellHeight": 224,
+        "rows": {
+          "middle_horizontal": [{ "x": 0, "y": 149, "w": 224, "h": 75 }],
+          "middle_vertical": [{ "x": 76, "y": 224, "w": 73, "h": 224 }],
+          "terminal_n": [{ "x": 51, "y": 448, "w": 123, "h": 224 }],
+          "terminal_e": [{ "x": 0, "y": 756, "w": 224, "h": 140 }],
+          "terminal_s": [{ "x": 49, "y": 896, "w": 126, "h": 224 }],
+          "terminal_w": [{ "x": 0, "y": 1213, "w": 224, "h": 131 }]
+        }
+      },
       "winter_frame_layout": {
         "sheetWidth": 336,
         "sheetHeight": 56,
@@ -70,6 +86,20 @@
           "terminal_e": [{ "x": 169, "y": 25, "w": 55, "h": 31 }],
           "terminal_s": [{ "x": 241, "y": 4, "w": 31, "h": 52 }],
           "terminal_w": [{ "x": 280, "y": 26, "w": 56, "h": 30 }]
+        }
+      },
+      "winter_hd_frame_layout": {
+        "sheetWidth": 1344,
+        "sheetHeight": 224,
+        "cellWidth": 224,
+        "cellHeight": 224,
+        "rows": {
+          "middle_horizontal": [{ "x": 0, "y": 148, "w": 224, "h": 76 }],
+          "middle_vertical": [{ "x": 294, "y": 2, "w": 67, "h": 222 }],
+          "terminal_n": [{ "x": 493, "y": 4, "w": 117, "h": 220 }],
+          "terminal_e": [{ "x": 676, "y": 87, "w": 220, "h": 137 }],
+          "terminal_s": [{ "x": 937, "y": 4, "w": 125, "h": 220 }],
+          "terminal_w": [{ "x": 1121, "y": 96, "w": 223, "h": 128 }]
         }
       }
     }

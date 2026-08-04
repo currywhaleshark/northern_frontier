@@ -159,7 +159,7 @@ function drawScene(
       ctx.fillStyle = 'rgba(47, 114, 148, 0.78)';
       ctx.fillRect(position.x * TILE, position.y * TILE, TILE, TILE);
     }
-    drawFishingPortPier(ctx, ORIGIN_X, ORIGIN_Y, studioPier, 1, undefined, scene.season);
+    drawFishingPortPier(ctx, ORIGIN_X, ORIGIN_Y, studioPier, 1, undefined, scene.season, true);
   }
 
   // ── 그림자 ──

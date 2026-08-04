@@ -1196,6 +1196,7 @@ export function drawFishingPortPier(
   progress01 = 1,
   ghostColor?: string,
   season: Season = 'summer',
+  highDefinition = false,
 ): void {
   const positions = fishingPortPierPositions(x, y, pier, false);
   const visibleSegments = ghostColor
@@ -1215,6 +1216,7 @@ export function drawFishingPortPier(
       terminal,
       ghostColor ? 0.72 : 1,
       season,
+      highDefinition,
     )) continue;
     const cx = (position.x + 0.5) * TILE;
     const cy = (position.y + 0.5) * TILE;
@@ -2823,7 +2825,16 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       ? b.workOrder.progress / Math.max(1, b.workOrder.required)
       : def.buildDays > 0 ? b.progress / def.buildDays : 1;
     if (b.type === 'fishingPort' && b.portPier) {
-      drawFishingPortPier(ctx, b.x, b.y, b.portPier, visuallyBuilt ? 1 : visualProgress, undefined, season);
+      drawFishingPortPier(
+        ctx,
+        b.x,
+        b.y,
+        b.portPier,
+        visuallyBuilt ? 1 : visualProgress,
+        undefined,
+        season,
+        renderScale === 2,
+      );
     }
     if (isPlotBuildingType(b.type)) {
       // 경작지는 발자국 칸마다 스프라이트를 타일링 — 파종을 마친 칸만 작물이 자라 보인다
@@ -3536,6 +3547,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
           1,
           ok ? 'rgba(111,191,115,0.58)' : 'rgba(224,108,92,0.58)',
           season,
+          renderScale === 2,
         );
       }
     }
