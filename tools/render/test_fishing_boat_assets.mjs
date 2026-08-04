@@ -10,6 +10,11 @@ assert.equal(png.readUInt32BE(16), manifest.frame_layout.sheetWidth, 'manifest�
 assert.equal(png.readUInt32BE(20), manifest.frame_layout.sheetHeight, 'manifest와 PNG 높이가 같아야 한다');
 assert.equal(manifest.engine, 'component-row');
 assert.equal(manifest.degraded_static_fallback, false);
+assert.deepEqual(manifest.display, {
+  width: 63,
+  height: 56,
+  anchor: 'waterline-bottom-center',
+}, '어선은 승인 원본 표시 크기의 50%로 그려야 한다');
 assert.deepEqual(manifest.directions.authored, ['ne', 'sw']);
 assert.deepEqual(manifest.directions.mirror, { nw: 'ne', se: 'sw' });
 assert.equal(manifest.chroma.key_threshold, 210, '승인한 RGB 210 크로마 계약을 보존해야 한다');
@@ -33,9 +38,13 @@ for (const direction of manifest.directions.authored) {
 
 const assetsSource = readFileSync(new URL('src/render/fishingBoatAssets.ts', ROOT), 'utf8');
 const rendererSource = readFileSync(new URL('src/render/renderer.ts', ROOT), 'utf8');
+const typesSource = readFileSync(new URL('src/game/types.ts', ROOT), 'utf8');
 const studioSource = readFileSync(new URL('tools/sprite-studio/src/BoatStage.tsx', ROOT), 'utf8');
 assert.match(assetsSource, /rows\[row\]\?\.\[0\]/, '런타임은 manifest frame_layout을 조회해야 한다');
 assert.match(rendererSource, /drawFishingBoatAtlas/, '게임 렌더러가 공용 어선 아틀라스를 사용해야 한다');
+assert.match(rendererSource, /fishingBoatRenderPosition/, '어선도 직전 좌표에서 현재 좌표로 보간해야 한다');
+assert.match(rendererSource, /r\.fishingBoatId != null/, '승선한 어부는 별도 주민 스프라이트로 그리면 안 된다');
+assert.match(typesSource, /interface FishingBoatState[\s\S]*px: number[\s\S]*py: number/, '선체에 렌더 보간 좌표가 필요하다');
 assert.match(studioSource, /drawFishingBoatAtlas/, '스프라이트 스튜디오도 공용 어선 아틀라스를 사용해야 한다');
 
 console.log('fishing boat asset tests passed');

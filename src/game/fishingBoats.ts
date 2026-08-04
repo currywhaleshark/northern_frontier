@@ -261,6 +261,11 @@ function syncFisherToBoat(state: GameState, boat: FishingBoatState): void {
       : `${waterName} 어장으로 항해 중`;
 }
 
+function settleFishingBoat(boat: FishingBoatState): void {
+  boat.px = boat.x;
+  boat.py = boat.y;
+}
+
 export interface FishingBoatTripPlan {
   groundId: string;
   depthBand: Extract<FishingGroundDepthBand, 'mid' | 'deep'>;
@@ -420,6 +425,7 @@ export function startFishingBoatTrip(
   boat.route = plan.route;
   boat.routeIndex = 0;
   boat.status = 'underway';
+  settleFishingBoat(boat);
   boat.durability = Math.max(0,
     boat.durability - CONFIG.fishingBoats.departureDurabilityCost *
       seaDurabilityMultiplier(state, kind ?? 'lake'));
@@ -471,6 +477,7 @@ export function advanceFishingBoatTrip(state: GameState, boatId: number, forceRe
   const boat = state.fishingBoats.find(candidate => candidate.id === boatId);
   if (!boat || boat.fisherId == null ||
       (boat.status !== 'underway' && boat.status !== 'fishing' && boat.status !== 'returning')) return;
+  settleFishingBoat(boat);
   const kind = waterKind(state.map[boat.y]?.[boat.x]);
   const seaCondition = kind === 'sea' ? seaConditionAt(state) : 'calm';
   if (kind === 'sea' && seaCondition === 'storm' && boat.status !== 'returning') {
@@ -641,6 +648,8 @@ export function advanceFishingBoatWork(
     fisherId: null,
     x: mooring.x,
     y: mooring.y,
+    px: mooring.x,
+    py: mooring.y,
     facing: fishingBoatFacingForStep(mooring.x - port.x, mooring.y - port.y) ?? 'ne',
     cargoFish: 0,
     cargoCapacity: CONFIG.fishingBoats.cargoCapacity,
@@ -668,6 +677,7 @@ export function boardFishingBoat(state: GameState, boatId: number, residentId: n
   }
   boat.fisherId = resident.id;
   boat.status = 'boarded';
+  settleFishingBoat(boat);
   resident.fishingBoatId = boat.id;
   resident.px = resident.x;
   resident.py = resident.y;
@@ -699,6 +709,7 @@ export function disembarkFishingBoat(state: GameState, boatId: number): string |
   resident.path = [];
   boat.fisherId = null;
   boat.status = boat.durability > 0 ? 'moored' : 'disabled';
+  settleFishingBoat(boat);
   clearFishingTrip(boat);
   return null;
 }
@@ -722,6 +733,13 @@ export function normalizeFishingBoats(state: GameState): void {
     usedIds.add(boat.id);
     boat.x = Math.floor(boat.x);
     boat.y = Math.floor(boat.y);
+    const previousX = Number.isInteger(boat.px) ? boat.px : boat.x;
+    const previousY = Number.isInteger(boat.py) ? boat.py : boat.y;
+    const previousTile = state.map[previousY]?.[previousX];
+    const previousPositionValid = waterKind(previousTile) === waterKind(tile) &&
+      Math.abs(previousX - boat.x) + Math.abs(previousY - boat.y) <= 1;
+    boat.px = previousPositionValid ? previousX : boat.x;
+    boat.py = previousPositionValid ? previousY : boat.y;
     boat.facing = BOAT_FACINGS.has(boat.facing) ? boat.facing : 'ne';
     boat.maxDurability = Number.isFinite(boat.maxDurability) && boat.maxDurability > 0
       ? boat.maxDurability : CONFIG.fishingBoats.durability;
@@ -757,6 +775,7 @@ export function normalizeFishingBoats(state: GameState): void {
         if (mooring) {
           boat.x = mooring.x;
           boat.y = mooring.y;
+          settleFishingBoat(boat);
         }
         boat.status = boat.durability > 0 ? 'moored' : 'disabled';
         clearFishingTrip(boat);

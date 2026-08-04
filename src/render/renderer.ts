@@ -308,6 +308,7 @@ export function findResidentAt(
   const warDispatchIds = new Set(state.warDispatch?.memberIds ?? []);
   for (const r of state.residents) {
     if (!r.alive) continue;
+    if (r.fishingBoatId != null) continue;
     if (expeditionUnitIds.has(r.id)) continue;
     if (warDispatchIds.has(r.id)) continue;
     if (presentation.indoorResidentIds.has(r.id)) continue;
@@ -1144,9 +1145,11 @@ function drawMineWorkRange(ctx: CanvasRenderingContext2D, x: number, y: number):
 function drawFishingBoatPlaceholder(
   ctx: CanvasRenderingContext2D,
   boat: GameState['fishingBoats'][number],
+  renderX: number,
+  renderY: number,
 ): void {
-  const cx = (boat.x + 0.5) * TILE;
-  const cy = (boat.y + 0.58) * TILE;
+  const cx = (renderX + 0.5) * TILE;
+  const cy = (renderY + 0.58) * TILE;
   const damaged = boat.durability <= boat.maxDurability * 0.35;
   ctx.save();
   ctx.translate(cx, cy);
@@ -1243,23 +1246,74 @@ export function drawFishingPortPier(
   ctx.restore();
 }
 
+function fishingBoatMooringOffset(
+  state: GameState,
+  boat: GameState['fishingBoats'][number],
+): { x: number; y: number } {
+  const port = state.buildings.find(building =>
+    building.id === boat.portId && building.type === 'fishingPort' && building.built);
+  const direction = port?.portPier?.direction;
+  if (!direction) return { x: 0, y: 0 };
+  const first = direction === 'n' || direction === 's' ? { x: 1, y: 0 } : { x: 0, y: 1 };
+  const second = { x: -first.x, y: -first.y };
+  const isWater = (offset: { x: number; y: number }): boolean => {
+    const terrain = state.map[boat.y + offset.y]?.[boat.x + offset.x]?.terrain;
+    return terrain === 'lake' || terrain === 'sea';
+  };
+  const side = isWater(first) ? first : isWater(second) ? second : first;
+  return { x: side.x * 1.25, y: side.y * 1.25 };
+}
+
+function fishingBoatMooringWeight(
+  boat: GameState['fishingBoats'][number],
+  alpha: number,
+): number {
+  const moving = (boat.px ?? boat.x) !== boat.x || (boat.py ?? boat.y) !== boat.y;
+  if (boat.status === 'moored' || boat.status === 'boarded' ||
+      boat.status === 'repairing' || boat.status === 'disabled') {
+    return moving ? alpha : 1;
+  }
+  if (boat.status !== 'underway') return 0;
+  if (boat.routeIndex === 0) return 1;
+  const routeStart = boat.route[0];
+  if (boat.routeIndex === 1 && routeStart?.x === (boat.px ?? boat.x) &&
+      routeStart?.y === (boat.py ?? boat.y)) return 1 - alpha;
+  return 0;
+}
+
+function fishingBoatRenderPosition(
+  state: GameState,
+  boat: GameState['fishingBoats'][number],
+  alpha: number,
+): { x: number; y: number } {
+  const previousX = boat.px ?? boat.x;
+  const previousY = boat.py ?? boat.y;
+  const mooring = fishingBoatMooringOffset(state, boat);
+  const mooringWeight = fishingBoatMooringWeight(boat, alpha);
+  return {
+    x: previousX + (boat.x - previousX) * alpha + mooring.x * mooringWeight,
+    y: previousY + (boat.y - previousY) * alpha + mooring.y * mooringWeight,
+  };
+}
+
 function drawFishingBoat(
   ctx: CanvasRenderingContext2D,
   state: GameState,
   boat: GameState['fishingBoats'][number],
+  renderPosition: { x: number; y: number },
 ): void {
   const tile = state.map[boat.y]?.[boat.x];
   const season = getSeason(state.day);
   const frozenLake = tile?.terrain === 'lake' && isLakeIceAt(state.map, state.day, boat.x, boat.y);
   const visualState = fishingBoatVisualState(boat.status, tile?.terrain, season, frozenLake);
-  const cx = (boat.x + 0.5) * TILE;
-  const baselineY = (boat.y + 1.1) * TILE;
+  const cx = (renderPosition.x + 0.5) * TILE;
+  const baselineY = (renderPosition.y + 1.1) * TILE;
   ctx.save();
   if (boat.status === 'disabled') ctx.globalAlpha *= 0.72;
   const drawn = drawFishingBoatAtlas(ctx, cx, baselineY, boat.facing ?? 'ne', visualState);
   ctx.restore();
   if (!drawn) {
-    drawFishingBoatPlaceholder(ctx, boat);
+    drawFishingBoatPlaceholder(ctx, boat, renderPosition.x, renderPosition.y);
     return;
   }
   if (boat.durability > boat.maxDurability * 0.35) return;
@@ -2537,7 +2591,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   const naturalWaterCoverage = waterSnapshot?.naturalCoverage ?? null;
   for (const r of state.residents) {
     if (!r.alive || r.trappedInMineId != null || predatorScoutIds.has(r.id) || warDispatchIds.has(r.id) ||
-        presentation.indoorResidentIds.has(r.id)) continue;
+        r.fishingBoatId != null || presentation.indoorResidentIds.has(r.id)) continue;
     const workStance = presentation.workStances.get(r.id);
     const p = residentPixelPos(r, o.alpha, workStance);
     // 저녁 마실 — 같은 타일에 모인 소그룹(최대 4인)이 겹치지 않게 둘러서고, 마실 지점을 바라본다.
@@ -2974,8 +3028,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   for (const boat of state.fishingBoats) {
     if (!isExplored(state, boat.x, boat.y) ||
         !tileRectIntersectsViewport(viewport, boat.x - 2, boat.y - 4, 5, 5)) continue;
-    enqueueRowDraw((boat.y + 0.82) * TILE, (boat.x + 0.5) * TILE, () =>
-      drawFishingBoat(ctx, state, boat));
+    const renderPosition = fishingBoatRenderPosition(state, boat, o.alpha);
+    enqueueRowDraw((renderPosition.y + 0.82) * TILE, (renderPosition.x + 0.5) * TILE, () =>
+      drawFishingBoat(ctx, state, boat, renderPosition));
   }
   for (let index = 0; index < localResidentDraws.length; index++) {
     const resident = localResidentDraws[index];

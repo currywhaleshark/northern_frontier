@@ -6,8 +6,8 @@
   "game_input": "/assets/fishing-boats-v1.png",
   "degraded_static_fallback": false,
   "display": {
-    "width": 126,
-    "height": 112,
+    "width": 63,
+    "height": 56,
     "anchor": "waterline-bottom-center"
   },
   "directions": {

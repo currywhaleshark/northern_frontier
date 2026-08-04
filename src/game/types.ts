@@ -131,6 +131,8 @@ export interface FishingBoatState {
   fisherId?: number | null;
   x: number;
   y: number;
+  px: number; // 직전 서브틱 위치 (렌더링 보간용)
+  py: number;
   facing: FishingBoatFacing;
   cargoFish: number;
   cargoCapacity: number;

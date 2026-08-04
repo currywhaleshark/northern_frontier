@@ -2194,13 +2194,19 @@ export function drawFishingPortPierAtlas(
   ensureLoaded();
   if (!fishingPortPierSheet) return false;
   const source = fishingPortPierSourceRect(fishingPortPierPart(direction, terminal));
+  const drawScale = terminal
+    ? FISHING_PORT_PIER_SHEET.terminalScale
+    : FISHING_PORT_PIER_SHEET.middleScale;
+  const drawSize = size * drawScale;
+  const drawX = x + (size - drawSize) / 2;
+  const drawY = y + (size - drawSize) / 2;
   ctx.save();
   ctx.globalAlpha *= alpha;
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(
     fishingPortPierSheet,
     source.x, source.y, source.w, source.h,
-    x, y, size, size,
+    drawX, drawY, drawSize, drawSize,
   );
   ctx.restore();
   return true;

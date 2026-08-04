@@ -30,6 +30,8 @@ export const FISHING_PORT_PIER_SHEET = {
   width: pier.display.width,
   height: pier.display.height,
   anchor: pier.display.anchor,
+  middleScale: pier.display.middleScale,
+  terminalScale: pier.display.terminalScale,
 } as const;
 
 export const FISHING_PORT_TERMINAL_DIRECTIONS: readonly FishingPortPierDirection[] = [

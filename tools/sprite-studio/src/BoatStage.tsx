@@ -74,7 +74,7 @@ export function BoatStage() {
           className="stage-canvas"
         />
         <div className="stage-hint muted">
-          게임과 같은 126×112 표시 크기·하단 물선 앵커·manifest 프레임을 사용합니다.
+          게임과 같은 63×56 표시 크기·하단 물선 앵커·manifest 프레임을 사용합니다.
         </div>
       </div>
       <div className="stage-panel">

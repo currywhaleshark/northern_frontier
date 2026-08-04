@@ -116,6 +116,10 @@ assert.ok(boats.fishingBoatExpectedCatch('deep', 20) > boats.fishingBoatExpected
   assert.equal(boats.boardFishingBoat(state, boat.id, fisher.id), null);
   assert.equal(fisher.x, boat.x, '승선 즉시 어부 위치를 선체와 맞춘다');
   assert.equal(boats.startLakeFishingTrip(state, boat.id, 36), null);
+  const departure = { x: boat.x, y: boat.y };
+  boats.advanceLakeFishingTrip(state, boat.id);
+  assert.deepEqual({ x: boat.px, y: boat.py }, departure,
+    '항행 선체는 직전 타일을 보존해 프레임 사이를 부드럽게 보간한다');
   let visitedFishing = false;
   for (let tick = 0; tick < 80 && boat.status !== 'moored' && boat.status !== 'disabled'; tick++) {
     boats.advanceLakeFishingTrip(state, boat.id);

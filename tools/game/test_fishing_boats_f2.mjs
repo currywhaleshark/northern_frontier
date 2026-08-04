@@ -132,6 +132,8 @@ assert.equal(simulation.buildingHasActiveWork(yard), true);
 assert.equal(boats.advanceFishingBoatWork(state, yard, CONFIG.fishingBoats.buildWorkDays), 'built');
 assert.equal(state.fishingBoats.length, 1);
 assert.equal(state.fishingBoats[0].portId, port.id);
+assert.equal(state.fishingBoats[0].px, state.fishingBoats[0].x);
+assert.equal(state.fishingBoats[0].py, state.fishingBoats[0].y);
 assert.ok(['ne', 'nw', 'se', 'sw'].includes(state.fishingBoats[0].facing));
 assert.equal(state.map[state.fishingBoats[0].y][state.fishingBoats[0].x].terrain, 'lake');
 assert.equal(state.priorityBuildingId, null);

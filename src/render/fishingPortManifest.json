@@ -26,19 +26,25 @@
     },
     "pier": {
       "game_input": "/assets/fishing-port-pier-v1.png",
-      "display": { "width": 28, "height": 28, "anchor": "tile-top-left" },
+      "display": {
+        "width": 28,
+        "height": 28,
+        "anchor": "tile-center",
+        "middleScale": 1,
+        "terminalScale": 1.4
+      },
       "frame_layout": {
         "sheetWidth": 56,
         "sheetHeight": 336,
         "cellWidth": 56,
         "cellHeight": 56,
         "rows": {
-          "middle_horizontal": [{ "x": 0, "y": 0, "w": 56, "h": 56 }],
-          "middle_vertical": [{ "x": 0, "y": 56, "w": 56, "h": 56 }],
-          "terminal_n": [{ "x": 0, "y": 112, "w": 56, "h": 56 }],
-          "terminal_e": [{ "x": 0, "y": 168, "w": 56, "h": 56 }],
-          "terminal_s": [{ "x": 0, "y": 224, "w": 56, "h": 56 }],
-          "terminal_w": [{ "x": 0, "y": 280, "w": 56, "h": 56 }]
+          "middle_horizontal": [{ "x": 0, "y": 37, "w": 56, "h": 19 }],
+          "middle_vertical": [{ "x": 19, "y": 56, "w": 18, "h": 56 }],
+          "terminal_n": [{ "x": 12, "y": 112, "w": 31, "h": 56 }],
+          "terminal_e": [{ "x": 0, "y": 189, "w": 56, "h": 35 }],
+          "terminal_s": [{ "x": 12, "y": 224, "w": 32, "h": 56 }],
+          "terminal_w": [{ "x": 0, "y": 303, "w": 56, "h": 33 }]
         }
       }
     }
