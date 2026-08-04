@@ -38,6 +38,10 @@ import {
   fishingPortPierSourceRect,
 } from './fishingPortAssets';
 import {
+  COASTAL_GROUND_SHEET,
+  coastalGroundSourceRect,
+} from './coastalGroundAssets';
+import {
   GENERATED_CHARACTER_SHEET,
   generatedCharacterFacingScale,
   generatedMountedRaiderSourceRect,
@@ -312,6 +316,7 @@ let chars: HTMLImageElement | null = null;
 let riverSheet: HTMLImageElement | null = null;
 let historicalTerrainSheet: HTMLImageElement | null = null;
 let historicalTerrainHdSheet: HTMLImageElement | null = null;
+let coastalGroundSheet: HTMLImageElement | null = null;
 type SeamlessGroundFamily = 'plain' | 'forest' | 'rock';
 interface SeamlessGroundPair {
   standard: HTMLImageElement | null;
@@ -512,6 +517,7 @@ function ensureLoaded(): void {
   loadAtlasAsset('/assets/river-mask-autotile-28px-sheet.png', true, image => { riverSheet = image; });
   loadAtlasAsset('/assets/folk-warm-terrain-v3-28px-sheet.png', true, image => { historicalTerrainSheet = image; });
   loadAtlasAsset('/assets/folk-warm-terrain-v3-56px-sheet.png', true, image => { historicalTerrainHdSheet = image; });
+  loadAtlasAsset(COASTAL_GROUND_SHEET.src, true, image => { coastalGroundSheet = image; });
   // 새 게임의 봄 자산만 시작 준비에 포함하고, 나머지 계절은 실제 진입 시 요청한다.
   requestSeamlessGroundSeason('spring', true);
   loadAtlasAsset(GENERATED_TERRAIN_OBJECT_SHEET.src, true, image => { terrainObjectSheet = image; });
@@ -1936,14 +1942,13 @@ function activeSeamlessGroundTerrain(
 
 const historicalGroundPatterns = new Map<string, HTMLCanvasElement>();
 
-function quiltedHistoricalGroundPattern(
-  terrain: Terrain,
-  season: Season,
+function quiltedGroundPattern(
+  patternName: string,
   active: { image: HTMLImageElement; sourceScale: 1 | 2 },
+  rect: { sx: number; sy: number; sw: number; sh: number },
+  centeredInset: number,
 ): HTMLCanvasElement | null {
-  const rect = historicalTerrainSourceRect(terrain, season, active.sourceScale);
-  if (!rect) return null;
-  const key = `${active.image.src}|${terrain}|${season}|${active.sourceScale}`;
+  const key = `${active.image.src}|${patternName}|${active.sourceScale}`;
   const cached = historicalGroundPatterns.get(key);
   if (cached) return cached;
   const canvas = document.createElement('canvas');
@@ -1959,7 +1964,6 @@ function quiltedHistoricalGroundPattern(
   // 셀 안쪽 표본을 여러 위상·방향으로 겹쳐 160 논리 픽셀짜리 매크로 텍스처를 만든다.
   // 조각 가장자리는 서로 페더링하고 캔버스 바깥으로 나간 기여분은 반대편에 더한다.
   // 따라서 매크로 텍스처 자체가 무봉제이면서 짧은 거울 반복의 띠 무늬도 피한다.
-  const centeredInset = active.sourceScale;
   const sourceCanvas = document.createElement('canvas');
   sourceCanvas.width = rect.sw;
   sourceCanvas.height = rect.sh;
@@ -1992,7 +1996,7 @@ function quiltedHistoricalGroundPattern(
   };
 
   let randomState = 0x811c9dc5;
-  for (const char of `${terrain}:${season}`) {
+  for (const char of patternName) {
     randomState ^= char.charCodeAt(0);
     randomState = Math.imul(randomState, 0x01000193) >>> 0;
   }
@@ -2046,6 +2050,34 @@ function quiltedHistoricalGroundPattern(
   patternCtx.putImageData(output, 0, 0);
   historicalGroundPatterns.set(key, canvas);
   return canvas;
+}
+
+function quiltedHistoricalGroundPattern(
+  terrain: Terrain,
+  season: Season,
+  active: { image: HTMLImageElement; sourceScale: 1 | 2 },
+): HTMLCanvasElement | null {
+  const rect = historicalTerrainSourceRect(terrain, season, active.sourceScale);
+  if (!rect) return null;
+  return quiltedGroundPattern(
+    `historical:${terrain}:${season}`,
+    active,
+    rect,
+    active.sourceScale,
+  );
+}
+
+function quiltedCoastalGroundPattern(
+  kind: 'mudflat' | 'sand' | 'shingle' | 'rocky',
+): HTMLCanvasElement | null {
+  if (!coastalGroundSheet) return null;
+  const rect = coastalGroundSourceRect(kind);
+  return quiltedGroundPattern(
+    `coastal:${kind}`,
+    { image: coastalGroundSheet, sourceScale: COASTAL_GROUND_SHEET.sourceScale },
+    { sx: rect.x, sy: rect.y, sw: rect.w, sh: rect.h },
+    0,
+  );
 }
 
 function positiveMod(value: number, modulus: number): number {
@@ -2292,6 +2324,22 @@ function drawCoastalGround(
 ): void {
   ctx.fillStyle = COAST_GROUND_COLORS[p.season][kind];
   ctx.fillRect(p.x, p.y, p.size, p.size);
+  const pattern = quiltedCoastalGroundPattern(kind);
+  if (pattern) {
+    drawWrappedHistoricalGround(ctx, pattern, COASTAL_GROUND_SHEET.sourceScale, p);
+    const tint = p.season === 'spring'
+      ? 'rgba(210, 199, 145, 0.07)'
+      : p.season === 'autumn'
+        ? 'rgba(104, 67, 31, 0.15)'
+        : p.season === 'winter'
+          ? 'rgba(222, 229, 232, 0.42)'
+          : null;
+    if (tint) {
+      ctx.fillStyle = tint;
+      ctx.fillRect(p.x, p.y, p.size, p.size);
+    }
+    return;
+  }
   const h = hash(p.tileX, p.tileY);
   if (kind === 'mudflat') {
     ctx.strokeStyle = p.winter ? 'rgba(211,220,220,0.24)' : 'rgba(61,91,91,0.38)';

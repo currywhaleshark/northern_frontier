@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-request",
+  "engine": "component-row",
+  "character": {
+    "id": "coastal-ground-tiles-v1",
+    "description": "four repeatable late-Joseon coastal ground material tiles matching the folk warm terrain atlas"
+  },
+  "cell": {
+    "shape": "square",
+    "size": 56,
+    "safe_margin": 0
+  },
+  "chroma_key": {
+    "name": "magenta",
+    "hex": "#FF00FF",
+    "rgb": [255, 0, 255]
+  },
+  "fit": {
+    "resample": "kcentroid",
+    "align_x": "alpha-centroid",
+    "align_y": "center",
+    "pixel_perfect": false,
+    "palette_size": 64,
+    "detail_bias": true,
+    "outline": 0.35
+  },
+  "states": {
+    "coastal_materials": {
+      "frames": 4,
+      "fps": 1,
+      "loop": false,
+      "action": "four separate opaque square terrain tiles in fixed order: wet mudflat with shallow drainage ripples; pale compact sand; rounded shingle beach; dark rocky shore"
+    }
+  }
+}
