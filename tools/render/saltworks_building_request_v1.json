@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-request",
+  "engine": "component-row",
+  "character": {
+    "id": "saltworks-building-v1",
+    "description": "late-Joseon Korean coastal salt-boiling workshop in the Northern warm pixel-art building style"
+  },
+  "cell": {
+    "shape": "rect",
+    "width": 112,
+    "height": 160,
+    "safe_margin_x": 4,
+    "safe_margin_y": 4
+  },
+  "chroma_key": {
+    "name": "magenta",
+    "hex": "#FF00FF",
+    "rgb": [255, 0, 255]
+  },
+  "fit": {
+    "resample": "kcentroid",
+    "align_x": "alpha-centroid",
+    "align_y": "bottom",
+    "pixel_perfect": true,
+    "logical_height": 80,
+    "palette_size": 48,
+    "detail_bias": true,
+    "outline": 0.35
+  },
+  "states": {
+    "seasonal": {
+      "frames": 2,
+      "fps": 1,
+      "loop": false,
+      "action": "two complete separate building sprites in fixed order: normal season coastal salt-boiling workshop; the exact same saltworks in winter with light settled snow"
+    }
+  }
+}

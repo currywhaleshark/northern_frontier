@@ -46,6 +46,10 @@ import {
   tidalFisheryBuildingSourceRect,
 } from './tidalFisheryBuildingAssets';
 import {
+  SALTWORKS_BUILDING_SHEET,
+  saltworksBuildingSourceRect,
+} from './saltworksBuildingAssets';
+import {
   GENERATED_CHARACTER_SHEET,
   generatedCharacterFacingScale,
   generatedMountedRaiderSourceRect,
@@ -322,6 +326,7 @@ let historicalTerrainSheet: HTMLImageElement | null = null;
 let historicalTerrainHdSheet: HTMLImageElement | null = null;
 let coastalGroundSheet: HTMLImageElement | null = null;
 let tidalFisheryBuildingSheet: HTMLImageElement | null = null;
+let saltworksBuildingSheet: HTMLImageElement | null = null;
 type SeamlessGroundFamily = 'plain' | 'forest' | 'rock';
 interface SeamlessGroundPair {
   standard: HTMLImageElement | null;
@@ -524,6 +529,7 @@ function ensureLoaded(): void {
   loadAtlasAsset('/assets/folk-warm-terrain-v3-56px-sheet.png', true, image => { historicalTerrainHdSheet = image; });
   loadAtlasAsset(COASTAL_GROUND_SHEET.src, true, image => { coastalGroundSheet = image; });
   loadAtlasAsset(TIDAL_FISHERY_BUILDING_SHEET.src, true, image => { tidalFisheryBuildingSheet = image; });
+  loadAtlasAsset(SALTWORKS_BUILDING_SHEET.src, true, image => { saltworksBuildingSheet = image; });
   // 새 게임의 봄 자산만 시작 준비에 포함하고, 나머지 계절은 실제 진입 시 요청한다.
   requestSeamlessGroundSeason('spring', true);
   loadAtlasAsset(GENERATED_TERRAIN_OBJECT_SHEET.src, true, image => { terrainObjectSheet = image; });
@@ -2079,6 +2085,27 @@ function blitTidalFisheryBuilding(
   return true;
 }
 
+function blitSaltworksBuilding(
+  ctx: CanvasRenderingContext2D,
+  p: BuildingDrawParams,
+): boolean {
+  if (p.type !== 'saltworks' || !saltworksBuildingSheet) return false;
+  const rect = saltworksBuildingSourceRect(p.season);
+  const destHeight = p.size * (SALTWORKS_BUILDING_SHEET.height / SALTWORKS_BUILDING_SHEET.width);
+  ctx.drawImage(
+    saltworksBuildingSheet,
+    rect.x,
+    rect.y,
+    rect.w,
+    rect.h,
+    p.x,
+    p.y + p.size - destHeight,
+    p.size,
+    destHeight,
+  );
+  return true;
+}
+
 function quiltedHistoricalGroundPattern(
   terrain: Terrain,
   season: Season,
@@ -2779,6 +2806,12 @@ export const atlasSprites: SpriteAPI = {
     }
 
     if (blitTidalFisheryBuilding(ctx, p)) {
+      ctx.globalAlpha = 1;
+      drawProgressBar(ctx, p);
+      return;
+    }
+
+    if (blitSaltworksBuilding(ctx, p)) {
       ctx.globalAlpha = 1;
       drawProgressBar(ctx, p);
       return;
