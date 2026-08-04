@@ -147,4 +147,34 @@ assert.ok(coast.fishingGrounds.some(ground => ground.kind === 'sea' && ground.de
     '어장 표식은 중심 타일 하나에만 뜬다');
 }
 
+// 지도 표식은 일반 수역과 갯벌을 서로 다른 생성 아이콘으로 표시한다.
+{
+  const manifest = JSON.parse(readFileSync(
+    new URL('../../src/render/fishingGroundIconManifest.json', import.meta.url),
+    'utf8',
+  ));
+  const iconPng = readFileSync(new URL('../../public/assets/fishing-ground-icons-v1.png', import.meta.url));
+  assert.equal(iconPng.toString('ascii', 1, 4), 'PNG');
+  assert.equal(iconPng.readUInt32BE(16), manifest.frame_layout.sheetWidth);
+  assert.equal(iconPng.readUInt32BE(20), manifest.frame_layout.sheetHeight);
+  assert.equal(manifest.engine, 'component-row');
+  assert.equal(manifest.degraded_static_fallback, false);
+  assert.deepEqual(Object.keys(manifest.frame_layout.rows), ['water', 'mudflat']);
+  assert.notDeepEqual(manifest.frame_layout.rows.water[0], manifest.frame_layout.rows.mudflat[0]);
+
+  const assetSource = readFileSync(
+    new URL('../../src/render/fishingGroundIconAssets.ts', import.meta.url), 'utf8',
+  );
+  const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
+  const rendererSource = readFileSync(new URL('../../src/render/renderer.ts', import.meta.url), 'utf8');
+  assert.match(assetSource, /kind === 'mudflat' \? 'mudflat' : 'water'/,
+    '강·호수·바다는 물고기, 갯벌은 별도 게 아이콘을 선택한다');
+  assert.match(atlasSource, /drawFishingGroundIconAtlas/);
+  assert.match(rendererSource, /drawFishingGroundIconAtlas\(/);
+  assert.match(rendererSource, /ground\.depthBand === 'shore' \? 1[^\n]+\? 2 : 3/,
+    '생성 아이콘으로 바꿔도 수심 물결 1·2·3개 구분을 유지한다');
+  assert.match(rendererSource, /stockRatio <= 0\.08[^\n]+grayscale/,
+    '고갈된 생성 아이콘은 회색으로 표시한다');
+}
+
 console.log('fishing grounds F0/F1 tests passed');

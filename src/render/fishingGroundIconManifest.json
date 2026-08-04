@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-runtime-icon-manifest",
+  "characterId": "fishing-ground-icons-v1",
+  "engine": "component-row",
+  "game_input": "/assets/fishing-ground-icons-v1.png",
+  "degraded_static_fallback": false,
+  "display": {
+    "width": 128,
+    "height": 128,
+    "anchor": "tile-center"
+  },
+  "chroma": {
+    "mode": "ycbcr",
+    "key": "#FF00FF"
+  },
+  "frame_layout": {
+    "sheetWidth": 128,
+    "sheetHeight": 256,
+    "cellWidth": 128,
+    "cellHeight": 128,
+    "rows": {
+      "water": [{ "x": 0, "y": 0, "w": 128, "h": 128 }],
+      "mudflat": [{ "x": 0, "y": 128, "w": 128, "h": 128 }]
+    }
+  }
+}

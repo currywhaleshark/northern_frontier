@@ -93,7 +93,13 @@ import {
 } from '../game/minerals';
 import type { AnimalHabitat, BattleScar, Building, BuildingTypeId, ClaimZone, FishingGroundState, FishingPortPier, ForeignSite, GameState, PastureArea, Resident, Season, Terrain, Tile } from '../game/types';
 import { historicalTerrainColumn } from './historicalTerrain';
-import { drawFishingBoatAtlas, drawFishingPortHouseAtlas, drawFishingPortPierAtlas } from './atlas';
+import {
+  drawFishingBoatAtlas,
+  drawFishingGroundIconAtlas,
+  drawFishingPortHouseAtlas,
+  drawFishingPortPierAtlas,
+} from './atlas';
+import { fishingGroundIconKind } from './fishingGroundIconAssets';
 import { fishingBoatVisualState } from './fishingBoatAssets';
 import { coastalGroundAt } from '../game/tidalFlats';
 import { pixelRectIntersectsViewport, tileRectIntersectsViewport, type SceneViewport } from './sceneViewport';
@@ -2027,7 +2033,7 @@ function drawStillWaterShoreRipples(
 function drawFishingGroundIcon(ctx: CanvasRenderingContext2D, ground: FishingGroundState): void {
   const cx = (ground.x + 0.5) * TILE;
   const cy = (ground.y + 0.5) * TILE;
-  const radius = TILE * 0.35;
+  const radius = TILE * 0.43;
   const rgb = fishingGroundRgb(ground);
   const stockRatio = ground.capacity > 0 ? Math.max(0, Math.min(1, ground.stock / ground.capacity)) : 0;
   const scale = TILE / 32;
@@ -2041,23 +2047,45 @@ function drawFishingGroundIcon(ctx: CanvasRenderingContext2D, ground: FishingGro
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = stockRatio > 0.08 ? `rgb(${rgb})` : 'rgb(151,155,157)';
-  ctx.beginPath();
-  ctx.ellipse(cx - 1 * scale, cy - 1 * scale, 7 * scale, 4 * scale, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx + 5 * scale, cy - 1 * scale);
-  ctx.lineTo(cx + 11 * scale, cy - 6 * scale);
-  ctx.lineTo(cx + 10 * scale, cy + 4 * scale);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = 'rgba(9,25,34,0.95)';
-  ctx.beginPath();
-  ctx.arc(cx - 4 * scale, cy - 2 * scale, 1.1 * scale, 0, Math.PI * 2);
-  ctx.fill();
+  if (stockRatio <= 0.08) ctx.filter = 'grayscale(1) saturate(0.25)';
+  const iconDrawn = drawFishingGroundIconAtlas(
+    ctx,
+    cx,
+    cy - TILE * 0.02,
+    TILE * 0.82,
+    fishingGroundIconKind(ground.kind),
+  );
+  ctx.filter = 'none';
+  if (!iconDrawn) {
+    ctx.fillStyle = stockRatio > 0.08 ? `rgb(${rgb})` : 'rgb(151,155,157)';
+    if (ground.kind === 'mudflat') {
+      ctx.beginPath();
+      ctx.ellipse(cx, cy - 1.5 * scale, 5.5 * scale, 3.4 * scale, 0, 0, Math.PI * 2);
+      ctx.fill();
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.arc(cx + side * 6 * scale, cy - 5 * scale, 2.2 * scale, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else {
+      ctx.beginPath();
+      ctx.ellipse(cx - 1 * scale, cy - 1 * scale, 7 * scale, 4 * scale, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(cx + 5 * scale, cy - 1 * scale);
+      ctx.lineTo(cx + 11 * scale, cy - 6 * scale);
+      ctx.lineTo(cx + 10 * scale, cy + 4 * scale);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(9,25,34,0.95)';
+      ctx.beginPath();
+      ctx.arc(cx - 4 * scale, cy - 2 * scale, 1.1 * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
   const depthMarks = ground.depthBand === 'shore' ? 1 : ground.depthBand === 'mid' ? 2 : 3;
-  ctx.strokeStyle = `rgba(${rgb},0.95)`;
+  ctx.strokeStyle = stockRatio > 0.08 ? `rgba(${rgb},0.95)` : 'rgba(151,155,157,0.9)';
   ctx.lineWidth = Math.max(1, 1.25 * scale);
   ctx.setLineDash([]);
   for (let index = 0; index < depthMarks; index++) {

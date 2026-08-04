@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-request",
+  "engine": "component-row",
+  "character": {
+    "id": "fishing-ground-icons-v1",
+    "description": "map resource marker icons matching the approved hunting habitat icon style"
+  },
+  "cell": {
+    "shape": "square",
+    "size": 128,
+    "safe_margin": 8
+  },
+  "chroma_key": {
+    "name": "magenta",
+    "hex": "#FF00FF",
+    "rgb": [255, 0, 255]
+  },
+  "fit": {
+    "resample": "kcentroid",
+    "align_x": "alpha-centroid",
+    "align_y": "center",
+    "pixel_perfect": true,
+    "logical_height": 112,
+    "palette_size": 64,
+    "detail_bias": true,
+    "outline": 0.62
+  },
+  "states": {
+    "water": {
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "action": "one centered silver-blue carp-like fish resource icon"
+    },
+    "mudflat": {
+      "frames": 1,
+      "fps": 1,
+      "loop": false,
+      "action": "one centered ochre-brown mud crab resource icon with raised claws"
+    }
+  }
+}

@@ -31,6 +31,11 @@ import {
   type FishingBoatVisualState,
 } from './fishingBoatAssets';
 import {
+  FISHING_GROUND_ICON_SHEET,
+  fishingGroundIconSourceRect,
+  type FishingGroundIconKind,
+} from './fishingGroundIconAssets';
+import {
   FISHING_PORT_HOUSE_SHEET,
   FISHING_PORT_HOUSE_WINTER_SHEET,
   FISHING_PORT_PIER_HD_SHEET,
@@ -404,6 +409,7 @@ let livestockHdSheet: HTMLImageElement | null = null;
 let corpseCoffinSprite: HTMLImageElement | null = null;
 let corpseCoffinHdSprite: HTMLImageElement | null = null;
 let fishingBoatSheet: HTMLImageElement | null = null;
+let fishingGroundIconSheet: HTMLImageElement | null = null;
 let fishingPortHouseSheet: HTMLImageElement | null = null;
 let fishingPortHouseWinterSheet: HTMLImageElement | null = null;
 let fishingPortPierSheet: HTMLImageElement | null = null;
@@ -687,6 +693,7 @@ function ensureLoaded(): void {
   loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.highDefinition.src, false,
     image => { residentWoodcutterVideoWorkHdSheet = image; });
   loadAtlasAsset(FISHING_BOAT_SHEET.src, true, image => { fishingBoatSheet = image; });
+  loadAtlasAsset(FISHING_GROUND_ICON_SHEET.src, true, image => { fishingGroundIconSheet = image; });
   loadAtlasAsset(FISHING_PORT_HOUSE_SHEET.src, false, image => { fishingPortHouseSheet = image; });
   loadAtlasAsset(FISHING_PORT_HOUSE_WINTER_SHEET.src, false, image => { fishingPortHouseWinterSheet = image; });
   loadAtlasAsset(FISHING_PORT_PIER_SHEET.src, false, image => { fishingPortPierSheet = image; });
@@ -2278,6 +2285,28 @@ export function drawFishingBoatAtlas(
     source.x, source.y, source.w, source.h,
     -FISHING_BOAT_SHEET.width / 2, -FISHING_BOAT_SHEET.height,
     FISHING_BOAT_SHEET.width, FISHING_BOAT_SHEET.height,
+  );
+  ctx.restore();
+  return true;
+}
+
+export function drawFishingGroundIconAtlas(
+  ctx: CanvasRenderingContext2D,
+  centerX: number,
+  centerY: number,
+  size: number,
+  kind: FishingGroundIconKind,
+): boolean {
+  ensureLoaded();
+  if (!fishingGroundIconSheet) return false;
+  const source = fishingGroundIconSourceRect(kind);
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(
+    fishingGroundIconSheet,
+    source.x, source.y, source.w, source.h,
+    centerX - size / 2, centerY - size / 2, size, size,
   );
   ctx.restore();
   return true;
