@@ -1277,7 +1277,7 @@ function fishingBoatMooringWeight(
   alpha: number,
 ): number {
   const moving = (boat.px ?? boat.x) !== boat.x || (boat.py ?? boat.y) !== boat.y;
-  if (boat.status === 'building' || boat.status === 'moored' || boat.status === 'boarded' ||
+  if (boat.status === 'moored' || boat.status === 'boarded' ||
       boat.status === 'repairing' || boat.status === 'disabled') {
     return moving ? alpha : 1;
   }

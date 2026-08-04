@@ -692,6 +692,8 @@ export function startFishingBoatConstruction(
     .find(candidate => candidate.portId === portId && candidate.slot === mooringSlot);
   const port = state.buildings.find(building => building.id === portId && building.type === 'fishingPort' && building.built);
   if (!port || !slot) return '같은 수역의 비어 있는 포구 계류 슬롯을 선택해야 합니다.';
+  const launch = fishingWaterAccessForBuilding(state, boatyard)[0];
+  if (!launch) return '배무이터 앞에 어선을 건조할 수 있는 수면이 없습니다.';
   if (!spendBoatResources(state, CONFIG.fishingBoats.buildWood, CONFIG.fishingBoats.buildTools)) {
     return `어선 건조에는 목재 ${CONFIG.fishingBoats.buildWood}, 도구 ${CONFIG.fishingBoats.buildTools}이 필요합니다.`;
   }
@@ -702,11 +704,11 @@ export function startFishingBoatConstruction(
     mooringSlot,
     boatyardId: boatyard.id,
     fisherIds: [],
-    x: slot.x,
-    y: slot.y,
-    px: slot.x,
-    py: slot.y,
-    facing: slot.facing,
+    x: launch.x,
+    y: launch.y,
+    px: launch.x,
+    py: launch.y,
+    facing: fishingBoatFacingForStep(launch.x - boatyard.x, launch.y - boatyard.y) ?? slot.facing,
     cargoFish: 0,
     cargoCapacity: CONFIG.fishingBoats.cargoCapacity,
     durability: CONFIG.fishingBoats.durability,
@@ -787,6 +789,16 @@ export function advanceFishingBoatWork(
     delete boatyard.boatWorkOrder;
     if (state.priorityBuildingId === boatyard.id) state.priorityBuildingId = null;
     return null;
+  }
+  const port = state.buildings.find(building =>
+    building.id === order.portId && building.type === 'fishingPort' && building.built);
+  const berth = port ? fishingPortMooringSlotPosition(port, boat.mooringSlot) : null;
+  if (berth) {
+    boat.x = berth.x;
+    boat.y = berth.y;
+    boat.px = berth.x;
+    boat.py = berth.y;
+    boat.facing = fishingBoatFacingForStep(berth.x - port!.x, berth.y - port!.y) ?? boat.facing;
   }
   boat.status = 'moored';
   boat.boatyardId = null;

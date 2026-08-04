@@ -126,6 +126,7 @@ const beforeWood = state.resources.wood;
 const beforeTools = state.resources.tools;
 const constructionSlots = boats.fishingBoatConstructionSlots(state, yard.id);
 assert.deepEqual(constructionSlots.map(slot => slot.slot), [0, 1], '포구 계류대 양옆에 두 척 자리를 제공한다');
+const yardLaunch = boats.fishingWaterAccessForBuilding(state, yard)[0];
 assert.equal(boats.startFishingBoatConstruction(state, yard.id, port.id, 0), null);
 assert.equal(state.resources.wood, beforeWood - CONFIG.fishingBoats.buildWood);
 assert.equal(state.resources.tools, beforeTools - CONFIG.fishingBoats.buildTools);
@@ -133,11 +134,21 @@ assert.equal(yard.boatWorkOrder.kind, 'build');
 assert.equal(state.fishingBoats.length, 1, '건조 등록 즉시 클릭 가능한 선박 개체를 만든다');
 assert.equal(state.fishingBoats[0].status, 'building');
 assert.equal(state.fishingBoats[0].mooringSlot, 0);
+assert.deepEqual(
+  { x: state.fishingBoats[0].x, y: state.fishingBoats[0].y },
+  yardLaunch,
+  '건조 중 선체는 목적 포구가 아니라 배무이터 앞 수면에 표시한다',
+);
 assert.equal(state.priorityBuildingId, yard.id, '어선 공정은 건축가 최우선 작업으로 잡힌다');
 assert.equal(simulation.buildingHasActiveWork(yard), true);
 assert.equal(boats.advanceFishingBoatWork(state, yard, CONFIG.fishingBoats.buildWorkDays), 'built');
 assert.equal(state.fishingBoats.length, 1);
 assert.equal(state.fishingBoats[0].portId, port.id);
+assert.deepEqual(
+  { x: state.fishingBoats[0].x, y: state.fishingBoats[0].y },
+  { x: constructionSlots[0].x, y: constructionSlots[0].y },
+  '완공한 선체는 실제 항해를 생략하고 예약한 포구 슬롯에 진수한다',
+);
 assert.equal(state.fishingBoats[0].px, state.fishingBoats[0].x);
 assert.equal(state.fishingBoats[0].py, state.fishingBoats[0].y);
 assert.ok(['ne', 'nw', 'se', 'sw'].includes(state.fishingBoats[0].facing));
