@@ -14,7 +14,10 @@ import {
 } from './game/simulation';
 import { forestTilesInArea, forestTilesInFootprint } from './game/landClearing';
 import { adjustGatheringWorkArea } from './game/gatheringZones';
-import { startFishingBoatConstruction, startFishingBoatRepair } from './game/fishingBoats';
+import {
+  assignNearestFisherToFishingBoat, fishingBoatConstructionSlots, startFishingBoatConstruction,
+  startFishingBoatRepair, unassignFisherFromFishingBoat,
+} from './game/fishingBoats';
 import { isSolidWallBuilding } from './game/walls';
 import { ClearingConfirmDialog } from './components/ClearingConfirmDialog';
 import { RoyalPlaqueConfirmDialog } from './components/RoyalPlaqueConfirmDialog';
@@ -354,6 +357,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   const [pastureStableId, setPastureStableId] = useState<number | null>(null);
   const [expandingBuildingId, setExpandingBuildingId] = useState<number | null>(null);
   const [relocatingBuildingId, setRelocatingBuildingId] = useState<number | null>(null);
+  const [placingFishingBoatFromBoatyardId, setPlacingFishingBoatFromBoatyardId] = useState<number | null>(null);
   // 개간 동의를 기다리는 공사 지정 — 수락하면 confirm이 같은 배치를 다시 실행한다
   const [clearingRequest, setClearingRequest] = useState<
     { title: string; trees: number; detail: string; confirm: () => void } | null
@@ -1151,9 +1155,44 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   };
 
   const handleStartFishingBoatConstruction = (boatyardId: number) => {
-    const err = startFishingBoatConstruction(stateRef.current, boatyardId);
-    notify(err ?? '어선 건조를 시작했습니다. 건축가가 배무이터에서 작업합니다.', err ? 'bad' : 'info');
-    if (!err) playSfx('hammer');
+    const slots = fishingBoatConstructionSlots(stateRef.current, boatyardId);
+    if (slots.length === 0) {
+      notify('같은 수역의 포구에 빈 계류 자리가 없거나 배무이터가 다른 작업 중입니다.', 'bad');
+      return;
+    }
+    setPlacingType(null);
+    setPastureStableId(null);
+    setExpandingBuildingId(null);
+    setRelocatingBuildingId(null);
+    setPlacingFishingBoatFromBoatyardId(boatyardId);
+    notify('포구 계류장 양옆의 빈 자리 중 하나를 선택하십시오.', 'info');
+  };
+
+  const handlePlaceFishingBoat = (portId: number, slot: 0 | 1) => {
+    if (placingFishingBoatFromBoatyardId == null) return;
+    const boatyardId = placingFishingBoatFromBoatyardId;
+    const nextBoatId = stateRef.current.nextFishingBoatId;
+    const err = startFishingBoatConstruction(stateRef.current, boatyardId, portId, slot);
+    notify(err ?? '어선 건조를 등록했습니다. 건축가가 배무이터에서 작업합니다.', err ? 'bad' : 'info');
+    if (!err) {
+      playSfx('hammer');
+      setPlacingFishingBoatFromBoatyardId(null);
+      setSelected(null);
+      setSelectedEntity({ kind: 'fishingBoat', id: nextBoatId });
+      setInspResidentId(null);
+    }
+    bump();
+  };
+
+  const handleAssignNearestFishingBoatCrew = (boatId: number) => {
+    const err = assignNearestFisherToFishingBoat(stateRef.current, boatId);
+    notify(err ?? '어선에 가장 가까운 어부를 배정했습니다.', err ? 'bad' : 'info');
+    bump();
+  };
+
+  const handleUnassignFishingBoatCrew = (boatId: number, residentId: number) => {
+    const err = unassignFisherFromFishingBoat(stateRef.current, boatId, residentId);
+    if (err) notify(err, 'bad');
     bump();
   };
 
@@ -1604,11 +1643,18 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     if (stateRef.current.scenario) markScenarioFlag(stateRef.current, 'residentSelected');
   };
 
+  const handleFishingBoatClick = (id: number) => {
+    setSelected(null);
+    setSelectedEntity({ kind: 'fishingBoat', id });
+    setInspResidentId(null);
+  };
+
   const handleClearSelection = useCallback(() => {
     setSelected(null);
     setSelectedEntity(null);
     setInspResidentId(null);
     setPastureStableId(null);
+    setPlacingFishingBoatFromBoatyardId(null);
   }, []);
 
   const handleSelectResidentFromDock = (id: number) => {
@@ -1682,6 +1728,8 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
           setGameMenuView('main');
         } else if (gameMenuView === 'main') {
           closeGameMenu();
+        } else if (placingFishingBoatFromBoatyardId != null) {
+          setPlacingFishingBoatFromBoatyardId(null);
         } else if (placingType) {
           setPlacingType(null);
         } else if (weaponDialogOpen) {
@@ -1731,7 +1779,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [
-    closeGameMenu, edictDialogOpen, expeditionMusterRequest, gameMenuView, openGameMenu, placingType,
+    closeGameMenu, edictDialogOpen, expeditionMusterRequest, gameMenuView, openGameMenu, placingFishingBoatFromBoatyardId, placingType,
     setUserSpeed, slotDialogMode, toggleDockWindow, weaponDialogOpen,
   ]);
 
@@ -1852,6 +1900,8 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               onSlaughterLivestock={handleSlaughterLivestock}
               onStartFishingBoatConstruction={handleStartFishingBoatConstruction}
               onStartFishingBoatRepair={handleStartFishingBoatRepair}
+              onAssignNearestFishingBoatCrew={handleAssignNearestFishingBoatCrew}
+              onUnassignFishingBoatCrew={handleUnassignFishingBoatCrew}
               onDefinePasture={handleDefinePasture}
               onExpandArea={handleExpandArea}
               onStartBuildingDemolition={handleStartBuildingDemolition}
@@ -1952,6 +2002,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                     pastureStableId={pastureStableId}
                     expandingBuildingId={expandingBuildingId}
                     relocatingBuildingId={relocatingBuildingId}
+                    placingFishingBoatFromBoatyardId={placingFishingBoatFromBoatyardId}
                     selected={selected}
                     selectedEntity={selectedEntity}
                     selectedResidentId={inspResidentId}
@@ -1961,12 +2012,15 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                     onPlacePasture={handlePlacePasture}
                     onPlaceRelocation={handlePlaceBuildingRelocation}
                     onResidentClick={handleResidentClick}
+                    onFishingBoatClick={handleFishingBoatClick}
+                    onPlaceFishingBoat={handlePlaceFishingBoat}
                     onContextAction={handleContextAction}
                     onCancelPlace={() => {
                       setPlacingType(null);
                       setPastureStableId(null);
                       setExpandingBuildingId(null);
                       setRelocatingBuildingId(null);
+                      setPlacingFishingBoatFromBoatyardId(null);
                     }}
                     onZoomChange={zoom => setUiPrefs(current => setMapZoom(current, zoom))}
                   />
@@ -1983,6 +2037,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                   setPastureStableId(null);
                   setExpandingBuildingId(null);
                   setRelocatingBuildingId(null);
+                  setPlacingFishingBoatFromBoatyardId(null);
                   setPlacingType(type);
                 }}
                 onClearSelection={handleClearSelection}

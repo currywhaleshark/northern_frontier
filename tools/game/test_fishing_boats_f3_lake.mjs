@@ -26,7 +26,6 @@ const boats = await load('fishingBoats');
 const buildings = await load('buildings');
 const saveLoad = await load('saveLoad');
 const simulation = await load('simulation');
-const workerSlots = await load('workerSlots');
 const { CONFIG } = await load('config');
 
 const savedSlots = new Map();
@@ -60,7 +59,7 @@ function makeLakeState() {
   state.day = 7;
   state.subTick = 9;
   const port = built(100, 'fishingPort', 3, 2, {
-    gatheringWorkArea: { x: 8, y: 7, radius: 9 }, inventory: {},
+    gatheringWorkArea: { x: 8, y: 7, radius: 9 }, inventory: {}, portPier: { direction: 's', length: 3 },
   });
   state.buildings.push(port);
   buildings.occupyBuildingTiles(state, port);
@@ -76,12 +75,12 @@ function makeLakeState() {
   for (const resident of state.residents) resident.alive = false;
   Object.assign(fisher, {
     alive: true, sick: false, health: 100, hunger: 100, warmth: 100, morale: 70,
-    job: 'fisher', assignedBuildingId: port.id, x: port.x, y: port.y, px: port.x, py: port.y,
+    job: 'fisher', assignedBuildingId: null, x: port.x, y: port.y, px: port.x, py: port.y,
     phase: 'rest', path: [], workTimer: 0, targetId: null, carrying: {}, manualOrder: null,
     fishingBoatId: null, skills: {},
   });
   const boat = {
-    id: 1, portId: port.id, boatyardId: null, fisherId: null, x: 3, y: 3,
+    id: 1, portId: port.id, mooringSlot: 0, boatyardId: null, fisherIds: [fisher.id], x: 3, y: 3,
     cargoFish: 0, cargoCapacity: CONFIG.fishingBoats.cargoCapacity,
     durability: CONFIG.fishingBoats.durability, maxDurability: CONFIG.fishingBoats.durability,
     status: 'moored', route: [], routeIndex: 0,
@@ -137,7 +136,17 @@ assert.ok(boats.fishingBoatExpectedCatch('deep', 20) > boats.fishingBoatExpected
 
 {
   const { state, port, fisher, boat } = makeLakeState();
-  assert.equal(workerSlots.assignResidentToBuilding(state, fisher.id, port.id), null);
+  const secondFisher = state.residents[1];
+  Object.assign(secondFisher, {
+    alive: true, sick: false, health: 100, hunger: 100, warmth: 100, morale: 70,
+    job: 'fisher', assignedBuildingId: null, x: port.x, y: port.y, px: port.x, py: port.y,
+    phase: 'rest', path: [], workTimer: 0, targetId: null, carrying: {}, manualOrder: null,
+    fishingBoatId: null, skills: {},
+  });
+  boat.fisherIds.push(secondFisher.id);
+  simulation.advanceTick(state);
+  assert.equal(fisher.fishingBoatId, boat.id);
+  assert.equal(secondFisher.fishingBoatId, boat.id, '배정된 두 어부가 같은 서브틱에 함께 승선한다');
   simulation.advanceTick(state);
   assert.ok(boat.status === 'underway' || boat.status === 'fishing',
     `포구 배정 어부가 가동 가능한 어선을 자동으로 타고 출항한다 (${boat.status}, ${fisher.task})`);
@@ -156,7 +165,7 @@ assert.ok(boats.fishingBoatExpectedCatch('deep', 20) > boats.fishingBoatExpected
   assert.ok(loaded);
   const loadedBoat = loaded.fishingBoats[0];
   const loadedFisher = loaded.residents.find(resident => resident.id === fisher.id);
-  assert.equal(loaded.schemaVersion, 60);
+  assert.equal(loaded.schemaVersion, 61);
   assert.equal(loadedBoat.status, savedStatus);
   assert.equal(loadedBoat.x, savedX);
   assert.equal(loadedBoat.y, savedY);
@@ -168,5 +177,6 @@ assert.ok(boats.fishingBoatExpectedCatch('deep', 20) > boats.fishingBoatExpected
 
 const migrated = saveLoad.migrateV59ToV60({ schemaVersion: 59, fishingBoats: [] });
 assert.equal(migrated.schemaVersion, 60);
+assert.equal(saveLoad.migrateV60ToV61(migrated).schemaVersion, 61);
 
 console.log('fishing boats F3 lake tests passed');

@@ -71,6 +71,8 @@ interface Props {
   onSlaughterLivestock: (buildingId: number, amount: number) => void;
   onStartFishingBoatConstruction: (boatyardId: number) => void;
   onStartFishingBoatRepair: (boatyardId: number, boatId: number) => void;
+  onAssignNearestFishingBoatCrew: (boatId: number) => void;
+  onUnassignFishingBoatCrew: (boatId: number, residentId: number) => void;
   onDefinePasture: (buildingId: number) => void;
   onExpandArea: (buildingId: number) => void;
   onStartBuildingDemolition: (buildingId: number) => void;
@@ -332,6 +334,8 @@ export function SelectionContextBar({
   onSlaughterLivestock,
   onStartFishingBoatConstruction,
   onStartFishingBoatRepair,
+  onAssignNearestFishingBoatCrew,
+  onUnassignFishingBoatCrew,
   onDefinePasture,
   onExpandArea,
   onStartBuildingDemolition,
@@ -370,6 +374,9 @@ export function SelectionContextBar({
     : null;
   const resident = selectedEntity.kind === 'resident'
     ? state.residents.find(candidate => candidate.id === selectedEntity.id) ?? null
+    : null;
+  const fishingBoat = selectedEntity.kind === 'fishingBoat'
+    ? state.fishingBoats.find(candidate => candidate.id === selectedEntity.id) ?? null
     : null;
   const spoilage = spoilagePreview(state);
   const mineSummary = building?.type === 'mine' ? mineMineralSummary(state, building) : null;
@@ -413,6 +420,62 @@ export function SelectionContextBar({
             onSetYouthActivity={activity => onSetYouthActivity(resident.id, activity)}
             onToggleCart={() => onToggleResidentCart(resident.id)}
           />
+        </div>
+      </section>
+    );
+  }
+
+  if (fishingBoat) {
+    const statusName: Record<typeof fishingBoat.status, string> = {
+      building: '건조 중',
+      moored: '계류 중',
+      boarded: '승선 대기',
+      underway: '출항 중',
+      fishing: '조업 중',
+      returning: '귀항 중',
+      repairing: '수리 중',
+      disabled: '운항 불가',
+    };
+    const port = state.buildings.find(building => building.id === fishingBoat.portId);
+    const crew = fishingBoat.fisherIds
+      .map(id => state.residents.find(resident => resident.id === id && resident.alive))
+      .filter((candidate): candidate is Resident => candidate != null);
+    const constructionPercent = Math.round(
+      ((fishingBoat.constructionProgress ?? 0) / Math.max(1, fishingBoat.constructionRequired ?? 1)) * 100,
+    );
+    return (
+      <section className="selection-context-bar" aria-label={`어선 ${fishingBoat.id}호 선택 정보`}>
+        <header className="selection-context-head">
+          <div><strong>어선 {fishingBoat.id}호</strong><span>{statusName[fishingBoat.status]}</span></div>
+          <button type="button" aria-label="선택 해제" title="선택 해제" onClick={onClear}>×</button>
+        </header>
+        <div className="selection-context-body">
+          <div className="selection-context-layout">
+            <div className="selection-context-info">
+              <table className="insp-table">
+                <tbody>
+                  <tr><td>포구</td><td>{port ? `${BUILDING_DEFS[port.type].name} #${port.id}` : '연결 끊김'} · {fishingBoat.mooringSlot === 0 ? '왼쪽' : '오른쪽'} 계류석</td></tr>
+                  <tr><td>상태</td><td>{statusName[fishingBoat.status]}{fishingBoat.status === 'building' ? ` ${constructionPercent}%` : ''}</td></tr>
+                  <tr><td>내구도</td><td>{Math.round(fishingBoat.durability)} / {Math.round(fishingBoat.maxDurability)}</td></tr>
+                  <tr><td>어획물</td><td>생선 {fishingBoat.cargoFish.toFixed(1)} / {fishingBoat.cargoCapacity.toFixed(1)}</td></tr>
+                  <tr><td>어부</td><td>{crew.length} / 2명</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="selection-context-actions">
+              {fishingBoat.status !== 'building' && crew.length < 2 && (
+                <button type="button" onClick={() => onAssignNearestFishingBoatCrew(fishingBoat.id)}>가까운 어부 배정</button>
+              )}
+              {crew.map(fisher => (
+                <div key={fisher.id} className="selection-worker-row">
+                  <button type="button" onClick={() => onSelectResident(fisher.id)}>{fisher.name}</button>
+                  <span>{fisher.fishingBoatId === fishingBoat.id ? '승선 중' : '배정됨'}</span>
+                  <button type="button" disabled={fisher.fishingBoatId === fishingBoat.id}
+                    onClick={() => onUnassignFishingBoatCrew(fishingBoat.id, fisher.id)}>해제</button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
     );

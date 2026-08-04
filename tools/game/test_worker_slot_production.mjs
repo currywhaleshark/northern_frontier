@@ -230,7 +230,8 @@ function prepareState(seed) {
     inventory: {},
   });
   const fisher = workableResident(state, 0, 'fisher', port.x, port.y);
-  assert.equal(workerSlots.assignResidentToBuilding(state, fisher.id, port.id), null);
+  assert.equal(workerSlots.assignResidentToBuilding(state, fisher.id, port.id), 'building has no worker slots',
+    '포구는 어부 작업 슬롯 대신 어선 승무원 슬롯을 쓴다');
   const before = state.fishingGrounds
     .filter(ground => ground.kind === 'lake' && ground.depthBand === 'shore')
     .reduce((sum, ground) => sum + ground.stock, 0);
@@ -240,8 +241,8 @@ function prepareState(seed) {
   const after = state.fishingGrounds
     .filter(ground => ground.kind === 'lake' && ground.depthBand === 'shore')
     .reduce((sum, ground) => sum + ground.stock, 0);
-  assert.ok((fisher.carrying.fish ?? 0) > 0, '포구에 배정된 어부는 배 없이 연안 어장을 이용한다');
-  assert.ok(after < before, '포구 도보 어로는 연안 공유 비축만 줄인다');
+  assert.equal(fisher.carrying.fish ?? 0, 0, '어선에 배정되지 않은 어부는 포구에서 작업하지 않는다');
+  assert.equal(after, before, '승무원이 없으면 포구 연안 비축을 소비하지 않는다');
 }
 
 {

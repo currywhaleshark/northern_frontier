@@ -12,7 +12,9 @@ import { contractReserved, contractReserveNeeds } from '../game/tradeContractRes
 import { nextContractDueDay } from '../game/tradeContracts';
 import { gatheringWorkArea } from '../game/gatheringZones';
 import { fishingGroundAt, fishingGroundSummaryInArea } from '../game/fishingGrounds';
-import { fishingBoatExpectedDurabilityCost, nearestCompatibleFishingPort } from '../game/fishingBoats';
+import {
+  fishingBoatConstructionSlots, fishingBoatExpectedDurabilityCost, nearestCompatibleFishingPort,
+} from '../game/fishingBoats';
 import { forecastSeaCondition, SEA_CONDITION_NAMES, seaConditionAt } from '../game/seaConditions';
 import { DRYING_PRODUCT_DEFS, DRYING_PRODUCT_ORDER, dryingProductOf } from '../game/preservation';
 import { TANNERY_PRODUCT_DEFS, TANNERY_PRODUCT_ORDER, tanneryProductOf } from '../game/wearables';
@@ -511,6 +513,7 @@ export function ActionPopup({
         const seaCondition = kind === 'sea' ? seaConditionAt(state) : null;
         const seaForecast = kind === 'sea' ? forecastSeaCondition(state) : null;
         const statusName = {
+          building: '건조',
           moored: '계류', boarded: '승선', underway: '출항', fishing: '조업', returning: '귀항',
           repairing: '수리', disabled: '사용 불가',
         } as const;
@@ -561,8 +564,9 @@ export function ActionPopup({
       {building.type === 'boatyard' && building.built && (() => {
         const order = building.boatWorkOrder;
         const port = nearestCompatibleFishingPort(state, building);
+        const constructionSlots = fishingBoatConstructionSlots(state, building.id);
         const repairable = state.fishingBoats.filter(boat =>
-          boat.fisherId == null && boat.durability < boat.maxDurability &&
+          !state.residents.some(resident => resident.fishingBoatId === boat.id) && boat.durability < boat.maxDurability &&
           (boat.status === 'moored' || boat.status === 'disabled'));
         return (
           <div className="worker-slot-panel">
@@ -577,7 +581,7 @@ export function ActionPopup({
             <button
               className="action-command"
               type="button"
-              disabled={order != null || port == null}
+              disabled={order != null || constructionSlots.length === 0}
               title={`목재 ${CONFIG.fishingBoats.buildWood} · 도구 ${CONFIG.fishingBoats.buildTools} · 건축가 ${CONFIG.fishingBoats.buildWorkDays}일`}
               onClick={() => onStartFishingBoatConstruction(building.id)}
             >

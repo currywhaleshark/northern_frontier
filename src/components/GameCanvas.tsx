@@ -7,7 +7,7 @@ import {
   BUILDING_DEFS, buildingCostFor, buildingFootprintDims, canAffordCost, canPlaceBuildingAt, isAreaBuildingType, preferredLeveeEdgeAt,
 } from '../game/buildings';
 import { getActiveSprites, onAtlasAssetSettled } from '../render/atlas';
-import { findResidentAt, renderScene, terrainVisualSignature } from '../render/renderer';
+import { findFishingBoatAt, findResidentAt, renderScene, terrainVisualSignature } from '../render/renderer';
 import { createResidentPresentationSnapshotCache } from '../render/residentPresentation';
 import { sceneViewportFromScroll, type SceneViewport } from '../render/sceneViewport';
 import { getPointerAction } from '../game/selectionActions';
@@ -23,6 +23,7 @@ import { mapBackingScaleForZoom, steppedMapZoom } from '../ui/mapZoom';
 import { hasSubsurfaceInsight } from '../game/subsurfaceVeins';
 import { wellWaterStatusAt } from '../game/waterSupply';
 import { GATE_CONVERSION_COSTS, isSolidWallBuilding, wallLineRect, type WallLineAxis } from '../game/walls';
+import { fishingBoatConstructionSlots, type FishingBoatConstructionSlot } from '../game/fishingBoats';
 
 const TILE = CONFIG.ui.tileSize;
 const CLICK_RADIUS = Math.round(TILE * 0.65); // 주민 클릭 판정 반경(픽셀)
@@ -42,6 +43,7 @@ interface Props {
   pastureStableId: number | null;
   expandingBuildingId: number | null;
   relocatingBuildingId: number | null;
+  placingFishingBoatFromBoatyardId: number | null;
   selected: { x: number; y: number } | null;
   selectedEntity: SelectedEntity | null;
   selectedResidentId: number | null;
@@ -54,6 +56,8 @@ interface Props {
   onPlacePasture: (x: number, y: number, w: number, h: number) => void;
   onPlaceRelocation: (x: number, y: number) => void;
   onResidentClick: (id: number) => void;
+  onFishingBoatClick: (id: number) => void;
+  onPlaceFishingBoat: (portId: number, slot: 0 | 1) => void;
   onContextAction: (x: number, y: number) => void;
   onCancelPlace: () => void;
   onZoomChange: (zoom: number) => void;
@@ -62,10 +66,10 @@ interface Props {
 export function GameCanvas({
   state, version, animationActive, zoom, showResidentJobMarkers, showResidentCargoMarkers,
   showAquiferLayer, showOreLayer,
-  placingType, pastureStableId, expandingBuildingId, relocatingBuildingId,
+  placingType, pastureStableId, expandingBuildingId, relocatingBuildingId, placingFishingBoatFromBoatyardId,
   selected, selectedEntity, selectedResidentId, anim,
   onTileClick, onPlacePlot, onPlacePasture, onPlaceRelocation,
-  onResidentClick, onContextAction, onCancelPlace, onZoomChange,
+  onResidentClick, onFishingBoatClick, onPlaceFishingBoat, onContextAction, onCancelPlace, onZoomChange,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawRef = useRef<(animationTimeMs: number) => void>(() => undefined);
@@ -99,6 +103,7 @@ export function GameCanvas({
   const isPlotPlacing = (placingType != null && isAreaBuildingType(placingType)) || isFootprintExpanding;
   const isWallLinePlacing = placingType != null && isSolidWallBuilding(placingType);
   const isPasturePlacing = pastureStableId != null;
+  const isFishingBoatPlacing = placingFishingBoatFromBoatyardId != null;
   const isAreaDragging = isPlotPlacing || isPasturePlacing || isWallLinePlacing;
   type PlotDrag = { ax: number; ay: number; cx: number; cy: number; lastAxis: WallLineAxis };
   const [plotDrag, setPlotDrag] = useState<PlotDrag | null>(null);
@@ -189,10 +194,30 @@ export function GameCanvas({
     ? canPlaceBuildingAt(state, 'well', hoverTile.x, hoverTile.y)
     : false;
   const geomancerPresent = placingType === 'well' && hasSubsurfaceInsight(state);
-  const pointerAction = placingType || isPasturePlacing || isFootprintExpanding || isRelocating
+  const pointerAction = placingType || isPasturePlacing || isFootprintExpanding || isRelocating || isFishingBoatPlacing
     ? null
     : getPointerAction(state, selectedEntity, hoveredTile);
   const selectedBuildingId = selectedEntity?.kind === 'building' ? selectedEntity.id : null;
+  const selectedFishingBoatId = selectedEntity?.kind === 'fishingBoat' ? selectedEntity.id : null;
+  const fishingBoatSlots = useMemo(
+    () => placingFishingBoatFromBoatyardId == null
+      ? []
+      : fishingBoatConstructionSlots(state, placingFishingBoatFromBoatyardId),
+    [state, version, placingFishingBoatFromBoatyardId],
+  );
+  const fishingBoatSlotAt = (point: { mx: number; my: number }): FishingBoatConstructionSlot | null => {
+    let best: FishingBoatConstructionSlot | null = null;
+    let bestDistance = TILE * 0.9;
+    for (const slot of fishingBoatSlots) {
+      const distance = Math.hypot((slot.renderX + 0.5) * TILE - point.mx, (slot.renderY + 0.62) * TILE - point.my);
+      if (distance <= bestDistance) {
+        best = slot;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  };
+  const fishingBoatPlacementHover = mouse && isFishingBoatPlacing ? fishingBoatSlotAt(mouse) : null;
   const terrainSignature = useMemo(() => terrainVisualSignature(state), [state, version]);
   const residentPresentation = residentPresentationCacheRef.current.get(state, version);
 
@@ -200,6 +225,10 @@ export function GameCanvas({
     const x = Math.floor(point.mx / TILE), y = Math.floor(point.my / TILE);
     const tile = state.map[y]?.[x];
     if (!tile) return 'outside';
+    if (isFishingBoatPlacing) {
+      const slot = fishingBoatSlotAt(point);
+      return slot ? `boat-slot:${slot.portId}:${slot.slot}` : `boat-slot:none:${x},${y}`;
+    }
     if (placingType === 'levee') {
       const edge = preferredLeveeEdgeAt(
         state,
@@ -215,6 +244,8 @@ export function GameCanvas({
     const frameAlpha = Math.max(0, Math.min(1, (performance.now() - anim.current.at) / anim.current.ms));
     const resident = findResidentAt(state, point.mx, point.my, frameAlpha, CLICK_RADIUS, residentPresentation);
     if (resident) return `resident:${resident.id}`;
+    const boat = findFishingBoatAt(state, point.mx, point.my, frameAlpha, CLICK_RADIUS);
+    if (boat) return `fishing-boat:${boat.id}`;
     const raid = state.raiders;
     if (raid?.spotted) {
       const rx = (raid.px + (raid.x - raid.px) * frameAlpha) * TILE + TILE / 2;
@@ -309,6 +340,9 @@ export function GameCanvas({
         ? { stableId: pastureStableId, rect: placingRect }
         : null,
       selectedBuildingId, viewport: viewportRef.current ?? undefined, terrainVisualSignature: terrainSignature,
+      selectedFishingBoatId,
+      placingFishingBoatFromBoatyardId,
+      fishingBoatPlacementHover,
       habitatIcon: habitatIconRef.current ?? undefined,
       sprites: getActiveSprites(), residentPresentation,
       renderScale,
@@ -410,27 +444,30 @@ export function GameCanvas({
   };
 
   // 툴팁 대상: 주민 우선, 그다음 (발견된) 습격 무리
-  const hoveredResident = mouse && !placingType && !isPasturePlacing
+  const hoveredResident = mouse && !placingType && !isPasturePlacing && !isFishingBoatPlacing
     ? findResidentAt(state, mouse.mx, mouse.my, alpha, CLICK_RADIUS, residentPresentation)
     : null;
+  const hoveredFishingBoat = mouse && !hoveredResident && !placingType && !isPasturePlacing && !isFishingBoatPlacing
+    ? findFishingBoatAt(state, mouse.mx, mouse.my, alpha, CLICK_RADIUS)
+    : null;
   let raiderHovered = false;
-  if (!hoveredResident && mouse && state.raiders && state.raiders.spotted) {
+  if (!hoveredResident && !hoveredFishingBoat && mouse && state.raiders && state.raiders.spotted) {
     const b = state.raiders;
     const bx = (b.px + (b.x - b.px) * alpha) * TILE + TILE / 2;
     const by = (b.py + (b.y - b.py) * alpha) * TILE + TILE / 2;
     raiderHovered = Math.hypot(bx - mouse.mx, by - mouse.my) <= 14;
   }
-  const hoveredSite = !hoveredResident && !raiderHovered && hoverTile
+  const hoveredSite = !hoveredResident && !hoveredFishingBoat && !raiderHovered && hoverTile
     ? foreignSiteAt(state, hoverTile.x, hoverTile.y)
     : null;
-  const actionTooltip = mouse && !hoveredResident && !raiderHovered && !hoveredSite && pointerAction && pointerAction.kind !== 'none'
+  const actionTooltip = mouse && !hoveredResident && !hoveredFishingBoat && !raiderHovered && !hoveredSite && pointerAction && pointerAction.kind !== 'none'
     ? pointerAction
     : null;
-  const canvasCursor = placingType || isPasturePlacing || isFootprintExpanding || isRelocating
+  const canvasCursor = placingType || isPasturePlacing || isFootprintExpanding || isRelocating || isFishingBoatPlacing
     ? 'crosshair'
     : panning
       ? 'grabbing'
-      : hoveredResident || hoveredSite
+      : hoveredResident || hoveredFishingBoat || hoveredSite
         ? 'pointer'
         : pointerAction && pointerAction.kind !== 'none'
           ? pointerAction.cursor
@@ -540,6 +577,11 @@ export function GameCanvas({
           const m = toMouse(e);
           const tx = Math.floor(m.mx / TILE), ty = Math.floor(m.my / TILE);
           if (tx < 0 || ty < 0 || tx >= w || ty >= h) return;
+          if (isFishingBoatPlacing) {
+            const slot = fishingBoatSlotAt(m);
+            if (slot) onPlaceFishingBoat(slot.portId, slot.slot);
+            return;
+          }
           if (!placingType) {
             if (isRelocating) {
               onPlaceRelocation(tx, ty);
@@ -551,12 +593,17 @@ export function GameCanvas({
               onResidentClick(resident.id);
               return;
             }
+            const boat = findFishingBoatAt(state, m.mx, m.my, alpha, CLICK_RADIUS);
+            if (boat) {
+              onFishingBoatClick(boat.id);
+              return;
+            }
           }
           onTileClick(tx, ty, m.mx / TILE - tx, m.my / TILE - ty);
         }}
         onContextMenu={e => {
           e.preventDefault();
-          if (placingType || isPasturePlacing || isFootprintExpanding || isRelocating) {
+          if (placingType || isPasturePlacing || isFootprintExpanding || isRelocating || isFishingBoatPlacing) {
             setPlotDrag(null);
             onCancelPlace();
             return;
@@ -707,7 +754,7 @@ export function GameCanvas({
           })()}
         </div>
       )}
-      {mouse && (hoveredResident || raiderHovered || hoveredSite || actionTooltip) && (
+      {mouse && (hoveredResident || hoveredFishingBoat || raiderHovered || hoveredSite || actionTooltip) && (
         <div ref={tooltipRef} className="map-tooltip" style={{ left: 0, top: 0 }}>
           {hoveredResident ? (
             <>
@@ -717,6 +764,11 @@ export function GameCanvas({
                   : JOB_NAMES[hoveredResident.job]
               }
               <div className="muted">{hoveredResident.task}{hoveredResident.sick ? ' · 앓는 중' : ''}</div>
+            </>
+          ) : hoveredFishingBoat ? (
+            <>
+              <b>어선 {hoveredFishingBoat.id}호</b>
+              <div className="muted">어부 {hoveredFishingBoat.fisherIds.length}/2명 · 내구도 {Math.round(hoveredFishingBoat.durability)}/{Math.round(hoveredFishingBoat.maxDurability)} · 클릭해 살펴보기</div>
             </>
           ) : raiderHovered ? (
             <>

@@ -219,7 +219,7 @@ export function selectedEntityAfterTileClick(
     return null;
   }
 
-  if ((current?.kind === 'resident' || current?.kind === 'building')
+  if ((current?.kind === 'resident' || current?.kind === 'building' || current?.kind === 'fishingBoat')
     && next.kind === 'tile'
     && (!explored || !foreignSiteAt(state, tile.x, tile.y))) {
     return null;

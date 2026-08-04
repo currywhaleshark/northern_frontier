@@ -26,7 +26,6 @@ const boats = await load('fishingBoats');
 const buildings = await load('buildings');
 const seaConditions = await load('seaConditions');
 const simulation = await load('simulation');
-const workerSlots = await load('workerSlots');
 const { CONFIG } = await load('config');
 
 function seedForCondition(condition, day = 15, weather = 'rain') {
@@ -58,7 +57,7 @@ function makeSeaState(condition = 'calm', day = 15, weather = 'rain') {
   const port = {
     id: 200, type: 'fishingPort', x: 3, y: 2,
     progress: buildings.BUILDING_DEFS.fishingPort.buildDays, built: true, fieldGrowth: 0,
-    gatheringWorkArea: { x: 8, y: 7, radius: 9 }, inventory: {},
+    gatheringWorkArea: { x: 8, y: 7, radius: 9 }, inventory: {}, portPier: { direction: 's', length: 3 },
   };
   state.buildings.push(port);
   buildings.occupyBuildingTiles(state, port);
@@ -74,12 +73,12 @@ function makeSeaState(condition = 'calm', day = 15, weather = 'rain') {
   const fisher = state.residents[0];
   Object.assign(fisher, {
     alive: true, sick: false, health: 100, hunger: 100, warmth: 100, morale: 70,
-    job: 'fisher', assignedBuildingId: port.id, x: port.x, y: port.y, px: port.x, py: port.y,
+    job: 'fisher', assignedBuildingId: null, x: port.x, y: port.y, px: port.x, py: port.y,
     phase: 'rest', path: [], workTimer: 0, targetId: null, carrying: {}, manualOrder: null,
     fishingBoatId: null, skills: {},
   });
   const boat = {
-    id: 1, portId: port.id, boatyardId: null, fisherId: null, x: 3, y: 3,
+    id: 1, portId: port.id, mooringSlot: 0, boatyardId: null, fisherIds: [fisher.id], x: 3, y: 3,
     cargoFish: 0, cargoCapacity: CONFIG.fishingBoats.cargoCapacity,
     durability: CONFIG.fishingBoats.durability, maxDurability: CONFIG.fishingBoats.durability,
     status: 'moored', route: [], routeIndex: 0,
@@ -111,7 +110,6 @@ assert.equal(forecast.condition, seaConditions.seaConditionForDay(calmSeed, 16, 
   const storm = makeSeaState('storm');
   assert.equal(boats.seaFishingTripPlan(storm.state, storm.boat, 36), null,
     '풍랑일에는 신규 출항을 취소한다');
-  assert.equal(workerSlots.assignResidentToBuilding(storm.state, storm.fisher.id, storm.port.id), null);
   const shoreBefore = storm.state.fishingGrounds[0].stock;
   for (let tick = 0; tick < 12; tick++) simulation.advanceTick(storm.state);
   assert.equal(storm.boat.status, 'moored', '풍랑 중에도 계류 어선은 출항하지 않는다');
@@ -150,7 +148,7 @@ assert.ok(roughLoss > calmLoss, '거친 물결은 실제 왕복·조업 내구 �
     const { state, fisher, boat } = makeSeaState('calm');
     state.seed = seed;
     state.weather = 'rain';
-    boat.fisherId = fisher.id;
+    boat.fisherIds = [fisher.id];
     boat.status = 'fishing';
     boat.x = 10;
     boat.y = 8;

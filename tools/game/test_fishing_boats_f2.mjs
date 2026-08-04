@@ -109,6 +109,7 @@ assert.deepEqual(loadedCompositePort?.portPier, { direction: 's', length: 3 },
   '저장/불러오기 뒤에도 복합 포구 잔교가 보존된다');
 
 const port = built(100, 'fishingPort', 3, 3);
+port.portPier = { direction: 's', length: 3 };
 const yard = built(101, 'boatyard', 8, 2);
 state.buildings.push(port, yard);
 
@@ -123,10 +124,15 @@ for (let y = 4; y <= 6; y++) state.map[y][7].terrain = 'lake';
 
 const beforeWood = state.resources.wood;
 const beforeTools = state.resources.tools;
-assert.equal(boats.startFishingBoatConstruction(state, yard.id), null);
+const constructionSlots = boats.fishingBoatConstructionSlots(state, yard.id);
+assert.deepEqual(constructionSlots.map(slot => slot.slot), [0, 1], '포구 계류대 양옆에 두 척 자리를 제공한다');
+assert.equal(boats.startFishingBoatConstruction(state, yard.id, port.id, 0), null);
 assert.equal(state.resources.wood, beforeWood - CONFIG.fishingBoats.buildWood);
 assert.equal(state.resources.tools, beforeTools - CONFIG.fishingBoats.buildTools);
 assert.equal(yard.boatWorkOrder.kind, 'build');
+assert.equal(state.fishingBoats.length, 1, '건조 등록 즉시 클릭 가능한 선박 개체를 만든다');
+assert.equal(state.fishingBoats[0].status, 'building');
+assert.equal(state.fishingBoats[0].mooringSlot, 0);
 assert.equal(state.priorityBuildingId, yard.id, '어선 공정은 건축가 최우선 작업으로 잡힌다');
 assert.equal(simulation.buildingHasActiveWork(yard), true);
 assert.equal(boats.advanceFishingBoatWork(state, yard, CONFIG.fishingBoats.buildWorkDays), 'built');
@@ -140,17 +146,28 @@ assert.equal(state.priorityBuildingId, null);
 
 const fisher = state.residents[0];
 Object.assign(fisher, {
-  alive: true, job: 'fisher', assignedBuildingId: port.id,
+  alive: true, job: 'fisher', assignedBuildingId: null,
   x: port.x, y: port.y, px: port.x, py: port.y, path: [], fishingBoatId: null,
 });
 const boat = state.fishingBoats[0];
+assert.equal(boats.assignFisherToFishingBoat(state, boat.id, fisher.id), null);
 assert.equal(boats.boardFishingBoat(state, boat.id, fisher.id), null);
-assert.equal(boat.fisherId, fisher.id);
+assert.deepEqual(boat.fisherIds, [fisher.id]);
 assert.equal(fisher.fishingBoatId, boat.id);
-assert.match(boats.boardFishingBoat(state, boat.id, fisher.id), /계류/);
+assert.match(boats.boardFishingBoat(state, boat.id, fisher.id), /승선/);
 assert.equal(boats.disembarkFishingBoat(state, boat.id), null);
 assert.equal(fisher.fishingBoatId, null);
 assert.equal(boat.status, 'moored');
+
+const fisher2 = state.residents[1];
+const fisher3 = state.residents[2];
+for (const extra of [fisher2, fisher3]) Object.assign(extra, {
+  alive: true, job: 'fisher', assignedBuildingId: null, fishingBoatId: null,
+});
+assert.equal(boats.assignFisherToFishingBoat(state, boat.id, fisher2.id), null);
+assert.match(boats.assignFisherToFishingBoat(state, boat.id, fisher3.id), /최대 2명/,
+  '어선 한 척의 어부 배정은 두 명을 넘지 않는다');
+assert.equal(boats.unassignFisherFromFishingBoat(state, boat.id, fisher2.id), null);
 
 boat.durability = 37;
 const repairWood = state.resources.wood;
@@ -161,25 +178,31 @@ assert.equal(boats.advanceFishingBoatWork(state, yard, CONFIG.fishingBoats.repai
 assert.equal(boat.durability, boat.maxDurability);
 assert.equal(boat.status, 'moored');
 
-const migrated = saveLoad.migrateV58ToV59({ schemaVersion: 58 });
-assert.equal(migrated.schemaVersion, 59);
-assert.deepEqual(migrated.fishingBoats, []);
-assert.equal(migrated.nextFishingBoatId, 1);
+const migrated = saveLoad.migrateV60ToV61({ schemaVersion: 60 });
+assert.equal(migrated.schemaVersion, 61);
+
+boat.fisherIds = [];
+boat.fisherId = fisher.id;
+fisher.assignedBuildingId = port.id;
+boats.normalizeFishingBoats(state);
+assert.deepEqual(boat.fisherIds, [fisher.id], 'v60 단일 어부 배정을 새 승무원 배열로 옮긴다');
+assert.equal(fisher.assignedBuildingId, null, '어선 선원은 기존 포구 작업장 배정을 해제한다');
 
 boat.fisherId = 999999;
+boat.fisherIds = [];
 boat.status = 'boarded';
 boats.normalizeFishingBoats(state);
 boat.facing = 'invalid';
 boats.normalizeFishingBoats(state);
 assert.equal(boat.facing, 'ne', '구 저장이나 손상된 방향 값은 NE로 정규화한다');
-assert.equal(boat.fisherId, null, '로드 정규화는 사라진 어부와 선체 관계를 끊는다');
+assert.deepEqual(boat.fisherIds, [], '로드 정규화는 사라진 어부와 선체 관계를 끊는다');
 assert.equal(boat.status, 'moored');
 assert.ok(state.nextFishingBoatId > boat.id);
 
 assert.equal(saveLoad.saveGame(state, 7), true);
 const loaded = saveLoad.loadGame(7);
 assert.ok(loaded);
-assert.equal(loaded.schemaVersion, 60);
+assert.equal(loaded.schemaVersion, 61);
 assert.equal(loaded.fishingBoats.length, 1);
 assert.equal(loaded.fishingBoats[0].id, boat.id);
 assert.equal(loaded.fishingBoats[0].portId, port.id);

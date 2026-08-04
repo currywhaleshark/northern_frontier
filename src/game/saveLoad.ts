@@ -884,6 +884,11 @@ export function migrateV59ToV60(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 60 };
 }
 
+// v61: 포구별 좌우 계류 슬롯과 어선별 최대 2인 승무원 배정, 건조 중 선체 엔티티.
+export function migrateV60ToV61(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 61 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -949,6 +954,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 57) migrated = migrateV57ToV58(migrated);
     else if (version === 58) migrated = migrateV58ToV59(migrated);
     else if (version === 59) migrated = migrateV59ToV60(migrated);
+    else if (version === 60) migrated = migrateV60ToV61(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }

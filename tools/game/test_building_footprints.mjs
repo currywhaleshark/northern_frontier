@@ -46,6 +46,7 @@ const SINGLE_TILE = [
   'field',
   'paddy',
   'ferry',
+  'fishingPort',
   'tidalFishery',
   'dryingRack',
   'onggiKiln',

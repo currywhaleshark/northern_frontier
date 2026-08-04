@@ -64,7 +64,7 @@ import {
 } from './fishingGrounds';
 import {
   advanceFishingBoatTrip, advanceFishingBoatWork, boardFishingBoat, disembarkFishingBoat,
-  fishingBoatTripPlan, startFishingBoatTrip,
+  fishingBoatCrew, fishingBoatTripPlan, startFishingBoatTrip,
 } from './fishingBoats';
 import { waterDependentProductionMultiplier } from './waterSupply';
 import { activeFireDisaster, applyFireWater, drawFireWater, nearestFireWaterSource } from './fire';
@@ -1011,7 +1011,7 @@ export function ensureResidentsOnPassableTiles(state: GameState): void {
   for (const resident of state.residents) {
     const boat = resident.fishingBoatId == null
       ? undefined
-      : state.fishingBoats.find(candidate => candidate.id === resident.fishingBoatId && candidate.fisherId === resident.id);
+      : state.fishingBoats.find(candidate => candidate.id === resident.fishingBoatId && candidate.fisherIds.includes(resident.id));
     if (resident.alive && !boat) ensureResidentOnPassableTile(state, resident);
   }
 }
@@ -2709,7 +2709,12 @@ function saltMakerTick(state: GameState, r: Resident, ctx: Ctx): void {
 
 function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
   const a = CONFIG.agents;
-  const workplace = assignedWorkplaceOfTypes(state, r, ctx, ['ferry', 'tidalFishery', 'fishingPort'], '어로 거점 배정 없음');
+  const assignedBoat = state.fishingBoats.find(boat => boat.fisherIds.includes(r.id));
+  const assignedPort = assignedBoat == null ? undefined : state.buildings.find(building =>
+    building.id === assignedBoat.portId && building.type === 'fishingPort' && building.built);
+  const workplace = assignedPort ?? assignedWorkplaceOfTypes(
+    state, r, ctx, ['ferry', 'tidalFishery'], '어로 거점이나 어선 배정 없음',
+  );
   if (!workplace) return;
   if (workplace.type === 'tidalFishery') {
     if (!state.fishingGrounds.some(ground => ground.kind === 'mudflat')) ensureFishingGrounds(state);
@@ -2753,7 +2758,7 @@ function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
     if ((portKind === 'lake' || portKind === 'sea') && carryTotal(r) <= WORK_STOCK_EPSILON) {
       const remainingWorkSubticks = DAY_BANDS.work.end - state.subTick + 1;
       const candidate = state.fishingBoats
-        .filter(boat => boat.portId === workplace.id && boat.status === 'moored' && boat.fisherId == null)
+        .filter(boat => boat.id === assignedBoat?.id && (boat.status === 'moored' || boat.status === 'boarded'))
         .map(boat => ({ boat, plan: fishingBoatTripPlan(state, boat, remainingWorkSubticks) }))
         .filter((entry): entry is { boat: GameState['fishingBoats'][number]; plan: NonNullable<typeof entry.plan> } =>
           entry.plan != null)
@@ -2764,12 +2769,10 @@ function fisherTick(state: GameState, r: Resident, ctx: Ctx): void {
         const st = goTo(state, r, ctx, buildingInteractionGoal(state, [workplace.id]));
         if (st === 'arrived') {
           const boardError = boardFishingBoat(state, candidate.boat.id, r.id);
-          const tripError = boardError == null
-            ? startFishingBoatTrip(state, candidate.boat.id, remainingWorkSubticks)
+          r.phase = boardError == null ? 'toWork' : 'rest';
+          r.task = boardError == null
+            ? (candidate.boat.fisherIds.length > 1 ? '동승 어부를 기다리는 중' : `${portKind === 'sea' ? '바다' : '호수'} 중·심수 어장으로 출항`)
             : boardError;
-          if (tripError != null && boardError == null) disembarkFishingBoat(state, candidate.boat.id);
-          r.phase = tripError == null ? 'toWork' : 'rest';
-          r.task = tripError == null ? `${portKind === 'sea' ? '바다' : '호수'} 중·심수 어장으로 출항` : tripError;
         } else {
           r.phase = st === 'stuck' ? 'rest' : 'toWork';
           r.task = st === 'stuck' ? '포구 길이 막힘' : '어선에 타러 포구로 이동';
@@ -3967,14 +3970,30 @@ export function agentsTick(state: GameState): void {
   for (const r of living) {
     const activeBoat = r.fishingBoatId == null
       ? undefined
-      : state.fishingBoats.find(boat => boat.id === r.fishingBoatId && boat.fisherId === r.id);
+      : state.fishingBoats.find(boat => boat.id === r.fishingBoatId && boat.fisherIds.includes(r.id));
     if (activeBoat) {
       r.px = r.x;
       r.py = r.y;
+      const boardedCrew = fishingBoatCrew(state, activeBoat)
+        .filter(resident => resident.fishingBoatId === activeBoat.id)
+        .sort((left, right) => left.id - right.id);
+      if (boardedCrew[0]?.id !== r.id) {
+        r.x = activeBoat.x;
+        r.y = activeBoat.y;
+        r.path = [];
+        r.phase = activeBoat.status === 'fishing' ? 'working' : 'toWork';
+        r.task = activeBoat.status === 'boarded' ? '동승 어부를 기다리는 중' : '어선 조업 중';
+        continue;
+      }
       if (activeBoat.status === 'boarded') {
         const remainingWorkSubticks = DAY_BANDS.work.end - state.subTick + 1;
-        if (dayBand === 'work' && startFishingBoatTrip(state, activeBoat.id, remainingWorkSubticks) == null) {
+        const tripError = dayBand === 'work'
+          ? startFishingBoatTrip(state, activeBoat.id, remainingWorkSubticks)
+          : '오늘 조업 시간이 끝났습니다.';
+        if (tripError == null) {
           r.task = `${state.map[activeBoat.y]?.[activeBoat.x]?.terrain === 'sea' ? '바다' : '호수'} 중·심수 어장으로 출항`;
+        } else if (tripError.includes('모두 승선')) {
+          r.task = tripError;
         } else {
           disembarkFishingBoat(state, activeBoat.id);
         }

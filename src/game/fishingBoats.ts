@@ -106,6 +106,21 @@ export function fishingPortMooringTile(
   return waterKind(map[terminal.y]?.[terminal.x]) ? terminal : null;
 }
 
+export type FishingBoatMooringSlot = 0 | 1;
+
+export function fishingPortMooringSlotPosition(
+  port: Pick<Building, 'x' | 'y' | 'portPier'>,
+  slot: FishingBoatMooringSlot,
+): { x: number; y: number; renderX: number; renderY: number } | null {
+  if (!port.portPier) return null;
+  const step = portPierStep(port.portPier.direction);
+  const x = port.x + step.x * port.portPier.length;
+  const y = port.y + step.y * port.portPier.length;
+  const side = { x: step.y, y: -step.x };
+  const sign = slot === 0 ? 1 : -1;
+  return { x, y, renderX: x + side.x * 1.25 * sign, renderY: y + side.y * 1.25 * sign };
+}
+
 export function fishingBoatFacingForStep(dx: number, dy: number): FishingBoatFacing | null {
   if (Math.abs(dx) >= Math.abs(dy) && dx > 0) return 'ne';
   if (Math.abs(dx) >= Math.abs(dy) && dx < 0) return 'sw';
@@ -204,6 +219,105 @@ function compatiblePortRoute(
   return best;
 }
 
+export interface FishingBoatConstructionSlot {
+  portId: number;
+  slot: FishingBoatMooringSlot;
+  x: number;
+  y: number;
+  renderX: number;
+  renderY: number;
+  facing: FishingBoatFacing;
+}
+
+export function fishingBoatConstructionSlots(state: GameState, boatyardId: number): FishingBoatConstructionSlot[] {
+  const boatyard = state.buildings.find(building =>
+    building.id === boatyardId && building.type === 'boatyard' && building.built);
+  if (!boatyard || boatyard.boatWorkOrder) return [];
+  const occupied = new Set(state.fishingBoats.map(boat => `${boat.portId}:${boat.mooringSlot}`));
+  return state.buildings
+    .filter(port => port.type === 'fishingPort' && port.built && compatiblePortRoute(state, boatyard, port).length > 0)
+    .flatMap(port => ([0, 1] as const).flatMap(slot => {
+      if (occupied.has(`${port.id}:${slot}`)) return [];
+      const position = fishingPortMooringSlotPosition(port, slot);
+      if (!position) return [];
+      return [{
+        portId: port.id,
+        slot,
+        ...position,
+        facing: fishingBoatFacingForStep(position.x - port.x, position.y - port.y) ?? 'ne',
+      }];
+    }));
+}
+
+export function fishingBoatCrew(state: Pick<GameState, 'residents'>, boat: FishingBoatState): Resident[] {
+  const ids = new Set(boat.fisherIds ?? []);
+  return state.residents.filter(resident => resident.alive && ids.has(resident.id));
+}
+
+export const FISHING_BOAT_CREW_CAPACITY = 2;
+
+export function assignFisherToFishingBoat(
+  state: GameState,
+  boatId: number,
+  residentId: number,
+): string | null {
+  const boat = state.fishingBoats.find(candidate => candidate.id === boatId);
+  const resident = state.residents.find(candidate => candidate.id === residentId && candidate.alive);
+  if (!boat || !resident) return '어선이나 어부를 찾을 수 없습니다.';
+  if (boat.status === 'building' || boat.status === 'repairing' || boat.status === 'underway' ||
+      boat.status === 'fishing' || boat.status === 'returning') {
+    return '계류 중인 완공 어선에만 어부를 배정할 수 있습니다.';
+  }
+  if (resident.job !== 'fisher') return '직업이 어부인 주민만 배정할 수 있습니다.';
+  if (boat.fisherIds.includes(resident.id)) return null;
+  if (boat.fisherIds.length >= FISHING_BOAT_CREW_CAPACITY) return '어선 한 척에는 어부를 최대 2명까지 배정할 수 있습니다.';
+  if (state.fishingBoats.some(candidate => candidate.id !== boat.id && candidate.fisherIds?.includes(resident.id))) {
+    return '이미 다른 어선에 배정된 어부입니다.';
+  }
+  if (resident.fishingBoatId != null) return '현재 승선 중인 어부는 다른 어선에 배정할 수 없습니다.';
+  resident.assignedBuildingId = null;
+  boat.fisherIds.push(resident.id);
+  boat.fisherIds.sort((left, right) => left - right);
+  return null;
+}
+
+export function unassignFisherFromFishingBoat(
+  state: GameState,
+  boatId: number,
+  residentId: number,
+): string | null {
+  const boat = state.fishingBoats.find(candidate => candidate.id === boatId);
+  if (!boat) return '어선을 찾을 수 없습니다.';
+  if (!boat.fisherIds.includes(residentId)) return null;
+  if (state.residents.some(resident => resident.id === residentId && resident.fishingBoatId === boat.id)) {
+    return '하선한 뒤에 배정을 해제할 수 있습니다.';
+  }
+  boat.fisherIds = boat.fisherIds.filter(id => id !== residentId);
+  return null;
+}
+
+export function assignNearestFisherToFishingBoat(state: GameState, boatId: number): string | null {
+  const boat = state.fishingBoats.find(candidate => candidate.id === boatId);
+  if (!boat) return '어선을 찾을 수 없습니다.';
+  if (boat.fisherIds.length >= FISHING_BOAT_CREW_CAPACITY) return '어선의 어부 자리가 모두 찼습니다.';
+  const assigned = new Set(state.fishingBoats.flatMap(candidate => candidate.fisherIds ?? []));
+  const port = state.buildings.find(building => building.id === boat.portId);
+  const fisher = state.residents
+    .filter(resident => resident.alive && resident.job === 'fisher' && resident.fishingBoatId == null &&
+      (resident.assignedBuildingId == null || resident.assignedBuildingId === boat.portId) && !assigned.has(resident.id))
+    .sort((left, right) => {
+      const leftDistance = Math.abs(left.x - (port?.x ?? boat.x)) + Math.abs(left.y - (port?.y ?? boat.y));
+      const rightDistance = Math.abs(right.x - (port?.x ?? boat.x)) + Math.abs(right.y - (port?.y ?? boat.y));
+      return leftDistance - rightDistance || left.id - right.id;
+    })[0];
+  if (!fisher) return '배정할 수 있는 어부가 없습니다.';
+  return assignFisherToFishingBoat(state, boat.id, fisher.id);
+}
+
+function boardedFishingBoatCrew(state: Pick<GameState, 'residents'>, boat: FishingBoatState): Resident[] {
+  return fishingBoatCrew(state, boat).filter(resident => resident.fishingBoatId === boat.id);
+}
+
 function portWorkArea(port: Pick<Building, 'x' | 'y' | 'gatheringWorkArea'>): { x: number; y: number; radius: number } {
   const configured = port.gatheringWorkArea;
   return {
@@ -243,22 +357,21 @@ function clearFishingTrip(boat: FishingBoatState): void {
   boat.fishingProgress = 0;
 }
 
-function syncFisherToBoat(state: GameState, boat: FishingBoatState): void {
-  if (boat.fisherId == null) return;
-  const fisher = state.residents.find(resident => resident.id === boat.fisherId && resident.alive);
-  if (!fisher) return;
-  fisher.px = fisher.x;
-  fisher.py = fisher.y;
-  fisher.x = boat.x;
-  fisher.y = boat.y;
-  fisher.path = [];
+function syncFishersToBoat(state: GameState, boat: FishingBoatState): void {
   const waterName = state.map[boat.y]?.[boat.x]?.terrain === 'sea' ? '바다' : '호수';
-  fisher.phase = boat.status === 'fishing' ? 'working' : 'toWork';
-  fisher.task = boat.status === 'fishing'
-    ? `${waterName} 어장에서 조업 중`
-    : boat.status === 'returning'
-      ? '포구로 귀항 중'
-      : `${waterName} 어장으로 항해 중`;
+  for (const fisher of boardedFishingBoatCrew(state, boat)) {
+    fisher.px = fisher.x;
+    fisher.py = fisher.y;
+    fisher.x = boat.x;
+    fisher.y = boat.y;
+    fisher.path = [];
+    fisher.phase = boat.status === 'fishing' ? 'working' : 'toWork';
+    fisher.task = boat.status === 'fishing'
+      ? `${waterName} 어장에서 조업 중`
+      : boat.status === 'returning'
+        ? '포구로 귀항 중'
+        : `${waterName} 어장으로 항해 중`;
+  }
 }
 
 function settleFishingBoat(boat: FishingBoatState): void {
@@ -410,7 +523,8 @@ export function startFishingBoatTrip(
   remainingWorkSubticks: number,
 ): string | null {
   const boat = state.fishingBoats.find(candidate => candidate.id === boatId);
-  if (!boat || boat.status !== 'boarded' || boat.fisherId == null) return '어부가 승선한 계류 어선이 필요합니다.';
+  if (!boat || boat.status !== 'boarded' || boardedFishingBoatCrew(state, boat).length === 0) return '어부가 승선한 계류 어선이 필요합니다.';
+  if (boardedFishingBoatCrew(state, boat).length < boat.fisherIds.length) return '배정된 어부가 모두 승선할 때까지 기다립니다.';
   const kind = waterKind(state.map[boat.y]?.[boat.x]);
   const plan = fishingBoatTripPlan(state, boat, remainingWorkSubticks);
   if (!plan) {
@@ -429,7 +543,7 @@ export function startFishingBoatTrip(
   boat.durability = Math.max(0,
     boat.durability - CONFIG.fishingBoats.departureDurabilityCost *
       seaDurabilityMultiplier(state, kind ?? 'lake'));
-  syncFisherToBoat(state, boat);
+  syncFishersToBoat(state, boat);
   return null;
 }
 
@@ -451,7 +565,7 @@ function unloadFishingBoat(state: GameState, boat: FishingBoatState): void {
   if (port && boat.cargoFish > 0) addBuildingStock(port, 'fish', boat.cargoFish);
   boat.cargoFish = 0;
   clearFishingTrip(boat);
-  if (boat.fisherId != null) disembarkFishingBoat(state, boat.id);
+  if (boardedFishingBoatCrew(state, boat).length > 0) disembarkFishingBoat(state, boat.id);
   else boat.status = boat.durability > 0 ? 'moored' : 'disabled';
 }
 
@@ -462,7 +576,8 @@ function applySeaStormHazard(state: GameState, boat: FishingBoatState): void {
   const hullDamage = CONFIG.fishingBoats.stormHullDamageMin +
     rng() * (CONFIG.fishingBoats.stormHullDamageMax - CONFIG.fishingBoats.stormHullDamageMin);
   boat.durability = Math.max(0, boat.durability - hullDamage);
-  const fisher = boat.fisherId == null ? undefined : state.residents.find(resident => resident.id === boat.fisherId);
+  const crew = boardedFishingBoatCrew(state, boat);
+  const fisher = crew.length > 0 ? crew[Math.floor(rng() * crew.length)] : undefined;
   let injuryText = '';
   if (fisher && rng() < CONFIG.fishingBoats.stormInjuryChance) {
     const injury = CONFIG.fishingBoats.stormInjuryMin +
@@ -475,7 +590,7 @@ function applySeaStormHazard(state: GameState, boat: FishingBoatState): void {
 
 export function advanceFishingBoatTrip(state: GameState, boatId: number, forceReturn = false): void {
   const boat = state.fishingBoats.find(candidate => candidate.id === boatId);
-  if (!boat || boat.fisherId == null ||
+  if (!boat || boardedFishingBoatCrew(state, boat).length === 0 ||
       (boat.status !== 'underway' && boat.status !== 'fishing' && boat.status !== 'returning')) return;
   settleFishingBoat(boat);
   const kind = waterKind(state.map[boat.y]?.[boat.x]);
@@ -511,13 +626,13 @@ export function advanceFishingBoatTrip(state: GameState, boatId: number, forceRe
       boat.route = [];
       boat.routeIndex = 0;
     }
-    syncFisherToBoat(state, boat);
+    syncFishersToBoat(state, boat);
     return;
   }
   const ground = state.fishingGrounds.find(candidate => candidate.id === boat.targetGroundId);
   if (!ground || ground.stock <= 0 || forceReturn) {
     beginReturn(state, boat);
-    syncFisherToBoat(state, boat);
+    syncFishersToBoat(state, boat);
     return;
   }
   boat.fishingProgress = Math.min(
@@ -539,7 +654,7 @@ export function advanceFishingBoatTrip(state: GameState, boatId: number, forceRe
       boat.cargoFish >= boat.cargoCapacity || boat.cargoFish >= targetCatch || ground.stock <= 0) {
     beginReturn(state, boat);
   }
-  syncFisherToBoat(state, boat);
+  syncFishersToBoat(state, boat);
 }
 
 export const advanceLakeFishingTrip = advanceFishingBoatTrip;
@@ -563,19 +678,50 @@ function spendBoatResources(state: GameState, wood: number, tools: number): bool
   return true;
 }
 
-export function startFishingBoatConstruction(state: GameState, boatyardId: number): string | null {
+export function startFishingBoatConstruction(
+  state: GameState,
+  boatyardId: number,
+  portId: number,
+  mooringSlot: FishingBoatMooringSlot,
+): string | null {
   const boatyard = state.buildings.find(building =>
     building.id === boatyardId && building.type === 'boatyard' && building.built);
   if (!boatyard) return '완공된 배무이터를 선택해야 합니다.';
   if (boatyard.boatWorkOrder) return '이미 어선 작업이 진행 중입니다.';
-  const port = nearestCompatibleFishingPort(state, boatyard);
-  if (!port) return '같은 호수나 바다로 이어진 완공 포구가 필요합니다.';
+  const slot = fishingBoatConstructionSlots(state, boatyardId)
+    .find(candidate => candidate.portId === portId && candidate.slot === mooringSlot);
+  const port = state.buildings.find(building => building.id === portId && building.type === 'fishingPort' && building.built);
+  if (!port || !slot) return '같은 수역의 비어 있는 포구 계류 슬롯을 선택해야 합니다.';
   if (!spendBoatResources(state, CONFIG.fishingBoats.buildWood, CONFIG.fishingBoats.buildTools)) {
     return `어선 건조에는 목재 ${CONFIG.fishingBoats.buildWood}, 도구 ${CONFIG.fishingBoats.buildTools}이 필요합니다.`;
   }
+  const boatId = state.nextFishingBoatId++;
+  state.fishingBoats.push({
+    id: boatId,
+    portId: port.id,
+    mooringSlot,
+    boatyardId: boatyard.id,
+    fisherIds: [],
+    x: slot.x,
+    y: slot.y,
+    px: slot.x,
+    py: slot.y,
+    facing: slot.facing,
+    cargoFish: 0,
+    cargoCapacity: CONFIG.fishingBoats.cargoCapacity,
+    durability: CONFIG.fishingBoats.durability,
+    maxDurability: CONFIG.fishingBoats.durability,
+    status: 'building',
+    route: [],
+    routeIndex: 0,
+    constructionProgress: 0,
+    constructionRequired: CONFIG.fishingBoats.buildWorkDays,
+  });
   boatyard.boatWorkOrder = {
     kind: 'build',
     portId: port.id,
+    boatId,
+    mooringSlot,
     progress: 0,
     required: CONFIG.fishingBoats.buildWorkDays,
   };
@@ -594,7 +740,7 @@ export function startFishingBoatRepair(
   if (boatyard.boatWorkOrder) return '이미 어선 작업이 진행 중입니다.';
   const boat = state.fishingBoats.find(candidate => candidate.id === boatId);
   if (!boat || (boat.status !== 'moored' && boat.status !== 'disabled')) return '계류된 손상 어선만 수리할 수 있습니다.';
-  if (boat.fisherId != null) return '어부가 내린 뒤 수리할 수 있습니다.';
+  if (boardedFishingBoatCrew(state, boat).length > 0) return '어부가 내린 뒤 수리할 수 있습니다.';
   if (boat.durability >= boat.maxDurability) return '수리가 필요하지 않은 어선입니다.';
   const port = state.buildings.find(building => building.id === boat.portId && building.type === 'fishingPort' && building.built);
   if (!port || compatiblePortRoute(state, boatyard, port).length === 0) return '배무이터와 같은 수역의 포구에 계류해야 합니다.';
@@ -622,6 +768,8 @@ export function advanceFishingBoatWork(
   const order = boatyard.type === 'boatyard' ? boatyard.boatWorkOrder : undefined;
   if (!order || !Number.isFinite(work) || work <= 0) return null;
   order.progress = Math.min(order.required, order.progress + work);
+  const workBoat = order.boatId == null ? undefined : state.fishingBoats.find(candidate => candidate.id === order.boatId);
+  if (order.kind === 'build' && workBoat) workBoat.constructionProgress = order.progress;
   if (order.progress < order.required) return null;
   if (order.kind === 'repair') {
     const boat = state.fishingBoats.find(candidate => candidate.id === order.boatId);
@@ -634,31 +782,15 @@ export function advanceFishingBoatWork(
     if (state.priorityBuildingId === boatyard.id) state.priorityBuildingId = null;
     return 'repaired';
   }
-  const port = state.buildings.find(building => building.id === order.portId && building.type === 'fishingPort' && building.built);
-  const mooring = port ? fishingWaterAccessForBuilding(state, port)[0] : undefined;
-  if (!port || !mooring) {
+  const boat = state.fishingBoats.find(candidate => candidate.id === order.boatId && candidate.status === 'building');
+  if (!boat) {
     delete boatyard.boatWorkOrder;
     if (state.priorityBuildingId === boatyard.id) state.priorityBuildingId = null;
     return null;
   }
-  state.fishingBoats.push({
-    id: state.nextFishingBoatId++,
-    portId: port.id,
-    boatyardId: null,
-    fisherId: null,
-    x: mooring.x,
-    y: mooring.y,
-    px: mooring.x,
-    py: mooring.y,
-    facing: fishingBoatFacingForStep(mooring.x - port.x, mooring.y - port.y) ?? 'ne',
-    cargoFish: 0,
-    cargoCapacity: CONFIG.fishingBoats.cargoCapacity,
-    durability: CONFIG.fishingBoats.durability,
-    maxDurability: CONFIG.fishingBoats.durability,
-    status: 'moored',
-    route: [],
-    routeIndex: 0,
-  });
+  boat.status = 'moored';
+  boat.boatyardId = null;
+  boat.constructionProgress = boat.constructionRequired;
   delete boatyard.boatWorkOrder;
   if (state.priorityBuildingId === boatyard.id) state.priorityBuildingId = null;
   return 'built';
@@ -668,14 +800,13 @@ export function boardFishingBoat(state: GameState, boatId: number, residentId: n
   const boat = state.fishingBoats.find(candidate => candidate.id === boatId);
   const resident = state.residents.find(candidate => candidate.id === residentId && candidate.alive);
   if (!boat || !resident) return '어선이나 어부를 찾을 수 없습니다.';
-  if (boat.status !== 'moored' || boat.fisherId != null) return '빈 채로 계류된 어선이 아닙니다.';
-  if (resident.job !== 'fisher' || resident.assignedBuildingId !== boat.portId) return '이 포구에 배정된 어부만 승선할 수 있습니다.';
+  if ((boat.status !== 'moored' && boat.status !== 'boarded') || boardedFishingBoatCrew(state, boat).length >= 2) return '승선할 자리가 없습니다.';
+  if (resident.job !== 'fisher' || !boat.fisherIds.includes(resident.id)) return '이 어선에 배정된 어부만 승선할 수 있습니다.';
   if (resident.fishingBoatId != null) return '이미 다른 어선에 승선했습니다.';
   const port = state.buildings.find(building => building.id === boat.portId && building.type === 'fishingPort' && building.built);
   if (!port || Math.max(Math.abs(resident.x - port.x), Math.abs(resident.y - port.y)) > 1) {
     return '포구에 도착한 어부만 승선할 수 있습니다.';
   }
-  boat.fisherId = resident.id;
   boat.status = 'boarded';
   settleFishingBoat(boat);
   resident.fishingBoatId = boat.id;
@@ -691,23 +822,24 @@ export function boardFishingBoat(state: GameState, boatId: number, residentId: n
 
 export function disembarkFishingBoat(state: GameState, boatId: number): string | null {
   const boat = state.fishingBoats.find(candidate => candidate.id === boatId);
-  if (!boat || boat.fisherId == null) return '승선한 어부가 없습니다.';
-  const resident = state.residents.find(candidate => candidate.id === boat.fisherId);
+  if (!boat) return '어선을 찾을 수 없습니다.';
+  const crew = boardedFishingBoatCrew(state, boat);
   const port = state.buildings.find(building => building.id === boat.portId && building.type === 'fishingPort' && building.built);
-  if (!resident || !port) return '하선할 포구를 찾을 수 없습니다.';
-  resident.fishingBoatId = null;
+  if (crew.length === 0 || !port) return '하선할 포구를 찾을 수 없습니다.';
   const landing = WATER_DIRECTIONS
     .map(direction => state.map[port.y + direction.y]?.[port.x + direction.x])
     .find(tile => tile && tile.buildingId == null &&
       tile.terrain !== 'river' && tile.terrain !== 'lake' && tile.terrain !== 'sea' &&
       tile.terrain !== 'mudflat' && tile.terrain !== 'mountain' && tile.terrain !== 'rock') ??
     state.map[port.y]?.[port.x];
-  resident.x = landing?.x ?? port.x;
-  resident.y = landing?.y ?? port.y;
-  resident.px = resident.x;
-  resident.py = resident.y;
-  resident.path = [];
-  boat.fisherId = null;
+  for (const resident of crew) {
+    resident.fishingBoatId = null;
+    resident.x = landing?.x ?? port.x;
+    resident.y = landing?.y ?? port.y;
+    resident.px = resident.x;
+    resident.py = resident.y;
+    resident.path = [];
+  }
   boat.status = boat.durability > 0 ? 'moored' : 'disabled';
   settleFishingBoat(boat);
   clearFishingTrip(boat);
@@ -715,7 +847,7 @@ export function disembarkFishingBoat(state: GameState, boatId: number): string |
 }
 
 const BOAT_STATUSES = new Set<FishingBoatState['status']>([
-  'moored', 'boarded', 'underway', 'fishing', 'returning', 'repairing', 'disabled',
+  'building', 'moored', 'boarded', 'underway', 'fishing', 'returning', 'repairing', 'disabled',
 ]);
 
 export function normalizeFishingBoats(state: GameState): void {
@@ -724,6 +856,7 @@ export function normalizeFishingBoats(state: GameState): void {
     .map(building => building.id));
   const residentById = new Map(state.residents.map(resident => [resident.id, resident]));
   const usedFisherIds = new Set<number>();
+  const usedSlotsByPort = new Map<number, Set<FishingBoatMooringSlot>>();
   const source = Array.isArray(state.fishingBoats) ? state.fishingBoats : [];
   const usedIds = new Set<number>();
   state.fishingBoats = source.filter(boat => {
@@ -741,6 +874,14 @@ export function normalizeFishingBoats(state: GameState): void {
     boat.px = previousPositionValid ? previousX : boat.x;
     boat.py = previousPositionValid ? previousY : boat.y;
     boat.facing = BOAT_FACINGS.has(boat.facing) ? boat.facing : 'ne';
+    const portSlots = usedSlotsByPort.get(boat.portId) ?? new Set<FishingBoatMooringSlot>();
+    const requestedSlot: FishingBoatMooringSlot | null = boat.mooringSlot === 0 || boat.mooringSlot === 1
+      ? boat.mooringSlot : null;
+    boat.mooringSlot = requestedSlot != null && !portSlots.has(requestedSlot)
+      ? requestedSlot
+      : (!portSlots.has(0) ? 0 : (!portSlots.has(1) ? 1 : (requestedSlot ?? 0)));
+    portSlots.add(boat.mooringSlot);
+    usedSlotsByPort.set(boat.portId, portSlots);
     boat.maxDurability = Number.isFinite(boat.maxDurability) && boat.maxDurability > 0
       ? boat.maxDurability : CONFIG.fishingBoats.durability;
     boat.durability = Number.isFinite(boat.durability)
@@ -762,14 +903,36 @@ export function normalizeFishingBoats(state: GameState): void {
     boat.tripDistance = Number.isFinite(boat.tripDistance) ? Math.max(0, boat.tripDistance!) : 0;
     boat.fishingProgress = Number.isFinite(boat.fishingProgress)
       ? Math.max(0, Math.min(CONFIG.fishingBoats.fishingWorkSubticks, Math.floor(boat.fishingProgress!))) : 0;
-    const fisher = boat.fisherId == null ? undefined : residentById.get(boat.fisherId);
-    if (!fisher || !fisher.alive || fisher.job !== 'fisher' || fisher.assignedBuildingId !== boat.portId ||
-        usedFisherIds.has(fisher.id)) {
-      boat.fisherId = null;
-      if (boat.status === 'boarded' || boat.status === 'underway' || boat.status === 'fishing' || boat.status === 'returning') {
+    const legacyIds = Array.isArray(boat.fisherIds) ? boat.fisherIds : [];
+    if (boat.fisherId != null) legacyIds.push(boat.fisherId);
+    boat.fisherIds = [...new Set(legacyIds)]
+      .filter(id => {
+        const fisher = residentById.get(id);
+        return Boolean(fisher?.alive && fisher.job === 'fisher' && !usedFisherIds.has(id));
+      })
+      .slice(0, FISHING_BOAT_CREW_CAPACITY);
+    delete boat.fisherId;
+    for (const fisherId of boat.fisherIds) {
+      usedFisherIds.add(fisherId);
+      const fisher = residentById.get(fisherId);
+      if (fisher?.assignedBuildingId === boat.portId) fisher.assignedBuildingId = null;
+    }
+    if (boat.status === 'building') {
+      const constructionRequired = Number.isFinite(boat.constructionRequired) && boat.constructionRequired! > 0
+        ? boat.constructionRequired! : CONFIG.fishingBoats.buildWorkDays;
+      boat.constructionRequired = constructionRequired;
+      boat.constructionProgress = Number.isFinite(boat.constructionProgress)
+        ? Math.max(0, Math.min(constructionRequired, boat.constructionProgress!)) : 0;
+    }
+    const activeStatus = boat.status === 'boarded' || boat.status === 'underway' ||
+      boat.status === 'fishing' || boat.status === 'returning';
+    const boardedCrew = boat.fisherIds
+      .map(id => residentById.get(id))
+      .filter((resident): resident is Resident => Boolean(resident?.alive && resident.fishingBoatId === boat.id));
+    if (activeStatus && boardedCrew.length === 0) {
         const port = state.buildings.find(building =>
           building.id === boat.portId && building.type === 'fishingPort' && building.built);
-        const mooring = port ? fishingWaterAccessForBuilding(state, port)[0] : undefined;
+        const mooring = port ? fishingPortMooringSlotPosition(port, boat.mooringSlot) : undefined;
         if (port && boat.cargoFish > 0) addBuildingStock(port, 'fish', boat.cargoFish);
         boat.cargoFish = 0;
         if (mooring) {
@@ -779,21 +942,20 @@ export function normalizeFishingBoats(state: GameState): void {
         }
         boat.status = boat.durability > 0 ? 'moored' : 'disabled';
         clearFishingTrip(boat);
+    } else if (activeStatus) {
+      for (const fisher of boardedCrew) {
+        fisher.x = boat.x;
+        fisher.y = boat.y;
+        fisher.px = boat.x;
+        fisher.py = boat.y;
+        fisher.path = [];
       }
-    } else {
-      usedFisherIds.add(fisher.id);
-      fisher.fishingBoatId = boat.id;
-      fisher.x = boat.x;
-      fisher.y = boat.y;
-      fisher.px = boat.x;
-      fisher.py = boat.y;
-      fisher.path = [];
     }
     return true;
   });
   const boatById = new Map(state.fishingBoats.map(boat => [boat.id, boat]));
   for (const resident of state.residents as Array<Resident>) {
-    if (resident.fishingBoatId != null && boatById.get(resident.fishingBoatId)?.fisherId !== resident.id) {
+    if (resident.fishingBoatId != null && !boatById.get(resident.fishingBoatId)?.fisherIds.includes(resident.id)) {
       resident.fishingBoatId = null;
     }
   }
@@ -812,7 +974,14 @@ export function normalizeFishingBoats(state: GameState): void {
       const boat = order.boatId == null ? undefined : boatById.get(order.boatId);
       if (!boat || boat.portId !== order.portId) delete building.boatWorkOrder;
     } else {
-      delete order.boatId;
+      const boat = order.boatId == null ? undefined : boatById.get(order.boatId);
+      if (!boat || boat.portId !== order.portId || boat.status !== 'building' ||
+          (order.mooringSlot !== 0 && order.mooringSlot !== 1) || boat.mooringSlot !== order.mooringSlot) {
+        delete building.boatWorkOrder;
+      } else {
+        boat.constructionProgress = order.progress;
+        boat.constructionRequired = order.required;
+      }
     }
   }
   state.nextFishingBoatId = Math.max(

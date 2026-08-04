@@ -201,7 +201,7 @@ export const BUILDING_DEF_DEFAULTS: Record<BuildingTypeId, BuildingDef> = {
   },
   fishingPort: {
     id: 'fishingPort', name: '포구',
-    desc: `보(堡) 승격 후 짓는 어업 거점. 육상 포구채에서 호수·바다 계류대까지 3~6칸 잔교가 뻗으며, 어부 2명이 반경 ${CONFIG.gatheringZones.fishingPortRadius}칸의 연안 어장을 이용하고 어선을 계류한다.`,
+    desc: `보(堡) 승격 후 짓는 어업 거점. 육상 포구채에서 호수·바다 계류대까지 3~6칸 잔교가 뻗으며, 계류대 양옆에 어선을 한 척씩 둔다. 어부는 포구가 아니라 어선에 최대 2명씩 배정한다.`,
     cost: { wood: 12, stone: 4, tools: 1 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
     winterBonus: false, placement: 'fishingWaterfront', unique: false, minRank: 'bo',
   },

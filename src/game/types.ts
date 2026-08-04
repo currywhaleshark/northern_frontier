@@ -107,6 +107,7 @@ export interface FishingGroundState {
 }
 
 export type FishingBoatStatus =
+  | 'building'
   | 'moored'
   | 'boarded'
   | 'underway'
@@ -127,7 +128,10 @@ export interface FishingPortPier {
 export interface FishingBoatState {
   id: number;
   portId: number;
+  mooringSlot: 0 | 1;
   boatyardId?: number | null;
+  fisherIds: number[];
+  /** v60 이하 저장 호환용. normalizeFishingBoats에서 fisherIds로 흡수한다. */
   fisherId?: number | null;
   x: number;
   y: number;
@@ -146,6 +150,8 @@ export interface FishingBoatState {
   tripCatchTarget?: number;
   tripDistance?: number;
   fishingProgress?: number;
+  constructionProgress?: number;
+  constructionRequired?: number;
 }
 
 export type JobId =
@@ -406,7 +412,8 @@ export type PointerCursor = 'default' | 'move' | 'copy' | 'pointer' | 'not-allow
 export type SelectedEntity =
   | { kind: 'tile'; x: number; y: number }
   | { kind: 'resident'; id: number }
-  | { kind: 'building'; id: number };
+  | { kind: 'building'; id: number }
+  | { kind: 'fishingBoat'; id: number };
 
 export type PointerAction =
   | { kind: 'none'; cursor: PointerCursor; label: string }
@@ -676,6 +683,7 @@ export interface FishingBoatWorkOrder {
   kind: 'build' | 'repair';
   portId: number;
   boatId?: number;
+  mooringSlot?: 0 | 1;
   progress: number;
   required: number;
 }

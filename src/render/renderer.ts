@@ -19,7 +19,9 @@ import { DAY_BANDS, DAY_CYCLE_SUBTICKS } from '../game/dayCycle';
 import { LEISURE_CLUSTER_CAPACITY } from '../game/agents';
 import { findHabitatIconAtTile } from '../game/habitats';
 import { findFishingGroundIconAtTile, fishingGroundAt } from '../game/fishingGrounds';
-import { fishingPortPierAt, fishingPortPierPositions } from '../game/fishingBoats';
+import {
+  fishingBoatConstructionSlots, fishingPortMooringSlotPosition, fishingPortPierAt, fishingPortPierPositions,
+} from '../game/fishingBoats';
 import { isBuildingFootprintExplored, isExplored } from '../game/exploration';
 import {
   builtWallTileSet, GATE_CONVERSION_COSTS, isSolidWallBuilding, isWallBuilding,
@@ -153,6 +155,9 @@ export interface SceneOptions {
   selected: { x: number; y: number } | null;
   selectedResidentId: number | null;
   selectedBuildingId?: number | null;
+  selectedFishingBoatId?: number | null;
+  placingFishingBoatFromBoatyardId?: number | null;
+  fishingBoatPlacementHover?: { portId: number; slot: 0 | 1 } | null;
   viewport?: SceneViewport;
   terrainVisualSignature?: number;
   sprites?: SpriteAPI;
@@ -1262,16 +1267,9 @@ function fishingBoatMooringOffset(
 ): { x: number; y: number } {
   const port = state.buildings.find(building =>
     building.id === boat.portId && building.type === 'fishingPort' && building.built);
-  const direction = port?.portPier?.direction;
-  if (!direction) return { x: 0, y: 0 };
-  const first = direction === 'n' || direction === 's' ? { x: 1, y: 0 } : { x: 0, y: 1 };
-  const second = { x: -first.x, y: -first.y };
-  const isWater = (offset: { x: number; y: number }): boolean => {
-    const terrain = state.map[boat.y + offset.y]?.[boat.x + offset.x]?.terrain;
-    return terrain === 'lake' || terrain === 'sea';
-  };
-  const side = isWater(first) ? first : isWater(second) ? second : first;
-  return { x: side.x * 1.25, y: side.y * 1.25 };
+  const position = port ? fishingPortMooringSlotPosition(port, boat.mooringSlot ?? 0) : null;
+  if (!position) return { x: 0, y: 0 };
+  return { x: position.renderX - position.x, y: position.renderY - position.y };
 }
 
 function fishingBoatMooringWeight(
@@ -1279,7 +1277,7 @@ function fishingBoatMooringWeight(
   alpha: number,
 ): number {
   const moving = (boat.px ?? boat.x) !== boat.x || (boat.py ?? boat.y) !== boat.y;
-  if (boat.status === 'moored' || boat.status === 'boarded' ||
+  if (boat.status === 'building' || boat.status === 'moored' || boat.status === 'boarded' ||
       boat.status === 'repairing' || boat.status === 'disabled') {
     return moving ? alpha : 1;
   }
@@ -1291,7 +1289,7 @@ function fishingBoatMooringWeight(
   return 0;
 }
 
-function fishingBoatRenderPosition(
+export function fishingBoatRenderPosition(
   state: GameState,
   boat: GameState['fishingBoats'][number],
   alpha: number,
@@ -1306,11 +1304,35 @@ function fishingBoatRenderPosition(
   };
 }
 
+export function findFishingBoatAt(
+  state: GameState,
+  mx: number,
+  my: number,
+  alpha: number,
+  radius = 22,
+): GameState['fishingBoats'][number] | null {
+  let best: GameState['fishingBoats'][number] | null = null;
+  let bestDistance = radius;
+  for (const boat of state.fishingBoats) {
+    if (!isExplored(state, boat.x, boat.y)) continue;
+    const position = fishingBoatRenderPosition(state, boat, alpha);
+    const x = (position.x + 0.5) * TILE;
+    const y = (position.y + 0.62) * TILE;
+    const distance = Math.hypot(x - mx, y - my);
+    if (distance <= bestDistance) {
+      best = boat;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
 function drawFishingBoat(
   ctx: CanvasRenderingContext2D,
   state: GameState,
   boat: GameState['fishingBoats'][number],
   renderPosition: { x: number; y: number },
+  selected: boolean,
 ): void {
   const tile = state.map[boat.y]?.[boat.x];
   const season = getSeason(state.day);
@@ -1319,11 +1341,31 @@ function drawFishingBoat(
   const cx = (renderPosition.x + 0.5) * TILE;
   const baselineY = (renderPosition.y + 1.1) * TILE;
   ctx.save();
+  if (selected) {
+    ctx.fillStyle = 'rgba(245, 196, 75, 0.28)';
+    ctx.strokeStyle = 'rgba(255, 220, 111, 0.95)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(cx, baselineY - 5, TILE * 0.56, TILE * 0.22, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  if (boat.status === 'building') ctx.globalAlpha *= 0.5;
   if (boat.status === 'disabled') ctx.globalAlpha *= 0.72;
   const drawn = drawFishingBoatAtlas(ctx, cx, baselineY, boat.facing ?? 'ne', visualState);
   ctx.restore();
   if (!drawn) {
     drawFishingBoatPlaceholder(ctx, boat, renderPosition.x, renderPosition.y);
+    return;
+  }
+  if (boat.status === 'building') {
+    const progress = (boat.constructionProgress ?? 0) / Math.max(1, boat.constructionRequired ?? 1);
+    ctx.save();
+    ctx.fillStyle = 'rgba(20, 15, 12, 0.82)';
+    ctx.fillRect(cx - 19, baselineY + 2, 38, 5);
+    ctx.fillStyle = '#e4b654';
+    ctx.fillRect(cx - 18, baselineY + 3, 36 * Math.max(0, Math.min(1, progress)), 3);
+    ctx.restore();
     return;
   }
   if (boat.durability > boat.maxDurability * 0.35) return;
@@ -3066,12 +3108,34 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     enqueueRowDraw((corpse.y + 1) * TILE, (corpse.x + 0.5) * TILE, () =>
       sprites.drawCorpse(ctx, drawParams));
   }
+  if (o.placingFishingBoatFromBoatyardId != null) {
+    for (const slot of fishingBoatConstructionSlots(state, o.placingFishingBoatFromBoatyardId)) {
+      if (!tileRectIntersectsViewport(viewport, slot.renderX - 2, slot.renderY - 4, 5, 5)) continue;
+      const cx = (slot.renderX + 0.5) * TILE;
+      const baselineY = (slot.renderY + 1.1) * TILE;
+      const hovered = o.fishingBoatPlacementHover?.portId === slot.portId &&
+        o.fishingBoatPlacementHover.slot === slot.slot;
+      enqueueRowDraw((slot.renderY + 0.82) * TILE, cx, () => {
+        ctx.save();
+        ctx.globalAlpha = hovered ? 0.78 : 0.38;
+        ctx.fillStyle = hovered ? 'rgba(111, 221, 143, 0.42)' : 'rgba(245, 196, 75, 0.22)';
+        ctx.strokeStyle = hovered ? 'rgba(139, 255, 169, 0.96)' : 'rgba(255, 220, 111, 0.82)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(cx, baselineY - 5, TILE * 0.56, TILE * 0.22, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        drawFishingBoatAtlas(ctx, cx, baselineY, slot.facing, 'moored');
+        ctx.restore();
+      });
+    }
+  }
   for (const boat of state.fishingBoats) {
     if (!isExplored(state, boat.x, boat.y) ||
         !tileRectIntersectsViewport(viewport, boat.x - 2, boat.y - 4, 5, 5)) continue;
     const renderPosition = fishingBoatRenderPosition(state, boat, o.alpha);
     enqueueRowDraw((renderPosition.y + 0.82) * TILE, (renderPosition.x + 0.5) * TILE, () =>
-      drawFishingBoat(ctx, state, boat, renderPosition));
+      drawFishingBoat(ctx, state, boat, renderPosition, o.selectedFishingBoatId === boat.id));
   }
   for (let index = 0; index < localResidentDraws.length; index++) {
     const resident = localResidentDraws[index];
