@@ -9,6 +9,7 @@ interface FrameRect {
 }
 
 const frames = boatyardBuildingManifest.frame_layout.rows.seasonal as FrameRect[];
+const hdFrames = boatyardBuildingManifest.hd_frame_layout.rows.seasonal as FrameRect[];
 
 export const BOATYARD_BUILDING_SHEET = {
   src: boatyardBuildingManifest.game_input,
@@ -18,11 +19,19 @@ export const BOATYARD_BUILDING_SHEET = {
   anchor: boatyardBuildingManifest.display.anchor,
 } as const;
 
-export function boatyardBuildingSourceRect(season: Season): FrameRect {
+export const BOATYARD_BUILDING_HD_SHEET = {
+  src: boatyardBuildingManifest.hd_game_input,
+  width: boatyardBuildingManifest.display.width,
+  height: boatyardBuildingManifest.display.height,
+  sourceScale: boatyardBuildingManifest.display.hdSourceScale as 8,
+  anchor: boatyardBuildingManifest.display.anchor,
+} as const;
+
+export function boatyardBuildingSourceRect(season: Season, highDefinition = false): FrameRect {
   const frameIndex = season === 'winter'
     ? boatyardBuildingManifest.seasonFrames.winter
     : boatyardBuildingManifest.seasonFrames.normal;
-  const rect = frames[frameIndex];
+  const rect = (highDefinition ? hdFrames : frames)[frameIndex];
   if (!rect) throw new Error(`Missing boatyard building frame: ${season}`);
   return rect;
 }

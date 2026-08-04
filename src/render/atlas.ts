@@ -51,14 +51,17 @@ import {
   coastalGroundSourceRect,
 } from './coastalGroundAssets';
 import {
+  TIDAL_FISHERY_BUILDING_HD_SHEET,
   TIDAL_FISHERY_BUILDING_SHEET,
   tidalFisheryBuildingSourceRect,
 } from './tidalFisheryBuildingAssets';
 import {
+  SALTWORKS_BUILDING_HD_SHEET,
   SALTWORKS_BUILDING_SHEET,
   saltworksBuildingSourceRect,
 } from './saltworksBuildingAssets';
 import {
+  BOATYARD_BUILDING_HD_SHEET,
   BOATYARD_BUILDING_SHEET,
   boatyardBuildingSourceRect,
 } from './boatyardBuildingAssets';
@@ -339,8 +342,11 @@ let historicalTerrainSheet: HTMLImageElement | null = null;
 let historicalTerrainHdSheet: HTMLImageElement | null = null;
 let coastalGroundSheet: HTMLImageElement | null = null;
 let tidalFisheryBuildingSheet: HTMLImageElement | null = null;
+let tidalFisheryBuildingHdSheet: HTMLImageElement | null = null;
 let saltworksBuildingSheet: HTMLImageElement | null = null;
+let saltworksBuildingHdSheet: HTMLImageElement | null = null;
 let boatyardBuildingSheet: HTMLImageElement | null = null;
+let boatyardBuildingHdSheet: HTMLImageElement | null = null;
 type SeamlessGroundFamily = 'plain' | 'forest' | 'rock';
 interface SeamlessGroundPair {
   standard: HTMLImageElement | null;
@@ -548,8 +554,11 @@ function ensureLoaded(): void {
   loadAtlasAsset('/assets/folk-warm-terrain-v3-56px-sheet.png', true, image => { historicalTerrainHdSheet = image; });
   loadAtlasAsset(COASTAL_GROUND_SHEET.src, true, image => { coastalGroundSheet = image; });
   loadAtlasAsset(TIDAL_FISHERY_BUILDING_SHEET.src, true, image => { tidalFisheryBuildingSheet = image; });
+  loadAtlasAsset(TIDAL_FISHERY_BUILDING_HD_SHEET.src, false, image => { tidalFisheryBuildingHdSheet = image; });
   loadAtlasAsset(SALTWORKS_BUILDING_SHEET.src, true, image => { saltworksBuildingSheet = image; });
+  loadAtlasAsset(SALTWORKS_BUILDING_HD_SHEET.src, false, image => { saltworksBuildingHdSheet = image; });
   loadAtlasAsset(BOATYARD_BUILDING_SHEET.src, true, image => { boatyardBuildingSheet = image; });
+  loadAtlasAsset(BOATYARD_BUILDING_HD_SHEET.src, false, image => { boatyardBuildingHdSheet = image; });
   // 새 게임의 봄 자산만 시작 준비에 포함하고, 나머지 계절은 실제 진입 시 요청한다.
   requestSeamlessGroundSeason('spring', true);
   loadAtlasAsset(GENERATED_TERRAIN_OBJECT_SHEET.src, true, image => { terrainObjectSheet = image; });
@@ -2093,11 +2102,14 @@ function blitTidalFisheryBuilding(
   ctx: CanvasRenderingContext2D,
   p: BuildingDrawParams,
 ): boolean {
-  if (p.type !== 'tidalFishery' || !tidalFisheryBuildingSheet) return false;
-  const rect = tidalFisheryBuildingSourceRect(p.season);
+  if (p.type !== 'tidalFishery') return false;
+  const highDefinition = Boolean(p.highDefinition && tidalFisheryBuildingHdSheet);
+  const image = highDefinition ? tidalFisheryBuildingHdSheet : tidalFisheryBuildingSheet;
+  if (!image) return false;
+  const rect = tidalFisheryBuildingSourceRect(p.season, highDefinition);
   const destHeight = p.size * (TIDAL_FISHERY_BUILDING_SHEET.height / TIDAL_FISHERY_BUILDING_SHEET.width);
   ctx.drawImage(
-    tidalFisheryBuildingSheet,
+    image,
     rect.x,
     rect.y,
     rect.w,
@@ -2114,11 +2126,14 @@ function blitSaltworksBuilding(
   ctx: CanvasRenderingContext2D,
   p: BuildingDrawParams,
 ): boolean {
-  if (p.type !== 'saltworks' || !saltworksBuildingSheet) return false;
-  const rect = saltworksBuildingSourceRect(p.season);
+  if (p.type !== 'saltworks') return false;
+  const highDefinition = Boolean(p.highDefinition && saltworksBuildingHdSheet);
+  const image = highDefinition ? saltworksBuildingHdSheet : saltworksBuildingSheet;
+  if (!image) return false;
+  const rect = saltworksBuildingSourceRect(p.season, highDefinition);
   const destHeight = p.size * (SALTWORKS_BUILDING_SHEET.height / SALTWORKS_BUILDING_SHEET.width);
   ctx.drawImage(
-    saltworksBuildingSheet,
+    image,
     rect.x,
     rect.y,
     rect.w,
@@ -2135,11 +2150,14 @@ function blitBoatyardBuilding(
   ctx: CanvasRenderingContext2D,
   p: BuildingDrawParams,
 ): boolean {
-  if (p.type !== 'boatyard' || !boatyardBuildingSheet) return false;
-  const rect = boatyardBuildingSourceRect(p.season);
+  if (p.type !== 'boatyard') return false;
+  const highDefinition = Boolean(p.highDefinition && boatyardBuildingHdSheet);
+  const image = highDefinition ? boatyardBuildingHdSheet : boatyardBuildingSheet;
+  if (!image) return false;
+  const rect = boatyardBuildingSourceRect(p.season, highDefinition);
   const destHeight = p.size * (BOATYARD_BUILDING_SHEET.height / BOATYARD_BUILDING_SHEET.width);
   ctx.drawImage(
-    boatyardBuildingSheet,
+    image,
     rect.x,
     rect.y,
     rect.w,

@@ -4,11 +4,13 @@
   "characterId": "saltworks-building-v1",
   "engine": "component-row",
   "game_input": "/assets/saltworks-building-v1.png",
+  "hd_game_input": "/assets/saltworks-building-hd-v1.png",
   "degraded_static_fallback": false,
   "display": {
     "width": 56,
     "height": 80,
     "sourceScale": 2,
+    "hdSourceScale": 8,
     "anchor": "footprint-bottom-left"
   },
   "seasonFrames": {
@@ -24,6 +26,18 @@
       "seasonal": [
         { "x": 0, "y": 0, "w": 112, "h": 160 },
         { "x": 112, "y": 0, "w": 112, "h": 160 }
+      ]
+    }
+  },
+  "hd_frame_layout": {
+    "sheetWidth": 896,
+    "sheetHeight": 640,
+    "cellWidth": 448,
+    "cellHeight": 640,
+    "rows": {
+      "seasonal": [
+        { "x": 0, "y": 0, "w": 448, "h": 640 },
+        { "x": 448, "y": 0, "w": 448, "h": 640 }
       ]
     }
   }

@@ -9,6 +9,7 @@ interface FrameRect {
 }
 
 const frames = saltworksBuildingManifest.frame_layout.rows.seasonal as FrameRect[];
+const hdFrames = saltworksBuildingManifest.hd_frame_layout.rows.seasonal as FrameRect[];
 
 export const SALTWORKS_BUILDING_SHEET = {
   src: saltworksBuildingManifest.game_input,
@@ -18,11 +19,19 @@ export const SALTWORKS_BUILDING_SHEET = {
   anchor: saltworksBuildingManifest.display.anchor,
 } as const;
 
-export function saltworksBuildingSourceRect(season: Season): FrameRect {
+export const SALTWORKS_BUILDING_HD_SHEET = {
+  src: saltworksBuildingManifest.hd_game_input,
+  width: saltworksBuildingManifest.display.width,
+  height: saltworksBuildingManifest.display.height,
+  sourceScale: saltworksBuildingManifest.display.hdSourceScale as 8,
+  anchor: saltworksBuildingManifest.display.anchor,
+} as const;
+
+export function saltworksBuildingSourceRect(season: Season, highDefinition = false): FrameRect {
   const frameIndex = season === 'winter'
     ? saltworksBuildingManifest.seasonFrames.winter
     : saltworksBuildingManifest.seasonFrames.normal;
-  const rect = frames[frameIndex];
+  const rect = (highDefinition ? hdFrames : frames)[frameIndex];
   if (!rect) throw new Error(`Missing saltworks building frame: ${season}`);
   return rect;
 }
