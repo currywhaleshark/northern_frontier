@@ -164,6 +164,12 @@ const { CONFIG } = await load('config');
     [tutorial.worldSetup.region, tutorial.worldSetup.mapSize, tutorial.worldSetup.seedSource],
     ['plains', 'medium', 'tutorial'],
   );
+  assert.deepEqual(
+    [tutorial.worldSetup.effective.resourceDensityMultiplier,
+      tutorial.worldSetup.effective.climateSeverityMultiplier],
+    [1, 1],
+    '길잡이는 설정 화면을 우회하며 기존 기준 지도·기후를 고정한다',
+  );
 }
 
 // P3: 메뉴 → launch → session은 난이도/이름 개별 필드를 되살리지 않고 options 객체를 전달한다.

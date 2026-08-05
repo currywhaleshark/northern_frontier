@@ -103,11 +103,9 @@ assert.match(atlasSource, /specialResidentSheet[\s\S]*bob, 1\.16/,
   const regionCardsSource = newGameSetupSource.split('REGIONS.map(region =>')[1]?.split('</button>)}')[0] ?? '';
   assert.match(regionCardsSource, /onClick=\{\(\) => setOptions\(current => \(\{ \.\.\.current, region: region\.id \}\)\)\}/,
     'region cards persist their selected option');
-  assert.match(newGameSetupSource, /id: 'mountain'[\s\S]*?enabled: true/,
-    'mountain must be an available starting region');
-  for (const region of ['lake', 'coast']) {
-    assert.match(newGameSetupSource, new RegExp(`id: '${region}'[^\\n]*S[45]에서 준비됩니다`),
-      `${region} remains a future locked region`);
+  for (const region of ['plains', 'mountain', 'lake', 'coast']) {
+    assert.match(newGameSetupSource, new RegExp(`id: '${region}'[^\\n]*enabled: true`),
+      `${region} must be an available starting region`);
   }
   assert.match(newGameSetupSource, /내부 능선과 깊은 숲[\s\S]*물과 평지는 부족[\s\S]*광물과 사냥감이 풍부/,
     'mountain description communicates its deliberate resource tradeoff');
@@ -119,6 +117,10 @@ assert.match(atlasSource, /specialResidentSheet[\s\S]*bob, 1\.16/,
     'all map size cards must remain selectable');
   assert.match(newGameSetupSource, /onClick=\{\(\) => setOptions\(current => \(\{ \.\.\.current, mapSize: size\.id \}\)\)\}/,
     'map size cards persist their selected option');
+  assert.doesNotMatch(newGameSetupSource, /세부 설정 <span>준비 중|<select disabled/,
+    'all four detailed tuning controls are enabled');
+  assert.match(newGameSetupSource, /difficultyPreset: 'custom'/,
+    'changing one tuning control marks the setup as custom');
 }
 
 console.log('quality-of-life UI tests passed');

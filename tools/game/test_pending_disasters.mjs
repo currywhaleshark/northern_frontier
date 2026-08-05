@@ -280,7 +280,7 @@ assert.ok(Number.isInteger(CURRENT_SCHEMA_VERSION) && CURRENT_SCHEMA_VERSION >= 
 const simulationSource = readFileSync(new URL('../../src/game/simulation.ts', import.meta.url), 'utf8');
 assert.match(
   simulationSource,
-  /state\.weather = weatherForDay\(state\.seed, state\.day\);[\s\S]*advancePendingDisasters\(state\);/,
+  /state\.weather = weatherForDay\([\s\S]*?state\.seed,\s*state\.day[\s\S]*?\);[\s\S]*advancePendingDisasters\(state\);/,
   'pending disasters advance after the deterministic weather for that day is known',
 );
 

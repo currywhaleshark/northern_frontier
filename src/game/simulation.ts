@@ -147,6 +147,12 @@ export function newGameFromOptions(
   const s = options.seed ?? Math.floor(Math.random() * 2 ** 31);
   const seedSource = seedSourceOverride ?? (options.seed == null ? 'random' : 'manual');
   const worldSetup = worldSetupSnapshot(options, seedSource);
+  if (seedSource === 'tutorial') {
+    // 길잡이는 설정 화면을 우회하는 고정 시나리오다. 쉬움의 물자·위협·서식지는 유지하되
+    // S6의 새 지도·기후 노브가 기존 시드 지도와 진행 속도를 바꾸지 않게 기준값으로 고정한다.
+    worldSetup.effective.resourceDensityMultiplier = 1;
+    worldSetup.effective.climateSeverityMultiplier = 1;
+  }
   const difficulty = options.baseDifficulty;
   const rng = makeRng(s);
   const { tiles, centerX, centerY } = generateMap(
