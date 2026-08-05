@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "kind": "imagegen-building-request",
+  "engine": "hd-first-seasonal",
+  "character": {
+    "id": "rainwater-cistern-building-v1",
+    "description": "late-Joseon Korean rainwater cistern with roof gutter, onggi jars, and stone base"
+  },
+  "source": {
+    "mode": "built-in-imagegen",
+    "normal": "tools/render/source_images/rainwater-cistern-v1/rainwater-cistern-normal-alpha.png",
+    "winter": "tools/render/source_images/rainwater-cistern-v1/rainwater-cistern-winter-alpha.png",
+    "backgroundRemoval": "built-in chroma source processed with imagegen remove_chroma_key.py"
+  },
+  "cell": {
+    "displayWidth": 28,
+    "displayHeight": 40,
+    "standardWidth": 56,
+    "standardHeight": 80,
+    "hdWidth": 224,
+    "hdHeight": 320,
+    "anchor": "tile-bottom-left"
+  },
+  "pipeline": {
+    "order": ["compose-hd", "derive-standard-from-hd"],
+    "script": "tools/render/build_rainwater_cistern_assets.py"
+  },
+  "states": {
+    "seasonal": ["normal", "winter"]
+  }
+}

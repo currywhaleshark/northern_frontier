@@ -56,6 +56,7 @@ import { initialAquiferLevels, initialOreVeinRemaining } from './subsurfaceVeins
 import { advanceFishingGrounds, ensureFishingGrounds, spawnFishingGrounds } from './fishingGrounds';
 import { fishingPortPierAt, fishingWaterAccessForBuilding } from './fishingBoats';
 import { dailyAquiferTick } from './waterSupply';
+import { initializeCisternState } from './rainwaterCistern';
 import {
   canPlantCropNow, cropIdForBuilding, CROP_DEFS, defaultCropForBuildingType, isCropAllowedOnBuilding,
 } from './crops';
@@ -357,6 +358,7 @@ function placePrebuilt(state: GameState, type: BuildingTypeId, x: number, y: num
   }
   if (type === 'jangdokdae') b.fermentBatches = [];
   if (type === 'stable') b.livestock = createDefaultLivestockState();
+  initializeCisternState(b);
   if (type === 'fishingPort') {
     b.portPier = fishingPortPierAt(state.map, x, y) ?? undefined;
     const water = fishingWaterAccessForBuilding(state, b)[0];
@@ -513,6 +515,7 @@ export function tryPlaceBuilding(
   if (type === 'dryingRack') b.dryingProduct = 'saltedFish';
   if (type === 'jangdokdae') b.fermentBatches = [];
   if (type === 'stable') b.livestock = createDefaultLivestockState();
+  initializeCisternState(b);
   if (type === 'fishingPort') {
     b.portPier = fishingPortPierAt(state.map, x, y) ?? undefined;
     const water = fishingWaterAccessForBuilding(state, b)[0];

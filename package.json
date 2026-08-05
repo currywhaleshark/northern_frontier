@@ -15,7 +15,7 @@
     "test:game:full": "node tools/run-game-tests.mjs --suite=full",
     "test:game:suites": "node tools/run-game-tests.mjs --list-suites",
     "test:terrain-growth": "node tools/render/test_historical_terrain.mjs && node tools/render/test_terrain_growth_assets.mjs && node tools/render/test_terrain_growth_visuals.mjs",
-    "test:building-assets": "node tools/render/test_cemetery_assets.mjs && node tools/render/test_oblique_building_assets.mjs",
+    "test:building-assets": "node tools/render/test_cemetery_assets.mjs && node tools/render/test_oblique_building_assets.mjs && node tools/render/test_rainwater_cistern_building_assets.mjs",
     "test:livestock-assets": "node tools/render/test_livestock_assets.mjs",
     "test:corpse-assets": "node tools/render/test_corpse_coffin_assets.mjs",
     "test:no-local-paths": "node tools/test_no_local_paths.mjs",

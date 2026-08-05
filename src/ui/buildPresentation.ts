@@ -29,6 +29,7 @@ export const BUILD_CATEGORY_BY_TYPE = {
   clinic: 'special',
   mine: 'production',
   well: 'housing',
+  rainwaterCistern: 'housing',
   deepMine: 'production',
   ferry: 'production',
   fishingPort: 'production',

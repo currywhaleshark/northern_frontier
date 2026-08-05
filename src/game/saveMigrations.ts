@@ -835,6 +835,23 @@ export function migrateV60ToV61(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 61 };
 }
 
+// v62: 빗물 저수조의 액체 저수량·눈 저장량·고갈 경고 날짜.
+export function migrateV61ToV62(raw: RawSave): RawSave {
+  const migrated = clonedRecord(raw);
+  if (Array.isArray(migrated.buildings)) {
+    for (const entry of migrated.buildings) {
+      if (!entry || typeof entry !== 'object') continue;
+      const building = entry as RawSave;
+      if (building.type !== 'rainwaterCistern') continue;
+      building.cisternStored = normalizedAmount(building.cisternStored);
+      building.cisternSnowStored = normalizedAmount(building.cisternSnowStored);
+      delete building.cisternDryWarningDay;
+    }
+  }
+  migrated.schemaVersion = 62;
+  return migrated;
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -901,6 +918,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 58) migrated = migrateV58ToV59(migrated);
     else if (version === 59) migrated = migrateV59ToV60(migrated);
     else if (version === 60) migrated = migrateV60ToV61(migrated);
+    else if (version === 61) migrated = migrateV61ToV62(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }

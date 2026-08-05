@@ -1475,9 +1475,9 @@ function goalItem(step, state, label) {
       `guide module ${id} uses the planned format`,
     );
   }
-  // 기존 14개 모듈 + S5 해안 시작·자염막 완공 안내 2개
+  // 기존 14개 모듈 + S5 해안 시작·자염막 완공 + 빗물 저수조 안내 3개
   assert.deepEqual(Object.keys(guides.GUIDE_MODULES).sort(), [
-    'battle', 'beast', 'chronicle', 'coast', 'diplomacy', 'disaster', 'expedition',
+    'battle', 'beast', 'chronicle', 'cistern', 'coast', 'diplomacy', 'disaster', 'expedition',
     'fire', 'livestock', 'mining', 'oxen', 'preservation', 'rename',
     'saltworks', 'tannery', 'tribute',
   ]);

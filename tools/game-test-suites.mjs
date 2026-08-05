@@ -56,6 +56,7 @@ const CORE_TESTS = testFiles(
   'processing_reserves',
   'processor_input_logistics',
   'promotion',
+  'rainwater_cistern',
   'resident_housing',
   'resource_category_consumption',
   'resource_save_migration',

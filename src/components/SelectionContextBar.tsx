@@ -29,6 +29,7 @@ import { enrolledStudentIds, isSchoolAge, schoolSeatCount } from '../game/educat
 import { specialResidentSkills } from '../game/specialResidents';
 import { isYouthWorkJob } from '../game/youth';
 import { buildingWaterSupply, wellWaterStatus } from '../game/waterSupply';
+import { cisternStatus } from '../game/rainwaterCistern';
 import { DAY_BAND_NAMES, uiDayBand } from '../ui/dayBand';
 import {
   ARTIFACT_WEAPON_NAMES, COMBAT_WEAPON_NAMES, MOUNT_NAMES, artifactWeaponForResident,
@@ -661,6 +662,7 @@ export function SelectionContextBar({
                           : null;
                         const water = building.built ? buildingWaterSupply(state, building) : null;
                         const wellStatus = building.built ? wellWaterStatus(state, building) : null;
+                        const rainwaterStatus = building.built ? cisternStatus(state, building) : null;
                         return (
                           <>
                             <tr><td>상태</td><td>{clearingBlocksWork(state, building)
@@ -703,6 +705,21 @@ export function SelectionContextBar({
                                 </tr>
                               </>
                             )}
+                            {rainwaterStatus && (
+                              <>
+                                <tr>
+                                  <td>빗물 저수</td>
+                                  <td>{rainwaterStatus.stored.toFixed(1)}/{rainwaterStatus.capacity} · {Math.floor(rainwaterStatus.levelRatio * 100)}%</td>
+                                </tr>
+                                {rainwaterStatus.frozen > 0 && (
+                                  <tr><td>얼어 있는 눈물</td><td>{rainwaterStatus.frozen.toFixed(1)} · 해빙 뒤 사용</td></tr>
+                                )}
+                                <tr>
+                                  <td>하루 공급</td>
+                                  <td>{rainwaterStatus.dailyOutput.toFixed(1)} · 반경 {rainwaterStatus.radius}칸 · 약 {rainwaterStatus.estimatedDays.toFixed(1)}일분</td>
+                                </tr>
+                              </>
+                            )}
                             {water && water.demand > 0 && (
                               <tr>
                                 <td>급수</td>
@@ -715,7 +732,9 @@ export function SelectionContextBar({
                                       ? '농수로'
                                       : water.source === 'well'
                                         ? '우물'
-                                        : '미급수'} ·{' '}
+                                        : water.source === 'cistern'
+                                          ? '빗물 저수조'
+                                          : '미급수'} ·{' '}
                                   {Math.floor(water.ratio * 100)}% ({water.supplied.toFixed(1)}/{water.demand.toFixed(1)})
                                 </td>
                               </tr>

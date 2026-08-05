@@ -14,7 +14,7 @@ type GuideFormat = 'card' | 'modal';
 type GuideModuleId =
   | 'preservation' | 'livestock' | 'oxen' | 'disaster' | 'fire' | 'diplomacy'
   | 'battle' | 'expedition' | 'beast' | 'mining' | 'chronicle' | 'rename'
-  | 'tribute' | 'tannery' | 'coast' | 'saltworks';
+  | 'tribute' | 'tannery' | 'coast' | 'saltworks' | 'cistern';
 
 interface GuideModule {
   id: GuideModuleId;
@@ -202,6 +202,18 @@ export const GUIDE_MODULES: Record<GuideModuleId, GuideModule> = {
       '· 염부 한 명은 하루 소금 0.75를 내며 소금 하나마다 장작 1.25를 태웁니다.\n' +
       '· 겨울에도 가동하지만 난방 장작과 같은 재고를 씁니다. 추위가 오기 전에는 가동 인원을 조절하십시오.',
   },
+  cistern: {
+    id: 'cistern',
+    title: '빗물 저수조',
+    summary: '빗물 저수조는 수맥 없이 생활용수를 보태지만, 비가 끊기면 우물보다 먼저 마릅니다.',
+    format: 'card',
+    body:
+      '빗물 저수조가 섰습니다. 지붕물받이와 큰 독에 비와 눈을 모아 가까운 집과 작업장에 나눕니다.\n' +
+      '· 수맥 없이 아무 육지에나 지을 수 있지만, 급수 반경과 하루 공급량은 우물보다 작습니다.\n' +
+      '· 우물이 닿으면 우물물을 먼저 쓰고, 모자란 생활용수만 저수조가 보탭니다.\n' +
+      '· 눈은 얼어 있다가 봄에 녹습니다. 겨울에는 쓸 수 있는 물의 하루 공급량도 절반입니다.\n' +
+      '· 가뭄에는 새 물이 들지 않고 저장수도 증발합니다. 이것만 믿고 마을을 크게 늘리지 마십시오.',
+  },
   rename: {
     id: 'rename',
     title: '개칭 청원',
@@ -226,6 +238,7 @@ const BUILDING_GUIDES: Partial<Record<BuildingTypeId, GuideModuleId>> = {
   stable: 'livestock',
   deepMine: 'mining',
   saltworks: 'saltworks',
+  rainwaterCistern: 'cistern',
 };
 
 function ensureGuideState(state: GameState): GuideState {

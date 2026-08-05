@@ -2,6 +2,7 @@ import { BUILDING_DEFS, buildingFootprintDims } from './buildings';
 import { annualClimateForState } from './climate';
 import { CONFIG } from './config';
 import { isDroughtActive } from './disasters';
+import { cisternStatus, dailyCisternTick } from './rainwaterCistern';
 import { aquiferSampleAt, aquiferVeins } from './subsurfaceVeins';
 import {
   buildingTouchesWaterCoverage,
@@ -10,7 +11,7 @@ import {
 } from './waterCoverage';
 import type { Building, BuildingTypeId, GameState, Resident } from './types';
 
-type WaterSupplySource = 'river' | 'lake' | 'canal' | 'well' | 'none';
+type WaterSupplySource = 'river' | 'lake' | 'canal' | 'well' | 'cistern' | 'none';
 
 export interface BuildingWaterSupply {
   demand: number;
@@ -22,6 +23,7 @@ export interface BuildingWaterSupply {
 export interface WaterSupplySnapshot {
   buildings: Map<number, BuildingWaterSupply>;
   aquiferConsumption: number[];
+  cisternConsumption: Map<number, number>;
   naturalCoverage: NaturalWaterCoverage;
 }
 
@@ -51,9 +53,16 @@ export const PREVIEW_WATER_BUILDING_ID = Number.MAX_SAFE_INTEGER;
 const EPSILON = 1e-6;
 const FAIR_SHARE_ITERATIONS = 64;
 
-interface WellSupplySource extends PreviewWell {
-  veinId: number;
+interface FiniteSupplySource extends PreviewWell {
   available: number;
+}
+
+interface WellSupplySource extends FiniteSupplySource {
+  veinId: number;
+}
+
+interface CisternSupplySource extends FiniteSupplySource {
+  buildingId: number;
 }
 
 interface WaterDemandEntry {
@@ -107,11 +116,11 @@ function footprintDistanceToTile(
 
 function distributeWellSupply(
   entries: WaterDemandEntry[],
-  sources: WellSupplySource[],
+  sources: FiniteSupplySource[],
   suppliedByBuilding: Map<number, number>,
 ): void {
   for (let iteration = 0; iteration < FAIR_SHARE_ITERATIONS; iteration++) {
-    const proposals: Array<{ source: WellSupplySource; entry: WaterDemandEntry; amount: number }> = [];
+    const proposals: Array<{ source: FiniteSupplySource; entry: WaterDemandEntry; amount: number }> = [];
     const proposedByBuilding = new Map<number, number>();
 
     for (const source of sources) {
@@ -191,6 +200,7 @@ export function waterSupplySnapshot(
 ): WaterSupplySnapshot {
   const aquiferConsumption = state.aquiferLevels.map(() => 0);
   const sources: WellSupplySource[] = [];
+  const cisternSources: CisternSupplySource[] = [];
   const levelByVein = new Map<number, number>();
 
   const registerWell = (well: PreviewWell, status: WellWaterStatus | null): void => {
@@ -201,6 +211,17 @@ export function waterSupplySnapshot(
 
   for (const well of state.buildings) {
     registerWell(well, wellWaterStatus(state, well));
+  }
+  for (const building of state.buildings) {
+    const status = cisternStatus(state, building);
+    if (status && status.dailyOutput > EPSILON) {
+      cisternSources.push({
+        x: building.x,
+        y: building.y,
+        buildingId: building.id,
+        available: status.dailyOutput,
+      });
+    }
   }
   if (previewWell) registerWell(previewWell, wellWaterStatusAt(state, previewWell.x, previewWell.y));
 
@@ -216,6 +237,7 @@ export function waterSupplySnapshot(
     }
   }
   const initialAvailable = new Map(sources.map(source => [source, source.available]));
+  const initialCisternAvailable = new Map(cisternSources.map(source => [source, source.available]));
 
   const demandBuildings: WaterDemandEntry[] =
     state.buildings
@@ -253,6 +275,9 @@ export function waterSupplySnapshot(
   );
   distributeWellSupply(housing, sources, suppliedByBuilding);
   distributeWellSupply(production, sources, suppliedByBuilding);
+  const suppliedByWells = new Map(suppliedByBuilding);
+  distributeWellSupply(housing, cisternSources, suppliedByBuilding);
+  distributeWellSupply(production, cisternSources, suppliedByBuilding);
 
   for (const { building, demand } of wellDemandBuildings) {
     const rawSupplied = Math.min(demand, suppliedByBuilding.get(building.id) ?? 0);
@@ -262,7 +287,9 @@ export function waterSupplySnapshot(
       demand,
       supplied,
       ratio,
-      source: supplied > EPSILON ? 'well' : 'none',
+      source: supplied > EPSILON
+        ? supplied - (suppliedByWells.get(building.id) ?? 0) > EPSILON ? 'cistern' : 'well'
+        : 'none',
     });
   }
 
@@ -271,7 +298,14 @@ export function waterSupplySnapshot(
     aquiferConsumption[source.veinId] =
       (aquiferConsumption[source.veinId] ?? 0) + consumed;
   }
-  return { buildings, aquiferConsumption, naturalCoverage };
+  const cisternConsumption = new Map<number, number>();
+  for (const source of cisternSources) {
+    cisternConsumption.set(
+      source.buildingId,
+      Math.max(0, (initialCisternAvailable.get(source) ?? 0) - source.available),
+    );
+  }
+  return { buildings, aquiferConsumption, cisternConsumption, naturalCoverage };
 }
 
 export function buildingWaterSupply(state: GameState, building: Building): BuildingWaterSupply {
@@ -319,4 +353,5 @@ export function dailyAquiferTick(state: GameState): void {
     const capacity = veins[veinId]?.capacity ?? current;
     state.aquiferLevels[veinId] = Math.min(capacity, Math.max(0, current - consumed + recovery));
   }
+  dailyCisternTick(state, snapshot.cisternConsumption);
 }

@@ -40,6 +40,7 @@ const BUILDING_COLUMNS: Record<BuildingTypeId, number> = {
   clinic: 6,
   mine: 10,
   well: 3,
+  rainwaterCistern: 3,
   deepMine: 10,
   ferry: 5,
   fishingPort: 5, // 전용 포구 자산 전 임시 수변 시설 셀

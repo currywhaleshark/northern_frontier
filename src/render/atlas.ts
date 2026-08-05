@@ -73,6 +73,11 @@ import {
   boatyardBuildingSourceRect,
 } from './boatyardBuildingAssets';
 import {
+  RAINWATER_CISTERN_BUILDING_HD_SHEET,
+  RAINWATER_CISTERN_BUILDING_SHEET,
+  rainwaterCisternBuildingSourceRect,
+} from './rainwaterCisternBuildingAssets';
+import {
   GENERATED_CHARACTER_SHEET,
   generatedCharacterFacingScale,
   generatedMountedRaiderSourceRect,
@@ -370,6 +375,8 @@ let saltworksBuildingSheet: HTMLImageElement | null = null;
 let saltworksBuildingHdSheet: HTMLImageElement | null = null;
 let boatyardBuildingSheet: HTMLImageElement | null = null;
 let boatyardBuildingHdSheet: HTMLImageElement | null = null;
+let rainwaterCisternBuildingSheet: HTMLImageElement | null = null;
+let rainwaterCisternBuildingHdSheet: HTMLImageElement | null = null;
 type SeamlessGroundFamily = 'plain' | 'forest' | 'rock';
 interface SeamlessGroundPair {
   standard: HTMLImageElement | null;
@@ -596,6 +603,8 @@ function ensureLoaded(): void {
   loadAtlasAsset(SALTWORKS_BUILDING_HD_SHEET.src, false, image => { saltworksBuildingHdSheet = image; });
   loadAtlasAsset(BOATYARD_BUILDING_SHEET.src, true, image => { boatyardBuildingSheet = image; });
   loadAtlasAsset(BOATYARD_BUILDING_HD_SHEET.src, false, image => { boatyardBuildingHdSheet = image; });
+  loadAtlasAsset(RAINWATER_CISTERN_BUILDING_SHEET.src, true, image => { rainwaterCisternBuildingSheet = image; });
+  loadAtlasAsset(RAINWATER_CISTERN_BUILDING_HD_SHEET.src, false, image => { rainwaterCisternBuildingHdSheet = image; });
   // 새 게임의 봄 자산만 시작 준비에 포함하고, 나머지 계절은 실제 진입 시 요청한다.
   requestSeamlessGroundSeason('spring', true);
   loadAtlasAsset(GENERATED_TERRAIN_OBJECT_SHEET.src, true, image => { terrainObjectSheet = image; });
@@ -1892,6 +1901,7 @@ const BUILDING_SPRITES: Record<BuildingTypeId, BuildingSprite> = {
   smithy:     { roof: ROOF_DARK, base: FACE_DOOR, glyph: ANVIL },
   mine:       { base: ROCK_GRAY2, glyph: ANVIL },
   well:       { base: FACE_STONE, glyph: WATER },
+  rainwaterCistern: { base: FACE_STONE, glyph: WATER },
   deepMine:   { roof: ROOF_DARK, base: ROCK_GRAY2, glyph: ANVIL },
   ferry:      { base: TENT_TAN, glyph: WATER },
   fishingPort: { base: TENT_TAN, glyph: WATER },
@@ -2226,6 +2236,32 @@ function blitBoatyardBuilding(
   if (!image) return false;
   const rect = boatyardBuildingSourceRect(p.season, highDefinition);
   const destHeight = p.size * (BOATYARD_BUILDING_SHEET.height / BOATYARD_BUILDING_SHEET.width);
+  ctx.drawImage(
+    image,
+    rect.x,
+    rect.y,
+    rect.w,
+    rect.h,
+    p.x,
+    p.y + p.size - destHeight,
+    p.size,
+    destHeight,
+  );
+  return true;
+}
+
+function blitRainwaterCisternBuilding(
+  ctx: CanvasRenderingContext2D,
+  p: BuildingDrawParams,
+): boolean {
+  if (p.type !== 'rainwaterCistern') return false;
+  const highDefinition = Boolean(p.highDefinition && rainwaterCisternBuildingHdSheet);
+  const image = highDefinition ? rainwaterCisternBuildingHdSheet : rainwaterCisternBuildingSheet;
+  if (!image) return false;
+  const rect = rainwaterCisternBuildingSourceRect(p.season, highDefinition);
+  const destHeight = p.size * (
+    RAINWATER_CISTERN_BUILDING_SHEET.height / RAINWATER_CISTERN_BUILDING_SHEET.width
+  );
   ctx.drawImage(
     image,
     rect.x,
@@ -3046,6 +3082,12 @@ export const atlasSprites: SpriteAPI = {
     }
 
     if (blitBoatyardBuilding(ctx, p)) {
+      ctx.globalAlpha = 1;
+      drawProgressBar(ctx, p);
+      return;
+    }
+
+    if (blitRainwaterCisternBuilding(ctx, p)) {
       ctx.globalAlpha = 1;
       drawProgressBar(ctx, p);
       return;

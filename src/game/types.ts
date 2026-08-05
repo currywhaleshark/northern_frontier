@@ -275,6 +275,7 @@ export type BuildingTypeId =
   | 'clinic'     // 의원
   | 'mine'       // 채광장
   | 'well'       // 우물 — 지하수 수맥 위 급수 시설
+  | 'rainwaterCistern' // 빗물 저수조 — 강수만 모아 쓰는 무인 생활용수 시설
   | 'deepMine'   // 채광갱 — 지하 광맥을 캐는 부 단계 작업장
   | 'ferry'      // 낚시터 (구 저장 호환을 위해 내부 ID 유지)
   | 'fishingPort' // 포구 — 호수·바다 연안 어로와 어선 계류 거점
@@ -677,6 +678,9 @@ export interface Building {
   repairCause?: BuildingRepairCause; // 우측 경고에서 습격·설해·대홍수·화재 피해를 구분한다
   boatWorkOrder?: FishingBoatWorkOrder; // 배무이터 전용 어선 건조·본수리 공정
   portPier?: FishingPortPier; // 포구 전용: 육상 포구채에서 수면 계류대까지 뻗는 직선 잔교
+  cisternStored?: number; // 빗물 저수조 전용: 지금 바로 쓸 수 있는 물
+  cisternSnowStored?: number; // 빗물 저수조 전용: 봄 해빙 전까지 얼어 있는 눈물
+  cisternDryWarningDay?: number; // 고갈 경고 중복 방지용 마지막 날짜
 }
 
 interface FishingBoatWorkOrder {

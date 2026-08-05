@@ -66,6 +66,7 @@ import {
   type PreviewWaterBuilding,
   type WaterSupplySnapshot,
 } from '../game/waterSupply';
+import { cisternStatus } from '../game/rainwaterCistern';
 import {
   waterCoverageTileKey,
   type NaturalWaterCoverage,
@@ -1789,10 +1790,11 @@ function drawWellSupplyRange(
   y: number,
   emphasis = true,
   color = '#6dd3f2',
+  radiusTiles: number = CONFIG.water.wellRadius,
 ): void {
   const cx = (x + 0.5) * TILE;
   const cy = (y + 0.5) * TILE;
-  const radius = CONFIG.water.wellRadius * TILE;
+  const radius = radiusTiles * TILE;
   ctx.save();
   ctx.fillStyle = color;
   ctx.globalAlpha = emphasis ? 0.13 : 0.06;
@@ -2631,8 +2633,13 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
     ? undefined
     : state.buildings.find(building =>
         building.id === o.selectedBuildingId && building.type === 'well');
+  const selectedCistern = o.selectedBuildingId == null
+    ? undefined
+    : state.buildings.find(building =>
+        building.id === o.selectedBuildingId && building.type === 'rainwaterCistern');
   const waterVisualizationActive =
-    showAquiferLayer || o.placingType === 'well' || selectedWell != null;
+    showAquiferLayer || o.placingType === 'well' || o.placingType === 'rainwaterCistern' ||
+    selectedWell != null || selectedCistern != null;
   const validWaterPlacement = o.placingType && o.hover
     ? isBuildingFootprintExplored(
         state,
@@ -2986,6 +2993,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
             b.built,
             waterSnapshot?.buildings.get(b.id),
             b.type === 'well' ? wellWaterStatus(state, b) : null,
+            b.type === 'rainwaterCistern' ? cisternStatus(state, b) : null,
           ) ?? undefined
         : b.type === 'gate' && b.gateWallType === 'earthFort'
           ? { color: '#8b633f', alpha: 0.18 }
@@ -3359,20 +3367,22 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   }
   if (waterVisualizationActive) {
     for (const well of state.buildings) {
-      if (well.type !== 'well' ||
+      if ((well.type !== 'well' && well.type !== 'rainwaterCistern') ||
           !isBuildingFootprintExplored(state, well.type, well.x, well.y, well.w, well.h)) continue;
       const tint = waterLayerTintForBuilding(
         well.type,
         well.built,
         undefined,
-        wellWaterStatus(state, well),
+        well.type === 'well' ? wellWaterStatus(state, well) : null,
+        well.type === 'rainwaterCistern' ? cisternStatus(state, well) : null,
       );
       drawWellSupplyRange(
         ctx,
         well.x,
         well.y,
-        selectedWell?.id === well.id,
+        selectedWell?.id === well.id || selectedCistern?.id === well.id,
         tint?.color,
+        well.type === 'rainwaterCistern' ? CONFIG.water.cisternRadius : CONFIG.water.wellRadius,
       );
     }
   }
@@ -3416,6 +3426,16 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
           previewTint?.color ?? '#76e4ff',
         );
       }
+    }
+    if (o.placingType === 'rainwaterCistern' && o.hover) {
+      drawWellSupplyRange(
+        ctx,
+        o.hover.x,
+        o.hover.y,
+        true,
+        '#5ec7bb',
+        CONFIG.water.cisternRadius,
+      );
     }
     const want = PLACEMENT_HINT[o.placingType];
     if (want) {
@@ -3659,6 +3679,8 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
             undefined,
             wellWaterStatusAt(state, o.hover.x, o.hover.y),
           ) ?? undefined
+        : o.placingType === 'rainwaterCistern'
+          ? waterLayerTintForBuilding('rainwaterCistern', false, undefined, null, null) ?? undefined
         : showAquiferLayer
           ? waterLayerTintForBuilding(
               o.placingType,

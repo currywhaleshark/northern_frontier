@@ -187,6 +187,12 @@ export const BUILDING_DEF_DEFAULTS: Record<BuildingTypeId, BuildingDef> = {
     cost: { wood: 4, stone: 6, tools: 1 }, buildDays: 4, slots: 0, capacity: 0, defense: 0,
     winterBonus: false, placement: 'land', unique: false,
   },
+  rainwaterCistern: {
+    id: 'rainwaterCistern', name: '빗물 저수조',
+    desc: `지붕물받이와 큰 독에 비와 눈을 모으는 무인 생활용수 시설. 수맥 없이 지을 수 있지만 반경 ${CONFIG.water.cisternRadius}칸만 하루 ${CONFIG.water.cisternDailyOutput}까지 공급하며 가뭄에는 먼저 마른다.`,
+    cost: { wood: 4, onggi: 2, stone: 2 }, buildDays: 3, slots: 0, capacity: 0, defense: 0,
+    winterBonus: false, placement: 'land', unique: false,
+  },
   deepMine: {
     id: 'deepMine', name: '채광갱',
     desc: '부(府) 승격 후 지하 광맥 위에 세우는 2×2 갱도. 채광꾼 4명이 광맥의 철이나 석재를 직접 캐며 같은 광맥의 매장량을 공유한다.',
@@ -346,7 +352,7 @@ export const BUILDING_DEFS: Record<BuildingTypeId, BuildingDef> =
   applyBalanceOverrides(cloneBalanceTree(BUILDING_DEF_DEFAULTS), 'buildings.');
 
 export const BUILD_MENU_ORDER: BuildingTypeId[] = [
-  'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'well', 'field', 'paddy', 'canal', 'weir', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'lodgingHut', 'clinic',
+  'hut', 'ondol', 'tileHouse', 'storehouse', 'cellar', 'bridge', 'well', 'rainwaterCistern', 'field', 'paddy', 'canal', 'weir', 'lumberCamp', 'woodShed', 'huntLodge', 'herbHut', 'lodgingHut', 'clinic',
   'smokehouse', 'dryingRack', 'saltworks', 'tidalFishery', 'smithy', 'mine', 'deepMine', 'ferry', 'fishingPort', 'boatyard', 'watermill', 'onggiKiln', 'jangdokdae', 'charcoalKiln', 'stable', 'nitreYard', 'dock', 'tannery', 'weavingHouse', 'market', 'office', 'cemetery', 'school', 'shrine', 'hermitage',
   'levee', 'palisade', 'earthFort', 'stoneWall', 'gate', 'watchtower', 'beacon', 'garrison',
   'cannonEmplacement', 'chongtongEmplacement',
@@ -363,6 +369,7 @@ const SINGLE_TILE_BUILDINGS = [
   'lodgingHut',
   'mine',
   'well',
+  'rainwaterCistern',
   'field',
   'paddy',
   'ferry',

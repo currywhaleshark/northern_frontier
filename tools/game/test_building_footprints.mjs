@@ -43,6 +43,7 @@ const SINGLE_TILE = [
   'lodgingHut',
   'mine',
   'well',
+  'rainwaterCistern',
   'field',
   'paddy',
   'ferry',

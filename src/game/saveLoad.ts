@@ -38,6 +38,7 @@ import {
 } from './weapons';
 import { beginExpeditionReturn } from './expedition';
 import { CURRENT_SCHEMA_VERSION } from './saveSchema';
+import { normalizeCisternState } from './rainwaterCistern';
 import { normalizeSubsurfaceState } from './subsurfaceVeins';
 import { defaultRaiderFormationLine } from './tacticalTargeting';
 import { legacyTacticalPlanMetadata, tacticalCompositionTemplate } from './tacticalCompositions';
@@ -1671,6 +1672,7 @@ export function loadGame(slot = 1): GameState | null {
       : 0;
     if (!parsed.unlockedLivestock.includes('chicken')) parsed.unlockedLivestock.push('chicken');
     for (const building of parsed.buildings) {
+      normalizeCisternState(building);
       if (building.built) building.repairing = false;
       const validGateWallType = building.gateWallType === 'palisade' ||
         building.gateWallType === 'earthFort' || building.gateWallType === 'stoneWall';
