@@ -169,9 +169,8 @@ function effectiveValues(options: NewGameOptions): WorldSetupSnapshot['effective
       threatGainMultiplier: preset.threatGain,
       raidPowerMultiplier: preset.raidPower,
       habitatChance: Math.min(0.98, preset.habitatChance * habitatMultiplier),
-      // 아직 지도 밀도·기후 소비처는 연결하지 않는다. S2 이후 활성화한다.
-      resourceDensityMultiplier: 1,
-      climateSeverityMultiplier: 1,
+      resourceDensityMultiplier: RESOURCE_DENSITY_MULTIPLIER[options.tuning.resourceDensity],
+      climateSeverityMultiplier: CLIMATE_SEVERITY_MULTIPLIER[options.tuning.climateSeverity],
     };
   }
   return {

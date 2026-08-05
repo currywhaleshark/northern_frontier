@@ -57,9 +57,27 @@ const { CONFIG } = await load('config');
       [expected.startRes, expected.threatGain, expected.raidPower, expected.habitatChance],
       `${difficulty} 프리셋은 기존 난이도 실효값을 그대로 쓴다`,
     );
-    assert.equal(setup.effective.resourceDensityMultiplier, 1);
-    assert.equal(setup.effective.climateSeverityMultiplier, 1);
+    assert.equal(setup.effective.resourceDensityMultiplier,
+      difficulty === 'easy' ? 1.25 : difficulty === 'hard' ? 0.75 : 1);
+    assert.equal(setup.effective.climateSeverityMultiplier,
+      difficulty === 'easy' ? 0.85 : difficulty === 'hard' ? 1.2 : 1);
   }
+
+  const custom = options.normalizeNewGameOptions({
+    ...options.optionsForDifficulty('hard'),
+    difficultyPreset: 'custom',
+    tuning: { startingResources: 'high', resourceDensity: 'low', climateSeverity: 'low', threat: 'normal' },
+  });
+  assert.equal(custom.baseDifficulty, 'hard', '개별 노브는 바탕 난이도를 보존한다');
+  assert.equal(custom.difficultyPreset, 'custom');
+  assert.deepEqual(options.worldSetupSnapshot(custom, 'manual').effective, {
+    startResourceMultiplier: 1.5,
+    threatGainMultiplier: 1,
+    raidPowerMultiplier: 1,
+    habitatChance: 0.45,
+    resourceDensityMultiplier: 0.75,
+    climateSeverityMultiplier: 0.85,
+  });
 
   const mountain = {
     settlementName: '  설한촌  ', difficultyPreset: 'hard', baseDifficulty: 'hard',
@@ -163,6 +181,14 @@ const { CONFIG } = await load('config');
   assert.match(menuSource, /시작/);
   assert.match(menuSource, /이어하기/);
   assert.match(menuSource, /튜토리얼/);
+  const setupSource = readFileSync(new URL('../../src/components/NewGameSetup.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(setupSource, /세부 설정 <span>준비 중|<select disabled/,
+    'S6 세부설정은 잠금이나 준비 중 표기를 남기지 않는다');
+  assert.match(setupSource, /difficultyPreset: 'custom'/,
+    '개별 노브 선택은 사용자 설정으로 전환한다');
+  for (const label of ['시작 물자', '자원 밀도', '기후 혹독도', '위협']) {
+    assert.match(setupSource, new RegExp(label));
+  }
 }
 
 console.log('new-game setup tests passed');

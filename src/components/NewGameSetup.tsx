@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { CONFIG } from '../game/config';
 import {
-  defaultNewGameOptions, MAX_NEW_GAME_SEED, SETUP_LEVEL_NAMES, tuningForDifficulty,
+  defaultNewGameOptions, MAX_NEW_GAME_SEED, tuningForDifficulty,
 } from '../game/newGameOptions';
 import {
   generateSettlementName, normalizeSettlementNameInput, SETTLEMENT_NAME_MAX_LENGTH,
 } from '../game/settlementName';
-import type { Difficulty, MapRegion, MapSize, NewGameOptions } from '../game/types';
+import type {
+  Difficulty, MapRegion, MapSize, NewGameOptions, NewGameTuning, SetupLevel,
+} from '../game/types';
 import { MenuSnowLayer } from './MenuSnowLayer';
 
 interface Props {
@@ -25,6 +27,33 @@ const SIZES: Array<{ id: MapSize; name: string; detail: string }> = [
   { id: 'small', name: '소형', detail: '56×56 · 짧고 밀도 높은 개척지입니다.' },
   { id: 'medium', name: '중형', detail: '72×72 · 현재 표준 지도 크기입니다.' },
   { id: 'large', name: '대형', detail: '96×96 · 넓은 변경을 장기적으로 개척합니다.' },
+];
+const TUNING_CONTROLS: Array<{
+  key: keyof NewGameTuning;
+  label: string;
+  levels: Record<SetupLevel, string>;
+  detail: string;
+}> = [
+  {
+    key: 'startingResources', label: '시작 물자',
+    levels: { low: '부족', normal: '기준', high: '풍부' },
+    detail: '첫날 보유한 식량·목재·도구 등 초기 물자를 조절합니다.',
+  },
+  {
+    key: 'resourceDensity', label: '자원 밀도',
+    levels: { low: '희소', normal: '기준', high: '풍부' },
+    detail: '숲·광물·수맥·사냥감·어장의 전반적인 풍요도를 조절합니다.',
+  },
+  {
+    key: 'climateSeverity', label: '기후 혹독도',
+    levels: { low: '온화', normal: '기준', high: '혹독' },
+    detail: '한랭·건조·눈보라가 해마다 얼마나 거세지는지 조절합니다.',
+  },
+  {
+    key: 'threat', label: '위협',
+    levels: { low: '낮음', normal: '기준', high: '높음' },
+    detail: '위협 증가 속도와 습격대 전력을 함께 조절합니다.',
+  },
 ];
 
 function rollCandidateName(): string {
@@ -50,6 +79,14 @@ export function NewGameSetup({ onStart, onBack }: Props) {
       difficultyPreset: difficulty,
       baseDifficulty: difficulty,
       tuning: tuningForDifficulty(difficulty),
+    }));
+  };
+
+  const chooseTuning = (key: keyof NewGameTuning, level: SetupLevel) => {
+    setOptions(current => ({
+      ...current,
+      difficultyPreset: 'custom',
+      tuning: { ...current.tuning, [key]: level },
     }));
   };
 
@@ -87,7 +124,7 @@ export function NewGameSetup({ onStart, onBack }: Props) {
         </section>
 
         <section className="new-game-setup-section">
-          <h2>난이도</h2>
+          <h2>난이도 {options.difficultyPreset === 'custom' && <span className="setup-custom-badge">사용자 설정</span>}</h2>
           <div className="diff-row">
             {DIFFICULTIES.map(id => {
               const difficulty = CONFIG.difficulty[id];
@@ -96,12 +133,6 @@ export function NewGameSetup({ onStart, onBack }: Props) {
               </button>;
             })}
           </div>
-        </section>
-
-        <section className="new-game-setup-section setup-seed-row">
-          <label htmlFor="new-game-seed">세계 시드 <span className="muted small">비워 두면 무작위</span></label>
-          <input id="new-game-seed" inputMode="numeric" value={seedInput} onChange={event => setSeedInput(event.target.value)} placeholder="무작위" aria-invalid={!seedIsInteger} />
-          {!seedIsInteger && <p className="setup-input-error">0~{MAX_NEW_GAME_SEED} 사이의 정수를 입력해 주십시오.</p>}
         </section>
 
         <section className="new-game-setup-section"><h2>지역</h2><div className="setup-card-row">
@@ -118,16 +149,23 @@ export function NewGameSetup({ onStart, onBack }: Props) {
           </button>)}
         </div></section>
 
-        <details className="new-game-tuning"><summary>세부 설정 <span>준비 중</span></summary><div>
-          {([
-            ['시작 자원', options.tuning.startingResources],
-            ['자원 밀도', options.tuning.resourceDensity],
-            ['기후 강도', options.tuning.climateSeverity],
-            ['위협 수준', options.tuning.threat],
-          ] as const).map(([label, level]) => <label key={label}>{label}
-            <select disabled value={level}><option value={level}>{SETUP_LEVEL_NAMES[level]}</option></select>
-          </label>)}
-          <p className="muted small">난이도 프리셋의 파생값을 보여 줍니다. 개별 변경은 후속 단계에서 열립니다.</p>
+        <details className="new-game-tuning"><summary>세부 설정 <span>{options.difficultyPreset === 'custom' ? '사용자 설정' : '난이도 프리셋'}</span></summary><div>
+          {TUNING_CONTROLS.map(control => {
+            const level = options.tuning[control.key];
+            return <label key={control.key}>{control.label}
+              <select value={level} onChange={event => chooseTuning(control.key, event.target.value as SetupLevel)}>
+                {(['low', 'normal', 'high'] as SetupLevel[]).map(candidate => (
+                  <option key={candidate} value={candidate}>{control.levels[candidate]}</option>
+                ))}
+              </select>
+              <span>{control.detail}</span>
+            </label>;
+          })}
+          <label className="setup-seed-row" htmlFor="new-game-seed">세계 시드 <span className="muted small">비워 두면 무작위</span>
+            <input id="new-game-seed" inputMode="numeric" value={seedInput} onChange={event => setSeedInput(event.target.value)} placeholder="무작위" aria-invalid={!seedIsInteger} />
+            {!seedIsInteger && <span className="setup-input-error">0~{MAX_NEW_GAME_SEED} 사이의 정수를 입력해 주십시오.</span>}
+          </label>
+          <p className="muted small">개별 값을 바꾸면 현재 난이도를 바탕으로 한 사용자 설정이 됩니다. 난이도 카드를 다시 고르면 네 값이 함께 복원됩니다.</p>
         </div></details>
 
         <div className="new-game-setup-actions">

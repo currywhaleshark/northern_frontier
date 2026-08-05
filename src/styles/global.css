@@ -2264,6 +2264,7 @@ html, body, #root {
 .new-game-setup-heading .menu-subtitle { margin: 5px 0 0; }
 .new-game-setup-section { margin: 0 0 17px; }
 .new-game-setup-section h2 { margin: 0 0 8px; color: var(--text); font-size: 14px; }
+.setup-custom-badge { margin-left: 6px; padding: 2px 6px; border: 1px solid rgba(217, 164, 65, 0.5); border-radius: 10px; color: var(--accent); font-size: 10px; font-weight: 500; }
 .new-game-setup-section > label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 13px; }
 .new-game-setup-section .settlement-name-row { justify-content: flex-start; margin: 0; }
 .setup-seed-row input { width: min(260px, 100%); padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: rgba(10, 14, 18, 0.75); color: var(--text); font: inherit; }
@@ -2278,8 +2279,11 @@ html, body, #root {
 .new-game-tuning summary { cursor: pointer; color: var(--text); }
 .new-game-tuning summary span { color: var(--muted); font-size: 11px; }
 .new-game-tuning > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
-.new-game-tuning label { display: grid; gap: 4px; color: var(--muted); font-size: 11px; }
-.new-game-tuning select { padding: 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel2); color: var(--muted); }
+.new-game-tuning label { display: grid; align-content: start; gap: 4px; color: var(--muted); font-size: 11px; }
+.new-game-tuning label > span { line-height: 1.35; }
+.new-game-tuning select { padding: 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel2); color: var(--text); }
+.new-game-tuning .setup-seed-row { grid-column: 1 / -1; }
+.new-game-tuning .setup-seed-row input { width: min(260px, 100%); }
 .new-game-tuning p { grid-column: 1 / -1; margin: 2px 0 0; }
 .new-game-setup-actions { display: flex; justify-content: flex-end; gap: 10px; }
 @media (max-width: 640px) { .new-game-setup { padding: 12px 0; } .new-game-setup-panel { padding: 20px; } .new-game-setup-heading { gap: 10px; } .new-game-setup-heading .menu-title { font-size: 23px; } .diff-row { flex-direction: column; } .new-game-tuning > div { grid-template-columns: 1fr; } }
