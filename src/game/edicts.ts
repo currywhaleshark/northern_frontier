@@ -6,7 +6,7 @@ import { countBuilt } from './buildings';
 import { CONFIG } from './config';
 import { addLog } from './events';
 import { withJosa } from './josa';
-import type { EdictId, EdictLevel, EdictState, GameState, MoraleFactor } from './types';
+import type { EdictId, EdictLevel, EdictState, GameState, JobId, MoraleFactor, Resident } from './types';
 
 interface EdictLevelDef {
   level: EdictLevel;
@@ -24,7 +24,9 @@ interface EdictDef {
 
 const EDICT_CFG = CONFIG.edicts;
 
-export const EDICT_ORDER: readonly EdictId[] = ['ration', 'fuelRation'];
+export const EDICT_ORDER: readonly EdictId[] = [
+  'ration', 'fuelRation', 'immigration', 'fireCode', 'curfew', 'elderCare', 'corvee',
+];
 
 export const EDICT_DEFS: Record<EdictId, EdictDef> = {
   ration: {
@@ -62,6 +64,57 @@ export const EDICT_DEFS: Record<EdictId, EdictDef> = {
         summary: `연료 소모 ${Math.round((EDICT_CFG.fuelRation.tight.fuelMult - 1) * 100)}%, `
           + `민심 ${EDICT_CFG.fuelRation.tight.morale} · 체온 하락과 질병 위험 증가`,
       },
+    ],
+  },
+  immigration: {
+    id: 'immigration',
+    name: '모민령',
+    hanja: '募民令',
+    desc: '떠도는 백성을 얼마나 적극적으로 불러들일지 정한다. 널리 받으면 일손은 빨리 늘지만 식량과 집이 빠듯해진다.',
+    levels: [
+      { level: 'generous', name: '널리 받음', summary: `무작위 이주 제안 +${Math.round((EDICT_CFG.immigration.generous.chanceMult - 1) * 100)}%, 민심 ${EDICT_CFG.immigration.generous.morale}` },
+      { level: 'normal', name: '평시', summary: '평소대로 유민을 맞는다' },
+      { level: 'tight', name: '엄히 가림', summary: `무작위 이주 제안 ${Math.round((EDICT_CFG.immigration.tight.chanceMult - 1) * 100)}%, 민심 ${EDICT_CFG.immigration.tight.morale}` },
+    ],
+  },
+  fireCode: {
+    id: 'fireCode',
+    name: '방화령',
+    hanja: '防火令',
+    desc: '불씨와 화기 작업을 엄히 단속한다. 큰불은 줄지만 가마와 대장간 같은 작업장이 더디게 돈다.',
+    levels: [
+      { level: 'normal', name: '평시', summary: '평소대로 불씨를 다룬다' },
+      { level: 'tight', name: '방화', summary: `발화 ${Math.round((EDICT_CFG.fireCode.tight.ignitionMult - 1) * 100)}% · 확산 ${Math.round((EDICT_CFG.fireCode.tight.spreadMult - 1) * 100)}% · 화기 작업장 생산 ${Math.round((EDICT_CFG.fireCode.tight.fireWorkMult - 1) * 100)}%` },
+    ],
+  },
+  curfew: {
+    id: 'curfew',
+    name: '야금령',
+    hanja: '夜禁令',
+    desc: '해가 지면 마실을 금하고 귀가시킨다. 여가는 줄지만 집에서 삼는 수공업품은 늘어난다.',
+    levels: [
+      { level: 'normal', name: '평시', summary: '저녁 마실을 허용한다' },
+      { level: 'tight', name: '야금', summary: `저녁 마실 금지 · 가내수공업 +${Math.round((EDICT_CFG.curfew.tight.homeCraftMult - 1) * 100)}% · 민심 ${EDICT_CFG.curfew.tight.morale}` },
+    ],
+  },
+  elderCare: {
+    id: 'elderCare',
+    name: '휼로령',
+    hanja: '恤老令',
+    desc: '예순이 넘은 노인의 일을 덜고 돌봄을 명한다. 숙련 일손은 줄지만 노환과 질병을 덜 겪는다.',
+    levels: [
+      { level: 'normal', name: '평시', summary: '평소대로 노년의 일을 맡긴다' },
+      { level: 'generous', name: '휼로', summary: `노년 노동 ${Math.round((EDICT_CFG.elderCare.generous.elderLaborMult - 1) * 100)}% · 노환 ${Math.round((EDICT_CFG.elderCare.generous.oldAgeDeathMult - 1) * 100)}% · 민심 +${EDICT_CFG.elderCare.generous.morale}` },
+    ],
+  },
+  corvee: {
+    id: 'corvee',
+    name: '부역령',
+    hanja: '賦役令',
+    desc: '토목 공사가 급할 때 건축가와 운반꾼을 저녁 초반까지 붙든다. 공사는 빨라지지만 몸과 민심이 상한다.',
+    levels: [
+      { level: 'normal', name: '평시', summary: '해가 지면 일을 마친다' },
+      { level: 'tight', name: '부역', summary: `건축가·운반꾼 저녁 ${EDICT_CFG.corvee.tight.eveningSubticks}틱 연장 · 민심 ${EDICT_CFG.corvee.tight.morale}` },
     ],
   },
 };
@@ -196,6 +249,84 @@ export function edictFuelRationMultiplier(state: GameState): number {
   return tight.fuelMult * (harshWeather ? tight.harshWeatherMult : 1);
 }
 
+export function edictImmigrationChanceMultiplier(state: GameState): number {
+  const level = edictLevel(state, 'immigration');
+  if (level === 'generous') return EDICT_CFG.immigration.generous.chanceMult;
+  if (level === 'tight') return EDICT_CFG.immigration.tight.chanceMult;
+  return 1;
+}
+
+export function edictImmigrationRejectionReputationMultiplier(state: GameState): number {
+  return edictLevel(state, 'immigration') === 'generous'
+    ? EDICT_CFG.immigration.generous.rejectionReputationMult
+    : 1;
+}
+
+export function edictFireIgnitionMultiplier(state: Pick<GameState, 'edicts'>): number {
+  return edictLevel(state as GameState, 'fireCode') === 'tight' ? EDICT_CFG.fireCode.tight.ignitionMult : 1;
+}
+
+export function edictFireSpreadMultiplier(state: GameState): number {
+  return edictLevel(state, 'fireCode') === 'tight' ? EDICT_CFG.fireCode.tight.spreadMult : 1;
+}
+
+const FIRE_USING_JOBS = new Set<JobId>(['potter', 'saltMaker', 'smith', 'charcoalBurner', 'powderMaker']);
+
+export function edictFireWorkMultiplier(state: GameState, job: JobId): number {
+  return edictLevel(state, 'fireCode') === 'tight' && FIRE_USING_JOBS.has(job)
+    ? EDICT_CFG.fireCode.tight.fireWorkMult
+    : 1;
+}
+
+export function edictCurfewActive(state: GameState): boolean {
+  return edictLevel(state, 'curfew') === 'tight';
+}
+
+export function edictHomeCraftMultiplier(state: GameState): number {
+  return edictCurfewActive(state) ? EDICT_CFG.curfew.tight.homeCraftMult : 1;
+}
+
+export function edictHomeCraftStockBuffer(state: GameState): number {
+  if (!edictCurfewActive(state)) return 0;
+  return state.residents.filter(resident => resident.alive && resident.stage !== 'infant').length *
+    EDICT_CFG.curfew.tight.stockBufferPerResident;
+}
+
+export function edictElderLaborMultiplier(state: GameState, resident: Pick<Resident, 'age' | 'stage'>): number {
+  if (resident.stage || resident.age < CONFIG.lifecycle.elderLaborAge || edictLevel(state, 'elderCare') !== 'generous') return 1;
+  return EDICT_CFG.elderCare.generous.elderLaborMult / CONFIG.lifecycle.elderLaborMult;
+}
+
+export function edictElderDeathMultiplier(state: GameState, resident: Pick<Resident, 'age' | 'stage'>): number {
+  if (resident.stage || resident.age < CONFIG.lifecycle.elderDeathCheckAge || edictLevel(state, 'elderCare') !== 'generous') return 1;
+  return EDICT_CFG.elderCare.generous.oldAgeDeathMult;
+}
+
+export function edictElderSicknessMultiplier(state: GameState, resident: Pick<Resident, 'age' | 'stage'>): number {
+  if (resident.stage || resident.age < CONFIG.lifecycle.elderLaborAge || edictLevel(state, 'elderCare') !== 'generous') return 1;
+  return EDICT_CFG.elderCare.generous.sicknessMult;
+}
+
+export function edictCorveeActive(state: GameState): boolean {
+  return edictLevel(state, 'corvee') === 'tight';
+}
+
+export function edictCorveeEligible(state: GameState, resident: Resident): boolean {
+  if (!edictCorveeActive(state) || (resident.job !== 'builder' && resident.job !== 'hauler')) return false;
+  if (!resident.alive || resident.stage || resident.sick || resident.health < 20 ||
+      state.day < (resident.quarantinedUntil ?? 0) || state.day < (resident.birthRecoveryUntil ?? 0)) return false;
+  return !(edictLevel(state, 'elderCare') === 'generous' && resident.age >= CONFIG.lifecycle.elderLaborAge);
+}
+
+export function edictCorveeEveningSubticks(state: GameState): number {
+  return edictCorveeActive(state) ? EDICT_CFG.corvee.tight.eveningSubticks : 0;
+}
+
+export function applyEdictCorveeStrain(state: GameState, resident: Resident): void {
+  if (!edictCorveeEligible(state, resident)) return;
+  resident.health = Math.max(1, resident.health - EDICT_CFG.corvee.tight.healthLossPerSubtick);
+}
+
 // ── 민심 내역 ──
 
 export function edictMoraleFactors(state: GameState): MoraleFactor[] {
@@ -203,9 +334,7 @@ export function edictMoraleFactors(state: GameState): MoraleFactor[] {
   for (const active of activeEdicts(state)) {
     const def = EDICT_DEFS[active.id];
     const levelDef = edictLevelDef(active.id, active.level);
-    const delta = active.id === 'ration'
-      ? (active.level === 'tight' ? EDICT_CFG.ration.tight.morale : EDICT_CFG.ration.generous.morale)
-      : EDICT_CFG.fuelRation.tight.morale;
+    const delta = edictMoraleDelta(active.id, active.level);
     factors.push({
       id: `edict:${active.id}`,
       label: `${def.name}${levelDef && levelDef.level !== 'normal' ? ` (${levelDef.name})` : ''} · ${active.days}일째 시행`,
@@ -222,4 +351,16 @@ export function edictMoraleFactors(state: GameState): MoraleFactor[] {
     });
   }
   return factors;
+}
+
+function edictMoraleDelta(id: EdictId, level: EdictLevel): number {
+  switch (id) {
+    case 'ration': return level === 'tight' ? EDICT_CFG.ration.tight.morale : EDICT_CFG.ration.generous.morale;
+    case 'fuelRation': return EDICT_CFG.fuelRation.tight.morale;
+    case 'immigration': return level === 'tight' ? EDICT_CFG.immigration.tight.morale : EDICT_CFG.immigration.generous.morale;
+    case 'fireCode': return EDICT_CFG.fireCode.tight.morale;
+    case 'curfew': return EDICT_CFG.curfew.tight.morale;
+    case 'elderCare': return EDICT_CFG.elderCare.generous.morale;
+    case 'corvee': return EDICT_CFG.corvee.tight.morale;
+  }
 }

@@ -2020,7 +2020,14 @@ type DeathCauseId = 'combat' | 'starvation' | 'cold' | 'disease' | 'other';
 
 // 절목(節目) — 중심지에서 반포하는 시행 세칙. 개별 항목은 「~령(令)」.
 // 계획: docs/DESIGN-2026-07-23-edict-system.md
-export type EdictId = 'ration' | 'fuelRation';
+export type EdictId =
+  | 'ration'
+  | 'fuelRation'
+  | 'immigration'
+  | 'fireCode'
+  | 'curfew'
+  | 'elderCare'
+  | 'corvee';
 export type EdictLevel = 'tight' | 'normal' | 'generous'; // 령마다 유효 단계가 다르다
 
 export interface EdictState {

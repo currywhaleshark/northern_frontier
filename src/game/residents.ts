@@ -11,6 +11,7 @@ import {
 import { BUILDING_DEFS } from './buildings';
 import { isNorthernDefectorOrigin, NORTHERN_DEFECTOR_NAMES } from './defectors';
 import { addLog } from './events';
+import { edictElderSicknessMultiplier } from './edicts';
 import { residentLogName } from './residentLogName';
 import { returnResidentCart } from './equipment';
 import { addCorpse } from './lifecycle';
@@ -417,7 +418,7 @@ export function updateResidentNeeds(
       if (season === 'summer') chance += hcfg.sickSummerChance;
       if (r.hunger < 25) chance += hcfg.sickHungryChance;
       chance += (1 - waterRatio) * CONFIG.water.unservedSickChance;
-      if (rng() < chance) {
+      if (rng() < chance * edictElderSicknessMultiplier(state, r)) {
         r.sick = true;
         addLog(state, `${withJosa(residentLogName(r), '이/가')} 병에 걸렸습니다.`, 'bad');
       }

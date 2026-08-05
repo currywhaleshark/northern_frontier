@@ -1,4 +1,5 @@
 import { CONFIG } from './config';
+import { edictHomeCraftMultiplier, edictHomeCraftStockBuffer } from './edicts';
 import { settlementLivestockWinterHayNeed } from './livestock';
 import { getSeason } from './seasons';
 import type {
@@ -215,7 +216,8 @@ function strawShoeCraftNeed(state: GameState): number {
   const living = state.residents.filter(resident => resident.alive && resident.stage !== 'infant');
   const missing = living.filter(resident => !resident.worn?.footwear).length;
   const nearExpiry = living.filter(resident => (resident.worn?.footwear?.wear ?? 0) >= 0.75).length;
-  const targetStock = missing + nearExpiry + CONFIG.wearables.strawShoeStockBuffer;
+  const targetStock = missing + nearExpiry + CONFIG.wearables.strawShoeStockBuffer +
+    edictHomeCraftStockBuffer(state);
   return Math.max(
     0,
     targetStock - finiteStock(state, 'strawShoes') - finiteStock(state, 'leatherShoes'),
@@ -235,7 +237,7 @@ export function craftStrawShoesAtHome(state: GameState, resident: Resident): num
   const laborMultiplier = resident.stage != null ? CONFIG.wearables.childWearMultiplier : 1;
   const output = Math.min(
     need,
-    CONFIG.wearables.strawShoePerEvening * laborMultiplier,
+    CONFIG.wearables.strawShoePerEvening * laborMultiplier * edictHomeCraftMultiplier(state),
     availableHay / CONFIG.wearables.strawShoeHayPerUnit,
   );
   if (output <= 0) return 0;

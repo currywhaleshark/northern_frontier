@@ -6,6 +6,7 @@ import { withJosa } from './josa';
 import { BUILDING_DEFS, cemeteryPlotCapacity } from './buildings';
 import { CONFIG } from './config';
 import { addLog } from './events';
+import { edictElderDeathMultiplier } from './edicts';
 import { settleEducationOnAdulthood } from './education';
 import { residentMonkBurialBonus } from './morale';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
@@ -135,7 +136,7 @@ function ageResidents(state: GameState, rng: () => number): void {
       0.9,
       l.elderDeathAnnualBase + l.elderDeathAnnualPerYear * (r.age - l.elderDeathCheckAge),
     );
-    if (rng() < chance) {
+    if (rng() < chance * edictElderDeathMultiplier(state, r)) {
       killResident(state, r, '노환');
     }
   }

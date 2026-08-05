@@ -9,6 +9,7 @@ import { skillGainMult } from './education';
 import { skillGainArtifactMultiplier } from './specialItems';
 import { haulingMoveSpeedMultiplier, scaledCarryCapacity } from './equipment';
 import { laborEfficiencyMult } from './lifecycle';
+import { edictElderLaborMultiplier, edictFireWorkMultiplier } from './edicts';
 import { processableAmount } from './processing';
 import { DRYING_PRODUCT_DEFS, dryingProductOf } from './preservation';
 import { activePredatorScoutIds } from './expeditionIntel';
@@ -66,8 +67,9 @@ export const LEISURE_DESTINATION_TIERS: readonly (readonly BuildingTypeId[])[] =
 
 // ─────────────────────────── 공통 헬퍼 ───────────────────────────
 
-export function effOf(r: Resident): number {
-  return (1 + (r.skills[r.job] ?? 0) * CONFIG.production.skillEffect) * laborEfficiencyMult(r);
+export function effOf(state: GameState, r: Resident): number {
+  return (1 + (r.skills[r.job] ?? 0) * CONFIG.production.skillEffect) * laborEfficiencyMult(r) *
+    edictElderLaborMultiplier(state, r) * edictFireWorkMultiplier(state, r.job);
 }
 
 export function gainSkillTick(state: Pick<GameState, 'specialItems'>, r: Resident): void {

@@ -1763,6 +1763,27 @@ export const CONFIG_DEFAULTS = {
     fuelRation: {
       tight: { fuelMult: 0.7, morale: -4, harshWeatherMult: 0.85 },
     },
+    // 모민령(募民令) — 무작위 유민·귀순 제안 빈도. 직접 초청·조정 모민은 건드리지 않는다.
+    immigration: {
+      generous: { chanceMult: 1.75, morale: -1, rejectionReputationMult: 1.5 },
+      tight: { chanceMult: 0.4, morale: -3, rejectionReputationMult: 1 },
+    },
+    // 방화령(防火令) — 불씨 단속과 화기 작업장 규제.
+    fireCode: {
+      tight: { ignitionMult: 0.55, spreadMult: 0.7, fireWorkMult: 0.9, morale: -2 },
+    },
+    // 야금령(夜禁令) — 저녁 마실을 막고 귀가 뒤 가내수공업을 독려한다.
+    curfew: {
+      tight: { homeCraftMult: 1.5, stockBufferPerResident: 0.25, morale: -4 },
+    },
+    // 휼로령(恤老令) — 60세 이상 노동을 덜 시키고 노환·질병 위험을 낮춘다.
+    elderCare: {
+      generous: { elderLaborMult: 0.6, oldAgeDeathMult: 0.5, sicknessMult: 0.65, morale: 2 },
+    },
+    // 부역령(賦役令) — 건축가·운반꾼만 저녁 초반까지 연장 근무한다.
+    corvee: {
+      tight: { eveningSubticks: 5, healthLossPerSubtick: 0.04, morale: -5 },
+    },
   },
 
   // 종교인 등장 — 네임드가 갈래를 열고, 이후에는 신맥·법맥 후계자가 시설을 잇는다.

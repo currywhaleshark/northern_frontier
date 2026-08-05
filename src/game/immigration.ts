@@ -2,6 +2,9 @@ import { housingCapacity } from './buildings';
 import { CONFIG } from './config';
 import { foodTotal } from './consumption';
 import { addLog } from './events';
+import {
+  edictImmigrationChanceMultiplier, edictImmigrationRejectionReputationMultiplier,
+} from './edicts';
 import { RESIDENT_ORIGINS, residentOriginLabel } from './defectors';
 import { addForeignSiteMemory } from './foreignSites';
 import { literateAdults } from './education';
@@ -113,7 +116,8 @@ function openImmigrationChoice(
       {
         id: 'reject',
         label: '돌려보낸다',
-        desc: options.granted ? '인구 변화 없음. 조정의 모민 방문을 정중히 사양합니다.' : `인구 변화 없음. 명성 -${CONFIG.immigration.rejectReputation}.`,
+        desc: options.granted ? '인구 변화 없음. 조정의 모민 방문을 정중히 사양합니다.'
+          : `인구 변화 없음. 명성 -${CONFIG.immigration.rejectReputation * edictImmigrationRejectionReputationMultiplier(state)}.`,
       },
     ],
     data: { count, children, elders, ...(options.granted ? { granted: true } : {}) },
@@ -175,7 +179,8 @@ export function maybeOfferDefectorImmigration(state: GameState, rng: () => numbe
   if (season !== 'spring' && season !== 'summer') return false;
   const lastDay = state.lastImmigrationDay ?? -999;
   if (state.day - lastDay < CONFIG.immigration.cooldownDays) return false;
-  if (rng() >= Math.min(1, CONFIG.defectors.immigrationDailyChance * rankEffects(state.rank).immigration)) return false;
+  if (rng() >= Math.min(1, CONFIG.defectors.immigrationDailyChance * rankEffects(state.rank).immigration *
+    edictImmigrationChanceMultiplier(state))) return false;
   const origins = [RESIDENT_ORIGINS.nimacha, RESIDENT_ORIGINS.holaon] as const;
   const origin = origins[Math.floor(rng() * origins.length)];
   const count = CONFIG.defectors.groupMin +
@@ -191,7 +196,8 @@ export function maybeOfferImmigration(state: GameState, rng: () => number): bool
   const im = CONFIG.immigration;
   const lastDay = state.lastImmigrationDay ?? -999;
   if (state.day - lastDay < im.cooldownDays) return false;
-  if (rng() >= Math.min(1, im.dailyChance * rankEffects(state.rank).immigration)) return false;
+  if (rng() >= Math.min(1, im.dailyChance * rankEffects(state.rank).immigration *
+    edictImmigrationChanceMultiplier(state))) return false;
   // 기존 일일 RNG 계약: 마지막 주민이 사라진 날에는 확률 확인 1회 뒤
   // 가족 구성 난수를 소비하지 않는다.
   if (livingResidents(state).length === 0) return false;
@@ -293,7 +299,9 @@ export function resolveImmigration(state: GameState, optionId: string): void {
       addLog(state, `${residentOriginLabel(origin)}의 귀순 청원을 거절했습니다. ${origin}과의 관계가 나빠졌습니다.`, 'bad', true);
       return;
     }
-    state.resources.reputation = Math.max(0, state.resources.reputation - CONFIG.immigration.rejectReputation);
+    const reputationLoss = CONFIG.immigration.rejectReputation *
+      edictImmigrationRejectionReputationMultiplier(state);
+    state.resources.reputation = Math.max(0, state.resources.reputation - reputationLoss);
     addLog(state, '머물 곳을 청하던 이들을 돌려보냈습니다. 야박하다는 소문이 퍼져 명성이 조금 떨어졌습니다.', 'bad', true);
   }
 }

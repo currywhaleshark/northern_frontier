@@ -3,6 +3,7 @@ import { buildingFootprintDims, isPlotBuildingType } from './buildings';
 import { annualClimateForState, climateSeverityForState } from './climate';
 import { CONFIG } from './config';
 import { addLog } from './events';
+import { edictFireIgnitionMultiplier, edictFireSpreadMultiplier } from './edicts';
 import { openGuideOnce } from './guides';
 import { buildingStock, takeBuildingStock } from './inventory';
 import { damageBuildingTargets } from './raidDamage';
@@ -46,7 +47,8 @@ export function canIgniteFireInWeather(weather: WeatherId): boolean {
   return !CONFIG.disasters.fire.noIgnitionWeather.includes(weather);
 }
 
-type FireClimateState = Pick<GameState, 'seed' | 'day' | 'weather'> & Partial<Pick<GameState, 'worldSetup'>>;
+type FireClimateState = Pick<GameState, 'seed' | 'day' | 'weather'> &
+  Partial<Pick<GameState, 'worldSetup' | 'edicts'>>;
 
 function consecutiveDryDays(state: FireClimateState): number {
   let days = 0;
@@ -70,7 +72,7 @@ export function fireDailyIgnitionChance(state: FireClimateState): number {
   );
   const dryDays = Math.min(CONFIG.disasters.fire.dryDayCap, consecutiveDryDays(state));
   return CONFIG.disasters.fire.dailyIgnitionChance * annualMultiplier *
-    (1 + dryDays * CONFIG.disasters.fire.dryDayBonus);
+    (1 + dryDays * CONFIG.disasters.fire.dryDayBonus) * edictFireIgnitionMultiplier(state);
 }
 
 export function fireIgnitionWeight(state: Pick<GameState, 'day'>, building: Building): number {
@@ -259,7 +261,8 @@ export function advanceFire(state: GameState): void {
       continue;
     }
 
-    const spreadChance = CONFIG.disasters.fire.spreadChancePerTick * Math.max(0.5, site.intensity);
+    const spreadChance = CONFIG.disasters.fire.spreadChancePerTick * Math.max(0.5, site.intensity) *
+      edictFireSpreadMultiplier(state);
     if (rng() < spreadChance) {
       const target = weightedBuilding(nearbyFireTargets(state, building, existing), state, rng);
       if (target) {

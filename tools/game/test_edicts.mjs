@@ -34,11 +34,17 @@ const load = name => import(pathToFileURL(join(compiledDir, `${name}.mjs`)).href
 
 try {
   const edicts = await load('edicts');
+  const agents = await load('agents');
+  const buildings = await load('buildings');
   const simulation = await load('simulation');
   const morale = await load('morale');
   const consumption = await load('consumption');
+  const agentCore = await load('agentCore');
+  const fire = await load('fire');
   const lifecycle = await load('lifecycle');
   const residents = await load('residents');
+  const wearables = await load('wearables');
+  const { DAY_BANDS } = await load('dayCycle');
   const saveLoad = await load('saveLoad');
   const { CURRENT_SCHEMA_VERSION } = await load('saveSchema');
   const { CONFIG } = await load('config');
@@ -65,6 +71,11 @@ try {
   {
     const state = simulation.newGame(2026072501);
     assert.deepEqual(state.edicts, {}, 'a new settlement has no edict in force');
+    assert.deepEqual(
+      edicts.EDICT_ORDER,
+      ['ration', 'fuelRation', 'immigration', 'fireCode', 'curfew', 'elderCare', 'corvee'],
+      'the full confirmed edict set is exposed in a stable order',
+    );
     for (const id of edicts.EDICT_ORDER) {
       assert.equal(edicts.edictLevel(state, id), 'normal');
       assert.equal(edicts.edictSinceDay(state, id), null, 'an untouched edict has no proclamation day');
@@ -76,6 +87,145 @@ try {
     assert.equal(edicts.edictSlotCapacity(state), E.slotsByRank.settlement);
     assert.equal(edicts.edictHoldDays(state), CONFIG.time.seasonDays, 'a proclaimed edict must hold one season');
     assert.deepEqual(edictFactors(state), [], 'peacetime edicts add no morale factor');
+  }
+
+  // ── 확장 절목: 평시 1배, 시행 중에는 각 시스템이 같은 설정값을 읽는다 ──
+  {
+    const state = simulation.newGame(2026080501);
+    const elder = state.residents.find(resident => resident.alive);
+    Object.assign(elder, { age: 60, stage: undefined, job: 'smith', sick: false, health: 100 });
+    elder.skills.smith = 0;
+
+    assert.equal(edicts.edictImmigrationChanceMultiplier(state), 1);
+    assert.equal(edicts.edictFireIgnitionMultiplier(state), 1);
+    assert.equal(edicts.edictFireSpreadMultiplier(state), 1);
+    assert.equal(edicts.edictFireWorkMultiplier(state, 'smith'), 1);
+    assert.equal(edicts.edictElderLaborMultiplier(state, elder), 1);
+    assert.equal(edicts.edictElderDeathMultiplier(state, elder), 1);
+    assert.equal(edicts.edictElderSicknessMultiplier(state, elder), 1);
+    assert.equal(edicts.edictCurfewActive(state), false);
+    assert.equal(edicts.edictCorveeActive(state), false);
+
+    state.edicts = {
+      immigration: { level: 'generous', sinceDay: state.day },
+      fireCode: { level: 'tight', sinceDay: state.day },
+      curfew: { level: 'tight', sinceDay: state.day },
+      elderCare: { level: 'generous', sinceDay: state.day },
+      corvee: { level: 'tight', sinceDay: state.day },
+    };
+    assert.equal(edicts.edictImmigrationChanceMultiplier(state), E.immigration.generous.chanceMult);
+    assert.equal(edicts.edictImmigrationRejectionReputationMultiplier(state), E.immigration.generous.rejectionReputationMult);
+    assert.equal(edicts.edictFireIgnitionMultiplier(state), E.fireCode.tight.ignitionMult);
+    assert.equal(edicts.edictFireSpreadMultiplier(state), E.fireCode.tight.spreadMult);
+    assert.equal(edicts.edictFireWorkMultiplier(state, 'smith'), E.fireCode.tight.fireWorkMult);
+    assert.equal(edicts.edictFireWorkMultiplier(state, 'farmer'), 1, 'non-fire work is not penalized');
+    assert.equal(
+      agentCore.effOf(state, elder),
+      E.elderCare.generous.elderLaborMult * E.fireCode.tight.fireWorkMult,
+      'elder care and fire-work restrictions compose once in the common labor multiplier',
+    );
+    assert.equal(edicts.edictElderDeathMultiplier(state, elder), E.elderCare.generous.oldAgeDeathMult);
+    assert.equal(edicts.edictElderSicknessMultiplier(state, elder), E.elderCare.generous.sicknessMult);
+    assert.equal(edicts.edictCurfewActive(state), true);
+    assert.equal(edicts.edictCorveeEveningSubticks(state), E.corvee.tight.eveningSubticks);
+  }
+
+  // ── 방화령은 같은 날씨의 발화 확률을 낮춘다 ──
+  {
+    const normal = simulation.newGame(2026080502);
+    normal.weather = 'clear';
+    const guarded = structuredClone(normal);
+    guarded.edicts = { fireCode: { level: 'tight', sinceDay: guarded.day } };
+    const baseChance = fire.fireDailyIgnitionChance(normal);
+    assert.ok(baseChance > 0);
+    assert.equal(
+      fire.fireDailyIgnitionChance(guarded),
+      baseChance * E.fireCode.tight.ignitionMult,
+    );
+  }
+
+  // ── 야금령은 귀가 수공업 산출과 비축 목표를 함께 늘린다 ──
+  {
+    const normal = simulation.newGame(2026080503);
+    normal.resources.hay = 1000;
+    normal.resources.strawShoes = 0;
+    normal.resources.leatherShoes = 0;
+    const curfew = structuredClone(normal);
+    curfew.edicts = { curfew: { level: 'tight', sinceDay: curfew.day } };
+    const normalResident = normal.residents.find(resident => resident.alive && resident.stage !== 'infant');
+    const curfewResident = curfew.residents.find(resident => resident.id === normalResident.id);
+    normalResident.lastStrawShoeCraftDay = undefined;
+    curfewResident.lastStrawShoeCraftDay = undefined;
+    const normalOutput = wearables.craftStrawShoesAtHome(normal, normalResident);
+    const curfewOutput = wearables.craftStrawShoesAtHome(curfew, curfewResident);
+    assert.ok(normalOutput > 0);
+    assert.equal(curfewOutput, normalOutput * E.curfew.tight.homeCraftMult);
+    assert.ok(edicts.edictHomeCraftStockBuffer(curfew) > 0);
+  }
+
+  // ── 부역은 성인 건축가·운반꾼만, 휼로 중인 노인은 제외한다 ──
+  {
+    const state = simulation.newGame(2026080504);
+    state.edicts = { corvee: { level: 'tight', sinceDay: state.day } };
+    const worker = state.residents.find(resident => resident.alive);
+    Object.assign(worker, { stage: undefined, age: 40, job: 'builder', sick: false, health: 100, quarantinedUntil: 0 });
+    assert.equal(edicts.edictCorveeEligible(state, worker), true);
+    worker.job = 'farmer';
+    assert.equal(edicts.edictCorveeEligible(state, worker), false);
+    worker.job = 'hauler';
+    worker.age = 65;
+    assert.equal(edicts.edictCorveeEligible(state, worker), true, 'ordinary elders may still join corvee');
+    state.edicts.elderCare = { level: 'generous', sinceDay: state.day };
+    assert.equal(edicts.edictCorveeEligible(state, worker), false, 'elder care explicitly exempts elders');
+  }
+
+  // ── 저녁 일과 통합: 부역 대상은 먼저 일하고, 야금 대상은 마실 대신 귀가한다 ──
+  {
+    const corveeState = simulation.newGame(2026080505);
+    const worker = corveeState.residents.find(resident => resident.alive);
+    for (const resident of corveeState.residents) resident.alive = resident.id === worker.id;
+    Object.assign(worker, {
+      alive: true, stage: undefined, age: 40, job: 'builder', sick: false, health: 100,
+      quarantinedUntil: 0, birthRecoveryUntil: 0, carrying: {}, haulTask: null, manualOrder: null,
+      x: 19, y: 20, px: 19, py: 20, phase: 'rest', path: [], targetId: null,
+    });
+    for (let y = 19; y <= 22; y++) {
+      for (let x = 18; x <= 22; x++) {
+        Object.assign(corveeState.map[y][x], { terrain: 'plain', buildingId: null });
+        corveeState.exploration.explored[y][x] = true;
+      }
+    }
+    const construction = {
+      id: corveeState.nextBuildingId++, type: 'hut', x: 20, y: 20,
+      progress: 0, built: false, fieldGrowth: 0,
+    };
+    corveeState.buildings.push(construction);
+    buildings.occupyBuildingTiles(corveeState, construction);
+    corveeState.weather = 'clear';
+    corveeState.edicts = { corvee: { level: 'tight', sinceDay: corveeState.day } };
+    corveeState.subTick = DAY_BANDS.evening.start;
+    agents.agentsTick(corveeState);
+    assert.ok(construction.progress > 0, 'the builder advances construction during the first corvee tick');
+    assert.equal(worker.health, 100 - E.corvee.tight.healthLossPerSubtick,
+      'the first evening corvee tick exacts its health cost');
+    const healthAfterWindow = worker.health;
+    corveeState.subTick = DAY_BANDS.evening.start + E.corvee.tight.eveningSubticks;
+    agents.agentsTick(corveeState);
+    assert.equal(worker.health, healthAfterWindow, 'corvee strain stops after the configured evening window');
+
+    const curfewState = simulation.newGame(2026080506);
+    const resident = curfewState.residents.find(candidate => candidate.alive && candidate.stage !== 'infant');
+    for (const candidate of curfewState.residents) candidate.alive = candidate.id === resident.id;
+    Object.assign(resident, {
+      alive: true, job: 'idle', sick: false, health: 100, phase: 'rest', path: [], targetId: null,
+      carrying: {}, haulTask: null, manualOrder: null,
+    });
+    curfewState.weather = 'clear';
+    curfewState.edicts = { curfew: { level: 'tight', sinceDay: curfewState.day } };
+    curfewState.subTick = DAY_BANDS.evening.start + 2;
+    agents.agentsTick(curfewState);
+    assert.ok(resident.phase === 'toHome' || resident.phase === 'sleeping');
+    assert.notEqual(resident.task, '마실 나감', 'curfew sends an eligible resident home instead of to leisure');
   }
 
   // ── 반포: 관아 앞에 방이 붙고 배율·민심 내역이 함께 선다 ──
@@ -267,10 +417,11 @@ try {
         ration: { level: 'tight' },
         curfew: { level: 'tight', sinceDay: 3 },
         fuelRation: { level: 'generous', sinceDay: 3 },
+        imaginary: { level: 'tight', sinceDay: 3 },
       },
     });
-    assert.deepEqual(Object.keys(broken.edicts), ['ration'],
-      'unknown edict ids and levels a 령 does not offer are dropped');
+    assert.deepEqual(Object.keys(broken.edicts), ['ration', 'curfew'],
+      'known new edicts survive while unknown ids and invalid levels are dropped');
     assert.equal(broken.edicts.ration.sinceDay, state.day, 'a missing proclamation day falls back to today');
   }
 
