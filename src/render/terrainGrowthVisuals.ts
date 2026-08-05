@@ -3,7 +3,7 @@ import type { Terrain, Tile } from '../game/types';
 export type TreeSpecies = 'broadleaf' | 'conifer';
 export type MountainProfile = 'shoulder' | 'ridgeLow' | 'ridgeHigh' | 'peak' | 'cliff';
 
-export interface TerrainNeighbors {
+interface TerrainNeighbors {
   n: boolean;
   e: boolean;
   s: boolean;

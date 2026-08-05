@@ -1,6 +1,6 @@
 import type { Building, Gender, Resident } from '../game/types';
 
-export type FarmerSpriteAction = 'till' | 'harvest' | 'oxPlow';
+type FarmerSpriteAction = 'till' | 'harvest' | 'oxPlow';
 
 export const RESIDENT_FARMER_TILL_SHEET = {
   frameSize: 40,

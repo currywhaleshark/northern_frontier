@@ -8,7 +8,7 @@ import type {
   TacticalRaiderSupportState,
 } from './types';
 
-export interface TacticalSupportUnitView {
+interface TacticalSupportUnitView {
   kind: TacticalRaiderSupportKind;
   status: 'ready' | 'firing' | 'reloading' | 'spent' | 'treating';
   statusLabel: string;

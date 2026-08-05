@@ -161,7 +161,7 @@ export interface BuildingDamageDrawParams {
   size: number;
 }
 
-export interface LivestockDrawParams {
+interface LivestockDrawParams {
   species: LivestockId;
   x: number;
   y: number;
@@ -169,7 +169,7 @@ export interface LivestockDrawParams {
   highDefinition?: boolean;
 }
 
-export interface CorpseDrawParams {
+interface CorpseDrawParams {
   x: number;
   y: number;
   size: number;

@@ -24,9 +24,9 @@ export const DOCK_WINDOW_MIN_SIZE = { width: 280, height: 180 } as const;
 export const DOCK_VIEWPORT_INSETS = { top: 8, right: 54, bottom: 56, left: 8 } as const;
 export const DOCK_DEFAULT_HUD_LANE_WIDTH = 360;
 export const DOCK_DEFAULT_HUD_GAP = 8;
-export const DOCK_CASCADE_STEP = 22;
+const DOCK_CASCADE_STEP = 22;
 
-export const DEFAULT_DOCK_WINDOW_SIZES: Record<FloatingWindowId, Readonly<{ width: number; height: number }>> = {
+const DEFAULT_DOCK_WINDOW_SIZES: Record<FloatingWindowId, Readonly<{ width: number; height: number }>> = {
   jobs: { width: 340, height: 520 },
   processing: { width: 340, height: 420 },
   residents: { width: 440, height: 540 },

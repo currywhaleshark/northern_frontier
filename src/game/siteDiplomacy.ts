@@ -185,7 +185,7 @@ export function banditLairScoutChance(state: GameState, siteId: number): number 
 
 export type BanditLairOutcome = 'victory' | 'raid' | 'abandoned' | 'defeat' | 'withdrawal';
 
-export interface BanditLairAssaultResult {
+interface BanditLairAssaultResult {
   outcome: 'victory' | 'defeat';
   chance: number;
   powderUsed: number;
@@ -325,13 +325,6 @@ export function resolveBanditLairAssault(
     addLog(state, `${withJosa(residentLogName(victim), '이/가')} 산채 토벌 실패로 중상을 입었습니다. (건강 -${damage})`, 'bad', true);
   }
   return result;
-}
-
-export function raidBanditLair(state: GameState, siteId: number, rng: () => number): string | null {
-  if (state.battle || state.raiders) return '습격에 대응 중에는 산채 토벌대를 보낼 수 없습니다.';
-  const combatants = createCombatRoster(state, { context: 'villageDefense' }).combatants;
-  const result = resolveBanditLairAssault(state, siteId, combatants.map(resident => resident.residentId), rng);
-  return typeof result === 'string' ? result : null;
 }
 
 export function banditLairRaidChance(

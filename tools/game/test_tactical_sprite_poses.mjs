@@ -1,3 +1,4 @@
+import { readAppCss } from '../app-stylesheets.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -191,7 +192,7 @@ const screenSource = [
   readFileSync(new URL('../../src/components/tactical/TacticalZoneColumn.tsx', import.meta.url), 'utf8'),
   readFileSync(new URL('../../src/components/tactical/TacticalGroupChip.tsx', import.meta.url), 'utf8'),
 ].join('\n');
-const tacticalCss = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
+const tacticalCss = readAppCss();
 assert.doesNotMatch(screenSource, /className="fx-muzzle-flash"/, 'zone-fixed musket flash must be removed');
 assert.match(screenSource, /tactical-unit-muzzle-flash/, 'muzzle flash must be anchored inside each firing sprite');
 assert.match(screenSource, /muzzleAnchor = firing && resolvedPose === 'attack'/,

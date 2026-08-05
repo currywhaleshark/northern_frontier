@@ -1,3 +1,4 @@
+import { readAppCss } from '../app-stylesheets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
@@ -11,7 +12,7 @@ const jobPanelSource = readFileSync(new URL('../../src/components/JobPanel.tsx',
 const weaponAllocationSource = readFileSync(new URL('../../src/components/WeaponAllocationDialog.tsx', import.meta.url), 'utf8');
 const weaponDialogSource = readFileSync(new URL('../../src/components/WeaponAllocationDialog.tsx', import.meta.url), 'utf8');
 const residentsWindowSource = readFileSync(new URL('../../src/components/dock/ResidentsWindow.tsx', import.meta.url), 'utf8');
-const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
+const cssSource = readAppCss();
 
 assert.match(appSource, /<SelectionContextBar\b[\s\S]*selectedEntity=\{selectedEntity\}/,
   'App must render the selection context from the canonical selected entity');

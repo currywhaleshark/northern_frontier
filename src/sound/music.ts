@@ -1,9 +1,9 @@
 // 화면 상태에 맞는 스트리밍 BGM 재생기.
 // 브라우저 자동재생 정책 때문에 첫 사용자 입력에서 initMusic()을 호출한다.
 
-export type MusicScene = 'title' | 'simulation' | 'battle';
+type MusicScene = 'title' | 'simulation' | 'battle';
 
-export const MUSIC_TRACKS: Record<MusicScene, readonly string[]> = {
+const MUSIC_TRACKS: Record<MusicScene, readonly string[]> = {
   title: ['/assets/audio/music/title.mp3'],
   simulation: [
     '/assets/audio/music/simulation1.mp3',

@@ -2,7 +2,7 @@ import { FOOD_RESOURCES, FUEL_RESOURCES, RESOURCE_DEFS } from './resourceCatalog
 import { clothingCoverageTotal as equippedClothingCoverageTotal } from './wearables';
 import type { GameState, ResourceId } from './types';
 
-export interface ResourceStockState {
+interface ResourceStockState {
   resources: Partial<Record<ResourceId, number>>;
 }
 

@@ -31,13 +31,13 @@ function stableHash(text: string): number {
   return hash >>> 0;
 }
 
-export function seasonFirstDay(year: number, season: Season): number {
+function seasonFirstDay(year: number, season: Season): number {
   const index = Math.max(0, SEASON_ORDER.indexOf(season));
   return (year - 1) * CONFIG.time.yearDays + index * CONFIG.time.seasonDays + 1;
 }
 
 // 체결 시 우호도가 정하는 기간 — 시드+연차로 결정적 (불러오기 시 재생성 가능)
-export function contractDurationYears(
+function contractDurationYears(
   seed: number, factionName: string, get: ResourceId, year: number, relation: number,
 ): number {
   const tier = CONFIG.trade.contract.durations.find(entry => relation >= entry.minRelation);
@@ -48,7 +48,7 @@ export function contractDurationYears(
 }
 
 // 계약 교환비에 얹는 배율 — 우호도 60부터 스팟 거래보다 소폭 유리해진다
-export function contractDiscount(relation: number): number {
+function contractDiscount(relation: number): number {
   return relation >= CONFIG.trade.contract.discountMinRelation ? CONFIG.trade.contract.discount : 1;
 }
 
@@ -61,7 +61,7 @@ export function contractGiveAmt(negotiatedGiveAmt: number, relation: number): nu
   return Math.max(1, Math.ceil(negotiatedGiveAmt * contractDiscount(relation)));
 }
 
-export function activeContracts(state: GameState): TradeContract[] {
+function activeContracts(state: GameState): TradeContract[] {
   return state.tradeContracts ?? [];
 }
 
@@ -111,7 +111,7 @@ export function tradeContractBlockReason(
   return null;
 }
 
-export interface TradeContractTerms {
+interface TradeContractTerms {
   factionName: string;
   give: ResourceId; giveAmt: number;
   get: ResourceId; getAmt: number;
@@ -170,7 +170,7 @@ export function daysUntilNextContract(state: GameState): number | null {
   return soonest;
 }
 
-export interface ContractGraceInfo {
+interface ContractGraceInfo {
   contract: TradeContract;
   daysLeft: number;   // 오늘 포함 남은 유예 일수
   shortfall: number;  // 아직 모자란 수량
@@ -286,7 +286,7 @@ function expireContract(state: GameState, contract: TradeContract): void {
 
 // 받을 물량을 고정한 채 현재 우호도로 내줄 몫을 다시 계산한다 (갱신용).
 // quoteFactionDemand와 같은 식이되 내주는 품목은 기존 계약 그대로 둔다.
-export function contractGiveForTerms(
+function contractGiveForTerms(
   factionName: string, give: ResourceId, get: ResourceId, getAmt: number, relation: number,
 ): number {
   const giveUnitValue = factionValue(factionName, give);
@@ -298,7 +298,7 @@ export function contractGiveForTerms(
 
 // 만료 계약의 갱신 조건 — 현재 우호도로 기간과 교환비를 다시 매긴다.
 // 관계를 키워 두었으면 더 긴 기간·나은 값이 자연스럽게 따라온다.
-export function renewalTerms(state: GameState, contract: TradeContract): TradeContractTerms | null {
+function renewalTerms(state: GameState, contract: TradeContract): TradeContractTerms | null {
   const relation = getRelation(state, contract.factionName);
   if (relation < CONFIG.trade.contract.minRelation) return null;
   const year = getYear(state.day);
@@ -317,7 +317,7 @@ export function renewalTerms(state: GameState, contract: TradeContract): TradeCo
 }
 
 // 만료 계절에 실행 대신 뜨는 갱신 제안 — 정기거래에서 모달이 뜨는 유일한 자리다
-export function openTradeContractRenewal(state: GameState, contract: TradeContract): void {
+function openTradeContractRenewal(state: GameState, contract: TradeContract): void {
   const terms = renewalTerms(state, contract);
   const relation = Math.round(getRelation(state, contract.factionName));
   state.pendingChoice = {

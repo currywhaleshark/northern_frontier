@@ -10,7 +10,7 @@ function wholeUnits(value: unknown): number {
   return Math.floor(Math.round(amount * 1_000_000_000) / 1_000_000_000);
 }
 
-export function tributeRequirement(tribute: CourtTribute | null, resource: ResourceId): number {
+function tributeRequirement(tribute: CourtTribute | null, resource: ResourceId): number {
   return wholeUnits(tribute?.items[resource]);
 }
 

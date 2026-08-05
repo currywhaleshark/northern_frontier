@@ -13,7 +13,7 @@ import {
 } from '../../ui/dockPresentation';
 import { DockWindow } from './DockWindow';
 
-export interface DockFrameItem {
+interface DockFrameItem {
   id: DockWindowId;
   label: string;
   icon: ReactNode;

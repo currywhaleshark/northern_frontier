@@ -9,7 +9,7 @@ const HAUL_SOURCE_BUILDING_TYPES: ReadonlySet<BuildingTypeId> = new Set([
   'fishingPort',
 ]);
 
-export function ensureBuildingInventory(building: Building): Partial<Record<ResourceId, number>> {
+function ensureBuildingInventory(building: Building): Partial<Record<ResourceId, number>> {
   if (!building.inventory) building.inventory = {};
   return building.inventory;
 }
@@ -46,7 +46,7 @@ export function isRaidProtectedBuildingInventory(building: Building): boolean {
   return building.type === 'jangdokdae';
 }
 
-export function addSettlementStock(state: GameState, resource: ResourceId, amount: number): void {
+function addSettlementStock(state: GameState, resource: ResourceId, amount: number): void {
   if (!Number.isFinite(amount) || amount <= 0) return;
   const current = Number.isFinite(state.resources[resource]) ? Math.max(0, state.resources[resource]) : 0;
   state.resources[resource] = current + amount;

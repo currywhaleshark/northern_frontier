@@ -30,7 +30,7 @@ export function nitreYardsActive(state: GameState): number {
 }
 
 // 최근 한 계절 안의 플레이어 주도 교역 성사 횟수
-export function recentInitiatedTrades(state: GameState): number {
+function recentInitiatedTrades(state: GameState): number {
   const s = CONFIG.suspicion;
   return (state.initiatedTradeDays ?? []).filter(d => state.day - d < s.tradeWindowDays).length;
 }

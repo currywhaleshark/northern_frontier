@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 
-export interface AtlasIconFrame {
+interface AtlasIconFrame {
   sx: number;
   sy: number;
   sw: number;

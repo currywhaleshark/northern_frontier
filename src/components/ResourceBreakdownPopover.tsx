@@ -4,7 +4,7 @@ import { MAX_STARRED_RESOURCES } from '../ui/uiPrefs';
 import { ResourceIcon } from './TradeResourceIcon';
 import { UiIcon } from './UiIcon';
 
-export interface ResourceBreakdownItem {
+interface ResourceBreakdownItem {
   id: StockResourceId;
   label: string;
   amount: number;

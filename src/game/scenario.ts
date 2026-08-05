@@ -33,7 +33,7 @@ export { countScenarioProgress, markScenarioFlag } from './scenarioFlags';
 export const TUTORIAL_SCENARIO_VERSION = 8;
 
 /** 소목표 하나 — 칩에 `라벨 (현재/목표)`로 선다. 라벨은 짧은 명사, 칩은 수치 요약이다. */
-export interface ScenarioGoalProgress {
+interface ScenarioGoalProgress {
   label: string;
   current: number;
   target: number;
@@ -51,7 +51,7 @@ interface ScenarioStepSpec {
   onDay?: (state: GameState, rng: () => number) => void;
 }
 
-export interface ScenarioStepDefinition extends ScenarioStepSpec {
+interface ScenarioStepDefinition extends ScenarioStepSpec {
   goal: (state: GameState) => string;   // 목표 한 줄 (모달 하단) — progress에서 조합한다
   isDone: (state: GameState) => boolean; // progress에서 파생 — 두 눈금이 갈라질 수 없다
 }

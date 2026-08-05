@@ -11,7 +11,7 @@ import { lowerSuspicion } from './suspicion';
 import { BORDER_COMMANDER_TITLE, borderCommanderEffects } from './diplomaticFigures';
 import type { GameState, Rank, ResourceId } from './types';
 
-export interface PetitionOffer {
+interface PetitionOffer {
   id: string;
   minRank: Rank;      // 이 단계부터 목록에 뜬다
   repMin: number;     // 필요 명성 (미달 시 비활성)

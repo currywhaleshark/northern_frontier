@@ -1,4 +1,4 @@
-export const MAP_ZOOM_LEVELS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2] as const;
+const MAP_ZOOM_LEVELS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2] as const;
 
 export function mapBackingScaleForZoom(zoom: number): 1 | 2 {
   return Number.isFinite(zoom) && zoom >= 2 - 0.001 ? 2 : 1;

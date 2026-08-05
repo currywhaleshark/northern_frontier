@@ -1,11 +1,11 @@
-export interface RuntimePerfEvent {
+interface RuntimePerfEvent {
   name: string;
   start: number;
   duration: number;
   detail?: Record<string, string | number | boolean | null>;
 }
 
-export interface RuntimePerfProbe {
+interface RuntimePerfProbe {
   active: boolean;
   startedAt: number;
   stoppedAt?: number;

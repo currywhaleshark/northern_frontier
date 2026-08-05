@@ -15,7 +15,7 @@ import type {
 
 const STEP_LABELS = ['입구', '중간', '후방 출구'] as const;
 
-export const ROUTE_ANCHOR_PREFIX = 'route|';
+const ROUTE_ANCHOR_PREFIX = 'route|';
 
 export function parseRouteAnchorId(anchorId: string): TacticalRouteSide | null {
   if (!anchorId.startsWith(ROUTE_ANCHOR_PREFIX)) return null;

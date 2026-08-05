@@ -11,7 +11,7 @@ import { getSeason } from './seasons';
 import { firewoodWeatherMult } from './weather';
 import type { GameState } from './types';
 
-export interface WinterReadiness {
+interface WinterReadiness {
   weight: number;          // 소비 몫 합계 — 아이는 성인보다 적게 먹고 적게 땐다
   foodStock: number;       // 곳간의 모든 식품 (부패 전 기준)
   foodPerDay: number;      // 겨울 하루치 식량 소모
@@ -54,7 +54,7 @@ export type WinterCheckVerdict = 'ok' | 'warn' | 'bad';
 
 // R5: 세공고 항목은 걷었다. R4로 첫 해에는 조정이 거두지 않아 첫 겨울 점검에서는 늘 "요구 없음 ✓"이었고,
 // 둘째 해부터는 세공 진행이 상단 바의 세공 칩과 조정 창에 이미 상시로 떠 있다 — 같은 눈금을 두 번 그리는 셈이었다.
-export interface WinterCheckItem {
+interface WinterCheckItem {
   id: 'food' | 'firewood' | 'housing' | 'wearables' | 'sick';
   label: string;
   verdict: WinterCheckVerdict;

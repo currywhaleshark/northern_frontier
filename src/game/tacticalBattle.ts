@@ -286,16 +286,16 @@ function defaultFormationLine(role: CombatRole, weapon: TacticalDefenderGroup['w
   return weapon === 'spear' || (weapon == null && (role === 'militia' || role === 'watchman')) ? 'front' : 'rear';
 }
 
-export function tacticalFormationLinesAdjacent(
+function tacticalFormationLinesAdjacent(
   from: TacticalFormationLine,
   to: TacticalFormationLine,
 ): boolean {
   return Math.abs(FORMATION_LINE_ORDER.indexOf(from) - FORMATION_LINE_ORDER.indexOf(to)) === 1;
 }
 
-export type TacticalRearResponseOptionId = 'reinforceRear' | 'redeployRear' | 'rangedRear' | 'unopposed';
+type TacticalRearResponseOptionId = 'reinforceRear' | 'redeployRear' | 'rangedRear' | 'unopposed';
 
-export interface TacticalRearResponseOption {
+interface TacticalRearResponseOption {
   id: TacticalRearResponseOptionId;
   label: string;
   description: string;
@@ -473,7 +473,7 @@ function strongest<T extends { power: number }>(groups: T[]): T | undefined {
   return [...groups].sort((a, b) => b.power - a.power)[0];
 }
 
-export function chooseAutomaticDefenderTarget(
+function chooseAutomaticDefenderTarget(
   battle: TacticalBattle,
   defender: TacticalDefenderGroup,
 ): string | undefined {
@@ -634,9 +634,6 @@ export function normalizeTacticalGroupTargets(battle: TacticalBattle): void {
   }
 }
 
-/** @deprecated v8 zone focus is read only during save migration. */
-export const normalizeTacticalFocusTargets = normalizeTacticalGroupTargets;
-
 function snapshotGroup(
   state: GameState,
   snapshots: CombatantSnapshot[],
@@ -752,7 +749,7 @@ export function settlementRaidPreparationPoints(state: GameState, warned: boolea
   return clamp(points, 0, prep.max);
 }
 
-export function deriveTacticalWallSection(
+function deriveTacticalWallSection(
   state: GameState,
   preferredBuildingId?: number,
 ): NonNullable<TacticalBattleZone['wallSection']> | undefined {
@@ -1601,7 +1598,7 @@ export function setTacticalGroupFacing(
   return null;
 }
 
-export interface TacticalStageAnchor {
+interface TacticalStageAnchor {
   zoneId: string;
   line: TacticalFormationLine;
 }
@@ -1882,56 +1879,6 @@ export function setTacticalAmbushAftermath(
   return null;
 }
 
-/**
- * @deprecated Runtime command UI uses per-group targets through
- * tacticalGroupTargetUnavailableReason and setTacticalGroupTarget.
- */
-export function tacticalFocusTargetUnavailableReason(
-  battle: TacticalBattle,
-  zoneId: string,
-  groupId: string,
-): string | null {
-  if (battle.assaultKind === 'predatorHunt') return '맹수 사냥에서는 집중 표적을 지정할 수 없습니다.';
-  const target = battle.raiderGroups.find(group => group.id === groupId);
-  if (!target || target.zoneId !== zoneId || target.intent === 'withdraw' || target.power <= 0 ||
-      target.count - target.killed <= 0) return '해당 구역에 유효한 적 표적이 없습니다.';
-  if (!target.revealed) return '아직 드러나지 않은 적은 집중 표적으로 지정할 수 없습니다.';
-  if (target.rearAssault && !tacticalRearAssaultIsEngaged(target)) {
-    return '아직 실제 후방 교전이 시작되지 않은 급습대는 집중 표적으로 지정할 수 없습니다.';
-  }
-  const direction = tacticalRearAssaultIsEngaged(target) ? 'rear' : 'frontal';
-  const attackers = battle.raiderGroups.filter(group =>
-    group.zoneId === zoneId &&
-    (direction === 'rear' ? tacticalRearAssaultIsEngaged(group) : !group.rearAssault) &&
-    group.intent !== 'withdraw' && group.power > 0 && group.count - group.killed > 0);
-  const contactLine = tacticalContactLine(attackers, direction);
-  const assignedDefenders = battle.defenderGroups.filter(group =>
-    group.zoneId === zoneId && group.commandable !== false && activeCount(group) > 0);
-  const rearAssaultActive = battle.raiderGroups.some(group =>
-    group.zoneId === zoneId && tacticalRearAssaultIsEngaged(group) && activeRaider(group));
-  const frontalAssaultActive = battle.raiderGroups.some(group =>
-    group.zoneId === zoneId && !group.rearAssault && activeRaider(group));
-  const split = splitTacticalEngagementDefenders(assignedDefenders, rearAssaultActive, frontalAssaultActive);
-  const defenders = direction === 'rear' ? split.rear : split.frontal;
-  if (defenders.length === 0) return '이 교전 방향에 집중 사격할 아군 부대가 없습니다.';
-  const defenderOrder: readonly TacticalFormationLine[] = direction === 'rear'
-    ? ['rear', 'middle', 'front']
-    : ['front', 'middle', 'rear'];
-  const defenderContactLine = defenderOrder.find(line => defenders.some(group => group.line === line)) ?? null;
-  const meleeContact = defenderContactLine != null && defenders.some(group =>
-    group.line === defenderContactLine && tacticalGroupCapabilities(group).has('melee'));
-  const context = {
-    direction,
-    contactLine,
-    meleeContact,
-    prepareVolleyApplied: battle.orientation !== 'assault' && applied(battle, 'prepareVolley'),
-  } as const;
-  const results = defenders.map(group => canTargetLine(group, target.line, context));
-  if (results.some(result => result.allowed)) return null;
-  const reasons = [...new Set(results.map(result => result.reason).filter((reason): reason is string => reason != null))];
-  return reasons[0] ?? '현재 아군 병과로 해당 열을 집중 공격할 수 없습니다.';
-}
-
 export function setTacticalGroupTarget(
   state: GameState,
   defenderGroupId: string,
@@ -1952,40 +1899,6 @@ export function setTacticalGroupTarget(
   if (unavailableReason) return unavailableReason;
   defender.targetGroupId = enemyGroupId;
   defender.targetSource = 'player';
-  return null;
-}
-
-/**
- * @deprecated Kept as a compatibility shim for legacy callers. New runtime
- * code must use setTacticalGroupTarget; save migration owns zone focus data.
- */
-export function setTacticalFocusTarget(
-  state: GameState,
-  zoneId: string,
-  groupId: string | null,
-): string | null {
-  const battle = state.tacticalBattle;
-  if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
-  if (battle.assaultKind === 'predatorHunt') return '맹수 사냥에서는 집중 표적을 지정할 수 없습니다.';
-  if (battle.phase !== 'command') return '지휘 단계에서만 집중 표적을 지정할 수 있습니다.';
-  const zone = battle.zones.find(candidate => candidate.id === zoneId);
-  if (!zone) return '표적을 지정할 전투 구역을 찾을 수 없습니다.';
-  if (groupId == null) {
-    for (const defender of battle.defenderGroups.filter(group =>
-      group.zoneId === zoneId && group.commandable !== false && activeCount(group) > 0)) {
-      defender.targetSource = 'auto';
-      defender.targetGroupId = chooseAutomaticDefenderTarget(battle, defender);
-    }
-    return null;
-  }
-  const unavailableReason = tacticalFocusTargetUnavailableReason(battle, zoneId, groupId);
-  if (unavailableReason) return unavailableReason;
-  for (const defender of battle.defenderGroups.filter(group =>
-    group.zoneId === zoneId && group.commandable !== false && activeCount(group) > 0 &&
-    tacticalGroupTargetUnavailableReason(battle, group.id, groupId) == null)) {
-    defender.targetGroupId = groupId;
-    defender.targetSource = 'player';
-  }
   return null;
 }
 
@@ -2168,7 +2081,7 @@ export function tacticalRearManeuverEffectiveCounterStrengthForZone(
   return enemyStratagemCounterStrengthForEngagement(stratagem, formationCounter);
 }
 
-export function tacticalFeintFormationCounter(battle: TacticalBattle): number {
+function tacticalFeintFormationCounter(battle: TacticalBattle): number {
   const reservePower = battle.defenderGroups.reduce((sum, group) => {
     const capabilities = tacticalGroupCapabilities(group);
     if (group.line !== 'middle' || group.commandable === false || activeCount(group) <= 0 ||
@@ -2270,7 +2183,7 @@ function activeCount(group: TacticalDefenderGroup): number {
   return Math.max(0, group.count - group.wounded - group.killed);
 }
 
-export interface TacticalFieldTreatmentResult {
+interface TacticalFieldTreatmentResult {
   treated: number;
   herbsSpent: number;
   byZone: Record<string, number>;

@@ -80,7 +80,7 @@ export function bumpDefenseTopology(state: GameState): void {
 }
 
 /** 현재 남은 내구를 포함한 공격 경로용 통과 비용. */
-export function wallBreachCost(building: Building): number {
+function wallBreachCost(building: Building): number {
   const wallType = effectiveWallType(building);
   if (!wallType || !isBlockingDefenseWall(building)) return 0;
   return Math.max(1, Math.round(wallIntegrity(building) * CONFIG.raidPathing.breachCostMultiplier[wallType]));

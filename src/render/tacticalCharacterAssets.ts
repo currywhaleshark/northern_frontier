@@ -1,34 +1,6 @@
-export const TACTICAL_CHARACTER_SHEET = {
-  residentWidth: 84,
-  mountedWidth: 168,
-  spriteHeight: 120,
-  residentColumns: 10,
-  rows: 2,
-  src: '/assets/tactical/folk-characters-tactical-v1.png',
-} as const;
-
-export const TACTICAL_MILITIA_SHEET = {
-  residentWidth: 84,
-  spriteHeight: 120,
-  columns: 3,
-  rows: 2,
-  src: '/assets/tactical/militia-weapons-tactical-v1.png',
-} as const;
-
-export const TACTICAL_RAIDER_SHEET = {
-  spriteWidth: 168,
-  spriteHeight: 120,
-  columns: 6,
-  src: '/assets/tactical/faction-raiders-tactical-v1.png',
-} as const;
-
-export const TACTICAL_COURT_ARMY_SHEET = {
-  spriteWidth: 168,
-  spriteHeight: 120,
-  columns: 5,
-  src: '/assets/tactical/court-army-tactical-v1.png',
-} as const;
-
+// v1 통짜 시트(folk-characters·militia-weapons·faction-raiders·court-army)는 자세별
+// *_POSE_SHEET로 대체됐다. 원본 PNG는 tools/render/compose_tactical_pose_references_v2.py의
+// 입력으로 계속 쓰이므로 public/assets/tactical/ 에 남겨 둔다.
 export type TacticalSpritePose = 'idle' | 'attack' | 'hurt' | 'wounded';
 
 export interface TacticalMuzzleAnchor {
@@ -184,7 +156,7 @@ function tacticalSpecialResidentColumn(
   return null;
 }
 
-export type TacticalDefaultWeaponPose = 'bambooSpear' | 'farmTools' | 'watchmanBaton';
+type TacticalDefaultWeaponPose = 'bambooSpear' | 'farmTools' | 'watchmanBaton';
 
 const DEFAULT_WEAPON_COLUMNS: Readonly<Record<TacticalDefaultWeaponPose, number>> = {
   bambooSpear: 0,
@@ -282,7 +254,7 @@ export function tacticalDefenderMuzzleAnchor(
   return { x: gender === 'female' ? 19 : 17, y: 47, size: 'musket' };
 }
 
-export const TACTICAL_BEAST_SHEETS = {
+const TACTICAL_BEAST_SHEETS = {
   wolf: '/assets/tactical/beasts/wolf/sheet-transparent.png',
   tiger: '/assets/tactical/beasts/tiger/sheet-transparent.png',
   greatTiger: '/assets/tactical/beasts/great-tiger/sheet-transparent.png',
@@ -302,7 +274,7 @@ const RAIDER_COLUMNS: Record<string, number> = {
   '변경 마적': 5,
 };
 
-export function tacticalRaiderColumn(faction: string): number | null {
+function tacticalRaiderColumn(faction: string): number | null {
   return RAIDER_COLUMNS[faction] ?? null;
 }
 

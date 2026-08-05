@@ -24,8 +24,8 @@ const WATER_DIRECTIONS = [
 
 const BOAT_FACINGS = new Set<FishingBoatFacing>(['ne', 'nw', 'se', 'sw']);
 
-export const FISHING_PORT_PIER_MIN_LENGTH = 3;
-export const FISHING_PORT_PIER_MAX_LENGTH = 6;
+const FISHING_PORT_PIER_MIN_LENGTH = 3;
+const FISHING_PORT_PIER_MAX_LENGTH = 6;
 
 const PORT_PIER_DIRECTIONS: readonly {
   direction: FishingPortPierDirection;
@@ -95,7 +95,7 @@ export function fishingPortPierAt(map: Tile[][], x: number, y: number): FishingP
   return null;
 }
 
-export function fishingPortMooringTile(
+function fishingPortMooringTile(
   map: Tile[][],
   x: number,
   y: number,
@@ -106,7 +106,7 @@ export function fishingPortMooringTile(
   return waterKind(map[terminal.y]?.[terminal.x]) ? terminal : null;
 }
 
-export type FishingBoatMooringSlot = 0 | 1;
+type FishingBoatMooringSlot = 0 | 1;
 
 export function fishingPortMooringSlotPosition(
   port: Pick<Building, 'x' | 'y' | 'portPier'>,
@@ -254,7 +254,7 @@ export function fishingBoatCrew(state: Pick<GameState, 'residents'>, boat: Fishi
   return state.residents.filter(resident => resident.alive && ids.has(resident.id));
 }
 
-export const FISHING_BOAT_CREW_CAPACITY = 2;
+const FISHING_BOAT_CREW_CAPACITY = 2;
 
 export function assignFisherToFishingBoat(
   state: GameState,
@@ -379,7 +379,7 @@ function settleFishingBoat(boat: FishingBoatState): void {
   boat.py = boat.y;
 }
 
-export interface FishingBoatTripPlan {
+interface FishingBoatTripPlan {
   groundId: string;
   depthBand: Extract<FishingGroundDepthBand, 'mid' | 'deep'>;
   target: FishingGroundTile;
@@ -392,7 +392,7 @@ export interface FishingBoatTripPlan {
   requiredSubticks: number;
 }
 
-export type LakeFishingTripPlan = FishingBoatTripPlan;
+type LakeFishingTripPlan = FishingBoatTripPlan;
 
 export function lakeFishingDepartureAllowed(day: number): boolean {
   const season = getSeason(day);
@@ -548,7 +548,6 @@ export function startFishingBoatTrip(
 }
 
 export const startLakeFishingTrip = startFishingBoatTrip;
-export const startSeaFishingTrip = startFishingBoatTrip;
 
 function beginReturn(state: GameState, boat: FishingBoatState): void {
   const port = state.buildings.find(building =>

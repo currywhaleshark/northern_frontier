@@ -1,7 +1,7 @@
 // 플레이어 조작이 거절될 때 화면 가운데에 띄우는 알림 — 로그만 보면 이유를 놓치기 때문이다.
 // 게임 진행이 만드는 로그(사냥·날씨 등)는 대상이 아니다. 클릭에 대한 응답만 띄운다.
 
-export type ActionNoticeTone = 'bad' | 'info' | 'good';
+type ActionNoticeTone = 'bad' | 'info' | 'good';
 
 export interface ActionNotice {
   id: number;
@@ -21,7 +21,7 @@ export interface ActionNoticeStore {
   clear: () => void;
 }
 
-export interface ActionNoticeOptions {
+interface ActionNoticeOptions {
   /** 기본 노출 시간. 긴 문구는 읽을 시간을 조금 더 준다. */
   ttlMs?: number;
   /** 동시에 쌓이는 최대 줄 수 — 넘치면 오래된 것부터 밀어낸다 */
@@ -34,7 +34,7 @@ const DEFAULT_MAX = 3;
 const TTL_PER_CHAR_MS = 34;
 const MAX_TTL_MS = 5200;
 
-export function noticeTtlMs(text: string, baseMs = DEFAULT_TTL_MS): number {
+function noticeTtlMs(text: string, baseMs = DEFAULT_TTL_MS): number {
   return Math.min(MAX_TTL_MS, baseMs + Math.max(0, text.length - 20) * TTL_PER_CHAR_MS);
 }
 

@@ -1,11 +1,11 @@
 import type { Tile } from './types';
 
-export interface GoalPoint {
+interface GoalPoint {
   x: number;
   y: number;
 }
 
-export interface GoalField {
+interface GoalField {
   width: number;
   height: number;
   goals: GoalPoint[];

@@ -413,7 +413,7 @@ function findNearbySpots(
  */
 export const CLEARING_APPROVAL_REQUIRED = '__clearing_approval_required__';
 
-export interface PlacementOptions {
+interface PlacementOptions {
   /** 공사터의 나무를 베고 짓겠다고 플레이어가 이미 수락했는가 */
   approveClearing?: boolean;
   /** 제방을 붙일 강 타일의 육지 쪽 변 */
@@ -938,13 +938,6 @@ export function issueResidentWorkOrder(
   interruptResidentForManualOrder(resident);
   resident.task = action.label;
   return null;
-}
-
-export function clearResidentManualOrder(state: GameState, residentId: number): void {
-  const resident = state.residents.find(res => res.id === residentId);
-  if (!resident) return;
-  resident.manualOrder = null;
-  interruptResidentForManualOrder(resident);
 }
 
 export function upgradeHousingBuilding(

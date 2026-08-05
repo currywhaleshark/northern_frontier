@@ -7,7 +7,7 @@ import { withJosa } from './josa';
 import { getYear } from './seasons';
 import type { GameState, SpecialItemId } from './types';
 
-export type UsableSpecialItemId = 'reliefGrainVoucher' | 'tributeWaiverDecree' | 'recruitmentNotice';
+type UsableSpecialItemId = 'reliefGrainVoucher' | 'tributeWaiverDecree' | 'recruitmentNotice';
 
 export function useSpecialItem(state: GameState, item: UsableSpecialItemId): string | null {
   if ((state.specialItems[item] ?? 0) < 1) return '기물함에 해당 기물이 없습니다.';

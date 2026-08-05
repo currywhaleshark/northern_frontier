@@ -307,6 +307,11 @@ def build_seam_preview(sheet: Image.Image) -> Image.Image:
     return out.resize((out.width * 3, out.height * 3), Image.Resampling.NEAREST)
 
 
+def repo_path(path: Path) -> str:
+    """저장소 루트 기준 상대 경로. 보고서가 커밋되므로 작업자 홈 경로를 남기지 않는다."""
+    return path.relative_to(ROOT).as_posix()
+
+
 def write_report() -> None:
     lines = [
         "River mask autotile build report",
@@ -314,10 +319,10 @@ def write_report() -> None:
         f"water_width={WATER_WIDTH}",
         f"connectors={len(CONNECTORS)}",
         f"seasons={len(SEASONS)}",
-        f"source={SOURCE_SHEET.as_posix()}",
-        f"sheet={SHEET_OUT.as_posix()}",
-        f"preview={PREVIEW_OUT.as_posix()}",
-        f"seam_preview={SEAM_PREVIEW_OUT.as_posix()}",
+        f"source={repo_path(SOURCE_SHEET)}",
+        f"sheet={repo_path(SHEET_OUT)}",
+        f"preview={repo_path(PREVIEW_OUT)}",
+        f"seam_preview={repo_path(SEAM_PREVIEW_OUT)}",
     ]
     REPORT_OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

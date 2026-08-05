@@ -182,7 +182,7 @@ const PROFILES: Record<RaiderUnitType, TacticalUnitIdentity> = {
   },
 };
 
-export const TACTICAL_UNIT_PROFILE_IDS = Object.freeze(Object.keys(PROFILES) as RaiderUnitType[]);
+const TACTICAL_UNIT_PROFILE_IDS = Object.freeze(Object.keys(PROFILES) as RaiderUnitType[]);
 
 export function tacticalUnitProfile(id: RaiderUnitType): TacticalUnitProfile {
   const identity = PROFILES[id];

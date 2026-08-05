@@ -2,9 +2,9 @@ import { CONFIG } from './config';
 import { WORK_SUBTICKS } from './dayCycle';
 import type { GameState, Resident } from './types';
 
-export type PhysicianTreatmentStatus = 'treated' | 'recovered' | 'no-patient' | 'no-herbs';
+type PhysicianTreatmentStatus = 'treated' | 'recovered' | 'no-patient' | 'no-herbs';
 
-export interface PhysicianTreatmentResult {
+interface PhysicianTreatmentResult {
   status: PhysicianTreatmentStatus;
   patient: Resident | null;
   herbsUsed: number;
@@ -26,7 +26,7 @@ export function hasActivePhysician(state: GameState): boolean {
   return activePhysicianCount(state) > 0;
 }
 
-export function physicianPatient(state: GameState, physicianId: number): Resident | null {
+function physicianPatient(state: GameState, physicianId: number): Resident | null {
   return state.residents
     .filter(resident => resident.id !== physicianId && resident.alive && (
       resident.sick || resident.health < CONFIG.medicine.patientHealthThreshold

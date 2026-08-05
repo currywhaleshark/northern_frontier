@@ -25,7 +25,7 @@ import { residentColdProtection } from './wearables';
 import { waterSupplySnapshot } from './waterSupply';
 import type { Building, GameState, Gender, JobId, Resident, Tile } from './types';
 
-export function rollResidentGender(rng: () => number): Gender {
+function rollResidentGender(rng: () => number): Gender {
   return rng() < 0.5 ? 'female' : 'male';
 }
 
@@ -272,7 +272,7 @@ export function countJob(state: GameState, job: JobId): number {
   return jobWorkforceCounts(state, job).total;
 }
 
-export interface JobWorkforceCounts {
+interface JobWorkforceCounts {
   adult: number;
   youth: number;
   total: number;

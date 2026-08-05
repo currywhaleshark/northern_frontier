@@ -1,3 +1,4 @@
+import { readAppCss } from '../app-stylesheets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
@@ -6,7 +7,7 @@ const alertsSource = readFileSync(new URL('../../src/components/AlertsPanel.tsx'
 const topBarSource = readFileSync(new URL('../../src/components/TopBar.tsx', import.meta.url), 'utf8');
 const dockSource = readFileSync(new URL('../../src/components/dock/DockFrame.tsx', import.meta.url), 'utf8');
 const dockPresentationSource = readFileSync(new URL('../../src/ui/dockPresentation.ts', import.meta.url), 'utf8');
-const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
+const cssSource = readAppCss();
 
 assert.doesNotMatch(appSource, /className=["']side right["']/,
   'the fixed right sidebar must be removed so the map can use the full content width');

@@ -15,20 +15,20 @@ export const BATTLE_SAMPLE_PATHS = {
   nightAmbushAlarm: '/assets/audio/battle/night-ambush-alarm.mp3',
 } as const;
 
-export const WEAPON_SHOT_STAGGER_MS = { arrow: 45, musket: 70, cannon: 110 } as const;
+const WEAPON_SHOT_STAGGER_MS = { arrow: 45, musket: 70, cannon: 110 } as const;
 
 const WEAPON_FAMILY_OFFSET_MS = { arrow: 0, musket: 55, cannon: 90 } as const;
 const WEAPON_BASE_VOLUME = { arrow: 0.78, musket: 0.9, cannon: 0.84 } as const;
 
 type BattleSampleName = keyof typeof BATTLE_SAMPLE_PATHS;
-export type WeaponShotKind = 'arrow' | 'musket' | 'cannon';
-export interface WeaponSalvoShots {
+type WeaponShotKind = 'arrow' | 'musket' | 'cannon';
+interface WeaponSalvoShots {
   arrows?: number;
   muskets?: number;
   cannons?: number;
 }
 
-export interface WeaponShotSchedule {
+interface WeaponShotSchedule {
   kind: WeaponShotKind;
   delaySeconds: number;
   volume: number;
@@ -36,7 +36,7 @@ export interface WeaponShotSchedule {
   pan: number;
 }
 
-export interface MeleeStrikeSchedule {
+interface MeleeStrikeSchedule {
   kind: 'melee1' | 'melee2';
   delaySeconds: number;
   volume: number;
@@ -236,10 +236,6 @@ export function playMeleeClash(participants: number): void {
   const samplesReady = battleSamples.has('melee1') && battleSamples.has('melee2');
   if (samplesReady) play();
   else void ensureBattleSamples().then(play);
-}
-
-export function isMuted(): boolean {
-  return muted;
 }
 
 export function setMuted(m: boolean): void {

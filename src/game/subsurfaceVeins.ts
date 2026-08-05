@@ -3,7 +3,7 @@ import { CONFIG } from './config';
 import { MAP_SIZE_DIMENSIONS } from './newGameOptions';
 import type { GameState, MapRegion } from './types';
 
-export interface SubsurfaceVein {
+interface SubsurfaceVein {
   id: number;
   cx: number;
   cy: number;
@@ -11,11 +11,11 @@ export interface SubsurfaceVein {
   capacity: number;
 }
 
-export interface OreVein extends SubsurfaceVein {
+interface OreVein extends SubsurfaceVein {
   mineral: 'iron' | 'stone';
 }
 
-export interface VeinSample<T extends SubsurfaceVein> {
+interface VeinSample<T extends SubsurfaceVein> {
   vein: T;
   richness: number;
   normalizedRichness: number;

@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import type { Building, DryingProductId, ResourceId } from './types';
 
-export interface DryingProductDef {
+interface DryingProductDef {
   id: DryingProductId;
   name: string;
   output: ResourceId;

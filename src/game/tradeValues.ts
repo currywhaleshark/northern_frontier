@@ -29,7 +29,7 @@ export function factionValue(factionName: string, resource: ResourceId): number 
   return faction?.tradeValues[resource] ?? RESOURCE_DEFS[resource].tradeBaseValue;
 }
 
-export interface FactionTradeCapacitySummary {
+interface FactionTradeCapacitySummary {
   total: number;
   used: number;
   remaining: number;

@@ -10,7 +10,7 @@ import {
 } from './waterCoverage';
 import type { Building, BuildingTypeId, GameState, Resident } from './types';
 
-export type WaterSupplySource = 'river' | 'lake' | 'canal' | 'well' | 'none';
+type WaterSupplySource = 'river' | 'lake' | 'canal' | 'well' | 'none';
 
 export interface BuildingWaterSupply {
   demand: number;
@@ -65,7 +65,7 @@ function residentBedShare(resident: Pick<Resident, 'stage'>): number {
   return resident.stage ? CONFIG.lifecycle.childBedShare : 1;
 }
 
-export function waterDemandForBuilding(
+function waterDemandForBuilding(
   state: GameState,
   building: Building,
 ): number {
@@ -279,12 +279,6 @@ export function buildingWaterSupply(state: GameState, building: Building): Build
   if (demand <= EPSILON) return { demand: 0, supplied: 0, ratio: 1, source: 'none' };
   return waterSupplySnapshot(state).buildings.get(building.id) ??
     { demand, supplied: 0, ratio: 0, source: 'none' };
-}
-
-export function residentWaterSupplyRatio(state: GameState, resident: Resident): number {
-  if (resident.homeBuildingId == null) return 0;
-  const home = state.buildings.find(building => building.id === resident.homeBuildingId);
-  return home ? buildingWaterSupply(state, home).ratio : 0;
 }
 
 export function waterDependentProductionMultiplier(state: GameState, building: Building): number {

@@ -384,7 +384,7 @@ function reservoirFillThreshold(index: number, tileCount: number): number {
   return Math.max(1, Math.ceil(totalDays * (index + 1) / Math.max(1, tileCount)));
 }
 
-export interface ReservoirWaterVisual {
+interface ReservoirWaterVisual {
   x: number;
   y: number;
   progress: number;

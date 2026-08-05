@@ -14,7 +14,7 @@ import { BALANCE_OVERRIDES } from './balanceOverrides';
 export type BalanceOverrideValue = number | boolean;
 
 /** 경로가 기본값 트리에 없거나 형이 어긋나 무시된 항목. 개발 중 확인용. */
-export const BALANCE_OVERRIDE_MISSES: string[] = [];
+const BALANCE_OVERRIDE_MISSES: string[] = [];
 
 /** 기본값 트리 깊은 복사 — 오버레이가 원본 리터럴을 건드리지 못하게 한다. */
 export function cloneBalanceTree<T>(value: T): T {
@@ -64,6 +64,3 @@ export function applyBalanceOverrides<T>(target: T, prefix: string): T {
 }
 
 /** 오버레이 항목 수 — 디버그 표시용. */
-export function balanceOverrideCount(): number {
-  return Object.keys(BALANCE_OVERRIDES).length;
-}

@@ -8,7 +8,7 @@ import type { GameState, JobId, Resident } from './types';
 import { youthActivityOf } from './youth';
 
 // 문해자 전용 관직 — 글을 모르면 맡을 수 없다
-export const LITERATE_JOBS: readonly JobId[] = ['physician', 'clerk', 'teacher'];
+const LITERATE_JOBS: readonly JobId[] = ['physician', 'clerk', 'teacher'];
 
 export function isLiterateJob(job: JobId): boolean {
   return LITERATE_JOBS.includes(job);

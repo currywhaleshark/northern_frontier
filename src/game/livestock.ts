@@ -8,7 +8,6 @@ import { reconcileMountAssignments } from './weapons';
 import { pastureRequiredHerders, stableLivestockCapacity } from './pastures';
 import type { Building, GameState, LivestockId, LivestockState, ResourceId, Season } from './types';
 
-export const LIVESTOCK_IDS = ['chicken', 'goat', 'sheep', 'pig', 'cattle', 'horse'] as const satisfies readonly LivestockId[];
 export const IMPLEMENTED_LIVESTOCK_IDS = ['chicken', 'goat', 'sheep', 'pig', 'cattle', 'horse'] as const satisfies readonly LivestockId[];
 
 export const LIVESTOCK_DEFS = {
@@ -20,20 +19,20 @@ export const LIVESTOCK_DEFS = {
   horse: { name: '군마' },
 } as const satisfies Record<LivestockId, { name: string }>;
 
-export interface LivestockDailyReport {
+interface LivestockDailyReport {
   grainConsumed: number;
   hayConsumed: number;
   births: number;
   deaths: number;
 }
 
-export interface LivestockProduct {
+interface LivestockProduct {
   resource: ResourceId;
   amount: number;
   task: string;
 }
 
-export interface LivestockLootReport {
+interface LivestockLootReport {
   lost: number;
   bySpecies: Partial<Record<LivestockId, number>>;
 }
@@ -280,7 +279,7 @@ export function setPlotPlowOxen(state: GameState, buildingId: number, count: num
 }
 
 // 소가 죽거나 도축되어 풀이 줄면 초과 배정을 해제한다 (나중에 지은 경작지부터)
-export function reconcilePlowOxen(state: GameState): void {
+function reconcilePlowOxen(state: GameState): void {
   let excess = plowOxenAssigned(state) - plowOxenPool(state);
   if (excess <= 0) return;
   const plots = state.buildings
@@ -349,7 +348,7 @@ export function setStableLivestock(state: GameState, buildingId: number, species
   return null;
 }
 
-export interface LivestockAcquisitionPreflight {
+interface LivestockAcquisitionPreflight {
   requested: number;
   freeCapacity: number;
   eligibleStableIds: number[];

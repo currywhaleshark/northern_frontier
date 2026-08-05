@@ -1,3 +1,4 @@
+import { readAppCss } from '../app-stylesheets.mjs';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { Buffer } from 'node:buffer';
@@ -54,7 +55,7 @@ const gameMenuSource = readFileSync(new URL('../../src/components/GameMenu.tsx',
 const canvasSource = readFileSync(new URL('../../src/components/GameCanvas.tsx', import.meta.url), 'utf8');
 const minimapSource = readFileSync(new URL('../../src/components/Minimap.tsx', import.meta.url), 'utf8');
 const musicSource = readFileSync(new URL('../../src/sound/music.ts', import.meta.url), 'utf8');
-const stylesSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
+const stylesSource = readAppCss();
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
 assert.match(appSource, /event\.code === 'Space'/);
 assert.match(appSource, /dockWindowForHotkey\(event\.key\)/);

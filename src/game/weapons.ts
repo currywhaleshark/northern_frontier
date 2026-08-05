@@ -13,7 +13,7 @@ export const COMBAT_WEAPON_NAMES: Record<CombatWeaponId, string> = {
   hornBow: '각궁',
   spear: '창',
 };
-export const COMBAT_WEAPON_RESOURCES: Record<CombatWeaponId, ResourceId> = {
+const COMBAT_WEAPON_RESOURCES: Record<CombatWeaponId, ResourceId> = {
   musket: 'muskets',
   hornBow: 'hornBows',
   spear: 'spears',
@@ -177,7 +177,7 @@ export function releaseResidentArtifactWeapons(
   return released;
 }
 
-export interface WeaponCounts {
+interface WeaponCounts {
   muskets: number;
   hornBows: number;
   spears: number;
@@ -185,28 +185,28 @@ export interface WeaponCounts {
   readyMuskets: number;
 }
 
-export interface MusketReadiness {
+interface MusketReadiness {
   assigned: number;
   ready: number;
   dry: number;
   powderRequired: number;
 }
 
-export interface MusketGroupReadiness {
+interface MusketGroupReadiness {
   byGroup: Readonly<Record<string, number>>;
   ready: number;
   powderRequired: number;
 }
 
-export function isCombatWeaponId(value: unknown): value is CombatWeaponId {
+function isCombatWeaponId(value: unknown): value is CombatWeaponId {
   return value === 'musket' || value === 'hornBow' || value === 'spear';
 }
 
-export function isMountId(value: unknown): value is MountId {
+function isMountId(value: unknown): value is MountId {
   return value === 'horse';
 }
 
-export function isCombatResident(resident: Pick<Resident, 'alive' | 'job'>): boolean {
+function isCombatResident(resident: Pick<Resident, 'alive' | 'job'>): boolean {
   return resident.alive && COMBAT_JOBS.has(resident.job);
 }
 
@@ -358,7 +358,7 @@ function assignFirstAvailable(
 
 // 기존 수비병 우선순위(조총→각궁→창)를 보존하고, 남는 무기만
 // 사냥꾼·파수꾼의 역할 적성에 맞춰 나눈다.
-export function automaticWeaponAssignments(state: GameState): Partial<Record<number, CombatWeaponId>> {
+function automaticWeaponAssignments(state: GameState): Partial<Record<number, CombatWeaponId>> {
   const assignments: Partial<Record<number, CombatWeaponId>> = {};
   const artifactHolders = new Set(
     Object.values(resolvedArtifactWeaponAssignments(state)).filter((id): id is number => typeof id === 'number'),

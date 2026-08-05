@@ -12,16 +12,16 @@ export type WorkLayoutResident = Pick<
 >;
 
 /** 서 있는 지형을 알려 주면 "<직업>@<지형>" 앵커를 찾는다. 없으면 기존 배치 그대로. */
-export type WorkLayoutTerrainLookup = (x: number, y: number) => Terrain | undefined;
+type WorkLayoutTerrainLookup = (x: number, y: number) => Terrain | undefined;
 
 /** facing 0 = 기존 방향 계산을 유지한다. */
-export interface WorkStanceAnchor {
+interface WorkStanceAnchor {
   offsetX: number;
   offsetY: number;
   facing: 1 | -1 | 0;
 }
 
-export type WorkAnchorLookup = (key: string) => WorkStanceAnchor | null;
+type WorkAnchorLookup = (key: string) => WorkStanceAnchor | null;
 
 export interface WorkLayoutTarget {
   x: number;
@@ -29,7 +29,7 @@ export interface WorkLayoutTarget {
   terrain: Terrain;
 }
 
-export type WorkLayoutTargetLookup = (resident: WorkLayoutResident) => WorkLayoutTarget | null;
+type WorkLayoutTargetLookup = (resident: WorkLayoutResident) => WorkLayoutTarget | null;
 
 const WORK_TARGET_FOREGROUND_SORT_EPSILON = 0.01;
 

@@ -1,8 +1,8 @@
 import type { Season, Terrain } from '../game/types';
 
-export const HISTORICAL_TERRAIN_TILE_SIZE = 28;
-export const HISTORICAL_TERRAIN_EDGE_INSET = 3;
-export const HISTORICAL_TERRAIN_SAMPLE_SIZE = 20;
+const HISTORICAL_TERRAIN_TILE_SIZE = 28;
+const HISTORICAL_TERRAIN_EDGE_INSET = 3;
+const HISTORICAL_TERRAIN_SAMPLE_SIZE = 20;
 
 const SEASON_ROWS: Record<Season, number> = {
   spring: 0,

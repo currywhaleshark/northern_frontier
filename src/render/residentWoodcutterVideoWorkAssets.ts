@@ -15,7 +15,7 @@ interface AnimationRow {
   loop: boolean;
 }
 
-export interface WoodcutterVideoWorkSourceRect {
+interface WoodcutterVideoWorkSourceRect {
   sx: number;
   sy: number;
   sw: number;

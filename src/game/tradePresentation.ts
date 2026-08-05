@@ -1,6 +1,6 @@
 import type { ResourceId } from './types';
 
-export interface FactionArtwork {
+interface FactionArtwork {
   src: string;
   alt: string;
   position?: string;
@@ -51,7 +51,7 @@ export const FACTION_ARTWORK: Record<string, FactionArtwork> = {
 
 export type ResourceIconId = ResourceId | 'foodGroup' | 'fuelGroup' | 'clothingGroup' | 'footwearGroup' | 'luxuryGroup';
 
-export interface TradeResourceSprite {
+interface TradeResourceSprite {
   atlas: string;
   columns: number;
   rows: number;

@@ -5,7 +5,7 @@ import { isForeignSiteOperational } from './foreignSites';
 import { changeRelation, getRelation } from './relations';
 import type { GameState, PredatorKind } from './types';
 
-export interface PredatorIntelOffer {
+interface PredatorIntelOffer {
   kind: PredatorKind;
   label: string;
   precision: 'rough' | 'exact';

@@ -1,3 +1,4 @@
+import { readAppCss } from '../app-stylesheets.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,7 +30,7 @@ transpileDirectory(new URL('../../src/ui/', import.meta.url), join(rootDir, 'ui'
 
 const { BUILD_MENU_ORDER } = await import(pathToFileURL(join(rootDir, 'game', 'buildings.mjs')).href);
 const drawerSource = readFileSync(new URL('../../src/components/BuildDrawer.tsx', import.meta.url), 'utf8');
-const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
+const cssSource = readAppCss();
 const {
   BUILD_CATEGORIES,
   BUILD_CATEGORY_BY_TYPE,

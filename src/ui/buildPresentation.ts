@@ -4,7 +4,7 @@ import type { UiIconName } from './uiIconAssets';
 
 export type BuildableBuildingTypeId = Exclude<BuildingTypeId, 'center'>;
 
-export const BUILD_CATEGORY_IDS = ['housing', 'production', 'farming', 'defense', 'special'] as const;
+const BUILD_CATEGORY_IDS = ['housing', 'production', 'farming', 'defense', 'special'] as const;
 export type BuildCategoryId = typeof BUILD_CATEGORY_IDS[number];
 
 export const DEFAULT_BUILD_CATEGORY: BuildCategoryId = 'housing';
@@ -64,14 +64,14 @@ export const BUILD_CATEGORY_BY_TYPE = {
   hermitage: 'special',
 } as const satisfies Record<BuildableBuildingTypeId, BuildCategoryId>;
 
-export interface BuildCategory {
+interface BuildCategory {
   id: BuildCategoryId;
   label: string;
   icon: UiIconName;
   types: readonly BuildableBuildingTypeId[];
 }
 
-export interface BuildDrawerState {
+interface BuildDrawerState {
   openCategory: BuildCategoryId | null;
   restoreCategory: BuildCategoryId | null;
 }

@@ -9,7 +9,7 @@ export interface SceneViewport {
   tileMaxY: number;
 }
 
-export interface SceneViewportInput {
+interface SceneViewportInput {
   scrollLeft: number;
   scrollTop: number;
   clientWidth: number;

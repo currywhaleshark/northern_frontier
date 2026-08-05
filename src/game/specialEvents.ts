@@ -262,7 +262,7 @@ export function predatorHuntChance(
   return Math.max(0.12, Math.min(0.94, chance));
 }
 
-export function predatorReadinessLabel(state: GameState, kind: WildlifeKind): string {
+function predatorReadinessLabel(state: GameState, kind: WildlifeKind): string {
   const r = weaponReadiness(state);
   const intel = state.incidents.predatorThreats[kind]?.intel;
   const chance = Math.round(predatorHuntChance(state, kind) * 100);
@@ -892,12 +892,12 @@ function huntFailure(
 
 export type WildlifeHuntOutcome = 'victory' | 'repelled' | 'escaped' | 'defeat';
 
-export interface WildlifeStrategicResult {
+interface WildlifeStrategicResult {
   loot: Partial<Record<ResourceId, number>>;
   specialItem?: SpecialItemId;
 }
 
-export interface WildlifeHuntResult extends WildlifeStrategicResult {
+interface WildlifeHuntResult extends WildlifeStrategicResult {
   outcome: WildlifeHuntOutcome;
   chance: number;
   powderUsed: number;

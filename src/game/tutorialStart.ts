@@ -47,7 +47,7 @@ export function createTutorialGame(): GameState {
   return state;
 }
 
-export interface TutorialWaterAccess {
+interface TutorialWaterAccess {
   wellSpots: number;         // 마을 근처에서 우물을 팔 수 있는 칸 수 (수맥 위)
   naturalWaterTiles: number; // 마을 근처의 강·농수로 급수권 칸 수
 }
@@ -83,7 +83,7 @@ export function tutorialWaterAccess(state: GameState): TutorialWaterAccess {
 }
 
 // 튜토리얼 진행에 꼭 필요한 지물 보정 — 위반 시 최소한으로 고친다
-export function ensureTutorialInvariants(state: GameState): void {
+function ensureTutorialInvariants(state: GameState): void {
   // 사냥 스텝: 활성 서식지가 하나는 있어야 한다 (newGame이 마을 근처 하나를 보장하지만 이중 안전망)
   if (!state.habitats.some(habitat => habitat.active)) {
     const forest = state.map.flat().find(tile => tile.terrain === 'forest');
@@ -115,7 +115,7 @@ export function ensureTutorialInvariants(state: GameState): void {
   if (outcrops.iron === 0) ensureTutorialOutcrop(state, true);
 }
 
-export interface TutorialOutcrops {
+interface TutorialOutcrops {
   stone: number; // 마을 근처의 돌 노두 수 (탐사되어 눈에 보이는 것만)
   iron: number;  // 마을 근처의 철 노두 수
 }

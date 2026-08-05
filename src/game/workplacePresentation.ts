@@ -1,9 +1,9 @@
 import type { Building, BuildingTypeId, Resident } from './types';
 
-export type WorkplaceActivityStyle = 'fire' | 'craft' | 'service';
-export type WorkplacePresentationMode = 'interior' | 'yard' | 'visible';
+type WorkplaceActivityStyle = 'fire' | 'craft' | 'service';
+type WorkplacePresentationMode = 'interior' | 'yard' | 'visible';
 
-export interface WorkplacePresentation {
+interface WorkplacePresentation {
   mode: WorkplacePresentationMode;
   activity: WorkplaceActivityStyle | null;
 }

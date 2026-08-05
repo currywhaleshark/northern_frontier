@@ -3,7 +3,7 @@ import { CONFIG } from './config';
 import { revealAround } from './exploration';
 import type { ForeignSite, GameState } from './types';
 
-export interface PassageRoute {
+interface PassageRoute {
   site: ForeignSite;
   tiles: { x: number; y: number }[];
 }
@@ -37,7 +37,7 @@ function lineTiles(from: { x: number; y: number }, to: { x: number; y: number })
   return result;
 }
 
-export function passageRouteToSite(state: GameState, site: ForeignSite): { x: number; y: number }[] {
+function passageRouteToSite(state: GameState, site: ForeignSite): { x: number; y: number }[] {
   const center = state.buildings.find(building => building.type === 'center');
   if (!center) return [];
   const centerDims = buildingFootprintDims(center);

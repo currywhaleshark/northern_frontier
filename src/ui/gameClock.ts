@@ -1,4 +1,4 @@
-export interface GameClockStep {
+interface GameClockStep {
   accumulator: number;
   ticksToAdvance: number;
 }

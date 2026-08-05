@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import type { Building, BuildingTypeId, CropId, ResourceId, Season } from './types';
 
-export interface CropDef {
+interface CropDef {
   id: CropId;
   name: string;
   desc: string;
@@ -113,7 +113,7 @@ export const CROP_DEFS: Record<CropId, CropDef> = {
   },
 };
 
-export const CROP_ORDER: CropId[] = ['millet', 'sorghum', 'buckwheat', 'barley', 'rice', 'vegetables', 'beans', 'cotton'];
+const CROP_ORDER: CropId[] = ['millet', 'sorghum', 'buckwheat', 'barley', 'rice', 'vegetables', 'beans', 'cotton'];
 
 export function defaultCropForBuildingType(type: BuildingTypeId): CropId | null {
   if (type === 'field') return 'millet';

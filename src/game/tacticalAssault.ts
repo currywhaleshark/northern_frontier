@@ -16,9 +16,6 @@ import { tacticalTargetingRole } from './tacticalTargeting';
 import {
   attachFeaturedResidentsToTacticalGroups,
   initializeTacticalDeployment,
-  mergeTacticalGroups,
-  placeTacticalDeploymentGroup,
-  splitTacticalGroup,
   tacticalDeploymentUnavailableReason,
   tacticalFeaturedResidentsFromSnapshots,
 } from './tacticalDeployment';
@@ -454,28 +451,6 @@ export function advanceAssaultPhase(state: GameState): string | null {
     return null;
   }
   return '지금은 다음 단계로 넘어갈 수 없습니다.';
-}
-
-export function assignAssaultGroup(state: GameState, groupId: string, zoneId: string): string | null {
-  const battle = state.tacticalBattle;
-  if (!battle || battle.orientation !== 'assault') return '진행 중인 산채 공격전이 없습니다.';
-  if (battle.phase !== 'deployment') return '배치 단계에서만 병력을 옮길 수 있습니다.';
-  const group = battle.defenderGroups.find(candidate => candidate.id === groupId);
-  if (!group) return '토벌대 그룹을 찾을 수 없습니다.';
-  const line = battle.deploymentPlacements?.[group.id]?.line ?? group.line;
-  return placeTacticalDeploymentGroup(state, groupId, { zoneId, line });
-}
-
-export function splitAssaultGroup(state: GameState, groupId: string, detachCount: number): string | null {
-  return splitTacticalGroup(state, groupId, detachCount);
-}
-
-export function mergeAssaultGroups(
-  state: GameState,
-  destinationGroupId: string,
-  sourceGroupId: string,
-): string | null {
-  return mergeTacticalGroups(state, destinationGroupId, sourceGroupId);
 }
 
 export function assaultCommandUnavailableReason(

@@ -69,7 +69,7 @@ export function hunterLocomotionFrameIndex(moving: boolean, elapsedMs: number): 
   return HUNTER_WALK_SEQUENCE[step % HUNTER_WALK_SEQUENCE.length];
 }
 
-export function hunterLoadFrameIndex(moving: boolean, elapsedMs: number): number {
+function hunterLoadFrameIndex(moving: boolean, elapsedMs: number): number {
   if (!moving) return 0;
   const step = Math.floor(Math.max(0, elapsedMs) / RESIDENT_HUNTER_LOAD_SHEET.frameDurationMs);
   return HUNTER_LOAD_SEQUENCE[step % HUNTER_LOAD_SEQUENCE.length];

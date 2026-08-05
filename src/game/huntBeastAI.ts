@@ -7,7 +7,7 @@ export type BeastAction =
   | { kind: 'breakout'; sectorId: string }
   | { kind: 'cornered' };
 
-export interface HuntGroupSnapshot {
+interface HuntGroupSnapshot {
   id: string;
   count: number;
   effectivePower: number;
@@ -15,7 +15,7 @@ export interface HuntGroupSnapshot {
   spearWall: boolean;
 }
 
-export interface HuntSectorSnapshot {
+interface HuntSectorSnapshot {
   id: string;
   blockade: number;
   groups: HuntGroupSnapshot[];

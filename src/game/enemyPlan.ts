@@ -380,7 +380,7 @@ export function eligibleEnemyDoctrines(
   });
 }
 
-export function chooseEnemyDoctrine(
+function chooseEnemyDoctrine(
   factionName: string,
   roll: number,
   maximumPhase: 1 | 2 | 8 = 2,
@@ -421,7 +421,7 @@ export function enemyObjectiveWeights(
   };
 }
 
-export function chooseEnemyObjective(
+function chooseEnemyObjective(
   factionName: string,
   power: number,
   relation: number,
@@ -582,7 +582,7 @@ export function enemyPlanWarningLines(plan: EnemyPlan | undefined): string[] {
   return lines.length > 0 ? lines : ['적의 대열에서 별도의 계책 징후는 보이지 않습니다.'];
 }
 
-export interface EnemyCompositionIntelGroupView {
+interface EnemyCompositionIntelGroupView {
   groupId: string;
   unitType?: import('./types').RaiderUnitType;
   label: string;
@@ -592,7 +592,7 @@ export interface EnemyCompositionIntelGroupView {
   support: boolean;
 }
 
-export interface EnemyCompositionIntelView {
+interface EnemyCompositionIntelView {
   revealed: boolean;
   templateId?: string;
   templateLabel: string;
@@ -600,7 +600,7 @@ export interface EnemyCompositionIntelView {
   hiddenGroupCount: number;
 }
 
-export function enemyCompositionIntelView(
+function enemyCompositionIntelView(
   battle: Pick<TacticalBattle, 'enemyPlan' | 'raiderGroups'>,
 ): EnemyCompositionIntelView {
   const plan = battle.enemyPlan;
@@ -645,7 +645,7 @@ export interface EnemyPlanSummaryView {
   hiddenStratagemCount: number;
 }
 
-export interface EnemyDoctrineIntentGroupView {
+interface EnemyDoctrineIntentGroupView {
   groupId: string;
   label: string;
   state: import('./types').TacticalAiState;
@@ -653,7 +653,7 @@ export interface EnemyDoctrineIntentGroupView {
   signal: string;
 }
 
-export interface EnemyDoctrineIntentView {
+interface EnemyDoctrineIntentView {
   doctrineRevealed: boolean;
   doctrineId?: EnemyDoctrineId;
   doctrineLabel: string;
@@ -728,14 +728,14 @@ export function enemyIntelLevel(input: {
   return clamp(score, 0, 4) as 0 | 1 | 2 | 3 | 4;
 }
 
-export interface InitialEnemyPlanReveals {
+interface InitialEnemyPlanReveals {
   objective: boolean;
   composition: boolean;
   doctrine: boolean;
   stratagemCount: number;
 }
 
-export function initialEnemyPlanReveals(level: number): InitialEnemyPlanReveals {
+function initialEnemyPlanReveals(level: number): InitialEnemyPlanReveals {
   const intelLevel = clamp(Math.floor(level), 0, 4);
   return {
     objective: intelLevel >= 1,
@@ -765,7 +765,7 @@ function applyEnemyPlanIntel(plan: EnemyPlan, level: number, roll: number): Enem
   return plan;
 }
 
-export function enemyStratagemPoints(factionName: string, power: number, relation: number): number {
+function enemyStratagemPoints(factionName: string, power: number, relation: number): number {
   const config = CONFIG.tacticalBattle.enemyPlan.stratagemPoints;
   const key = factionKey(factionName);
   const base = config.factionBase[key];

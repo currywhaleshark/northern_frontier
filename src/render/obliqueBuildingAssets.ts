@@ -120,7 +120,7 @@ export const OBLIQUE_BUILDING_SHEETS = {
   Record<'standard' | 'highDefinition', ObliqueBuildingSheet>
 >;
 
-export interface ObliqueBuildingFrame {
+interface ObliqueBuildingFrame {
   readonly group: ObliqueBuildingGroup;
   readonly column: number;
 }

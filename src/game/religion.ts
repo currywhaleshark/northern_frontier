@@ -69,7 +69,7 @@ const PERSONS: ReligionPerson[] = [
   },
 ];
 
-export function unlockedReligionsOf(state: GameState): ReligionId[] {
+function unlockedReligionsOf(state: GameState): ReligionId[] {
   if (!state.unlockedReligions) state.unlockedReligions = [];
   return state.unlockedReligions;
 }
@@ -195,7 +195,7 @@ export function reconcileReligiousSuccession(state: GameState, rng: () => number
   ensureMonkSuccession(state, rng);
 }
 
-export function isReligionUnlocked(state: GameState, religion: ReligionId): boolean {
+function isReligionUnlocked(state: GameState, religion: ReligionId): boolean {
   return unlockedReligionsOf(state).includes(religion);
 }
 

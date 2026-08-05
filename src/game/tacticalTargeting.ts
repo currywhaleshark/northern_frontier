@@ -4,7 +4,7 @@ import type {
   CombatWeaponId, RaiderUnitType, TacticalDefenderGroup, TacticalFormationLine, TacticalRaiderGroup,
 } from './types';
 
-export type TacticalEngagementDirection = 'frontal' | 'rear';
+type TacticalEngagementDirection = 'frontal' | 'rear';
 
 export interface TacticalTargetingContext {
   direction: TacticalEngagementDirection;
@@ -13,18 +13,18 @@ export interface TacticalTargetingContext {
   prepareVolleyApplied: boolean;
 }
 
-export interface TacticalTargetingResult {
+interface TacticalTargetingResult {
   allowed: boolean;
   efficiency: number;
   reason: string | null;
 }
 
-export type TacticalTargetingAttacker = Pick<TacticalDefenderGroup, 'weapon' | 'role' | 'readyMuskets' | 'line'> | Pick<
+type TacticalTargetingAttacker = Pick<TacticalDefenderGroup, 'weapon' | 'role' | 'readyMuskets' | 'line'> | Pick<
   TacticalRaiderGroup,
   'unitType' | 'line'
 >;
 
-export type TacticalTargetingRole = 'melee' | 'musket' | 'bow';
+type TacticalTargetingRole = 'melee' | 'musket' | 'bow';
 
 export function defaultRaiderFormationLine(
   unitType?: RaiderUnitType,

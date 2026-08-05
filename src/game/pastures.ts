@@ -53,10 +53,6 @@ export function stableLivestockCapacity(
   return Math.max(1, Math.floor(area * CONFIG.pasture.capacityPerTile[species]));
 }
 
-export function pastureContains(area: PastureArea | undefined, x: number, y: number): boolean {
-  return !!area && x >= area.x && y >= area.y && x < area.x + area.w && y < area.y + area.h;
-}
-
 function rectanglesOverlap(a: PastureArea, b: PastureArea): boolean {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }

@@ -23,14 +23,14 @@ import type {
 } from './types';
 
 // 특수 주민 고유의 패시브 스킬 — 명부·주민 선택 정보에 항상 붙어 다니는 표식.
-export interface SpecialResidentSkill {
+interface SpecialResidentSkill {
   id: string;
   icon: UiIconName;
   name: string;
   effect: string;
 }
 
-export interface SpecialResidentDefinition {
+interface SpecialResidentDefinition {
   id: SpecialResidentId;
   name: string;
   shortName: string;
@@ -338,7 +338,7 @@ export function specialResidentRecordsOf(
   return state.specialResidentRecords;
 }
 
-export function activeSpecialResident(state: GameState, id: SpecialResidentId) {
+function activeSpecialResident(state: GameState, id: SpecialResidentId) {
   return state.residents.find(resident => resident.alive && resident.special === id);
 }
 

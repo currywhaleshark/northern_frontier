@@ -1,7 +1,8 @@
+import { readAppCss } from '../app-stylesheets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const css = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
+const css = readAppCss();
 const gameMenu = readFileSync(new URL('../../src/components/GameMenu.tsx', import.meta.url), 'utf8');
 const saveSlot = readFileSync(new URL('../../src/components/SaveSlotDialog.tsx', import.meta.url), 'utf8');
 

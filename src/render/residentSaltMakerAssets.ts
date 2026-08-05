@@ -2,12 +2,12 @@ import type { Gender } from '../game/types';
 
 export type SaltMakerSpriteState = 'idle' | 'walk' | 'seaIntake' | 'kilnWork';
 
-export interface ResidentSaltMakerSheet {
+interface ResidentSaltMakerSheet {
   src: string;
   frameSize: number;
 }
 
-export interface ResidentSaltMakerSheetPair {
+interface ResidentSaltMakerSheetPair {
   standard: ResidentSaltMakerSheet;
   highDefinition: ResidentSaltMakerSheet;
 }

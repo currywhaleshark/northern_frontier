@@ -1,7 +1,7 @@
 import { CONFIG } from './config';
 import { DAY_CYCLE_SUBTICKS } from './dayCycle';
 import { addLog } from './events';
-import { findPath } from './agents';
+import { findPath } from './pathfinding';
 import { isRaidTileTraversable, planRaidRoute } from './raidRoutes';
 import { killResident } from './residents';
 import type { Building, GameState, RaiderBand, Resident } from './types';
@@ -18,7 +18,7 @@ function absoluteTick(state: Pick<GameState, 'day' | 'subTick'>): number {
   return state.day * DAY_CYCLE_SUBTICKS + state.subTick;
 }
 
-export function watchtowerIntegrityMax(): number {
+function watchtowerIntegrityMax(): number {
   return CONFIG.watchtower.integrityMax;
 }
 

@@ -108,7 +108,7 @@ export function tributeSilverCost(tribute: CourtTribute): number {
   return Math.max(1, Math.ceil(totalValue * CONFIG.tribute.silverPayMarkup / RESOURCE_DEFS.silver.tradeBaseValue));
 }
 
-export function hasLenientTributeGrace(state: Pick<GameState, 'borderCommander'>): boolean {
+function hasLenientTributeGrace(state: Pick<GameState, 'borderCommander'>): boolean {
   return state.borderCommander.temper === 'lenient' && !state.borderCommander.tributeLeniencyUsed;
 }
 

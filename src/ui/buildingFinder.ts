@@ -3,13 +3,13 @@ import type { Building, BuildingTypeId } from '../game/types';
 
 export type BuildingFinderStatus = 'all' | 'operational' | 'construction' | 'repairing';
 
-export interface BuildingFinderFilters {
+interface BuildingFinderFilters {
   query: string;
   type: BuildingTypeId | null;
   status: BuildingFinderStatus;
 }
 
-export function buildingFinderStatus(building: Building): Exclude<BuildingFinderStatus, 'all'> {
+function buildingFinderStatus(building: Building): Exclude<BuildingFinderStatus, 'all'> {
   if (building.repairing || building.structureRepair) return 'repairing';
   if (!building.built || building.expansion || building.workOrder || building.gateConversion) return 'construction';
   return 'operational';

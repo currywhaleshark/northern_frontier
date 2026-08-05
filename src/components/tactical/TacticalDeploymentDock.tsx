@@ -28,7 +28,7 @@ import { playSfx } from '../../sound/sfx';
 import { DockDefenderSprite } from './TacticalGroupChip';
 import { useStagePointerDrag } from './stagePointerDrag';
 
-export const DEPLOY_ANCHOR_ATTRIBUTE = 'data-deploy-anchor';
+const DEPLOY_ANCHOR_ATTRIBUTE = 'data-deploy-anchor';
 export const DEPLOY_DOCK_ANCHOR_ID = 'dock-waiting';
 
 export interface DeploymentDragSnapshot {

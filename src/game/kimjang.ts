@@ -4,9 +4,9 @@ import { freeJangdokdaeOnggiCapacity } from './fermentation';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import type { Building, GameState, PendingChoice } from './types';
 
-export type KimjangSize = keyof typeof CONFIG.fermentation.kimjangSizes;
+type KimjangSize = keyof typeof CONFIG.fermentation.kimjangSizes;
 
-export interface KimjangRequirements {
+interface KimjangRequirements {
   onggi: number;
   vegetables: number;
   salt: number;
@@ -32,7 +32,7 @@ export function isKimjangWindow(day: number): boolean {
     || (season === 'winter' && dayOfSeason <= CONFIG.fermentation.kimjangWinterEndDay);
 }
 
-export function kimjangRequirements(size: KimjangSize): KimjangRequirements {
+function kimjangRequirements(size: KimjangSize): KimjangRequirements {
   const onggi = CONFIG.fermentation.kimjangSizes[size];
   return {
     onggi,
@@ -42,7 +42,7 @@ export function kimjangRequirements(size: KimjangSize): KimjangRequirements {
   };
 }
 
-export function kimjangFreeOnggiCapacity(state: GameState): number {
+function kimjangFreeOnggiCapacity(state: GameState): number {
   return builtJangdokdaes(state).reduce(
     (total, building) => total + Math.floor(freeJangdokdaeOnggiCapacity(building) + 1e-9),
     0,

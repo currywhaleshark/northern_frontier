@@ -515,7 +515,7 @@ const residentJigeCargoSheets: Partial<Record<JobId, HTMLImageElement>> = {};
 const residentJigeCargoHdSheets: Partial<Record<JobId, HTMLImageElement>> = {};
 let started = false;
 
-export interface AtlasAssetState {
+interface AtlasAssetState {
   src: string;
   status: 'idle' | 'loading' | 'loaded' | 'failed';
   required: boolean;

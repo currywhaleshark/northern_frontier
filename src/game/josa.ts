@@ -1,4 +1,4 @@
-export type JosaPair = '이/가' | '을/를' | '과/와' | '은/는' | '으로/로';
+type JosaPair = '이/가' | '을/를' | '과/와' | '은/는' | '으로/로';
 
 // 숫자로 끝나면 읽는 소리의 받침을 따른다: 0영 1일 2이 3삼 4사 5오 6육 7칠 8팔 9구
 // (0 = 받침 없음, 8 = ㄹ, 그 외 양수 = 기타 받침)
@@ -16,7 +16,7 @@ function finalConsonantIndex(text: string): number {
   return (syllable.charCodeAt(0) - 0xac00) % 28;
 }
 
-export function selectJosa(text: string | number, pair: JosaPair): string {
+function selectJosa(text: string | number, pair: JosaPair): string {
   const finalIndex = finalConsonantIndex(String(text));
   if (pair === '으로/로') return finalIndex > 0 && finalIndex !== 8 ? '으로' : '로';
   const [withFinal, withoutFinal] = pair.split('/');

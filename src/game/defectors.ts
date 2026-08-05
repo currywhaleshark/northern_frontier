@@ -17,7 +17,7 @@ export const NORTHERN_DEFECTOR_NAMES = [
   '귀이파', '아을파', '가수거', '가소', '대두', '다하내',
 ] as const;
 
-export type ResidentOriginProfile = keyof typeof RESIDENT_ORIGINS | 'other' | 'local';
+type ResidentOriginProfile = keyof typeof RESIDENT_ORIGINS | 'other' | 'local';
 
 const NORTHERN_ORIGINS = new Set([
   '오도리 씨족',

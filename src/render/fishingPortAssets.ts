@@ -8,7 +8,7 @@ interface FrameRect {
   readonly h: number;
 }
 
-export type FishingPortPierPart =
+type FishingPortPierPart =
   | 'middle_horizontal'
   | 'middle_vertical'
   | `terminal_${FishingPortPierDirection}`;
@@ -71,10 +71,6 @@ export const FISHING_PORT_PIER_WINTER_HD_SHEET = {
   middleScale: pier.display.middleScale,
   terminalScale: pier.display.terminalScale,
 } as const;
-
-export const FISHING_PORT_TERMINAL_DIRECTIONS: readonly FishingPortPierDirection[] = [
-  'n', 'e', 's', 'w',
-];
 
 export function fishingPortHouseSourceRect(season: Season = 'summer'): FrameRect {
   const row = season === 'winter' ? 'winter' : 'normal';

@@ -72,7 +72,7 @@ export function tacticalRouteBySide(
   return battle.flankRoutes?.find(route => route.side === side);
 }
 
-export const TACTICAL_ROUTE_NODES: readonly TacticalRouteNode[] = Object.freeze([
+const TACTICAL_ROUTE_NODES: readonly TacticalRouteNode[] = Object.freeze([
   'approachGate', 'middle', 'storehouseGate',
 ]);
 
@@ -80,7 +80,7 @@ function tacticalRouteNode(value: unknown): value is TacticalRouteNode {
   return value === 'approachGate' || value === 'middle' || value === 'storehouseGate';
 }
 
-export function tacticalRouteNodeFromLegacyStep(
+function tacticalRouteNodeFromLegacyStep(
   step: 0 | 1 | 2,
   originZoneId: string,
 ): TacticalRouteNode {
@@ -157,7 +157,7 @@ export function tacticalFlankRoutePreparationUnavailableReason(
   return null;
 }
 
-export interface TacticalFlankRoutePreparationOption {
+interface TacticalFlankRoutePreparationOption {
   side: TacticalRouteSide;
   routeId: string;
   label: string;
@@ -771,7 +771,7 @@ export function advanceTacticalRouteTransits(
   return advances;
 }
 
-export interface TacticalRouteRoundResolution {
+interface TacticalRouteRoundResolution {
   engagements: TacticalRouteEngagement[];
   arrivals: TacticalRouteArrival[];
   events: TacticalAnimationEvent[];
@@ -1029,9 +1029,9 @@ export interface TacticalFlankRouteView {
   expectedArrivalRounds?: readonly [number, number];
 }
 
-export type TacticalRouteStageDisplay = 'hidden' | 'suspected' | 'revealed';
+type TacticalRouteStageDisplay = 'hidden' | 'suspected' | 'revealed';
 
-export interface TacticalRouteNodeView {
+interface TacticalRouteNodeView {
   node: TacticalRouteNode;
   label: string;
 }
@@ -1073,14 +1073,14 @@ export interface TacticalRouteStageView {
   expectedArrivalRounds?: readonly [number, number];
 }
 
-export interface TacticalZoneStageView {
+interface TacticalZoneStageView {
   kind: 'zone';
   stageId: Extract<TacticalStageId, { kind: 'zone' }>;
   label: string;
   order: number;
 }
 
-export interface TacticalStageLinkView {
+interface TacticalStageLinkView {
   routeId: string;
   side: TacticalRouteSide;
   zoneStageId: Extract<TacticalStageId, { kind: 'zone' }>;
@@ -1089,7 +1089,7 @@ export interface TacticalStageLinkView {
   accessible: boolean;
 }
 
-export interface TacticalStageTopologyView {
+interface TacticalStageTopologyView {
   stages: Array<TacticalZoneStageView | TacticalRouteStageView>;
   links: TacticalStageLinkView[];
   selectedFallback: TacticalStageId;

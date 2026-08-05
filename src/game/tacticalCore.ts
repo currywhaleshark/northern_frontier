@@ -9,7 +9,7 @@ import type {
 
 type TacticalOutcome = NonNullable<TacticalRoundReport['outcome']>;
 
-export interface TacticalShotCounts {
+interface TacticalShotCounts {
   arrows?: number;
   muskets?: number;
   cannons?: number;

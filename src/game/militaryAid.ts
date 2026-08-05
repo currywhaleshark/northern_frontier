@@ -201,11 +201,11 @@ export function militaryAidForLair(
     : undefined;
 }
 
-export function activeWarDispatchResidentIds(state: Pick<GameState, 'warDispatch'>): Set<number> {
+function activeWarDispatchResidentIds(state: Pick<GameState, 'warDispatch'>): Set<number> {
   return new Set(state.warDispatch?.memberIds ?? []);
 }
 
-export function eligibleWarDispatchResidents(state: GameState): Resident[] {
+function eligibleWarDispatchResidents(state: GameState): Resident[] {
   const scouts = activePredatorScoutIds(state);
   const away = activeWarDispatchResidentIds(state);
   return state.residents

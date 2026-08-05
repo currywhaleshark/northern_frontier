@@ -317,7 +317,7 @@ export function takeFishingGroundStockById(
   return taken;
 }
 
-export interface FishingGroundSummary {
+interface FishingGroundSummary {
   grounds: number;
   tiles: number;
   stock: number;

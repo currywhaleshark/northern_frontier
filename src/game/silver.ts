@@ -53,7 +53,7 @@ function minedRockRecently(state: GameState): boolean {
   return state.day - (state.lastRockMiningDay ?? -999) <= 1;
 }
 
-export function openSilverVeinChoice(state: GameState): void {
+function openSilverVeinChoice(state: GameState): void {
   const v = vein(state);
   if (!v || state.pendingChoice || state.battle) return;
   v.status = 'offered';

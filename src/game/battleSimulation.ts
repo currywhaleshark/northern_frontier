@@ -104,7 +104,7 @@ function pick<T>(setting: SimSetting<T>, roll: () => T): T {
   return setting === 'random' ? roll() : setting;
 }
 
-export function randomDefenderCounts(rng: () => number): BattleSimDefenderCounts {
+function randomDefenderCounts(rng: () => number): BattleSimDefenderCounts {
   const counts: BattleSimDefenderCounts = {
     muskets: Math.floor(rng() * 4),
     bows: Math.floor(rng() * 5),

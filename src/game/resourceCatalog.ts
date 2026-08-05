@@ -11,7 +11,7 @@ export type ResourceCategory =
   | 'currency'
   | 'abstract';
 
-export interface ResourceDef {
+interface ResourceDef {
   id: ResourceId;
   name: string;
   category: ResourceCategory;

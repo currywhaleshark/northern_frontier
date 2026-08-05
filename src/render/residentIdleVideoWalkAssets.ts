@@ -15,7 +15,7 @@ interface AnimationRow {
   loop: boolean;
 }
 
-export interface IdleVideoWalkSourceRect {
+interface IdleVideoWalkSourceRect {
   sx: number;
   sy: number;
   sw: number;

@@ -81,7 +81,7 @@ export function minerWorkSourceRect(gender: Gender, elapsedMs: number, highDefin
   return sourceRect(frameSize, gender, minerWorkFrameIndex(elapsedMs));
 }
 
-export function minerLoadFrameIndex(moving: boolean, elapsedMs: number): number {
+function minerLoadFrameIndex(moving: boolean, elapsedMs: number): number {
   if (!moving) return 0;
   const step = Math.floor(Math.max(0, elapsedMs) / RESIDENT_MINER_LOAD_SHEET.frameDurationMs);
   return MINER_LOAD_SEQUENCE[step % MINER_LOAD_SEQUENCE.length];

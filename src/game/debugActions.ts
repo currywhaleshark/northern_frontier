@@ -61,7 +61,7 @@ function fail(reason: string): DebugResult {
 }
 
 /** 치트로 상태를 건드린 저장임을 남긴다 (게임플레이 불이익 없음). */
-export function markDebugTouched(state: GameState): void {
+function markDebugTouched(state: GameState): void {
   state.debugTouched = true;
 }
 
@@ -172,7 +172,7 @@ export function debugAdvanceToNextSeason(state: GameState): DebugResult {
   return debugAdvanceDays(state, remaining);
 }
 
-export function debugTargetDay(year: number, season: Season, dayOfSeason: number): number {
+function debugTargetDay(year: number, season: Season, dayOfSeason: number): number {
   const seasonIndex = Math.max(0, SEASON_ORDER.indexOf(season));
   const y = Math.max(1, Math.floor(numberOr(year, 1)));
   const d = Math.min(CONFIG.time.seasonDays, Math.max(1, Math.floor(numberOr(dayOfSeason, 1))));
@@ -251,7 +251,7 @@ function clamp(value: number, min: number, max: number): number {
 
 export type DebugAgeBand = 'random' | 'child' | 'youth' | 'adult' | 'elder';
 
-export interface DebugResidentSpawnOptions {
+interface DebugResidentSpawnOptions {
   count?: number;
   gender?: Gender | 'random';
   ageBand?: DebugAgeBand;

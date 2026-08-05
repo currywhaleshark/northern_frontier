@@ -4,7 +4,7 @@ import { SEASON_ORDER } from './constants';
 import { getDayOfSeason, getSeason } from './seasons';
 import type { ForeignSite, GameState, Gender, JobId, Season, Terrain } from './types';
 
-export type ForeignSitePropKind = 'field' | 'hut' | 'storehouse' | 'dryingRack' | 'boat' | 'huntLodge';
+type ForeignSitePropKind = 'field' | 'hut' | 'storehouse' | 'dryingRack' | 'boat' | 'huntLodge';
 
 export interface ForeignSiteProp {
   kind: ForeignSitePropKind;
@@ -12,7 +12,7 @@ export interface ForeignSiteProp {
   y: number;
 }
 
-export interface ForeignSiteActor {
+interface ForeignSiteActor {
   x: number;
   y: number;
   job: JobId;

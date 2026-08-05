@@ -1,9 +1,10 @@
+import { readAppCss } from '../app-stylesheets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const appSource = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
 const dockSource = readFileSync(new URL('../../src/components/dock/DockFrame.tsx', import.meta.url), 'utf8');
-const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
+const cssSource = readAppCss();
 
 assert.match(appSource,
   /id:\s*'minimap'[\s\S]*className:\s*'hud-minimap-window'[\s\S]*className="minimap-overlay"[\s\S]*<Minimap/,

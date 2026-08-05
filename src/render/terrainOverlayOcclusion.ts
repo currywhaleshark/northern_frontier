@@ -3,7 +3,7 @@ import type { ForeignSite, Tile } from '../game/types';
 import { FOREIGN_SITE_CORE_SHEET } from './foreignSiteAssets';
 import { TERRAIN_GROWTH_DRAW_SIZE } from './terrainGrowthAssets';
 
-export interface PixelRect {
+interface PixelRect {
   x: number;
   y: number;
   w: number;

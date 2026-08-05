@@ -14,7 +14,7 @@ interface WearableDef {
   moveMultiplier: number;
 }
 
-export const WEARABLE_DEFS: Record<WearableResource, WearableDef> = {
+const WEARABLE_DEFS: Record<WearableResource, WearableDef> = {
   hideClothes: { slot: 'clothing', warmth: 1, durability: 1.35, moveMultiplier: 1 },
   cottonClothes: { slot: 'clothing', warmth: 0.85, durability: 1, moveMultiplier: 1 },
   strawShoes: {
@@ -79,7 +79,7 @@ function finiteWear(value: unknown): number {
     : 0;
 }
 
-export function normalizeWornItem(value: unknown, slot: WearableSlot): WornItem | undefined {
+function normalizeWornItem(value: unknown, slot: WearableSlot): WornItem | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const raw = value as Partial<WornItem>;
   if (typeof raw.resource !== 'string' || !(raw.resource in WEARABLE_DEFS)) return undefined;
@@ -127,7 +127,7 @@ export function equipMissingWearables(state: GameState, resident: Resident): boo
   return changed;
 }
 
-export function residentClothingCoverage(resident: Resident): number {
+function residentClothingCoverage(resident: Resident): number {
   const item = resident.worn?.clothing;
   return item ? WEARABLE_DEFS[item.resource].warmth : 0;
 }
@@ -211,7 +211,7 @@ export function resolvedTanneryProduct(
   return clothingDeficit >= footwearDeficit ? 'hideClothes' : 'leatherShoes';
 }
 
-export function strawShoeCraftNeed(state: GameState): number {
+function strawShoeCraftNeed(state: GameState): number {
   const living = state.residents.filter(resident => resident.alive && resident.stage !== 'infant');
   const missing = living.filter(resident => !resident.worn?.footwear).length;
   const nearExpiry = living.filter(resident => (resident.worn?.footwear?.wear ?? 0) >= 0.75).length;

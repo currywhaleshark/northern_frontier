@@ -13,7 +13,7 @@ export function acceptsClearedLand(def: BuildingDef): boolean {
   return def.placement === 'land' || def.placement === 'field' || def.placement === 'paddy';
 }
 
-export function isClearableForestTile(tile: Tile | undefined): boolean {
+function isClearableForestTile(tile: Tile | undefined): boolean {
   return !!tile && tile.terrain === 'forest';
 }
 
@@ -91,7 +91,7 @@ export function clearingBlocksWork(state: GameState, building: Building): boolea
   return awaitsClearing(state, building);
 }
 
-export interface ClearingSite {
+interface ClearingSite {
   building: Building;
   tiles: Tile[];
 }

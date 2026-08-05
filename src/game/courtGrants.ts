@@ -6,9 +6,9 @@ import { borderCommanderEffects } from './diplomaticFigures';
 import type { SpecialItemId } from './specialItems';
 import type { GameState, LivestockId, Rank, ResourceId } from './types';
 
-export type CourtGrantResourceCategory = 'practical' | 'advanced';
+type CourtGrantResourceCategory = 'practical' | 'advanced';
 
-export interface CourtGrantResourceCandidate {
+interface CourtGrantResourceCandidate {
   resource: ResourceId;
   baseAmount: number;
   weight: number;
@@ -18,13 +18,13 @@ export interface CourtGrantResourceCandidate {
   category: CourtGrantResourceCategory;
 }
 
-export interface CourtGrantResourceReward {
+interface CourtGrantResourceReward {
   resource: ResourceId;
   amount: number;
   category: CourtGrantResourceCategory;
 }
 
-export interface CourtGrantLivestockReward {
+interface CourtGrantLivestockReward {
   kind: 'livestock';
   grantType: 'livestock' | 'warhorse';
   species: LivestockId;
@@ -32,7 +32,7 @@ export interface CourtGrantLivestockReward {
   category: 'practical';
 }
 
-export type CourtGrantReward = CourtGrantResourceReward | CourtGrantLivestockReward;
+type CourtGrantReward = CourtGrantResourceReward | CourtGrantLivestockReward;
 
 /** 이번 하사품 범위의 전용 기물. 이후 기물은 이 목록에 명시적으로 추가한다. */
 export const COURT_GRANT_ARTIFACT_IDS = [
@@ -51,13 +51,13 @@ export const COURT_GRANT_ARTIFACT_IDS = [
   'royalMusket',
 ] as const satisfies readonly SpecialItemId[];
 
-export interface CourtGrantArtifactRoll {
+interface CourtGrantArtifactRoll {
   item: SpecialItemId | null;
   eligible: boolean;
   guaranteedByPity: boolean;
 }
 
-export interface CourtGrantLivestockCandidate {
+interface CourtGrantLivestockCandidate {
   kind: 'livestock';
   grantType: 'livestock' | 'warhorse';
   species: readonly LivestockId[];

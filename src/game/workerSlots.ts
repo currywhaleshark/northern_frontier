@@ -5,7 +5,7 @@ import { pastureRequiredHerders } from './pastures';
 import { canResidentTakeJob } from './youth';
 import type { Building, BuildingTypeId, GameState, JobId, Resident } from './types';
 
-export interface WorkerSlotConfig {
+interface WorkerSlotConfig {
   job: JobId;
   slots: number;
 }

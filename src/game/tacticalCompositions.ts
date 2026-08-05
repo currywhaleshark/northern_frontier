@@ -219,7 +219,7 @@ export function tacticalCompositionTemplate(id: string | undefined): TacticalCom
   return id ? TEMPLATES.find(template => template.id === id) : undefined;
 }
 
-export function eligibleTacticalCompositionTemplates(input: {
+function eligibleTacticalCompositionTemplates(input: {
   faction: TacticalEnemyFactionId;
   doctrine: EnemyDoctrineId;
   objective: EnemyObjectiveId;

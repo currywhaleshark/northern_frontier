@@ -9,7 +9,7 @@ import { oreSampleAt } from './subsurfaceVeins';
 import { assignedWorkers } from './workerSlots';
 import type { Building, GameState, PendingDisaster, Resident } from './types';
 
-export type MineCollapseAdvanceResult = 'keep' | 'resolved';
+type MineCollapseAdvanceResult = 'keep' | 'resolved';
 
 function activeMineCollapse(state: Pick<GameState, 'pendingDisasters'>): PendingDisaster | undefined {
   return state.pendingDisasters.find(disaster => disaster.id === 'mineCollapse');

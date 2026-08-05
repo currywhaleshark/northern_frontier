@@ -5,10 +5,10 @@ import type { GameState, ResourceId } from '../game/types';
 
 export const METRIC_RESOURCE_IDS = ['reputation', 'defense'] as const satisfies readonly ResourceId[];
 
-export type MetricResourceId = typeof METRIC_RESOURCE_IDS[number];
+type MetricResourceId = typeof METRIC_RESOURCE_IDS[number];
 export type StockResourceId = Exclude<ResourceId, MetricResourceId>;
 
-export const RESOURCE_DISPLAY_GROUP_IDS = [
+const RESOURCE_DISPLAY_GROUP_IDS = [
   'food',
   'fuel',
   'clothing',
@@ -78,7 +78,7 @@ export function isResourceDisplayGroupId(value: unknown): value is ResourceDispl
 
 export const STOCK_RESOURCE_ORDER = RESOURCE_ORDER.filter(isStockResourceId);
 
-export interface ResourceDisplayGroup {
+interface ResourceDisplayGroup {
   id: ResourceDisplayGroupId;
   title: string;
   icon: ResourceIconId;

@@ -27,8 +27,6 @@ export const COASTAL_GROUND_SHEET = {
   anchor: coastalGroundManifest.display.anchor,
 } as const;
 
-export const COASTAL_GROUND_KINDS: readonly CoastalGroundKind[] = materials;
-
 export const COASTAL_SEAMLESS_GROUND_SHEETS: Record<
   SeamlessCoastalGroundKind,
   { readonly standard: SeamlessCoastalGroundAsset; readonly highDefinition: SeamlessCoastalGroundAsset }

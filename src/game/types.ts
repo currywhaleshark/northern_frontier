@@ -106,7 +106,7 @@ export interface FishingGroundState {
   recoveryPerDay: number;
 }
 
-export type FishingBoatStatus =
+type FishingBoatStatus =
   | 'building'
   | 'moored'
   | 'boarded'
@@ -186,7 +186,7 @@ export type JobId =
 
 export type CombatWeaponId = 'musket' | 'hornBow' | 'spear';
 export type MountId = 'horse';
-export type WeaponAllocationMode = 'auto' | 'manual';
+type WeaponAllocationMode = 'auto' | 'manual';
 export type HuntPreyId = 'rabbit' | 'pheasant' | 'roeDeer' | 'wildBoar';
 
 export type ResourceId =
@@ -407,7 +407,7 @@ export interface ForeignSite {
   lairDoctrineNextReviewDay?: number;
 }
 
-export type PointerCursor = 'default' | 'move' | 'copy' | 'pointer' | 'not-allowed';
+type PointerCursor = 'default' | 'move' | 'copy' | 'pointer' | 'not-allowed';
 
 export type SelectedEntity =
   | { kind: 'tile'; x: number; y: number }
@@ -428,7 +428,7 @@ export type ManualOrder =
 
 export type DayBand = 'dawn' | 'work' | 'evening' | 'night';
 
-export type AgentPhase =
+type AgentPhase =
   | 'rest'
   | 'toWork'
   | 'working'
@@ -438,7 +438,7 @@ export type AgentPhase =
   | 'toHome'
   | 'sleeping';
 
-export interface HaulTask {
+interface HaulTask {
   sourceBuildingId: number;
   resource: ResourceId;
   amount: number;
@@ -460,7 +460,7 @@ export type SpecialResidentId =
   | 'interpreter'   // 퇴역 역관 배수겸
   | 'hangwae';      // 항왜 철포수 사야카
 
-export type SpecialResidentStatus = 'confined' | 'active' | 'departed' | 'declined' | 'dead';
+type SpecialResidentStatus = 'confined' | 'active' | 'departed' | 'declined' | 'dead';
 
 export interface SpecialResidentRecord {
   status: SpecialResidentStatus;
@@ -499,7 +499,7 @@ export interface Corpse {
 }
 
 // 묘지에 안치된 뒤에도 남는 최소 기록. 구버전 묘는 일부 값이 없을 수 있다.
-export interface BurialRecord {
+interface BurialRecord {
   corpseId?: number;
   name?: string;
   cause?: string;
@@ -586,7 +586,7 @@ export interface PastureArea {
   h: number;
 }
 
-export interface BuildingExpansion {
+interface BuildingExpansion {
   kind: 'footprint' | 'pasture';
   fromArea: PastureArea;
   targetArea: PastureArea;
@@ -595,7 +595,7 @@ export interface BuildingExpansion {
   addedTiles: number;
 }
 
-export interface BuildingWorkOrder {
+interface BuildingWorkOrder {
   kind: 'demolish' | 'relocate';
   phase: 'dismantling' | 'rebuilding';
   progress: number;
@@ -603,14 +603,14 @@ export interface BuildingWorkOrder {
   destination?: PastureArea;
 }
 
-export interface GateConversion {
+interface GateConversion {
   wallType: SolidWallBuildingTypeId;
   progress: number;
   required: number;
   paidCost: Partial<Record<ResourceId, number>>;
 }
 
-export interface StructureRepair {
+interface StructureRepair {
   progress: number;
   required: number;
   paidCost: Partial<Record<ResourceId, number>>;
@@ -622,7 +622,7 @@ export interface WeirReservoirTile {
   originalTerrain: Extract<Terrain, 'plain' | 'fertile'>;
 }
 
-export interface WeirReservoirState {
+interface WeirReservoirState {
   startedDay: number;
   floodedCount: number;
   tiles: WeirReservoirTile[];
@@ -679,7 +679,7 @@ export interface Building {
   portPier?: FishingPortPier; // 포구 전용: 육상 포구채에서 수면 계류대까지 뻗는 직선 잔교
 }
 
-export interface FishingBoatWorkOrder {
+interface FishingBoatWorkOrder {
   kind: 'build' | 'repair';
   portId: number;
   boatId?: number;
@@ -737,7 +737,7 @@ export interface TradeQuote {
   margin: number;
 }
 
-export type TradeNegotiationPhase = 'selecting' | 'countered' | 'accepted' | 'rejected';
+type TradeNegotiationPhase = 'selecting' | 'countered' | 'accepted' | 'rejected';
 
 export interface TradeNegotiation {
   faction: string;
@@ -763,7 +763,7 @@ export interface TradeEvaluation {
   message: string;
 }
 
-export type DiplomaticEnvoyKind = 'gift' | 'pact' | 'claimAccord' | 'aidRequest';
+type DiplomaticEnvoyKind = 'gift' | 'pact' | 'claimAccord' | 'aidRequest';
 
 export interface PendingEnvoy {
   factionName: string;
@@ -781,17 +781,17 @@ export interface PendingEnvoy {
   aidWarriorCount?: number;
 }
 
-export interface DiplomaticPact {
+interface DiplomaticPact {
   factionName: string;
   untilDay: number;
 }
 
-export interface ClaimAccord {
+interface ClaimAccord {
   zoneId: number;
   untilDay: number;
 }
 
-export interface ReadyMilitaryAid {
+interface ReadyMilitaryAid {
   factionName: string;
   targetSiteId: number;
   warriorCount: number;
@@ -873,14 +873,14 @@ export interface YearlySnapshot {
 }
 
 // 개칭 청원 — 파발이 한양을 왕복하는 동안의 대기 상태
-export interface PendingSettlementRename {
+interface PendingSettlementRename {
   requestedName: string;
   sentDay: number;
   dueDay: number;
 }
 
 // 은맥의 생애: offered(선택 대기) → secret(잠채) / sanctioned(설점) / sealed(봉인) / buried(묻어둠)
-export type SilverVeinStatus = 'offered' | 'secret' | 'sanctioned' | 'sealed' | 'buried';
+type SilverVeinStatus = 'offered' | 'secret' | 'sanctioned' | 'sealed' | 'buried';
 
 export interface SilverVeinState {
   status: SilverVeinStatus;
@@ -894,7 +894,7 @@ export interface SilverVeinState {
   lastOfferDay?: number;   // 마지막으로 은맥 선택지를 연 날(기록·구 저장 호환)
 }
 
-export interface ChoiceOption {
+interface ChoiceOption {
   id: string;
   label: string;
   desc: string;
@@ -998,10 +998,10 @@ export interface FireSite {
   ignitedSubTick: number;
 }
 
-export type FireResponsePhase = 'toWater' | 'toFire';
+type FireResponsePhase = 'toWater' | 'toFire';
 export type FireWaterSourceKind = 'well' | 'river' | 'lake';
 
-export interface FireResponse {
+interface FireResponse {
   buildingId: number;
   sourceKind: FireWaterSourceKind;
   sourceBuildingId?: number;
@@ -1042,7 +1042,7 @@ export interface PredatorThreat {
   };
 }
 
-export interface PlagueCase {
+interface PlagueCase {
   residentId: number;
   resolvesOnDay: number;
   real: boolean;
@@ -1153,7 +1153,7 @@ export interface RaiderBand {
 }
 
 export type ExpeditionKind = 'lairAssault' | 'predatorHunt';
-export type ExpeditionPhase = 'muster' | 'march' | 'engage' | 'return';
+type ExpeditionPhase = 'muster' | 'march' | 'engage' | 'return';
 export type ExpeditionRaidOrder = 'return' | 'continue';
 
 export interface Expedition {
@@ -1178,7 +1178,7 @@ export interface Expedition {
   externalAid?: ExpeditionExternalAid;
 }
 
-export interface RaidHoldState {
+interface RaidHoldState {
   power: number;
   faction: string;
   warned: boolean;
@@ -1187,7 +1187,7 @@ export interface RaidHoldState {
   ticksRemaining: number;
 }
 
-export interface WatchtowerProjectile {
+interface WatchtowerProjectile {
   id: number;
   towerId: number;
   fromX: number;
@@ -1199,9 +1199,9 @@ export interface WatchtowerProjectile {
   bow: boolean;
 }
 
-export type SiegePhase = 'evacuation' | 'encirclement' | 'wallCombat' | 'sortie' | 'withdrawal';
+type SiegePhase = 'evacuation' | 'encirclement' | 'wallCombat' | 'sortie' | 'withdrawal';
 export type SiegeStance = 'hold' | 'wall' | 'field';
-export type SiegeWallEngagementMode = 'automatic' | 'manual';
+type SiegeWallEngagementMode = 'automatic' | 'manual';
 
 /** P3 장기 공성. P2의 RaiderBand.siege와 원정대 대기용 RaidHoldState와는 별개다. */
 export interface SiegeState {
@@ -1231,7 +1231,7 @@ export interface SiegeState {
   wallEngagement?: { day: number; mode: SiegeWallEngagementMode };
 }
 
-export type BattlePhase = 'muster' | 'clash';
+type BattlePhase = 'muster' | 'clash';
 export type BattleOutcome = 'victory' | 'defeat';
 // garrison: 수비병+파수꾼 요격 / levy: 성한 주민 전체 징집
 export type BattleMode = 'garrison' | 'levy';
@@ -1266,7 +1266,7 @@ export interface BattleScar {
   until: number; // 이 날까지 자국이 남는다
 }
 
-export type TacticalBattlePhase =
+type TacticalBattlePhase =
   | 'preparation'
   | 'preparationExecution'
   | 'deployment'
@@ -1296,7 +1296,6 @@ export type DefenderGroupKind =
 export type RaiderGroupKind = 'main' | 'looters' | 'flankers';
 export type TacticalFormationLine = 'front' | 'middle' | 'rear';
 export type TacticalFlankPlan = 'breakthrough' | 'rearAssault';
-export type TacticalTargetSource = 'auto' | 'player' | 'ai';
 export type EnemyObjectiveId = 'breakthrough' | 'plunder' | 'arson';
 export type EnemyStratagemId = 'rearManeuver' | 'wallBreakers' | 'fireArrows' | 'feint' | 'nightApproach';
 export type EnemyDoctrineId =
@@ -1311,10 +1310,10 @@ export type EnemyDoctrineId =
 export type TacticalEnemyFactionId = 'default' | 'nimacha' | 'holaon' | 'bandit' | 'court';
 export type TacticalRouteSide = 'left' | 'right';
 export type TacticalRouteIntel = 'unknown' | 'suspected' | 'revealed';
-export type TacticalRouteControl = 'neutral' | 'defender' | 'raider' | 'contested';
+type TacticalRouteControl = 'neutral' | 'defender' | 'raider' | 'contested';
 export type TacticalRouteTerrain = 'woodedRidge' | 'riverBank';
 export type TacticalRouteNode = 'approachGate' | 'middle' | 'storehouseGate';
-export type TacticalRoutePurpose = 'block' | 'move' | 'flank' | 'return' | 'transfer';
+type TacticalRoutePurpose = 'block' | 'move' | 'flank' | 'return' | 'transfer';
 
 export type TacticalStageId =
   | { kind: 'zone'; zoneId: string }
@@ -1324,7 +1323,7 @@ export type TacticalStageDestination =
   | { kind: 'zoneLane'; zoneId: string; line: TacticalFormationLine }
   | { kind: 'routeNode'; routeId: string; node: TacticalRouteNode };
 
-export type TacticalStageMoveEffect =
+type TacticalStageMoveEffect =
   | 'none'
   | 'redeploy'
   | 'advance'
@@ -1410,7 +1409,7 @@ export interface TacticalRouteArrival {
   destinationZoneId: string;
   rearAssault: boolean;
 }
-export type TacticalUnitTag =
+type TacticalUnitTag =
   | 'infantry'
   | 'mounted'
   | 'ranged'
@@ -1516,7 +1515,7 @@ export interface TacticalUnitProfile {
   enabled: boolean;
 }
 
-export interface TacticalCompositionCandidate {
+interface TacticalCompositionCandidate {
   unitType: RaiderUnitType;
   weight: number;
 }
@@ -1600,7 +1599,7 @@ export interface TacticalBattleZone {
   focusTargetSource?: 'auto' | 'player';
 }
 
-export interface TacticalWallSection {
+interface TacticalWallSection {
   buildingId: number;
   wallType: SolidWallBuildingTypeId;
   integrity: number;
@@ -1853,7 +1852,7 @@ export type TacticalBattleFlankOutcome =
   | 'defenderReachedRear'
   | 'contested';
 
-export interface TacticalBattleFlankRouteReport {
+interface TacticalBattleFlankRouteReport {
   routeId: string;
   side: TacticalRouteSide;
   label: string;
@@ -2008,12 +2007,12 @@ export interface AlertItem {
   level: 'warn' | 'danger';
 }
 
-export interface GameOverState {
+interface GameOverState {
   won: boolean;
   reason: string;
 }
 
-export type DeathCauseId = 'combat' | 'starvation' | 'cold' | 'disease' | 'other';
+type DeathCauseId = 'combat' | 'starvation' | 'cold' | 'disease' | 'other';
 
 // 절목(節目) — 중심지에서 반포하는 시행 세칙. 개별 항목은 「~령(令)」.
 // 계획: docs/DESIGN-2026-07-23-edict-system.md

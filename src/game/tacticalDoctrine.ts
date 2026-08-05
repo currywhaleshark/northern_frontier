@@ -7,7 +7,7 @@ import type {
   TacticalRaiderGroup,
 } from './types';
 
-export interface TacticalDoctrineTransition {
+interface TacticalDoctrineTransition {
   groupId: string;
   groupLabel: string;
   doctrine: EnemyDoctrineId;

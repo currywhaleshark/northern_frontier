@@ -2121,7 +2121,7 @@ export const CONFIG_DEFAULTS = {
   },
 } as const;
 
-export type Config = typeof CONFIG_DEFAULTS;
+type Config = typeof CONFIG_DEFAULTS;
 
 // ── 오버레이 병합 ───────────────────────────────────────────────────────
 // **이 자리가 중요하다.** 다른 모듈은 import 시점에 값을 읽어가기도 하므로

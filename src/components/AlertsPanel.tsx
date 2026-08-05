@@ -17,7 +17,7 @@ import { mineCollapseRepairLocked, mineCollapseSurvivalChance } from '../game/mi
 import { buildingRepairCause } from '../game/raidDamage';
 import type { AlertItem, BuildingRepairCause, GameState } from '../game/types';
 
-export function computeAlerts(state: GameState): AlertItem[] {
+function computeAlerts(state: GameState): AlertItem[] {
   const alerts: AlertItem[] = [];
   const living = livingResidents(state);
   const pop = living.length;

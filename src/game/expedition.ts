@@ -1,4 +1,5 @@
-import { findPath, isTerrainPassable, resetAgent } from './agents';
+import { resetAgent } from './agents';
+import { findPath, isTerrainPassable } from './pathfinding';
 import { CONFIG } from './config';
 import { addLog } from './events';
 import { createCombatRoster, isCombatReadyResident, type CombatantSnapshot } from './combatRoster';
@@ -15,7 +16,7 @@ const MUSTER_DEADLINE_TICKS = 5;
 const MUSTER_READY_RATIO = 0.6;
 const MUSTER_RADIUS = 2;
 
-export interface CreateExpeditionInput {
+interface CreateExpeditionInput {
   kind: ExpeditionKind;
   memberIds: number[];
   targetX: number;
@@ -26,7 +27,7 @@ export interface CreateExpeditionInput {
   carriedLoot?: Partial<Record<ResourceId, number>>;
 }
 
-export function expeditionMemberIds(state: GameState): Set<number> {
+function expeditionMemberIds(state: GameState): Set<number> {
   return new Set(state.expedition?.memberIds ?? []);
 }
 
@@ -50,7 +51,7 @@ export function expeditionCombatPower(state: GameState, memberIds: Iterable<numb
     externalAidCombatPower(state.expedition?.externalAid);
 }
 
-export interface CombatRosterWeaponSummary {
+interface CombatRosterWeaponSummary {
   assignedMuskets: number;
   readyMuskets: number;
   dryMuskets: number;
@@ -59,7 +60,7 @@ export interface CombatRosterWeaponSummary {
   unarmed: number;
 }
 
-export interface ExpeditionMusterPreview {
+interface ExpeditionMusterPreview {
   expeditionCombatants: CombatantSnapshot[];
   remainingCombatants: CombatantSnapshot[];
   expeditionPower: number;

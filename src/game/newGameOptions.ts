@@ -23,19 +23,13 @@ export const MAP_SIZE_NAMES: Record<MapSize, string> = {
   large: '대형',
 };
 
-export const SETUP_LEVEL_NAMES: Record<SetupLevel, string> = {
-  low: '낮음',
-  normal: '기준',
-  high: '높음',
-};
-
 const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
 const ACTIVE_MAP_REGIONS: readonly MapRegion[] = ['plains', 'mountain', 'lake', 'coast'];
 const MAP_SIZES: readonly MapSize[] = ['small', 'medium', 'large'];
 const SETUP_LEVELS: readonly SetupLevel[] = ['low', 'normal', 'high'];
 export const MAX_NEW_GAME_SEED = 0x7fffffff;
 
-export interface MapDimensions {
+interface MapDimensions {
   width: number;
   height: number;
 }
@@ -95,7 +89,7 @@ function setupLevel(value: unknown, fallback: SetupLevel): SetupLevel {
     : fallback;
 }
 
-export function normalizeNewGameSeed(value: unknown): number | undefined {
+function normalizeNewGameSeed(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
   return Math.max(0, Math.min(MAX_NEW_GAME_SEED, Math.floor(value)));
 }

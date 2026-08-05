@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { readAppCss } from './app-stylesheets.mjs';
 
 const assetPath = join(process.cwd(), 'public', 'assets', 'main-menu-background.png');
-const cssPath = join(process.cwd(), 'src', 'styles', 'global.css');
-const css = readFileSync(cssPath, 'utf8');
+const css = readAppCss();
 
 assert.equal(existsSync(assetPath), true, 'main menu background asset exists');
 assert.ok(

@@ -5,7 +5,7 @@ import { makeRng } from './map';
 import { getYear } from './seasons';
 import type { GameState } from './types';
 
-export type ClimateDisasterEventId =
+type ClimateDisasterEventId =
   'earlyFrost' | 'lateFrost' | 'locust' | 'drought' | 'plagueSuspicion' | 'livestockEpidemic';
 
 type DisasterState = Pick<GameState, 'seed' | 'day' | 'specialItems'>;

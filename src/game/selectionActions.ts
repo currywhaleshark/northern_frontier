@@ -1,7 +1,7 @@
 import { BUILDING_DEFS, footprintTilesOf, getBuilding, isBuildingUnlocked } from './buildings';
 import { CONFIG } from './config';
 import { collectHuntableTiles } from './habitats';
-import { isPassable, isTerrainPassable } from './agents';
+import { isPassable, isTerrainPassable } from './pathfinding';
 import { getSeason } from './seasons';
 import { isExplored } from './exploration';
 import { foreignSiteAt } from './foreignSites';
@@ -13,7 +13,7 @@ import { canAssignResidentToBuilding, workerSlotConfig } from './workerSlots';
 import { unauthorizedTerritorySiteIds } from './territory';
 import type { Building, GameState, JobId, PointerAction, SelectedEntity, Tile } from './types';
 
-export interface BuildingActionItem {
+interface BuildingActionItem {
   id: string;
   label: string;
   disabled?: boolean;
@@ -56,7 +56,7 @@ function tileBuildings(state: GameState, tile: Tile): Building[] {
   return primary ? [primary, ...overlays.filter(building => building.id !== primary.id)] : overlays;
 }
 
-export function tileBelongsToBuilding(state: GameState, tile: Tile, building: Building): boolean {
+function tileBelongsToBuilding(state: GameState, tile: Tile, building: Building): boolean {
   const footprint = footprintTilesOf(state, building);
   return !!footprint?.some(part => part.x === tile.x && part.y === tile.y);
 }
@@ -94,7 +94,7 @@ function slottedAssignmentAction(state: GameState, residentId: number, tile: Til
   };
 }
 
-export function canResidentWorkTarget(
+function canResidentWorkTarget(
   state: GameState,
   job: JobId,
   tile: Tile,
@@ -191,7 +191,7 @@ export function canResidentWorkTarget(
   }
 }
 
-export function selectedEntityFromTile(state: GameState, tile: Tile): SelectedEntity {
+function selectedEntityFromTile(state: GameState, tile: Tile): SelectedEntity {
   const building = tileBuildings(state, tile)[0];
   return building ? { kind: 'building', id: building.id } : { kind: 'tile', x: tile.x, y: tile.y };
 }

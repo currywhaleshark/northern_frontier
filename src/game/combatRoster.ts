@@ -9,7 +9,7 @@ import type {
   ArtifactWeaponId, CombatWeaponId, GameState, MountId, Resident, SpecialResidentId,
 } from './types';
 
-export type CombatContext = 'villageDefense' | 'expedition';
+type CombatContext = 'villageDefense' | 'expedition';
 
 export type CombatRole = 'militia' | 'watchman' | 'hunter' | 'healer' | 'civilian';
 
@@ -38,7 +38,7 @@ export interface CombatantSnapshot {
   weaponPower: number;
 }
 
-export function combatRoleForResident(resident: Pick<Resident, 'job'>): CombatRole {
+function combatRoleForResident(resident: Pick<Resident, 'job'>): CombatRole {
   if (resident.job === 'physician') return 'healer';
   if (resident.job === 'militia' || resident.job === 'watchman' || resident.job === 'hunter') {
     return resident.job;

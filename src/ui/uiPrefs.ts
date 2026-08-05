@@ -30,7 +30,7 @@ export const UI_PREFS_KEY = 'buksae-ui-prefs';
 export const LEGACY_BUILD_MENU_OPEN_KEY = 'buksae-buildmenu-open';
 export const UI_PREFS_VERSION = 9;
 export const MAX_STARRED_RESOURCES = 8;
-export const DEFAULT_MAP_ZOOM = 1;
+const DEFAULT_MAP_ZOOM = 1;
 
 export interface AudioPrefs {
   sfxEnabled: boolean;
@@ -59,7 +59,7 @@ export interface UiPrefs extends ResidentMarkerPrefs {
   autoFastForwardSleepingNight: boolean;
 }
 
-export interface UiPrefsStorage {
+interface UiPrefsStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem?(key: string): void;
@@ -106,7 +106,7 @@ function normalizeAudioPrefs(value: unknown): AudioPrefs {
   };
 }
 
-export function normalizeMapZoom(value: unknown): number {
+function normalizeMapZoom(value: unknown): number {
   const number = Number(value);
   if (!Number.isFinite(number)) return DEFAULT_MAP_ZOOM;
   return Math.min(2, Math.max(0.5, Math.round(number * 100) / 100));

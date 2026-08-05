@@ -22,7 +22,7 @@ export const ROYAL_PLAQUE_PRODUCTION_BUILDING_TYPES = [
   'weavingHouse',
 ] as const satisfies readonly BuildingTypeId[];
 
-export type RoyalPlaqueProductionBuildingType =
+type RoyalPlaqueProductionBuildingType =
   typeof ROYAL_PLAQUE_PRODUCTION_BUILDING_TYPES[number];
 
 const ROYAL_PLAQUE_PRODUCTION_BUILDING_SET: ReadonlySet<BuildingTypeId> =
@@ -34,7 +34,7 @@ export function isRoyalPlaqueProductionBuildingType(
   return ROYAL_PLAQUE_PRODUCTION_BUILDING_SET.has(type);
 }
 
-export function isRoyalPlaqueProductionBuilding(
+function isRoyalPlaqueProductionBuilding(
   building: Building | null | undefined,
 ): building is Building & { type: RoyalPlaqueProductionBuildingType } {
   return !!building && isRoyalPlaqueProductionBuildingType(building.type);

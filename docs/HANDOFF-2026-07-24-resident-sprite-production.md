@@ -134,7 +134,7 @@ tools/render/source_images/resident-woodcutter-video-v2/
 아래 PowerShell 예시는 저장소 루트에서 실행한다.
 
 ```powershell
-$skill = 'C:\Users\yurib\.codex\skills\sprite-gen\scripts'
+$skill = "$env:USERPROFILE\.codex\skills\sprite-gen\scripts"
 $run = 'tools/render/generated/resident-woodcutter-video-female-hd-v2'
 python "$skill\compose_sprite_atlas.py" --run-dir $run
 python "$skill\preview_animation.py" --run-dir $run

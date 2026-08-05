@@ -352,7 +352,7 @@ export const BUILD_MENU_ORDER: BuildingTypeId[] = [
   'cannonEmplacement', 'chongtongEmplacement',
 ];
 
-export const SINGLE_TILE_BUILDINGS = [
+const SINGLE_TILE_BUILDINGS = [
   'bridge',
   'weir',
   'levee',
@@ -399,7 +399,7 @@ export function clampPlotSide(value: number | undefined): number {
   return Math.min(CONFIG.farming.maxPlotSide, Math.max(1, Math.floor(value)));
 }
 
-export interface FootprintDims { w: number; h: number }
+interface FootprintDims { w: number; h: number }
 
 export function buildingFootprintDims(building: Pick<Building, 'type' | 'w' | 'h'>): FootprintDims {
   if (isAreaBuildingType(building.type)) {
@@ -765,11 +765,11 @@ const LEVEE_INCOMPATIBLE_BUILDINGS: ReadonlySet<BuildingTypeId> = new Set([
   'dock',
 ]);
 
-export function isLeveeIncompatibleBuildingType(type: BuildingTypeId): boolean {
+function isLeveeIncompatibleBuildingType(type: BuildingTypeId): boolean {
   return LEVEE_INCOMPATIBLE_BUILDINGS.has(type);
 }
 
-export function leveeAtTile(
+function leveeAtTile(
   state: Pick<GameState, 'buildings'>,
   x: number,
   y: number,
@@ -789,7 +789,7 @@ function isLeveeBankLand(tile: Tile | undefined): boolean {
     tile.terrain !== 'center';
 }
 
-export function leveeEdgesAt(state: Pick<GameState, 'map'>, x: number, y: number): LeveeEdge[] {
+function leveeEdgesAt(state: Pick<GameState, 'map'>, x: number, y: number): LeveeEdge[] {
   if (state.map[y]?.[x]?.terrain !== 'river') return [];
   const edges: LeveeEdge[] = [];
   for (const [edge, dx, dy] of LEVEE_EDGE_OFFSETS) {
@@ -810,7 +810,7 @@ export function leveeAtEdge(
     building.leveeEdge === edge);
 }
 
-export function availableLeveeEdgesAt(
+function availableLeveeEdgesAt(
   state: Pick<GameState, 'map' | 'buildings'>,
   x: number,
   y: number,
@@ -837,7 +837,7 @@ export function preferredLeveeEdgeAt(
     .sort((a, b) => distance[a] - distance[b])[0] ?? null;
 }
 
-export function isLeveePlacementEligible(state: GameState, x: number, y: number): boolean {
+function isLeveePlacementEligible(state: GameState, x: number, y: number): boolean {
   return availableLeveeEdgesAt(state, x, y).length > 0;
 }
 
@@ -1005,7 +1005,7 @@ export function canAfford(state: GameState, def: BuildingDef): boolean {
   return canAffordCost(state, def.cost);
 }
 
-export interface SmithyProductDef {
+interface SmithyProductDef {
   id: SmithyProductId;
   name: string;
   minRank?: Rank;
@@ -1115,7 +1115,7 @@ export function armedMusketeers(state: GameState): number {
     .filter(combatant => combatant.readyWeapon === 'musket').length;
 }
 
-export interface MilitiaWeaponAllocation {
+interface MilitiaWeaponAllocation {
   muskets: number;
   hornBows: number;
   spears: number;

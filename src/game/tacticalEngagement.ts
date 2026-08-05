@@ -53,7 +53,7 @@ export function tacticalFacingTurnPowerMultiplier(
     : CONFIG.tacticalBattle.formationExposure.facing.turnPowerMultiplier;
 }
 
-export function tacticalFacingExposureMultiplier(
+function tacticalFacingExposureMultiplier(
   defender: Pick<TacticalDefenderGroup, 'facing'>,
   direction: 'frontal' | 'rear',
 ): number {
@@ -235,7 +235,7 @@ function normalizedWeights(weights: ReadonlyArray<number>): number[] {
   return positive.map(() => 0);
 }
 
-export function targetedAllocationWeights(
+function targetedAllocationWeights(
   baseWeights: ReadonlyArray<number>,
   targetDemands: ReadonlyArray<number>,
   capacities: ReadonlyArray<number>,
@@ -383,44 +383,6 @@ function targetingContext(
       tacticalGroupCapabilities(group).has('melee')),
     prepareVolleyApplied,
   };
-}
-
-export function chooseTacticalEnemyFocusTarget(
-  defenders: ReadonlyArray<TacticalDefenderGroup>,
-  attackers: ReadonlyArray<TacticalRaiderGroup>,
-  direction: 'frontal' | 'rear',
-  zoneId: string,
-): string | undefined {
-  const candidates = defenders.filter(group =>
-    group.zoneId === zoneId && activeDefenderCount(group) > 0);
-  const activeAttackers = attackers.filter(group =>
-    group.zoneId === zoneId && group.intent !== 'withdraw' && group.power > 0 && activeRaiderCount(group) > 0);
-  if (candidates.length === 0 || activeAttackers.length === 0) return undefined;
-  const dominant = activeAttackers.reduce((best, group) =>
-    group.power * (group.combatMultiplier ?? 1) > best.power * (best.combatMultiplier ?? 1) ? group : best);
-  const find = (predicate: (group: TacticalDefenderGroup) => boolean): TacticalDefenderGroup | undefined =>
-    candidates.find(predicate);
-  const ranged = (group: TacticalDefenderGroup): boolean => tacticalGroupCapabilities(group).has('volley');
-  const melee = (group: TacticalDefenderGroup): boolean => tacticalGroupCapabilities(group).has('melee');
-
-  if (direction === 'rear' || dominant.rearAssault) {
-    return (find(group => group.line === 'rear' && ranged(group))
-      ?? find(group => group.line === 'rear' && group.commandable === false)
-      ?? find(group => group.line === 'rear')
-      ?? find(group => group.line === 'middle' && ranged(group))
-      ?? candidates[0])?.id;
-  }
-  if (dominant.intent === 'loot' || dominant.kind === 'looters') {
-    return (find(group => group.command === 'guardStorehouse') ?? candidates[0])?.id;
-  }
-  if (tacticalTargetingRole(dominant) !== 'melee') {
-    return (find(group => group.weapon === 'musket')
-      ?? find(group => ranged(group))
-      ?? candidates[0])?.id;
-  }
-  return (find(group => group.line === 'front' && melee(group))
-    ?? find(group => group.line === 'front')
-    ?? candidates[0])?.id;
 }
 
 function animationEvent(
@@ -602,7 +564,7 @@ function surpriseConfusionChance(zone: TacticalBattleZone, defenders: TacticalDe
   return clamp(0.35 + zone.ambushBonus / 100 + Math.min(0.2, hunters * 0.025), 0.35, 1);
 }
 
-export interface EngagementExchangeInput {
+interface EngagementExchangeInput {
   zone: TacticalBattleZone;
   defenders: ReadonlyArray<TacticalDefenderGroup>;
   attackers: ReadonlyArray<TacticalRaiderGroup>;
@@ -620,20 +582,20 @@ export interface EngagementExchangeInput {
   rng: () => number;
 }
 
-export interface TacticalDefenderLoss {
+interface TacticalDefenderLoss {
   groupId: string;
   wounded: number;
   killed: number;
 }
 
-export interface TacticalRaiderLoss {
+interface TacticalRaiderLoss {
   groupId: string;
   killed: number;
   powerAfter: number;
   confused: boolean;
 }
 
-export interface EngagementExchangeResult {
+interface EngagementExchangeResult {
   enemyPower: number;
   defensePower: number;
   enemyShare: number;
@@ -1248,7 +1210,7 @@ export function resolveEngagementExchange(input: EngagementExchangeInput): Engag
   };
 }
 
-export interface DefenseZoneConsequencesInput {
+interface DefenseZoneConsequencesInput {
   zone: TacticalBattleZone;
   defenders: ReadonlyArray<TacticalDefenderGroup>;
   attackers: ReadonlyArray<TacticalRaiderGroup>;
@@ -1264,7 +1226,7 @@ export interface DefenseZoneConsequencesInput {
   rng: () => number;
 }
 
-export interface DefenseZoneConsequencesResult {
+interface DefenseZoneConsequencesResult {
   pressure: number;
   breached: boolean;
   buildingsDamaged: number;

@@ -7,7 +7,7 @@ export type GatheringBuildingType = Extract<BuildingTypeId, 'lumberCamp' | 'hunt
 type GatheringAnchor = Pick<Building, 'type' | 'x' | 'y' | 'gatheringWorkArea'>;
 type TilePoint = Pick<Tile, 'x' | 'y'>;
 
-export interface GatheringForestSummary {
+interface GatheringForestSummary {
   forestTiles: number;
   matureTrees: number;
 }

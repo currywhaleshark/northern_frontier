@@ -677,7 +677,7 @@ function rectsIntersect(
   return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
 }
 
-export interface TreeCanopyProxy {
+interface TreeCanopyProxy {
   sortY: number;
   cx: number;
   cy: number;
@@ -892,7 +892,7 @@ function typesWithNightEffect(): ReadonlySet<BuildingTypeId> {
   return nightEffectTypeCache;
 }
 
-export interface BuildingEffectPass {
+interface BuildingEffectPass {
   /** 이번 패스에서 그릴 발동 조건들 — 건물 패스와 밤 색조 패스가 나뉘어 있다 */
   active: ReadonlySet<BuildingEffectWhen>;
   workers: number;
@@ -3711,7 +3711,7 @@ function annualSunFactor01(day: number): number {
   return (1 + Math.cos(Math.PI * 2 * (getDayOfYear(day) - CONFIG.time.seasonDays * 1.5) / CONFIG.time.yearDays)) / 2;
 }
 
-export interface DayShadow {
+interface DayShadow {
   ux: number; // 높이 1px가 만드는 화면 가로 오프셋 (부호 = 해 반대 방향)
   uy: number; // 높이 1px가 만드는 화면 세로(아래) 오프셋 — 3/4 시점이라 항상 살짝 앞으로 깔린다
   angle: number;
@@ -3750,7 +3750,7 @@ let shadowLayer: HTMLCanvasElement | null = null;
 // 키당 한 번만 생성하므로 이후에는 건물당 drawImage 두 번이 전부다.
 // baseRow: 실루엣의 실제 시각적 밑변(마지막 불투명 행). 봉수대처럼 스프라이트가
 // 풋프린트 밑변까지 닿지 않는 건물은 이 줄에 그림자를 붙여야 잘려 보이지 않는다.
-export interface BuildingShadowSilhouette {
+interface BuildingShadowSilhouette {
   canvas: HTMLCanvasElement;
   baseRow: number;
   visualHeight: number;
@@ -3825,7 +3825,7 @@ export function buildingShadowSilhouette(
 }
 
 /** 눕힌 실루엣이 어디에 얹혔는지 — 스튜디오가 잘린 영역과 접지선을 겹쳐 그리는 데 쓴다. */
-export interface BuildingShadowPlacement {
+interface BuildingShadowPlacement {
   /** 투영에 실제로 쓰인 실루엣 마지막 행 (마당형은 마당만큼 위로 잘린다) */
   baseRowUsed: number;
   /** 앞쪽 스탬프의 접지선 y */
@@ -4033,7 +4033,7 @@ export function drawNightTint(ctx: CanvasRenderingContext2D, night: number, fill
 }
 
 /** 해의 세기 — 낮은 양수(정오 1), 밤은 음수(자정 −1). 계절마다 낮 길이가 다르다. */
-export function sunFactorFor(state: Pick<GameState, 'day'>, dayFrac: number): number {
+function sunFactorFor(state: Pick<GameState, 'day'>, dayFrac: number): number {
   const daylight = SEASON_DAYLIGHT_FRAC[getSeason(state.day)];
   const dawnT = 0.25 - daylight / 2;
   const duskT = 0.25 + daylight / 2;

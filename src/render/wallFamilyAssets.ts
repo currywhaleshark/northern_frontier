@@ -13,9 +13,9 @@ export const WALL_MODULAR_PIECES = [
   'vertical',
 ] as const;
 
-export type WallFamilyWallType = typeof WALL_FAMILY_WALL_TYPES[number];
-export type WallModularPiece = typeof WALL_MODULAR_PIECES[number];
-export type WallVisualMaterial = 'wood' | 'earth' | 'stone';
+type WallFamilyWallType = typeof WALL_FAMILY_WALL_TYPES[number];
+type WallModularPiece = typeof WALL_MODULAR_PIECES[number];
+type WallVisualMaterial = 'wood' | 'earth' | 'stone';
 
 export const WALL_FAMILY_SHEET = {
   tileSize: 28,

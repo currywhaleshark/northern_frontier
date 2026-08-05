@@ -1,8 +1,8 @@
 import type { CoastalGroundKind } from '../game/tidalFlats';
 
-export type LakeShoreGroundKind = Exclude<CoastalGroundKind, 'mudflat'>;
+type LakeShoreGroundKind = Exclude<CoastalGroundKind, 'mudflat'>;
 
-export interface LakeShoreEdges {
+interface LakeShoreEdges {
   readonly n: boolean;
   readonly e: boolean;
   readonly s: boolean;

@@ -173,7 +173,7 @@ const WOOD_SPLITTER_WORK_SEQUENCE = [0, 1, 2, 3] as const;
 const FISHER_WORK_SEQUENCE = [0, 1, 2, 3] as const;
 const FOUR_PHASE_WORK_SEQUENCE = [0, 1, 2, 3] as const;
 
-export function woodSplitterWorkFrameIndex(elapsedMs: number): number {
+function woodSplitterWorkFrameIndex(elapsedMs: number): number {
   const step = Math.floor(
     Math.max(0, elapsedMs) / RESIDENT_WOOD_SPLITTER_WORK_SHEET.frameDurationMs,
   );
@@ -196,7 +196,7 @@ export function woodSplitterWorkSourceRect(
   };
 }
 
-export function fisherWorkFrameIndex(elapsedMs: number): number {
+function fisherWorkFrameIndex(elapsedMs: number): number {
   const step = Math.floor(
     Math.max(0, elapsedMs) / RESIDENT_FISHER_WORK_SHEET.frameDurationMs,
   );

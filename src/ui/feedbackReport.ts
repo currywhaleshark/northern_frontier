@@ -10,7 +10,7 @@ export interface FeedbackDraft {
   includeDiagnostics: boolean;
 }
 
-export interface FeedbackContext {
+interface FeedbackContext {
   speed: number;
   zoom: number;
   userAgent?: string;
@@ -44,7 +44,7 @@ export function buildFeedbackDiagnostics(state: GameState, context: FeedbackCont
   };
 }
 
-export function buildFeedbackMarkdown(
+function buildFeedbackMarkdown(
   draft: FeedbackDraft,
   state: GameState,
   context: FeedbackContext,

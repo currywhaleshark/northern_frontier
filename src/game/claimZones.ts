@@ -31,7 +31,7 @@ function claimLabel(zone: ClaimZone): string {
   return labels[zone.kind];
 }
 
-export function noteClaimIntrusion(state: GameState, zone: ClaimZone, reason: string): void {
+function noteClaimIntrusion(state: GameState, zone: ClaimZone, reason: string): void {
   const site = state.foreignSites.find(candidate => candidate.id === zone.siteId);
   if (!site) return;
   if (!zone.discovered) {

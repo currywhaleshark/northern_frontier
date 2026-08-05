@@ -12,7 +12,7 @@ export function youthActivityOf(
   return resident.youthActivity === 'school' ? 'school' : 'work';
 }
 
-export function isWorkingYouth(
+function isWorkingYouth(
   resident: Pick<Resident, 'stage' | 'youthActivity'>,
 ): boolean {
   return youthActivityOf(resident) === 'work';

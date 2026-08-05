@@ -1,7 +1,7 @@
 import { buildingFootprintDims } from './buildings';
 import type { Building } from './types';
 
-export interface FarmWorkTile {
+interface FarmWorkTile {
   x: number;
   y: number;
 }

@@ -49,7 +49,7 @@ export function applyBattleDefenseMultipliers(
   return adjusted;
 }
 
-export function raidBandSize(power: number): number {
+function raidBandSize(power: number): number {
   return Math.max(1, Math.min(6, 3 + Math.floor(power / 25)));
 }
 

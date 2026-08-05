@@ -238,7 +238,7 @@ export function borderCommanderRumor(temper: BorderCommanderTemper): string {
   }[temper];
 }
 
-export interface BorderCommanderEffects {
+interface BorderCommanderEffects {
   suspicionRiseMultiplier: number;
   suspicionNaturalDecayMultiplier: number;
   courtGrantRankShift: number;

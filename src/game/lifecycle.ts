@@ -16,7 +16,7 @@ import { assignedWorkers } from './workerSlots';
 import { youthLaborMult } from './youth';
 import type { Building, Corpse, GameState, LifeStage, Resident } from './types';
 
-export const LIFE_STAGE_ORDER: LifeStage[] = ['infant', 'child', 'youth'];
+const LIFE_STAGE_ORDER: LifeStage[] = ['infant', 'child', 'youth'];
 export const LIFE_STAGE_NAMES: Record<LifeStage, string> = {
   infant: '아기', child: '어린이', youth: '소년',
 };
@@ -185,7 +185,7 @@ function cohouseCouple(state: GameState, a: Resident, b: Resident): void {
   tryMove(a, b);
 }
 
-export function openWeddingChoice(state: GameState, a: Resident, b: Resident): void {
+function openWeddingChoice(state: GameState, a: Resident, b: Resident): void {
   const l = CONFIG.lifecycle;
   const canFeast = edibleFoodTotal(state) >= l.weddingFeastFood;
   state.pendingChoice = {

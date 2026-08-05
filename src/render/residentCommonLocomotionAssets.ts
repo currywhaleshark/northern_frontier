@@ -9,7 +9,7 @@ interface FrameRect {
   h: number;
 }
 
-export interface CommonLocomotionSourceRect {
+interface CommonLocomotionSourceRect {
   sx: number;
   sy: number;
   sw: number;

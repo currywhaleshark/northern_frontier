@@ -7,7 +7,7 @@ import { breakDiplomaticPact } from './diplomacy';
 import { isClaimPermissionActive } from './claimZones';
 import type { ClaimZone, ForeignSite, GameState, PointerAction, TerritoryViolation } from './types';
 
-export type TerritoryUse = 'passage' | 'work';
+type TerritoryUse = 'passage' | 'work';
 
 function activeSite(site: ForeignSite): boolean {
   return site.discovered && site.status !== 'abandoned' && site.status !== 'burned';
@@ -65,7 +65,7 @@ export function canWorkForeignTerritory(
   return unauthorizedTerritorySiteIds(state, x, y, 'work', ignoredSiteIds).length === 0;
 }
 
-export function territorySiteNames(state: GameState, siteIds: readonly number[]): string[] {
+function territorySiteNames(state: GameState, siteIds: readonly number[]): string[] {
   return [...new Set(siteIds.map(id => state.foreignSites.find(site => site.id === id)?.factionName).filter(Boolean) as string[])];
 }
 

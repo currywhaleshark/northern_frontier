@@ -8,13 +8,13 @@ import { getSeason } from './seasons';
 import { firewoodWeatherMult } from './weather';
 import type { Building, BuildingTypeId, GameState, Resident } from './types';
 
-export type LodgingWorksiteType = Extract<BuildingTypeId, 'lumberCamp' | 'huntLodge' | 'herbHut' | 'mine'>;
+type LodgingWorksiteType = Extract<BuildingTypeId, 'lumberCamp' | 'huntLodge' | 'herbHut' | 'mine'>;
 
 const LODGING_WORKSITE_TYPES: ReadonlySet<BuildingTypeId> = new Set([
   'lumberCamp', 'huntLodge', 'herbHut', 'mine',
 ]);
 
-export interface LodgingSupplySummary {
+interface LodgingSupplySummary {
   food: number;
   fuelHeat: number;
   workers: number;
@@ -22,7 +22,7 @@ export interface LodgingSupplySummary {
   fuelDays: number;
 }
 
-export interface LodgingConsumptionGroup {
+interface LodgingConsumptionGroup {
   hut: Building;
   residents: Resident[];
   foodNeed: number;
@@ -35,7 +35,7 @@ export interface LodgingConsumptionGroup {
   firewoodRatio: number;
 }
 
-export function isLodgingWorksiteType(type: BuildingTypeId): type is LodgingWorksiteType {
+function isLodgingWorksiteType(type: BuildingTypeId): type is LodgingWorksiteType {
   return LODGING_WORKSITE_TYPES.has(type);
 }
 
@@ -87,7 +87,7 @@ export function lodgingHutPlacementTarget(state: GameState, x: number, y: number
     })[0] ?? null;
 }
 
-export function residentSleepingAtLodgingHut(state: GameState, resident: Resident): Building | null {
+function residentSleepingAtLodgingHut(state: GameState, resident: Resident): Building | null {
   if (resident.phase !== 'sleeping' || resident.targetId == null) return null;
   const hut = lodgingHutForResident(state, resident);
   return hut?.id === resident.targetId ? hut : null;

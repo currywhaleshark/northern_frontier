@@ -8,7 +8,7 @@ import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { plaqueProductionMultiplier } from './royalPlaque';
 import type { Building, FermentBatch, GameState, ResourceId } from './types';
 
-export interface FermentationReport {
+interface FermentationReport {
   startedJang: number;
   completedJang: number;
   completedKimchi: number;
@@ -34,7 +34,7 @@ export function isJangBrewingWindow(day: number): boolean {
     || (season === 'winter' && dayOfSeason <= CONFIG.fermentation.jangWinterEndDay);
 }
 
-export function occupiedFermentationOnggi(building: Building): number {
+function occupiedFermentationOnggi(building: Building): number {
   return batchesOf(building).reduce((total, batch) => total + batchOnggiUse(batch), 0);
 }
 

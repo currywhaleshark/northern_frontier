@@ -142,7 +142,7 @@ export function buildResidentPresentationSnapshot(state: GameState): ResidentPre
   };
 }
 
-export interface ResidentPresentationSnapshotCache {
+interface ResidentPresentationSnapshotCache {
   get(state: GameState, simulationVersion: number): ResidentPresentationSnapshot;
   clear(): void;
 }

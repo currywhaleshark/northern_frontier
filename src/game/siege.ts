@@ -54,7 +54,7 @@ export function centerProtectedInterior(state: GameState): Set<string> {
   return connected;
 }
 
-export function buildingInsideSiegeInterior(building: Building, interior: ReadonlySet<string>, state: GameState): boolean {
+function buildingInsideSiegeInterior(building: Building, interior: ReadonlySet<string>, state: GameState): boolean {
   const footprint = footprintTilesOf(state, building) ?? [{ x: building.x, y: building.y }];
   return footprint.every(tile => interior.has(key(tile.x, tile.y)));
 }
@@ -336,7 +336,7 @@ function refreshInterior(state: GameState, siege: SiegeState): Set<string> {
   return new Set(siege.protectedInterior);
 }
 
-export type SiegeResidentDisposition = 'evacuate' | 'work' | 'suspend' | 'stranded';
+type SiegeResidentDisposition = 'evacuate' | 'work' | 'suspend' | 'stranded';
 
 export function siegeResidentDisposition(state: GameState, resident: Resident): SiegeResidentDisposition {
   const siege = state.siegeState;
@@ -581,7 +581,7 @@ function pressureWall(state: GameState, siege: SiegeState, interior: ReadonlySet
   return true;
 }
 
-export interface SiegeReadiness {
+interface SiegeReadiness {
   protectedShare: number;
   evacuees: number;
   stranded: number;

@@ -2,7 +2,7 @@ import type { Season } from '../game/types';
 
 // 강 타일의 이웃 정보 — true면 그 방향이 뭍(강이 아님)
 // 렌더러는 이 정보로 물 영역을 계산해 강 폭이 지도 그대로 드러나게 그린다.
-export interface RiverNeighbors {
+interface RiverNeighbors {
   n: boolean;
   e: boolean;
   s: boolean;
@@ -48,7 +48,7 @@ export function riverFillSourceRect(season: Season, frozenRiver: boolean) {
   };
 }
 
-export interface RiverWaterBox {
+interface RiverWaterBox {
   x0: number;
   y0: number;
   x1: number; // exclusive
@@ -66,7 +66,7 @@ export function riverWaterBox(nb: RiverNeighbors): RiverWaterBox {
   };
 }
 
-export type RiverCorner = 'ne' | 'se' | 'sw' | 'nw';
+type RiverCorner = 'ne' | 'se' | 'sw' | 'nw';
 
 // 대각선만 뭍인 모서리: 양옆이 모두 강이라 물이 타일 모서리까지 닿지만,
 // 대각선의 뭍 모퉁이를 침범하면 안 되므로 그 모서리를 뭍으로 되메운다.

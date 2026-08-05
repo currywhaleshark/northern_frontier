@@ -1,3 +1,4 @@
+import { readAppCss } from '../app-stylesheets.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
@@ -15,7 +16,7 @@ const commandPresentationSource = readFileSync(
   new URL('../../src/components/tactical/commandPresentation.ts', import.meta.url),
   'utf8',
 );
-const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
+const cssSource = readAppCss();
 
 assert.match(screenSource, /<TacticalZoneColumn\b/, 'the battle screen must delegate each battlefield zone');
 assert.match(screenSource, /tacticalRouteStageView\(battle\)/,

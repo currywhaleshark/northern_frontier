@@ -26,7 +26,7 @@ export function ensureProcessingReserves(state: GameState): void {
   state.processingReserves = next;
 }
 
-export function processingReserve(state: GameState, resource: ProcessingInputId): number {
+function processingReserve(state: GameState, resource: ProcessingInputId): number {
   ensureProcessingReserves(state);
   return state.processingReserves[resource];
 }

@@ -17,7 +17,7 @@ interface AnimationRow {
 
 export type WoodcutterVideoWalkKind = 'axe' | 'jige';
 
-export interface WoodcutterVideoWalkSourceRect {
+interface WoodcutterVideoWalkSourceRect {
   sx: number;
   sy: number;
   sw: number;

@@ -1,6 +1,6 @@
 // 저장 존재 여부처럼 메뉴에서도 필요한 최소 저장소 계약만 둔다.
 // 실제 직렬화·마이그레이션은 큰 saveLoad 모듈을 게임 시작 시 지연 로딩한다.
-export const SAVE_STORAGE_KEY = 'buksae-save-v3';
+const SAVE_STORAGE_KEY = 'buksae-save-v3';
 export const SAVE_SLOT_COUNT = 4;
 
 export function saveSlotStorageKey(slot: number): string {

@@ -7,16 +7,16 @@ import { createCombatRoster } from './combatRoster';
 import { foodTotal, fuelHeatTotal } from './consumption';
 import { getYear } from './seasons';
 import type {
-  BuildingTypeId, DeathCauseId, GameState, LifetimeStats, YearlySnapshot,
+  BuildingTypeId, GameState, LifetimeStats, YearlySnapshot,
 } from './types';
 
-export interface CultivatedArea {
+interface CultivatedArea {
   fieldTiles: number;
   paddyTiles: number;
   totalTiles: number;
 }
 
-export interface FortificationStats {
+interface FortificationStats {
   palisadeSegments: number;
   earthFortSegments: number;
   stoneWallSegments: number;
@@ -53,7 +53,7 @@ export function generalBuildingCounts(state: GameState): Partial<Record<Building
   return counts;
 }
 
-export function generalBuildingTotal(state: GameState): number {
+function generalBuildingTotal(state: GameState): number {
   let total = 0;
   for (const count of Object.values(generalBuildingCounts(state))) total += count ?? 0;
   return total;
@@ -77,7 +77,7 @@ export function fortificationStats(state: GameState): FortificationStats {
   return stats;
 }
 
-export function wallSegmentTotal(state: GameState): number {
+function wallSegmentTotal(state: GameState): number {
   let total = 0;
   for (const building of state.buildings) {
     if (building.built && WALL_SEGMENT_TYPES.has(building.type)) total++;
@@ -102,10 +102,6 @@ export function createLifetimeStats(trackingSinceDay: number): LifetimeStats {
     tradesCompleted: 0,
     grantsReceived: 0,
   };
-}
-
-export function countDeath(state: GameState, cause: DeathCauseId): void {
-  state.lifetimeStats.deathsByCause[cause] = (state.lifetimeStats.deathsByCause[cause] ?? 0) + 1;
 }
 
 /** 연초 스냅샷 1건 — 같은 연도가 이미 있으면 아무 일도 하지 않는다 (저장·로드 안전). */

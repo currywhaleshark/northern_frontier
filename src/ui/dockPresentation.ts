@@ -1,5 +1,5 @@
 export const DOCK_WINDOW_IDS = ['jobs', 'processing', 'residents', 'specialResidents', 'factions', 'court', 'incidents'] as const;
-export const HUD_WINDOW_IDS = ['minimap', 'selection'] as const;
+const HUD_WINDOW_IDS = ['minimap', 'selection'] as const;
 export const FLOATING_WINDOW_IDS = [...DOCK_WINDOW_IDS, ...HUD_WINDOW_IDS] as const;
 
 export type DockWindowId = typeof DOCK_WINDOW_IDS[number];

@@ -8,13 +8,13 @@ import { addLog } from './events';
 import { withJosa } from './josa';
 import type { EdictId, EdictLevel, EdictState, GameState, MoraleFactor } from './types';
 
-export interface EdictLevelDef {
+interface EdictLevelDef {
   level: EdictLevel;
   name: string;     // 절미 / 평시 / 후히
   summary: string;  // 효과와 대가 한 줄
 }
 
-export interface EdictDef {
+interface EdictDef {
   id: EdictId;
   name: string;     // 절미령
   hanja: string;
@@ -87,7 +87,7 @@ export function edictDaysInEffect(state: GameState, id: EdictId): number {
   return since == null ? 0 : Math.max(1, state.day - since + 1);
 }
 
-export interface ActiveEdict {
+interface ActiveEdict {
   id: EdictId;
   level: EdictLevel;
   days: number;

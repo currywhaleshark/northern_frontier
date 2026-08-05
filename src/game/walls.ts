@@ -7,14 +7,14 @@ export interface WallConnections {
   w: boolean;
 }
 
-export interface WallAdjacentTypes {
+interface WallAdjacentTypes {
   n?: BuildingTypeId;
   e?: BuildingTypeId;
   s?: BuildingTypeId;
   w?: BuildingTypeId;
 }
 
-export const WALL_BUILDING_TYPES = [
+const WALL_BUILDING_TYPES = [
   'palisade',
   'earthFort',
   'stoneWall',
@@ -44,7 +44,7 @@ export function wallTileKey(x: number, y: number): string {
   return `${x},${y}`;
 }
 
-export interface WallLineRect {
+interface WallLineRect {
   x: number;
   y: number;
   w: number;
@@ -149,6 +149,3 @@ export function wallConnectionsAt(state: Pick<GameState, 'buildings'>, x: number
   return wallConnectionsFromMap(builtWallTileMap(state), x, y);
 }
 
-export function wallAdjacentTypesAt(state: Pick<GameState, 'buildings'>, x: number, y: number): WallAdjacentTypes {
-  return wallAdjacentTypesFromMap(builtWallTileMap(state), x, y);
-}

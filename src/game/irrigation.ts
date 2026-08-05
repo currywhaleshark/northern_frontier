@@ -1,7 +1,7 @@
 import { isNaturalWaterTerrain } from './terrain';
-import type { BuildingTypeId, GameState } from './types';
+import type { GameState } from './types';
 
-export interface CanalConnections {
+interface CanalConnections {
   n: boolean;
   e: boolean;
   s: boolean;
@@ -20,7 +20,7 @@ function key(x: number, y: number): string {
 }
 
 /** 완공된 농수로만 물길 계산과 논 자격에 쓴다. */
-export function builtCanalTileSet(state: Pick<GameState, 'buildings'>): Set<string> {
+function builtCanalTileSet(state: Pick<GameState, 'buildings'>): Set<string> {
   return new Set(state.buildings
     .filter(building => building.type === 'canal' && building.built)
     .map(building => key(building.x, building.y)));
@@ -117,9 +117,4 @@ export function canalConnectionsAt(
     s: tiles.has(key(x, y + 1)) || river.s,
     w: tiles.has(key(x - 1, y)) || river.w,
   };
-}
-
-/** Typescript의 BuildingTypeId 확장 시 import가 실제 사용 중임을 명시한다. */
-export function isCanalBuildingType(type: BuildingTypeId): type is 'canal' {
-  return type === 'canal';
 }

@@ -1,6 +1,6 @@
 import type { DockWindowId } from './dockPresentation';
 
-export const DOCK_HOTKEYS: ReadonlyArray<{ key: string; id: DockWindowId }> = [
+const DOCK_HOTKEYS: ReadonlyArray<{ key: string; id: DockWindowId }> = [
   { key: 'q', id: 'jobs' },
   { key: 'w', id: 'processing' },
   { key: 'e', id: 'residents' },

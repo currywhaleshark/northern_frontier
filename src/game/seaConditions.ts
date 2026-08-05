@@ -5,7 +5,7 @@ import { getYear } from './seasons';
 import { weatherForDay } from './weatherSchedule';
 import type { GameState, WeatherId } from './types';
 
-export type SeaCondition = 'calm' | 'rough' | 'storm';
+type SeaCondition = 'calm' | 'rough' | 'storm';
 
 function clampChance(value: number): number {
   return Math.max(0, Math.min(1, value));

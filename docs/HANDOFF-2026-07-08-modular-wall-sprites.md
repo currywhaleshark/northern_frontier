@@ -89,7 +89,7 @@ The generated palisade source included an unwanted drop shadow and represented t
 
 - `node tools/game/test_walls_and_gate.mjs`
 - `node tools/render/test_wall_family_assets.mjs`
-- `C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe tools/render/test_wall_family_asset_pixels.py`
+- `python tools/render/test_wall_family_asset_pixels.py`
 - `npm.cmd run build`
 
 ## Notes For The Next Worker

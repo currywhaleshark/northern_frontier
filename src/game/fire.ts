@@ -13,7 +13,7 @@ import { weatherForDay } from './weatherSchedule';
 import { isNaturalWaterTerrain } from './terrain';
 import type { Building, FireSite, FireWaterSourceKind, GameState, PendingDisaster, WeatherId } from './types';
 
-export interface FireWaterSource {
+interface FireWaterSource {
   kind: FireWaterSourceKind;
   x: number;
   y: number;
@@ -48,7 +48,7 @@ export function canIgniteFireInWeather(weather: WeatherId): boolean {
 
 type FireClimateState = Pick<GameState, 'seed' | 'day' | 'weather'> & Partial<Pick<GameState, 'worldSetup'>>;
 
-export function consecutiveDryDays(state: FireClimateState): number {
+function consecutiveDryDays(state: FireClimateState): number {
   let days = 0;
   for (let day = Math.max(1, state.day); day >= 1; day--) {
     const weather = day === state.day ? state.weather : weatherForDay(
@@ -83,7 +83,7 @@ export function fireIgnitionWeight(state: Pick<GameState, 'day'>, building: Buil
   return Math.max(0, base * winterHousingMultiplier);
 }
 
-export function chooseFireIgnitionBuilding(
+function chooseFireIgnitionBuilding(
   state: Pick<GameState, 'day' | 'buildings'>,
   rng: () => number,
 ): Building | null {

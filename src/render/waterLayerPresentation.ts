@@ -1,7 +1,7 @@
 import type { BuildingTypeId } from '../game/types';
 import type { BuildingWaterSupply, WellWaterStatus } from '../game/waterSupply';
 
-export type WaterLayerTintKind =
+type WaterLayerTintKind =
   | 'well'
   | 'well-low'
   | 'river-supplied'
@@ -11,7 +11,7 @@ export type WaterLayerTintKind =
   | 'partially-supplied'
   | 'unsupplied';
 
-export interface WaterLayerTint {
+interface WaterLayerTint {
   kind: WaterLayerTintKind;
   color: string;
   alpha: number;

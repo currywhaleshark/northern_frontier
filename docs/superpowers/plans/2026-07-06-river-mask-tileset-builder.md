@@ -41,19 +41,19 @@ pixel density of the 56px terrain sheet instead of displaying internally enlarge
 Use this Python executable for all script runs:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' tools/terrain/build_river_mask_tiles.py
+python tools/terrain/build_river_mask_tiles.py
 ```
 
 Run a focused validation only:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' tools/terrain/build_river_mask_tiles.py --validate-only
+python tools/terrain/build_river_mask_tiles.py --validate-only
 ```
 
 Run focused tests:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m unittest tools.terrain.test_build_river_mask_tiles
+python -m unittest tools.terrain.test_build_river_mask_tiles
 ```
 
 ---
@@ -94,7 +94,7 @@ if __name__ == "__main__":
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m unittest tools.terrain.test_build_river_mask_tiles
+python -m unittest tools.terrain.test_build_river_mask_tiles
 ```
 
 Expected: FAIL or ERROR because `tools/terrain/build_river_mask_tiles.py` does not exist yet.
@@ -181,7 +181,7 @@ Create `tools/terrain/README.md`:
 Run the deterministic river builder from the repository root:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' tools/terrain/build_river_mask_tiles.py
+python tools/terrain/build_river_mask_tiles.py
 ```
 
 The first pass writes generated preview assets to `docs/assets/terrain/river/generated/`.
@@ -201,7 +201,7 @@ docs/assets/terrain/river/generated/.gitkeep
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' tools/terrain/build_river_mask_tiles.py
+python tools/terrain/build_river_mask_tiles.py
 ```
 
 Expected:
@@ -217,7 +217,7 @@ validate only: False
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m unittest tools.terrain.test_build_river_mask_tiles
+python -m unittest tools.terrain.test_build_river_mask_tiles
 ```
 
 Expected:
@@ -265,7 +265,7 @@ Add these tests inside `RiverMaskTilesTest`:
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m unittest tools.terrain.test_build_river_mask_tiles
+python -m unittest tools.terrain.test_build_river_mask_tiles
 ```
 
 Expected: ERROR because `draw_connector_mask`, `edge_pixels`, and `validate_masks` are not defined.
@@ -364,7 +364,7 @@ def main() -> None:
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' tools/terrain/build_river_mask_tiles.py --validate-only
+python tools/terrain/build_river_mask_tiles.py --validate-only
 ```
 
 Expected:
@@ -378,7 +378,7 @@ validated masks: 16 connectors
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m unittest tools.terrain.test_build_river_mask_tiles
+python -m unittest tools.terrain.test_build_river_mask_tiles
 ```
 
 Expected:
@@ -508,7 +508,7 @@ This keeps generated texture inside each tile while pinning open connector edge 
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' tools/terrain/build_river_mask_tiles.py --validate-only
+python tools/terrain/build_river_mask_tiles.py --validate-only
 ```
 
 Expected:
@@ -550,7 +550,7 @@ Add this test inside `RiverMaskTilesTest`:
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m unittest tools.terrain.test_build_river_mask_tiles
+python -m unittest tools.terrain.test_build_river_mask_tiles
 ```
 
 Expected: ERROR because `build_sheet` is not defined.
@@ -622,7 +622,7 @@ Append to `main()` after the `validate_only` return:
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' tools/terrain/build_river_mask_tiles.py
+python tools/terrain/build_river_mask_tiles.py
 ```
 
 Expected:
@@ -639,7 +639,7 @@ wrote C:\Users\USER\Documents\Projects\northern frontier\docs\assets\terrain\riv
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m unittest tools.terrain.test_build_river_mask_tiles
+python -m unittest tools.terrain.test_build_river_mask_tiles
 ```
 
 Expected:
@@ -750,7 +750,7 @@ Add this print in `main()`:
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' tools/terrain/build_river_mask_tiles.py
+python tools/terrain/build_river_mask_tiles.py
 ```
 
 Expected:
@@ -808,7 +808,7 @@ Add this test inside `RiverMaskTilesTest`:
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m unittest tools.terrain.test_build_river_mask_tiles
+python -m unittest tools.terrain.test_build_river_mask_tiles
 ```
 
 Expected: ERROR because `validate_sheet_edges` is not defined.
@@ -868,7 +868,7 @@ In `main()`, after `sheet = build_sheet()`, add:
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m unittest tools.terrain.test_build_river_mask_tiles
+python -m unittest tools.terrain.test_build_river_mask_tiles
 ```
 
 Expected:
@@ -882,7 +882,7 @@ OK
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' tools/terrain/build_river_mask_tiles.py
+python tools/terrain/build_river_mask_tiles.py
 ```
 
 Expected:
@@ -937,7 +937,7 @@ The builder owns connector geometry, water width, and edge contact pixels. Gener
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' tools/terrain/build_river_mask_tiles.py --validate-only
+python tools/terrain/build_river_mask_tiles.py --validate-only
 ```
 
 Expected:
@@ -951,7 +951,7 @@ validated masks: 16 connectors
 Run:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' tools/terrain/build_river_mask_tiles.py
+python tools/terrain/build_river_mask_tiles.py
 ```
 
 Expected:
@@ -993,7 +993,7 @@ git commit -m "Document river mask tileset workflow"
 - [ ] Run geometry validation:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' tools/terrain/build_river_mask_tiles.py --validate-only
+python tools/terrain/build_river_mask_tiles.py --validate-only
 ```
 
 Expected: exits `0` and prints `validated masks: 16 connectors`.
@@ -1001,7 +1001,7 @@ Expected: exits `0` and prints `validated masks: 16 connectors`.
 - [ ] Run focused tests:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m unittest tools.terrain.test_build_river_mask_tiles
+python -m unittest tools.terrain.test_build_river_mask_tiles
 ```
 
 Expected: exits `0`.
@@ -1009,7 +1009,7 @@ Expected: exits `0`.
 - [ ] Run full asset export:
 
 ```powershell
-& 'C:\Users\USER\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' tools/terrain/build_river_mask_tiles.py
+python tools/terrain/build_river_mask_tiles.py
 ```
 
 Expected: exits `0` and writes the sheet, 4x preview, seam preview, and report.

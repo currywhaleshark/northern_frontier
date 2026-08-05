@@ -1,5 +1,5 @@
 import { CONFIG } from './config';
-import type { GatheringWorkArea, Season, Tile } from './types';
+import type { Season, Tile } from './types';
 
 export type CoastalGroundKind = 'mudflat' | 'sand' | 'shingle' | 'rocky';
 
@@ -21,62 +21,6 @@ export function normalizeTidalFlatTile(tile: Tile): void {
 
 export function ensureTidalFlatStocks(map: Tile[][]): void {
   for (const tile of map.flat()) normalizeTidalFlatTile(tile);
-}
-
-export function advanceTidalFlatStocks(map: Tile[][]): number {
-  let recovered = 0;
-  for (const tile of map.flat()) {
-    if (tile.terrain !== 'mudflat') continue;
-    normalizeTidalFlatTile(tile);
-    const before = tile.tidalStock ?? 0;
-    tile.tidalStock = Math.min(
-      tile.tidalCapacity ?? CONFIG.tidalFlats.capacityPerTile,
-      before + CONFIG.tidalFlats.recoveryPerTilePerDay,
-    );
-    recovered += tile.tidalStock - before;
-  }
-  return recovered;
-}
-
-export function takeTidalFlatStock(tile: Tile, amount: number): number {
-  if (tile.terrain !== 'mudflat') return 0;
-  normalizeTidalFlatTile(tile);
-  const requested = Number.isFinite(amount) ? Math.max(0, amount) : 0;
-  const taken = Math.min(tile.tidalStock ?? 0, requested);
-  tile.tidalStock = Math.max(0, (tile.tidalStock ?? 0) - taken);
-  return taken;
-}
-
-export interface TidalFlatSummary {
-  tiles: number;
-  stock: number;
-  capacity: number;
-}
-
-export function tidalFlatSummaryInArea(map: Tile[][], area: GatheringWorkArea): TidalFlatSummary {
-  const summary: TidalFlatSummary = { tiles: 0, stock: 0, capacity: 0 };
-  for (let y = area.y - area.radius; y <= area.y + area.radius; y++) {
-    for (let x = area.x - area.radius; x <= area.x + area.radius; x++) {
-      const tile = map[y]?.[x];
-      if (!tile || tile.terrain !== 'mudflat' || (x - area.x) ** 2 + (y - area.y) ** 2 > area.radius ** 2) continue;
-      normalizeTidalFlatTile(tile);
-      summary.tiles++;
-      summary.stock += tile.tidalStock ?? 0;
-      summary.capacity += tile.tidalCapacity ?? 0;
-    }
-  }
-  return summary;
-}
-
-export function tidalFlatTileCountNear(map: Tile[][], x: number, y: number, radius: number): number {
-  let count = 0;
-  for (let ty = y - radius; ty <= y + radius; ty++) {
-    for (let tx = x - radius; tx <= x + radius; tx++) {
-      if ((tx - x) ** 2 + (ty - y) ** 2 > radius ** 2) continue;
-      if (map[ty]?.[tx]?.terrain === 'mudflat') count++;
-    }
-  }
-  return count;
 }
 
 export function tidalFlatYieldMultiplier(season: Season): number {

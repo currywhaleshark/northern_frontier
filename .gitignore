@@ -3,3 +3,23 @@ dist
 *.local
 .superpowers/
 __pycache__/
+
+# 작업용 스크래치 — 산출물은 public/ 또는 docs/ 로 옮긴 뒤 커밋한다
+tmp/
+backup_json/
+pull-backups/
+debug_output/
+debug_output_heuristic/
+tools/game/debug-temp/
+
+# 자산 생성·큐레이션 스크립트의 실행 로그
+*.out.log
+*.err.log
+
+# 스프라이트 파이프라인 중간 산출물 (약 5.5GB). 확정된 시트만 public/ · docs/ 로 옮겨 커밋한다.
+# 이미 추적 중인 tools/render/generated/** 소수 파일은 그대로 유지된다.
+tools/render/generated/
+tools/render/curation/
+tools/render/exports/
+tools/render/source_videos/
+*.sg-rwlock

@@ -27,7 +27,7 @@ interface MinimapSiteVisual {
   discovered: boolean;
 }
 
-export interface MinimapBaseInvalidationInput {
+interface MinimapBaseInvalidationInput {
   terrainSignature: number;
   explored: readonly (readonly boolean[])[];
   buildings: readonly MinimapBuildingVisual[];
@@ -60,7 +60,7 @@ interface MinimapTargetVisual extends MinimapPointVisual {
   expeditionTarget?: boolean;
 }
 
-export interface MinimapOverlayInvalidationInput {
+interface MinimapOverlayInvalidationInput {
   mapWidth: number;
   mapHeight: number;
   viewport: MinimapViewportVisual;

@@ -1,4 +1,4 @@
-export interface PopoverPlacement {
+interface PopoverPlacement {
   x: number;
   y: number;
   placement: 'above' | 'below';

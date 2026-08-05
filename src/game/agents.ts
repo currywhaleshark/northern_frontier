@@ -1,21 +1,42 @@
-// 주민 에이전트 시뮬레이션 — 서브틱 단위의 이동, 작업, 운반
+// 주민 에이전트 시뮬레이션 — 서브틱 단위의 직업별 작업, 운반, 하루 일과.
 // 자원은 창고/거점에 짐을 부려야 마을 비축량에 더해진다.
+// 이동·목표 판정 등 공용 실행 계층은 agentCore.ts, 경로 탐색은 pathfinding.ts에 있다.
 import { withJosa } from './josa';
+import {
+  GATHERING_JOBS, LEISURE_CLUSTER_CAPACITY, LEISURE_DESTINATION_TIERS, OUTDOOR_JOBS, PRODUCING_JOBS,
+  SUBTICKS, WORK_CRAFT_EPSILON, WORK_STOCK_EPSILON, absoluteTick, addCarry,
+  assignFireResponses, assignedWorkplace, assignedWorkplaceOfTypes, buildingGoal, buildingInteractionGoal,
+  carryTotal, clearHaulTask, depositAll, depositBuildings, depositGoal,
+  effOf, ensureResidentOnPassableTile, fireResponseAgentTick, gainSkillTick, goTo,
+  goToCenter, huntDepletionWarningDaysFor, isResidentAtBuildingInteraction, isSettledAtGoal, isWorkplaceInputStock,
+  loiterNearBuilding, loiterNearCenter, nearestBuilding, pathFailUntilFor, resetAgent,
+  supplyWorkplaceInputs, tidalDepletionWarningDaysFor, tryLoiterStep, unloadAtDepositGoal, workerSlotGoal,
+  workplaceInputResources,
+} from './agentCore';
+// agents는 에이전트 계층의 공개 진입점으로 남는다 — 다른 모듈과 게임 테스트가 여기서 가져간다.
+export {
+  LEISURE_CLUSTER_CAPACITY, SUBTICKS, ensureResidentOnPassableTile, ensureResidentsOnPassableTiles,
+  gainSkillTick, resetAgent,
+} from './agentCore';
+export { findPath, isPassable, isTerrainPassable } from './pathfinding';
+import type { Ctx, GoResult, WorkplaceInputs } from './agentCore';
+import {
+  CARDINAL_DIRS, isPassable,
+} from './pathfinding';
 import { CONFIG } from './config';
 import {
   DAY_BANDS, DAY_CYCLE_SUBTICKS, WORK_RATE_SCALE, WORK_SUBTICKS, dayBandOf,
 } from './dayCycle';
 import {
   BUILDING_DEFS, buildingCostForInstance, cemeteryPlotCapacity, clearBuildingTiles, computeDefense, footprintTilesOf,
-  isBuildingUpperPassageTile, isPlotBuildingType, isSmithyProductUnlocked, occupyBuildingTiles, officeEfficiencyMultiplier,
+  isPlotBuildingType, isSmithyProductUnlocked, occupyBuildingTiles, officeEfficiencyMultiplier,
   plotArea, preferredLeveeEdgeAt, saltworksHasSeaAccess, SMITHY_PRODUCT_DEFS, smithyProductOf, sownAreaOf,
 } from './buildings';
 import { JOB_NAMES, RESOURCE_NAMES } from './constants';
 import { addLog } from './events';
 import { openBuildingCompletionGuide } from './guides';
 import { residentLogName } from './residentLogName';
-import { enrolledStudentIds, skillGainMult } from './education';
-import { skillGainArtifactMultiplier } from './specialItems';
+import { enrolledStudentIds } from './education';
 import { haulerCarryCapacity, haulingMoveSpeedMultiplier, scaledCarryCapacity } from './equipment';
 import {
   collectHuntableTiles, habitatReserveSummaryInArea, huntableHabitatAtTile, takeHabitatStock,
@@ -24,7 +45,7 @@ import { huntPreyName, rollHuntPrey, scaledHuntYield, type HuntPreyDef } from '.
 import { makeRng } from './map';
 // 잎 모듈에서 직접 가져온다 — scenario.ts를 거치면 agents → scenario → raids → agents 고리가 생긴다
 import { countScenarioProgress } from './scenarioFlags';
-import { buryCorpse, corpsesOf, laborEfficiencyMult, nextCorpseToCollect } from './lifecycle';
+import { buryCorpse, corpsesOf, nextCorpseToCollect } from './lifecycle';
 import { extractMineralDeposit, mineralRemaining } from './minerals';
 import { clearTreeStage, markForestHarvest, treeStageFor } from './forestGrowth';
 import { assignClearingCrews, clearingBlocksWork, clearingSites, pendingClearingTiles } from './landClearing';
@@ -34,9 +55,8 @@ import { isLakeIceAt } from './lakeIce';
 import { outdoorMult } from './weather';
 import {
   droughtFarmGrowthMultiplier, droughtFishYieldMultiplier, initializeWeirReservoir,
-  isSpringFloodedTile, restoreWeirReservoir,
+  restoreWeirReservoir,
 } from './disasters';
-import { processableAmount } from './processing';
 import { DRYING_PRODUCT_DEFS, dryingProductOf } from './preservation';
 import { jangdokdaeInputNeeds } from './fermentation';
 import { canGrowCropNow, canHarvestCropNow, canPlantCropNow, cropIdForBuilding, CROP_DEFS } from './crops';
@@ -48,7 +68,7 @@ import {
   craftStrawShoesAtHome, equipMissingWearables, footwearCoverageTotal,
   normalizeWearableResourceStocks, residentFootwearMoveMultiplier, resolvedTanneryProduct, TANNERY_PRODUCT_DEFS,
 } from './wearables';
-import { isGateBuilding, isWallBuilding } from './walls';
+import { isWallBuilding } from './walls';
 import { bumpDefenseTopology, wallIntegrityMax } from './raidRoutes';
 import {
   ensureLivestockState, hayFromHarvestProgress, livestockProductForHerder, plotWorkMultiplier,
@@ -67,7 +87,6 @@ import {
   fishingBoatCrew, fishingBoatTripPlan, startFishingBoatTrip,
 } from './fishingBoats';
 import { waterDependentProductionMultiplier } from './waterSupply';
-import { activeFireDisaster, applyFireWater, drawFireWater, nearestFireWaterSource } from './fire';
 import { mineCollapseRepairLocked } from './mineCollapse';
 import { rankProductionEfficiency } from './productionEfficiency';
 import { cleanupRoyalPlaqueAfterBuildingRemoval, plaqueProductionMultiplier } from './royalPlaque';
@@ -75,13 +94,12 @@ import { describeGoal, type DescribedGoal } from './pathGoals';
 import { farmWorkTileForTick } from './farmWorkTiles';
 import { reconcileResidentHomes, residentHome } from './residents';
 import { reconcileMountAssignments } from './weapons';
-import { canEnterForeignTerritory, canWorkForeignTerritory, noteTerritoryViolation } from './territory';
+import { canWorkForeignTerritory, noteTerritoryViolation } from './territory';
 import { noteProximityBuildingCompletion } from './proximityWarnings';
 import {
-  assignedBuildingForResident, assignedSlotResidents, assignedWorkers, autoAssignWorkersToBuilding,
+  assignedBuildingForResident, assignedWorkers, autoAssignWorkersToBuilding,
   clearAssignmentsForBuilding, isResidentInAssignedSlot,
 } from './workerSlots';
-import { buildingWorkerSlots } from './buildingWorkerSlots';
 import { recordNotableBuildingCompletion } from './annals';
 import {
   addBuildingStock, buildingStock, depositResidentToBuilding, depositResidentToSettlement,
@@ -92,929 +110,9 @@ import {
   lodgingSupplySummary, lodgingWorkers,
 } from './lodgingHuts';
 import type {
-  Building, BuildingTypeId, GameState, ManualOrder, ProcessingInputId, Resident, ResourceId, Season,
+  Building, BuildingTypeId, GameState, ManualOrder, Resident, ResourceId, Season,
   SmithyProductId, Tile,
 } from './types';
-
-export const SUBTICKS = DAY_CYCLE_SUBTICKS;
-
-interface Ctx {
-  season: Season;
-  outdoor: number;
-  tMod: number;   // 도구 보정
-  mMod: number;   // 사기·관청·등급 노동 보정
-  outputMod: number; // mMod에 RC 자원 산출 보정을 한 번만 합성
-  rng: () => number;
-  centerId: number;
-  huntable: Map<string, number>; // 사냥 가능 타일 ("x,y") → 수확 배율 — 서식지 범위/크기와 연동
-  farmerWorkIdsByPlot: Map<number, number[]>;
-  /** 이번 서브틱에 공사터 개간을 맡은 벌목꾼 (주민 id → 건물 id) */
-  clearingCrew: Map<number, number>;
-  /** 개간 담당이 따로 있는 나무 ("x,y") — 일반 벌목은 이 칸을 건드리지 않는다 */
-  clearingReserved: Set<string>;
-}
-
-const PRODUCING_JOBS = [
-  'woodcutter', 'woodSplitter', 'hunter', 'farmer', 'miller', 'builder', 'curer', 'potter', 'saltMaker', 'smith', 'miner', 'fisher',
-  'charcoalBurner', 'herder', 'powderMaker', 'tanner', 'weaver', 'herbalist', 'hauler',
-];
-const OUTDOOR_JOBS = [
-  'woodcutter', 'woodSplitter', 'hunter', 'herbalist', 'farmer', 'builder', 'miner', 'fisher',
-  'charcoalBurner', 'herder', 'saltMaker',
-];
-const GATHERING_JOBS = ['woodcutter', 'hunter', 'herbalist', 'miner', 'fisher'];
-
-export const LEISURE_CLUSTER_CAPACITY = 4;
-const WORK_STOCK_EPSILON = 0.05 * WORK_RATE_SCALE;
-const WORK_CRAFT_EPSILON = 0.02 * WORK_RATE_SCALE;
-
-// 새 여가 시설(예: 주막)은 이 우선순위 표에 타입을 추가하는 것으로 연결한다.
-// 같은 우선순위 안에서는 건물 id 순으로 슬롯을 열어 저장/불러오기에도 흔들리지 않게 한다.
-const LEISURE_DESTINATION_TIERS: readonly (readonly BuildingTypeId[])[] = [
-  ['shrine', 'hermitage'],
-  ['market'],
-  ['center'],
-];
-
-// ─────────────────────────── 공통 헬퍼 ───────────────────────────
-
-function effOf(r: Resident): number {
-  return (1 + (r.skills[r.job] ?? 0) * CONFIG.production.skillEffect) * laborEfficiencyMult(r);
-}
-
-export function gainSkillTick(state: Pick<GameState, 'specialItems'>, r: Resident): void {
-  const cur = r.skills[r.job] ?? 0;
-  // 문해자는 무엇을 배워도 빠르다 (서당 교육의 평생 보상)
-  r.skills[r.job] = Math.min(
-    1,
-    cur + (CONFIG.production.skillGainPerDay / 5) * skillGainMult(r) *
-      skillGainArtifactMultiplier(state, r.job) * WORK_RATE_SCALE,
-  );
-}
-
-function carryTotal(r: Resident): number {
-  return Object.values(r.carrying).reduce((s: number, v) => s + (v ?? 0), 0);
-}
-
-function addCarry(r: Resident, res: ResourceId, amt: number): void {
-  r.carrying[res] = (r.carrying[res] ?? 0) + amt;
-}
-
-function depositAll(state: GameState, r: Resident): void {
-  depositResidentToSettlement(state, r);
-}
-
-// 직업 변경/사망 등으로 에이전트 상태를 정리 (짐은 마을 몫으로 귀속)
-export function resetAgent(state: GameState, r: Resident): void {
-  depositAll(state, r);
-  r.path = [];
-  r.phase = 'rest';
-  r.workTimer = 0;
-  r.targetId = null;
-  r.miningDepositBuildingId = null;
-  r.haulTask = null;
-  r.manualOrder = null;
-}
-
-// ─────────────────────────── 이동/경로 ───────────────────────────
-
-const PASSABLE_BUILDING_TYPES: ReadonlySet<BuildingTypeId> = new Set<BuildingTypeId>([
-  'field',
-  'paddy',
-  'bridge',
-  'canal',
-  'ferry',
-  'dock',
-  'lumberCamp',
-  'huntLodge',
-  'herbHut',
-  'mine',
-]);
-
-function buildingAtTile(state: GameState, t: Tile): Building | undefined {
-  if (t.buildingId == null) return undefined;
-  return state.buildings.find(b => b.id === t.buildingId);
-}
-
-function isPassableBuilding(type: BuildingTypeId): boolean {
-  return PASSABLE_BUILDING_TYPES.has(type) || isGateBuilding(type);
-}
-
-export function isTerrainPassable(state: GameState, x: number, y: number): boolean {
-  const t = state.map[y]?.[x];
-  if (!t) return false;
-  if (isSpringFloodedTile(state, x, y)) return false;
-  const building = buildingAtTile(state, t);
-  const breachedPassage = building?.breached === true && isWallBuilding(building.type);
-  const siegeGateClosed = building?.type === 'gate' && state.siegeState != null &&
-    state.siegeState.phase !== 'evacuation' && state.siegeState.phase !== 'sortie' &&
-    state.siegeState.phase !== 'withdrawal';
-  if (siegeGateClosed && !breachedPassage) return false;
-  if (building && !breachedPassage && !isPassableBuilding(building.type) &&
-      !isBuildingUpperPassageTile(building, x, y)) return false;
-  if (t.terrain === 'mountain' || t.terrain === 'rock' || t.terrain === 'sea') return false;
-  if (t.terrain === 'river') {
-    if (building && (building.type === 'bridge' || building.type === 'ferry' || building.type === 'dock')) return true;
-    // 겨울 언 강 위는 걸어서 건널 수 있다 (해빙기 홍수 제외)
-    return getSeason(state.day) === 'winter' && state.weather !== 'thawFlood';
-  }
-  if (t.terrain === 'lake') return isLakeIceAt(state.map, state.day, x, y);
-  return true;
-}
-
-export function isPassable(
-  state: GameState,
-  x: number,
-  y: number,
-  ignoredTerritorySiteIds: readonly number[] = [],
-): boolean {
-  return isTerrainPassable(state, x, y) && canEnterForeignTerritory(state, x, y, ignoredTerritorySiteIds);
-}
-
-const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
-const CARDINAL_DIRS = DIRS.slice(0, 4);
-
-function goalTiles(state: GameState, isGoal: (t: Tile) => boolean): { x: number; y: number }[] {
-  const goals: { x: number; y: number }[] = [];
-  for (const row of state.map) {
-    for (const tile of row) {
-      if (isGoal(tile)) goals.push({ x: tile.x, y: tile.y });
-    }
-  }
-  return goals;
-}
-
-function octileDistance(x: number, y: number, goals: readonly { x: number; y: number }[]): number {
-  let best = Infinity;
-  for (const goal of goals) {
-    const dx = Math.abs(goal.x - x);
-    const dy = Math.abs(goal.y - y);
-    const diag = Math.min(dx, dy);
-    const straight = Math.max(dx, dy) - diag;
-    best = Math.min(best, diag * 14 + straight * 10);
-  }
-  return best === Infinity ? 0 : best;
-}
-
-function reconstructPath(prev: Int32Array, width: number, start: number, end: number): { x: number; y: number }[] {
-  const path: { x: number; y: number }[] = [];
-  let node = end;
-  while (node !== start) {
-    if (node < 0) return [];
-    const x = node % width;
-    path.push({ x, y: (node - x) / width });
-    node = prev[node];
-  }
-  path.reverse();
-  return path;
-}
-
-// A*: 조건을 만족하는 가장 가까운 타일까지의 경로 (시작 타일 제외)
-// passable을 넘기면 주민과 다른 통행 규칙을 적용할 수 있다.
-// 성능: (1) 통행 판정은 탐색 한 번 안에서 칸당 1회로 메모한다 — 세력권·건물 검사가 비싸다.
-//       (2) open 리스트는 이진 힙 (push 시점 점수 고정 + closed 스킵의 lazy deletion).
-function runtimePathStartTime(): number | null {
-  if (typeof window === 'undefined') return null;
-  return (window as unknown as { __runtimePerfStartTime?: () => number | null })
-    .__runtimePerfStartTime?.() ?? null;
-}
-
-function recordRuntimePathfinding(
-  startedAt: number | null,
-  detail: Record<string, string | number | boolean | null>,
-): void {
-  if (typeof window === 'undefined') return;
-  (window as unknown as {
-    __recordRuntimePerfSince?: (
-      name: string,
-      start: number | null,
-      detail?: Record<string, string | number | boolean | null>,
-    ) => void;
-  }).__recordRuntimePerfSince?.('pathfinding', startedAt, detail);
-}
-
-export function findPath(
-  state: GameState,
-  sx: number,
-  sy: number,
-  isGoal: (t: Tile) => boolean,
-  passable?: (x: number, y: number) => boolean,
-): { x: number; y: number }[] | null {
-  const startedAt = runtimePathStartTime();
-  const result = findPathCore(state, sx, sy, isGoal, passable);
-  recordRuntimePathfinding(startedAt, {
-    fromX: sx,
-    fromY: sy,
-    pathLength: result?.length ?? 0,
-    found: result !== null,
-  });
-  return result;
-}
-
-function findPathCore(
-  state: GameState,
-  sx: number,
-  sy: number,
-  isGoal: (t: Tile) => boolean,
-  passable?: (x: number, y: number) => boolean,
-): { x: number; y: number }[] | null {
-  const basePass = passable ?? ((x: number, y: number) => isPassable(state, x, y));
-  const h = state.map.length, w = state.map[0]?.length ?? 0;
-  if (sx < 0 || sy < 0 || sx >= w || sy >= h || !state.map[sy]?.[sx]) return null;
-  const described = isGoal as DescribedGoal;
-  const describedFits = described.goalPoints &&
-    (described.goalWidth == null || described.goalWidth === w) &&
-    (described.goalHeight == null || described.goalHeight === h);
-  const goals = describedFits ? described.goalPoints! : goalTiles(state, isGoal);
-  if (goals.length === 0) return null;
-  const estimate = describedFits && described.goalHeuristic?.length === w * h
-    ? (x: number, y: number) => described.goalHeuristic![y * w + x]
-    : goals.length <= 128
-    ? (x: number, y: number) => octileDistance(x, y, goals)
-    : () => 0;
-
-  const passMemo = new Int8Array(w * h).fill(-1);
-  const canPass = (x: number, y: number): boolean => {
-    if (x < 0 || y < 0 || x >= w || y >= h) return false;
-    const i = y * w + x;
-    const cached = passMemo[i];
-    if (cached >= 0) return cached === 1;
-    const ok = basePass(x, y);
-    passMemo[i] = ok ? 1 : 0;
-    return ok;
-  };
-
-  const start = sy * w + sx;
-  const prev = new Int32Array(w * h).fill(-2);
-  const cost = new Int32Array(w * h).fill(0x3fffffff);
-  const closed = new Uint8Array(w * h);
-  prev[start] = -1;
-  cost[start] = 0;
-
-  // 이진 최소 힙 — 점수/노드 병렬 배열, 점수는 push 시점에 고정
-  const heapScore: number[] = [];
-  const heapNode: number[] = [];
-  const heapPush = (s: number, n: number): void => {
-    let i = heapScore.length;
-    heapScore.push(s);
-    heapNode.push(n);
-    while (i > 0) {
-      const p = (i - 1) >> 1;
-      if (heapScore[p] <= heapScore[i]) break;
-      [heapScore[p], heapScore[i]] = [heapScore[i], heapScore[p]];
-      [heapNode[p], heapNode[i]] = [heapNode[i], heapNode[p]];
-      i = p;
-    }
-  };
-  const heapPop = (): number => {
-    const top = heapNode[0];
-    const lastScore = heapScore.pop()!;
-    const lastNode = heapNode.pop()!;
-    if (heapNode.length > 0) {
-      heapScore[0] = lastScore;
-      heapNode[0] = lastNode;
-      let i = 0;
-      for (;;) {
-        const l = i * 2 + 1;
-        const r = l + 1;
-        let m = i;
-        if (l < heapScore.length && heapScore[l] < heapScore[m]) m = l;
-        if (r < heapScore.length && heapScore[r] < heapScore[m]) m = r;
-        if (m === i) break;
-        [heapScore[m], heapScore[i]] = [heapScore[i], heapScore[m]];
-        [heapNode[m], heapNode[i]] = [heapNode[i], heapNode[m]];
-        i = m;
-      }
-    }
-    return top;
-  };
-
-  heapPush(estimate(sx, sy), start);
-  while (heapNode.length > 0) {
-    const cur = heapPop();
-    if (closed[cur]) continue;
-    closed[cur] = 1;
-    const cx = cur % w, cy = (cur - cx) / w;
-    const tile = state.map[cy]?.[cx];
-    if (!tile) continue;
-    if (cur !== start && isGoal(tile)) {
-      return reconstructPath(prev, w, start, cur);
-    }
-    for (const [dx, dy] of DIRS) {
-      const nx = cx + dx, ny = cy + dy;
-      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-      if (!canPass(nx, ny)) continue;
-      if (dx !== 0 && dy !== 0 && (!canPass(cx + dx, cy) || !canPass(cx, cy + dy))) continue;
-      const ni = ny * w + nx;
-      const nextCost = cost[cur] + (dx !== 0 && dy !== 0 ? 14 : 10);
-      if (nextCost >= cost[ni]) continue;
-      prev[ni] = cur;
-      cost[ni] = nextCost;
-      heapPush(nextCost + estimate(nx, ny), ni);
-    }
-  }
-  return null;
-}
-
-const bfs = findPath;
-
-function moveSteps(state: GameState, r: Resident, ctx: Ctx): number {
-  let sp: number = CONFIG.agents.moveSpeed;
-  if (ctx.season === 'winter') sp = CONFIG.agents.moveSpeedWinter;
-  if (state.weather === 'blizzard' || state.weather === 'heavySnow') {
-    sp = Math.min(sp, CONFIG.agents.moveSpeedSnow);
-  }
-  sp *= haulingMoveSpeedMultiplier(r);
-  sp *= residentFootwearMoveMultiplier(r);
-  const n = Math.floor(sp);
-  return n + (ctx.rng() < sp - n ? 1 : 0);
-}
-
-type GoResult = 'arrived' | 'moving' | 'stuck';
-
-// 논리 좌표가 목표에 닿은 틱에도 화면은 px/py에서 x/y로 이동을 보간한다.
-// 짐 내리기는 그 보간이 끝난 다음 틱에 실행해야 한다.
-function isSettledAtGoal(resident: Resident, result: GoResult): boolean {
-  return result === 'arrived' && resident.px === resident.x && resident.py === resident.y;
-}
-
-// 실패한 경로 탐색은 몇 서브틱 쉬어 간다 — 막힌 주민이 매 틱 지도 전체를 다시 뒤지는 것을 막는다.
-// (저장되지 않는 순수 성능 캐시. 지형은 서브틱 사이에 거의 변하지 않는다.)
-const PATH_FAIL_COOLDOWN_TICKS = 3;
-const pathFailUntilByState = new WeakMap<GameState, Map<number, number>>();
-const huntDepletionWarningDayByState = new WeakMap<GameState, Map<number, number>>();
-const tidalDepletionWarningDayByState = new WeakMap<GameState, Map<number, number>>();
-
-function pathFailUntilFor(state: GameState): Map<number, number> {
-  let cache = pathFailUntilByState.get(state);
-  if (!cache) {
-    cache = new Map<number, number>();
-    pathFailUntilByState.set(state, cache);
-  }
-  return cache;
-}
-
-function huntDepletionWarningDaysFor(state: GameState): Map<number, number> {
-  let cache = huntDepletionWarningDayByState.get(state);
-  if (!cache) {
-    cache = new Map<number, number>();
-    huntDepletionWarningDayByState.set(state, cache);
-  }
-  return cache;
-}
-
-function tidalDepletionWarningDaysFor(state: GameState): Map<number, number> {
-  let cache = tidalDepletionWarningDayByState.get(state);
-  if (!cache) {
-    cache = new Map<number, number>();
-    tidalDepletionWarningDayByState.set(state, cache);
-  }
-  return cache;
-}
-
-function absoluteTick(state: GameState): number {
-  return state.day * SUBTICKS + state.subTick;
-}
-
-// 목표 조건을 향해 이동. 이미 목표 위면 arrived.
-function goTo(
-  state: GameState,
-  r: Resident,
-  ctx: Ctx,
-  isGoal: (t: Tile) => boolean,
-  passable?: (x: number, y: number) => boolean,
-  onStep?: (x: number, y: number) => void,
-): GoResult {
-  const canPass = passable ?? ((x: number, y: number) => isPassable(state, x, y));
-  if (isGoal(state.map[r.y][r.x])) { r.path = []; return 'arrived'; }
-  if (r.path.length === 0) {
-    const pathFailUntil = pathFailUntilFor(state);
-    const nowTick = absoluteTick(state);
-    if ((pathFailUntil.get(r.id) ?? 0) > nowTick) return 'stuck';
-    const p = bfs(state, r.x, r.y, isGoal, canPass);
-    if (!p) {
-      pathFailUntil.set(r.id, nowTick + PATH_FAIL_COOLDOWN_TICKS);
-      return 'stuck';
-    }
-    pathFailUntil.delete(r.id);
-    r.path = p;
-  }
-  const steps = moveSteps(state, r, ctx);
-  for (let i = 0; i < steps && r.path.length > 0; i++) {
-    const next = r.path[0];
-    if (!canPass(next.x, next.y)) { r.path = []; return 'moving'; } // 다음 틱에 재탐색
-    r.path.shift();
-    r.x = next.x; r.y = next.y;
-    onStep?.(next.x, next.y);
-  }
-  return isGoal(state.map[r.y][r.x]) ? 'arrived' : 'moving';
-}
-
-function isBuildingInteractionTile(state: GameState, t: Tile, buildingId: number): boolean {
-  const building = state.buildings.find(b => b.id === buildingId);
-  if (!building) return false;
-  if (!isPassable(state, t.x, t.y)) return false;
-  if (isPassableBuilding(building.type)) return t.buildingId === building.id;
-
-  const footprint = footprintTilesOf(state, building);
-  if (!footprint) return false;
-  return footprint.some(tile =>
-    Math.max(Math.abs(tile.x - t.x), Math.abs(tile.y - t.y)) === 1);
-}
-
-function isResidentAtBuildingInteraction(state: GameState, r: Resident, buildingId: number): boolean {
-  const tile = state.map[r.y]?.[r.x];
-  return tile ? isBuildingInteractionTile(state, tile, buildingId) : false;
-}
-
-// 건물 상호작용 칸을 미리 집합으로 만든다 — 경로 탐색이 지도 전 칸에 목표 판정을 돌리므로
-// 판정은 O(1)이어야 한다 (칸마다 건물 검색+발자국 검사를 하면 탐색 한 번에 수십만 연산이 된다).
-function buildingInteractionGoal(state: GameState, buildingIds: readonly number[]): (t: Tile) => boolean {
-  const w = state.map[0]?.length ?? 0;
-  const goalSet = new Set<number>();
-  for (const id of buildingIds) {
-    const building = state.buildings.find(b => b.id === id);
-    if (!building) continue;
-    const footprint = footprintTilesOf(state, building);
-    if (!footprint) continue;
-    if (isPassableBuilding(building.type)) {
-      for (const tile of footprint) {
-        if (tile.buildingId === building.id && isPassable(state, tile.x, tile.y)) {
-          goalSet.add(tile.y * w + tile.x);
-        }
-      }
-      continue;
-    }
-    const inFootprint = new Set(footprint.map(tile => tile.y * w + tile.x));
-    for (const tile of footprint) {
-      for (const [dx, dy] of DIRS) {
-        const nx = tile.x + dx, ny = tile.y + dy;
-        if (!state.map[ny]?.[nx]) continue;
-        const ni = ny * w + nx;
-        if (inFootprint.has(ni) || goalSet.has(ni)) continue;
-        if (!isPassable(state, nx, ny)) continue;
-        goalSet.add(ni);
-      }
-    }
-  }
-  const points = [...goalSet]
-    .sort((a, b) => a - b)
-    .map(index => ({ x: index % w, y: Math.floor(index / w) }));
-  return describeGoal(t => goalSet.has(t.y * w + t.x), points);
-}
-
-// 하역 거점: 중심지 + 창고 (+직업별 거점 건물)
-function depositBuildings(state: GameState, extra: BuildingTypeId[]): Building[] {
-  const productionSites = state.buildings.filter(b => b.built && extra.includes(b.type));
-  if (productionSites.length > 0) return productionSites;
-  return state.buildings.filter(isStorageBuilding);
-}
-
-function depositGoal(state: GameState, extra: BuildingTypeId[]): (t: Tile) => boolean {
-  return buildingInteractionGoal(state, depositBuildings(state, extra).map(building => building.id));
-}
-
-function unloadAtDepositGoal(
-  state: GameState,
-  resident: Resident,
-  extra: BuildingTypeId[],
-): void {
-  const productionSite = depositBuildings(state, extra)
-    .find(building => !isStorageBuilding(building) &&
-      isResidentAtBuildingInteraction(state, resident, building.id));
-  if (productionSite) depositResidentToBuilding(productionSite, resident);
-  else depositResidentToSettlement(state, resident);
-}
-
-function buildingGoal(state: GameState, id: number): (t: Tile) => boolean {
-  return buildingInteractionGoal(state, [id]);
-}
-
-function naturalWaterGoal(state: GameState, riverX: number, riverY: number): (t: Tile) => boolean {
-  const points: { x: number; y: number }[] = [];
-  const width = state.map[0]?.length ?? 0;
-  const indices = new Set<number>();
-  for (const [dx, dy] of DIRS) {
-    const x = riverX + dx;
-    const y = riverY + dy;
-    if (!state.map[y]?.[x] || !isPassable(state, x, y)) continue;
-    indices.add(y * width + x);
-  }
-  for (const index of [...indices].sort((a, b) => a - b)) {
-    points.push({ x: index % width, y: Math.floor(index / width) });
-  }
-  return describeGoal(tile => indices.has(tile.y * width + tile.x), points);
-}
-
-function canRespondToFire(state: GameState, resident: Resident): boolean {
-  if (!resident.alive || resident.sick || resident.health < 20 || state.day < (resident.quarantinedUntil ?? 0)) return false;
-  if (state.day < (resident.birthRecoveryUntil ?? 0)) return false;
-  if (resident.stage && (resident.stage !== 'youth' || resident.youthActivity === 'school')) return false;
-  if (state.expedition?.memberIds.includes(resident.id) || state.battle?.defenderIds.includes(resident.id)) return false;
-  if (state.warDispatch?.memberIds.includes(resident.id)) return false;
-  return !activePredatorScoutIds(state).has(resident.id);
-}
-
-function assignFireResponses(state: GameState, residents: readonly Resident[]): void {
-  const disaster = activeFireDisaster(state);
-  const sites = disaster?.fireSites ?? [];
-  const activeIds = new Set(sites.map(site => site.buildingId));
-  for (const resident of residents) {
-    if (resident.fireResponse && (!activeIds.has(resident.fireResponse.buildingId) || !canRespondToFire(state, resident))) {
-      delete resident.fireResponse;
-    }
-  }
-  if (sites.length === 0) return;
-  const assignedBySite = new Map<number, number>();
-  for (const resident of residents) {
-    if (resident.fireResponse) {
-      assignedBySite.set(resident.fireResponse.buildingId, (assignedBySite.get(resident.fireResponse.buildingId) ?? 0) + 1);
-    }
-  }
-  for (const site of sites) {
-    const building = state.buildings.find(candidate => candidate.id === site.buildingId && candidate.built);
-    if (!building) continue;
-    const source = nearestFireWaterSource(state, building);
-    if (!source) continue;
-    const available = residents
-      .filter(resident => !resident.fireResponse && canRespondToFire(state, resident))
-      .sort((a, b) => Math.abs(a.x - building.x) + Math.abs(a.y - building.y) -
-        (Math.abs(b.x - building.x) + Math.abs(b.y - building.y)) || a.id - b.id);
-    let assigned = assignedBySite.get(building.id) ?? 0;
-    for (const resident of available) {
-      if (assigned >= CONFIG.disasters.fire.maximumRespondersPerSite) break;
-      resident.fireResponse = {
-        buildingId: building.id,
-        sourceKind: source.kind,
-        sourceBuildingId: source.buildingId,
-        sourceX: source.x,
-        sourceY: source.y,
-        phase: 'toWater',
-        carriedWater: 0,
-      };
-      resident.path = [];
-      clearHaulTask(resident);
-      assigned++;
-    }
-  }
-}
-
-function fireResponseAgentTick(state: GameState, resident: Resident, ctx: Ctx): boolean {
-  const response = resident.fireResponse;
-  if (!response) return false;
-  const burning = activeFireDisaster(state)?.fireSites?.some(site => site.buildingId === response.buildingId);
-  const building = state.buildings.find(candidate => candidate.id === response.buildingId && candidate.built);
-  if (!burning || !building || !canRespondToFire(state, resident)) {
-    delete resident.fireResponse;
-    return false;
-  }
-  clearHaulTask(resident);
-  if (response.phase === 'toWater') {
-    resident.task = response.sourceKind === 'well'
-      ? '우물로 물 뜨러 이동'
-      : response.sourceKind === 'lake' ? '호수로 물 뜨러 이동' : '강으로 물 뜨러 이동';
-    const goal = response.sourceKind === 'well' && response.sourceBuildingId != null
-      ? buildingGoal(state, response.sourceBuildingId)
-      : naturalWaterGoal(state, response.sourceX, response.sourceY);
-    const result = goTo(state, resident, ctx, goal);
-    if (!isSettledAtGoal(resident, result)) return true;
-    const amount = drawFireWater(state, {
-      kind: response.sourceKind,
-      buildingId: response.sourceBuildingId,
-      x: response.sourceX,
-      y: response.sourceY,
-      distance: 0,
-    });
-    if (amount <= 0) {
-      const source = nearestFireWaterSource(state, building);
-      if (!source) {
-        delete resident.fireResponse;
-        resident.path = [];
-        return false;
-      }
-      response.sourceKind = source.kind;
-      response.sourceBuildingId = source.buildingId;
-      response.sourceX = source.x;
-      response.sourceY = source.y;
-      resident.path = [];
-      return true;
-    }
-    response.carriedWater = amount;
-    response.phase = 'toFire';
-    resident.path = [];
-    return true;
-  }
-  resident.task = '화재 현장으로 물 운반';
-  const result = goTo(state, resident, ctx, buildingGoal(state, building.id));
-  if (!isSettledAtGoal(resident, result)) return true;
-  applyFireWater(state, building.id, response.carriedWater);
-  response.carriedWater = 0;
-  response.phase = 'toWater';
-  resident.task = '불길에 물 붓는 중';
-  resident.path = [];
-  return true;
-}
-
-/**
- * 서는 자리가 정해진 야외 작업 — 건물 옆 아무 칸이 아니라 등록된 칸으로 간다.
- * 자리는 스프라이트 스튜디오에서 실물을 보며 정하고, 배정 순번(id 오름차순)이
- * 곧 자리 번호라 두 근무자가 같은 칸을 다투지 않는다.
- * 미등록·지도 밖·통행 불가면 기존 동작(건물 인접 아무 칸)으로 되돌아간다.
- */
-function workerSlotGoal(state: GameState, r: Resident, building: Building): (t: Tile) => boolean {
-  const slots = buildingWorkerSlots(building.type);
-  if (slots.length === 0) return buildingGoal(state, building.id);
-  const index = assignedSlotResidents(state, building).findIndex(worker => worker.id === r.id);
-  if (index < 0) return buildingGoal(state, building.id);
-  const slot = slots[index % slots.length];
-  const sx = building.x + slot.tileDX;
-  const sy = building.y + slot.tileDY;
-  if (!state.map[sy]?.[sx] || !isPassable(state, sx, sy)) return buildingGoal(state, building.id);
-  return describeGoal(t => t.x === sx && t.y === sy, [{ x: sx, y: sy }]);
-}
-
-function goToCenter(state: GameState, r: Resident, ctx: Ctx): GoResult {
-  return goTo(state, r, ctx, buildingGoal(state, ctx.centerId));
-}
-
-function manhattanXY(ax: number, ay: number, bx: number, by: number): number {
-  return Math.abs(ax - bx) + Math.abs(ay - by);
-}
-
-function canStepTo(state: GameState, x: number, y: number, dx: number, dy: number): boolean {
-  const nx = x + dx, ny = y + dy;
-  if (!isPassable(state, nx, ny)) return false;
-  if (dx !== 0 && dy !== 0 && (!isPassable(state, x + dx, y) || !isPassable(state, x, y + dy))) return false;
-  return true;
-}
-
-function tryLoiterStep(
-  state: GameState,
-  r: Resident,
-  ctx: Ctx,
-  anchorX: number,
-  anchorY: number,
-  radius: number,
-): boolean {
-  const start = Math.floor(ctx.rng() * DIRS.length);
-  for (let i = 0; i < DIRS.length; i++) {
-    const [dx, dy] = DIRS[(start + i) % DIRS.length];
-    const nx = r.x + dx, ny = r.y + dy;
-    if (manhattanXY(nx, ny, anchorX, anchorY) > radius) continue;
-    if (!canStepTo(state, r.x, r.y, dx, dy)) continue;
-    r.x = nx;
-    r.y = ny;
-    return true;
-  }
-  return false;
-}
-
-function loiterNearPoint(
-  state: GameState,
-  r: Resident,
-  ctx: Ctx,
-  anchorX: number,
-  anchorY: number,
-  radius: number,
-  task: string,
-): GoResult {
-  r.task = task;
-  if (manhattanXY(r.x, r.y, anchorX, anchorY) > radius) {
-    const returnRadius = Math.max(1, Math.min(2, radius));
-    return goTo(state, r, ctx, tile =>
-      isPassable(state, tile.x, tile.y) && manhattanXY(tile.x, tile.y, anchorX, anchorY) <= returnRadius);
-  }
-  r.path = [];
-  if (ctx.rng() < 0.65 && tryLoiterStep(state, r, ctx, anchorX, anchorY, radius)) return 'moving';
-  return 'arrived';
-}
-
-function loiterNearCenter(state: GameState, r: Resident, ctx: Ctx, task: string): GoResult {
-  const center = state.buildings.find(b => b.id === ctx.centerId);
-  if (!center) {
-    r.task = task;
-    r.path = [];
-    tryLoiterStep(state, r, ctx, r.x, r.y, 2);
-    return 'arrived';
-  }
-  return loiterNearPoint(state, r, ctx, center.x, center.y, 8, task);
-}
-
-function loiterNearBuilding(
-  state: GameState,
-  r: Resident,
-  ctx: Ctx,
-  building: Building,
-  radius: number,
-  task: string,
-): GoResult {
-  r.task = task;
-  if (manhattanXY(r.x, r.y, building.x, building.y) > radius) {
-    return goTo(state, r, ctx, buildingGoal(state, building.id));
-  }
-  r.path = [];
-  if (ctx.rng() < 0.55 && tryLoiterStep(state, r, ctx, building.x, building.y, radius)) return 'moving';
-  return 'arrived';
-}
-
-function depositCarriedResources(
-  state: GameState,
-  r: Resident,
-  ctx: Ctx,
-  extra: BuildingTypeId[],
-  task: string,
-): boolean {
-  if (carryTotal(r) <= 0) return false;
-  r.phase = 'toDeposit';
-  r.task = task;
-  const st = goTo(state, r, ctx, depositGoal(state, extra));
-  if (isSettledAtGoal(r, st)) {
-    unloadAtDepositGoal(state, r, extra);
-    r.phase = 'rest';
-  } else if (st === 'stuck') {
-    depositResidentToSettlement(state, r);
-    r.phase = 'rest';
-  }
-  return true;
-}
-
-function assignedWorkplace(
-  state: GameState,
-  r: Resident,
-  ctx: Ctx,
-  type: BuildingTypeId,
-  waitTask: string,
-): Building | null {
-  return assignedWorkplaceOfTypes(state, r, ctx, [type], waitTask);
-}
-
-function assignedWorkplaceOfTypes(
-  state: GameState,
-  r: Resident,
-  ctx: Ctx,
-  types: readonly BuildingTypeId[],
-  waitTask: string,
-): Building | null {
-  const building = assignedBuildingForResident(state, r);
-  if (!building || !types.includes(building.type) || !isResidentInAssignedSlot(state, r, building)) {
-    if (depositCarriedResources(state, r, ctx, [], waitTask)) return null;
-    loiterNearCenter(state, r, ctx, waitTask);
-    return null;
-  }
-  return building;
-}
-
-type WorkplaceInputs = Partial<Record<ResourceId, number>>;
-
-function isReservedProcessingInput(resource: ResourceId): resource is ProcessingInputId {
-  return resource === 'wood' || resource === 'rice' || resource === 'hide' || resource === 'iron'
-    || resource === 'meat' || resource === 'fish';
-}
-
-function settlementProcessingStock(state: GameState, resource: ResourceId): number {
-  return isReservedProcessingInput(resource) ? processableAmount(state, resource) : state.resources[resource];
-}
-
-function workplaceInputResources(building: Building): ResourceId[] {
-  switch (building.type) {
-    case 'watermill': return ['rice'];
-    case 'woodShed': return ['wood'];
-    case 'charcoalKiln': return ['wood'];
-    case 'tannery': return ['hide'];
-    case 'weavingHouse': return ['cotton'];
-    case 'nitreYard': return ['firewood', 'stone'];
-    case 'smithy': return Object.keys(SMITHY_PRODUCT_DEFS[smithyProductOf(building)].inputPerUnit) as ResourceId[];
-    case 'smokehouse': return ['meat', 'firewood', 'charcoal'];
-    case 'dryingRack': return Object.keys(DRYING_PRODUCT_DEFS[dryingProductOf(building)].inputPerUnit) as ResourceId[];
-    case 'onggiKiln': return ['firewood', 'charcoal'];
-    case 'saltworks': return ['firewood'];
-    case 'jangdokdae': return ['beans', 'salt', 'onggi'];
-    default: return [];
-  }
-}
-
-function isWorkplaceInputStock(building: Building, resource: ResourceId): boolean {
-  return workplaceInputResources(building).includes(resource);
-}
-
-function processorCarryCapacity(resource: ResourceId): number {
-  const capacities = CONFIG.agents.carryCap as Partial<Record<ResourceId, number>>;
-  return scaledCarryCapacity(capacities[resource] ?? CONFIG.agents.haulerCarryCap);
-}
-
-function unloadWorkplaceInputs(building: Building, resident: Resident, inputs: Set<ResourceId>): void {
-  for (const [resource, amount] of Object.entries(resident.carrying) as [ResourceId, number][]) {
-    if (!inputs.has(resource) || amount <= 0) continue;
-    addBuildingStock(building, resource, amount);
-    delete resident.carrying[resource];
-  }
-}
-
-// 가공 작업자는 창고에서 원료를 직접 가져와 지정 작업장의 현장 재고로 만든다.
-function supplyWorkplaceInputs(
-  state: GameState,
-  resident: Resident,
-  ctx: Ctx,
-  workplace: Building,
-  requirements: WorkplaceInputs,
-): boolean {
-  const inputIds = (Object.entries(requirements) as [ResourceId, number][])
-    .filter(([, amount]) => amount > 0)
-    .map(([resource]) => resource);
-  const inputSet = new Set(inputIds);
-  const hasCarriedInput = inputIds.some(resource => (resident.carrying[resource] ?? 0) > 0);
-
-  if (hasCarriedInput) {
-    resident.phase = 'toDeposit';
-    resident.task = '작업장에 원료 운반';
-    const st = goTo(state, resident, ctx, buildingGoal(state, workplace.id));
-    if (isSettledAtGoal(resident, st)) {
-      unloadWorkplaceInputs(workplace, resident, inputSet);
-      resident.phase = 'rest';
-      resident.path = [];
-    } else if (st === 'stuck') {
-      depositResidentToSettlement(state, resident);
-      resident.phase = 'rest';
-    }
-    return true;
-  }
-
-  if (carryTotal(resident) > 0) {
-    return depositCarriedResources(state, resident, ctx, [], '남은 짐 정리');
-  }
-
-  const resource = (Object.entries(requirements) as [ResourceId, number][]).find(([candidate, needed]) =>
-    needed > 0 &&
-    buildingStock(workplace, candidate) + 0.0001 < needed &&
-    settlementProcessingStock(state, candidate) > WORK_STOCK_EPSILON)?.[0];
-  if (!resource) return false;
-
-  const storage = nearestBuilding(resident, state.buildings.filter(isStorageBuilding));
-  if (!storage) {
-    resident.phase = 'rest';
-    resident.task = '원료 창고 없음';
-    return true;
-  }
-
-  resident.phase = 'toWork';
-  resident.task = `${RESOURCE_NAMES[resource]} 가지러 이동`;
-  const st = goTo(state, resident, ctx, buildingGoal(state, storage.id));
-  if (st === 'arrived') {
-    const pickupCap = resource === 'tools'
-      ? Math.min(1, processorCarryCapacity(resource))
-      : processorCarryCapacity(resource);
-    const amount = Math.min(settlementProcessingStock(state, resource), pickupCap);
-    if (amount > WORK_STOCK_EPSILON) {
-      state.resources[resource] = Math.max(0, state.resources[resource] - amount);
-      addCarry(resident, resource, amount);
-      resident.phase = 'toDeposit';
-      resident.path = [];
-      resident.task = `${RESOURCE_NAMES[resource]} 운반`;
-    } else {
-      resident.phase = 'rest';
-      resident.path = [];
-      resident.task = `${RESOURCE_NAMES[resource]} 대기`;
-    }
-  } else if (st === 'stuck') {
-    resident.phase = 'rest';
-    resident.task = '창고 길이 막힘';
-  }
-  return true;
-}
-
-function nearestPassableTile(state: GameState, x: number, y: number, maxRadius = 8): Tile | null {
-  for (let radius = 1; radius <= maxRadius; radius++) {
-    for (let ty = y - radius; ty <= y + radius; ty++) {
-      for (let tx = x - radius; tx <= x + radius; tx++) {
-        if (Math.max(Math.abs(tx - x), Math.abs(ty - y)) !== radius) continue;
-        const tile = state.map[ty]?.[tx];
-        if (tile && isPassable(state, tx, ty)) return tile;
-      }
-    }
-  }
-  return null;
-}
-
-export function ensureResidentOnPassableTile(state: GameState, r: Resident): void {
-  const ignored = r.manualOrder?.unauthorizedSiteIds ?? [];
-  if (isPassable(state, r.x, r.y, ignored)) return;
-  const tile = nearestPassableTile(state, r.x, r.y);
-  if (!tile) return;
-  r.x = tile.x;
-  r.y = tile.y;
-  r.px = tile.x;
-  r.py = tile.y;
-  r.path = [];
-}
-
-export function ensureResidentsOnPassableTiles(state: GameState): void {
-  for (const resident of state.residents) {
-    const boat = resident.fishingBoatId == null
-      ? undefined
-      : state.fishingBoats.find(candidate => candidate.id === resident.fishingBoatId && candidate.fisherIds.includes(resident.id));
-    if (resident.alive && !boat) ensureResidentOnPassableTile(state, resident);
-  }
-}
 
 // ─────────────────────────── 채집형 작업 공통 루틴 ───────────────────────────
 
@@ -2101,11 +1199,6 @@ function assignHaulTask(state: GameState, resident: Resident): boolean {
   return false;
 }
 
-function clearHaulTask(resident: Resident): void {
-  resident.haulTask = null;
-  resident.targetId = null;
-  resident.path = [];
-}
 
 function collectHaulLoad(state: GameState, resident: Resident, source: Building): number {
   const task = resident.haulTask;
@@ -3226,15 +2319,6 @@ function undertakerTick(state: GameState, r: Resident, ctx: Ctx): void {
   r.task = '상여 운구';
 }
 
-function nearestBuilding<T extends { x: number; y: number }>(r: Resident, list: T[]): T | null {
-  let best: T | null = null;
-  let bestD = Infinity;
-  for (const b of list) {
-    const d = Math.abs(b.x - r.x) + Math.abs(b.y - r.y);
-    if (d < bestD) { bestD = d; best = b; }
-  }
-  return best;
-}
 
 export function leisureDestinations(state: GameState): Building[] {
   const built = state.buildings.filter(building => building.built);

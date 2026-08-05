@@ -3,7 +3,7 @@ import type { Season, TacticalRouteTerrain, TacticalZoneKind } from '../game/typ
 type TacticalBackgroundKind = 'approach' | 'wall' | 'storehouse' | 'center';
 type OffensiveBackgroundKind = 'banditLair' | 'predatorHunt';
 
-export interface TacticalBackgroundAsset {
+interface TacticalBackgroundAsset {
   src: string;
   size?: string;
   position?: string;

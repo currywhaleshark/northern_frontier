@@ -6,7 +6,7 @@ export const WALL_GATE_ORIENTATIONS = [
   'vertical',
 ] as const;
 
-export type WallGateOrientation = typeof WALL_GATE_ORIENTATIONS[number];
+type WallGateOrientation = typeof WALL_GATE_ORIENTATIONS[number];
 
 export const WALL_GATE_SHEET = {
   tileSize: 28,

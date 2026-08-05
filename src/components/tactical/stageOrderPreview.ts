@@ -1,7 +1,7 @@
 // Phase 4·5 무대 명령/방향 표시 문구 — 명령 종류·전력 페널티·이동 문구는 전부 백엔드
 // preview 계약 값을 그대로 보여주며 여기서 재계산하지 않는다.
 import type {
-  TacticalFacingPreview, TacticalStageAnchor, TacticalStageOrderPreview,
+  TacticalFacingPreview, TacticalStageOrderPreview,
 } from '../../game/tacticalBattle';
 import type { TacticalBattle, TacticalFacing } from '../../game/types';
 import { deploymentLineLabel } from './TacticalDeploymentDock';
@@ -11,11 +11,6 @@ export function stageOrderCommandLabel(command: TacticalStageOrderPreview['comma
   if (command === 'advance') return '전진';
   if (command === 'fallback') return '후퇴';
   return '위치 유지';
-}
-
-export function stageOrderAnchorText(battle: TacticalBattle, anchor: TacticalStageAnchor): string {
-  const zoneName = battle.zones.find(zone => zone.id === anchor.zoneId)?.name ?? anchor.zoneId;
-  return `${zoneName} ${deploymentLineLabel(anchor.line)}`;
 }
 
 /** 확인 카드 제목의 `전열 → 중열` / `숲길 잠입로 → 산채 목책` 표기 — 바뀐 축만 짧게 보여준다 */

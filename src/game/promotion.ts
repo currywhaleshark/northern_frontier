@@ -37,7 +37,7 @@ export function promotionDecreeItem(rank: PromotionRank): SpecialItemId {
   return PROMOTION_DECREE_ITEMS[rank];
 }
 
-export function hasPromotionDecree(state: GameState, rank: PromotionRank): boolean {
+function hasPromotionDecree(state: GameState, rank: PromotionRank): boolean {
   return (state.specialItems[promotionDecreeItem(rank)] ?? 0) > 0;
 }
 

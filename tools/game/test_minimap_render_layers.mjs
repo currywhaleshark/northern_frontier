@@ -1,3 +1,4 @@
+import { readAppCss } from '../app-stylesheets.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -90,7 +91,7 @@ assert.equal(minimapBaseInvalidationKey(base()), stableBaseKey,
   'selection, raid, target pulse, and viewport state must remain outside the base key');
 
 const minimapSource = readFileSync(new URL('../../src/components/Minimap.tsx', import.meta.url), 'utf8');
-const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
+const cssSource = readAppCss();
 assert.match(minimapSource, /baseCanvasRef[\s\S]*overlayCanvasRef/,
   'the minimap must own distinct base and overlay canvases');
 assert.match(minimapSource,

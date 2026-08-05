@@ -1,9 +1,9 @@
 # 전투 확장 3단계 — 우회로 화살표 QA
 
-- source visual truth path: `C:\Users\yurib\AppData\Local\Temp\codex-clipboard-3239d266-864e-40a8-a979-cc2ada6c9b5f.png`
-- implementation screenshot path: `C:\Users\yurib\Documents\New project\northern\docs\qa\combat-expansion-phase-3-route-gates-approach.png`
-- route-stage implementation screenshot path: `C:\Users\yurib\Documents\New project\northern\docs\qa\combat-expansion-phase-3-route-stage-right-exits.png`
-- comparison image path: `C:\Users\yurib\Documents\New project\northern\docs\qa\combat-expansion-phase-3-route-gates-comparison.png`
+- source visual truth path: 사용자가 붙여넣은 주석 이미지 (임시 클립보드 파일, 저장소에 없음)
+- implementation screenshot path: `docs/qa/combat-expansion-phase-3-route-gates-approach.png`
+- route-stage implementation screenshot path: `docs/qa/combat-expansion-phase-3-route-stage-right-exits.png`
+- comparison image path: `docs/qa/combat-expansion-phase-3-route-gates-comparison.png`
 - viewport: 1280 × 720 (구현), 1468 × 550 (사용자 주석 원본)
 - state: 겨울 마을 방어전, 배치 단계, 우측 우회로 개방·적 부대 진입
 
@@ -32,9 +32,9 @@
 ## Comparison history
 
 1. 첫 우측 우회 전장 캡처에서 창고지대 출구 라벨 일부가 전장 미니맵 아래로 들어가는 P2 문제가 있었다.
-   - earlier evidence: `C:\Users\yurib\Documents\New project\northern\docs\qa\combat-expansion-phase-3-route-stage-right-exits-iteration-1.png`
+   - earlier evidence: `docs/qa/combat-expansion-phase-3-route-stage-right-exits-iteration-1.png`
    - fix: 창고지대 끝 출구 묶음을 해당 노드 너비의 36% 지점으로 옮겼다.
-   - post-fix evidence: `C:\Users\yurib\Documents\New project\northern\docs\qa\combat-expansion-phase-3-route-stage-right-exits.png`
+   - post-fix evidence: `docs/qa/combat-expansion-phase-3-route-stage-right-exits.png`
    - result: 화살표와 `창고지대 출구` 라벨이 모두 노출된다.
 
 ## Browser verification

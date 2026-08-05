@@ -1,11 +1,11 @@
-export interface LakeBanks {
+interface LakeBanks {
   n: boolean;
   e: boolean;
   s: boolean;
   w: boolean;
 }
 
-export interface LakeShoreRipple {
+interface LakeShoreRipple {
   edge: keyof LakeBanks;
   offset: number;
   phase: number;

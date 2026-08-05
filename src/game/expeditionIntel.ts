@@ -1,13 +1,13 @@
 import { CONFIG } from './config';
 import type { GameState, PredatorKind, PredatorThreat, TigerTier, WildlifeKind } from './types';
 
-export type EnemyIntelPrecision = 'exact' | 'rough' | 'unknown';
+type EnemyIntelPrecision = 'exact' | 'rough' | 'unknown';
 
-export type ExpeditionIntelTarget =
+type ExpeditionIntelTarget =
   | { kind: 'lairAssault'; siteId: number }
   | { kind: 'predatorHunt'; predatorKind: PredatorKind };
 
-export interface EnemyIntel {
+interface EnemyIntel {
   precision: EnemyIntelPrecision;
   precisionLabel: string;
   sizeText: string;
@@ -15,7 +15,7 @@ export interface EnemyIntel {
   detail: string;
 }
 
-export interface PredatorThreatProfile {
+interface PredatorThreatProfile {
   size: number;
   strength: number;
   tigerTier?: TigerTier;

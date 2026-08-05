@@ -36,7 +36,7 @@ export type ArtifactWeaponId = (typeof ARTIFACT_WEAPON_IDS)[number];
 
 const SPECIAL_ITEM_ID_SET = new Set<string>(SPECIAL_ITEM_IDS);
 
-export function isSpecialItemId(value: unknown): value is SpecialItemId {
+function isSpecialItemId(value: unknown): value is SpecialItemId {
   return typeof value === 'string' && SPECIAL_ITEM_ID_SET.has(value);
 }
 

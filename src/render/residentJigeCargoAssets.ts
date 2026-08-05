@@ -1,11 +1,11 @@
 import type { Gender, JobId } from '../game/types';
 
-export interface ResidentJigeCargoSheet {
+interface ResidentJigeCargoSheet {
   src: string;
   frameSize: number;
 }
 
-export interface ResidentJigeCargoSheetPair {
+interface ResidentJigeCargoSheetPair {
   standard: ResidentJigeCargoSheet;
   highDefinition: ResidentJigeCargoSheet;
 }

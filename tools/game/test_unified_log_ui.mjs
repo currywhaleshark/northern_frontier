@@ -1,9 +1,10 @@
+import { readAppCss } from '../app-stylesheets.mjs';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 
 const appSource = readFileSync(new URL('../../src/GameSession.tsx', import.meta.url), 'utf8');
 const logSource = readFileSync(new URL('../../src/components/UnifiedLog.tsx', import.meta.url), 'utf8');
-const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
+const cssSource = readAppCss();
 
 assert.match(appSource, /<Profiler id="log-boundary"[\s\S]*?<RuntimeVersionBoundary store=\{uiVersionStore\}>[\s\S]*?<UnifiedLog state=\{stateRef\.current\}/,
   'App must render one unified log over the canvas through its management snapshot boundary');

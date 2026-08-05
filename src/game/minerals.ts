@@ -4,7 +4,7 @@ import type { Tile } from './types';
 export type MineralResource = 'stone' | 'iron' | 'silver';
 export type MineralVisualTier = 'trace' | 'small' | 'medium' | 'large' | 'huge';
 
-export interface MineralExtraction {
+interface MineralExtraction {
   resource: MineralResource;
   amount: number;
   remaining: number;

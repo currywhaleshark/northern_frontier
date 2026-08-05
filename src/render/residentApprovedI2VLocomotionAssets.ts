@@ -22,7 +22,7 @@ interface AnimationRow {
   loop: boolean;
 }
 
-export interface ApprovedI2VSourceRect {
+interface ApprovedI2VSourceRect {
   sx: number;
   sy: number;
   sw: number;

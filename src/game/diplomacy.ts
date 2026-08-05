@@ -69,7 +69,7 @@ const CLAIM_ACCORD_LABELS: Record<ClaimZone['kind'], string> = {
   hunting: '사냥터', fishing: '어로 구역', forest: '숲 이용지', field: '경작지 주변', sacred: '금기 구역', passage: '통행로',
 };
 
-export interface ClaimAccordPreview {
+interface ClaimAccordPreview {
   value: number;
   requiredValue: number;
   durationDays: number;
@@ -219,7 +219,7 @@ export function canOpenGiftEnvoy(state: GameState, factionName: string): string 
   return null;
 }
 
-export interface GiftPreview {
+interface GiftPreview {
   value: number;
   relationGain: number;
   repeatedThisYear: boolean;
@@ -244,7 +244,7 @@ export function giftPreview(state: GameState, factionName: string, resource: Res
   };
 }
 
-export interface PactPreview {
+interface PactPreview {
   value: number;
   years: number;
   days: number;
@@ -647,7 +647,7 @@ export function resolveClaimAccordOffer(state: GameState, optionId: string): voi
   }
 }
 
-export interface RaidTipInformant {
+interface RaidTipInformant {
   factionName: string;
   leader: FactionLeader;
   relation: number;

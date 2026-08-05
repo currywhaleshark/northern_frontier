@@ -2,14 +2,14 @@ import { CONFIG } from './config';
 import type { AnimalHabitat, GatheringWorkArea, Terrain, Tile } from './types';
 
 // 서식지 후보 — 숲 덩어리(연결 성분)의 중심. 지도 생성 때 확률로 서식지가 된다.
-export interface HabitatCandidate {
+interface HabitatCandidate {
   x: number;
   y: number;
   radius: number;
   forestTiles: number;
 }
 
-export interface ForestHabitatOptions {
+interface ForestHabitatOptions {
   minTiles: number;
   radius: number;
 }
@@ -183,7 +183,7 @@ export function isHabitatActive(
 }
 
 // 사냥 수확 배율 규칙 — config 값을 호출자가 넘긴다 (이 모듈은 의존성 없이 단독 테스트된다)
-export interface HuntableYieldOptions {
+interface HuntableYieldOptions {
   habitatYieldBase: number;    // 서식지 기본 배율
   habitatYieldPerTile: number; // 서식지 숲 1타일당 가산
   habitatYieldMax: number;
@@ -238,7 +238,7 @@ export function huntableHabitatAtTile(
   return candidates[0] ?? null;
 }
 
-export interface HabitatReserveSummary {
+interface HabitatReserveSummary {
   habitats: number;
   stock: number;
   capacity: number;

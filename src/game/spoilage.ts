@@ -3,9 +3,9 @@ import { getSeason } from './seasons';
 import type { GameState, ResourceId, Season } from './types';
 
 export const SPOILABLE_RESOURCE_IDS = ['fish', 'milk', 'meat', 'eggs', 'vegetables'] as const satisfies readonly ResourceId[];
-export type SpoilableResourceId = typeof SPOILABLE_RESOURCE_IDS[number];
+type SpoilableResourceId = typeof SPOILABLE_RESOURCE_IDS[number];
 
-export interface SpoilageItem {
+interface SpoilageItem {
   resource: SpoilableResourceId;
   stock: number;
   eligibleStock: number;
@@ -15,7 +15,7 @@ export interface SpoilageItem {
   loss: number;
 }
 
-export interface SpoilageReport {
+interface SpoilageReport {
   season: Season;
   cellarCount: number;
   capacity: number;
@@ -39,7 +39,7 @@ export function spoilageStockSnapshot(state: Pick<GameState, 'resources'>): Part
   };
 }
 
-export function cellarCount(state: GameState): number {
+function cellarCount(state: GameState): number {
   return state.buildings.filter(building => building.type === 'cellar' && building.built).length;
 }
 

@@ -17,14 +17,14 @@ export interface StageDragPoint {
   y: number;
 }
 
-export interface StageDragState {
+interface StageDragState {
   dragging: boolean;
   pointerType: string | null;
   position: StageDragPoint | null;
   hoverAnchorId: string | null;
 }
 
-export interface StagePointerDragOptions {
+interface StagePointerDragOptions {
   /** 앵커 판정에 쓸 data 속성 이름 (기본 data-stage-anchor) */
   anchorAttribute?: string;
   disabled?: boolean;
@@ -48,7 +48,7 @@ export interface StagePointerDragOptions {
 const camelize = (attribute: string) =>
   attribute.replace(/^data-/, '').replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
 
-export function findStageDragAnchorId(
+function findStageDragAnchorId(
   x: number,
   y: number,
   anchorAttribute = 'data-stage-anchor',

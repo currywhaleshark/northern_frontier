@@ -1,3 +1,4 @@
+import { readAppCss } from '../app-stylesheets.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,7 +29,7 @@ transpileDirectory(new URL('../../src/game/', import.meta.url), join(rootDir, 'g
 transpileDirectory(new URL('../../src/ui/', import.meta.url), join(rootDir, 'ui'));
 
 const display = await import(pathToFileURL(join(rootDir, 'ui', 'resourceDisplay.mjs')).href);
-const cssSource = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8');
+const cssSource = readAppCss();
 const topBarSource = readFileSync(new URL('../../src/components/TopBar.tsx', import.meta.url), 'utf8');
 const popoverSource = readFileSync(new URL('../../src/components/ResourceBreakdownPopover.tsx', import.meta.url), 'utf8');
 const {

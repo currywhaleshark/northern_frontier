@@ -31,7 +31,7 @@ function activeReligiousWorker(
   return null;
 }
 
-export function hasResidentShaman(state: GameState): boolean {
+function hasResidentShaman(state: GameState): boolean {
   return activeReligiousWorker(state, 'shrine', 'shaman') != null;
 }
 

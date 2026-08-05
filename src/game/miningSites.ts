@@ -5,7 +5,7 @@ import type { Building, GameState, Tile } from './types';
 type MineAnchor = Pick<Building, 'x' | 'y'>;
 type TilePoint = Pick<Tile, 'x' | 'y'>;
 
-export interface MineMineralSummary {
+interface MineMineralSummary {
   deposits: number;
   stone: number;
   iron: number;

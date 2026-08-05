@@ -4,7 +4,7 @@ export type ResidentStatusFilter = 'all' | 'attention' | 'workplace' | 'young' |
 export type ResidentSort = 'arrival' | 'name' | 'health' | 'job' | 'workplace';
 export type ResidentJobFilter = 'all' | 'religious' | JobId;
 
-export interface ResidentListFilters {
+interface ResidentListFilters {
   query: string;
   job: ResidentJobFilter;
   status: ResidentStatusFilter;

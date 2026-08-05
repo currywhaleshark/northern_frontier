@@ -1,6 +1,6 @@
 import type { Terrain } from '../game/types';
 
-export type TerrainCanopyLayer = 'forest' | null;
+type TerrainCanopyLayer = 'forest' | null;
 
 export function terrainCanopyLayer(terrain: Terrain): TerrainCanopyLayer {
   switch (terrain) {

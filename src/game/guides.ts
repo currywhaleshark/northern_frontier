@@ -9,14 +9,14 @@
 import { addLog } from './events';
 import type { BuildingTypeId, GameState, GuideCardEntry, GuideState } from './types';
 
-export type GuideFormat = 'card' | 'modal';
+type GuideFormat = 'card' | 'modal';
 
-export type GuideModuleId =
+type GuideModuleId =
   | 'preservation' | 'livestock' | 'oxen' | 'disaster' | 'fire' | 'diplomacy'
   | 'battle' | 'expedition' | 'beast' | 'mining' | 'chronicle' | 'rename'
   | 'tribute' | 'tannery' | 'coast' | 'saltworks';
 
-export interface GuideModule {
+interface GuideModule {
   id: GuideModuleId;
   title: string;
   /** 로그에 병기하는 한 줄 — 카드를 놓쳐도 이것만은 남는다 */
