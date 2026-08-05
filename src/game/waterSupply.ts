@@ -169,6 +169,7 @@ export function wellWaterStatusAt(
   const width = state.map[0]?.length ?? 0;
   const sample = aquiferSampleAt(
     state.seed, width, state.map.length, x, y, state.worldSetup?.region,
+    state.worldSetup?.effective.resourceDensityMultiplier,
   );
   if (!sample) return null;
   const level = Math.max(0, state.aquiferLevels[sample.vein.id] ?? 0);
@@ -311,7 +312,10 @@ export function dailyAquiferTick(state: GameState): void {
   );
   const drought = isDroughtActive(state);
   const width = state.map[0]?.length ?? 0;
-  const veins = aquiferVeins(state.seed, width, state.map.length, state.worldSetup?.region);
+  const veins = aquiferVeins(
+    state.seed, width, state.map.length, state.worldSetup?.region,
+    state.worldSetup?.effective.resourceDensityMultiplier,
+  );
 
   for (let veinId = 0; veinId < state.aquiferLevels.length; veinId++) {
     const current = Math.max(0, state.aquiferLevels[veinId] ?? 0);

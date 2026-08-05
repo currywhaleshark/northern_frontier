@@ -107,6 +107,7 @@ export function generateMap(
   seed: number,
   dimensions: Readonly<{ width: number; height: number }> = CONFIG.map,
   region: MapRegion = 'plains',
+  resourceDensityMultiplier = 1,
 ): { tiles: Tile[][]; centerX: number; centerY: number } {
   const rng = makeRng(seed);
   const w = Math.max(16, Math.floor(dimensions.width));
@@ -263,9 +264,82 @@ export function generateMap(
   if (lakeRegion || coastRegion) ensureNearbyForest(tiles, centerX, centerY);
   placeNearbyMineralDeposits(tiles, centerX, centerY, rng);
   if (coastRegion) clearCoastalTransitionProps(tiles);
+  applySurfaceResourceDensity(tiles, centerX, centerY, seed, resourceDensityMultiplier);
   ensureForestGrowth(tiles);
 
   return { tiles, centerX, centerY };
+}
+
+function normalizedResourceDensity(value: number): number {
+  return Number.isFinite(value) ? Math.max(0.5, Math.min(1.5, value)) : 1;
+}
+
+function shuffled<T>(values: readonly T[], rng: () => number): T[] {
+  const result = [...values];
+  for (let index = result.length - 1; index > 0; index--) {
+    const other = Math.floor(rng() * (index + 1));
+    [result[index], result[other]] = [result[other], result[index]];
+  }
+  return result;
+}
+
+/**
+ * 본 지도 RNG와 분리한 후처리 스트림. normal(1)은 즉시 반환해 기존 지도와 RNG를 그대로 보존한다.
+ * 저밀도도 중심지 근처의 시작 숲·돌·철 보장은 건드리지 않는다.
+ */
+function applySurfaceResourceDensity(
+  tiles: Tile[][],
+  centerX: number,
+  centerY: number,
+  seed: number,
+  rawMultiplier: number,
+): void {
+  const multiplier = normalizedResourceDensity(rawMultiplier);
+  if (Math.abs(multiplier - 1) < 1e-9) return;
+  const rng = makeRng((seed ^ 0x51f15e5d) >>> 0);
+  const all = tiles.flat();
+  const distance = (tile: Tile): number => Math.abs(tile.x - centerX) + Math.abs(tile.y - centerY);
+
+  const forests = all.filter(tile => tile.terrain === 'forest');
+  const forestTarget = Math.max(12, Math.round(forests.length * multiplier));
+  if (forestTarget < forests.length) {
+    const removable = shuffled(forests.filter(tile => distance(tile) > 18), rng);
+    for (const tile of removable.slice(0, forests.length - forestTarget)) tile.terrain = 'plain';
+  } else if (forestTarget > forests.length) {
+    const candidates = shuffled(all.filter(tile => {
+      if (tile.terrain !== 'plain' || distance(tile) <= 18) return false;
+      if (coastalGroundAt(tiles, tile.x, tile.y) != null) return false;
+      return [-1, 0, 1].some(dy => [-1, 0, 1].some(dx =>
+        (dx !== 0 || dy !== 0) && tiles[tile.y + dy]?.[tile.x + dx]?.terrain === 'forest'));
+    }), rng);
+    for (const tile of candidates.slice(0, forestTarget - forests.length)) tile.terrain = 'forest';
+  }
+
+  const deposits = all.filter(tile => tile.terrain === 'rock');
+  const depositTarget = Math.max(2, Math.round(deposits.length * multiplier));
+  if (depositTarget < deposits.length) {
+    const protectedDistance = CONFIG.minerals.nearbyMaxDistance + 5;
+    const removable = shuffled(deposits.filter(tile => distance(tile) > protectedDistance), rng);
+    for (const tile of removable.slice(0, deposits.length - depositTarget)) {
+      tile.terrain = 'plain';
+      tile.hasIron = false;
+      tile.hasSilver = false;
+      delete tile.mineralRemaining;
+    }
+  } else if (depositTarget > deposits.length) {
+    const candidates = shuffled(all.filter(tile => {
+      if (tile.terrain !== 'mountain' || coastalGroundAt(tiles, tile.x, tile.y) != null) return false;
+      return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
+        const neighbor = tiles[tile.y + dy]?.[tile.x + dx];
+        return neighbor && neighbor.terrain !== 'mountain' && neighbor.terrain !== 'rock' &&
+          !isOpenWaterTerrain(neighbor.terrain);
+      });
+    }), rng);
+    for (const tile of candidates.slice(0, depositTarget - deposits.length)) {
+      const hasIron = rng() < 0.5;
+      setMineralDeposit(tile, hasIron, rollMineralDepositAmount(hasIron, rng));
+    }
+  }
 }
 
 function clearCoastalTransitionProps(tiles: Tile[][]): void {

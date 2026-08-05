@@ -2527,6 +2527,7 @@ function minerTick(state: GameState, r: Resident, ctx: Ctx): void {
       assignedMine.x,
       assignedMine.y,
       state.worldSetup?.region,
+      state.worldSetup?.effective.resourceDensityMultiplier,
     );
     const remaining = sample ? state.oreVeinRemaining[sample.vein.id] ?? 0 : 0;
     if (!sample || remaining <= 0) {

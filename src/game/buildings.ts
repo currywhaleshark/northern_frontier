@@ -574,11 +574,13 @@ export function canPlaceBuildingAt(
   if (type === 'well') {
     return aquiferSampleAt(
       state.seed, state.map[0]?.length ?? 0, state.map.length, x, y, state.worldSetup?.region,
+      state.worldSetup?.effective.resourceDensityMultiplier,
     ) != null;
   }
   if (type === 'deepMine') {
     const sample = oreSampleAt(
       state.seed, state.map[0]?.length ?? 0, state.map.length, x, y, state.worldSetup?.region,
+      state.worldSetup?.effective.resourceDensityMultiplier,
     );
     return sample != null && (state.oreVeinRemaining[sample.vein.id] ?? 0) > 0;
   }
@@ -649,11 +651,13 @@ export function canRelocateBuildingAt(
   if (building.type === 'well') {
     return aquiferSampleAt(
       state.seed, state.map[0]?.length ?? 0, state.map.length, x, y, state.worldSetup?.region,
+      state.worldSetup?.effective.resourceDensityMultiplier,
     ) != null;
   }
   if (building.type === 'deepMine') {
     const sample = oreSampleAt(
       state.seed, state.map[0]?.length ?? 0, state.map.length, x, y, state.worldSetup?.region,
+      state.worldSetup?.effective.resourceDensityMultiplier,
     );
     return sample != null && (state.oreVeinRemaining[sample.vein.id] ?? 0) > 0;
   }

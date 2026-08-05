@@ -28,8 +28,12 @@ function normalizedRegion(region: MapRegion): 'plains' | 'mountain' | 'lake' | '
   return region === 'mountain' || region === 'lake' || region === 'coast' ? region : 'plains';
 }
 
-function cacheKey(seed: number, width: number, height: number, region: MapRegion): string {
-  return `${seed}:${width}:${height}:${normalizedRegion(region)}`;
+function normalizedDensity(value: number): number {
+  return Number.isFinite(value) ? Math.max(0.5, Math.min(1.5, value)) : 1;
+}
+
+function cacheKey(seed: number, width: number, height: number, region: MapRegion, density: number): string {
+  return `${seed}:${width}:${height}:${normalizedRegion(region)}:${normalizedDensity(density).toFixed(4)}`;
 }
 
 function mapMargin(width: number, height: number): number {
@@ -103,8 +107,9 @@ function startingSettlementAquiferCenter(
   width: number,
   height: number,
   region: MapRegion,
+  resourceDensityMultiplier: number,
 ): { x: number; y: number } {
-  const generated = generateMap(seed, { width, height }, region);
+  const generated = generateMap(seed, { width, height }, region, resourceDensityMultiplier);
   return {
     x: Math.min(width - 1, generated.centerX + 1),
     y: Math.min(height - 1, generated.centerY + 1),
@@ -141,9 +146,11 @@ export function aquiferVeins(
   width: number,
   height: number,
   region: MapRegion = 'plains',
+  resourceDensityMultiplier = 1,
 ): readonly SubsurfaceVein[] {
   const resolvedRegion = normalizedRegion(region);
-  const key = cacheKey(seed, width, height, resolvedRegion);
+  const density = normalizedDensity(resourceDensityMultiplier);
+  const key = cacheKey(seed, width, height, resolvedRegion, density);
   const cached = aquiferCache.get(key);
   if (cached) return cached;
   const rng = makeRng((seed ^ 0x4a71f39d) >>> 0);
@@ -172,7 +179,7 @@ export function aquiferVeins(
         (4 + rng() * 3) * Math.min(1.25, areaScale) *
         radiusMultiplier,
       )),
-      capacity: Math.round((90 + rng() * 70) * capacityMultiplier),
+      capacity: Math.round((90 + rng() * 70) * capacityMultiplier * density),
     });
   }
   const riverCenters = riverCenterline(seed, width, height);
@@ -194,10 +201,10 @@ export function aquiferVeins(
         (4 + rng() * 3) * Math.min(1.25, areaScale) *
         radiusMultiplier,
       )),
-      capacity: Math.round((90 + rng() * 70) * capacityMultiplier),
+      capacity: Math.round((90 + rng() * 70) * capacityMultiplier * density),
     });
   }
-  const startingCenter = startingSettlementAquiferCenter(seed, width, height, resolvedRegion);
+  const startingCenter = startingSettlementAquiferCenter(seed, width, height, resolvedRegion, density);
   veins.push({
     id: veins.length,
     cx: startingCenter.x,
@@ -214,9 +221,11 @@ export function oreVeins(
   width: number,
   height: number,
   region: MapRegion = 'plains',
+  resourceDensityMultiplier = 1,
 ): readonly OreVein[] {
   const resolvedRegion = normalizedRegion(region);
-  const key = cacheKey(seed, width, height, resolvedRegion);
+  const density = normalizedDensity(resourceDensityMultiplier);
+  const key = cacheKey(seed, width, height, resolvedRegion, density);
   const cached = oreCache.get(key);
   if (cached) return cached;
   const rng = makeRng((seed ^ 0x6d2b79f5) >>> 0);
@@ -243,7 +252,7 @@ export function oreVeins(
       )),
       capacity: Math.round(
         (mineral === 'iron' ? 420 + rng() * 260 : 560 + rng() * 340) *
-        (resolvedRegion === 'mountain' ? 1.4 : resolvedRegion === 'lake' ? 0.8 : 1),
+        (resolvedRegion === 'mountain' ? 1.4 : resolvedRegion === 'lake' ? 0.8 : 1) * density,
       ),
     };
   });
@@ -258,8 +267,9 @@ export function aquiferSampleAt(
   x: number,
   y: number,
   region: MapRegion = 'plains',
+  resourceDensityMultiplier = 1,
 ): VeinSample<SubsurfaceVein> | null {
-  return strongestSample(aquiferVeins(seed, width, height, region), x, y);
+  return strongestSample(aquiferVeins(seed, width, height, region, resourceDensityMultiplier), x, y);
 }
 
 export function oreSampleAt(
@@ -269,8 +279,9 @@ export function oreSampleAt(
   x: number,
   y: number,
   region: MapRegion = 'plains',
+  resourceDensityMultiplier = 1,
 ): VeinSample<OreVein> | null {
-  const samples = oreVeins(seed, width, height, region)
+  const samples = oreVeins(seed, width, height, region, resourceDensityMultiplier)
     .map(vein => strongestSample([vein], x, y))
     .filter((sample): sample is VeinSample<OreVein> => sample != null)
     .sort((left, right) =>
@@ -284,8 +295,9 @@ export function initialAquiferLevels(
   width: number,
   height: number,
   region: MapRegion = 'plains',
+  resourceDensityMultiplier = 1,
 ): number[] {
-  return aquiferVeins(seed, width, height, region).map(vein => vein.capacity);
+  return aquiferVeins(seed, width, height, region, resourceDensityMultiplier).map(vein => vein.capacity);
 }
 
 export function initialOreVeinRemaining(
@@ -293,16 +305,18 @@ export function initialOreVeinRemaining(
   width: number,
   height: number,
   region: MapRegion = 'plains',
+  resourceDensityMultiplier = 1,
 ): number[] {
-  return oreVeins(seed, width, height, region).map(vein => vein.capacity);
+  return oreVeins(seed, width, height, region, resourceDensityMultiplier).map(vein => vein.capacity);
 }
 
 export function normalizeSubsurfaceState(state: GameState): void {
   const width = state.map[0]?.length ?? 0;
   const height = state.map.length;
   const region = state.worldSetup?.region ?? 'plains';
-  const aquifers = aquiferVeins(state.seed, width, height, region);
-  const ores = oreVeins(state.seed, width, height, region);
+  const density = state.worldSetup?.effective.resourceDensityMultiplier ?? 1;
+  const aquifers = aquiferVeins(state.seed, width, height, region, density);
+  const ores = oreVeins(state.seed, width, height, region, density);
   state.aquiferLevels = aquifers.map(vein => {
     const value = Number(state.aquiferLevels?.[vein.id]);
     return Number.isFinite(value) ? Math.min(vein.capacity, Math.max(0, value)) : vein.capacity;

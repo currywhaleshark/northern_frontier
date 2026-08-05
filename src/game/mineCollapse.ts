@@ -41,6 +41,7 @@ export function mineCollapseDailyChance(state: GameState, mine: Building): numbe
     mine.x,
     mine.y,
     state.worldSetup?.region,
+    state.worldSetup?.effective.resourceDensityMultiplier,
   );
   if (!sample) return 0;
   const remaining = Math.max(0, state.oreVeinRemaining[sample.vein.id] ?? 0);
