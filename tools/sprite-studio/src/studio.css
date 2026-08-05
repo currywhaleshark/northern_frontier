@@ -210,3 +210,48 @@ body {
 .field { display: grid; gap: 3px; }
 .field span { color: var(--muted); font-size: 11px; }
 .field input[type='range'] { width: 100%; }
+
+/* 자산 정리 — 런타임 루트 PNG만 감사하고, 선택한 미사용 후보를 보관함으로 이동한다. */
+.asset-cleanup { display: grid; grid-template-rows: auto auto auto 1fr; min-height: 0; }
+.asset-toolbar, .asset-summary {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 12px; border-bottom: 1px solid var(--border);
+}
+.asset-toolbar > div:first-child { display: grid; gap: 2px; }
+.asset-toolbar .asset-filter { margin-left: auto; width: 170px; }
+.asset-summary { background: #181e24; color: var(--muted); }
+.asset-summary strong { color: var(--accent); }
+.asset-summary .spacer { flex: 1; }
+.btn.danger { border-color: var(--bad); color: var(--bad); }
+.asset-message { padding: 7px 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
+.asset-message.error { color: var(--bad); }
+.asset-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px; padding: 12px; overflow: auto; align-content: start;
+}
+.asset-card {
+  display: grid; gap: 6px; align-content: start;
+  min-width: 0; padding: 8px; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 6px;
+}
+.asset-card.unused { border-color: #71534e; }
+.asset-card.selected { border-color: var(--bad); background: #2b2222; }
+.asset-preview {
+  height: 128px; display: grid; place-items: center; overflow: hidden;
+  border-radius: 4px; background-color: #0e1216;
+  background-image: linear-gradient(45deg, #1d242b 25%, transparent 25%),
+    linear-gradient(-45deg, #1d242b 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #1d242b 75%),
+    linear-gradient(-45deg, transparent 75%, #1d242b 75%);
+  background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+.asset-preview img { max-width: 100%; max-height: 100%; image-rendering: pixelated; object-fit: contain; }
+.asset-card-head { display: flex; align-items: center; gap: 8px; }
+.asset-check { margin-left: auto; display: flex; gap: 4px; align-items: center; color: var(--muted); }
+.asset-status { border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-size: 10px; }
+.asset-status.unused { border-color: var(--bad); color: var(--bad); }
+.asset-status.dynamic { color: #6fb3d2; }
+.asset-status.used { color: #82b47a; }
+.asset-name { font-size: 11px; overflow-wrap: anywhere; }
+.asset-reason, .asset-replacement { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.asset-replacement { color: var(--accent); }

@@ -1,6 +1,14 @@
 import type { CoastalGroundKind } from '../game/tidalFlats';
 import coastalGroundManifest from './coastalGroundManifest.json';
 
+export type SeamlessCoastalGroundKind = CoastalGroundKind;
+
+interface SeamlessCoastalGroundAsset {
+  readonly src: string;
+  readonly size: number;
+  readonly sourceScale: 1 | 2;
+}
+
 interface FrameRect {
   readonly x: number;
   readonly y: number;
@@ -20,6 +28,28 @@ export const COASTAL_GROUND_SHEET = {
 } as const;
 
 export const COASTAL_GROUND_KINDS: readonly CoastalGroundKind[] = materials;
+
+export const COASTAL_SEAMLESS_GROUND_SHEETS: Record<
+  SeamlessCoastalGroundKind,
+  { readonly standard: SeamlessCoastalGroundAsset; readonly highDefinition: SeamlessCoastalGroundAsset }
+> = {
+  mudflat: {
+    standard: { src: '/assets/coastal-mudflat-seamless-v1-standard-448px.png', size: 448, sourceScale: 1 },
+    highDefinition: { src: '/assets/coastal-mudflat-seamless-v1-hd-896px.png', size: 896, sourceScale: 2 },
+  },
+  sand: {
+    standard: { src: '/assets/coastal-sand-seamless-v1-standard-448px.png', size: 448, sourceScale: 1 },
+    highDefinition: { src: '/assets/coastal-sand-seamless-v1-hd-896px.png', size: 896, sourceScale: 2 },
+  },
+  shingle: {
+    standard: { src: '/assets/coastal-shingle-seamless-v1-standard-448px.png', size: 448, sourceScale: 1 },
+    highDefinition: { src: '/assets/coastal-shingle-seamless-v1-hd-896px.png', size: 896, sourceScale: 2 },
+  },
+  rocky: {
+    standard: { src: '/assets/coastal-rocky-seamless-v1-standard-448px.png', size: 448, sourceScale: 1 },
+    highDefinition: { src: '/assets/coastal-rocky-seamless-v1-hd-896px.png', size: 896, sourceScale: 2 },
+  },
+};
 
 export function coastalGroundSourceRect(kind: CoastalGroundKind): FrameRect {
   const index = materials.indexOf(kind);

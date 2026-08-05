@@ -1,0 +1,9 @@
+Use case: stylized-concept
+Asset type: large seamless static pixel-art water texture for a historical settlement game
+Primary request: create a homogeneous top-down river-water material matching the attached reference palette and pixel scale.
+Subject: muted medium blue river water with fine broken current streaks, tiny soft glints, and restrained suspended-silt variation.
+Style/medium: crisp hand-painted pixel art, fine 1–3 pixel detail, no smooth photographic rendering.
+Composition/framing: strict orthographic surface filling the square edge to edge; uniform density; repeat-friendly; no focal point or dominant stripe.
+Lighting/mood: diffuse daylight, low contrast, readable beneath existing animated flow overlays.
+Constraints: fully opaque; static base texture only; similar brightness everywhere.
+Avoid: banks, shore, rocks, plants, fish, foam masses, waterfall, objects, horizon, frame, text, logo, watermark, large waves, broad gradient.

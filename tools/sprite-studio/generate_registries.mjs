@@ -54,6 +54,7 @@ export const SPRITE_DISPLAY_METRIC_KEYS = [
   ...JIGE_JOBS.map(job => `jige.${job}`),
   ...WALK_JOBS.map(job => `walk.${job}`),
   ...WORK_JOBS.map(job => `work.${job}`),
+  'work.fisher.mudflatShellfish',
   ...SALT_MAKER_STATES.map(state => `saltMaker.${state}`),
   'work.farmer.oxPlow',
   'work.farmer.harvest',

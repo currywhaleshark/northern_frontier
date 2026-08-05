@@ -74,6 +74,7 @@ export const SPRITE_DISPLAY_METRIC_KEYS: readonly string[] = [
   "work.undertaker",
   "work.curer",
   "work.potter",
+  "work.fisher.mudflatShellfish",
   "saltMaker.idle",
   "saltMaker.walk",
   "saltMaker.seaIntake",

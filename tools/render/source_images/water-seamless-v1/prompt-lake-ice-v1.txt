@@ -1,0 +1,9 @@
+Use case: stylized-concept
+Asset type: large seamless static pixel-art frozen lake texture for a historical settlement game
+Primary request: create a homogeneous frozen lake surface matching the attached pale blue-gray ice palette and pixel scale.
+Subject: broad still lake ice with fine irregular polygonal hairline cracks, translucent cloudy patches, faint trapped bubbles, and sparse frost speckles.
+Style/medium: crisp restrained pixel art, fine 1–3 pixel detail, no smooth photographic rendering.
+Composition/framing: strict orthographic ice filling the square edge to edge; repeat-friendly; no focal crack or radial impact pattern.
+Lighting/mood: diffuse winter daylight, calmer and slightly bluer than frozen river ice.
+Constraints: fully opaque; static base texture; uniform crack density and brightness.
+Avoid: open water holes, broken floes, snow drifts, footprints, objects, large central crack, black fissures, horizon, frame, text, logo, watermark, broad gradient.

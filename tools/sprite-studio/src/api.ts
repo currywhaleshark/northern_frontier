@@ -63,6 +63,24 @@ export interface StudioData {
   'building-shadows': Record<string, ShadowSettingsEdit>;
 }
 
+export interface AssetAuditEntry {
+  name: string;
+  src: string;
+  bytes: number;
+  dimensions: { width: number; height: number } | null;
+  status: 'used' | 'dynamic' | 'unused';
+  reason: string;
+  references: string[];
+  replacement: string | null;
+}
+
+export interface AssetAudit {
+  generatedAt: string;
+  scope: string;
+  assets: AssetAuditEntry[];
+  summary: { total: number; used: number; dynamic: number; unused: number; unusedBytes: number };
+}
+
 function stripComment<T extends Record<string, unknown>>(value: T): T {
   const { _comment: _ignored, ...rest } = value;
   return rest as T;
@@ -89,4 +107,21 @@ export async function saveRegistry(registry: RegistryName, data: unknown): Promi
   });
   const result = await response.json().catch(() => ({ ok: false, error: '응답을 읽지 못했습니다' }));
   if (!response.ok || !result.ok) throw new Error(result.error ?? '저장에 실패했습니다');
+}
+
+export async function loadAssetAudit(): Promise<AssetAudit> {
+  const response = await fetch('/api/assets/audit');
+  if (!response.ok) throw new Error(`자산 감사를 읽지 못했습니다 (${response.status})`);
+  return response.json();
+}
+
+export async function archiveUnusedAssets(names: string[]): Promise<{ moved: string[]; archiveDir: string }> {
+  const response = await fetch('/api/assets/archive', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ names }),
+  });
+  const result = await response.json().catch(() => ({ ok: false, error: '응답을 읽지 못했습니다' }));
+  if (!response.ok || !result.ok) throw new Error(result.error ?? '자산 정리에 실패했습니다');
+  return result;
 }

@@ -1,0 +1,9 @@
+Use case: stylized-concept
+Asset type: large seamless static pixel-art water texture for a historical settlement game
+Primary request: create a homogeneous calm lake-water material matching the attached blue-gray reference palette and pixel scale.
+Subject: clear muted lake water with very subtle short curved ripplelets, soft diffuse tonal mottling, and sparse tiny glints.
+Style/medium: crisp restrained pixel art, fine 1–3 pixel detail, no smooth photographic rendering.
+Composition/framing: strict orthographic surface filling the square edge to edge; uniform repeat-friendly field; no centered ripple ring or focal point.
+Lighting/mood: quiet diffuse daylight, lower energy and smoother than a river or sea.
+Constraints: fully opaque; static base texture only; existing shoreline ripple animation must remain visually legible above it.
+Avoid: banks, shore, reeds, fish, boats, foam, current direction, large rings, horizon, frame, text, logo, watermark, broad gradient.

@@ -1,0 +1,9 @@
+Use case: stylized-concept
+Asset type: large seamless static pixel-art frozen river texture for a historical settlement game
+Primary request: create a homogeneous frozen river surface matching the attached pale ice palette and pixel scale.
+Subject: cold pale gray-blue river ice with narrow hairline cracks, soft trapped longitudinal streaks, cloudy inclusions, and sparse frost grains.
+Style/medium: crisp restrained pixel art, fine 1–3 pixel lines and clusters, no smooth photographic rendering.
+Composition/framing: strict orthographic ice filling the square edge to edge; repeat-friendly; subtle former-flow direction without a dominant band.
+Lighting/mood: diffuse winter daylight, firm traversable ice, quiet and cold.
+Constraints: fully opaque; static base texture; uniform crack density and brightness.
+Avoid: open water holes, broken floes, snow banks, footprints, objects, large central crack, black fissures, horizon, frame, text, logo, watermark, broad gradient.

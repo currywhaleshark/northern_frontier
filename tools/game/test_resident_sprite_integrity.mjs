@@ -4,8 +4,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 
 const NORMAL_40 = { frameSize: 40, footBaselineTolerance: 6, minTopPadding: 1, minSidePadding: 1 };
-const RAISED_TOOL_40 = { ...NORMAL_40, minTopPadding: 0 };
-const LARGE_64 = { frameSize: 64, footBaselineTolerance: 9, minTopPadding: 1, minSidePadding: 1 };
 const OX_72 = { frameSize: 72, footBaselineTolerance: 11, minTopPadding: 1, minSidePadding: 1 };
 
 const sheets = [
@@ -14,19 +12,14 @@ const sheets = [
   ['resident-woodcutter-load-v1.png', 4, NORMAL_40],
   ['resident-hunter-hunt-v1.png', 2, NORMAL_40],
   ['resident-hunter-locomotion-v1.png', 4, NORMAL_40],
-  ['resident-hunter-load-v1.png', 4, NORMAL_40],
   ['resident-hauler-locomotion-v1.png', 3, NORMAL_40],
-  ['resident-hauler-cart-locomotion-v1.png', 3, LARGE_64],
   ['resident-farmer-till-v1.png', 3, NORMAL_40],
   ['resident-farmer-harvest-v1.png', 3, NORMAL_40],
   ['resident-farmer-ox-plow-v1.png', 3, OX_72],
   ['resident-builder-locomotion-v1.png', 3, NORMAL_40],
-  ['resident-builder-work-v1.png', 4, RAISED_TOOL_40],
   ['resident-miner-locomotion-v1.png', 3, NORMAL_40],
   ['resident-miner-work-v1.png', 3, NORMAL_40],
-  ['resident-miner-load-v1.png', 3, NORMAL_40],
   ['resident-herbalist-locomotion-v1.png', 3, NORMAL_40],
-  ['resident-herbalist-gather-v1.png', 4, NORMAL_40],
 ];
 
 function paeth(a, b, c) {

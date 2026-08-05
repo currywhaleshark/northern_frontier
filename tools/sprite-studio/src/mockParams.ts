@@ -80,6 +80,11 @@ export function previewForKey(key: string): KeyPreview {
       return { params: { ...base, job: job('farmer'), working: true, moving: false, farmerAction: 'harvest' }, label: '농부 수확' };
     case 'work.farmer.till':
       return { params: { ...base, job: job('farmer'), working: true, moving: false, farmerAction: 'till' }, label: '농부 김매기' };
+    case 'work.fisher.mudflatShellfish':
+      return {
+        params: { ...base, job: job('fisher'), working: true, moving: false, fisherAction: 'mudflatShellfish' },
+        label: '어부 갯벌 조개·게 채취',
+      };
     case 'load.hunter':
       return { params: { ...base, job: job('hunter'), moving: true, carryingGame: true }, label: '사냥꾼 사냥감 운반' };
     case 'load.miner':

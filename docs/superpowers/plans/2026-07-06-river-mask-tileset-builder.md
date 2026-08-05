@@ -1,13 +1,19 @@
 # River Mask Tileset Builder Implementation Plan
 
 > **계획 상태:** 완료
-> **상태 갱신:** 2026-07-29 — 마스크 생성·검증·프리뷰와 타일 시트 출력을 완료했다.
+> **상태 갱신:** 2026-08-05 — 기존 둑 마스크를 유지하면서 강 액체·결빙 심리스 수면을 평지와 같은 네이티브 1px 밀도로 보정하고 HD→일반 파생·자산 검사·빌드를 완료했다.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a deterministic Python/Pillow pipeline that creates, validates, and previews 28px Folk Warm river autotiles from fixed connector masks.
 
 **Architecture:** A focused Python module under `tools/terrain/` owns connector definitions, procedural masks, texture sampling, validation, and preview export. The first pass writes generated assets under `docs/assets/terrain/river/generated/` and does not touch runtime renderer code.
+
+**2026-08-05 follow-up:** Runtime river banks still use this mask contract, while the fill area now prefers
+world-aligned `water-river` and `water-river-ice` seamless textures. The old fill cells remain the load-failure
+fallback, and the animated current pass remains unchanged.
+The HD surface frequency is raised fourfold before the standard asset is derived, matching the native
+pixel density of the 56px terrain sheet instead of displaying internally enlarged pixel clusters.
 
 **Tech Stack:** Python 3 from the bundled Codex runtime, Pillow 12.2.0, existing PNG source candidates under `docs/assets/terrain/river/`, Git for task checkpoints.
 

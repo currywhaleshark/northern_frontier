@@ -2,11 +2,12 @@
 // 게임 번들과 분리된 별도 vite 앱이지만, src/render·src/game을 그대로 import해
 // **실제 그리기 코드**로 미리보기를 그린다. 모조 구현은 실물과 어긋나는 순간 툴을 못 믿게 된다.
 import { execFile } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { auditRootSpriteAssets } from './asset-audit.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..', '..');
@@ -82,6 +83,51 @@ function studioApi(): Plugin {
               writeFileSync(path, rollback, 'utf8');
               await runGenerator().catch(() => undefined);
             }
+            res.statusCode = 500;
+            res.end(JSON.stringify({ ok: false, error: String((error as Error).message ?? error) }));
+          }
+        });
+      });
+
+      server.middlewares.use('/api/assets/audit', (_req, res) => {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        try {
+          res.end(JSON.stringify(auditRootSpriteAssets(ROOT)));
+        } catch (error) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ ok: false, error: String((error as Error).message ?? error) }));
+        }
+      });
+
+      server.middlewares.use('/api/assets/archive', (req, res) => {
+        if (req.method !== 'POST') { res.statusCode = 405; res.end('POST only'); return; }
+        const chunks: Buffer[] = [];
+        req.on('data', chunk => chunks.push(chunk as Buffer));
+        req.on('end', () => {
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          try {
+            const { names } = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { names?: unknown };
+            if (!Array.isArray(names) || names.length === 0) throw new Error('정리할 자산을 선택하세요.');
+            const report = auditRootSpriteAssets(ROOT);
+            const unused = new Set(report.assets.filter(asset => asset.status === 'unused').map(asset => asset.name));
+            const selected = [...new Set(names.map(String))];
+            for (const name of selected) {
+              if (name !== name.split(/[\\/]/).pop() || !unused.has(name)) {
+                throw new Error(`현재 미사용으로 검증되지 않은 자산: ${name}`);
+              }
+            }
+            const day = new Date().toISOString().slice(0, 10);
+            const archiveDir = join(ROOT, 'tools', 'render', 'archive', `unused-runtime-assets-${day}`);
+            mkdirSync(archiveDir, { recursive: true });
+            for (const name of selected) {
+              renameSync(join(ROOT, 'public', 'assets', name), join(archiveDir, name));
+            }
+            res.end(JSON.stringify({
+              ok: true,
+              moved: selected,
+              archiveDir: relative(ROOT, archiveDir).replaceAll('\\', '/'),
+            }));
+          } catch (error) {
             res.statusCode = 500;
             res.end(JSON.stringify({ ok: false, error: String((error as Error).message ?? error) }));
           }

@@ -14,18 +14,21 @@ async function loadTs(path) {
 // lakeIce imports seasons, so inline the fixed 12-day seasonal calendar for this standalone render test.
 const lakeIce = readFileSync(new URL('../../src/game/lakeIce.ts', import.meta.url), 'utf8')
   .replace("import { getDayOfSeason, getSeason } from './seasons';", '')
+  .replace("import { isOpenWaterTerrain } from './terrain';", '')
   .replace("import type { Tile } from './types';", '')
   .replace(/Tile\[\]\[\]/g, 'any[][]');
 const combined = `
   const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
   function getSeason(day) { return SEASONS[Math.floor(((Math.max(1, day) - 1) % 48) / 12)]; }
   function getDayOfSeason(day) { return ((Math.max(1, day) - 1) % 12) + 1; }
+  function isOpenWaterTerrain(terrain) { return terrain === 'river' || terrain === 'lake' || terrain === 'sea'; }
   ${lakeIce}`;
 const iceOutput = ts.transpileModule(combined, {
   compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 const ice = await import(`data:text/javascript;base64,${Buffer.from(iceOutput).toString('base64')}`);
 const ripples = await loadTs('../../src/render/lakeShoreRipples.ts');
+const shoreGround = await loadTs('../../src/render/lakeShoreGround.ts');
 
 function map() {
   return Array.from({ length: 5 }, (_, y) => Array.from({ length: 5 }, (_, x) => ({
@@ -50,5 +53,30 @@ assert.deepEqual(north, ripples.lakeShoreRipples({ n: true, e: false, s: false, 
   'same tile and time produce deterministic ripple bands');
 const corner = ripples.lakeShoreRipples({ n: true, e: true, s: false, w: false }, 10, 20, 800, 28);
 assert.deepEqual(corner.map(ripple => ripple.edge), ['n', 'n', 'e', 'e'], 'corner ripples stay attached to both shores');
+
+const noShore = { n: false, e: false, s: false, w: false };
+const northShore = { n: true, e: false, s: false, w: false };
+assert.equal(shoreGround.lakeShoreGroundAt(noShore, 9, 12), null,
+  'deep lake tiles never receive a shore ground material');
+assert.equal(
+  shoreGround.lakeShoreGroundAt(northShore, 9, 12),
+  shoreGround.lakeShoreGroundAt(northShore, 9, 12),
+  'lake shore material selection is deterministic',
+);
+assert.equal(
+  shoreGround.lakeShoreGroundAt(northShore, 9, 12),
+  shoreGround.lakeShoreGroundAt(northShore, 11, 14),
+  'tiles in one 3x3 block share a short shore segment',
+);
+const shoreSamples = [];
+for (let y = 0; y < 96; y++) {
+  for (let x = 0; x < 96; x++) shoreSamples.push(shoreGround.lakeShoreGroundAt(northShore, x, y));
+}
+const mixedSamples = shoreSamples.filter(Boolean);
+assert.ok(mixedSamples.length / shoreSamples.length > 0.3 && mixedSamples.length / shoreSamples.length < 0.46,
+  'only part of the lake shore receives coastal material');
+assert.deepEqual([...new Set(mixedSamples)].sort(), ['rocky', 'sand', 'shingle'],
+  'lake shore mix uses all three non-mudflat materials');
+assert.ok(!mixedSamples.includes('mudflat'), 'mudflat is excluded from lake shores');
 
 console.log('lake ice and shoreline ripple tests passed');

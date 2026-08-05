@@ -64,7 +64,7 @@ const slotRegistry = await import(pathToFileURL(join(renderDir, 'buildingWorkerS
 
   // 코드에 박힌 정적 키는 전부 레지스트리가 아는 키여야 한다.
   // 점이 있는 것만 키로 본다 — 'jige'·'axe' 같은 다른 용도의 짧은 리터럴과 섞이지 않게.
-  const literalPattern = /'((?:i2v|video|jige|walk|work|load|cart|cart-load)(?:\.[A-Za-z]+)+)'/g;
+  const literalPattern = /'((?:i2v|video|jige|walk|work|load|cart|cart-load|saltMaker)(?:\.[A-Za-z]+)+)'/g;
   const literals = new Set([...atlas.matchAll(literalPattern)].map(match => match[1]));
   // 유일한 무점 키인 common은 사용 지점을 직접 확인한다.
   assert.ok(
@@ -81,7 +81,8 @@ const slotRegistry = await import(pathToFileURL(join(renderDir, 'buildingWorkerS
   if (atlas.includes('`i2v.${p.job}`')) dynamicPrefixes.push('i2v.');
   if (atlas.includes('`jige.${p.job}`')) dynamicPrefixes.push('jige.');
   if (atlas.includes('`video.woodcutter.walk.${kind}`')) dynamicPrefixes.push('video.woodcutter.walk.');
-  assert.equal(dynamicPrefixes.length, 3, 'i2v·지게·벌목 보행의 동적 키 3계열이 모두 살아 있다');
+  if (atlas.includes('`saltMaker.${state}`')) dynamicPrefixes.push('saltMaker.');
+  assert.equal(dynamicPrefixes.length, 4, 'i2v·지게·벌목 보행·염부의 동적 키 4계열이 모두 살아 있다');
 
   // 레지스트리가 아는 키는 전부 코드 어딘가에서 쓰여야 한다 (유령 키 방지).
   for (const key of known) {

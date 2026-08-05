@@ -30,6 +30,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--overlap", type=int, default=64)
     parser.add_argument("--candidates", type=int, default=48)
     parser.add_argument("--seed", type=int, default=73021)
+    parser.add_argument("--selection", choices=("cut", "seam"), default="cut")
+    parser.add_argument(
+        "--frequency",
+        type=int,
+        default=1,
+        help=(
+            "Shrink the seamless texture by this integer factor and repeat it "
+            "back to the requested size. This raises detail density while "
+            "preserving a seamless boundary."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -103,6 +114,7 @@ def choose_best_texture(
     overlap: int,
     candidates: int,
     seed: int,
+    selection: str = "cut",
 ) -> tuple[np.ndarray, tuple[int, int], float]:
     window_size = size + overlap
     if source.shape[0] < window_size or source.shape[1] < window_size:
@@ -120,13 +132,17 @@ def choose_best_texture(
     best_texture: np.ndarray | None = None
     best_origin = (0, 0)
     best_score = float("inf")
+    best_rank = (float("inf"), float("inf"))
     for x, y in sorted(origins):
         window = source[y : y + window_size, x : x + window_size]
         texture, score = make_toroidal(window, size, overlap)
-        if score < best_score:
+        _, _, seam_ratio = seam_metrics(texture)
+        rank = (seam_ratio, score) if selection == "seam" else (score, seam_ratio)
+        if rank < best_rank:
             best_texture = texture
             best_origin = (x, y)
             best_score = score
+            best_rank = rank
     assert best_texture is not None
     return best_texture, best_origin, best_score
 
@@ -142,6 +158,27 @@ def seam_metrics(texture: np.ndarray) -> tuple[float, float, float]:
         + np.abs(pixels[1:] - pixels[:-1]).mean()
     ) / 2
     return float(seam), float(internal), float(seam / max(internal, 0.001))
+
+
+def increase_texture_frequency(texture: np.ndarray, frequency: int) -> np.ndarray:
+    if frequency < 1:
+        raise ValueError("frequency must be at least 1")
+    if frequency == 1:
+        return texture
+    height, width = texture.shape[:2]
+    if width % frequency or height % frequency:
+        raise ValueError(
+            f"texture size {width}x{height} must be divisible by frequency {frequency}"
+        )
+    reduced = Image.fromarray(texture, mode="RGB").resize(
+        (width // frequency, height // frequency),
+        Image.Resampling.BOX,
+    )
+    repeated = Image.new("RGB", (width, height))
+    for row in range(frequency):
+        for column in range(frequency):
+            repeated.paste(reduced, (column * reduced.width, row * reduced.height))
+    return np.asarray(repeated)
 
 
 def save_outputs(
@@ -180,7 +217,9 @@ def main() -> None:
         args.overlap,
         args.candidates,
         args.seed + args.season_row,
+        args.selection,
     )
+    texture = increase_texture_frequency(texture, args.frequency)
     save_outputs(texture, args.output_hd, args.output_standard, args.qa)
     seam, internal, ratio = seam_metrics(texture)
     print(

@@ -48,8 +48,15 @@ import {
 } from './fishingPortAssets';
 import {
   COASTAL_GROUND_SHEET,
+  COASTAL_SEAMLESS_GROUND_SHEETS,
   coastalGroundSourceRect,
+  type SeamlessCoastalGroundKind,
 } from './coastalGroundAssets';
+import { lakeShoreGroundAt } from './lakeShoreGround';
+import {
+  WATER_SURFACE_SHEETS,
+  type WaterSurfaceKind,
+} from './waterSurfaceAssets';
 import {
   TIDAL_FISHERY_BUILDING_HD_SHEET,
   TIDAL_FISHERY_BUILDING_SHEET,
@@ -344,6 +351,19 @@ let riverSheet: HTMLImageElement | null = null;
 let historicalTerrainSheet: HTMLImageElement | null = null;
 let historicalTerrainHdSheet: HTMLImageElement | null = null;
 let coastalGroundSheet: HTMLImageElement | null = null;
+const coastalSeamlessGroundSheets: Record<SeamlessCoastalGroundKind, SeamlessGroundPair> = {
+  mudflat: { standard: null, highDefinition: null },
+  sand: { standard: null, highDefinition: null },
+  shingle: { standard: null, highDefinition: null },
+  rocky: { standard: null, highDefinition: null },
+};
+const waterSurfaceSheets: Record<WaterSurfaceKind, SeamlessGroundPair> = {
+  river: { standard: null, highDefinition: null },
+  lake: { standard: null, highDefinition: null },
+  sea: { standard: null, highDefinition: null },
+  riverIce: { standard: null, highDefinition: null },
+  lakeIce: { standard: null, highDefinition: null },
+};
 let tidalFisheryBuildingSheet: HTMLImageElement | null = null;
 let tidalFisheryBuildingHdSheet: HTMLImageElement | null = null;
 let saltworksBuildingSheet: HTMLImageElement | null = null;
@@ -558,6 +578,18 @@ function ensureLoaded(): void {
   loadAtlasAsset('/assets/folk-warm-terrain-v3-28px-sheet.png', true, image => { historicalTerrainSheet = image; });
   loadAtlasAsset('/assets/folk-warm-terrain-v3-56px-sheet.png', true, image => { historicalTerrainHdSheet = image; });
   loadAtlasAsset(COASTAL_GROUND_SHEET.src, true, image => { coastalGroundSheet = image; });
+  for (const kind of ['mudflat', 'sand', 'shingle', 'rocky'] as const) {
+    const assets = COASTAL_SEAMLESS_GROUND_SHEETS[kind];
+    const pair = coastalSeamlessGroundSheets[kind];
+    loadAtlasAsset(assets.standard.src, false, image => { pair.standard = image; });
+    loadAtlasAsset(assets.highDefinition.src, false, image => { pair.highDefinition = image; });
+  }
+  for (const kind of ['river', 'lake', 'sea', 'riverIce', 'lakeIce'] as const) {
+    const assets = WATER_SURFACE_SHEETS[kind];
+    const pair = waterSurfaceSheets[kind];
+    loadAtlasAsset(assets.standard.src, false, image => { pair.standard = image; });
+    loadAtlasAsset(assets.highDefinition.src, false, image => { pair.highDefinition = image; });
+  }
   loadAtlasAsset(TIDAL_FISHERY_BUILDING_SHEET.src, true, image => { tidalFisheryBuildingSheet = image; });
   loadAtlasAsset(TIDAL_FISHERY_BUILDING_HD_SHEET.src, false, image => { tidalFisheryBuildingHdSheet = image; });
   loadAtlasAsset(SALTWORKS_BUILDING_SHEET.src, true, image => { saltworksBuildingSheet = image; });
@@ -1998,6 +2030,32 @@ function activeSeamlessGroundTerrain(
   return null;
 }
 
+function activeCoastalSeamlessGround(
+  kind: SeamlessCoastalGroundKind,
+  highDefinition: boolean | undefined,
+): { image: HTMLImageElement; sourceScale: 1 | 2 } | null {
+  const pair = coastalSeamlessGroundSheets[kind];
+  if (highDefinition && pair.highDefinition) {
+    return { image: pair.highDefinition, sourceScale: 2 };
+  }
+  if (pair.standard) return { image: pair.standard, sourceScale: 1 };
+  if (pair.highDefinition) return { image: pair.highDefinition, sourceScale: 2 };
+  return null;
+}
+
+function activeWaterSurface(
+  kind: WaterSurfaceKind,
+  highDefinition: boolean | undefined,
+): { image: HTMLImageElement; sourceScale: 1 | 2 } | null {
+  const pair = waterSurfaceSheets[kind];
+  if (highDefinition && pair.highDefinition) {
+    return { image: pair.highDefinition, sourceScale: 2 };
+  }
+  if (pair.standard) return { image: pair.standard, sourceScale: 1 };
+  if (pair.highDefinition) return { image: pair.highDefinition, sourceScale: 2 };
+  return null;
+}
+
 const historicalGroundPatterns = new Map<string, HTMLCanvasElement>();
 
 function quiltedGroundPattern(
@@ -2487,6 +2545,27 @@ const SEA_WATER_COLORS: Record<Season, string> = {
   winter: '#376b91',
 };
 
+const WATER_SURFACE_TINTS: Record<'river' | 'lake' | 'sea', Record<Season, string | null>> = {
+  river: {
+    spring: 'rgba(74, 139, 169, 0.24)',
+    summer: null,
+    autumn: 'rgba(97, 156, 178, 0.24)',
+    winter: 'rgba(74, 139, 169, 0.24)',
+  },
+  lake: {
+    spring: 'rgba(50, 108, 145, 0.28)',
+    summer: null,
+    autumn: 'rgba(53, 106, 135, 0.28)',
+    winter: 'rgba(62, 111, 158, 0.28)',
+  },
+  sea: {
+    spring: 'rgba(40, 95, 130, 0.24)',
+    summer: null,
+    autumn: 'rgba(49, 95, 124, 0.28)',
+    winter: 'rgba(55, 107, 145, 0.28)',
+  },
+};
+
 const COAST_GROUND_COLORS: Record<Season, Record<'mudflat' | 'sand' | 'shingle' | 'rocky', string>> = {
   spring: { mudflat: '#75654d', sand: '#a99a73', shingle: '#9c927b', rocky: '#817d70' },
   summer: { mudflat: '#6f5f47', sand: '#b1a078', shingle: '#a3977d', rocky: '#817b6e' },
@@ -2501,9 +2580,15 @@ function drawCoastalGround(
 ): void {
   ctx.fillStyle = COAST_GROUND_COLORS[p.season][kind];
   ctx.fillRect(p.x, p.y, p.size, p.size);
+  const seamless = activeCoastalSeamlessGround(kind, p.highDefinition);
+  if (seamless) {
+    drawWrappedHistoricalGround(ctx, seamless.image, seamless.sourceScale, p);
+  }
   const pattern = quiltedCoastalGroundPattern(kind);
-  if (pattern) {
-    drawWrappedHistoricalGround(ctx, pattern, COASTAL_GROUND_SHEET.sourceScale, p);
+  if (seamless || pattern) {
+    if (!seamless && pattern) {
+      drawWrappedHistoricalGround(ctx, pattern, COASTAL_GROUND_SHEET.sourceScale, p);
+    }
     const tint = p.season === 'spring'
       ? 'rgba(210, 199, 145, 0.07)'
       : p.season === 'autumn'
@@ -2551,9 +2636,13 @@ function drawNaturalWaterTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParam
   const inset = RIVER_BANK_INSET * f;
   const strip = RIVER_BANK_STRIP * f;
   const bankColor = RIVER_BANK_COLORS[p.season];
+  const lakeShoreGround = p.terrain === 'lake'
+    ? lakeShoreGroundAt(nb, p.tileX, p.tileY)
+    : null;
 
   // 1) 땅 밑바탕 — 주변 지형과 같은 시트라 물가 바깥이 이웃 타일과 이어진다
   if (p.terrain === 'sea' && p.coastalGround) drawCoastalGround(ctx, p, p.coastalGround);
+  else if (lakeShoreGround) drawCoastalGround(ctx, p, lakeShoreGround);
   else drawHistoricalGround(ctx, 'plain', p);
   blendGroundEdges(ctx, p);
 
@@ -2572,9 +2661,26 @@ function drawNaturalWaterTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParam
     bh + (nb.n ? strip : 0) + (nb.s ? strip : 0),
   );
 
-  // 3) 물 — 강은 방향성이 있는 시트, 액체 호수는 고요한 단색 수면을 쓴다.
-  // 호수의 움직임은 별도 물가 파문 레이어만 담당해 강물 같은 사선 흐름이 생기지 않는다.
-  if ((p.terrain === 'lake' || p.terrain === 'sea') && !p.frozenRiver) {
+  // 3) 물 — 대형 정적 심리스 수면 위에 기존 강 흐름·호숫가 파문 패스가 별도로 움직인다.
+  const surfaceKind: WaterSurfaceKind = p.frozenRiver
+    ? p.terrain === 'lake' ? 'lakeIce' : 'riverIce'
+    : p.terrain === 'lake' ? 'lake' : p.terrain === 'sea' ? 'sea' : 'river';
+  const waterSurface = activeWaterSurface(surfaceKind, p.highDefinition);
+  if (waterSurface) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(bx, by, bw, bh);
+    ctx.clip();
+    drawWrappedHistoricalGround(ctx, waterSurface.image, waterSurface.sourceScale, p);
+    if (!p.frozenRiver) {
+      const tint = WATER_SURFACE_TINTS[p.terrain as 'river' | 'lake' | 'sea'][p.season];
+      if (tint) {
+        ctx.fillStyle = tint;
+        ctx.fillRect(bx, by, bw, bh);
+      }
+    }
+    ctx.restore();
+  } else if ((p.terrain === 'lake' || p.terrain === 'sea') && !p.frozenRiver) {
     ctx.fillStyle = p.terrain === 'sea' ? SEA_WATER_COLORS[p.season] : LAKE_WATER_COLORS[p.season];
     ctx.fillRect(bx, by, bw, bh);
   } else {
@@ -2606,7 +2712,14 @@ function drawNaturalWaterTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParam
     const bottom = corner === 'se' || corner === 'sw';
     const cx = p.x + (right ? p.size - inset : 0);
     const cy = p.y + (bottom ? p.size - inset : 0);
-    if (groundRect && activeGround) {
+    if (lakeShoreGround) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(cx, cy, inset, inset);
+      ctx.clip();
+      drawCoastalGround(ctx, p, lakeShoreGround);
+      ctx.restore();
+    } else if (groundRect && activeGround) {
       ctx.drawImage(
         activeGround.image,
         groundRect.sx + (right ? groundRect.sw - RIVER_BANK_INSET * srcScale : 0),
@@ -2621,14 +2734,6 @@ function drawNaturalWaterTile(ctx: CanvasRenderingContext2D, p: TerrainDrawParam
     ctx.fillRect(cx, bottom ? cy : cy + inset - strip, inset, strip);
   }
 
-  // 6) 언 강 표시 — 얼음 텍스처 위에 옅은 균열 한 줄 (겨울에 건널 수 있다는 표식)
-  if (p.frozenRiver) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
-    ctx.beginPath();
-    ctx.moveTo(bx + 2 * f, by + bh - 3 * f);
-    ctx.lineTo(bx + bw - 3 * f, by + 2 * f);
-    ctx.stroke();
-  }
 }
 
 // 계절 색조 보정 (지형 레이어에 타일 단위로 적용)

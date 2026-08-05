@@ -1,0 +1,8 @@
+Use case: stylized-concept
+Asset type: large source material for a seamless top-down game terrain texture
+Primary request: Create one square, edge-to-edge sample of a northern shingle beach matching Image 1's rounded pebble material and Image 2's folk-warm terrain pixel texture density.
+Input images: Image 1 is the locked shingle material, pebble scale, and palette reference; Image 2 is the large-scale texture/style and detail-density reference only.
+Composition/framing: strict orthographic top-down surface filling the entire square; uniform detail distribution; no horizon, border, margin, tile outline, focal point, or large landmark.
+Style/medium: warm restrained hand-painted pixel-art terrain texture for a historical strategy game; crisp low-resolution pixel clusters, no smooth photorealism.
+Materials/textures: dense small rounded gray-brown pebbles with restrained size and color variation; no isolated boulders or repeated rows.
+Constraints: fully opaque; repeat-friendly homogeneous material; consistent illumination and color from corner to corner; no embedded objects, vegetation, water, foam, shells, text, grid, cast shadow, vignette, or watermark.

@@ -1,0 +1,9 @@
+Use case: stylized-concept
+Asset type: large seamless static pixel-art water texture for a historical settlement game
+Primary request: create a homogeneous dark northern sea-water material matching the attached deep blue reference palette and pixel scale.
+Subject: dark blue-gray seawater with dense small irregular wind ripplelets, faint short wave crests, and subtle depth variation.
+Style/medium: crisp hand-painted pixel art, fine 1–3 pixel detail, restrained historical game palette.
+Composition/framing: strict orthographic surface filling the square edge to edge; repeat-friendly; no large wave, horizon, or focal point.
+Lighting/mood: cool overcast daylight, slightly rougher and darker than lake water.
+Constraints: fully opaque; static base texture only; similar brightness across all edges.
+Avoid: shoreline, beach, boats, animals, islands, white foam masses, storm swell, horizon, frame, text, logo, watermark, broad gradient.

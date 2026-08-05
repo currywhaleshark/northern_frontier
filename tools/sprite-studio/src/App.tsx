@@ -10,14 +10,16 @@ import { ScaleBench } from './ScaleBench';
 import { StanceStage } from './StanceStage';
 import { BuildingStage, type BuildingLayer } from './BuildingStage';
 import { BoatStage } from './BoatStage';
+import { AssetCleanup } from './AssetCleanup';
 
-type TabId = 'scale' | 'stance' | 'building' | 'boat';
+type TabId = 'scale' | 'stance' | 'building' | 'boat' | 'cleanup';
 
 const TABS: readonly { id: TabId; label: string }[] = [
   { id: 'scale', label: '비율 정렬대' },
   { id: 'stance', label: '작업 자세' },
   { id: 'building', label: '건물' },
   { id: 'boat', label: '선박' },
+  { id: 'cleanup', label: '자산 정리' },
 ];
 
 export function App() {
@@ -74,7 +76,8 @@ export function App() {
     'worker-slots': savedSlots,
   };
   const draft = drafts[registry];
-  const dirty = tab !== 'boat' && data != null && JSON.stringify(draft) !== JSON.stringify(savedDrafts[registry]);
+  const registryEditable = tab !== 'boat' && tab !== 'cleanup';
+  const dirty = registryEditable && data != null && JSON.stringify(draft) !== JSON.stringify(savedDrafts[registry]);
 
   const changeMetric = useCallback((key: string, metric: SpriteDisplayMetric) => {
     setMetrics(current => {
@@ -175,8 +178,8 @@ export function App() {
         )}
         <span className="spacer" />
         <span className={`status${status.includes('실패') ? ' error' : ''}`}>{status}</span>
-        <button type="button" className="btn" onClick={revert} disabled={!dirty}>되돌리기</button>
-        <button type="button" className="btn primary" onClick={save} disabled={!dirty}>저장</button>
+        {registryEditable && <button type="button" className="btn" onClick={revert} disabled={!dirty}>되돌리기</button>}
+        {registryEditable && <button type="button" className="btn primary" onClick={save} disabled={!dirty}>저장</button>}
       </header>
 
       {data == null ? (
@@ -210,8 +213,10 @@ export function App() {
           onSlotsChange={changeSlots}
           animate={animate}
         />
-      ) : (
+      ) : tab === 'boat' ? (
         <BoatStage />
+      ) : (
+        <AssetCleanup />
       )}
     </div>
   );

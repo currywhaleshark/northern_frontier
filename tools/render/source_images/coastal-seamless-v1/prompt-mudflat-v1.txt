@@ -1,0 +1,12 @@
+Use case: stylized-concept
+Asset type: large seamless pixel-art ground texture for a historical settlement game
+Primary request: create a large homogeneous sample of wet northern tidal-flat mud matching the attached reference tile's identity and muted palette.
+Input images: Image 1 is the exact color, pixel-art style, and material reference; expand its mudflat character without copying its small-tile composition.
+Scene/backdrop: strict orthographic top-down ground surface filling the entire image edge to edge.
+Subject: cool gray-brown wet compact mud, shallow irregular tidal rivulets and soft damp streaks, with very sparse tiny shell flecks and occasional short subdued reed stubble.
+Style/medium: crisp hand-painted pixel art, restrained historical game palette, fine 1–3 pixel surface detail, no antialiasing look.
+Composition/framing: uniform repeat-friendly material field with no center, no focal point, no dominant channel crossing the image, and similar density and brightness everywhere.
+Lighting/mood: diffuse overcast light; flat readable ground material; no cast shadows and no directional gradient.
+Color palette: muted wet taupe, cool gray-brown, desaturated dark teal-gray in the shallow rivulets, taken from the reference.
+Constraints: fully opaque square raster; seamless-friendly homogeneous texture; preserve fine pixel detail; edge-to-edge ground only.
+Avoid: horizon, shoreline, open water body, large puddles, large cracks, strong diagonal band, broad light or dark stripe, repeated stamp pattern, plants larger than tiny stubble, animals, people, tools, baskets, buildings, rocks, border, frame, text, logo, watermark, vignette.

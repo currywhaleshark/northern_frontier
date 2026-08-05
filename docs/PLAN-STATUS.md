@@ -27,7 +27,7 @@
 | [채광갱과 지하 광맥](DESIGN-2026-07-28-deep-mining.md) | 완료 | M1~M4와 2×2 채광갱 계절 아트·표준/HD 연결·표적 검증 완료 |
 | [재해 확장](DESIGN-2026-07-28-disasters.md) | 완료 | D0~D9·U6 완료. 기후 연동 재해, 화재 진화, 갱도 붕괴 전조·매몰·구조까지 표적 회귀와 빌드로 검증 |
 | [정기거래 계약](DESIGN-2026-07-28-recurring-trade.md) | 완료 | 계약 전 과정·UI·경보와 체결 불가 사유 중앙 플로트까지 반영 |
-| [스프라이트 스튜디오 설계](DESIGN-2026-07-28-sprite-studio.md) | 완료 | 레지스트리 5종, 편집 UI, 작업자 슬롯까지 P0~P6 구현 |
+| [스프라이트 스튜디오 설계](DESIGN-2026-07-28-sprite-studio.md) | 완료 | 레지스트리 5종·편집 UI·작업자 슬롯과 루트 배포 PNG의 미사용 감사·보관함 정리까지 구현 |
 | [착용 장비와 가죽 경제](DESIGN-2026-07-28-wearables-and-footwear.md) | 완료 | 의복·신발 착용, 마모, 제작, 저장, UI 반영. 사망 회수 없음은 확정 범위 |
 | [우물과 급수](DESIGN-2026-07-28-wells-and-water.md) | 완료 | 내륙·시작 수맥, 복수 우물·공정 배분·레이어·우물 아트·U6 화재 F0~F3와 U5 농수로(강 연결·논 판정·통행·절차형 렌더), U2 배치 예상 산출 문구를 실제 급수 계산 재사용으로 완료 |
 | [연대기 화면](DESIGN-2026-07-29-chronicle-screen.md) | 완료 | C1~C4 구현·검증 완료 (v43). 행정단위 표기(촌·보·진·부)와 상단바·저장 슬롯 표기가 범위 외 추가로 반영됨 |
@@ -62,7 +62,7 @@
 | [외교 활동 E3 습격 귀띔 구현계획](IMPLEMENTATION-2026-07-30-diplomatic-actions-e3.md) | 완료 | 관계 70 문턱·타 세력 제외·결정적 제보자·성향 대사·협박 거절 후 warned 전파를 표적 테스트와 빌드로 검증 |
 | [외교 활동 E4 근접 경고 구현계획](IMPLEMENTATION-2026-07-30-diplomatic-actions-e4.md) | 완료 | P0~P3: 경계 밖 2칸 완충의 건물/3일 작업, 발견 거점 외곽 3칸의 3일 배회, 세력×사유 dedupe·4일 약한 압박·중앙 플로트·v50 저장을 E4/E2 표적 회귀와 빌드로 검증 |
 | [외교 활동 E5 생활권 협정 구현계획](IMPLEMENTATION-2026-07-30-diplomatic-actions-e5.md) | 완료 | `gpt-5.6-terra / high`: 구역별 사절·반경/관계 가격·연간 권리, 통행/사냥 허가 통합·길/교역 정합, 경고/항의 수습과 v51 저장을 E5/E4/E2 표적 회귀·빌드로 검증 |
-| [스프라이트 스튜디오 구현계획](IMPLEMENTATION-2026-07-28-sprite-studio.md) | 완료 | P8까지 완료. 위쪽은 노두 뒤, 좌우·아래쪽은 노두 앞이라는 인접 채광 가림 순서를 게임·탭 B 공통 계산과 네 방향 실화면으로 검증 |
+| [스프라이트 스튜디오 구현계획](IMPLEMENTATION-2026-07-28-sprite-studio.md) | 완료 | P9까지 완료. 인접 채광 가림 공통화에 더해 루트 PNG 189개의 직접·동적 참조 감사와 안전한 보관함 이동을 검증 |
 | [어장·어선·출어 설계](DESIGN-2026-08-02-fishing-boats.md) | 완료 | F0~F5와 선박 개체화 완료. 포구 양측 2슬롯·선박당 어부 최대 2명·배무이터 앞 건조 후 지정 슬롯 진수·개별 선박 선택/정보 UI·하단 원 선택 표시를 v61 저장과 F2~F4 표적 테스트·빌드로 검증했으며, 기존 한선형 어선·복합 포구·어장 아이콘·최대 줌 HD 자산 계약도 유지함 |
 | [빗물 저수조 설계](DESIGN-2026-08-03-rainwater-cistern.md) | 미착수 | 해안·산지 물 부족의 보완재 — 강우 적립·하루 공급 상한·가뭄 취약 저수조 W1~W3 설계. 우물 대체 금지가 경계 |
 | [새 게임 설정 개편 설계](DESIGN-2026-08-01-new-game-setup.md) | 완료 | S0~S6 완료. 4지역·3크기와 시작 물자·통합 자원 밀도·기후 혹독도·위협의 단계 설정을 지도·경제·날씨·저장에 연결하고 고정 길잡이·84개 core·UI 회귀·빌드로 검증 |
@@ -70,9 +70,9 @@
 | [새 게임 설정 S0+S1 구현계획](IMPLEMENTATION-2026-08-02-new-game-setup-s0-s1.md) | 완료 | `NewGameOptions`·`worldSetup`, v57 저장, 메뉴/설정 화면과 결정론·구 저장·튜토리얼 회귀를 구현하고 78개 core·빌드·UI 스모크 통과 |
 | [새 게임 설정 S2 지도 크기 구현계획](IMPLEMENTATION-2026-08-02-new-game-setup-s2-map-sizes.md) | 완료 | 56²·72²·96² 생성·선택 UI, 중형 RNG 보존, 실제 행렬 기반 저장 보정과 다중 시드·79개 core·성능·실화면 검증 완료 |
 | [새 게임 설정 S3 산지 구현계획](IMPLEMENTATION-2026-08-02-new-game-setup-s3-mountain-region.md) | 완료 | 광상 장벽·인접 채광·광부 가림과 산 돌출부의 자연수·외부 거점 침범 방지 마스크를 전용 회귀·빌드·실화면으로 검증 |
-| [새 게임 설정 S4 호수 구현계획](IMPLEMENTATION-2026-08-02-new-game-setup-s4-lake-region.md) | 완료 | 큰 연결 호수·지역 자원 프로필·자연 급수·무홍수·호숫가 파문·점진 결빙/해빙을 core 82/82·빌드·실화면으로 검증 |
+| [새 게임 설정 S4 호수 구현계획](IMPLEMENTATION-2026-08-02-new-game-setup-s4-lake-region.md) | 완료 | 큰 연결 호수·자연 급수·호숫가 파문과 액체/결빙·부분 호반 심리스 재질을 평지와 같은 네이티브 1px 밀도로 보정하고 결빙 진행·표적 회귀·빌드로 검증 |
 | [새 게임 설정 S5 해안 구현계획](IMPLEMENTATION-2026-08-03-new-game-setup-s5-coast-region.md) | 완료 | 남쪽 연속 바다·자염막·염부와 자동 소금 운반을 구현하고, 골간 우디캐 외 교역 세력의 소금 매입·희소품 가치 3.2로 물·일반 자원 부족을 수출로 보완 |
-| [해안 전이 지형과 갯벌 어로 구현계획](IMPLEMENTATION-2026-08-03-coastal-transition-tidal-flat.md) | 완료 | 무지물·건축 금지 모래/갯벌, 첫 내륙 평지 자염막, `mudflat` 공동 비축·어살터·숲식 해안 이음매, 염부의 실제 취수 왕복·전측면 HD-first v2 시트와 갯벌 조개·게 채취 어부의 남녀 쪼그린 4프레임 작업 시트를 지형·UI·스프라이트 검사·빌드·실화면으로 검증 |
+| [해안 전이 지형과 갯벌 어로 구현계획](IMPLEMENTATION-2026-08-03-coastal-transition-tidal-flat.md) | 완료 | 갯벌·모래·자갈·암반 4종과 정적 바다 심리스 수면을 평지와 같은 네이티브 1px 밀도로 보정하고 `mudflat` 비축·어살터·염부·갯벌 어부 자산을 회귀·빌드로 검증 |
 | [디버그 치트 패널 설계](DESIGN-2026-08-03-debug-cheat-panel.md) | 완료 | 8개 섹션 백틱 토글 패널과 단일 조작 모듈 `game/debugActions`, DEV 게이트+지연 import로 프로덕션 무포함, `debugTouched` 표식과 모달·전투 중 파괴적 조작 잠금을 실기동·전용 회귀·빌드로 검증. 공성 강제 개시는 방어 개편 P5 이후, 저장 슬롯 표식 표시는 후속 |
 | [밸런스 편집기 설계](DESIGN-2026-08-03-balance-editor.md) | 완료 | B1~B4 구현. 오버레이 병합(`balanceOverlay`+생성 `balanceOverrides`)을 config.ts·buildings.ts 본문에서 끝내 게임·테스트가 같은 값을 보고, 별도 앱 `edit:balance`가 CONFIG·BUILDING_DEFS 2219개 항목을 자동 폼·주석 동반·반영 시점 배지·변경 하이라이트로 편집한다. 흡수용 diff 내보내기 포함. 오버레이 프리셋과 리로드 없는 "다시 읽기"는 후속 |
 | [채집 영역 체제 설계](DESIGN-2026-08-01-gathering-zones.md) | 완료 | G1~G4 완료. 작업영역·거점 배정·숙식 움막과 사냥터 비축 보정을 검증했으며, 어부의 영역·비축 편입은 통합 어장·어선 설계 F0~F4로 이관 |
@@ -95,7 +95,7 @@
 | [민병 실제 전투](superpowers/plans/2026-07-06-militia-real-battle.md) | 완료 | 소집에서 실제 전투로 이어지는 흐름 구현 |
 | [플레이어 주도 교역](superpowers/plans/2026-07-06-player-initiated-trade.md) | 완료 | 세력 탭·장터 거래 시작과 협상 구현 |
 | [승격·화약 로드맵](superpowers/plans/2026-07-06-promotion-and-gunpowder-roadmap.md) | 완료 | 승격, 청원·화기, 화약·의심, 전투 연계까지 후속 구현됨 |
-| [River Mask Tileset Builder](superpowers/plans/2026-07-06-river-mask-tileset-builder.md) | 완료 | 마스크 생성·검증·프리뷰·시트 출력 완료 |
+| [River Mask Tileset Builder](superpowers/plans/2026-07-06-river-mask-tileset-builder.md) | 완료 | 둑 마스크·폴백 시트를 유지하며 강 액체/결빙 심리스 바탕을 평지와 같은 네이티브 1px 밀도로 보정하고 기존 흐름 패스·자산 회귀·빌드 검증 |
 | [Agent Loiter Farming](superpowers/plans/2026-07-07-agent-loiter-farming.md) | 완료 | 작업자가 지정 경작지에 머무는 동작과 테스트 반영 |
 | [보 등급 해금](superpowers/plans/2026-07-07-bo-rank-unlocks.md) | 완료 | 보 등급 건물·직업 해금 구현 |
 | [교량 등급](superpowers/plans/2026-07-07-bridge-tier.md) | 완료 | 교량 배치·등급 규칙 반영 |
