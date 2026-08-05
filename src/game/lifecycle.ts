@@ -3,14 +3,18 @@
 // 새해마다 1살씩만 먹는다(비대칭 — 압축 노화는 개국공신을 너무 일찍 데려간다).
 // 계획: docs/superpowers/plans/2026-07-17-marriage-birth-growth.md
 import { withJosa } from './josa';
-import { BUILDING_DEFS, cemeteryPlotCapacity } from './buildings';
+import { BUILDING_DEFS, cemeteryPlotCapacity, computeDefense } from './buildings';
 import { CONFIG } from './config';
 import { addLog } from './events';
 import { edictElderDeathMultiplier } from './edicts';
 import { settleEducationOnAdulthood } from './education';
-import { residentMonkBurialBonus } from './morale';
+import { returnResidentCart } from './equipment';
+import { detachDepartingResidentFromFamily } from './family';
+import {
+  residentMonkBurialBonus, settlementMoraleBirthMultiplier, settlementMoraleDepartureChance,
+} from './morale';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
-import { killResident, livingResidents, rollResidentName } from './residents';
+import { killResident, livingResidents, reconcileResidentHomes, rollResidentName } from './residents';
 import { residentLogName } from './residentLogName';
 import { getDayOfYear, getSeason } from './seasons';
 import { assignedWorkers } from './workerSlots';
@@ -199,7 +203,7 @@ function openWeddingChoice(state: GameState, a: Resident, b: Resident): void {
       {
         id: 'feast',
         label: '잔치를 연다',
-        desc: `식량 ${withJosa(l.weddingFeastFood, '을/를')} 들여 온 마을이 먹고 마십니다. 전 주민 사기 +${l.weddingFeastMorale}.`,
+        desc: `식량 ${withJosa(l.weddingFeastFood, '을/를')} 들여 온 마을이 먹고 마십니다. 전 주민 민심 +${l.weddingFeastMorale}.`,
         disabled: !canFeast,
         disabledReason: canFeast ? undefined : '잔치를 벌일 식량이 없습니다',
       },
@@ -297,6 +301,9 @@ function tryBirths(state: GameState, rng: () => number): void {
     >= livingResidents(state).length * CONFIG.needs.foodPerDay * l.birthFoodDaysRequired;
   if (!foodOk) return;
   const living = livingResidents(state);
+  const averageMorale = living.reduce((sum, resident) => sum + resident.morale, 0) /
+    Math.max(1, living.length);
+  const moraleMultiplier = settlementMoraleBirthMultiplier(averageMorale);
   const warmthAvg = living.reduce((sum, r) => sum + r.warmth, 0) / Math.max(1, living.length);
   if (warmthAvg < l.birthWarmthRequired) return;
 
@@ -309,7 +316,7 @@ function tryBirths(state: GameState, rng: () => number): void {
     if (father.homeBuildingId !== mother.homeBuildingId) continue; // 같은 집에 살아야 한다
     if (childCountOf(state, mother) >= l.maxChildrenPerCouple) continue;
 
-    let chance = l.birthDailyChance;
+    let chance = l.birthDailyChance * moraleMultiplier;
     const home = state.buildings.find(building => building.id === mother.homeBuildingId);
     if (home && homeOccupancy(state, home.id) + l.childBedShare > BUILDING_DEFS[home.type].capacity) {
       chance *= l.birthHousingFullMult; // 집이 꽉 차면 아기가 잘 안 생긴다
@@ -323,6 +330,70 @@ function tryBirths(state: GameState, rng: () => number): void {
     mother.birthRecoveryUntil = state.day + l.birthRecoveryDays + winterExtra;
     addLog(state, `${withJosa(residentLogName(mother), '이/가')} ${baby.gender === 'male' ? '사내' : '계집'}아이를 낳았습니다. 이름은 ${baby.name}.`, 'good', true);
   }
+}
+
+function householdForDeparture(state: GameState, anchor: Resident): Resident[] {
+  const living = livingResidents(state);
+  const ids = new Set<number>([anchor.id]);
+  const spouse = anchor.spouseId == null ? null : living.find(resident => resident.id === anchor.spouseId);
+  if (spouse) ids.add(spouse.id);
+  for (const child of living) {
+    if (!child.stage) continue;
+    if ((child.motherId != null && ids.has(child.motherId)) ||
+        (child.fatherId != null && ids.has(child.fatherId))) ids.add(child.id);
+  }
+  return living.filter(resident => ids.has(resident.id));
+}
+
+function tryMoraleDeparture(state: GameState, rng: () => number): void {
+  if (state.scenario || state.gameOver || state.pendingChoice || state.battle) return;
+  const living = livingResidents(state);
+  const minimumRemaining = CONFIG.satisfaction.departureMinimumRemainingPopulation;
+  if (living.length <= minimumRemaining) return;
+  const averageMorale = living.reduce((sum, resident) => sum + resident.morale, 0) / living.length;
+  const departureChance = settlementMoraleDepartureChance(averageMorale);
+  if (departureChance <= 0 || rng() >= departureChance) return;
+
+  const absentIds = new Set([
+    ...(state.expedition?.memberIds ?? []),
+    ...(state.warDispatch?.memberIds ?? []),
+  ]);
+  const households = new Map<string, Resident[]>();
+  for (const resident of living) {
+    if (resident.stage || resident.special || resident.fishingBoatId != null ||
+        resident.trappedInMineId != null || absentIds.has(resident.id)) continue;
+    const household = householdForDeparture(state, resident);
+    if (household.some(member => member.special || member.fishingBoatId != null ||
+      member.trappedInMineId != null || absentIds.has(member.id))) continue;
+    if (living.length - household.length < minimumRemaining) continue;
+    const key = household.map(member => member.id).sort((a, b) => a - b).join(',');
+    households.set(key, household);
+  }
+  const candidates = [...households.values()];
+  if (candidates.length === 0) return;
+  const departing = candidates[Math.floor(rng() * candidates.length)];
+  const departingIds = new Set(departing.map(resident => resident.id));
+  for (const resident of departing) {
+    delete state.weaponAssignments[resident.id];
+    delete state.mountAssignments[resident.id];
+    returnResidentCart(state, resident);
+    detachDepartingResidentFromFamily(state, resident);
+  }
+  for (const boat of state.fishingBoats) {
+    boat.fisherIds = boat.fisherIds.filter(residentId => !departingIds.has(residentId));
+  }
+  state.residents = state.residents.filter(resident => !departingIds.has(resident.id));
+  reconcileResidentHomes(state, rng);
+  state.resources.defense = computeDefense(state);
+  const anchor = departing[0];
+  addLog(
+    state,
+    departing.length === 1
+      ? `${withJosa(residentLogName(anchor), '이/가')} 흉흉한 민심을 견디지 못하고 마을을 떠났습니다.`
+      : `${residentLogName(anchor)}네 ${departing.length}명이 흉흉한 민심을 견디지 못하고 마을을 떠났습니다.`,
+    'bad',
+    true,
+  );
 }
 
 // ── 장례 ────────────────────────────────────────────────
@@ -483,6 +554,7 @@ function reconcileCarriedCorpses(state: GameState): void {
 export function lifecycleDailyTick(state: GameState, rng: () => number): void {
   growStages(state);
   ageResidents(state, rng);
+  tryMoraleDeparture(state, rng);
   tryMarriage(state, rng);
   tryBirths(state, rng);
   reconcileCarriedCorpses(state);

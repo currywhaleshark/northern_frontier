@@ -136,7 +136,7 @@ function prepareBuildableLandTile(state, type) {
   assert.equal(canPetition(state), null);
 }
 
-// ── 사치품: 청원으로 재고를 받고, 사용할 때만 사기가 오른다 ──
+// ── 사치품: 청원으로 재고를 받고, 사용할 때만 민심이 오른다 ──
 {
   const state = simulation.newGame(11);
   state.rank = 'jin';

@@ -69,6 +69,13 @@ assert.match(readmeSource, /`Space` \| 일시정지/);
 assert.match(readmeSource, /효과음\(SE\)과 배경 음악\(BGM\)/);
 assert.doesNotMatch(topBarSource, /onClick=\{onSave\}|onClick=\{onLoad\}|onClick=\{onNewGame\}/,
   'save, load, and new game must no longer be direct TopBar actions');
+assert.match(topBarSource, /title=\{moraleTooltip\}>평균 민심/,
+  'the compact TopBar morale value exposes its effects through hover text');
+assert.doesNotMatch(topBarSource, /평균 사기/,
+  'settlement sentiment is consistently named 민심 rather than tactical 사기');
+for (const effect of ['자원 산출·치료 민심 배율', '출산 확률 민심 배율', '주민 이탈']) {
+  assert.ok(topBarSource.includes(effect), `the morale tooltip explains ${effect}`);
+}
 assert.match(gameMenuSource, />저장<[\s\S]*>불러오기<[\s\S]*>새 게임<[\s\S]*>설정</);
 assert.match(canvasSource, /onWheel=\{handleWheel\}/);
 assert.match(canvasSource, /resetZoom[\s\S]*requestZoom\(1\)/);

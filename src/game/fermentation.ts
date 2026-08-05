@@ -147,7 +147,7 @@ export function updateFermentation(state: GameState): FermentationReport {
     );
   }
   if (report.completedKimchi > 0) {
-    // 현판은 완성품만 늘린다. 공동 작업 사기와 옹기 회수는 원래 담근 양을 따른다.
+    // 현판은 완성품만 늘린다. 공동 작업 민심과 옹기 회수는 원래 담근 양을 따른다.
     const completedOnggi = completedKimchiBase / CONFIG.fermentation.kimchiOutputPerOnggi;
     const morale = completedOnggi * CONFIG.fermentation.kimjangMoralePerOnggi;
     for (const resident of state.residents) {
@@ -155,7 +155,7 @@ export function updateFermentation(state: GameState): FermentationReport {
     }
     addLog(
       state,
-      `김치 ${withJosa(report.completedKimchi.toFixed(0), '이/가')} 익었습니다. 옹기 ${recoveredKimchiOnggi.toFixed(1)}개를 되찾고 주민 사기 +${morale.toFixed(1)}.`,
+      `김치 ${withJosa(report.completedKimchi.toFixed(0), '이/가')} 익었습니다. 옹기 ${recoveredKimchiOnggi.toFixed(1)}개를 되찾고 주민 민심 +${morale.toFixed(1)}.`,
       'good',
       true,
     );

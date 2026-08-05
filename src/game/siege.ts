@@ -682,6 +682,6 @@ export function processSiegeDay(state: GameState): void {
       resident.health = Math.max(1, resident.health - CONFIG.siege.coldNoFuelHealthLoss);
       resident.morale = Math.max(0, resident.morale - CONFIG.siege.coldNoFuelMoraleLoss);
     }
-    addLog(state, '성내 땔감이 바닥나 추위가 주민의 건강과 사기를 깎고 있습니다.', 'bad', true);
+    addLog(state, '성내 땔감이 바닥나 추위가 주민의 건강과 민심을 깎고 있습니다.', 'bad', true);
   }
 }

@@ -219,7 +219,7 @@ export function setEdictLevel(state: GameState, id: EdictId, level: EdictLevel):
     );
   }
 
-  // 조령모개(朝令暮改) — 최소 유지 기간 안의 강제 변경은 사기와 명성을 깎는다
+  // 조령모개(朝令暮改) — 최소 유지 기간 안의 강제 변경은 민심과 명성을 깎는다
   if (whiplashDays > 0 && previousLevel !== level) {
     state.edictWhiplashUntil = state.day + EDICT_CFG.whiplashDays;
     state.resources.reputation = Math.max(0, state.resources.reputation + EDICT_CFG.whiplashReputation);

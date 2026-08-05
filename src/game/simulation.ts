@@ -1450,7 +1450,7 @@ export function useLuxuryGood(state: GameState, resource: ResourceId): string | 
   for (const resident of livingResidents(state)) {
     resident.morale = Math.min(100, resident.morale + CONFIG.petition.luxuryMorale);
   }
-  addLog(state, `${withJosa(RESOURCE_NAMES[resource], '을/를')} 나누어 주민들의 사기를 북돋았습니다.`, 'good');
+  addLog(state, `${withJosa(RESOURCE_NAMES[resource], '을/를')} 나누어 주민들의 민심을 북돋았습니다.`, 'good');
   return null;
 }
 

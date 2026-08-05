@@ -481,11 +481,11 @@ export type ReligiousVocation = 'shaman' | 'monk';
 export interface MoraleFactor {
   id: string;
   label: string;
-  delta: number;      // 목표 사기 기여 (+만족 / -불만)
+  delta: number;      // 목표 민심 기여 (+만족 / -불만)
   unlocked: boolean;  // 현 티어에서 기대 항목인지 (잠긴 항목은 계산 제외)
 }
 
-// 매장을 기다리는 시신. 방치가 길어지면 마을 사기가 상한다.
+// 매장을 기다리는 시신. 방치가 길어지면 마을 민심이 상한다.
 export interface Corpse {
   id: number;
   name: string;
@@ -2170,7 +2170,7 @@ export interface GameState {
   suspicion: number;                  // 0~100
   // ── 절목 (구버전 저장에는 없음 = 전부 평시) ──
   edicts?: Partial<Record<EdictId, EdictState>>;
-  edictWhiplashUntil?: number;        // 조령모개 사기 페널티 종료일
+  edictWhiplashUntil?: number;        // 조령모개 민심 페널티 종료일
   nitrePaused: boolean;               // 염초장 가동 중지 토글 (플레이어)
   nitreHiddenUntil: number;           // 감찰 은닉: 이 날까지 염초장이 멈춘다
   initiatedTradeDays: number[];       // 최근 플레이어 주도 교역 성사일 (월경 교역 혐의)

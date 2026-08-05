@@ -19,7 +19,7 @@ interface PetitionOffer {
   label: string;
   desc: string;
   gives?: Partial<Record<ResourceId, number>>;
-  morale?: number;    // 사치품: 전 주민 사기 상승
+  morale?: number;    // 사치품: 전 주민 민심 상승
   cannon?: boolean;   // 불랑기포 배치권 +1
 }
 
@@ -56,17 +56,17 @@ export const PETITION_OFFERS: PetitionOffer[] = [
   },
   {
     id: 'porcelain', minRank: 'jin', repMin: 45, repCost: 6,
-    label: '자기를 청한다', desc: '교역과 사기 진작에 쓸 자기를 청한다.',
+    label: '자기를 청한다', desc: '교역과 민심 진작에 쓸 자기를 청한다.',
     gives: { porcelain: 2 },
   },
   {
     id: 'brassware', minRank: 'jin', repMin: 45, repCost: 6,
-    label: '유기를 청한다', desc: '교역과 사기 진작에 쓸 유기를 청한다.',
+    label: '유기를 청한다', desc: '교역과 민심 진작에 쓸 유기를 청한다.',
     gives: { brassware: 2 },
   },
   {
     id: 'lacquerware', minRank: 'jin', repMin: 45, repCost: 6,
-    label: '칠기를 청한다', desc: '교역과 사기 진작에 쓸 칠기를 청한다.',
+    label: '칠기를 청한다', desc: '교역과 민심 진작에 쓸 칠기를 청한다.',
     gives: { lacquerware: 2 },
   },
   {
@@ -119,7 +119,7 @@ function offerDesc(state: GameState, offer: PetitionOffer): string {
     parts.push(Object.entries(offer.gives)
       .map(([res, amt]) => `${RESOURCE_NAMES[res as ResourceId]} +${petitionResourceAmount(state, amt)}`).join(', '));
   }
-  if (offer.morale) parts.push(`전 주민 사기 +${offer.morale}`);
+  if (offer.morale) parts.push(`전 주민 민심 +${offer.morale}`);
   if (offer.cannon) parts.push('불랑기포대 배치권 +1');
   parts.push(`명성 -${petitionReputationCost(state, offer)}`);
   return `${offer.desc} (${parts.join(', ')})`;

@@ -131,7 +131,7 @@ function healthyState(seed) {
   assert.equal(lifecycle.elderLaborMult({ age: 30 }), 1);
 }
 
-// ── 혼인: 성사되면 혼례 사건이 열리고, 잔치는 사기를 올린다 ──
+// ── 혼인: 성사되면 혼례 사건이 열리고, 잔치는 민심을 올린다 ──
 {
   const state = healthyState(2026071724);
   for (const r of state.residents) { r.spouseId = null; r.age = 25; }
@@ -202,6 +202,52 @@ function healthyState(seed) {
   const popAfter = state.residents.length;
   lifecycle.lifecycleDailyTick(state, seqRng([0.9, 0]));
   assert.equal(state.residents.length, popAfter, 'no births while starving');
+}
+
+// ── 민심: 높으면 출산이 늘고, 25 미만에서는 주민이 가족 단위로 이탈할 수 있다 ──
+{
+  const prepareCouple = seed => {
+    const state = healthyState(seed);
+    state.scenario = {}; // 이탈을 끄고 출산 배율만 격리한다
+    for (const resident of state.residents) resident.spouseId = null;
+    const mother = state.residents.find(resident => resident.gender === 'female');
+    const father = state.residents.find(resident => resident.gender === 'male');
+    mother.age = 24;
+    father.age = 26;
+    mother.spouseId = father.id;
+    father.spouseId = mother.id;
+    mother.homeBuildingId = 4242;
+    father.homeBuildingId = 4242;
+    return { state, mother, father };
+  };
+
+  const high = prepareCouple(2026080507);
+  for (const resident of high.state.residents) resident.morale = 100;
+  const highBefore = high.state.residents.length;
+  lifecycle.lifecycleDailyTick(high.state, seqRng([0.9, 0.03]));
+  assert.equal(high.state.residents.length, highBefore + 1,
+    'high morale raises the birth roll above the same random value');
+
+  const low = prepareCouple(2026080508);
+  for (const resident of low.state.residents) resident.morale = 0;
+  const lowBefore = low.state.residents.length;
+  lifecycle.lifecycleDailyTick(low.state, seqRng([0.9, 0.03]));
+  assert.equal(low.state.residents.length, lowBefore,
+    'low morale lowers the birth roll below the same random value');
+
+  const departure = healthyState(2026080509);
+  departure.scenario = null;
+  for (const resident of departure.residents) {
+    resident.morale = 0;
+    resident.stage = null;
+    resident.spouseId = null;
+    delete resident.special;
+  }
+  const departureBefore = residents.livingResidents(departure).length;
+  lifecycle.lifecycleDailyTick(departure, seqRng([0, 0]));
+  assert.equal(residents.livingResidents(departure).length, departureBefore - 1);
+  assert.ok(departure.log.some(entry => entry.text.includes('민심') && entry.text.includes('떠났습니다')),
+    'a low-morale departure is reported with the unified 민심 term');
 }
 
 // ── 장례: 시신은 묘지에 묻히고, 방치하면 민심이 상한다 ──

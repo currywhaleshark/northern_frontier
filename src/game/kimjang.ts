@@ -93,7 +93,7 @@ export function maybeOpenKimjangEvent(state: GameState): boolean {
     }).concat([{
       id: 'kimjang-skip',
       label: '올해는 건너뛴다',
-      desc: '재료와 장독대는 아끼지만 겨울 채소 반찬과 공동 작업의 사기 보너스를 얻지 못합니다.',
+      desc: '재료와 장독대는 아끼지만 겨울 채소 반찬과 공동 작업의 민심 보너스를 얻지 못합니다.',
       disabled: false,
       disabledReason: undefined,
     }]),

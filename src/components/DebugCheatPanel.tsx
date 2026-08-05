@@ -389,8 +389,8 @@ function ResidentSection({ state, run }: { state: GameState; run: RunFn }) {
       </Row>
       <Row label="전원">
         <DebugButton onClick={() => run(() => debugRestoreAllResidents(state))}>만복·회복</DebugButton>
-        <input style={inputStyle} value={morale} onChange={event => setMorale(event.target.value)} title="사기" />
-        <DebugButton onClick={() => run(() => debugSetAllMorale(state, Number(morale)))}>사기 설정</DebugButton>
+        <input style={inputStyle} value={morale} onChange={event => setMorale(event.target.value)} title="민심" />
+        <DebugButton onClick={() => run(() => debugSetAllMorale(state, Number(morale)))}>민심 설정</DebugButton>
       </Row>
     </div>
   );

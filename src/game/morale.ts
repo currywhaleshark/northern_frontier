@@ -147,10 +147,40 @@ export function moraleBreakdown(state: GameState, inputs: MoraleInputs): MoraleF
   return factors;
 }
 
-// 목표 사기 — 잠긴(상위 티어) 항목은 계산에서 완전히 빠진다. 티어가 오르면
-// 새 항목이 대개 미충족으로 들어와 사기가 한 계단 내려앉는다 (승격은 영광이자 숙제).
+// 목표 민심 — 잠긴(상위 티어) 항목은 계산에서 완전히 빠진다. 티어가 오르면
+// 새 항목이 대개 미충족으로 들어와 민심이 한 계단 내려앉는다 (승격은 영광이자 숙제).
 export function moraleTarget(state: GameState, inputs: MoraleInputs): number {
   return CONFIG.satisfaction.base + moraleBreakdown(state, inputs)
     .filter(factor => factor.unlocked)
     .reduce((sum, factor) => sum + factor.delta, 0);
+}
+
+function clampedMorale(value: number): number {
+  return Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
+}
+
+export function settlementMoraleProductionMultiplier(averageMorale: number): number {
+  const s = CONFIG.satisfaction;
+  return s.productionMinMult + (clampedMorale(averageMorale) / 100) *
+    (s.productionMaxMult - s.productionMinMult);
+}
+
+export function settlementMoraleBirthMultiplier(averageMorale: number): number {
+  const s = CONFIG.satisfaction;
+  return s.birthMinMult + (clampedMorale(averageMorale) / 100) *
+    (s.birthMaxMult - s.birthMinMult);
+}
+
+export function settlementMoraleDepartureChance(averageMorale: number): number {
+  const s = CONFIG.satisfaction;
+  const morale = clampedMorale(averageMorale);
+  if (morale >= s.departureThreshold) return 0;
+  return s.departureDailyMaxChance * (s.departureThreshold - morale) / s.departureThreshold;
+}
+
+export function displayedMoraleTarget(state: Pick<GameState, 'moraleFactors'>): number {
+  const target = CONFIG.satisfaction.base + (state.moraleFactors ?? [])
+    .filter(factor => factor.unlocked)
+    .reduce((sum, factor) => sum + factor.delta, 0);
+  return clampedMorale(target);
 }

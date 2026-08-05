@@ -34,6 +34,16 @@ const { CONFIG } = await load('config');
 const S = CONFIG.satisfaction;
 const GOOD_INPUTS = { foodOk: true, warmthAvg: 80, dietVarietyScore: 1, clothesCoverage: 1 };
 
+// ── 민심의 실제 효과 배율과 이탈 문턱 ──
+assert.equal(morale.settlementMoraleProductionMultiplier(0), S.productionMinMult);
+assert.equal(morale.settlementMoraleProductionMultiplier(50), 1);
+assert.equal(morale.settlementMoraleProductionMultiplier(100), S.productionMaxMult);
+assert.equal(morale.settlementMoraleBirthMultiplier(0), S.birthMinMult);
+assert.equal(morale.settlementMoraleBirthMultiplier(50), 1);
+assert.equal(morale.settlementMoraleBirthMultiplier(100), S.birthMaxMult);
+assert.equal(morale.settlementMoraleDepartureChance(S.departureThreshold), 0);
+assert.equal(morale.settlementMoraleDepartureChance(0), S.departureDailyMaxChance);
+
 function addBuilt(state, type) {
   const building = {
     id: state.nextBuildingId++, type, x: 8, y: 8,

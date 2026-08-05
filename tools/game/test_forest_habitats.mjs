@@ -31,6 +31,7 @@ const {
   takeHabitatStock,
   spawnAnimalHabitats,
 } = await import(pathToFileURL(join(outDir, 'habitats.mjs')).href);
+const { CONFIG } = await import(pathToFileURL(join(outDir, 'config.mjs')).href);
 
 const YIELD_OPTS = {
   habitatYieldBase: 0.8,
@@ -38,9 +39,17 @@ const YIELD_OPTS = {
   habitatYieldMax: 1.4,
 };
 
-assert.equal(habitatCapacity(8), 12, 'the minimum habitat reserve is tripled');
-assert.equal(habitatCapacity(20), 30, 'forest-scaled habitat reserve is tripled');
-assert.equal(habitatCapacity(100), 90, 'the maximum habitat reserve is tripled');
+assert.equal(habitatCapacity(8), 24, 'the minimum habitat reserve gives twice the previous breathing room');
+assert.equal(habitatCapacity(20), 60, 'forest-scaled habitat reserve is doubled');
+assert.equal(habitatCapacity(100), 180, 'the maximum habitat reserve is doubled');
+
+assert.equal(CONFIG.agents.work.chop, 4, 'chopping takes one more subtick');
+assert.equal(CONFIG.agents.yields.wood, 1.25, 'each completed chop yields slightly more wood');
+assert.equal(CONFIG.agents.forestDepleteChance, 0.08, 'each completed chop is less likely to deplete a mature tree');
+const relativeForestPressure = (3 / CONFIG.agents.work.chop) * (CONFIG.agents.forestDepleteChance / 0.12);
+assert.ok(Math.abs(relativeForestPressure - 0.5) < 1e-9, 'forest depletion per unit time is halved');
+const relativeWoodThroughput = (3 / CONFIG.agents.work.chop) * (CONFIG.agents.yields.wood / 1.1);
+assert.ok(relativeWoodThroughput > 0.8 && relativeWoodThroughput < 0.9, 'wood supply slows only moderately');
 
 function makeMap(width, height, forest = []) {
   const forestSet = new Set(forest.map(([x, y]) => `${x},${y}`));
@@ -152,12 +161,12 @@ assert.equal(findHabitatIconAtTile([{ id: 1, x: 1, y: 1, radius: 4, active: true
   assert.equal(legacy.stock, legacy.capacity);
 }
 
-// 3배 상향 이전 저장은 남은 비율을 보존해 새 최대치로 즉시 환산한다.
+// 직전 버전 저장은 남은 비율을 보존해 두 배가 된 새 최대치로 즉시 환산한다.
 {
   const capacity = habitatCapacity(9);
   const legacy = {
     id: 1, x: 1, y: 1, radius: 4, active: true,
-    stock: capacity / 6, capacity: capacity / 3,
+    stock: capacity / 4, capacity: capacity / 2,
   };
   rebalanceLoadedHabitatReserve(nineTileForest, legacy);
   assert.equal(legacy.capacity, capacity);

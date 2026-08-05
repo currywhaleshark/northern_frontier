@@ -123,9 +123,9 @@ export const CONFIG_DEFAULTS = {
 
   // 짐승 서식지 — 숲 크기로 정해지는 사냥감 비축량과 회복 속도.
   habitats: {
-    reservePerForestTile: 1.5,
-    reserveMin: 12,
-    reserveMax: 90,
+    reservePerForestTile: 3,
+    reserveMin: 24,
+    reserveMax: 180,
     recoveryPerDayRatio: 0.08,
     recoveryPerDayMin: 1.05,
     depletionLogCooldownDays: 8,
@@ -808,17 +808,18 @@ export const CONFIG_DEFAULTS = {
     haulerCartCarryCap: 24,   // 수레 장비 운반꾼 적재량
     haulerCartBatchMin: 8,
     work: {                   // 작업지에서 1회 채집에 드는 서브틱
-      chop: 3, hunt: 5, herb: 3, mine: 4, fish: 4,
+      chop: 4, hunt: 5, herb: 3, mine: 4, fish: 4,
       herd: 5,
       harvestPerSubtick: 8,   // 가을 수확: 서브틱당 깎는 성장도
       growPerSubtick: 1.4,    // 봄여름 농사: 서브틱당 올리는 성장도
       buildPerSubtick: 0.2,   // 건축가 서브틱당 공정 (건축가-일 환산)
     },
     yields: {                 // 1회 채집으로 지는 짐
-      wood: 1.1, game: 0.75, herbs: 0.55, iron: 1.2, mineStone: 0.4, stone: 1.1, fish: 1.2,
+      wood: 1.25, game: 0.75, herbs: 0.55, iron: 1.2, mineStone: 0.4, stone: 1.1, fish: 1.2,
       silver: 0.5,
     },
-    forestDepleteChance: 0.12, // 벌목 1회당 성목이 그루터기가 될 확률
+    // 3틱·12%에서 4틱·8%로 조정 — 시간당 성목 고갈은 이전의 정확히 절반.
+    forestDepleteChance: 0.08, // 벌목 1회당 성목이 그루터기가 될 확률
     // 공사터 개간: 한 현장에 붙는 벌목꾼 상한. 낮게 잡아야 벌목꾼이 한 곳에
     // 우르르 몰리지 않고, 사람이 많으면 여러 공사터를 동시에 열 수 있다.
     clearingCuttersPerSite: 2,
@@ -1679,7 +1680,7 @@ export const CONFIG_DEFAULTS = {
     marriageDailyChance: 0.03,   // 자격 있는 짝이 있을 때의 일일 성사 확률
     maxMarriageAge: 50,
     weddingFeastFood: 8,         // 잔치 비용 (식용 식량)
-    weddingFeastMorale: 6,       // 잔치 시 전 주민 사기
+    weddingFeastMorale: 6,       // 잔치 시 전 주민 민심
     weddingQuietMorale: 2,       // 조용히 치러도 당사자들 주변의 잔잔한 기쁨
     // 출산 — 같은 집에 사는 부부. 굶는 마을엔 아기가 안 생긴다.
     birthDailyChance: 0.025,     // 부부당, 식량·온기 여유 시
@@ -1722,6 +1723,13 @@ export const CONFIG_DEFAULTS = {
   // 계획: docs/superpowers/plans/2026-07-17-satisfaction-religion.md
   satisfaction: {
     base: 50,
+    productionMinMult: 0.8,                // 민심 0의 자원 산출·치료 배율
+    productionMaxMult: 1.2,                // 민심 100의 자원 산출·치료 배율
+    birthMinMult: 0.5,                     // 민심 0의 출산 확률 배율
+    birthMaxMult: 1.5,                     // 민심 100의 출산 확률 배율
+    departureThreshold: 25,                // 이 미만부터 주민 이탈 위험 발생
+    departureDailyMaxChance: 0.015,        // 민심 0에서 정착지 단위 일일 최대 이탈 확률
+    departureMinimumRemainingPopulation: 3, // 이탈 뒤 최소 잔류 인구
     mealOk: 10, mealShort: -18,            // 정착지: 끼니
     warmthGood: 8, warmthBad: -12,         // 정착지: 온기 (60 이상 / 35 미만)
     varietyPenalty: -8,                    // 정착지: 식단 단조 (다양성 0.5 미만)
@@ -1739,7 +1747,7 @@ export const CONFIG_DEFAULTS = {
     promotionCheerDays: 12,
     legacyTransitionCheer: 8,              // 구저장 고티어가 새 기대에 적응하는 동안의 별도 완충
     legacyTransitionDays: 12,
-    monkGriefRelief: 3,                    // 노승 상주 시 사망 사기 하락 6 → 3
+    monkGriefRelief: 3,                    // 노승 상주 시 사망 민심 하락 6 → 3
     monkBurialBonus: 2,                    // 노승 상주 시 안장 위로 +2
     namedMonkGriefRelief: 2,               // 해운의 천도재 — 일반 후계 승려보다 강함
     namedMonkBurialBonus: 3,
@@ -1891,8 +1899,8 @@ export const CONFIG_DEFAULTS = {
   funeral: {
     plotsPerTile: 4,             // 묘역 한 칸을 2×2로 나눠 네 사람을 안장
     unburiedGraceDays: 3,        // 이 일수를 넘긴 시신부터 방치 페널티
-    unburiedMoralePerDay: 1.5,   // 방치 시신이 있는 날의 전 주민 사기 하락
-    burialMoraleRelief: 3,       // 안장 시 전 주민 사기 회복 (장례의 위로)
+    unburiedMoralePerDay: 1.5,   // 방치 시신이 있는 날의 전 주민 민심 하락
+    burialMoraleRelief: 3,       // 안장 시 전 주민 민심 회복 (장례의 위로)
     corpseRetryDays: 2,          // 접근 불가 시신의 재시도 간격
   },
 
@@ -2054,7 +2062,7 @@ export const CONFIG_DEFAULTS = {
     cooldownDays: 12,  // 분기(계절)당 1회
     // 진(鎭) 이상은 봄마다 화약이 소량 정기 지급된다 (의도적으로 부족하게 — 단계 3의 긴장 기반)
     yearlyPowder: { settlement: 0, bo: 0, jin: 2, bu: 4 },
-    luxuryMorale: 15,  // 사치품(비단·소금) 하사 시 전 주민 사기 상승
+    luxuryMorale: 15,  // 사치품(비단·소금) 하사 시 전 주민 민심 상승
   },
 
   // 모반 의심 — "변방 수령이 딴마음을 품었는가". 화약 자급은 강하지만 몰래 해야 하는 것.

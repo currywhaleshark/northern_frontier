@@ -501,7 +501,7 @@ export function debugSetAllMorale(state: GameState, value: number): DebugResult 
   const residents = livingResidents(state);
   if (residents.length === 0) return fail('살아 있는 주민이 없습니다');
   for (const resident of residents) resident.morale = morale;
-  return done(state, `전원 사기 = ${round(morale)}`);
+  return done(state, `전원 민심 = ${round(morale)}`);
 }
 
 // ─────────────────────────── 지도 ───────────────────────────

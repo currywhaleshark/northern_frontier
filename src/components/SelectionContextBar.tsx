@@ -311,7 +311,7 @@ function ResidentContext({ state, resident, onSetJob, onToggleCart, onSetYouthAc
         <tr><td>배고픔</td><td><Bar value={resident.hunger} color="#d9a441" /></td></tr>
         <tr><td>체온</td><td><Bar value={resident.warmth} color="#7ab3d9" /></td></tr>
         <tr><td>건강</td><td><Bar value={resident.health} color="#6fbf73" /></td></tr>
-        <tr><td>사기</td><td><Bar value={resident.morale} color="#b58ad9" /></td></tr>
+        <tr><td>민심</td><td><Bar value={resident.morale} color="#b58ad9" /></td></tr>
         <tr><td>숙련도</td><td>{((resident.skills[resident.job] ?? 0) * 100).toFixed(0)}%</td></tr>
       </tbody>
     </table>

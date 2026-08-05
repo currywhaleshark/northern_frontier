@@ -344,7 +344,7 @@ export function killResident(
   } else {
     addLog(state, `${withJosa(residentLogName(r), '이/가')} ${withJosa(cause, '으로/로')} 세상을 떠났습니다.`, 'bad', true);
   }
-  // 이웃의 죽음은 마을 전체의 사기를 깎는다 — 노승의 재(齋)가 있으면 슬픔이 덜하다
+  // 이웃의 죽음은 마을 전체의 민심을 깎는다 — 노승의 재(齋)가 있으면 슬픔이 덜하다
   const griefLoss = residentMonkGriefLoss(state);
   for (const other of state.residents) {
     if (other.alive) other.morale = Math.max(0, other.morale - griefLoss);
@@ -473,7 +473,7 @@ export function updateResidentNeeds(
   reconcileResidentHomes(state, rng);
 }
 
-// 사기: 성분 기반 목표치로 수렴 — 티어가 오를수록 기대 항목이 늘어난다 (morale.ts)
+// 민심: 성분 기반 목표치로 수렴 — 티어가 오를수록 기대 항목이 늘어난다 (morale.ts)
 export function updateMorale(state: GameState, inputs: MoraleInputs): void {
   state.moraleFactors = moraleBreakdown(state, inputs); // UI(민심 내역) 스냅숏
   const target = moraleTarget(state, inputs);

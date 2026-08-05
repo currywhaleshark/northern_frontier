@@ -4,6 +4,10 @@ import { housingCapacity } from '../game/buildings';
 import { CONFIG } from '../game/config';
 import { RANK_NAMES, RESOURCE_NAMES, SEASON_NAMES, WEATHER_NAMES } from '../game/constants';
 import { nextRank } from '../game/promotion';
+import {
+  displayedMoraleTarget, settlementMoraleBirthMultiplier, settlementMoraleDepartureChance,
+  settlementMoraleProductionMultiplier,
+} from '../game/morale';
 import { avg, livingResidents, residentHome } from '../game/residents';
 import { getDayOfSeason, getSeason, getYear } from '../game/seasons';
 import { settlementDisplayName } from '../game/settlementName';
@@ -57,6 +61,27 @@ export function TopBar({
   const housing = housingCapacity(state);
   const housed = living.filter(resident => residentHome(state, resident)).length;
   const homeless = pop - housed;
+  const averageMorale = avg(state, 'morale');
+  const moraleTarget = displayedMoraleTarget(state);
+  const moraleProduction = settlementMoraleProductionMultiplier(averageMorale);
+  const moraleBirth = settlementMoraleBirthMultiplier(averageMorale);
+  const moraleDeparture = settlementMoraleDepartureChance(averageMorale);
+  const moraleTrend = Math.abs(moraleTarget - averageMorale) < 0.5
+    ? '목표에 도달'
+    : `${moraleTarget > averageMorale ? '상승' : '하락'} 중 · 하루 최대 4`;
+  const moraleFactors = (state.moraleFactors ?? [])
+    .filter(factor => factor.unlocked && factor.delta !== 0)
+    .map(factor => `${factor.label} ${factor.delta > 0 ? '+' : ''}${factor.delta}`)
+    .join(' · ');
+  const moraleTooltip = [
+    `평균 민심 ${averageMorale.toFixed(0)} / 목표 ${moraleTarget.toFixed(0)} — ${moraleTrend}`,
+    `자원 산출·치료 민심 배율 ${(moraleProduction * 100).toFixed(1)}%`,
+    `출산 확률 민심 배율 ${(moraleBirth * 100).toFixed(0)}%`,
+    moraleDeparture > 0
+      ? `주민 이탈 위험 하루 ${(moraleDeparture * 100).toFixed(2)}%`
+      : `주민 이탈 없음 — 민심 ${CONFIG.satisfaction.departureThreshold} 이상`,
+    `목표 내역: 기본 ${CONFIG.satisfaction.base}${moraleFactors ? ` · ${moraleFactors}` : ''}`,
+  ].join('\n');
   const [hoveredGroup, setHoveredGroup] = useState<ResourceDisplayGroupId | null>(null);
   const [focusedGroup, setFocusedGroup] = useState<ResourceDisplayGroupId | null>(null);
   const starredResources = DISPLAY_RESOURCE_ORDER.filter(resource => uiPrefs.starredResources.includes(resource));
@@ -281,7 +306,7 @@ export function TopBar({
           {homeless > 0 && <> · 노숙 <b className="housing-shortage">{homeless}</b></>}
           {' '}· 사망 <b>{state.totalDeaths}</b> · 병자 <b>{sick}</b> ·
           평균 건강 <b>{avg(state, 'health').toFixed(0)}</b> ·
-          평균 사기 <b>{avg(state, 'morale').toFixed(0)}</b>
+          <span title={moraleTooltip}>평균 민심 <b>{averageMorale.toFixed(0)}</b></span>
         </span>
         <span className={`threat-box${state.threat > 60 ? ' threat-high' : ''}`}>
           위협도 {state.threat.toFixed(0)}

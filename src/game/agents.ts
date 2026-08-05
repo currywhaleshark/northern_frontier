@@ -46,6 +46,7 @@ import {
 } from './habitats';
 import { huntPreyName, rollHuntPrey, scaledHuntYield, type HuntPreyDef } from './hunting';
 import { makeRng } from './map';
+import { settlementMoraleProductionMultiplier } from './morale';
 // 잎 모듈에서 직접 가져온다 — scenario.ts를 거치면 agents → scenario → raids → agents 고리가 생긴다
 import { countScenarioProgress } from './scenarioFlags';
 import { buryCorpse, corpsesOf, nextCorpseToCollect } from './lifecycle';
@@ -3045,7 +3046,7 @@ export function agentsTick(state: GameState): void {
   const tMod = producers <= 0 || t >= producers ? 1 : 0.6 + 0.4 * (t / producers);
   const mAvg = living.reduce((s, r) => s + r.morale, 0) / living.length;
   const center = state.buildings.find(b => b.type === 'center');
-  const laborOutputMod = (0.8 + (mAvg / 100) * 0.4) * officeEfficiencyMultiplier(state) *
+  const laborOutputMod = settlementMoraleProductionMultiplier(mAvg) * officeEfficiencyMultiplier(state) *
     rankProductionEfficiency(state.rank);
   const ctx: Ctx = {
     season,

@@ -31,7 +31,7 @@ export interface Ctx {
   season: Season;
   outdoor: number;
   tMod: number;   // 도구 보정
-  mMod: number;   // 사기·관청·등급 노동 보정
+  mMod: number;   // 민심·관청·등급 노동 보정
   outputMod: number; // mMod에 RC 자원 산출 보정을 한 번만 합성
   rng: () => number;
   centerId: number;

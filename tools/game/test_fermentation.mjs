@@ -181,7 +181,7 @@ function runUntil(
   assert.equal(kimjang.maybeOpenKimjangEvent(state), false, 'the same year never opens a second kimjang event');
 }
 
-// 김치가 익으면 완성품·재사용 옹기가 생기고 규모 비례 공동 작업 사기가 오른다.
+// 김치가 익으면 완성품·재사용 옹기가 생기고 규모 비례 공동 작업 민심이 오른다.
 {
   const state = prepare(2026071705);
   state.day = 38;

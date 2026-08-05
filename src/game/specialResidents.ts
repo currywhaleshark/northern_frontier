@@ -57,14 +57,14 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     job: 'shaman',
     epithet: '산신을 모시는 떠돌이 무당',
     story: '방울과 부채를 지니고 북방의 산신을 모시며 마을에 들어왔다.',
-    benefit: `당집에 상주하면 일반 무당의 굿 소리에 더해 사기 +${CONFIG.satisfaction.namedShamanCheerBonus}.`,
+    benefit: `당집에 상주하면 일반 무당의 굿 소리에 더해 민심 +${CONFIG.satisfaction.namedShamanCheerBonus}.`,
     risk: '사망하면 월향의 고유한 큰굿은 사라지지만, 내림굿을 받은 후계 무당이 당집을 지킨다.',
     skills: [
       {
         id: 'greatGut',
         icon: 'shaman',
         name: '만신의 큰굿',
-        effect: `월향이 당집에 상주하면 일반 무당 효과에 더해 마을 사기 +${CONFIG.satisfaction.namedShamanCheerBonus}. 후계자는 이 특기를 물려받지 않는다.`,
+        effect: `월향이 당집에 상주하면 일반 무당 효과에 더해 마을 민심 +${CONFIG.satisfaction.namedShamanCheerBonus}. 후계자는 이 특기를 물려받지 않는다.`,
       },
     ],
     illustration: {
@@ -82,14 +82,14 @@ export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
     job: 'monk',
     epithet: '망자의 명복을 비는 떠돌이 승려',
     story: '잿빛 승복 한 벌로 변방을 걸으며 살아 있는 이와 죽은 이를 함께 돌본다.',
-    benefit: `암자에 상주하면 사망 사기 하락을 ${CONFIG.satisfaction.namedMonkGriefRelief}로 줄이고 안장 위로 +${CONFIG.satisfaction.namedMonkBurialBonus}.`,
+    benefit: `암자에 상주하면 사망 민심 하락을 ${CONFIG.satisfaction.namedMonkGriefRelief}로 줄이고 안장 위로 +${CONFIG.satisfaction.namedMonkBurialBonus}.`,
     risk: '노년의 자연사 위험이 있으나, 미리 거둔 동자승이 성장하면 일반 승려로 법맥을 잇는다.',
     skills: [
       {
         id: 'cheondojae',
         icon: 'monk',
         name: '해운의 천도재',
-        effect: `사망 사기 하락을 ${CONFIG.satisfaction.namedMonkGriefRelief}로 줄이고 안장 위로 +${CONFIG.satisfaction.namedMonkBurialBonus}. 후계 승려의 상례 보정보다 강하다.`,
+        effect: `사망 민심 하락을 ${CONFIG.satisfaction.namedMonkGriefRelief}로 줄이고 안장 위로 +${CONFIG.satisfaction.namedMonkBurialBonus}. 후계 승려의 상례 보정보다 강하다.`,
       },
     ],
     illustration: {

@@ -556,7 +556,7 @@ function resolveFightFallback(
       ? damageBuildings(state, rng, CONFIG.raid.buildingDamage.villageVictory)
       : [];
     state.resources.reputation = Math.min(100, state.resources.reputation + 5);
-    moraleShock(state, -8); // 사기 상승
+    moraleShock(state, -8); // 민심 하락
     changeRelation(state, faction, CONFIG.relations.militiaWin); // 물리치면 원한이 남는다
     const winText = mode === 'garrison'
       ? `${withJosa(side, '이/가')} ${withJosa(factionRaidPartyLabel(state, faction), '을/를')} 외곽에서 물리쳤습니다! 부상자 ${injured}명, 건물 피해는 없습니다.`
