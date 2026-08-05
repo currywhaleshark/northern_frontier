@@ -10,6 +10,7 @@ import { advanceMineCollapseDisaster } from './mineCollapse';
 import { damageBuildingTargets } from './raidDamage';
 import { getSeason, getYear } from './seasons';
 import { seasonWeatherSchedule, weatherForDay } from './weatherSchedule';
+import { climateSeverityForState } from './climate';
 import type {
   Building, CropId, DisasterAffectedTile, DisasterId, GameState, PendingDisaster, Terrain, WeatherId,
   WeirReservoirTile,
@@ -227,12 +228,14 @@ export function isDroughtActive(state: Pick<GameState, 'pendingDisasters'>): boo
 }
 
 export function hasSnowDamageTriggerWeather(
-  state: Pick<GameState, 'seed' | 'day' | 'weather'>,
+  state: Pick<GameState, 'seed' | 'day' | 'weather'> & Partial<Pick<GameState, 'worldSetup'>>,
 ): boolean {
   if (!SNOW_DAMAGE_WEATHERS.has(state.weather) || state.day <= 1) return false;
   let consecutive = 1;
   for (let offset = 1; offset < CONFIG.disasters.snowDamage.triggerConsecutiveSnowDays; offset++) {
-    if (!SNOW_DAMAGE_WEATHERS.has(weatherForDay(state.seed, state.day - offset))) return false;
+    if (!SNOW_DAMAGE_WEATHERS.has(weatherForDay(
+      state.seed, state.day - offset, climateSeverityForState(state),
+    ))) return false;
     consecutive++;
   }
   return consecutive >= CONFIG.disasters.snowDamage.triggerConsecutiveSnowDays;

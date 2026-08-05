@@ -1,6 +1,8 @@
 // 저장 상태 없이 세계 시드와 연차에서 재생성하는 연간 기후.
 import { CONFIG } from './config';
 import { makeRng } from './map';
+import { getYear } from './seasons';
+import type { GameState } from './types';
 
 export interface AnnualClimate {
   /** -1 한랭 ~ +1 온난 */
@@ -27,12 +29,41 @@ function climateAxisAnomaly(seed: number, year: number, axis: AnnualClimateAxis)
  * year는 게임의 1 기반 연차다. 각 축은 `rng() - rng()` 삼각분포를 사용해
  * 0 부근은 자주, -1·+1 부근은 드물게 만든다.
  */
-export function annualClimate(seed: number, year: number): AnnualClimate {
-  return {
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+function climateSeverity(value: number): number {
+  return Number.isFinite(value) ? clamp(value, 0.5, 1.5) : 1;
+}
+
+/** -1(안전)~+1(위험) 축을 0~1 위험량으로 옮겨 혹독도 배율을 단조 적용한다. */
+function scaledHazardAxis(value: number, severity: number): number {
+  return clamp((clamp(value, -1, 1) + 1) * climateSeverity(severity) - 1, -1, 1);
+}
+
+export function annualClimate(seed: number, year: number, severity = 1): AnnualClimate {
+  const base = {
     temperatureAnomaly: climateAxisAnomaly(seed, year, 'temperature'),
     precipitationAnomaly: climateAxisAnomaly(seed, year, 'precipitation'),
     storminess: climateAxisAnomaly(seed, year, 'storminess'),
   };
+  if (Math.abs(severity - 1) < 1e-9) return base;
+  return {
+    temperatureAnomaly: -scaledHazardAxis(-base.temperatureAnomaly, severity),
+    precipitationAnomaly: -scaledHazardAxis(-base.precipitationAnomaly, severity),
+    storminess: scaledHazardAxis(base.storminess, severity),
+  };
+}
+
+type ClimateState = Pick<GameState, 'seed' | 'day'> & Partial<Pick<GameState, 'worldSetup'>>;
+
+export function climateSeverityForState(state: Partial<Pick<GameState, 'worldSetup'>>): number {
+  return climateSeverity(state.worldSetup?.effective.climateSeverityMultiplier ?? 1);
+}
+
+export function annualClimateForState(state: ClimateState): AnnualClimate {
+  return annualClimate(state.seed, getYear(state.day), climateSeverityForState(state));
 }
 
 function climateValueOrNormal(value: number): number {

@@ -1,13 +1,13 @@
 // 평시 화재의 발화·급수원 순수 규칙. 실제 연소와 주민 왕복은 다음 단계에서 연결한다.
 import { buildingFootprintDims, isPlotBuildingType } from './buildings';
-import { annualClimate } from './climate';
+import { annualClimateForState, climateSeverityForState } from './climate';
 import { CONFIG } from './config';
 import { addLog } from './events';
 import { openGuideOnce } from './guides';
 import { buildingStock, takeBuildingStock } from './inventory';
 import { damageBuildingTargets } from './raidDamage';
 import { recordAnnals } from './annals';
-import { getSeason, getYear } from './seasons';
+import { getSeason } from './seasons';
 import { wellWaterStatus } from './waterSupply';
 import { weatherForDay } from './weatherSchedule';
 import { isNaturalWaterTerrain } from './terrain';
@@ -46,19 +46,23 @@ export function canIgniteFireInWeather(weather: WeatherId): boolean {
   return !CONFIG.disasters.fire.noIgnitionWeather.includes(weather);
 }
 
-export function consecutiveDryDays(state: Pick<GameState, 'seed' | 'day' | 'weather'>): number {
+type FireClimateState = Pick<GameState, 'seed' | 'day' | 'weather'> & Partial<Pick<GameState, 'worldSetup'>>;
+
+export function consecutiveDryDays(state: FireClimateState): number {
   let days = 0;
   for (let day = Math.max(1, state.day); day >= 1; day--) {
-    const weather = day === state.day ? state.weather : weatherForDay(state.seed, day);
+    const weather = day === state.day ? state.weather : weatherForDay(
+      state.seed, day, climateSeverityForState(state),
+    );
     if (!DRY_WEATHERS.has(weather)) break;
     days++;
   }
   return days;
 }
 
-export function fireDailyIgnitionChance(state: Pick<GameState, 'seed' | 'day' | 'weather'>): number {
+export function fireDailyIgnitionChance(state: FireClimateState): number {
   if (!canIgniteFireInWeather(state.weather)) return 0;
-  const climate = annualClimate(state.seed, getYear(state.day));
+  const climate = annualClimateForState(state);
   const annualMultiplier = clamp(
     1 + climate.precipitationAnomaly * CONFIG.disasters.fire.precipitationCoefficient,
     CONFIG.disasters.fire.annualMinMultiplier,

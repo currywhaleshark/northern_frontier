@@ -1,8 +1,7 @@
 import { BUILDING_DEFS, buildingFootprintDims } from './buildings';
-import { annualClimate } from './climate';
+import { annualClimateForState } from './climate';
 import { CONFIG } from './config';
 import { isDroughtActive } from './disasters';
-import { getYear } from './seasons';
 import { aquiferSampleAt, aquiferVeins } from './subsurfaceVeins';
 import {
   buildingTouchesWaterCoverage,
@@ -305,7 +304,7 @@ function weatherRecoveryBonus(state: GameState): number {
 
 export function dailyAquiferTick(state: GameState): void {
   const snapshot = waterSupplySnapshot(state);
-  const climate = annualClimate(state.seed, getYear(state.day));
+  const climate = annualClimateForState(state);
   const climateMultiplier = Math.max(
     0.5,
     1 + climate.precipitationAnomaly * CONFIG.water.climateRecoveryFactor,

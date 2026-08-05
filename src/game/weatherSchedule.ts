@@ -159,10 +159,11 @@ function previousWinterSnowDays(
   seed: number,
   year: number,
   override?: number,
+  climateSeverityMultiplier = 1,
 ): number {
   if (Number.isFinite(override)) return Math.max(0, Math.floor(override!));
   if (year <= 1) return CONFIG.weather.schedule.thawFlood.normalWinterSnowDays;
-  return countSnowDays(seasonWeatherSchedule(seed, year - 1, 'winter'));
+  return countSnowDays(seasonWeatherSchedule(seed, year - 1, 'winter', climateSeverityMultiplier));
 }
 
 function thawFloodDays(
@@ -173,12 +174,15 @@ function thawFloodDays(
   table: Record<WeatherId, number>,
   totalBaseWeight: number,
   priorWinterSnowDays?: number,
+  climateSeverityMultiplier = 1,
 ): number {
   if (season !== 'spring' || tableWeight(table, 'thawFlood') <= 0) return 0;
 
   const thaw = CONFIG.weather.schedule.thawFlood;
   const baselineDays = CONFIG.time.seasonDays * tableWeight(table, 'thawFlood') / totalBaseWeight;
-  const snowDeviation = previousWinterSnowDays(seed, year, priorWinterSnowDays)
+  const snowDeviation = previousWinterSnowDays(
+    seed, year, priorWinterSnowDays, climateSeverityMultiplier,
+  )
     - thaw.normalWinterSnowDays;
   const expected = baselineDays
     + snowDeviation * thaw.snowDayFactor
@@ -266,6 +270,7 @@ function weatherCountsForClimate(
   season: Season,
   climate: AnnualClimate,
   priorWinterSnowDays?: number,
+  climateSeverityMultiplier = 1,
 ): WeatherCounts {
   const table = baseTable(season);
   const seasonDays = CONFIG.time.seasonDays;
@@ -320,7 +325,10 @@ function weatherCountsForClimate(
 
   replaceNonPrecipitationWithThawFlood(
     counts,
-    thawFloodDays(seed, year, season, climate, table, totalBaseWeight, priorWinterSnowDays),
+    thawFloodDays(
+      seed, year, season, climate, table, totalBaseWeight,
+      priorWinterSnowDays, climateSeverityMultiplier,
+    ),
   );
 
   makeRunCapsFeasible(counts, table, adjustedWeights);
@@ -440,8 +448,11 @@ export function seasonWeatherScheduleForClimate(
   season: Season,
   climate: AnnualClimate,
   priorWinterSnowDays?: number,
+  climateSeverityMultiplier = 1,
 ): readonly WeatherId[] {
-  const counts = weatherCountsForClimate(seed, year, season, climate, priorWinterSnowDays);
+  const counts = weatherCountsForClimate(
+    seed, year, season, climate, priorWinterSnowDays, climateSeverityMultiplier,
+  );
   return arrangeWeatherRuns(counts, seed, year, season);
 }
 
@@ -449,11 +460,24 @@ export function seasonWeatherSchedule(
   seed: number,
   year: number,
   season: Season,
+  climateSeverityMultiplier = 1,
 ): readonly WeatherId[] {
-  return seasonWeatherScheduleForClimate(seed, year, season, annualClimate(seed, year));
+  const priorWinterSnowDays = season === 'spring' && year > 1
+    ? countSnowDays(seasonWeatherSchedule(seed, year - 1, 'winter', climateSeverityMultiplier))
+    : undefined;
+  return seasonWeatherScheduleForClimate(
+    seed,
+    year,
+    season,
+    annualClimate(seed, year, climateSeverityMultiplier),
+    priorWinterSnowDays,
+    climateSeverityMultiplier,
+  );
 }
 
-export function weatherForDay(seed: number, day: number): WeatherId {
-  const schedule = seasonWeatherSchedule(seed, getYear(day), getSeason(day));
+export function weatherForDay(seed: number, day: number, climateSeverityMultiplier = 1): WeatherId {
+  const schedule = seasonWeatherSchedule(
+    seed, getYear(day), getSeason(day), climateSeverityMultiplier,
+  );
   return schedule[getDayOfSeason(day) - 1];
 }

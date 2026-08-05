@@ -1,5 +1,5 @@
 // 연간 기후를 재해 발생 가중치와 선택 결과 확률로 변환하는 단일 원본.
-import { annualClimate, annualClimateSummary, type AnnualClimate } from './climate';
+import { annualClimateForState, annualClimateSummary, type AnnualClimate } from './climate';
 import { CONFIG } from './config';
 import { makeRng } from './map';
 import { getYear } from './seasons';
@@ -9,14 +9,14 @@ export type ClimateDisasterEventId =
   'earlyFrost' | 'lateFrost' | 'locust' | 'drought' | 'plagueSuspicion' | 'livestockEpidemic';
 
 type DisasterState = Pick<GameState, 'seed' | 'day' | 'specialItems'>;
-type ClimateState = Pick<GameState, 'seed' | 'day'>;
+type ClimateState = Pick<GameState, 'seed' | 'day'> & Partial<Pick<GameState, 'worldSetup'>>;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
 function currentClimate(state: ClimateState): AnnualClimate {
-  return annualClimate(state.seed, getYear(state.day));
+  return annualClimateForState(state);
 }
 
 function earlyFrostOccurrenceWeight(climate: AnnualClimate): number {

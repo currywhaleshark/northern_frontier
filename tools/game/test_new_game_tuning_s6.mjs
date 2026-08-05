@@ -25,6 +25,8 @@ const load = name => import(pathToFileURL(join(compiledDir, `${name}.mjs`)).href
 const simulation = await load('simulation');
 const subsurface = await load('subsurfaceVeins');
 const saveLoad = await load('saveLoad');
+const climate = await load('climate');
+const weatherSchedule = await load('weatherSchedule');
 
 const storage = new Map();
 globalThis.localStorage = {
@@ -120,4 +122,42 @@ assert.deepEqual(loaded.worldSetup.tuning, custom.worldSetup.tuning);
 assert.deepEqual(loaded.worldSetup.effective, custom.worldSetup.effective,
   '사용자 설정의 실효값은 저장 왕복 뒤에도 당시 스냅샷을 유지한다');
 
-console.log('new-game tuning S6 resource tests passed');
+// 기후 위험축은 같은 시드·연도에서 온화→기준→혹독 순으로 단조 증가한다.
+const severeWeather = new Set(['frost', 'heavySnow', 'blizzard', 'coldSnap']);
+const severeDays = { low: 0, normal: 0, high: 0 };
+for (const seed of [2026080511, 2026080512, 2026080513, 2026080514]) {
+  for (let year = 1; year <= 8; year++) {
+    const mild = climate.annualClimate(seed, year, 0.85);
+    const normal = climate.annualClimate(seed, year, 1);
+    const harsh = climate.annualClimate(seed, year, 1.2);
+    assert.deepEqual(normal, climate.annualClimate(seed, year),
+      '기후 배율 1은 기존 연간 기후를 그대로 보존한다');
+    assert.ok(mild.temperatureAnomaly >= normal.temperatureAnomaly &&
+      normal.temperatureAnomaly >= harsh.temperatureAnomaly, '혹독할수록 같은 해가 더 춥다');
+    assert.ok(mild.precipitationAnomaly >= normal.precipitationAnomaly &&
+      normal.precipitationAnomaly >= harsh.precipitationAnomaly, '혹독할수록 같은 해가 더 건조하다');
+    assert.ok(mild.storminess <= normal.storminess && normal.storminess <= harsh.storminess,
+      '혹독할수록 같은 해의 폭풍성이 높다');
+
+    for (const [level, severity] of [['low', 0.85], ['normal', 1], ['high', 1.2]]) {
+      for (const season of ['spring', 'summer', 'autumn', 'winter']) {
+        severeDays[level] += weatherSchedule.seasonWeatherSchedule(seed, year, season, severity)
+          .filter(weather => severeWeather.has(weather)).length;
+      }
+    }
+  }
+}
+assert.ok(severeDays.low < severeDays.normal && severeDays.normal < severeDays.high,
+  `다년 혹한 날씨 합계가 온화<기준<혹독이어야 한다: ${JSON.stringify(severeDays)}`);
+
+for (const level of ['low', 'normal', 'high']) {
+  const state = simulation.newGameFromOptions({
+    ...options(2026080588, 'normal'),
+    tuning: { startingResources: 'normal', resourceDensity: 'normal', climateSeverity: level, threat: 'normal' },
+  });
+  assert.equal(state.weather, weatherSchedule.weatherForDay(
+    state.seed, 1, state.worldSetup.effective.climateSeverityMultiplier,
+  ), `${level} 기후의 첫날 날씨도 저장된 실효값을 읽는다`);
+}
+
+console.log('new-game tuning S6 resource and climate tests passed');

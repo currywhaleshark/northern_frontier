@@ -16,6 +16,7 @@ import { createResident, killResident, livingResidents, reconcileResidentHomes, 
 import { residentLogName } from './residentLogName';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { weatherForDay } from './weather';
+import { climateSeverityForState } from './climate';
 import { createCombatRoster } from './combatRoster';
 import { RESIDENT_ORIGINS } from './defectors';
 import {
@@ -619,10 +620,12 @@ function locustFarms(state: GameState): Building[] {
   return standingFarms(state).filter(building => sownAreaOf(building) > 0);
 }
 
-export function hasDroughtTriggerWeather(state: Pick<GameState, 'seed' | 'day' | 'weather'>): boolean {
+export function hasDroughtTriggerWeather(
+  state: Pick<GameState, 'seed' | 'day' | 'weather'> & Partial<Pick<GameState, 'worldSetup'>>,
+): boolean {
   if (state.weather === 'rain') return false;
   for (let offset = 1; offset < CONFIG.disasters.drought.triggerDryDays; offset++) {
-    if (weatherForDay(state.seed, state.day - offset) === 'rain') return false;
+    if (weatherForDay(state.seed, state.day - offset, climateSeverityForState(state)) === 'rain') return false;
   }
   return true;
 }
