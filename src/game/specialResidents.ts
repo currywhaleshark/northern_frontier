@@ -12,6 +12,7 @@ import { makeRng } from './map';
 import { changeRelation, getRelation } from './relations';
 import { createResident, reconcileResidentHomes } from './residents';
 import { detachDepartingResidentFromFamily } from './family';
+import { TUTORIAL_ADVISOR_DIALOGUE } from './tutorialAdvisor';
 import { weaponStock } from './weapons';
 import type {
   GameState,
@@ -47,6 +48,31 @@ interface SpecialResidentDefinition {
 }
 
 export const SPECIAL_RESIDENT_ROSTER: readonly SpecialResidentDefinition[] = [
+  {
+    id: 'tutorialAdvisor',
+    name: '산골 길잡이 연이',
+    shortName: '연이',
+    badge: 'yeoni',
+    gender: 'female',
+    age: CONFIG.specialResidents.tutorialAdvisorAge,
+    job: 'woodcutter',
+    epithet: '두 해 동안 곁을 지킨 산골 길잡이',
+    story: '산길과 숲일에 밝아 개척의 첫걸음을 함께했다. 길잡이를 마친 뒤에도 마을에 남아 제 손으로 살림을 보태겠다고 청한다.',
+    benefit: `벌목꾼 고정 · 자신의 벌목 산출 +${Math.round((CONFIG.specialResidents.tutorialAdvisorWoodYieldMult - 1) * 100)}%`,
+    risk: '전투와 원정에는 나가지 않음 · 보너스는 연이 개인에게만 적용',
+    skills: [
+      {
+        id: 'forestEye',
+        icon: 'tracking',
+        name: '숲길 눈썰미',
+        effect: `벨 나무와 나를 길을 재빨리 가려 자신의 벌목 산출이 ${Math.round((CONFIG.specialResidents.tutorialAdvisorWoodYieldMult - 1) * 100)}% 늘어난다.`,
+      },
+    ],
+    illustration: {
+      src: '/assets/events/special-tutorial-advisor-yeoni-v1.png',
+      alt: '붉은 댕기를 맨 연이가 갠 하늘 아래 북방 개척지를 바라보는 모습',
+    },
+  },
   {
     id: 'mudang',
     name: '만신 월향',
@@ -347,6 +373,37 @@ function markSpent(state: GameState, id: SpecialResidentId): void {
   if (!state.spentSpecialIds.includes(id)) state.spentSpecialIds.push(id);
 }
 
+/** 튜토리얼 완주 뒤에만 여는, 게임당 한 번의 확정 합류 장면. */
+export function openTutorialAdvisorJoinChoice(state: GameState): boolean {
+  const id: SpecialResidentId = 'tutorialAdvisor';
+  if (state.pendingChoice || state.battle || state.gameOver) return false;
+  if (state.spentSpecialIds?.includes(id) || specialResidentRecordsOf(state)[id] || activeSpecialResident(state, id)) {
+    return false;
+  }
+  const definition = specialResidentDefinition(id);
+  markSpent(state, id);
+  state.pendingChoice = {
+    kind: 'specialResident',
+    title: '길잡이의 청 — 함께 남는 연이',
+    body:
+      '두 해를 함께 살피고 나니, 이곳을 두고 돌아서기가 영 서운합니다.\n\n' +
+      '말로 길만 짚어 드리는 일은 여기까지 하겠습니다. 허락해 주신다면 저도 마을 사람이 되어, ' +
+      '숲길을 오가며 제 손으로 살림을 보태고 싶습니다. 힘에 부치는 싸움에는 나서지 않겠지만, 나무 보는 눈만큼은 제법 쓸 만할 겁니다.',
+    illustration: definition.illustration,
+    dialogue: TUTORIAL_ADVISOR_DIALOGUE,
+    options: [
+      {
+        id: 'accept',
+        label: '그러자. 함께 남아 다오.',
+        desc: `연이가 벌목꾼으로 합류합니다. 자신의 벌목 산출 +${Math.round((CONFIG.specialResidents.tutorialAdvisorWoodYieldMult - 1) * 100)}%, 전투 불참.`,
+      },
+    ],
+    data: { special: id, phase: 'tutorialJoin' },
+  };
+  addLog(state, '연이가 길잡이 일을 마치고 마을에 남고 싶다는 뜻을 밝혔습니다.', 'info', true);
+  return true;
+}
+
 // 주기적 압박 사건(송환·압송·추노·징발)을 받는 인물의 재요구 간격
 const DEMAND_COOLDOWNS: Partial<Record<SpecialResidentId, number>> = {
   jurchenWarrior: CONFIG.specialResidents.jurchenWarriorDemandCooldownDays,
@@ -604,6 +661,11 @@ export function resolveSpecialResidentChoice(
   const id = choice.data.special as SpecialResidentId;
   const phase = choice.data.phase;
   state.pendingChoice = null;
+
+  if (id === 'tutorialAdvisor' && phase === 'tutorialJoin') {
+    if (optionId === 'accept') recruitSpecialResident(state, id, rng);
+    return;
+  }
 
   if (id === 'exiledScholar' && phase === 'arrival') {
     if (optionId === 'appoint') {

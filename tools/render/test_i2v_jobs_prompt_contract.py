@@ -70,12 +70,34 @@ def main() -> None:
     require(shaman, "ordinary daily movement")
     require(shaman, "no dancing")
 
+    assert locomotion.ACTIONS == ("idle", "walk", "jige_walk", "work")
+    yeoni_walk = locomotion.build_prompt("tutorial_advisor_yeoni", "walk")
+    require(yeoni_walk, "chest, pelvis, knees, both feet, entire head, nose, eyes, and gaze")
+    require(yeoni_walk, "She must look where she walks")
+    require(yeoni_walk, "Keep the small hatchet low")
+
+    yeoni_jige = locomotion.build_prompt("tutorial_advisor_yeoni", "jige_walk")
+    require(yeoni_jige, "loaded-jige woodcutter")
+    require(yeoni_jige, "Keep the wooden jige squarely strapped to her back")
+    require(yeoni_jige, "both hands empty")
+    require(yeoni_jige, "no hatchet, axe, blade, or other handheld tool anywhere")
+    assert locomotion.source_png_for_character("tutorial_advisor_yeoni", "jige_walk").name == (
+        "yeoni-jige-loaded-oriented-raw.png"
+    )
+
+    yeoni_work = locomotion.build_prompt("tutorial_advisor_yeoni", "work")
+    require(yeoni_work, "STATIONARY WOODCUTTING WORK")
+    require(yeoni_work, "Both feet remain planted")
+    require(yeoni_work, "midpoint between her planted feet fixed")
+    require(yeoni_work, "No tree, stump, chips, dust, or detached debris")
+    assert "Tools stay rigid: same shape, length, orientation, and grip" not in yeoni_work
+
     assert api.should_retry_after_ingest("retry", 1, 3)
     assert api.should_retry_after_ingest("retry", 2, 3)
     assert not api.should_retry_after_ingest("retry", 3, 3)
     assert not api.should_retry_after_ingest("passed", 1, 3)
 
-    print("PASS i2v idle/walk prompt and retry contracts")
+    print("PASS i2v idle/walk/jige/work prompt and retry contracts")
 
 
 if __name__ == "__main__":

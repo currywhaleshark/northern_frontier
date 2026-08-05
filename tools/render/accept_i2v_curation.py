@@ -109,6 +109,12 @@ def parse_args() -> argparse.Namespace:
         description="Freeze one approved resident I2V curation run."
     )
     parser.add_argument("character")
+    parser.add_argument(
+        "--states",
+        nargs="+",
+        default=["idle", "walk"],
+        help="States to freeze. Defaults to the original idle/walk contract.",
+    )
     parser.add_argument("--root", type=Path, default=DEFAULT_ROOT)
     parser.add_argument("--skill-root", type=Path, default=DEFAULT_SKILL_ROOT)
     parser.add_argument(
@@ -121,6 +127,9 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    requested_states = tuple(dict.fromkeys(args.states))
+    if not requested_states:
+        raise ValueError("at least one state is required")
     root = args.root.resolve()
     character_dir = (root / args.character).resolve()
     if character_dir.parent != root:
@@ -147,7 +156,7 @@ def main() -> int:
 
     frame_rows = row_by_state(frames_manifest)
     states: dict[str, Any] = {}
-    for state in ("idle", "walk"):
+    for state in requested_states:
         if state not in curation.get("states", {}):
             raise ValueError(f"curation is missing state: {state}")
         if state not in frame_rows:
@@ -166,7 +175,7 @@ def main() -> int:
     report = read_json(run_dir / "sprite-sheet-alpha.report.json")
     if not report.get("ok"):
         raise ValueError("atlas composition report is not ok")
-    for state in ("idle", "walk"):
+    for state in requested_states:
         actual = manifest["animation"]["rows"][state]["frames"]
         expected = len(states[state]["selected_indices"])
         if actual != expected:
@@ -183,7 +192,7 @@ def main() -> int:
         "manifest.json",
     ):
         shutil.copy2(run_dir / filename, accepted_dir / filename)
-    for state in ("idle", "walk"):
+    for state in requested_states:
         copy_if_present(
             run_dir / "exports" / f"{state}.gif",
             accepted_dir / "exports" / f"{state}.gif",
@@ -202,7 +211,7 @@ def main() -> int:
             "fps": request["states"][state]["fps"],
             "loop": request["states"][state]["loop"],
         }
-        for state in ("idle", "walk")
+        for state in requested_states
     }
     approval = {
         "version": 1,
@@ -228,10 +237,11 @@ def main() -> int:
         "",
         (
             f"- {date.today().isoformat()}: Human curator approved the current "
-            "`idle` and `walk` frame order in the live curation view."
+            f"{', '.join(f'`{state}`' for state in requested_states)} frame order "
+            "in the live curation view."
         ),
     ]
-    for state in ("idle", "walk"):
+    for state in requested_states:
         clone_count = len(states[state].get("clones", {}))
         clone_note = f"; {clone_count} clone instance(s)" if clone_count else ""
         qa_lines.append(
@@ -257,7 +267,7 @@ def main() -> int:
         "accepted_dir": str(accepted_dir),
         "states": {
             state: len(states[state]["selected_indices"])
-            for state in ("idle", "walk")
+            for state in requested_states
         },
         "timing": timing,
         "atlas_sha256": approval["atlas_sha256"],

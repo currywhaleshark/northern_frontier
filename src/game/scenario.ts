@@ -14,14 +14,16 @@ import { markGuideSeen, openGuideOnce } from './guides';
 import { openScriptedImmigrationChoice } from './immigration';
 import { makeRng } from './map';
 import { spawnRaiders } from './raids';
+import { openTutorialAdvisorJoinChoice } from './specialResidents';
 import { residentLogName } from './residentLogName';
 import { withJosa } from './josa';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { tributeReserved } from './tributeReserve';
+import { TUTORIAL_ADVISOR_DIALOGUE } from './tutorialAdvisor';
 import { isWallBuilding } from './walls';
 import { buildingTouchesWaterCoverage, naturalWaterCoverageTileSets } from './waterCoverage';
 import { dailyFuelHeatNeed } from './winterReadiness';
-import type { DialoguePresentation, GameState, JobId, Resident, ResourceId, ScenarioState } from './types';
+import type { GameState, JobId, Resident, ResourceId, ScenarioState } from './types';
 
 // 진행 표식은 잎 모듈에 있다 (agents.ts가 누계를 올려야 해서 순환을 끊었다).
 // 부르는 쪽은 예전처럼 scenario에서 가져다 쓴다.
@@ -33,11 +35,7 @@ export { countScenarioProgress, markScenarioFlag } from './scenarioFlags';
 export const TUTORIAL_SCENARIO_VERSION = 8;
 
 // 길잡이 화자는 튜토리얼 모달과 화면 앵커 말풍선이 함께 쓴다.
-// 최종 초상 자산이 들어오면 portrait만 더하면 모든 대화 표면에 동시에 반영된다.
-export const TUTORIAL_GUIDE_DIALOGUE: DialoguePresentation = {
-  speaker: '연이',
-  speakerTitle: '산골 길잡이',
-};
+export const TUTORIAL_GUIDE_DIALOGUE = TUTORIAL_ADVISOR_DIALOGUE;
 
 /** 소목표 하나 — 칩에 `라벨 (현재/목표)`로 선다. 라벨은 짧은 명사, 칩은 수치 요약이다. */
 interface ScenarioGoalProgress {
@@ -830,4 +828,6 @@ export function resolveScenarioChoice(state: GameState, optionId: string): void 
   );
   // 두 해를 넘긴 직후 — 개칭 청원을 여기서 잇는다 (일반 게임은 첫 겨울 다음 봄 첫날)
   openGuideOnce(state, 'rename');
+  // 길잡이 역할을 끝낸 연이는 별도의 그림·대화 장면에서 확정 합류한다.
+  openTutorialAdvisorJoinChoice(state);
 }

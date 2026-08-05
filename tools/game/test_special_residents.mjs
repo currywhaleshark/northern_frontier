@@ -56,6 +56,7 @@ function pngSize(path) {
 const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
 const specialResidents = await import(pathToFileURL(join(compiledDir, 'specialResidents.mjs')).href);
+const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
 const buildings = await import(pathToFileURL(join(compiledDir, 'buildings.mjs')).href);
 const combatCapabilities = await import(pathToFileURL(join(compiledDir, 'combatCapabilities.mjs')).href);
 const combatRoster = await import(pathToFileURL(join(compiledDir, 'combatRoster.mjs')).href);
@@ -67,6 +68,7 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
 {
   const roster = specialResidents.SPECIAL_RESIDENT_ROSTER;
   assert.deepEqual(roster.map(resident => resident.id), [
+    'tutorialAdvisor',
     'mudang', 'nosung', 'exiledScholar', 'jurchenWarrior',
     'tigerHunter', 'geomancer', 'uinyeo', 'runawaySmith', 'interpreter', 'hangwae',
   ]);
@@ -84,6 +86,66 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
     specialResidents.specialResidentSkills('jurchenWarrior').some(skill => skill.id === 'shadowAmbush'),
     'jurchenWarrior ambush is surfaced as a passive skill',
   );
+}
+
+{
+  const state = simulation.newGame(2026080601);
+  assert.equal(specialResidents.openTutorialAdvisorJoinChoice(state), true);
+  assert.equal(state.pendingChoice?.kind, 'specialResident');
+  assert.equal(
+    specialResidents.specialResidentDefinition('tutorialAdvisor').badge,
+    'yeoni',
+    'Yeoni uses her dedicated special-resident badge',
+  );
+  assert.deepEqual(state.pendingChoice?.data, {
+    special: 'tutorialAdvisor', phase: 'tutorialJoin',
+  });
+  assert.equal(
+    state.pendingChoice?.illustration?.src,
+    '/assets/events/special-tutorial-advisor-yeoni-v1.png',
+  );
+  assert.equal(
+    state.pendingChoice?.dialogue?.portrait?.src,
+    '/assets/portraits/tutorial-advisor-yeoni-v1.png',
+  );
+  assert.deepEqual(state.pendingChoice?.options.map(option => option.id), ['accept']);
+  assert.ok(state.spentSpecialIds.includes('tutorialAdvisor'), 'the tutorial reward is game-once when offered');
+
+  specialResidents.resolveSpecialResidentChoice(state, 'accept', () => 0.25);
+  const yeoni = state.residents.find(resident => resident.special === 'tutorialAdvisor');
+  assert.ok(yeoni?.alive, 'Yeoni joins as a living resident');
+  assert.equal(yeoni.name, '산골 길잡이 연이');
+  assert.equal(yeoni.gender, 'female');
+  assert.equal(yeoni.age, CONFIG.specialResidents.tutorialAdvisorAge);
+  assert.equal(yeoni.job, 'woodcutter');
+  assert.equal(state.specialResidentRecords.tutorialAdvisor.status, 'active');
+  assert.equal(specialResidents.openTutorialAdvisorJoinChoice(state), false, 'Yeoni cannot be offered twice');
+
+  const defenseRoster = combatRoster.createCombatRoster(state, {
+    context: 'villageDefense', includeCivilians: true,
+  });
+  assert.equal(
+    defenseRoster.combatants.some(combatant => combatant.residentId === yeoni.id),
+    false,
+    'the woodcutter advisor never becomes a combatant',
+  );
+  assert.ok(defenseRoster.civilians.includes(yeoni.id), 'Yeoni remains a protected civilian');
+
+  const stored = new Map();
+  globalThis.localStorage = {
+    getItem: key => stored.get(key) ?? null,
+    setItem: (key, value) => { stored.set(key, String(value)); },
+    removeItem: key => { stored.delete(key); },
+    clear: () => { stored.clear(); },
+    key: index => [...stored.keys()][index] ?? null,
+    get length() { return stored.size; },
+  };
+  assert.equal(saveLoad.saveGame(state, 9), true);
+  const loaded = saveLoad.loadGame(9);
+  const loadedYeoni = loaded?.residents.find(resident => resident.special === 'tutorialAdvisor');
+  assert.ok(loadedYeoni?.alive, 'Yeoni survives a save/load round trip');
+  assert.equal(loaded?.specialResidentRecords?.tutorialAdvisor?.residentId, loadedYeoni.id);
+  assert.ok(loaded?.spentSpecialIds?.includes('tutorialAdvisor'));
 }
 
 {

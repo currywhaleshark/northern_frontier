@@ -320,6 +320,11 @@ import {
   woodcutterVideoWorkSourceRect,
 } from './residentWoodcutterVideoWorkAssets';
 import {
+  TUTORIAL_ADVISOR_YEONI_SHEETS,
+  tutorialAdvisorYeoniSourceRect,
+  type TutorialAdvisorYeoniState,
+} from './tutorialAdvisorYeoniAssets';
+import {
   RESIDENT_JIGE_CARGO_DISPLAY_FRAME_SIZE,
   RESIDENT_JIGE_CARGO_SHEETS,
   isResidentJigeCargoJob,
@@ -518,6 +523,8 @@ let residentWoodcutterVideoWalkSheet: HTMLImageElement | null = null;
 let residentWoodcutterVideoWalkHdSheet: HTMLImageElement | null = null;
 let residentWoodcutterVideoWorkSheet: HTMLImageElement | null = null;
 let residentWoodcutterVideoWorkHdSheet: HTMLImageElement | null = null;
+let tutorialAdvisorYeoniSheet: HTMLImageElement | null = null;
+let tutorialAdvisorYeoniHdSheet: HTMLImageElement | null = null;
 const residentJigeCargoSheets: Partial<Record<JobId, HTMLImageElement>> = {};
 const residentJigeCargoHdSheets: Partial<Record<JobId, HTMLImageElement>> = {};
 let started = false;
@@ -751,6 +758,10 @@ function ensureLoaded(): void {
     image => { residentWoodcutterVideoWorkSheet = image; });
   loadAtlasAsset(RESIDENT_WOODCUTTER_VIDEO_WORK_SHEETS.highDefinition.src, false,
     image => { residentWoodcutterVideoWorkHdSheet = image; });
+  loadAtlasAsset(TUTORIAL_ADVISOR_YEONI_SHEETS.standard.src, false,
+    image => { tutorialAdvisorYeoniSheet = image; });
+  loadAtlasAsset(TUTORIAL_ADVISOR_YEONI_SHEETS.highDefinition.src, false,
+    image => { tutorialAdvisorYeoniHdSheet = image; });
   loadAtlasAsset(FISHING_BOAT_SHEET.src, true, image => { fishingBoatSheet = image; });
   loadAtlasAsset(FISHING_GROUND_ICON_SHEET.src, true, image => { fishingGroundIconSheet = image; });
   loadAtlasAsset(FISHING_PORT_HOUSE_SHEET.src, false, image => { fishingPortHouseSheet = image; });
@@ -2202,6 +2213,47 @@ function blitTidalFisheryBuilding(
   return true;
 }
 
+function tutorialAdvisorYeoniState(p: ResidentDrawParams): TutorialAdvisorYeoniState {
+  if (p.working && !p.moving) return 'work';
+  if (p.carryingWood) return 'jige_walk';
+  return p.moving ? 'walk' : 'idle';
+}
+
+function drawTutorialAdvisorYeoni(
+  ctx: CanvasRenderingContext2D,
+  p: ResidentDrawParams,
+  animationTimeMs: number,
+): boolean {
+  if (p.special !== 'tutorialAdvisor') return false;
+  const wantsHighDefinition = canvasBackingScale(ctx) >= 1.5;
+  const highDefinition = wantsHighDefinition && tutorialAdvisorYeoniHdSheet != null;
+  const image = highDefinition ? tutorialAdvisorYeoniHdSheet : tutorialAdvisorYeoniSheet;
+  if (!image) return false;
+  const state = tutorialAdvisorYeoniState(p);
+  const animate = state === 'work' || Boolean(p.moving);
+  const rect = tutorialAdvisorYeoniSourceRect(
+    state,
+    animate ? animationTimeMs : 0,
+    highDefinition,
+  );
+  const sizeScale = p.sizeScale ?? 1;
+  // 연이 원본은 오른쪽을 본 채 제작되었다. 왼쪽 기준인 공용 주민 시트와 반대이므로
+  // 공용 그리기의 facing 부호를 한 번 뒤집어 실제 이동 방향과 시선을 맞춘다.
+  const facing = p.facing == null ? undefined : p.facing === 1 ? -1 : 1;
+  drawResidentImageRect(
+    ctx,
+    image,
+    rect,
+    p.x,
+    p.y,
+    facing,
+    TUTORIAL_ADVISOR_YEONI_SHEETS.displayWidth * sizeScale,
+    TUTORIAL_ADVISOR_YEONI_SHEETS.displayHeight * sizeScale,
+    'special.tutorialAdvisor',
+  );
+  return true;
+}
+
 function blitSaltworksBuilding(
   ctx: CanvasRenderingContext2D,
   p: BuildingDrawParams,
@@ -3315,7 +3367,9 @@ export const atlasSprites: SpriteAPI = {
     }
 
     const specialRect = p.special ? specialResidentSourceRect(p.special) : null;
-    if (p.special && drawApprovedI2VLocomotion(ctx, p, animationTime)) {
+    if (drawTutorialAdvisorYeoni(ctx, p, animationTime)) {
+      drewOptionalResidentPresentation = true;
+    } else if (p.special && drawApprovedI2VLocomotion(ctx, p, animationTime)) {
       drewOptionalResidentPresentation = true;
     } else if (specialResidentSheet && specialRect) {
       drawGeneratedCharacterRect(ctx, specialResidentSheet, specialRect, p.x, p.y, p.facing, bob, 1.16);

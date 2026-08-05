@@ -66,7 +66,7 @@ const MILITIA_IDENTITIES: Record<MilitiaWeaponSpriteId | 'unarmed', string> = {
   muskets: 'militia_musket',
 };
 
-const SPECIAL_IDENTITIES: Record<SpecialResidentId, string> = {
+const SPECIAL_IDENTITIES: Partial<Record<SpecialResidentId, string>> = {
   mudang: 'shaman_named_wolhyang',
   nosung: 'monk_named_haeun',
   exiledScholar: 'exiled_scholar_yun',
@@ -116,7 +116,7 @@ function rowName(
 ): string | null {
   if (special) {
     const identity = SPECIAL_IDENTITIES[special];
-    return `${identity}_${moving ? 'walk' : 'idle'}`;
+    return identity ? `${identity}_${moving ? 'walk' : 'idle'}` : null;
   }
   if (religiousVocation) {
     const vocation = religiousVocation === 'shaman'

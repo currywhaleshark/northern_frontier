@@ -453,6 +453,7 @@ export type YouthActivity = 'work' | 'school';
 
 // 네임드 특수 주민 — 게임당 한 번만 오는 인물 (2026-07-17-special-residents.md의 첫 조각)
 export type SpecialResidentId =
+  | 'tutorialAdvisor' // 산골 길잡이 연이
   | 'mudang' | 'nosung' | 'exiledScholar' | 'jurchenWarrior'
   | 'tigerHunter'   // 착호 포수 박돌개
   | 'geomancer'     // 맹인 지관 허생

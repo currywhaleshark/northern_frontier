@@ -1,9 +1,11 @@
 import type { WeatherId } from '../game/types';
 
-interface UiIconFrame {
+export interface UiIconFrame {
   atlas: string;
   column: number;
   row: number;
+  columns?: number;
+  rows?: number;
 }
 
 const STATUS_ATLAS = '/assets/ui/status-weather-icons-v1.png';
@@ -62,6 +64,13 @@ export const UI_ICON_FRAMES = {
   tracking: { atlas: SPECIAL_ATLAS, column: 1, row: 3 },
   target: { atlas: SPECIAL_ATLAS, column: 2, row: 3 },
   needle: { atlas: SPECIAL_ATLAS, column: 3, row: 3 },
+  yeoni: {
+    atlas: '/assets/ui/special-yeoni-icon-v1.png',
+    column: 0,
+    row: 0,
+    columns: 1,
+    rows: 1,
+  },
 
   grantReliefVoucher: { atlas: COURT_ITEM_ATLAS, column: 2, row: 0 },
   grantWaiverDecree: { atlas: COURT_ITEM_ATLAS, column: 3, row: 0 },
@@ -79,6 +88,20 @@ export const UI_ICON_FRAMES = {
 } as const satisfies Record<string, UiIconFrame>;
 
 export type UiIconName = keyof typeof UI_ICON_FRAMES;
+
+export function uiIconAtlasStyle(frame: UiIconFrame): {
+  backgroundSize: string;
+  backgroundPosition: string;
+} {
+  const columns = frame.columns ?? 4;
+  const rows = frame.rows ?? 4;
+  const x = columns <= 1 ? 0 : frame.column * (100 / (columns - 1));
+  const y = rows <= 1 ? 0 : frame.row * (100 / (rows - 1));
+  return {
+    backgroundSize: `${columns * 100}% ${rows * 100}%`,
+    backgroundPosition: `${x}% ${y}%`,
+  };
+}
 
 export const WEATHER_UI_ICON_NAMES: Record<WeatherId, UiIconName> = {
   clear: 'weatherClear',

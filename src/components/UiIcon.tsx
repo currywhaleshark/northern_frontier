@@ -2,6 +2,7 @@ import type { WeatherId } from '../game/types';
 import {
   UI_ICON_FRAMES,
   WEATHER_UI_ICON_NAMES,
+  uiIconAtlasStyle,
   type UiIconName,
 } from '../ui/uiIconAssets';
 
@@ -16,6 +17,7 @@ interface Props {
 
 export function UiIcon({ name, size = 20, className = '', label }: Props) {
   const frame = UI_ICON_FRAMES[name];
+  const atlasStyle = uiIconAtlasStyle(frame);
   return (
     <span
       className={`ui-icon ${className}`.trim()}
@@ -23,8 +25,7 @@ export function UiIcon({ name, size = 20, className = '', label }: Props) {
         width: size,
         height: size,
         backgroundImage: `url('${frame.atlas}')`,
-        backgroundSize: '400% 400%',
-        backgroundPosition: `${frame.column * (100 / 3)}% ${frame.row * (100 / 3)}%`,
+        ...atlasStyle,
       }}
       role={label ? 'img' : undefined}
       aria-label={label}

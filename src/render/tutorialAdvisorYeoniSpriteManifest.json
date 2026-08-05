@@ -1,0 +1,324 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-runtime-variant-manifest",
+  "characterId": "tutorial_advisor_yeoni",
+  "engine": "component-row",
+  "game_input": "/assets/tutorial-advisor-yeoni-i2v-v1.png",
+  "high_definition_game_input": "/assets/tutorial-advisor-yeoni-i2v-hd-v1.png",
+  "degraded_static_fallback": false,
+  "display": {
+    "bodyHeight": 36,
+    "anchor": "feet-bottom-center"
+  },
+  "states": [
+    "idle",
+    "walk",
+    "jige_walk",
+    "work"
+  ],
+  "animation": {
+    "cellWidth": 28,
+    "cellHeight": 42,
+    "columns": 4,
+    "rows": {
+      "idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "walk": {
+        "row": 1,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "jige_walk": {
+        "row": 2,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      },
+      "work": {
+        "row": 3,
+        "frames": 4,
+        "fps": 5,
+        "durations_ms": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "loop": true,
+        "frame_variant": "pixel"
+      }
+    }
+  },
+  "frame_layout": {
+    "sheetWidth": 112,
+    "sheetHeight": 168,
+    "cellWidth": 28,
+    "cellHeight": 42,
+    "rows": {
+      "idle": [
+        {
+          "x": 0,
+          "y": 0,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 0,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 0,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 0,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "walk": [
+        {
+          "x": 0,
+          "y": 42,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 42,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 42,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 42,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "jige_walk": [
+        {
+          "x": 0,
+          "y": 84,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 84,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 84,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 84,
+          "w": 28,
+          "h": 42
+        }
+      ],
+      "work": [
+        {
+          "x": 0,
+          "y": 126,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 56,
+          "y": 126,
+          "w": 28,
+          "h": 42
+        },
+        {
+          "x": 84,
+          "y": 126,
+          "w": 28,
+          "h": 42
+        }
+      ]
+    }
+  },
+  "high_definition_frame_layout": {
+    "sheetWidth": 224,
+    "sheetHeight": 336,
+    "cellWidth": 56,
+    "cellHeight": 84,
+    "rows": {
+      "idle": [
+        {
+          "x": 0,
+          "y": 0,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 0,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 0,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 0,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "walk": [
+        {
+          "x": 0,
+          "y": 84,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 84,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 84,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 84,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "jige_walk": [
+        {
+          "x": 0,
+          "y": 168,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 168,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 168,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 168,
+          "w": 56,
+          "h": 84
+        }
+      ],
+      "work": [
+        {
+          "x": 0,
+          "y": 252,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 56,
+          "y": 252,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 112,
+          "y": 252,
+          "w": 56,
+          "h": 84
+        },
+        {
+          "x": 168,
+          "y": 252,
+          "w": 56,
+          "h": 84
+        }
+      ]
+    }
+  },
+  "source_runs": {
+    "hd": "tools/render/generated/tutorial-advisor-yeoni-i2v-v1/hd",
+    "standard": "tools/render/generated/tutorial-advisor-yeoni-i2v-v1/standard"
+  },
+  "derivation": {
+    "order": [
+      "approved_full_resolution",
+      "hd_master",
+      "standard_from_hd_master_raw"
+    ],
+    "hd_atlas_sha256": "0006728eb388adb699bb146d390f045a735ac60110bc931cd179427e663eef5b"
+  },
+  "published": {
+    "standard": {
+      "path": "public/assets/tutorial-advisor-yeoni-i2v-v1.png",
+      "sha256": "144fcb123441c6e887b3528291a600300d7e22188e66ff7a9a6d7832afcbee0d"
+    },
+    "hd": {
+      "path": "public/assets/tutorial-advisor-yeoni-i2v-hd-v1.png",
+      "sha256": "0006728eb388adb699bb146d390f045a735ac60110bc931cd179427e663eef5b"
+    }
+  }
+}

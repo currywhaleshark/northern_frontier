@@ -69,6 +69,11 @@ const agentsSource = readFileSync(new URL('../../src/game/agents.ts', import.met
   assert.equal(tutorial.pendingChoice?.kind, 'scenario');
   assert.deepEqual(tutorial.pendingChoice?.dialogue, {
     speaker: '연이', speakerTitle: '산골 길잡이',
+    portrait: {
+      src: '/assets/portraits/tutorial-advisor-yeoni-v1.png',
+      alt: '붉은 댕기를 맨 산골 길잡이 연이',
+      position: 'center 24%',
+    },
   }, 'tutorial steps use the reusable portrait-dialogue presentation');
   assert.match(tutorial.pendingChoice?.body ?? '', /^나으리,/);
   assert.equal(tutorial.pendingChoice?.options[0]?.label, '알겠다.');
@@ -78,7 +83,9 @@ const agentsSource = readFileSync(new URL('../../src/game/agents.ts', import.met
 // 시나리오 중 허용되는 모달 — 길잡이 스텝과 그 스텝이 직접 불러 세운 통제 사건뿐이다.
 // R5로 둘째 해가 붙으면서 통제 유민·습격, 세공 파발 공지·수거가 늘었다.
 // 모두 랜덤 게이트 밖에서 열리는 통제·결정론 사건이다.
-const ALLOWED_MODAL_KINDS = new Set(['scenario', 'immigration', 'raid', 'tributeAnnouncement', 'tribute']);
+const ALLOWED_MODAL_KINDS = new Set([
+  'scenario', 'specialResident', 'immigration', 'raid', 'tributeAnnouncement', 'tribute',
+]);
 
 // 17스텝의 id — 첫 해 10스텝(R4)에 둘째 해 7스텝(R5)을 이어 붙인 판.
 // 순서가 바뀌면 코치·문구도 함께 손봐야 한다.
@@ -997,6 +1004,9 @@ function goalItem(step, state, label) {
   assert.equal(scenario.scenarioSuppressesRandomEvents(state), false);
   // R4: 완주 표식이 남고, 첫 해에는 세공이 한 번도 요구되지 않았다
   assert.equal(state.tutorialGraduate, true, 'finishing the tutorial leaves a mark on the game');
+  const yeoni = state.residents.find(resident => resident.special === 'tutorialAdvisor');
+  assert.ok(yeoni?.alive, 'the completed tutorial grants Yeoni as a resident');
+  assert.equal(yeoni.job, 'woodcutter');
 
   // ── R5 관측 ──
   // 완주에 두 해가 걸린다 (첫 겨울에서 끝나지 않는다)
@@ -1521,6 +1531,8 @@ function goalItem(step, state, label) {
   scenario.dailyScenarioTick(opened);
   assert.equal(opened.pendingChoice?.data.phase, 'complete');
   simulation.resolveChoice(opened, 'guided');
+  assert.equal(opened.pendingChoice?.data.phase, 'tutorialJoin');
+  simulation.resolveChoice(opened, 'accept');
   assert.equal(opened.scenario, null);
   assert.equal(scenario.scenarioSuppressesRandomEvents(opened), false);
   assert.equal(
@@ -1539,6 +1551,8 @@ function goalItem(step, state, label) {
   scenario.dailyScenarioTick(state);
   assert.equal(state.pendingChoice?.data.phase, 'complete');
   simulation.resolveChoice(state, 'solo');
+  assert.equal(state.pendingChoice?.data.phase, 'tutorialJoin');
+  simulation.resolveChoice(state, 'accept');
   assert.equal(state.scenario, null);
   assert.equal(state.guides.enabled, false, 'the solo choice turns the first-time help off');
 }

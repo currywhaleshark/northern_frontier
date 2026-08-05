@@ -55,9 +55,11 @@ class FakeImage {
 function drawContext(backingScale = 1) {
   const images = [];
   const drawCalls = [];
+  const scales = [];
   return {
     images,
     drawCalls,
+    scales,
     imageSmoothingEnabled: false,
     fillStyle: '',
     strokeStyle: '',
@@ -78,7 +80,7 @@ function drawContext(backingScale = 1) {
     restore() {},
     rotate() {},
     save() {},
-    scale() {},
+    scale(x, y) { scales.push([x, y]); },
     stroke() {},
     strokeRect() {},
     translate() {},
@@ -140,6 +142,16 @@ try {
       asset.src === '/assets/resident-approved-i2v-locomotion-hd-v1.png')?.required,
     false,
     'approved HD profession locomotion is an optional presentation asset',
+  );
+  assert.equal(
+    initialStates.find(asset => asset.src === '/assets/tutorial-advisor-yeoni-i2v-v1.png')?.required,
+    false,
+    'Yeoni standard animation is optional presentation',
+  );
+  assert.equal(
+    initialStates.find(asset => asset.src === '/assets/tutorial-advisor-yeoni-i2v-hd-v1.png')?.required,
+    false,
+    'Yeoni HD animation is optional presentation',
   );
 
   const failedWorkSrc = '/assets/resident-woodcutter-work-v1.png';
@@ -367,6 +379,52 @@ try {
     FakeImage.bySrc.get('/assets/resident-approved-i2v-locomotion-hd-v1.png'),
     'an approved named special resident uses the HD I2V walk before the static portrait',
   );
+
+  const yeoniIdleContext = drawContext();
+  atlas.atlasSprites.drawResident(yeoniIdleContext, residentParams({
+    gender: 'female', special: 'tutorialAdvisor', moving: false, working: false,
+    animationTimeMs: 600,
+  }));
+  assert.equal(
+    yeoniIdleContext.images[0],
+    FakeImage.bySrc.get('/assets/tutorial-advisor-yeoni-i2v-v1.png'),
+    'standing Yeoni uses her dedicated standard sheet',
+  );
+  assert.deepEqual(yeoniIdleContext.drawCalls[0].args.slice(0, 4), [0, 0, 28, 42]);
+  assert.deepEqual(yeoniIdleContext.scales[0], [1, 1], 'facing right keeps Yeoni unmirrored');
+
+  const yeoniWalkContext = drawContext();
+  atlas.atlasSprites.drawResident(yeoniWalkContext, residentParams({
+    gender: 'female', special: 'tutorialAdvisor', moving: true, working: false,
+    animationTimeMs: 200,
+  }));
+  assert.deepEqual(yeoniWalkContext.drawCalls[0].args.slice(0, 4), [28, 42, 28, 42]);
+
+  const yeoniLeftContext = drawContext();
+  atlas.atlasSprites.drawResident(yeoniLeftContext, residentParams({
+    gender: 'female', special: 'tutorialAdvisor', moving: true, working: false,
+    facing: -1, animationTimeMs: 200,
+  }));
+  assert.deepEqual(yeoniLeftContext.scales[0], [-1, 1], 'facing left mirrors Yeoni once');
+
+  const yeoniJigeContext = drawContext();
+  atlas.atlasSprites.drawResident(yeoniJigeContext, residentParams({
+    gender: 'female', special: 'tutorialAdvisor', moving: true, working: false,
+    carryingWood: true, animationTimeMs: 400,
+  }));
+  assert.deepEqual(yeoniJigeContext.drawCalls[0].args.slice(0, 4), [56, 84, 28, 42]);
+
+  const yeoniWorkHdContext = drawContext(2);
+  atlas.atlasSprites.drawResident(yeoniWorkHdContext, residentParams({
+    gender: 'female', special: 'tutorialAdvisor', moving: false, working: true,
+    animationTimeMs: 600,
+  }));
+  assert.equal(
+    yeoniWorkHdContext.images[0],
+    FakeImage.bySrc.get('/assets/tutorial-advisor-yeoni-i2v-hd-v1.png'),
+    'working Yeoni uses the HD sheet on a 2x backing canvas',
+  );
+  assert.deepEqual(yeoniWorkHdContext.drawCalls[0].args.slice(0, 4), [168, 252, 56, 84]);
 
   FakeImage.bySrc = new Map();
   const coreFailureAtlas = await import(`${atlasUrl}?core-failure`);

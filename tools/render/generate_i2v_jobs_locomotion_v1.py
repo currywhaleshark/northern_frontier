@@ -43,18 +43,26 @@ SPECIAL_RESIDENTS_DIR = EXPORT_ROOT / "04_special_residents"
 YOUTH_RELIGIOUS_DIR = ROOT / "tools" / "render" / "source_images" / "youth-religious-i2v-v1"
 YOUTH_RELIGIOUS_V2_DIR = ROOT / "tools" / "render" / "source_images" / "youth-religious-i2v-v2" / "raw"
 COASTAL_F5_DIR = ROOT / "tools" / "render" / "source_images" / "coastal-f5-v1"
+TUTORIAL_ADVISOR_DIR = (
+    ROOT / "tools" / "render" / "source_images" / "tutorial-advisor-yeoni-v1"
+)
 SOURCE_DIRS = (JOBS_DIR, SPECIAL_RESIDENTS_DIR, YOUTH_RELIGIOUS_DIR)
 CHARACTER_SOURCE_OVERRIDES = {
     "youth_farmer_male": YOUTH_RELIGIOUS_V2_DIR / "youth_farmer_male.png",
     "youth_farmer_female": YOUTH_RELIGIOUS_V2_DIR / "youth_farmer_female.png",
     "salt_maker_male": COASTAL_F5_DIR / "salt-maker-male-base-v2.png",
     "salt_maker_female": COASTAL_F5_DIR / "salt-maker-female-base-v2.png",
+    "tutorial_advisor_yeoni": TUTORIAL_ADVISOR_DIR / "yeoni-sprite-oriented-raw.png",
 }
 ACTION_SOURCE_OVERRIDES = {
     (
         "jurchen_warrior_aragae",
         "walk",
     ): SPECIAL_RESIDENTS_DIR / "jurchen_warrior_aragae-walk-anchor.png",
+    (
+        "tutorial_advisor_yeoni",
+        "jige_walk",
+    ): TUTORIAL_ADVISOR_DIR / "yeoni-jige-loaded-oriented-raw.png",
 }
 OUTPUT_ROOT = EXPORT_ROOT / "i2v_outputs"
 MAGENTA = np.array([255, 0, 255], dtype=np.int16)
@@ -66,7 +74,7 @@ PILOT_CHARACTERS = (
     "hunter_male",
     "militia_spear_female",
 )
-ACTIONS = ("idle", "walk")
+ACTIONS = ("idle", "walk", "jige_walk", "work")
 
 # Optional completed locomotion references — motion/rhythm/camera only.
 # Never copy face, clothing, or body from these into target characters.
@@ -81,6 +89,16 @@ MOTION_REFERENCE_NOTES = {
         "walk rhythm — a small, mundane everyday gait at natural speed, soft low weight "
         "transfer, clear left/right alternation, gentle opposite arm swing, and repeated "
         "in-place cycles with a locked camera. Avoid stiff or theatrical march energy."
+    ),
+    "jige_walk": (
+        "Motion reference only (do not copy identity): completed loaded-jige woodcutter "
+        "walk rhythm — a small careful load-bearing gait, soft low steps, restrained arm "
+        "movement, stable cargo, and repeated in-place cycles with a locked camera."
+    ),
+    "work": (
+        "Motion reference only (do not copy identity): completed woodcutter chop rhythm — "
+        "stationary preparation, a compact controlled downward axe swing, low follow-through, "
+        "and recovery to the source pose with a locked camera."
     ),
 }
 
@@ -288,9 +306,77 @@ CHARACTER_IDENTITY: dict[str, str] = {
         "Joseon chulrik, black jeonrip, cartridge belt and pouch, and one long wooden-stock "
         "matchlock held upright; no Japanese clothing, armor, sword, or hairstyle"
     ),
+    "tutorial_advisor_yeoni": (
+        "young unmarried Korean woman Yeon-i with a gently cute realistic face, one long black "
+        "daenggi-meori braid tied with a muted red daenggi ribbon, jade-green jeogori with an "
+        "off-white collar and ties, deep-rose chima, dark shoes, and one small woodcutting "
+        "hatchet held low and close to her body"
+    ),
+}
+
+ACTION_IDENTITY_OVERRIDES: dict[tuple[str, str], str] = {
+    (
+        "tutorial_advisor_yeoni",
+        "jige_walk",
+    ): (
+        "young unmarried Korean woman Yeon-i with a gently cute realistic face, one long black "
+        "daenggi-meori braid tied with a muted red daenggi ribbon, jade-green jeogori with an "
+        "off-white collar and ties, deep-rose chima, dark shoes, and one wooden Korean jige "
+        "backpack loaded with a compact tied bundle of short split firewood; both hands empty, "
+        "no hatchet, axe, blade, or other handheld tool anywhere"
+    ),
 }
 
 CHARACTER_ACTION_NOTES: dict[tuple[str, str], str] = {
+    (
+        "tutorial_advisor_yeoni",
+        "idle",
+    ): (
+        "Camera-angle and gaze lock: preserve the source's coherent front-side three-quarter "
+        "down-right view. Her chest, pelvis, knees, both feet, entire head, nose, eyes, and "
+        "gaze must stay aimed along that same diagonal in every frame. Never let her glance "
+        "sideways or turn her face away from her body. Keep both soles planted. Preserve the "
+        "single braid, red ribbon, full skirt silhouette, and one low hatchet without sway. "
+        "This clip must look almost like the exact same still image for all six seconds. If any "
+        "motion is uncertain, keep her perfectly frozen rather than moving a foot or changing pose. "
+    ),
+    (
+        "tutorial_advisor_yeoni",
+        "walk",
+    ): (
+        "Camera-angle and gaze lock: walk along the source's front-side three-quarter down-right "
+        "diagonal while her chest, pelvis, knees, both feet, entire head, nose, eyes, and gaze "
+        "all remain aimed in that same travel direction throughout the gait. She must look where "
+        "she walks, never sideways or over the opposite shoulder. Preserve the single braid and "
+        "red ribbon. Keep the small hatchet low, close, and rigid on the same side; never raise, "
+        "swing, shoulder, swap, drop, or multiply it. "
+    ),
+    (
+        "tutorial_advisor_yeoni",
+        "jige_walk",
+    ): (
+        "Camera-angle and gaze lock: walk along the source's front-side three-quarter down-right "
+        "diagonal while her chest, pelvis, knees, both feet, entire head, nose, eyes, and gaze "
+        "all remain aimed in that same travel direction. Keep the single braid and red ribbon. "
+        "Keep the wooden jige squarely strapped to her back and the tied short-log load compact, "
+        "centered, rigid, and unchanged. Never lose, drop, spill, swing, resize, or multiply the "
+        "jige, straps, rope, or logs. Her hands remain empty and close to her sides. "
+    ),
+    (
+        "tutorial_advisor_yeoni",
+        "work",
+    ): (
+        "Camera-angle and gaze lock: preserve the same front-side three-quarter down-right work "
+        "axis throughout the chop. Her feet stay planted and her face and eyes follow the axe's "
+        "down-right work direction without turning toward the opposite shoulder. Preserve the "
+        "single braid and red ribbon close to her body. Use the one existing hatchet only; the "
+        "free hand may join the handle during the controlled swing, but never add, drop, swap, "
+        "resize, or transform the axe. Keep the midpoint between her planted feet fixed at the "
+        "same screen coordinate; hinge forward and back without drifting sideways. Keep the axe "
+        "head below shoulder height at all times and keep her head horizontally near its source "
+        "position. Use only a short waist-to-knee chopping arc, never a raised or overhead pose. "
+        "No tree, stump, chips, dust, or detached debris. "
+    ),
     (
         "salt_maker_male",
         "idle",
@@ -459,11 +545,18 @@ def out_dir(character: str, action: str, root: Path = OUTPUT_ROOT) -> Path:
 
 
 def build_prompt(character: str, action: str) -> str:
-    identity = CHARACTER_IDENTITY.get(
+    identity = ACTION_IDENTITY_OVERRIDES.get((character, action)) or CHARACTER_IDENTITY.get(
         character,
         f"the exact game character from the source image named {character}",
     )
     motion_note = MOTION_REFERENCE_NOTES[action]
+    tool_lock = (
+        "Preserve every tool's exact shape, length, material, and count. During a work action, "
+        "the existing tool may rotate only as part of the requested work motion; never redesign, "
+        "drop, swap, merge, or multiply it. "
+        if action == "work"
+        else "Tools stay rigid: same shape, length, orientation, and grip. "
+    )
     common = (
         f"Animate this exact pixel-art game character: {identity}. "
         "The source image is the sole identity reference — do not redesign or reinterpret "
@@ -476,7 +569,7 @@ def build_prompt(character: str, action: str) -> str:
         "Background is exact flat solid #FF00FF magenta for the entire video — no shadow, "
         "ground, dust, light effects, scenery, or text. "
         "No extra people, no extra limbs, no finger multiplication. "
-        "Tools stay rigid: same shape, length, orientation, and grip. "
+        f"{tool_lock}"
         "Clothing pattern and colors must not flicker or change. "
         f"{motion_note}"
     )
@@ -499,7 +592,7 @@ def build_prompt(character: str, action: str) -> str:
             "If either foot changes its ground contact or screen coordinate, the result is invalid. "
             "First and last frames must connect as a seamless loop."
         )
-    else:
+    elif action in ("walk", "jige_walk"):
         motion = (
             "Action: a seamless repeated in-place walk cycle at an ordinary unhurried "
             "working-villager pace. "
@@ -528,6 +621,23 @@ def build_prompt(character: str, action: str) -> str:
             "it as a weapon unless the source already shows that exact pose. "
             "No foot sliding, teleporting limbs, fused legs, or foot shape morphing. "
             "The repeated gait must remain periodic so the first and last frames connect cleanly."
+        )
+    else:
+        motion = (
+            "Action: a seamless repeated STATIONARY WOODCUTTING WORK cycle with four clearly "
+            "readable phases: stable low ready pose, waist-height preparation, short controlled "
+            "downward hatchet strike, and low follow-through returning to the ready pose. The axe "
+            "head never rises above her shoulders or head. Both feet remain "
+            "planted in the same screen positions and stance width throughout; this is not walking, "
+            "running, stepping, turning, or travelling. Keep the pelvis centered and the movement "
+            "economical, with less than a 20-degree torso hinge, like ordinary repeated labor "
+            "rather than a dramatic combat attack. The "
+            "hatchet stays fully visible and inside frame through the whole arc. Hands, wrists, "
+            "elbows, shoulders, torso hinge, knees, and gaze must remain anatomically coherent. "
+            "No overhead swing of any kind, raised axe, spinning, jumping, kneeling, weapon flourish, tree, stump, "
+            "wood chips, sparks, dust, impact flash, smear, speed line, detached debris, extra axe, "
+            "or extra limb. Complete several consistent work cycles during the clip so four clean "
+            "phases can be selected, and make the first and last frames connect cleanly."
         )
     role_lock = ""
     if character.startswith("youth_"):

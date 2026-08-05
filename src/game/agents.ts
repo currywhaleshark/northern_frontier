@@ -421,7 +421,8 @@ function clearingWoodcutterTick(state: GameState, r: Resident, ctx: Ctx, siteId:
     goal: t => treeAt(t.x, t.y) != null,
     workTicks: a.work.chop,
     yieldRes: 'wood',
-    yieldAmt: a.yields.wood * CONFIG.seasons.woodMult[ctx.season],
+    yieldAmt: a.yields.wood * CONFIG.seasons.woodMult[ctx.season] *
+      (r.special === 'tutorialAdvisor' ? CONFIG.specialResidents.tutorialAdvisorWoodYieldMult : 1),
     cap: a.carryCap.wood,
     depositExtra: ['lumberCamp'],
     taskWork: '공사터 벌목 중', taskMove: '공사터로 이동', taskHaul: '목재 운반',
@@ -471,7 +472,8 @@ function woodcutterTick(state: GameState, r: Resident, ctx: Ctx, skipClearing = 
       !ctx.clearingReserved.has(`${t.x},${t.y}`) && treeStageFor(t) === 'mature',
     workTicks: a.work.chop,
     yieldRes: 'wood',
-    yieldAmt: a.yields.wood * CONFIG.seasons.woodMult[ctx.season],
+    yieldAmt: a.yields.wood * CONFIG.seasons.woodMult[ctx.season] *
+      (r.special === 'tutorialAdvisor' ? CONFIG.specialResidents.tutorialAdvisorWoodYieldMult : 1),
     cap: a.carryCap.wood,
     depositExtra: ['lumberCamp'],
     depositTargets: () => [lumberCamp],
