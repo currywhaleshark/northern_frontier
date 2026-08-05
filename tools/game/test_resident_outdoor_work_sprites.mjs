@@ -33,6 +33,7 @@ assert.deepEqual(
 
 const wideWorkSheets = [
   ['FISHER', 'resident-fisher-work'],
+  ['FISHER_MUDFLAT', 'resident-fisher-mudflat-work'],
   ['HERDER', 'resident-herder-work'],
   ['CHARCOAL_BURNER', 'resident-charcoal-burner-work'],
   ['POWDER_MAKER', 'resident-powder-maker-work'],
@@ -70,6 +71,10 @@ assert.deepEqual(
   { sx: 256, sy: 128, sw: 128, sh: 128 },
 );
 assert.deepEqual(
+  assets.fisherMudflatWorkSourceRect('female', 600, true),
+  { sx: 384, sy: 128, sw: 128, sh: 128 },
+);
+assert.deepEqual(
   assets.undertakerWorkSourceRect('male', 600),
   { sx: 192, sy: 0, sw: 64, sh: 64 },
 );
@@ -93,6 +98,11 @@ for (const job of [
 }
 assert.match(
   atlasSource,
+  /p\.fisherAction === ['"]mudflatShellfish['"]/,
+  'mudflat shellfish gathering selects the dedicated crouching work sheet',
+);
+assert.match(
+  atlasSource,
   /standardTextureScale \* 0\.5/,
   'wide prop sheets preserve resident body scale in HD mode',
 );
@@ -108,6 +118,11 @@ assert.match(
 );
 
 const rendererSource = readFileSync(new URL('../../src/render/renderer.ts', import.meta.url), 'utf8');
+assert.match(
+  rendererSource,
+  /r\.job === ['"]fisher['"] && r\.task === ['"]갯벌에서 조개·게 줍는 중['"]/,
+  'only the shellfish-gathering mudflat task requests the crouching fisher action',
+);
 assert.match(
   rendererSource,
   /r\.job === ['"]undertaker['"] && r\.task === ['"]묘지 돌봄['"]/,

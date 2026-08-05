@@ -43,6 +43,24 @@ export const RESIDENT_FISHER_WORK_HD_SHEET = {
   src: '/assets/resident-fisher-work-hd-v1.png',
 } as const;
 
+export const RESIDENT_FISHER_MUDFLAT_WORK_SHEET = {
+  frameSize: 64,
+  displayFrameSize: 40,
+  columns: 4,
+  rows: 2,
+  frameDurationMs: 200,
+  src: '/assets/resident-fisher-mudflat-work-v1.png',
+} as const;
+
+export const RESIDENT_FISHER_MUDFLAT_WORK_HD_SHEET = {
+  frameSize: 128,
+  displayFrameSize: 40,
+  columns: 4,
+  rows: 2,
+  frameDurationMs: 200,
+  src: '/assets/resident-fisher-mudflat-work-hd-v1.png',
+} as const;
+
 export const RESIDENT_HERDER_WORK_SHEET = {
   frameSize: 64,
   displayFrameSize: 40,
@@ -193,6 +211,22 @@ export function fisherWorkSourceRect(
   const frameSize = highDefinition
     ? RESIDENT_FISHER_WORK_HD_SHEET.frameSize
     : RESIDENT_FISHER_WORK_SHEET.frameSize;
+  return {
+    sx: fisherWorkFrameIndex(elapsedMs) * frameSize,
+    sy: (gender === 'female' ? 1 : 0) * frameSize,
+    sw: frameSize,
+    sh: frameSize,
+  };
+}
+
+export function fisherMudflatWorkSourceRect(
+  gender: Gender,
+  elapsedMs: number,
+  highDefinition = false,
+) {
+  const frameSize = highDefinition
+    ? RESIDENT_FISHER_MUDFLAT_WORK_HD_SHEET.frameSize
+    : RESIDENT_FISHER_MUDFLAT_WORK_SHEET.frameSize;
   return {
     sx: fisherWorkFrameIndex(elapsedMs) * frameSize,
     sy: (gender === 'female' ? 1 : 0) * frameSize,

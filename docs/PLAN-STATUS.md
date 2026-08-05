@@ -71,7 +71,7 @@
 | [새 게임 설정 S3 산지 구현계획](IMPLEMENTATION-2026-08-02-new-game-setup-s3-mountain-region.md) | 완료 | 광상 장벽·인접 채광·광부 가림과 산 돌출부의 자연수·외부 거점 침범 방지 마스크를 전용 회귀·빌드·실화면으로 검증 |
 | [새 게임 설정 S4 호수 구현계획](IMPLEMENTATION-2026-08-02-new-game-setup-s4-lake-region.md) | 완료 | 큰 연결 호수·지역 자원 프로필·자연 급수·무홍수·호숫가 파문·점진 결빙/해빙을 core 82/82·빌드·실화면으로 검증 |
 | [새 게임 설정 S5 해안 구현계획](IMPLEMENTATION-2026-08-03-new-game-setup-s5-coast-region.md) | 완료 | 남쪽 연속 바다·자염막·염부와 자동 소금 운반을 구현하고, 골간 우디캐 외 교역 세력의 소금 매입·희소품 가치 3.2로 물·일반 자원 부족을 수출로 보완 |
-| [해안 전이 지형과 갯벌 어로 구현계획](IMPLEMENTATION-2026-08-03-coastal-transition-tidal-flat.md) | 완료 | 무지물·건축 금지 모래/갯벌, 첫 내륙 평지 자염막, `mudflat` 공동 비축·어살터·숲식 해안 이음매, 염부의 실제 취수 왕복과 갯벌 조개·게 채취 어부의 남녀 쪼그린 4프레임 작업 시트를 지형·UI·스프라이트 검사·빌드·실화면으로 검증 |
+| [해안 전이 지형과 갯벌 어로 구현계획](IMPLEMENTATION-2026-08-03-coastal-transition-tidal-flat.md) | 완료 | 무지물·건축 금지 모래/갯벌, 첫 내륙 평지 자염막, `mudflat` 공동 비축·어살터·숲식 해안 이음매, 염부의 실제 취수 왕복·전측면 HD-first v2 시트와 갯벌 조개·게 채취 어부의 남녀 쪼그린 4프레임 작업 시트를 지형·UI·스프라이트 검사·빌드·실화면으로 검증 |
 | [디버그 치트 패널 설계](DESIGN-2026-08-03-debug-cheat-panel.md) | 완료 | 8개 섹션 백틱 토글 패널과 단일 조작 모듈 `game/debugActions`, DEV 게이트+지연 import로 프로덕션 무포함, `debugTouched` 표식과 모달·전투 중 파괴적 조작 잠금을 실기동·전용 회귀·빌드로 검증. 공성 강제 개시는 방어 개편 P5 이후, 저장 슬롯 표식 표시는 후속 |
 | [밸런스 편집기 설계](DESIGN-2026-08-03-balance-editor.md) | 완료 | B1~B4 구현. 오버레이 병합(`balanceOverlay`+생성 `balanceOverrides`)을 config.ts·buildings.ts 본문에서 끝내 게임·테스트가 같은 값을 보고, 별도 앱 `edit:balance`가 CONFIG·BUILDING_DEFS 2219개 항목을 자동 폼·주석 동반·반영 시점 배지·변경 하이라이트로 편집한다. 흡수용 diff 내보내기 포함. 오버레이 프리셋과 리로드 없는 "다시 읽기"는 후속 |
 | [채집 영역 체제 설계](DESIGN-2026-08-01-gathering-zones.md) | 완료 | G1~G4 완료. 작업영역·거점 배정·숙식 움막과 사냥터 비축 보정을 검증했으며, 어부의 영역·비축 편입은 통합 어장·어선 설계 F0~F4로 이관 |

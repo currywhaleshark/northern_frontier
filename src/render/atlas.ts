@@ -256,6 +256,8 @@ import {
   RESIDENT_CURER_WORK_SHEET,
   RESIDENT_FISHER_WORK_HD_SHEET,
   RESIDENT_FISHER_WORK_SHEET,
+  RESIDENT_FISHER_MUDFLAT_WORK_HD_SHEET,
+  RESIDENT_FISHER_MUDFLAT_WORK_SHEET,
   RESIDENT_HERDER_WORK_HD_SHEET,
   RESIDENT_HERDER_WORK_SHEET,
   RESIDENT_POWDER_MAKER_WORK_HD_SHEET,
@@ -270,6 +272,7 @@ import {
   RESIDENT_WORK_PRESENTATION_SCALE_BY_JOB,
   charcoalBurnerWorkSourceRect,
   curerWorkSourceRect,
+  fisherMudflatWorkSourceRect,
   fisherWorkSourceRect,
   herderWorkSourceRect,
   powderMakerWorkSourceRect,
@@ -461,6 +464,8 @@ let residentWoodSplitterWorkSheet: HTMLImageElement | null = null;
 let residentWoodSplitterWorkHdSheet: HTMLImageElement | null = null;
 let residentFisherWorkSheet: HTMLImageElement | null = null;
 let residentFisherWorkHdSheet: HTMLImageElement | null = null;
+let residentFisherMudflatWorkSheet: HTMLImageElement | null = null;
+let residentFisherMudflatWorkHdSheet: HTMLImageElement | null = null;
 let residentHerderWorkSheet: HTMLImageElement | null = null;
 let residentHerderWorkHdSheet: HTMLImageElement | null = null;
 let residentCharcoalBurnerWorkSheet: HTMLImageElement | null = null;
@@ -651,6 +656,10 @@ function ensureLoaded(): void {
     image => { residentFisherWorkSheet = image; });
   loadAtlasAsset(RESIDENT_FISHER_WORK_HD_SHEET.src, false,
     image => { residentFisherWorkHdSheet = image; });
+  loadAtlasAsset(RESIDENT_FISHER_MUDFLAT_WORK_SHEET.src, false,
+    image => { residentFisherMudflatWorkSheet = image; });
+  loadAtlasAsset(RESIDENT_FISHER_MUDFLAT_WORK_HD_SHEET.src, false,
+    image => { residentFisherMudflatWorkHdSheet = image; });
   loadAtlasAsset(RESIDENT_HERDER_WORK_SHEET.src, false,
     image => { residentHerderWorkSheet = image; });
   loadAtlasAsset(RESIDENT_HERDER_WORK_HD_SHEET.src, false,
@@ -1634,12 +1643,15 @@ function drawOptionalResidentPresentation(
       break;
     case 'fisher':
       if (p.working && !p.moving) {
+        const mudflatShellfish = p.fisherAction === 'mudflatShellfish';
         return drawStationaryWork(
-          residentFisherWorkSheet,
-          residentFisherWorkHdSheet,
-          highDefinition => fisherWorkSourceRect(p.gender, animationTimeMs, highDefinition),
+          mudflatShellfish ? residentFisherMudflatWorkSheet : residentFisherWorkSheet,
+          mudflatShellfish ? residentFisherMudflatWorkHdSheet : residentFisherWorkHdSheet,
+          highDefinition => mudflatShellfish
+            ? fisherMudflatWorkSourceRect(p.gender, animationTimeMs, highDefinition)
+            : fisherWorkSourceRect(p.gender, animationTimeMs, highDefinition),
           RESIDENT_FISHER_WORK_SHEET.displayFrameSize / RESIDENT_FISHER_WORK_SHEET.frameSize,
-          'work.fisher',
+          mudflatShellfish ? 'work.fisher.mudflatShellfish' : 'work.fisher',
         );
       }
       break;

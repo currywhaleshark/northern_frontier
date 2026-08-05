@@ -1,0 +1,16 @@
+{
+  "states": {
+    "side_sea_intake": {
+      "frames": 4,
+      "fps": 5,
+      "loop": true,
+      "action": "tilted front-side three-quarter salt-worker seawater intake cycle facing screen-right; keep face, chest, pelvis, knees, and feet on the same diagonal in all frames; lower one small wooden dipper bucket toward an off-frame brine source, scoop, lift with both hands, return to ready; bucket stays connected to the hands; never rotate into a pure side profile"
+    },
+    "side_kiln_work": {
+      "frames": 4,
+      "fps": 5,
+      "loop": true,
+      "action": "tilted front-side three-quarter salt-kiln tending cycle facing screen-right; keep face, chest, pelvis, knees, and feet on the same diagonal in all frames; lean toward an off-frame boiling pan, stir brine with one short wooden paddle, straighten slightly, return; paddle stays connected to the hands; never rotate into a pure side profile"
+    }
+  }
+}

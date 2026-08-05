@@ -2693,6 +2693,9 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       showCargoMarker: o.residentCargoMarkers ?? true,
       cartEquipped: r.cartEquipped,
       farmerAction: farmerSpriteActionFor(r, presentation.oxPlowFarmerIds),
+      fisherAction: r.job === 'fisher' && r.task === '갯벌에서 조개·게 줍는 중'
+        ? 'mudflatShellfish'
+        : undefined,
       saltMakerAction: r.job === 'saltMaker' && r.task === '바닷물 긷는 중'
         ? 'seaIntake'
         : 'kilnWork',

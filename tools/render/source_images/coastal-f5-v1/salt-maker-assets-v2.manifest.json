@@ -1,0 +1,63 @@
+{
+  "version": 2,
+  "kind": "salt-maker-runtime-assets",
+  "engine": "component-row",
+  "states": [
+    "idle",
+    "walk",
+    "side_sea_intake",
+    "side_kiln_work"
+  ],
+  "frames": 4,
+  "fps": 5,
+  "standard_cell": 64,
+  "hd_cell": 128,
+  "source_runs": {
+    "male": {
+      "hd": "tools/render/generated/coastal-f5-v1/salt-maker-male-final-hd-v2",
+      "standard": "tools/render/generated/coastal-f5-v1/salt-maker-male-final-v2"
+    },
+    "female": {
+      "hd": "tools/render/generated/coastal-f5-v1/salt-maker-female-final-hd-v2",
+      "standard": "tools/render/generated/coastal-f5-v1/salt-maker-female-final-v2"
+    }
+  },
+  "published": {
+    "male": {
+      "standard_source": {
+        "path": "tools/render/source_images/coastal-f5-v1/salt-maker-male-sheet-v2.png",
+        "sha256": "73d91f4a2a688b730e24fbae80af4e1209b6ecf6d20e76d00a341ea2ca13031f"
+      },
+      "hd_source": {
+        "path": "tools/render/source_images/coastal-f5-v1/salt-maker-male-sheet-hd-v2.png",
+        "sha256": "fdebb1f67401584a44088af6eb3a944aae92fb4fca1414b8684d0e1284f07107"
+      },
+      "standard_public": {
+        "path": "public/assets/resident-salt-maker-male-v2.png",
+        "sha256": "73d91f4a2a688b730e24fbae80af4e1209b6ecf6d20e76d00a341ea2ca13031f"
+      },
+      "hd_public": {
+        "path": "public/assets/resident-salt-maker-male-hd-v2.png",
+        "sha256": "fdebb1f67401584a44088af6eb3a944aae92fb4fca1414b8684d0e1284f07107"
+      }
+    },
+    "female": {
+      "standard_source": {
+        "path": "tools/render/source_images/coastal-f5-v1/salt-maker-female-sheet-v2.png",
+        "sha256": "4eaa0f1497fc43454c3026236b4118c0d909588aa2ec08f96de7c5baff634fff"
+      },
+      "hd_source": {
+        "path": "tools/render/source_images/coastal-f5-v1/salt-maker-female-sheet-hd-v2.png",
+        "sha256": "954f92fda2916b44bee1145082e1778b2e9e55afcce0b31d7e8c756048059f3a"
+      },
+      "standard_public": {
+        "path": "public/assets/resident-salt-maker-female-v2.png",
+        "sha256": "4eaa0f1497fc43454c3026236b4118c0d909588aa2ec08f96de7c5baff634fff"
+      },
+      "hd_public": {
+        "path": "public/assets/resident-salt-maker-female-hd-v2.png",
+        "sha256": "954f92fda2916b44bee1145082e1778b2e9e55afcce0b31d7e8c756048059f3a"
+      }
+    }
+  }
+}

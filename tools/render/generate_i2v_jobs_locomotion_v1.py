@@ -42,10 +42,13 @@ JOBS_DIR = EXPORT_ROOT / "01_jobs"
 SPECIAL_RESIDENTS_DIR = EXPORT_ROOT / "04_special_residents"
 YOUTH_RELIGIOUS_DIR = ROOT / "tools" / "render" / "source_images" / "youth-religious-i2v-v1"
 YOUTH_RELIGIOUS_V2_DIR = ROOT / "tools" / "render" / "source_images" / "youth-religious-i2v-v2" / "raw"
+COASTAL_F5_DIR = ROOT / "tools" / "render" / "source_images" / "coastal-f5-v1"
 SOURCE_DIRS = (JOBS_DIR, SPECIAL_RESIDENTS_DIR, YOUTH_RELIGIOUS_DIR)
 CHARACTER_SOURCE_OVERRIDES = {
     "youth_farmer_male": YOUTH_RELIGIOUS_V2_DIR / "youth_farmer_male.png",
     "youth_farmer_female": YOUTH_RELIGIOUS_V2_DIR / "youth_farmer_female.png",
+    "salt_maker_male": COASTAL_F5_DIR / "salt-maker-male-base-v2.png",
+    "salt_maker_female": COASTAL_F5_DIR / "salt-maker-female-base-v2.png",
 }
 ACTION_SOURCE_OVERRIDES = {
     (
@@ -156,6 +159,18 @@ CHARACTER_IDENTITY: dict[str, str] = {
         "adult female Joseon farmer with wide straw hat, dark hair in a low bun, "
         "cream-white top, dark blue long skirt, straw shoes, long-handled hoe held "
         "low in her right hand"
+    ),
+    "salt_maker_male": (
+        "adult male Joseon salt maker with a black-gray cloth headband, small tied "
+        "topknot, short beard and mustache, salt-stained gray-brown sleeveless work "
+        "coat over cream sleeves, rope belt, loose blue-gray trousers, wrapped calves, "
+        "and woven straw shoes"
+    ),
+    "salt_maker_female": (
+        "adult female Joseon salt maker with a black-gray cloth headband and low "
+        "nape-level jjokmeori with no crown topknot, salt-stained gray-brown sleeveless "
+        "work coat over cream sleeves, rope belt, loose blue-gray trousers, wrapped "
+        "calves, and woven straw shoes"
     ),
     "hunter_male": (
         "adult male Joseon hunter with topknot and headband, light facial hair, "
@@ -276,6 +291,41 @@ CHARACTER_IDENTITY: dict[str, str] = {
 }
 
 CHARACTER_ACTION_NOTES: dict[tuple[str, str], str] = {
+    (
+        "salt_maker_male",
+        "idle",
+    ): (
+        "Camera-angle lock: preserve the source's tilted front-side three-quarter view "
+        "in every frame. Keep the face, chest, pelvis, knees, and both feet aimed along "
+        "that same diagonal. Never rotate into a pure side profile or a front view. "
+    ),
+    (
+        "salt_maker_male",
+        "walk",
+    ): (
+        "Camera-angle lock: walk along the source's tilted front-side three-quarter "
+        "diagonal while the face, chest, pelvis, knees, and both feet keep that same "
+        "orientation in every gait phase. Never rotate into a pure side profile or a "
+        "front view. Preserve the black-gray head cloth, small topknot, and short beard. "
+    ),
+    (
+        "salt_maker_female",
+        "idle",
+    ): (
+        "Camera-angle lock: preserve the source's tilted front-side three-quarter view "
+        "in every frame. Keep the face, chest, pelvis, knees, and both feet aimed along "
+        "that same diagonal. Never rotate into a pure side profile or a front view. "
+        "Keep the low nape bun; never add a crown topknot. "
+    ),
+    (
+        "salt_maker_female",
+        "walk",
+    ): (
+        "Camera-angle lock: walk along the source's tilted front-side three-quarter "
+        "diagonal while the face, chest, pelvis, knees, and both feet keep that same "
+        "orientation in every gait phase. Never rotate into a pure side profile or a "
+        "front view. Keep the low nape bun; never add a crown topknot. "
+    ),
     (
         "jurchen_warrior_aragae",
         "walk",

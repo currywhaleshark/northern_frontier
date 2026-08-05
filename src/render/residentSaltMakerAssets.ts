@@ -16,12 +16,12 @@ export const RESIDENT_SALT_MAKER_DISPLAY_FRAME_SIZE = 40;
 
 export const RESIDENT_SALT_MAKER_SHEETS: Record<Gender, ResidentSaltMakerSheetPair> = {
   male: {
-    standard: { src: '/assets/resident-salt-maker-male-v1.png', frameSize: 64 },
-    highDefinition: { src: '/assets/resident-salt-maker-male-hd-v1.png', frameSize: 128 },
+    standard: { src: '/assets/resident-salt-maker-male-v2.png', frameSize: 64 },
+    highDefinition: { src: '/assets/resident-salt-maker-male-hd-v2.png', frameSize: 128 },
   },
   female: {
-    standard: { src: '/assets/resident-salt-maker-female-v1.png', frameSize: 64 },
-    highDefinition: { src: '/assets/resident-salt-maker-female-hd-v1.png', frameSize: 128 },
+    standard: { src: '/assets/resident-salt-maker-female-v2.png', frameSize: 64 },
+    highDefinition: { src: '/assets/resident-salt-maker-female-hd-v2.png', frameSize: 128 },
   },
 };
 
@@ -33,8 +33,8 @@ const STATE_ROW: Record<SaltMakerSpriteState, number> = {
 };
 
 const FRAME_DURATION_MS: Record<SaltMakerSpriteState, number> = {
-  idle: 250,
-  walk: 167,
+  idle: 200,
+  walk: 200,
   seaIntake: 200,
   kilnWork: 200,
 };
