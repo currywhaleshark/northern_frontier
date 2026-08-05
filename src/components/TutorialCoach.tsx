@@ -4,15 +4,42 @@
 // 앵커가 사라진 UI 개편에도 조용히 물러날 뿐 게임을 막지 않는다.
 import { useEffect, useState, type CSSProperties } from 'react';
 import { buildingFootprintDims } from '../game/buildings';
-import { currentScenarioStep } from '../game/scenario';
+import {
+  currentScenarioStep, TUTORIAL_GUIDE_DIALOGUE, tutorialTributeCanFillFromStock,
+  tutorialTributeNeedsTannery, tutorialTributePrepared,
+} from '../game/scenario';
 import { countJob } from '../game/residents';
 import { isWallBuilding } from '../game/walls';
 import type { GameState } from '../game/types';
+import { DialoguePortrait } from './DialoguePortrait';
 
 interface CoachHint {
   // 이 소목표가 끝났으면 다음 힌트로 넘어간다. 없으면 스텝이 끝날 때까지 유지.
   done?: (state: GameState) => boolean;
   path: readonly { tut: string; text: string }[];
+}
+
+// 화면을 가리키는 짧은 말은 큰 대화보다 가볍게 들려야 한다. 원문의 조작 정보는
+// 그대로 두고 딱딱한 명령형 어미만 연이의 다정한 존댓말로 바꾼다.
+export function tutorialCoachVoice(text: string): string {
+  const endings: readonly [string, string][] = [
+    ['여십시오.', '열어 보세요.'],
+    ['누르십시오.', '눌러 보세요.'],
+    ['두십시오.', '두세요.'],
+    ['올리십시오.', '올려 주세요.'],
+    ['만드십시오.', '만들어 주세요.'],
+    ['배정하십시오.', '배정해 주세요.'],
+    ['배치하십시오.', '배치해 주세요.'],
+    ['완공하십시오.', '완공해 주세요.'],
+    ['기다리십시오.', '기다려 주세요.'],
+    ['흘리십시오.', '흘려 보세요.'],
+    ['드러내십시오.', '드러내 보세요.'],
+    ['정하십시오.', '정해 보세요.'],
+    ['살피십시오.', '살펴보세요.'],
+    ['먹이십시오.', '먹여 주세요.'],
+    ['하십시오.', '해 주세요.'],
+  ];
+  return endings.reduce((line, [formal, friendly]) => line.split(formal).join(friendly), text);
 }
 
 // 스텝의 목표 수치는 scenario.flags에 주입되어 있다. 없으면 영영 못 이룬 것으로 본다.
@@ -131,10 +158,13 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
     },
     {
       done: state => assignedJobCount(state, 'woodcutter', 'lumberCamp') >= 1,
-      path: [{
-        tut: 'building-worker-slot-lumberCamp',
-        text: '완공된 벌목장을 선택하고 빈 작업 슬롯을 눌러 벌목꾼을 배정하십시오.',
-      }],
+      path: [
+        { tut: 'map-view', text: '지도에서 완공된 벌목장을 눌러 선택해 보세요.' },
+        {
+          tut: 'building-worker-slot-lumberCamp',
+          text: '이제 빈 작업 슬롯을 눌러 벌목꾼을 배정하십시오.',
+        },
+      ],
     },
     {
       // 여기서부터는 상세 창을 거치지 않는다 — ＋ 한 번이 무직자 하나를 그 자리에서 올린다
@@ -254,10 +284,13 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
     },
     {
       done: state => assignedJobCount(state, 'hunter', 'huntLodge') >= 2,
-      path: [{
-        tut: 'building-worker-slot-huntLodge',
-        text: '완공된 사냥막을 선택하고 빈 작업 슬롯을 두 번 눌러 사냥꾼을 배정하십시오.',
-      }],
+      path: [
+        { tut: 'map-view', text: '지도에서 완공된 사냥막을 눌러 선택해 보세요.' },
+        {
+          tut: 'building-worker-slot-huntLodge',
+          text: '이제 빈 작업 슬롯을 두 번 눌러 사냥꾼을 배정하십시오.',
+        },
+      ],
     },
     {
       path: [{ tut: 'time-play', text: '시간을 흘려 사냥꾼이 고기를 채우게 하십시오. 고기는 상하니 쟁여 두기보다 제때 먹이십시오.' }],
@@ -297,10 +330,13 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
     },
     {
       done: state => assignedJobCount(state, 'herbalist', 'herbHut') >= 1,
-      path: [{
-        tut: 'building-worker-slot-herbHut',
-        text: '완공된 약초막을 선택하고 빈 작업 슬롯을 눌러 약초꾼을 배정하십시오.',
-      }],
+      path: [
+        { tut: 'map-view', text: '지도에서 완공된 약초막을 눌러 선택해 보세요.' },
+        {
+          tut: 'building-worker-slot-herbHut',
+          text: '이제 빈 작업 슬롯을 눌러 약초꾼을 배정하십시오.',
+        },
+      ],
     },
     {
       path: [{ tut: 'time-play', text: '시간을 흘려 병자가 자리를 털고 일어나기를 기다리십시오.' }],
@@ -356,6 +392,7 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
     },
     {
       // 얕은 앵커(독 아이콘) → 깊은 앵커(창 안의 세공고 칸). 창이 닫혀 있으면 코치가 스스로 물러난다
+      done: state => tutorialTributeNeedsTannery(state),
       path: [
         { tut: 'dock-court', text: '조정 창을 여십시오.' },
         { tut: 'tribute-reserve', text: '세공고에 올해 요구 품목을 옮겨 두십시오. 넣어 둔 몫은 겨울 소비와 분리되어 잠깁니다.' },
@@ -381,7 +418,15 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
       ],
     },
     {
+      done: state => tutorialTributeCanFillFromStock(state),
       path: [{ tut: 'time-play', text: '시간을 흘려 무두장이가 가죽옷을 짓게 하십시오. 가죽이 끊기거든 사냥꾼을 더 두십시오.' }],
+    },
+    {
+      done: state => tutorialTributePrepared(state),
+      path: [
+        { tut: 'dock-court', text: '가죽옷이 마련되었습니다. 조정 창을 다시 여십시오.' },
+        { tut: 'tribute-reserve', text: '가죽옷을 세공고에 요구량만큼 옮겨 두십시오.' },
+      ],
     },
   ],
   // 유민은 스텝이 직접 부르는 통제 사건이다 — 가리킬 곳은 시간뿐이고, 판단은 제안 창에서 한다
@@ -418,10 +463,13 @@ const STEP_HINTS: Record<string, readonly CoachHint[]> = {
     },
     {
       done: state => assignedJobCount(state, 'miner', 'mine') >= 1,
-      path: [{
-        tut: 'building-worker-slot-mine',
-        text: '완공된 채광장을 선택하고 빈 작업 슬롯을 눌러 채광꾼을 배정하십시오.',
-      }],
+      path: [
+        { tut: 'map-view', text: '지도에서 완공된 채광장을 눌러 선택해 보세요.' },
+        {
+          tut: 'building-worker-slot-mine',
+          text: '이제 빈 작업 슬롯을 눌러 채광꾼을 배정하십시오.',
+        },
+      ],
     },
     {
       path: [{ tut: 'time-play', text: '시간을 흘려 배정된 채광꾼이 영역 안의 돌과 철을 캐 오게 하십시오.' }],
@@ -541,8 +589,11 @@ export function TutorialCoach({ state }: { state: GameState }) {
         role="status"
         style={bubbleStyle}
       >
-        <span className="tutorial-coach-label">길잡이</span>
-        {target.text}
+        <DialoguePortrait dialogue={TUTORIAL_GUIDE_DIALOGUE} compact />
+        <span className="tutorial-coach-copy">
+          <span className="tutorial-coach-label">{TUTORIAL_GUIDE_DIALOGUE.speaker}</span>
+          {tutorialCoachVoice(target.text)}
+        </span>
       </div>
     </>
   );

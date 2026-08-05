@@ -54,6 +54,9 @@ const topBarSource = readFileSync(new URL('../../src/components/TopBar.tsx', imp
 const gameMenuSource = readFileSync(new URL('../../src/components/GameMenu.tsx', import.meta.url), 'utf8');
 const canvasSource = readFileSync(new URL('../../src/components/GameCanvas.tsx', import.meta.url), 'utf8');
 const minimapSource = readFileSync(new URL('../../src/components/Minimap.tsx', import.meta.url), 'utf8');
+const eventModalSource = readFileSync(new URL('../../src/components/EventModal.tsx', import.meta.url), 'utf8');
+const portraitSource = readFileSync(new URL('../../src/components/DialoguePortrait.tsx', import.meta.url), 'utf8');
+const tutorialCoachSource = readFileSync(new URL('../../src/components/TutorialCoach.tsx', import.meta.url), 'utf8');
 const musicSource = readFileSync(new URL('../../src/sound/music.ts', import.meta.url), 'utf8');
 const stylesSource = readAppCss();
 const atlasSource = readFileSync(new URL('../../src/render/atlas.ts', import.meta.url), 'utf8');
@@ -83,6 +86,21 @@ assert.match(stylesSource, /\.canvas-wrap\s*\{[\s\S]*?overflow:\s*hidden;/,
   'the map viewport must not expose native wheel scrolling after wheel zoom is enabled');
 assert.match(minimapSource, /mapViewportScale\(box\)/,
   'minimap navigation must account for the rendered map zoom');
+assert.match(eventModalSource, /choice\.dialogue[\s\S]*DialoguePortrait/,
+  'the generic event modal switches to portrait dialogue when presentation metadata is present');
+assert.match(eventModalSource, /opt\.effect[\s\S]*choice-effect/,
+  'dialogue choices render mechanical effects separately from spoken labels');
+assert.match(portraitSource, /dialogue\.portrait[\s\S]*placeholder/,
+  'dialogue speakers retain a usable named placeholder before final portrait art arrives');
+assert.match(tutorialCoachSource, /TUTORIAL_GUIDE_DIALOGUE[\s\S]*DialoguePortrait/,
+  'anchored tutorial hints and modal dialogue share the same guide identity');
+assert.match(tutorialCoachSource, /tutorialCoachVoice\(target\.text\)/,
+  'anchored hints pass through the friendly guide voice without changing their mechanics');
+assert.doesNotMatch(tutorialCoachSource, /나으리, \{target\.text\}/,
+  'short anchored hints do not repeat the player address on every line');
+for (const selector of ['dialogue-scene', 'dialogue-portrait', 'dialogue-speaker', 'choice-effect']) {
+  assert.match(stylesSource, new RegExp(`\\.${selector}\\b`), `dialogue UI styles include .${selector}`);
+}
 assert.match(musicSource, /Math\.max\(0, Math\.min\(1, \(now - startedAt\) \/ CROSSFADE_MS\)\)/,
   'music crossfades must clamp animation progress before assigning HTML audio volume');
 assert.match(atlasSource, /specialResidentSheet[\s\S]*bob, 1\.16/,

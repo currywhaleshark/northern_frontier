@@ -901,9 +901,22 @@ export interface SilverVeinState {
 interface ChoiceOption {
   id: string;
   label: string;
-  desc: string;
+  desc?: string;
+  effect?: string; // 대사와 분리해 표시하는 실제 비용·보상·목표
   disabled?: boolean;
   disabledReason?: string;
+}
+
+// 초상화 대화형 사건의 표시 정보. 사건 판정과 분리된 순수 표시 메타데이터라
+// 기존 PendingChoice와 저장 호환을 유지하면서 튜토리얼·후반 이야기 사건이 함께 쓴다.
+export interface DialoguePresentation {
+  speaker: string;
+  speakerTitle?: string;
+  portrait?: {
+    src: string;
+    alt: string;
+    position?: string;
+  };
 }
 
 export interface PendingChoice {
@@ -914,6 +927,7 @@ export interface PendingChoice {
     src: string;
     alt: string;
   };
+  dialogue?: DialoguePresentation;
   options: ChoiceOption[];
   // raid: { power, faction, warned } / trade: { give, giveAmt, get, getAmt, faction } / immigration: { count }
   data: Record<string, unknown>;

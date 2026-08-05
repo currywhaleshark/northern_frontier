@@ -1994,7 +1994,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
               {() => <UnifiedLog state={stateRef.current} />}
             </RuntimeVersionBoundary>
           </Profiler>
-          <div className="canvas-wrap" ref={mapViewportRef}>
+          <div className="canvas-wrap" ref={mapViewportRef} data-tut="map-view">
             <RuntimeVersionBoundary store={runtimeVersionStore}>
               {runtimeVersion => {
                 const runtimeState = stateRef.current;
