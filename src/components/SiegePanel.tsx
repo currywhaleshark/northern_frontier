@@ -11,9 +11,10 @@ function days(value: number): string {
   return Number.isFinite(value) ? `${Math.max(0, Math.floor(value))}일분` : '넉넉함';
 }
 
-export function SiegePanel({ state, onChangeStance }: {
+export function SiegePanel({ state, onChangeStance, onCommandWallBattle }: {
   state: GameState;
   onChangeStance: (stance: SiegeStance) => void;
+  onCommandWallBattle: () => void;
 }) {
   const siege = state.siegeState;
   if (!siege) return null;
@@ -43,6 +44,7 @@ export function SiegePanel({ state, onChangeStance }: {
         <div className="siege-stance-actions">
           <button disabled={siege.stance === 'hold' || switchedToday} onClick={() => onChangeStance('hold')}>농성</button>
           <button disabled={siege.stance === 'wall' || switchedToday} onClick={() => onChangeStance('wall')}>성벽전</button>
+          {siege.phase === 'wallCombat' && <button onClick={onCommandWallBattle}>성벽전 직접 지휘</button>}
           <button className="danger" onClick={() => onChangeStance('field')}>수비대 출격</button>
         </div>
       )}

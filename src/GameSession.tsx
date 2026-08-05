@@ -78,7 +78,7 @@ import { useSpecialItem } from './game/specialItemActions';
 import { installRoyalPlaque, royalPlaqueInstallError } from './game/royalPlaque';
 import { getPointerAction, selectedEntityAfterTileClick } from './game/selectionActions';
 import { makeRng } from './game/map';
-import { changeSiegeStance } from './game/siege';
+import { changeSiegeStance, startTacticalWallBattle } from './game/siege';
 import { openTerritoryOrderConfirmation } from './game/territory';
 import {
   BUILDING_DEFS, buildingFootprintDims, computeDefense, preferredLeveeEdgeAt,
@@ -1210,6 +1210,12 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     bump();
   };
 
+  const handleCommandWallBattle = () => {
+    const error = startTacticalWallBattle(stateRef.current);
+    if (error) notify(error, 'info', true);
+    bump();
+  };
+
   const handleUseSpecialItem = (item: SpecialItemId) => {
     if (item !== 'reliefGrainVoucher' && item !== 'tributeWaiverDecree' && item !== 'recruitmentNotice') return;
     const error = useSpecialItem(stateRef.current, item);
@@ -1975,7 +1981,11 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
             {() => (
               <div className="right-overlay-stack">
                 <AlertsPanel state={stateRef.current} />
-                <SiegePanel state={stateRef.current} onChangeStance={handleSiegeStance} />
+                <SiegePanel
+                  state={stateRef.current}
+                  onChangeStance={handleSiegeStance}
+                  onCommandWallBattle={handleCommandWallBattle}
+                />
               </div>
             )}
           </RuntimeVersionBoundary>

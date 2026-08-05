@@ -130,7 +130,7 @@ export function attachFeaturedResidentsToTacticalGroups(
 }
 
 export function defaultTacticalDeploymentPlacement(
-  battle: Pick<TacticalBattle, 'encounterKind' | 'orientation' | 'assaultKind' | 'prepActions'>,
+  battle: Pick<TacticalBattle, 'encounterKind' | 'orientation' | 'assaultKind' | 'prepActions' | 'defenseStage'>,
   group: TacticalDefenderGroup,
 ): TacticalDeploymentPlacement {
   if (group.kind === 'civilian') return { zoneId: 'center', line: 'rear', fixed: true };
@@ -139,6 +139,12 @@ export function defaultTacticalDeploymentPlacement(
   }
   if (battle.orientation === 'assault') {
     return { zoneId: 'lairTrail', line: group.kind === 'healer' ? 'rear' : group.line };
+  }
+  if (battle.defenseStage === 'wallBreach') {
+    return { zoneId: 'wall', line: group.kind === 'healer' ? 'rear' : group.line };
+  }
+  if (battle.defenseStage === 'villageDefense') {
+    return { zoneId: group.kind === 'healer' ? 'center' : 'storehouse', line: group.kind === 'healer' ? 'rear' : group.line };
   }
   const ambushCapable = tacticalGroupCapabilities(group).has('ambush');
   const zoneId = ambushCapable
@@ -255,6 +261,12 @@ export function tacticalDeploymentPlacementUnavailableReason(
     return samePlacement(current, placement as TacticalDeploymentPlacement)
       ? null
       : '피난 주민은 마을 중심지 최후열에서 이동할 수 없습니다.';
+  }
+  if (battle.defenseStage === 'wallBreach' && placement.zoneId !== 'wall') {
+    return '성벽 단면 전투의 수비대는 돌파 지점에만 배치할 수 있습니다.';
+  }
+  if (battle.defenseStage === 'villageDefense' && placement.zoneId !== 'storehouse' && placement.zoneId !== 'center') {
+    return '성벽이 무너진 뒤에는 창고 주변이나 마을 중심지에만 배치할 수 있습니다.';
   }
   if (group.kind === 'healer' && placement.line !== 'rear') return '전술 치료반은 후열에만 배치할 수 있습니다.';
   if (battle.assaultKind === 'predatorHunt' && placement.zoneId === 'huntDen') {

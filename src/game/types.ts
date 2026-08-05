@@ -1810,6 +1810,7 @@ export interface TacticalRoundReport {
   raiderMoraleDelta: number;
   positionsApplied?: boolean;
   ended?: boolean;
+  stageTransition?: 'villageDefense';
   outcome?:
     | 'defenseSuccess'
     | 'partialLoss'
@@ -1948,6 +1949,10 @@ export interface TacticalBattle {
   reports: TacticalRoundReport[];
   pendingReport: TacticalRoundReport | null;
   mode: BattleMode;
+  /** P5 장기 공성 수동전의 현재 무대. 일반 습격 방어전에는 없다. */
+  defenseStage?: 'wallBreach' | 'villageDefense';
+  wallStageRoundLimit?: number;
+  villageStageStartRound?: number;
   orientation?: 'defense' | 'assault';
   assaultKind?: 'banditLair' | 'predatorHunt';
   assaultTargetSiteId?: number;

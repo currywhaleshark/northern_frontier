@@ -1208,6 +1208,7 @@ export const CONFIG_DEFAULTS = {
   // 전력(power) 계열은 서로 견주는 상대값이고, *Multiplier는 그 전력에 곱하는 배율이다.
   tacticalBattle: {
     maxRounds: 5,
+    wallStageMaxRounds: 3,
     // 사냥 몰이 — 매복 일격과 포위, 짐승의 판단(돌파·재은신)까지.
     hunt: {
       maxEngagements: 8,

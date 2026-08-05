@@ -12,6 +12,7 @@ import {
 } from './raidRoutes';
 import { FOOD_RESOURCES } from './resourceCatalog';
 import { getSeason } from './seasons';
+import { createTacticalBattle } from './tacticalBattle';
 import { isStationedWatchman } from './watchtowers';
 import type {
   Building, GameState, PendingChoice, RaiderBand, Resident, ResourceId, SiegeStance, SiegeState,
@@ -206,6 +207,32 @@ export function changeSiegeStance(state: GameState, stance: SiegeStance): string
   siege.phase = stance === 'wall' ? 'wallCombat' : 'encirclement';
   siege.lastStanceChangeDay = state.day;
   addLog(state, stance === 'wall' ? '수비대가 성벽전 태세로 전환했습니다.' : '수비대가 농성 태세로 전환했습니다.', 'raid');
+  return null;
+}
+
+export function startTacticalWallBattle(state: GameState): string | null {
+  const siege = state.siegeState;
+  if (!siege || !state.raiders) return '직접 지휘할 공성군이 없습니다.';
+  if (state.tacticalBattle || state.battle) return '이미 진행 중인 전투가 있습니다.';
+  if (state.pendingChoice) return '먼저 현재 결정을 마쳐야 합니다.';
+  if (siege.phase === 'evacuation') return '성문을 닫고 피난을 마친 뒤 성벽전을 지휘할 수 있습니다.';
+  if (siege.phase !== 'wallCombat' || siege.stance !== 'wall') return '성벽전 태세에서만 직접 지휘할 수 있습니다.';
+  const interior = new Set(siege.protectedInterior);
+  const preferred = siege.breachTargetId == null
+    ? undefined
+    : state.buildings.find(building => building.id === siege.breachTargetId && isBlockingDefenseWall(building));
+  const wall = preferred ?? boundaryWalls(state, interior)
+    .sort((left, right) => wallIntegrity(left) - wallIntegrity(right) || left.id - right.id)[0];
+  if (!wall) return '직접 지휘할 온전한 성벽 구간을 찾을 수 없습니다.';
+  siege.breachTargetId = wall.id;
+  createTacticalBattle(state, {
+    factionName: siege.faction,
+    power: siege.raiderPower,
+    warned: siege.warned,
+    siege: true,
+    mode: 'garrison',
+    wallSectionBuildingId: wall.id,
+  });
   return null;
 }
 

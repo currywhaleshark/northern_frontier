@@ -2,7 +2,7 @@ import { resetAgent } from './agents';
 import {
   activeArtillery, artilleryMoralePenalty, artilleryPieceCount, describeArtillery,
 } from './artillery';
-import { BUILDING_DEFS, countBuilt } from './buildings';
+import { BUILDING_DEFS, computeDefense, countBuilt } from './buildings';
 import { combatGroupLabel, tacticalGroupCapabilities } from './combatCapabilities';
 import { createCombatRoster, isCombatReadyResident, type CombatantSnapshot, type CombatRole } from './combatRoster';
 import { CONFIG } from './config';
@@ -21,7 +21,7 @@ import { addLog } from './events';
 import { withJosa } from './josa';
 import { ARTIFACT_WEAPON_NAMES } from './weapons';
 import { makeRng } from './map';
-import { effectiveWallType, wallIntegrity, wallIntegrityMax } from './raidRoutes';
+import { bumpDefenseTopology, effectiveWallType, wallIntegrity, wallIntegrityMax } from './raidRoutes';
 import {
   applyLootLosses, damageBuildings, describeLootLosses, injure, killResidents, moraleShock,
 } from './raidDamage';
@@ -1095,7 +1095,18 @@ export function createTacticalBattle(
     revealed: false,
   });
   const enemies = raiderGroups(params.factionName, originalPower, { scoutsReady, deepScouted }, enemyPlan);
-  const flankRoutes = createTacticalFlankRoutes(enemyPlan);
+  const zones = createZones(state, params.siege, groups, params.wallSectionBuildingId);
+  const wallStage = params.siege && zones.some(zone => zone.id === 'wall' && zone.wallSection != null);
+  if (wallStage) {
+    for (const enemy of enemies) {
+      enemy.zoneId = 'wall';
+      enemy.targetZoneId = enemy.kind === 'looters' ? 'storehouse' : 'center';
+      enemy.pendingZoneId = undefined;
+      enemy.routeTransit = undefined;
+      enemy.rearAssault = false;
+    }
+  }
+  const flankRoutes = wallStage ? [] : createTacticalFlankRoutes(enemyPlan);
   const battle: TacticalBattle = {
     encounterKind: 'raidDefense',
     id: state.day * 1000 + state.subTick * 10 + (params.mode === 'levy' ? 2 : 1),
@@ -1110,12 +1121,12 @@ export function createTacticalBattle(
     prepPoints: Math.max(0, settlementRaidPreparationPoints(state, params.warned) - enemyPlanPreparationPenalty(enemyPlan)),
     prepActions: PREPARATION_ACTIONS.map(action => ({ ...action, selected: false, applied: false })),
     preparationEvents: [],
-    zones: createZones(state, params.siege, groups, params.wallSectionBuildingId),
+    zones,
     flankRoutes,
     defenderGroups: groups,
     raiderGroups: enemies,
     enemyPlan,
-    currentZoneId: 'approach',
+    currentZoneId: wallStage ? 'wall' : 'approach',
     villageMorale: clamp(
       CONFIG.tacticalBattle.morale.village +
       (params.warned ? CONFIG.tacticalBattle.morale.warnedBonus : 0) +
@@ -1129,6 +1140,8 @@ export function createTacticalBattle(
     reports: [],
     pendingReport: null,
     mode: params.mode,
+    defenseStage: wallStage ? 'wallBreach' : undefined,
+    wallStageRoundLimit: wallStage ? CONFIG.tacticalBattle.wallStageMaxRounds : undefined,
     resourceSnapshot: captureTacticalResources(state),
   };
   initializeEnemyTacticalRouteTransit(battle, state.weather);
@@ -1137,7 +1150,9 @@ export function createTacticalBattle(
   state.tacticalBattle = battle;
   state.battle = null;
   state.pendingChoice = null;
-  addLog(state, `${params.factionName}의 습격에 맞서 직접 방어 지휘를 시작합니다.`, 'raid', true);
+  addLog(state, wallStage
+    ? `${params.factionName}의 공세에 맞서 돌파 지점의 성벽전을 직접 지휘합니다.`
+    : `${params.factionName}의 습격에 맞서 직접 방어 지휘를 시작합니다.`, 'raid', true);
   for (const warning of enemyPlanWarningLines(enemyPlan)) addLog(state, `적의 계책 징후: ${warning}`, 'raid');
   return battle;
 }
@@ -1174,6 +1189,12 @@ export function tacticalPreparationUnavailableReason(
   if (!battle) return '진행 중인 직접 지휘 전투가 없습니다.';
   if (battle.assaultKind === 'predatorHunt') return huntPreparationUnavailableReason(state, actionId);
   if (battle.orientation === 'assault') return assaultPreparationUnavailableReason(state, actionId);
+  if (battle.defenseStage === 'wallBreach' && actionId === 'openFlankRoute') {
+    return '성벽 단면 전투에서는 우회로를 열 수 없습니다.';
+  }
+  if (battle.defenseStage === 'wallBreach' && actionId === 'setAmbush') {
+    return '성벽 단면 전투에서는 사냥꾼도 돌파 지점을 지킵니다.';
+  }
   if (actionId === 'setAmbush' && !battle.defenderGroups.some(group => tacticalGroupCapabilities(group).has('ambush') && group.count > 0)) {
     return '매복시킬 사냥꾼이 없습니다.';
   }
@@ -2422,6 +2443,7 @@ export function resolveTacticalRound(state: GameState): string | null {
     return resolveAssaultRound(state);
   }
   if (battle.phase !== 'command') return '교전을 진행할 지휘 단계가 아닙니다.';
+  const wallStage = battle.defenseStage === 'wallBreach';
   const rng = makeRng(state.seed + battle.id * 8191 + battle.round * 131071);
   const routeAdvances = advanceTacticalRouteTransits(battle);
   const routeResolution = resolveTacticalRouteRound(battle, routeAdvances, state.weather, rng);
@@ -2639,6 +2661,7 @@ export function resolveTacticalRound(state: GameState): string | null {
         roundKilled += loss.killed;
       }
       if (engagement.direction === 'frontal') {
+        const wasBreached = zone.breached;
         const consequenceAttackers = engagement.attackers.filter(attacker => attacker.intent !== 'withdraw');
         const consequences = consequenceAttackers.length > 0 && exchange.enemyPower > 0
           ? applyDefenseZoneConsequences({
@@ -2676,7 +2699,8 @@ export function resolveTacticalRound(state: GameState): string | null {
         zone.breached = consequences.breached;
         events.push(...consequences.breachEvents);
         lines.push(...consequences.breachLines);
-        buildingsDamaged += consequences.buildingsDamaged;
+        const mapWallBreach = wallStage && zone.id === 'wall' && !wasBreached && consequences.breached;
+        buildingsDamaged += Math.max(0, consequences.buildingsDamaged - Number(mapWallBreach));
         for (const [key, amount] of Object.entries(consequences.loot)) {
           const resource = key as ResourceId;
           lootBag[resource] = (lootBag[resource] ?? 0) + (amount ?? 0);
@@ -2751,7 +2775,7 @@ export function resolveTacticalRound(state: GameState): string | null {
         side: 'raider', groupId: attacker.id, float: '급습 이탈!',
       });
       lines.push(`${withJosa(attacker.label, '이/가')} 후방 급습 목표를 달성하고 전장에서 이탈했습니다.`);
-    } else if (!attacker.confused && index >= 0 && index < route.length - 1 &&
+    } else if (!wallStage && !attacker.confused && index >= 0 && index < route.length - 1 &&
       shouldRaiderAdvance(attacker, battle, zone, share, defenderReadiness.get(attacker.zoneId) ?? 0)) {
       const fromZoneId = attacker.zoneId;
       if (attacker.kind === 'main' && !attacker.rearAssault && zone && zone.id !== 'wall') {
@@ -2829,13 +2853,18 @@ export function resolveTacticalRound(state: GameState): string | null {
   const totalRaiderPower = battle.raiderGroups.reduce((sum, group) => sum + group.power, 0);
   const center = battle.zones.find(zone => zone.id === 'center')!;
   let outcome: TacticalRoundReport['outcome'];
+  let stageTransition: TacticalRoundReport['stageTransition'];
   if (battle.raiderMorale <= 0 || totalRaiderPower <= battle.originalPower * 0.18 || activeRaiders.length === 0) {
+    outcome = 'defenseSuccess';
+  } else if (wallStage && battle.zones.find(zone => zone.id === 'wall')?.breached) {
+    stageTransition = 'villageDefense';
+  } else if (wallStage && battle.round >= (battle.wallStageRoundLimit ?? CONFIG.tacticalBattle.wallStageMaxRounds)) {
     outcome = 'defenseSuccess';
   } else if (battle.villageMorale <= 0 || center.breached) {
     outcome = 'villageRouted';
-  } else if (objectiveOutcome) {
+  } else if (!wallStage && objectiveOutcome) {
     outcome = objectiveOutcome;
-  } else if (battle.round >= CONFIG.tacticalBattle.maxRounds) {
+  } else if (!wallStage && battle.round - (battle.villageStageStartRound ?? 1) + 1 >= CONFIG.tacticalBattle.maxRounds) {
     const sufferedLoss = battle.zones.some(zone => zone.breached) || priorLootRounds > 0 || thisRoundLooted;
     outcome = tacticalMaximumRoundOutcome(sufferedLoss);
   }
@@ -2845,14 +2874,20 @@ export function resolveTacticalRound(state: GameState): string | null {
   if (thisRoundLooted) lines.push(`창고 피해 예상: ${describeLootLosses(lootBag)}.`);
   if (buildingsDamaged > 0) lines.push(`방어 시설과 건물 ${buildingsDamaged}곳이 파손될 위험에 놓였습니다.`);
   lines.push(`마을 기세 ${villageMoraleDelta >= 0 ? '+' : ''}${villageMoraleDelta}, 적 기세 ${raiderMoraleDelta}.`);
-  if (outcome) event(events, nextFocusZoneId, outcome === 'defenseSuccess' ? 'moraleBreak' : 'report', summaryForOutcome(outcome), 900);
+  if (stageTransition === 'villageDefense') {
+    event(events, 'wall', 'report', '성벽이 무너졌습니다. 살아남은 수비대가 마을 안쪽 방어선으로 물러납니다.', 900);
+  } else if (outcome) {
+    event(events, nextFocusZoneId, outcome === 'defenseSuccess' ? 'moraleBreak' : 'report', summaryForOutcome(outcome), 900);
+  }
   else event(events, nextFocusZoneId, 'camera', '다음으로 위급한 전선이 드러납니다.', 500);
 
   const report: TacticalRoundReport = {
     round: battle.round,
     focusZoneId,
     nextFocusZoneId,
-    summary: outcome ? summaryForOutcome(outcome) : `제${battle.round}차 교전이 끝났습니다. 다음 전선을 지휘하십시오.`,
+    summary: stageTransition === 'villageDefense'
+      ? '성벽 돌파를 허용했습니다. 병력과 피해를 그대로 이어 마을 방어전으로 전환합니다.'
+      : outcome ? summaryForOutcome(outcome) : `제${battle.round}차 교전이 끝났습니다. 다음 전선을 지휘하십시오.`,
     lines,
     events,
     routeAdvances,
@@ -2868,6 +2903,7 @@ export function resolveTacticalRound(state: GameState): string | null {
     villageMoraleDelta,
     raiderMoraleDelta,
     ended: outcome != null,
+    stageTransition,
     outcome,
   };
   battle.reports.push(report);
@@ -2898,6 +2934,52 @@ export function completeTacticalSimulation(state: GameState): string | null {
   return null;
 }
 
+function transitionWallBattleToVillageDefense(state: GameState, battle: TacticalBattle): void {
+  const wallZone = battle.zones.find(zone => zone.id === 'wall');
+  const section = wallZone?.wallSection;
+  const wall = section
+    ? state.buildings.find(building => building.id === section.buildingId)
+    : undefined;
+  if (wall && effectiveWallType(wall)) {
+    wall.structureIntegrityMax = wallIntegrityMax(wall);
+    wall.structureIntegrity = 0;
+    wall.breached = true;
+    delete wall.structureRepair;
+    bumpDefenseTopology(state);
+    state.resources.defense = computeDefense(state);
+  }
+  if (state.siegeState) state.siegeState.breachTargetId = section?.buildingId;
+
+  battle.defenseStage = 'villageDefense';
+  battle.villageStageStartRound = battle.round;
+  battle.flankRoutes = [];
+  for (const enemy of battle.raiderGroups) {
+    enemy.pendingZoneId = undefined;
+    enemy.routeTransit = undefined;
+    enemy.rearAssault = false;
+    if (enemy.intent === 'withdraw' || enemy.power <= 0) continue;
+    enemy.zoneId = enemy.kind === 'main' ? 'center' : 'storehouse';
+    enemy.targetZoneId = enemy.kind === 'main' ? 'center' : 'storehouse';
+    enemy.engagementsInZone = 0;
+  }
+  for (const defender of battle.defenderGroups) {
+    defender.command = null;
+    defender.commandSource = undefined;
+    defender.targetGroupId = undefined;
+    defender.targetSource = undefined;
+    defender.routeTransit = undefined;
+    defender.pendingLine = undefined;
+  }
+  battle.currentZoneId = battle.raiderGroups
+    .filter(group => group.intent !== 'withdraw' && group.power > 0)
+    .sort((left, right) => right.power - left.power)[0]?.zoneId ?? 'storehouse';
+  battle.pendingReport = null;
+  battle.phase = 'deployment';
+  initializeTacticalDeployment(battle);
+  normalizeTacticalGroupTargets(battle);
+  addLog(state, '성벽 돌파 지점이 무너졌습니다. 살아남은 수비대를 마을 안쪽 방어선에 다시 배치하십시오.', 'raid', true);
+}
+
 export function acknowledgeTacticalReport(state: GameState): string | null {
   const battle = state.tacticalBattle;
   if (!battle || !battle.pendingReport) return '확인할 전투 보고가 없습니다.';
@@ -2905,6 +2987,10 @@ export function acknowledgeTacticalReport(state: GameState): string | null {
   if (battle.orientation === 'assault') return acknowledgeAssaultReport(state);
   if (battle.phase !== 'report') return '아직 전투 연출이 끝나지 않았습니다.';
   applyDefenseReportPositions(battle);
+  if (battle.pendingReport.stageTransition === 'villageDefense') {
+    transitionWallBattleToVillageDefense(state, battle);
+    return null;
+  }
   if (battle.pendingReport.ended) {
     battle.phase = 'finished';
     return null;
@@ -3085,6 +3171,7 @@ export function tacticalBattleTacticsReport(battle: TacticalBattle): TacticalBat
 export function finishTacticalBattle(state: GameState): void {
   const battle = state.tacticalBattle;
   if (!battle) return;
+  const longSiege = battle.defenseStage ? state.siegeState : null;
   if (battle.assaultKind === 'predatorHunt') {
     finishPredatorTacticalHunt(state);
     return;
@@ -3125,6 +3212,15 @@ export function finishTacticalBattle(state: GameState): void {
     const recovery = recoverRoutedLoot(state, grossLootLosses, routedLootRecoveryRate(mountedPursuers));
     lootLosses = recovery.netLoss;
     recoveredLoot = recovery.recovered;
+  }
+  if (longSiege && outcome === 'defenseSuccess') {
+    for (const [resourceKey, rawAmount] of Object.entries(longSiege.loot)) {
+      const resource = resourceKey as ResourceId;
+      const amount = Math.max(0, rawAmount ?? 0) * CONFIG.siege.repelledLootRecovery;
+      if (amount <= 0) continue;
+      state.resources[resource] = (state.resources[resource] ?? 0) + amount;
+      recoveredLoot[resource] = (recoveredLoot[resource] ?? 0) + amount;
+    }
   }
   const looted = hasLoot(grossLootLosses);
   const damageCount = battle.reports.reduce((sum, report) => sum + report.buildingsDamaged, 0);
@@ -3187,6 +3283,7 @@ export function finishTacticalBattle(state: GameState): void {
   state.raidCooldown = CONFIG.threat.raidCooldownDays;
   state.raiders = null;
   state.battle = null;
+  if (longSiege) state.siegeState = null;
 
   for (const id of participantIds) {
     const resident = state.residents.find(candidate => candidate.id === id);

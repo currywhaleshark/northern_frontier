@@ -1096,6 +1096,7 @@ function migratePendingReport(
     villageMoraleDelta: Number(report.villageMoraleDelta) || 0,
     raiderMoraleDelta: Number(report.raiderMoraleDelta) || 0,
     positionsApplied: report.positionsApplied === true,
+    stageTransition: report.stageTransition === 'villageDefense' ? 'villageDefense' : undefined,
   } as TacticalRoundReport;
 }
 
@@ -1201,6 +1202,10 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     : source.encounterKind === 'predatorHunt' || source.assaultKind === 'predatorHunt'
       ? 'predatorHunt'
       : 'raidDefense';
+  const defenseStage = encounterKind === 'raidDefense' &&
+    (source.defenseStage === 'wallBreach' || source.defenseStage === 'villageDefense')
+    ? source.defenseStage
+    : undefined;
   const legacyRearEngagedZoneIds = new Set((source.raiderGroups as unknown[]).flatMap(entry => {
     if (!entry || typeof entry !== 'object') return [];
     const group = entry as Record<string, unknown>;
@@ -1466,6 +1471,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
         routeArrivals: migrateRouteArrivals(item.routeArrivals, flankRouteIds),
         raidersKilled: Math.max(0, Number(item.raidersKilled) || 0),
         raiderPowerRestored: Math.max(0, Number(item.raiderPowerRestored) || 0),
+        stageTransition: item.stageTransition === 'villageDefense' ? 'villageDefense' : undefined,
       } as unknown as TacticalRoundReport;
     });
   const phase = String(source.phase);
@@ -1498,6 +1504,17 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     if (encounterKind === 'banditLair') {
       return {
         zoneId: zoneIds.has('lairTrail') ? 'lairTrail' : defaultZoneId,
+        line: group.kind === 'healer' ? 'rear' : group.line,
+      };
+    }
+    if (defenseStage === 'wallBreach') {
+      return { zoneId: zoneIds.has('wall') ? 'wall' : defaultZoneId, line: group.kind === 'healer' ? 'rear' : group.line };
+    }
+    if (defenseStage === 'villageDefense') {
+      return {
+        zoneId: group.kind === 'healer' && zoneIds.has('center')
+          ? 'center'
+          : zoneIds.has('storehouse') ? 'storehouse' : defaultZoneId,
         line: group.kind === 'healer' ? 'rear' : group.line,
       };
     }
@@ -1546,6 +1563,11 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
       const assaultZoneAllowed = encounterKind !== 'banditLair' || zoneId === 'lairTrail' ||
         (group.kind === 'hunter' && zoneId === 'lairWall' && prepApplied('preInfiltration'));
       const huntZoneAllowed = encounterKind !== 'predatorHunt' || zoneId !== 'huntDen';
+      const defenseStageZoneAllowed = defenseStage === 'wallBreach'
+        ? zoneId === 'wall'
+        : defenseStage === 'villageDefense'
+          ? zoneId === 'storehouse' || zoneId === 'center'
+          : true;
       const routeId = typeof candidate.routeId === 'string' && flankRouteIds.has(candidate.routeId)
         ? candidate.routeId : undefined;
       const rawGroup = group as unknown as Record<string, unknown>;
@@ -1556,7 +1578,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
         rawTransit?.routeId === routeId;
       if (routePlacementAllowed) {
         placement = { zoneId: '', line, routeId };
-      } else if (zoneIds.has(zoneId) && line && assaultZoneAllowed && huntZoneAllowed) {
+      } else if (zoneIds.has(zoneId) && line && assaultZoneAllowed && huntZoneAllowed && defenseStageZoneAllowed) {
         const hidden = (encounterKind === 'banditLair' && group.kind === 'hunter' && zoneId === 'lairWall' &&
             prepApplied('preInfiltration')) ||
           (encounterKind === 'raidDefense' && group.kind === 'hunter' && zoneId === 'approach' && prepApplied('setAmbush'));
@@ -1580,6 +1602,13 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
   const migrated = {
     ...source,
     encounterKind,
+    defenseStage,
+    wallStageRoundLimit: defenseStage
+      ? Math.max(1, Math.floor(Number(source.wallStageRoundLimit) || CONFIG.tacticalBattle.wallStageMaxRounds))
+      : undefined,
+    villageStageStartRound: defenseStage === 'villageDefense'
+      ? Math.max(1, Math.floor(Number(source.villageStageStartRound) || 1))
+      : undefined,
     orientation: encounterKind === 'raidDefense' ? 'defense' : 'assault',
     assaultKind: encounterKind === 'raidDefense' ? undefined : encounterKind,
     phase,
