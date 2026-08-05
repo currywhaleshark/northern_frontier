@@ -80,7 +80,7 @@ import type {
   AnnalsEntry, AnnalsKind, Difficulty, LogEntry, YearlySnapshot,
   CombatWeaponId, CourtTribute, DefenderGroupKind, EdictId, EdictLevel, EdictState,
   EnemyObjectiveId, FermentBatch, GameState, Gender, Resident, ResourceId,
-  PreparationActionId, RaiderUnitType, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalCommandId,
+  PreparationActionId, RaiderUnitType, TacticalAnimationEvent, TacticalBattle, TacticalBattleReport, TacticalBattleZone, TacticalCommandId,
   SpecialItemId, SpecialResidentId, TacticalAiState, TacticalDeploymentPlacement, TacticalFeaturedResident, TacticalFormationLine,
   TacticalBattleFlankOutcome, TacticalBattleTacticsReport, TacticalFacing, TacticalPreparationEffect,
   TacticalRaiderGroup, TacticalRoundReport, TradeContract,
@@ -1156,6 +1156,33 @@ function migratedFormationLinesAdjacent(from: TacticalFormationLine, to: Tactica
   return Math.abs(lines.indexOf(from) - lines.indexOf(to)) === 1;
 }
 
+function normalizeTacticalWallSection(
+  raw: unknown,
+  state: GameState,
+): TacticalBattleZone['wallSection'] {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const source = raw as Record<string, unknown>;
+  const buildingId = Number(source.buildingId);
+  const wallType = source.wallType;
+  const integrityMax = Number(source.integrityMax);
+  if (!Number.isInteger(buildingId) || !state.buildings.some(building => building.id === buildingId)) return undefined;
+  if (wallType !== 'palisade' && wallType !== 'earthFort' && wallType !== 'stoneWall') return undefined;
+  if (!Number.isFinite(integrityMax) || integrityMax <= 0) return undefined;
+  const ids = (value: unknown): number[] => Array.isArray(value)
+    ? [...new Set(value.map(Number).filter(id => Number.isInteger(id) && id >= 0))]
+    : [];
+  return {
+    buildingId,
+    wallType,
+    integrity: Math.max(0, Math.min(integrityMax, Number(source.integrity) || 0)),
+    integrityMax,
+    gate: source.gate === true,
+    watchtowerIds: ids(source.watchtowerIds),
+    stationedWatchmanIds: ids(source.stationedWatchmanIds),
+    bowWatchmanIds: ids(source.bowWatchmanIds),
+  };
+}
+
 export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalBattle | null {
   if (raw == null) return null;
   if (typeof raw !== 'object') return null;
@@ -1196,6 +1223,7 @@ export function migrateTacticalBattle(raw: unknown, state: GameState): TacticalB
     lootRisk: Math.max(0, Number(zone.lootRisk) || 0),
     civilianRisk: Math.max(0, Number(zone.civilianRisk) || 0),
     description: typeof zone.description === 'string' ? zone.description : '',
+    wallSection: normalizeTacticalWallSection(zone.wallSection, state),
     focusTargetGroupId: typeof zone.focusTargetGroupId === 'string' ? zone.focusTargetGroupId : undefined,
     focusTargetSource: zone.focusTargetSource === 'player' ? 'player' : 'auto',
   }));

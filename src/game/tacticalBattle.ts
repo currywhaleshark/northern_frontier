@@ -2,7 +2,7 @@ import { resetAgent } from './agents';
 import {
   activeArtillery, artilleryMoralePenalty, artilleryPieceCount, describeArtillery,
 } from './artillery';
-import { countBuilt } from './buildings';
+import { BUILDING_DEFS, countBuilt } from './buildings';
 import { combatGroupLabel, tacticalGroupCapabilities } from './combatCapabilities';
 import { createCombatRoster, isCombatReadyResident, type CombatantSnapshot, type CombatRole } from './combatRoster';
 import { CONFIG } from './config';
@@ -21,13 +21,15 @@ import { addLog } from './events';
 import { withJosa } from './josa';
 import { ARTIFACT_WEAPON_NAMES } from './weapons';
 import { makeRng } from './map';
+import { effectiveWallType, wallIntegrity, wallIntegrityMax } from './raidRoutes';
 import {
   applyLootLosses, damageBuildings, describeLootLosses, injure, killResidents, moraleShock,
 } from './raidDamage';
 import { changeRelation } from './relations';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { activePredatorScoutIds } from './expeditionIntel';
-import { allocateMusketReadiness, consumeMusketVolleys } from './weapons';
+import { allocateMusketReadiness, assignedWeapon, consumeMusketVolleys } from './weapons';
+import { stationedWatchman } from './watchtowers';
 import {
   captureTacticalResources, gradeTacticalBattle, TACTICAL_BATTLE_GRADE_LABELS,
   raidDefenseObjectiveAchieved, raidDefenseObjectiveResult, tacticalClosingSummary,
@@ -750,17 +752,81 @@ export function settlementRaidPreparationPoints(state: GameState, warned: boolea
   return clamp(points, 0, prep.max);
 }
 
-function createZones(state: GameState, siege: boolean, groups: TacticalDefenderGroup[]): TacticalBattleZone[] {
+export function deriveTacticalWallSection(
+  state: GameState,
+  preferredBuildingId?: number,
+): NonNullable<TacticalBattleZone['wallSection']> | undefined {
+  const candidateIds = [
+    preferredBuildingId,
+    state.siegeState?.breachTargetId,
+    state.raiders?.breachTargetId,
+    state.raiders?.route?.breaches[0]?.buildingId,
+  ].filter((id): id is number => Number.isInteger(id));
+  const wall = [...new Set(candidateIds)]
+    .map(id => state.buildings.find(building => building.id === id))
+    .find(building => building?.built && effectiveWallType(building) != null);
+  if (!wall) return undefined;
+  const wallType = effectiveWallType(wall);
+  if (!wallType) return undefined;
+
+  const wallCenter = {
+    x: wall.x + ((wall.w ?? 1) - 1) / 2,
+    y: wall.y + ((wall.h ?? 1) - 1) / 2,
+  };
+  const towers = state.buildings.filter(tower => {
+    if (tower.type !== 'watchtower' || !tower.built || tower.repairing) return false;
+    if ((tower.structureIntegrity ?? CONFIG.watchtower.integrityMax) <= 0) return false;
+    const centerX = tower.x + ((tower.w ?? 1) - 1) / 2;
+    const centerY = tower.y + ((tower.h ?? 1) - 1) / 2;
+    return Math.hypot(centerX - wallCenter.x, centerY - wallCenter.y) <= CONFIG.watchtower.range + 1e-9;
+  }).sort((left, right) => left.id - right.id);
+  const stationed = towers.flatMap(tower => {
+    const resident = stationedWatchman(state, tower);
+    return resident ? [resident] : [];
+  });
+
+  return {
+    buildingId: wall.id,
+    wallType,
+    integrity: wallIntegrity(wall),
+    integrityMax: wallIntegrityMax(wall),
+    gate: wall.type === 'gate',
+    watchtowerIds: towers.map(tower => tower.id),
+    stationedWatchmanIds: stationed.map(resident => resident.id),
+    bowWatchmanIds: stationed
+      .filter(resident => assignedWeapon(state, resident.id) === 'hornBow')
+      .map(resident => resident.id),
+  };
+}
+
+function createZones(
+  state: GameState,
+  siege: boolean,
+  groups: TacticalDefenderGroup[],
+  wallSectionBuildingId?: number,
+): TacticalBattleZone[] {
   const hasHunters = groups.some(candidate => candidate.role === 'hunter');
-  const wallStrength =
+  const wallSection = deriveTacticalWallSection(state, wallSectionBuildingId);
+  const fallbackWallStrength =
     countBuilt(state, 'palisade') * 4 +
     countBuilt(state, 'earthFort') * 7 +
     countBuilt(state, 'stoneWall') * 10 +
     countBuilt(state, 'gate') * 8 +
     countBuilt(state, 'watchtower') * 3;
-  const wallName = countBuilt(state, 'gate') > 0
-    ? '성문 방어선'
-    : wallStrength > 0 ? '목책 방어선' : '마을 방어선';
+  const sectionIntegrityRatio = wallSection
+    ? wallSection.integrity / Math.max(1, wallSection.integrityMax)
+    : 0;
+  const wallStrength = wallSection
+    ? Math.round((
+      BUILDING_DEFS[wallSection.wallType].defense +
+      (wallSection.gate ? BUILDING_DEFS.gate.defense : 0)
+    ) * sectionIntegrityRatio) + wallSection.stationedWatchmanIds.length * 3
+    : fallbackWallStrength;
+  const wallName = wallSection
+    ? `${BUILDING_DEFS[wallSection.wallType].name}${wallSection.gate ? ' 성문' : ''} 단면`
+    : countBuilt(state, 'gate') > 0
+      ? '성문 방어선'
+      : wallStrength > 0 ? '목책 방어선' : '마을 방어선';
   const stores = countBuilt(state, 'storehouse');
   return [
     {
@@ -776,9 +842,15 @@ function createZones(state: GameState, siege: boolean, groups: TacticalDefenderG
       pressure: siege ? 12 : 0, breached: false,
       defenseBonus: Math.min(35, wallStrength + (siege ? 5 : 0)), ambushBonus: 0,
       lootRisk: 5, civilianRisk: 10,
-      description: wallStrength > 0
-        ? '방책과 성문을 사이에 두고 적의 주력을 받아내는 구역입니다.'
-        : '수비병이 급히 장애물을 세우고 마을 어귀를 지키는 구역입니다.',
+      description: wallSection
+        ? `${BUILDING_DEFS[wallSection.wallType].name} 내구 ${Math.round(sectionIntegrityRatio * 100)}%` +
+          `${wallSection.gate ? ' · 성문' : ''}` +
+          `${wallSection.stationedWatchmanIds.length > 0 ? ` · 주둔 망루 ${wallSection.stationedWatchmanIds.length}곳` : ''}` +
+          '을 기준으로 돌파 지점의 전장을 구성합니다.'
+        : wallStrength > 0
+          ? '방책과 성문을 사이에 두고 적의 주력을 받아내는 구역입니다.'
+          : '수비병이 급히 장애물을 세우고 마을 어귀를 지키는 구역입니다.',
+      wallSection,
     },
     {
       id: 'storehouse', name: '창고 주변', kind: 'storehouse', order: 2,
@@ -984,6 +1056,7 @@ export function createTacticalBattle(
     forcedStratagem?: EnemyStratagemId | 'none';
     forcedFlankRoute?: TacticalRouteSide | 'none';
     maximumCompositionPhase?: 1 | 2 | 8;
+    wallSectionBuildingId?: number;
   },
 ): TacticalBattle {
   const groups = defenderGroups(state, params.mode);
@@ -1037,7 +1110,7 @@ export function createTacticalBattle(
     prepPoints: Math.max(0, settlementRaidPreparationPoints(state, params.warned) - enemyPlanPreparationPenalty(enemyPlan)),
     prepActions: PREPARATION_ACTIONS.map(action => ({ ...action, selected: false, applied: false })),
     preparationEvents: [],
-    zones: createZones(state, params.siege, groups),
+    zones: createZones(state, params.siege, groups, params.wallSectionBuildingId),
     flankRoutes,
     defenderGroups: groups,
     raiderGroups: enemies,

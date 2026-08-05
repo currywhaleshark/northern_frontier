@@ -48,6 +48,7 @@ const tacticalCore = await import(pathToFileURL(join(compiledDir, 'tacticalCore.
 const tacticalEngagement = await import(pathToFileURL(join(compiledDir, 'tacticalEngagement.mjs')).href);
 const enemyPlan = await import(pathToFileURL(join(compiledDir, 'enemyPlan.mjs')).href);
 const tacticalCommandState = await import(pathToFileURL(join(compiledDir, 'tacticalCommandState.mjs')).href);
+const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
 const battleSimulation = await import(pathToFileURL(join(compiledDir, 'battleSimulation.mjs')).href);
@@ -198,6 +199,58 @@ function deployCommandableToZone(state, zoneId) {
       openFlankRoute: 2,
     },
   );
+}
+
+{
+  const state = simulation.newGame(2026080501);
+  prepareDefenders(state);
+  const gate = {
+    id: state.nextBuildingId++, type: 'gate', gateWallType: 'stoneWall', x: 10, y: 10,
+    progress: 999, built: true, fieldGrowth: 0, structureIntegrity: 130, structureIntegrityMax: 260,
+  };
+  const nearTower = {
+    id: state.nextBuildingId++, type: 'watchtower', x: 15, y: 10,
+    progress: 999, built: true, fieldGrowth: 0, structureIntegrity: 80, structureIntegrityMax: 80,
+  };
+  const farTower = {
+    id: state.nextBuildingId++, type: 'watchtower', x: 30, y: 30,
+    progress: 999, built: true, fieldGrowth: 0, structureIntegrity: 80, structureIntegrityMax: 80,
+  };
+  state.buildings.push(gate, nearTower, farTower);
+  const watchman = state.residents[0];
+  Object.assign(watchman, {
+    alive: true, sick: false, health: 100, job: 'watchman', assignedBuildingId: nearTower.id,
+  });
+  state.weaponAllocationMode = 'manual';
+  state.weaponAssignments[watchman.id] = 'hornBow';
+  state.siegeState = { breachTargetId: gate.id };
+
+  const battle = tactical.createTacticalBattle(state, {
+    factionName: '성벽 단면 시험대', power: 60, warned: true, siege: true, mode: 'garrison',
+  });
+  const wall = battle.zones.find(zone => zone.id === 'wall');
+  assert.deepEqual(wall.wallSection, {
+    buildingId: gate.id,
+    wallType: 'stoneWall',
+    integrity: 130,
+    integrityMax: 260,
+    gate: true,
+    watchtowerIds: [nearTower.id],
+    stationedWatchmanIds: [watchman.id],
+    bowWatchmanIds: [watchman.id],
+  }, 'the wall stage snapshots the actual breach section and only in-range active tower support');
+  assert.equal(wall.name, '석벽 성문 단면');
+  assert.equal(wall.defenseBonus, 17,
+    'wall-stage defense uses local grade, remaining integrity, staffed tower support, and siege bonus');
+  assert.match(wall.description, /내구 50% · 성문 · 주둔 망루 1곳/);
+
+  const migrated = saveLoad.migrateTacticalBattle(JSON.parse(JSON.stringify(battle)), state);
+  assert.deepEqual(migrated?.zones.find(zone => zone.id === 'wall')?.wallSection, wall.wallSection,
+    'wall-stage map derivation survives a tactical save round trip');
+  const invalid = JSON.parse(JSON.stringify(battle));
+  invalid.zones.find(zone => zone.id === 'wall').wallSection.wallType = 'paperWall';
+  assert.equal(saveLoad.migrateTacticalBattle(invalid, state)?.zones.find(zone => zone.id === 'wall')?.wallSection, undefined,
+    'invalid wall-stage metadata is discarded without losing the tactical battle');
 }
 
 {

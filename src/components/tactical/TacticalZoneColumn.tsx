@@ -1017,6 +1017,14 @@ export function TacticalZoneColumn({
   const visibleBreached = zone.breached &&
     (liveBreachEventIndex < 0 || eventIndex >= liveBreachEventIndex);
   const barricadeState = visibleBreached ? 'broken' : barricadeReinforced ? 'reinforced' : 'normal';
+  const wallSectionName = zone.wallSection
+    ? `${{ palisade: '목책', earthFort: '토성', stoneWall: '석벽' }[zone.wallSection.wallType]}` +
+      `${zone.wallSection.gate ? ' 성문' : ''}`
+    : null;
+  const wallSectionLabel = zone.wallSection && wallSectionName
+    ? `${wallSectionName} ${Math.round(zone.wallSection.integrity / Math.max(1, zone.wallSection.integrityMax) * 100)}%` +
+      `${zone.wallSection.stationedWatchmanIds.length > 0 ? ` · 망루 ${zone.wallSection.stationedWatchmanIds.length}` : ''}`
+    : null;
   const raidersAdvancing = activeEvent?.kind === 'advance' &&
     activeEvent.zoneId === zone.id && activeEvent.side !== 'defender' &&
     !activeEvent.actorGroupIds?.length;
@@ -1254,10 +1262,10 @@ export function TacticalZoneColumn({
       {zone.kind === 'wall' && (
         <div
           className={`tactical-barricade ${barricadeState}${assault ? ' enemy-held' : ' village-held'}${activeEvent?.kind === 'wallAssault' && activeEvent.zoneId === zone.id ? ' under-attack' : ''}${activeEvent?.kind === 'wallHit' && activeEvent.zoneId === zone.id ? ' breaking' : ''}${activeEvent?.kind === 'fortify' && activeEvent.zoneId === zone.id ? ' fortifying' : ''}${activeEvent?.kind === 'artilleryHit' && activeEvent.zoneId === zone.id ? ' bombarded' : ''}`}
-          aria-label={visibleBreached ? '파괴된 방책' : assault ? '마적이 지키는 산채 목책' : barricadeReinforced ? '강화된 방책' : '일반 방책'}
+          aria-label={visibleBreached ? '파괴된 방책' : assault ? '마적이 지키는 산채 목책' : wallSectionLabel ?? (barricadeReinforced ? '강화된 방책' : '일반 방책')}
         >
           <img src={BARRICADE_SPRITES[barricadeState]} alt="" aria-hidden="true" />
-          <b>{visibleBreached ? (assault ? '산채 목책 돌파' : '방책 파괴') : assault ? '산채 목책' : barricadeReinforced ? '강화 방책' : '방책'}</b>
+          <b>{visibleBreached ? (assault ? '산채 목책 돌파' : '방책 파괴') : assault ? '산채 목책' : wallSectionLabel ?? (barricadeReinforced ? '강화 방책' : '방책')}</b>
         </div>
       )}
       <div className="tactical-raider-rank">

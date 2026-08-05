@@ -1590,9 +1590,22 @@ export interface TacticalBattleZone {
   lootRisk: number;
   civilianRisk: number;
   description: string;
+  /** P5 성벽전에서 지도 돌파 지점의 구조물 상태를 전투 시작 시 고정한 단면 스냅샷. */
+  wallSection?: TacticalWallSection;
   sectorBlockade?: number;
   focusTargetGroupId?: string;
   focusTargetSource?: 'auto' | 'player';
+}
+
+export interface TacticalWallSection {
+  buildingId: number;
+  wallType: SolidWallBuildingTypeId;
+  integrity: number;
+  integrityMax: number;
+  gate: boolean;
+  watchtowerIds: number[];
+  stationedWatchmanIds: number[];
+  bowWatchmanIds: number[];
 }
 
 export interface TacticalFeaturedResident {
