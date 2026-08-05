@@ -26,6 +26,17 @@ const tactical = await import(pathToFileURL(join(compiledDir, 'tacticalBattle.mj
 const deployment = await import(pathToFileURL(join(compiledDir, 'tacticalDeployment.mjs')).href);
 const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).href);
 
+function installStorage(backing = new Map()) {
+  globalThis.localStorage = {
+    get length() { return backing.size; },
+    getItem: key => backing.get(key) ?? null,
+    setItem: (key, value) => backing.set(key, String(value)),
+    removeItem: key => backing.delete(key),
+    key: index => [...backing.keys()][index] ?? null,
+  };
+  return backing;
+}
+
 function wallSiegeState(seed) {
   const state = simulation.newGame(seed);
   state.pendingChoice = null;
@@ -76,6 +87,9 @@ function enterCommandPhase(state) {
 {
   const { state, gate } = wallSiegeState(2026080502);
   assert.equal(siegeModule.startTacticalWallBattle(state), null);
+  assert.deepEqual(state.siegeState.wallEngagement, { day: state.day, mode: 'manual' });
+  assert.equal(state.siegeState.lastProcessedDay, state.day,
+    'manual command consumes the current siege day before automatic pressure can run');
   const battle = state.tacticalBattle;
   assert.equal(battle.defenseStage, 'wallBreach');
   assert.equal(battle.wallStageRoundLimit, 3);
@@ -135,6 +149,14 @@ function enterCommandPhase(state) {
   assert.equal(migrated.reports[0].stageTransition, 'villageDefense');
   assert.deepEqual(migrated.defenderGroups.map(group => [group.id, group.wounded, group.killed]), casualtySnapshot);
 
+  installStorage();
+  assert.equal(saveLoad.saveGame(state), true);
+  const loaded = saveLoad.loadGame();
+  assert.deepEqual(loaded.siegeState.wallEngagement, { day: state.day, mode: 'manual' },
+    'manual wall engagement survives a mid-battle save/load');
+  assert.equal(loaded.tacticalBattle.defenseStage, 'villageDefense');
+  assert.equal(loaded.tacticalBattle.villageStageStartRound, 2);
+
   const woodBeforeFinish = state.resources.wood;
   battle.reports.push({
     ...breachReport,
@@ -166,6 +188,36 @@ function enterCommandPhase(state) {
   assert.equal(battle.pendingReport.ended, true);
   assert.equal(battle.pendingReport.stageTransition, undefined);
   assert.equal(gate.breached, undefined, 'holding through the wall-stage limit leaves the map wall intact');
+}
+
+// 일일 자동 압박 뒤에는 같은 날 직접 지휘로 성벽·병력을 다시 손상시킬 수 없다.
+{
+  const { state, gate } = wallSiegeState(2026080504);
+  state.siegeState.lastProcessedDay = state.day - 1;
+  state.siegeState.raiderPower = 500;
+  state.raiders.power = 500;
+  state.siegeState.enemySupply = 99;
+  const integrityBefore = gate.structureIntegrity;
+  siegeModule.processSiegeDay(state);
+  assert.ok(gate.structureIntegrity < integrityBefore, 'automatic wall pressure damages the real wall once');
+  assert.deepEqual(state.siegeState.wallEngagement, { day: state.day, mode: 'automatic' });
+  const integrityAfterAutomatic = gate.structureIntegrity;
+  const raiderPowerAfterAutomatic = state.siegeState.raiderPower;
+  assert.match(siegeModule.startTacticalWallBattle(state), /이미 자동 처리/);
+  assert.equal(state.tacticalBattle, null);
+  assert.equal(gate.structureIntegrity, integrityAfterAutomatic);
+  assert.equal(state.siegeState.raiderPower, raiderPowerAfterAutomatic);
+}
+
+// 직접 지휘를 먼저 선택하면 같은 날 일일 처리 호출이 와도 자동 압박은 건너뛴다.
+{
+  const { state, gate } = wallSiegeState(2026080505);
+  state.siegeState.lastProcessedDay = state.day - 1;
+  const integrityBefore = gate.structureIntegrity;
+  assert.equal(siegeModule.startTacticalWallBattle(state), null);
+  siegeModule.processSiegeDay(state);
+  assert.equal(gate.structureIntegrity, integrityBefore);
+  assert.deepEqual(state.siegeState.wallEngagement, { day: state.day, mode: 'manual' });
 }
 
 console.log('tactical wall-stage P5 tests passed');

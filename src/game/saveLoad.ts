@@ -2234,6 +2234,13 @@ function normalizeSiegeState(state: GameState): void {
     breachTargetId: Number.isInteger(candidate.breachTargetId) &&
       buildingIds.has(candidate.breachTargetId as number)
       ? candidate.breachTargetId : undefined,
+    wallEngagement: Number.isFinite(candidate.wallEngagement?.day) &&
+      (candidate.wallEngagement?.mode === 'automatic' || candidate.wallEngagement?.mode === 'manual')
+      ? {
+          day: Math.min(state.day, Math.max(0, Math.floor(candidate.wallEngagement.day))),
+          mode: candidate.wallEngagement.mode,
+        }
+      : undefined,
   };
   if (state.siegeState.phase === 'sortie' && !state.battle && !state.tacticalBattle) state.siegeState = null;
 }

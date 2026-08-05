@@ -25,6 +25,7 @@ export function SiegePanel({ state, onChangeStance, onCommandWallBattle }: {
   const now = state.day * DAY_CYCLE_SUBTICKS + state.subTick;
   const evacuationTicks = Math.max(0, siege.evacuationDeadlineTick - now);
   const switchedToday = siege.lastStanceChangeDay === state.day;
+  const wallResolvedToday = siege.wallEngagement?.day === state.day;
 
   return (
     <section className="siege-panel" aria-label="공성 현황">
@@ -44,11 +45,20 @@ export function SiegePanel({ state, onChangeStance, onCommandWallBattle }: {
         <div className="siege-stance-actions">
           <button disabled={siege.stance === 'hold' || switchedToday} onClick={() => onChangeStance('hold')}>농성</button>
           <button disabled={siege.stance === 'wall' || switchedToday} onClick={() => onChangeStance('wall')}>성벽전</button>
-          {siege.phase === 'wallCombat' && <button onClick={onCommandWallBattle}>성벽전 직접 지휘</button>}
+          {siege.phase === 'wallCombat' && (
+            <button
+              disabled={wallResolvedToday}
+              title={wallResolvedToday ? '오늘 성벽 교전은 이미 처리되었습니다.' : undefined}
+              onClick={onCommandWallBattle}
+            >성벽전 직접 지휘</button>
+          )}
           <button className="danger" onClick={() => onChangeStance('field')}>수비대 출격</button>
         </div>
       )}
       {switchedToday && siege.phase !== 'evacuation' && <small>오늘은 이미 태세를 바꿨습니다.</small>}
+      {wallResolvedToday && siege.phase === 'wallCombat' && (
+        <small>오늘 성벽 교전은 {siege.wallEngagement?.mode === 'manual' ? '직접 지휘' : '자동 처리'}로 소진되었습니다.</small>
+      )}
     </section>
   );
 }

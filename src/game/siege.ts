@@ -217,6 +217,11 @@ export function startTacticalWallBattle(state: GameState): string | null {
   if (state.pendingChoice) return '먼저 현재 결정을 마쳐야 합니다.';
   if (siege.phase === 'evacuation') return '성문을 닫고 피난을 마친 뒤 성벽전을 지휘할 수 있습니다.';
   if (siege.phase !== 'wallCombat' || siege.stance !== 'wall') return '성벽전 태세에서만 직접 지휘할 수 있습니다.';
+  if (siege.wallEngagement?.day === state.day) {
+    return siege.wallEngagement.mode === 'automatic'
+      ? '오늘 성벽 교전은 이미 자동 처리되었습니다. 다음 날 직접 지휘할 수 있습니다.'
+      : '오늘 성벽 교전은 이미 직접 지휘로 처리되었습니다.';
+  }
   const interior = new Set(siege.protectedInterior);
   const preferred = siege.breachTargetId == null
     ? undefined
@@ -233,6 +238,8 @@ export function startTacticalWallBattle(state: GameState): string | null {
     mode: 'garrison',
     wallSectionBuildingId: wall.id,
   });
+  siege.wallEngagement = { day: state.day, mode: 'manual' };
+  siege.lastProcessedDay = Math.max(siege.lastProcessedDay, state.day);
   return null;
 }
 
@@ -628,11 +635,13 @@ export function processSiegeDay(state: GameState): void {
 
   if (siege.stance === 'wall') {
     siege.phase = 'wallCombat';
+    siege.wallEngagement = { day: state.day, mode: 'automatic' };
     if (pressureWall(state, siege, interior)) crisisChoice(state);
   } else {
     siege.phase = 'encirclement';
     const pressureToday = (state.seed + state.day + Math.round(siege.raiderPower)) % 3 === 0;
     if (pressureToday) {
+      siege.wallEngagement = { day: state.day, mode: 'automatic' };
       if (pressureWall(state, siege, interior)) crisisChoice(state);
     } else {
       const target = advancePlunderParty(state, siege);

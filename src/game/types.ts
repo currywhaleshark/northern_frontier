@@ -1201,6 +1201,7 @@ export interface WatchtowerProjectile {
 
 export type SiegePhase = 'evacuation' | 'encirclement' | 'wallCombat' | 'sortie' | 'withdrawal';
 export type SiegeStance = 'hold' | 'wall' | 'field';
+export type SiegeWallEngagementMode = 'automatic' | 'manual';
 
 /** P3 장기 공성. P2의 RaiderBand.siege와 원정대 대기용 RaidHoldState와는 별개다. */
 export interface SiegeState {
@@ -1226,6 +1227,8 @@ export interface SiegeState {
   protectedInterior: string[];
   topologyRevision: number;
   breachTargetId?: number;
+  /** 같은 날 일일 성벽 압박과 직접 지휘가 중복 적용되지 않게 하는 처리 기록. */
+  wallEngagement?: { day: number; mode: SiegeWallEngagementMode };
 }
 
 export type BattlePhase = 'muster' | 'clash';

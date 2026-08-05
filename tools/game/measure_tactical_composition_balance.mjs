@@ -82,6 +82,7 @@ const CONFIGURATIONS = [
 function advanceToCommand(tactical, state) {
   const battle = state.tacticalBattle;
   for (let guard = 0; guard < 4 && battle.phase !== 'command'; guard += 1) {
+    if (battle.phase === 'deployment') tactical.applyAutoDeployTacticalGroups(battle);
     assert.equal(tactical.advanceTacticalPhase(state), null);
   }
   assert.equal(battle.phase, 'command');
