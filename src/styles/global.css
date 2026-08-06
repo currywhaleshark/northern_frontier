@@ -404,6 +404,52 @@ html, body, #root {
      스크롤을 막으므로 쓰지 않는다. inline-block 캔버스가 자연스럽게 스크롤된다. */
 }
 .canvas-wrap canvas { image-rendering: pixelated; display: block; }
+.resident-speech-bubble {
+  position: absolute;
+  z-index: 32;
+  width: max-content;
+  max-width: 230px;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  padding: 8px 11px;
+  border: 1px solid #493d2a;
+  border-radius: 9px;
+  background: rgba(250, 242, 215, 0.96);
+  color: #282116;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.38;
+  text-align: center;
+  animation: resident-speech-in 140ms ease-out;
+}
+.resident-speech-bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%) rotate(45deg);
+  border-right: 1px solid #493d2a;
+  border-bottom: 1px solid #493d2a;
+  background: inherit;
+}
+.resident-speech-bubble.warning {
+  border-color: #8b5719;
+  background: rgba(255, 221, 145, 0.98);
+  color: #4a2707;
+}
+.resident-speech-bubble.surprise {
+  border-color: #5d0d0d;
+  background: rgba(139, 30, 25, 0.98);
+  color: #fff4df;
+  box-shadow: 0 0 0 2px rgba(255, 190, 120, 0.35), 0 4px 16px rgba(0, 0, 0, 0.55);
+}
+@keyframes resident-speech-in {
+  from { opacity: 0; transform: translate(-50%, calc(-100% + 5px)) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+}
 
 .map-layer-tabs {
   position: absolute;
@@ -2517,6 +2563,19 @@ html, body, #root {
 .settings-display-option input { margin-top: 3px; accent-color: var(--accent); }
 .settings-display-option span { display: grid; gap: 3px; }
 .settings-display-option small { color: var(--muted); line-height: 1.35; }
+.settings-select-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel2);
+}
+.settings-select-row span { display: grid; gap: 3px; }
+.settings-select-row small { color: var(--muted); line-height: 1.35; }
+.settings-select-row select { min-width: 132px; }
 .settings-audio-row {
   display: grid;
   grid-template-columns: minmax(145px, auto) minmax(120px, 1fr) 44px;

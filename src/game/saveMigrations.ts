@@ -881,6 +881,23 @@ export function migrateV65ToV66(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 66 };
 }
 
+// v67: 주민 소문망의 일일 발화 슬롯과 반복 억제 장부.
+// 화면에 떠 있는 말풍선은 저장하지 않고 로드 뒤 새 발화만 만든다.
+export function migrateV66ToV67(raw: RawSave): RawSave {
+  return {
+    ...clonedRecord(raw),
+    ambientSpeech: {
+      lastProcessedDay: 0,
+      consumedSlotIds: [],
+      deliveredRumorIds: [],
+      recentLines: [],
+      recentFacts: [],
+      lastDietVarietyScore: 1,
+    },
+    schemaVersion: 67,
+  };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -952,6 +969,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 63) migrated = migrateV63ToV64(migrated);
     else if (version === 64) migrated = migrateV64ToV65(migrated);
     else if (version === 65) migrated = migrateV65ToV66(migrated);
+    else if (version === 66) migrated = migrateV66ToV67(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }

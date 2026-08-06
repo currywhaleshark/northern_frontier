@@ -17,6 +17,7 @@ import { changeRelation, getRelation, hostileRelationsAvg } from './relations';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
 import { getSeason, getYear } from './seasons';
 import { isLakeIceAt } from './lakeIce';
+import { announceRaidProximitySpeech, announceRaidSpawnSpeech } from './ambientSpeech';
 import type {
   BattleMode, Building, ExpeditionRaidOrder, GameState, PendingChoice, RaiderBand, RaidRoutePlan, TradeNegotiation,
 } from './types';
@@ -407,10 +408,13 @@ export function spawnRaiders(
         faction: faction.name,
         warned,
         spotted: true,
+        warningSource,
+        proximityAlerted: true,
         siege: true,
         speed: 0,
         trail: [],
       };
+      announceRaidSpawnSpeech(state, state.raiders);
       if (!canStartLongSiege(state) || !openLongSiegeChoice(state)) {
         openRaidChoice(state, rng, warned, power, faction.name, true);
       }
@@ -428,6 +432,8 @@ export function spawnRaiders(
     originSiteId: originUsed ? originSite?.id : undefined,
     warned,
     spotted: warned,
+    warningSource,
+    proximityAlerted: false,
     siege,
     phase: 'approaching',
     route,
@@ -436,6 +442,7 @@ export function spawnRaiders(
     speed: warned ? CONFIG.raid.raiderSpeedWarned : CONFIG.raid.raiderSpeedSurprise,
     trail: [],
   };
+  announceRaidSpawnSpeech(state, state.raiders);
   if (warned && warningSource !== 'diplomatic') {
     const warning = originUsed && originSite?.discovered
       ? `${originSite.name}에서 무장대가 출발하는 움직임을 포착했습니다!`
@@ -528,6 +535,9 @@ export function raidersTick(state: GameState, rng: () => number): void {
   }
   const center = state.buildings.find(b => b.type === 'center');
   const dist = center ? Math.abs(band.x - center.x) + Math.abs(band.y - center.y) : 0;
+  if (!band.proximityAlerted && dist <= CONFIG.raid.spotDistance) {
+    announceRaidProximitySpeech(state, band);
+  }
   if (!band.spotted && dist <= CONFIG.raid.spotDistance) {
     band.spotted = true;
     addLog(state, `경계병이 접근하는 무장 무리를 발견했습니다! ${withJosa(factionRaidPartyLabel(state, band.faction), '으로/로')} 보입니다.`, 'raid');

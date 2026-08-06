@@ -377,29 +377,47 @@ function scenarioRunning(state: GameState): boolean {
   return state.scenario != null && !state.scenario.completed;
 }
 
+export interface WarParticipationSchedule {
+  year: number;
+  offerDay: number;
+  dayOfYear: number;
+  requester: string;
+  opponent: string;
+}
+
+/** 연례 참전 요청의 결정적 일정을 소문 공급자와 실제 사건이 함께 읽는다. */
+export function warParticipationSchedule(state: GameState): WarParticipationSchedule | null {
+  const year = getYear(state.day);
+  if (year < 2 || year <= state.lastWarParticipationOfferYear || state.warDispatch || scenarioRunning(state)) return null;
+  const offerDay = 10 + stableRoll(state, year) % 20;
+  const dayOfYear = (state.day - 1) % CONFIG.time.yearDays + 1;
+  const requesterIndex = stableRoll(state, year * 17) % DIPLOMATIC_FACTION_NAMES.length;
+  const opponentOffset = 1 + stableRoll(state, year * 31) % (DIPLOMATIC_FACTION_NAMES.length - 1);
+  return {
+    year,
+    offerDay,
+    dayOfYear,
+    requester: DIPLOMATIC_FACTION_NAMES[requesterIndex],
+    opponent: DIPLOMATIC_FACTION_NAMES[(requesterIndex + opponentOffset) % DIPLOMATIC_FACTION_NAMES.length],
+  };
+}
+
 export function dailyMilitaryDiplomacyTick(state: GameState): void {
   if (state.warDispatch && state.warDispatch.dueDay <= state.day) {
     resolveWarDispatch(state, state.warDispatch);
   }
   if (state.pendingChoice || state.warDispatch || getYear(state.day) <= state.lastWarParticipationOfferYear) return;
-  const year = getYear(state.day);
-  if (year < 2) return;
+  const schedule = warParticipationSchedule(state);
+  if (!schedule) return;
   // 참전 요청은 랜덤 사건이 아니라 연 1회의 결정론 사건이라 게이트 밖에 있다.
   // 그러나 둘째 해부터 오므로 R5로 길잡이가 둘째 해까지 늘어나면서 스텝 안내를 덮게 되었고,
   // 수락하면 수비병이 마을을 비워 16단계의 통제 습격까지 어그러진다.
   // 여기서는 미루기만 한다 — lastWarParticipationOfferYear를 적지 않으므로
   // 길잡이가 끝나는 즉시(같은 해라도) 전령이 다시 온다.
-  if (scenarioRunning(state)) return;
-  const offerDay = 10 + stableRoll(state, year) % 20;
-  const dayOfYear = (state.day - 1) % CONFIG.time.yearDays + 1;
-  if (dayOfYear < offerDay) return;
-  const requesterIndex = stableRoll(state, year * 17) % DIPLOMATIC_FACTION_NAMES.length;
-  const opponentOffset = 1 + stableRoll(state, year * 31) % (DIPLOMATIC_FACTION_NAMES.length - 1);
-  const requester = DIPLOMATIC_FACTION_NAMES[requesterIndex];
-  const opponent = DIPLOMATIC_FACTION_NAMES[(requesterIndex + opponentOffset) % DIPLOMATIC_FACTION_NAMES.length];
-  state.lastWarParticipationOfferYear = year;
-  const reason = openWarParticipationRequest(state, requester, opponent);
-  if (reason) addLog(state, `${requester}의 참전 요청 전령이 사정이 여의치 않아 돌아갔습니다.`, 'info');
+  if (schedule.dayOfYear < schedule.offerDay) return;
+  state.lastWarParticipationOfferYear = schedule.year;
+  const reason = openWarParticipationRequest(state, schedule.requester, schedule.opponent);
+  if (reason) addLog(state, `${schedule.requester}의 참전 요청 전령이 사정이 여의치 않아 돌아갔습니다.`, 'info');
 }
 
 export function normalizeMilitaryAidState(state: GameState): void {

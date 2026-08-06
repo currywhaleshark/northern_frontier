@@ -11,6 +11,7 @@ import {
   saveUiPrefs,
   setAudioPrefs,
   setAutoFastForwardSleepingNight,
+  setResidentSpeechFrequency,
   setResidentMarkerPrefs,
 } from './ui/uiPrefs';
 import type { GameSessionLaunch, GameSessionReturnTarget } from './sessionLaunch';
@@ -130,10 +131,13 @@ export default function App() {
           audio={uiPrefs.audio}
           residentMarkers={uiPrefs}
           autoFastForwardSleepingNight={uiPrefs.autoFastForwardSleepingNight}
+          residentSpeechFrequency={uiPrefs.residentSpeechFrequency}
           onChange={update => setUiPrefs(current => setAudioPrefs(current, update))}
           onResidentMarkersChange={update => setUiPrefs(current => setResidentMarkerPrefs(current, update))}
           onAutoFastForwardSleepingNightChange={enabled =>
             setUiPrefs(current => setAutoFastForwardSleepingNight(current, enabled))}
+          onResidentSpeechFrequencyChange={frequency =>
+            setUiPrefs(current => setResidentSpeechFrequency(current, frequency))}
           onClose={() => setSettingsOpen(false)}
           backLabel="메인 메뉴로"
         />

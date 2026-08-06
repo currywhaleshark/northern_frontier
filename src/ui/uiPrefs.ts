@@ -28,7 +28,7 @@ import {
 
 export const UI_PREFS_KEY = 'buksae-ui-prefs';
 export const LEGACY_BUILD_MENU_OPEN_KEY = 'buksae-buildmenu-open';
-export const UI_PREFS_VERSION = 9;
+export const UI_PREFS_VERSION = 10;
 export const MAX_STARRED_RESOURCES = 8;
 const DEFAULT_MAP_ZOOM = 1;
 
@@ -44,6 +44,8 @@ export interface ResidentMarkerPrefs {
   showResidentCargoMarkers: boolean;
 }
 
+export type ResidentSpeechFrequency = 'off' | 'low' | 'normal' | 'often';
+
 export interface UiPrefs extends ResidentMarkerPrefs {
   version: typeof UI_PREFS_VERSION;
   starredResources: StockResourceId[];
@@ -57,6 +59,7 @@ export interface UiPrefs extends ResidentMarkerPrefs {
   showAquiferLayer: boolean;
   showOreLayer: boolean;
   autoFastForwardSleepingNight: boolean;
+  residentSpeechFrequency: ResidentSpeechFrequency;
 }
 
 interface UiPrefsStorage {
@@ -86,6 +89,7 @@ export function defaultUiPrefs(buildDrawerLastCategory = DEFAULT_BUILD_CATEGORY)
     showResidentJobMarkers: true,
     showResidentCargoMarkers: true,
     autoFastForwardSleepingNight: true,
+    residentSpeechFrequency: 'normal',
   };
 }
 
@@ -146,12 +150,13 @@ export function normalizeUiPrefs(value: unknown, migratedBuildCategory = DEFAULT
     showAquiferLayer?: unknown;
     showOreLayer?: unknown;
     autoFastForwardSleepingNight?: unknown;
+    residentSpeechFrequency?: unknown;
   };
   if (candidate.version !== 1 && candidate.version !== 2
     && candidate.version !== 3 && candidate.version !== 4
     && candidate.version !== 5 && candidate.version !== 6
     && candidate.version !== 7 && candidate.version !== 8
-    && candidate.version !== UI_PREFS_VERSION) {
+    && candidate.version !== 9 && candidate.version !== UI_PREFS_VERSION) {
     return defaultUiPrefs();
   }
   return {
@@ -192,6 +197,11 @@ export function normalizeUiPrefs(value: unknown, migratedBuildCategory = DEFAULT
     autoFastForwardSleepingNight: candidate.version >= 8
       ? candidate.autoFastForwardSleepingNight !== false
       : true,
+    residentSpeechFrequency: candidate.version >= 10 &&
+      (candidate.residentSpeechFrequency === 'off' || candidate.residentSpeechFrequency === 'low' ||
+        candidate.residentSpeechFrequency === 'normal' || candidate.residentSpeechFrequency === 'often')
+      ? candidate.residentSpeechFrequency
+      : 'normal',
   };
 }
 
@@ -350,6 +360,15 @@ export function setAutoFastForwardSleepingNight(prefs: UiPrefs, enabled: boolean
   return enabled === prefs.autoFastForwardSleepingNight
     ? prefs
     : { ...prefs, autoFastForwardSleepingNight: enabled };
+}
+
+export function setResidentSpeechFrequency(
+  prefs: UiPrefs,
+  residentSpeechFrequency: ResidentSpeechFrequency,
+): UiPrefs {
+  return residentSpeechFrequency === prefs.residentSpeechFrequency
+    ? prefs
+    : { ...prefs, residentSpeechFrequency };
 }
 
 export function setMapZoom(prefs: UiPrefs, mapZoom: number): UiPrefs {

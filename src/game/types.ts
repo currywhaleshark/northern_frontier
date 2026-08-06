@@ -980,6 +980,22 @@ interface ChoiceOption {
   disabledReason?: string;
 }
 
+export interface AmbientSpeechHistoryEntry {
+  id: string;
+  day: number;
+}
+
+/** 주민 말풍선은 런타임 UI 상태이고, 중복 방지 장부만 세이브에 남긴다. */
+export interface AmbientSpeechState {
+  lastProcessedDay: number;
+  consumedSlotIds: string[];
+  deliveredRumorIds: string[];
+  recentLines: AmbientSpeechHistoryEntry[];
+  recentFacts: AmbientSpeechHistoryEntry[];
+  lastDietVarietyScore: number;
+  lastDominantFood?: ResourceId;
+}
+
 // 초상화 대화형 사건의 표시 정보. 사건 판정과 분리된 순수 표시 메타데이터라
 // 기존 PendingChoice와 저장 호환을 유지하면서 튜토리얼·후반 이야기 사건이 함께 쓴다.
 export interface DialoguePresentation {
@@ -1232,6 +1248,8 @@ export interface RaiderBand {
   originSiteId?: number;
   warned: boolean;   // 봉수/망루 조기 경보를 받았는지
   spotted: boolean;  // 접근 발견 로그를 이미 띄웠는지
+  warningSource?: 'diplomatic'; // 외교 귀띔은 파수꾼의 관측으로 잘못 말하지 않는다
+  proximityAlerted?: boolean; // 실제 시야 거리에서 외친 1회성 경보
   siege: boolean;    // 목책에 막혀 공성 중인지
   phase?: 'approaching' | 'breaching';
   route?: RaidRoutePlan;
@@ -2166,6 +2184,7 @@ export interface GameState {
   nextClaimZoneId: number;
   territoryViolations: TerritoryViolation[];
   residents: Resident[];
+  ambientSpeech: AmbientSpeechState;
   buildings: Building[];
   defenseTopologyRevision: number; // 성벽·성목 등 침입 경로 비용 지형의 변경 번호
   priorityBuildingId?: number | null; // 건설·수리·확장·해체·이전 중 최우선 작업

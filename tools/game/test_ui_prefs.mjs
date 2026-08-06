@@ -39,6 +39,7 @@ const {
   normalizeUiPrefs,
   saveUiPrefs,
   setAutoFastForwardSleepingNight,
+  setResidentSpeechFrequency,
   setResidentMarkerPrefs,
   setMapLayerVisibility,
   setDockWindowLayout,
@@ -93,7 +94,7 @@ assert.deepEqual(normalized.autoAssignBuildingTypes, ['field', 'smithy'],
 assert.deepEqual(normalized.pinnedDockWindows, ['jobs', 'processing', 'residents', 'factions', 'court'],
   'dock preferences must remove duplicate and unknown window pins');
 assert.deepEqual(normalized.dockWindowLayouts, {}, 'v4 prefs must start without saved window layouts');
-assert.equal(normalized.version, 9, 'v4 prefs must migrate to the current schema without resetting');
+assert.equal(normalized.version, 10, 'v4 prefs must migrate to the current schema without resetting');
 assert.deepEqual(normalized.audio, { sfxEnabled: true, sfxVolume: 0.7, musicEnabled: true, musicVolume: 0.7 });
 assert.equal(normalized.mapZoom, 1);
 assert.equal(normalized.showResidentJobMarkers, true);
@@ -101,6 +102,7 @@ assert.equal(normalized.showResidentCargoMarkers, true);
 assert.equal(normalized.showAquiferLayer, false);
 assert.equal(normalized.showOreLayer, false);
 assert.equal(normalized.autoFastForwardSleepingNight, true);
+assert.equal(normalized.residentSpeechFrequency, 'normal');
 
 const legacyStorage = memoryStorage({
   [UI_PREFS_KEY]: JSON.stringify({
@@ -111,7 +113,7 @@ const legacyStorage = memoryStorage({
   [LEGACY_BUILD_MENU_OPEN_KEY]: JSON.stringify({ 생산: true }),
 });
 const migrated = loadUiPrefs(legacyStorage);
-assert.equal(migrated.version, 9, 'v1 prefs must migrate to the current schema');
+assert.equal(migrated.version, 10, 'v1 prefs must migrate to the current schema');
 assert.deepEqual(migrated.starredResources, ['tools'], 'v1 stars must survive migration');
 assert.deepEqual(migrated.pinnedResourceGroups, ['materials'], 'v1 group pins must survive migration');
 assert.equal(migrated.buildDrawerLastCategory, 'production',
@@ -209,6 +211,8 @@ const v8NightSpeed = normalizeUiPrefs({
 assert.equal(v8NightSpeed.autoFastForwardSleepingNight, false);
 assert.equal(v8NightSpeed.showAquiferLayer, false, 'pre-layer prefs must begin with overlays hidden');
 assert.equal(v8NightSpeed.showOreLayer, false, 'pre-layer prefs must begin with overlays hidden');
+assert.equal(v8NightSpeed.residentSpeechFrequency, 'normal',
+  'pre-speech prefs must begin at the normal two-per-day setting');
 
 let prefs = defaultUiPrefs();
 for (const resource of DISPLAY_RESOURCE_ORDER.slice(0, MAX_STARRED_RESOURCES)) {
@@ -256,6 +260,8 @@ prefs = setResidentMarkerPrefs(prefs, { showResidentCargoMarkers: false });
 assert.equal(prefs.showResidentCargoMarkers, false);
 prefs = setAutoFastForwardSleepingNight(prefs, false);
 assert.equal(prefs.autoFastForwardSleepingNight, false);
+prefs = setResidentSpeechFrequency(prefs, 'often');
+assert.equal(prefs.residentSpeechFrequency, 'often');
 prefs = setMapLayerVisibility(prefs, 'aquifer', true);
 assert.equal(prefs.showAquiferLayer, true);
 assert.equal(prefs.showOreLayer, false);

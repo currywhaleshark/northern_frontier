@@ -2,6 +2,7 @@ const testFiles = (...names) => names.map(name => `test_${name}.mjs`);
 
 // PR마다 확인할 저장·경제·건축·튜토리얼·방어 핵심 계약.
 const CORE_TESTS = testFiles(
+  'ambient_speech',
   'area_expansion',
   'auto_worker_assignment',
   'building_finder',

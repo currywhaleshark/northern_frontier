@@ -141,6 +141,7 @@ import type {
   NewGameOptions, PastureArea, PointerAction, Resident, ResourceId, Season, SmithyProductId,
   TanneryProductId, WorldSetupSnapshot, YouthActivity,
 } from './types';
+import { ambientSpeechTick } from './ambientSpeech';
 
 // ─────────────────────────── 새 게임 ───────────────────────────
 
@@ -204,6 +205,14 @@ export function newGameFromOptions(
     nextClaimZoneId: 1,
     territoryViolations: [],
     residents: [],
+    ambientSpeech: {
+      lastProcessedDay: 0,
+      consumedSlotIds: [],
+      deliveredRumorIds: [],
+      recentLines: [],
+      recentFacts: [],
+      lastDietVarietyScore: 1,
+    },
     buildings: [],
     defenseTopologyRevision: 0,
     priorityBuildingId: null,
@@ -1485,6 +1494,7 @@ export function advanceTick(state: GameState): void {
     perfLast = now;
   };
   agentsTick(state);
+  ambientSpeechTick(state);
   lap('t1-agents');
   foreignSitePartiesTick(state);
   lap('t1-foreign-sites');
@@ -1827,6 +1837,12 @@ function runConsumptionAndNeeds(state: GameState, rng: () => number): void {
   const foodNeed = weight * cfg.foodPerDay;
   const rationedFoodNeed = foodNeed * edictFoodRationMultiplier(state);
   const foodResult = consumeFoodByDiet(state, rationedFoodNeed);
+  state.ambientSpeech.lastDietVarietyScore = foodResult.varietyScore;
+  const dominantFood = (Object.entries(foodResult.byResource) as Array<[ResourceId, number]>)
+    .filter(([, amount]) => amount > 0)
+    .sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (dominantFood) state.ambientSpeech.lastDominantFood = dominantFood;
+  else delete state.ambientSpeech.lastDominantFood;
   const fedRatio = foodNeed > 0 ? Math.min(1, foodResult.totalConsumed / foodNeed) : 1;
   const foodShortage = foodResult.shortageRatio < 0.999; // 배급이 아니라 재고가 모자란 경우
 

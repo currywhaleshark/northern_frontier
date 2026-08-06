@@ -25,6 +25,7 @@ import { wellWaterStatusAt } from '../game/waterSupply';
 import { GATE_CONVERSION_COSTS, isSolidWallBuilding, wallLineRect, type WallLineAxis } from '../game/walls';
 import { fishingBoatConstructionSlots, type FishingBoatConstructionSlot } from '../game/fishingBoats';
 import { foreignSitePartyKindLabel } from '../game/foreignSiteSimulation';
+import { activeAmbientSpeech, setAmbientSpeechVisibleResidents } from '../game/ambientSpeech';
 
 const TILE = CONFIG.ui.tileSize;
 const CLICK_RADIUS = Math.round(TILE * 0.65); // 주민 클릭 판정 반경(픽셀)
@@ -90,6 +91,7 @@ export function GameCanvas({
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [mouse, setMouse] = useState<{ mx: number; my: number } | null>(null);
   const [panning, setPanning] = useState(false);
+  const [, setSpeechClock] = useState(0);
   // 드래그 패닝 상태 (리렌더 없이 추적)
   const drag = useRef({ active: false, button: 0, sx: 0, sy: 0, scrollL: 0, scrollT: 0, moved: false });
   const zoomAnchorRef = useRef<{ worldX: number; worldY: number; boxX: number; boxY: number } | null>(null);
@@ -171,6 +173,15 @@ export function GameCanvas({
   const h = state.map.length, w = state.map[0]?.length ?? 0;
   const logicalWidth = w * TILE;
   const logicalHeight = h * TILE;
+
+  const syncVisibleSpeakers = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    setAmbientSpeechVisibleResidents(state, state.residents
+      .filter(resident => resident.x >= viewport.tileMinX && resident.x <= viewport.tileMaxX &&
+        resident.y >= viewport.tileMinY && resident.y <= viewport.tileMaxY)
+      .map(resident => resident.id));
+  }, [state]);
   const renderScale = mapBackingScaleForZoom(zoom);
   const alpha = Math.max(0, Math.min(1, (performance.now() - anim.current.at) / anim.current.ms));
   const hoverTile = mouse
@@ -433,6 +444,7 @@ export function GameCanvas({
         tileSize: TILE,
         overscanTiles: 1,
       });
+      syncVisibleSpeakers();
       requestCanvasRender();
     };
     updateViewport();
@@ -443,7 +455,11 @@ export function GameCanvas({
       box.removeEventListener('scroll', updateViewport);
       resizeObserver.disconnect();
     };
-  }, [requestCanvasRender, zoom, logicalWidth, logicalHeight]);
+  }, [requestCanvasRender, syncVisibleSpeakers, zoom, logicalWidth, logicalHeight]);
+
+  useEffect(() => {
+    syncVisibleSpeakers();
+  }, [syncVisibleSpeakers, version]);
 
   useEffect(() => {
     positionTooltip(pointerPositionRef.current);
@@ -494,6 +510,30 @@ export function GameCanvas({
         : pointerAction && pointerAction.kind !== 'none'
           ? pointerAction.cursor
           : 'grab';
+
+  const ambientSpeech = activeAmbientSpeech(state);
+  const speechSpeaker = ambientSpeech
+    ? state.residents.find(resident => resident.id === ambientSpeech.speakerResidentId && resident.alive)
+    : undefined;
+  useEffect(() => {
+    if (!ambientSpeech) return;
+    const timeout = window.setTimeout(
+      () => setSpeechClock(current => current + 1),
+      Math.max(0, ambientSpeech.expiresAtMs - Date.now()) + 20,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [ambientSpeech?.id, ambientSpeech?.expiresAtMs]);
+  const speechPosition = speechSpeaker ? (() => {
+    const viewport = viewportRef.current;
+    const worldX = (speechSpeaker.px + (speechSpeaker.x - speechSpeaker.px) * alpha + 0.5) * TILE;
+    const worldY = (speechSpeaker.py + (speechSpeaker.y - speechSpeaker.py) * alpha) * TILE - 5;
+    if (!viewport) return { left: worldX * zoom, top: worldY * zoom };
+    const marginX = Math.min(110, viewport.pixelWidth / 3);
+    return {
+      left: Math.min(viewport.pixelX + viewport.pixelWidth - marginX, Math.max(viewport.pixelX + marginX, worldX)) * zoom,
+      top: Math.min(viewport.pixelY + viewport.pixelHeight - 28, Math.max(viewport.pixelY + 45, worldY)) * zoom,
+    };
+  })() : null;
 
   return (
     <div style={{ position: 'relative', display: 'inline-block', width: logicalWidth * zoom, height: logicalHeight * zoom }}>
@@ -641,6 +681,15 @@ export function GameCanvas({
           onContextAction(tx, ty);
         }}
       />
+      {ambientSpeech && speechPosition && (
+        <div
+          className={`resident-speech-bubble ${ambientSpeech.tone}`}
+          style={{ left: speechPosition.left, top: speechPosition.top }}
+          role={ambientSpeech.tone === 'ambient' ? 'status' : 'alert'}
+        >
+          {ambientSpeech.text}
+        </div>
+      )}
       {mouse && placingRect && (placingType || isPasturePlacing || isFootprintExpanding) && (
         <div ref={tooltipRef} className="map-tooltip" style={{ left: 0, top: 0 }}>
           <b>{placingRect.w}×{placingRect.h} ({placingRect.w * placingRect.h}칸)</b>

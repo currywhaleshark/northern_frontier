@@ -1425,6 +1425,33 @@ export function loadGame(slot = 1): GameState | null {
       }
     }
     normalizeResidentFamilyReferences(parsed);
+    const rawAmbientSpeech = parsed.ambientSpeech;
+    parsed.ambientSpeech = {
+      lastProcessedDay: Number.isInteger(rawAmbientSpeech?.lastProcessedDay)
+        ? Math.max(0, rawAmbientSpeech.lastProcessedDay)
+        : 0,
+      consumedSlotIds: Array.isArray(rawAmbientSpeech?.consumedSlotIds)
+        ? rawAmbientSpeech.consumedSlotIds.filter((id): id is string => typeof id === 'string').slice(-8)
+        : [],
+      deliveredRumorIds: Array.isArray(rawAmbientSpeech?.deliveredRumorIds)
+        ? rawAmbientSpeech.deliveredRumorIds.filter((id): id is string => typeof id === 'string').slice(-32)
+        : [],
+      recentLines: Array.isArray(rawAmbientSpeech?.recentLines)
+        ? rawAmbientSpeech.recentLines.filter(entry =>
+          entry && typeof entry.id === 'string' && Number.isFinite(entry.day)).slice(-24)
+        : [],
+      recentFacts: Array.isArray(rawAmbientSpeech?.recentFacts)
+        ? rawAmbientSpeech.recentFacts.filter(entry =>
+          entry && typeof entry.id === 'string' && Number.isFinite(entry.day)).slice(-16)
+        : [],
+      lastDietVarietyScore: Number.isFinite(rawAmbientSpeech?.lastDietVarietyScore)
+        ? Math.min(1, Math.max(0, rawAmbientSpeech.lastDietVarietyScore))
+        : 1,
+      lastDominantFood: typeof rawAmbientSpeech?.lastDominantFood === 'string' &&
+        RESOURCE_ID_SET.has(rawAmbientSpeech.lastDominantFood)
+        ? rawAmbientSpeech.lastDominantFood as ResourceId
+        : undefined,
+    };
     if (!('raiders' in parsed)) return null;
     if (!Object.prototype.hasOwnProperty.call(parsed, 'battle')) parsed.battle = null;
     if (!Array.isArray(parsed.battleScars)) parsed.battleScars = [];
@@ -1836,6 +1863,8 @@ export function loadGame(slot = 1): GameState | null {
       : null;
     if (parsed.raiders) {
       const band = parsed.raiders;
+      band.proximityAlerted = band.proximityAlerted === true;
+      if (band.warningSource !== 'diplomatic') delete band.warningSource;
       band.path = Array.isArray(band.path) ? band.path.filter(step => Number.isFinite(step?.x) && Number.isFinite(step?.y)) : [];
       band.trail = Array.isArray(band.trail) ? band.trail.slice(-30) : [];
       band.phase = band.phase === 'breaching' ? 'breaching' : 'approaching';

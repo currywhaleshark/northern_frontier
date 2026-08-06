@@ -117,6 +117,7 @@ import {
   saveUiPrefs,
   setAudioPrefs,
   setAutoFastForwardSleepingNight,
+  setResidentSpeechFrequency,
   setResidentMarkerPrefs,
   setDockWindowLayout,
   setMapZoom,
@@ -138,6 +139,7 @@ import type { AutoAssignBuildingType } from './game/workerSlots';
 import { RuntimeVersionBoundary } from './components/RuntimeVersionBoundary';
 import { createRuntimeVersionStore, uiRefreshIntervalMs } from './ui/runtimeVersionStore';
 import { ActionNoticeLayer } from './components/ActionNotice';
+import { setAmbientSpeechFrequency } from './game/ambientSpeech';
 import { createActionNoticeStore, type ActionNoticeStore } from './ui/actionNotices';
 import {
   recordRuntimePerf, recordRuntimePerfSince, runtimePerfSnapshot, runtimePerfStartTime,
@@ -399,6 +401,10 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
   useEffect(() => {
     saveUiPrefs(uiPrefs);
   }, [uiPrefs]);
+
+  useEffect(() => {
+    setAmbientSpeechFrequency(stateRef.current, uiPrefs.residentSpeechFrequency);
+  }, [uiPrefs.residentSpeechFrequency]);
 
   useEffect(() => {
     setSfxSettings({ enabled: uiPrefs.audio.sfxEnabled, volume: uiPrefs.audio.sfxVolume });
@@ -2300,10 +2306,13 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
           audio={uiPrefs.audio}
           residentMarkers={uiPrefs}
           autoFastForwardSleepingNight={uiPrefs.autoFastForwardSleepingNight}
+          residentSpeechFrequency={uiPrefs.residentSpeechFrequency}
           onChange={update => setUiPrefs(current => setAudioPrefs(current, update))}
           onResidentMarkersChange={update => setUiPrefs(current => setResidentMarkerPrefs(current, update))}
           onAutoFastForwardSleepingNightChange={enabled =>
             setUiPrefs(current => setAutoFastForwardSleepingNight(current, enabled))}
+          onResidentSpeechFrequencyChange={frequency =>
+            setUiPrefs(current => setResidentSpeechFrequency(current, frequency))}
           guidesEnabled={guidesEnabled(stateRef.current)}
           onGuidesEnabledChange={enabled => {
             setGuidesEnabled(stateRef.current, enabled);

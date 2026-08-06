@@ -1,15 +1,17 @@
-import type { AudioPrefs, ResidentMarkerPrefs } from '../ui/uiPrefs';
+import type { AudioPrefs, ResidentMarkerPrefs, ResidentSpeechFrequency } from '../ui/uiPrefs';
 
 interface Props {
   audio: AudioPrefs;
   residentMarkers: ResidentMarkerPrefs;
   autoFastForwardSleepingNight: boolean;
+  residentSpeechFrequency: ResidentSpeechFrequency;
   // 초회 도움말 — 게임 중에만 넘어온다 (메인 메뉴에는 상태가 없다)
   guidesEnabled?: boolean;
   onGuidesEnabledChange?: (enabled: boolean) => void;
   onChange: (update: Partial<AudioPrefs>) => void;
   onResidentMarkersChange: (update: Partial<ResidentMarkerPrefs>) => void;
   onAutoFastForwardSleepingNightChange: (enabled: boolean) => void;
+  onResidentSpeechFrequencyChange: (frequency: ResidentSpeechFrequency) => void;
   onClose: () => void;
   backLabel?: string;
 }
@@ -52,11 +54,13 @@ export function SettingsDialog({
   audio,
   residentMarkers,
   autoFastForwardSleepingNight,
+  residentSpeechFrequency,
   guidesEnabled,
   onGuidesEnabledChange,
   onChange,
   onResidentMarkersChange,
   onAutoFastForwardSleepingNightChange,
+  onResidentSpeechFrequencyChange,
   onClose,
   backLabel = '뒤로',
 }: Props) {
@@ -125,6 +129,24 @@ export function SettingsDialog({
               </label>
             )}
           </div>
+        </div>
+        <div className="settings-section">
+          <h3>주민 이야기</h3>
+          <label className="settings-select-row">
+            <span>
+              <strong>생활 말풍선 빈도</strong>
+              <small>평범한 잡담과 소문만 조절합니다. 습격 경보 같은 긴급 외침은 항상 표시됩니다.</small>
+            </span>
+            <select
+              value={residentSpeechFrequency}
+              onChange={event => onResidentSpeechFrequencyChange(event.target.value as ResidentSpeechFrequency)}
+            >
+              <option value="off">끔</option>
+              <option value="low">적게 · 하루 1회</option>
+              <option value="normal">보통 · 하루 2회</option>
+              <option value="often">자주 · 하루 3~4회</option>
+            </select>
+          </label>
         </div>
         <div className="settings-section">
           <h3>소리</h3>

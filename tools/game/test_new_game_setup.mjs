@@ -138,7 +138,7 @@ const { CONFIG } = await load('config');
 
 // P1: v56 저장은 기본 설정으로 v57 중간 단계에 이관되며 현재 스키마는 습격 원천 거주지를 포함한 v66이다.
 {
-  assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 66, '습격 원천 거주지 저장 스키마는 v66이다');
+  assert.equal(saveLoad.CURRENT_SCHEMA_VERSION, 67, '주민 소문망 저장 스키마는 v67이다');
   assert.equal(typeof saveLoad.migrateV56ToV57, 'function');
   const migrated = saveLoad.migrateV56ToV57({ schemaVersion: 56, difficulty: 'hard' });
   assert.equal(migrated.schemaVersion, 57);
