@@ -226,11 +226,21 @@ export function planRaidRoute(
 ): RaidRoutePlan | null {
   const open = routeFor(state, start, target, 'open', options.allowBlockedStart === true);
   const assault = routeFor(state, start, target, 'assault', options.allowBlockedStart === true);
+  return selectRaidRoute(open, assault, power);
+}
+
+/** 실제 이동비용은 보존하되 벽을 피해 도는 개방 경로에는 선택용 우회 부담을 더한다. */
+export function selectRaidRoute(
+  open: RaidRoutePlan | null,
+  assault: RaidRoutePlan | null,
+  power: number,
+): RaidRoutePlan | null {
   if (!assault) return open;
   if (!open) return assault;
   const ratio = power < 30 ? CONFIG.raidPathing.detourRatio.small
     : power < 50 ? CONFIG.raidPathing.detourRatio.medium : CONFIG.raidPathing.detourRatio.large;
-  return open.totalCost <= assault.totalCost * ratio ? open : assault;
+  const detourCost = open.totalCost * CONFIG.raidPathing.openRouteDetourCostMultiplier;
+  return detourCost <= assault.totalCost * ratio ? open : assault;
 }
 
 /** 첫 돌파 지점이 중심지를 감싼 보호영역의 실제 외곽 경계인지 판정한다. */

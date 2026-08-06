@@ -103,8 +103,8 @@ function interiorHas(interior, x, y) {
   const youngPlan = raidRoutes.planRaidRoute(young, start, target, 40);
   const maturePlan = raidRoutes.planRaidRoute(mature, start, target, 40);
   assert.equal(youngPlan.totalCost, plainPlan.totalCost, 'young trees cost the same as plain terrain to raiders');
-  assert.equal(maturePlan.totalCost - plainPlan.totalCost, Math.round(10 * 1.8) - 10,
-    'one cardinal mature-forest step applies the initial 1.8 multiplier exactly');
+  assert.equal(maturePlan.totalCost - plainPlan.totalCost, Math.round(10 * 2.0) - 10,
+    'one cardinal mature-forest step applies the tuned 2.0 multiplier exactly');
   assert.ok(maturePlan.steps.some(step => step.x === 13 && step.y === 10), 'the forced route crosses the mature tree tile');
   const residentPath = state => agents.findPath(
     state, start.x, start.y,
@@ -113,6 +113,19 @@ function interiorHas(interior, x, y) {
   );
   assert.deepEqual(residentPath(mature), residentPath(plain),
     'mature-forest weighting does not alter the resident A* route');
+}
+
+// 벽을 피해 도는 개방 경로에는 선택 평가용 부담을 더해 경계선의 중규모 무리를
+// 공성으로 유도하되, 소규모 무리의 넓은 우회 허용 성향은 유지한다.
+{
+  const open = { steps: [], breaches: [], totalCost: 149, kind: 'open' };
+  const assault = { steps: [], breaches: [{ buildingId: 1, x: 0, y: 0 }], totalCost: 100, kind: 'assault' };
+  assert.equal(CONFIG.raidPathing.openRouteDetourCostMultiplier, 1.1,
+    'open detours receive the tuned 10% route-selection surcharge');
+  assert.equal(raidRoutes.selectRaidRoute(open, assault, 40).kind, 'assault',
+    'the detour surcharge tips a borderline medium party toward assault');
+  assert.equal(raidRoutes.selectRaidRoute(open, assault, 29).kind, 'open',
+    'small parties retain enough detour budget to use the same opening');
 }
 
 // 공격 경로도 두 벽 모서리 사이를 대각선으로 무상 통과할 수 없다.

@@ -1136,8 +1136,10 @@ export const CONFIG_DEFAULTS = {
 
   // 습격 경로 — 지형 통행 비용과 성벽 돌파(내구도·피해), 보수 자재.
   raidPathing: {
-    matureForestCostMultiplier: 1.8,
-    // 무리 규모별 우회 허용 배율 — 작을수록 돌파보다 우회를 택한다
+    matureForestCostMultiplier: 2.0,
+    // 개방 경로가 벽을 피해 돌아갈 때 선택 평가에만 붙는 비용. 실제 이동 속도는 바꾸지 않는다.
+    openRouteDetourCostMultiplier: 1.1,
+    // 무리 규모별 우회 허용 배율 — 클수록 돌파보다 우회를 택한다
     detourRatio: { small: 2.0, medium: 1.5, large: 1.2 },
     // 성벽 종류별 내구도
     integrityMax: { palisade: 60, earthFort: 150, stoneWall: 260 },
