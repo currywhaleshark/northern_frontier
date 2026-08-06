@@ -28,6 +28,15 @@ const workerSlots = await load('workerSlots');
 const inventory = await load('inventory');
 const { CONFIG } = await load('config');
 
+const agentsSource = readFileSync(new URL('../../src/game/agents.ts', import.meta.url), 'utf8');
+assert.equal(CONFIG.production.lumberCampBonus, 1.4,
+  'the lumber camp keeps its intended forty-percent production bonus');
+assert.match(
+  agentsSource,
+  /yieldAmt:\s*a\.yields\.wood\s*\*\s*CONFIG\.production\.lumberCampBonus\s*\*\s*CONFIG\.seasons\.woodMult/,
+  'assigned lumber-camp woodcutters must apply the configured production bonus before seasonal output',
+);
+
 const state = simulation.newGame(2026080201);
 state.exploration = { explored: state.map.map(row => row.map(() => true)) };
 state.pendingChoice = null;

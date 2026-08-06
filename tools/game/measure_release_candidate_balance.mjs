@@ -25,6 +25,9 @@ export const AUTOPLAY_POLICY_DESCRIPTION = [
   '기존 trade autoplay의 공개 건설·교역 API와 보수적인 선택 정책을 재사용한다.',
   '겨울에는 놀게 되는 농부를 연료·사냥 노동으로 돌리고, 화면에 보이는 식량·땔감 일수에 따라 건설과 교역을 보류한다.',
   '화면에 보이는 자원·주거·계절·방어 정보만 사용하며 미래 RNG나 숨은 사건 결과를 읽지 않는다.',
+  '첫 밭은 2×2로 열어 농부 둘을 붙이고, 첫 경작기를 보낸 뒤 겨울에 식량 20일·연료 45일 여유가 있으면 3×3으로 넓힌다.',
+  '탐사된 숲과 드러난 서식지 비축을 기준으로 벌목장·사냥막·약초막 작업영역을 주기적으로 옮긴다.',
+  '정착지 단계부터 발견된 노두 곁에 채광장을 짓고, 작업 반경의 광상이 고갈되면 다음 노두로 이전한다.',
   '세공은 준비한 최선의 납부, 김장은 가능한 최대 규모, 이주는 확대 인구 기준 20일 식량과 계절별 난방 여유가 있을 때만 수용한다.',
   '서당이 실제 가동될 때 좌석 절반 이내의 소년을 결정적으로 취학시키고 나머지는 일 돕기로 둔다.',
   '대형 경작지·의원·묘지·서당·축사는 기존 해금·비용·배치 API를 통해서만 추가 운용한다.',
@@ -45,6 +48,7 @@ const years = smokeMode
 const seedBase = optionNumber('seed', DEFAULT_SEED);
 const compact = process.argv.includes('--compact');
 const summaryOnly = process.argv.includes('--summary-only');
+const tracePolicy = process.argv.includes('--trace-policy');
 
 const {
   simulation,
@@ -59,6 +63,9 @@ const livestock = await loadCompiledGameModule('livestock');
 const weapons = await loadCompiledGameModule('weapons');
 const spoilage = await loadCompiledGameModule('spoilage');
 const saveLoad = await loadCompiledGameModule('saveLoad');
+const gatheringZones = await loadCompiledGameModule('gatheringZones');
+const habitats = await loadCompiledGameModule('habitats');
+const miningSites = await loadCompiledGameModule('miningSites');
 
 class MemoryStorage {
   #values = new Map();
@@ -74,6 +81,8 @@ globalThis.localStorage ??= new MemoryStorage();
 const RANKS = ['settlement', 'bo', 'jin', 'bu'];
 const PRESERVED_RESOURCES = ['curedMeat', 'saltedFish', 'driedFish'];
 const CRITICAL_JOBS = ['farmer', 'builder', 'miner', 'herder', 'physician', 'teacher', 'undertaker'];
+const cultivatedFieldsByState = new WeakMap();
+const firstFieldExpansionTargetsByState = new WeakMap();
 
 function round(value, digits = 2) {
   return Number((Number.isFinite(value) ? value : 0).toFixed(digits));
@@ -123,7 +132,67 @@ function builtStableSpecies(state) {
 }
 
 function activeConstructionCount(state) {
-  return state.buildings.filter(building => !building.built).length;
+  return state.buildings.filter(building => !building.built || building.expansion || building.workOrder).length;
+}
+
+function tryQueueFirstField(state, candidates) {
+  if (state.buildings.some(building => building.type === 'field')) return false;
+  if (!buildings.canAffordCost(state, buildings.buildingCostFor('field', 2, 2))) return false;
+  for (const { x, y } of candidates) {
+    if (!buildings.canPlaceBuildingAt(state, 'field', x, y, 3, 3)) continue;
+    if (simulation.tryPlaceBuilding(state, 'field', x, y, 2, 2) == null) {
+      const field = state.buildings.at(-1);
+      firstFieldExpansionTargetsByState.set(state, { fieldId: field.id, x, y, w: 3, h: 3 });
+      return true;
+    }
+  }
+  return false;
+}
+
+function tryExpandFirstField(state) {
+  const field = state.buildings.find(building =>
+    building.type === 'field' && building.built && !building.expansion &&
+    (building.w ?? 1) === 2 && (building.h ?? 1) === 2);
+  if (!field) return false;
+  let cultivated = cultivatedFieldsByState.get(state);
+  if (!cultivated) {
+    cultivated = new Set();
+    cultivatedFieldsByState.set(state, cultivated);
+  }
+  if ((field.sownArea ?? 0) > 0.5 || (field.fieldGrowth ?? 0) > 0.5) cultivated.add(field.id);
+  const firstGrowingSeasonComplete = cultivated.has(field.id) && simulation.getSeason(state.day) === 'winter';
+  if (!firstGrowingSeasonComplete ||
+      foodDays(state) < 20 || fuelDays(state) < 45) return false;
+  const reserved = firstFieldExpansionTargetsByState.get(state);
+  const targets = reserved?.fieldId === field.id
+    ? [reserved]
+    : [-1, 0].flatMap(offsetY => [-1, 0].map(offsetX => ({
+      x: field.x + offsetX, y: field.y + offsetY, w: 3, h: 3,
+    })));
+  const errors = [];
+  for (const target of targets) {
+      const error = simulation.expandAreaBuilding(
+        state, field.id, target.x, target.y, target.w, target.h, { approveClearing: true },
+      );
+      if (error == null) return true;
+      errors.push(error);
+  }
+  if (tracePolicy) {
+    const target = targets[0];
+    const blockers = [];
+    for (let y = target.y; y < target.y + target.h; y++) {
+      for (let x = target.x; x < target.x + target.w; x++) {
+        const tile = state.map[y]?.[x];
+        if (!tile || tile.buildingId && tile.buildingId !== field.id ||
+            !['plain', 'fertile', 'forest'].includes(tile?.terrain)) {
+          const occupant = state.buildings.find(building => building.id === tile?.buildingId);
+          blockers.push(`${x},${y}:${tile?.terrain ?? 'outside'}:${occupant?.type ?? tile?.buildingId ?? '-'}`);
+        }
+      }
+    }
+    console.log(`[policy] day ${state.day}: field expansion blocked: ${[...new Set(errors)].join(' / ')} (${blockers.join(', ')})`);
+  }
+  return false;
 }
 
 function tryQueueLargePlot(state, type, desired, candidates) {
@@ -136,34 +205,106 @@ function tryQueueLargePlot(state, type, desired, candidates) {
   return false;
 }
 
+function mineCandidateScore(state, candidate) {
+  const summary = miningSites.mineMineralSummary(state, candidate);
+  const stoneWeight = state.resources.stone < 24 ? 3 : 1;
+  const ironWeight = state.resources.iron < 6 ? 5 : 2;
+  return summary.stone * stoneWeight + summary.iron * ironWeight + summary.silver;
+}
+
+function bestMineCandidate(state, candidates, relocatingMine = null) {
+  let best = null;
+  for (const candidate of candidates) {
+    const valid = relocatingMine
+      ? buildings.canRelocateBuildingAt(state, relocatingMine, candidate.x, candidate.y)
+      : buildings.canPlaceBuildingAt(state, 'mine', candidate.x, candidate.y);
+    if (!valid) continue;
+    const score = mineCandidateScore(state, candidate);
+    if (score <= 0) continue;
+    if (!best || score > best.score || (score === best.score && candidate.distance < best.distance)) {
+      best = { ...candidate, score };
+    }
+  }
+  return best;
+}
+
+function manageSurfaceMine(state, candidates) {
+  const mines = state.buildings.filter(building => building.type === 'mine');
+  if (mines.some(building => !building.built || building.workOrder)) return false;
+  const exhausted = mines.find(building => miningSites.mineMineralSummary(state, building).deposits === 0);
+  if (exhausted) {
+    const destination = bestMineCandidate(state, candidates, exhausted);
+    if (!destination) return false;
+    return simulation.startBuildingRelocation(
+      state, exhausted.id, destination.x, destination.y, { approveClearing: true },
+    ) == null;
+  }
+  if (mines.length > 0) return false;
+  const destination = bestMineCandidate(state, candidates);
+  if (!destination) {
+    if (tracePolicy) console.log(`[policy] day ${state.day}: no visible mine destination`);
+    return false;
+  }
+  if (!buildings.canAfford(state, buildings.BUILDING_DEFS.mine)) {
+    if (tracePolicy) console.log(
+      `[policy] day ${state.day}: mine waits for resources ` +
+      `(wood ${round(state.resources.wood)}, stone ${round(state.resources.stone)}, tools ${round(state.resources.tools)})`,
+    );
+    return true;
+  }
+  const error = simulation.tryPlaceBuilding(
+    state, 'mine', destination.x, destination.y, undefined, undefined, { approveClearing: true },
+  );
+  if (tracePolicy) console.log(`[policy] day ${state.day}: mine at ${destination.x},${destination.y}: ${error ?? 'queued'}`);
+  return error == null;
+}
+
 function manageReleaseConstruction(state, candidates) {
   const pop = living(state).length;
   const constructionLimit = pop >= 30 ? 2 : 1;
   if (activeConstructionCount(state) >= constructionLimit) return;
 
+  if (tryQueueFirstField(state, candidates)) return;
+  const reserved = firstFieldExpansionTargetsByState.get(state);
+  const reservationActive = reserved && state.buildings.some(building =>
+    building.id === reserved.fieldId && (building.w ?? 1) === 2 && (building.h ?? 1) === 2);
+  const buildCandidates = reservationActive
+    ? candidates.filter(candidate => candidate.x < reserved.x - 1 || candidate.x >= reserved.x + reserved.w ||
+      candidate.y < reserved.y - 1 || candidate.y >= reserved.y + reserved.h)
+    : candidates;
+  const firstFieldReady = state.buildings.some(building => building.type === 'field' && building.built);
+  if (firstFieldReady) {
+    if (tryQueueBuilding(state, 'lumberCamp', 1, buildCandidates)) return;
+    if (tryQueueBuilding(state, 'market', 1, buildCandidates)) return;
+    if (tryExpandFirstField(state)) return;
+    if (manageSurfaceMine(state, buildCandidates)) return;
+  }
+
   const desiredFields = Math.max(1, Math.ceil((pop + 8) / 14));
   const hasLargeField = state.buildings.some(building => building.type === 'field' && plotArea(building) >= 9);
-  const canExpandFood = !hasLargeField || (foodDays(state) >= 18 && fuelDays(state) >= 40);
-  if (canExpandFood && tryQueueLargePlot(state, 'field', desiredFields, candidates)) return;
+  const canExpandFood = hasLargeField && foodDays(state) >= 18 && fuelDays(state) >= 40;
+  if (canExpandFood && tryQueueLargePlot(state, 'field', desiredFields, buildCandidates)) return;
 
   for (const [type, desired] of [
     ['woodShed', 1],
     ['lumberCamp', 1],
-    ['market', 1],
-    ['huntLodge', 1],
-    ['herbHut', 1],
-    ['smithy', 1],
   ]) {
-    if (tryQueueBuilding(state, type, desired, candidates)) return;
+    if (tryQueueBuilding(state, type, desired, buildCandidates)) return;
+  }
+
+  for (const [type, desired] of [
+    ['market', 1], ['huntLodge', 1], ['herbHut', 1], ['smithy', 1],
+  ]) {
+    if (tryQueueBuilding(state, type, desired, buildCandidates)) return;
   }
 
   const desiredHuts = Math.max(2, Math.ceil((pop + 8 - buildings.BUILDING_DEFS.center.capacity) /
     buildings.BUILDING_DEFS.hut.capacity));
-  if (tryQueueBuilding(state, 'hut', desiredHuts, candidates)) return;
+  if (tryQueueBuilding(state, 'hut', desiredHuts, buildCandidates)) return;
 
   const reserveReady = foodDays(state) >= 28 && fuelDays(state) >= 55;
   if (!reserveReady) return;
-  if ((state.corpses?.length ?? 0) > 0 && tryQueueBuilding(state, 'cemetery', 1, candidates)) return;
+  if ((state.corpses?.length ?? 0) > 0 && tryQueueBuilding(state, 'cemetery', 1, buildCandidates)) return;
 
   for (const [type, desired] of [
     ['cellar', 1],
@@ -175,30 +316,30 @@ function manageReleaseConstruction(state, candidates) {
     ['watchtower', 4],
     ['palisade', 14],
   ]) {
-    if (tryQueueBuilding(state, type, desired, candidates)) return;
+    if (tryQueueBuilding(state, type, desired, buildCandidates)) return;
   }
 
   if (state.rank !== 'settlement') {
     const desiredPaddies = Math.max(1, Math.ceil(pop / 28));
-    if (tryQueueLargePlot(state, 'paddy', desiredPaddies, candidates)) return;
+    if (tryQueueLargePlot(state, 'paddy', desiredPaddies, buildCandidates)) return;
     for (const [type, desired] of [
-      ['mine', 1], ['ferry', 1], ['watermill', 1], ['weavingHouse', 1],
+      ['ferry', 1], ['watermill', 1], ['weavingHouse', 1],
       ['ondol', Math.max(2, Math.ceil(pop / 15))], ['dryingRack', 1],
       ['onggiKiln', 1], ['jangdokdae', 1],
     ]) {
-      if (tryQueueBuilding(state, type, desired, candidates)) return;
+      if (tryQueueBuilding(state, type, desired, buildCandidates)) return;
     }
   }
   if (state.rank === 'jin' || state.rank === 'bu') {
     for (const [type, desired] of [
       ['clinic', 1], ['school', 1], ['stable', 3], ['charcoalKiln', 1], ['earthFort', 8],
     ]) {
-      if (tryQueueBuilding(state, type, desired, candidates)) return;
+      if (tryQueueBuilding(state, type, desired, buildCandidates)) return;
     }
   }
   if (state.rank === 'bu') {
     for (const [type, desired] of [['office', 1], ['dock', 1], ['stoneWall', 8]]) {
-      if (tryQueueBuilding(state, type, desired, candidates)) return;
+      if (tryQueueBuilding(state, type, desired, buildCandidates)) return;
     }
   }
 }
@@ -226,6 +367,66 @@ function manageCropPlan(state) {
   });
 }
 
+function revealedGatheringCandidates(state, building) {
+  const current = gatheringZones.gatheringWorkArea(building);
+  const candidates = [{ x: current.x, y: current.y }];
+  for (let y = 0; y < state.map.length; y++) {
+    for (let x = 0; x < state.map[y].length; x++) {
+      if (state.exploration?.explored[y]?.[x] !== true) continue;
+      if (state.map[y][x].terrain === 'forest') candidates.push({ x, y });
+    }
+  }
+  if (building.type === 'huntLodge') {
+    for (const habitat of state.habitats ?? []) {
+      if (state.exploration?.explored[habitat.y]?.[habitat.x] === true) {
+        candidates.push({ x: habitat.x, y: habitat.y });
+      }
+    }
+  }
+  return candidates;
+}
+
+function gatheringAreaScore(state, building, area) {
+  if (building.type === 'huntLodge') {
+    const visibleHabitats = (state.habitats ?? []).filter(habitat =>
+      state.exploration?.explored[habitat.y]?.[habitat.x] === true);
+    const summary = habitats.habitatReserveSummaryInArea(state.map, visibleHabitats, area);
+    return summary.stock * 4 + summary.capacity + summary.habitats;
+  }
+  const summary = gatheringZones.gatheringForestSummary(state, {
+    ...building,
+    gatheringWorkArea: area,
+  });
+  return building.type === 'lumberCamp'
+    ? summary.matureTrees * 4 + summary.forestTiles
+    : summary.forestTiles;
+}
+
+function manageGatheringWorkAreas(state) {
+  for (const building of state.buildings.filter(candidate =>
+    candidate.built && ['lumberCamp', 'huntLodge', 'herbHut'].includes(candidate.type))) {
+    const current = gatheringZones.gatheringWorkArea(building);
+    const currentScore = gatheringAreaScore(state, building, current);
+    let best = { x: current.x, y: current.y, score: currentScore };
+    for (const candidate of revealedGatheringCandidates(state, building)) {
+      const area = { x: candidate.x, y: candidate.y, radius: current.radius };
+      const score = gatheringAreaScore(state, building, area);
+      const distance = Math.abs(candidate.x - building.x) + Math.abs(candidate.y - building.y);
+      const bestDistance = Math.abs(best.x - building.x) + Math.abs(best.y - building.y);
+      if (score > best.score || (score === best.score && distance < bestDistance) ||
+          (score === best.score && distance === bestDistance &&
+            (candidate.y < best.y || (candidate.y === best.y && candidate.x < best.x)))) {
+        best = { ...candidate, score };
+      }
+    }
+    const worthwhile = best.score > currentScore * 1.15 || (currentScore <= 0 && best.score > 0);
+    if (!worthwhile || (best.x === current.x && best.y === current.y)) continue;
+    gatheringZones.adjustGatheringWorkArea(
+      state, building.id, best.x - current.x, best.y - current.y, 0,
+    );
+  }
+}
+
 function releaseJobTargets(state, laborCount) {
   const pop = living(state).length;
   const season = simulation.getSeason(state.day);
@@ -236,7 +437,12 @@ function releaseJobTargets(state, laborCount) {
   const farmSlots = state.buildings
     .filter(building => building.built && (building.type === 'field' || building.type === 'paddy'))
     .reduce((sum, building) => sum + workerSlots.workerSlotCount(building), 0);
-  if (season !== 'winter') add('farmer', farmSlots);
+  const plotConstructionCount = state.buildings.filter(building =>
+    !building.built && buildings.isPlotBuildingType(building.type)).length;
+  const plotConstructionFarmers = plotConstructionCount > 0 ? 2 : 0;
+  if (season !== 'winter' || plotConstructionCount > 0) {
+    add('farmer', Math.max(farmSlots, plotConstructionFarmers));
+  }
 
   const fuelUrgent = fuelDays(state) < (season === 'winter' ? 85 : 100);
   if (fuelUrgent) {
@@ -247,14 +453,16 @@ function releaseJobTargets(state, laborCount) {
   if (foodUrgent) add('hunter', Math.max(season === 'winter' ? 3 : 2, Math.ceil(pop * 0.14)));
 
   add('hauler', Math.max(1, Math.ceil(pop / 18)));
-  const firstFoodPlotReady = state.buildings.some(building =>
-    building.type === 'field' && building.built && plotArea(building) >= 9);
-  const builderCount = activeConstructionCount(state) > 0
-    ? (!firstFoodPlotReady ? 2 : Math.min(2, Math.max(1, Math.ceil(pop / 24))))
+  const nonPlotConstructionCount = state.buildings.filter(building =>
+    !building.built && !buildings.isPlotBuildingType(building.type)).length;
+  const builderCount = nonPlotConstructionCount > 0
+    ? Math.min(2, Math.max(1, Math.ceil(pop / 24)))
     : 0;
   add('builder', builderCount);
   add('smith', builtCount(state, 'smithy') > 0 && state.resources.tools < Math.max(8, Math.ceil(pop * 0.5)) ? 1 : 0);
-  add('miner', state.resources.stone < Math.max(24, pop) || state.resources.iron < 6 ? 1 : 0);
+  const mineReady = state.buildings.some(building => building.type === 'mine' && building.built &&
+    miningSites.mineMineralSummary(state, building).deposits > 0);
+  add('miner', mineReady && (state.resources.stone < Math.max(24, pop) || state.resources.iron < 6) ? 1 : 0);
   add('watchman', Math.max(1, Math.floor(pop / 18)));
   add('herbalist', builtCount(state, 'herbHut') > 0 && state.resources.herbs < Math.max(8, pop * 0.5) ? 1 : 0);
   add('tanner', builtCount(state, 'tannery') > 0 && clothingTotal(state) < pop * 1.15 ? 1 : 0);
@@ -303,7 +511,11 @@ function tryReleaseTrade(state, metrics) {
   const pop = living(state).length;
   const season = simulation.getSeason(state.day);
   let target = null;
-  if ((season === 'autumn' || season === 'winter') && fuelDays(state) < 85) {
+  const firstMineNeedsTools = builtCount(state, 'market') > 0 &&
+    !state.buildings.some(building => building.type === 'mine') && state.resources.tools < 1;
+  if (firstMineNeedsTools) {
+    target = { resource: 'tools', amount: Math.max(2, Math.ceil(1 - state.resources.tools)) };
+  } else if ((season === 'autumn' || season === 'winter') && fuelDays(state) < 85) {
     target = { resource: 'firewood', amount: Math.max(4, Math.ceil(pop * 1.8)) };
   } else if (foodDays(state) < 35) {
     target = { resource: 'grain', amount: Math.max(4, Math.ceil(pop * 1.5)) };
@@ -889,6 +1101,7 @@ function runOne(seed) {
     const population = living(state).length;
     const built = state.buildings.filter(building => building.built).length;
     if (state.day % 3 === 1 || population !== lastPopulation || built !== lastBuilt) {
+      manageGatheringWorkAreas(state);
       manageYouthPolicy(state);
       rebalanceReleaseJobs(state);
       manageServiceJobs(state);
@@ -987,6 +1200,33 @@ function runOne(seed) {
       if (building.built) bag[building.type] = (bag[building.type] ?? 0) + 1;
       return bag;
     }, {})).sort()),
+    finalFields: state.buildings.filter(building => building.type === 'field').map(building => ({
+      id: building.id,
+      dimensions: `${building.w ?? 1}x${building.h ?? 1}`,
+      built: building.built,
+      expansion: building.expansion?.targetArea
+        ? `${building.expansion.targetArea.w}x${building.expansion.targetArea.h}`
+        : null,
+    })),
+    finalConstructions: state.buildings.filter(building => !building.built).map(building => ({
+      type: building.type,
+      progress: round(building.progress ?? building.workOrder?.progress ?? 0),
+      required: round(building.workOrder?.required ?? buildings.BUILDING_DEFS[building.type].buildDays),
+      workOrder: building.workOrder?.kind ?? null,
+    })),
+    finalJobs: Object.fromEntries(Object.entries(living(state).reduce((bag, resident) => {
+      bag[resident.job] = (bag[resident.job] ?? 0) + 1;
+      return bag;
+    }, {})).sort()),
+    finalMining: {
+      stocks: {
+        stone: round(state.resources.stone),
+        iron: round(state.resources.iron),
+        tools: round(state.resources.tools),
+      },
+      mines: state.buildings.filter(building => building.type === 'mine' && building.built)
+        .map(building => ({ id: building.id, ...miningSites.mineMineralSummary(state, building) })),
+    },
     ...metrics,
     spoilageLoss: round(metrics.spoilageLoss),
     preservedFoodProduced: round(metrics.preservedFoodProduced),
@@ -1065,6 +1305,20 @@ function summarize(results, durationMs) {
       silverIncome: round(sum(results, result => result.silverIncome)),
       silverSpending: round(sum(results, result => result.silverSpending)),
       secretMiningDays: sum(results, result => result.secretMiningDays),
+    },
+    mining: {
+      runsWithBuiltMine: results.filter(result => result.finalMining.mines.length > 0).length,
+      finalMiners: sum(results, result => result.finalJobs.miner ?? 0),
+      averageFinalStocks: {
+        stone: round(average(results.map(result => result.finalMining.stocks.stone))),
+        iron: round(average(results.map(result => result.finalMining.stocks.iron))),
+        tools: round(average(results.map(result => result.finalMining.stocks.tools))),
+      },
+      remainingKnownDeposits: {
+        stone: round(sum(results, result => sum(result.finalMining.mines, mine => mine.stone))),
+        iron: round(sum(results, result => sum(result.finalMining.mines, mine => mine.iron))),
+        silver: round(sum(results, result => sum(result.finalMining.mines, mine => mine.silver))),
+      },
     },
     labor: {
       youthWorkDays: sum(results, result => result.youthWorkDays),

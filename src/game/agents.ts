@@ -421,7 +421,7 @@ function clearingWoodcutterTick(state: GameState, r: Resident, ctx: Ctx, siteId:
     goal: t => treeAt(t.x, t.y) != null,
     workTicks: a.work.chop,
     yieldRes: 'wood',
-    yieldAmt: a.yields.wood * CONFIG.seasons.woodMult[ctx.season] *
+    yieldAmt: a.yields.wood * CONFIG.production.lumberCampBonus * CONFIG.seasons.woodMult[ctx.season] *
       (r.special === 'tutorialAdvisor' ? CONFIG.specialResidents.tutorialAdvisorWoodYieldMult : 1),
     cap: a.carryCap.wood,
     depositExtra: ['lumberCamp'],
