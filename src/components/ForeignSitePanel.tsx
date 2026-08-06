@@ -114,6 +114,9 @@ export function ForeignSitePanel({
           <tr><td>군사력</td><td>{estimatePower(state, site)}</td></tr>
           <tr><td>호의 / 신용</td><td>{Math.round(site.goodwill)} / {Math.round(site.trust)}</td></tr>
           <tr><td>경계심 / 은혜</td><td>{Math.round(site.alarm)} / {site.favors}</td></tr>
+          {(site.militaryActivityUntilDay ?? 0) > state.day && (
+            <tr><td>군사 활동</td><td>무장대 출정 · {site.militaryActivityUntilDay! - state.day}일 뒤 재편</td></tr>
+          )}
           {hasLocalEconomy && <tr><td>비축 식량</td><td>약 {Math.floor(foreignSiteFoodDays(site))}일분</td></tr>}
           {hasLocalEconomy && (
             <tr>

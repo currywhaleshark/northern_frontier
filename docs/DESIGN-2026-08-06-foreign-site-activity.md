@@ -1,7 +1,7 @@
 # 타 부족 거주지 활동 설계 — 생활대·경제·왕래
 
-> **계획 상태:** 일부 완료
-> **상태 갱신:** 2026-08-06 — A0~A4의 실제 생활·순찰·상단·전령·계절 이동, 현지 재고 교역과 원조 결과, v65 저장까지 구현했다.
+> **계획 상태:** 완료
+> **상태 갱신:** 2026-08-06 — A0~A5와 v66 저장, 거주지 기반 습격 출발·군사 슬롯·전투 결과 귀속 및 최종 성능·네 지역 실화면 감사를 완료했다.
 
 - 작성일: 2026-08-06
 - 관련 시스템: `foreignSites`, `foreignSiteActivity`, 생활권, 교역, 외교, 이민·귀순, 습격
@@ -149,6 +149,7 @@ interface ClaimZoneGrowthState {
 ```
 
 - 생활 활동대는 v63, 생활권 성장·유예 장부는 v64, 상단·전령 일정과 계절 이동 상태는 v65 저장 스키마에 반영한다.
+- 거주지 군사 활동 재편일과 진행 중 습격의 출발 거주지는 v66 저장 스키마에 반영한다.
 - 구 저장은 활동대가 없는 상태로 정규화하고 각 거주지의 다음 출발일을 `siteId`로 분산해 한날 동시에 쏟아져 나오지 않게 한다.
 - 부모 거주지가 불타거나 버려지면 귀환 중 활동대는 지도 가장자리로 퇴각하고 나머지는 제거한다.
 - 구 저장의 생활권은 현재 `radius`를 `baseRadius`와 `targetRadius`의 시작값으로 삼아 불러오자마자 경계가 움직이지 않게 한다.
@@ -266,9 +267,10 @@ A0~A2를 첫 묶음으로 한다. 여기까지 완료되면 “사람이 실제�
 - [x] A2: 귀환 생산물을 식량·교역 재고에 나누어 넣고, 3일마다 최소 생계·소비·생산을 결산한다. 외부 사냥대와 어로대는 플레이어와 같은 서식지·어장 비축을 제한 수확하며 `prosperous/hungry/sick` 전이와 거주지 패널 요약을 연결했다.
 - [x] A3: 활동대를 주민처럼 선택해 소속·목적·인원·화물을 확인하고 미니맵에서 추적한다. 번영·위기 압력에 따라 경계 순찰 귀환 후 한 칸 확장하거나 한 계절 예고 후 한 칸 축소하며, 기존 시설 유예·협정 중 축소 고정·현장 순찰 항의를 연결했다.
 - [x] A4: 통행 협정과 도달 가능한 장터가 있는 현지 거주지는 실제 상단을 보내고 원천 재고 안에서 거래한다. 굶주림·질병 전령은 도착 뒤 계절당 한 번 원조를 청하며, 계절 야영지는 지도 경계를 오가는 행렬이 도착·퇴장한 뒤 활성 상태가 바뀐다.
-- [ ] A5: 타 세력 거주지 기반 습격 출발과 최종 성능·네 지역 실화면 감사는 남아 있다.
+- [x] A5: 운용 가능한 같은 세력 거주지에서 실제 통행 가능한 습격 경로를 찾고, 길이 없으면 지도 가장자리 출발로 폴백한다. 실제 출발 거주지에만 군사 활동 재편 슬롯을 잠그며 즉시전·자동전·전술전·장기 공성 결과를 해당 거주지 기억에 돌려준다. 산채만 막힌 시작 지형 예외를 유지해 기존 습격 계약도 보존했다.
+- [x] 최종 감사: 중형 평원·대형 산지에서 외부 활동대 로직을 각각 1년 3,456서브틱 계측했고 최대 활동대는 1개·2개, 거주지당 최대 1개였다. 평원·산지·호수·해안 생성 회귀와 실제 새 게임 화면, 최소 줌, 최대 줌 HD, 콘솔 오류 유무를 확인했다.
 
-대표 근거는 `src/game/foreignSiteSimulation.ts`, `src/game/foreignSites.ts`, `src/game/events.ts`, `src/game/claimZones.ts`, `src/game/territory.ts`, `src/render/renderer.ts`, `src/components/GameCanvas.tsx`, `src/components/Minimap.tsx`, `src/components/ForeignSitePanel.tsx`, `tools/game/test_foreign_sites.mjs`, `tools/game/test_release_candidate_save_roundtrip.mjs`다. 외부 거주지, 교역, 외교 E5·E6, 선택 UI, 미니맵 레이어, 저장 왕복, 신규 게임, 망루 P4 및 프로덕션 빌드를 통과했다.
+대표 근거는 `src/game/foreignSiteSimulation.ts`, `src/game/foreignSites.ts`, `src/game/raids.ts`, `src/game/battles.ts`, `src/game/siege.ts`, `src/game/tacticalBattle.ts`, `src/game/events.ts`, `src/game/claimZones.ts`, `src/game/territory.ts`, `src/render/renderer.ts`, `src/components/GameCanvas.tsx`, `src/components/Minimap.tsx`, `src/components/ForeignSitePanel.tsx`, `tools/game/test_foreign_sites.mjs`, `tools/game/test_release_candidate_save_roundtrip.mjs`, `tools/game/measure_foreign_site_activity_a5.mjs`다. 외부 거주지, 교역, 외교 E5·E6, 선택 UI, 미니맵 레이어, 습격 경로, 공성·전술전, 저장 왕복, 네 지역 생성, 신규 게임, 망루 P4, 성능 계측 및 프로덕션 빌드를 통과했다.
 
 ## 9. 기존 시스템 접점
 
@@ -339,5 +341,5 @@ A0~A2를 첫 묶음으로 한다. 여기까지 완료되면 “사람이 실제�
 - [x] A2 활동 결과가 재고·공유 자원·거주지 상태에 반영된다.
 - [x] A3 발견·선택·순찰, 생활권의 점진적 확장·축소, 기존 이용 유예와 협정 고정이 연결된다.
 - [x] A4 상단·전령·계절 이동이 실제 왕래로 표현된다.
-- [ ] A5 거주지 기반 습격 출발과 기존 공성 체계가 정합하다.
-- [ ] 표적·인접 회귀, 구 저장, 성능 측정, 네 지역 실화면, 프로덕션 빌드가 통과한다.
+- [x] A5 거주지 기반 습격 출발과 기존 공성 체계가 정합하다.
+- [x] 표적·인접 회귀, 구 저장, 성능 측정, 네 지역 실화면, 프로덕션 빌드가 통과한다.

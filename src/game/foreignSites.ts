@@ -284,6 +284,8 @@ export function ensureForeignSiteState(state: GameState): void {
     site.alarm ??= 0;
     site.favors ??= 0;
     site.lastInteractionDay ??= -999;
+    site.militaryActivityUntilDay = Number.isFinite(site.militaryActivityUntilDay)
+      ? Math.max(0, Math.floor(Number(site.militaryActivityUntilDay))) : undefined;
     site.seasonalTransition = site.seasonalTransition === 'entering' || site.seasonalTransition === 'leaving'
       ? site.seasonalTransition : undefined;
     ensureSiteActivity(site, state.day);
@@ -395,6 +397,11 @@ export function ensureForeignSiteState(state: GameState): void {
     Number.isFinite(state.nextForeignSitePartyId) ? Math.floor(state.nextForeignSitePartyId) : 1,
     Math.max(0, ...state.foreignSiteParties.map(party => party.id)) + 1,
   );
+  if (state.raiders) {
+    state.raiders.originSiteId = Number.isInteger(state.raiders.originSiteId) &&
+      state.foreignSites.some(site => site.id === state.raiders?.originSiteId)
+      ? state.raiders.originSiteId : undefined;
+  }
 }
 
 export function foreignSiteAt(state: GameState, x: number, y: number): ForeignSite | null {
@@ -465,14 +472,42 @@ export function updateSeasonalForeignSites(state: GameState, season = getSeason(
 }
 
 export function findRaidOriginSite(state: GameState, factionName: string): ForeignSite | null {
-  if (factionName !== '변경 마적') return null;
   const center = centerOf(state);
-  return state.foreignSites.find(site =>
-    site.type === 'banditLair' &&
-    site.factionName === factionName &&
-    site.status !== 'burned' &&
-    site.status !== 'abandoned' &&
-    manhattan(site, center) >= CONFIG.foreignSites.minRaidOriginDistance) ?? null;
+  return state.foreignSites
+    .filter(site => site.factionName === factionName && site.type !== 'ruin' &&
+      isForeignSiteOperational(site) && site.militaryPower > 0 &&
+      (site.militaryActivityUntilDay ?? 0) <= state.day &&
+      manhattan(site, center) >= CONFIG.foreignSites.minRaidOriginDistance)
+    .sort((left, right) => {
+      const leftLair = left.type === 'banditLair' ? 1 : 0;
+      const rightLair = right.type === 'banditLair' ? 1 : 0;
+      return rightLair - leftLair || right.militaryPower - left.militaryPower || left.id - right.id;
+    })[0] ?? null;
+}
+
+export function markRaidOriginDeparture(state: GameState, siteId: number): void {
+  const site = state.foreignSites.find(candidate => candidate.id === siteId);
+  if (!site) return;
+  site.lastRaidDay = state.day;
+  site.militaryActivityUntilDay = state.day + CONFIG.threat.raidCooldownDays;
+  addForeignSiteMemory(state, site.id, '무장대가 개척지를 노리고 거주지에서 출발했습니다.', 'bad');
+}
+
+export function recordRaidOriginOutcome(
+  state: GameState,
+  siteId: number | undefined,
+  outcome: 'repelled' | 'succeeded' | 'withdrew',
+): void {
+  if (siteId == null) return;
+  const site = state.foreignSites.find(candidate => candidate.id === siteId);
+  if (!site) return;
+  const text = outcome === 'repelled'
+    ? '개척지로 보낸 무장대가 패해 흩어져 돌아왔습니다.'
+    : outcome === 'succeeded'
+      ? '개척지로 보낸 무장대가 약탈과 위협을 마치고 돌아왔습니다.'
+      : '개척지로 보낸 무장대가 싸움을 끝내고 물러났습니다.';
+  addForeignSiteMemory(state, site.id, text, outcome === 'repelled' ? 'bad' : 'neutral');
+  site.alarm = Math.min(100, site.alarm + (outcome === 'repelled' ? 6 : 2));
 }
 
 export function isForeignSiteOperational(site: ForeignSite): boolean {

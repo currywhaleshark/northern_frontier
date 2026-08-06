@@ -28,6 +28,7 @@ import {
 import { changeRelation } from './relations';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
 import { activePredatorScoutIds } from './expeditionIntel';
+import { recordRaidOriginOutcome } from './foreignSites';
 import { allocateMusketReadiness, assignedWeapon, consumeMusketVolleys } from './weapons';
 import { stationedWatchman } from './watchtowers';
 import {
@@ -3194,6 +3195,7 @@ export function finishTacticalBattle(state: GameState): void {
     ? CONFIG.threat.afterRaidThreat
     : Math.min(100, CONFIG.threat.afterRaidThreat + (battleGrade === 'narrowDefeat' ? 10 : 20));
   state.raidCooldown = CONFIG.threat.raidCooldownDays;
+  recordRaidOriginOutcome(state, state.raiders?.originSiteId, result === 'victory' ? 'repelled' : 'succeeded');
   state.raiders = null;
   state.battle = null;
   if (longSiege) state.siegeState = null;

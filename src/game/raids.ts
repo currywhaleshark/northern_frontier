@@ -24,7 +24,7 @@ import {
   bumpDefenseTopology, effectiveWallType, isBlockingDefenseWall, isRaidTileTraversable,
   isProtectedBoundaryBreach, planRaidRoute, wallIntegrity, wallIntegrityMax,
 } from './raidRoutes';
-import { findRaidOriginSite } from './foreignSites';
+import { findRaidOriginSite, markRaidOriginDeparture, recordRaidOriginOutcome } from './foreignSites';
 import { createTacticalBattle } from './tacticalBattle';
 import { activePredatorScoutIds } from './expeditionIntel';
 import { activeDiplomaticPact, announceRaidTip, raidTipInformant } from './diplomacy';
@@ -341,9 +341,8 @@ export function spawnRaiders(
   let originUsed = false;
   const originSite = findRaidOriginSite(state, faction.name);
   if (originSite) {
-    const originPassable = (x: number, y: number) =>
-      raiderPassable(state, x, y) ||
-      (state.map[y]?.[x]?.buildingId == null &&
+    const originPassable = (x: number, y: number) => raiderPassable(state, x, y) ||
+      (originSite.type === 'banditLair' && state.map[y]?.[x]?.buildingId == null &&
         (state.map[y]?.[x]?.terrain === 'mountain' || state.map[y]?.[x]?.terrain === 'river' ||
           state.map[y]?.[x]?.terrain === 'lake'));
     const starts: Array<{ x: number; y: number; order: number }> = [];
@@ -356,7 +355,13 @@ export function spawnRaiders(
     }
     starts.sort((a, b) => a.order - b.order);
     for (const start of starts) {
-      const planned = centerApproachPlans(state, start, center, power, { allowBlockedStart: true })[0];
+      const planned = centerApproachPlans(
+        state,
+        start,
+        center,
+        power,
+        { allowBlockedStart: originSite.type === 'banditLair' },
+      )[0];
       if (planned) {
         path = planned.plan.steps;
         route = planned.plan;
@@ -365,7 +370,7 @@ export function spawnRaiders(
           isProtectedBoundaryBreach(state, center, planned.plan.breaches[0]);
         spawn = { x: start.x, y: start.y };
         originUsed = true;
-        originSite.lastRaidDay = state.day;
+        markRaidOriginDeparture(state, originSite.id);
         break;
       }
     }
@@ -420,6 +425,7 @@ export function spawnRaiders(
     power,
     size: Math.min(6, 3 + Math.floor(power / 25)),
     faction: faction.name,
+    originSiteId: originUsed ? originSite?.id : undefined,
     warned,
     spotted: warned,
     siege,
@@ -431,7 +437,12 @@ export function spawnRaiders(
     trail: [],
   };
   if (warned && warningSource !== 'diplomatic') {
-    addLog(state, `${originUsed && originSite?.scoutedUntilDay && originSite.scoutedUntilDay >= state.day ? '정찰해 둔 산길에서 움직임을 포착했습니다!' : '봉수와 망루에서 경보!'} ${withJosa(factionRaidPartyLabel(state, faction.name), '이/가')} 접근하고 있습니다. 들이닥치기 전에 대비하십시오.`, 'raid');
+    const warning = originUsed && originSite?.discovered
+      ? `${originSite.name}에서 무장대가 출발하는 움직임을 포착했습니다!`
+      : originUsed && originSite?.scoutedUntilDay && originSite.scoutedUntilDay >= state.day
+        ? '정찰해 둔 산길에서 움직임을 포착했습니다!'
+        : '봉수와 망루에서 경보!';
+    addLog(state, `${warning} ${withJosa(factionRaidPartyLabel(state, faction.name), '이/가')} 접근하고 있습니다. 들이닥치기 전에 대비하십시오.`, 'raid');
   }
 }
 
@@ -538,7 +549,7 @@ export function raidersTick(state: GameState, rng: () => number): void {
 // 무리 없는 폴백 습격의 즉시 전투 판정 (요격/징집 공용) — 승패 확률만 다르고 결과 처리는 같다
 function resolveFightFallback(
   state: GameState, rng: () => number, faction: string, successP: number, side: string, mode: BattleMode,
-): void {
+): boolean {
   const away = new Set([...(state.expedition?.memberIds ?? []), ...(state.warDispatch?.memberIds ?? [])]);
   const defenderIds = state.residents
     .filter(resident => resident.alive && !away.has(resident.id) && !resident.sick && resident.health >= 20 &&
@@ -565,6 +576,7 @@ function resolveFightFallback(
     recordAnnals(state, 'raid', winText);
     state.lifetimeStats.raidsRepelled++;
     if (injured > 0 || damaged.length > 0) state.lifetimeStats.raidsSuffered++;
+    return true;
   } else {
     const killed = killResidents(
       state,
@@ -585,6 +597,7 @@ function resolveFightFallback(
     addLog(state, lossText, 'raid');
     recordAnnals(state, 'raid', `${factionRaidPartyLabel(state, faction)}의 습격 — ${lossText}`);
     state.lifetimeStats.raidsSuffered++;
+    return false;
   }
 }
 
@@ -842,6 +855,8 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
   const faction = c.data.faction as string;
   const warned = c.data.warned as boolean;
   const expeditionOrder = c.data.expeditionOrder as ExpeditionRaidOrder | undefined;
+  const originSiteId = state.raiders?.originSiteId;
+  let originOutcome: 'repelled' | 'succeeded' | 'withdrew' = 'succeeded';
 
   // 경보/공성/궂은 날씨 보정 — 지도 전투와 같은 배율 (눈보라·혹한은 침입자에게 더 가혹하다)
   const battleMods = { warned, siege: Boolean(c.data.siege) };
@@ -887,7 +902,9 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
       const fightDefense = applyBattleDefenseMultipliers(
         state.resources.defense * cannonBattleMult(state), battleMods, state.weather);
       consumeBattlePowder(state);
-      resolveFightFallback(state, rng, faction, fightDefense / (fightDefense + power), '수비병', 'garrison');
+      originOutcome = resolveFightFallback(
+        state, rng, faction, fightDefense / (fightDefense + power), '수비병', 'garrison',
+      ) ? 'repelled' : 'succeeded';
       break;
     }
     case 'levy': {
@@ -896,7 +913,9 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
         (state.resources.defense + levyDefenseBonus(state)) * cannonBattleMult(state),
         battleMods, state.weather);
       consumeBattlePowder(state);
-      resolveFightFallback(state, rng, faction, levyDefense / (levyDefense + power), '징집된 주민들', 'levy');
+      originOutcome = resolveFightFallback(
+        state, rng, faction, levyDefense / (levyDefense + power), '징집된 주민들', 'levy',
+      ) ? 'repelled' : 'succeeded';
       break;
     }
     case 'manual-garrison': {
@@ -936,6 +955,7 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
       // 조정에서의 명성과 그 세력과의 관계가 함께 작용한다
       const negotiateP = (state.resources.reputation * 0.6 + getRelation(state, faction) * 0.4) / 100 + 0.1;
       if (rng() < negotiateP) {
+        originOutcome = 'withdrew';
         // 협상 성공: 소규모 교환으로 마무리
         const give = Math.min(10, edibleFoodTotal(state));
         consumeEdibleFood(state, give);
@@ -969,6 +989,7 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
       break;
     }
     case 'beacon': {
+      originOutcome = 'repelled';
       state.resources.firewood = Math.max(0, state.resources.firewood - 5);
       state.threat = Math.max(0, state.threat - 35);
       const lootMsg = loot(state, 0.1);
@@ -986,6 +1007,7 @@ export function resolveRaid(state: GameState, optionId: string, rng: () => numbe
     state.threat = CONFIG.threat.afterRaidThreat;
   }
   state.raidCooldown = CONFIG.threat.raidCooldownDays;
+  recordRaidOriginOutcome(state, originSiteId, originOutcome);
   state.raiders = null; // 무리는 물러간다
   state.raidHold = null;
   state.pendingChoice = null;

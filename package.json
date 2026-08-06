@@ -21,6 +21,7 @@
     "test:no-local-paths": "node tools/test_no_local_paths.mjs",
     "measure:runtime": "node tools/game/measure_runtime_performance.mjs",
     "measure:map-sizes": "node tools/game/measure_map_size_s2.mjs",
+    "measure:foreign-sites": "node tools/game/measure_foreign_site_activity_a5.mjs",
     "test:combat": "node tools/game/test_tactical_battle.mjs",
     "gen:sprite-metrics": "node tools/game/generate_tactical_sprite_metrics.mjs",
     "edit:head-boxes": "node tools/game/head_box_editor.mjs",

@@ -137,6 +137,57 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
 }
 
 {
+  const state = simulation.newGame(2026080603);
+  const site = state.foreignSites.find(candidate => candidate.type === 'village' || candidate.type === 'fishingVillage');
+  state.map.flat().forEach(tile => { tile.terrain = 'plain'; tile.buildingId = null; });
+  site.discovered = true;
+  state.diplomaticPacts = [];
+  assert.equal(foreignSites.findRaidOriginSite(state, site.factionName)?.id, site.id,
+    'an operational matching settlement can become a raid origin');
+  raids.spawnRaiders(state, () => 0.5, true, site.factionName, 30);
+  assert.ok(state.raiders, 'a matching settlement raid still uses the existing RaiderBand');
+  assert.equal(state.raiders.originSiteId, site.id);
+  const originDistance = Math.max(
+    site.x - state.raiders.x,
+    state.raiders.x - (site.x + site.width - 1),
+    site.y - state.raiders.y,
+    state.raiders.y - (site.y + site.height - 1),
+  );
+  assert.ok(originDistance <= 1, 'the raid starts around its source settlement');
+  assert.equal(site.militaryActivityUntilDay, state.day + CONFIG.threat.raidCooldownDays,
+    'departure locks the source settlement military slot for recovery');
+  assert.equal(foreignSites.findRaidOriginSite(state, site.factionName), null,
+    'a recovering source settlement cannot launch another raid');
+  state.pendingChoice = {
+    kind: 'raid', title: 'test raid', body: 'test', options: [],
+    data: { power: 30, faction: site.factionName, warned: true, siege: false },
+  };
+  raids.resolveRaid(state, 'beacon', () => 0);
+  assert.ok(site.memories.some(memory => memory.text.includes('패해 흩어져')),
+    'repelled raid result returns to the source settlement memory');
+  state.day = site.militaryActivityUntilDay;
+  assert.equal(foreignSites.findRaidOriginSite(state, site.factionName)?.id, site.id,
+    'the military slot reopens after its deterministic recovery period');
+}
+
+{
+  const state = simulation.newGame(2026080604);
+  const site = state.foreignSites.find(candidate => candidate.type === 'village' || candidate.type === 'fishingVillage');
+  state.map.flat().forEach(tile => { tile.terrain = 'plain'; tile.buildingId = null; });
+  for (let y = site.y - 1; y <= site.y + site.height; y++) {
+    for (let x = site.x - 1; x <= site.x + site.width; x++) {
+      if (state.map[y]?.[x]) state.map[y][x].terrain = 'mountain';
+    }
+  }
+  raids.spawnRaiders(state, () => 0.5, false, site.factionName, 30);
+  assert.ok(state.raiders, 'a blocked settlement origin falls back to the existing map-edge raid');
+  assert.equal(state.raiders.originSiteId, undefined, 'fallback raid does not claim a source route it could not use');
+  assert.equal(site.militaryActivityUntilDay, undefined, 'failed local route does not lock the settlement military slot');
+  assert.ok(state.raiders.x === 0 || state.raiders.y === 0 || state.raiders.x === state.map[0].length - 1,
+    'the fallback raid starts on an existing map edge');
+}
+
+{
   const state = simulation.newGame(2026071206);
   delete state.foreignSites;
   delete state.claimZones;
@@ -166,6 +217,9 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
   const diplomacyMigrated = saveMigrations.migrateV64ToV65({ schemaVersion: 64, foreignSiteParties: [] });
   assert.equal(diplomacyMigrated.schemaVersion, 65);
   assert.deepEqual(diplomacyMigrated.foreignSiteParties, [], 'v65 preserves safe existing party state for normalization');
+  const raidOriginMigrated = saveMigrations.migrateV65ToV66({ schemaVersion: 65, raiders: { faction: 'test' } });
+  assert.equal(raidOriginMigrated.schemaVersion, 66);
+  assert.equal(raidOriginMigrated.raiders.originSiteId, undefined, 'old active raids keep an unknown origin in v66');
 }
 
 {

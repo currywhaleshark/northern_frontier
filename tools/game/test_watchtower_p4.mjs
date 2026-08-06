@@ -281,7 +281,7 @@ function bandAt(x, y, power = 40) {
   watchtowers.watchtowerTick(state);
   assert.equal(saveLoad.saveGame(state), true);
   const loaded = saveLoad.loadGame();
-  assert.equal(loaded.schemaVersion, 65);
+  assert.equal(loaded.schemaVersion, 66);
   assert.equal(loaded.residents.find(entry => entry.id === watchman.id).assignedBuildingId, tower.id);
   assert.equal(loaded.watchtowerProjectiles.length, 1);
   const migrated = saveLoad.migrateV55ToV56({ schemaVersion: 55, residents: [], buildings: [] });

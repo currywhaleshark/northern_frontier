@@ -875,6 +875,12 @@ export function migrateV64ToV65(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 65 };
 }
 
+// v66: 습격대의 원천 거주지와 거주지별 군사 활동 회복 슬롯.
+// 구 저장의 진행 중 습격은 원천 미상으로 유지하고, 새 필드는 상태 정규화가 보충한다.
+export function migrateV65ToV66(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 66 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -945,6 +951,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 62) migrated = migrateV62ToV63(migrated);
     else if (version === 63) migrated = migrateV63ToV64(migrated);
     else if (version === 64) migrated = migrateV64ToV65(migrated);
+    else if (version === 65) migrated = migrateV65ToV66(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }

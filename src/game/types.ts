@@ -464,6 +464,7 @@ export interface ForeignSite {
   seasonalTransition?: 'entering' | 'leaving';
   lastInteractionDay: number;
   lastRaidDay?: number;
+  militaryActivityUntilDay?: number;
   scoutedUntilDay?: number;
   lairScoutAttempts?: number;
   lairScoutFailures?: number;
@@ -1227,6 +1228,7 @@ export interface RaiderBand {
   power: number;
   size: number;      // 지도에 그릴 인원 점 수
   faction: string;
+  originSiteId?: number;
   warned: boolean;   // 봉수/망루 조기 경보를 받았는지
   spotted: boolean;  // 접근 발견 로그를 이미 띄웠는지
   siege: boolean;    // 목책에 막혀 공성 중인지

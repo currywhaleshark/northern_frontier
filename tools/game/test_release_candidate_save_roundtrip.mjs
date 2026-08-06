@@ -342,6 +342,7 @@ for (const [index, rank] of ['bo', 'jin'].entries()) {
   site.activity.nextDiplomaticDay = state.day + 7;
   site.activity.lastAidRequestSeasonKey = 3;
   site.activity.tradeRouteBlockedUntilDay = state.day + 2;
+  site.militaryActivityUntilDay = state.day + 8;
   claimZone.growth.pressure = 2;
   claimZone.growth.pendingChange = 'contract';
   claimZone.growth.previousRadius = claimZone.radius;
@@ -367,6 +368,7 @@ for (const [index, rank] of ['bo', 'jin'].entries()) {
       assert.equal(loadedSite.activity.nextDiplomaticDay, state.day + 7);
       assert.equal(loadedSite.activity.lastAidRequestSeasonKey, 3);
       assert.equal(loadedSite.activity.tradeRouteBlockedUntilDay, state.day + 2);
+      assert.equal(loadedSite.militaryActivityUntilDay, state.day + 8);
       const growth = loaded.claimZones.find(candidate => candidate.id === claimZone.id).growth;
       assert.equal(growth.pendingChange, 'contract');
       assert.equal(growth.targetRadius, claimZone.radius - 1);
@@ -381,6 +383,7 @@ for (const [index, rank] of ['bo', 'jin'].entries()) {
       assert.ok(loadedSite.activity.nextDiplomaticDay >= state.day + 7,
         'the diplomatic schedule remains valid after ten simulated days and reload');
       assert.equal(loadedSite.activity.lastAidRequestSeasonKey, 3);
+      assert.equal(loadedSite.militaryActivityUntilDay, state.day + 8);
       const growth = reloaded.claimZones.find(candidate => candidate.id === claimZone.id).growth;
       assert.equal(growth.pendingChange, 'contract');
       assert.equal(growth.targetRadius, claimZone.radius - 1);

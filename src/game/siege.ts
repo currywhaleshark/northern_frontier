@@ -14,6 +14,7 @@ import { FOOD_RESOURCES } from './resourceCatalog';
 import { getSeason } from './seasons';
 import { createTacticalBattle } from './tacticalBattle';
 import { isStationedWatchman } from './watchtowers';
+import { recordRaidOriginOutcome } from './foreignSites';
 import type {
   Building, GameState, PendingChoice, RaiderBand, Resident, ResourceId, SiegeStance, SiegeState,
 } from './types';
@@ -269,6 +270,11 @@ function finishSiege(state: GameState, result: 'withdrawal' | 'repelled' | 'surr
     : `${siege.faction}의 장기 공성을 버텨 내고 적을 물렸습니다.`);
   state.threat = CONFIG.threat.afterRaidThreat;
   state.raidCooldown = CONFIG.threat.raidCooldownDays;
+  recordRaidOriginOutcome(
+    state,
+    state.raiders?.originSiteId,
+    result === 'repelled' ? 'repelled' : result === 'surrender' ? 'succeeded' : 'withdrew',
+  );
   state.raiders = null;
   state.raidHold = null;
   state.siegeState = null;

@@ -16,6 +16,7 @@ import { consumeMusketPowder, musketReadiness } from './weapons';
 import { damageBuildings, injure, killResidents, loot, moraleShock } from './raidDamage';
 import { factionRaidPartyLabel } from './diplomaticFigures';
 import { isLakeIceAt } from './lakeIce';
+import { recordRaidOriginOutcome } from './foreignSites';
 import type { Battle, BattleLocation, BattleMode, BattleOutcome, GameState, RaiderBand, Resident, WeatherId } from './types';
 
 export const BATTLE_MUSTER_DEADLINE = 5;
@@ -334,6 +335,7 @@ function finishBattle(state: GameState, outcome: BattleOutcome, rng: () => numbe
     addLog(state, '출격대가 공성진에 남겨진 전리품 일부를 되찾았습니다.', 'good');
   }
   if (sortieSiege) state.siegeState = null;
+  recordRaidOriginOutcome(state, state.raiders?.originSiteId, outcome === 'victory' ? 'repelled' : 'succeeded');
   state.raiders = null;
   state.battle = null;
 
