@@ -106,7 +106,11 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
   );
   assert.equal(
     state.pendingChoice?.dialogue?.portrait?.src,
-    '/assets/portraits/tutorial-advisor-yeoni-v2.png',
+    '/assets/portraits/tutorial-advisor-yeoni-v2-display.png',
+  );
+  assert.equal(
+    state.pendingChoice?.dialogue?.portrait?.compactSrc,
+    '/assets/portraits/tutorial-advisor-yeoni-v2-compact.png',
   );
   assert.deepEqual(state.pendingChoice?.options.map(option => option.id), ['accept']);
   assert.ok(state.spentSpecialIds.includes('tutorialAdvisor'), 'the tutorial reward is game-once when offered');
@@ -361,6 +365,14 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
 
 {
   const root = fileURLToPath(new URL('../../', import.meta.url));
+  assert.deepEqual(
+    pngSize(join(root, 'public/assets/portraits/tutorial-advisor-yeoni-v2-display.png')),
+    { width: 300, height: 375 },
+  );
+  assert.deepEqual(
+    pngSize(join(root, 'public/assets/portraits/tutorial-advisor-yeoni-v2-compact.png')),
+    { width: 76, height: 76 },
+  );
   const sheet = pngSize(join(root, 'public/assets/special-residents-v2.png'));
   assert.deepEqual(sheet, { width: 28 * 10, height: 40 });
   for (const definition of specialResidents.SPECIAL_RESIDENT_ROSTER) {

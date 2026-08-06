@@ -987,6 +987,7 @@ export interface DialoguePresentation {
   speakerTitle?: string;
   portrait?: {
     src: string;
+    compactSrc?: string;
     alt: string;
     position?: string;
   };

@@ -16,7 +16,7 @@ export function DialoguePortrait({ dialogue, compact = false }: Props) {
     return (
       <img
         className={className}
-        src={dialogue.portrait.src}
+        src={compact ? dialogue.portrait.compactSrc ?? dialogue.portrait.src : dialogue.portrait.src}
         alt={dialogue.portrait.alt}
         style={dialogue.portrait.position ? { objectPosition: dialogue.portrait.position } : undefined}
       />
