@@ -364,6 +364,44 @@ export interface ForeignSiteMemory {
   kind: 'good' | 'bad' | 'neutral';
 }
 
+export type ForeignSiteActivityCondition = 'stable' | 'prosperous' | 'hungry' | 'sick';
+
+export interface ForeignSiteActivityLedger {
+  lastSettlementDay: number;
+  nextActivityDay: number;
+  activitySequence: number;
+  condition: ForeignSiteActivityCondition;
+  surplusSettlements: number;
+  hungerDays: number;
+  sicknessDays: number;
+  pendingProduction: Partial<Record<ResourceId, number>>;
+  recentProduction: Partial<Record<ResourceId, number>>;
+}
+
+export type ForeignSitePartyKind = 'farm' | 'hunt' | 'fish' | 'forage';
+export type ForeignSitePartyPhase = 'outbound' | 'working' | 'returning' | 'waiting' | 'retreating';
+
+export interface ForeignSiteParty {
+  id: number;
+  siteId: number;
+  kind: ForeignSitePartyKind;
+  phase: ForeignSitePartyPhase;
+  x: number;
+  y: number;
+  px: number;
+  py: number;
+  path: Array<{ x: number; y: number }>;
+  target: { x: number; y: number } | null;
+  memberCount: number;
+  cargo: Partial<Record<ResourceId, number>>;
+  departedDay: number;
+  workUntilTick?: number;
+  activitySequence: number;
+  resourceTargetId?: string;
+  spotted: boolean;
+  facing: 1 | -1;
+}
+
 export type BanditLairDoctrineId = 'trailAttrition' | 'wallHold' | 'leaderEscape';
 
 export interface BanditLairDefensePlan {
@@ -393,6 +431,7 @@ export interface ForeignSite {
   alarm: number;
   favors: number;
   memories: ForeignSiteMemory[];
+  activity?: ForeignSiteActivityLedger;
   seasonalActive?: boolean;
   activeSeasons?: Season[];
   lastInteractionDay: number;
@@ -2086,6 +2125,8 @@ export interface GameState {
   fishingBoats: FishingBoatState[];
   nextFishingBoatId: number;
   foreignSites: ForeignSite[];
+  foreignSiteParties: ForeignSiteParty[];
+  nextForeignSitePartyId: number;
   claimZones: ClaimZone[];
   nextForeignSiteId: number;
   nextClaimZoneId: number;

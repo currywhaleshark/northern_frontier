@@ -31,12 +31,14 @@ const diplomaticEnvoys = await import(pathToFileURL(join(compiledDir, 'diplomacy
 const raids = await import(pathToFileURL(join(compiledDir, 'raids.mjs')).href);
 const minimap = await import(pathToFileURL(join(compiledDir, 'minimap.mjs')).href);
 const activity = await import(pathToFileURL(join(compiledDir, 'foreignSiteActivity.mjs')).href);
+const activitySimulation = await import(pathToFileURL(join(compiledDir, 'foreignSiteSimulation.mjs')).href);
 const passage = await import(pathToFileURL(join(compiledDir, 'passage.mjs')).href);
 const events = await import(pathToFileURL(join(compiledDir, 'events.mjs')).href);
 const tradeValues = await import(pathToFileURL(join(compiledDir, 'tradeValues.mjs')).href);
 const agents = await import(pathToFileURL(join(compiledDir, 'agents.mjs')).href);
 const selectionActions = await import(pathToFileURL(join(compiledDir, 'selectionActions.mjs')).href);
 const territory = await import(pathToFileURL(join(compiledDir, 'territory.mjs')).href);
+const saveMigrations = await import(pathToFileURL(join(compiledDir, 'saveMigrations.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs')).href);
 
@@ -48,6 +50,9 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
   assert.ok(state.claimZones.length >= 3);
   assert.equal(state.nextForeignSiteId, state.foreignSites.length + 1);
   assert.equal(state.nextClaimZoneId, state.claimZones.length + 1);
+  assert.deepEqual(state.foreignSiteParties, []);
+  assert.equal(state.nextForeignSitePartyId, 1);
+  assert.ok(state.foreignSites.every(site => site.activity), 'every generated site has an activity ledger');
 
   const center = state.buildings.find(building => building.type === 'center');
   for (const site of state.foreignSites) {
@@ -135,11 +140,134 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
   delete state.claimZones;
   delete state.nextForeignSiteId;
   delete state.nextClaimZoneId;
+  delete state.foreignSiteParties;
+  delete state.nextForeignSitePartyId;
   foreignSites.ensureForeignSiteState(state);
   assert.deepEqual(state.foreignSites, []);
   assert.deepEqual(state.claimZones, []);
   assert.equal(state.nextForeignSiteId, 1);
   assert.equal(state.nextClaimZoneId, 1);
+  assert.deepEqual(state.foreignSiteParties, []);
+  assert.equal(state.nextForeignSitePartyId, 1);
+
+  const migrated = saveMigrations.migrateV62ToV63({
+    schemaVersion: 62,
+    foreignSites: [{ id: 1, status: 'stable' }],
+    foreignSiteParties: [{ id: 99 }],
+  });
+  assert.equal(migrated.schemaVersion, 63);
+  assert.deepEqual(migrated.foreignSiteParties, [], 'old saves do not restore incomplete activity parties');
+  assert.equal(migrated.nextForeignSitePartyId, 1);
+}
+
+{
+  const state = simulation.newGame(2026071212);
+  const site = state.foreignSites.find(candidate => candidate.type === 'village' || candidate.type === 'fishingVillage');
+  site.type = 'village';
+  site.discovered = true;
+  state.foreignSites.forEach(candidate => { candidate.activity.nextActivityDay = state.day + 99; });
+  site.activity.nextActivityDay = state.day;
+  const target = { x: Math.min(state.map[0].length - 1, site.x + site.width), y: site.y };
+  for (let y = Math.max(0, site.y - 1); y <= Math.min(state.map.length - 1, site.y + site.height); y++) {
+    for (let x = Math.max(0, site.x - 1); x <= Math.min(state.map[0].length - 1, site.x + site.width); x++) {
+      state.map[y][x].terrain = 'plain';
+      state.map[y][x].buildingId = null;
+    }
+  }
+  state.claimZones = state.claimZones.filter(zone => zone.siteId !== site.id);
+  state.claimZones.push({
+    id: state.nextClaimZoneId++, siteId: site.id, factionName: site.factionName,
+    kind: 'field', x: target.x, y: target.y, radius: 2, discovered: true,
+  });
+  const twin = JSON.parse(JSON.stringify(state));
+  const foodBefore = site.foodStock;
+  activitySimulation.dailyForeignSiteActivityTick(state);
+  activitySimulation.dailyForeignSiteActivityTick(twin);
+  assert.deepEqual(twin.foreignSiteParties, state.foreignSiteParties,
+    'the same seed, day, site, and activity sequence choose the same party and target');
+  const party = state.foreignSiteParties.find(candidate => candidate.siteId === site.id);
+  assert.ok(party, 'a due settlement sends a real activity party');
+  assert.equal(party.kind, 'farm');
+
+  for (let tick = 0; tick < 180 && state.foreignSiteParties.some(candidate => candidate.id === party.id); tick++) {
+    activitySimulation.foreignSitePartiesTick(state);
+    state.subTick++;
+    if (state.subTick >= CONFIG.agents.subticksPerDay) {
+      state.subTick = 0;
+      state.day++;
+    }
+  }
+  assert.equal(state.foreignSiteParties.some(candidate => candidate.id === party.id), false,
+    'the activity party completes work and returns home');
+  assert.ok(site.foodStock > foodBefore, 'returned farm cargo enters settlement food stock');
+  assert.ok((site.activity.pendingProduction.grain ?? 0) > 0, 'trip output is recorded for the next settlement');
+}
+
+{
+  const state = simulation.newGame(2026071213);
+  const camp = state.foreignSites.find(candidate => candidate.type === 'seasonalCamp');
+  camp.discovered = true;
+  camp.seasonalActive = true;
+  state.foreignSites.forEach(candidate => { candidate.activity.nextActivityDay = state.day + 99; });
+  camp.activity.nextActivityDay = state.day;
+  const target = { x: Math.min(state.map[0].length - 1, camp.x + 1), y: camp.y };
+  for (let y = Math.max(0, camp.y - 1); y <= Math.min(state.map.length - 1, camp.y + 1); y++) {
+    for (let x = Math.max(0, camp.x - 1); x <= Math.min(state.map[0].length - 1, camp.x + 1); x++) {
+      state.map[y][x].terrain = 'forest';
+      state.map[y][x].buildingId = null;
+    }
+  }
+  const habitat = state.habitats[0];
+  state.habitats.forEach(candidate => { candidate.active = false; });
+  habitat.x = target.x;
+  habitat.y = target.y;
+  habitat.radius = 1;
+  habitat.stock = 10;
+  habitat.active = true;
+  state.claimZones = state.claimZones.filter(zone => zone.siteId !== camp.id);
+  state.claimZones.push({
+    id: state.nextClaimZoneId++, siteId: camp.id, factionName: camp.factionName,
+    kind: 'hunting', x: target.x, y: target.y, radius: 2, discovered: true,
+  });
+  activitySimulation.dailyForeignSiteActivityTick(state);
+  const party = state.foreignSiteParties.find(candidate => candidate.siteId === camp.id);
+  assert.ok(party, 'an active seasonal camp sends a hunting party');
+  assert.equal(party.kind, 'hunt');
+  const stockBefore = habitat.stock;
+  for (let tick = 0; tick < 120 && habitat.stock === stockBefore; tick++) {
+    activitySimulation.foreignSitePartiesTick(state);
+    state.subTick++;
+    if (state.subTick >= CONFIG.agents.subticksPerDay) {
+      state.subTick = 0;
+      state.day++;
+    }
+  }
+  assert.ok(habitat.stock < stockBefore, 'foreign hunting consumes the same habitat reserve as the player');
+}
+
+{
+  const state = simulation.newGame(2026071214);
+  const site = state.foreignSites.find(candidate => candidate.type === 'village' || candidate.type === 'fishingVillage');
+  state.foreignSites.forEach(candidate => { candidate.activity.nextActivityDay = state.day + 99; });
+  site.status = 'stable';
+  site.activity.condition = 'stable';
+  site.activity.lastSettlementDay = state.day - 6;
+  site.foodStock = 0;
+  activitySimulation.dailyForeignSiteActivityTick(state);
+  assert.equal(site.status, 'hungry', 'two poor settlements make food shortage visible');
+
+  site.activity.lastSettlementDay = state.day - 3;
+  site.activity.hungerDays = CONFIG.foreignSites.activity.sicknessHungerDays;
+  site.foodStock = 0;
+  state.weather = 'coldSnap';
+  activitySimulation.dailyForeignSiteActivityTick(state);
+  assert.equal(site.status, 'sick', 'prolonged hunger in severe cold can make the site sick');
+
+  site.activity.lastSettlementDay = state.day - 3;
+  site.foodStock = site.population * CONFIG.foreignSites.activity.foodConsumptionPerPersonPerDay * 30;
+  state.weather = 'clear';
+  activitySimulation.dailyForeignSiteActivityTick(state);
+  assert.equal(site.status, 'stable', 'adequate food lets a sick settlement recover');
 }
 
 {

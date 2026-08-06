@@ -312,6 +312,26 @@ export const CONFIG_DEFAULTS = {
     violationIgnoreRelation: -8,
     banditScoutWarningBonus: 0.25,
     lairSuppressionDays: 18,
+    // 외부 거주지 대표 생활 활동대와 저빈도 생계 결산.
+    activity: {
+      settlementIntervalDays: 3,
+      departureIntervalDays: 3,
+      workDurationTicks: 18,
+      travelSpeedTilesPerTick: 0.18,
+      maxMembers: 3,
+      foodConsumptionPerPersonPerDay: 0.035,
+      passiveFoodPerPersonPerDay: 0.03,
+      hungryFoodDays: 8,
+      recoveryFoodDays: 14,
+      prosperousFoodDays: 42,
+      prosperousSettlements: 2,
+      sicknessHungerDays: 12,
+      huntStockPerTrip: 1.4,
+      fishStockPerTrip: 1.8,
+      farmFoodPerTrip: 2.2,
+      forageHerbsPerTrip: 0.8,
+      forageWoodPerTrip: 1.2,
+    },
     // 산채 정찰 — 성공 확률의 가감 요인과 실패 시 산채 경계 상승
     banditLairScouting: {
       baseChance: 0.28,

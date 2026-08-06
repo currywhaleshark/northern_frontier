@@ -12,7 +12,8 @@ export interface ForeignSiteProp {
   y: number;
 }
 
-interface ForeignSiteActor {
+export interface ForeignSiteActor {
+  siteId?: number;
   x: number;
   y: number;
   job: JobId;
@@ -233,4 +234,37 @@ export function foreignSiteActors(state: GameState, site: ForeignSite, time: num
   if (site.type === 'village' || site.type === 'fishingVillage') return settlementActors(state, site, time);
   if (site.type === 'seasonalCamp') return campActors(state, site, time);
   return [];
+}
+
+export function foreignSitePartyActors(state: GameState): ForeignSiteActor[] {
+  const actors: ForeignSiteActor[] = [];
+  for (const party of state.foreignSiteParties) {
+    const site = state.foreignSites.find(candidate => candidate.id === party.siteId);
+    if (!site || (!party.spotted && !site.discovered)) continue;
+    const job: JobId = party.kind === 'farm'
+      ? 'farmer'
+      : party.kind === 'hunt' ? 'hunter' : party.kind === 'fish' ? 'fisher' : 'herbalist';
+    const carrying = (party.phase === 'returning' || party.phase === 'retreating') &&
+      Object.values(party.cargo).some(amount => (amount ?? 0) > 0);
+    const moving = party.phase === 'outbound' || party.phase === 'returning' || party.phase === 'retreating';
+    const offsets = [
+      { x: 0, y: 0 },
+      { x: -0.22 * party.facing, y: 0.16 },
+      { x: 0.2 * party.facing, y: 0.22 },
+    ];
+    for (let index = 0; index < party.memberCount; index++) {
+      const offset = offsets[index % offsets.length];
+      actors.push({
+        siteId: site.id,
+        x: party.px + offset.x,
+        y: party.py + offset.y,
+        job,
+        gender: (party.id + index + site.id) % 4 === 0 ? 'female' : 'male',
+        carrying,
+        moving,
+        facing: party.facing,
+      });
+    }
+  }
+  return actors;
 }

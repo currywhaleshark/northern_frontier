@@ -122,6 +122,7 @@ import { resolveTerritoryWarning, updateTerritoryWarnings } from './territory';
 import {
   foreignSiteAt, generateForeignSites, revealForeignSitesFromExploration, updateSeasonalForeignSites,
 } from './foreignSites';
+import { dailyForeignSiteActivityTick, foreignSitePartiesTick } from './foreignSiteSimulation';
 import {
   autoAssignWorkersToSelectedBuildingTypes as autoAssignWorkersToSelectedSlots,
   assignNearestWorkerToBuilding as assignNearestWorkerToSlot,
@@ -193,6 +194,8 @@ export function newGameFromOptions(
     fishingBoats: [],
     nextFishingBoatId: 1,
     foreignSites: [],
+    foreignSiteParties: [],
+    nextForeignSitePartyId: 1,
     claimZones: [],
     nextForeignSiteId: 1,
     nextClaimZoneId: 1,
@@ -1479,6 +1482,8 @@ export function advanceTick(state: GameState): void {
   };
   agentsTick(state);
   lap('t1-agents');
+  foreignSitePartiesTick(state);
+  lap('t1-foreign-sites');
   advanceFire(state);
   lap('t1-fire');
   reconcileWeaponAssignments(state);
@@ -1557,6 +1562,7 @@ function endOfDay(state: GameState): void {
 
   regrowForest(state, rng, season);
   updateHabitats(state);
+  dailyForeignSiteActivityTick(state);
   runToolWear(state);
   runConsumptionAndNeeds(state, rng);
   wearablesDailyTick(state);

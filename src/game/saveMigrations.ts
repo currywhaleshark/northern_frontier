@@ -852,6 +852,17 @@ export function migrateV61ToV62(raw: RawSave): RawSave {
   return migrated;
 }
 
+// v63: 외부 거주지의 실제 작업대와 3일 단위 생산·식량 장부.
+// 거주지별 장부는 전체 상태 정규화에서 현재 날짜와 기존 거주지 상태를 기준으로 채운다.
+export function migrateV62ToV63(raw: RawSave): RawSave {
+  return {
+    ...clonedRecord(raw),
+    foreignSiteParties: [],
+    nextForeignSitePartyId: 1,
+    schemaVersion: 63,
+  };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -919,6 +930,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 59) migrated = migrateV59ToV60(migrated);
     else if (version === 60) migrated = migrateV60ToV61(migrated);
     else if (version === 61) migrated = migrateV61ToV62(migrated);
+    else if (version === 62) migrated = migrateV62ToV63(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }

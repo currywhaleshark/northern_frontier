@@ -50,7 +50,9 @@ import {
 import { stableResidentAnimationOffset } from './residentAnimation';
 import { claimZonesAt } from '../game/claimZones';
 import { foreignSiteAt } from '../game/foreignSites';
-import { foreignSiteActors, foreignSiteProps, type ForeignSiteProp } from '../game/foreignSiteActivity';
+import {
+  foreignSiteActors, foreignSitePartyActors, foreignSiteProps, type ForeignSiteProp,
+} from '../game/foreignSiteActivity';
 import { activePassageRoutes } from '../game/passage';
 import { weaponCountsForResidents } from '../game/weapons';
 import { activePredatorScoutIds } from '../game/expeditionIntel';
@@ -3140,6 +3142,28 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
         ctx.restore();
       });
     }
+  }
+  for (const actor of foreignSitePartyActors(state)) {
+    if (!pixelRectIntersectsViewport(viewport, actor.x * TILE - TILE, actor.y * TILE - TILE, TILE * 2, TILE * 2)) continue;
+    const site = state.foreignSites.find(candidate => candidate.id === actor.siteId);
+    if (!site) continue;
+    const drawParams: ResidentDrawParams = {
+      job: actor.job,
+      gender: actor.gender,
+      x: actor.x * TILE,
+      y: actor.y * TILE,
+      sick: false,
+      carrying: actor.carrying,
+      showCargoMarker: o.residentCargoMarkers ?? true,
+      selected: false,
+      moving: actor.moving,
+      facing: actor.facing,
+      foreignFaction: site.factionName ?? undefined,
+    };
+    enqueueRowDraw(drawParams.y, drawParams.x, () => {
+      sprites.drawResident(ctx, drawParams);
+      occludedResidentDraws.push(drawParams);
+    });
   }
   for (const boat of state.fishingBoats) {
     if (!isExplored(state, boat.x, boat.y) ||

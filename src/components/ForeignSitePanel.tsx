@@ -4,7 +4,8 @@ import { CONFIG } from '../game/config';
 import { isClaimPermissionActive } from '../game/claimZones';
 import { canOpenClaimAccordEnvoy, claimAccordEnvoyRemainingDays, claimAccordRemainingDays } from '../game/diplomacy';
 import { SITE_GIFTS, type SiteGiftType } from '../game/siteDiplomacy';
-import type { ClaimKind, ForeignSite, ForeignSiteStatus, ForeignSiteType, GameState } from '../game/types';
+import { foreignSiteFoodDays, foreignSitePartyKindLabel } from '../game/foreignSiteSimulation';
+import type { ClaimKind, ForeignSite, ForeignSiteStatus, ForeignSiteType, GameState, ResourceId } from '../game/types';
 import { FactionName } from './FactionName';
 
 const TYPE_NAMES: Record<ForeignSiteType, string> = {
@@ -66,6 +67,12 @@ export function ForeignSitePanel({
   const inactive = site.type === 'seasonalCamp' && site.seasonalActive === false;
   const operational = site.status !== 'burned' && site.status !== 'abandoned';
   const passageActive = zones.some(zone => zone.kind === 'passage' && isClaimPermissionActive(state, zone));
+  const activityParties = state.foreignSiteParties.filter(party => party.siteId === site.id);
+  const recentProduction = Object.entries(site.activity?.recentProduction ?? {})
+    .filter((entry): entry is [string, number] => Number(entry[1]) > 0)
+    .map(([resource, amount]) => `${RESOURCE_NAMES[resource as ResourceId] ?? resource} ${amount.toFixed(1)}`)
+    .join(' · ');
+  const hasLocalEconomy = operational && site.type !== 'banditLair' && site.type !== 'ruin' && site.type !== 'outpost';
 
   return (
     <div className="foreign-site-panel">
@@ -101,6 +108,16 @@ export function ForeignSitePanel({
           <tr><td>군사력</td><td>{estimatePower(state, site)}</td></tr>
           <tr><td>호의 / 신용</td><td>{Math.round(site.goodwill)} / {Math.round(site.trust)}</td></tr>
           <tr><td>경계심 / 은혜</td><td>{Math.round(site.alarm)} / {site.favors}</td></tr>
+          {hasLocalEconomy && <tr><td>비축 식량</td><td>약 {Math.floor(foreignSiteFoodDays(site))}일분</td></tr>}
+          {hasLocalEconomy && (
+            <tr>
+              <td>바깥 활동</td>
+              <td>{activityParties.length > 0
+                ? activityParties.map(party => `${foreignSitePartyKindLabel(party.kind)} ${party.memberCount}명`).join(' · ')
+                : inactive ? '야영지 비움' : '거주지에서 쉬는 중'}</td>
+            </tr>
+          )}
+          {hasLocalEconomy && recentProduction && <tr><td>최근 3일 생산</td><td>{recentProduction}</td></tr>}
           {faction && <tr><td>세력색</td><td><span className="foreign-site-color" style={{ background: faction.color }} />{faction.name}</td></tr>}
         </tbody>
       </table>

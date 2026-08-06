@@ -9,6 +9,7 @@ import { coastalGroundAt } from './tidalFlats';
 import type {
   ClaimKind,
   ForeignSite,
+  ForeignSiteActivityCondition,
   ForeignSiteMemory,
   ForeignSiteType,
   GameState,
@@ -109,8 +110,42 @@ function createSite(
   return site;
 }
 
+function activityConditionFor(site: ForeignSite): ForeignSiteActivityCondition {
+  return site.status === 'prosperous' || site.status === 'hungry' || site.status === 'sick'
+    ? site.status
+    : 'stable';
+}
+
+function ensureSiteActivity(site: ForeignSite, day: number): void {
+  const activity = site.activity;
+  const interval = CONFIG.foreignSites.activity.settlementIntervalDays;
+  site.activity = {
+    lastSettlementDay: Number.isFinite(activity?.lastSettlementDay)
+      ? Math.min(day, Math.floor(activity!.lastSettlementDay)) : day,
+    nextActivityDay: Number.isFinite(activity?.nextActivityDay)
+      ? Math.max(day, Math.floor(activity!.nextActivityDay))
+      : day + 1 + (site.id % interval),
+    activitySequence: Number.isFinite(activity?.activitySequence)
+      ? Math.max(0, Math.floor(activity!.activitySequence)) : 0,
+    condition: activity?.condition === 'prosperous' || activity?.condition === 'hungry' || activity?.condition === 'sick'
+      ? activity.condition : activityConditionFor(site),
+    surplusSettlements: Number.isFinite(activity?.surplusSettlements)
+      ? Math.max(0, Math.floor(activity!.surplusSettlements)) : 0,
+    hungerDays: Number.isFinite(activity?.hungerDays)
+      ? Math.max(0, Math.floor(activity!.hungerDays)) : 0,
+    sicknessDays: Number.isFinite(activity?.sicknessDays)
+      ? Math.max(0, Math.floor(activity!.sicknessDays)) : 0,
+    pendingProduction: activity?.pendingProduction && typeof activity.pendingProduction === 'object'
+      ? { ...activity.pendingProduction } : {},
+    recentProduction: activity?.recentProduction && typeof activity.recentProduction === 'object'
+      ? { ...activity.recentProduction } : {},
+  };
+}
+
 export function generateForeignSites(state: GameState, rng: () => number): void {
   state.foreignSites = [];
+  state.foreignSiteParties = [];
+  state.nextForeignSitePartyId = 1;
   state.claimZones = [];
   state.nextForeignSiteId = 1;
   state.nextClaimZoneId = 1;
@@ -214,10 +249,13 @@ export function generateForeignSites(state: GameState, rng: () => number): void 
     lairDoctrineRevealed: false,
   });
   addClaimZone(state, lair, 'passage', 4);
+  for (const site of state.foreignSites) ensureSiteActivity(site, state.day);
 }
 
 export function ensureForeignSiteState(state: GameState): void {
   state.foreignSites ??= [];
+  state.foreignSiteParties ??= [];
+  state.nextForeignSitePartyId ??= Math.max(0, ...state.foreignSiteParties.map(party => party.id)) + 1;
   state.claimZones ??= [];
   state.nextForeignSiteId ??= Math.max(0, ...state.foreignSites.map(site => site.id)) + 1;
   state.nextClaimZoneId ??= Math.max(0, ...state.claimZones.map(zone => zone.id)) + 1;
@@ -232,6 +270,7 @@ export function ensureForeignSiteState(state: GameState): void {
     site.alarm ??= 0;
     site.favors ??= 0;
     site.lastInteractionDay ??= -999;
+    ensureSiteActivity(site, state.day);
     if (site.type === 'banditLair') {
       site.lairScoutAttempts = Number.isFinite(site.lairScoutAttempts)
         ? Math.max(0, Math.floor(site.lairScoutAttempts!)) : 0;
@@ -254,6 +293,38 @@ export function ensureForeignSiteState(state: GameState): void {
         );
     }
   }
+  const siteIds = new Set(state.foreignSites.map(site => site.id));
+  const phases = new Set(['outbound', 'working', 'returning', 'waiting', 'retreating']);
+  const kinds = new Set(['farm', 'hunt', 'fish', 'forage']);
+  state.foreignSiteParties = state.foreignSiteParties.filter(party =>
+    party && Number.isInteger(party.id) && party.id > 0 && siteIds.has(party.siteId) &&
+    kinds.has(party.kind) && phases.has(party.phase) && Number.isFinite(party.x) && Number.isFinite(party.y));
+  for (const party of state.foreignSiteParties) {
+    party.x = Math.floor(party.x);
+    party.y = Math.floor(party.y);
+    party.px = Number.isFinite(party.px) ? party.px : party.x + 0.5;
+    party.py = Number.isFinite(party.py) ? party.py : party.y + 0.5;
+    party.path = Array.isArray(party.path)
+      ? party.path.filter(point => Number.isFinite(point?.x) && Number.isFinite(point?.y))
+        .map(point => ({ x: Math.floor(point.x), y: Math.floor(point.y) }))
+      : [];
+    party.target = party.target && Number.isFinite(party.target.x) && Number.isFinite(party.target.y)
+      ? { x: Math.floor(party.target.x), y: Math.floor(party.target.y) } : null;
+    party.memberCount = Math.max(1, Math.min(
+      CONFIG.foreignSites.activity.maxMembers,
+      Number.isFinite(party.memberCount) ? Math.floor(party.memberCount) : 1,
+    ));
+    party.cargo = party.cargo && typeof party.cargo === 'object' ? { ...party.cargo } : {};
+    party.departedDay = Number.isFinite(party.departedDay) ? Math.floor(party.departedDay) : state.day;
+    party.activitySequence = Number.isFinite(party.activitySequence)
+      ? Math.max(0, Math.floor(party.activitySequence)) : 0;
+    party.spotted = party.spotted === true;
+    party.facing = party.facing === -1 ? -1 : 1;
+  }
+  state.nextForeignSitePartyId = Math.max(
+    Number.isFinite(state.nextForeignSitePartyId) ? Math.floor(state.nextForeignSitePartyId) : 1,
+    Math.max(0, ...state.foreignSiteParties.map(party => party.id)) + 1,
+  );
 }
 
 export function foreignSiteAt(state: GameState, x: number, y: number): ForeignSite | null {

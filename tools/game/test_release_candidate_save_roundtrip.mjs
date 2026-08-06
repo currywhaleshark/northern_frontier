@@ -336,8 +336,30 @@ for (const [index, rank] of ['bo', 'jin'].entries()) {
 // 6. Current schema saves use the same two-stage round trip.
 {
   const state = makeStableState(2026071950);
+  const site = state.foreignSites.find(candidate => candidate.type === 'village' || candidate.type === 'fishingVillage');
+  site.discovered = true;
+  state.foreignSiteParties.push({
+    id: state.nextForeignSitePartyId++, siteId: site.id, kind: 'farm', phase: 'working',
+    x: site.x + site.width, y: site.y, px: site.x + site.width + 0.5, py: site.y + 0.5,
+    path: [], target: { x: site.x + site.width, y: site.y }, memberCount: 2,
+    cargo: { grain: 1.5 }, departedDay: state.day,
+    workUntilTick: state.day * CONFIG.agents.subticksPerDay + 10_000,
+    activitySequence: 4, spotted: true, facing: 1,
+  });
   await roundTripScenario({
     name: 'current-schema', state, schemaVersion: saveLoad.CURRENT_SCHEMA_VERSION,
+    afterFirstLoad: loaded => {
+      const party = loaded.foreignSiteParties[0];
+      assert.equal(party.siteId, site.id);
+      assert.equal(party.phase, 'working');
+      assert.deepEqual(party.cargo, { grain: 1.5 });
+    },
+    afterReload: reloaded => {
+      const party = reloaded.foreignSiteParties[0];
+      assert.equal(party.siteId, site.id);
+      assert.equal(party.phase, 'working');
+      assert.deepEqual(party.cargo, { grain: 1.5 });
+    },
   });
   results.push('current-schema');
 }
