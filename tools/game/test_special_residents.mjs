@@ -140,11 +140,13 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
     key: index => [...stored.keys()][index] ?? null,
     get length() { return stored.size; },
   };
+  state.specialResidentRecords.tutorialAdvisor.fatefulEscapeUsed = true;
   assert.equal(saveLoad.saveGame(state, 9), true);
   const loaded = saveLoad.loadGame(9);
   const loadedYeoni = loaded?.residents.find(resident => resident.special === 'tutorialAdvisor');
   assert.ok(loadedYeoni?.alive, 'Yeoni survives a save/load round trip');
   assert.equal(loaded?.specialResidentRecords?.tutorialAdvisor?.residentId, loadedYeoni.id);
+  assert.equal(loaded?.specialResidentRecords?.tutorialAdvisor?.fatefulEscapeUsed, true);
   assert.ok(loaded?.spentSpecialIds?.includes('tutorialAdvisor'));
 }
 

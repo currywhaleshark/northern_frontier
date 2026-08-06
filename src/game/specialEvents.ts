@@ -15,6 +15,7 @@ import { activePhysicianCount, hasActivePhysician } from './medicine';
 import { createResident, killResident, livingResidents, reconcileResidentHomes, residentHome } from './residents';
 import { residentLogName } from './residentLogName';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
+import { applySpecialResidentFatefulEscape } from './specialResidentSurvival';
 import { weatherForDay } from './weather';
 import { climateSeverityForState } from './climate';
 import { createCombatRoster } from './combatRoster';
@@ -877,6 +878,17 @@ function huntFailure(
       ? CONFIG.specialEvents.tigerHuntDeathChance
       : 0) * tigerDanger;
   if (rng() < deathChance) {
+    const damage = applySpecialResidentFatefulEscape(state, victim);
+    if (damage != null) {
+      addLog(
+        state,
+        `${withJosa(residentLogName(victim), '은/는')} ${wildlifeName(kind, state)} 토벌에서 죽을 고비를 넘겼습니다. ` +
+          `중태에 빠졌습니다. (건강 -${damage})`,
+        'bad',
+        true,
+      );
+      return { residentId: victim.id, killed: false, damage };
+    }
     killResident(state, victim, kind === 'tiger' ? '호환' : '늑대 습격');
     return { residentId: victim.id, killed: true };
   }
@@ -1470,6 +1482,17 @@ function predatorEncounter(state: GameState, kind: 'wolf' | 'tiger', candidates:
     ? CONFIG.specialEvents.wolfEncounterDeathChance
     : CONFIG.specialEvents.tigerEncounterDeathChance) * tigerDanger;
   if (rng() < deathChance) {
+    const damage = applySpecialResidentFatefulEscape(state, victim);
+    if (damage != null) {
+      addLog(
+        state,
+        `${withJosa(residentLogName(victim), '은/는')} ${kind === 'wolf' ? '늑대' : wildlifeName(kind, state)}의 습격에서 ` +
+          `죽을 고비를 넘겼습니다. 중태에 빠졌습니다. (건강 -${damage})`,
+        'bad',
+        true,
+      );
+      return;
+    }
     killResident(state, victim, kind === 'tiger' ? '호환' : '늑대 습격');
     return;
   }
@@ -1664,6 +1687,17 @@ function updateEpidemic(state: GameState, rng: () => number): void {
       (hasHerbs ? config.herbDeathMultiplier : 1) *
       (care.clinicCount > 0 ? config.clinicDeathMultiplier : 1);
     if (epidemic.mode === 'uncontained' && rng() < deathChance) {
+      const damage = applySpecialResidentFatefulEscape(state, resident);
+      if (damage != null) {
+        addLog(
+          state,
+          `${withJosa(residentLogName(resident), '은/는')} 역병으로 죽을 고비를 넘겼으나 중태에 빠졌습니다. ` +
+            `(건강 -${damage})`,
+          'bad',
+          true,
+        );
+        continue;
+      }
       killResident(state, resident, '역병');
       epidemic.deathCount = (epidemic.deathCount ?? 0) + 1;
       delete epidemic.infectedSince[id];

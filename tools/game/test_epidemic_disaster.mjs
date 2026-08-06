@@ -203,6 +203,27 @@ function startEpidemicState(state, patient, mode = 'uncontained') {
 }
 
 {
+  const state = simulation.newGame(2026080602, 'normal', '특수주민 중태');
+  const [patient] = prepareResidents(state, 1);
+  Object.assign(patient, { special: 'uinyeo', health: 100 });
+  state.specialResidentRecords = {
+    uinyeo: { status: 'active', residentId: patient.id, joinedDay: state.day },
+  };
+  startEpidemicState(state, patient);
+
+  specialEvents.updateSpecialEvents(state, () => 0);
+  assert.equal(patient.alive, true, 'a named resident survives the first random epidemic death');
+  assert.equal(patient.health, CONFIG.specialResidents.fatefulEscapeHealth);
+  assert.equal(state.incidents.epidemic.deathCount, 0);
+  assert.equal(state.specialResidentRecords.uinyeo.fatefulEscapeUsed, true);
+
+  state.day += 1;
+  specialEvents.updateSpecialEvents(state, () => 0);
+  assert.equal(patient.alive, false, 'the same named resident has no second epidemic escape');
+  assert.equal(state.incidents.epidemic, null, 'the epidemic closes after its last patient dies');
+}
+
+{
   const state = simulation.newGame(2026072907, 'normal', '구저장');
   const [patient] = prepareResidents(state, 1);
   patient.sick = true;

@@ -470,6 +470,7 @@ export interface SpecialResidentRecord {
   availableUntilDay?: number;
   originFaction?: string;
   joinedDay?: number;
+  fatefulEscapeUsed?: boolean; // 맹수·역병의 무작위 즉사를 중태로 넘긴 일회성 보호
   courtDemandResolved?: boolean;
   pardonResolved?: boolean;
   nextDemandDay?: number;

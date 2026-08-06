@@ -27,6 +27,7 @@ const load = name => import(pathToFileURL(join(compiledDir, `${name}.mjs`)).href
 const simulation = await load('simulation');
 const lifecycle = await load('lifecycle');
 const residents = await load('residents');
+const specialResidentSurvival = await load('specialResidentSurvival');
 const { CONFIG } = await load('config');
 
 const L = CONFIG.lifecycle;
@@ -122,13 +123,56 @@ function healthyState(seed) {
   elder.spouseId = other.id;
   const before = state.residents[2].age;
   state.day = CONFIG.time.yearDays + 1; // 2년차 첫날
-  lifecycle.lifecycleDailyTick(state, seqRng([0, 0.9])); // 노년 사망 성공, 혼인 롤은 실패
+  lifecycle.lifecycleDailyTick(state, seqRng([0.9, 0.9]), () => 0); // 연초 난수는 보존, 노환은 독립 판정
   assert.equal(elder.alive, false, 'elders can die of old age at new year');
   assert.equal(state.residents[2].age, before + 1, 'adults age one year per new year');
   assert.equal(other.spouseId, null, 'the widow is single again');
   assert.ok((state.corpses ?? []).some(corpse => corpse.name === elder.name), 'death leaves a corpse');
   assert.equal(lifecycle.elderLaborMult({ age: 65 }), L.elderLaborMult);
   assert.equal(lifecycle.elderLaborMult({ age: 30 }), 1);
+}
+
+// ── 노환 일일 확률: 연간 확률을 보존하며 연중 어느 날에도 판정한다 ──
+{
+  const state = healthyState(2026080603);
+  const elder = state.residents[0];
+  state.residents = [elder];
+  Object.assign(elder, { age: 65, spouseId: null, morale: 100 });
+  state.day = CONFIG.time.seasonDays + 3; // 여름 3일
+  const annualChance = Math.min(
+    0.9,
+    L.elderDeathAnnualBase + L.elderDeathAnnualPerYear * (elder.age - L.elderDeathCheckAge),
+  );
+  const dailyChance = lifecycle.elderDeathDailyChance(state, elder);
+  assert.ok(Math.abs((1 - Math.pow(1 - dailyChance, CONFIG.time.yearDays)) - annualChance) < 1e-12);
+  const ageBefore = elder.age;
+  lifecycle.lifecycleDailyTick(state, () => 0.999, () => dailyChance / 2);
+  assert.equal(elder.alive, false, 'old age can occur outside the new-year boundary');
+  assert.equal(elder.age, ageBefore, 'daily old-age checks do not change age outside new year');
+}
+
+// ── 특수주민 노환: 합류 후 2년 유예, 이후 일반 확률의 절반 ──
+{
+  const state = healthyState(2026080601);
+  const elder = state.residents[0];
+  state.residents = [elder];
+  Object.assign(elder, { age: 72, special: 'exiledScholar', spouseId: null, morale: 100 });
+  state.specialResidentRecords = {
+    exiledScholar: { status: 'active', residentId: elder.id, joinedDay: 1 },
+  };
+
+  state.day = CONFIG.time.yearDays + 1;
+  assert.equal(specialResidentSurvival.specialResidentOldAgeDeathMultiplier(state, elder), 0);
+  lifecycle.lifecycleDailyTick(state, () => 0, () => 0);
+  assert.equal(elder.alive, true, 'a named resident is immune to old age during the two-year grace period');
+
+  state.day = CONFIG.time.yearDays * 2 + 1;
+  assert.equal(
+    specialResidentSurvival.specialResidentOldAgeDeathMultiplier(state, elder),
+    CONFIG.specialResidents.oldAgeDeathMultiplier,
+  );
+  lifecycle.lifecycleDailyTick(state, () => 0, () => 0);
+  assert.equal(elder.alive, false, 'old age can be lethal again once the grace period expires');
 }
 
 // ── 혼인: 성사되면 혼례 사건이 열리고, 잔치는 민심을 올린다 ──

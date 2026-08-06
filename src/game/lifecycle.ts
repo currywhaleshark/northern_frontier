@@ -14,9 +14,11 @@ import {
   residentMonkBurialBonus, settlementMoraleBirthMultiplier, settlementMoraleDepartureChance,
 } from './morale';
 import { consumeEdibleFood, edibleFoodTotal } from './resources';
+import { makeRng } from './map';
 import { killResident, livingResidents, reconcileResidentHomes, rollResidentName } from './residents';
 import { residentLogName } from './residentLogName';
 import { getDayOfYear, getSeason } from './seasons';
+import { specialResidentOldAgeDeathMultiplier } from './specialResidentSurvival';
 import { assignedWorkers } from './workerSlots';
 import { youthLaborMult } from './youth';
 import type { Building, Corpse, GameState, LifeStage, Resident } from './types';
@@ -127,22 +129,49 @@ function growStages(state: GameState): void {
   }
 }
 
-// ── 노화·자연사 (새해마다) ───────────────────────────────
+// ── 노화(새해)·자연사(매일) ──────────────────────────────
 
 function ageResidents(state: GameState, rng: () => number): void {
   if (getDayOfYear(state.day) !== 1 || state.day <= 1) return;
-  const l = CONFIG.lifecycle;
   for (const r of livingResidents(state)) {
     if (r.stage) continue; // 아이는 단계 게이지로 자란다
     r.age += 1;
-    if (r.age < l.elderDeathCheckAge) continue;
-    const chance = Math.min(
-      0.9,
-      l.elderDeathAnnualBase + l.elderDeathAnnualPerYear * (r.age - l.elderDeathCheckAge),
-    );
-    if (rng() < chance * edictElderDeathMultiplier(state, r)) {
-      killResident(state, r, '노환');
-    }
+    // 노환은 독립 난수를 쓰지만, 연초의 공유 난수 소비량은 구 저장의 다른 사건 순서를 위해 남긴다.
+    if (r.age >= CONFIG.lifecycle.elderDeathCheckAge) rng();
+  }
+}
+
+export function elderDeathDailyChance(state: GameState, resident: Resident): number {
+  if (resident.stage || resident.age < CONFIG.lifecycle.elderDeathCheckAge) return 0;
+  const l = CONFIG.lifecycle;
+  const annualBase = Math.min(
+    0.9,
+    l.elderDeathAnnualBase + l.elderDeathAnnualPerYear * (resident.age - l.elderDeathCheckAge),
+  );
+  const annualChance = Math.max(0, Math.min(
+    1,
+    annualBase * edictElderDeathMultiplier(state, resident) * specialResidentOldAgeDeathMultiplier(state, resident),
+  ));
+  return 1 - Math.pow(1 - annualChance, 1 / CONFIG.time.yearDays);
+}
+
+function elderDeathRoll(state: GameState, resident: Resident): number {
+  const seed = (
+    state.seed ^
+    Math.imul(state.day, 0x045d9f3b) ^
+    Math.imul(resident.id, 0x27d4eb2d) ^
+    0x6e624eb7
+  ) >>> 0;
+  return makeRng(seed)();
+}
+
+function checkElderDeaths(
+  state: GameState,
+  roll: (resident: Resident) => number = resident => elderDeathRoll(state, resident),
+): void {
+  for (const resident of livingResidents(state)) {
+    const chance = elderDeathDailyChance(state, resident);
+    if (chance > 0 && roll(resident) < chance) killResident(state, resident, '노환');
   }
 }
 
@@ -551,9 +580,14 @@ function reconcileCarriedCorpses(state: GameState): void {
   }
 }
 
-export function lifecycleDailyTick(state: GameState, rng: () => number): void {
+export function lifecycleDailyTick(
+  state: GameState,
+  rng: () => number,
+  elderRoll?: (resident: Resident) => number,
+): void {
   growStages(state);
   ageResidents(state, rng);
+  checkElderDeaths(state, elderRoll);
   tryMoraleDeparture(state, rng);
   tryMarriage(state, rng);
   tryBirths(state, rng);

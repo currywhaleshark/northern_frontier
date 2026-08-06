@@ -1805,8 +1805,11 @@ export const CONFIG_DEFAULTS = {
     monkNoviceMentorAge: 55,
   },
 
-  // 이름 있는 특수 주민 — 크게 돕는 만큼 지속 위험을 가져온다.
+  // 이름 있는 특수 주민 — 합류 직후 허무하게 잃지 않되, 위험 자체는 남긴다.
   specialResidents: {
+    oldAgeGraceYears: 2,
+    oldAgeDeathMultiplier: 0.5,
+    fatefulEscapeHealth: 10,
     // 길잡이 연이 — 튜토리얼 완주 보상. 개인 벌목에만 작은 보너스를 준다.
     tutorialAdvisorAge: 18,
     tutorialAdvisorWoodYieldMult: 1.1,

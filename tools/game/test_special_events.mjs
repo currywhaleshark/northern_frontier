@@ -74,6 +74,29 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
 }
 
 {
+  const state = simulation.newGame(2203);
+  const victim = state.residents[0];
+  state.residents = [victim];
+  Object.assign(victim, { special: 'tigerHunter', health: 100, sick: false });
+  state.specialResidentRecords = {
+    tigerHunter: { status: 'active', residentId: victim.id, joinedDay: state.day },
+  };
+  state.incidents.scheduledDays = [state.day + 20];
+  state.incidents.predatorThreats.wolf = { kind: 'wolf', untilDay: state.day + 5 };
+  state.map[victim.y][victim.x].terrain = 'forest';
+
+  specialEvents.updateSpecialEvents(state, () => 0);
+  assert.equal(victim.alive, true, 'a named resident survives the first random predator death');
+  assert.equal(victim.health, CONFIG.specialResidents.fatefulEscapeHealth);
+  assert.equal(victim.sick, true, 'the escape leaves the named resident critically injured');
+  assert.equal(state.specialResidentRecords.tigerHunter.fatefulEscapeUsed, true);
+
+  state.day += 1;
+  specialEvents.updateSpecialEvents(state, () => 0);
+  assert.equal(victim.alive, false, 'the same named resident has no second predator escape');
+}
+
+{
   const state = simulation.newGame(2252);
   state.incidents.scheduledDays = [state.day];
   state.incidents.cooldownUntil = { wolf: 999, wildGinseng: 999 };
