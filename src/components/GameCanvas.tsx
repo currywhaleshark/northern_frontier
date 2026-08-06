@@ -89,6 +89,7 @@ export function GameCanvas({
     residentPresentationCacheRef.current = createResidentPresentationSnapshotCache();
   }
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const speechBubbleRef = useRef<HTMLDivElement>(null);
   const [mouse, setMouse] = useState<{ mx: number; my: number } | null>(null);
   const [panning, setPanning] = useState(false);
   const [, setSpeechClock] = useState(0);
@@ -184,6 +185,31 @@ export function GameCanvas({
   }, [state]);
   const renderScale = mapBackingScaleForZoom(zoom);
   const alpha = Math.max(0, Math.min(1, (performance.now() - anim.current.at) / anim.current.ms));
+  const ambientSpeech = activeAmbientSpeech(state);
+  const speechSpeaker = ambientSpeech
+    ? state.residents.find(resident => resident.id === ambientSpeech.speakerResidentId && resident.alive)
+    : undefined;
+  const speechPositionAt = useCallback((frameAlpha: number) => {
+    if (!speechSpeaker) return null;
+    const viewport = viewportRef.current;
+    const worldX = (speechSpeaker.px + (speechSpeaker.x - speechSpeaker.px) * frameAlpha + 0.5) * TILE;
+    const worldY = (speechSpeaker.py + (speechSpeaker.y - speechSpeaker.py) * frameAlpha) * TILE - 5;
+    if (!viewport) return { left: worldX * zoom, top: worldY * zoom };
+    const marginX = Math.min(110, viewport.pixelWidth / 3);
+    return {
+      left: Math.min(viewport.pixelX + viewport.pixelWidth - marginX, Math.max(viewport.pixelX + marginX, worldX)) * zoom,
+      top: Math.min(viewport.pixelY + viewport.pixelHeight - 28, Math.max(viewport.pixelY + 45, worldY)) * zoom,
+    };
+  }, [speechSpeaker, zoom]);
+  useEffect(() => {
+    if (!ambientSpeech) return;
+    const timeout = window.setTimeout(
+      () => setSpeechClock(current => current + 1),
+      Math.max(0, ambientSpeech.expiresAtMs - Date.now()) + 20,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [ambientSpeech?.id, ambientSpeech?.expiresAtMs]);
+  const speechPosition = speechPositionAt(alpha);
   const hoverTile = mouse
     ? { x: Math.floor(mouse.mx / TILE), y: Math.floor(mouse.my / TILE) }
     : null;
@@ -354,6 +380,12 @@ export function GameCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const frameAlpha = Math.max(0, Math.min(1, (animationTimeMs - anim.current.at) / anim.current.ms));
+    const speechPositionForFrame = speechPositionAt(frameAlpha);
+    const speechBubble = speechBubbleRef.current;
+    if (speechBubble && speechPositionForFrame) {
+      speechBubble.style.left = `${speechPositionForFrame.left}px`;
+      speechBubble.style.top = `${speechPositionForFrame.top}px`;
+    }
     const perf = window.__renderPerf;
     const start = perf ? performance.now() : 0;
     const runtimeDrawStart = runtimePerfStartTime();
@@ -511,30 +543,6 @@ export function GameCanvas({
           ? pointerAction.cursor
           : 'grab';
 
-  const ambientSpeech = activeAmbientSpeech(state);
-  const speechSpeaker = ambientSpeech
-    ? state.residents.find(resident => resident.id === ambientSpeech.speakerResidentId && resident.alive)
-    : undefined;
-  useEffect(() => {
-    if (!ambientSpeech) return;
-    const timeout = window.setTimeout(
-      () => setSpeechClock(current => current + 1),
-      Math.max(0, ambientSpeech.expiresAtMs - Date.now()) + 20,
-    );
-    return () => window.clearTimeout(timeout);
-  }, [ambientSpeech?.id, ambientSpeech?.expiresAtMs]);
-  const speechPosition = speechSpeaker ? (() => {
-    const viewport = viewportRef.current;
-    const worldX = (speechSpeaker.px + (speechSpeaker.x - speechSpeaker.px) * alpha + 0.5) * TILE;
-    const worldY = (speechSpeaker.py + (speechSpeaker.y - speechSpeaker.py) * alpha) * TILE - 5;
-    if (!viewport) return { left: worldX * zoom, top: worldY * zoom };
-    const marginX = Math.min(110, viewport.pixelWidth / 3);
-    return {
-      left: Math.min(viewport.pixelX + viewport.pixelWidth - marginX, Math.max(viewport.pixelX + marginX, worldX)) * zoom,
-      top: Math.min(viewport.pixelY + viewport.pixelHeight - 28, Math.max(viewport.pixelY + 45, worldY)) * zoom,
-    };
-  })() : null;
-
   return (
     <div style={{ position: 'relative', display: 'inline-block', width: logicalWidth * zoom, height: logicalHeight * zoom }}>
       <canvas
@@ -683,6 +691,7 @@ export function GameCanvas({
       />
       {ambientSpeech && speechPosition && (
         <div
+          ref={speechBubbleRef}
           className={`resident-speech-bubble ${ambientSpeech.tone}`}
           style={{ left: speechPosition.left, top: speechPosition.top }}
           role={ambientSpeech.tone === 'ambient' ? 'status' : 'alert'}

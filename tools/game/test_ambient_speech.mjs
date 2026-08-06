@@ -164,4 +164,12 @@ function visibleState(seed) {
   });
 }
 
+{
+  const canvasSource = readFileSync(new URL('../../src/components/GameCanvas.tsx', import.meta.url), 'utf8');
+  assert.match(canvasSource, /speechPositionAt\(frameAlpha\)/,
+    'the speech bubble must reuse the canvas frame interpolation alpha');
+  assert.match(canvasSource, /speechBubble\.style\.left/,
+    'the RAF draw loop must update the live speech bubble position without waiting for React');
+}
+
 console.log('ambient speech tests passed');
