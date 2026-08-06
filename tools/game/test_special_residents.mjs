@@ -106,7 +106,7 @@ const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).h
   );
   assert.equal(
     state.pendingChoice?.dialogue?.portrait?.src,
-    '/assets/portraits/tutorial-advisor-yeoni-v1.png',
+    '/assets/portraits/tutorial-advisor-yeoni-v2.png',
   );
   assert.deepEqual(state.pendingChoice?.options.map(option => option.id), ['accept']);
   assert.ok(state.spentSpecialIds.includes('tutorialAdvisor'), 'the tutorial reward is game-once when offered');
