@@ -2319,6 +2319,7 @@ function drawForeignSite(
   site: ForeignSite,
   selected: boolean,
   season: ReturnType<typeof getSeason>,
+  highDefinition: boolean,
 ): void {
   const x = site.x * TILE;
   const y = site.y * TILE;
@@ -2338,6 +2339,7 @@ function drawForeignSite(
     x,
     y,
     size: Math.max(w, h),
+    highDefinition,
   });
   if (drewSprite) {
     ctx.fillStyle = color;
@@ -2434,6 +2436,7 @@ function drawForeignSiteProp(
   site: ForeignSite,
   season: ReturnType<typeof getSeason>,
   day: number,
+  highDefinition: boolean,
 ): void {
   const x = prop.x * TILE;
   const y = prop.y * TILE;
@@ -2447,10 +2450,12 @@ function drawForeignSiteProp(
       siteType: site.type,
       status: site.status,
       variant: 'prop',
+      propKind: prop.kind,
       season,
       x,
       y,
       size: TILE,
+      highDefinition,
     });
     if (!drewForeign) {
       drawBuildingSprite(ctx, sprites, {
@@ -2463,40 +2468,25 @@ function drawForeignSiteProp(
         y,
         size: TILE,
         season,
+        highDefinition,
       });
     }
     ctx.fillStyle = siteColor(site);
     ctx.fillRect(x + 4, y + TILE - 3, TILE - 8, 2);
     return;
   }
-  ctx.save();
-  if (prop.kind === 'dryingRack') {
-    ctx.strokeStyle = '#8b6c48';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x + 5, y + TILE - 5);
-    ctx.lineTo(x + 9, y + 7);
-    ctx.lineTo(x + TILE - 7, y + 7);
-    ctx.lineTo(x + TILE - 4, y + TILE - 5);
-    ctx.moveTo(x + 8, y + 12);
-    ctx.lineTo(x + TILE - 6, y + 12);
-    ctx.stroke();
-    ctx.fillStyle = '#b7c2b0';
-    for (let i = 0; i < 3; i++) ctx.fillRect(x + 10 + i * 4, y + 13, 2, 6);
-  } else {
-    ctx.fillStyle = '#67513a';
-    ctx.strokeStyle = '#9ac2d0';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(x + TILE / 2, y + TILE / 2 + 2, TILE * 0.38, TILE * 0.16, -0.2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x + TILE * 0.34, y + TILE * 0.38);
-    ctx.lineTo(x + TILE * 0.66, y + TILE * 0.62);
-    ctx.stroke();
-  }
-  ctx.restore();
+  sprites.drawForeignStructure(ctx, {
+    factionName: site.factionName,
+    siteType: site.type,
+    status: site.status,
+    variant: 'prop',
+    propKind: prop.kind,
+    season,
+    x,
+    y,
+    size: TILE,
+    highDefinition,
+  });
 }
 
 // 프레임 병목 계측 (옵트인) — 콘솔에서 `window.__renderPerf = {}`를 넣으면 구간별 누적 ms가 쌓인다
@@ -3062,17 +3052,17 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
   for (const site of visibleSites) {
     for (const prop of foreignSiteProps(state, site)) {
       if (prop.kind === 'field') {
-        drawForeignSiteProp(ctx, sprites, prop, site, season, state.day);
+        drawForeignSiteProp(ctx, sprites, prop, site, season, state.day, renderScale === 2);
       } else {
         enqueueRowDraw((prop.y + 1) * TILE, (prop.x + 0.5) * TILE, () =>
-          drawForeignSiteProp(ctx, sprites, prop, site, season, state.day));
+          drawForeignSiteProp(ctx, sprites, prop, site, season, state.day, renderScale === 2));
       }
     }
   }
   for (const site of visibleSites) {
     const selected = !!o.selected && foreignSiteAt(state, o.selected.x, o.selected.y)?.id === site.id;
     enqueueRowDraw((site.y + site.height) * TILE, (site.x + site.width / 2) * TILE, () =>
-      drawForeignSite(ctx, sprites, site, selected, season));
+      drawForeignSite(ctx, sprites, site, selected, season, renderScale === 2));
   }
   for (const animal of pastureLivestockDraws(
     state,

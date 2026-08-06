@@ -188,6 +188,7 @@ import {
   FOREIGN_RESIDENT_SHEET,
   FOREIGN_SITE_CORE_SHEET,
   FOREIGN_SITE_PROP_SHEET,
+  FOREIGN_SITE_SHEETS,
   foreignResidentSourceRect,
   foreignStructureSourceRect,
 } from './foreignSiteAssets';
@@ -459,7 +460,9 @@ let fishingPortPierWinterSheet: HTMLImageElement | null = null;
 let fishingPortPierWinterHdSheet: HTMLImageElement | null = null;
 let foreignResidentSheet: HTMLImageElement | null = null;
 let foreignSiteCoreSheet: HTMLImageElement | null = null;
+let foreignSiteCoreHdSheet: HTMLImageElement | null = null;
 let foreignSitePropSheet: HTMLImageElement | null = null;
+let foreignSitePropHdSheet: HTMLImageElement | null = null;
 let specialResidentSheet: HTMLImageElement | null = null;
 let centerPromotionSheet: HTMLImageElement | null = null;
 let residentWoodcutterWorkSheet: HTMLImageElement | null = null;
@@ -648,8 +651,10 @@ function ensureLoaded(): void {
   loadAtlasAsset(CORPSE_COFFIN_SPRITES.standard.src, true, image => { corpseCoffinSprite = image; });
   loadAtlasAsset(CORPSE_COFFIN_SPRITES.highDefinition.src, true, image => { corpseCoffinHdSprite = image; });
   loadAtlasAsset(FOREIGN_RESIDENT_SHEET.src, true, image => { foreignResidentSheet = image; });
-  loadAtlasAsset(FOREIGN_SITE_CORE_SHEET.src, true, image => { foreignSiteCoreSheet = image; });
-  loadAtlasAsset(FOREIGN_SITE_PROP_SHEET.src, true, image => { foreignSitePropSheet = image; });
+  loadAtlasAsset(FOREIGN_SITE_SHEETS.core.standard.src, true, image => { foreignSiteCoreSheet = image; });
+  loadAtlasAsset(FOREIGN_SITE_SHEETS.core.highDefinition.src, false, image => { foreignSiteCoreHdSheet = image; });
+  loadAtlasAsset(FOREIGN_SITE_SHEETS.prop.standard.src, true, image => { foreignSitePropSheet = image; });
+  loadAtlasAsset(FOREIGN_SITE_SHEETS.prop.highDefinition.src, false, image => { foreignSitePropHdSheet = image; });
   loadAtlasAsset(SPECIAL_RESIDENT_SHEET.src, true, image => { specialResidentSheet = image; });
   loadAtlasAsset(CENTER_PROMOTION_SHEET.src, true, image => { centerPromotionSheet = image; });
   loadAtlasAsset(GENERATED_CHARACTER_SHEET.src, true, image => { generatedCharacterSheet = image; });
@@ -1810,13 +1815,25 @@ function drawForeignStructureSprite(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
   p: ForeignStructureDrawParams,
+  highDefinition: boolean,
 ): boolean {
   if (p.status === 'burned' || p.status === 'abandoned') return false;
-  const rect = foreignStructureSourceRect(p.factionName, p.variant);
+  const rect = foreignStructureSourceRect(
+    p.factionName,
+    p.variant,
+    p.season,
+    highDefinition,
+    p.propKind,
+  );
   if (!rect) return false;
-  const baseWidth = p.variant === 'core' ? FOREIGN_SITE_CORE_SHEET.spriteWidth : FOREIGN_SITE_PROP_SHEET.spriteWidth;
+  const baseWidth = p.variant === 'core'
+    ? FOREIGN_SITE_CORE_SHEET.spriteWidth
+    : FOREIGN_SITE_PROP_SHEET.spriteWidth;
+  const displayHeight = p.variant === 'core'
+    ? FOREIGN_SITE_CORE_SHEET.spriteHeight
+    : FOREIGN_SITE_PROP_SHEET.spriteHeight;
   const scale = p.size / baseWidth;
-  const destHeight = rect.sh * scale;
+  const destHeight = displayHeight * scale;
   ctx.drawImage(img, rect.sx, rect.sy, rect.sw, rect.sh, p.x, p.y + p.size - destHeight, p.size, destHeight);
   return true;
 }
@@ -3336,8 +3353,14 @@ export const atlasSprites: SpriteAPI = {
   },
 
   drawForeignStructure(ctx, p) {
-    const sheet = p.variant === 'core' ? foreignSiteCoreSheet : foreignSitePropSheet;
-    return sheet ? drawForeignStructureSprite(ctx, sheet, p) : false;
+    const standard = p.variant === 'core' ? foreignSiteCoreSheet : foreignSitePropSheet;
+    const highDefinition = p.variant === 'core' ? foreignSiteCoreHdSheet : foreignSitePropHdSheet;
+    if (p.highDefinition && highDefinition) {
+      return drawForeignStructureSprite(ctx, highDefinition, p, true);
+    }
+    if (standard) return drawForeignStructureSprite(ctx, standard, p, false);
+    if (highDefinition) return drawForeignStructureSprite(ctx, highDefinition, p, true);
+    return false;
   },
 
   drawResident(ctx, p) {

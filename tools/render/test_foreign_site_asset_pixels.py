@@ -6,8 +6,10 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[2]
 SHEETS = [
     (ROOT / "public" / "assets" / "foreign-residents-v1.png", 28, 40, 4, 2),
-    (ROOT / "public" / "assets" / "foreign-site-cores-v1.png", 56, 80, 5, 1),
-    (ROOT / "public" / "assets" / "foreign-site-props-v1.png", 28, 40, 5, 1),
+    (ROOT / "public" / "assets" / "foreign-site-cores-v2.png", 112, 160, 5, 2),
+    (ROOT / "public" / "assets" / "foreign-site-cores-hd-v2.png", 448, 640, 5, 2),
+    (ROOT / "public" / "assets" / "foreign-site-props-v2.png", 56, 80, 7, 2),
+    (ROOT / "public" / "assets" / "foreign-site-props-hd-v2.png", 224, 320, 7, 2),
 ]
 
 
@@ -39,5 +41,26 @@ for path, cell_width, cell_height, columns, rows in SHEETS:
                 row,
                 "visible magenta fringe",
             )
+
+
+for stem, columns in (("foreign-site-cores", 5), ("foreign-site-props", 7)):
+    standard = Image.open(ROOT / "public" / "assets" / f"{stem}-v2.png").convert("RGBA")
+    hd = Image.open(ROOT / "public" / "assets" / f"{stem}-hd-v2.png").convert("RGBA")
+    assert hd.width == standard.width * 4 and hd.height == standard.height * 4, (
+        stem,
+        standard.size,
+        hd.size,
+    )
+    cell_width = standard.width // columns
+    cell_height = standard.height // 2
+    for column in range(columns):
+        normal = standard.crop((column * cell_width, 0, (column + 1) * cell_width, cell_height))
+        winter = standard.crop((
+            column * cell_width,
+            cell_height,
+            (column + 1) * cell_width,
+            cell_height * 2,
+        ))
+        assert normal.tobytes() != winter.tobytes(), f"{stem} column {column} winter frame is unchanged"
 
 print("foreign site asset pixel tests passed")

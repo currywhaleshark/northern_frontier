@@ -1,0 +1,393 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-runtime-foreign-site-manifest",
+  "characterId": "foreign-sites-oblique-v2",
+  "engine": "component-row",
+  "degraded_static_fallback": false,
+  "seasonRows": {
+    "normal": 0,
+    "winter": 1
+  },
+  "factionColumns": [
+    "odo",
+    "olyanghap",
+    "golgan",
+    "nimacha",
+    "bandit"
+  ],
+  "propColumns": [
+    "odo",
+    "olyanghap",
+    "golgan",
+    "nimacha",
+    "bandit",
+    "dryingRack",
+    "boat"
+  ],
+  "display": {
+    "core": {
+      "width": 56,
+      "height": 80,
+      "anchor": "footprint-bottom-left"
+    },
+    "prop": {
+      "width": 28,
+      "height": 40,
+      "anchor": "tile-bottom-left"
+    }
+  },
+  "sheets": {
+    "core": {
+      "standard": {
+        "src": "/assets/foreign-site-cores-v2.png",
+        "cellWidth": 112,
+        "cellHeight": 160,
+        "columns": 5,
+        "rows": 2,
+        "sheetWidth": 560,
+        "sheetHeight": 320,
+        "frameLayout": {
+          "normal": [
+            {
+              "x": 0,
+              "y": 0,
+              "w": 112,
+              "h": 160
+            },
+            {
+              "x": 112,
+              "y": 0,
+              "w": 112,
+              "h": 160
+            },
+            {
+              "x": 224,
+              "y": 0,
+              "w": 112,
+              "h": 160
+            },
+            {
+              "x": 336,
+              "y": 0,
+              "w": 112,
+              "h": 160
+            },
+            {
+              "x": 448,
+              "y": 0,
+              "w": 112,
+              "h": 160
+            }
+          ],
+          "winter": [
+            {
+              "x": 0,
+              "y": 160,
+              "w": 112,
+              "h": 160
+            },
+            {
+              "x": 112,
+              "y": 160,
+              "w": 112,
+              "h": 160
+            },
+            {
+              "x": 224,
+              "y": 160,
+              "w": 112,
+              "h": 160
+            },
+            {
+              "x": 336,
+              "y": 160,
+              "w": 112,
+              "h": 160
+            },
+            {
+              "x": 448,
+              "y": 160,
+              "w": 112,
+              "h": 160
+            }
+          ]
+        }
+      },
+      "highDefinition": {
+        "src": "/assets/foreign-site-cores-hd-v2.png",
+        "cellWidth": 448,
+        "cellHeight": 640,
+        "columns": 5,
+        "rows": 2,
+        "sheetWidth": 2240,
+        "sheetHeight": 1280,
+        "frameLayout": {
+          "normal": [
+            {
+              "x": 0,
+              "y": 0,
+              "w": 448,
+              "h": 640
+            },
+            {
+              "x": 448,
+              "y": 0,
+              "w": 448,
+              "h": 640
+            },
+            {
+              "x": 896,
+              "y": 0,
+              "w": 448,
+              "h": 640
+            },
+            {
+              "x": 1344,
+              "y": 0,
+              "w": 448,
+              "h": 640
+            },
+            {
+              "x": 1792,
+              "y": 0,
+              "w": 448,
+              "h": 640
+            }
+          ],
+          "winter": [
+            {
+              "x": 0,
+              "y": 640,
+              "w": 448,
+              "h": 640
+            },
+            {
+              "x": 448,
+              "y": 640,
+              "w": 448,
+              "h": 640
+            },
+            {
+              "x": 896,
+              "y": 640,
+              "w": 448,
+              "h": 640
+            },
+            {
+              "x": 1344,
+              "y": 640,
+              "w": 448,
+              "h": 640
+            },
+            {
+              "x": 1792,
+              "y": 640,
+              "w": 448,
+              "h": 640
+            }
+          ]
+        }
+      }
+    },
+    "prop": {
+      "standard": {
+        "src": "/assets/foreign-site-props-v2.png",
+        "cellWidth": 56,
+        "cellHeight": 80,
+        "columns": 7,
+        "rows": 2,
+        "sheetWidth": 392,
+        "sheetHeight": 160,
+        "frameLayout": {
+          "normal": [
+            {
+              "x": 0,
+              "y": 0,
+              "w": 56,
+              "h": 80
+            },
+            {
+              "x": 56,
+              "y": 0,
+              "w": 56,
+              "h": 80
+            },
+            {
+              "x": 112,
+              "y": 0,
+              "w": 56,
+              "h": 80
+            },
+            {
+              "x": 168,
+              "y": 0,
+              "w": 56,
+              "h": 80
+            },
+            {
+              "x": 224,
+              "y": 0,
+              "w": 56,
+              "h": 80
+            },
+            {
+              "x": 280,
+              "y": 0,
+              "w": 56,
+              "h": 80
+            },
+            {
+              "x": 336,
+              "y": 0,
+              "w": 56,
+              "h": 80
+            }
+          ],
+          "winter": [
+            {
+              "x": 0,
+              "y": 80,
+              "w": 56,
+              "h": 80
+            },
+            {
+              "x": 56,
+              "y": 80,
+              "w": 56,
+              "h": 80
+            },
+            {
+              "x": 112,
+              "y": 80,
+              "w": 56,
+              "h": 80
+            },
+            {
+              "x": 168,
+              "y": 80,
+              "w": 56,
+              "h": 80
+            },
+            {
+              "x": 224,
+              "y": 80,
+              "w": 56,
+              "h": 80
+            },
+            {
+              "x": 280,
+              "y": 80,
+              "w": 56,
+              "h": 80
+            },
+            {
+              "x": 336,
+              "y": 80,
+              "w": 56,
+              "h": 80
+            }
+          ]
+        }
+      },
+      "highDefinition": {
+        "src": "/assets/foreign-site-props-hd-v2.png",
+        "cellWidth": 224,
+        "cellHeight": 320,
+        "columns": 7,
+        "rows": 2,
+        "sheetWidth": 1568,
+        "sheetHeight": 640,
+        "frameLayout": {
+          "normal": [
+            {
+              "x": 0,
+              "y": 0,
+              "w": 224,
+              "h": 320
+            },
+            {
+              "x": 224,
+              "y": 0,
+              "w": 224,
+              "h": 320
+            },
+            {
+              "x": 448,
+              "y": 0,
+              "w": 224,
+              "h": 320
+            },
+            {
+              "x": 672,
+              "y": 0,
+              "w": 224,
+              "h": 320
+            },
+            {
+              "x": 896,
+              "y": 0,
+              "w": 224,
+              "h": 320
+            },
+            {
+              "x": 1120,
+              "y": 0,
+              "w": 224,
+              "h": 320
+            },
+            {
+              "x": 1344,
+              "y": 0,
+              "w": 224,
+              "h": 320
+            }
+          ],
+          "winter": [
+            {
+              "x": 0,
+              "y": 320,
+              "w": 224,
+              "h": 320
+            },
+            {
+              "x": 224,
+              "y": 320,
+              "w": 224,
+              "h": 320
+            },
+            {
+              "x": 448,
+              "y": 320,
+              "w": 224,
+              "h": 320
+            },
+            {
+              "x": 672,
+              "y": 320,
+              "w": 224,
+              "h": 320
+            },
+            {
+              "x": 896,
+              "y": 320,
+              "w": 224,
+              "h": 320
+            },
+            {
+              "x": 1120,
+              "y": 320,
+              "w": 224,
+              "h": 320
+            },
+            {
+              "x": 1344,
+              "y": 320,
+              "w": 224,
+              "h": 320
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -124,10 +124,12 @@ export interface ForeignStructureDrawParams {
   siteType: ForeignSiteType;
   status: ForeignSiteStatus;
   variant: 'core' | 'prop';
+  propKind?: 'hut' | 'storehouse' | 'dryingRack' | 'boat' | 'huntLodge';
   season: Season;
   x: number;
   y: number;
   size: number;
+  highDefinition?: boolean;
 }
 
 export interface RaiderDrawParams {
