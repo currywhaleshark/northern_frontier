@@ -1,4 +1,5 @@
 import { CONFIG } from './config';
+import { isBuildingUnlocked } from './buildings';
 import { addLog } from './events';
 import { freeJangdokdaeOnggiCapacity } from './fermentation';
 import { getDayOfSeason, getSeason, getYear } from './seasons';
@@ -69,7 +70,8 @@ function shortageReason(state: GameState, requirements: KimjangRequirements): st
 
 export function maybeOpenKimjangEvent(state: GameState): boolean {
   const year = getYear(state.day);
-  if (state.pendingChoice || !isKimjangWindow(state.day) || state.lastKimjangYear >= year) return false;
+  if (!isBuildingUnlocked(state.rank, 'jangdokdae') || state.pendingChoice ||
+      !isKimjangWindow(state.day) || state.lastKimjangYear >= year) return false;
 
   const freeCapacity = kimjangFreeOnggiCapacity(state);
   state.lastKimjangYear = year;

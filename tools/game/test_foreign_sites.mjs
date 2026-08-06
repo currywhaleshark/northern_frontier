@@ -24,6 +24,7 @@ function compileGameModules() {
 
 const compiledDir = compileGameModules();
 const simulation = await import(pathToFileURL(join(compiledDir, 'simulation.mjs')).href);
+const newGameOptions = await import(pathToFileURL(join(compiledDir, 'newGameOptions.mjs')).href);
 const foreignSites = await import(pathToFileURL(join(compiledDir, 'foreignSites.mjs')).href);
 const claimZones = await import(pathToFileURL(join(compiledDir, 'claimZones.mjs')).href);
 const diplomacy = await import(pathToFileURL(join(compiledDir, 'siteDiplomacy.mjs')).href);
@@ -60,6 +61,46 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
   for (const site of state.foreignSites) {
     const distance = Math.abs(site.x - center.x) + Math.abs(site.y - center.y);
     assert.ok(distance >= CONFIG.foreignSites.minCenterDistance, `${site.name} is too close (${distance})`);
+  }
+}
+
+{
+  const expectedBySize = {
+    small: { settlements: 1, seasonalCamps: 1, banditLairs: 1 },
+    medium: { settlements: 2, seasonalCamps: 2, banditLairs: 1 },
+    large: { settlements: 3, seasonalCamps: 2, banditLairs: 2 },
+  };
+  for (const [index, mapSize] of ['small', 'medium', 'large'].entries()) {
+    const state = simulation.newGameFromOptions({
+      ...newGameOptions.optionsForDifficulty('normal', '', 2026080610 + index),
+      mapSize,
+      seed: 2026080610 + index,
+    });
+    const expected = expectedBySize[mapSize];
+    const settlements = state.foreignSites.filter(site => site.type === 'village' || site.type === 'fishingVillage');
+    assert.deepEqual({
+      settlements: settlements.length,
+      seasonalCamps: state.foreignSites.filter(site => site.type === 'seasonalCamp').length,
+      banditLairs: state.foreignSites.filter(site => site.type === 'banditLair').length,
+    }, expected, `${mapSize} uses its foreign-site density contract`);
+
+    for (const site of settlements) {
+      for (let y = site.y; y < site.y + site.height; y++) {
+        for (let x = site.x; x < site.x + site.width; x++) {
+          assert.ok(['plain', 'fertile'].includes(state.map[y][x].terrain),
+            `${mapSize} settlement footprints stay on cleared ground`);
+        }
+      }
+      for (const prop of activity.foreignSiteProps(state, site)) {
+        if (!['field', 'hut', 'storehouse', 'dryingRack'].includes(prop.kind)) continue;
+        assert.ok(['plain', 'fertile'].includes(state.map[prop.y][prop.x].terrain),
+          `${mapSize} settlement props do not overlap trees`);
+      }
+    }
+    if (mapSize === 'large') {
+      assert.ok(settlements.some(site => site.type === 'village' && site.name.includes('들녘')),
+        'large maps can place a village away from the riverside');
+    }
   }
 }
 
@@ -121,6 +162,7 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
 {
   const state = simulation.newGame(2026071205);
   const lair = state.foreignSites.find(site => site.type === 'banditLair');
+  state.map.flat().forEach(tile => { tile.terrain = 'plain'; tile.buildingId = null; });
   assert.equal(foreignSites.findRaidOriginSite(state, '변경 마적')?.id, lair.id);
   raids.spawnRaiders(state, () => 0.5, false, '변경 마적', 30);
   assert.ok(state.raiders, 'bandit raid spawns a moving band');

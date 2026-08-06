@@ -189,9 +189,9 @@ export const BUILDING_DEF_DEFAULTS: Record<BuildingTypeId, BuildingDef> = {
   },
   rainwaterCistern: {
     id: 'rainwaterCistern', name: '빗물 저수조',
-    desc: `지붕물받이와 큰 독에 비와 눈을 모으는 무인 생활용수 시설. 수맥 없이 지을 수 있지만 반경 ${CONFIG.water.cisternRadius}칸만 하루 ${CONFIG.water.cisternDailyOutput}까지 공급하며 가뭄에는 먼저 마른다.`,
+    desc: `보(堡) 승격 후 지붕물받이와 큰 독에 비와 눈을 모으는 무인 생활용수 시설. 수맥 없이 지을 수 있지만 반경 ${CONFIG.water.cisternRadius}칸만 하루 ${CONFIG.water.cisternDailyOutput}까지 공급하며 가뭄에는 먼저 마른다.`,
     cost: { wood: 4, onggi: 2, stone: 2 }, buildDays: 3, slots: 0, capacity: 0, defense: 0,
-    winterBonus: false, placement: 'land', unique: false,
+    winterBonus: false, placement: 'land', unique: false, minRank: 'bo',
   },
   deepMine: {
     id: 'deepMine', name: '채광갱',

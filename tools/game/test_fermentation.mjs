@@ -160,6 +160,21 @@ function runUntil(
   assert.equal(state.pendingChoice.options.find(option => option.id === 'kimjang-skip').disabled, false);
 }
 
+// 장독대를 지을 수 없는 촌 단계에는 김장 선택을 띄우거나 그해 기회를 소모하지 않는다.
+{
+  const state = prepare(2026080605);
+  state.rank = 'settlement';
+  state.day = 34;
+
+  assert.equal(kimjang.maybeOpenKimjangEvent(state), false);
+  assert.equal(state.pendingChoice, null);
+  assert.equal(state.lastKimjangYear, 0);
+
+  state.rank = buildings.BUILDING_DEFS.jangdokdae.minRank;
+  assert.equal(kimjang.maybeOpenKimjangEvent(state), true,
+    'promotion during the same kimjang window should still open the event');
+}
+
 // 큰 김장은 여러 장독대의 빈자리에 나뉘어 들어가며 해마다 한 번만 열린다.
 {
   const state = prepare(2026071704);

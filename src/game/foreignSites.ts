@@ -13,12 +13,26 @@ import type {
   ForeignSiteMemory,
   ForeignSiteType,
   GameState,
+  MapSize,
   Season,
   Tile,
 } from './types';
 
 const LOCAL_FACTIONS = ['오도리 씨족', '올량합 부락', '골간 우디캐'] as const;
 const CAMP_FACTIONS = ['니마차 우디캐', '올량합 부락'] as const;
+const SETTLEMENT_TERRAINS = new Set<Tile['terrain']>(['plain', 'fertile']);
+const CAMP_TERRAINS = new Set<Tile['terrain']>(['forest', 'plain', 'fertile']);
+const LAIR_TERRAINS = new Set<Tile['terrain']>(['mountain', 'forest', 'rock', 'plain', 'fertile']);
+
+export const FOREIGN_SITE_COUNTS_BY_MAP_SIZE: Record<MapSize, Readonly<{
+  settlements: number;
+  seasonalCamps: number;
+  banditLairs: number;
+}>> = {
+  small: { settlements: 1, seasonalCamps: 1, banditLairs: 1 },
+  medium: { settlements: 2, seasonalCamps: 2, banditLairs: 1 },
+  large: { settlements: 3, seasonalCamps: 2, banditLairs: 2 },
+};
 
 function centerOf(state: GameState): { x: number; y: number } {
   const center = state.buildings.find(building => building.type === 'center');
@@ -39,20 +53,29 @@ function terrainNear(state: GameState, tile: Tile, terrain: Tile['terrain'], rad
   return count;
 }
 
-function siteFits(state: GameState, tile: Tile, width: number, height: number): boolean {
+function siteFits(
+  state: GameState,
+  tile: Tile,
+  width: number,
+  height: number,
+  allowedTerrains: ReadonlySet<Tile['terrain']>,
+  minSpacing: number = CONFIG.foreignSites.minSiteSpacing,
+): boolean {
   const center = centerOf(state);
   if (manhattan(tile, center) < CONFIG.foreignSites.minCenterDistance) return false;
   for (let y = tile.y; y < tile.y + height; y++) {
     for (let x = tile.x; x < tile.x + width; x++) {
       const target = state.map[y]?.[x];
-      if (!target || target.buildingId != null || target.terrain === 'river' ||
-          target.terrain === 'lake' || target.terrain === 'sea' || target.terrain === 'mudflat' ||
-          target.terrain === 'center') return false;
+      if (!target || target.buildingId != null || !allowedTerrains.has(target.terrain)) return false;
       if ((target.terrain === 'plain' || target.terrain === 'fertile' || target.terrain === 'forest' ||
           target.terrain === 'rock') && coastalGroundAt(state.map, x, y) != null) return false;
     }
   }
-  return state.foreignSites.every(site => manhattan(tile, site) >= CONFIG.foreignSites.minSiteSpacing);
+  return state.foreignSites.every(site => {
+    const overlaps = tile.x < site.x + site.width && tile.x + width > site.x &&
+      tile.y < site.y + site.height && tile.y + height > site.y;
+    return !overlaps && manhattan(tile, site) >= minSpacing;
+  });
 }
 
 function chooseSiteTile(
@@ -60,21 +83,24 @@ function chooseSiteTile(
   rng: () => number,
   width: number,
   height: number,
+  allowedTerrains: ReadonlySet<Tile['terrain']>,
   score: (tile: Tile) => number,
 ): Tile {
   const candidates = state.map.flat()
-    .filter(tile => siteFits(state, tile, width, height))
+    .filter(tile => siteFits(state, tile, width, height, allowedTerrains))
     .map(tile => ({ tile, score: score(tile) + rng() * 2 }))
     .sort((a, b) => b.score - a.score);
   if (candidates[0]) return candidates[0].tile;
 
   const center = centerOf(state);
   const fallback = state.map.flat()
-    .filter(tile => tile.buildingId == null && tile.terrain !== 'river' &&
-      tile.terrain !== 'lake' && tile.terrain !== 'sea' && tile.terrain !== 'mudflat' &&
-      tile.terrain !== 'center' && coastalGroundAt(state.map, tile.x, tile.y) == null)
+    .filter(tile => siteFits(
+      state, tile, width, height, allowedTerrains,
+      Math.max(4, Math.floor(CONFIG.foreignSites.minSiteSpacing * 0.7)),
+    ))
     .sort((a, b) => manhattan(b, center) - manhattan(a, center))[0];
-  return fallback ?? state.map[1][1];
+  if (!fallback) throw new Error('외부 거점이 들어갈 유효한 터를 찾지 못했습니다.');
+  return fallback;
 }
 
 function addClaimZone(
@@ -164,105 +190,121 @@ export function generateForeignSites(state: GameState, rng: () => number): void 
   state.nextForeignSiteId = 1;
   state.nextClaimZoneId = 1;
 
-  const localFaction = LOCAL_FACTIONS[Math.floor(rng() * LOCAL_FACTIONS.length)];
-  const localFactionDef = FACTIONS.find(faction => faction.name === localFaction);
-  const localType: ForeignSiteType = localFaction === '골간 우디캐' ? 'fishingVillage' : 'village';
-  const localTile = chooseSiteTile(state, rng, 2, 2, tile => {
-    const river = terrainNear(state, tile, 'river', 3);
-    const forest = terrainNear(state, tile, 'forest', 3);
-    const fertile = terrainNear(state, tile, 'fertile', 3);
-    const terrain = tile.terrain === 'fertile' ? 5 : tile.terrain === 'plain' ? 3 : 0;
-    return terrain + river * (localType === 'fishingVillage' ? 2.2 : 1.1) + forest * 0.35 + fertile * 0.8;
-  });
-  const localSite = createSite(state, {
-    type: localType,
-    name: localType === 'fishingVillage' ? `${localFaction} 강가 어로 취락` : `${localFaction} 강가 부락`,
-    factionName: localFaction,
-    x: localTile.x,
-    y: localTile.y,
-    width: 2,
-    height: 2,
-    discovered: false,
-    status: 'stable',
-    population: 34 + Math.floor(rng() * 35),
-    militaryPower: 18 + Math.floor(rng() * 18),
-    foodStock: 35 + Math.floor(rng() * 30),
-    tradeStock: localType === 'fishingVillage'
-      ? { fish: 24, salt: 18, hide: 8, wood: 10 }
-      : { grain: 22, meat: 12, hide: 10 },
-    influenceRadius: 5,
-    goodwill: Math.round(localFactionDef?.initialRelation ?? 50),
-    trust: 45,
-    alarm: 12,
-    favors: 0,
-  });
-  addClaimZone(state, localSite, localType === 'fishingVillage' ? 'fishing' : 'field', 4);
-  addClaimZone(state, localSite, 'passage', 5);
+  const mapSize = state.worldSetup?.mapSize ??
+    (state.map.length >= 96 ? 'large' : state.map.length <= 56 ? 'small' : 'medium');
+  const counts = FOREIGN_SITE_COUNTS_BY_MAP_SIZE[mapSize];
+  const settlementFactionOffset = Math.floor(rng() * LOCAL_FACTIONS.length);
+  for (let index = 0; index < counts.settlements; index++) {
+    const localFaction = LOCAL_FACTIONS[(settlementFactionOffset + index) % LOCAL_FACTIONS.length];
+    const localFactionDef = FACTIONS.find(faction => faction.name === localFaction);
+    const localType: ForeignSiteType = localFaction === '골간 우디캐' ? 'fishingVillage' : 'village';
+    const localTile = chooseSiteTile(state, rng, 2, 2, SETTLEMENT_TERRAINS, tile => {
+      const river = terrainNear(state, tile, 'river', 3);
+      const forest = terrainNear(state, tile, 'forest', 3);
+      const fertile = terrainNear(state, tile, 'fertile', 3);
+      const terrain = tile.terrain === 'fertile' ? 5 : 3;
+      if (localType === 'fishingVillage') return terrain + river * 2.2 + forest * 0.25 + fertile * 0.8;
+      const inland = index > 0 ? Math.max(0, 8 - river * 1.4) : 0;
+      return terrain + river * (index > 0 ? -0.2 : 0.25) + forest * 0.45 + fertile * 0.8 + inland;
+    });
+    const riverside = terrainNear(state, localTile, 'river', 2) > 0;
+    const localSite = createSite(state, {
+      type: localType,
+      name: localType === 'fishingVillage'
+        ? `${localFaction} 강가 어로 취락`
+        : `${localFaction} ${riverside ? '강가' : '들녘'} 부락`,
+      factionName: localFaction,
+      x: localTile.x,
+      y: localTile.y,
+      width: 2,
+      height: 2,
+      discovered: false,
+      status: 'stable',
+      population: 34 + Math.floor(rng() * 35),
+      militaryPower: 18 + Math.floor(rng() * 18),
+      foodStock: 35 + Math.floor(rng() * 30),
+      tradeStock: localType === 'fishingVillage'
+        ? { fish: 24, salt: 18, hide: 8, wood: 10 }
+        : { grain: 22, meat: 12, hide: 10 },
+      influenceRadius: 5,
+      goodwill: Math.round(localFactionDef?.initialRelation ?? 50),
+      trust: 45,
+      alarm: 12,
+      favors: 0,
+    });
+    addClaimZone(state, localSite, localType === 'fishingVillage' ? 'fishing' : 'field', 4);
+    addClaimZone(state, localSite, 'passage', 5);
+  }
 
-  const campFaction = CAMP_FACTIONS[Math.floor(rng() * CAMP_FACTIONS.length)];
-  const activeSeasons: Season[] = campFaction === '니마차 우디캐' ? ['autumn', 'winter'] : ['spring', 'summer'];
-  const campTile = chooseSiteTile(state, rng, 1, 1, tile => {
-    const nearestHabitat = state.habitats.reduce((best, habitat) =>
-      Math.min(best, manhattan(tile, habitat)), Number.POSITIVE_INFINITY);
-    return (tile.terrain === 'forest' ? 10 : 0) + Math.max(0, 10 - nearestHabitat) + terrainNear(state, tile, 'forest', 2);
-  });
-  const camp = createSite(state, {
-    type: 'seasonalCamp',
-    name: `${campFaction} 계절 사냥 야영지`,
-    factionName: campFaction,
-    x: campTile.x,
-    y: campTile.y,
-    width: 1,
-    height: 1,
-    discovered: false,
-    status: 'stable',
-    population: 12 + Math.floor(rng() * 15),
-    militaryPower: 14 + Math.floor(rng() * 16),
-    foodStock: 14 + Math.floor(rng() * 18),
-    tradeStock: { hide: 16, meat: 12, herbs: 6 },
-    influenceRadius: 5,
-    goodwill: Math.round(FACTIONS.find(faction => faction.name === campFaction)?.initialRelation ?? 45),
-    trust: 34,
-    alarm: 18,
-    favors: 0,
-    seasonalActive: activeSeasons.includes(getSeason(state.day)),
-    activeSeasons,
-  });
-  addClaimZone(state, camp, 'hunting', 5);
-  addClaimZone(state, camp, 'forest', 4);
+  const campFactionOffset = Math.floor(rng() * CAMP_FACTIONS.length);
+  for (let index = 0; index < counts.seasonalCamps; index++) {
+    const campFaction = CAMP_FACTIONS[(campFactionOffset + index) % CAMP_FACTIONS.length];
+    const activeSeasons: Season[] = campFaction === '니마차 우디캐' ? ['autumn', 'winter'] : ['spring', 'summer'];
+    const campTile = chooseSiteTile(state, rng, 1, 1, CAMP_TERRAINS, tile => {
+      const nearestHabitat = state.habitats.reduce((best, habitat) =>
+        Math.min(best, manhattan(tile, habitat)), Number.POSITIVE_INFINITY);
+      return (tile.terrain === 'forest' ? 10 : 0) + Math.max(0, 10 - nearestHabitat) + terrainNear(state, tile, 'forest', 2);
+    });
+    const camp = createSite(state, {
+      type: 'seasonalCamp',
+      name: `${campFaction} 계절 사냥 야영지`,
+      factionName: campFaction,
+      x: campTile.x,
+      y: campTile.y,
+      width: 1,
+      height: 1,
+      discovered: false,
+      status: 'stable',
+      population: 12 + Math.floor(rng() * 15),
+      militaryPower: 14 + Math.floor(rng() * 16),
+      foodStock: 14 + Math.floor(rng() * 18),
+      tradeStock: { hide: 16, meat: 12, herbs: 6 },
+      influenceRadius: 5,
+      goodwill: Math.round(FACTIONS.find(faction => faction.name === campFaction)?.initialRelation ?? 45),
+      trust: 34,
+      alarm: 18,
+      favors: 0,
+      seasonalActive: activeSeasons.includes(getSeason(state.day)),
+      activeSeasons,
+    });
+    addClaimZone(state, camp, 'hunting', 5);
+    addClaimZone(state, camp, 'forest', 4);
+  }
 
-  const lairTile = chooseSiteTile(state, rng, 2, 2, tile => {
-    const h = state.map.length;
-    const w = state.map[0].length;
-    const edge = Math.min(tile.x, tile.y, w - 1 - tile.x, h - 1 - tile.y);
-    const terrain = tile.terrain === 'mountain' ? 14 : tile.terrain === 'forest' ? 10 : tile.terrain === 'rock' ? 8 : 0;
-    return terrain + Math.max(0, 12 - edge) + Math.max(0, h * 0.45 - tile.y) * 0.25;
-  });
-  const lair = createSite(state, {
-    type: 'banditLair',
-    name: '변경 마적 산채',
-    factionName: '변경 마적',
-    x: lairTile.x,
-    y: lairTile.y,
-    width: 2,
-    height: 2,
-    discovered: false,
-    status: 'fortified',
-    population: 18 + Math.floor(rng() * 15),
-    militaryPower: 32 + Math.floor(rng() * 26),
-    foodStock: 18 + Math.floor(rng() * 18),
-    tradeStock: { grain: 8, tools: 2, hide: 9 },
-    influenceRadius: 4,
-    goodwill: 5,
-    trust: 5,
-    alarm: 55,
-    favors: 0,
-    lairScoutAttempts: 0,
-    lairScoutFailures: 0,
-    lairAssaultDefeats: 0,
-    lairDoctrineRevealed: false,
-  });
-  addClaimZone(state, lair, 'passage', 4);
+  for (let index = 0; index < counts.banditLairs; index++) {
+    const lairTile = chooseSiteTile(state, rng, 2, 2, LAIR_TERRAINS, tile => {
+      const h = state.map.length;
+      const w = state.map[0].length;
+      const edge = Math.min(tile.x, tile.y, w - 1 - tile.x, h - 1 - tile.y);
+      const terrain = tile.terrain === 'mountain' ? 14 : tile.terrain === 'forest' ? 10 : tile.terrain === 'rock' ? 8 : 0;
+      return terrain + Math.max(0, 12 - edge) + Math.max(0, h * 0.45 - tile.y) * 0.25;
+    });
+    const lair = createSite(state, {
+      type: 'banditLair',
+      name: index === 0 ? '변경 마적 산채' : '변경 마적 외곽 산채',
+      factionName: '변경 마적',
+      x: lairTile.x,
+      y: lairTile.y,
+      width: 2,
+      height: 2,
+      discovered: false,
+      status: 'fortified',
+      population: 18 + Math.floor(rng() * 15),
+      militaryPower: 32 + Math.floor(rng() * 26),
+      foodStock: 18 + Math.floor(rng() * 18),
+      tradeStock: { grain: 8, tools: 2, hide: 9 },
+      influenceRadius: 4,
+      goodwill: 5,
+      trust: 5,
+      alarm: 55,
+      favors: 0,
+      lairScoutAttempts: 0,
+      lairScoutFailures: 0,
+      lairAssaultDefeats: 0,
+      lairDoctrineRevealed: false,
+    });
+    addClaimZone(state, lair, 'passage', 4);
+  }
   for (const site of state.foreignSites) ensureSiteActivity(site, state.day);
 }
 

@@ -31,10 +31,12 @@ const saveLoad = await import(pathToFileURL(join(compiledDir, 'saveLoad.mjs')).h
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
 function factionZone(state) {
-  const zone = state.claimZones.find(candidate => {
-    const site = state.foreignSites.find(foreign => foreign.id === candidate.siteId);
-    return candidate.kind !== 'passage' && site?.factionName && state.factionLeaders[site.factionName];
-  });
+  const zone = state.claimZones
+    .filter(candidate => {
+      const site = state.foreignSites.find(foreign => foreign.id === candidate.siteId);
+      return candidate.kind !== 'passage' && site?.factionName && state.factionLeaders[site.factionName];
+    })
+    .sort((left, right) => right.radius - left.radius || left.id - right.id)[0];
   assert.ok(zone, '지도자 있는 여진 생활권이 하나 있어야 한다');
   const site = state.foreignSites.find(candidate => candidate.id === zone.siteId);
   assert.ok(site?.factionName);
@@ -54,6 +56,12 @@ function bufferTile(state, zone) {
         const ox = candidate.x - other.x;
         const oy = candidate.y - other.y;
         return ox * ox + oy * oy <= other.radius * other.radius;
+      }) && !state.claimZones.some(other => {
+        if (other.id === zone.id) return false;
+        const otherOuter = other.radius + CONFIG.foreignSites.proximityClaimBufferTiles;
+        const ox = candidate.x - other.x;
+        const oy = candidate.y - other.y;
+        return ox * ox + oy * oy <= otherOuter * otherOuter;
       });
   });
   assert.ok(tile, '생활권 완충 타일이 하나 있어야 한다');
@@ -122,7 +130,7 @@ function bufferTile(state, zone) {
   state.buildings.push(building);
   state.day = CONFIG.foreignSites.claimDailyInterval - (zone.id % CONFIG.foreignSites.claimDailyInterval);
   claimZones.dailyClaimTensionTick(state);
-  proximity.noteProximityBuildingCompletion(state, { id: state.nextBuildingId++, type: 'hut', x: buffer.x, y: buffer.y, progress: 1, built: true, fieldGrowth: 0 });
+  proximity.noteProximityBuildingCompletion(state, { id: state.nextBuildingId++, type: 'well', x: buffer.x, y: buffer.y, progress: 1, built: true, fieldGrowth: 0 });
   assert.equal(state.relations[faction], relationBefore, '협정 중 점유는 일일 생활권 긴장을 만들지 않는다');
   assert.equal(site.alarm, alarmBefore, '협정 중 점유는 경계심을 올리지 않는다');
   assert.equal(state.proximityWarnings.includes(`E4:claimBuffer:${faction}`), false, '협정 중 완충 건물은 E4 경고를 만들지 않는다');

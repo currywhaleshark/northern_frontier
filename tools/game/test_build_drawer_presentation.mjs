@@ -74,6 +74,12 @@ assert.match(drawerSource, /현재 단계[\s\S]*?currentRankBuildItems\.map\(ren
   'current-rank buildings must render before promotion-locked buildings');
 assert.match(drawerSource, /resourceShortage && <span className="build-drawer-item-status">자원 부족<\/span>/,
   'resource shortages need a distinct disabled badge');
+assert.match(drawerSource, /showShortages=\{reason === '자원 부족'\}/,
+  'only resource-shortage locks should annotate current stock in the cost line');
+assert.match(drawerSource, /shortage \? `\(\$\{available\}\)` : ''/,
+  'a missing resource must append the floored current stock after the required amount');
+assert.match(cssSource, /\.build-drawer-tooltip-cost-shortage\s*\{[^}]*color:\s*var\(--bad\);[^}]*font-weight:\s*700;/,
+  'missing cost entries must use the established red warning color');
 assert.match(drawerSource, /title=\{reason \? `사용 불가: \$\{reason\}` : def\.name\}/,
   'unavailable items must preserve an explicit lock reason');
 assert.match(cssSource, /\.build-drawer-list\s*\{[\s\S]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)[\s\S]*overflow-y:\s*auto;/,

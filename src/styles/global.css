@@ -1335,6 +1335,8 @@ html, body, #root {
   pointer-events: none;
   white-space: pre-line;
 }
+.build-drawer-tooltip-line { display: block; }
+.build-drawer-tooltip-cost-shortage { color: var(--bad); font-weight: 700; }
 .build-drawer-head {
   display: flex;
   align-items: center;

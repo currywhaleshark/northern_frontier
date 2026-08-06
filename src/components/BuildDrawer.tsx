@@ -30,21 +30,47 @@ interface Props {
   shortcutsEnabled?: boolean;
 }
 
-function costText(type: BuildableBuildingTypeId): string {
-  if (type === 'gate') return '추가 비용: 목책 목재 1 · 토성 목재 3/도구 1 · 석벽 목재 4/철 1/도구 1';
-  const parts = Object.entries(BUILDING_DEFS[type].cost).map(
-    ([resource, amount]) => `${RESOURCE_NAMES[resource as ResourceId]} ${amount}`,
-  );
-  return parts.length > 0 ? parts.join(' · ') : '무료';
+function CostLine({ state, type, showShortages }: {
+  state: GameState;
+  type: BuildableBuildingTypeId;
+  showShortages: boolean;
+}) {
+  if (type === 'gate') {
+    return <>추가 비용: 목책 목재 1 · 토성 목재 3/도구 1 · 석벽 목재 4/철 1/도구 1</>;
+  }
+  const parts = Object.entries(BUILDING_DEFS[type].cost);
+  if (parts.length === 0) return <>무료</>;
+  return <>{parts.map(([resource, amount], index) => {
+    const resourceId = resource as ResourceId;
+    const required = amount ?? 0;
+    const available = Math.max(0, Math.floor(state.resources[resourceId] ?? 0));
+    const shortage = showShortages && (state.resources[resourceId] ?? 0) < required;
+    return (
+      <span key={resourceId}>
+        {index > 0 && ' · '}
+        <span className={shortage ? 'build-drawer-tooltip-cost-shortage' : undefined}>
+          {RESOURCE_NAMES[resourceId]} {required}{shortage ? `(${available})` : ''}
+        </span>
+      </span>
+    );
+  })}</>;
 }
 
-function buildingTooltip(type: BuildableBuildingTypeId, reason: string | null): string {
+function BuildingTooltip({ state, type, reason }: {
+  state: GameState;
+  type: BuildableBuildingTypeId;
+  reason: string | null;
+}) {
   const def = BUILDING_DEFS[type];
-  return [
-    def.desc,
-    `${costText(type)} · 공기 ${def.buildDays}일`,
-    reason ? `사용 불가: ${reason}` : null,
-  ].filter((line): line is string => line != null).join('\n');
+  return (
+    <>
+      <span className="build-drawer-tooltip-line">{def.desc}</span>
+      <span className="build-drawer-tooltip-line">
+        <CostLine state={state} type={type} showShortages={reason === '자원 부족'} /> · 공기 {def.buildDays}일
+      </span>
+      {reason && <span className="build-drawer-tooltip-line">사용 불가: {reason}</span>}
+    </>
+  );
 }
 
 function unavailableReason(state: GameState, type: BuildableBuildingTypeId): string | null {
@@ -231,7 +257,11 @@ export function BuildDrawer({
         >
           {tooltipType && activeCategory.types.includes(tooltipType) && (
             <div id="build-drawer-tooltip" className="build-drawer-tooltip" role="tooltip">
-              {buildingTooltip(tooltipType, unavailableReason(state, tooltipType))}
+              <BuildingTooltip
+                state={state}
+                type={tooltipType}
+                reason={unavailableReason(state, tooltipType)}
+              />
             </div>
           )}
           <header className="build-drawer-head">

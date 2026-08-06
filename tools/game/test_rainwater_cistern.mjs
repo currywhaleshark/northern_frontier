@@ -18,6 +18,8 @@ for (const file of readdirSync(srcDir).filter(file => file.endsWith('.ts'))) {
 }
 
 const { CONFIG } = await import(pathToFileURL(join(outDir, 'config.mjs')).href);
+const { BUILDING_DEFS, isBuildingUnlocked } =
+  await import(pathToFileURL(join(outDir, 'buildings.mjs')).href);
 const { cisternStatus, dailyCisternTick } =
   await import(pathToFileURL(join(outDir, 'rainwaterCistern.mjs')).href);
 const { waterSupplySnapshot } =
@@ -51,6 +53,12 @@ const state = {
   pendingDisasters: [],
   logs: [],
 };
+
+assert.equal(BUILDING_DEFS.rainwaterCistern.minRank, 'bo');
+assert.equal(isBuildingUnlocked('settlement', 'rainwaterCistern'), false,
+  'a settlement cannot build pottery-dependent rainwater cisterns');
+assert.equal(isBuildingUnlocked('bo', 'rainwaterCistern'), true,
+  'rainwater cisterns unlock at bo with the pottery infrastructure');
 
 let snapshot = waterSupplySnapshot(state);
 assert.equal(snapshot.buildings.get(house.id)?.source, 'cistern');

@@ -93,7 +93,8 @@ export function foreignSiteProps(state: GameState, site: ForeignSite): ForeignSi
     props.push({ kind: 'field', ...point });
   }
 
-  const landTiles = nearbyTiles(state, site, 3, new Set<Terrain>(['plain', 'fertile', 'forest', 'center']));
+  // 부락 부속 건물은 숲을 덮어 그리지 않는다. 본체와 경작지처럼 이미 트인 땅만 쓴다.
+  const landTiles = nearbyTiles(state, site, 3, new Set<Terrain>(['plain', 'fertile']));
   const structures = takeUnused(landTiles, used, site.type === 'village' ? 2 : 3);
   structures.forEach((point, index) => {
     const kind: ForeignSitePropKind = site.type === 'fishingVillage' && index < 2
