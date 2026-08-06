@@ -91,7 +91,12 @@ export const SPRITE_DISPLAY_METRIC_KEYS: readonly string[] = [
 
 const DEFAULT_DISPLAY_METRIC: SpriteDisplayMetric = { scale: 1, dy: 0 };
 
-export const SPRITE_DISPLAY_METRICS: Readonly<Record<string, SpriteDisplayMetric>> = {};
+export const SPRITE_DISPLAY_METRICS: Readonly<Record<string, SpriteDisplayMetric>> = {
+  "common": {
+    "scale": 1.24,
+    "dy": 0
+  }
+};
 
 export function spriteDisplayMetric(key: string | undefined): SpriteDisplayMetric {
   if (!key) return DEFAULT_DISPLAY_METRIC;
@@ -112,7 +117,13 @@ export const WORK_ANCHOR_KEYS: readonly string[] = [
   "herbalist@forest"
 ];
 
-export const WORK_ANCHORS: Readonly<Record<string, WorkAnchor>> = {};
+export const WORK_ANCHORS: Readonly<Record<string, WorkAnchor>> = {
+  "miner@rock": {
+    "offsetX": 0,
+    "offsetY": 0,
+    "facing": 1
+  }
+};
 
 export function workAnchor(key: string): WorkAnchor | null {
   return WORK_ANCHORS[key] ?? null;

@@ -1,1 +1,7 @@
-{}
+{
+  "miner@rock": {
+    "offsetX": 0,
+    "offsetY": 0,
+    "facing": 1
+  }
+}
