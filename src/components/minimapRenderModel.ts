@@ -51,6 +51,12 @@ interface MinimapRaidVisual extends MinimapPointVisual {
   faction?: string;
 }
 
+interface MinimapPartyVisual extends MinimapPointVisual {
+  id: string | number;
+  siteId: string | number;
+  phase: string;
+}
+
 interface MinimapTargetVisual extends MinimapPointVisual {
   key?: string;
   id?: string;
@@ -66,6 +72,7 @@ interface MinimapOverlayInvalidationInput {
   viewport: MinimapViewportVisual;
   selected: MinimapPointVisual | null;
   raid: MinimapRaidVisual | null;
+  parties?: readonly MinimapPartyVisual[];
   targets: readonly MinimapTargetVisual[];
 }
 
@@ -101,6 +108,8 @@ export function minimapOverlayInvalidationKey(input: MinimapOverlayInvalidationI
   const { viewport } = input;
   const selected = input.selected ? `${input.selected.x},${input.selected.y}` : '-';
   const raid = input.raid ? `${input.raid.x},${input.raid.y},${input.raid.faction ?? ''}` : '-';
+  const parties = sortedKey((input.parties ?? []).map(party =>
+    `${party.id},${party.siteId},${party.x},${party.y},${party.phase}`));
   const targets = sortedKey(input.targets.map(target => [
     target.key ?? target.id ?? '',
     target.kind,
@@ -119,6 +128,7 @@ export function minimapOverlayInvalidationKey(input: MinimapOverlayInvalidationI
     viewport.height,
     selected,
     raid,
+    parties,
     targets,
   ].join('|');
 }

@@ -1655,6 +1655,14 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
     setInspResidentId(null);
   };
 
+  const handleForeignSitePartyClick = (id: number) => {
+    const party = stateRef.current.foreignSiteParties.find(candidate => candidate.id === id);
+    if (!party) return;
+    setSelected({ x: party.x, y: party.y });
+    setSelectedEntity({ kind: 'foreignSiteParty', id });
+    setInspResidentId(null);
+  };
+
   const handleClearSelection = useCallback(() => {
     setSelected(null);
     setSelectedEntity(null);
@@ -1868,7 +1876,12 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                       version={runtimeVersion}
                       animationActive={speed > 0 && !runtimeState.pendingChoice && !runtimeState.pendingPromotionNotice && !runtimeState.tacticalBattle && !runtimeState.tacticalBattleReport && !runtimeState.gameOver}
                       viewportRef={mapViewportRef}
-                      selected={selected}
+                      selected={selectedEntity?.kind === 'foreignSiteParty'
+                        ? (() => {
+                          const party = runtimeState.foreignSiteParties.find(candidate => candidate.id === selectedEntity.id);
+                          return party ? { x: party.x, y: party.y } : null;
+                        })()
+                        : selected}
                       selectedBuildingId={selectedEntity?.kind === 'building' ? selectedEntity.id : null}
                       onFocusBuilding={handleFocusBuilding}
                       // 튜토리얼 0단계(미니맵으로 시점 옮기기) 달성 플래그
@@ -2023,6 +2036,7 @@ export default function GameSession({ launch, onReturnToMenu }: GameSessionProps
                     onPlaceRelocation={handlePlaceBuildingRelocation}
                     onResidentClick={handleResidentClick}
                     onFishingBoatClick={handleFishingBoatClick}
+                    onForeignSitePartyClick={handleForeignSitePartyClick}
                     onPlaceFishingBoat={handlePlaceFishingBoat}
                     onContextAction={handleContextAction}
                     onCancelPlace={() => {

@@ -337,7 +337,14 @@ for (const [index, rank] of ['bo', 'jin'].entries()) {
 {
   const state = makeStableState(2026071950);
   const site = state.foreignSites.find(candidate => candidate.type === 'village' || candidate.type === 'fishingVillage');
+  const claimZone = state.claimZones.find(candidate => candidate.siteId === site.id);
   site.discovered = true;
+  claimZone.growth.pressure = 2;
+  claimZone.growth.pendingChange = 'contract';
+  claimZone.growth.previousRadius = claimZone.radius;
+  claimZone.growth.targetRadius = claimZone.radius - 1;
+  claimZone.growth.establishedUseBuildingIds = [state.buildings[0].id];
+  claimZone.growth.establishedUseGraceUntilDay = state.day + 40;
   state.foreignSiteParties.push({
     id: state.nextForeignSitePartyId++, siteId: site.id, kind: 'farm', phase: 'working',
     x: site.x + site.width, y: site.y, px: site.x + site.width + 0.5, py: site.y + 0.5,
@@ -353,12 +360,19 @@ for (const [index, rank] of ['bo', 'jin'].entries()) {
       assert.equal(party.siteId, site.id);
       assert.equal(party.phase, 'working');
       assert.deepEqual(party.cargo, { grain: 1.5 });
+      const growth = loaded.claimZones.find(candidate => candidate.id === claimZone.id).growth;
+      assert.equal(growth.pendingChange, 'contract');
+      assert.equal(growth.targetRadius, claimZone.radius - 1);
+      assert.deepEqual(growth.establishedUseBuildingIds, [state.buildings[0].id]);
     },
     afterReload: reloaded => {
       const party = reloaded.foreignSiteParties[0];
       assert.equal(party.siteId, site.id);
       assert.equal(party.phase, 'working');
       assert.deepEqual(party.cargo, { grain: 1.5 });
+      const growth = reloaded.claimZones.find(candidate => candidate.id === claimZone.id).growth;
+      assert.equal(growth.pendingChange, 'contract');
+      assert.equal(growth.targetRadius, claimZone.radius - 1);
     },
   });
   results.push('current-schema');

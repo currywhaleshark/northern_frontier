@@ -24,6 +24,7 @@ import { hasSubsurfaceInsight } from '../game/subsurfaceVeins';
 import { wellWaterStatusAt } from '../game/waterSupply';
 import { GATE_CONVERSION_COSTS, isSolidWallBuilding, wallLineRect, type WallLineAxis } from '../game/walls';
 import { fishingBoatConstructionSlots, type FishingBoatConstructionSlot } from '../game/fishingBoats';
+import { foreignSitePartyKindLabel } from '../game/foreignSiteSimulation';
 
 const TILE = CONFIG.ui.tileSize;
 const CLICK_RADIUS = Math.round(TILE * 0.65); // 주민 클릭 판정 반경(픽셀)
@@ -57,6 +58,7 @@ interface Props {
   onPlaceRelocation: (x: number, y: number) => void;
   onResidentClick: (id: number) => void;
   onFishingBoatClick: (id: number) => void;
+  onForeignSitePartyClick: (id: number) => void;
   onPlaceFishingBoat: (portId: number, slot: 0 | 1) => void;
   onContextAction: (x: number, y: number) => void;
   onCancelPlace: () => void;
@@ -69,7 +71,7 @@ export function GameCanvas({
   placingType, pastureStableId, expandingBuildingId, relocatingBuildingId, placingFishingBoatFromBoatyardId,
   selected, selectedEntity, selectedResidentId, anim,
   onTileClick, onPlacePlot, onPlacePasture, onPlaceRelocation,
-  onResidentClick, onFishingBoatClick, onPlaceFishingBoat, onContextAction, onCancelPlace, onZoomChange,
+  onResidentClick, onFishingBoatClick, onForeignSitePartyClick, onPlaceFishingBoat, onContextAction, onCancelPlace, onZoomChange,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawRef = useRef<(animationTimeMs: number) => void>(() => undefined);
@@ -199,6 +201,21 @@ export function GameCanvas({
     : getPointerAction(state, selectedEntity, hoveredTile);
   const selectedBuildingId = selectedEntity?.kind === 'building' ? selectedEntity.id : null;
   const selectedFishingBoatId = selectedEntity?.kind === 'fishingBoat' ? selectedEntity.id : null;
+  const selectedForeignSitePartyId = selectedEntity?.kind === 'foreignSiteParty' ? selectedEntity.id : null;
+  const foreignSitePartyAtPoint = (point: { mx: number; my: number }) => {
+    let best = null as GameState['foreignSiteParties'][number] | null;
+    let bestDistance = CLICK_RADIUS;
+    for (const party of state.foreignSiteParties) {
+      const site = state.foreignSites.find(candidate => candidate.id === party.siteId);
+      if (!site || (!party.spotted && !site.discovered)) continue;
+      const distance = Math.hypot(party.px * TILE - point.mx, party.py * TILE - point.my);
+      if (distance <= bestDistance) {
+        best = party;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  };
   const fishingBoatSlots = useMemo(
     () => placingFishingBoatFromBoatyardId == null
       ? []
@@ -246,6 +263,8 @@ export function GameCanvas({
     if (resident) return `resident:${resident.id}`;
     const boat = findFishingBoatAt(state, point.mx, point.my, frameAlpha, CLICK_RADIUS);
     if (boat) return `fishing-boat:${boat.id}`;
+    const party = foreignSitePartyAtPoint(point);
+    if (party) return `foreign-site-party:${party.id}`;
     const raid = state.raiders;
     if (raid?.spotted) {
       const rx = (raid.px + (raid.x - raid.px) * frameAlpha) * TILE + TILE / 2;
@@ -340,7 +359,7 @@ export function GameCanvas({
         ? { stableId: pastureStableId, rect: placingRect }
         : null,
       selectedBuildingId, viewport: viewportRef.current ?? undefined, terrainVisualSignature: terrainSignature,
-      selectedFishingBoatId,
+      selectedFishingBoatId, selectedForeignSitePartyId,
       placingFishingBoatFromBoatyardId,
       fishingBoatPlacementHover,
       habitatIcon: habitatIconRef.current ?? undefined,
@@ -450,24 +469,27 @@ export function GameCanvas({
   const hoveredFishingBoat = mouse && !hoveredResident && !placingType && !isPasturePlacing && !isFishingBoatPlacing
     ? findFishingBoatAt(state, mouse.mx, mouse.my, alpha, CLICK_RADIUS)
     : null;
+  const hoveredForeignSiteParty = mouse && !hoveredResident && !hoveredFishingBoat && !placingType && !isPasturePlacing && !isFishingBoatPlacing
+    ? foreignSitePartyAtPoint(mouse)
+    : null;
   let raiderHovered = false;
-  if (!hoveredResident && !hoveredFishingBoat && mouse && state.raiders && state.raiders.spotted) {
+  if (!hoveredResident && !hoveredFishingBoat && !hoveredForeignSiteParty && mouse && state.raiders && state.raiders.spotted) {
     const b = state.raiders;
     const bx = (b.px + (b.x - b.px) * alpha) * TILE + TILE / 2;
     const by = (b.py + (b.y - b.py) * alpha) * TILE + TILE / 2;
     raiderHovered = Math.hypot(bx - mouse.mx, by - mouse.my) <= 14;
   }
-  const hoveredSite = !hoveredResident && !hoveredFishingBoat && !raiderHovered && hoverTile
+  const hoveredSite = !hoveredResident && !hoveredFishingBoat && !hoveredForeignSiteParty && !raiderHovered && hoverTile
     ? foreignSiteAt(state, hoverTile.x, hoverTile.y)
     : null;
-  const actionTooltip = mouse && !hoveredResident && !hoveredFishingBoat && !raiderHovered && !hoveredSite && pointerAction && pointerAction.kind !== 'none'
+  const actionTooltip = mouse && !hoveredResident && !hoveredFishingBoat && !hoveredForeignSiteParty && !raiderHovered && !hoveredSite && pointerAction && pointerAction.kind !== 'none'
     ? pointerAction
     : null;
   const canvasCursor = placingType || isPasturePlacing || isFootprintExpanding || isRelocating || isFishingBoatPlacing
     ? 'crosshair'
     : panning
       ? 'grabbing'
-      : hoveredResident || hoveredFishingBoat || hoveredSite
+      : hoveredResident || hoveredFishingBoat || hoveredForeignSiteParty || hoveredSite
         ? 'pointer'
         : pointerAction && pointerAction.kind !== 'none'
           ? pointerAction.cursor
@@ -596,6 +618,11 @@ export function GameCanvas({
             const boat = findFishingBoatAt(state, m.mx, m.my, alpha, CLICK_RADIUS);
             if (boat) {
               onFishingBoatClick(boat.id);
+              return;
+            }
+            const party = foreignSitePartyAtPoint(m);
+            if (party) {
+              onForeignSitePartyClick(party.id);
               return;
             }
           }
@@ -754,7 +781,7 @@ export function GameCanvas({
           })()}
         </div>
       )}
-      {mouse && (hoveredResident || hoveredFishingBoat || raiderHovered || hoveredSite || actionTooltip) && (
+      {mouse && (hoveredResident || hoveredFishingBoat || hoveredForeignSiteParty || raiderHovered || hoveredSite || actionTooltip) && (
         <div ref={tooltipRef} className="map-tooltip" style={{ left: 0, top: 0 }}>
           {hoveredResident ? (
             <>
@@ -769,6 +796,11 @@ export function GameCanvas({
             <>
               <b>어선 {hoveredFishingBoat.id}호</b>
               <div className="muted">어부 {hoveredFishingBoat.fisherIds.length}/2명 · 내구도 {Math.round(hoveredFishingBoat.durability)}/{Math.round(hoveredFishingBoat.maxDurability)} · 클릭해 살펴보기</div>
+            </>
+          ) : hoveredForeignSiteParty ? (
+            <>
+              <b>{state.foreignSites.find(site => site.id === hoveredForeignSiteParty.siteId)?.name ?? '외부 활동대'}</b>
+              <div className="muted">{foreignSitePartyKindLabel(hoveredForeignSiteParty.kind)} · {hoveredForeignSiteParty.memberCount}명 · 클릭해 살펴보기</div>
             </>
           ) : raiderHovered ? (
             <>

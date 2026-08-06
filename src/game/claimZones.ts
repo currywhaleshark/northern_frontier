@@ -65,17 +65,57 @@ export function dailyClaimTensionTick(state: GameState): void {
   const interval = CONFIG.foreignSites.claimDailyInterval;
   for (const zone of state.claimZones) {
     if ((state.day + zone.id) % interval !== 0 || isClaimPermissionActive(state, zone)) continue;
+    if (zone.growth?.establishedUseGraceUntilDay != null &&
+        zone.growth.establishedUseGraceUntilDay < state.day) {
+      zone.growth.establishedUseGraceUntilDay = undefined;
+      zone.growth.establishedUseBuildingIds = [];
+    }
+    const graceIds = zone.growth?.establishedUseGraceUntilDay != null &&
+      zone.growth.establishedUseGraceUntilDay >= state.day
+      ? new Set(zone.growth.establishedUseBuildingIds)
+      : new Set<number>();
     const site = state.foreignSites.find(candidate => candidate.id === zone.siteId);
     if (!site || !isForeignSiteOperational(site)) continue;
-    const occupied = state.buildings.some(building => {
+    const occupied = state.buildings.find(building => {
+      if (graceIds.has(building.id)) return false;
       const footprint = footprintTilesOf(state, building) ?? [];
       return footprint.some(tile => claimZonesAt(state, tile.x, tile.y).some(candidate => candidate.id === zone.id));
     });
     if (!occupied) continue;
     zone.discovered = true;
-    site.alarm = Math.min(100, site.alarm + 2);
-    if (site.factionName) changeRelation(state, site.factionName, -1);
-    addForeignSiteMemory(state, site.id, `${claimLabel(zone)} 안의 개척지 시설이 계속 남아 있어 경계심이 커졌습니다.`, 'bad');
-    addLog(state, `${withJosa(site.factionName ?? '현지 사람들', '이/가')} ${claimLabel(zone)} 안의 개척지 시설을 불편하게 여기고 있습니다.`, 'bad');
+    zone.growth ??= {
+      baseRadius: zone.radius, targetRadius: zone.radius, pressure: 0,
+      lastBoundaryChangeDay: state.day, establishedUseBuildingIds: [],
+    };
+    if (zone.growth.warningTargetBuildingId != null) continue;
+    zone.growth.warningTargetBuildingId = occupied.id;
+    zone.growth.warningScheduledDay = state.day;
+    zone.growth.warningPatrolPartyId = undefined;
+    if (site.discovered) {
+      addLog(state, `${site.name}에서 ${claimLabel(zone)} 안의 시설을 확인할 경계 순찰대를 보냈습니다.`, 'info');
+    }
   }
+}
+
+export function applyScheduledClaimWarning(state: GameState, zoneId: number): boolean {
+  const zone = state.claimZones.find(candidate => candidate.id === zoneId);
+  const site = zone ? state.foreignSites.find(candidate => candidate.id === zone.siteId) : null;
+  if (!zone || !site || !zone.growth?.warningTargetBuildingId) return false;
+  const targetStillExists = state.buildings.some(
+    building => building.id === zone.growth?.warningTargetBuildingId,
+  );
+  if (!targetStillExists || isClaimPermissionActive(state, zone)) {
+    zone.growth.warningTargetBuildingId = undefined;
+    zone.growth.warningScheduledDay = undefined;
+    zone.growth.warningPatrolPartyId = undefined;
+    return false;
+  }
+  site.alarm = Math.min(100, site.alarm + 2);
+  if (site.factionName) changeRelation(state, site.factionName, -1);
+  addForeignSiteMemory(state, site.id, `${claimLabel(zone)} 안의 개척지 시설을 순찰대가 확인해 경계심이 커졌습니다.`, 'bad');
+  addLog(state, `${withJosa(site.factionName ?? '현지 사람들', '이/가')} ${claimLabel(zone)} 안의 개척지 시설을 확인하고 항의했습니다.`, 'bad');
+  zone.growth.warningTargetBuildingId = undefined;
+  zone.growth.warningScheduledDay = undefined;
+  zone.growth.warningPatrolPartyId = undefined;
+  return true;
 }

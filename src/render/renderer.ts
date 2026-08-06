@@ -159,6 +159,7 @@ export interface SceneOptions {
   selectedResidentId: number | null;
   selectedBuildingId?: number | null;
   selectedFishingBoatId?: number | null;
+  selectedForeignSitePartyId?: number | null;
   placingFishingBoatFromBoatyardId?: number | null;
   fishingBoatPlacementHover?: { portId: number; slot: 0 | 1 } | null;
   viewport?: SceneViewport;
@@ -3155,7 +3156,7 @@ export function renderScene(canvas: HTMLCanvasElement, state: GameState, o: Scen
       sick: false,
       carrying: actor.carrying,
       showCargoMarker: o.residentCargoMarkers ?? true,
-      selected: false,
+      selected: actor.partyId === o.selectedForeignSitePartyId,
       moving: actor.moving,
       facing: actor.facing,
       foreignFaction: site.factionName ?? undefined,

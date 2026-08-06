@@ -14,6 +14,7 @@ export interface ForeignSiteProp {
 
 export interface ForeignSiteActor {
   siteId?: number;
+  partyId?: number;
   x: number;
   y: number;
   job: JobId;
@@ -243,7 +244,8 @@ export function foreignSitePartyActors(state: GameState): ForeignSiteActor[] {
     if (!site || (!party.spotted && !site.discovered)) continue;
     const job: JobId = party.kind === 'farm'
       ? 'farmer'
-      : party.kind === 'hunt' ? 'hunter' : party.kind === 'fish' ? 'fisher' : 'herbalist';
+      : party.kind === 'hunt' ? 'hunter' : party.kind === 'fish' ? 'fisher'
+        : party.kind === 'patrol' ? 'watchman' : 'herbalist';
     const carrying = (party.phase === 'returning' || party.phase === 'retreating') &&
       Object.values(party.cargo).some(amount => (amount ?? 0) > 0);
     const moving = party.phase === 'outbound' || party.phase === 'returning' || party.phase === 'retreating';
@@ -256,6 +258,7 @@ export function foreignSitePartyActors(state: GameState): ForeignSiteActor[] {
       const offset = offsets[index % offsets.length];
       actors.push({
         siteId: site.id,
+        partyId: party.id,
         x: party.px + offset.x,
         y: party.py + offset.y,
         job,

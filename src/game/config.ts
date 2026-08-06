@@ -332,6 +332,13 @@ export const CONFIG_DEFAULTS = {
       forageHerbsPerTrip: 0.8,
       forageWoodPerTrip: 1.2,
     },
+    claimGrowth: {
+      minimumRadius: 2,
+      maximumRadiusBonus: 2,
+      expandPressure: 3,
+      contractPressure: -3,
+      pressureLimit: 6,
+    },
     // 산채 정찰 — 성공 확률의 가감 요인과 실패 시 산채 경계 상승
     banditLairScouting: {
       baseChance: 0.28,

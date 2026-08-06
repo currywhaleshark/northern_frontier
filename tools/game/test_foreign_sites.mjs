@@ -53,6 +53,8 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
   assert.deepEqual(state.foreignSiteParties, []);
   assert.equal(state.nextForeignSitePartyId, 1);
   assert.ok(state.foreignSites.every(site => site.activity), 'every generated site has an activity ledger');
+  assert.ok(state.claimZones.every(zone => zone.growth?.baseRadius === zone.radius),
+    'every generated claim zone starts with a stable growth ledger');
 
   const center = state.buildings.find(building => building.type === 'center');
   for (const site of state.foreignSites) {
@@ -158,6 +160,9 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
   assert.equal(migrated.schemaVersion, 63);
   assert.deepEqual(migrated.foreignSiteParties, [], 'old saves do not restore incomplete activity parties');
   assert.equal(migrated.nextForeignSitePartyId, 1);
+  const growthMigrated = saveMigrations.migrateV63ToV64({ schemaVersion: 63, claimZones: [{ radius: 5 }] });
+  assert.equal(growthMigrated.schemaVersion, 64);
+  assert.equal(growthMigrated.claimZones[0].radius, 5, 'v64 migration preserves the old visible claim radius');
 }
 
 {
@@ -188,6 +193,10 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
   const party = state.foreignSiteParties.find(candidate => candidate.siteId === site.id);
   assert.ok(party, 'a due settlement sends a real activity party');
   assert.equal(party.kind, 'farm');
+  assert.ok(activity.foreignSitePartyActors(state).every(actor => actor.partyId === party.id),
+    'render actors retain their selectable party id');
+  assert.deepEqual(minimap.visibleMinimapForeignSiteParties(state).map(candidate => candidate.id), [party.id],
+    'a discovered settlement party appears on the minimap');
 
   for (let tick = 0; tick < 180 && state.foreignSiteParties.some(candidate => candidate.id === party.id); tick++) {
     activitySimulation.foreignSitePartiesTick(state);
@@ -201,6 +210,117 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
     'the activity party completes work and returns home');
   assert.ok(site.foodStock > foodBefore, 'returned farm cargo enters settlement food stock');
   assert.ok((site.activity.pendingProduction.grain ?? 0) > 0, 'trip output is recorded for the next settlement');
+}
+
+{
+  const state = simulation.newGame(2026071215);
+  const site = state.foreignSites.find(candidate => candidate.type === 'village' || candidate.type === 'fishingVillage');
+  const zone = state.claimZones.find(candidate => candidate.siteId === site.id);
+  state.foreignSites = [site];
+  state.claimZones = [zone];
+  state.foreignSiteParties = [];
+  site.discovered = true;
+  site.status = 'prosperous';
+  site.activity.condition = 'prosperous';
+  site.activity.recentProduction = { grain: 2 };
+  zone.discovered = true;
+  zone.growth.pressure = 1;
+  const oldRadius = zone.radius;
+  for (let y = Math.max(0, zone.y - oldRadius - 2); y <= Math.min(state.map.length - 1, zone.y + oldRadius + 2); y++) {
+    for (let x = Math.max(0, zone.x - oldRadius - 2); x <= Math.min(state.map[0].length - 1, zone.x + oldRadius + 2); x++) {
+      if (state.map[y][x].buildingId == null) state.map[y][x].terrain = 'plain';
+    }
+  }
+  const ringTiles = [
+    { x: zone.x + oldRadius + 1, y: zone.y },
+    { x: zone.x - oldRadius - 1, y: zone.y },
+    { x: zone.x, y: zone.y + oldRadius + 1 },
+    { x: zone.x, y: zone.y - oldRadius - 1 },
+  ].filter(tile => state.map[tile.y]?.[tile.x] && state.map[tile.y][tile.x].buildingId == null);
+  assert.ok(ringTiles.length >= 2, 'the claim has testable outer-ring tiles');
+  const addHut = tile => {
+    const building = {
+      id: state.nextBuildingId++, type: 'hut', x: tile.x, y: tile.y,
+      progress: 1, built: true, fieldGrowth: 0,
+    };
+    state.buildings.push(building);
+    state.map[tile.y][tile.x].buildingId = building.id;
+    return building;
+  };
+  const established = addHut(ringTiles[0]);
+  activitySimulation.seasonalForeignSiteBoundaryTick(state);
+  const patrol = state.foreignSiteParties.find(candidate => candidate.kind === 'patrol');
+  assert.ok(patrol, 'prosperity pressure sends a visible boundary patrol before expansion');
+  assert.equal(zone.radius, oldRadius, 'the claim does not expand before the patrol returns');
+
+  for (let tick = 0; tick < 360 && state.foreignSiteParties.some(candidate => candidate.id === patrol.id); tick++) {
+    activitySimulation.foreignSitePartiesTick(state);
+    state.subTick++;
+    if (state.subTick >= CONFIG.agents.subticksPerDay) {
+      state.subTick = 0;
+      state.day++;
+    }
+  }
+  assert.equal(zone.radius, oldRadius + 1, 'a returning patrol confirms one tile of seasonal expansion');
+  assert.ok(zone.growth.establishedUseBuildingIds.includes(established.id),
+    'buildings already present in the new ring receive established-use grace');
+
+  const tensionDayOffset = (CONFIG.foreignSites.claimDailyInterval -
+    ((state.day + zone.id) % CONFIG.foreignSites.claimDailyInterval)) % CONFIG.foreignSites.claimDailyInterval;
+  state.day += tensionDayOffset;
+  const alarmBeforeGrace = site.alarm;
+  claimZones.dailyClaimTensionTick(state);
+  assert.equal(site.alarm, alarmBeforeGrace, 'an established building does not create tension during its grace season');
+  assert.equal(territory.unauthorizedTerritorySiteIds(state, established.x, established.y, 'work').length, 0,
+    'existing work inside the protected footprint remains authorized during grace');
+
+  const newBuilding = addHut(ringTiles[1]);
+  assert.ok(!zone.growth.establishedUseBuildingIds.includes(newBuilding.id));
+  assert.deepEqual(territory.unauthorizedTerritorySiteIds(state, newBuilding.x, newBuilding.y, 'work'), [site.id],
+    'new construction in the expanded ring receives no established-use protection');
+  state.day += CONFIG.foreignSites.claimDailyInterval;
+  claimZones.dailyClaimTensionTick(state);
+  assert.equal(site.alarm, alarmBeforeGrace, 'daily tension schedules a field patrol instead of applying an unseen penalty');
+  assert.equal(zone.growth.warningTargetBuildingId, newBuilding.id);
+  activitySimulation.dailyForeignSiteActivityTick(state);
+  const warningPatrol = state.foreignSiteParties.find(candidate => candidate.patrolPurpose === 'warning');
+  assert.ok(warningPatrol, 'the settlement sends a patrol to inspect the unauthorized building');
+  for (let tick = 0; tick < 360 && site.alarm === alarmBeforeGrace; tick++) {
+    activitySimulation.foreignSitePartiesTick(state);
+    state.subTick++;
+    if (state.subTick >= CONFIG.agents.subticksPerDay) {
+      state.subTick = 0;
+      state.day++;
+    }
+  }
+  assert.ok(site.alarm > alarmBeforeGrace, 'tension applies when the patrol reaches and confirms the intrusion');
+  assert.equal(zone.growth.warningTargetBuildingId, undefined);
+}
+
+{
+  const state = simulation.newGame(2026071216);
+  const site = state.foreignSites.find(candidate => candidate.type === 'village' || candidate.type === 'fishingVillage');
+  const zone = state.claimZones.find(candidate => candidate.siteId === site.id);
+  state.foreignSites = [site];
+  state.claimZones = [zone];
+  state.foreignSiteParties = [];
+  site.discovered = true;
+  site.status = 'sick';
+  site.activity.condition = 'sick';
+  zone.discovered = true;
+  zone.growth.pressure = 0;
+  const oldRadius = zone.radius;
+  activitySimulation.seasonalForeignSiteBoundaryTick(state);
+  assert.equal(zone.growth.pendingChange, 'contract');
+  assert.equal(zone.radius, oldRadius, 'contraction is announced for one season before changing the boundary');
+
+  state.claimAccords = [{ zoneId: zone.id, untilDay: state.day + CONFIG.time.seasonDays * 2 }];
+  state.day += CONFIG.time.seasonDays;
+  activitySimulation.seasonalForeignSiteBoundaryTick(state);
+  assert.equal(zone.radius, oldRadius, 'an active claim accord freezes pending contraction');
+  state.day = state.claimAccords[0].untilDay;
+  activitySimulation.seasonalForeignSiteBoundaryTick(state);
+  assert.equal(zone.radius, oldRadius - 1, 'the pending contraction applies after the accord expires');
 }
 
 {

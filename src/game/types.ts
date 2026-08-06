@@ -346,6 +346,20 @@ export type ForeignSiteStatus =
 
 export type ClaimKind = 'hunting' | 'fishing' | 'forest' | 'field' | 'sacred' | 'passage';
 
+export interface ClaimZoneGrowthState {
+  baseRadius: number;
+  targetRadius: number;
+  pressure: number;
+  lastBoundaryChangeDay: number;
+  pendingChange?: 'expand' | 'contract';
+  previousRadius?: number;
+  establishedUseGraceUntilDay?: number;
+  establishedUseBuildingIds: number[];
+  warningTargetBuildingId?: number;
+  warningScheduledDay?: number;
+  warningPatrolPartyId?: number;
+}
+
 export interface ClaimZone {
   id: number;
   siteId: number;
@@ -356,6 +370,7 @@ export interface ClaimZone {
   radius: number;
   discovered: boolean;
   permittedUntilDay?: number;
+  growth?: ClaimZoneGrowthState;
 }
 
 export interface ForeignSiteMemory {
@@ -378,7 +393,7 @@ export interface ForeignSiteActivityLedger {
   recentProduction: Partial<Record<ResourceId, number>>;
 }
 
-export type ForeignSitePartyKind = 'farm' | 'hunt' | 'fish' | 'forage';
+export type ForeignSitePartyKind = 'farm' | 'hunt' | 'fish' | 'forage' | 'patrol';
 export type ForeignSitePartyPhase = 'outbound' | 'working' | 'returning' | 'waiting' | 'retreating';
 
 export interface ForeignSiteParty {
@@ -398,6 +413,10 @@ export interface ForeignSiteParty {
   workUntilTick?: number;
   activitySequence: number;
   resourceTargetId?: string;
+  claimZoneId?: number;
+  boundaryChange?: 'expand';
+  patrolPurpose?: 'boundary' | 'warning';
+  targetBuildingId?: number;
   spotted: boolean;
   facing: 1 | -1;
 }
@@ -453,7 +472,8 @@ export type SelectedEntity =
   | { kind: 'tile'; x: number; y: number }
   | { kind: 'resident'; id: number }
   | { kind: 'building'; id: number }
-  | { kind: 'fishingBoat'; id: number };
+  | { kind: 'fishingBoat'; id: number }
+  | { kind: 'foreignSiteParty'; id: number };
 
 export type PointerAction =
   | { kind: 'none'; cursor: PointerCursor; label: string }

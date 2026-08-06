@@ -37,6 +37,7 @@ function overlay(overrides = {}) {
     viewport: { left: 0, top: 0, width: 0.2, height: 0.2 },
     selected: null,
     raid: null,
+    parties: [],
     targets: [],
     ...overrides,
   };
@@ -87,6 +88,9 @@ assert.notEqual(minimapOverlayInvalidationKey(overlay({
 assert.notEqual(minimapOverlayInvalidationKey(overlay({
   raid: { x: 6, y: 7, faction: '여진' },
 })), stableOverlayKey, 'raid markers must invalidate only the overlay key');
+assert.notEqual(minimapOverlayInvalidationKey(overlay({
+  parties: [{ id: 3, siteId: 8, x: 6.5, y: 7.5, phase: 'outbound' }],
+})), stableOverlayKey, 'moving foreign parties must invalidate only the overlay key');
 assert.equal(minimapBaseInvalidationKey(base()), stableBaseKey,
   'selection, raid, target pulse, and viewport state must remain outside the base key');
 

@@ -122,7 +122,9 @@ import { resolveTerritoryWarning, updateTerritoryWarnings } from './territory';
 import {
   foreignSiteAt, generateForeignSites, revealForeignSitesFromExploration, updateSeasonalForeignSites,
 } from './foreignSites';
-import { dailyForeignSiteActivityTick, foreignSitePartiesTick } from './foreignSiteSimulation';
+import {
+  dailyForeignSiteActivityTick, foreignSitePartiesTick, seasonalForeignSiteBoundaryTick,
+} from './foreignSiteSimulation';
 import {
   autoAssignWorkersToSelectedBuildingTypes as autoAssignWorkersToSelectedSlots,
   assignNearestWorkerToBuilding as assignNearestWorkerToSlot,
@@ -1633,6 +1635,7 @@ function settleSowingDeadline(state: GameState, prev: string, next: string): voi
 function onSeasonChange(state: GameState, prev: string, next: string): void {
   resetFactionTradeCapacityUsage(state);
   updateSeasonalForeignSites(state, next as ReturnType<typeof getSeason>);
+  seasonalForeignSiteBoundaryTick(state);
   addLog(state, `${withJosa(SEASON_NAMES[next as keyof typeof SEASON_NAMES], '이/가')} 시작되었습니다. (${getYear(state.day)}년차)`, 'weather');
   settleSowingDeadline(state, prev, next);
 

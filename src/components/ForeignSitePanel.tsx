@@ -129,10 +129,21 @@ export function ForeignSitePanel({
             const accordDays = claimAccordRemainingDays(state, zone.id);
             const envoyDays = claimAccordEnvoyRemainingDays(state, zone.id);
             const accordReason = site.factionName ? canOpenClaimAccordEnvoy(state, site.factionName, zone.id) : '소속을 확인할 수 없습니다';
+            const growth = zone.growth;
+            const graceDays = growth?.establishedUseGraceUntilDay == null
+              ? 0 : Math.max(0, growth.establishedUseGraceUntilDay - state.day);
+            const boundaryState = growth?.pendingChange === 'expand'
+              ? '확장 순찰 중'
+              : growth?.pendingChange === 'contract'
+                ? accordDays != null ? '협정으로 축소 보류' : '다음 계절 축소 예정'
+                : (growth?.pressure ?? 0) > 0
+                  ? `확장 압력 +${growth?.pressure}`
+                  : (growth?.pressure ?? 0) < 0 ? `축소 압력 ${growth?.pressure}` : '경계 안정';
             return (
             <div key={zone.id}>
-              <span>{CLAIM_NAMES[zone.kind]}</span>
+              <span>{CLAIM_NAMES[zone.kind]} · 반경 {zone.radius}</span>
               <span>{accordDays != null ? `협정 ${accordDays}일` : envoyDays != null ? `사절 ${envoyDays}일` : isClaimPermissionActive(state, zone) ? `${Math.max(0, (zone.permittedUntilDay ?? state.day) - state.day)}일 허락` : '허락 없음'}</span>
+              <span title="생활권 경계는 계절마다 한 칸씩만 바뀝니다">{boundaryState}{graceDays > 0 ? ` · 기존 시설 유예 ${graceDays}일` : ''}</span>
               {site.factionName && (
                 <button className="btn small" type="button" disabled={inactive || !!accordReason} title={accordReason ?? `은 또는 ${site.factionName}이 받는 물자로 1년 협정을 제안합니다`} onClick={() => onOpenClaimAccord(site.factionName!, zone.id)}>
                   협정 제안

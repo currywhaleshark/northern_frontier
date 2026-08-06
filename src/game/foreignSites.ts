@@ -93,6 +93,13 @@ function addClaimZone(
     y: site.y + Math.floor(site.height / 2),
     radius,
     discovered,
+    growth: {
+      baseRadius: radius,
+      targetRadius: radius,
+      pressure: 0,
+      lastBoundaryChangeDay: state.day,
+      establishedUseBuildingIds: [],
+    },
   });
 }
 
@@ -293,9 +300,47 @@ export function ensureForeignSiteState(state: GameState): void {
         );
     }
   }
+  for (const zone of state.claimZones) {
+    const growth = zone.growth;
+    const baseRadius = Number.isFinite(growth?.baseRadius)
+      ? Math.max(CONFIG.foreignSites.claimGrowth.minimumRadius, Math.floor(growth!.baseRadius))
+      : Math.max(CONFIG.foreignSites.claimGrowth.minimumRadius, Math.floor(zone.radius));
+    const targetRadius = Number.isFinite(growth?.targetRadius)
+      ? Math.floor(growth!.targetRadius) : Math.floor(zone.radius);
+    zone.radius = Math.max(CONFIG.foreignSites.claimGrowth.minimumRadius, Math.floor(zone.radius));
+    zone.growth = {
+      baseRadius,
+      targetRadius: Math.max(
+        CONFIG.foreignSites.claimGrowth.minimumRadius,
+        Math.min(baseRadius + CONFIG.foreignSites.claimGrowth.maximumRadiusBonus, targetRadius),
+      ),
+      pressure: Number.isFinite(growth?.pressure)
+        ? Math.max(-CONFIG.foreignSites.claimGrowth.pressureLimit,
+          Math.min(CONFIG.foreignSites.claimGrowth.pressureLimit, Math.floor(growth!.pressure)))
+        : 0,
+      lastBoundaryChangeDay: Number.isFinite(growth?.lastBoundaryChangeDay)
+        ? Math.floor(growth!.lastBoundaryChangeDay) : state.day,
+      pendingChange: growth?.pendingChange === 'expand' || growth?.pendingChange === 'contract'
+        ? growth.pendingChange : undefined,
+      previousRadius: typeof growth?.previousRadius === 'number' && Number.isFinite(growth.previousRadius)
+        ? Math.floor(growth.previousRadius) : undefined,
+      establishedUseGraceUntilDay: typeof growth?.establishedUseGraceUntilDay === 'number' &&
+        Number.isFinite(growth.establishedUseGraceUntilDay)
+        ? Math.floor(growth.establishedUseGraceUntilDay) : undefined,
+      establishedUseBuildingIds: Array.isArray(growth?.establishedUseBuildingIds)
+        ? [...new Set(growth!.establishedUseBuildingIds.filter(id => Number.isInteger(id) && id > 0))]
+        : [],
+      warningTargetBuildingId: Number.isInteger(growth?.warningTargetBuildingId)
+        ? growth!.warningTargetBuildingId : undefined,
+      warningScheduledDay: typeof growth?.warningScheduledDay === 'number' && Number.isFinite(growth.warningScheduledDay)
+        ? Math.floor(growth.warningScheduledDay) : undefined,
+      warningPatrolPartyId: Number.isInteger(growth?.warningPatrolPartyId)
+        ? growth!.warningPatrolPartyId : undefined,
+    };
+  }
   const siteIds = new Set(state.foreignSites.map(site => site.id));
   const phases = new Set(['outbound', 'working', 'returning', 'waiting', 'retreating']);
-  const kinds = new Set(['farm', 'hunt', 'fish', 'forage']);
+  const kinds = new Set(['farm', 'hunt', 'fish', 'forage', 'patrol']);
   state.foreignSiteParties = state.foreignSiteParties.filter(party =>
     party && Number.isInteger(party.id) && party.id > 0 && siteIds.has(party.siteId) &&
     kinds.has(party.kind) && phases.has(party.phase) && Number.isFinite(party.x) && Number.isFinite(party.y));
@@ -318,6 +363,12 @@ export function ensureForeignSiteState(state: GameState): void {
     party.departedDay = Number.isFinite(party.departedDay) ? Math.floor(party.departedDay) : state.day;
     party.activitySequence = Number.isFinite(party.activitySequence)
       ? Math.max(0, Math.floor(party.activitySequence)) : 0;
+    party.claimZoneId = Number.isInteger(party.claimZoneId) && state.claimZones.some(zone => zone.id === party.claimZoneId)
+      ? party.claimZoneId : undefined;
+    party.boundaryChange = party.boundaryChange === 'expand' ? 'expand' : undefined;
+    party.patrolPurpose = party.patrolPurpose === 'boundary' || party.patrolPurpose === 'warning'
+      ? party.patrolPurpose : undefined;
+    party.targetBuildingId = Number.isInteger(party.targetBuildingId) ? party.targetBuildingId : undefined;
     party.spotted = party.spotted === true;
     party.facing = party.facing === -1 ? -1 : 1;
   }

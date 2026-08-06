@@ -51,6 +51,7 @@ import type {
 import { ActionPopup } from './ActionPopup';
 import { BuildingIcon } from './BuildingIcon';
 import { ForeignSitePanel } from './ForeignSitePanel';
+import { foreignSitePartyKindLabel } from '../game/foreignSiteSimulation';
 import { LivestockIcon } from './LivestockIcon';
 import { ResourceIcon } from './TradeResourceIcon';
 import { UiIcon } from './UiIcon';
@@ -379,6 +380,10 @@ export function SelectionContextBar({
   const fishingBoat = selectedEntity.kind === 'fishingBoat'
     ? state.fishingBoats.find(candidate => candidate.id === selectedEntity.id) ?? null
     : null;
+  const foreignSiteParty = selectedEntity.kind === 'foreignSiteParty'
+    ? state.foreignSiteParties.find(candidate => candidate.id === selectedEntity.id) ?? null
+    : null;
+  if (selectedEntity.kind === 'foreignSiteParty' && !foreignSiteParty) return null;
   const spoilage = spoilagePreview(state);
   const mineSummary = building?.type === 'mine' ? mineMineralSummary(state, building) : null;
   const gatheringBuilding = building && isGatheringBuildingType(building.type) ? building : null;
@@ -477,6 +482,40 @@ export function SelectionContextBar({
               ))}
             </div>
           </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (foreignSiteParty) {
+    const site = state.foreignSites.find(candidate => candidate.id === foreignSiteParty.siteId);
+    const phaseName: Record<typeof foreignSiteParty.phase, string> = {
+      outbound: '목적지로 이동 중',
+      working: '작업 중',
+      returning: '거주지로 귀환 중',
+      waiting: '귀환로를 찾는 중',
+      retreating: '퇴각 중',
+    };
+    const cargo = Object.entries(foreignSiteParty.cargo)
+      .filter((entry): entry is [string, number] => Number(entry[1]) > 0)
+      .map(([resource, amount]) => `${RESOURCE_NAMES[resource as ResourceId] ?? resource} ${amount.toFixed(1)}`)
+      .join(' · ');
+    return (
+      <section className="selection-context-bar" aria-label={`외부 활동대 ${foreignSiteParty.id} 선택 정보`}>
+        <header className="selection-context-head">
+          <div><strong>{site?.name ?? '소속을 알 수 없는 활동대'}</strong><span>{foreignSitePartyKindLabel(foreignSiteParty.kind)}</span></div>
+          <button type="button" aria-label="선택 해제" title="선택 해제" onClick={onClear}>×</button>
+        </header>
+        <div className="selection-context-body">
+          <table className="insp-table">
+            <tbody>
+              <tr><td>소속</td><td>{site?.factionName ?? '확인되지 않음'}</td></tr>
+              <tr><td>상태</td><td>{phaseName[foreignSiteParty.phase]}</td></tr>
+              <tr><td>인원</td><td>{foreignSiteParty.memberCount}명</td></tr>
+              <tr><td>화물</td><td>{cargo || '아직 없음'}</td></tr>
+              <tr><td>출발</td><td>{foreignSiteParty.departedDay}일 · {site?.name ?? '출발지 미상'}</td></tr>
+            </tbody>
+          </table>
         </div>
       </section>
     );

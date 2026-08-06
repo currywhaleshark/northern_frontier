@@ -29,6 +29,13 @@ function coveringSites(state: GameState, x: number, y: number): Map<number, type
   return grouped;
 }
 
+function establishedUseCoversTile(state: GameState, zone: ClaimZone, x: number, y: number): boolean {
+  const growth = zone.growth;
+  if (!growth?.establishedUseGraceUntilDay || growth.establishedUseGraceUntilDay < state.day) return false;
+  const buildingId = state.map[y]?.[x]?.buildingId;
+  return buildingId != null && growth.establishedUseBuildingIds.includes(buildingId);
+}
+
 export function unauthorizedTerritorySiteIds(
   state: GameState,
   x: number,
@@ -40,7 +47,9 @@ export function unauthorizedTerritorySiteIds(
   const blocked: number[] = [];
   for (const [siteId, zones] of coveringSites(state, x, y)) {
     if (ignored.has(siteId)) continue;
-    const relevant = use === 'passage' ? zones : zones.filter(zone => zone.kind !== 'passage');
+    const relevant = (use === 'passage' ? zones : zones.filter(zone => zone.kind !== 'passage'))
+      .filter(zone => !establishedUseCoversTile(state, zone, x, y));
+    if (relevant.length === 0) continue;
     const permitted = relevant.some(zone => isClaimPermissionActive(state, zone));
     if (!permitted) blocked.push(siteId);
   }

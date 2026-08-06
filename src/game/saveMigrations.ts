@@ -863,6 +863,12 @@ export function migrateV62ToV63(raw: RawSave): RawSave {
   };
 }
 
+// v64: 생활권의 계절별 확장·축소 압력, 경계 변경 예고, 기존 시설 유예 장부.
+// 구 생활권의 현재 반경은 로드 정규화에서 base/target 반경의 시작값으로 사용한다.
+export function migrateV63ToV64(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 64 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -931,6 +937,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 60) migrated = migrateV60ToV61(migrated);
     else if (version === 61) migrated = migrateV61ToV62(migrated);
     else if (version === 62) migrated = migrateV62ToV63(migrated);
+    else if (version === 63) migrated = migrateV63ToV64(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }

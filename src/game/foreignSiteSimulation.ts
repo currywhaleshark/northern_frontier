@@ -1,5 +1,8 @@
 import { CONFIG } from './config';
+import { footprintTilesOf } from './buildings';
+import { applyScheduledClaimWarning } from './claimZones';
 import { DAY_CYCLE_SUBTICKS } from './dayCycle';
+import { activeClaimAccord } from './diplomacy';
 import { addLog } from './events';
 import { takeFishingGroundStockById } from './fishingGrounds';
 import { addForeignSiteMemory, isForeignSiteOperational } from './foreignSites';
@@ -65,6 +68,17 @@ function zoneContains(zone: ClaimZone, x: number, y: number): boolean {
 
 function zonesFor(state: GameState, site: ForeignSite, kinds: readonly ClaimZone['kind'][]): ClaimZone[] {
   return state.claimZones.filter(zone => zone.siteId === site.id && kinds.includes(zone.kind));
+}
+
+function ensureZoneGrowth(zone: ClaimZone, day: number): NonNullable<ClaimZone['growth']> {
+  zone.growth ??= {
+    baseRadius: zone.radius,
+    targetRadius: zone.radius,
+    pressure: 0,
+    lastBoundaryChangeDay: day,
+    establishedUseBuildingIds: [],
+  };
+  return zone.growth;
 }
 
 function candidateTiles(
@@ -220,6 +234,146 @@ function spawnParty(state: GameState, site: ForeignSite): boolean {
   return true;
 }
 
+function boundaryExpansionAllowed(state: GameState, zone: ClaimZone, radius: number): boolean {
+  const center = state.buildings.find(building => building.type === 'center');
+  if (center) {
+    const footprint = footprintTilesOf(state, center) ?? [];
+    if (footprint.some(tile => (tile.x - zone.x) ** 2 + (tile.y - zone.y) ** 2 <= radius ** 2)) return false;
+  }
+  for (const site of state.foreignSites) {
+    if (site.id === zone.siteId) continue;
+    for (let y = site.y; y < site.y + site.height; y++) {
+      for (let x = site.x; x < site.x + site.width; x++) {
+        if ((x - zone.x) ** 2 + (y - zone.y) ** 2 <= radius ** 2) return false;
+      }
+    }
+  }
+  return !state.claimZones.some(other => other.siteId !== zone.siteId &&
+    Math.hypot(other.x - zone.x, other.y - zone.y) < radius + other.radius);
+}
+
+function boundaryPatrolTarget(
+  state: GameState,
+  site: ForeignSite,
+  zone: ClaimZone,
+  radius: number,
+): ActivityTarget | null {
+  const candidates: Array<{ x: number; y: number }> = [];
+  for (let y = zone.y - radius - 1; y <= zone.y + radius + 1; y++) {
+    for (let x = zone.x - radius - 1; x <= zone.x + radius + 1; x++) {
+      const distance = Math.hypot(x - zone.x, y - zone.y);
+      if (Math.abs(distance - radius) > 0.7 || withinSite(site, x, y) || !partyPassable(state, site, x, y)) continue;
+      candidates.push({ x, y });
+    }
+  }
+  const sequence = site.activity?.activitySequence ?? 0;
+  candidates.sort((left, right) =>
+    hash(state.seed, site.id, sequence, left.x, left.y) - hash(state.seed, site.id, sequence, right.x, right.y));
+  return firstReachableTarget(state, site, 'patrol', candidates);
+}
+
+function spawnBoundaryPatrol(state: GameState, site: ForeignSite, zone: ClaimZone, targetRadius: number): boolean {
+  if (!canDepart(state, site) || !boundaryExpansionAllowed(state, zone, targetRadius)) return false;
+  const target = boundaryPatrolTarget(state, site, zone, targetRadius);
+  if (!target) return false;
+  const activity = site.activity!;
+  const start = siteStart(site);
+  const memberCount = Math.min(2, CONFIG.foreignSites.activity.maxMembers);
+  state.foreignSiteParties.push({
+    id: state.nextForeignSitePartyId++,
+    siteId: site.id,
+    kind: 'patrol',
+    phase: 'outbound',
+    x: start.x,
+    y: start.y,
+    px: start.x + 0.5,
+    py: start.y + 0.5,
+    path: target.path,
+    target: { x: target.x, y: target.y },
+    memberCount,
+    cargo: {},
+    departedDay: state.day,
+    activitySequence: activity.activitySequence++,
+    claimZoneId: zone.id,
+    boundaryChange: 'expand',
+    patrolPurpose: 'boundary',
+    spotted: site.discovered,
+    facing: target.x < start.x ? -1 : 1,
+  });
+  const growth = ensureZoneGrowth(zone, state.day);
+  growth.previousRadius = zone.radius;
+  growth.targetRadius = targetRadius;
+  growth.pendingChange = 'expand';
+  return true;
+}
+
+function warningPatrolTarget(
+  state: GameState,
+  site: ForeignSite,
+  buildingId: number,
+): ActivityTarget | null {
+  const building = state.buildings.find(candidate => candidate.id === buildingId);
+  if (!building) return null;
+  const footprint = footprintTilesOf(state, building) ?? [];
+  const candidates: Array<{ x: number; y: number }> = [];
+  const seen = new Set<string>();
+  for (const tile of footprint) {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const x = tile.x + dx;
+        const y = tile.y + dy;
+        const key = `${x},${y}`;
+        if (seen.has(key) || withinSite(site, x, y) || !partyPassable(state, site, x, y)) continue;
+        seen.add(key);
+        candidates.push({ x, y });
+      }
+    }
+  }
+  return firstReachableTarget(state, site, 'patrol', candidates);
+}
+
+function spawnWarningPatrol(state: GameState, site: ForeignSite, zone: ClaimZone, buildingId: number): boolean {
+  if (!canDepart(state, site)) return false;
+  const target = warningPatrolTarget(state, site, buildingId);
+  if (!target) return false;
+  const activity = site.activity!;
+  const start = siteStart(site);
+  const party: ForeignSiteParty = {
+    id: state.nextForeignSitePartyId++, siteId: site.id, kind: 'patrol', phase: 'outbound',
+    x: start.x, y: start.y, px: start.x + 0.5, py: start.y + 0.5,
+    path: target.path, target: { x: target.x, y: target.y }, memberCount: Math.min(2, CONFIG.foreignSites.activity.maxMembers),
+    cargo: {}, departedDay: state.day, activitySequence: activity.activitySequence++,
+    claimZoneId: zone.id, patrolPurpose: 'warning', targetBuildingId: buildingId,
+    spotted: site.discovered, facing: target.x < start.x ? -1 : 1,
+  };
+  state.foreignSiteParties.push(party);
+  ensureZoneGrowth(zone, state.day).warningPatrolPartyId = party.id;
+  return true;
+}
+
+function dispatchClaimWarningPatrols(state: GameState): void {
+  for (const zone of state.claimZones) {
+    const growth = zone.growth;
+    if (growth?.warningTargetBuildingId == null) continue;
+    const site = state.foreignSites.find(candidate => candidate.id === zone.siteId);
+    if (!site || !isForeignSiteOperational(site)) continue;
+    const targetStillExists = state.buildings.some(building => building.id === growth.warningTargetBuildingId);
+    if (!targetStillExists || activeClaimAccord(state, zone.id)) {
+      growth.warningTargetBuildingId = undefined;
+      growth.warningScheduledDay = undefined;
+      growth.warningPatrolPartyId = undefined;
+      continue;
+    }
+    const activePatrol = growth.warningPatrolPartyId == null
+      ? null : state.foreignSiteParties.find(party => party.id === growth.warningPatrolPartyId);
+    if (activePatrol) continue;
+    growth.warningPatrolPartyId = undefined;
+    if (spawnWarningPatrol(state, site, zone, growth.warningTargetBuildingId)) continue;
+    if (state.day - (growth.warningScheduledDay ?? state.day) >= 3) applyScheduledClaimWarning(state, zone.id);
+  }
+}
+
 function movementSpeed(state: GameState): number {
   const base = CONFIG.foreignSites.activity.travelSpeedTilesPerTick;
   if (state.weather === 'heavySnow') return base * 0.72;
@@ -258,6 +412,12 @@ function setCargo(party: ForeignSiteParty, resource: ResourceId, amount: number)
 
 function harvest(state: GameState, party: ForeignSiteParty): void {
   const cfg = CONFIG.foreignSites.activity;
+  if (party.kind === 'patrol') {
+    if (party.patrolPurpose === 'warning' && party.claimZoneId != null) {
+      applyScheduledClaimWarning(state, party.claimZoneId);
+    }
+    return;
+  }
   if (party.kind === 'hunt') {
     const habitatId = Number(party.resourceTargetId?.replace('habitat:', ''));
     const habitat = state.habitats.find(candidate => candidate.id === habitatId);
@@ -320,6 +480,34 @@ function depositCargo(site: ForeignSite, party: ForeignSiteParty): void {
   }
 }
 
+function completeBoundaryPatrol(state: GameState, site: ForeignSite, party: ForeignSiteParty): void {
+  if (party.boundaryChange !== 'expand' || party.claimZoneId == null) return;
+  const zone = state.claimZones.find(candidate => candidate.id === party.claimZoneId && candidate.siteId === site.id);
+  if (!zone?.growth || zone.growth.pendingChange !== 'expand') return;
+  const previousRadius = zone.growth.previousRadius ?? zone.radius;
+  const nextRadius = Math.max(previousRadius, zone.growth.targetRadius);
+  const protectedIds = state.buildings.filter(building => {
+    const footprint = footprintTilesOf(state, building) ?? [];
+    return footprint.some(tile => {
+      const distanceSquared = (tile.x - zone.x) ** 2 + (tile.y - zone.y) ** 2;
+      return distanceSquared <= nextRadius ** 2 && distanceSquared > previousRadius ** 2;
+    });
+  }).map(building => building.id);
+  zone.radius = nextRadius;
+  zone.growth.lastBoundaryChangeDay = state.day;
+  zone.growth.pressure = 0;
+  zone.growth.pendingChange = undefined;
+  zone.growth.previousRadius = undefined;
+  zone.growth.establishedUseBuildingIds = protectedIds;
+  zone.growth.establishedUseGraceUntilDay = protectedIds.length > 0
+    ? state.day + CONFIG.time.seasonDays : undefined;
+  const text = protectedIds.length > 0
+    ? `경계 순찰을 마치고 생활권을 넓혔습니다. 새 경계 안의 기존 시설 ${protectedIds.length}곳은 한 계절 동안 유예됩니다.`
+    : '경계 순찰을 마치고 생활권을 한 칸 넓혔습니다.';
+  addForeignSiteMemory(state, site.id, text, 'neutral');
+  if (zone.discovered && site.discovered) addLog(state, `${site.name}: ${text}`, 'info');
+}
+
 function updateSpotted(state: GameState, site: ForeignSite, party: ForeignSiteParty): void {
   if (party.spotted || site.discovered) {
     party.spotted = true;
@@ -355,6 +543,7 @@ export function foreignSitePartiesTick(state: GameState): void {
     if (party.phase === 'returning' || party.phase === 'retreating') {
       if (!moveParty(state, party)) continue;
       depositCargo(site, party);
+      completeBoundaryPatrol(state, site, party);
       site.activity!.nextActivityDay = Math.max(
         site.activity!.nextActivityDay,
         state.day + CONFIG.foreignSites.activity.departureIntervalDays,
@@ -364,6 +553,65 @@ export function foreignSitePartiesTick(state: GameState): void {
   }
   if (finished.size > 0) {
     state.foreignSiteParties = state.foreignSiteParties.filter(party => !finished.has(party.id));
+  }
+}
+
+function seasonalPressure(site: ForeignSite): number {
+  if (site.type === 'seasonalCamp' && site.seasonalActive === false) return -3;
+  const condition = site.activity?.condition ?? 'stable';
+  if (condition === 'prosperous') return 2;
+  if (condition === 'hungry') return -2;
+  if (condition === 'sick') return -3;
+  const produced = Object.values(site.activity?.recentProduction ?? {})
+    .reduce((sum, amount) => sum + (amount ?? 0), 0);
+  return produced > 0 ? 1 : 0;
+}
+
+function finalizeContraction(state: GameState, site: ForeignSite, zone: ClaimZone): void {
+  const growth = ensureZoneGrowth(zone, state.day);
+  zone.radius = Math.max(CONFIG.foreignSites.claimGrowth.minimumRadius, growth.targetRadius);
+  growth.lastBoundaryChangeDay = state.day;
+  growth.pendingChange = undefined;
+  growth.previousRadius = undefined;
+  growth.pressure = 0;
+  growth.establishedUseBuildingIds = [];
+  growth.establishedUseGraceUntilDay = undefined;
+  const text = '바깥 활동이 줄어 생활권 경계를 한 칸 거두었습니다.';
+  addForeignSiteMemory(state, site.id, text, 'neutral');
+  if (zone.discovered && site.discovered) addLog(state, `${site.name}: ${text}`, 'info');
+}
+
+export function seasonalForeignSiteBoundaryTick(state: GameState): void {
+  const cfg = CONFIG.foreignSites.claimGrowth;
+  for (const zone of state.claimZones) {
+    const site = state.foreignSites.find(candidate => candidate.id === zone.siteId);
+    if (!site || site.type === 'banditLair' || site.type === 'ruin' || site.type === 'outpost' ||
+        !isForeignSiteOperational(site)) continue;
+    const growth = ensureZoneGrowth(zone, state.day);
+    if (growth.pendingChange === 'contract') {
+      if (!activeClaimAccord(state, zone.id) && growth.lastBoundaryChangeDay < state.day) {
+        finalizeContraction(state, site, zone);
+      }
+      continue;
+    }
+    if (growth.pendingChange === 'expand') continue;
+    growth.pressure = Math.max(-cfg.pressureLimit, Math.min(cfg.pressureLimit,
+      growth.pressure + seasonalPressure(site)));
+    const maxRadius = growth.baseRadius + cfg.maximumRadiusBonus;
+    if (growth.pressure >= cfg.expandPressure && zone.radius < maxRadius) {
+      spawnBoundaryPatrol(state, site, zone, zone.radius + 1);
+      continue;
+    }
+    if (growth.pressure <= cfg.contractPressure && zone.radius > cfg.minimumRadius && !activeClaimAccord(state, zone.id)) {
+      growth.previousRadius = zone.radius;
+      growth.targetRadius = zone.radius - 1;
+      growth.pendingChange = 'contract';
+      growth.lastBoundaryChangeDay = state.day;
+      growth.pressure = 0;
+      const text = '먹을거리와 바깥 활동이 줄어 다음 계절부터 생활권 경계를 거둘 예정입니다.';
+      addForeignSiteMemory(state, site.id, text, 'neutral');
+      if (zone.discovered && site.discovered) addLog(state, `${site.name}: ${text}`, 'info');
+    }
   }
 }
 
@@ -450,6 +698,7 @@ function retryWaitingParty(state: GameState, party: ForeignSiteParty): void {
 }
 
 export function dailyForeignSiteActivityTick(state: GameState): void {
+  dispatchClaimWarningPatrols(state);
   for (const party of state.foreignSiteParties) {
     if (party.phase === 'waiting') retryWaitingParty(state, party);
   }
@@ -469,5 +718,6 @@ export function foreignSitePartyKindLabel(kind: ForeignSitePartyKind): string {
   if (kind === 'farm') return '경작하러 나감';
   if (kind === 'hunt') return '사냥 중';
   if (kind === 'fish') return '고기잡이 중';
+  if (kind === 'patrol') return '경계 순찰 중';
   return '숲 채집 중';
 }

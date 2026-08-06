@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, t
 import { CONFIG } from '../game/config';
 import { buildingFootprintDims } from '../game/buildings';
 import { FACTIONS } from '../game/constants';
-import { visibleMinimapRaid, visibleMinimapSites } from '../game/minimap';
+import { visibleMinimapForeignSiteParties, visibleMinimapRaid, visibleMinimapSites } from '../game/minimap';
+import { foreignSitePartyKindLabel } from '../game/foreignSiteSimulation';
 import { activeExpeditionTargetMarkers } from '../game/expeditionTargets';
 import type { ForeignSite, GameState, Terrain } from '../game/types';
 import { terrainVisualSignature } from '../render/renderer';
@@ -145,6 +146,7 @@ export function Minimap({
   const minimapHeight = Math.round(MAP_SIZE * mapHeight / mapWidth);
   const visibleRaid = visibleMinimapRaid(state);
   const visibleSites = visibleMinimapSites(state);
+  const visibleParties = visibleMinimapForeignSiteParties(state);
   const targetMarkers = activeExpeditionTargetMarkers(state);
   const baseInvalidationKey = useMemo(() => minimapBaseInvalidationKey({
     terrainSignature: terrainVisualSignature(state),
@@ -159,6 +161,7 @@ export function Minimap({
     viewport,
     selected,
     raid: visibleRaid,
+    parties: visibleParties,
     targets: targetMarkers,
   });
 
@@ -295,6 +298,19 @@ export function Minimap({
         ctx.stroke();
       }
 
+      for (const party of visibleParties) {
+        const site = state.foreignSites.find(candidate => candidate.id === party.siteId);
+        const x = party.px * scaleX;
+        const y = party.py * scaleY;
+        ctx.beginPath();
+        ctx.arc(x, y, 2.4, 0, Math.PI * 2);
+        ctx.fillStyle = site ? factionColor(site) : '#d2a958';
+        ctx.strokeStyle = '#111518';
+        ctx.lineWidth = 1;
+        ctx.fill();
+        ctx.stroke();
+      }
+
       if (selected) {
         ctx.strokeStyle = '#eff7fb';
         ctx.lineWidth = 1;
@@ -364,6 +380,14 @@ export function Minimap({
     if (visibleRaid) {
       const distance = Math.hypot(px - (visibleRaid.x + 0.5) * scaleX, py - (visibleRaid.y + 0.5) * scaleY);
       if (distance <= 9) return `습격 경보 · ${visibleRaid.faction}`;
+    }
+    const party = visibleParties.find(candidate => Math.hypot(
+      px - candidate.px * scaleX,
+      py - candidate.py * scaleY,
+    ) <= 6);
+    if (party) {
+      const site = state.foreignSites.find(candidate => candidate.id === party.siteId);
+      return `${site?.name ?? '외부 활동대'} · ${foreignSitePartyKindLabel(party.kind)}`;
     }
     const target = targetMarkers.find(candidate => Math.hypot(
       px - (candidate.x + 0.5) * scaleX,
