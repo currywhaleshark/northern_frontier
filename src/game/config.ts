@@ -292,6 +292,9 @@ export const CONFIG_DEFAULTS = {
   foreignSites: {
     minCenterDistance: 16,
     minSiteSpacing: 11,
+    inlandVillageRiverClearance: 4,
+    settlementSpreadWeight: 0.4,
+    largeLairSpacing: 32,
     minRaidOriginDistance: 14,
     passageRevealRadius: 1,
     passageTradeCapacityMult: 1.2,

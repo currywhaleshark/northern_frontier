@@ -43,6 +43,10 @@ function manhattan(a: { x: number; y: number }, b: { x: number; y: number }): nu
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
+function euclidean(a: { x: number; y: number }, b: { x: number; y: number }): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
 function terrainNear(state: GameState, tile: Tile, terrain: Tile['terrain'], radius: number): number {
   let count = 0;
   for (let y = tile.y - radius; y <= tile.y + radius; y++) {
@@ -85,19 +89,28 @@ function chooseSiteTile(
   height: number,
   allowedTerrains: ReadonlySet<Tile['terrain']>,
   score: (tile: Tile) => number,
+  preferredPlacement: (tile: Tile) => boolean = () => true,
 ): Tile {
   const candidates = state.map.flat()
-    .filter(tile => siteFits(state, tile, width, height, allowedTerrains))
+    .filter(tile => preferredPlacement(tile) && siteFits(state, tile, width, height, allowedTerrains))
     .map(tile => ({ tile, score: score(tile) + rng() * 2 }))
     .sort((a, b) => b.score - a.score);
   if (candidates[0]) return candidates[0].tile;
 
   const center = centerOf(state);
-  const fallback = state.map.flat()
-    .filter(tile => siteFits(
+  const relaxedSpacing = Math.max(4, Math.floor(CONFIG.foreignSites.minSiteSpacing * 0.7));
+  const preferredFallback = state.map.flat()
+    .filter(tile => preferredPlacement(tile) && siteFits(
       state, tile, width, height, allowedTerrains,
-      Math.max(4, Math.floor(CONFIG.foreignSites.minSiteSpacing * 0.7)),
+      relaxedSpacing,
     ))
+    .map(tile => ({ tile, score: score(tile) }))
+    .sort((a, b) => b.score - a.score)[0]?.tile;
+  if (preferredFallback) return preferredFallback;
+
+  // 극단적인 절차 생성 지도에서도 시작 자체가 실패하지 않도록 입지 선호만 마지막에 완화한다.
+  const fallback = state.map.flat()
+    .filter(tile => siteFits(state, tile, width, height, allowedTerrains, relaxedSpacing))
     .sort((a, b) => manhattan(b, center) - manhattan(a, center))[0];
   if (!fallback) throw new Error('외부 거점이 들어갈 유효한 터를 찾지 못했습니다.');
   return fallback;
@@ -198,15 +211,22 @@ export function generateForeignSites(state: GameState, rng: () => number): void 
     const localFaction = LOCAL_FACTIONS[(settlementFactionOffset + index) % LOCAL_FACTIONS.length];
     const localFactionDef = FACTIONS.find(faction => faction.name === localFaction);
     const localType: ForeignSiteType = localFaction === '골간 우디캐' ? 'fishingVillage' : 'village';
+    const existingSettlements = state.foreignSites.filter(site =>
+      site.type === 'village' || site.type === 'fishingVillage');
     const localTile = chooseSiteTile(state, rng, 2, 2, SETTLEMENT_TERRAINS, tile => {
       const river = terrainNear(state, tile, 'river', 3);
       const forest = terrainNear(state, tile, 'forest', 3);
       const fertile = terrainNear(state, tile, 'fertile', 3);
       const terrain = tile.terrain === 'fertile' ? 5 : 3;
-      if (localType === 'fishingVillage') return terrain + river * 2.2 + forest * 0.25 + fertile * 0.8;
-      const inland = index > 0 ? Math.max(0, 8 - river * 1.4) : 0;
-      return terrain + river * (index > 0 ? -0.2 : 0.25) + forest * 0.45 + fertile * 0.8 + inland;
-    });
+      const spread = existingSettlements.length === 0 ? 0 : Math.min(
+        ...existingSettlements.map(site => euclidean(tile, site)),
+      ) * CONFIG.foreignSites.settlementSpreadWeight;
+      if (localType === 'fishingVillage') {
+        return terrain + river * 2.2 + forest * 0.25 + fertile * 0.8 + spread;
+      }
+      return terrain - river * 0.45 + forest * 0.35 + fertile * 0.8 + spread;
+    }, tile => localType === 'fishingVillage' ||
+      terrainNear(state, tile, 'river', CONFIG.foreignSites.inlandVillageRiverClearance) === 0);
     const riverside = terrainNear(state, localTile, 'river', 2) > 0;
     const localSite = createSite(state, {
       type: localType,
@@ -272,13 +292,18 @@ export function generateForeignSites(state: GameState, rng: () => number): void 
   }
 
   for (let index = 0; index < counts.banditLairs; index++) {
+    const existingLairs = state.foreignSites.filter(site => site.type === 'banditLair');
     const lairTile = chooseSiteTile(state, rng, 2, 2, LAIR_TERRAINS, tile => {
       const h = state.map.length;
       const w = state.map[0].length;
       const edge = Math.min(tile.x, tile.y, w - 1 - tile.x, h - 1 - tile.y);
       const terrain = tile.terrain === 'mountain' ? 14 : tile.terrain === 'forest' ? 10 : tile.terrain === 'rock' ? 8 : 0;
-      return terrain + Math.max(0, 12 - edge) + Math.max(0, h * 0.45 - tile.y) * 0.25;
-    });
+      const spread = existingLairs.length === 0 ? 0 : Math.min(
+        ...existingLairs.map(site => euclidean(tile, site)),
+      ) * 0.4;
+      return terrain + Math.max(0, 12 - edge) + Math.max(0, h * 0.45 - tile.y) * 0.25 + spread;
+    }, tile => mapSize !== 'large' || existingLairs.every(site =>
+      euclidean(tile, site) >= CONFIG.foreignSites.largeLairSpacing));
     const lair = createSite(state, {
       type: 'banditLair',
       name: index === 0 ? '변경 마적 산채' : '변경 마적 외곽 산채',

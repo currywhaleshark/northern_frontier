@@ -43,6 +43,16 @@ const saveMigrations = await import(pathToFileURL(join(compiledDir, 'saveMigrati
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs')).href);
 
+function terrainCountNear(state, point, terrain, radius) {
+  let count = 0;
+  for (let y = point.y - radius; y <= point.y + radius; y++) {
+    for (let x = point.x - radius; x <= point.x + radius; x++) {
+      if (state.map[y]?.[x]?.terrain === terrain) count++;
+    }
+  }
+  return count;
+}
+
 {
   const state = simulation.newGame(2026071201);
   assert.ok(state.foreignSites.some(site => site.type === 'village' || site.type === 'fishingVillage'));
@@ -96,11 +106,36 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
         assert.ok(['plain', 'fertile'].includes(state.map[prop.y][prop.x].terrain),
           `${mapSize} settlement props do not overlap trees`);
       }
+      if (site.type === 'village') {
+        assert.equal(terrainCountNear(
+          state, site, 'river', CONFIG.foreignSites.inlandVillageRiverClearance,
+        ), 0, `${mapSize} ordinary villages deliberately use inland clearings`);
+      }
     }
     if (mapSize === 'large') {
-      assert.ok(settlements.some(site => site.type === 'village' && site.name.includes('들녘')),
-        'large maps can place a village away from the riverside');
+      assert.ok(settlements.filter(site => site.type === 'village').every(site => site.name.includes('들녘')),
+        'large-map ordinary villages are named for their inland placement');
+      const lairs = state.foreignSites.filter(site => site.type === 'banditLair');
+      assert.ok(Math.hypot(lairs[0].x - lairs[1].x, lairs[0].y - lairs[1].y) >=
+        CONFIG.foreignSites.largeLairSpacing, 'large-map bandit lairs keep their dedicated separation');
     }
+  }
+}
+
+{
+  for (const [index, region] of ['plains', 'mountain', 'lake', 'coast'].entries()) {
+    const seed = 2026080630 + index;
+    const state = simulation.newGameFromOptions({
+      ...newGameOptions.optionsForDifficulty('normal', '', seed),
+      mapSize: 'large', region, seed,
+    });
+    const villages = state.foreignSites.filter(site => site.type === 'village');
+    assert.ok(villages.every(site => terrainCountNear(
+      state, site, 'river', CONFIG.foreignSites.inlandVillageRiverClearance,
+    ) === 0), `${region} large-map villages stay inland`);
+    const lairs = state.foreignSites.filter(site => site.type === 'banditLair');
+    assert.ok(Math.hypot(lairs[0].x - lairs[1].x, lairs[0].y - lairs[1].y) >=
+      CONFIG.foreignSites.largeLairSpacing, `${region} large-map lairs stay separated`);
   }
 }
 
