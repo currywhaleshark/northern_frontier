@@ -163,6 +163,9 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
   const growthMigrated = saveMigrations.migrateV63ToV64({ schemaVersion: 63, claimZones: [{ radius: 5 }] });
   assert.equal(growthMigrated.schemaVersion, 64);
   assert.equal(growthMigrated.claimZones[0].radius, 5, 'v64 migration preserves the old visible claim radius');
+  const diplomacyMigrated = saveMigrations.migrateV64ToV65({ schemaVersion: 64, foreignSiteParties: [] });
+  assert.equal(diplomacyMigrated.schemaVersion, 65);
+  assert.deepEqual(diplomacyMigrated.foreignSiteParties, [], 'v65 preserves safe existing party state for normalization');
 }
 
 {
@@ -428,15 +431,35 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
   camp.discovered = true;
   camp.seasonalActive = false;
   assert.deepEqual(activity.foreignSiteActors(state, camp, 0), [], 'inactive camp stays empty');
-  camp.seasonalActive = true;
-  camp.activeSeasons = ['spring'];
-  state.day = 1;
-  const arriving = activity.foreignSiteActors(state, camp, 0);
+  camp.seasonalTransition = 'entering';
+  state.foreignSites.forEach(candidate => {
+    candidate.activity.nextActivityDay = state.day + 99;
+    candidate.activity.nextDiplomaticDay = state.day + 99;
+  });
+  activitySimulation.dailyForeignSiteActivityTick(state);
+  const migration = state.foreignSiteParties.find(party => party.siteId === camp.id && party.kind === 'seasonalMigration');
+  assert.ok(migration, 'an inactive seasonal camp starts a real entry procession');
+  assert.equal(migration.migrationDirection, 'entering');
   const mapWidth = state.map[0].length;
   const mapHeight = state.map.length;
-  assert.ok(arriving.length >= 3, 'active camp receives a hunting party');
-  assert.ok(arriving.some(actor => actor.x <= 0.6 || actor.y <= 0.6 || actor.x >= mapWidth - 0.6 || actor.y >= mapHeight - 0.6),
-    'hunters enter from a map edge');
+  assert.ok(migration.x === 0 || migration.y === 0 || migration.x === mapWidth - 1 || migration.y === mapHeight - 1,
+    'the real entry procession starts at a map edge');
+  for (let tick = 0; tick < 1000 && state.foreignSiteParties.includes(migration); tick++) {
+    activitySimulation.foreignSitePartiesTick(state);
+  }
+  assert.equal(camp.seasonalActive, true, 'the camp becomes active only after the procession arrives');
+  assert.equal(camp.seasonalTransition, undefined);
+  assert.ok(activity.foreignSiteActors(state, camp, 8).length >= 3, 'camp life appears after the real arrival');
+  camp.seasonalTransition = 'leaving';
+  activitySimulation.dailyForeignSiteActivityTick(state);
+  const leaving = state.foreignSiteParties.find(party => party.siteId === camp.id && party.kind === 'seasonalMigration');
+  assert.ok(leaving, 'an active seasonal camp starts a real departure procession');
+  assert.equal(leaving.x, camp.x, 'the departure procession starts at the camp');
+  for (let tick = 0; tick < 1000 && state.foreignSiteParties.includes(leaving); tick++) {
+    activitySimulation.foreignSitePartiesTick(state);
+  }
+  assert.equal(camp.seasonalActive, false, 'the camp becomes inactive only after the procession leaves the map');
+  assert.equal(camp.seasonalTransition, undefined);
 }
 
 {
@@ -536,6 +559,98 @@ const { FACTIONS } = await import(pathToFileURL(join(compiledDir, 'constants.mjs
   simulation.resolveChoice(state, 'ignore');
   assert.ok(state.relations[site.factionName] < relationBefore, 'ignoring the warning damages faction relations');
   assert.equal(state.territoryViolations.length, 0, 'resolved warning clears the violation');
+}
+
+{
+  const state = simulation.newGame(2026080601);
+  const site = state.foreignSites.find(candidate => candidate.type === 'village' || candidate.type === 'fishingVillage');
+  const center = state.buildings.find(building => building.type === 'center');
+  state.map.flat().forEach(tile => { tile.terrain = 'plain'; tile.buildingId = null; });
+  state.buildings.push({
+    id: state.nextBuildingId++, type: 'market', x: Math.min(state.map[0].length - 3, center.x + 3), y: center.y,
+    progress: 99, built: true, fieldGrowth: 0,
+  });
+  site.discovered = true;
+  state.relations[site.factionName] = 90;
+  state.claimZones.filter(zone => zone.siteId === site.id && zone.kind === 'passage')
+    .forEach(zone => { zone.permittedUntilDay = state.day + 100; });
+  state.foreignSites.forEach(candidate => {
+    candidate.activity.nextActivityDay = state.day + 99;
+    candidate.activity.nextDiplomaticDay = state.day + 99;
+  });
+  site.activity.nextDiplomaticDay = state.day;
+  activitySimulation.dailyForeignSiteActivityTick(state);
+  const caravan = state.foreignSiteParties.find(party => party.siteId === site.id && party.kind === 'caravan');
+  assert.ok(caravan, 'a friendly site with passage permission sends a physical caravan');
+  for (let tick = 0; tick < 1000 && state.pendingChoice?.kind !== 'trade'; tick++) {
+    activitySimulation.foreignSitePartiesTick(state);
+  }
+  assert.equal(state.pendingChoice?.kind, 'trade', 'trade opens only after the caravan reaches the market');
+  const negotiation = events.tradeNegotiationOf(state.pendingChoice);
+  assert.equal(negotiation.sourceSiteId, site.id);
+  assert.equal(negotiation.sourcePartyId, caravan.id);
+  const faction = FACTIONS.find(candidate => candidate.name === site.factionName);
+  const get = faction.exports.find(resource => resource !== negotiation.give && (site.tradeStock[resource] ?? 0) >= 1);
+  assert.ok(get, 'the source settlement has a faction export in its real stock');
+  state.resources[negotiation.give] = 500;
+  const siteStockBefore = site.tradeStock[get];
+  const playerStockBefore = state.resources[get];
+  const foodBefore = site.foodStock;
+  const incomingBefore = site.tradeStock[negotiation.give] ?? 0;
+  assert.equal(events.negotiateTrade(state, get, 1, undefined, negotiation.giveAmt), null);
+  assert.ok(negotiation.phase === 'accepted' || negotiation.phase === 'countered');
+  const actualGet = negotiation.getAmt;
+  const actualGive = negotiation.giveAmt;
+  simulation.resolveChoice(state, 'confirm');
+  assert.equal(site.tradeStock[get], siteStockBefore - actualGet, 'the source site loses traded export stock once');
+  assert.equal(state.resources[get], playerStockBefore + actualGet, 'the player receives caravan stock once');
+  if (['grain', 'meat', 'fish'].includes(negotiation.give)) {
+    assert.equal(site.foodStock, foodBefore + actualGive, 'food paid to the caravan feeds its source settlement');
+  } else {
+    assert.equal(site.tradeStock[negotiation.give], incomingBefore + actualGive,
+      'non-food payment enters the source settlement trade stock');
+  }
+  assert.equal(caravan.interactionResolved, true, 'resolved trade releases the caravan to return');
+}
+
+{
+  const state = simulation.newGame(2026080602);
+  const site = state.foreignSites.find(candidate => candidate.type === 'village' || candidate.type === 'fishingVillage');
+  state.map.flat().forEach(tile => { tile.terrain = 'plain'; tile.buildingId = null; });
+  site.discovered = true;
+  site.activity.condition = 'hungry';
+  site.status = 'hungry';
+  site.foodStock = 0;
+  state.relations[site.factionName] = 60;
+  state.resources.grain = 100;
+  state.foreignSites.forEach(candidate => {
+    candidate.activity.nextActivityDay = state.day + 99;
+    candidate.activity.nextDiplomaticDay = state.day + 99;
+  });
+  site.activity.nextDiplomaticDay = state.day;
+  activitySimulation.dailyForeignSiteActivityTick(state);
+  const messenger = state.foreignSiteParties.find(party => party.siteId === site.id && party.kind === 'messenger');
+  assert.ok(messenger, 'a hungry friendly site sends a physical aid messenger');
+  for (let tick = 0; tick < 1000 && state.pendingChoice?.kind !== 'foreignSiteAidRequest'; tick++) {
+    activitySimulation.foreignSitePartiesTick(state);
+  }
+  assert.equal(state.pendingChoice?.kind, 'foreignSiteAidRequest', 'aid choice opens only after messenger arrival');
+  const relationBefore = state.relations[site.factionName];
+  simulation.resolveChoice(state, 'grain');
+  assert.equal(state.resources.grain, 100 - CONFIG.foreignSites.activity.aidGrainAmount);
+  assert.equal(site.foodStock, CONFIG.foreignSites.activity.aidGrainAmount);
+  assert.ok(state.relations[site.factionName] > relationBefore);
+  assert.equal(site.favors, 1, 'accepted aid creates one favor owed by the site');
+  assert.equal(messenger.interactionResolved, true);
+  for (let tick = 0; tick < 1000 && state.foreignSiteParties.includes(messenger); tick++) {
+    activitySimulation.foreignSitePartiesTick(state);
+  }
+  site.activity.condition = 'hungry';
+  site.status = 'hungry';
+  site.activity.nextDiplomaticDay = state.day;
+  activitySimulation.dailyForeignSiteActivityTick(state);
+  assert.equal(state.foreignSiteParties.some(party => party.siteId === site.id && party.kind === 'messenger'), false,
+    'the same settlement cannot request aid twice in one season');
 }
 
 console.log('foreign site tests passed');

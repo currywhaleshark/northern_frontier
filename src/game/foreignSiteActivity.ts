@@ -1,8 +1,5 @@
 import { buildingFootprintDims } from './buildings';
-import { CONFIG } from './config';
-import { SEASON_ORDER } from './constants';
-import { getDayOfSeason, getSeason } from './seasons';
-import type { ForeignSite, GameState, Gender, JobId, Season, Terrain } from './types';
+import type { ForeignSite, GameState, Gender, JobId, Terrain } from './types';
 
 type ForeignSitePropKind = 'field' | 'hut' | 'storehouse' | 'dryingRack' | 'boat' | 'huntLodge';
 
@@ -166,56 +163,11 @@ function settlementActors(state: GameState, site: ForeignSite, time: number): Fo
   });
 }
 
-function nearestMapEdge(state: GameState, site: ForeignSite): Point {
-  const width = state.map[0]?.length ?? 1;
-  const height = state.map.length;
-  const center = { x: site.x + site.width / 2, y: site.y + site.height / 2 };
-  const edges = [
-    { x: 0.5, y: center.y },
-    { x: width - 0.5, y: center.y },
-    { x: center.x, y: 0.5 },
-    { x: center.x, y: height - 0.5 },
-  ];
-  return edges.sort((a, b) => Math.hypot(a.x - center.x, a.y - center.y) - Math.hypot(b.x - center.x, b.y - center.y))[0];
-}
-
-function adjacentSeason(season: Season, offset: -1 | 1): Season {
-  const index = SEASON_ORDER.indexOf(season);
-  return SEASON_ORDER[(index + offset + SEASON_ORDER.length) % SEASON_ORDER.length];
-}
-
 function campActors(state: GameState, site: ForeignSite, time: number): ForeignSiteActor[] {
-  if (site.seasonalActive === false || site.status === 'abandoned' || site.status === 'burned') return [];
-  const activeSeasons = site.activeSeasons ?? SEASON_ORDER;
-  const season = getSeason(state.day);
-  if (!activeSeasons.includes(season)) return [];
-  const subtickFraction = ((time % CONFIG.agents.subticksPerDay) + CONFIG.agents.subticksPerDay) % CONFIG.agents.subticksPerDay;
-  const dayOfSeason = getDayOfSeason(state.day) - 1 + subtickFraction / CONFIG.agents.subticksPerDay;
-  const arriving = !activeSeasons.includes(adjacentSeason(season, -1)) && dayOfSeason < 1.75;
-  const leaving = !activeSeasons.includes(adjacentSeason(season, 1)) && dayOfSeason > CONFIG.time.seasonDays - 1.75;
+  if (site.seasonalActive === false || site.seasonalTransition === 'leaving' ||
+      site.status === 'abandoned' || site.status === 'burned') return [];
   const center = { x: site.x + site.width / 2, y: site.y + site.height / 2 };
-  const edge = nearestMapEdge(state, site);
   const count = Math.max(3, Math.min(5, Math.round(site.population / 5)));
-
-  if (arriving || leaving) {
-    return Array.from({ length: count }, (_unused, index) => {
-      const stagger = index * 0.12;
-      const progress = arriving
-        ? smooth((dayOfSeason - stagger) / 1.35)
-        : smooth((dayOfSeason - (CONFIG.time.seasonDays - 1.65) - stagger) / 1.35);
-      const from = arriving ? edge : center;
-      const to = arriving ? center : edge;
-      const point = lerpPoint(from, to, progress);
-      return {
-        ...point,
-        job: 'hunter',
-        gender: (index + site.id) % 4 === 0 ? 'female' : 'male',
-        carrying: leaving && index % 2 === 0,
-        moving: progress > 0 && progress < 1,
-        facing: to.x < from.x ? -1 : 1,
-      };
-    });
-  }
 
   const huntingTiles = nearbyTiles(state, site, 5, new Set<Terrain>(['forest', 'plain', 'fertile']));
   const targets = huntingTiles.length > 0 ? huntingTiles : [{ x: site.x + 2, y: site.y + 1 }];
@@ -245,9 +197,14 @@ export function foreignSitePartyActors(state: GameState): ForeignSiteActor[] {
     const job: JobId = party.kind === 'farm'
       ? 'farmer'
       : party.kind === 'hunt' ? 'hunter' : party.kind === 'fish' ? 'fisher'
-        : party.kind === 'patrol' ? 'watchman' : 'herbalist';
-    const carrying = (party.phase === 'returning' || party.phase === 'retreating') &&
-      Object.values(party.cargo).some(amount => (amount ?? 0) > 0);
+        : party.kind === 'patrol' ? 'watchman'
+          : party.kind === 'caravan' || party.kind === 'messenger' ? 'hauler'
+            : party.kind === 'seasonalMigration' ? 'hunter' : 'herbalist';
+    const hasCargo = Object.values(party.cargo).some(amount => (amount ?? 0) > 0);
+    const carrying = hasCargo && (
+      party.phase === 'returning' || party.phase === 'retreating' || party.kind === 'caravan' ||
+      (party.kind === 'seasonalMigration' && party.migrationDirection === 'leaving')
+    );
     const moving = party.phase === 'outbound' || party.phase === 'returning' || party.phase === 'retreating';
     const offsets = [
       { x: 0, y: 0 },

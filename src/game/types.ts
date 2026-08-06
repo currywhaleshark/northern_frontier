@@ -391,9 +391,14 @@ export interface ForeignSiteActivityLedger {
   sicknessDays: number;
   pendingProduction: Partial<Record<ResourceId, number>>;
   recentProduction: Partial<Record<ResourceId, number>>;
+  nextDiplomaticDay: number;
+  lastAidRequestSeasonKey?: number;
+  tradeRouteBlockedUntilDay?: number;
 }
 
-export type ForeignSitePartyKind = 'farm' | 'hunt' | 'fish' | 'forage' | 'patrol';
+export type ForeignSitePartyKind =
+  | 'farm' | 'hunt' | 'fish' | 'forage' | 'patrol'
+  | 'caravan' | 'messenger' | 'seasonalMigration';
 export type ForeignSitePartyPhase = 'outbound' | 'working' | 'returning' | 'waiting' | 'retreating';
 
 export interface ForeignSiteParty {
@@ -417,6 +422,9 @@ export interface ForeignSiteParty {
   boundaryChange?: 'expand';
   patrolPurpose?: 'boundary' | 'warning';
   targetBuildingId?: number;
+  migrationDirection?: 'entering' | 'leaving';
+  interactionPending?: boolean;
+  interactionResolved?: boolean;
   spotted: boolean;
   facing: 1 | -1;
 }
@@ -453,6 +461,7 @@ export interface ForeignSite {
   activity?: ForeignSiteActivityLedger;
   seasonalActive?: boolean;
   activeSeasons?: Season[];
+  seasonalTransition?: 'entering' | 'leaving';
   lastInteractionDay: number;
   lastRaidDay?: number;
   scoutedUntilDay?: number;
@@ -819,6 +828,8 @@ export interface TradeNegotiation {
   message: string;
   maxAcceptGetAmt?: number;
   specialItem?: SpecialItemId | null;
+  sourceSiteId?: number;
+  sourcePartyId?: number;
 }
 
 export interface TradeEvaluation {
@@ -981,7 +992,7 @@ export interface DialoguePresentation {
 }
 
 export interface PendingChoice {
-  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tributeAnnouncement' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'guide' | 'promotionDecree' | 'mineCollapse' | 'giftEnvoy' | 'pactEnvoy' | 'pactRenewal' | 'claimAccordEnvoy' | 'claimAccordRenewal' | 'claimAccordOffer' | 'aidRequestEnvoy' | 'warParticipationRequest' | 'warParticipationResult';
+  kind: 'raid' | 'expedition' | 'expeditionRaidOrder' | 'trade' | 'extortion' | 'tribute' | 'tributeAnnouncement' | 'tradeContract' | 'petition' | 'inspection' | 'crackdown' | 'immigration' | 'incident' | 'territory' | 'silverVein' | 'wedding' | 'religion' | 'specialResident' | 'scenario' | 'guide' | 'promotionDecree' | 'mineCollapse' | 'giftEnvoy' | 'pactEnvoy' | 'pactRenewal' | 'claimAccordEnvoy' | 'claimAccordRenewal' | 'claimAccordOffer' | 'aidRequestEnvoy' | 'foreignSiteAidRequest' | 'warParticipationRequest' | 'warParticipationResult';
   title: string;
   body: string;
   illustration?: {

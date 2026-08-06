@@ -3,11 +3,12 @@ import { footprintTilesOf } from './buildings';
 import { applyScheduledClaimWarning } from './claimZones';
 import { DAY_CYCLE_SUBTICKS } from './dayCycle';
 import { activeClaimAccord } from './diplomacy';
-import { addLog } from './events';
+import { addLog, openForeignSiteCaravanTrade } from './events';
 import { takeFishingGroundStockById } from './fishingGrounds';
 import { addForeignSiteMemory, isForeignSiteOperational } from './foreignSites';
 import { takeHabitatStock } from './habitats';
 import { findPath, isTerrainPassable } from './pathfinding';
+import { changeRelation, getRelation } from './relations';
 import { getSeason } from './seasons';
 import type {
   ClaimZone,
@@ -196,6 +197,7 @@ function activityTarget(state: GameState, site: ForeignSite): ActivityTarget | n
 
 function canDepart(state: GameState, site: ForeignSite): boolean {
   if (!isForeignSiteOperational(site) || site.type === 'banditLair' || site.type === 'ruin' || site.type === 'outpost') return false;
+  if (site.seasonalTransition) return false;
   if (state.weather === 'blizzard' || state.siegeState || state.tacticalBattle || state.battle) return false;
   return !state.foreignSiteParties.some(party => party.siteId === site.id);
 }
@@ -231,6 +233,139 @@ function spawnParty(state: GameState, site: ForeignSite): boolean {
   });
   activity.activitySequence++;
   activity.nextActivityDay = state.day + CONFIG.foreignSites.activity.departureIntervalDays;
+  return true;
+}
+
+function currentSeasonKey(state: GameState): number {
+  return Math.floor(Math.max(0, state.day - 1) / CONFIG.time.seasonDays);
+}
+
+function sitePassageActive(state: GameState, site: ForeignSite): boolean {
+  return state.claimZones.some(zone => zone.siteId === site.id && zone.kind === 'passage' &&
+    ((zone.permittedUntilDay ?? 0) >= state.day || !!activeClaimAccord(state, zone.id)));
+}
+
+function visitBuildingTarget(
+  state: GameState,
+  site: ForeignSite,
+  kind: ForeignSitePartyKind,
+  buildingTypes: readonly string[],
+): ActivityTarget | null {
+  const candidates: Array<{ x: number; y: number; resourceTargetId: string }> = [];
+  const seen = new Set<string>();
+  for (const building of state.buildings) {
+    if (!building.built || !buildingTypes.includes(building.type)) continue;
+    for (const tile of footprintTilesOf(state, building) ?? []) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const x = tile.x + dx;
+          const y = tile.y + dy;
+          const key = `${x},${y}`;
+          if (seen.has(key) || !partyPassable(state, site, x, y)) continue;
+          seen.add(key);
+          candidates.push({ x, y, resourceTargetId: `building:${building.id}` });
+        }
+      }
+    }
+  }
+  return firstReachableTarget(state, site, kind, candidates);
+}
+
+function spawnVisitorParty(
+  state: GameState,
+  site: ForeignSite,
+  target: ActivityTarget,
+  memberCount: number,
+  cargo: Partial<Record<ResourceId, number>> = {},
+): ForeignSiteParty {
+  const activity = site.activity!;
+  const start = siteStart(site);
+  const party: ForeignSiteParty = {
+    id: state.nextForeignSitePartyId++,
+    siteId: site.id,
+    kind: target.kind,
+    phase: 'outbound',
+    x: start.x,
+    y: start.y,
+    px: start.x + 0.5,
+    py: start.y + 0.5,
+    path: target.path,
+    target: { x: target.x, y: target.y },
+    memberCount,
+    cargo,
+    departedDay: state.day,
+    activitySequence: activity.activitySequence++,
+    resourceTargetId: target.resourceTargetId,
+    spotted: site.discovered,
+    facing: target.x < start.x ? -1 : 1,
+  };
+  state.foreignSiteParties.push(party);
+  return party;
+}
+
+function caravanCargo(site: ForeignSite): Partial<Record<ResourceId, number>> {
+  const entry = (Object.entries(site.tradeStock) as Array<[ResourceId, number]>)
+    .filter(([, amount]) => Number.isFinite(amount) && amount >= 1)
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0];
+  return entry ? { [entry[0]]: Math.min(6, Math.floor(entry[1])) } : {};
+}
+
+function spawnCaravan(state: GameState, site: ForeignSite): boolean {
+  const target = visitBuildingTarget(state, site, 'caravan', ['market', 'dock']);
+  if (!target) {
+    site.activity!.tradeRouteBlockedUntilDay = state.day + 3;
+    return false;
+  }
+  spawnVisitorParty(state, site, target, Math.min(3, CONFIG.foreignSites.activity.maxMembers), caravanCargo(site));
+  site.activity!.tradeRouteBlockedUntilDay = undefined;
+  site.activity!.nextDiplomaticDay = state.day + CONFIG.foreignSites.activity.diplomaticIntervalDays;
+  return true;
+}
+
+function spawnAidMessenger(state: GameState, site: ForeignSite): boolean {
+  const target = visitBuildingTarget(state, site, 'messenger', ['center', 'market']);
+  if (!target) return false;
+  spawnVisitorParty(state, site, target, 1);
+  site.activity!.lastAidRequestSeasonKey = currentSeasonKey(state);
+  site.activity!.nextDiplomaticDay = state.day + CONFIG.foreignSites.activity.diplomaticIntervalDays;
+  return true;
+}
+
+function migrationPath(state: GameState, site: ForeignSite): Array<{ x: number; y: number }> | null {
+  const start = siteStart(site);
+  const width = state.map[0]?.length ?? 0;
+  const height = state.map.length;
+  return findPath(
+    state,
+    start.x,
+    start.y,
+    tile => tile.x === 0 || tile.y === 0 || tile.x === width - 1 || tile.y === height - 1,
+    (x, y) => partyPassable(state, site, x, y),
+  );
+}
+
+function spawnSeasonalMigration(state: GameState, site: ForeignSite): boolean {
+  const direction = site.seasonalTransition;
+  if (!direction || state.foreignSiteParties.some(party => party.siteId === site.id)) return false;
+  const outward = migrationPath(state, site);
+  if (!outward?.length) return false;
+  const camp = siteStart(site);
+  const fullOutward = [camp, ...outward];
+  const route = direction === 'entering' ? [...fullOutward].reverse() : fullOutward;
+  const start = route[0];
+  const path = route.slice(1);
+  const target = path[path.length - 1] ?? start;
+  const party: ForeignSiteParty = {
+    id: state.nextForeignSitePartyId++, siteId: site.id, kind: 'seasonalMigration', phase: 'outbound',
+    x: start.x, y: start.y, px: start.x + 0.5, py: start.y + 0.5,
+    path, target: { x: target.x, y: target.y },
+    memberCount: Math.min(3, CONFIG.foreignSites.activity.maxMembers),
+    cargo: direction === 'leaving' ? caravanCargo(site) : {},
+    departedDay: state.day, activitySequence: site.activity!.activitySequence++, migrationDirection: direction,
+    spotted: site.discovered, facing: target.x < start.x ? -1 : 1,
+  };
+  state.foreignSiteParties.push(party);
   return true;
 }
 
@@ -372,6 +507,91 @@ function dispatchClaimWarningPatrols(state: GameState): void {
     if (spawnWarningPatrol(state, site, zone, growth.warningTargetBuildingId)) continue;
     if (state.day - (growth.warningScheduledDay ?? state.day) >= 3) applyScheduledClaimWarning(state, zone.id);
   }
+}
+
+function openForeignSiteAidRequest(state: GameState, site: ForeignSite, party: ForeignSiteParty): boolean {
+  if (state.pendingChoice || state.battle || state.scenario) return false;
+  const cfg = CONFIG.foreignSites.activity;
+  const sick = site.activity?.condition === 'sick';
+  state.pendingChoice = {
+    kind: 'foreignSiteAidRequest',
+    title: `${site.name}의 원조 요청`,
+    body: sick
+      ? `${site.name}에서 온 전령이 굶주림과 병을 함께 호소합니다. 곡식과 약재를 보내면 그들의 생계 장부가 바로 나아집니다.`
+      : `${site.name}에서 온 전령이 겨울을 넘길 곡식을 청합니다. 거절해도 곧바로 적대하지는 않지만 기억에는 남습니다.`,
+    options: [
+      {
+        id: 'grain', label: `곡식 ${cfg.aidGrainAmount}을 보낸다`,
+        desc: '굶주림과 식량 비축을 직접 개선합니다.',
+        disabled: state.resources.grain < cfg.aidGrainAmount,
+        disabledReason: state.resources.grain < cfg.aidGrainAmount ? '곡식이 부족합니다' : undefined,
+      },
+      ...(sick ? [{
+        id: 'medicine', label: `곡식 ${cfg.aidMedicineGrainAmount}·약초 ${cfg.aidHerbsAmount}을 보낸다`,
+        desc: '굶주림과 질병 누적을 함께 크게 낮춥니다.',
+        disabled: state.resources.grain < cfg.aidMedicineGrainAmount || state.resources.herbs < cfg.aidHerbsAmount,
+        disabledReason: state.resources.grain < cfg.aidMedicineGrainAmount || state.resources.herbs < cfg.aidHerbsAmount
+          ? '곡식이나 약초가 부족합니다' : undefined,
+      }] : []),
+      { id: 'decline', label: '이번에는 돕지 못한다', desc: '즉시 적대하지 않지만 거절한 일을 기억합니다.' },
+    ],
+    data: { siteId: site.id, partyId: party.id },
+  };
+  party.interactionPending = true;
+  addLog(state, `${site.name}의 전령이 중심지에 도착해 원조를 청했습니다.`, 'info', true);
+  return true;
+}
+
+function finishVisitorInteraction(state: GameState, partyId: number): void {
+  const party = state.foreignSiteParties.find(candidate => candidate.id === partyId);
+  if (!party) return;
+  party.interactionPending = false;
+  party.interactionResolved = true;
+}
+
+export function resolveForeignSiteAidRequest(state: GameState, optionId: string): void {
+  const choice = state.pendingChoice;
+  if (!choice || choice.kind !== 'foreignSiteAidRequest') return;
+  const siteId = Number(choice.data.siteId);
+  const partyId = Number(choice.data.partyId);
+  const site = state.foreignSites.find(candidate => candidate.id === siteId);
+  state.pendingChoice = null;
+  finishVisitorInteraction(state, partyId);
+  if (!site?.activity) return;
+  const cfg = CONFIG.foreignSites.activity;
+  if (optionId === 'decline') {
+    addForeignSiteMemory(state, site.id, '원조를 청한 전령이 빈손으로 돌아왔습니다.', 'bad');
+    addLog(state, `${site.name}의 원조 요청을 거절했습니다.`, 'info', true);
+    return;
+  }
+  const medicine = optionId === 'medicine';
+  const grain = medicine ? cfg.aidMedicineGrainAmount : cfg.aidGrainAmount;
+  const herbs = medicine ? cfg.aidHerbsAmount : 0;
+  if (state.resources.grain < grain || state.resources.herbs < herbs) {
+    addLog(state, '보내기로 한 원조 물자가 부족해 전령을 빈손으로 돌려보냈습니다.', 'bad', true);
+    return;
+  }
+  state.resources.grain -= grain;
+  state.resources.herbs -= herbs;
+  const messenger = state.foreignSiteParties.find(candidate => candidate.id === partyId);
+  if (messenger) messenger.cargo = herbs > 0 ? { grain, herbs } : { grain };
+  site.foodStock += grain;
+  site.activity.hungerDays = Math.max(0, site.activity.hungerDays - CONFIG.foreignSites.activity.settlementIntervalDays * 3);
+  if (medicine) site.activity.sicknessDays = Math.max(0, site.activity.sicknessDays - CONFIG.foreignSites.activity.settlementIntervalDays * 4);
+  site.goodwill = Math.min(100, site.goodwill + cfg.aidGoodwillGain);
+  site.trust = Math.min(100, site.trust + cfg.aidTrustGain);
+  site.favors += 1;
+  if (site.factionName) changeRelation(state, site.factionName, cfg.aidRelationGain);
+  if (foodDays(site) >= cfg.recoveryFoodDays && (!medicine || site.activity.sicknessDays === 0)) {
+    applyCondition(state, site, 'stable');
+  } else if (site.activity.condition === 'sick' && medicine) {
+    applyCondition(state, site, 'hungry');
+  }
+  const text = medicine
+    ? `곡식 ${grain}과 약초 ${herbs}을 받아 굶주림과 병세가 누그러졌습니다.`
+    : `곡식 ${grain}을 받아 식량 사정이 나아졌습니다.`;
+  addForeignSiteMemory(state, site.id, text, 'good');
+  addLog(state, `${site.name}에 ${text}`, 'good', true);
 }
 
 function movementSpeed(state: GameState): number {
@@ -522,7 +742,25 @@ export function foreignSitePartiesTick(state: GameState): void {
   const now = absoluteTick(state);
   for (const party of state.foreignSiteParties) {
     const site = state.foreignSites.find(candidate => candidate.id === party.siteId);
-    if (!site || !isForeignSiteOperational(site)) {
+    if (!site) {
+      finished.add(party.id);
+      continue;
+    }
+    if (party.kind === 'seasonalMigration') {
+      updateSpotted(state, site, party);
+      if (!moveParty(state, party)) continue;
+      const entering = party.migrationDirection === 'entering';
+      site.seasonalActive = entering;
+      site.seasonalTransition = undefined;
+      const text = entering
+        ? '사냥꾼들이 지도 밖에서 돌아와 계절 야영지를 다시 열었습니다.'
+        : '사냥꾼들이 짐을 싣고 지도 밖으로 떠나 계절 야영지가 비었습니다.';
+      addForeignSiteMemory(state, site.id, text, 'neutral');
+      if (site.discovered) addLog(state, `${site.name}: ${text}`, 'info', true);
+      finished.add(party.id);
+      continue;
+    }
+    if (!isForeignSiteOperational(site)) {
       finished.add(party.id);
       continue;
     }
@@ -535,6 +773,18 @@ export function foreignSitePartiesTick(state: GameState): void {
       continue;
     }
     if (party.phase === 'working') {
+      if (party.kind === 'caravan' || party.kind === 'messenger') {
+        if (party.interactionResolved) {
+          beginReturn(state, site, party);
+        } else if (!party.interactionPending) {
+          if (party.kind === 'caravan') {
+            party.interactionPending = openForeignSiteCaravanTrade(state, site.id, party.id);
+          } else {
+            openForeignSiteAidRequest(state, site, party);
+          }
+        }
+        continue;
+      }
       if (now < (party.workUntilTick ?? now)) continue;
       harvest(state, party);
       beginReturn(state, site, party);
@@ -542,7 +792,9 @@ export function foreignSitePartiesTick(state: GameState): void {
     }
     if (party.phase === 'returning' || party.phase === 'retreating') {
       if (!moveParty(state, party)) continue;
-      depositCargo(site, party);
+      if (party.kind === 'farm' || party.kind === 'hunt' || party.kind === 'fish' || party.kind === 'forage') {
+        depositCargo(site, party);
+      }
       completeBoundaryPatrol(state, site, party);
       site.activity!.nextActivityDay = Math.max(
         site.activity!.nextActivityDay,
@@ -697,8 +949,41 @@ function retryWaitingParty(state: GameState, party: ForeignSiteParty): void {
   party.phase = 'returning';
 }
 
+function dispatchSeasonalMigrations(state: GameState): void {
+  for (const site of state.foreignSites) {
+    if (site.type !== 'seasonalCamp' || !site.seasonalTransition) continue;
+    spawnSeasonalMigration(state, site);
+  }
+}
+
+function hasCaravanStock(site: ForeignSite): boolean {
+  return Object.values(site.tradeStock).some(amount => Number.isFinite(amount) && (amount ?? 0) >= 1);
+}
+
+function dispatchDiplomaticParties(state: GameState): void {
+  for (const site of state.foreignSites) {
+    const activity = site.activity;
+    if (!activity || state.day < activity.nextDiplomaticDay || !canDepart(state, site)) continue;
+    const relation = site.factionName ? getRelation(state, site.factionName) : 0;
+    const needsAid = activity.condition === 'hungry' || activity.condition === 'sick';
+    if (!state.scenario && needsAid && relation >= CONFIG.foreignSites.activity.aidRequestMinRelation &&
+        activity.lastAidRequestSeasonKey !== currentSeasonKey(state)) {
+      if (spawnAidMessenger(state, site)) continue;
+      activity.nextDiplomaticDay = state.day + 2;
+      continue;
+    }
+    const blocked = (activity.tradeRouteBlockedUntilDay ?? -1) >= state.day;
+    if (site.discovered && relation >= CONFIG.foreignSites.activity.caravanMinRelation &&
+        sitePassageActive(state, site) && hasCaravanStock(site) && !blocked) {
+      if (spawnCaravan(state, site)) continue;
+    }
+    activity.nextDiplomaticDay = state.day + 3;
+  }
+}
+
 export function dailyForeignSiteActivityTick(state: GameState): void {
   dispatchClaimWarningPatrols(state);
+  dispatchSeasonalMigrations(state);
   for (const party of state.foreignSiteParties) {
     if (party.phase === 'waiting') retryWaitingParty(state, party);
   }
@@ -710,6 +995,11 @@ export function dailyForeignSiteActivityTick(state: GameState): void {
         state.day - activity.lastSettlementDay >= CONFIG.foreignSites.activity.settlementIntervalDays) {
       settleSite(state, site);
     }
+  }
+  dispatchDiplomaticParties(state);
+  for (const site of state.foreignSites) {
+    const activity = site.activity;
+    if (!activity) continue;
     if (state.day >= activity.nextActivityDay && canDepart(state, site)) spawnParty(state, site);
   }
 }
@@ -719,5 +1009,8 @@ export function foreignSitePartyKindLabel(kind: ForeignSitePartyKind): string {
   if (kind === 'hunt') return '사냥 중';
   if (kind === 'fish') return '고기잡이 중';
   if (kind === 'patrol') return '경계 순찰 중';
+  if (kind === 'caravan') return '장터로 가는 상단';
+  if (kind === 'messenger') return '원조를 청하는 전령';
+  if (kind === 'seasonalMigration') return '계절 이동 행렬';
   return '숲 채집 중';
 }

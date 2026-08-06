@@ -500,6 +500,13 @@ export function SelectionContextBar({
       .filter((entry): entry is [string, number] => Number(entry[1]) > 0)
       .map(([resource, amount]) => `${RESOURCE_NAMES[resource as ResourceId] ?? resource} ${amount.toFixed(1)}`)
       .join(' · ');
+    const partyStatus = foreignSiteParty.phase === 'working' && foreignSiteParty.kind === 'caravan'
+      ? '장터에서 교역 협상 중'
+      : foreignSiteParty.phase === 'working' && foreignSiteParty.kind === 'messenger'
+        ? '중심지에서 답을 기다리는 중'
+        : foreignSiteParty.phase === 'outbound' && foreignSiteParty.kind === 'seasonalMigration'
+          ? foreignSiteParty.migrationDirection === 'entering' ? '야영지로 입장 중' : '지도 밖으로 퇴장 중'
+          : phaseName[foreignSiteParty.phase];
     return (
       <section className="selection-context-bar" aria-label={`외부 활동대 ${foreignSiteParty.id} 선택 정보`}>
         <header className="selection-context-head">
@@ -510,7 +517,7 @@ export function SelectionContextBar({
           <table className="insp-table">
             <tbody>
               <tr><td>소속</td><td>{site?.factionName ?? '확인되지 않음'}</td></tr>
-              <tr><td>상태</td><td>{phaseName[foreignSiteParty.phase]}</td></tr>
+              <tr><td>상태</td><td>{partyStatus}</td></tr>
               <tr><td>인원</td><td>{foreignSiteParty.memberCount}명</td></tr>
               <tr><td>화물</td><td>{cargo || '아직 없음'}</td></tr>
               <tr><td>출발</td><td>{foreignSiteParty.departedDay}일 · {site?.name ?? '출발지 미상'}</td></tr>

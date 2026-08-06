@@ -64,7 +64,8 @@ export function ForeignSitePanel({
 }: Props) {
   const faction = FACTIONS.find(candidate => candidate.name === site.factionName);
   const zones = state.claimZones.filter(zone => zone.siteId === site.id && zone.discovered);
-  const inactive = site.type === 'seasonalCamp' && site.seasonalActive === false;
+  const inactive = site.type === 'seasonalCamp' &&
+    (site.seasonalActive === false || site.seasonalTransition != null);
   const operational = site.status !== 'burned' && site.status !== 'abandoned';
   const passageActive = zones.some(zone => zone.kind === 'passage' && isClaimPermissionActive(state, zone));
   const activityParties = state.foreignSiteParties.filter(party => party.siteId === site.id);
@@ -89,7 +90,12 @@ export function ForeignSitePanel({
           ? '산채는 정주 부락이 아니라 국경을 떠도는 무장 무리의 은신처입니다.'
           : '이곳 사람들은 우리가 오기 전부터 강과 숲과 산길을 함께 써 왔습니다.'}
       </div>
-      {inactive && <div className="foreign-site-notice">계절이 바뀌어 야영지가 비어 있습니다.</div>}
+      {site.seasonalTransition && (
+        <div className="foreign-site-notice">
+          {site.seasonalTransition === 'entering' ? '사냥꾼들이 야영지로 들어오는 중입니다.' : '사냥꾼들이 짐을 싣고 떠나는 중입니다.'}
+        </div>
+      )}
+      {inactive && !site.seasonalTransition && <div className="foreign-site-notice">계절이 바뀌어 야영지가 비어 있습니다.</div>}
       {passageActive && (
         <div className="foreign-site-notice">
           산길 개방 · 교역 한도 +{Math.round((CONFIG.foreignSites.passageTradeCapacityMult - 1) * 100)}% · 상단 회전 {CONFIG.foreignSites.passageTradeCooldownReduction}일 단축

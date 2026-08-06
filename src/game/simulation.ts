@@ -123,7 +123,8 @@ import {
   foreignSiteAt, generateForeignSites, revealForeignSitesFromExploration, updateSeasonalForeignSites,
 } from './foreignSites';
 import {
-  dailyForeignSiteActivityTick, foreignSitePartiesTick, seasonalForeignSiteBoundaryTick,
+  dailyForeignSiteActivityTick, foreignSitePartiesTick, resolveForeignSiteAidRequest,
+  seasonalForeignSiteBoundaryTick,
 } from './foreignSiteSimulation';
 import {
   autoAssignWorkersToSelectedBuildingTypes as autoAssignWorkersToSelectedSlots,
@@ -1429,6 +1430,7 @@ export function resolveChoice(state: GameState, optionId: string): void {
   else if (state.pendingChoice.kind === 'claimAccordRenewal') resolveClaimAccordRenewal(state, optionId);
   else if (state.pendingChoice.kind === 'claimAccordOffer') resolveClaimAccordOffer(state, optionId);
   else if (state.pendingChoice.kind === 'aidRequestEnvoy') resolveAidRequestChoice(state, optionId);
+  else if (state.pendingChoice.kind === 'foreignSiteAidRequest') resolveForeignSiteAidRequest(state, optionId);
   else if (state.pendingChoice.kind === 'warParticipationRequest') resolveWarParticipationChoice(state, optionId);
   else if (state.pendingChoice.kind === 'warParticipationResult') resolveWarParticipationResult(state);
   else resolveTrade(state, optionId);

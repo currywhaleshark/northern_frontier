@@ -146,6 +146,13 @@ function ensureSiteActivity(site: ForeignSite, day: number): void {
       ? { ...activity.pendingProduction } : {},
     recentProduction: activity?.recentProduction && typeof activity.recentProduction === 'object'
       ? { ...activity.recentProduction } : {},
+    nextDiplomaticDay: Number.isFinite(activity?.nextDiplomaticDay)
+      ? Math.max(day, Math.floor(activity!.nextDiplomaticDay))
+      : day + 4 + (site.id % 5),
+    lastAidRequestSeasonKey: Number.isFinite(activity?.lastAidRequestSeasonKey)
+      ? Math.floor(Number(activity!.lastAidRequestSeasonKey)) : undefined,
+    tradeRouteBlockedUntilDay: Number.isFinite(activity?.tradeRouteBlockedUntilDay)
+      ? Math.floor(Number(activity!.tradeRouteBlockedUntilDay)) : undefined,
   };
 }
 
@@ -277,6 +284,8 @@ export function ensureForeignSiteState(state: GameState): void {
     site.alarm ??= 0;
     site.favors ??= 0;
     site.lastInteractionDay ??= -999;
+    site.seasonalTransition = site.seasonalTransition === 'entering' || site.seasonalTransition === 'leaving'
+      ? site.seasonalTransition : undefined;
     ensureSiteActivity(site, state.day);
     if (site.type === 'banditLair') {
       site.lairScoutAttempts = Number.isFinite(site.lairScoutAttempts)
@@ -340,7 +349,13 @@ export function ensureForeignSiteState(state: GameState): void {
   }
   const siteIds = new Set(state.foreignSites.map(site => site.id));
   const phases = new Set(['outbound', 'working', 'returning', 'waiting', 'retreating']);
-  const kinds = new Set(['farm', 'hunt', 'fish', 'forage', 'patrol']);
+  const kinds = new Set(['farm', 'hunt', 'fish', 'forage', 'patrol', 'caravan', 'messenger', 'seasonalMigration']);
+  const pendingInteractionPartyId = state.pendingChoice?.kind === 'foreignSiteAidRequest'
+    ? Number(state.pendingChoice.data.partyId)
+    : state.pendingChoice?.kind === 'trade' && state.pendingChoice.data.negotiation &&
+        typeof state.pendingChoice.data.negotiation === 'object'
+      ? Number((state.pendingChoice.data.negotiation as { sourcePartyId?: unknown }).sourcePartyId)
+      : Number.NaN;
   state.foreignSiteParties = state.foreignSiteParties.filter(party =>
     party && Number.isInteger(party.id) && party.id > 0 && siteIds.has(party.siteId) &&
     kinds.has(party.kind) && phases.has(party.phase) && Number.isFinite(party.x) && Number.isFinite(party.y));
@@ -369,6 +384,10 @@ export function ensureForeignSiteState(state: GameState): void {
     party.patrolPurpose = party.patrolPurpose === 'boundary' || party.patrolPurpose === 'warning'
       ? party.patrolPurpose : undefined;
     party.targetBuildingId = Number.isInteger(party.targetBuildingId) ? party.targetBuildingId : undefined;
+    party.migrationDirection = party.migrationDirection === 'entering' || party.migrationDirection === 'leaving'
+      ? party.migrationDirection : undefined;
+    party.interactionPending = party.interactionPending === true && party.id === pendingInteractionPartyId;
+    party.interactionResolved = party.interactionResolved === true;
     party.spotted = party.spotted === true;
     party.facing = party.facing === -1 ? -1 : 1;
   }
@@ -439,13 +458,9 @@ export function updateSeasonalForeignSites(state: GameState, season = getSeason(
   for (const site of state.foreignSites) {
     if (site.type !== 'seasonalCamp') continue;
     const active = site.activeSeasons?.includes(season) ?? true;
-    if (site.seasonalActive === active) continue;
-    site.seasonalActive = active;
-    if (!site.discovered) continue;
-    addLog(state, active
-      ? `${site.name}에 다시 연기가 올랐습니다.`
-      : `계절이 바뀌며 ${withJosa(site.name, '이/가')} 비었습니다.`, 'info', true);
-    addForeignSiteMemory(state, site.id, active ? '사냥꾼들이 계절 야영지로 돌아왔습니다.' : '계절이 바뀌어 야영지가 비었습니다.', 'neutral');
+    if (site.seasonalActive === active && !site.seasonalTransition) continue;
+    site.seasonalTransition = active ? 'entering' : 'leaving';
+    if (site.activity) site.activity.nextActivityDay = Math.max(site.activity.nextActivityDay, state.day + 1);
   }
 }
 

@@ -85,6 +85,61 @@ function isForeignTradeFaction(factionName: string): boolean {
   return FACTIONS.find(candidate => candidate.name === factionName)?.foreignTrade !== false;
 }
 
+function hasPhysicalLocalTradeRoute(state: GameState, factionName: string): boolean {
+  return state.foreignSites.some(site => {
+    if (site.factionName !== factionName || !site.discovered || site.status === 'burned' || site.status === 'abandoned' ||
+        site.seasonalActive === false || (site.activity?.tradeRouteBlockedUntilDay ?? -1) >= state.day) return false;
+    return state.claimZones.some(zone => zone.siteId === site.id && zone.kind === 'passage' &&
+      ((zone.permittedUntilDay ?? 0) >= state.day ||
+        state.claimAccords.some(accord => accord.zoneId === zone.id && accord.untilDay > state.day)));
+  });
+}
+
+function sourceSiteFor(state: GameState, negotiation: TradeNegotiation) {
+  return negotiation.sourceSiteId == null
+    ? null : state.foreignSites.find(site => site.id === negotiation.sourceSiteId) ?? null;
+}
+
+function sourceStockAvailable(state: GameState, negotiation: TradeNegotiation, resource: ResourceId): number {
+  const site = sourceSiteFor(state, negotiation);
+  return site ? Math.max(0, Math.floor(site.tradeStock[resource] ?? 0)) : Number.POSITIVE_INFINITY;
+}
+
+function finishCaravanVisit(state: GameState, negotiation: TradeNegotiation): void {
+  if (negotiation.sourcePartyId == null) return;
+  const party = state.foreignSiteParties.find(candidate => candidate.id === negotiation.sourcePartyId);
+  if (!party) return;
+  party.interactionPending = false;
+  party.interactionResolved = true;
+}
+
+export function openForeignSiteCaravanTrade(state: GameState, siteId: number, partyId: number): boolean {
+  if (state.pendingChoice || state.battle) return false;
+  const site = state.foreignSites.find(candidate => candidate.id === siteId);
+  const party = state.foreignSiteParties.find(candidate => candidate.id === partyId && candidate.kind === 'caravan');
+  const faction = site?.factionName ? FACTIONS.find(candidate => candidate.name === site.factionName) : null;
+  if (!site || !party || !faction || faction.trades.length === 0) return false;
+  const tpl = scaledTradeOffer(state, faction.trades[party.activitySequence % faction.trades.length]);
+  state.pendingChoice = makeTradeChoice({
+    faction: faction.name,
+    initiatedBy: 'faction',
+    phase: 'selecting',
+    give: tpl.give,
+    giveAmt: tpl.giveAmt,
+    originalGiveAmt: tpl.giveAmt,
+    get: null,
+    getAmt: 0,
+    round: 0,
+    margin: relationMargin(getRelation(state, faction.name)),
+    message: `${site.name}에서 온 상단이 ${RESOURCE_NAMES[tpl.give]} ${withJosa(tpl.giveAmt, '을/를')} 구합니다. ` +
+      '상단이 실제로 싣고 온 재고 안에서 받을 물품과 수량을 제시하십시오.',
+    sourceSiteId: site.id,
+    sourcePartyId: party.id,
+  });
+  addLog(state, `${site.name}의 상단이 장터에 도착했습니다.`, 'trade', true);
+  return true;
+}
+
 // 장터가 있으면 주기적으로 교역 제안이 온다.
 // 교역 상대와 품목은 세력 정의(FACTIONS.trades)를 따른다 — 습격 성향이 있어도
 // 교역품이 있는 세력(니마차 등)은 평시엔 장사꾼으로 온다.
@@ -95,7 +150,8 @@ export function maybeOfferTrade(state: GameState, rng: () => number, daysSinceTr
   if (rng() >= CONFIG.trade.dailyChance) return false;
 
   // 관계가 좋은 세력일수록 장터에 자주 온다
-  const traders = FACTIONS.filter(f => f.trades.length > 0 && !factionTradeUnlockReason(state, f.name));
+  const traders = FACTIONS.filter(f => f.trades.length > 0 && !factionTradeUnlockReason(state, f.name) &&
+    !hasPhysicalLocalTradeRoute(state, f.name));
   if (traders.length === 0) return false;
   const weights = traders.map(f => 20 + getRelation(state, f.name));
   let pick = rng() * weights.reduce((s, w) => s + w, 0);
@@ -193,7 +249,11 @@ export function negotiateTrade(
     const valueMultiplier = negotiation.initiatedBy === 'player'
       ? 1 / relationMargin(getRelation(state, negotiation.faction))
       : visitorTradeMultiplier(getRelation(state, negotiation.faction));
-    const maxGetAmt = Math.min(capacity, Math.floor((item.tradeValue * valueMultiplier) / getUnitValue));
+    const maxGetAmt = Math.min(
+      capacity,
+      Math.floor((item.tradeValue * valueMultiplier) / getUnitValue),
+      sourceStockAvailable(state, negotiation, get),
+    );
     negotiation.specialItem = specialItem;
     negotiation.get = get;
     negotiation.getAmt = Math.min(getAmt, Math.max(0, maxGetAmt));
@@ -277,15 +337,29 @@ export function negotiateTrade(
     get,
     getAmt,
   });
+  const localMax = Math.min(evaluation.maxGetAmt, sourceStockAvailable(state, negotiation, get));
   negotiation.phase = evaluation.outcome;
   negotiation.giveAmt = evaluation.offer.giveAmt;
   negotiation.get = evaluation.offer.get;
   negotiation.getAmt = evaluation.offer.getAmt;
-  negotiation.maxAcceptGetAmt = evaluation.maxGetAmt;
+  negotiation.maxAcceptGetAmt = localMax;
   negotiation.round += 1;
   negotiation.message = evaluation.message;
+  if (negotiation.sourceSiteId != null && evaluation.outcome !== 'rejected' && getAmt > localMax) {
+    if (localMax > 0 && getAmt <= Math.ceil(localMax * CONFIG.trade.counterTolerance)) {
+      negotiation.phase = 'countered';
+      negotiation.getAmt = localMax;
+      negotiation.message = `${RESOURCE_NAMES[get]}은 이번 상단이 싣고 온 ${localMax}까지만 내놓겠다고 합니다.`;
+    } else {
+      negotiation.phase = 'rejected';
+      negotiation.getAmt = getAmt;
+      negotiation.message = localMax > 0
+        ? `${RESOURCE_NAMES[get]}은 이번 상단이 ${localMax}밖에 싣고 오지 않았습니다.`
+        : `이번 상단에는 ${withJosa(RESOURCE_NAMES[get], '이/가')} 없습니다.`;
+    }
+  }
   updateTradeNegotiation(state, negotiation);
-  return evaluation.outcome === 'rejected' ? evaluation.message : null;
+  return negotiation.phase === 'rejected' ? negotiation.message : null;
 }
 
 function factionNameFor(negotiation: TradeNegotiation): string {
@@ -351,9 +425,34 @@ export function resolveTrade(state: GameState, optionId: string): void {
         updateTradeNegotiation(state, negotiation);
         return;
       }
+      const sourceSite = sourceSiteFor(state, negotiation);
+      if (sourceSite && (sourceSite.tradeStock[negotiation.get] ?? 0) < negotiation.getAmt) {
+        negotiation.message = `${withJosa(RESOURCE_NAMES[negotiation.get], '이/가')} 상단의 실제 재고보다 부족해 거래를 확정할 수 없습니다.`;
+        updateTradeNegotiation(state, negotiation);
+        return;
+      }
       if (specialItem) state.specialItems[specialItem] -= 1;
       else if (negotiation.give) state.resources[negotiation.give] -= negotiation.giveAmt;
       state.resources[negotiation.get] += negotiation.getAmt;
+      if (sourceSite) {
+        sourceSite.tradeStock[negotiation.get] = Math.max(
+          0,
+          (sourceSite.tradeStock[negotiation.get] ?? 0) - negotiation.getAmt,
+        );
+        if (!specialItem && negotiation.give) {
+          if ((['grain', 'meat', 'fish'] as ResourceId[]).includes(negotiation.give)) {
+            sourceSite.foodStock += negotiation.giveAmt;
+          } else {
+            sourceSite.tradeStock[negotiation.give] =
+              (sourceSite.tradeStock[negotiation.give] ?? 0) + negotiation.giveAmt;
+          }
+        }
+        sourceSite.goodwill = Math.min(100, sourceSite.goodwill + 2);
+        sourceSite.trust = Math.min(100, sourceSite.trust + 1);
+        sourceSite.lastInteractionDay = state.day;
+        sourceSite.memories.unshift({ day: state.day, text: '장터를 찾아온 상단이 거래를 마치고 돌아갔습니다.', kind: 'good' });
+        if (sourceSite.memories.length > 12) sourceSite.memories.length = 12;
+      }
       useFactionTradeCapacity(state, negotiation.faction, negotiation.get, negotiation.getAmt);
       state.resources.reputation = Math.min(100, state.resources.reputation + (negotiation.initiatedBy === 'player' ? 1 : 2));
       changeRelation(state, negotiation.faction, CONFIG.relations.tradeAccept);
@@ -371,6 +470,12 @@ export function resolveTrade(state: GameState, optionId: string): void {
       );
       state.lifetimeStats.tradesCompleted++; // 실제 자원이 오간 순간에만 센다
       acquireFirstLivestockFromTrade(state, negotiation.faction);
+      if (negotiation.sourcePartyId != null) {
+        const caravan = state.foreignSiteParties.find(candidate => candidate.id === negotiation.sourcePartyId);
+        if (caravan) caravan.cargo = !specialItem && negotiation.give
+          ? { [negotiation.give]: negotiation.giveAmt } : {};
+      }
+      finishCaravanVisit(state, negotiation);
       state.pendingChoice = null;
       return;
     }
@@ -383,6 +488,7 @@ export function resolveTrade(state: GameState, optionId: string): void {
       } else {
         addLog(state, `${negotiation.faction}에 보낸 교역 사절을 거두었습니다.`, 'info');
       }
+      finishCaravanVisit(state, negotiation);
       state.pendingChoice = null;
       return;
     }

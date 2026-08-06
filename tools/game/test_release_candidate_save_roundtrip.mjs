@@ -339,6 +339,9 @@ for (const [index, rank] of ['bo', 'jin'].entries()) {
   const site = state.foreignSites.find(candidate => candidate.type === 'village' || candidate.type === 'fishingVillage');
   const claimZone = state.claimZones.find(candidate => candidate.siteId === site.id);
   site.discovered = true;
+  site.activity.nextDiplomaticDay = state.day + 7;
+  site.activity.lastAidRequestSeasonKey = 3;
+  site.activity.tradeRouteBlockedUntilDay = state.day + 2;
   claimZone.growth.pressure = 2;
   claimZone.growth.pendingChange = 'contract';
   claimZone.growth.previousRadius = claimZone.radius;
@@ -360,6 +363,10 @@ for (const [index, rank] of ['bo', 'jin'].entries()) {
       assert.equal(party.siteId, site.id);
       assert.equal(party.phase, 'working');
       assert.deepEqual(party.cargo, { grain: 1.5 });
+      const loadedSite = loaded.foreignSites.find(candidate => candidate.id === site.id);
+      assert.equal(loadedSite.activity.nextDiplomaticDay, state.day + 7);
+      assert.equal(loadedSite.activity.lastAidRequestSeasonKey, 3);
+      assert.equal(loadedSite.activity.tradeRouteBlockedUntilDay, state.day + 2);
       const growth = loaded.claimZones.find(candidate => candidate.id === claimZone.id).growth;
       assert.equal(growth.pendingChange, 'contract');
       assert.equal(growth.targetRadius, claimZone.radius - 1);
@@ -370,6 +377,10 @@ for (const [index, rank] of ['bo', 'jin'].entries()) {
       assert.equal(party.siteId, site.id);
       assert.equal(party.phase, 'working');
       assert.deepEqual(party.cargo, { grain: 1.5 });
+      const loadedSite = reloaded.foreignSites.find(candidate => candidate.id === site.id);
+      assert.ok(loadedSite.activity.nextDiplomaticDay >= state.day + 7,
+        'the diplomatic schedule remains valid after ten simulated days and reload');
+      assert.equal(loadedSite.activity.lastAidRequestSeasonKey, 3);
       const growth = reloaded.claimZones.find(candidate => candidate.id === claimZone.id).growth;
       assert.equal(growth.pendingChange, 'contract');
       assert.equal(growth.targetRadius, claimZone.radius - 1);

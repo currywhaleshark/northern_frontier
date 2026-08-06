@@ -869,6 +869,12 @@ export function migrateV63ToV64(raw: RawSave): RawSave {
   return { ...clonedRecord(raw), schemaVersion: 64 };
 }
 
+// v65: 현지 상단·원조 전령 일정과 계절 야영지 입퇴장 활동대.
+// 세부 장부 기본값과 진행 중 활동대 필드는 전체 상태 정규화가 보충한다.
+export function migrateV64ToV65(raw: RawSave): RawSave {
+  return { ...clonedRecord(raw), schemaVersion: 65 };
+}
+
 export function migrateToCurrent(raw: unknown): RawSave {
   let migrated = clonedRecord(raw);
   const sourceVersion = Number.isInteger(migrated.schemaVersion) ? Number(migrated.schemaVersion) : 3;
@@ -938,6 +944,7 @@ export function migrateToCurrent(raw: unknown): RawSave {
     else if (version === 61) migrated = migrateV61ToV62(migrated);
     else if (version === 62) migrated = migrateV62ToV63(migrated);
     else if (version === 63) migrated = migrateV63ToV64(migrated);
+    else if (version === 64) migrated = migrateV64ToV65(migrated);
     else break;
     version = Number(migrated.schemaVersion);
   }
