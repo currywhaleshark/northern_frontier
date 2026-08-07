@@ -24,8 +24,12 @@ const compiledDir = compileGameModules();
 const load = name => import(pathToFileURL(join(compiledDir, `${name}.mjs`)).href);
 const groundsApi = await load('fishingGrounds');
 const buildings = await load('buildings');
+const constants = await load('constants');
+const inventory = await load('inventory');
 const saveLoad = await load('saveLoad');
 const simulation = await load('simulation');
+const workerSlots = await load('workerSlots');
+const { CONFIG } = await load('config');
 
 function plainMap(width, height) {
   return Array.from({ length: height }, (_row, y) => Array.from({ length: width }, (_cell, x) => ({
@@ -113,12 +117,52 @@ function plainMap(width, height) {
 
 assert.equal(buildings.BUILDING_DEFS.ferry.id, 'ferry', '구 저장 호환 내부 ID는 ferry다');
 assert.equal(buildings.BUILDING_DEFS.ferry.name, '낚시터', '사용자 노출 명칭은 낚시터다');
+assert.equal(buildings.BUILDING_DEFS.ferry.minRank, undefined, '낚시터는 개척지 단계부터 열린다');
 assert.equal(saveLoad.migrateV57ToV58({ schemaVersion: 57 }).schemaVersion, 58);
 assert.deepEqual(saveLoad.migrateV57ToV58({ schemaVersion: 57 }).fishingGrounds, []);
 
 const coast = simulation.newGameFromOptions({ region: 'coast', seed: 20260891 });
 assert.ok(coast.fishingGrounds.some(ground => ground.kind === 'mudflat'));
 assert.ok(coast.fishingGrounds.some(ground => ground.kind === 'sea' && ground.depthBand !== 'shore'));
+
+const lake = simulation.newGameFromOptions({ region: 'lake', seed: 20260892 });
+const lakeFisheryTile = lake.map.flat().find(tile => tile.terrain === 'lake' && tile.buildingId == null &&
+  groundsApi.fishingGroundAt(lake.fishingGrounds, tile.x, tile.y, 'shore') &&
+  [[0, -1], [0, 1], [-1, 0], [1, 0]].some(([dx, dy]) => {
+    const terrain = lake.map[tile.y + dy]?.[tile.x + dx]?.terrain;
+    return terrain != null && !['river', 'lake', 'sea', 'mountain', 'rock', 'center'].includes(terrain);
+  }));
+assert.ok(lakeFisheryTile, '호수에 육지와 맞닿은 연안 어장이 있다');
+assert.equal(constants.isJobUnlocked('settlement', 'fisher', 'lake'), true,
+  '호수 어부는 개척지 단계부터 열린다');
+assert.equal(buildings.canPlaceBuildingAt(lake, 'ferry', lakeFisheryTile.x, lakeFisheryTile.y), true,
+  '개척지 낚시터를 호수 연안 어장에 놓을 수 있다');
+for (const resource of Object.keys(lake.resources)) lake.resources[resource] = 100;
+lake.resources.fish = 0;
+assert.equal(simulation.tryPlaceBuilding(lake, 'ferry', lakeFisheryTile.x, lakeFisheryTile.y), null);
+const lakeFishery = lake.buildings.at(-1);
+lakeFishery.built = true;
+lakeFishery.progress = buildings.BUILDING_DEFS.ferry.buildDays;
+const lakeFisher = lake.residents[0];
+for (const resident of lake.residents) resident.alive = resident.id === lakeFisher.id;
+Object.assign(lakeFisher, {
+  alive: true, sick: false, health: 100, hunger: 100, warmth: 100, morale: 70,
+  job: 'fisher', x: lakeFishery.x, y: lakeFishery.y, px: lakeFishery.x, py: lakeFishery.y,
+  phase: 'rest', path: [], workTimer: 0, targetId: null, carrying: {}, manualOrder: null,
+});
+assert.equal(workerSlots.assignResidentToBuilding(lake, lakeFisher.id, lakeFishery.id), null);
+const lakeGround = groundsApi.fishingGroundAt(lake.fishingGrounds, lakeFishery.x, lakeFishery.y, 'shore');
+const lakeGroundBefore = lakeGround.stock;
+const fisherTasks = new Set();
+for (let tick = 0; tick < CONFIG.agents.subticksPerDay * 6; tick++) {
+  lake.pendingChoice = null;
+  simulation.advanceTick(lake);
+  fisherTasks.add(lakeFisher.task);
+}
+assert.ok(lake.resources.fish + inventory.buildingStock(lakeFishery, 'fish') + (lakeFisher.carrying.fish ?? 0) > 0,
+  `개척지 어부가 호수 낚시터의 연안 어장에서 실제 물고기를 잡는다 (task=${lakeFisher.task}, ` +
+  `alive=${lakeFisher.alive}, assigned=${lakeFisher.assignedBuildingId}, ground=${lakeGroundBefore}->${lakeGround.stock}, ` +
+  `tasks=${[...fisherTasks].join('|')})`);
 
 // 기본 자원 밀도는 모든 후보를 표시하던 초기 구현의 약 1/3만 남긴다.
 {

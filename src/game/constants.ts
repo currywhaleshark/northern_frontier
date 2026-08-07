@@ -55,7 +55,6 @@ export const JOB_ORDER: JobId[] = [
 
 export const JOB_MIN_RANK: Partial<Record<JobId, Rank>> = {
   miller: 'bo',
-  fisher: 'bo',
   potter: 'bo',
   weaver: 'bo',
   charcoalBurner: 'jin',
@@ -66,8 +65,7 @@ export const JOB_MIN_RANK: Partial<Record<JobId, Rank>> = {
   teacher: 'jin',
 };
 
-export function isJobUnlocked(rank: Rank | undefined, job: JobId, region?: MapRegion): boolean {
-  if (job === 'fisher' && region === 'coast') return true;
+export function isJobUnlocked(rank: Rank | undefined, job: JobId, _region?: MapRegion): boolean {
   return rankAtLeast(rank, JOB_MIN_RANK[job]);
 }
 
@@ -87,7 +85,7 @@ export const JOB_DESC: Record<JobId, string> = {
   saltMaker: '해안의 자염막에서 바닷물을 장작으로 끓여 소금을 만듭니다.',
   smith: '창고에서 철과 필요한 재료를 가져와 지정 대장간에서 도구와 무기를 만듭니다.',
   miner: '정착지 단계부터 광상을 찾아 돌·철·은을 캡니다. 채광장이 있으면 반경 안의 광물을 그곳에 하역합니다.',
-  fisher: '해안에서는 어살터의 갯벌을 도보로 이용하고, 다른 지역에서는 보(堡) 승격 후 낚시터에서 강고기를 잡습니다.',
+  fisher: '개척지 단계부터 강·호수 낚시터나 해안 어살터에서 물고기를 잡습니다. 보(堡) 승격 뒤에는 포구와 어선도 운용합니다.',
   charcoalBurner: '진(鎭) 승격 후 창고에서 목재를 가져와 지정 숯가마에서 숯으로 굽습니다.',
   herder: '진(鎭) 승격 후 배치할 수 있습니다. 축사에서 가축을 돌보며 식량과 가죽을 보탭니다.',
   tanner: '무두질 작업장에서 가죽을 손질해 옷감과 방한용 의복 생산을 돕습니다.',

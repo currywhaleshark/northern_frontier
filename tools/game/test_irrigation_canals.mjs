@@ -80,7 +80,7 @@ assert.equal(buildings.canPlaceBuildingAt(lakeState, 'watermill', 0, 2), false,
 assert.equal(buildings.canPlaceBuildingAt(lakeState, 'bridge', 0, 2), false,
   'a bridge remains a river-only building in S4');
 assert.equal(buildings.canPlaceBuildingAt(lakeState, 'ferry', 0, 2), false,
-  'the existing stationary ferry remains a river-only fishery');
+  'a stationary fishery still requires a generated shore fishing ground');
 assert.equal(buildings.canPlaceBuildingAt(lakeState, 'dock', 0, 2), false,
   'the trade dock remains a river-only building before the fishing-port phase');
 

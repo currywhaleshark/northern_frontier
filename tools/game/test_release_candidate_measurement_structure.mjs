@@ -43,6 +43,10 @@ assert.match(measureSource, /function tryExpandFirstField[\s\S]*cultivated\.has\
   'the first field must expand after its first growing season, during winter, once food and fuel reserves recover');
 assert.match(measureSource, /firstFieldReady[\s\S]*'lumberCamp'[\s\S]*'market'[\s\S]*tryExpandFirstField[\s\S]*manageSurfaceMine/,
   'food expansion must follow the wood and trade prerequisites and take priority over optional surface mining');
+assert.match(measureSource, /worldSetup\?\.region === 'lake'[\s\S]*tryQueueBuilding\(state, 'ferry'/,
+  'lake autoplay must prioritize its settlement-tier stationary fishery before trade and mining');
+assert.match(measureSource, /fisheryReady[\s\S]*'ferry'[\s\S]*'tidalFishery'[\s\S]*'fishingPort'[\s\S]*add\('fisher'/,
+  'release autoplay must staff every available early fishing facility');
 assert.match(measureSource, /function tryReleaseTrade\(/,
   'release autoplay must manage explicit food, fuel, and tool reserves without hidden state');
 assert.match(measureSource, /function collectNewLogs\(/,

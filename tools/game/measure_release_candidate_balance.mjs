@@ -275,6 +275,7 @@ function manageReleaseConstruction(state, candidates) {
   const firstFieldReady = state.buildings.some(building => building.type === 'field' && building.built);
   if (firstFieldReady) {
     if (tryQueueBuilding(state, 'lumberCamp', 1, buildCandidates)) return;
+    if (state.worldSetup?.region === 'lake' && tryQueueBuilding(state, 'ferry', 1, buildCandidates)) return;
     if (tryQueueBuilding(state, 'market', 1, buildCandidates)) return;
     if (tryExpandFirstField(state)) return;
     if (manageSurfaceMine(state, buildCandidates)) return;
@@ -468,7 +469,9 @@ function releaseJobTargets(state, laborCount) {
   add('tanner', builtCount(state, 'tannery') > 0 && clothingTotal(state) < pop * 1.15 ? 1 : 0);
   add('curer', builtCount(state, 'smokehouse') > 0 && state.resources.meat > state.processingReserves.meat + 2 ? 1 : 0);
   add('miller', builtCount(state, 'watermill') > 0 && state.resources.rice > 2 ? 1 : 0);
-  add('fisher', builtCount(state, 'ferry') > 0 ? Math.max(1, Math.floor(pop / 24)) : 0);
+  const fisheryReady = ['ferry', 'tidalFishery', 'fishingPort']
+    .some(type => builtCount(state, type) > 0);
+  add('fisher', fisheryReady ? Math.max(1, Math.floor(pop / 24)) : 0);
   add('herder', builtCount(state, 'stable') > 0 ? Math.max(1, Math.floor(pop / 30)) : 0);
   add('potter', builtCount(state, 'onggiKiln') > 0 && state.resources.onggi < 8 ? 1 : 0);
   add('charcoalBurner', builtCount(state, 'charcoalKiln') > 0 && fuelDays(state) < 80 ? 1 : 0);

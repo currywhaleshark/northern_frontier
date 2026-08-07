@@ -49,7 +49,10 @@ export function isTerrainPassable(state: GameState, x: number, y: number): boole
     // 겨울 언 강 위는 걸어서 건널 수 있다 (해빙기 홍수 제외)
     return getSeason(state.day) === 'winter' && state.weather !== 'thawFlood';
   }
-  if (t.terrain === 'lake') return isLakeIceAt(state.map, state.day, x, y);
+  if (t.terrain === 'lake') {
+    if (building?.type === 'ferry') return true;
+    return isLakeIceAt(state.map, state.day, x, y);
+  }
   return true;
 }
 

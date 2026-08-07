@@ -35,8 +35,8 @@ const workerSlots = await import(pathToFileURL(join(compiledDir, 'workerSlots.mj
 const selectionActions = await import(pathToFileURL(join(compiledDir, 'selectionActions.mjs')).href);
 const { CONFIG } = await import(pathToFileURL(join(compiledDir, 'config.mjs')).href);
 
-const BO_BUILDINGS = ['ondol', 'ferry', 'paddy', 'watermill', 'onggiKiln', 'jangdokdae'];
-const BO_JOBS = ['fisher', 'miller', 'potter'];
+const BO_BUILDINGS = ['ondol', 'paddy', 'watermill', 'onggiKiln', 'jangdokdae'];
+const BO_JOBS = ['miller', 'potter'];
 
 function boostResources(state) {
   for (const key of Object.keys(state.resources)) state.resources[key] = 1000;
@@ -160,13 +160,15 @@ function runTicks(state, ticks) {
     assert.equal(constants.isJobUnlocked(state.rank, job), false, `${job} is locked before bo`);
   }
   assert.equal(constants.isJobUnlocked(state.rank, 'miner'), true, 'miner is a settlement-tier job');
+  assert.equal(constants.isJobUnlocked(state.rank, 'fisher', 'lake'), true, 'fisher is a settlement-tier lake job');
   assert.equal(buildings.isBuildingUnlocked(state.rank, 'mine'), true, 'mine is a settlement-tier building');
+  assert.equal(buildings.isBuildingUnlocked(state.rank, 'ferry'), true, 'fishery is a settlement-tier building');
 
   const resident = state.residents.find(r => r.alive);
   simulation.setResidentJob(state, resident.id, 'miner');
   assert.equal(resident.job, 'miner');
   simulation.setResidentJob(state, resident.id, 'fisher');
-  assert.equal(resident.job, 'miner');
+  assert.equal(resident.job, 'fisher');
 }
 
 {

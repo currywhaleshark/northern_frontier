@@ -201,9 +201,9 @@ export const BUILDING_DEF_DEFAULTS: Record<BuildingTypeId, BuildingDef> = {
   },
   ferry: {
     id: 'ferry', name: '낚시터',
-    desc: '보(堡) 승격 후 건설. 육지와 맞닿은 강 타일의 반경 1칸 연안 어장에서 어부가 배 없이 물고기를 잡는 거점.',
+    desc: '개척지 단계부터 건설. 육지와 맞닿은 강·호수의 연안 어장에서 어부가 배 없이 물고기를 잡는 거점.',
     cost: { wood: 14, stone: 4, tools: 1 }, buildDays: 7, slots: 2, capacity: 0, defense: 0,
-    winterBonus: false, placement: 'riverbank', unique: false, minRank: 'bo',
+    winterBonus: false, placement: 'riverbank', unique: false,
   },
   fishingPort: {
     id: 'fishingPort', name: '포구',
@@ -566,6 +566,8 @@ export function canPlaceBuildingAt(
   if (type === 'fishingPort') {
     const [main, ...pierTiles] = tiles;
     if (!main || !canPlaceOn(def, main, state) || pierTiles.some(tile => tile.buildingId != null)) return false;
+  } else if (type === 'ferry') {
+    if (!tiles.every(tile => tile.buildingId == null && isStationaryFisheryShore(state, tile))) return false;
   } else if (!tiles.every(tile => canPlaceOn(def, tile, state))) return false;
   if (type === 'boatyard') {
     const dims = buildingFootprintDims({ type, w, h });
@@ -645,7 +647,9 @@ export function canRelocateBuildingAt(
     return hasRiver && hasLand &&
       usableTiles.every(tile => tile.terrain === 'river' || isWatermillLandTile(tile));
   }
-  if (!usableTiles.every(tile => canPlaceOn(def, tile, state))) return false;
+  if (building.type === 'ferry') {
+    if (!usableTiles.every(tile => tile.buildingId == null && isStationaryFisheryShore(state, tile))) return false;
+  } else if (!usableTiles.every(tile => canPlaceOn(def, tile, state))) return false;
   if (building.type === 'boatyard' &&
       fishingWaterfrontAccessTiles(state.map, x, y, w, h).length === 0) return false;
   if (building.type === 'saltworks' && !saltworksFootprintHasSeaAccess(state, x, y, 2, 2)) return false;
@@ -926,6 +930,22 @@ function isRiverbank(state: GameState | undefined, tile: Tile): boolean {
     isLand(state.map[tile.y]?.[tile.x - 1]) ||
     isLand(state.map[tile.y]?.[tile.x + 1])
   );
+}
+
+function isStationaryFisheryShore(state: GameState | undefined, tile: Tile): boolean {
+  if (!state || (tile.terrain !== 'river' && tile.terrain !== 'lake')) return false;
+  const isLand = (neighbor: Tile | undefined): boolean =>
+    neighbor != null &&
+    neighbor.terrain !== 'river' &&
+    neighbor.terrain !== 'lake' &&
+    neighbor.terrain !== 'sea' &&
+    neighbor.terrain !== 'mountain' &&
+    neighbor.terrain !== 'rock' &&
+    neighbor.terrain !== 'center';
+  return isLand(state.map[tile.y - 1]?.[tile.x]) ||
+    isLand(state.map[tile.y + 1]?.[tile.x]) ||
+    isLand(state.map[tile.y]?.[tile.x - 1]) ||
+    isLand(state.map[tile.y]?.[tile.x + 1]);
 }
 
 function hasAdjacentNaturalWater(state: GameState | undefined, tile: Tile): boolean {

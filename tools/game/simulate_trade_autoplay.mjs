@@ -224,7 +224,9 @@ function jobTargets(state) {
   add('potter', kimjangEnabled && builtCount(state, 'onggiKiln') > 0 && state.resources.onggi < 6 ? 1 : 0);
   add('watchman', Math.max(1, Math.floor(pop / 12)));
   add('tanner', builtCount(state, 'tannery') > 0 && clothingTotal(state) < pop * 1.1 ? 1 : 0);
-  add('fisher', builtCount(state, 'ferry') > 0 ? Math.max(1, Math.floor(pop / 20)) : 0);
+  const fisheryReady = ['ferry', 'tidalFishery', 'fishingPort']
+    .some(type => builtCount(state, type) > 0);
+  add('fisher', fisheryReady ? Math.max(1, Math.floor(pop / 20)) : 0);
   add('miner', Math.max(1, Math.floor(pop / 18)));
   add('miller', builtCount(state, 'watermill') > 0 && state.resources.rice > 2 ? 1 : 0);
   add('charcoalBurner', builtCount(state, 'charcoalKiln') > 0 && fuelDays(state) < 45 ? 1 : 0);
